@@ -34,6 +34,17 @@ extern "C" {
 #define JF(st, off)  (*(float   *)((unsigned char *)(st) + (off)))   /* float  */
 #define JI(st, off)  (*(int32_t *)((unsigned char *)(st) + (off)))   /* int32  */
 
+/* Full engine state size. The initializer (sub_1803990C0) writes up to offset
+ * ~10.69 MB (all 8 voices + global blocks); the master reads a counter at
+ * +11022344. 12 MB covers the whole block with margin. */
+#define JUNO_STATE_BYTES  (12u * 1024u * 1024u)
+
+/* juno_engine_init — exact transcription of sub_1803990C0. Fills the engine
+ * state `st` with the real coefficients. Set JF(st,16) to the sample rate first
+ * (44100 selects one precomputed coefficient set; any other value the second).
+ * Returns the sample rate it used. */
+uint32_t juno_engine_init(unsigned char *st);
+
 /* voice_render — exact transcription of sub_180369070. Produces one mono sample
  * for one voice from its state block `st`; writes it to *outL and *outR (the
  * plugin duplicates the mono voice to both channels; stereo comes from chorus).
