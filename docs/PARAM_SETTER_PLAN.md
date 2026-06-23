@@ -15,7 +15,26 @@ numbers out of the live plugin.
   a **type flag, not a value**. So the registration does NOT carry the coefficient
   value; it is applied downstream by the parameter system.
 
-## The fork (what the next dump decides)
+## RESOLVED (param_setter/ dumped): Option B is NOT tractable as a recipe
+`sub_1803ABA00` turned out to be plain `std::vector::push_back` of a 40-byte
+descriptor `{name, &slot, type-flag}`; its whole callee tree is vector machinery
+(grow/realloc/move/throw). **It writes nothing to the coefficient slots.** So the
+values are applied later by the host/preset driving per-parameter setters — the
+full parameter framework, dependent on default/preset data absent from static
+dumps. Transcribing that is disproportionate and still needs the host's values.
+
+**Decision: pivot to a *validated* runtime capture** (Option A, hardened):
+- base-pointer sanity: known fields must read their static values
+  (`state[2199956]==0x80000`, `state[95828]==1024`, `state[101028]==1024`);
+- coefficient-vs-state: capture twice; anything that changes between snapshots is
+  per-sample state, not a coefficient — drop it;
+- semantic cross-check: each value against its parameter name
+  (`docs/COEFF_PARAM_MAP.md`) — an on/off slot must read 0/1, "Part Tune" centred;
+- final arbiter: sample-accurate A/B of port vs plugin on the same note.
+
+The capture script `tools/capture_runtime_coeffs.js` now does the first three.
+
+## (historical) The fork (what the next dump decided)
 `tools/extract_param_setter.py` dumps `sub_1803ABA00` (+ the other registrars and
 their callees) and the default-constant bytes. It answers one question:
 
