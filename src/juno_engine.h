@@ -30,7 +30,7 @@ extern "C" {
 #define JUNO_NUM_VOICES         8
 
 /* Offset accessors into the state block `st` (an unsigned char*). The casts
- * mirror the decompile's *(float*)/*(_DWORD*) memory reads exactly. */
+ * mirror the decompile (float / dword) memory reads exactly. */
 #define JF(st, off)  (*(float   *)((unsigned char *)(st) + (off)))   /* float  */
 #define JI(st, off)  (*(int32_t *)((unsigned char *)(st) + (off)))   /* int32  */
 

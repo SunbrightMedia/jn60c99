@@ -16,3 +16,5 @@ tests/test_helpers
 # Python cache
 __pycache__/
 *.pyc
+
+tests/test_voice_smoke
