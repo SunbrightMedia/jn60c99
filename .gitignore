@@ -12,3 +12,7 @@ extract.log
 
 # Test binaries
 tests/test_helpers
+
+# Python cache
+__pycache__/
+*.pyc
