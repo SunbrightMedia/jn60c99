@@ -22,6 +22,7 @@ int main(void)
     JF(st, 16) = 44100.0f;
     juno_chorus_init(st);                   /* constructor: delay lengths + zero */
     uint32_t rate = juno_engine_init(st);   /* voice coefficients */
+    juno_chorus_coeffs_apply(st);           /* chorus float coeffs (no-op until captured) */
 
     static struct juno_host_shim shim;
     juno_driver_attach_host(st, &shim, 0 /* dry/bypass */);

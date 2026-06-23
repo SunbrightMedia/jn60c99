@@ -95,6 +95,33 @@ above is the stereo-chorus/output layer on top.
    (`juno_driver_attach_host`), and calls the master. `make test` green
    (`tests/test_master_smoke.c`).
 
+## UPDATE 2 — chorus coeff source corrected; full pipeline runs
+
+The IDA `chorus_coeffs/` dump (sub_180388170 + sub_1803A1300) arrived and rewrote
+the picture:
+
+- **`sub_180388170` is NOT the coeff generator** — my ranking heuristic was fooled.
+  Its "constants" are parameter NAME strings (`aMasterTune`, `aLfoRate`, …) and it
+  `push_back`s ~1121 parameter descriptors. It's the **parameter registry**; for
+  each param it does `lea rax,[rdi+coeffOffset]` + a default and calls the
+  registrar `sub_1803ABA00`. It writes **zero** floats to the audio state.
+- **`sub_1803A1300` (was "zeroinit") IS the chorus constructor** — 2982 stores: the
+  integer **BBD delay-line lengths** (`[2199956]=0x80000`, `[6395252]=0x80000`,
+  `[95828]=1024`, …) + ring indices + buffer zeroing. Ported verbatim →
+  `src/chorus_init.c` (`juno_chorus_init`), wired before the voice init. **With the
+  lengths set, the master no longer reads out of bounds: the full master/chorus
+  path now runs end-to-end, finite over 2048 samples.**
+- **The 241 missing coefficients** (read-only in the master, set by no static
+  init — count verified by offset diff) are **applied at runtime** from parameter
+  defaults/presets, several through a param→curve map. The faithful, non-fitted
+  way to get them is a **live capture** → `tools/capture_chorus_coeffs.js` +
+  `docs/RUN_GUIDE_CHORUS_CAPTURE.md`. The apply path is already wired
+  (`juno_chorus_coeffs_apply` ← `src/chorus_coeffs_data.c`); it's a no-op until the
+  capture is pasted in, at which point the chorus comes alive.
+
+Current init sequence: `juno_chorus_init` → `juno_engine_init` →
+`juno_chorus_coeffs_apply` → per-sample `juno_driver_render_sample`.
+
 ### Two hard truths found (no fabrication)
 - **Polyphony isn't free.** The 8 voice copies differ across THREE regions with
   DIFFERENT strides (main +10512, shared +0, aux +32), so a single uniform base
