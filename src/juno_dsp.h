@@ -19,6 +19,16 @@ extern "C" {
 float juno_wrap24(float x);
 float juno_triangle(float phase);
 
+/* More leaf helpers (used by the master/chorus sub_180363380):
+ * juno_pitch_poly — 0x180368DC0: pitch (clamped [-20,8.9]) -> ratio via the
+ *                   unk_1809894E0 13-term spline (same table voice_render uses).
+ * juno_wrap_unit  — 0x180368F30: wrap to [-1,1) (both directions).
+ * juno_wrap_hi    — 0x180368F90: wrap only when > 1.
+ */
+double juno_pitch_poly(double x);
+float  juno_wrap_unit(float x);
+float  juno_wrap_hi(float x);
+
 #ifdef __cplusplus
 }
 #endif
