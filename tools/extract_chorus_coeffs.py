@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# [SUPERSEDED — kept for provenance] This dump was run and DISPROVED its premise:
+# sub_180388170 is the PARAMETER REGISTRY (registers ~1121 params; its "constants"
+# are name strings), not the chorus coefficient generator. The chorus constructor
+# is sub_1803A1300 (-> src/chorus_init.c); the coefficient VALUES are applied at
+# runtime and are captured via tools/capture_runtime_coeffs.js. Do not rerun.
+#
 # extract_chorus_coeffs.py — IDA Pro 9.3 (x86-64) one-shot dump for the chorus
 # COEFFICIENT GENERATOR sub_180388170.
 #

@@ -120,29 +120,31 @@ the picture:
   capture is pasted in, at which point the chorus comes alive.
 
 Current init sequence: `juno_chorus_init` → `juno_engine_init` →
-`juno_chorus_coeffs_apply` → per-sample `juno_driver_render_sample`.
+`juno_runtime_coeffs_apply` → per-sample `juno_driver_render_sample`.
 
-### Two hard truths found (no fabrication)
+### Hard truths found (no fabrication)
 - **Polyphony isn't free.** The 8 voice copies differ across THREE regions with
   DIFFERENT strides (main +10512, shared +0, aux +32), so a single uniform base
   shift CANNOT serve voices 1-7 — and the 8 decompiles differ in ~1800 lines
   (Hex-Rays re-numbered temps), so they aren't trivially generatable either.
   Faking it = a wrong approximation, so the driver renders **voice 0 exactly** and
   zeros 1-7. True polyphony needs per-voice asm for sub_18036CE00..sub_180383F20
-  (transcribe each) OR a verified offset-classification to parameterise the one
-  render. Bounded, but real work.
-- **The master can't execute until the chorus coeffs exist.** Its BBD delay lines
-  index as `(len-1) & idx`; the length fields are among the ~250 produced by
-  sub_180388170, currently zero → mask `-1` → out-of-bounds read (verified
-  segfault). Even the "dry" branch indexes the delay lines, so "dry path still
-  correct" was optimistic. The driver therefore **gates** the master call on a
-  length sentinel and emits the exact dry voice sum until coeffs load. Once
-  `extract_chorus_coeffs.py` is run and sub_180388170 is transcribed, the gate
-  opens and the full master/chorus runs.
+  OR a verified offset-classification to parameterise the one render.
+- **The engine is silent until the runtime parameter layer is applied** — to BOTH
+  voice and chorus. The static inits set the math coefficient *tables* and the
+  chorus *structure* (delay lengths), but NOT the patch: 349 offsets (107 voice +
+  242 chorus) are read by the DSP and written by no init. They are applied at
+  runtime by the parameter system. Verified: triggering voice 0's note-on gate
+  with no patch yields silence. These 349 are captured from the live plugin
+  (`tools/capture_runtime_coeffs.js`) — the runtime-only case the handoff allows.
+- **`sub_180388170` is the parameter registry, not the coeff generator** — the
+  earlier ranking heuristic was fooled by coincident offsets. Corrected.
 
-## Recommendation
-The exact DSP core is complete. Reaching a *playable, chorused* engine needs the
-chorus code located (one targeted Frida-assisted extraction) and the host glue
-(mix/note-trigger) decided. Both are bounded; neither affects the already-exact
-voice core. Decision for the user: locate the chorus now, or proceed to wire a
-standard-sum driver around the exact voice core first.
+## Recommendation / next action
+The exact DSP transcription (voice core + master/chorus + chorus constructor) is
+complete and the full pipeline **runs finite end-to-end**. The single highest-
+value step to a *playable* engine is **one Frida capture** of the 349 runtime
+coefficients for a default patch (`docs/RUN_GUIDE_RUNTIME_CAPTURE.md`); paste it
+into `src/runtime_coeffs_data.c` and a note sounds with the chorus live. After
+that: per-voice polyphony, then per-stage numerical validation against the plugin
+(still the real definition of "correct" — at 0% so far).
