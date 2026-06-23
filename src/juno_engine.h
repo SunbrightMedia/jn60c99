@@ -52,12 +52,17 @@ uint32_t juno_engine_init(unsigned char *st);
  * masks are -1 and it reads out of bounds. (Returns the state pointer; unused.) */
 void *juno_chorus_init(unsigned char *st);
 
-/* juno_chorus_coeffs_apply — write the 241 chorus/output coefficients the master
- * reads but no static init sets (the plugin applies them at runtime from the
- * parameter system). Values are captured from the live plugin via
- * tools/capture_chorus_coeffs.js into src/chorus_coeffs_data.c. Call after
+/* juno_runtime_coeffs_apply — write the 349 parameter-applied coefficients the
+ * DSP (voice_render + master) reads but no static init sets (107 voice-patch +
+ * 242 chorus/master; the plugin applies them at runtime from the parameter
+ * system). Values are captured from the live plugin via
+ * tools/capture_runtime_coeffs.js into src/runtime_coeffs_data.c. Call after
  * juno_chorus_init + juno_engine_init. No-op until the capture is pasted in. */
-void juno_chorus_coeffs_apply(unsigned char *st);
+void juno_runtime_coeffs_apply(unsigned char *st);
+
+/* 1 once the runtime coefficients have been captured into runtime_coeffs_data.c,
+ * else 0 (placeholder). The driver gates the master/chorus vs dry path on this. */
+int juno_runtime_coeffs_loaded(void);
 
 /* voice_render — exact transcription of sub_180369070. Produces one mono sample
  * for one voice from its state block `st`; writes it to *outL and *outR (the
@@ -74,9 +79,9 @@ uint32_t juno_voice_render(unsigned char *st, float *outL, float *outR);
  *   a3 : {float* L, float* R} — receives 2*state[101264] (L), 2*state[101280] (R).
  * Returns a3[1] (the decompile returns the R pointer in rax); unused by callers.
  *
- * The chorus reads ~250 coefficient fields produced by sub_180388170, which is
- * not yet captured (Hex-Rays returns None on it). Until those exist the fields
- * are zero and the chorus is inert. See docs/MASTER_RENDER_MAP.md. */
+ * The chorus reads coefficient fields applied at runtime by the parameter system
+ * (captured via juno_runtime_coeffs_apply). Until captured those fields are zero
+ * and the chorus is inert. See docs/MASTER_RENDER_MAP.md. */
 float *juno_master_render(unsigned char *a1, float **a2, float **a3);
 
 #ifdef __cplusplus

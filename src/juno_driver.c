@@ -39,16 +39,6 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
     memcpy(st + 136, &base, sizeof(void *));
 }
 
-/* One of the BBD chorus delay-line LENGTH fields. It is produced by the chorus
- * coefficient generator sub_180388170 (NOT by juno_engine_init), so it is zero
- * until those coefficients are captured. The master indexes its circular buffers
- * as `(len-1) & idx`; with len==0 the mask is -1 (all bits) and the index reads
- * out of bounds. We use this field as the "chorus initialised" sentinel: when it
- * is zero we must NOT run the master (it would read uninitialised memory) and
- * instead emit the exact dry voice sum. Once extract_chorus_coeffs.py is run and
- * the coefficients are loaded, this becomes nonzero and the full master runs.  */
-#define JUNO_CHORUS_LEN_SENTINEL  2199956
-
 /* Render one stereo output sample: voices -> 8 buffers -> master process.
  * Writes the final stereo pair to *outL / *outR. Returns 1 if the full master/
  * chorus path ran, 0 if the dry fallback was used (chorus coeffs not yet loaded). */
@@ -72,7 +62,12 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
     }
     /* Voices 1..7 stay 0.0f (see SCOPE note above). */
 
-    if (JI(st, JUNO_CHORUS_LEN_SENTINEL) != 0) {
+    /* Run the full master/chorus only once the float coefficients are captured;
+     * with them zero the master's output saturator collapses to silence, so the
+     * useful, faithful behaviour is the dry voice sum. (The delay-line lengths
+     * from juno_chorus_init are always set, so the master itself won't read out
+     * of bounds — the gate here is purely silence-vs-signal.) */
+    if (juno_runtime_coeffs_loaded()) {
         float *a3[2] = { outL, outR };
         *outL = 0.0f; *outR = 0.0f;
         juno_master_render(st, a2, a3);
