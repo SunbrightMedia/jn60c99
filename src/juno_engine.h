@@ -51,6 +51,20 @@ uint32_t juno_engine_init(unsigned char *st);
  * Returns the sample as a bit pattern (the decompile returns it in eax). */
 uint32_t juno_voice_render(unsigned char *st, float *outL, float *outR);
 
+/* juno_master_render — exact transcription of sub_180363380. The master process:
+ * sums the 8 voice samples, runs the stereo BBD chorus, and writes the final
+ * true-stereo output. Per-sample.
+ *   a1 : engine state.
+ *   a2 : array of 8 voice-sample pointers at EVEN indices a2[0,2,..,14] (the
+ *        plugin's voice-buffer layout; odd slots are unused).
+ *   a3 : {float* L, float* R} — receives 2*state[101264] (L), 2*state[101280] (R).
+ * Returns a3[1] (the decompile returns the R pointer in rax); unused by callers.
+ *
+ * The chorus reads ~250 coefficient fields produced by sub_180388170, which is
+ * not yet captured (Hex-Rays returns None on it). Until those exist the fields
+ * are zero and the chorus is inert. See docs/MASTER_RENDER_MAP.md. */
+float *juno_master_render(unsigned char *a1, float **a2, float **a3);
+
 #ifdef __cplusplus
 }
 #endif
