@@ -39,3 +39,26 @@ substitute a plausible guess.
 
 Everything *outside* these helper-call sites is unambiguous in the pseudocode and
 will be transcribed directly; the asm is needed only to pin the helper arguments.
+
+## RESOLVED helper arguments (from `asm_dump/sub_180369070_180369070.asm`)
+
+The x64 ABI passes the float arg in **xmm0**; tracing the xmm0 setup before each
+`call` gives the exact argument:
+
+| asm line | helper | argument | decompile site |
+|----------|--------|----------|----------------|
+| 446  | triangle | `v108` (wrapped phase, `a1+2304` offset) | ~881 |
+| 1052 | wrap24 | `-v230`, v230 = old `*(a1+7552)` (`xorps xmm0,xmm11` = negate) | 1207 |
+| 1251 | wrap24 | `-v244`, v244 = old `*(a1+8976)` | 1308 |
+| 2101,2280,2458,2636 | triangle | **Pattern A** `(phase+1.0)*0.5`, phase=`*(a1+4640)` (xmm12=0.5=`dword_180AE500C`) | 1700,1804,1908,2012 |
+| 2152,2330,2508,2686 | triangle | **Pattern B** `v412 / (a1+4816 ± 1.0)` (± by sign of v412) | 1727,1831,1935,2039 |
+| 2205,2383,2561,2739 | triangle | **Pattern C** `-|xmm7|` (`andps` abs then `xorps` negate) | 1754,1858,1962,2066 |
+
+Patterns A/B/C repeat once per oscillator across the 4-voice unison bank. The
+exact source register for Pattern B's numerator and Pattern C's `xmm7` will be
+re-confirmed against full register state when that stage is transcribed (the asm
+file has the complete trace).
+
+**Status:** all data needed for the voice engine is now in hand — `dsp_dump`
+(algorithm) + `init_dump` (coefficients) + `asm_dump` (dropped args). No further
+extraction is required; remaining work is transcription.
