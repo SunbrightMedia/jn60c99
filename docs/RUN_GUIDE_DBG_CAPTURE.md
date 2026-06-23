@@ -12,10 +12,16 @@ source — they are measurements of the shipped plugin, not fitted.
    to reproduce. Keep audio running (the master `sub_180363380` is called every
    block, even in silence). Wait ~1–2 s after picking the patch so smoothing
    settles.
-2. **Attach IDA:** open *this plugin's* database in IDA → **Debugger → Attach to
-   process** → pick the host. Choose the local Windows debugger backend. IDA
-   rebases the database onto the loaded module, so the script's addresses work
-   as-is.
+2. **Attach IDA:** open *this plugin's* database in IDA → set the debugger to
+   **Local Windows debugger** (Debugger → Select debugger). You may need IDA
+   running **as Administrator** to attach. Then **Debugger → Attach to process…**
+   → pick the **host** process (the plugin DLL can't be launched directly, so
+   *attach* — don't *run*). The process suspends.
+   - The plugin DLL usually loads at a **relocated base** (not `0x180000000`), so
+     the script finds the module's real runtime base by name (`PLUGIN_HINT`,
+     default `"cloud"`) and computes the breakpoint from it. If it logs "module
+     not found", set `PLUGIN_HINT` to a substring of the right module from the
+     list it prints.
 3. **Run:** **File → Script file… → `extract_runtime_coeffs_dbg.py`**.
 4. It sets a breakpoint at the master, verifies it's reading the real engine
    state, takes a few spaced snapshots, and prints a C table (also written to

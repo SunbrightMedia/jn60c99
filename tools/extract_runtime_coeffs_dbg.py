@@ -33,9 +33,16 @@
 # If automation is flaky in your setup, see MANUAL MODE at the bottom.
 
 import struct, os
-import idc, ida_dbg, ida_name
+import idc, ida_dbg, ida_name, idautils
 
-MASTER     = 0x180363380     # sub_180363380 (database EA; IDA rebases at runtime)
+IMAGE_BASE = 0x180000000
+RVA_MASTER = 0x363380        # sub_180363380 within the plugin module
+MASTER     = IMAGE_BASE + RVA_MASTER   # database EA (fallback only)
+# Substring (lowercased) of the plugin module's file name, used to find its REAL
+# runtime base after attaching to the host (the DLL may load at a relocated base,
+# so the database EA above won't bind a breakpoint unless IDA rebased). Adjust if
+# your binary's name differs.
+PLUGIN_HINT = "cloud"
 SNAPSHOTS  = 3               # number of snapshots to compare for invariance
 SKIP       = 30              # block-hits to run between snapshots (catch slow drift)
 KNOWN      = [(2199956, 0x80000), (95828, 1024), (101028, 1024)]  # static base check
@@ -76,6 +83,23 @@ OFFSETS = [
 ]
 
 def log(m): print("[dbg-capture] " + m)
+
+def resolve_master():
+    """Find the plugin module's runtime base and return the live address of the
+    master. Falls back to the database EA if the module can't be found by name."""
+    found = []
+    for m in idautils.Modules():
+        nm = m.name or ""
+        found.append(nm)
+        if PLUGIN_HINT in os.path.basename(nm).lower():
+            ea = m.base + RVA_MASTER
+            log("plugin module: %s @ 0x%X -> master 0x%X" % (nm, m.base, ea))
+            return ea
+    log("plugin module (hint '%s') not found among debugged modules." % PLUGIN_HINT)
+    log("loaded modules: " + ", ".join(os.path.basename(n) for n in found if n))
+    log("set PLUGIN_HINT to a substring of the right one; using database EA 0x%X "
+        "as a fallback (works only if IDA rebased the database)." % MASTER)
+    return MASTER
 
 def ru32(ea):
     b = idc.read_dbg_memory(ea, 4)
@@ -141,8 +165,9 @@ def main():
     if ida_dbg.get_process_state() == 0:
         log("No active debug session. Attach IDA to the host process first "
             "(Debugger -> Attach), then re-run this script."); return
-    log("setting breakpoint at master 0x%X" % MASTER)
-    ida_dbg.add_bpt(MASTER)
+    master = resolve_master()
+    log("setting breakpoint at master 0x%X" % master)
+    ida_dbg.add_bpt(master)
     try:
         # first hit -> verify base
         if wait_break() <= 0: log("debugger stopped unexpectedly."); return
@@ -159,14 +184,17 @@ def main():
             log("snapshot %d/%d taken" % (s + 1, SNAPSHOTS))
         emit(snaps)
     finally:
-        ida_dbg.del_bpt(MASTER)
+        ida_dbg.del_bpt(master)
         log("breakpoint removed. (process left suspended; resume or detach in IDA.)")
 
 # ── MANUAL MODE ───────────────────────────────────────────────────────────────
-# If the continue/wait loop misbehaves, set a breakpoint at 0x180363380 yourself,
-# let it hit (play audio), then in the Python console run:
+# If the continue/wait loop misbehaves: in the Python console get the master's
+# live address (handles the relocated DLL base), set a breakpoint, let it hit
+# (audio running), then read once:
+#     import sys; m = sys.modules[__name__]
+#     ea = m.resolve_master(); import ida_dbg; ida_dbg.add_bpt(ea)   # then resume in IDA
+#     # after it breaks:
 #     base = idc.get_reg_value("rcx")
-#     import importlib, sys; m = sys.modules[__name__]
 #     m.verify_base(base); m.emit([m.snapshot(base)])   # single-snapshot (no invariance)
 # Single-snapshot skips the state/coeff check, so prefer the automated path.
 
