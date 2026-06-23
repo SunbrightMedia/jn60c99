@@ -44,7 +44,7 @@ MASTER     = IMAGE_BASE + RVA_MASTER   # database EA (fallback only)
 # shipped binary is "JUNO-60(VST3 64bit).vst3"; add hints if yours differs.
 PLUGIN_HINTS = ["juno", "cloud"]
 SNAPSHOTS  = 3               # number of snapshots to compare for invariance
-SKIP       = 30              # block-hits to run between snapshots (catch slow drift)
+SKIP       = 12              # master hits to run between snapshots (spacing)
 KNOWN      = [(2199956, 0x80000), (95828, 1024), (101028, 1024)]  # static base check
 OUT        = os.path.join(os.path.dirname(idc.get_idb_path()) or ".",
                           "runtime_coeffs_capture.txt")
@@ -120,11 +120,18 @@ def verify_base(base):
     if ok: log("base check OK — rcx is the engine state (static fields match).")
     return ok
 
-def wait_break():
-    """Continue and wait until the next suspension (our breakpoint)."""
-    ida_dbg.continue_process()
-    code = ida_dbg.wait_for_next_event(ida_dbg.WFNE_SUSP, -1)
-    return code
+def wait_master(master):
+    """Continue and wait until execution is actually stopped AT the master
+    breakpoint. Thread start/exit and other suspensions are skipped (we just
+    continue again), so a snapshot is only ever taken with rcx = engine state."""
+    while True:
+        ida_dbg.continue_process()
+        code = ida_dbg.wait_for_next_event(ida_dbg.WFNE_SUSP, -1)
+        if code <= 0:
+            return False                      # process exited / detached / error
+        if idc.get_reg_value("rip") == master:
+            return True                       # stopped at our breakpoint
+        # otherwise it was a thread/library/other event — loop and continue
 
 def f32(bits):
     return struct.unpack("<f", struct.pack("<I", bits))[0] if bits is not None else 0.0
@@ -170,16 +177,18 @@ def main():
     log("setting breakpoint at master 0x%X" % master)
     ida_dbg.add_bpt(master)
     try:
+        log("waiting for the master breakpoint (skipping thread events)...")
         # first hit -> verify base
-        if wait_break() <= 0: log("debugger stopped unexpectedly."); return
+        if not wait_master(master): log("process exited before the breakpoint."); return
         base = idc.get_reg_value("rcx")
         log("engine state (rcx) = 0x%X" % base)
         if not verify_base(base): return
         snaps = [snapshot(base)]
-        # further spaced snapshots
+        log("snapshot 1/%d taken" % SNAPSHOTS)
+        # further spaced snapshots (SKIP real master hits between each)
         for s in range(1, SNAPSHOTS):
             for _ in range(SKIP):
-                if wait_break() <= 0: log("stopped early."); break
+                if not wait_master(master): log("stopped early."); break
             base = idc.get_reg_value("rcx")
             snaps.append(snapshot(base))
             log("snapshot %d/%d taken" % (s + 1, SNAPSHOTS))
