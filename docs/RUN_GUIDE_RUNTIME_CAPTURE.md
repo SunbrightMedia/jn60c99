@@ -35,6 +35,15 @@ case the handoff sanctions Frida for.
 driver gates on `juno_runtime_coeffs_loaded()`, so the next build is playable:
 a note sounds and (if the captured patch had chorus on) the chorus is live.
 
+## Built-in self-validation
+The script now (a) confirms `arg0` is the engine state by checking known static
+fields (`state[2199956]==0x80000`, `[95828]/[101028]==1024`) — if this fails the
+capture is aborted (wrong pointer); (b) snapshots the 349 offsets twice and flags
+any that change as per-sample STATE (emitted as 0, not applied), leaving only
+time-invariant coefficients. Play a **sustained** note so the two snapshots are
+during steady audio. After pasting, also eyeball values against
+`docs/COEFF_PARAM_MAP.md` (on/off slots = 0/1, etc.).
+
 ## Verifying after paste
 `make test` should still pass (finite). `test_master_smoke` will report
 `path: full master/chorus`. Set the driver's `chorus_mode`

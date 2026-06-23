@@ -39,23 +39,59 @@ function findModule() {
     return null;
 }
 
-function dump(a1) {
+// Known fields written by the STATIC init (juno_chorus_init), used to confirm
+// arg0 really is the engine-state base before we trust any value off it.
+var KNOWN = [[2199956, 0x80000], [95828, 1024], [101028, 1024]];
+
+function snapshot(a1) {
+    var s = {};
+    for (var i = 0; i < OFFSETS.length; i++) s[OFFSETS[i]] = a1.add(OFFSETS[i]).readU32();
+    return s;
+}
+
+function verifyBase(a1) {
+    var ok = true;
+    for (var i = 0; i < KNOWN.length; i++) {
+        var got = a1.add(KNOWN[i][0]).readU32();
+        if (got !== KNOWN[i][1]) {
+            console.log('[!] base check FAILED: state[' + KNOWN[i][0] + '] = 0x' +
+                        got.toString(16) + ' expected 0x' + KNOWN[i][1].toString(16));
+            ok = false;
+        }
+    }
+    if (ok) console.log('[*] base check OK — arg0 is the engine state.');
+    return ok;
+}
+
+function emit(a1, snapA, snapB) {
+    // anything that changed between the two snapshots is per-sample STATE, not a
+    // coefficient — flag it, and zero it in the table so it is not "applied".
+    var drifted = [];
     var out = [];
-    out.push('/* captured from live plugin @ ' + new Date().toISOString() + ' */');
+    out.push('/* captured from live plugin @ ' + new Date().toISOString() +
+             ' — base-checked, time-invariance-checked */');
     out.push('static const juno_coeff k[] = {');
     var line = '  ';
     for (var i = 0; i < OFFSETS.length; i++) {
         var off = OFFSETS[i];
-        var bits = a1.add(off).readU32();
+        var b = snapB[off];
+        var emitBits = b;
+        if (snapA[off] !== b) { drifted.push(off); emitBits = 0; }   // state, not coeff
         var f = a1.add(off).readFloat();
-        line += '{' + off + ',0x' + ('00000000' + bits.toString(16)).slice(-8) + 'u}, ';
-        if ((i % 4) === 3) { out.push(line + '/* ~' + f + ' */'); line = '  '; }
+        line += '{' + off + ',0x' + ('00000000' + emitBits.toString(16)).slice(-8) + 'u}, ';
+        if ((i % 4) === 3) { out.push(line + '/* ~' + (emitBits ? f : 0) + ' */'); line = '  '; }
     }
     if (line.trim().length) out.push(line);
     out.push('};');
     console.log('\n===== BEGIN runtime_coeffs_data.c table (paste over the placeholder) =====');
     console.log(out.join('\n'));
-    console.log('===== END =====\n');
+    console.log('===== END =====');
+    if (drifted.length)
+        console.log('[!] ' + drifted.length + ' offsets changed between snapshots ' +
+                    '(treated as STATE, emitted as 0): ' + drifted.join(', '));
+    else
+        console.log('[*] all ' + OFFSETS.length + ' offsets time-invariant — consistent with coefficients.');
+    console.log('[i] next: cross-check values against docs/COEFF_PARAM_MAP.md, then the A/B vs plugin.');
 }
 
 (function main() {
@@ -63,14 +99,20 @@ function dump(a1) {
     if (!mod) return;
     var addr = mod.base.add(RVA_MASTER);
     console.log('[*] hooking master sub_180363380 @ ' + addr + ' (base ' + mod.base + ')');
-    var n = 0, done = false;
+    var n = 0, snapA = null, done = false;
     Interceptor.attach(addr, {
         onEnter: function (args) {
             if (done) return;
-            if (++n < SETTLE_BLOCKS) return;
-            done = true;
-            dump(ptr(args[0]));   // x64 __fastcall arg0 (engine state) in rcx
+            n++;
+            if (n === SETTLE_BLOCKS) {                    // first (settled) snapshot
+                if (!verifyBase(ptr(args[0]))) { done = true; return; }
+                snapA = snapshot(ptr(args[0]));
+            } else if (n === SETTLE_BLOCKS * 2 && snapA) { // second, to test invariance
+                done = true;
+                emit(ptr(args[0]), snapA, snapshot(ptr(args[0])));
+            }
         }
     });
-    console.log('[*] armed — play a note / let audio run; capture after ' + SETTLE_BLOCKS + ' blocks.');
+    console.log('[*] armed — play a sustained note; captures at blocks ' +
+                SETTLE_BLOCKS + ' and ' + (SETTLE_BLOCKS * 2) + '.');
 })();
