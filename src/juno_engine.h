@@ -45,6 +45,13 @@ extern "C" {
  * Returns the sample rate it used. */
 uint32_t juno_engine_init(unsigned char *st);
 
+/* juno_chorus_init — exact transcription of sub_1803A1300, the chorus/master
+ * state constructor: zeroes the BBD delay buffers and writes the integer control
+ * fields (delay-line lengths, ring indices) the master indexes its circular
+ * buffers with. Call BEFORE juno_engine_init. Without it the master's buffer
+ * masks are -1 and it reads out of bounds. (Returns the state pointer; unused.) */
+void *juno_chorus_init(unsigned char *st);
+
 /* voice_render — exact transcription of sub_180369070. Produces one mono sample
  * for one voice from its state block `st`; writes it to *outL and *outR (the
  * plugin duplicates the mono voice to both channels; stereo comes from chorus).
