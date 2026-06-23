@@ -1,0 +1,4 @@
+state_base=0x2DA7B040
+size=0xB80000
+sample_rate_bits=0x47BB8000
+# fill in: patch name, chorus mode, MIDI note (if any)
