@@ -19,7 +19,7 @@ int main(void)
     unsigned char *st = calloc(1, JUNO_STATE_BYTES);
     if (!st) { printf("alloc failed\n"); return 1; }
 
-    JF(st, 16) = 44100.0f;
+    JF(st, 16) = 96000.0f;  /* match captured coeffs */
     juno_chorus_init(st);                   /* constructor: delay lengths + zero */
     uint32_t rate = juno_engine_init(st);   /* voice coefficients */
     juno_runtime_coeffs_apply(st);           /* chorus float coeffs (no-op until captured) */
