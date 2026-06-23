@@ -20,11 +20,14 @@ int main(void)
     if (!st) { printf("alloc failed\n"); return 1; }
 
     JF(st, 16) = 44100.0f;
-    uint32_t rate = juno_engine_init(st);
+    juno_chorus_init(st);                   /* constructor: delay lengths + zero */
+    uint32_t rate = juno_engine_init(st);   /* voice coefficients */
 
     static struct juno_host_shim shim;
     juno_driver_attach_host(st, &shim, 0 /* dry/bypass */);
     printf("init done; rate=%u; chorus mode=0 (dry)\n", rate);
+    printf("BBD delay-line length sentinel state[2199956] = 0x%X (expect 0x80000)\n",
+           JI(st, 2199956));
 
     float l = 0.0f, r = 0.0f;
     int nonfinite = 0, ran_master = 0;
