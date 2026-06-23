@@ -43,8 +43,8 @@ MASTER     = IMAGE_BASE + RVA_MASTER   # database EA (fallback only)
 # base, so the database EA above won't bind a breakpoint unless IDA rebased). The
 # shipped binary is "JUNO-60(VST3 64bit).vst3"; add hints if yours differs.
 PLUGIN_HINTS = ["juno", "cloud"]
-SNAPSHOTS  = 3               # number of snapshots to compare for invariance
-SKIP       = 12              # master hits to run between snapshots (spacing)
+SNAPSHOTS  = 2               # snapshots compared for invariance (phase 2)
+SKIP       = 8               # master hits between snapshots
 KNOWN      = [(2199956, 0x80000), (95828, 1024), (101028, 1024)]  # static base check
 OUT        = os.path.join(os.path.dirname(idc.get_idb_path()) or ".",
                           "runtime_coeffs_capture.txt")
@@ -120,18 +120,18 @@ def verify_base(base):
     if ok: log("base check OK — rcx is the engine state (static fields match).")
     return ok
 
-def wait_master(master):
-    """Continue and wait until execution is actually stopped AT the master
-    breakpoint. Thread start/exit and other suspensions are skipped (we just
-    continue again), so a snapshot is only ever taken with rcx = engine state."""
-    while True:
+def wait_master(master, max_events=20000):
+    """Continue and wait until actually stopped AT the master breakpoint, skipping
+    thread/library events. Bounded so it can never spin forever."""
+    n = 0
+    while n < max_events:
         ida_dbg.continue_process()
-        code = ida_dbg.wait_for_next_event(ida_dbg.WFNE_SUSP, -1)
-        if code <= 0:
+        if ida_dbg.wait_for_next_event(ida_dbg.WFNE_SUSP, -1) <= 0:
             return False                      # process exited / detached / error
+        n += 1
         if idc.get_reg_value("rip") == master:
-            return True                       # stopped at our breakpoint
-        # otherwise it was a thread/library/other event — loop and continue
+            return True
+    return False
 
 def f32(bits):
     return struct.unpack("<f", struct.pack("<I", bits))[0] if bits is not None else 0.0
@@ -169,33 +169,50 @@ def emit(snaps):
         log("all %d offsets time-invariant -- consistent with coefficients." % n)
     log("next: cross-check vs docs/COEFF_PARAM_MAP.md, then A/B vs plugin.")
 
+# Two-phase, NON-BLOCKING model (reliable; gives you visual confirmation):
+#   Run #1 (process suspended, not at master): arm the breakpoint + resume, then
+#            return. Let audio play in the host; IDA STOPS at the master (the
+#            disassembly jumps there) — that is your proof the breakpoint hits.
+#   Run #2 (process now stopped AT master): capture the coefficients and emit.
 def main():
-    if ida_dbg.get_process_state() == 0:
-        log("No active debug session. Attach IDA to the host process first "
-            "(Debugger -> Attach), then re-run this script."); return
+    st = ida_dbg.get_process_state()
+    if st == 0:
+        log("No debug session. Attach IDA to the host (Debugger -> Attach), then re-run."); return
     master = resolve_master()
-    log("setting breakpoint at master 0x%X" % master)
-    ida_dbg.add_bpt(master)
-    try:
-        log("waiting for the master breakpoint (skipping thread events)...")
-        # first hit -> verify base
-        if not wait_master(master): log("process exited before the breakpoint."); return
+    rip = idc.get_reg_value("rip")
+
+    if st < 0 and rip == master:
+        # ── PHASE 2: stopped at the master breakpoint -> capture ──
+        log("stopped AT master 0x%X — capturing." % master)
         base = idc.get_reg_value("rcx")
         log("engine state (rcx) = 0x%X" % base)
         if not verify_base(base): return
-        snaps = [snapshot(base)]
-        log("snapshot 1/%d taken" % SNAPSHOTS)
-        # further spaced snapshots (SKIP real master hits between each)
+        snaps = [snapshot(base)]; log("snapshot 1 taken")
         for s in range(1, SNAPSHOTS):
-            for _ in range(SKIP):
-                if not wait_master(master): log("stopped early."); break
-            base = idc.get_reg_value("rcx")
-            snaps.append(snapshot(base))
-            log("snapshot %d/%d taken" % (s + 1, SNAPSHOTS))
+            log("collecting snapshot %d (a few more block hits)..." % (s + 1))
+            if not wait_master(master):
+                log("breakpoint stopped hitting — emitting with snapshot 1 only "
+                    "(no invariance check)."); break
+            snaps.append(snapshot(idc.get_reg_value("rcx"))); log("snapshot %d taken" % (s + 1))
         emit(snaps)
-    finally:
         ida_dbg.del_bpt(master)
-        log("breakpoint removed. (process left suspended; resume or detach in IDA.)")
+        log("done. breakpoint removed; process left suspended (resume/detach in IDA).")
+        return
+
+    if st > 0:
+        log("Process is RUNNING. If you already armed the breakpoint, wait until IDA")
+        log("stops at the master (disasm jumps there), THEN run this script again.")
+        return
+
+    # ── PHASE 1: suspended elsewhere -> arm + resume ──
+    ida_dbg.add_bpt(master)
+    log("breakpoint ARMED at master 0x%X." % master)
+    log(">>> Now let audio play in the host. IDA will STOP at the master")
+    log(">>> (the disassembly view jumps to it). THEN run this script AGAIN to capture.")
+    log(">>> If IDA never stops there, the master isn't being called — check that the")
+    log(">>> Ableton audio engine is active (CPU meter), the track isn't frozen, and")
+    log(">>> the plugin isn't bypassed.")
+    ida_dbg.continue_process()
 
 # ── MANUAL MODE ───────────────────────────────────────────────────────────────
 # If the continue/wait loop misbehaves: in the Python console get the master's
