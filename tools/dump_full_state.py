@@ -28,6 +28,8 @@ PLUGIN_HINTS = ["juno", "cloud"]
 DUMP_SIZE   = 0xB80000        # ~11.5 MB: covers the whole state the DSP reads
 CHUNK       = 0x10000         # 64 KB reads (zero-filled on any unmapped page)
 SETTLE_HITS = 16             # master hits between the two dumps
+WAIT_SECS   = 3              # per wait_for_next_event timeout (seconds)
+WAIT_TRIES  = 20             # total wait = WAIT_SECS * WAIT_TRIES (~60s)
 KNOWN       = [(2199956, 0x80000), (95828, 1024), (101028, 1024)]
 OUTDIR      = os.path.join(os.path.dirname(idc.get_idb_path()) or ".", "state_dump")
 
@@ -77,49 +79,62 @@ def wait_master(master, max_events=20000):
         if idc.get_reg_value("rip") == master: return True
     return False
 
+def capture(master):
+    os.makedirs(OUTDIR, exist_ok=True)
+    base = idc.get_reg_value("rcx"); log("engine state (rcx) = 0x%X" % base)
+    if not verify_base(base): return
+    sr = ru32(base + 16)
+    log("dumping t0 (big read; a few seconds)...")
+    dump_state(base, os.path.join(OUTDIR, "state_t0.bin"))
+    for _ in range(SETTLE_HITS):
+        if not wait_master(master): break
+    base2 = idc.get_reg_value("rcx")
+    log("dumping t1...")
+    dump_state(base2, os.path.join(OUTDIR, "state_t1.bin"))
+    with open(os.path.join(OUTDIR, "meta.txt"), "w") as fh:
+        fh.write("base_t0=0x%X\nbase_t1=0x%X\nsize=0x%X\nsample_rate_bits=0x%08X\n"
+                 % (base, base2, DUMP_SIZE, sr or 0))
+        fh.write("# fill in: patch name, chorus mode, MIDI note held\n")
+    ida_dbg.del_bpt(master)
+    log("DONE. Zip state_dump/ and upload it. (process left suspended.)")
+
 def main():
     st = ida_dbg.get_process_state()
     if st == 0:
         log("No debug session. Attach IDA to the host first, then re-run."); return
     master = resolve_master()
-    if st < 0 and idc.get_reg_value("rip") == master:
-        # PHASE 2: capture
-        os.makedirs(OUTDIR, exist_ok=True)
-        base = idc.get_reg_value("rcx"); log("engine state (rcx) = 0x%X" % base)
-        if not verify_base(base): return
-        sr = ru32(base + 16)
-        log("dumping t0 (this is the big read; a few seconds)...")
-        dump_state(base, os.path.join(OUTDIR, "state_t0.bin"))
-        for _ in range(SETTLE_HITS):
-            if not wait_master(master): break
-        base2 = idc.get_reg_value("rcx")
-        log("dumping t1...")
-        dump_state(base2, os.path.join(OUTDIR, "state_t1.bin"))
-        with open(os.path.join(OUTDIR, "meta.txt"), "w") as fh:
-            fh.write("base_t0=0x%X\nbase_t1=0x%X\nsize=0x%X\nsample_rate_bits=0x%08X\n"
-                     % (base, base2, DUMP_SIZE, sr or 0))
-            fh.write("# fill in: patch name, chorus mode, MIDI note held\n")
-        ida_dbg.del_bpt(master)
-        log("DONE. Zip state_dump/ and upload it. (process left suspended.)")
-        return
-    if st > 0:
-        log("Process RUNNING. Wait until IDA stops at the master, then run again."); return
-    # PHASE 1: arm + resume.
-    # Disable IDA's auto-suspend on thread/library/start events so the process runs
-    # straight to OUR breakpoint instead of stopping in ntdll every time a thread or
-    # DLL loads (that bouncing 0x7FF9... is exactly that). Breakpoints still suspend.
+    # Disable auto-suspend on thread/library events so the process runs straight to
+    # OUR breakpoint (not into ntdll on every thread/DLL load). Breakpoints still hit.
     try:
         old = ida_dbg.set_debugger_options(0)
         log("disabled auto-suspend on thread/library events (was 0x%X)." % old)
     except Exception as e:
-        log("couldn't auto-set options (%s); in the GUI uncheck 'Suspend on thread "
+        log("couldn't auto-set options (%s); GUI: uncheck 'Suspend on thread "
             "start/exit' and 'Suspend on library load/unload'." % e)
     ida_dbg.add_bpt(master)
-    log("breakpoint ARMED at master 0x%X." % master)
-    log(">>> Make sure Ableton is actually producing sound (audio engine ON, track")
-    log(">>> not frozen/bypassed). IDA will STOP at the master (disasm jumps there).")
-    log(">>> THEN run this script AGAIN to dump.")
+
+    if st < 0 and idc.get_reg_value("rip") == master:
+        log("already stopped at the master — capturing.")
+        capture(master); return
+
+    # ONE-SHOT: resume and WAIT for the master (no two-run timing race).
+    log("breakpoint armed at 0x%X — resuming and WAITING for it to hit." % master)
+    log(">>> RIGHT NOW: make JUNO-60 play CONTINUOUS sound (hold a note / loop a clip,")
+    log(">>> arp OFF, audio engine ON, track not frozen/bypassed). Waiting up to %ds..."
+        % (WAIT_SECS * WAIT_TRIES))
     ida_dbg.continue_process()
+    for i in range(WAIT_TRIES):
+        code = ida_dbg.wait_for_next_event(ida_dbg.WFNE_SUSP, WAIT_SECS)
+        if code > 0:
+            if idc.get_reg_value("rip") == master:
+                log("hit the master — capturing."); capture(master); return
+            ida_dbg.continue_process()            # unexpected stop; resume
+        else:
+            log("  ...still waiting (%d/%d) — is audio continuously playing?"
+                % (i + 1, WAIT_TRIES))
+    log("Master not hit in ~%ds. The plugin's mix/chorus path isn't executing —" % (WAIT_SECS * WAIT_TRIES))
+    log("make sure you can HEAR JUNO-60 continuously (audio engine ON, sustained note,")
+    log("arp OFF, not frozen/bypassed), then run this script again.")
 
 if __name__ == "__main__":
     main()
