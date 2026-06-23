@@ -21,3 +21,5 @@ __pycache__/
 
 # Large raw memory dumps (compressed .gz kept as provenance)
 state_dump/*.bin
+state_dump/.dspreads.txt
+tests/validate_state
