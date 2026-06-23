@@ -12,9 +12,9 @@ extract.log
 
 # Test binaries
 tests/test_helpers
+tests/test_voice_smoke
+tests/test_master_smoke
 
 # Python cache
 __pycache__/
 *.pyc
-
-tests/test_voice_smoke
