@@ -30,7 +30,7 @@
 # Targets the IDA 9.x IDAPython API (ida_hexrays / ida_funcs / idautils). Stable
 # across the 9.3 service packs.
 
-import os
+import os, struct
 import ida_hexrays, ida_funcs, ida_bytes, ida_name, ida_segment
 import idautils, idc, ida_idaapi
 
@@ -120,16 +120,21 @@ def data_refs(ea):
             seg = ida_segment.getseg(dref)
             segname = ida_segment.get_segm_name(seg) if seg else "?"
             name = ida_name.get_name(dref) or ""
-            # pull a 4- and 8-byte view; float reads are the ones we care about
+            # pull a 4- and 8-byte view; float reads are the ones we care about.
+            # Each conversion is guarded independently so one unreadable address
+            # (e.g. a ref into the last bytes of a segment) can't blank the rest.
+            u32 = f32 = f64 = None
             try:
                 u32 = ida_bytes.get_dword(dref)
-                f32 = idc.atof if False else None  # placeholder; raw bits below
-                import struct
-                f32 = struct.unpack("<f", struct.pack("<I", u32))[0]
-                f64 = struct.unpack("<d", ida_bytes.get_qword(dref).to_bytes(8, "little"))[0]
-                refs.append((dref, segname, name, u32, f32, f64))
+                f32 = struct.unpack("<f", struct.pack("<I", u32 & 0xFFFFFFFF))[0]
             except Exception:
-                refs.append((dref, segname, name, None, None, None))
+                pass
+            try:
+                q = ida_bytes.get_qword(dref) & 0xFFFFFFFFFFFFFFFF
+                f64 = struct.unpack("<d", q.to_bytes(8, "little"))[0]
+            except Exception:
+                pass
+            refs.append((dref, segname, name, u32, f32, f64))
     return refs
 
 def decompile_text(ea):
@@ -154,9 +159,10 @@ def disasm_text(ea):
 def main():
     if not ida_hexrays.init_hexrays_plugin():
         log("ERROR: Hex-Rays decompiler not available. Need the x86-64 decompiler "
-            "assigned to this license.")
+            "assigned to this license. (No output written.)")
         return
     os.makedirs(OUT, exist_ok=True)
+    log("output folder: %s" % os.path.abspath(OUT))
 
     if SCOPE == "all":
         closure = set(idautils.Functions())
@@ -165,6 +171,10 @@ def main():
     else:
         roots = climb_to_roots(SEED_EAS, CALLER_LEVELS)
         log("roots (after climbing %d caller levels): %d" % (CALLER_LEVELS, len(roots)))
+        # Show the roots by name so you can confirm the master-mix & chorus were
+        # actually reached by the caller-climb (not just the render seed).
+        for r in sorted(roots):
+            log("  root: 0x%X  %s" % (r, fname(r)))
         # transitive callee walk from roots
         closure = set(roots)
         frontier = set(roots)
@@ -181,7 +191,10 @@ def main():
     manifest = []
     data_index = {}
 
+    log("decompiling %d functions (this can take several minutes)…" % len(closure))
     for i, ea in enumerate(closure):
+        if i and i % 100 == 0:
+            log("  …%d/%d decompiled" % (i, len(closure)))
         nm = fname(ea)
         safe = nm.replace("?", "_").replace(":", "_").replace("/", "_")[:80]
         path = os.path.join(OUT, "%04d_%s_%X.c" % (i, safe, ea))
@@ -230,8 +243,11 @@ def main():
             seg, dn, u32, f32, f64 = data_index[d]
             fh.write("0x%X  %s  %s  %s  %s  %s\n" % (d, seg, dn, u32, f32, f64))
 
-    log("DONE. Wrote %d functions to %s" % (len(closure), OUT))
-    log("Read MANIFEST.md first, then the root functions, then their callees.")
+    log("DONE. Wrote %d functions + MANIFEST.md/callgraph.txt/constants.txt to:"
+        % len(closure))
+    log("  %s" % os.path.abspath(OUT))
+    log("Next: tar that folder and upload it. (Read MANIFEST.md first, then the "
+        "root functions, then their callees.)")
 
 if __name__ == "__main__":
     main()
