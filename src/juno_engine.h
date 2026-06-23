@@ -52,6 +52,13 @@ uint32_t juno_engine_init(unsigned char *st);
  * masks are -1 and it reads out of bounds. (Returns the state pointer; unused.) */
 void *juno_chorus_init(unsigned char *st);
 
+/* juno_chorus_coeffs_apply — write the 241 chorus/output coefficients the master
+ * reads but no static init sets (the plugin applies them at runtime from the
+ * parameter system). Values are captured from the live plugin via
+ * tools/capture_chorus_coeffs.js into src/chorus_coeffs_data.c. Call after
+ * juno_chorus_init + juno_engine_init. No-op until the capture is pasted in. */
+void juno_chorus_coeffs_apply(unsigned char *st);
+
 /* voice_render — exact transcription of sub_180369070. Produces one mono sample
  * for one voice from its state block `st`; writes it to *outL and *outR (the
  * plugin duplicates the mono voice to both channels; stereo comes from chorus).
