@@ -22,7 +22,7 @@
 #   GUI: File > Script file... > extract_param_setter.py   (analyzed DB)
 #   Output: ./param_setter/ next to the database. Zip and upload it.
 
-import os, struct
+import os, struct, re
 import ida_funcs, ida_hexrays, ida_name, idautils, idc, ida_bytes
 
 IMAGE_BASE = 0x180000000
@@ -32,31 +32,39 @@ OUT = os.path.join(os.path.dirname(idc.get_idb_path()) or ".", "param_setter")
 
 def log(m): print("[param_setter] " + m)
 def fname(ea): return ida_name.get_name(ea) or ("sub_%X" % ea)
+# Windows-safe filename token (C++ mangled names contain ? @ < > : etc.)
+def safe(s): return re.sub(r"[^A-Za-z0-9_.-]", "_", s)[:80]
 
 def dump_pseudo(ea, tag):
-    path = os.path.join(OUT, "%s_%s_%X.c" % (tag, fname(ea), ea))
+    path = os.path.join(OUT, "%s_%s_%X.c" % (tag, safe(fname(ea)), ea))
     try:
         cf = ida_hexrays.decompile(ea); ps = str(cf) if cf else "// decompile returned None\n"
     except Exception as e:
         ps = "// DECOMPILE FAILED: %s\n" % e
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write("// %s @ 0x%X (RVA 0x%X)\n\n" % (fname(ea), ea, ea-IMAGE_BASE) + ps + "\n")
-    log("c    -> %s" % os.path.basename(path))
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("// %s @ 0x%X (RVA 0x%X)\n\n" % (fname(ea), ea, ea-IMAGE_BASE) + ps + "\n")
+        log("c    -> %s" % os.path.basename(path))
+    except Exception as e:
+        log("c    SKIP 0x%X (%s)" % (ea, e))
 
 def dump_asm(ea, tag):
     f = ida_funcs.get_func(ea)
     if not f: log("WARN no func @ 0x%X" % ea); return []
-    path = os.path.join(OUT, "%s_%s_%X.asm" % (tag, fname(ea), ea))
+    path = os.path.join(OUT, "%s_%s_%X.asm" % (tag, safe(fname(ea)), ea))
     callees = []
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write("; %s @ 0x%X (RVA 0x%X) size=0x%X\n\n" % (fname(ea), ea, ea-IMAGE_BASE, f.end_ea-f.start_ea))
-        for head in idautils.Heads(f.start_ea, f.end_ea):
-            raw = ida_bytes.get_bytes(head, idc.get_item_size(head)) or b""
-            fh.write("%016X  %-26s  %s\n" % (head, " ".join("%02X"%b for b in raw), idc.GetDisasm(head)))
-            if idc.print_insn_mnem(head) == "call":
-                t = idc.get_operand_value(head, 0)
-                if t and ida_funcs.get_func(t): callees.append(t)
-    log("asm  -> %s" % os.path.basename(path))
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("; %s @ 0x%X (RVA 0x%X) size=0x%X\n\n" % (fname(ea), ea, ea-IMAGE_BASE, f.end_ea-f.start_ea))
+            for head in idautils.Heads(f.start_ea, f.end_ea):
+                raw = ida_bytes.get_bytes(head, idc.get_item_size(head)) or b""
+                fh.write("%016X  %-26s  %s\n" % (head, " ".join("%02X"%b for b in raw), idc.GetDisasm(head)))
+                if idc.print_insn_mnem(head) == "call":
+                    t = idc.get_operand_value(head, 0)
+                    if t and ida_funcs.get_func(t): callees.append(t)
+        log("asm  -> %s" % os.path.basename(path))
+    except Exception as e:
+        log("asm  SKIP 0x%X (%s)" % (ea, e))
     return callees
 
 def dump_const(addr):
@@ -77,12 +85,16 @@ def main():
             log("skip (no func) 0x%X" % ea); continue
         if have: dump_pseudo(ea, "reg")
         callees = dump_asm(ea, "reg")
-        # one level down: the mapping / apply chain (skip CRT noise heuristically)
+        # one level down: the mapping / apply chain. STL/CRT helpers (e.g.
+        # vector::_Xlen) come along as noise — harmless, just ignore those files.
         for c in callees:
             if c in seen or c in REGISTRARS: continue
             seen.add(c)
-            if have: dump_pseudo(c, "callee")
-            dump_asm(c, "callee")
+            try:
+                if have: dump_pseudo(c, "callee")
+                dump_asm(c, "callee")
+            except Exception as e:
+                log("callee SKIP 0x%X (%s)" % (c, e))
     with open(os.path.join(OUT, "default_constants.txt"), "w", encoding="utf-8") as fh:
         fh.write("# default-descriptor constants the registry hands the registrar\n\n")
         for a in CONSTS: fh.write(dump_const(a) + "\n")
