@@ -48,6 +48,32 @@ boundary). A plain sum of voice outputs is the standard and almost-certainly
 -correct behaviour, but it is an assumption, not transcribed. The note-on gate is
 `*(state+101504)==1.0`; the pitch-field mapping is not in our data.
 
+## UPDATE — master/chorus located; resume plan
+
+The static float-DSP search found the missing master process:
+**`sub_180363380`** = 8-voice mix + stereo BBD chorus (circular delay at
+`a1+91728`) + true-stereo output. Decompile is in
+`audio_search/000_*` and `init_dump/020_*`; disassembly in `master_deps/`.
+
+Helpers it needs are now ported (`juno_pitch_poly`, `juno_wrap_unit`,
+`juno_wrap_hi` in `src/juno_dsp.c`).
+
+**Remaining to finish the chorus (next session, fresh context):**
+1. Transcribe `sub_180363380` (2875 lines) the same way as voice_render
+   (translate_voice-style: offsets→JF/JI; resolve dropped helper args from
+   `master_deps/master_sub_180363380_*.asm`; helpers → juno_* names).
+2. Chorus coefficients: ~250 read-only offsets `sub_1803990C0` doesn't set are
+   produced by **`sub_180388170`** (the param/coeff setup; touches 20/25 chorus
+   signature offsets). **Hex-Rays returns None on it** — transcribe from its
+   disassembly (dump asm of 0x388170), or capture the resulting values once.
+   Until then the chorus state is zero (dry path still correct).
+3. Wire the driver: per-sample loop calls the per-voice renders into 8 buffers,
+   then `sub_180363380(state, voiceBufs, outLR)`. Multi-voice strides known
+   (main +10512, shared +0, aux +32).
+
+The dry synth voice + filter + envelopes + init are exact and complete; the
+above is the stereo-chorus/output layer on top.
+
 ## Recommendation
 The exact DSP core is complete. Reaching a *playable, chorused* engine needs the
 chorus code located (one targeted Frida-assisted extraction) and the host glue
