@@ -32,7 +32,7 @@
 
 import os, struct
 import ida_hexrays, ida_funcs, ida_bytes, ida_name, ida_segment
-import idautils, idc, ida_idaapi
+import idautils, idc, ida_idaapi, ida_xref
 
 # ─────────────────────────── CONFIG ───────────────────────────
 IMAGE_BASE = 0x180000000
@@ -67,8 +67,8 @@ def callees_of(ea):
     for head in idautils.Heads(f.start_ea, f.end_ea):
         for xref in idautils.XrefsFrom(head, 0):
             # fl_CN/fl_CF = near/far call; fl_JN/fl_JF can be tail-calls too
-            if xref.type in (ida_idaapi.fl_CN, ida_idaapi.fl_CF,
-                             ida_idaapi.fl_JN, ida_idaapi.fl_JF):
+            if xref.type in (ida_xref.fl_CN, ida_xref.fl_CF,
+                             ida_xref.fl_JN, ida_xref.fl_JF):
                 tgt = func_start(xref.to)
                 if tgt != ida_idaapi.BADADDR:
                     out.add(tgt)
@@ -81,8 +81,8 @@ def callers_of(ea):
     if not f:
         return out
     for xref in idautils.XrefsTo(f.start_ea, 0):
-        if xref.type in (ida_idaapi.fl_CN, ida_idaapi.fl_CF,
-                         ida_idaapi.fl_JN, ida_idaapi.fl_JF):
+        if xref.type in (ida_xref.fl_CN, ida_xref.fl_CF,
+                         ida_xref.fl_JN, ida_xref.fl_JF):
             src = func_start(xref.frm)
             if src != ida_idaapi.BADADDR:
                 out.add(src)
