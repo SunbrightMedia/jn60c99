@@ -1,3 +1,16 @@
+# [SUPERSEDED] `extract_chorus_coeffs.py` — what it found, and why it's done
+
+> **Outcome (resolved):** this dump was run and it *disproved* the hypothesis.
+> `sub_180388170` is **not** the coefficient generator — it is the **parameter
+> registry** (registers ~1121 parameters; its "constants" are name strings). The
+> real chorus *constructor* is `sub_1803A1300` (now ported as `juno_chorus_init`),
+> which sets the BBD delay-line lengths/indices. The actual coefficient **values**
+> are applied at runtime by the parameter system and are captured with Frida —
+> see **`docs/RUN_GUIDE_RUNTIME_CAPTURE.md`**. No need to run this script again;
+> it is kept for provenance. Original instructions below.
+
+---
+
 # How to run `extract_chorus_coeffs.py` (chorus coefficient generator dump)
 
 The stereo BBD chorus in `sub_180363380` reads ~250 read-only coefficient
