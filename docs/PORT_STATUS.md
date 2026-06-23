@@ -74,6 +74,45 @@ Helpers it needs are now ported (`juno_pitch_poly`, `juno_wrap_unit`,
 The dry synth voice + filter + envelopes + init are exact and complete; the
 above is the stereo-chorus/output layer on top.
 
+## DONE this session (branch claude/cool-volta-hnunqw)
+
+1. ✅ **Master transcribed** → `src/master_render.c` (`juno_master_render`,
+   sub_180363380). Body kept verbatim (IDA `_DWORD/_QWORD/_WORD/__int16` as
+   typedefs/macros, `a1` an `unsigned char*`) with 19 fixups only where Hex-Rays
+   dropped an XMM arg / mangled SIMD. **Every dropped arg recovered from the asm**
+   and documented in `docs/MASTER_RENDER_MAP.md` — notably the 3 chorus LFO
+   stages (stages 2 & 3 had the whole phase-increment block dropped; reconstructed
+   from asm, identical to the fully-decompiled stage 1) and the 3 output
+   `wrap_unit` LFOs. Compiles clean under `-Wall -Wextra`.
+2. ✅ **IDA extraction script** for the coeff generator →
+   `tools/extract_chorus_coeffs.py` (+ `docs/RUN_GUIDE_CHORUS_COEFFS.md`). Dumps
+   the **disassembly of sub_180388170** (Hex-Rays = None on it), its caller
+   context (for args), and its referenced `.rdata` float values. **User must run
+   this in IDA 9.3** and upload `chorus_coeffs/`.
+3. ✅ **Driver wired** → `src/juno_driver.c` / `.h` (`juno_driver_render_sample`):
+   renders voices into the 8-buffer layout the master expects (even slots
+   a2[0,2,…14]), supplies the chorus-mode selectors via a host-params shim
+   (`juno_driver_attach_host`), and calls the master. `make test` green
+   (`tests/test_master_smoke.c`).
+
+### Two hard truths found (no fabrication)
+- **Polyphony isn't free.** The 8 voice copies differ across THREE regions with
+  DIFFERENT strides (main +10512, shared +0, aux +32), so a single uniform base
+  shift CANNOT serve voices 1-7 — and the 8 decompiles differ in ~1800 lines
+  (Hex-Rays re-numbered temps), so they aren't trivially generatable either.
+  Faking it = a wrong approximation, so the driver renders **voice 0 exactly** and
+  zeros 1-7. True polyphony needs per-voice asm for sub_18036CE00..sub_180383F20
+  (transcribe each) OR a verified offset-classification to parameterise the one
+  render. Bounded, but real work.
+- **The master can't execute until the chorus coeffs exist.** Its BBD delay lines
+  index as `(len-1) & idx`; the length fields are among the ~250 produced by
+  sub_180388170, currently zero → mask `-1` → out-of-bounds read (verified
+  segfault). Even the "dry" branch indexes the delay lines, so "dry path still
+  correct" was optimistic. The driver therefore **gates** the master call on a
+  length sentinel and emits the exact dry voice sum until coeffs load. Once
+  `extract_chorus_coeffs.py` is run and sub_180388170 is transcribed, the gate
+  opens and the full master/chorus runs.
+
 ## Recommendation
 The exact DSP core is complete. Reaching a *playable, chorused* engine needs the
 chorus code located (one targeted Frida-assisted extraction) and the host glue
