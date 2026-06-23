@@ -104,12 +104,21 @@ def main():
         return
     if st > 0:
         log("Process RUNNING. Wait until IDA stops at the master, then run again."); return
-    # PHASE 1: arm + resume
+    # PHASE 1: arm + resume.
+    # Disable IDA's auto-suspend on thread/library/start events so the process runs
+    # straight to OUR breakpoint instead of stopping in ntdll every time a thread or
+    # DLL loads (that bouncing 0x7FF9... is exactly that). Breakpoints still suspend.
+    try:
+        old = ida_dbg.set_debugger_options(0)
+        log("disabled auto-suspend on thread/library events (was 0x%X)." % old)
+    except Exception as e:
+        log("couldn't auto-set options (%s); in the GUI uncheck 'Suspend on thread "
+            "start/exit' and 'Suspend on library load/unload'." % e)
     ida_dbg.add_bpt(master)
     log("breakpoint ARMED at master 0x%X." % master)
-    log(">>> Let audio play. IDA will STOP at the master (disasm jumps there).")
-    log(">>> THEN run this script AGAIN to dump. If it never stops, the audio engine")
-    log(">>> isn't processing (check CPU meter / track not frozen / not bypassed).")
+    log(">>> Make sure Ableton is actually producing sound (audio engine ON, track")
+    log(">>> not frozen/bypassed). IDA will STOP at the master (disasm jumps there).")
+    log(">>> THEN run this script AGAIN to dump.")
     ida_dbg.continue_process()
 
 if __name__ == "__main__":
