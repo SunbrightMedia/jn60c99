@@ -5,18 +5,19 @@
 # verify time-invariance (coeff vs state), inspect per-voice values, and find the
 # played note's pitch -- all without ever returning to the debugger.
 #
-# TWO-PHASE, NON-BLOCKING (reliable; gives visual confirmation):
-#   Run #1 (process suspended, not at master): arm breakpoint + resume, return.
-#           Let audio play; IDA STOPS at the master (disasm jumps there) = it works.
-#   Run #2 (stopped AT master): dump t0, run a few blocks, dump t1, write meta.
+# ONE-SHOT: it disables IDA's auto-suspend on thread/library events, arms a
+# breakpoint at the master, resumes, and BLOCK-WAITS (~60s) for the breakpoint to
+# hit; then dumps. No two-run timing race -- start continuous audio, run once.
 #
 # HOW TO RUN
-#   1. Host: load JUNO-60 with the PATCH + CHORUS MODE you want, hold a sustained
-#      note (e.g. middle C), audio running, settle ~1-2 s.
-#   2. IDA attached to the host (Local Windows debugger), process suspended.
-#   3. File -> Script file... -> dump_full_state.py   (run once to arm)
-#   4. Let audio play; when IDA stops at the master, run it AGAIN to dump.
-#   5. Zip the state_dump/ folder and upload it.
+#   1. Host: load JUNO-60 with the PATCH + CHORUS MODE you want. Turn the ARP OFF
+#      and HOLD a sustained note (or loop a clip) so audio is CONTINUOUS. Confirm
+#      you can hear it and the CPU meter is moving.
+#   2. IDA attached to the host (Local Windows debugger).
+#   3. File -> Script file... -> dump_full_state.py   (run ONCE, keep the note held)
+#   4. It prints "hit the master -- capturing", then dumps t0/t1 + meta.
+#   5. Edit state_dump/meta.txt (patch name, chorus mode, MIDI note), zip the
+#      state_dump/ folder and upload it.
 
 import os, struct
 import idc, ida_dbg, idautils
