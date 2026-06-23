@@ -1,0 +1,11 @@
+# Build artifacts
+*.o
+*.a
+*.so
+*.exe
+build/
+
+# IDA databases (large; not committed)
+*.i64
+*.idb
+extract.log
