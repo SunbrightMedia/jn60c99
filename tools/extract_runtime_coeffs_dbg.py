@@ -38,11 +38,11 @@ import idc, ida_dbg, ida_name, idautils
 IMAGE_BASE = 0x180000000
 RVA_MASTER = 0x363380        # sub_180363380 within the plugin module
 MASTER     = IMAGE_BASE + RVA_MASTER   # database EA (fallback only)
-# Substring (lowercased) of the plugin module's file name, used to find its REAL
-# runtime base after attaching to the host (the DLL may load at a relocated base,
-# so the database EA above won't bind a breakpoint unless IDA rebased). Adjust if
-# your binary's name differs.
-PLUGIN_HINT = "cloud"
+# Substring(s) (lowercased) of the plugin module's file name, used to find its
+# REAL runtime base after attaching to the host (the DLL may load at a relocated
+# base, so the database EA above won't bind a breakpoint unless IDA rebased). The
+# shipped binary is "JUNO-60(VST3 64bit).vst3"; add hints if yours differs.
+PLUGIN_HINTS = ["juno", "cloud"]
 SNAPSHOTS  = 3               # number of snapshots to compare for invariance
 SKIP       = 30              # block-hits to run between snapshots (catch slow drift)
 KNOWN      = [(2199956, 0x80000), (95828, 1024), (101028, 1024)]  # static base check
@@ -91,11 +91,12 @@ def resolve_master():
     for m in idautils.Modules():
         nm = m.name or ""
         found.append(nm)
-        if PLUGIN_HINT in os.path.basename(nm).lower():
+        base = os.path.basename(nm).lower()
+        if any(h in base for h in PLUGIN_HINTS):
             ea = m.base + RVA_MASTER
             log("plugin module: %s @ 0x%X -> master 0x%X" % (nm, m.base, ea))
             return ea
-    log("plugin module (hint '%s') not found among debugged modules." % PLUGIN_HINT)
+    log("plugin module (hints %s) not found among debugged modules." % PLUGIN_HINTS)
     log("loaded modules: " + ", ".join(os.path.basename(n) for n in found if n))
     log("set PLUGIN_HINT to a substring of the right one; using database EA 0x%X "
         "as a fallback (works only if IDA rebased the database)." % MASTER)
