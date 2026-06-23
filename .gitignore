@@ -9,3 +9,6 @@ build/
 *.i64
 *.idb
 extract.log
+
+# Test binaries
+tests/test_helpers
