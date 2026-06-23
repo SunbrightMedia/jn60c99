@@ -1,138 +1,138 @@
 #!/usr/bin/env python3
-# dump_full_state.py — capture the ENTIRE live engine-state block, ONCE, via IDA's
-# debugger. Dumps the whole ~11.5 MB the DSP uses, twice (t0/t1), to binary files.
-# Offline we extract any coefficient, tell coeff-vs-state by diffing t0/t1, inspect
-# per-voice values, and find the played note's pitch -- no more debugging.
+# dump_full_state.py — capture the live engine-state block by SCANNING memory for
+# its fingerprint. No breakpoints, no dependence on which build of the plugin runs.
 #
-# ROBUST MULTI-BREAKPOINT: the master alone wasn't being hit, so we breakpoint
-# EVERYTHING that runs when a note sounds -- the master, the voice dispatch, and all
-# 8 per-voice renders. They all receive the engine state in rcx, so whichever fires
-# first gives us the state pointer (validated by a base check). It also logs WHICH
-# function fired, which tells us what's actually on the live audio path.
+# WHY: breakpoints on every DSP function never fired while audio played -> the
+# running audio path is a different build than our database (CPU-specific variant).
+# But the engine STATE is a ~11.5 MB heap block with a unique signature set by the
+# chorus constructor: state[2199956]==0x80000, state[95828]==1024, [101028]==1024.
+# We just suspend the process, enumerate its memory, and find the block by that
+# signature -- then dump it twice (t0/t1) so offline we can extract every
+# coefficient and tell coeff-vs-state.
 #
 # HOW TO RUN
-#   1. Host: load JUNO-60 with the PATCH + CHORUS MODE you want. Turn ARP OFF and
-#      HOLD a sustained note so audio is CONTINUOUS (you should hear it).
+#   1. Host: JUNO-60 loaded with the PATCH + CHORUS MODE you want (a note doesn't
+#      even need to be held -- the state exists as soon as the plugin initialised).
 #   2. IDA attached to the host (Local Windows debugger).
-#   3. File -> Script file... -> dump_full_state.py   (run ONCE, keep the note held)
-#   4. It prints "HIT <fn> ... capturing", dumps t0/t1 + meta.
-#   5. Edit state_dump/meta.txt, zip state_dump/, upload it.
+#   3. File -> Script file... -> dump_full_state.py
+#   4. It suspends, scans, finds the state, dumps state_dump/. Zip & upload.
 
 import os, struct
-import idc, ida_dbg, idautils
+import idc, ida_dbg
 
-IMAGE_BASE  = 0x180000000
-PLUGIN_HINTS = ["juno", "cloud"]
-# every function that receives the engine state in rcx and runs while a note plays:
-RVAS = {
-    0x363380: "master",   0x398F30: "dispatch",
-    0x369070: "voice0",   0x36CE00: "voice1", 0x370B90: "voice2", 0x374900: "voice3",
-    0x378690: "voice4",   0x37C420: "voice5", 0x380190: "voice6", 0x383F20: "voice7",
-}
-DUMP_SIZE   = 0xB80000        # ~11.5 MB: covers the whole state the DSP reads
-CHUNK       = 0x10000         # 64 KB reads (zero-filled on any unmapped page)
-WAIT_SECS   = 3              # per wait timeout
-WAIT_TRIES  = 20             # total ~60s
-KNOWN       = [(2199956, 0x80000), (95828, 1024), (101028, 1024)]
+SIG = [(2199956, 0x80000), (95828, 1024), (101028, 1024)]   # state fingerprint
+MAXOFF      = max(o for o, _ in SIG)                          # 2199956
+MIN_REGION  = MAXOFF + 16                                     # region must cover the sig
+DUMP_SIZE   = 0xB80000        # ~11.5 MB dumped from the found base
+RCHUNK      = 0x100000        # 1 MB read chunks
+REGION_CAP  = 0x4000000       # scan at most 64 MB per region
 OUTDIR      = os.path.join(os.path.dirname(idc.get_idb_path()) or ".", "state_dump")
 
-def log(m): print("[full-dump] " + m)
+def log(m): print("[scan] " + m)
 
-def resolve_base():
-    found = []
-    for m in idautils.Modules():
-        nm = m.name or ""; found.append(nm)
-        if any(h in os.path.basename(nm).lower() for h in PLUGIN_HINTS):
-            log("plugin module: %s @ 0x%X" % (nm, m.base)); return m.base
-    log("module not found; loaded: " + ", ".join(os.path.basename(n) for n in found if n))
-    log("falling back to static imagebase 0x%X." % IMAGE_BASE); return IMAGE_BASE
+def regions():
+    """List (start, end, perm) of debuggee memory regions, robustly."""
+    out = []
+    try:
+        import ida_idd, ida_dbg as _d
+        mi = ida_idd.meminfo_vec_t()
+        if _d.get_memory_info(mi) > 0:
+            for r in mi: out.append((r.start_ea, r.end_ea, getattr(r, "perm", 0)))
+            return out
+    except Exception as e:
+        log("get_memory_info failed (%s); trying segments." % e)
+    try:
+        ida_dbg.refresh_debugger_memory()
+    except Exception:
+        pass
+    ea = idc.get_first_seg()
+    while ea != idc.BADADDR:
+        out.append((ea, idc.get_segm_end(ea), idc.get_segm_attr(ea, idc.SEGATTR_PERM)))
+        ea = idc.get_next_seg(ea)
+    return out
+
+def read_region(start, size):
+    size = min(size, REGION_CAP)
+    buf = bytearray(); off = 0
+    while off < size:
+        sz = min(RCHUNK, size - off)
+        b = idc.read_dbg_memory(start + off, sz)
+        if off == 0 and (not b or len(b) != sz):
+            return None                      # region not readable
+        buf += b if (b and len(b) == sz) else b"\x00" * sz
+        off += sz
+    return bytes(buf)
+
+def find_state():
+    need = struct.pack("<I", SIG[0][1])      # 0x80000 little-endian
+    v1024 = struct.pack("<I", 1024)
+    regs = regions()
+    log("enumerated %d memory regions; scanning ones >= %d bytes..." % (len(regs), MIN_REGION))
+    scanned = 0
+    for (s, e, perm) in regs:
+        size = e - s
+        if size < MIN_REGION: continue
+        buf = read_region(s, size)
+        if buf is None: continue
+        scanned += 1
+        idx = buf.find(need)
+        while idx != -1:
+            p = idx - SIG[0][0]
+            if p >= 0 and p + 101032 <= len(buf) \
+               and buf[p+95828:p+95832] == v1024 and buf[p+101028:p+101032] == v1024:
+                log("FOUND state fingerprint at 0x%X (region 0x%X..0x%X)" % (s + p, s, e))
+                return s + p
+            idx = buf.find(need, idx + 1)
+    log("scanned %d readable large regions; fingerprint NOT found." % scanned)
+    return None
 
 def ru32(ea):
     b = idc.read_dbg_memory(ea, 4)
     return struct.unpack("<I", b)[0] if b and len(b) == 4 else None
 
-def verify_base(base):
-    ok = True
-    for off, exp in KNOWN:
-        got = ru32(base + off)
-        if got != exp:
-            log("  base check: state[%d]=%s expected 0x%X"
-                % (off, ("0x%X"%got) if got is not None else "None", exp)); ok = False
-    return ok
-
 def dump_state(base, path):
     n = 0
     with open(path, "wb") as fh:
         while n < DUMP_SIZE:
-            sz = min(CHUNK, DUMP_SIZE - n)
+            sz = min(0x10000, DUMP_SIZE - n)
             b = idc.read_dbg_memory(base + n, sz)
             fh.write(b if b and len(b) == sz else b"\x00" * sz)
             n += sz
     log("wrote %s (%d bytes)" % (os.path.basename(path), DUMP_SIZE))
 
-def wait_any(timeout):
-    """Continue, wait for any breakpoint suspension. Returns rip or None (timeout)."""
-    ida_dbg.continue_process()
-    code = ida_dbg.wait_for_next_event(ida_dbg.WFNE_SUSP, timeout)
-    return idc.get_reg_value("rip") if code > 0 else None
-
-def capture(state_base, modbase):
-    os.makedirs(OUTDIR, exist_ok=True)
-    sr = ru32(state_base + 16)
-    log("dumping t0 (big read; a few seconds)...")
-    dump_state(state_base, os.path.join(OUTDIR, "state_t0.bin"))
-    # advance a few block-hits, then dump t1 from a fresh rcx
-    base2 = state_base
-    for _ in range(12):
-        rip = wait_any(WAIT_SECS)
-        if rip is None: break
-        rcx = idc.get_reg_value("rcx")
-        if verify_base(rcx): base2 = rcx
-    log("dumping t1...")
-    dump_state(base2, os.path.join(OUTDIR, "state_t1.bin"))
-    with open(os.path.join(OUTDIR, "meta.txt"), "w") as fh:
-        fh.write("state_base_t0=0x%X\nstate_base_t1=0x%X\nmodule_base=0x%X\nsize=0x%X\n"
-                 "sample_rate_bits=0x%08X\n" % (state_base, base2, modbase, DUMP_SIZE, sr or 0))
-        fh.write("# fill in: patch name, chorus mode, MIDI note held\n")
-    for ea in list(RVAS): ida_dbg.del_bpt(modbase + ea)
-    log("DONE. Zip state_dump/ and upload it. (process left suspended.)")
-
 def main():
     if ida_dbg.get_process_state() == 0:
         log("No debug session. Attach IDA to the host first, then re-run."); return
-    base = resolve_base()
-    try:
-        old = ida_dbg.set_debugger_options(0)
-        log("disabled auto-suspend on thread/library events (was 0x%X)." % old)
-    except Exception as e:
-        log("couldn't auto-set options (%s); GUI: uncheck the 'Suspend on thread/"
-            "library' options." % e)
-    addr2name = {}
-    for rva, name in RVAS.items():
-        ea = base + rva
-        ok = ida_dbg.add_bpt(ea)
-        addr2name[ea] = name
-        log("bp %-8s @ 0x%X  add_bpt=%s" % (name, ea, ok))
+    # make sure the process is suspended so memory is stable
+    if ida_dbg.get_process_state() > 0:
+        log("suspending process for a stable scan...")
+        ida_dbg.suspend_process()
+        ida_dbg.wait_for_next_event(ida_dbg.WFNE_SUSP, 10)
 
-    log("resuming and WAITING for any of them to fire (~%ds)." % (WAIT_SECS * WAIT_TRIES))
-    log(">>> HOLD a sustained note NOW (arp OFF, audio engine ON).")
-    for i in range(WAIT_TRIES):
-        rip = wait_any(WAIT_SECS)
-        if rip is None:
-            log("  ...still waiting (%d/%d) — note held? audio audible?" % (i + 1, WAIT_TRIES))
-            continue
-        name = addr2name.get(rip, "0x%X" % rip)
-        rcx = idc.get_reg_value("rcx")
-        log("HIT %s (rip=0x%X), rcx=0x%X" % (name, rip, rcx))
-        if verify_base(rcx):
-            log("base check OK — that rcx is the engine state. capturing.")
-            capture(rcx, base); return
-        log("  (rcx isn't the engine state here; continuing to the next hit)")
-    log("Nothing fired in ~%ds. If you can clearly HEAR a sustained JUNO-60 note,"
-        % (WAIT_SECS * WAIT_TRIES))
-    log("then the live audio path uses code at addresses we don't expect (e.g. a")
-    log("CPU-specific build) — tell the porting side and we'll adapt. Otherwise make")
-    log("sure the note is sustained and audible, and run again.")
+    base = find_state()
+    if base is None:
+        log("Could not find the engine state. Make sure JUNO-60 is loaded/initialised")
+        log("in the host. If it still fails, tell the porting side the region list above.")
+        return
+
+    os.makedirs(OUTDIR, exist_ok=True)
+    sr = ru32(base + 16)
+    log("dumping t0 (big read; a few seconds)...")
+    dump_state(base, os.path.join(OUTDIR, "state_t0.bin"))
+    # resume briefly so per-sample state advances, then re-suspend and dump t1 from
+    # the SAME base (a heap block doesn't move).
+    try:
+        ida_dbg.continue_process(); ida_dbg.wait_for_next_event(ida_dbg.WFNE_SUSP, 1)
+        ida_dbg.suspend_process();  ida_dbg.wait_for_next_event(ida_dbg.WFNE_SUSP, 5)
+    except Exception:
+        pass
+    log("dumping t1...")
+    dump_state(base, os.path.join(OUTDIR, "state_t1.bin"))
+    with open(os.path.join(OUTDIR, "meta.txt"), "w") as fh:
+        fh.write("state_base=0x%X\nsize=0x%X\nsample_rate_bits=0x%08X\n"
+                 % (base, DUMP_SIZE, sr or 0))
+        fh.write("# fill in: patch name, chorus mode, MIDI note (if any)\n")
+    log("DONE. Zip state_dump/ and upload it.")
 
 if __name__ == "__main__":
     main()
