@@ -6,6 +6,7 @@
  */
 #include "juno_dsp.h"
 #include <math.h>
+#include "juno_tables.h"
 
 /* ── 0x180368D60 — juno_wrap24 ──────────────────────────────────────────────
  * Wrap a value into signed 24-bit fixed point and scale back by 2^-24.
@@ -67,4 +68,46 @@ float juno_triangle(float phase)
     } else {
         return -2.0f - v2;          /* -2 - 2*p */
     }
+}
+
+/* ── 0x180368DC0 — juno_pitch_poly ──────────────────────────────────────────
+ * Pitch -> ratio via the 13-term spline in juno_pitch_table (the unk_1809894E0
+ * table, row = clamp(x,-20,8.9)+20). Exact transcription.
+ */
+double juno_pitch_poly(double x)
+{
+    double v1 = fmin(fmax(x, -20.0), 8.9);
+    double v2 = v1 * v1 * v1;
+    const double *v3 = juno_pitch_table[(int)(v1 + 20.0)];
+    double v4 = v2 * v1 * v1;
+    double v5 = v4 * v1 * v1;
+    double v6 = v5 * v1 * v1;
+    return v1 * v3[2]
+         + v3[0]
+         + v1 * v1 * v3[4]
+         + v2 * v3[6]
+         + v2 * v1 * v3[8]
+         + v4 * v3[10]
+         + v4 * v1 * v3[12]
+         + v5 * v3[14]
+         + v5 * v1 * v3[16]
+         + v6 * v3[18]
+         + v6 * v1 * v3[20]
+         + v6 * v1 * v1 * v3[22]
+         + v6 * v1 * v1 * v1 * v3[24];
+}
+
+/* ── 0x180368F30 — juno_wrap_unit: wrap to [-1,1) both directions ─────────── */
+float juno_wrap_unit(float x)
+{
+    if (x > 1.0f)  return fmodf(x + 1.0f, 2.0f) - 1.0f;
+    if (x < -1.0f) return fmodf(x - 1.0f, 2.0f) + 1.0f;
+    return x;
+}
+
+/* ── 0x180368F90 — juno_wrap_hi: wrap only when > 1 ───────────────────────── */
+float juno_wrap_hi(float x)
+{
+    if (x > 1.0f) return fmodf(x + 1.0f, 2.0f) - 1.0f;
+    return x;
 }
