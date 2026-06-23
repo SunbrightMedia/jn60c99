@@ -1,14 +1,19 @@
-/* chorus_coeffs_data.c — the 241 chorus/output coefficient values the master
- * (sub_180363380) reads but no static init writes. They are applied at runtime
- * by the plugin's parameter system (sub_180388170 registers each as a parameter
- * target; several pass through a param->curve mapping), so they are captured as
- * MEASUREMENTS from the live plugin via tools/capture_chorus_coeffs.js — not
- * fitted. See docs/RUN_GUIDE_CHORUS_CAPTURE.md.
+/* runtime_coeffs_data.c — the 349 parameter-applied coefficient values the DSP
+ * (voice_render + master) READS but no static init writes. They are applied at
+ * runtime by the plugin's parameter system: sub_180388170 registers ~1121
+ * parameters, each via lea [rdi+slot] + a default -> sub_1803ABA00; the values
+ * (voice patch: osc levels, cutoff, env, mix; chorus: BBD clock/LFO/mix/output
+ * saturator) are written when defaults/presets are applied, several through a
+ * param->curve map. So they are captured as MEASUREMENTS from the live plugin
+ * via tools/capture_runtime_coeffs.js -- not fitted. These are exactly the
+ * runtime-only values the handoff sanctions a Frida capture for.
  *
- * UNTIL CAPTURED: every value below is 0, so juno_chorus_coeffs_apply() is a
- * no-op and the chorus stays inert (the pipeline runs, output is dry/near-silent).
- * Run the Frida script, paste its emitted table over the placeholder `k[]` below,
- * and the chorus comes alive with the plugin's exact coefficients.
+ * 107 are voice-region (a patch); 242 are chorus/master-region. Capturing them
+ * for one default patch makes the engine PLAYABLE (a note produces sound, the
+ * chorus is live). See docs/RUN_GUIDE_RUNTIME_CAPTURE.md.
+ *
+ * UNTIL CAPTURED every value is 0, so juno_runtime_coeffs_apply() is a no-op and
+ * the engine is silent (no patch). Paste the Frida output over `k[]` below.
  */
 #include "juno_engine.h"
 #include <string.h>
@@ -18,6 +23,24 @@ typedef struct { int off; uint32_t bits; } juno_coeff;
 
 /* ==== PLACEHOLDER: replace this whole array with the Frida capture output ==== */
 static const juno_coeff k[] = {
+  {272,0}, {304,0}, {368,0}, {384,0}, {592,0}, {608,0},
+  {624,0}, {1040,0}, {1056,0}, {1072,0}, {1088,0}, {1856,0},
+  {1872,0}, {1888,0}, {1904,0}, {1920,0}, {1936,0}, {1952,0},
+  {1968,0}, {1984,0}, {2000,0}, {2016,0}, {2032,0}, {2048,0},
+  {2064,0}, {2080,0}, {2096,0}, {2112,0}, {2560,0}, {2784,0},
+  {2800,0}, {2816,0}, {2832,0}, {2848,0}, {3040,0}, {3264,0},
+  {3280,0}, {3296,0}, {3312,0}, {3328,0}, {3840,0}, {3856,0},
+  {3872,0}, {3888,0}, {3904,0}, {3920,0}, {3936,0}, {3952,0},
+  {3968,0}, {3984,0}, {4000,0}, {4016,0}, {4032,0}, {4048,0},
+  {4064,0}, {4080,0}, {4096,0}, {4112,0}, {4128,0}, {4144,0},
+  {4192,0}, {4208,0}, {4224,0}, {5520,0}, {6448,0}, {6512,0},
+  {6528,0}, {6720,0}, {6736,0}, {6832,0}, {6864,0}, {7008,0},
+  {7024,0}, {7296,0}, {7312,0}, {7328,0}, {7344,0}, {7360,0},
+  {7376,0}, {7392,0}, {7408,0}, {7424,0}, {7440,0}, {7456,0},
+  {7472,0}, {7600,0}, {7616,0}, {7632,0}, {9056,0}, {9072,0},
+  {9088,0}, {9104,0}, {9584,0}, {9600,0}, {9616,0}, {9680,0},
+  {9824,0}, {10176,0}, {10192,0}, {10208,0}, {10224,0}, {10240,0},
+  {10256,0}, {10272,0}, {10288,0}, {10304,0}, {10320,0}, {84304,0},
   {84448,0}, {84464,0}, {84480,0}, {84496,0}, {84544,0}, {84560,0},
   {85136,0}, {85152,0}, {85168,0}, {85184,0}, {85984,0}, {86288,0},
   {86304,0}, {86320,0}, {87056,0}, {91120,0}, {91136,0}, {91152,0},
@@ -61,9 +84,9 @@ static const juno_coeff k[] = {
   {11022340,0},};
 /* ==== END PLACEHOLDER ==== */
 
-/* Apply the captured chorus coefficients into the engine state. Call after
+/* Apply the captured runtime coefficients into the engine state. Call after
  * juno_chorus_init + juno_engine_init. No-op while the table is all zeros. */
-void juno_chorus_coeffs_apply(unsigned char *st)
+void juno_runtime_coeffs_apply(unsigned char *st)
 {
     size_t i, n = sizeof(k) / sizeof(k[0]);
     for (i = 0; i < n; ++i) {
@@ -71,4 +94,14 @@ void juno_chorus_coeffs_apply(unsigned char *st)
         memcpy(&f, &k[i].bits, sizeof f);
         JF(st, k[i].off) = f;
     }
+}
+
+/* 1 once real coefficients have been captured (any nonzero entry), else 0. The
+ * driver gates the full master/chorus vs the dry voice fallback on this. */
+int juno_runtime_coeffs_loaded(void)
+{
+    size_t i, n = sizeof(k) / sizeof(k[0]);
+    for (i = 0; i < n; ++i)
+        if (k[i].bits != 0u) return 1;
+    return 0;
 }

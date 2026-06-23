@@ -22,7 +22,7 @@ int main(void)
     JF(st, 16) = 44100.0f;
     juno_chorus_init(st);                   /* constructor: delay lengths + zero */
     uint32_t rate = juno_engine_init(st);   /* voice coefficients */
-    juno_chorus_coeffs_apply(st);           /* chorus float coeffs (no-op until captured) */
+    juno_runtime_coeffs_apply(st);           /* chorus float coeffs (no-op until captured) */
 
     static struct juno_host_shim shim;
     juno_driver_attach_host(st, &shim, 0 /* dry/bypass */);
@@ -39,8 +39,8 @@ int main(void)
 
     printf("ran 2048 samples; last out = (%g, %g); nonfinite = %d\n", l, r, nonfinite);
     printf("path: %s\n", ran_master
-           ? "full master/chorus (coeffs loaded)"
-           : "dry voice sum (chorus coeffs from sub_180388170 not yet captured)");
+           ? "full master/chorus (runtime coeffs loaded)"
+           : "dry voice sum (runtime coeffs not yet captured)");
     if (nonfinite) { printf("FAIL: non-finite output from master pipeline\n"); free(st); return 1; }
     printf("OK: init + driver + master_render linked & ran clean (finite, no crash)\n");
     free(st);
