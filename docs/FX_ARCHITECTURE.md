@@ -46,3 +46,22 @@ the voice/master/chorus, validated as it goes.
 `refs/data/`: the resolved FX/arp vtables, the six FX/arp/gate tables (raw bytes),
 and the segment map. Full 5.4 MB dump (raw `.rdata`/`.data`/`.pdata`) kept locally,
 gitignored. Resolver: `tools/resolve_vtable.py`.
+
+## Arp finding (closes the loop)
+The arp scanner (`sub_1803C0260`) and note-output (`sub_1803C35A0`: velocity-sens
+scaling → synth note-on via `*(synth_vtable+24)`) are transcribable, and the
+note-ordering (mode/range via `obj+3472`) is visible in the scanner. BUT the
+rhythm/gate **pattern table** (`obj+610`, 6 bytes/step) is **patch data** — it's
+what makes "SQ Dynamic **ARPG**" a specific sequenced groove. So reproducing *this*
+arp needs the preset parser too. The arp *engine* is doable; the *pattern* is data.
+
+## Net scope to reproduce "SQ Dynamic ARPG"
+Four large, partly-interdependent subsystems:
+1. **Preset parser** (`KoaBankFile00003` schema) — supplies the patch values AND the
+   arp pattern. Largest single sub-project; mostly generic Roland-framework plumbing.
+2. **Arp engine** — scanner + key buffer + clock; transcribable, drives note events.
+3. **Delay worker** — behind the threading/task dispatch; needs the dispatch traced.
+4. **Reverb worker** — Schroeder/FDN tank (coefficients recovered); also behind the
+   task dispatch.
+The data is fully unblocked for all four; the remaining cost is transcription +
+tracing the FX task dispatch, realistically multiple dedicated sessions.
