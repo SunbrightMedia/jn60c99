@@ -5,15 +5,14 @@
  * the master reads through a host-params pointer, and calls the master process
  * (juno_master_render = sub_180363380) to produce the final stereo sample.
  *
- * SCOPE / HONESTY: the master's input is 8 voice samples. We have ONE exact voice
- * render (juno_voice_render = sub_180369070, voice 0's absolute offsets). The
- * plugin compiled 8 specialised copies; voices differ across THREE regions with
- * DIFFERENT strides (main +10512, shared +0, aux +32), so a single uniform base
- * shift cannot serve voices 1-7 correctly. Faking it would be a wrong
- * approximation (forbidden). Until the per-voice renders exist (dump asm for
- * sub_18036CE00..sub_180383F20 and transcribe each, or build a verified offset
- * classification to parameterise the one render), voices 1-7 are rendered as
- * silence. Voice 0 is exact. See docs/PORT_STATUS.md.
+ * POLYPHONY: the master's input is 8 voice samples. The plugin compiled 8
+ * specialised copies of the voice render; diffing all 8 decompiles
+ * (sub_18036CE00..sub_180383F20) proves each is voice 0's identical code with its
+ * state offsets shifted by region (main +10512*v, shared +0, aux +32*v) — verified
+ * EXACTLY for all 622 offsets. So one parameterised render (juno_voice_render_v +
+ * juno_voff) serves all 8 voices faithfully; we render each into its buffer and let
+ * the master sum them. Per-voice patch coefficients are broadcast to all voices in
+ * juno_runtime_coeffs_apply. See docs/PORT_STATUS.md / docs/POLYPHONY.md.
  */
 #include "juno_engine.h"
 #include "juno_driver.h"
@@ -78,12 +77,11 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
         a2[2 * i] = &vbuf[i];                          /* even slots = voices */
     }
 
-    /* Voice 0 — the one exact render we have. */
-    {
+    /* Render all 8 voices via the verified per-voice offset remap (juno_voff). */
+    for (i = 0; i < JUNO_NUM_VOICES; ++i) {
         float vr = 0.0f;
-        juno_voice_render(st, &vbuf[0], &vr);
+        juno_voice_render_v(st, &vbuf[i], &vr, i);
     }
-    /* Voices 1..7 stay 0.0f (see SCOPE note above). */
 
     /* Run the full master/chorus only once the float coefficients are captured;
      * with them zero the master's output saturator collapses to silence, so the

@@ -90,7 +90,20 @@ static const juno_coeff k[] = {
 void juno_runtime_coeffs_apply(unsigned char *st)
 {
     size_t i, n = sizeof(k) / sizeof(k[0]);
-    for (i = 0; i < n; ++i) { float f; memcpy(&f, &k[i].bits, sizeof f); JF(st, k[i].off) = f; }
+    for (i = 0; i < n; ++i) {
+        float f; memcpy(&f, &k[i].bits, sizeof f);
+        JF(st, k[i].off) = f;
+        /* These coefficients were captured from voice 0's region. The plugin's
+         * parameter system broadcasts each per-voice patch value to ALL 8 voices,
+         * so replicate the per-voice main-block fields (verified range [176,10672])
+         * into voices 1..7 at +10512*v. Global/master/chorus coeffs (outside that
+         * range) are written once. Without this, only voice 0 sounds. */
+        if (k[i].off >= 176 && k[i].off <= 10672) {
+            int v;
+            for (v = 1; v < JUNO_NUM_VOICES; ++v)
+                JF(st, k[i].off + v * JUNO_VOICE_MAIN_STRIDE) = f;
+        }
+    }
 }
 
 int juno_runtime_coeffs_loaded(void)

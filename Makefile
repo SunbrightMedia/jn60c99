@@ -43,6 +43,11 @@ scale: tests/play_scale.c $(SRC)
 	$(CC) $(CFLAGS) -o tests/play_scale tests/play_scale.c $(SRC) $(LDLIBS)
 	./tests/play_scale /tmp/juno_scale.wav 0.55
 
+# Render a chord progression (proves polyphony). `make chord` -> /tmp/juno_chord.wav
+chord: tests/play_chord.c $(SRC)
+	$(CC) $(CFLAGS) -o tests/play_chord tests/play_chord.c $(SRC) $(LDLIBS)
+	./tests/play_chord /tmp/juno_chord.wav
+
 # Capture-free per-sample A/B: run our DSP forward from t0, match t1 (control-rate).
 ab: tests/ab_persample.c $(SRC)
 	gunzip -kf state_dump/state_t0.bin.gz state_dump/state_t1.bin.gz

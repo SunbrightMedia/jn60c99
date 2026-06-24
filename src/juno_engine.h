@@ -34,6 +34,19 @@ extern "C" {
 #define JF(st, off)  (*(float   *)((unsigned char *)(st) + (off)))   /* float  */
 #define JI(st, off)  (*(int32_t *)((unsigned char *)(st) + (off)))   /* int32  */
 
+/* Per-voice offset remap. The plugin compiled 8 specialised voice renders; diffing
+ * all 8 decompiles proves each is voice 0's identical code with its state offsets
+ * shifted by region: main block +10512*v, the shared block [84000,90000) unshifted,
+ * and the aux slot (101504) +32*v. This reproduces voice v's offsets EXACTLY (all
+ * 622 verified against sub_18036CE00..sub_180383F20), so one parameterised render
+ * serves all voices faithfully. juno_voff(off,0) == off (voice 0 unchanged). */
+static inline size_t juno_voff(size_t off, int v)
+{
+    if (off >= 84000u && off < 90000u)  return off;                  /* shared */
+    if (off >= 100000u)                 return off + (size_t)32 * v; /* aux    */
+    return off + (size_t)10512 * v;                                  /* main   */
+}
+
 /* Full engine state size. The initializer (sub_1803990C0) writes up to offset
  * ~10.69 MB (all 8 voices + global blocks); the master reads a counter at
  * +11022344. 12 MB covers the whole block with margin. */
@@ -69,6 +82,10 @@ int juno_runtime_coeffs_loaded(void);
  * plugin duplicates the mono voice to both channels; stereo comes from chorus).
  * Returns the sample as a bit pattern (the decompile returns it in eax). */
 uint32_t juno_voice_render(unsigned char *st, float *outL, float *outR);
+
+/* Polyphonic variant: render voice `v` (0..7) using the verified per-region offset
+ * remap (juno_voff). juno_voice_render(st,l,r) == juno_voice_render_v(st,l,r,0). */
+uint32_t juno_voice_render_v(unsigned char *st, float *outL, float *outR, int v);
 
 /* juno_master_render — exact transcription of sub_180363380. The master process:
  * sums the 8 voice samples, runs the stereo BBD chorus, and writes the final

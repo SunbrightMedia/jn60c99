@@ -10,12 +10,25 @@
 #include <math.h>
 #include <string.h>
 
-#define JU(st, off)  (*(uint32_t *)((unsigned char *)(st) + (off)))
+/* Polyphonic remap: every state access in this file is shifted into voice _v's
+ * region via the verified juno_voff() rule (see juno_engine.h). The local _v is a
+ * parameter of juno_voice_render_v; for voice 0 the remap is the identity, so the
+ * voice-0 output is bit-identical to the original transcription. */
+#undef JF
+#undef JI
+#define JF(st, off)  (*(float    *)((unsigned char *)(st) + juno_voff((off), _v)))
+#define JI(st, off)  (*(int32_t  *)((unsigned char *)(st) + juno_voff((off), _v)))
+#define JU(st, off)  (*(uint32_t *)((unsigned char *)(st) + juno_voff((off), _v)))
 
 static inline float    f32_from_bits(uint32_t b){ float f; memcpy(&f,&b,4); return f; }
 static inline uint32_t bits_from_f32(float f){ uint32_t b; memcpy(&b,&f,4); return b; }
 
 uint32_t juno_voice_render(unsigned char *a1, float *outL, float *outR)
+{
+    return juno_voice_render_v(a1, outL, outR, 0);
+}
+
+uint32_t juno_voice_render_v(unsigned char *a1, float *outL, float *outR, int _v)
 {
   float v2; // xmm4_4
   float v5; // xmm0_4
@@ -1225,7 +1238,7 @@ LABEL_46:
                          + 1.0))
          * JF(a1, 7856);
     v239 = v238 * v238;
-    v240 = (float)((float)((float)((float)((float)((float)((float)((float)(v238 * v238) * *(float *)(a1 + 0x2000))
+    v240 = (float)((float)((float)((float)((float)((float)((float)((float)(v238 * v238) * JF(a1, 0x2000))
                                                          + JF(a1, 8160))
                                                  * (float)(v239 * v239))
                                          + (float)((float)((float)(v238 * v238) * JF(a1, 8128))
