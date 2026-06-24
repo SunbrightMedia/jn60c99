@@ -1,8 +1,8 @@
 # master_render (sub_180363380) — transcription map & dropped-arg resolutions
 
 `sub_180363380` is the **master process**: 8-voice mix → stereo BBD chorus
-(multi-mode) → true-stereo output. Source: `init_dump/020_sub_180363380_*.c`
-(2875-line Hex-Rays body; `audio_search/000_*` is byte-identical). Ported to
+(multi-mode) → true-stereo output. Source: `sub_180363380` in the full decompile
+(`refs/allcode_decomp.tgz`, file `decomp_360000.c`; 2875-line Hex-Rays body). Ported to
 `src/master_render.c` by `tools/translate_master.py`.
 
 ## Method

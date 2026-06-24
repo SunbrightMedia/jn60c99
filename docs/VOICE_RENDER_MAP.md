@@ -3,7 +3,8 @@
 Per-sample, mono-per-voice render. Operates on the voice-state struct (`a1`).
 Output: one float at `a1+10672`, written to both L and R (`**a2`, `*a2[1]`);
 stereo is added later by the chorus. All 8 voice copies are identical (per-voice
-base stride +10512). Line numbers refer to `dsp_dump/0021_sub_180369070_*.c`.
+base stride +10512). Line numbers refer to `sub_180369070` in the full decompile
+(`refs/allcode_decomp.tgz`, file `decomp_360000.c`).
 
 ## Stages (top → bottom)
 
@@ -59,6 +60,7 @@ exact source register for Pattern B's numerator and Pattern C's `xmm7` will be
 re-confirmed against full register state when that stage is transcribed (the asm
 file has the complete trace).
 
-**Status:** all data needed for the voice engine is now in hand — `dsp_dump`
-(algorithm) + `init_dump` (coefficients) + `asm_dump` (dropped args). No further
-extraction is required; remaining work is transcription.
+**Status:** all data needed for the voice engine is in hand — the full decompile
+(`refs/allcode_decomp.tgz`: algorithm + initializer/coefficients) + `asm_dump`/
+`everything_static` (dropped args from disassembly). No further extraction is
+required; the voice engine is transcribed (`src/voice_render.c`).

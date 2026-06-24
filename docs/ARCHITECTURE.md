@@ -1,8 +1,9 @@
-# Cloud 60 DSP architecture (derived from the IDA dump)
+# Cloud 60 DSP architecture (derived from the decompile)
 
-This is the map of the audio engine, reconstructed from `dsp_dump/`. It records
-what each function in the closure *is*, so transcription doesn't re-derive it.
-ImageBase `0x180000000`. The decompile is the spec (see `HANDOFF_IDA.md`).
+This is the map of the audio engine, reconstructed from the full decompile
+(`refs/allcode_decomp.tgz`). It records what each function in the closure *is*, so
+transcription doesn't re-derive it. ImageBase `0x180000000`. The decompile is the
+spec (see `docs/DATA_PROVENANCE.md`).
 
 ## Processing model
 
@@ -64,15 +65,15 @@ and call it per active voice. Do NOT write eight copies.
   list. Voice allocation bookkeeping.
 - **`0x1803C2E00`**: per-voice "is still active" predicate (returns bool).
 
-## Chorus cluster (stereo BBD) — to transcribe
+## Chorus cluster (stereo BBD) — transcribed
 
 - **`0x1803C52E0`**: chorus process entry; calls the BBD stage functions
   `0x1803C8120, 0x1803C8390, 0x1803C86A0, 0x1803C87E0`.
-- **`0x1803C5070`**: chorus allocation/init (heap). Some coefficient *values*
-  live at runtime here — per the handoff, the handful of runtime chorus values
-  come from the old project's **Frida golden dumps only** (real measurements),
-  cross-checked against the offsets this code reads. Pull those only when we
-  reach the chorus.
+- **`0x1803C5070`**: chorus allocation/init (heap). The stereo BBD chorus is now
+  transcribed (`src/master_render.c` + `src/chorus_init.c`); its coefficients are
+  **derived from the decompiled code + recovered tables**, not measured. (This
+  supersedes the original plan, which had assumed a few chorus values would be
+  runtime-only and need a capture — they were recovered statically instead.)
 - Small helpers: `0x1803C56C0, 0x1803C5BC0, 0x1803C5CF0` (error/throw paths,
   not DSP).
 
@@ -93,5 +94,5 @@ the C library's. Everything else is not part of the audio algorithm.
 3. `voice_render` body, validated stage-by-stage against the decompile's
    intermediate signals.
 4. Voice dispatch + lifecycle (clean offline driver, no host threading).
-5. Chorus chain (+ Frida runtime values).
+5. Chorus chain (coefficients derived statically from the decompile).
 6. Assemble full engine; only then end-to-end.

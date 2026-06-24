@@ -59,7 +59,7 @@ The init check above proves the *initialisation* matches. For the *running* DSP:
   expected; the audio bounce covers those.)
 - **Audio bounce (`make abwav REF=plugin_ref.wav`):** the one capture still needed —
   the plugin's own WAV output for a known note. `tests/wav_compare` diffs envelope,
-  pitch and timbre (spectral cosine). See docs/RUN_GUIDE_AUDIO_AB.md. The pitch ratio
+  pitch and timbre (spectral cosine). See docs/RUN_GUIDE_AB_AUDIO.md. The pitch ratio
   also pins the MIDI-note → pitch mapping (the one open gap) from real data.
 
 ## Reproduce

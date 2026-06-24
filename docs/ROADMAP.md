@@ -73,7 +73,7 @@ the way the plugin does, no preset is faithful and effect coeffs can't be set.*
 
 - **2.1 Transcribe the parameter apply path.** The registry `sub_180388170` names the
   ~1122 params and their offsets (`docs/COEFF_PARAM_MAP.md`, `docs/PARAM_MAP.tsv`); the
-  *values* are applied downstream by the parameter system (`docs/PARAM_SETTER_PLAN.md`).
+  *values* are applied downstream by the parameter system (`docs/PARAM_APPLY_MAP.md`).
   Transcribe that apply/curve code: param value → state coefficient(s), including the
   curve LUTs. *Oracle: we already have a full captured coefficient set for PD Juno Pad
   — applying that patch's param values must reproduce those 279+ coefficients exactly.*

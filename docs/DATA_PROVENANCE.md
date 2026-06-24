@@ -1,60 +1,47 @@
 # Data provenance & trust verdict
 
 What is trustworthy as a coefficient/algorithm source for this port, and what is
-not. Recorded so it is never re-litigated. The project rule: the decompile is the
-spec; fitted/calibrated numbers are forbidden (see `HANDOFF_IDA.md`).
+not. Recorded so it is never re-litigated. **Project rule: the decompile is the
+spec; fitted/calibrated numbers are forbidden.**
 
-## TRUSTED — use these
+## TRUSTED — the decompile is the single source
 
 | Source | What it provides | Why trusted |
 |--------|------------------|-------------|
-| `dsp_dump/` | The audio **algorithm** (voice render, master dispatch, chorus code, helpers) | Direct Hex-Rays decompile of the shipped binary. |
-| `init_dump/` | The **coefficient values** the voice path reads | Static `.rdata` floats + the initializer (`0x1803990C0`) that writes them into the voice struct. Freshly extracted from the same binary. |
+| `refs/allcode_decomp.tgz` | The audio **algorithm** (voice render, master/chorus, FX graph, helpers) and the **coefficient values** (static `.rdata` floats + the initializer `sub_1803990C0` that writes them) | Direct Hex-Rays decompile of the shipped binary; full plugin, indexed by `refs/manifest.tsv`. |
+| `asm_dump/`, `everything_static/`, `master_deps/`, `param_setter/`, `host_layer/` | Disassembly for functions Hex-Rays dropped args on or returned `None` for | Raw IDA asm of the same binary — the only version-controlled disassembly. |
+| `refs/data/`, `refs/*.json` | Resolved FX/arp vtables and extracted coefficient tables | Extracted from the binary's data segments. |
 
 ### Proof the voice path is fully covered
 
-`sub_1803990C0` (the voice initializer, 2289 struct writes) writes every
-read-only coefficient field `voice_render` consumes. Spot-decoded:
-
+`sub_1803990C0` (2289 struct writes) writes every read-only coefficient field
+`voice_render` consumes. Spot-decoded:
 - Waveshaper polynomial `a1+2160..+2256` = `0.0027, 0.1221, 2.1487, −0.8796,
-  −0.3931, −0.5017, 2.718282`. The trailing `2.718282` is **e** — these are the
-  genuine designed exp-saturation coefficients.
+  −0.3931, −0.5017, 2.718282` — the trailing `2.718282` is **e**: genuine designed
+  exp-saturation coefficients.
 - Mix/scale `a1+2352..+2464` = `0.5, 1, 1, 2, 0.5, 14, 0.0142`.
 
-`dsp_dump` (algorithm) + `init_dump` (values) ⇒ the **voice engine is
-bit-exact-portable with no external data**.
+⇒ The voice engine is **bit-exact-portable with no external data**.
 
-## UNTRUSTED — quarantined, do NOT use as coefficient source
+## FORBIDDEN — fitted/calibrated numbers (the failed-project poison)
 
-Files in `quarantine/old_project_UNTRUSTED/` (kept only as evidence):
+The previous, abandoned effort produced a "golden dump" of fitted coefficients
+("calibrated to 0.539x from P6 audio", "fixed 4x level deficit", "fitted filter").
+Those values do **not** exist in the binary's static `.rdata` (verified offset by
+offset) and were never used as a source here. The raw poison files have been
+**removed** from the repo; this verdict is kept so the lesson is not re-learned:
+**if a number isn't in the decompile, it does not go in the port.**
 
-- **`golden_dump_20260621.txt`** — from the failed previous project.
-  **Contaminated with fitted values.** Cross-checked its filter/LFO/master
-  numbers against the binary's static `.rdata`:
+## Captures that remain — oracles only, never sources
 
-  | old-dump value (claim) | in binary `.rdata`? |
-  |---|---|
-  | `0.10703` "cascade g" | ABSENT |
-  | `0.56808`, `-0.28404` "filter taps" | ABSENT |
-  | `0.000038666` "the missing coeff" | ABSENT |
-  | `0.24184303`, `1.4754223`, `0.83815932` | ABSENT |
-  | `0.6428789` | present (genuine — it's in the voice-init table) |
+A small number of live-plugin captures survive strictly as **cross-checks**, never
+compiled in as the port's values:
+- `state_dump/*.bin.gz` — memory snapshot backing the 2289/2289 init bit-exact
+  proof.
+- `src/runtime_coeffs_data.c` — a captured PD-Juno-Pad coefficient set used to
+  validate the param-apply engine (88/88 LUT members exact). The apply mechanism
+  is transcribed from the decompile; the capture only confirms it.
 
-  Its own notes confirm fitting: *"APPLIED to fitted filter"*, *"calibrated to
-  0.539x from P6 audio"*, *"fixed 4x level deficit"*, *"Needs targeted
-  re-capture"*. This is exactly the "poison" the handoff warns against. Only ever
-  used here as a loose sanity cross-reference — never as a value source.
-
-- **`frida_chorus_coeffs.js`** — a capture *script* (not data) reading chorus
-  offsets `0x419410…`. The golden dump itself states the chorus was "NOT
-  initialized/active" in that capture and the offsets may be wrong. Not relied on.
-
-## CHORUS — derive from code; recapture only if a value is truly runtime-only
-
-The chorus DSP object is heap-allocated; its coefficients are **computed at
-runtime** (BBD clock from sample rate, LFO rate/depth, mix). The chorus
-**algorithm** is in `dsp_dump` (`0x1803C5070` init, `0x1803C52E0` process, BBD
-stages). Plan: transcribe the chorus code and **derive** its coefficients from
-the algorithm + sample rate. Only if a genuinely runtime-only value remains
-unknown after transcription do we do a **fresh, correct Frida capture with chorus
-confirmed ON** — with a corrected script, not the old one.
+The chorus and every FX coefficient are **derived from the decompiled code +
+recovered tables**, not measured. No new capture is needed for the port to be
+complete.

@@ -5,7 +5,7 @@ to its parameter NAME and registered default source, parsed from
 `chorus_coeffs/coeffgen_sub_180388170_180388170.asm`. 312 of 349 are covered
 here; the default constant `xmmword_18098C030` is metadata `{1,0,0,0}` (a type
 flag), NOT the value — values are applied downstream by the parameter system
-(see docs/PARAM_SETTER_PLAN.md). Use this to VALIDATE any capture: e.g. an
+(see docs/PARAM_APPLY_MAP.md). Use this to VALIDATE any capture: e.g. an
 on/off slot must read 0 or 1; 'Part Tune' should be ~centred.
 
 | state offset | parameter | default source |

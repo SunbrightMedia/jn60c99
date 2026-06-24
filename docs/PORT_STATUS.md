@@ -1,201 +1,76 @@
-# Port status & the chorus/driver boundary
+# Port status
 
-Honest accounting of what is ported exactly, what remains, and what is **not in
-our extracted data**. The user asked for hard truth over guesses; this records it.
+Current, honest accounting of the C99 JUNO-60 port. The whole VST3 is decompiled
+in-repo (`refs/allcode_decomp.tgz` + `refs/manifest.tsv`), so every value is
+derivable from the binary — there is no remaining dependency on live captures or
+reference renders as a *source* (a couple of captures survive only as validation
+oracles, noted below).
 
-## CURRENT STATE (latest — read this first)
+## What "done" means here
 
-**The port plays: in tune, polyphonic, full signal chain.** From a fresh init it
-renders audible notes (`make play`), a scale (`make scale`, tuned <0.1 cents), and
-chords (`make chord`) through DCO → 4-pole VCF (envelope sweep) → VCA → stereo BBD
-chorus. Highlights this phase:
-- **Note-on** is the per-voice gate "M.Gate" (offset 320); voice_render generates
-  the LFO + both ADSRs + filter sweep internally. `juno_note_on(st,voice,midi)`.
-- **Pitch** from code: octave→Hz is the transcribed DCO's own calibration
-  (C=22380.1 Hz), note→octave is standard A440 equal temperament (the plugin's
-  default tuning). Rendered notes match standard to <0.1 cents. (docs/CONTROL_LAYER.md)
-- **Polyphony**: all 8 voice functions proven to be voice 0's code with verified
-  region-shifted offsets; one parameterised render (`juno_voice_render_v`/`juno_voff`)
-  serves all 8, voice 0 bit-identical. (docs/POLYPHONY.md)
-- **Validation**: init bit-exact (0 stable gaps); capture-free per-sample A/B shows
-  control-rate fields bit-exact vs the live plugin (`make ab`). (docs/VALIDATION.md)
+Two different bars, kept strictly separate:
 
-Open items: patch values currently come from a captured preset (real PD-Juno-Pad
-values) — loading arbitrary named presets needs the bank-file parser
-(docs/PRESET_FORMAT.md, deferred). Voice-allocation policy is host-side.
+- **Data layer — bit-exact and proven.** Identical IEEE-754 uint32 bit patterns
+  vs the binary. Init: 2289/2289 `engine_init` stores. Param apply: the LUT
+  mechanism (`sub_356380`) is 88/88 exact LUT members; FX-coefficient setup is
+  69/69 exact. The 66 denormalize LUTs are transcribed as raw float32 bit
+  patterns (`src/juno_param_luts.c`).
+- **Audio DSP — transcribed, NOT numerically verified.** The voice render,
+  master/chorus, and FX graph are faithful line-by-line transcriptions of the
+  decompile, but no per-sample A/B against the plugin has been run, so "sounds
+  identical" is not claimed. Renders are musically in the ballpark, not proven.
 
-**Extraction is COMPLETE and permanent.** The entire plugin (77,167 functions) is
-archived in `refs/` (`manifest.tsv` index + `allcode_decomp.tgz` full decompile).
-No further IDA sessions or live captures are needed — everything is searchable
-offline.
+## Transcribed from the decompile (compiling, in `src/`)
 
-**Done and PROVEN against the live plugin** (`make validate`, see docs/VALIDATION.md):
-- Voice DSP (`voice_render`), master mix + stereo BBD chorus + output
-  (`master_render`), coefficient init (`juno_engine_init`), chorus constructor
-  (`juno_chorus_init`) — all transcribed exact.
-- Init validated: **2289/2289 engine_init offsets bit-exact; 0 stable gaps** over
-  all 1585 DSP-read offsets vs the live plugin (preset PD The Juno Pad, 96 kHz).
-- Runtime coefficients for that patch captured & validated (279 values); used as
-  the validation ORACLE, not as the port's source.
+| Piece | Source fn | File |
+|-------|-----------|------|
+| Voice render (DCO, 4-pole VCF, ADSR×2, VCA, unison) | `sub_180369070` | `src/voice_render.c` |
+| Master mix + stereo BBD chorus + output | `sub_180363380` | `src/master_render.c` |
+| Coefficient init (2289 stores, SR-aware) | `sub_1803990C0` | `src/*engine_init*` |
+| Chorus constructor (BBD delay lengths, ring state) | `sub_1803A1300` | `src/chorus_init.c` |
+| Leaf helpers (wrap24, triangle, poly pitch) | 0x368D60/0x368FC0 | `src/juno_dsp.c` |
+| Param→coeff apply engine (LUT + switch) | `sub_356380` | `src/juno_params.c` |
+| 66 denormalize LUTs (raw bit patterns) | `.rdata` tables | `src/juno_param_luts.c` |
+| FX-coefficient setup (reverb/delay/chorus) | FX setup fns | (`refs/fx_coeff_recipe.json`) |
+| Driver / per-sample loop | `sub_180398EC0` | `src/juno_driver.c` |
 
-**Remaining (offline transcription from the full dump; nothing needed from the user):**
-1. **#1 note/MIDI handler** — note→pitch/gate + voice allocation (makes it play).
-   Buried in the VST3/threading layer (voice mgmt is pointer-based 40-byte structs,
-   not flat `+10512` offsets). Under research.
-2. **#2 parameter→coefficient appliers** — to honour any patch from original code
-   (not per-patch captures). Surface being scoped from the full dump.
-3. **Polyphony** — transcribe voices 1-7 (all 8 decompiles+asm are in the dump).
-4. **Per-block driver** — refine `juno_driver` to mirror `sub_180398EC0` (enable
-   flag + skip counter → master → prune) exactly.
+Polyphony: all 8 voice renders are voice 0's code at verified region strides
+(main +10512, shared +0, aux +32); one parameterised render serves all 8, voice 0
+bit-identical (`docs/POLYPHONY.md`).
 
-Per the user's directive: transcribe the ORIGINAL code for #1/#2 (the captures are
-only the validation oracle). Each piece is checked against the captured ground
-truth as it lands.
+## FX architecture (resolved)
 
----
+The reverb and delay are **not** standalone DSP functions — they are sub-graphs of
+`CJu60Sim`, a JUNO-60 circuit/signal-graph simulator (vtable @0x98AE98, ~10.7 MB
+per-instance workspace), evaluated by large unrolled solver methods. Their setup
+emits define-tap + coefficient-bind calls from recovered tables
+(`refs/reverb_tables.json`, `refs/delay_tables.json`). Full detail and the two
+faithful-vs-approximate transcription paths are in `docs/FX_ARCHITECTURE.md`.
 
-## Ported — exact, compiling, tested
-| Piece | Source | Notes |
-|-------|--------|-------|
-| `juno_wrap24`, `juno_triangle` | 0x368D60/0x368FC0 | leaf helpers, self-checked |
-| `juno_voice_render` | 0x180369070 | full synth voice (DCO, 4-pole VCF, ADSR×2, VCA, unison bank); all helper args from asm |
-| `juno_engine_init` | 0x1803990C0 | 2293-store coefficient init, sample-rate aware |
-| lookup tables | .rdata | exponent + pitch tables, exact |
+## Preset path
 
-This is the synth core — the part the previous attempt got wrong. It is done.
+The `KoaBankFile00003`/`PG-JU60` bank format is decoded
+(`docs/PRESET_BANK_FORMAT.md`), proven by the 16-byte name anchor. Per-parameter
+**steps** are recovered for real patches. The one statically-unavailable link is
+the **DB-index ↔ engine-coefficient bridge**, which the plugin builds at runtime
+as a red-black tree (`sub_3C7AE0`) — not statically reconstructable, so it is the
+subject of the next phase (runtime translation; `docs/DB_ENGINE_BRIDGE.md`).
 
-## Multi-voice instantiation — solvable from our data
-The 8 voice renders are one routine at different bases. Per-voice region strides
-(verified by diffing voice 0 vs voice 1 offsets):
-- main voice block (≈ offsets 320–10672): **+10512 per voice**
-- shared/global block (84272–84432): **+0** (all voices read the same)
-- aux array (101504): **+32 per voice**
-So one parameterised `voice_render` (or 8 generated copies) can serve all voices.
-No extra data needed.
+## Open / unverified
 
-## NOT in our extracted data (do not fabricate)
+1. **Audio numerical validation** — no per-sample A/B has confirmed the DSP is
+   bit-faithful; this is the real definition of "correct" and is still at 0%.
+2. **Pitch drift / vibrato** — the user hears a pitch drift on sustained renders
+   that may indicate a DSP issue, not just a patch LFO depth. Reopened as a live
+   concern (`docs/CHORUS_VIBRATO_DIAG.md`); to be chased through the runtime
+   translation, NOT via WAV matching.
+3. **DB→engine continuous-param bridge** — runtime-built; the next work item.
+4. **FX per-sample solver fidelity** — the CJu60Sim tank solvers (one of which
+   Hex-Rays could not lift) are mapped but not yet transcribed to C.
 
-### 1. The chorus DSP
-The "chorus cluster" (0x3C52E0, 0x3C8120, 0x3C8390, 0x3C86A0, 0x3C87E0, 0x3C6F00)
-is **entirely threading / task-queue plumbing** — zero float DSP (verified by
-scanning all 129 closure functions: the only heavy float-math functions are the
-8 voice renders). The audio worker loop `0x3C6F00` dispatches downstream work
-through an **indirect vtable call** `(*(...+104))(...)` taken when `a2==0`; the
-static call-graph walk in extract_dsp.py cannot follow indirect calls, so the
-stereo BBD chorus routine was never captured. **Its code is not in `dsp_dump`.**
+## Validation oracles still in repo (not sources)
 
-To port the chorus we must first locate it. Options:
-- **Frida**: hook the indirect call site in `0x3C6F00` (or the process callback)
-  to log the target function address at runtime, then one targeted IDA dump of
-  that function (+ its coefficient init). Small and precise.
-- **Static**: resolve the vtable at `*(obj+8)`, method `+104` — needs the class
-  identity; harder without runtime.
-
-### 2. Voice mix / output / note-trigger
-`voice_render` writes a mono sample (overwrite) per voice; the summation of the 8
-voices, the stereo output routing, and the MIDI-note → pitch/gate field mapping
-live in the host/threading layer **above** our closure (the same indirect-call
-boundary). A plain sum of voice outputs is the standard and almost-certainly
--correct behaviour, but it is an assumption, not transcribed. The note-on gate is
-`*(state+101504)==1.0`; the pitch-field mapping is not in our data.
-
-## UPDATE — master/chorus located; resume plan
-
-The static float-DSP search found the missing master process:
-**`sub_180363380`** = 8-voice mix + stereo BBD chorus (circular delay at
-`a1+91728`) + true-stereo output. Decompile is in
-`audio_search/000_*` and `init_dump/020_*`; disassembly in `master_deps/`.
-
-Helpers it needs are now ported (`juno_pitch_poly`, `juno_wrap_unit`,
-`juno_wrap_hi` in `src/juno_dsp.c`).
-
-**Remaining to finish the chorus (next session, fresh context):**
-1. Transcribe `sub_180363380` (2875 lines) the same way as voice_render
-   (translate_voice-style: offsets→JF/JI; resolve dropped helper args from
-   `master_deps/master_sub_180363380_*.asm`; helpers → juno_* names).
-2. Chorus coefficients: ~250 read-only offsets `sub_1803990C0` doesn't set are
-   produced by **`sub_180388170`** (the param/coeff setup; touches 20/25 chorus
-   signature offsets). **Hex-Rays returns None on it** — transcribe from its
-   disassembly (dump asm of 0x388170), or capture the resulting values once.
-   Until then the chorus state is zero (dry path still correct).
-3. Wire the driver: per-sample loop calls the per-voice renders into 8 buffers,
-   then `sub_180363380(state, voiceBufs, outLR)`. Multi-voice strides known
-   (main +10512, shared +0, aux +32).
-
-The dry synth voice + filter + envelopes + init are exact and complete; the
-above is the stereo-chorus/output layer on top.
-
-## DONE this session (branch claude/cool-volta-hnunqw)
-
-1. ✅ **Master transcribed** → `src/master_render.c` (`juno_master_render`,
-   sub_180363380). Body kept verbatim (IDA `_DWORD/_QWORD/_WORD/__int16` as
-   typedefs/macros, `a1` an `unsigned char*`) with 19 fixups only where Hex-Rays
-   dropped an XMM arg / mangled SIMD. **Every dropped arg recovered from the asm**
-   and documented in `docs/MASTER_RENDER_MAP.md` — notably the 3 chorus LFO
-   stages (stages 2 & 3 had the whole phase-increment block dropped; reconstructed
-   from asm, identical to the fully-decompiled stage 1) and the 3 output
-   `wrap_unit` LFOs. Compiles clean under `-Wall -Wextra`.
-2. ✅ **IDA extraction script** for the coeff generator →
-   `tools/extract_chorus_coeffs.py` (+ `docs/RUN_GUIDE_CHORUS_COEFFS.md`). Dumps
-   the **disassembly of sub_180388170** (Hex-Rays = None on it), its caller
-   context (for args), and its referenced `.rdata` float values. **User must run
-   this in IDA 9.3** and upload `chorus_coeffs/`.
-3. ✅ **Driver wired** → `src/juno_driver.c` / `.h` (`juno_driver_render_sample`):
-   renders voices into the 8-buffer layout the master expects (even slots
-   a2[0,2,…14]), supplies the chorus-mode selectors via a host-params shim
-   (`juno_driver_attach_host`), and calls the master. `make test` green
-   (`tests/test_master_smoke.c`).
-
-## UPDATE 2 — chorus coeff source corrected; full pipeline runs
-
-The IDA `chorus_coeffs/` dump (sub_180388170 + sub_1803A1300) arrived and rewrote
-the picture:
-
-- **`sub_180388170` is NOT the coeff generator** — my ranking heuristic was fooled.
-  Its "constants" are parameter NAME strings (`aMasterTune`, `aLfoRate`, …) and it
-  `push_back`s ~1121 parameter descriptors. It's the **parameter registry**; for
-  each param it does `lea rax,[rdi+coeffOffset]` + a default and calls the
-  registrar `sub_1803ABA00`. It writes **zero** floats to the audio state.
-- **`sub_1803A1300` (was "zeroinit") IS the chorus constructor** — 2982 stores: the
-  integer **BBD delay-line lengths** (`[2199956]=0x80000`, `[6395252]=0x80000`,
-  `[95828]=1024`, …) + ring indices + buffer zeroing. Ported verbatim →
-  `src/chorus_init.c` (`juno_chorus_init`), wired before the voice init. **With the
-  lengths set, the master no longer reads out of bounds: the full master/chorus
-  path now runs end-to-end, finite over 2048 samples.**
-- **The 241 missing coefficients** (read-only in the master, set by no static
-  init — count verified by offset diff) are **applied at runtime** from parameter
-  defaults/presets, several through a param→curve map. The faithful, non-fitted
-  way to get them is a **live capture** → `tools/capture_chorus_coeffs.js` +
-  `docs/RUN_GUIDE_CHORUS_CAPTURE.md`. The apply path is already wired
-  (`juno_chorus_coeffs_apply` ← `src/chorus_coeffs_data.c`); it's a no-op until the
-  capture is pasted in, at which point the chorus comes alive.
-
-Current init sequence: `juno_chorus_init` → `juno_engine_init` →
-`juno_runtime_coeffs_apply` → per-sample `juno_driver_render_sample`.
-
-### Hard truths found (no fabrication)
-- **Polyphony isn't free.** The 8 voice copies differ across THREE regions with
-  DIFFERENT strides (main +10512, shared +0, aux +32), so a single uniform base
-  shift CANNOT serve voices 1-7 — and the 8 decompiles differ in ~1800 lines
-  (Hex-Rays re-numbered temps), so they aren't trivially generatable either.
-  Faking it = a wrong approximation, so the driver renders **voice 0 exactly** and
-  zeros 1-7. True polyphony needs per-voice asm for sub_18036CE00..sub_180383F20
-  OR a verified offset-classification to parameterise the one render.
-- **The engine is silent until the runtime parameter layer is applied** — to BOTH
-  voice and chorus. The static inits set the math coefficient *tables* and the
-  chorus *structure* (delay lengths), but NOT the patch: 349 offsets (107 voice +
-  242 chorus) are read by the DSP and written by no init. They are applied at
-  runtime by the parameter system. Verified: triggering voice 0's note-on gate
-  with no patch yields silence. These 349 are captured from the live plugin
-  (`tools/capture_runtime_coeffs.js`) — the runtime-only case the handoff allows.
-- **`sub_180388170` is the parameter registry, not the coeff generator** — the
-  earlier ranking heuristic was fooled by coincident offsets. Corrected.
-
-## Recommendation / next action
-The exact DSP transcription (voice core + master/chorus + chorus constructor) is
-complete and the full pipeline **runs finite end-to-end**. The single highest-
-value step to a *playable* engine is **one Frida capture** of the 349 runtime
-coefficients for a default patch (`docs/RUN_GUIDE_RUNTIME_CAPTURE.md`); paste it
-into `src/runtime_coeffs_data.c` and a note sounds with the chorus live. After
-that: per-voice polyphony, then per-stage numerical validation against the plugin
-(still the real definition of "correct" — at 0% so far).
+- `state_dump/*.bin.gz` — live-plugin memory snapshot; backs the 2289/2289 init
+  bit-exact proof.
+- `src/runtime_coeffs_data.c` — captured PD-Juno-Pad coefficient set; used only to
+  cross-check the apply engine, never compiled in as the port's value source.
