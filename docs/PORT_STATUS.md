@@ -5,6 +5,25 @@ our extracted data**. The user asked for hard truth over guesses; this records i
 
 ## CURRENT STATE (latest — read this first)
 
+**The port plays: in tune, polyphonic, full signal chain.** From a fresh init it
+renders audible notes (`make play`), a scale (`make scale`, tuned <0.1 cents), and
+chords (`make chord`) through DCO → 4-pole VCF (envelope sweep) → VCA → stereo BBD
+chorus. Highlights this phase:
+- **Note-on** is the per-voice gate "M.Gate" (offset 320); voice_render generates
+  the LFO + both ADSRs + filter sweep internally. `juno_note_on(st,voice,midi)`.
+- **Pitch** from code: octave→Hz is the transcribed DCO's own calibration
+  (C=22380.1 Hz), note→octave is standard A440 equal temperament (the plugin's
+  default tuning). Rendered notes match standard to <0.1 cents. (docs/CONTROL_LAYER.md)
+- **Polyphony**: all 8 voice functions proven to be voice 0's code with verified
+  region-shifted offsets; one parameterised render (`juno_voice_render_v`/`juno_voff`)
+  serves all 8, voice 0 bit-identical. (docs/POLYPHONY.md)
+- **Validation**: init bit-exact (0 stable gaps); capture-free per-sample A/B shows
+  control-rate fields bit-exact vs the live plugin (`make ab`). (docs/VALIDATION.md)
+
+Open items: patch values currently come from a captured preset (real PD-Juno-Pad
+values) — loading arbitrary named presets needs the bank-file parser
+(docs/PRESET_FORMAT.md, deferred). Voice-allocation policy is host-side.
+
 **Extraction is COMPLETE and permanent.** The entire plugin (77,167 functions) is
 archived in `refs/` (`manifest.tsv` index + `allcode_decomp.tgz` full decompile).
 No further IDA sessions or live captures are needed — everything is searchable
