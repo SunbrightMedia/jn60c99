@@ -94,3 +94,35 @@ callback (`sub_1803C7400` / the chain process) logging the function addresses th
 touch the audio buffer. That reveals the FX workers in one shot; the transcription
 itself stays 100% static from the decompile. Alternatively, keep hunting statically
 for the task-enqueue sites that reference the FX worker fn-ptrs (slower, uncertain).
+
+## RESOLVED: the FX live inside CJu60Sim (a circuit/graph simulator)
+Kept digging statically and reached ground truth. The reverb's `CDSPRev` object is a
+thin front-end over a shared engine pointer at `CDSPRev+8`. Every reverb method just
+issues graph-build calls into that engine:
+- `engine.vtable+16` (sub_1803C00B560)  = define buffer/tap `idx` of length `N`
+- `engine.vtable+24` (sub_1803E8160)     = reset (writes state[+10759872]=256)
+- `sub_1803C22920(engine,id,val)`        = set node coefficient/connection by id
+The reverb's setup (`sub_1803C1AC0`) walks the recovered delay-length table and emits
+~30+ `define-tap` calls (offsets accumulate: +963, +2, ... = the tank taps) plus
+coefficient binds (param ids 0x44A, 0x454–0x45F). So the reverb is **graph DATA**, not
+a DSP function.
+
+The engine class is **`CJu60Sim`** (JUNO-60 circuit/signal-graph simulator), vtable
+@0x98AE98, with a ~10.7 MB per-instance state workspace (9 instances allocated in
+`sub_1803C68D0`). Its solver methods are enormous:
+- slot 9  `sub_1803A66B0`  ~20 KB
+- slot 10 `sub_1803F90C0`  ~33 KB
+- slot 11 `sub_1803A1300`  ~21 KB
+- slot 14 `sub_1803E8170`  ~67 KB  ← **decompiler emitted `// None` (could not lift it)**
+
+**Conclusion.** The delay and reverb are sub-graphs of CJu60Sim, evaluated by these
+unrolled solvers (one of which is undecompilable). There is no compact, standalone
+reverb/delay algorithm to transcribe. Two honest paths:
+  A. Reconstruct the CJu60Sim node model from the decompiled solver slots (10/11/9) and
+     rebuild the reverb/delay sub-graphs from their setup data — large, uncertain (33 KB
+     of unrolled math to read), but bit-faithful in principle.
+  B. Implement a standard algorithmic reverb/delay seeded with the ALREADY-RECOVERED
+     coefficients (delay lengths 246/738/1910/…, allpass gains, damping biquads). This is
+     a recognizable plate/FDN topology and will sound musically close, but is NOT
+     bit-identical to the circuit sim.
+The recovered coefficients make path B immediately actionable; path A is a project.
