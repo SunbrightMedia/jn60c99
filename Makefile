@@ -48,6 +48,12 @@ chord: tests/play_chord.c $(SRC)
 	$(CC) $(CFLAGS) -o tests/play_chord tests/play_chord.c $(SRC) $(LDLIBS)
 	./tests/play_chord /tmp/juno_chord.wav
 
+# Render the "SQ Dynamic ARPG" preset overlay (arpeggio + block). -> /tmp/juno_preset*.wav
+preset: tests/play_preset.c $(SRC)
+	$(CC) $(CFLAGS) -o tests/play_preset tests/play_preset.c $(SRC) $(LDLIBS)
+	./tests/play_preset /tmp/juno_preset.wav
+	./tests/play_preset /tmp/juno_preset_block.wav block
+
 # Capture-free per-sample A/B: run our DSP forward from t0, match t1 (control-rate).
 ab: tests/ab_persample.c $(SRC)
 	gunzip -kf state_dump/state_t0.bin.gz state_dump/state_t1.bin.gz
