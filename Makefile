@@ -60,6 +60,15 @@ arp: tests/play_arp.c $(SRC)
 	$(CC) $(CFLAGS) -o tests/play_arp tests/play_arp.c $(SRC) $(LDLIBS)
 	./tests/play_arp /tmp/juno_arp.wav $(ARGS)
 
+# Phase 0 oracle: render port from an event log + A/B vs a plugin reference WAV.
+#   make oracle REF=/path/plugin.wav EV=tests/oracle/cmaj_sqarpg.txt
+EV ?= tests/oracle/cmaj_sqarpg.txt
+oracle: tests/render_events.c $(SRC)
+	$(CC) $(CFLAGS) -o tests/render_events tests/render_events.c $(SRC) $(LDLIBS)
+	./tests/render_events $(EV) /tmp/port_oracle.wav
+	@test -n "$(REF)" && python3 tools/ab_compare.py "$(REF)" /tmp/port_oracle.wav || \
+	  echo "(set REF=/path/to/plugin_reference.wav to run the A/B comparison)"
+
 # Capture-free per-sample A/B: run our DSP forward from t0, match t1 (control-rate).
 ab: tests/ab_persample.c $(SRC)
 	gunzip -kf state_dump/state_t0.bin.gz state_dump/state_t1.bin.gz
