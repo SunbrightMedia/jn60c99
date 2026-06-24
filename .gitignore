@@ -23,3 +23,6 @@ __pycache__/
 state_dump/*.bin
 state_dump/.dspreads.txt
 tests/validate_state
+
+# Full-plugin dump: keep the compressed reference in refs/, ignore the raw extract
+allcode/
