@@ -53,12 +53,46 @@ Re-derived all three chorus LFO phase accumulators directly from the disassembly
   1's inline `if(x>1) fmodf(x+1,2)−1`. Every offset = stage-1 offset − 6395376 +
   stage base (consistent across all three).
 
-**Conclusion: the chorus LFO *code* is not the drift source.** The drift must come
-from the *values* feeding these LFOs (the runtime-applied **rate** `JF(…+272)`,
-**depth/scale**, and the LFO→delay-time mapping), or from the voice's own
-LFO→DCO-pitch path (offset 4032), or BBD read-pointer interpolation. The rate/depth
-coefficients arrive through the parameter-apply path, so the investigation now
-moves into the runtime translation (below).
+**Conclusion: the chorus LFO *code* is not the drift source.**
+
+## Finding 2 (DONE): the voice LFO→pitch path is faithful — RULED OUT
+
+The voice's own LFO→DCO-pitch is the most direct pitch modulator. Compared
+`src/voice_render.c` against the decompile (`sub_180369070`) for two regions:
+- **LFO oscillator / rate+envelope** (decompile 28570–28591 ↔ `voice_render.c`
+  756–777): verbatim identical — `v68=(v59−v65)·JF(1152)+v65`, `v69=JF(1088)` (LFO
+  Rate), `v70=v68·JF(1040)−JF(1040)·v69+v69`, clamp, `expf(...)`, etc.
+- **LFO→pitch application** (decompile 28858–28885 ↔ `voice_render.c` 1044–1071):
+  verbatim identical — `v176 = JF(1792)·JF(4016)` (LFO sig · **LFO Gain**),
+  `v180 = v176·JF(4032)` (· **LFO Level/depth**), summed into the DCO pitch
+  accumulator at 3776.
+
+**The LFO DSP code (chorus + voice) is verified faithful.** The pitch drift is
+therefore governed by the **coefficient values** at the LFO offsets — JUNO voice
+LFO params, all statically located in the registry (`docs/PARAM_MAP.tsv`):
+
+| param | pid | offset | tableId |
+|---|---|---|---|
+| LFO Rate | 11 | 1088 | 22 |
+| LFO Delay | 16 | 1920 | 44 |
+| LFO Gain | 54 | 4016 | — |
+| **LFO Level (→pitch depth)** | 55 | 4032 | 0 |
+
+For **SQ Dynamic ARPG** these are currently **UNMAPPED** (`db_engine_bridge.json →
+db_engine_unmapped`): the render leaves whatever the PD-Juno-Pad capture / init put
+in those offsets, so the vibrato is literally *another patch's* LFO settings. This
+matches the user's hope ("really hoping that has to do with the preset PARAMETERS
+and not the actual DSP code"): it is the parameters, not the DSP.
+
+## The fix path: bind the LFO (and other continuous) params DB→engine
+
+The blocker is the **DB-index → engine-offset** binding for continuous params
+(generic `0..255` specs that don't self-identify). The decisive static key would be
+the **VST3-ParamID ↔ engine-offset** join (the red-black tree seed gives
+VST3-ParamID ↔ DB-index by the formula `key = 0x60000A + 2·(db−755)`; the registry
+gives registry-paramID ↔ offset). Recovering that join makes the whole bridge —
+including LFO rate/depth — exact. This is the runtime-translation work tracked
+separately.
 
 ## Remaining plan (code-first, no reference renders)
 2. **Trace the LFO→pitch path** (offset 4032) from the apply engine: confirm the
