@@ -37,3 +37,4 @@ tests/play_arp
 tests/render_events
 data_sections/
 tests/test_apply
+refs/preset_banks/
