@@ -65,3 +65,32 @@ Four large, partly-interdependent subsystems:
    task dispatch.
 The data is fully unblocked for all four; the remaining cost is transcription +
 tracing the FX task dispatch, realistically multiple dedicated sessions.
+
+## Deep trace result (reverb worker hunt) — the real blocker
+Traced the full effects-chain object and audio path:
+- The whole DSP is one object `CPrmDSPRev<CPrmDSPSystem8Dly<CPrmDSPJu60>>`
+  (ctor `sub_1803B3010`): synth base at +0, delay sub-objects at +6784 (DlyDly),
+  +6976 (Pan), +7184/+7400 (Ch), +7616 (FlSt), +7824 (Mfx1), reverb at +8176.
+- Chain vtables resolve (CPrmDSPSystem8Dly @0x9C19F8, CPrmDSPRev @0x9C2508); the
+  per-layer overrides (slots 0/2/3/4/5) are all **lifecycle/param dispatchers**
+  (no audio-buffer arg) — `sub_1803B86C0/8830/8560` just switch on the FX-type
+  selector `obj+1480` and call a sub-object's control method.
+- The **synth** audio process is `sub_1803C7400` (loops samples → `sub_180398EC0`
+  = voice mix + master/chorus → level metering). It has **no static callers** and
+  does **not** reference the FX sub-objects — it's a task dispatched through the
+  threading worker (`sub_1803C6F00`, mutex/condvar queue).
+- The CDSPRev sub-object's own vtable is all small param setters; its largest method
+  is the buffer-setup `sub_1803C1AC0` (sums delay lengths to size the tank). No
+  large per-sample tank-DSP function exists in the reverb's code region.
+
+**Conclusion:** the per-sample FX DSP workers are reached only through the threading
+task queue + indirect vtable dispatch, assembled at runtime; ~12 levels of static
+tracing did not surface the actual reverb/delay sample loop. The structure is fully
+mapped and the reverb coefficients are recovered, but the worker *functions* are not
+statically locatable. This is the genuine blocker.
+
+**Cleanest unblock (navigational only):** one runtime call-tree trace on the process
+callback (`sub_1803C7400` / the chain process) logging the function addresses that
+touch the audio buffer. That reveals the FX workers in one shot; the transcription
+itself stays 100% static from the decompile. Alternatively, keep hunting statically
+for the task-enqueue sites that reference the FX worker fn-ptrs (slower, uncertain).
