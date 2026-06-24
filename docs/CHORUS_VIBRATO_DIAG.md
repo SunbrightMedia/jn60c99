@@ -36,12 +36,31 @@ as spectra:
   LFO phase offsets / increments are wrong, the channels won't sit anti-phase and
   the mod won't cancel — heard as vibrato/drift instead of width.
 
-## Plan (code-first, no reference renders)
+## Finding 1 (DONE): the chorus LFO phase math is faithful — RULED OUT
 
-1. **Re-derive the chorus LFO math directly from the disassembly** of
-   `sub_180363380` (the 3 phase accumulators + their increments + initial phases),
-   independently of the existing C, and diff against `src/master_render.c`. Any
-   discrepancy in increment/phase/sign is the prime suspect.
+Re-derived all three chorus LFO phase accumulators directly from the disassembly
+(`master_deps/master_sub_180363380_180363380.asm`) and diffed against
+`src/master_render.c`:
+- **Stage 1** (fully rendered by Hex-Rays) matches the decompile verbatim:
+  `incr = clamp(pitch,±512)·rate`; `±2/±4` reduction; `==0 → fallback`;
+  `phase += incr`; `if(phase>1) phase = fmodf(phase+1,2)−1`; store
+  `phase·scale + (scale−1)`.
+- **Stages 2 & 3** (increment block dropped by Hex-Rays, reconstructed from asm)
+  are byte-faithful to the disassembly. Verified the stage-2 block instruction by
+  instruction at `0x180363EC7–F47`: the `±2/±4` reduction is `+(-4.0)` when
+  `≥4.0` else `+(-2.0)` when `≥2.0` (consts `dword_180AE5510=-4`,
+  `dword_180AE54F8=-2`) — identical to the C. `juno_wrap_hi(x)` is exactly stage
+  1's inline `if(x>1) fmodf(x+1,2)−1`. Every offset = stage-1 offset − 6395376 +
+  stage base (consistent across all three).
+
+**Conclusion: the chorus LFO *code* is not the drift source.** The drift must come
+from the *values* feeding these LFOs (the runtime-applied **rate** `JF(…+272)`,
+**depth/scale**, and the LFO→delay-time mapping), or from the voice's own
+LFO→DCO-pitch path (offset 4032), or BBD read-pointer interpolation. The rate/depth
+coefficients arrive through the parameter-apply path, so the investigation now
+moves into the runtime translation (below).
+
+## Remaining plan (code-first, no reference renders)
 2. **Trace the LFO→pitch path** (offset 4032) from the apply engine: confirm the
    rate/depth/ramp coefficients written there match the decompiled LFO and the
    preset's real step values — i.e. that the drift magnitude is what the patch
