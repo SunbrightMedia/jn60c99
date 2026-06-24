@@ -59,7 +59,7 @@ def main():
         hit = None
         for rt, t in tabs:
             for i, x in enumerate(t):
-                if abs(x - v) < 1e-6:
+                if struct.pack('<f',x)==struct.pack('<f',v):
                     hit = (rt, i); break
             if hit: break
         if hit:

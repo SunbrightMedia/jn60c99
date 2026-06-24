@@ -36,3 +36,4 @@ tests/play_preset
 tests/play_arp
 tests/render_events
 data_sections/
+tests/test_apply

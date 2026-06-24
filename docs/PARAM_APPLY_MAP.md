@@ -251,16 +251,21 @@ which is missing per §5.)
 `src/runtime_coeffs_data.c` for exact membership. Result over the 279 captured values:
 
 - **109 (39%)** switch/identity → read exactly 0 or 1.
-- **98 (35%)** are **EXACT LUT members**: `coefficient = table[step]`, bit-for-bit. The
-  step index is the patch's raw parameter value — e.g. recovered for PD Juno Pad:
-  ENV1 Attack=step 197 (`0x5E0010`), ENV1 Decay=179 / Release=197 (`0x5E0C10`),
-  ENV1 Sustain=139 (`0x5E3C10`), LPF Cutoff=234 (`0x5CD0E0`). Saved to
-  `refs/recovered_param_steps.json`.
-- **72 (26%)** are the `scale*value+offset` family (`sub_356150`) — known mechanism,
-  validation pending (constants at rva `0xAE50B4`, in hand).
+- **88 (32%)** are **EXACT-bit LUT members**: `coefficient = table[step]`, bit-for-bit
+  (exact float equality, not a tolerance). The step index is the patch's raw parameter
+  value — e.g. recovered for PD Juno Pad: ENV1 Attack=197 (`0x5E0010`), Decay=179 /
+  Release=197 (`0x5E0C10`), Sustain=139 (`0x5E3C10`), LPF Cutoff=234 (`0x5CD0E0`). Saved
+  to `refs/recovered_param_steps.json`.
+- **82 (29%)** are NOT param-LUT-applied: their names (`Rev Ecf DPF/HPF/LPF`,
+  `High Cut B0/Qc`, `Delay Time`, `Wet/Dry Gain`, `Chorus CV`) show they are **FX filter
+  coefficients computed by the reverb/delay/chorus setup** from the FX tables
+  (`refs/reverb_tables.json` etc.) — they belong to the FX-init transcription, not this
+  param-apply engine. (A handful of near-LUT synth params — LFO rate — use scale/interp.)
 
-So **74% of the patch is reproduced bit-exact from the decompiled mechanism + dumped
-tables, with no capture** — and the LUT lookup is confirmed the correct model. This
-also means the capture can be *replaced*: read a preset's step values, index the table,
-get the exact coefficient. Remaining to reach 100%: validate the scale+offset family and
-map each paramID → its table (from the controller param-list build).
+So **71% of the patch is reproduced bit-exact by the C apply engine** (`src/juno_params.c`
++ `src/juno_param_luts.c`), proven by `tests/test_apply.c` (**88/88 LUT members bit-exact,
+0 mismatch**). The capture is therefore *replaceable* for the param-driven coefficients:
+read a preset's step values, `juno_param_apply_lut(state, offset, tableId, step)`, done.
+Remaining to 100%: map each paramID → its (offset, tableId) for *all* params from the
+controller param-list build (generalizes beyond the 88 captured), and transcribe the FX
+setup for the 29% FX-derived coefficients.

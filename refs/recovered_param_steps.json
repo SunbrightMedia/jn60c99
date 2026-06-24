@@ -1,492 +1,442 @@
 {
 "304": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
+"step": 92
 },
 "336": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
+"step": 92
 },
 "464": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
+"step": 92
 },
 "496": {
+"tableId": 20,
 "table": "0x7FF91E5CCCE0",
-"step": 0,
-"value": -1.0
+"step": 0
 },
 "512": {
+"tableId": 20,
 "table": "0x7FF91E5CCCE0",
-"step": 0,
-"value": -1.0
+"step": 0
 },
 "624": {
+"tableId": 4,
 "table": "0x7FF91E5CA7D0",
-"step": 56,
-"value": 0.031564343720674515
+"step": 56
 },
 "704": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
+"step": 92
 },
 "720": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
+"step": 92
 },
 "752": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
-},
-"1088": {
-"table": "0x7FF91E5CD0E0",
-"step": 221,
-"value": 0.36470603942871094
-},
-"1664": {
-"table": "0x7FF91E5CA7D0",
-"step": 194,
-"value": 4.2553889215923846e-05
+"step": 92
 },
 "1920": {
-"table": "0x7FF91E5CA7D0",
-"step": 250,
-"value": 1.6843458070070483e-05
-},
-"2064": {
-"table": "0x7FF91E5CD0E0",
-"step": 221,
-"value": 0.36470603942871094
-},
-"2704": {
-"table": "0x7FF91E5CA7D0",
-"step": 118,
-"value": 0.00018024444580078125
+"tableId": 44,
+"table": "0x7FF91E5E2410",
+"step": 185
 },
 "2784": {
+"tableId": 35,
 "table": "0x7FF91E5E0010",
-"step": 197,
-"value": 0.0029711821116507053
+"step": 197
 },
 "2800": {
+"tableId": 50,
 "table": "0x7FF91E5E3C10",
-"step": 139,
-"value": 0.694629430770874
+"step": 139
 },
 "2816": {
+"tableId": 38,
 "table": "0x7FF91E5E0C10",
-"step": 179,
-"value": 0.004721424542367458
+"step": 179
 },
 "2832": {
+"tableId": 38,
 "table": "0x7FF91E5E0C10",
-"step": 197,
-"value": 0.0033374899066984653
-},
-"3184": {
-"table": "0x7FF91E5CA7D0",
-"step": 118,
-"value": 0.00018024444580078125
+"step": 197
 },
 "3264": {
+"tableId": 35,
 "table": "0x7FF91E5E0010",
-"step": 240,
-"value": 0.0012088677613064647
+"step": 240
 },
 "3296": {
+"tableId": 38,
 "table": "0x7FF91E5E0C10",
-"step": 0,
-"value": 5.33350133895874
+"step": 0
 },
 "3312": {
+"tableId": 38,
 "table": "0x7FF91E5E0C10",
-"step": 194,
-"value": 0.0035444109234958887
+"step": 194
 },
 "3616": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
+"step": 92
 },
 "3632": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
+"step": 92
 },
 "3696": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
+"step": 92
 },
 "3824": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
+"step": 92
 },
 "4032": {
+"tableId": 0,
 "table": "0x7FF91E5C97D0",
-"step": 119,
-"value": -0.0016094116726890206
+"step": 119
 },
 "4128": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 163,
-"value": 0.13725490868091583
+"step": 163
 },
 "4144": {
+"tableId": 45,
 "table": "0x7FF91E5E2810",
-"step": 153,
-"value": 0.5412007570266724
+"step": 153
 },
 "4192": {
+"tableId": 54,
 "table": "0x7FF91E5E6DA0",
-"step": 164,
-"value": 0.8597774505615234
+"step": 164
 },
 "4224": {
-"table": "0x7FF91E5CAEE0",
-"step": 171,
-"value": 0.31640625
+"tableId": 54,
+"table": "0x7FF91E5E6DA0",
+"step": 81
 },
 "4240": {
+"tableId": 54,
 "table": "0x7FF91E5E6DA0",
-"step": 164,
-"value": 0.8597774505615234
+"step": 164
 },
 "4272": {
-"table": "0x7FF91E5CAEE0",
-"step": 171,
-"value": 0.31640625
+"tableId": 54,
+"table": "0x7FF91E5E6DA0",
+"step": 81
 },
 "4736": {
+"tableId": 54,
 "table": "0x7FF91E5E6DA0",
-"step": 164,
-"value": 0.8597774505615234
+"step": 164
 },
 "4768": {
-"table": "0x7FF91E5CAEE0",
-"step": 171,
-"value": 0.31640625
+"tableId": 54,
+"table": "0x7FF91E5E6DA0",
+"step": 81
 },
 "5520": {
+"tableId": 27,
 "table": "0x7FF91E5DE2E0",
-"step": 124,
-"value": 0.019999999552965164
+"step": 124
 },
 "6512": {
+"tableId": 54,
 "table": "0x7FF91E5E6DA0",
-"step": 173,
-"value": 1.0073647499084473
+"step": 173
 },
 "6528": {
+"tableId": 12,
 "table": "0x7FF91E5CAEE0",
-"step": 230,
-"value": 0.17578125
-},
-"6736": {
-"table": "0x7FF91E5CD0E0",
-"step": 234,
-"value": 0.41568565368652344
+"step": 230
 },
 "6864": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 107,
-"value": 0.8425197005271912
+"step": 107
 },
 "6880": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 107,
-"value": 0.8425197005271912
+"step": 107
 },
 "6896": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 107,
-"value": 0.8425197005271912
+"step": 107
 },
 "6912": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 107,
-"value": 0.8425197005271912
+"step": 107
 },
 "6976": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
+"step": 92
 },
 "6992": {
+"tableId": 32,
 "table": "0x7FF91E5DF610",
-"step": 92,
-"value": 6.668468952178955
+"step": 92
 },
 "7248": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 107,
-"value": 0.8425197005271912
+"step": 107
 },
 "7344": {
+"tableId": 47,
 "table": "0x7FF91E5E3010",
-"step": 136,
-"value": 0.008810149505734444
+"step": 136
 },
 "7392": {
+"tableId": 46,
 "table": "0x7FF91E5E2C10",
-"step": 182,
-"value": 3.1583917140960693
+"step": 182
 },
 "7440": {
+"tableId": 24,
 "table": "0x7FF91E5CDAE0",
-"step": 63,
-"value": -0.5039370059967041
+"step": 63
 },
 "7472": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 178,
-"value": 0.19607843458652496
+"step": 178
 },
 "9584": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 22,
-"value": 0.17322835326194763
+"step": 22
 },
 "9616": {
+"tableId": 56,
 "table": "0x7FF91E5E7500",
-"step": 228,
-"value": 0.9299999475479126
+"step": 228
 },
 "9632": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 22,
-"value": 0.17322835326194763
+"step": 22
 },
 "9664": {
+"tableId": 56,
 "table": "0x7FF91E5E7500",
-"step": 228,
-"value": 0.9299999475479126
+"step": 228
 },
 "9680": {
+"tableId": 56,
 "table": "0x7FF91E5E7500",
-"step": 235,
-"value": 1.1543598175048828
+"step": 235
 },
 "9696": {
+"tableId": 56,
 "table": "0x7FF91E5E7500",
-"step": 235,
-"value": 1.1543598175048828
+"step": 235
 },
 "9712": {
+"tableId": 56,
 "table": "0x7FF91E5E7500",
-"step": 235,
-"value": 1.1543598175048828
+"step": 235
 },
 "9728": {
+"tableId": 56,
 "table": "0x7FF91E5E7500",
-"step": 235,
-"value": 1.1543598175048828
+"step": 235
 },
 "9760": {
+"tableId": 56,
 "table": "0x7FF91E5E7500",
-"step": 228,
-"value": 0.9299999475479126
+"step": 228
 },
 "10240": {
+"tableId": 41,
 "table": "0x7FF91E5E1810",
-"step": 0,
-"value": 0.0021598446182906628
+"step": 0
 },
 "91136": {
+"tableId": 64,
 "table": "0x7FF91E5E7EB0",
-"step": 200,
-"value": 0.9675675630569458
-},
-"91152": {
-"table": "0x7FF91E5CA850",
-"step": 249,
-"value": 9.999999747378752e-06
+"step": 200
 },
 "91184": {
+"tableId": 64,
 "table": "0x7FF91E5E7EB0",
-"step": 210,
-"value": 0.004000000189989805
-},
-"91200": {
-"table": "0x7FF91E5E0010",
-"step": 245,
-"value": 0.0010784313781186938
+"step": 210
 },
 "91232": {
+"tableId": 64,
 "table": "0x7FF91E5E7EB0",
-"step": 201,
-"value": 1.1699999570846558
+"step": 201
 },
 "91248": {
-"table": "0x7FF91E5CA7D0",
-"step": 214,
-"value": 3.049962833756581e-05
-},
-"96352": {
-"table": "0x7FF91E5CA7D0",
-"step": 220,
-"value": 2.751054853433743e-05
+"tableId": 64,
+"table": "0x7FF91E5E7EB0",
+"step": 145
 },
 "96368": {
+"tableId": 64,
 "table": "0x7FF91E5E7EB0",
-"step": 150,
-"value": 0.0029931971803307533
+"step": 150
 },
 "96384": {
-"table": "0x7FF91E5CA7D0",
-"step": 214,
-"value": 3.049962833756581e-05
+"tableId": 64,
+"table": "0x7FF91E5E7EB0",
+"step": 145
 },
 "101072": {
+"tableId": 49,
 "table": "0x7FF91E5E3810",
-"step": 50,
-"value": 0.26217398047447205
+"step": 50
 },
 "101152": {
+"tableId": 19,
 "table": "0x7FF91E5CC8E0",
-"step": 128,
-"value": 0.24184302985668182
+"step": 128
 },
 "102464": {
+"tableId": 55,
 "table": "0x7FF91E5E71A0",
-"step": 209,
-"value": 0.2058020681142807
+"step": 209
 },
 "102608": {
-"table": "0x7FF91E5E71A0",
-"step": 116,
-"value": 0.0052359821274876595
+"tableId": 57,
+"table": "0x7FF91E5E7700",
+"step": 210
 },
 "102656": {
+"tableId": 55,
 "table": "0x7FF91E5E71A0",
-"step": 215,
-"value": 0.795496940612793
+"step": 215
 },
 "4297696": {
+"tableId": 55,
 "table": "0x7FF91E5E71A0",
-"step": 209,
-"value": 0.2058020681142807
+"step": 209
 },
 "4297792": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 255,
-"value": 0.49803921580314636
+"step": 255
 },
 "4297808": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 236,
-"value": 0.42352941632270813
+"step": 236
 },
 "4297888": {
+"tableId": 4,
 "table": "0x7FF91E5CA7D0",
-"step": 23,
-"value": 2.0
+"step": 23
 },
 "4297904": {
-"table": "0x7FF91E5E71A0",
-"step": 116,
-"value": 0.0052359821274876595
+"tableId": 57,
+"table": "0x7FF91E5E7700",
+"step": 210
 },
 "4297952": {
+"tableId": 55,
 "table": "0x7FF91E5E71A0",
-"step": 215,
-"value": 0.795496940612793
+"step": 215
 },
 "6396160": {
+"tableId": 4,
 "table": "0x7FF91E5CA7D0",
-"step": 5,
-"value": 0.5
+"step": 5
 },
 "6396288": {
+"tableId": 55,
 "table": "0x7FF91E5E71A0",
-"step": 215,
-"value": 0.795496940612793
+"step": 215
 },
 "6396336": {
+"tableId": 64,
 "table": "0x7FF91E5E7EB0",
-"step": 17,
-"value": 0.00163624610286206
+"step": 17
 },
 "6396400": {
-"table": "0x7FF91E5CA7D0",
-"step": 214,
-"value": 3.049962833756581e-05
+"tableId": 64,
+"table": "0x7FF91E5E7EB0",
+"step": 145
 },
 "6497280": {
+"tableId": 55,
 "table": "0x7FF91E5E71A0",
-"step": 209,
-"value": 0.2058020681142807
+"step": 209
 },
 "6497344": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 224,
-"value": 0.3764705955982208
+"step": 224
 },
 "6497376": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 236,
-"value": 0.42352941632270813
+"step": 236
 },
 "6497424": {
-"table": "0x7FF91E5E71A0",
-"step": 116,
-"value": 0.0052359821274876595
+"tableId": 57,
+"table": "0x7FF91E5E7700",
+"step": 210
 },
 "6497472": {
+"tableId": 55,
 "table": "0x7FF91E5E71A0",
-"step": 215,
-"value": 0.795496940612793
+"step": 215
 },
 "10693040": {
+"tableId": 4,
 "table": "0x7FF91E5CA7D0",
-"step": 5,
-"value": 0.5
+"step": 5
 },
 "10693056": {
+"tableId": 22,
 "table": "0x7FF91E5CD2E0",
-"step": 128,
-"value": 0.501960813999176
+"step": 128
 },
 "10693168": {
+"tableId": 55,
 "table": "0x7FF91E5E71A0",
-"step": 215,
-"value": 0.795496940612793
+"step": 215
 },
 "10693216": {
+"tableId": 64,
 "table": "0x7FF91E5E7EB0",
-"step": 17,
-"value": 0.00163624610286206
+"step": 17
 },
 "10693280": {
-"table": "0x7FF91E5E71A0",
-"step": 214,
-"value": 0.6428789496421814
+"tableId": 64,
+"table": "0x7FF91E5E7EB0",
+"step": 153
 },
 "10693344": {
+"tableId": 20,
 "table": "0x7FF91E5CCCE0",
-"step": 0,
-"value": -1.0
+"step": 0
 },
 "10759392": {
+"tableId": 4,
 "table": "0x7FF91E5CA7D0",
-"step": 5,
-"value": 0.5
+"step": 5
 },
 "10759440": {
+"tableId": 21,
 "table": "0x7FF91E5CD0E0",
-"step": 255,
-"value": 0.49803921580314636
-},
-"10759504": {
-"table": "0x7FF91E5C97D0",
-"step": 129,
-"value": 2.0760257029905915e-05
+"step": 255
 }
 }
