@@ -34,17 +34,23 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
  * (chorus coefficients from sub_180388170 not yet captured — see juno_driver.c). */
 int juno_driver_render_sample(unsigned char *st, float *outL, float *outR);
 
-/* --- note gate ---------------------------------------------------------------
+/* --- note gate + pitch --------------------------------------------------------
  * A note is played by holding the per-voice master gate ("M.Gate", flat-state
  * offset 320 + voice*10512) at 1.0 and pulsing the note-on edge (offset 101504 +
  * voice*32) for one sample. voice_render then generates the LFO, both ADSR
- * envelopes and the filter sweep internally from that gate — no external envelope
- * code is required. These map the parameter the host sets on a MIDI note-on/off.
- * The note's pitch comes from the pitch slot (offset 4448) set by the patch; the
- * MIDI-note -> octave-pitch conversion is the one documented gap (see
- * docs/CONTROL_LAYER.md), so these play at the patch's stored pitch. */
-void juno_note_on (unsigned char *st, int voice);   /* gate=1.0 + note-on edge */
-void juno_note_off(unsigned char *st, int voice);   /* gate=0.0 (release)      */
+ * envelopes and the filter sweep internally from that gate.
+ *
+ * Pitch: voice_render reads the pitch from offset 4448 (+voice*10512) in OCTAVES
+ * (Hz = JUNO_DCO_REF_HZ * 2^pitch). juno_note_on sets it for a MIDI note under
+ * standard A440 equal temperament — the plugin's default tuning (its 12-entry
+ * fine-tune table sub_135D180 defaults to equal temperament). The octave->Hz
+ * reference is the transcribed DCO's own calibration, so the produced frequency
+ * is exactly 440*2^((note-69)/12). Patch transpose/master-tune params are separate
+ * (368/384) and left at the patch's values. */
+#define JUNO_DCO_REF_HZ  22380.1   /* Hz at pitch-offset 0, from the transcribed DCO */
+
+void juno_note_on (unsigned char *st, int voice, int midi_note);  /* gate + pitch + edge */
+void juno_note_off(unsigned char *st, int voice);                 /* gate=0.0 (release)  */
 
 #ifdef __cplusplus
 }

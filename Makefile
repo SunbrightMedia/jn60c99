@@ -32,10 +32,16 @@ sound: tests/sound_test.c $(SRC)
 	$(CC) $(CFLAGS) -o tests/sound_test tests/sound_test.c $(SRC) $(LDLIBS)
 	./tests/sound_test state_dump/state_t0.bin /tmp/juno_sound 96000
 
-# Play an actual note from a fresh engine through the full stereo chorus path.
+# Play an actual note (NOTE=midi, default 60) through the full stereo chorus path.
+NOTE ?= 60
 play: tests/play_note.c $(SRC)
 	$(CC) $(CFLAGS) -o tests/play_note tests/play_note.c $(SRC) $(LDLIBS)
-	./tests/play_note /tmp/juno_note.wav 4 1.5
+	./tests/play_note /tmp/juno_note.wav 4 1.5 $(NOTE)
+
+# Render a scale (proves per-note pitch). `make scale` -> /tmp/juno_scale.wav
+scale: tests/play_scale.c $(SRC)
+	$(CC) $(CFLAGS) -o tests/play_scale tests/play_scale.c $(SRC) $(LDLIBS)
+	./tests/play_scale /tmp/juno_scale.wav 0.55
 
 # Capture-free per-sample A/B: run our DSP forward from t0, match t1 (control-rate).
 ab: tests/ab_persample.c $(SRC)

@@ -62,7 +62,9 @@ int main(int argc, char **argv)
     printf("patch pitch (oct) = %.4f ; LPF cutoff = %.4f ; LFO rate = %.4f\n",
            JF(st, 4448), JF(st, 6736), JF(st, 1088));
 
-    juno_note_on(st, 0);
+    int midi = (argc > 4) ? atoi(argv[4]) : 60;     /* default middle C */
+    juno_note_on(st, 0, midi);
+    printf("MIDI note %d\n", midi);
     int ran_master = 0;
     double sum = 0; float peak = 0;
     for (int i = 0; i < N; ++i) {

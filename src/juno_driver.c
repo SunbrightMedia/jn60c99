@@ -18,6 +18,7 @@
 #include "juno_engine.h"
 #include "juno_driver.h"
 #include <string.h>
+#include <math.h>
 
 /* Install the host-params shim into the state block. Call once after init.
  * `shim` must outlive all render calls (the state holds a pointer into it). */
@@ -43,13 +44,17 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
  * at 1.0 for the duration of the note and pulses the note-on edge (offset 101504
  * + v*32). voice_render consumes the edge once, then runs its internal LFO/ADSR/
  * filter-envelope generators off the held gate. */
-#define JUNO_GATE_OFF(v)  (JUNO_VOICE_MAIN_BASE0 + (v) * JUNO_VOICE_MAIN_STRIDE)   /* 320 */
-#define JUNO_EDGE_OFF(v)  (JUNO_VOICE_AUX_BASE0  + (v) * JUNO_VOICE_AUX_STRIDE)    /* 101504 */
+#define JUNO_GATE_OFF(v)   (JUNO_VOICE_MAIN_BASE0 + (v) * JUNO_VOICE_MAIN_STRIDE)  /* 320 */
+#define JUNO_PITCH_OFF(v)  (4448            + (v) * JUNO_VOICE_MAIN_STRIDE)        /* 4448 */
+#define JUNO_EDGE_OFF(v)   (JUNO_VOICE_AUX_BASE0  + (v) * JUNO_VOICE_AUX_STRIDE)   /* 101504 */
 
-void juno_note_on(unsigned char *st, int voice)
+void juno_note_on(unsigned char *st, int voice, int midi_note)
 {
-    JF(st, JUNO_GATE_OFF(voice)) = 1.0f;
-    JI(st, JUNO_EDGE_OFF(voice)) = 0x3F800000;   /* 1.0f — one-shot retrigger */
+    /* pitch in octaves so Hz = JUNO_DCO_REF_HZ*2^pitch == 440*2^((note-69)/12) */
+    float pitch = (float)(log2(440.0 / JUNO_DCO_REF_HZ) + (midi_note - 69) / 12.0);
+    JF(st, JUNO_PITCH_OFF(voice)) = pitch;
+    JF(st, JUNO_GATE_OFF(voice))  = 1.0f;
+    JI(st, JUNO_EDGE_OFF(voice))  = 0x3F800000;  /* 1.0f — one-shot retrigger */
 }
 
 void juno_note_off(unsigned char *st, int voice)

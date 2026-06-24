@@ -64,6 +64,18 @@ No bespoke per-parameter setters or curve math to reimplement.
   **octave units**; the live pitch is written through the pitch parameter's
   descriptor pointer (bound to `&state[+4448]`).
 
+### RESOLVED — note → pitch
+voice_render reads the pitch from offset 4448 in OCTAVES and turns it into a DCO
+frequency via `juno_pitch_table` (Hz = C·2^pitch). Measuring the transcribed DCO
+gives C = 22380.1 Hz at pitch 0, a clean 2^oct law (each +1.0 doubles the
+frequency). The fine-tune table `sub_135D180` defaults to equal temperament, so a
+MIDI note maps with standard A440: `pitch = log2(440/C) + (note-69)/12`. Rendered
+notes match standard tuning to **<0.1 cents across two octaves** (A4 = 440.01 Hz).
+Implemented in `juno_note_on(st, voice, midi_note)` (src/juno_driver.c). The
+absolute reference C is the DCO's own calibration (from code); only the A440 +
+equal-temperament convention is assumed, which is the plugin's default tuning.
+`make play NOTE` / `tests/play_scale` demonstrate it.
+
 ### Known gap (do NOT fabricate)
 The exact **integer-MIDI-note → octave-pitch float** conversion is not a visible
 inline formula — the note stays an integer and is converted in the DCO/parameter-

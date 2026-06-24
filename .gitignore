@@ -30,3 +30,4 @@ tests/sound_test
 tests/play_note
 tests/ab_persample
 tests/wav_compare
+tests/play_scale
