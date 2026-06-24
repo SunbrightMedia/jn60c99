@@ -1,0 +1,227 @@
+{
+ "_meta": {
+  "preset": "SQ Dynamic ARPG (bank record index 1)",
+  "purpose": "The db_engine_bridge applied to SQ ARPG, ready for juno_apply_preset / juno_param_apply_lut. Decode uses the CORRECTED block-2 stride-4 alignment.",
+  "how_to_use": "engine_lut[offset] = {step,tableId}: call juno_param_apply_lut(state, offset, tableId, step, broadcast=1). steps_by_paramId can feed juno_apply_preset(state, steps, n) once expanded to an int array indexed by paramId (entries absent = -1/skip). driver_fx are NOT LUT params: set them on the driver/FX chain (e.g. chorus_mode).",
+  "confidence_summary": "HIGH for the discrete/FX/global selectors and OSC1 Feet + Master Tune; LOW for the tentative continuous DCO/VCA levels (section-correct, exact target not bijectively proven). See refs/db_engine_bridge.json for per-param confidence."
+ },
+ "engine_lut": {
+  "3840": {
+   "step": 3,
+   "raw_db_step": 3,
+   "tableId": 5,
+   "name": "OSC1 Feet",
+   "db_index": 760,
+   "voice0_paramId": 43,
+   "confidence": "HIGH"
+  },
+  "368": {
+   "step": 128,
+   "raw_db_step": 128,
+   "tableId": 6,
+   "name": "Master Tune",
+   "db_index": 870,
+   "voice0_paramId": 3,
+   "confidence": "HIGH"
+  },
+  "4208": {
+   "step": 255,
+   "raw_db_step": 255,
+   "tableId": 54,
+   "name": "JU OSC Sqr Lev (tentative)",
+   "db_index": 770,
+   "voice0_paramId": 64,
+   "confidence": "LOW"
+  },
+  "4192": {
+   "step": 255,
+   "raw_db_step": 255,
+   "tableId": 54,
+   "name": "JU OSC Saw Lev (tentative)",
+   "db_index": 771,
+   "voice0_paramId": 63,
+   "confidence": "LOW"
+  },
+  "4224": {
+   "step": 159,
+   "raw_db_step": 159,
+   "tableId": 54,
+   "name": "JU OSC Sub Lev (tentative)",
+   "db_index": 772,
+   "voice0_paramId": 65,
+   "confidence": "LOW"
+  },
+  "6528": {
+   "step": 90,
+   "raw_db_step": 90,
+   "tableId": 12,
+   "name": "Osc Noise Level (tentative)",
+   "db_index": 779,
+   "voice0_paramId": 69,
+   "confidence": "LOW"
+  },
+  "2800": {
+   "step": 195,
+   "raw_db_step": 195,
+   "tableId": 50,
+   "name": "ENV Sustain (VCA, tentative)",
+   "db_index": 795,
+   "voice0_paramId": 33,
+   "confidence": "LOW"
+  },
+  "2832": {
+   "step": 96,
+   "raw_db_step": 96,
+   "tableId": 38,
+   "name": "ENV Release (VCA, tentative)",
+   "db_index": 796,
+   "voice0_paramId": 35,
+   "confidence": "LOW"
+  }
+ },
+ "engine_lut_broadcast_offsets": {
+  "3840": 3,
+  "14352": 3,
+  "24864": 3,
+  "35376": 3,
+  "45888": 3,
+  "56400": 3,
+  "66912": 3,
+  "77424": 3,
+  "368": 128,
+  "10880": 128,
+  "21392": 128,
+  "31904": 128,
+  "42416": 128,
+  "52928": 128,
+  "63440": 128,
+  "73952": 128,
+  "4208": 255,
+  "14720": 255,
+  "25232": 255,
+  "35744": 255,
+  "46256": 255,
+  "56768": 255,
+  "67280": 255,
+  "77792": 255,
+  "4192": 255,
+  "14704": 255,
+  "25216": 255,
+  "35728": 255,
+  "46240": 255,
+  "56752": 255,
+  "67264": 255,
+  "77776": 255,
+  "4224": 159,
+  "14736": 159,
+  "25248": 159,
+  "35760": 159,
+  "46272": 159,
+  "56784": 159,
+  "67296": 159,
+  "77808": 159,
+  "6528": 90,
+  "17040": 90,
+  "27552": 90,
+  "38064": 90,
+  "48576": 90,
+  "59088": 90,
+  "69600": 90,
+  "80112": 90,
+  "2800": 195,
+  "13312": 195,
+  "23824": 195,
+  "34336": 195,
+  "44848": 195,
+  "55360": 195,
+  "65872": 195,
+  "76384": 195,
+  "2832": 96,
+  "13344": 96,
+  "23856": 96,
+  "34368": 96,
+  "44880": 96,
+  "55392": 96,
+  "65904": 96,
+  "76416": 96
+ },
+ "steps_by_paramId": {
+  "43": 3,
+  "3": 128,
+  "64": 255,
+  "63": 255,
+  "65": 159,
+  "69": 90,
+  "33": 195,
+  "35": 96
+ },
+ "driver_fx": {
+  "873": {
+   "name": "JUNO Chorus mode (driver chorus_mode)",
+   "value": 2,
+   "driver_target": "juno_driver_attach_host: chorus_mode",
+   "confidence": "HIGH"
+  },
+  "875": {
+   "name": "System-8 FX-A type (delay/mod slot)",
+   "value": 0,
+   "driver_target": "FX-A type selector",
+   "confidence": "HIGH"
+  },
+  "876": {
+   "name": "Reverb type",
+   "value": 3,
+   "driver_target": "reverb type selector",
+   "confidence": "HIGH"
+  },
+  "872": {
+   "name": "Filter type (LPF/HPF slope)",
+   "value": 0,
+   "driver_target": "filter type selector",
+   "confidence": "HIGH"
+  },
+  "871": {
+   "name": "Model JUNO-60/106",
+   "value": 0,
+   "driver_target": "model selector (bridge case 871 booleanizes)",
+   "confidence": "HIGH"
+  },
+  "868": {
+   "name": "Sub-osc waveform",
+   "value": 1,
+   "driver_target": "sub-osc wave selector",
+   "confidence": "MEDIUM"
+  },
+  "800": {
+   "name": "Key Assign (POLY1/MONO/UNISON/POLY2)",
+   "value": 0,
+   "driver_target": "voice-allocation mode",
+   "confidence": "HIGH"
+  },
+  "759": {
+   "name": "PWM source -> PWM SW {LFO/ENV1/ENV2/Manual}",
+   "value": 0,
+   "driver_target": "engine pid46-49 (4 switches) one-hot from 6-way",
+   "confidence": "MEDIUM"
+  },
+  "769": {
+   "name": "Coarse transpose/range (+-11)",
+   "value": 0,
+   "driver_target": "bridge case 769: value = step-11 (bipolar -11..+11)",
+   "confidence": "MEDIUM"
+  }
+ },
+ "audible_summary": {
+  "OSC1_feet_db760": 3,
+  "key_assign_db800": "POLY1",
+  "noise_pinkwhite_db775": "WHITE",
+  "pwm_source_db759": "MAN",
+  "chorus_db873": "JUNO CH1",
+  "fxA_db875": "DELAY",
+  "reverb_db876": "HALL 2",
+  "filter_db872": "LPF -24dB",
+  "model_db871": "JUNO-60",
+  "subosc_wave_db868": "-1OCT SIN",
+  "master_tune_db870": 128
+ }
+}

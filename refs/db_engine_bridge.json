@@ -1,0 +1,207 @@
+{
+ "_meta": {
+  "purpose": "DB-index -> engine target bridge for the JUNO-60 capture-free preset path.",
+  "path_used": "B (semantic + ordered alignment + cross-preset validation). Path A (static table) was conclusively ruled out: the DB->engine setter (CPrmDSPSystem8Dly<CPrmDSPJu60> vtable+88, rva 0x3B1790) is a retn-0 nullsub; the only runtime bridge is sub_7FF91E027AE0's red-black tree keyed by VST3 ParamID with DB-index in node+8, passed verbatim (no db->offset arithmetic) to that nullsub. So there is NO static numeric DB-index->offset map; semantic alignment is required.",
+  "engine_paramId": "base-voice paramID (0..109) per docs/PARAM_MAP.tsv; render broadcasts to all 8 voices (paramID + 110*v / offset + 10512*v). For FX/global/driver selectors engine_paramId is null and 'driver_target' names the destination.",
+  "value_domain": "A DB step (0..255) IS the engine LUT step, except where 'value_bias' is given (the engine's own bridge applies it): subtract value_bias before LUT lookup.",
+  "block2_correction": "IMPORTANT: refs/preset_bank.json's db_global_fx_params (DB854..877) used a WRONG +200 offset (DB864/DB868 violated their ranges). The CORRECT decode is stride-4 from the reverb anchor: pos = 321 + (db-876)*4, which yields 24/24 range-fit and matches every selector default. Values in sqarpg_engine_steps.json use the corrected decode.",
+  "honest_boundary": "Continuous block-1 synth params (DCO pulse/saw/sub levels, PWM depth, VCF cutoff/res/env-amount, ENV A/D/S/R, LFO rate/depth) are decoded to DB index (proven) but their bijective DB-index->engine-paramID pairing inside the System-8 multi-OSC layout is NOT statically provable and was NOT guessed. They are listed in db_engine_unmapped."
+ },
+ "bridge": {
+  "760": {
+   "engine_paramId": 43,
+   "offset": 3840,
+   "name": "OSC1 Feet",
+   "tableId": 5,
+   "confidence": "HIGH",
+   "method": "proven-anchor (spec identical+unique; offset 3840 confirmed)",
+   "note": "DB spec '64..2 FEET' == engine 'OSC1 Feet'; the one statically-proven pair."
+  },
+  "870": {
+   "engine_paramId": 3,
+   "offset": 368,
+   "name": "Master Tune",
+   "tableId": 6,
+   "confidence": "HIGH",
+   "method": "discrete-spec-unique + cross-preset (all 64 = 128 center, matches def)",
+   "note": "DB870 -1200..+1200CENT def=128 center == engine pid3 'Master Tune'. All 64 presets read 128 (untouched) -> consistent."
+  },
+  "873": {
+   "engine_paramId": null,
+   "offset": null,
+   "name": "JUNO Chorus mode (driver chorus_mode)",
+   "tableId": null,
+   "driver_target": "juno_driver_attach_host: chorus_mode",
+   "confidence": "HIGH",
+   "method": "discrete-spec-unique + corrected-decode + cross-preset semantics",
+   "note": "DB873 = OVERDRIVE|DISTORTION|JUNO CH1|JUNO CH2|CRUSHER|PHASER. JUNO CH1(33)/JUNO CH2(22) are the authentic JUNO-60 chorus I/II; PHASER(8),DISTORTION(1) are alt character fx. This is the JUNO chorus selector. Maps to master_render chorus_mode (host-params +136/+112). mode 0 = bypass."
+  },
+  "875": {
+   "engine_paramId": null,
+   "offset": null,
+   "name": "System-8 FX-A type (delay/mod slot)",
+   "tableId": null,
+   "driver_target": "FX-A type selector",
+   "confidence": "HIGH",
+   "method": "discrete-spec-unique + corrected-decode",
+   "note": "DB875 = DELAY|PAN DELAY|CHORUS 1|CHORUS 2|FLANGER|DELAY+CHORUS. Separate System-8 modulation/delay slot (the delay/chorus instances at engine offsets 6396xxx/10693xxx). 29 DELAY, 17 PAN DELAY, 10 CHORUS1..."
+  },
+  "876": {
+   "engine_paramId": null,
+   "offset": null,
+   "name": "Reverb type",
+   "tableId": null,
+   "driver_target": "reverb type selector",
+   "confidence": "HIGH",
+   "method": "discrete-spec-unique + reverb anchor (HALL2 for SQ ARPG validated)",
+   "note": "DB876 = AMBIENCE|ROOM|HALL1|HALL2|PLATE|MODULATION. The block-2 alignment anchor."
+  },
+  "872": {
+   "engine_paramId": null,
+   "offset": null,
+   "name": "Filter type (LPF/HPF slope)",
+   "tableId": null,
+   "driver_target": "filter type selector",
+   "confidence": "HIGH",
+   "method": "discrete-spec-unique + corrected-decode",
+   "note": "DB872 = LPF-24/-18/-12 | HPF-12/-18/-24. All factory presets that are pure JUNO use LPF-24 (0). engine LPF is -24dB/oct (4-pole)."
+  },
+  "871": {
+   "engine_paramId": null,
+   "offset": null,
+   "name": "Model JUNO-60/106",
+   "tableId": null,
+   "driver_target": "model selector (bridge case 871 booleanizes)",
+   "confidence": "HIGH",
+   "method": "discrete-spec-unique + bridge case 871 (booleanize a3!=0)",
+   "note": "DB871 = JUNO-60(0)|JUNO-106(1). Bridge switch case 871 sets value=(a3!=0). All 64 bank presets = 0 (JUNO-60)."
+  },
+  "868": {
+   "engine_paramId": null,
+   "offset": null,
+   "name": "Sub-osc waveform",
+   "tableId": null,
+   "driver_target": "sub-osc wave selector",
+   "confidence": "MEDIUM",
+   "method": "discrete-spec-unique + corrected-decode (range now 0..5, was 0..255 mis-decoded)",
+   "note": "DB868 = -2OCT SIN|-1OCT SIN|SIN|TRI|-1OCT TRI|-2OCT TRI. The corrected stride-4 decode gives 0..5 (range-valid); the old +200 decode gave 0..255 (invalid)."
+  },
+  "800": {
+   "engine_paramId": null,
+   "offset": null,
+   "name": "Key Assign (POLY1/MONO/UNISON/POLY2)",
+   "tableId": null,
+   "driver_target": "voice-allocation mode",
+   "confidence": "HIGH",
+   "method": "discrete-spec-unique + cross-preset (BS->MONO, PD->POLY1)",
+   "note": "DB800 = POLY1|MONO|UNISON|POLY2. Validated: BS(bass) presets 9/11 = MONO(1); all 12 PD(pad) = POLY1(0). Voice-allocation mode (not a per-voice LUT slot)."
+  },
+  "759": {
+   "engine_paramId": null,
+   "offset": null,
+   "name": "PWM source -> PWM SW {LFO/ENV1/ENV2/Manual}",
+   "tableId": null,
+   "driver_target": "engine pid46-49 (4 switches) one-hot from 6-way",
+   "confidence": "MEDIUM",
+   "method": "discrete-spec semantic (6-way -> 4 one-hot switches)",
+   "note": "DB759 = MAN|LFO|ENV1+|ENV1-|ENV2+|ENV2-. Engine has 4 PWM switches pid46 PWM SW LFO(3888), pid47 ENV1(3904), pid48 ENV2(3920), pid49 Manual(3936). Mapping: 0->Manual on; 1->LFO on; 2,3->ENV1 on; 4,5->ENV2 on (sign = ENV polarity, carried separately). SQ ARPG=0 -> Manual PWM."
+  },
+  "769": {
+   "engine_paramId": null,
+   "offset": null,
+   "name": "Coarse transpose/range (+-11)",
+   "tableId": null,
+   "driver_target": "bridge case 769: value = step-11 (bipolar -11..+11)",
+   "confidence": "MEDIUM",
+   "method": "bridge-confirmed value-bias (case 769: v=a3-11) + spec -11..11",
+   "note": "Bridge switch explicitly biases DB769 by -11 (bipolar). Spec -11..+11. All 64 presets store 11 (=> 0 after bias) -> a fixed/centered coarse pitch. SQ ARPG=11 -> 0 semitone offset.",
+   "value_bias": 11
+  },
+  "770": {
+   "engine_paramId": 64,
+   "offset": 4208,
+   "name": "JU OSC Sqr Lev (tentative)",
+   "tableId": 54,
+   "confidence": "LOW",
+   "method": "section-semantic (DCO mixer) + cross-preset; saw/sqr assignment not bijective",
+   "note": "DB770 a DCO mixer level (def128, all presets present). Tentatively the pulse/square level. SQ ARPG=255 (full)."
+  },
+  "771": {
+   "engine_paramId": 63,
+   "offset": 4192,
+   "name": "JU OSC Saw Lev (tentative)",
+   "tableId": 54,
+   "confidence": "LOW",
+   "method": "section-semantic (DCO mixer); saw/sqr assignment not bijective",
+   "note": "DB771 a DCO mixer level (def0). Tentatively the saw level. SQ ARPG=255 (full)."
+  },
+  "772": {
+   "engine_paramId": 65,
+   "offset": 4224,
+   "name": "JU OSC Sub Lev (tentative)",
+   "tableId": 54,
+   "confidence": "LOW",
+   "method": "section-semantic + cross-preset (BS mean 172 >> PD 30: bass-heavy = SUB)",
+   "note": "DB772 (BS=172, PD=30) tracks bass-heavy patches strongly -> tentatively SUB level. SQ ARPG=159."
+  },
+  "779": {
+   "engine_paramId": 69,
+   "offset": 6528,
+   "name": "Osc Noise Level (tentative)",
+   "tableId": 12,
+   "confidence": "LOW",
+   "method": "section-semantic (noise) + the PINK/WHITE selector (DB775) is adjacent",
+   "note": "DB779 (all-present 15..251, def255) is the noise-section level next to the PINK/WHITE selector DB775. SQ ARPG=90."
+  },
+  "795": {
+   "engine_paramId": 33,
+   "offset": 2800,
+   "name": "ENV Sustain (VCA, tentative)",
+   "tableId": 50,
+   "confidence": "LOW",
+   "method": "cross-preset (PD 136 >> BS 52: pads sustain) + spec OFF|1..255",
+   "note": "DB795 (OFF|1..255) tracks pad>bass -> tentatively the VCA/amp envelope SUSTAIN. SQ ARPG=195. ENV1 vs ENV2 assignment not proven."
+  },
+  "796": {
+   "engine_paramId": 35,
+   "offset": 2832,
+   "name": "ENV Release (VCA, tentative)",
+   "tableId": 38,
+   "confidence": "LOW",
+   "method": "cross-preset (PD 93 >> BS 20: pads release long) + spec OFF|1..255",
+   "note": "DB796 (OFF|1..255) tracks pad>bass -> tentatively the VCA/amp envelope RELEASE. SQ ARPG=96. ENV1 vs ENV2 assignment not proven."
+  }
+ },
+ "db_engine_unmapped": {
+  "note": "Decoded to DB index (proven) but NOT bijectively mappable to an engine paramID without the runtime tree. Left out per the no-fabrication rule.",
+  "continuous_block1": {
+   "758": "DCO/PWM-area level (def0..255).",
+   "766": "centered param (def128, all 64 = 128) - untouched in every preset.",
+   "773": "DCO mixer level (mostly 0; bass-leaning).",
+   "781,782,784,785,786,787": "VCF/ENV modulation amounts & levels (centered or level). DB784/786 track pad>>bass (movement/LFO/VCF-env) but exact target unproven.",
+   "783,788,793,797,810": "centered/always-present params (cutoff, env amount, VCA level candidates) - section plausible, exact engine offset unproven.",
+   "789,790,791,792,794": "levels/gates (DB794 near-binary on; DB791 usually full).",
+   "798": "sparse OFF|1..255 (56/64 = OFF).",
+   "755,776": "centered (def128) - all presets 128 (untouched)."
+  },
+  "discrete_block1": {
+   "756": "OFF|ON (bridge case 756 has an extra side-effect setter) - SQ ARPG=1.",
+   "799": "OFF|ON sparse.",
+   "803": "OFF|ON (30 off / 34 on) - SQ ARPG=1.",
+   "801": "1..24 (all 64 = 11) - fixed.",
+   "811": "DISABLE|ENABLE (all 64 = ENABLE)."
+  },
+  "global_block2": {
+   "854,855,856,857,862,863,864,866,867,869,874,877": "global ENV/mod/level fields (corrected stride-4 decode). DB858-861 are global ENV-time-like (def 43/43/22/22) but show only coarse quantized values across the bank, not clean ADSR; not the primary audible envelope. DB874 = drive/character amount for DB873.",
+   "865": "-11..+11 (all 64 = 11 => centered)."
+  }
+ },
+ "sqarpg_chorus_and_lfo": {
+  "chorus_mode_db873": "JUNO CH1 (value 2) = JUNO-60 Chorus I.",
+  "fxA_db875": "DELAY (value 0) - no extra chorus in the System-8 FX-A slot.",
+  "reverb_db876": "HALL 2 (value 3).",
+  "filter_db872": "LPF -24dB (value 0).",
+  "model_db871": "JUNO-60 (value 0).",
+  "answer_vibrato": "The audible chorus/vibrato is a PRESET param: DB873 selects JUNO Chorus I, which drives master_render's chorus_mode (a real BBD-chorus stage), NOT a transcription artifact. Plus the patch's own LFO->pitch (block-1) adds vibrato. SQ ARPG should render WITH JUNO Chorus I engaged."
+ }
+}
