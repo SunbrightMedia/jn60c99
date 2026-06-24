@@ -66,8 +66,8 @@ EV ?= tests/oracle/cmaj_sqarpg.txt
 oracle: tests/render_events.c $(SRC)
 	$(CC) $(CFLAGS) -o tests/render_events tests/render_events.c $(SRC) $(LDLIBS)
 	./tests/render_events $(EV) /tmp/port_oracle.wav
-	@test -n "$(REF)" && python3 tools/ab_compare.py "$(REF)" /tmp/port_oracle.wav || \
-	  echo "(set REF=/path/to/plugin_reference.wav to run the A/B comparison)"
+	@if [ -f "$(REF)" ]; then python3 tools/ab_compare.py "$(REF)" /tmp/port_oracle.wav; \
+	 else echo "(set REF=/path/to/plugin_reference.wav to run the A/B comparison)"; fi
 
 # Capture-free per-sample A/B: run our DSP forward from t0, match t1 (control-rate).
 ab: tests/ab_persample.c $(SRC)
