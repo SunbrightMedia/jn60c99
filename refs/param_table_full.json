@@ -1,0 +1,4111 @@
+{
+ "0": {
+  "offset": 272,
+  "name": "UseExtJack",
+  "tableId": 52,
+  "source": "name-fallback"
+ },
+ "1": {
+  "offset": 304,
+  "name": "M.CV",
+  "tableId": 32,
+  "source": "oracle"
+ },
+ "3": {
+  "offset": 368,
+  "name": "Master Tune",
+  "tableId": 6,
+  "source": "vtable-multi",
+  "alts": [
+   6,
+   27,
+   55
+  ]
+ },
+ "4": {
+  "offset": 384,
+  "name": "Part Tune",
+  "tableId": 27,
+  "source": "vtable"
+ },
+ "5": {
+  "offset": 592,
+  "name": "Portamento OnOff",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "6": {
+  "offset": 608,
+  "name": "Portamento Mode",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "7": {
+  "offset": 624,
+  "name": "Portamento Time",
+  "tableId": 4,
+  "source": "oracle"
+ },
+ "8": {
+  "offset": 1040,
+  "name": "LFO Griffer Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "9": {
+  "offset": 1056,
+  "name": "LFO Tempo Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "10": {
+  "offset": 1072,
+  "name": "LFO Tempo Rate",
+  "tableId": 53,
+  "source": "vtable-multi",
+  "alts": [
+   48,
+   53
+  ]
+ },
+ "11": {
+  "offset": 1088,
+  "name": "LFO Rate",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "12": {
+  "offset": 1856,
+  "name": "Gate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "13": {
+  "offset": 1872,
+  "name": "LFO Trig",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "15": {
+  "offset": 1904,
+  "name": "LFO UseExtGate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "16": {
+  "offset": 1920,
+  "name": "LFO Delay",
+  "tableId": 44,
+  "source": "oracle"
+ },
+ "17": {
+  "offset": 1936,
+  "name": "LFO Delay Sw",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "18": {
+  "offset": 1952,
+  "name": "LFO Sin Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "19": {
+  "offset": 1968,
+  "name": "LFO Tri Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "20": {
+  "offset": 1984,
+  "name": "LFO Sqr Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "21": {
+  "offset": 2000,
+  "name": "LFO Saw Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "22": {
+  "offset": 2016,
+  "name": "LFO Saw(Inv) Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "23": {
+  "offset": 2032,
+  "name": "LFO S&H Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "24": {
+  "offset": 2048,
+  "name": "LFO Noise Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "25": {
+  "offset": 2064,
+  "name": "LFO Noise Mix",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "31": {
+  "offset": 2560,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "32": {
+  "offset": 2784,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "oracle"
+ },
+ "33": {
+  "offset": 2800,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "oracle"
+ },
+ "34": {
+  "offset": 2816,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "oracle"
+ },
+ "35": {
+  "offset": 2832,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "oracle"
+ },
+ "37": {
+  "offset": 3040,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "38": {
+  "offset": 3264,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "oracle"
+ },
+ "39": {
+  "offset": 3280,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "40": {
+  "offset": 3296,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "oracle"
+ },
+ "41": {
+  "offset": 3312,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "oracle"
+ },
+ "43": {
+  "offset": 3840,
+  "name": "OSC1 Feet",
+  "tableId": 5,
+  "source": "vtable"
+ },
+ "44": {
+  "offset": 3856,
+  "name": "Griffer Bend SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "45": {
+  "offset": 3872,
+  "name": "Bend Enable SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "50": {
+  "offset": 3952,
+  "name": "Tune",
+  "tableId": 28,
+  "source": "vtable"
+ },
+ "53": {
+  "offset": 4000,
+  "name": "Mod Sw",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "55": {
+  "offset": 4032,
+  "name": "LFO Level",
+  "tableId": 0,
+  "source": "oracle"
+ },
+ "56": {
+  "offset": 4048,
+  "name": "LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "59": {
+  "offset": 4096,
+  "name": "ENV Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "60": {
+  "offset": 4112,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "61": {
+  "offset": 4128,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "oracle"
+ },
+ "62": {
+  "offset": 4144,
+  "name": "PWM Level",
+  "tableId": 45,
+  "source": "oracle"
+ },
+ "63": {
+  "offset": 4192,
+  "name": "JU OSC Saw Lev",
+  "tableId": 54,
+  "source": "oracle"
+ },
+ "64": {
+  "offset": 4208,
+  "name": "JU OSC Sqr Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "65": {
+  "offset": 4224,
+  "name": "JU OSC Sub Lev",
+  "tableId": 54,
+  "source": "oracle"
+ },
+ "66": {
+  "offset": 5520,
+  "name": "Duty Tune",
+  "tableId": 27,
+  "source": "oracle"
+ },
+ "68": {
+  "offset": 6512,
+  "name": "Osc1 Level",
+  "tableId": 54,
+  "source": "oracle"
+ },
+ "69": {
+  "offset": 6528,
+  "name": "Osc Noise Level",
+  "tableId": 12,
+  "source": "oracle"
+ },
+ "70": {
+  "offset": 6720,
+  "name": "Griffer SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "71": {
+  "offset": 6736,
+  "name": "LPF Cutoff",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "72": {
+  "offset": 6832,
+  "name": "LPF Resonance",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "73": {
+  "offset": 6864,
+  "name": "Velocity",
+  "tableId": 21,
+  "source": "oracle"
+ },
+ "74": {
+  "offset": 7008,
+  "name": "Env1/2",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "75": {
+  "offset": 7024,
+  "name": "Int/Env",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "77": {
+  "offset": 7312,
+  "name": "Ext LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "78": {
+  "offset": 7328,
+  "name": "GRF Bned SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "79": {
+  "offset": 7344,
+  "name": "LFO Level",
+  "tableId": 47,
+  "source": "oracle"
+ },
+ "81": {
+  "offset": 7376,
+  "name": "MOD SW",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "82": {
+  "offset": 7392,
+  "name": "ENV Level",
+  "tableId": 46,
+  "source": "oracle"
+ },
+ "83": {
+  "offset": 7408,
+  "name": "KCV Level",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "84": {
+  "offset": 7424,
+  "name": "Velocity Sens",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "85": {
+  "offset": 7440,
+  "name": "Velocity Offset",
+  "tableId": 24,
+  "source": "oracle"
+ },
+ "86": {
+  "offset": 7456,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "87": {
+  "offset": 7472,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "oracle"
+ },
+ "89": {
+  "offset": 7616,
+  "name": "Resonance Tune",
+  "tableId": 31,
+  "source": "vtable"
+ },
+ "95": {
+  "offset": 9584,
+  "name": "AMP TONE",
+  "tableId": 21,
+  "source": "oracle"
+ },
+ "96": {
+  "offset": 9600,
+  "name": "AMP VELOCITY SENS",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "97": {
+  "offset": 9616,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "tableId": 56,
+  "source": "oracle"
+ },
+ "98": {
+  "offset": 9680,
+  "name": "Velocity",
+  "tableId": 56,
+  "source": "oracle"
+ },
+ "99": {
+  "offset": 9824,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "103": {
+  "offset": 10224,
+  "name": "Ext ENV SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "104": {
+  "offset": 10240,
+  "name": "HPF Cutoff",
+  "tableId": 41,
+  "source": "oracle"
+ },
+ "108": {
+  "offset": 10304,
+  "name": "ENV LEVEL",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "110": {
+  "offset": 10784,
+  "name": "UseExtJack",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "111": {
+  "offset": 10816,
+  "name": "M.CV",
+  "tableId": 32,
+  "source": "name-fallback"
+ },
+ "113": {
+  "offset": 10880,
+  "name": "Master Tune",
+  "tableId": 6,
+  "source": "vtable-multi",
+  "alts": [
+   6,
+   27,
+   55
+  ]
+ },
+ "114": {
+  "offset": 10896,
+  "name": "Part Tune",
+  "tableId": 27,
+  "source": "vtable"
+ },
+ "115": {
+  "offset": 11104,
+  "name": "Portamento OnOff",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "116": {
+  "offset": 11120,
+  "name": "Portamento Mode",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "117": {
+  "offset": 11136,
+  "name": "Portamento Time",
+  "tableId": 7,
+  "source": "vtable"
+ },
+ "118": {
+  "offset": 11552,
+  "name": "LFO Griffer Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "119": {
+  "offset": 11568,
+  "name": "LFO Tempo Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "120": {
+  "offset": 11584,
+  "name": "LFO Tempo Rate",
+  "tableId": 53,
+  "source": "vtable-multi",
+  "alts": [
+   48,
+   53
+  ]
+ },
+ "121": {
+  "offset": 11600,
+  "name": "LFO Rate",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "122": {
+  "offset": 12368,
+  "name": "Gate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "123": {
+  "offset": 12384,
+  "name": "LFO Trig",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "125": {
+  "offset": 12416,
+  "name": "LFO UseExtGate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "126": {
+  "offset": 12432,
+  "name": "LFO Delay",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "127": {
+  "offset": 12448,
+  "name": "LFO Delay Sw",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "128": {
+  "offset": 12464,
+  "name": "LFO Sin Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "129": {
+  "offset": 12480,
+  "name": "LFO Tri Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "130": {
+  "offset": 12496,
+  "name": "LFO Sqr Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "131": {
+  "offset": 12512,
+  "name": "LFO Saw Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "132": {
+  "offset": 12528,
+  "name": "LFO Saw(Inv) Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "133": {
+  "offset": 12544,
+  "name": "LFO S&H Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "134": {
+  "offset": 12560,
+  "name": "LFO Noise Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "135": {
+  "offset": 12576,
+  "name": "LFO Noise Mix",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "141": {
+  "offset": 13072,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "142": {
+  "offset": 13296,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "143": {
+  "offset": 13312,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "144": {
+  "offset": 13328,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "145": {
+  "offset": 13344,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "147": {
+  "offset": 13552,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "148": {
+  "offset": 13776,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "149": {
+  "offset": 13792,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "150": {
+  "offset": 13808,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "151": {
+  "offset": 13824,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "153": {
+  "offset": 14352,
+  "name": "OSC1 Feet",
+  "tableId": 5,
+  "source": "vtable"
+ },
+ "154": {
+  "offset": 14368,
+  "name": "Griffer Bend SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "155": {
+  "offset": 14384,
+  "name": "Bend Enable SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "160": {
+  "offset": 14464,
+  "name": "Tune",
+  "tableId": 28,
+  "source": "vtable"
+ },
+ "163": {
+  "offset": 14512,
+  "name": "Mod Sw",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "165": {
+  "offset": 14544,
+  "name": "LFO Level",
+  "tableId": 0,
+  "source": "vtable"
+ },
+ "166": {
+  "offset": 14560,
+  "name": "LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "169": {
+  "offset": 14608,
+  "name": "ENV Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "170": {
+  "offset": 14624,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "171": {
+  "offset": 14640,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "172": {
+  "offset": 14656,
+  "name": "PWM Level",
+  "tableId": 45,
+  "source": "vtable"
+ },
+ "173": {
+  "offset": 14704,
+  "name": "JU OSC Saw Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "174": {
+  "offset": 14720,
+  "name": "JU OSC Sqr Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "175": {
+  "offset": 14736,
+  "name": "JU OSC Sub Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "176": {
+  "offset": 16032,
+  "name": "Duty Tune",
+  "tableId": 27,
+  "source": "name-fallback"
+ },
+ "178": {
+  "offset": 17024,
+  "name": "Osc1 Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "179": {
+  "offset": 17040,
+  "name": "Osc Noise Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "180": {
+  "offset": 17232,
+  "name": "Griffer SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "181": {
+  "offset": 17248,
+  "name": "LPF Cutoff",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "182": {
+  "offset": 17344,
+  "name": "LPF Resonance",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "183": {
+  "offset": 17376,
+  "name": "Velocity",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "184": {
+  "offset": 17520,
+  "name": "Env1/2",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "185": {
+  "offset": 17536,
+  "name": "Int/Env",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "187": {
+  "offset": 17824,
+  "name": "Ext LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "188": {
+  "offset": 17840,
+  "name": "GRF Bned SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "189": {
+  "offset": 17856,
+  "name": "LFO Level",
+  "tableId": 47,
+  "source": "vtable"
+ },
+ "191": {
+  "offset": 17888,
+  "name": "MOD SW",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "192": {
+  "offset": 17904,
+  "name": "ENV Level",
+  "tableId": 46,
+  "source": "vtable"
+ },
+ "193": {
+  "offset": 17920,
+  "name": "KCV Level",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "194": {
+  "offset": 17936,
+  "name": "Velocity Sens",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "195": {
+  "offset": 17952,
+  "name": "Velocity Offset",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "196": {
+  "offset": 17968,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "197": {
+  "offset": 17984,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "199": {
+  "offset": 18128,
+  "name": "Resonance Tune",
+  "tableId": 31,
+  "source": "vtable"
+ },
+ "205": {
+  "offset": 20096,
+  "name": "AMP TONE",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "206": {
+  "offset": 20112,
+  "name": "AMP VELOCITY SENS",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "207": {
+  "offset": 20128,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "208": {
+  "offset": 20192,
+  "name": "Velocity",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "209": {
+  "offset": 20336,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "213": {
+  "offset": 20736,
+  "name": "Ext ENV SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "214": {
+  "offset": 20752,
+  "name": "HPF Cutoff",
+  "tableId": 41,
+  "source": "name-fallback"
+ },
+ "218": {
+  "offset": 20816,
+  "name": "ENV LEVEL",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "220": {
+  "offset": 21296,
+  "name": "UseExtJack",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "221": {
+  "offset": 21328,
+  "name": "M.CV",
+  "tableId": 32,
+  "source": "name-fallback"
+ },
+ "223": {
+  "offset": 21392,
+  "name": "Master Tune",
+  "tableId": 6,
+  "source": "vtable-multi",
+  "alts": [
+   6,
+   27,
+   55
+  ]
+ },
+ "224": {
+  "offset": 21408,
+  "name": "Part Tune",
+  "tableId": 27,
+  "source": "vtable"
+ },
+ "225": {
+  "offset": 21616,
+  "name": "Portamento OnOff",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "226": {
+  "offset": 21632,
+  "name": "Portamento Mode",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "227": {
+  "offset": 21648,
+  "name": "Portamento Time",
+  "tableId": 7,
+  "source": "vtable"
+ },
+ "228": {
+  "offset": 22064,
+  "name": "LFO Griffer Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "229": {
+  "offset": 22080,
+  "name": "LFO Tempo Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "230": {
+  "offset": 22096,
+  "name": "LFO Tempo Rate",
+  "tableId": 53,
+  "source": "vtable-multi",
+  "alts": [
+   48,
+   53
+  ]
+ },
+ "231": {
+  "offset": 22112,
+  "name": "LFO Rate",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "232": {
+  "offset": 22880,
+  "name": "Gate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "233": {
+  "offset": 22896,
+  "name": "LFO Trig",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "235": {
+  "offset": 22928,
+  "name": "LFO UseExtGate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "236": {
+  "offset": 22944,
+  "name": "LFO Delay",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "237": {
+  "offset": 22960,
+  "name": "LFO Delay Sw",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "238": {
+  "offset": 22976,
+  "name": "LFO Sin Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "239": {
+  "offset": 22992,
+  "name": "LFO Tri Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "240": {
+  "offset": 23008,
+  "name": "LFO Sqr Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "241": {
+  "offset": 23024,
+  "name": "LFO Saw Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "242": {
+  "offset": 23040,
+  "name": "LFO Saw(Inv) Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "243": {
+  "offset": 23056,
+  "name": "LFO S&H Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "244": {
+  "offset": 23072,
+  "name": "LFO Noise Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "245": {
+  "offset": 23088,
+  "name": "LFO Noise Mix",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "251": {
+  "offset": 23584,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "252": {
+  "offset": 23808,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "253": {
+  "offset": 23824,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "254": {
+  "offset": 23840,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "255": {
+  "offset": 23856,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "257": {
+  "offset": 24064,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "258": {
+  "offset": 24288,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "259": {
+  "offset": 24304,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "260": {
+  "offset": 24320,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "261": {
+  "offset": 24336,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "263": {
+  "offset": 24864,
+  "name": "OSC1 Feet",
+  "tableId": 5,
+  "source": "vtable"
+ },
+ "264": {
+  "offset": 24880,
+  "name": "Griffer Bend SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "265": {
+  "offset": 24896,
+  "name": "Bend Enable SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "270": {
+  "offset": 24976,
+  "name": "Tune",
+  "tableId": 28,
+  "source": "vtable"
+ },
+ "273": {
+  "offset": 25024,
+  "name": "Mod Sw",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "275": {
+  "offset": 25056,
+  "name": "LFO Level",
+  "tableId": 0,
+  "source": "vtable"
+ },
+ "276": {
+  "offset": 25072,
+  "name": "LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "279": {
+  "offset": 25120,
+  "name": "ENV Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "280": {
+  "offset": 25136,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "281": {
+  "offset": 25152,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "282": {
+  "offset": 25168,
+  "name": "PWM Level",
+  "tableId": 45,
+  "source": "vtable"
+ },
+ "283": {
+  "offset": 25216,
+  "name": "JU OSC Saw Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "284": {
+  "offset": 25232,
+  "name": "JU OSC Sqr Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "285": {
+  "offset": 25248,
+  "name": "JU OSC Sub Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "286": {
+  "offset": 26544,
+  "name": "Duty Tune",
+  "tableId": 27,
+  "source": "name-fallback"
+ },
+ "288": {
+  "offset": 27536,
+  "name": "Osc1 Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "289": {
+  "offset": 27552,
+  "name": "Osc Noise Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "290": {
+  "offset": 27744,
+  "name": "Griffer SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "291": {
+  "offset": 27760,
+  "name": "LPF Cutoff",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "292": {
+  "offset": 27856,
+  "name": "LPF Resonance",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "293": {
+  "offset": 27888,
+  "name": "Velocity",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "294": {
+  "offset": 28032,
+  "name": "Env1/2",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "295": {
+  "offset": 28048,
+  "name": "Int/Env",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "297": {
+  "offset": 28336,
+  "name": "Ext LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "298": {
+  "offset": 28352,
+  "name": "GRF Bned SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "299": {
+  "offset": 28368,
+  "name": "LFO Level",
+  "tableId": 47,
+  "source": "vtable"
+ },
+ "301": {
+  "offset": 28400,
+  "name": "MOD SW",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "302": {
+  "offset": 28416,
+  "name": "ENV Level",
+  "tableId": 46,
+  "source": "vtable"
+ },
+ "303": {
+  "offset": 28432,
+  "name": "KCV Level",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "304": {
+  "offset": 28448,
+  "name": "Velocity Sens",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "305": {
+  "offset": 28464,
+  "name": "Velocity Offset",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "306": {
+  "offset": 28480,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "307": {
+  "offset": 28496,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "309": {
+  "offset": 28640,
+  "name": "Resonance Tune",
+  "tableId": 31,
+  "source": "vtable"
+ },
+ "315": {
+  "offset": 30608,
+  "name": "AMP TONE",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "316": {
+  "offset": 30624,
+  "name": "AMP VELOCITY SENS",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "317": {
+  "offset": 30640,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "318": {
+  "offset": 30704,
+  "name": "Velocity",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "319": {
+  "offset": 30848,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "323": {
+  "offset": 31248,
+  "name": "Ext ENV SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "324": {
+  "offset": 31264,
+  "name": "HPF Cutoff",
+  "tableId": 41,
+  "source": "name-fallback"
+ },
+ "328": {
+  "offset": 31328,
+  "name": "ENV LEVEL",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "330": {
+  "offset": 31808,
+  "name": "UseExtJack",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "331": {
+  "offset": 31840,
+  "name": "M.CV",
+  "tableId": 32,
+  "source": "name-fallback"
+ },
+ "333": {
+  "offset": 31904,
+  "name": "Master Tune",
+  "tableId": 6,
+  "source": "vtable-multi",
+  "alts": [
+   6,
+   27,
+   55
+  ]
+ },
+ "334": {
+  "offset": 31920,
+  "name": "Part Tune",
+  "tableId": 27,
+  "source": "vtable"
+ },
+ "335": {
+  "offset": 32128,
+  "name": "Portamento OnOff",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "336": {
+  "offset": 32144,
+  "name": "Portamento Mode",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "337": {
+  "offset": 32160,
+  "name": "Portamento Time",
+  "tableId": 7,
+  "source": "vtable"
+ },
+ "338": {
+  "offset": 32576,
+  "name": "LFO Griffer Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "339": {
+  "offset": 32592,
+  "name": "LFO Tempo Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "340": {
+  "offset": 32608,
+  "name": "LFO Tempo Rate",
+  "tableId": 53,
+  "source": "vtable-multi",
+  "alts": [
+   48,
+   53
+  ]
+ },
+ "341": {
+  "offset": 32624,
+  "name": "LFO Rate",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "342": {
+  "offset": 33392,
+  "name": "Gate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "343": {
+  "offset": 33408,
+  "name": "LFO Trig",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "345": {
+  "offset": 33440,
+  "name": "LFO UseExtGate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "346": {
+  "offset": 33456,
+  "name": "LFO Delay",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "347": {
+  "offset": 33472,
+  "name": "LFO Delay Sw",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "348": {
+  "offset": 33488,
+  "name": "LFO Sin Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "349": {
+  "offset": 33504,
+  "name": "LFO Tri Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "350": {
+  "offset": 33520,
+  "name": "LFO Sqr Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "351": {
+  "offset": 33536,
+  "name": "LFO Saw Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "352": {
+  "offset": 33552,
+  "name": "LFO Saw(Inv) Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "353": {
+  "offset": 33568,
+  "name": "LFO S&H Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "354": {
+  "offset": 33584,
+  "name": "LFO Noise Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "355": {
+  "offset": 33600,
+  "name": "LFO Noise Mix",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "361": {
+  "offset": 34096,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "362": {
+  "offset": 34320,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "363": {
+  "offset": 34336,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "364": {
+  "offset": 34352,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "365": {
+  "offset": 34368,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "367": {
+  "offset": 34576,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "368": {
+  "offset": 34800,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "369": {
+  "offset": 34816,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "370": {
+  "offset": 34832,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "371": {
+  "offset": 34848,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "373": {
+  "offset": 35376,
+  "name": "OSC1 Feet",
+  "tableId": 5,
+  "source": "vtable"
+ },
+ "374": {
+  "offset": 35392,
+  "name": "Griffer Bend SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "375": {
+  "offset": 35408,
+  "name": "Bend Enable SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "380": {
+  "offset": 35488,
+  "name": "Tune",
+  "tableId": 28,
+  "source": "vtable"
+ },
+ "383": {
+  "offset": 35536,
+  "name": "Mod Sw",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "385": {
+  "offset": 35568,
+  "name": "LFO Level",
+  "tableId": 0,
+  "source": "vtable"
+ },
+ "386": {
+  "offset": 35584,
+  "name": "LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "389": {
+  "offset": 35632,
+  "name": "ENV Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "390": {
+  "offset": 35648,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "391": {
+  "offset": 35664,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "392": {
+  "offset": 35680,
+  "name": "PWM Level",
+  "tableId": 45,
+  "source": "vtable"
+ },
+ "393": {
+  "offset": 35728,
+  "name": "JU OSC Saw Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "394": {
+  "offset": 35744,
+  "name": "JU OSC Sqr Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "395": {
+  "offset": 35760,
+  "name": "JU OSC Sub Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "396": {
+  "offset": 37056,
+  "name": "Duty Tune",
+  "tableId": 27,
+  "source": "name-fallback"
+ },
+ "398": {
+  "offset": 38048,
+  "name": "Osc1 Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "399": {
+  "offset": 38064,
+  "name": "Osc Noise Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "400": {
+  "offset": 38256,
+  "name": "Griffer SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "401": {
+  "offset": 38272,
+  "name": "LPF Cutoff",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "402": {
+  "offset": 38368,
+  "name": "LPF Resonance",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "403": {
+  "offset": 38400,
+  "name": "Velocity",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "404": {
+  "offset": 38544,
+  "name": "Env1/2",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "405": {
+  "offset": 38560,
+  "name": "Int/Env",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "407": {
+  "offset": 38848,
+  "name": "Ext LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "408": {
+  "offset": 38864,
+  "name": "GRF Bned SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "409": {
+  "offset": 38880,
+  "name": "LFO Level",
+  "tableId": 47,
+  "source": "vtable"
+ },
+ "411": {
+  "offset": 38912,
+  "name": "MOD SW",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "412": {
+  "offset": 38928,
+  "name": "ENV Level",
+  "tableId": 46,
+  "source": "vtable"
+ },
+ "413": {
+  "offset": 38944,
+  "name": "KCV Level",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "414": {
+  "offset": 38960,
+  "name": "Velocity Sens",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "415": {
+  "offset": 38976,
+  "name": "Velocity Offset",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "416": {
+  "offset": 38992,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "417": {
+  "offset": 39008,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "419": {
+  "offset": 39152,
+  "name": "Resonance Tune",
+  "tableId": 31,
+  "source": "vtable"
+ },
+ "425": {
+  "offset": 41120,
+  "name": "AMP TONE",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "426": {
+  "offset": 41136,
+  "name": "AMP VELOCITY SENS",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "427": {
+  "offset": 41152,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "428": {
+  "offset": 41216,
+  "name": "Velocity",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "429": {
+  "offset": 41360,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "433": {
+  "offset": 41760,
+  "name": "Ext ENV SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "434": {
+  "offset": 41776,
+  "name": "HPF Cutoff",
+  "tableId": 41,
+  "source": "name-fallback"
+ },
+ "438": {
+  "offset": 41840,
+  "name": "ENV LEVEL",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "440": {
+  "offset": 42320,
+  "name": "UseExtJack",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "441": {
+  "offset": 42352,
+  "name": "M.CV",
+  "tableId": 32,
+  "source": "name-fallback"
+ },
+ "443": {
+  "offset": 42416,
+  "name": "Master Tune",
+  "tableId": 6,
+  "source": "vtable-multi",
+  "alts": [
+   6,
+   27,
+   55
+  ]
+ },
+ "444": {
+  "offset": 42432,
+  "name": "Part Tune",
+  "tableId": 27,
+  "source": "vtable"
+ },
+ "445": {
+  "offset": 42640,
+  "name": "Portamento OnOff",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "446": {
+  "offset": 42656,
+  "name": "Portamento Mode",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "447": {
+  "offset": 42672,
+  "name": "Portamento Time",
+  "tableId": 7,
+  "source": "vtable"
+ },
+ "448": {
+  "offset": 43088,
+  "name": "LFO Griffer Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "449": {
+  "offset": 43104,
+  "name": "LFO Tempo Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "450": {
+  "offset": 43120,
+  "name": "LFO Tempo Rate",
+  "tableId": 53,
+  "source": "vtable-multi",
+  "alts": [
+   48,
+   53
+  ]
+ },
+ "451": {
+  "offset": 43136,
+  "name": "LFO Rate",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "452": {
+  "offset": 43904,
+  "name": "Gate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "453": {
+  "offset": 43920,
+  "name": "LFO Trig",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "455": {
+  "offset": 43952,
+  "name": "LFO UseExtGate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "456": {
+  "offset": 43968,
+  "name": "LFO Delay",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "457": {
+  "offset": 43984,
+  "name": "LFO Delay Sw",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "458": {
+  "offset": 44000,
+  "name": "LFO Sin Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "459": {
+  "offset": 44016,
+  "name": "LFO Tri Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "460": {
+  "offset": 44032,
+  "name": "LFO Sqr Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "461": {
+  "offset": 44048,
+  "name": "LFO Saw Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "462": {
+  "offset": 44064,
+  "name": "LFO Saw(Inv) Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "463": {
+  "offset": 44080,
+  "name": "LFO S&H Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "464": {
+  "offset": 44096,
+  "name": "LFO Noise Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "465": {
+  "offset": 44112,
+  "name": "LFO Noise Mix",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "471": {
+  "offset": 44608,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "472": {
+  "offset": 44832,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "473": {
+  "offset": 44848,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "474": {
+  "offset": 44864,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "475": {
+  "offset": 44880,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "477": {
+  "offset": 45088,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "478": {
+  "offset": 45312,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "479": {
+  "offset": 45328,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "480": {
+  "offset": 45344,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "481": {
+  "offset": 45360,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "483": {
+  "offset": 45888,
+  "name": "OSC1 Feet",
+  "tableId": 5,
+  "source": "vtable"
+ },
+ "484": {
+  "offset": 45904,
+  "name": "Griffer Bend SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "485": {
+  "offset": 45920,
+  "name": "Bend Enable SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "490": {
+  "offset": 46000,
+  "name": "Tune",
+  "tableId": 28,
+  "source": "vtable"
+ },
+ "493": {
+  "offset": 46048,
+  "name": "Mod Sw",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "495": {
+  "offset": 46080,
+  "name": "LFO Level",
+  "tableId": 0,
+  "source": "vtable"
+ },
+ "496": {
+  "offset": 46096,
+  "name": "LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "499": {
+  "offset": 46144,
+  "name": "ENV Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "500": {
+  "offset": 46160,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "501": {
+  "offset": 46176,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "502": {
+  "offset": 46192,
+  "name": "PWM Level",
+  "tableId": 45,
+  "source": "vtable"
+ },
+ "503": {
+  "offset": 46240,
+  "name": "JU OSC Saw Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "504": {
+  "offset": 46256,
+  "name": "JU OSC Sqr Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "505": {
+  "offset": 46272,
+  "name": "JU OSC Sub Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "506": {
+  "offset": 47568,
+  "name": "Duty Tune",
+  "tableId": 27,
+  "source": "name-fallback"
+ },
+ "508": {
+  "offset": 48560,
+  "name": "Osc1 Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "509": {
+  "offset": 48576,
+  "name": "Osc Noise Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "510": {
+  "offset": 48768,
+  "name": "Griffer SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "511": {
+  "offset": 48784,
+  "name": "LPF Cutoff",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "512": {
+  "offset": 48880,
+  "name": "LPF Resonance",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "513": {
+  "offset": 48912,
+  "name": "Velocity",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "514": {
+  "offset": 49056,
+  "name": "Env1/2",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "515": {
+  "offset": 49072,
+  "name": "Int/Env",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "517": {
+  "offset": 49360,
+  "name": "Ext LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "518": {
+  "offset": 49376,
+  "name": "GRF Bned SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "519": {
+  "offset": 49392,
+  "name": "LFO Level",
+  "tableId": 47,
+  "source": "vtable"
+ },
+ "521": {
+  "offset": 49424,
+  "name": "MOD SW",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "522": {
+  "offset": 49440,
+  "name": "ENV Level",
+  "tableId": 46,
+  "source": "vtable"
+ },
+ "523": {
+  "offset": 49456,
+  "name": "KCV Level",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "524": {
+  "offset": 49472,
+  "name": "Velocity Sens",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "525": {
+  "offset": 49488,
+  "name": "Velocity Offset",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "526": {
+  "offset": 49504,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "527": {
+  "offset": 49520,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "529": {
+  "offset": 49664,
+  "name": "Resonance Tune",
+  "tableId": 31,
+  "source": "vtable"
+ },
+ "535": {
+  "offset": 51632,
+  "name": "AMP TONE",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "536": {
+  "offset": 51648,
+  "name": "AMP VELOCITY SENS",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "537": {
+  "offset": 51664,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "538": {
+  "offset": 51728,
+  "name": "Velocity",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "539": {
+  "offset": 51872,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "543": {
+  "offset": 52272,
+  "name": "Ext ENV SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "544": {
+  "offset": 52288,
+  "name": "HPF Cutoff",
+  "tableId": 41,
+  "source": "name-fallback"
+ },
+ "548": {
+  "offset": 52352,
+  "name": "ENV LEVEL",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "550": {
+  "offset": 52832,
+  "name": "UseExtJack",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "551": {
+  "offset": 52864,
+  "name": "M.CV",
+  "tableId": 32,
+  "source": "name-fallback"
+ },
+ "553": {
+  "offset": 52928,
+  "name": "Master Tune",
+  "tableId": 6,
+  "source": "vtable-multi",
+  "alts": [
+   6,
+   27,
+   55
+  ]
+ },
+ "554": {
+  "offset": 52944,
+  "name": "Part Tune",
+  "tableId": 27,
+  "source": "vtable"
+ },
+ "555": {
+  "offset": 53152,
+  "name": "Portamento OnOff",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "556": {
+  "offset": 53168,
+  "name": "Portamento Mode",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "557": {
+  "offset": 53184,
+  "name": "Portamento Time",
+  "tableId": 7,
+  "source": "vtable"
+ },
+ "558": {
+  "offset": 53600,
+  "name": "LFO Griffer Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "559": {
+  "offset": 53616,
+  "name": "LFO Tempo Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "560": {
+  "offset": 53632,
+  "name": "LFO Tempo Rate",
+  "tableId": 53,
+  "source": "vtable-multi",
+  "alts": [
+   48,
+   53
+  ]
+ },
+ "561": {
+  "offset": 53648,
+  "name": "LFO Rate",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "562": {
+  "offset": 54416,
+  "name": "Gate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "563": {
+  "offset": 54432,
+  "name": "LFO Trig",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "565": {
+  "offset": 54464,
+  "name": "LFO UseExtGate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "566": {
+  "offset": 54480,
+  "name": "LFO Delay",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "567": {
+  "offset": 54496,
+  "name": "LFO Delay Sw",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "568": {
+  "offset": 54512,
+  "name": "LFO Sin Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "569": {
+  "offset": 54528,
+  "name": "LFO Tri Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "570": {
+  "offset": 54544,
+  "name": "LFO Sqr Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "571": {
+  "offset": 54560,
+  "name": "LFO Saw Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "572": {
+  "offset": 54576,
+  "name": "LFO Saw(Inv) Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "573": {
+  "offset": 54592,
+  "name": "LFO S&H Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "574": {
+  "offset": 54608,
+  "name": "LFO Noise Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "575": {
+  "offset": 54624,
+  "name": "LFO Noise Mix",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "581": {
+  "offset": 55120,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "582": {
+  "offset": 55344,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "583": {
+  "offset": 55360,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "584": {
+  "offset": 55376,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "585": {
+  "offset": 55392,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "587": {
+  "offset": 55600,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "588": {
+  "offset": 55824,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "589": {
+  "offset": 55840,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "590": {
+  "offset": 55856,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "591": {
+  "offset": 55872,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "593": {
+  "offset": 56400,
+  "name": "OSC1 Feet",
+  "tableId": 5,
+  "source": "vtable"
+ },
+ "594": {
+  "offset": 56416,
+  "name": "Griffer Bend SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "595": {
+  "offset": 56432,
+  "name": "Bend Enable SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "600": {
+  "offset": 56512,
+  "name": "Tune",
+  "tableId": 28,
+  "source": "vtable"
+ },
+ "603": {
+  "offset": 56560,
+  "name": "Mod Sw",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "605": {
+  "offset": 56592,
+  "name": "LFO Level",
+  "tableId": 0,
+  "source": "vtable"
+ },
+ "606": {
+  "offset": 56608,
+  "name": "LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "609": {
+  "offset": 56656,
+  "name": "ENV Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "610": {
+  "offset": 56672,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "611": {
+  "offset": 56688,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "612": {
+  "offset": 56704,
+  "name": "PWM Level",
+  "tableId": 45,
+  "source": "vtable"
+ },
+ "613": {
+  "offset": 56752,
+  "name": "JU OSC Saw Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "614": {
+  "offset": 56768,
+  "name": "JU OSC Sqr Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "615": {
+  "offset": 56784,
+  "name": "JU OSC Sub Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "616": {
+  "offset": 58080,
+  "name": "Duty Tune",
+  "tableId": 27,
+  "source": "name-fallback"
+ },
+ "618": {
+  "offset": 59072,
+  "name": "Osc1 Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "619": {
+  "offset": 59088,
+  "name": "Osc Noise Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "620": {
+  "offset": 59280,
+  "name": "Griffer SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "621": {
+  "offset": 59296,
+  "name": "LPF Cutoff",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "622": {
+  "offset": 59392,
+  "name": "LPF Resonance",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "623": {
+  "offset": 59424,
+  "name": "Velocity",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "624": {
+  "offset": 59568,
+  "name": "Env1/2",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "625": {
+  "offset": 59584,
+  "name": "Int/Env",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "627": {
+  "offset": 59872,
+  "name": "Ext LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "628": {
+  "offset": 59888,
+  "name": "GRF Bned SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "629": {
+  "offset": 59904,
+  "name": "LFO Level",
+  "tableId": 47,
+  "source": "vtable"
+ },
+ "631": {
+  "offset": 59936,
+  "name": "MOD SW",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "632": {
+  "offset": 59952,
+  "name": "ENV Level",
+  "tableId": 46,
+  "source": "vtable"
+ },
+ "633": {
+  "offset": 59968,
+  "name": "KCV Level",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "634": {
+  "offset": 59984,
+  "name": "Velocity Sens",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "635": {
+  "offset": 60000,
+  "name": "Velocity Offset",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "636": {
+  "offset": 60016,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "637": {
+  "offset": 60032,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "639": {
+  "offset": 60176,
+  "name": "Resonance Tune",
+  "tableId": 31,
+  "source": "vtable"
+ },
+ "645": {
+  "offset": 62144,
+  "name": "AMP TONE",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "646": {
+  "offset": 62160,
+  "name": "AMP VELOCITY SENS",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "647": {
+  "offset": 62176,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "648": {
+  "offset": 62240,
+  "name": "Velocity",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "649": {
+  "offset": 62384,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "653": {
+  "offset": 62784,
+  "name": "Ext ENV SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "654": {
+  "offset": 62800,
+  "name": "HPF Cutoff",
+  "tableId": 41,
+  "source": "name-fallback"
+ },
+ "658": {
+  "offset": 62864,
+  "name": "ENV LEVEL",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "660": {
+  "offset": 63344,
+  "name": "UseExtJack",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "661": {
+  "offset": 63376,
+  "name": "M.CV",
+  "tableId": 32,
+  "source": "name-fallback"
+ },
+ "663": {
+  "offset": 63440,
+  "name": "Master Tune",
+  "tableId": 6,
+  "source": "vtable-multi",
+  "alts": [
+   6,
+   27,
+   55
+  ]
+ },
+ "664": {
+  "offset": 63456,
+  "name": "Part Tune",
+  "tableId": 27,
+  "source": "vtable"
+ },
+ "665": {
+  "offset": 63664,
+  "name": "Portamento OnOff",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "666": {
+  "offset": 63680,
+  "name": "Portamento Mode",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "667": {
+  "offset": 63696,
+  "name": "Portamento Time",
+  "tableId": 7,
+  "source": "vtable"
+ },
+ "668": {
+  "offset": 64112,
+  "name": "LFO Griffer Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "669": {
+  "offset": 64128,
+  "name": "LFO Tempo Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "670": {
+  "offset": 64144,
+  "name": "LFO Tempo Rate",
+  "tableId": 53,
+  "source": "vtable-multi",
+  "alts": [
+   48,
+   53
+  ]
+ },
+ "671": {
+  "offset": 64160,
+  "name": "LFO Rate",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "672": {
+  "offset": 64928,
+  "name": "Gate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "673": {
+  "offset": 64944,
+  "name": "LFO Trig",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "675": {
+  "offset": 64976,
+  "name": "LFO UseExtGate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "676": {
+  "offset": 64992,
+  "name": "LFO Delay",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "677": {
+  "offset": 65008,
+  "name": "LFO Delay Sw",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "678": {
+  "offset": 65024,
+  "name": "LFO Sin Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "679": {
+  "offset": 65040,
+  "name": "LFO Tri Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "680": {
+  "offset": 65056,
+  "name": "LFO Sqr Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "681": {
+  "offset": 65072,
+  "name": "LFO Saw Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "682": {
+  "offset": 65088,
+  "name": "LFO Saw(Inv) Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "683": {
+  "offset": 65104,
+  "name": "LFO S&H Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "684": {
+  "offset": 65120,
+  "name": "LFO Noise Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "685": {
+  "offset": 65136,
+  "name": "LFO Noise Mix",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "691": {
+  "offset": 65632,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "692": {
+  "offset": 65856,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "693": {
+  "offset": 65872,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "694": {
+  "offset": 65888,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "695": {
+  "offset": 65904,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "697": {
+  "offset": 66112,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "698": {
+  "offset": 66336,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "699": {
+  "offset": 66352,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "700": {
+  "offset": 66368,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "701": {
+  "offset": 66384,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "703": {
+  "offset": 66912,
+  "name": "OSC1 Feet",
+  "tableId": 5,
+  "source": "vtable"
+ },
+ "704": {
+  "offset": 66928,
+  "name": "Griffer Bend SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "705": {
+  "offset": 66944,
+  "name": "Bend Enable SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "710": {
+  "offset": 67024,
+  "name": "Tune",
+  "tableId": 28,
+  "source": "vtable"
+ },
+ "713": {
+  "offset": 67072,
+  "name": "Mod Sw",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "715": {
+  "offset": 67104,
+  "name": "LFO Level",
+  "tableId": 0,
+  "source": "vtable"
+ },
+ "716": {
+  "offset": 67120,
+  "name": "LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "719": {
+  "offset": 67168,
+  "name": "ENV Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "720": {
+  "offset": 67184,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "721": {
+  "offset": 67200,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "722": {
+  "offset": 67216,
+  "name": "PWM Level",
+  "tableId": 45,
+  "source": "vtable"
+ },
+ "723": {
+  "offset": 67264,
+  "name": "JU OSC Saw Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "724": {
+  "offset": 67280,
+  "name": "JU OSC Sqr Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "725": {
+  "offset": 67296,
+  "name": "JU OSC Sub Lev",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "726": {
+  "offset": 68592,
+  "name": "Duty Tune",
+  "tableId": 27,
+  "source": "name-fallback"
+ },
+ "728": {
+  "offset": 69584,
+  "name": "Osc1 Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "729": {
+  "offset": 69600,
+  "name": "Osc Noise Level",
+  "tableId": 54,
+  "source": "vtable"
+ },
+ "730": {
+  "offset": 69792,
+  "name": "Griffer SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "731": {
+  "offset": 69808,
+  "name": "LPF Cutoff",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "732": {
+  "offset": 69904,
+  "name": "LPF Resonance",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "733": {
+  "offset": 69936,
+  "name": "Velocity",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "734": {
+  "offset": 70080,
+  "name": "Env1/2",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "735": {
+  "offset": 70096,
+  "name": "Int/Env",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "737": {
+  "offset": 70384,
+  "name": "Ext LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "738": {
+  "offset": 70400,
+  "name": "GRF Bned SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "739": {
+  "offset": 70416,
+  "name": "LFO Level",
+  "tableId": 47,
+  "source": "vtable"
+ },
+ "741": {
+  "offset": 70448,
+  "name": "MOD SW",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "742": {
+  "offset": 70464,
+  "name": "ENV Level",
+  "tableId": 46,
+  "source": "vtable"
+ },
+ "743": {
+  "offset": 70480,
+  "name": "KCV Level",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "744": {
+  "offset": 70496,
+  "name": "Velocity Sens",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "745": {
+  "offset": 70512,
+  "name": "Velocity Offset",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "746": {
+  "offset": 70528,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "747": {
+  "offset": 70544,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "749": {
+  "offset": 70688,
+  "name": "Resonance Tune",
+  "tableId": 31,
+  "source": "vtable"
+ },
+ "755": {
+  "offset": 72656,
+  "name": "AMP TONE",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "756": {
+  "offset": 72672,
+  "name": "AMP VELOCITY SENS",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "757": {
+  "offset": 72688,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "758": {
+  "offset": 72752,
+  "name": "Velocity",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "759": {
+  "offset": 72896,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "763": {
+  "offset": 73296,
+  "name": "Ext ENV SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "764": {
+  "offset": 73312,
+  "name": "HPF Cutoff",
+  "tableId": 41,
+  "source": "name-fallback"
+ },
+ "768": {
+  "offset": 73376,
+  "name": "ENV LEVEL",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "770": {
+  "offset": 73856,
+  "name": "UseExtJack",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "771": {
+  "offset": 73888,
+  "name": "M.CV",
+  "tableId": 32,
+  "source": "name-fallback"
+ },
+ "773": {
+  "offset": 73952,
+  "name": "Master Tune",
+  "tableId": 6,
+  "source": "name-fallback"
+ },
+ "774": {
+  "offset": 73968,
+  "name": "Part Tune",
+  "tableId": 27,
+  "source": "name-fallback"
+ },
+ "775": {
+  "offset": 74176,
+  "name": "Portamento OnOff",
+  "tableId": 52,
+  "source": "name-fallback"
+ },
+ "776": {
+  "offset": 74192,
+  "name": "Portamento Mode",
+  "tableId": 52,
+  "source": "name-fallback"
+ },
+ "778": {
+  "offset": 74624,
+  "name": "LFO Griffer Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "779": {
+  "offset": 74640,
+  "name": "LFO Tempo Rate Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "780": {
+  "offset": 74656,
+  "name": "LFO Tempo Rate",
+  "tableId": 53,
+  "source": "vtable-multi",
+  "alts": [
+   48,
+   53
+  ]
+ },
+ "781": {
+  "offset": 74672,
+  "name": "LFO Rate",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "782": {
+  "offset": 75440,
+  "name": "Gate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "783": {
+  "offset": 75456,
+  "name": "LFO Trig",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "785": {
+  "offset": 75488,
+  "name": "LFO UseExtGate",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "786": {
+  "offset": 75504,
+  "name": "LFO Delay",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "787": {
+  "offset": 75520,
+  "name": "LFO Delay Sw",
+  "tableId": 44,
+  "source": "vtable"
+ },
+ "788": {
+  "offset": 75536,
+  "name": "LFO Sin Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "789": {
+  "offset": 75552,
+  "name": "LFO Tri Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "790": {
+  "offset": 75568,
+  "name": "LFO Sqr Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "791": {
+  "offset": 75584,
+  "name": "LFO Saw Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "792": {
+  "offset": 75600,
+  "name": "LFO Saw(Inv) Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "793": {
+  "offset": 75616,
+  "name": "LFO S&H Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "794": {
+  "offset": 75632,
+  "name": "LFO Noise Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "795": {
+  "offset": 75648,
+  "name": "LFO Noise Mix",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "801": {
+  "offset": 76144,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "802": {
+  "offset": 76368,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "803": {
+  "offset": 76384,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "804": {
+  "offset": 76400,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "805": {
+  "offset": 76416,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "807": {
+  "offset": 76624,
+  "name": "LFO trigger env sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "808": {
+  "offset": 76848,
+  "name": "ENV Attack",
+  "tableId": 35,
+  "source": "name-fallback"
+ },
+ "809": {
+  "offset": 76864,
+  "name": "ENV Sustain",
+  "tableId": 50,
+  "source": "vtable"
+ },
+ "810": {
+  "offset": 76880,
+  "name": "ENV Decay",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "811": {
+  "offset": 76896,
+  "name": "ENV Release",
+  "tableId": 38,
+  "source": "name-fallback"
+ },
+ "813": {
+  "offset": 77424,
+  "name": "OSC1 Feet",
+  "tableId": 5,
+  "source": "name-fallback"
+ },
+ "814": {
+  "offset": 77440,
+  "name": "Griffer Bend SW",
+  "tableId": 52,
+  "source": "name-fallback"
+ },
+ "815": {
+  "offset": 77456,
+  "name": "Bend Enable SW",
+  "tableId": 52,
+  "source": "name-fallback"
+ },
+ "820": {
+  "offset": 77536,
+  "name": "Tune",
+  "tableId": 28,
+  "source": "name-fallback"
+ },
+ "823": {
+  "offset": 77584,
+  "name": "Mod Sw",
+  "tableId": 22,
+  "source": "name-fallback"
+ },
+ "826": {
+  "offset": 77632,
+  "name": "LFO Sw",
+  "tableId": 52,
+  "source": "name-fallback"
+ },
+ "829": {
+  "offset": 77680,
+  "name": "ENV Sw",
+  "tableId": 52,
+  "source": "name-fallback"
+ },
+ "830": {
+  "offset": 77696,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "name-fallback"
+ },
+ "831": {
+  "offset": 77712,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "832": {
+  "offset": 77728,
+  "name": "PWM Level",
+  "tableId": 45,
+  "source": "name-fallback"
+ },
+ "833": {
+  "offset": 77776,
+  "name": "JU OSC Saw Lev",
+  "tableId": 54,
+  "source": "name-fallback"
+ },
+ "834": {
+  "offset": 77792,
+  "name": "JU OSC Sqr Lev",
+  "tableId": 54,
+  "source": "name-fallback"
+ },
+ "835": {
+  "offset": 77808,
+  "name": "JU OSC Sub Lev",
+  "tableId": 54,
+  "source": "name-fallback"
+ },
+ "836": {
+  "offset": 79104,
+  "name": "Duty Tune",
+  "tableId": 27,
+  "source": "name-fallback"
+ },
+ "838": {
+  "offset": 80096,
+  "name": "Osc1 Level",
+  "tableId": 54,
+  "source": "name-fallback"
+ },
+ "840": {
+  "offset": 80304,
+  "name": "Griffer SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "841": {
+  "offset": 80320,
+  "name": "LPF Cutoff",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "842": {
+  "offset": 80416,
+  "name": "LPF Resonance",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "843": {
+  "offset": 80448,
+  "name": "Velocity",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "844": {
+  "offset": 80592,
+  "name": "Env1/2",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "845": {
+  "offset": 80608,
+  "name": "Int/Env",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "847": {
+  "offset": 80896,
+  "name": "Ext LFO Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "848": {
+  "offset": 80912,
+  "name": "GRF Bned SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "849": {
+  "offset": 80928,
+  "name": "LFO Level",
+  "tableId": 47,
+  "source": "vtable"
+ },
+ "851": {
+  "offset": 80960,
+  "name": "MOD SW",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "852": {
+  "offset": 80976,
+  "name": "ENV Level",
+  "tableId": 46,
+  "source": "vtable"
+ },
+ "853": {
+  "offset": 80992,
+  "name": "KCV Level",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "854": {
+  "offset": 81008,
+  "name": "Velocity Sens",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "855": {
+  "offset": 81024,
+  "name": "Velocity Offset",
+  "tableId": 56,
+  "source": "vtable"
+ },
+ "856": {
+  "offset": 81040,
+  "name": "Bend Level",
+  "tableId": 26,
+  "source": "vtable"
+ },
+ "857": {
+  "offset": 81056,
+  "name": "Bend Range",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "859": {
+  "offset": 81200,
+  "name": "Resonance Tune",
+  "tableId": 31,
+  "source": "vtable"
+ },
+ "865": {
+  "offset": 83168,
+  "name": "AMP TONE",
+  "tableId": 24,
+  "source": "vtable"
+ },
+ "866": {
+  "offset": 83184,
+  "name": "AMP VELOCITY SENS",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "867": {
+  "offset": 83200,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "868": {
+  "offset": 83264,
+  "name": "Velocity",
+  "tableId": 57,
+  "source": "vtable"
+ },
+ "869": {
+  "offset": 83408,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "vtable"
+ },
+ "873": {
+  "offset": 83808,
+  "name": "Ext ENV SW",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "874": {
+  "offset": 83824,
+  "name": "HPF Cutoff",
+  "tableId": 41,
+  "source": "name-fallback"
+ },
+ "878": {
+  "offset": 83888,
+  "name": "ENV LEVEL",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "880": {
+  "offset": 84304,
+  "name": "Ext Noise Sw",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "907": {
+  "offset": 91136,
+  "name": "Error Depth",
+  "tableId": 64,
+  "source": "oracle"
+ },
+ "908": {
+  "offset": 91152,
+  "name": "LFO Rate",
+  "tableId": 22,
+  "source": "name-fallback"
+ },
+ "910": {
+  "offset": 91184,
+  "name": "LFO Depth",
+  "tableId": 64,
+  "source": "oracle"
+ },
+ "912": {
+  "offset": 91216,
+  "name": "Dry Level",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "913": {
+  "offset": 91232,
+  "name": "Wet Level",
+  "tableId": 64,
+  "source": "oracle"
+ },
+ "914": {
+  "offset": 91248,
+  "name": "Ip Fc",
+  "tableId": 64,
+  "source": "oracle"
+ },
+ "915": {
+  "offset": 91264,
+  "name": "On/Off",
+  "tableId": 52,
+  "source": "vtable"
+ },
+ "916": {
+  "offset": 91280,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "name-fallback"
+ },
+ "918": {
+  "offset": 96352,
+  "name": "LFO Rate",
+  "tableId": 22,
+  "source": "vtable"
+ },
+ "919": {
+  "offset": 96368,
+  "name": "LFO Depth",
+  "tableId": 64,
+  "source": "oracle"
+ },
+ "920": {
+  "offset": 96384,
+  "name": "Ip Fc",
+  "tableId": 64,
+  "source": "oracle"
+ },
+ "921": {
+  "offset": 96400,
+  "name": "On/Off",
+  "tableId": 22,
+  "source": "vtable-multi",
+  "alts": [
+   22,
+   52
+  ]
+ },
+ "922": {
+  "offset": 96416,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "name-fallback"
+ },
+ "923": {
+  "offset": 101072,
+  "name": "Patch Level",
+  "tableId": 49,
+  "source": "oracle"
+ },
+ "924": {
+  "offset": 101136,
+  "name": "Expression",
+  "tableId": 18,
+  "source": "vtable"
+ },
+ "925": {
+  "offset": 101152,
+  "name": "Volume",
+  "tableId": 19,
+  "source": "oracle"
+ },
+ "950": {
+  "offset": 102464,
+  "name": "High Cut Fc",
+  "tableId": 55,
+  "source": "oracle"
+ },
+ "953": {
+  "offset": 102512,
+  "name": "Dry Level",
+  "tableId": 22,
+  "source": "name-fallback"
+ },
+ "955": {
+  "offset": 102544,
+  "name": "Ip Fc",
+  "tableId": 64,
+  "source": "name-fallback"
+ },
+ "956": {
+  "offset": 102560,
+  "name": "Feedback",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "958": {
+  "offset": 102592,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "name-fallback"
+ },
+ "959": {
+  "offset": 102608,
+  "name": "LF Damp Fc",
+  "tableId": 57,
+  "source": "oracle"
+ },
+ "962": {
+  "offset": 102656,
+  "name": "HF Damp Fc",
+  "tableId": 55,
+  "source": "oracle"
+ },
+ "972": {
+  "offset": 4297696,
+  "name": "High Cut Fc",
+  "tableId": 55,
+  "source": "oracle"
+ },
+ "975": {
+  "offset": 4297744,
+  "name": "Dry Level",
+  "tableId": 22,
+  "source": "name-fallback"
+ },
+ "977": {
+  "offset": 4297776,
+  "name": "Ip Fc",
+  "tableId": 64,
+  "source": "name-fallback"
+ },
+ "978": {
+  "offset": 4297792,
+  "name": "Tap Time",
+  "tableId": 21,
+  "source": "oracle"
+ },
+ "979": {
+  "offset": 4297808,
+  "name": "Feedback",
+  "tableId": 21,
+  "source": "oracle"
+ },
+ "981": {
+  "offset": 4297840,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "name-fallback"
+ },
+ "984": {
+  "offset": 4297888,
+  "name": "Wet Gain",
+  "tableId": 4,
+  "source": "oracle"
+ },
+ "985": {
+  "offset": 4297904,
+  "name": "LF Damp Fc",
+  "tableId": 57,
+  "source": "oracle"
+ },
+ "988": {
+  "offset": 4297952,
+  "name": "HF Damp Fc",
+  "tableId": 55,
+  "source": "oracle"
+ },
+ "995": {
+  "offset": 6396160,
+  "name": "LFO Manual",
+  "tableId": 4,
+  "source": "oracle"
+ },
+ "1003": {
+  "offset": 6396288,
+  "name": "High Cut Fc",
+  "tableId": 55,
+  "source": "oracle"
+ },
+ "1006": {
+  "offset": 6396336,
+  "name": "Low Cut Fc",
+  "tableId": 64,
+  "source": "oracle"
+ },
+ "1008": {
+  "offset": 6396368,
+  "name": "Dry Level",
+  "tableId": 22,
+  "source": "name-fallback"
+ },
+ "1010": {
+  "offset": 6396400,
+  "name": "Ip Fc",
+  "tableId": 64,
+  "source": "oracle"
+ },
+ "1011": {
+  "offset": 6396416,
+  "name": "Feedback",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "1013": {
+  "offset": 6396448,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "name-fallback"
+ },
+ "1017": {
+  "offset": 6396512,
+  "name": "Wet Gain",
+  "tableId": 4,
+  "source": "name-fallback"
+ },
+ "1022": {
+  "offset": 6430496,
+  "name": "LFO Manual",
+  "tableId": 4,
+  "source": "name-fallback"
+ },
+ "1030": {
+  "offset": 6430624,
+  "name": "High Cut Fc",
+  "tableId": 55,
+  "source": "name-fallback"
+ },
+ "1033": {
+  "offset": 6430672,
+  "name": "Low Cut Fc",
+  "tableId": 64,
+  "source": "name-fallback"
+ },
+ "1035": {
+  "offset": 6430704,
+  "name": "Dry Level",
+  "tableId": 22,
+  "source": "name-fallback"
+ },
+ "1037": {
+  "offset": 6430736,
+  "name": "Ip Fc",
+  "tableId": 64,
+  "source": "name-fallback"
+ },
+ "1038": {
+  "offset": 6430752,
+  "name": "Feedback",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "1040": {
+  "offset": 6430784,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "name-fallback"
+ },
+ "1041": {
+  "offset": 6430800,
+  "name": "LFO St.Phase",
+  "tableId": 20,
+  "source": "name-fallback"
+ },
+ "1050": {
+  "offset": 6497280,
+  "name": "High Cut Fc",
+  "tableId": 55,
+  "source": "oracle"
+ },
+ "1053": {
+  "offset": 6497328,
+  "name": "Dry Level",
+  "tableId": 22,
+  "source": "name-fallback"
+ },
+ "1054": {
+  "offset": 6497344,
+  "name": "Wet Level",
+  "tableId": 21,
+  "source": "oracle"
+ },
+ "1055": {
+  "offset": 6497360,
+  "name": "Ip Fc",
+  "tableId": 64,
+  "source": "name-fallback"
+ },
+ "1056": {
+  "offset": 6497376,
+  "name": "Feedback",
+  "tableId": 21,
+  "source": "oracle"
+ },
+ "1058": {
+  "offset": 6497408,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "name-fallback"
+ },
+ "1059": {
+  "offset": 6497424,
+  "name": "LF Damp Fc",
+  "tableId": 57,
+  "source": "oracle"
+ },
+ "1062": {
+  "offset": 6497472,
+  "name": "HF Damp Fc",
+  "tableId": 55,
+  "source": "oracle"
+ },
+ "1069": {
+  "offset": 10693040,
+  "name": "LFO Manual",
+  "tableId": 4,
+  "source": "oracle"
+ },
+ "1070": {
+  "offset": 10693056,
+  "name": "LFO Depth",
+  "tableId": 22,
+  "source": "oracle"
+ },
+ "1077": {
+  "offset": 10693168,
+  "name": "High Cut Fc",
+  "tableId": 55,
+  "source": "oracle"
+ },
+ "1080": {
+  "offset": 10693216,
+  "name": "Low Cut Fc",
+  "tableId": 64,
+  "source": "oracle"
+ },
+ "1082": {
+  "offset": 10693248,
+  "name": "Dry Level",
+  "tableId": 22,
+  "source": "name-fallback"
+ },
+ "1084": {
+  "offset": 10693280,
+  "name": "Ip Fc",
+  "tableId": 64,
+  "source": "oracle"
+ },
+ "1085": {
+  "offset": 10693296,
+  "name": "Feedback",
+  "tableId": 21,
+  "source": "name-fallback"
+ },
+ "1087": {
+  "offset": 10693328,
+  "name": "Mute",
+  "tableId": 51,
+  "source": "name-fallback"
+ },
+ "1088": {
+  "offset": 10693344,
+  "name": "LFO St.Phase",
+  "tableId": 20,
+  "source": "oracle"
+ },
+ "1092": {
+  "offset": 10759392,
+  "name": "Rev Ecf Density",
+  "tableId": 4,
+  "source": "oracle"
+ },
+ "1095": {
+  "offset": 10759440,
+  "name": "Rev Ecf Glb Lev",
+  "tableId": 21,
+  "source": "oracle"
+ }
+}
