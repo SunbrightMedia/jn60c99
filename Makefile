@@ -54,6 +54,12 @@ preset: tests/play_preset.c $(SRC)
 	./tests/play_preset /tmp/juno_preset.wav
 	./tests/play_preset /tmp/juno_preset_block.wav block
 
+# Hold a chord through the arpeggiator (UP/DOWN/UP-DOWN, ranges). -> /tmp/juno_arp.wav
+# Override: make arp ARGS="up range3 140"
+arp: tests/play_arp.c $(SRC)
+	$(CC) $(CFLAGS) -o tests/play_arp tests/play_arp.c $(SRC) $(LDLIBS)
+	./tests/play_arp /tmp/juno_arp.wav $(ARGS)
+
 # Capture-free per-sample A/B: run our DSP forward from t0, match t1 (control-rate).
 ab: tests/ab_persample.c $(SRC)
 	gunzip -kf state_dump/state_t0.bin.gz state_dump/state_t1.bin.gz

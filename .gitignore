@@ -33,4 +33,5 @@ tests/wav_compare
 tests/play_scale
 tests/play_chord
 tests/play_preset
+tests/play_arp
 data_sections/
