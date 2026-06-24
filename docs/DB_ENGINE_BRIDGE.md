@@ -23,10 +23,24 @@ Deliverables: `refs/db_engine_bridge.json` (the mapping), `refs/sqarpg_engine_st
   up a **red-black tree** (root `qword_7FF91E910E18`) keyed by VST3 ParamID, reads the DB
   index from node+8, range-checks it against the DB record, and calls the **same vtable+88
   nullsub** with the DB index passed **verbatim** (no `db→offset` arithmetic). The tree
-  seed is a static `{key, db_index}` immediate list (recoverable: DB755..814 key =
-  `0x60000A + 2*(db-755)`), but it carries **no engine-paramID/offset** — that lives only
-  in the descriptor registry `sub_388170`, keyed by engine paramID, which is exactly what
-  `docs/PARAM_MAP.tsv` already captures. **No static numeric DB-index→offset map exists.**
+  seed IS a static `{key, db_index}` immediate list and was **fully extracted** (678
+  records, decoded from the stack-built seed array in the CRT-init thunk `sub_7FF91DD0D5A0`
+  = rva 0xAD5A0, immediates in `allcode/asm_080000.asm:14270-17264`; seeder
+  `sub_7FF91E025820` @0x3C5820, node builder `sub_7FF91E025030` @0x3C5030, node layout
+  `key@+28 / db_index@+32`). **Corrected key formula** (the earlier
+  `0x60000A + 2*(db-755)` was off by 2): for the patch bank
+  `key = 0x600000 + 2*(db-751)` for DB 751..814, then the **stride changes to 8** at DB
+  815 (`DB815->0x600080 ... DB877->0x600270`), then DB879+ jumps to the 0xA00000
+  automation bank. Piecewise but exact.
+- **BUT the seed carries no engine-paramID/offset** — only `{VST3-ParamID, DB-index}`, and
+  the VST3-ParamID is just a relabeling of the DB-index (a pure function of it), so it
+  dead-ends at the nullsub. The engine offset lives only in the descriptor registry
+  `sub_388170`, keyed by **registry index** (= `docs/PARAM_MAP.tsv` `param_id`), and the
+  40-byte registry descriptor contains **zero** ParamID immediates (grep of the builder
+  asm for any 0x600000/0xA00000-range value: no matches). **So the middle leg —
+  VST3-ParamID to registry-index/offset — exists in NO static structure; it is performed
+  only by live runtime objects.** Confirmed twice over: descriptor has no ParamID, and the
+  binding call is a nullsub. **No static numeric DB-index->offset map exists.**
 
 What Path A *did* yield and is folded into the bridge: the engine's own **value-bias
 transforms** in that switch — `case 769: value−11` (bipolar ±11), `case 871:
