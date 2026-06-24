@@ -37,30 +37,37 @@ static void set_voices(unsigned char *st,int off,float f){
 
 /* --- "SQ Dynamic ARPG" overlay --------------------------------------------
  * Offsets from docs/PARAM_MAP.tsv. Base (PD Juno Pad) values noted in comments.
- * Goal: pluckier/percussive amp + moving filter, saw+pulse DCO, chorus II. */
+ * Tuned to a user Ableton render of the patch (held C major): SUSTAINED (not plucky),
+ * bright, matched envelope/brightness/level — see chat analysis. */
 static void preset_sq_arpg(unsigned char *st){
-    /* ENV-1 (filter envelope): pluck the cutoff — fast attack, quick decay, low sustain */
-    set_voices(st,2784, 0.090f);   /* E1 Attack rate  (base 0.00297 -> faster)  */
-    set_voices(st,2816, 0.018f);   /* E1 Decay rate   (base 0.00472 -> quicker) */
-    set_voices(st,2800, 0.28f);    /* E1 Sustain lvl  (base 0.695  -> lower)    */
-    set_voices(st,2832, 0.030f);   /* E1 Release rate (base 0.00334)            */
+    /* ENV-1 (filter envelope): fast attack, slow decay, HIGH sustain (cutoff stays open) */
+    set_voices(st,2784, 0.060f);   /* E1 Attack rate  (base 0.00297 -> faster onset) */
+    set_voices(st,2816, 0.0047f);  /* E1 Decay rate   (base 0.00472, ~unchanged)     */
+    set_voices(st,2800, 0.80f);    /* E1 Sustain lvl  (base 0.695 -> high, sustained) */
+    set_voices(st,2832, 0.030f);   /* E1 Release rate (base 0.00334)                  */
 
-    /* ENV-2 (amp envelope): percussive — fast attack, medium decay, low-mid sustain */
-    set_voices(st,3264, 0.090f);   /* E2 Attack  (base 0.00121)                 */
-    set_voices(st,3296, 0.020f);   /* E2 Decay   (base 5.33 -> short)           */
-    set_voices(st,3280, 0.45f);    /* E2 Sustain (base 1.0 -> pluck)            */
-    set_voices(st,3312, 0.035f);   /* E2 Release (base 0.00354)                 */
+    /* ENV-2 (amp envelope): fast attack, full sustain (held chord, not percussive) */
+    set_voices(st,3264, 0.060f);   /* E2 Attack  (base 0.00121 -> faster)             */
+    set_voices(st,3296, 5.0f);     /* E2 Decay   (base 5.33, ~unchanged)              */
+    set_voices(st,3280, 1.00f);    /* E2 Sustain (base 1.0 -> full sustain)           */
+    set_voices(st,3312, 0.035f);   /* E2 Release (base 0.00354)                       */
 
-    /* VCF: moderate cutoff, a little resonance, strong env-1 sweep for movement */
-    set_voices(st,6736, 0.38f);    /* LPF Cutoff (base 0.416)                   */
-    set_voices(st,7392, 3.6f);     /* ENV->filter depth (base 3.158 -> a touch more) */
+    /* VCF: cutoff + env-1 sweep tuned to match the reference brightness (centroid ~2.8 kHz) */
+    set_voices(st,6736, 0.37f);    /* LPF Cutoff (matched)                            */
+    set_voices(st,7392, 2.5f);     /* ENV->filter depth (matched)                     */
 
-    /* DCO: keep saw + pulse forward, trim sub/noise for a cleaner sequenced tone */
-    set_voices(st,4192, 0.90f);    /* Saw level  (base 0.860)                   */
-    set_voices(st,6512, 0.95f);    /* Pulse level (base 1.007)                  */
-    set_voices(st,4224, 0.22f);    /* Sub level  (base 0.316 -> less)           */
-    set_voices(st,6528, 0.06f);    /* Noise level (base 0.176 -> less)          */
-    /* Chorus II is already the base mode; left as-is. */
+    /* DCO: saw + pulse forward, sub/noise trimmed */
+    set_voices(st,4192, 0.90f);    /* Saw level  (base 0.860)                         */
+    set_voices(st,6512, 0.95f);    /* Pulse level (base 1.007)                        */
+    set_voices(st,4224, 0.22f);    /* Sub level  (base 0.316 -> less)                 */
+    set_voices(st,6528, 0.06f);    /* Noise level (base 0.176 -> less)                */
+
+    /* output level trimmed to the reference peak; velocity 100/127 into the filter path */
+    set_voices(st,10320, 0.85f);   /* AMP LEVEL (matched peak)                         */
+    { float vel=100.0f/127.0f;
+      set_voices(st,6864,vel); set_voices(st,6880,vel); set_voices(st,6896,vel); set_voices(st,6912,vel); }
+    /* Chorus II is already the base mode. NOTE: send reverb/delay (HALL2/DLY) tail is
+     * NOT yet applied — those FX coeffs aren't loaded, so there's no post-release tail. */
 }
 
 int main(int argc,char**argv){
@@ -68,8 +75,8 @@ int main(int argc,char**argv){
     int block=(argc>2 && strcmp(argv[2],"block")==0);
     const int SR=96000;
 
-    /* I–V–vi–IV, three notes each */
-    int chords[4][3]={ {60,64,67}, {55,59,62}, {57,60,64}, {53,57,60} };
+    /* I–V–vi–IV, three notes each (C5-rooted register, matching the reference octave) */
+    int chords[4][3]={ {72,76,79}, {67,71,74}, {69,72,76}, {65,69,72} };
 
     unsigned char *st=malloc(JUNO_STATE_BYTES); memset(st,0,JUNO_STATE_BYTES);
     juno_chorus_init(st); juno_engine_init(st); juno_runtime_coeffs_apply(st);
