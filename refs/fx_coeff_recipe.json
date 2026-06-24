@@ -1,0 +1,675 @@
+{
+ "102368": {
+  "name": "DLY HighCut C0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x98903c",
+  "value": "0x3e1b31ce",
+  "note": "default HC biquad",
+  "value_f": 0.15155718
+ },
+ "102416": {
+  "name": "DLY HighCut B0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x9890d8",
+  "value": "0x3fb07de6",
+  "note": "default HC biquad",
+  "value_f": 1.37884212
+ },
+ "102432": {
+  "name": "DLY HighCut B2",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x9890dc",
+  "value": "0xbf07c840",
+  "note": "default HC biquad",
+  "value_f": -0.53039932
+ },
+ "102464": {
+  "name": "DLY HighCut Fc",
+  "kind": "lut",
+  "table": "0x986d68",
+  "index": 7,
+  "rva_addr": "0x986d84",
+  "value": "0x3e52bdc7",
+  "input_step": 7,
+  "value_f": 0.20580207
+ },
+ "102480": {
+  "name": "DLY HighCut Qc",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x988f9c",
+  "value": "0x3fb50bf3",
+  "note": "fixed Qc default 1.414427",
+  "value_f": 1.41442716
+ },
+ "102512": {
+  "name": "DLY Dry Level",
+  "kind": "lut",
+  "table": "0x9d9f20",
+  "index": 0,
+  "rva_addr": "0x9d9f20",
+  "value": "0x3f800000",
+  "value_f": 1.0
+ },
+ "102608": {
+  "name": "DLY LFDampFc",
+  "kind": "lut",
+  "table": "0x987a48",
+  "index": 0,
+  "rva_addr": "0x987a48",
+  "value": "0x3bab929a",
+  "value_f": 0.00523598
+ },
+ "102624": {
+  "name": "DLY LFDampHp",
+  "kind": "lut",
+  "table": "0x9d9f20",
+  "index": 0,
+  "rva_addr": "0x9d9f20",
+  "value": "0x3f800000",
+  "value_f": 1.0
+ },
+ "102640": {
+  "name": "DLY LFDampLp",
+  "kind": "lut",
+  "table": "0x9d9f20",
+  "index": 0,
+  "rva_addr": "0x9d9f20",
+  "value": "0x3f800000",
+  "value_f": 1.0
+ },
+ "102656": {
+  "name": "DLY HFDampFc",
+  "kind": "lut",
+  "table": "0x986d68",
+  "index": 13,
+  "rva_addr": "0x986d9c",
+  "value": "0x3f4ba5b0",
+  "value_f": 0.79549694
+ },
+ "102672": {
+  "name": "DLY HFDampHp",
+  "kind": "lut",
+  "table": "0x9d9f20",
+  "index": 0,
+  "rva_addr": "0x9d9f20",
+  "value": "0x3f800000",
+  "value_f": 1.0
+ },
+ "102688": {
+  "name": "DLY HFDampLp",
+  "kind": "lut",
+  "table": "0x9d9f20",
+  "index": 0,
+  "rva_addr": "0x9d9f20",
+  "value": "0x3f800000",
+  "value_f": 1.0
+ },
+ "4297600": {
+  "name": "DL2 HighCut C0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x98903c",
+  "value": "0x3e1b31ce",
+  "note": "default HC biquad",
+  "value_f": 0.15155718
+ },
+ "4297648": {
+  "name": "DL2 HighCut B0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x9890d8",
+  "value": "0x3fb07de6",
+  "note": "default HC biquad",
+  "value_f": 1.37884212
+ },
+ "4297664": {
+  "name": "DL2 HighCut B2",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x9890dc",
+  "value": "0xbf07c840",
+  "note": "default HC biquad",
+  "value_f": -0.53039932
+ },
+ "4297696": {
+  "name": "DL2 HighCut Fc",
+  "kind": "lut",
+  "table": "0x986d68",
+  "index": 7,
+  "rva_addr": "0x986d84",
+  "value": "0x3e52bdc7",
+  "input_step": 7,
+  "value_f": 0.20580207
+ },
+ "4297712": {
+  "name": "DL2 HighCut Qc",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x988f9c",
+  "value": "0x3fb50bf3",
+  "note": "fixed Qc default 1.414427",
+  "value_f": 1.41442716
+ },
+ "4297888": {
+  "name": "DL2 Wet Gain",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x969640",
+  "value": "0x40000000",
+  "note": "default 2.0",
+  "value_f": 2.0
+ },
+ "4297904": {
+  "name": "DL2 LFDampFc",
+  "kind": "lut",
+  "table": "0x987a48",
+  "index": 0,
+  "rva_addr": "0x987a48",
+  "value": "0x3bab929a",
+  "value_f": 0.00523598
+ },
+ "4297952": {
+  "name": "DL2 HFDampFc",
+  "kind": "lut",
+  "table": "0x986d68",
+  "index": 13,
+  "rva_addr": "0x986d9c",
+  "value": "0x3f4ba5b0",
+  "value_f": 0.79549694
+ },
+ "6395312": {
+  "name": "CHO Chorus CV",
+  "kind": "formula",
+  "formula": "-(code)/255.0 (float32)",
+  "input_step": 1358,
+  "value": "0xc0aa6a6a",
+  "value_f": -5.32549
+ },
+ "6396192": {
+  "name": "CHO HighCut C0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x989054",
+  "value": "0x3f03df74",
+  "note": "default HC biquad",
+  "value_f": 0.51512837
+ },
+ "6396208": {
+  "name": "CHO HighCut A0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x989058",
+  "value": "0x3f83df74",
+  "note": "default HC biquad",
+  "value_f": 1.03025675
+ },
+ "6396224": {
+  "name": "CHO HighCut A1",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x98905c",
+  "value": "0x3f03df74",
+  "note": "default HC biquad",
+  "value_f": 0.51512837
+ },
+ "6396240": {
+  "name": "CHO HighCut B0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x988fa4",
+  "value": "0xbee549c0",
+  "note": "default HC biquad",
+  "value_f": -0.44782829
+ },
+ "6396256": {
+  "name": "CHO HighCut B2",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x988fa8",
+  "value": "0xbf1cd8f1",
+  "note": "default HC biquad",
+  "value_f": -0.61268526
+ },
+ "6396288": {
+  "name": "CHO HighCut Fc",
+  "kind": "lut",
+  "table": "0x986d68",
+  "index": 13,
+  "rva_addr": "0x986d9c",
+  "value": "0x3f4ba5b0",
+  "input_step": 13,
+  "value_f": 0.79549694
+ },
+ "6396304": {
+  "name": "CHO HighCut Qc",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x988f9c",
+  "value": "0x3fb50bf3",
+  "note": "fixed Qc default 1.414427",
+  "value_f": 1.41442716
+ },
+ "6396336": {
+  "name": "CHO LowCut Fc",
+  "kind": "lut",
+  "table": "0x987ef0",
+  "index": 1,
+  "rva_addr": "0x987ef4",
+  "value": "0x3ad6774f",
+  "value_f": 0.00163625
+ },
+ "6396400": {
+  "name": "CHO Ip Fc",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x9880f4",
+  "value": "0x37ffd974",
+  "note": "fixed 3.05e-5",
+  "value_f": 3.05e-05
+ },
+ "6396496": {
+  "name": "CHO Dry Gain",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x98906c",
+  "value": "0x3f353f7d",
+  "note": "default 0.708",
+  "value_f": 0.708
+ },
+ "6396512": {
+  "name": "CHO Wet Gain",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x98909c",
+  "value": "0x3fb4dd2f",
+  "note": "default 1.413",
+  "value_f": 1.41299999
+ },
+ "6497184": {
+  "name": "CH2 HighCut C0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x98903c",
+  "value": "0x3e1b31ce",
+  "note": "default HC biquad",
+  "value_f": 0.15155718
+ },
+ "6497232": {
+  "name": "CH2 HighCut B0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x9890d8",
+  "value": "0x3fb07de6",
+  "note": "default HC biquad",
+  "value_f": 1.37884212
+ },
+ "6497248": {
+  "name": "CH2 HighCut B2",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x9890dc",
+  "value": "0xbf07c840",
+  "note": "default HC biquad",
+  "value_f": -0.53039932
+ },
+ "6497280": {
+  "name": "CH2 HighCut Fc",
+  "kind": "lut",
+  "table": "0x986d68",
+  "index": 7,
+  "rva_addr": "0x986d84",
+  "value": "0x3e52bdc7",
+  "input_step": 7,
+  "value_f": 0.20580207
+ },
+ "6497296": {
+  "name": "CH2 HighCut Qc",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x988f9c",
+  "value": "0x3fb50bf3",
+  "note": "fixed Qc default 1.414427",
+  "value_f": 1.41442716
+ },
+ "6497424": {
+  "name": "CH2 LFDampFc",
+  "kind": "lut",
+  "table": "0x987a48",
+  "index": 0,
+  "rva_addr": "0x987a48",
+  "value": "0x3bab929a",
+  "value_f": 0.00523598
+ },
+ "6497472": {
+  "name": "CH2 HFDampFc",
+  "kind": "lut",
+  "table": "0x986d68",
+  "index": 13,
+  "rva_addr": "0x986d9c",
+  "value": "0x3f4ba5b0",
+  "value_f": 0.79549694
+ },
+ "10692016": {
+  "name": "CHO2 Chorus CV",
+  "kind": "formula",
+  "formula": "-(code)/255.0 (float32)",
+  "input_step": 1490,
+  "value": "0xc0bafafb",
+  "value_f": -5.84313726
+ },
+ "10693072": {
+  "name": "CH3 HighCut C0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x989054",
+  "value": "0x3f03df74",
+  "note": "default HC biquad",
+  "value_f": 0.51512837
+ },
+ "10693088": {
+  "name": "CH3 HighCut A0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x989058",
+  "value": "0x3f83df74",
+  "note": "default HC biquad",
+  "value_f": 1.03025675
+ },
+ "10693104": {
+  "name": "CH3 HighCut A1",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x98905c",
+  "value": "0x3f03df74",
+  "note": "default HC biquad",
+  "value_f": 0.51512837
+ },
+ "10693120": {
+  "name": "CH3 HighCut B0",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x988fa4",
+  "value": "0xbee549c0",
+  "note": "default HC biquad",
+  "value_f": -0.44782829
+ },
+ "10693136": {
+  "name": "CH3 HighCut B2",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x988fa8",
+  "value": "0xbf1cd8f1",
+  "note": "default HC biquad",
+  "value_f": -0.61268526
+ },
+ "10693168": {
+  "name": "CH3 HighCut Fc",
+  "kind": "lut",
+  "table": "0x986d68",
+  "index": 13,
+  "rva_addr": "0x986d9c",
+  "value": "0x3f4ba5b0",
+  "input_step": 13,
+  "value_f": 0.79549694
+ },
+ "10693184": {
+  "name": "CH3 HighCut Qc",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x988f9c",
+  "value": "0x3fb50bf3",
+  "note": "fixed Qc default 1.414427",
+  "value_f": 1.41442716
+ },
+ "10693216": {
+  "name": "CH3 LowCut Fc",
+  "kind": "lut",
+  "table": "0x987ef0",
+  "index": 1,
+  "rva_addr": "0x987ef4",
+  "value": "0x3ad6774f",
+  "value_f": 0.00163625
+ },
+ "10693280": {
+  "name": "CH3 Ip Fc",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x988114",
+  "value": "0x3f2493b7",
+  "note": "fixed 0.6428789",
+  "value_f": 0.64287895
+ },
+ "10759520": {
+  "name": "Rev Ecf HPF C0",
+  "kind": "lut",
+  "table": "0x9d9f20",
+  "index": 6,
+  "rva_addr": "0x9d9f38",
+  "value": "0x3f7f8b7e",
+  "input_step": "AP row 2",
+  "value_f": 0.99822223
+ },
+ "10759536": {
+  "name": "Rev Ecf HPF A0",
+  "kind": "lut",
+  "table": "0x9d9f20",
+  "index": 7,
+  "rva_addr": "0x9d9f3c",
+  "value": "0xbf7f8b7e",
+  "input_step": "AP row 2",
+  "value_f": -0.99822223
+ },
+ "10759552": {
+  "name": "Rev Ecf HPF B0",
+  "kind": "lut",
+  "table": "0x9d9f20",
+  "index": 8,
+  "rva_addr": "0x9d9f40",
+  "value": "0x3f7f16fb",
+  "input_step": "AP row 2",
+  "value_f": 0.9964444
+ },
+ "10759568": {
+  "name": "Rev Ecf LPF C0",
+  "kind": "lut",
+  "table": "0x9da130",
+  "index": 55,
+  "rva_addr": "0x9da20c",
+  "value": "0x3d434c95",
+  "input_step": "DMP row 11",
+  "value_f": 0.04768046
+ },
+ "10759584": {
+  "name": "Rev Ecf LPF A0",
+  "kind": "lut",
+  "table": "0x9da130",
+  "index": 56,
+  "rva_addr": "0x9da210",
+  "value": "0x3dc34c95",
+  "input_step": "DMP row 11",
+  "value_f": 0.09536091
+ },
+ "10759600": {
+  "name": "Rev Ecf LPF A1",
+  "kind": "lut",
+  "table": "0x9da130",
+  "index": 57,
+  "rva_addr": "0x9da214",
+  "value": "0x3d434c95",
+  "input_step": "DMP row 11",
+  "value_f": 0.04768046
+ },
+ "10759616": {
+  "name": "Rev Ecf LPF B0",
+  "kind": "lut",
+  "table": "0x9da130",
+  "index": 58,
+  "rva_addr": "0x9da218",
+  "value": "0x3fa5addf",
+  "input_step": "DMP row 11",
+  "value_f": 1.29436862
+ },
+ "10759632": {
+  "name": "Rev Ecf LPF B1",
+  "kind": "lut",
+  "table": "0x9da130",
+  "index": 59,
+  "rva_addr": "0x9da21c",
+  "value": "0xbef85dc7",
+  "input_step": "DMP row 11",
+  "value_f": -0.48509046
+ },
+ "10759648": {
+  "name": "Rev Ecf DPF Fc",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x9da6c0",
+  "value": "0x3d090dbb",
+  "note": "fixed damping prefilter coef",
+  "value_f": 0.03346036
+ },
+ "10759664": {
+  "name": "Rev Ecf DPF0 Hp",
+  "kind": "lut",
+  "table": "0x9ddeb0",
+  "index": 337,
+  "rva_addr": "0x9de3f4",
+  "value": "0x3f2d8fd1",
+  "input_step": "row 84 col1",
+  "value_f": 0.67797571
+ },
+ "10759680": {
+  "name": "Rev Ecf DPF0 Lp",
+  "kind": "lut",
+  "table": "0x9ddeb0",
+  "index": 336,
+  "rva_addr": "0x9de3f0",
+  "value": "0xbf586ee2",
+  "input_step": "row 84 col0",
+  "value_f": -0.84544194
+ },
+ "10759696": {
+  "name": "Rev Ecf DPF Fc",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x9da6c0",
+  "value": "0x3d090dbb",
+  "note": "fixed damping prefilter coef",
+  "value_f": 0.03346036
+ },
+ "10759712": {
+  "name": "Rev Ecf DPF1 Hp",
+  "kind": "lut",
+  "table": "0x9ddeb0",
+  "index": 337,
+  "rva_addr": "0x9de3f4",
+  "value": "0x3f2d8fd1",
+  "input_step": "row 84 col1",
+  "value_f": 0.67797571
+ },
+ "10759728": {
+  "name": "Rev Ecf DPF1 Lp",
+  "kind": "lut",
+  "table": "0x9ddeb0",
+  "index": 336,
+  "rva_addr": "0x9de3f0",
+  "value": "0xbf586ee2",
+  "input_step": "row 84 col0",
+  "value_f": -0.84544194
+ },
+ "10759744": {
+  "name": "Rev Ecf DPF Fc",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x9da6c0",
+  "value": "0x3d090dbb",
+  "note": "fixed damping prefilter coef",
+  "value_f": 0.03346036
+ },
+ "10759760": {
+  "name": "Rev Ecf DPF2 Hp",
+  "kind": "lut",
+  "table": "0x9ddeb0",
+  "index": 339,
+  "rva_addr": "0x9de3fc",
+  "value": "0x3f19d713",
+  "input_step": "row 84 col3",
+  "value_f": 0.60093802
+ },
+ "10759776": {
+  "name": "Rev Ecf DPF2 Lp",
+  "kind": "lut",
+  "table": "0x9ddeb0",
+  "index": 338,
+  "rva_addr": "0x9de3f8",
+  "value": "0xbf4afeb9",
+  "input_step": "row 84 col2",
+  "value_f": -0.79294926
+ },
+ "10759792": {
+  "name": "Rev Ecf DPF Fc",
+  "kind": "const",
+  "table": "const_rdata",
+  "index": 0,
+  "rva_addr": "0x9da6c0",
+  "value": "0x3d090dbb",
+  "note": "fixed damping prefilter coef",
+  "value_f": 0.03346036
+ },
+ "10759808": {
+  "name": "Rev Ecf DPF3 Hp",
+  "kind": "lut",
+  "table": "0x9ddeb0",
+  "index": 339,
+  "rva_addr": "0x9de3fc",
+  "value": "0x3f19d713",
+  "input_step": "row 84 col3",
+  "value_f": 0.60093802
+ },
+ "10759824": {
+  "name": "Rev Ecf DPF3 Lp",
+  "kind": "lut",
+  "table": "0x9ddeb0",
+  "index": 338,
+  "rva_addr": "0x9de3f8",
+  "value": "0xbf4afeb9",
+  "input_step": "row 84 col2",
+  "value_f": -0.79294926
+ }
+}
