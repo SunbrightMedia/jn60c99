@@ -1,0 +1,77 @@
+{
+  "_doc": "Parameter->coefficient transform curves for RolandCloud JUNO-60 VST3. See docs/PARAM_APPLY_MAP.md. Image base for 'rva' fields = 0x180000000 (IDA convention; runtime base 0x7FF91DC60000 is equivalent). All rvas below are IDA-style (0x180000000+rva).",
+
+  "apply_model": {
+    "summary": "value -> integer engine step (0..N) -> per-parameter float LUT lookup -> raw store into descriptor slot. Host-normalized 0..1 is NOT transformed at the VST3 boundary; denormalization is deferred into the engine apply path.",
+    "raw_store": {"rva": "0x3C1090", "alt": "0x3C10F0", "code": "**(float**)(*(*(a1)+56) + 40*idx + 32) = a4", "transform": "none (identity store)"},
+    "denormalize_lut_fn": {"rva": "0x356380", "signature": "double sub_356380(engine, int tableId, int step)", "formula": "TABLE[tableId][clamp(step, 0, N_tableId)]", "note": "66 cases (tableId 0..65). Some tableIds are samplerate-selected (see samplerate_dispatch)."},
+    "range_param_toPlain_fn": {"rva": "0x3D70D0", "formula": "stepCount<=1: min + (max-min)*norm ; stepped: round((stepCount+1)*norm) etc", "min_getter": "0x3D69A0", "max_getter": "0x3D6990", "note": "Steinberg-SDK RangeParameter path (host-facing params). min/max live in the Parameter object (offsets +824/+832), NOT in the 40-byte engine descriptor."},
+    "range_param_toNormalized_fn": {"rva": "0x3D7010", "formula": "(value-min)/(max-min)"},
+    "identity_param_fn": ["0x3D7000", "0x3D70C0"],
+    "midi_cc_denorm_fn": {"rva": "0x353E80", "formula": "fixed-point (const*cc)>>32>>6 /2 (per-param)"},
+    "per_param_scale_offset_apply": {"example_rva": "0x356150", "formula": "value*scale[idx] + offset  (scale/offset constants near dword_7FF91E7450B4, rva ~0x7450B4 region)", "note": "visible only in asm (Hex-Rays drops the implicit xmm float arg to 0x3C1090)"}
+  },
+
+  "host_boundary": {
+    "setParamNormalized": {"controller": "CVstEditController (rtti sub @0x347670)", "parameter_setNormalized_rva": "0x3D6FA0", "behavior": "clamp(value,0,1) stored NORMALIZED at param-object +808; notifies; does NOT reach engine slots"},
+    "process": {"rva": "0x34A380", "param_change_consume_rva": "0x31F2C0", "behavior": "getPoint() double normalized value passed verbatim into a mutex-guarded event queue at engine+440; drained later where denormalize occurs"}
+  },
+
+  "samplerate_dispatch": {
+    "note": "Time-domain params (ENV/LFO rates) pick the tableId by current samplerate, so the resulting slot coefficient is samplerate-specific. The captured oracle is 96 kHz.",
+    "example_fn_rva": "0x356E30",
+    "rule_seen": "if sr==44100 -> tableId 39 ; elif sr==48000 -> 40 ; else (96000) -> 41"
+  },
+
+  "denormalize_lut_tables": {
+    "_note": "Contiguous float[] LUTs, 4 bytes/entry, indexed by clamped step. CONTENTS ARE NOT IN THE PROVIDED DATA DUMPS (region rva 0x5C97D0..0x5CE6E0 is below the dumped .rdata start 0x934000). Extract this 20240-byte blob from the binary to complete the port.",
+    "region_rva": "0x5C97D0..0x5CE6E0",
+    "region_bytes": 20240,
+    "in_data_dumps": false,
+    "entries_index_by_tableId": [
+      {"tableId": 0,  "rva": "0x5C97D0", "N": 255, "bytes": 1024},
+      {"tableId": 1,  "rva": "0x5C9BD0", "N": 255, "bytes": 1024},
+      {"tableId": 2,  "rva": "0x5C9FD0", "N": 255, "bytes": 1024},
+      {"tableId": 3,  "rva": "0x5CA3D0", "N": 255, "bytes": 1024},
+      {"tableId": 4,  "rva": "0x5CA7D0", "N": 23,  "bytes": 96},
+      {"tableId": 5,  "rva": "0x5CA830", "N": 5,   "bytes": 24},
+      {"tableId": 51, "rva": "0x5CA848", "N": 1,   "bytes": 8},
+      {"tableId": 6,  "rva": "0x5CA850", "N": 20,  "bytes": 84},
+      {"tableId": 7,  "rva": "0x5CA8B0", "N": 255, "bytes": 1024},
+      {"tableId": 8,  "rva": "0x5CACB0", "N": 3,   "bytes": 16},
+      {"tableId": 9,  "rva": "0x5CACC0", "N": 3,   "bytes": 16},
+      {"tableId": 10, "rva": "0x5CACD0", "N": 3,   "bytes": 16},
+      {"tableId": 11, "rva": "0x5CACE0", "N": 127, "bytes": 512},
+      {"tableId": 12, "rva": "0x5CAEE0", "N": 255, "bytes": 1024},
+      {"tableId": 13, "rva": "0x5CB2E0", "N": 255, "bytes": 1024},
+      {"tableId": 14, "rva": "0x5CB6E0", "N": 255, "bytes": 1024},
+      {"tableId": 15, "rva": "0x5CBAE0", "N": 255, "bytes": 1024},
+      {"tableId": 16, "rva": "0x5CBEE0", "N": 255, "bytes": 1024},
+      {"tableId": 17, "rva": "0x5CC2E0", "N": 255, "bytes": 1024},
+      {"tableId": 18, "rva": "0x5CC6E0", "N": 127, "bytes": 512},
+      {"tableId": 19, "rva": "0x5CC8E0", "N": 255, "bytes": 1024},
+      {"tableId": 20, "rva": "0x5CCCE0", "N": 255, "bytes": 1024},
+      {"tableId": 21, "rva": "0x5CD0E0", "N": 127, "bytes": 512},
+      {"tableId": 22, "rva": "0x5CD2E0", "N": 255, "bytes": 1024},
+      {"tableId": 23, "rva": "0x5CD6E0", "N": 255, "bytes": 1024},
+      {"tableId": 24, "rva": "0x5CDAE0", "N": 255, "bytes": 1024},
+      {"tableId": 25, "rva": "0x5CDEE0", "N": 255, "bytes": 1024},
+      {"tableId": 26, "rva": "0x5CE2E0", "N": 255, "bytes": 1024}
+    ]
+  },
+
+  "sysex_transfer_curves_decoded": {
+    "_note": "These closed-form curves are EMBEDDED in the patch SysEx transcoder sub_351710 (rva 0x351710). They map a 0..255 byte index to a value, used to align the JUNO-60 hardware SysEx byte domain with the internal display/value domain. They are DECODED FROM CODE (no external data) and are useful as reference / sanity bounds, but they are NOT the same as the engine denormalize LUTs above (which produce the per-sample slot coefficients). Provided because they are the only fully-recoverable curves.",
+    "env_time": {"source_rva": "0x351710", "case": "30,32", "formula": "n<=128: n/256 ; n>128: ((0.00058500306 - n*9.5199505e-07)*n - 0.099640459)*n + 5.6657672", "samples": {"0": 0.0, "64": 0.25, "128": 0.5, "192": 1.36224, "255": 2.51189}},
+    "db_level": {"source_rva": "0x351710", "case": "70", "formula": "j==128: 1.0 ; else (10^(j/255)-1)/9 * 4.1349", "samples": {"0": 0.0, "64": 0.35941, "128": 1.0, "192": 2.14171, "255": 4.1349}},
+    "lfo_ms": {"source_rva": "0x351710", "case": "104(2nd branch)", "formula": "((10^(v/255)-1)/9)*790 + 10", "samples": {"0": 10.0, "64": 78.668, "128": 201.056, "192": 419.187, "255": 800.0}}
+  },
+
+  "missing_data_blobs": [
+    {"what": "denormalize LUT tables", "rva": "0x5C97D0..0x5CE6E0", "bytes": 20240, "used_by_rva": "0x356380", "needed_for": "preset-load / engine apply: value->coefficient"},
+    {"what": "per-param scale/offset constants", "rva": "~0x7450B4 region (e.g. dword_7FF91E7450B4, dword_7FF91E74543C ~255.0)", "used_by_rva": "0x356150, 0x359890", "needed_for": "v*scale+offset apply virtuals"},
+    {"what": "SysEx field schema (type/offset table)", "rva": "0x8A4290 (dword_7FF91E8A4290, 31 entries)", "used_by_rva": "0x351710", "needed_for": "SysEx .PRM patch import field mapping"},
+    {"what": "SysEx compare LUTs", "rva": "0x5C9500..0x5C9640 (xmmword_*)", "used_by_rva": "0x351710", "needed_for": "SysEx transcode comparisons"},
+    {"what": "per-param display metadata (int min/max/default/flag)", "rva": "0x5EC040 (unk_7FF91E5EC040, 4966 x 16 bytes)", "used_by_rva": "0x3ABAF0", "needed_for": "host param registration + display only (NOT audio)"}
+  ]
+}
