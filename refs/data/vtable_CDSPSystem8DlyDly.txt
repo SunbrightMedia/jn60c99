@@ -1,0 +1,24 @@
+[ 0] (vtable+0x0)  0x360580  nullsub_75
+[ 1] (vtable+0x8)  0x360800  nullsub_973
+[ 2] (vtable+0x10)  0x360570  nullsub_972
+[ 3] (vtable+0x18)  0x360640  sub_7FF91DFC0640
+[ 4] (vtable+0x20)  0x360700  sub_7FF91DFC0700
+[ 5] (vtable+0x28)  0x360590  sub_7FF91DFC0590
+[ 6] (vtable+0x30)  0x360460  sub_7FF91DFC0460
+[ 7] (vtable+0x38)  0x360450  sub_7FF91DFC0450
+[ 8] (vtable+0x40)  0x35FCF0  sub_7FF91DFBFCF0
+[ 9] (vtable+0x48)  0x3604F0  sub_7FF91DFC04F0
+[10] (vtable+0x50)  0x35FF30  sub_7FF91DFBFF30
+[11] (vtable+0x58)  0x360290  sub_7FF91DFC0290
+[12] (vtable+0x60)  0x360300  sub_7FF91DFC0300
+[13] (vtable+0x68)  0x3603B0  sub_7FF91DFC03B0
+[14] (vtable+0x70)  0x35FDF0  sub_7FF91DFBFDF0
+[15] (vtable+0x78)  0x35FEB0  sub_7FF91DFBFEB0
+[16] (vtable+0x80)  0x3604D0  sub_7FF91DFC04D0
+[17] (vtable+0x88)  0x35FD70  sub_7FF91DFBFD70
+[18] (vtable+0x90)  0x35FB60  sub_7FF91DFBFB60
+[19] (vtable+0x98)  0x35FBF0  sub_7FF91DFBFBF0
+[20] (vtable+0xa0)  0x3604E0  sub_7FF91DFC04E0
+[21] (vtable+0xa8)  0x360820  sub_7FF91DFC0820
+[22] (vtable+0xb0)  0x360810  sub_7FF91DFC0810
+[23] (vtable+0xb8)  0x360790  sub_7FF91DFC0790

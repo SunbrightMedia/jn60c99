@@ -1,0 +1,2 @@
+[ 0] (vtable+0x0)  0x3C35A0  sub_7FF91E0235A0
+[ 1] (vtable+0x8)  0x3C3580  sub_7FF91E023580

@@ -32,3 +32,4 @@ tests/ab_persample
 tests/wav_compare
 tests/play_scale
 tests/play_chord
+data_sections/
