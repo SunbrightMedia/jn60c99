@@ -1,0 +1,808 @@
+{
+ "_meta": {
+  "purpose": "Default-patch step source from the plugin's parameter database unk_7FF91E5EC040 (rva 0x98C040), 16-byte {min,max,default,flag} x4966, default field = init step.",
+  "status": "PARTIAL \u2014 see boundary.",
+  "boundary": "A DEFINITIVE engine-paramID (PARAM_MAP / refs/param_table_full.json) -> DB-index (0..4965) mapping is NOT statically recoverable. Verified three routes: (1) registry sub_388170 40-byte engine records carry name+&slot+typeflag but NO DB-index; (2) the DB has NO param-name field (name slot off_7FF91E609B60[2*i] is empty; [2*i+1] is only a value-format spec), so DB-name<->PARAM_MAP-name matching is impossible; (3) RangeParameter ctor sub_3D50E0 takes a VST3 ParamID (a3->+16), not a DB-index. The DB is the shared Roland System-8/RolandCloud system param DB; its synth/patch params are a single-instance block (~indices 755-877) re-indexed and bridged to the per-voice engine only by a RUNTIME-built CC/key red-black tree (sub_3C7AE0, qword_7FF91E910E18) \u2014 not a static table.",
+  "what_is_provable": "The DB synth/patch-param block (indices 755..877) and every record's {min,max,default,spec}. The default field is the init-patch step (e.g. OSC feet def=3 '8FEET', ENV times def=43/22, Tune def=128 center, Sustain def=255).",
+  "db_index_to_engine_paramId": "unresolved (see boundary)",
+  "cross_check": "For each tentative match below, default_step is within [min,max] of its DB record, and lut[tableId][default_step] is finite (verified)."
+ },
+ "synth_param_db_block": {
+  "755": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..255"
+  },
+  "756": {
+   "min": 0,
+   "max": 1,
+   "default_step": 0,
+   "spec": "OFF|ON"
+  },
+  "757": {
+   "min": 0,
+   "max": 5,
+   "default_step": 0,
+   "spec": "0..5"
+  },
+  "758": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "759": {
+   "min": 0,
+   "max": 5,
+   "default_step": 0,
+   "spec": "MAN|LFO|ENV1+|ENV1-|ENV2+|ENV2-"
+  },
+  "760": {
+   "min": 0,
+   "max": 5,
+   "default_step": 3,
+   "spec": "64FEET|32FEET|16FEET|8FEET|4FEET|2FEET"
+  },
+  "761": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "762": {
+   "min": 0,
+   "max": 5,
+   "default_step": 0,
+   "spec": "0..5"
+  },
+  "763": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "764": {
+   "min": 0,
+   "max": 5,
+   "default_step": 0,
+   "spec": "0..5"
+  },
+  "765": {
+   "min": 0,
+   "max": 5,
+   "default_step": 0,
+   "spec": "64|32|16|8|4|2"
+  },
+  "766": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..128..255"
+  },
+  "767": {
+   "min": 0,
+   "max": 3,
+   "default_step": 0,
+   "spec": "OFF|ON|--|--"
+  },
+  "768": {
+   "min": 0,
+   "max": 3,
+   "default_step": 0,
+   "spec": "OFF|ON|--|--"
+  },
+  "769": {
+   "min": -11,
+   "max": 11,
+   "default_step": 0,
+   "spec": "-11..11"
+  },
+  "770": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..255"
+  },
+  "771": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "772": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "773": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "774": {
+   "min": 0,
+   "max": 3,
+   "default_step": 0,
+   "spec": "--|--|--|--"
+  },
+  "775": {
+   "min": 0,
+   "max": 3,
+   "default_step": 0,
+   "spec": "PINK|WHITE|--|--"
+  },
+  "776": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..255"
+  },
+  "777": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "778": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "779": {
+   "min": 0,
+   "max": 255,
+   "default_step": 255,
+   "spec": "0..255"
+  },
+  "780": {
+   "min": 0,
+   "max": 3,
+   "default_step": 0,
+   "spec": "--|--|--|--"
+  },
+  "781": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "782": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "783": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..255"
+  },
+  "784": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "785": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "786": {
+   "min": 0,
+   "max": 255,
+   "default_step": 255,
+   "spec": "0..255"
+  },
+  "787": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "788": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..255"
+  },
+  "789": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "790": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "791": {
+   "min": 0,
+   "max": 255,
+   "default_step": 255,
+   "spec": "0..255"
+  },
+  "792": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "793": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..255"
+  },
+  "794": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "795": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "OFF|1..255"
+  },
+  "796": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "OFF|1..255"
+  },
+  "797": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..255"
+  },
+  "798": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "OFF|1..255"
+  },
+  "799": {
+   "min": 0,
+   "max": 1,
+   "default_step": 0,
+   "spec": "OFF|ON"
+  },
+  "800": {
+   "min": 0,
+   "max": 3,
+   "default_step": 0,
+   "spec": "POLY1|MONO|UNISON|POLY2"
+  },
+  "801": {
+   "min": 0,
+   "max": 23,
+   "default_step": 11,
+   "spec": "1..24"
+  },
+  "802": {
+   "min": 0,
+   "max": 127,
+   "default_step": 0,
+   "spec": "--"
+  },
+  "803": {
+   "min": 0,
+   "max": 1,
+   "default_step": 0,
+   "spec": "OFF|ON"
+  },
+  "804": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "--"
+  },
+  "805": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "--"
+  },
+  "806": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "--"
+  },
+  "807": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "--"
+  },
+  "808": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "--"
+  },
+  "809": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "--"
+  },
+  "810": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..255"
+  },
+  "811": {
+   "min": 0,
+   "max": 1,
+   "default_step": 1,
+   "spec": "DISABLE|ENABLE"
+  },
+  "812": {
+   "min": 0,
+   "max": 1,
+   "default_step": 0,
+   "spec": "--"
+  },
+  "813": {
+   "min": 0,
+   "max": 1,
+   "default_step": 0,
+   "spec": "--"
+  },
+  "814": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "815": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "816": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "817": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "818": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "819": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "820": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "821": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "822": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "823": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "824": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "825": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "826": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "827": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "828": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "829": {
+   "min": 0,
+   "max": -1,
+   "default_step": 0,
+   "spec": "4 char"
+  },
+  "830": {
+   "min": 0,
+   "max": 65535,
+   "default_step": 0,
+   "spec": "0..65535 (max 16 jacks)"
+  },
+  "831": {
+   "min": 0,
+   "max": 1,
+   "default_step": 0,
+   "spec": "OFF|ON"
+  },
+  "832": {
+   "min": 0,
+   "max": 5,
+   "default_step": 0,
+   "spec": "0..5"
+  },
+  "833": {
+   "min": 0,
+   "max": 5,
+   "default_step": 0,
+   "spec": "0..5"
+  },
+  "834": {
+   "min": 0,
+   "max": 9,
+   "default_step": 0,
+   "spec": "1..10"
+  },
+  "835": {
+   "min": -5,
+   "max": 5,
+   "default_step": 0,
+   "spec": "-5..+5"
+  },
+  "836": {
+   "min": -3,
+   "max": 3,
+   "default_step": 0,
+   "spec": "-3..+3"
+  },
+  "837": {
+   "min": 0,
+   "max": 1,
+   "default_step": 0,
+   "spec": "OFF|ON"
+  },
+  "838": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "839": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "840": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "841": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "842": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "843": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "844": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "845": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "846": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "847": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "848": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "849": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "850": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "851": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "852": {
+   "min": 0,
+   "max": 13,
+   "default_step": 0,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)"
+  },
+  "853": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "x0.0 (0)..x1.0 (128)..x2.0 (255)"
+  },
+  "854": {
+   "min": 0,
+   "max": 2,
+   "default_step": 0,
+   "spec": "1|2|3"
+  },
+  "855": {
+   "min": 0,
+   "max": 2,
+   "default_step": 1,
+   "spec": "ENV1|ENV2|GATE"
+  },
+  "856": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "-128..+127"
+  },
+  "857": {
+   "min": 0,
+   "max": 3,
+   "default_step": 0,
+   "spec": "x1|x2|x3|x4"
+  },
+  "858": {
+   "min": 0,
+   "max": 255,
+   "default_step": 43,
+   "spec": "0..255"
+  },
+  "859": {
+   "min": 0,
+   "max": 255,
+   "default_step": 43,
+   "spec": "0..255"
+  },
+  "860": {
+   "min": 0,
+   "max": 255,
+   "default_step": 22,
+   "spec": "0..255"
+  },
+  "861": {
+   "min": 0,
+   "max": 255,
+   "default_step": 22,
+   "spec": "0..255"
+  },
+  "862": {
+   "min": 0,
+   "max": 2,
+   "default_step": 0,
+   "spec": "1|2|3"
+  },
+  "863": {
+   "min": 0,
+   "max": 1,
+   "default_step": 0,
+   "spec": "OFF|ON"
+  },
+  "864": {
+   "min": 0,
+   "max": 1,
+   "default_step": 0,
+   "spec": "1|2"
+  },
+  "865": {
+   "min": 0,
+   "max": 22,
+   "default_step": 11,
+   "spec": "-11..+11"
+  },
+  "866": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..255"
+  },
+  "867": {
+   "min": 0,
+   "max": 1,
+   "default_step": 0,
+   "spec": "1|2"
+  },
+  "868": {
+   "min": 0,
+   "max": 5,
+   "default_step": 0,
+   "spec": "-2OCT SIN|-1OCT SIN|SIN|TRI|-1OCT TRI|-2OCT TRI"
+  },
+  "869": {
+   "min": 0,
+   "max": 255,
+   "default_step": 0,
+   "spec": "0..255"
+  },
+  "870": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "-1200CENT..+1200CENT"
+  },
+  "871": {
+   "min": 0,
+   "max": 1,
+   "default_step": 0,
+   "spec": "        JUNO-60 (0)|JUNO-106 (1)"
+  },
+  "872": {
+   "min": 0,
+   "max": 5,
+   "default_step": 0,
+   "spec": "LPF -24dB|LPF -18dB|LPF -12dB|HPF -12dB|HPF -18dB|HPF -24dB"
+  },
+  "873": {
+   "min": 0,
+   "max": 5,
+   "default_step": 2,
+   "spec": "OVERDRIVE|DISTORTION|JUNO CH1|JUNO CH2|CRUSHER|PHASER"
+  },
+  "874": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..255"
+  },
+  "875": {
+   "min": 0,
+   "max": 5,
+   "default_step": 0,
+   "spec": "DELAY|PAN DELAY|CHORUS 1|CHORUS 2|FLANGER|DELAY+CHORUS"
+  },
+  "876": {
+   "min": 0,
+   "max": 5,
+   "default_step": 2,
+   "spec": "AMBIENCE|ROOM|HALL 1|HALL 2|PLATE|MODULATION"
+  },
+  "877": {
+   "min": 0,
+   "max": 255,
+   "default_step": 128,
+   "spec": "0..255"
+  }
+ },
+ "tentative_matches": {
+  "43": {
+   "db_index": 760,
+   "default_step": 3,
+   "db_min": 0,
+   "db_max": 5,
+   "in_range": true,
+   "note": "OSC1 Feet: DB spec '64..2 FEET' def=3(8') == PARAM_MAP pid43 'OSC1 Feet'",
+   "confidence": "LOW (spec-semantic, not bijective)",
+   "offset": 3840,
+   "name": "OSC1 Feet",
+   "tableId": 5,
+   "lut_coeff_at_default": 1.0,
+   "lut_coeff_finite": true
+  },
+  "32": {
+   "db_index": 858,
+   "default_step": 43,
+   "db_min": 0,
+   "db_max": 255,
+   "in_range": true,
+   "note": "ENV time def=43; pid32 'ENV Attack' (ENV1). DB has 2 env-time pairs (858/859,860/861); pairing to ENV1/2 attack/decay is by panel order, not proven.",
+   "confidence": "LOW (spec-semantic, not bijective)",
+   "offset": 2784,
+   "name": "ENV Attack",
+   "tableId": 35,
+   "lut_coeff_at_default": 0.28818297386169434,
+   "lut_coeff_finite": true
+  },
+  "34": {
+   "db_index": 860,
+   "default_step": 22,
+   "db_min": 0,
+   "db_max": 255,
+   "in_range": true,
+   "note": "ENV time def=22; pid34 'ENV Decay' (ENV1) \u2014 same caveat.",
+   "confidence": "LOW (spec-semantic, not bijective)",
+   "offset": 2816,
+   "name": "ENV Decay",
+   "tableId": 38,
+   "lut_coeff_at_default": 0.9813655018806458,
+   "lut_coeff_finite": true
+  },
+  "3": {
+   "db_index": 870,
+   "default_step": 128,
+   "db_min": 0,
+   "db_max": 255,
+   "in_range": true,
+   "note": "Tune -1200..+1200cent def=128(center); pid3 'Master Tune'.",
+   "confidence": "LOW (spec-semantic, not bijective)",
+   "offset": 368,
+   "name": "Master Tune",
+   "tableId": 6,
+   "lut_coeff_at_default": 7.647678285138682e-05,
+   "lut_coeff_finite": true
+  }
+ }
+}

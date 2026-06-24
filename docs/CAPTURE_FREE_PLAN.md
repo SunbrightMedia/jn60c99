@@ -19,9 +19,17 @@ Every engine coefficient = **`f(param_value, tables)`**, and both sides are in t
   4966 entries; the construction loop (decomp_3C0000.c ~4988) registers each default.
 
 ## Work items
-1. **Default patch** (task #9, in progress) — resolve paramID → DB-index (the DB is the
-   shared 4966-entry Roland database; our 1121 params are a re-indexed subset), then read
-   each default step → `refs/default_patch.json`. paramID ≠ DB-index (verified).
+1. **Default patch** (task #9) — PARTIAL / boundary found. The 123 binary-sourced synth
+   init-patch defaults ARE extracted (`refs/default_patch.json`, DB-index 755–877: feet,
+   PWM source, ENV times, tune-center, noise type, etc.). BUT the **paramID↔DB-index bridge
+   is NOT statically present**: the registry (`sub_388170`) records no DB-index, the DB has
+   no param names (only value-format specs), the controller ctor takes a VST3 ParamID but
+   no DB-index, and the only link is a **runtime-built red-black tree** (`sub_3C7AE0`).
+   So a *fully* binary-sourced default patch needs either that tree's reconstruction or
+   ~123 semantic spec→name matches (uncertain). **Deferred — not on the critical path:**
+   we already have a real patch's step values in-repo (PD Juno Pad, recovered from the
+   existing capture in `refs/recovered_param_steps.json` — derived data, not new external
+   input). The pragmatic capture-free port computes coefficients from those.
 2. **FX-coefficient setup** (task #10) — the 57 reverb/delay/chorus filter coefficients
    (29% of the capture: `Rev Ecf *`, `High Cut *`, `Delay Time`, `Wet/Dry`) are computed
    by the FX setup from the FX tables (`refs/reverb_tables.json`, `refs/delay_tables.json`).
