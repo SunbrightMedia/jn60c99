@@ -24,7 +24,13 @@ tests/test_master_smoke: tests/test_master_smoke.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
 clean:
-	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke
+	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/sound_test
+
+# Faithful sound test: run our DSP forward from the live plugin's captured state.
+sound: tests/sound_test.c $(SRC)
+	gunzip -kf state_dump/state_t0.bin.gz
+	$(CC) $(CFLAGS) -o tests/sound_test tests/sound_test.c $(SRC) $(LDLIBS)
+	./tests/sound_test state_dump/state_t0.bin /tmp/juno_sound 96000
 
 # Validate the port's init against the live-plugin state dump (state_dump/).
 validate: tests/validate_state.c $(SRC)
