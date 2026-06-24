@@ -17,3 +17,10 @@ void juno_param_apply_lut(unsigned char *st, int offset, int tableId, int step, 
 void juno_param_apply_value(unsigned char *st, int offset, float value, int broadcast);
 
 #endif
+
+#include "juno_param_table.h"
+/* Apply a whole preset: steps[] indexed by paramId (0..maxId), -1 = "not set/skip".
+ * Walks JUNO_PARAM_TABLE, denormalizes each via its tableId, writes + broadcasts.
+ * Returns the number of params applied. Covers the LUT-denormalized synth params;
+ * switches and FX-derived coefficients are handled separately. */
+int juno_apply_preset(unsigned char *st, const int *steps, int n);
