@@ -47,9 +47,27 @@ coefficients, all nonzero — now in `src/runtime_coeffs_data.c`.
   `dump_full_state.py` just works). Per‑voice copies (voices 1‑7) are pending
   polyphony.
 
+## Running-DSP A/B (per-sample, beyond init)
+The init check above proves the *initialisation* matches. For the *running* DSP:
+
+- **Capture-free (`make ab`):** load the live plugin's t0 snapshot, run our
+  `voice_render` forward, and match t1. The **control-rate** fields converge to the
+  plugin **bit-exactly** — the VCF cutoff slew hits 0.000e+00 residual at K=6367
+  samples; 58/155 dynamic voice-0 fields land within 0.01%. This validates the
+  per-sample control-rate math against the real plugin with data we already have.
+  (Audio-rate filter-memory fields decorrelate in phase over thousands of samples —
+  expected; the audio bounce covers those.)
+- **Audio bounce (`make abwav REF=plugin_ref.wav`):** the one capture still needed —
+  the plugin's own WAV output for a known note. `tests/wav_compare` diffs envelope,
+  pitch and timbre (spectral cosine). See docs/RUN_GUIDE_AUDIO_AB.md. The pitch ratio
+  also pins the MIDI-note → pitch mapping (the one open gap) from real data.
+
 ## Reproduce
 ```
-make validate
+make validate   # init bit-exactness (0 stable gaps)
+make ab         # capture-free per-sample control-rate A/B
+make play       # render an audible note
+make abwav REF=plugin_ref.wav   # audio A/B vs a plugin bounce (needs the bounce)
 ```
-(Decompresses `state_dump/state_t0.bin.gz`/`t1`, builds `tests/validate_state.c`,
-runs the comparison.)
+(`make validate` decompresses `state_dump/state_t0.bin.gz`/`t1`, builds
+`tests/validate_state.c`, runs the comparison.)

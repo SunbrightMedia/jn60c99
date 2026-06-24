@@ -37,6 +37,21 @@ play: tests/play_note.c $(SRC)
 	$(CC) $(CFLAGS) -o tests/play_note tests/play_note.c $(SRC) $(LDLIBS)
 	./tests/play_note /tmp/juno_note.wav 4 1.5
 
+# Capture-free per-sample A/B: run our DSP forward from t0, match t1 (control-rate).
+ab: tests/ab_persample.c $(SRC)
+	gunzip -kf state_dump/state_t0.bin.gz state_dump/state_t1.bin.gz
+	$(CC) $(CFLAGS) -o tests/ab_persample tests/ab_persample.c $(SRC) $(LDLIBS)
+	./tests/ab_persample state_dump/state_t0.bin state_dump/state_t1.bin state_dump/.dspreads.txt 20000
+
+# Audio A/B: compare the port's note against a plugin bounce (REF=path to plugin.wav).
+# Renders the port note, then diffs envelope / pitch / timbre. See docs/RUN_GUIDE_AUDIO_AB.md.
+REF ?= plugin_ref.wav
+abwav: tests/play_note.c tests/wav_compare.c $(SRC)
+	$(CC) $(CFLAGS) -o tests/play_note tests/play_note.c $(SRC) $(LDLIBS)
+	$(CC) $(CFLAGS) -o tests/wav_compare tests/wav_compare.c $(LDLIBS)
+	./tests/play_note /tmp/juno_note.wav 4 1.5
+	./tests/wav_compare $(REF) /tmp/juno_note.wav
+
 # Validate the port's init against the live-plugin state dump (state_dump/).
 validate: tests/validate_state.c $(SRC)
 	gunzip -kf state_dump/state_t0.bin.gz state_dump/state_t1.bin.gz

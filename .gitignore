@@ -28,3 +28,5 @@ tests/validate_state
 allcode/
 tests/sound_test
 tests/play_note
+tests/ab_persample
+tests/wav_compare
