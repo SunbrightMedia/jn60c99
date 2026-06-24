@@ -86,3 +86,17 @@ table), and the descriptor `+32` binding code in the `sub_180363380` init region
   trigger/pruner + the note→pitch binding (the one gap to pin).
 - To **honour any patch from original code**: transcribe the raw store + ID→offset
   map + factory-default constants (all mechanical/data).
+
+## Sound-test diagnostic (empirical, this session)
+Loaded the captured PD-Juno-Pad coefficients, set the note-on edge `state[101504]=1.0`,
+and rendered. Findings:
+- **Oscillator core works:** DCO phase advances; saw mix `state[1792] = -0.99`
+  (full scale); wave-mix `state[4928] = -1.07`; VCA env `state[9856]` opens to ~1.0.
+- **Signal dies in the filter:** VCF output `state[10544] ≈ 0` and decays — the
+  filter envelope stays closed, so the (correct) ladder filters the voice to silence.
+- **No single-field shortcut:** holding any one offset (300..10800) at 1.0 every
+  sample produces no voice output. The note-on is a SEQUENCED gate (the ramped
+  gate that opens BOTH the amp and filter ADSRs), not a single flag.
+- **Conclusion:** an audible test requires the real note-on gate path — the ramp
+  engine `sub_1803C2E80` driving the held-gate that triggers the filter/amp
+  envelopes. That is unit #1; the engine itself is proven to synthesize.
