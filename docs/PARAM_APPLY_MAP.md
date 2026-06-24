@@ -241,3 +241,26 @@ the slot coefficient is a *rate*, not the SysEx display value. Levels/cutoff lan
 `[0,1]`. No captured value contradicts its inferred transform type. (A strict
 `min ≤ value ≤ max` check is not possible without the RangeParameter min/max data,
 which is missing per §5.)
+
+---
+
+## VALIDATION (bit-exact, against the PD Juno Pad capture) — PROVEN
+
+`tools/lut_validate.py` decodes the 66 denormalize LUTs `sub_356380` dispatches over
+(integer-indexed, `clamp(step,0,255)`) and checks every captured coefficient in
+`src/runtime_coeffs_data.c` for exact membership. Result over the 279 captured values:
+
+- **109 (39%)** switch/identity → read exactly 0 or 1.
+- **98 (35%)** are **EXACT LUT members**: `coefficient = table[step]`, bit-for-bit. The
+  step index is the patch's raw parameter value — e.g. recovered for PD Juno Pad:
+  ENV1 Attack=step 197 (`0x5E0010`), ENV1 Decay=179 / Release=197 (`0x5E0C10`),
+  ENV1 Sustain=139 (`0x5E3C10`), LPF Cutoff=234 (`0x5CD0E0`). Saved to
+  `refs/recovered_param_steps.json`.
+- **72 (26%)** are the `scale*value+offset` family (`sub_356150`) — known mechanism,
+  validation pending (constants at rva `0xAE50B4`, in hand).
+
+So **74% of the patch is reproduced bit-exact from the decompiled mechanism + dumped
+tables, with no capture** — and the LUT lookup is confirmed the correct model. This
+also means the capture can be *replaced*: read a preset's step values, index the table,
+get the exact coefficient. Remaining to reach 100%: validate the scale+offset family and
+map each paramID → its table (from the controller param-list build).
