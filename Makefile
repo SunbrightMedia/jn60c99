@@ -32,6 +32,11 @@ sound: tests/sound_test.c $(SRC)
 	$(CC) $(CFLAGS) -o tests/sound_test tests/sound_test.c $(SRC) $(LDLIBS)
 	./tests/sound_test state_dump/state_t0.bin /tmp/juno_sound 96000
 
+# Play an actual note from a fresh engine through the full stereo chorus path.
+play: tests/play_note.c $(SRC)
+	$(CC) $(CFLAGS) -o tests/play_note tests/play_note.c $(SRC) $(LDLIBS)
+	./tests/play_note /tmp/juno_note.wav 4 1.5
+
 # Validate the port's init against the live-plugin state dump (state_dump/).
 validate: tests/validate_state.c $(SRC)
 	gunzip -kf state_dump/state_t0.bin.gz state_dump/state_t1.bin.gz

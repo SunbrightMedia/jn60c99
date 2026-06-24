@@ -34,6 +34,18 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
  * (chorus coefficients from sub_180388170 not yet captured — see juno_driver.c). */
 int juno_driver_render_sample(unsigned char *st, float *outL, float *outR);
 
+/* --- note gate ---------------------------------------------------------------
+ * A note is played by holding the per-voice master gate ("M.Gate", flat-state
+ * offset 320 + voice*10512) at 1.0 and pulsing the note-on edge (offset 101504 +
+ * voice*32) for one sample. voice_render then generates the LFO, both ADSR
+ * envelopes and the filter sweep internally from that gate — no external envelope
+ * code is required. These map the parameter the host sets on a MIDI note-on/off.
+ * The note's pitch comes from the pitch slot (offset 4448) set by the patch; the
+ * MIDI-note -> octave-pitch conversion is the one documented gap (see
+ * docs/CONTROL_LAYER.md), so these play at the patch's stored pitch. */
+void juno_note_on (unsigned char *st, int voice);   /* gate=1.0 + note-on edge */
+void juno_note_off(unsigned char *st, int voice);   /* gate=0.0 (release)      */
+
 #ifdef __cplusplus
 }
 #endif

@@ -27,3 +27,4 @@ tests/validate_state
 # Full-plugin dump: keep the compressed reference in refs/, ignore the raw extract
 allcode/
 tests/sound_test
+tests/play_note

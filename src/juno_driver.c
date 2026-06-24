@@ -39,6 +39,24 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
     memcpy(st + 136, &base, sizeof(void *));
 }
 
+/* Note gate. The host holds the per-voice "M.Gate" param (offset 320 + v*10512)
+ * at 1.0 for the duration of the note and pulses the note-on edge (offset 101504
+ * + v*32). voice_render consumes the edge once, then runs its internal LFO/ADSR/
+ * filter-envelope generators off the held gate. */
+#define JUNO_GATE_OFF(v)  (JUNO_VOICE_MAIN_BASE0 + (v) * JUNO_VOICE_MAIN_STRIDE)   /* 320 */
+#define JUNO_EDGE_OFF(v)  (JUNO_VOICE_AUX_BASE0  + (v) * JUNO_VOICE_AUX_STRIDE)    /* 101504 */
+
+void juno_note_on(unsigned char *st, int voice)
+{
+    JF(st, JUNO_GATE_OFF(voice)) = 1.0f;
+    JI(st, JUNO_EDGE_OFF(voice)) = 0x3F800000;   /* 1.0f — one-shot retrigger */
+}
+
+void juno_note_off(unsigned char *st, int voice)
+{
+    JF(st, JUNO_GATE_OFF(voice)) = 0.0f;
+}
+
 /* Render one stereo output sample: voices -> 8 buffers -> master process.
  * Writes the final stereo pair to *outL / *outR. Returns 1 if the full master/
  * chorus path ran, 0 if the dry fallback was used (chorus coeffs not yet loaded). */

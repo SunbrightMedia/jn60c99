@@ -87,7 +87,26 @@ table), and the descriptor `+32` binding code in the `sub_180363380` init region
 - To **honour any patch from original code**: transcribe the raw store + ID→offset
   map + factory-default constants (all mechanical/data).
 
-## Sound-test diagnostic (empirical, this session)
+## RESOLVED — the voice plays from the gate at offset 320
+The full parameter map (registry `sub_180388170`, parsed clean) gives the per-voice
+control slots by name. The note gate is **"M.Gate" at offset 320** (param idx 2),
+NOT 1856 ("Gate", which is a different/secondary flag) and NOT a control-layer ramp.
+Holding `state[320] = 1.0` (+ the one-shot edge at `state[101504]`) makes
+voice_render generate the LFO (`+560`), both ADSRs (params at `+2784`/`+3264`) and
+the filter-envelope sweep (`+3232`) **internally**, per sample. So the "ramp
+engine / envelope generator" is NOT needed for a basic note — voice_render is
+self-contained once gated. The ramp engine (src/ramp_engine.c) remains the exact
+mechanism for parameter smoothing and the keyboard-object gate, but the audible
+path does not depend on it.
+
+Key per-voice param offsets (voice 0; add v·10512): 272 UseExtJack, 304 M.CV,
+**320 M.Gate (note gate)**, 368 Master Tune, 384 Part Tune, 1088 LFO Rate,
+2784–2832 ENV1 A/S/D/R, 3264–3312 ENV2 A/S/D/R, 4448 pitch (octaves),
+6736 LPF Cutoff, 6832 LPF Resonance, 6864 Velocity, 9824 Mute (amp enable),
+10176 Gate SW, 10208 ENV2 SW, 10304 ENV LEVEL, 10320 AMP LEVEL. Full list of 1121
+params in the parser output (tools, registry asm).
+
+## Sound-test diagnostic (empirical, earlier this session — superseded above)
 Loaded the captured PD-Juno-Pad coefficients, set the note-on edge `state[101504]=1.0`,
 and rendered. Findings:
 - **Oscillator core works:** DCO phase advances; saw mix `state[1792] = -0.99`

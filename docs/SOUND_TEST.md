@@ -1,4 +1,38 @@
-# Sound test — the decisive diagnosis (this session)
+# Sound test — RESOLVED: the port plays (this session)
+
+## TL;DR — it makes sound
+`make play` renders an actual note from a fresh engine through the full stereo
+chorus and writes a WAV. The note-on is exactly what the plugin's host does: hold
+the **per-voice master gate "M.Gate" (flat-state offset 320 + voice·10512)** at 1.0
+and pulse the note-on edge (offset 101504). **voice_render then generates the LFO,
+both ADSR envelopes and the filter sweep entirely on its own** — there is no
+separate envelope code to transcribe. Measured output (PD The Juno Pad, 96 kHz):
+
+```
+attack swell  -40 dBFS -> -16 dBFS over ~2 s (filter envelope opening)
+sustain       ~-16 dBFS plateau
+release       gate->0 -> decays to -37 dBFS over ~1.5 s
+stereo        L != R in 95570/96000 samples (BBD chorus width)
+peak 0.68, rms -18.8 dBFS over 5.5 s
+```
+
+This corrects the earlier diagnostic below, which concluded "no single field opens
+the voice." That was wrong: it swept offsets 300–10800 but never the **gate at 320
+held at 1.0** (the renderer saves/restores 320 around the note-on edge, so a naive
+poke that also touched the edge cancelled out). Holding 320 = 1.0 drives the entire
+voice. The signal path DCO -> 4-pole VCF (with envelope sweep) -> VCA -> stereo BBD
+chorus is now proven audible end-to-end.
+
+The MIDI-note -> octave-pitch conversion is still the one open gap (notes play at the
+patch's stored pitch, offset 4448); see docs/CONTROL_LAYER.md.
+
+```
+make play    # render a note to /tmp/juno_note.wav
+```
+
+---
+
+# Sound test — the original diagnosis (kept for the record)
 
 The goal was an audible note. This documents what we proved, with hard numbers,
 and why an audible note needs one more transcribed subsystem (the control-layer
