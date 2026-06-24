@@ -37,3 +37,20 @@ One of:
 Typical locations: the plugin's resource/data folder under the Roland Cloud install,
 or wherever the plugin's "export patch" writes. Attach the file and I'll reverse the
 layout and build the parser for that format.
+
+## The file you provided (5c53067b-1_Preset.bin)
+- Magic `KoaBankFile00003`, product `PG-JU60`, bank name `SY Poly Synth`.
+- 1,294,295 bytes. It is a BANK: one real patch at the front (~bytes 39–4900),
+  then ~4096 empty 236-byte init slots (repeating `$$$$$$$$`/`11111111` markers,
+  stride 236, in 64 groups separated by 5355-byte gaps).
+- Patch values are stored POSITIONALLY as small integer/nibble bytes; the field
+  names (`fm.PATCH.FLT.VCF CUTOFF FREQ`, `…RATE H`, …) are the code's schema, not in
+  the file. The "H" suffixes are high-resolution high-bytes (8-bit base + extension).
+
+## Decoding cost (honest)
+Faithful decode needs the schema (field order + size + per-field scaling) from the
+config-driven deserializer `sub_18033C330`/`sub_18033DD00` (format descriptor:
+patchIdPosition/Size, bankNamePosition/Size, nonActiveAreaPosition/Size, …). This is
+the largest remaining transcription, and mostly generic Roland-framework plumbing
+shared across products (SH-101/SH-2/System-8/…), not JUNO DSP. Guessing the scaling
+is forbidden, so this is a real sub-project — tracked here, decision pending.
