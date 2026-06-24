@@ -1,8 +1,11 @@
 /* play_chord.c — polyphonic demo: chords across the 8 voices through the chorus.
  * Proves the verified per-voice offset remap: each voice renders the same DSP at
  * its own state region, summed by the master. Plays a small I–V–vi–IV progression.
- *   usage: play_chord <out.wav>
- */
+ *   usage: play_chord <out.wav> [nolfo]
+ * Pass "nolfo" to zero the DCO LFO->pitch depth ("LFO Level", offset 4032) on all
+ * voices — removes the ~3.8-cent LFO vibrato/drift, leaving filter LFO/PWM/envelopes
+ * intact (4032 feeds only the pitch-mod term). */
+
 #include "../src/juno_engine.h"
 #include "../src/juno_driver.h"
 #include <stdio.h>
@@ -32,8 +35,11 @@ int main(int argc, char **argv){
     int per=(int)(hold*SR), gap=(int)(rel*SR), tail=(int)(1.0*SR);
     int N=4*per+tail; float *L=malloc(sizeof(float)*N), *R=malloc(sizeof(float)*N);
 
+    int nolfo = (argc>2 && strcmp(argv[2],"nolfo")==0);
+
     unsigned char *st=malloc(JUNO_STATE_BYTES); memset(st,0,JUNO_STATE_BYTES);
     juno_chorus_init(st); juno_engine_init(st); juno_runtime_coeffs_apply(st);
+    if (nolfo) for (int v=0; v<JUNO_NUM_VOICES; ++v) JF(st, 4032 + v*10512) = 0.0f;
     static struct juno_host_shim shim; memset(&shim,0,sizeof shim);
     juno_driver_attach_host(st,&shim,2);
 
