@@ -3,6 +3,38 @@
 Honest accounting of what is ported exactly, what remains, and what is **not in
 our extracted data**. The user asked for hard truth over guesses; this records it.
 
+## CURRENT STATE (latest — read this first)
+
+**Extraction is COMPLETE and permanent.** The entire plugin (77,167 functions) is
+archived in `refs/` (`manifest.tsv` index + `allcode_decomp.tgz` full decompile).
+No further IDA sessions or live captures are needed — everything is searchable
+offline.
+
+**Done and PROVEN against the live plugin** (`make validate`, see docs/VALIDATION.md):
+- Voice DSP (`voice_render`), master mix + stereo BBD chorus + output
+  (`master_render`), coefficient init (`juno_engine_init`), chorus constructor
+  (`juno_chorus_init`) — all transcribed exact.
+- Init validated: **2289/2289 engine_init offsets bit-exact; 0 stable gaps** over
+  all 1585 DSP-read offsets vs the live plugin (preset PD The Juno Pad, 96 kHz).
+- Runtime coefficients for that patch captured & validated (279 values); used as
+  the validation ORACLE, not as the port's source.
+
+**Remaining (offline transcription from the full dump; nothing needed from the user):**
+1. **#1 note/MIDI handler** — note→pitch/gate + voice allocation (makes it play).
+   Buried in the VST3/threading layer (voice mgmt is pointer-based 40-byte structs,
+   not flat `+10512` offsets). Under research.
+2. **#2 parameter→coefficient appliers** — to honour any patch from original code
+   (not per-patch captures). Surface being scoped from the full dump.
+3. **Polyphony** — transcribe voices 1-7 (all 8 decompiles+asm are in the dump).
+4. **Per-block driver** — refine `juno_driver` to mirror `sub_180398EC0` (enable
+   flag + skip counter → master → prune) exactly.
+
+Per the user's directive: transcribe the ORIGINAL code for #1/#2 (the captures are
+only the validation oracle). Each piece is checked against the captured ground
+truth as it lands.
+
+---
+
 ## Ported — exact, compiling, tested
 | Piece | Source | Notes |
 |-------|--------|-------|
