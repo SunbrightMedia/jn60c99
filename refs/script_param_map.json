@@ -7,7 +7,7 @@
   "counts": {
    "patch_params": 114,
    "panel_exposed": 61,
-   "engine_offset_resolved": 20
+   "engine_offset_resolved": 23
   }
  },
  "params": [
@@ -239,8 +239,8 @@
    "default": "128",
    "type": "int2x4",
    "panel_exposed": true,
-   "engine_offset": 4144,
-   "offset_via": "PWM Level"
+   "engine_offset": null,
+   "offset_via": null
   },
   {
    "db_index": 771,
@@ -448,8 +448,8 @@
    "default": "0",
    "type": "int2x4",
    "panel_exposed": true,
-   "engine_offset": null,
-   "offset_via": null
+   "engine_offset": 3264,
+   "offset_via": "ENV Attack"
   },
   {
    "db_index": 790,
@@ -459,8 +459,8 @@
    "default": "0",
    "type": "int2x4",
    "panel_exposed": true,
-   "engine_offset": null,
-   "offset_via": null
+   "engine_offset": 3296,
+   "offset_via": "ENV Decay"
   },
   {
    "db_index": 791,
@@ -470,8 +470,8 @@
    "default": "255",
    "type": "int2x4",
    "panel_exposed": true,
-   "engine_offset": null,
-   "offset_via": null
+   "engine_offset": 3280,
+   "offset_via": "ENV Sustain"
   },
   {
    "db_index": 792,
@@ -481,8 +481,8 @@
    "default": "0",
    "type": "int2x4",
    "panel_exposed": true,
-   "engine_offset": null,
-   "offset_via": null
+   "engine_offset": 3312,
+   "offset_via": "ENV Release"
   },
   {
    "db_index": 793,

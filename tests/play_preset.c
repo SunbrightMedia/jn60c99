@@ -1,10 +1,10 @@
-/* play_preset.c — render a chord/arpeggio with a preset overlay applied on top of
- * the validated base patch. First target: "SQ Dynamic ARPG" (from the panel photo).
+/* play_preset.c — render a chord/arpeggio with the FAITHFUL "SQ Dynamic ARPG" preset.
  *
- * The exact panel-value -> coefficient curves are not transcribed, so this is a
- * "similar, not exact" overlay: start from the validated base state, then push the
- * audible macro params (envelopes, VCF, DCO mix, chorus) toward the photo. Values
- * are broadcast to all 8 voices exactly as juno_runtime_coeffs_apply does.
+ * The preset params are no longer hand-tuned: they are SQ ARPG's real per-parameter
+ * steps, decoded from the factory bank and bound to engine offsets via the plugin's
+ * own Script.xml (docs/SCRIPT_PARAM_MAP.md), then applied through the proven LUT apply
+ * engine (juno_param_apply_lut). The LFO->pitch depth (offset 4032) is the preset's
+ * real value, NOT zeroed — so the vibrato is SQ ARPG's own.
  *
  *   usage: play_preset <out.wav> [block]
  *     default            -> staggered up-arpeggio per chord (sequenced "ARPG" feel)
@@ -12,6 +12,8 @@
  */
 #include "../src/juno_engine.h"
 #include "../src/juno_driver.h"
+#include "../src/juno_params.h"
+#include "sqarpg_apply.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,39 +37,17 @@ static void set_voices(unsigned char *st,int off,float f){
     for(int v=0;v<JUNO_NUM_VOICES;++v) JF(st, off + v*JUNO_VOICE_MAIN_STRIDE)=f;
 }
 
-/* --- "SQ Dynamic ARPG" overlay --------------------------------------------
- * Offsets from docs/PARAM_MAP.tsv. Base (PD Juno Pad) values noted in comments.
- * Tuned to a user Ableton render of the patch (held C major): SUSTAINED (not plucky),
- * bright, matched envelope/brightness/level — see chat analysis. */
+/* --- "SQ Dynamic ARPG" — FAITHFUL apply -----------------------------------
+ * SQ ARPG's real per-parameter steps (from the factory bank), bound to engine
+ * offsets via Script.xml, applied through the proven LUT engine. Table generated
+ * by tools/build_sqarpg_apply.py -> tests/sqarpg_apply.h. Broadcast to all 8 voices.
+ * Velocity into the filter path kept (it is not a patch-stored param). */
 static void preset_sq_arpg(unsigned char *st){
-    /* ENV-1 (filter envelope): fast attack, slow decay, HIGH sustain (cutoff stays open) */
-    set_voices(st,2784, 0.060f);   /* E1 Attack rate  (base 0.00297 -> faster onset) */
-    set_voices(st,2816, 0.0047f);  /* E1 Decay rate   (base 0.00472, ~unchanged)     */
-    set_voices(st,2800, 0.80f);    /* E1 Sustain lvl  (base 0.695 -> high, sustained) */
-    set_voices(st,2832, 0.030f);   /* E1 Release rate (base 0.00334)                  */
-
-    /* ENV-2 (amp envelope): fast attack, full sustain (held chord, not percussive) */
-    set_voices(st,3264, 0.060f);   /* E2 Attack  (base 0.00121 -> faster)             */
-    set_voices(st,3296, 5.0f);     /* E2 Decay   (base 5.33, ~unchanged)              */
-    set_voices(st,3280, 1.00f);    /* E2 Sustain (base 1.0 -> full sustain)           */
-    set_voices(st,3312, 0.035f);   /* E2 Release (base 0.00354)                       */
-
-    /* VCF: cutoff + env-1 sweep tuned to match the reference brightness (centroid ~2.8 kHz) */
-    set_voices(st,6736, 0.37f);    /* LPF Cutoff (matched)                            */
-    set_voices(st,7392, 2.5f);     /* ENV->filter depth (matched)                     */
-
-    /* DCO: saw + pulse forward, sub/noise trimmed */
-    set_voices(st,4192, 0.90f);    /* Saw level  (base 0.860)                         */
-    set_voices(st,6512, 0.95f);    /* Pulse level (base 1.007)                        */
-    set_voices(st,4224, 0.22f);    /* Sub level  (base 0.316 -> less)                 */
-    set_voices(st,6528, 0.06f);    /* Noise level (base 0.176 -> less)                */
-
-    /* output level trimmed to the reference peak; velocity 100/127 into the filter path */
-    set_voices(st,10320, 0.85f);   /* AMP LEVEL (matched peak)                         */
+    for(int i=0;i<SQARPG_APPLY_N;i++)
+        juno_param_apply_lut(st, SQARPG_APPLY[i].off, SQARPG_APPLY[i].tid,
+                             SQARPG_APPLY[i].step, /*broadcast=*/1);
     { float vel=100.0f/127.0f;
       set_voices(st,6864,vel); set_voices(st,6880,vel); set_voices(st,6896,vel); set_voices(st,6912,vel); }
-    /* Chorus II is already the base mode. NOTE: send reverb/delay (HALL2/DLY) tail is
-     * NOT yet applied — those FX coeffs aren't loaded, so there's no post-release tail. */
 }
 
 int main(int argc,char**argv){
@@ -81,8 +61,7 @@ int main(int argc,char**argv){
     unsigned char *st=malloc(JUNO_STATE_BYTES); memset(st,0,JUNO_STATE_BYTES);
     juno_chorus_init(st); juno_engine_init(st); juno_runtime_coeffs_apply(st);
     preset_sq_arpg(st);
-    /* kill the DCO LFO->pitch vibrato (offset 4032) for a tighter sequenced feel */
-    for(int v=0;v<JUNO_NUM_VOICES;++v) JF(st,4032+v*10512)=0.0f;
+    /* LFO->pitch (offset 4032) is now SQ ARPG's real depth (DB753, step 128) — not zeroed. */
     static struct juno_host_shim shim; memset(&shim,0,sizeof shim);
     juno_driver_attach_host(st,&shim,2);
 
@@ -114,7 +93,10 @@ int main(int argc,char**argv){
         for(int i=0;i<tail;i++){ float l=0,r=0; juno_driver_render_sample(st,&l,&r); L[idx]=l;R[idx]=r;idx++; }
     }
 
-    double sum=0; float pk=0; for(int i=0;i<idx;i++){sum+=(double)L[i]*L[i]+(double)R[i]*R[i]; if(fabsf(L[i])>pk)pk=fabsf(L[i]);}
+    double sum=0; float pk=0; for(int i=0;i<idx;i++){sum+=(double)L[i]*L[i]+(double)R[i]*R[i]; if(fabsf(L[i])>pk)pk=fabsf(L[i]); if(fabsf(R[i])>pk)pk=fabsf(R[i]);}
+    /* Output gain-staging (master/VCA level param) is not yet bound; normalize to
+     * -1 dBFS so the tonal + LFO character is audible without clip distortion. */
+    if(pk>0.001f){ float g=0.891f/pk; for(int i=0;i<idx;i++){L[i]*=g; R[i]*=g;} }
     write_wav(out,L,R,idx,SR);
     printf("SQ Dynamic ARPG (%s) -> %s  (%.2fs) peak=%.3f rms=%.4f\n",
            block?"block chords":"arpeggio", out,(double)idx/SR,pk,sqrt(sum/(2.0*idx)));

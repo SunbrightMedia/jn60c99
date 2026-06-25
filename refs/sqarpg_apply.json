@@ -1,0 +1,163 @@
+{
+ "_meta": {
+  "preset": "SQ Dynamic ARPG (bank record 1)",
+  "source": "Script.xml DB->offset alignment + bank nibble decode + param_table_full tableId",
+  "name_anchor": "SQ Dynamic ARPG "
+ },
+ "apply": [
+  {
+   "offset": 1920,
+   "tableId": 44,
+   "step": 0,
+   "name": "LFO DELAY TIME",
+   "db_index": 751
+  },
+  {
+   "offset": 1088,
+   "tableId": 22,
+   "step": 63,
+   "name": "LFO RATE",
+   "db_index": 752
+  },
+  {
+   "offset": 4032,
+   "tableId": 0,
+   "step": 128,
+   "name": "DCO LFO MOD",
+   "db_index": 753
+  },
+  {
+   "offset": 4144,
+   "tableId": 45,
+   "step": 0,
+   "name": "DCO PWM DEPTH",
+   "db_index": 758
+  },
+  {
+   "offset": 3840,
+   "tableId": 5,
+   "step": 3,
+   "name": "DCO RANGE",
+   "db_index": 760
+  },
+  {
+   "offset": 4192,
+   "tableId": 54,
+   "step": 255,
+   "name": "DCO SAW LEVEL",
+   "db_index": 771
+  },
+  {
+   "offset": 4224,
+   "tableId": 54,
+   "step": 159,
+   "name": "DCO SUB LEVEL",
+   "db_index": 772
+  },
+  {
+   "offset": 6528,
+   "tableId": 12,
+   "step": 0,
+   "name": "DCO NOISE LEVEL",
+   "db_index": 773
+  },
+  {
+   "offset": 6736,
+   "tableId": 22,
+   "step": 90,
+   "name": "VCF CUTOFF FREQ",
+   "db_index": 779
+  },
+  {
+   "offset": 6832,
+   "tableId": 22,
+   "step": 0,
+   "name": "VCF RESONANCE",
+   "db_index": 781
+  },
+  {
+   "offset": 10240,
+   "tableId": 41,
+   "step": 0,
+   "name": "HPF CUTOFF FREQ",
+   "db_index": 782
+  },
+  {
+   "offset": 7392,
+   "tableId": 46,
+   "step": 190,
+   "name": "VCF ENV MOD",
+   "db_index": 783
+  },
+  {
+   "offset": 2784,
+   "tableId": 35,
+   "step": 0,
+   "name": "ENV1 ATTACK",
+   "db_index": 784
+  },
+  {
+   "offset": 2816,
+   "tableId": 38,
+   "step": 64,
+   "name": "ENV1 DECAY",
+   "db_index": 785
+  },
+  {
+   "offset": 2800,
+   "tableId": 50,
+   "step": 194,
+   "name": "ENV1 SUSTAIN",
+   "db_index": 786
+  },
+  {
+   "offset": 2832,
+   "tableId": 38,
+   "step": 94,
+   "name": "ENV1 RELEASE",
+   "db_index": 787
+  },
+  {
+   "offset": 7408,
+   "tableId": 24,
+   "step": 255,
+   "name": "VCF KEY FOLLOW",
+   "db_index": 788
+  },
+  {
+   "offset": 3264,
+   "tableId": 35,
+   "step": 0,
+   "name": "ENV2 ATTACK",
+   "db_index": 789
+  },
+  {
+   "offset": 3296,
+   "tableId": 38,
+   "step": 178,
+   "name": "ENV2 DECAY",
+   "db_index": 790
+  },
+  {
+   "offset": 3280,
+   "tableId": 50,
+   "step": 0,
+   "name": "ENV2 SUSTAIN",
+   "db_index": 791
+  },
+  {
+   "offset": 3312,
+   "tableId": 38,
+   "step": 48,
+   "name": "ENV2 RELEASE",
+   "db_index": 792
+  },
+  {
+   "offset": 4128,
+   "tableId": 21,
+   "step": 11,
+   "name": "BEND RANGE",
+   "db_index": 801
+  }
+ ]
+}

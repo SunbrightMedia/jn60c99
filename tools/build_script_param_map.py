@@ -21,6 +21,9 @@ XML = os.path.join(ROOT, 'refs/plugin_resources/Script.xml')
 
 # Script panel-name -> registry name (docs/PARAM_MAP.tsv). Only where they differ;
 # exact-name matches resolve automatically.
+# Script panel-name -> registry name. ENV1/ENV2 both map to the registry's duplicate
+# "ENV Attack/Decay/Sustain/Release" names; occurrence order disambiguates them
+# (1st Script ENV* -> 1st registry block @2784, 2nd -> 2nd block @3264).
 NAME_BRIDGE = {
     'LFO RATE': 'LFO Rate', 'LFO DELAY TIME': 'LFO Delay', 'DCO LFO MOD': 'LFO Level',
     'VCF LFO MOD': 'LFO Gain', 'DCO RANGE': 'OSC1 Feet', 'DCO SAW LEVEL': 'JU OSC Saw Lev',
@@ -28,18 +31,22 @@ NAME_BRIDGE = {
     'DCO NOISE LEVEL': 'Osc Noise Level', 'VCF CUTOFF FREQ': 'LPF Cutoff',
     'VCF RESONANCE': 'LPF Resonance', 'HPF CUTOFF FREQ': 'HPF Cutoff',
     'VCF ENV MOD': 'ENV Level', 'VCF KEY FOLLOW': 'KCV Level', 'DCO PWM LEVEL': 'PWM Level',
-    'DCO PWM DEPTH': 'PWM Level', 'ENV1 ATTACK': 'ENV Attack', 'ENV1 DECAY': 'ENV Decay',
+    'DCO PWM DEPTH': 'PWM Level',
+    'ENV1 ATTACK': 'ENV Attack', 'ENV1 DECAY': 'ENV Decay',
     'ENV1 SUSTAIN': 'ENV Sustain', 'ENV1 RELEASE': 'ENV Release',
+    'ENV2 ATTACK': 'ENV Attack', 'ENV2 DECAY': 'ENV Decay',
+    'ENV2 SUSTAIN': 'ENV Sustain', 'ENV2 RELEASE': 'ENV Release',
 }
 
 def load_registry():
+    """name (upper) -> list of offsets in registration order (voice-0 block)."""
     reg = {}
     for line in open(os.path.join(ROOT, 'docs/PARAM_MAP.tsv')).read().splitlines()[1:]:
         p = line.split('\t')
         if len(p) >= 3 and p[1].isdigit():
             off = int(p[1])
             if 320 <= off < 10832:          # voice-0 block only
-                reg.setdefault(p[2].upper(), off)
+                reg.setdefault(p[2].upper(), []).append(off)
     return reg
 
 def script_order():
@@ -69,15 +76,20 @@ def script_order():
 
 def main():
     reg = load_registry()
+    used = {}                                    # registry name -> next occurrence index
     order = script_order()
     out = []
     for i, (nm, rng, df, ty) in enumerate(order):
         panel = not (nm and nm.startswith('('))   # parens => not on the JUNO-60 panel
         off = None; via = None
         if panel and nm and nm != '_reserve_':
-            bn = NAME_BRIDGE.get(nm, nm)
-            if bn.upper() in reg:
-                off, via = reg[bn.upper()], bn
+            bn = NAME_BRIDGE.get(nm, nm).upper()
+            offs = reg.get(bn)
+            if offs:
+                k = used.get(bn, 0)
+                if k < len(offs):                # consume occurrences in order
+                    off, via = offs[k], NAME_BRIDGE.get(nm, nm)
+                    used[bn] = k + 1
         out.append({
             "db_index": 750 + i, "script_index": i, "name": nm, "range": rng,
             "default": df, "type": ty, "panel_exposed": panel,
