@@ -1,3 +1,34 @@
+# OPEN: noise/level byte→step transform (the "noisy SQ ARPG render")
+
+The LUT apply `sub_356380` is a pure clamped `lut[tableId][step]` (bit-exact, 88/88
+vectors). What is NOT pinned is how a **stored bank byte becomes the `step`** for the
+DCO-level family. Hard evidence, and two REJECTED fixes (do not retry):
+
+- `lut[12]` (Osc Noise Level, offset 6528) is **descending**: `[0]=2.177`,
+  `[230]=0.176`, `[255]=0.125` (bit-exact from rdata).
+- The **only** setter that complements the step (`255 - a3`) uses **tableId 19
+  (Volume)** — `decomp_340000.c:22331/22860/24208`. **tableId 12 never inverts.**
+  ⇒ REJECTED: "apply `255-byte` to noise."
+- Across bank presets, **DB773 ≈ 0** (noise off; occasional KY=7, PL=40) while
+  **DB779 varies** (60..153). Musically: DB773 = noise level (mostly off), DB779 =
+  cutoff. ⇒ REJECTED: "rebind noise to DB779" (would mean every patch has heavy
+  noise, and orphans cutoff).
+- **The contradiction to resolve:** PD's *captured* coefficient at 6528 is
+  `0.176 = lut[12][230]`, but PD-class presets decode the noise byte (DB773) to 0.
+  So byte→step is **not identity** and **not `255-x`** for this family — there is an
+  unpinned transform (per-param scale/base, or the wrong preset is assumed for the
+  PD capture). The deserializer `sub_33BFC0` is a positional field walker with only
+  two adjustments (`*a3==19` adds `obj+52`; positions 600..615 add +1) — neither
+  explains 0→230.
+
+**Next step (verifiable, not a guess):** identify which bank preset the
+`src/runtime_coeffs_data.c` capture ("PD Juno Pad") actually is, decode its raw noise
+byte, and from (byte, captured-coef→step) derive the transform; or trace the noise
+param's specific `+120` setter. Until pinned, leave the binding/step as-is rather
+than introduce a fitted value.
+
+---
+
 # Parameter → coefficient APPLY path (JUNO-60 VST3)
 
 How a parameter VALUE (host-normalized 0..1, or a preset's stored step) becomes the
