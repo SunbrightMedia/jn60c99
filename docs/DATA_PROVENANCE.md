@@ -32,6 +32,30 @@ offset) and were never used as a source here. The raw poison files have been
 **removed** from the repo; this verdict is kept so the lesson is not re-learned:
 **if a number isn't in the decompile, it does not go in the port.**
 
+## METHOD — when something looks "runtime-only", check for a Hex-Rays `None` first
+
+The single biggest source of wasted effort here was treating decompiler *gaps* as
+*architecture*. Some functions are too large/obfuscated for Hex-Rays and decompile
+to **`None`** (e.g. the 12.4 K-line parameter registry `sub_180388170`). Because
+their body never appears in any `.c` file, every binding/store they make is
+invisible to a `.c`-level grep — which repeatedly led to the false conclusion that
+a value was "runtime-only / not statically reconstructable" and to reaching for a
+capture. **It was in the binary the whole time, in asm.**
+
+**The rule going forward:** before declaring any DSP block, coefficient, or binding
+"unknown / runtime-only / needs a capture," confirm the function that produces it
+actually *decompiled*. If it is `None` (or has dropped args), go to the
+disassembly (`allcode/asm_*.asm`, `*_deps/`, `asm_dump/`) and extract it there —
+by hand or by parsing the asm idiom (as `refs/param_registry.json` was parsed from
+the registration pattern). The entire plugin is present in the decompile; a missing
+answer means *we* haven't read the right segment yet, not that it isn't there.
+
+Worked examples of this method:
+- **`sub_180388170` → `refs/param_registry.json`**: 1121 name→engine-slot bindings
+  (the "DB→engine bridge" once thought runtime-only). See `docs/PARAM_REGISTRY.md`.
+- **`sub_180363380` chorus**: bit-exact-verified against `master_deps/*.asm` when the
+  `.c` was ambiguous (`docs/CHORUS_VIBRATO_DIAG.md` Findings).
+
 ## Captures that remain — oracles only, never sources
 
 A small number of live-plugin captures survive strictly as **cross-checks**, never

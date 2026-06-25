@@ -1,0 +1,7857 @@
+{
+ "_meta": {
+  "source": "sub_180388170 (rva 0x388170) param registry, extracted from allcode/asm_380000.asm",
+  "note": "Hex-Rays returned None on this fn; it builds the name->engine-slot bindings (the DB->engine bridge). 'desc' = the shared descriptor-template xmmword each param loads (range/curve/default).",
+  "count": 1121,
+  "idx_note": "idx = registration order within sub_180388170 (candidate engine paramID; apply path keys the red-black tree on these bindings)"
+ },
+ "params": [
+  {
+   "offset": 272,
+   "hex": "0x110",
+   "name": "UseExtJack",
+   "desc": null,
+   "idx": 0
+  },
+  {
+   "offset": 304,
+   "hex": "0x130",
+   "name": "M.CV",
+   "desc": null,
+   "idx": 1
+  },
+  {
+   "offset": 320,
+   "hex": "0x140",
+   "name": "M.Gate",
+   "desc": null,
+   "idx": 2
+  },
+  {
+   "offset": 368,
+   "hex": "0x170",
+   "name": "Master Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 3
+  },
+  {
+   "offset": 384,
+   "hex": "0x180",
+   "name": "Part Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 4
+  },
+  {
+   "offset": 592,
+   "hex": "0x250",
+   "name": "Portamento OnOff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 5
+  },
+  {
+   "offset": 608,
+   "hex": "0x260",
+   "name": "Portamento Mode",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 6
+  },
+  {
+   "offset": 624,
+   "hex": "0x270",
+   "name": "Portamento Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 7
+  },
+  {
+   "offset": 1040,
+   "hex": "0x410",
+   "name": "LFO Griffer Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 8
+  },
+  {
+   "offset": 1056,
+   "hex": "0x420",
+   "name": "LFO Tempo Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 9
+  },
+  {
+   "offset": 1072,
+   "hex": "0x430",
+   "name": "LFO Tempo Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 10
+  },
+  {
+   "offset": 1088,
+   "hex": "0x440",
+   "name": "LFO Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 11
+  },
+  {
+   "offset": 1856,
+   "hex": "0x740",
+   "name": "Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 12
+  },
+  {
+   "offset": 1872,
+   "hex": "0x750",
+   "name": "LFO Trig",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 13
+  },
+  {
+   "offset": 1888,
+   "hex": "0x760",
+   "name": "Reset Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 14
+  },
+  {
+   "offset": 1904,
+   "hex": "0x770",
+   "name": "LFO UseExtGate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 15
+  },
+  {
+   "offset": 1920,
+   "hex": "0x780",
+   "name": "LFO Delay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 16
+  },
+  {
+   "offset": 1936,
+   "hex": "0x790",
+   "name": "LFO Delay Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 17
+  },
+  {
+   "offset": 1952,
+   "hex": "0x7a0",
+   "name": "LFO Sin Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 18
+  },
+  {
+   "offset": 1968,
+   "hex": "0x7b0",
+   "name": "LFO Tri Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 19
+  },
+  {
+   "offset": 1984,
+   "hex": "0x7c0",
+   "name": "LFO Sqr Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 20
+  },
+  {
+   "offset": 2000,
+   "hex": "0x7d0",
+   "name": "LFO Saw Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 21
+  },
+  {
+   "offset": 2016,
+   "hex": "0x7e0",
+   "name": "LFO Saw(Inv) Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 22
+  },
+  {
+   "offset": 2032,
+   "hex": "0x7f0",
+   "name": "LFO S&H Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 23
+  },
+  {
+   "offset": 2048,
+   "hex": "0x800",
+   "name": "LFO Noise Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 24
+  },
+  {
+   "offset": 2064,
+   "hex": "0x810",
+   "name": "LFO Noise Mix",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 25
+  },
+  {
+   "offset": 2080,
+   "hex": "0x820",
+   "name": "LFO Internal Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 26
+  },
+  {
+   "offset": 2096,
+   "hex": "0x830",
+   "name": "LFO External0 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 27
+  },
+  {
+   "offset": 2112,
+   "hex": "0x840",
+   "name": "LFO External1 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 28
+  },
+  {
+   "offset": 2528,
+   "hex": "0x9e0",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 29
+  },
+  {
+   "offset": 2544,
+   "hex": "0x9f0",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 30
+  },
+  {
+   "offset": 2560,
+   "hex": "0xa00",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 31
+  },
+  {
+   "offset": 2784,
+   "hex": "0xae0",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 32
+  },
+  {
+   "offset": 2800,
+   "hex": "0xaf0",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 33
+  },
+  {
+   "offset": 2816,
+   "hex": "0xb00",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 34
+  },
+  {
+   "offset": 2832,
+   "hex": "0xb10",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 35
+  },
+  {
+   "offset": 2848,
+   "hex": "0xb20",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 36
+  },
+  {
+   "offset": 3040,
+   "hex": "0xbe0",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 37
+  },
+  {
+   "offset": 3264,
+   "hex": "0xcc0",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 38
+  },
+  {
+   "offset": 3280,
+   "hex": "0xcd0",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 39
+  },
+  {
+   "offset": 3296,
+   "hex": "0xce0",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 40
+  },
+  {
+   "offset": 3312,
+   "hex": "0xcf0",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 41
+  },
+  {
+   "offset": 3328,
+   "hex": "0xd00",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 42
+  },
+  {
+   "offset": 3840,
+   "hex": "0xf00",
+   "name": "OSC1 Feet",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 43
+  },
+  {
+   "offset": 3856,
+   "hex": "0xf10",
+   "name": "Griffer Bend SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 44
+  },
+  {
+   "offset": 3872,
+   "hex": "0xf20",
+   "name": "Bend Enable SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 45
+  },
+  {
+   "offset": 3888,
+   "hex": "0xf30",
+   "name": "PWM SW LFO",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 46
+  },
+  {
+   "offset": 3904,
+   "hex": "0xf40",
+   "name": "PWM SW ENV1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 47
+  },
+  {
+   "offset": 3920,
+   "hex": "0xf50",
+   "name": "PWM SW ENV2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 48
+  },
+  {
+   "offset": 3936,
+   "hex": "0xf60",
+   "name": "PWM SW Manual",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 49
+  },
+  {
+   "offset": 3952,
+   "hex": "0xf70",
+   "name": "Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 50
+  },
+  {
+   "offset": 3968,
+   "hex": "0xf80",
+   "name": "Detune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 51
+  },
+  {
+   "offset": 3984,
+   "hex": "0xf90",
+   "name": "Mod Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 52
+  },
+  {
+   "offset": 4000,
+   "hex": "0xfa0",
+   "name": "Mod Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 53
+  },
+  {
+   "offset": 4016,
+   "hex": "0xfb0",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 54
+  },
+  {
+   "offset": 4032,
+   "hex": "0xfc0",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 55
+  },
+  {
+   "offset": 4048,
+   "hex": "0xfd0",
+   "name": "LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 56
+  },
+  {
+   "offset": 4064,
+   "hex": "0xfe0",
+   "name": "ENV1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 57
+  },
+  {
+   "offset": 4080,
+   "hex": "0xff0",
+   "name": "ENV2 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 58
+  },
+  {
+   "offset": 4096,
+   "hex": "0x1000",
+   "name": "ENV Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 59
+  },
+  {
+   "offset": 4112,
+   "hex": "0x1010",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 60
+  },
+  {
+   "offset": 4128,
+   "hex": "0x1020",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 61
+  },
+  {
+   "offset": 4144,
+   "hex": "0x1030",
+   "name": "PWM Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 62
+  },
+  {
+   "offset": 4192,
+   "hex": "0x1060",
+   "name": "JU OSC Saw Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 63
+  },
+  {
+   "offset": 4208,
+   "hex": "0x1070",
+   "name": "JU OSC Sqr Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 64
+  },
+  {
+   "offset": 4224,
+   "hex": "0x1080",
+   "name": "JU OSC Sub Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 65
+  },
+  {
+   "offset": 5520,
+   "hex": "0x1590",
+   "name": "Duty Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 66
+  },
+  {
+   "offset": 6448,
+   "hex": "0x1930",
+   "name": "Osc1 Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 67
+  },
+  {
+   "offset": 6512,
+   "hex": "0x1970",
+   "name": "Osc1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 68
+  },
+  {
+   "offset": 6528,
+   "hex": "0x1980",
+   "name": "Osc Noise Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 69
+  },
+  {
+   "offset": 6720,
+   "hex": "0x1a40",
+   "name": "Griffer SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 70
+  },
+  {
+   "offset": 6736,
+   "hex": "0x1a50",
+   "name": "LPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 71
+  },
+  {
+   "offset": 6832,
+   "hex": "0x1ab0",
+   "name": "LPF Resonance",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 72
+  },
+  {
+   "offset": 6864,
+   "hex": "0x1ad0",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 73
+  },
+  {
+   "offset": 7008,
+   "hex": "0x1b60",
+   "name": "Env1/2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 74
+  },
+  {
+   "offset": 7024,
+   "hex": "0x1b70",
+   "name": "Int/Env",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 75
+  },
+  {
+   "offset": 7296,
+   "hex": "0x1c80",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 76
+  },
+  {
+   "offset": 7312,
+   "hex": "0x1c90",
+   "name": "Ext LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 77
+  },
+  {
+   "offset": 7328,
+   "hex": "0x1ca0",
+   "name": "GRF Bned SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 78
+  },
+  {
+   "offset": 7344,
+   "hex": "0x1cb0",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 79
+  },
+  {
+   "offset": 7360,
+   "hex": "0x1cc0",
+   "name": "MOD Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 80
+  },
+  {
+   "offset": 7376,
+   "hex": "0x1cd0",
+   "name": "MOD SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 81
+  },
+  {
+   "offset": 7392,
+   "hex": "0x1ce0",
+   "name": "ENV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 82
+  },
+  {
+   "offset": 7408,
+   "hex": "0x1cf0",
+   "name": "KCV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 83
+  },
+  {
+   "offset": 7424,
+   "hex": "0x1d00",
+   "name": "Velocity Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 84
+  },
+  {
+   "offset": 7440,
+   "hex": "0x1d10",
+   "name": "Velocity Offset",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 85
+  },
+  {
+   "offset": 7456,
+   "hex": "0x1d20",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 86
+  },
+  {
+   "offset": 7472,
+   "hex": "0x1d30",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 87
+  },
+  {
+   "offset": 7600,
+   "hex": "0x1db0",
+   "name": "Cutoff Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 88
+  },
+  {
+   "offset": 7616,
+   "hex": "0x1dc0",
+   "name": "Resonance Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 89
+  },
+  {
+   "offset": 7632,
+   "hex": "0x1dd0",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 90
+  },
+  {
+   "offset": 9056,
+   "hex": "0x2360",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 91
+  },
+  {
+   "offset": 9072,
+   "hex": "0x2370",
+   "name": "-12dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 92
+  },
+  {
+   "offset": 9088,
+   "hex": "0x2380",
+   "name": "-18dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 93
+  },
+  {
+   "offset": 9104,
+   "hex": "0x2390",
+   "name": "-24dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 94
+  },
+  {
+   "offset": 9584,
+   "hex": "0x2570",
+   "name": "AMP TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 95
+  },
+  {
+   "offset": 9600,
+   "hex": "0x2580",
+   "name": "AMP VELOCITY SENS",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 96
+  },
+  {
+   "offset": 9616,
+   "hex": "0x2590",
+   "name": "AMP FIX VELOCITY LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 97
+  },
+  {
+   "offset": 9680,
+   "hex": "0x25d0",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 98
+  },
+  {
+   "offset": 9824,
+   "hex": "0x2660",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 99
+  },
+  {
+   "offset": 10176,
+   "hex": "0x27c0",
+   "name": "Gate SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 100
+  },
+  {
+   "offset": 10192,
+   "hex": "0x27d0",
+   "name": "ENV1 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 101
+  },
+  {
+   "offset": 10208,
+   "hex": "0x27e0",
+   "name": "ENV2 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 102
+  },
+  {
+   "offset": 10224,
+   "hex": "0x27f0",
+   "name": "Ext ENV SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 103
+  },
+  {
+   "offset": 10240,
+   "hex": "0x2800",
+   "name": "HPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 104
+  },
+  {
+   "offset": 10256,
+   "hex": "0x2810",
+   "name": "HPF Switch",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 105
+  },
+  {
+   "offset": 10272,
+   "hex": "0x2820",
+   "name": "Boost LPF Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 106
+  },
+  {
+   "offset": 10288,
+   "hex": "0x2830",
+   "name": "Boost Thru Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 107
+  },
+  {
+   "offset": 10304,
+   "hex": "0x2840",
+   "name": "ENV LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 108
+  },
+  {
+   "offset": 10320,
+   "hex": "0x2850",
+   "name": "AMP LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 109
+  },
+  {
+   "offset": 10784,
+   "hex": "0x2a20",
+   "name": "UseExtJack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 110
+  },
+  {
+   "offset": 10816,
+   "hex": "0x2a40",
+   "name": "M.CV",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 111
+  },
+  {
+   "offset": 10832,
+   "hex": "0x2a50",
+   "name": "M.Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 112
+  },
+  {
+   "offset": 10880,
+   "hex": "0x2a80",
+   "name": "Master Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 113
+  },
+  {
+   "offset": 10896,
+   "hex": "0x2a90",
+   "name": "Part Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 114
+  },
+  {
+   "offset": 11104,
+   "hex": "0x2b60",
+   "name": "Portamento OnOff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 115
+  },
+  {
+   "offset": 11120,
+   "hex": "0x2b70",
+   "name": "Portamento Mode",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 116
+  },
+  {
+   "offset": 11136,
+   "hex": "0x2b80",
+   "name": "Portamento Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 117
+  },
+  {
+   "offset": 11552,
+   "hex": "0x2d20",
+   "name": "LFO Griffer Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 118
+  },
+  {
+   "offset": 11568,
+   "hex": "0x2d30",
+   "name": "LFO Tempo Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 119
+  },
+  {
+   "offset": 11584,
+   "hex": "0x2d40",
+   "name": "LFO Tempo Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 120
+  },
+  {
+   "offset": 11600,
+   "hex": "0x2d50",
+   "name": "LFO Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 121
+  },
+  {
+   "offset": 12368,
+   "hex": "0x3050",
+   "name": "Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 122
+  },
+  {
+   "offset": 12384,
+   "hex": "0x3060",
+   "name": "LFO Trig",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 123
+  },
+  {
+   "offset": 12400,
+   "hex": "0x3070",
+   "name": "Reset Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 124
+  },
+  {
+   "offset": 12416,
+   "hex": "0x3080",
+   "name": "LFO UseExtGate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 125
+  },
+  {
+   "offset": 12432,
+   "hex": "0x3090",
+   "name": "LFO Delay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 126
+  },
+  {
+   "offset": 12448,
+   "hex": "0x30a0",
+   "name": "LFO Delay Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 127
+  },
+  {
+   "offset": 12464,
+   "hex": "0x30b0",
+   "name": "LFO Sin Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 128
+  },
+  {
+   "offset": 12480,
+   "hex": "0x30c0",
+   "name": "LFO Tri Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 129
+  },
+  {
+   "offset": 12496,
+   "hex": "0x30d0",
+   "name": "LFO Sqr Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 130
+  },
+  {
+   "offset": 12512,
+   "hex": "0x30e0",
+   "name": "LFO Saw Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 131
+  },
+  {
+   "offset": 12528,
+   "hex": "0x30f0",
+   "name": "LFO Saw(Inv) Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 132
+  },
+  {
+   "offset": 12544,
+   "hex": "0x3100",
+   "name": "LFO S&H Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 133
+  },
+  {
+   "offset": 12560,
+   "hex": "0x3110",
+   "name": "LFO Noise Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 134
+  },
+  {
+   "offset": 12576,
+   "hex": "0x3120",
+   "name": "LFO Noise Mix",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 135
+  },
+  {
+   "offset": 12592,
+   "hex": "0x3130",
+   "name": "LFO Internal Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 136
+  },
+  {
+   "offset": 12608,
+   "hex": "0x3140",
+   "name": "LFO External0 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 137
+  },
+  {
+   "offset": 12624,
+   "hex": "0x3150",
+   "name": "LFO External1 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 138
+  },
+  {
+   "offset": 13040,
+   "hex": "0x32f0",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 139
+  },
+  {
+   "offset": 13056,
+   "hex": "0x3300",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 140
+  },
+  {
+   "offset": 13072,
+   "hex": "0x3310",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 141
+  },
+  {
+   "offset": 13296,
+   "hex": "0x33f0",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 142
+  },
+  {
+   "offset": 13312,
+   "hex": "0x3400",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 143
+  },
+  {
+   "offset": 13328,
+   "hex": "0x3410",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 144
+  },
+  {
+   "offset": 13344,
+   "hex": "0x3420",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 145
+  },
+  {
+   "offset": 13360,
+   "hex": "0x3430",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 146
+  },
+  {
+   "offset": 13552,
+   "hex": "0x34f0",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 147
+  },
+  {
+   "offset": 13776,
+   "hex": "0x35d0",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 148
+  },
+  {
+   "offset": 13792,
+   "hex": "0x35e0",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 149
+  },
+  {
+   "offset": 13808,
+   "hex": "0x35f0",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 150
+  },
+  {
+   "offset": 13824,
+   "hex": "0x3600",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 151
+  },
+  {
+   "offset": 13840,
+   "hex": "0x3610",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 152
+  },
+  {
+   "offset": 14352,
+   "hex": "0x3810",
+   "name": "OSC1 Feet",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 153
+  },
+  {
+   "offset": 14368,
+   "hex": "0x3820",
+   "name": "Griffer Bend SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 154
+  },
+  {
+   "offset": 14384,
+   "hex": "0x3830",
+   "name": "Bend Enable SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 155
+  },
+  {
+   "offset": 14400,
+   "hex": "0x3840",
+   "name": "PWM SW LFO",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 156
+  },
+  {
+   "offset": 14416,
+   "hex": "0x3850",
+   "name": "PWM SW ENV1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 157
+  },
+  {
+   "offset": 14432,
+   "hex": "0x3860",
+   "name": "PWM SW ENV2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 158
+  },
+  {
+   "offset": 14448,
+   "hex": "0x3870",
+   "name": "PWM SW Manual",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 159
+  },
+  {
+   "offset": 14464,
+   "hex": "0x3880",
+   "name": "Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 160
+  },
+  {
+   "offset": 14480,
+   "hex": "0x3890",
+   "name": "Detune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 161
+  },
+  {
+   "offset": 14496,
+   "hex": "0x38a0",
+   "name": "Mod Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 162
+  },
+  {
+   "offset": 14512,
+   "hex": "0x38b0",
+   "name": "Mod Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 163
+  },
+  {
+   "offset": 14528,
+   "hex": "0x38c0",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 164
+  },
+  {
+   "offset": 14544,
+   "hex": "0x38d0",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 165
+  },
+  {
+   "offset": 14560,
+   "hex": "0x38e0",
+   "name": "LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 166
+  },
+  {
+   "offset": 14576,
+   "hex": "0x38f0",
+   "name": "ENV1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 167
+  },
+  {
+   "offset": 14592,
+   "hex": "0x3900",
+   "name": "ENV2 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 168
+  },
+  {
+   "offset": 14608,
+   "hex": "0x3910",
+   "name": "ENV Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 169
+  },
+  {
+   "offset": 14624,
+   "hex": "0x3920",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 170
+  },
+  {
+   "offset": 14640,
+   "hex": "0x3930",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 171
+  },
+  {
+   "offset": 14656,
+   "hex": "0x3940",
+   "name": "PWM Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 172
+  },
+  {
+   "offset": 14704,
+   "hex": "0x3970",
+   "name": "JU OSC Saw Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 173
+  },
+  {
+   "offset": 14720,
+   "hex": "0x3980",
+   "name": "JU OSC Sqr Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 174
+  },
+  {
+   "offset": 14736,
+   "hex": "0x3990",
+   "name": "JU OSC Sub Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 175
+  },
+  {
+   "offset": 16032,
+   "hex": "0x3ea0",
+   "name": "Duty Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 176
+  },
+  {
+   "offset": 16960,
+   "hex": "0x4240",
+   "name": "Osc1 Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 177
+  },
+  {
+   "offset": 17024,
+   "hex": "0x4280",
+   "name": "Osc1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 178
+  },
+  {
+   "offset": 17040,
+   "hex": "0x4290",
+   "name": "Osc Noise Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 179
+  },
+  {
+   "offset": 17232,
+   "hex": "0x4350",
+   "name": "Griffer SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 180
+  },
+  {
+   "offset": 17248,
+   "hex": "0x4360",
+   "name": "LPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 181
+  },
+  {
+   "offset": 17344,
+   "hex": "0x43c0",
+   "name": "LPF Resonance",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 182
+  },
+  {
+   "offset": 17376,
+   "hex": "0x43e0",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 183
+  },
+  {
+   "offset": 17520,
+   "hex": "0x4470",
+   "name": "Env1/2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 184
+  },
+  {
+   "offset": 17536,
+   "hex": "0x4480",
+   "name": "Int/Env",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 185
+  },
+  {
+   "offset": 17808,
+   "hex": "0x4590",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 186
+  },
+  {
+   "offset": 17824,
+   "hex": "0x45a0",
+   "name": "Ext LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 187
+  },
+  {
+   "offset": 17840,
+   "hex": "0x45b0",
+   "name": "GRF Bned SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 188
+  },
+  {
+   "offset": 17856,
+   "hex": "0x45c0",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 189
+  },
+  {
+   "offset": 17872,
+   "hex": "0x45d0",
+   "name": "MOD Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 190
+  },
+  {
+   "offset": 17888,
+   "hex": "0x45e0",
+   "name": "MOD SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 191
+  },
+  {
+   "offset": 17904,
+   "hex": "0x45f0",
+   "name": "ENV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 192
+  },
+  {
+   "offset": 17920,
+   "hex": "0x4600",
+   "name": "KCV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 193
+  },
+  {
+   "offset": 17936,
+   "hex": "0x4610",
+   "name": "Velocity Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 194
+  },
+  {
+   "offset": 17952,
+   "hex": "0x4620",
+   "name": "Velocity Offset",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 195
+  },
+  {
+   "offset": 17968,
+   "hex": "0x4630",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 196
+  },
+  {
+   "offset": 17984,
+   "hex": "0x4640",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 197
+  },
+  {
+   "offset": 18112,
+   "hex": "0x46c0",
+   "name": "Cutoff Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 198
+  },
+  {
+   "offset": 18128,
+   "hex": "0x46d0",
+   "name": "Resonance Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 199
+  },
+  {
+   "offset": 18144,
+   "hex": "0x46e0",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 200
+  },
+  {
+   "offset": 19568,
+   "hex": "0x4c70",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 201
+  },
+  {
+   "offset": 19584,
+   "hex": "0x4c80",
+   "name": "-12dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 202
+  },
+  {
+   "offset": 19600,
+   "hex": "0x4c90",
+   "name": "-18dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 203
+  },
+  {
+   "offset": 19616,
+   "hex": "0x4ca0",
+   "name": "-24dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 204
+  },
+  {
+   "offset": 20096,
+   "hex": "0x4e80",
+   "name": "AMP TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 205
+  },
+  {
+   "offset": 20112,
+   "hex": "0x4e90",
+   "name": "AMP VELOCITY SENS",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 206
+  },
+  {
+   "offset": 20128,
+   "hex": "0x4ea0",
+   "name": "AMP FIX VELOCITY LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 207
+  },
+  {
+   "offset": 20192,
+   "hex": "0x4ee0",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 208
+  },
+  {
+   "offset": 20336,
+   "hex": "0x4f70",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 209
+  },
+  {
+   "offset": 20688,
+   "hex": "0x50d0",
+   "name": "Gate SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 210
+  },
+  {
+   "offset": 20704,
+   "hex": "0x50e0",
+   "name": "ENV1 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 211
+  },
+  {
+   "offset": 20720,
+   "hex": "0x50f0",
+   "name": "ENV2 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 212
+  },
+  {
+   "offset": 20736,
+   "hex": "0x5100",
+   "name": "Ext ENV SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 213
+  },
+  {
+   "offset": 20752,
+   "hex": "0x5110",
+   "name": "HPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 214
+  },
+  {
+   "offset": 20768,
+   "hex": "0x5120",
+   "name": "HPF Switch",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 215
+  },
+  {
+   "offset": 20784,
+   "hex": "0x5130",
+   "name": "Boost LPF Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 216
+  },
+  {
+   "offset": 20800,
+   "hex": "0x5140",
+   "name": "Boost Thru Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 217
+  },
+  {
+   "offset": 20816,
+   "hex": "0x5150",
+   "name": "ENV LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 218
+  },
+  {
+   "offset": 20832,
+   "hex": "0x5160",
+   "name": "AMP LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 219
+  },
+  {
+   "offset": 21296,
+   "hex": "0x5330",
+   "name": "UseExtJack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 220
+  },
+  {
+   "offset": 21328,
+   "hex": "0x5350",
+   "name": "M.CV",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 221
+  },
+  {
+   "offset": 21344,
+   "hex": "0x5360",
+   "name": "M.Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 222
+  },
+  {
+   "offset": 21392,
+   "hex": "0x5390",
+   "name": "Master Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 223
+  },
+  {
+   "offset": 21408,
+   "hex": "0x53a0",
+   "name": "Part Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 224
+  },
+  {
+   "offset": 21616,
+   "hex": "0x5470",
+   "name": "Portamento OnOff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 225
+  },
+  {
+   "offset": 21632,
+   "hex": "0x5480",
+   "name": "Portamento Mode",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 226
+  },
+  {
+   "offset": 21648,
+   "hex": "0x5490",
+   "name": "Portamento Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 227
+  },
+  {
+   "offset": 22064,
+   "hex": "0x5630",
+   "name": "LFO Griffer Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 228
+  },
+  {
+   "offset": 22080,
+   "hex": "0x5640",
+   "name": "LFO Tempo Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 229
+  },
+  {
+   "offset": 22096,
+   "hex": "0x5650",
+   "name": "LFO Tempo Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 230
+  },
+  {
+   "offset": 22112,
+   "hex": "0x5660",
+   "name": "LFO Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 231
+  },
+  {
+   "offset": 22880,
+   "hex": "0x5960",
+   "name": "Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 232
+  },
+  {
+   "offset": 22896,
+   "hex": "0x5970",
+   "name": "LFO Trig",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 233
+  },
+  {
+   "offset": 22912,
+   "hex": "0x5980",
+   "name": "Reset Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 234
+  },
+  {
+   "offset": 22928,
+   "hex": "0x5990",
+   "name": "LFO UseExtGate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 235
+  },
+  {
+   "offset": 22944,
+   "hex": "0x59a0",
+   "name": "LFO Delay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 236
+  },
+  {
+   "offset": 22960,
+   "hex": "0x59b0",
+   "name": "LFO Delay Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 237
+  },
+  {
+   "offset": 22976,
+   "hex": "0x59c0",
+   "name": "LFO Sin Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 238
+  },
+  {
+   "offset": 22992,
+   "hex": "0x59d0",
+   "name": "LFO Tri Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 239
+  },
+  {
+   "offset": 23008,
+   "hex": "0x59e0",
+   "name": "LFO Sqr Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 240
+  },
+  {
+   "offset": 23024,
+   "hex": "0x59f0",
+   "name": "LFO Saw Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 241
+  },
+  {
+   "offset": 23040,
+   "hex": "0x5a00",
+   "name": "LFO Saw(Inv) Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 242
+  },
+  {
+   "offset": 23056,
+   "hex": "0x5a10",
+   "name": "LFO S&H Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 243
+  },
+  {
+   "offset": 23072,
+   "hex": "0x5a20",
+   "name": "LFO Noise Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 244
+  },
+  {
+   "offset": 23088,
+   "hex": "0x5a30",
+   "name": "LFO Noise Mix",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 245
+  },
+  {
+   "offset": 23104,
+   "hex": "0x5a40",
+   "name": "LFO Internal Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 246
+  },
+  {
+   "offset": 23120,
+   "hex": "0x5a50",
+   "name": "LFO External0 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 247
+  },
+  {
+   "offset": 23136,
+   "hex": "0x5a60",
+   "name": "LFO External1 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 248
+  },
+  {
+   "offset": 23552,
+   "hex": "0x5c00",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 249
+  },
+  {
+   "offset": 23568,
+   "hex": "0x5c10",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 250
+  },
+  {
+   "offset": 23584,
+   "hex": "0x5c20",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 251
+  },
+  {
+   "offset": 23808,
+   "hex": "0x5d00",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 252
+  },
+  {
+   "offset": 23824,
+   "hex": "0x5d10",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 253
+  },
+  {
+   "offset": 23840,
+   "hex": "0x5d20",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 254
+  },
+  {
+   "offset": 23856,
+   "hex": "0x5d30",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 255
+  },
+  {
+   "offset": 23872,
+   "hex": "0x5d40",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 256
+  },
+  {
+   "offset": 24064,
+   "hex": "0x5e00",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 257
+  },
+  {
+   "offset": 24288,
+   "hex": "0x5ee0",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 258
+  },
+  {
+   "offset": 24304,
+   "hex": "0x5ef0",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 259
+  },
+  {
+   "offset": 24320,
+   "hex": "0x5f00",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 260
+  },
+  {
+   "offset": 24336,
+   "hex": "0x5f10",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 261
+  },
+  {
+   "offset": 24352,
+   "hex": "0x5f20",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 262
+  },
+  {
+   "offset": 24864,
+   "hex": "0x6120",
+   "name": "OSC1 Feet",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 263
+  },
+  {
+   "offset": 24880,
+   "hex": "0x6130",
+   "name": "Griffer Bend SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 264
+  },
+  {
+   "offset": 24896,
+   "hex": "0x6140",
+   "name": "Bend Enable SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 265
+  },
+  {
+   "offset": 24912,
+   "hex": "0x6150",
+   "name": "PWM SW LFO",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 266
+  },
+  {
+   "offset": 24928,
+   "hex": "0x6160",
+   "name": "PWM SW ENV1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 267
+  },
+  {
+   "offset": 24944,
+   "hex": "0x6170",
+   "name": "PWM SW ENV2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 268
+  },
+  {
+   "offset": 24960,
+   "hex": "0x6180",
+   "name": "PWM SW Manual",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 269
+  },
+  {
+   "offset": 24976,
+   "hex": "0x6190",
+   "name": "Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 270
+  },
+  {
+   "offset": 24992,
+   "hex": "0x61a0",
+   "name": "Detune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 271
+  },
+  {
+   "offset": 25008,
+   "hex": "0x61b0",
+   "name": "Mod Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 272
+  },
+  {
+   "offset": 25024,
+   "hex": "0x61c0",
+   "name": "Mod Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 273
+  },
+  {
+   "offset": 25040,
+   "hex": "0x61d0",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 274
+  },
+  {
+   "offset": 25056,
+   "hex": "0x61e0",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 275
+  },
+  {
+   "offset": 25072,
+   "hex": "0x61f0",
+   "name": "LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 276
+  },
+  {
+   "offset": 25088,
+   "hex": "0x6200",
+   "name": "ENV1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 277
+  },
+  {
+   "offset": 25104,
+   "hex": "0x6210",
+   "name": "ENV2 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 278
+  },
+  {
+   "offset": 25120,
+   "hex": "0x6220",
+   "name": "ENV Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 279
+  },
+  {
+   "offset": 25136,
+   "hex": "0x6230",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 280
+  },
+  {
+   "offset": 25152,
+   "hex": "0x6240",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 281
+  },
+  {
+   "offset": 25168,
+   "hex": "0x6250",
+   "name": "PWM Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 282
+  },
+  {
+   "offset": 25216,
+   "hex": "0x6280",
+   "name": "JU OSC Saw Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 283
+  },
+  {
+   "offset": 25232,
+   "hex": "0x6290",
+   "name": "JU OSC Sqr Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 284
+  },
+  {
+   "offset": 25248,
+   "hex": "0x62a0",
+   "name": "JU OSC Sub Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 285
+  },
+  {
+   "offset": 26544,
+   "hex": "0x67b0",
+   "name": "Duty Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 286
+  },
+  {
+   "offset": 27472,
+   "hex": "0x6b50",
+   "name": "Osc1 Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 287
+  },
+  {
+   "offset": 27536,
+   "hex": "0x6b90",
+   "name": "Osc1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 288
+  },
+  {
+   "offset": 27552,
+   "hex": "0x6ba0",
+   "name": "Osc Noise Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 289
+  },
+  {
+   "offset": 27744,
+   "hex": "0x6c60",
+   "name": "Griffer SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 290
+  },
+  {
+   "offset": 27760,
+   "hex": "0x6c70",
+   "name": "LPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 291
+  },
+  {
+   "offset": 27856,
+   "hex": "0x6cd0",
+   "name": "LPF Resonance",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 292
+  },
+  {
+   "offset": 27888,
+   "hex": "0x6cf0",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 293
+  },
+  {
+   "offset": 28032,
+   "hex": "0x6d80",
+   "name": "Env1/2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 294
+  },
+  {
+   "offset": 28048,
+   "hex": "0x6d90",
+   "name": "Int/Env",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 295
+  },
+  {
+   "offset": 28320,
+   "hex": "0x6ea0",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 296
+  },
+  {
+   "offset": 28336,
+   "hex": "0x6eb0",
+   "name": "Ext LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 297
+  },
+  {
+   "offset": 28352,
+   "hex": "0x6ec0",
+   "name": "GRF Bned SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 298
+  },
+  {
+   "offset": 28368,
+   "hex": "0x6ed0",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 299
+  },
+  {
+   "offset": 28384,
+   "hex": "0x6ee0",
+   "name": "MOD Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 300
+  },
+  {
+   "offset": 28400,
+   "hex": "0x6ef0",
+   "name": "MOD SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 301
+  },
+  {
+   "offset": 28416,
+   "hex": "0x6f00",
+   "name": "ENV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 302
+  },
+  {
+   "offset": 28432,
+   "hex": "0x6f10",
+   "name": "KCV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 303
+  },
+  {
+   "offset": 28448,
+   "hex": "0x6f20",
+   "name": "Velocity Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 304
+  },
+  {
+   "offset": 28464,
+   "hex": "0x6f30",
+   "name": "Velocity Offset",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 305
+  },
+  {
+   "offset": 28480,
+   "hex": "0x6f40",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 306
+  },
+  {
+   "offset": 28496,
+   "hex": "0x6f50",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 307
+  },
+  {
+   "offset": 28624,
+   "hex": "0x6fd0",
+   "name": "Cutoff Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 308
+  },
+  {
+   "offset": 28640,
+   "hex": "0x6fe0",
+   "name": "Resonance Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 309
+  },
+  {
+   "offset": 28656,
+   "hex": "0x6ff0",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 310
+  },
+  {
+   "offset": 30080,
+   "hex": "0x7580",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 311
+  },
+  {
+   "offset": 30096,
+   "hex": "0x7590",
+   "name": "-12dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 312
+  },
+  {
+   "offset": 30112,
+   "hex": "0x75a0",
+   "name": "-18dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 313
+  },
+  {
+   "offset": 30128,
+   "hex": "0x75b0",
+   "name": "-24dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 314
+  },
+  {
+   "offset": 30608,
+   "hex": "0x7790",
+   "name": "AMP TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 315
+  },
+  {
+   "offset": 30624,
+   "hex": "0x77a0",
+   "name": "AMP VELOCITY SENS",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 316
+  },
+  {
+   "offset": 30640,
+   "hex": "0x77b0",
+   "name": "AMP FIX VELOCITY LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 317
+  },
+  {
+   "offset": 30704,
+   "hex": "0x77f0",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 318
+  },
+  {
+   "offset": 30848,
+   "hex": "0x7880",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 319
+  },
+  {
+   "offset": 31200,
+   "hex": "0x79e0",
+   "name": "Gate SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 320
+  },
+  {
+   "offset": 31216,
+   "hex": "0x79f0",
+   "name": "ENV1 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 321
+  },
+  {
+   "offset": 31232,
+   "hex": "0x7a00",
+   "name": "ENV2 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 322
+  },
+  {
+   "offset": 31248,
+   "hex": "0x7a10",
+   "name": "Ext ENV SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 323
+  },
+  {
+   "offset": 31264,
+   "hex": "0x7a20",
+   "name": "HPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 324
+  },
+  {
+   "offset": 31280,
+   "hex": "0x7a30",
+   "name": "HPF Switch",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 325
+  },
+  {
+   "offset": 31296,
+   "hex": "0x7a40",
+   "name": "Boost LPF Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 326
+  },
+  {
+   "offset": 31312,
+   "hex": "0x7a50",
+   "name": "Boost Thru Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 327
+  },
+  {
+   "offset": 31328,
+   "hex": "0x7a60",
+   "name": "ENV LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 328
+  },
+  {
+   "offset": 31344,
+   "hex": "0x7a70",
+   "name": "AMP LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 329
+  },
+  {
+   "offset": 31808,
+   "hex": "0x7c40",
+   "name": "UseExtJack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 330
+  },
+  {
+   "offset": 31840,
+   "hex": "0x7c60",
+   "name": "M.CV",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 331
+  },
+  {
+   "offset": 31856,
+   "hex": "0x7c70",
+   "name": "M.Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 332
+  },
+  {
+   "offset": 31904,
+   "hex": "0x7ca0",
+   "name": "Master Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 333
+  },
+  {
+   "offset": 31920,
+   "hex": "0x7cb0",
+   "name": "Part Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 334
+  },
+  {
+   "offset": 32128,
+   "hex": "0x7d80",
+   "name": "Portamento OnOff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 335
+  },
+  {
+   "offset": 32144,
+   "hex": "0x7d90",
+   "name": "Portamento Mode",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 336
+  },
+  {
+   "offset": 32160,
+   "hex": "0x7da0",
+   "name": "Portamento Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 337
+  },
+  {
+   "offset": 32576,
+   "hex": "0x7f40",
+   "name": "LFO Griffer Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 338
+  },
+  {
+   "offset": 32592,
+   "hex": "0x7f50",
+   "name": "LFO Tempo Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 339
+  },
+  {
+   "offset": 32608,
+   "hex": "0x7f60",
+   "name": "LFO Tempo Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 340
+  },
+  {
+   "offset": 32624,
+   "hex": "0x7f70",
+   "name": "LFO Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 341
+  },
+  {
+   "offset": 33392,
+   "hex": "0x8270",
+   "name": "Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 342
+  },
+  {
+   "offset": 33408,
+   "hex": "0x8280",
+   "name": "LFO Trig",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 343
+  },
+  {
+   "offset": 33424,
+   "hex": "0x8290",
+   "name": "Reset Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 344
+  },
+  {
+   "offset": 33440,
+   "hex": "0x82a0",
+   "name": "LFO UseExtGate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 345
+  },
+  {
+   "offset": 33456,
+   "hex": "0x82b0",
+   "name": "LFO Delay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 346
+  },
+  {
+   "offset": 33472,
+   "hex": "0x82c0",
+   "name": "LFO Delay Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 347
+  },
+  {
+   "offset": 33488,
+   "hex": "0x82d0",
+   "name": "LFO Sin Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 348
+  },
+  {
+   "offset": 33504,
+   "hex": "0x82e0",
+   "name": "LFO Tri Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 349
+  },
+  {
+   "offset": 33520,
+   "hex": "0x82f0",
+   "name": "LFO Sqr Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 350
+  },
+  {
+   "offset": 33536,
+   "hex": "0x8300",
+   "name": "LFO Saw Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 351
+  },
+  {
+   "offset": 33552,
+   "hex": "0x8310",
+   "name": "LFO Saw(Inv) Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 352
+  },
+  {
+   "offset": 33568,
+   "hex": "0x8320",
+   "name": "LFO S&H Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 353
+  },
+  {
+   "offset": 33584,
+   "hex": "0x8330",
+   "name": "LFO Noise Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 354
+  },
+  {
+   "offset": 33600,
+   "hex": "0x8340",
+   "name": "LFO Noise Mix",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 355
+  },
+  {
+   "offset": 33616,
+   "hex": "0x8350",
+   "name": "LFO Internal Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 356
+  },
+  {
+   "offset": 33632,
+   "hex": "0x8360",
+   "name": "LFO External0 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 357
+  },
+  {
+   "offset": 33648,
+   "hex": "0x8370",
+   "name": "LFO External1 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 358
+  },
+  {
+   "offset": 34064,
+   "hex": "0x8510",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 359
+  },
+  {
+   "offset": 34080,
+   "hex": "0x8520",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 360
+  },
+  {
+   "offset": 34096,
+   "hex": "0x8530",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 361
+  },
+  {
+   "offset": 34320,
+   "hex": "0x8610",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 362
+  },
+  {
+   "offset": 34336,
+   "hex": "0x8620",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 363
+  },
+  {
+   "offset": 34352,
+   "hex": "0x8630",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 364
+  },
+  {
+   "offset": 34368,
+   "hex": "0x8640",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 365
+  },
+  {
+   "offset": 34384,
+   "hex": "0x8650",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 366
+  },
+  {
+   "offset": 34576,
+   "hex": "0x8710",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 367
+  },
+  {
+   "offset": 34800,
+   "hex": "0x87f0",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 368
+  },
+  {
+   "offset": 34816,
+   "hex": "0x8800",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 369
+  },
+  {
+   "offset": 34832,
+   "hex": "0x8810",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 370
+  },
+  {
+   "offset": 34848,
+   "hex": "0x8820",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 371
+  },
+  {
+   "offset": 34864,
+   "hex": "0x8830",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 372
+  },
+  {
+   "offset": 35376,
+   "hex": "0x8a30",
+   "name": "OSC1 Feet",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 373
+  },
+  {
+   "offset": 35392,
+   "hex": "0x8a40",
+   "name": "Griffer Bend SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 374
+  },
+  {
+   "offset": 35408,
+   "hex": "0x8a50",
+   "name": "Bend Enable SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 375
+  },
+  {
+   "offset": 35424,
+   "hex": "0x8a60",
+   "name": "PWM SW LFO",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 376
+  },
+  {
+   "offset": 35440,
+   "hex": "0x8a70",
+   "name": "PWM SW ENV1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 377
+  },
+  {
+   "offset": 35456,
+   "hex": "0x8a80",
+   "name": "PWM SW ENV2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 378
+  },
+  {
+   "offset": 35472,
+   "hex": "0x8a90",
+   "name": "PWM SW Manual",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 379
+  },
+  {
+   "offset": 35488,
+   "hex": "0x8aa0",
+   "name": "Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 380
+  },
+  {
+   "offset": 35504,
+   "hex": "0x8ab0",
+   "name": "Detune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 381
+  },
+  {
+   "offset": 35520,
+   "hex": "0x8ac0",
+   "name": "Mod Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 382
+  },
+  {
+   "offset": 35536,
+   "hex": "0x8ad0",
+   "name": "Mod Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 383
+  },
+  {
+   "offset": 35552,
+   "hex": "0x8ae0",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 384
+  },
+  {
+   "offset": 35568,
+   "hex": "0x8af0",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 385
+  },
+  {
+   "offset": 35584,
+   "hex": "0x8b00",
+   "name": "LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 386
+  },
+  {
+   "offset": 35600,
+   "hex": "0x8b10",
+   "name": "ENV1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 387
+  },
+  {
+   "offset": 35616,
+   "hex": "0x8b20",
+   "name": "ENV2 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 388
+  },
+  {
+   "offset": 35632,
+   "hex": "0x8b30",
+   "name": "ENV Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 389
+  },
+  {
+   "offset": 35648,
+   "hex": "0x8b40",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 390
+  },
+  {
+   "offset": 35664,
+   "hex": "0x8b50",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 391
+  },
+  {
+   "offset": 35680,
+   "hex": "0x8b60",
+   "name": "PWM Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 392
+  },
+  {
+   "offset": 35728,
+   "hex": "0x8b90",
+   "name": "JU OSC Saw Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 393
+  },
+  {
+   "offset": 35744,
+   "hex": "0x8ba0",
+   "name": "JU OSC Sqr Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 394
+  },
+  {
+   "offset": 35760,
+   "hex": "0x8bb0",
+   "name": "JU OSC Sub Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 395
+  },
+  {
+   "offset": 37056,
+   "hex": "0x90c0",
+   "name": "Duty Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 396
+  },
+  {
+   "offset": 37984,
+   "hex": "0x9460",
+   "name": "Osc1 Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 397
+  },
+  {
+   "offset": 38048,
+   "hex": "0x94a0",
+   "name": "Osc1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 398
+  },
+  {
+   "offset": 38064,
+   "hex": "0x94b0",
+   "name": "Osc Noise Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 399
+  },
+  {
+   "offset": 38256,
+   "hex": "0x9570",
+   "name": "Griffer SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 400
+  },
+  {
+   "offset": 38272,
+   "hex": "0x9580",
+   "name": "LPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 401
+  },
+  {
+   "offset": 38368,
+   "hex": "0x95e0",
+   "name": "LPF Resonance",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 402
+  },
+  {
+   "offset": 38400,
+   "hex": "0x9600",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 403
+  },
+  {
+   "offset": 38544,
+   "hex": "0x9690",
+   "name": "Env1/2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 404
+  },
+  {
+   "offset": 38560,
+   "hex": "0x96a0",
+   "name": "Int/Env",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 405
+  },
+  {
+   "offset": 38832,
+   "hex": "0x97b0",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 406
+  },
+  {
+   "offset": 38848,
+   "hex": "0x97c0",
+   "name": "Ext LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 407
+  },
+  {
+   "offset": 38864,
+   "hex": "0x97d0",
+   "name": "GRF Bned SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 408
+  },
+  {
+   "offset": 38880,
+   "hex": "0x97e0",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 409
+  },
+  {
+   "offset": 38896,
+   "hex": "0x97f0",
+   "name": "MOD Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 410
+  },
+  {
+   "offset": 38912,
+   "hex": "0x9800",
+   "name": "MOD SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 411
+  },
+  {
+   "offset": 38928,
+   "hex": "0x9810",
+   "name": "ENV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 412
+  },
+  {
+   "offset": 38944,
+   "hex": "0x9820",
+   "name": "KCV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 413
+  },
+  {
+   "offset": 38960,
+   "hex": "0x9830",
+   "name": "Velocity Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 414
+  },
+  {
+   "offset": 38976,
+   "hex": "0x9840",
+   "name": "Velocity Offset",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 415
+  },
+  {
+   "offset": 38992,
+   "hex": "0x9850",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 416
+  },
+  {
+   "offset": 39008,
+   "hex": "0x9860",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 417
+  },
+  {
+   "offset": 39136,
+   "hex": "0x98e0",
+   "name": "Cutoff Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 418
+  },
+  {
+   "offset": 39152,
+   "hex": "0x98f0",
+   "name": "Resonance Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 419
+  },
+  {
+   "offset": 39168,
+   "hex": "0x9900",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 420
+  },
+  {
+   "offset": 40592,
+   "hex": "0x9e90",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 421
+  },
+  {
+   "offset": 40608,
+   "hex": "0x9ea0",
+   "name": "-12dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 422
+  },
+  {
+   "offset": 40624,
+   "hex": "0x9eb0",
+   "name": "-18dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 423
+  },
+  {
+   "offset": 40640,
+   "hex": "0x9ec0",
+   "name": "-24dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 424
+  },
+  {
+   "offset": 41120,
+   "hex": "0xa0a0",
+   "name": "AMP TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 425
+  },
+  {
+   "offset": 41136,
+   "hex": "0xa0b0",
+   "name": "AMP VELOCITY SENS",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 426
+  },
+  {
+   "offset": 41152,
+   "hex": "0xa0c0",
+   "name": "AMP FIX VELOCITY LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 427
+  },
+  {
+   "offset": 41216,
+   "hex": "0xa100",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 428
+  },
+  {
+   "offset": 41360,
+   "hex": "0xa190",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 429
+  },
+  {
+   "offset": 41712,
+   "hex": "0xa2f0",
+   "name": "Gate SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 430
+  },
+  {
+   "offset": 41728,
+   "hex": "0xa300",
+   "name": "ENV1 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 431
+  },
+  {
+   "offset": 41744,
+   "hex": "0xa310",
+   "name": "ENV2 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 432
+  },
+  {
+   "offset": 41760,
+   "hex": "0xa320",
+   "name": "Ext ENV SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 433
+  },
+  {
+   "offset": 41776,
+   "hex": "0xa330",
+   "name": "HPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 434
+  },
+  {
+   "offset": 41792,
+   "hex": "0xa340",
+   "name": "HPF Switch",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 435
+  },
+  {
+   "offset": 41808,
+   "hex": "0xa350",
+   "name": "Boost LPF Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 436
+  },
+  {
+   "offset": 41824,
+   "hex": "0xa360",
+   "name": "Boost Thru Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 437
+  },
+  {
+   "offset": 41840,
+   "hex": "0xa370",
+   "name": "ENV LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 438
+  },
+  {
+   "offset": 41856,
+   "hex": "0xa380",
+   "name": "AMP LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 439
+  },
+  {
+   "offset": 42320,
+   "hex": "0xa550",
+   "name": "UseExtJack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 440
+  },
+  {
+   "offset": 42352,
+   "hex": "0xa570",
+   "name": "M.CV",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 441
+  },
+  {
+   "offset": 42368,
+   "hex": "0xa580",
+   "name": "M.Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 442
+  },
+  {
+   "offset": 42416,
+   "hex": "0xa5b0",
+   "name": "Master Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 443
+  },
+  {
+   "offset": 42432,
+   "hex": "0xa5c0",
+   "name": "Part Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 444
+  },
+  {
+   "offset": 42640,
+   "hex": "0xa690",
+   "name": "Portamento OnOff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 445
+  },
+  {
+   "offset": 42656,
+   "hex": "0xa6a0",
+   "name": "Portamento Mode",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 446
+  },
+  {
+   "offset": 42672,
+   "hex": "0xa6b0",
+   "name": "Portamento Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 447
+  },
+  {
+   "offset": 43088,
+   "hex": "0xa850",
+   "name": "LFO Griffer Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 448
+  },
+  {
+   "offset": 43104,
+   "hex": "0xa860",
+   "name": "LFO Tempo Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 449
+  },
+  {
+   "offset": 43120,
+   "hex": "0xa870",
+   "name": "LFO Tempo Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 450
+  },
+  {
+   "offset": 43136,
+   "hex": "0xa880",
+   "name": "LFO Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 451
+  },
+  {
+   "offset": 43904,
+   "hex": "0xab80",
+   "name": "Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 452
+  },
+  {
+   "offset": 43920,
+   "hex": "0xab90",
+   "name": "LFO Trig",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 453
+  },
+  {
+   "offset": 43936,
+   "hex": "0xaba0",
+   "name": "Reset Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 454
+  },
+  {
+   "offset": 43952,
+   "hex": "0xabb0",
+   "name": "LFO UseExtGate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 455
+  },
+  {
+   "offset": 43968,
+   "hex": "0xabc0",
+   "name": "LFO Delay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 456
+  },
+  {
+   "offset": 43984,
+   "hex": "0xabd0",
+   "name": "LFO Delay Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 457
+  },
+  {
+   "offset": 44000,
+   "hex": "0xabe0",
+   "name": "LFO Sin Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 458
+  },
+  {
+   "offset": 44016,
+   "hex": "0xabf0",
+   "name": "LFO Tri Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 459
+  },
+  {
+   "offset": 44032,
+   "hex": "0xac00",
+   "name": "LFO Sqr Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 460
+  },
+  {
+   "offset": 44048,
+   "hex": "0xac10",
+   "name": "LFO Saw Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 461
+  },
+  {
+   "offset": 44064,
+   "hex": "0xac20",
+   "name": "LFO Saw(Inv) Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 462
+  },
+  {
+   "offset": 44080,
+   "hex": "0xac30",
+   "name": "LFO S&H Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 463
+  },
+  {
+   "offset": 44096,
+   "hex": "0xac40",
+   "name": "LFO Noise Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 464
+  },
+  {
+   "offset": 44112,
+   "hex": "0xac50",
+   "name": "LFO Noise Mix",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 465
+  },
+  {
+   "offset": 44128,
+   "hex": "0xac60",
+   "name": "LFO Internal Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 466
+  },
+  {
+   "offset": 44144,
+   "hex": "0xac70",
+   "name": "LFO External0 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 467
+  },
+  {
+   "offset": 44160,
+   "hex": "0xac80",
+   "name": "LFO External1 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 468
+  },
+  {
+   "offset": 44576,
+   "hex": "0xae20",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 469
+  },
+  {
+   "offset": 44592,
+   "hex": "0xae30",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 470
+  },
+  {
+   "offset": 44608,
+   "hex": "0xae40",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 471
+  },
+  {
+   "offset": 44832,
+   "hex": "0xaf20",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 472
+  },
+  {
+   "offset": 44848,
+   "hex": "0xaf30",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 473
+  },
+  {
+   "offset": 44864,
+   "hex": "0xaf40",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 474
+  },
+  {
+   "offset": 44880,
+   "hex": "0xaf50",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 475
+  },
+  {
+   "offset": 44896,
+   "hex": "0xaf60",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 476
+  },
+  {
+   "offset": 45088,
+   "hex": "0xb020",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 477
+  },
+  {
+   "offset": 45312,
+   "hex": "0xb100",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 478
+  },
+  {
+   "offset": 45328,
+   "hex": "0xb110",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 479
+  },
+  {
+   "offset": 45344,
+   "hex": "0xb120",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 480
+  },
+  {
+   "offset": 45360,
+   "hex": "0xb130",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 481
+  },
+  {
+   "offset": 45376,
+   "hex": "0xb140",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 482
+  },
+  {
+   "offset": 45888,
+   "hex": "0xb340",
+   "name": "OSC1 Feet",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 483
+  },
+  {
+   "offset": 45904,
+   "hex": "0xb350",
+   "name": "Griffer Bend SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 484
+  },
+  {
+   "offset": 45920,
+   "hex": "0xb360",
+   "name": "Bend Enable SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 485
+  },
+  {
+   "offset": 45936,
+   "hex": "0xb370",
+   "name": "PWM SW LFO",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 486
+  },
+  {
+   "offset": 45952,
+   "hex": "0xb380",
+   "name": "PWM SW ENV1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 487
+  },
+  {
+   "offset": 45968,
+   "hex": "0xb390",
+   "name": "PWM SW ENV2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 488
+  },
+  {
+   "offset": 45984,
+   "hex": "0xb3a0",
+   "name": "PWM SW Manual",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 489
+  },
+  {
+   "offset": 46000,
+   "hex": "0xb3b0",
+   "name": "Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 490
+  },
+  {
+   "offset": 46016,
+   "hex": "0xb3c0",
+   "name": "Detune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 491
+  },
+  {
+   "offset": 46032,
+   "hex": "0xb3d0",
+   "name": "Mod Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 492
+  },
+  {
+   "offset": 46048,
+   "hex": "0xb3e0",
+   "name": "Mod Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 493
+  },
+  {
+   "offset": 46064,
+   "hex": "0xb3f0",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 494
+  },
+  {
+   "offset": 46080,
+   "hex": "0xb400",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 495
+  },
+  {
+   "offset": 46096,
+   "hex": "0xb410",
+   "name": "LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 496
+  },
+  {
+   "offset": 46112,
+   "hex": "0xb420",
+   "name": "ENV1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 497
+  },
+  {
+   "offset": 46128,
+   "hex": "0xb430",
+   "name": "ENV2 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 498
+  },
+  {
+   "offset": 46144,
+   "hex": "0xb440",
+   "name": "ENV Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 499
+  },
+  {
+   "offset": 46160,
+   "hex": "0xb450",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 500
+  },
+  {
+   "offset": 46176,
+   "hex": "0xb460",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 501
+  },
+  {
+   "offset": 46192,
+   "hex": "0xb470",
+   "name": "PWM Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 502
+  },
+  {
+   "offset": 46240,
+   "hex": "0xb4a0",
+   "name": "JU OSC Saw Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 503
+  },
+  {
+   "offset": 46256,
+   "hex": "0xb4b0",
+   "name": "JU OSC Sqr Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 504
+  },
+  {
+   "offset": 46272,
+   "hex": "0xb4c0",
+   "name": "JU OSC Sub Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 505
+  },
+  {
+   "offset": 47568,
+   "hex": "0xb9d0",
+   "name": "Duty Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 506
+  },
+  {
+   "offset": 48496,
+   "hex": "0xbd70",
+   "name": "Osc1 Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 507
+  },
+  {
+   "offset": 48560,
+   "hex": "0xbdb0",
+   "name": "Osc1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 508
+  },
+  {
+   "offset": 48576,
+   "hex": "0xbdc0",
+   "name": "Osc Noise Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 509
+  },
+  {
+   "offset": 48768,
+   "hex": "0xbe80",
+   "name": "Griffer SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 510
+  },
+  {
+   "offset": 48784,
+   "hex": "0xbe90",
+   "name": "LPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 511
+  },
+  {
+   "offset": 48880,
+   "hex": "0xbef0",
+   "name": "LPF Resonance",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 512
+  },
+  {
+   "offset": 48912,
+   "hex": "0xbf10",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 513
+  },
+  {
+   "offset": 49056,
+   "hex": "0xbfa0",
+   "name": "Env1/2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 514
+  },
+  {
+   "offset": 49072,
+   "hex": "0xbfb0",
+   "name": "Int/Env",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 515
+  },
+  {
+   "offset": 49344,
+   "hex": "0xc0c0",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 516
+  },
+  {
+   "offset": 49360,
+   "hex": "0xc0d0",
+   "name": "Ext LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 517
+  },
+  {
+   "offset": 49376,
+   "hex": "0xc0e0",
+   "name": "GRF Bned SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 518
+  },
+  {
+   "offset": 49392,
+   "hex": "0xc0f0",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 519
+  },
+  {
+   "offset": 49408,
+   "hex": "0xc100",
+   "name": "MOD Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 520
+  },
+  {
+   "offset": 49424,
+   "hex": "0xc110",
+   "name": "MOD SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 521
+  },
+  {
+   "offset": 49440,
+   "hex": "0xc120",
+   "name": "ENV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 522
+  },
+  {
+   "offset": 49456,
+   "hex": "0xc130",
+   "name": "KCV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 523
+  },
+  {
+   "offset": 49472,
+   "hex": "0xc140",
+   "name": "Velocity Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 524
+  },
+  {
+   "offset": 49488,
+   "hex": "0xc150",
+   "name": "Velocity Offset",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 525
+  },
+  {
+   "offset": 49504,
+   "hex": "0xc160",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 526
+  },
+  {
+   "offset": 49520,
+   "hex": "0xc170",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 527
+  },
+  {
+   "offset": 49648,
+   "hex": "0xc1f0",
+   "name": "Cutoff Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 528
+  },
+  {
+   "offset": 49664,
+   "hex": "0xc200",
+   "name": "Resonance Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 529
+  },
+  {
+   "offset": 49680,
+   "hex": "0xc210",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 530
+  },
+  {
+   "offset": 51104,
+   "hex": "0xc7a0",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 531
+  },
+  {
+   "offset": 51120,
+   "hex": "0xc7b0",
+   "name": "-12dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 532
+  },
+  {
+   "offset": 51136,
+   "hex": "0xc7c0",
+   "name": "-18dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 533
+  },
+  {
+   "offset": 51152,
+   "hex": "0xc7d0",
+   "name": "-24dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 534
+  },
+  {
+   "offset": 51632,
+   "hex": "0xc9b0",
+   "name": "AMP TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 535
+  },
+  {
+   "offset": 51648,
+   "hex": "0xc9c0",
+   "name": "AMP VELOCITY SENS",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 536
+  },
+  {
+   "offset": 51664,
+   "hex": "0xc9d0",
+   "name": "AMP FIX VELOCITY LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 537
+  },
+  {
+   "offset": 51728,
+   "hex": "0xca10",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 538
+  },
+  {
+   "offset": 51872,
+   "hex": "0xcaa0",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 539
+  },
+  {
+   "offset": 52224,
+   "hex": "0xcc00",
+   "name": "Gate SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 540
+  },
+  {
+   "offset": 52240,
+   "hex": "0xcc10",
+   "name": "ENV1 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 541
+  },
+  {
+   "offset": 52256,
+   "hex": "0xcc20",
+   "name": "ENV2 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 542
+  },
+  {
+   "offset": 52272,
+   "hex": "0xcc30",
+   "name": "Ext ENV SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 543
+  },
+  {
+   "offset": 52288,
+   "hex": "0xcc40",
+   "name": "HPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 544
+  },
+  {
+   "offset": 52304,
+   "hex": "0xcc50",
+   "name": "HPF Switch",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 545
+  },
+  {
+   "offset": 52320,
+   "hex": "0xcc60",
+   "name": "Boost LPF Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 546
+  },
+  {
+   "offset": 52336,
+   "hex": "0xcc70",
+   "name": "Boost Thru Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 547
+  },
+  {
+   "offset": 52352,
+   "hex": "0xcc80",
+   "name": "ENV LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 548
+  },
+  {
+   "offset": 52368,
+   "hex": "0xcc90",
+   "name": "AMP LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 549
+  },
+  {
+   "offset": 52832,
+   "hex": "0xce60",
+   "name": "UseExtJack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 550
+  },
+  {
+   "offset": 52864,
+   "hex": "0xce80",
+   "name": "M.CV",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 551
+  },
+  {
+   "offset": 52880,
+   "hex": "0xce90",
+   "name": "M.Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 552
+  },
+  {
+   "offset": 52928,
+   "hex": "0xcec0",
+   "name": "Master Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 553
+  },
+  {
+   "offset": 52944,
+   "hex": "0xced0",
+   "name": "Part Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 554
+  },
+  {
+   "offset": 53152,
+   "hex": "0xcfa0",
+   "name": "Portamento OnOff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 555
+  },
+  {
+   "offset": 53168,
+   "hex": "0xcfb0",
+   "name": "Portamento Mode",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 556
+  },
+  {
+   "offset": 53184,
+   "hex": "0xcfc0",
+   "name": "Portamento Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 557
+  },
+  {
+   "offset": 53600,
+   "hex": "0xd160",
+   "name": "LFO Griffer Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 558
+  },
+  {
+   "offset": 53616,
+   "hex": "0xd170",
+   "name": "LFO Tempo Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 559
+  },
+  {
+   "offset": 53632,
+   "hex": "0xd180",
+   "name": "LFO Tempo Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 560
+  },
+  {
+   "offset": 53648,
+   "hex": "0xd190",
+   "name": "LFO Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 561
+  },
+  {
+   "offset": 54416,
+   "hex": "0xd490",
+   "name": "Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 562
+  },
+  {
+   "offset": 54432,
+   "hex": "0xd4a0",
+   "name": "LFO Trig",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 563
+  },
+  {
+   "offset": 54448,
+   "hex": "0xd4b0",
+   "name": "Reset Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 564
+  },
+  {
+   "offset": 54464,
+   "hex": "0xd4c0",
+   "name": "LFO UseExtGate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 565
+  },
+  {
+   "offset": 54480,
+   "hex": "0xd4d0",
+   "name": "LFO Delay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 566
+  },
+  {
+   "offset": 54496,
+   "hex": "0xd4e0",
+   "name": "LFO Delay Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 567
+  },
+  {
+   "offset": 54512,
+   "hex": "0xd4f0",
+   "name": "LFO Sin Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 568
+  },
+  {
+   "offset": 54528,
+   "hex": "0xd500",
+   "name": "LFO Tri Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 569
+  },
+  {
+   "offset": 54544,
+   "hex": "0xd510",
+   "name": "LFO Sqr Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 570
+  },
+  {
+   "offset": 54560,
+   "hex": "0xd520",
+   "name": "LFO Saw Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 571
+  },
+  {
+   "offset": 54576,
+   "hex": "0xd530",
+   "name": "LFO Saw(Inv) Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 572
+  },
+  {
+   "offset": 54592,
+   "hex": "0xd540",
+   "name": "LFO S&H Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 573
+  },
+  {
+   "offset": 54608,
+   "hex": "0xd550",
+   "name": "LFO Noise Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 574
+  },
+  {
+   "offset": 54624,
+   "hex": "0xd560",
+   "name": "LFO Noise Mix",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 575
+  },
+  {
+   "offset": 54640,
+   "hex": "0xd570",
+   "name": "LFO Internal Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 576
+  },
+  {
+   "offset": 54656,
+   "hex": "0xd580",
+   "name": "LFO External0 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 577
+  },
+  {
+   "offset": 54672,
+   "hex": "0xd590",
+   "name": "LFO External1 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 578
+  },
+  {
+   "offset": 55088,
+   "hex": "0xd730",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 579
+  },
+  {
+   "offset": 55104,
+   "hex": "0xd740",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 580
+  },
+  {
+   "offset": 55120,
+   "hex": "0xd750",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 581
+  },
+  {
+   "offset": 55344,
+   "hex": "0xd830",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 582
+  },
+  {
+   "offset": 55360,
+   "hex": "0xd840",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 583
+  },
+  {
+   "offset": 55376,
+   "hex": "0xd850",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 584
+  },
+  {
+   "offset": 55392,
+   "hex": "0xd860",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 585
+  },
+  {
+   "offset": 55408,
+   "hex": "0xd870",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 586
+  },
+  {
+   "offset": 55600,
+   "hex": "0xd930",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 587
+  },
+  {
+   "offset": 55824,
+   "hex": "0xda10",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 588
+  },
+  {
+   "offset": 55840,
+   "hex": "0xda20",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 589
+  },
+  {
+   "offset": 55856,
+   "hex": "0xda30",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 590
+  },
+  {
+   "offset": 55872,
+   "hex": "0xda40",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 591
+  },
+  {
+   "offset": 55888,
+   "hex": "0xda50",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 592
+  },
+  {
+   "offset": 56400,
+   "hex": "0xdc50",
+   "name": "OSC1 Feet",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 593
+  },
+  {
+   "offset": 56416,
+   "hex": "0xdc60",
+   "name": "Griffer Bend SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 594
+  },
+  {
+   "offset": 56432,
+   "hex": "0xdc70",
+   "name": "Bend Enable SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 595
+  },
+  {
+   "offset": 56448,
+   "hex": "0xdc80",
+   "name": "PWM SW LFO",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 596
+  },
+  {
+   "offset": 56464,
+   "hex": "0xdc90",
+   "name": "PWM SW ENV1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 597
+  },
+  {
+   "offset": 56480,
+   "hex": "0xdca0",
+   "name": "PWM SW ENV2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 598
+  },
+  {
+   "offset": 56496,
+   "hex": "0xdcb0",
+   "name": "PWM SW Manual",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 599
+  },
+  {
+   "offset": 56512,
+   "hex": "0xdcc0",
+   "name": "Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 600
+  },
+  {
+   "offset": 56528,
+   "hex": "0xdcd0",
+   "name": "Detune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 601
+  },
+  {
+   "offset": 56544,
+   "hex": "0xdce0",
+   "name": "Mod Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 602
+  },
+  {
+   "offset": 56560,
+   "hex": "0xdcf0",
+   "name": "Mod Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 603
+  },
+  {
+   "offset": 56576,
+   "hex": "0xdd00",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 604
+  },
+  {
+   "offset": 56592,
+   "hex": "0xdd10",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 605
+  },
+  {
+   "offset": 56608,
+   "hex": "0xdd20",
+   "name": "LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 606
+  },
+  {
+   "offset": 56624,
+   "hex": "0xdd30",
+   "name": "ENV1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 607
+  },
+  {
+   "offset": 56640,
+   "hex": "0xdd40",
+   "name": "ENV2 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 608
+  },
+  {
+   "offset": 56656,
+   "hex": "0xdd50",
+   "name": "ENV Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 609
+  },
+  {
+   "offset": 56672,
+   "hex": "0xdd60",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 610
+  },
+  {
+   "offset": 56688,
+   "hex": "0xdd70",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 611
+  },
+  {
+   "offset": 56704,
+   "hex": "0xdd80",
+   "name": "PWM Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 612
+  },
+  {
+   "offset": 56752,
+   "hex": "0xddb0",
+   "name": "JU OSC Saw Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 613
+  },
+  {
+   "offset": 56768,
+   "hex": "0xddc0",
+   "name": "JU OSC Sqr Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 614
+  },
+  {
+   "offset": 56784,
+   "hex": "0xddd0",
+   "name": "JU OSC Sub Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 615
+  },
+  {
+   "offset": 58080,
+   "hex": "0xe2e0",
+   "name": "Duty Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 616
+  },
+  {
+   "offset": 59008,
+   "hex": "0xe680",
+   "name": "Osc1 Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 617
+  },
+  {
+   "offset": 59072,
+   "hex": "0xe6c0",
+   "name": "Osc1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 618
+  },
+  {
+   "offset": 59088,
+   "hex": "0xe6d0",
+   "name": "Osc Noise Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 619
+  },
+  {
+   "offset": 59280,
+   "hex": "0xe790",
+   "name": "Griffer SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 620
+  },
+  {
+   "offset": 59296,
+   "hex": "0xe7a0",
+   "name": "LPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 621
+  },
+  {
+   "offset": 59392,
+   "hex": "0xe800",
+   "name": "LPF Resonance",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 622
+  },
+  {
+   "offset": 59424,
+   "hex": "0xe820",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 623
+  },
+  {
+   "offset": 59568,
+   "hex": "0xe8b0",
+   "name": "Env1/2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 624
+  },
+  {
+   "offset": 59584,
+   "hex": "0xe8c0",
+   "name": "Int/Env",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 625
+  },
+  {
+   "offset": 59856,
+   "hex": "0xe9d0",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 626
+  },
+  {
+   "offset": 59872,
+   "hex": "0xe9e0",
+   "name": "Ext LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 627
+  },
+  {
+   "offset": 59888,
+   "hex": "0xe9f0",
+   "name": "GRF Bned SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 628
+  },
+  {
+   "offset": 59904,
+   "hex": "0xea00",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 629
+  },
+  {
+   "offset": 59920,
+   "hex": "0xea10",
+   "name": "MOD Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 630
+  },
+  {
+   "offset": 59936,
+   "hex": "0xea20",
+   "name": "MOD SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 631
+  },
+  {
+   "offset": 59952,
+   "hex": "0xea30",
+   "name": "ENV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 632
+  },
+  {
+   "offset": 59968,
+   "hex": "0xea40",
+   "name": "KCV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 633
+  },
+  {
+   "offset": 59984,
+   "hex": "0xea50",
+   "name": "Velocity Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 634
+  },
+  {
+   "offset": 60000,
+   "hex": "0xea60",
+   "name": "Velocity Offset",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 635
+  },
+  {
+   "offset": 60016,
+   "hex": "0xea70",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 636
+  },
+  {
+   "offset": 60032,
+   "hex": "0xea80",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 637
+  },
+  {
+   "offset": 60160,
+   "hex": "0xeb00",
+   "name": "Cutoff Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 638
+  },
+  {
+   "offset": 60176,
+   "hex": "0xeb10",
+   "name": "Resonance Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 639
+  },
+  {
+   "offset": 60192,
+   "hex": "0xeb20",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 640
+  },
+  {
+   "offset": 61616,
+   "hex": "0xf0b0",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 641
+  },
+  {
+   "offset": 61632,
+   "hex": "0xf0c0",
+   "name": "-12dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 642
+  },
+  {
+   "offset": 61648,
+   "hex": "0xf0d0",
+   "name": "-18dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 643
+  },
+  {
+   "offset": 61664,
+   "hex": "0xf0e0",
+   "name": "-24dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 644
+  },
+  {
+   "offset": 62144,
+   "hex": "0xf2c0",
+   "name": "AMP TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 645
+  },
+  {
+   "offset": 62160,
+   "hex": "0xf2d0",
+   "name": "AMP VELOCITY SENS",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 646
+  },
+  {
+   "offset": 62176,
+   "hex": "0xf2e0",
+   "name": "AMP FIX VELOCITY LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 647
+  },
+  {
+   "offset": 62240,
+   "hex": "0xf320",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 648
+  },
+  {
+   "offset": 62384,
+   "hex": "0xf3b0",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 649
+  },
+  {
+   "offset": 62736,
+   "hex": "0xf510",
+   "name": "Gate SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 650
+  },
+  {
+   "offset": 62752,
+   "hex": "0xf520",
+   "name": "ENV1 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 651
+  },
+  {
+   "offset": 62768,
+   "hex": "0xf530",
+   "name": "ENV2 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 652
+  },
+  {
+   "offset": 62784,
+   "hex": "0xf540",
+   "name": "Ext ENV SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 653
+  },
+  {
+   "offset": 62800,
+   "hex": "0xf550",
+   "name": "HPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 654
+  },
+  {
+   "offset": 62816,
+   "hex": "0xf560",
+   "name": "HPF Switch",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 655
+  },
+  {
+   "offset": 62832,
+   "hex": "0xf570",
+   "name": "Boost LPF Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 656
+  },
+  {
+   "offset": 62848,
+   "hex": "0xf580",
+   "name": "Boost Thru Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 657
+  },
+  {
+   "offset": 62864,
+   "hex": "0xf590",
+   "name": "ENV LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 658
+  },
+  {
+   "offset": 62880,
+   "hex": "0xf5a0",
+   "name": "AMP LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 659
+  },
+  {
+   "offset": 63344,
+   "hex": "0xf770",
+   "name": "UseExtJack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 660
+  },
+  {
+   "offset": 63376,
+   "hex": "0xf790",
+   "name": "M.CV",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 661
+  },
+  {
+   "offset": 63392,
+   "hex": "0xf7a0",
+   "name": "M.Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 662
+  },
+  {
+   "offset": 63440,
+   "hex": "0xf7d0",
+   "name": "Master Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 663
+  },
+  {
+   "offset": 63456,
+   "hex": "0xf7e0",
+   "name": "Part Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 664
+  },
+  {
+   "offset": 63664,
+   "hex": "0xf8b0",
+   "name": "Portamento OnOff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 665
+  },
+  {
+   "offset": 63680,
+   "hex": "0xf8c0",
+   "name": "Portamento Mode",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 666
+  },
+  {
+   "offset": 63696,
+   "hex": "0xf8d0",
+   "name": "Portamento Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 667
+  },
+  {
+   "offset": 64112,
+   "hex": "0xfa70",
+   "name": "LFO Griffer Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 668
+  },
+  {
+   "offset": 64128,
+   "hex": "0xfa80",
+   "name": "LFO Tempo Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 669
+  },
+  {
+   "offset": 64144,
+   "hex": "0xfa90",
+   "name": "LFO Tempo Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 670
+  },
+  {
+   "offset": 64160,
+   "hex": "0xfaa0",
+   "name": "LFO Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 671
+  },
+  {
+   "offset": 64928,
+   "hex": "0xfda0",
+   "name": "Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 672
+  },
+  {
+   "offset": 64944,
+   "hex": "0xfdb0",
+   "name": "LFO Trig",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 673
+  },
+  {
+   "offset": 64960,
+   "hex": "0xfdc0",
+   "name": "Reset Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 674
+  },
+  {
+   "offset": 64976,
+   "hex": "0xfdd0",
+   "name": "LFO UseExtGate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 675
+  },
+  {
+   "offset": 64992,
+   "hex": "0xfde0",
+   "name": "LFO Delay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 676
+  },
+  {
+   "offset": 65008,
+   "hex": "0xfdf0",
+   "name": "LFO Delay Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 677
+  },
+  {
+   "offset": 65024,
+   "hex": "0xfe00",
+   "name": "LFO Sin Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 678
+  },
+  {
+   "offset": 65040,
+   "hex": "0xfe10",
+   "name": "LFO Tri Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 679
+  },
+  {
+   "offset": 65056,
+   "hex": "0xfe20",
+   "name": "LFO Sqr Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 680
+  },
+  {
+   "offset": 65072,
+   "hex": "0xfe30",
+   "name": "LFO Saw Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 681
+  },
+  {
+   "offset": 65088,
+   "hex": "0xfe40",
+   "name": "LFO Saw(Inv) Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 682
+  },
+  {
+   "offset": 65104,
+   "hex": "0xfe50",
+   "name": "LFO S&H Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 683
+  },
+  {
+   "offset": 65120,
+   "hex": "0xfe60",
+   "name": "LFO Noise Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 684
+  },
+  {
+   "offset": 65136,
+   "hex": "0xfe70",
+   "name": "LFO Noise Mix",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 685
+  },
+  {
+   "offset": 65152,
+   "hex": "0xfe80",
+   "name": "LFO Internal Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 686
+  },
+  {
+   "offset": 65168,
+   "hex": "0xfe90",
+   "name": "LFO External0 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 687
+  },
+  {
+   "offset": 65184,
+   "hex": "0xfea0",
+   "name": "LFO External1 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 688
+  },
+  {
+   "offset": 65600,
+   "hex": "0x10040",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 689
+  },
+  {
+   "offset": 65616,
+   "hex": "0x10050",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 690
+  },
+  {
+   "offset": 65632,
+   "hex": "0x10060",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 691
+  },
+  {
+   "offset": 65856,
+   "hex": "0x10140",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 692
+  },
+  {
+   "offset": 65872,
+   "hex": "0x10150",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 693
+  },
+  {
+   "offset": 65888,
+   "hex": "0x10160",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 694
+  },
+  {
+   "offset": 65904,
+   "hex": "0x10170",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 695
+  },
+  {
+   "offset": 65920,
+   "hex": "0x10180",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 696
+  },
+  {
+   "offset": 66112,
+   "hex": "0x10240",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 697
+  },
+  {
+   "offset": 66336,
+   "hex": "0x10320",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 698
+  },
+  {
+   "offset": 66352,
+   "hex": "0x10330",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 699
+  },
+  {
+   "offset": 66368,
+   "hex": "0x10340",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 700
+  },
+  {
+   "offset": 66384,
+   "hex": "0x10350",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 701
+  },
+  {
+   "offset": 66400,
+   "hex": "0x10360",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 702
+  },
+  {
+   "offset": 66912,
+   "hex": "0x10560",
+   "name": "OSC1 Feet",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 703
+  },
+  {
+   "offset": 66928,
+   "hex": "0x10570",
+   "name": "Griffer Bend SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 704
+  },
+  {
+   "offset": 66944,
+   "hex": "0x10580",
+   "name": "Bend Enable SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 705
+  },
+  {
+   "offset": 66960,
+   "hex": "0x10590",
+   "name": "PWM SW LFO",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 706
+  },
+  {
+   "offset": 66976,
+   "hex": "0x105a0",
+   "name": "PWM SW ENV1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 707
+  },
+  {
+   "offset": 66992,
+   "hex": "0x105b0",
+   "name": "PWM SW ENV2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 708
+  },
+  {
+   "offset": 67008,
+   "hex": "0x105c0",
+   "name": "PWM SW Manual",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 709
+  },
+  {
+   "offset": 67024,
+   "hex": "0x105d0",
+   "name": "Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 710
+  },
+  {
+   "offset": 67040,
+   "hex": "0x105e0",
+   "name": "Detune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 711
+  },
+  {
+   "offset": 67056,
+   "hex": "0x105f0",
+   "name": "Mod Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 712
+  },
+  {
+   "offset": 67072,
+   "hex": "0x10600",
+   "name": "Mod Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 713
+  },
+  {
+   "offset": 67088,
+   "hex": "0x10610",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 714
+  },
+  {
+   "offset": 67104,
+   "hex": "0x10620",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 715
+  },
+  {
+   "offset": 67120,
+   "hex": "0x10630",
+   "name": "LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 716
+  },
+  {
+   "offset": 67136,
+   "hex": "0x10640",
+   "name": "ENV1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 717
+  },
+  {
+   "offset": 67152,
+   "hex": "0x10650",
+   "name": "ENV2 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 718
+  },
+  {
+   "offset": 67168,
+   "hex": "0x10660",
+   "name": "ENV Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 719
+  },
+  {
+   "offset": 67184,
+   "hex": "0x10670",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 720
+  },
+  {
+   "offset": 67200,
+   "hex": "0x10680",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 721
+  },
+  {
+   "offset": 67216,
+   "hex": "0x10690",
+   "name": "PWM Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 722
+  },
+  {
+   "offset": 67264,
+   "hex": "0x106c0",
+   "name": "JU OSC Saw Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 723
+  },
+  {
+   "offset": 67280,
+   "hex": "0x106d0",
+   "name": "JU OSC Sqr Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 724
+  },
+  {
+   "offset": 67296,
+   "hex": "0x106e0",
+   "name": "JU OSC Sub Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 725
+  },
+  {
+   "offset": 68592,
+   "hex": "0x10bf0",
+   "name": "Duty Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 726
+  },
+  {
+   "offset": 69520,
+   "hex": "0x10f90",
+   "name": "Osc1 Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 727
+  },
+  {
+   "offset": 69584,
+   "hex": "0x10fd0",
+   "name": "Osc1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 728
+  },
+  {
+   "offset": 69600,
+   "hex": "0x10fe0",
+   "name": "Osc Noise Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 729
+  },
+  {
+   "offset": 69792,
+   "hex": "0x110a0",
+   "name": "Griffer SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 730
+  },
+  {
+   "offset": 69808,
+   "hex": "0x110b0",
+   "name": "LPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 731
+  },
+  {
+   "offset": 69904,
+   "hex": "0x11110",
+   "name": "LPF Resonance",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 732
+  },
+  {
+   "offset": 69936,
+   "hex": "0x11130",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 733
+  },
+  {
+   "offset": 70080,
+   "hex": "0x111c0",
+   "name": "Env1/2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 734
+  },
+  {
+   "offset": 70096,
+   "hex": "0x111d0",
+   "name": "Int/Env",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 735
+  },
+  {
+   "offset": 70368,
+   "hex": "0x112e0",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 736
+  },
+  {
+   "offset": 70384,
+   "hex": "0x112f0",
+   "name": "Ext LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 737
+  },
+  {
+   "offset": 70400,
+   "hex": "0x11300",
+   "name": "GRF Bned SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 738
+  },
+  {
+   "offset": 70416,
+   "hex": "0x11310",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 739
+  },
+  {
+   "offset": 70432,
+   "hex": "0x11320",
+   "name": "MOD Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 740
+  },
+  {
+   "offset": 70448,
+   "hex": "0x11330",
+   "name": "MOD SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 741
+  },
+  {
+   "offset": 70464,
+   "hex": "0x11340",
+   "name": "ENV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 742
+  },
+  {
+   "offset": 70480,
+   "hex": "0x11350",
+   "name": "KCV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 743
+  },
+  {
+   "offset": 70496,
+   "hex": "0x11360",
+   "name": "Velocity Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 744
+  },
+  {
+   "offset": 70512,
+   "hex": "0x11370",
+   "name": "Velocity Offset",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 745
+  },
+  {
+   "offset": 70528,
+   "hex": "0x11380",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 746
+  },
+  {
+   "offset": 70544,
+   "hex": "0x11390",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 747
+  },
+  {
+   "offset": 70672,
+   "hex": "0x11410",
+   "name": "Cutoff Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 748
+  },
+  {
+   "offset": 70688,
+   "hex": "0x11420",
+   "name": "Resonance Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 749
+  },
+  {
+   "offset": 70704,
+   "hex": "0x11430",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 750
+  },
+  {
+   "offset": 72128,
+   "hex": "0x119c0",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 751
+  },
+  {
+   "offset": 72144,
+   "hex": "0x119d0",
+   "name": "-12dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 752
+  },
+  {
+   "offset": 72160,
+   "hex": "0x119e0",
+   "name": "-18dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 753
+  },
+  {
+   "offset": 72176,
+   "hex": "0x119f0",
+   "name": "-24dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 754
+  },
+  {
+   "offset": 72656,
+   "hex": "0x11bd0",
+   "name": "AMP TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 755
+  },
+  {
+   "offset": 72672,
+   "hex": "0x11be0",
+   "name": "AMP VELOCITY SENS",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 756
+  },
+  {
+   "offset": 72688,
+   "hex": "0x11bf0",
+   "name": "AMP FIX VELOCITY LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 757
+  },
+  {
+   "offset": 72752,
+   "hex": "0x11c30",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 758
+  },
+  {
+   "offset": 72896,
+   "hex": "0x11cc0",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 759
+  },
+  {
+   "offset": 73248,
+   "hex": "0x11e20",
+   "name": "Gate SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 760
+  },
+  {
+   "offset": 73264,
+   "hex": "0x11e30",
+   "name": "ENV1 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 761
+  },
+  {
+   "offset": 73280,
+   "hex": "0x11e40",
+   "name": "ENV2 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 762
+  },
+  {
+   "offset": 73296,
+   "hex": "0x11e50",
+   "name": "Ext ENV SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 763
+  },
+  {
+   "offset": 73312,
+   "hex": "0x11e60",
+   "name": "HPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 764
+  },
+  {
+   "offset": 73328,
+   "hex": "0x11e70",
+   "name": "HPF Switch",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 765
+  },
+  {
+   "offset": 73344,
+   "hex": "0x11e80",
+   "name": "Boost LPF Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 766
+  },
+  {
+   "offset": 73360,
+   "hex": "0x11e90",
+   "name": "Boost Thru Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 767
+  },
+  {
+   "offset": 73376,
+   "hex": "0x11ea0",
+   "name": "ENV LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 768
+  },
+  {
+   "offset": 73392,
+   "hex": "0x11eb0",
+   "name": "AMP LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 769
+  },
+  {
+   "offset": 73856,
+   "hex": "0x12080",
+   "name": "UseExtJack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 770
+  },
+  {
+   "offset": 73888,
+   "hex": "0x120a0",
+   "name": "M.CV",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 771
+  },
+  {
+   "offset": 73904,
+   "hex": "0x120b0",
+   "name": "M.Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 772
+  },
+  {
+   "offset": 73952,
+   "hex": "0x120e0",
+   "name": "Master Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 773
+  },
+  {
+   "offset": 73968,
+   "hex": "0x120f0",
+   "name": "Part Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 774
+  },
+  {
+   "offset": 74176,
+   "hex": "0x121c0",
+   "name": "Portamento OnOff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 775
+  },
+  {
+   "offset": 74192,
+   "hex": "0x121d0",
+   "name": "Portamento Mode",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 776
+  },
+  {
+   "offset": 74208,
+   "hex": "0x121e0",
+   "name": "Portamento Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 777
+  },
+  {
+   "offset": 74624,
+   "hex": "0x12380",
+   "name": "LFO Griffer Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 778
+  },
+  {
+   "offset": 74640,
+   "hex": "0x12390",
+   "name": "LFO Tempo Rate Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 779
+  },
+  {
+   "offset": 74656,
+   "hex": "0x123a0",
+   "name": "LFO Tempo Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 780
+  },
+  {
+   "offset": 74672,
+   "hex": "0x123b0",
+   "name": "LFO Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 781
+  },
+  {
+   "offset": 75440,
+   "hex": "0x126b0",
+   "name": "Gate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 782
+  },
+  {
+   "offset": 75456,
+   "hex": "0x126c0",
+   "name": "LFO Trig",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 783
+  },
+  {
+   "offset": 75472,
+   "hex": "0x126d0",
+   "name": "Reset Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 784
+  },
+  {
+   "offset": 75488,
+   "hex": "0x126e0",
+   "name": "LFO UseExtGate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 785
+  },
+  {
+   "offset": 75504,
+   "hex": "0x126f0",
+   "name": "LFO Delay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 786
+  },
+  {
+   "offset": 75520,
+   "hex": "0x12700",
+   "name": "LFO Delay Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 787
+  },
+  {
+   "offset": 75536,
+   "hex": "0x12710",
+   "name": "LFO Sin Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 788
+  },
+  {
+   "offset": 75552,
+   "hex": "0x12720",
+   "name": "LFO Tri Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 789
+  },
+  {
+   "offset": 75568,
+   "hex": "0x12730",
+   "name": "LFO Sqr Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 790
+  },
+  {
+   "offset": 75584,
+   "hex": "0x12740",
+   "name": "LFO Saw Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 791
+  },
+  {
+   "offset": 75600,
+   "hex": "0x12750",
+   "name": "LFO Saw(Inv) Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 792
+  },
+  {
+   "offset": 75616,
+   "hex": "0x12760",
+   "name": "LFO S&H Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 793
+  },
+  {
+   "offset": 75632,
+   "hex": "0x12770",
+   "name": "LFO Noise Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 794
+  },
+  {
+   "offset": 75648,
+   "hex": "0x12780",
+   "name": "LFO Noise Mix",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 795
+  },
+  {
+   "offset": 75664,
+   "hex": "0x12790",
+   "name": "LFO Internal Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 796
+  },
+  {
+   "offset": 75680,
+   "hex": "0x127a0",
+   "name": "LFO External0 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 797
+  },
+  {
+   "offset": 75696,
+   "hex": "0x127b0",
+   "name": "LFO External1 Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 798
+  },
+  {
+   "offset": 76112,
+   "hex": "0x12950",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 799
+  },
+  {
+   "offset": 76128,
+   "hex": "0x12960",
+   "name": "read only",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 800
+  },
+  {
+   "offset": 76144,
+   "hex": "0x12970",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 801
+  },
+  {
+   "offset": 76368,
+   "hex": "0x12a50",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 802
+  },
+  {
+   "offset": 76384,
+   "hex": "0x12a60",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 803
+  },
+  {
+   "offset": 76400,
+   "hex": "0x12a70",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 804
+  },
+  {
+   "offset": 76416,
+   "hex": "0x12a80",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 805
+  },
+  {
+   "offset": 76432,
+   "hex": "0x12a90",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 806
+  },
+  {
+   "offset": 76624,
+   "hex": "0x12b50",
+   "name": "LFO trigger env sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 807
+  },
+  {
+   "offset": 76848,
+   "hex": "0x12c30",
+   "name": "ENV Attack",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 808
+  },
+  {
+   "offset": 76864,
+   "hex": "0x12c40",
+   "name": "ENV Sustain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 809
+  },
+  {
+   "offset": 76880,
+   "hex": "0x12c50",
+   "name": "ENV Decay",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 810
+  },
+  {
+   "offset": 76896,
+   "hex": "0x12c60",
+   "name": "ENV Release",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 811
+  },
+  {
+   "offset": 76912,
+   "hex": "0x12c70",
+   "name": "Q24C Initialize",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 812
+  },
+  {
+   "offset": 77424,
+   "hex": "0x12e70",
+   "name": "OSC1 Feet",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 813
+  },
+  {
+   "offset": 77440,
+   "hex": "0x12e80",
+   "name": "Griffer Bend SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 814
+  },
+  {
+   "offset": 77456,
+   "hex": "0x12e90",
+   "name": "Bend Enable SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 815
+  },
+  {
+   "offset": 77472,
+   "hex": "0x12ea0",
+   "name": "PWM SW LFO",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 816
+  },
+  {
+   "offset": 77488,
+   "hex": "0x12eb0",
+   "name": "PWM SW ENV1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 817
+  },
+  {
+   "offset": 77504,
+   "hex": "0x12ec0",
+   "name": "PWM SW ENV2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 818
+  },
+  {
+   "offset": 77520,
+   "hex": "0x12ed0",
+   "name": "PWM SW Manual",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 819
+  },
+  {
+   "offset": 77536,
+   "hex": "0x12ee0",
+   "name": "Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 820
+  },
+  {
+   "offset": 77552,
+   "hex": "0x12ef0",
+   "name": "Detune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 821
+  },
+  {
+   "offset": 77568,
+   "hex": "0x12f00",
+   "name": "Mod Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 822
+  },
+  {
+   "offset": 77584,
+   "hex": "0x12f10",
+   "name": "Mod Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 823
+  },
+  {
+   "offset": 77600,
+   "hex": "0x12f20",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 824
+  },
+  {
+   "offset": 77616,
+   "hex": "0x12f30",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 825
+  },
+  {
+   "offset": 77632,
+   "hex": "0x12f40",
+   "name": "LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 826
+  },
+  {
+   "offset": 77648,
+   "hex": "0x12f50",
+   "name": "ENV1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 827
+  },
+  {
+   "offset": 77664,
+   "hex": "0x12f60",
+   "name": "ENV2 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 828
+  },
+  {
+   "offset": 77680,
+   "hex": "0x12f70",
+   "name": "ENV Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 829
+  },
+  {
+   "offset": 77696,
+   "hex": "0x12f80",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 830
+  },
+  {
+   "offset": 77712,
+   "hex": "0x12f90",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 831
+  },
+  {
+   "offset": 77728,
+   "hex": "0x12fa0",
+   "name": "PWM Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 832
+  },
+  {
+   "offset": 77776,
+   "hex": "0x12fd0",
+   "name": "JU OSC Saw Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 833
+  },
+  {
+   "offset": 77792,
+   "hex": "0x12fe0",
+   "name": "JU OSC Sqr Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 834
+  },
+  {
+   "offset": 77808,
+   "hex": "0x12ff0",
+   "name": "JU OSC Sub Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 835
+  },
+  {
+   "offset": 79104,
+   "hex": "0x13500",
+   "name": "Duty Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 836
+  },
+  {
+   "offset": 80032,
+   "hex": "0x138a0",
+   "name": "Osc1 Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 837
+  },
+  {
+   "offset": 80096,
+   "hex": "0x138e0",
+   "name": "Osc1 Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 838
+  },
+  {
+   "offset": 80112,
+   "hex": "0x138f0",
+   "name": "Osc Noise Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 839
+  },
+  {
+   "offset": 80304,
+   "hex": "0x139b0",
+   "name": "Griffer SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 840
+  },
+  {
+   "offset": 80320,
+   "hex": "0x139c0",
+   "name": "LPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 841
+  },
+  {
+   "offset": 80416,
+   "hex": "0x13a20",
+   "name": "LPF Resonance",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 842
+  },
+  {
+   "offset": 80448,
+   "hex": "0x13a40",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 843
+  },
+  {
+   "offset": 80592,
+   "hex": "0x13ad0",
+   "name": "Env1/2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 844
+  },
+  {
+   "offset": 80608,
+   "hex": "0x13ae0",
+   "name": "Int/Env",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 845
+  },
+  {
+   "offset": 80880,
+   "hex": "0x13bf0",
+   "name": "LFO Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 846
+  },
+  {
+   "offset": 80896,
+   "hex": "0x13c00",
+   "name": "Ext LFO Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 847
+  },
+  {
+   "offset": 80912,
+   "hex": "0x13c10",
+   "name": "GRF Bned SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 848
+  },
+  {
+   "offset": 80928,
+   "hex": "0x13c20",
+   "name": "LFO Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 849
+  },
+  {
+   "offset": 80944,
+   "hex": "0x13c30",
+   "name": "MOD Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 850
+  },
+  {
+   "offset": 80960,
+   "hex": "0x13c40",
+   "name": "MOD SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 851
+  },
+  {
+   "offset": 80976,
+   "hex": "0x13c50",
+   "name": "ENV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 852
+  },
+  {
+   "offset": 80992,
+   "hex": "0x13c60",
+   "name": "KCV Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 853
+  },
+  {
+   "offset": 81008,
+   "hex": "0x13c70",
+   "name": "Velocity Sens",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 854
+  },
+  {
+   "offset": 81024,
+   "hex": "0x13c80",
+   "name": "Velocity Offset",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 855
+  },
+  {
+   "offset": 81040,
+   "hex": "0x13c90",
+   "name": "Bend Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 856
+  },
+  {
+   "offset": 81056,
+   "hex": "0x13ca0",
+   "name": "Bend Range",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 857
+  },
+  {
+   "offset": 81184,
+   "hex": "0x13d20",
+   "name": "Cutoff Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 858
+  },
+  {
+   "offset": 81200,
+   "hex": "0x13d30",
+   "name": "Resonance Tune",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 859
+  },
+  {
+   "offset": 81216,
+   "hex": "0x13d40",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 860
+  },
+  {
+   "offset": 82640,
+   "hex": "0x142d0",
+   "name": "PlugIn Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 861
+  },
+  {
+   "offset": 82656,
+   "hex": "0x142e0",
+   "name": "-12dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 862
+  },
+  {
+   "offset": 82672,
+   "hex": "0x142f0",
+   "name": "-18dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 863
+  },
+  {
+   "offset": 82688,
+   "hex": "0x14300",
+   "name": "-24dB/oct Tap",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 864
+  },
+  {
+   "offset": 83168,
+   "hex": "0x144e0",
+   "name": "AMP TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 865
+  },
+  {
+   "offset": 83184,
+   "hex": "0x144f0",
+   "name": "AMP VELOCITY SENS",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 866
+  },
+  {
+   "offset": 83200,
+   "hex": "0x14500",
+   "name": "AMP FIX VELOCITY LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 867
+  },
+  {
+   "offset": 83264,
+   "hex": "0x14540",
+   "name": "Velocity",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 868
+  },
+  {
+   "offset": 83408,
+   "hex": "0x145d0",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 869
+  },
+  {
+   "offset": 83760,
+   "hex": "0x14730",
+   "name": "Gate SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 870
+  },
+  {
+   "offset": 83776,
+   "hex": "0x14740",
+   "name": "ENV1 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 871
+  },
+  {
+   "offset": 83792,
+   "hex": "0x14750",
+   "name": "ENV2 SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 872
+  },
+  {
+   "offset": 83808,
+   "hex": "0x14760",
+   "name": "Ext ENV SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 873
+  },
+  {
+   "offset": 83824,
+   "hex": "0x14770",
+   "name": "HPF Cutoff",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 874
+  },
+  {
+   "offset": 83840,
+   "hex": "0x14780",
+   "name": "HPF Switch",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 875
+  },
+  {
+   "offset": 83856,
+   "hex": "0x14790",
+   "name": "Boost LPF Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 876
+  },
+  {
+   "offset": 83872,
+   "hex": "0x147a0",
+   "name": "Boost Thru Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 877
+  },
+  {
+   "offset": 83888,
+   "hex": "0x147b0",
+   "name": "ENV LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 878
+  },
+  {
+   "offset": 83904,
+   "hex": "0x147c0",
+   "name": "AMP LEVEL",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 879
+  },
+  {
+   "offset": 84304,
+   "hex": "0x14950",
+   "name": "Ext Noise Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 880
+  },
+  {
+   "offset": 84448,
+   "hex": "0x149e0",
+   "name": "Voice01 Output On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 881
+  },
+  {
+   "offset": 84464,
+   "hex": "0x149f0",
+   "name": "Voice23 Output On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 882
+  },
+  {
+   "offset": 84480,
+   "hex": "0x14a00",
+   "name": "Voice45 Output On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 883
+  },
+  {
+   "offset": 84496,
+   "hex": "0x14a10",
+   "name": "Voice67 Output On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 884
+  },
+  {
+   "offset": 84544,
+   "hex": "0x14a40",
+   "name": "Effect SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 885
+  },
+  {
+   "offset": 84560,
+   "hex": "0x14a50",
+   "name": "Mute SW",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 886
+  },
+  {
+   "offset": 85136,
+   "hex": "0x14c90",
+   "name": "DS Drive",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 887
+  },
+  {
+   "offset": 85152,
+   "hex": "0x14ca0",
+   "name": "DS Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 888
+  },
+  {
+   "offset": 85168,
+   "hex": "0x14cb0",
+   "name": "DS Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 889
+  },
+  {
+   "offset": 85184,
+   "hex": "0x14cc0",
+   "name": "DS BiasMute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 890
+  },
+  {
+   "offset": 85984,
+   "hex": "0x14fe0",
+   "name": "OD TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 891
+  },
+  {
+   "offset": 86288,
+   "hex": "0x15110",
+   "name": "DS Drive",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 892
+  },
+  {
+   "offset": 86304,
+   "hex": "0x15120",
+   "name": "DS Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 893
+  },
+  {
+   "offset": 86320,
+   "hex": "0x15130",
+   "name": "DS Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 894
+  },
+  {
+   "offset": 86336,
+   "hex": "0x15140",
+   "name": "DS BiasMute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 895
+  },
+  {
+   "offset": 87056,
+   "hex": "0x15410",
+   "name": "DS TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 896
+  },
+  {
+   "offset": 87616,
+   "hex": "0x15640",
+   "name": "DS Drive",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 897
+  },
+  {
+   "offset": 87632,
+   "hex": "0x15650",
+   "name": "DS Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 898
+  },
+  {
+   "offset": 87648,
+   "hex": "0x15660",
+   "name": "DS Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 899
+  },
+  {
+   "offset": 88976,
+   "hex": "0x15b90",
+   "name": "MT TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 900
+  },
+  {
+   "offset": 89312,
+   "hex": "0x15ce0",
+   "name": "DS Drive",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 901
+  },
+  {
+   "offset": 89328,
+   "hex": "0x15cf0",
+   "name": "DS Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 902
+  },
+  {
+   "offset": 89344,
+   "hex": "0x15d00",
+   "name": "DS Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 903
+  },
+  {
+   "offset": 89360,
+   "hex": "0x15d10",
+   "name": "DS BiasMute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 904
+  },
+  {
+   "offset": 90256,
+   "hex": "0x16090",
+   "name": "FZ TONE",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 905
+  },
+  {
+   "offset": 91120,
+   "hex": "0x163f0",
+   "name": "Delay Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 906
+  },
+  {
+   "offset": 91136,
+   "hex": "0x16400",
+   "name": "Error Depth",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 907
+  },
+  {
+   "offset": 91152,
+   "hex": "0x16410",
+   "name": "LFO Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 908
+  },
+  {
+   "offset": 91168,
+   "hex": "0x16420",
+   "name": "LFO Phase",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 909
+  },
+  {
+   "offset": 91184,
+   "hex": "0x16430",
+   "name": "LFO Depth",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 910
+  },
+  {
+   "offset": 91200,
+   "hex": "0x16440",
+   "name": "Noise Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 911
+  },
+  {
+   "offset": 91216,
+   "hex": "0x16450",
+   "name": "Dry Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 912
+  },
+  {
+   "offset": 91232,
+   "hex": "0x16460",
+   "name": "Wet Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 913
+  },
+  {
+   "offset": 91248,
+   "hex": "0x16470",
+   "name": "Ip Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 914
+  },
+  {
+   "offset": 91264,
+   "hex": "0x16480",
+   "name": "On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 915
+  },
+  {
+   "offset": 91280,
+   "hex": "0x16490",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 916
+  },
+  {
+   "offset": 96336,
+   "hex": "0x17850",
+   "name": "Delay Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 917
+  },
+  {
+   "offset": 96352,
+   "hex": "0x17860",
+   "name": "LFO Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 918
+  },
+  {
+   "offset": 96368,
+   "hex": "0x17870",
+   "name": "LFO Depth",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 919
+  },
+  {
+   "offset": 96384,
+   "hex": "0x17880",
+   "name": "Ip Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 920
+  },
+  {
+   "offset": 96400,
+   "hex": "0x17890",
+   "name": "On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 921
+  },
+  {
+   "offset": 96416,
+   "hex": "0x178a0",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 922
+  },
+  {
+   "offset": 101072,
+   "hex": "0x18ad0",
+   "name": "Patch Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 923
+  },
+  {
+   "offset": 101136,
+   "hex": "0x18b10",
+   "name": "Expression",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 924
+  },
+  {
+   "offset": 101152,
+   "hex": "0x18b20",
+   "name": "Volume",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 925
+  },
+  {
+   "offset": 101488,
+   "hex": "0x18c70",
+   "name": "Voice0 Gate Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 926
+  },
+  {
+   "offset": 101504,
+   "hex": "0x18c80",
+   "name": "Voice0 Note Off Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 927
+  },
+  {
+   "offset": 101520,
+   "hex": "0x18c90",
+   "name": "Voice1 Gate Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 928
+  },
+  {
+   "offset": 101536,
+   "hex": "0x18ca0",
+   "name": "Voice1 Note Off Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 929
+  },
+  {
+   "offset": 101552,
+   "hex": "0x18cb0",
+   "name": "Voice2 Gate Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 930
+  },
+  {
+   "offset": 101568,
+   "hex": "0x18cc0",
+   "name": "Voice2 Note Off Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 931
+  },
+  {
+   "offset": 101584,
+   "hex": "0x18cd0",
+   "name": "Voice3 Gate Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 932
+  },
+  {
+   "offset": 101600,
+   "hex": "0x18ce0",
+   "name": "Voice3 Note Off Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 933
+  },
+  {
+   "offset": 101616,
+   "hex": "0x18cf0",
+   "name": "Voice4 Gate Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 934
+  },
+  {
+   "offset": 101632,
+   "hex": "0x18d00",
+   "name": "Voice4 Note Off Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 935
+  },
+  {
+   "offset": 101648,
+   "hex": "0x18d10",
+   "name": "Voice5 Gate Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 936
+  },
+  {
+   "offset": 101664,
+   "hex": "0x18d20",
+   "name": "Voice5 Note Off Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 937
+  },
+  {
+   "offset": 101680,
+   "hex": "0x18d30",
+   "name": "Voice6 Gate Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 938
+  },
+  {
+   "offset": 101696,
+   "hex": "0x18d40",
+   "name": "Voice6 Note Off Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 939
+  },
+  {
+   "offset": 101712,
+   "hex": "0x18d50",
+   "name": "Voice7 Gate Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 940
+  },
+  {
+   "offset": 101728,
+   "hex": "0x18d60",
+   "name": "Voice7 Note Off Notify",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 941
+  },
+  {
+   "offset": 101744,
+   "hex": "0x18d70",
+   "name": "DLY Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 942
+  },
+  {
+   "offset": 102352,
+   "hex": "0x18fd0",
+   "name": "Delay Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 943
+  },
+  {
+   "offset": 102368,
+   "hex": "0x18fe0",
+   "name": "High Cut C0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 944
+  },
+  {
+   "offset": 102384,
+   "hex": "0x18ff0",
+   "name": "High Cut A0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 945
+  },
+  {
+   "offset": 102400,
+   "hex": "0x19000",
+   "name": "High Cut A1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 946
+  },
+  {
+   "offset": 102416,
+   "hex": "0x19010",
+   "name": "High Cut B0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 947
+  },
+  {
+   "offset": 102432,
+   "hex": "0x19020",
+   "name": "High Cut B2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 948
+  },
+  {
+   "offset": 102448,
+   "hex": "0x19030",
+   "name": "Use IIR High Cut Filter",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 949
+  },
+  {
+   "offset": 102464,
+   "hex": "0x19040",
+   "name": "High Cut Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 950
+  },
+  {
+   "offset": 102480,
+   "hex": "0x19050",
+   "name": "High Cut Qc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 951
+  },
+  {
+   "offset": 102496,
+   "hex": "0x19060",
+   "name": "High Cut Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 952
+  },
+  {
+   "offset": 102512,
+   "hex": "0x19070",
+   "name": "Dry Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 953
+  },
+  {
+   "offset": 102528,
+   "hex": "0x19080",
+   "name": "Wet Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 954
+  },
+  {
+   "offset": 102544,
+   "hex": "0x19090",
+   "name": "Ip Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 955
+  },
+  {
+   "offset": 102560,
+   "hex": "0x190a0",
+   "name": "Feedback",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 956
+  },
+  {
+   "offset": 102576,
+   "hex": "0x190b0",
+   "name": "On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 957
+  },
+  {
+   "offset": 102592,
+   "hex": "0x190c0",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 958
+  },
+  {
+   "offset": 102608,
+   "hex": "0x190d0",
+   "name": "LF Damp Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 959
+  },
+  {
+   "offset": 102624,
+   "hex": "0x190e0",
+   "name": "LF Damp Hp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 960
+  },
+  {
+   "offset": 102640,
+   "hex": "0x190f0",
+   "name": "LF Damp Lp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 961
+  },
+  {
+   "offset": 102656,
+   "hex": "0x19100",
+   "name": "HF Damp Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 962
+  },
+  {
+   "offset": 102672,
+   "hex": "0x19110",
+   "name": "HF Damp Hp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 963
+  },
+  {
+   "offset": 102688,
+   "hex": "0x19120",
+   "name": "HF Damp Lp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 964
+  },
+  {
+   "offset": 4297584,
+   "hex": "0x419370",
+   "name": "Delay Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 965
+  },
+  {
+   "offset": 4297600,
+   "hex": "0x419380",
+   "name": "High Cut C0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 966
+  },
+  {
+   "offset": 4297616,
+   "hex": "0x419390",
+   "name": "High Cut A0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 967
+  },
+  {
+   "offset": 4297632,
+   "hex": "0x4193a0",
+   "name": "High Cut A1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 968
+  },
+  {
+   "offset": 4297648,
+   "hex": "0x4193b0",
+   "name": "High Cut B0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 969
+  },
+  {
+   "offset": 4297664,
+   "hex": "0x4193c0",
+   "name": "High Cut B2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 970
+  },
+  {
+   "offset": 4297680,
+   "hex": "0x4193d0",
+   "name": "Use IIR High Cut Filter",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 971
+  },
+  {
+   "offset": 4297696,
+   "hex": "0x4193e0",
+   "name": "High Cut Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 972
+  },
+  {
+   "offset": 4297712,
+   "hex": "0x4193f0",
+   "name": "High Cut Qc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 973
+  },
+  {
+   "offset": 4297728,
+   "hex": "0x419400",
+   "name": "High Cut Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 974
+  },
+  {
+   "offset": 4297744,
+   "hex": "0x419410",
+   "name": "Dry Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 975
+  },
+  {
+   "offset": 4297760,
+   "hex": "0x419420",
+   "name": "Wet Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 976
+  },
+  {
+   "offset": 4297776,
+   "hex": "0x419430",
+   "name": "Ip Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 977
+  },
+  {
+   "offset": 4297792,
+   "hex": "0x419440",
+   "name": "Tap Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 978
+  },
+  {
+   "offset": 4297808,
+   "hex": "0x419450",
+   "name": "Feedback",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 979
+  },
+  {
+   "offset": 4297824,
+   "hex": "0x419460",
+   "name": "On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 980
+  },
+  {
+   "offset": 4297840,
+   "hex": "0x419470",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 981
+  },
+  {
+   "offset": 4297856,
+   "hex": "0x419480",
+   "name": "Tap Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 982
+  },
+  {
+   "offset": 4297872,
+   "hex": "0x419490",
+   "name": "Stereo Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 983
+  },
+  {
+   "offset": 4297888,
+   "hex": "0x4194a0",
+   "name": "Wet Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 984
+  },
+  {
+   "offset": 4297904,
+   "hex": "0x4194b0",
+   "name": "LF Damp Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 985
+  },
+  {
+   "offset": 4297920,
+   "hex": "0x4194c0",
+   "name": "LF Damp Hp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 986
+  },
+  {
+   "offset": 4297936,
+   "hex": "0x4194d0",
+   "name": "LF Damp Lp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 987
+  },
+  {
+   "offset": 4297952,
+   "hex": "0x4194e0",
+   "name": "HF Damp Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 988
+  },
+  {
+   "offset": 4297968,
+   "hex": "0x4194f0",
+   "name": "HF Damp Hp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 989
+  },
+  {
+   "offset": 4297984,
+   "hex": "0x419500",
+   "name": "HF Damp Lp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 990
+  },
+  {
+   "offset": 6395312,
+   "hex": "0x6195b0",
+   "name": "Chorus CV",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 991
+  },
+  {
+   "offset": 6395328,
+   "hex": "0x6195c0",
+   "name": "Chrus LFO Sync",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 992
+  },
+  {
+   "offset": 6396128,
+   "hex": "0x6198e0",
+   "name": "Delay Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 993
+  },
+  {
+   "offset": 6396144,
+   "hex": "0x6198f0",
+   "name": "LFO Curve",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 994
+  },
+  {
+   "offset": 6396160,
+   "hex": "0x619900",
+   "name": "LFO Manual",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 995
+  },
+  {
+   "offset": 6396176,
+   "hex": "0x619910",
+   "name": "LFO Depth",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 996
+  },
+  {
+   "offset": 6396192,
+   "hex": "0x619920",
+   "name": "High Cut C0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 997
+  },
+  {
+   "offset": 6396208,
+   "hex": "0x619930",
+   "name": "High Cut A0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 998
+  },
+  {
+   "offset": 6396224,
+   "hex": "0x619940",
+   "name": "High Cut A1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 999
+  },
+  {
+   "offset": 6396240,
+   "hex": "0x619950",
+   "name": "High Cut B0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1000
+  },
+  {
+   "offset": 6396256,
+   "hex": "0x619960",
+   "name": "High Cut B2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1001
+  },
+  {
+   "offset": 6396272,
+   "hex": "0x619970",
+   "name": "Use IIR High Cut Filter",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1002
+  },
+  {
+   "offset": 6396288,
+   "hex": "0x619980",
+   "name": "High Cut Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1003
+  },
+  {
+   "offset": 6396304,
+   "hex": "0x619990",
+   "name": "High Cut Qc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1004
+  },
+  {
+   "offset": 6396320,
+   "hex": "0x6199a0",
+   "name": "High Cut Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1005
+  },
+  {
+   "offset": 6396336,
+   "hex": "0x6199b0",
+   "name": "Low Cut Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1006
+  },
+  {
+   "offset": 6396352,
+   "hex": "0x6199c0",
+   "name": "Low Cut Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1007
+  },
+  {
+   "offset": 6396368,
+   "hex": "0x6199d0",
+   "name": "Dry Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1008
+  },
+  {
+   "offset": 6396384,
+   "hex": "0x6199e0",
+   "name": "Wet Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1009
+  },
+  {
+   "offset": 6396400,
+   "hex": "0x6199f0",
+   "name": "Ip Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1010
+  },
+  {
+   "offset": 6396416,
+   "hex": "0x619a00",
+   "name": "Feedback",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1011
+  },
+  {
+   "offset": 6396432,
+   "hex": "0x619a10",
+   "name": "On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1012
+  },
+  {
+   "offset": 6396448,
+   "hex": "0x619a20",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1013
+  },
+  {
+   "offset": 6396464,
+   "hex": "0x619a30",
+   "name": "Tap Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1014
+  },
+  {
+   "offset": 6396480,
+   "hex": "0x619a40",
+   "name": "Stereo Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1015
+  },
+  {
+   "offset": 6396496,
+   "hex": "0x619a50",
+   "name": "Dry Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1016
+  },
+  {
+   "offset": 6396512,
+   "hex": "0x619a60",
+   "name": "Wet Gain",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1017
+  },
+  {
+   "offset": 6429472,
+   "hex": "0x621b20",
+   "name": "Flanger CV",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1018
+  },
+  {
+   "offset": 6429488,
+   "hex": "0x621b30",
+   "name": "Flanger LFO Sync",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1019
+  },
+  {
+   "offset": 6430464,
+   "hex": "0x621f00",
+   "name": "Delay Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1020
+  },
+  {
+   "offset": 6430480,
+   "hex": "0x621f10",
+   "name": "LFO Curve",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1021
+  },
+  {
+   "offset": 6430496,
+   "hex": "0x621f20",
+   "name": "LFO Manual",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1022
+  },
+  {
+   "offset": 6430512,
+   "hex": "0x621f30",
+   "name": "LFO Depth",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1023
+  },
+  {
+   "offset": 6430528,
+   "hex": "0x621f40",
+   "name": "High Cut C0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1024
+  },
+  {
+   "offset": 6430544,
+   "hex": "0x621f50",
+   "name": "High Cut A0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1025
+  },
+  {
+   "offset": 6430560,
+   "hex": "0x621f60",
+   "name": "High Cut A1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1026
+  },
+  {
+   "offset": 6430576,
+   "hex": "0x621f70",
+   "name": "High Cut B0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1027
+  },
+  {
+   "offset": 6430592,
+   "hex": "0x621f80",
+   "name": "High Cut B2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1028
+  },
+  {
+   "offset": 6430608,
+   "hex": "0x621f90",
+   "name": "Use IIR High Cut Filter",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1029
+  },
+  {
+   "offset": 6430624,
+   "hex": "0x621fa0",
+   "name": "High Cut Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1030
+  },
+  {
+   "offset": 6430640,
+   "hex": "0x621fb0",
+   "name": "High Cut Qc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1031
+  },
+  {
+   "offset": 6430656,
+   "hex": "0x621fc0",
+   "name": "High Cut Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1032
+  },
+  {
+   "offset": 6430672,
+   "hex": "0x621fd0",
+   "name": "Low Cut Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1033
+  },
+  {
+   "offset": 6430688,
+   "hex": "0x621fe0",
+   "name": "Low Cut Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1034
+  },
+  {
+   "offset": 6430704,
+   "hex": "0x621ff0",
+   "name": "Dry Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1035
+  },
+  {
+   "offset": 6430720,
+   "hex": "0x622000",
+   "name": "Wet Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1036
+  },
+  {
+   "offset": 6430736,
+   "hex": "0x622010",
+   "name": "Ip Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1037
+  },
+  {
+   "offset": 6430752,
+   "hex": "0x622020",
+   "name": "Feedback",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1038
+  },
+  {
+   "offset": 6430768,
+   "hex": "0x622030",
+   "name": "On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1039
+  },
+  {
+   "offset": 6430784,
+   "hex": "0x622040",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1040
+  },
+  {
+   "offset": 6430800,
+   "hex": "0x622050",
+   "name": "LFO St.Phase",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1041
+  },
+  {
+   "offset": 6430816,
+   "hex": "0x622060",
+   "name": "LFO St.Ofst",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1042
+  },
+  {
+   "offset": 6497168,
+   "hex": "0x632390",
+   "name": "Delay Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1043
+  },
+  {
+   "offset": 6497184,
+   "hex": "0x6323a0",
+   "name": "High Cut C0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1044
+  },
+  {
+   "offset": 6497200,
+   "hex": "0x6323b0",
+   "name": "High Cut A0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1045
+  },
+  {
+   "offset": 6497216,
+   "hex": "0x6323c0",
+   "name": "High Cut A1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1046
+  },
+  {
+   "offset": 6497232,
+   "hex": "0x6323d0",
+   "name": "High Cut B0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1047
+  },
+  {
+   "offset": 6497248,
+   "hex": "0x6323e0",
+   "name": "High Cut B2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1048
+  },
+  {
+   "offset": 6497264,
+   "hex": "0x6323f0",
+   "name": "Use IIR High Cut Filter",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1049
+  },
+  {
+   "offset": 6497280,
+   "hex": "0x632400",
+   "name": "High Cut Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1050
+  },
+  {
+   "offset": 6497296,
+   "hex": "0x632410",
+   "name": "High Cut Qc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1051
+  },
+  {
+   "offset": 6497312,
+   "hex": "0x632420",
+   "name": "High Cut Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1052
+  },
+  {
+   "offset": 6497328,
+   "hex": "0x632430",
+   "name": "Dry Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1053
+  },
+  {
+   "offset": 6497344,
+   "hex": "0x632440",
+   "name": "Wet Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1054
+  },
+  {
+   "offset": 6497360,
+   "hex": "0x632450",
+   "name": "Ip Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1055
+  },
+  {
+   "offset": 6497376,
+   "hex": "0x632460",
+   "name": "Feedback",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1056
+  },
+  {
+   "offset": 6497392,
+   "hex": "0x632470",
+   "name": "On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1057
+  },
+  {
+   "offset": 6497408,
+   "hex": "0x632480",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1058
+  },
+  {
+   "offset": 6497424,
+   "hex": "0x632490",
+   "name": "LF Damp Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1059
+  },
+  {
+   "offset": 6497440,
+   "hex": "0x6324a0",
+   "name": "LF Damp Hp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1060
+  },
+  {
+   "offset": 6497456,
+   "hex": "0x6324b0",
+   "name": "LF Damp Lp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1061
+  },
+  {
+   "offset": 6497472,
+   "hex": "0x6324c0",
+   "name": "HF Damp Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1062
+  },
+  {
+   "offset": 6497488,
+   "hex": "0x6324d0",
+   "name": "HF Damp Hp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1063
+  },
+  {
+   "offset": 6497504,
+   "hex": "0x6324e0",
+   "name": "HF Damp Lp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1064
+  },
+  {
+   "offset": 10692016,
+   "hex": "0xa325b0",
+   "name": "Chorus CV",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1065
+  },
+  {
+   "offset": 10692032,
+   "hex": "0xa325c0",
+   "name": "Chrus LFO Sync",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1066
+  },
+  {
+   "offset": 10693008,
+   "hex": "0xa32990",
+   "name": "Delay Time",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1067
+  },
+  {
+   "offset": 10693024,
+   "hex": "0xa329a0",
+   "name": "LFO Curve",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1068
+  },
+  {
+   "offset": 10693040,
+   "hex": "0xa329b0",
+   "name": "LFO Manual",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1069
+  },
+  {
+   "offset": 10693056,
+   "hex": "0xa329c0",
+   "name": "LFO Depth",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1070
+  },
+  {
+   "offset": 10693072,
+   "hex": "0xa329d0",
+   "name": "High Cut C0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1071
+  },
+  {
+   "offset": 10693088,
+   "hex": "0xa329e0",
+   "name": "High Cut A0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1072
+  },
+  {
+   "offset": 10693104,
+   "hex": "0xa329f0",
+   "name": "High Cut A1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1073
+  },
+  {
+   "offset": 10693120,
+   "hex": "0xa32a00",
+   "name": "High Cut B0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1074
+  },
+  {
+   "offset": 10693136,
+   "hex": "0xa32a10",
+   "name": "High Cut B2",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1075
+  },
+  {
+   "offset": 10693152,
+   "hex": "0xa32a20",
+   "name": "Use IIR High Cut Filter",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1076
+  },
+  {
+   "offset": 10693168,
+   "hex": "0xa32a30",
+   "name": "High Cut Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1077
+  },
+  {
+   "offset": 10693184,
+   "hex": "0xa32a40",
+   "name": "High Cut Qc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1078
+  },
+  {
+   "offset": 10693200,
+   "hex": "0xa32a50",
+   "name": "High Cut Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1079
+  },
+  {
+   "offset": 10693216,
+   "hex": "0xa32a60",
+   "name": "Low Cut Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1080
+  },
+  {
+   "offset": 10693232,
+   "hex": "0xa32a70",
+   "name": "Low Cut Sw",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1081
+  },
+  {
+   "offset": 10693248,
+   "hex": "0xa32a80",
+   "name": "Dry Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1082
+  },
+  {
+   "offset": 10693264,
+   "hex": "0xa32a90",
+   "name": "Wet Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1083
+  },
+  {
+   "offset": 10693280,
+   "hex": "0xa32aa0",
+   "name": "Ip Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1084
+  },
+  {
+   "offset": 10693296,
+   "hex": "0xa32ab0",
+   "name": "Feedback",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1085
+  },
+  {
+   "offset": 10693312,
+   "hex": "0xa32ac0",
+   "name": "On/Off",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1086
+  },
+  {
+   "offset": 10693328,
+   "hex": "0xa32ad0",
+   "name": "Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1087
+  },
+  {
+   "offset": 10693344,
+   "hex": "0xa32ae0",
+   "name": "LFO St.Phase",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1088
+  },
+  {
+   "offset": 10693360,
+   "hex": "0xa32af0",
+   "name": "LFO St.Ofst",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1089
+  },
+  {
+   "offset": 10759360,
+   "hex": "0xa42cc0",
+   "name": "Rev Dpm PreDly",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1090
+  },
+  {
+   "offset": 10759376,
+   "hex": "0xa42cd0",
+   "name": "Rev Ecf On",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1091
+  },
+  {
+   "offset": 10759392,
+   "hex": "0xa42ce0",
+   "name": "Rev Ecf Density",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1092
+  },
+  {
+   "offset": 10759408,
+   "hex": "0xa42cf0",
+   "name": "Rev Ecf Level",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1093
+  },
+  {
+   "offset": 10759424,
+   "hex": "0xa42d00",
+   "name": "Rev Ecf Dir Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1094
+  },
+  {
+   "offset": 10759440,
+   "hex": "0xa42d10",
+   "name": "Rev Ecf Glb Lev",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1095
+  },
+  {
+   "offset": 10759456,
+   "hex": "0xa42d20",
+   "name": "Rev Ecf Mute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1096
+  },
+  {
+   "offset": 10759472,
+   "hex": "0xa42d30",
+   "name": "Rev Ecf In Att ",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1097
+  },
+  {
+   "offset": 10759488,
+   "hex": "0xa42d40",
+   "name": "Rev Ecf Depth",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1098
+  },
+  {
+   "offset": 10759504,
+   "hex": "0xa42d50",
+   "name": "Rev Ecf Rate",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1099
+  },
+  {
+   "offset": 10759520,
+   "hex": "0xa42d60",
+   "name": "Rev Ecf HPF C0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1100
+  },
+  {
+   "offset": 10759536,
+   "hex": "0xa42d70",
+   "name": "Rev Ecf HPF A0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1101
+  },
+  {
+   "offset": 10759552,
+   "hex": "0xa42d80",
+   "name": "Rev Ecf HPF B0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1102
+  },
+  {
+   "offset": 10759568,
+   "hex": "0xa42d90",
+   "name": "Rev Ecf LPF C0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1103
+  },
+  {
+   "offset": 10759584,
+   "hex": "0xa42da0",
+   "name": "Rev Ecf LPF A0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1104
+  },
+  {
+   "offset": 10759600,
+   "hex": "0xa42db0",
+   "name": "Rev Ecf LPF A1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1105
+  },
+  {
+   "offset": 10759616,
+   "hex": "0xa42dc0",
+   "name": "Rev Ecf LPF B0",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1106
+  },
+  {
+   "offset": 10759632,
+   "hex": "0xa42dd0",
+   "name": "Rev Ecf LPF B1",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1107
+  },
+  {
+   "offset": 10759648,
+   "hex": "0xa42de0",
+   "name": "Rev Ecf DPF0 Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1108
+  },
+  {
+   "offset": 10759664,
+   "hex": "0xa42df0",
+   "name": "Rev Ecf DPF0 Hp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1109
+  },
+  {
+   "offset": 10759680,
+   "hex": "0xa42e00",
+   "name": "Rev Ecf DPF0 Lp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1110
+  },
+  {
+   "offset": 10759696,
+   "hex": "0xa42e10",
+   "name": "Rev Ecf DPF1 Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1111
+  },
+  {
+   "offset": 10759712,
+   "hex": "0xa42e20",
+   "name": "Rev Ecf DPF1 Hp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1112
+  },
+  {
+   "offset": 10759728,
+   "hex": "0xa42e30",
+   "name": "Rev Ecf DPF1 Lp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1113
+  },
+  {
+   "offset": 10759744,
+   "hex": "0xa42e40",
+   "name": "Rev Ecf DPF2 Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1114
+  },
+  {
+   "offset": 10759760,
+   "hex": "0xa42e50",
+   "name": "Rev Ecf DPF2 Hp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1115
+  },
+  {
+   "offset": 10759776,
+   "hex": "0xa42e60",
+   "name": "Rev Ecf DPF2 Lp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1116
+  },
+  {
+   "offset": 10759792,
+   "hex": "0xa42e70",
+   "name": "Rev Ecf DPF3 Fc",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1117
+  },
+  {
+   "offset": 10759808,
+   "hex": "0xa42e80",
+   "name": "Rev Ecf DPF3 Hp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1118
+  },
+  {
+   "offset": 10759824,
+   "hex": "0xa42e90",
+   "name": "Rev Ecf DPF3 Lp",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1119
+  },
+  {
+   "offset": 10759840,
+   "hex": "0xa42ea0",
+   "name": "Rev Ecf DlyMute",
+   "desc": "xmmword_7FF91E5EC030",
+   "idx": 1120
+  }
+ ]
+}
