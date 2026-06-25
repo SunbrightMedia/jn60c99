@@ -40,7 +40,7 @@ int main(int argc,char**argv){
     juno_arp_note_on(&arp,60,100); juno_arp_note_on(&arp,64,100); juno_arp_note_on(&arp,67,100);
     juno_arp_set_mode(&arp,15); juno_arp_set_range(&arp,0); juno_arp_set_running(&arp,1);
 
-    int start=SR/2, step=SR/4, gate=(int)(step*0.7);   /* STEP=1 -> 1/8 @120bpm (code-confirmed UP, 1-octave) */
+    int start=SR/2, step=SR/8, gate=(int)(step*0.7);   /* STEP=1 ~ 1/16 @120bpm (1/8 ran too slow per A/B) */
     int arp_end=start+2*SR, N=start+2*SR+SR, idx=0;
     float*L=malloc(4*N),*R=malloc(4*N);
     int next_step=start, cur=-1, gate_off=-1, nsteps=0;
