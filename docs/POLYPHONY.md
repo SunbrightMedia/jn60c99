@@ -40,3 +40,25 @@ True 8-voice polyphony, each voice exact. `tests/play_chord.c` (`make chord`)
 renders a C–G–Am–F progression; `juno_note_on(st, voice, midi_note)` plays a note on
 any voice. Voice allocation (which physical voice a new note takes) is a host-layer
 policy; the driver currently assigns voices explicitly.
+
+## Correction: the M.CV pitch-base bug (chords only played the root)
+
+The "True 8-voice polyphony" claim above was premature — voices 1-7 produced sound
+but at the WRONG PITCH, so chords collapsed to the root. Root cause:
+
+- **Offset 304 ("M.CV") is the per-voice pitch BASE**, and it sits **16 bytes BELOW**
+  each voice's main block (voice 0 at 304, voice 1 at 10816, voice 2 at 21328 = each
+  voice's block-start − 16). `voice_render` reads it via `juno_voff(304,v)=304+10512*v`.
+- The parameter broadcast copies voice-0 params across voices at `+10512`. Offset
+  10816 is *also* listed as a voice-0 param ("M.CV") in `PARAM_MAP.tsv`, so the
+  broadcast writes that param value into **voice 1's pitch-base slot (10816)** — and
+  likewise for voices 2-7. Result: voices 1-7's pitch base is overwritten with the
+  wrong value (~2.0 instead of the patch base ~6.67). Only voice 0 was correct,
+  because the capture seeded its M.CV directly.
+- Proven by tracing the pitch path (`4448` note + `3776` mod; `3776 ← 752 ← M.CV/304`):
+  with the same note, voice 0 M.CV=6.668 vs voices 1-7=2.000. Copying voice 0's M.CV
+  to all voices restored a full C-E-G triad.
+
+**Fix** (`src/juno_driver.c`, `juno_note_on`): re-seat each played voice's M.CV
+(`304 + v*10512`) from voice 0's base, after the broadcast. Verified: full triad via
+the normal `note_on` path; smoke tests green. Chords now play correctly.
