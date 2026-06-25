@@ -41,3 +41,4 @@ refs/preset_banks/
 
 # Arp smoke test binary
 tests/test_arp_smoke
+tests/test_init_default

@@ -1,0 +1,8973 @@
+[
+ {
+  "param_id": 0,
+  "name": "UseExtJack",
+  "offset": 272,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1,
+  "name": "M.CV",
+  "offset": 304,
+  "tableId": 32,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 2,
+  "name": "M.Gate",
+  "offset": 320,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 3,
+  "name": "Master Tune",
+  "offset": 368,
+  "tableId": 6,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 4,
+  "name": "Part Tune",
+  "offset": 384,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 5,
+  "name": "Portamento OnOff",
+  "offset": 592,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 6,
+  "name": "Portamento Mode",
+  "offset": 608,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 7,
+  "name": "Portamento Time",
+  "offset": 624,
+  "tableId": 4,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 8,
+  "name": "LFO Griffer Rate Sw",
+  "offset": 1040,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 9,
+  "name": "LFO Tempo Rate Sw",
+  "offset": 1056,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 10,
+  "name": "LFO Tempo Rate",
+  "offset": 1072,
+  "tableId": 53,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 11,
+  "name": "LFO Rate",
+  "offset": 1088,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 12,
+  "name": "Gate",
+  "offset": 1856,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 13,
+  "name": "LFO Trig",
+  "offset": 1872,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 14,
+  "name": "Reset Sw",
+  "offset": 1888,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 15,
+  "name": "LFO UseExtGate",
+  "offset": 1904,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 16,
+  "name": "LFO Delay",
+  "offset": 1920,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 17,
+  "name": "LFO Delay Sw",
+  "offset": 1936,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 18,
+  "name": "LFO Sin Sw",
+  "offset": 1952,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 19,
+  "name": "LFO Tri Sw",
+  "offset": 1968,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 20,
+  "name": "LFO Sqr Sw",
+  "offset": 1984,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 21,
+  "name": "LFO Saw Sw",
+  "offset": 2000,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 22,
+  "name": "LFO Saw(Inv) Sw",
+  "offset": 2016,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 23,
+  "name": "LFO S&H Sw",
+  "offset": 2032,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 24,
+  "name": "LFO Noise Sw",
+  "offset": 2048,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 25,
+  "name": "LFO Noise Mix",
+  "offset": 2064,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 26,
+  "name": "LFO Internal Sw",
+  "offset": 2080,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 27,
+  "name": "LFO External0 Sw",
+  "offset": 2096,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 28,
+  "name": "LFO External1 Sw",
+  "offset": 2112,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 29,
+  "name": "read only",
+  "offset": 2528,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 30,
+  "name": "read only",
+  "offset": 2544,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 31,
+  "name": "LFO trigger env sw",
+  "offset": 2560,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 32,
+  "name": "ENV Attack",
+  "offset": 2784,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 33,
+  "name": "ENV Sustain",
+  "offset": 2800,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 34,
+  "name": "ENV Decay",
+  "offset": 2816,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 35,
+  "name": "ENV Release",
+  "offset": 2832,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 36,
+  "name": "Q24C Initialize",
+  "offset": 2848,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 37,
+  "name": "LFO trigger env sw",
+  "offset": 3040,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 38,
+  "name": "ENV Attack",
+  "offset": 3264,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 39,
+  "name": "ENV Sustain",
+  "offset": 3280,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 40,
+  "name": "ENV Decay",
+  "offset": 3296,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 41,
+  "name": "ENV Release",
+  "offset": 3312,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 42,
+  "name": "Q24C Initialize",
+  "offset": 3328,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 43,
+  "name": "OSC1 Feet",
+  "offset": 3840,
+  "tableId": 5,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 44,
+  "name": "Griffer Bend SW",
+  "offset": 3856,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 45,
+  "name": "Bend Enable SW",
+  "offset": 3872,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 46,
+  "name": "PWM SW LFO",
+  "offset": 3888,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 47,
+  "name": "PWM SW ENV1",
+  "offset": 3904,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 48,
+  "name": "PWM SW ENV2",
+  "offset": 3920,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 49,
+  "name": "PWM SW Manual",
+  "offset": 3936,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 50,
+  "name": "Tune",
+  "offset": 3952,
+  "tableId": 28,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 51,
+  "name": "Detune",
+  "offset": 3968,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 52,
+  "name": "Mod Sens",
+  "offset": 3984,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 53,
+  "name": "Mod Sw",
+  "offset": 4000,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 54,
+  "name": "LFO Gain",
+  "offset": 4016,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 55,
+  "name": "LFO Level",
+  "offset": 4032,
+  "tableId": 0,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 56,
+  "name": "LFO Sw",
+  "offset": 4048,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 57,
+  "name": "ENV1 Level",
+  "offset": 4064,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 58,
+  "name": "ENV2 Level",
+  "offset": 4080,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 59,
+  "name": "ENV Sw",
+  "offset": 4096,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 60,
+  "name": "Bend Level",
+  "offset": 4112,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 61,
+  "name": "Bend Range",
+  "offset": 4128,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 62,
+  "name": "PWM Level",
+  "offset": 4144,
+  "tableId": 45,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 63,
+  "name": "JU OSC Saw Lev",
+  "offset": 4192,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 64,
+  "name": "JU OSC Sqr Lev",
+  "offset": 4208,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 65,
+  "name": "JU OSC Sub Lev",
+  "offset": 4224,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 66,
+  "name": "Duty Tune",
+  "offset": 5520,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 67,
+  "name": "Osc1 Mute",
+  "offset": 6448,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 68,
+  "name": "Osc1 Level",
+  "offset": 6512,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 69,
+  "name": "Osc Noise Level",
+  "offset": 6528,
+  "tableId": 12,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 70,
+  "name": "Griffer SW",
+  "offset": 6720,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 71,
+  "name": "LPF Cutoff",
+  "offset": 6736,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 72,
+  "name": "LPF Resonance",
+  "offset": 6832,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 73,
+  "name": "Velocity",
+  "offset": 6864,
+  "tableId": 21,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 74,
+  "name": "Env1/2",
+  "offset": 7008,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 75,
+  "name": "Int/Env",
+  "offset": 7024,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 76,
+  "name": "LFO Gain",
+  "offset": 7296,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 77,
+  "name": "Ext LFO Sw",
+  "offset": 7312,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 78,
+  "name": "GRF Bned SW",
+  "offset": 7328,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 79,
+  "name": "LFO Level",
+  "offset": 7344,
+  "tableId": 47,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 80,
+  "name": "MOD Sens",
+  "offset": 7360,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 81,
+  "name": "MOD SW",
+  "offset": 7376,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 82,
+  "name": "ENV Level",
+  "offset": 7392,
+  "tableId": 46,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 83,
+  "name": "KCV Level",
+  "offset": 7408,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 84,
+  "name": "Velocity Sens",
+  "offset": 7424,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 85,
+  "name": "Velocity Offset",
+  "offset": 7440,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 86,
+  "name": "Bend Level",
+  "offset": 7456,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 87,
+  "name": "Bend Range",
+  "offset": 7472,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 88,
+  "name": "Cutoff Tune",
+  "offset": 7600,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 89,
+  "name": "Resonance Tune",
+  "offset": 7616,
+  "tableId": 31,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 90,
+  "name": "PlugIn Sw",
+  "offset": 7632,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 91,
+  "name": "PlugIn Sw",
+  "offset": 9056,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 92,
+  "name": "-12dB/oct Tap",
+  "offset": 9072,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 93,
+  "name": "-18dB/oct Tap",
+  "offset": 9088,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 94,
+  "name": "-24dB/oct Tap",
+  "offset": 9104,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 95,
+  "name": "AMP TONE",
+  "offset": 9584,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 96,
+  "name": "AMP VELOCITY SENS",
+  "offset": 9600,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 97,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "offset": 9616,
+  "tableId": 56,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 98,
+  "name": "Velocity",
+  "offset": 9680,
+  "tableId": 56,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 99,
+  "name": "Mute",
+  "offset": 9824,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 100,
+  "name": "Gate SW",
+  "offset": 10176,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 101,
+  "name": "ENV1 SW",
+  "offset": 10192,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 102,
+  "name": "ENV2 SW",
+  "offset": 10208,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 103,
+  "name": "Ext ENV SW",
+  "offset": 10224,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 104,
+  "name": "HPF Cutoff",
+  "offset": 10240,
+  "tableId": 41,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 105,
+  "name": "HPF Switch",
+  "offset": 10256,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 106,
+  "name": "Boost LPF Level",
+  "offset": 10272,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 107,
+  "name": "Boost Thru Level",
+  "offset": 10288,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 108,
+  "name": "ENV LEVEL",
+  "offset": 10304,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 109,
+  "name": "AMP LEVEL",
+  "offset": 10320,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 110,
+  "name": "UseExtJack",
+  "offset": 10784,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 111,
+  "name": "M.CV",
+  "offset": 10816,
+  "tableId": 32,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 112,
+  "name": "M.Gate",
+  "offset": 10832,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 113,
+  "name": "Master Tune",
+  "offset": 10880,
+  "tableId": 6,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 114,
+  "name": "Part Tune",
+  "offset": 10896,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 115,
+  "name": "Portamento OnOff",
+  "offset": 11104,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 116,
+  "name": "Portamento Mode",
+  "offset": 11120,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 117,
+  "name": "Portamento Time",
+  "offset": 11136,
+  "tableId": 7,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 118,
+  "name": "LFO Griffer Rate Sw",
+  "offset": 11552,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 119,
+  "name": "LFO Tempo Rate Sw",
+  "offset": 11568,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 120,
+  "name": "LFO Tempo Rate",
+  "offset": 11584,
+  "tableId": 53,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 121,
+  "name": "LFO Rate",
+  "offset": 11600,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 122,
+  "name": "Gate",
+  "offset": 12368,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 123,
+  "name": "LFO Trig",
+  "offset": 12384,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 124,
+  "name": "Reset Sw",
+  "offset": 12400,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 125,
+  "name": "LFO UseExtGate",
+  "offset": 12416,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 126,
+  "name": "LFO Delay",
+  "offset": 12432,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 127,
+  "name": "LFO Delay Sw",
+  "offset": 12448,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 128,
+  "name": "LFO Sin Sw",
+  "offset": 12464,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 129,
+  "name": "LFO Tri Sw",
+  "offset": 12480,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 130,
+  "name": "LFO Sqr Sw",
+  "offset": 12496,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 131,
+  "name": "LFO Saw Sw",
+  "offset": 12512,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 132,
+  "name": "LFO Saw(Inv) Sw",
+  "offset": 12528,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 133,
+  "name": "LFO S&H Sw",
+  "offset": 12544,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 134,
+  "name": "LFO Noise Sw",
+  "offset": 12560,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 135,
+  "name": "LFO Noise Mix",
+  "offset": 12576,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 136,
+  "name": "LFO Internal Sw",
+  "offset": 12592,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 137,
+  "name": "LFO External0 Sw",
+  "offset": 12608,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 138,
+  "name": "LFO External1 Sw",
+  "offset": 12624,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 139,
+  "name": "read only",
+  "offset": 13040,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 140,
+  "name": "read only",
+  "offset": 13056,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 141,
+  "name": "LFO trigger env sw",
+  "offset": 13072,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 142,
+  "name": "ENV Attack",
+  "offset": 13296,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 143,
+  "name": "ENV Sustain",
+  "offset": 13312,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 144,
+  "name": "ENV Decay",
+  "offset": 13328,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 145,
+  "name": "ENV Release",
+  "offset": 13344,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 146,
+  "name": "Q24C Initialize",
+  "offset": 13360,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 147,
+  "name": "LFO trigger env sw",
+  "offset": 13552,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 148,
+  "name": "ENV Attack",
+  "offset": 13776,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 149,
+  "name": "ENV Sustain",
+  "offset": 13792,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 150,
+  "name": "ENV Decay",
+  "offset": 13808,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 151,
+  "name": "ENV Release",
+  "offset": 13824,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 152,
+  "name": "Q24C Initialize",
+  "offset": 13840,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 153,
+  "name": "OSC1 Feet",
+  "offset": 14352,
+  "tableId": 5,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 154,
+  "name": "Griffer Bend SW",
+  "offset": 14368,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 155,
+  "name": "Bend Enable SW",
+  "offset": 14384,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 156,
+  "name": "PWM SW LFO",
+  "offset": 14400,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 157,
+  "name": "PWM SW ENV1",
+  "offset": 14416,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 158,
+  "name": "PWM SW ENV2",
+  "offset": 14432,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 159,
+  "name": "PWM SW Manual",
+  "offset": 14448,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 160,
+  "name": "Tune",
+  "offset": 14464,
+  "tableId": 28,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 161,
+  "name": "Detune",
+  "offset": 14480,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 162,
+  "name": "Mod Sens",
+  "offset": 14496,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 163,
+  "name": "Mod Sw",
+  "offset": 14512,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 164,
+  "name": "LFO Gain",
+  "offset": 14528,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 165,
+  "name": "LFO Level",
+  "offset": 14544,
+  "tableId": 0,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 166,
+  "name": "LFO Sw",
+  "offset": 14560,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 167,
+  "name": "ENV1 Level",
+  "offset": 14576,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 168,
+  "name": "ENV2 Level",
+  "offset": 14592,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 169,
+  "name": "ENV Sw",
+  "offset": 14608,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 170,
+  "name": "Bend Level",
+  "offset": 14624,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 171,
+  "name": "Bend Range",
+  "offset": 14640,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 172,
+  "name": "PWM Level",
+  "offset": 14656,
+  "tableId": 45,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 173,
+  "name": "JU OSC Saw Lev",
+  "offset": 14704,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 174,
+  "name": "JU OSC Sqr Lev",
+  "offset": 14720,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 175,
+  "name": "JU OSC Sub Lev",
+  "offset": 14736,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 176,
+  "name": "Duty Tune",
+  "offset": 16032,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 177,
+  "name": "Osc1 Mute",
+  "offset": 16960,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 178,
+  "name": "Osc1 Level",
+  "offset": 17024,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 179,
+  "name": "Osc Noise Level",
+  "offset": 17040,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 180,
+  "name": "Griffer SW",
+  "offset": 17232,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 181,
+  "name": "LPF Cutoff",
+  "offset": 17248,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 182,
+  "name": "LPF Resonance",
+  "offset": 17344,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 183,
+  "name": "Velocity",
+  "offset": 17376,
+  "tableId": 56,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 184,
+  "name": "Env1/2",
+  "offset": 17520,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 185,
+  "name": "Int/Env",
+  "offset": 17536,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 186,
+  "name": "LFO Gain",
+  "offset": 17808,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 187,
+  "name": "Ext LFO Sw",
+  "offset": 17824,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 188,
+  "name": "GRF Bned SW",
+  "offset": 17840,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 189,
+  "name": "LFO Level",
+  "offset": 17856,
+  "tableId": 47,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 190,
+  "name": "MOD Sens",
+  "offset": 17872,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 191,
+  "name": "MOD SW",
+  "offset": 17888,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 192,
+  "name": "ENV Level",
+  "offset": 17904,
+  "tableId": 46,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 193,
+  "name": "KCV Level",
+  "offset": 17920,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 194,
+  "name": "Velocity Sens",
+  "offset": 17936,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 195,
+  "name": "Velocity Offset",
+  "offset": 17952,
+  "tableId": 56,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 196,
+  "name": "Bend Level",
+  "offset": 17968,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 197,
+  "name": "Bend Range",
+  "offset": 17984,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 198,
+  "name": "Cutoff Tune",
+  "offset": 18112,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 199,
+  "name": "Resonance Tune",
+  "offset": 18128,
+  "tableId": 31,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 200,
+  "name": "PlugIn Sw",
+  "offset": 18144,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 201,
+  "name": "PlugIn Sw",
+  "offset": 19568,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 202,
+  "name": "-12dB/oct Tap",
+  "offset": 19584,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 203,
+  "name": "-18dB/oct Tap",
+  "offset": 19600,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 204,
+  "name": "-24dB/oct Tap",
+  "offset": 19616,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 205,
+  "name": "AMP TONE",
+  "offset": 20096,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 206,
+  "name": "AMP VELOCITY SENS",
+  "offset": 20112,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 207,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "offset": 20128,
+  "tableId": 57,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 208,
+  "name": "Velocity",
+  "offset": 20192,
+  "tableId": 57,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 209,
+  "name": "Mute",
+  "offset": 20336,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 210,
+  "name": "Gate SW",
+  "offset": 20688,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 211,
+  "name": "ENV1 SW",
+  "offset": 20704,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 212,
+  "name": "ENV2 SW",
+  "offset": 20720,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 213,
+  "name": "Ext ENV SW",
+  "offset": 20736,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 214,
+  "name": "HPF Cutoff",
+  "offset": 20752,
+  "tableId": 41,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 215,
+  "name": "HPF Switch",
+  "offset": 20768,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 216,
+  "name": "Boost LPF Level",
+  "offset": 20784,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 217,
+  "name": "Boost Thru Level",
+  "offset": 20800,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 218,
+  "name": "ENV LEVEL",
+  "offset": 20816,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 219,
+  "name": "AMP LEVEL",
+  "offset": 20832,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 220,
+  "name": "UseExtJack",
+  "offset": 21296,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 221,
+  "name": "M.CV",
+  "offset": 21328,
+  "tableId": 32,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 222,
+  "name": "M.Gate",
+  "offset": 21344,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 223,
+  "name": "Master Tune",
+  "offset": 21392,
+  "tableId": 6,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 224,
+  "name": "Part Tune",
+  "offset": 21408,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 225,
+  "name": "Portamento OnOff",
+  "offset": 21616,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 226,
+  "name": "Portamento Mode",
+  "offset": 21632,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 227,
+  "name": "Portamento Time",
+  "offset": 21648,
+  "tableId": 7,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 228,
+  "name": "LFO Griffer Rate Sw",
+  "offset": 22064,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 229,
+  "name": "LFO Tempo Rate Sw",
+  "offset": 22080,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 230,
+  "name": "LFO Tempo Rate",
+  "offset": 22096,
+  "tableId": 53,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 231,
+  "name": "LFO Rate",
+  "offset": 22112,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 232,
+  "name": "Gate",
+  "offset": 22880,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 233,
+  "name": "LFO Trig",
+  "offset": 22896,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 234,
+  "name": "Reset Sw",
+  "offset": 22912,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 235,
+  "name": "LFO UseExtGate",
+  "offset": 22928,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 236,
+  "name": "LFO Delay",
+  "offset": 22944,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 237,
+  "name": "LFO Delay Sw",
+  "offset": 22960,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 238,
+  "name": "LFO Sin Sw",
+  "offset": 22976,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 239,
+  "name": "LFO Tri Sw",
+  "offset": 22992,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 240,
+  "name": "LFO Sqr Sw",
+  "offset": 23008,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 241,
+  "name": "LFO Saw Sw",
+  "offset": 23024,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 242,
+  "name": "LFO Saw(Inv) Sw",
+  "offset": 23040,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 243,
+  "name": "LFO S&H Sw",
+  "offset": 23056,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 244,
+  "name": "LFO Noise Sw",
+  "offset": 23072,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 245,
+  "name": "LFO Noise Mix",
+  "offset": 23088,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 246,
+  "name": "LFO Internal Sw",
+  "offset": 23104,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 247,
+  "name": "LFO External0 Sw",
+  "offset": 23120,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 248,
+  "name": "LFO External1 Sw",
+  "offset": 23136,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 249,
+  "name": "read only",
+  "offset": 23552,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 250,
+  "name": "read only",
+  "offset": 23568,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 251,
+  "name": "LFO trigger env sw",
+  "offset": 23584,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 252,
+  "name": "ENV Attack",
+  "offset": 23808,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 253,
+  "name": "ENV Sustain",
+  "offset": 23824,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 254,
+  "name": "ENV Decay",
+  "offset": 23840,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 255,
+  "name": "ENV Release",
+  "offset": 23856,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 256,
+  "name": "Q24C Initialize",
+  "offset": 23872,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 257,
+  "name": "LFO trigger env sw",
+  "offset": 24064,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 258,
+  "name": "ENV Attack",
+  "offset": 24288,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 259,
+  "name": "ENV Sustain",
+  "offset": 24304,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 260,
+  "name": "ENV Decay",
+  "offset": 24320,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 261,
+  "name": "ENV Release",
+  "offset": 24336,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 262,
+  "name": "Q24C Initialize",
+  "offset": 24352,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 263,
+  "name": "OSC1 Feet",
+  "offset": 24864,
+  "tableId": 5,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 264,
+  "name": "Griffer Bend SW",
+  "offset": 24880,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 265,
+  "name": "Bend Enable SW",
+  "offset": 24896,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 266,
+  "name": "PWM SW LFO",
+  "offset": 24912,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 267,
+  "name": "PWM SW ENV1",
+  "offset": 24928,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 268,
+  "name": "PWM SW ENV2",
+  "offset": 24944,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 269,
+  "name": "PWM SW Manual",
+  "offset": 24960,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 270,
+  "name": "Tune",
+  "offset": 24976,
+  "tableId": 28,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 271,
+  "name": "Detune",
+  "offset": 24992,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 272,
+  "name": "Mod Sens",
+  "offset": 25008,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 273,
+  "name": "Mod Sw",
+  "offset": 25024,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 274,
+  "name": "LFO Gain",
+  "offset": 25040,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 275,
+  "name": "LFO Level",
+  "offset": 25056,
+  "tableId": 0,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 276,
+  "name": "LFO Sw",
+  "offset": 25072,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 277,
+  "name": "ENV1 Level",
+  "offset": 25088,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 278,
+  "name": "ENV2 Level",
+  "offset": 25104,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 279,
+  "name": "ENV Sw",
+  "offset": 25120,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 280,
+  "name": "Bend Level",
+  "offset": 25136,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 281,
+  "name": "Bend Range",
+  "offset": 25152,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 282,
+  "name": "PWM Level",
+  "offset": 25168,
+  "tableId": 45,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 283,
+  "name": "JU OSC Saw Lev",
+  "offset": 25216,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 284,
+  "name": "JU OSC Sqr Lev",
+  "offset": 25232,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 285,
+  "name": "JU OSC Sub Lev",
+  "offset": 25248,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 286,
+  "name": "Duty Tune",
+  "offset": 26544,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 287,
+  "name": "Osc1 Mute",
+  "offset": 27472,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 288,
+  "name": "Osc1 Level",
+  "offset": 27536,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 289,
+  "name": "Osc Noise Level",
+  "offset": 27552,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 290,
+  "name": "Griffer SW",
+  "offset": 27744,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 291,
+  "name": "LPF Cutoff",
+  "offset": 27760,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 292,
+  "name": "LPF Resonance",
+  "offset": 27856,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 293,
+  "name": "Velocity",
+  "offset": 27888,
+  "tableId": 56,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 294,
+  "name": "Env1/2",
+  "offset": 28032,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 295,
+  "name": "Int/Env",
+  "offset": 28048,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 296,
+  "name": "LFO Gain",
+  "offset": 28320,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 297,
+  "name": "Ext LFO Sw",
+  "offset": 28336,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 298,
+  "name": "GRF Bned SW",
+  "offset": 28352,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 299,
+  "name": "LFO Level",
+  "offset": 28368,
+  "tableId": 47,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 300,
+  "name": "MOD Sens",
+  "offset": 28384,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 301,
+  "name": "MOD SW",
+  "offset": 28400,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 302,
+  "name": "ENV Level",
+  "offset": 28416,
+  "tableId": 46,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 303,
+  "name": "KCV Level",
+  "offset": 28432,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 304,
+  "name": "Velocity Sens",
+  "offset": 28448,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 305,
+  "name": "Velocity Offset",
+  "offset": 28464,
+  "tableId": 56,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 306,
+  "name": "Bend Level",
+  "offset": 28480,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 307,
+  "name": "Bend Range",
+  "offset": 28496,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 308,
+  "name": "Cutoff Tune",
+  "offset": 28624,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 309,
+  "name": "Resonance Tune",
+  "offset": 28640,
+  "tableId": 31,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 310,
+  "name": "PlugIn Sw",
+  "offset": 28656,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 311,
+  "name": "PlugIn Sw",
+  "offset": 30080,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 312,
+  "name": "-12dB/oct Tap",
+  "offset": 30096,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 313,
+  "name": "-18dB/oct Tap",
+  "offset": 30112,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 314,
+  "name": "-24dB/oct Tap",
+  "offset": 30128,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 315,
+  "name": "AMP TONE",
+  "offset": 30608,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 316,
+  "name": "AMP VELOCITY SENS",
+  "offset": 30624,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 317,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "offset": 30640,
+  "tableId": 57,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 318,
+  "name": "Velocity",
+  "offset": 30704,
+  "tableId": 57,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 319,
+  "name": "Mute",
+  "offset": 30848,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 320,
+  "name": "Gate SW",
+  "offset": 31200,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 321,
+  "name": "ENV1 SW",
+  "offset": 31216,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 322,
+  "name": "ENV2 SW",
+  "offset": 31232,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 323,
+  "name": "Ext ENV SW",
+  "offset": 31248,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 324,
+  "name": "HPF Cutoff",
+  "offset": 31264,
+  "tableId": 41,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 325,
+  "name": "HPF Switch",
+  "offset": 31280,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 326,
+  "name": "Boost LPF Level",
+  "offset": 31296,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 327,
+  "name": "Boost Thru Level",
+  "offset": 31312,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 328,
+  "name": "ENV LEVEL",
+  "offset": 31328,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 329,
+  "name": "AMP LEVEL",
+  "offset": 31344,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 330,
+  "name": "UseExtJack",
+  "offset": 31808,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 331,
+  "name": "M.CV",
+  "offset": 31840,
+  "tableId": 32,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 332,
+  "name": "M.Gate",
+  "offset": 31856,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 333,
+  "name": "Master Tune",
+  "offset": 31904,
+  "tableId": 6,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 334,
+  "name": "Part Tune",
+  "offset": 31920,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 335,
+  "name": "Portamento OnOff",
+  "offset": 32128,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 336,
+  "name": "Portamento Mode",
+  "offset": 32144,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 337,
+  "name": "Portamento Time",
+  "offset": 32160,
+  "tableId": 7,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 338,
+  "name": "LFO Griffer Rate Sw",
+  "offset": 32576,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 339,
+  "name": "LFO Tempo Rate Sw",
+  "offset": 32592,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 340,
+  "name": "LFO Tempo Rate",
+  "offset": 32608,
+  "tableId": 53,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 341,
+  "name": "LFO Rate",
+  "offset": 32624,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 342,
+  "name": "Gate",
+  "offset": 33392,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 343,
+  "name": "LFO Trig",
+  "offset": 33408,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 344,
+  "name": "Reset Sw",
+  "offset": 33424,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 345,
+  "name": "LFO UseExtGate",
+  "offset": 33440,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 346,
+  "name": "LFO Delay",
+  "offset": 33456,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 347,
+  "name": "LFO Delay Sw",
+  "offset": 33472,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 348,
+  "name": "LFO Sin Sw",
+  "offset": 33488,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 349,
+  "name": "LFO Tri Sw",
+  "offset": 33504,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 350,
+  "name": "LFO Sqr Sw",
+  "offset": 33520,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 351,
+  "name": "LFO Saw Sw",
+  "offset": 33536,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 352,
+  "name": "LFO Saw(Inv) Sw",
+  "offset": 33552,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 353,
+  "name": "LFO S&H Sw",
+  "offset": 33568,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 354,
+  "name": "LFO Noise Sw",
+  "offset": 33584,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 355,
+  "name": "LFO Noise Mix",
+  "offset": 33600,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 356,
+  "name": "LFO Internal Sw",
+  "offset": 33616,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 357,
+  "name": "LFO External0 Sw",
+  "offset": 33632,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 358,
+  "name": "LFO External1 Sw",
+  "offset": 33648,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 359,
+  "name": "read only",
+  "offset": 34064,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 360,
+  "name": "read only",
+  "offset": 34080,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 361,
+  "name": "LFO trigger env sw",
+  "offset": 34096,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 362,
+  "name": "ENV Attack",
+  "offset": 34320,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 363,
+  "name": "ENV Sustain",
+  "offset": 34336,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 364,
+  "name": "ENV Decay",
+  "offset": 34352,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 365,
+  "name": "ENV Release",
+  "offset": 34368,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 366,
+  "name": "Q24C Initialize",
+  "offset": 34384,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 367,
+  "name": "LFO trigger env sw",
+  "offset": 34576,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 368,
+  "name": "ENV Attack",
+  "offset": 34800,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 369,
+  "name": "ENV Sustain",
+  "offset": 34816,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 370,
+  "name": "ENV Decay",
+  "offset": 34832,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 371,
+  "name": "ENV Release",
+  "offset": 34848,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 372,
+  "name": "Q24C Initialize",
+  "offset": 34864,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 373,
+  "name": "OSC1 Feet",
+  "offset": 35376,
+  "tableId": 5,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 374,
+  "name": "Griffer Bend SW",
+  "offset": 35392,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 375,
+  "name": "Bend Enable SW",
+  "offset": 35408,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 376,
+  "name": "PWM SW LFO",
+  "offset": 35424,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 377,
+  "name": "PWM SW ENV1",
+  "offset": 35440,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 378,
+  "name": "PWM SW ENV2",
+  "offset": 35456,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 379,
+  "name": "PWM SW Manual",
+  "offset": 35472,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 380,
+  "name": "Tune",
+  "offset": 35488,
+  "tableId": 28,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 381,
+  "name": "Detune",
+  "offset": 35504,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 382,
+  "name": "Mod Sens",
+  "offset": 35520,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 383,
+  "name": "Mod Sw",
+  "offset": 35536,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 384,
+  "name": "LFO Gain",
+  "offset": 35552,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 385,
+  "name": "LFO Level",
+  "offset": 35568,
+  "tableId": 0,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 386,
+  "name": "LFO Sw",
+  "offset": 35584,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 387,
+  "name": "ENV1 Level",
+  "offset": 35600,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 388,
+  "name": "ENV2 Level",
+  "offset": 35616,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 389,
+  "name": "ENV Sw",
+  "offset": 35632,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 390,
+  "name": "Bend Level",
+  "offset": 35648,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 391,
+  "name": "Bend Range",
+  "offset": 35664,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 392,
+  "name": "PWM Level",
+  "offset": 35680,
+  "tableId": 45,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 393,
+  "name": "JU OSC Saw Lev",
+  "offset": 35728,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 394,
+  "name": "JU OSC Sqr Lev",
+  "offset": 35744,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 395,
+  "name": "JU OSC Sub Lev",
+  "offset": 35760,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 396,
+  "name": "Duty Tune",
+  "offset": 37056,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 397,
+  "name": "Osc1 Mute",
+  "offset": 37984,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 398,
+  "name": "Osc1 Level",
+  "offset": 38048,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 399,
+  "name": "Osc Noise Level",
+  "offset": 38064,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 400,
+  "name": "Griffer SW",
+  "offset": 38256,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 401,
+  "name": "LPF Cutoff",
+  "offset": 38272,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 402,
+  "name": "LPF Resonance",
+  "offset": 38368,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 403,
+  "name": "Velocity",
+  "offset": 38400,
+  "tableId": 56,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 404,
+  "name": "Env1/2",
+  "offset": 38544,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 405,
+  "name": "Int/Env",
+  "offset": 38560,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 406,
+  "name": "LFO Gain",
+  "offset": 38832,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 407,
+  "name": "Ext LFO Sw",
+  "offset": 38848,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 408,
+  "name": "GRF Bned SW",
+  "offset": 38864,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 409,
+  "name": "LFO Level",
+  "offset": 38880,
+  "tableId": 47,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 410,
+  "name": "MOD Sens",
+  "offset": 38896,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 411,
+  "name": "MOD SW",
+  "offset": 38912,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 412,
+  "name": "ENV Level",
+  "offset": 38928,
+  "tableId": 46,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 413,
+  "name": "KCV Level",
+  "offset": 38944,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 414,
+  "name": "Velocity Sens",
+  "offset": 38960,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 415,
+  "name": "Velocity Offset",
+  "offset": 38976,
+  "tableId": 56,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 416,
+  "name": "Bend Level",
+  "offset": 38992,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 417,
+  "name": "Bend Range",
+  "offset": 39008,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 418,
+  "name": "Cutoff Tune",
+  "offset": 39136,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 419,
+  "name": "Resonance Tune",
+  "offset": 39152,
+  "tableId": 31,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 420,
+  "name": "PlugIn Sw",
+  "offset": 39168,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 421,
+  "name": "PlugIn Sw",
+  "offset": 40592,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 422,
+  "name": "-12dB/oct Tap",
+  "offset": 40608,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 423,
+  "name": "-18dB/oct Tap",
+  "offset": 40624,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 424,
+  "name": "-24dB/oct Tap",
+  "offset": 40640,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 425,
+  "name": "AMP TONE",
+  "offset": 41120,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 426,
+  "name": "AMP VELOCITY SENS",
+  "offset": 41136,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 427,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "offset": 41152,
+  "tableId": 57,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 428,
+  "name": "Velocity",
+  "offset": 41216,
+  "tableId": 57,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 429,
+  "name": "Mute",
+  "offset": 41360,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 430,
+  "name": "Gate SW",
+  "offset": 41712,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 431,
+  "name": "ENV1 SW",
+  "offset": 41728,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 432,
+  "name": "ENV2 SW",
+  "offset": 41744,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 433,
+  "name": "Ext ENV SW",
+  "offset": 41760,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 434,
+  "name": "HPF Cutoff",
+  "offset": 41776,
+  "tableId": 41,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 435,
+  "name": "HPF Switch",
+  "offset": 41792,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 436,
+  "name": "Boost LPF Level",
+  "offset": 41808,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 437,
+  "name": "Boost Thru Level",
+  "offset": 41824,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 438,
+  "name": "ENV LEVEL",
+  "offset": 41840,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 439,
+  "name": "AMP LEVEL",
+  "offset": 41856,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 440,
+  "name": "UseExtJack",
+  "offset": 42320,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 441,
+  "name": "M.CV",
+  "offset": 42352,
+  "tableId": 32,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 442,
+  "name": "M.Gate",
+  "offset": 42368,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 443,
+  "name": "Master Tune",
+  "offset": 42416,
+  "tableId": 6,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 444,
+  "name": "Part Tune",
+  "offset": 42432,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 445,
+  "name": "Portamento OnOff",
+  "offset": 42640,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 446,
+  "name": "Portamento Mode",
+  "offset": 42656,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 447,
+  "name": "Portamento Time",
+  "offset": 42672,
+  "tableId": 7,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 448,
+  "name": "LFO Griffer Rate Sw",
+  "offset": 43088,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 449,
+  "name": "LFO Tempo Rate Sw",
+  "offset": 43104,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 450,
+  "name": "LFO Tempo Rate",
+  "offset": 43120,
+  "tableId": 53,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 451,
+  "name": "LFO Rate",
+  "offset": 43136,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 452,
+  "name": "Gate",
+  "offset": 43904,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 453,
+  "name": "LFO Trig",
+  "offset": 43920,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 454,
+  "name": "Reset Sw",
+  "offset": 43936,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 455,
+  "name": "LFO UseExtGate",
+  "offset": 43952,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 456,
+  "name": "LFO Delay",
+  "offset": 43968,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 457,
+  "name": "LFO Delay Sw",
+  "offset": 43984,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 458,
+  "name": "LFO Sin Sw",
+  "offset": 44000,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 459,
+  "name": "LFO Tri Sw",
+  "offset": 44016,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 460,
+  "name": "LFO Sqr Sw",
+  "offset": 44032,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 461,
+  "name": "LFO Saw Sw",
+  "offset": 44048,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 462,
+  "name": "LFO Saw(Inv) Sw",
+  "offset": 44064,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 463,
+  "name": "LFO S&H Sw",
+  "offset": 44080,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 464,
+  "name": "LFO Noise Sw",
+  "offset": 44096,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 465,
+  "name": "LFO Noise Mix",
+  "offset": 44112,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 466,
+  "name": "LFO Internal Sw",
+  "offset": 44128,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 467,
+  "name": "LFO External0 Sw",
+  "offset": 44144,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 468,
+  "name": "LFO External1 Sw",
+  "offset": 44160,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 469,
+  "name": "read only",
+  "offset": 44576,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 470,
+  "name": "read only",
+  "offset": 44592,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 471,
+  "name": "LFO trigger env sw",
+  "offset": 44608,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 472,
+  "name": "ENV Attack",
+  "offset": 44832,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 473,
+  "name": "ENV Sustain",
+  "offset": 44848,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 474,
+  "name": "ENV Decay",
+  "offset": 44864,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 475,
+  "name": "ENV Release",
+  "offset": 44880,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 476,
+  "name": "Q24C Initialize",
+  "offset": 44896,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 477,
+  "name": "LFO trigger env sw",
+  "offset": 45088,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 478,
+  "name": "ENV Attack",
+  "offset": 45312,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 479,
+  "name": "ENV Sustain",
+  "offset": 45328,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 480,
+  "name": "ENV Decay",
+  "offset": 45344,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 481,
+  "name": "ENV Release",
+  "offset": 45360,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 482,
+  "name": "Q24C Initialize",
+  "offset": 45376,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 483,
+  "name": "OSC1 Feet",
+  "offset": 45888,
+  "tableId": 5,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 484,
+  "name": "Griffer Bend SW",
+  "offset": 45904,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 485,
+  "name": "Bend Enable SW",
+  "offset": 45920,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 486,
+  "name": "PWM SW LFO",
+  "offset": 45936,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 487,
+  "name": "PWM SW ENV1",
+  "offset": 45952,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 488,
+  "name": "PWM SW ENV2",
+  "offset": 45968,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 489,
+  "name": "PWM SW Manual",
+  "offset": 45984,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 490,
+  "name": "Tune",
+  "offset": 46000,
+  "tableId": 28,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 491,
+  "name": "Detune",
+  "offset": 46016,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 492,
+  "name": "Mod Sens",
+  "offset": 46032,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 493,
+  "name": "Mod Sw",
+  "offset": 46048,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 494,
+  "name": "LFO Gain",
+  "offset": 46064,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 495,
+  "name": "LFO Level",
+  "offset": 46080,
+  "tableId": 0,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 496,
+  "name": "LFO Sw",
+  "offset": 46096,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 497,
+  "name": "ENV1 Level",
+  "offset": 46112,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 498,
+  "name": "ENV2 Level",
+  "offset": 46128,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 499,
+  "name": "ENV Sw",
+  "offset": 46144,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 500,
+  "name": "Bend Level",
+  "offset": 46160,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 501,
+  "name": "Bend Range",
+  "offset": 46176,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 502,
+  "name": "PWM Level",
+  "offset": 46192,
+  "tableId": 45,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 503,
+  "name": "JU OSC Saw Lev",
+  "offset": 46240,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 504,
+  "name": "JU OSC Sqr Lev",
+  "offset": 46256,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 505,
+  "name": "JU OSC Sub Lev",
+  "offset": 46272,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 506,
+  "name": "Duty Tune",
+  "offset": 47568,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 507,
+  "name": "Osc1 Mute",
+  "offset": 48496,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 508,
+  "name": "Osc1 Level",
+  "offset": 48560,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 509,
+  "name": "Osc Noise Level",
+  "offset": 48576,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 510,
+  "name": "Griffer SW",
+  "offset": 48768,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 511,
+  "name": "LPF Cutoff",
+  "offset": 48784,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 512,
+  "name": "LPF Resonance",
+  "offset": 48880,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 513,
+  "name": "Velocity",
+  "offset": 48912,
+  "tableId": 56,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 514,
+  "name": "Env1/2",
+  "offset": 49056,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 515,
+  "name": "Int/Env",
+  "offset": 49072,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 516,
+  "name": "LFO Gain",
+  "offset": 49344,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 517,
+  "name": "Ext LFO Sw",
+  "offset": 49360,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 518,
+  "name": "GRF Bned SW",
+  "offset": 49376,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 519,
+  "name": "LFO Level",
+  "offset": 49392,
+  "tableId": 47,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 520,
+  "name": "MOD Sens",
+  "offset": 49408,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 521,
+  "name": "MOD SW",
+  "offset": 49424,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 522,
+  "name": "ENV Level",
+  "offset": 49440,
+  "tableId": 46,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 523,
+  "name": "KCV Level",
+  "offset": 49456,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 524,
+  "name": "Velocity Sens",
+  "offset": 49472,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 525,
+  "name": "Velocity Offset",
+  "offset": 49488,
+  "tableId": 56,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 526,
+  "name": "Bend Level",
+  "offset": 49504,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 527,
+  "name": "Bend Range",
+  "offset": 49520,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 528,
+  "name": "Cutoff Tune",
+  "offset": 49648,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 529,
+  "name": "Resonance Tune",
+  "offset": 49664,
+  "tableId": 31,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 530,
+  "name": "PlugIn Sw",
+  "offset": 49680,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 531,
+  "name": "PlugIn Sw",
+  "offset": 51104,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 532,
+  "name": "-12dB/oct Tap",
+  "offset": 51120,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 533,
+  "name": "-18dB/oct Tap",
+  "offset": 51136,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 534,
+  "name": "-24dB/oct Tap",
+  "offset": 51152,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 535,
+  "name": "AMP TONE",
+  "offset": 51632,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 536,
+  "name": "AMP VELOCITY SENS",
+  "offset": 51648,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 537,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "offset": 51664,
+  "tableId": 57,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 538,
+  "name": "Velocity",
+  "offset": 51728,
+  "tableId": 57,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 539,
+  "name": "Mute",
+  "offset": 51872,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 540,
+  "name": "Gate SW",
+  "offset": 52224,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 541,
+  "name": "ENV1 SW",
+  "offset": 52240,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 542,
+  "name": "ENV2 SW",
+  "offset": 52256,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 543,
+  "name": "Ext ENV SW",
+  "offset": 52272,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 544,
+  "name": "HPF Cutoff",
+  "offset": 52288,
+  "tableId": 41,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 545,
+  "name": "HPF Switch",
+  "offset": 52304,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 546,
+  "name": "Boost LPF Level",
+  "offset": 52320,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 547,
+  "name": "Boost Thru Level",
+  "offset": 52336,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 548,
+  "name": "ENV LEVEL",
+  "offset": 52352,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 549,
+  "name": "AMP LEVEL",
+  "offset": 52368,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 550,
+  "name": "UseExtJack",
+  "offset": 52832,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 551,
+  "name": "M.CV",
+  "offset": 52864,
+  "tableId": 32,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 552,
+  "name": "M.Gate",
+  "offset": 52880,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 553,
+  "name": "Master Tune",
+  "offset": 52928,
+  "tableId": 6,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 554,
+  "name": "Part Tune",
+  "offset": 52944,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 555,
+  "name": "Portamento OnOff",
+  "offset": 53152,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 556,
+  "name": "Portamento Mode",
+  "offset": 53168,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 557,
+  "name": "Portamento Time",
+  "offset": 53184,
+  "tableId": 7,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 558,
+  "name": "LFO Griffer Rate Sw",
+  "offset": 53600,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 559,
+  "name": "LFO Tempo Rate Sw",
+  "offset": 53616,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 560,
+  "name": "LFO Tempo Rate",
+  "offset": 53632,
+  "tableId": 53,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 561,
+  "name": "LFO Rate",
+  "offset": 53648,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 562,
+  "name": "Gate",
+  "offset": 54416,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 563,
+  "name": "LFO Trig",
+  "offset": 54432,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 564,
+  "name": "Reset Sw",
+  "offset": 54448,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 565,
+  "name": "LFO UseExtGate",
+  "offset": 54464,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 566,
+  "name": "LFO Delay",
+  "offset": 54480,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 567,
+  "name": "LFO Delay Sw",
+  "offset": 54496,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 568,
+  "name": "LFO Sin Sw",
+  "offset": 54512,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 569,
+  "name": "LFO Tri Sw",
+  "offset": 54528,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 570,
+  "name": "LFO Sqr Sw",
+  "offset": 54544,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 571,
+  "name": "LFO Saw Sw",
+  "offset": 54560,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 572,
+  "name": "LFO Saw(Inv) Sw",
+  "offset": 54576,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 573,
+  "name": "LFO S&H Sw",
+  "offset": 54592,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 574,
+  "name": "LFO Noise Sw",
+  "offset": 54608,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 575,
+  "name": "LFO Noise Mix",
+  "offset": 54624,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 576,
+  "name": "LFO Internal Sw",
+  "offset": 54640,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 577,
+  "name": "LFO External0 Sw",
+  "offset": 54656,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 578,
+  "name": "LFO External1 Sw",
+  "offset": 54672,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 579,
+  "name": "read only",
+  "offset": 55088,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 580,
+  "name": "read only",
+  "offset": 55104,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 581,
+  "name": "LFO trigger env sw",
+  "offset": 55120,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 582,
+  "name": "ENV Attack",
+  "offset": 55344,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 583,
+  "name": "ENV Sustain",
+  "offset": 55360,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 584,
+  "name": "ENV Decay",
+  "offset": 55376,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 585,
+  "name": "ENV Release",
+  "offset": 55392,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 586,
+  "name": "Q24C Initialize",
+  "offset": 55408,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 587,
+  "name": "LFO trigger env sw",
+  "offset": 55600,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 588,
+  "name": "ENV Attack",
+  "offset": 55824,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 589,
+  "name": "ENV Sustain",
+  "offset": 55840,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 590,
+  "name": "ENV Decay",
+  "offset": 55856,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 591,
+  "name": "ENV Release",
+  "offset": 55872,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 592,
+  "name": "Q24C Initialize",
+  "offset": 55888,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 593,
+  "name": "OSC1 Feet",
+  "offset": 56400,
+  "tableId": 5,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 594,
+  "name": "Griffer Bend SW",
+  "offset": 56416,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 595,
+  "name": "Bend Enable SW",
+  "offset": 56432,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 596,
+  "name": "PWM SW LFO",
+  "offset": 56448,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 597,
+  "name": "PWM SW ENV1",
+  "offset": 56464,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 598,
+  "name": "PWM SW ENV2",
+  "offset": 56480,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 599,
+  "name": "PWM SW Manual",
+  "offset": 56496,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 600,
+  "name": "Tune",
+  "offset": 56512,
+  "tableId": 28,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 601,
+  "name": "Detune",
+  "offset": 56528,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 602,
+  "name": "Mod Sens",
+  "offset": 56544,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 603,
+  "name": "Mod Sw",
+  "offset": 56560,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 604,
+  "name": "LFO Gain",
+  "offset": 56576,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 605,
+  "name": "LFO Level",
+  "offset": 56592,
+  "tableId": 0,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 606,
+  "name": "LFO Sw",
+  "offset": 56608,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 607,
+  "name": "ENV1 Level",
+  "offset": 56624,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 608,
+  "name": "ENV2 Level",
+  "offset": 56640,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 609,
+  "name": "ENV Sw",
+  "offset": 56656,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 610,
+  "name": "Bend Level",
+  "offset": 56672,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 611,
+  "name": "Bend Range",
+  "offset": 56688,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 612,
+  "name": "PWM Level",
+  "offset": 56704,
+  "tableId": 45,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 613,
+  "name": "JU OSC Saw Lev",
+  "offset": 56752,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 614,
+  "name": "JU OSC Sqr Lev",
+  "offset": 56768,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 615,
+  "name": "JU OSC Sub Lev",
+  "offset": 56784,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 616,
+  "name": "Duty Tune",
+  "offset": 58080,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 617,
+  "name": "Osc1 Mute",
+  "offset": 59008,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 618,
+  "name": "Osc1 Level",
+  "offset": 59072,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 619,
+  "name": "Osc Noise Level",
+  "offset": 59088,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 620,
+  "name": "Griffer SW",
+  "offset": 59280,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 621,
+  "name": "LPF Cutoff",
+  "offset": 59296,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 622,
+  "name": "LPF Resonance",
+  "offset": 59392,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 623,
+  "name": "Velocity",
+  "offset": 59424,
+  "tableId": 56,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 624,
+  "name": "Env1/2",
+  "offset": 59568,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 625,
+  "name": "Int/Env",
+  "offset": 59584,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 626,
+  "name": "LFO Gain",
+  "offset": 59856,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 627,
+  "name": "Ext LFO Sw",
+  "offset": 59872,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 628,
+  "name": "GRF Bned SW",
+  "offset": 59888,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 629,
+  "name": "LFO Level",
+  "offset": 59904,
+  "tableId": 47,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 630,
+  "name": "MOD Sens",
+  "offset": 59920,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 631,
+  "name": "MOD SW",
+  "offset": 59936,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 632,
+  "name": "ENV Level",
+  "offset": 59952,
+  "tableId": 46,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 633,
+  "name": "KCV Level",
+  "offset": 59968,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 634,
+  "name": "Velocity Sens",
+  "offset": 59984,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 635,
+  "name": "Velocity Offset",
+  "offset": 60000,
+  "tableId": 56,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 636,
+  "name": "Bend Level",
+  "offset": 60016,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 637,
+  "name": "Bend Range",
+  "offset": 60032,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 638,
+  "name": "Cutoff Tune",
+  "offset": 60160,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 639,
+  "name": "Resonance Tune",
+  "offset": 60176,
+  "tableId": 31,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 640,
+  "name": "PlugIn Sw",
+  "offset": 60192,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 641,
+  "name": "PlugIn Sw",
+  "offset": 61616,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 642,
+  "name": "-12dB/oct Tap",
+  "offset": 61632,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 643,
+  "name": "-18dB/oct Tap",
+  "offset": 61648,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 644,
+  "name": "-24dB/oct Tap",
+  "offset": 61664,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 645,
+  "name": "AMP TONE",
+  "offset": 62144,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 646,
+  "name": "AMP VELOCITY SENS",
+  "offset": 62160,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 647,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "offset": 62176,
+  "tableId": 57,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 648,
+  "name": "Velocity",
+  "offset": 62240,
+  "tableId": 57,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 649,
+  "name": "Mute",
+  "offset": 62384,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 650,
+  "name": "Gate SW",
+  "offset": 62736,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 651,
+  "name": "ENV1 SW",
+  "offset": 62752,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 652,
+  "name": "ENV2 SW",
+  "offset": 62768,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 653,
+  "name": "Ext ENV SW",
+  "offset": 62784,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 654,
+  "name": "HPF Cutoff",
+  "offset": 62800,
+  "tableId": 41,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 655,
+  "name": "HPF Switch",
+  "offset": 62816,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 656,
+  "name": "Boost LPF Level",
+  "offset": 62832,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 657,
+  "name": "Boost Thru Level",
+  "offset": 62848,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 658,
+  "name": "ENV LEVEL",
+  "offset": 62864,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 659,
+  "name": "AMP LEVEL",
+  "offset": 62880,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 660,
+  "name": "UseExtJack",
+  "offset": 63344,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 661,
+  "name": "M.CV",
+  "offset": 63376,
+  "tableId": 32,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 662,
+  "name": "M.Gate",
+  "offset": 63392,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 663,
+  "name": "Master Tune",
+  "offset": 63440,
+  "tableId": 6,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 664,
+  "name": "Part Tune",
+  "offset": 63456,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 665,
+  "name": "Portamento OnOff",
+  "offset": 63664,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 666,
+  "name": "Portamento Mode",
+  "offset": 63680,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 667,
+  "name": "Portamento Time",
+  "offset": 63696,
+  "tableId": 7,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 668,
+  "name": "LFO Griffer Rate Sw",
+  "offset": 64112,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 669,
+  "name": "LFO Tempo Rate Sw",
+  "offset": 64128,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 670,
+  "name": "LFO Tempo Rate",
+  "offset": 64144,
+  "tableId": 53,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 671,
+  "name": "LFO Rate",
+  "offset": 64160,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 672,
+  "name": "Gate",
+  "offset": 64928,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 673,
+  "name": "LFO Trig",
+  "offset": 64944,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 674,
+  "name": "Reset Sw",
+  "offset": 64960,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 675,
+  "name": "LFO UseExtGate",
+  "offset": 64976,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 676,
+  "name": "LFO Delay",
+  "offset": 64992,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 677,
+  "name": "LFO Delay Sw",
+  "offset": 65008,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 678,
+  "name": "LFO Sin Sw",
+  "offset": 65024,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 679,
+  "name": "LFO Tri Sw",
+  "offset": 65040,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 680,
+  "name": "LFO Sqr Sw",
+  "offset": 65056,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 681,
+  "name": "LFO Saw Sw",
+  "offset": 65072,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 682,
+  "name": "LFO Saw(Inv) Sw",
+  "offset": 65088,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 683,
+  "name": "LFO S&H Sw",
+  "offset": 65104,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 684,
+  "name": "LFO Noise Sw",
+  "offset": 65120,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 685,
+  "name": "LFO Noise Mix",
+  "offset": 65136,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 686,
+  "name": "LFO Internal Sw",
+  "offset": 65152,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 687,
+  "name": "LFO External0 Sw",
+  "offset": 65168,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 688,
+  "name": "LFO External1 Sw",
+  "offset": 65184,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 689,
+  "name": "read only",
+  "offset": 65600,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 690,
+  "name": "read only",
+  "offset": 65616,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 691,
+  "name": "LFO trigger env sw",
+  "offset": 65632,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 692,
+  "name": "ENV Attack",
+  "offset": 65856,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 693,
+  "name": "ENV Sustain",
+  "offset": 65872,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 694,
+  "name": "ENV Decay",
+  "offset": 65888,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 695,
+  "name": "ENV Release",
+  "offset": 65904,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 696,
+  "name": "Q24C Initialize",
+  "offset": 65920,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 697,
+  "name": "LFO trigger env sw",
+  "offset": 66112,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 698,
+  "name": "ENV Attack",
+  "offset": 66336,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 699,
+  "name": "ENV Sustain",
+  "offset": 66352,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 700,
+  "name": "ENV Decay",
+  "offset": 66368,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 701,
+  "name": "ENV Release",
+  "offset": 66384,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 702,
+  "name": "Q24C Initialize",
+  "offset": 66400,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 703,
+  "name": "OSC1 Feet",
+  "offset": 66912,
+  "tableId": 5,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 704,
+  "name": "Griffer Bend SW",
+  "offset": 66928,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 705,
+  "name": "Bend Enable SW",
+  "offset": 66944,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 706,
+  "name": "PWM SW LFO",
+  "offset": 66960,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 707,
+  "name": "PWM SW ENV1",
+  "offset": 66976,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 708,
+  "name": "PWM SW ENV2",
+  "offset": 66992,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 709,
+  "name": "PWM SW Manual",
+  "offset": 67008,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 710,
+  "name": "Tune",
+  "offset": 67024,
+  "tableId": 28,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 711,
+  "name": "Detune",
+  "offset": 67040,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 712,
+  "name": "Mod Sens",
+  "offset": 67056,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 713,
+  "name": "Mod Sw",
+  "offset": 67072,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 714,
+  "name": "LFO Gain",
+  "offset": 67088,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 715,
+  "name": "LFO Level",
+  "offset": 67104,
+  "tableId": 0,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 716,
+  "name": "LFO Sw",
+  "offset": 67120,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 717,
+  "name": "ENV1 Level",
+  "offset": 67136,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 718,
+  "name": "ENV2 Level",
+  "offset": 67152,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 719,
+  "name": "ENV Sw",
+  "offset": 67168,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 720,
+  "name": "Bend Level",
+  "offset": 67184,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 721,
+  "name": "Bend Range",
+  "offset": 67200,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 722,
+  "name": "PWM Level",
+  "offset": 67216,
+  "tableId": 45,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 723,
+  "name": "JU OSC Saw Lev",
+  "offset": 67264,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 724,
+  "name": "JU OSC Sqr Lev",
+  "offset": 67280,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 725,
+  "name": "JU OSC Sub Lev",
+  "offset": 67296,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 726,
+  "name": "Duty Tune",
+  "offset": 68592,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 727,
+  "name": "Osc1 Mute",
+  "offset": 69520,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 728,
+  "name": "Osc1 Level",
+  "offset": 69584,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 729,
+  "name": "Osc Noise Level",
+  "offset": 69600,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 730,
+  "name": "Griffer SW",
+  "offset": 69792,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 731,
+  "name": "LPF Cutoff",
+  "offset": 69808,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 732,
+  "name": "LPF Resonance",
+  "offset": 69904,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 733,
+  "name": "Velocity",
+  "offset": 69936,
+  "tableId": 56,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 734,
+  "name": "Env1/2",
+  "offset": 70080,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 735,
+  "name": "Int/Env",
+  "offset": 70096,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 736,
+  "name": "LFO Gain",
+  "offset": 70368,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 737,
+  "name": "Ext LFO Sw",
+  "offset": 70384,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 738,
+  "name": "GRF Bned SW",
+  "offset": 70400,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 739,
+  "name": "LFO Level",
+  "offset": 70416,
+  "tableId": 47,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 740,
+  "name": "MOD Sens",
+  "offset": 70432,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 741,
+  "name": "MOD SW",
+  "offset": 70448,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 742,
+  "name": "ENV Level",
+  "offset": 70464,
+  "tableId": 46,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 743,
+  "name": "KCV Level",
+  "offset": 70480,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 744,
+  "name": "Velocity Sens",
+  "offset": 70496,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 745,
+  "name": "Velocity Offset",
+  "offset": 70512,
+  "tableId": 56,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 746,
+  "name": "Bend Level",
+  "offset": 70528,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 747,
+  "name": "Bend Range",
+  "offset": 70544,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 748,
+  "name": "Cutoff Tune",
+  "offset": 70672,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 749,
+  "name": "Resonance Tune",
+  "offset": 70688,
+  "tableId": 31,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 750,
+  "name": "PlugIn Sw",
+  "offset": 70704,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 751,
+  "name": "PlugIn Sw",
+  "offset": 72128,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 752,
+  "name": "-12dB/oct Tap",
+  "offset": 72144,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 753,
+  "name": "-18dB/oct Tap",
+  "offset": 72160,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 754,
+  "name": "-24dB/oct Tap",
+  "offset": 72176,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 755,
+  "name": "AMP TONE",
+  "offset": 72656,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 756,
+  "name": "AMP VELOCITY SENS",
+  "offset": 72672,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 757,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "offset": 72688,
+  "tableId": 57,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 758,
+  "name": "Velocity",
+  "offset": 72752,
+  "tableId": 57,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 759,
+  "name": "Mute",
+  "offset": 72896,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 760,
+  "name": "Gate SW",
+  "offset": 73248,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 761,
+  "name": "ENV1 SW",
+  "offset": 73264,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 762,
+  "name": "ENV2 SW",
+  "offset": 73280,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 763,
+  "name": "Ext ENV SW",
+  "offset": 73296,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 764,
+  "name": "HPF Cutoff",
+  "offset": 73312,
+  "tableId": 41,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 765,
+  "name": "HPF Switch",
+  "offset": 73328,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 766,
+  "name": "Boost LPF Level",
+  "offset": 73344,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 767,
+  "name": "Boost Thru Level",
+  "offset": 73360,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 768,
+  "name": "ENV LEVEL",
+  "offset": 73376,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 769,
+  "name": "AMP LEVEL",
+  "offset": 73392,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 770,
+  "name": "UseExtJack",
+  "offset": 73856,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 771,
+  "name": "M.CV",
+  "offset": 73888,
+  "tableId": 32,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 772,
+  "name": "M.Gate",
+  "offset": 73904,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 773,
+  "name": "Master Tune",
+  "offset": 73952,
+  "tableId": 6,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 774,
+  "name": "Part Tune",
+  "offset": 73968,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 775,
+  "name": "Portamento OnOff",
+  "offset": 74176,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 776,
+  "name": "Portamento Mode",
+  "offset": 74192,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 777,
+  "name": "Portamento Time",
+  "offset": 74208,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 778,
+  "name": "LFO Griffer Rate Sw",
+  "offset": 74624,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 779,
+  "name": "LFO Tempo Rate Sw",
+  "offset": 74640,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 780,
+  "name": "LFO Tempo Rate",
+  "offset": 74656,
+  "tableId": 53,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 781,
+  "name": "LFO Rate",
+  "offset": 74672,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 782,
+  "name": "Gate",
+  "offset": 75440,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 783,
+  "name": "LFO Trig",
+  "offset": 75456,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 784,
+  "name": "Reset Sw",
+  "offset": 75472,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 785,
+  "name": "LFO UseExtGate",
+  "offset": 75488,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 786,
+  "name": "LFO Delay",
+  "offset": 75504,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 787,
+  "name": "LFO Delay Sw",
+  "offset": 75520,
+  "tableId": 44,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 788,
+  "name": "LFO Sin Sw",
+  "offset": 75536,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 789,
+  "name": "LFO Tri Sw",
+  "offset": 75552,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 790,
+  "name": "LFO Sqr Sw",
+  "offset": 75568,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 791,
+  "name": "LFO Saw Sw",
+  "offset": 75584,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 792,
+  "name": "LFO Saw(Inv) Sw",
+  "offset": 75600,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 793,
+  "name": "LFO S&H Sw",
+  "offset": 75616,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 794,
+  "name": "LFO Noise Sw",
+  "offset": 75632,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 795,
+  "name": "LFO Noise Mix",
+  "offset": 75648,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 796,
+  "name": "LFO Internal Sw",
+  "offset": 75664,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 797,
+  "name": "LFO External0 Sw",
+  "offset": 75680,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 798,
+  "name": "LFO External1 Sw",
+  "offset": 75696,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 799,
+  "name": "read only",
+  "offset": 76112,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 800,
+  "name": "read only",
+  "offset": 76128,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 801,
+  "name": "LFO trigger env sw",
+  "offset": 76144,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 802,
+  "name": "ENV Attack",
+  "offset": 76368,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 803,
+  "name": "ENV Sustain",
+  "offset": 76384,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 804,
+  "name": "ENV Decay",
+  "offset": 76400,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 805,
+  "name": "ENV Release",
+  "offset": 76416,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 806,
+  "name": "Q24C Initialize",
+  "offset": 76432,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 807,
+  "name": "LFO trigger env sw",
+  "offset": 76624,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 808,
+  "name": "ENV Attack",
+  "offset": 76848,
+  "tableId": 35,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 809,
+  "name": "ENV Sustain",
+  "offset": 76864,
+  "tableId": 50,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 810,
+  "name": "ENV Decay",
+  "offset": 76880,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 811,
+  "name": "ENV Release",
+  "offset": 76896,
+  "tableId": 38,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 812,
+  "name": "Q24C Initialize",
+  "offset": 76912,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 813,
+  "name": "OSC1 Feet",
+  "offset": 77424,
+  "tableId": 5,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 814,
+  "name": "Griffer Bend SW",
+  "offset": 77440,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 815,
+  "name": "Bend Enable SW",
+  "offset": 77456,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 816,
+  "name": "PWM SW LFO",
+  "offset": 77472,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 817,
+  "name": "PWM SW ENV1",
+  "offset": 77488,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 818,
+  "name": "PWM SW ENV2",
+  "offset": 77504,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 819,
+  "name": "PWM SW Manual",
+  "offset": 77520,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 820,
+  "name": "Tune",
+  "offset": 77536,
+  "tableId": 28,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 821,
+  "name": "Detune",
+  "offset": 77552,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 822,
+  "name": "Mod Sens",
+  "offset": 77568,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 823,
+  "name": "Mod Sw",
+  "offset": 77584,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 824,
+  "name": "LFO Gain",
+  "offset": 77600,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 825,
+  "name": "LFO Level",
+  "offset": 77616,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 826,
+  "name": "LFO Sw",
+  "offset": 77632,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 827,
+  "name": "ENV1 Level",
+  "offset": 77648,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 828,
+  "name": "ENV2 Level",
+  "offset": 77664,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 829,
+  "name": "ENV Sw",
+  "offset": 77680,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 830,
+  "name": "Bend Level",
+  "offset": 77696,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 831,
+  "name": "Bend Range",
+  "offset": 77712,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 832,
+  "name": "PWM Level",
+  "offset": 77728,
+  "tableId": 45,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 833,
+  "name": "JU OSC Saw Lev",
+  "offset": 77776,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 834,
+  "name": "JU OSC Sqr Lev",
+  "offset": 77792,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 835,
+  "name": "JU OSC Sub Lev",
+  "offset": 77808,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 836,
+  "name": "Duty Tune",
+  "offset": 79104,
+  "tableId": 27,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 837,
+  "name": "Osc1 Mute",
+  "offset": 80032,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 838,
+  "name": "Osc1 Level",
+  "offset": 80096,
+  "tableId": 54,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 839,
+  "name": "Osc Noise Level",
+  "offset": 80112,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 840,
+  "name": "Griffer SW",
+  "offset": 80304,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 841,
+  "name": "LPF Cutoff",
+  "offset": 80320,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 842,
+  "name": "LPF Resonance",
+  "offset": 80416,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 843,
+  "name": "Velocity",
+  "offset": 80448,
+  "tableId": 56,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 844,
+  "name": "Env1/2",
+  "offset": 80592,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 845,
+  "name": "Int/Env",
+  "offset": 80608,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 846,
+  "name": "LFO Gain",
+  "offset": 80880,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 847,
+  "name": "Ext LFO Sw",
+  "offset": 80896,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 848,
+  "name": "GRF Bned SW",
+  "offset": 80912,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 849,
+  "name": "LFO Level",
+  "offset": 80928,
+  "tableId": 47,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 850,
+  "name": "MOD Sens",
+  "offset": 80944,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 851,
+  "name": "MOD SW",
+  "offset": 80960,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 852,
+  "name": "ENV Level",
+  "offset": 80976,
+  "tableId": 46,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 853,
+  "name": "KCV Level",
+  "offset": 80992,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 854,
+  "name": "Velocity Sens",
+  "offset": 81008,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 855,
+  "name": "Velocity Offset",
+  "offset": 81024,
+  "tableId": 56,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 856,
+  "name": "Bend Level",
+  "offset": 81040,
+  "tableId": 26,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 857,
+  "name": "Bend Range",
+  "offset": 81056,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 858,
+  "name": "Cutoff Tune",
+  "offset": 81184,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 859,
+  "name": "Resonance Tune",
+  "offset": 81200,
+  "tableId": 31,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 860,
+  "name": "PlugIn Sw",
+  "offset": 81216,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 861,
+  "name": "PlugIn Sw",
+  "offset": 82640,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 862,
+  "name": "-12dB/oct Tap",
+  "offset": 82656,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 863,
+  "name": "-18dB/oct Tap",
+  "offset": 82672,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 864,
+  "name": "-24dB/oct Tap",
+  "offset": 82688,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 865,
+  "name": "AMP TONE",
+  "offset": 83168,
+  "tableId": 24,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 866,
+  "name": "AMP VELOCITY SENS",
+  "offset": 83184,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 867,
+  "name": "AMP FIX VELOCITY LEVEL",
+  "offset": 83200,
+  "tableId": 57,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 868,
+  "name": "Velocity",
+  "offset": 83264,
+  "tableId": 57,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 869,
+  "name": "Mute",
+  "offset": 83408,
+  "tableId": 51,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 870,
+  "name": "Gate SW",
+  "offset": 83760,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 871,
+  "name": "ENV1 SW",
+  "offset": 83776,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 872,
+  "name": "ENV2 SW",
+  "offset": 83792,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 873,
+  "name": "Ext ENV SW",
+  "offset": 83808,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 874,
+  "name": "HPF Cutoff",
+  "offset": 83824,
+  "tableId": 41,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 875,
+  "name": "HPF Switch",
+  "offset": 83840,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 876,
+  "name": "Boost LPF Level",
+  "offset": 83856,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 877,
+  "name": "Boost Thru Level",
+  "offset": 83872,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 878,
+  "name": "ENV LEVEL",
+  "offset": 83888,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 879,
+  "name": "AMP LEVEL",
+  "offset": 83904,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 880,
+  "name": "Ext Noise Sw",
+  "offset": 84304,
+  "tableId": 52,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 881,
+  "name": "Voice01 Output On/Off",
+  "offset": 84448,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 882,
+  "name": "Voice23 Output On/Off",
+  "offset": 84464,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 883,
+  "name": "Voice45 Output On/Off",
+  "offset": 84480,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 884,
+  "name": "Voice67 Output On/Off",
+  "offset": 84496,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 885,
+  "name": "Effect SW",
+  "offset": 84544,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 886,
+  "name": "Mute SW",
+  "offset": 84560,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 887,
+  "name": "DS Drive",
+  "offset": 85136,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 888,
+  "name": "DS Level",
+  "offset": 85152,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 889,
+  "name": "DS Mute",
+  "offset": 85168,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 890,
+  "name": "DS BiasMute",
+  "offset": 85184,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 891,
+  "name": "OD TONE",
+  "offset": 85984,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 892,
+  "name": "DS Drive",
+  "offset": 86288,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 893,
+  "name": "DS Level",
+  "offset": 86304,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 894,
+  "name": "DS Mute",
+  "offset": 86320,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 895,
+  "name": "DS BiasMute",
+  "offset": 86336,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 896,
+  "name": "DS TONE",
+  "offset": 87056,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 897,
+  "name": "DS Drive",
+  "offset": 87616,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 898,
+  "name": "DS Level",
+  "offset": 87632,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 899,
+  "name": "DS Mute",
+  "offset": 87648,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 900,
+  "name": "MT TONE",
+  "offset": 88976,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 901,
+  "name": "DS Drive",
+  "offset": 89312,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 902,
+  "name": "DS Level",
+  "offset": 89328,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 903,
+  "name": "DS Mute",
+  "offset": 89344,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 904,
+  "name": "DS BiasMute",
+  "offset": 89360,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 905,
+  "name": "FZ TONE",
+  "offset": 90256,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 906,
+  "name": "Delay Time",
+  "offset": 91120,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 907,
+  "name": "Error Depth",
+  "offset": 91136,
+  "tableId": 64,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 908,
+  "name": "LFO Rate",
+  "offset": 91152,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 909,
+  "name": "LFO Phase",
+  "offset": 91168,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 910,
+  "name": "LFO Depth",
+  "offset": 91184,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 911,
+  "name": "Noise Level",
+  "offset": 91200,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 912,
+  "name": "Dry Level",
+  "offset": 91216,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 913,
+  "name": "Wet Level",
+  "offset": 91232,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 914,
+  "name": "Ip Fc",
+  "offset": 91248,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 915,
+  "name": "On/Off",
+  "offset": 91264,
+  "tableId": 52,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 916,
+  "name": "Mute",
+  "offset": 91280,
+  "tableId": 51,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 917,
+  "name": "Delay Time",
+  "offset": 96336,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 918,
+  "name": "LFO Rate",
+  "offset": 96352,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 919,
+  "name": "LFO Depth",
+  "offset": 96368,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 920,
+  "name": "Ip Fc",
+  "offset": 96384,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 921,
+  "name": "On/Off",
+  "offset": 96400,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 922,
+  "name": "Mute",
+  "offset": 96416,
+  "tableId": 51,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 923,
+  "name": "Patch Level",
+  "offset": 101072,
+  "tableId": 49,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 924,
+  "name": "Expression",
+  "offset": 101136,
+  "tableId": 18,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 925,
+  "name": "Volume",
+  "offset": 101152,
+  "tableId": 19,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 926,
+  "name": "Voice0 Gate Notify",
+  "offset": 101488,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 927,
+  "name": "Voice0 Note Off Notify",
+  "offset": 101504,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 928,
+  "name": "Voice1 Gate Notify",
+  "offset": 101520,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 929,
+  "name": "Voice1 Note Off Notify",
+  "offset": 101536,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 930,
+  "name": "Voice2 Gate Notify",
+  "offset": 101552,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 931,
+  "name": "Voice2 Note Off Notify",
+  "offset": 101568,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 932,
+  "name": "Voice3 Gate Notify",
+  "offset": 101584,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 933,
+  "name": "Voice3 Note Off Notify",
+  "offset": 101600,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 934,
+  "name": "Voice4 Gate Notify",
+  "offset": 101616,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 935,
+  "name": "Voice4 Note Off Notify",
+  "offset": 101632,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 936,
+  "name": "Voice5 Gate Notify",
+  "offset": 101648,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 937,
+  "name": "Voice5 Note Off Notify",
+  "offset": 101664,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 938,
+  "name": "Voice6 Gate Notify",
+  "offset": 101680,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 939,
+  "name": "Voice6 Note Off Notify",
+  "offset": 101696,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 940,
+  "name": "Voice7 Gate Notify",
+  "offset": 101712,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 941,
+  "name": "Voice7 Note Off Notify",
+  "offset": 101728,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 942,
+  "name": "DLY Mute",
+  "offset": 101744,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 943,
+  "name": "Delay Time",
+  "offset": 102352,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 944,
+  "name": "High Cut C0",
+  "offset": 102368,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 945,
+  "name": "High Cut A0",
+  "offset": 102384,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 946,
+  "name": "High Cut A1",
+  "offset": 102400,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 947,
+  "name": "High Cut B0",
+  "offset": 102416,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 948,
+  "name": "High Cut B2",
+  "offset": 102432,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 949,
+  "name": "Use IIR High Cut Filter",
+  "offset": 102448,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 950,
+  "name": "High Cut Fc",
+  "offset": 102464,
+  "tableId": 55,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 951,
+  "name": "High Cut Qc",
+  "offset": 102480,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 952,
+  "name": "High Cut Sw",
+  "offset": 102496,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 953,
+  "name": "Dry Level",
+  "offset": 102512,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 954,
+  "name": "Wet Level",
+  "offset": 102528,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 955,
+  "name": "Ip Fc",
+  "offset": 102544,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 956,
+  "name": "Feedback",
+  "offset": 102560,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 957,
+  "name": "On/Off",
+  "offset": 102576,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 958,
+  "name": "Mute",
+  "offset": 102592,
+  "tableId": 51,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 959,
+  "name": "LF Damp Fc",
+  "offset": 102608,
+  "tableId": 57,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 960,
+  "name": "LF Damp Hp",
+  "offset": 102624,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 961,
+  "name": "LF Damp Lp",
+  "offset": 102640,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 962,
+  "name": "HF Damp Fc",
+  "offset": 102656,
+  "tableId": 55,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 963,
+  "name": "HF Damp Hp",
+  "offset": 102672,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 964,
+  "name": "HF Damp Lp",
+  "offset": 102688,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 965,
+  "name": "Delay Time",
+  "offset": 4297584,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 966,
+  "name": "High Cut C0",
+  "offset": 4297600,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 967,
+  "name": "High Cut A0",
+  "offset": 4297616,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 968,
+  "name": "High Cut A1",
+  "offset": 4297632,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 969,
+  "name": "High Cut B0",
+  "offset": 4297648,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 970,
+  "name": "High Cut B2",
+  "offset": 4297664,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 971,
+  "name": "Use IIR High Cut Filter",
+  "offset": 4297680,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 972,
+  "name": "High Cut Fc",
+  "offset": 4297696,
+  "tableId": 55,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 973,
+  "name": "High Cut Qc",
+  "offset": 4297712,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 974,
+  "name": "High Cut Sw",
+  "offset": 4297728,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 975,
+  "name": "Dry Level",
+  "offset": 4297744,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 976,
+  "name": "Wet Level",
+  "offset": 4297760,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 977,
+  "name": "Ip Fc",
+  "offset": 4297776,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 978,
+  "name": "Tap Time",
+  "offset": 4297792,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 979,
+  "name": "Feedback",
+  "offset": 4297808,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 980,
+  "name": "On/Off",
+  "offset": 4297824,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 981,
+  "name": "Mute",
+  "offset": 4297840,
+  "tableId": 51,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 982,
+  "name": "Tap Sw",
+  "offset": 4297856,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 983,
+  "name": "Stereo Sw",
+  "offset": 4297872,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 984,
+  "name": "Wet Gain",
+  "offset": 4297888,
+  "tableId": 4,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 985,
+  "name": "LF Damp Fc",
+  "offset": 4297904,
+  "tableId": 57,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 986,
+  "name": "LF Damp Hp",
+  "offset": 4297920,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 987,
+  "name": "LF Damp Lp",
+  "offset": 4297936,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 988,
+  "name": "HF Damp Fc",
+  "offset": 4297952,
+  "tableId": 55,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 989,
+  "name": "HF Damp Hp",
+  "offset": 4297968,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 990,
+  "name": "HF Damp Lp",
+  "offset": 4297984,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 991,
+  "name": "Chorus CV",
+  "offset": 6395312,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 992,
+  "name": "Chrus LFO Sync",
+  "offset": 6395328,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 993,
+  "name": "Delay Time",
+  "offset": 6396128,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 994,
+  "name": "LFO Curve",
+  "offset": 6396144,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 995,
+  "name": "LFO Manual",
+  "offset": 6396160,
+  "tableId": 4,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 996,
+  "name": "LFO Depth",
+  "offset": 6396176,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 997,
+  "name": "High Cut C0",
+  "offset": 6396192,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 998,
+  "name": "High Cut A0",
+  "offset": 6396208,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 999,
+  "name": "High Cut A1",
+  "offset": 6396224,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1000,
+  "name": "High Cut B0",
+  "offset": 6396240,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1001,
+  "name": "High Cut B2",
+  "offset": 6396256,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1002,
+  "name": "Use IIR High Cut Filter",
+  "offset": 6396272,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1003,
+  "name": "High Cut Fc",
+  "offset": 6396288,
+  "tableId": 55,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1004,
+  "name": "High Cut Qc",
+  "offset": 6396304,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1005,
+  "name": "High Cut Sw",
+  "offset": 6396320,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1006,
+  "name": "Low Cut Fc",
+  "offset": 6396336,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1007,
+  "name": "Low Cut Sw",
+  "offset": 6396352,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1008,
+  "name": "Dry Level",
+  "offset": 6396368,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1009,
+  "name": "Wet Level",
+  "offset": 6396384,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1010,
+  "name": "Ip Fc",
+  "offset": 6396400,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1011,
+  "name": "Feedback",
+  "offset": 6396416,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1012,
+  "name": "On/Off",
+  "offset": 6396432,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1013,
+  "name": "Mute",
+  "offset": 6396448,
+  "tableId": 51,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1014,
+  "name": "Tap Sw",
+  "offset": 6396464,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1015,
+  "name": "Stereo Sw",
+  "offset": 6396480,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1016,
+  "name": "Dry Gain",
+  "offset": 6396496,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1017,
+  "name": "Wet Gain",
+  "offset": 6396512,
+  "tableId": 4,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1018,
+  "name": "Flanger CV",
+  "offset": 6429472,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1019,
+  "name": "Flanger LFO Sync",
+  "offset": 6429488,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1020,
+  "name": "Delay Time",
+  "offset": 6430464,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1021,
+  "name": "LFO Curve",
+  "offset": 6430480,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1022,
+  "name": "LFO Manual",
+  "offset": 6430496,
+  "tableId": 4,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1023,
+  "name": "LFO Depth",
+  "offset": 6430512,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1024,
+  "name": "High Cut C0",
+  "offset": 6430528,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1025,
+  "name": "High Cut A0",
+  "offset": 6430544,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1026,
+  "name": "High Cut A1",
+  "offset": 6430560,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1027,
+  "name": "High Cut B0",
+  "offset": 6430576,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1028,
+  "name": "High Cut B2",
+  "offset": 6430592,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1029,
+  "name": "Use IIR High Cut Filter",
+  "offset": 6430608,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1030,
+  "name": "High Cut Fc",
+  "offset": 6430624,
+  "tableId": 55,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1031,
+  "name": "High Cut Qc",
+  "offset": 6430640,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1032,
+  "name": "High Cut Sw",
+  "offset": 6430656,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1033,
+  "name": "Low Cut Fc",
+  "offset": 6430672,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1034,
+  "name": "Low Cut Sw",
+  "offset": 6430688,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1035,
+  "name": "Dry Level",
+  "offset": 6430704,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1036,
+  "name": "Wet Level",
+  "offset": 6430720,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1037,
+  "name": "Ip Fc",
+  "offset": 6430736,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1038,
+  "name": "Feedback",
+  "offset": 6430752,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1039,
+  "name": "On/Off",
+  "offset": 6430768,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1040,
+  "name": "Mute",
+  "offset": 6430784,
+  "tableId": 51,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1041,
+  "name": "LFO St.Phase",
+  "offset": 6430800,
+  "tableId": 20,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1042,
+  "name": "LFO St.Ofst",
+  "offset": 6430816,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1043,
+  "name": "Delay Time",
+  "offset": 6497168,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1044,
+  "name": "High Cut C0",
+  "offset": 6497184,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1045,
+  "name": "High Cut A0",
+  "offset": 6497200,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1046,
+  "name": "High Cut A1",
+  "offset": 6497216,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1047,
+  "name": "High Cut B0",
+  "offset": 6497232,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1048,
+  "name": "High Cut B2",
+  "offset": 6497248,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1049,
+  "name": "Use IIR High Cut Filter",
+  "offset": 6497264,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1050,
+  "name": "High Cut Fc",
+  "offset": 6497280,
+  "tableId": 55,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1051,
+  "name": "High Cut Qc",
+  "offset": 6497296,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1052,
+  "name": "High Cut Sw",
+  "offset": 6497312,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1053,
+  "name": "Dry Level",
+  "offset": 6497328,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1054,
+  "name": "Wet Level",
+  "offset": 6497344,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1055,
+  "name": "Ip Fc",
+  "offset": 6497360,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1056,
+  "name": "Feedback",
+  "offset": 6497376,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1057,
+  "name": "On/Off",
+  "offset": 6497392,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1058,
+  "name": "Mute",
+  "offset": 6497408,
+  "tableId": 51,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1059,
+  "name": "LF Damp Fc",
+  "offset": 6497424,
+  "tableId": 57,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1060,
+  "name": "LF Damp Hp",
+  "offset": 6497440,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1061,
+  "name": "LF Damp Lp",
+  "offset": 6497456,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1062,
+  "name": "HF Damp Fc",
+  "offset": 6497472,
+  "tableId": 55,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1063,
+  "name": "HF Damp Hp",
+  "offset": 6497488,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1064,
+  "name": "HF Damp Lp",
+  "offset": 6497504,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1065,
+  "name": "Chorus CV",
+  "offset": 10692016,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1066,
+  "name": "Chrus LFO Sync",
+  "offset": 10692032,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1067,
+  "name": "Delay Time",
+  "offset": 10693008,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1068,
+  "name": "LFO Curve",
+  "offset": 10693024,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1069,
+  "name": "LFO Manual",
+  "offset": 10693040,
+  "tableId": 4,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1070,
+  "name": "LFO Depth",
+  "offset": 10693056,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1071,
+  "name": "High Cut C0",
+  "offset": 10693072,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1072,
+  "name": "High Cut A0",
+  "offset": 10693088,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1073,
+  "name": "High Cut A1",
+  "offset": 10693104,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1074,
+  "name": "High Cut B0",
+  "offset": 10693120,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1075,
+  "name": "High Cut B2",
+  "offset": 10693136,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1076,
+  "name": "Use IIR High Cut Filter",
+  "offset": 10693152,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1077,
+  "name": "High Cut Fc",
+  "offset": 10693168,
+  "tableId": 55,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1078,
+  "name": "High Cut Qc",
+  "offset": 10693184,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1079,
+  "name": "High Cut Sw",
+  "offset": 10693200,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1080,
+  "name": "Low Cut Fc",
+  "offset": 10693216,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1081,
+  "name": "Low Cut Sw",
+  "offset": 10693232,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1082,
+  "name": "Dry Level",
+  "offset": 10693248,
+  "tableId": 22,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1083,
+  "name": "Wet Level",
+  "offset": 10693264,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1084,
+  "name": "Ip Fc",
+  "offset": 10693280,
+  "tableId": 64,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1085,
+  "name": "Feedback",
+  "offset": 10693296,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1086,
+  "name": "On/Off",
+  "offset": 10693312,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1087,
+  "name": "Mute",
+  "offset": 10693328,
+  "tableId": 51,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1088,
+  "name": "LFO St.Phase",
+  "offset": 10693344,
+  "tableId": 20,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1089,
+  "name": "LFO St.Ofst",
+  "offset": 10693360,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1090,
+  "name": "Rev Dpm PreDly",
+  "offset": 10759360,
+  "tableId": null,
+  "default_step": 0,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1091,
+  "name": "Rev Ecf On",
+  "offset": 10759376,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1092,
+  "name": "Rev Ecf Density",
+  "offset": 10759392,
+  "tableId": 4,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1093,
+  "name": "Rev Ecf Level",
+  "offset": 10759408,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1094,
+  "name": "Rev Ecf Dir Lev",
+  "offset": 10759424,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1095,
+  "name": "Rev Ecf Glb Lev",
+  "offset": 10759440,
+  "tableId": 21,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1096,
+  "name": "Rev Ecf Mute",
+  "offset": 10759456,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1097,
+  "name": "Rev Ecf In Att ",
+  "offset": 10759472,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": "dword_18098AC78",
+  "default_value": 0.03125
+ },
+ {
+  "param_id": 1098,
+  "name": "Rev Ecf Depth",
+  "offset": 10759488,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1099,
+  "name": "Rev Ecf Rate",
+  "offset": 10759504,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": "dword_18098BC64",
+  "default_value": 2.0760257029905915e-05
+ },
+ {
+  "param_id": 1100,
+  "name": "Rev Ecf HPF C0",
+  "offset": 10759520,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1101,
+  "name": "Rev Ecf HPF A0",
+  "offset": 10759536,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1102,
+  "name": "Rev Ecf HPF B0",
+  "offset": 10759552,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1103,
+  "name": "Rev Ecf LPF C0",
+  "offset": 10759568,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1104,
+  "name": "Rev Ecf LPF A0",
+  "offset": 10759584,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1105,
+  "name": "Rev Ecf LPF A1",
+  "offset": 10759600,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1106,
+  "name": "Rev Ecf LPF B0",
+  "offset": 10759616,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1107,
+  "name": "Rev Ecf LPF B1",
+  "offset": 10759632,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1108,
+  "name": "Rev Ecf DPF0 Fc",
+  "offset": 10759648,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1109,
+  "name": "Rev Ecf DPF0 Hp",
+  "offset": 10759664,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1110,
+  "name": "Rev Ecf DPF0 Lp",
+  "offset": 10759680,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1111,
+  "name": "Rev Ecf DPF1 Fc",
+  "offset": 10759696,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1112,
+  "name": "Rev Ecf DPF1 Hp",
+  "offset": 10759712,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1113,
+  "name": "Rev Ecf DPF1 Lp",
+  "offset": 10759728,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1114,
+  "name": "Rev Ecf DPF2 Fc",
+  "offset": 10759744,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1115,
+  "name": "Rev Ecf DPF2 Hp",
+  "offset": 10759760,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1116,
+  "name": "Rev Ecf DPF2 Lp",
+  "offset": 10759776,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1117,
+  "name": "Rev Ecf DPF3 Fc",
+  "offset": 10759792,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1118,
+  "name": "Rev Ecf DPF3 Hp",
+  "offset": 10759808,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1119,
+  "name": "Rev Ecf DPF3 Lp",
+  "offset": 10759824,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": null
+ },
+ {
+  "param_id": 1120,
+  "name": "Rev Ecf DlyMute",
+  "offset": 10759840,
+  "tableId": null,
+  "default_step": 1,
+  "default_scalar_const": "dword_18098BE1C",
+  "default_value": 0.6634521484375
+ }
+]

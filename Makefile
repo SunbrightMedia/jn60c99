@@ -89,6 +89,13 @@ abwav: tests/play_note.c tests/wav_compare.c $(SRC)
 	./tests/play_note /tmp/juno_note.wav 4 1.5
 	./tests/wav_compare $(REF) /tmp/juno_note.wav
 
+# Smoke test + before/after for the construction-time parameter-default init.
+tests/test_init_default: tests/test_init_default.c $(SRC)
+	$(CC) $(CFLAGS) -o $@ tests/test_init_default.c $(SRC) $(LDLIBS)
+
+init_default: tests/test_init_default
+	./tests/test_init_default
+
 # Validate the port's init against the live-plugin state dump (state_dump/).
 validate: tests/validate_state.c $(SRC)
 	gunzip -kf state_dump/state_t0.bin.gz state_dump/state_t1.bin.gz
