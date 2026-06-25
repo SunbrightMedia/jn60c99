@@ -9,10 +9,11 @@ OBJ     := $(SRC:.c=.o)
 .PHONY: all test clean
 all: $(OBJ)
 
-test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke
+test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_arp_smoke
 	./tests/test_helpers
 	./tests/test_voice_smoke
 	./tests/test_master_smoke
+	./tests/test_arp_smoke
 
 tests/test_helpers: tests/test_helpers.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
@@ -23,8 +24,12 @@ tests/test_voice_smoke: tests/test_voice_smoke.c $(SRC)
 tests/test_master_smoke: tests/test_master_smoke.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
+# Arpeggiator smoke test (faithful CArpeggio transcription; self-contained).
+tests/test_arp_smoke: tests/test_arp_smoke.c src/arp.c src/arp.h
+	$(CC) $(CFLAGS) -o $@ tests/test_arp_smoke.c src/arp.c $(LDLIBS)
+
 clean:
-	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/sound_test
+	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_arp_smoke tests/sound_test
 
 # Faithful sound test: run our DSP forward from the live plugin's captured state.
 sound: tests/sound_test.c $(SRC)

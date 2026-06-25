@@ -1,5 +1,15 @@
 # JUNO-60 (RolandCloud) Arpeggiator — Reverse-Engineered DSP / Clock Notes
 
+> **Panel exposure (confirmed from the plugin UI).** The JUNO-60's *entire* arp panel
+> is: **ARPEGGIO** on/off, **ARP MODE** (UP / UP & DOWN / DOWN), **ARP RANGE** (1 / 2 / 3).
+> That is the whole user-facing arp, and it is implemented by the **`CArpeggio`** base
+> engine (direction selectors + octave range `+3472`/`+3476`). The derived **`CKbdArp`**
+> 150-pattern sequencer (`word_7FF91E624480`, §4) is **RolandCloud framework code compiled
+> into the DLL but NOT exposed by the JUNO-60 panel** — it is unused for this product. The
+> faithful port (`src/arp.c`) transcribes only `CArpeggio`; the pattern layer is documented
+> below for reference but deliberately not implemented. See `docs/EXPOSURE.md` (if present)
+> for the general framework-vs-exposed boundary.
+
 Source: decompiled C in `allcode/decomp_380000.c` and `allcode/decomp_3C0000.c`.
 Image base `0x7FF91DC60000`. Data segments in `data_sections/data_sections/seg_*.bin`
 (file names are RVA-based, e.g. `seg_rdata_935650.bin` covers rva `0x935650..0xC43000`).
