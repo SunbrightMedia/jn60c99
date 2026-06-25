@@ -1,3 +1,13 @@
+
+## CORRECTION (arp field labels): the stride-4 arp slots are SW / TYPE / RANGE
+The deserializer copies decoded body bytes to record offsets 298/306/314, which on
+the full-record nibble stream land at decoded positions **149 / 153 / 157** (NOT
+141/145/149). Verified: pos 149 = ARPEGGIO SW (=1 for exactly the 7 "SQ" presets).
+So: 149=ARP SW, 153=ARP TYPE (Script.xml arpType: 0=UP,1=UP&DOWN,>=2=DOWN),
+157=ARP **RANGE/octaves** (arpStep: 0=1oct,1=2oct,>=2=3oct) — the "STEP" knob is the
+octave RANGE, not a rate. SQ Dynamic ARPG = SW 1, TYPE 0 (UP), RANGE 1 (**2 octaves**).
+juno_arp_set_range(arg)=octaves-1. There is no preset arp-rate on the JUNO-60 panel.
+
 # RolandCloud JUNO-60 Preset-Bank Format (`KoaBankFile00003` / `PG-JU60`)
 
 Reverse-engineered from `refs/preset_banks/bank1.bin` (1,294,295 bytes, 64 factory

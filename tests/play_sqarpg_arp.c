@@ -38,7 +38,7 @@ int main(int argc,char**argv){
     *(int8_t*)(a+3054)=1; *(int8_t*)(a+3055)=1;            /* 1 cell/step, advance each scan */
     *(uint16_t*)(a+610)=1; *(uint8_t*)(a+996)=0x01; *(uint16_t*)(a+996+2)=1;
     juno_arp_note_on(&arp,60,100); juno_arp_note_on(&arp,64,100); juno_arp_note_on(&arp,67,100);
-    juno_arp_set_mode(&arp,15); juno_arp_set_range(&arp,0); juno_arp_set_running(&arp,1);
+    juno_arp_set_mode(&arp,15); juno_arp_set_range(&arp,1); juno_arp_set_running(&arp,1);
 
     int start=SR/2, step=SR/8, gate=(int)(step*0.7);   /* STEP=1 ~ 1/16 @120bpm (1/8 ran too slow per A/B) */
     int arp_end=start+2*SR, N=start+2*SR+SR, idx=0;

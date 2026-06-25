@@ -36,8 +36,8 @@ int main(int argc,char**argv){
  juno_arp_init(&arp,&cb); unsigned char*a=arp.st;
  *(int8_t*)(a+3054)=1; *(int8_t*)(a+3055)=1; *(uint16_t*)(a+610)=1;
  *(uint8_t*)(a+996)=0x01; *(uint16_t*)(a+996+2)=1;
- juno_arp_note_on(&arp,72,100); juno_arp_note_on(&arp,76,100); juno_arp_note_on(&arp,79,100); /* C5 E5 G5 */
- juno_arp_set_mode(&arp,15); juno_arp_set_range(&arp,0); juno_arp_set_running(&arp,1);
+ juno_arp_note_on(&arp,60,100); juno_arp_note_on(&arp,64,100); juno_arp_note_on(&arp,67,100); /* C4 E4 G4 */
+ juno_arp_set_mode(&arp,15); juno_arp_set_range(&arp,1); juno_arp_set_running(&arp,1); /* UP, 2 octaves (SQ ARPG) */
  /* 120 BPM, 1/16 steps = 0.125 s */
  int step=(int)(0.125*SR), gate=(int)(step*0.7);
  int N=(int)(3.0*SR), idx=0, cur=-1, gate_off=-1, next=0, steps=0;
