@@ -62,21 +62,35 @@ if (!mod) {
       if (done) return;
       if (++calls < WARM_BLOCKS) return;
       done = true;
-      try {
-        var state = args[0];                       // a1 = engine state base
-        console.log('[capture] state base = ' + state + '  dumping ' + DUMP_BYTES + ' bytes...');
-        var buf = Memory.readByteArray(state, DUMP_BYTES);
-        var fname = 'juno_state_' + mod.base + '.bin';
-        var f = new File(fname, 'wb');
-        f.write(buf);
-        f.flush();
-        f.close();
-        console.log('[capture] WROTE ' + fname + '  (' + DUMP_BYTES + ' bytes). Send this file back.');
-        console.log('[capture] Tip: re-run per patch (INIT patch, then SQ Dynamic ARPG) for a full set.');
-      } catch (e) {
-        console.error('[capture] dump failed: ' + e + '  (try a smaller DUMP_BYTES, e.g. 200000, ' +
-                      'if the region is not fully mapped).');
+      var state = args[0];                         // a1 = engine state base
+      console.log('[capture] state base = ' + state);
+
+      // Robust write: try a few sizes (the deep chorus region may not be fully mapped),
+      // and use whichever File API this Frida build exposes (writeAllBytes is preferred;
+      // the instance API is the fallback — note: no .flush(), which 404s on Frida 17).
+      function writeFile(fname, bytes) {
+        if (typeof File.writeAllBytes === 'function') { File.writeAllBytes(fname, bytes); return; }
+        var f = new File(fname, 'wb'); f.write(bytes); f.close();
       }
+      function tryDump(fname, size) {
+        try {
+          var buf = Memory.readByteArray(state, size);
+          if (!buf) { console.error('[capture] read returned null at size ' + size); return false; }
+          writeFile(fname, buf);
+          console.log('[capture] WROTE ' + fname + '  (' + size + ' bytes).');
+          return true;
+        } catch (e) {
+          console.error('[capture] size ' + size + ' failed: ' + e);
+          return false;
+        }
+      }
+      // 200 KB always works and covers the voice/filter/env/oscillator coefficients
+      // (all the load-bearing offsets). The 11 MB attempt additionally grabs the chorus.
+      tryDump('juno_state_voice.bin', 200000);
+      if (!tryDump('juno_state_full.bin', DUMP_BYTES))
+        console.log('[capture] (11MB region not fully mapped — juno_state_voice.bin is the one that matters.)');
+      console.log('[capture] Files are in the directory you ran frida from. Send juno_state_voice.bin back.');
+      console.log('[capture] Tip: re-run per patch (INIT patch, then SQ Dynamic ARPG) for a full set.');
     }
   });
   console.log('[capture] armed. Play/hold a note in the host; dump fires after ' + WARM_BLOCKS + ' audio blocks.');
