@@ -74,7 +74,8 @@ if (!mod) {
       }
       function tryDump(fname, size) {
         try {
-          var buf = Memory.readByteArray(state, size);
+          // Frida 17 removed the global Memory.readByteArray; use the NativePointer method.
+          var buf = state.readByteArray(size);
           if (!buf) { console.error('[capture] read returned null at size ' + size); return false; }
           writeFile(fname, buf);
           console.log('[capture] WROTE ' + fname + '  (' + size + ' bytes).');
