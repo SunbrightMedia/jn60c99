@@ -224,3 +224,30 @@ rate/depth inputs (`6395312`/`6395328`) are still the PD-Juno-Pad captured value
 if CH1's true depth differs we'd need SQ ARPG's chorus coeffs; (2) faithful FX-A
 (the real DB875=0 delay) needs that slot's runtime coefficients. Both are small
 targeted captures, not code work.
+
+## Finding 5: onset drift = the chorus wobble (voice is stable); chorus runs on FOREIGN coeffs
+
+User reported the fixed render "still sounds wrong at the start." Measured the pitch
+trajectory over time, two ways (quadrature demod + a settling-free per-window DFT):
+
+- **Voice (pre-chorus):** +9c in the first 43 ms window only (the note attack), then
+  stable at −3c and settling to 0 within ~0.7 s. The oscillator/filter onset is
+  clean — the earlier "38c at 0.1 s" was the demod's own 4-pole filter settling, not
+  real pitch. **The voice does not drift.**
+- **Final (post-chorus):** a continuous ±10–15c wobble across the whole note,
+  slightly larger in the first ~300 ms. This is the chorus, most audible on the clean
+  note onset — which is what reads as "drift at the start."
+
+**Root of the residual:** the chorus rate (`6395312` = −5.32549) and depth
+(`6395328` = 1.0) are loaded **only** from the PD-Juno-Pad capture
+(`src/runtime_coeffs_data.c:66-67`); no static initializer writes them (verified:
+zero static writes in `src/` and `allcode/`). They are runtime-set per chorus mode
+by the host's DB→engine bridge. So we are driving the (bit-exact) CH1 DSP with
+**another patch's** chorus settings. If PD-Juno-Pad's chorus mode/depth differs from
+SQ ARPG's CH1, our wobble magnitude/rate is wrong — and this is the prime remaining
+suspect for "exaggerated."
+
+**To close it bit-exactly (priority, runtime-translation work):** obtain SQ ARPG's
+actual `6395312`/`6395328` — either by finishing the DB→engine bridge so the preset's
+chorus mode computes them (`docs/DB_ENGINE_BRIDGE.md`), or a 2-value targeted capture.
+Until then the chorus depth is *approximate* (foreign-patch), not exact.
