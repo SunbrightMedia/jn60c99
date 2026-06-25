@@ -12,6 +12,7 @@ static const juno_param_map_ent JUNO_PARAM_MAP[] = {
   { 753,   4032,   0, "DCO LFO MOD"},
   { 758,   4144,  45, "DCO PWM DEPTH"},
   { 760,   3840,   5, "DCO RANGE"},
+  { 770,   4208,  54, "DCO PWM LEVEL"},
   { 771,   4192,  54, "DCO SAW LEVEL"},
   { 772,   4224,  54, "DCO SUB LEVEL"},
   { 773,   6528,  12, "DCO NOISE LEVEL"},
@@ -28,9 +29,10 @@ static const juno_param_map_ent JUNO_PARAM_MAP[] = {
   { 790,   3296,  38, "ENV2 DECAY"},
   { 791,   3280,  50, "ENV2 SUSTAIN"},
   { 792,   3312,  38, "ENV2 RELEASE"},
+  { 793,   9584,  21, "VCA TONE"},
   { 801,   4128,  21, "BEND RANGE"},
 };
-#define JUNO_PARAM_MAP_N 22
+#define JUNO_PARAM_MAP_N 24
 /* FX/global selectors (stride-4 region; k=309+(db-871)*4 on the bank stream) */
 #define JUNO_DB_MODEL 871
 #define JUNO_DB_FILTER 872

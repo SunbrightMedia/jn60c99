@@ -7,7 +7,7 @@
   "counts": {
    "patch_params": 114,
    "panel_exposed": 61,
-   "engine_offset_resolved": 23
+   "engine_offset_resolved": 25
   }
  },
  "params": [
@@ -239,8 +239,8 @@
    "default": "128",
    "type": "int2x4",
    "panel_exposed": true,
-   "engine_offset": null,
-   "offset_via": null
+   "engine_offset": 4208,
+   "offset_via": "JU OSC Sqr Lev (registry idx64; 3rd osc mix level, stride-16 between Saw 4192/Sub 4224, tid54; PROVEN vs rec0 capture step140->0x3f11e430)"
   },
   {
    "db_index": 771,
@@ -492,8 +492,8 @@
    "default": "128",
    "type": "int2x4",
    "panel_exposed": true,
-   "engine_offset": null,
-   "offset_via": null
+   "engine_offset": 9584,
+   "offset_via": "AMP TONE (registry idx95; VCA tone; tid21; PROVEN vs rec0 capture)"
   },
   {
    "db_index": 794,
