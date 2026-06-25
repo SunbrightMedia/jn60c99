@@ -27,6 +27,10 @@
 
 'use strict';
 
+// IMPORTANT: the file is written by the injected agent inside the HOST process, so a
+// bare filename lands in the host's working dir (often a read-only install folder ->
+// "Permission denied"). Set OUT_DIR to a folder YOU can write to (forward slashes).
+var OUT_DIR = 'C:/Users/sunbr/Downloads/neotestenv';   // <-- change to your folder
 var MODULE_NAME = null;          // e.g. "Cloud 60.vst3" or "System-8.dll"; null = auto-detect by export scan
 var RVA_MASTER_RENDER = 0x363380; // sub_180363380, image base 0x180000000
 var DUMP_BYTES = 11 * 1024 * 1024; // 11 MB: covers the full CJu60Sim workspace (voice + aux + chorus state @ ~10.7MB)
@@ -87,8 +91,8 @@ if (!mod) {
       }
       // 200 KB always works and covers the voice/filter/env/oscillator coefficients
       // (all the load-bearing offsets). The 11 MB attempt additionally grabs the chorus.
-      tryDump('juno_state_voice.bin', 200000);
-      if (!tryDump('juno_state_full.bin', DUMP_BYTES))
+      tryDump(OUT_DIR + '/juno_state_voice.bin', 200000);
+      if (!tryDump(OUT_DIR + '/juno_state_full.bin', DUMP_BYTES))
         console.log('[capture] (11MB region not fully mapped — juno_state_voice.bin is the one that matters.)');
       console.log('[capture] Files are in the directory you ran frida from. Send juno_state_voice.bin back.');
       console.log('[capture] Tip: re-run per patch (INIT patch, then SQ Dynamic ARPG) for a full set.');
