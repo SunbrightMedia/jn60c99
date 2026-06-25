@@ -47,7 +47,7 @@ work lands — keep this current.
 | Init / coefficient layer (`engine_init`) | 95% | Bit-exact: 2289/2289 stores match the binary. |
 | Voice DSP — DCO/HPF/VCF/2×ADSR/VCA/LFO/unison | 100% | **Bit-exact verified** vs decompile+asm (full line-by-line diff, zero discrepancies). |
 | Polyphony (8 voices, M.CV fix) | 95% | All 8 voices render; voice 0 bit-identical; M.CV pitch-base bug fixed; 622 offsets verified. |
-| Master mix + BBD chorus (×2 instances) | 100% | Both chorus instances **bit-exact verified** vs asm. |
+| Master mix + BBD chorus (×2 instances) | 100% | Both chorus instances **bit-exact verified** vs asm; Chorus I/II CV **recovered capture-free** (step·11/255−8, steps 62/50, bit-exact). |
 | Delay FX (+ DL2) | 100% | **Bit-exact verified** (both modes, interpolation, damping, feedback). |
 | Reverb (CJu60Sim) | 98% | DSP **bit-exact verified**; HALL2 **activated** (tap-builder `sub_7FF91E021AC0` transcribed, renders a decaying tail). Per-patch decay-knob damping is the small remainder. |
 | System-8 FX-A slot (Flanger, all 6 modes) | 100% | DSP **bit-exact verified**; routed separately from chorus; thru-bypassed when type=DELAY. |
@@ -57,7 +57,7 @@ work lands — keep this current.
 | Param registry (name→engine slot) | 100% | All 1121 bindings extracted from the asm (`refs/param_registry.json`). |
 | Param-apply engine (step→coefficient) | 95% | LUT mechanism bit-exact (88/88); noise byte-0 gate resolved & verified. |
 | Host layer — preset loader + RT synth API | 70% | Capture-free preset loader + CLI host (`host/juno_render.c`) + **real-time polyphonic synth API** (`host/juno_synth.c`: create/load/note-on-off/process-block with 8-voice allocation). Only the thin **VST3 SDK binding** (IAudioProcessor/IEditController glue + state chunk) remains. |
-| **Overall (weighted)** | **~88%** | **Every audio DSP block is bit-exact-verified against the binary, and any factory patch renders capture-free.** Remaining: the lone chorus-CV capture value, the per-patch reverb-decay damping, and the VST3 SDK wrapper. |
+| **Overall (weighted)** | **~90%** | **Every audio DSP block is bit-exact-verified, and any factory patch renders fully capture-free (incl. the chorus CV, now recovered).** Remaining: the per-patch reverb-decay damping rows and the VST3 SDK wrapper. |
 
 See `docs/PORT_STATUS.md` for the detailed accounting and `docs/` for per-subsystem maps.
 

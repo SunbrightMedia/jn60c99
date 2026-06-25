@@ -6,6 +6,7 @@
 #include "juno_params.h"
 #include "juno_param_map.h"
 #include "juno_preset.h"
+#include "juno_fx.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,6 +57,7 @@ int juno_preset_load(unsigned char *st, const char *bank_path, int record,
         juno_param_apply_lut(st, e->off, e->tid, step, /*broadcast=*/1);
         applied++;
     }
+    juno_chorus_set_rates(st);   /* capture-free JUNO chorus I/II rates */
     if (info) info->applied=applied;
     free(dec); free(rec);
     return 0;

@@ -57,7 +57,37 @@ so only the mode int + the runtime output-mix gains (85152 DS-Level / 85168 Mute
 85184 BiasMute) are host-side — which is exactly why offline FX-A is silent unless
 the driver thru-routes 84624→84672/84704 (see `juno_driver.c` fxa_bypass).
 
-## 3. JUNO Chorus mode → Chorus CV (6395312) — NOT static in the PE ⚠️ (the lone boundary)
+## 3. JUNO Chorus mode → Chorus CV (6395312 / 10692016) — RECOVERED, static, bit-exact ✅
+
+**Resolved — it IS statically derivable** (the earlier "host-pushed, not in the PE"
+conclusion was wrong; the producer just hadn't been read). The setter is
+`sub_7FF91DFBE590` (rva **0x35E590**, `CDSPSystem8DlyCh` vtable slot 0 — the chorus
+LFO-rate setter):
+
+```
+value = LUT22(step) * 11.0 - 8.0          // float32
+```
+- `LUT22` (tableId 22) @ rva `0x96D2E0` = exact linear `step/255` (0 deviations / 256).
+- scale `11.0` @ rva `0xAE5370`; offset `8.0` @ rva `0xAE5350`.
+- paramID `this[+0x6C] = 0x3DF = 991` ("Chorus CV" @ 6395312); 2nd instance idx 1065
+  @ 10692016 (same class). Written via `sub_7FF91E021090(eng, base, 991, value)`.
+
+**Per-mode steps (recovered, bit-exact round-trip):**
+
+| JUNO Chorus | step | CV | bits | captured |
+|---|--:|--:|---|---|
+| CH1 (Chorus I)  | **62** | −5.32549002 | `0xC0AA6A6A` | `0xC0AA6A6A` ✓ |
+| CH2 (Chorus II) | **50** | −5.84313726 | `0xC0BAFAFB` | `0xC0BAFAFB` ✓ |
+
+The two engine instances carry the fixed Chorus I / II rates (mode selects routing);
+`(step·11)/255 − 8` reproduces both captured floats exactly. Implemented capture-free
+in `src/juno_fx.c` (`juno_chorus_set_rates`), wired into `juno_preset_load`. The
+`−1358/255` "formula" in `refs/fx_coeff_recipe.json` was a back-fit; the true
+mechanism is the above. **The chorus has no remaining capture dependency.** The only
+non-literal bit is the DB873-mode→step selection, now a proven 2-entry table
+{CH1:62, CH2:50}.
+
+### (historical) earlier conclusion — NOT static in the PE
 
 Verified three ways that **6395312 is never written by any statically-decompiled
 function**: registered as node #988 (`sub_180388170`) with only the generic
