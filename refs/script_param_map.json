@@ -7,7 +7,7 @@
   "counts": {
    "patch_params": 114,
    "panel_exposed": 61,
-   "engine_offset_resolved": 25
+   "engine_offset_resolved": 24
   }
  },
  "params": [
@@ -580,8 +580,9 @@
    "default": "11",
    "type": "int2x4",
    "panel_exposed": true,
-   "engine_offset": 4128,
-   "offset_via": "BEND RANGE"
+   "engine_offset": null,
+   "offset_via": null,
+   "note": "BEND RANGE is a 0..23 SEMITONE value (default 11), NOT a 0..255 step. Engine offset 4128 (Bend Range) encodes it as (n-128)/255 via LUT21 (capture=LUT21(171)=43/255=0.16863 for R=11; init default=LUT21(163)=35/255). The 0..23 -> engine transform is bend-specific and NOT the generic pure-LUT path (LUT21(11)=0.0866 is wrong), so it is intentionally left UNAPPLIED (rides the engine init default) until the bend-range setter is transcribed. Inaudible without pitch-bend."
   },
   {
    "db_index": 802,

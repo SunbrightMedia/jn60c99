@@ -30,9 +30,8 @@ static const juno_param_map_ent JUNO_PARAM_MAP[] = {
   { 791,   3280,  50, "ENV2 SUSTAIN"},
   { 792,   3312,  38, "ENV2 RELEASE"},
   { 793,   9584,  21, "VCA TONE"},
-  { 801,   4128,  21, "BEND RANGE"},
 };
-#define JUNO_PARAM_MAP_N 24
+#define JUNO_PARAM_MAP_N 23
 /* FX/global selectors (stride-4 region; k=309+(db-871)*4 on the bank stream) */
 #define JUNO_DB_MODEL 871
 #define JUNO_DB_FILTER 872
