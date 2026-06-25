@@ -45,6 +45,7 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
  * filter-envelope generators off the held gate. */
 #define JUNO_GATE_OFF(v)   (JUNO_VOICE_MAIN_BASE0 + (v) * JUNO_VOICE_MAIN_STRIDE)  /* 320 */
 #define JUNO_PITCH_OFF(v)  (4448            + (v) * JUNO_VOICE_MAIN_STRIDE)        /* 4448 */
+#define JUNO_MCV_OFF(v)    (304             + (v) * JUNO_VOICE_MAIN_STRIDE)        /* 304 */
 #define JUNO_EDGE_OFF(v)   (JUNO_VOICE_AUX_BASE0  + (v) * JUNO_VOICE_AUX_STRIDE)   /* 101504 */
 
 void juno_note_on(unsigned char *st, int voice, int midi_note)
@@ -52,6 +53,13 @@ void juno_note_on(unsigned char *st, int voice, int midi_note)
     /* pitch in octaves so Hz = JUNO_DCO_REF_HZ*2^pitch == 440*2^((note-69)/12) */
     float pitch = (float)(log2(440.0 / JUNO_DCO_REF_HZ) + (midi_note - 69) / 12.0);
     JF(st, JUNO_PITCH_OFF(voice)) = pitch;
+    /* M.CV (offset 304) is the per-voice pitch BASE. It sits 16 bytes below the
+     * voice block, so the parameter broadcast (which copies voice-0 params across
+     * voices at +10512) lands voice v's M.CV slot inside voice v-1's nominal block
+     * and overwrites it with the wrong value — leaving voices 1..7 mistuned (only
+     * voice 0, seeded by the capture, was correct). Re-seat each played voice's
+     * M.CV base from voice 0's so all voices share the correct pitch reference. */
+    JF(st, JUNO_MCV_OFF(voice)) = JF(st, JUNO_MCV_OFF(0));
     JF(st, JUNO_GATE_OFF(voice))  = 1.0f;
     JI(st, JUNO_EDGE_OFF(voice))  = 0x3F800000;  /* 1.0f — one-shot retrigger */
 }
