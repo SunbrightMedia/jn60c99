@@ -28,8 +28,21 @@ def main():
     name = ''.join(chr(dec[78 + j]) if 32 <= dec[78 + j] < 127 else '?' for j in range(16))
     assert 'SQ Dynamic' in name, f"calibration check failed: name={name!r}"
     def step_for_db(db):
-        k = (db - 755) + 19
+        # Synth-voice block is stride-1; the FX/global selector block (DB868-877)
+        # is a stride-4 (int8x4) region, proven by the deserializer's hardcoded
+        # 8-byte dest stride at decomp_300000.c:40107-40109. On this full-record
+        # nibble stream the FX anchor is k = 309 + (db-871)*4 (verified to reproduce
+        # chorus=2/reverb=3/fxA=0/model=0 for SQ ARPG). See docs/PRESET_BANK_FORMAT.md.
+        if 868 <= db <= 877:
+            k = 309 + (db - 871) * 4
+        else:
+            k = (db - 755) + 19
         return dec[k] if 0 <= k < len(dec) else None
+
+    # Decode the FX/global selectors capture-free (used to drive chorus/reverb/FX-A).
+    fx_selectors = {db: step_for_db(db) for db in
+                    {871: "MODEL", 872: "FILTER", 873: "JUNO Chorus mode",
+                     875: "FX-A type", 876: "Reverb type"}}
 
     smap = json.load(open(os.path.join(ROOT, 'refs/script_param_map.json')))['params']
     ptab = json.load(open(os.path.join(ROOT, 'refs/param_table_full.json')))

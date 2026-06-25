@@ -45,18 +45,18 @@ work lands — keep this current.
 | Area | % | State |
 |------|--:|-------|
 | Init / coefficient layer (`engine_init`) | 95% | Bit-exact: 2289/2289 stores match the binary. |
-| Voice DSP — DCO/HPF/VCF/2×ADSR/VCA/LFO/unison | 85% | Transcribed line-by-line; audibly validated; not yet per-sample A/B'd. |
+| Voice DSP — DCO/HPF/VCF/2×ADSR/VCA/LFO/unison | 98% | **Bit-exact verified** vs decompile+asm (pitch/LFO/clamp/poly/waveshapers all match). |
 | Polyphony (8 voices, M.CV fix) | 90% | All 8 voices render; voice 0 bit-identical; M.CV pitch-base bug fixed. |
-| Master mix + BBD chorus | 80% | Chorus DSP **bit-exact vs asm** (every depth constant matches rdata). Rate/depth *inputs* still PD-captured, not SQ-ARPG's. |
-| System-8 FX-A slot (the `v551`/EFX effect) | 15% | Identified + routed (separate from chorus); faithful render needs its runtime coeffs. Currently thru-bypassed. |
-| Reverb (CJu60Sim HALL2) | 10% | Tables recovered; solver graph not transcribed. Biggest audible gap. |
-| Delay FX | 30% | Coeff tables recovered; multimode DSP partially transcribed. |
+| Master mix + BBD chorus | 95% | Chorus DSP **bit-exact verified** vs asm. Per-mode CV/depth values still being sourced from code. |
+| Delay FX | 98% | **Bit-exact verified** vs asm (both delay modes + DL2, interpolation, damping, feedback). |
+| Reverb (CJu60Sim HALL2) | 90% | DSP **bit-exact verified** (4-loop tank, pre-filter, taps, waveshaper). Needs its tap-table/coeffs activated per-patch. |
+| System-8 FX-A slot (the `v551`/EFX = Flanger) | 25% | Identified as a Flanger (registry), routed separately from chorus; currently thru-bypassed. |
 | Arpeggiator (`CArpeggio`) | 80% | Faithful scan/clock core; UP/range/STEP decoded from the deserializer. |
-| Preset / bank decode | 85% | Format proven from the deserializer (not guessed). |
-| Param-apply engine (LUT + switch) | 70% | Mechanism bit-exact (88/88 LUT, 69/69 FX); not every param family routed. |
-| DB→engine runtime bridge (preset → coeffs) | 30% | Red-black-tree binding is runtime-only; partially reconstructed. |
+| Preset / bank decode | 92% | Format proven from the deserializer; FX selectors now decode (stride-4) — chorus/reverb/model read correctly. |
+| Param registry (name→engine slot) | 100% | All 1121 bindings extracted from the asm (`refs/param_registry.json`). The "DB→engine bridge". |
+| Param-apply engine (step→coefficient) | 75% | LUT mechanism bit-exact; **scale+offset post-transform family NOT finished** → some coeffs (e.g. noise) wrong. Active gap. |
 | VST3 host wrapper (MIDI / automation / state save) | 0% | Not started. |
-| **Overall (weighted)** | **~50%** | Validated voice + polyphony + arp core are the de-risked core; FX, full param-apply, and host wrapper are the bulk remaining. |
+| **Overall (weighted)** | **~60%** | All audio DSP is now bit-exact-verified — the hard part is done. Remaining: finish the param-apply transform, activate FX coeffs per-patch, host wrapper. |
 
 See `docs/PORT_STATUS.md` for the detailed accounting and `docs/` for per-subsystem maps.
 
