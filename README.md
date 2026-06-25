@@ -56,7 +56,7 @@ work lands — keep this current.
 | Preset / bank decode | 95% | Deserializer-proven; FX selectors decode (stride-4); byte→step = identity (verified 14/16). |
 | Param registry (name→engine slot) | 100% | All 1121 bindings extracted from the asm (`refs/param_registry.json`). |
 | Param-apply engine (step→coefficient) | 95% | LUT mechanism bit-exact (88/88); noise byte-0 gate resolved & verified. |
-| Host layer — preset loader + offline render | 60% | Capture-free C preset loader (any factory patch → engine) + CLI host (`host/juno_render.c`) render any bank patch to WAV with its FX. **VST3 SDK packaging** (real-time process / automation / MIDI / state chunk) remains. |
+| Host layer — preset loader + RT synth API | 70% | Capture-free preset loader + CLI host (`host/juno_render.c`) + **real-time polyphonic synth API** (`host/juno_synth.c`: create/load/note-on-off/process-block with 8-voice allocation). Only the thin **VST3 SDK binding** (IAudioProcessor/IEditController glue + state chunk) remains. |
 | **Overall (weighted)** | **~88%** | **Every audio DSP block is bit-exact-verified against the binary, and any factory patch renders capture-free.** Remaining: the lone chorus-CV capture value, the per-patch reverb-decay damping, and the VST3 SDK wrapper. |
 
 See `docs/PORT_STATUS.md` for the detailed accounting and `docs/` for per-subsystem maps.
