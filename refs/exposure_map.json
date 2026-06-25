@@ -1,0 +1,1296 @@
+{
+ "_meta": {
+  "purpose": "Authoritative boundary of what the JUNO-60 (Cloud 60) product actually EXPOSES, vs. shared RolandCloud framework code/params/tables that are compiled into the DLL but unused by this product. Built capture-free from the decompiled binary + factory preset DB + the confirmed panel photo.",
+  "method": "Three binary-grounded sources cross-referenced: (1) the parameter registry (sub_388170 -> docs/PARAM_MAP.tsv): 1121 descriptors = one ~110-param framework voice template replicated ~16x (16 parts) \u2014 names like 'LFO Level','ENV Attack' each appear 16x. (2) the factory-preset DB synth block (DB 755..877, refs/default_patch.json): the 123 params the preset format actually stores, each with a value-format SPEC that is the panel's control labelling. (3) the confirmed JUNO-60 panel (ARPEGGIO/ARP MODE/ARP RANGE + the standard DCO/VCF/VCA/ENV/LFO/CHORUS sections).",
+  "key_finding": "'Present in the binary' != 'exposed by the product'. The exposed JUNO-60 patch surface is the 123-param DB block, NOT the 1121-param registry. Mapping work must be scoped to the 123, not the 1121 \u2014 the framework superset is what made the DB->engine continuous-param binding look intractable.",
+  "uidesc_note": "The definitive panel control->ParamID map lives in the VST3 bundle's Resources/*.uidesc (VSTGUI), which is NOT inside the decompiled PE (only VSTGUI parser error strings + SVG assets are present). So the exact per-control ParamID is confirmable only with the bundle file; the DB block + specs give the exposed SET authoritatively without it."
+ },
+ "registry_decomposition": {
+  "total_registry_params": 1121,
+  "framework_voice_template_params": 110,
+  "replication": "~16 parts/voices (name duplication x16 confirmed)",
+  "exposed_juno60_patch_params": 123,
+  "of_which": {
+   "preset_name_chars": 16,
+   "framework_modular_cv_jack_matrix_DB830_852": 23,
+   "actual_juno60_patch_params": 84,
+   "proven_engine_offset_bindings": 8,
+   "continuous_runtime_only_bindings": 71
+  }
+ },
+ "exposed_db_params": [
+  {
+   "db_index": 755,
+   "spec": "0..255",
+   "default_step": 128,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 756,
+   "spec": "OFF|ON",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 757,
+   "spec": "0..5",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 758,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 759,
+   "spec": "MAN|LFO|ENV1+|ENV1-|ENV2+|ENV2-",
+   "default_step": 0,
+   "panel_section": "DCO",
+   "panel_control": "PWM source",
+   "engine_offset": null,
+   "registry_name": "PWM source -> PWM SW {LFO/ENV1/ENV2/Manual}",
+   "tableId": null,
+   "binding": "driver/discrete",
+   "confidence": "MEDIUM"
+  },
+  {
+   "db_index": 760,
+   "spec": "64FEET|32FEET|16FEET|8FEET|4FEET|2FEET",
+   "default_step": 3,
+   "panel_section": "DCO",
+   "panel_control": "OSC range / feet",
+   "engine_offset": 3840,
+   "registry_name": "OSC1 Feet",
+   "tableId": 5,
+   "binding": "proven",
+   "confidence": "HIGH"
+  },
+  {
+   "db_index": 761,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 762,
+   "spec": "0..5",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 763,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 764,
+   "spec": "0..5",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 765,
+   "spec": "64|32|16|8|4|2",
+   "default_step": 0,
+   "panel_section": "DCO",
+   "panel_control": "sub/feet selector",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 766,
+   "spec": "0..128..255",
+   "default_step": 128,
+   "panel_section": "DCO",
+   "panel_control": "PWM depth (manual)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 767,
+   "spec": "OFF|ON|--|--",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 768,
+   "spec": "OFF|ON|--|--",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 769,
+   "spec": "-11..11",
+   "default_step": 0,
+   "panel_section": "GLOBAL",
+   "panel_control": "transpose",
+   "engine_offset": null,
+   "registry_name": "Coarse transpose/range (+-11)",
+   "tableId": null,
+   "binding": "driver/discrete",
+   "confidence": "MEDIUM"
+  },
+  {
+   "db_index": 770,
+   "spec": "0..255",
+   "default_step": 128,
+   "panel_section": "DCO",
+   "panel_control": "square level",
+   "engine_offset": 4208,
+   "registry_name": "JU OSC Sqr Lev (tentative)",
+   "tableId": 54,
+   "binding": "proven",
+   "confidence": "LOW"
+  },
+  {
+   "db_index": 771,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "DCO",
+   "panel_control": "saw level",
+   "engine_offset": 4192,
+   "registry_name": "JU OSC Saw Lev (tentative)",
+   "tableId": 54,
+   "binding": "proven",
+   "confidence": "LOW"
+  },
+  {
+   "db_index": 772,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "DCO",
+   "panel_control": "sub level",
+   "engine_offset": 4224,
+   "registry_name": "JU OSC Sub Lev (tentative)",
+   "tableId": 54,
+   "binding": "proven",
+   "confidence": "LOW"
+  },
+  {
+   "db_index": 773,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 774,
+   "spec": "--|--|--|--",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 775,
+   "spec": "PINK|WHITE|--|--",
+   "default_step": 0,
+   "panel_section": "NOISE",
+   "panel_control": "noise type PINK/WHITE",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 776,
+   "spec": "0..255",
+   "default_step": 128,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 777,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 778,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 779,
+   "spec": "0..255",
+   "default_step": 255,
+   "panel_section": "NOISE",
+   "panel_control": "noise level",
+   "engine_offset": 6528,
+   "registry_name": "Osc Noise Level (tentative)",
+   "tableId": 12,
+   "binding": "proven",
+   "confidence": "LOW"
+  },
+  {
+   "db_index": 780,
+   "spec": "--|--|--|--",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 781,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 782,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 783,
+   "spec": "0..255",
+   "default_step": 128,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 784,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 785,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 786,
+   "spec": "0..255",
+   "default_step": 255,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 787,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 788,
+   "spec": "0..255",
+   "default_step": 128,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 789,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 790,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 791,
+   "spec": "0..255",
+   "default_step": 255,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 792,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 793,
+   "spec": "0..255",
+   "default_step": 128,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 794,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 795,
+   "spec": "OFF|1..255",
+   "default_step": 0,
+   "panel_section": "ENV2/VCA",
+   "panel_control": "sustain",
+   "engine_offset": 2800,
+   "registry_name": "ENV Sustain (VCA, tentative)",
+   "tableId": 50,
+   "binding": "proven",
+   "confidence": "LOW"
+  },
+  {
+   "db_index": 796,
+   "spec": "OFF|1..255",
+   "default_step": 0,
+   "panel_section": "ENV2/VCA",
+   "panel_control": "release",
+   "engine_offset": 2832,
+   "registry_name": "ENV Release (VCA, tentative)",
+   "tableId": 38,
+   "binding": "proven",
+   "confidence": "LOW"
+  },
+  {
+   "db_index": 797,
+   "spec": "0..255",
+   "default_step": 128,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 798,
+   "spec": "OFF|1..255",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 799,
+   "spec": "OFF|ON",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 800,
+   "spec": "POLY1|MONO|UNISON|POLY2",
+   "default_step": 0,
+   "panel_section": "GLOBAL",
+   "panel_control": "key assign POLY/MONO/UNISON",
+   "engine_offset": null,
+   "registry_name": "Key Assign (POLY1/MONO/UNISON/POLY2)",
+   "tableId": null,
+   "binding": "driver/discrete",
+   "confidence": "HIGH"
+  },
+  {
+   "db_index": 801,
+   "spec": "1..24",
+   "default_step": 11,
+   "panel_section": "ARP",
+   "panel_control": "range / bend",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 802,
+   "spec": "--",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 803,
+   "spec": "OFF|ON",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 804,
+   "spec": "--",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 805,
+   "spec": "--",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 806,
+   "spec": "--",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 807,
+   "spec": "--",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 808,
+   "spec": "--",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 809,
+   "spec": "--",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 810,
+   "spec": "0..255",
+   "default_step": 128,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 811,
+   "spec": "DISABLE|ENABLE",
+   "default_step": 1,
+   "panel_section": "GLOBAL",
+   "panel_control": "enable",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 812,
+   "spec": "--",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 813,
+   "spec": "--",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 814,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 815,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 816,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 817,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 818,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 819,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 820,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 821,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 822,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 823,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 824,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 825,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 826,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 827,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 828,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 829,
+   "spec": "4 char",
+   "default_step": 0,
+   "panel_section": "PRESET NAME",
+   "panel_control": "name char (not a control)",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 830,
+   "spec": "0..65535 (max 16 jacks)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 831,
+   "spec": "OFF|ON",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 832,
+   "spec": "0..5",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 833,
+   "spec": "0..5",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 834,
+   "spec": "1..10",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 835,
+   "spec": "-5..+5",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 836,
+   "spec": "-3..+3",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 837,
+   "spec": "OFF|ON",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 838,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 839,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 840,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 841,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 842,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 843,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 844,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 845,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 846,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 847,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 848,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 849,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 850,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 851,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 852,
+   "spec": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "default_step": 0,
+   "panel_section": "FRAMEWORK (modular CV/jack matrix)",
+   "panel_control": "System-8 patch-jack routing; not on the JUNO-60 panel",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 853,
+   "spec": "x0.0 (0)..x1.0 (128)..x2.0 (255)",
+   "default_step": 128,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 854,
+   "spec": "1|2|3",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 855,
+   "spec": "ENV1|ENV2|GATE",
+   "default_step": 1,
+   "panel_section": "VCA",
+   "panel_control": "ENV select ENV1/ENV2/GATE",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 856,
+   "spec": "-128..+127",
+   "default_step": 128,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 857,
+   "spec": "x1|x2|x3|x4",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 858,
+   "spec": "0..255",
+   "default_step": 43,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 859,
+   "spec": "0..255",
+   "default_step": 43,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 860,
+   "spec": "0..255",
+   "default_step": 22,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 861,
+   "spec": "0..255",
+   "default_step": 22,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 862,
+   "spec": "1|2|3",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 863,
+   "spec": "OFF|ON",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 864,
+   "spec": "1|2",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 865,
+   "spec": "-11..+11",
+   "default_step": 11,
+   "panel_section": "GLOBAL",
+   "panel_control": "bend range",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 866,
+   "spec": "0..255",
+   "default_step": 128,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 867,
+   "spec": "1|2",
+   "default_step": 0,
+   "panel_section": "DISCRETE (unclassified)",
+   "panel_control": "labelled selector; section TBD",
+   "engine_offset": null,
+   "binding": "unmapped-discrete",
+   "confidence": null
+  },
+  {
+   "db_index": 868,
+   "spec": "-2OCT SIN|-1OCT SIN|SIN|TRI|-1OCT TRI|-2OCT TRI",
+   "default_step": 0,
+   "panel_section": "DCO",
+   "panel_control": "sub-osc waveform",
+   "engine_offset": null,
+   "registry_name": "Sub-osc waveform",
+   "tableId": null,
+   "binding": "driver/discrete",
+   "confidence": "MEDIUM"
+  },
+  {
+   "db_index": 869,
+   "spec": "0..255",
+   "default_step": 0,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 870,
+   "spec": "-1200CENT..+1200CENT",
+   "default_step": 128,
+   "panel_section": "GLOBAL",
+   "panel_control": "Master Tune",
+   "engine_offset": 368,
+   "registry_name": "Master Tune",
+   "tableId": 6,
+   "binding": "proven",
+   "confidence": "HIGH"
+  },
+  {
+   "db_index": 871,
+   "spec": "        JUNO-60 (0)|JUNO-106 (1)",
+   "default_step": 0,
+   "panel_section": "GLOBAL",
+   "panel_control": "Model JUNO-60/106",
+   "engine_offset": null,
+   "registry_name": "Model JUNO-60/106",
+   "tableId": null,
+   "binding": "driver/discrete",
+   "confidence": "HIGH"
+  },
+  {
+   "db_index": 872,
+   "spec": "LPF -24dB|LPF -18dB|LPF -12dB|HPF -12dB|HPF -18dB|HPF -24dB",
+   "default_step": 0,
+   "panel_section": "VCF",
+   "panel_control": "filter type LPF/HPF slope",
+   "engine_offset": null,
+   "registry_name": "Filter type (LPF/HPF slope)",
+   "tableId": null,
+   "binding": "driver/discrete",
+   "confidence": "HIGH"
+  },
+  {
+   "db_index": 873,
+   "spec": "OVERDRIVE|DISTORTION|JUNO CH1|JUNO CH2|CRUSHER|PHASER",
+   "default_step": 2,
+   "panel_section": "CHORUS/FX",
+   "panel_control": "FX-B / chorus mode",
+   "engine_offset": null,
+   "registry_name": "JUNO Chorus mode (driver chorus_mode)",
+   "tableId": null,
+   "binding": "driver/discrete",
+   "confidence": "HIGH"
+  },
+  {
+   "db_index": 874,
+   "spec": "0..255",
+   "default_step": 128,
+   "panel_section": "CONTINUOUS (unclassified knob)",
+   "panel_control": "0..255 knob; section TBD",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  },
+  {
+   "db_index": 875,
+   "spec": "DELAY|PAN DELAY|CHORUS 1|CHORUS 2|FLANGER|DELAY+CHORUS",
+   "default_step": 0,
+   "panel_section": "FX",
+   "panel_control": "System-8 FX-A type",
+   "engine_offset": null,
+   "registry_name": "System-8 FX-A type (delay/mod slot)",
+   "tableId": null,
+   "binding": "driver/discrete",
+   "confidence": "HIGH"
+  },
+  {
+   "db_index": 876,
+   "spec": "AMBIENCE|ROOM|HALL 1|HALL 2|PLATE|MODULATION",
+   "default_step": 2,
+   "panel_section": "REVERB",
+   "panel_control": "reverb type",
+   "engine_offset": null,
+   "registry_name": "Reverb type",
+   "tableId": null,
+   "binding": "driver/discrete",
+   "confidence": "HIGH"
+  },
+  {
+   "db_index": 877,
+   "spec": "0..255",
+   "default_step": 128,
+   "panel_section": "FX",
+   "panel_control": "FX level/param",
+   "engine_offset": null,
+   "binding": "runtime-only (continuous)",
+   "confidence": null
+  }
+ ],
+ "framework_only_NOT_exposed_by_juno60": [
+  "The 16x replication of the registry param template (parts 2..16) \u2014 JUNO-60 is one part.",
+  "LFO waveform switches: 'LFO Sin/Tri/Sqr/Saw/Saw(Inv)/S&H/Noise Sw' (offsets 1952..2048) \u2014 the JUNO-60 LFO is triangle-only; these are System-8 framework.",
+  "Second LFO/MOD block (registry offsets 7296..7392: 'LFO Gain/Level','MOD Sens/SW') and OSC2/OSC3-style params \u2014 System-8 multi-osc; JUNO-60 has one DCO + one LFO.",
+  "DB 830..852 modular CV/jack routing ('default|CV OUT|GATE OUT|LFO OUT|...') and 'Griffer'/keyboard-CV params \u2014 System-8 patch-jack matrix, not on the JUNO-60 panel.",
+  "CKbdArp 150-pattern sequencer (word_7FF91E624480, 10 styles x 15 variations) \u2014 the JUNO-60 arp is the CArpeggio MODE x RANGE engine only.",
+  "Portamento, ext-jack ('UseExtJack','M.CV'), 'PlugIn Sw', 'Q24C Initialize' \u2014 framework lifecycle/routing, not panel controls.",
+  "Unused System-8 FX-A slot modes beyond what the preset selects (PAN DELAY/FLANGER/etc. are framework options exposed via one selector, DB875)."
+ ]
+}
