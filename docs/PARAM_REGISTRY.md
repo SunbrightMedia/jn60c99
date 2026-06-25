@@ -77,3 +77,45 @@ specific patch's chorus coefficients fully from static data:
 The headline: the bridge is **static and extracted**. No capture is required to know
 *which* coefficient each parameter drives — only to (still) confirm the few CH1
 preset values, which is now a bounded data hunt in the binary.
+
+## Data-hunt results (the chorus value chase)
+
+Pursuing CH1's exact chorus values turned up several things — some answers, one
+methodology bug that mattered more than the chorus:
+
+1. **Chorus CV is mode-set model data, formula bit-exact.** `Chorus CV = −code/255`
+   (float32, verified `docs/FX_COEFF_SETUP.md`). The chorus block runs **identical
+   code for CH1 (v39=2) and CH2 (v39=3)** — only `if (v39 <= 3)`, no sub-branch — so
+   CH1 vs CH2 differ *purely by this coefficient value*. The two chorus instances'
+   codes are 1358 (6395312) and 1490 (10692016); both are exact integers (value×255
+   is exactly integral, so the integer-code model is real, not back-fit). They yield
+   an LFO ≈ 0.4 Hz, which **matches real JUNO Chorus I** — so the current chorus rate
+   is very likely already CH1-correct.
+2. **The exact mode→code table is NOT a hardcoded constant** near the chorus (the
+   `0x54E`/`0x5D2` immediates found were coincidental DB-index sequences). It is
+   produced by the JUNO model's chorus-mode handler at apply time — the next target,
+   same asm-extraction method.
+3. **The patch does not store Chorus CV / LFO Depth** — they are not panel-exposed
+   (`refs/script_param_map.json`). Chorus is set via `JUNO Chorus mode` (DB873). But
+   the patch DOES expose its own **JUNO LFO** (DB752 RATE, DB751 DELAY, DB753 DCO LFO
+   MOD) and `EFFECT DEPTH` (DB794).
+
+### The bug that actually mattered: we were auditioning the wrong patch's voice
+
+Decoding SQ ARPG's bank gives **DCO LFO MOD = 128** (half-depth LFO→pitch), LFO
+RATE = 63, LFO DELAY = 0 — a deliberate vibrato in the patch. But the one-note
+renders used `juno_runtime_coeffs_apply` + `juno_overlay_patch`, i.e. the
+**PD-Juno-Pad** capture, whose DCO LFO MOD ≈ 0 (no vibrato). So those renders were
+PD Juno Pad's voice coefficients, not SQ ARPG's — which is why the measured voice was
+"rock-stable" (it had no LFO vibrato to be unstable). The correct capture-free SQ
+render is `tests/play_preset.c` / `tests/sqarpg_apply.h` (22 real bank-decoded voice
+params applied through the LUT engine), which **does** include the patch's own
+vibrato. Always render SQ ARPG through that path, not the PD overlay.
+
+### Known decode bug to fix
+
+The linear bank decode `step = dec[(db−755)+19]` is correct for the stride-1 voice
+block but **wrong for the FX/arp params (DB871+)**: it reads `JUNO Chorus mode`
+(DB873) as 0 instead of 2, because the record switches to a stride-4 layout there
+(`docs/PRESET_BANK_FORMAT.md`). The FX selector steps must be read with the
+stride-4 offset before they can be trusted.
