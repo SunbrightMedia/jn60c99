@@ -48,6 +48,28 @@ Impact: SQ ARPG has **PULSE LEVEL = 255** (full on) — previously rendered at t
 default ~half, so the whole pulse oscillator was under-mixed. Adding it is what
 moved the centroid 1687 → 1417 (toward the 1187 reference).
 
+## Bridge breakthrough — apply order is STATIC (more bindings landed)
+
+A decompile trace of the patch-apply path found the "DB→engine not statically
+recoverable" claim is too strong: the apply is a **positional descriptor walk**
+(`sub_33BFC0` @ rva 0x33BFC0; running position counter = Script param order, so
+DB = 750 + position), and each position's descriptor carries a static
+`{offset, tableId}` — already recovered in `src/juno_param_table.h`. Only the FX
+**node** binding hop (panel→vtable-only FX setter) is runtime.
+
+New proven, capture-validated voice bindings added since:
+
+| DB | param | offset / tid | proof |
+|--:|---|---|---|
+| 756 | LFO KEY TRIG | 1872, tid51 (inverted sw) | per-note LFO phase-reset DSP `voice_render.c:806-818` + rec0 cap (step0→1.0). ON in SQ ARPG → resets vibrato each arp note (the perceived "pitch drift"). |
+| 759 | DCO PWM SOURCE | one-hot 3888/3904/3920/3936 | PWM mix DSP `voice_render.c:1083-1089` + rec0 cap (LFO→3888=1.0). Fixes MANUAL patches (engine default leaked 3888=1.0=LFO). |
+
+FX-send transforms are **static = curve-22 (step/255)** (the earlier "0.498≠0.694"
+was a wrong-step error). **DELAY LEVEL → 102528 = curve22(step) is confirmed**
+(rec0 bank step 20 at decoded k=60 = captured curve22(20)). **REVERB LEVEL →
+10759440 is NOT confirmed**: the captured node = curve22(127) but step 127 appears
+nowhere in the bank, so that node is a HALL2 constant, not the per-patch send.
+
 ## Still open (the remaining ~1.2× brightness / body)
 
 - **FX send levels** DB794 EFFECT DEPTH (=255), DB795 REVERB LEVEL (=195),
