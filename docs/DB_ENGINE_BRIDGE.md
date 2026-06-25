@@ -10,6 +10,16 @@ Deliverables: `refs/db_engine_bridge.json` (the mapping), `refs/sqarpg_engine_st
 
 ---
 
+> **⚡ SUPERSEDED for continuous params (see `docs/SCRIPT_PARAM_MAP.md`).** The
+> "runtime-only / not statically recoverable" conclusion below is true of the **PE
+> binary** but was overturned by the plugin's own shipped resource **`Script.xml`**
+> (`refs/plugin_resources/Script.xml`), which lists every param in canonical order with
+> name/range/default. Its order aligns 1:1 with the DB block (`Script[i] ↔ DB[750+i]`,
+> proven by DCO RANGE==DB760 + range/default agreement), giving DB-index → param name →
+> engine offset **statically and capture-free**. This binds the LFO rate/depth (DB752→
+> offset 1088, DB753→4032) behind the pitch drift. The PE-only analysis below remains
+> accurate for *why the binary alone* couldn't do it.
+
 ## 1. Which path worked — **Path B (semantic + ordered alignment)**
 
 **Path A (static translation) was conclusively ruled out**, confirming the

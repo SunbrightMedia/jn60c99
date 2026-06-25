@@ -1,0 +1,196 @@
+//////////////////////////////////////////////////////////////////////////////
+// TextCodeTable.dat
+
+CodeConnectTargetError
+Either the PLUG-OUT SYNTHESIZER is not connected, or is connected incorrectly.\nCheck the connection.\n\nConnecting SYSTEM-8 PLUG-OUT SYNTHESIZER to this software allows you to:\n- Take this software as a PLUG-OUT wherever you go, from mobile production to live performance.\n- Transfer sounds between SYSTEM-8 and this software with PLUG-OUT.\n- Use SYSTEM-8 as a fully-controllable dedicated keyboard controller via USB.\nFor further information about PLUG-OUT SYNTHESIZER, please visit to http://www.roland.com/
+PLUG-OUT SYNTHESIZER が接続されていないか、接続が正しくないようです。\n接続を確認してください。\n\nSYSTEM-8 PLUG-OUT SYNTHESIZERを接続すると:\n- 本ソフトウェアをSYSTEM-8にPLUG-OUTして、モバイル制作やライブ演奏に持ち出すことができます。\n- SYSTEM-8と本ソフトウェアとの間で音色の情報を転送することができます。\n- フルコントロール可能な専用USBキーボード・コントローラとして使用できます。\nPLUG-OUT SYNTHESIZERについて詳しくは、http://www.roland.com/ をご覧ください。
+
+CodeReadFileError
+The file could not be read.
+ファイルが読み込めませんでした。
+
+CodeWriteFileError
+The file could not be saved.\nMake sure that the media is not write protected, and that there is sufficient free space.
+ファイルが保存できませんでした。\nメディアが書き込み禁止になっていないか、空き容量があるか確認してください。
+
+CodeMidiDeviceError
+The connection with the PLUG-OUT SYNTHESIZER was ended.
+PLUG-OUT SYNTHESIZER との接続が切断されました。
+
+CodeMidiReconnectMessage
+The PLUG-OUT SYNTHESIZER was reconnected.
+PLUG-OUT SYNTHESIZER と再接続しました。
+
+CodeManualFileName
+JUNO-60_Manual_E.pdf
+JUNO-60_Manual_J.pdf
+
+CodeManualOpenError
+The program for opening the owner's manual (PDF) could not be started.
+取扱説明書 (PDF) を開くためのプログラムを起動できませんでした。
+
+CodeAskSaveMessage
+Save changes to %s?
+%s への変更を保存しますか？
+
+CodeContentStoreUrl
+https://contentstore.roland.com
+https://contentstore.roland.com
+
+CodeRolandCloudUrl
+http://www.rolandcloud.com/
+http://www.rolandcloud.com/
+
+CodeRolandAiraMicrositeUrl
+http://www.roland.com/aira/
+http://www.roland.co.jp/aira/
+
+CodeRolandAiraUrl
+http://www.roland.com/categories/aira/
+http://www.roland.co.jp/categories/aira/
+
+CodeSystem1DownloadUrl
+https://www.roland.com/global/products/system-1/downloads/
+https://www.roland.com/jp/products/system-1/downloads/
+
+CodeSystem1mDownloadUrl
+https://www.roland.com/global/products/system-1m/downloads/
+https://www.roland.com/jp/products/system-1m/downloads/
+
+CodeSystem8DownloadUrl
+https://www.roland.com/global/products/system-8/downloads/
+https://www.roland.com/jp/products/system-8/downloads/
+
+CodePlugOutSoftSynthUrl
+http://www.roland.com/categories/aira/plug-out_synthesizers/
+http://www.roland.co.jp/categories/aira/plug-out_synthesizers/
+
+CodeBrowserOpenError
+The internet browser could not be started.
+インターネット・ブラウザを起動できませんでした。
+
+CodeActivatorNonActivatedMessage
+Since activation has not been completed, the audio output periodically becomes distorted and reduced in volume after 10 minutes.\nPurchase the PLUG-OUT Software Synthesizer and activate it.
+アクティベーションが未完了のため 10 分後に周期的に音が歪んで小さくなります。\n購入後にアクティベーションをしてください。
+
+CodeActivatorExpiredMessage
+Since activation has not been completed, the audio output periodically becomes distorted and reduced in volume.\nPurchase the PLUG-OUT Software Synthesizer and activate it.
+アクティベーションが未完了のため周期的に音が歪んで小さくなります。\n購入後にアクティベーションをしてください。
+
+CodeActivatorNonAuthorizedMessage
+Since authorization has not been completed, the audio output periodically becomes distorted and reduced in volume after 10 minutes.
+オーサライズが未完了のため 10 分後に周期的に音が歪んで小さくなります。
+
+CodeActivatorAuthorizeExpiredMessage
+Since authorization has not been completed, the audio output periodically becomes distorted and reduced in volume.
+オーサライズが未完了のため周期的に音が歪んで小さくなります。
+
+CodeNoConnectivityError
+Unable to connect to internet.
+インターネットに接続できません。
+
+CodeUnauthorizedError
+Your authorization has expired or is incorrect.\nPlease try logging in again or go to https://www.rolandcloud.com/contact-us.
+ログイン情報が間違っているかオーサライズ期間が終了しています。\n再度ログインしなおすか https://www.rolandcloud.com/contact-us からお問い合わせください。
+
+CodeAuthorizationError
+We were unable to authenticate your account.\nPlease try logging in again or go to https://www.rolandcloud.com/contact-us.
+お客様のアカウントを認証できませんでした。\n再度ログインしなおすか https://www.rolandcloud.com/contact-us からお問い合わせください。
+
+CodeExpiredError
+Your authorization is no longer active.\nPlease visit https://www.rolandcloud.com/account/signin to subscribe.
+オーサライズ期間が終了しています。\nhttps://www.rolandcloud.com/account/signin からサブスクリプションの登録/継続をしてください。
+
+//////////////////////////////////////////////////////////////////////////////
+
+CodePlugoutSendMessage
+Now sending data.
+データを送っています。
+
+CodePlugoutGetMessage
+Now getting data.
+データを取り込んでいます。
+
+CodePlugoutUpdateMessage
+Updating.
+更新中です。
+
+CodePlugoutUserCancelledError
+Cancelled.
+キャンセルされました。
+
+CodePlugoutAlreadyInstalledError
+Already Plugged-Out.
+すでに Plug-Out されています。
+
+CodePlugoutInvalidFileError
+The data file is invalid.
+不正なデータファイルです。
+
+CodePlugoutInvalidPacketError
+The data is damaged.
+データが壊れています。
+
+CodePlugoutConnectTargetError
+MIDI communication failed.
+MIDI 通信に失敗しました。
+
+CodePlugoutInvalidMidiPortError
+The MIDI port is invalid.
+MIDI ポートが不正です。
+
+CodePlugoutDeviceVersionError
+Update the PLUG-OUT SYNTHESIZER to the latest version.
+PLUG-OUT SYNTHESIZER を最新バージョンにアップデートしてください。
+
+CodePlugoutDeviceSlotError
+Change the PLUG-OUT SYNTHESIZER's MODEL setting to PLUG-OUT.
+PLUG-OUT SYNTHESIZER の MODEL を PLUG-OUT に変更してください。
+
+CodePlugoutModelError
+Please do Plug-Out JUNO-60.\nIf it has been already done, change the PLUG-OUT SYNTHESIZER's MODEL setting to JUNO-60.
+JUNO-60 を Plug-Out してください。\nすでに Plug-Out されている場合は PLUG-OUT SYNTHESIZER の MODEL を JUNO-60 に変更してください。
+
+CodePlugoutOtherSlotError
+Already Plugged-Out to PLUG-OUT %d.
+すでに PLUG-OUT %d に Plug-Out されています。
+
+CodePlugoutConfirmMessage
+Ready to Plug-Out. OK?
+Plug-Out します。よろしいですか？
+
+CodePlugoutRestrictedMessage
+Ready to Plug-Out. OK?\nSince activation has not been completed, the PLUG-OUT Software Synthesizer will disappear from the PLUG-OUT SYNTHESIZER when you power-off the PLUG-OUT SYNTHESIZER.
+Plug-Out します。よろしいですか？\nアクティベーションが未完了のため PLUG-OUT SYNTHESIZER の電源を切ると PLUG-OUT Software Synthesizer は PLUG-OUT SYNTHESIZER から消えます。
+
+CodePlugoutRestrictedAuthMessage
+Ready to Plug-Out. OK?\nSince authorization has not been completed, the PLUG-OUT Software Synthesizer will disappear from the PLUG-OUT SYNTHESIZER when you power-off the PLUG-OUT SYNTHESIZER.
+Plug-Out します。よろしいですか？\nオーサライズが未完了のため PLUG-OUT SYNTHESIZER の電源を切ると PLUG-OUT Software Synthesizer は PLUG-OUT SYNTHESIZER から消えます。
+
+CodePlugoutOtherModelMessage
+Other model already Plugged-Out.\nProceed?
+別のモデルが Plug-Out されています。\n続けますか？
+
+CodePlugoutDeviceUnavailableError
+This model is not available for a PLUG-OUT SYNTHESIZER connected.
+このモデルは接続された PLUG-OUT SYNTHESIZER に対応していません。
+
+CodePlugoutAlreadyMessage
+Already Plugged-Out.\nReady to send patches 1-64. OK?
+すでに Plug-Out されています。\nパッチ 1-64 を送ります。よろしいですか？
+
+CodeSendPatchesMessage
+Ready to send patches 1-64. OK?
+パッチ 1-64 を送ります。よろしいですか？
+
+CodeGetPatchesMessage
+Ready to get patches 1-64. OK?
+パッチ 1-64 を取り込みます。よろしいですか？
+
+CodeRenamePatchBankError
+Rename to the one that is not used yet and is valid for file name.
+未だ使用されておらずファイル名に使用できる名前に変更してください。
+
+CodeDeletePatchBankMessage
+Ready to delete this patch bank. OK?
+このパッチ・バンクを削除します。よろしいですか？
