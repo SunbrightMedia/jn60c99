@@ -46,3 +46,4 @@ tests/test_init_default
 # raw state captures (large; generated .c is committed)
 refs/captures/*.bin
 tests/play_captured
+tests/play_sqarpg_arp
