@@ -13,6 +13,10 @@ typedef struct {
     int  model;         /* DB871: 0=JUNO-60                      */
     int  filter_type;   /* DB872                                 */
     int  applied;       /* number of voice params applied        */
+    /* Arp settings (decoded from the bank's stride-4 region) — for ANY preset. */
+    int  arp_on;        /* ARPEGGIO SW: 1=on                     */
+    int  arp_mode;      /* juno_arp_set_mode value: 15=UP 16=DOWN 17=UP&DOWN */
+    int  arp_range;     /* juno_arp_set_range value: 0=1oct 1=2oct 2=3oct    */
 } juno_preset_info;
 
 /* Load bank record `record` from `bank_path` into engine state `st` (which must

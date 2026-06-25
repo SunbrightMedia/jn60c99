@@ -47,6 +47,15 @@ int juno_preset_load(unsigned char *st, const char *bank_path, int record,
         info->chorus_mode = step_fx(dec,ndec,JUNO_DB_CHORUS);
         info->fxa_type    = step_fx(dec,ndec,JUNO_DB_FXA);
         info->reverb_type = step_fx(dec,ndec,JUNO_DB_REVERB);
+        /* Arp settings — stride-4 arp block, decoded positions 149/153/157
+         * (deserializer record bytes 298/306/314; docs/PRESET_BANK_FORMAT.md).
+         * TYPE: 0=UP->set_mode 15, 1=UP&DOWN->17, >=2=DOWN->16.
+         * RANGE (the "STEP" knob is the octave range): stored value = set_range
+         * arg (0=1oct, 1=2oct, >=2=3oct). Works for ANY preset. */
+        { int sw=(149<ndec)?dec[149]:0, ty=(153<ndec)?dec[153]:0, rg=(157<ndec)?dec[157]:0;
+          info->arp_on    = (sw==1);
+          info->arp_mode  = (ty==0)?15:(ty==1)?17:16;
+          info->arp_range = (rg>2)?2:rg; }
     }
 
     int applied=0;
