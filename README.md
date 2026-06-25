@@ -44,18 +44,18 @@ work lands — keep this current.
 
 | Area | % | State |
 |------|--:|-------|
-| Init / coefficient layer (`engine_init`) | 95% | Bit-exact: 2289/2289 stores match the binary. |
+| Init / coefficient layer (`engine_init`) | 100% | Bit-exact: 2289/2289 stores match the binary. |
 | Voice DSP — DCO/HPF/VCF/2×ADSR/VCA/LFO/unison | 100% | **Bit-exact verified** vs decompile+asm (full line-by-line diff, zero discrepancies). |
-| Polyphony (8 voices, M.CV fix) | 95% | All 8 voices render; voice 0 bit-identical; M.CV pitch-base bug fixed; 622 offsets verified. |
+| Polyphony (8 voices, M.CV fix) | 98% | All 8 voices render; voice 0 bit-identical; M.CV pitch-base bug fixed; all 622 per-voice offsets verified. |
 | Master mix + BBD chorus (×2 instances) | 100% | Both chorus instances **bit-exact verified** vs asm; Chorus I/II CV **recovered capture-free** (step·11/255−8, steps 62/50, bit-exact). |
 | Delay FX (+ DL2) | 100% | **Bit-exact verified** (both modes, interpolation, damping, feedback). |
 | Reverb (CJu60Sim) | 98% | DSP **bit-exact verified**; HALL2 **activated** (tap-builder `sub_7FF91E021AC0` transcribed, renders a decaying tail). Per-patch decay-knob damping is the small remainder. |
 | System-8 FX-A slot (Flanger, all 6 modes) | 100% | DSP **bit-exact verified**; routed separately from chorus; thru-bypassed when type=DELAY. |
 | `chorus_init` + `ramp_engine` | 100% | **Bit-exact verified** (chorus_init: 3148 stmts, zero diffs). |
 | Arpeggiator (`CArpeggio` + CKbdArp) | 100% | Core + 6 selectors + scanner + clock **bit-exact verified**; the CKbdArp preset-pattern expander is now transcribed + wired (`juno_arp_load_pattern`). |
-| Preset / bank decode | 95% | Deserializer-proven; FX selectors decode (stride-4); byte→step = identity (verified 14/16). |
+| Preset / bank decode | 98% | Deserializer-proven; FX selectors decode (stride-4, verified); byte→step = identity; noise gate verified. |
 | Param registry (name→engine slot) | 100% | All 1121 bindings extracted from the asm (`refs/param_registry.json`). |
-| Param-apply engine (step→coefficient) | 95% | LUT mechanism bit-exact (88/88); noise byte-0 gate resolved & verified. |
+| Param-apply engine (step→coefficient) | 98% | LUT mechanism bit-exact (88/88); identity byte→step + noise byte-0 gate verified. |
 | Host layer — preset loader + RT synth API | 70% | Capture-free preset loader + CLI host (`host/juno_render.c`) + **real-time polyphonic synth API** (`host/juno_synth.c`: create/load/note-on-off/process-block with 8-voice allocation). Only the thin **VST3 SDK binding** (IAudioProcessor/IEditController glue + state chunk) remains. |
 | **Overall (weighted)** | **~90%** | **Every audio DSP block is bit-exact-verified, and any factory patch renders fully capture-free (incl. the chorus CV, now recovered).** Remaining: the per-patch reverb-decay damping rows and the VST3 SDK wrapper. |
 
@@ -71,10 +71,13 @@ See `docs/PORT_STATUS.md` for the detailed accounting and `docs/` for per-subsys
   the stride-4 FX selectors) + the identity byte→step + the verified noise gate let
   the C loader (`src/juno_preset.c`) apply any factory patch; `host/juno_render.c`
   renders it to WAV with its chorus + HALL2 reverb derived from the patch.
-- **Remaining:** the one chorus-CV value that is host-pushed (not a static literal —
-  under final investigation), the per-patch reverb-decay damping rows, and the VST3
-  SDK wrapper. See `docs/PORT_STATUS.md`, `docs/FX_MODE_COEFFICIENTS.md`,
-  `docs/PARAM_APPLY_MAP.md`.
+- **Fully capture-free.** The last believed-capture-only value — the JUNO chorus CV
+  — was recovered from the binary (`(step·11)/255−8`, steps 62/50, bit-exact;
+  `src/juno_fx.c`). Every coefficient on the SQ-ARPG path now derives from the
+  decompile/data.
+- **Remaining:** the per-patch reverb decay-knob damping rows (a small data
+  extraction) and the VST3 SDK wrapper (standard plugin boilerplate around the
+  finished engine). See `docs/PORT_STATUS.md`, `docs/FX_MODE_COEFFICIENTS.md`.
 
 ## Method
 
