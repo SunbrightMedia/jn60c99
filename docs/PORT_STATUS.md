@@ -73,10 +73,13 @@ subject of the next phase (runtime translation; `docs/DB_ENGINE_BRIDGE.md`).
 
 ## Open / not done
 
-1. **Pitch drift = the BBD chorus**, isolated by measurement (dry voice is rock-stable;
-   chorus adds ±9 cents). The chorus *code* is faithful; its per-patch *depth* (Chorus
-   CV, ~6 MB deep in state) wasn't captured, so it runs on a generic value
-   (`docs/CHORUS_VIBRATO_DIAG.md`).
+1. **Pitch drift = the BBD chorus**, isolated by single-note measurement (pre-chorus
+   voice is rock-stable at 3c p2p; chorus adds ~35c p2p at 2.86 Hz). The chorus is
+   *correctly enabled* — SQ ARPG's patch data sets JUNO CH1 (mode 2) — and runs on
+   **recipe-exact** coefficients (Chorus CV −5.32549, depth 1.0), so the wobble is the
+   authentic Chorus I vibrato, not a generic/too-deep value. The one open check is
+   whether the user's correct reference shows the same wobble; if not, the next lead
+   is the BBD delay-sweep magnitude, not the LFO (`docs/CHORUS_VIBRATO_DIAG.md`).
 2. **Reverb + delay FX** — not transcribed (CJu60Sim graph solvers); SQ ARPG's HALL2
    reverb is absent (the biggest remaining audible gap).
 3. **Capture-free continuous-param apply** — the per-patch continuous coefficient values

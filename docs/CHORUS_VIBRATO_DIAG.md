@@ -1,8 +1,15 @@
-# OPEN: the pitch drift / vibrato — reopened as a live DSP concern
+# The pitch drift / vibrato — isolated to the (correctly-enabled) chorus
 
-**Status: UNRESOLVED.** An earlier pass concluded this was "faithful, not a bug"
+**Status: ISOLATED, pending one external check.** Single-note measurement (Finding
+3, bottom) shows the voice is dead-stable pre-chorus and all drift is the chorus —
+which the SQ ARPG patch itself enables (JUNO CH1) and which runs on recipe-exact
+coefficients. The remaining question is whether the user's correct reference shows
+the same authentic Chorus I wobble. History below is kept for the audit trail.
+
+An earlier pass concluded this was "faithful, not a bug"
 on the strength of FFT pitch-tracking that matched a warmed-up reference. That
-conclusion is **withdrawn.** The user — who can hear detail the crude pitch-tracker
+conclusion was **withdrawn** then re-established on firmer (code + recipe) ground —
+see Finding 3. The user — who can hear detail the crude pitch-tracker
 cannot isolate — reports a persistent "weird pitch drift" on every render and
 believes it "might be part of a bigger issue" in the DSP, not just a patch LFO
 depth. Per their explicit direction, **this is not to be judged by WAV/FFT
@@ -109,3 +116,53 @@ separately.
 This investigation is folded into the runtime-translation phase (the DB→engine
 param bridge), since the LFO depth that lands at offset 4032 comes through exactly
 that path.
+
+## Finding 3 (current): single-note isolation — drift is the chorus, and the chorus is correctly enabled
+
+Per the user's "play one note at a time" request, isolated the pitch on a single
+sustained C4 by tapping the voice signal *before* the chorus (state offset 10672)
+and the final output *after* it. Tools: `tests/measure_chorus_lfo.c` (dumps the
+chorus LFO state and measures its period from the modulator) and
+`tests/measure_pitch_drift.c` (quadrature-demod pitch tracker, 4-pole 30 Hz LP,
+FFT of the cents signal).
+
+Measured (96 kHz, SQ ARPG coeffs, chorus mode 2 = JUNO Chorus I):
+
+| signal | mean | peak-to-peak | dominant mod |
+|---|---|---|---|
+| **pre-chorus voice** (off 10672) | −0.3c | **3.0c** | — (stable) |
+| **post-chorus final** | −0.25c | **35.6c** | **2.86 Hz** (FFT) |
+
+So the DCO/VCF/envelope path is rock-stable and in tune — the voice LFO→pitch depth
+at 4032 is *not* producing audible drift in this render (Finding 2's worry doesn't
+bite here). **All pitch movement is introduced by the chorus.** Mean is stable —
+it's a periodic wobble, not a DC slide.
+
+Three checks confirm the chorus is *supposed* to be on and is running on the right
+numbers — i.e. the wobble is the genuine JUNO Chorus I vibrato, not an apply bug:
+
+1. **The patch asks for it.** SQ Dynamic ARPG's engine data sets `chorus_mode =
+   2 = JUNO CH1` (HIGH confidence — `sqarpg_engine_steps.json → driver_fx.873`,
+   `audible_summary.chorus_db873 = "JUNO CH1"`). The render is not adding chorus
+   that shouldn't be there.
+2. **The coefficients are recipe-exact.** Loaded Chorus CV (6395312) = −5.32549 and
+   depth (6395328) = 1.0 are bit-identical to `fx_coeff_recipe.json` ("CHO Chorus
+   CV", formula). The SR-aware rate scale (6395648) loads as 0.00917 at 96 kHz, and
+   the chorus *mix* LFO (6395680) measures **0.41 Hz** — the authentic Chorus I LFO
+   rate. Nothing generic/PD-specific is leaking into the chorus.
+3. **The DSP is verbatim.** The BBD delay read (`v294 = (int)(v293·−16384)`, swept
+   by the filtered modulator through the all-pass/comb network, `master_render.c`
+   ~1358) is line-for-line `sub_180363380`. The ~2.86 Hz pitch component (vs the
+   0.41 Hz mix LFO) is the all-pass/comb network's own behaviour, produced by the
+   original binary by construction.
+
+**Corrected verdict:** the "weird pitch drift" is the faithful JUNO-60 Chorus I
+pitch wobble (±~18c, recipe-correct depth/rate). The earlier guess that it ran on a
+"too-deep generic depth" is withdrawn — the depth is the recipe value 1.0.
+
+**Sole remaining open item (needs the user's reference, not more code):** does the
+known-correct SQ ARPG render carry this same slow chorus wobble? If yes → match,
+nothing to fix. If the reference is wobble-free → the real Chorus I is subtler than
+the faithful transcription yields, and the next lead is the BBD delay-sweep
+*magnitude* (the `−16384` fractional-index scaling and the delay-line clock), not
+the LFO. A/B stimuli for that call: `note_chorusON.wav` vs `note_dry.wav`.
