@@ -38,3 +38,6 @@ tests/render_events
 data_sections/
 tests/test_apply
 refs/preset_banks/
+
+# Arp smoke test binary
+tests/test_arp_smoke
