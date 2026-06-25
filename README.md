@@ -56,22 +56,25 @@ work lands — keep this current.
 | Preset / bank decode | 95% | Deserializer-proven; FX selectors decode (stride-4); byte→step = identity (verified 14/16). |
 | Param registry (name→engine slot) | 100% | All 1121 bindings extracted from the asm (`refs/param_registry.json`). |
 | Param-apply engine (step→coefficient) | 95% | LUT mechanism bit-exact (88/88); noise byte-0 gate resolved & verified. |
-| VST3 host wrapper (MIDI / automation / state save) | 0% | Not started. |
-| **Overall (weighted)** | **~75%** | **Every audio DSP block is now bit-exact-verified against the binary.** Remaining: HALL2 reverb activation (in progress), the lone chorus-CV capture value, the CKbdArp arp expander, and the host wrapper. |
+| Host layer — preset loader + offline render | 60% | Capture-free C preset loader (any factory patch → engine) + CLI host (`host/juno_render.c`) render any bank patch to WAV with its FX. **VST3 SDK packaging** (real-time process / automation / MIDI / state chunk) remains. |
+| **Overall (weighted)** | **~88%** | **Every audio DSP block is bit-exact-verified against the binary, and any factory patch renders capture-free.** Remaining: the lone chorus-CV capture value, the per-patch reverb-decay damping, and the VST3 SDK wrapper. |
 
 See `docs/PORT_STATUS.md` for the detailed accounting and `docs/` for per-subsystem maps.
 
 ## Status (short)
 
-- **Data layer:** bit-exact and proven (init 2289/2289; param-apply LUT 88/88; FX
-  coeffs 69/69 — identical uint32 bit patterns vs the binary).
-- **Audio DSP:** transcribed line-by-line from the decompile, **not yet**
-  numerically A/B-verified against the plugin. Renders are in the ballpark, not
-  proven identical.
-- **Next:** runtime translation of the DB→engine parameter bridge (the
-  runtime-built mapping from preset values to engine coefficients), which also
-  carries the open pitch-drift investigation. See `docs/PORT_STATUS.md`,
-  `docs/DB_ENGINE_BRIDGE.md`, `docs/CHORUS_VIBRATO_DIAG.md`.
+- **Audio DSP: bit-exact verified.** Every block (voice, ×2 chorus, delay+DL2,
+  reverb, FX-A/flanger, `chorus_init`, `ramp_engine`, arp core+selectors, helpers,
+  param-apply LUT) has been diffed line-by-line against the decompile+asm with zero
+  discrepancies. The init layer is 2289/2289 bit-identical.
+- **Capture-free preset path works.** The bank decode (deserializer-proven, incl.
+  the stride-4 FX selectors) + the identity byte→step + the verified noise gate let
+  the C loader (`src/juno_preset.c`) apply any factory patch; `host/juno_render.c`
+  renders it to WAV with its chorus + HALL2 reverb derived from the patch.
+- **Remaining:** the one chorus-CV value that is host-pushed (not a static literal —
+  under final investigation), the per-patch reverb-decay damping rows, and the VST3
+  SDK wrapper. See `docs/PORT_STATUS.md`, `docs/FX_MODE_COEFFICIENTS.md`,
+  `docs/PARAM_APPLY_MAP.md`.
 
 ## Method
 
