@@ -154,22 +154,18 @@
    "note": "DB779 (all-present 15..251, def255) is the noise-section level next to the PINK/WHITE selector DB775. SQ ARPG=90."
   },
   "795": {
-   "engine_paramId": 33,
-   "offset": 2800,
-   "name": "ENV Sustain (VCA, tentative)",
-   "tableId": 50,
-   "confidence": "LOW",
-   "method": "cross-preset (PD 136 >> BS 52: pads sustain) + spec OFF|1..255",
-   "note": "DB795 (OFF|1..255) tracks pad>bass -> tentatively the VCA/amp envelope SUSTAIN. SQ ARPG=195. ENV1 vs ENV2 assignment not proven."
+   "engine_paramId": 1095,
+   "offset": 10759440,
+   "tableId": 21,
+   "name": "REVERB LEVEL (FX wet, host-side bind)",
+   "note": "Script.xml proves DB795=REVERB LEVEL, NOT ENV Sustain. Engine consumer 10759440 (Rev Ecf Glb Lev), master_render.c:2252/2274/2298. Binding is host-pushed (red-black tree), NOT static: captured node=0.498 != tid21(177)=0.192, so do NOT apply via static LUT. Same host-side class as Chorus CV. SQ ARPG step=195."
   },
   "796": {
-   "engine_paramId": 35,
-   "offset": 2832,
-   "name": "ENV Release (VCA, tentative)",
-   "tableId": 38,
-   "confidence": "LOW",
-   "method": "cross-preset (PD 93 >> BS 20: pads release long) + spec OFF|1..255",
-   "note": "DB796 (OFF|1..255) tracks pad>bass -> tentatively the VCA/amp envelope RELEASE. SQ ARPG=96. ENV1 vs ENV2 assignment not proven."
+   "engine_paramId": 954,
+   "offset": 102528,
+   "tableId": null,
+   "name": "DELAY LEVEL (FX-A wet, host-side bind)",
+   "note": "Script.xml proves DB796=DELAY LEVEL, NOT ENV Release. Engine consumer 102528 (Wet Level, master_render.c:1216) or the FX-A-DELAY twin 4297760 when DB875=DELAY. Host-pushed, instance-dependent; not statically bindable. SQ ARPG step=96."
   }
  },
  "db_engine_unmapped": {

@@ -112,3 +112,32 @@ the PE statically. It needs either the DB873→CV host mapping reproduced, or a 
 2-value capture. It currently runs on the captured −5.32549/−5.84314, which give the
 correct ~0.4 Hz CH1 rate — so the chorus is plausibly already right; this is the last
 ≈1% of "fully capture-free."
+
+## 4. FX SEND levels (DB794-797) — HOST-SIDE, not statically bindable ⚠️
+
+The panel FX-send knobs decode cleanly from the bank (Script.xml DB indices) but
+their DB→engine binding is **host-pushed via the runtime red-black tree**, the same
+class as the Chorus CV (§3) and FX-A mode (§2). The engine *offsets* they drive are
+identifiable from the registry + consuming DSP, but **no static function** binds the
+panel index to them (the static setters are vtable-only / nullsub).
+
+| DB | param | engine consumer | curve | status |
+|--:|---|---|---|---|
+| 794 | EFFECT DEPTH | FX-A send/output gain (101744 DLY Mute, or host-only 84512+) | — | **unresolved** (host-only) |
+| 795 | REVERB LEVEL | 10759440 `Rev Ecf Glb Lev` (`master_render.c:2252/2274/2298`) | curve-22 via `sub_7FF91E021240`→node 0x447 | host-side |
+| 796 | DELAY LEVEL | 102528 `Wet Level` (`master_render.c:1216`); FX-A-DELAY twin 4297760 when DB875=DELAY | direct | host-side, instance-dep |
+| 797 | DELAY TIME | 102352 `Delay Time` (`master_render.c:1128`); twin 4297584 | formula (`docs/DELAY_DSP.md:82`) | host-side, instance-dep |
+
+**Do NOT apply these via the static voice-param LUT.** Verified contradiction for
+DB795: the captured node `10759440 = 0.498` ≠ `tid21(REVERB LEVEL=177) = 0.192`, so a
+static `tid21(step)` apply is wrong — the host scaling differs. The reverb wet level
+currently rides the captured-default coefficient (`runtime_coeffs_apply`), close
+enough across presets; per-preset FX-send accuracy needs the host bridge reproduced
+(or a small capture), exactly like the Chorus CV.
+
+**Stale-data fix:** `refs/db_engine_bridge.json` previously mapped DB795→offset 2800
+(ENV Sustain) and DB796→offset 2832 (ENV Release) at low confidence — **wrong**
+(predates Script.xml; would corrupt the VCA envelope if applied). Corrected to
+REVERB/DELAY LEVEL with the host-side caveat. The loader never used those entries (it
+reads `script_param_map.json`, where 795/796 are `null`), so no active corruption — a
+latent trap now closed.
