@@ -211,3 +211,38 @@ def db(idx):                             # DB patch index 755..877 -> value
     return val[(idx-755) + (11 if idx <= 853 else 200)]
 ```
 `db(814..829)` spells the preset name; `db(760)` is OSC1 feet; `db(876)` is reverb type.
+
+## Deserializer-proven layout (supersedes the guessed offsets above)
+
+Traced the actual preset deserializer instead of inferring the format. The byte
+layout is defined by the binary, not a single linear offset:
+
+- **Nibble decode is authoritative**: store `sub_7FF91DF9CDA0` (rva 0x33CDA0,
+  decomp_300000.c:49191/49195) writes two nibbles per byte; decode is
+  `value = body[2k]*16 + body[2k+1]` (high nibble first). Name pack
+  `sub_7FF91DF9BC80` (0x33BC80, :48309) confirms it for the 32-byte→16-char name.
+- **Base offset is a hardcoded 140**: `sub_7FF91DFB2C90` (0x352C90,
+  decomp_340000.c:13920) `return 140;` → decoded position 70, exactly where the
+  16-char name lands ("SQ Dynamic ARPG ").
+- **Per-preset param loop**: bank parser `sub_7FF91DF91530` (0x331530, :40217)
+  validates magic + `PG-JU60`, then loops `sub_7FF91DF90ED0` (0x330ED0) over 64
+  params, distributing via the nibble store.
+
+**Why the prior `(db-755)+11` model broke past the name:** the stream is serialized
+structs of varying width, NOT one linear DB-indexed array. The synth block is
+**stride 1**; the **PAT_NAME1 arp/jack block is stride 4** (`int8x4` params, value in
+byte 0, 3 pad bytes). The arp params are a separate stride-4 region, so a linear
+offset extrapolation lands on the wrong byte after the name.
+
+**Arp params (record-absolute bytes, hardcoded at decomp_300000.c:40107-40109):**
+
+| param | decoded pos | record bytes | SQ Dynamic ARPG (rec 1) |
+|---|---|---|---|
+| ARPEGGIO SW   | 141 | 298,299 | **1 (ON)** |
+| ARPEGGIO TYPE | 145 | 306,307 | **0 (UP)** |
+| ARPEGGIO STEP | 149 | 314,315 | **1** |
+| OCTAVE SHIFT  | 161 | 338,339 | **0 (1 octave)** |
+| KEY HOLD      | 165 | 346,347 | 0 |
+
+Proven by: the deserializer hardcoding offsets 298/306/314, AND ARPEGGIO SW=1
+correlating exactly with the 7 "SQ" presets (and 0 for the other 57) across bank1.bin.
