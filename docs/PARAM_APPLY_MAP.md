@@ -1,4 +1,24 @@
-# OPEN: noise/level byte→step transform (the "noisy SQ ARPG render")
+# RESOLVED: noise byte→step is identity + a byte-0 zero-gate (the "noisy render")
+
+**Fixed.** The byte→step mapping for the synth-voice family is **identity** (raw bank
+byte = LUT step) — verified 14/16 offsets bit-exact against bank record 0 ("SY Poly
+Synth" = `src/captured_patch.c`). The noise anomaly is a **setter-level byte-0 gate
+specific to the noise level** (tableId 12, used ONLY by offset 6528): step 0 writes
+**0.0** (noise OFF), not `lut[12][0]=2.177`. The descending noise LUT floors at 0.125,
+so "fully off" is unreachable through the table; the engine special-cases it.
+
+Verified bit-exact at BOTH endpoints against live-engine captures:
+- SY Poly Synth: noise byte 0 → `0x00000000` (`src/captured_patch.c`, confirmed).
+- PD Juno Pad: noise byte 230 → `lut[12][230] = 0x3e340000` (`src/runtime_coeffs_data.c`).
+- Contrast (proves it's noise-specific): ENV2-attack byte 0 → `lut[35][0]=3.5556`
+  loads normally (NOT gated).
+
+Implemented in `src/juno_params.c` `juno_param_apply_lut`: `if (tableId==12 && step==0)
+c = 0.0f;`. SQ Dynamic ARPG noise byte = 0 → coef 0 (off, pad-correct); the noisy
+render is fixed (6528 went 2.177 → 0). The earlier `255-x` and DB779-rebind theories
+were correctly rejected.
+
+## (historical) OPEN: noise/level byte→step transform
 
 The LUT apply `sub_356380` is a pure clamped `lut[tableId][step]` (bit-exact, 88/88
 vectors). What is NOT pinned is how a **stored bank byte becomes the `step`** for the

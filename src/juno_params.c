@@ -2,6 +2,14 @@
 
 void juno_param_apply_lut(unsigned char *st, int offset, int tableId, int step, int broadcast){
     float c = juno_lut_apply(tableId, step);
+    /* Osc Noise Level (tableId 12 — used ONLY by engine offset 6528) carries a
+     * setter-level byte-0 gate: step 0 writes 0.0 (noise OFF), NOT lut[12][0]=2.177.
+     * The noise LUT is descending with floor 0.125, so "fully off" is unreachable
+     * through the table; the engine special-cases it in the param's +120 setter.
+     * Verified bit-exact against two live-engine captures: SY Poly Synth (byte 0 ->
+     * 0x00000000, src/captured_patch.c) and PD Juno Pad (byte 230 -> lut[12][230] =
+     * 0x3e340000, src/runtime_coeffs_data.c). See docs/PARAM_APPLY_MAP.md. */
+    if (tableId == 12 && step == 0) c = 0.0f;
     JF(st, offset) = c;
     if (broadcast)
         for (int v = 1; v < JUNO_NUM_VOICES; ++v)
