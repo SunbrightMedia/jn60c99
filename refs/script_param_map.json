@@ -7,7 +7,7 @@
   "counts": {
    "patch_params": 114,
    "panel_exposed": 61,
-   "engine_offset_resolved": 24
+   "engine_offset_resolved": 25
   }
  },
  "params": [
@@ -85,8 +85,8 @@
    "default": "0",
    "type": "int2x4",
    "panel_exposed": true,
-   "engine_offset": null,
-   "offset_via": null
+   "engine_offset": 1872,
+   "offset_via": "LFO Trig (registry idx13, tid51 inverted switch; PROVEN: per-note LFO phase-reset DSP voice_render.c:806-818 + capture rec0 step0->1.0)"
   },
   {
    "db_index": 757,

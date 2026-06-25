@@ -10,6 +10,7 @@ static const juno_param_map_ent JUNO_PARAM_MAP[] = {
   { 751,   1920,  44, "LFO DELAY TIME"},
   { 752,   1088,  22, "LFO RATE"},
   { 753,   4032,   0, "DCO LFO MOD"},
+  { 756,   1872,  51, "LFO KEY TRIG"},
   { 758,   4144,  45, "DCO PWM DEPTH"},
   { 760,   3840,   5, "DCO RANGE"},
   { 770,   4208,  54, "DCO PWM LEVEL"},
@@ -31,7 +32,7 @@ static const juno_param_map_ent JUNO_PARAM_MAP[] = {
   { 792,   3312,  38, "ENV2 RELEASE"},
   { 793,   9584,  21, "VCA TONE"},
 };
-#define JUNO_PARAM_MAP_N 23
+#define JUNO_PARAM_MAP_N 24
 /* FX/global selectors (stride-4 region; k=309+(db-871)*4 on the bank stream) */
 #define JUNO_DB_MODEL 871
 #define JUNO_DB_FILTER 872

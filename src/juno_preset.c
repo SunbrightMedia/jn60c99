@@ -66,6 +66,21 @@ int juno_preset_load(unsigned char *st, const char *bank_path, int record,
         juno_param_apply_lut(st, e->off, e->tid, step, /*broadcast=*/1);
         applied++;
     }
+    /* DCO PWM SOURCE (DB759, range 0..5): one-hot demux into the 4 PWM-mod
+     * switches 3888 (LFO) / 3904 (ENV1) / 3920 (ENV2) / 3936 (Manual). These are
+     * vtable-only setters (no LUT tableId); the demux + offsets are proven by the
+     * PWM mix DSP (voice_render.c:1083-1089) and the rec0 capture (src=LFO ->
+     * 3888=1.0, rest 0). 0=MANUAL, 1=LFO, 2/3=ENV1±, 4/5=ENV2± (ENV polarity sign
+     * is a refinement; the selected magnitude is faithful). Without this the
+     * engine default (3888=1.0 = LFO) leaks into MANUAL patches. */
+    { int src = step_synth(dec,ndec,759);
+      if (src >= 0){
+        juno_param_apply_value(st, 3888, (src==1)?1.0f:0.0f, 1);          /* LFO    */
+        juno_param_apply_value(st, 3904, (src==2||src==3)?1.0f:0.0f, 1);  /* ENV1   */
+        juno_param_apply_value(st, 3920, (src==4||src==5)?1.0f:0.0f, 1);  /* ENV2   */
+        juno_param_apply_value(st, 3936, (src==0)?1.0f:0.0f, 1);          /* Manual */
+      }
+    }
     juno_chorus_set_rates(st);   /* capture-free JUNO chorus I/II rates */
     if (info) info->applied=applied;
     free(dec); free(rec);
