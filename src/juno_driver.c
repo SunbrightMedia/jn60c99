@@ -21,6 +21,15 @@
 
 /* Install the host-params shim into the state block. Call once after init.
  * `shim` must outlive all render calls (the state holds a pointer into it). */
+/* FX-A (Prog_ID_EFX, the v551 slot) thru-bypass. The System-8 FX-A is a separate
+ * effect in series BEFORE the JUNO chorus; its off/delay paths need runtime-only
+ * coefficients we don't have, so by default we route its input (state+84624) to
+ * its output taps (state+84672 / state+84704) each sample — a clean thru — rather
+ * than letting it run as a stray modulator. Set to 0 once real FX-A coeffs exist. */
+static int g_fxa_bypass = 1;
+
+void juno_driver_set_fxa_bypass(int on) { g_fxa_bypass = on; }
+
 void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
                              int32_t chorus_mode)
 {
@@ -28,7 +37,7 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
     void *base;
 
     shim->mode_v39  = chorus_mode;
-    shim->mode_v551 = chorus_mode;
+    shim->mode_v551 = 0;            /* FX-A off; the thru-bypass supplies the signal */
     p39  = &shim->mode_v39;
     p551 = &shim->mode_v551;
     /* params+136 -> &mode_v39 ; params+112 -> &mode_v551 (used by the chase) */
@@ -100,6 +109,15 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
         float *a3[2] = { outL, outR };
         *outL = 0.0f; *outR = 0.0f;
         juno_master_render(st, a2, a3);
+        /* FX-A thru-bypass: overwrite the EFX output taps (read by next sample's
+         * chorus input mix at master_render.c:813/830) with the EFX input
+         * (state+84624 = the mixed voice signal), so the JUNO chorus processes the
+         * dry voice with no stray FX-A modulation. One-sample latency; from the 2nd
+         * sample on the chorus always sees the thru signal. See juno_driver.h. */
+        if (g_fxa_bypass) {
+            JF(st, 84672) = JF(st, 84624);
+            JF(st, 84704) = JF(st, 84624);
+        }
         return 1;
     }
 

@@ -13,11 +13,26 @@ extern "C" {
 #endif
 
 /* Shim that satisfies the master's host-params pointer chase off state+136.
- * The master reads two chorus-mode selectors:
+ * The master runs TWO DIFFERENT effects IN SERIES, each with its own selector:
  *   base = *(void**)(state+136);
- *   v39  = *(int*)*(void**)((char*)base + 136);   // first chorus engine
- *   v551 = *(int*)*(void**)((char*)base + 112);   // second chorus engine
- * Mode 0 selects the dry/bypass path in both engines. */
+ *   v39  = *(int*)*(void**)((char*)base + 136);   // "Prog_ID_DLY" slot
+ *   v551 = *(int*)*(void**)((char*)base + 112);   // "Prog_ID_EFX" slot
+ *
+ * These are NOT two halves of one chorus. The decompile's program-slot vector
+ * (decomp_380000.c:4512-4618) names them: slot 5 (params+136) = the Delay/Chorus
+ * block that holds the authentic JUNO BBD chorus (state 6395xxx), driven by the
+ * patch's "JUNO Chorus mode" (DB873 — off/CH1/CH2); slot 4 (params+112) = the
+ * System-8 "FX-A" effect slot (state 84672..96xxx), driven by "FX-A type" (DB875).
+ * Signal flow per sample: voices -> FX-A (v551) -> JUNO chorus (v39) -> output.
+ *
+ * `mode_v39` is the JUNO chorus mode (2 = CH1 for SQ Dynamic ARPG).
+ * `mode_v551` is the FX-A type. FX-A's "off/delay" paths (v551 0/1) read
+ * coefficients that only the live host writes (the EFX output-mix gains at
+ * 85152/85168/85184 — runtime-only, absent from our static state), so they
+ * collapse to silence offline. To render FX-A faithfully we'd need that patch's
+ * FX-A coefficients (a small capture). Until then, `fxa_bypass` routes the FX-A
+ * input straight to its output (a clean thru), so the JUNO chorus processes the
+ * dry voice and no spurious second modulation is added. See docs/CHORUS_VIBRATO_DIAG.md. */
 struct juno_host_shim {
     int32_t mode_v39;
     int32_t mode_v551;
@@ -25,9 +40,15 @@ struct juno_host_shim {
 };
 
 /* Wire the shim into the state block. Call once after juno_engine_init.
+ * Sets mode_v39 = chorus_mode (the JUNO chorus); sets the FX-A slot to off and
+ * enables the FX-A thru-bypass by default (see the struct note above).
  * `shim` must outlive all subsequent render calls. */
 void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
                              int32_t chorus_mode);
+
+/* Enable (1) / disable (0) the FX-A thru-bypass. Default: enabled. Disable only
+ * when the live FX-A coefficients have been loaded into the state. */
+void juno_driver_set_fxa_bypass(int on);
 
 /* Render one stereo output sample (voices -> 8 buffers -> master process).
  * Returns 1 if the full master/chorus path ran, 0 if the dry fallback was used

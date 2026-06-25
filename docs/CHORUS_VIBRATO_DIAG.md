@@ -166,3 +166,61 @@ nothing to fix. If the reference is wobble-free → the real Chorus I is subtler
 the faithful transcription yields, and the next lead is the BBD delay-sweep
 *magnitude* (the `−16384` fractional-index scaling and the delay-line clock), not
 the LFO. A/B stimuli for that call: `note_chorusON.wav` vs `note_dry.wav`.
+
+## Finding 4 (ROOT CAUSE): the master runs TWO FX in series; the driver wrongly ran the chorus twice
+
+The user reported the wobble felt "exaggerated" vs the real plugin, so we
+bit-exact-verified the whole chorus path. Two parallel investigations:
+
+**(a) The chorus DSP is bit-exact.** Diffed the v39 JUNO-chorus block in
+`src/master_render.c` (1238-1418) against the disassembly
+(`master_deps/master_sub_180363380_180363380.asm`, 1347-1711) and the raw rdata
+bytes. Every modulation-depth constant matches exactly: the BBD delay-index scale
+`dword_18098ACB8` = `0xC6800000` = **−16384.0** (exactly 2¹⁴), the rate multiply at
+`a1+6395648`, the ±512 clamp (`0x44000000`/`0xC4000000`), the depth path
+`phase*depth + (depth−1.0)` (both terms present, asm 1383/1395/1398), the ±2/±4
+phase reduction, and the 0.5 wet/dry mix. **The chorus code does not exaggerate
+anything.**
+
+**(b) The master runs two different effects in series — and the offline driver was
+running the chorus in *both* slots.** The program-slot vector
+(`decomp_380000.c:4512-4618`) names six slots; the master reads two of them:
+- `v39 = **(*(a1+136)+136)` → slot 5 "Prog_ID_DLY" = the **Delay/Chorus** block (state
+  6395xxx) that holds the authentic JUNO BBD chorus. Driven by **DB873 "JUNO Chorus
+  mode"** (= 2 = CH1 for SQ ARPG).
+- `v551 = **(*(a1+136)+112)` → slot 4 "Prog_ID_EFX" = the **System-8 FX-A** slot
+  (state 84672..96xxx). Driven by **DB875 "System-8 FX-A type"** (= 0 for SQ ARPG).
+
+Signal flow per sample: `voices → FX-A (v551) → JUNO chorus (v39) → output` (the
+FX-A block writes 84672/84704; the next sample's chorus-input mix reads them at
+`master_render.c:813/830`). The old `juno_driver_attach_host` set **both** selectors
+to `chorus_mode`, so the FX-A slot ran as a *second* chorus-type modulator stacked
+in front of the JUNO chorus.
+
+Measured pitch wobble on a sustained C4 (quadrature-demod tracker):
+
+| configuration | p2p |
+|---|---|
+| both slots = chorus (old, wrong) | 35.6c |
+| FX-A slot alone, JUNO chorus off | **32.0c** |
+| JUNO chorus alone, FX-A bypassed (new) | 24.2c |
+
+So the FX-A slot — *not* the JUNO chorus — was contributing the bulk of the
+"exaggerated" depth. SQ ARPG's FX-A is type 0 (a delay/off, which adds no pitch
+modulation), so it should never have modulated.
+
+**Fix applied (`src/juno_driver.c`, `src/juno_driver.h`):** the two FX selectors are
+now separated. `mode_v39` = the JUNO chorus; `mode_v551` = FX-A (set to off). FX-A's
+off/delay paths read coefficients only the live host writes (the EFX output-mix
+gains at 85152/85168/85184 — runtime-only, absent from our static state), so they
+collapse to silence offline; until a small FX-A capture exists, the driver routes
+the FX-A input (`state+84624`) straight to its output taps (`84672`/`84704`) — a
+clean thru — so the JUNO chorus processes the dry voice with no stray modulation.
+`juno_driver_set_fxa_bypass(0)` disables the thru once real FX-A coeffs are loaded.
+Demo: `tests/measure_fxa_bypass.c`; A/B `chorus_FIXED.wav` vs `chorus_OLD_exaggerated.wav`.
+
+**Still open:** (1) whether the JUNO chorus's own 24.2c is the exact CH1 depth — its
+rate/depth inputs (`6395312`/`6395328`) are still the PD-Juno-Pad captured values, so
+if CH1's true depth differs we'd need SQ ARPG's chorus coeffs; (2) faithful FX-A
+(the real DB875=0 delay) needs that slot's runtime coefficients. Both are small
+targeted captures, not code work.
