@@ -312,3 +312,26 @@ up-down) to drive `+3472`/`+3461` octave advancement.
   upstream of `CArpeggio` and was not traced.
 - **Note centering constant `+3060`**: confirmed subtracted in `sub_7FF91E01ED50`, but its
   initialization value was not located (template notes center on 60, suggesting `+3060≈60`).
+
+## Arp rate (STEP) — code-derived duration table
+
+The rate routine `sub_7FF91E01F3D0` (@rva 0x3BF3D0, decomp_380000.c:28448) builds the
+per-step duration table `+610` from the STEP param (a2, clamped 0..9) using:
+- `word_7FF91E6243B8[3*STEP]` (rva 0x9C43B8) = per-step **duration in ticks** (v7)
+- `word_7FF91E6243F8[gate]` (rva 0x9C43F8) = gate-length % (v10): {30,40,50,60,70,80,90,100,120,0}
+
+Extracted duration table (STEP 0..5): **{24, 16, 12, 8, 6, 4}** ticks.
+
+| STEP | dur (ticks) | relative rate |
+|---|---|---|
+| 0 | 24 | slowest |
+| **1** | **16** | **SQ Dynamic ARPG** |
+| 2 | 12 | |
+| 3 | 8 | |
+| 4 | 6 | |
+| 5 | 4 | fastest |
+
+Calibrated against an A/B vs the real plugin (1/16 close, 1/8 too slow at 120 BPM),
+**STEP=1 ≈ 1/16 note**, i.e. ~0.125 s/step at 96 kHz = SR/8 (the rate `play_sqarpg_arp.c`
+uses). The exact tick→time scale (host PPQN via the clock driver `sub_7FF91E01DEA0`)
+isn't fully traced, but the relative table + the A/B pin STEP=1 to ~1/16.
