@@ -56,17 +56,37 @@ the **DB-index ↔ engine-coefficient bridge**, which the plugin builds at runti
 as a red-black tree (`sub_3C7AE0`) — not statically reconstructable, so it is the
 subject of the next phase (runtime translation; `docs/DB_ENGINE_BRIDGE.md`).
 
-## Open / unverified
+## Milestones reached (validated against a live-plugin capture)
 
-1. **Audio numerical validation** — no per-sample A/B has confirmed the DSP is
-   bit-faithful; this is the real definition of "correct" and is still at 0%.
-2. **Pitch drift / vibrato** — the user hears a pitch drift on sustained renders
-   that may indicate a DSP issue, not just a patch LFO depth. Reopened as a live
-   concern (`docs/CHORUS_VIBRATO_DIAG.md`); to be chased through the runtime
-   translation, NOT via WAV matching.
-3. **DB→engine continuous-param bridge** — runtime-built; the next work item.
-4. **FX per-sample solver fidelity** — the CJu60Sim tank solvers (one of which
-   Hex-Rays could not lift) are mapped but not yet transcribed to C.
+- **Voice DSP validated**: a 200 KB capture of the running plugin's coefficient state
+  (SQ Dynamic ARPG) drives the faithful `voice_render`; a single note renders a correct,
+  in-tune tone with the patch's real timbre (user-confirmed "solid sound").
+  (`refs/captures/`, `tests/play_captured.c`.)
+- **Polyphony works**: fixed the M.CV pitch-base bug (offset 304 sits below each voice
+  block; the param broadcast was corrupting voices 1-7's pitch). Chords now render with
+  all tones (`docs/POLYPHONY.md`). `juno_note_on` re-seats each voice's M.CV.
+- **Arp**: faithful `CArpeggio` (`src/arp.c`) sequences a held chord on one voice; the
+  preset's settings (UP, 1 octave, STEP=1≈1/16) decoded from the deserializer
+  (`docs/PRESET_BANK_FORMAT.md`, `docs/ARP_DSP.md`).
+- **Bank format proven from the deserializer** (not guessed) — correct decode for all
+  preset params.
+
+## Open / not done
+
+1. **Pitch drift = the BBD chorus**, isolated by measurement (dry voice is rock-stable;
+   chorus adds ±9 cents). The chorus *code* is faithful; its per-patch *depth* (Chorus
+   CV, ~6 MB deep in state) wasn't captured, so it runs on a generic value
+   (`docs/CHORUS_VIBRATO_DIAG.md`).
+2. **Reverb + delay FX** — not transcribed (CJu60Sim graph solvers); SQ ARPG's HALL2
+   reverb is absent (the biggest remaining audible gap).
+3. **Capture-free continuous-param apply** — the per-patch continuous coefficient values
+   are runtime-only in the binary (proven 3 ways); a fully static port needs either one
+   small capture per patch or finishing the param-apply transcription.
+4. **VST3 host layer** (MIDI/automation/state save) — not started.
+
+Rough production-port completeness: **~45-55%** — the validated voice DSP + working
+polyphony + arp are the hard, derisked core; the FX transcription, full param-apply,
+and host wrapper are the bulk of what remains.
 
 ## Validation oracles still in repo (not sources)
 
