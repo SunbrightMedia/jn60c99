@@ -105,4 +105,8 @@ int64_t juno_arp_sel_transpose(unsigned char *a1, int a2, int64_t a3); /* m11  *
 }
 #endif
 
+/* CKbdArp preset-pattern loader (sub_7FF91E023010): stage a 550-byte style/
+ * variation pattern record so the next clock boundary expands it. */
+void juno_arp_load_pattern(juno_arp *arp, const unsigned char *mode_hdr, const unsigned char *pattern);
+
 #endif /* JUNO_ARP_H */

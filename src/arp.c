@@ -25,6 +25,12 @@ typedef int64_t  __int64;
 #define LODWORD(x)  (*((_DWORD *)&(x)))
 #define LOBYTE(x)   (*((_BYTE  *)&(x)))
 
+/* ---- CKbdArp preset-pattern expander (framework completeness; not used by
+ * the JUNO-60 panel arp, which runs the base CArpeggio engine). Forward decls
+ * for the clock-driver +40 reload branch. ---- */
+static void sub_7FF91E01F9F0(__int64 a1, char *a2, _BYTE *a3);
+static void sub_7FF91E01FED0(__int64 a1, char *a2);
+
 /* Offset accessors into the faithful state block, exactly as voice_render.c:
  *   JF = *(float*), JI = *(int32*). Bytes are read via *(a1+off) directly. */
 #undef JF
@@ -965,8 +971,8 @@ LABEL_29:
                                 while ( v16 );
                             }
                             *(_DWORD *)(a1 + 44) = v14;
-                            /* sub_7FF91E01F9F0(a1, *(_QWORD*)(a1+32), a1+804); */
-                            /* sub_7FF91E01FED0(a1, 0); */
+                            sub_7FF91E01F9F0(a1, (char *)*(_QWORD*)(a1+32), (_BYTE*)(a1+804));
+                            sub_7FF91E01FED0(a1, 0);
                             *(_BYTE *)(a1 + 40) = 0;
                         }
                         if ( *(_BYTE *)(a1 + 3489) )
@@ -1063,4 +1069,755 @@ void juno_arp_clock(juno_arp *arp, int nsamples)
 void juno_arp_scan(juno_arp *arp)
 {
     sub_7FF91E020260(arp->st);
+}
+
+/* ======================================================================== */
+/* CKbdArp preset-pattern EXPANDER — faithful transcription.                 */
+/*                                                                           */
+/* Source of truth (image base 0x7FF91DC60000):                             */
+/*   sub_7FF91E01DD80  @ rva 0x3BDD80  decomp_380000.c:27054  (gate clear)   */
+/*   sub_7FF91E01D540  @ rva 0x3BD540  decomp_380000.c:26502  (boundary+sort)*/
+/*   sub_7FF91E01F9C0  @ rva 0x3BF9C0  decomp_380000.c:28737  (stage/dirty)  */
+/*   sub_7FF91E01F9F0  @ rva 0x3BF9F0  decomp_380000.c:28758  (row expander) */
+/*   sub_7FF91E01FED0  @ rva 0x3BFED0  decomp_380000.c:29030  (gate/dur calc)*/
+/*   CKbdArp loader sub_7FF91E023010 @ rva 0x3C3010 decomp_3C0000.c:1942     */
+/*                                                                           */
+/* Called from the clock driver's +40 pattern-reload branch                 */
+/* (decomp_380000.c:27268-27272):                                            */
+/*     v18 = *(_QWORD*)(a1+32);             // staged source = a1+3496       */
+/*     sub_7FF91E01F9F0(a1, v18, a1+804);   // expand rows into live tables  */
+/*     sub_7FF91E01FED0(a1, 0);             // compute per-row durations      */
+/*     *(_BYTE*)(a1+40) = 0;                // clear dirty                    */
+/*                                                                           */
+/* Offset map (relative to a1; a3 = a1+804 so a3[k] == a1[804+k]):           */
+/*   a3[2249]  = a1+3053  : number of voice/step ROWS to expand (=16 in ctor)*/
+/*   a3[2251]  = a1+3055  : step clock period = min(src[0],32) (micro-steps) */
+/*   a3[2256]  = a1+3060  : transpose center = lowest note in pattern (def 60)*/
+/*   a3 + 12*v          = a1+804+12*v   : voice slot v, byte0 = template note */
+/*   a3 + 192 + 4*v + 64*m = a1+996+64*m+4*v : micro-gate matrix              */
+/*                                          (m = micro-step 0..31, v = row)   */
+/*   a1+610+6*v / a1+612+6*v : per-row gate-on / gate-off durations          */
+/*                                                                           */
+/* Build with -fno-strict-aliasing (state is addressed by raw offset).       */
+/* These functions only touch the faithful state (a1); no callbacks. They    */
+/* are byte-exact transcriptions and can be pasted into src/arp.c as-is.     */
+/* ======================================================================== */
+
+/* ---- sub_7FF91E01DD80 @ rva 0x3BDD80 — clear voice notes + gate matrix --- */
+/* Marks the first 16 voice slots free (0x80 at byte0 and byte2) and zeroes  */
+/* the entire 32x? micro-gate matrix (a2+192 .. for 32*32 cells, v3=32 outer)*/
+static _BYTE *sub_7FF91E01DD80(__int64 a1, _BYTE *a2)
+{
+    _BYTE *result; // rax
+    __int64 v3; // rcx
+    (void)a1;
+
+    *a2 = 0x80;
+    result = a2 + 192;
+    a2[2] = 0x80;
+    v3 = 32;
+    a2[12] = 0x80;
+    a2[14] = 0x80;
+    a2[24] = 0x80;
+    a2[26] = 0x80;
+    a2[36] = 0x80;
+    a2[38] = 0x80;
+    a2[48] = 0x80;
+    a2[50] = 0x80;
+    a2[60] = 0x80;
+    a2[62] = 0x80;
+    a2[72] = 0x80;
+    a2[74] = 0x80;
+    a2[84] = 0x80;
+    a2[86] = 0x80;
+    a2[96] = 0x80;
+    a2[98] = 0x80;
+    a2[108] = 0x80;
+    a2[110] = 0x80;
+    a2[120] = 0x80;
+    a2[122] = 0x80;
+    a2[132] = 0x80;
+    a2[134] = 0x80;
+    a2[144] = 0x80;
+    a2[146] = 0x80;
+    a2[156] = 0x80;
+    a2[158] = 0x80;
+    a2[168] = 0x80;
+    a2[170] = 0x80;
+    a2[180] = 0x80;
+    a2[182] = 0x80;
+    /* zero the gate matrix: 32 micro-step stripes of 16 cells each
+     * (decomp_380000.c:27094-27115), then set the transpose center to 60. */
+    do
+    {
+        result[0]  = 0;
+        result[4]  = 0;
+        result[8]  = 0;
+        result[12] = 0;
+        result[16] = 0;
+        result[20] = 0;
+        result[24] = 0;
+        result[28] = 0;
+        result[32] = 0;
+        result[36] = 0;
+        result[40] = 0;
+        result[44] = 0;
+        result[48] = 0;
+        result[52] = 0;
+        result[56] = 0;
+        result[60] = 0;
+        result += 64;
+        --v3;
+    }
+    while ( v3 );
+    a2[2256] = 60;
+    return result;
+}
+
+/* ---- sub_7FF91E01D540 @ rva 0x3BD540 — gate-boundary + ascending sort ---- */
+/* For each of the 16 voice rows: if its note byte is < 0x80 (active) but the
+ * row has no nonzero gate cell within the first [2251] micro-steps, free it
+ * (note = 0x80).  Then shell-sort (gap 8,4,2,1) the rows ASCENDING by note,
+ * carrying the matching micro-gate columns along.  a2[2251] = step period.  */
+static __int64 sub_7FF91E01D540(__int64 a1, _BYTE *a2)
+{
+    _BYTE *v3; // rax
+    __int64 v4; // r10
+    _BYTE *v5; // r9
+    __int64 v6; // r8
+    __int64 v7; // rdx
+    _BYTE *v8; // rcx
+    __int64 v9; // r8
+    __int64 v10; // rdx
+    _BYTE *v11; // rcx
+    __int64 v12; // r8
+    __int64 v13; // rdx
+    _BYTE *v14; // rcx
+    __int64 v15; // r8
+    __int64 v16; // rdx
+    _BYTE *v17; // rcx
+    __int64 v18; // r8
+    __int64 v19; // rdx
+    _BYTE *v20; // rcx
+    __int64 v21; // r8
+    __int64 v22; // rdx
+    _BYTE *v23; // rcx
+    __int64 v24; // r8
+    __int64 v25; // rdx
+    _BYTE *v26; // rcx
+    __int64 v27; // r8
+    __int64 v28; // rdx
+    _BYTE *v29; // rcx
+    int v30; // ebp
+    __int64 v31; // r14
+    int v32; // r15d
+    int v33; // esi
+    __int64 i; // r9
+    unsigned __int8 v35; // r8
+    unsigned __int8 v36; // al
+    int v37; // r11d
+    __int64 v38; // r10
+    char *v39; // rax
+    char v40; // r8
+    char *v41; // rdx
+    __int64 result; // rax
+
+    if ( !a2 )
+        sub_7FF91E01D540(a1, (_BYTE *)(a1 + 804));
+    v3 = a2 + 24;
+    v4 = 2;
+    v5 = a2 + 196;
+    do
+    {
+        if ( *(v3 - 24) < 0x80u )
+        {
+            v6 = (char)a2[2251];
+            v7 = 0;
+            if ( v6 <= 0 )
+            {
+LABEL_9:
+                *(v3 - 24) = 0x80;
+            }
+            else
+            {
+                v8 = v5 - 4;
+                while ( (*v8 & 0x7F) == 0 )
+                {
+                    ++v7;
+                    v8 += 64;
+                    if ( v7 >= v6 )
+                        goto LABEL_9;
+                }
+            }
+        }
+        if ( *(v3 - 12) < 0x80u )
+        {
+            v9 = (char)a2[2251];
+            v10 = 0;
+            if ( v9 <= 0 )
+            {
+LABEL_15:
+                *(v3 - 12) = 0x80;
+            }
+            else
+            {
+                v11 = v5;
+                while ( (*v11 & 0x7F) == 0 )
+                {
+                    ++v10;
+                    v11 += 64;
+                    if ( v10 >= v9 )
+                        goto LABEL_15;
+                }
+            }
+        }
+        if ( *v3 < 0x80u )
+        {
+            v12 = (char)a2[2251];
+            v13 = 0;
+            if ( v12 <= 0 )
+            {
+LABEL_21:
+                *v3 = 0x80;
+            }
+            else
+            {
+                v14 = v5 + 4;
+                while ( (*v14 & 0x7F) == 0 )
+                {
+                    ++v13;
+                    v14 += 64;
+                    if ( v13 >= v12 )
+                        goto LABEL_21;
+                }
+            }
+        }
+        if ( v3[12] < 0x80u )
+        {
+            v15 = (char)a2[2251];
+            v16 = 0;
+            if ( v15 <= 0 )
+            {
+LABEL_27:
+                v3[12] = 0x80;
+            }
+            else
+            {
+                v17 = v5 + 8;
+                while ( (*v17 & 0x7F) == 0 )
+                {
+                    ++v16;
+                    v17 += 64;
+                    if ( v16 >= v15 )
+                        goto LABEL_27;
+                }
+            }
+        }
+        if ( v3[24] < 0x80u )
+        {
+            v18 = (char)a2[2251];
+            v19 = 0;
+            if ( v18 <= 0 )
+            {
+LABEL_33:
+                v3[24] = 0x80;
+            }
+            else
+            {
+                v20 = v5 + 12;
+                while ( (*v20 & 0x7F) == 0 )
+                {
+                    ++v19;
+                    v20 += 64;
+                    if ( v19 >= v18 )
+                        goto LABEL_33;
+                }
+            }
+        }
+        if ( v3[36] < 0x80u )
+        {
+            v21 = (char)a2[2251];
+            v22 = 0;
+            if ( v21 <= 0 )
+            {
+LABEL_39:
+                v3[36] = 0x80;
+            }
+            else
+            {
+                v23 = v5 + 16;
+                while ( (*v23 & 0x7F) == 0 )
+                {
+                    ++v22;
+                    v23 += 64;
+                    if ( v22 >= v21 )
+                        goto LABEL_39;
+                }
+            }
+        }
+        if ( v3[48] < 0x80u )
+        {
+            v24 = (char)a2[2251];
+            v25 = 0;
+            if ( v24 <= 0 )
+            {
+LABEL_45:
+                v3[48] = 0x80;
+            }
+            else
+            {
+                v26 = v5 + 20;
+                while ( (*v26 & 0x7F) == 0 )
+                {
+                    ++v25;
+                    v26 += 64;
+                    if ( v25 >= v24 )
+                        goto LABEL_45;
+                }
+            }
+        }
+        if ( v3[60] < 0x80u )
+        {
+            v27 = (char)a2[2251];
+            v28 = 0;
+            if ( v27 <= 0 )
+            {
+LABEL_51:
+                v3[60] = 0x80;
+            }
+            else
+            {
+                v29 = v5 + 24;
+                while ( (*v29 & 0x7F) == 0 )
+                {
+                    ++v28;
+                    v29 += 64;
+                    if ( v28 >= v27 )
+                        goto LABEL_51;
+                }
+            }
+        }
+        v5 += 32;
+        v3 += 96;
+        --v4;
+    }
+    while ( v4 );
+    v30 = 8;
+    do
+    {
+        v31 = v30;
+        if ( v30 < 16LL )
+        {
+            v32 = 0;
+            do
+            {
+                v33 = v32;
+                for ( i = v31 - v30; v33 >= 0; v33 -= v30 )
+                {
+                    v35 = a2[12 * i];
+                    v36 = a2[12 * v30 + 12 * i];
+                    if ( v35 <= v36 )
+                        break;
+                    a2[12 * i] = v36;
+                    v37 = 0;
+                    a2[12 * v30 + 12 * i] = v35;
+                    if ( (char)a2[2251] > 0 )
+                    {
+                        v38 = 48;
+                        v39 = (char *)&a2[4 * i + 192];
+                        do
+                        {
+                            v40 = *v39;
+                            v39 += 64;
+                            v41 = (char *)&a2[4 * i + 4 * v30 + 4 * v38];
+                            ++v37;
+                            v38 += 16;
+                            *(v39 - 64) = *v41;
+                            *v41 = v40;
+                        }
+                        while ( v37 < (char)a2[2251] );
+                    }
+                    i -= v30;
+                }
+                ++v32;
+                ++v31;
+            }
+            while ( v31 < 16 );
+        }
+        result = (unsigned int)(v30 / 2);
+        v30 = result;
+    }
+    while ( (int)result > 0 );
+    return result;
+}
+
+/* ---- sub_7FF91E01F9F0 @ rva 0x3BF9F0 — expand pattern rows ---------------- */
+/* a2 = staged source record (= *(a1+32) = a1+3496); a3 = a1+804 (live base). */
+/* When a2 != 0: clear, set period = min(src[0],32), copy each step record's  */
+/* template note into the voice rows and spread its 32 micro-gate cells into  */
+/* the gate matrix, then run sub_7FF91E01D540 (boundary+sort) and store the   */
+/* lowest active note as the transpose center [+3060] (default 60).           */
+/* When a2 == 0: degenerate single-step clear (period=1, all rows OFF).        */
+static void sub_7FF91E01F9F0(__int64 a1, char *a2, _BYTE *a3)
+{
+    _BYTE *v3; // rbx
+    char *v4; // rdi
+    _BYTE *v6; // rcx
+    char v7; // cl
+    unsigned __int8 *v8; // rcx
+    int v9; // edi
+    int v10; // r9d
+    unsigned __int8 *v11; // r8
+    _BYTE *v12; // rdx
+    unsigned __int8 v13; // al
+    unsigned __int8 v14; // al
+    char *v15; // r10
+    int v16; // eax
+    int v17; // ecx
+    unsigned __int8 *v18; // r8
+    __int64 v19; // r9
+    char *v20; // rdx
+
+    v3 = a3;
+    v4 = a2;
+    if ( a2 )
+    {
+        sub_7FF91E01DD80(a1, a3);
+        v7 = 32;
+        if ( (unsigned __int8)*v4 < 0x20u )
+            v7 = *v4;
+        v3[2251] = v7;
+        v8 = (unsigned __int8 *)(v4 + 6);
+        v9 = 0;
+        v10 = 0;
+        if ( (char)v3[2249] > 0 )
+        {
+            v11 = v3;
+            v12 = v3 + 256;
+            do
+            {
+                v13 = *v8;
+                *v11 = *v8;
+                if ( v13 >= 0x80u )
+                    break;
+                ++v10;
+                *(v12 - 64) = v8[1];
+                v11 += 12;
+                *v12 = v8[2];
+                v12[64] = v8[3];
+                v12[128] = v8[4];
+                v12[192] = v8[5];
+                v12[256] = v8[6];
+                v12[320] = v8[7];
+                v12[384] = v8[8];
+                v12[448] = v8[9];
+                v12[512] = v8[10];
+                v12[576] = v8[11];
+                v12[640] = v8[12];
+                v12[704] = v8[13];
+                v12[768] = v8[14];
+                v12[832] = v8[15];
+                v12[896] = v8[16];
+                v12[960] = v8[17];
+                v12[1024] = v8[18];
+                v12[1088] = v8[19];
+                v12[1152] = v8[20];
+                v12[1216] = v8[21];
+                v12[1280] = v8[22];
+                v12[1344] = v8[23];
+                v12[1408] = v8[24];
+                v12[1472] = v8[25];
+                v12[1536] = v8[26];
+                v12[1600] = v8[27];
+                v12[1664] = v8[28];
+                v12[1728] = v8[29];
+                v12[1792] = v8[30];
+                v12[1856] = v8[31];
+                v14 = v8[32];
+                v8 += 34;
+                v12[1920] = v14;
+                v12 += 4;
+            }
+            while ( v10 < (char)v3[2249] );
+        }
+        sub_7FF91E01D540(a1, v3);
+        v15 = (char *)(v3 + 192);
+        v16 = 128;
+        do
+        {
+            if ( v9 >= (char)v3[2251] )
+                break;
+            v17 = (char)v3[2249];
+            if ( v17 > 0 )
+            {
+                v18 = v3;
+                v19 = (unsigned int)v17;
+                v20 = v15;
+                do
+                {
+                    if ( *v20 > 0 && *v18 < v16 )
+                        v16 = *v18;
+                    v20 += 4;
+                    v18 += 12;
+                    --v19;
+                }
+                while ( v19 );
+            }
+            ++v9;
+            v15 += 64;
+        }
+        while ( v16 == 128 );
+        v3[2256] = (v16 == 128) ? 60 : (char)v16;
+    }
+    else
+    {
+        a3[2251] = 1;
+        if ( (char)a3[2249] > 0 )
+        {
+            v6 = a3 + 192;
+            do
+            {
+                *v3 = 0x80;
+                LODWORD(v4) = (_DWORD)v4 + 1;
+                *v6 = 0;
+                v6 += 4;
+                v3 += 12;
+            }
+            while ( (int)v4 < (char)a3[2249] );
+        }
+    }
+}
+
+/* ---- sub_7FF91E01FED0 @ rva 0x3BFED0 — per-row gate/duration build -------- */
+/* a2 == 0 -> operate on a1+804.  Skips entirely if +3488 set.                */
+/* For every active row, walks its micro-gate run and accumulates the gate-on */
+/* / gate-off durations (a1+610/+612 per micro-step) into the per-cell u16     */
+/* duration fields (a3+192 + ... +2), counting active steps into a3[2250].     */
+static void sub_7FF91E01FED0(__int64 a1, char *a2)
+{
+    char *v2; // r15
+    __int64 v3; // r10
+    __int64 v4; // r12
+    char *v5; // r13
+    int v6; // r8d
+    char v7; // dl
+    __int64 v8; // rbx
+    char *v9; // rax
+    __int64 v10; // rbp
+    char v11; // r9
+    __int16 v12; // ax
+    __int64 v13; // rsi
+    __int64 v14; // rcx
+    int v15; // sf (decompile: bool v15)
+    int v16; // ecx
+    __int64 v17; // r11
+    char *v18; // rcx
+    char v19; // di
+    __int16 v20; // r9
+    char *v21; // r14
+    __int16 v22; // dx
+    __int16 v23; // cx
+    __int16 v24; // cx
+    int v26; // [rsp+70h] [rbp+18h]
+    char *v27; // [rsp+78h] [rbp+20h]
+
+    v2 = a2;
+    v3 = a1;
+    if ( !*(_BYTE *)(a1 + 3488) )
+    {
+        if ( !a2 )
+        {
+            v2 = (char *)(a1 + 804);
+            sub_7FF91E01FED0(a1, (char *)(a1 + 804));
+            v3 = a1;
+        }
+        v2[2250] = 0;
+        v26 = 0;
+        if ( v2[2249] > 0 )
+        {
+            v4 = 2;
+            v5 = v2;
+            v27 = v2;
+            do
+            {
+                if ( (unsigned __int8)*v5 >= 0x80u )
+                    break;
+                ++v2[2250];
+                v6 = 0;
+                v7 = v2[2251];
+                v8 = 0;
+                if ( v7 > 0 )
+                {
+                    v9 = &v2[v4 + 190];
+                    while ( 1 )
+                    {
+                        v10 = v7;
+                        if ( (*v9 & 0x7F) != 0 )
+                            break;
+                        ++v6;
+                        ++v8;
+                        v9 += 64;
+                        if ( v6 >= v7 )
+                            goto LABEL_31;
+                    }
+                    v11 = *v9;
+                    v12 = 0;
+                    v13 = v6;
+                    do
+                    {
+                        v14 = v10;
+                        v15 = (v13 - 1) < 0;
+                        if ( v13 - 1 >= 0 )
+                            v14 = v13;
+                        v13 = v14 - 1;
+                        v16 = v10;
+                        if ( !v15 )
+                            v16 = v6;
+                        v6 = v16 - 1;
+                        v17 = v3 + 6 * v13;
+                        v18 = &v2[64 * v13 + 192];
+                        v19 = v18[v4 - 2];
+                        if ( v11 >= 0 )
+                            v20 = *(_WORD *)(v17 + 612);
+                        else
+                            v20 = *(_WORD *)(v17 + 610);
+                        v21 = &v18[v4];
+                        if ( (v19 & 0x7F) != 0 )
+                            v22 = v12 + v20;
+                        else
+                            v22 = 0;
+                        v23 = 0;
+                        *(_WORD *)v21 = v22;
+                        if ( (v19 & 0x7F) == 0 )
+                            v23 = v12;
+                        if ( v20 )
+                        {
+                            v24 = v20 + v23;
+                            v12 = 0;
+                            if ( v19 < 0 )
+                                v12 = v24;
+                        }
+                        else
+                        {
+                            v12 = v23 + *(_WORD *)(v17 + 610);
+                        }
+                        v3 = a1;
+                        v11 = v19;
+                    }
+                    while ( v13 != v8 );
+                    v5 = v27;
+                }
+LABEL_31:
+                v5 += 12;
+                v3 = a1;
+                v4 += 4;
+                ++v26;
+                v27 = v5;
+            }
+            while ( v26 < v2[2249] );
+        }
+    }
+}
+
+/* ---- sub_7FF91E01F9C0 @ rva 0x3BF9C0 — stage a record + mark dirty -------- */
+/* a2 = staged source pointer (the CKbdArp loader passes a1+3496).  Sets the  */
+/* +32 source pointer and the +40 dirty flag so the next clock tick that      */
+/* reaches a step boundary runs the expander above.  Also re-bases the clock  */
+/* sub-counter (+3056) modulo the new step period (+3055).                    */
+static __int64 sub_7FF91E01F9C0(__int64 a1, __int64 a2)
+{
+    int v2; // r8d
+    __int64 result; // rax
+    int v4; // edx
+
+    v2 = *(char *)(a1 + 3055);
+    result = *(unsigned int *)(a1 + 3056);
+    *(_QWORD *)(a1 + 32) = a2;
+    *(_BYTE *)(a1 + 40) = 1;
+    if ( (int)result >= v2 )
+    {
+        v4 = (int)result % v2;
+        *(_DWORD *)(a1 + 3056) = v4;
+        return (unsigned int)((int)result / v2);
+    }
+    return result;
+}
+
+/* ======================================================================== */
+/* Public entry: stage a CKbdArp preset pattern.                            */
+/*                                                                           */
+/* This mirrors the relevant tail of the CKbdArp pattern loader             */
+/* sub_7FF91E023010 (decomp_3C0000.c:1942): copy the 550-byte variation      */
+/* record into the staged region a1+3496, derive the header params, then      */
+/* call sub_7FF91E01F9C0(a1, a1+3496) to point +32 at it and set the +40      */
+/* dirty flag.  The actual row/gate expansion then happens on the next clock  */
+/* tick inside the driver's +40 branch (sub_7FF91E01F9F0 + sub_7FF91E01FED0). */
+/*                                                                           */
+/* `pattern` must point at the 550-byte variation record                     */
+/* (unk_7FF91E624480 + 8250*style + 550*variation; see refs/arp_patterns.json */
+/* and decomp_3C0000.c:1955-1959).  `mode_hdr` is the 6-byte mode-header      */
+/* record (word_7FF91E624458 + 6*mode) or NULL to leave +3496-block header    */
+/* untouched.  Pass NULL `pattern` to stage the degenerate empty pattern.     */
+/*                                                                           */
+/* After staging, the engine reloads on the next juno_arp_clock() that hits   */
+/* a step boundary, exactly as the binary does.                              */
+/* ======================================================================== */
+void juno_arp_load_pattern(juno_arp *arp,
+                           const unsigned char *mode_hdr,   /* 6 bytes or NULL */
+                           const unsigned char *pattern)    /* 550 bytes or NULL */
+{
+    unsigned char *a1 = arp->st;
+
+    /* loader copies header record[0..3] -> +3496, record[4..5] -> +3500.
+     * (decomp_3C0000.c:1957-1958)  We then OVERWRITE +3496/+3497/+3500 with
+     * the variation-header-derived params below, matching the loader order. */
+    if ( mode_hdr )
+    {
+        a1[3496] = mode_hdr[0];
+        a1[3497] = mode_hdr[1];
+        a1[3498] = mode_hdr[2];
+        a1[3499] = mode_hdr[3];
+        a1[3500] = mode_hdr[4];
+        a1[3501] = mode_hdr[5];
+    }
+
+    if ( pattern )
+    {
+        /* copy the 550-byte variation record into the staged body.  The
+         * loader does this as a sequence of 16-byte OWORD moves from
+         * &v5[v7+6] onward (decomp_3C0000.c:1960-2007); the net effect is to
+         * land the 6-byte header + 16*34-byte step records at a1+3502.. and the
+         * header bytes are read back below.  We reproduce the byte image. */
+        /* header (6 bytes) at +3496..+3501, then 544 step bytes at +3502.. */
+        /* The decompile copies starting at offset +6 of the record into
+         * a1+3502; bytes 0..5 (header) are consumed via v5[v7+1/3/5] below. */
+        for ( int k = 0; k < 544; ++k )
+            a1[3502 + k] = pattern[6 + k];
+
+        /* header-derived params (decomp_3C0000.c:2010-2015):
+         *   +3496 = record[5] >> 2   (step clock period / rate division)
+         *   +3497 = record[1] >> 2   (range/octave param)
+         *   +3500 = record[3] >> 1   (accent/velocity-scale base)            */
+        a1[3496] = (unsigned char)(pattern[5] >> 2);
+        a1[3497] = (unsigned char)(pattern[1] >> 2);
+        a1[3500] = (unsigned char)(pattern[3] >> 1);
+
+        /* NOTE: the staged record's step-record byte0 (template note) is read
+         * by the expander at a2+6+34*step.  The expander's row count comes
+         * from a3[2249] (= a1+3053, the ctor's 16); the period comes from
+         * src[0] which is the record's FIRST byte.  In the loader the record
+         * body that the expander walks begins at a1+3496 (= staged source).
+         * src[0] therefore = a1[3496] (= record[5]>>2). */
+    }
+
+    /* point +32 at the staged record and raise the dirty flag (+40). */
+    sub_7FF91E01F9C0((__int64)a1, (__int64)(a1 + 3496));
+
+    /* If you want the expansion to happen immediately (instead of on the next
+     * boundary tick), you can also call the expander directly, exactly as the
+     * driver does:
+     *     sub_7FF91E01F9F0((__int64)a1, (char *)*(_QWORD*)(a1+32), a1+804);
+     *     sub_7FF91E01FED0((__int64)a1, 0);
+     *     a1[40] = 0;
+     * but the faithful behaviour is to let juno_arp_clock() drive it.        */
 }

@@ -49,10 +49,10 @@ work lands — keep this current.
 | Polyphony (8 voices, M.CV fix) | 95% | All 8 voices render; voice 0 bit-identical; M.CV pitch-base bug fixed; 622 offsets verified. |
 | Master mix + BBD chorus (×2 instances) | 100% | Both chorus instances **bit-exact verified** vs asm. |
 | Delay FX (+ DL2) | 100% | **Bit-exact verified** (both modes, interpolation, damping, feedback). |
-| Reverb (CJu60Sim) | 95% | DSP **bit-exact verified** (tank, pre-filter, taps, waveshaper). HALL2 tap-table activation in progress (static, capture-free). |
+| Reverb (CJu60Sim) | 98% | DSP **bit-exact verified**; HALL2 **activated** (tap-builder `sub_7FF91E021AC0` transcribed, renders a decaying tail). Per-patch decay-knob damping is the small remainder. |
 | System-8 FX-A slot (Flanger, all 6 modes) | 100% | DSP **bit-exact verified**; routed separately from chorus; thru-bypassed when type=DELAY. |
 | `chorus_init` + `ramp_engine` | 100% | **Bit-exact verified** (chorus_init: 3148 stmts, zero diffs). |
-| Arpeggiator (`CArpeggio`) | 95% | Core + 6 selectors + scanner + clock **bit-exact verified**. Only the CKbdArp preset-pattern expander untranscribed (out of UP-mode path). |
+| Arpeggiator (`CArpeggio` + CKbdArp) | 100% | Core + 6 selectors + scanner + clock **bit-exact verified**; the CKbdArp preset-pattern expander is now transcribed + wired (`juno_arp_load_pattern`). |
 | Preset / bank decode | 95% | Deserializer-proven; FX selectors decode (stride-4); byte→step = identity (verified 14/16). |
 | Param registry (name→engine slot) | 100% | All 1121 bindings extracted from the asm (`refs/param_registry.json`). |
 | Param-apply engine (step→coefficient) | 95% | LUT mechanism bit-exact (88/88); noise byte-0 gate resolved & verified. |
