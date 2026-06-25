@@ -14,7 +14,8 @@
 #include <string.h>
 #include <math.h>
 
-void juno_load_captured_runtime(unsigned char *st);
+void juno_runtime_coeffs_apply(unsigned char *st);
+void juno_overlay_patch(unsigned char *st);
 
 static void write_wav(const char *path,const float *L,const float *R,int n,int sr){
     FILE *f=fopen(path,"wb"); if(!f){perror(path);return;}
@@ -37,7 +38,8 @@ int main(int argc,char**argv){
     unsigned char *st=malloc(JUNO_STATE_BYTES); memset(st,0,JUNO_STATE_BYTES);
     juno_chorus_init(st);            /* BBD structure (deep offsets) */
     juno_engine_init(st);            /* static coefficient tables */
-    juno_load_captured_runtime(st);  /* real patch coeffs at proven offsets, clean state */
+    juno_runtime_coeffs_apply(st);   /* working scaffold (pitch + priming) */
+    juno_overlay_patch(st);          /* new capture: real patch coefficients */
 
     /* chorus mode selector via the host-params shim (mode 2 = JUNO Chorus I) */
     static struct juno_host_shim shim; memset(&shim,0,sizeof shim);
