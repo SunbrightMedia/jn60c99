@@ -582,7 +582,7 @@
    "panel_exposed": true,
    "engine_offset": null,
    "offset_via": null,
-   "note": "BEND RANGE is a 0..23 SEMITONE value (default 11), NOT a 0..255 step. Engine offset 4128 (Bend Range) encodes it as (n-128)/255 via LUT21 (capture=LUT21(171)=43/255=0.16863 for R=11; init default=LUT21(163)=35/255). The 0..23 -> engine transform is bend-specific and NOT the generic pure-LUT path (LUT21(11)=0.0866 is wrong), so it is intentionally left UNAPPLIED (rides the engine init default) until the bend-range setter is transcribed. Inaudible without pitch-bend."
+   "note": "BEND RANGE: 0..23 semitones. Engine 4128 = LUT21(step+160) = (R+32)/255 (R=11 -> 0x3e2cacad, capture-validated). Applied directly in juno_preset_load (not the generic LUT map). Transform now RESOLVED."
   },
   {
    "db_index": 802,

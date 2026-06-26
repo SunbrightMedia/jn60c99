@@ -101,6 +101,19 @@ int juno_preset_load(unsigned char *st, const char *bank_path, int record,
     }
     if (info) info->fxa_v39 = (fxa==0) ? 1 : 0;  /* 1=delay; 0=off (other FX-A modes TODO) */
 
+    /* Additional capture-validated bindings (refs/db_engine_map_full.json) kept out
+     * of the generated LUT map because each needs a tableId override or a
+     * non-identity step transform. All round-trip bit-exact vs the rec0 capture. */
+    { int s;
+      /* DB798 PORTAMENTO TIME -> 624, tableId 7 (the param-table's tid4 is stale;
+       * step 10 -> 0x3ad61183 exact). Per-voice glide-time 1-pole coefficient. */
+      s = step_synth(dec,ndec,798); if (s>=0 && s<=255) juno_param_apply_lut(st, 624, 7, s, 1);
+      /* DB803 TEMPO SYNC -> 1056 (LFO Tempo Rate Sw), tableId 52 (0/1 switch). */
+      s = step_synth(dec,ndec,803); if (s>=0 && s<=255) juno_param_apply_lut(st, 1056, 52, s, 1);
+      /* DB801 BEND RANGE -> 4128: a 0..23 SEMITONE value, engine = LUT21(step+160)
+       * = (R+32)/255 (R=11 -> 0x3e2cacad exact). NOT the plain 0..255 LUT path. */
+      s = step_synth(dec,ndec,801); if (s>=0 && s+160<=255) juno_param_apply_lut(st, 4128, 21, s+160, 1);
+    }
     juno_chorus_set_rates(st);   /* capture-free JUNO chorus I/II rates */
     if (info) info->applied=applied;
     free(dec); free(rec);
