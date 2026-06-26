@@ -47,3 +47,27 @@ away). => Transcribing the note-on velocity handler would NOT change this sound.
 ### Residual uncertain (small effect, computed/non-default, no oracle)
 - 1072 (above), 2672 (=8.15, computed, envelope-region), 6512 (Osc1 Level
   =1.00736 = `lut[54][173]`, non-default — likely a model osc-level trim).
+
+## UPDATE: the LFO tempo-sync rate (1072) is almost certainly CORRECT
+Decoded the LFO rate semantics in voice_render.c:756-799:
+`v83 = tempo_sync ? 1072 : free_rate`; LFO phase increment = `v83 / 65536`.
+So `1072 = 2.7298` → freq = 2.7298 × 96000 / 65536 = **3.998 Hz**. At 120 BPM a
+1/8 note = 4.0 Hz. So 1072 is a clean **1/8-note tempo sync at 120 BPM** — the
+musically-correct value for our render. The pad capture was evidently also 120 BPM
+with the same/compatible division, so 2.7298 is correct (not a bug).
+NB: 1072 is host-tempo-computed and is NOT plumbed in our port (no BPM→engine path);
+it currently relies on the seed. At a different render tempo it would need
+recomputing as `freq·65536/SR` with `freq = (BPM/60)·cycles_per_beat`.
+
+## Overall conclusion of the sensitivity investigation
+After exhaustively perturbing every capture-seeded voice offset and tracing the
+audible ones to their meaning:
+- **No confident remaining static-coefficient bug** explains "sounds off." The DCO
+  mix, VCF, ADSR, FX, and LFO rate are all correct; the velocity/note-on handler is
+  a dead end (JUNO-60 isn't velocity-sensitive); the capture residual is tiny and
+  the few uncertain offsets are likely correct global/tempo values.
+- The remaining perceived difference is therefore most plausibly in the **arp
+  performance** (the host harness uses a single retriggered voice + a host-chosen
+  1/16 rate / 50% gate, rather than the plugin's own polyphonic arp voicing &
+  pattern) and/or **genuine analog-domain modeling** — i.e., the analog-behaviour
+  uncertainty flagged from the start, not a transcription error.
