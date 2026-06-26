@@ -114,15 +114,12 @@ int juno_preset_load(unsigned char *st, const char *bank_path, int record,
        * = (R+32)/255 (R=11 -> 0x3e2cacad exact). NOT the plain 0..255 LUT path. */
       s = step_synth(dec,ndec,801); if (s>=0 && s+160<=255) juno_param_apply_lut(st, 4128, 21, s+160, 1);
     }
-    /* DB795 REVERB LEVEL -> master reverb wet send @10759440 ("Rev Ecf Glb Lev",
-     * CDSPRev node 0x447), transform curve-22 = step/255. The reverb setter
-     * sub_7FF91E021240 (rva 0x3C1240) runs the knob through curve-22 then writes
-     * this node; it is the wet-tank multiplier at master_render.c:2252/2274/2298.
-     * (The earlier "host-side" call was a curve-21-vs-22 misread.) Single master
-     * node -> broadcast 0. The reverb activation (juno_reverb_activate) does not
-     * touch it, so this per-patch level survives. */
-    { int s = step_synth(dec,ndec,795);
-      if (s>=0 && s<=255) juno_param_apply_lut(st, 10759440, 22, s, 0); }
+    /* DB795 REVERB LEVEL: NOT bound to engine node 10759440. The ECF-reverb ctor
+     * sub_7FF91E01CCC0 (rva 0x3BCCC0) writes node 0x447 (@10759440) UNCONDITIONALLY
+     * to curve22(127) at init; no DB795 path overwrites it. (Decompile-proven, and
+     * independent of any capture oracle.) The patch REVERB LEVEL routes to the
+     * master reverb send mixer at render time, not to a stored 0..1 DSP node. It is
+     * applied via the reverb activation depth in the host, not here. */
 
     /* The final three (EditController/host-layer params, now resolved + capture-
      * validated bit-exact; refs/db_engine_map_full.json). */

@@ -57,8 +57,9 @@ work lands — keep this current.
 | Panel→engine param coverage | 100% | **Every JUNO-60 panel parameter is bound + capture-validated bit-exact.** Complete DB→engine map (`refs/db_engine_map_full.json`) from the static positional descriptor walk (`sub_33BFC0`; DB=750+position) + the corrected stride-4 block-2 decode (`241+(db-854)*4`). Applied: 24-param LUT map + pulse/VCA-tone + LFO KEY TRIG + PWM-source demux + portamento (tid7) + tempo-sync + BEND RANGE (`LUT21(step+160)`) + arp + 5 FX selectors + FX-A DELAY + REVERB LEVEL (10759440) + REVERB TIME (10759360) + VCF LFO MOD (7344, tid47) + VCA LEVEL (101072 dB curve) + EFFECT DEPTH (102576) + **VCA ENV-SELECT** (DB855 demux — fixed 19/64 presets that use ENV1/GATE not the ENV2 default). Every "host-side"-flagged param was ultimately found statically. The one unbound knob, EFFECT TONE (DB874), is *genuinely* host-side and inert for JUNO chorus modes (it only colours the non-JUNO overdrive/crusher effects). Master tune & block-2 mod-matrix are 0/center across all 64 factory banks, so the engine default is already bit-exact. |
 | Param registry (name→engine slot) | 100% | All 1121 bindings extracted from the asm (`refs/param_registry.json`). |
 | Param-apply engine (step→coefficient) | 98% | LUT mechanism bit-exact (88/88); identity byte→step + noise byte-0 gate verified. |
-| Host layer — preset loader + RT synth API | 70% | Capture-free preset loader + CLI host (`host/juno_render.c`) + **real-time polyphonic synth API** (`host/juno_synth.c`: create/load/note-on-off/process-block with 8-voice allocation). Only the thin **VST3 SDK binding** (IAudioProcessor/IEditController glue + state chunk) remains. |
-| **Overall (weighted)** | **~94%** | **Every audio DSP block is bit-exact-verified, and any factory patch renders fully capture-free (incl. the chorus CV, now recovered).** Remaining: the per-patch reverb-decay damping rows and the VST3 SDK wrapper. |
+| Host layer — preset loader + RT synth API | 70% | Preset loader + CLI host (`host/juno_render.c`) + **real-time polyphonic synth API** (`host/juno_synth.c`: create/load/note-on-off/process-block with 8-voice allocation). Remaining: the VST3 SDK binding **and** the capture-seed dependency below. |
+| **Render is NOT yet capture-free** | — | The render path seeds engine state via `juno_runtime_coeffs_apply` — **279 coefficients memory-captured from a *different* preset ("PD The Juno Pad")**. The loader overwrites only ~40 of them, so **249 captured coefficients from another patch survive into every render** (incl. SQ ARPG). True capture-independence requires re-deriving those 249 from the decompile's init/`chorus_init`/delay/reverb setup (the preset-independent ones) and from the bank decode (any preset-specific ones). See `docs/PROVENANCE_CORRECTION.md`. |
+| **Overall (weighted)** | **~88%** | Every audio DSP *block* is bit-exact-verified and the loader mechanism is validated against the real record-0 capture. **Not capture-free** (the 279-coeff seed above), and there is **no captured oracle for SQ Dynamic ARPG**, so that specific preset's render is verified only indirectly. Remaining: eliminate the capture seed, per-patch reverb-decay rows, VST3 wrapper. |
 
 See `docs/PORT_STATUS.md` for the detailed accounting and `docs/` for per-subsystem maps.
 
@@ -72,10 +73,14 @@ See `docs/PORT_STATUS.md` for the detailed accounting and `docs/` for per-subsys
   the stride-4 FX selectors) + the identity byte→step + the verified noise gate let
   the C loader (`src/juno_preset.c`) apply any factory patch; `host/juno_render.c`
   renders it to WAV with its chorus + HALL2 reverb derived from the patch.
-- **Fully capture-free.** The last believed-capture-only value — the JUNO chorus CV
-  — was recovered from the binary (`(step·11)/255−8`, steps 62/50, bit-exact;
-  `src/juno_fx.c`). Every coefficient on the SQ-ARPG path now derives from the
-  decompile/data.
+- **NOT fully capture-free (corrected).** The render still seeds engine state from
+  `src/runtime_coeffs_data.c` — 279 coefficients **memory-captured from the
+  "PD The Juno Pad" preset**, of which 249 survive unmodified into every render
+  (the loader overwrites ~40). The earlier "fully capture-free" claim, and the
+  claim that `state_dump/state_t0.bin` is an SQ-ARPG capture, were both wrong; see
+  `docs/PROVENANCE_CORRECTION.md`. The only genuine captures held are record 0
+  ("SY Poly Synth", `src/captured_patch.c`) and "PD The Juno Pad" — **neither is
+  SQ Dynamic ARPG.**
 - **Remaining:** the per-patch reverb decay-knob damping rows (a small data
   extraction) and the VST3 SDK wrapper (standard plugin boilerplate around the
   finished engine). See `docs/PORT_STATUS.md`, `docs/FX_MODE_COEFFICIENTS.md`.
