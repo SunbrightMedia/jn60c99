@@ -51,3 +51,41 @@ preset-specific and rules out **both** records 0 and 1.
 3. The **REVERB LEVEL → node 10759440** binding remains correctly removed (the ECF
    ctor `sub_7FF91E01CCC0` writes that node unconditionally; decompile evidence,
    independent of the oracle question).
+
+## Seed breakdown — does the capture actually change the SQ ARPG sound?
+
+Quantified the 279-coeff seed against the full render pipeline (preset load +
+driver attach + reverb activate) with the seed disabled:
+
+| bucket | count | verdict for SQ ARPG |
+|---|--:|---|
+| Pipeline already MATCHES the captured value | 9 | redundant |
+| Loader DIFFERS (correctly overrides with SQ-ARPG values) | 21 | seed value is the *wrong* (pad) value, but the loader wins → correct |
+| Pipeline leaves ZERO (survives from capture) | 249 | analysed below |
+
+Of the 249 survivors:
+- **~119 FX coefficients** (chorus 6396xxx ×40, delay 6497xxx ×17, reverb
+  10759xxx ×45, FX-A 4297xxx ×17). These depend only on the chorus MODE / reverb
+  TYPE selectors. **SQ ARPG and the captured "PD The Juno Pad" share the same
+  selectors (chorus mode 2, HALL2/type 3)**, so the seeded FX coefficients are
+  *coincidentally correct* for SQ ARPG. (They would be wrong for a preset with a
+  different chorus mode / reverb type — a real global-accuracy gap.)
+- **~106 voice-region constants.** Mostly preset-INDEPENDENT: the M.CV pitch base
+  `6.66847` (repeated ×12), unity `1.0` switches, velocity-curve constants. These
+  are the same for every patch, so seeding them is correct (they should be written
+  by `engine_init`, which currently doesn't).
+- The envelope-block offsets 2592–2768 (and 3072–3248) are **per-sample state**,
+  not config — `voice_render.c:941–987` reads and rewrites them every sample. They
+  look "stable" only because both capture snapshots caught steady-state sustain.
+
+**Conclusion:** for SQ Dynamic ARPG specifically, the seed does **not** materially
+change the sound — the FX coeffs are coincidentally correct, the constants are
+preset-independent, the params are loader-overwritten, and the envelope siblings
+are self-overwriting state. Eliminating the capture is a **capture-free *purity*
+goal** (and a **global-accuracy** fix for presets whose chorus-mode/reverb-type
+differ from the captured pad), **not** the cause of "SQ ARPG sounds off."
+
+The remaining audible gap is therefore most plausibly the **arp performance
+harness** (`host/render_test.c` retriggers a single voice 0 rather than the
+plugin's polyphonic arp voice allocation, with a host-derived BPM/gate) and/or
+genuine analog-domain modeling — not a static-coefficient transcription bug.
