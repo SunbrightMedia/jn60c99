@@ -85,6 +85,11 @@ int juno_runtime_coeffs_loaded(void);
  * juno_runtime_coeffs_apply. See src/juno_fx_filter_coeffs.c. */
 void juno_fx_filter_coeffs_apply(unsigned char *st);
 
+/* juno_construction_defaults — faithful transcription of sub_3A66B0: the
+ * plugin's construction-time default writer (zeros all 1121 param value-slots,
+ * sets the 16 PlugIn Sw to 1.0). Part of the capture-free param pipeline. */
+void juno_construction_defaults(unsigned char *st);
+
 /* juno_reverb_coeffs_apply — capture-free seed for the HALL2 reverb coefficient
  * blocks (input allpass/CV + tank/DPF/HPF/LPF, 48 offsets). 46/48 are .rdata
  * literals (verified in seg_rdata_935650.bin); the 2 others are a documented
