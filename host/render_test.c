@@ -41,8 +41,14 @@ int main(int argc,char**argv){
  *(uint8_t*)(a+996)=0x01; *(uint16_t*)(a+996+2)=1;
  juno_arp_note_on(&arp,60,100); juno_arp_note_on(&arp,64,100); juno_arp_note_on(&arp,67,100); /* C4 E4 G4 */
  juno_arp_set_mode(&arp,pi.arp_mode); juno_arp_set_range(&arp,pi.arp_range); juno_arp_set_running(&arp,1); /* arp from preset (global) */
- /* 120 BPM, 1/16 steps = 0.125 s */
- int step=(int)(0.125*SR), gate=(int)(step*0.7);
+ /* Arp clock: the JUNO-60 arp has NO patch rate param — the rate is the host
+  * tempo. Default note division is 1/16 (System-8 program STEP=1; the rate builder
+  * sub_7FF91E01F3D0 dur table {24,16,12,8,6,4}, and the empirical A/B pins STEP=1 ≈
+  * 1/16). Derive the step from BPM rather than hardcoding 0.125·SR so it's faithful
+  * at any tempo. Gate = the CArpeggio default 50% (gate-% table index 2), NOT 70%. */
+ const double BPM = 120.0;
+ int step=(int)((60.0/BPM)*SR/4.0 + 0.5);   /* 1/16 note */
+ int gate=step/2;                            /* 50% duty */
  int N=(int)(3.0*SR), idx=0, cur=-1, gate_off=-1, next=0, steps=0;
  float*L=malloc(4*N),*R=malloc(4*N);
  for(int i=0;i<N;i++){
