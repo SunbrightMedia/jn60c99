@@ -47,3 +47,4 @@ tests/test_init_default
 refs/captures/*.bin
 tests/play_captured
 tests/play_sqarpg_arp
+scratch_decomp/
