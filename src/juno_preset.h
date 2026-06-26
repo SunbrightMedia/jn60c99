@@ -17,6 +17,7 @@ typedef struct {
     int  arp_on;        /* ARPEGGIO SW: 1=on                     */
     int  arp_mode;      /* juno_arp_set_mode value: 15=UP 16=DOWN 17=UP&DOWN */
     int  arp_range;     /* juno_arp_set_range value: 0=1oct 1=2oct 2=3oct    */
+    int  fxa_v39;       /* FX-A System-8 multi-FX mode int (params+136): 1=DELAY, 0=off */
 } juno_preset_info;
 
 /* Load bank record `record` from `bank_path` into engine state `st` (which must

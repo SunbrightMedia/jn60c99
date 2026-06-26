@@ -29,7 +29,10 @@ int main(int argc,char**argv){
  if(juno_preset_load(st,"refs/preset_banks/bank1.bin",1,&pi)){fprintf(stderr,"load fail\n");return 1;}
  printf("preset[1] = \"%s\"  chorus=%d(CH%d) fxA=%d reverb=%d\n",pi.name,pi.chorus_mode,pi.chorus_mode-1,pi.fxa_type,pi.reverb_type);
  {float vel=100.f/127.f;for(int o=6864;o<=6912;o+=16)for(int vv=0;vv<JUNO_NUM_VOICES;vv++)JF(st,o+vv*JUNO_VOICE_MAIN_STRIDE)=vel;}
- static struct juno_host_shim sh;memset(&sh,0,sizeof sh);juno_driver_attach_host(st,&sh,pi.chorus_mode>=1?pi.chorus_mode:2);
+ /* mode_v39 (params+136) is the FX-A System-8 multi-FX, NOT the JUNO BBD chorus
+  * (which runs via juno_chorus_set_rates). For SQ ARPG fxa=DELAY -> v39=1. Running
+  * it as the chorus mode (the old code) made the FX-A a stray 2nd chorus. */
+ static struct juno_host_shim sh;memset(&sh,0,sizeof sh);juno_driver_attach_host(st,&sh,pi.fxa_v39);
  if(pi.reverb_type>=0&&pi.reverb_type<=5) juno_reverb_activate(st,pi.reverb_type,1.0f);
  /* faithful arp on a held C major triad, UP, 1 octave */
  juno_arp arp; juno_arp_callbacks cb={on_on,on_off,NULL};

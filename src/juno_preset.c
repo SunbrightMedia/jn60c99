@@ -81,6 +81,26 @@ int juno_preset_load(unsigned char *st, const char *bank_path, int record,
         juno_param_apply_value(st, 3936, (src==0)?1.0f:0.0f, 1);          /* Manual */
       }
     }
+    /* FX-A DELAY activation (DB875=0=DELAY). The driver previously ran the FX-A
+     * slot as a chorus (mode int = JUNO chorus mode) — a stray 2nd chorus that
+     * made the stereo image far too wide. The System-8 multi-FX (v39 slot,
+     * params+136) is the FX-A; for DELAY its mode int must be 1 (master_render.c
+     * v39==1 = stereo delay) and the host sets that from info->fxa_v39. The delay
+     * zone coefficients (4297xxx) are already seeded bit-exact by
+     * juno_runtime_coeffs_apply; only the two panel sends + the input "Mute" gate
+     * need writing (global FX nodes -> broadcast 0). Transforms are curve-22
+     * (=step/255), proven bit-exact. DB796 DELAY LEVEL @4297760, DB797 DELAY TIME
+     * @4297584, the un-seeded input gate @4297840 -> 1.0. */
+    int fxa = step_fx(dec,ndec,JUNO_DB_FXA);
+    if (fxa == 0){  /* DELAY */
+        int dl = step_synth(dec,ndec,796);   /* DELAY LEVEL */
+        int dt = step_synth(dec,ndec,797);   /* DELAY TIME  */
+        if (dl>=0 && dl<=255) juno_param_apply_value(st, 4297760, juno_lut_apply(22,dl), 0);
+        if (dt>=0 && dt<=255) juno_param_apply_value(st, 4297584, juno_lut_apply(22,dt), 0);
+        juno_param_apply_value(st, 4297840, 1.0f, 0);   /* input gate open */
+    }
+    if (info) info->fxa_v39 = (fxa==0) ? 1 : 0;  /* 1=delay; 0=off (other FX-A modes TODO) */
+
     juno_chorus_set_rates(st);   /* capture-free JUNO chorus I/II rates */
     if (info) info->applied=applied;
     free(dec); free(rec);
