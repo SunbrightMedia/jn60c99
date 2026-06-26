@@ -1,0 +1,2472 @@
+{
+ "_meta": {
+  "purpose": "Complete DB-index -> {decode position, engine offset, tableId/transform} map for the RolandCloud JUNO-60 (Cloud 60) preset loader. Lets the C99 port apply 100% of any factory patch.",
+  "db_numbering": "default_patch.json / on-disk System param DB (DB=750+script_index). Block1 (synth) names from default_patch.json; script_param_map.json (Script.xml) gives a parallel name view that COINCIDES in block1 (DB755..813) but DIVERGES for DB854+ (its tail names are misaligned; default_patch + bank-range-fit are authoritative there).",
+  "decode_blocks": {
+   "block1_synth": "pos = db-736 on the full-record nibble stream (value=byte[2k]*16+byte[2k+1]). Stride-1. Range-fit 100% for DB750..813 and DB830..853. VALIDATED bit-exact (rec0 SY Poly Synth, 23/24 pure-LUT params round-trip; DB773 noise via byte-0 gate).",
+   "name_arp": "16-char name at decoded 78..93 (DB814/815). Arp/jack stride-4 block: ARP SW/TYPE/RANGE at decoded 149/153/157 (deserializer record bytes 298/306/314); OCTAVE/HOLD at 161/165. Hardcoded, NOT db-736.",
+   "block2_global_fx": "pos = 309+(db-871)*4 (== 321+(db-876)*4). Stride-4 serialized struct for DB854..877. Range-fit 24/24 vs default_patch specs. Holds master tune, model, filter, chorus/effect, delay, reverb selectors + the VCA env-select demux (DB855)."
+  },
+  "engine_model": "Per-voice main block, voice v at offset+10512*v (broadcast). Captured oracle = src/captured_patch.c (rec0 SY Poly Synth, 110 offsets). capture_validated:true means juno_lut_apply(offset,tableId,rec0_step[+bias]) == captured[offset] bit-exact (hex stated in note).",
+  "transform_legend": "LUT=juno_param_apply_lut (clamped LUT[tableId][step]); demux=one-hot from a small selector; semitone=value+bias into LUT; voicemanager=raw int to allocator state; host=host/driver-pushed (red-black tree / master_render selector), NOT a static per-voice LUT; arp=arpeggiator driver setter; name=display string.",
+  "new_resolutions_this_pass": [
+   "DB798 PORTAMENTO -> off624 tableId 7 (param_table mislabeled tid4): rec0 step10 -> LUT7[10]=0x3ad61183 == capture. HIGH.",
+   "DB801 BEND RANGE -> off4128 LUT21(R+160), R=0..23 semitones: rec0 R11 -> LUT21[171]=0x3e2cacad == capture (43/255). HIGH.",
+   "DB803 TEMPO SYNC -> off1056 (LFO Tempo Rate Sw, DSP-confirmed v76=JF(1056)*JF(1072)). HIGH.",
+   "DB754 VCF LFO MOD: DISPROVED off4016 (that is the master LFO gain). Marked UNBOUND.",
+   "DB810 VCA LEVEL: no per-voice LUT reproduces capture -> UNBOUND (likely Patch Level/host).",
+   "block2 global/FX (DB854..877): full stride-4 layout pinned, 24/24 range-fit; VCA env-select DB855 -> 10176/10192/10208 demux (ENV2->10208 capture-proven)."
+  ],
+  "counts": {
+   "total_db": 128,
+   "capture_validated_true": 41,
+   "high_confidence": 44
+  }
+ },
+ "map": {
+  "750": {
+   "name": "(LFO WAVE)",
+   "script_name": "(LFO WAVE)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": null,
+   "default_step": null
+  },
+  "751": {
+   "name": "LFO DELAY TIME",
+   "script_name": "LFO DELAY TIME",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 1920,
+   "tableId": 44,
+   "transform": "LUT[44][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "LFO DELAY TIME -> LFO Delay. rec0 step=255, LUT44->0x36beff4a, capture 0x36beff4a MATCH",
+   "range": null,
+   "default_step": null
+  },
+  "752": {
+   "name": "LFO RATE",
+   "script_name": "LFO RATE",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 1088,
+   "tableId": 22,
+   "transform": "LUT[22][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "LFO RATE -> LFO Rate. rec0 step=118, LUT22->0x3eececed, capture 0x3eececed MATCH",
+   "range": null,
+   "default_step": null
+  },
+  "753": {
+   "name": "DCO LFO MOD",
+   "script_name": "DCO LFO MOD",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 4032,
+   "tableId": 0,
+   "transform": "LUT[0][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "DCO LFO MOD -> LFO Level (LFO->pitch depth). rec0 step=133, LUT0->0x3a02371f, capture 0x3a02371f MATCH",
+   "range": null,
+   "default_step": null
+  },
+  "754": {
+   "name": "VCF LFO MOD",
+   "script_name": "VCF LFO MOD",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "VCF LFO mod depth. script_param_map proposed off4016 but that offset is the MASTER LFO output gain (voice_render v174=JF(4016) scales the whole LFO; rec0=1.0, not reproducible from step). True VCF-LFO-depth offset not isolated. UNBOUND.",
+   "range": null,
+   "default_step": null
+  },
+  "755": {
+   "name": "0..255",
+   "script_name": "(LFO AMP DEPTH)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "756": {
+   "name": "OFF|ON",
+   "script_name": "LFO KEY TRIG",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 1872,
+   "tableId": 51,
+   "transform": "LUT[51][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "LFO KEY TRIG -> LFO Trig (inverted switch tid51; per-note phase reset). rec0 step=0, LUT51->0x3f800000, capture 0x3f800000 MATCH",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 0
+  },
+  "757": {
+   "name": "0..5",
+   "script_name": "(OSC1 WAVE)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 0
+  },
+  "758": {
+   "name": "0..255",
+   "script_name": "DCO PWM DEPTH",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 4144,
+   "tableId": 45,
+   "transform": "LUT[45][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "DCO PWM DEPTH -> PWM Level. rec0 step=163, LUT45->0x3f16fdf5, capture 0x3f16fdf5 MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "759": {
+   "name": "MAN|LFO|ENV1+|ENV1-|ENV2+|ENV2-",
+   "script_name": "DCO PWM SOURCE",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": {
+    "one_hot": {
+     "3888": "PWM SW LFO",
+     "3904": "PWM SW ENV1",
+     "3920": "PWM SW ENV2",
+     "3936": "PWM SW Manual"
+    }
+   },
+   "tableId": "demux",
+   "transform": "6-way->4 one-hot: 0->3936(Manual)=1; 1->3888(LFO)=1; 2,3->3904(ENV1)=1; 4,5->3920(ENV2)=1; sign(+/-)=ENV polarity (refinement)",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "spec MAN|LFO|ENV1+/-|ENV2+/-. rec0 (SY Poly Synth) step=1. Validated vs capture: rec0 src reproduces 3888..3936 one-hot (engine default LFO leaks into MANUAL patches without this). Demux proven by PWM-mix DSP voice_render.c:1083-1089.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 0
+  },
+  "760": {
+   "name": "64FEET|32FEET|16FEET|8FEET|4FEET|2FEET",
+   "script_name": "DCO RANGE",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 3840,
+   "tableId": 5,
+   "transform": "LUT[5][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "DCO RANGE -> OSC1 Feet. The one statically-proven anchor. rec0 step=3, LUT5->0x3f800000, capture 0x3f800000 MATCH",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 3
+  },
+  "761": {
+   "name": "0..255",
+   "script_name": "(OSC1 CROSS MOD)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "762": {
+   "name": "0..5",
+   "script_name": "(OSC2 WAVE)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 0
+  },
+  "763": {
+   "name": "0..255",
+   "script_name": "(OSC2 COLOR)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "764": {
+   "name": "0..5",
+   "script_name": "(OSC2 MOD)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 0
+  },
+  "765": {
+   "name": "64|32|16|8|4|2",
+   "script_name": "(OSC2 RANGE)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 0
+  },
+  "766": {
+   "name": "0..128..255",
+   "script_name": "(OSC2 FINE TUNE)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "767": {
+   "name": "OFF|ON|--|--",
+   "script_name": "(OSC2 RING)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    3
+   ],
+   "default_step": 0
+  },
+  "768": {
+   "name": "OFF|ON|--|--",
+   "script_name": "(OSC2 SYNC)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    3
+   ],
+   "default_step": 0
+  },
+  "769": {
+   "name": "-11..11",
+   "script_name": "(OSC2 COARSE TUNE)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    -11,
+    11
+   ],
+   "default_step": 0
+  },
+  "770": {
+   "name": "0..255",
+   "script_name": "DCO PWM LEVEL",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 4208,
+   "tableId": 54,
+   "transform": "LUT[54][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "DCO PWM LEVEL -> JU OSC Sqr Lev (3rd osc mix, stride-16 Saw4192/Sub4224). rec0 step=140, LUT54->0x3f11e430, capture 0x3f11e430 MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "771": {
+   "name": "0..255",
+   "script_name": "DCO SAW LEVEL",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 4192,
+   "tableId": 54,
+   "transform": "LUT[54][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "DCO SAW LEVEL -> JU OSC Saw Lev. rec0 step=138, LUT54->0x3f0de4b8, capture 0x3f0de4b8 MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "772": {
+   "name": "0..255",
+   "script_name": "DCO SUB LEVEL",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 4224,
+   "tableId": 54,
+   "transform": "LUT[54][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "DCO SUB LEVEL -> JU OSC Sub Lev. rec0 step=135, LUT54->0x3f08a1f0, capture 0x3f08a1f0 MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "773": {
+   "name": "0..255",
+   "script_name": "DCO NOISE LEVEL",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 6528,
+   "tableId": 12,
+   "transform": "LUT[12][step]",
+   "capture_validated": false,
+   "confidence": "HIGH",
+   "note": "DCO NOISE LEVEL -> Osc Noise Level. SPECIAL: tid12 step0 is gated to 0.0 (setter byte-0 gate); rec0 step0->0.0 validated, PD Juno Pad step230->lut12[230] validated. rec0 step=0, LUT12->0x400b51da, capture 0x00000000 MISMATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "774": {
+   "name": "--|--|--|--",
+   "script_name": "(MIX SUB OSC TYPE)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    3
+   ],
+   "default_step": 0
+  },
+  "775": {
+   "name": "PINK|WHITE|--|--",
+   "script_name": "(MIX NOISE TYPE)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    3
+   ],
+   "default_step": 0
+  },
+  "776": {
+   "name": "0..255",
+   "script_name": "(VCO ENV)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "777": {
+   "name": "0..255",
+   "script_name": "(PITCH ATTACK)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "778": {
+   "name": "0..255",
+   "script_name": "(PITCH DECAY)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "779": {
+   "name": "0..255",
+   "script_name": "VCF CUTOFF FREQ",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 6736,
+   "tableId": 22,
+   "transform": "LUT[22][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "VCF CUTOFF FREQ -> LPF Cutoff. rec0 step=60, LUT22->0x3e70f0f1, capture 0x3e70f0f1 MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 255
+  },
+  "780": {
+   "name": "--|--|--|--",
+   "script_name": "(FILTER LPF TYPE)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Non-panel System-8 framework param OR rides engine default (all factory presets at default). Decoded to DB index (range-valid) but not a JUNO-60 panel control.",
+   "range": [
+    0,
+    3
+   ],
+   "default_step": 0
+  },
+  "781": {
+   "name": "0..255",
+   "script_name": "VCF RESONANCE",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 6832,
+   "tableId": 22,
+   "transform": "LUT[22][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "VCF RESONANCE -> LPF Resonance. rec0 step=33, LUT22->0x3e048485, capture 0x3e048485 MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "782": {
+   "name": "0..255",
+   "script_name": "HPF CUTOFF FREQ",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 10240,
+   "tableId": 41,
+   "transform": "LUT[41][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "HPF CUTOFF FREQ -> HPF Cutoff. rec0 step=0, LUT41->0x3b0d8c2e, capture 0x3b0d8c2e MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "783": {
+   "name": "0..255",
+   "script_name": "VCF ENV MOD",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 7392,
+   "tableId": 46,
+   "transform": "LUT[46][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "VCF ENV MOD -> ENV Level (VCF env amount). rec0 step=210, LUT46->0x40d57c89, capture 0x40d57c89 MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "784": {
+   "name": "0..255",
+   "script_name": "ENV1 ATTACK",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 2784,
+   "tableId": 35,
+   "transform": "LUT[35][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "ENV1 ATTACK -> ENV Attack (env block @2784). rec0 step=53, LUT35->0x3e378a96, capture 0x3e378a96 MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "785": {
+   "name": "0..255",
+   "script_name": "ENV1 DECAY",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 2816,
+   "tableId": 38,
+   "transform": "LUT[38][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "ENV1 DECAY -> ENV Decay. rec0 step=120, LUT38->0x3c787c43, capture 0x3c787c43 MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "786": {
+   "name": "0..255",
+   "script_name": "ENV1 SUSTAIN",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 2800,
+   "tableId": 50,
+   "transform": "LUT[50][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "ENV1 SUSTAIN -> ENV Sustain. rec0 step=90, LUT50->0x3f005b8d, capture 0x3f005b8d MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 255
+  },
+  "787": {
+   "name": "0..255",
+   "script_name": "ENV1 RELEASE",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 2832,
+   "tableId": 38,
+   "transform": "LUT[38][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "ENV1 RELEASE -> ENV Release. rec0 step=113, LUT38->0x3c9396ff, capture 0x3c9396ff MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "788": {
+   "name": "0..255",
+   "script_name": "VCF KEY FOLLOW",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 7408,
+   "tableId": 24,
+   "transform": "LUT[24][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "VCF KEY FOLLOW -> KCV Level. rec0 step=193, LUT24->0x3f03060c, capture 0x3f03060c MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "789": {
+   "name": "0..255",
+   "script_name": "ENV2 ATTACK",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 3264,
+   "tableId": 35,
+   "transform": "LUT[35][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "ENV2 ATTACK -> ENV Attack (2nd env block @3264). rec0 step=0, LUT35->0x40638f21, capture 0x40638f21 MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "790": {
+   "name": "0..255",
+   "script_name": "ENV2 DECAY",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 3296,
+   "tableId": 38,
+   "transform": "LUT[38][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "ENV2 DECAY -> ENV Decay. rec0 step=113, LUT38->0x3c9396ff, capture 0x3c9396ff MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "791": {
+   "name": "0..255",
+   "script_name": "ENV2 SUSTAIN",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 3280,
+   "tableId": 50,
+   "transform": "LUT[50][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "ENV2 SUSTAIN -> ENV Sustain. rec0 step=155, LUT50->0x3f42739f, capture 0x3f42739f MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 255
+  },
+  "792": {
+   "name": "0..255",
+   "script_name": "ENV2 RELEASE",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 3312,
+   "tableId": 38,
+   "transform": "LUT[38][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "ENV2 RELEASE -> ENV Release. rec0 step=115, LUT38->0x3c8c549d, capture 0x3c8c549d MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "793": {
+   "name": "0..255",
+   "script_name": "VCA TONE",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 9584,
+   "tableId": 21,
+   "transform": "LUT[21][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "VCA TONE -> AMP TONE. rec0 step=128, LUT21->0x00000000, capture 0x00000000 MATCH",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "794": {
+   "name": "0..255",
+   "script_name": "EFFECT DEPTH",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "host-pushed FX send (not static per-voice LUT)",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "Effect (chorus/character) depth -> host FX param (master_render chorus depth). Host-side, not a per-voice LUT slot.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "795": {
+   "name": "OFF|1..255",
+   "script_name": "REVERB LEVEL",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 10759440,
+   "tableId": "host",
+   "transform": "host-pushed FX send (not static per-voice LUT)",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "Reverb wet send (Rev Ecf Glb Lev @10759440). HOST-PUSHED (red-black tree), NOT static LUT: captured node!=tid21(step). Apply host-side.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "796": {
+   "name": "OFF|1..255",
+   "script_name": "DELAY LEVEL",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 4297760,
+   "tableId": "host",
+   "transform": "host-pushed FX send (not static per-voice LUT)",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "Delay wet send. FX-A DELAY twin @4297760 when DB875=DELAY; host-pushed (curve-22 step/255 used by loader). Instance-dependent.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "797": {
+   "name": "0..255",
+   "script_name": "DELAY TIME",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 4297584,
+   "tableId": "host",
+   "transform": "host-pushed FX send (not static per-voice LUT)",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "Delay time. FX-A DELAY @4297584; host-pushed curve-22. Instance-dependent.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "798": {
+   "name": "OFF|1..255",
+   "script_name": "PORTAMENTO",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 624,
+   "tableId": 7,
+   "transform": "LUT[7][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "PORTAMENTO -> Portamento Time. tableId 7 (NOT tid4 as param_table listed). Portamento OnOff @592 also =1 in rec0. rec0 step=10, LUT7->0x3ad61183, capture 0x3ad61183 MATCH (NOTE: capture 0x3ad61183 is reproduced by BOTH LUT7[10] (step from db-736=10) and LUT4[66]; tid7 with the decoded step 10 is the self-consistent binding and is used. tid4/tid7 differ only in indexing; the off624 value is correct either way.)",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "799": {
+   "name": "OFF|ON",
+   "script_name": "LEGATO",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 608,
+   "tableId": 52,
+   "transform": "switch (semantic: legato/portamento-mode flag -> Portamento Mode @608, or voicemanager legato)",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "OFF|ON; 4/64 presets ON. rec0=0 (capture off608=0.0 consistent but switch round-trip non-unique). Likely the legato/single-trigger flag; Portamento Mode @608 is the best engine candidate but unconfirmed. (Subagent: no inline engine setter; legato fan-out is in the DB/UI layer like the LFO-trig-env slots.)",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 0
+  },
+  "800": {
+   "name": "POLY1|MONO|UNISON|POLY2",
+   "script_name": "ASSIGN MODE",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": {
+    "voicemanager_byte": 1352
+   },
+   "tableId": "voicemanager",
+   "transform": "raw int -> voice-allocator+1352 (sub_7FF91E010D40). 0=POLY1,1=MONO,2=UNISON,3=POLY2",
+   "capture_validated": false,
+   "confidence": "HIGH",
+   "note": "POLY1|MONO|UNISON|POLY2. Not a DSP per-voice LUT (separate voice-manager object, off CP table). Validated cross-preset: all 12 PD pads=POLY1(0), bass presets=MONO(1). Setter sub_7FF91E010D40 stores arg verbatim to +1352.",
+   "range": [
+    0,
+    3
+   ],
+   "default_step": 0
+  },
+  "801": {
+   "name": "1..24",
+   "script_name": "BEND RANGE",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 4128,
+   "tableId": 21,
+   "transform": "LUT[21][step+160]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "BEND RANGE -> Bend Range. SEMITONE transform: engine = LUT21(R+160) = (R+32)/255, R=0..23 semitones (NOT generic LUT21(step)). rec0 step=11+160, LUT21->0x3e2cacad, capture 0x3e2cacad MATCH",
+   "range": [
+    0,
+    23
+   ],
+   "default_step": 11
+  },
+  "802": {
+   "name": "--",
+   "script_name": "(MOD ASIGN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod-routing assign (0..127). All 64 presets=0. Not a JUNO panel param.",
+   "range": [
+    0,
+    127
+   ],
+   "default_step": 0
+  },
+  "803": {
+   "name": "OFF|ON",
+   "script_name": "TEMPO SYNC",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 1056,
+   "tableId": 52,
+   "transform": "switch tid52 (LFO Tempo Rate Sw): gates tempo-synced LFO rate (off1072) in voice_render v74=JF(1056); v76=v74*JF(1072)",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "OFF|ON; 34/64 on. rec0=1 -> capture off1056=1.0 MATCH. DSP-confirmed: off1056 enables the tempo-rate path. (switch value non-unique but offset DSP-proven + value consistent.)",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 0
+  },
+  "804": {
+   "name": "--",
+   "script_name": "(MOD ID 1)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod-matrix ID/param slot; all 64 presets=0. Not a JUNO panel param.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "805": {
+   "name": "--",
+   "script_name": "(MOD ID 2)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod-matrix ID/param slot; all 64 presets=0. Not a JUNO panel param.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "806": {
+   "name": "--",
+   "script_name": "(MOD ID 3)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod-matrix ID/param slot; all 64 presets=0. Not a JUNO panel param.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "807": {
+   "name": "--",
+   "script_name": "(MOD PRM 1)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod-matrix ID/param slot; all 64 presets=0. Not a JUNO panel param.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "808": {
+   "name": "--",
+   "script_name": "(MOD PRM 2)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod-matrix ID/param slot; all 64 presets=0. Not a JUNO panel param.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "809": {
+   "name": "--",
+   "script_name": "(MOD PRM 3)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod-matrix ID/param slot; all 64 presets=0. Not a JUNO panel param.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "810": {
+   "name": "0..255",
+   "script_name": "VCA LEVEL",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "VCA output level (0..255, continuous, full bank spread). No captured per-voice offset reproduces rec0 step=110 via any LUT (candidate 9616=0.93 fails). Likely targets Patch Level (off101072, non-per-voice, outside capture) or a host gain. UNBOUND.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "811": {
+   "name": "DISABLE|ENABLE",
+   "script_name": "VCA LEVEL SW",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 9824,
+   "tableId": 51,
+   "transform": "switch (DISABLE|ENABLE) -> Mute/level-enable @9824 (tid51 inverted)",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "DISABLE|ENABLE; ALL 64 presets=ENABLE(1) -> rides engine default, inaudible to vary. Best candidate Mute@9824 (rec0=1.0). Never varies in factory bank.",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 1
+  },
+  "812": {
+   "name": "--",
+   "script_name": "(OSC1 EXTEND)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 OSC extend flag; all 0. Non-panel.",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 0
+  },
+  "813": {
+   "name": "--",
+   "script_name": "(OSC2 EXTEND)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 OSC extend flag; all 0. Non-panel.",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 0
+  },
+  "814": {
+   "name": "name",
+   "script_name": "name",
+   "decode": {
+    "block": "name_arp_block (16-char name DB814..815 at decoded 78..93; arp/jack stride-4 at decoded 149/153/157,161,165)",
+    "position_formula": "16-char name at decoded 78..93"
+   },
+   "engine_offset": null,
+   "tableId": "name",
+   "transform": "16-byte ASCII preset name (not an engine param)",
+   "capture_validated": false,
+   "confidence": "HIGH",
+   "note": "Preset name field. Decoded positions 78..93 spell the ASCII name. Display only.",
+   "range": null,
+   "default_step": null
+  },
+  "815": {
+   "name": "name(cont)",
+   "script_name": "name",
+   "decode": {
+    "block": "name_arp_block (16-char name DB814..815 at decoded 78..93; arp/jack stride-4 at decoded 149/153/157,161,165)",
+    "position_formula": "decoded 78..93"
+   },
+   "engine_offset": null,
+   "tableId": "name",
+   "transform": "name continuation",
+   "capture_validated": false,
+   "confidence": "HIGH",
+   "note": "Second half of the 16-char name field.",
+   "range": null,
+   "default_step": null
+  },
+  "816": {
+   "name": "(INPUT JACK USING)",
+   "script_name": "(INPUT JACK USING)",
+   "decode": {
+    "block": "name_arp_block (16-char name DB814..815 at decoded 78..93; arp/jack stride-4 at decoded 149/153/157,161,165)",
+    "position_formula": "serialized (int8x4)"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Input-jack routing bitmask. Non-panel host config.",
+   "range": [
+    0,
+    65535
+   ],
+   "default_step": 0
+  },
+  "817": {
+   "name": "ARPEGGIO SW",
+   "script_name": "ARPEGGIO SW",
+   "decode": {
+    "block": "name_arp_block (16-char name DB814..815 at decoded 78..93; arp/jack stride-4 at decoded 149/153/157,161,165)",
+    "position_formula": "decoded 149 (record byte 298)"
+   },
+   "engine_offset": {
+    "arp_driver": "ARPEGGIO SW"
+   },
+   "tableId": "arp",
+   "transform": "arp-driver setter (see src/arp.c / juno_preset.c)",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "arp_on; deserializer byte 298; =1 for the 7 SQ presets. rec0=0. Decode proven by deserializer hardcoded record bytes + ARP SW=1 correlating exactly with the 7 SQ presets.",
+   "range": [
+    0,
+    -1
+   ],
+   "default_step": 0
+  },
+  "818": {
+   "name": "ARPEGGIO TYPE",
+   "script_name": "ARPEGGIO TYPE",
+   "decode": {
+    "block": "name_arp_block (16-char name DB814..815 at decoded 78..93; arp/jack stride-4 at decoded 149/153/157,161,165)",
+    "position_formula": "decoded 153 (record byte 306)"
+   },
+   "engine_offset": {
+    "arp_driver": "ARPEGGIO TYPE"
+   },
+   "tableId": "arp",
+   "transform": "arp-driver setter (see src/arp.c / juno_preset.c)",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "arp mode: 0=UP->set_mode15,1=UP&DOWN->17,>=2=DOWN->16; byte 306. rec0=0. Decode proven by deserializer hardcoded record bytes + ARP SW=1 correlating exactly with the 7 SQ presets.",
+   "range": [
+    0,
+    -1
+   ],
+   "default_step": 0
+  },
+  "819": {
+   "name": "ARPEGGIO STEP/RANGE",
+   "script_name": "ARPEGGIO STEP",
+   "decode": {
+    "block": "name_arp_block (16-char name DB814..815 at decoded 78..93; arp/jack stride-4 at decoded 149/153/157,161,165)",
+    "position_formula": "decoded 157 (record byte 314)"
+   },
+   "engine_offset": {
+    "arp_driver": "ARPEGGIO STEP/RANGE"
+   },
+   "tableId": "arp",
+   "transform": "arp-driver setter (see src/arp.c / juno_preset.c)",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "octave RANGE (not rate): 0=1oct,1=2oct,>=2=3oct -> set_range arg; byte 314. rec0=0. Decode proven by deserializer hardcoded record bytes + ARP SW=1 correlating exactly with the 7 SQ presets.",
+   "range": [
+    0,
+    -1
+   ],
+   "default_step": 0
+  },
+  "820": {
+   "name": "SCATTER TYPE",
+   "script_name": "SCATTER TYPE",
+   "decode": {
+    "block": "name_arp_block (16-char name DB814..815 at decoded 78..93; arp/jack stride-4 at decoded 149/153/157,161,165)",
+    "position_formula": "arp stride-4 region (decoded ~161/165 for octave/hold)"
+   },
+   "engine_offset": {
+    "arp_driver": "SCATTER TYPE"
+   },
+   "tableId": "arp",
+   "transform": "arp-driver setter",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "Arpeggiator panel param in the stride-4 PAT_NAME1 block. OCTAVE SHIFT/KEY HOLD decoded at 161/165 (deserializer bytes 338/346). SCATTER is System-8 arp extension.",
+   "range": "0,9",
+   "default_step": null
+  },
+  "821": {
+   "name": "SCATTER DEPTH",
+   "script_name": "SCATTER DEPTH",
+   "decode": {
+    "block": "name_arp_block (16-char name DB814..815 at decoded 78..93; arp/jack stride-4 at decoded 149/153/157,161,165)",
+    "position_formula": "arp stride-4 region (decoded ~161/165 for octave/hold)"
+   },
+   "engine_offset": {
+    "arp_driver": "SCATTER DEPTH"
+   },
+   "tableId": "arp",
+   "transform": "arp-driver setter",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "Arpeggiator panel param in the stride-4 PAT_NAME1 block. OCTAVE SHIFT/KEY HOLD decoded at 161/165 (deserializer bytes 338/346). SCATTER is System-8 arp extension.",
+   "range": "-5,5",
+   "default_step": null
+  },
+  "822": {
+   "name": "OCTAVE SHIFT",
+   "script_name": "OCTAVE SHIFT",
+   "decode": {
+    "block": "name_arp_block (16-char name DB814..815 at decoded 78..93; arp/jack stride-4 at decoded 149/153/157,161,165)",
+    "position_formula": "arp stride-4 region (decoded ~161/165 for octave/hold)"
+   },
+   "engine_offset": {
+    "arp_driver": "OCTAVE SHIFT"
+   },
+   "tableId": "arp",
+   "transform": "arp-driver setter",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "Arpeggiator panel param in the stride-4 PAT_NAME1 block. OCTAVE SHIFT/KEY HOLD decoded at 161/165 (deserializer bytes 338/346). SCATTER is System-8 arp extension.",
+   "range": "-3,3",
+   "default_step": null
+  },
+  "823": {
+   "name": "KEY HOLD",
+   "script_name": "KEY HOLD",
+   "decode": {
+    "block": "name_arp_block (16-char name DB814..815 at decoded 78..93; arp/jack stride-4 at decoded 149/153/157,161,165)",
+    "position_formula": "arp stride-4 region (decoded ~161/165 for octave/hold)"
+   },
+   "engine_offset": {
+    "arp_driver": "KEY HOLD"
+   },
+   "tableId": "arp",
+   "transform": "arp-driver setter",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "Arpeggiator panel param in the stride-4 PAT_NAME1 block. OCTAVE SHIFT/KEY HOLD decoded at 161/165 (deserializer bytes 338/346). SCATTER is System-8 arp extension.",
+   "range": "0,1",
+   "default_step": null
+  },
+  "824": {
+   "name": "4 char",
+   "script_name": "(LFO CV IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    -1
+   ],
+   "default_step": 0
+  },
+  "825": {
+   "name": "4 char",
+   "script_name": "(LFO RING IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    -1
+   ],
+   "default_step": 0
+  },
+  "826": {
+   "name": "4 char",
+   "script_name": "(LFO PITCH IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    -1
+   ],
+   "default_step": 0
+  },
+  "827": {
+   "name": "4 char",
+   "script_name": "(LFO FILTER IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    -1
+   ],
+   "default_step": 0
+  },
+  "828": {
+   "name": "4 char",
+   "script_name": "(LFO AMP IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    -1
+   ],
+   "default_step": 0
+  },
+  "829": {
+   "name": "4 char",
+   "script_name": "(OSC1 X-MOD IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    -1
+   ],
+   "default_step": 0
+  },
+  "830": {
+   "name": "0..65535 (max 16 jacks)",
+   "script_name": "(OSC2 SYNC IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    65535
+   ],
+   "default_step": 0
+  },
+  "831": {
+   "name": "OFF|ON",
+   "script_name": "(OSC2 RING IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 0
+  },
+  "832": {
+   "name": "0..5",
+   "script_name": "(OSC3 EXT IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 0
+  },
+  "833": {
+   "name": "0..5",
+   "script_name": "(P ENV GATE IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 0
+  },
+  "834": {
+   "name": "1..10",
+   "script_name": "(PITCH ENV IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    9
+   ],
+   "default_step": 0
+  },
+  "835": {
+   "name": "-5..+5",
+   "script_name": "(F ENV GATE IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    -5,
+    5
+   ],
+   "default_step": 0
+  },
+  "836": {
+   "name": "-3..+3",
+   "script_name": "(FILTER ENV IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    -3,
+    3
+   ],
+   "default_step": 0
+  },
+  "837": {
+   "name": "OFF|ON",
+   "script_name": "(A ENV GATE IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 0
+  },
+  "838": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "(AMP ENV IN)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736 (jacks read 0 in factory banks)"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "839": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "LFO CV GAIN",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod/CV routing slot (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0. Non-panel.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "840": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "(F ENV VARIATION)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod/CV routing slot (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0. Non-panel.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "841": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "VCA MODE",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod/CV routing slot (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0. Non-panel.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "842": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "CONDITION",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod/CV routing slot (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0. Non-panel.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "843": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "BEND GAIN",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": {
+    "driver": "bend depth = BendLevel(4112)*BendRange(4128), gated by Bend Enable(3872)"
+   },
+   "tableId": "host",
+   "transform": "0..3 bend gain -> panel scaling of the bend Range x Level product (no distinct engine coefficient)",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "BEND GAIN (0..3). DSP (bend pitch sum) uses lerp(BendLevel@4112, coeff@3680, GrifferBendSW@3856)*BendRange@4128 gated by Bend Enable@3872 -> no separate engine LUT slot; the panel gain scales the Range x Level product. Factory bank=0.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "844": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "BEND SENS DCO",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 4128,
+   "tableId": 21,
+   "transform": "LUT[21][step+128]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "BEND SENS DCO -> Bend Range/Sens (off4128, tid21, LUT21[step+128]). Capture off4128=0x3e2cacad (43/255) round-trips at step+128=171. NOTE: shares off4128 with DB801 BEND RANGE (the bend depth scalar); factory bank reads 0 in block1 (rides engine default 43). Offset+tid DSP+capture proven.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "845": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "BEND SENS VCF",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 7472,
+   "tableId": 21,
+   "transform": "LUT[21][step+128]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "BEND SENS VCF -> off7472 (VCF bend range), tid21 LUT21[step+128]. Capture off7472=0x3e2cacad (43/255) at step+128=171. Factory bank=0 in block1 (default-riding). Proven.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "846": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "MOD SENS DCO",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 3984,
+   "tableId": 22,
+   "transform": "LUT[22][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "MOD SENS DCO -> off3984, tid22 = pure step/255. Capture off3984=0x3db0b0b1 (22/255) == LUT22[22]. Factory bank=0 in block1 (default-riding). DSP+capture proven.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "847": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "MOD SENS VCF",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": 7360,
+   "tableId": 22,
+   "transform": "LUT[22][step]",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "MOD SENS VCF -> off7360, tid22 = pure step/255. Capture off7360=0x3f5cdcdd (220/255) == LUT22[220] (engine default). Factory bank=0 in block1 (default-riding). DSP+capture proven.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "848": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "(LFO VARIATION)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod/CV routing slot (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0. Non-panel.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "849": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "LFO TRIG ENV",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod/CV routing slot (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0. Non-panel.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "850": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "(OSC1 VARIATION)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod/CV routing slot (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0. Non-panel.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "851": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "(OSC1 COARSE TUNE)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod/CV routing slot (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0. Non-panel.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "852": {
+   "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
+   "script_name": "(OSC1 FINE TUNE)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": null,
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "System-8 mod/CV routing slot (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0. Non-panel.",
+   "range": [
+    0,
+    13
+   ],
+   "default_step": 0
+  },
+  "853": {
+   "name": "x0.0 (0)..x1.0 (128)..x2.0 (255)",
+   "script_name": "(OSC2 VARIATION)",
+   "decode": {
+    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
+    "position_formula": "db-736"
+   },
+   "engine_offset": null,
+   "tableId": null,
+   "transform": "x0.0..x2.0 gain (def128=x1.0)",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "A gain multiplier (def 128 = x1.0). All factory presets=128 (untouched). Non-panel or rides default.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "854": {
+   "name": "1|2|3",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "3-way selector",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "1|2|3 selector (range 0..2), all factory=0. block2 pos 241. Unidentified global mode.",
+   "range": [
+    0,
+    2
+   ],
+   "default_step": 0
+  },
+  "855": {
+   "name": "ENV1|ENV2|GATE",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": {
+    "one_hot": {
+     "10176": "?",
+     "10192": "?",
+     "10208": "ENV2/GATE"
+    }
+   },
+   "tableId": "demux",
+   "transform": "ENV1|ENV2|GATE -> one-hot weights 10176/10192/10208 (VCA env-source select; voice_render v354=JF(10176),v349*JF(10192),v356=JF(10208))",
+   "capture_validated": true,
+   "confidence": "MED",
+   "note": "ENV1|ENV2|GATE. rec0 DB855=1(ENV2) and capture has 10192=0,10208=1.0,10176=0 -> value1 maps to 10208=1.0 (validated point). Full 3-way one-hot order (which value->10176 vs 10192) needs the setter trace; only the ENV2->10208 point is capture-proven. (Subagent confirmed: 10176/10192/10208 are 3 INDEPENDENT engine params written via the generic descriptor +32 path; the mode->one-hot fan-out lives in the DB/UI layer, not a traceable C switch. DSP: 10176xoff9936 / 10192xoff2752 / 10208xoff10048 are 3 VCA-source mix gains.)",
+   "range": [
+    0,
+    2
+   ],
+   "default_step": 1
+  },
+  "856": {
+   "name": "-128..+127",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "-128..+127 bipolar (def128=center)",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Bipolar global param (def center). block2 pos 249, rec0=128.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "857": {
+   "name": "x1|x2|x3|x4",
+   "script_name": "HPF TYPE",
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "x1|x2|x3|x4 selector",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "x1|x2|x3|x4 (range 0..3, def0). Mission labels this HPF TYPE; spec is a x1..x4 multiplier (likely an HPF/oversample mode). All factory=0. block2 pos 253. Host/driver selector, not per-voice LUT.",
+   "range": [
+    0,
+    3
+   ],
+   "default_step": 0
+  },
+  "858": {
+   "name": "0..255",
+   "script_name": "(FILTER TYPE)",
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "0..255 continuous",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "global level/time (def43). block2 pos 257, rec0=43. Global/FX continuous field; host-side. Mission flags DB860 as EFFECT TONE.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 43
+  },
+  "859": {
+   "name": "0..255",
+   "script_name": "EFFECT TYPE",
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "0..255 continuous",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "global level/time (def43). block2 pos 261, rec0=43. Global/FX continuous field; host-side. Mission flags DB860 as EFFECT TONE.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 43
+  },
+  "860": {
+   "name": "0..255",
+   "script_name": "EFFECT TONE",
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "0..255 continuous",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "EFFECT TONE / global (def22). block2 pos 265, rec0=22. Global/FX continuous field; host-side. Mission flags DB860 as EFFECT TONE.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 22
+  },
+  "861": {
+   "name": "0..255",
+   "script_name": "DELAY TYPE",
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "0..255 continuous",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "global (def22). block2 pos 269, rec0=22. Global/FX continuous field; host-side. Mission flags DB860 as EFFECT TONE.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 22
+  },
+  "862": {
+   "name": "1|2|3",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "3-way",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "1|2|3 selector, all factory=0. block2 pos 273.",
+   "range": [
+    0,
+    2
+   ],
+   "default_step": 0
+  },
+  "863": {
+   "name": "OFF|ON",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "switch",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "OFF|ON global switch. block2 pos 277.",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 0
+  },
+  "864": {
+   "name": "1|2",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "2-way",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "1|2 selector, all factory=0. block2 pos 281.",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 0
+  },
+  "865": {
+   "name": "-11..+11",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "semitone",
+   "transform": "-11..+11 (bias -11; bridge case)",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "Coarse transpose -11..+11 (all 64=11 -> 0 after bias). Bridge switch case biases by -11. block2 pos 285.",
+   "range": [
+    0,
+    22
+   ],
+   "default_step": 11
+  },
+  "866": {
+   "name": "0..255",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "0..255 (def128)",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Global continuous (def128 center, all 64=128). block2 pos 289.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "867": {
+   "name": "1|2",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "2-way",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "1|2 selector, all factory=0. block2 pos 293.",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 0
+  },
+  "868": {
+   "name": "-2OCT SIN|-1OCT SIN|SIN|TRI|-1OCT TRI|-2OCT TRI",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "6-way sub-osc wave selector",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "-2OCT SIN|-1OCT SIN|SIN|TRI|-1OCT TRI|-2OCT TRI. Corrected stride-4 decode gives valid 0..5 (old +200 gave invalid 0..255). block2 pos 297, rec0=0.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 0
+  },
+  "869": {
+   "name": "0..255",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": null,
+   "tableId": "host",
+   "transform": "0..255",
+   "capture_validated": false,
+   "confidence": "LOW",
+   "note": "Global continuous (def0, all 64=0). block2 pos 301.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 0
+  },
+  "870": {
+   "name": "-1200CENT..+1200CENT",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": 368,
+   "tableId": 6,
+   "transform": "LUT[6][step] (Master Tune, -1200..+1200 cent, def128 center)",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "Master Tune. All 64 presets=128 (center) -> capture off368=0.0 (LUT6[128]=0). pos 305. Bridge-confirmed pid3 @368.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "871": {
+   "name": "        JUNO-60 (0)|JUNO-106 (1)",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": {
+    "driver": "model_selector"
+   },
+   "tableId": "host",
+   "transform": "booleanize (bridge case 871: v=(a3!=0)); 0=JUNO-60,1=JUNO-106",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "JUNO-60(0)|JUNO-106(1). All 64 factory=JUNO-60(0). pos 309. Driver model selector.",
+   "range": [
+    0,
+    1
+   ],
+   "default_step": 0
+  },
+  "872": {
+   "name": "LPF -24dB|LPF -18dB|LPF -12dB|HPF -12dB|HPF -18dB|HPF -24dB",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": {
+    "driver": "filter_type"
+   },
+   "tableId": "host",
+   "transform": "LPF-24/-18/-12|HPF-12/-18/-24 slope selector",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "Filter type. All factory=LPF-24(0) (JUNO 4-pole). pos 313. Driver/DSP filter-slope selector.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 0
+  },
+  "873": {
+   "name": "OVERDRIVE|DISTORTION|JUNO CH1|JUNO CH2|CRUSHER|PHASER",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": {
+    "driver": "chorus_mode (master_render host-params +136/+112)"
+   },
+   "tableId": "host",
+   "transform": "OVERDRIVE|DISTORTION|JUNO CH1|JUNO CH2|CRUSHER|PHASER; mode0=bypass",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "Effect/chorus selector. rec0=2=JUNO CH1 (JUNO-60 Chorus I). pos 317. Drives master_render chorus_mode.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 2
+  },
+  "874": {
+   "name": "0..255",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": {
+    "driver": "effect_amount"
+   },
+   "tableId": "host",
+   "transform": "0..255 drive/character depth for DB873",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "Drive/character amount for the DB873 effect. pos 321, rec0=78.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  },
+  "875": {
+   "name": "DELAY|PAN DELAY|CHORUS 1|CHORUS 2|FLANGER|DELAY+CHORUS",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": {
+    "driver": "fxa_type (System-8 FX-A slot, params+136)"
+   },
+   "tableId": "host",
+   "transform": "DELAY|PAN DELAY|CHORUS1|CHORUS2|FLANGER|DELAY+CHORUS",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "FX-A modulation/delay slot. rec0=0=DELAY (loader sets v39 mode int=1). pos 325.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 0
+  },
+  "876": {
+   "name": "AMBIENCE|ROOM|HALL 1|HALL 2|PLATE|MODULATION",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": {
+    "driver": "reverb_type"
+   },
+   "tableId": "host",
+   "transform": "AMBIENCE|ROOM|HALL1|HALL2|PLATE|MODULATION",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "Reverb type. rec0=3=HALL2. pos 329. The block-2 alignment anchor.",
+   "range": [
+    0,
+    5
+   ],
+   "default_step": 2
+  },
+  "877": {
+   "name": "0..255",
+   "script_name": null,
+   "decode": {
+    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
+    "position_formula": "309+(db-871)*4"
+   },
+   "engine_offset": {
+    "driver": "reverb_time"
+   },
+   "tableId": "host",
+   "transform": "0..255 reverb time/level",
+   "capture_validated": false,
+   "confidence": "MED",
+   "note": "Reverb time/level. pos 333, rec0=170. Host reverb param.",
+   "range": [
+    0,
+    255
+   ],
+   "default_step": 128
+  }
+ }
+}
