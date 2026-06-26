@@ -1,6 +1,11 @@
-/* runtime_coeffs_data.c — the parameter-applied coefficients the DSP reads but no
- * static init writes, CAPTURED from the live plugin (memory-scanned engine state)
- * for preset "PD The Juno Pad", chorus mode II, 96 kHz. MEASUREMENTS, not fitted.
+/* runtime_coeffs_data.c — parameter-applied coefficients the DSP reads but no
+ * static init writes. ORIGIN: memory-captured from the live plugin for preset
+ * "PD The Juno Pad", chorus mode II, 96 kHz. This is a CAPTURE and is being
+ * eliminated coefficient-by-coefficient (docs/PROVENANCE_CORRECTION.md):
+ *   - 98 shared FX filter templates: now applied capture-free from .rdata via
+ *     juno_fx_filter_coeffs_apply() (src/juno_fx_filter_coeffs.c). REMOVED here.
+ *   - remaining 181 offsets: still capture-sourced (voice LUT params + reverb
+ *     tank + switches) pending decompile transcription.
  *
  * Derived rigorously from the full state dump: every offset voice_render/master
  * READS where the live plugin differs from our (chorus_init+engine_init) state AND
@@ -48,32 +53,12 @@ static const juno_coeff k[] = {
   {9872,0x3f7fff70u}, {9904,0x039da956u}, {9920,0x039da956u}, {9936,0x039da956u}, /* ~9.26651e-37 */
   {10048,0x0700f964u}, {10080,0x80000000u}, {10208,0x3f800000u}, {10240,0x3b0d8c2eu}, /* ~0.00215984 */
   {10288,0x3f800000u}, {10304,0x3f800000u}, {10320,0x3f800000u}, {10432,0x02800b23u}, /* ~1.88143e-37 */
-  {10448,0x02800b23u}, {84448,0x3f800000u}, {84464,0x3f800000u}, {84480,0x3f800000u}, /* ~1 */
-  {84496,0x3f800000u}, {84544,0x3f800000u}, {84560,0x3f800000u}, {85152,0x41008081u}, /* ~8.03137 */
-  {91120,0x3c0e0000u}, {91136,0x3f77b282u}, {91152,0x3727c5acu}, {91168,0x3f800000u}, /* ~1 */
-  {91184,0x3b83126fu}, {91200,0x3a8d5a27u}, {91216,0x3fa66666u}, {91232,0x3f95c28fu}, /* ~1.17 */
-  {91248,0x37ffd974u}, {91264,0x3f800000u}, {91280,0x3f800000u}, {96336,0x3c1abc15u}, /* ~0.00944426 */
-  {96352,0x37e6c674u}, {96368,0x3b442984u}, {96384,0x37ffd974u}, {96400,0x3f800000u}, /* ~1 */
-  {96416,0x3f800000u}, {101072,0x3e863babu}, {101136,0x3f800000u}, {101152,0x3e77a5b3u}, /* ~0.241843 */
-  {101744,0x3f800000u}, {102352,0x400c9e00u}, {102368,0x3e1b31ceu}, {102416,0x3fb07de6u}, /* ~1.37884 */
-  {102432,0xbf07c840u}, {102464,0x3e52bdc7u}, {102480,0x3fb50bf3u}, {102496,0x3f800000u}, /* ~1 */
-  {102512,0x3f800000u}, {102608,0x3bab929au}, {102624,0x3f800000u}, {102640,0x3f800000u}, /* ~1 */
-  {102656,0x3f4ba5b0u}, {102672,0x3f800000u}, {102688,0x3f800000u}, {4297584,0x3ee0f001u}, /* ~0.439331 */
-  {4297600,0x3e1b31ceu}, {4297648,0x3fb07de6u}, {4297664,0xbf07c840u}, {4297696,0x3e52bdc7u}, /* ~0.205802 */
-  {4297712,0x3fb50bf3u}, {4297728,0x3f800000u}, {4297744,0x3f800000u}, {4297760,0x3f800000u}, /* ~1 */
-  {4297792,0x3efefeffu}, {4297808,0x3ed8d8d9u}, {4297824,0x3f800000u}, {4297856,0x3f800000u}, /* ~1 */
-  {4297888,0x40000000u}, {4297904,0x3bab929au}, {4297920,0x3f800000u}, {4297936,0x3f800000u}, /* ~1 */
-  {4297952,0x3f4ba5b0u}, {4297968,0x3f800000u}, {4297984,0x3f800000u}, {6395312,0xc0aa6a6au}, /* ~-5.32549 */
-  {6395328,0x3f800000u}, {6396128,0x3d6f8001u}, {6396160,0x3f000000u}, {6396176,0x3f800000u}, /* ~1 */
-  {6396192,0x3f03df74u}, {6396208,0x3f83df74u}, {6396224,0x3f03df74u}, {6396240,0xbee549c0u}, /* ~-0.447828 */
-  {6396256,0xbf1cd8f1u}, {6396288,0x3f4ba5b0u}, {6396304,0x3fb50bf3u}, {6396320,0x3f800000u}, /* ~1 */
-  {6396336,0x3ad6774fu}, {6396352,0x3f800000u}, {6396368,0x3f800000u}, {6396384,0x3f800000u}, /* ~1 */
-  {6396400,0x37ffd974u}, {6396432,0x3f800000u}, {6396448,0x3f800000u}, {6396480,0x3f800000u}, /* ~1 */
-  {6396496,0x3f353f7du}, {6396512,0x3fb4dd2fu}, {6497168,0x400c9e00u}, {6497184,0x3e1b31ceu}, /* ~0.151557 */
-  {6497232,0x3fb07de6u}, {6497248,0xbf07c840u}, {6497280,0x3e52bdc7u}, {6497296,0x3fb50bf3u}, /* ~1.41443 */
-  {6497312,0x3f800000u}, {6497328,0x3f800000u}, {6497344,0x3ec0c0c1u}, {6497376,0x3ed8d8d9u}, /* ~0.423529 */
-  {6497392,0x3f800000u}, {6497424,0x3bab929au}, {6497440,0x3f800000u}, {6497456,0x3f800000u}, /* ~1 */
-  {6497472,0x3f4ba5b0u}, {6497488,0x3f800000u}, {6497504,0x3f800000u}, {10692016,0xc0bafafbu}, /* ~-5.84314 */
+  {10448,0x02800b23u}, /* ~1 */
+  {101072,0x3e863babu}, /* ~0.241843 */
+  {4297584,0x3ee0f001u}, /* ~0.439331 */
+  {4297760,0x3f800000u}, /* ~1 */
+  {6395312,0xc0aa6a6au}, /* ~-5.32549 */
+  {10692016,0xc0bafafbu}, /* ~-5.84314 */
   {10692032,0x3f800000u}, {10693008,0x3d6f8001u}, {10693040,0x3f000000u}, {10693056,0x3f008081u}, /* ~0.501961 */
   {10693072,0x3f03df74u}, {10693088,0x3f83df74u}, {10693104,0x3f03df74u}, {10693120,0xbee549c0u}, /* ~-0.447828 */
   {10693136,0xbf1cd8f1u}, {10693168,0x3f4ba5b0u}, {10693184,0x3fb50bf3u}, {10693200,0x3f800000u}, /* ~1 */
@@ -104,6 +89,10 @@ void juno_runtime_coeffs_apply(unsigned char *st)
                 JF(st, k[i].off + v * JUNO_VOICE_MAIN_STRIDE) = f;
         }
     }
+    /* The 98 shared FX filter-coefficient templates (chorus/delay/FX-A/effect)
+     * are no longer in k[] — they are now applied capture-free from the binary's
+     * .rdata via this call, preserving identical engine state. */
+    juno_fx_filter_coeffs_apply(st);
 }
 
 int juno_runtime_coeffs_loaded(void)

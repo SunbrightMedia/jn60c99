@@ -77,6 +77,14 @@ void juno_runtime_coeffs_apply(unsigned char *st);
  * else 0 (placeholder). The driver gates the master/chorus vs dry path on this. */
 int juno_runtime_coeffs_loaded(void);
 
+/* juno_fx_filter_coeffs_apply — capture-free seed for the shared FX filter
+ * coefficient templates (chorus/delay/FX-A/effect blocks): 98 offsets, every
+ * value the binary's invariant FX-selector coefficient sourced from .rdata
+ * (provenance verified in data_sections/seg_rdata_935650.bin). These offsets
+ * were removed from the former PD-Juno-Pad memory capture. Called by
+ * juno_runtime_coeffs_apply. See src/juno_fx_filter_coeffs.c. */
+void juno_fx_filter_coeffs_apply(unsigned char *st);
+
 /* voice_render — exact transcription of sub_180369070. Produces one mono sample
  * for one voice from its state block `st`; writes it to *outL and *outR (the
  * plugin duplicates the mono voice to both channels; stereo comes from chorus).
