@@ -143,6 +143,20 @@ int juno_preset_load(unsigned char *st, const char *bank_path, int record,
       s = step_synth(dec,ndec,794); if (s>=0 && s<=255) juno_param_apply_value(st, 102576, (float)s/255.0f, 0);
     }
 
+    /* DB855 VCA ENV SELECT (panel "GATE / ENV-2 / ENV-1"): 0=ENV1, 1=ENV2, 2=GATE.
+     * One-hot demux into the VCA env switches 10192 (ENV1) / 10208 (ENV2) / 10176
+     * (GATE) consumed at voice_render.c:1548-1554. Block-2 decode (step_fx; the
+     * 309+(db-871)*4 formula extends to the whole DB838-877 stride-4 block).
+     * Validated: rec0 DB855=1 -> 10208=1,10192=0,10176=0, matching the capture.
+     * Most factory presets = ENV2 (the engine default); some use GATE. Per-voice. */
+    { int s = step_fx(dec,ndec,855);
+      if (s >= 0){
+        juno_param_apply_value(st, 10192, (s==0)?1.0f:0.0f, 1);  /* ENV1 */
+        juno_param_apply_value(st, 10208, (s==1)?1.0f:0.0f, 1);  /* ENV2 (default) */
+        juno_param_apply_value(st, 10176, (s>=2)?1.0f:0.0f, 1);  /* GATE */
+      }
+    }
+
     juno_chorus_set_rates(st);   /* capture-free JUNO chorus I/II rates */
     if (info) info->applied=applied;
     free(dec); free(rec);
