@@ -876,15 +876,19 @@
    "name": "OFF|1..255",
    "script_name": "REVERB LEVEL",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block1_synth (pos=db-736 nibble stream)",
+    "position_formula": "db-736",
+    "rec0_step": 177,
+    "rec1_step": 195
    },
    "engine_offset": 10759440,
-   "tableId": "host",
-   "transform": "host-pushed FX send (not static per-voice LUT)",
-   "capture_validated": false,
-   "confidence": "MED",
-   "note": "Reverb wet send (Rev Ecf Glb Lev @10759440). HOST-PUSHED (red-black tree), NOT static LUT: captured node!=tid21(step). Apply host-side.",
+   "tableId": 22,
+   "transform": "curve22 = step/255 (dword_7FF91E5CD2E0[step], bit-exact)",
+   "capture_validated": true,
+   "confidence": "RESOLVED-NEGATIVE",
+   "note": "CORRECTED. Node 10759440 ('Rev Ecf Glb Lev', CDSPRev internal node id 0x447) is the ECF reverb's INTERNAL global level. In state_t0/t1 it = 0x3efefeff = curve22(127) = 127/255. That 127 is the HARDCODED ENGINE INIT DEFAULT set by the ECF-reverb constructor sub_7FF91E01CCC0 @rva 0x3BCCC0 (decomp_380000.c:25902: vtable+120(self,1,127) -> reverb-level setter sub_7FF91E021240 @rva 0x3C1240 -> curve22 -> node 0x447). It is NOT driven by DB795. PROOF: state_t0/t1 pinned to bank record 1 (SQ Dynamic ARPG) via the delay send (DB796 DELAY LEVEL=96 -> node 6497344 = 0x3ec0c0c1 = curve22(96), bit-exact identity). Record 1 DB795=195; curve22(195)=0x3f43c3c4=195/255 appears at ZERO offsets in the entire 12MB engine dump, and 127 is independent of DB795 (rec0=177, rec1=195, engine always 127 default). => The patch REVERB LEVEL knob does NOT write node 10759440. The earlier 'host-side red-black tree' claim was a misattribution: the E910E18 RB-tree maps ParamID->NAME STRING (e.g. key 0x447 -> char* 'fm.PATCH3.SEQ_STEP59...'), not ParamID->engine-index. The port's juno_preset.c:124 (DB795->10759440 identity) is WRONG and should be removed; REVERB LEVEL routes to the master reverb send mixer (not stored as a 0..1 node in this DSP-coefficient dump). DELAY LEVEL (DB796) IS the validated identity send.",
+   "engine_init_default_step": 127,
+   "engine_init_fn": "sub_7FF91E01CCC0 @rva 0x3BCCC0 (decomp_380000.c:25896-25902)",
    "range": [
     0,
     255
@@ -908,7 +912,16 @@
     0,
     255
    ],
-   "default_step": 0
+   "default_step": 0,
+   "delay_send_resolved": {
+    "engine_offset": 6497344,
+    "name": "Wet Level (FX-A delay, idx1054)",
+    "tableId": 22,
+    "transform": "curve22 = step/255, IDENTITY",
+    "capture_validated": true,
+    "proof": "state_t0/t1 (=bank rec1 SQ ARPG) node 6497344 = 0x3ec0c0c1 = curve22(96); rec1 DB796=96. bit-exact.",
+    "note": "FX-A=delay for rec1 (selector DB875/FXA=0). This is the live delay wet send; reverb/chorus sends are NOT stored as 0..1 nodes in the DSP dump."
+   }
   },
   "797": {
    "name": "0..255",
