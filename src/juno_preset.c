@@ -124,6 +124,25 @@ int juno_preset_load(unsigned char *st, const char *bank_path, int record,
     { int s = step_synth(dec,ndec,795);
       if (s>=0 && s<=255) juno_param_apply_lut(st, 10759440, 22, s, 0); }
 
+    /* The final three (EditController/host-layer params, now resolved + capture-
+     * validated bit-exact; refs/db_engine_map_full.json). */
+    { int s;
+      /* DB754 VCF LFO MOD -> 7344 "LFO Level" (VCF block), tableId 47 (bipolar,
+       * step 128 = 0 = off; ±3.642 at extremes). Per-voice. PROVEN: rec0 step 140
+       * -> 0x3c94d734 = table47[140]. Adds the LFO term to the cutoff accumulator
+       * (voice_render.c:1190-1192). (The old 4160 guess was the PWM block, not VCF.) */
+      s = step_synth(dec,ndec,754); if (s>=0 && s<=255) juno_param_apply_lut(st, 7344, 47, s, 1);
+      /* DB810 VCA LEVEL -> 101072 "Patch Level" (master), tableId 49 dB curve
+       * (10^(step/255)-1)/9*4.1349; PROVEN: step 110 -> 0x3f47f3aa. Master output
+       * level (normalized out of peak-normalized renders, bound for completeness).
+       * NB: 10320 "AMP LEVEL" is a per-voice analog gain-cal constant, not this. */
+      s = step_synth(dec,ndec,810); if (s>=0 && s<=255) juno_param_apply_lut(st, 101072, 49, s, 0);
+      /* DB794 EFFECT DEPTH -> 102576 FX-A wet/dry crossfade = step/255 (proven by
+       * the FX-A sibling slots 102528=20/255, 102560=108/255). Used by chorus-mode
+       * FX-A; delay-type FX-A uses its own On/Off (4297824). Master node. */
+      s = step_synth(dec,ndec,794); if (s>=0 && s<=255) juno_param_apply_value(st, 102576, (float)s/255.0f, 0);
+    }
+
     juno_chorus_set_rates(st);   /* capture-free JUNO chorus I/II rates */
     if (info) info->applied=applied;
     free(dec); free(rec);
