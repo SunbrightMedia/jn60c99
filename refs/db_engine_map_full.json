@@ -5,7 +5,7 @@
   "decode_blocks": {
    "block1_synth": "pos = db-736 on the full-record nibble stream (value=byte[2k]*16+byte[2k+1]). Stride-1. Range-fit 100% for DB750..813 and DB830..853. VALIDATED bit-exact (rec0 SY Poly Synth, 23/24 pure-LUT params round-trip; DB773 noise via byte-0 gate).",
    "name_arp": "16-char name at decoded 78..93 (DB814/815). Arp/jack stride-4 block: ARP SW/TYPE/RANGE at decoded 149/153/157 (deserializer record bytes 298/306/314); OCTAVE/HOLD at 161/165. Hardcoded, NOT db-736.",
-   "block2_global_fx": "pos = 309+(db-871)*4 (== 321+(db-876)*4). Stride-4 serialized struct for DB854..877. Range-fit 24/24 vs default_patch specs. Holds master tune, model, filter, chorus/effect, delay, reverb selectors + the VCA env-select demux (DB855)."
+   "block2_global_fx": "pos = 309+(db-871)*4 (== 241+(db-854)*4). Stride-4 serialized struct, CONTIGUOUS for DB838..877 (block start DB838=decoded-pos177). Range-fit + default_step match for all 40 fields. DB838..853 are the mod-routing matrix + BEND/MOD SENS + CONDITION + VCA-env default-riding slots (read 0/const in every factory bank; position structurally pinned, not round-trip-validatable). DB854..877 are the live global/FX selectors (model, filter, chorus/effect, fxa/delay, reverb, master tune, transpose). The old 'block1 db-736' claim for DB838..853 was WRONG: DB853 alone disproves it (block1-pos117=0 vs block2-pos237=128=x1.0 default)."
   },
   "engine_model": "Per-voice main block, voice v at offset+10512*v (broadcast). Captured oracle = src/captured_patch.c (rec0 SY Poly Synth, 110 offsets). capture_validated:true means juno_lut_apply(offset,tableId,rec0_step[+bias]) == captured[offset] bit-exact (hex stated in note).",
   "transform_legend": "LUT=juno_param_apply_lut (clamped LUT[tableId][step]); demux=one-hot from a small selector; semitone=value+bias into LUT; voicemanager=raw int to allocator state; host=host/driver-pushed (red-black tree / master_render selector), NOT a static per-voice LUT; arp=arpeggiator driver setter; name=display string.",
@@ -15,7 +15,8 @@
    "DB803 TEMPO SYNC -> off1056 (LFO Tempo Rate Sw, DSP-confirmed v76=JF(1056)*JF(1072)). HIGH.",
    "DB754 VCF LFO MOD: DISPROVED off4016 (that is the master LFO gain). Marked UNBOUND.",
    "DB810 VCA LEVEL: no per-voice LUT reproduces capture -> UNBOUND (likely Patch Level/host).",
-   "block2 global/FX (DB854..877): full stride-4 layout pinned, 24/24 range-fit; VCA env-select DB855 -> 10176/10192/10208 demux (ENV2->10208 capture-proven)."
+   "block2 global/FX (DB854..877): full stride-4 layout pinned, 24/24 range-fit; VCA env-select DB855 -> 10176/10192/10208 demux (ENV2->10208 capture-proven).",
+   "DB838..877 decode REPOINTED to block2 stride-4 (241+(db-854)*4). DB838..853 mod-matrix slots read 0/const in all 64 factory banks -> position structurally pinned but not capture-validatable. DB853 (x1.0=128) disproves the prior block1 db-736 assignment. DB844..847 SENS: engine offset/transform stay capture-proven, decode-position now correctly flagged structural-only."
   ],
   "counts": {
    "total_db": 128,
@@ -1539,14 +1540,15 @@
    "script_name": "(OSC2 SYNC IN)",
    "decode": {
     "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736 (jacks read 0 in factory banks)"
+    "position_formula": "db-736 (jacks read 0 in factory banks)",
+    "decoded_position": 94
    },
    "engine_offset": null,
    "tableId": null,
    "transform": null,
    "capture_validated": false,
    "confidence": "LOW",
-   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel. [Block2 stride-4 does NOT cover this DB: block2 starts at DB838 (decoded-pos177). DB830..837 block2-pos would collide with the arp block (149/153/157=ARP SW/TYPE/RANGE). These are block1 db-736 CV jacks, =0 in all 64 banks.]",
    "range": [
     0,
     65535
@@ -1558,14 +1560,15 @@
    "script_name": "(OSC2 RING IN)",
    "decode": {
     "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736 (jacks read 0 in factory banks)"
+    "position_formula": "db-736 (jacks read 0 in factory banks)",
+    "decoded_position": 95
    },
    "engine_offset": null,
    "tableId": null,
    "transform": null,
    "capture_validated": false,
    "confidence": "LOW",
-   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel. [Block2 stride-4 does NOT cover this DB: block2 starts at DB838 (decoded-pos177). DB830..837 block2-pos would collide with the arp block (149/153/157=ARP SW/TYPE/RANGE). These are block1 db-736 CV jacks, =0 in all 64 banks.]",
    "range": [
     0,
     1
@@ -1577,14 +1580,15 @@
    "script_name": "(OSC3 EXT IN)",
    "decode": {
     "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736 (jacks read 0 in factory banks)"
+    "position_formula": "db-736 (jacks read 0 in factory banks)",
+    "decoded_position": 96
    },
    "engine_offset": null,
    "tableId": null,
    "transform": null,
    "capture_validated": false,
    "confidence": "LOW",
-   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel. [Block2 stride-4 does NOT cover this DB: block2 starts at DB838 (decoded-pos177). DB830..837 block2-pos would collide with the arp block (149/153/157=ARP SW/TYPE/RANGE). These are block1 db-736 CV jacks, =0 in all 64 banks.]",
    "range": [
     0,
     5
@@ -1596,14 +1600,15 @@
    "script_name": "(P ENV GATE IN)",
    "decode": {
     "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736 (jacks read 0 in factory banks)"
+    "position_formula": "db-736 (jacks read 0 in factory banks)",
+    "decoded_position": 97
    },
    "engine_offset": null,
    "tableId": null,
    "transform": null,
    "capture_validated": false,
    "confidence": "LOW",
-   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel. [Block2 stride-4 does NOT cover this DB: block2 starts at DB838 (decoded-pos177). DB830..837 block2-pos would collide with the arp block (149/153/157=ARP SW/TYPE/RANGE). These are block1 db-736 CV jacks, =0 in all 64 banks.]",
    "range": [
     0,
     5
@@ -1615,14 +1620,15 @@
    "script_name": "(PITCH ENV IN)",
    "decode": {
     "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736 (jacks read 0 in factory banks)"
+    "position_formula": "db-736 (jacks read 0 in factory banks)",
+    "decoded_position": 98
    },
    "engine_offset": null,
    "tableId": null,
    "transform": null,
    "capture_validated": false,
    "confidence": "LOW",
-   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel. [Block2 stride-4 does NOT cover this DB: block2 starts at DB838 (decoded-pos177). DB830..837 block2-pos would collide with the arp block (149/153/157=ARP SW/TYPE/RANGE). These are block1 db-736 CV jacks, =0 in all 64 banks.]",
    "range": [
     0,
     9
@@ -1634,14 +1640,15 @@
    "script_name": "(F ENV GATE IN)",
    "decode": {
     "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736 (jacks read 0 in factory banks)"
+    "position_formula": "db-736 (jacks read 0 in factory banks)",
+    "decoded_position": 99
    },
    "engine_offset": null,
    "tableId": null,
    "transform": null,
    "capture_validated": false,
    "confidence": "LOW",
-   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel. [Block2 stride-4 does NOT cover this DB: block2 starts at DB838 (decoded-pos177). DB830..837 block2-pos would collide with the arp block (149/153/157=ARP SW/TYPE/RANGE). These are block1 db-736 CV jacks, =0 in all 64 banks.]",
    "range": [
     -5,
     5
@@ -1653,14 +1660,15 @@
    "script_name": "(FILTER ENV IN)",
    "decode": {
     "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736 (jacks read 0 in factory banks)"
+    "position_formula": "db-736 (jacks read 0 in factory banks)",
+    "decoded_position": 100
    },
    "engine_offset": null,
    "tableId": null,
    "transform": null,
    "capture_validated": false,
    "confidence": "LOW",
-   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel. [Block2 stride-4 does NOT cover this DB: block2 starts at DB838 (decoded-pos177). DB830..837 block2-pos would collide with the arp block (149/153/157=ARP SW/TYPE/RANGE). These are block1 db-736 CV jacks, =0 in all 64 banks.]",
    "range": [
     -3,
     3
@@ -1672,14 +1680,15 @@
    "script_name": "(A ENV GATE IN)",
    "decode": {
     "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736 (jacks read 0 in factory banks)"
+    "position_formula": "db-736 (jacks read 0 in factory banks)",
+    "decoded_position": 101
    },
    "engine_offset": null,
    "tableId": null,
    "transform": null,
    "capture_validated": false,
    "confidence": "LOW",
-   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel.",
+   "note": "System-8 CV patch-jack routing (default|CV OUT|GATE OUT|LFO OUT). All 64 factory presets=0 (no jacks). Non-panel. [Block2 stride-4 does NOT cover this DB: block2 starts at DB838 (decoded-pos177). DB830..837 block2-pos would collide with the arp block (149/153/157=ARP SW/TYPE/RANGE). These are block1 db-736 CV jacks, =0 in all 64 banks.]",
    "range": [
     0,
     1
@@ -1690,8 +1699,12 @@
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "(AMP ENV IN)",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736 (jacks read 0 in factory banks)"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 177,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": null,
@@ -1703,14 +1716,19 @@
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it"
   },
   "839": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "LFO CV GAIN",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 181,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": null,
@@ -1722,14 +1740,19 @@
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it"
   },
   "840": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "(F ENV VARIATION)",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 185,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": null,
@@ -1741,14 +1764,19 @@
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it"
   },
   "841": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "VCA MODE",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 189,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": null,
@@ -1760,14 +1788,19 @@
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it"
   },
   "842": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "CONDITION",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 193,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": null,
@@ -1779,14 +1812,19 @@
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it"
   },
   "843": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "BEND GAIN",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 197,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": {
     "driver": "bend depth = BendLevel(4112)*BendRange(4128), gated by Bend Enable(3872)"
@@ -1800,90 +1838,119 @@
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it"
   },
   "844": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "BEND SENS DCO",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 201,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": 4128,
    "tableId": 21,
    "transform": "LUT[21][step+128]",
    "capture_validated": true,
    "confidence": "HIGH",
-   "note": "BEND SENS DCO -> Bend Range/Sens (off4128, tid21, LUT21[step+128]). Capture off4128=0x3e2cacad (43/255) round-trips at step+128=171. NOTE: shares off4128 with DB801 BEND RANGE (the bend depth scalar); factory bank reads 0 in block1 (rides engine default 43). Offset+tid DSP+capture proven.",
+   "note": "BEND SENS DCO -> Bend Range/Sens (off4128, tid21, LUT21[step+128]). Capture off4128=0x3e2cacad (43/255) round-trips at step+128=171. NOTE: shares off4128 with DB801 BEND RANGE (the bend depth scalar); factory bank reads 0 in block1 (rides engine default 43). Offset+tid DSP+capture proven. [POSITION NOTE: engine offset+tableId+transform are capture-proven, but the *decode position* (stride-4 201) is only structural \u2014 this slot reads 0 in all 64 factory banks (rides engine default), so no capture round-trips the position. To pin it you'd need a bank/state pair where this param is non-default.]",
    "range": [
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it",
+   "position_validated": false
   },
   "845": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "BEND SENS VCF",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 205,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": 7472,
    "tableId": 21,
    "transform": "LUT[21][step+128]",
    "capture_validated": true,
    "confidence": "HIGH",
-   "note": "BEND SENS VCF -> off7472 (VCF bend range), tid21 LUT21[step+128]. Capture off7472=0x3e2cacad (43/255) at step+128=171. Factory bank=0 in block1 (default-riding). Proven.",
+   "note": "BEND SENS VCF -> off7472 (VCF bend range), tid21 LUT21[step+128]. Capture off7472=0x3e2cacad (43/255) at step+128=171. Factory bank=0 in block1 (default-riding). Proven. [POSITION NOTE: engine offset+tableId+transform are capture-proven, but the *decode position* (stride-4 205) is only structural \u2014 this slot reads 0 in all 64 factory banks (rides engine default), so no capture round-trips the position. To pin it you'd need a bank/state pair where this param is non-default.]",
    "range": [
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it",
+   "position_validated": false
   },
   "846": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "MOD SENS DCO",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 209,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": 3984,
    "tableId": 22,
    "transform": "LUT[22][step]",
    "capture_validated": true,
    "confidence": "HIGH",
-   "note": "MOD SENS DCO -> off3984, tid22 = pure step/255. Capture off3984=0x3db0b0b1 (22/255) == LUT22[22]. Factory bank=0 in block1 (default-riding). DSP+capture proven.",
+   "note": "MOD SENS DCO -> off3984, tid22 = pure step/255. Capture off3984=0x3db0b0b1 (22/255) == LUT22[22]. Factory bank=0 in block1 (default-riding). DSP+capture proven. [POSITION NOTE: engine offset+tableId+transform are capture-proven, but the *decode position* (stride-4 209) is only structural \u2014 this slot reads 0 in all 64 factory banks (rides engine default), so no capture round-trips the position. To pin it you'd need a bank/state pair where this param is non-default.]",
    "range": [
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it",
+   "position_validated": false
   },
   "847": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "MOD SENS VCF",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 213,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": 7360,
    "tableId": 22,
    "transform": "LUT[22][step]",
    "capture_validated": true,
    "confidence": "HIGH",
-   "note": "MOD SENS VCF -> off7360, tid22 = pure step/255. Capture off7360=0x3f5cdcdd (220/255) == LUT22[220] (engine default). Factory bank=0 in block1 (default-riding). DSP+capture proven.",
+   "note": "MOD SENS VCF -> off7360, tid22 = pure step/255. Capture off7360=0x3f5cdcdd (220/255) == LUT22[220] (engine default). Factory bank=0 in block1 (default-riding). DSP+capture proven. [POSITION NOTE: engine offset+tableId+transform are capture-proven, but the *decode position* (stride-4 213) is only structural \u2014 this slot reads 0 in all 64 factory banks (rides engine default), so no capture round-trips the position. To pin it you'd need a bank/state pair where this param is non-default.]",
    "range": [
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it",
+   "position_validated": false
   },
   "848": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "(LFO VARIATION)",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 217,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": null,
@@ -1895,14 +1962,19 @@
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it"
   },
   "849": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "LFO TRIG ENV",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 221,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": null,
@@ -1914,14 +1986,19 @@
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it"
   },
   "850": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "(OSC1 VARIATION)",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 225,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": null,
@@ -1933,14 +2010,19 @@
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it"
   },
   "851": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "(OSC1 COARSE TUNE)",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 229,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": null,
@@ -1952,14 +2034,19 @@
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it"
   },
   "852": {
    "name": "default (0)| CV OUT (1)|GATE OUT (2) |LFO OUT (3)|LFO A OUT (4)|LFO B OUT (5)|P ENV OUT (6)|F ENV OUT (7)|A ENV OUT (8)|OSC1 OUT (9)|OSC1 SYNC OUT (10)|OSC2 OUT (11)|OSC3 OUT (12)|MIX OUT (13)",
    "script_name": "(OSC1 FINE TUNE)",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 233,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": null,
@@ -1971,14 +2058,19 @@
     0,
     13
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_pinned": "structural (stride-4 contiguity); NOT round-trip-validatable: all 64 factory banks read this slot = default, so no capture exercises it"
   },
   "853": {
    "name": "x0.0 (0)..x1.0 (128)..x2.0 (255)",
    "script_name": "(OSC2 VARIATION)",
    "decode": {
-    "block": "block1_synth (pos = db-736 on full-record nibble stream; stride-1; 100% range-fit DB750..813,830..853)",
-    "position_formula": "db-736"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 237,
+    "factory_values": [
+     128
+    ]
    },
    "engine_offset": null,
    "tableId": null,
@@ -1990,14 +2082,20 @@
     0,
     255
    ],
-   "default_step": 128
+   "default_step": 128,
+   "position_pinned": "structural; always 128 (x1.0) in all 64 factory banks"
   },
   "854": {
    "name": "1|2|3",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 241,
+    "factory_values": [
+     0,
+     1
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2009,14 +2107,21 @@
     0,
     2
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_validated": true
   },
   "855": {
    "name": "ENV1|ENV2|GATE",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 245,
+    "factory_values": [
+     0,
+     1,
+     2
+    ]
    },
    "engine_offset": {
     "one_hot": {
@@ -2034,14 +2139,21 @@
     0,
     2
    ],
-   "default_step": 1
+   "default_step": 1,
+   "position_validated": true
   },
   "856": {
    "name": "-128..+127",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 249,
+    "factory_values": [
+     0,
+     78,
+     128
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2053,14 +2165,19 @@
     0,
     255
    ],
-   "default_step": 128
+   "default_step": 128,
+   "position_validated": true
   },
   "857": {
    "name": "x1|x2|x3|x4",
    "script_name": "HPF TYPE",
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 253,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2072,14 +2189,22 @@
     0,
     3
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_validated": false
   },
   "858": {
    "name": "0..255",
    "script_name": "(FILTER TYPE)",
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 257,
+    "factory_values": [
+     0,
+     43,
+     176,
+     255
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2091,14 +2216,22 @@
     0,
     255
    ],
-   "default_step": 43
+   "default_step": 43,
+   "position_validated": true
   },
   "859": {
    "name": "0..255",
    "script_name": "EFFECT TYPE",
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 261,
+    "factory_values": [
+     0,
+     43,
+     253,
+     255
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2110,14 +2243,24 @@
     0,
     255
    ],
-   "default_step": 43
+   "default_step": 43,
+   "position_validated": true
   },
   "860": {
    "name": "0..255",
    "script_name": "EFFECT TONE",
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 265,
+    "factory_values": [
+     0,
+     10,
+     20,
+     22,
+     25,
+     38
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2129,14 +2272,26 @@
     0,
     255
    ],
-   "default_step": 22
+   "default_step": 22,
+   "position_validated": true
   },
   "861": {
    "name": "0..255",
    "script_name": "DELAY TYPE",
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 269,
+    "factory_values": [
+     0,
+     22,
+     28,
+     30,
+     45,
+     93,
+     159,
+     220
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2148,14 +2303,19 @@
     0,
     255
    ],
-   "default_step": 22
+   "default_step": 22,
+   "position_validated": true
   },
   "862": {
    "name": "1|2|3",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 273,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2167,14 +2327,20 @@
     0,
     2
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_validated": false
   },
   "863": {
    "name": "OFF|ON",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 277,
+    "factory_values": [
+     0,
+     1
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2186,14 +2352,19 @@
     0,
     1
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_validated": true
   },
   "864": {
    "name": "1|2",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 281,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2205,14 +2376,19 @@
     0,
     1
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_validated": false
   },
   "865": {
    "name": "-11..+11",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 285,
+    "factory_values": [
+     11
+    ]
    },
    "engine_offset": null,
    "tableId": "semitone",
@@ -2224,14 +2400,19 @@
     0,
     22
    ],
-   "default_step": 11
+   "default_step": 11,
+   "position_validated": true
   },
   "866": {
    "name": "0..255",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 289,
+    "factory_values": [
+     128
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2243,14 +2424,19 @@
     0,
     255
    ],
-   "default_step": 128
+   "default_step": 128,
+   "position_validated": true
   },
   "867": {
    "name": "1|2",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 293,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2262,14 +2448,20 @@
     0,
     1
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_validated": false
   },
   "868": {
    "name": "-2OCT SIN|-1OCT SIN|SIN|TRI|-1OCT TRI|-2OCT TRI",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 297,
+    "factory_values": [
+     0,
+     1
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2281,14 +2473,19 @@
     0,
     5
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_validated": true
   },
   "869": {
    "name": "0..255",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 301,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": null,
    "tableId": "host",
@@ -2300,14 +2497,19 @@
     0,
     255
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_validated": false
   },
   "870": {
    "name": "-1200CENT..+1200CENT",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 305,
+    "factory_values": [
+     128
+    ]
    },
    "engine_offset": 368,
    "tableId": 6,
@@ -2319,14 +2521,20 @@
     0,
     255
    ],
-   "default_step": 128
+   "default_step": 128,
+   "position_validated": true
   },
   "871": {
    "name": "        JUNO-60 (0)|JUNO-106 (1)",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 309,
+    "factory_values": [
+     0,
+     1
+    ]
    },
    "engine_offset": {
     "driver": "model_selector"
@@ -2340,14 +2548,19 @@
     0,
     1
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_validated": true
   },
   "872": {
    "name": "LPF -24dB|LPF -18dB|LPF -12dB|HPF -12dB|HPF -18dB|HPF -24dB",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 313,
+    "factory_values": [
+     0
+    ]
    },
    "engine_offset": {
     "driver": "filter_type"
@@ -2361,14 +2574,22 @@
     0,
     5
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_validated": false
   },
   "873": {
    "name": "OVERDRIVE|DISTORTION|JUNO CH1|JUNO CH2|CRUSHER|PHASER",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 317,
+    "factory_values": [
+     1,
+     2,
+     3,
+     5
+    ]
    },
    "engine_offset": {
     "driver": "chorus_mode (master_render host-params +136/+112)"
@@ -2382,14 +2603,35 @@
     0,
     5
    ],
-   "default_step": 2
+   "default_step": 2,
+   "position_validated": true
   },
   "874": {
    "name": "0..255",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 321,
+    "factory_values": [
+     0,
+     26,
+     78,
+     79,
+     80,
+     81,
+     83,
+     89,
+     93,
+     95,
+     97,
+     98,
+     102,
+     105,
+     106,
+     109,
+     "..."
+    ]
    },
    "engine_offset": {
     "driver": "effect_amount"
@@ -2403,14 +2645,23 @@
     0,
     255
    ],
-   "default_step": 128
+   "default_step": 128,
+   "position_validated": true
   },
   "875": {
    "name": "DELAY|PAN DELAY|CHORUS 1|CHORUS 2|FLANGER|DELAY+CHORUS",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 325,
+    "factory_values": [
+     0,
+     1,
+     2,
+     3,
+     5
+    ]
    },
    "engine_offset": {
     "driver": "fxa_type (System-8 FX-A slot, params+136)"
@@ -2424,14 +2675,24 @@
     0,
     5
    ],
-   "default_step": 0
+   "default_step": 0,
+   "position_validated": true
   },
   "876": {
    "name": "AMBIENCE|ROOM|HALL 1|HALL 2|PLATE|MODULATION",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 329,
+    "factory_values": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ]
    },
    "engine_offset": {
     "driver": "reverb_type"
@@ -2445,14 +2706,35 @@
     0,
     5
    ],
-   "default_step": 2
+   "default_step": 2,
+   "position_validated": true
   },
   "877": {
    "name": "0..255",
    "script_name": null,
    "decode": {
-    "block": "block2_global_fx (pos = 309+(db-871)*4; stride-4 serialized struct; 24/24 range-fit DB854..877)",
-    "position_formula": "309+(db-871)*4"
+    "block": "block2_global_fx (pos = 309+(db-871)*4 == 241+(db-854)*4; stride-4 serialized struct; CONTIGUOUS over DB838..877). Block start DB838=decoded-pos 177. Verified: DB853=128(x1.0),855=1(ENV2),856=128,858/859=43,860/861=22,865=11,866=128,870=128 all match default_patch default_steps at the stride-4 positions; block1 db-736 does NOT (e.g. DB853 block1-pos117=0 vs block2-pos237=128). DB838..852 read 0 in all 64 factory banks.",
+    "position_formula": "241+(db-854)*4  (== 309+(db-871)*4)",
+    "decoded_position": 333,
+    "factory_values": [
+     87,
+     117,
+     128,
+     130,
+     145,
+     148,
+     156,
+     159,
+     162,
+     163,
+     166,
+     168,
+     170,
+     171,
+     175,
+     180,
+     "..."
+    ]
    },
    "engine_offset": {
     "driver": "reverb_time"
@@ -2466,7 +2748,8 @@
     0,
     255
    ],
-   "default_step": 128
+   "default_step": 128,
+   "position_validated": true
   }
  }
 }
