@@ -85,6 +85,13 @@ int juno_runtime_coeffs_loaded(void);
  * juno_runtime_coeffs_apply. See src/juno_fx_filter_coeffs.c. */
 void juno_fx_filter_coeffs_apply(unsigned char *st);
 
+/* juno_reverb_coeffs_apply — capture-free seed for the HALL2 reverb coefficient
+ * blocks (input allpass/CV + tank/DPF/HPF/LPF, 48 offsets). 46/48 are .rdata
+ * literals (verified in seg_rdata_935650.bin); the 2 others are a documented
+ * chorus-CV formula and a shared 1-pole node default. Removed from the capture.
+ * Called by juno_runtime_coeffs_apply. See src/juno_reverb_coeffs.c. */
+void juno_reverb_coeffs_apply(unsigned char *st);
+
 /* voice_render — exact transcription of sub_180369070. Produces one mono sample
  * for one voice from its state block `st`; writes it to *outL and *outR (the
  * plugin duplicates the mono voice to both channels; stereo comes from chorus).

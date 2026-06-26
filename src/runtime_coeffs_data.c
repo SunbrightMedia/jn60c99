@@ -58,19 +58,7 @@ static const juno_coeff k[] = {
   {4297584,0x3ee0f001u}, /* ~0.439331 */
   {4297760,0x3f800000u}, /* ~1 */
   {6395312,0xc0aa6a6au}, /* ~-5.32549 */
-  {10692016,0xc0bafafbu}, /* ~-5.84314 */
-  {10692032,0x3f800000u}, {10693008,0x3d6f8001u}, {10693040,0x3f000000u}, {10693056,0x3f008081u}, /* ~0.501961 */
-  {10693072,0x3f03df74u}, {10693088,0x3f83df74u}, {10693104,0x3f03df74u}, {10693120,0xbee549c0u}, /* ~-0.447828 */
-  {10693136,0xbf1cd8f1u}, {10693168,0x3f4ba5b0u}, {10693184,0x3fb50bf3u}, {10693200,0x3f800000u}, /* ~1 */
-  {10693216,0x3ad6774fu}, {10693232,0x3f800000u}, {10693248,0x3f800000u}, {10693264,0x3f800000u}, /* ~1 */
-  {10693280,0x3f2493b7u}, {10693312,0x3f800000u}, {10693344,0xbf800000u}, {10693360,0x3f800000u}, /* ~1 */
-  {10759376,0x3f800000u}, {10759392,0x3f000000u}, {10759408,0x3f800000u}, {10759424,0x3f800000u}, /* ~1 */
-  {10759440,0x3efefeffu}, {10759504,0x37ae2650u}, {10759520,0x3f7f8b7eu}, {10759536,0xbf7f8b7eu}, /* ~-0.998222 */
-  {10759552,0x3f7f16fbu}, {10759568,0x3d434c95u}, {10759584,0x3dc34c95u}, {10759600,0x3d434c95u}, /* ~0.0476805 */
-  {10759616,0x3fa5addfu}, {10759632,0xbef85dc7u}, {10759648,0x3d090dbbu}, {10759664,0x3f2d8fd1u}, /* ~0.677976 */
-  {10759680,0xbf586ee2u}, {10759696,0x3d090dbbu}, {10759712,0x3f2d8fd1u}, {10759728,0xbf586ee2u}, /* ~-0.845442 */
-  {10759744,0x3d090dbbu}, {10759760,0x3f19d713u}, {10759776,0xbf4afeb9u}, {10759792,0x3d090dbbu}, /* ~0.0334604 */
-  {10759808,0x3f19d713u}, {10759824,0xbf4afeb9u}, {10759872,0x00000100u}, };
+  };
 
 void juno_runtime_coeffs_apply(unsigned char *st)
 {
@@ -90,9 +78,11 @@ void juno_runtime_coeffs_apply(unsigned char *st)
         }
     }
     /* The 98 shared FX filter-coefficient templates (chorus/delay/FX-A/effect)
-     * are no longer in k[] — they are now applied capture-free from the binary's
-     * .rdata via this call, preserving identical engine state. */
+     * and the 48 HALL2 reverb coefficients are no longer in k[] — they are now
+     * applied capture-free from the binary's .rdata via these calls, preserving
+     * identical engine state. */
     juno_fx_filter_coeffs_apply(st);
+    juno_reverb_coeffs_apply(st);
 }
 
 int juno_runtime_coeffs_loaded(void)
