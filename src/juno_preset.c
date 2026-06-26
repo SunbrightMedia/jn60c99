@@ -157,6 +157,18 @@ int juno_preset_load(unsigned char *st, const char *bank_path, int record,
       }
     }
 
+    /* DB877 REVERB TIME -> CDSPRev tank-length node 1090 @ offset 10759360.
+     * time(s) = step*30/255 (0..30 s); node = (int)(SR*0.001*time)-2 = (int)(96*time)-2
+     * at 96 kHz. Setter sub_7FF91E021720 (vtable+0x30) writes it + retunes the tank.
+     * PROVEN bit-exact: DB877=170 -> 20.0 s -> 1918 = 0x44efc000 (full capture
+     * state_t0/t1). Master node; block-2 decode (step_fx). juno_reverb_activate does
+     * not touch 10759360, so this per-patch length survives. */
+    { int s = step_fx(dec,ndec,877);
+      if (s >= 0){ float t = (float)s*30.0f/255.0f; int len = (int)(96.0f*t)-2;
+        if (len < 0) len = 0;
+        juno_param_apply_value(st, 10759360, (float)len, 0); }
+    }
+
     juno_chorus_set_rates(st);   /* capture-free JUNO chorus I/II rates */
     if (info) info->applied=applied;
     free(dec); free(rec);

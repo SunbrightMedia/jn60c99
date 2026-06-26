@@ -2634,13 +2634,13 @@
     ]
    },
    "engine_offset": {
-    "driver": "effect_amount"
+    "driver": "effect_tone (host-param struct *(a1+136); System-8 multi-FX-B 'tone')"
    },
    "tableId": "host",
-   "transform": "0..255 drive/character depth for DB873",
-   "capture_validated": false,
-   "confidence": "MED",
-   "note": "Drive/character amount for the DB873 effect. pos 321, rec0=78.",
+   "transform": "0..255 EFFECT TONE for the DB873 effect; read LIVE from the host-param struct, NOT a static engine node.",
+   "capture_validated": "host_confirmed",
+   "confidence": "HIGH",
+   "note": "RESOLVED as GENUINELY HOST-SIDE. This is Script.xml PAT3 'EFFECT TONE' (0..255 def128; NOT a separate 'effect amount/depth' -- that is DB794 EFFECT DEPTH @102576). The DB873 effect selector and its TONE are read every block from the live host-param struct: master_render.c:853 v39=**(a1+136)+136 (FX-A type) and :2344 v551=**(a1+136)+112 (effect/chorus mode); the effect coefficients (chorus 6396xxx, fx 86xxx) are recomputed at render-time (sub_180388170, uncaptured). PROOF it is not static: capture bank1.bin rec0 has DB874=78 (non-default) yet every chorus/fx static coeff (6396288 CHO HighCut=0.7955, 102464/6497280 HighCut Fc=0.2058, etc.) reads its rdata DEFAULT in state_t0/t1.bin -- a static binding would show step-78 values. For JUNO-chorus modes (rec0 DB873=2=JUNO CH1) the JUNO chorus tone is fixed, so EFFECT TONE only audibly affects the non-JUNO System-8 effect modes. Loader must route it to the host-param struct slot, not write an engine offset. pos 321, rec0=78.",
    "range": [
     0,
     255
@@ -2701,7 +2701,7 @@
    "transform": "AMBIENCE|ROOM|HALL1|HALL2|PLATE|MODULATION",
    "capture_validated": true,
    "confidence": "HIGH",
-   "note": "Reverb type. rec0=3=HALL2. pos 329. The block-2 alignment anchor.",
+   "note": "Reverb type. rec0=3=HALL2. pos 329. The block-2 alignment anchor. NOTE re 'REVERB TONE': there is NO separate REVERB TONE knob on the JUNO-60 FX-DETAIL panel (the PAT3 panel block is exactly EFFECT TYPE/EFFECT TONE/DELAY TYPE/REVERB TYPE/REVERB TIME). The reverb HF damping/tone == Script.xml PAT2_REV 'REVERB HIGH CUT' (range 0..14 def11), which is a System-reverb-config field SELECTED BY reverb_type, not an independent panel param. It drives the reverb damping biquad @10759568-10759632 (table 0x9da130 / refs reverb_tables damping_biquads, row = high-cut index; capture row 11 = [0.04768,0.095361,0.04768,1.2944,-0.48509] EXACT) plus the DPF Hp/Lp @10759664/10759680.. (table 0x9ddeb0 row 84). So 'REVERB TONE' is bound implicitly via reverb_type; no extra loader binding needed for the factory panel.",
    "range": [
     0,
     5
@@ -2736,14 +2736,12 @@
      "..."
     ]
    },
-   "engine_offset": {
-    "driver": "reverb_time"
-   },
-   "tableId": "host",
-   "transform": "0..255 reverb time/level",
-   "capture_validated": false,
-   "confidence": "MED",
-   "note": "Reverb time/level. pos 333, rec0=170. Host reverb param.",
+   "engine_offset": 10759360,
+   "tableId": "reverb_time_tank",
+   "transform": "time = step*30/255 (0..30 seconds-scale, integer); engine node 1090 @10759360 = (float)((int)(SR*0.001*time)-2), SR=96000 => (int)(96*time)-2. Setter sub_7FF91E021720 (CDSPRev vtable+0x30, decomp_3C0000.c:964) writes node 1090 then retunes the tank via vtable+0x20.",
+   "capture_validated": true,
+   "confidence": "HIGH",
+   "note": "RESOLVED (Script.xml PAT3 'REVERB TIME', 0..255 def128). NOT host-side: lands statically in engine node memory. CDSPRev tank-length node 1090 -> offset 10759360 (node base 10741920 = 10759440 - 16*1095; stride-16 from REVERB LEVEL node 0x447=1095@10759440). Capture (bank1.bin rec0 'SY Poly Synth', DB877=170): state_t0/t1.bin[10759360] = 0x44efc000 = float(1918.0) EXACT. Round-trip step170 -> time=170*30/255=20.0 (exact int) -> (int)(96*20)-2 = 1918. Both 12MB captures' reverb region identical (same preset). The *30/255 host scale is inferred from this one exact integer landing (0..30s range); offset+(int)(96*time)-2 formula bit-exact; scale constant has a single validating point.",
    "range": [
     0,
     255
