@@ -90,6 +90,12 @@ void juno_fx_filter_coeffs_apply(unsigned char *st);
  * sets the 16 PlugIn Sw to 1.0). Part of the capture-free param pipeline. */
 void juno_construction_defaults(unsigned char *st);
 
+/* juno_registration_defaults — the param-registration (sub_388170) defaults:
+ * 3 .rdata value-constants + 17 switch "on" defaults. sub_388170 is undecompilable
+ * in the 60 binary; these are binary-sourced (.rdata) / preset-independent switch
+ * defaults. Apply after juno_construction_defaults. See src/juno_registration_defaults.c. */
+void juno_registration_defaults(unsigned char *st);
+
 /* juno_reverb_coeffs_apply — capture-free seed for the HALL2 reverb coefficient
  * blocks (input allpass/CV + tank/DPF/HPF/LPF, 48 offsets). 46/48 are .rdata
  * literals (verified in seg_rdata_935650.bin); the 2 others are a documented
