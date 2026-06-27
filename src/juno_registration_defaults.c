@@ -20,6 +20,7 @@ void juno_registration_defaults(unsigned char *st)
     put(st, 5520, 0x3ca3d70au); /* Duty Tune      0.02     @rva 0x97e4d0 */
     put(st, 6512, 0x3f80f154u); /* Osc1 Level     1.00736  @rva 0x987054 */
     put(st, 7440, 0xbf010204u); /* Velocity Offset -0.5039 @rva 0x96dbdc */
+    put(st, 9616, 0x3f6e147au); /* AMP FIX VEL LEVEL 0.93 @rva 0x987890 (JUNO fixed amp level; not velocity-sensitive) */
     /* switch defaults = 1.0 (registration "on" default; preset-independent) */
     static const int sw[] = {592,1888,1936,1952,2080,2848,3328,3872,4016,4048,
                              6448,7296,9104,9824,10288,10304,10320};
