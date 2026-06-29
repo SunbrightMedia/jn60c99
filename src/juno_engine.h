@@ -73,9 +73,13 @@ void *juno_chorus_init(unsigned char *st);
  * juno_chorus_init + juno_engine_init. No-op until the capture is pasted in. */
 void juno_runtime_coeffs_apply(unsigned char *st);
 
-/* 1 once the runtime coefficients have been captured into runtime_coeffs_data.c,
- * else 0 (placeholder). The driver gates the master/chorus vs dry path on this. */
-int juno_runtime_coeffs_loaded(void);
+/* The driver gates the full master/chorus path (vs the dry voice-sum fallback) on
+ * whether the parameter-applied coefficients have been seeded. juno_master_gate_set
+ * raises that flag; it is called by whichever seed ran (juno_capture_free_seed or
+ * the legacy juno_runtime_coeffs_apply), so the product works with the capture file
+ * absent. See src/juno_master_gate.c. */
+int  juno_runtime_coeffs_loaded(void);
+void juno_master_gate_set(int ready);
 
 /* juno_fx_filter_coeffs_apply — capture-free seed for the shared FX filter
  * coefficient templates (chorus/delay/FX-A/effect blocks): 98 offsets, every

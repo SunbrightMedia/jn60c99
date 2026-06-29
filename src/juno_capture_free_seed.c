@@ -28,6 +28,8 @@
  */
 #include "juno_engine.h"
 
+void juno_master_gate_set(int ready);
+
 void juno_capture_free_seed(unsigned char *st)
 {
     juno_construction_defaults(st);
@@ -35,4 +37,5 @@ void juno_capture_free_seed(unsigned char *st)
     juno_voice_constants(st);
     juno_fx_filter_coeffs_apply(st);
     juno_reverb_coeffs_apply(st);
+    juno_master_gate_set(1);   /* master/chorus coefficients are now present */
 }

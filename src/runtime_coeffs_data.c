@@ -83,11 +83,5 @@ void juno_runtime_coeffs_apply(unsigned char *st)
      * identical engine state. */
     juno_fx_filter_coeffs_apply(st);
     juno_reverb_coeffs_apply(st);
-}
-
-int juno_runtime_coeffs_loaded(void)
-{
-    size_t i, n = sizeof(k) / sizeof(k[0]);
-    for (i = 0; i < n; ++i) if (k[i].bits != 0u) return 1;
-    return 0;
+    juno_master_gate_set(1);   /* legacy capture seed: master coefficients present */
 }

@@ -2,6 +2,8 @@
 #include "../src/juno_engine.h"
 #include "../src/juno_driver.h"
 #include "../src/juno_reverb.h"
+#include "../src/juno_params.h"
+#include "../src/juno_param_map.h"
 #include "juno_synth.h"
 #include <stdlib.h>
 #include <string.h>
@@ -23,14 +25,24 @@ struct juno_synth {
     unsigned clock;
 };
 
-juno_synth *juno_synth_create(void){
-    juno_synth *s = calloc(1, sizeof *s);
-    s->st = malloc(JUNO_STATE_BYTES); memset(s->st, 0, JUNO_STATE_BYTES);
+static void synth_init_engine(juno_synth *s, double sr){
+    memset(s->st, 0, JUNO_STATE_BYTES);
+    /* engine_init reads the sample rate from state+16; 44100 selects one
+     * precomputed coefficient set, anything else the other (48000/96000). */
+    JF(s->st, 16) = (float)sr;
     juno_chorus_init(s->st); juno_engine_init(s->st); JUNO_SEED(s->st);
     juno_driver_attach_host(s->st, &s->shim, 2 /*CH1 default*/);
-    for (int v=0; v<JUNO_NUM_VOICES; ++v) s->note_of_voice[v] = -1;
+    for (int v=0; v<JUNO_NUM_VOICES; ++v){ s->note_of_voice[v] = -1; s->age[v]=0; }
+    s->clock = 0;
+}
+juno_synth *juno_synth_create_sr(double sr){
+    juno_synth *s = calloc(1, sizeof *s);
+    s->st = malloc(JUNO_STATE_BYTES);
+    synth_init_engine(s, sr);
     return s;
 }
+juno_synth *juno_synth_create(void){ return juno_synth_create_sr(48000.0); }
+void juno_synth_set_sample_rate(juno_synth *s, double sr){ if(s) synth_init_engine(s, sr); }
 void juno_synth_destroy(juno_synth *s){ if(!s) return; free(s->st); free(s); }
 
 int juno_synth_load_preset(juno_synth *s, const char *bank, int rec, juno_preset_info *info){
@@ -65,4 +77,20 @@ void juno_synth_all_notes_off(juno_synth *s){
 }
 void juno_synth_process(juno_synth *s, float *outL, float *outR, int n){
     for (int i=0;i<n;i++){ float l=0,r=0; juno_driver_render_sample(s->st,&l,&r); outL[i]=l; outR[i]=r; }
+}
+
+/* ---- Panel-parameter interface ---- */
+int juno_synth_num_params(void){
+    return (int)(sizeof(JUNO_PARAM_MAP)/sizeof(JUNO_PARAM_MAP[0]));
+}
+const char *juno_synth_param_name(int i){
+    if (i<0 || i>=juno_synth_num_params()) return "";
+    return JUNO_PARAM_MAP[i].name;
+}
+void juno_synth_set_param(juno_synth *s, int i, float norm){
+    if (!s || i<0 || i>=juno_synth_num_params()) return;
+    if (norm<0.f) norm=0.f; else if (norm>1.f) norm=1.f;
+    const juno_param_map_ent *e = &JUNO_PARAM_MAP[i];
+    int step = (int)(norm*255.0f + 0.5f);
+    juno_param_apply_lut(s->st, e->off, e->tid, step, /*broadcast=*/1);
 }
