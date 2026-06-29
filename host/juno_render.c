@@ -14,6 +14,13 @@
 #include <string.h>
 #include <math.h>
 void juno_runtime_coeffs_apply(unsigned char*);
+/* Capture-free product seed (see src/juno_capture_free_seed.c); -DJUNO_USE_CAPTURE
+ * restores the old "PD The Juno Pad" memory-capture seed (test oracle only). */
+#ifdef JUNO_USE_CAPTURE
+#  define JUNO_SEED(st) juno_runtime_coeffs_apply(st)
+#else
+#  define JUNO_SEED(st) juno_capture_free_seed(st)
+#endif
 static void wav(const char*p,float*L,float*R,int n,int sr){FILE*f=fopen(p,"wb");if(!f){perror(p);return;}int db=n*4,br=sr*4;unsigned u;unsigned short s;
  fwrite("RIFF",1,4,f);u=36+db;fwrite(&u,4,1,f);fwrite("WAVE",1,4,f);fwrite("fmt ",1,4,f);u=16;fwrite(&u,4,1,f);s=1;fwrite(&s,2,1,f);s=2;fwrite(&s,2,1,f);
  u=sr;fwrite(&u,4,1,f);u=br;fwrite(&u,4,1,f);s=4;fwrite(&s,2,1,f);s=16;fwrite(&s,2,1,f);fwrite("data",1,4,f);u=db;fwrite(&u,4,1,f);
@@ -25,7 +32,7 @@ int main(int argc,char**argv){
  if(nn==0){notes[0]=60;notes[1]=64;notes[2]=67;nn=3;}
  const int SR=48000;
  unsigned char*st=malloc(JUNO_STATE_BYTES);memset(st,0,JUNO_STATE_BYTES);
- juno_chorus_init(st);juno_engine_init(st);juno_runtime_coeffs_apply(st);
+ juno_chorus_init(st);juno_engine_init(st);JUNO_SEED(st);
  juno_preset_info pi;
  if(juno_preset_load(st,bank,rec,&pi)!=0){fprintf(stderr,"preset load failed\n");return 1;}
  /* velocity into the filter path (not a patch param) */

@@ -6,6 +6,14 @@
 #include <stdlib.h>
 #include <string.h>
 void juno_runtime_coeffs_apply(unsigned char*);
+/* The product is capture-free: seed engine coefficients from the binary-sourced
+ * transcription (juno_capture_free_seed). Build with -DJUNO_USE_CAPTURE to restore
+ * the old "PD The Juno Pad" memory-capture seed (kept only as a test oracle). */
+#ifdef JUNO_USE_CAPTURE
+#  define JUNO_SEED(st) juno_runtime_coeffs_apply(st)
+#else
+#  define JUNO_SEED(st) juno_capture_free_seed(st)
+#endif
 
 struct juno_synth {
     unsigned char *st;
@@ -18,7 +26,7 @@ struct juno_synth {
 juno_synth *juno_synth_create(void){
     juno_synth *s = calloc(1, sizeof *s);
     s->st = malloc(JUNO_STATE_BYTES); memset(s->st, 0, JUNO_STATE_BYTES);
-    juno_chorus_init(s->st); juno_engine_init(s->st); juno_runtime_coeffs_apply(s->st);
+    juno_chorus_init(s->st); juno_engine_init(s->st); JUNO_SEED(s->st);
     juno_driver_attach_host(s->st, &s->shim, 2 /*CH1 default*/);
     for (int v=0; v<JUNO_NUM_VOICES; ++v) s->note_of_voice[v] = -1;
     return s;

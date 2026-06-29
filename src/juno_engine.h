@@ -96,6 +96,19 @@ void juno_construction_defaults(unsigned char *st);
  * defaults. Apply after juno_construction_defaults. See src/juno_registration_defaults.c. */
 void juno_registration_defaults(unsigned char *st);
 
+/* juno_voice_constants — the System-8 framework value-slots (Mod/Vel/Bend Sens +
+ * master M.CV) the voice render reads. Binary-sourced (LUT outputs = .rdata
+ * literals), default-riding for all 64 factory banks. Apply before juno_preset_load
+ * so a future position-pinned decode can override. See src/juno_voice_constants.c. */
+void juno_voice_constants(unsigned char *st);
+
+/* juno_capture_free_seed — the single binary-sourced replacement for the
+ * "PD The Juno Pad" memory capture (juno_runtime_coeffs_apply). Bundles the
+ * construction + registration + framework-constant + FX + reverb seeds, all from
+ * transcribed code / .rdata. Call after chorus_init + engine_init and BEFORE
+ * juno_preset_load. See src/juno_capture_free_seed.c. */
+void juno_capture_free_seed(unsigned char *st);
+
 /* juno_reverb_coeffs_apply — capture-free seed for the HALL2 reverb coefficient
  * blocks (input allpass/CV + tank/DPF/HPF/LPF, 48 offsets). 46/48 are .rdata
  * literals (verified in seg_rdata_935650.bin); the 2 others are a documented
