@@ -57,20 +57,39 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
 #define JUNO_MCV_OFF(v)    (304             + (v) * JUNO_VOICE_MAIN_STRIDE)        /* 304 */
 #define JUNO_EDGE_OFF(v)   (JUNO_VOICE_AUX_BASE0  + (v) * JUNO_VOICE_AUX_STRIDE)   /* 101504 */
 
+void juno_note_on_vel(unsigned char *st, int voice, int midi_note, int velocity)
+{
+    /* DCO pitch. The engine's pitch table (juno_pitch_table, filled by
+     * engine_init) is referenced so pitch-offset 0 == A440; the oscillator's
+     * final pitch is JF(4448) + JF(3776), where 3776 follows the M.CV/portamento
+     * base. For a plainly-keyed note the pitch is pure equal temperament and the
+     * M.CV base contributes nothing, so
+     *     Hz = 440 * 2^((note-69)/12).
+     * (The earlier formula referenced a wrong 22380.1 Hz base — i.e. it subtracted
+     * ~5.669 octaves — which the capture happened to mask by seeding M.CV at
+     * +6.668 octaves; together they left every note an octave sharp, and without
+     * the capture they collapsed pitch ~5.7 octaves into sub-audio rumble.) */
+    float pitch = (float)((midi_note - 69) / 12.0);
+    JF(st, JUNO_PITCH_OFF(voice)) = pitch;        /* 4448: note pitch, octaves re A440 */
+    JF(st, JUNO_MCV_OFF(voice))   = 0.0f;         /* 304: no pitch-base / portamento offset */
+    /* Note velocity. The amp/VCA reads the per-voice velocity slots (6864 + the
+     * smoother copies at 6880/6896/6912) as v/127; with them left at 0 the VCA is
+     * effectively closed and the note plays far too quietly. The JUNO-60's velocity
+     * *depth* is 0 (the dynamics curve at 9680 is multiplied out), so this sets the
+     * VCA trigger level, not a velocity-dynamics response. */
+    {
+        float v = (float)((velocity < 0 ? 0 : velocity > 127 ? 127 : velocity)) / 127.0f;
+        int o;
+        for (o = 6864; o <= 6912; o += 16)
+            JF(st, o + (size_t)voice * JUNO_VOICE_MAIN_STRIDE) = v;
+    }
+    JF(st, JUNO_GATE_OFF(voice))  = 1.0f;         /* 320: gate held                        */
+    JI(st, JUNO_EDGE_OFF(voice))  = 0x3F800000;   /* 101504: 1.0f one-shot retrigger edge  */
+}
+
 void juno_note_on(unsigned char *st, int voice, int midi_note)
 {
-    /* pitch in octaves so Hz = JUNO_DCO_REF_HZ*2^pitch == 440*2^((note-69)/12) */
-    float pitch = (float)(log2(440.0 / JUNO_DCO_REF_HZ) + (midi_note - 69) / 12.0);
-    JF(st, JUNO_PITCH_OFF(voice)) = pitch;
-    /* M.CV (offset 304) is the per-voice pitch BASE. It sits 16 bytes below the
-     * voice block, so the parameter broadcast (which copies voice-0 params across
-     * voices at +10512) lands voice v's M.CV slot inside voice v-1's nominal block
-     * and overwrites it with the wrong value — leaving voices 1..7 mistuned (only
-     * voice 0, seeded by the capture, was correct). Re-seat each played voice's
-     * M.CV base from voice 0's so all voices share the correct pitch reference. */
-    JF(st, JUNO_MCV_OFF(voice)) = JF(st, JUNO_MCV_OFF(0));
-    JF(st, JUNO_GATE_OFF(voice))  = 1.0f;
-    JI(st, JUNO_EDGE_OFF(voice))  = 0x3F800000;  /* 1.0f — one-shot retrigger */
+    juno_note_on_vel(st, voice, midi_note, 100);  /* default velocity */
 }
 
 void juno_note_off(unsigned char *st, int voice)

@@ -61,16 +61,18 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR);
  * voice*32) for one sample. voice_render then generates the LFO, both ADSR
  * envelopes and the filter sweep internally from that gate.
  *
- * Pitch: voice_render reads the pitch from offset 4448 (+voice*10512) in OCTAVES
- * (Hz = JUNO_DCO_REF_HZ * 2^pitch). juno_note_on sets it for a MIDI note under
- * standard A440 equal temperament — the plugin's default tuning (its 12-entry
- * fine-tune table sub_135D180 defaults to equal temperament). The octave->Hz
- * reference is the transcribed DCO's own calibration, so the produced frequency
- * is exactly 440*2^((note-69)/12). Patch transpose/master-tune params are separate
- * (368/384) and left at the patch's values. */
-#define JUNO_DCO_REF_HZ  22380.1   /* Hz at pitch-offset 0, from the transcribed DCO */
+ * Pitch: voice_render forms the oscillator pitch as JF(4448) + JF(3776) (octaves)
+ * and looks it up in juno_pitch_table, which is referenced so pitch-offset 0 == A440.
+ * 4448 is the keyed note (+voice*10512); 3776 follows the M.CV/portamento base, which
+ * juno_note_on leaves at 0 for a plainly-keyed note. So the produced frequency is
+ * exactly 440*2^((note-69)/12) under standard A440 equal temperament (the plugin's
+ * default tuning; its 12-entry fine-tune table sub_135D180 defaults to equal
+ * temperament). Patch transpose/master-tune params are separate (368/384) and 0/center
+ * across all 64 factory banks. */
+#define JUNO_DCO_REF_HZ  440.0   /* Hz at pitch-offset 0 (A440) — the pitch-table reference */
 
-void juno_note_on (unsigned char *st, int voice, int midi_note);  /* gate + pitch + edge */
+void juno_note_on (unsigned char *st, int voice, int midi_note);  /* pitch+vel(100)+gate+edge */
+void juno_note_on_vel(unsigned char *st, int voice, int midi_note, int velocity); /* +velocity */
 void juno_note_off(unsigned char *st, int voice);                 /* gate=0.0 (release)  */
 
 #ifdef __cplusplus

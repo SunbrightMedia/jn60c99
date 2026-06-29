@@ -57,7 +57,7 @@ int juno_synth_load_preset(juno_synth *s, const char *bank, int rec, juno_preset
 }
 
 void juno_synth_note_on(juno_synth *s, int note, int vel){
-    (void)vel;
+    if (vel <= 0) { juno_synth_note_off(s, note); return; }
     int free_v=-1, oldest=0; unsigned oldest_age=~0u;
     for (int v=0; v<JUNO_NUM_VOICES; ++v){
         if (s->note_of_voice[v] < 0){ free_v=v; break; }
@@ -65,7 +65,7 @@ void juno_synth_note_on(juno_synth *s, int note, int vel){
     }
     int v = (free_v>=0)? free_v : oldest;       /* steal oldest if full */
     if (free_v<0) juno_note_off(s->st, v);
-    juno_note_on(s->st, v, note);
+    juno_note_on_vel(s->st, v, note, vel);
     s->note_of_voice[v]=note; s->age[v]=++s->clock;
 }
 void juno_synth_note_off(juno_synth *s, int note){
