@@ -41,6 +41,10 @@ int main(int argc,char**argv){
  int chorus = (pi.chorus_mode>=1)?pi.chorus_mode:0;
  static struct juno_host_shim sh;memset(&sh,0,sizeof sh);juno_driver_attach_host(st,&sh,chorus?chorus:2);
  if(pi.reverb_type>=0 && pi.reverb_type<=5) juno_reverb_activate(st,pi.reverb_type,1.0f);
+ /* warm-up pre-roll: settle the chorus delay smoother (tau=32787 samples) +
+  * reverb retune/fade, matching a live plugin that has been processing silence
+  * since activation (authentic-behavior parity; see host/juno_synth.c). */
+ for(int i=0;i<8*32787;i++){float l,r;juno_driver_render_sample(st,&l,&r);}
  printf("preset: \"%s\"  model=%d filter=%d chorus=%d fxA=%d reverb=%d  (%d params)\n",
    pi.name,pi.model,pi.filter_type,pi.chorus_mode,pi.fxa_type,pi.reverb_type,pi.applied);
  /* play the notes as a slow up-arpeggio, 1 voice retriggered */

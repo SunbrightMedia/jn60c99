@@ -53,6 +53,20 @@ int juno_synth_load_preset(juno_synth *s, const char *bank, int rec, juno_preset
     juno_driver_attach_host(s->st, &s->shim, chorus?chorus:2);
     if (info->reverb_type>=0 && info->reverb_type<=5)
         juno_reverb_activate(s->st, info->reverb_type, 1.0f);
+    /* Warm-up pre-roll: process silence so the master's slow control smoothers
+     * settle before the first note. AUTHENTIC-BEHAVIOR PARITY, not a DSP change:
+     * the binary's chorus delay smoother starts from construction state and
+     * settles with tau = 32787 samples (the mode switch zeroes only the level
+     * ramps, never the delay smoother, and nothing pre-fills the BBD lines) — a
+     * live plugin has been rendering silence since activation, so it never
+     * sounds the ~2.7 s wet pitch slide a cold engine produces on its first
+     * seconds of output. 8*tau (~262k samples) also absorbs the reverb
+     * clear/retune countdown + wet fade-in (~2756 samples). */
+    {
+        int i, n = 8 * 32787;
+        float l, r2;
+        for (i = 0; i < n; ++i) juno_driver_render_sample(s->st, &l, &r2);
+    }
     return 0;
 }
 
