@@ -1,7 +1,24 @@
 #include "juno_params.h"
 
+/* SR-dependent LUT families. The binary's per-param setters read the engine
+ * sample rate and select the family member at apply time (e.g. the HPF setter
+ * sub_7FF91DFB6E30: sr==44100 -> table 39, sr==48000 -> 40, else 41). Families
+ * ({44.1k, 48k, 96k} members, ratios 2.1769 / 2.0 verified across all steps):
+ *   {33,34,35} ENV attack   {36,37,38} ENV decay/release
+ *   {39,40,41} HPF cutoff   {42,43,44} LFO delay
+ * The param map stores the 96k member id; remap by the engine SR here — the
+ * single choke point every apply goes through, mirroring the binary. */
+static int juno_tid_for_sr(const unsigned char *st, int tid){
+    if (tid==35 || tid==38 || tid==41 || tid==44) {
+        int sr = (int)JF(st, 16);
+        if (sr == 44100) return tid - 2;
+        if (sr == 48000) return tid - 1;
+    }
+    return tid;
+}
+
 void juno_param_apply_lut(unsigned char *st, int offset, int tableId, int step, int broadcast){
-    float c = juno_lut_apply(tableId, step);
+    float c = juno_lut_apply(juno_tid_for_sr(st, tableId), step);
     /* (A former special-case gated tableId 12 step 0 to 0.0 for Osc Noise Level.
      * The decompile audit disproved it: NO call site in the whole binary uses
      * table 12 — the real OscVoice noise setter (sub_7FF91DFBC4B0) applies LUT54,
