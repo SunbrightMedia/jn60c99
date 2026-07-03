@@ -48,3 +48,4 @@ refs/captures/*.bin
 tests/play_captured
 tests/play_sqarpg_arp
 scratch_decomp/
+tests/test_regression

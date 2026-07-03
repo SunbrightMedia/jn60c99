@@ -9,11 +9,12 @@ OBJ     := $(SRC:.c=.o)
 .PHONY: all test clean
 all: $(OBJ)
 
-test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_arp_smoke
+test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_arp_smoke tests/test_regression
 	./tests/test_helpers
 	./tests/test_voice_smoke
 	./tests/test_master_smoke
 	./tests/test_arp_smoke
+	./tests/test_regression
 
 tests/test_helpers: tests/test_helpers.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
@@ -28,8 +29,13 @@ tests/test_master_smoke: tests/test_master_smoke.c $(SRC)
 tests/test_arp_smoke: tests/test_arp_smoke.c src/arp.c src/arp.h
 	$(CC) $(CFLAGS) -o $@ tests/test_arp_smoke.c src/arp.c $(LDLIBS)
 
+# Regression guards: rec0 oracle bit-exact, SR-family selection, note-path
+# invariants, preset render smoke. Run on every change.
+tests/test_regression: tests/test_regression.c $(SRC)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
 clean:
-	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_arp_smoke tests/sound_test
+	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_arp_smoke tests/test_regression tests/sound_test
 
 # Faithful sound test: run our DSP forward from the live plugin's captured state.
 sound: tests/sound_test.c $(SRC)
