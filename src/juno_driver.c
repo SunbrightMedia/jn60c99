@@ -49,10 +49,17 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
     memcpy(st + 136, &base, sizeof(void *));
 }
 
-/* Note gate. The host holds the per-voice "M.Gate" param (offset 320 + v*10512)
- * at 1.0 for the duration of the note and pulses the note-on edge (offset 101504
- * + v*32). voice_render consumes the edge once, then runs its internal LFO/ADSR/
- * filter-envelope generators off the held gate. */
+/* Note gate — protocol verified faithful against the decompile + runtime dump:
+ * the render reads M.Gate (320 + v*10512) as a LEVEL gate every sample, and
+ * 101504 + v*32 ("Voice N Note Off Notify", param 927+) as a SELF-CLEARING
+ * one-shot: while pending=1.0 the render saves the gate, forces it 0 for that
+ * one sample, then restores it and clears the flag (decomp_340000.c:28376-80 /
+ * 29955-58). The real control layer ARMS the flag at note-off/prune/init —
+ * every idle voice in the runtime dump holds it pending — so a fresh note
+ * always begins with one forced gate-0 sample (the retrigger). Pulsing it at
+ * note-on reproduces that exactly, incl. voice-steal retrigger. (101488
+ * "Gate Notify" is a write-only control-layer latch with no reader anywhere
+ * in the binary; the driver correctly ignores it.) */
 #define JUNO_GATE_OFF(v)   (JUNO_VOICE_MAIN_BASE0 + (v) * JUNO_VOICE_MAIN_STRIDE)  /* 320 */
 #define JUNO_PITCH_OFF(v)  (4448            + (v) * JUNO_VOICE_MAIN_STRIDE)        /* 4448 */
 #define JUNO_MCV_OFF(v)    (304             + (v) * JUNO_VOICE_MAIN_STRIDE)        /* 304 */
@@ -114,6 +121,12 @@ void juno_note_on(unsigned char *st, int voice, int midi_note)
 void juno_note_off(unsigned char *st, int voice)
 {
     JF(st, JUNO_GATE_OFF(voice)) = 0.0f;
+    /* Re-arm the Note Off Notify one-shot, restoring the engine's invariant
+     * that every idle voice holds it pending (runtime dump: 1.0 on all
+     * non-rendering voices). No audible effect today (with the gate already 0
+     * the pulse is a no-op and note-on re-pulses), but it matches the real
+     * control layer, which arms it at note-off/prune. */
+    JI(st, JUNO_EDGE_OFF(voice)) = 0x3F800000;
 }
 
 /* Render one stereo output sample: voices -> 8 buffers -> master process.
