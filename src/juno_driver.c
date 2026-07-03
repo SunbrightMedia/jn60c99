@@ -81,16 +81,26 @@ void juno_note_on_vel(unsigned char *st, int voice, int midi_note, int velocity)
      * base, one bypassed M.CV with 4448=(note-69)/12 — frequency-correct but it
      * lost the per-key detune and broke the portamento path.) */
     JF(st, JUNO_MCV_OFF(voice)) = juno_lut_apply(32, midi_note & 127);  /* 304: key CV */
-    /* Note velocity. The amp/VCA reads the per-voice velocity slots (6864 + the
-     * smoother copies at 6880/6896/6912) as v/127; with them left at 0 the VCA is
-     * effectively closed and the note plays far too quietly. The JUNO-60's velocity
-     * *depth* is 0 (the dynamics curve at 9680 is multiplied out), so this sets the
-     * VCA trigger level, not a velocity-dynamics response. */
+    /* Note velocity — the real trigger writes TWO distinct velocity params
+     * (audited vs the decompile; both bit-exact vs the runtime dump at vel 107):
+     *  - LINEAR velocity (param id 73) -> 6864 + smoother copies 6880/6896/6912,
+     *    = LUT56[vel] = vel/127 (dump 0.842520 = 107/127). Gates the VCA level;
+     *    with these at 0 the note is nearly silent.
+     *  - CURVE velocity (param id 98, setter sub_180357160) -> 9680 (+copies
+     *    9696/9712), = LUT57[vel] (dump 1.154360 = LUT57[107]). The amp combines
+     *    v331 = fix(9616) + sens(9600)*(smoothed(9680) - fix); the JUNO-60 panel
+     *    has AMP VELOCITY SENS = 0 so this is multiplied out, but it is what the
+     *    plugin writes and is live for any velocity-sensitive configuration. */
     {
-        float v = (float)((velocity < 0 ? 0 : velocity > 127 ? 127 : velocity)) / 127.0f;
+        int vc = velocity < 0 ? 0 : velocity > 127 ? 127 : velocity;
+        float v = (float)vc / 127.0f;
+        float cw = juno_lut_apply(57, vc);
+        size_t b = (size_t)voice * JUNO_VOICE_MAIN_STRIDE;
         int o;
-        for (o = 6864; o <= 6912; o += 16)
-            JF(st, o + (size_t)voice * JUNO_VOICE_MAIN_STRIDE) = v;
+        for (o = 6864; o <= 6912; o += 16) JF(st, o + b) = v;
+        JF(st, 9680 + b) = cw;
+        JF(st, 9696 + b) = cw;   /* render copy chain 9680->9696 */
+        JF(st, 9712 + b) = cw;   /* smoother history; seeded = settled state */
     }
     JF(st, JUNO_GATE_OFF(voice))  = 1.0f;         /* 320: gate held                        */
     JI(st, JUNO_EDGE_OFF(voice))  = 0x3F800000;   /* 101504: 1.0f one-shot retrigger edge  */
