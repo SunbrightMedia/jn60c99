@@ -113,6 +113,40 @@ int juno_preset_load(unsigned char *st, const char *bank_path, int record,
       /* DB801 BEND RANGE -> 4128: a 0..23 SEMITONE value, engine = LUT21(step+160)
        * = (R+32)/255 (R=11 -> 0x3e2cacad exact). NOT the plain 0..255 LUT path. */
       s = step_synth(dec,ndec,801); if (s>=0 && s+160<=255) juno_param_apply_lut(st, 4128, 21, s+160, 1);
+
+      /* DB752 LFO RATE fans out to THREE slots (decompile-proven: the LfoVoice
+       * rate setter sub_7FF91DFBAA80 @ rva 0x35AA80 writes them all):
+       *   1088 = LUT22[step]                      (free-run rate — in the map)
+       *   2064 = LUT22[step]                      (LFO Noise Mix: same value, second
+       *                                            write by the SAME handler — this
+       *                                            param has NO bank position of its own)
+       *   1072 = LUT53[tempo*10] * LUT48[step]    (tempo-synced rate, LFO cycles per
+       *                                            whole note x whole-notes/sec)
+       * The ctor default tempo is 120 BPM (sub_7FF91DFB9F70 stores 1200); the engine
+       * chooses 1088 vs 1072 by the TEMPO SYNC switch (1056). LUT53[1200] =
+       * 0x3f2eb51b; rec0: x LUT48[118]=6.0 -> 0x408307d4 bit-exact, and the pad
+       * capture's 1072 = 0x402eb51b = LUT53[1200]*4.0 confirms it independently. */
+      s = step_synth(dec,ndec,752);
+      if (s>=0 && s<=255) {
+          static const union { unsigned u; float f; } lut53_1200 = { 0x3f2eb51bu };
+          juno_param_apply_lut(st, 2064, 22, s, 1);
+          juno_param_apply_value(st, 1072, lut53_1200.f * juno_lut_apply(48, s), 1);
+      }
+      /* DB782 HPF CUTOFF drives FOUR slots (asm-proven, sub_7FF91DFB6E30 @ rva
+       * 0x356E30 / allcode/asm_340000.asm:23351): 10240 = LUT41[step] (96k table;
+       * 39/40/41 by SR), 10256 = LUT52[step!=0] (HPF engage switch), 10272 = 0.0,
+       * 10288 = 1.0. The map covers 10240 only; without 10256 the HPF never
+       * engages for any preset with HPF > 0. */
+      s = step_synth(dec,ndec,782);
+      if (s>=0 && s<=255) {
+          juno_param_apply_lut(st, 10256, 52, s ? 1 : 0, 1);
+          juno_param_apply_value(st, 10272, 0.0f, 1);
+          juno_param_apply_value(st, 10288, 1.0f, 1);
+      }
+      /* DB751 LFO DELAY TIME also writes 1936 = LUT52[step!=0] (LFO Delay Sw),
+       * same handler as the 1920 delay-time write (decompile-proven). */
+      s = step_synth(dec,ndec,751);
+      if (s>=0 && s<=255) juno_param_apply_lut(st, 1936, 52, s ? 1 : 0, 1);
     }
     /* DB795 REVERB LEVEL: NOT bound to engine node 10759440. The ECF-reverb ctor
      * sub_7FF91E01CCC0 (rva 0x3BCCC0) writes node 0x447 (@10759440) UNCONDITIONALLY

@@ -16,7 +16,7 @@ static const juno_param_map_ent JUNO_PARAM_MAP[] = {
   { 770,   4208,  54, "DCO PWM LEVEL"},
   { 771,   4192,  54, "DCO SAW LEVEL"},
   { 772,   4224,  54, "DCO SUB LEVEL"},
-  { 773,   6528,  12, "DCO NOISE LEVEL"},
+  { 773,   6528,  54, "DCO NOISE LEVEL"},  /* was tid12: the real OscVoice setter (sub_7FF91DFBC4B0) applies LUT54; LUT54[0]=0 natively */
   { 779,   6736,  22, "VCF CUTOFF FREQ"},
   { 781,   6832,  22, "VCF RESONANCE"},
   { 782,  10240,  41, "HPF CUTOFF FREQ"},
@@ -30,7 +30,7 @@ static const juno_param_map_ent JUNO_PARAM_MAP[] = {
   { 790,   3296,  38, "ENV2 DECAY"},
   { 791,   3280,  50, "ENV2 SUSTAIN"},
   { 792,   3312,  38, "ENV2 RELEASE"},
-  { 793,   9584,  21, "VCA TONE"},
+  { 793,   9584,  24, "VCA TONE"},  /* was tid21 (stale registry tid): the AmpVoice tone setter (sub_7FF91DFB7060) applies bipolar LUT24 */
 };
 #define JUNO_PARAM_MAP_N 24
 /* FX/global selectors (stride-4 region; k=309+(db-871)*4 on the bank stream) */
