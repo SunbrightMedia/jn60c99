@@ -16,6 +16,7 @@
  */
 #include "juno_engine.h"
 #include "juno_driver.h"
+#include "juno_param_luts.h"
 #include <string.h>
 #include <math.h>
 
@@ -59,19 +60,27 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
 
 void juno_note_on_vel(unsigned char *st, int voice, int midi_note, int velocity)
 {
-    /* DCO pitch. The engine's pitch table (juno_pitch_table, filled by
-     * engine_init) is referenced so pitch-offset 0 == A440; the oscillator's
-     * final pitch is JF(4448) + JF(3776), where 3776 follows the M.CV/portamento
-     * base. For a plainly-keyed note the pitch is pure equal temperament and the
-     * M.CV base contributes nothing, so
-     *     Hz = 440 * 2^((note-69)/12).
-     * (The earlier formula referenced a wrong 22380.1 Hz base — i.e. it subtracted
-     * ~5.669 octaves — which the capture happened to mask by seeding M.CV at
-     * +6.668 octaves; together they left every note an octave sharp, and without
-     * the capture they collapsed pitch ~5.7 octaves into sub-audio rumble.) */
-    float pitch = (float)((midi_note - 69) / 12.0);
-    JF(st, JUNO_PITCH_OFF(voice)) = pitch;        /* 4448: note pitch, octaves re A440 */
-    JF(st, JUNO_MCV_OFF(voice))   = 0.0f;         /* 304: no pitch-base / portamento offset */
+    /* DCO pitch — the binary's actual note path (verified against the plugin's own
+     * runtime state, state_dump/state_t0.bin + the record-0 capture):
+     *
+     *   - The voice-trigger writes the KEY CV to M.CV (offset 304), applied through
+     *     the tid-32 pitch LUT with step = the MIDI note itself. LUT32 is the
+     *     plugin's semitone table WITH per-key analog detune baked in
+     *     (LUT32[i] = (i-12)/12 + eps_i, |eps| <= ~2.3 cents):
+     *       pad dump  304 = 6.668469 = LUT32[92] bit-exact (held G#6, note 92)
+     *       rec0 dump 304 = 2.000303 = LUT32[36] bit-exact (held C2,  note 36)
+     *   - 4448 is the STATIC pitch base -4.75 = -57/12 (engine_init writes
+     *     0xC0980000; it is NOT a descriptor slot, so it survives the param layer)
+     *     and is never touched at note-on.
+     *   - voice_render forms the final pitch as JF(4448) + JF(3776), where 3776 is
+     *     M.CV through the portamento smoother. So
+     *       Hz = 440 * 2^((note-69)/12 + eps_note)
+     *     and portamento glides the note CV exactly as the plugin does.
+     *
+     * (Two earlier formulas here were wrong: one referenced a bogus 22380.1 Hz
+     * base, one bypassed M.CV with 4448=(note-69)/12 — frequency-correct but it
+     * lost the per-key detune and broke the portamento path.) */
+    JF(st, JUNO_MCV_OFF(voice)) = juno_lut_apply(32, midi_note & 127);  /* 304: key CV */
     /* Note velocity. The amp/VCA reads the per-voice velocity slots (6864 + the
      * smoother copies at 6880/6896/6912) as v/127; with them left at 0 the VCA is
      * effectively closed and the note plays far too quietly. The JUNO-60's velocity
