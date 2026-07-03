@@ -1,3 +1,18 @@
+> **CORRECTION (2026-07, full driver/decoder audits):** several conclusions below
+> are superseded. (1) "The note-on velocity handler is a dead end" was wrong in
+> practice: while the velocity *curve* (9680) is indeed multiplied out by
+> AMP VELOCITY SENS = 0, the *linear* velocity slots (6864 family) gate the VCA —
+> the driver was not writing them and every note played 20-40x too quiet. Both
+> are now written (vel/127 + LUT57[vel]), matching the trigger in the binary.
+> (2) "No remaining static-coefficient bug" predates finding the note-path bugs
+> (wrong pitch reference; bypassed M.CV disabling VCF key follow), five decoder
+> bugs (VCA TONE tid24, NOISE tid54, LFO RATE 3-slot fan-out incl. tempo rate,
+> HPF engage switch, LFO Delay Sw), and the SR-family selection bug (96k tables
+> applied at 44.1k -> envelopes 2.18x too fast). See the git log for each fix.
+> (3) The onset wet-path pitch slide is authentic plugin behavior (chorus delay
+> smoother settling, tau = 32787 samples); hosts now pre-roll to match a live
+> instance.
+
 # Voice-region capture sensitivity analysis (SQ Dynamic ARPG)
 
 Goal: determine which of the 133 remaining capture-seeded voice-region offsets

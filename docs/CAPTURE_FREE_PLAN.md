@@ -1,3 +1,11 @@
+> **STATUS (2026-07): capture elimination is COMPLETE.** The product seeds from
+> `juno_capture_free_seed()` (construction + registration defaults + framework
+> constants + .rdata FX/reverb tables) and the loader reproduces the record-0
+> oracle **58/58 bit-exact** with `runtime_coeffs_data.c` excluded from the
+> build. `refs/recovered_param_steps.json` (capture-reverse-matched steps) is
+> **deprecated** — superseded by the deserializer-proven decode; kept only as
+> a historical artifact.
+
 # Making the port fully capture-free (everything from the decompile)
 
 Goal (user directive): the port reproduces the plugin with **no external input** — no

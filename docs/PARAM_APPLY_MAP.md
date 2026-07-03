@@ -1,3 +1,10 @@
+> **CORRECTION (2026-07, deserializer audit):** the "byte-0 gate" story below is
+> **disproven**. No call site in the whole binary uses LUT table 12 — the real
+> OscVoice noise setter (`sub_7FF91DFBC4B0`) applies **LUT54**, whose step 0 is
+> natively 0.0, so no gate exists. The PD-pad captured value `0x3e340000` is
+> `LUT54[45]` (that patch's noise byte was 45, not 230). The map now binds DB773
+> with tableId 54 and `juno_params.c` carries no special case.
+
 # RESOLVED: noise byte→step is identity + a byte-0 zero-gate (the "noisy render")
 
 **Fixed.** The byte→step mapping for the synth-voice family is **identity** (raw bank
