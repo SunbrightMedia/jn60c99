@@ -36,11 +36,14 @@ void juno_voice_constants(unsigned char *st)
     juno_param_apply_lut(st, 7424, 22, 105, /*broadcast=*/1); /* Velocity Sens 105/255 = LUT22[105] @rva 0x96d484 */
     juno_param_apply_lut(st, 7472, 22,  43, /*broadcast=*/1); /* Bend Sens VCF  43/255 = LUT22[43]  @rva 0x96d38c */
 
-    /* M.CV master value-slot (param_id 111), pitch/CV LUT tableId 32; index 36 =
-     * 2.0003 = .rdata 0x400004f7 @rva 0x97f6a0 (same table as the voice M.CV pitch
-     * base 6.66847 = LUT32[92]). Master slot — render path never reads it; write
-     * once (broadcast=0). Do NOT broadcast: 10816 + 7*10512 = 84400 lands in the
-     * shared region [84000,90000) and would clobber the DSP-read coefficient that
-     * engine_init puts at 84400 (voice_render.c). */
-    juno_param_apply_lut(st, 10816, 32, 36, /*broadcast=*/0); /* M.CV (master) 2.0003 = LUT32[36] @rva 0x97f6a0 */
+    /* M.CV (key CV) registration default — LUT32[36] = 2.000303 = .rdata
+     * 0x400004f7 @rva 0x97f6a0 (a C2). M.CV is a PER-VOICE param (offsets 304,
+     * 10816, 21328, ... = 304 + v*10512; each voice's render reads its own slot,
+     * e.g. voice 1 at decomp_340000.c:30564), and the plugin's runtime state
+     * shows every never-played voice still holding LUT32[36] (pad dump voices
+     * 6-7; rec0 capture all checked voices). Note-on overwrites the played
+     * voice's slot with LUT32[midi_note]; this default is the portamento glide
+     * origin of each voice's FIRST note. Broadcast from base 304 (tops out at
+     * 73888, safely below the shared region). */
+    juno_param_apply_lut(st, 304, 32, 36, /*broadcast=*/1); /* M.CV default C2 = LUT32[36] @rva 0x97f6a0 */
 }
