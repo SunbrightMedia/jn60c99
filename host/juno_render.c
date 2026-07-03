@@ -32,6 +32,7 @@ int main(int argc,char**argv){
  if(nn==0){notes[0]=60;notes[1]=64;notes[2]=67;nn=3;}
  const int SR=48000;
  unsigned char*st=malloc(JUNO_STATE_BYTES);memset(st,0,JUNO_STATE_BYTES);
+ JF(st,16)=(float)SR;   /* engine SR: selects init coeff set + SR-family LUTs */
  juno_chorus_init(st);juno_engine_init(st);JUNO_SEED(st);
  juno_preset_info pi;
  if(juno_preset_load(st,bank,rec,&pi)!=0){fprintf(stderr,"preset load failed\n");return 1;}
