@@ -35,17 +35,31 @@
 #define BANK_COUNT    64
 
 /* Confirmed bindings: {blob parameter position, curve id, engine state offset}.
- * blob positions anchored to patch 5; curve+offset from the plugin's thunks. */
+ * - blob_pos: aligned to the plugin's ordered param table, anchored to the known
+ *   values of bank patch 5 "LD Classic Lead" (unique value matches).
+ * - curve_id: from the plugin's setter thunks, confirmed by running the real
+ *   thunks under Unicorn. Sample-rate-variant curves (the envelope times) were
+ *   emulated at 96 kHz (our engine's rate): ENV Attack=35, Decay/Release=38.
+ * - offset: the engine coefficient slot (registry, name-checked vs COEFF_PARAM_MAP).
+ * VCF CUTOFF FREQ is oracle-proven: juno_curve(22,153)=0.600000 == the plugin's
+ * own float value for this patch. */
 typedef struct { int blob_pos; int curve_id; int offset; const char *name; } juno_bind;
 
 static const juno_bind BINDINGS[] = {
-    { 35, 22,  6736, "VCF CUTOFF FREQ" },   /* -> LPF Cutoff (verified = 0.6)   */
-    { 37, 22,  6832, "VCF RESONANCE"   },   /* -> LPF Resonance                 */
-    { 38,  1, 10240, "HPF CUTOFF FREQ" },   /* -> HPF Cutoff                    */
-    { 44, 35,  2784, "ENV1 ATTACK"     },   /* -> filter ENV Attack (96k curve) */
-    { 41, 36,  2816, "ENV1 DECAY"      },   /* -> filter ENV Decay              */
-    { 42, 50,  2800, "ENV1 SUSTAIN"    },   /* -> filter ENV Sustain            */
-    { 43, 36,  2832, "ENV1 RELEASE"    },   /* -> filter ENV Release            */
+    { 35, 22,  6736, "VCF CUTOFF FREQ" },   /* -> LPF Cutoff  (VERIFIED = 0.6)     */
+    { 37, 22,  6832, "VCF RESONANCE"   },   /* -> LPF Resonance                    */
+    /* HPF CUTOFF FREQ (blob 38 -> 10240) deferred: its thunk is SR-variant and the
+     * two extraction methods disagreed on the curve (41 vs 52); not applied until
+     * the exact 96 kHz curve is pinned (no fabrication). */
+    { 44, 35,  2784, "ENV1 ATTACK"     },   /* -> filter ENV Attack  (96k curve 35)*/
+    { 41, 38,  2816, "ENV1 DECAY"      },   /* -> filter ENV Decay   (96k curve 38)*/
+    { 42, 50,  2800, "ENV1 SUSTAIN"    },   /* -> filter ENV Sustain               */
+    { 43, 38,  2832, "ENV1 RELEASE"    },   /* -> filter ENV Release (96k curve 38)*/
+    { 45, 35,  3264, "ENV2 ATTACK"     },   /* -> amp ENV Attack                   */
+    { 52, 38,  3312, "ENV2 RELEASE"    },   /* -> amp ENV Release                  */
+    { 48, 24,  7408, "VCF KEY FOLLOW"  },   /* -> KCV Level                        */
+    { 39, 46,  7392, "VCF ENV MOD"     },   /* -> ENV Level (filter env depth)     */
+    { 53, 24,  9584, "VCA TONE"        },   /* -> AMP TONE                         */
 };
 #define N_BINDINGS ((int)(sizeof(BINDINGS)/sizeof(BINDINGS[0])))
 
