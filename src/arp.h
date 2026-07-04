@@ -109,4 +109,9 @@ int64_t juno_arp_sel_transpose(unsigned char *a1, int a2, int64_t a3); /* m11  *
  * variation pattern record so the next clock boundary expands it. */
 void juno_arp_load_pattern(juno_arp *arp, const unsigned char *mode_hdr, const unsigned char *pattern);
 
+/* Expand the staged pattern immediately (the binary's config-apply sequence;
+ * also run by the clock's +40 branch at step boundaries). Must be called once
+ * after juno_arp_load_pattern and BEFORE the first juno_arp_clock tick. */
+void juno_arp_pattern_commit(juno_arp *arp);
+
 #endif /* JUNO_ARP_H */

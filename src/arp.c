@@ -1032,6 +1032,13 @@ void juno_arp_init(juno_arp *arp, const juno_arp_callbacks *cb)
      * arp that is clocked before set-mode is safe (matches sub_7FF91E01FCB0
      * default). */
     ARP_SEL(arp->st) = juno_arp_sel_order;
+    /* Step-period pre-seed. In the binary, the CKbdArp wrapper loads + expands
+     * the default pattern at construction, so +3055 is always >= 1 before the
+     * first stage call (sub_7FF91E01F9C0 computes counter % period with NO
+     * zero guard — a 0 period is unreachable in the real init order). Seed 1
+     * so a load_pattern before the first expansion is equally safe; the first
+     * expansion overwrites it with the pattern's real period. */
+    *(signed char *)(arp->st + 3055) = 1;
 }
 
 void juno_arp_note_on(juno_arp *arp, int key, int vel)
@@ -1820,4 +1827,18 @@ void juno_arp_load_pattern(juno_arp *arp,
      *     sub_7FF91E01FED0((__int64)a1, 0);
      *     a1[40] = 0;
      * but the faithful behaviour is to let juno_arp_clock() drive it.        */
+}
+
+/* Immediate expansion of the staged pattern — the sequence the binary's
+ * config-apply runs at construction/param-change (sub_7FF91E024920 ->
+ * sub_7FF91E020EC0 path), and the same three calls the clock driver's +40
+ * branch performs at a step boundary. Required before the first
+ * juno_arp_clock tick: until a pattern has expanded, the step-period field
+ * (+3055) is 0 and the clock's modulo faults. */
+void juno_arp_pattern_commit(juno_arp *arp)
+{
+    unsigned char *a1 = arp->st;
+    sub_7FF91E01F9F0((__int64)a1, (char *)*(__int64 *)(a1 + 32), (_BYTE *)(a1 + 804));
+    sub_7FF91E01FED0((__int64)a1, 0);
+    a1[40] = 0;
 }
