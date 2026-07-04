@@ -24,12 +24,22 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LIB = os.path.join(ROOT, "libjuno.so")
 MAP = os.path.join(ROOT, "docs", "COEFF_PARAM_MAP.md")
 PRESET_DIR = os.path.join(ROOT, "presets")
+CRASH_LOG = os.path.join(ROOT, "gui", "crash.log")
 SAMPLE_RATE = 96000  # captured patch is 96 kHz (docs/PORT_STATUS.md)
+
+def crumb(msg):
+    """Startup breadcrumb — printed AND appended to gui/crash.log, so a crash
+    that closes the console still leaves a trail of how far startup got."""
+    print("[juno_gui] " + msg, flush=True)
+    with open(CRASH_LOG, "a") as f:
+        f.write("[juno_gui] " + msg + "\n")
 
 # ---------------------------------------------------------------- engine
 
 class Engine:
     def __init__(self):
+        if not os.path.exists(LIB):
+            raise RuntimeError("%s not found — build it first:  make gui" % LIB)
         lib = ctypes.CDLL(LIB)
         lib.juno_gui_create.restype = ctypes.c_void_p
         lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
@@ -125,11 +135,15 @@ def selftest():
 # -------------------------------------------------------------------- UI
 
 def main():
+    crumb("python %s on %s" % (sys.version.split()[0], sys.platform))
     import tkinter as tk
     from tkinter import ttk, filedialog, messagebox, simpledialog
+    crumb("tkinter %s" % tk.TkVersion)
 
     eng = Engine()
+    crumb("engine created (libjuno.so loaded, state initialised)")
     params = load_param_map()
+    crumb("param map parsed: %d params" % len(params))
 
     root = tk.Tk()
     root.title("jn60c99 test panel — %d params @ %d Hz" % (len(params), SAMPLE_RATE))
@@ -249,10 +263,37 @@ def main():
 
     build_rows()
     fvar.trace_add("write", lambda *_: build_rows(fvar.get()))
+    crumb("UI built — entering mainloop")
     root.mainloop()
+    crumb("mainloop exited (window closed)")
+
+def run_guarded():
+    """Run main() with full crash capture: Python exceptions AND hard crashes
+    (segfaults) both land in gui/crash.log, and an error dialog is kept open
+    so a console-flash launch still shows what died."""
+    import faulthandler
+    open(CRASH_LOG, "w").close()                 # fresh log per run
+    fh = open(CRASH_LOG, "a")
+    faulthandler.enable(fh)                      # segfault -> traceback in log
+    try:
+        main()
+    except Exception:
+        import traceback
+        tb = traceback.format_exc()
+        sys.stderr.write(tb)
+        fh.write(tb); fh.flush()
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            r = tk.Tk(); r.withdraw()
+            messagebox.showerror("juno_gui crashed",
+                                 tb + "\n(saved to gui/crash.log)")
+        except Exception:
+            pass
+        sys.exit(1)
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         selftest()
     else:
-        main()
+        run_guarded()

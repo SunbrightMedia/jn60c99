@@ -21,6 +21,7 @@ __pycache__/
 
 # GUI output (libjuno.so covered by *.so above)
 gui/render.wav
+gui/crash.log
 presets/
 
 # Large raw memory dumps (compressed .gz kept as provenance)
