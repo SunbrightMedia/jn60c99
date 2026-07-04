@@ -6,8 +6,13 @@ LDLIBS  ?= -lm
 SRC     := $(wildcard src/*.c)
 OBJ     := $(SRC:.c=.o)
 
-.PHONY: all test clean
+.PHONY: all test clean gui
 all: $(OBJ)
+
+# Shared library for the test GUI (gui/juno_gui.py via ctypes).
+gui: libjuno.so
+libjuno.so: gui/juno_bridge.c $(SRC)
+	$(CC) $(CFLAGS) -shared -fPIC -o $@ $^ $(LDLIBS)
 
 test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke
 	./tests/test_helpers

@@ -19,6 +19,10 @@ tests/test_master_smoke
 __pycache__/
 *.pyc
 
+# GUI output (libjuno.so covered by *.so above)
+gui/render.wav
+presets/
+
 # Large raw memory dumps (compressed .gz kept as provenance)
 state_dump/*.bin
 state_dump/.dspreads.txt
