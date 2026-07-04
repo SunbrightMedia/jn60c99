@@ -7,23 +7,25 @@ output), just compiled with emscripten instead of gcc.
 
 ## Use it — the permanent-URL way (recommended)
 
-Two one-time steps (the workflow can't be pushed by a bot token — it needs
-`workflow` scope — so you add it):
+No file to create, no merge. The app is mirrored into the repo's `docs/` folder;
+just point Pages at it:
 
-1. **Add the workflow.** Copy `gui/web/pages-workflow.yml` to
-   `.github/workflows/pages.yml`. Easiest: on GitHub, **Add file → Create new
-   file**, name it `.github/workflows/pages.yml`, paste the contents, commit.
-2. **Enable Pages.** Repo **Settings → Pages → Source → "GitHub Actions"**.
-
-Then every push to the default branch republishes. The synth lives at:
+1. Repo **Settings** → **Pages** (left sidebar).
+2. **Source: Deploy from a branch.** Branch: `claude/c99-gui-fable5-yfhak1`,
+   folder: **`/docs`**. Save.
+3. Wait ~1 minute, refresh. A link appears — the synth lives at:
 
 ```
 https://<owner>.github.io/<repo>/
 ```
 
-Bookmark it. When new changes land, just refresh — nothing to download or run.
-(The workflow rebuilds the WASM from `src/` in CI, so the hosted binary can
-never drift from the source.)
+Bookmark it. Every push to that branch republishes automatically — just refresh.
+(Once the branch is merged, switch the Pages branch to `main`.)
+
+**Alternative — auto-rebuild via Actions** (`pages-workflow.yml`): copy it to
+`.github/workflows/pages.yml` and set Source → "GitHub Actions". This rebuilds
+the WASM from `src/` in CI so the hosted binary can't drift. Optional; the
+`/docs` method above is simpler.
 
 ## Use it — locally, no build
 
