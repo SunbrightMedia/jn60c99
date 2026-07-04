@@ -21,7 +21,9 @@ Usage:  make gui && python3 gui/juno_gui.py
 import ctypes, json, os, re, struct, sys, wave
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LIB = os.path.join(ROOT, "libjuno.so")
+# Windows loads the prebuilt DLL shipped in the repo root (see Makefile `dll`
+# target); everywhere else build libjuno.so with `make gui`.
+LIB = os.path.join(ROOT, "juno.dll" if sys.platform == "win32" else "libjuno.so")
 MAP = os.path.join(ROOT, "docs", "COEFF_PARAM_MAP.md")
 PRESET_DIR = os.path.join(ROOT, "presets")
 CRASH_LOG = os.path.join(ROOT, "gui", "crash.log")
@@ -31,7 +33,7 @@ def crumb(msg):
     """Startup breadcrumb — printed AND appended to gui/crash.log, so a crash
     that closes the console still leaves a trail of how far startup got."""
     print("[juno_gui] " + msg, flush=True)
-    with open(CRASH_LOG, "a") as f:
+    with open(CRASH_LOG, "a", encoding="utf-8") as f:
         f.write("[juno_gui] " + msg + "\n")
 
 # ---------------------------------------------------------------- engine
@@ -39,7 +41,10 @@ def crumb(msg):
 class Engine:
     def __init__(self):
         if not os.path.exists(LIB):
-            raise RuntimeError("%s not found — build it first:  make gui" % LIB)
+            raise RuntimeError("%s not found — %s" % (LIB,
+                "juno.dll ships prebuilt in the repo root; re-download the "
+                "branch (or build: make dll)" if sys.platform == "win32"
+                else "build it first:  make gui"))
         lib = ctypes.CDLL(LIB)
         lib.juno_gui_create.restype = ctypes.c_void_p
         lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
@@ -92,7 +97,7 @@ def section_of(off):
 def load_param_map():
     """Parse docs/COEFF_PARAM_MAP.md table rows -> [(offset, name)]."""
     params = []
-    with open(MAP) as f:
+    with open(MAP, encoding="utf-8") as f:   # md has non-ASCII; cp1252 would die
         for line in f:
             m = re.match(r"\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|", line)
             if m and m.group(1).isdigit():

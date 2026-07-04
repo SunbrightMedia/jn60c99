@@ -10,6 +10,18 @@ python3 gui/juno_gui.py        # opens the panel
 python3 gui/juno_gui.py --selftest   # headless bridge check (no display)
 ```
 
+**Windows:** no build needed — a prebuilt `juno.dll` (mingw-w64, static,
+imports only KERNEL32+msvcrt; smoke-tested under Wine) is committed in the
+repo root and the GUI loads it automatically:
+
+```
+py gui\juno_gui.py
+```
+
+To rebuild it: `make dll` (cross) or natively
+`gcc -std=c99 -O2 -fno-strict-aliasing -shared -static -o juno.dll gui/juno_bridge.c src/*.c -lm`
+from MinGW/MSYS2. Any crash/traceback lands in `gui/crash.log`.
+
 ## What it is
 
 - **Every mapped parameter** — the rows of `docs/COEFF_PARAM_MAP.md` (the

@@ -14,6 +14,14 @@ gui: libjuno.so
 libjuno.so: gui/juno_bridge.c $(SRC)
 	$(CC) $(CFLAGS) -shared -fPIC -o $@ $^ $(LDLIBS)
 
+# Windows DLL for the GUI (cross-compile with mingw-w64, or native MinGW).
+# -static: no MinGW runtime DLLs needed; imports only KERNEL32 + msvcrt.
+# A prebuilt juno.dll is committed so Windows users can run the GUI directly.
+CC_WIN ?= x86_64-w64-mingw32-gcc
+dll: juno.dll
+juno.dll: gui/juno_bridge.c $(SRC)
+	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $^ $(LDLIBS)
+
 test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke
 	./tests/test_helpers
 	./tests/test_voice_smoke

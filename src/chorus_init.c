@@ -13,7 +13,10 @@
 
 typedef uint32_t _DWORD;
 typedef uint64_t _QWORD;
+#if !defined(_WIN32)          /* MSVC/MinGW define __int64 as a builtin keyword
+                                 (same 64-bit signed type; typedef would clash) */
 typedef int64_t  __int64;
+#endif
 
 void *juno_chorus_init(unsigned char *a1)
 {
