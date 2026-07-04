@@ -1,5 +1,26 @@
 /* juno_note.c — see juno_note.h.
  *
+ * STATUS: WORKING PLACEHOLDER, NOT a faithful port of the note-on write. It
+ * makes the ADSR envelope open (the DSP is fine — see below), but the way it
+ * opens the gate is a HACK, not the plugin's mechanism. Honest accounting:
+ *   - The DSP layer is correct. voice_render's DCO frequency scaling is exact
+ *     (state[4416] doubles per octave of state[4448], measured); the shared ADSR
+ *     gate state[560] and its fixed thresholds (state[2864]/[3344]=-0.5) are
+ *     read exactly. The DSP plays whatever inputs it is given, correctly.
+ *   - What is NOT ported (control layer) and is faked here:
+ *     (1) The gate. state[560] = conditioner(v29 = s272·s240·(s208-s320)+s320).
+ *         The REAL note-on loads pitch-derived DCO coefficients into
+ *         208/240/272/320 so v29>0 opens the gate as a side effect. We instead
+ *         poke state[320] — which is the DCO PHASE ACCUMULATOR (reset on the
+ *         note edge at voice_render line 553) — to a small value so v29>0. This
+ *         works empirically but is the wrong mechanism; the faithful write needs
+ *         the descriptor-1090 ramp out-pointer binding (unresolved init gap).
+ *     (2) The pitch VALUE. state[4448] is the DCO pitch input; the DSP is exact,
+ *         but the integer-note -> octave-value formula (control layer) is not
+ *         traced, so PITCH_C4 below is an unverified calibration, not derived.
+ * So: this is enough to demonstrate the ADSR/gate path end-to-end, but the two
+ * un-ported control-layer inputs above must be traced for a faithful note-on.
+ *
  * Reconstructed from the control-layer traces (sub_1803C1720 gate-on,
  * sub_1803C17A0 gate-off, sub_1803C2920 voice-trigger -> ramp start toward the
  * gate target, sub_1803C24A0 per-sample pruner -> ramp step) and from a direct

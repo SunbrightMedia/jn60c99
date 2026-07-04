@@ -73,17 +73,23 @@ DCO-coeff slots 208/240/272 at 0, `v29 = state[320]`, so ramping `state[320]`
 opens the gate. This corrected the earlier misread (`state[560]` is derived, not
 directly writable; and `v125=1` is *idle*, not attack).
 
-**Honest caveats (documented in the code, next to refine):**
-1. **Gate opener is a minimal faithful reconstruction**, not the exact write:
-   we ramp `state[320]→0.01` to open `state[560]`. The real note-on presumably
-   loads pitch-derived DCO coefficients into 208/240/272/320; pinning the exact
-   value needs the descriptor-1090 ramp out-pointer binding (the unresolved init
-   gap). The *mechanism* is real; the specific opening write is reconstructed.
-2. **Pitch tuning is NOT yet exact.** `state[4448]` is the DCO pitch (octave
-   units) but the ported DCO frequency path has a scaling/domain discrepancy
-   (~9.4-octave offset vs the pitch table; measured frequency is unstable) — the
-   note is periodic and musical but not verified in-tune. Needs a dedicated DCO
-   pitch-path audit + the exact note→octave formula (`sub_180413320`).
+**Honest caveats — the DSP is fine; both gaps are un-ported CONTROL-LAYER inputs:**
+0. **The DSP layer is NOT the problem.** Measured: `state[4416]` doubles per
+   octave of `state[4448]` exactly (clean frequency scaling); the ADSR gate
+   `state[560]` and thresholds are read exactly. An earlier note here claimed a
+   "DSP scaling discrepancy" — that was wrong and is retracted. The DSP plays
+   whatever inputs it's given, correctly. The two issues below are inputs the
+   note-on (control layer) must supply and that we haven't traced.
+1. **Gate opener is a HACK, not the faithful write.** `state[560]` opens when the
+   conditioner `v29 = s272·s240·(s208−s320)+s320 > 0`. The real note-on loads
+   pitch-derived DCO coefficients into 208/240/272/320 so v29>0 falls out; we
+   instead poke `state[320]` — the DCO **phase accumulator** — which works but is
+   the wrong mechanism. The faithful write needs the descriptor-1090 ramp
+   out-pointer binding (unresolved init gap).
+2. **Pitch VALUE is an unverified calibration.** The DSP plays `state[4448]`
+   exactly; we just don't have the control-layer integer-note→octave formula, so
+   the constant in `juno_note_pitch` is a guess (currently ~an octave off). Trace
+   `sub_180413320` for the real note→pitch map → in tune.
 3. **Velocity is accepted but unused** (amp comes from the ADSR).
 
 ## Next steps (in order)
