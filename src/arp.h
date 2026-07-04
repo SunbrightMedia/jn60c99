@@ -100,6 +100,9 @@ int64_t juno_arp_sel_updown(unsigned char *a1, int a2, int64_t a3); /* mode 17 *
 int64_t juno_arp_sel_random(unsigned char *a1, int a2, int64_t a3); /* mode 18 */
 int64_t juno_arp_sel_order(unsigned char *a1, int a2, int64_t a3);  /* default */
 int64_t juno_arp_sel_transpose(unsigned char *a1, int a2, int64_t a3); /* m11  */
+int64_t juno_arp_sel_kup(unsigned char *a1, int a2, int64_t a3);      /* mode 0  KbdArp UP     */
+int64_t juno_arp_sel_kdown(unsigned char *a1, int a2, int64_t a3);    /* mode 19 KbdArp DOWN   */
+int64_t juno_arp_sel_kupdown(unsigned char *a1, int a2, int64_t a3);  /* mode 20 KbdArp UP&DN  */
 
 #ifdef __cplusplus
 }

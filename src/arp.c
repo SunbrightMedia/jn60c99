@@ -444,12 +444,118 @@ int64_t juno_arp_sel_transpose(unsigned char *a1, int a2, int64_t a3)
 }
 
 /* ======================================================================== */
+/* KbdArp direction selectors 0/19/20 — the modes the JUNO-60's arp panel   */
+/* actually installs (loader sub_7FF91E023010 passes mode_hdr[2]: header 0  */
+/* -> mode 0 = UP, header 1 -> mode 20 = UP&DOWN, headers 2..5 -> mode 19 = */
+/* DOWN; cross-checked against Script.xml arpType displays "DOWN,UP&DOWN,   */
+/* UP" for raw {2|3|4|5,1,0}). Faithful transcriptions.                     */
+/* ======================================================================== */
+
+/* mode 0 — UP.  sub_7FF91E01EFC0 @ rva 0x3BEFC0.  Walks the sorted held    */
+/* list bottom-up by the +3464 cursor; wraps to 0 setting the octave-advance */
+/* notify (+3468). Octave expansion is applied by the scanner via +3472.    */
+int64_t juno_arp_sel_kup(unsigned char *a1, int a2, int64_t a3)
+{
+    __int64 v1; // r9
+    int v3; // ecx
+    char v4; // dl
+    __int64 result; // rax
+    (void)a2; (void)a3;
+
+    v1 = *(int *)(a1 + 3320);
+    if ( *(_DWORD *)(a1 + 56) > *(_DWORD *)(a1 + 3320) - *(char *)(a1 + 3054) )
+        *(_DWORD *)(a1 + 56) = 0;
+    v3 = *(_DWORD *)(a1 + 3464);
+    if ( v3 > (int)v1 - 1 )
+    {
+        *(_DWORD *)(a1 + 3464) = 0;
+        v3 = 0;
+        *(_BYTE *)(a1 + 3468) = 1;
+    }
+    if ( v3 < 0 )
+    {
+        *(_DWORD *)(a1 + 3464) = 0;
+        v3 = 0;
+    }
+    v4 = *(_BYTE *)(a1 + 3460);
+    if ( !v4 )
+    {
+        *(_DWORD *)(a1 + 3464) = 0;
+        v3 = 0;
+    }
+    result = (unsigned int)*(char *)(v3 + (__int64)a1 + 3064);
+    if ( (int)result < 0 )
+        result = (unsigned int)*(char *)(v1 + (__int64)a1 + 3063);
+    if ( !v4 )
+        *(_BYTE *)(a1 + 3460) = 1;
+    *(_DWORD *)(a1 + 3464) = v3 + 1;
+    return result;
+}
+
+/* mode 19 — DOWN over range octaves.  sub_7FF91E01E850 @ rva 0x3BE850. */
+int64_t juno_arp_sel_kdown(unsigned char *a1, int a2, int64_t a3)
+{
+    __int64 v1; int v3,v4,v6,v7,v9,v10,v11,v12; char v8; __int64 result;
+    (void)a2; (void)a3;
+    v1 = *(int *)(a1 + 3320);
+    v3 = *(char *)(a1 + 3054);
+    v4 = (int)v1 * (*(_DWORD *)(a1 + 3476) + 1) - 1;
+    v6 = (int)v1 - v3;
+    v7 = ((int)v1 - v3 < 0) ? 0 : v6;
+    if ( *(_DWORD *)(a1 + 56) > (unsigned int)v7 ) *(_DWORD *)(a1 + 56) = 0;
+    v8 = *(_BYTE *)(a1 + 3460);
+    if ( v8 ) { v9 = *(_DWORD *)(a1 + 3464); v10 = v9; }
+    else      { *(_DWORD *)(a1 + 3464) = v4; v9 = v4; v10 = v4; }
+    if ( v9 > v4 ) { do { v9 = v10 - 1; v10 = v9; } while ( v9 > v4 ); *(_DWORD *)(a1 + 3464) = v9; }
+    if ( v9 < 0 )  { *(_DWORD *)(a1 + 3464) = 0; v9 = 0; }
+    v11 = *(char *)(v9 % (int)v1 + (__int64)a1 + 3064);
+    *(_DWORD *)(a1 + 3472) = v9 / (int)v1;
+    if ( v11 < 0 ) v11 = *(char *)(v1 + (__int64)a1 + 3063);
+    if ( !v8 ) *(_BYTE *)(a1 + 3460) = 1;
+    v12 = v9 - 1;
+    *(_BYTE *)(a1 + 3468) = 0;
+    result = (unsigned int)v11;
+    if ( v9 - 1 < 0 ) v12 = v4;
+    *(_DWORD *)(a1 + 3464) = v12;
+    return result;
+}
+
+/* mode 20 — UP&DOWN over range octaves.  sub_7FF91E01E5C0 @ rva 0x3BE5C0. */
+int64_t juno_arp_sel_kupdown(unsigned char *a1, int a2, int64_t a3)
+{
+    __int64 v1; int v2,v3,v5,v6,v8,v9,v10; char v7; int v11; __int64 result;
+    (void)a2; (void)a3;
+    v1 = *(int *)(a1 + 3320);
+    v2 = *(char *)(a1 + 3054);
+    v3 = (int)v1 * (*(_DWORD *)(a1 + 3476) + 1) - 1;
+    v5 = (int)v1 - v2;
+    v6 = ((int)v1 - v2 < 0) ? 0 : v5;
+    if ( *(_DWORD *)(a1 + 56) > (unsigned int)v6 ) *(_DWORD *)(a1 + 56) = 0;
+    v7 = *(_BYTE *)(a1 + 3460);
+    if ( v7 ) { v8 = *(_DWORD *)(a1 + 3464); v9 = v8; }
+    else      { *(_DWORD *)(a1 + 3464) = 0; v8 = 0; *(_BYTE *)(a1 + 3461) = 1; v9 = 0; }
+    if ( v8 > v3 ) { do { v8 = v9 - 1; v9 = v8; } while ( v8 > v3 ); *(_DWORD *)(a1 + 3464) = v8; }
+    if ( v8 < 0 )  { *(_DWORD *)(a1 + 3464) = 0; v8 = 0; }
+    v10 = *(char *)(v8 % (int)v1 + (__int64)a1 + 3064);
+    *(_DWORD *)(a1 + 3472) = v8 / (int)v1;
+    if ( v10 < 0 ) v10 = *(char *)(v1 + (__int64)a1 + 3063);
+    if ( !v7 ) *(_BYTE *)(a1 + 3460) = 1;
+    v11 = (*(_BYTE *)(a1 + 3461) == 0);
+    *(_BYTE *)(a1 + 3468) = 0;
+    if ( v11 ) {
+        *(_DWORD *)(a1 + 3464) = v8 - 1;
+        result = (unsigned int)v10;
+        if ( v8 - 1 <= 0 ) *(_BYTE *)(a1 + 3461) = 1;
+    } else {
+        result = (unsigned int)v10;
+        *(_DWORD *)(a1 + 3464) = v8 + 1;
+        if ( v8 + 1 >= v3 ) *(_BYTE *)(a1 + 3461) = 0;
+    }
+    return result;
+}
+
+/* ======================================================================== */
 /* Mode installer.  sub_7FF91E01FCB0 @ rva 0x3BFCB0.                        */
-/* Installs the +3480 selector ptr by mode index (docs/ARP_DSP.md §5).      */
-/* Modes 15/16/17/18 -> UP/DOWN/UP-DOWN/RANDOM (transcribed); 11 -> transpose;*/
-/* default -> ORDER. Modes 0-10,13,14,19,20 share the held-list-walk shape   */
-/* but were NOT individually traced (Open Questions §6); we install the      */
-/* ORDER fallback for them and flag it, rather than invent their ordering.   */
 /* ======================================================================== */
 static void sub_7FF91E01FCB0(unsigned char *a1, int a2)
 {
@@ -462,22 +568,18 @@ static void sub_7FF91E01FCB0(unsigned char *a1, int a2)
         case 18: ARP_SEL(a1) = juno_arp_sel_random;    break; /* sub_7FF91E01EBF0 */
         case 11: ARP_SEL(a1) = juno_arp_sel_transpose; break; /* sub_7FF91E01ED50 */
 
+        /* --- KbdArp factory modes (the ones preset headers install) --- */
+        case 0:  ARP_SEL(a1) = juno_arp_sel_kup;       break; /* sub_7FF91E01EFC0 UP     */
+        case 19: ARP_SEL(a1) = juno_arp_sel_kdown;     break; /* sub_7FF91E01E850 DOWN   */
+        case 20: ARP_SEL(a1) = juno_arp_sel_kupdown;   break; /* sub_7FF91E01E5C0 UP&DN  */
+
         /* --- not transcribed: same selector shape, ordering untraced --- */
-        /* case 0:  sub_7FF91E01EFC0 — not transcribed */
-        /* case 1:  sub_7FF91E01F060 — not transcribed */
-        /* case 2:  sub_7FF91E01F0C0 — not transcribed */
-        /* case 3:  sub_7FF91E01E6E0 — not transcribed */
-        /* case 4:  sub_7FF91E01E790 — not transcribed */
-        /* case 5:  sub_7FF91E01E800 — not transcribed */
-        /* case 6:  sub_7FF91E01E400 — not transcribed */
-        /* case 7:  sub_7FF91E01E4E0 — not transcribed */
-        /* case 8:  sub_7FF91E01E560 — not transcribed */
-        /* case 9:  sub_7FF91E01EDB0 — chord build, not transcribed */
-        /* case 10: sub_7FF91E01EEC0 — not transcribed */
-        /* case 13: sub_7FF91E01E940 — not transcribed */
-        /* case 14: sub_7FF91E01EF80 — not transcribed */
-        /* case 19: sub_7FF91E01E850 — not transcribed */
-        /* case 20: sub_7FF91E01E5C0 — not transcribed */
+        /* case 1:  sub_7FF91E01F060 */ /* case 2:  sub_7FF91E01F0C0 */
+        /* case 3:  sub_7FF91E01E6E0 */ /* case 4:  sub_7FF91E01E790 */
+        /* case 5:  sub_7FF91E01E800 */ /* case 6:  sub_7FF91E01E400 */
+        /* case 7:  sub_7FF91E01E4E0 */ /* case 8:  sub_7FF91E01E560 */
+        /* case 9:  sub_7FF91E01EDB0 (chord build) */ /* case 10: sub_7FF91E01EEC0 */
+        /* case 13: sub_7FF91E01E940 */ /* case 14: sub_7FF91E01EF80 */
 
         default: ARP_SEL(a1) = juno_arp_sel_order;     break; /* sub_7FF91E01ED30 */
     }
