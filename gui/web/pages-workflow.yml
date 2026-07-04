@@ -1,0 +1,46 @@
+# Deploy the in-browser JUNO-60 GUI (gui/web) to GitHub Pages.
+# One-time setup: repo Settings > Pages > Source = "GitHub Actions".
+# After that, every push to the default branch republishes; the synth lives at
+#   https://<owner>.github.io/<repo>/   — bookmark it, no download/Python needed.
+#
+# The WASM is rebuilt from source here (emscripten) so the committed juno.wasm
+# can never drift from src/. The prebuilt files are also committed, so Pages
+# works even if you disable this workflow.
+name: Deploy web GUI to Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up emscripten
+        uses: mymindstorm/setup-emsdk@v14
+      - name: Build WASM + params.json
+        run: bash gui/web/build.sh
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: gui/web
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

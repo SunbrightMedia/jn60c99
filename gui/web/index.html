@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🎹</text></svg>">
+<title>jn60c99 — JUNO-60 C99 (in-browser)</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.4 system-ui, sans-serif; background: #1a1c20; color: #ddd; }
+  header { position: sticky; top: 0; background: #23262c; border-bottom: 1px solid #333;
+           padding: 8px 12px; z-index: 10; }
+  h1 { font-size: 15px; margin: 0 0 6px; font-weight: 600; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  button, select, input[type=text], input[type=number] {
+    background: #2c2f36; color: #ddd; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: inherit; }
+  button { cursor: pointer; } button:hover { background: #363a42; }
+  button.on { background: #3a5; border-color: #4c7; color: #fff; }
+  .warn { color: #e88; font-size: 12px; margin-top: 4px; }
+  .note { color: #888; font-size: 11px; font-weight: 400; }
+  main { padding: 10px 12px 80px; }
+  .sec { margin: 14px 0 4px; font-weight: 600; color: #9cf; border-bottom: 1px solid #333;
+         padding-bottom: 2px; }
+  .p { display: grid; grid-template-columns: 220px 1fr 90px 20px; gap: 8px;
+       align-items: center; padding: 2px 0; }
+  .p label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p .off { color: #667; font-size: 11px; }
+  .p input[type=range] { width: 100%; }
+  .p input[type=number] { width: 88px; }
+  .p .heur { color: #a83; } .p .auth { color: #4a4; }
+  #piano { position: relative; height: 90px; user-select: none; margin: 6px 0; }
+  .key { position: absolute; bottom: 0; border: 1px solid #111; border-radius: 0 0 4px 4px; }
+  .key.w { width: 26px; height: 90px; background: #eee; z-index: 1; }
+  .key.b { width: 16px; height: 56px; background: #222; z-index: 2; }
+  .key.w.dn { background: #9cf; } .key.b.dn { background: #47a; }
+  #status { position: fixed; bottom: 0; left: 0; right: 0; background: #23262c;
+            border-top: 1px solid #333; padding: 5px 12px; font-size: 12px; color: #9a9; }
+</style>
+
+<header>
+  <h1>jn60c99 — JUNO-60 C99 <span class=note id="meta">· loading WebAssembly…</span></h1>
+  <div class="row">
+    <button onclick="factory()">Factory patch</button>
+    <select id="presets" title="saved patches (this browser)"></select>
+    <button onclick="loadPreset()">Load</button>
+    <button onclick="savePreset()">Save…</button>
+    <button onclick="exportPreset()" title="download current patch as .json">Export</button>
+    <button onclick="document.getElementById('imp').click()">Import</button>
+    <input type="file" id="imp" accept=".json" style="display:none" onchange="importPreset(this)">
+    <span style="width:12px"></span>
+    <button onclick="render()">▶ Render &amp; play</button>
+    <input type="number" id="frames" value="48000" min="256" step="4800" title="frames @96kHz" style="width:80px">
+    <span style="width:12px"></span>
+    chorus:
+    <button class=cm data-m=0 onclick="chorus(0)">dry</button>
+    <button class=cm data-m=1 onclick="chorus(1)">I</button>
+    <button class=cm data-m=2 onclick="chorus(2)">II</button>
+  </div>
+  <div id="piano"></div>
+  <div class="row">
+    <input type="text" id="filter" placeholder="filter parameters…" oninput="renderList()" style="flex:1">
+    <label class=note><input type="checkbox" id="onlyauth" onchange="renderList()"> real-range only</label>
+  </div>
+  <div class="warn" id="warn"></div>
+</header>
+
+<main id="list"></main>
+<div id="status">initialising…</div>
+
+<script type="module">
+import JunoModule from "./juno.js";
+
+const SR = 96000;
+const $ = s => document.querySelector(s);
+const status = m => $("#status").textContent = m;
+
+// heuristics mirrored from gui/juno_web.py param_meta()
+const SWITCH = /\b(sw|on\/?off|onoff|mute|enable|bypass|sync|reset|trig|initialize|use iir|tap sw|low cut sw|high cut sw)\b/i;
+const BIPOLAR = /\b(tune|detune|bend|offset|ofst|phase|pan)\b/i;
+function sectionOf(off) {
+  const t = [[84000,"Voice"],[85000,"Master/Voices"],[91000,"Drive/OD/DS"],
+    [96000,"FX Chorus A (91k)"],[101000,"FX Chorus B (96k)"],[102000,"Output"],
+    [110000,"Delay/HighCut"],[5000000,"Delay 2"],[6400000,"Chorus I"],
+    [6450000,"Flanger"],[6500000,"FX"],[10700000,"Chorus II"]];
+  for (const [lim,name] of t) if (off < lim) return name;
+  return "Reverb Ecf";
+}
+
+let M, ctx, get, set, factoryFn, chorusFn, gateFn, renderFn, malloc, free;
+let PARAMS = [], REAL = {};
+
+async function boot() {
+  M = await JunoModule();
+  get = M.cwrap("juno_gui_get","number",["number","number"]);
+  set = M.cwrap("juno_gui_set",null,["number","number","number"]);
+  factoryFn = M.cwrap("juno_gui_recall_factory",null,["number"]);
+  chorusFn = M.cwrap("juno_gui_set_chorus_mode",null,["number","number"]);
+  gateFn = M.cwrap("juno_gui_gate",null,["number","number"]);
+  renderFn = M.cwrap("juno_gui_render","number",["number","number","number"]);
+  malloc = M._malloc; free = M._free;
+  ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 0);
+  if (!ctx) { status("engine alloc failed"); return; }
+
+  const raw = await fetch("params.json").then(r => r.json());
+  try { REAL = await fetch("param_meta.json").then(r => r.ok ? r.json() : {}); } catch { REAL = {}; }
+  PARAMS = raw.map(([off,name]) => descriptor(off,name));
+
+  const heur = PARAMS.filter(p => !p.auth).length;
+  $("#meta").textContent = `· ${PARAMS.length} params @ ${SR} Hz · runs entirely in your browser`;
+  $("#warn").innerHTML =
+    (heur ? `⚠ ${heur} params use <b>heuristic</b> slider bounds (positions are the real captured values). Drop a real <code>param_meta.json</code> beside this page for the plugin's true ranges. ` : "") +
+    "Piano/gate write the note-on edge but stay <b>silent</b>: the note trigger path (unit #1) isn't ported yet.";
+  buildPiano();
+  refreshPresets();
+  renderList();
+  status("ready — running in-browser (no server)");
+}
+
+function descriptor(off, name) {
+  const val = get(ctx, off);
+  let lo, hi, kind, auth = false;
+  if (REAL[off]) { lo = +REAL[off].min; hi = +REAL[off].max; kind = REAL[off].kind || "cont"; auth = true; }
+  else if (SWITCH.test(name)) { lo = 0; hi = 1; kind = "switch"; }
+  else if (BIPOLAR.test(name)) { const s = Math.max(1, Math.abs(val)*1.25); lo = -s; hi = s; kind = "cont"; }
+  else { lo = 0; hi = Math.max(1, Math.abs(val)*1.25); kind = "cont"; }
+  return { off, name, section: sectionOf(off), kind, min: lo, max: hi, value: val, auth };
+}
+
+const fmt = v => v === 0 ? "0" : (Math.abs(v) >= 1e-4 && Math.abs(v) < 1e6 ? (+v.toFixed(6)).toString() : v.toExponential(3));
+const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
+
+function renderList() {
+  const f = $("#filter").value.toLowerCase(), onlyAuth = $("#onlyauth").checked;
+  const el = $("#list"); el.innerHTML = ""; let sec = null;
+  for (const p of PARAMS) {
+    if (onlyAuth && !p.auth) continue;
+    if (f && !p.name.toLowerCase().includes(f) && !String(p.off).includes(f)) continue;
+    if (p.section !== sec) { sec = p.section; const h = document.createElement("div"); h.className="sec"; h.textContent=sec; el.appendChild(h); }
+    el.appendChild(rowFor(p));
+  }
+}
+
+function rowFor(p) {
+  const d = document.createElement("div"); d.className = "p";
+  const lab = document.createElement("label"); lab.title = p.name;
+  lab.innerHTML = `<span class=off>@${p.off} </span>${p.name}`;
+  const mid = document.createElement("div");
+  const num = document.createElement("input"); num.type="number"; num.step="any"; num.value=fmt(p.value);
+  const tag = document.createElement("span");
+  tag.className = p.auth ? "auth" : "heur"; tag.textContent = p.auth ? "●" : "~";
+  tag.title = p.auth ? "real plugin range" : "heuristic bounds";
+
+  if (p.kind === "switch") {
+    const b = document.createElement("button");
+    const paint = v => { b.textContent = v>=0.5?"ON":"off"; b.classList.toggle("on", v>=0.5); };
+    paint(p.value);
+    b.onclick = () => commit(p, b.classList.contains("on")?0:1, {num, paint});
+    num.style.display = "none"; mid.appendChild(b);
+  } else {
+    const r = document.createElement("input"); r.type="range";
+    r.min=p.min; r.max=p.max; r.step=(p.max-p.min)/1000 || 0.001; r.value=clamp(p.value,p.min,p.max);
+    r.oninput = () => num.value = fmt(+r.value);
+    r.onchange = () => commit(p, +r.value, {num, range:r});
+    mid.appendChild(r); p._range = r;
+  }
+  num.onchange = () => commit(p, +num.value, {num, range:p._range});
+  d.append(lab, mid, num, tag); return d;
+}
+
+function commit(p, v, ui) {
+  set(ctx, p.off, v); p.value = get(ctx, p.off);
+  if (ui.num) ui.num.value = fmt(p.value);
+  if (ui.range) ui.range.value = clamp(p.value, p.min, p.max);
+  if (ui.paint) ui.paint(p.value);
+  status(`${p.name} @${p.off} = ${fmt(p.value)}`);
+}
+
+// --- controls (exposed for inline handlers) ---
+window.renderList = renderList;
+window.factory = () => { factoryFn(ctx); PARAMS.forEach(p => p.value = get(ctx,p.off)); renderList(); status("factory patch recalled"); };
+window.chorus = m => { chorusFn(ctx, m); document.querySelectorAll(".cm").forEach(b=>b.classList.toggle("on", +b.dataset.m===m)); status("chorus mode "+m); };
+
+// --- presets: localStorage + file export/import ---
+const KEY = "jn60c99.presets";
+const store = () => JSON.parse(localStorage.getItem(KEY) || "{}");
+function refreshPresets() {
+  const s = $("#presets"), names = Object.keys(store()).sort();
+  s.innerHTML = names.map(n=>`<option>${n}</option>`).join("") || "<option disabled>(no saved patches)</option>";
+}
+function snapshot() { const o={}; for (const p of PARAMS) o[p.off]=get(ctx,p.off); return o; }
+function apply(o) { for (const k in o) set(ctx, +k, +o[k]); PARAMS.forEach(p=>p.value=get(ctx,p.off)); renderList(); }
+window.savePreset = () => { const n=prompt("Patch name:"); if(!n) return; const all=store(); all[n]=snapshot(); localStorage.setItem(KEY, JSON.stringify(all)); refreshPresets(); $("#presets").value=n; status("saved "+n); };
+window.loadPreset = () => { const n=$("#presets").value, all=store(); if(!all[n]) return; apply(all[n]); status("loaded "+n); };
+window.exportPreset = () => { const blob=new Blob([JSON.stringify(snapshot(),null,0)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="patch.json"; a.click(); status("exported patch.json"); };
+window.importPreset = (inp) => { const f=inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ apply(JSON.parse(rd.result)); status("imported "+f.name);}catch(e){status("import failed: "+e);} }; rd.readAsText(f); inp.value=""; };
+
+// --- render + play via Web Audio (no server) ---
+let audioCtx;
+window.render = () => {
+  const n = Math.max(256, $("#frames").value|0);
+  const bytes = n*2*4, p = malloc(bytes);
+  renderFn(ctx, p, n);
+  const inter = new Float32Array(M.HEAPF32.buffer, p, n*2).slice();
+  free(p);
+  audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)({sampleRate: SR});
+  const buf = audioCtx.createBuffer(2, n, SR), L = buf.getChannelData(0), R = buf.getChannelData(1);
+  for (let i=0;i<n;i++){ L[i]=inter[2*i]; R[i]=inter[2*i+1]; }
+  const src = audioCtx.createBufferSource(); src.buffer = buf; src.connect(audioCtx.destination);
+  audioCtx.resume(); src.start();
+  status(`playing ${(n/SR).toFixed(2)}s (in-browser render)`);
+};
+
+// --- piano MIDI 36..72 ---
+const WHITE = [0,2,4,5,7,9,11];
+function buildPiano() {
+  const el = $("#piano"); el.innerHTML=""; let wx=0, wi=0;
+  const black=[];
+  for (let midi=36; midi<=72; midi++) {
+    if (WHITE.includes(midi%12)) { el.appendChild(mkKey(midi,"w",wx)); wx+=27; wi++; }
+    else black.push([midi, wi]);
+  }
+  for (const [midi, idx] of black) el.appendChild(mkKey(midi,"b", idx*27 - 8));
+  el.style.width = wx + "px";
+}
+function mkKey(midi, cls, left) {
+  const k = document.createElement("div"); k.className="key "+cls; k.style.left=left+"px";
+  const dn = e => { e.preventDefault(); k.classList.add("dn"); note(midi,true); };
+  const up = () => { if(k.classList.contains("dn")){ k.classList.remove("dn"); note(midi,false);} };
+  k.addEventListener("mousedown",dn); k.addEventListener("mouseup",up); k.addEventListener("mouseleave",up);
+  return k;
+}
+function note(midi, on) {
+  // pitch (UNCONFIRMED (note-60)/12 octave mapping) + voice-0 gate edge; silent until unit #1.
+  if (on) { set(ctx, 4448, (midi-60)/12); gateFn(ctx, 1); } else gateFn(ctx, 0);
+  status((on?"note-on ":"note-off ")+midi+" (silent: note path not ported)");
+}
+
+boot().catch(e => { status("ERROR: "+e); $("#warn").textContent = e; console.error(e); });
+</script>
+</html>
