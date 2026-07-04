@@ -9,6 +9,8 @@
  */
 #include "../src/juno_engine.h"
 #include "../src/juno_driver.h"
+#include "../src/juno_apply.h"
+#include "../src/juno_note.h"
 #include <stdlib.h>
 
 typedef struct {
@@ -82,12 +84,62 @@ void juno_gui_gate(juno_ctx *c, float v)
     JF(c->st, JUNO_VOICE_AUX_BASE0) = v;
 }
 
-/* Render nframes stereo samples into out (interleaved L,R). Returns 1 if the
- * full master/chorus path ran, 0 if the dry fallback was used. */
+/* Note driver (src/juno_note.c). Opens the ADSR gate + sets DCO pitch on voice
+ * 0. NOTE: the gate mechanism and pitch value are the honest HACK/calibration
+ * documented in juno_note.c — timbre coefficients loaded by apply_bank ARE
+ * bit-exact, but the note-on write itself is not yet a faithful port. */
+void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
+{
+    if (c) juno_note_on(c->st, 0, midi_note, velocity);
+}
+void juno_gui_note_off(juno_ctx *c)
+{
+    if (c) juno_note_off(c->st, 0);
+}
+
+/* Apply bank patch `idx` (raw KoaBankFile00003 bytes in `bank`, `len` bytes)
+ * into this engine's coefficient slots via the bit-exact applier
+ * (src/juno_apply.c). Returns # coefficients set. The bound subset is
+ * reproduced EXACTLY (curve LUTs proven vs the real machine code); unbound
+ * params keep their current (engine-default) value. */
+int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx)
+{
+    if (!c || !bank || len <= 0) return 0;
+    return juno_bank_apply(c->st, bank, idx);
+}
+
+/* Render nframes stereo samples into out (interleaved L,R). Advances the note
+ * driver's gate ramp once per sample (matches the control-tick rate the ramp
+ * math assumes). Returns 1 if the full master/chorus path ran, 0 if the dry
+ * fallback was used. */
 int juno_gui_render(juno_ctx *c, float *out, int nframes)
 {
     int i, full = 0;
-    for (i = 0; i < nframes; ++i)
+    for (i = 0; i < nframes; ++i) {
+        juno_note_tick(c->st);
         full = juno_driver_render_sample(c->st, &out[2 * i], &out[2 * i + 1]);
+    }
     return full;
+}
+
+/* Render the DRY voice signal (voice 0 = the one exact per-sample render),
+ * bypassing the master/chorus/output stage. This is the genuine pre-FX signal
+ * and carries the bit-exact timbre of whatever coefficients are loaded (osc +
+ * VCF + VCA + both ADSRs). We use it for the note preview because the master's
+ * output/chorus stage depends on ~250 coefficients Hex-Rays could not decompile
+ * (see src/master_render.c) — with them zero the master's dry & chorus-I output
+ * collapse to silence. So the dry voice is the most faithful AUDIBLE signal the
+ * port can currently produce. Ticks the note driver once per sample. */
+int juno_gui_render_dry(juno_ctx *c, float *out, int nframes)
+{
+    int i;
+    if (!c) return 0;
+    for (i = 0; i < nframes; ++i) {
+        float vb = 0.0f, vr = 0.0f;
+        juno_note_tick(c->st);
+        juno_voice_render(c->st, &vb, &vr);   /* voice 0, exact */
+        out[2 * i]     = vb;                   /* mono voice -> both channels */
+        out[2 * i + 1] = vb;
+    }
+    return 1;
 }

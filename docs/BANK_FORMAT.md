@@ -52,26 +52,30 @@ The per-patch parser `sub_7FF91DFB1710` was fully transcribed (19-case switch:
 params) with **zero mismatches**. So each patch now decodes to its 31 parameter
 values at their correct programmer-state destinations.
 
-## The remaining gap — audible recall (honest)
+## Audible recall — partial, exact where bound (honest)
 
-Two things are still not delivered, for one shared reason:
+The plugin's fully-general **programmer-value → engine-coefficient** path runs
+through a reflection-based **Koa value tree** (`CKoaValue` / `CKoaStruct`), not a
+small table, so a complete static port of it is large and not done. But an
+**empirical shortcut** delivers a verified subset without porting that tree:
 
-1. **Specific panel names** per parameter. The 31 values are positioned
-   correctly but their labels are transform-derived **roles** (e.g. "Bipolar mod
-   depth", "Filter-mapped discrete"), not confirmed "VCF Cutoff"-style names.
-2. **Applying a patch to our engine** so it sounds.
+- The user's live patch was identified as bank patch 5 `LD Classic Lead` (blob
+  correlation), giving us its **real Ableton parameter values** as ground truth.
+- Matching those unique values back to blob positions **anchors the blob→param
+  alignment**; the per-param `(curve_id, engine_offset)` comes from the plugin's
+  own setter thunks (run under Unicorn for the sample-rate-variant curves).
+- The curve evaluator is bit-exact (proven vs the real machine code), so the
+  chain reproduces the plugin's stored coefficient exactly for bound params.
+  **Oracle:** `juno_curve(22,153) = 0.600000` == the plugin's own VCF cutoff
+  float for patch 5.
 
-Both need the **programmer-value → engine-coefficient binding**. The plugin does
-this through a generic, reflection-based **Koa value tree** (`CKoaValue` /
-`CKoaStruct` nodes), **not** a small lookup table — so it is effectively the
-whole (un-ported) parameter system, plus a per-block coefficient recompute. And
-"PD The Juno Pad" (our only captured engine-state oracle) is **not** in this
-bank, so the binding can't be pinned empirically from what we have.
+Shipped (`src/juno_apply.c`, wired into `gui/web`): **Load bank → pick preset →
+Apply → play.** 11 coefficients load bit-exactly (VCF cutoff/resonance, both
+ADSR envelopes, filter env-mod, key-follow, VCA tone). See
+`docs/AUDIBLE_RECALL_PLAN.md` for the exact/partial/approximate breakdown.
 
-Paths to close it: (a) port the Koa parameter→coefficient system (large), or
-(b) capture **one** bank patch's engine-coefficient state from the running
-plugin (`tools/capture_runtime_coeffs.js`) — a single ground-truth pair pins the
-binding for all 64 patches, since the transform is deterministic.
-
-=> Shipped: a faithful **bank browser** (`gui/web` "Load bank (.bin)…"): 64 real
-factory names + per-patch values. Audible recall remains the open item above.
+Still open (each blocked on certainty, not guessed): DCO oscillator mix and VCA
+level (OscVoice/VoiceCmn setters live outside the extracted range), ENV2
+decay/sustain (255/255 value-collision in the anchor patch), HPF (SR-variant
+curve), LFO and the FX chain. Closing these needs either porting the Koa tree or
+extracting the remaining setter thunks — both from the binary, no captures.

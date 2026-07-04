@@ -4,6 +4,37 @@ Goal: load a JU60 bank patch and hear it, by **porting the original code** (no
 runtime captures). This records what was proven with the plugin binary +
 decompile in hand, and the concrete plan.
 
+## STATUS — end-to-end recall works in the web app (partial coverage, exact where bound)
+
+The browser app (`gui/web/`, mirrored to `docs/`) now does the full loop:
+**import a `.bin` bank → pick a preset → Apply → press a key → hear it.**
+Wiring: `juno_gui_apply_bank` (bridge) → `juno_bank_apply` (src/juno_apply.c) →
+`juno_curve` (bit-exact vs the real machine code) writes the engine coefficient
+slots; the piano triggers the ported note/gate/ADSR driver and plays the **dry
+voice** signal.
+
+What is EXACT vs PARTIAL, stated plainly:
+- **Bit-exact:** the curve evaluator (proven vs Unicorn) and the **11 bound
+  coefficients** — VCF cutoff & resonance, both ADSR envelopes (filter + amp
+  attack/release, filter sustain), filter env-mod, key-follow, VCA tone.
+  Oracle-proven: patch 5 `LD Classic Lead` VCF cutoff = `juno_curve(22,153)` =
+  `0.600000`, matching the plugin's own stored float. Verified in-browser
+  (Chromium): apply patch 5 → cutoff slot = 0.600000, note peak 0.0207, audible.
+- **NOT yet bound (stay at engine defaults):** DCO oscillator mix (saw/sub/pwm/
+  noise levels — the OscVoice setters live outside the range extracted so far),
+  ENV2 decay/sustain (255/255 value-collision in the anchor patch → blob order
+  unproven), HPF (sample-rate-variant curve unresolved), LFO, and the FX chain.
+- **Approximate (documented hacks, not fabrication):** note-on **pitch** is a
+  DCO-domain calibration and the **gate** opener pokes the phase-accumulator
+  slot (see src/juno_note.c). Timbre is exact; base pitch may sit an octave off.
+- **Preview is the dry voice** (pre-FX): the master/chorus **output stage needs
+  ~250 coefficients Hex-Rays could not decompile** (src/master_render.c), so the
+  master's dry & chorus-I output collapse to silence. The dry voice is the most
+  faithful audible signal the port can produce today.
+
+Next for coverage: extract the OscVoice/VoiceCmn setters (DCO + VCA levels) and
+add them to the binding table only once each (curve, offset) is certain.
+
 ## Verdict: BOTH remaining units are BOUNDED and portable from what we have
 
 The earlier "disproportionate / needs data we don't have" conclusion

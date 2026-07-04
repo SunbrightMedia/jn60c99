@@ -49,13 +49,7 @@
     <button onclick="document.getElementById('imp').click()">Import</button>
     <input type="file" id="imp" accept=".json" style="display:none" onchange="importPreset(this)">
     <span style="width:12px"></span>
-    <button onclick="render()">▶ Render &amp; play</button>
-    <input type="number" id="frames" value="48000" min="256" step="4800" title="frames @96kHz" style="width:80px">
-    <span style="width:12px"></span>
-    chorus:
-    <button class=cm data-m=0 onclick="chorus(0)">dry</button>
-    <button class=cm data-m=1 onclick="chorus(1)">I</button>
-    <button class=cm data-m=2 onclick="chorus(2)">II</button>
+    <button onclick="render()" title="play a middle-C note of the current patch (dry voice path)">▶ Audition (C4)</button>
     <span style="width:12px"></span>
     <button onclick="document.getElementById('bankfile').click()" title="load a KoaBankFile00003 / PG-JU60 bank">Load bank (.bin)…</button>
     <input type="file" id="bankfile" accept=".bin" style="display:none" onchange="loadBank(this)">
@@ -72,6 +66,7 @@
   <div style="position:sticky;top:0;background:#262a31;padding:8px 12px;border-bottom:1px solid #383c44;display:flex;gap:8px;align-items:center">
     <b id="bankttl">Bank</b>
     <select id="banksel" style="flex:1"></select>
+    <button class="on" onclick="applyBankPatch()" title="load this patch's bit-exact coefficient subset into the engine">Apply to engine ▶</button>
     <button onclick="document.getElementById('bankdlg').close()">Close</button>
   </div>
   <div style="padding:6px 12px 4px;color:#e88;font-size:11px" id="bankwarn"></div>
@@ -102,6 +97,7 @@ function sectionOf(off) {
 }
 
 let M, ctx, get, set, factoryFn, chorusFn, gateFn, renderFn, malloc, free;
+let noteOnFn, noteOffFn, applyBankFn, renderDryFn;
 let PARAMS = [], REAL = {};
 
 async function boot() {
@@ -112,6 +108,10 @@ async function boot() {
   chorusFn = M.cwrap("juno_gui_set_chorus_mode",null,["number","number"]);
   gateFn = M.cwrap("juno_gui_gate",null,["number","number"]);
   renderFn = M.cwrap("juno_gui_render","number",["number","number","number"]);
+  renderDryFn = M.cwrap("juno_gui_render_dry","number",["number","number","number"]);
+  noteOnFn = M.cwrap("juno_gui_note_on",null,["number","number","number"]);
+  noteOffFn = M.cwrap("juno_gui_note_off",null,["number"]);
+  applyBankFn = M.cwrap("juno_gui_apply_bank","number",["number","number","number","number"]);
   malloc = M._malloc; free = M._free;
   ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 0);
   if (!ctx) { status("engine alloc failed"); return; }
@@ -124,7 +124,7 @@ async function boot() {
   $("#meta").textContent = `· ${PARAMS.length} params @ ${SR} Hz · runs entirely in your browser`;
   $("#warn").innerHTML =
     (heur ? `⚠ ${heur} params use <b>heuristic</b> slider bounds (positions are the real captured values). Drop a real <code>param_meta.json</code> beside this page for the plugin's true ranges. ` : "") +
-    "Piano/gate write the note-on edge but stay <b>silent</b>: the note trigger path (unit #1) isn't ported yet.";
+    "Press a key to hear a note (the ported ADSR/gate driver). <b>Pitch is an approximate calibration</b> and the note-on gate is a working hack, not yet a faithful port — but a bank patch's <b>timbre coefficients load bit-exactly</b> (Load bank → Apply).";
   buildPiano();
   refreshPresets();
   renderList();
@@ -211,37 +211,46 @@ window.importPreset = (inp) => { const f=inp.files[0]; if(!f) return; const rd=n
 
 // --- render + play via Web Audio (no server) ---
 let audioCtx;
-window.render = () => {
-  const n = Math.max(256, $("#frames").value|0);
-  const bytes = n*2*4, p = malloc(bytes);
-  renderFn(ctx, p, n);
-  const inter = new Float32Array(M.HEAPF32.buffer, p, n*2).slice();
-  free(p);
-  audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)({sampleRate: SR});
-  const buf = audioCtx.createBuffer(2, n, SR), L = buf.getChannelData(0), R = buf.getChannelData(1);
-  for (let i=0;i<n;i++){ L[i]=inter[2*i]; R[i]=inter[2*i+1]; }
-  const src = audioCtx.createBufferSource(); src.buffer = buf; src.connect(audioCtx.destination);
-  audioCtx.resume(); src.start();
-  status(`playing ${(n/SR).toFixed(2)}s (in-browser render)`);
-};
+// "Audition" = play a middle-C (C4) note of the current patch through the dry
+// voice path. (The old master-path render is silent for dry/chorus-I because the
+// master's output stage needs coefficients Hex-Rays couldn't decompile.)
+window.render = () => note(60, true);
 
 // --- bank browser (.bin) ---
-let BANK = null;
+let BANK = null, BANK_RAW = null;
 window.loadBank = (inp) => {
   const f = inp.files[0]; if (!f) return;
   const rd = new FileReader();
   rd.onload = () => {
-    try { BANK = decodeBank(rd.result); showBank(); status(`bank loaded: ${BANK.patch_count} patches`); }
+    try {
+      BANK_RAW = new Uint8Array(rd.result);           // raw bytes for the C applier
+      BANK = decodeBank(rd.result); showBank();
+      status(`bank loaded: ${BANK.patch_count} patches`);
+    }
     catch (e) { status("bank error: " + e.message); alert("Could not read bank:\n" + e.message); }
   };
   rd.readAsArrayBuffer(f); inp.value = "";
+};
+
+// Apply the selected patch's bit-exact coefficient subset into the live engine.
+window.applyBankPatch = () => {
+  if (!BANK_RAW) return;
+  const idx = +$("#banksel").value;
+  const ptr = malloc(BANK_RAW.length);
+  M.HEAPU8.set(BANK_RAW, ptr);
+  const n = applyBankFn(ctx, ptr, BANK_RAW.length, idx);
+  free(ptr);
+  PARAMS.forEach(p => p.value = get(ctx, p.off));   // reflect new coeffs in the sliders
+  renderList();
+  $("#bankdlg").close();
+  status(`applied patch ${idx} "${BANK.patches[idx].name}" — ${n} bit-exact coefficients loaded (press a key to hear it)`);
 };
 function showBank() {
   const sel = $("#banksel");
   sel.innerHTML = BANK.patches.map(p => `<option value="${p.index}">${String(p.index).padStart(2,"0")}  ${p.name}</option>`).join("");
   sel.onchange = () => showPatch(+sel.value);
   $("#bankttl").textContent = `${BANK.model} bank`;
-  $("#bankwarn").innerHTML = "Inspection only — parameter labels are transform-derived <b>roles</b>, not confirmed panel names, and values are not applied to the synth (the plugin routes them through a reflection-based param tree that isn't ported). See docs/BANK_FORMAT.md.";
+  $("#bankwarn").innerHTML = "The role bars below are inspection-only (transform-derived labels). <b>Apply to engine</b> loads the <b>verified</b> subset as bit-exact coefficients: VCF cutoff/resonance, both ADSR envelopes, filter env-mod, key-follow, VCA tone. DCO oscillator mix, HPF, LFO and FX are not yet bound and stay at engine defaults. See docs/BANK_FORMAT.md.";
   showPatch(0);
   $("#bankdlg").showModal();
 }
@@ -279,10 +288,29 @@ function mkKey(midi, cls, left) {
   k.addEventListener("mousedown",dn); k.addEventListener("mouseup",up); k.addEventListener("mouseleave",up);
   return k;
 }
+// Press a key -> render a full ADSR note offline (note-on, hold, note-off,
+// release tail) through the ported gate/ramp driver and play it. Pitch is the
+// approximate DCO calibration in juno_note.c; timbre is the loaded coefficients.
 function note(midi, on) {
-  // pitch (UNCONFIRMED (note-60)/12 octave mapping) + voice-0 gate edge; silent until unit #1.
-  if (on) { set(ctx, 4448, (midi-60)/12); gateFn(ctx, 1); } else gateFn(ctx, 0);
-  status((on?"note-on ":"note-off ")+midi+" (silent: note path not ported)");
+  if (!on) return;                      // one-shot note per key press
+  const HOLD = Math.round(0.55 * SR), REL = Math.round(0.55 * SR);
+  const total = HOLD + REL;
+  const p = malloc(total * 2 * 4);
+  noteOnFn(ctx, midi, 100);
+  renderDryFn(ctx, p + 0, HOLD);                    // attack + sustain (dry voice)
+  noteOffFn(ctx);
+  renderDryFn(ctx, p + HOLD * 2 * 4, REL);          // release tail
+  const inter = new Float32Array(M.HEAPF32.buffer, p, total * 2).slice();
+  free(p);
+  playInterleaved(inter, total);
+  status(`note ${midi} played (dry voice: exact osc+VCF+VCA+ADSR; pitch approximate; FX chain not in preview)`);
+}
+function playInterleaved(inter, n) {
+  audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)({sampleRate: SR});
+  const buf = audioCtx.createBuffer(2, n, SR), L = buf.getChannelData(0), R = buf.getChannelData(1);
+  for (let i=0;i<n;i++){ L[i]=inter[2*i]; R[i]=inter[2*i+1]; }
+  const src = audioCtx.createBufferSource(); src.buffer = buf; src.connect(audioCtx.destination);
+  audioCtx.resume(); src.start();
 }
 
 boot().catch(e => { status("ERROR: "+e); $("#warn").textContent = e; console.error(e); });
