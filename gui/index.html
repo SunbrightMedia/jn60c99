@@ -1,0 +1,210 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>jn60c99 — JUNO-60 C99 test panel</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.4 system-ui, sans-serif; background: #1a1c20; color: #ddd; }
+  header { position: sticky; top: 0; background: #23262c; border-bottom: 1px solid #333;
+           padding: 8px 12px; z-index: 10; }
+  h1 { font-size: 15px; margin: 0 0 6px; font-weight: 600; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  button, select, input[type=text], input[type=number] {
+    background: #2c2f36; color: #ddd; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: inherit; }
+  button { cursor: pointer; } button:hover { background: #363a42; }
+  button.on { background: #3a5; border-color: #4c7; color: #fff; }
+  .warn { color: #e88; font-size: 12px; margin-top: 4px; }
+  .note { color: #888; font-size: 11px; }
+  main { padding: 10px 12px 80px; }
+  .sec { margin: 14px 0 4px; font-weight: 600; color: #9cf; border-bottom: 1px solid #333;
+         padding-bottom: 2px; }
+  .p { display: grid; grid-template-columns: 220px 1fr 90px 20px; gap: 8px;
+       align-items: center; padding: 2px 0; }
+  .p label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p .off { color: #667; font-size: 11px; }
+  .p input[type=range] { width: 100%; }
+  .p input[type=number] { width: 88px; }
+  .p .heur { color: #a83; } .p .auth { color: #4a4; }
+  /* piano */
+  #piano { position: relative; height: 90px; user-select: none; margin: 6px 0; }
+  .key { position: absolute; bottom: 0; border: 1px solid #111; border-radius: 0 0 4px 4px; }
+  .key.w { width: 26px; height: 90px; background: #eee; z-index: 1; }
+  .key.b { width: 16px; height: 56px; background: #222; z-index: 2; margin-left: -8px; }
+  .key.w:active, .key.w.dn { background: #9cf; }
+  .key.b:active, .key.b.dn { background: #47a; }
+  #status { position: fixed; bottom: 0; left: 0; right: 0; background: #23262c;
+            border-top: 1px solid #333; padding: 5px 12px; font-size: 12px; color: #9a9; }
+</style>
+
+<header>
+  <h1>jn60c99 — JUNO-60 C99 test panel <span class=note id="meta"></span></h1>
+  <div class="row">
+    <button onclick="factory()">Factory patch</button>
+    <select id="presets" title="patch bank (JSON)"></select>
+    <button onclick="loadPreset()">Load</button>
+    <button onclick="savePreset()">Save as…</button>
+    <span style="width:12px"></span>
+    <button onclick="render()">▶ Render &amp; play</button>
+    <input type="number" id="frames" value="48000" min="256" step="4800" title="frames @96kHz" style="width:80px">
+    <span style="width:12px"></span>
+    chorus:
+    <button class=cm data-m=0 onclick="chorus(0)">dry</button>
+    <button class=cm data-m=1 onclick="chorus(1)">I</button>
+    <button class=cm data-m=2 onclick="chorus(2)">II</button>
+  </div>
+  <div id="piano"></div>
+  <div class="row">
+    <input type="text" id="filter" placeholder="filter parameters…" oninput="render_list()" style="flex:1">
+    <label class=note><input type="checkbox" id="onlyauth" onchange="render_list()"> real-range only</label>
+  </div>
+  <div class="warn" id="warn"></div>
+</header>
+
+<main id="list"></main>
+<div id="status">loading…</div>
+<audio id="audio"></audio>
+
+<script>
+let PARAMS = [], SR = 96000;
+const $ = s => document.querySelector(s);
+const api = (path, body) => fetch(path, body ? {method:"POST",
+    headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {})
+  .then(r => r.headers.get("content-type").includes("json") ? r.json() : r);
+const status = m => $("#status").textContent = m;
+
+async function boot() {
+  const d = await api("/api/params");
+  PARAMS = d.params; SR = d.sample_rate;
+  fillPresets(d.presets);
+  const heur = PARAMS.filter(p => !p.authoritative).length;
+  $("#meta").textContent = `· ${PARAMS.length} params @ ${SR} Hz`;
+  $("#warn").innerHTML =
+    (heur ? `⚠ ${heur} params use <b>heuristic</b> slider bounds (positions are the real captured values). Run <code>tools/extract_param_meta.py</code> in IDA → <code>gui/param_meta.json</code> for the plugin's real ranges. ` : "") +
+    "Piano/gate write the note-on edge but stay <b>silent</b>: the note trigger path (unit #1) isn't ported yet — see docs/CONTROL_LAYER.md.";
+  buildPiano();
+  render_list();
+  status("ready");
+}
+
+function fillPresets(list) {
+  const s = $("#presets");
+  s.innerHTML = list.map(n => `<option>${n}</option>`).join("") || "<option disabled>(no JSON patches)</option>";
+}
+
+function render_list() {
+  const f = $("#filter").value.toLowerCase();
+  const onlyAuth = $("#onlyauth").checked;
+  const el = $("#list"); el.innerHTML = "";
+  let sec = null;
+  for (const p of PARAMS) {
+    if (onlyAuth && !p.authoritative) continue;
+    if (f && !p.name.toLowerCase().includes(f) && !String(p.off).includes(f)) continue;
+    if (p.section !== sec) { sec = p.section;
+      const h = document.createElement("div"); h.className = "sec"; h.textContent = sec; el.appendChild(h); }
+    el.appendChild(rowFor(p));
+  }
+}
+
+function rowFor(p) {
+  const d = document.createElement("div"); d.className = "p";
+  const lab = document.createElement("label"); lab.textContent = p.name; lab.title = p.name;
+  const mid = document.createElement("div");
+  const num = document.createElement("input"); num.type = "number"; num.step = "any"; num.value = fmt(p.value);
+  const tag = document.createElement("span");
+  tag.className = p.authoritative ? "auth" : "heur";
+  tag.textContent = p.authoritative ? "●" : "~";
+  tag.title = p.authoritative ? "real plugin range" : "heuristic bounds";
+
+  if (p.kind === "switch") {
+    const b = document.createElement("button");
+    const set = v => { b.textContent = v >= 0.5 ? "ON" : "off"; b.classList.toggle("on", v >= 0.5); };
+    set(p.value);
+    b.onclick = () => { const nv = b.classList.contains("on") ? 0 : 1; commit(p, nv, {num, set}); };
+    num.style.display = "none";
+    mid.appendChild(b);
+  } else {
+    const r = document.createElement("input"); r.type = "range";
+    r.min = p.min; r.max = p.max; r.step = (p.max - p.min) / 1000 || 0.001; r.value = clamp(p.value, p.min, p.max);
+    r.oninput = () => { num.value = fmt(+r.value); };
+    r.onchange = () => commit(p, +r.value, {num, range: r});
+    mid.appendChild(r);
+    p._range = r;
+  }
+  num.onchange = () => commit(p, +num.value, {num, range: p._range});
+  d.append(lab, mid, num, tag);
+  d.querySelector(".off"); // noop
+  lab.insertAdjacentHTML("afterbegin", `<span class=off>@${p.off} </span>`);
+  return d;
+}
+
+async function commit(p, v, ui) {
+  const r = await api("/api/set", {off: p.off, value: v});
+  p.value = r.value;
+  if (ui.num) ui.num.value = fmt(r.value);
+  if (ui.range) ui.range.value = clamp(r.value, p.min, p.max);
+  if (ui.set) ui.set(r.value);
+  status(`${p.name} @${p.off} = ${fmt(r.value)}`);
+}
+
+const fmt = v => v === 0 ? "0" : (Math.abs(v) >= 1e-4 && Math.abs(v) < 1e6 ? (+v.toFixed(6)).toString() : v.toExponential(3));
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+async function factory() {
+  const d = await api("/api/factory", {}); PARAMS = d.params; render_list(); status("factory patch recalled");
+}
+async function loadPreset() {
+  const n = $("#presets").value; if (!n) return;
+  const d = await api("/api/preset/load", {name: n}); PARAMS = d.params; render_list(); status("loaded " + n);
+}
+async function savePreset() {
+  const n = prompt("Patch name:"); if (!n) return;
+  const d = await api("/api/preset/save", {name: n}); fillPresets(d.presets);
+  $("#presets").value = d.saved; status("saved " + d.saved);
+}
+async function chorus(m) {
+  await api("/api/chorus", {mode: m});
+  document.querySelectorAll(".cm").forEach(b => b.classList.toggle("on", +b.dataset.m === m));
+  status("chorus mode " + m);
+}
+async function render() {
+  const n = Math.max(256, +$("#frames").value | 0);
+  status("rendering " + n + " frames…");
+  const a = $("#audio"); a.src = "/api/render?frames=" + n + "&t=" + Date.now();
+  a.play().then(() => status("playing " + (n / SR).toFixed(2) + "s")).catch(() => status("rendered (press ▶ again to play)"));
+}
+
+// --- piano: C2..C5 (MIDI 36..72) ---
+const WHITE = [0,2,4,5,7,9,11], BLACKPOS = {1:0.6,3:1.6,6:3.6,8:4.6,10:5.6};
+function buildPiano() {
+  const el = $("#piano"); el.innerHTML = ""; let x = 0;
+  for (let midi = 36; midi <= 72; midi++) {
+    const pc = midi % 12;
+    if (WHITE.includes(pc)) {
+      const k = key(midi, "w"); k.style.left = x + "px"; el.appendChild(k); x += 27;
+    }
+  }
+  x = 0; let wi = 0;
+  for (let midi = 36; midi <= 72; midi++) {
+    const pc = midi % 12;
+    if (WHITE.includes(pc)) wi++;
+    else { const k = key(midi, "b"); k.style.left = ((wi) * 27) + "px"; el.appendChild(k); }
+  }
+  el.style.width = (WHITE.filter((_,i)=>true), x = 0, (Math.ceil((72-36+1)*7/12)+1)*27) + "px";
+}
+function key(midi, cls) {
+  const k = document.createElement("div"); k.className = "key " + cls; k.dataset.midi = midi;
+  const down = e => { e.preventDefault(); k.classList.add("dn"); note(midi, true); };
+  const up = () => { k.classList.remove("dn"); note(midi, false); };
+  k.addEventListener("mousedown", down);
+  k.addEventListener("mouseup", up);
+  k.addEventListener("mouseleave", () => { if (k.classList.contains("dn")) up(); });
+  return k;
+}
+function note(midi, on) {
+  api("/api/note", {note: midi, on});
+  status((on ? "note-on " : "note-off ") + midi + " (silent: note path not ported)");
+}
+
+boot().catch(e => { status("ERROR: " + e); $("#warn").textContent = e; });
+</script>
