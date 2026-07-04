@@ -37,22 +37,41 @@ byte slots they write (see `PARSER_CASES` in `tools/decode_bank.py`): raw `/255`
 stores, bipolar recenters, boolean flags, and curve inverse-lookups (LFO rate,
 `pow(v,1.6)`, dB) for the non-linear controls.
 
-## What is NOT recoverable from this repo (honest gap)
+## Resolved with the plugin binary (extraction, not capture)
 
-Mapping every blob byte → its parameter identity → the engine coefficient our
-port reads requires two **static data tables** that the decompile *references*
-but does not contain the values of (Hex-Rays decompiles code, not `.rdata` data):
+Given the original `JUNO60VST3_64bit.vst3` (PE x64, imagebase `0x180000000`), the
+two data tables were extracted **statically** by RVA (no runtime capture):
 
-- `dword_7FF91E8A4290` — the ~31-entry src→dest table (blob byte → param dest).
-- the 16-float curve LUTs (`xmmword_7FF91E5C95xx`) for the ~6 non-linear params.
+- `dword_7FF91E8A4290` (RVA `0xC44290`, .data) — the **31-entry src→dest table**,
+  now embedded in `tools/decode_bank.py` / `gui/web/bank.js`.
+- the curve LUTs (RVA `~0x969500`, .rdata) — the non-linear param maps.
 
-These live in the plugin's `.rdata`. The full plugin **code** decompile is in
-`refs/allcode_decomp.tgz`, but the 12 MB plugin **binary** (where those bytes
-are) is not in the repo — only the C99 port build. And "PD The Juno Pad" (our
-only captured oracle patch) is **not in this bank**, so the mapping can't be
-recovered empirically either.
+The per-patch parser `sub_7FF91DFB1710` was fully transcribed (19-case switch:
+`/255` raw, bipolar `(v>>1)+128` recenter, boolean, VCF-cutoff cubic, dB→amp,
+`pow(v,1.6)`, exp-time). An adversarial pass re-decoded all 64 patches (1984
+params) with **zero mismatches**. So each patch now decodes to its 31 parameter
+values at their correct programmer-state destinations.
 
-=> **Decoding (names + values) is done.** Making a patch *audible* on our engine
-needs those two tables extracted **once, statically, from the plugin binary**
-(not a runtime capture); then the parser + mapping transcribe directly from the
-code already in `refs/`.
+## The remaining gap — audible recall (honest)
+
+Two things are still not delivered, for one shared reason:
+
+1. **Specific panel names** per parameter. The 31 values are positioned
+   correctly but their labels are transform-derived **roles** (e.g. "Bipolar mod
+   depth", "Filter-mapped discrete"), not confirmed "VCF Cutoff"-style names.
+2. **Applying a patch to our engine** so it sounds.
+
+Both need the **programmer-value → engine-coefficient binding**. The plugin does
+this through a generic, reflection-based **Koa value tree** (`CKoaValue` /
+`CKoaStruct` nodes), **not** a small lookup table — so it is effectively the
+whole (un-ported) parameter system, plus a per-block coefficient recompute. And
+"PD The Juno Pad" (our only captured engine-state oracle) is **not** in this
+bank, so the binding can't be pinned empirically from what we have.
+
+Paths to close it: (a) port the Koa parameter→coefficient system (large), or
+(b) capture **one** bank patch's engine-coefficient state from the running
+plugin (`tools/capture_runtime_coeffs.js`) — a single ground-truth pair pins the
+binding for all 64 patches, since the transform is deterministic.
+
+=> Shipped: a faithful **bank browser** (`gui/web` "Load bank (.bin)…"): 64 real
+factory names + per-patch values. Audible recall remains the open item above.

@@ -32,7 +32,7 @@ PY
 
 # Mirror the static app into docs/ — GitHub Pages serves it from there
 # (Settings > Pages > Deploy from a branch > /docs). Keeps both copies in sync.
-cp gui/web/index.html gui/web/juno.js gui/web/juno.wasm \
+cp gui/web/index.html gui/web/bank.js gui/web/juno.js gui/web/juno.wasm \
    gui/web/params.json gui/web/param_meta.json docs/
 touch docs/.nojekyll
 

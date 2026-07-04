@@ -56,6 +56,9 @@
     <button class=cm data-m=0 onclick="chorus(0)">dry</button>
     <button class=cm data-m=1 onclick="chorus(1)">I</button>
     <button class=cm data-m=2 onclick="chorus(2)">II</button>
+    <span style="width:12px"></span>
+    <button onclick="document.getElementById('bankfile').click()" title="load a KoaBankFile00003 / PG-JU60 bank">Load bank (.bin)…</button>
+    <input type="file" id="bankfile" accept=".bin" style="display:none" onchange="loadBank(this)">
   </div>
   <div id="piano"></div>
   <div class="row">
@@ -65,11 +68,22 @@
   <div class="warn" id="warn"></div>
 </header>
 
+<dialog id="bankdlg" style="width:min(760px,92vw);max-height:82vh;background:#22252b;color:#ddd;border:1px solid #444;border-radius:8px;padding:0">
+  <div style="position:sticky;top:0;background:#262a31;padding:8px 12px;border-bottom:1px solid #383c44;display:flex;gap:8px;align-items:center">
+    <b id="bankttl">Bank</b>
+    <select id="banksel" style="flex:1"></select>
+    <button onclick="document.getElementById('bankdlg').close()">Close</button>
+  </div>
+  <div style="padding:6px 12px 4px;color:#e88;font-size:11px" id="bankwarn"></div>
+  <div id="bankparams" style="padding:4px 12px 14px"></div>
+</dialog>
+
 <main id="list"></main>
 <div id="status">initialising…</div>
 
 <script type="module">
 import JunoModule from "./juno.js";
+import { decodeBank } from "./bank.js";
 
 const SR = 96000;
 const $ = s => document.querySelector(s);
@@ -210,6 +224,41 @@ window.render = () => {
   audioCtx.resume(); src.start();
   status(`playing ${(n/SR).toFixed(2)}s (in-browser render)`);
 };
+
+// --- bank browser (.bin) ---
+let BANK = null;
+window.loadBank = (inp) => {
+  const f = inp.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try { BANK = decodeBank(rd.result); showBank(); status(`bank loaded: ${BANK.patch_count} patches`); }
+    catch (e) { status("bank error: " + e.message); alert("Could not read bank:\n" + e.message); }
+  };
+  rd.readAsArrayBuffer(f); inp.value = "";
+};
+function showBank() {
+  const sel = $("#banksel");
+  sel.innerHTML = BANK.patches.map(p => `<option value="${p.index}">${String(p.index).padStart(2,"0")}  ${p.name}</option>`).join("");
+  sel.onchange = () => showPatch(+sel.value);
+  $("#bankttl").textContent = `${BANK.model} bank`;
+  $("#bankwarn").innerHTML = "Inspection only — parameter labels are transform-derived <b>roles</b>, not confirmed panel names, and values are not applied to the synth (the plugin routes them through a reflection-based param tree that isn't ported). See docs/BANK_FORMAT.md.";
+  showPatch(0);
+  $("#bankdlg").showModal();
+}
+function showPatch(idx) {
+  const p = BANK.patches[idx];
+  const rows = p.params.map(pr => {
+    const bar = Math.round(pr.normalized * 100);
+    const dim = pr.confidence === "unconfirmed" ? "opacity:.55" : "";
+    return `<div style="display:grid;grid-template-columns:210px 1fr 54px;gap:8px;align-items:center;padding:1px 0;${dim}">
+      <span title="${pr.role}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pr.role}</span>
+      <span style="background:#1a1c20;border-radius:3px;height:9px;position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:${bar}%;background:#4a7;border-radius:3px"></span></span>
+      <span style="text-align:right;color:#9cf">${pr.raw} <span class=note>(${pr.normalized.toFixed(2)})</span></span>
+    </div>`;
+  }).join("");
+  $("#bankparams").innerHTML = `<div style="font-weight:600;margin:2px 0 6px">[${p.index}] ${p.name}</div>${rows}`;
+  $("#banksel").value = idx;
+}
 
 // --- piano MIDI 36..72 ---
 const WHITE = [0,2,4,5,7,9,11];
