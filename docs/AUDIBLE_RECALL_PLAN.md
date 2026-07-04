@@ -56,6 +56,36 @@ NOT the reflection framework that was feared. The actual math is **`clamp + LUT`
   `state[560]` open the filter/amp ADSRs.** `state[560]` is computed from a
   DCO-path signal, so the gate is not a naive `state[544]=4` (confirmed silent).
 
+## MILESTONE — the port makes its first audible note (unit #1 Tier-1)
+
+`src/juno_note.c/.h` — an offline note driver over the ported ramp engine.
+Verified: with the captured PD-Juno-Pad patch loaded, `juno_note_on(st,0,60,100)`
++ per-sample `juno_note_tick` + `juno_voice_render` produces a **non-silent,
+ADSR-enveloped tone** (peak |out| ≈ 0.022; attack rise → sustain → release on
+`juno_note_off`). `make test` still green. This is the first time the port
+sounds — from ported control-layer code, no captures.
+
+**What is correctly traced (real code):** the shared ADSR gate is `state[560]`
+(both filter and amp envelopes: `attack ⇔ state[560] ≥ 0.5`, since the fixed
+thresholds `state[2864]=state[3344]=-0.5` from init). `state[560]` is the output
+of the DCO gate-conditioner `v29 = s272·s240·(s208−s320) + s320`; with the patch
+DCO-coeff slots 208/240/272 at 0, `v29 = state[320]`, so ramping `state[320]`
+opens the gate. This corrected the earlier misread (`state[560]` is derived, not
+directly writable; and `v125=1` is *idle*, not attack).
+
+**Honest caveats (documented in the code, next to refine):**
+1. **Gate opener is a minimal faithful reconstruction**, not the exact write:
+   we ramp `state[320]→0.01` to open `state[560]`. The real note-on presumably
+   loads pitch-derived DCO coefficients into 208/240/272/320; pinning the exact
+   value needs the descriptor-1090 ramp out-pointer binding (the unresolved init
+   gap). The *mechanism* is real; the specific opening write is reconstructed.
+2. **Pitch tuning is NOT yet exact.** `state[4448]` is the DCO pitch (octave
+   units) but the ported DCO frequency path has a scaling/domain discrepancy
+   (~9.4-octave offset vs the pitch table; measured frequency is unstable) — the
+   note is periodic and musical but not verified in-tune. Needs a dedicated DCO
+   pitch-path audit + the exact note→octave formula (`sub_180413320`).
+3. **Velocity is accepted but unused** (amp comes from the ADSR).
+
 ## Next steps (in order)
 1. Trace the descriptor→ramp-object→slot binding for the gate param (the init
    that sets each ramp object's out-pointer) → the exact slot the trigger ramps,
