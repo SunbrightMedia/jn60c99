@@ -45,6 +45,23 @@ because ATTACK has the highest address). Each panel's (curve, offset, transform)
 is recovered by RUNNING the real dispatch under Unicorn and matching
 `juno_curve(curve, transform(value))` bit-for-bit across a dense value grid.
 
+### The `.bin` bank-select path applies ONLY the 222-byte blob (verified in code)
+
+A decisive finding for scoping "all parameters": the KoaBankFile bank-select
+loader `sub_7FF91DFB2380` loops 64× over `sub_7FF91DFB1710` (decomp_340000.c:13216),
+which reads exactly a 16-char **name** + a `0xDE` = **222-byte blob** per patch, then
+a fixed 31-entry transform table — it **never reads `record[238:]`**. The blob is
+the value-tree leaves pool 2..112 (`blob_pos = pool_index − 2`; dispatch index =
+`pool_index + 742`). The plugin's "extended" engine params — **VCA MODE, CONDITION,
+MOD SENS DCO/VCF, LFO TRIG ENV, VCF/VCA VELOCITY SENS, VCF CUTOFF FREQ H** (pool
+≥113, dispatch 855/856/860/861/863/1028/1029/1058, verified name-for-name against
+the engine registry) — live *past* the blob, in a separate full-tree serialization
+(VST3 setState / project restore) that the bank-select path does not consume. So on
+**patch-select the plugin leaves those params at engine defaults** — which is exactly
+what this applier does. The applier is therefore faithful to the bank-select recall
+path, not missing coverage: every parameter the `.bin` bank-select actually applies
+is bound (save the 4 EFX leaves below, whose ordering is external).
+
 ### Honestly not yet bound (documented, never guessed)
 
 - **The 4 EFX leaves (EFFECT DEPTH, DELAY LEVEL/TIME, REVERB LEVEL).** These
