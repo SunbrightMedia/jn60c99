@@ -13,15 +13,20 @@
  * = 0.600000 == the plugin's own "VCF CUTOFF FREQ H" float. So this chain
  * reproduces the plugin's stored coefficient exactly for the bound parameters.
  *
- * COVERAGE (honest): 29 distinct parameters, verified END-TO-END bit-exact vs the
- * value tree at each patch's ACTUAL blob values (tools/golden_cmp.py: patches 0,5,
- * 15,32,48,63 all match every bound coefficient bit-for-bit). Bound groups:
+ * COVERAGE (honest): 30 distinct parameters, verified END-TO-END bit-exact vs the
+ * value tree at each patch's ACTUAL blob values — tools/golden_cmp.py confirms all
+ * 64 bank patches match every bound coefficient (40 offsets) bit-for-bit. This is
+ * every JUNO-60 engine-driving parameter that is cleanly code-resolvable: a probe
+ * of all 79 panel dispatch indices shows ~45 write NOTHING to the engine (they are
+ * JU-06A-only features absent from this JUNO-60 model — OSC2, cross-mod, ring, sync
+ * — or inactive type/mod-matrix slots), so recall for those is a no-op. Bound groups:
  *   - VCF: cutoff, resonance, HPF cutoff (+3 secondary coeffs), env-mod, key-follow,
  *     LFO mod, VCA tone.
  *   - Envelopes: ENV1 A/D/S/R and ENV2 A/D/S/R (all four each).
  *   - DCO: range, PWM depth, PWM level, saw/sub/noise level, LFO mod, PWM SOURCE
  *     (a small-integer enum: LFO/ENV1±/ENV2±/Manual — see apply_pwm_source).
- *   - LFO: delay, rate, key-trig.  Global: VCA level, portamento, bend range.
+ *   - LFO: delay, rate, key-trig, tempo-sync.  Global: VCA level, portamento,
+ *     bend range.
  * The blob->panel order is the plugin's own value-tree leaf SERIALIZATION order
  * (leaf.address = 2*blob_pos, emitted in address order; the schema places ENV1 as
  * D,S,R,A because ATTACK has the highest address). Per-panel (curve,offset,transform)
@@ -32,11 +37,13 @@
  *     their blob-slot assignment {40,49,50,51} is not yet code-proven (the schema
  *     addresses in that region are unresolved), and they route to the master/chorus
  *     FX section (not the audible dry voice path).
- *   - LEGATO / ASSIGN MODE: in isolation the value tree writes only constant
- *     (default) coefficients for these — they are combined keyboard-mode switches
- *     with no independent per-param coefficient; deferred pending full-recall order.
- *   - Exponential rate coefficients (LFO Tempo Rate, Delay Time): no juno_curve
- *     matches; need the specific formula ported from the decompile.
+ *   - LEGATO / ASSIGN MODE: probing a FRESH value tree shows these write NO engine
+ *     coefficient at all — they are note-allocation flags (mono/poly/legato voice
+ *     behaviour) stored in the flat param array, not DSP coefficients, so there is
+ *     nothing to apply for bit-exact timbre recall.
+ *   - Exponential rate coefficients (LFO Tempo Rate off1072, Delay Time off102352):
+ *     no juno_curve matches; need the specific formula ported from the decompile.
+ *     Both are tempo-synced (inaudible in the free-running dry preview).
  * See docs/AUDIBLE_RECALL_PLAN.md.
  *
  * At 96 kHz (the engine's rate) the sample-rate-variant ADSR curves resolve to
@@ -118,6 +125,7 @@ static const juno_bind BINDINGS[] = {
     { 54,  7, T_ID,   624, "PORTAMENTO"      }, /* -> Porta Time  (2nd coeff)          */
     { 57, 10, T_ID,  4128, "BEND RANGE"      }, /* -> Bend (value tree c10; +c10@7472) */
     { 57, 10, T_ID,  7472, "BEND RANGE"      }, /* -> Bend Range VCF (2nd coeff)       */
+    { 59, 52, T_ID,  1056, "TEMPO SYNC"      }, /* -> LFO Tempo Rate Sw (value tree c52)*/
     /* DCO LFO MOD + the 6 above: blob position from the plugin's own value-tree
      * leaf serialization order (the CKoa tree child order; three code-reading
      * agents + the parser agree it is blob = panel+5 with the tree-reordered

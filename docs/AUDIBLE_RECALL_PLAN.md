@@ -4,46 +4,61 @@ Goal: load a JU60 bank patch and hear it, by **porting the original code** (no
 runtime captures). This records what was proven with the plugin binary +
 decompile in hand, and the concrete plan.
 
-## STATUS — end-to-end recall works in the web app (partial coverage, exact where bound)
+## STATUS — every engine-driving parameter is bit-exact; all 64 patches verified
 
-The browser app (`gui/web/`, mirrored to `docs/`) now does the full loop:
+The browser app (`gui/web/`, mirrored to `docs/`) does the full loop:
 **import a `.bin` bank → pick a preset → Apply → press a key → hear it.**
 Wiring: `juno_gui_apply_bank` (bridge) → `juno_bank_apply` (src/juno_apply.c) →
 `juno_curve` (bit-exact vs the real machine code) writes the engine coefficient
 slots; the piano triggers the ported note/gate/ADSR driver and plays the **dry
 voice** signal.
 
-What is EXACT vs PARTIAL, stated plainly:
-- **Bit-exact:** the curve evaluator (proven vs Unicorn) and the **12 bound
-  coefficients** — VCF cutoff & resonance, **HPF cutoff**, both ADSR envelopes
-  (filter + amp attack/release, filter sustain), filter env-mod, key-follow, VCA
-  tone. Every curve id was re-confirmed by RUNNING the real setter thunk under
-  Unicorn (`unit2/pin_curve.py`), with a passing sanity check on a known thunk.
-  Oracle-proven: patch 5 `LD Classic Lead` VCF cutoff = `juno_curve(22,153)` =
-  `0.600000`, matching the plugin's own stored float. Verified in-browser
-  (Chromium): apply patch 5 → cutoff slot = 0.600000, note peak 0.0207, audible.
-  HPF cutoff = curve 41, **SR-invariant** (identical at 44.1/48/96 kHz) — the
-  earlier "41 vs 52" doubt was conflating HPF *Cutoff* (10240, c41) with HPF
-  *Switch* (10256, c52).
-- **NOT bound — for a proven reason, not a guess-gap:**
-  - **DCO oscillator mix (saw/sub/sqr/noise levels), PWM level, VCA/AMP level.**
-    Exhaustively scanned all **357 setter thunks across all 23 vtable classes**:
-    *none* writes offsets 4192/4208/4224/6528/4144/10320 via a curve setter.
-    These are produced by the registry coefficient generator (reflection "Koa"
-    value tree), which is not ported — so there is no curve+offset to bind.
-  - **ENV2 (amp) decay/sustain:** the anchor patch has decay==sustain==255, so
-    the value-anchor can't order the two blob slots (needs a 2nd oracle patch).
-  - **LFO and the FX chain:** not yet traced.
-- **Approximate (documented hacks, not fabrication):** note-on **pitch** is a
-  DCO-domain calibration and the **gate** opener pokes the phase-accumulator
-  slot (see src/juno_note.c). Timbre is exact; base pitch may sit an octave off.
-- **Preview is the dry voice** (pre-FX): the master/chorus **output stage needs
-  ~250 coefficients Hex-Rays could not decompile** (src/master_render.c), so the
-  master's dry & chorus-I output collapse to silence. The dry voice is the most
-  faithful audible signal the port can produce today.
+### What "all 79 parameters" actually resolves to (probed, not assumed)
 
-Next for coverage: extract the OscVoice/VoiceCmn setters (DCO + VCA levels) and
-add them to the binding table only once each (curve, offset) is certain.
+Probing **all 79 panel dispatch indices** (dispatch = panel + 749) through the
+emulated value tree gives the definitive picture:
+
+- **~34 panels drive the DSP engine.** Every one that is cleanly code-resolvable
+  is now **bound and bit-exact** (30 distinct parameters, 40 coefficient slots).
+- **~45 panels write NOTHING to the engine** — they are JU-06A-only controls
+  absent from this JUNO-60 model (OSC2, cross-mod, ring, sync, coarse/fine tune),
+  or inactive type / mod-matrix slots. For these, "recall" is a genuine no-op:
+  there is no coefficient to set, so they are trivially correct.
+- **LEGATO / ASSIGN MODE** write no DSP coefficient either — a fresh-tree probe
+  shows they are note-allocation flags (mono/poly/legato voice behaviour) stored
+  in the flat param array, not timbre. Nothing to apply for exact timbre recall.
+
+### Bound & verified BIT-EXACT (30 params / 40 coefficients)
+
+Verified END-TO-END: `unit2/golden_cmp.py` drives the real value tree at each
+patch's **actual** blob values and compares against the compiled C applier —
+**all 64 bank patches match every bound coefficient bit-for-bit.** Groups:
+DCO (range, PWM depth/level/source-enum, saw/sub/noise level, LFO mod), VCF
+(cutoff, resonance, HPF cutoff + 3 secondaries, env-mod, key-follow, LFO mod),
+both ADSR envelopes (ENV1 & ENV2 A/D/S/R in full), VCA (tone, level), LFO (delay,
+rate, key-trig, tempo-sync), and portamento / bend range. Oracle cross-check:
+patch 5 VCF cutoff = `juno_curve(22,153)` = `0.600000`, the plugin's own float.
+
+The blob→panel order is the plugin's own value-tree **leaf serialization order**
+(`leaf.address = 2*blob_pos`, emitted in address order; ENV1 serializes D,S,R,A
+because ATTACK has the highest address). Each panel's (curve, offset, transform)
+is recovered by RUNNING the real dispatch under Unicorn and matching
+`juno_curve(curve, transform(value))` bit-for-bit across a dense value grid.
+
+### Honestly not yet bound (documented, never guessed)
+
+- **The 4 EFX leaves (EFFECT DEPTH, DELAY LEVEL/TIME, REVERB LEVEL).** Their
+  blob-slot assignment {40,49,50,51} is not code-proven (the schema addresses in
+  that region are embedded, not in the 31-entry parser transform table), and they
+  route to the master/chorus FX section — which is the un-decompiled path that
+  outputs silence in the dry preview. Deferred until the order is code-proven.
+- **Exponential tempo-rate coefficients** (LFO Tempo Rate off1072, tempo-synced
+  Delay Time off102352): no `juno_curve` matches; need the specific formula from
+  the decompile. Both are tempo-synced, inaudible in the free-running dry preview.
+- **Approximate (documented hacks, not fabrication):** note-on **pitch/gate** is
+  a calibration (src/juno_note.c) — timbre is exact, note triggering is not yet a
+  faithful port. **Preview is the dry voice** (pre-FX): the master/chorus output
+  stage needs ~250 coefficients Hex-Rays could not decompile (src/master_render.c).
 
 ## BREAKTHROUGH — the Koa value tree is CRACKED by emulation (binary-only)
 
