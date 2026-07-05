@@ -67,13 +67,34 @@ own value tree under Unicorn — no captures, no external data, pure binary.
 
 Bindings now committed (bit-exact): the 12 filter/env anchors + DCO PWM LEVEL
 (blob 26 -> off 4208 curve 54; an earlier commit misattributed it to off 4144 =
-DCO PWM DEPTH — the value tree corrected it), LFO DELAY TIME (off 1920 c44), and
-VCA LEVEL (off 101072 c49). Each added only where the blob position is a strict
-unique value-match to patch 5 AND `juno_curve(curve, raw)` reproduces the value
-tree's float. The engine side (offset+curve) is now known for ALL ~79 panel
-params via the value tree; the remaining blob positions (collisions like DCO
-SAW/SUB, common values like NOISE) are resolved by emulating the recall FRONT-END
-(bank blob -> panel index), which is the final step in progress.
+DCO PWM DEPTH — the value tree corrected it), LFO DELAY TIME (off 1920 c44),
+VCA LEVEL (off 101072 c49), and DCO SAW LEVEL (blob 27 -> off 4192 c54). **16
+params bit-exact.** Each added only where the blob position is a strict unique
+value-match to patch 5 AND `juno_curve(curve, raw)` reproduces the value tree's
+float.
+
+The engine side (panel_index -> offset+curve) is now PROVEN for ALL panel params
+via the value tree — that half is done. The remaining work is purely the
+**blob_pos -> panel_index** source mapping, and it is an IRREGULAR PERMUTATION,
+not a simple table:
+- `blob == leaf-2` (leaf = the ordered name pool at 0x180c46000; panel = leaf-7)
+  holds for 28 of the 57 in-blob params, but the envelope block is reordered
+  (ENV1 is stored D,S,R,A not A,D,S,R, so ATTACK is leaf+2; KEY FOLLOW / ENV2
+  RELEASE / VCA TONE are also +2). So it cannot be derived heuristically to a
+  bit-exact standard.
+- ~15 panel params (leaf index > 111: BEND/MOD SENS, HPF/EFFECT/DELAY/REVERB
+  TYPE, VCF/VCA VELOCITY SENS, VCA MODE, CONDITION, DELAY FEEDBACK, ...) are NOT
+  in the 222-byte blob at all — they live in OTHER value-tree chunks of the
+  20223-byte record (there is non-zero data beyond byte 238, nibble/tree-encoded).
+- The recall is a separate VST3 setState path (the dispatch sub_7FF91E019A30 is
+  vtable slot 11, called virtually, never by name); the parser sub_7FF91DFB1710
+  only fills a parallel programmer/display buffer, and the engine recall reads the
+  RAW blob. Getting every source position bit-exactly requires emulating that
+  setState recall and hooking the value SOURCE of each dispatch — in progress.
+
+So: 16/79 committed bit-exact; the engine side of the other ~63 is proven; only
+their record source positions remain, blocked on the setState recall emulation
+(no fabrication until each is proven by running code).
 
 ## The Koa binding wall — established conclusively (4-angle investigation)
 
