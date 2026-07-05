@@ -96,6 +96,26 @@ So: 16/79 committed bit-exact; the engine side of the other ~63 is proven; only
 their record source positions remain, blocked on the setState recall emulation
 (no fabrication until each is proven by running code).
 
+### Second structural finding — some panel params are COMPOUND (multi-write)
+
+Running the value-tree dispatch per param shows that a single panel parameter can
+drive SEVERAL engine coefficients at once, not one:
+- EFFECT DEPTH (dispatch 794) writes off 84544 (a saturating curve, clips at 1.0)
+  AND off 85136 (a smooth 0..1) AND touches off 85152 — one knob, a drive+level
+  macro.
+- LFO RATE (dispatch 752) writes off 1072 as an exponential Hz rate (0.34..87 Hz)
+  AND off 1088 / 2064 as normalized 0..1 values.
+- DELAY LEVEL (dispatch 796) writes off 102528 (curve 22) AND a switch off 102576.
+
+The current applier binds ONE {blob,curve,offset} per param, so it can only
+represent the SINGLE-write params (filter, envelopes, DCO levels, etc.). The
+clean way to make ALL 79 bit-exact — including the compound ones — is to PORT the
+value-tree dispatch `sub_7FF91E019A30` itself to C (transcribe its ~312-case
+switch, each case calling the real curve + its one-or-more raw stores), then feed
+it `dispatch_c(panel_index, blob[blob_pos(panel)])`. That, plus the blob->panel
+recall map, is the definitive route to full bit-exact recall. Both are bounded
+transcription/emulation tasks from the binary (no captures); neither is guessed.
+
 ## The Koa binding wall — established conclusively (4-angle investigation)
 
 A thorough investigation (parser trace, Koa-registration read, .rdata/.data scan,
