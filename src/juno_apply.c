@@ -72,11 +72,18 @@ static const juno_bind BINDINGS[] = {
     {  7, 44,  1920, "LFO DELAY TIME"  },   /* -> LFO Delay (value tree, 96k c44)  */
     { 66, 49,101072, "VCA LEVEL"       },   /* -> Patch Level (value tree c49)     */
     { 27, 54,  4192, "DCO SAW LEVEL"   },   /* -> JU OSC Saw Lev (value tree c54)  */
-    /* DCO SAW LEVEL: value tree routes panel 22 -> off 4192 / curve 54. blob 27 is
-     * the UNIQUE slot holding 149 in patch 5 (== SAW's value); since no second 149
-     * slot exists, SUB's listed 149 is a data dup and SAW owns blob 27. The leaf
-     * serialization order (blob == leaf-2) independently predicts blob 27 for panel
-     * 22. juno_curve(54,149)=0.6578414 matches the value tree bit-for-bit. */
+    { 28, 54,  4224, "DCO SUB LEVEL"   },   /* -> JU OSC Sub Lev (value tree c54)  */
+    { 29, 54,  6528, "DCO NOISE LEVEL" },   /* -> Osc Noise Level (value tree c54) */
+    /* DCO SAW/SUB/NOISE LEVEL: value tree routes panels 22/23/24 -> off
+     * 4192/4224/6528 (all curve 54). Blob positions come from the plugin's own
+     * canonical panel->blob table (.text rva 0x3b7d60, table[panel+27]=blob_pos),
+     * which reproduces EVERY committed anchor's blob position and the DCO block
+     * 21..24 -> blob 26..29 in order. Cross-checks: PWM blob26=172 and SAW blob27=
+     * 149 are unique value-matches; NOISE blob29=0 matches; SUB blob28=0 (patch 5's
+     * SUB is 0 — the Ableton JSON's 149 was a copy of SAW, per the recall trace).
+     * The DCO block is in the table's NON-reordered region (unlike the envelope
+     * blocks, where the JU-06A reorders A,D,S,R->D,S,R,A). juno_curve(54,·) matches
+     * the value tree bit-for-bit for each. */
     /* DCO PWM LEVEL: bound via the plugin's own RUNTIME value tree, now emulated
      * under Unicorn (processor ctor sub_7FF91E013320 + param dispatch
      * sub_7FF91E019A30). The dispatch maps panel index -> engine setter; verified
