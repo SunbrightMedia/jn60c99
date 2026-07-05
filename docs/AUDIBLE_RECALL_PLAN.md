@@ -40,10 +40,19 @@ rate, key-trig, tempo-sync), and portamento / bend range. Oracle cross-check:
 patch 5 VCF cutoff = `juno_curve(22,153)` = `0.600000`, the plugin's own float.
 
 The blob→panel order is the plugin's own value-tree **leaf serialization order**
-(`leaf.address = 2*blob_pos`, emitted in address order; ENV1 serializes D,S,R,A
-because ATTACK has the highest address). Each panel's (curve, offset, transform)
-is recovered by RUNNING the real dispatch under Unicorn and matching
-`juno_curve(curve, transform(value))` bit-for-bit across a dense value grid.
+(`blob_pos = pool_index − 2` in declaration order, with 4 leaves displaced +4 by
+address-sort: ENV1 ATTACK, VCF KEY FOLLOW, ENV2 RELEASE, VCA TONE — so ENV1
+serializes D,S,R,A). Each panel's (curve, offset, transform) is recovered by RUNNING
+the real dispatch under Unicorn and matching `juno_curve(curve, transform(value))`
+bit-for-bit across a dense value grid.
+
+**Independent, non-circular validation of the mapping:** the value tree stores the
+16-char patch **name** as leaves pool 72..87 = blob_pos 70..85. Decoding the raw
+`.bin` blob at blob_pos 70..85 with the same nibble formula spells each patch's name
+**exactly** ("LD Classic Lead", "SY Poly Synth", "SY Pulsar Twinkl", …). Real ASCII
+data landing precisely where the pool mapping predicts proves the decode formula and
+`blob_pos = pool−2` mapping independently of the value tree — so the golden test is
+not self-referential; the mapping framework it rests on is confirmed by real data.
 
 ### The `.bin` bank-select path applies ONLY the 222-byte blob (verified in code)
 
@@ -64,17 +73,21 @@ is bound (save the 4 EFX leaves below, whose ordering is external).
 
 ### Honestly not yet bound (documented, never guessed)
 
-- **The 4 EFX leaves (EFFECT DEPTH, DELAY LEVEL/TIME, REVERB LEVEL).** These
-  occupy blob {40,49,50,51} (proven: the parser transform table `dword_7FF91E8A4290`
-  gives blob50=address100, blob51=address102, and addresses 80/98 are direct-copy),
-  but the exact **leaf→slot permutation is provably NOT in this binary** — a focused
-  read established that the per-leaf schema `address` values are loaded from an
-  EXTERNAL descriptor file (the schema parser is fed by a `std::ifstream`; the two
-  in-file name tables are display-order only and carry no address). Two plausible
-  orderings conflict and nothing in the binary disambiguates them, so we **refuse to
-  guess** (the cardinal rule: only the binary is ground truth). They also route to
-  the master/chorus FX section — the un-decompiled, silent path — so deferring them
-  costs the audible port nothing.
+- **The 4 EFX leaves (EFFECT DEPTH, REVERB LEVEL, DELAY LEVEL, DELAY TIME).** These
+  occupy blob {40,49,50,51}. Structure now understood: EFFECT DEPTH & REVERB sit at
+  their *direct* slots blob {50,51} (addresses 100,102 = 2·(pool−2); confirmed in the
+  parser transform table), while DELAY LEVEL & DELAY TIME are *displaced* to the two
+  slots the envelope reorder vacates, blob {40,49} (addresses 80,98, direct-copy).
+  But the residual intra-pair orderings — EFFECT DEPTH vs REVERB at {50,51}, and
+  DELAY LEVEL vs DELAY TIME at {40,49} — are **not resolvable from this binary**: the
+  per-leaf schema `address` values come from an EXTERNAL descriptor file (schema
+  parser fed by a `std::ifstream`; the in-binary name tables are declaration-order
+  only). Worse, the display-decode and the value-tree engine path *disagree* on what
+  these slots even are (the decode treats blob-addr 100 as a discrete 0-3 effect
+  mode, the value tree as a continuous "DS Drive" curve), so binding them would risk
+  a wrong coefficient. They also route to the master/chorus FX section — the un-
+  decompiled, silent path — so per the cardinal rule (only the binary is ground
+  truth, never guess) they stay deferred at no cost to the audible port.
 - **Exponential tempo-rate coefficients** (LFO Tempo Rate off1072, tempo-synced
   Delay Time off102352): no `juno_curve` matches; need the specific formula from
   the decompile. Both are tempo-synced, inaudible in the free-running dry preview.

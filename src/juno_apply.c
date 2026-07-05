@@ -4,14 +4,18 @@
  *   bank blob byte  --(bit-exact curve, src/juno_curve.c)-->  engine coefficient.
  * The bit-exact curve evaluator is PROVEN vs the real machine code (Unicorn).
  * The per-parameter binding {blob_pos -> (curve_id, engine_offset)} is recovered
- * from: (a) the plugin's setter thunks (curve_id + engine_offset per parameter,
- * 105/105 name-checked vs COEFF_PARAM_MAP), and (b) an empirical alignment of
- * the bank blob to the plugin's ordered parameter table, anchored to a known
- * patch (bank patch 5 "LD Classic Lead") whose live Ableton values we have.
+ * from: (a) RUNNING the plugin's real value-tree dispatch under Unicorn (curve_id +
+ * engine_offset per parameter), and (b) the value-tree leaf SERIALIZATION order:
+ * blob_pos = pool_index - 2 (declaration order), with 4 envelope/filter leaves
+ * displaced +4 by address-sort (ENV1 ATTACK, VCF KEY FOLLOW, ENV2 RELEASE, VCA TONE).
  *
- * VERIFIED ANCHOR: patch 5's VCF CUTOFF FREQ = blob 153 -> juno_curve(22,153)
- * = 0.600000 == the plugin's own "VCF CUTOFF FREQ H" float. So this chain
- * reproduces the plugin's stored coefficient exactly for the bound parameters.
+ * VALIDATED (binary-only, non-circular): decoding the raw .bin blob at blob_pos
+ * 70..85 with this same nibble formula spells each patch's NAME exactly ("LD Classic
+ * Lead", "SY Poly Synth", ...), because the value tree stores the 16-char patch name
+ * as leaves pool 72..87 = blob_pos 70..85. Real ASCII data landing exactly where the
+ * pool mapping predicts proves the decode + blob_pos=pool-2 mapping independently of
+ * the value tree. Cross-check: patch 5 VCF CUTOFF FREQ = blob 153 -> juno_curve(22,153)
+ * = 0.600000 == the value tree's own float for this patch.
  *
  * COVERAGE (honest): 30 distinct parameters, verified END-TO-END bit-exact vs the
  * value tree at each patch's ACTUAL blob values — tools/golden_cmp.py confirms all
