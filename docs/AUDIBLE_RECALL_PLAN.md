@@ -45,6 +45,36 @@ What is EXACT vs PARTIAL, stated plainly:
 Next for coverage: extract the OscVoice/VoiceCmn setters (DCO + VCA levels) and
 add them to the binding table only once each (curve, offset) is certain.
 
+## BREAKTHROUGH — the Koa value tree is CRACKED by emulation (binary-only)
+
+The "wall" below (static analysis can't recover the binding) was TRUE for static
+analysis but is now SUPERSEDED: the binding is recoverable by RUNNING the plugin's
+own value tree under Unicorn — no captures, no external data, pure binary.
+
+- Construct the DSP processor by running its real ctor `sub_7FF91E013320` under
+  Unicorn with `operator new` -> a bump allocator (this is what got past the prior
+  object-graph failures). Vtable slot 11 = `sub_7FF91E019A30` is the value-tree
+  parameter dispatch: `setParamByIndex(processor, panel_index, flag, value)`, a
+  giant switch that routes to the real voice setters (which apply the real curve
+  and write the engine descriptor).
+- Calling `dispatch(panel_index, value)` and hooking the engine writes yields, BY
+  RUNNING THE REAL CODE, `panel_index -> engine_offset + curve + exact float`.
+- Validated: all 12 original anchors reproduce exactly; `juno_curve(22,153)=0.600`
+  at off 6736. The panel<->engine map is exact: `dispatch_index = panel_index+749`
+  (verified at every anchor + the full enabled/disabled panel pattern).
+- Harnesses: `scratchpad/unit2/emu_valuetree.py` (dispatch runner),
+  `emu_ctor_probe.py` (ctor), `final_blob_engine.json` / `vt_index_map.json`.
+
+Bindings now committed (bit-exact): the 12 filter/env anchors + DCO PWM LEVEL
+(blob 26 -> off 4208 curve 54; an earlier commit misattributed it to off 4144 =
+DCO PWM DEPTH — the value tree corrected it), LFO DELAY TIME (off 1920 c44), and
+VCA LEVEL (off 101072 c49). Each added only where the blob position is a strict
+unique value-match to patch 5 AND `juno_curve(curve, raw)` reproduces the value
+tree's float. The engine side (offset+curve) is now known for ALL ~79 panel
+params via the value tree; the remaining blob positions (collisions like DCO
+SAW/SUB, common values like NOISE) are resolved by emulating the recall FRONT-END
+(bank blob -> panel index), which is the final step in progress.
+
 ## The Koa binding wall — established conclusively (4-angle investigation)
 
 A thorough investigation (parser trace, Koa-registration read, .rdata/.data scan,

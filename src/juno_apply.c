@@ -68,22 +68,28 @@ static const juno_bind BINDINGS[] = {
     { 48, 24,  7408, "VCF KEY FOLLOW"  },   /* -> KCV Level                        */
     { 39, 46,  7392, "VCF ENV MOD"     },   /* -> ENV Level (filter env depth)     */
     { 53, 24,  9584, "VCA TONE"        },   /* -> AMP TONE                         */
-    { 26, 45,  4144, "DCO PWM LEVEL"   },   /* -> DCO PWM Level (see note below)   */
-    /* DCO PWM LEVEL: recovered by RUNNING the plugin's own OscVoice setter
-     * (sub_7FF91DFBC3D0, vtable slot 12) under Unicorn — it calls the real curve
-     * evaluator with curve id 45 and writes descriptor param_id 62 -> engine
-     * offset 4144. Cross-checked: juno_curve(45,172)=0.6324297 reproduces that
-     * setter's output bit-for-bit. blob_pos 26 is a UNIQUE value-match (patch 5's
-     * only slot holding 172 == the plugin's DCO PWM LEVEL value), the same anchor
-     * method as the filter params above.
+    { 26, 54,  4208, "DCO PWM LEVEL"   },   /* -> JU OSC Sqr Lev (see note below)  */
+    {  7, 44,  1920, "LFO DELAY TIME"  },   /* -> LFO Delay (value tree, 96k c44)  */
+    { 66, 49,101072, "VCA LEVEL"       },   /* -> Patch Level (value tree c49)     */
+    /* DCO PWM LEVEL: bound via the plugin's own RUNTIME value tree, now emulated
+     * under Unicorn (processor ctor sub_7FF91E013320 + param dispatch
+     * sub_7FF91E019A30). The dispatch maps panel index -> engine setter; verified
+     * reproducing all 12 anchors exactly (VCF CUTOFF->6736, HPF->10240, ...), with
+     * panel_index + 749 == dispatch_index. Panel 21 "DCO PWM LEVEL" -> dispatch 770
+     * -> engine offset 4208 (curve 54). Cross-checked: juno_curve(54,172)=0.9901619
+     * reproduces the value tree's output bit-for-bit. blob_pos 26 is patch 5's
+     * unique slot holding 172 (== the plugin's DCO PWM LEVEL value).
+     *   CORRECTION: an earlier commit bound this to offset 4144/curve 45; that slot
+     *   is actually DCO PWM *DEPTH* (panel 9). The value tree is authoritative.
      *
-     * NOT YET BOUND (blob_pos not uniquely resolvable from patch 5, no fabrication):
-     *   DCO SAW/SUB LEVEL (offsets 4192/4224, both curve 54): patch 5 has SAW==SUB==149
-     *     and only ONE blob slot (27) holds 149, so which of the two setters blob 27
-     *     feeds is undecidable without the runtime value-tree (in progress).
-     *   DCO NOISE LEVEL (6528, curve 54): patch 5 value 0 is non-unique.
-     *   VCA/AMP LEVEL (blob 66 unique, offset 10320): its setter takes a DIRECT float;
-     *     the raw->float normalization lives in the value tree (not yet emulated). */
+     * NOT YET BOUND (engine side proven via the value tree; blob_pos pending the
+     * recall FRONT-END emulation, no fabrication):
+     *   DCO SAW LEVEL (off 4192, curve 54) / DCO SUB LEVEL (off 4224, curve 54):
+     *     patch 5 has both listed 149 and only blob 27 holds 149, so the blob->panel
+     *     split needs the bank-file recall front-end (in progress).
+     *   DCO NOISE LEVEL (off 6528, curve 54): patch 5 value 0 is non-unique.
+     *   VCA/patch level (off 101072 "Patch Level", curve 49): value-tree-proven
+     *     engine side; blob_pos 66 (value 46) unique but pending front-end confirm. */
 };
 #define N_BINDINGS ((int)(sizeof(BINDINGS)/sizeof(BINDINGS[0])))
 
