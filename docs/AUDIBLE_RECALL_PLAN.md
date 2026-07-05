@@ -14,16 +14,26 @@ slots; the piano triggers the ported note/gate/ADSR driver and plays the **dry
 voice** signal.
 
 What is EXACT vs PARTIAL, stated plainly:
-- **Bit-exact:** the curve evaluator (proven vs Unicorn) and the **11 bound
-  coefficients** — VCF cutoff & resonance, both ADSR envelopes (filter + amp
-  attack/release, filter sustain), filter env-mod, key-follow, VCA tone.
+- **Bit-exact:** the curve evaluator (proven vs Unicorn) and the **12 bound
+  coefficients** — VCF cutoff & resonance, **HPF cutoff**, both ADSR envelopes
+  (filter + amp attack/release, filter sustain), filter env-mod, key-follow, VCA
+  tone. Every curve id was re-confirmed by RUNNING the real setter thunk under
+  Unicorn (`unit2/pin_curve.py`), with a passing sanity check on a known thunk.
   Oracle-proven: patch 5 `LD Classic Lead` VCF cutoff = `juno_curve(22,153)` =
   `0.600000`, matching the plugin's own stored float. Verified in-browser
   (Chromium): apply patch 5 → cutoff slot = 0.600000, note peak 0.0207, audible.
-- **NOT yet bound (stay at engine defaults):** DCO oscillator mix (saw/sub/pwm/
-  noise levels — the OscVoice setters live outside the range extracted so far),
-  ENV2 decay/sustain (255/255 value-collision in the anchor patch → blob order
-  unproven), HPF (sample-rate-variant curve unresolved), LFO, and the FX chain.
+  HPF cutoff = curve 41, **SR-invariant** (identical at 44.1/48/96 kHz) — the
+  earlier "41 vs 52" doubt was conflating HPF *Cutoff* (10240, c41) with HPF
+  *Switch* (10256, c52).
+- **NOT bound — for a proven reason, not a guess-gap:**
+  - **DCO oscillator mix (saw/sub/sqr/noise levels), PWM level, VCA/AMP level.**
+    Exhaustively scanned all **357 setter thunks across all 23 vtable classes**:
+    *none* writes offsets 4192/4208/4224/6528/4144/10320 via a curve setter.
+    These are produced by the registry coefficient generator (reflection "Koa"
+    value tree), which is not ported — so there is no curve+offset to bind.
+  - **ENV2 (amp) decay/sustain:** the anchor patch has decay==sustain==255, so
+    the value-anchor can't order the two blob slots (needs a 2nd oracle patch).
+  - **LFO and the FX chain:** not yet traced.
 - **Approximate (documented hacks, not fabrication):** note-on **pitch** is a
   DCO-domain calibration and the **gate** opener pokes the phase-accumulator
   slot (see src/juno_note.c). Timbre is exact; base pitch may sit an octave off.

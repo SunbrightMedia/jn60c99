@@ -14,15 +14,25 @@
  * reproduces the plugin's stored coefficient exactly for the bound parameters.
  *
  * COVERAGE (honest): this binds the CONFIRMED voice-0 subset — the filter
- * (cutoff/resonance/HPF) and the filter ADSR — where both the blob position and
- * the engine (curve,offset) are unambiguous and, where an oracle value exists,
- * verified. Parameters whose engine binding was left ambiguous in the extracted
- * data (the DCO oscillator levels share one curve across saw/sub/sqr/noise; the
- * second ADSR / FX-chain params were not all captured) are NOT applied yet and
- * are listed in docs/AUDIBLE_RECALL_PLAN.md. Nothing is guessed.
+ * (VCF cutoff/resonance, HPF cutoff), both ADSRs (filter + amp attack/release,
+ * filter sustain), filter env-mod, key-follow, VCA tone — where both the blob
+ * position and the engine (curve,offset) are unambiguous and, where an oracle
+ * value exists, verified. Every curve id below was re-confirmed by RUNNING the
+ * real setter thunk under Unicorn (see tools/pin_curve provenance).
+ * NOT applied yet, for a documented reason (never guessed):
+ *   - DCO oscillator mix (saw/sub/sqr/noise levels) and VCA/AMP level: these do
+ *     NOT go through a per-parameter curve setter at all — they are produced by
+ *     the registry coefficient generator (reflection "Koa" value tree), which is
+ *     not ported. Confirmed: none of the 23 vtable classes expose a curve-setter
+ *     thunk that writes 4192/4208/4224/6528/10320.
+ *   - ENV2 (amp) decay/sustain: the anchor patch has decay==sustain==255, so the
+ *     value-anchor can't order the two blob slots.
+ * See docs/AUDIBLE_RECALL_PLAN.md.
  *
  * At 96 kHz (the engine's rate) the sample-rate-variant ADSR curves resolve to
- * the "other" variant (ENV attack=35, decay/release=36) per the empirical trace.
+ * the "other" variant (ENV attack=35, decay/release=38) — verified by emulating
+ * the real thunks with voice+0x38 set to 96000. HPF cutoff (curve 41) is
+ * SR-invariant (same curve at 44.1/48/96 kHz).
  */
 #include "juno_engine.h"
 #include "juno_curve.h"
@@ -48,9 +58,7 @@ typedef struct { int blob_pos; int curve_id; int offset; const char *name; } jun
 static const juno_bind BINDINGS[] = {
     { 35, 22,  6736, "VCF CUTOFF FREQ" },   /* -> LPF Cutoff  (VERIFIED = 0.6)     */
     { 37, 22,  6832, "VCF RESONANCE"   },   /* -> LPF Resonance                    */
-    /* HPF CUTOFF FREQ (blob 38 -> 10240) deferred: its thunk is SR-variant and the
-     * two extraction methods disagreed on the curve (41 vs 52); not applied until
-     * the exact 96 kHz curve is pinned (no fabrication). */
+    { 38, 41, 10240, "HPF CUTOFF FREQ" },   /* -> HPF Cutoff (curve 41, SR-invariant)*/
     { 44, 35,  2784, "ENV1 ATTACK"     },   /* -> filter ENV Attack  (96k curve 35)*/
     { 41, 38,  2816, "ENV1 DECAY"      },   /* -> filter ENV Decay   (96k curve 38)*/
     { 42, 50,  2800, "ENV1 SUSTAIN"    },   /* -> filter ENV Sustain               */

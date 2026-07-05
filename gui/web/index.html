@@ -250,7 +250,7 @@ function showBank() {
   sel.innerHTML = BANK.patches.map(p => `<option value="${p.index}">${String(p.index).padStart(2,"0")}  ${p.name}</option>`).join("");
   sel.onchange = () => showPatch(+sel.value);
   $("#bankttl").textContent = `${BANK.model} bank`;
-  $("#bankwarn").innerHTML = "The role bars below are inspection-only (transform-derived labels). <b>Apply to engine</b> loads the <b>verified</b> subset as bit-exact coefficients: VCF cutoff/resonance, both ADSR envelopes, filter env-mod, key-follow, VCA tone. DCO oscillator mix, HPF, LFO and FX are not yet bound and stay at engine defaults. See docs/BANK_FORMAT.md.";
+  $("#bankwarn").innerHTML = "The role bars below are inspection-only (transform-derived labels). <b>Apply to engine</b> loads the <b>verified</b> subset as bit-exact coefficients: VCF cutoff/resonance, HPF cutoff, both ADSR envelopes, filter env-mod, key-follow, VCA tone. DCO oscillator mix, VCA level, LFO and FX are not yet bound — they route through the plugin's reflection coefficient generator (no per-parameter curve setter exists), so they stay at engine defaults. See docs/BANK_FORMAT.md.";
   showPatch(0);
   $("#bankdlg").showModal();
 }
