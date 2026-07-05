@@ -81,6 +81,10 @@ static const juno_bind BINDINGS[] = {
     { 16,  5,  3840, "DCO RANGE"       },   /* -> OSC1 Feet (value tree c5)        */
     { 46, 38,  3296, "ENV2 DECAY"      },   /* -> amp ENV Decay (96k c38)          */
     { 47, 50,  3280, "ENV2 SUSTAIN"    },   /* -> amp ENV Sustain (value tree c50) */
+    { 54, 52,   592, "PORTAMENTO"      },   /* -> Porta (value tree c52; +c7@624)  */
+    { 54,  7,   624, "PORTAMENTO"      },   /* -> Porta time  (2nd coeff)          */
+    { 57, 10,  4128, "BEND RANGE"      },   /* -> Bend (value tree c10; +c10@7472) */
+    { 57, 10,  7472, "BEND RANGE"      },   /* -> Bend Range VCF (2nd coeff)       */
     /* DCO LFO MOD + the 6 above: blob position from the plugin's own value-tree
      * leaf serialization order (the CKoa tree child order; three code-reading
      * agents + the parser agree it is blob = panel+5 with the tree-reordered
