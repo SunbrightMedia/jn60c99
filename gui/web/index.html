@@ -124,7 +124,7 @@ async function boot() {
   $("#meta").textContent = `· ${PARAMS.length} params @ ${SR} Hz · runs entirely in your browser`;
   $("#warn").innerHTML =
     (heur ? `⚠ ${heur} params use <b>heuristic</b> slider bounds (positions are the real captured values). Drop a real <code>param_meta.json</code> beside this page for the plugin's true ranges. ` : "") +
-    "Press a key to hear a note (the ported ADSR/gate driver, calibrated to concert pitch). The note-on gate opener is still a working hack, not yet a faithful port — but a bank patch's <b>timbre coefficients load bit-exactly</b> (Load bank → Apply).";
+    "Load a bank → Apply, then press a key. A bank patch's <b>30 timbre parameters load bit-exactly</b> (verified vs the plugin across all 64 patches). You hear the exact <b>dry voice</b> (osc+VCF+VCA+both ADSRs) at concert pitch, with an 8× preview makeup gain — the master/chorus FX output stage needs ~250 coefficients Hex-Rays could not decompile, so it is not in the preview. The note-on trigger is a calibrated driver, not yet a faithful port of the plugin's own note handler.";
   buildPiano();
   refreshPresets();
   renderList();
@@ -250,7 +250,7 @@ function showBank() {
   sel.innerHTML = BANK.patches.map(p => `<option value="${p.index}">${String(p.index).padStart(2,"0")}  ${p.name}</option>`).join("");
   sel.onchange = () => showPatch(+sel.value);
   $("#bankttl").textContent = `${BANK.model} bank`;
-  $("#bankwarn").innerHTML = "The role bars below are inspection-only (transform-derived labels). <b>Apply to engine</b> loads the <b>verified</b> subset as bit-exact coefficients: VCF cutoff/resonance, HPF cutoff, both ADSR envelopes, filter env-mod, key-follow, VCA tone. DCO oscillator mix, VCA level, LFO and FX are not yet bound — they route through the plugin's reflection coefficient generator (no per-parameter curve setter exists), so they stay at engine defaults. See docs/BANK_FORMAT.md.";
+  $("#bankwarn").innerHTML = "<b>Apply to engine</b> loads <b>30 parameters as bit-exact coefficients</b>, verified against the plugin's own value tree across all 64 patches: DCO range / PWM depth·level·source / saw·sub·noise level / LFO mod, VCF cutoff · resonance · HPF cutoff · env-mod · key-follow · LFO mod, both ADSR envelopes in full, VCA tone · level, and LFO delay · rate · key-trig · tempo-sync + portamento · bend range. Not applied: the 4 FX leaves (effect / reverb / delay — their blob order lives in an external schema file, and they route to the un-decompiled FX stage). See docs/AUDIBLE_RECALL_PLAN.md.";
   showPatch(0);
   $("#bankdlg").showModal();
 }
@@ -303,12 +303,26 @@ function note(midi, on) {
   const inter = new Float32Array(M.HEAPF32.buffer, p, total * 2).slice();
   free(p);
   playInterleaved(inter, total);
-  status(`note ${midi} played (dry voice: exact osc+VCF+VCA+ADSR at concert pitch; FX chain not in preview)`);
+  status(`note ${midi} played — bit-exact dry voice (osc+VCF+VCA+ADSR) at concert pitch, +8x preview makeup gain; the master/chorus FX stage is not in the preview`);
 }
+// Preview makeup gain. The dry voice is emitted at the plugin's PRE-MASTER level:
+// the exact per-voice output is scaled by the engine's own 0.023 voice-normalization
+// (state[10400], a transcribed init constant), and the real plugin then sums 8 voices
+// and applies the master output stage's makeup gain. That master stage needs ~250
+// coefficients Hex-Rays could not decompile, so it is not ported — leaving a single
+// dry voice peaking near 0.03..0.09 (barely audible). We apply a fixed 8x makeup so
+// the bit-exact timbre is clearly audible; measured max over all 64 patches is 0.085,
+// so 8x -> ~0.68 peak, no clipping. This gain is a PREVIEW convenience, not the
+// plugin's exact master gain (which is un-portable).
+const PREVIEW_MAKEUP = 8.0;
 function playInterleaved(inter, n) {
   audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)({sampleRate: SR});
   const buf = audioCtx.createBuffer(2, n, SR), L = buf.getChannelData(0), R = buf.getChannelData(1);
-  for (let i=0;i<n;i++){ L[i]=inter[2*i]; R[i]=inter[2*i+1]; }
+  for (let i=0;i<n;i++){
+    let s = inter[2*i] * PREVIEW_MAKEUP;
+    if (s >  1) s =  1; else if (s < -1) s = -1;   // safety clamp (should not trigger)
+    L[i] = R[i] = s;
+  }
   const src = audioCtx.createBufferSource(); src.buffer = buf; src.connect(audioCtx.destination);
   audioCtx.resume(); src.start();
 }
