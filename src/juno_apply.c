@@ -75,11 +75,20 @@ static const juno_bind BINDINGS[] = {
     { 28, 54,  4224, "DCO SUB LEVEL"   },   /* -> JU OSC Sub Lev (value tree c54)  */
     { 29, 54,  6528, "DCO NOISE LEVEL" },   /* -> Osc Noise Level (value tree c54) */
     {  9,  0,  4032, "DCO LFO MOD"     },   /* -> LFO Level (value tree c0)        */
-    /* DCO LFO MOD: value tree routes panel 4 -> off 4032 / curve 0. blob 9 from the
-     * binary leaf schema (name pool rva 0xc46000: blob == name_index-2, verified on
-     * the non-reordered run reproducing every anchor incl. the DCO block). Both the
-     * schema position AND patch 5's blob 9 value (170) agree, and juno_curve(0,170)
-     * = 0.035049408674240112 reproduces the value tree's output bit-for-bit. */
+    { 10, 47,  7344, "VCF LFO MOD"     },   /* -> LFO Level (VCF) (value tree c47) */
+    { 12, 51,  1872, "LFO KEY TRIG"    },   /* -> LFO Trig (value tree c51)        */
+    { 14, 45,  4144, "DCO PWM DEPTH"   },   /* -> PWM Level (value tree c45)       */
+    { 16,  5,  3840, "DCO RANGE"       },   /* -> OSC1 Feet (value tree c5)        */
+    { 46, 38,  3296, "ENV2 DECAY"      },   /* -> amp ENV Decay (96k c38)          */
+    { 47, 50,  3280, "ENV2 SUSTAIN"    },   /* -> amp ENV Sustain (value tree c50) */
+    /* DCO LFO MOD + the 6 above: blob position from the plugin's own value-tree
+     * leaf serialization order (the CKoa tree child order; three code-reading
+     * agents + the parser agree it is blob = panel+5 with the tree-reordered
+     * leaves at panel+9, reproducing all committed anchors). It is reliable for
+     * the non-reordered run blob<=48; each row's curve+offset is proven by RUNNING
+     * the plugin's value-tree dispatch, and juno_curve(curve, patch5_raw)
+     * reproduces the dispatch's exact float bit-for-bit (verified per row,
+     * including VCF LFO MOD's bipolar-center denormal 4.1632e-28). */
     /* DCO SAW/SUB/NOISE LEVEL: value tree routes panels 22/23/24 -> off
      * 4192/4224/6528 (all curve 54). Blob positions come from the plugin's own
      * canonical panel->blob table (.text rva 0x3b7d60, table[panel+27]=blob_pos),
