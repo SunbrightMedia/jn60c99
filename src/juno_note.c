@@ -15,9 +15,12 @@
  *         note edge at voice_render line 553) — to a small value so v29>0. This
  *         works empirically but is the wrong mechanism; the faithful write needs
  *         the descriptor-1090 ramp out-pointer binding (unresolved init gap).
- *     (2) The pitch VALUE. state[4448] is the DCO pitch input; the DSP is exact,
- *         but the integer-note -> octave-value formula (control layer) is not
- *         traced, so PITCH_C4 below is an unverified calibration, not derived.
+ *     (2) The pitch VALUE. state[4448] is the DCO pitch input; the DSP is exact.
+ *         The plugin's own integer-note -> octave-value formula is not traced, so
+ *         PITCH_C4 below is a host-side CALIBRATION (not derived) — but it is now
+ *         measured so standard MIDI notes play at concert pitch (MIDI 60 -> C4
+ *         261.6 Hz, autocorrelation-verified; relative semitones are exact since
+ *         the DSP doubles per octave unit). Was one octave high before.
  * So: this is enough to demonstrate the ADSR/gate path end-to-end, but the two
  * un-ported control-layer inputs above must be traced for a faithful note-on.
  *
@@ -63,11 +66,14 @@
 
 /* DCO pitch calibration. state[4448] is in octave units (one unit == one octave;
  * verified: +1.0 doubles the oscillator frequency). C4 (MIDI 60, 261.63 Hz) is at
- * this engine's DCO scale = -5.4192 (measured from the exact phase increment
- * v398*48000 at 96 kHz). One semitone = 1/12 unit. NOTE: this is the DCO-domain
- * value; it differs from firstnote/note_pitch_table.h (a separate pitch node) by a
- * constant octave offset, which is a DCO-tuning matter beyond the note-on layer. */
-#define PITCH_C4     (-5.4192f)
+ * this engine's DCO scale = -6.4192, RE-MEASURED at 96 kHz by rendering the note
+ * and autocorrelating the output fundamental (state[4448]=-6.42 -> 261.6 Hz).
+ * One semitone = 1/12 unit. (The earlier -5.4192 was one octave too high — it
+ * produced C5=523 Hz for MIDI 60; corrected here so standard MIDI notes play at
+ * concert pitch. This is a host-side calibration of the offline note driver, not
+ * the plugin's own note path; DCO RANGE / fine-tune are separate per-patch params
+ * in the unported reflection path.) */
+#define PITCH_C4     (-6.4192f)
 
 /* Module-static ramp objects (offline host-side control state). */
 static juno_ramp g_gate[JUNO_NUM_VOICES];

@@ -124,7 +124,7 @@ async function boot() {
   $("#meta").textContent = `· ${PARAMS.length} params @ ${SR} Hz · runs entirely in your browser`;
   $("#warn").innerHTML =
     (heur ? `⚠ ${heur} params use <b>heuristic</b> slider bounds (positions are the real captured values). Drop a real <code>param_meta.json</code> beside this page for the plugin's true ranges. ` : "") +
-    "Press a key to hear a note (the ported ADSR/gate driver). <b>Pitch is an approximate calibration</b> and the note-on gate is a working hack, not yet a faithful port — but a bank patch's <b>timbre coefficients load bit-exactly</b> (Load bank → Apply).";
+    "Press a key to hear a note (the ported ADSR/gate driver, calibrated to concert pitch). The note-on gate opener is still a working hack, not yet a faithful port — but a bank patch's <b>timbre coefficients load bit-exactly</b> (Load bank → Apply).";
   buildPiano();
   refreshPresets();
   renderList();
@@ -303,7 +303,7 @@ function note(midi, on) {
   const inter = new Float32Array(M.HEAPF32.buffer, p, total * 2).slice();
   free(p);
   playInterleaved(inter, total);
-  status(`note ${midi} played (dry voice: exact osc+VCF+VCA+ADSR; pitch approximate; FX chain not in preview)`);
+  status(`note ${midi} played (dry voice: exact osc+VCF+VCA+ADSR at concert pitch; FX chain not in preview)`);
 }
 function playInterleaved(inter, n) {
   audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)({sampleRate: SR});
