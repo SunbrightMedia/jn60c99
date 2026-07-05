@@ -71,6 +71,12 @@ static const juno_bind BINDINGS[] = {
     { 26, 54,  4208, "DCO PWM LEVEL"   },   /* -> JU OSC Sqr Lev (see note below)  */
     {  7, 44,  1920, "LFO DELAY TIME"  },   /* -> LFO Delay (value tree, 96k c44)  */
     { 66, 49,101072, "VCA LEVEL"       },   /* -> Patch Level (value tree c49)     */
+    { 27, 54,  4192, "DCO SAW LEVEL"   },   /* -> JU OSC Saw Lev (value tree c54)  */
+    /* DCO SAW LEVEL: value tree routes panel 22 -> off 4192 / curve 54. blob 27 is
+     * the UNIQUE slot holding 149 in patch 5 (== SAW's value); since no second 149
+     * slot exists, SUB's listed 149 is a data dup and SAW owns blob 27. The leaf
+     * serialization order (blob == leaf-2) independently predicts blob 27 for panel
+     * 22. juno_curve(54,149)=0.6578414 matches the value tree bit-for-bit. */
     /* DCO PWM LEVEL: bound via the plugin's own RUNTIME value tree, now emulated
      * under Unicorn (processor ctor sub_7FF91E013320 + param dispatch
      * sub_7FF91E019A30). The dispatch maps panel index -> engine setter; verified
