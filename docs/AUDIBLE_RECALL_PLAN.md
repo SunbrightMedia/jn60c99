@@ -47,11 +47,17 @@ is recovered by RUNNING the real dispatch under Unicorn and matching
 
 ### Honestly not yet bound (documented, never guessed)
 
-- **The 4 EFX leaves (EFFECT DEPTH, DELAY LEVEL/TIME, REVERB LEVEL).** Their
-  blob-slot assignment {40,49,50,51} is not code-proven (the schema addresses in
-  that region are embedded, not in the 31-entry parser transform table), and they
-  route to the master/chorus FX section — which is the un-decompiled path that
-  outputs silence in the dry preview. Deferred until the order is code-proven.
+- **The 4 EFX leaves (EFFECT DEPTH, DELAY LEVEL/TIME, REVERB LEVEL).** These
+  occupy blob {40,49,50,51} (proven: the parser transform table `dword_7FF91E8A4290`
+  gives blob50=address100, blob51=address102, and addresses 80/98 are direct-copy),
+  but the exact **leaf→slot permutation is provably NOT in this binary** — a focused
+  read established that the per-leaf schema `address` values are loaded from an
+  EXTERNAL descriptor file (the schema parser is fed by a `std::ifstream`; the two
+  in-file name tables are display-order only and carry no address). Two plausible
+  orderings conflict and nothing in the binary disambiguates them, so we **refuse to
+  guess** (the cardinal rule: only the binary is ground truth). They also route to
+  the master/chorus FX section — the un-decompiled, silent path — so deferring them
+  costs the audible port nothing.
 - **Exponential tempo-rate coefficients** (LFO Tempo Rate off1072, tempo-synced
   Delay Time off102352): no `juno_curve` matches; need the specific formula from
   the decompile. Both are tempo-synced, inaudible in the free-running dry preview.

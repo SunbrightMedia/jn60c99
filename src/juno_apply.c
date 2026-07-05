@@ -34,9 +34,14 @@
  * juno_curve(curve, transform(value)) bit-for-bit across a dense value grid.
  * NOT applied yet, for a documented reason (never guessed):
  *   - The four EFX leaves (EFFECT DEPTH, REVERB LEVEL, DELAY LEVEL, DELAY TIME):
- *     their blob-slot assignment {40,49,50,51} is not yet code-proven (the schema
- *     addresses in that region are unresolved), and they route to the master/chorus
- *     FX section (not the audible dry voice path).
+ *     these occupy blob {40,49,50,51} (proven: the parser transform table gives
+ *     blob50=addr100, blob51=addr102; 80/98 are direct-copy), but the exact
+ *     leaf->slot PERMUTATION is provably NOT in this binary — the per-leaf schema
+ *     `address` values are read from an EXTERNAL descriptor file (the schema parser
+ *     is fed by a std::ifstream; the two in-file name tables are display-order only
+ *     and carry no address). Two plausible orderings conflict and the binary cannot
+ *     disambiguate, so we refuse to guess. These also route to the master/chorus FX
+ *     section (the un-decompiled, silent path), so deferring them costs no audio.
  *   - LEGATO / ASSIGN MODE: probing a FRESH value tree shows these write NO engine
  *     coefficient at all — they are note-allocation flags (mono/poly/legato voice
  *     behaviour) stored in the flat param array, not DSP coefficients, so there is
