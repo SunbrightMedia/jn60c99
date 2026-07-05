@@ -45,6 +45,34 @@ What is EXACT vs PARTIAL, stated plainly:
 Next for coverage: extract the OscVoice/VoiceCmn setters (DCO + VCA levels) and
 add them to the binding table only once each (curve, offset) is certain.
 
+## The Koa binding wall — established conclusively (4-angle investigation)
+
+A thorough investigation (parser trace, Koa-registration read, .rdata/.data scan,
+and Unicorn emulation) settled WHY coverage cannot be extended past the 12 verified
+params by static analysis alone:
+- The bank-blob -> panel-state decode IS fully verified (parser sub_7FF91DFB1710 +
+  the 31-entry table dword_7FF91E8A4290). blob_pos == parser src/2 (proven).
+- The panel-state -> ENGINE-coefficient binding is a **runtime-constructed CKoaValue
+  value tree**, not a static table. Its leaves hold only NAMES (a 4232-entry const
+  char* pool at VA 0x180c46000, e.g. "fm.PATCH.FLT.VCF CUTOFF FREQ") with **no
+  parallel param_id/offset/curve/setter array** anywhere in .rdata/.data.
+- Decisive negatives: the only pointers to the 51 setter thunks live in the 23
+  per-class C++ vtables (no auxiliary dispatch table); the distinctive prog_dest
+  3041 appears exactly ONCE in the whole binary (inside the parser table), proving
+  prog_dest indexes no static structure.
+- The panel names ("VCF CUTOFF FREQ") differ from the engine registry names
+  ("LPF Cutoff"), so there is no static string-join either.
+- Emulating the value-tree construction+apply failed again on the
+  CPrmDSPJu60Plugin object graph (operator new / std containers / atomics / RTTI) —
+  a second independent attempt confirming the prior "not tractable" finding.
+
+Result: **new_bindable_count = 0**; the 12 bindings were, however, re-validated by
+multiple independent methods (VCF cutoff oracle-exact). Extending coverage requires
+one of: (a) fully emulating the runtime value-tree object graph (hard, 2 failed
+attempts); or (b) more ground-truth coefficient values (the plugin's "*_H" floats)
+for the unbound params, letting each curve be IDENTIFIED (not fitted) against the
+66 real curves — the same method that produced the 2 existing oracles.
+
 ## Verdict: BOTH remaining units are BOUNDED and portable from what we have
 
 The earlier "disproportionate / needs data we don't have" conclusion
