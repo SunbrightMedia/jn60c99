@@ -74,6 +74,12 @@ static const juno_bind BINDINGS[] = {
     { 27, 54,  4192, "DCO SAW LEVEL"   },   /* -> JU OSC Saw Lev (value tree c54)  */
     { 28, 54,  4224, "DCO SUB LEVEL"   },   /* -> JU OSC Sub Lev (value tree c54)  */
     { 29, 54,  6528, "DCO NOISE LEVEL" },   /* -> Osc Noise Level (value tree c54) */
+    {  9,  0,  4032, "DCO LFO MOD"     },   /* -> LFO Level (value tree c0)        */
+    /* DCO LFO MOD: value tree routes panel 4 -> off 4032 / curve 0. blob 9 from the
+     * binary leaf schema (name pool rva 0xc46000: blob == name_index-2, verified on
+     * the non-reordered run reproducing every anchor incl. the DCO block). Both the
+     * schema position AND patch 5's blob 9 value (170) agree, and juno_curve(0,170)
+     * = 0.035049408674240112 reproduces the value tree's output bit-for-bit. */
     /* DCO SAW/SUB/NOISE LEVEL: value tree routes panels 22/23/24 -> off
      * 4192/4224/6528 (all curve 54). Blob positions come from the plugin's own
      * canonical panel->blob table (.text rva 0x3b7d60, table[panel+27]=blob_pos),
