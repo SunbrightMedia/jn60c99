@@ -13,20 +13,30 @@
  * = 0.600000 == the plugin's own "VCF CUTOFF FREQ H" float. So this chain
  * reproduces the plugin's stored coefficient exactly for the bound parameters.
  *
- * COVERAGE (honest): this binds the CONFIRMED voice-0 subset — the filter
- * (VCF cutoff/resonance, HPF cutoff), both ADSRs (filter + amp attack/release,
- * filter sustain), filter env-mod, key-follow, VCA tone — where both the blob
- * position and the engine (curve,offset) are unambiguous and, where an oracle
- * value exists, verified. Every curve id below was re-confirmed by RUNNING the
- * real setter thunk under Unicorn (see tools/pin_curve provenance).
+ * COVERAGE (honest): 29 distinct parameters, verified END-TO-END bit-exact vs the
+ * value tree at each patch's ACTUAL blob values (tools/golden_cmp.py: patches 0,5,
+ * 15,32,48,63 all match every bound coefficient bit-for-bit). Bound groups:
+ *   - VCF: cutoff, resonance, HPF cutoff (+3 secondary coeffs), env-mod, key-follow,
+ *     LFO mod, VCA tone.
+ *   - Envelopes: ENV1 A/D/S/R and ENV2 A/D/S/R (all four each).
+ *   - DCO: range, PWM depth, PWM level, saw/sub/noise level, LFO mod, PWM SOURCE
+ *     (a small-integer enum: LFO/ENV1±/ENV2±/Manual — see apply_pwm_source).
+ *   - LFO: delay, rate, key-trig.  Global: VCA level, portamento, bend range.
+ * The blob->panel order is the plugin's own value-tree leaf SERIALIZATION order
+ * (leaf.address = 2*blob_pos, emitted in address order; the schema places ENV1 as
+ * D,S,R,A because ATTACK has the highest address). Per-panel (curve,offset,transform)
+ * come from RUNNING the plugin's real value-tree dispatch under Unicorn and matching
+ * juno_curve(curve, transform(value)) bit-for-bit across a dense value grid.
  * NOT applied yet, for a documented reason (never guessed):
- *   - DCO oscillator mix (saw/sub/sqr/noise levels) and VCA/AMP level: these do
- *     NOT go through a per-parameter curve setter at all — they are produced by
- *     the registry coefficient generator (reflection "Koa" value tree), which is
- *     not ported. Confirmed: none of the 23 vtable classes expose a curve-setter
- *     thunk that writes 4192/4208/4224/6528/10320.
- *   - ENV2 (amp) decay/sustain: the anchor patch has decay==sustain==255, so the
- *     value-anchor can't order the two blob slots.
+ *   - The four EFX leaves (EFFECT DEPTH, REVERB LEVEL, DELAY LEVEL, DELAY TIME):
+ *     their blob-slot assignment {40,49,50,51} is not yet code-proven (the schema
+ *     addresses in that region are unresolved), and they route to the master/chorus
+ *     FX section (not the audible dry voice path).
+ *   - LEGATO / ASSIGN MODE: in isolation the value tree writes only constant
+ *     (default) coefficients for these — they are combined keyboard-mode switches
+ *     with no independent per-param coefficient; deferred pending full-recall order.
+ *   - Exponential rate coefficients (LFO Tempo Rate, Delay Time): no juno_curve
+ *     matches; need the specific formula ported from the decompile.
  * See docs/AUDIBLE_RECALL_PLAN.md.
  *
  * At 96 kHz (the engine's rate) the sample-rate-variant ADSR curves resolve to
@@ -53,38 +63,61 @@
  * - offset: the engine coefficient slot (registry, name-checked vs COEFF_PARAM_MAP).
  * VCF CUTOFF FREQ is oracle-proven: juno_curve(22,153)=0.600000 == the plugin's
  * own float value for this patch. */
-typedef struct { int blob_pos; int curve_id; int offset; const char *name; } juno_bind;
+/* Value transforms applied to the raw blob byte before juno_curve(). Recovered by
+ * RUNNING the value tree over a dense grid and finding, per engine coefficient, the
+ * unique (curve_id, transform) whose juno_curve(curve, tf(v)) reproduces the tree's
+ * float for EVERY grid value bit-for-bit (see tools/genfull2). Most params are T_ID;
+ * a few driven coefficients (e.g. HPF Boost Thru) use a bipolar/halved input. */
+enum { T_ID, T_HALF, T_BIP, T_INV, T_INVHALF };
+static int apply_tf(int tf, int v)
+{
+    switch (tf) {
+        case T_HALF:    return v >> 1;
+        case T_BIP:     return (v >> 1) + 128;
+        case T_INV:     return 255 - v;
+        case T_INVHALF: return ((255 - v) >> 1) + 1;
+        default:        return v;              /* T_ID */
+    }
+}
+
+typedef struct { int blob_pos; int curve_id; int tf; int offset; const char *name; } juno_bind;
 
 static const juno_bind BINDINGS[] = {
-    { 35, 22,  6736, "VCF CUTOFF FREQ" },   /* -> LPF Cutoff  (VERIFIED = 0.6)     */
-    { 37, 22,  6832, "VCF RESONANCE"   },   /* -> LPF Resonance                    */
-    { 38, 41, 10240, "HPF CUTOFF FREQ" },   /* -> HPF Cutoff (curve 41, SR-invariant)*/
-    { 44, 35,  2784, "ENV1 ATTACK"     },   /* -> filter ENV Attack  (96k curve 35)*/
-    { 41, 38,  2816, "ENV1 DECAY"      },   /* -> filter ENV Decay   (96k curve 38)*/
-    { 42, 50,  2800, "ENV1 SUSTAIN"    },   /* -> filter ENV Sustain               */
-    { 43, 38,  2832, "ENV1 RELEASE"    },   /* -> filter ENV Release (96k curve 38)*/
-    { 45, 35,  3264, "ENV2 ATTACK"     },   /* -> amp ENV Attack                   */
-    { 52, 38,  3312, "ENV2 RELEASE"    },   /* -> amp ENV Release                  */
-    { 48, 24,  7408, "VCF KEY FOLLOW"  },   /* -> KCV Level                        */
-    { 39, 46,  7392, "VCF ENV MOD"     },   /* -> ENV Level (filter env depth)     */
-    { 53, 24,  9584, "VCA TONE"        },   /* -> AMP TONE                         */
-    { 26, 54,  4208, "DCO PWM LEVEL"   },   /* -> JU OSC Sqr Lev (see note below)  */
-    {  7, 44,  1920, "LFO DELAY TIME"  },   /* -> LFO Delay (value tree, 96k c44)  */
-    { 66, 49,101072, "VCA LEVEL"       },   /* -> Patch Level (value tree c49)     */
-    { 27, 54,  4192, "DCO SAW LEVEL"   },   /* -> JU OSC Saw Lev (value tree c54)  */
-    { 28, 54,  4224, "DCO SUB LEVEL"   },   /* -> JU OSC Sub Lev (value tree c54)  */
-    { 29, 54,  6528, "DCO NOISE LEVEL" },   /* -> Osc Noise Level (value tree c54) */
-    {  9,  0,  4032, "DCO LFO MOD"     },   /* -> LFO Level (value tree c0)        */
-    { 10, 47,  7344, "VCF LFO MOD"     },   /* -> LFO Level (VCF) (value tree c47) */
-    { 12, 51,  1872, "LFO KEY TRIG"    },   /* -> LFO Trig (value tree c51)        */
-    { 14, 45,  4144, "DCO PWM DEPTH"   },   /* -> PWM Level (value tree c45)       */
-    { 16,  5,  3840, "DCO RANGE"       },   /* -> OSC1 Feet (value tree c5)        */
-    { 46, 38,  3296, "ENV2 DECAY"      },   /* -> amp ENV Decay (96k c38)          */
-    { 47, 50,  3280, "ENV2 SUSTAIN"    },   /* -> amp ENV Sustain (value tree c50) */
-    { 54, 52,   592, "PORTAMENTO"      },   /* -> Porta (value tree c52; +c7@624)  */
-    { 54,  7,   624, "PORTAMENTO"      },   /* -> Porta time  (2nd coeff)          */
-    { 57, 10,  4128, "BEND RANGE"      },   /* -> Bend (value tree c10; +c10@7472) */
-    { 57, 10,  7472, "BEND RANGE"      },   /* -> Bend Range VCF (2nd coeff)       */
+    { 35, 22, T_ID,  6736, "VCF CUTOFF FREQ" }, /* -> LPF Cutoff  (VERIFIED = 0.6)     */
+    { 37, 22, T_ID,  6832, "VCF RESONANCE"   }, /* -> LPF Resonance                    */
+    { 38, 41, T_ID, 10240, "HPF CUTOFF FREQ" }, /* -> HPF Cutoff (curve 41, SR-invar.) */
+    { 38, 52, T_ID, 10256, "HPF CUTOFF FREQ" }, /* -> HPF Switch  (2nd coeff)          */
+    { 38, 10, T_ID, 10272, "HPF CUTOFF FREQ" }, /* -> Boost LPF Level (3rd coeff)      */
+    { 38, 18, T_BIP,10288, "HPF CUTOFF FREQ" }, /* -> Boost Thru Level (4th, bipolar)  */
+    { 44, 35, T_ID,  2784, "ENV1 ATTACK"     }, /* -> filter ENV Attack  (96k curve 35)*/
+    { 41, 38, T_ID,  2816, "ENV1 DECAY"      }, /* -> filter ENV Decay   (96k curve 38)*/
+    { 42, 50, T_ID,  2800, "ENV1 SUSTAIN"    }, /* -> filter ENV Sustain               */
+    { 43, 38, T_ID,  2832, "ENV1 RELEASE"    }, /* -> filter ENV Release (96k curve 38)*/
+    { 45, 35, T_ID,  3264, "ENV2 ATTACK"     }, /* -> amp ENV Attack                   */
+    { 52, 38, T_ID,  3312, "ENV2 RELEASE"    }, /* -> amp ENV Release                  */
+    { 48, 24, T_ID,  7408, "VCF KEY FOLLOW"  }, /* -> KCV Level                        */
+    { 39, 46, T_ID,  7392, "VCF ENV MOD"     }, /* -> ENV Level (filter env depth)     */
+    { 53, 24, T_ID,  9584, "VCA TONE"        }, /* -> AMP TONE                         */
+    { 26, 54, T_ID,  4208, "DCO PWM LEVEL"   }, /* -> JU OSC Sqr Lev (see note below)  */
+    {  7, 44, T_ID,  1920, "LFO DELAY TIME"  }, /* -> LFO Delay (value tree, 96k c44)  */
+    {  7, 52, T_ID,  1936, "LFO DELAY TIME"  }, /* -> LFO Delay Sw (2nd coeff)         */
+    {  8, 22, T_ID,  1088, "LFO RATE"        }, /* -> LFO Rate (value tree c22)        */
+    {  8, 22, T_ID,  2064, "LFO RATE"        }, /* -> LFO Noise Mix (shared rate coeff)*/
+    { 66, 49, T_ID,101072, "VCA LEVEL"       }, /* -> Patch Level (value tree c49)     */
+    { 27, 54, T_ID,  4192, "DCO SAW LEVEL"   }, /* -> JU OSC Saw Lev (value tree c54)  */
+    { 28, 54, T_ID,  4224, "DCO SUB LEVEL"   }, /* -> JU OSC Sub Lev (value tree c54)  */
+    { 29, 54, T_ID,  6528, "DCO NOISE LEVEL" }, /* -> Osc Noise Level (value tree c54) */
+    {  9,  0, T_ID,  4032, "DCO LFO MOD"     }, /* -> LFO Level (value tree c0)        */
+    { 10, 47, T_ID,  7344, "VCF LFO MOD"     }, /* -> LFO Level (VCF) (value tree c47) */
+    { 12, 51, T_ID,  1872, "LFO KEY TRIG"    }, /* -> LFO Trig (value tree c51)        */
+    { 14, 45, T_ID,  4144, "DCO PWM DEPTH"   }, /* -> PWM Level (value tree c45)       */
+    { 16,  5, T_ID,  3840, "DCO RANGE"       }, /* -> OSC1 Feet (value tree c5)        */
+    { 46, 38, T_ID,  3296, "ENV2 DECAY"      }, /* -> amp ENV Decay (96k c38)          */
+    { 47, 50, T_ID,  3280, "ENV2 SUSTAIN"    }, /* -> amp ENV Sustain (value tree c50) */
+    { 54, 52, T_ID,   592, "PORTAMENTO"      }, /* -> Porta OnOff (value tree c52)     */
+    { 54,  7, T_ID,   624, "PORTAMENTO"      }, /* -> Porta Time  (2nd coeff)          */
+    { 57, 10, T_ID,  4128, "BEND RANGE"      }, /* -> Bend (value tree c10; +c10@7472) */
+    { 57, 10, T_ID,  7472, "BEND RANGE"      }, /* -> Bend Range VCF (2nd coeff)       */
     /* DCO LFO MOD + the 6 above: blob position from the plugin's own value-tree
      * leaf serialization order (the CKoa tree child order; three code-reading
      * agents + the parser agree it is blob = panel+5 with the tree-reordered
@@ -143,6 +176,29 @@ int juno_bank_patch_name(const unsigned char *bank, int idx, char out[17])
     return 1;
 }
 
+/* DCO PWM SOURCE (blob 15) is a small-integer ENUM, not a curve: the value tree
+ * sets one of four boolean/polarity flags (recovered by probing all 256 values on
+ * the value-tree dispatch for panel 10):
+ *   0 -> Manual=1;  1 -> LFO=1;  2 -> ENV1=+1;  3 -> ENV1=-1;
+ *   4 -> ENV2=+1;   5 -> ENV2=-1;  6..255 -> Manual=1 (default/clamp).
+ * Engine slots: PWM SW LFO=3888, ENV1=3904, ENV2=3920, Manual=3936. */
+static void apply_pwm_source(unsigned char *state, int v)
+{
+    float lfo = 0.0f, env1 = 0.0f, env2 = 0.0f, man = 0.0f;
+    switch (v) {
+        case 1:  lfo  =  1.0f; break;
+        case 2:  env1 =  1.0f; break;
+        case 3:  env1 = -1.0f; break;
+        case 4:  env2 =  1.0f; break;
+        case 5:  env2 = -1.0f; break;
+        default: man  =  1.0f; break;   /* 0 and 6..255 */
+    }
+    JF(state, 3888) = lfo;
+    JF(state, 3904) = env1;
+    JF(state, 3920) = env2;
+    JF(state, 3936) = man;
+}
+
 /* Apply patch `idx` from `bank` into the engine `state`. Returns #params set. */
 int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
 {
@@ -153,7 +209,14 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
     for (i = 0; i < N_BINDINGS; ++i) {
         int p = BINDINGS[i].blob_pos;
         int v = ((blob[2 * p] & 0xF) << 4) | (blob[2 * p + 1] & 0xF);  /* hi-nibble */
-        JF(state, BINDINGS[i].offset) = juno_curve(BINDINGS[i].curve_id, v);
+        JF(state, BINDINGS[i].offset) =
+            juno_curve(BINDINGS[i].curve_id, apply_tf(BINDINGS[i].tf, v));
+        ++n;
+    }
+    /* DCO PWM SOURCE — blob 15 enum (4 flag coefficients). */
+    {
+        int v = ((blob[2 * 15] & 0xF) << 4) | (blob[2 * 15 + 1] & 0xF);
+        apply_pwm_source(state, v);
         ++n;
     }
     return n;
