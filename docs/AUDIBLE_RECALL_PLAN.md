@@ -85,14 +85,26 @@ Newest, honest state (supersedes the older "Approximate/Next steps" notes below)
   are **constant across all 64 bank patches** (all default). Net: **the 55 chorus
   patches (EFFECT TYPE 1/2/3) are already served correctly** by engine_init + the
   master; the earlier "chorus I/II" worry was a non-issue in this engine.
-- **Residual: slot-2 EFFECT TYPE modes 1 & 5 (9 patches).** The two insert slots
-  are v39 (DELAY TYPE) and v551 (EFFECT TYPE). EFFECT TYPE is {1:1, 2:33, 3:22, 5:8}
-  and modes 2/3 render byte-identical (chorus), so v551=2 is correct for the 55
-  chorus patches. Routing v551 to the real EFFECT TYPE was tested: mode 5 (8 patches)
-  attenuates ~2x and mode 1 (1 patch) goes SILENT — the slot-2 mode-1/5 effect blocks
-  (86xxx / 95888..96928) are not fully configured, so v551 is kept at 2 (chorus) to
-  avoid regression. Cracking these 9 patches would use the same master-object oracle
-  (build the slot-2 effect, read its param->coeff bindings) — deferred, not guessed.
+- **Residual: slot-2 EFFECT TYPE modes 1 & 5 (9 patches) — at the verifiability
+  limit under binary-only/no-captures.** The two insert slots are v39 (DELAY TYPE)
+  and v551 (EFFECT TYPE). EFFECT TYPE is {1:1, 2:33, 3:22, 5:8}; the master routes
+  v551: 0->distortion(DS), 1->86xxx, 2/3/4->chorus (byte-identical), 5->95888. So
+  v551=2 is correct for the 55 chorus patches. The remaining 9 (modes 1 & 5) were
+  investigated fully with the master-object oracle:
+    - The slot-2 effect blocks' params (mode-1 ids 0x37c-0x37f -> 86288..86336;
+      mode-5 ids 0x396-0x39a -> 96352..96416) are **NOT recalled by any value-tree
+      leaf** (scanned dispatch 742..1400) — they are fixed, not per-patch.
+    - The mode-1 block is all-zero in our state (unconfigured -> routing v551=1 is
+      SILENT); the mode-5 block is configured only from the capture (96400/96416=1.0)
+      and routing v551=5 attenuates ~2x.
+    - The param-smoother defaults read 0 and the param DB (`&unk_7FF91E5EC040+16*id`)
+      does not encode a readable default — so the *correct* fixed value for these
+      blocks depends on the effect-object **smoother subsystem's** runtime behavior
+      (a per-sample ramp path we do not port), and cannot be pinned from static data.
+  Because their correctness can't be verified without the original plugin's audio
+  (a capture, which is forbidden), v551 is kept at 2 (chorus) — a known-clean
+  stand-in, no regression. This is the one place where "sounds exactly the same"
+  and "binary-only, no captures" genuinely conflict for a subset of patches.
 - **REVERB — NOW RECALLED per-patch (was the last gap). CRACKED via a 2nd oracle.**
   The reverb is NOT a slot-2 insert; it is a **global send** in the master output
   stage (`master_render` LABEL_105), always active, scaled per-patch by REVERB LEVEL.
