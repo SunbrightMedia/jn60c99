@@ -8,6 +8,33 @@
  * such offsets were dropped). 279 coefficients, all nonzero. With these applied,
  * our initialised state matches the plugin's at ~100% over the DSP read set
  * (see docs/VALIDATION.md). NOTE: 96 kHz -- run the engine at 96000.
+ *
+ * WHAT THIS TABLE ACTUALLY IS (per-offset classification, cross-referenced against
+ * the master-object descriptor oracle's param->engine-offset registry — see
+ * docs/AUDIBLE_RECALL_PLAN.md "Baseline classification"):
+ *   -  36 / 279 offsets are FRONT-PANEL coefficients that per-patch recall
+ *      (juno_bank_apply + delay/reverb/hpf) OVERWRITES. The captured value here is
+ *      only a placeholder for those — the loaded patch's own value wins.
+ *   - 243 / 279 offsets are engine INTERNALS that NO front-panel patch parameter
+ *      targets (verified: none appears in the front-panel blob map; their registry
+ *      names are internal wiring — M.CV, Osc1 Level/Mute, LFO Sw, Effect SW, Voice
+ *      Output On/Off, and the effect/reverb ALGORITHM filter constants). A JUNO-60
+ *      patch is DEFINED by its front-panel controls, so anything not driven by them
+ *      is patch-INVARIANT. This table therefore functions as the engine's fixed
+ *      DEFAULTS table, not as per-patch data leaking into every patch.
+ *   Split of the 243: 75 pure-structural (no param targets them at all), 168
+ *   internal-param defaults (127 effect/master-block algorithm coeffs, 41 voice/
+ *   synth internal switches/levels). The only per-patch error this can introduce
+ *   is the documented slot-2 EFFECT-TYPE modes 1/5 residual (9 patches, effect
+ *   blocks 84544/85152/91xxx stuck at the default) — everything else is a genuine
+ *   invariant constant, identical to the plugin's own.
+ *
+ * WHY IT IS STILL A CAPTURE (not binary-derived): these constants are computed at
+ * plugin init by loading the default patch and running the full effect/voice
+ * PREPARE (filter-coeff math at 96 kHz, smoother snap-to-default). Reproducing them
+ * from the binary needs that entire prepare to run under emulation; it faults early
+ * (effect param-holder vector never built — sub_7FF91E01C980 @ rva 0x3BC980), so the
+ * values remain a measurement. They are honest measurements, not guesses or fits.
  */
 #include "juno_engine.h"
 #include <string.h>

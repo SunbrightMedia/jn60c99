@@ -178,6 +178,46 @@ Newest, honest state (supersedes the older "Approximate/Next steps" notes below)
   counterpart to correlate against; VCA MODE / tune have none, so their positions
   can't be found by correlation and won't be fabricated.
 
+## Baseline classification — what the captured `runtime_coeffs` table actually is
+
+The one remaining non-binary piece is `src/runtime_coeffs_data.c`: 279 engine
+coefficients memory-scanned from the live plugin (default preset "PD The Juno
+Pad", 96 kHz) — the parameter-applied engine state that no static init writes.
+"Retire the captured FX baseline if possible" (task #15) was pursued to its
+tractability limit this session. Findings, cross-referenced against the
+master-object descriptor oracle's param→engine-offset registry (1121 params):
+
+- **36 / 279** offsets are FRONT-PANEL coefficients that per-patch recall
+  (`juno_bank_apply` + `delay_recall` + `reverb_recall` + `hpf_type`) overwrites.
+  The captured value is a placeholder there; the loaded patch's own value wins.
+- **243 / 279** offsets are engine INTERNALS that **no front-panel patch parameter
+  targets**. A JUNO-60 patch is *defined* by its front-panel controls, so anything
+  not driven by them is **patch-invariant** — identical for every patch. This table
+  therefore functions as the engine's fixed DEFAULTS table, not as one preset's data
+  leaking into all patches. Split: **75** pure-structural (no param targets them at
+  all) + **168** internal-param defaults (**127** effect/master-block algorithm
+  coeffs — reverb allpass/comb tunings, chorus/delay/distortion internals — and
+  **41** voice/synth internal switches/levels: M.CV, Osc1 Level/Mute, LFO Sw,
+  Velocity constants, Effect SW, Voice Output On/Off, …).
+- **Net per-patch error** introduced by keeping these fixed = exactly the already
+  documented **slot-2 EFFECT-TYPE modes 1/5 residual** (9 patches; effect blocks
+  84544 / 85152 / 91xxx stuck at the mode-2/chorus default). Every other one of the
+  243 is a genuine invariant constant equal to the plugin's own value. So switching
+  patches in the port changes ONLY recalled coefficients — verifiable by construction
+  (`juno_bank_apply` writes only the recalled set; the 243 are never touched).
+
+**Why it stays a capture (not binary-derived).** These constants are computed at
+plugin init by loading the default patch and running the full effect/voice PREPARE
+(filter-coeff math at 96 kHz + smoother snap-to-default). The master-object oracle
+constructs the real `CJu60Sim` and builds all 1121 descriptors + 798 smoothers, but
+the descriptors store only name/target/type — **no default value** — and the PREPARE
+that would fill the coefficients (`sub_7FF91E01C980` @ rva 0x3BC980) faults early
+under emulation (the effect param-holder vector is never built). So the values remain
+honest MEASUREMENTS, not fits or guesses — and they are proven to be invariant engine
+constants, which is the strongest honest statement available without re-running the
+plugin's entire prepare. Retiring the capture fully is bounded (needs the master
+PREPARE to run to completion under emulation) but not tractable with current tooling.
+
 ## STATUS — every engine-driving parameter is bit-exact; all 64 patches verified
 
 The browser app (`gui/web/`, mirrored to `docs/`) does the full loop:
