@@ -103,6 +103,23 @@ Newest, honest state (supersedes the older "Approximate/Next steps" notes below)
   block per reverb config. That is the last, hardest piece — large and not yet built.
   Until then reverb patches deliberately stay on the (safe, non-regressing) chorus,
   and routing v551 to the un-configured reverb/slot-2-delay is NOT done (it regresses).
+  - **DSP-level trace (this session), narrowing the blocker further.** An impulse
+    into the reverb (v551=5) shows the tank **does ring**: state `95936` decays from
+    ~12 to ~0 over ~6000 samples (a short ~0.06 s room), and the reverb output
+    register `84704` carries it (~0.01). Tracing both output channels: the reverb tail
+    **is present but only in R** (`96320`→`84704`→v37→`84880`, R ≈ 0.0015 decaying to
+    ~1e-4), while **L is silent** (`96304`→`84672`→v35→`84864` is input-derived and
+    dies with the note). So a reverb tail renders, but quiet and hard-panned — exactly
+    the signature of the per-patch WET/RETURN level (REVERB LEVEL) being **unset**: the
+    (chorus-preset) capture leaves it at 0, and it is applied through the effect object. So the remaining unknowns are exactly two
+    effect-object-supplied numbers — the reverb **wet/return gain** (from REVERB LEVEL)
+    and the **decay/damping** (from REVERB TIME) — both requiring the master-object
+    harness above; the tank algorithm itself is already correct in the port.
+    Attempted extending the value-tree oracle: the effect object at `THIS+88` IS
+    allocated by the ctor, but **its own param-smoother array (`obj+88`) is null** —
+    the vtable-indirect sub-construction that would build it did not run under
+    emulation, which is why the REVERB LEVEL setter derefs null. Building that array
+    (or running the master ctor that builds it) is the concrete next step.
 - (superseded) The full FX DSP (delay/chorus/flanger/reverb/distortion) IS ported
   (`master_render.c`) and its per-mode static coeffs ARE in `juno_init.c`. But
   per-preset effect-MODE recall is not derivable from the binary: (a) the chorus
