@@ -23,8 +23,38 @@ Newest, honest state (supersedes the older "Approximate/Next steps" notes below)
   shared +0, aux +v*32); a self-consistency test proves all 8 voices render
   bit-identically. Chords now sound (native 8-voice; browser via the rebuilt
   WASM). See **docs/POLYPHONY.md**.
-- **Chorus-mode recall + effect/delay/reverb (asked as "fix #2") — BLOCKED, not
-  fabricated.** The full FX DSP (delay/chorus/flanger/reverb/distortion) IS ported
+- **Extended engine params NOW RECALLED (was blocked on record positions).** The
+  extended-region byte positions were cracked from the binary: the in-binary
+  leaf-order table (VA 0x180C46000) + deterministic value-tree serialization give
+  `raw = 490 + 8*(leaf-113)` for the NAME1/2/3 block (the external XML only packs
+  the compact blob, NOT this region — the prior "external schema" blocker is
+  debunked for the extended region). Bound and verified bit-for-bit vs the Unicorn
+  oracle across all 64 patches (0/448 mismatches): **VCA MODE** (rec 490 → ENV1/
+  ENV2/Gate at 10176/10192/10208; 12/45/7 — GATE is audibly organ-like),
+  **LFO TRIG ENV** (rec 554 → 2560/3040), **VCF/VCA VELOCITY SENS** (rec 1862/2102
+  → 7424/9600, v/255). MASTER TUNE is a SYSTEM/global leaf (absent from the per-
+  patch record), so correctly not recalled. MOD SENS / CONDITION recall to 0/
+  constant in this path (inert) — not bound. HPF TYPE deferred (its offsets are
+  already front-panel-bound — needs ordering care).
+- **Chorus-mode recall + effect/delay/reverb (asked as "fix #2") — STILL BLOCKED,
+  not fabricated.** Two independent, opposite-pointing signals prevent a safe bind:
+  (1) the effect-mode int cells S+11022052 (Prog_ID_EFX) / S+11022056 (Prog_ID_DLY)
+  ARE written by the value-tree via a registered `int*` and their consumer IS the
+  ported master_render — but WHICH record leaf drives WHICH cell is not code-proven:
+  the name-match says EFFECT TYPE→EFX, yet the per-patch value distribution
+  (EFFECT TYPE {2:33,3:22,5:8} vs DELAY TYPE {0:29,1:17,...}) says EFFECT TYPE→DLY
+  (the chorus stage) to be JUNO-plausible — the two hypotheses give OPPOSITE results.
+  (2) Even with the mode resolved, the per-mode enable/level/depth/rate cells
+  (chorus 6396432/6396448/6396176, reverb 10759376/408/488/504) are set by the
+  effect objects' vtable-indirect OO setup, NOT any value-tree leaf, so switching
+  modes would use the mode-II capture's enable/level and likely sound wrong for
+  non-chorus patches. The reverb/chorus FILTER coeffs, by contrast, are baked
+  `.rdata` tables constant per (effect-type, SR) — they do NOT vary per patch, so
+  the "frozen" filter coeffs are actually correct. Delay/effect-depth params ARE
+  recallable via the decompiled dispatch but are inert while the mode is forced.
+  Net: recalling the FX mode faithfully needs transcribing the vtable-indirect
+  effect-setup path AND proving the leaf→cell binding — the honest remaining wall.
+- (superseded) The full FX DSP (delay/chorus/flanger/reverb/distortion) IS ported
   (`master_render.c`) and its per-mode static coeffs ARE in `juno_init.c`. But
   per-preset effect-MODE recall is not derivable from the binary: (a) the chorus
   selector is `v39 = *(int*)(S+11022056) = Prog_ID_DLY` (value 2/3 = chorus,
