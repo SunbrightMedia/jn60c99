@@ -74,15 +74,35 @@ Newest, honest state (supersedes the older "Approximate/Next steps" notes below)
   DELAY-TYPE-0 patches with level>0 now audibly echo (`tests/test_delay_recall.c`).
   This also **fixes the double-chorus bug**: slot 1 was forced to chorus for every
   patch; it now plays its real per-patch DELAY TYPE (delay / passthrough / chorus).
-- **Slot-2 (chorus/reverb) recall — STILL the remaining gap (honest).** v551 =
-  EFFECT TYPE is left on the constant chorus block. The chorus/reverb enable/level/
-  depth/rate cells (6396432/6396448/6396176, 10759376/408/488/504) are set by the
-  effect objects' vtable-indirect OO setup, not any value-tree leaf, so they are not
-  per-patch derivable from the binary yet; and routing v551 to the reverb block
-  (EFFECT TYPE 5, 8 patches) or slot-2 delay (modes 0/1) with only the captured
-  chorus state produces silence/garbage — so those are deliberately NOT routed.
-  Net: the delay slot is now faithful per-patch; chorus stays mode II for all
-  patches and reverb (8 patches) is not yet recalled.
+- **Slot-2 CHORUS — now shown to be COMPLETE, not a gap (verified this session).**
+  Deep dive into `master_render`: modes 2 and 3 both fall into the same `if (v39<=3)`
+  / `if (v551<=3)` branch with **no `==3` sub-branch anywhere** — so "Chorus I" and
+  "Chorus II" run byte-identical code on byte-identical coefficients (an empirical
+  A/B render confirmed 2 and 3 produce identical output). The chorus LFO rate cell
+  `6395648` is written **only** by `engine_init` (grep of the full decompile: exactly
+  one writer, `sub_1803990C0`), never per-mode — so there is no per-mode chorus coeff
+  to recall. And the PATCH2 chorus params (PRE DELAY, LOW/HIGH CUT, LFO GAIN/OFFSET)
+  are **constant across all 64 bank patches** (all default). Net: **the 55 chorus
+  patches (EFFECT TYPE 1/2/3) are already served correctly** by engine_init + the
+  master; the earlier "chorus I/II" worry was a non-issue in this engine.
+- **Slot-2 REVERB — the ONE genuine remaining gap (8 patches, EFFECT TYPE 5).**
+  Precisely located this session. The stage-2 reverb is a full allpass-diffusion +
+  comb tank at engine block `95888..96928` (distinct from the stage-1 reverb block
+  `6497xxx/10692xxx`). `engine_init` writes its tank coeffs (comb feedback 0.999,
+  allpass gains) and the capture sets the enable gates (`96400=96416=1.0`) — yet a
+  2-second post-release render shows **no reverb tail** (v551=5 decays *faster* than
+  chorus for every EFFECT-TYPE-5 patch; some go silent). The reason: the per-patch
+  reverb configuration (REVERB TIME **varies 87–255 across patches**, DENSITY, the
+  send/return level from REVERB LEVEL) is applied through the **master/effect object**,
+  not the value-tree. Proof: recalling REVERB LEVEL (dispatch idx 795) **faults in the
+  value-tree oracle** at VA `0x7FF91E022E86`, dereferencing a null effect-object
+  pointer (`null+0x14`) — i.e. the setter targets the master effect object, which the
+  voice-graph oracle never constructs. Deriving per-patch reverb therefore needs a
+  **second emulation harness that constructs and runs the master/effect object** (its
+  ctor + prepare + the REVERB LEVEL/TIME/DENSITY setters), then dumps the `95888..96928`
+  block per reverb config. That is the last, hardest piece — large and not yet built.
+  Until then reverb patches deliberately stay on the (safe, non-regressing) chorus,
+  and routing v551 to the un-configured reverb/slot-2-delay is NOT done (it regresses).
 - (superseded) The full FX DSP (delay/chorus/flanger/reverb/distortion) IS ported
   (`master_render.c`) and its per-mode static coeffs ARE in `juno_init.c`. But
   per-preset effect-MODE recall is not derivable from the binary: (a) the chorus
