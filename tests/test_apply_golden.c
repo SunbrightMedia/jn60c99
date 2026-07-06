@@ -111,6 +111,19 @@ static int check(const char *name, const unsigned char *blob, const golden_t *g)
     memset(bank, 0, sizeof(bank));
     bank[0] = 'K';                                  /* "KoaBankFile00003" sentinel */
     memcpy(bank + 23 + 16, blob, 222);              /* record 0 blob at +16 */
+    /* Embed the VCF CUTOFF FREQ high-res float (big-endian nibbles at record byte
+     * 1870) so the applier's cutoff-H override reads it. For patches 0/5/40 the H
+     * float equals the coarse cutoff, i.e. the golden off-6736 bits, so encode that. */
+    {
+        unsigned int hbits = 0;
+        for (i = 0; i < NG; ++i) if (g[i].off == 6736) hbits = g[i].bits;
+        unsigned char be[4];
+        be[0]=(hbits>>24)&0xFF; be[1]=(hbits>>16)&0xFF; be[2]=(hbits>>8)&0xFF; be[3]=hbits&0xFF;
+        for (i = 0; i < 4; ++i) {
+            bank[23 + 1870 + 2*i]     = (be[i] >> 4) & 0xF;
+            bank[23 + 1870 + 2*i + 1] = be[i] & 0xF;
+        }
+    }
     memset(state, 0, sizeof(state));
     juno_bank_apply(state, bank, 0);
     for (i = 0; i < NG; ++i) {

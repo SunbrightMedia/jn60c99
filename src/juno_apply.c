@@ -17,10 +17,17 @@
  * the value tree. Cross-check: patch 5 VCF CUTOFF FREQ = blob 153 -> juno_curve(22,153)
  * = 0.600000 == the value tree's own float for this patch.
  *
- * COVERAGE (honest): 30 distinct parameters — the front-panel synthesis block, which
- * DEFINES the timbre. These are in the 222-byte front-panel window (record byte =
- * 2*pool_index + 12 for pool 2..112; blob_pos = pool_index - 2), verified END-TO-END
- * bit-exact vs the value tree (tools/golden_cmp.py: all 64 patches, 40 offsets).
+ * COVERAGE (honest): 30 distinct parameters (front-panel synthesis block, which
+ * DEFINES the timbre) + the high-resolution VCF cutoff override. VALIDATED against
+ * the plugin's OWN recall: a Unicorn oracle (tools/build_oracle.py replays the real
+ * value-tree dispatch per recalled leaf) — the applier reproduces every coefficient
+ * the recall writes, bit-for-bit, across ALL 64 patches (1752/1752 offsets), incl.
+ * off 6736 now that the cutoff-H override is applied. The only oracle coefficients
+ * the applier does NOT set are off 1072 (LFO Tempo Rate — runtime tempo state,
+ * recomputed from host BPM at play-time, not a stored recall value) and off 608
+ * (a combined legato+assign keyboard-mode switch, non-audible for single notes).
+ * The front-panel bytes live in the 222-byte window (record byte = 2*pool + 12 for
+ * pool 2..112; blob_pos = pool - 2).
  *   The EXTENDED params (PATCH2/PATCH3 leaves: velocity/mod/bend sens, cutoff-H,
  *   tune/condition, VCA mode, HPF/effect/delay/reverb TYPE) are NOT bound: the record
  *   is a MULTI-BLOCK structure and those leaves live at higher, non-flat offsets (e.g.
@@ -221,6 +228,29 @@ static void apply_pwm_source(unsigned char *state, int v)
     JF(state, 3936) = man;
 }
 
+/* Read a big-endian IEEE-754 float stored as 8 nibbles in the record starting at
+ * record byte offset `roff` (the `blob` pointer is record+16, i.e. blob-relative
+ * index = roff-16). The plugin stores full-resolution companions of some params
+ * this way and its recall applies them ON TOP OF the coarse front-panel byte.
+ * Proven against the plugin's own recall (Unicorn oracle, tools/build_oracle.py):
+ * VCF CUTOFF FREQ H at record byte 1870 equals engine off 6736 for all 64 patches
+ * — bit-identical to the coarse juno_curve(22,byte) for 53, and the correct FINER
+ * value for 11 (e.g. patch 47: 0.1424 vs the coarse 0.2078). */
+static float record_befloat(const unsigned char *blob, int roff)
+{
+    int b = roff - BANK_BLOB_OFF;                 /* blob-relative byte index */
+    unsigned int bits =
+        ((unsigned)(((blob[b+0] & 0xF) << 4) | (blob[b+1] & 0xF)) << 24) |
+        ((unsigned)(((blob[b+2] & 0xF) << 4) | (blob[b+3] & 0xF)) << 16) |
+        ((unsigned)(((blob[b+4] & 0xF) << 4) | (blob[b+5] & 0xF)) <<  8) |
+        ((unsigned)(((blob[b+6] & 0xF) << 4) | (blob[b+7] & 0xF)));
+    float f;
+    unsigned int t = bits;
+    { unsigned char *dst = (unsigned char *)&f, *src = (unsigned char *)&t;
+      dst[0]=src[0]; dst[1]=src[1]; dst[2]=src[2]; dst[3]=src[3]; }
+    return f;
+}
+
 /* Apply patch `idx` from `bank` into the engine `state`. Returns #params set. */
 int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
 {
@@ -241,5 +271,8 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
         apply_pwm_source(state, v);
         ++n;
     }
+    /* VCF CUTOFF FREQ high-resolution override (see record_befloat): the plugin
+     * recalls the full-precision cutoff float and it supersedes the coarse byte. */
+    JF(state, 6736) = record_befloat(blob, 1870);
     return n;
 }
