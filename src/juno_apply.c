@@ -17,13 +17,19 @@
  * the value tree. Cross-check: patch 5 VCF CUTOFF FREQ = blob 153 -> juno_curve(22,153)
  * = 0.600000 == the value tree's own float for this patch.
  *
- * COVERAGE (honest): 30 distinct parameters, verified END-TO-END bit-exact vs the
- * value tree at each patch's ACTUAL blob values — tools/golden_cmp.py confirms all
- * 64 bank patches match every bound coefficient (40 offsets) bit-for-bit. This is
- * every JUNO-60 engine-driving parameter that is cleanly code-resolvable: a probe
- * of all 79 panel dispatch indices shows ~45 write NOTHING to the engine (they are
- * JU-06A-only features absent from this JUNO-60 model — OSC2, cross-mod, ring, sync
- * — or inactive type/mod-matrix slots), so recall for those is a no-op. Bound groups:
+ * COVERAGE (honest): 33 distinct parameters. The whole 20223-byte record is ONE
+ * nibble-pair pool array (byte = 2*pool_index + 12; blob_pos = pool_index - 2), and
+ * our PG-JU60 bank's loader reads the FULL record, so every pool value is recallable
+ * — not just the 222-byte front-panel window. 30 core params verified END-TO-END
+ * bit-exact vs the value tree (tools/golden_cmp.py: all 64 patches, 40 offsets), plus
+ * 3 extended params (VCF/VCA VELOCITY SENS, LFO TRIG ENV).
+ *   IMPORTANT: every EXTENDED parameter (velocity/mod/bend sens, tune/condition, VCA
+ *   mode, HPF/effect/delay/reverb TYPE) reads 0 in ALL 64 patches of this factory
+ *   bank, so recalling them = the engine default = no audible change here; the 3
+ *   bound above are value-0-verified == default. The other extended params are
+ *   switches (need enum logic) or share a coefficient with an already-bound param
+ *   (BEND SENS/GAIN write off4128/7472, owned by BEND RANGE) — deferred, and moot for
+ *   this bank since they are all 0. Bound groups:
  *   - VCF: cutoff, resonance, HPF cutoff (+3 secondary coeffs), env-mod, key-follow,
  *     LFO mod, VCA tone.
  *   - Envelopes: ENV1 A/D/S/R and ENV2 A/D/S/R (all four each).
@@ -135,6 +141,15 @@ static const juno_bind BINDINGS[] = {
     { 57, 10, T_ID,  4128, "BEND RANGE"      }, /* -> Bend (value tree c10; +c10@7472) */
     { 57, 10, T_ID,  7472, "BEND RANGE"      }, /* -> Bend Range VCF (2nd coeff)       */
     { 59, 52, T_ID,  1056, "TEMPO SYNC"      }, /* -> LFO Tempo Rate Sw (value tree c52)*/
+    /* Extended params (pool>=113 -> blob_pos = pool-2; the whole record is one
+     * nibble-pair pool array at byte 2*pool+12, and our PG-JU60 bank's loader reads
+     * the FULL record, so these ARE recalled). Value-0 output verified == engine
+     * default, so recall is exact. All three are 0 in every patch of this factory
+     * bank, so they're inaudible here, but the recall is now correct for any value. */
+    {119, 52, T_ID,  2560, "LFO TRIG ENV"    }, /* pool121 -> LFO trigger env sw        */
+    {119, 52, T_ID,  3040, "LFO TRIG ENV"    }, /* pool121 -> (2nd coeff)               */
+    {284, 22, T_ID,  7424, "VCF VELOCITY SENS"}, /* pool286 -> Velocity Sens            */
+    {314, 22, T_ID,  9600, "VCA VELOCITY SENS"}, /* pool316 -> AMP VELOCITY SENS         */
     /* DCO LFO MOD + the 6 above: blob position from the plugin's own value-tree
      * leaf serialization order (the CKoa tree child order; three code-reading
      * agents + the parser agree it is blob = panel+5 with the tree-reordered
