@@ -228,6 +228,40 @@ static void apply_pwm_source(unsigned char *state, int v)
     JF(state, 3936) = man;
 }
 
+/* Read one logical byte (a nibble pair) from an EXTENDED record position. The
+ * record body past the 16-char name is nibble-packed: logical byte at record
+ * offset `roff` = ((rec[roff]&0xF)<<4) | (rec[roff+1]&0xF); the `blob` pointer is
+ * record+16 so the blob-relative index is roff-16. Extended-param positions come
+ * from the in-binary leaf-order table (VA 0x180C46000) + the deterministic
+ * value-tree serialization (raw = 490 + 8*(leaf-113) for the NAME1/2/3 block);
+ * each recall is verified bit-for-bit against the plugin's own value-tree dispatch
+ * (Unicorn oracle) across all 64 patches. */
+static int record_byte(const unsigned char *blob, int roff)
+{
+    int b = roff - BANK_BLOB_OFF;
+    return ((blob[b] & 0xF) << 4) | (blob[b + 1] & 0xF);
+}
+
+/* VCA MODE (extended leaf 113, record byte 490): the amp-source selector. Recalls
+ * to the ENV1/ENV2/Gate switch flags exactly as the plugin's value-tree dispatch
+ * (leaf 113 -> engine 10176/10192/10208) does:
+ *   0 -> ENV1 (10192=1);  1 -> ENV2 (10208=1);  2 -> GATE (10176=1).
+ * Verified vs the oracle across all 64 patches (distribution 12/45/7). GATE mode
+ * makes the amp organ-like (level while the note is held, no ADSR contour) — an
+ * audibly distinct behaviour from the enveloped ENV1/ENV2 modes. */
+static void apply_vca_mode(unsigned char *state, int v)
+{
+    float gate = 0.0f, env1 = 0.0f, env2 = 0.0f;
+    switch (v) {
+        case 1:  env2 = 1.0f; break;
+        case 2:  gate = 1.0f; break;
+        default: env1 = 1.0f; break;   /* 0, 3, and any clamp -> ENV1 */
+    }
+    JF(state, 10176) = gate;   /* Gate SW */
+    JF(state, 10192) = env1;   /* ENV1 SW */
+    JF(state, 10208) = env2;   /* ENV2 SW */
+}
+
 /* Read a big-endian IEEE-754 float stored as 8 nibbles in the record starting at
  * record byte offset `roff` (the `blob` pointer is record+16, i.e. blob-relative
  * index = roff-16). The plugin stores full-resolution companions of some params
@@ -274,5 +308,23 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
     /* VCF CUTOFF FREQ high-resolution override (see record_befloat): the plugin
      * recalls the full-precision cutoff float and it supersedes the coarse byte. */
     JF(state, 6736) = record_befloat(blob, 1870);
+
+    /* Extended engine parameters stored PAST the 222-byte front-panel blob. Their
+     * record byte positions come from the in-binary leaf-order table + value-tree
+     * serialization (see record_byte); each mapping below is transcribed from the
+     * plugin's own dispatch and verified bit-for-bit vs the Unicorn oracle over all
+     * 64 patches. These write per-voice offsets (<84272), so juno_driver_seed_voices
+     * replicates them to all 8 voices. */
+    apply_vca_mode(state, record_byte(blob, 490));      /* VCA MODE  (leaf 113) */
+    {
+        int t = record_byte(blob, 554);                  /* LFO TRIG ENV (leaf 121) */
+        JF(state, 2560) = t ? 1.0f : 0.0f;               /* both env-trigger switches */
+        JF(state, 3040) = t ? 1.0f : 0.0f;
+    }
+    /* VCF / VCA VELOCITY SENS (leaves 286 / 316): linear v/255 into the sens
+     * coefficients the voice scales its velocity response by. */
+    JF(state, 7424) = (float)record_byte(blob, 1862) / 255.0f;   /* VCF VEL SENS */
+    JF(state, 9600) = (float)record_byte(blob, 2102) / 255.0f;   /* VCA VEL SENS */
+    n += 4;
     return n;
 }
