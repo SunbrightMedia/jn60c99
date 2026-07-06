@@ -1,5 +1,12 @@
 # JUNO-60 DSP → C99 (exact-port restart)
 
+> ## ⭐ THE GOAL (see [GOAL.md](GOAL.md) — read it first)
+> A **bit-exact C99 port of the DSP engine**, plus **whatever it takes to sound
+> EXACTLY the same as the original plugin, in the browser** — kept portable C99
+> so it can **eventually run on a microcontroller (Teensy)**. Ground truth is
+> ONLY the decompiled/compiled binary. "Sounds exactly the same" is the
+> acceptance test, not "N params bound." Full goal + rules in **[GOAL.md](GOAL.md)**.
+
 A C99 port of the Roland Cloud **Cloud 60** (JUNO-60 emulation) **DSP audio
 engine**. The goal is an **exact, structural transcription** of the plugin's
 actual algorithm — same operations, same signal flow, same coefficients — not a
