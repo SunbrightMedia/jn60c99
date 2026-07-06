@@ -17,12 +17,17 @@
 extern "C" {
 #endif
 
-/* Per-voice base layout (verified from the 8 identical voice-render copies):
- *   main state block : voice v at  +320  + v*10512
- *   secondary array  : voice v at  +101504 + v*32
- * voice_render is transcribed for voice 0's absolute offsets; the driver selects
- * the per-voice base. (The plugin specialised one routine per voice; we keep one
- * routine parameterised by base.) */
+/* Per-voice / shared state layout — DERIVED by diffing the offset constants of
+ * the 8 specialised voice-render copies (sub_180369070..sub_180383F20); every
+ * one of their 1222 state references falls into exactly one of these regions
+ * (see docs/POLYPHONY.md):
+ *   main per-voice block : offsets [176,10672]   -> +v*10512  (8 blocks tile
+ *                          [176,84272) exactly: 176 + 8*10512 == 84272)
+ *   shared global block  : offsets [84272,84432] -> +0 (all voices share it)
+ *   aux one-shot edge     : offset  101504        -> +v*32
+ * voice_render is one routine parameterised by voice index; voice 0 is identical
+ * to the original voice-0 function. MAIN_BASE0 (320) is the first field the note
+ * driver writes; the block itself starts at 176. */
 #define JUNO_VOICE_MAIN_BASE0   320
 #define JUNO_VOICE_MAIN_STRIDE  10512
 #define JUNO_VOICE_AUX_BASE0    101504
@@ -64,11 +69,14 @@ void juno_runtime_coeffs_apply(unsigned char *st);
  * else 0 (placeholder). The driver gates the master/chorus vs dry path on this. */
 int juno_runtime_coeffs_loaded(void);
 
-/* voice_render — exact transcription of sub_180369070. Produces one mono sample
- * for one voice from its state block `st`; writes it to *outL and *outR (the
- * plugin duplicates the mono voice to both channels; stereo comes from chorus).
+/* voice_render — exact transcription of sub_180369070, parameterised by voice.
+ * Produces one mono sample for voice `voice` (0..7) from engine state `base`;
+ * writes it to *outL and *outR (the plugin duplicates the mono voice to both
+ * channels; stereo comes from chorus). Selects per-voice offsets internally
+ * (main +voice*10512, shared +0, aux +voice*32); voice==0 is bit-identical to
+ * the original. Render voices in order 0..7 per sample (shared block chains).
  * Returns the sample as a bit pattern (the decompile returns it in eax). */
-uint32_t juno_voice_render(unsigned char *st, float *outL, float *outR);
+uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *outR);
 
 /* juno_master_render — exact transcription of sub_180363380. The master process:
  * sums the 8 voice samples, runs the stereo BBD chorus, and writes the final

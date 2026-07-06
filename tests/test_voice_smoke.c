@@ -22,7 +22,7 @@ int main(void)
     float l = 0.0f, r = 0.0f;
     int nonfinite = 0;
     for (int i = 0; i < 1024; ++i) {
-        juno_voice_render(st, &l, &r);
+        juno_voice_render(st, 0, &l, &r);
         if (!isfinite(l) || !isfinite(r)) ++nonfinite;
     }
 

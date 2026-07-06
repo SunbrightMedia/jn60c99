@@ -22,11 +22,12 @@ dll: juno.dll
 juno.dll: gui/juno_bridge.c $(SRC)
 	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $^ $(LDLIBS)
 
-test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden
+test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency
 	./tests/test_helpers
 	./tests/test_voice_smoke
 	./tests/test_master_smoke
 	./tests/test_apply_golden
+	./tests/test_poly_consistency
 
 tests/test_helpers: tests/test_helpers.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
@@ -40,9 +41,12 @@ tests/test_master_smoke: tests/test_master_smoke.c $(SRC)
 tests/test_apply_golden: tests/test_apply_golden.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
+tests/test_poly_consistency: tests/test_poly_consistency.c $(SRC)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
 clean:
 	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke \
-	      tests/test_apply_golden
+	      tests/test_apply_golden tests/test_poly_consistency
 
 # Validate the port's init against the live-plugin state dump (state_dump/).
 validate: tests/validate_state.c $(SRC)

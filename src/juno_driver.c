@@ -5,15 +5,15 @@
  * the master reads through a host-params pointer, and calls the master process
  * (juno_master_render = sub_180363380) to produce the final stereo sample.
  *
- * SCOPE / HONESTY: the master's input is 8 voice samples. We have ONE exact voice
- * render (juno_voice_render = sub_180369070, voice 0's absolute offsets). The
- * plugin compiled 8 specialised copies; voices differ across THREE regions with
- * DIFFERENT strides (main +10512, shared +0, aux +32), so a single uniform base
- * shift cannot serve voices 1-7 correctly. Faking it would be a wrong
- * approximation (forbidden). Until the per-voice renders exist (dump asm for
- * sub_18036CE00..sub_180383F20 and transcribe each, or build a verified offset
- * classification to parameterise the one render), voices 1-7 are rendered as
- * silence. Voice 0 is exact. See docs/PORT_STATUS.md.
+ * POLYPHONY: the master's input is 8 voice samples. voice_render is now
+ * parameterised by voice index using the VERIFIED offset classification (diffing
+ * the 8 specialised copies sub_180369070..sub_180383F20 proves every state
+ * reference is main +v*10512, shared +0, or aux +v*32 — see docs/POLYPHONY.md).
+ * So all 8 voices are rendered by the one exact transcription, in order 0..7 each
+ * sample so the shared block chains exactly as the plugin's 8 calls do. Each
+ * voice needs its own copy of the per-voice patch coefficients: juno_bank_apply
+ * writes voice 0's block, and juno_driver_seed_voices replicates it to voices
+ * 1..7 (call after apply). Global coeffs (e.g. VCA level at 101072) stay single.
  */
 #include "juno_engine.h"
 #include "juno_driver.h"
@@ -39,7 +39,20 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
     memcpy(st + 136, &base, sizeof(void *));
 }
 
-/* Render one stereo output sample: voices -> 8 buffers -> master process.
+/* Replicate voice 0's per-voice state block [176,84272) to voices 1..7 so every
+ * voice carries the same patch coefficients. Call once after juno_bank_apply (and
+ * after juno_engine_init). The 8 blocks tile [176,84272) exactly at stride 10512;
+ * the shared/global region (>=84272) and the header (<176) are left untouched. */
+void juno_driver_seed_voices(unsigned char *st)
+{
+    const unsigned block = 176;                 /* per-voice block start          */
+    int v;
+    for (v = 1; v < JUNO_NUM_VOICES; ++v)
+        memcpy(st + block + (unsigned)v * JUNO_VOICE_MAIN_STRIDE,
+               st + block, JUNO_VOICE_MAIN_STRIDE);
+}
+
+/* Render one stereo output sample: 8 voices -> 8 buffers -> master process.
  * Writes the final stereo pair to *outL / *outR. Returns 1 if the full master/
  * chorus path ran, 0 if the dry fallback was used (chorus coeffs not yet loaded). */
 int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
@@ -50,17 +63,16 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
     int i;
 
     for (i = 0; i < 16; ++i) a2[i] = &scratch;        /* default: harmless */
+
+    /* All 8 voices, IN ORDER (the shared block at 84272 chains across them, as
+     * the plugin's 8 sequential voice calls do). Each voice reads/writes its own
+     * main block (+i*10512) and aux edge (+i*32); voice_render selects them. */
     for (i = 0; i < JUNO_NUM_VOICES; ++i) {
+        float vr = 0.0f;
         vbuf[i] = 0.0f;
+        juno_voice_render(st, i, &vbuf[i], &vr);
         a2[2 * i] = &vbuf[i];                          /* even slots = voices */
     }
-
-    /* Voice 0 — the one exact render we have. */
-    {
-        float vr = 0.0f;
-        juno_voice_render(st, &vbuf[0], &vr);
-    }
-    /* Voices 1..7 stay 0.0f (see SCOPE note above). */
 
     /* Run the full master/chorus only once the float coefficients are captured;
      * with them zero the master's output saturator collapses to silence, so the

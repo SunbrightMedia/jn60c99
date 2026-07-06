@@ -17,6 +17,9 @@ typedef struct {
     unsigned char *st;
     struct juno_host_shim shim;   /* must outlive render calls */
     int chorus_mode;
+    int voice_note[JUNO_NUM_VOICES];   /* MIDI note per voice, -1 = free      */
+    unsigned voice_age[JUNO_NUM_VOICES];/* allocation order (for LRU stealing) */
+    unsigned age_counter;
 } juno_ctx;
 
 /* Create + fully init an engine. sample_rate should be 96000 to match the
@@ -24,6 +27,7 @@ typedef struct {
 juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
 {
     juno_ctx *c = calloc(1, sizeof *c);
+    int v;
     if (!c) return NULL;
     c->st = calloc(1, JUNO_STATE_BYTES);
     if (!c->st) { free(c); return NULL; }
@@ -32,7 +36,9 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     juno_chorus_init(c->st);
     juno_engine_init(c->st);
     juno_runtime_coeffs_apply(c->st);
+    juno_driver_seed_voices(c->st);      /* all 8 voices carry the same coeffs */
     c->chorus_mode = chorus_mode;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
     return c;
 }
@@ -65,6 +71,7 @@ float juno_gui_get(juno_ctx *c, int off)
 void juno_gui_recall_factory(juno_ctx *c)
 {
     juno_runtime_coeffs_apply(c->st);
+    juno_driver_seed_voices(c->st);      /* propagate to all 8 voices */
     juno_driver_attach_host(c->st, &c->shim, c->chorus_mode);
 }
 
@@ -84,18 +91,42 @@ void juno_gui_gate(juno_ctx *c, float v)
     JF(c->st, JUNO_VOICE_AUX_BASE0) = v;
 }
 
-/* Note driver (src/juno_note.c). Sets the per-voice DCO note pitch (state[304] =
- * note/12, the plugin's own pitch slot), opens the shared ADSR gate (ramps
- * state[320], the plugin's own gate write), and fires the DCO retrigger edge on
- * voice 0. Faithful port recovered from the binary + live-plugin state; MIDI 60
- * plays concert C4 (261.63 Hz) exactly. See src/juno_note.c for the derivation. */
+/* Note driver (src/juno_note.c) with an 8-voice allocator. note-on picks a free
+ * voice (else steals the oldest) and sets its per-voice DCO pitch (state[V*10512+
+ * 304] = note/12), opens its shared ADSR gate (ramps state[V*10512+320]) and
+ * fires its DCO retrigger edge — the plugin's own note writes, one voice each.
+ * All 8 voices are rendered every sample (juno_gui_render), so chords sound.
+ * Faithful port from the binary + live-plugin state; MIDI 60 = concert C4. */
 void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
 {
-    if (c) juno_note_on(c->st, 0, midi_note, velocity);
+    int v, pick = -1;
+    unsigned oldest;
+    if (!c) return;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v)          /* prefer a voice already   */
+        if (c->voice_note[v] == midi_note) { pick = v; break; }  /* on this note*/
+    if (pick < 0)
+        for (v = 0; v < JUNO_NUM_VOICES; ++v)      /* then a free voice         */
+            if (c->voice_note[v] < 0) { pick = v; break; }
+    if (pick < 0) {                                /* else steal the oldest     */
+        pick = 0; oldest = c->voice_age[0];
+        for (v = 1; v < JUNO_NUM_VOICES; ++v)
+            if (c->voice_age[v] < oldest) { oldest = c->voice_age[v]; pick = v; }
+    }
+    c->voice_note[pick] = midi_note;
+    c->voice_age[pick]  = ++c->age_counter;
+    juno_note_on(c->st, pick, midi_note, velocity);
 }
-void juno_gui_note_off(juno_ctx *c)
+
+/* Release the voice(s) playing `midi_note`. midi_note < 0 releases all voices. */
+void juno_gui_note_off(juno_ctx *c, int midi_note)
 {
-    if (c) juno_note_off(c->st, 0);
+    int v;
+    if (!c) return;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        if (c->voice_note[v] == midi_note || (midi_note < 0 && c->voice_note[v] >= 0)) {
+            juno_note_off(c->st, v);
+            c->voice_note[v] = -1;
+        }
 }
 
 /* Apply bank patch `idx` (raw KoaBankFile00003 bytes in `bank`, `len` bytes)
@@ -105,8 +136,11 @@ void juno_gui_note_off(juno_ctx *c)
  * params keep their current (engine-default) value. */
 int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx)
 {
+    int n;
     if (!c || !bank || len <= 0) return 0;
-    return juno_bank_apply(c->st, bank, idx);
+    n = juno_bank_apply(c->st, bank, idx);
+    juno_driver_seed_voices(c->st);      /* all 8 voices play the applied patch */
+    return n;
 }
 
 /* Render nframes stereo samples into out (interleaved L,R). Advances the note
@@ -133,14 +167,18 @@ int juno_gui_render(juno_ctx *c, float *out, int nframes)
  * port can currently produce. Ticks the note driver once per sample. */
 int juno_gui_render_dry(juno_ctx *c, float *out, int nframes)
 {
-    int i;
+    int i, v;
     if (!c) return 0;
     for (i = 0; i < nframes; ++i) {
-        float vb = 0.0f, vr = 0.0f;
+        float mix = 0.0f;
         juno_note_tick(c->st);
-        juno_voice_render(c->st, &vb, &vr);   /* voice 0, exact */
-        out[2 * i]     = vb;                   /* mono voice -> both channels */
-        out[2 * i + 1] = vb;
+        for (v = 0; v < JUNO_NUM_VOICES; ++v) {   /* all 8 voices, in order */
+            float vb = 0.0f, vr = 0.0f;
+            juno_voice_render(c->st, v, &vb, &vr);
+            mix += vb;
+        }
+        out[2 * i]     = mix;                     /* mono mix -> both channels */
+        out[2 * i + 1] = mix;
     }
     return 1;
 }

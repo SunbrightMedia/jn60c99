@@ -15,7 +15,21 @@
 static inline float    f32_from_bits(uint32_t b){ float f; memcpy(&f,&b,4); return f; }
 static inline uint32_t bits_from_f32(float f){ uint32_t b; memcpy(&b,&f,4); return b; }
 
-uint32_t juno_voice_render(unsigned char *a1, float *outL, float *outR)
+/* Render one voice (0..7) of the 8-voice engine.
+ *
+ * The plugin compiled 8 specialised copies of this function (sub_180369070 =
+ * voice 0 .. sub_180383F20 = voice 7). Diffing their decompiled offset constants
+ * proves each copy is byte-identical modulo THREE region strides (derived, not
+ * guessed — see docs/POLYPHONY.md):
+ *   - main per-voice block  offsets [176,10672]  -> +voice*10512   (via a1 below)
+ *   - shared global block   offsets [84272,84432] -> +0 (all voices, chained)
+ *   - aux one-shot edge      offset 101504         -> +voice*32
+ * So this one exact transcription serves every voice: `a1` is the voice's main
+ * base (base + voice*10512), the 15 shared sites use `base` unshifted, and the 3
+ * aux sites use `base` at 101504+voice*32. voice==0 gives a1==base -> identical
+ * to the original voice-0 function bit-for-bit. Render voices in order 0..7 each
+ * sample so the shared block chains exactly as the plugin's 8 calls do. */
+uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *outR)
 {
   float v2; // xmm4_4
   float v5; // xmm0_4
@@ -544,20 +558,24 @@ uint32_t juno_voice_render(unsigned char *a1, float *outL, float *outR)
   int v528; // [rsp+D0h] [rbp+8h]
   float v529; // [rsp+E0h] [rbp+18h]
 
+  /* Per-voice region bases (see the header comment above). */
+  unsigned char *a1 = base + (unsigned)voice * JUNO_VOICE_MAIN_STRIDE;
+  unsigned auxoff  = JUNO_VOICE_AUX_BASE0 + (unsigned)voice * JUNO_VOICE_AUX_STRIDE;
+
   v2 = JF(a1, 320);
   v528 = 0;
-  if ( JF(a1, 101504) == 1.0 )
+  if ( JF(base, auxoff) == 1.0 )
   {
     v528 = JI(a1, 320);
     v2 = 0.0;
     JI(a1, 320) = 0;
   }
-  v5 = JF(a1, 84336);
-  v6 = JF(a1, 84272);
-  v7 = JF(a1, 84304);
-  JF(a1, 84352) = v5;
-  JF(a1, 84288) = v6;
-  JF(a1, 84320) = v7;
+  v5 = JF(base, 84336);
+  v6 = JF(base, 84272);
+  v7 = JF(base, 84304);
+  JF(base, 84352) = v5;
+  JF(base, 84288) = v6;
+  JF(base, 84320) = v7;
   v8 = (int)(float)(v5 * -16777216.0);
   if ( !v8 )
   {
@@ -594,15 +612,15 @@ LABEL_11:
   if ( (v15 & 0x1000000) == 0 )
     v17 = v13;
   JF(a1, 192) = v12;
-  JI(a1, 84384) = JI(a1, 84368);
+  JI(base, 84384) = JI(base, 84368);
   JI(a1, 512) = JI(a1, 496);
   JF(a1, 352) = v2;
   v20 = (float)v17 * 0.000000059604645;
   JF(a1, 400) = v14;
   JF(a1, 416) = v16;
-  JF(a1, 84336) = v20;
-  v21 = (float)(v20 * JF(a1, 84400)) + JF(a1, 84416);
-  JF(a1, 84368) = v21;
+  JF(base, 84336) = v20;
+  v21 = (float)(v20 * JF(base, 84400)) + JF(base, 84416);
+  JF(base, 84368) = v21;
   v22 = v18 - (float)(v7 * v21);
   v23 = JF(a1, 272);
   JF(a1, 288) = v23;
@@ -610,7 +628,7 @@ LABEL_11:
   v25 = JF(a1, 240);
   v26 = v23 * v25;
   JF(a1, 256) = v25;
-  JF(a1, 84432) = v24;
+  JF(base, 84432) = v24;
   v27 = JF(a1, 304);
   JF(a1, 336) = v27;
   JF(a1, 448) = v26;
@@ -765,7 +783,7 @@ LABEL_46:
   v80 = JF(a1, 1488);
   v81 = JF(a1, 1536);
   JI(a1, 1648) = JI(a1, 1632);
-  v82 = JI(a1, 84432);
+  v82 = JI(base, 84432);
   JF(a1, 1520) = v78;
   JF(a1, 1504) = v80;
   JF(a1, 1552) = v81;
@@ -1079,7 +1097,7 @@ LABEL_46:
   JI(a1, 4240) = JI(a1, 4192);
   JI(a1, 4256) = v189;
   JI(a1, 4272) = JI(a1, 4224);
-  v190 = JF(a1, 84432);
+  v190 = JF(base, 84432);
   JI(a1, 4320) = JI(a1, 4304);
   v191 = JF(a1, 4288);
   JF(a1, 4304) = v191;
@@ -2125,10 +2143,10 @@ LABEL_46:
        + v524;
   JF(a1, 4928) = v526;
   JF(a1, 3520) = v526;
-  if ( JF(a1, 101504) == 1.0 )
+  if ( JF(base, auxoff) == 1.0 )
   {
     JI(a1, 320) = v528;
-    JI(a1, 101504) = 0;
+    JI(base, auxoff) = 0;
   }
   *outL = JF(a1, 10672);
   result = JU(a1, 10672);

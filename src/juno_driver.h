@@ -29,7 +29,12 @@ struct juno_host_shim {
 void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
                              int32_t chorus_mode);
 
-/* Render one stereo output sample (voices -> 8 buffers -> master process).
+/* Replicate voice 0's per-voice patch coefficients to voices 1..7. Call once
+ * after juno_bank_apply (which writes voice 0 only) so all 8 voices play the same
+ * patch. Global coefficients (>=84272) are left as the applier set them. */
+void juno_driver_seed_voices(unsigned char *st);
+
+/* Render one stereo output sample (8 voices -> 8 buffers -> master process).
  * Returns 1 if the full master/chorus path ran, 0 if the dry fallback was used
  * (chorus coefficients from sub_180388170 not yet captured — see juno_driver.c). */
 int juno_driver_render_sample(unsigned char *st, float *outL, float *outR);
