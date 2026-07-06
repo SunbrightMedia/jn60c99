@@ -213,6 +213,16 @@ const BLK = 1024;
 function ensureAudio() {
   if (audioCtx) { audioCtx.resume(); return; }
   audioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate: SR});
+  // The engine's coefficients (curves + captured baseline) are computed for
+  // EXACTLY 96 kHz. If the browser/device won't give a 96 kHz context it silently
+  // falls back (usually 48 kHz), and every 96 kHz sample the engine renders then
+  // plays an octave low at half speed — the classic "sounds wrong". Surface it.
+  if (Math.abs(audioCtx.sampleRate - SR) > 1) {
+    status("⚠ audio running at " + audioCtx.sampleRate + " Hz, engine expects " +
+           SR + " Hz — pitch/tempo will be off. Use a browser/device that supports " +
+           SR + " Hz output (desktop Chrome/Firefox).");
+    console.warn("JUNO: AudioContext sampleRate", audioCtx.sampleRate, "!=", SR);
+  }
   rbuf = malloc(BLK * 2 * 4); rcap = BLK;
   procNode = audioCtx.createScriptProcessor(BLK, 0, 2);
   procNode.onaudioprocess = (e) => {
