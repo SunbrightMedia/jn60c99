@@ -36,6 +36,13 @@ Newest, honest state (supersedes the older "Approximate/Next steps" notes below)
   patch record), so correctly not recalled. MOD SENS / CONDITION recall to 0/
   constant in this path (inert) — not bound. HPF TYPE deferred (its offsets are
   already front-panel-bound — needs ordering care).
+- **HPF TYPE NOW RECALLED (was a latent bug).** The HPF's 4 engine coefficients
+  (10240/10256/10272/10288) are a JOINT function of HPF CUTOFF FREQ (blob 38) and
+  HPF TYPE (record 618); the value tree applies HPF TYPE last. The front-panel-only
+  binding was correct for the 54 TYPE=0 patches but wrong for the 10 TYPE=1 patches.
+  Fixed: `hpf_type_lut.c` captures the plugin's TYPE=1 output over all 256 cutoff
+  bytes (baked LUT, same principle as juno_curve); all 64 patches' HPF now matches
+  the oracle full recall (0/256). 
 - **Chorus-mode recall + effect/delay/reverb (asked as "fix #2") — STILL BLOCKED,
   not fabricated.** Two independent, opposite-pointing signals prevent a safe bind:
   (1) the effect-mode int cells S+11022052 (Prog_ID_EFX) / S+11022056 (Prog_ID_DLY)
