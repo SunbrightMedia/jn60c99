@@ -30,7 +30,6 @@
   .p .off { color: #667; font-size: 11px; }
   .p input[type=range] { width: 100%; }
   .p input[type=number] { width: 88px; }
-  .p .heur { color: #a83; } .p .auth { color: #4a4; }
   #piano { position: relative; height: 90px; user-select: none; margin: 6px 0; }
   .key { position: absolute; bottom: 0; border: 1px solid #111; border-radius: 0 0 4px 4px; }
   .key.w { width: 26px; height: 90px; background: #eee; z-index: 1; }
@@ -59,7 +58,6 @@
   <div id="piano"></div>
   <div class="row">
     <input type="text" id="filter" placeholder="filter parameters…" oninput="renderList()" style="flex:1">
-    <label class=note><input type="checkbox" id="onlyauth" onchange="renderList()"> real-range only</label>
   </div>
   <div class="warn" id="warn"></div>
 </header>
@@ -122,11 +120,10 @@ async function boot() {
   try { REAL = await fetch("param_meta.json").then(r => r.ok ? r.json() : {}); } catch { REAL = {}; }
   PARAMS = raw.map(([off,name]) => descriptor(off,name));
 
-  const heur = PARAMS.filter(p => !p.auth).length;
   $("#meta").textContent = `· ${PARAMS.length} params @ ${SR} Hz · runs entirely in your browser`;
   $("#warn").innerHTML =
     `<div class="info">✓ Ready — <b>Load bank → Apply → press a key.</b> Applying a patch loads <b>30 timbre parameters as bit-exact coefficients</b> (verified against the plugin across all 64 patches): oscillator mix, VCF, both ADSR envelopes, VCA, LFO, portamento, bend.</div>` +
-    `<div class="caveat">Preview notes (not defects): you hear the <b>dry voice</b> at concert pitch with an 8× makeup gain — the master/chorus FX stage needs ~250 coefficients that could not be decompiled, so it is out of the preview; the note-on trigger is a calibrated driver, not yet a faithful port; and the inspection sliders below use ${heur ? "heuristic" : "real"} ranges (the <i>values</i> are always real).</div>`;
+    `<div class="caveat">Preview notes (not defects): you hear the <b>dry voice</b> at concert pitch with an 8× makeup gain — the master/chorus FX stage needs ~250 coefficients that could not be decompiled, so it is out of the preview; the note-on trigger is a calibrated driver, not yet a faithful port. The sliders below show the engine's live coefficient values.</div>`;
   buildPiano();
   refreshPresets();
   renderList();
@@ -147,10 +144,9 @@ const fmt = v => v === 0 ? "0" : (Math.abs(v) >= 1e-4 && Math.abs(v) < 1e6 ? (+v
 const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
 
 function renderList() {
-  const f = $("#filter").value.toLowerCase(), onlyAuth = $("#onlyauth").checked;
+  const f = $("#filter").value.toLowerCase();
   const el = $("#list"); el.innerHTML = ""; let sec = null;
   for (const p of PARAMS) {
-    if (onlyAuth && !p.auth) continue;
     if (f && !p.name.toLowerCase().includes(f) && !String(p.off).includes(f)) continue;
     if (p.section !== sec) { sec = p.section; const h = document.createElement("div"); h.className="sec"; h.textContent=sec; el.appendChild(h); }
     el.appendChild(rowFor(p));
@@ -163,9 +159,6 @@ function rowFor(p) {
   lab.innerHTML = `<span class=off>@${p.off} </span>${p.name}`;
   const mid = document.createElement("div");
   const num = document.createElement("input"); num.type="number"; num.step="any"; num.value=fmt(p.value);
-  const tag = document.createElement("span");
-  tag.className = p.auth ? "auth" : "heur"; tag.textContent = p.auth ? "●" : "~";
-  tag.title = p.auth ? "real plugin range" : "heuristic bounds";
 
   if (p.kind === "switch") {
     const b = document.createElement("button");
@@ -181,7 +174,7 @@ function rowFor(p) {
     mid.appendChild(r); p._range = r;
   }
   num.onchange = () => commit(p, +num.value, {num, range:p._range});
-  d.append(lab, mid, num, tag); return d;
+  d.append(lab, mid, num); return d;
 }
 
 function commit(p, v, ui) {
