@@ -17,7 +17,9 @@
     padding: 4px 8px; font: inherit; }
   button { cursor: pointer; } button:hover { background: #363a42; }
   button.on { background: #3a5; border-color: #4c7; color: #fff; }
-  .warn { color: #e88; font-size: 12px; margin-top: 4px; }
+  .warn { color: #e88; font-size: 12px; margin-top: 4px; }   /* real errors only */
+  .info { color: #9ad39a; font-size: 12px; margin-top: 4px; }  /* status / it-works */
+  .caveat { color: #7d8894; font-size: 11px; margin-top: 3px; line-height: 1.4; }
   .note { color: #888; font-size: 11px; font-weight: 400; }
   main { padding: 10px 12px 80px; }
   .sec { margin: 14px 0 4px; font-weight: 600; color: #9cf; border-bottom: 1px solid #333;
@@ -69,7 +71,7 @@
     <button class="on" onclick="applyBankPatch()" title="load this patch's bit-exact coefficient subset into the engine">Apply to engine ▶</button>
     <button onclick="document.getElementById('bankdlg').close()">Close</button>
   </div>
-  <div style="padding:6px 12px 4px;color:#e88;font-size:11px" id="bankwarn"></div>
+  <div style="padding:6px 12px 4px" id="bankwarn"></div>
   <div id="bankparams" style="padding:4px 12px 14px"></div>
 </dialog>
 
@@ -123,8 +125,8 @@ async function boot() {
   const heur = PARAMS.filter(p => !p.auth).length;
   $("#meta").textContent = `· ${PARAMS.length} params @ ${SR} Hz · runs entirely in your browser`;
   $("#warn").innerHTML =
-    (heur ? `⚠ ${heur} params use <b>heuristic</b> slider bounds (positions are the real captured values). Drop a real <code>param_meta.json</code> beside this page for the plugin's true ranges. ` : "") +
-    "Load a bank → Apply, then press a key. A bank patch's <b>30 timbre parameters load bit-exactly</b> (verified vs the plugin across all 64 patches). You hear the exact <b>dry voice</b> (osc+VCF+VCA+both ADSRs) at concert pitch, with an 8× preview makeup gain — the master/chorus FX output stage needs ~250 coefficients Hex-Rays could not decompile, so it is not in the preview. The note-on trigger is a calibrated driver, not yet a faithful port of the plugin's own note handler.";
+    `<div class="info">✓ Ready — <b>Load bank → Apply → press a key.</b> Applying a patch loads <b>30 timbre parameters as bit-exact coefficients</b> (verified against the plugin across all 64 patches): oscillator mix, VCF, both ADSR envelopes, VCA, LFO, portamento, bend.</div>` +
+    `<div class="caveat">Preview notes (not defects): you hear the <b>dry voice</b> at concert pitch with an 8× makeup gain — the master/chorus FX stage needs ~250 coefficients that could not be decompiled, so it is out of the preview; the note-on trigger is a calibrated driver, not yet a faithful port; and the inspection sliders below use ${heur ? "heuristic" : "real"} ranges (the <i>values</i> are always real).</div>`;
   buildPiano();
   refreshPresets();
   renderList();
@@ -250,7 +252,9 @@ function showBank() {
   sel.innerHTML = BANK.patches.map(p => `<option value="${p.index}">${String(p.index).padStart(2,"0")}  ${p.name}</option>`).join("");
   sel.onchange = () => showPatch(+sel.value);
   $("#bankttl").textContent = `${BANK.model} bank`;
-  $("#bankwarn").innerHTML = "<b>Apply to engine</b> loads <b>30 parameters as bit-exact coefficients</b>, verified against the plugin's own value tree across all 64 patches: DCO range / PWM depth·level·source / saw·sub·noise level / LFO mod, VCF cutoff · resonance · HPF cutoff · env-mod · key-follow · LFO mod, both ADSR envelopes in full, VCA tone · level, and LFO delay · rate · key-trig · tempo-sync + portamento · bend range. Not applied: the 4 FX leaves (effect / reverb / delay — their blob order lives in an external schema file, and they route to the un-decompiled FX stage). See docs/AUDIBLE_RECALL_PLAN.md.";
+  $("#bankwarn").innerHTML =
+    `<div class="info"><b>Apply to engine</b> loads <b>30 parameters as bit-exact coefficients</b>, verified against the plugin's own value tree across all 64 patches: DCO range / PWM depth·level·source / saw·sub·noise level / LFO mod, VCF cutoff · resonance · HPF cutoff · env-mod · key-follow · LFO mod, both ADSR envelopes in full, VCA tone · level, LFO delay · rate · key-trig · tempo-sync, portamento · bend range.</div>` +
+    `<div class="caveat">Not applied (by design): the 4 FX leaves — effect / reverb / delay. Their blob order lives in an external schema file that isn't in the plugin binary, and they route to the un-decompiled FX stage, so they'd have no audible effect anyway. See docs/AUDIBLE_RECALL_PLAN.md.</div>`;
   showPatch(0);
   $("#bankdlg").showModal();
 }
