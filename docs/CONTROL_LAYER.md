@@ -61,17 +61,27 @@ No bespoke per-parameter setters or curve math to reimplement.
 - **Gate edge** at `state[voiceBase+101504]`: a one-shot retrigger flag (`==1.0`
   means "a note just started"); the renderer consumes it then zeroes it.
 - **Pitch:** the renderer reads `clamp(state[+4448] + state[+3776], -20, 8.9)` in
-  **octave units**; the live pitch is written through the pitch parameter's
-  descriptor pointer (bound to `&state[+4448]`).
+  **octave units**. `state[+3776]` is the recomputed DCO pitch-mod sum whose
+  dominant term is the frozen portamento conditioner output `v28 == state[+304]`
+  (see below); `state[+4448] = -4.75` is a FIXED tune constant written by init
+  (identical for every voice/patch). The per-voice **note pitch lives in
+  `state[+304]`**, not `+4448`.
 
-### Known gap (do NOT fabricate)
-The exact **integer-MIDI-note → octave-pitch float** conversion is not a visible
-inline formula — the note stays an integer and is converted in the DCO/parameter-
-binding layer via tuning tables (e.g. `sub_135D180` writes a 12-entry `cents/1200`
-table). The descriptor binding for the pitch parameter (which param ID points at
-`&state[4448]`, and the int→float it stores) must be traced from the original code
-before the port can pitch notes correctly. The plausible `(note-60)/12` is an
-inference, not read — treat as UNCONFIRMED until the binding is traced.
+### Note → pitch (RESOLVED — see src/juno_note.c)
+The per-voice note pitch is **`state[voiceBase+304] = midi_note / 12.0`** (octave
+units). Combined with the fixed `state[+4448] = -4.75 (= -57/12)` and the scale
+`state[+5536] = 220/96000` (with pitch-spline `poly(0)=1.0`, poly≈2^x), the DCO
+plays `220·2^(state[+4448]+state[+304]) = 220·2^((note-57)/12) = 440·2^((note-69)/12)`
+= concert pitch. Verified end-to-end in the ported voice: MIDI 60 → 261.63 Hz
+(0.00 cents), octaves double exactly. Grounded in: (1) the two twin conditioners
+in `voice_render` share coef `state[+240]*state[+272]==0` (never written by init
+or render ⇒ `v28==state[+304]` pitch, `v29==state[+320]` gate); (2) fresh init
+leaves `state[+304]=6.668469` and the live-plugin dump has per-voice pitches
+`6.50191/6.66847/6.75152` = notes `78/80/81` (`n/12` + ~+2.2 cent master tune).
+The ~+2.2 cent master-tune residual (the plugin's default is slightly sharp of
+A440) would need the 12-entry analog tuning table `sub_7FF91DFBD180`
+(`table[s]=cents_s/1200`) and its note-on apply path to fold in exactly; `n/12`
+is within ~2 cents and is exact concert A440.
 
 ## Helpers to transcribe for the control layer
 `sub_1803C2E80`/`2E00` (ramp engine), `sub_1803C24A0` (pruner) + its vector

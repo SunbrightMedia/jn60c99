@@ -1,24 +1,27 @@
-/* juno_note.h — minimal offline note driver for the JUNO-60 C99 port.
+/* juno_note.h — faithful offline note driver for the JUNO-60 C99 port.
  *
- * Reconstructs the plugin's note-on / gate / ADSR-trigger control layer on top
- * of the ported per-sample DSP (juno_voice_render) and the ported ramp engine
- * (juno_ramp.c). It drives one (or more) of the 8 voices: sets the DCO pitch,
- * opens the shared envelope gate, and fires the one-shot attack edge; note-off
- * closes the gate so both ADSRs enter release.
+ * Reproduces the plugin's note-on / gate / pitch / ADSR-trigger control layer on
+ * top of the ported per-sample DSP (juno_voice_render) and the ported ramp engine
+ * (juno_ramp.c). Drives one (or more) of the 8 voices: sets the per-voice DCO
+ * note pitch, opens the shared envelope gate, and fires the one-shot DCO
+ * retrigger edge; note-off closes the gate so both ADSRs enter release.
  *
- * The envelope gate: voice_render computes a per-voice binary gate at state[560]
- * (= JF(base+240)) from the DCO gate-conditioner (state base+0 / +... ). Both the
- * filter ADSR (state[2592]) and amp ADSR (state[3072]) run iff that gate is 1
- * (their v125/v147 flags are (gate*v123 + (-0.5) >= 0) ? run : idle, and in the
- * captured PD-Juno-Pad patch v123==v145==1). The gate latches to 1 when the
- * conditioner output v29 is nonzero and >= -state[544](~0.0104). We open it by
- * ramping the DCO phase-reset base slot (base+0, = state[320] for voice 0) from 0
- * to a small positive level: this makes v29>0 without perturbing the DCO pitch
- * (the oscillator frequency depends only on state[4448]+state[3776], not on this
- * slot), so the note sounds in-tune. Note-off ramps the same slot back to 0.
+ * PITCH: the per-voice note pitch is state[voiceBase+304] = midi_note/12.0 (octave
+ * units). The DCO sums it with the FIXED tune state[voiceBase+4448] = -4.75 that
+ * init writes, giving 220*2^((note-57)/12) = concert pitch. (state[304] is the
+ * frozen portamento conditioner input; state[240]*state[272]==0 so it passes to
+ * the DCO instantly.) The note path must NOT write state[4448].
  *
- * See docs/CONTROL_LAYER.md and the firstnote traces. Offline/host-side: the
- * per-voice ramp objects are kept in module-static storage here.
+ * GATE: the shared binary gate state[560] is 1 iff the twin conditioner output
+ * v29 = state[272]*state[240]*(state[208]-state[320])+state[320] is nonzero and
+ * >= -state[544]. Since state[240]*state[272]==0 (never set), v29==state[320], so
+ * we ramp state[320] 0->positive on note-on (gate opens, both ADSRs attack) and
+ * ->0 on note-off (both ADSRs release) — the plugin's own gate write. The gate is
+ * binary; state[320]'s magnitude is audio-irrelevant (state[480]=v29 is dead).
+ *
+ * See src/juno_note.c for the full derivation (live-plugin state + decompile) and
+ * docs/CONTROL_LAYER.md. Offline/host-side: the per-voice ramp objects are kept
+ * in module-static storage here.
  */
 #ifndef JUNO_NOTE_H
 #define JUNO_NOTE_H
@@ -40,8 +43,8 @@ void juno_note_off(unsigned char *st, int voice);
  * sample, immediately BEFORE juno_voice_render for that voice/sample. */
 void juno_note_tick(unsigned char *st);
 
-/* Map a MIDI note to the DCO pitch value written to state[4448] (octave units,
- * one unit == one octave). Exposed for tests/diagnostics. */
+/* Map a MIDI note to the per-voice DCO pitch value written to state[304] (octave
+ * units, one unit == one octave; = midi_note/12). Exposed for tests/diagnostics. */
 float juno_note_pitch(int midi_note);
 
 #ifdef __cplusplus

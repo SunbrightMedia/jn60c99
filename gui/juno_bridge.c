@@ -84,10 +84,11 @@ void juno_gui_gate(juno_ctx *c, float v)
     JF(c->st, JUNO_VOICE_AUX_BASE0) = v;
 }
 
-/* Note driver (src/juno_note.c). Opens the ADSR gate + sets DCO pitch on voice
- * 0. NOTE: the gate mechanism and pitch value are the honest HACK/calibration
- * documented in juno_note.c — timbre coefficients loaded by apply_bank ARE
- * bit-exact, but the note-on write itself is not yet a faithful port. */
+/* Note driver (src/juno_note.c). Sets the per-voice DCO note pitch (state[304] =
+ * note/12, the plugin's own pitch slot), opens the shared ADSR gate (ramps
+ * state[320], the plugin's own gate write), and fires the DCO retrigger edge on
+ * voice 0. Faithful port recovered from the binary + live-plugin state; MIDI 60
+ * plays concert C4 (261.63 Hz) exactly. See src/juno_note.c for the derivation. */
 void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     if (c) juno_note_on(c->st, 0, midi_note, velocity);
