@@ -85,8 +85,26 @@ Newest, honest state (supersedes the older "Approximate/Next steps" notes below)
   are **constant across all 64 bank patches** (all default). Net: **the 55 chorus
   patches (EFFECT TYPE 1/2/3) are already served correctly** by engine_init + the
   master; the earlier "chorus I/II" worry was a non-issue in this engine.
-- **Slot-2 REVERB — the ONE genuine remaining gap (8 patches, EFFECT TYPE 5).**
-  Precisely located this session. The stage-2 reverb is a full allpass-diffusion +
+- **REVERB — NOW RECALLED per-patch (was the last gap). CRACKED via a 2nd oracle.**
+  The reverb is NOT a slot-2 insert; it is a **global send** in the master output
+  stage (`master_render` LABEL_105), always active, scaled per-patch by REVERB LEVEL.
+  I built a second Unicorn harness that constructs the real `CJu60Sim` effect engine
+  (`sub_7FF91DFE80F0`) and runs the descriptor + param-smoother build
+  (`sub_7FF91E022550` -> `sub_7FF91E0225B0`), which binds each effect param to its
+  engine coefficient from the plugin's `.rdata` tables. Reading those bindings gave
+  the reverb param -> coeff map: **REVERB LEVEL (blob 51) -> 10759408** (send/wet),
+  **REVERB TIME (rec 666) -> 10759680** (decay feedback). The per-value curves are
+  the plugin's own value-tree outputs (captured from the effect param setter
+  `sub_7FF91E022E80`). Shipped in `src/reverb_recall.c`, applied per-patch by
+  `juno_bank_apply`. VALIDATED: patches with REVERB LEVEL=0 add exactly 0 reverb;
+  patches with LEVEL>0 add a reverb tail proportional to level; all 64 render finite
+  (no blow-up). `tests/test_reverb_recall.c` freezes the mapping. This also confirms
+  the reverb tank coeffs are sample-rate constants written only by `engine_init`
+  (never modulated), so only these two smoothed params are per-patch.
+- (superseded) **Slot-2 REVERB — earlier mislabelled as the gap.** The stage-2
+  block `95888..96928` I traced (below) is a *different*, mostly-inactive effect
+  path; the audible reverb is the global send above. Kept for provenance.
+  The stage-2 reverb is a full allpass-diffusion +
   comb tank at engine block `95888..96928` (distinct from the stage-1 reverb block
   `6497xxx/10692xxx`). `engine_init` writes its tank coeffs (comb feedback 0.999,
   allpass gains) and the capture sets the enable gates (`96400=96416=1.0`) — yet a

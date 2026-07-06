@@ -77,6 +77,7 @@
 #include "juno_apply.h"
 #include "hpf_type_lut.h"
 #include "delay_recall.h"
+#include "reverb_recall.h"
 
 #define BANK_HEADER   23
 #define BANK_STRIDE   20223
@@ -349,6 +350,14 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
      * chorus. Slot-2 (v551 = EFFECT TYPE) stays on the chorus block (see driver).
      * `blob` is record + 16, so the record start is blob - BANK_BLOB_OFF. */
     juno_apply_delay(state, blob - BANK_BLOB_OFF);
+    ++n;
+
+    /* Per-patch global REVERB recall. The reverb is a global send in the master
+     * output stage (always active); REVERB LEVEL -> 10759408 (send/wet) and
+     * REVERB TIME -> 10759680 (decay) are recalled from the plugin's own value
+     * tree (see reverb_recall.c). These are global coefficients (>84272), single
+     * write, not seeded per-voice. */
+    juno_apply_reverb(state, blob - BANK_BLOB_OFF);
     ++n;
     return n;
 }
