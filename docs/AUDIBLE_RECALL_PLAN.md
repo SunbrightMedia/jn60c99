@@ -85,6 +85,14 @@ Newest, honest state (supersedes the older "Approximate/Next steps" notes below)
   are **constant across all 64 bank patches** (all default). Net: **the 55 chorus
   patches (EFFECT TYPE 1/2/3) are already served correctly** by engine_init + the
   master; the earlier "chorus I/II" worry was a non-issue in this engine.
+- **Residual: slot-2 EFFECT TYPE modes 1 & 5 (9 patches).** The two insert slots
+  are v39 (DELAY TYPE) and v551 (EFFECT TYPE). EFFECT TYPE is {1:1, 2:33, 3:22, 5:8}
+  and modes 2/3 render byte-identical (chorus), so v551=2 is correct for the 55
+  chorus patches. Routing v551 to the real EFFECT TYPE was tested: mode 5 (8 patches)
+  attenuates ~2x and mode 1 (1 patch) goes SILENT — the slot-2 mode-1/5 effect blocks
+  (86xxx / 95888..96928) are not fully configured, so v551 is kept at 2 (chorus) to
+  avoid regression. Cracking these 9 patches would use the same master-object oracle
+  (build the slot-2 effect, read its param->coeff bindings) — deferred, not guessed.
 - **REVERB — NOW RECALLED per-patch (was the last gap). CRACKED via a 2nd oracle.**
   The reverb is NOT a slot-2 insert; it is a **global send** in the master output
   stage (`master_render` LABEL_105), always active, scaled per-patch by REVERB LEVEL.
