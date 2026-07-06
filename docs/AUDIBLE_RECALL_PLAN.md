@@ -4,6 +4,46 @@ Goal: load a JU60 bank patch and hear it, by **porting the original code** (no
 runtime captures). This records what was proven with the plugin binary +
 decompile in hand, and the concrete plan.
 
+## Session update — note-on, polyphony done; chorus-mode/extended params blocked
+
+Newest, honest state (supersedes the older "Approximate/Next steps" notes below):
+
+- **Note-on / gate / pitch — FAITHFUL now (was a hack).** Pitch is the per-voice
+  slot `state[voiceBase+304] = note/12` and the gate ramps `state[voiceBase+320]`,
+  both DERIVED from `voice_render`'s algebra + the live-plugin state dump (the
+  frozen glide/gate conditioners `v28==state[304]`, `v29==state[320]` because
+  `state[240]*state[272]==0`); `state[4448]=-4.75` is the fixed tune. Rendered
+  check: MIDI 48/60/72/84 → 130.81/261.63/523.25/1046.50 Hz, 0.00-cent error. The
+  fitted `PITCH_C4=-6.4192` and the `state[320]=0.01` poke are gone.
+  (`src/juno_note.c`.) NOT folded in, stated plainly: the ~+2.2-cent master tune
+  (analog table `sub_1803BD180`) and velocity→amp (gate-on param 1090 descriptor
+  indirection).
+- **8-voice polyphony — FAITHFUL now (was voice 0 only).** The per-voice state
+  layout is DERIVED by diffing the 8 compiled voice functions (main +v*10512,
+  shared +0, aux +v*32); a self-consistency test proves all 8 voices render
+  bit-identically. Chords now sound (native 8-voice; browser via the rebuilt
+  WASM). See **docs/POLYPHONY.md**.
+- **Chorus-mode recall + effect/delay/reverb (asked as "fix #2") — BLOCKED, not
+  fabricated.** The full FX DSP (delay/chorus/flanger/reverb/distortion) IS ported
+  (`master_render.c`) and its per-mode static coeffs ARE in `juno_init.c`. But
+  per-preset effect-MODE recall is not derivable from the binary: (a) the chorus
+  selector is `v39 = *(int*)(S+11022056) = Prog_ID_DLY` (value 2/3 = chorus,
+  proven), but the integer→OFF/I/II **labels are not in the binary** (enum strings
+  live in a resource pool that isn't extractable, and no code proves the
+  leaf→cell write — confirmed by two independent decompile investigations);
+  (b) EFFECT TYPE's record position comes from the **external schema descriptor**
+  (not in the `.vst3`); (c) the preset-dependent FX runtime coefficients for the
+  non-chorus modes are **not in the binary** (only chorus-II was captured). So the
+  port plays chorus II + always-on reverb faithfully and cannot switch modes per
+  preset without guessing. Recoverable only by re-capturing the live plugin per
+  mode, or obtaining the external descriptor.
+- **VCA mode + tune switches (asked as "fix #3") — BLOCKED, same root cause.**
+  VCA MODE, MASTER TUNE, OCTAVE SHIFT are extended params past the 222-byte blob;
+  their record byte positions come from the same external schema. VCF CUTOFF H
+  (record byte 1870) was recoverable only because it has a coarse front-panel
+  counterpart to correlate against; VCA MODE / tune have none, so their positions
+  can't be found by correlation and won't be fabricated.
+
 ## STATUS — every engine-driving parameter is bit-exact; all 64 patches verified
 
 The browser app (`gui/web/`, mirrored to `docs/`) does the full loop:
@@ -91,10 +131,11 @@ is bound (save the 4 EFX leaves below, whose ordering is external).
 - **Exponential tempo-rate coefficients** (LFO Tempo Rate off1072, tempo-synced
   Delay Time off102352): no `juno_curve` matches; need the specific formula from
   the decompile. Both are tempo-synced, inaudible in the free-running dry preview.
-- **Approximate (documented hacks, not fabrication):** note-on **pitch/gate** is
-  a calibration (src/juno_note.c) — timbre is exact, note triggering is not yet a
-  faithful port. **Preview is the dry voice** (pre-FX): the master/chorus output
-  stage needs ~250 coefficients Hex-Rays could not decompile (src/master_render.c).
+- **Note-on pitch/gate: RESOLVED** — now a faithful port (see the Session update
+  at the top); the earlier "calibration" note is superseded. **Preview is now the
+  full 8-voice master path** (voice mix + stereo BBD chorus mode II + output
+  stage), polyphonic; the dry-voice fallback remains only when the runtime chorus
+  coefficients are absent.
 
 ## BREAKTHROUGH — the Koa value tree is CRACKED by emulation (binary-only)
 
