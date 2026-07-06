@@ -110,7 +110,7 @@ async function boot() {
   renderFn = M.cwrap("juno_gui_render","number",["number","number","number"]);
   renderDryFn = M.cwrap("juno_gui_render_dry","number",["number","number","number"]);
   noteOnFn = M.cwrap("juno_gui_note_on",null,["number","number","number"]);
-  noteOffFn = M.cwrap("juno_gui_note_off",null,["number"]);
+  noteOffFn = M.cwrap("juno_gui_note_off",null,["number","number"]);
   applyBankFn = M.cwrap("juno_gui_apply_bank","number",["number","number","number","number"]);
   malloc = M._malloc; free = M._free;
   ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 2);  // chorus mode II
@@ -204,12 +204,32 @@ window.loadPreset = () => { const n=$("#presets").value, all=store(); if(!all[n]
 window.exportPreset = () => { const blob=new Blob([JSON.stringify(snapshot(),null,0)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="patch.json"; a.click(); status("exported patch.json"); };
 window.importPreset = (inp) => { const f=inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ apply(JSON.parse(rd.result)); status("imported "+f.name);}catch(e){status("import failed: "+e);} }; rd.readAsText(f); inp.value=""; };
 
-// --- render + play via Web Audio (no server) ---
-let audioCtx;
-// "Audition" = play a middle-C (C4) note of the current patch through the dry
-// voice path. (The old master-path render is silent for dry/chorus-I because the
-// master's output stage needs coefficients Hex-Rays couldn't decompile.)
-window.render = () => note(60, true);
+// --- render + play via Web Audio (no server), REAL-TIME + POLYPHONIC ---
+// A ScriptProcessor renders the full 8-voice master path continuously; key
+// presses drive per-voice note-on/off through the ported gate/ADSR driver and
+// the 8-voice allocator (juno_bridge.c), so held chords sound with real voices.
+let audioCtx, procNode, rbuf = 0, rcap = 0;
+const BLK = 1024;
+function ensureAudio() {
+  if (audioCtx) { audioCtx.resume(); return; }
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate: SR});
+  rbuf = malloc(BLK * 2 * 4); rcap = BLK;
+  procNode = audioCtx.createScriptProcessor(BLK, 0, 2);
+  procNode.onaudioprocess = (e) => {
+    const L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
+    const n = L.length;                       // == BLK
+    renderFn(ctx, rbuf, n);                    // full 8-voice + master/chorus
+    const s = new Float32Array(M.HEAPF32.buffer, rbuf, n * 2);
+    for (let i = 0; i < n; i++) {              // true stereo from the BBD chorus
+      let l = s[2*i], r = s[2*i+1];            // hard-clamp = the engine's own saturator role
+      L[i] = l > 1 ? 1 : l < -1 ? -1 : l;
+      R[i] = r > 1 ? 1 : r < -1 ? -1 : r;
+    }
+  };
+  procNode.connect(audioCtx.destination);
+}
+// "Audition" = play a middle-C (C4) for ~0.6s (note-on then note-off).
+window.render = () => { note(60, true); setTimeout(() => note(60, false), 600); };
 
 // --- bank browser (.bin) ---
 let BANK = null, BANK_RAW = null;
@@ -285,42 +305,15 @@ function mkKey(midi, cls, left) {
   k.addEventListener("mousedown",dn); k.addEventListener("mouseup",up); k.addEventListener("mouseleave",up);
   return k;
 }
-// Press a key -> render a full ADSR note offline (note-on, hold, note-off,
-// release tail) through the ported gate/ramp driver and play it. Pitch is the
-// approximate DCO calibration in juno_note.c; timbre is the loaded coefficients.
+// Press a key -> note-on (allocates a voice); release -> note-off (that voice
+// enters ADSR release). Holding several keys sounds a real polyphonic chord (up
+// to 8 voices) through the ported driver. Pitch is the faithful state[304]=note/12
+// (concert A440); timbre is the applied bit-exact coefficients; the full master
+// path (8-voice mix + stereo BBD chorus mode II + output stage) plays live.
 function note(midi, on) {
-  if (!on) return;                      // one-shot note per key press
-  const HOLD = Math.round(0.55 * SR), REL = Math.round(0.55 * SR);
-  const total = HOLD + REL;
-  const p = malloc(total * 2 * 4);
-  noteOnFn(ctx, midi, 100);
-  renderFn(ctx, p + 0, HOLD);                       // attack + sustain (full master+chorus)
-  noteOffFn(ctx);
-  renderFn(ctx, p + HOLD * 2 * 4, REL);             // release tail
-  const inter = new Float32Array(M.HEAPF32.buffer, p, total * 2).slice();
-  free(p);
-  playInterleaved(inter, total);
-  status(`note ${midi} played — full voice + stereo BBD chorus (mode II) at the plugin's own output level`);
-}
-// Playback: the FULL master path (8-voice mix + stereo BBD chorus + output stage)
-// runs in chorus mode II, so the output is already at the plugin's real level
-// (mean ~0.42, occasional peaks past 1.0 on the loudest patches). We use it as-is
-// (PREVIEW_GAIN = 1) and hard-clamp to [-1,1] — the same role the engine's own
-// output saturator plays. No artificial makeup gain. The chorus coefficients come
-// from the captured mode-II runtime state; the per-voice timbre is bit-exact per
-// patch. (Chorus mode/on-off is not yet recalled per-patch — mode II is used for
-// all, which matches most JUNO patches and is far closer than a chorus-less voice.)
-const PREVIEW_GAIN = 1.0;
-function playInterleaved(inter, n) {
-  audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)({sampleRate: SR});
-  const buf = audioCtx.createBuffer(2, n, SR), L = buf.getChannelData(0), R = buf.getChannelData(1);
-  const clamp = x => { x *= PREVIEW_GAIN; return x > 1 ? 1 : x < -1 ? -1 : x; };
-  for (let i=0;i<n;i++){
-    L[i] = clamp(inter[2*i]);         // true stereo from the BBD chorus
-    R[i] = clamp(inter[2*i+1]);
-  }
-  const src = audioCtx.createBufferSource(); src.buffer = buf; src.connect(audioCtx.destination);
-  audioCtx.resume(); src.start();
+  ensureAudio();
+  if (on) noteOnFn(ctx, midi, 100); else noteOffFn(ctx, midi);
+  if (on) status(`note ${midi} — live 8-voice master path + stereo BBD chorus (mode II)`);
 }
 
 boot().catch(e => { status("ERROR: "+e); $("#warn").textContent = e; console.error(e); });
