@@ -75,6 +75,7 @@
 #include "juno_engine.h"
 #include "juno_curve.h"
 #include "juno_apply.h"
+#include "hpf_type_lut.h"
 
 #define BANK_HEADER   23
 #define BANK_STRIDE   20223
@@ -326,5 +327,17 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
     JF(state, 7424) = (float)record_byte(blob, 1862) / 255.0f;   /* VCF VEL SENS */
     JF(state, 9600) = (float)record_byte(blob, 2102) / 255.0f;   /* VCA VEL SENS */
     n += 4;
+
+    /* HPF TYPE (record 618, leaf 129): the HPF coefficients (10240/10256/10272/
+     * 10288) are a JOINT function of HPF CUTOFF FREQ (blob 38) and HPF TYPE, and
+     * HPF TYPE is applied LAST in the value tree. The front-panel bindings above
+     * already produce the TYPE=0 result; for TYPE!=0 the plugin recomputes them
+     * (low-cut + boost) — see hpf_type_lut.c. Fixes the 10 TYPE=1 patches. */
+    {
+        int hpf_cut  = ((blob[2 * 38] & 0xF) << 4) | (blob[2 * 38 + 1] & 0xF);
+        int hpf_type = record_byte(blob, 618);
+        juno_apply_hpf_type(state, hpf_cut, hpf_type);
+        ++n;
+    }
     return n;
 }
