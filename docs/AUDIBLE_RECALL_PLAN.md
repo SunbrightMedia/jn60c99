@@ -43,24 +43,32 @@ Newest, honest state (supersedes the older "Approximate/Next steps" notes below)
   Fixed: `hpf_type_lut.c` captures the plugin's TYPE=1 output over all 256 cutoff
   bytes (baked LUT, same principle as juno_curve); all 64 patches' HPF now matches
   the oracle full recall (0/256). 
-- **Chorus-mode recall + effect/delay/reverb (asked as "fix #2") — STILL BLOCKED,
-  not fabricated.** Two independent, opposite-pointing signals prevent a safe bind:
-  (1) the effect-mode int cells S+11022052 (Prog_ID_EFX) / S+11022056 (Prog_ID_DLY)
-  ARE written by the value-tree via a registered `int*` and their consumer IS the
-  ported master_render — but WHICH record leaf drives WHICH cell is not code-proven:
-  the name-match says EFFECT TYPE→EFX, yet the per-patch value distribution
-  (EFFECT TYPE {2:33,3:22,5:8} vs DELAY TYPE {0:29,1:17,...}) says EFFECT TYPE→DLY
-  (the chorus stage) to be JUNO-plausible — the two hypotheses give OPPOSITE results.
-  (2) Even with the mode resolved, the per-mode enable/level/depth/rate cells
-  (chorus 6396432/6396448/6396176, reverb 10759376/408/488/504) are set by the
-  effect objects' vtable-indirect OO setup, NOT any value-tree leaf, so switching
-  modes would use the mode-II capture's enable/level and likely sound wrong for
-  non-chorus patches. The reverb/chorus FILTER coeffs, by contrast, are baked
-  `.rdata` tables constant per (effect-type, SR) — they do NOT vary per patch, so
-  the "frozen" filter coeffs are actually correct. Delay/effect-depth params ARE
-  recallable via the decompiled dispatch but are inert while the mode is forced.
-  Net: recalling the FX mode faithfully needs transcribing the vtable-indirect
-  effect-setup path AND proving the leaf→cell binding — the honest remaining wall.
+- **Effect-mode selector mapping — NOW PROVEN (was "unprovable").** By
+  disassembling the value-tree dispatch (sub_7FF91E019A30) case 875 = DELAY TYPE:
+  it does `mov edx,5; call setProgID` — index 5 → Prog_ID vector entry 5 =
+  Prog_ID_DLY = cell 11022056 = **v39** (confirmed by building the vector in the
+  oracle: entry 5's valuePtr = engine+11022056). So **DELAY TYPE → v39** (the
+  chorus/delay/flanger stage; identity 0-5) and by symmetry **EFFECT TYPE → v551**
+  (Prog_ID_EFX = 11022052). The earlier ambiguity is resolved from the code, not
+  guessed. Consumers are the ported master_render. The delay mode even RENDERS:
+  setting v39=0 + the "Mute" selected-mask 102592=1.0 + delay coeffs produces
+  echoes (verified).
+- **BUT per-patch FX recall is STILL blocked — by two SEPARATE, documented,
+  unproven pieces (not the mapping, and not fabricatable to bit-exact):**
+  (1) The delay's Wet/Feedback/Time come from the four EFX front-panel leaves
+  (EFFECT DEPTH/REVERB LEVEL/DELAY LEVEL/DELAY TIME) which the parser permutes into
+  blob slots {40,49,50,51}; the DELAY LEVEL vs DELAY TIME assignment (blob40 vs
+  blob49) has NO parser case coverage and is only inferred from value stats
+  (`order_ju60_format.json` flags it "not proven"). v39=0 with the frozen delay
+  params = silence, so a wrong binding sounds worse than the current chorus.
+  (2) The chorus/reverb enable/level/depth/rate cells (6396432/6396448/6396176,
+  10759376/408/488/504) are set by the effect objects' vtable-indirect OO setup,
+  not any value-tree leaf. The reverb/chorus FILTER coeffs are baked `.rdata`
+  tables constant per (effect-type, SR) — those "frozen" values are actually
+  correct. Net: the mode mapping is proven; faithful FX recall additionally needs
+  the EFX blob permutation resolved (external schema / setState emulation) AND the
+  vtable-indirect enable/level path transcribed. The current port forces chorus II
+  — correct for the ~33 chorus-II patches, wrong for the rest.
 - (superseded) The full FX DSP (delay/chorus/flanger/reverb/distortion) IS ported
   (`master_render.c`) and its per-mode static coeffs ARE in `juno_init.c`. But
   per-preset effect-MODE recall is not derivable from the binary: (a) the chorus
