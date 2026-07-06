@@ -76,6 +76,7 @@
 #include "juno_curve.h"
 #include "juno_apply.h"
 #include "hpf_type_lut.h"
+#include "delay_recall.h"
 
 #define BANK_HEADER   23
 #define BANK_STRIDE   20223
@@ -339,5 +340,15 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
         juno_apply_hpf_type(state, hpf_cut, hpf_type);
         ++n;
     }
+
+    /* Per-patch DELAY effect recall (slot-1 / v39). Sets the DELAY TYPE selector
+     * and, for DELAY TYPE == 0, the slot-1 delay coefficient block (Wet/Feedback/
+     * Time/Dry/On-Off + filter), all transcribed from the value-tree oracle. The
+     * host shim points the master's v39 pointer chase at state[JUNO_PROG_DLY], so
+     * this makes the ~15 delay-on patches audibly play delay instead of the forced
+     * chorus. Slot-2 (v551 = EFFECT TYPE) stays on the chorus block (see driver).
+     * `blob` is record + 16, so the record start is blob - BANK_BLOB_OFF. */
+    juno_apply_delay(state, blob - BANK_BLOB_OFF);
+    ++n;
     return n;
 }

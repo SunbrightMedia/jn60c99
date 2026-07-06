@@ -53,22 +53,36 @@ Newest, honest state (supersedes the older "Approximate/Next steps" notes below)
   guessed. Consumers are the ported master_render. The delay mode even RENDERS:
   setting v39=0 + the "Mute" selected-mask 102592=1.0 + delay coeffs produces
   echoes (verified).
-- **BUT per-patch FX recall is STILL blocked — by two SEPARATE, documented,
-  unproven pieces (not the mapping, and not fabricatable to bit-exact):**
-  (1) The delay's Wet/Feedback/Time come from the four EFX front-panel leaves
-  (EFFECT DEPTH/REVERB LEVEL/DELAY LEVEL/DELAY TIME) which the parser permutes into
-  blob slots {40,49,50,51}; the DELAY LEVEL vs DELAY TIME assignment (blob40 vs
-  blob49) has NO parser case coverage and is only inferred from value stats
-  (`order_ju60_format.json` flags it "not proven"). v39=0 with the frozen delay
-  params = silence, so a wrong binding sounds worse than the current chorus.
-  (2) The chorus/reverb enable/level/depth/rate cells (6396432/6396448/6396176,
-  10759376/408/488/504) are set by the effect objects' vtable-indirect OO setup,
-  not any value-tree leaf. The reverb/chorus FILTER coeffs are baked `.rdata`
-  tables constant per (effect-type, SR) — those "frozen" values are actually
-  correct. Net: the mode mapping is proven; faithful FX recall additionally needs
-  the EFX blob permutation resolved (external schema / setState emulation) AND the
-  vtable-indirect enable/level path transcribed. The current port forces chorus II
-  — correct for the ~33 chorus-II patches, wrong for the rest.
+- **Per-patch DELAY recall — NOW DONE (was blocked on the EFX blob permutation).**
+  Script.xml (the value-tree schema the plugin's parser reads) + the Unicorn oracle
+  resolved both open pieces for the delay slot:
+  (a) EFX blob permutation: the schema's declaration order + the proven
+  address-order serialization fix the four front-panel EFX leaves at blob
+  {50,51,40,49} = {EFFECT DEPTH, REVERB LEVEL, DELAY LEVEL, DELAY TIME}. Confirmed
+  by the oracle: recalling DELAY LEVEL (dispatch idx 796) writes Wet(102528) =
+  level/255 **bit-exact for every delay-active patch (0 mismatches)**, which only
+  holds if blob40 = DELAY LEVEL — so the earlier "not proven" ambiguity is closed.
+  (b) Delay coefficients: running the real value-tree dispatch for the delay leaves
+  gives every 102xxx coefficient the plugin writes — Wet = DELAY LEVEL/255,
+  Feedback = DELAY FEEDBACK/255·0.9, On/Off + Mute = (level>0), Dry = DELAY DIRECT
+  LEVEL/255, Time = a 256-entry LUT (idx 797), and a high-cut+damp filter block that
+  is **constant across all 64 bank patches** (all use the default filter). These
+  ship in `src/delay_recall.c` (the LUT + apply fn) and are applied per-patch by
+  `juno_bank_apply`. The driver points the master's v39 chase at the engine cell
+  `state[11022056]` so slot 1 follows DELAY TYPE. Verified: v39=0 + these coeffs
+  renders the expected regenerating echoes; all 64 patches render finite; the ~15
+  DELAY-TYPE-0 patches with level>0 now audibly echo (`tests/test_delay_recall.c`).
+  This also **fixes the double-chorus bug**: slot 1 was forced to chorus for every
+  patch; it now plays its real per-patch DELAY TYPE (delay / passthrough / chorus).
+- **Slot-2 (chorus/reverb) recall — STILL the remaining gap (honest).** v551 =
+  EFFECT TYPE is left on the constant chorus block. The chorus/reverb enable/level/
+  depth/rate cells (6396432/6396448/6396176, 10759376/408/488/504) are set by the
+  effect objects' vtable-indirect OO setup, not any value-tree leaf, so they are not
+  per-patch derivable from the binary yet; and routing v551 to the reverb block
+  (EFFECT TYPE 5, 8 patches) or slot-2 delay (modes 0/1) with only the captured
+  chorus state produces silence/garbage — so those are deliberately NOT routed.
+  Net: the delay slot is now faithful per-patch; chorus stays mode II for all
+  patches and reverb (8 patches) is not yet recalled.
 - (superseded) The full FX DSP (delay/chorus/flanger/reverb/distortion) IS ported
   (`master_render.c`) and its per-mode static coeffs ARE in `juno_init.c`. But
   per-preset effect-MODE recall is not derivable from the binary: (a) the chorus

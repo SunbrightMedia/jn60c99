@@ -11,6 +11,7 @@
 #include "../src/juno_driver.h"
 #include "../src/juno_apply.h"
 #include "../src/juno_note.h"
+#include "../src/delay_recall.h"
 #include <stdlib.h>
 
 typedef struct {
@@ -71,6 +72,9 @@ float juno_gui_get(juno_ctx *c, int off)
 void juno_gui_recall_factory(juno_ctx *c)
 {
     juno_runtime_coeffs_apply(c->st);
+    /* factory capture is a chorus preset; reset slot-1 (v39) to 0 so the delay
+     * slot is a clean pass-through (no stale DELAY TYPE from a prior patch). */
+    *(int32_t *)(c->st + JUNO_PROG_DLY) = 0;
     juno_driver_seed_voices(c->st);      /* propagate to all 8 voices */
     juno_driver_attach_host(c->st, &c->shim, c->chorus_mode);
 }

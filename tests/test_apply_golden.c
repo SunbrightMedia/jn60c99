@@ -106,8 +106,12 @@ static int check(const char *name, const unsigned char *blob, const golden_t *g)
 {
     /* header(23) + name(16) + blob(222) is enough for record 0. */
     unsigned char bank[23 + 20223];
-    unsigned char state[2200000];
+    /* Full engine state on the heap: juno_bank_apply now also writes the DELAY
+     * TYPE selector at state[JUNO_PROG_DLY] (~11 MB in), so the buffer must span
+     * the whole engine, not just the low front-panel region. */
+    unsigned char *state = calloc(1, JUNO_STATE_BYTES);
     int i, fails = 0;
+    if (!state) { printf("alloc failed\n"); return 1; }
     memset(bank, 0, sizeof(bank));
     bank[0] = 'K';                                  /* "KoaBankFile00003" sentinel */
     memcpy(bank + 23 + 16, blob, 222);              /* record 0 blob at +16 */
@@ -124,7 +128,6 @@ static int check(const char *name, const unsigned char *blob, const golden_t *g)
             bank[23 + 1870 + 2*i + 1] = be[i] & 0xF;
         }
     }
-    memset(state, 0, sizeof(state));
     juno_bank_apply(state, bank, 0);
     for (i = 0; i < NG; ++i) {
         float v = JF(state, g[i].off);
@@ -134,6 +137,7 @@ static int check(const char *name, const unsigned char *blob, const golden_t *g)
             ++fails;
         }
     }
+    free(state);
     return fails;
 }
 

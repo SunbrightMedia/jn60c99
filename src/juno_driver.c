@@ -17,6 +17,7 @@
  */
 #include "juno_engine.h"
 #include "juno_driver.h"
+#include "delay_recall.h"
 #include <string.h>
 
 /* Install the host-params shim into the state block. Call once after init.
@@ -27,11 +28,16 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
     int32_t *p39, *p551;
     void *base;
 
-    shim->mode_v39  = chorus_mode;
-    shim->mode_v551 = chorus_mode;
-    p39  = &shim->mode_v39;
+    shim->mode_v39  = chorus_mode;   /* legacy field; no longer read by the master */
+    shim->mode_v551 = chorus_mode;   /* slot-2 (EFFECT) selector: fixed chorus     */
+    /* The master reads slot 1 (v39) through params+136 and slot 2 (v551) through
+     * params+112 (see src/master_render.c). Point slot 1 at the ENGINE cell the
+     * per-patch DELAY recall writes (state[JUNO_PROG_DLY] = DELAY TYPE) so the
+     * delay slot follows the loaded patch; keep slot 2 on the constant chorus.
+     * The v39 cell is left as-is here (owned by juno_apply_delay); it defaults to
+     * 0 = delay-with-muted-block = clean pass-through until a patch is applied. */
+    p39  = (int32_t *)(st + JUNO_PROG_DLY);
     p551 = &shim->mode_v551;
-    /* params+136 -> &mode_v39 ; params+112 -> &mode_v551 (used by the chase) */
     memcpy(shim->params + 136, &p39,  sizeof(void *));
     memcpy(shim->params + 112, &p551, sizeof(void *));
     /* base = &shim->params, stored at state+136 (the chase's first hop) */

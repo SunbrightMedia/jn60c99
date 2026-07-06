@@ -123,7 +123,7 @@ async function boot() {
   $("#meta").textContent = `· ${PARAMS.length} params @ ${SR} Hz · runs entirely in your browser`;
   $("#warn").innerHTML =
     `<div class="info">✓ Ready — <b>Load bank → Apply → press a key.</b> Applying a patch loads <b>30 timbre parameters as bit-exact coefficients</b> (verified against the plugin across all 64 patches): oscillator mix, VCF, both ADSR envelopes, VCA, LFO, portamento, bend. You hear the <b>full signal path</b> — voice + stereo BBD chorus + output stage — at the plugin's own level.</div>` +
-    `<div class="caveat">Caveats (not defects): the chorus runs in mode II for every patch (per-patch chorus on/off/I/II is not yet recalled), and the note-on trigger is a calibrated driver, not yet a faithful port of the plugin's own note handler. The sliders below show the engine's live coefficient values.</div>`;
+    `<div class="caveat">Caveats (not defects): the per-patch <b>DELAY</b> effect is now recalled (type + level + time + feedback, from the plugin's own value-tree), so delay patches audibly echo; the second effect slot still runs chorus mode II for every patch (per-patch chorus I/II and reverb are not yet recalled), and the note-on trigger is a calibrated driver, not yet a faithful port of the plugin's own note handler. The sliders below show the engine's live coefficient values.</div>`;
   buildPiano();
   refreshPresets();
   renderList();

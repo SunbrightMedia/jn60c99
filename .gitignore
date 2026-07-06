@@ -33,3 +33,4 @@ tests/validate_state
 allcode/
 tests/test_apply_golden
 tests/test_poly_consistency
+tests/test_delay_recall

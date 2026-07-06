@@ -13,15 +13,18 @@ extern "C" {
 #endif
 
 /* Shim that satisfies the master's host-params pointer chase off state+136.
- * The master reads two chorus-mode selectors:
+ * The master reads two effect-slot selectors:
  *   base = *(void**)(state+136);
- *   v39  = *(int*)*(void**)((char*)base + 136);   // first chorus engine
- *   v551 = *(int*)*(void**)((char*)base + 112);   // second chorus engine
- * Mode 0 selects the dry/bypass path in both engines. */
+ *   v39  = *(int*)*(void**)((char*)base + 136);   // slot 1 (DELAY TYPE)
+ *   v551 = *(int*)*(void**)((char*)base + 112);   // slot 2 (EFFECT TYPE)
+ * juno_driver_attach_host points params+136 at the ENGINE cell state[JUNO_PROG_DLY]
+ * (written per-patch by juno_apply_delay) so slot 1 follows the loaded patch's
+ * DELAY TYPE, and points params+112 at mode_v551 (a fixed chorus selector). Each
+ * selector picks the slot algorithm: 0 delay, 2/3 chorus, 4/5 reverb. */
 struct juno_host_shim {
-    int32_t mode_v39;
-    int32_t mode_v551;
-    unsigned char params[160];   /* +112 and +136 hold pointers to the modes */
+    int32_t mode_v39;            /* legacy; not read by the master any more */
+    int32_t mode_v551;           /* slot-2 EFFECT selector (fixed chorus)   */
+    unsigned char params[160];   /* +112 and +136 hold pointers to the selectors */
 };
 
 /* Wire the shim into the state block. Call once after juno_engine_init.
