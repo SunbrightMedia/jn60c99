@@ -30,6 +30,12 @@ json.dump(sorted(out), open("gui/web/params.json", "w"))
 print("params.json:", len(out), "params")
 PY
 
+# Cache-busting: stamp index.html with the WASM content hash so browsers/CDN fetch
+# the new engine instead of a stale juno.wasm (same filename would otherwise cache).
+VER=$(sha256sum gui/web/juno.wasm | cut -c1-12)
+sed -i "s/const BUILD_VER = \"[^\"]*\"/const BUILD_VER = \"$VER\"/" gui/web/index.html
+echo "stamped BUILD_VER=$VER"
+
 # Mirror the static app into docs/ — GitHub Pages serves it from there
 # (Settings > Pages > Deploy from a branch > /docs). Keeps both copies in sync.
 cp gui/web/index.html gui/web/bank.js gui/web/juno.js gui/web/juno.wasm \

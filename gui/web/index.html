@@ -90,8 +90,11 @@
 <div id="status">initialising…</div>
 
 <script type="module">
-import JunoModule from "./juno.js";
 import { decodeBank } from "./bank.js";
+
+/* Cache-buster: build.sh rewrites this to the WASM content hash each build, so a new
+ * engine is always fetched fresh instead of served from the browser/CDN cache. */
+const BUILD_VER = "8b6fcbd185d3";
 
 const SR = 96000;
 const $ = s => document.querySelector(s);
@@ -115,7 +118,9 @@ let arpOn = false;
 let PARAMS = [], REAL = {};
 
 async function boot() {
-  M = await JunoModule();
+  status("loading engine (build " + BUILD_VER + ")…");
+  const { default: JunoModule } = await import("./juno.js?v=" + BUILD_VER);
+  M = await JunoModule({ locateFile: (path) => path.endsWith(".wasm") ? path + "?v=" + BUILD_VER : path });
   get = M.cwrap("juno_gui_get","number",["number","number"]);
   set = M.cwrap("juno_gui_set",null,["number","number","number"]);
   factoryFn = M.cwrap("juno_gui_recall_factory",null,["number"]);
