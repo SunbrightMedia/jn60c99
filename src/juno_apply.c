@@ -94,6 +94,7 @@
 #include "hpf_type_lut.h"
 #include "delay_recall.h"
 #include "reverb_recall.h"
+#include "chorus_recall.h"
 
 #define BANK_HEADER   23
 #define BANK_STRIDE   20223
@@ -374,6 +375,14 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
      * tree (see reverb_recall.c). These are global coefficients (>84272), single
      * write, not seeded per-voice. */
     juno_apply_reverb(state, blob - BANK_BLOB_OFF);
+    ++n;
+
+    /* Per-patch CHORUS level recall (slot-2 chorus block): EFFECT DEPTH -> Wet,
+     * EFFECT TONE -> Noise, Dry const 1.3, all bit-exact from the value-tree
+     * dispatch (see chorus_recall.c). Replaces the captured pad's chorus depth
+     * with each patch's own for the patches whose EFFECT TYPE selects the chorus.
+     * Global master cells (>84272), single write. */
+    juno_apply_chorus(state, blob - BANK_BLOB_OFF);
     ++n;
     return n;
 }
