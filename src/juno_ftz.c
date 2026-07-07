@@ -34,6 +34,26 @@
 #include <math.h>
 #include <float.h>
 
+/* Enable the CPU's hardware flush-to-zero / denormals-are-zero mode, matching the
+ * exact SSE MXCSR state the plugin (and every x86 audio host) runs in. On x86 this
+ * makes the ENTIRE engine compute in the plugin's floating-point mode — the most
+ * faithful reproduction possible — so denormals never even form. WebAssembly and
+ * targets without SSE have no such mode; there this is a no-op and the per-sample
+ * juno_flush_denormals() below is the fallback. Call once after engine init. */
+#if defined(__SSE__) && !defined(__EMSCRIPTEN__)
+#include <xmmintrin.h>
+#include <pmmintrin.h>   /* _MM_SET_DENORMALS_ZERO_MODE (DAZ) */
+void juno_enable_hw_ftz(void)
+{
+    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);        /* FTZ: denormal result -> 0 */
+    _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON); /* DAZ: denormal operand -> 0 */
+}
+int juno_hw_ftz_available(void) { return 1; }
+#else
+void juno_enable_hw_ftz(void) { /* no hardware FTZ (WASM/other): explicit flush used */ }
+int juno_hw_ftz_available(void) { return 0; }
+#endif
+
 /* structural per-voice recursive-state offsets (relative to the voice block,
  * all >= 176 so they never touch the header/shim-pointer region). */
 static const int VOICE_OFF[] = {

@@ -76,6 +76,13 @@ int juno_runtime_coeffs_loaded(void);
  * slower ops cause the intermittent audio crackle). See src/juno_ftz.c. */
 void juno_flush_denormals(unsigned char *st);
 
+/* juno_enable_hw_ftz — put the CPU into the plugin's SSE flush-to-zero /
+ * denormals-are-zero mode (x86 only). On WebAssembly / non-SSE targets this is a
+ * no-op and juno_flush_denormals() is the per-sample fallback. Call once after
+ * init. juno_hw_ftz_available() returns 1 when the hardware mode was applied. */
+void juno_enable_hw_ftz(void);
+int  juno_hw_ftz_available(void);
+
 /* voice_render — exact transcription of sub_180369070, parameterised by voice.
  * Produces one mono sample for voice `voice` (0..7) from engine state `base`;
  * writes it to *outL and *outR (the plugin duplicates the mono voice to both

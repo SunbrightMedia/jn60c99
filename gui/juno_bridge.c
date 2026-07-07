@@ -55,6 +55,7 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     c->st = calloc(1, JUNO_STATE_BYTES);
     if (!c->st) { free(c); return NULL; }
 
+    juno_enable_hw_ftz();                /* run in the plugin's SSE FTZ/DAZ mode (x86) */
     JF(c->st, 16) = sample_rate;
     juno_chorus_init(c->st);
     juno_engine_init(c->st);
