@@ -29,32 +29,31 @@ the assembled instrument. The glue and the init baseline were never bit-exact.
    DSP-read offsets (residuals: offset 136 = params pointer, set by attach_host;
    offset 4 = object-header count, not read as a coefficient).
 
-   What the capture STILL provides — the "orphans" (read by the DSP, written by no
-   engine code): **760 offsets (74 voice + 686 master/FX).** These are NOT
-   setSampleRate output (both binary and prepare have them 0 at prepare time); they
-   are populated later in the plugin's lifecycle. Precisely mapped:
-   - **Envelope smoother inits** 2848/3328 and osc enable 6448 (=1.0): set by the
-     smoother snap-all `sub_7FF91E0229B0` @0x3C29B0 (binary-derivable).
-   - **Gate/velocity coefficients** 6864 (0.84252) / 9680 (1.15436): read by
-     voice_render (smoother targets); the recall oracle's resolution (dispatch 450
-     "Gate Notify", curve 56/57, CONST(100)) is a MISATTRIBUTION — juno_curve(56,
-     100)=0.787 ≠ 0.84252 — so their true source is UNRESOLVED. Without them the
-     voice output is scaled by 0 → silent; this is why the capture cannot yet be
-     dropped outright.
-   - **DCO PWM SOURCE** 3888: per-patch (blob 15), addable to recall once verified.
-   - **Master/FX** 686 orphans: bound FX-parameter storage cells + the reverb
-     tap-index / algorithm tables. Per-patch FX param VALUES (patch byte -> curve ->
-     value) are the README's documented-unresolved FX/master recall path
-     (see scratchpad/oracle/effect_prepare_findings.md — the descriptor map and the
-     setValue write mechanism 0x3C1090 are known; the value source is not).
-   - **Lifecycle caveat:** snap-all also ZEROES algorithm constants setSampleRate
-     had written (6512/7440/9616), so the ready-to-play state is NOT a naive
-     setSampleRate+snap-all compose — the true state needs the plugin's own
-     end-to-end sequence (load-patch -> note-on -> render), whose render/process
-     `sub_7FF91E027400` @0x3C7400 spawns worker threads (a poor emulation target).
-   Net: the voice's static coefficients are bit-exact from the binary; the residual
-   note-time/velocity + master/FX coefficients remain capture-sourced pending the
-   above resolutions.
+   RESOLVED SINCE (all committed, binary-derived, no capture):
+   - **Voice is fully binary-derived and audibly sounds with the capture disabled.**
+     The gate/velocity coefficients 6864/9680 were the last voice blocker: proven
+     bit-for-bit (by driving the plugin's own dispatch over a velocity sweep) to be
+     `juno_curve(56, velocity)` / `juno_curve(57, velocity)` — the raw MIDI
+     velocity, written at note-on (`src/juno_note.c`; the earlier "dispatch 450
+     CONST(100)" was an oracle misattribution). The envelope-smoother inits
+     2848/3328 and osc enable 6448 (=1.0, from snap-all) are in `juno_engine_prepare`.
+   - **Per-patch FX values are binary-derived recall.** Delay + reverb (existing) +
+     **chorus levels** (new `src/chorus_recall.c`: EFFECT DEPTH->Wet, EFFECT
+     TONE->Noise, Dry=1.3, bit-exact LUTs reproducing the runtime baseline).
+
+   THE ONE REMAINING CAPTURE DEPENDENCY — the master OUTPUT/effect-enable prepare
+   constants. The voice sounds with no capture, but the master OUTPUT stage still
+   goes silent without it: **121 master-read offsets** are the effect blocks'
+   ENABLE/structural constants (chorus Mute 91280 / Ip Fc 91248, the output-stage
+   unity gains 101136/102496/102624/102640/102672/102688, and the per-mode effect
+   blocks 4297xxx BBD-delay, 6395xxx chorus-CV, 96336 mode-5). These are INVARIANT
+   effect-algorithm constants written by the effect object's per-mode PREPARE /
+   setActive step (gated on `part+1480`), which `CWaveGen::build` + `setSampleRate`
+   + snap-all do NOT reach in emulation. Deriving that step (drive the effect
+   setActive on the full CJu60Sim part per mode, re-read the blocks) is the last
+   piece needed to drop `runtime_coeffs_data.c` entirely.
+   Net: voice + per-patch FX = bit-exact from the binary; only the master's static
+   effect-enable/algorithm prepare constants remain capture-sourced.
 
 3. ~~**Arpeggiator is HAND-WRITTEN**~~ — **FIXED.** The hand-written arp (fixed
    8 Hz, wrong DOWN octave direction, guessed UP&DOWN order) has been replaced by a
