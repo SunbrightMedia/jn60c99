@@ -22,7 +22,7 @@ dll: juno.dll
 juno.dll: gui/juno_bridge.c $(SRC)
 	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $^ $(LDLIBS)
 
-test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal
+test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path
 	./tests/test_helpers
 	./tests/test_voice_smoke
 	./tests/test_master_smoke
@@ -31,6 +31,7 @@ test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/te
 	./tests/test_delay_recall
 	./tests/test_reverb_recall
 	./tests/test_denormal
+	./tests/test_note_path
 
 tests/test_helpers: tests/test_helpers.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
@@ -55,7 +56,7 @@ tests/test_reverb_recall: tests/test_reverb_recall.c $(SRC)
 
 clean:
 	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke \
-	      tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal
+	      tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path
 
 # Validate the port's init against the live-plugin state dump (state_dump/).
 validate: tests/validate_state.c $(SRC)
@@ -69,4 +70,7 @@ print('\n'.join(str(o) for o in sorted(o for o in r if 0<o<=12058620)))" > state
 	./tests/validate_state state_dump/state_t0.bin state_dump/state_t1.bin state_dump/.dspreads.txt
 
 tests/test_denormal: tests/test_denormal.c $(SRC)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
+tests/test_note_path: tests/test_note_path.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)

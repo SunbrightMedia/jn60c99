@@ -36,3 +36,7 @@ tests/test_poly_consistency
 tests/test_delay_recall
 tests/test_reverb_recall
 tests/test_denormal
+tests/test_note_path
+
+# Local scratch / reverse-engineering workspace (not committed)
+scratchpad/
