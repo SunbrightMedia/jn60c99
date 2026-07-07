@@ -129,6 +129,21 @@ void juno_note_on(unsigned char *st, int voice, int midi_note, int velocity)
     /* 3. one-shot DCO retrigger edge (consumed on the next voice_render sample). */
     JF(st, AUX_EDGE(voice)) = 1.0f;
 
+    /* 4. RETRIGGER the ADSRs. On the real synth the voice-trigger restarts each
+     *    voice's envelopes from zero when it is (re)assigned to a note — so a
+     *    replayed note, a stolen/reused voice, or an arp step all "speak" with a
+     *    fresh attack. Without this the port re-attacks from wherever the voice's
+     *    envelope was left (sustain / mid-release), so held or reused voices don't
+     *    re-strike — the "attack isn't snappy" / arp "just clicks" reports.
+     *    Zero the ENV1 (filter, 2592..2768) and ENV2 (amp, 3072..3248) STATE
+     *    blocks — the run-time level/integrator/shift-register history. The A/D/S/R
+     *    coefficients live at 2784+/3264+ and are deliberately left untouched. */
+    {
+        unsigned o;
+        for (o = 2592; o <= 2768; o += 16) JF(st, base + o) = 0.0f;
+        for (o = 3072; o <= 3248; o += 16) JF(st, base + o) = 0.0f;
+    }
+
     (void)velocity; /* velocity->amp level (gate-on param 1090) not yet traced;
                      * the note sounds at the patch's ADSR level. */
 }
