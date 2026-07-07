@@ -20,40 +20,38 @@ the assembled instrument. The glue and the init baseline were never bit-exact.
    prepared voice-0 block `[176,10688)` now matches the binary with **zero
    mismatches** (`scratchpad/oracle/gen_voice_prepare.py`).
 
-2. **`runtime_coeffs_data.c` is a CAPTURE of ONE patch ("PD The Juno Pad")** —
-   PARTIALLY RETIRED, fully mapped. `juno_engine_prepare` now supplies 90 of the
-   capture's offsets bit-exactly from the binary (setSampleRate + snap-all), and
-   for those the capture no longer contributes (prepare runs after it and wins).
-   A full-state A/B (`scratchpad/oracle/full_ab.py`) proves the C engine, WITHOUT
-   the capture, matches the binary's BUILD+setSampleRate state on **1571/1573**
-   DSP-read offsets (residuals: offset 136 = params pointer, set by attach_host;
-   offset 4 = object-header count, not read as a coefficient).
+2. ~~**`runtime_coeffs_data.c` is a CAPTURE of ONE patch ("PD The Juno Pad")**~~
+   — **RETIRED. The captured baseline is deleted; every coefficient the DSP reads
+   at playback now comes from the binary.** The full chain:
+   - `juno_engine_init` — the constructor state (sub_1803990C0).
+   - `juno_engine_prepare` (`src/juno_prepare.c`) — the prepared state the plugin's
+     own `setSampleRate` + smoother snap-all (`sub_7FF91E0229B0`) + effect
+     setActive produce: the 33 voice coefficients init misses, the master
+     per-voice output gains, the chorus/delay/output-filter constants, the effect
+     ENABLE/output constants (chorus Mute/Ip Fc, output-stage unity gains), and the
+     full **reverb-ECF tank** (density + HPF/LPF/DPF filter cascade). All are the
+     exact 32-bit patterns dumped from the binary under emulation.
+   - **note-on velocity** (`src/juno_note.c`): 6864/9680 = `juno_curve(56/57,
+     velocity)`, proven bit-for-bit by driving the plugin's dispatch over a
+     velocity sweep.
+   - **per-patch recall**: delay + reverb + **chorus levels** (`src/chorus_recall.c`).
 
-   RESOLVED SINCE (all committed, binary-derived, no capture):
-   - **Voice is fully binary-derived and audibly sounds with the capture disabled.**
-     The gate/velocity coefficients 6864/9680 were the last voice blocker: proven
-     bit-for-bit (by driving the plugin's own dispatch over a velocity sweep) to be
-     `juno_curve(56, velocity)` / `juno_curve(57, velocity)` — the raw MIDI
-     velocity, written at note-on (`src/juno_note.c`; the earlier "dispatch 450
-     CONST(100)" was an oracle misattribution). The envelope-smoother inits
-     2848/3328 and osc enable 6448 (=1.0, from snap-all) are in `juno_engine_prepare`.
-   - **Per-patch FX values are binary-derived recall.** Delay + reverb (existing) +
-     **chorus levels** (new `src/chorus_recall.c`: EFFECT DEPTH->Wet, EFFECT
-     TONE->Noise, Dry=1.3, bit-exact LUTs reproducing the runtime baseline).
+   VERIFICATION: a full-state A/B (`scratchpad/oracle/full_ab.py` /
+   `dump_full_effect.py`) proves the C engine, with NO capture, matches the
+   binary's BUILD → snap-all → setSampleRate state across the whole DSP-read set
+   (the only residuals are offset 136 = params pointer set by attach_host, offset 4
+   = an object-header count, and a handful of snap-all-order artifacts where the
+   correct setSampleRate value is kept). All 64 bank patches render finite and
+   non-silent with the capture removed. The driver now always runs the full
+   master/output path.
 
-   THE ONE REMAINING CAPTURE DEPENDENCY — the master OUTPUT/effect-enable prepare
-   constants. The voice sounds with no capture, but the master OUTPUT stage still
-   goes silent without it: **121 master-read offsets** are the effect blocks'
-   ENABLE/structural constants (chorus Mute 91280 / Ip Fc 91248, the output-stage
-   unity gains 101136/102496/102624/102640/102672/102688, and the per-mode effect
-   blocks 4297xxx BBD-delay, 6395xxx chorus-CV, 96336 mode-5). These are INVARIANT
-   effect-algorithm constants written by the effect object's per-mode PREPARE /
-   setActive step (gated on `part+1480`), which `CWaveGen::build` + `setSampleRate`
-   + snap-all do NOT reach in emulation. Deriving that step (drive the effect
-   setActive on the full CJu60Sim part per mode, re-read the blocks) is the last
-   piece needed to drop `runtime_coeffs_data.c` entirely.
-   Net: voice + per-patch FX = bit-exact from the binary; only the master's static
-   effect-enable/algorithm prepare constants remain capture-sourced.
+   HONEST RESIDUAL (does not need the capture): the per-mode STRUCTURAL blocks for
+   effect modes the JUNO-60 does not use by default — the mode-5 chorus block
+   (96384/96416) and the slot-1 BBD-delay (4297xxx) / slot-1 chorus-CV (6395xxx) —
+   are only reached when a patch selects those modes; the driver keeps slot-2
+   pinned to the chorus, so they are inert for the standard chorus path. Deriving
+   their per-mode setActive output is the one remaining item for 100% mode
+   coverage (docs/CHORUS_RECALL.md §5).
 
 3. ~~**Arpeggiator is HAND-WRITTEN**~~ — **FIXED.** The hand-written arp (fixed
    8 Hz, wrong DOWN octave direction, guessed UP&DOWN order) has been replaced by a

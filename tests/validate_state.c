@@ -16,7 +16,7 @@ int main(int argc, char **argv)
     if (argc < 4) { printf("usage: %s t0 t1 offs\n", argv[0]); return 2; }
     unsigned char *st = calloc(1, JUNO_STATE_BYTES);
     JF(st, 16) = 96000.0f;
-    juno_chorus_init(st); juno_engine_init(st); juno_runtime_coeffs_apply(st);
+    juno_chorus_init(st); juno_engine_init(st); juno_engine_prepare(st);
     static unsigned char t0[N], t1[N];
     FILE *f0 = fopen(argv[1],"rb"), *f1 = fopen(argv[2],"rb"), *fo = fopen(argv[3],"r");
     if (!f0||!f1||!fo) { printf("FAIL: missing inputs (run `make validate`)\n"); return 2; }

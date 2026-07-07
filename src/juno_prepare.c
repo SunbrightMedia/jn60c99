@@ -119,6 +119,51 @@ void juno_engine_prepare(unsigned char *st)
     /* reverb-ECF */
     JI(st,  10759504) = 0x37ae2650;  /*  2.07603e-05  Rev Ecf Rate (SR-derived)*/
     JI(st,  10759872) = 0x00000100;  /*  int 256      reverb algo const        */
+    /* effect ENABLE / output-stage constants — the per-mode effect setActive step
+     * (container setSampleRate sub_7FF91E01C980 @0x3BC980 + snap-all) writes these;
+     * without them the master output stage stays muted. All binary-derived (see
+     * scratchpad/oracle/chorus_structural_findings.md / cs_effect_merged.json),
+     * bit-exact vs the runtime baseline. Invariant (not per-patch). */
+    JI(st,     84560) = 0x3f800000;  /*  1.0          Mute SW (OD/DS block)   */
+    JI(st,     85152) = 0x41008081;  /*  8.03137      DS Level                */
+    JI(st,     91248) = 0x37ffd974;  /*  3.04996e-05  chorus Ip Fc            */
+    JI(st,     91280) = 0x3f800000;  /*  1.0          chorus Mute/enable      */
+    JI(st,    101136) = 0x3f800000;  /*  1.0          Expression (output)     */
+    JI(st,    101744) = 0x3f800000;  /*  1.0          DLY Mute                */
+    JI(st,    102496) = 0x3f800000;  /*  1.0          High Cut Sw             */
+    JI(st,    102624) = 0x3f800000;  /*  1.0          LF Damp Hp              */
+    JI(st,    102640) = 0x3f800000;  /*  1.0          LF Damp Lp              */
+    JI(st,    102672) = 0x3f800000;  /*  1.0          HF Damp Hp              */
+    JI(st,    102688) = 0x3f800000;  /*  1.0          HF Damp Lp              */
+    /* reverb-ECF tank — the reverb ALGORITHM constants (density, dir/global
+     * level, and the HPF/LPF/DPF filter cascade). Global send, always read by the
+     * master output stage; without these the reverb produces no tail. Binary-
+     * derived (BUILD -> snap-all -> setSampleRate); the SR-dependent filter coeffs
+     * are the 96 kHz values. REVERB LEVEL (10759408) + TIME (10759680) stay
+     * per-patch (reverb_recall.c). */
+    JI(st,  10759376) = 0x3f800000;  /*  1.0          Rev Ecf On              */
+    JI(st,  10759392) = 0x3f000000;  /*  0.5          Rev Ecf Density         */
+    JI(st,  10759424) = 0x3f800000;  /*  1.0          Rev Ecf Dir Lev         */
+    JI(st,  10759440) = 0x3efefeff;  /*  0.498039     Rev Ecf Glb Lev         */
+    JI(st,  10759520) = 0x3f7f8b7e;  /*  0.998222     Rev Ecf HPF C0          */
+    JI(st,  10759536) = 0xbf7f8b7e;  /* -0.998222     Rev Ecf HPF A0          */
+    JI(st,  10759552) = 0x3f7f16fb;  /*  0.996444     Rev Ecf HPF B0          */
+    JI(st,  10759568) = 0x3d434c95;  /*  0.0476805    Rev Ecf LPF C0          */
+    JI(st,  10759584) = 0x3dc34c95;  /*  0.0953609    Rev Ecf LPF A0          */
+    JI(st,  10759600) = 0x3d434c95;  /*  0.0476805    Rev Ecf LPF A1          */
+    JI(st,  10759616) = 0x3fa5addf;  /*  1.29437      Rev Ecf LPF B0          */
+    JI(st,  10759632) = 0xbef85dc7;  /* -0.48509      Rev Ecf LPF B1          */
+    JI(st,  10759648) = 0x3e0566f8;  /*  0.130276     Rev Ecf DPF0 Fc         */
+    JI(st,  10759664) = 0x3ebd52a3;  /*  0.369771     Rev Ecf DPF0 Hp         */
+    JI(st,  10759696) = 0x3e0566f8;  /*  0.130276     Rev Ecf DPF1 Fc         */
+    JI(st,  10759712) = 0x3ebd52a3;  /*  0.369771     Rev Ecf DPF1 Hp         */
+    JI(st,  10759728) = 0xbf16c2f3;  /* -0.588912     Rev Ecf DPF1 Lp         */
+    JI(st,  10759744) = 0x3e0566f8;  /*  0.130276     Rev Ecf DPF2 Fc         */
+    JI(st,  10759760) = 0x3e8f487e;  /*  0.27985      Rev Ecf DPF2 Hp         */
+    JI(st,  10759776) = 0xbf044337;  /* -0.516651     Rev Ecf DPF2 Lp         */
+    JI(st,  10759792) = 0x3e0566f8;  /*  0.130276     Rev Ecf DPF3 Fc         */
+    JI(st,  10759808) = 0x3e8f487e;  /*  0.27985      Rev Ecf DPF3 Hp         */
+    JI(st,  10759824) = 0xbf044337;  /* -0.516651     Rev Ecf DPF3 Lp         */
     /* reverb tap-index table (integers) — vtable[10] algorithm constants */
     JI(st,  11022208) = 0x00000001;  JI(st,  11022212) = 0x0000077f;
     JI(st,  11022216) = 0x00000b41;  JI(st,  11022220) = 0x000012b8;

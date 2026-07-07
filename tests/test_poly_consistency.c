@@ -33,7 +33,7 @@ static void render_isolated(int voice, uint32_t *out)
     JF(st, 16) = 96000.0f;
     juno_chorus_init(st);
     juno_engine_init(st);
-    juno_runtime_coeffs_apply(st);            /* patch coeffs -> voice 0's block */
+    juno_engine_prepare(st);            /* patch coeffs -> voice 0's block */
     juno_driver_seed_voices(st);              /* every voice gets voice 0's coeffs */
 
     mb  = (unsigned)voice * JUNO_VOICE_MAIN_STRIDE;

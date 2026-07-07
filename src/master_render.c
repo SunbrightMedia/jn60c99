@@ -20,10 +20,11 @@
  * CPrmDSPJu60Plugin::declareParameters — the 1121-slot param-descriptor DB builder
  * — which writes no coefficients.) The emulation runs the real construction +
  * setSampleRate and reproduces the derivable subset bit-for-bit, and confirms the
- * effect coefficients are genuine plugin prepare outputs (see tools/oracle/ and
- * src/runtime_coeffs_data.c). They reach this flat-state transcription via the
- * runtime_coeffs baseline; without them the chorus is inert. The algorithm here
- * is complete and exact.
+ * effect coefficients are genuine plugin prepare outputs (see tools/oracle/).
+ * They reach this flat-state transcription via juno_engine_prepare (the binary's
+ * setSampleRate + snap-all + effect-enable prepared state) plus the per-patch
+ * delay/reverb/chorus recall — no captured baseline. The algorithm here is
+ * complete and exact.
  */
 #include "juno_engine.h"
 #include "juno_dsp.h"

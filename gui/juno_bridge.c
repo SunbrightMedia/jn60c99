@@ -70,13 +70,12 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     juno_enable_hw_ftz();                /* run in the plugin's SSE FTZ/DAZ mode (x86) */
     JF(c->st, 16) = sample_rate;
     juno_chorus_init(c->st);
-    juno_engine_init(c->st);
-    juno_runtime_coeffs_apply(c->st);   /* still supplies the master/FX region (temporary) */
-    juno_engine_prepare(c->st);          /* binary-derived voice defaults OVERRIDE the capture's
-                                          * voice values -> voice block is now bit-exact vs the
-                                          * plugin's setSampleRate (see src/juno_prepare.c) */
-    default_patch(c->st);               /* FX power-on default (reverb off) — see default_patch */
-    juno_driver_seed_voices(c->st);      /* all 8 voices carry the same coeffs */
+    juno_engine_init(c->st);             /* constructor state (sub_1803990C0)              */
+    juno_engine_prepare(c->st);          /* setSampleRate + snap-all prepared state — the
+                                          * complete binary-derived voice + master/FX
+                                          * baseline (no capture; see src/juno_prepare.c) */
+    default_patch(c->st);                /* FX power-on default (reverb off)               */
+    juno_driver_seed_voices(c->st);      /* all 8 voices carry the same coeffs             */
     c->chorus_mode = chorus_mode;
     for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
     /* arp: bit-exact CArpeggio, off by default. carp_init seeds power-on state
@@ -110,18 +109,15 @@ float juno_gui_get(juno_ctx *c, int off)
     return 0.0f;
 }
 
-/* Re-apply the captured factory patch (PD The Juno Pad) — preset recall of
- * the built-in capture, via the same apply path the port already uses.
- * The capture includes offset 136 (a fragment of the LIVE plugin's host-params
- * pointer), which clobbers the shim pointer attach_host installed there — so
- * re-attach the shim afterwards or the master's pointer chase derefs garbage. */
+/* Reset to the engine's binary power-on state (the plugin's own default patch):
+ * re-run the constructor + the setSampleRate/snap-all prepared baseline. No
+ * capture is involved — this is the genuine default the plugin boots into. */
 void juno_gui_recall_factory(juno_ctx *c)
 {
-    juno_runtime_coeffs_apply(c->st);
-    juno_engine_prepare(c->st);          /* binary voice defaults override the capture */
+    juno_engine_init(c->st);             /* constructor state                    */
+    juno_engine_prepare(c->st);          /* binary prepared baseline (no capture) */
     default_patch(c->st);
-    /* factory capture is a chorus preset; reset slot-1 (v39) to 0 so the delay
-     * slot is a clean pass-through (no stale DELAY TYPE from a prior patch). */
+    /* clean slot-1 (v39): no stale DELAY TYPE from a prior patch */
     *(int32_t *)(c->st + JUNO_PROG_DLY) = 0;
     juno_driver_seed_voices(c->st);      /* propagate to all 8 voices */
     juno_driver_attach_host(c->st, &c->shim, c->chorus_mode);

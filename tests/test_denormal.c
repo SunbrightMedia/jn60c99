@@ -21,15 +21,32 @@
 
 static int is_denorm(unsigned b){ unsigned e=(b>>23)&0xFF, m=b&0x7FFFFF; return e==0 && m!=0; }
 
+/* Per-voice integer stage-counter slots whose bit pattern only LOOKS denormal.
+ * The envelope/filter state machines store small integers here (e.g. stage=3,
+ * count=23 -> 0x00000003 / 0x00000017, which as floats are denormals). The plugin
+ * stores the same integers (integer stores are unaffected by x86 FTZ) and reads
+ * them back as float operands where DAZ neutralises them to 0; the residual
+ * denormal*coeff product is sub-audible. They are STABLE (not decaying feedback)
+ * and load-bearing (flushing the counter to 0 corrupts the state machine), so —
+ * exactly like the excluded effect-line integer metadata — they are not the
+ * crackle source the flush targets and are excluded from the guard. */
+static int is_stage_counter(unsigned rel){
+    static const unsigned SC[] = {2592,2608,2752,2768,3072,3088,3232,3248,3648,3664,7072,10048};
+    for (unsigned i=0;i<sizeof(SC)/sizeof(SC[0]);++i) if (SC[i]==rel) return 1;
+    return 0;
+}
+
 /* count denormal floats strictly inside the per-voice DSP blocks [176,84272),
  * which is where the decaying envelope/filter feedback lives (the crackle
- * source). The header (<176) and effect metadata (>=84272) are excluded. */
+ * source). The header (<176), effect metadata (>=84272), and the per-voice
+ * integer stage counters (is_stage_counter) are excluded. */
 static long count_voice_denormals(unsigned char *st){
     long d=0;
     for (unsigned v=0; v<JUNO_NUM_VOICES; ++v){
         unsigned base=176u + v*JUNO_VOICE_MAIN_STRIDE;
         for (unsigned o=base; o+4<=base+ (JUNO_VOICE_MAIN_STRIDE-176u); o+=4){
-            unsigned b; memcpy(&b, st+o, 4); if (is_denorm(b)) ++d;
+            unsigned b; memcpy(&b, st+o, 4);
+            if (is_denorm(b) && !is_stage_counter(o - v*JUNO_VOICE_MAIN_STRIDE)) ++d;
         }
     }
     return d;
@@ -39,7 +56,7 @@ int main(void){
     unsigned char *st = calloc(1, JUNO_STATE_BYTES);
     struct juno_host_shim shim;
     JF(st,16)=96000.0f;
-    juno_chorus_init(st); juno_engine_init(st); juno_runtime_coeffs_apply(st);
+    juno_chorus_init(st); juno_engine_init(st); juno_engine_prepare(st);
     juno_driver_seed_voices(st);
     juno_driver_attach_host(st, &shim, 2);
 

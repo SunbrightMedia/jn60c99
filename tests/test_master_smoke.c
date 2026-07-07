@@ -19,10 +19,10 @@ int main(void)
     unsigned char *st = calloc(1, JUNO_STATE_BYTES);
     if (!st) { printf("alloc failed\n"); return 1; }
 
-    JF(st, 16) = 96000.0f;  /* match captured coeffs */
+    JF(st, 16) = 96000.0f;
     juno_chorus_init(st);                   /* constructor: delay lengths + zero */
     uint32_t rate = juno_engine_init(st);   /* voice coefficients */
-    juno_runtime_coeffs_apply(st);           /* chorus float coeffs (no-op until captured) */
+    juno_engine_prepare(st);                /* binary prepared baseline (voice + FX) */
 
     static struct juno_host_shim shim;
     juno_driver_attach_host(st, &shim, 0 /* dry/bypass */);
@@ -39,8 +39,8 @@ int main(void)
 
     printf("ran 2048 samples; last out = (%g, %g); nonfinite = %d\n", l, r, nonfinite);
     printf("path: %s\n", ran_master
-           ? "full master/chorus (runtime coeffs loaded)"
-           : "dry voice sum (runtime coeffs not yet captured)");
+           ? "full master/chorus (binary prepared baseline)"
+           : "dry voice sum");
     if (nonfinite) { printf("FAIL: non-finite output from master pipeline\n"); free(st); return 1; }
     printf("OK: init + driver + master_render linked & ran clean (finite, no crash)\n");
     free(st);

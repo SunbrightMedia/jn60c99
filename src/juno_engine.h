@@ -66,17 +66,11 @@ void juno_engine_prepare(unsigned char *st);
  * masks are -1 and it reads out of bounds. (Returns the state pointer; unused.) */
 void *juno_chorus_init(unsigned char *st);
 
-/* juno_runtime_coeffs_apply — write the 349 parameter-applied coefficients the
- * DSP (voice_render + master) reads but no static init sets (107 voice-patch +
- * 242 chorus/master; the plugin applies them at runtime from the parameter
- * system). Values are captured from the live plugin via
- * tools/capture_runtime_coeffs.js into src/runtime_coeffs_data.c. Call after
- * juno_chorus_init + juno_engine_init. No-op until the capture is pasted in. */
-void juno_runtime_coeffs_apply(unsigned char *st);
-
-/* 1 once the runtime coefficients have been captured into runtime_coeffs_data.c,
- * else 0 (placeholder). The driver gates the master/chorus vs dry path on this. */
-int juno_runtime_coeffs_loaded(void);
+/* NOTE: the former juno_runtime_coeffs_apply / _loaded (a captured one-patch
+ * baseline) have been RETIRED. Every coefficient the DSP reads at playback now
+ * comes from the binary: juno_engine_init (constructor) + juno_engine_prepare
+ * (setSampleRate + snap-all prepared state) + the per-patch recall. See
+ * docs/BITEXACT_AUDIT.md. */
 
 /* juno_flush_denormals — flush the engine's recursive DSP state (envelope,
  * filter, delay/chorus/reverb feedback) to zero, reproducing the x86 plugin's
@@ -110,9 +104,9 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
  *   a3 : {float* L, float* R} — receives 2*state[101264] (L), 2*state[101280] (R).
  * Returns a3[1] (the decompile returns the R pointer in rax); unused by callers.
  *
- * The chorus reads coefficient fields applied at runtime by the parameter system
- * (captured via juno_runtime_coeffs_apply). Until captured those fields are zero
- * and the chorus is inert. See docs/MASTER_RENDER_MAP.md. */
+ * The chorus/reverb/output coefficient fields are all supplied bit-exactly from
+ * the binary by juno_engine_prepare (the effect prepare/enable state) + the
+ * per-patch recall (delay/reverb/chorus). See docs/MASTER_RENDER_MAP.md. */
 float *juno_master_render(unsigned char *a1, float **a2, float **a3);
 
 #ifdef __cplusplus

@@ -80,12 +80,11 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
         a2[2 * i] = &vbuf[i];                          /* even slots = voices */
     }
 
-    /* Run the full master/chorus only once the float coefficients are captured;
-     * with them zero the master's output saturator collapses to silence, so the
-     * useful, faithful behaviour is the dry voice sum. (The delay-line lengths
-     * from juno_chorus_init are always set, so the master itself won't read out
-     * of bounds — the gate here is purely silence-vs-signal.) */
-    if (juno_runtime_coeffs_loaded()) {
+    /* Run the full master/chorus/output stage. Every coefficient it reads is now
+     * supplied bit-exactly from the binary (juno_engine_init + juno_engine_prepare
+     * for the invariant/prepare state, the per-patch recall for the rest) — no
+     * captured baseline — so the master always produces the faithful signal. */
+    {
         float *a3[2] = { outL, outR };
         *outL = 0.0f; *outR = 0.0f;
         juno_master_render(st, a2, a3);
@@ -94,16 +93,5 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
          * the real CPU). Removes the denormal-op load behind the crackle. */
         juno_flush_denormals(st);
         return 1;
-    }
-
-    /* Chorus coefficients not loaded: emit the exact dry voice sum (the genuine
-     * pre-chorus signal), duplicated to both channels as the voice path does. */
-    {
-        float dry = 0.0f;
-        for (i = 0; i < JUNO_NUM_VOICES; ++i) dry += vbuf[i];
-        *outL = dry;
-        *outR = dry;
-        juno_flush_denormals(st);
-        return 0;
     }
 }
