@@ -21,6 +21,28 @@ typedef struct {
     int voice_note[JUNO_NUM_VOICES];   /* MIDI note per voice, -1 = free      */
     unsigned voice_age[JUNO_NUM_VOICES];/* allocation order (for LRU stealing) */
     unsigned age_counter;
+
+    /* Arpeggiator (host-side note sequencer). The JUNO-60's own arp is a simple
+     * monophonic step sequencer over the held keys: modes UP / DOWN / UP&DOWN,
+     * range 1-3 octaves. The plugin's CArpeggio is host code (not a DSP coeff),
+     * and the per-preset arp on/mode/rate live in the un-decodable extended
+     * record region, so this reproduces the arp BEHAVIOUR with explicit controls
+     * rather than per-preset recall. When off, note-on/off drive the synth
+     * directly (unchanged). When on, keys feed the held set and the clock steps
+     * the pattern into the voice allocator. */
+    int   arp_on;          /* 0/1                                              */
+    int   arp_mode;        /* 0=up, 1=down, 2=up&down                          */
+    int   arp_oct;         /* octave range 1..3                                */
+    float arp_rate_hz;     /* steps per second                                 */
+    float arp_gate;        /* note-on fraction of the step (0..1), rest = off  */
+    int   arp_held[16];    /* currently held keys, ascending                   */
+    int   arp_nheld;
+    int   arp_seq[48];     /* expanded step pattern (held x octaves x mode)     */
+    int   arp_nseq;
+    int   arp_step;        /* index into arp_seq of the sounding step           */
+    int   arp_cur;         /* MIDI note currently sounding (-1 = none)          */
+    double arp_clk;        /* sample accumulator within the current step        */
+    int   arp_gated;       /* 1 while the current step's note is on             */
 } juno_ctx;
 
 /* Create + fully init an engine. sample_rate should be 96000 to match the
@@ -40,6 +62,9 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     juno_driver_seed_voices(c->st);      /* all 8 voices carry the same coeffs */
     c->chorus_mode = chorus_mode;
     for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
+    /* arp defaults: off, UP, 1 octave, 1/8-note-ish at ~120 BPM, 50% gate */
+    c->arp_mode = 0; c->arp_oct = 1; c->arp_rate_hz = 8.0f; c->arp_gate = 0.5f;
+    c->arp_cur = -1; c->arp_step = 0;
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
     return c;
 }
@@ -95,23 +120,21 @@ void juno_gui_gate(juno_ctx *c, float v)
     JF(c->st, JUNO_VOICE_AUX_BASE0) = v;
 }
 
+/* --- internal synth triggers (drive the 8-voice allocator directly) --------- */
 /* Note driver (src/juno_note.c) with an 8-voice allocator. note-on picks a free
  * voice (else steals the oldest) and sets its per-voice DCO pitch (state[V*10512+
  * 304] = note/12), opens its shared ADSR gate (ramps state[V*10512+320]) and
- * fires its DCO retrigger edge — the plugin's own note writes, one voice each.
- * All 8 voices are rendered every sample (juno_gui_render), so chords sound.
- * Faithful port from the binary + live-plugin state; MIDI 60 = concert C4. */
-void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
+ * fires its DCO retrigger edge — the plugin's own note writes, one voice each. */
+static void synth_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     int v, pick = -1;
     unsigned oldest;
-    if (!c) return;
-    for (v = 0; v < JUNO_NUM_VOICES; ++v)          /* prefer a voice already   */
-        if (c->voice_note[v] == midi_note) { pick = v; break; }  /* on this note*/
+    for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        if (c->voice_note[v] == midi_note) { pick = v; break; }
     if (pick < 0)
-        for (v = 0; v < JUNO_NUM_VOICES; ++v)      /* then a free voice         */
+        for (v = 0; v < JUNO_NUM_VOICES; ++v)
             if (c->voice_note[v] < 0) { pick = v; break; }
-    if (pick < 0) {                                /* else steal the oldest     */
+    if (pick < 0) {
         pick = 0; oldest = c->voice_age[0];
         for (v = 1; v < JUNO_NUM_VOICES; ++v)
             if (c->voice_age[v] < oldest) { oldest = c->voice_age[v]; pick = v; }
@@ -120,17 +143,118 @@ void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
     c->voice_age[pick]  = ++c->age_counter;
     juno_note_on(c->st, pick, midi_note, velocity);
 }
-
-/* Release the voice(s) playing `midi_note`. midi_note < 0 releases all voices. */
-void juno_gui_note_off(juno_ctx *c, int midi_note)
+static void synth_note_off(juno_ctx *c, int midi_note)
 {
     int v;
-    if (!c) return;
     for (v = 0; v < JUNO_NUM_VOICES; ++v)
         if (c->voice_note[v] == midi_note || (midi_note < 0 && c->voice_note[v] >= 0)) {
             juno_note_off(c->st, v);
             c->voice_note[v] = -1;
         }
+}
+
+/* --- arpeggiator ------------------------------------------------------------ */
+/* Rebuild the step pattern from the currently-held keys, octave range and mode.
+ * UP: keys low->high across the octave range; DOWN: reverse; UP&DOWN: up then
+ * down without repeating the top/bottom (the JUNO-60's own up-and-down feel). */
+static void arp_rebuild_seq(juno_ctx *c)
+{
+    int n = 0, o, i;
+    int up[48], nup = 0;
+    for (o = 0; o < c->arp_oct; ++o)
+        for (i = 0; i < c->arp_nheld; ++i)
+            if (nup < 48) up[nup++] = c->arp_held[i] + 12 * o;
+    if (c->arp_mode == 1) {                 /* DOWN */
+        for (i = nup - 1; i >= 0; --i) c->arp_seq[n++] = up[i];
+    } else if (c->arp_mode == 2) {          /* UP & DOWN */
+        for (i = 0; i < nup; ++i) c->arp_seq[n++] = up[i];
+        for (i = nup - 2; i >= 1; --i) if (n < 48) c->arp_seq[n++] = up[i];
+    } else {                                /* UP (default) */
+        for (i = 0; i < nup; ++i) c->arp_seq[n++] = up[i];
+    }
+    c->arp_nseq = n;
+    if (c->arp_step >= n) c->arp_step = 0;
+}
+/* silence any sounding arp note */
+static void arp_note_off(juno_ctx *c)
+{
+    if (c->arp_cur >= 0) { synth_note_off(c, c->arp_cur); c->arp_cur = -1; }
+    c->arp_gated = 0;
+}
+/* Advance the arp clock by one sample; trigger/release steps as the clock rolls.
+ * Called once per rendered sample when the arp is enabled. */
+static void arp_tick(juno_ctx *c)
+{
+    double sr = JF(c->st, 16); if (sr <= 0.0) sr = 96000.0;
+    double step_samples = sr / (c->arp_rate_hz > 0.1f ? c->arp_rate_hz : 0.1f);
+    double gate_samples = step_samples * (double)c->arp_gate;
+    if (c->arp_nseq == 0) { arp_note_off(c); c->arp_clk = 0.0; return; }
+    /* note-off partway through the step (gate), then next note at the boundary */
+    if (c->arp_gated && c->arp_clk >= gate_samples) arp_note_off(c);
+    if (c->arp_clk >= step_samples || c->arp_cur < 0) {
+        c->arp_clk = 0.0;
+        arp_note_off(c);
+        if (c->arp_step >= c->arp_nseq) c->arp_step = 0;
+        c->arp_cur = c->arp_seq[c->arp_step];
+        synth_note_on(c, c->arp_cur, 100);
+        c->arp_gated = 1;
+        c->arp_step = (c->arp_step + 1) % c->arp_nseq;
+    }
+    c->arp_clk += 1.0;
+}
+
+/* Public note-on: routes to the arp held-set when enabled, else the synth. */
+void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
+{
+    int i, j;
+    if (!c) return;
+    if (!c->arp_on) { synth_note_on(c, midi_note, velocity); return; }
+    for (i = 0; i < c->arp_nheld; ++i) if (c->arp_held[i] == midi_note) return; /* dup */
+    if (c->arp_nheld >= 16) return;
+    for (i = 0; i < c->arp_nheld && c->arp_held[i] < midi_note; ++i) ;   /* insert sorted */
+    for (j = c->arp_nheld; j > i; --j) c->arp_held[j] = c->arp_held[j-1];
+    c->arp_held[i] = midi_note; c->arp_nheld++;
+    arp_rebuild_seq(c);
+}
+
+/* Public note-off. midi_note < 0 releases everything. */
+void juno_gui_note_off(juno_ctx *c, int midi_note)
+{
+    int i, j;
+    if (!c) return;
+    if (!c->arp_on) { synth_note_off(c, midi_note); return; }
+    if (midi_note < 0) { c->arp_nheld = 0; }
+    else for (i = 0; i < c->arp_nheld; ++i)
+        if (c->arp_held[i] == midi_note) {
+            for (j = i; j < c->arp_nheld - 1; ++j) c->arp_held[j] = c->arp_held[j+1];
+            c->arp_nheld--; break;
+        }
+    arp_rebuild_seq(c);
+    if (c->arp_nheld == 0) arp_note_off(c);
+}
+
+/* Configure the arpeggiator. on: 0/1. mode: 0=up,1=down,2=up&down. oct: 1..3.
+ * rate_hz: steps/sec. gate: note-on fraction of a step (0..1). Toggling off
+ * flushes held keys + any sounding step so the synth returns to direct play. */
+void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float rate_hz, float gate)
+{
+    int was;
+    if (!c) return;
+    was = c->arp_on;
+    c->arp_mode = mode < 0 ? 0 : (mode > 2 ? 2 : mode);
+    c->arp_oct  = oct  < 1 ? 1 : (oct  > 3 ? 3 : oct);
+    if (rate_hz > 0.1f) c->arp_rate_hz = rate_hz;
+    if (gate >= 0.0f && gate <= 1.0f) c->arp_gate = gate;
+    c->arp_on = on ? 1 : 0;
+    if (was && !c->arp_on) {                 /* turning off: clear everything */
+        arp_note_off(c); c->arp_nheld = 0; c->arp_nseq = 0; c->arp_step = 0;
+        synth_note_off(c, -1);
+    }
+    if (!was && c->arp_on) {                  /* turning on: silence direct notes */
+        synth_note_off(c, -1);
+        c->arp_nheld = 0; c->arp_nseq = 0; c->arp_step = 0; c->arp_cur = -1; c->arp_clk = 0.0;
+    }
+    arp_rebuild_seq(c);
 }
 
 /* Apply bank patch `idx` (raw KoaBankFile00003 bytes in `bank`, `len` bytes)
@@ -155,6 +279,7 @@ int juno_gui_render(juno_ctx *c, float *out, int nframes)
 {
     int i, full = 0;
     for (i = 0; i < nframes; ++i) {
+        if (c->arp_on) arp_tick(c);        /* step the arp pattern in real time */
         juno_note_tick(c->st);
         full = juno_driver_render_sample(c->st, &out[2 * i], &out[2 * i + 1]);
     }

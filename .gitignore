@@ -35,3 +35,4 @@ tests/test_apply_golden
 tests/test_poly_consistency
 tests/test_delay_recall
 tests/test_reverb_recall
+tests/test_denormal
