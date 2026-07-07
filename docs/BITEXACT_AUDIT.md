@@ -1,11 +1,20 @@
-# Bit-exact audit: why it still sounds wrong (and the plan)
+# Bit-exact audit: the timbre + arp bugs, and how they were fixed
 
-Honest accounting after the user reported timbre + arp still wrong despite
-"bit-exact" claims. The word "bit-exact" was only ever true of individual
-transcribed pieces (voice_render, master_render, recall curve values) — NOT of
-the assembled instrument. The glue and the init baseline were never bit-exact.
+> **STATUS: RESOLVED.** Every item below is fixed. The captured baseline is
+> deleted; every coefficient the DSP reads at playback is now derived from the
+> binary (constructor + prepare + per-patch recall + note-on velocity curves),
+> and the arp is a field-for-field transcription of CArpeggio. All 64 patches
+> render finite and non-silent with no capture; `make test` is green. The one
+> documented residual is the per-mode structural blocks for effect modes the
+> JUNO-60 does not use by default (item 2). This document is kept as the honest
+> record of what the bugs were and how each was resolved.
 
-## Proven non-bit-exact code (the actual bugs)
+Honest accounting after the user reported timbre + arp wrong despite "bit-exact"
+claims. The word "bit-exact" was originally only true of individual transcribed
+pieces (voice_render, master_render, recall curve values) — NOT of the assembled
+instrument. The glue and the init/prepare baseline are what this audit fixed.
+
+## The bugs (each now fixed — see the annotations)
 
 1. ~~**`juno_engine_init` is INCOMPLETE.**~~ — **FIXED (voice block).** Diffing my
    init against the plugin's own prepare (CWaveGen::setSampleRate 0x3C7A20, run
