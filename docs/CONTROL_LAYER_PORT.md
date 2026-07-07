@@ -72,12 +72,41 @@ replaced by the faithful voice-allocation + M.Gate driving.
 5. **hpf_type_lut / juno_ftz** provenance: confirm transcription; use hardware FTZ
    where available, explicit flush only as the WASM fallback.
 
+## Verified against the decompile (the note handler is now bit-exact)
+
+The full Hex-Rays decompilation is committed at `refs/allcode_decomp.tgz` (unpack to
+inspect; RVA-named `decomp_XXXXXX.c` + `refs/manifest.tsv`). Using it we confirmed
+the note control surface directly against the plugin's own code:
+
+- **Immediate set** `sub_7FF91E0210F0(obj,0,param,value)` = `*descriptor[param].target
+  = value`. Verbatim.
+- **Smoothed set** `sub_7FF91E0210D0 → sub_7FF91E022920` only acts `if
+  descriptor[param].flag == 1` (en=1); it arms `smoother[descriptor.slot]` via
+  `sub_7FF91E022E80(...,target,time,subdiv=10)`. So **en=0 params (M.CV, M.Gate) are
+  never smoothed — they are written immediately.** The smoother arm/step
+  (`sub_7FF91E022E80` / `sub_7FF91E022E00`) is the exact math already in
+  `src/juno_ramp.c`; the run/reap loop is `sub_7FF91E0224A0`. The gate ramp target
+  constant is `unk_1809DEB50 = 4.0` (used only for smoothed trigger params).
+
+The note handler `src/juno_note.c` was therefore rewritten to write M.CV
+(off 304) = note/12, M.Gate (off 320) = 1.0 on note-on / 0.0 on note-off, and the
+aux DCO-retrigger latch (off 101504+v*32) — ALL immediate, matching the descriptor
+flags. The earlier hand-written gate RAMP + envelope-integrator RESET were removed:
+measured against the bit-exact DSP they produced an onset click + slow swell even
+for fast-attack patches ("attack never snappy", "clicking"); the immediate-gate
+mechanism reaches full level immediately with a clean gate-edge re-attack. Guarded
+by `tests/test_note_path.c`.
+
 ## Status
 - Binary-derived the full param routing table (1121 params). ✓
-- Confirmed the ramp engine (`juno_ramp.c`) is already bit-exact. ✓
-- Mapped the note path to params 1/2/73/98 and confirmed the envelope is
-  gate-driven (no reset param). ✓
-- Established that the current envelope-reset + arp are approximations to be
-  replaced. ✓
-- Remaining: transcribe the voice allocator + note handler, the smoother advance,
-  CArpeggio, and retire the capture. In progress.
+- Confirmed the ramp engine (`juno_ramp.c`) is already bit-exact (== sub_7FF91E022E80/
+  E00), and the smoother run loop is sub_7FF91E0224A0. ✓
+- **Note handler rewritten to the bit-exact immediate-gate mechanism** and verified
+  against sub_7FF91E0210F0 / sub_7FF91E022920 + measured on the DSP. ✓
+- Hardware SSE FTZ/DAZ enabled on x86 (juno_ftz.c) to match the plugin's FP mode;
+  explicit per-sample flush kept as the WASM fallback. ✓
+- Full decompile recovered (`refs/allcode_decomp.tgz`) — unblocks the remaining
+  transcriptions.
+- Remaining: velocity curve (sub_7FF91E021720, param-1090 path), voice-allocator
+  policy, CArpeggio + whether arp is per-preset, and retiring the capture. Mapping
+  in progress against the recovered decompile.

@@ -301,6 +301,7 @@ int juno_gui_render_dry(juno_ctx *c, float *out, int nframes)
     if (!c) return 0;
     for (i = 0; i < nframes; ++i) {
         float mix = 0.0f;
+        if (c->arp_on) arp_tick(c);        /* keep the arp advancing in the dry path too */
         juno_note_tick(c->st);
         for (v = 0; v < JUNO_NUM_VOICES; ++v) {   /* all 8 voices, in order */
             float vb = 0.0f, vr = 0.0f;
