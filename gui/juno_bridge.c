@@ -46,6 +46,23 @@ typedef struct {
     int   arp_gated;       /* 1 while the current step's note is on             */
 } juno_ctx;
 
+/* Reset the global REVERB send to its juno_engine_init value (OFF).
+ *
+ * The runtime_coeffs baseline was CAPTURED from "PD The Juno Pad" — a pad drenched
+ * in reverb — so it carries REVERB LEVEL (off 10759408) = 1.0 (fully wet). That is a
+ * per-patch FRONT-PANEL value (the runtime_coeffs_data.c header calls these captured
+ * front-panel offsets "only a placeholder"), NOT a global default: juno_engine_init
+ * leaves it 0.0, and per-patch recall (juno_apply_reverb) sets it from the loaded
+ * patch. Left at the pad's 1.0 it drenches EVERY default/unapplied sound, so the wet
+ * reverb tank swells on every note — masking the (bit-exact, fast) voice attack as a
+ * slow ~240 ms swell, darkening the timbre, and washing the arpeggiator into mush.
+ * We restore the init/off default; a bank patch's own reverb still recalls on Apply. */
+#define JUNO_REVERB_SEND 10759408u
+static void default_fx_off(unsigned char *st)
+{
+    JF(st, JUNO_REVERB_SEND) = 0.0f;   /* init value; per-patch recall re-enables it */
+}
+
 /* Create + fully init an engine. sample_rate should be 96000 to match the
  * captured patch. Returns NULL on alloc failure. */
 juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
@@ -61,6 +78,7 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     juno_chorus_init(c->st);
     juno_engine_init(c->st);
     juno_runtime_coeffs_apply(c->st);
+    default_fx_off(c->st);               /* dry default (see default_fx_off) */
     juno_driver_seed_voices(c->st);      /* all 8 voices carry the same coeffs */
     c->chorus_mode = chorus_mode;
     for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
@@ -99,6 +117,7 @@ float juno_gui_get(juno_ctx *c, int off)
 void juno_gui_recall_factory(juno_ctx *c)
 {
     juno_runtime_coeffs_apply(c->st);
+    default_fx_off(c->st);
     /* factory capture is a chorus preset; reset slot-1 (v39) to 0 so the delay
      * slot is a clean pass-through (no stale DELAY TYPE from a prior patch). */
     *(int32_t *)(c->st + JUNO_PROG_DLY) = 0;
