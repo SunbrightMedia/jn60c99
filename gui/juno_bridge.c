@@ -37,29 +37,24 @@ typedef struct {
     carp  arp;             /* bit-exact CArpeggio state machine                 */
 } juno_ctx;
 
-/* Make the preview's DEFAULT/factory patch a clean, playable JUNO sound.
+/* FX power-on default for the UNAPPLIED sound.
  *
- * The runtime_coeffs baseline was CAPTURED from "PD The Juno Pad" — a slow, heavily
- * reverbed pad — so on its own it is a poor default for auditioning: two of its
- * captured FRONT-PANEL coefficients dominate every default/unapplied note. These are
- * per-patch placeholders (the runtime_coeffs_data.c header calls them "only a
- * placeholder"), NOT engine defaults, and per-patch recall (juno_bank_apply /
- * juno_apply_reverb) overrides them the moment a bank patch is applied. We reset them
- * to sensible defaults so the out-of-the-box sound is snappy and dry:
- *   1. REVERB LEVEL (10759408): the pad carries 1.0 (fully wet); juno_engine_init
- *      leaves it 0.0. Full wet swells the reverb tank on every note (~240 ms),
- *      masking the (bit-exact, fast) voice attack and washing the arp. -> 0.0 (off).
- *   2. ENV attack (amp 3264 / filter 2784): the pad's amp attack coeff is 0.00121
- *      => an ~870 ms attack. That is the "attack is super slow" report for anyone
- *      playing the default. -> a fast attack so the default speaks immediately.
- * A loaded patch's own reverb + envelope still recall exactly on Apply. */
+ * The ENV-attack part of the old default_patch is gone: juno_engine_prepare now
+ * writes the binary's genuine power-on envelope coefficients (attack 3.555611,
+ * etc.), so the default speaks with the plugin's real default envelope — no more
+ * hand fast-attack.
+ *
+ * The one remaining reset is the REVERB SEND (10759408). The captured baseline
+ * (from "PD The Juno Pad", a fully-wet reverb pad) carries 1.0 here, washing every
+ * unapplied note. The plugin's genuine power-on value is 0.0: the effect-parameter
+ * storage cells are all zero after BUILD + setSampleRate (verified under emulation —
+ * see scratchpad/oracle/effect_prepare_findings.md; the FX params are only written
+ * by per-patch recall). So 0.0 is the binary default, not a hand-fitted taste value,
+ * and a loaded patch's own reverb still recalls exactly on Apply. */
 #define JUNO_REVERB_SEND 10759408u
 static void default_patch(unsigned char *st)
 {
-    JF(st, JUNO_REVERB_SEND) = 0.0f;          /* dry default (init value)            */
-    float fast_attack = juno_curve(35, 22);   /* ~2 ms env attack — snappy, no click */
-    JF(st, 3264) = fast_attack;               /* ENV2 (amp) attack                   */
-    JF(st, 2784) = fast_attack;               /* ENV1 (filter) attack                */
+    JF(st, JUNO_REVERB_SEND) = 0.0f;          /* binary power-on default (FX cell = 0) */
 }
 
 /* Create + fully init an engine. sample_rate should be 96000 to match the
@@ -76,8 +71,11 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     JF(c->st, 16) = sample_rate;
     juno_chorus_init(c->st);
     juno_engine_init(c->st);
-    juno_runtime_coeffs_apply(c->st);
-    default_patch(c->st);               /* snappy, dry default (see default_patch) */
+    juno_runtime_coeffs_apply(c->st);   /* still supplies the master/FX region (temporary) */
+    juno_engine_prepare(c->st);          /* binary-derived voice defaults OVERRIDE the capture's
+                                          * voice values -> voice block is now bit-exact vs the
+                                          * plugin's setSampleRate (see src/juno_prepare.c) */
+    default_patch(c->st);               /* FX power-on default (reverb off) — see default_patch */
     juno_driver_seed_voices(c->st);      /* all 8 voices carry the same coeffs */
     c->chorus_mode = chorus_mode;
     for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
@@ -120,6 +118,7 @@ float juno_gui_get(juno_ctx *c, int off)
 void juno_gui_recall_factory(juno_ctx *c)
 {
     juno_runtime_coeffs_apply(c->st);
+    juno_engine_prepare(c->st);          /* binary voice defaults override the capture */
     default_patch(c->st);
     /* factory capture is a chorus preset; reset slot-1 (v39) to 0 so the delay
      * slot is a clean pass-through (no stale DELAY TYPE from a prior patch). */
