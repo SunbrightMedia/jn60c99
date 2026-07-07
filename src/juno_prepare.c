@@ -50,6 +50,12 @@ void juno_engine_prepare(unsigned char *st)
     /* --- INVARIANT (not recallable; prepare is the ONLY source) ----------- */
     JI(st,   304) = 0x400004f7;  /*  2.000303     master tune / pitch base    */
     JI(st,  1072) = 0x410bc406;  /*  8.735357                                 */
+    /* envelope-smoother / osc-enable inits: snap-all sub_7FF91E0229B0 sets these
+     * to 1.0 for every voice; invariant (no patch data). voice_render uses 2848/
+     * 3328 as one-pole lerp coefficients, 6448 as an osc enable. */
+    JI(st,  2848) = 0x3f800000;  /*  1.0          ENV1 smoother init          */
+    JI(st,  3328) = 0x3f800000;  /*  1.0          ENV2 smoother init          */
+    JI(st,  6448) = 0x3f800000;  /*  1.0          osc enable                  */
     JI(st,  1888) = 0x3f800000;  /*  1.0          unity gain/scale            */
     JI(st,  1952) = 0x3f800000;  /*  1.0                                      */
     JI(st,  2080) = 0x3f800000;  /*  1.0                                      */

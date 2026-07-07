@@ -67,12 +67,15 @@
  * whose gate has already fallen (note-off -> gate 0), so note-on's gate 0->1 edge
  * re-attacks cleanly. We drive M.Gate immediately; the bit-exact DSP does the rest.
  *
- * Velocity (params 73/98, immediate) is not written here yet — the velocity->coeff
- * curve is not transcribed, so notes sound at the patch's own ADSR level. Documented
- * honestly rather than guessed.
+ * Velocity (params 73/98, immediate) IS now written: note-on sets 6864 =
+ * juno_curve(56, velocity) (VCF) and 9680 = juno_curve(57, velocity) (VCA), the
+ * raw MIDI velocity through the plugin's own gate-notify curves. Proven bit-exact
+ * by driving the plugin's dispatch over a full velocity sweep under emulation
+ * (see scratchpad/oracle/velocity_coeff_findings.md); no longer capture-sourced.
  */
 #include "juno_engine.h"
 #include "juno_note.h"
+#include "juno_curve.h"
 
 /* Per-voice absolute state offsets (relative to voice base = voice*STRIDE). */
 #define VBASE(v)    ((unsigned int)(v) * JUNO_VOICE_MAIN_STRIDE)  /* v*10512 */
@@ -108,7 +111,20 @@ void juno_note_on(unsigned char *st, int voice, int midi_note, int velocity)
     /* Aux latch (immediate): one-shot DCO phase retrigger (consumed next sample). */
     JF(st, AUX_EDGE(voice)) = 1.0f;
 
-    (void)velocity;   /* velocity->coeff curve not transcribed; see file header. */
+    /* Velocity coefficients (immediate). The plugin's note-on fires the per-voice
+     * "gate notify" (poly allocator sub_7FF91DFB3150 -> dispatch case 450 ->
+     * FltVoice/AmpVoice velocity setters sub_7FF91DFB9F30 / sub_7FF91DFB7160),
+     * which write the RAW MIDI velocity through curve 56 (VCF) / curve 57 (VCA)
+     * into these two DSP-read smoother targets. voice_render reads 6864 (VCF) at
+     * line 1142 and 9680 (VCA) at 1492. Proven bit-for-bit over a full velocity
+     * sweep by driving the plugin's own dispatch under emulation (velocity 107 ->
+     * 0.842520 / 1.154360, matching the earlier capture). Without these the voice
+     * output is scaled by 0 -> silent. See scratchpad/oracle/velocity_coeff_findings.md. */
+    JF(st, base + 6864) = juno_curve(56, velocity);   /* VCF velocity (param 73) */
+    JF(st, base + 9680) = juno_curve(57, velocity);   /* VCA velocity (param 98) */
+    /* The same gate-notify sets these two to 1.0 (velocity-independent). */
+    JF(st, base + 1856) = 1.0f;
+    JF(st, base + 9824) = 1.0f;
 }
 
 void juno_note_off(unsigned char *st, int voice)
