@@ -20,14 +20,41 @@ the assembled instrument. The glue and the init baseline were never bit-exact.
    prepared voice-0 block `[176,10688)` now matches the binary with **zero
    mismatches** (`scratchpad/oracle/gen_voice_prepare.py`).
 
-2. **`runtime_coeffs_data.c` is a CAPTURE of ONE patch ("PD The Juno Pad").** It
-   fills the init gap + the master/chorus/output coefficients. A snapshot of one
-   dark, reverbed pad applied under every patch = the "too dark/filtered" color.
-   Non-bit-exact by definition. Retiring it needs the effect PREPARE derived from
-   the binary — the effect objects live at part+6784/6976/7184/7400/7616/7824/8176
-   and their coeff-compute is gated on the effect-type selector (part+1480); the
-   master reads them flattened into the state at 4297584/6395312/6497168/10692016/
-   10759376.
+2. **`runtime_coeffs_data.c` is a CAPTURE of ONE patch ("PD The Juno Pad")** —
+   PARTIALLY RETIRED, fully mapped. `juno_engine_prepare` now supplies 90 of the
+   capture's offsets bit-exactly from the binary (setSampleRate + snap-all), and
+   for those the capture no longer contributes (prepare runs after it and wins).
+   A full-state A/B (`scratchpad/oracle/full_ab.py`) proves the C engine, WITHOUT
+   the capture, matches the binary's BUILD+setSampleRate state on **1571/1573**
+   DSP-read offsets (residuals: offset 136 = params pointer, set by attach_host;
+   offset 4 = object-header count, not read as a coefficient).
+
+   What the capture STILL provides — the "orphans" (read by the DSP, written by no
+   engine code): **760 offsets (74 voice + 686 master/FX).** These are NOT
+   setSampleRate output (both binary and prepare have them 0 at prepare time); they
+   are populated later in the plugin's lifecycle. Precisely mapped:
+   - **Envelope smoother inits** 2848/3328 and osc enable 6448 (=1.0): set by the
+     smoother snap-all `sub_7FF91E0229B0` @0x3C29B0 (binary-derivable).
+   - **Gate/velocity coefficients** 6864 (0.84252) / 9680 (1.15436): read by
+     voice_render (smoother targets); the recall oracle's resolution (dispatch 450
+     "Gate Notify", curve 56/57, CONST(100)) is a MISATTRIBUTION — juno_curve(56,
+     100)=0.787 ≠ 0.84252 — so their true source is UNRESOLVED. Without them the
+     voice output is scaled by 0 → silent; this is why the capture cannot yet be
+     dropped outright.
+   - **DCO PWM SOURCE** 3888: per-patch (blob 15), addable to recall once verified.
+   - **Master/FX** 686 orphans: bound FX-parameter storage cells + the reverb
+     tap-index / algorithm tables. Per-patch FX param VALUES (patch byte -> curve ->
+     value) are the README's documented-unresolved FX/master recall path
+     (see scratchpad/oracle/effect_prepare_findings.md — the descriptor map and the
+     setValue write mechanism 0x3C1090 are known; the value source is not).
+   - **Lifecycle caveat:** snap-all also ZEROES algorithm constants setSampleRate
+     had written (6512/7440/9616), so the ready-to-play state is NOT a naive
+     setSampleRate+snap-all compose — the true state needs the plugin's own
+     end-to-end sequence (load-patch -> note-on -> render), whose render/process
+     `sub_7FF91E027400` @0x3C7400 spawns worker threads (a poor emulation target).
+   Net: the voice's static coefficients are bit-exact from the binary; the residual
+   note-time/velocity + master/FX coefficients remain capture-sourced pending the
+   above resolutions.
 
 3. ~~**Arpeggiator is HAND-WRITTEN**~~ — **FIXED.** The hand-written arp (fixed
    8 Hz, wrong DOWN octave direction, guessed UP&DOWN order) has been replaced by a

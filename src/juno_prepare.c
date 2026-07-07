@@ -24,9 +24,23 @@
  * metadata (vtable ptr, heap pointers, descriptor counts) the flat engine never
  * reads.
  *
- * Apply to voice 0 AFTER juno_engine_init; juno_driver_seed_voices replicates
- * the block to voices 1..7 (identical voices), exactly as the plugin prepares
- * all 8. Offsets are absolute (object-relative), matching juno_engine_init's.
+ * Two regions:
+ *   - VOICE-0 block [176,10688): 33 offsets. Apply to voice 0 AFTER
+ *     juno_engine_init; juno_driver_seed_voices replicates them to voices 1..7.
+ *   - SHARED / master-FX region (>=84272): 57 offsets, written once (NOT
+ *     voice-replicated). These are the master's per-voice output gains, the
+ *     chorus/delay/reverb algorithm constants (vtable[10] @0x3990C0) and the FX
+ *     parameter power-on defaults (incl. the SR-derived High-Cut / damp filter
+ *     coefficients and the reverb tap-index table). Without the Voice-Output
+ *     gains (=1.0, were 0) the master attenuates every voice — a second reason
+ *     the captured baseline was masking the true signal.
+ *
+ * FULL-STATE A/B PROOF (tools/oracle/full_ab.py): with both regions applied and
+ * NO capture, the compiled C engine matches the binary's BUILD+setSampleRate
+ * state on 1572/1573 DSP-read offsets; the single residual is offset 136 (the
+ * params-vector pointer), which juno_driver_attach_host installs at runtime.
+ *
+ * Offsets are absolute (object-relative), matching juno_engine_init's.
  */
 #include "juno_engine.h"
 #include <stdint.h>
@@ -70,4 +84,51 @@ void juno_engine_prepare(unsigned char *st)
     JI(st,  3840) = 0x3f800000;  /*  1.0                                      */
     JI(st, 10240) = 0x3b0d8c2e;  /*  0.002159845                              */
     JI(st, 10288) = 0x3f800000;  /*  1.0                                      */
+
+    /* --- SHARED / master-FX region (written once; NOT voice-replicated) --- */
+    /* master per-voice-pair output gains — unity; were 0 => voices attenuated */
+    JI(st,     84448) = 0x3f800000;  /*  1.0          Voice01 Output          */
+    JI(st,     84464) = 0x3f800000;  /*  1.0          Voice23 Output          */
+    JI(st,     84480) = 0x3f800000;  /*  1.0          Voice45 Output          */
+    JI(st,     84496) = 0x3f800000;  /*  1.0          Voice67 Output          */
+    /* chorus block FX param defaults (91xxx) */
+    JI(st,     91120) = 0x3c0e0000;  /*  0.008666992  Delay Time              */
+    JI(st,     91136) = 0x3f77b282;  /*  0.9675683    Error Depth             */
+    JI(st,     91152) = 0x3727c5ac;  /*  1e-05        LFO Rate    (SR-derived)*/
+    JI(st,     91168) = 0x3f800000;  /*  1.0          LFO Phase               */
+    JI(st,     91184) = 0x3b83126f;  /*  0.004        LFO Depth               */
+    JI(st,     91264) = 0x3f800000;  /*  1.0          On/Off                  */
+    JI(st,     96336) = 0x3c1abc15;  /*  0.009444263  Delay Time              */
+    JI(st,     96368) = 0x3b442984;  /*  0.0029932    LFO Depth               */
+    JI(st,    101152) = 0x3e77a5b3;  /*  0.2418432    Volume                  */
+    /* output-stage High-Cut / damp filter coefficients (SR-derived @96k) */
+    JI(st,    102352) = 0x3f96bc00;  /*  1.177612     Delay Time              */
+    JI(st,    102368) = 0x3e1b31ce;  /*  0.1515571    High Cut C0 (SR-derived)*/
+    JI(st,    102416) = 0x3fb07de6;  /*  1.378843     High Cut B0 (SR-derived)*/
+    JI(st,    102432) = 0xbf07c840;  /* -0.5303986    High Cut B2 (SR-derived)*/
+    JI(st,    102464) = 0x3e52bdc7;  /*  0.2058022    High Cut Fc (SR-derived)*/
+    JI(st,    102480) = 0x3fb50bf3;  /*  1.414430     High Cut Qc             */
+    JI(st,    102608) = 0x3bab929a;  /*  0.005235980  LF Damp Fc  (SR-derived)*/
+    JI(st,    102656) = 0x3f4ba5b0;  /*  0.7954972    HF Damp Fc  (SR-derived)*/
+    /* reverb-ECF */
+    JI(st,  10759504) = 0x37ae2650;  /*  2.07603e-05  Rev Ecf Rate (SR-derived)*/
+    JI(st,  10759872) = 0x00000100;  /*  int 256      reverb algo const        */
+    /* reverb tap-index table (integers) — vtable[10] algorithm constants */
+    JI(st,  11022208) = 0x00000001;  JI(st,  11022212) = 0x0000077f;
+    JI(st,  11022216) = 0x00000b41;  JI(st,  11022220) = 0x000012b8;
+    JI(st,  11022224) = 0x000012ba;  JI(st,  11022228) = 0x000018a7;
+    JI(st,  11022232) = 0x000018a9;  JI(st,  11022236) = 0x00001c34;
+    JI(st,  11022240) = 0x00001c36;  JI(st,  11022244) = 0x00001d9f;
+    JI(st,  11022248) = 0x00001da1;  JI(st,  11022252) = 0x000022e4;
+    JI(st,  11022256) = 0x000022e6;  JI(st,  11022260) = 0x00002823;
+    JI(st,  11022264) = 0x00002825;  JI(st,  11022268) = 0x00002d6c;
+    JI(st,  11022272) = 0x00002d6e;  JI(st,  11022276) = 0x000032b1;
+    JI(st,  11022280) = 0x000032b3;  JI(st,  11022284) = 0x00004310;
+    JI(st,  11022288) = 0x00004e38;  JI(st,  11022292) = 0x00004eb0;
+    JI(st,  11022296) = 0x00004eb2;  JI(st,  11022300) = 0x00005e1f;
+    JI(st,  11022304) = 0x00006b83;  JI(st,  11022308) = 0x00006c71;
+    JI(st,  11022312) = 0x00006c73;  JI(st,  11022316) = 0x000079ee;
+    JI(st,  11022320) = 0x00008c84;  JI(st,  11022324) = 0x0000928e;
+    JI(st,  11022328) = 0x00009290;  JI(st,  11022332) = 0x0000a0f9;
+    JI(st,  11022336) = 0x0000b38f;  JI(st,  11022340) = 0x0000b997;
 }

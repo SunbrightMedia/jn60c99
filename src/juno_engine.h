@@ -50,11 +50,13 @@ extern "C" {
  * Returns the sample rate it used. */
 uint32_t juno_engine_init(unsigned char *st);
 
-/* juno_engine_prepare — the voice-block coefficients the plugin's sample-rate
- * prepare (CWaveGen::setSampleRate, RVA 0x3C7A20) writes but the constructor
- * juno_engine_init does not (33 DSP-read voice-0 offsets, binary-derived — see
- * src/juno_prepare.c). Call on voice 0 AFTER juno_engine_init; seed_voices then
- * replicates to voices 1..7. Completes the voice block bit-for-bit vs the binary. */
+/* juno_engine_prepare — the coefficients the plugin's sample-rate prepare
+ * (CWaveGen::setSampleRate 0x3C7A20 + smoother snap-all 0x3C29B0) writes but the
+ * constructor juno_engine_init does not: 33 DSP-read voice-0 offsets (replicated
+ * to voices 1..7 by seed_voices) + 57 shared/master-FX offsets (written once).
+ * All binary-derived — see src/juno_prepare.c. Call AFTER juno_engine_init.
+ * Verified: with these applied the C engine matches the binary's prepared state
+ * on 1571/1573 DSP-read offsets (tools/oracle/full_ab.py). */
 void juno_engine_prepare(unsigned char *st);
 
 /* juno_chorus_init — exact transcription of sub_1803A1300, the chorus/master

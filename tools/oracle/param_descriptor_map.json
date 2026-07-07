@@ -1,0 +1,6728 @@
+[
+{
+"idx": 0,
+"off": 272,
+"type": 0,
+"name": "UseExtJack"
+},
+{
+"idx": 1,
+"off": 304,
+"type": 0,
+"name": "M.CV"
+},
+{
+"idx": 2,
+"off": 320,
+"type": 0,
+"name": "M.Gate"
+},
+{
+"idx": 3,
+"off": 368,
+"type": 1,
+"name": "Master Tune"
+},
+{
+"idx": 4,
+"off": 384,
+"type": 1,
+"name": "Part Tune"
+},
+{
+"idx": 5,
+"off": 592,
+"type": 0,
+"name": "Portamento OnOff"
+},
+{
+"idx": 6,
+"off": 608,
+"type": 0,
+"name": "Portamento Mode"
+},
+{
+"idx": 7,
+"off": 624,
+"type": 1,
+"name": "Portamento Time"
+},
+{
+"idx": 8,
+"off": 1040,
+"type": 0,
+"name": "LFO Griffer Rate Sw"
+},
+{
+"idx": 9,
+"off": 1056,
+"type": 0,
+"name": "LFO Tempo Rate Sw"
+},
+{
+"idx": 10,
+"off": 1072,
+"type": 0,
+"name": "LFO Tempo Rate"
+},
+{
+"idx": 11,
+"off": 1088,
+"type": 1,
+"name": "LFO Rate"
+},
+{
+"idx": 12,
+"off": 1856,
+"type": 0,
+"name": "Gate"
+},
+{
+"idx": 13,
+"off": 1872,
+"type": 0,
+"name": "LFO Trig"
+},
+{
+"idx": 14,
+"off": 1888,
+"type": 0,
+"name": "Reset Sw"
+},
+{
+"idx": 15,
+"off": 1904,
+"type": 1,
+"name": "LFO UseExtGate"
+},
+{
+"idx": 16,
+"off": 1920,
+"type": 1,
+"name": "LFO Delay"
+},
+{
+"idx": 17,
+"off": 1936,
+"type": 1,
+"name": "LFO Delay Sw"
+},
+{
+"idx": 18,
+"off": 1952,
+"type": 1,
+"name": "LFO Sin Sw"
+},
+{
+"idx": 19,
+"off": 1968,
+"type": 1,
+"name": "LFO Tri Sw"
+},
+{
+"idx": 20,
+"off": 1984,
+"type": 1,
+"name": "LFO Sqr Sw"
+},
+{
+"idx": 21,
+"off": 2000,
+"type": 1,
+"name": "LFO Saw Sw"
+},
+{
+"idx": 22,
+"off": 2016,
+"type": 1,
+"name": "LFO Saw(Inv) Sw"
+},
+{
+"idx": 23,
+"off": 2032,
+"type": 1,
+"name": "LFO S&H Sw"
+},
+{
+"idx": 24,
+"off": 2048,
+"type": 1,
+"name": "LFO Noise Sw"
+},
+{
+"idx": 25,
+"off": 2064,
+"type": 1,
+"name": "LFO Noise Mix"
+},
+{
+"idx": 26,
+"off": 2080,
+"type": 1,
+"name": "LFO Internal Sw"
+},
+{
+"idx": 27,
+"off": 2096,
+"type": 1,
+"name": "LFO External0 Sw"
+},
+{
+"idx": 28,
+"off": 2112,
+"type": 1,
+"name": "LFO External1 Sw"
+},
+{
+"idx": 29,
+"off": 2528,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 30,
+"off": 2544,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 31,
+"off": 2560,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 32,
+"off": 2784,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 33,
+"off": 2800,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 34,
+"off": 2816,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 35,
+"off": 2832,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 36,
+"off": 2848,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 37,
+"off": 3040,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 38,
+"off": 3264,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 39,
+"off": 3280,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 40,
+"off": 3296,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 41,
+"off": 3312,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 42,
+"off": 3328,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 43,
+"off": 3840,
+"type": 0,
+"name": "OSC1 Feet"
+},
+{
+"idx": 44,
+"off": 3856,
+"type": 0,
+"name": "Griffer Bend SW"
+},
+{
+"idx": 45,
+"off": 3872,
+"type": 0,
+"name": "Bend Enable SW"
+},
+{
+"idx": 46,
+"off": 3888,
+"type": 0,
+"name": "PWM SW LFO"
+},
+{
+"idx": 47,
+"off": 3904,
+"type": 0,
+"name": "PWM SW ENV1"
+},
+{
+"idx": 48,
+"off": 3920,
+"type": 0,
+"name": "PWM SW ENV2"
+},
+{
+"idx": 49,
+"off": 3936,
+"type": 0,
+"name": "PWM SW Manual"
+},
+{
+"idx": 50,
+"off": 3952,
+"type": 1,
+"name": "Tune"
+},
+{
+"idx": 51,
+"off": 3968,
+"type": 1,
+"name": "Detune"
+},
+{
+"idx": 52,
+"off": 3984,
+"type": 1,
+"name": "Mod Sens"
+},
+{
+"idx": 53,
+"off": 4000,
+"type": 1,
+"name": "Mod Sw"
+},
+{
+"idx": 54,
+"off": 4016,
+"type": 1,
+"name": "LFO Gain"
+},
+{
+"idx": 55,
+"off": 4032,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 56,
+"off": 4048,
+"type": 1,
+"name": "LFO Sw"
+},
+{
+"idx": 57,
+"off": 4064,
+"type": 1,
+"name": "ENV1 Level"
+},
+{
+"idx": 58,
+"off": 4080,
+"type": 1,
+"name": "ENV2 Level"
+},
+{
+"idx": 59,
+"off": 4096,
+"type": 1,
+"name": "ENV Sw"
+},
+{
+"idx": 60,
+"off": 4112,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 61,
+"off": 4128,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 62,
+"off": 4144,
+"type": 1,
+"name": "PWM Level"
+},
+{
+"idx": 63,
+"off": 4192,
+"type": 1,
+"name": "JU OSC Saw Lev"
+},
+{
+"idx": 64,
+"off": 4208,
+"type": 1,
+"name": "JU OSC Sqr Lev"
+},
+{
+"idx": 65,
+"off": 4224,
+"type": 1,
+"name": "JU OSC Sub Lev"
+},
+{
+"idx": 66,
+"off": 5520,
+"type": 1,
+"name": "Duty Tune"
+},
+{
+"idx": 67,
+"off": 6448,
+"type": 1,
+"name": "Osc1 Mute"
+},
+{
+"idx": 68,
+"off": 6512,
+"type": 1,
+"name": "Osc1 Level"
+},
+{
+"idx": 69,
+"off": 6528,
+"type": 1,
+"name": "Osc Noise Level"
+},
+{
+"idx": 70,
+"off": 6720,
+"type": 0,
+"name": "Griffer SW"
+},
+{
+"idx": 71,
+"off": 6736,
+"type": 1,
+"name": "LPF Cutoff"
+},
+{
+"idx": 72,
+"off": 6832,
+"type": 1,
+"name": "LPF Resonance"
+},
+{
+"idx": 73,
+"off": 6864,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 74,
+"off": 7008,
+"type": 0,
+"name": "Env1/2"
+},
+{
+"idx": 75,
+"off": 7024,
+"type": 0,
+"name": "Int/Env"
+},
+{
+"idx": 76,
+"off": 7296,
+"type": 0,
+"name": "LFO Gain"
+},
+{
+"idx": 77,
+"off": 7312,
+"type": 0,
+"name": "Ext LFO Sw"
+},
+{
+"idx": 78,
+"off": 7328,
+"type": 0,
+"name": "GRF Bned SW"
+},
+{
+"idx": 79,
+"off": 7344,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 80,
+"off": 7360,
+"type": 1,
+"name": "MOD Sens"
+},
+{
+"idx": 81,
+"off": 7376,
+"type": 1,
+"name": "MOD SW"
+},
+{
+"idx": 82,
+"off": 7392,
+"type": 1,
+"name": "ENV Level"
+},
+{
+"idx": 83,
+"off": 7408,
+"type": 1,
+"name": "KCV Level"
+},
+{
+"idx": 84,
+"off": 7424,
+"type": 1,
+"name": "Velocity Sens"
+},
+{
+"idx": 85,
+"off": 7440,
+"type": 1,
+"name": "Velocity Offset"
+},
+{
+"idx": 86,
+"off": 7456,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 87,
+"off": 7472,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 88,
+"off": 7600,
+"type": 1,
+"name": "Cutoff Tune"
+},
+{
+"idx": 89,
+"off": 7616,
+"type": 1,
+"name": "Resonance Tune"
+},
+{
+"idx": 90,
+"off": 7632,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 91,
+"off": 9056,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 92,
+"off": 9072,
+"type": 1,
+"name": "-12dB/oct Tap"
+},
+{
+"idx": 93,
+"off": 9088,
+"type": 1,
+"name": "-18dB/oct Tap"
+},
+{
+"idx": 94,
+"off": 9104,
+"type": 1,
+"name": "-24dB/oct Tap"
+},
+{
+"idx": 95,
+"off": 9584,
+"type": 1,
+"name": "AMP TONE"
+},
+{
+"idx": 96,
+"off": 9600,
+"type": 1,
+"name": "AMP VELOCITY SENS"
+},
+{
+"idx": 97,
+"off": 9616,
+"type": 1,
+"name": "AMP FIX VELOCITY LEVEL"
+},
+{
+"idx": 98,
+"off": 9680,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 99,
+"off": 9824,
+"type": 0,
+"name": "Mute"
+},
+{
+"idx": 100,
+"off": 10176,
+"type": 0,
+"name": "Gate SW"
+},
+{
+"idx": 101,
+"off": 10192,
+"type": 0,
+"name": "ENV1 SW"
+},
+{
+"idx": 102,
+"off": 10208,
+"type": 0,
+"name": "ENV2 SW"
+},
+{
+"idx": 103,
+"off": 10224,
+"type": 0,
+"name": "Ext ENV SW"
+},
+{
+"idx": 104,
+"off": 10240,
+"type": 1,
+"name": "HPF Cutoff"
+},
+{
+"idx": 105,
+"off": 10256,
+"type": 1,
+"name": "HPF Switch"
+},
+{
+"idx": 106,
+"off": 10272,
+"type": 1,
+"name": "Boost LPF Level"
+},
+{
+"idx": 107,
+"off": 10288,
+"type": 1,
+"name": "Boost Thru Level"
+},
+{
+"idx": 108,
+"off": 10304,
+"type": 1,
+"name": "ENV LEVEL"
+},
+{
+"idx": 109,
+"off": 10320,
+"type": 1,
+"name": "AMP LEVEL"
+},
+{
+"idx": 110,
+"off": 10784,
+"type": 0,
+"name": "UseExtJack"
+},
+{
+"idx": 111,
+"off": 10816,
+"type": 0,
+"name": "M.CV"
+},
+{
+"idx": 112,
+"off": 10832,
+"type": 0,
+"name": "M.Gate"
+},
+{
+"idx": 113,
+"off": 10880,
+"type": 1,
+"name": "Master Tune"
+},
+{
+"idx": 114,
+"off": 10896,
+"type": 1,
+"name": "Part Tune"
+},
+{
+"idx": 115,
+"off": 11104,
+"type": 0,
+"name": "Portamento OnOff"
+},
+{
+"idx": 116,
+"off": 11120,
+"type": 0,
+"name": "Portamento Mode"
+},
+{
+"idx": 117,
+"off": 11136,
+"type": 1,
+"name": "Portamento Time"
+},
+{
+"idx": 118,
+"off": 11552,
+"type": 0,
+"name": "LFO Griffer Rate Sw"
+},
+{
+"idx": 119,
+"off": 11568,
+"type": 0,
+"name": "LFO Tempo Rate Sw"
+},
+{
+"idx": 120,
+"off": 11584,
+"type": 0,
+"name": "LFO Tempo Rate"
+},
+{
+"idx": 121,
+"off": 11600,
+"type": 1,
+"name": "LFO Rate"
+},
+{
+"idx": 122,
+"off": 12368,
+"type": 0,
+"name": "Gate"
+},
+{
+"idx": 123,
+"off": 12384,
+"type": 0,
+"name": "LFO Trig"
+},
+{
+"idx": 124,
+"off": 12400,
+"type": 0,
+"name": "Reset Sw"
+},
+{
+"idx": 125,
+"off": 12416,
+"type": 1,
+"name": "LFO UseExtGate"
+},
+{
+"idx": 126,
+"off": 12432,
+"type": 1,
+"name": "LFO Delay"
+},
+{
+"idx": 127,
+"off": 12448,
+"type": 1,
+"name": "LFO Delay Sw"
+},
+{
+"idx": 128,
+"off": 12464,
+"type": 1,
+"name": "LFO Sin Sw"
+},
+{
+"idx": 129,
+"off": 12480,
+"type": 1,
+"name": "LFO Tri Sw"
+},
+{
+"idx": 130,
+"off": 12496,
+"type": 1,
+"name": "LFO Sqr Sw"
+},
+{
+"idx": 131,
+"off": 12512,
+"type": 1,
+"name": "LFO Saw Sw"
+},
+{
+"idx": 132,
+"off": 12528,
+"type": 1,
+"name": "LFO Saw(Inv) Sw"
+},
+{
+"idx": 133,
+"off": 12544,
+"type": 1,
+"name": "LFO S&H Sw"
+},
+{
+"idx": 134,
+"off": 12560,
+"type": 1,
+"name": "LFO Noise Sw"
+},
+{
+"idx": 135,
+"off": 12576,
+"type": 1,
+"name": "LFO Noise Mix"
+},
+{
+"idx": 136,
+"off": 12592,
+"type": 1,
+"name": "LFO Internal Sw"
+},
+{
+"idx": 137,
+"off": 12608,
+"type": 1,
+"name": "LFO External0 Sw"
+},
+{
+"idx": 138,
+"off": 12624,
+"type": 1,
+"name": "LFO External1 Sw"
+},
+{
+"idx": 139,
+"off": 13040,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 140,
+"off": 13056,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 141,
+"off": 13072,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 142,
+"off": 13296,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 143,
+"off": 13312,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 144,
+"off": 13328,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 145,
+"off": 13344,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 146,
+"off": 13360,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 147,
+"off": 13552,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 148,
+"off": 13776,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 149,
+"off": 13792,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 150,
+"off": 13808,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 151,
+"off": 13824,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 152,
+"off": 13840,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 153,
+"off": 14352,
+"type": 0,
+"name": "OSC1 Feet"
+},
+{
+"idx": 154,
+"off": 14368,
+"type": 0,
+"name": "Griffer Bend SW"
+},
+{
+"idx": 155,
+"off": 14384,
+"type": 0,
+"name": "Bend Enable SW"
+},
+{
+"idx": 156,
+"off": 14400,
+"type": 0,
+"name": "PWM SW LFO"
+},
+{
+"idx": 157,
+"off": 14416,
+"type": 0,
+"name": "PWM SW ENV1"
+},
+{
+"idx": 158,
+"off": 14432,
+"type": 0,
+"name": "PWM SW ENV2"
+},
+{
+"idx": 159,
+"off": 14448,
+"type": 0,
+"name": "PWM SW Manual"
+},
+{
+"idx": 160,
+"off": 14464,
+"type": 1,
+"name": "Tune"
+},
+{
+"idx": 161,
+"off": 14480,
+"type": 1,
+"name": "Detune"
+},
+{
+"idx": 162,
+"off": 14496,
+"type": 1,
+"name": "Mod Sens"
+},
+{
+"idx": 163,
+"off": 14512,
+"type": 1,
+"name": "Mod Sw"
+},
+{
+"idx": 164,
+"off": 14528,
+"type": 1,
+"name": "LFO Gain"
+},
+{
+"idx": 165,
+"off": 14544,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 166,
+"off": 14560,
+"type": 1,
+"name": "LFO Sw"
+},
+{
+"idx": 167,
+"off": 14576,
+"type": 1,
+"name": "ENV1 Level"
+},
+{
+"idx": 168,
+"off": 14592,
+"type": 1,
+"name": "ENV2 Level"
+},
+{
+"idx": 169,
+"off": 14608,
+"type": 1,
+"name": "ENV Sw"
+},
+{
+"idx": 170,
+"off": 14624,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 171,
+"off": 14640,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 172,
+"off": 14656,
+"type": 1,
+"name": "PWM Level"
+},
+{
+"idx": 173,
+"off": 14704,
+"type": 1,
+"name": "JU OSC Saw Lev"
+},
+{
+"idx": 174,
+"off": 14720,
+"type": 1,
+"name": "JU OSC Sqr Lev"
+},
+{
+"idx": 175,
+"off": 14736,
+"type": 1,
+"name": "JU OSC Sub Lev"
+},
+{
+"idx": 176,
+"off": 16032,
+"type": 1,
+"name": "Duty Tune"
+},
+{
+"idx": 177,
+"off": 16960,
+"type": 1,
+"name": "Osc1 Mute"
+},
+{
+"idx": 178,
+"off": 17024,
+"type": 1,
+"name": "Osc1 Level"
+},
+{
+"idx": 179,
+"off": 17040,
+"type": 1,
+"name": "Osc Noise Level"
+},
+{
+"idx": 180,
+"off": 17232,
+"type": 0,
+"name": "Griffer SW"
+},
+{
+"idx": 181,
+"off": 17248,
+"type": 1,
+"name": "LPF Cutoff"
+},
+{
+"idx": 182,
+"off": 17344,
+"type": 1,
+"name": "LPF Resonance"
+},
+{
+"idx": 183,
+"off": 17376,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 184,
+"off": 17520,
+"type": 0,
+"name": "Env1/2"
+},
+{
+"idx": 185,
+"off": 17536,
+"type": 0,
+"name": "Int/Env"
+},
+{
+"idx": 186,
+"off": 17808,
+"type": 0,
+"name": "LFO Gain"
+},
+{
+"idx": 187,
+"off": 17824,
+"type": 0,
+"name": "Ext LFO Sw"
+},
+{
+"idx": 188,
+"off": 17840,
+"type": 0,
+"name": "GRF Bned SW"
+},
+{
+"idx": 189,
+"off": 17856,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 190,
+"off": 17872,
+"type": 1,
+"name": "MOD Sens"
+},
+{
+"idx": 191,
+"off": 17888,
+"type": 1,
+"name": "MOD SW"
+},
+{
+"idx": 192,
+"off": 17904,
+"type": 1,
+"name": "ENV Level"
+},
+{
+"idx": 193,
+"off": 17920,
+"type": 1,
+"name": "KCV Level"
+},
+{
+"idx": 194,
+"off": 17936,
+"type": 1,
+"name": "Velocity Sens"
+},
+{
+"idx": 195,
+"off": 17952,
+"type": 1,
+"name": "Velocity Offset"
+},
+{
+"idx": 196,
+"off": 17968,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 197,
+"off": 17984,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 198,
+"off": 18112,
+"type": 1,
+"name": "Cutoff Tune"
+},
+{
+"idx": 199,
+"off": 18128,
+"type": 1,
+"name": "Resonance Tune"
+},
+{
+"idx": 200,
+"off": 18144,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 201,
+"off": 19568,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 202,
+"off": 19584,
+"type": 1,
+"name": "-12dB/oct Tap"
+},
+{
+"idx": 203,
+"off": 19600,
+"type": 1,
+"name": "-18dB/oct Tap"
+},
+{
+"idx": 204,
+"off": 19616,
+"type": 1,
+"name": "-24dB/oct Tap"
+},
+{
+"idx": 205,
+"off": 20096,
+"type": 1,
+"name": "AMP TONE"
+},
+{
+"idx": 206,
+"off": 20112,
+"type": 1,
+"name": "AMP VELOCITY SENS"
+},
+{
+"idx": 207,
+"off": 20128,
+"type": 1,
+"name": "AMP FIX VELOCITY LEVEL"
+},
+{
+"idx": 208,
+"off": 20192,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 209,
+"off": 20336,
+"type": 0,
+"name": "Mute"
+},
+{
+"idx": 210,
+"off": 20688,
+"type": 0,
+"name": "Gate SW"
+},
+{
+"idx": 211,
+"off": 20704,
+"type": 0,
+"name": "ENV1 SW"
+},
+{
+"idx": 212,
+"off": 20720,
+"type": 0,
+"name": "ENV2 SW"
+},
+{
+"idx": 213,
+"off": 20736,
+"type": 0,
+"name": "Ext ENV SW"
+},
+{
+"idx": 214,
+"off": 20752,
+"type": 1,
+"name": "HPF Cutoff"
+},
+{
+"idx": 215,
+"off": 20768,
+"type": 1,
+"name": "HPF Switch"
+},
+{
+"idx": 216,
+"off": 20784,
+"type": 1,
+"name": "Boost LPF Level"
+},
+{
+"idx": 217,
+"off": 20800,
+"type": 1,
+"name": "Boost Thru Level"
+},
+{
+"idx": 218,
+"off": 20816,
+"type": 1,
+"name": "ENV LEVEL"
+},
+{
+"idx": 219,
+"off": 20832,
+"type": 1,
+"name": "AMP LEVEL"
+},
+{
+"idx": 220,
+"off": 21296,
+"type": 0,
+"name": "UseExtJack"
+},
+{
+"idx": 221,
+"off": 21328,
+"type": 0,
+"name": "M.CV"
+},
+{
+"idx": 222,
+"off": 21344,
+"type": 0,
+"name": "M.Gate"
+},
+{
+"idx": 223,
+"off": 21392,
+"type": 1,
+"name": "Master Tune"
+},
+{
+"idx": 224,
+"off": 21408,
+"type": 1,
+"name": "Part Tune"
+},
+{
+"idx": 225,
+"off": 21616,
+"type": 0,
+"name": "Portamento OnOff"
+},
+{
+"idx": 226,
+"off": 21632,
+"type": 0,
+"name": "Portamento Mode"
+},
+{
+"idx": 227,
+"off": 21648,
+"type": 1,
+"name": "Portamento Time"
+},
+{
+"idx": 228,
+"off": 22064,
+"type": 0,
+"name": "LFO Griffer Rate Sw"
+},
+{
+"idx": 229,
+"off": 22080,
+"type": 0,
+"name": "LFO Tempo Rate Sw"
+},
+{
+"idx": 230,
+"off": 22096,
+"type": 0,
+"name": "LFO Tempo Rate"
+},
+{
+"idx": 231,
+"off": 22112,
+"type": 1,
+"name": "LFO Rate"
+},
+{
+"idx": 232,
+"off": 22880,
+"type": 0,
+"name": "Gate"
+},
+{
+"idx": 233,
+"off": 22896,
+"type": 0,
+"name": "LFO Trig"
+},
+{
+"idx": 234,
+"off": 22912,
+"type": 0,
+"name": "Reset Sw"
+},
+{
+"idx": 235,
+"off": 22928,
+"type": 1,
+"name": "LFO UseExtGate"
+},
+{
+"idx": 236,
+"off": 22944,
+"type": 1,
+"name": "LFO Delay"
+},
+{
+"idx": 237,
+"off": 22960,
+"type": 1,
+"name": "LFO Delay Sw"
+},
+{
+"idx": 238,
+"off": 22976,
+"type": 1,
+"name": "LFO Sin Sw"
+},
+{
+"idx": 239,
+"off": 22992,
+"type": 1,
+"name": "LFO Tri Sw"
+},
+{
+"idx": 240,
+"off": 23008,
+"type": 1,
+"name": "LFO Sqr Sw"
+},
+{
+"idx": 241,
+"off": 23024,
+"type": 1,
+"name": "LFO Saw Sw"
+},
+{
+"idx": 242,
+"off": 23040,
+"type": 1,
+"name": "LFO Saw(Inv) Sw"
+},
+{
+"idx": 243,
+"off": 23056,
+"type": 1,
+"name": "LFO S&H Sw"
+},
+{
+"idx": 244,
+"off": 23072,
+"type": 1,
+"name": "LFO Noise Sw"
+},
+{
+"idx": 245,
+"off": 23088,
+"type": 1,
+"name": "LFO Noise Mix"
+},
+{
+"idx": 246,
+"off": 23104,
+"type": 1,
+"name": "LFO Internal Sw"
+},
+{
+"idx": 247,
+"off": 23120,
+"type": 1,
+"name": "LFO External0 Sw"
+},
+{
+"idx": 248,
+"off": 23136,
+"type": 1,
+"name": "LFO External1 Sw"
+},
+{
+"idx": 249,
+"off": 23552,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 250,
+"off": 23568,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 251,
+"off": 23584,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 252,
+"off": 23808,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 253,
+"off": 23824,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 254,
+"off": 23840,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 255,
+"off": 23856,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 256,
+"off": 23872,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 257,
+"off": 24064,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 258,
+"off": 24288,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 259,
+"off": 24304,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 260,
+"off": 24320,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 261,
+"off": 24336,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 262,
+"off": 24352,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 263,
+"off": 24864,
+"type": 0,
+"name": "OSC1 Feet"
+},
+{
+"idx": 264,
+"off": 24880,
+"type": 0,
+"name": "Griffer Bend SW"
+},
+{
+"idx": 265,
+"off": 24896,
+"type": 0,
+"name": "Bend Enable SW"
+},
+{
+"idx": 266,
+"off": 24912,
+"type": 0,
+"name": "PWM SW LFO"
+},
+{
+"idx": 267,
+"off": 24928,
+"type": 0,
+"name": "PWM SW ENV1"
+},
+{
+"idx": 268,
+"off": 24944,
+"type": 0,
+"name": "PWM SW ENV2"
+},
+{
+"idx": 269,
+"off": 24960,
+"type": 0,
+"name": "PWM SW Manual"
+},
+{
+"idx": 270,
+"off": 24976,
+"type": 1,
+"name": "Tune"
+},
+{
+"idx": 271,
+"off": 24992,
+"type": 1,
+"name": "Detune"
+},
+{
+"idx": 272,
+"off": 25008,
+"type": 1,
+"name": "Mod Sens"
+},
+{
+"idx": 273,
+"off": 25024,
+"type": 1,
+"name": "Mod Sw"
+},
+{
+"idx": 274,
+"off": 25040,
+"type": 1,
+"name": "LFO Gain"
+},
+{
+"idx": 275,
+"off": 25056,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 276,
+"off": 25072,
+"type": 1,
+"name": "LFO Sw"
+},
+{
+"idx": 277,
+"off": 25088,
+"type": 1,
+"name": "ENV1 Level"
+},
+{
+"idx": 278,
+"off": 25104,
+"type": 1,
+"name": "ENV2 Level"
+},
+{
+"idx": 279,
+"off": 25120,
+"type": 1,
+"name": "ENV Sw"
+},
+{
+"idx": 280,
+"off": 25136,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 281,
+"off": 25152,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 282,
+"off": 25168,
+"type": 1,
+"name": "PWM Level"
+},
+{
+"idx": 283,
+"off": 25216,
+"type": 1,
+"name": "JU OSC Saw Lev"
+},
+{
+"idx": 284,
+"off": 25232,
+"type": 1,
+"name": "JU OSC Sqr Lev"
+},
+{
+"idx": 285,
+"off": 25248,
+"type": 1,
+"name": "JU OSC Sub Lev"
+},
+{
+"idx": 286,
+"off": 26544,
+"type": 1,
+"name": "Duty Tune"
+},
+{
+"idx": 287,
+"off": 27472,
+"type": 1,
+"name": "Osc1 Mute"
+},
+{
+"idx": 288,
+"off": 27536,
+"type": 1,
+"name": "Osc1 Level"
+},
+{
+"idx": 289,
+"off": 27552,
+"type": 1,
+"name": "Osc Noise Level"
+},
+{
+"idx": 290,
+"off": 27744,
+"type": 0,
+"name": "Griffer SW"
+},
+{
+"idx": 291,
+"off": 27760,
+"type": 1,
+"name": "LPF Cutoff"
+},
+{
+"idx": 292,
+"off": 27856,
+"type": 1,
+"name": "LPF Resonance"
+},
+{
+"idx": 293,
+"off": 27888,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 294,
+"off": 28032,
+"type": 0,
+"name": "Env1/2"
+},
+{
+"idx": 295,
+"off": 28048,
+"type": 0,
+"name": "Int/Env"
+},
+{
+"idx": 296,
+"off": 28320,
+"type": 0,
+"name": "LFO Gain"
+},
+{
+"idx": 297,
+"off": 28336,
+"type": 0,
+"name": "Ext LFO Sw"
+},
+{
+"idx": 298,
+"off": 28352,
+"type": 0,
+"name": "GRF Bned SW"
+},
+{
+"idx": 299,
+"off": 28368,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 300,
+"off": 28384,
+"type": 1,
+"name": "MOD Sens"
+},
+{
+"idx": 301,
+"off": 28400,
+"type": 1,
+"name": "MOD SW"
+},
+{
+"idx": 302,
+"off": 28416,
+"type": 1,
+"name": "ENV Level"
+},
+{
+"idx": 303,
+"off": 28432,
+"type": 1,
+"name": "KCV Level"
+},
+{
+"idx": 304,
+"off": 28448,
+"type": 1,
+"name": "Velocity Sens"
+},
+{
+"idx": 305,
+"off": 28464,
+"type": 1,
+"name": "Velocity Offset"
+},
+{
+"idx": 306,
+"off": 28480,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 307,
+"off": 28496,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 308,
+"off": 28624,
+"type": 1,
+"name": "Cutoff Tune"
+},
+{
+"idx": 309,
+"off": 28640,
+"type": 1,
+"name": "Resonance Tune"
+},
+{
+"idx": 310,
+"off": 28656,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 311,
+"off": 30080,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 312,
+"off": 30096,
+"type": 1,
+"name": "-12dB/oct Tap"
+},
+{
+"idx": 313,
+"off": 30112,
+"type": 1,
+"name": "-18dB/oct Tap"
+},
+{
+"idx": 314,
+"off": 30128,
+"type": 1,
+"name": "-24dB/oct Tap"
+},
+{
+"idx": 315,
+"off": 30608,
+"type": 1,
+"name": "AMP TONE"
+},
+{
+"idx": 316,
+"off": 30624,
+"type": 1,
+"name": "AMP VELOCITY SENS"
+},
+{
+"idx": 317,
+"off": 30640,
+"type": 1,
+"name": "AMP FIX VELOCITY LEVEL"
+},
+{
+"idx": 318,
+"off": 30704,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 319,
+"off": 30848,
+"type": 0,
+"name": "Mute"
+},
+{
+"idx": 320,
+"off": 31200,
+"type": 0,
+"name": "Gate SW"
+},
+{
+"idx": 321,
+"off": 31216,
+"type": 0,
+"name": "ENV1 SW"
+},
+{
+"idx": 322,
+"off": 31232,
+"type": 0,
+"name": "ENV2 SW"
+},
+{
+"idx": 323,
+"off": 31248,
+"type": 0,
+"name": "Ext ENV SW"
+},
+{
+"idx": 324,
+"off": 31264,
+"type": 1,
+"name": "HPF Cutoff"
+},
+{
+"idx": 325,
+"off": 31280,
+"type": 1,
+"name": "HPF Switch"
+},
+{
+"idx": 326,
+"off": 31296,
+"type": 1,
+"name": "Boost LPF Level"
+},
+{
+"idx": 327,
+"off": 31312,
+"type": 1,
+"name": "Boost Thru Level"
+},
+{
+"idx": 328,
+"off": 31328,
+"type": 1,
+"name": "ENV LEVEL"
+},
+{
+"idx": 329,
+"off": 31344,
+"type": 1,
+"name": "AMP LEVEL"
+},
+{
+"idx": 330,
+"off": 31808,
+"type": 0,
+"name": "UseExtJack"
+},
+{
+"idx": 331,
+"off": 31840,
+"type": 0,
+"name": "M.CV"
+},
+{
+"idx": 332,
+"off": 31856,
+"type": 0,
+"name": "M.Gate"
+},
+{
+"idx": 333,
+"off": 31904,
+"type": 1,
+"name": "Master Tune"
+},
+{
+"idx": 334,
+"off": 31920,
+"type": 1,
+"name": "Part Tune"
+},
+{
+"idx": 335,
+"off": 32128,
+"type": 0,
+"name": "Portamento OnOff"
+},
+{
+"idx": 336,
+"off": 32144,
+"type": 0,
+"name": "Portamento Mode"
+},
+{
+"idx": 337,
+"off": 32160,
+"type": 1,
+"name": "Portamento Time"
+},
+{
+"idx": 338,
+"off": 32576,
+"type": 0,
+"name": "LFO Griffer Rate Sw"
+},
+{
+"idx": 339,
+"off": 32592,
+"type": 0,
+"name": "LFO Tempo Rate Sw"
+},
+{
+"idx": 340,
+"off": 32608,
+"type": 0,
+"name": "LFO Tempo Rate"
+},
+{
+"idx": 341,
+"off": 32624,
+"type": 1,
+"name": "LFO Rate"
+},
+{
+"idx": 342,
+"off": 33392,
+"type": 0,
+"name": "Gate"
+},
+{
+"idx": 343,
+"off": 33408,
+"type": 0,
+"name": "LFO Trig"
+},
+{
+"idx": 344,
+"off": 33424,
+"type": 0,
+"name": "Reset Sw"
+},
+{
+"idx": 345,
+"off": 33440,
+"type": 1,
+"name": "LFO UseExtGate"
+},
+{
+"idx": 346,
+"off": 33456,
+"type": 1,
+"name": "LFO Delay"
+},
+{
+"idx": 347,
+"off": 33472,
+"type": 1,
+"name": "LFO Delay Sw"
+},
+{
+"idx": 348,
+"off": 33488,
+"type": 1,
+"name": "LFO Sin Sw"
+},
+{
+"idx": 349,
+"off": 33504,
+"type": 1,
+"name": "LFO Tri Sw"
+},
+{
+"idx": 350,
+"off": 33520,
+"type": 1,
+"name": "LFO Sqr Sw"
+},
+{
+"idx": 351,
+"off": 33536,
+"type": 1,
+"name": "LFO Saw Sw"
+},
+{
+"idx": 352,
+"off": 33552,
+"type": 1,
+"name": "LFO Saw(Inv) Sw"
+},
+{
+"idx": 353,
+"off": 33568,
+"type": 1,
+"name": "LFO S&H Sw"
+},
+{
+"idx": 354,
+"off": 33584,
+"type": 1,
+"name": "LFO Noise Sw"
+},
+{
+"idx": 355,
+"off": 33600,
+"type": 1,
+"name": "LFO Noise Mix"
+},
+{
+"idx": 356,
+"off": 33616,
+"type": 1,
+"name": "LFO Internal Sw"
+},
+{
+"idx": 357,
+"off": 33632,
+"type": 1,
+"name": "LFO External0 Sw"
+},
+{
+"idx": 358,
+"off": 33648,
+"type": 1,
+"name": "LFO External1 Sw"
+},
+{
+"idx": 359,
+"off": 34064,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 360,
+"off": 34080,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 361,
+"off": 34096,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 362,
+"off": 34320,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 363,
+"off": 34336,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 364,
+"off": 34352,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 365,
+"off": 34368,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 366,
+"off": 34384,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 367,
+"off": 34576,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 368,
+"off": 34800,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 369,
+"off": 34816,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 370,
+"off": 34832,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 371,
+"off": 34848,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 372,
+"off": 34864,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 373,
+"off": 35376,
+"type": 0,
+"name": "OSC1 Feet"
+},
+{
+"idx": 374,
+"off": 35392,
+"type": 0,
+"name": "Griffer Bend SW"
+},
+{
+"idx": 375,
+"off": 35408,
+"type": 0,
+"name": "Bend Enable SW"
+},
+{
+"idx": 376,
+"off": 35424,
+"type": 0,
+"name": "PWM SW LFO"
+},
+{
+"idx": 377,
+"off": 35440,
+"type": 0,
+"name": "PWM SW ENV1"
+},
+{
+"idx": 378,
+"off": 35456,
+"type": 0,
+"name": "PWM SW ENV2"
+},
+{
+"idx": 379,
+"off": 35472,
+"type": 0,
+"name": "PWM SW Manual"
+},
+{
+"idx": 380,
+"off": 35488,
+"type": 1,
+"name": "Tune"
+},
+{
+"idx": 381,
+"off": 35504,
+"type": 1,
+"name": "Detune"
+},
+{
+"idx": 382,
+"off": 35520,
+"type": 1,
+"name": "Mod Sens"
+},
+{
+"idx": 383,
+"off": 35536,
+"type": 1,
+"name": "Mod Sw"
+},
+{
+"idx": 384,
+"off": 35552,
+"type": 1,
+"name": "LFO Gain"
+},
+{
+"idx": 385,
+"off": 35568,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 386,
+"off": 35584,
+"type": 1,
+"name": "LFO Sw"
+},
+{
+"idx": 387,
+"off": 35600,
+"type": 1,
+"name": "ENV1 Level"
+},
+{
+"idx": 388,
+"off": 35616,
+"type": 1,
+"name": "ENV2 Level"
+},
+{
+"idx": 389,
+"off": 35632,
+"type": 1,
+"name": "ENV Sw"
+},
+{
+"idx": 390,
+"off": 35648,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 391,
+"off": 35664,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 392,
+"off": 35680,
+"type": 1,
+"name": "PWM Level"
+},
+{
+"idx": 393,
+"off": 35728,
+"type": 1,
+"name": "JU OSC Saw Lev"
+},
+{
+"idx": 394,
+"off": 35744,
+"type": 1,
+"name": "JU OSC Sqr Lev"
+},
+{
+"idx": 395,
+"off": 35760,
+"type": 1,
+"name": "JU OSC Sub Lev"
+},
+{
+"idx": 396,
+"off": 37056,
+"type": 1,
+"name": "Duty Tune"
+},
+{
+"idx": 397,
+"off": 37984,
+"type": 1,
+"name": "Osc1 Mute"
+},
+{
+"idx": 398,
+"off": 38048,
+"type": 1,
+"name": "Osc1 Level"
+},
+{
+"idx": 399,
+"off": 38064,
+"type": 1,
+"name": "Osc Noise Level"
+},
+{
+"idx": 400,
+"off": 38256,
+"type": 0,
+"name": "Griffer SW"
+},
+{
+"idx": 401,
+"off": 38272,
+"type": 1,
+"name": "LPF Cutoff"
+},
+{
+"idx": 402,
+"off": 38368,
+"type": 1,
+"name": "LPF Resonance"
+},
+{
+"idx": 403,
+"off": 38400,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 404,
+"off": 38544,
+"type": 0,
+"name": "Env1/2"
+},
+{
+"idx": 405,
+"off": 38560,
+"type": 0,
+"name": "Int/Env"
+},
+{
+"idx": 406,
+"off": 38832,
+"type": 0,
+"name": "LFO Gain"
+},
+{
+"idx": 407,
+"off": 38848,
+"type": 0,
+"name": "Ext LFO Sw"
+},
+{
+"idx": 408,
+"off": 38864,
+"type": 0,
+"name": "GRF Bned SW"
+},
+{
+"idx": 409,
+"off": 38880,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 410,
+"off": 38896,
+"type": 1,
+"name": "MOD Sens"
+},
+{
+"idx": 411,
+"off": 38912,
+"type": 1,
+"name": "MOD SW"
+},
+{
+"idx": 412,
+"off": 38928,
+"type": 1,
+"name": "ENV Level"
+},
+{
+"idx": 413,
+"off": 38944,
+"type": 1,
+"name": "KCV Level"
+},
+{
+"idx": 414,
+"off": 38960,
+"type": 1,
+"name": "Velocity Sens"
+},
+{
+"idx": 415,
+"off": 38976,
+"type": 1,
+"name": "Velocity Offset"
+},
+{
+"idx": 416,
+"off": 38992,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 417,
+"off": 39008,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 418,
+"off": 39136,
+"type": 1,
+"name": "Cutoff Tune"
+},
+{
+"idx": 419,
+"off": 39152,
+"type": 1,
+"name": "Resonance Tune"
+},
+{
+"idx": 420,
+"off": 39168,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 421,
+"off": 40592,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 422,
+"off": 40608,
+"type": 1,
+"name": "-12dB/oct Tap"
+},
+{
+"idx": 423,
+"off": 40624,
+"type": 1,
+"name": "-18dB/oct Tap"
+},
+{
+"idx": 424,
+"off": 40640,
+"type": 1,
+"name": "-24dB/oct Tap"
+},
+{
+"idx": 425,
+"off": 41120,
+"type": 1,
+"name": "AMP TONE"
+},
+{
+"idx": 426,
+"off": 41136,
+"type": 1,
+"name": "AMP VELOCITY SENS"
+},
+{
+"idx": 427,
+"off": 41152,
+"type": 1,
+"name": "AMP FIX VELOCITY LEVEL"
+},
+{
+"idx": 428,
+"off": 41216,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 429,
+"off": 41360,
+"type": 0,
+"name": "Mute"
+},
+{
+"idx": 430,
+"off": 41712,
+"type": 0,
+"name": "Gate SW"
+},
+{
+"idx": 431,
+"off": 41728,
+"type": 0,
+"name": "ENV1 SW"
+},
+{
+"idx": 432,
+"off": 41744,
+"type": 0,
+"name": "ENV2 SW"
+},
+{
+"idx": 433,
+"off": 41760,
+"type": 0,
+"name": "Ext ENV SW"
+},
+{
+"idx": 434,
+"off": 41776,
+"type": 1,
+"name": "HPF Cutoff"
+},
+{
+"idx": 435,
+"off": 41792,
+"type": 1,
+"name": "HPF Switch"
+},
+{
+"idx": 436,
+"off": 41808,
+"type": 1,
+"name": "Boost LPF Level"
+},
+{
+"idx": 437,
+"off": 41824,
+"type": 1,
+"name": "Boost Thru Level"
+},
+{
+"idx": 438,
+"off": 41840,
+"type": 1,
+"name": "ENV LEVEL"
+},
+{
+"idx": 439,
+"off": 41856,
+"type": 1,
+"name": "AMP LEVEL"
+},
+{
+"idx": 440,
+"off": 42320,
+"type": 0,
+"name": "UseExtJack"
+},
+{
+"idx": 441,
+"off": 42352,
+"type": 0,
+"name": "M.CV"
+},
+{
+"idx": 442,
+"off": 42368,
+"type": 0,
+"name": "M.Gate"
+},
+{
+"idx": 443,
+"off": 42416,
+"type": 1,
+"name": "Master Tune"
+},
+{
+"idx": 444,
+"off": 42432,
+"type": 1,
+"name": "Part Tune"
+},
+{
+"idx": 445,
+"off": 42640,
+"type": 0,
+"name": "Portamento OnOff"
+},
+{
+"idx": 446,
+"off": 42656,
+"type": 0,
+"name": "Portamento Mode"
+},
+{
+"idx": 447,
+"off": 42672,
+"type": 1,
+"name": "Portamento Time"
+},
+{
+"idx": 448,
+"off": 43088,
+"type": 0,
+"name": "LFO Griffer Rate Sw"
+},
+{
+"idx": 449,
+"off": 43104,
+"type": 0,
+"name": "LFO Tempo Rate Sw"
+},
+{
+"idx": 450,
+"off": 43120,
+"type": 0,
+"name": "LFO Tempo Rate"
+},
+{
+"idx": 451,
+"off": 43136,
+"type": 1,
+"name": "LFO Rate"
+},
+{
+"idx": 452,
+"off": 43904,
+"type": 0,
+"name": "Gate"
+},
+{
+"idx": 453,
+"off": 43920,
+"type": 0,
+"name": "LFO Trig"
+},
+{
+"idx": 454,
+"off": 43936,
+"type": 0,
+"name": "Reset Sw"
+},
+{
+"idx": 455,
+"off": 43952,
+"type": 1,
+"name": "LFO UseExtGate"
+},
+{
+"idx": 456,
+"off": 43968,
+"type": 1,
+"name": "LFO Delay"
+},
+{
+"idx": 457,
+"off": 43984,
+"type": 1,
+"name": "LFO Delay Sw"
+},
+{
+"idx": 458,
+"off": 44000,
+"type": 1,
+"name": "LFO Sin Sw"
+},
+{
+"idx": 459,
+"off": 44016,
+"type": 1,
+"name": "LFO Tri Sw"
+},
+{
+"idx": 460,
+"off": 44032,
+"type": 1,
+"name": "LFO Sqr Sw"
+},
+{
+"idx": 461,
+"off": 44048,
+"type": 1,
+"name": "LFO Saw Sw"
+},
+{
+"idx": 462,
+"off": 44064,
+"type": 1,
+"name": "LFO Saw(Inv) Sw"
+},
+{
+"idx": 463,
+"off": 44080,
+"type": 1,
+"name": "LFO S&H Sw"
+},
+{
+"idx": 464,
+"off": 44096,
+"type": 1,
+"name": "LFO Noise Sw"
+},
+{
+"idx": 465,
+"off": 44112,
+"type": 1,
+"name": "LFO Noise Mix"
+},
+{
+"idx": 466,
+"off": 44128,
+"type": 1,
+"name": "LFO Internal Sw"
+},
+{
+"idx": 467,
+"off": 44144,
+"type": 1,
+"name": "LFO External0 Sw"
+},
+{
+"idx": 468,
+"off": 44160,
+"type": 1,
+"name": "LFO External1 Sw"
+},
+{
+"idx": 469,
+"off": 44576,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 470,
+"off": 44592,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 471,
+"off": 44608,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 472,
+"off": 44832,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 473,
+"off": 44848,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 474,
+"off": 44864,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 475,
+"off": 44880,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 476,
+"off": 44896,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 477,
+"off": 45088,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 478,
+"off": 45312,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 479,
+"off": 45328,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 480,
+"off": 45344,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 481,
+"off": 45360,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 482,
+"off": 45376,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 483,
+"off": 45888,
+"type": 0,
+"name": "OSC1 Feet"
+},
+{
+"idx": 484,
+"off": 45904,
+"type": 0,
+"name": "Griffer Bend SW"
+},
+{
+"idx": 485,
+"off": 45920,
+"type": 0,
+"name": "Bend Enable SW"
+},
+{
+"idx": 486,
+"off": 45936,
+"type": 0,
+"name": "PWM SW LFO"
+},
+{
+"idx": 487,
+"off": 45952,
+"type": 0,
+"name": "PWM SW ENV1"
+},
+{
+"idx": 488,
+"off": 45968,
+"type": 0,
+"name": "PWM SW ENV2"
+},
+{
+"idx": 489,
+"off": 45984,
+"type": 0,
+"name": "PWM SW Manual"
+},
+{
+"idx": 490,
+"off": 46000,
+"type": 1,
+"name": "Tune"
+},
+{
+"idx": 491,
+"off": 46016,
+"type": 1,
+"name": "Detune"
+},
+{
+"idx": 492,
+"off": 46032,
+"type": 1,
+"name": "Mod Sens"
+},
+{
+"idx": 493,
+"off": 46048,
+"type": 1,
+"name": "Mod Sw"
+},
+{
+"idx": 494,
+"off": 46064,
+"type": 1,
+"name": "LFO Gain"
+},
+{
+"idx": 495,
+"off": 46080,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 496,
+"off": 46096,
+"type": 1,
+"name": "LFO Sw"
+},
+{
+"idx": 497,
+"off": 46112,
+"type": 1,
+"name": "ENV1 Level"
+},
+{
+"idx": 498,
+"off": 46128,
+"type": 1,
+"name": "ENV2 Level"
+},
+{
+"idx": 499,
+"off": 46144,
+"type": 1,
+"name": "ENV Sw"
+},
+{
+"idx": 500,
+"off": 46160,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 501,
+"off": 46176,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 502,
+"off": 46192,
+"type": 1,
+"name": "PWM Level"
+},
+{
+"idx": 503,
+"off": 46240,
+"type": 1,
+"name": "JU OSC Saw Lev"
+},
+{
+"idx": 504,
+"off": 46256,
+"type": 1,
+"name": "JU OSC Sqr Lev"
+},
+{
+"idx": 505,
+"off": 46272,
+"type": 1,
+"name": "JU OSC Sub Lev"
+},
+{
+"idx": 506,
+"off": 47568,
+"type": 1,
+"name": "Duty Tune"
+},
+{
+"idx": 507,
+"off": 48496,
+"type": 1,
+"name": "Osc1 Mute"
+},
+{
+"idx": 508,
+"off": 48560,
+"type": 1,
+"name": "Osc1 Level"
+},
+{
+"idx": 509,
+"off": 48576,
+"type": 1,
+"name": "Osc Noise Level"
+},
+{
+"idx": 510,
+"off": 48768,
+"type": 0,
+"name": "Griffer SW"
+},
+{
+"idx": 511,
+"off": 48784,
+"type": 1,
+"name": "LPF Cutoff"
+},
+{
+"idx": 512,
+"off": 48880,
+"type": 1,
+"name": "LPF Resonance"
+},
+{
+"idx": 513,
+"off": 48912,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 514,
+"off": 49056,
+"type": 0,
+"name": "Env1/2"
+},
+{
+"idx": 515,
+"off": 49072,
+"type": 0,
+"name": "Int/Env"
+},
+{
+"idx": 516,
+"off": 49344,
+"type": 0,
+"name": "LFO Gain"
+},
+{
+"idx": 517,
+"off": 49360,
+"type": 0,
+"name": "Ext LFO Sw"
+},
+{
+"idx": 518,
+"off": 49376,
+"type": 0,
+"name": "GRF Bned SW"
+},
+{
+"idx": 519,
+"off": 49392,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 520,
+"off": 49408,
+"type": 1,
+"name": "MOD Sens"
+},
+{
+"idx": 521,
+"off": 49424,
+"type": 1,
+"name": "MOD SW"
+},
+{
+"idx": 522,
+"off": 49440,
+"type": 1,
+"name": "ENV Level"
+},
+{
+"idx": 523,
+"off": 49456,
+"type": 1,
+"name": "KCV Level"
+},
+{
+"idx": 524,
+"off": 49472,
+"type": 1,
+"name": "Velocity Sens"
+},
+{
+"idx": 525,
+"off": 49488,
+"type": 1,
+"name": "Velocity Offset"
+},
+{
+"idx": 526,
+"off": 49504,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 527,
+"off": 49520,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 528,
+"off": 49648,
+"type": 1,
+"name": "Cutoff Tune"
+},
+{
+"idx": 529,
+"off": 49664,
+"type": 1,
+"name": "Resonance Tune"
+},
+{
+"idx": 530,
+"off": 49680,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 531,
+"off": 51104,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 532,
+"off": 51120,
+"type": 1,
+"name": "-12dB/oct Tap"
+},
+{
+"idx": 533,
+"off": 51136,
+"type": 1,
+"name": "-18dB/oct Tap"
+},
+{
+"idx": 534,
+"off": 51152,
+"type": 1,
+"name": "-24dB/oct Tap"
+},
+{
+"idx": 535,
+"off": 51632,
+"type": 1,
+"name": "AMP TONE"
+},
+{
+"idx": 536,
+"off": 51648,
+"type": 1,
+"name": "AMP VELOCITY SENS"
+},
+{
+"idx": 537,
+"off": 51664,
+"type": 1,
+"name": "AMP FIX VELOCITY LEVEL"
+},
+{
+"idx": 538,
+"off": 51728,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 539,
+"off": 51872,
+"type": 0,
+"name": "Mute"
+},
+{
+"idx": 540,
+"off": 52224,
+"type": 0,
+"name": "Gate SW"
+},
+{
+"idx": 541,
+"off": 52240,
+"type": 0,
+"name": "ENV1 SW"
+},
+{
+"idx": 542,
+"off": 52256,
+"type": 0,
+"name": "ENV2 SW"
+},
+{
+"idx": 543,
+"off": 52272,
+"type": 0,
+"name": "Ext ENV SW"
+},
+{
+"idx": 544,
+"off": 52288,
+"type": 1,
+"name": "HPF Cutoff"
+},
+{
+"idx": 545,
+"off": 52304,
+"type": 1,
+"name": "HPF Switch"
+},
+{
+"idx": 546,
+"off": 52320,
+"type": 1,
+"name": "Boost LPF Level"
+},
+{
+"idx": 547,
+"off": 52336,
+"type": 1,
+"name": "Boost Thru Level"
+},
+{
+"idx": 548,
+"off": 52352,
+"type": 1,
+"name": "ENV LEVEL"
+},
+{
+"idx": 549,
+"off": 52368,
+"type": 1,
+"name": "AMP LEVEL"
+},
+{
+"idx": 550,
+"off": 52832,
+"type": 0,
+"name": "UseExtJack"
+},
+{
+"idx": 551,
+"off": 52864,
+"type": 0,
+"name": "M.CV"
+},
+{
+"idx": 552,
+"off": 52880,
+"type": 0,
+"name": "M.Gate"
+},
+{
+"idx": 553,
+"off": 52928,
+"type": 1,
+"name": "Master Tune"
+},
+{
+"idx": 554,
+"off": 52944,
+"type": 1,
+"name": "Part Tune"
+},
+{
+"idx": 555,
+"off": 53152,
+"type": 0,
+"name": "Portamento OnOff"
+},
+{
+"idx": 556,
+"off": 53168,
+"type": 0,
+"name": "Portamento Mode"
+},
+{
+"idx": 557,
+"off": 53184,
+"type": 1,
+"name": "Portamento Time"
+},
+{
+"idx": 558,
+"off": 53600,
+"type": 0,
+"name": "LFO Griffer Rate Sw"
+},
+{
+"idx": 559,
+"off": 53616,
+"type": 0,
+"name": "LFO Tempo Rate Sw"
+},
+{
+"idx": 560,
+"off": 53632,
+"type": 0,
+"name": "LFO Tempo Rate"
+},
+{
+"idx": 561,
+"off": 53648,
+"type": 1,
+"name": "LFO Rate"
+},
+{
+"idx": 562,
+"off": 54416,
+"type": 0,
+"name": "Gate"
+},
+{
+"idx": 563,
+"off": 54432,
+"type": 0,
+"name": "LFO Trig"
+},
+{
+"idx": 564,
+"off": 54448,
+"type": 0,
+"name": "Reset Sw"
+},
+{
+"idx": 565,
+"off": 54464,
+"type": 1,
+"name": "LFO UseExtGate"
+},
+{
+"idx": 566,
+"off": 54480,
+"type": 1,
+"name": "LFO Delay"
+},
+{
+"idx": 567,
+"off": 54496,
+"type": 1,
+"name": "LFO Delay Sw"
+},
+{
+"idx": 568,
+"off": 54512,
+"type": 1,
+"name": "LFO Sin Sw"
+},
+{
+"idx": 569,
+"off": 54528,
+"type": 1,
+"name": "LFO Tri Sw"
+},
+{
+"idx": 570,
+"off": 54544,
+"type": 1,
+"name": "LFO Sqr Sw"
+},
+{
+"idx": 571,
+"off": 54560,
+"type": 1,
+"name": "LFO Saw Sw"
+},
+{
+"idx": 572,
+"off": 54576,
+"type": 1,
+"name": "LFO Saw(Inv) Sw"
+},
+{
+"idx": 573,
+"off": 54592,
+"type": 1,
+"name": "LFO S&H Sw"
+},
+{
+"idx": 574,
+"off": 54608,
+"type": 1,
+"name": "LFO Noise Sw"
+},
+{
+"idx": 575,
+"off": 54624,
+"type": 1,
+"name": "LFO Noise Mix"
+},
+{
+"idx": 576,
+"off": 54640,
+"type": 1,
+"name": "LFO Internal Sw"
+},
+{
+"idx": 577,
+"off": 54656,
+"type": 1,
+"name": "LFO External0 Sw"
+},
+{
+"idx": 578,
+"off": 54672,
+"type": 1,
+"name": "LFO External1 Sw"
+},
+{
+"idx": 579,
+"off": 55088,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 580,
+"off": 55104,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 581,
+"off": 55120,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 582,
+"off": 55344,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 583,
+"off": 55360,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 584,
+"off": 55376,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 585,
+"off": 55392,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 586,
+"off": 55408,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 587,
+"off": 55600,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 588,
+"off": 55824,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 589,
+"off": 55840,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 590,
+"off": 55856,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 591,
+"off": 55872,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 592,
+"off": 55888,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 593,
+"off": 56400,
+"type": 0,
+"name": "OSC1 Feet"
+},
+{
+"idx": 594,
+"off": 56416,
+"type": 0,
+"name": "Griffer Bend SW"
+},
+{
+"idx": 595,
+"off": 56432,
+"type": 0,
+"name": "Bend Enable SW"
+},
+{
+"idx": 596,
+"off": 56448,
+"type": 0,
+"name": "PWM SW LFO"
+},
+{
+"idx": 597,
+"off": 56464,
+"type": 0,
+"name": "PWM SW ENV1"
+},
+{
+"idx": 598,
+"off": 56480,
+"type": 0,
+"name": "PWM SW ENV2"
+},
+{
+"idx": 599,
+"off": 56496,
+"type": 0,
+"name": "PWM SW Manual"
+},
+{
+"idx": 600,
+"off": 56512,
+"type": 1,
+"name": "Tune"
+},
+{
+"idx": 601,
+"off": 56528,
+"type": 1,
+"name": "Detune"
+},
+{
+"idx": 602,
+"off": 56544,
+"type": 1,
+"name": "Mod Sens"
+},
+{
+"idx": 603,
+"off": 56560,
+"type": 1,
+"name": "Mod Sw"
+},
+{
+"idx": 604,
+"off": 56576,
+"type": 1,
+"name": "LFO Gain"
+},
+{
+"idx": 605,
+"off": 56592,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 606,
+"off": 56608,
+"type": 1,
+"name": "LFO Sw"
+},
+{
+"idx": 607,
+"off": 56624,
+"type": 1,
+"name": "ENV1 Level"
+},
+{
+"idx": 608,
+"off": 56640,
+"type": 1,
+"name": "ENV2 Level"
+},
+{
+"idx": 609,
+"off": 56656,
+"type": 1,
+"name": "ENV Sw"
+},
+{
+"idx": 610,
+"off": 56672,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 611,
+"off": 56688,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 612,
+"off": 56704,
+"type": 1,
+"name": "PWM Level"
+},
+{
+"idx": 613,
+"off": 56752,
+"type": 1,
+"name": "JU OSC Saw Lev"
+},
+{
+"idx": 614,
+"off": 56768,
+"type": 1,
+"name": "JU OSC Sqr Lev"
+},
+{
+"idx": 615,
+"off": 56784,
+"type": 1,
+"name": "JU OSC Sub Lev"
+},
+{
+"idx": 616,
+"off": 58080,
+"type": 1,
+"name": "Duty Tune"
+},
+{
+"idx": 617,
+"off": 59008,
+"type": 1,
+"name": "Osc1 Mute"
+},
+{
+"idx": 618,
+"off": 59072,
+"type": 1,
+"name": "Osc1 Level"
+},
+{
+"idx": 619,
+"off": 59088,
+"type": 1,
+"name": "Osc Noise Level"
+},
+{
+"idx": 620,
+"off": 59280,
+"type": 0,
+"name": "Griffer SW"
+},
+{
+"idx": 621,
+"off": 59296,
+"type": 1,
+"name": "LPF Cutoff"
+},
+{
+"idx": 622,
+"off": 59392,
+"type": 1,
+"name": "LPF Resonance"
+},
+{
+"idx": 623,
+"off": 59424,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 624,
+"off": 59568,
+"type": 0,
+"name": "Env1/2"
+},
+{
+"idx": 625,
+"off": 59584,
+"type": 0,
+"name": "Int/Env"
+},
+{
+"idx": 626,
+"off": 59856,
+"type": 0,
+"name": "LFO Gain"
+},
+{
+"idx": 627,
+"off": 59872,
+"type": 0,
+"name": "Ext LFO Sw"
+},
+{
+"idx": 628,
+"off": 59888,
+"type": 0,
+"name": "GRF Bned SW"
+},
+{
+"idx": 629,
+"off": 59904,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 630,
+"off": 59920,
+"type": 1,
+"name": "MOD Sens"
+},
+{
+"idx": 631,
+"off": 59936,
+"type": 1,
+"name": "MOD SW"
+},
+{
+"idx": 632,
+"off": 59952,
+"type": 1,
+"name": "ENV Level"
+},
+{
+"idx": 633,
+"off": 59968,
+"type": 1,
+"name": "KCV Level"
+},
+{
+"idx": 634,
+"off": 59984,
+"type": 1,
+"name": "Velocity Sens"
+},
+{
+"idx": 635,
+"off": 60000,
+"type": 1,
+"name": "Velocity Offset"
+},
+{
+"idx": 636,
+"off": 60016,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 637,
+"off": 60032,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 638,
+"off": 60160,
+"type": 1,
+"name": "Cutoff Tune"
+},
+{
+"idx": 639,
+"off": 60176,
+"type": 1,
+"name": "Resonance Tune"
+},
+{
+"idx": 640,
+"off": 60192,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 641,
+"off": 61616,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 642,
+"off": 61632,
+"type": 1,
+"name": "-12dB/oct Tap"
+},
+{
+"idx": 643,
+"off": 61648,
+"type": 1,
+"name": "-18dB/oct Tap"
+},
+{
+"idx": 644,
+"off": 61664,
+"type": 1,
+"name": "-24dB/oct Tap"
+},
+{
+"idx": 645,
+"off": 62144,
+"type": 1,
+"name": "AMP TONE"
+},
+{
+"idx": 646,
+"off": 62160,
+"type": 1,
+"name": "AMP VELOCITY SENS"
+},
+{
+"idx": 647,
+"off": 62176,
+"type": 1,
+"name": "AMP FIX VELOCITY LEVEL"
+},
+{
+"idx": 648,
+"off": 62240,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 649,
+"off": 62384,
+"type": 0,
+"name": "Mute"
+},
+{
+"idx": 650,
+"off": 62736,
+"type": 0,
+"name": "Gate SW"
+},
+{
+"idx": 651,
+"off": 62752,
+"type": 0,
+"name": "ENV1 SW"
+},
+{
+"idx": 652,
+"off": 62768,
+"type": 0,
+"name": "ENV2 SW"
+},
+{
+"idx": 653,
+"off": 62784,
+"type": 0,
+"name": "Ext ENV SW"
+},
+{
+"idx": 654,
+"off": 62800,
+"type": 1,
+"name": "HPF Cutoff"
+},
+{
+"idx": 655,
+"off": 62816,
+"type": 1,
+"name": "HPF Switch"
+},
+{
+"idx": 656,
+"off": 62832,
+"type": 1,
+"name": "Boost LPF Level"
+},
+{
+"idx": 657,
+"off": 62848,
+"type": 1,
+"name": "Boost Thru Level"
+},
+{
+"idx": 658,
+"off": 62864,
+"type": 1,
+"name": "ENV LEVEL"
+},
+{
+"idx": 659,
+"off": 62880,
+"type": 1,
+"name": "AMP LEVEL"
+},
+{
+"idx": 660,
+"off": 63344,
+"type": 0,
+"name": "UseExtJack"
+},
+{
+"idx": 661,
+"off": 63376,
+"type": 0,
+"name": "M.CV"
+},
+{
+"idx": 662,
+"off": 63392,
+"type": 0,
+"name": "M.Gate"
+},
+{
+"idx": 663,
+"off": 63440,
+"type": 1,
+"name": "Master Tune"
+},
+{
+"idx": 664,
+"off": 63456,
+"type": 1,
+"name": "Part Tune"
+},
+{
+"idx": 665,
+"off": 63664,
+"type": 0,
+"name": "Portamento OnOff"
+},
+{
+"idx": 666,
+"off": 63680,
+"type": 0,
+"name": "Portamento Mode"
+},
+{
+"idx": 667,
+"off": 63696,
+"type": 1,
+"name": "Portamento Time"
+},
+{
+"idx": 668,
+"off": 64112,
+"type": 0,
+"name": "LFO Griffer Rate Sw"
+},
+{
+"idx": 669,
+"off": 64128,
+"type": 0,
+"name": "LFO Tempo Rate Sw"
+},
+{
+"idx": 670,
+"off": 64144,
+"type": 0,
+"name": "LFO Tempo Rate"
+},
+{
+"idx": 671,
+"off": 64160,
+"type": 1,
+"name": "LFO Rate"
+},
+{
+"idx": 672,
+"off": 64928,
+"type": 0,
+"name": "Gate"
+},
+{
+"idx": 673,
+"off": 64944,
+"type": 0,
+"name": "LFO Trig"
+},
+{
+"idx": 674,
+"off": 64960,
+"type": 0,
+"name": "Reset Sw"
+},
+{
+"idx": 675,
+"off": 64976,
+"type": 1,
+"name": "LFO UseExtGate"
+},
+{
+"idx": 676,
+"off": 64992,
+"type": 1,
+"name": "LFO Delay"
+},
+{
+"idx": 677,
+"off": 65008,
+"type": 1,
+"name": "LFO Delay Sw"
+},
+{
+"idx": 678,
+"off": 65024,
+"type": 1,
+"name": "LFO Sin Sw"
+},
+{
+"idx": 679,
+"off": 65040,
+"type": 1,
+"name": "LFO Tri Sw"
+},
+{
+"idx": 680,
+"off": 65056,
+"type": 1,
+"name": "LFO Sqr Sw"
+},
+{
+"idx": 681,
+"off": 65072,
+"type": 1,
+"name": "LFO Saw Sw"
+},
+{
+"idx": 682,
+"off": 65088,
+"type": 1,
+"name": "LFO Saw(Inv) Sw"
+},
+{
+"idx": 683,
+"off": 65104,
+"type": 1,
+"name": "LFO S&H Sw"
+},
+{
+"idx": 684,
+"off": 65120,
+"type": 1,
+"name": "LFO Noise Sw"
+},
+{
+"idx": 685,
+"off": 65136,
+"type": 1,
+"name": "LFO Noise Mix"
+},
+{
+"idx": 686,
+"off": 65152,
+"type": 1,
+"name": "LFO Internal Sw"
+},
+{
+"idx": 687,
+"off": 65168,
+"type": 1,
+"name": "LFO External0 Sw"
+},
+{
+"idx": 688,
+"off": 65184,
+"type": 1,
+"name": "LFO External1 Sw"
+},
+{
+"idx": 689,
+"off": 65600,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 690,
+"off": 65616,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 691,
+"off": 65632,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 692,
+"off": 65856,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 693,
+"off": 65872,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 694,
+"off": 65888,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 695,
+"off": 65904,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 696,
+"off": 65920,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 697,
+"off": 66112,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 698,
+"off": 66336,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 699,
+"off": 66352,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 700,
+"off": 66368,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 701,
+"off": 66384,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 702,
+"off": 66400,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 703,
+"off": 66912,
+"type": 0,
+"name": "OSC1 Feet"
+},
+{
+"idx": 704,
+"off": 66928,
+"type": 0,
+"name": "Griffer Bend SW"
+},
+{
+"idx": 705,
+"off": 66944,
+"type": 0,
+"name": "Bend Enable SW"
+},
+{
+"idx": 706,
+"off": 66960,
+"type": 0,
+"name": "PWM SW LFO"
+},
+{
+"idx": 707,
+"off": 66976,
+"type": 0,
+"name": "PWM SW ENV1"
+},
+{
+"idx": 708,
+"off": 66992,
+"type": 0,
+"name": "PWM SW ENV2"
+},
+{
+"idx": 709,
+"off": 67008,
+"type": 0,
+"name": "PWM SW Manual"
+},
+{
+"idx": 710,
+"off": 67024,
+"type": 1,
+"name": "Tune"
+},
+{
+"idx": 711,
+"off": 67040,
+"type": 1,
+"name": "Detune"
+},
+{
+"idx": 712,
+"off": 67056,
+"type": 1,
+"name": "Mod Sens"
+},
+{
+"idx": 713,
+"off": 67072,
+"type": 1,
+"name": "Mod Sw"
+},
+{
+"idx": 714,
+"off": 67088,
+"type": 1,
+"name": "LFO Gain"
+},
+{
+"idx": 715,
+"off": 67104,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 716,
+"off": 67120,
+"type": 1,
+"name": "LFO Sw"
+},
+{
+"idx": 717,
+"off": 67136,
+"type": 1,
+"name": "ENV1 Level"
+},
+{
+"idx": 718,
+"off": 67152,
+"type": 1,
+"name": "ENV2 Level"
+},
+{
+"idx": 719,
+"off": 67168,
+"type": 1,
+"name": "ENV Sw"
+},
+{
+"idx": 720,
+"off": 67184,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 721,
+"off": 67200,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 722,
+"off": 67216,
+"type": 1,
+"name": "PWM Level"
+},
+{
+"idx": 723,
+"off": 67264,
+"type": 1,
+"name": "JU OSC Saw Lev"
+},
+{
+"idx": 724,
+"off": 67280,
+"type": 1,
+"name": "JU OSC Sqr Lev"
+},
+{
+"idx": 725,
+"off": 67296,
+"type": 1,
+"name": "JU OSC Sub Lev"
+},
+{
+"idx": 726,
+"off": 68592,
+"type": 1,
+"name": "Duty Tune"
+},
+{
+"idx": 727,
+"off": 69520,
+"type": 1,
+"name": "Osc1 Mute"
+},
+{
+"idx": 728,
+"off": 69584,
+"type": 1,
+"name": "Osc1 Level"
+},
+{
+"idx": 729,
+"off": 69600,
+"type": 1,
+"name": "Osc Noise Level"
+},
+{
+"idx": 730,
+"off": 69792,
+"type": 0,
+"name": "Griffer SW"
+},
+{
+"idx": 731,
+"off": 69808,
+"type": 1,
+"name": "LPF Cutoff"
+},
+{
+"idx": 732,
+"off": 69904,
+"type": 1,
+"name": "LPF Resonance"
+},
+{
+"idx": 733,
+"off": 69936,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 734,
+"off": 70080,
+"type": 0,
+"name": "Env1/2"
+},
+{
+"idx": 735,
+"off": 70096,
+"type": 0,
+"name": "Int/Env"
+},
+{
+"idx": 736,
+"off": 70368,
+"type": 0,
+"name": "LFO Gain"
+},
+{
+"idx": 737,
+"off": 70384,
+"type": 0,
+"name": "Ext LFO Sw"
+},
+{
+"idx": 738,
+"off": 70400,
+"type": 0,
+"name": "GRF Bned SW"
+},
+{
+"idx": 739,
+"off": 70416,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 740,
+"off": 70432,
+"type": 1,
+"name": "MOD Sens"
+},
+{
+"idx": 741,
+"off": 70448,
+"type": 1,
+"name": "MOD SW"
+},
+{
+"idx": 742,
+"off": 70464,
+"type": 1,
+"name": "ENV Level"
+},
+{
+"idx": 743,
+"off": 70480,
+"type": 1,
+"name": "KCV Level"
+},
+{
+"idx": 744,
+"off": 70496,
+"type": 1,
+"name": "Velocity Sens"
+},
+{
+"idx": 745,
+"off": 70512,
+"type": 1,
+"name": "Velocity Offset"
+},
+{
+"idx": 746,
+"off": 70528,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 747,
+"off": 70544,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 748,
+"off": 70672,
+"type": 1,
+"name": "Cutoff Tune"
+},
+{
+"idx": 749,
+"off": 70688,
+"type": 1,
+"name": "Resonance Tune"
+},
+{
+"idx": 750,
+"off": 70704,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 751,
+"off": 72128,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 752,
+"off": 72144,
+"type": 1,
+"name": "-12dB/oct Tap"
+},
+{
+"idx": 753,
+"off": 72160,
+"type": 1,
+"name": "-18dB/oct Tap"
+},
+{
+"idx": 754,
+"off": 72176,
+"type": 1,
+"name": "-24dB/oct Tap"
+},
+{
+"idx": 755,
+"off": 72656,
+"type": 1,
+"name": "AMP TONE"
+},
+{
+"idx": 756,
+"off": 72672,
+"type": 1,
+"name": "AMP VELOCITY SENS"
+},
+{
+"idx": 757,
+"off": 72688,
+"type": 1,
+"name": "AMP FIX VELOCITY LEVEL"
+},
+{
+"idx": 758,
+"off": 72752,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 759,
+"off": 72896,
+"type": 0,
+"name": "Mute"
+},
+{
+"idx": 760,
+"off": 73248,
+"type": 0,
+"name": "Gate SW"
+},
+{
+"idx": 761,
+"off": 73264,
+"type": 0,
+"name": "ENV1 SW"
+},
+{
+"idx": 762,
+"off": 73280,
+"type": 0,
+"name": "ENV2 SW"
+},
+{
+"idx": 763,
+"off": 73296,
+"type": 0,
+"name": "Ext ENV SW"
+},
+{
+"idx": 764,
+"off": 73312,
+"type": 1,
+"name": "HPF Cutoff"
+},
+{
+"idx": 765,
+"off": 73328,
+"type": 1,
+"name": "HPF Switch"
+},
+{
+"idx": 766,
+"off": 73344,
+"type": 1,
+"name": "Boost LPF Level"
+},
+{
+"idx": 767,
+"off": 73360,
+"type": 1,
+"name": "Boost Thru Level"
+},
+{
+"idx": 768,
+"off": 73376,
+"type": 1,
+"name": "ENV LEVEL"
+},
+{
+"idx": 769,
+"off": 73392,
+"type": 1,
+"name": "AMP LEVEL"
+},
+{
+"idx": 770,
+"off": 73856,
+"type": 0,
+"name": "UseExtJack"
+},
+{
+"idx": 771,
+"off": 73888,
+"type": 0,
+"name": "M.CV"
+},
+{
+"idx": 772,
+"off": 73904,
+"type": 0,
+"name": "M.Gate"
+},
+{
+"idx": 773,
+"off": 73952,
+"type": 1,
+"name": "Master Tune"
+},
+{
+"idx": 774,
+"off": 73968,
+"type": 1,
+"name": "Part Tune"
+},
+{
+"idx": 775,
+"off": 74176,
+"type": 0,
+"name": "Portamento OnOff"
+},
+{
+"idx": 776,
+"off": 74192,
+"type": 0,
+"name": "Portamento Mode"
+},
+{
+"idx": 777,
+"off": 74208,
+"type": 1,
+"name": "Portamento Time"
+},
+{
+"idx": 778,
+"off": 74624,
+"type": 0,
+"name": "LFO Griffer Rate Sw"
+},
+{
+"idx": 779,
+"off": 74640,
+"type": 0,
+"name": "LFO Tempo Rate Sw"
+},
+{
+"idx": 780,
+"off": 74656,
+"type": 0,
+"name": "LFO Tempo Rate"
+},
+{
+"idx": 781,
+"off": 74672,
+"type": 1,
+"name": "LFO Rate"
+},
+{
+"idx": 782,
+"off": 75440,
+"type": 0,
+"name": "Gate"
+},
+{
+"idx": 783,
+"off": 75456,
+"type": 0,
+"name": "LFO Trig"
+},
+{
+"idx": 784,
+"off": 75472,
+"type": 0,
+"name": "Reset Sw"
+},
+{
+"idx": 785,
+"off": 75488,
+"type": 1,
+"name": "LFO UseExtGate"
+},
+{
+"idx": 786,
+"off": 75504,
+"type": 1,
+"name": "LFO Delay"
+},
+{
+"idx": 787,
+"off": 75520,
+"type": 1,
+"name": "LFO Delay Sw"
+},
+{
+"idx": 788,
+"off": 75536,
+"type": 1,
+"name": "LFO Sin Sw"
+},
+{
+"idx": 789,
+"off": 75552,
+"type": 1,
+"name": "LFO Tri Sw"
+},
+{
+"idx": 790,
+"off": 75568,
+"type": 1,
+"name": "LFO Sqr Sw"
+},
+{
+"idx": 791,
+"off": 75584,
+"type": 1,
+"name": "LFO Saw Sw"
+},
+{
+"idx": 792,
+"off": 75600,
+"type": 1,
+"name": "LFO Saw(Inv) Sw"
+},
+{
+"idx": 793,
+"off": 75616,
+"type": 1,
+"name": "LFO S&H Sw"
+},
+{
+"idx": 794,
+"off": 75632,
+"type": 1,
+"name": "LFO Noise Sw"
+},
+{
+"idx": 795,
+"off": 75648,
+"type": 1,
+"name": "LFO Noise Mix"
+},
+{
+"idx": 796,
+"off": 75664,
+"type": 1,
+"name": "LFO Internal Sw"
+},
+{
+"idx": 797,
+"off": 75680,
+"type": 1,
+"name": "LFO External0 Sw"
+},
+{
+"idx": 798,
+"off": 75696,
+"type": 1,
+"name": "LFO External1 Sw"
+},
+{
+"idx": 799,
+"off": 76112,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 800,
+"off": 76128,
+"type": 0,
+"name": "read only"
+},
+{
+"idx": 801,
+"off": 76144,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 802,
+"off": 76368,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 803,
+"off": 76384,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 804,
+"off": 76400,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 805,
+"off": 76416,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 806,
+"off": 76432,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 807,
+"off": 76624,
+"type": 0,
+"name": "LFO trigger env sw"
+},
+{
+"idx": 808,
+"off": 76848,
+"type": 1,
+"name": "ENV Attack"
+},
+{
+"idx": 809,
+"off": 76864,
+"type": 1,
+"name": "ENV Sustain"
+},
+{
+"idx": 810,
+"off": 76880,
+"type": 1,
+"name": "ENV Decay"
+},
+{
+"idx": 811,
+"off": 76896,
+"type": 1,
+"name": "ENV Release"
+},
+{
+"idx": 812,
+"off": 76912,
+"type": 1,
+"name": "Q24C Initialize"
+},
+{
+"idx": 813,
+"off": 77424,
+"type": 0,
+"name": "OSC1 Feet"
+},
+{
+"idx": 814,
+"off": 77440,
+"type": 0,
+"name": "Griffer Bend SW"
+},
+{
+"idx": 815,
+"off": 77456,
+"type": 0,
+"name": "Bend Enable SW"
+},
+{
+"idx": 816,
+"off": 77472,
+"type": 0,
+"name": "PWM SW LFO"
+},
+{
+"idx": 817,
+"off": 77488,
+"type": 0,
+"name": "PWM SW ENV1"
+},
+{
+"idx": 818,
+"off": 77504,
+"type": 0,
+"name": "PWM SW ENV2"
+},
+{
+"idx": 819,
+"off": 77520,
+"type": 0,
+"name": "PWM SW Manual"
+},
+{
+"idx": 820,
+"off": 77536,
+"type": 1,
+"name": "Tune"
+},
+{
+"idx": 821,
+"off": 77552,
+"type": 1,
+"name": "Detune"
+},
+{
+"idx": 822,
+"off": 77568,
+"type": 1,
+"name": "Mod Sens"
+},
+{
+"idx": 823,
+"off": 77584,
+"type": 1,
+"name": "Mod Sw"
+},
+{
+"idx": 824,
+"off": 77600,
+"type": 1,
+"name": "LFO Gain"
+},
+{
+"idx": 825,
+"off": 77616,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 826,
+"off": 77632,
+"type": 1,
+"name": "LFO Sw"
+},
+{
+"idx": 827,
+"off": 77648,
+"type": 1,
+"name": "ENV1 Level"
+},
+{
+"idx": 828,
+"off": 77664,
+"type": 1,
+"name": "ENV2 Level"
+},
+{
+"idx": 829,
+"off": 77680,
+"type": 1,
+"name": "ENV Sw"
+},
+{
+"idx": 830,
+"off": 77696,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 831,
+"off": 77712,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 832,
+"off": 77728,
+"type": 1,
+"name": "PWM Level"
+},
+{
+"idx": 833,
+"off": 77776,
+"type": 1,
+"name": "JU OSC Saw Lev"
+},
+{
+"idx": 834,
+"off": 77792,
+"type": 1,
+"name": "JU OSC Sqr Lev"
+},
+{
+"idx": 835,
+"off": 77808,
+"type": 1,
+"name": "JU OSC Sub Lev"
+},
+{
+"idx": 836,
+"off": 79104,
+"type": 1,
+"name": "Duty Tune"
+},
+{
+"idx": 837,
+"off": 80032,
+"type": 1,
+"name": "Osc1 Mute"
+},
+{
+"idx": 838,
+"off": 80096,
+"type": 1,
+"name": "Osc1 Level"
+},
+{
+"idx": 839,
+"off": 80112,
+"type": 1,
+"name": "Osc Noise Level"
+},
+{
+"idx": 840,
+"off": 80304,
+"type": 0,
+"name": "Griffer SW"
+},
+{
+"idx": 841,
+"off": 80320,
+"type": 1,
+"name": "LPF Cutoff"
+},
+{
+"idx": 842,
+"off": 80416,
+"type": 1,
+"name": "LPF Resonance"
+},
+{
+"idx": 843,
+"off": 80448,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 844,
+"off": 80592,
+"type": 0,
+"name": "Env1/2"
+},
+{
+"idx": 845,
+"off": 80608,
+"type": 0,
+"name": "Int/Env"
+},
+{
+"idx": 846,
+"off": 80880,
+"type": 0,
+"name": "LFO Gain"
+},
+{
+"idx": 847,
+"off": 80896,
+"type": 0,
+"name": "Ext LFO Sw"
+},
+{
+"idx": 848,
+"off": 80912,
+"type": 0,
+"name": "GRF Bned SW"
+},
+{
+"idx": 849,
+"off": 80928,
+"type": 1,
+"name": "LFO Level"
+},
+{
+"idx": 850,
+"off": 80944,
+"type": 1,
+"name": "MOD Sens"
+},
+{
+"idx": 851,
+"off": 80960,
+"type": 1,
+"name": "MOD SW"
+},
+{
+"idx": 852,
+"off": 80976,
+"type": 1,
+"name": "ENV Level"
+},
+{
+"idx": 853,
+"off": 80992,
+"type": 1,
+"name": "KCV Level"
+},
+{
+"idx": 854,
+"off": 81008,
+"type": 1,
+"name": "Velocity Sens"
+},
+{
+"idx": 855,
+"off": 81024,
+"type": 1,
+"name": "Velocity Offset"
+},
+{
+"idx": 856,
+"off": 81040,
+"type": 1,
+"name": "Bend Level"
+},
+{
+"idx": 857,
+"off": 81056,
+"type": 1,
+"name": "Bend Range"
+},
+{
+"idx": 858,
+"off": 81184,
+"type": 1,
+"name": "Cutoff Tune"
+},
+{
+"idx": 859,
+"off": 81200,
+"type": 1,
+"name": "Resonance Tune"
+},
+{
+"idx": 860,
+"off": 81216,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 861,
+"off": 82640,
+"type": 0,
+"name": "PlugIn Sw"
+},
+{
+"idx": 862,
+"off": 82656,
+"type": 1,
+"name": "-12dB/oct Tap"
+},
+{
+"idx": 863,
+"off": 82672,
+"type": 1,
+"name": "-18dB/oct Tap"
+},
+{
+"idx": 864,
+"off": 82688,
+"type": 1,
+"name": "-24dB/oct Tap"
+},
+{
+"idx": 865,
+"off": 83168,
+"type": 1,
+"name": "AMP TONE"
+},
+{
+"idx": 866,
+"off": 83184,
+"type": 1,
+"name": "AMP VELOCITY SENS"
+},
+{
+"idx": 867,
+"off": 83200,
+"type": 1,
+"name": "AMP FIX VELOCITY LEVEL"
+},
+{
+"idx": 868,
+"off": 83264,
+"type": 0,
+"name": "Velocity"
+},
+{
+"idx": 869,
+"off": 83408,
+"type": 0,
+"name": "Mute"
+},
+{
+"idx": 870,
+"off": 83760,
+"type": 0,
+"name": "Gate SW"
+},
+{
+"idx": 871,
+"off": 83776,
+"type": 0,
+"name": "ENV1 SW"
+},
+{
+"idx": 872,
+"off": 83792,
+"type": 0,
+"name": "ENV2 SW"
+},
+{
+"idx": 873,
+"off": 83808,
+"type": 0,
+"name": "Ext ENV SW"
+},
+{
+"idx": 874,
+"off": 83824,
+"type": 1,
+"name": "HPF Cutoff"
+},
+{
+"idx": 875,
+"off": 83840,
+"type": 1,
+"name": "HPF Switch"
+},
+{
+"idx": 876,
+"off": 83856,
+"type": 1,
+"name": "Boost LPF Level"
+},
+{
+"idx": 877,
+"off": 83872,
+"type": 1,
+"name": "Boost Thru Level"
+},
+{
+"idx": 878,
+"off": 83888,
+"type": 1,
+"name": "ENV LEVEL"
+},
+{
+"idx": 879,
+"off": 83904,
+"type": 1,
+"name": "AMP LEVEL"
+},
+{
+"idx": 880,
+"off": 84304,
+"type": 0,
+"name": "Ext Noise Sw"
+},
+{
+"idx": 881,
+"off": 84448,
+"type": 1,
+"name": "Voice01 Output On/Off"
+},
+{
+"idx": 882,
+"off": 84464,
+"type": 1,
+"name": "Voice23 Output On/Off"
+},
+{
+"idx": 883,
+"off": 84480,
+"type": 1,
+"name": "Voice45 Output On/Off"
+},
+{
+"idx": 884,
+"off": 84496,
+"type": 1,
+"name": "Voice67 Output On/Off"
+},
+{
+"idx": 885,
+"off": 84544,
+"type": 1,
+"name": "Effect SW"
+},
+{
+"idx": 886,
+"off": 84560,
+"type": 1,
+"name": "Mute SW"
+},
+{
+"idx": 887,
+"off": 85136,
+"type": 1,
+"name": "DS Drive"
+},
+{
+"idx": 888,
+"off": 85152,
+"type": 1,
+"name": "DS Level"
+},
+{
+"idx": 889,
+"off": 85168,
+"type": 1,
+"name": "DS Mute"
+},
+{
+"idx": 890,
+"off": 85184,
+"type": 1,
+"name": "DS BiasMute"
+},
+{
+"idx": 891,
+"off": 85984,
+"type": 1,
+"name": "OD TONE"
+},
+{
+"idx": 892,
+"off": 86288,
+"type": 1,
+"name": "DS Drive"
+},
+{
+"idx": 893,
+"off": 86304,
+"type": 1,
+"name": "DS Level"
+},
+{
+"idx": 894,
+"off": 86320,
+"type": 1,
+"name": "DS Mute"
+},
+{
+"idx": 895,
+"off": 86336,
+"type": 1,
+"name": "DS BiasMute"
+},
+{
+"idx": 896,
+"off": 87056,
+"type": 1,
+"name": "DS TONE"
+},
+{
+"idx": 897,
+"off": 87616,
+"type": 1,
+"name": "DS Drive"
+},
+{
+"idx": 898,
+"off": 87632,
+"type": 1,
+"name": "DS Level"
+},
+{
+"idx": 899,
+"off": 87648,
+"type": 1,
+"name": "DS Mute"
+},
+{
+"idx": 900,
+"off": 88976,
+"type": 1,
+"name": "MT TONE"
+},
+{
+"idx": 901,
+"off": 89312,
+"type": 1,
+"name": "DS Drive"
+},
+{
+"idx": 902,
+"off": 89328,
+"type": 1,
+"name": "DS Level"
+},
+{
+"idx": 903,
+"off": 89344,
+"type": 1,
+"name": "DS Mute"
+},
+{
+"idx": 904,
+"off": 89360,
+"type": 1,
+"name": "DS BiasMute"
+},
+{
+"idx": 905,
+"off": 90256,
+"type": 1,
+"name": "FZ TONE"
+},
+{
+"idx": 906,
+"off": 91120,
+"type": 0,
+"name": "Delay Time"
+},
+{
+"idx": 907,
+"off": 91136,
+"type": 0,
+"name": "Error Depth"
+},
+{
+"idx": 908,
+"off": 91152,
+"type": 1,
+"name": "LFO Rate"
+},
+{
+"idx": 909,
+"off": 91168,
+"type": 1,
+"name": "LFO Phase"
+},
+{
+"idx": 910,
+"off": 91184,
+"type": 1,
+"name": "LFO Depth"
+},
+{
+"idx": 911,
+"off": 91200,
+"type": 1,
+"name": "Noise Level"
+},
+{
+"idx": 912,
+"off": 91216,
+"type": 1,
+"name": "Dry Level"
+},
+{
+"idx": 913,
+"off": 91232,
+"type": 1,
+"name": "Wet Level"
+},
+{
+"idx": 914,
+"off": 91248,
+"type": 1,
+"name": "Ip Fc"
+},
+{
+"idx": 915,
+"off": 91264,
+"type": 1,
+"name": "On/Off"
+},
+{
+"idx": 916,
+"off": 91280,
+"type": 1,
+"name": "Mute"
+},
+{
+"idx": 917,
+"off": 96336,
+"type": 0,
+"name": "Delay Time"
+},
+{
+"idx": 918,
+"off": 96352,
+"type": 1,
+"name": "LFO Rate"
+},
+{
+"idx": 919,
+"off": 96368,
+"type": 1,
+"name": "LFO Depth"
+},
+{
+"idx": 920,
+"off": 96384,
+"type": 1,
+"name": "Ip Fc"
+},
+{
+"idx": 921,
+"off": 96400,
+"type": 1,
+"name": "On/Off"
+},
+{
+"idx": 922,
+"off": 96416,
+"type": 1,
+"name": "Mute"
+},
+{
+"idx": 923,
+"off": 101072,
+"type": 1,
+"name": "Patch Level"
+},
+{
+"idx": 924,
+"off": 101136,
+"type": 1,
+"name": "Expression"
+},
+{
+"idx": 925,
+"off": 101152,
+"type": 1,
+"name": "Volume"
+},
+{
+"idx": 926,
+"off": 101488,
+"type": 0,
+"name": "Voice0 Gate Notify"
+},
+{
+"idx": 927,
+"off": 101504,
+"type": 0,
+"name": "Voice0 Note Off Notify"
+},
+{
+"idx": 928,
+"off": 101520,
+"type": 0,
+"name": "Voice1 Gate Notify"
+},
+{
+"idx": 929,
+"off": 101536,
+"type": 0,
+"name": "Voice1 Note Off Notify"
+},
+{
+"idx": 930,
+"off": 101552,
+"type": 0,
+"name": "Voice2 Gate Notify"
+},
+{
+"idx": 931,
+"off": 101568,
+"type": 0,
+"name": "Voice2 Note Off Notify"
+},
+{
+"idx": 932,
+"off": 101584,
+"type": 0,
+"name": "Voice3 Gate Notify"
+},
+{
+"idx": 933,
+"off": 101600,
+"type": 0,
+"name": "Voice3 Note Off Notify"
+},
+{
+"idx": 934,
+"off": 101616,
+"type": 0,
+"name": "Voice4 Gate Notify"
+},
+{
+"idx": 935,
+"off": 101632,
+"type": 0,
+"name": "Voice4 Note Off Notify"
+},
+{
+"idx": 936,
+"off": 101648,
+"type": 0,
+"name": "Voice5 Gate Notify"
+},
+{
+"idx": 937,
+"off": 101664,
+"type": 0,
+"name": "Voice5 Note Off Notify"
+},
+{
+"idx": 938,
+"off": 101680,
+"type": 0,
+"name": "Voice6 Gate Notify"
+},
+{
+"idx": 939,
+"off": 101696,
+"type": 0,
+"name": "Voice6 Note Off Notify"
+},
+{
+"idx": 940,
+"off": 101712,
+"type": 0,
+"name": "Voice7 Gate Notify"
+},
+{
+"idx": 941,
+"off": 101728,
+"type": 0,
+"name": "Voice7 Note Off Notify"
+},
+{
+"idx": 942,
+"off": 101744,
+"type": 1,
+"name": "DLY Mute"
+},
+{
+"idx": 943,
+"off": 102352,
+"type": 0,
+"name": "Delay Time"
+},
+{
+"idx": 944,
+"off": 102368,
+"type": 1,
+"name": "High Cut C0"
+},
+{
+"idx": 945,
+"off": 102384,
+"type": 1,
+"name": "High Cut A0"
+},
+{
+"idx": 946,
+"off": 102400,
+"type": 1,
+"name": "High Cut A1"
+},
+{
+"idx": 947,
+"off": 102416,
+"type": 1,
+"name": "High Cut B0"
+},
+{
+"idx": 948,
+"off": 102432,
+"type": 1,
+"name": "High Cut B2"
+},
+{
+"idx": 949,
+"off": 102448,
+"type": 1,
+"name": "Use IIR High Cut Filter"
+},
+{
+"idx": 950,
+"off": 102464,
+"type": 1,
+"name": "High Cut Fc"
+},
+{
+"idx": 951,
+"off": 102480,
+"type": 1,
+"name": "High Cut Qc"
+},
+{
+"idx": 952,
+"off": 102496,
+"type": 1,
+"name": "High Cut Sw"
+},
+{
+"idx": 953,
+"off": 102512,
+"type": 1,
+"name": "Dry Level"
+},
+{
+"idx": 954,
+"off": 102528,
+"type": 1,
+"name": "Wet Level"
+},
+{
+"idx": 955,
+"off": 102544,
+"type": 1,
+"name": "Ip Fc"
+},
+{
+"idx": 956,
+"off": 102560,
+"type": 1,
+"name": "Feedback"
+},
+{
+"idx": 957,
+"off": 102576,
+"type": 1,
+"name": "On/Off"
+},
+{
+"idx": 958,
+"off": 102592,
+"type": 1,
+"name": "Mute"
+},
+{
+"idx": 959,
+"off": 102608,
+"type": 1,
+"name": "LF Damp Fc"
+},
+{
+"idx": 960,
+"off": 102624,
+"type": 1,
+"name": "LF Damp Hp"
+},
+{
+"idx": 961,
+"off": 102640,
+"type": 1,
+"name": "LF Damp Lp"
+},
+{
+"idx": 962,
+"off": 102656,
+"type": 1,
+"name": "HF Damp Fc"
+},
+{
+"idx": 963,
+"off": 102672,
+"type": 1,
+"name": "HF Damp Hp"
+},
+{
+"idx": 964,
+"off": 102688,
+"type": 1,
+"name": "HF Damp Lp"
+},
+{
+"idx": 965,
+"off": 4297584,
+"type": 0,
+"name": "Delay Time"
+},
+{
+"idx": 966,
+"off": 4297600,
+"type": 1,
+"name": "High Cut C0"
+},
+{
+"idx": 967,
+"off": 4297616,
+"type": 1,
+"name": "High Cut A0"
+},
+{
+"idx": 968,
+"off": 4297632,
+"type": 1,
+"name": "High Cut A1"
+},
+{
+"idx": 969,
+"off": 4297648,
+"type": 1,
+"name": "High Cut B0"
+},
+{
+"idx": 970,
+"off": 4297664,
+"type": 1,
+"name": "High Cut B2"
+},
+{
+"idx": 971,
+"off": 4297680,
+"type": 1,
+"name": "Use IIR High Cut Filter"
+},
+{
+"idx": 972,
+"off": 4297696,
+"type": 1,
+"name": "High Cut Fc"
+},
+{
+"idx": 973,
+"off": 4297712,
+"type": 1,
+"name": "High Cut Qc"
+},
+{
+"idx": 974,
+"off": 4297728,
+"type": 1,
+"name": "High Cut Sw"
+},
+{
+"idx": 975,
+"off": 4297744,
+"type": 1,
+"name": "Dry Level"
+},
+{
+"idx": 976,
+"off": 4297760,
+"type": 1,
+"name": "Wet Level"
+},
+{
+"idx": 977,
+"off": 4297776,
+"type": 1,
+"name": "Ip Fc"
+},
+{
+"idx": 978,
+"off": 4297792,
+"type": 1,
+"name": "Tap Time"
+},
+{
+"idx": 979,
+"off": 4297808,
+"type": 1,
+"name": "Feedback"
+},
+{
+"idx": 980,
+"off": 4297824,
+"type": 1,
+"name": "On/Off"
+},
+{
+"idx": 981,
+"off": 4297840,
+"type": 1,
+"name": "Mute"
+},
+{
+"idx": 982,
+"off": 4297856,
+"type": 1,
+"name": "Tap Sw"
+},
+{
+"idx": 983,
+"off": 4297872,
+"type": 1,
+"name": "Stereo Sw"
+},
+{
+"idx": 984,
+"off": 4297888,
+"type": 1,
+"name": "Wet Gain"
+},
+{
+"idx": 985,
+"off": 4297904,
+"type": 1,
+"name": "LF Damp Fc"
+},
+{
+"idx": 986,
+"off": 4297920,
+"type": 1,
+"name": "LF Damp Hp"
+},
+{
+"idx": 987,
+"off": 4297936,
+"type": 1,
+"name": "LF Damp Lp"
+},
+{
+"idx": 988,
+"off": 4297952,
+"type": 1,
+"name": "HF Damp Fc"
+},
+{
+"idx": 989,
+"off": 4297968,
+"type": 1,
+"name": "HF Damp Hp"
+},
+{
+"idx": 990,
+"off": 4297984,
+"type": 1,
+"name": "HF Damp Lp"
+},
+{
+"idx": 991,
+"off": 6395312,
+"type": 1,
+"name": "Chorus CV"
+},
+{
+"idx": 992,
+"off": 6395328,
+"type": 1,
+"name": "Chrus LFO Sync"
+},
+{
+"idx": 993,
+"off": 6396128,
+"type": 0,
+"name": "Delay Time"
+},
+{
+"idx": 994,
+"off": 6396144,
+"type": 1,
+"name": "LFO Curve"
+},
+{
+"idx": 995,
+"off": 6396160,
+"type": 1,
+"name": "LFO Manual"
+},
+{
+"idx": 996,
+"off": 6396176,
+"type": 1,
+"name": "LFO Depth"
+},
+{
+"idx": 997,
+"off": 6396192,
+"type": 1,
+"name": "High Cut C0"
+},
+{
+"idx": 998,
+"off": 6396208,
+"type": 1,
+"name": "High Cut A0"
+},
+{
+"idx": 999,
+"off": 6396224,
+"type": 1,
+"name": "High Cut A1"
+},
+{
+"idx": 1000,
+"off": 6396240,
+"type": 1,
+"name": "High Cut B0"
+},
+{
+"idx": 1001,
+"off": 6396256,
+"type": 1,
+"name": "High Cut B2"
+},
+{
+"idx": 1002,
+"off": 6396272,
+"type": 1,
+"name": "Use IIR High Cut Filter"
+},
+{
+"idx": 1003,
+"off": 6396288,
+"type": 1,
+"name": "High Cut Fc"
+},
+{
+"idx": 1004,
+"off": 6396304,
+"type": 1,
+"name": "High Cut Qc"
+},
+{
+"idx": 1005,
+"off": 6396320,
+"type": 1,
+"name": "High Cut Sw"
+},
+{
+"idx": 1006,
+"off": 6396336,
+"type": 1,
+"name": "Low Cut Fc"
+},
+{
+"idx": 1007,
+"off": 6396352,
+"type": 1,
+"name": "Low Cut Sw"
+},
+{
+"idx": 1008,
+"off": 6396368,
+"type": 1,
+"name": "Dry Level"
+},
+{
+"idx": 1009,
+"off": 6396384,
+"type": 1,
+"name": "Wet Level"
+},
+{
+"idx": 1010,
+"off": 6396400,
+"type": 1,
+"name": "Ip Fc"
+},
+{
+"idx": 1011,
+"off": 6396416,
+"type": 1,
+"name": "Feedback"
+},
+{
+"idx": 1012,
+"off": 6396432,
+"type": 1,
+"name": "On/Off"
+},
+{
+"idx": 1013,
+"off": 6396448,
+"type": 1,
+"name": "Mute"
+},
+{
+"idx": 1014,
+"off": 6396464,
+"type": 1,
+"name": "Tap Sw"
+},
+{
+"idx": 1015,
+"off": 6396480,
+"type": 1,
+"name": "Stereo Sw"
+},
+{
+"idx": 1016,
+"off": 6396496,
+"type": 1,
+"name": "Dry Gain"
+},
+{
+"idx": 1017,
+"off": 6396512,
+"type": 1,
+"name": "Wet Gain"
+},
+{
+"idx": 1018,
+"off": 6429472,
+"type": 1,
+"name": "Flanger CV"
+},
+{
+"idx": 1019,
+"off": 6429488,
+"type": 1,
+"name": "Flanger LFO Sync"
+},
+{
+"idx": 1020,
+"off": 6430464,
+"type": 0,
+"name": "Delay Time"
+},
+{
+"idx": 1021,
+"off": 6430480,
+"type": 1,
+"name": "LFO Curve"
+},
+{
+"idx": 1022,
+"off": 6430496,
+"type": 1,
+"name": "LFO Manual"
+},
+{
+"idx": 1023,
+"off": 6430512,
+"type": 1,
+"name": "LFO Depth"
+},
+{
+"idx": 1024,
+"off": 6430528,
+"type": 1,
+"name": "High Cut C0"
+},
+{
+"idx": 1025,
+"off": 6430544,
+"type": 1,
+"name": "High Cut A0"
+},
+{
+"idx": 1026,
+"off": 6430560,
+"type": 1,
+"name": "High Cut A1"
+},
+{
+"idx": 1027,
+"off": 6430576,
+"type": 1,
+"name": "High Cut B0"
+},
+{
+"idx": 1028,
+"off": 6430592,
+"type": 1,
+"name": "High Cut B2"
+},
+{
+"idx": 1029,
+"off": 6430608,
+"type": 1,
+"name": "Use IIR High Cut Filter"
+},
+{
+"idx": 1030,
+"off": 6430624,
+"type": 1,
+"name": "High Cut Fc"
+},
+{
+"idx": 1031,
+"off": 6430640,
+"type": 1,
+"name": "High Cut Qc"
+},
+{
+"idx": 1032,
+"off": 6430656,
+"type": 1,
+"name": "High Cut Sw"
+},
+{
+"idx": 1033,
+"off": 6430672,
+"type": 1,
+"name": "Low Cut Fc"
+},
+{
+"idx": 1034,
+"off": 6430688,
+"type": 1,
+"name": "Low Cut Sw"
+},
+{
+"idx": 1035,
+"off": 6430704,
+"type": 1,
+"name": "Dry Level"
+},
+{
+"idx": 1036,
+"off": 6430720,
+"type": 1,
+"name": "Wet Level"
+},
+{
+"idx": 1037,
+"off": 6430736,
+"type": 1,
+"name": "Ip Fc"
+},
+{
+"idx": 1038,
+"off": 6430752,
+"type": 1,
+"name": "Feedback"
+},
+{
+"idx": 1039,
+"off": 6430768,
+"type": 1,
+"name": "On/Off"
+},
+{
+"idx": 1040,
+"off": 6430784,
+"type": 1,
+"name": "Mute"
+},
+{
+"idx": 1041,
+"off": 6430800,
+"type": 1,
+"name": "LFO St.Phase"
+},
+{
+"idx": 1042,
+"off": 6430816,
+"type": 1,
+"name": "LFO St.Ofst"
+},
+{
+"idx": 1043,
+"off": 6497168,
+"type": 0,
+"name": "Delay Time"
+},
+{
+"idx": 1044,
+"off": 6497184,
+"type": 1,
+"name": "High Cut C0"
+},
+{
+"idx": 1045,
+"off": 6497200,
+"type": 1,
+"name": "High Cut A0"
+},
+{
+"idx": 1046,
+"off": 6497216,
+"type": 1,
+"name": "High Cut A1"
+},
+{
+"idx": 1047,
+"off": 6497232,
+"type": 1,
+"name": "High Cut B0"
+},
+{
+"idx": 1048,
+"off": 6497248,
+"type": 1,
+"name": "High Cut B2"
+},
+{
+"idx": 1049,
+"off": 6497264,
+"type": 1,
+"name": "Use IIR High Cut Filter"
+},
+{
+"idx": 1050,
+"off": 6497280,
+"type": 1,
+"name": "High Cut Fc"
+},
+{
+"idx": 1051,
+"off": 6497296,
+"type": 1,
+"name": "High Cut Qc"
+},
+{
+"idx": 1052,
+"off": 6497312,
+"type": 1,
+"name": "High Cut Sw"
+},
+{
+"idx": 1053,
+"off": 6497328,
+"type": 1,
+"name": "Dry Level"
+},
+{
+"idx": 1054,
+"off": 6497344,
+"type": 1,
+"name": "Wet Level"
+},
+{
+"idx": 1055,
+"off": 6497360,
+"type": 1,
+"name": "Ip Fc"
+},
+{
+"idx": 1056,
+"off": 6497376,
+"type": 1,
+"name": "Feedback"
+},
+{
+"idx": 1057,
+"off": 6497392,
+"type": 1,
+"name": "On/Off"
+},
+{
+"idx": 1058,
+"off": 6497408,
+"type": 1,
+"name": "Mute"
+},
+{
+"idx": 1059,
+"off": 6497424,
+"type": 1,
+"name": "LF Damp Fc"
+},
+{
+"idx": 1060,
+"off": 6497440,
+"type": 1,
+"name": "LF Damp Hp"
+},
+{
+"idx": 1061,
+"off": 6497456,
+"type": 1,
+"name": "LF Damp Lp"
+},
+{
+"idx": 1062,
+"off": 6497472,
+"type": 1,
+"name": "HF Damp Fc"
+},
+{
+"idx": 1063,
+"off": 6497488,
+"type": 1,
+"name": "HF Damp Hp"
+},
+{
+"idx": 1064,
+"off": 6497504,
+"type": 1,
+"name": "HF Damp Lp"
+},
+{
+"idx": 1065,
+"off": 10692016,
+"type": 1,
+"name": "Chorus CV"
+},
+{
+"idx": 1066,
+"off": 10692032,
+"type": 1,
+"name": "Chrus LFO Sync"
+},
+{
+"idx": 1067,
+"off": 10693008,
+"type": 0,
+"name": "Delay Time"
+},
+{
+"idx": 1068,
+"off": 10693024,
+"type": 1,
+"name": "LFO Curve"
+},
+{
+"idx": 1069,
+"off": 10693040,
+"type": 1,
+"name": "LFO Manual"
+},
+{
+"idx": 1070,
+"off": 10693056,
+"type": 1,
+"name": "LFO Depth"
+},
+{
+"idx": 1071,
+"off": 10693072,
+"type": 1,
+"name": "High Cut C0"
+},
+{
+"idx": 1072,
+"off": 10693088,
+"type": 1,
+"name": "High Cut A0"
+},
+{
+"idx": 1073,
+"off": 10693104,
+"type": 1,
+"name": "High Cut A1"
+},
+{
+"idx": 1074,
+"off": 10693120,
+"type": 1,
+"name": "High Cut B0"
+},
+{
+"idx": 1075,
+"off": 10693136,
+"type": 1,
+"name": "High Cut B2"
+},
+{
+"idx": 1076,
+"off": 10693152,
+"type": 1,
+"name": "Use IIR High Cut Filter"
+},
+{
+"idx": 1077,
+"off": 10693168,
+"type": 1,
+"name": "High Cut Fc"
+},
+{
+"idx": 1078,
+"off": 10693184,
+"type": 1,
+"name": "High Cut Qc"
+},
+{
+"idx": 1079,
+"off": 10693200,
+"type": 1,
+"name": "High Cut Sw"
+},
+{
+"idx": 1080,
+"off": 10693216,
+"type": 1,
+"name": "Low Cut Fc"
+},
+{
+"idx": 1081,
+"off": 10693232,
+"type": 1,
+"name": "Low Cut Sw"
+},
+{
+"idx": 1082,
+"off": 10693248,
+"type": 1,
+"name": "Dry Level"
+},
+{
+"idx": 1083,
+"off": 10693264,
+"type": 1,
+"name": "Wet Level"
+},
+{
+"idx": 1084,
+"off": 10693280,
+"type": 1,
+"name": "Ip Fc"
+},
+{
+"idx": 1085,
+"off": 10693296,
+"type": 1,
+"name": "Feedback"
+},
+{
+"idx": 1086,
+"off": 10693312,
+"type": 1,
+"name": "On/Off"
+},
+{
+"idx": 1087,
+"off": 10693328,
+"type": 1,
+"name": "Mute"
+},
+{
+"idx": 1088,
+"off": 10693344,
+"type": 1,
+"name": "LFO St.Phase"
+},
+{
+"idx": 1089,
+"off": 10693360,
+"type": 1,
+"name": "LFO St.Ofst"
+},
+{
+"idx": 1090,
+"off": 10759360,
+"type": 0,
+"name": "Rev Dpm PreDly"
+},
+{
+"idx": 1091,
+"off": 10759376,
+"type": 1,
+"name": "Rev Ecf On"
+},
+{
+"idx": 1092,
+"off": 10759392,
+"type": 1,
+"name": "Rev Ecf Density"
+},
+{
+"idx": 1093,
+"off": 10759408,
+"type": 1,
+"name": "Rev Ecf Level"
+},
+{
+"idx": 1094,
+"off": 10759424,
+"type": 1,
+"name": "Rev Ecf Dir Lev"
+},
+{
+"idx": 1095,
+"off": 10759440,
+"type": 1,
+"name": "Rev Ecf Glb Lev"
+},
+{
+"idx": 1096,
+"off": 10759456,
+"type": 1,
+"name": "Rev Ecf Mute"
+},
+{
+"idx": 1097,
+"off": 10759472,
+"type": 1,
+"name": "Rev Ecf In Att "
+},
+{
+"idx": 1098,
+"off": 10759488,
+"type": 1,
+"name": "Rev Ecf Depth"
+},
+{
+"idx": 1099,
+"off": 10759504,
+"type": 1,
+"name": "Rev Ecf Rate"
+},
+{
+"idx": 1100,
+"off": 10759520,
+"type": 1,
+"name": "Rev Ecf HPF C0"
+},
+{
+"idx": 1101,
+"off": 10759536,
+"type": 1,
+"name": "Rev Ecf HPF A0"
+},
+{
+"idx": 1102,
+"off": 10759552,
+"type": 1,
+"name": "Rev Ecf HPF B0"
+},
+{
+"idx": 1103,
+"off": 10759568,
+"type": 1,
+"name": "Rev Ecf LPF C0"
+},
+{
+"idx": 1104,
+"off": 10759584,
+"type": 1,
+"name": "Rev Ecf LPF A0"
+},
+{
+"idx": 1105,
+"off": 10759600,
+"type": 1,
+"name": "Rev Ecf LPF A1"
+},
+{
+"idx": 1106,
+"off": 10759616,
+"type": 1,
+"name": "Rev Ecf LPF B0"
+},
+{
+"idx": 1107,
+"off": 10759632,
+"type": 1,
+"name": "Rev Ecf LPF B1"
+},
+{
+"idx": 1108,
+"off": 10759648,
+"type": 1,
+"name": "Rev Ecf DPF0 Fc"
+},
+{
+"idx": 1109,
+"off": 10759664,
+"type": 1,
+"name": "Rev Ecf DPF0 Hp"
+},
+{
+"idx": 1110,
+"off": 10759680,
+"type": 1,
+"name": "Rev Ecf DPF0 Lp"
+},
+{
+"idx": 1111,
+"off": 10759696,
+"type": 1,
+"name": "Rev Ecf DPF1 Fc"
+},
+{
+"idx": 1112,
+"off": 10759712,
+"type": 1,
+"name": "Rev Ecf DPF1 Hp"
+},
+{
+"idx": 1113,
+"off": 10759728,
+"type": 1,
+"name": "Rev Ecf DPF1 Lp"
+},
+{
+"idx": 1114,
+"off": 10759744,
+"type": 1,
+"name": "Rev Ecf DPF2 Fc"
+},
+{
+"idx": 1115,
+"off": 10759760,
+"type": 1,
+"name": "Rev Ecf DPF2 Hp"
+},
+{
+"idx": 1116,
+"off": 10759776,
+"type": 1,
+"name": "Rev Ecf DPF2 Lp"
+},
+{
+"idx": 1117,
+"off": 10759792,
+"type": 1,
+"name": "Rev Ecf DPF3 Fc"
+},
+{
+"idx": 1118,
+"off": 10759808,
+"type": 1,
+"name": "Rev Ecf DPF3 Hp"
+},
+{
+"idx": 1119,
+"off": 10759824,
+"type": 1,
+"name": "Rev Ecf DPF3 Lp"
+},
+{
+"idx": 1120,
+"off": 10759840,
+"type": 1,
+"name": "Rev Ecf DlyMute"
+}
+]
