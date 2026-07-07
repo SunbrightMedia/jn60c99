@@ -49,6 +49,17 @@ void juno_enable_hw_ftz(void)
     _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON); /* DAZ: denormal operand -> 0 */
 }
 int juno_hw_ftz_available(void) { return 1; }
+#elif defined(__ARM_FP) && !defined(__EMSCRIPTEN__)
+/* ARM VFP/Cortex-M (the Teensy 4.x target): set FPSCR bit 24 (FZ) for flush-to-zero.
+ * ARM's FZ covers both denormal inputs and outputs, so it is the DAZ+FTZ equivalent. */
+void juno_enable_hw_ftz(void)
+{
+    unsigned int fpscr;
+    __asm__ __volatile__("vmrs %0, fpscr" : "=r"(fpscr));
+    fpscr |= (1u << 24);                                 /* FZ */
+    __asm__ __volatile__("vmsr fpscr, %0" : : "r"(fpscr));
+}
+int juno_hw_ftz_available(void) { return 1; }
 #else
 void juno_enable_hw_ftz(void) { /* no hardware FTZ (WASM/other): explicit flush used */ }
 int juno_hw_ftz_available(void) { return 0; }
