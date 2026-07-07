@@ -24,9 +24,15 @@ the assembled instrument. The glue and the init baseline were never bit-exact.
    master reads them flattened into the state at 4297584/6395312/6497168/10692016/
    10759376.
 
-3. **Arpeggiator is HAND-WRITTEN** (arp_tick/arp_rebuild_seq): fixed 8 Hz (plugin
-   is 24-PPQN tempo-synced), DOWN mode reverses octaves the wrong way, UP&DOWN uses
-   a guessed order (plugin uses binary table unk_7FF91E624480). Being transcribed.
+3. ~~**Arpeggiator is HAND-WRITTEN**~~ — **FIXED.** The hand-written arp (fixed
+   8 Hz, wrong DOWN octave direction, guessed UP&DOWN order) has been replaced by a
+   **bit-exact transcription of CArpeggio** (`src/carp.c`): the note selectors
+   (UP `sub_7FF91E01EFC0` / UP&DOWN `sub_7FF91E01E5C0` / DOWN `sub_7FF91E01E850`),
+   the pitch-sorted held-note list (insertion sort `sub_7FF91E023440`), octave
+   fold, velocity math (`sub_7FF91E0235A0`) and the 24-PPQN clock with the extracted
+   RATE/GATE tables are all copied field-for-field from the binary. Tempo (BPM) and
+   gate are host inputs (the plugin's arp is host-tempo-synced). Full derivation +
+   the honestly-flagged residual ambiguities in `docs/ARP_PROVENANCE.md`.
 
 4. **Chorus mode hard-wired to II** (index.html), not recalled. 55/64 patches are
    type 2/3/4 = chorus (II is byte-identical-correct); modes 1&5 (9 patches) route

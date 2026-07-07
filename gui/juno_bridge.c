@@ -13,6 +13,7 @@
 #include "../src/juno_curve.h"
 #include "../src/juno_note.h"
 #include "../src/delay_recall.h"
+#include "../src/carp.h"
 #include <stdlib.h>
 
 typedef struct {
@@ -24,27 +25,16 @@ typedef struct {
     unsigned voice_age[JUNO_NUM_VOICES];/* allocation order (LRU; higher = newer)    */
     unsigned age_counter;
 
-    /* Arpeggiator (host-side note sequencer). The JUNO-60's own arp is a simple
-     * monophonic step sequencer over the held keys: modes UP / DOWN / UP&DOWN,
-     * range 1-3 octaves. The plugin's CArpeggio is host code (not a DSP coeff),
-     * and the per-preset arp on/mode/rate live in the un-decodable extended
-     * record region, so this reproduces the arp BEHAVIOUR with explicit controls
-     * rather than per-preset recall. When off, note-on/off drive the synth
-     * directly (unchanged). When on, keys feed the held set and the clock steps
-     * the pattern into the voice allocator. */
-    int   arp_on;          /* 0/1                                              */
-    int   arp_mode;        /* 0=up, 1=down, 2=up&down                          */
-    int   arp_oct;         /* octave range 1..3                                */
-    float arp_rate_hz;     /* steps per second                                 */
-    float arp_gate;        /* note-on fraction of the step (0..1), rest = off  */
-    int   arp_held[16];    /* currently held keys, ascending                   */
-    int   arp_nheld;
-    int   arp_seq[48];     /* expanded step pattern (held x octaves x mode)     */
-    int   arp_nseq;
-    int   arp_step;        /* index into arp_seq of the sounding step           */
-    int   arp_cur;         /* MIDI note currently sounding (-1 = none)          */
-    double arp_clk;        /* sample accumulator within the current step        */
-    int   arp_gated;       /* 1 while the current step's note is on             */
+    /* Arpeggiator — the plugin's CArpeggio transcribed BIT-EXACTLY in src/carp.c
+     * (UP / UP&DOWN / DOWN ordering, octave range, 24-PPQN tempo clock, gate — all
+     * traced to the binary; see docs/ARP_PROVENANCE.md). `arp_on` is a driver
+     * flag: when set, note-on/off feed the arp's held set and carp_tick sequences
+     * steps into the voice allocator once per rendered sample; when clear, notes
+     * drive the synth directly. The JUNO arp is host-tempo-synced (no per-patch
+     * rate), so the standalone supplies a BPM + note division. */
+    int   arp_on;          /* 0/1 (driver routes notes through the arp when set) */
+    int   arp_cur;         /* MIDI note currently sounding via the arp (-1 none) */
+    carp  arp;             /* bit-exact CArpeggio state machine                 */
 } juno_ctx;
 
 /* Make the preview's DEFAULT/factory patch a clean, playable JUNO sound.
@@ -91,9 +81,13 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     juno_driver_seed_voices(c->st);      /* all 8 voices carry the same coeffs */
     c->chorus_mode = chorus_mode;
     for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
-    /* arp defaults: off, UP, 1 octave, 1/8-note-ish at ~120 BPM, 50% gate */
-    c->arp_mode = 0; c->arp_oct = 1; c->arp_rate_hz = 8.0f; c->arp_gate = 0.5f;
-    c->arp_cur = -1; c->arp_step = 0;
+    /* arp: bit-exact CArpeggio, off by default. carp_init seeds power-on state
+     * (empty keyboard, UP, 1 octave, 120 BPM, eighth-note clock); give it a
+     * musical 60% gate default (index 3). */
+    carp_init(&c->arp);
+    carp_set_gate_index(&c->arp, 3);
+    c->arp_on = 0;
+    c->arp_cur = -1;
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
     return c;
 }
@@ -215,108 +209,84 @@ static void synth_note_off(juno_ctx *c, int midi_note)
         }
 }
 
-/* --- arpeggiator ------------------------------------------------------------ */
-/* Rebuild the step pattern from the currently-held keys, octave range and mode.
- * UP: keys low->high across the octave range; DOWN: reverse; UP&DOWN: up then
- * down without repeating the top/bottom (the JUNO-60's own up-and-down feel). */
-static void arp_rebuild_seq(juno_ctx *c)
+/* --- arpeggiator (bit-exact CArpeggio, src/carp.c) -------------------------- */
+/* The step ordering, octave fold, insertion-sorted held-note list, velocity math
+ * and 24-PPQN clock are all transcribed from the plugin (see src/carp.c and
+ * docs/ARP_PROVENANCE.md). This bridge only routes MIDI into the arp's held
+ * set and drains the events carp_tick emits into the 8-voice allocator. */
+
+/* Map a 0..1 gate fraction to the nearest entry of the plugin's GATE table
+ * {30,40,50,60,70,80,90,100,120,0}% — the arp reads a table INDEX, not a
+ * fraction, so the UI's continuous gate is quantised to the machine's steps. */
+static int gate_frac_to_index(float g)
 {
-    int n = 0, o, i;
-    int up[48], nup = 0;
-    for (o = 0; o < c->arp_oct; ++o)
-        for (i = 0; i < c->arp_nheld; ++i)
-            if (nup < 48) up[nup++] = c->arp_held[i] + 12 * o;
-    if (c->arp_mode == 1) {                 /* DOWN */
-        for (i = nup - 1; i >= 0; --i) c->arp_seq[n++] = up[i];
-    } else if (c->arp_mode == 2) {          /* UP & DOWN */
-        for (i = 0; i < nup; ++i) c->arp_seq[n++] = up[i];
-        for (i = nup - 2; i >= 1; --i) if (n < 48) c->arp_seq[n++] = up[i];
-    } else {                                /* UP (default) */
-        for (i = 0; i < nup; ++i) c->arp_seq[n++] = up[i];
+    int pct = (int)(g * 100.0f + 0.5f), best = 0, bestd = 1000, i;
+    for (i = 0; i < 10; ++i) {
+        int d = pct - (int)CARP_GATE_TABLE[i];
+        if (d < 0) d = -d;
+        if (d < bestd) { bestd = d; best = i; }
     }
-    c->arp_nseq = n;
-    if (c->arp_step >= n) c->arp_step = 0;
+    return best;
 }
-/* silence any sounding arp note */
-static void arp_note_off(juno_ctx *c)
-{
-    if (c->arp_cur >= 0) { synth_note_off(c, c->arp_cur); c->arp_cur = -1; }
-    c->arp_gated = 0;
-}
-/* Advance the arp clock by one sample; trigger/release steps as the clock rolls.
- * Called once per rendered sample when the arp is enabled. */
+
+/* Drain one sample's worth of arp events into the voice allocator. Called once
+ * per rendered sample when the arp is enabled: carp_tick emits note-offs before
+ * note-ons at each gate/step boundary, exactly as the plugin's clock does. */
 static void arp_tick(juno_ctx *c)
 {
     double sr = JF(c->st, 16); if (sr <= 0.0) sr = 96000.0;
-    double step_samples = sr / (c->arp_rate_hz > 0.1f ? c->arp_rate_hz : 0.1f);
-    double gate_samples = step_samples * (double)c->arp_gate;
-    if (c->arp_nseq == 0) { arp_note_off(c); c->arp_clk = 0.0; return; }
-    /* note-off partway through the step (gate), then next note at the boundary */
-    if (c->arp_gated && c->arp_clk >= gate_samples) arp_note_off(c);
-    if (c->arp_clk >= step_samples || c->arp_cur < 0) {
-        c->arp_clk = 0.0;
-        arp_note_off(c);
-        if (c->arp_step >= c->arp_nseq) c->arp_step = 0;
-        c->arp_cur = c->arp_seq[c->arp_step];
-        synth_note_on(c, c->arp_cur, 100);
-        c->arp_gated = 1;
-        c->arp_step = (c->arp_step + 1) % c->arp_nseq;
+    carp_event ev[4];
+    int i, n = carp_tick(&c->arp, sr, ev, 4);
+    for (i = 0; i < n; ++i) {
+        if (ev[i].kind == 0) {                          /* note-off */
+            synth_note_off(c, ev[i].note);
+            if (ev[i].note == c->arp_cur) c->arp_cur = -1;
+        } else {                                        /* note-on  */
+            synth_note_on(c, ev[i].note, ev[i].velocity);
+            c->arp_cur = ev[i].note;
+        }
     }
-    c->arp_clk += 1.0;
 }
 
-/* Public note-on: routes to the arp held-set when enabled, else the synth. */
+/* Public note-on: feeds the arp's held-key set when enabled, else the synth. */
 void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
 {
-    int i, j;
     if (!c) return;
     if (!c->arp_on) { synth_note_on(c, midi_note, velocity); return; }
-    for (i = 0; i < c->arp_nheld; ++i) if (c->arp_held[i] == midi_note) return; /* dup */
-    if (c->arp_nheld >= 16) return;
-    for (i = 0; i < c->arp_nheld && c->arp_held[i] < midi_note; ++i) ;   /* insert sorted */
-    for (j = c->arp_nheld; j > i; --j) c->arp_held[j] = c->arp_held[j-1];
-    c->arp_held[i] = midi_note; c->arp_nheld++;
-    arp_rebuild_seq(c);
+    carp_add_key(&c->arp, midi_note, velocity);
 }
 
 /* Public note-off. midi_note < 0 releases everything. */
 void juno_gui_note_off(juno_ctx *c, int midi_note)
 {
-    int i, j;
     if (!c) return;
     if (!c->arp_on) { synth_note_off(c, midi_note); return; }
-    if (midi_note < 0) { c->arp_nheld = 0; }
-    else for (i = 0; i < c->arp_nheld; ++i)
-        if (c->arp_held[i] == midi_note) {
-            for (j = i; j < c->arp_nheld - 1; ++j) c->arp_held[j] = c->arp_held[j+1];
-            c->arp_nheld--; break;
-        }
-    arp_rebuild_seq(c);
-    if (c->arp_nheld == 0) arp_note_off(c);
+    carp_remove_key(&c->arp, midi_note);     /* midi_note < 0 => release all */
 }
 
-/* Configure the arpeggiator. on: 0/1. mode: 0=up,1=down,2=up&down. oct: 1..3.
- * rate_hz: steps/sec. gate: note-on fraction of a step (0..1). Toggling off
- * flushes held keys + any sounding step so the synth returns to direct play. */
-void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float rate_hz, float gate)
+/* Configure the arpeggiator. on: 0/1. mode: 0=up,1=down,2=up&down (the UI/patch
+ * convention). oct: 1..3. bpm: host tempo (<=0 keeps the current tempo — the
+ * plugin's arp is host-synced, so BPM is a host input, not a patch value). gate:
+ * note-on fraction 0..1, quantised to the machine's GATE table (<0 keeps current).
+ * Toggling on/off flushes held keys + any sounding step so play stays clean. */
+void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, float gate)
 {
-    int was;
+    int was, type;
     if (!c) return;
     was = c->arp_on;
-    c->arp_mode = mode < 0 ? 0 : (mode > 2 ? 2 : mode);
-    c->arp_oct  = oct  < 1 ? 1 : (oct  > 3 ? 3 : oct);
-    if (rate_hz > 0.1f) c->arp_rate_hz = rate_hz;
-    if (gate >= 0.0f && gate <= 1.0f) c->arp_gate = gate;
+    /* UI mode (0=up,1=down,2=up&down) -> CArpeggio TYPE (0=UP,1=UP&DOWN,2=DOWN). */
+    type = (mode == 1) ? CARP_TYPE_DOWN : (mode == 2) ? CARP_TYPE_UPDOWN : CARP_TYPE_UP;
+    carp_set_mode(&c->arp, type);
+    /* UI octaves 1..3 -> ARPEGGIO STEP 0..2 (carp_set_range maps step->range). */
+    carp_set_range(&c->arp, (oct < 1 ? 1 : (oct > 3 ? 3 : oct)) - 1);
+    if (bpm > 0.0f) carp_set_bpm(&c->arp, (double)bpm);
+    if (gate >= 0.0f) carp_set_gate_index(&c->arp, gate_frac_to_index(gate));
     c->arp_on = on ? 1 : 0;
-    if (was && !c->arp_on) {                 /* turning off: clear everything */
-        arp_note_off(c); c->arp_nheld = 0; c->arp_nseq = 0; c->arp_step = 0;
+    if (was != c->arp_on) {                  /* on the toggle: flush everything */
         synth_note_off(c, -1);
+        carp_remove_key(&c->arp, -1);
+        c->arp_cur = -1;
     }
-    if (!was && c->arp_on) {                  /* turning on: silence direct notes */
-        synth_note_off(c, -1);
-        c->arp_nheld = 0; c->arp_nseq = 0; c->arp_step = 0; c->arp_cur = -1; c->arp_clk = 0.0;
-    }
-    arp_rebuild_seq(c);
 }
 
 /* Apply bank patch `idx` (raw KoaBankFile00003 bytes in `bank`, `len` bytes)
@@ -334,7 +304,7 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
      * see juno_bank_arp); rate stays local (the plugin's arp is host-tempo-synced,
      * no per-patch rate). This makes "arp presets" arpeggiate on load. */
     on = juno_bank_arp(bank, idx, &mode, &oct);
-    juno_gui_arp_config(c, on, mode, oct, c->arp_rate_hz, c->arp_gate);
+    juno_gui_arp_config(c, on, mode, oct, -1.0f, -1.0f);  /* keep UI bpm/gate */
     return n;
 }
 
@@ -343,8 +313,12 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
  * toggle/mode/octave controls to a recalled patch. */
 int juno_gui_get_arp(juno_ctx *c)
 {
+    int mode, oct;
     if (!c) return 0;
-    return (c->arp_on ? 1 : 0) | ((c->arp_mode & 3) << 1) | (((c->arp_oct - 1) & 3) << 3);
+    /* CArpeggio TYPE -> UI mode (0=up,1=down,2=up&down); range -> octaves. */
+    mode = (c->arp.type == 0) ? 0 : (c->arp.type == 1) ? 2 : 1;
+    oct  = c->arp.range + 1;
+    return (c->arp_on ? 1 : 0) | ((mode & 3) << 1) | (((oct - 1) & 3) << 3);
 }
 
 /* Render nframes stereo samples into out (interleaved L,R). Advances the note
