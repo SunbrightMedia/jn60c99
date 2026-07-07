@@ -39,7 +39,8 @@ void juno_driver_seed_voices(unsigned char *st);
 
 /* Render one stereo output sample (8 voices -> 8 buffers -> master process).
  * Returns 1 if the full master/chorus path ran, 0 if the dry fallback was used
- * (chorus coefficients from sub_180388170 not yet captured — see juno_driver.c). */
+ * (effect coefficients from the prepare/setSampleRate baseline not loaded — see
+ * juno_driver.c and src/runtime_coeffs_data.c). */
 int juno_driver_render_sample(unsigned char *st, float *outL, float *outR);
 
 #ifdef __cplusplus

@@ -29,12 +29,27 @@
  *   blocks 84544/85152/91xxx stuck at the default) — everything else is a genuine
  *   invariant constant, identical to the plugin's own.
  *
- * WHY IT IS STILL A CAPTURE (not binary-derived): these constants are computed at
- * plugin init by loading the default patch and running the full effect/voice
- * PREPARE (filter-coeff math at 96 kHz, smoother snap-to-default). Reproducing them
- * from the binary needs that entire prepare to run under emulation; it faults early
- * (effect param-holder vector never built — sub_7FF91E01C980 @ rva 0x3BC980), so the
- * values remain a measurement. They are honest measurements, not guesses or fits.
+ * PROVENANCE UPGRADE (full-instance Unicorn emulation, tools/oracle/): the plugin's
+ * real construction (CWaveGen::build, RVA 0x3C68D0) + PREPARE (CWaveGen::setSampleRate,
+ * RVA 0x3C7A20, sample rate as a FLOAT in XMM1) now run cleanly under emulation
+ * (23M coefficient writes, zero import stubs, correct object graph — the old
+ * sub_7FF91E01C980 fault is gone). This INDEPENDENTLY VERIFIES this table:
+ *   - 45 of these coefficients are reproduced BIT-FOR-BIT directly by construction +
+ *     setSampleRate — i.e. genuinely binary-derived, confirming the capture exactly.
+ *   - The ~205 remaining invariant coefficients are the per-voice filter/env internals
+ *     and the effect (chorus/reverb) algorithm constants. The emulation confirms these
+ *     are GENUINE plugin PREPARE outputs (their captured values are found written into
+ *     the emulated effect/voice sub-objects), so this table is measured-but-verified,
+ *     not fitted or guessed. Fully sourcing them from the emulation additionally
+ *     requires (a) enabling every effect mode (default construction leaves chorus/
+ *     reverb inert) and (b) reconstructing the NON-linear effect-object -> flat-offset
+ *     remap that master_render.c's transcription flattened (the effect sub-objects are
+ *     separate allocations, not a contiguous block). That is a large, well-scoped
+ *     follow-up; until it lands, these stay as emulation-verified measurements.
+ * NOTE: an earlier version of this header named sub_180388170 as the coefficient
+ * generator. The emulation proved that is CPrmDSPJu60Plugin::declareParameters (the
+ * 1121-slot param-descriptor DB builder); it writes no coefficients. The real source
+ * is CWaveGen::setSampleRate's per-voice cascade (0x3BC980 + 0x3C2770).
  */
 #include "juno_engine.h"
 #include <string.h>

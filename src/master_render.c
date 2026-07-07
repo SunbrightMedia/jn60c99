@@ -12,11 +12,18 @@
  *      2*state[101264] (L) and 2*state[101280] (R).
  * Build with -fno-strict-aliasing (the engine addresses state by raw offset).
  *
- * NOTE: the ~250 chorus/output coefficients produced by sub_180388170 are not
- * yet in our data (Hex-Rays returns None on it; see tools/extract_chorus_coeffs.py).
- * Until they are captured those fields are zero, so the chorus is inert and the
- * output saturator collapses toward silence — this is missing DATA, not a
- * transcription gap. The algorithm here is complete and exact.
+ * NOTE: the ~250 chorus/output coefficients are the effect-object filter
+ * constants computed by the plugin's PREPARE — CWaveGen::setSampleRate (RVA
+ * 0x3C7A20), which per voice runs the effect/chorus broadcast (0x3BC980) and the
+ * filter-coeff math (0x3C2770). (Earlier notes wrongly named sub_180388170 as the
+ * generator; a full-instance Unicorn emulation showed that function is actually
+ * CPrmDSPJu60Plugin::declareParameters — the 1121-slot param-descriptor DB builder
+ * — which writes no coefficients.) The emulation runs the real construction +
+ * setSampleRate and reproduces the derivable subset bit-for-bit, and confirms the
+ * effect coefficients are genuine plugin prepare outputs (see tools/oracle/ and
+ * src/runtime_coeffs_data.c). They reach this flat-state transcription via the
+ * runtime_coeffs baseline; without them the chorus is inert. The algorithm here
+ * is complete and exact.
  */
 #include "juno_engine.h"
 #include "juno_dsp.h"

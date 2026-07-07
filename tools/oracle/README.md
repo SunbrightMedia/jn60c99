@@ -48,3 +48,18 @@ the curve function `0x356380` (edx=curve_id, r8d=value) and the descriptor write
 - `gap_bindings.json` — the remaining panel controls, per-row confidence.
 - `static_table.json` — dispatch map, slot→thunk, 155-leaf curve catalog, parser
   record map, ABI notes.
+
+## Prepare / runtime-coeffs derivation (derive_coeffs.py)
+
+`derive_coeffs.py` builds the full instance and runs the real PREPARE to derive the
+`src/runtime_coeffs_data.c` baseline from the binary:
+- BUILD  = CWaveGen::build       (RVA 0x3C68D0, vtable[1])
+- PREP   = CWaveGen::setSampleRate (RVA 0x3C7A20, vtable[3]) — sample rate is a
+  **float in XMM1** (NOT a GP reg; emu2.call() only sets rcx/rdx/r8/r9, so drive
+  emu_start manually and set XMM1 = float32(96000.0)).
+setSampleRate does ~23M coefficient writes (zero import stubs, correct graph) and
+reproduces 45/279 runtime coeffs bit-for-bit. The remaining ~205 invariant coeffs
+are per-voice/effect internals whose captured values are confirmed present in the
+emulated sub-objects; fully sourcing them needs every effect mode enabled + the
+non-linear effect-object -> flat-offset remap that master_render.c flattened.
+NOTE: sub_180388170 is declareParameters (param-descriptor DB), NOT a coeff generator.
