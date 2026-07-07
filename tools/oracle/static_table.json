@@ -1,0 +1,3856 @@
+{
+ "meta": {
+  "vtable_rva": "0x9c3018",
+  "curve_fn_rva": "0x356380",
+  "dispatch_abi": "sub_7FF91E019A30(rcx=this, edx=dispatch_index, r8d=flag[1=immediate], r9d=value)",
+  "curve_abi": "0x356380(rcx=curveObj[ignored], edx=curve_id, r8d=value_int) -> xmm0 float",
+  "note": "slot thunks 187..352 broadcast to runtime target list or forward to subobject; curve_id lives in leaf methods (this catalog).",
+  "decomp_base": "0x7ff91dc60000",
+  "leaf_oracle": "each leaf executed under Unicorn over value 0..255; effective_curve/transform = bit-exact juno_curve match of the WRITTEN float (SR-variant + transforms resolved empirically). 111/155 single/multi-matched; multi-write & bipolar-special leaves flagged."
+ },
+ "dispatch": {
+  "20": {
+   "slot": 187,
+   "byteoff": 1496,
+   "flatN": 237,
+   "thunk": "0x3af590"
+  },
+  "128": {
+   "slot": 188,
+   "byteoff": 1504,
+   "flatN": 238,
+   "thunk": "0x3b0510"
+  },
+  "129": {
+   "slot": 189,
+   "byteoff": 1512,
+   "flatN": 239,
+   "thunk": "0x3b04a0"
+  },
+  "130": {
+   "slot": 190,
+   "byteoff": 1520,
+   "flatN": 240,
+   "thunk": "0x3aff60"
+  },
+  "131": {
+   "slot": 191,
+   "byteoff": 1528,
+   "flatN": 241,
+   "thunk": "0x3affd0"
+  },
+  "132": {
+   "slot": 192,
+   "byteoff": 1536,
+   "flatN": 242,
+   "thunk": "0x3b0040"
+  },
+  "133": {
+   "slot": 193,
+   "byteoff": 1544,
+   "flatN": 243,
+   "thunk": "0x3b00b0"
+  },
+  "134": {
+   "slot": 194,
+   "byteoff": 1552,
+   "flatN": 244,
+   "thunk": "0x3b0120"
+  },
+  "135": {
+   "slot": 195,
+   "byteoff": 1560,
+   "flatN": 245,
+   "thunk": "0x3b0190"
+  },
+  "136": {
+   "slot": 196,
+   "byteoff": 1568,
+   "flatN": 246,
+   "thunk": "0x3b0200"
+  },
+  "137": {
+   "slot": 197,
+   "byteoff": 1576,
+   "flatN": 247,
+   "thunk": "0x3b0270"
+  },
+  "138": {
+   "slot": 198,
+   "byteoff": 1584,
+   "flatN": 248,
+   "thunk": "0x3b02e0"
+  },
+  "139": {
+   "slot": 199,
+   "byteoff": 1592,
+   "flatN": 249,
+   "thunk": "0x3b0350"
+  },
+  "140": {
+   "slot": 200,
+   "byteoff": 1600,
+   "flatN": 250,
+   "thunk": "0x3b03c0"
+  },
+  "141": {
+   "slot": 201,
+   "byteoff": 1608,
+   "flatN": 251,
+   "thunk": "0x3b0430"
+  },
+  "189": {
+   "slot": 202,
+   "byteoff": 1616,
+   "flatN": 252,
+   "thunk": "0x3b1210"
+  },
+  "196": {
+   "slot": 204,
+   "byteoff": 1632,
+   "flatN": 254,
+   "thunk": "0x3afe00"
+  },
+  "254": {
+   "slot": 205,
+   "byteoff": 1640,
+   "flatN": 255,
+   "thunk": "0x3af190"
+  },
+  "312": {
+   "slot": 206,
+   "byteoff": 1648,
+   "flatN": 256,
+   "thunk": "0x3b9990"
+  },
+  "313": {
+   "slot": 207,
+   "byteoff": 1656,
+   "flatN": 257,
+   "thunk": "0x3b0600"
+  },
+  "314": {
+   "slot": 208,
+   "byteoff": 1664,
+   "flatN": 258,
+   "thunk": "0x3b0650"
+  },
+  "315": {
+   "slot": 209,
+   "byteoff": 1672,
+   "flatN": 259,
+   "thunk": "0x3b06a0"
+  },
+  "316": {
+   "slot": 210,
+   "byteoff": 1680,
+   "flatN": 260,
+   "thunk": "0x3b06f0"
+  },
+  "317": {
+   "slot": 211,
+   "byteoff": 1688,
+   "flatN": 261,
+   "thunk": "0x3b0740"
+  },
+  "318": {
+   "slot": 212,
+   "byteoff": 1696,
+   "flatN": 262,
+   "thunk": "0x3b0790"
+  },
+  "373": {
+   "slot": 213,
+   "byteoff": 1704,
+   "flatN": 263,
+   "thunk": "0x3b9a20"
+  },
+  "375": {
+   "slot": 214,
+   "byteoff": 1712,
+   "flatN": 264,
+   "thunk": "0x3b9710"
+  },
+  "433": {
+   "slot": 215,
+   "byteoff": 1720,
+   "flatN": 265,
+   "thunk": "0x3ae3b0"
+  },
+  "434": {
+   "slot": 216,
+   "byteoff": 1728,
+   "flatN": 266,
+   "thunk": "0x3ae3d0"
+  },
+  "435": {
+   "slot": 217,
+   "byteoff": 1736,
+   "flatN": 267,
+   "thunk": "0x3ae3f0"
+  },
+  "436": {
+   "slot": 218,
+   "byteoff": 1744,
+   "flatN": 268,
+   "thunk": "0x3ae410"
+  },
+  "437": {
+   "slot": 219,
+   "byteoff": 1752,
+   "flatN": 269,
+   "thunk": "0x3ae430"
+  },
+  "438": {
+   "slot": 220,
+   "byteoff": 1760,
+   "flatN": 270,
+   "thunk": "0x3ae450"
+  },
+  "439": {
+   "slot": 221,
+   "byteoff": 1768,
+   "flatN": 271,
+   "thunk": "0x3ae470"
+  },
+  "440": {
+   "slot": 222,
+   "byteoff": 1776,
+   "flatN": 272,
+   "thunk": "0x3ae490"
+  },
+  "450": {
+   "slot": 223,
+   "byteoff": 1784,
+   "flatN": 273,
+   "thunk": "0x3aec60"
+  },
+  "451": {
+   "slot": 224,
+   "byteoff": 1792,
+   "flatN": 274,
+   "thunk": "0x3aece0"
+  },
+  "452": {
+   "slot": 225,
+   "byteoff": 1800,
+   "flatN": 275,
+   "thunk": "0x3aed60"
+  },
+  "453": {
+   "slot": 226,
+   "byteoff": 1808,
+   "flatN": 276,
+   "thunk": "0x3aede0"
+  },
+  "454": {
+   "slot": 227,
+   "byteoff": 1816,
+   "flatN": 277,
+   "thunk": "0x3aee60"
+  },
+  "455": {
+   "slot": 228,
+   "byteoff": 1824,
+   "flatN": 278,
+   "thunk": "0x3aeee0"
+  },
+  "456": {
+   "slot": 229,
+   "byteoff": 1832,
+   "flatN": 279,
+   "thunk": "0x3aef60"
+  },
+  "457": {
+   "slot": 230,
+   "byteoff": 1840,
+   "flatN": 280,
+   "thunk": "0x3aefe0"
+  },
+  "467": {
+   "slot": 231,
+   "byteoff": 1848,
+   "flatN": 281,
+   "thunk": "0x3afb90"
+  },
+  "468": {
+   "slot": 232,
+   "byteoff": 1856,
+   "flatN": 282,
+   "thunk": "0x3afba0"
+  },
+  "469": {
+   "slot": 233,
+   "byteoff": 1864,
+   "flatN": 283,
+   "thunk": "0x3afbb0"
+  },
+  "470": {
+   "slot": 234,
+   "byteoff": 1872,
+   "flatN": 284,
+   "thunk": "0x3afbc0"
+  },
+  "471": {
+   "slot": 235,
+   "byteoff": 1880,
+   "flatN": 285,
+   "thunk": "0x3afbd0"
+  },
+  "472": {
+   "slot": 236,
+   "byteoff": 1888,
+   "flatN": 286,
+   "thunk": "0x3afbe0"
+  },
+  "473": {
+   "slot": 237,
+   "byteoff": 1896,
+   "flatN": 287,
+   "thunk": "0x3afbf0"
+  },
+  "474": {
+   "slot": 238,
+   "byteoff": 1904,
+   "flatN": 288,
+   "thunk": "0x3afc00"
+  },
+  "484": {
+   "slot": 239,
+   "byteoff": 1912,
+   "flatN": 289,
+   "thunk": "0x3afa50"
+  },
+  "493": {
+   "slot": 240,
+   "byteoff": 1920,
+   "flatN": 290,
+   "thunk": "0x3afd40"
+  },
+  "495": {
+   "slot": 241,
+   "byteoff": 1928,
+   "flatN": 291,
+   "thunk": "0x3af810"
+  },
+  "498": {
+   "slot": 242,
+   "byteoff": 1936,
+   "flatN": 292,
+   "thunk": "0x3aebd0"
+  },
+  "553": {
+   "slot": 243,
+   "byteoff": 1944,
+   "flatN": 293,
+   "thunk": "0x3af070"
+  },
+  "554": {
+   "slot": 244,
+   "byteoff": 1952,
+   "flatN": 294,
+   "thunk": "0x3af080"
+  },
+  "555": {
+   "slot": 245,
+   "byteoff": 1960,
+   "flatN": 295,
+   "thunk": "0x3af060"
+  },
+  "614": {
+   "slot": 246,
+   "byteoff": 1968,
+   "flatN": 296,
+   "thunk": "0x3afd30"
+  },
+  "657": {
+   "slot": 247,
+   "byteoff": 1976,
+   "flatN": 297,
+   "thunk": "0x3b1340"
+  },
+  "665": {
+   "slot": 248,
+   "byteoff": 1984,
+   "flatN": 298,
+   "thunk": "0x3b1350"
+  },
+  "668": {
+   "slot": 249,
+   "byteoff": 1992,
+   "flatN": 299,
+   "thunk": "0x3b1320"
+  },
+  "669": {
+   "slot": 250,
+   "byteoff": 2000,
+   "flatN": 300,
+   "thunk": "0x3b1330"
+  },
+  "699": {
+   "slot": 251,
+   "byteoff": 2008,
+   "flatN": 301,
+   "thunk": "0x3af4f0"
+  },
+  "707": {
+   "slot": 252,
+   "byteoff": 2016,
+   "flatN": 302,
+   "thunk": "0x3af500"
+  },
+  "710": {
+   "slot": 253,
+   "byteoff": 2024,
+   "flatN": 303,
+   "thunk": "0x3af4d0"
+  },
+  "711": {
+   "slot": 254,
+   "byteoff": 2032,
+   "flatN": 304,
+   "thunk": "0x3af4e0"
+  },
+  "751": {
+   "slot": 255,
+   "byteoff": 2040,
+   "flatN": 305,
+   "thunk": "0x3af1d0"
+  },
+  "752": {
+   "slot": 256,
+   "byteoff": 2048,
+   "flatN": 306,
+   "thunk": "0x3af2d0"
+  },
+  "753": {
+   "slot": 257,
+   "byteoff": 2056,
+   "flatN": 307,
+   "thunk": "0x3afc90"
+  },
+  "754": {
+   "slot": 258,
+   "byteoff": 2064,
+   "flatN": 308,
+   "thunk": "0x3b1560"
+  },
+  "756": {
+   "slot": 259,
+   "byteoff": 2072,
+   "flatN": 309,
+   "thunk": "0x3af450"
+  },
+  "757": {
+   "slot": 260,
+   "byteoff": 2080,
+   "flatN": 310,
+   "thunk": "0x3b1780"
+  },
+  "758": {
+   "slot": 261,
+   "byteoff": 2088,
+   "flatN": 311,
+   "thunk": "0x3ae320"
+  },
+  "759": {
+   "slot": 262,
+   "byteoff": 2096,
+   "flatN": 312,
+   "thunk": "0x3af8d0"
+  },
+  "760": {
+   "slot": 263,
+   "byteoff": 2104,
+   "flatN": 313,
+   "thunk": "0x3afc10"
+  },
+  "770": {
+   "slot": 264,
+   "byteoff": 2112,
+   "flatN": 314,
+   "thunk": "0x3af690"
+  },
+  "771": {
+   "slot": 265,
+   "byteoff": 2120,
+   "flatN": 315,
+   "thunk": "0x3af710"
+  },
+  "772": {
+   "slot": 266,
+   "byteoff": 2128,
+   "flatN": 316,
+   "thunk": "0x3af790"
+  },
+  "773": {
+   "slot": 267,
+   "byteoff": 2136,
+   "flatN": 317,
+   "thunk": "0x3af610"
+  },
+  "779": {
+   "slot": 268,
+   "byteoff": 2144,
+   "flatN": 318,
+   "thunk": "0x3b1360"
+  },
+  "781": {
+   "slot": 269,
+   "byteoff": 2152,
+   "flatN": 319,
+   "thunk": "0x3b15e0"
+  },
+  "782": {
+   "slot": 270,
+   "byteoff": 2160,
+   "flatN": 320,
+   "thunk": "0x3af090"
+  },
+  "783": {
+   "slot": 271,
+   "byteoff": 2168,
+   "flatN": 321,
+   "thunk": "0x3b1460"
+  },
+  "784": {
+   "slot": 272,
+   "byteoff": 2176,
+   "flatN": 322,
+   "thunk": "0x3ae7d0"
+  },
+  "785": {
+   "slot": 273,
+   "byteoff": 2184,
+   "flatN": 323,
+   "thunk": "0x3ae850"
+  },
+  "786": {
+   "slot": 274,
+   "byteoff": 2192,
+   "flatN": 324,
+   "thunk": "0x3ae950"
+  },
+  "787": {
+   "slot": 275,
+   "byteoff": 2200,
+   "flatN": 325,
+   "thunk": "0x3ae8d0"
+  },
+  "788": {
+   "slot": 276,
+   "byteoff": 2208,
+   "flatN": 326,
+   "thunk": "0x3b14e0"
+  },
+  "789": {
+   "slot": 277,
+   "byteoff": 2216,
+   "flatN": 327,
+   "thunk": "0x3ae9d0"
+  },
+  "790": {
+   "slot": 278,
+   "byteoff": 2224,
+   "flatN": 328,
+   "thunk": "0x3aea50"
+  },
+  "791": {
+   "slot": 279,
+   "byteoff": 2232,
+   "flatN": 329,
+   "thunk": "0x3aeb50"
+  },
+  "792": {
+   "slot": 280,
+   "byteoff": 2240,
+   "flatN": 330,
+   "thunk": "0x3aead0"
+  },
+  "793": {
+   "slot": 281,
+   "byteoff": 2248,
+   "flatN": 331,
+   "thunk": "0x3b12a0"
+  },
+  "794": {
+   "slot": 282,
+   "byteoff": 2256,
+   "flatN": 332,
+   "thunk": "0x3ae560"
+  },
+  "795": {
+   "slot": 283,
+   "byteoff": 2264,
+   "flatN": 333,
+   "thunk": "0x3b9880"
+  },
+  "796": {
+   "slot": 284,
+   "byteoff": 2272,
+   "flatN": 334,
+   "thunk": "0x3b8e50"
+  },
+  "797": {
+   "slot": 285,
+   "byteoff": 2280,
+   "flatN": 335,
+   "thunk": "0x3b9250"
+  },
+  "798": {
+   "slot": 286,
+   "byteoff": 2288,
+   "flatN": 336,
+   "thunk": "0x3afe10"
+  },
+  "799": {
+   "slot": 287,
+   "byteoff": 2296,
+   "flatN": 337,
+   "thunk": "0x3af1b0"
+  },
+  "800": {
+   "slot": 288,
+   "byteoff": 2304,
+   "flatN": 338,
+   "thunk": "0x3afa70"
+  },
+  "801": {
+   "slot": 289,
+   "byteoff": 2312,
+   "flatN": 339,
+   "thunk": "0x3ae100"
+  },
+  "803": {
+   "slot": 290,
+   "byteoff": 2320,
+   "flatN": 340,
+   "thunk": "0x3b99d0"
+  },
+  "810": {
+   "slot": 291,
+   "byteoff": 2328,
+   "flatN": 341,
+   "thunk": "0x3afd10"
+  },
+  "830": {
+   "slot": 292,
+   "byteoff": 2336,
+   "flatN": 342,
+   "thunk": "0x3af1a0"
+  },
+  "838": {
+   "slot": 293,
+   "byteoff": 2344,
+   "flatN": 343,
+   "thunk": "0x3afaf0"
+  },
+  "839": {
+   "slot": 294,
+   "byteoff": 2352,
+   "flatN": 344,
+   "thunk": "0x3afb20"
+  },
+  "840": {
+   "slot": 295,
+   "byteoff": 2360,
+   "flatN": 345,
+   "thunk": "0x3afb10"
+  },
+  "841": {
+   "slot": 296,
+   "byteoff": 2368,
+   "flatN": 346,
+   "thunk": "0x3afb00"
+  },
+  "842": {
+   "slot": 297,
+   "byteoff": 2376,
+   "flatN": 347,
+   "thunk": "0x3afae0"
+  },
+  "843": {
+   "slot": 298,
+   "byteoff": 2384,
+   "flatN": 348,
+   "thunk": "0x3afb30"
+  },
+  "844": {
+   "slot": 299,
+   "byteoff": 2392,
+   "flatN": 349,
+   "thunk": "0x3afb50"
+  },
+  "845": {
+   "slot": 300,
+   "byteoff": 2400,
+   "flatN": 350,
+   "thunk": "0x3afb40"
+  },
+  "846": {
+   "slot": 301,
+   "byteoff": 2408,
+   "flatN": 351,
+   "thunk": "0x3afb60"
+  },
+  "847": {
+   "slot": 302,
+   "byteoff": 2416,
+   "flatN": 352,
+   "thunk": "0x3afb80"
+  },
+  "848": {
+   "slot": 303,
+   "byteoff": 2424,
+   "flatN": 353,
+   "thunk": "0x3afb70"
+  },
+  "849": {
+   "slot": 304,
+   "byteoff": 2432,
+   "flatN": 354,
+   "thunk": "0x3afad0"
+  },
+  "850": {
+   "slot": 305,
+   "byteoff": 2440,
+   "flatN": 355,
+   "thunk": "0x3afac0"
+  },
+  "851": {
+   "slot": 306,
+   "byteoff": 2448,
+   "flatN": 356,
+   "thunk": "0x3afab0"
+  },
+  "852": {
+   "slot": 307,
+   "byteoff": 2456,
+   "flatN": 357,
+   "thunk": "0x3afaa0"
+  },
+  "853": {
+   "slot": 308,
+   "byteoff": 2464,
+   "flatN": 358,
+   "thunk": "0x3af1c0"
+  },
+  "855": {
+   "slot": 309,
+   "byteoff": 2472,
+   "flatN": 359,
+   "thunk": "0x3adfc0"
+  },
+  "856": {
+   "slot": 310,
+   "byteoff": 2480,
+   "flatN": 360,
+   "thunk": "0x3ade40"
+  },
+  "857": {
+   "slot": 311,
+   "byteoff": 2488,
+   "flatN": 361,
+   "thunk": "0x3ae040"
+  },
+  "858": {
+   "slot": 312,
+   "byteoff": 2496,
+   "flatN": 362,
+   "thunk": "0x3ae240"
+  },
+  "859": {
+   "slot": 313,
+   "byteoff": 2504,
+   "flatN": 363,
+   "thunk": "0x3ae1c0"
+  },
+  "860": {
+   "slot": 314,
+   "byteoff": 2512,
+   "flatN": 364,
+   "thunk": "0x3af9d0"
+  },
+  "861": {
+   "slot": 315,
+   "byteoff": 2520,
+   "flatN": 365,
+   "thunk": "0x3af950"
+  },
+  "863": {
+   "slot": 316,
+   "byteoff": 2528,
+   "flatN": 366,
+   "thunk": "0x3af250"
+  },
+  "871": {
+   "slot": 317,
+   "byteoff": 2536,
+   "flatN": 367,
+   "thunk": "0x3af110"
+  },
+  "873": {
+   "slot": 318,
+   "byteoff": 2544,
+   "flatN": 368,
+   "thunk": "0x3ae7b0"
+  },
+  "874": {
+   "slot": 319,
+   "byteoff": 2552,
+   "flatN": 369,
+   "thunk": "0x3ae720"
+  },
+  "875": {
+   "slot": 320,
+   "byteoff": 2560,
+   "flatN": 370,
+   "thunk": "0x3b93e0"
+  },
+  "876": {
+   "slot": 321,
+   "byteoff": 2568,
+   "flatN": 371,
+   "thunk": "0x3b98e0"
+  },
+  "877": {
+   "slot": 322,
+   "byteoff": 2576,
+   "flatN": 372,
+   "thunk": "0x3b98d0"
+  },
+  "878": {
+   "slot": 323,
+   "byteoff": 2584,
+   "flatN": 373,
+   "thunk": "0x3af350"
+  },
+  "1028": {
+   "slot": 324,
+   "byteoff": 2592,
+   "flatN": 374,
+   "thunk": "0x3b16e0"
+  },
+  "1029": {
+   "slot": 325,
+   "byteoff": 2600,
+   "flatN": 375,
+   "thunk": "0x3b13e0"
+  },
+  "1058": {
+   "slot": 326,
+   "byteoff": 2608,
+   "flatN": 376,
+   "thunk": "0x3b1660"
+  },
+  "1178": {
+   "slot": 327,
+   "byteoff": 2616,
+   "flatN": 377,
+   "thunk": "0x3b91e0"
+  },
+  "1179": {
+   "slot": 328,
+   "byteoff": 2624,
+   "flatN": 378,
+   "thunk": "0x3b8d00"
+  },
+  "1180": {
+   "slot": 329,
+   "byteoff": 2632,
+   "flatN": 379,
+   "thunk": "0x3b9150"
+  },
+  "1181": {
+   "slot": 330,
+   "byteoff": 2640,
+   "flatN": 380,
+   "thunk": "0x3b8c90"
+  },
+  "1182": {
+   "slot": 331,
+   "byteoff": 2648,
+   "flatN": 381,
+   "thunk": "0x3b9070"
+  },
+  "1183": {
+   "slot": 332,
+   "byteoff": 2656,
+   "flatN": 382,
+   "thunk": "0x3b90e0"
+  },
+  "1184": {
+   "slot": 333,
+   "byteoff": 2664,
+   "flatN": 383,
+   "thunk": "0x3b8d70"
+  },
+  "1185": {
+   "slot": 334,
+   "byteoff": 2672,
+   "flatN": 384,
+   "thunk": "0x3b8de0"
+  },
+  "1210": {
+   "slot": 335,
+   "byteoff": 2680,
+   "flatN": 385,
+   "thunk": "0x3b8bf0"
+  },
+  "1211": {
+   "slot": 336,
+   "byteoff": 2688,
+   "flatN": 386,
+   "thunk": "0x3b8990"
+  },
+  "1212": {
+   "slot": 337,
+   "byteoff": 2696,
+   "flatN": 387,
+   "thunk": "0x3b8ae0"
+  },
+  "1213": {
+   "slot": 338,
+   "byteoff": 2704,
+   "flatN": 388,
+   "thunk": "0x3b8ad0"
+  },
+  "1214": {
+   "slot": 339,
+   "byteoff": 2712,
+   "flatN": 389,
+   "thunk": "0x3b8ab0"
+  },
+  "1215": {
+   "slot": 340,
+   "byteoff": 2720,
+   "flatN": 390,
+   "thunk": "0x3b8ac0"
+  },
+  "1242": {
+   "slot": 341,
+   "byteoff": 2728,
+   "flatN": 391,
+   "thunk": "0x3b9660"
+  },
+  "1243": {
+   "slot": 342,
+   "byteoff": 2736,
+   "flatN": 392,
+   "thunk": "0x3b96b0"
+  },
+  "1244": {
+   "slot": 343,
+   "byteoff": 2744,
+   "flatN": 393,
+   "thunk": "0x3b9700"
+  },
+  "1245": {
+   "slot": 344,
+   "byteoff": 2752,
+   "flatN": 394,
+   "thunk": "0x3b95c0"
+  },
+  "1246": {
+   "slot": 345,
+   "byteoff": 2760,
+   "flatN": 395,
+   "thunk": "0x3b9650"
+  },
+  "1247": {
+   "slot": 346,
+   "byteoff": 2768,
+   "flatN": 396,
+   "thunk": "0x3b9630"
+  },
+  "1248": {
+   "slot": 347,
+   "byteoff": 2776,
+   "flatN": 397,
+   "thunk": "0x3b9640"
+  },
+  "1323": {
+   "slot": 348,
+   "byteoff": 2784,
+   "flatN": 398,
+   "thunk": "0x3b98c0"
+  },
+  "1324": {
+   "slot": 349,
+   "byteoff": 2792,
+   "flatN": 399,
+   "thunk": "0x3b9870"
+  },
+  "1325": {
+   "slot": 350,
+   "byteoff": 2800,
+   "flatN": 400,
+   "thunk": "0x3b98b0"
+  },
+  "1326": {
+   "slot": 351,
+   "byteoff": 2808,
+   "flatN": 401,
+   "thunk": "0x3b9830"
+  },
+  "1327": {
+   "slot": 352,
+   "byteoff": 2816,
+   "flatN": 402,
+   "thunk": "0x3b9840"
+  }
+ },
+ "leaf_curve_catalog": {
+  "0x3562b0": {
+   "fn": "0x3562b0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x356310": {
+   "fn": "0x356310",
+   "curve_ids": [
+    57
+   ],
+   "transform": "HALF",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     57,
+     "HALF"
+    ]
+   ],
+   "effective_curve": 57,
+   "effective_transform": "HALF"
+  },
+  "0x356cd0": {
+   "fn": "0x356cd0",
+   "curve_ids": [
+    1,
+    2,
+    3
+   ],
+   "transform": "ID",
+   "ncalls": 3,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x356e30": {
+   "fn": "0x356e30",
+   "curve_ids": [
+    39
+   ],
+   "transform": "ID",
+   "ncalls": 2,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     18,
+     "BIP"
+    ],
+    [
+     21,
+     "BIP"
+    ],
+    [
+     52,
+     "BIP"
+    ],
+    [
+     52,
+     "INVHALF"
+    ],
+    [
+     56,
+     "BIP"
+    ],
+    [
+     62,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 18,
+   "effective_transform": "BIP"
+  },
+  "0x356fb0": {
+   "fn": "0x356fb0",
+   "curve_ids": [
+    51
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     51,
+     "ID"
+    ]
+   ],
+   "effective_curve": 51,
+   "effective_transform": "ID"
+  },
+  "0x357060": {
+   "fn": "0x357060",
+   "curve_ids": [
+    24
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     24,
+     "ID"
+    ]
+   ],
+   "effective_curve": 24,
+   "effective_transform": "ID"
+  },
+  "0x3570c0": {
+   "fn": "0x3570c0",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x357100": {
+   "fn": "0x357100",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x357160": {
+   "fn": "0x357160",
+   "curve_ids": [
+    57
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     57,
+     "ID"
+    ]
+   ],
+   "effective_curve": 57,
+   "effective_transform": "ID"
+  },
+  "0x357230": {
+   "fn": "0x357230",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x357390": {
+   "fn": "0x357390",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x357580": {
+   "fn": "0x357580",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x357740": {
+   "fn": "0x357740",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x3577b0": {
+   "fn": "0x3577b0",
+   "curve_ids": [
+    19
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x357a00": {
+   "fn": "0x357a00",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x357d60": {
+   "fn": "0x357d60",
+   "curve_ids": [
+    25
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     25,
+     "ID"
+    ]
+   ],
+   "effective_curve": 25,
+   "effective_transform": "ID"
+  },
+  "0x357e40": {
+   "fn": "0x357e40",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x357fc0": {
+   "fn": "0x357fc0",
+   "curve_ids": [
+    19
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     19,
+     "ID"
+    ]
+   ],
+   "effective_curve": 19,
+   "effective_transform": "ID"
+  },
+  "0x358020": {
+   "fn": "0x358020",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x358120": {
+   "fn": "0x358120",
+   "curve_ids": [
+    24
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     24,
+     "ID"
+    ]
+   ],
+   "effective_curve": 24,
+   "effective_transform": "ID"
+  },
+  "0x358540": {
+   "fn": "0x358540",
+   "curve_ids": [
+    33
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     35,
+     "ID"
+    ]
+   ],
+   "effective_curve": 35,
+   "effective_transform": "ID"
+  },
+  "0x3585c0": {
+   "fn": "0x3585c0",
+   "curve_ids": [
+    36
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     38,
+     "ID"
+    ]
+   ],
+   "effective_curve": 38,
+   "effective_transform": "ID"
+  },
+  "0x358640": {
+   "fn": "0x358640",
+   "curve_ids": [
+    36
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     38,
+     "ID"
+    ]
+   ],
+   "effective_curve": 38,
+   "effective_transform": "ID"
+  },
+  "0x3586c0": {
+   "fn": "0x3586c0",
+   "curve_ids": [
+    50
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     50,
+     "ID"
+    ]
+   ],
+   "effective_curve": 50,
+   "effective_transform": "ID"
+  },
+  "0x358720": {
+   "fn": "0x358720",
+   "curve_ids": [
+    33
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     35,
+     "ID"
+    ]
+   ],
+   "effective_curve": 35,
+   "effective_transform": "ID"
+  },
+  "0x3587a0": {
+   "fn": "0x3587a0",
+   "curve_ids": [
+    36
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     38,
+     "ID"
+    ]
+   ],
+   "effective_curve": 38,
+   "effective_transform": "ID"
+  },
+  "0x358820": {
+   "fn": "0x358820",
+   "curve_ids": [
+    36
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     38,
+     "ID"
+    ]
+   ],
+   "effective_curve": 38,
+   "effective_transform": "ID"
+  },
+  "0x3588a0": {
+   "fn": "0x3588a0",
+   "curve_ids": [
+    50
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     50,
+     "ID"
+    ]
+   ],
+   "effective_curve": 50,
+   "effective_transform": "ID"
+  },
+  "0x358910": {
+   "fn": "0x358910",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x359440": {
+   "fn": "0x359440",
+   "curve_ids": [
+    26
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x3594d0": {
+   "fn": "0x3594d0",
+   "curve_ids": [
+    46
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     46,
+     "ID"
+    ]
+   ],
+   "effective_curve": 46,
+   "effective_transform": "ID"
+  },
+  "0x359530": {
+   "fn": "0x359530",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x359630": {
+   "fn": "0x359630",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x359670": {
+   "fn": "0x359670",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x359700": {
+   "fn": "0x359700",
+   "curve_ids": [
+    24
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     24,
+     "ID"
+    ]
+   ],
+   "effective_curve": 24,
+   "effective_transform": "ID"
+  },
+  "0x359790": {
+   "fn": "0x359790",
+   "curve_ids": [
+    47
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     47,
+     "ID"
+    ]
+   ],
+   "effective_curve": 47,
+   "effective_transform": "ID"
+  },
+  "0x3597f0": {
+   "fn": "0x3597f0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x3598f0": {
+   "fn": "0x3598f0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x359a60": {
+   "fn": "0x359a60",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x359af0": {
+   "fn": "0x359af0",
+   "curve_ids": [
+    31
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     2,
+     "BIP"
+    ],
+    [
+     3,
+     "BIP"
+    ],
+    [
+     9,
+     "BIP"
+    ],
+    [
+     10,
+     "BIP"
+    ],
+    [
+     51,
+     "BIP"
+    ],
+    [
+     51,
+     "INVHALF"
+    ],
+    [
+     59,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 2,
+   "effective_transform": "BIP"
+  },
+  "0x359be0": {
+   "fn": "0x359be0",
+   "curve_ids": [
+    22,
+    4
+   ],
+   "transform": "ID",
+   "ncalls": 2,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     2,
+     "BIP"
+    ],
+    [
+     3,
+     "BIP"
+    ],
+    [
+     9,
+     "BIP"
+    ],
+    [
+     10,
+     "BIP"
+    ],
+    [
+     51,
+     "BIP"
+    ],
+    [
+     51,
+     "INVHALF"
+    ],
+    [
+     59,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 2,
+   "effective_transform": "BIP"
+  },
+  "0x359d10": {
+   "fn": "0x359d10",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     2,
+     "BIP"
+    ],
+    [
+     3,
+     "BIP"
+    ],
+    [
+     9,
+     "BIP"
+    ],
+    [
+     10,
+     "BIP"
+    ],
+    [
+     51,
+     "BIP"
+    ],
+    [
+     51,
+     "INVHALF"
+    ],
+    [
+     59,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 2,
+   "effective_transform": "BIP"
+  },
+  "0x359de0": {
+   "fn": "0x359de0",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x359e20": {
+   "fn": "0x359e20",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x359e60": {
+   "fn": "0x359e60",
+   "curve_ids": [
+    56
+   ],
+   "transform": "HALF",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x359ed0": {
+   "fn": "0x359ed0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x359f30": {
+   "fn": "0x359f30",
+   "curve_ids": [
+    56
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     21,
+     "ID"
+    ],
+    [
+     56,
+     "ID"
+    ]
+   ],
+   "effective_curve": 56,
+   "effective_transform": "ID"
+  },
+  "0x35a570": {
+   "fn": "0x35a570",
+   "curve_ids": [
+    42
+   ],
+   "transform": "ID",
+   "ncalls": 2,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     44,
+     "ID"
+    ]
+   ],
+   "effective_curve": 44,
+   "effective_transform": "ID"
+  },
+  "0x35a660": {
+   "fn": "0x35a660",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35a6b0": {
+   "fn": "0x35a6b0",
+   "curve_ids": [
+    51
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     51,
+     "ID"
+    ]
+   ],
+   "effective_curve": 51,
+   "effective_transform": "ID"
+  },
+  "0x35a7e0": {
+   "fn": "0x35a7e0",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35a840": {
+   "fn": "0x35a840",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35a8a0": {
+   "fn": "0x35a8a0",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35a900": {
+   "fn": "0x35a900",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35a960": {
+   "fn": "0x35a960",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35a9c0": {
+   "fn": "0x35a9c0",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35aa20": {
+   "fn": "0x35aa20",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35aa80": {
+   "fn": "0x35aa80",
+   "curve_ids": [
+    22,
+    53,
+    48
+   ],
+   "transform": "ID",
+   "ncalls": 3,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35ac40": {
+   "fn": "0x35ac40",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35aca0": {
+   "fn": "0x35aca0",
+   "curve_ids": [
+    53,
+    48
+   ],
+   "transform": "ID",
+   "ncalls": 2,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35ad00": {
+   "fn": "0x35ad00",
+   "curve_ids": [
+    48,
+    53
+   ],
+   "transform": "ID",
+   "ncalls": 2,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35ad70": {
+   "fn": "0x35ad70",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35adb0": {
+   "fn": "0x35adb0",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35aef0": {
+   "fn": "0x35aef0",
+   "curve_ids": [
+    18
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     18,
+     "ID"
+    ]
+   ],
+   "effective_curve": 18,
+   "effective_transform": "ID"
+  },
+  "0x35af50": {
+   "fn": "0x35af50",
+   "curve_ids": [
+    19
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     19,
+     "ID"
+    ]
+   ],
+   "effective_curve": 19,
+   "effective_transform": "ID"
+  },
+  "0x35b0c0": {
+   "fn": "0x35b0c0",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35bb80": {
+   "fn": "0x35bb80",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35bbd0": {
+   "fn": "0x35bbd0",
+   "curve_ids": [
+    26
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35bea0": {
+   "fn": "0x35bea0",
+   "curve_ids": [
+    5
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     5,
+     "ID"
+    ]
+   ],
+   "effective_curve": 5,
+   "effective_transform": "ID"
+  },
+  "0x35bee0": {
+   "fn": "0x35bee0",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35c030": {
+   "fn": "0x35c030",
+   "curve_ids": [],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     0,
+     "ID"
+    ]
+   ],
+   "effective_curve": 0,
+   "effective_transform": "ID"
+  },
+  "0x35c090": {
+   "fn": "0x35c090",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x35c1d0": {
+   "fn": "0x35c1d0",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35c230": {
+   "fn": "0x35c230",
+   "curve_ids": [
+    28
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     28,
+     "ID"
+    ]
+   ],
+   "effective_curve": 28,
+   "effective_transform": "ID"
+  },
+  "0x35c290": {
+   "fn": "0x35c290",
+   "curve_ids": [
+    54
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     54,
+     "ID"
+    ]
+   ],
+   "effective_curve": 54,
+   "effective_transform": "ID"
+  },
+  "0x35c2f0": {
+   "fn": "0x35c2f0",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35c3d0": {
+   "fn": "0x35c3d0",
+   "curve_ids": [
+    45
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     45,
+     "ID"
+    ]
+   ],
+   "effective_curve": 45,
+   "effective_transform": "ID"
+  },
+  "0x35c4b0": {
+   "fn": "0x35c4b0",
+   "curve_ids": [
+    54
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     54,
+     "ID"
+    ]
+   ],
+   "effective_curve": 54,
+   "effective_transform": "ID"
+  },
+  "0x35c510": {
+   "fn": "0x35c510",
+   "curve_ids": [
+    54
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     54,
+     "ID"
+    ]
+   ],
+   "effective_curve": 54,
+   "effective_transform": "ID"
+  },
+  "0x35c570": {
+   "fn": "0x35c570",
+   "curve_ids": [
+    54
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     54,
+     "ID"
+    ]
+   ],
+   "effective_curve": 54,
+   "effective_transform": "ID"
+  },
+  "0x35c5d0": {
+   "fn": "0x35c5d0",
+   "curve_ids": [
+    54
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     54,
+     "ID"
+    ]
+   ],
+   "effective_curve": 54,
+   "effective_transform": "ID"
+  },
+  "0x35c630": {
+   "fn": "0x35c630",
+   "curve_ids": [
+    22,
+    4
+   ],
+   "transform": "ID",
+   "ncalls": 2,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     2,
+     "BIP"
+    ],
+    [
+     3,
+     "BIP"
+    ],
+    [
+     9,
+     "BIP"
+    ],
+    [
+     10,
+     "BIP"
+    ],
+    [
+     51,
+     "BIP"
+    ],
+    [
+     51,
+     "INVHALF"
+    ],
+    [
+     59,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 2,
+   "effective_transform": "BIP"
+  },
+  "0x35c710": {
+   "fn": "0x35c710",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     2,
+     "BIP"
+    ],
+    [
+     3,
+     "BIP"
+    ],
+    [
+     9,
+     "BIP"
+    ],
+    [
+     10,
+     "BIP"
+    ],
+    [
+     51,
+     "BIP"
+    ],
+    [
+     51,
+     "INVHALF"
+    ],
+    [
+     59,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 2,
+   "effective_transform": "BIP"
+  },
+  "0x35c860": {
+   "fn": "0x35c860",
+   "curve_ids": [
+    49
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     49,
+     "ID"
+    ]
+   ],
+   "effective_curve": 49,
+   "effective_transform": "ID"
+  },
+  "0x35cce0": {
+   "fn": "0x35cce0",
+   "curve_ids": [
+    32
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "EMU_FAIL"
+  },
+  "0x35ce20": {
+   "fn": "0x35ce20",
+   "curve_ids": [
+    27
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35ce90": {
+   "fn": "0x35ce90",
+   "curve_ids": [
+    6
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     6,
+     "ID"
+    ]
+   ],
+   "effective_curve": 6,
+   "effective_transform": "ID"
+  },
+  "0x35cef0": {
+   "fn": "0x35cef0",
+   "curve_ids": [
+    55
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35cf90": {
+   "fn": "0x35cf90",
+   "curve_ids": [
+    27
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35d000": {
+   "fn": "0x35d000",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35d040": {
+   "fn": "0x35d040",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35d080": {
+   "fn": "0x35d080",
+   "curve_ids": [
+    7
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35d1a0": {
+   "fn": "0x35d1a0",
+   "curve_ids": [
+    52
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     52,
+     "ID"
+    ]
+   ],
+   "effective_curve": 52,
+   "effective_transform": "ID"
+  },
+  "0x35db00": {
+   "fn": "0x35db00",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x35db80": {
+   "fn": "0x35db80",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x35dc70": {
+   "fn": "0x35dc70",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35dd50": {
+   "fn": "0x35dd50",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x35ddd0": {
+   "fn": "0x35ddd0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35de50": {
+   "fn": "0x35de50",
+   "curve_ids": [
+    64
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     2,
+     "BIP"
+    ],
+    [
+     3,
+     "BIP"
+    ],
+    [
+     9,
+     "BIP"
+    ],
+    [
+     10,
+     "BIP"
+    ],
+    [
+     51,
+     "BIP"
+    ],
+    [
+     51,
+     "INVHALF"
+    ],
+    [
+     59,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 2,
+   "effective_transform": "BIP"
+  },
+  "0x35e290": {
+   "fn": "0x35e290",
+   "curve_ids": [
+    65
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35e590": {
+   "fn": "0x35e590",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35e630": {
+   "fn": "0x35e630",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x35e6b0": {
+   "fn": "0x35e6b0",
+   "curve_ids": [
+    19
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35e740": {
+   "fn": "0x35e740",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35eb90": {
+   "fn": "0x35eb90",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x35ec10": {
+   "fn": "0x35ec10",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x35ed00": {
+   "fn": "0x35ed00",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35ede0": {
+   "fn": "0x35ede0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x35ee60": {
+   "fn": "0x35ee60",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35eee0": {
+   "fn": "0x35eee0",
+   "curve_ids": [
+    64
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     2,
+     "BIP"
+    ],
+    [
+     3,
+     "BIP"
+    ],
+    [
+     9,
+     "BIP"
+    ],
+    [
+     10,
+     "BIP"
+    ],
+    [
+     51,
+     "BIP"
+    ],
+    [
+     51,
+     "INVHALF"
+    ],
+    [
+     59,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 2,
+   "effective_transform": "BIP"
+  },
+  "0x35f320": {
+   "fn": "0x35f320",
+   "curve_ids": [
+    65
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35f570": {
+   "fn": "0x35f570",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35f610": {
+   "fn": "0x35f610",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x35f690": {
+   "fn": "0x35f690",
+   "curve_ids": [
+    19
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35f720": {
+   "fn": "0x35f720",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35fbf0": {
+   "fn": "0x35fbf0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "EMU_FAIL"
+  },
+  "0x35fcf0": {
+   "fn": "0x35fcf0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x35fd70": {
+   "fn": "0x35fd70",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x35fdf0": {
+   "fn": "0x35fdf0",
+   "curve_ids": [
+    59
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     18,
+     "BIP"
+    ],
+    [
+     21,
+     "BIP"
+    ],
+    [
+     52,
+     "BIP"
+    ],
+    [
+     52,
+     "INVHALF"
+    ],
+    [
+     56,
+     "BIP"
+    ],
+    [
+     62,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 18,
+   "effective_transform": "BIP"
+  },
+  "0x35feb0": {
+   "fn": "0x35feb0",
+   "curve_ids": [],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     58,
+     "ID"
+    ],
+    [
+     61,
+     "ID"
+    ],
+    [
+     64,
+     "ID"
+    ]
+   ],
+   "effective_curve": 58,
+   "effective_transform": "ID"
+  },
+  "0x35ff30": {
+   "fn": "0x35ff30",
+   "curve_ids": [
+    58
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     2,
+     "BIP"
+    ],
+    [
+     3,
+     "BIP"
+    ],
+    [
+     9,
+     "BIP"
+    ],
+    [
+     10,
+     "BIP"
+    ],
+    [
+     51,
+     "BIP"
+    ],
+    [
+     51,
+     "INVHALF"
+    ],
+    [
+     59,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 2,
+   "effective_transform": "BIP"
+  },
+  "0x360300": {
+   "fn": "0x360300",
+   "curve_ids": [
+    59
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     59,
+     "ID"
+    ]
+   ],
+   "effective_curve": 59,
+   "effective_transform": "ID"
+  },
+  "0x3603b0": {
+   "fn": "0x3603b0",
+   "curve_ids": [
+    60
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x3604f0": {
+   "fn": "0x3604f0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x360920": {
+   "fn": "0x360920",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x3609a0": {
+   "fn": "0x3609a0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x360a90": {
+   "fn": "0x360a90",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x360b70": {
+   "fn": "0x360b70",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x360bf0": {
+   "fn": "0x360bf0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x360c80": {
+   "fn": "0x360c80",
+   "curve_ids": [
+    64
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     2,
+     "BIP"
+    ],
+    [
+     3,
+     "BIP"
+    ],
+    [
+     9,
+     "BIP"
+    ],
+    [
+     10,
+     "BIP"
+    ],
+    [
+     51,
+     "BIP"
+    ],
+    [
+     51,
+     "INVHALF"
+    ],
+    [
+     59,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 2,
+   "effective_transform": "BIP"
+  },
+  "0x3610e0": {
+   "fn": "0x3610e0",
+   "curve_ids": [
+    65
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x361350": {
+   "fn": "0x361350",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x3613f0": {
+   "fn": "0x3613f0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x361520": {
+   "fn": "0x361520",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "EMU_FAIL"
+  },
+  "0x361630": {
+   "fn": "0x361630",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x3616b0": {
+   "fn": "0x3616b0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x361740": {
+   "fn": "0x361740",
+   "curve_ids": [
+    59
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     18,
+     "BIP"
+    ],
+    [
+     21,
+     "BIP"
+    ],
+    [
+     52,
+     "BIP"
+    ],
+    [
+     52,
+     "INVHALF"
+    ],
+    [
+     56,
+     "BIP"
+    ],
+    [
+     62,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 18,
+   "effective_transform": "BIP"
+  },
+  "0x361800": {
+   "fn": "0x361800",
+   "curve_ids": [],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     58,
+     "ID"
+    ],
+    [
+     61,
+     "ID"
+    ],
+    [
+     64,
+     "ID"
+    ]
+   ],
+   "effective_curve": 58,
+   "effective_transform": "ID"
+  },
+  "0x361890": {
+   "fn": "0x361890",
+   "curve_ids": [
+    58
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     2,
+     "BIP"
+    ],
+    [
+     3,
+     "BIP"
+    ],
+    [
+     9,
+     "BIP"
+    ],
+    [
+     10,
+     "BIP"
+    ],
+    [
+     51,
+     "BIP"
+    ],
+    [
+     51,
+     "INVHALF"
+    ],
+    [
+     59,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 2,
+   "effective_transform": "BIP"
+  },
+  "0x361c80": {
+   "fn": "0x361c80",
+   "curve_ids": [
+    59
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     59,
+     "ID"
+    ]
+   ],
+   "effective_curve": 59,
+   "effective_transform": "ID"
+  },
+  "0x361d40": {
+   "fn": "0x361d40",
+   "curve_ids": [
+    60
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x361e80": {
+   "fn": "0x361e80",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x361f00": {
+   "fn": "0x361f00",
+   "curve_ids": [
+    19
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x361f80": {
+   "fn": "0x361f80",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x362590": {
+   "fn": "0x362590",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "EMU_FAIL"
+  },
+  "0x362690": {
+   "fn": "0x362690",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x362710": {
+   "fn": "0x362710",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x362790": {
+   "fn": "0x362790",
+   "curve_ids": [
+    59
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     18,
+     "BIP"
+    ],
+    [
+     21,
+     "BIP"
+    ],
+    [
+     52,
+     "BIP"
+    ],
+    [
+     52,
+     "INVHALF"
+    ],
+    [
+     56,
+     "BIP"
+    ],
+    [
+     62,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 18,
+   "effective_transform": "BIP"
+  },
+  "0x362850": {
+   "fn": "0x362850",
+   "curve_ids": [],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     58,
+     "ID"
+    ],
+    [
+     61,
+     "ID"
+    ],
+    [
+     64,
+     "ID"
+    ]
+   ],
+   "effective_curve": 58,
+   "effective_transform": "ID"
+  },
+  "0x3628d0": {
+   "fn": "0x3628d0",
+   "curve_ids": [
+    58
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     2,
+     "BIP"
+    ],
+    [
+     3,
+     "BIP"
+    ],
+    [
+     9,
+     "BIP"
+    ],
+    [
+     10,
+     "BIP"
+    ],
+    [
+     51,
+     "BIP"
+    ],
+    [
+     51,
+     "INVHALF"
+    ],
+    [
+     59,
+     "BIP"
+    ]
+   ],
+   "effective_curve": 2,
+   "effective_transform": "BIP"
+  },
+  "0x362ca0": {
+   "fn": "0x362ca0",
+   "curve_ids": [
+    59
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     59,
+     "ID"
+    ]
+   ],
+   "effective_curve": 59,
+   "effective_transform": "ID"
+  },
+  "0x362d50": {
+   "fn": "0x362d50",
+   "curve_ids": [
+    60
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": []
+  },
+  "0x362fb0": {
+   "fn": "0x362fb0",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x363040": {
+   "fn": "0x363040",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "OK",
+   "oracle_matches": [
+    [
+     22,
+     "ID"
+    ]
+   ],
+   "effective_curve": 22,
+   "effective_transform": "ID"
+  },
+  "0x3c1240": {
+   "fn": "0x3c1240",
+   "curve_ids": [
+    22
+   ],
+   "transform": "ID",
+   "ncalls": 1,
+   "oracle_status": "NO_WRITE"
+  }
+ },
+ "parser_record_map": [
+  {
+   "idx": 0,
+   "record_off": 4,
+   "dest_off": 16
+  },
+  {
+   "idx": 1,
+   "record_off": 6,
+   "dest_off": 14
+  },
+  {
+   "idx": 2,
+   "record_off": 10,
+   "dest_off": 24
+  },
+  {
+   "idx": 3,
+   "record_off": 18,
+   "dest_off": 32
+  },
+  {
+   "idx": 4,
+   "record_off": 20,
+   "dest_off": 18
+  },
+  {
+   "idx": 5,
+   "record_off": 22,
+   "dest_off": 28
+  },
+  {
+   "idx": 6,
+   "record_off": 24,
+   "dest_off": 30
+  },
+  {
+   "idx": 7,
+   "record_off": 26,
+   "dest_off": 52
+  },
+  {
+   "idx": 8,
+   "record_off": 28,
+   "dest_off": 54
+  },
+  {
+   "idx": 9,
+   "record_off": 30,
+   "dest_off": 56
+  },
+  {
+   "idx": 10,
+   "record_off": 32,
+   "dest_off": 58
+  },
+  {
+   "idx": 11,
+   "record_off": 44,
+   "dest_off": 76
+  },
+  {
+   "idx": 12,
+   "record_off": 46,
+   "dest_off": 70
+  },
+  {
+   "idx": 13,
+   "record_off": 48,
+   "dest_off": 74
+  },
+  {
+   "idx": 14,
+   "record_off": 52,
+   "dest_off": 78
+  },
+  {
+   "idx": 15,
+   "record_off": 54,
+   "dest_off": 20
+  },
+  {
+   "idx": 16,
+   "record_off": 56,
+   "dest_off": 88
+  },
+  {
+   "idx": 17,
+   "record_off": 68,
+   "dest_off": 468
+  },
+  {
+   "idx": 18,
+   "record_off": 70,
+   "dest_off": 132
+  },
+  {
+   "idx": 19,
+   "record_off": 82,
+   "dest_off": 80
+  },
+  {
+   "idx": 20,
+   "record_off": 84,
+   "dest_off": 82
+  },
+  {
+   "idx": 21,
+   "record_off": 86,
+   "dest_off": 84
+  },
+  {
+   "idx": 22,
+   "record_off": 88,
+   "dest_off": 86
+  },
+  {
+   "idx": 23,
+   "record_off": 100,
+   "dest_off": 612
+  },
+  {
+   "idx": 24,
+   "record_off": 102,
+   "dest_off": 104
+  },
+  {
+   "idx": 25,
+   "record_off": 104,
+   "dest_off": 106
+  },
+  {
+   "idx": 26,
+   "record_off": 106,
+   "dest_off": 3041
+  },
+  {
+   "idx": 27,
+   "record_off": 122,
+   "dest_off": 108
+  },
+  {
+   "idx": 28,
+   "record_off": 124,
+   "dest_off": 110
+  },
+  {
+   "idx": 29,
+   "record_off": 126,
+   "dest_off": 112
+  },
+  {
+   "idx": 30,
+   "record_off": 130,
+   "dest_off": 118
+  }
+ ]
+}

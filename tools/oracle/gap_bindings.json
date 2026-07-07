@@ -1,0 +1,114 @@
+{
+ "meta": {
+  "leaf_to_db": "DB_index = leaf + 728 (verified: leaf113=VCA MODE=DB841, leaf121=LFO TRIG=DB849, leaf129=HPF TYPE=DB857).",
+  "record_pos_formula": "extended NAME2/3 leaf record_pos = 490 + 8*(DB-841) = 490 + 8*(leaf-113).",
+  "names_verified": "param names from Script.xml DB order (DB=leaf+728), confirmed against juno_apply anchors.",
+  "honesty": "curve/transform/offset marked 'unresolved' wherever the full-instance emulation did not cleanly resolve them; 'derived' = engine offset from Script->engine name-match with transform inferred (NOT emulation-verified). No values guessed."
+ },
+ "rows": [
+  {
+   "name": "CONDITION",
+   "db_index": 842,
+   "record_pos": 498,
+   "curve_id": null,
+   "transform": null,
+   "engine_offset": null,
+   "confidence": "unresolved",
+   "note": "emulation: dispatch a2=842 produced NO curve call and NO coefficient write in the voice-instance construction (routes to master/flat-param path not wired). Roland CONDITION = per-patch tune/condition. Not resolved; do not guess."
+  },
+  {
+   "name": "BEND SENS DCO",
+   "db_index": 844,
+   "record_pos": 514,
+   "curve_id": null,
+   "transform": "likely value/255 (UNVERIFIED)",
+   "confidence": "unresolved",
+   "note": "OFFSET IS A NAME-MATCH HINT ONLY (Script name -> param_routing engine name); emulation did NOT resolve this param (produces no clean coeff write) and independently showed misattribution risk for such params. UNVERIFIED. emulation produced no coeff write (a2=844); engine offset derived by name-match to 'Bend Level' DCO block [(60, 4112, 'Bend Level'), (86, 7456, 'Bend Level')]. Transform inferred linear by analogy to VCF/VCA VEL SENS (juno_apply /255) but NOT emulation-verified.",
+   "engine_offset_hint": 4112,
+   "engine_offset": null
+  },
+  {
+   "name": "BEND SENS VCF",
+   "db_index": 845,
+   "record_pos": 522,
+   "curve_id": null,
+   "transform": "likely value/255 (UNVERIFIED)",
+   "confidence": "unresolved",
+   "note": "OFFSET IS A NAME-MATCH HINT ONLY (Script name -> param_routing engine name); emulation did NOT resolve this param (produces no clean coeff write) and independently showed misattribution risk for such params. UNVERIFIED. as BEND SENS DCO but VCF block; candidates [(60, 4112, 'Bend Level'), (86, 7456, 'Bend Level'), (170, 14624, 'Bend Level')].",
+   "engine_offset_hint": 7456,
+   "engine_offset": null
+  },
+  {
+   "name": "MOD SENS DCO",
+   "db_index": 846,
+   "record_pos": 530,
+   "curve_id": null,
+   "transform": "likely value/255 (UNVERIFIED)",
+   "confidence": "unresolved",
+   "note": "OFFSET IS A NAME-MATCH HINT ONLY (Script name -> param_routing engine name); emulation did NOT resolve this param (produces no clean coeff write) and independently showed misattribution risk for such params. UNVERIFIED. engine name-match 'Mod Sens' DCO [(52, 3984, 'Mod Sens'), (80, 7360, 'MOD Sens')]; transform unverified.",
+   "engine_offset_hint": 3984,
+   "engine_offset": null
+  },
+  {
+   "name": "MOD SENS VCF",
+   "db_index": 847,
+   "record_pos": 538,
+   "curve_id": null,
+   "transform": "likely value/255 (UNVERIFIED)",
+   "confidence": "unresolved",
+   "note": "OFFSET IS A NAME-MATCH HINT ONLY (Script name -> param_routing engine name); emulation did NOT resolve this param (produces no clean coeff write) and independently showed misattribution risk for such params. UNVERIFIED. engine name-match 'Mod Sens' VCF [(52, 3984, 'Mod Sens'), (80, 7360, 'MOD Sens'), (162, 14496, 'Mod Sens')]; transform unverified.",
+   "engine_offset_hint": 7360,
+   "engine_offset": null
+  },
+  {
+   "name": "EFFECT TONE",
+   "db_index": 860,
+   "record_pos": 642,
+   "curve_id": null,
+   "transform": null,
+   "engine_offset": null,
+   "confidence": "unresolved",
+   "note": "emulation a2=860 calls juno_curve(22) but the captured write paramIdx is misattributed (routes through the master/FX section, not the voice graph). FX section is the un-decompiled/external-schema path (juno_apply defers all EFX). Not resolved."
+  },
+  {
+   "name": "EFFECT TYPE",
+   "db_index": 859,
+   "record_pos": 634,
+   "curve_id": null,
+   "transform": "enum",
+   "engine_offset": "master FX selector",
+   "confidence": "unresolved",
+   "note": "FX slot selector (modes route 2/3/4->chorus). Master/FX section; juno_apply defers. Not a voice coefficient."
+  },
+  {
+   "name": "blob31 (rec78, range 0..1)",
+   "db_index": null,
+   "record_pos": 78,
+   "curve_id": null,
+   "transform": null,
+   "engine_offset": null,
+   "confidence": "unresolved",
+   "note": "could not identify the DB/leaf for blob_pos 31 from the parser table (rec 78 not in dword_7FF91E8A4290 remap); range 0..1 switch. Candidates: VCA LEVEL SW(DB811) or a MIX type. Not resolved."
+  },
+  {
+   "name": "LEGATO",
+   "db_index": 799,
+   "record_pos": 126,
+   "curve_id": null,
+   "transform": "mode_flag (no curve)",
+   "engine_offset": "keyboard-mode (off ~608 region)",
+   "confidence": "verified_nonaudio",
+   "note": "emulation: a2=799 invokes setters (32 calls) but writes keyboard/voice-mode flags, NOT a DSP curve coefficient. Matches juno_apply: legato/assign are note-allocation flags, non-audible for single notes."
+  },
+  {
+   "name": "ASSIGN MODE",
+   "db_index": 800,
+   "record_pos": 128,
+   "curve_id": null,
+   "transform": "mode_flag (no curve)",
+   "engine_offset": "keyboard-mode (poly/mono/mono-legato)",
+   "confidence": "verified_nonaudio",
+   "note": "emulation: a2=800 invokes setters (40 calls) -> voice allocation mode flags, no DSP curve coefficient."
+  }
+ ]
+}

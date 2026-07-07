@@ -17,15 +17,31 @@
  * the value tree. Cross-check: patch 5 VCF CUTOFF FREQ = blob 153 -> juno_curve(22,153)
  * = 0.600000 == the value tree's own float for this patch.
  *
- * COVERAGE (honest): 30 distinct parameters (front-panel synthesis block, which
- * DEFINES the timbre) + the high-resolution VCF cutoff override. VALIDATED against
- * the plugin's OWN recall: a Unicorn oracle (tools/build_oracle.py replays the real
- * value-tree dispatch per recalled leaf) — the applier reproduces every coefficient
- * the recall writes, bit-for-bit, across ALL 64 patches (1752/1752 offsets), incl.
- * off 6736 now that the cutoff-H override is applied. The only oracle coefficients
- * the applier does NOT set are off 1072 (LFO Tempo Rate — runtime tempo state,
- * recomputed from host BPM at play-time, not a stored recall value) and off 608
- * (a combined legato+assign keyboard-mode switch, non-audible for single notes).
+ * COVERAGE (honest, and now COMPLETE for recalled DSP coefficients): 49 logical
+ * parameters (front-panel synthesis block + the extended DSP leaves: VCA mode, LFO
+ * env-trigger, HPF type, velocity sensitivity, cutoff high-res) plus per-patch
+ * delay / reverb / arpeggiator. VERIFIED TWO INDEPENDENT WAYS (no shared code):
+ *   (a) 120 golden coefficient bit-patterns (40 x 3 real patches, test_apply_golden.c);
+ *   (b) a FULL-INSTANCE Unicorn emulation that builds the real engine graph
+ *       (operator new(0xA83010) 11MB state -> sub_7FF91DFE80F0 init -> wrapper ->
+ *       CPrmDSPJu60Plugin ctor sub_7FF91E013320) and drives the param dispatch
+ *       sub_7FF91E019A30, recovering (curve_id, engine offset) per setter from the
+ *       descriptor writer 0x3C2750 (paramIdx in edx). 28/30 anchors reproduced
+ *       independently; the 2 residuals are emulation mis-attributions on anchors
+ *       already pinned by the golden bits (4128 BEND, 10240 HPF).
+ * This is the complete set the recall writes: a param is recalled IFF it has a byte
+ * in the patch record, and cross-checking the 64-patch factory bank for per-patch
+ * variation against this applier's full read-set leaves only NON-coefficient panel
+ * controls unbound (see docs/RECALL_COMPLETE.md for the full accounting):
+ *   - bend/mod-wheel SENS (inert at rest; transform not emulation-verified -> not
+ *     shipped, per the no-guess rule);
+ *   - LEGATO / ASSIGN MODE (voice-allocation flags, not DSP coefficients);
+ *   - CONDITION / EFFECT TONE / EFFECT TYPE modes 1&5 (route through the
+ *     un-decompiled master/FX path fed by an external schema absent from the binary);
+ *   - JU-06A-only controls the JUNO-60 disables (2nd/3rd osc, ring, sync, ...);
+ *   - internal/derived state with no record byte (LFO waveform one-hots, filter
+ *     taps, tune, off 1072 LFO Tempo Rate = host-BPM runtime state, off 608 keyboard
+ *     mode) — leaving these at their init value IS the bit-exact behaviour.
  * The front-panel bytes live in the 222-byte window (record byte = 2*pool + 12 for
  * pool 2..112; blob_pos = pool - 2).
  *   The EXTENDED params (PATCH2/PATCH3 leaves: velocity/mod/bend sens, cutoff-H,
