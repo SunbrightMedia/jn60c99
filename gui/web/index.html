@@ -94,7 +94,7 @@ import { decodeBank } from "./bank.js";
 
 /* Cache-buster: build.sh rewrites this to the WASM content hash each build, so a new
  * engine is always fetched fresh instead of served from the browser/CDN cache. */
-const BUILD_VER = "5d1f09cb84c4";
+const BUILD_VER = "4092c254e6e8";
 
 const SR = 96000;
 const $ = s => document.querySelector(s);
@@ -113,7 +113,7 @@ function sectionOf(off) {
 }
 
 let M, ctx, get, set, factoryFn, chorusFn, gateFn, renderFn, malloc, free;
-let noteOnFn, noteOffFn, applyBankFn, renderDryFn, arpFn;
+let noteOnFn, noteOffFn, applyBankFn, renderDryFn, arpFn, getArpFn;
 let arpOn = false;
 let PARAMS = [], REAL = {};
 
@@ -131,6 +131,7 @@ async function boot() {
   noteOnFn = M.cwrap("juno_gui_note_on",null,["number","number","number"]);
   noteOffFn = M.cwrap("juno_gui_note_off",null,["number","number"]);
   arpFn = M.cwrap("juno_gui_arp_config",null,["number","number","number","number","number","number"]);
+  getArpFn = M.cwrap("juno_gui_get_arp","number",["number"]);
   applyBankFn = M.cwrap("juno_gui_apply_bank","number",["number","number","number","number"]);
   malloc = M._malloc; free = M._free;
   ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 2);  // chorus mode II
@@ -299,8 +300,16 @@ window.applyBankPatch = () => {
   free(ptr);
   PARAMS.forEach(p => p.value = get(ctx, p.off));   // reflect new coeffs in the sliders
   renderList();
+  // sync the arp UI to the per-patch arp recall (juno_gui_apply_bank set it)
+  if (getArpFn) {
+    const a = getArpFn(ctx);
+    arpOn = !!(a & 1);
+    $("#arpMode").value = String((a >> 1) & 3);
+    $("#arpOct").value  = String(((a >> 3) & 3) + 1);
+    const b = $("#arpToggle"); b.textContent = arpOn ? "On" : "Off"; b.classList.toggle("on", arpOn);
+  }
   $("#bankdlg").close();
-  status(`applied patch ${idx} "${BANK.patches[idx].name}" — ${n} bit-exact coefficients loaded (press a key to hear it)`);
+  status(`applied patch ${idx} "${BANK.patches[idx].name}" — ${n} bit-exact coefficients loaded${arpOn?" · arp ON":""} (press a key to hear it)`);
 };
 function showBank() {
   const sel = $("#banksel");

@@ -361,3 +361,28 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
     ++n;
     return n;
 }
+
+/* Per-patch ARPEGGIATOR recall. The arp SW/TYPE/STEP live in the NAME1 value-tree
+ * block (leaves 89/90/91). Their record positions (298/306/314) are derived from
+ * the SAME contiguous leaf enumeration that lands all five oracle-anchored NAME2/3
+ * leaves (VCA MODE@490, LFO TRIG@554, HPF TYPE@618, DELAY TYPE@650, REVERB TIME@666)
+ * exactly on record_byte = 8*leaf - 414, with a perfectly consistent offset across
+ * all five (verified by enumerating the Script.xml value leaves). So these are
+ * derived to the same standard as the anchors, not guessed.
+ *   ARPEGGIO TYPE (leaf 90): 0=UP, 1=UP&DOWN, 2..5=DOWN.
+ *   ARPEGGIO STEP (leaf 91): octave range, 0=1 oct, 1=2 oct, 2..5=3 oct.
+ * The plugin's arp rate is host-tempo-synced (24-PPQN), with no per-patch rate, so
+ * the standalone preview keeps its own rate; only on/mode/range recall per patch. */
+int juno_bank_arp(const unsigned char *bank, int idx, int *mode, int *oct)
+{
+    const unsigned char *blob;
+    int sw, type, step;
+    if (idx < 0 || idx >= BANK_COUNT) return 0;
+    blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
+    sw   = record_byte(blob, 298);   /* ARPEGGIO SW   (leaf 89) */
+    type = record_byte(blob, 306);   /* ARPEGGIO TYPE (leaf 90) */
+    step = record_byte(blob, 314);   /* ARPEGGIO STEP (leaf 91) */
+    if (mode) *mode = (type == 0) ? 0 : (type == 1) ? 2 : 1;  /* up / up&down / down */
+    if (oct)  *oct  = (step == 0) ? 1 : (step == 1) ? 2 : 3;
+    return sw ? 1 : 0;
+}

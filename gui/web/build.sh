@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo root
 
 emcc -std=c99 -O2 -fno-strict-aliasing gui/juno_bridge.c src/*.c -lm \
-  -s EXPORTED_FUNCTIONS='["_juno_gui_create","_juno_gui_set","_juno_gui_get","_juno_gui_recall_factory","_juno_gui_set_chorus_mode","_juno_gui_gate","_juno_gui_note_on","_juno_gui_note_off","_juno_gui_arp_config","_juno_gui_apply_bank","_juno_gui_render","_juno_gui_render_dry","_malloc","_free"]' \
+  -s EXPORTED_FUNCTIONS='["_juno_gui_create","_juno_gui_set","_juno_gui_get","_juno_gui_recall_factory","_juno_gui_set_chorus_mode","_juno_gui_gate","_juno_gui_note_on","_juno_gui_note_off","_juno_gui_arp_config","_juno_gui_get_arp","_juno_gui_apply_bank","_juno_gui_render","_juno_gui_render_dry","_malloc","_free"]' \
   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32","HEAPU8"]' \
   -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORT_NAME=JunoModule \
   -s ENVIRONMENT=web \

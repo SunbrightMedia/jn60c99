@@ -326,11 +326,25 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float rate_hz, 
  * params keep their current (engine-default) value. */
 int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx)
 {
-    int n;
+    int n, mode = 0, oct = 1, on;
     if (!c || !bank || len <= 0) return 0;
     n = juno_bank_apply(c->st, bank, idx);
     juno_driver_seed_voices(c->st);      /* all 8 voices play the applied patch */
+    /* Per-patch ARPEGGIATOR recall: on/mode/range come from the patch (bit-exact,
+     * see juno_bank_arp); rate stays local (the plugin's arp is host-tempo-synced,
+     * no per-patch rate). This makes "arp presets" arpeggiate on load. */
+    on = juno_bank_arp(bank, idx, &mode, &oct);
+    juno_gui_arp_config(c, on, mode, oct, c->arp_rate_hz, c->arp_gate);
     return n;
+}
+
+/* Packed arp state for the UI to read back after apply: bit0 = on, bits1-2 = mode
+ * (0=up,1=down,2=up&down), bits3-4 = oct-1 (0..2). Lets the web UI sync its arp
+ * toggle/mode/octave controls to a recalled patch. */
+int juno_gui_get_arp(juno_ctx *c)
+{
+    if (!c) return 0;
+    return (c->arp_on ? 1 : 0) | ((c->arp_mode & 3) << 1) | (((c->arp_oct - 1) & 3) << 3);
 }
 
 /* Render nframes stereo samples into out (interleaved L,R). Advances the note
