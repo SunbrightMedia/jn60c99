@@ -107,6 +107,39 @@ by `tests/test_note_path.c`.
   explicit per-sample flush kept as the WASM fallback. ✓
 - Full decompile recovered (`refs/allcode_decomp.tgz`) — unblocks the remaining
   transcriptions.
-- Remaining: velocity curve (sub_7FF91E021720, param-1090 path), voice-allocator
-  policy, CArpeggio + whether arp is per-preset, and retiring the capture. Mapping
-  in progress against the recovered decompile.
+- Voice allocator ported to the plugin's policy (below). ✓
+- Remaining: velocity curve fold-in (below), and retiring the capture.
+
+## Voice allocator (transcribed: CAssignJu60 / CAssignB)
+
+ctor `sub_7FF91DFB59D0` → base `sub_7FF91DFB4E50` (voice count = min(req,8), init with
+8; LRU queue at +120 = identity `[0..7]`), poly alloc `sub_7FF91DFB3150`. The engine
+is **8-voice** (JUNO-60 hardware is 6; this JU-06A model allocates 8 — matched). Poly
+note-on picks a voice in strict priority, then moves it to the LRU front:
+  1. a voice already playing this MIDI note (re-strike);
+  2. the OLDEST FREE voice (envelope finished);
+  3. the OLDEST voice in RELEASE (gate off, still ringing);
+  4. STEAL the oldest voice (LRU tail).
+On steal/reuse it issues **gate-off → set-note → gate-on** (a gate 1→0→1 re-strike)
+with **NO envelope-integrator reset** — re-attack is purely the M.Gate edge + the
+DCO latch. This is exactly the mechanism the note handler already implements; it
+independently confirms removing the hand-written envelope reset was correct.
+`gui/juno_bridge.c` now implements this policy (same-note → oldest-free → oldest-
+release → steal-oldest, LRU age, env-decay reaping of released voices).
+
+## Velocity (identified, not yet integrated — honest)
+
+Per-voice modules CDSPJu60FltVoice (VCF, ctor `sub_7FF91DFB8AF0`) and CDSPJu60AmpVoice
+(VCA, ctor `sub_7FF91DFB5B20`) each build a 256-entry **cubic velocity curve**
+`curve[i] = ((i+1)/129.0)^3`, i=0..255 (clamped [0,255]), feeding the immediate
+params **VCF Velocity (73 / off 6864)** and **VCA Velocity (98 / off 9680)**, with
+companion params Velocity Sens/Offset (84/85, 96/97). The exact fold-in of Sens/Offset
+around the cubic curve into the final coefficient is structurally located but NOT yet
+reduced to an equation, so velocity is left un-written (notes sound at the patch's own
+level) rather than shipped as a partial approximation. The on-screen/computer keyboard
+sends fixed velocity, so this is inaudible in the current preview.
+
+CORRECTION (provenance hygiene): an earlier note said `sub_7FF91E021720` was the
+velocity handler. It is NOT — it is a CDSPRev (reverb) method that writes param 1090
+"Rev Dpm PreDly" (pre-delay ms→samples). It never touches velocity or M.CV/M.Gate and
+must not be in the note path.

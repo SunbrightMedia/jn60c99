@@ -18,8 +18,9 @@ typedef struct {
     unsigned char *st;
     struct juno_host_shim shim;   /* must outlive render calls */
     int chorus_mode;
-    int voice_note[JUNO_NUM_VOICES];   /* MIDI note per voice, -1 = free      */
-    unsigned voice_age[JUNO_NUM_VOICES];/* allocation order (for LRU stealing) */
+    int voice_note[JUNO_NUM_VOICES];   /* MIDI note per voice, -1 = free (env done) */
+    unsigned char voice_gated[JUNO_NUM_VOICES];/* 1 = note held (gate on), 0 = released */
+    unsigned voice_age[JUNO_NUM_VOICES];/* allocation order (LRU; higher = newer)    */
     unsigned age_counter;
 
     /* Arpeggiator (host-side note sequencer). The JUNO-60's own arp is a simple
@@ -122,35 +123,67 @@ void juno_gui_gate(juno_ctx *c, float v)
 }
 
 /* --- internal synth triggers (drive the 8-voice allocator directly) --------- */
-/* Note driver (src/juno_note.c) with an 8-voice allocator. note-on picks a free
- * voice (else steals the oldest) and sets its per-voice DCO pitch (state[V*10512+
- * 304] = note/12), opens its shared ADSR gate (ramps state[V*10512+320]) and
- * fires its DCO retrigger edge — the plugin's own note writes, one voice each. */
+/* Faithful transcription of the plugin's voice allocator CAssignJu60/CAssignB
+ * (ctor sub_7FF91DFB59D0, poly alloc sub_7FF91DFB3150; see docs/CONTROL_LAYER_PORT.md).
+ * 8 voices, LRU (age = allocation order, higher = newer). Note-on picks a voice in
+ * strict priority: (1) a voice already playing this note (re-strike), (2) the OLDEST
+ * FREE voice (envelope finished), (3) the OLDEST voice in RELEASE (gate off but still
+ * ringing), (4) STEAL the oldest voice. This "prefer free over release" ordering is
+ * what preserves release tails until a voice is genuinely needed. The picked voice
+ * gets M.CV / M.Gate / DCO-latch written immediately by juno_note_on (all en=0). */
+#define VCA_ENV_OFF 3072          /* per-voice amp-ADSR integrator (voice base rel.) */
+#define REAP_EPS    1.0e-3f       /* below this the release is over -> voice is free */
+
+/* Free any released voice whose amp envelope has decayed to silence (the plugin's
+ * assigner clears a voice once its envelope completes). Call once per render block. */
+static void synth_reap(juno_ctx *c)
+{
+    int v;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        if (c->voice_note[v] >= 0 && !c->voice_gated[v]) {
+            unsigned b = (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
+            float env = JF(c->st, b + VCA_ENV_OFF);
+            if (env < REAP_EPS && env > -REAP_EPS) c->voice_note[v] = -1;
+        }
+}
+
+/* Pick the lowest-age (oldest) voice matching predicate class, or -1. */
+static int pick_oldest(juno_ctx *c, int want_assigned, int want_gated)
+{
+    int v, pick = -1; unsigned oldest = 0;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+        int assigned = c->voice_note[v] >= 0;
+        if (assigned != want_assigned) continue;
+        if (assigned && (int)c->voice_gated[v] != want_gated) continue;
+        if (pick < 0 || c->voice_age[v] < oldest) { oldest = c->voice_age[v]; pick = v; }
+    }
+    return pick;
+}
+
 static void synth_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     int v, pick = -1;
-    unsigned oldest;
+    /* 1. same-note reuse */
     for (v = 0; v < JUNO_NUM_VOICES; ++v)
         if (c->voice_note[v] == midi_note) { pick = v; break; }
-    if (pick < 0)
-        for (v = 0; v < JUNO_NUM_VOICES; ++v)
-            if (c->voice_note[v] < 0) { pick = v; break; }
-    if (pick < 0) {
-        pick = 0; oldest = c->voice_age[0];
-        for (v = 1; v < JUNO_NUM_VOICES; ++v)
-            if (c->voice_age[v] < oldest) { oldest = c->voice_age[v]; pick = v; }
-    }
-    c->voice_note[pick] = midi_note;
-    c->voice_age[pick]  = ++c->age_counter;
+    /* 2. oldest FREE (env done)  3. oldest RELEASE (gate off, ringing)  4. steal oldest active */
+    if (pick < 0) pick = pick_oldest(c, 0, 0);          /* free: unassigned */
+    if (pick < 0) pick = pick_oldest(c, 1, 0);          /* release: assigned, not gated */
+    if (pick < 0) pick = pick_oldest(c, 1, 1);          /* steal: assigned, gated */
+    if (pick < 0) pick = 0;                             /* fallback */
+    c->voice_note[pick]  = midi_note;
+    c->voice_gated[pick] = 1;
+    c->voice_age[pick]   = ++c->age_counter;
     juno_note_on(c->st, pick, midi_note, velocity);
 }
 static void synth_note_off(juno_ctx *c, int midi_note)
 {
     int v;
     for (v = 0; v < JUNO_NUM_VOICES; ++v)
-        if (c->voice_note[v] == midi_note || (midi_note < 0 && c->voice_note[v] >= 0)) {
-            juno_note_off(c->st, v);
-            c->voice_note[v] = -1;
+        if ((c->voice_note[v] == midi_note && c->voice_gated[v]) ||
+            (midi_note < 0 && c->voice_note[v] >= 0)) {
+            juno_note_off(c->st, v);           /* M.Gate -> 0 immediate (release) */
+            c->voice_gated[v] = 0;             /* keep the note assigned until the env decays */
         }
 }
 
@@ -279,6 +312,7 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
 int juno_gui_render(juno_ctx *c, float *out, int nframes)
 {
     int i, full = 0;
+    synth_reap(c);                         /* free voices whose release has decayed */
     for (i = 0; i < nframes; ++i) {
         if (c->arp_on) arp_tick(c);        /* step the arp pattern in real time */
         juno_note_tick(c->st);
@@ -299,6 +333,7 @@ int juno_gui_render_dry(juno_ctx *c, float *out, int nframes)
 {
     int i, v;
     if (!c) return 0;
+    synth_reap(c);                         /* free voices whose release has decayed */
     for (i = 0; i < nframes; ++i) {
         float mix = 0.0f;
         if (c->arp_on) arp_tick(c);        /* keep the arp advancing in the dry path too */
