@@ -69,6 +69,13 @@ void juno_runtime_coeffs_apply(unsigned char *st);
  * else 0 (placeholder). The driver gates the master/chorus vs dry path on this. */
 int juno_runtime_coeffs_loaded(void);
 
+/* juno_flush_denormals — flush the engine's recursive DSP state (envelope,
+ * filter, delay/chorus/reverb feedback) to zero, reproducing the x86 plugin's
+ * SSE FTZ/DAZ behaviour that WebAssembly lacks. Call once per rendered sample;
+ * prevents decayed tails from settling into the denormal range (whose ~100x
+ * slower ops cause the intermittent audio crackle). See src/juno_ftz.c. */
+void juno_flush_denormals(unsigned char *st);
+
 /* voice_render — exact transcription of sub_180369070, parameterised by voice.
  * Produces one mono sample for voice `voice` (0..7) from engine state `base`;
  * writes it to *outL and *outR (the plugin duplicates the mono voice to both

@@ -89,6 +89,10 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
         float *a3[2] = { outL, outR };
         *outL = 0.0f; *outR = 0.0f;
         juno_master_render(st, a2, a3);
+        /* Reproduce the x86 plugin's FTZ/DAZ: flush decayed recursive state out
+         * of the denormal range so the next sample reads zeros (as it would on
+         * the real CPU). Removes the denormal-op load behind the crackle. */
+        juno_flush_denormals(st);
         return 1;
     }
 
@@ -99,6 +103,7 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
         for (i = 0; i < JUNO_NUM_VOICES; ++i) dry += vbuf[i];
         *outL = dry;
         *outR = dry;
+        juno_flush_denormals(st);
         return 0;
     }
 }
