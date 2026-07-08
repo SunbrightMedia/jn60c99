@@ -138,6 +138,18 @@ void juno_note_off(unsigned char *st, int voice)
     JF(st, base + GATE_OFF) = 0.0f;
 }
 
+void juno_note_glide(unsigned char *st, int voice, int midi_note)
+{
+    unsigned int base;
+    if (voice < 0 || voice >= JUNO_NUM_VOICES) return;
+    base = VBASE(voice);
+    /* M.CV only — leave M.Gate and the aux DCO latch untouched so the envelopes
+     * keep running and the DCO does not re-phase: the pitch slews (with portamento
+     * on, the DCO glide conditioner smooths it; off, it steps). Mirrors the
+     * assigner's `setparam(433+v, key)` with no gate edge. */
+    JF(st, base + PITCH_OFF) = juno_note_pitch(midi_note);
+}
+
 /* The gate is now an immediate write (no host-side ramp to advance), so the
  * per-sample tick is a no-op. Kept for API/source compatibility. */
 void juno_note_tick(unsigned char *st)

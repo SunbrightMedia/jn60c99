@@ -25,6 +25,18 @@ typedef struct {
     unsigned voice_age[JUNO_NUM_VOICES];/* allocation order (LRU; higher = newer)    */
     unsigned age_counter;
 
+    /* Voice-assign modes (CAssignJu60, transcribed from the binary — see
+     * docs/VOICE_MODES.md / scratchpad/oracle/assign_modes_findings.md). Recalled
+     * per patch by juno_bank_voice_modes():
+     *   assign_mode 0 = POLY, 1 = MONO (voice 0), 2 = UNISON (all 8), 3 = POLY-variant.
+     *   legato + portamento_on gate the poly legato-glide (§4.3) and the mono/unison
+     *   overlap-legato / low-note-release fallback. held_notes = 128-bit MIDI held
+     *   mask (scanned lowest-first for the mono/unison release fallback). */
+    int assign_mode;                    /* 0..3 */
+    int legato;                         /* 0/1  */
+    int portamento_on;                  /* 0/1 (PORTAMENTO byte != 0) */
+    unsigned held_notes[4];             /* bit n = MIDI note n currently held */
+
     /* Arpeggiator — the plugin's CArpeggio transcribed BIT-EXACTLY in src/carp.c
      * (UP / UP&DOWN / DOWN ordering, octave range, 24-PPQN tempo clock, gate — all
      * traced to the binary; see docs/ARP_PROVENANCE.md). `arp_on` is a driver
@@ -87,6 +99,21 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     c->arp_cur = -1;
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
     return c;
+}
+
+/* Diagnostic: copy the current per-voice allocation into caller arrays (each of
+ * length JUNO_NUM_VOICES). notes[v] = MIDI note or -1 (free); gated[v] = 1 if the
+ * gate is on. Returns the number of currently-gated voices. For tests/UI only. */
+int juno_gui_debug_voices(juno_ctx *c, int *notes, unsigned char *gated)
+{
+    int v, ng = 0;
+    if (!c) return 0;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+        if (notes) notes[v] = c->voice_note[v];
+        if (gated) gated[v] = c->voice_gated[v];
+        if (c->voice_gated[v]) ++ng;
+    }
+    return ng;
 }
 
 void juno_gui_destroy(juno_ctx *c)
@@ -177,31 +204,158 @@ static int pick_oldest(juno_ctx *c, int want_assigned, int want_gated)
     return pick;
 }
 
-static void synth_note_on(juno_ctx *c, int midi_note, int velocity)
+/* pick the NEWEST (max age) voice matching predicate class, or -1. */
+static int pick_newest(juno_ctx *c, int want_assigned, int want_gated)
+{
+    int v, pick = -1; unsigned newest = 0;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+        int assigned = c->voice_note[v] >= 0;
+        if (assigned != want_assigned) continue;
+        if (assigned && (int)c->voice_gated[v] != want_gated) continue;
+        if (pick < 0 || c->voice_age[v] > newest) { newest = c->voice_age[v]; pick = v; }
+    }
+    return pick;
+}
+
+/* 128-bit held-note bitmask (mirrors the assigner's a1[20..23]). */
+static void held_set(juno_ctx *c, int n)   { if (n>=0 && n<128) c->held_notes[n>>5] |=  (1u<<(n&31)); }
+static void held_clear(juno_ctx *c, int n) { if (n>=0 && n<128) c->held_notes[n>>5] &= ~(1u<<(n&31)); }
+static int  held_lowest(juno_ctx *c)       /* lowest still-held MIDI note, or -1 */
+{
+    int w, b;
+    for (w = 0; w < 4; ++w)
+        if (c->held_notes[w])
+            for (b = 0; b < 32; ++b)
+                if (c->held_notes[w] & (1u << b)) return (w << 5) | b;
+    return -1;
+}
+
+/* Trigger one voice with a full gate edge (retrigger) and LRU/bookkeeping update. */
+static void voice_trigger(juno_ctx *c, int v, int midi_note, int velocity)
+{
+    c->voice_note[v]  = midi_note;
+    c->voice_gated[v] = 1;
+    c->voice_age[v]   = ++c->age_counter;
+    juno_note_on(c->st, v, midi_note, velocity);
+}
+
+/* MODE 0 POLY (sub_7FF91DFB3150) + MODE 3 POLY-variant (sub_7FF91DFB35C0). The
+ * two differ only in voice selection: MODE 0 = same-note reuse (newest) ->
+ * oldest-free -> oldest-release -> steal(oldest, or newest if portamento); MODE 3 =
+ * first free/release by linear index -> steal, no same-note reuse, no legato glide. */
+static void poly_note_on(juno_ctx *c, int midi_note, int velocity, int variant)
 {
     int v, pick = -1;
-    /* 1. same-note reuse */
-    for (v = 0; v < JUNO_NUM_VOICES; ++v)
-        if (c->voice_note[v] == midi_note) { pick = v; break; }
-    /* 2. oldest FREE (env done)  3. oldest RELEASE (gate off, ringing)  4. steal oldest active */
-    if (pick < 0) pick = pick_oldest(c, 0, 0);          /* free: unassigned */
-    if (pick < 0) pick = pick_oldest(c, 1, 0);          /* release: assigned, not gated */
-    if (pick < 0) pick = pick_oldest(c, 1, 1);          /* steal: assigned, gated */
-    if (pick < 0) pick = 0;                             /* fallback */
-    c->voice_note[pick]  = midi_note;
-    c->voice_gated[pick] = 1;
-    c->voice_age[pick]   = ++c->age_counter;
-    juno_note_on(c->st, pick, midi_note, velocity);
+    if (!variant) {                                     /* MODE 0 selection */
+        pick = pick_newest(c, 1, 1);                    /* same-note: search gated */
+        if (pick >= 0 && c->voice_note[pick] != midi_note) pick = -1;
+        if (pick < 0) {                                 /* same-note among any assigned */
+            int best = -1; unsigned age = 0, w;
+            for (w = 0; w < JUNO_NUM_VOICES; ++w)
+                if (c->voice_note[w] == midi_note && (best < 0 || c->voice_age[w] > age))
+                    { age = c->voice_age[w]; best = w; }
+            pick = best;
+        }
+        if (pick < 0) pick = pick_oldest(c, 0, 0);      /* oldest free */
+        if (pick < 0) pick = pick_oldest(c, 1, 0);      /* oldest release-pending */
+    } else {                                            /* MODE 3: first free/release by index */
+        for (v = 0; v < JUNO_NUM_VOICES; ++v)
+            if (c->voice_note[v] < 0 || !c->voice_gated[v]) { pick = v; break; }
+    }
+    if (pick < 0)                                       /* steal: newest if porta, else oldest */
+        pick = c->portamento_on ? pick_newest(c, 1, 1) : pick_oldest(c, 1, 1);
+    if (pick < 0) pick = 0;
+
+    /* MODE 0 legato+portamento poly-glide (§4.3): drag every OTHER still-gated
+     * voice's pitch to the new note without a gate edge. */
+    if (!variant && c->legato && c->portamento_on)
+        for (v = 0; v < JUNO_NUM_VOICES; ++v)
+            if (v != pick && c->voice_gated[v] && c->voice_note[v] >= 0) {
+                juno_note_glide(c->st, v, midi_note);
+                c->voice_note[v] = midi_note;
+            }
+
+    voice_trigger(c, pick, midi_note, velocity);        /* chosen voice always retriggers */
 }
-static void synth_note_off(juno_ctx *c, int midi_note)
+
+/* MODE 1 MONO (sub_7FF91DFB38F0): one fixed voice (0). Overlapping (still-gated)
+ * note = legato (pitch+gate refresh, no gate-off retrigger); idle/releasing = full
+ * retrigger. Voices 1..7 forced off. */
+static void mono_note_on(juno_ctx *c, int midi_note, int velocity)
+{
+    int v;
+    if (!c->voice_gated[0]) {                            /* idle/releasing -> retrigger */
+        voice_trigger(c, 0, midi_note, velocity);
+    } else {                                             /* legato: pitch move, keep envelope */
+        juno_note_glide(c->st, 0, midi_note);
+        c->voice_note[0] = midi_note;
+        c->voice_age[0]  = ++c->age_counter;
+    }
+    for (v = 1; v < JUNO_NUM_VOICES; ++v)               /* force mono: release the rest */
+        if (c->voice_note[v] >= 0) { juno_note_off(c->st, v); c->voice_gated[v] = 0; }
+}
+
+/* MODE 2 UNISON (sub_7FF91DFB3B60): all 8 voices on the same note. Whole stack
+ * retriggers only when idle; overlapping notes glide the stack. */
+static void unison_note_on(juno_ctx *c, int midi_note, int velocity)
+{
+    int v, was_idle = !c->voice_gated[0];
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+        if (was_idle) voice_trigger(c, v, midi_note, velocity);
+        else { juno_note_glide(c->st, v, midi_note); c->voice_note[v] = midi_note;
+               c->voice_age[v] = ++c->age_counter; }
+    }
+}
+
+static void synth_note_on(juno_ctx *c, int midi_note, int velocity)
+{
+    held_set(c, midi_note);
+    switch (c->assign_mode) {
+        case 1:  mono_note_on(c, midi_note, velocity);      break;
+        case 2:  unison_note_on(c, midi_note, velocity);    break;
+        case 3:  poly_note_on(c, midi_note, velocity, 1);   break;
+        default: poly_note_on(c, midi_note, velocity, 0);   break;
+    }
+}
+
+/* Release all voices playing `key` (or every voice if key < 0). Used by POLY. */
+static void poly_release_key(juno_ctx *c, int key)
 {
     int v;
     for (v = 0; v < JUNO_NUM_VOICES; ++v)
-        if ((c->voice_note[v] == midi_note && c->voice_gated[v]) ||
-            (midi_note < 0 && c->voice_note[v] >= 0)) {
-            juno_note_off(c->st, v);           /* M.Gate -> 0 immediate (release) */
-            c->voice_gated[v] = 0;             /* keep the note assigned until the env decays */
+        if ((c->voice_note[v] == key && c->voice_gated[v]) ||
+            (key < 0 && c->voice_note[v] >= 0)) {
+            juno_note_off(c->st, v);
+            c->voice_gated[v] = 0;                          /* keep assigned until env decays */
         }
+}
+
+/* MONO/UNISON note-off: if the released key is the sounding note and another key is
+ * still held, glide the voice(s) to the LOWEST held note (low-note priority, no
+ * re-gate); else release. `all` = apply to the whole stack (unison) vs voice 0 (mono). */
+static void mono_note_off(juno_ctx *c, int key, int all)
+{
+    int lo, v, last = all ? JUNO_NUM_VOICES : 1;
+    if (key >= 0 && c->voice_note[0] != key) return;        /* stale key */
+    lo = held_lowest(c);
+    if (lo >= 0) {                                          /* fall back to lowest held */
+        for (v = 0; v < last; ++v)
+            if (c->voice_note[v] >= 0) { juno_note_glide(c->st, v, lo); c->voice_note[v] = lo; }
+    } else {                                                /* nothing held -> release */
+        for (v = 0; v < last; ++v)
+            if (c->voice_note[v] >= 0) { juno_note_off(c->st, v); c->voice_gated[v] = 0; }
+    }
+}
+
+static void synth_note_off(juno_ctx *c, int midi_note)
+{
+    held_clear(c, midi_note);
+    if (midi_note < 0) { c->held_notes[0]=c->held_notes[1]=c->held_notes[2]=c->held_notes[3]=0; }
+    switch (c->assign_mode) {
+        case 1:  mono_note_off(c, midi_note, 0);            break;   /* mono: voice 0     */
+        case 2:  mono_note_off(c, midi_note, 1);            break;   /* unison: all voices */
+        default: poly_release_key(c, midi_note);            break;   /* poly / variant    */
+    }
 }
 
 /* --- arpeggiator (bit-exact CArpeggio, src/carp.c) -------------------------- */
@@ -291,10 +445,23 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, floa
  * params keep their current (engine-default) value. */
 int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx)
 {
-    int n, mode = 0, oct = 1, on;
+    int n, mode = 0, oct = 1, on, porta = 0;
     if (!c || !bank || len <= 0) return 0;
     n = juno_bank_apply(c->st, bank, idx);
     juno_driver_seed_voices(c->st);      /* all 8 voices play the applied patch */
+    /* Per-patch VOICE-ASSIGN recall (CAssignJu60): ASSIGN MODE (poly/mono/unison/
+     * poly-variant), LEGATO, and PORTAMENTO-engaged drive the note allocator above. */
+    juno_bank_voice_modes(bank, idx, &c->legato, &c->assign_mode, &porta);
+    c->portamento_on = (porta != 0);
+    /* Switching assign mode flushes sounding voices so the new allocator starts
+     * clean (the plugin's mode-change reader flushes hold + all-notes-off). Release
+     * ALL voices directly (mode-agnostic) and clear the held-note mask. */
+    {
+        int v;
+        for (v = 0; v < JUNO_NUM_VOICES; ++v)
+            if (c->voice_note[v] >= 0) { juno_note_off(c->st, v); c->voice_gated[v] = 0; }
+        c->held_notes[0] = c->held_notes[1] = c->held_notes[2] = c->held_notes[3] = 0;
+    }
     /* Per-patch ARPEGGIATOR recall: on/mode/range come from the patch (bit-exact,
      * see juno_bank_arp); rate stays local (the plugin's arp is host-tempo-synced,
      * no per-patch rate). This makes "arp presets" arpeggiate on load. */

@@ -20,11 +20,14 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx);
  * plugin (no per-patch value), so it is not returned. */
 int juno_bank_arp(const unsigned char *bank, int idx, int *mode, int *oct);
 
-/* Decode the per-patch VOICE-ASSIGN settings (CTRL leaves 57/58 at front-panel
- * blob positions 55/56). Writes *legato (0/1) and *assign (ASSIGN MODE 0..3).
- * Returns 1 on success (valid idx). The allocation semantics these select are
- * applied in the note driver (see gui/juno_bridge.c). */
-int juno_bank_voice_modes(const unsigned char *bank, int idx, int *legato, int *assign);
+/* Decode the per-patch VOICE-ASSIGN settings (CTRL leaves at front-panel blob
+ * positions): *legato (leaf 57 / bp 55, 0/1), *assign (ASSIGN MODE, leaf 58 / bp 56,
+ * 0..3), *porta (PORTAMENTO, leaf 56 / bp 54, 0..255 — the raw byte; the assigner
+ * treats "engaged" as porta != 0). Any out pointer may be NULL. Returns 1 on success.
+ * The allocation semantics these select are applied in the note driver
+ * (gui/juno_bridge.c): 0=POLY, 1=MONO, 2=UNISON, 3=POLY-variant. */
+int juno_bank_voice_modes(const unsigned char *bank, int idx,
+                          int *legato, int *assign, int *porta);
 
 #ifdef __cplusplus
 }

@@ -32,6 +32,12 @@ void juno_note_on(unsigned char *st, int voice, int midi_note, int velocity);
 /* Release `voice`: writes M.Gate = 0 (immediate) so both ADSRs enter release. */
 void juno_note_off(unsigned char *st, int voice);
 
+/* Glide `voice` to `midi_note`: writes M.CV (pitch) ONLY — no gate edge, no DCO
+ * retrigger latch, no velocity. This is the assigner's legato / portamento move
+ * (CAssignJu60 sets NOTE CV param 433+v without touching the gate, so the ADSRs
+ * keep running — see docs, mono/unison legato + poly-portamento-glide). */
+void juno_note_glide(unsigned char *st, int voice, int midi_note);
+
 /* No-op: the gate is now an immediate write with no host-side ramp to advance.
  * Retained for API/source compatibility (callers tick it once per sample). */
 void juno_note_tick(unsigned char *st);
