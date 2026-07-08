@@ -138,7 +138,15 @@ static const juno_bind BINDINGS[] = {
     { 38, 52, T_ID, 10256, "HPF CUTOFF FREQ" }, /* -> HPF Switch  (2nd coeff)          */
     { 38, 10, T_ID, 10272, "HPF CUTOFF FREQ" }, /* -> Boost LPF Level (3rd coeff)      */
     { 38, 18, T_BIP,10288, "HPF CUTOFF FREQ" }, /* -> Boost Thru Level (4th, bipolar)  */
-    { 44, 35, T_ID,  2784, "ENV1 ATTACK"     }, /* -> filter ENV Attack  (96k curve 35)*/
+    { 40, 35, T_ID,  2784, "ENV1 ATTACK"     }, /* -> filter ENV Attack  (96k curve 35)
+                                                  * blob 40, NOT 44: the record stores ENV1
+                                                  * as natural A,D,S,R at 40,41,42,43 (D/S/R
+                                                  * coincide with the old D,S,R,A guess; only
+                                                  * A differs). Confirmed from the plugin's
+                                                  * own parser under emulation + the raw bank:
+                                                  * patch13 "Rip Lead" blob40=13 (fast attack,
+                                                  * == panel value), blob44=128 (a bipolar knob
+                                                  * that is never <70 across all 64 patches). */
     { 41, 38, T_ID,  2816, "ENV1 DECAY"      }, /* -> filter ENV Decay   (96k curve 38)*/
     { 42, 50, T_ID,  2800, "ENV1 SUSTAIN"    }, /* -> filter ENV Sustain               */
     { 43, 38, T_ID,  2832, "ENV1 RELEASE"    }, /* -> filter ENV Release (96k curve 38)*/
