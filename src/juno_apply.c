@@ -449,3 +449,18 @@ int juno_bank_arp(const unsigned char *bank, int idx, int *mode, int *oct)
     if (oct)  *oct  = (step == 0) ? 1 : (step == 1) ? 2 : 3;
     return sw ? 1 : 0;
 }
+
+/* Decode LEGATO (CTRL leaf 57, front-panel blob_pos 55) and ASSIGN MODE (CTRL
+ * leaf 58, blob_pos 56). These are front-panel nibble-pair bytes (stride-2:
+ * blob byte = 2*blob_pos), the same decode the BINDINGS loop uses. Verified by the
+ * per-leaf variance audit (scratchpad/oracle/leaf_variance_audit.py): LEGATO takes
+ * value 1 in 4 patches, ASSIGN MODE 1 in 14 and 2 in 2 patches — all in range. */
+int juno_bank_voice_modes(const unsigned char *bank, int idx, int *legato, int *assign)
+{
+    const unsigned char *blob;
+    if (idx < 0 || idx >= BANK_COUNT) return 0;
+    blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
+    if (legato) *legato = ((blob[2 * 55] & 0xF) << 4) | (blob[2 * 55 + 1] & 0xF);
+    if (assign) *assign = ((blob[2 * 56] & 0xF) << 4) | (blob[2 * 56 + 1] & 0xF);
+    return 1;
+}
