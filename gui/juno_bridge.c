@@ -90,11 +90,11 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     juno_driver_seed_voices(c->st);      /* all 8 voices carry the same coeffs             */
     c->chorus_mode = chorus_mode;
     for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
-    /* arp: bit-exact CArpeggio, off by default. carp_init seeds power-on state
-     * (empty keyboard, UP, 1 octave, 120 BPM, eighth-note clock); give it a
-     * musical 60% gate default (index 3). */
+    /* arp: bit-exact CArpeggio, off by default. carp_init seeds the plugin's
+     * power-on arp state exactly: UP, 1 octave, 120 BPM, and — the binary defaults —
+     * the RATE table at rate_index 4 (sixteenth notes) and gate index 7 (100%). No
+     * override here: the earlier gate-index 3 (60%) was wrong (arp_rate_findings.md). */
     carp_init(&c->arp);
-    carp_set_gate_index(&c->arp, 3);
     c->arp_on = 0;
     c->arp_cur = -1;
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);

@@ -227,3 +227,25 @@ the sorted list (shift the tail down) and clear `+3192[note]`.
    `carp_set_range` is asserted by `ARP_FINDINGS.md` (from `Script.xml`), not
    re-derived here; `sub_7FF91E01FE60` stores the range value verbatim to
    `+3476`, so any 0..5→range table is a UI-layer decision, not engine logic.
+
+---
+
+## UPDATE (state-diff campaign): step rate + gate corrected from the binary
+
+A full binary re-derivation (scratchpad/oracle/arp_rate_findings.md) corrected two
+defaults the earlier transcription got wrong:
+
+- **Step rate = RATE_TABLE[rate_index], rate_index = 4 → 6 ticks = 1/16** at 120 BPM.
+  Enabling the arp runs sub_7FF91E024F40 which hard-codes cfg[7]=2 → the rate map
+  {0,0,4,1,3,5}[2] = 4. There is NO user arp-RATE parameter. The `24/(2-(division!=0))`
+  = 12/24-tick "owner clock" the port previously used is actually the chord RE-LATCH
+  quantizer (sub_7FF91E023C50 via router+5), never the step length. Fix: carp_init
+  `use_rate_table=1, rate_index=4` (was 0/0 → eighth notes, the audible "half-time" bug).
+- **Gate default = index 7 (100%)**, from the default sub-pattern header (0x1C>>2). The
+  bridge's override to index 3 (60%) is removed.
+- First note of an UP phrase = the lowest held key at the played octave (60, then
+  72, 84 for range 2) — never an octave-high start. Velocity is pass-through of the
+  played key (grid vel 127 with sens 100 makes the sens term vanish).
+
+VERIFIED: carp_tick with held C4 @120 BPM emits notes at t=0.000, 0.125, 0.250, …
+(1/16), first note 60. make test green.

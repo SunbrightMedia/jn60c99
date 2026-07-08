@@ -274,8 +274,15 @@ void carp_init(carp *e)
     e->oct_adv_flag = 0; e->oct_shift = 0; e->range = 0;
     e->type = 0; e->selector = CARP_TYPE_SELECTOR[0];
     e->vel_fixed = 0; e->vel_sens = 0;
-    e->bpm = 120.0; e->division = 0; e->rate_index = 0; e->gate_index = 7;
-    e->use_rate_table = 0;
+    /* Step clock: the real plugin ALWAYS steps by RATE_TABLE[rate_index] ticks
+     * (step trigger sub_7FF91E020260: +3048 += *(u16*)(a1+6*step+610)); enabling the
+     * arp forces rate_index = 4 (sub_7FF91E024F40 hard-codes cfg[7]=2 -> map{0,0,4,1,
+     * 3,5}[2] + 0 = 4 -> RATE_TABLE[4] = 6 ticks = 1/16 at 120 BPM). The owner-clock
+     * 12/24-tick divisor we previously used is the chord RE-LATCH quantizer, not the
+     * step clock (see docs/ARP_PROVENANCE.md / scratchpad/oracle/arp_rate_findings.md).
+     * gate_index 7 = 100% is the default sub-pattern header (0x1C>>2). */
+    e->bpm = 120.0; e->division = 0; e->rate_index = 4; e->gate_index = 7;
+    e->use_rate_table = 1;
     e->pos = 0.0; e->cur_note = -1; e->gate_closed = 0; e->first_step = 1;
 }
 
@@ -289,10 +296,10 @@ void carp_set_mode(carp *e, int type)
     e->started = 0; e->sel_step = 0; e->ud_dir = 1; e->oct_shift = 0; e->oct_adv_flag = 0;
 }
 
-/* ARPEGGIO STEP param (0..5) -> octave range (octaves-1), then stored to
- * a1+3476 by sub_7FF91E01FE60. The 0..5 -> {0,1,2,2,2,2} mapping (1/2/3
- * octaves) is asserted by ARP_FINDINGS.md from Script.xml; it is NOT
- * re-derived from the binary here (see docs/ARP_PROVENANCE.md). */
+/* ARPEGGIO STEP param (0..5) -> octave range (octaves-1). Binary-proven:
+ * dispatch id 833 -> sub_7FF91E024F40 clamps min(step,2) -> CArpeggio+4076 ->
+ * sub_7FF91E01FE60 stores it to +3476 (range), consumed by the selectors as octave
+ * span. So {0,1,2,2,2,2} == min(step,2) is exact (arp_rate_findings.md §3). */
 void carp_set_range(carp *e, int step)
 {
     static const int MAP[6] = { 0, 1, 2, 2, 2, 2 };
@@ -340,7 +347,10 @@ int carp_tick(carp *e, double sample_rate, carp_event *ev, int cap)
             e->cur_note = -1;
         }
         e->pos = 0.0; e->first_step = 1;
-        e->started = 0; e->sel_step = 0; e->ud_dir = 1; e->oct_shift = 0;
+        /* Last-key release (sub_7FF91E01F2A0): zero sel_step, oct_shift, oct_adv_flag
+         * — but NOT started (stays 1 after the first note ever) and NOT ud_dir (kept),
+         * so 2nd-and-later phrases resume DOWN/UP&DOWN ordering exactly as the binary. */
+        e->sel_step = 0; e->oct_shift = 0; e->oct_adv_flag = 0;
         return n;
     }
 
