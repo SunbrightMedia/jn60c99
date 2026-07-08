@@ -282,6 +282,43 @@ static void apply_vca_mode(unsigned char *state, int v)
     JF(state, 10208) = env2;   /* ENV2 SW */
 }
 
+/* (F ENV VARIATION) (extended leaf 112, record byte 482 — the leaf immediately
+ * before VCA MODE in the NAME2 block): the VCF ENVELOPE-SOURCE selector. This is
+ * the switch that decides which envelope opens the filter, and it was the cause of
+ * the "pluck has a slow attack" bug: unrecalled, it stayed 0 (=ENV1) for every
+ * patch, so a pluck whose filter should snap open on the FAST amp envelope (ENV2)
+ * instead crawled open on the slow filter envelope (ENV1).
+ *
+ * Derived entirely from the decompiled voice render (src/voice_render.c 1151-1157,
+ * a byte-identical transcription of sub_180369070) plus the two settable param
+ * descriptors idx 74 "Env1/2" (offset 7008) and idx 75 "Int/Env" (offset 7024):
+ *     7040 = 7008;                                  // bit-copy (int), read as float
+ *     v210 = 2752 + 7040 * (3232 - 2752);           // lerp(ENV1, ENV2, 7008)
+ *     7072 = v210 + 7024 * (6640 - v210);           // lerp(selected-env, Int, 7024)
+ * so 7008 is a FLOAT lerp factor (0.0 -> ENV1-derived state 2752, 1.0 -> ENV2-
+ * derived state 3232) and 7024 mixes the chosen envelope with the internal source
+ * 6640. It must be written as float 1.0f (not int 1): the render reads JF(7040), and
+ * an integer 1 would read back as a ~1.4e-45 denormal (i.e. still ENV1). Mapping:
+ *   0 -> ENV1  (7008=0, 7024=0) — the power-on default init/prepare already leave;
+ *   1 -> ENV2  (7008=1, 7024=0);
+ *   2 -> INT   (7024=1)         — the "Int" position feeding source 6640.
+ * The 0 and 1 cases are fully grounded: value 0 must reproduce the power-on state
+ * (verified 57/64 patches sit here) and value 1 = ENV2 is the fix that makes the 7
+ * plucky/percussive patches (incl. patch 10 "PL The Square") snap. Value 2 does not
+ * occur in the factory bank, so its Int mapping is derived from the descriptor name
+ * + the render math but is not exercised by any patch (flagged honestly). */
+static void apply_fenv_variation(unsigned char *state, int v)
+{
+    float env12 = 0.0f, intenv = 0.0f;
+    switch (v) {
+        case 1:  env12  = 1.0f; break;   /* ENV2 drives the filter */
+        case 2:  intenv = 1.0f; break;   /* Int source (unexercised by this bank) */
+        default: break;                  /* 0 (and clamp) -> ENV1, the default state */
+    }
+    JF(state, 7008) = env12;    /* Env1/2 selector (lerp ENV1<->ENV2) */
+    JF(state, 7024) = intenv;   /* Int/Env mix                       */
+}
+
 /* Read a big-endian IEEE-754 float stored as 8 nibbles in the record starting at
  * record byte offset `roff` (the `blob` pointer is record+16, i.e. blob-relative
  * index = roff-16). The plugin stores full-resolution companions of some params
@@ -336,6 +373,7 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
      * 64 patches. These write per-voice offsets (<84272), so juno_driver_seed_voices
      * replicates them to all 8 voices. */
     apply_vca_mode(state, record_byte(blob, 490));      /* VCA MODE  (leaf 113) */
+    apply_fenv_variation(state, record_byte(blob, 482)); /* F ENV VARIATION (leaf 112) */
     {
         int t = record_byte(blob, 554);                  /* LFO TRIG ENV (leaf 121) */
         JF(state, 2560) = t ? 1.0f : 0.0f;               /* both env-trigger switches */
