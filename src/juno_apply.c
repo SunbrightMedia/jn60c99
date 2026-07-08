@@ -95,6 +95,7 @@
 #include "delay_recall.h"
 #include "reverb_recall.h"
 #include "chorus_recall.h"
+#include "effect_modes.h"
 
 #define BANK_HEADER   23
 #define BANK_STRIDE   20223
@@ -421,6 +422,14 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
      * with each patch's own for the patches whose EFFECT TYPE selects the chorus.
      * Global master cells (>84272), single write. */
     juno_apply_chorus(state, blob - BANK_BLOB_OFF);
+    ++n;
+
+    /* Per-patch EFFECT TYPE routing + modes 1 (distortion+pan) and 5 (chorus/ensemble
+     * variant): writes the slot-2 selector cell (state[JUNO_PROG_EFX]) so the master
+     * follows the patch's EFFECT TYPE, the shared slot-2 "Effect SW" wet level, and —
+     * for a mode-1 or mode-5 patch — that mode's structural block + recalled cells,
+     * all bit-exact from the binary (see src/effect_modes.c). */
+    juno_apply_effect_modes(state, blob - BANK_BLOB_OFF);
     ++n;
     return n;
 }

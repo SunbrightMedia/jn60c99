@@ -49,8 +49,8 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
         JF(state, 91216) = 1.3f;                                    /* Dry (const) */
         JF(state, 91232) = cr_bits(CHORUS_WET_LUT[depth & 0xFF]);   /* Wet         */
         JF(state, 91200) = cr_bits(CHORUS_NOISE_LUT[tone & 0xFF]);  /* Noise       */
-    } else if (etype == 5) {                        /* block B (96336) */
-        JF(state, 96400) = (float)depth / 255.0f;                  /* On/Off      */
-        JF(state, 96352) = cr_bits(CHORUS5_LFORATE_LUT[tone & 0xFF]); /* LFO Rate  */
     }
+    /* EFFECT TYPE mode 5 (block B, 96336) is now handled fully — structural block +
+     * On/Off + LFO Rate + enable gates — by src/effect_modes.c (juno_apply_effect_modes),
+     * alongside mode 1. This recall covers only the mode-2/3/4 chorus (block A). */
 }
