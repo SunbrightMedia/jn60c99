@@ -151,10 +151,19 @@ static const juno_bind BINDINGS[] = {
     { 42, 50, T_ID,  2800, "ENV1 SUSTAIN"    }, /* -> filter ENV Sustain               */
     { 43, 38, T_ID,  2832, "ENV1 RELEASE"    }, /* -> filter ENV Release (96k curve 38)*/
     { 45, 35, T_ID,  3264, "ENV2 ATTACK"     }, /* -> amp ENV Attack                   */
-    { 52, 38, T_ID,  3312, "ENV2 RELEASE"    }, /* -> amp ENV Release                  */
-    { 48, 24, T_ID,  7408, "VCF KEY FOLLOW"  }, /* -> KCV Level                        */
+    { 48, 38, T_ID,  3312, "ENV2 RELEASE"    }, /* -> amp ENV Release  (blob 48, NOT 52:
+                                                  * dispatch=blob+744 holds for all 26 other
+                                                  * bindings; 792-744=48. Was reading a DELAY
+                                                  * byte. Same +4 address-sort bug as ATTACK.)*/
+    { 44, 24, T_ID,  7408, "VCF KEY FOLLOW"  }, /* -> KCV Level  (blob 44, NOT 48: 788-744=44.
+                                                  * curve 24 is BIPOLAR; blob48 gave sign-
+                                                  * flipped tracking, e.g. patch13 -1.0 (dark)
+                                                  * vs correct 0.0 (neutral) -> brightness.)  */
     { 39, 46, T_ID,  7392, "VCF ENV MOD"     }, /* -> ENV Level (filter env depth)     */
-    { 53, 24, T_ID,  9584, "VCA TONE"        }, /* -> AMP TONE                         */
+    { 49, 24, T_ID,  9584, "VCA TONE"        }, /* -> AMP TONE  (blob 49, NOT 53: 793-744=49.
+                                                  * blob53 is the DELAY TIME leaf; curve 24
+                                                  * bipolar sign-flipped, e.g. patch40 +0.197
+                                                  * vs correct -0.331. Same +4 bug as ATTACK.) */
     { 26, 54, T_ID,  4208, "DCO PWM LEVEL"   }, /* -> JU OSC Sqr Lev (see note below)  */
     {  7, 44, T_ID,  1920, "LFO DELAY TIME"  }, /* -> LFO Delay (value tree, 96k c44)  */
     {  7, 52, T_ID,  1936, "LFO DELAY TIME"  }, /* -> LFO Delay Sw (2nd coeff)         */
