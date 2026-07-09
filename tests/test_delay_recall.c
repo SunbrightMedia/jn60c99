@@ -45,8 +45,8 @@ int main(void)
 
     /* --- case 1: DELAY TYPE 0, LEVEL 128, TIME 128, FEEDBACK 255, DIRECT 255 --- */
     put_pair(rec, 650, 0);      /* DELAY TYPE   */
-    put_blob(rec,  40, 128);    /* DELAY LEVEL  */
-    put_blob(rec,  49, 128);    /* DELAY TIME   */
+    put_blob(rec,  52, 128);    /* DELAY LEVEL  (blob 52, corrected from 40)  */
+    put_blob(rec,  53, 128);    /* DELAY TIME   (blob 53, corrected from 49)  */
     put_pair(rec, 3057, 255);   /* DELAY FEEDBACK   */
     put_pair(rec, 3060, 255);   /* DELAY DIRECT LEV */
     memset(st, 0, JUNO_STATE_BYTES);
@@ -76,7 +76,7 @@ int main(void)
 
     /* --- case 3: DELAY TYPE 0 but LEVEL 0 (delay off): block muted --- */
     put_pair(rec, 650, 0);
-    put_blob(rec, 40, 0);
+    put_blob(rec, 52, 0);       /* DELAY LEVEL 0 (blob 52, corrected from 40) */
     memset(st, 0, JUNO_STATE_BYTES);
     juno_bank_apply(st, bank, 0);
     if (JF(st, 102576) != 0.0f || JF(st, 102592) != 0.0f) {

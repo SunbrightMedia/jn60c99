@@ -317,25 +317,12 @@ static void apply_vca_mode(unsigned char *state, int v)
  * derived state 3232) and 7024 mixes the chosen envelope with the internal source
  * 6640. It must be written as float 1.0f (not int 1): the render reads JF(7040), and
  * an integer 1 would read back as a ~1.4e-45 denormal (i.e. still ENV1). Mapping:
- *   0 -> ENV1  (7008=0, 7024=0) — the power-on default init/prepare already leave;
- *   1 -> ENV2  (7008=1, 7024=0);
- *   2 -> INT   (7024=1)         — the "Int" position feeding source 6640.
- * The 0 and 1 cases are fully grounded: value 0 must reproduce the power-on state
- * (verified 57/64 patches sit here) and value 1 = ENV2 is the fix that makes the 7
- * plucky/percussive patches (incl. patch 10 "PL The Square") snap. Value 2 does not
- * occur in the factory bank, so its Int mapping is derived from the descriptor name
- * + the render math but is not exercised by any patch (flagged honestly). */
-static void apply_fenv_variation(unsigned char *state, int v)
-{
-    float env12 = 0.0f, intenv = 0.0f;
-    switch (v) {
-        case 1:  env12  = 1.0f; break;   /* ENV2 drives the filter */
-        case 2:  intenv = 1.0f; break;   /* Int source (unexercised by this bank) */
-        default: break;                  /* 0 (and clamp) -> ENV1, the default state */
-    }
-    JF(state, 7008) = env12;    /* Env1/2 selector (lerp ENV1<->ENV2) */
-    JF(state, 7024) = intenv;   /* Int/Env mix                       */
-}
+ *   0 -> ENV1  (7008=0, 7024=0) — the power-on default init/prepare leave.
+ * RETRACTED (Tier-C audit 2026): the plugin does NOT recall this — a full 0..1121
+ * dispatch sweep finds ZERO writers of 7008/7024, disp854 is disabled in Script.xml,
+ * and 0/64 patches touch them in the oracle. The filter always uses ENV1. The former
+ * apply_fenv_variation() wrote ENV2 for 7 patches by ear (a divergence) and is removed;
+ * leaving the init default (both 0.0) is bit-exact. */
 
 /* Read a big-endian IEEE-754 float stored as 8 nibbles in the record starting at
  * record byte offset `roff` (the `blob` pointer is record+16, i.e. blob-relative
@@ -391,7 +378,20 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
      * 64 patches. These write per-voice offsets (<84272), so juno_driver_seed_voices
      * replicates them to all 8 voices. */
     apply_vca_mode(state, record_byte(blob, 490));      /* VCA MODE  (leaf 113) */
-    apply_fenv_variation(state, record_byte(blob, 482)); /* F ENV VARIATION (leaf 112) */
+    /* F ENV VARIATION: NOT recalled by the plugin. Proven non-circularly (Tier-C audit
+     * 2026): a full 0..1121 dispatch sweep finds ZERO writers of 7008/7024, disp854 is
+     * parenthesized/disabled in Script.xml, and 0/64 patches touch these in the oracle.
+     * juno_init leaves both = 0 (filter always driven by ENV1), which is bit-exact.
+     * The prior apply_fenv_variation() call wrote ENV2 for 7 "plucky" patches by ear —
+     * a divergence from the plugin — so it is removed (function deleted above). */
+    {
+        /* PORTAMENTO MODE (off 608): the plugin sets it to 1.0 only when BOTH LEGATO
+         * and ASSIGN are engaged (isolated fresh-construct repro: leg-only=0, asg-only=0,
+         * both=1.0; oracle shows P5/P47 = 0x3f800000). Per-voice, seeded to all 8. */
+        int lg = ((blob[2 * 55] & 0xF) << 4) | (blob[2 * 55 + 1] & 0xF);
+        int as = ((blob[2 * 56] & 0xF) << 4) | (blob[2 * 56 + 1] & 0xF);
+        JF(state, 608) = (lg != 0 && as != 0) ? 1.0f : 0.0f;
+    }
     {
         int t = record_byte(blob, 554);                  /* LFO TRIG ENV (leaf 121) */
         JF(state, 2560) = t ? 1.0f : 0.0f;               /* both env-trigger switches */

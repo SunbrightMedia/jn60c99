@@ -102,8 +102,12 @@ static int blob_val(const unsigned char *rec, int bp)
 void juno_apply_delay(unsigned char *state, const unsigned char *rec)
 {
     int dtype  = rec_byte(rec, 650);          /* DELAY TYPE -> v39 selector      */
-    int level  = blob_val(rec, 40);           /* DELAY LEVEL                     */
-    int dtime  = blob_val(rec, 49);           /* DELAY TIME  (0..255)            */
+    int level  = blob_val(rec, 52);           /* DELAY LEVEL (blob 52, NOT 40: blob 40 is
+                                                  ENV1 ATTACK. dispatch=blob+744 pins 796->52;
+                                                  was colliding with the knob recall — 11
+                                                  patches had delay wrongly OFF.)            */
+    int dtime  = blob_val(rec, 53);           /* DELAY TIME  (blob 53, NOT 49: blob 49 is
+                                                  VCA TONE; 797->53.)                        */
     int fb     = rec_byte(rec, 3057);         /* DELAY FEEDBACK                  */
     int direct = rec_byte(rec, 3060);         /* DELAY DIRECT LEVEL              */
     unsigned k;
@@ -122,8 +126,8 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     }
     JF(state, 102528) = (float)level  / 255.0f;             /* Wet      */
     JF(state, 102560) = (float)fb     / 255.0f * 0.9f;      /* Feedback */
-    JF(state, 102576) = level > 0 ? 1.0f : 0.0f;            /* On/Off   */
-    JF(state, 102592) = level > 0 ? 1.0f : 0.0f;            /* Mute/enable */
+    JF(state, 102576) = level >= 2 ? 1.0f : 0.0f;           /* On/Off (curve: v0,v1->0, v2->1) */
+    JF(state, 102592) = level >= 2 ? 1.0f : 0.0f;           /* Mute/enable */
     JF(state, 102512) = (float)direct / 255.0f;             /* Dry      */
     bits = DELAYTIME_LUT[dtime & 0xFF];
     memcpy(&f, &bits, sizeof f);
