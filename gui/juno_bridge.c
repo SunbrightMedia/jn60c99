@@ -256,8 +256,18 @@ static void poly_note_on(juno_ctx *c, int midi_note, int velocity, int variant)
                     { age = c->voice_age[w]; best = w; }
             pick = best;
         }
-        if (pick < 0) pick = pick_oldest(c, 0, 0);      /* oldest free */
-        if (pick < 0) pick = pick_oldest(c, 1, 0);      /* oldest release-pending */
+        if (pick < 0) {                                 /* oldest GATE-OFF voice — free OR
+                                                           still-ringing, ONE oldest-by-age
+                                                           pick. Verified by executing the
+                                                           plugin's CAssignJu60 (RVA 0x353150)
+                                                           under Unicorn: its scan tests only
+                                                           the gate byte, with no reaped-vs-
+                                                           ringing preference. */
+            int w; unsigned oldest = 0;
+            for (w = 0; w < JUNO_NUM_VOICES; ++w)
+                if (!c->voice_gated[w] && (pick < 0 || c->voice_age[w] < oldest))
+                    { oldest = c->voice_age[w]; pick = w; }
+        }
     } else {                                            /* MODE 3: first free/release by index */
         for (v = 0; v < JUNO_NUM_VOICES; ++v)
             if (c->voice_note[v] < 0 || !c->voice_gated[v]) { pick = v; break; }
@@ -288,6 +298,7 @@ static void mono_note_on(juno_ctx *c, int midi_note, int velocity)
         voice_trigger(c, 0, midi_note, velocity);
     } else {                                             /* legato: pitch move, keep envelope */
         juno_note_glide(c->st, 0, midi_note);
+        juno_note_velocity(c->st, 0, velocity);          /* refresh VCF/VCA vel, no gate edge */
         c->voice_note[0] = midi_note;
         c->voice_age[0]  = ++c->age_counter;
     }
@@ -302,8 +313,8 @@ static void unison_note_on(juno_ctx *c, int midi_note, int velocity)
     int v, was_idle = !c->voice_gated[0];
     for (v = 0; v < JUNO_NUM_VOICES; ++v) {
         if (was_idle) voice_trigger(c, v, midi_note, velocity);
-        else { juno_note_glide(c->st, v, midi_note); c->voice_note[v] = midi_note;
-               c->voice_age[v] = ++c->age_counter; }
+        else { juno_note_glide(c->st, v, midi_note); juno_note_velocity(c->st, v, velocity);
+               c->voice_note[v] = midi_note; c->voice_age[v] = ++c->age_counter; }
     }
 }
 

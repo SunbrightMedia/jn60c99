@@ -150,6 +150,21 @@ void juno_note_glide(unsigned char *st, int voice, int midi_note)
     JF(st, base + PITCH_OFF) = juno_note_pitch(midi_note);
 }
 
+/* Refresh the velocity coefficients (VCF 6864 / VCA 9680) WITHOUT a gate edge —
+ * used by MONO legato / UNISON glide overlaps. Verified by executing the plugin's
+ * CAssignJu60 (RVA 0x353150) under Unicorn: a legato/glide note arriving with a
+ * different velocity refreshes GATE(v, newvel) (velocity coeffs only, no gate-off,
+ * no DCO re-latch); an identical velocity is a no-op (same curves as note-on). */
+void juno_note_velocity(unsigned char *st, int voice, int velocity)
+{
+    unsigned int base;
+    if (voice < 0 || voice >= JUNO_NUM_VOICES) return;
+    if (velocity <= 0) return;
+    base = VBASE(voice);
+    JF(st, base + 6864) = juno_curve(56, velocity);   /* VCF velocity (param 73) */
+    JF(st, base + 9680) = juno_curve(57, velocity);   /* VCA velocity (param 98) */
+}
+
 /* The gate is now an immediate write (no host-side ramp to advance), so the
  * per-sample tick is a no-op. Kept for API/source compatibility. */
 void juno_note_tick(unsigned char *st)

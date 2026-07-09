@@ -38,6 +38,10 @@ void juno_note_off(unsigned char *st, int voice);
  * keep running — see docs, mono/unison legato + poly-portamento-glide). */
 void juno_note_glide(unsigned char *st, int voice, int midi_note);
 
+/* Refresh velocity coeffs (VCF/VCA) without a gate edge — MONO legato / UNISON glide
+ * overlaps with a changed velocity. Verified vs CAssignJu60 under emulation. */
+void juno_note_velocity(unsigned char *st, int voice, int velocity);
+
 /* No-op: the gate is now an immediate write with no host-side ramp to advance.
  * Retained for API/source compatibility (callers tick it once per sample). */
 void juno_note_tick(unsigned char *st);
