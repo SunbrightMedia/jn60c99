@@ -85,10 +85,14 @@
  *     Both are tempo-synced (inaudible in the free-running dry preview).
  * See docs/AUDIBLE_RECALL_PLAN.md.
  *
- * At 96 kHz (the engine's rate) the sample-rate-variant ADSR curves resolve to
- * the "other" variant (ENV attack=35, decay/release=38) — verified by emulating
- * the real thunks with voice+0x38 set to 96000. HPF cutoff (curve 41) is
- * SR-invariant (same curve at 44.1/48/96 kHz).
+ * SAMPLE-RATE-VARIANT recall (sr_variant flag, host rate from state[16]): the
+ * plugin's recall setter selects a curve arm by rate — attack 33/34/35, decay &
+ * release 36/37/38, LFO-delay 42/43/44, HPF-cutoff 39/40/41 for 44100/48000/96k —
+ * and multiplies portamento time (curve 7) by 96000/H. Proven bit-exact 256/256 vs
+ * the plugin's recall dispatch at all three rates and cross-checked against
+ * juno_prepare's independent Class-C/A defaults (scratchpad/oracle/recall_rate_spec.md).
+ * (The earlier "HPF cutoff curve 41 SR-invariant" note was WRONG — it selects
+ * 39/40/41; only its 3 secondary coeffs 10256/10272/10288 are rate-invariant.)
  */
 #include "juno_engine.h"
 #include "juno_curve.h"
@@ -109,8 +113,8 @@
  * - blob_pos: aligned to the plugin's ordered param table, anchored to the known
  *   values of bank patch 5 "LD Classic Lead" (unique value matches).
  * - curve_id: from the plugin's setter thunks, confirmed by running the real
- *   thunks under Unicorn. Sample-rate-variant curves (the envelope times) were
- *   emulated at 96 kHz (our engine's rate): ENV Attack=35, Decay/Release=38.
+ *   thunks under Unicorn. curve_id is the 96 kHz arm; the sample-rate-variant rows
+ *   (sr_variant=1/2) select the per-rate arm/multiply at recall time (see above).
  * - offset: the engine coefficient slot (registry, name-checked vs COEFF_PARAM_MAP).
  * VCF CUTOFF FREQ is oracle-proven: juno_curve(22,153)=0.600000 == the plugin's
  * own float value for this patch. */
@@ -131,16 +135,33 @@ static int apply_tf(int tf, int v)
     }
 }
 
-typedef struct { int blob_pos; int curve_id; int tf; int offset; const char *name; } juno_bind;
+/* sr_variant: 0 = rate-invariant curve; 1 = 3-class curve-arm select {c-2,c-1,c}
+ * by host rate (44100/48000/else-96k); 2 = post-curve C/H multiply (portamento).
+ * The plugin's recall setter thunks read the descriptor's rate field and select a
+ * consecutive juno_curve arm for the SR-variant envelope/LFO-delay/HPF params, or
+ * (porta) multiply juno_curve(7,·) by 96000/H. All arms already exist bit-exact in
+ * juno_curve.c; verified 256/256 at 44100/48000/96000 and cross-checked against
+ * juno_prepare's independent Class-C/A defaults. See scratchpad/oracle/recall_rate_spec.md. */
+typedef struct { int blob_pos; int curve_id; int tf; int offset; const char *name; int sr_variant; } juno_bind;
+
+/* Curve-arm select by host rate: arm(44100)=c96-2, arm(48000)=c96-1, else=c96
+ * (the binary's LUT layout keeps the three rate variants as a consecutive triple). */
+static int rate_curve(int c96, int Hr)
+{
+    return (Hr == 44100) ? c96 - 2 : (Hr == 48000) ? c96 - 1 : c96;
+}
 
 static const juno_bind BINDINGS[] = {
     { 35, 22, T_ID,  6736, "VCF CUTOFF FREQ" }, /* -> LPF Cutoff  (VERIFIED = 0.6)     */
     { 37, 22, T_ID,  6832, "VCF RESONANCE"   }, /* -> LPF Resonance                    */
-    { 38, 41, T_ID, 10240, "HPF CUTOFF FREQ" }, /* -> HPF Cutoff (curve 41, SR-invar.) */
+    { 38, 41, T_ID, 10240, "HPF CUTOFF FREQ", 1 }, /* -> HPF Cutoff. SR-VARIANT: arm 39/40/41
+                                                  * by rate (recall_rate_spec.md); the 3 secondary
+                                                  * coeffs 10256/10272/10288 below are rate-invar. */
     { 38, 52, T_ID, 10256, "HPF CUTOFF FREQ" }, /* -> HPF Switch  (2nd coeff)          */
     { 38, 10, T_ID, 10272, "HPF CUTOFF FREQ" }, /* -> Boost LPF Level (3rd coeff)      */
     { 38, 18, T_BIP,10288, "HPF CUTOFF FREQ" }, /* -> Boost Thru Level (4th, bipolar)  */
-    { 40, 35, T_ID,  2784, "ENV1 ATTACK"     }, /* -> filter ENV Attack  (96k curve 35)
+    { 40, 35, T_ID,  2784, "ENV1 ATTACK", 1  }, /* -> filter ENV Attack. SR-VARIANT arm 33/34/35
+                                                  * (96k curve 35)
                                                   * blob 40, NOT 44: the record stores ENV1
                                                   * as natural A,D,S,R at 40,41,42,43 (D/S/R
                                                   * coincide with the old D,S,R,A guess; only
@@ -149,11 +170,11 @@ static const juno_bind BINDINGS[] = {
                                                   * patch13 "Rip Lead" blob40=13 (fast attack,
                                                   * == panel value), blob44=128 (a bipolar knob
                                                   * that is never <70 across all 64 patches). */
-    { 41, 38, T_ID,  2816, "ENV1 DECAY"      }, /* -> filter ENV Decay   (96k curve 38)*/
+    { 41, 38, T_ID,  2816, "ENV1 DECAY", 1   }, /* -> filter ENV Decay. SR-VARIANT 36/37/38 */
     { 42, 50, T_ID,  2800, "ENV1 SUSTAIN"    }, /* -> filter ENV Sustain               */
-    { 43, 38, T_ID,  2832, "ENV1 RELEASE"    }, /* -> filter ENV Release (96k curve 38)*/
-    { 45, 35, T_ID,  3264, "ENV2 ATTACK"     }, /* -> amp ENV Attack                   */
-    { 48, 38, T_ID,  3312, "ENV2 RELEASE"    }, /* -> amp ENV Release  (blob 48, NOT 52:
+    { 43, 38, T_ID,  2832, "ENV1 RELEASE", 1 }, /* -> filter ENV Release. SR-VARIANT 36/37/38 */
+    { 45, 35, T_ID,  3264, "ENV2 ATTACK", 1  }, /* -> amp ENV Attack. SR-VARIANT 33/34/35 */
+    { 48, 38, T_ID,  3312, "ENV2 RELEASE", 1 }, /* -> amp ENV Release. SR-VARIANT 36/37/38 (blob 48, NOT 52:
                                                   * dispatch=blob+744 holds for all 26 other
                                                   * bindings; 792-744=48. Was reading a DELAY
                                                   * byte. Same +4 address-sort bug as ATTACK.)*/
@@ -167,7 +188,7 @@ static const juno_bind BINDINGS[] = {
                                                   * bipolar sign-flipped, e.g. patch40 +0.197
                                                   * vs correct -0.331. Same +4 bug as ATTACK.) */
     { 26, 54, T_ID,  4208, "DCO PWM LEVEL"   }, /* -> JU OSC Sqr Lev (see note below)  */
-    {  7, 44, T_ID,  1920, "LFO DELAY TIME"  }, /* -> LFO Delay (value tree, 96k c44)  */
+    {  7, 44, T_ID,  1920, "LFO DELAY TIME", 1 }, /* -> LFO Delay. SR-VARIANT arm 42/43/44 */
     {  7, 52, T_ID,  1936, "LFO DELAY TIME"  }, /* -> LFO Delay Sw (2nd coeff)         */
     {  8, 22, T_ID,  1088, "LFO RATE"        }, /* -> LFO Rate (value tree c22)        */
     {  8, 22, T_ID,  2064, "LFO RATE"        }, /* -> LFO Noise Mix (shared rate coeff)*/
@@ -180,10 +201,11 @@ static const juno_bind BINDINGS[] = {
     { 12, 51, T_ID,  1872, "LFO KEY TRIG"    }, /* -> LFO Trig (value tree c51)        */
     { 14, 45, T_ID,  4144, "DCO PWM DEPTH"   }, /* -> PWM Level (value tree c45)       */
     { 16,  5, T_ID,  3840, "DCO RANGE"       }, /* -> OSC1 Feet (value tree c5)        */
-    { 46, 38, T_ID,  3296, "ENV2 DECAY"      }, /* -> amp ENV Decay (96k c38)          */
+    { 46, 38, T_ID,  3296, "ENV2 DECAY", 1   }, /* -> amp ENV Decay. SR-VARIANT 36/37/38 */
     { 47, 50, T_ID,  3280, "ENV2 SUSTAIN"    }, /* -> amp ENV Sustain (value tree c50) */
     { 54, 52, T_ID,   592, "PORTAMENTO"      }, /* -> Porta OnOff (value tree c52)     */
-    { 54,  7, T_ID,   624, "PORTAMENTO"      }, /* -> Porta Time  (2nd coeff)          */
+    { 54,  7, T_ID,   624, "PORTAMENTO", 2   }, /* -> Porta Time. SR-VARIANT: juno_curve(7,v)
+                                                  * * (96000/H) for H!=96000 (C/H post-multiply) */
     { 57, 10, T_ID,  4128, "BEND RANGE"      }, /* -> Bend (value tree c10; +c10@7472) */
     { 57, 10, T_ID,  7472, "BEND RANGE"      }, /* -> Bend Range VCF (2nd coeff)       */
     { 59, 52, T_ID,  1056, "TEMPO SYNC"      }, /* -> LFO Tempo Rate Sw (value tree c52)*/
@@ -354,13 +376,25 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
 {
     int i, n = 0;
     const unsigned char *blob;
+    int Hr;
     if (idx < 0 || idx >= BANK_COUNT) return 0;
+    /* Host rate, exactly as juno_prepare reads it — drives the SR-variant curve
+     * selection so recall matches the plugin at 44100/48000/else-96k. An unset
+     * rate field (0) defaults to 96 kHz (the engine's historical rate). */
+    Hr = (int)JF(state, 16);
+    if (Hr <= 0) Hr = 96000;
     blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
     for (i = 0; i < N_BINDINGS; ++i) {
-        int p = BINDINGS[i].blob_pos;
-        int v = ((blob[2 * p] & 0xF) << 4) | (blob[2 * p + 1] & 0xF);  /* hi-nibble */
-        JF(state, BINDINGS[i].offset) =
-            juno_curve(BINDINGS[i].curve_id, apply_tf(BINDINGS[i].tf, v));
+        int p   = BINDINGS[i].blob_pos;
+        int v   = ((blob[2 * p] & 0xF) << 4) | (blob[2 * p + 1] & 0xF);  /* hi-nibble */
+        int cid = BINDINGS[i].curve_id;
+        float c;
+        if (BINDINGS[i].sr_variant == 1)              /* 3-class curve-arm select */
+            cid = rate_curve(cid, Hr);
+        c = juno_curve(cid, apply_tf(BINDINGS[i].tf, v));
+        if (BINDINGS[i].sr_variant == 2 && Hr != 96000)  /* porta C/H post-multiply */
+            c *= 96000.0f / (float)Hr;
+        JF(state, BINDINGS[i].offset) = c;
         ++n;
     }
     /* DCO PWM SOURCE — blob 15 enum (4 flag coefficients). */
