@@ -85,10 +85,29 @@ typedef struct {
     long long  tick_period;     /* integer tick period (60e9*SR/round(BPM)/24), 1e-9 units */
     long long  tick_counter;    /* +24     : running 24-PPQN tick index         */
     long long  next_step_tick;  /* +3048   : tick at which the next step fires  */
-    long long  off_tick;        /* slot+8  : scheduled note-off tick (-1=none)  */
     int        running;         /* +44>=2  : arp has been started (has notes)   */
-    int     cur_note;           /* MIDI note currently sounding, or -1        */
-    int     gate_closed;        /* 1 once this step's note-off has fired      */
+
+    /* ---- SCATTER pattern grid (STEP x SLOT) --------------------------------
+     * The plugin's arp is not one-note-per-step: it walks a runtime slot table
+     * (built from the .rdata pattern block by expand sub_7FF91E01F9F0, then
+     * prune-all-rest + shell-sort-by-base-note sub_7FF91E01D540) and calls the
+     * selector once per ACTIVE grid cell. The default slab0/sub7 collapses to
+     * 1 slot / 1 step / velocity 127, i.e. carp's original single-note-per-step
+     * behaviour, bit-for-bit. See scratchpad/oracle/arp_pattern_grid_spec.md
+     * (verified 330/330 vs the plugin under Unicorn). */
+    int      scatter_type;      /* SCATTER TYPE 0..9   -> pattern slab           */
+    int      scatter_sub;       /* SCATTER DEPTH+7 (2..12) -> pattern sub         */
+    int      pat_len;           /* pattern length in steps (a1+3055, 1..32)       */
+    int      pat_nslots;        /* active slots after prune/sort (a1+3054)        */
+    int      pat_step;          /* current step index (a1+3056, -1 before start)  */
+    int      pat_sens;          /* velocity sensitivity, header[3]>>1 (=100)      */
+    uint8_t  grid_vel [16][32]; /* runtime cell velocity(bit0-6)|tie(bit7) [slot][step] */
+    uint16_t grid_gate[16][32]; /* runtime per-cell gate length in ticks (FED0)   */
+    uint8_t  slot_note[16];     /* runtime slot base note (0x80=none), sorted asc */
+    int      slot_pitch[16];    /* current sounding pitch per slot, -1 = silent   */
+    int      slot_noteidx[16];  /* raw selector note owning the slot (a1+804 +3)   */
+    long long slot_offtick[16]; /* scheduled note-off tick per slot (-1 = none)   */
+    int8_t   note_slot[128];    /* a1+3324 raw-note -> slot map, -1 = free         */
 } carp;
 
 /* Reset to power-on defaults (empty keyboard, UP, 1 octave, 120 BPM). */
@@ -107,6 +126,14 @@ void carp_set_division(carp *e, int rate_sw); /* 0 => 12 PPQN, !=0 => 24 PPQN */
 void carp_set_rate_index(carp *e, int idx);   /* 0..9 fine rate (opt-in)      */
 void carp_set_gate_index(carp *e, int idx);   /* 0..9 gate %                  */
 void carp_set_velocity(carp *e, int fixed, int sens); /* fixed 0..127, sens 0..100 */
+
+/* Select the SCATTER pattern grid. type = SCATTER TYPE (0..9 -> slab), depth =
+ * SCATTER DEPTH (-5..5 -> sub = depth+7). Rebuilds the runtime slot/grid tables
+ * (expand -> prune -> shell-sort -> gate-fill) and sets velocity sensitivity from
+ * the pattern header. Defaults (0,0) -> slab0/sub7 = the proven power-on pattern,
+ * which reproduces the single-note-per-step path bit-for-bit. Called by carp_init;
+ * call again to change patterns. See scratchpad/oracle/arp_pattern_grid_spec.md. */
+void carp_set_scatter(carp *e, int type, int depth);
 
 /* Advance the arp by exactly one output sample. Writes up to `cap` events
  * into `ev` (note-offs before note-ons) and returns how many were produced.

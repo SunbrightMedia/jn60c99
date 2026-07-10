@@ -196,25 +196,35 @@ the sorted list (shift the tail down) and clear `+3192[note]`.
 
 ## 7. What remains genuinely ambiguous (NOT guessed)
 
+> **RESOLVED (both items 1 and 2 below were closed later).** The STEP×SLOT grid
+> is now fully modeled and driven by `carp.c` (`carp_set_scatter` + the per-slot
+> step loop), verified **330/330 bit-exact** against the plugin's own code under
+> Unicorn across all 110 reachable patterns × 3 selector/range setups. The slab/sub
+> selection is proven: **slab = SCATTER TYPE, sub = SCATTER DEPTH + 7** (loader
+> `sub_7FF91E023010`), and the per-patch recall of SCATTER TYPE/DEPTH is bound to
+> value-tree leaf 92/93 = record byte 322/330 (param-DB dispatch cases 834/835).
+> See `scratchpad/oracle/arp_pattern_grid_spec.md` and `scatter_recall_spec.md`.
+> The historical notes below are kept for provenance.
+
 1. **Parameter binding → loader args `a2/a3/a4`.** `sub_7FF91E023010` takes
    `(type, a3, a4)` where `a3` picks the 8250-byte slab and `a4` the 550-byte
-   sub-pattern, but its only in-tree caller is the thunk `sub_7FF91E022F70`
-   which passes just `a1`; the decompile drops `rdx/r8/r9`, so **which slab /
-   sub-pattern a given UI state selects cannot be pinned from this decompile.**
-   Consequently the full STEP×SLOT rhythm grid (`+996`) is extracted as raw
-   bytes and its format documented, but `carp.c` does not drive it — it runs the
-   canonical **one selector call per step**, which is exactly what the
-   closed-form selectors `EFC0/E5C0/E850` encode and matches the verified
-   UP/DOWN behaviour. For TYPE 0..5 with the factory sub-patterns this is the
-   observable output; arbitrary custom grids are out of scope.
+   sub-pattern. *(RESOLVED: `a3 = SCATTER TYPE`, `a4 = SCATTER DEPTH + 7`, driven
+   from the param-DB setters `sub_7FF91E024F10` (cfg[8]) / `sub_7FF91E024EE0`
+   (cfg[9]=v+7) via `sub_7FF91E020EC0`; the full STEP×SLOT grid `+996` is now
+   expanded, pruned+sorted, and iterated one selector call PER ACTIVE CELL by
+   `carp.c`. The default slab0/sub7 reduces to one selector call per step, so the
+   earlier one-call-per-step model was the correct special case for the factory
+   default — which all 64 factory patches use.)*
 
 2. **Grid note-hold field (`+996` cell `+2`).** `sub_7FF91E01DD80` zeroes the
    grid and `sub_7FF91E01F9F0` writes only byte 0 of each cell, yet the step
    trigger reads a `u16` hold at cell `+2` for note-off scheduling
-   (`sub_7FF91E020260`:218). In the traced path that value is 0. `carp.c`
-   therefore takes the note-off timing from the clearly-decoded `+610` gate
-   length (`dur * gate% / 100`) instead — the well-defined gate source — and
-   this ambiguity is flagged rather than resolved.
+   (`sub_7FF91E020260`:218). *(RESOLVED: cell `+2` is the per-cell gate length
+   written by the backward tie-accumulation `sub_7FF91E01FED0` (ported as
+   `fed0_gates` in `carp.c`); for the reachable patterns every tie is a pure hold
+   and the base gate is `dur * gate% / 100`, so at the factory default it equals
+   the `+610` gate length used before. Note-off ticks are now bit-exact for all
+   110 patterns.)*
 
 3. **Two rate mechanisms.** The owner clock divisor (12/24, §4) and the fine
    RATE table (`rate_index` 0..9, §3b, via `a1+4047`/`sub_7FF91E0234F0`) are

@@ -397,8 +397,11 @@ static int gate_frac_to_index(float g)
 static void arp_tick(juno_ctx *c)
 {
     double sr = JF(c->st, 16); if (sr <= 0.0) sr = 96000.0;
-    carp_event ev[4];
-    int i, n = carp_tick(&c->arp, sr, ev, 4);
+    /* A dense SCATTER pattern can fire many slots on one tick (each up to a
+     * steal-off + self-off + on), plus the pre-step scheduled offs — well over 4.
+     * Size for the worst case (16 slots) so no events are dropped. */
+    carp_event ev[64];
+    int i, n = carp_tick(&c->arp, sr, ev, 64);
     for (i = 0; i < n; ++i) {
         if (ev[i].kind == 0) {                          /* note-off */
             synth_note_off(c, ev[i].note);
@@ -484,6 +487,17 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
      * no per-patch rate). This makes "arp presets" arpeggiate on load. */
     on = juno_bank_arp(bank, idx, &mode, &oct);
     juno_gui_arp_config(c, on, mode, oct, -1.0f, -1.0f);  /* keep UI bpm/gate */
+    /* Per-patch SCATTER pattern grid: SCATTER TYPE/DEPTH (proven leaf 92/93 ->
+     * record byte 322/330) select the arp's STEP x SLOT grid via carp_set_scatter.
+     * All 64 factory patches decode to (0,0) = the default slab0/sub7 grid, so this
+     * is inert for the stock bank but recalls correctly for any non-default patch.
+     * Applied AFTER arp_config (which resets the selector) so the pattern load lands
+     * last. See scratchpad/oracle/scatter_recall_spec.md. */
+    {
+        int stype = 0, sdepth = 0;
+        juno_bank_scatter(bank, idx, &stype, &sdepth);
+        carp_set_scatter(&c->arp, stype, sdepth);
+    }
     return n;
 }
 

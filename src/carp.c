@@ -9,6 +9,9 @@
  * lists the parts of the decompile that are genuinely ambiguous.
  */
 #include "carp.h"
+#include "carp_patterns.h"      /* SCATTER pattern table (generated from the PE .rdata) */
+
+static int step_ticks(const carp *e);   /* fwd: step period in 24-PPQN ticks */
 
 /* ===================================================================== *
  *  Extracted data tables (raw bytes from the binary, .rdata section)
@@ -262,6 +265,125 @@ static int velocity_calc(carp *e, int in_vel, int per_note_vel)
 }
 
 /* ===================================================================== *
+ *  SCATTER pattern grid  (static .rdata block -> playable runtime grid)
+ *  Ports the loader/expander/prune-sort/gate-fill chain; see
+ *  scratchpad/oracle/arp_pattern_grid_spec.md (verified 330/330 vs plugin).
+ * ===================================================================== */
+
+/* Gate-length fill for ONE slot's step cells — transcribes sub_7FF91E01FED0.
+ * cells[k] = grid velocity(bit0-6)|tie(bit7). Walks steps BACKWARD (wrapping) so
+ * each active cell's gate = its base gateLen plus the duration of every following
+ * tie-flagged cell before the next non-tie. dur / gateLen are the per-step
+ * constants (RATE[rate][0] and GATE[gate]*dur/100, filled identically for every
+ * step by F3D0). Faithful port of fed0_gates() in verify_grid.py. */
+static void fed0_gates(const uint8_t *cells, int patLen, int dur, int gateLen,
+                       uint16_t *gate)
+{
+    int v6, v8, v11, v12, v13;
+    int k;
+    for (k = 0; k < 32; ++k) gate[k] = 0;
+    if (patLen <= 0) return;
+    v6 = 0;
+    while (v6 < patLen && (cells[v6] & 0x7F) == 0) ++v6;
+    if (v6 >= patLen) return;                 /* LABEL_31: no active cell */
+    v8 = v6; v11 = cells[v6]; v12 = 0; v13 = v6;
+    for (;;) {
+        int v19, v20, v22, v23;
+        v13 = (v13 - 1 >= 0) ? v13 - 1 : patLen - 1;   /* decrement with wrap */
+        v19 = cells[v13];
+        v20 = ((int8_t)v11 >= 0) ? gateLen : dur;      /* prev cell a tie -> full dur */
+        v22 = ((v19 & 0x7F) != 0) ? (v12 + v20) : 0;
+        gate[v13] = (uint16_t)v22;
+        v23 = ((v19 & 0x7F) == 0) ? v12 : 0;
+        if (v20) {
+            int v24 = v20 + v23; v12 = 0;
+            if ((int8_t)v19 < 0) v12 = v24;            /* this cell is a tie -> carry back */
+        } else {
+            v12 = v23 + dur;
+        }
+        v11 = v19;
+        if (v13 == v8) break;
+    }
+}
+
+/* Recompute all 16 slots' gate lengths from the current rate/gate index (the
+ * plugin re-runs F3D0+FED0 on a rate/gate change). Cheap; called on pattern load
+ * and whenever the rate or gate index changes. */
+static void rebuild_gates(carp *e)
+{
+    int dur     = step_ticks(e);
+    int gateLen = (dur * (int)CARP_GATE_TABLE[e->gate_index]) / 100;
+    int s;
+    for (s = 0; s < 16; ++s)
+        fed0_gates(e->grid_vel[s], e->pat_len, dur, gateLen, e->grid_gate[s]);
+}
+
+void carp_set_scatter(carp *e, int type, int depth)
+{
+    int slab = type  < 0 ? 0 : (type  > 9 ? 9 : type);
+    int d    = depth < -7 ? -7 : (depth > 7 ? 7 : depth);
+    int sub  = d + 7;                              /* SCATTER DEPTH+7 -> sub */
+    const uint8_t *blk = carp_pattern_table
+                       + (unsigned)CARP_PAT_SLAB_STRIDE * (unsigned)slab
+                       + (unsigned)CARP_PAT_SUB_STRIDE  * (unsigned)sub;
+    int patLen = blk[5] >> 2;                      /* header[5]>>2, clamp 1..32 */
+    int sens   = blk[3] >> 1;                      /* header[3]>>1 (=100 for all) */
+    int term = 16, s, k, gi;
+    static const int GAPS[4] = { 8, 4, 2, 1 };
+    if (patLen < 1) patLen = 1;
+    if (patLen > 32) patLen = 32;
+
+    e->scatter_type = slab; e->scatter_sub = sub;
+    e->pat_len = patLen;    e->pat_sens = sens;
+
+    /* --- expand sub_7FF91E01F9F0: per-slot base note + 32 step cells (transpose),
+     *     stopping the slot list at the first base-note terminator (>=0x80). --- */
+    for (s = 0; s < 16; ++s) {
+        const uint8_t *g = blk + 6 + 34 * s;
+        e->slot_note[s] = g[0];
+        for (k = 0; k < 32; ++k) e->grid_vel[s][k] = g[1 + k];
+    }
+    for (s = 0; s < 16; ++s) if (e->slot_note[s] >= 0x80) { term = s; break; }
+    for (s = term; s < 16; ++s) { e->slot_note[s] = 0x80; for (k = 0; k < 32; ++k) e->grid_vel[s][k] = 0; }
+
+    /* --- prune+sort sub_7FF91E01D540 part 1: all-rest rows over [0,patLen) -> 0x80 --- */
+    for (s = 0; s < 16; ++s) {
+        if (e->slot_note[s] < 0x80) {
+            int allrest = 1;
+            for (k = 0; k < patLen; ++k) if (e->grid_vel[s][k] & 0x7F) { allrest = 0; break; }
+            if (allrest) e->slot_note[s] = 0x80;
+        }
+    }
+    /* --- part 2: shell sort (gaps 8,4,2,1) by UNSIGNED base note ascending,
+     *     carrying each slot's grid row; deactivated slots (0x80) sink to the end. --- */
+    for (gi = 0; gi < 4; ++gi) {
+        int gap = GAPS[gi], j;
+        for (j = gap; j < 16; ++j) {
+            int i = j - gap;
+            while (i >= 0) {
+                if (e->slot_note[i] <= e->slot_note[i + gap]) break;
+                { uint8_t tn = e->slot_note[i]; e->slot_note[i] = e->slot_note[i + gap]; e->slot_note[i + gap] = tn; }
+                for (k = 0; k < patLen; ++k) {
+                    uint8_t t = e->grid_vel[i][k];
+                    e->grid_vel[i][k] = e->grid_vel[i + gap][k];
+                    e->grid_vel[i + gap][k] = t;
+                }
+                i -= gap;
+            }
+        }
+    }
+    e->pat_nslots = 0;
+    for (s = 0; s < 16; ++s) { if (e->slot_note[s] >= 0x80) break; ++e->pat_nslots; }
+
+    /* reset per-slot voice tracking + pattern step; velocity uses the header sens */
+    for (s = 0; s < 16; ++s) { e->slot_pitch[s] = -1; e->slot_noteidx[s] = 0; e->slot_offtick[s] = -1; }
+    for (k = 0; k < 128; ++k) e->note_slot[k] = -1;
+    e->pat_step  = -1;
+    e->vel_sens  = (uint8_t)sens;
+    rebuild_gates(e);
+}
+
+/* ===================================================================== *
  *  Configuration
  * ===================================================================== */
 void carp_init(carp *e)
@@ -286,7 +408,12 @@ void carp_init(carp *e)
     /* Free-running tick grid: phase/counter run on the transport, the first step
      * is scheduled at tick_counter+1 on empty->held (never at pos 0). */
     e->tick_acc = 0; e->tick_period = 1; e->tick_counter = 0; e->next_step_tick = 0;
-    e->off_tick = -1; e->running = 0; e->cur_note = -1; e->gate_closed = 0;
+    e->running = 0;
+    /* Load the power-on SCATTER pattern (slab0/sub7): 1 slot, 1 step, velocity 127.
+     * This is the proven default and collapses the step loop to the original
+     * single-note-per-step behaviour. Sets the pattern/grid/slot state and vel_sens
+     * (=100). Must come AFTER rate_index/gate_index are set above. */
+    carp_set_scatter(e, 0, 0);
 }
 
 void carp_set_mode(carp *e, int type)
@@ -312,9 +439,9 @@ void carp_set_range(carp *e, int step)
 }
 
 void carp_set_bpm(carp *e, double bpm)           { if (bpm > 0.0) e->bpm = bpm; }
-void carp_set_division(carp *e, int rate_sw)     { e->division = rate_sw; }
-void carp_set_rate_index(carp *e, int idx)       { if(idx<0)idx=0; if(idx>9)idx=9; e->rate_index=idx; }
-void carp_set_gate_index(carp *e, int idx)       { if(idx<0)idx=0; if(idx>9)idx=9; e->gate_index=idx; }
+void carp_set_division(carp *e, int rate_sw)     { e->division = rate_sw; rebuild_gates(e); }
+void carp_set_rate_index(carp *e, int idx)       { if(idx<0)idx=0; if(idx>9)idx=9; e->rate_index=idx; rebuild_gates(e); }
+void carp_set_gate_index(carp *e, int idx)       { if(idx<0)idx=0; if(idx>9)idx=9; e->gate_index=idx; rebuild_gates(e); }
 void carp_set_velocity(carp *e, int fixed, int sens)
 {
     if (fixed < 0) fixed = 0;
@@ -370,17 +497,22 @@ int carp_tick(carp *e, double sample_rate, carp_event *ev, int cap)
      * sets state +44 2->0 immediately and tail-calls the all-notes-off D3A0, which
      * offs only voice slots still SOUNDING (note < 0x80). There is NO tick-spanning
      * release tail in the no-sustain case (the +44=3 / +604 tail is a sustain-pedal-
-     * only path; +48 is a dead counter). So emit the trailing off ONLY if the
-     * current note is still open (gate not yet closed) — otherwise D3A0 emits
-     * nothing and a carp off here would be a spurious duplicate. Then go idle;
-     * the free clock keeps advancing so the next phrase re-quantizes to
-     * tick_counter+1. Zero sel_step/oct_shift/oct_adv_flag; keep started/ud_dir.
-     * See scratchpad/oracle/arp_release_fsm_spec.md (§5.1). */
+     * only path; +48 is a dead counter). So emit a trailing off for every slot still
+     * open (gate not yet closed); slots whose gate already closed emit nothing (no
+     * spurious duplicate). Then go idle; the free clock keeps advancing so the next
+     * phrase re-quantizes to tick_counter+1. Zero sel_step/oct_shift/oct_adv_flag;
+     * keep started/ud_dir. See scratchpad/oracle/arp_release_fsm_spec.md (§5.1). */
     if (e->count == 0) {
-        if (e->cur_note >= 0 && !e->gate_closed && n < cap) {
-            ev[n].kind = 0; ev[n].note = e->cur_note; ev[n].velocity = 64; n++;
+        int s;
+        for (s = 0; s < e->pat_nslots; ++s) {
+            if (e->slot_pitch[s] >= 0) {
+                if (n < cap) { ev[n].kind = 0; ev[n].note = e->slot_pitch[s]; ev[n].velocity = 64; n++; }
+                e->note_slot[e->slot_noteidx[s] & 0x7F] = -1;
+                e->slot_pitch[s] = -1;
+            }
+            e->slot_offtick[s] = -1;
         }
-        e->cur_note = -1; e->gate_closed = 1; e->off_tick = -1; e->running = 0;
+        e->running = 0;
         e->sel_step = 0; e->oct_shift = 0; e->oct_adv_flag = 0;
     }
 
@@ -390,31 +522,65 @@ int carp_tick(carp *e, double sample_rate, carp_event *ev, int cap)
         e->tick_acc -= e->tick_period;
         e->tick_counter++;
 
-        /* (1) scheduled note-off first (plugin fires offs before step trigger).
-         * Plugin arp offs carry MIDI velocity 64 (0x40), not 0 — inert for the
-         * JUNO voice path but faithful to the emitted event stream. */
-        if (e->cur_note >= 0 && !e->gate_closed &&
-            e->off_tick >= 0 && e->tick_counter == e->off_tick) {
-            if (n < cap) { ev[n].kind=0; ev[n].note=e->cur_note; ev[n].velocity=64; n++; }
-            e->gate_closed = 1;
+        /* (1) scheduled note-offs first (plugin fires offs before step trigger),
+         * one per slot whose offTick == curTick. Plugin arp offs carry MIDI
+         * velocity 64 (0x40), not 0 — inert for the JUNO voice path but faithful
+         * to the emitted event stream. (per-tick handler body sub_7FF91E020960) */
+        {
+            int s;
+            for (s = 0; s < e->pat_nslots; ++s) {
+                if (e->slot_pitch[s] >= 0 && e->slot_offtick[s] >= 0 &&
+                    e->tick_counter == e->slot_offtick[s]) {
+                    if (n < cap) { ev[n].kind=0; ev[n].note=e->slot_pitch[s]; ev[n].velocity=64; n++; }
+                    e->note_slot[e->slot_noteidx[s] & 0x7F] = -1;
+                    e->slot_pitch[s] = -1;
+                }
+            }
         }
 
-        /* (2) step trigger: +24 == +3048 -> sub_7FF91E020260 */
+        /* (2) step trigger: +24 == +3048 -> sub_7FF91E020260. The step advances the
+         * pattern step once, then walks the pruned/sorted slots 0..pat_nslots-1,
+         * calling the selector once per ACTIVE cell (grid vel != 0). A note already
+         * owned by an EARLIER slot is skipped (no retrigger); one owned by this-or-a-
+         * LATER slot is stolen (off'd). The default slab0/sub7 (1 slot, 1 step, vel
+         * 127) degenerates to exactly one selector call + one emit per step. */
         if (e->running && e->count > 0 && e->tick_counter == e->next_step_tick) {
-            if (e->cur_note >= 0 && !e->gate_closed) {   /* gate>=step: force close */
-                if (n < cap) { ev[n].kind=0; ev[n].note=e->cur_note; ev[n].velocity=64; n++; }
+            int dur = step_ticks(e);
+            int s;
+            e->pat_step += 1;
+            if (e->pat_step >= e->pat_len) e->pat_step = 0;
+            e->nslots = e->count;                        /* chord size (selector field56, inert) */
+            e->next_step_tick += dur;                    /* +3048 += dur (constant step period)  */
+            for (s = 0; s < e->pat_nslots; ++s) {
+                int gv = e->grid_vel[s][e->pat_step] & 0x7F;
+                int raw, owner, pitch, per, vel;
+                if (gv == 0) continue;                   /* rest cell: selector NOT called */
+                if (e->count == 0) continue;
+                raw = run_selector(e);                   /* ADVANCES once per active cell */
+                if (raw < 0) continue;
+                owner = e->note_slot[raw & 0x7F];
+                if (owner >= 0 && owner < s) continue;   /* voiced by an earlier slot -> skip */
+                if (owner >= 0) {                        /* owner >= s -> steal it */
+                    if (e->slot_pitch[owner] >= 0) {
+                        if (n < cap) { ev[n].kind=0; ev[n].note=e->slot_pitch[owner]; ev[n].velocity=64; n++; }
+                        e->note_slot[e->slot_noteidx[owner] & 0x7F] = -1;
+                        e->slot_pitch[owner] = -1;
+                    }
+                }
+                if (e->slot_pitch[s] >= 0) {             /* turn off THIS slot's old note (LABEL_16) */
+                    if (n < cap) { ev[n].kind=0; ev[n].note=e->slot_pitch[s]; ev[n].velocity=64; n++; }
+                    e->note_slot[e->slot_noteidx[s] & 0x7F] = -1;
+                    e->slot_pitch[s] = -1;
+                }
+                pitch = apply_octave_and_fold(e, raw);   /* octave-advance (UP) + fold, when playing */
+                e->note_slot[raw & 0x7F] = (int8_t)s;
+                e->slot_noteidx[s] = raw;
+                e->slot_pitch[s]   = pitch;
+                e->slot_offtick[s] = e->tick_counter + e->grid_gate[s][e->pat_step];
+                per = e->per_note_vel[(unsigned)raw & 0x7F];
+                vel = velocity_calc(e, gv, per);         /* a3=gridVel, a4=per, sens=pat_sens */
+                if (n < cap) { ev[n].kind=1; ev[n].note=pitch; ev[n].velocity=vel; n++; }
             }
-            e->nslots = e->count;                        /* chord size            */
-            int dur        = step_ticks(e);
-            int gate_ticks = (dur * CARP_GATE_TABLE[e->gate_index]) / 100; /* as F3D0 */
-            int base   = run_selector(e);                /* sorted note value     */
-            int in_v   = e->per_note_vel[(unsigned)base & 0x7F]; /* a1+464[note]  */
-            int pitch  = apply_octave_and_fold(e, base);
-            int vel    = velocity_calc(e, in_v, in_v);
-            e->cur_note = pitch; e->gate_closed = 0;
-            e->off_tick = e->tick_counter + gate_ticks;  /* offTick = curTick+gateLen */
-            e->next_step_tick += dur;                    /* +3048 += dur          */
-            if (n < cap) { ev[n].kind=1; ev[n].note=pitch; ev[n].velocity=vel; n++; }
         }
     }
     return n;

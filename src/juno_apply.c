@@ -591,6 +591,34 @@ int juno_bank_arp(const unsigned char *bank, int idx, int *mode, int *oct)
     return sw ? 1 : 0;
 }
 
+/* Decode SCATTER TYPE (NAME1 leaf 92, record byte 322 -> arp pattern slab 0..9) and
+ * SCATTER DEPTH (leaf 93, record byte 330, SIGNED int8 -5..5 -> pattern sub = depth+7).
+ * These select the arpeggiator's STEP x SLOT pattern grid (carp_set_scatter /
+ * src/carp_patterns.h). The leaf -> param-DB id 834/835 -> record-byte binding is
+ * nominally proven: the schema NAME1 value-leaf order (…ARP SW/TYPE/STEP, SCATTER
+ * TYPE, SCATTER DEPTH…), the consecutive param-DB dispatch cases 831..835
+ * (sub_7FF91E027AE0), and the rigid 8-byte NAME stride (record = 8*leaf-414) anchored
+ * to 8 verified leaves all agree. All 64 factory patches decode to (0,0) = the default
+ * slab0/sub7 grid. Writes *type (0..9) and *depth (-7..7, setter-clamped); either
+ * pointer may be NULL. Returns 1 on success. See scratchpad/oracle/scatter_recall_spec.md. */
+int juno_bank_scatter(const unsigned char *bank, int idx, int *type, int *depth)
+{
+    const unsigned char *blob;
+    int t, draw, d;
+    if (idx < 0 || idx >= BANK_COUNT) return 0;
+    blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
+    t    = record_byte(blob, 322);              /* SCATTER TYPE  (leaf 92)     */
+    draw = record_byte(blob, 330);              /* SCATTER DEPTH (leaf 93)     */
+    d    = (draw >= 128) ? draw - 256 : draw;   /* signed int8, musical -5..5  */
+    if (t < 0) t = 0;                           /* setter guard cfg[8] <= 9    */
+    if (t > 9) t = 9;
+    if (d < -7) d = -7;                          /* setter guard cfg[9]=d+7 in [0,14] */
+    if (d > 7) d = 7;
+    if (type)  *type  = t;
+    if (depth) *depth = d;
+    return 1;
+}
+
 /* Decode LEGATO (CTRL leaf 57, front-panel blob_pos 55) and ASSIGN MODE (CTRL
  * leaf 58, blob_pos 56). These are front-panel nibble-pair bytes (stride-2:
  * blob byte = 2*blob_pos), the same decode the BINDINGS loop uses. Verified by the

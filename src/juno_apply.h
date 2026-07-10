@@ -20,6 +20,13 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx);
  * plugin (no per-patch value), so it is not returned. */
 int juno_bank_arp(const unsigned char *bank, int idx, int *mode, int *oct);
 
+/* Decode the per-patch SCATTER TYPE (0..9 -> arp pattern slab) and SCATTER DEPTH
+ * (-7..7 -> pattern sub = depth+7), which select the arpeggiator's STEP x SLOT
+ * pattern grid (feed to carp_set_scatter). Proven leaf 92/93 -> record byte 322/330;
+ * all 64 factory patches decode to (0,0) = the default grid. *type / *depth may be
+ * NULL. Returns 1 on success. See scratchpad/oracle/scatter_recall_spec.md. */
+int juno_bank_scatter(const unsigned char *bank, int idx, int *type, int *depth);
+
 /* Decode the per-patch VOICE-ASSIGN settings (CTRL leaves at front-panel blob
  * positions): *legato (leaf 57 / bp 55, 0/1), *assign (ASSIGN MODE, leaf 58 / bp 56,
  * 0..3), *porta (PORTAMENTO, leaf 56 / bp 54, 0..255 — the raw byte; the assigner
