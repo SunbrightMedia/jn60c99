@@ -27,6 +27,14 @@ int juno_bank_arp(const unsigned char *bank, int idx, int *mode, int *oct);
  * NULL. Returns 1 on success. See scratchpad/oracle/scatter_recall_spec.md. */
 int juno_bank_scatter(const unsigned char *bank, int idx, int *type, int *depth);
 
+/* LFO Tempo Rate (cell 1072): write the host-tempo-synced LFO rate to all 8 voices.
+ * Required for the 34/64 factory patches with TEMPO SYNC on (else their LFO is frozen).
+ * lfo_rate_byte = the LFO RATE front-panel byte (juno_bank_lfo_rate_byte); bpm = host
+ * tempo. Bit-exact (juno_curve 48 x 53), SR-independent, inert while sync is off.
+ * See scratchpad/oracle/lfo_tempo_rate_spec.md. */
+void juno_apply_lfo_tempo(unsigned char *state, int lfo_rate_byte, float bpm);
+int  juno_bank_lfo_rate_byte(const unsigned char *bank, int idx);
+
 /* Decode the per-patch VOICE-ASSIGN settings (CTRL leaves at front-panel blob
  * positions): *legato (leaf 57 / bp 55, 0/1), *assign (ASSIGN MODE, leaf 58 / bp 56,
  * 0..3), *porta (PORTAMENTO, leaf 56 / bp 54, 0..255 — the raw byte; the assigner

@@ -47,6 +47,12 @@ typedef struct {
     int   arp_on;          /* 0/1 (driver routes notes through the arp when set) */
     int   arp_cur;         /* MIDI note currently sounding via the arp (-1 none) */
     carp  arp;             /* bit-exact CArpeggio state machine                 */
+
+    /* LFO RATE front-panel byte of the loaded patch (blob 8), stashed so a host
+     * tempo change can recompute the tempo-synced LFO rate (cell 1072). The
+     * plugin feeds 1072 = curve48[byte] x curve53[BPM*10] from host tempo; 34/64
+     * factory patches sync the LFO to it. See juno_apply_lfo_tempo. */
+    int   lfo_rate_byte;
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -444,7 +450,11 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, floa
     carp_set_mode(&c->arp, type);
     /* UI octaves 1..3 -> ARPEGGIO STEP 0..2 (carp_set_range maps step->range). */
     carp_set_range(&c->arp, (oct < 1 ? 1 : (oct > 3 ? 3 : oct)) - 1);
-    if (bpm > 0.0f) carp_set_bpm(&c->arp, (double)bpm);
+    if (bpm > 0.0f) {
+        carp_set_bpm(&c->arp, (double)bpm);
+        /* Host tempo drives the synced LFO rate (cell 1072) too, not just the arp. */
+        juno_apply_lfo_tempo(c->st, c->lfo_rate_byte, (float)c->arp.bpm);
+    }
     if (gate >= 0.0f) carp_set_gate_index(&c->arp, gate_frac_to_index(gate));
     c->arp_on = on ? 1 : 0;
     if (was != c->arp_on) {                  /* on the toggle: flush everything */
@@ -498,6 +508,12 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
         juno_bank_scatter(bank, idx, &stype, &sdepth);
         carp_set_scatter(&c->arp, stype, sdepth);
     }
+    /* Per-patch TEMPO-SYNCED LFO rate (cell 1072): 34/64 factory patches sync the LFO
+     * to host tempo; the voice DSP then uses 1072 (not the free knob rate). Feed it from
+     * the patch's LFO RATE byte + current host BPM (bit-exact curve48 x curve53). Stashed
+     * so a later tempo change recomputes it. Inert on patches with sync off. */
+    c->lfo_rate_byte = juno_bank_lfo_rate_byte(bank, idx);
+    juno_apply_lfo_tempo(c->st, c->lfo_rate_byte, (float)c->arp.bpm);
     return n;
 }
 

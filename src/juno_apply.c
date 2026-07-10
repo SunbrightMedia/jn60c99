@@ -619,6 +619,41 @@ int juno_bank_scatter(const unsigned char *bank, int idx, int *type, int *depth)
     return 1;
 }
 
+/* LFO Tempo Rate (engine cell 1072) — the tempo-synced LFO rate coefficient. When a
+ * patch has TEMPO SYNC on (34/64 factory patches), the voice DSP uses cell 1072 as the
+ * LFO rate INSTEAD of the free knob rate (src/voice_render.c:775-796: JF(1056)==1 ->
+ * LFO rate = JF(1072) verbatim). The plugin feeds 1072 from HOST TEMPO; the port left
+ * it 0, freezing the LFO on every synced patch. Bit-exact formula (proven 270/270 vs
+ * the plugin's own dispatch under Unicorn, scratchpad/oracle/lfo_tempo_rate_spec.md):
+ *   1072 = juno_curve(48, LFO_RATE_byte) * juno_curve(53, clamp(round(BPM*10),400,3000))
+ * curve48 = the note-division rate (LFO cycles per whole note) from the LFO RATE knob;
+ * curve53 = the tempo->multiplier LUT indexed by BPM*10 (0.1-BPM steps). Both LUTs are
+ * already baked bit-exact in juno_curve.c. The result is SAMPLE-RATE INDEPENDENT.
+ * Written to all 8 voices; harmless while sync is off (voice_render ignores it then). */
+void juno_apply_lfo_tempo(unsigned char *state, int lfo_rate_byte, float bpm)
+{
+    int   idx = (int)(bpm * 10.0f + 0.5f);       /* curve53 index = BPM*10, round */
+    float coeff;
+    unsigned v;
+    if (idx < 400)  idx = 400;                   /* plugin TEMPO param clamps BPM to [40,300]; */
+    if (idx > 3000) idx = 3000;                  /* curve53 clamp is [100,3000] */
+    if (lfo_rate_byte < 0) lfo_rate_byte = 0;
+    if (lfo_rate_byte > 255) lfo_rate_byte = 255;
+    coeff = juno_curve(48, lfo_rate_byte) * juno_curve(53, idx);   /* f32 mul (mulss) */
+    for (v = 0; v < 8u; ++v)
+        JF(state, v * JUNO_VOICE_MAIN_STRIDE + 1072u) = coeff;
+}
+
+/* Read the LFO RATE front-panel byte (blob pool 8, the {8,22,T_ID,1088} binding's
+ * source) from a bank patch, for juno_apply_lfo_tempo. Returns 0 on bad idx. */
+int juno_bank_lfo_rate_byte(const unsigned char *bank, int idx)
+{
+    const unsigned char *blob;
+    if (idx < 0 || idx >= BANK_COUNT) return 0;
+    blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
+    return ((blob[2 * 8] & 0xF) << 4) | (blob[2 * 8 + 1] & 0xF);
+}
+
 /* Decode LEGATO (CTRL leaf 57, front-panel blob_pos 55) and ASSIGN MODE (CTRL
  * leaf 58, blob_pos 56). These are front-panel nibble-pair bytes (stride-2:
  * blob byte = 2*blob_pos), the same decode the BINDINGS loop uses. Verified by the
