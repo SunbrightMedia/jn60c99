@@ -13,11 +13,14 @@
  * scratchpad/oracle/fx_recall_findings.md.
  *
  * The block's STRUCTURAL constants (LFO rate/phase/depth, BBD delay time) are
- * mode-selected PREPARE outputs, supplied for mode 2 by juno_engine_prepare; the
- * master reads the same 91120 block for EFFECT TYPE 2/3/4 (levels identical), so
- * these level writes are correct for all three. The mode-5 (96336) block and the
- * per-mode structural distinction for 3/4 are a documented residual (the driver
- * pins the slot-2 selector to chorus, so mode-5 patches currently read block A).
+ * mode-selected PREPARE outputs, supplied by juno_engine_prepare. EFFECT TYPE 2, 3
+ * and 4 write BIT-IDENTICAL block A (91120) — proven three independent ways in
+ * scratchpad/oracle/chorus_structural_findings.md: the master-read cells are the
+ * same for all three, so these level writes are bit-exact for Chorus I / II / I+II
+ * (the I/II/I+II distinction is NOT carried in the master-read block-A cells). Mode 5
+ * (block B, 96336) and mode 1 (distortion+pan) are handled fully by effect_modes.c;
+ * the driver routes slot-2 to the recalled EFFECT TYPE (juno_apply_effect_modes
+ * writes JUNO_PROG_EFX), so mode-5 patches read block B, not block A.
  */
 #include "juno_engine.h"
 #include "chorus_recall.h"
