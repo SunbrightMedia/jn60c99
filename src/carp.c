@@ -285,7 +285,7 @@ void carp_init(carp *e)
     e->use_rate_table = 1;
     /* Free-running tick grid: phase/counter run on the transport, the first step
      * is scheduled at tick_counter+1 on empty->held (never at pos 0). */
-    e->tick_phase = 0.0; e->tick_counter = 0; e->next_step_tick = 0;
+    e->tick_acc = 0; e->tick_period = 1; e->tick_counter = 0; e->next_step_tick = 0;
     e->off_tick = -1; e->running = 0; e->cur_note = -1; e->gate_closed = 0;
 }
 
@@ -344,7 +344,18 @@ int carp_tick(carp *e, double sample_rate, carp_event *ev, int cap)
     int n = 0;
     if (sample_rate <= 0.0) sample_rate = 96000.0;
 
-    const double spp = sample_rate * 60.0 / (e->bpm * 24.0);   /* samples/tick */
+    /* Integer 24-PPQN tick period in 1e-9-sample units, matching the plugin's own
+     * process clock (RVA 0x300000 loop, decompile line 27326):
+     *   period = 60000000000 * SR / round(BPM) / 24   (integer division)
+     * i.e. samples-per-tick x 1e9 truncated to an integer, with the tempo pre-rounded.
+     * We accumulate 1e9 units per sample and fire a tick when the accumulator reaches
+     * the period — sample-EXACT, unlike a float samples/tick (no sub-sample drift). */
+    {
+        long long bpmr = (long long)(e->bpm + 0.5);   /* round(BPM), bpm > 0 */
+        if (bpmr < 1) bpmr = 1;
+        e->tick_period = 60000000000LL * (long long)sample_rate / bpmr / 24LL;
+        if (e->tick_period < 1) e->tick_period = 1;
+    }
 
     /* --- arp start: empty -> held (mirror sub_7FF91E01D810 LABEL_27) --------
      * schedule the first step at +3048 = +24 + 1 (the next whole tick). patStep
@@ -368,9 +379,9 @@ int carp_tick(carp *e, double sample_rate, carp_event *ev, int cap)
     }
 
     /* --- advance the free-running 24-PPQN tick clock by one sample ---------- */
-    e->tick_phase += 1.0;
-    if (e->tick_phase >= spp) {
-        e->tick_phase -= spp;
+    e->tick_acc += 1000000000LL;                     /* +1e9 units (= one sample) */
+    if (e->tick_acc >= e->tick_period) {
+        e->tick_acc -= e->tick_period;
         e->tick_counter++;
 
         /* (1) scheduled note-off first (plugin fires offs before step trigger) */

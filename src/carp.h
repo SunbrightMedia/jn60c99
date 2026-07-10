@@ -81,7 +81,8 @@ typedef struct {
      * host transport (NOT reset on key-down), and the first step is scheduled at
      * +3048 = +24 + 1, i.e. the next whole tick strictly after the key press —
      * never at pos 0. See scratchpad/oracle/arp_finish_findings.md (a). */
-    double     tick_phase;      /* +20/+24 : samples elapsed in current tick   */
+    long long  tick_acc;        /* +20/+24 : tick-phase accumulator, 1e-9-sample units */
+    long long  tick_period;     /* integer tick period (60e9*SR/round(BPM)/24), 1e-9 units */
     long long  tick_counter;    /* +24     : running 24-PPQN tick index         */
     long long  next_step_tick;  /* +3048   : tick at which the next step fires  */
     long long  off_tick;        /* slot+8  : scheduled note-off tick (-1=none)  */

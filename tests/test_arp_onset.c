@@ -25,10 +25,16 @@ int main(void)
 
     carp_event ev[4];
     int first_on = -1;
-    for (int s = 0; s < 8000; ++s) {
+    long onsets[16]; int no = 0;
+    for (int s = 0; s < 160000 && no < 12; ++s) {
         int nn = carp_tick(&e, SR, ev, 4);
         for (int i = 0; i < nn; ++i)
-            if (ev[i].kind == 1 && first_on < 0) first_on = s;
+            if (ev[i].kind == 1) { if (first_on < 0) first_on = s; if (no < 16) onsets[no++] = s; }
+    }
+    /* Integer tick accumulator => EXACT even step spacing (no float drift). */
+    for (int i = 2; i < no; ++i) {
+        long d = onsets[i] - onsets[i-1], d0 = onsets[i-1] - onsets[i-2];
+        if (d != d0) { printf("  FAIL: step spacing drift at step %d (%ld != %ld)\n", i, d, d0); ++fails; break; }
     }
 
     /* first note-on must NOT be at sample 0 (the old bug) and must land on the
