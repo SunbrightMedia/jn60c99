@@ -365,16 +365,22 @@ int carp_tick(carp *e, double sample_rate, carp_event *ev, int cap)
         e->next_step_tick = e->tick_counter + 1;
     }
 
-    /* --- all keys released (mirror sub_7FF91E01F2A0 / state 2->0) -----------
-     * emit the trailing note-off, drop running; the tick grid keeps advancing
-     * below so the next phrase re-quantizes to tick_counter+1. Zero sel_step,
-     * oct_shift, oct_adv_flag — but NOT started / ud_dir (kept), so 2nd-and-later
-     * phrases resume DOWN / UP&DOWN ordering exactly as the binary. */
+    /* --- all keys released (mirror sub_7FF91E01F2A0 -> sub_7FF91E01D3A0) -----
+     * The plugin handles the LAST key-release (no sustain) SYNCHRONOUSLY: F2A0
+     * sets state +44 2->0 immediately and tail-calls the all-notes-off D3A0, which
+     * offs only voice slots still SOUNDING (note < 0x80). There is NO tick-spanning
+     * release tail in the no-sustain case (the +44=3 / +604 tail is a sustain-pedal-
+     * only path; +48 is a dead counter). So emit the trailing off ONLY if the
+     * current note is still open (gate not yet closed) — otherwise D3A0 emits
+     * nothing and a carp off here would be a spurious duplicate. Then go idle;
+     * the free clock keeps advancing so the next phrase re-quantizes to
+     * tick_counter+1. Zero sel_step/oct_shift/oct_adv_flag; keep started/ud_dir.
+     * See scratchpad/oracle/arp_release_fsm_spec.md (§5.1). */
     if (e->count == 0) {
-        if (e->cur_note >= 0 && n < cap) {
-            ev[n].kind = 0; ev[n].note = e->cur_note; ev[n].velocity = 0; n++;
+        if (e->cur_note >= 0 && !e->gate_closed && n < cap) {
+            ev[n].kind = 0; ev[n].note = e->cur_note; ev[n].velocity = 64; n++;
         }
-        e->cur_note = -1; e->off_tick = -1; e->running = 0;
+        e->cur_note = -1; e->gate_closed = 1; e->off_tick = -1; e->running = 0;
         e->sel_step = 0; e->oct_shift = 0; e->oct_adv_flag = 0;
     }
 
@@ -384,17 +390,19 @@ int carp_tick(carp *e, double sample_rate, carp_event *ev, int cap)
         e->tick_acc -= e->tick_period;
         e->tick_counter++;
 
-        /* (1) scheduled note-off first (plugin fires offs before step trigger) */
+        /* (1) scheduled note-off first (plugin fires offs before step trigger).
+         * Plugin arp offs carry MIDI velocity 64 (0x40), not 0 — inert for the
+         * JUNO voice path but faithful to the emitted event stream. */
         if (e->cur_note >= 0 && !e->gate_closed &&
             e->off_tick >= 0 && e->tick_counter == e->off_tick) {
-            if (n < cap) { ev[n].kind=0; ev[n].note=e->cur_note; ev[n].velocity=0; n++; }
+            if (n < cap) { ev[n].kind=0; ev[n].note=e->cur_note; ev[n].velocity=64; n++; }
             e->gate_closed = 1;
         }
 
         /* (2) step trigger: +24 == +3048 -> sub_7FF91E020260 */
         if (e->running && e->count > 0 && e->tick_counter == e->next_step_tick) {
             if (e->cur_note >= 0 && !e->gate_closed) {   /* gate>=step: force close */
-                if (n < cap) { ev[n].kind=0; ev[n].note=e->cur_note; ev[n].velocity=0; n++; }
+                if (n < cap) { ev[n].kind=0; ev[n].note=e->cur_note; ev[n].velocity=64; n++; }
             }
             e->nslots = e->count;                        /* chord size            */
             int dur        = step_ticks(e);

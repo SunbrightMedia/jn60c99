@@ -22,7 +22,7 @@ dll: juno.dll
 juno.dll: gui/juno_bridge.c $(SRC)
 	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $^ $(LDLIBS)
 
-test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate
+test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release
 	./tests/test_helpers
 	./tests/test_voice_smoke
 	./tests/test_master_smoke
@@ -35,6 +35,7 @@ test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/te
 	./tests/test_prepare_rate
 	./tests/test_arp_onset
 	./tests/test_recall_rate
+	./tests/test_arp_release
 
 tests/test_helpers: tests/test_helpers.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
@@ -59,7 +60,7 @@ tests/test_reverb_recall: tests/test_reverb_recall.c $(SRC)
 
 clean:
 	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke \
-	      tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate
+	      tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release
 
 # Validate the port's init against the live-plugin state dump (state_dump/).
 validate: tests/validate_state.c $(SRC)
@@ -85,4 +86,7 @@ tests/test_arp_onset: tests/test_arp_onset.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
 tests/test_recall_rate: tests/test_recall_rate.c $(SRC)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
+tests/test_arp_release: tests/test_arp_release.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
