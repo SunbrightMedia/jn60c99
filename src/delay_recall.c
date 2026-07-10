@@ -9,7 +9,8 @@
  *   On/Off     (102576) = 1 if DELAY LEVEL > 0 else 0       [dispatch idx 796]
  *   Mute/enable(102592) = same as On/Off (0 in the muted default => no output)
  *   Dry Level  (102512) = DELAY DIRECT LEVEL / 255          [dispatch idx 1181]
- *   Delay Time (102352) = DELAYTIME_LUT[DELAY TIME byte]    [dispatch idx 797]
+ *   Delay Time (102352) = ((float)H*DELAYTIME_MS[byte])*(1/16384000)-(2/16384)
+ *                         [dispatch idx 797; RATE-PARAMETERIZED, bit-exact any H]
  *   High-cut + LF/HF damp filter block (102368..102688): CONSTANT across all 64
  *     bank patches (every patch uses the default DELAY HIGH CUT / DAMP settings),
  *     so the plugin recomputes the same coefficients each time — reproduced here
@@ -27,52 +28,30 @@
 #include "delay_recall.h"
 #include <string.h>
 
-/* DELAY TIME byte -> engine offset 102352, 256 entries, verbatim from the value
- * tree (dispatch idx 797). Non-linear (musical) delay-time curve. */
-static const uint32_t DELAYTIME_LUT[256] = {
-  0x3d6f8001u, 0x3d6f8001u, 0x3d83c000u, 0x3d8fc000u, 0x3d9bc000u, 0x3da7c001u,
-  0x3da7c001u, 0x3db3c001u, 0x3dbfc001u, 0x3dcbc001u, 0x3dd7c001u, 0x3de3c001u,
-  0x3defc001u, 0x3defc001u, 0x3dfbc001u, 0x3e03e000u, 0x3e09e000u, 0x3e0fe000u,
-  0x3e15e000u, 0x3e1be000u, 0x3e21e001u, 0x3e27e001u, 0x3e2de001u, 0x3e33e001u,
-  0x3e39e001u, 0x3e3fe001u, 0x3e45e001u, 0x3e4be001u, 0x3e51e001u, 0x3e57e001u,
-  0x3e5de001u, 0x3e63e001u, 0x3e69e001u, 0x3e6fe001u, 0x3e75e001u, 0x3e7be001u,
-  0x3e80f000u, 0x3e83f000u, 0x3e86f000u, 0x3e8cf000u, 0x3e8ff000u, 0x3e92f000u,
-  0x3e95f000u, 0x3e98f000u, 0x3e9bf000u, 0x3ea1f001u, 0x3ea4f001u, 0x3ea7f001u,
-  0x3eaaf001u, 0x3eadf001u, 0x3eb3f001u, 0x3eb6f001u, 0x3eb9f001u, 0x3ebcf001u,
-  0x3ec2f001u, 0x3ec5f001u, 0x3ec8f001u, 0x3ecef001u, 0x3ed1f001u, 0x3ed4f001u,
-  0x3edaf001u, 0x3eddf001u, 0x3ee0f001u, 0x3ee6f001u, 0x3ee9f001u, 0x3eeff001u,
-  0x3ef2f001u, 0x3ef5f001u, 0x3efbf001u, 0x3efef001u, 0x3f027800u, 0x3f03f800u,
-  0x3f06f800u, 0x3f087800u, 0x3f0b7800u, 0x3f0e7800u, 0x3f0ff800u, 0x3f12f800u,
-  0x3f147800u, 0x3f177800u, 0x3f18f800u, 0x3f1bf800u, 0x3f1ef800u, 0x3f207800u,
-  0x3f237801u, 0x3f267801u, 0x3f297801u, 0x3f2af801u, 0x3f2df801u, 0x3f30f801u,
-  0x3f33f801u, 0x3f357801u, 0x3f387801u, 0x3f3b7801u, 0x3f3e7801u, 0x3f417801u,
-  0x3f447801u, 0x3f45f801u, 0x3f48f801u, 0x3f4bf801u, 0x3f4ef801u, 0x3f51f801u,
-  0x3f54f801u, 0x3f57f801u, 0x3f5af801u, 0x3f5df801u, 0x3f60f801u, 0x3f63f801u,
-  0x3f66f801u, 0x3f6b7801u, 0x3f6e7801u, 0x3f717801u, 0x3f747801u, 0x3f777801u,
-  0x3f7a7801u, 0x3f7ef801u, 0x3f80fc00u, 0x3f827c00u, 0x3f83fc00u, 0x3f863c00u,
-  0x3f87bc00u, 0x3f893c00u, 0x3f8b7c00u, 0x3f8cfc00u, 0x3f8f3c00u, 0x3f90bc00u,
-  0x3f92fc00u, 0x3f947c00u, 0x3f96bc00u, 0x3f983c00u, 0x3f9a7c00u, 0x3f9bfc00u,
-  0x3f9e3c00u, 0x3f9fbc00u, 0x3fa1fc01u, 0x3fa43c01u, 0x3fa5bc01u, 0x3fa7fc01u,
-  0x3faa3c01u, 0x3fac7c01u, 0x3fadfc01u, 0x3fb03c01u, 0x3fb27c01u, 0x3fb4bc01u,
-  0x3fb6fc01u, 0x3fb93c01u, 0x3fbb7c01u, 0x3fbdbc01u, 0x3fbffc01u, 0x3fc23c01u,
-  0x3fc47c01u, 0x3fc6bc01u, 0x3fc8fc01u, 0x3fcb3c01u, 0x3fcd7c01u, 0x3fd07c01u,
-  0x3fd2bc01u, 0x3fd4fc01u, 0x3fd73c01u, 0x3fda3c01u, 0x3fdc7c01u, 0x3fdebc01u,
-  0x3fe1bc01u, 0x3fe3fc01u, 0x3fe6fc01u, 0x3fe93c01u, 0x3fec3c01u, 0x3fee7c01u,
-  0x3ff17c01u, 0x3ff3bc01u, 0x3ff6bc01u, 0x3ff9bc01u, 0x3ffcbc01u, 0x3ffefc01u,
-  0x4000fe00u, 0x40027e00u, 0x4003fe00u, 0x40057e00u, 0x4006fe00u, 0x40087e00u,
-  0x4009fe00u, 0x400b7e00u, 0x400cfe00u, 0x400e7e00u, 0x400ffe00u, 0x40117e00u,
-  0x4012fe00u, 0x4014de00u, 0x40165e00u, 0x4017de00u, 0x4019be00u, 0x401b3e00u,
-  0x401d1e00u, 0x401e9e00u, 0x40207e00u, 0x4021fe01u, 0x4023de01u, 0x4025be01u,
-  0x40273e01u, 0x40291e01u, 0x402afe01u, 0x402cde01u, 0x402ebe01u, 0x40309e01u,
-  0x40327e01u, 0x40345e01u, 0x40363e01u, 0x40381e01u, 0x4039fe01u, 0x403bde01u,
-  0x403dbe01u, 0x403ffe01u, 0x4041de01u, 0x4043be01u, 0x4045fe01u, 0x4047de01u,
-  0x404a1e01u, 0x404c5e01u, 0x404e3e01u, 0x40507e01u, 0x4052be01u, 0x40549e01u,
-  0x4056de01u, 0x40591e01u, 0x405b5e01u, 0x405d9e01u, 0x405fde01u, 0x40621e01u,
-  0x4064be01u, 0x4066fe01u, 0x40693e01u, 0x406b7e01u, 0x406e1e01u, 0x40705e01u,
-  0x4072fe01u, 0x40753e01u, 0x4077de01u, 0x407a7e01u, 0x407d1e01u, 0x407f5e01u,
-  0x4080ff00u, 0x40824f00u, 0x40839f00u, 0x4084ef00u, 0x40866f00u, 0x4087bf00u,
-  0x40890f00u, 0x408a5f00u, 0x408bdf00u, 0x408d2f00u, 0x408eaf00u, 0x408fff00u,
-  0x40917f00u, 0x4092ff00u, 0x40947f00u, 0x4095ff00u,
+/* DELAY TIME byte -> per-byte delay time in INTEGER MILLISECONDS (10..800 ms),
+ * rate-independent (dispatch idx 797). The engine coefficient at 102352 is affine
+ * in the host rate H: coeff = ((float)H * ms) * (1/16384000) - (2/16384) — see the
+ * three float32 ops in juno_apply_delay (bit-exact 768/768 at 44100/48000/96000,
+ * scratchpad/oracle/delaytime_rate_spec.md). The old fixed uint32 table was exactly
+ * this formula frozen at H=96000, so it played delay-mode patches ~2x off at 48 kHz;
+ * this ms table + the formula is correct at any host rate. */
+static const uint16_t DELAYTIME_MS[256] = {
+   10,  10,  11,  12,  13,  14,  14,  15,  16,  17,  18,  19,  20,  20,  21,  22,
+   23,  24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,
+   39,  40,  41,  42,  43,  44,  45,  47,  48,  49,  50,  51,  52,  54,  55,  56,
+   57,  58,  60,  61,  62,  63,  65,  66,  67,  69,  70,  71,  73,  74,  75,  77,
+   78,  80,  81,  82,  84,  85,  87,  88,  90,  91,  93,  95,  96,  98,  99, 101,
+  102, 104, 106, 107, 109, 111, 113, 114, 116, 118, 120, 121, 123, 125, 127, 129,
+  131, 132, 134, 136, 138, 140, 142, 144, 146, 148, 150, 152, 154, 157, 159, 161,
+  163, 165, 167, 170, 172, 174, 176, 179, 181, 183, 186, 188, 191, 193, 196, 198,
+  201, 203, 206, 208, 211, 213, 216, 219, 221, 224, 227, 230, 232, 235, 238, 241,
+  244, 247, 250, 253, 256, 259, 262, 265, 268, 271, 274, 278, 281, 284, 287, 291,
+  294, 297, 301, 304, 308, 311, 315, 318, 322, 325, 329, 333, 337, 340, 344, 348,
+  352, 356, 360, 364, 368, 372, 376, 380, 384, 388, 392, 397, 401, 405, 410, 414,
+  419, 423, 428, 432, 437, 442, 446, 451, 456, 461, 466, 471, 476, 481, 486, 491,
+  496, 501, 506, 512, 517, 522, 528, 533, 539, 545, 550, 556, 562, 567, 573, 579,
+  585, 591, 597, 603, 610, 616, 622, 628, 635, 641, 648, 654, 661, 668, 675, 681,
+  688, 695, 702, 709, 717, 724, 731, 738, 746, 753, 761, 768, 776, 784, 792, 800,
 };
 
 /* Constant high-cut + damp filter block (offset, bits) — the plugin's recomputed
@@ -129,7 +108,15 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     JF(state, 102576) = level >= 2 ? 1.0f : 0.0f;           /* On/Off (curve: v0,v1->0, v2->1) */
     JF(state, 102592) = level >= 2 ? 1.0f : 0.0f;           /* Mute/enable */
     JF(state, 102512) = (float)direct / 255.0f;             /* Dry      */
-    bits = DELAYTIME_LUT[dtime & 0xFF];
-    memcpy(&f, &bits, sizeof f);
-    JF(state, 102352) = f;                                  /* Delay Time */
+    /* Delay Time (102352): rate-parameterized. coeff = ((float)H*ms)*(1/16384000)
+     * - (2/16384), in THIS three-op float32 order (the algebraically-equal
+     * ((H*ms-2)/16384) is wrong — H*ms exceeds 2^24 so the -2 vanishes before the
+     * scale). Hr from state[16] exactly as prepare/apply read it; unset => 96 kHz. */
+    {
+        int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+        float dt = (float)Hr * (float)DELAYTIME_MS[dtime & 0xFF]; /* mulss H,ms   */
+        dt = dt * (1.0f / 16384000.0f);                          /* mulss C1      */
+        dt = dt - (2.0f / 16384.0f);                             /* subss C2 (2^-13) */
+        JF(state, 102352) = dt;
+    }
 }
