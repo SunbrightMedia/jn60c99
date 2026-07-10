@@ -40,3 +40,5 @@ tests/test_note_path
 
 # Local scratch / reverse-engineering workspace (not committed)
 scratchpad/
+tests/test_prepare_rate
+tests/test_arp_onset

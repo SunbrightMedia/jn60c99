@@ -45,12 +45,14 @@
  * The front-panel bytes live in the 222-byte window (record byte = 2*pool + 12 for
  * pool 2..112; blob_pos = pool - 2).
  *   The EXTENDED params (PATCH2/PATCH3 leaves: velocity/mod/bend sens, cutoff-H,
- *   tune/condition, VCA mode, HPF/effect/delay/reverb TYPE) are NOT bound: the record
- *   is a MULTI-BLOCK structure and those leaves live at higher, non-flat offsets (e.g.
- *   VCF CUTOFF FREQ H is at record byte ~1871, not 2*287+12) whose addresses are the
- *   schema addresses (same external-schema data that blocks the EFX order). An earlier
+ *   tune/condition, VCA mode, HPF/effect TYPE) are NOT bound via the flat formula: the
+ *   record is a MULTI-BLOCK structure and those leaves live at higher, non-flat offsets
+ *   (e.g. VCF CUTOFF FREQ H is at record byte ~1871, not 2*287+12) whose addresses are
+ *   the schema addresses (same external-schema data that blocks the EFX order). An earlier
  *   attempt using a flat offset formula was WRONG (it read empty bytes as 0); reverted.
  *   Remapping PATCH2/PATCH3 needs the record deserializer or the external schema.
+ *   (The FX TYPEs that ARE recalled — DELAY TYPE record byte 650, REVERB TYPE record
+ *   byte 658 — use direct record-byte reads in delay_recall.c / reverb_recall.c.)
  * Bound groups:
  *   - VCF: cutoff, resonance, HPF cutoff (+3 secondary coeffs), env-mod, key-follow,
  *     LFO mod, VCA tone.
@@ -426,10 +428,11 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
     ++n;
 
     /* Per-patch global REVERB recall. The reverb is a global send in the master
-     * output stage (always active); REVERB LEVEL -> 10759408 (send/wet) and
-     * REVERB TIME -> 10759680 (decay) are recalled from the plugin's own value
-     * tree (see reverb_recall.c). These are global coefficients (>84272), single
-     * write, not seeded per-voice. */
+     * output stage (always active); REVERB LEVEL (blob 51) -> 10759408 (send/wet),
+     * plus REVERB TYPE (record 658) + TIME (record 666) -> the 4 DPF cutoffs, the
+     * type-5 stage, and the 8 joint (type,time) Hp/Lp decay coeffs, all recalled
+     * from the plugin's own value tree (see reverb_recall.c). Global coefficients
+     * (>84272), single write, not seeded per-voice. */
     juno_apply_reverb(state, blob - BANK_BLOB_OFF);
     ++n;
 

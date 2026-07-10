@@ -1,53 +1,68 @@
-/* juno_prepare.c — the voice-block coefficients the plugin's own prepare
- * (CWaveGen::setSampleRate, RVA 0x3C7A20) writes, that the constructor
+/* juno_prepare.c — the voice-block + master-FX coefficients the plugin's own
+ * prepare (CWaveGen::setSampleRate, RVA 0x3C7A20) writes, that the constructor
  * transcription juno_engine_init (sub_1803990C0) does NOT.
  *
- * PROVENANCE — binary, not capture. Every value below is the exact 32-bit
- * pattern the plugin's setSampleRate leaves in the CJu60Sim voice-0 block when
- * executed under Unicorn (BUILD @0x3C68D0 + setSampleRate @0x3C7A20 with
- * XMM1=float32(96000)). This is the binary's OWN code producing the value — it
- * is NOT scanned from the running commercial plugin. See
- * scratchpad/oracle/gen_voice_prepare.py for the generator + the A/B proof.
+ * RATE-PARAMETERIZED. The plugin runs its DSP natively at the HOST sample rate
+ * (no oversampling, no decimator — proven three independent ways in
+ * scratchpad/oracle/samplerate_findings.md). setSampleRate recomputes the
+ * rate-dependent coefficients from the host rate H every time. This function
+ * reproduces that computation BIT-EXACTLY at any host rate, reading H from the
+ * engine's SR field JF(st,16) (set before juno_engine_init, exactly as the
+ * plugin's ctor reads it for its ==44100 table select).
  *
- * WHY A SEPARATE STEP: these 33 offsets are DSP-read at playback but come from
- * the sample-rate prepare, not the constructor, so juno_engine_init leaves them
- * zero. 21 of them are INVARIANT (not among the 79 recallable parameters, so no
- * patch ever changes them) — without this the captured pad was their only
- * source, which is exactly why every patch inherited the pad's dark colour. The
- * other 12 are recall-defaults (a loaded bank overwrites them; this supplies the
- * plugin's genuine power-on default so the UNAPPLIED sound is the real machine's,
- * not a pad snapshot).
+ * PROVENANCE — binary, not capture. Every constant and every rate-law below was
+ * located by instruction-level tracing of setSampleRate under Unicorn (write-hook
+ * -> ring-buffer disassembly -> rip-relative constant extraction), then verified
+ * bit-for-bit against the binary's OWN BUILD+setSampleRate output at 44100 /
+ * 48000 / 88200 / 96000. See scratchpad/oracle/prepare_rate_spec.md for the full
+ * derivation, the negative controls, and the per-offset disassembly sites. No
+ * capture files were opened.
  *
- * A/B PROOF (gen_voice_prepare.py): with these applied, my prepared voice-0
- * block [176,10688) matches the binary's setSampleRate output with ZERO
- * mismatches; the only residual diffs are in the object header [0,176) — C++
- * metadata (vtable ptr, heap pointers, descriptor counts) the flat engine never
- * reads.
+ * FIVE rate mechanisms (only 3 offsets are true C/H — the audit's "everything is
+ * C/H" assumption was DISPROVEN by tracing the binary):
+ *   A. true C/H (continuous float divide): 624, 91152, 102608.
+ *   B. affine delay-time  ((float)H*T - 2.0f)*(1/16384f): 91120, 96336, 102352.
+ *   C. 3-class rate-selected curve {44100 / 48000 / else-96k}: the ENV1/ENV2
+ *      attack/decay/release + DCO/LFO voice coeffs 1920, 2784, 2816, 2832, 3264,
+ *      3296, 3312, 10240. The plugin picks a curve INDEX by rate (disasm @0x358540:
+ *      cmp rate,0xAC44 / cmp rate,0xBB80; setne; +0x22); 88200==96000 (clamped).
+ *   D. 2-class rate-selected {44100 / else}: 102448, 102656.
+ *   E. reverb tap-index generator (34 ints): a continuous predelay
+ *      (floor(T1*H)) plus a rate-CLASS integer stage table (TAP44 for 44100,
+ *      TAP96 shifted by predelay-1919 otherwise). Naive floor(tap96*H/96000)
+ *      is DISPROVEN (33/34 taps wrong at 48000).
  *
- * Two regions:
- *   - VOICE-0 block [176,10688): 33 offsets. Apply to voice 0 AFTER
- *     juno_engine_init; juno_driver_seed_voices replicates them to voices 1..7.
- *   - SHARED / master-FX region (>=84272): 57 offsets, written once (NOT
- *     voice-replicated). These are the master's per-voice output gains, the
- *     chorus/delay/reverb algorithm constants (vtable[10] @0x3990C0) and the FX
- *     parameter power-on defaults (incl. the SR-derived High-Cut / damp filter
- *     coefficients and the reverb tap-index table). Without the Voice-Output
- *     gains (=1.0, were 0) the master attenuates every voice — a second reason
- *     the captured baseline was masking the true signal.
+ * At exactly 96 kHz every class reproduces the previously-hardcoded 96 kHz value
+ * byte-for-byte (Class A: 96000/H==1; Class B: verified; Class C/D: the else
+ * branch; Class E: shift 0) — so behavior at the engine's old fixed 96 kHz rate
+ * is UNCHANGED (regression-safe), while 48000 / 44100 now get the plugin's genuine
+ * per-rate coefficients. Note (faithful vintage quirk): the class-C/D coeffs only
+ * differ at exactly 44100 and 48000; any other rate gets the 96 kHz value — this
+ * is the plugin's own two-table design, so envelope/reverb TIMING at non-44.1/48k
+ * rates matches the plugin's (frozen-96k) behavior, not a continuous scaling.
  *
- * FULL-STATE A/B PROOF (tools/oracle/full_ab.py): with both regions applied and
- * NO capture, the compiled C engine matches the binary's BUILD+setSampleRate
- * state on 1572/1573 DSP-read offsets; the single residual is offset 136 (the
- * params-vector pointer), which juno_driver_attach_host installs at runtime.
+ * The 21 INVARIANT voice coeffs and all the rate-INDEPENDENT master-FX constants
+ * (High-Cut biquad, reverb ECF HPF/LPF/DPF cascade, effect enables) are byte-
+ * identical across all four rates in the binary and are kept as literal hardcodes.
  *
- * Offsets are absolute (object-relative), matching juno_engine_init's.
+ * Offsets are absolute (object-relative), matching juno_engine_init's. Voice-0
+ * block [176,10688) is replicated to voices 1..7 by juno_driver_seed_voices.
  */
 #include "juno_engine.h"
 #include <stdint.h>
+#include <string.h>
+
+/* reinterpret a float32 bit pattern as a float (the plugin's .rdata constants). */
+static float f32(uint32_t b) { float f; memcpy(&f, &b, sizeof f); return f; }
 
 void juno_engine_prepare(unsigned char *st)
 {
-    /* --- INVARIANT (not recallable; prepare is the ONLY source) ----------- */
+    /* Host rate: the plugin's setSampleRate arg, stored verbatim at obj+8 / our
+     * SR field [16]. Float for the continuous laws, int for the class selects. */
+    const float Hf = JF(st, 16);
+    const int   Hr = (int)Hf;
+
+    /* --- INVARIANT (not recallable, rate-independent; prepare is the ONLY source) */
     JI(st,   304) = 0x400004f7;  /*  2.000303     master tune / pitch base    */
     JI(st,  1072) = 0x410bc406;  /*  8.735357                                 */
     /* envelope-smoother / osc-enable inits: snap-all sub_7FF91E0229B0 sets these
@@ -76,54 +91,79 @@ void juno_engine_prepare(unsigned char *st)
     JI(st, 10304) = 0x3f800000;  /*  1.0                                      */
     JI(st, 10320) = 0x3f800000;  /*  1.0                                      */
 
-    /* --- recall-defaults (a loaded bank overwrites these; this is the
-     *     plugin's power-on default for the UNAPPLIED sound) --------------- */
-    JI(st,   624) = 0x3d01499d;  /*  0.03156434                               */
+    /* --- recall-defaults: rate-INDEPENDENT unity slots (bank overwrites) ---- */
     JI(st,  1872) = 0x3f800000;  /*  1.0                                      */
-    JI(st,  1920) = 0x3c2aaa78;  /*  0.01041662                               */
-    JI(st,  2784) = 0x40638f21;  /*  3.555611     ENV1 (filter) attack coeff  */
-    JI(st,  2816) = 0x40aaac0b;  /*  5.333501     ENV1 decay coeff            */
-    JI(st,  2832) = 0x40aaac0b;  /*  5.333501     ENV1 release coeff          */
-    JI(st,  3264) = 0x40638f21;  /*  3.555611     ENV2 (amp) attack coeff     */
-    JI(st,  3296) = 0x40aaac0b;  /*  5.333501     ENV2 decay coeff            */
-    JI(st,  3312) = 0x40aaac0b;  /*  5.333501     ENV2 release coeff          */
     JI(st,  3840) = 0x3f800000;  /*  1.0                                      */
-    JI(st, 10240) = 0x3b0d8c2e;  /*  0.002159845                              */
     JI(st, 10288) = 0x3f800000;  /*  1.0                                      */
 
-    /* --- SHARED / master-FX region (written once; NOT voice-replicated) --- */
+    /* --- Class A: true C/H (continuous float divide) ----------------------- */
+    /* base96 * (96000.0f/(float)H) — one divss then one mulss, exactly as the
+     * binary (const 96000.0f @RVA 0x98802C). At H==96000 the ratio is 1.0f so the
+     * result is base96 verbatim. Recall-default (bank overwrites 624). */
+    {
+        const float r96 = 96000.0f / Hf;
+        JF(st,    624) = f32(0x3d01499d) * r96;  /* Porta/env time base (3030.177/H) */
+        JF(st, 102608) = f32(0x3bab929a) * r96;  /* LF-Damp Fc      (502.6543/H)     */
+        /* 91152 MUST divide 0.96f directly (a base96*96000/H form is 1 ULP wrong —
+         * the 1e-5 base lost precision). Single divss of 0.96f (0x3f75c28f). */
+        JF(st,  91152) = 0.96f / Hf;             /* chorus LFO rate (0.96/H)         */
+    }
+
+    /* --- Class B: affine delay-time ((float)H*T - 2.0f) * (1/16384f) -------- */
+    /* mulss H,T -> subss ,2.0f -> mulss ,1/16384 (disasm @0x357c2e; K1=2, K2=1/16384). */
+    {
+        const float K2 = 1.0f / 16384.0f;        /* 0x38800000, exact */
+        JF(st,  91120) = (Hf * f32(0x3ac49ba6) - 2.0f) * K2;  /* T=0.0015    (1.5 ms) */
+        JF(st,  96336) = (Hf * f32(0x3ad5febf) - 2.0f) * K2;  /* T=0.00163265        */
+        JF(st, 102352) = (Hf * f32(0x3e4dd2f2) - 2.0f) * K2;  /* T=0.201     (201 ms)*/
+    }
+
+    /* --- Class C: 3-class rate-selected voice coeffs (44100 / 48000 / else) - */
+    /* ENV1/ENV2 attack/decay/release + DCO/LFO. Bit-exact hardcode of the three
+     * curve outputs the plugin selects by rate. Recall may overwrite the
+     * recallable ones per-patch; this is the rate-correct UNAPPLIED default. */
+    #define SELC(v44, v48, v96) (Hr == 44100 ? (v44) : (Hr == 48000 ? (v48) : (v96)))
+    JI(st,  1920) = SELC(0x3cb9c172, 0x3caaa9e0, 0x3c2aaa78); /* LFO delay        */
+    JI(st,  2784) = SELC(0x40f7ad09, 0x40e38db9, 0x40638f21); /* ENV1 attack      */
+    JI(st,  2816) = SELC(0x4139c0c1, 0x412aa9ad, 0x40aaac0b); /* ENV1 decay       */
+    JI(st,  2832) = SELC(0x4139c0c1, 0x412aa9ad, 0x40aaac0b); /* ENV1 release     */
+    JI(st,  3264) = SELC(0x40f7ad09, 0x40e38db9, 0x40638f21); /* ENV2 attack      */
+    JI(st,  3296) = SELC(0x4139c0c1, 0x412aa9ad, 0x40aaac0b); /* ENV2 decay       */
+    JI(st,  3312) = SELC(0x4139c0c1, 0x412aa9ad, 0x40aaac0b); /* ENV2 release     */
+    JI(st, 10240) = SELC(0x3b9a10b5, 0x3b8d8c28, 0x3b0d8c2e); /* HPF cutoff dflt  */
+    #undef SELC
+
+    /* --- SHARED / master-FX region (written once; NOT voice-replicated) ----- */
     /* master per-voice-pair output gains — unity; were 0 => voices attenuated */
     JI(st,     84448) = 0x3f800000;  /*  1.0          Voice01 Output          */
     JI(st,     84464) = 0x3f800000;  /*  1.0          Voice23 Output          */
     JI(st,     84480) = 0x3f800000;  /*  1.0          Voice45 Output          */
     JI(st,     84496) = 0x3f800000;  /*  1.0          Voice67 Output          */
-    /* chorus block FX param defaults (91xxx) */
-    JI(st,     91120) = 0x3c0e0000;  /*  0.008666992  Delay Time              */
+    /* chorus block FX param defaults (91xxx) — rate-independent members */
     JI(st,     91136) = 0x3f77b282;  /*  0.9675683    Error Depth             */
-    JI(st,     91152) = 0x3727c5ac;  /*  1e-05        LFO Rate    (SR-derived)*/
     JI(st,     91168) = 0x3f800000;  /*  1.0          LFO Phase               */
     JI(st,     91184) = 0x3b83126f;  /*  0.004        LFO Depth               */
     JI(st,     91264) = 0x3f800000;  /*  1.0          On/Off                  */
-    JI(st,     96336) = 0x3c1abc15;  /*  0.009444263  Delay Time              */
     JI(st,     96368) = 0x3b442984;  /*  0.0029932    LFO Depth               */
     JI(st,    101152) = 0x3e77a5b3;  /*  0.2418432    Volume                  */
-    /* output-stage High-Cut / damp filter coefficients (SR-derived @96k) */
-    JI(st,    102352) = 0x3f96bc00;  /*  1.177612     Delay Time              */
-    JI(st,    102368) = 0x3e1b31ce;  /*  0.1515571    High Cut C0 (SR-derived)*/
-    JI(st,    102416) = 0x3fb07de6;  /*  1.378843     High Cut B0 (SR-derived)*/
-    JI(st,    102432) = 0xbf07c840;  /* -0.5303986    High Cut B2 (SR-derived)*/
-    JI(st,    102464) = 0x3e52bdc7;  /*  0.2058022    High Cut Fc (SR-derived)*/
+    /* output-stage High-Cut biquad coefficients — rate-INDEPENDENT (identical
+     * bytes at 44100/48000/88200/96000; frozen-96k design) */
+    JI(st,    102368) = 0x3e1b31ce;  /*  0.1515571    High Cut C0             */
+    JI(st,    102416) = 0x3fb07de6;  /*  1.378843     High Cut B0             */
+    JI(st,    102432) = 0xbf07c840;  /* -0.5303986    High Cut B2             */
+    JI(st,    102464) = 0x3e52bdc7;  /*  0.2058022    High Cut Fc             */
     JI(st,    102480) = 0x3fb50bf3;  /*  1.414430     High Cut Qc             */
-    JI(st,    102608) = 0x3bab929a;  /*  0.005235980  LF Damp Fc  (SR-derived)*/
-    JI(st,    102656) = 0x3f4ba5b0;  /*  0.7954972    HF Damp Fc  (SR-derived)*/
-    /* reverb-ECF */
-    JI(st,  10759504) = 0x37ae2650;  /*  2.07603e-05  Rev Ecf Rate (SR-derived)*/
+    /* --- Class D: 2-class rate-selected {44100 / else} --------------------- */
+    JI(st,    102448) = (Hr == 44100) ? 0x3f800000 : 0x00000000; /* High-Cut Sw   */
+    JI(st,    102656) = (Hr == 44100) ? 0x3f800000 : 0x3f4ba5b0; /* HF-Damp Fc    */
+    /* reverb-ECF rate — rate-INDEPENDENT (identical across the 4 rates) */
+    JI(st,  10759504) = 0x37ae2650;  /*  2.07603e-05  Rev Ecf Rate            */
     JI(st,  10759872) = 0x00000100;  /*  int 256      reverb algo const        */
     /* effect ENABLE / output-stage constants — the per-mode effect setActive step
      * (container setSampleRate sub_7FF91E01C980 @0x3BC980 + snap-all) writes these;
      * without them the master output stage stays muted. All binary-derived (see
      * scratchpad/oracle/chorus_structural_findings.md / cs_effect_merged.json),
-     * bit-exact vs the runtime baseline. Invariant (not per-patch). */
+     * bit-exact vs the runtime baseline. Invariant (not per-patch, rate-indep). */
     JI(st,     84560) = 0x3f800000;  /*  1.0          Mute SW (OD/DS block)   */
     JI(st,     85152) = 0x41008081;  /*  8.03137      DS Level                */
     JI(st,     91248) = 0x37ffd974;  /*  3.04996e-05  chorus Ip Fc            */
@@ -138,9 +178,9 @@ void juno_engine_prepare(unsigned char *st)
     /* reverb-ECF tank — the reverb ALGORITHM constants (density, dir/global
      * level, and the HPF/LPF/DPF filter cascade). Global send, always read by the
      * master output stage; without these the reverb produces no tail. Binary-
-     * derived (BUILD -> snap-all -> setSampleRate); the SR-dependent filter coeffs
-     * are the 96 kHz values. REVERB LEVEL (10759408) + TIME (10759680) stay
-     * per-patch (reverb_recall.c). */
+     * derived (BUILD -> snap-all -> setSampleRate); rate-INDEPENDENT (identical at
+     * all four rates). REVERB LEVEL (10759408) + TIME (10759680) stay per-patch
+     * (reverb_recall.c). */
     JI(st,  10759376) = 0x3f800000;  /*  1.0          Rev Ecf On              */
     JI(st,  10759392) = 0x3f000000;  /*  0.5          Rev Ecf Density         */
     JI(st,  10759424) = 0x3f800000;  /*  1.0          Rev Ecf Dir Lev         */
@@ -164,22 +204,31 @@ void juno_engine_prepare(unsigned char *st)
     JI(st,  10759792) = 0x3e0566f8;  /*  0.130276     Rev Ecf DPF3 Fc         */
     JI(st,  10759808) = 0x3e8f487e;  /*  0.27985      Rev Ecf DPF3 Hp         */
     JI(st,  10759824) = 0xbf044337;  /* -0.516651     Rev Ecf DPF3 Lp         */
-    /* reverb tap-index table (integers) — vtable[10] algorithm constants */
-    JI(st,  11022208) = 0x00000001;  JI(st,  11022212) = 0x0000077f;
-    JI(st,  11022216) = 0x00000b41;  JI(st,  11022220) = 0x000012b8;
-    JI(st,  11022224) = 0x000012ba;  JI(st,  11022228) = 0x000018a7;
-    JI(st,  11022232) = 0x000018a9;  JI(st,  11022236) = 0x00001c34;
-    JI(st,  11022240) = 0x00001c36;  JI(st,  11022244) = 0x00001d9f;
-    JI(st,  11022248) = 0x00001da1;  JI(st,  11022252) = 0x000022e4;
-    JI(st,  11022256) = 0x000022e6;  JI(st,  11022260) = 0x00002823;
-    JI(st,  11022264) = 0x00002825;  JI(st,  11022268) = 0x00002d6c;
-    JI(st,  11022272) = 0x00002d6e;  JI(st,  11022276) = 0x000032b1;
-    JI(st,  11022280) = 0x000032b3;  JI(st,  11022284) = 0x00004310;
-    JI(st,  11022288) = 0x00004e38;  JI(st,  11022292) = 0x00004eb0;
-    JI(st,  11022296) = 0x00004eb2;  JI(st,  11022300) = 0x00005e1f;
-    JI(st,  11022304) = 0x00006b83;  JI(st,  11022308) = 0x00006c71;
-    JI(st,  11022312) = 0x00006c73;  JI(st,  11022316) = 0x000079ee;
-    JI(st,  11022320) = 0x00008c84;  JI(st,  11022324) = 0x0000928e;
-    JI(st,  11022328) = 0x00009290;  JI(st,  11022332) = 0x0000a0f9;
-    JI(st,  11022336) = 0x0000b38f;  JI(st,  11022340) = 0x0000b997;
+
+    /* --- Class E: reverb tap-index table (34 ints, 11022208..11022340) ------ */
+    /* Generator sub_0x3C1AC0: tap[0]=1; a continuous predelay = floor(T1*H) (T1 in
+     * [0.01998958,0.02), ~19.99 ms) plus rate-class integer stage lengths. At
+     * H==44100 the whole stage table is the 44.1k set (TAP44); otherwise it is the
+     * 96k set (TAP96) shifted uniformly by (predelay-1919). Reproduces all 34 taps
+     * at 44100/48000/88200/96000 (naive floor(tap96*H/96000) is DISPROVEN). */
+    {
+        static const int32_t TAP96[34] = {
+                1,  1919,  2881,  4792,  4794,  6311,  6313,  7220,  7222,  7583,
+             7585,  8932,  8934, 10275, 10277, 11628, 11630, 12977, 12979, 17168,
+            20024, 20144, 20146, 24095, 27523, 27761, 27763, 31214, 35972, 37518,
+            37520, 41209, 45967, 47511 };
+        static const int32_t TAP44[34] = {
+                1,   881,  1843,  2721,  2723,  3420,  3422,  3839,  3841,  4007,
+             4009,  4628,  4630,  5246,  5248,  5869,  5871,  6490,  6492,  8416,
+             9728,  9783,  9785, 11599, 13174, 13283, 13285, 14870, 17056, 17766,
+            17768, 19463, 21648, 22358 };
+        int k;
+        if (Hr == 44100) {
+            for (k = 0; k < 34; ++k) JI(st, 11022208 + 4 * k) = TAP44[k];
+        } else {
+            const int shift = (int)(0.019995f * Hf) - 1919;   /* floor via trunc */
+            JI(st, 11022208) = 1;
+            for (k = 1; k < 34; ++k) JI(st, 11022208 + 4 * k) = TAP96[k] + shift;
+        }
+    }
 }

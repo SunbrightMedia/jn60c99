@@ -276,14 +276,17 @@ void carp_init(carp *e)
     e->vel_fixed = 0; e->vel_sens = 0;
     /* Step clock: the real plugin ALWAYS steps by RATE_TABLE[rate_index] ticks
      * (step trigger sub_7FF91E020260: +3048 += *(u16*)(a1+6*step+610)); enabling the
-     * arp forces rate_index = 4 (sub_7FF91E024F40 hard-codes cfg[7]=2 -> map{0,0,4,1,
+     * arp forces rate_index = 4 (sub_7FF91E024F40 hard-codes cfg[7]=2 -> map{0,2,4,1,
      * 3,5}[2] + 0 = 4 -> RATE_TABLE[4] = 6 ticks = 1/16 at 120 BPM). The owner-clock
      * 12/24-tick divisor we previously used is the chord RE-LATCH quantizer, not the
      * step clock (see docs/ARP_PROVENANCE.md / scratchpad/oracle/arp_rate_findings.md).
      * gate_index 7 = 100% is the default sub-pattern header (0x1C>>2). */
     e->bpm = 120.0; e->division = 0; e->rate_index = 4; e->gate_index = 7;
     e->use_rate_table = 1;
-    e->pos = 0.0; e->cur_note = -1; e->gate_closed = 0; e->first_step = 1;
+    /* Free-running tick grid: phase/counter run on the transport, the first step
+     * is scheduled at tick_counter+1 on empty->held (never at pos 0). */
+    e->tick_phase = 0.0; e->tick_counter = 0; e->next_step_tick = 0;
+    e->off_tick = -1; e->running = 0; e->cur_note = -1; e->gate_closed = 0;
 }
 
 void carp_set_mode(carp *e, int type)
@@ -341,48 +344,59 @@ int carp_tick(carp *e, double sample_rate, carp_event *ev, int cap)
     int n = 0;
     if (sample_rate <= 0.0) sample_rate = 96000.0;
 
-    if (e->count == 0) {                          /* no keys held */
+    const double spp = sample_rate * 60.0 / (e->bpm * 24.0);   /* samples/tick */
+
+    /* --- arp start: empty -> held (mirror sub_7FF91E01D810 LABEL_27) --------
+     * schedule the first step at +3048 = +24 + 1 (the next whole tick). patStep
+     * is implicitly -1: the first run_selector() call below is step 0. */
+    if (e->count > 0 && !e->running) {
+        e->running = 1;
+        e->next_step_tick = e->tick_counter + 1;
+    }
+
+    /* --- all keys released (mirror sub_7FF91E01F2A0 / state 2->0) -----------
+     * emit the trailing note-off, drop running; the tick grid keeps advancing
+     * below so the next phrase re-quantizes to tick_counter+1. Zero sel_step,
+     * oct_shift, oct_adv_flag — but NOT started / ud_dir (kept), so 2nd-and-later
+     * phrases resume DOWN / UP&DOWN ordering exactly as the binary. */
+    if (e->count == 0) {
         if (e->cur_note >= 0 && n < cap) {
             ev[n].kind = 0; ev[n].note = e->cur_note; ev[n].velocity = 0; n++;
-            e->cur_note = -1;
         }
-        e->pos = 0.0; e->first_step = 1;
-        /* Last-key release (sub_7FF91E01F2A0): zero sel_step, oct_shift, oct_adv_flag
-         * — but NOT started (stays 1 after the first note ever) and NOT ud_dir (kept),
-         * so 2nd-and-later phrases resume DOWN/UP&DOWN ordering exactly as the binary. */
+        e->cur_note = -1; e->off_tick = -1; e->running = 0;
         e->sel_step = 0; e->oct_shift = 0; e->oct_adv_flag = 0;
-        return n;
     }
 
-    e->nslots = e->count;                         /* chord size (see notes)  */
+    /* --- advance the free-running 24-PPQN tick clock by one sample ---------- */
+    e->tick_phase += 1.0;
+    if (e->tick_phase >= spp) {
+        e->tick_phase -= spp;
+        e->tick_counter++;
 
-    double spp   = sample_rate * 60.0 / (e->bpm * 24.0);   /* samples/tick   */
-    int    dur   = step_ticks(e);
-    double step_samples = (double)dur * spp;
-    int    gate_ticks   = (dur * CARP_GATE_TABLE[e->gate_index]) / 100; /* int, as F3D0 */
-    double gate_samples = (double)gate_ticks * spp;
-
-    /* note-off at the gate boundary inside the step */
-    if (e->cur_note >= 0 && !e->gate_closed && e->pos >= gate_samples) {
-        if (n < cap) { ev[n].kind=0; ev[n].note=e->cur_note; ev[n].velocity=0; n++; }
-        e->gate_closed = 1;
-    }
-
-    /* step boundary -> take the next step */
-    if (e->first_step || e->pos >= step_samples) {
-        e->pos = 0.0;
-        e->first_step = 0;
-        if (e->cur_note >= 0 && !e->gate_closed) {   /* gate>=step: close now */
+        /* (1) scheduled note-off first (plugin fires offs before step trigger) */
+        if (e->cur_note >= 0 && !e->gate_closed &&
+            e->off_tick >= 0 && e->tick_counter == e->off_tick) {
             if (n < cap) { ev[n].kind=0; ev[n].note=e->cur_note; ev[n].velocity=0; n++; }
+            e->gate_closed = 1;
         }
-        int base = run_selector(e);                  /* sorted note value     */
-        int in_v = e->per_note_vel[(unsigned)base & 0x7F]; /* a1+464[note]    */
-        int pitch = apply_octave_and_fold(e, base);
-        int vel   = velocity_calc(e, in_v, in_v);
-        e->cur_note = pitch; e->gate_closed = 0;
-        if (n < cap) { ev[n].kind=1; ev[n].note=pitch; ev[n].velocity=vel; n++; }
-    }
 
-    e->pos += 1.0;
+        /* (2) step trigger: +24 == +3048 -> sub_7FF91E020260 */
+        if (e->running && e->count > 0 && e->tick_counter == e->next_step_tick) {
+            if (e->cur_note >= 0 && !e->gate_closed) {   /* gate>=step: force close */
+                if (n < cap) { ev[n].kind=0; ev[n].note=e->cur_note; ev[n].velocity=0; n++; }
+            }
+            e->nslots = e->count;                        /* chord size            */
+            int dur        = step_ticks(e);
+            int gate_ticks = (dur * CARP_GATE_TABLE[e->gate_index]) / 100; /* as F3D0 */
+            int base   = run_selector(e);                /* sorted note value     */
+            int in_v   = e->per_note_vel[(unsigned)base & 0x7F]; /* a1+464[note]  */
+            int pitch  = apply_octave_and_fold(e, base);
+            int vel    = velocity_calc(e, in_v, in_v);
+            e->cur_note = pitch; e->gate_closed = 0;
+            e->off_tick = e->tick_counter + gate_ticks;  /* offTick = curTick+gateLen */
+            e->next_step_tick += dur;                    /* +3048 += dur          */
+            if (n < cap) { ev[n].kind=1; ev[n].note=pitch; ev[n].velocity=vel; n++; }
+        }
+    }
     return n;
 }

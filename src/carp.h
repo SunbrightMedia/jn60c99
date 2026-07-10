@@ -76,11 +76,18 @@ typedef struct {
     int     use_rate_table;     /* 0: step = division (12/24 PPQN, decoded
                                  *    clock);  1: step = RATE[rate_index]      */
 
-    /* ---- runtime step clock ----------------------------------------- */
-    double  pos;                /* samples elapsed inside the current step    */
+    /* ---- runtime step clock (free-running 24-PPQN tick grid) --------------
+     * Mirrors CArpeggio's transport clock: +20/+24 free-run every sample on the
+     * host transport (NOT reset on key-down), and the first step is scheduled at
+     * +3048 = +24 + 1, i.e. the next whole tick strictly after the key press —
+     * never at pos 0. See scratchpad/oracle/arp_finish_findings.md (a). */
+    double     tick_phase;      /* +20/+24 : samples elapsed in current tick   */
+    long long  tick_counter;    /* +24     : running 24-PPQN tick index         */
+    long long  next_step_tick;  /* +3048   : tick at which the next step fires  */
+    long long  off_tick;        /* slot+8  : scheduled note-off tick (-1=none)  */
+    int        running;         /* +44>=2  : arp has been started (has notes)   */
     int     cur_note;           /* MIDI note currently sounding, or -1        */
     int     gate_closed;        /* 1 once this step's note-off has fired      */
-    int     first_step;         /* 1 until the first step has been taken      */
 } carp;
 
 /* Reset to power-on defaults (empty keyboard, UP, 1 octave, 120 BPM). */
