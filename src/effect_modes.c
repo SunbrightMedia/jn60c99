@@ -11,10 +11,16 @@
  * The structural cells (MODE1_STRUCT / MODE5_STRUCT, effect_luts.h) are the plugin's
  * own BUILD -> snap-all -> setSampleRate output dumped under emulation @96 kHz. The
  * per-patch cells are recalled from the value-tree dispatch LUTs. Three multiplicative
- * enable-gates could not be driven in emulation (the non-default sub-effects are
- * constructed but never enabled, so their smoother targets stay 0) — their enabled
- * values are transferred from the binary-derived chorus twins and flagged in the docs:
- *   86320 DS Mute = 1.0, 96384 Ip Fc = 0x37ffd974, 96416 Mute = 1.0.
+ * enable-gates are not written by the value tree (the non-default sub-effects are
+ * constructed but never enabled, so their smoother targets stay 0). Their enabled
+ * values:
+ *   96384 Ip Fc = 0x37ffd974, 96416 Mute = 1.0 (mode 5) — now DIRECTLY OBSERVED from
+ *     the binary's own code (static disasm of the setter + the master-read storage
+ *     cells under emulation): PROVEN, scratchpad/oracle/mode5_gates_spec.md.
+ *   86320 DS Mute = 1.0 (mode 1) — derived: the multiplicative "Mute" gate's enabled
+ *     value, matching the block-A chorus twin 91280 = 1.0 and the prepare constant
+ *     84560 "Mute SW" = 1.0 (juno_prepare.c); strongly supported but not driven under
+ *     emulation (the mode-1 sub-effect is never enabled in the traced path).
  */
 #include "juno_engine.h"
 #include "effect_modes.h"
