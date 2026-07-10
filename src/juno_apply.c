@@ -206,8 +206,10 @@ static const juno_bind BINDINGS[] = {
     { 54, 52, T_ID,   592, "PORTAMENTO"      }, /* -> Porta OnOff (value tree c52)     */
     { 54,  7, T_ID,   624, "PORTAMENTO", 2   }, /* -> Porta Time. SR-VARIANT: juno_curve(7,v)
                                                   * * (96000/H) for H!=96000 (C/H post-multiply) */
-    { 57, 10, T_ID,  4128, "BEND RANGE"      }, /* -> Bend (value tree c10; +c10@7472) */
-    { 57, 10, T_ID,  7472, "BEND RANGE"      }, /* -> Bend Range VCF (2nd coeff)       */
+    /* BEND RANGE (blob 57) is NOT a standalone binding: it is the curve4() factor of
+     * the bend-depth PRODUCT at 4128/7472 — see apply_bend_mod_sens(). The old
+     * {57,curve 10,4128/7472} rows were a disguised write-zero (curve 10 == 0 for the
+     * factory BEND RANGE=11) and are removed. */
     { 59, 52, T_ID,  1056, "TEMPO SYNC"      }, /* -> LFO Tempo Rate Sw (value tree c52)*/
     /* DCO LFO MOD + the 6 above: blob position from the plugin's own value-tree
      * leaf serialization order (the CKoa tree child order; three code-reading
@@ -324,6 +326,41 @@ static void apply_vca_mode(unsigned char *state, int v)
     JF(state, 10208) = env2;   /* ENV2 SW */
 }
 
+/* BEND SENS DCO/VCF (leaves 116/117) + MOD SENS DCO/VCF (leaves 118/119). The
+ * plugin's recall runs a per-voice recompute that stores a PRODUCT coefficient, not
+ * a single-curve write (setters 0x35C630/0x359BE0/0x35C710/0x359D10, driven bit-exact
+ * under Unicorn — scratchpad/oracle/bendmod_recall_spec.md):
+ *   4128 (bend depth DCO) = curve22(BEND SENS DCO) * curve4(BEND RANGE) * mode(BEND GAIN)
+ *   7472 (bend depth VCF) = curve22(BEND SENS VCF) * curve4(BEND RANGE) * mode(BEND GAIN)
+ *   3984 (mod depth DCO)  = curve22(MOD SENS DCO)
+ *   7360 (mod depth VCF)  = curve22(MOD SENS VCF) * 10.0
+ * mode(g) = {1:2, 2:3, 3:4, else:1}. All SR-INVARIANT (no rate branch in the thunks).
+ * These are the recalled DEPTHS; the live bend/mod AMOUNT (off 4112/7456) is a separate
+ * runtime coeff that is 0 at a centered wheel, so the depths are inert in the dry
+ * preview (verified: the mod sources 3856/3552/4112 are 0 at rest -> the render term
+ * that reads 4128 is 0) but are the plugin's true recalled state and correct once live
+ * bend/mod is driven. Voice-0 offsets, replicated to all 8 by juno_driver_seed_voices.
+ * NOTE: the old "{57,curve 10,4128/7472} BEND RANGE" BINDINGS rows were mis-mapped —
+ * curve 10 is ~all-zero (0 for the factory BEND RANGE=11), a disguised write-zero; the
+ * real BEND RANGE curve is 4, applied as a factor here. */
+static const float BEND_GAIN_MODE[4] = { 1.0f, 2.0f, 3.0f, 4.0f };
+static void apply_bend_mod_sens(unsigned char *state, const unsigned char *blob)
+{
+    int bsd  = record_byte(blob, 514);   /* BEND SENS DCO (leaf 116) */
+    int bsv  = record_byte(blob, 522);   /* BEND SENS VCF (leaf 117) */
+    int msd  = record_byte(blob, 530);   /* MOD  SENS DCO (leaf 118) */
+    int msv  = record_byte(blob, 538);   /* MOD  SENS VCF (leaf 119) */
+    int bg   = record_byte(blob, 506);   /* BEND GAIN     (leaf 115, 0 in all factory) */
+    int brng = ((blob[2 * 57] & 0xF) << 4) | (blob[2 * 57 + 1] & 0xF);  /* BEND RANGE (blob 57) */
+    float mode = BEND_GAIN_MODE[(bg >= 0 && bg <= 3) ? bg : 0];
+    float c4r  = juno_curve(4, brng);
+    /* mulss left-to-right, matching the binary's mulss xmm6,xmm1; mulss xmm6,xmm0. */
+    JF(state, 4128) = juno_curve(22, bsd) * c4r * mode;   /* Bend depth DCO */
+    JF(state, 7472) = juno_curve(22, bsv) * c4r * mode;   /* Bend depth VCF */
+    JF(state, 3984) = juno_curve(22, msd);                /* Mod depth DCO  */
+    JF(state, 7360) = juno_curve(22, msv) * 10.0f;        /* Mod depth VCF  */
+}
+
 /* (F ENV VARIATION) (extended leaf 112, record byte 482 — the leaf immediately
  * before VCA MODE in the NAME2 block): the VCF ENVELOPE-SOURCE selector. This is
  * the switch that decides which envelope opens the filter, and it was the cause of
@@ -414,6 +451,8 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
      * 64 patches. These write per-voice offsets (<84272), so juno_driver_seed_voices
      * replicates them to all 8 voices. */
     apply_vca_mode(state, record_byte(blob, 490));      /* VCA MODE  (leaf 113) */
+    apply_bend_mod_sens(state, blob);                   /* BEND/MOD SENS (leaves 115..119) */
+    n += 4;
     /* F ENV VARIATION: NOT recalled by the plugin. Proven non-circularly (Tier-C audit
      * 2026): a full 0..1121 dispatch sweep finds ZERO writers of 7008/7024, disp854 is
      * parenthesized/disabled in Script.xml, and 0/64 patches touch these in the oracle.
