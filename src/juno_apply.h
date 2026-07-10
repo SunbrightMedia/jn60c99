@@ -29,6 +29,14 @@ int juno_bank_arp(const unsigned char *bank, int idx, int *mode, int *oct);
 int juno_bank_voice_modes(const unsigned char *bank, int idx,
                           int *legato, int *assign, int *porta);
 
+/* CONDITION analog voice-scatter. juno_apply_condition writes PER-VOICE-DISTINCT
+ * detune/level coefficients for the clamped byte cbyte (0..255), so it MUST be called
+ * AFTER juno_driver_seed_voices (seed replicates voice 0 and would clobber the scatter).
+ * juno_bank_condition reads the CONDITION byte (leaf 114, record 498) for patch idx
+ * (default 128). See src/juno_apply.c / scratchpad/oracle/condition_scatter_spec.md. */
+void juno_apply_condition(unsigned char *state, int cbyte);
+int  juno_bank_condition(const unsigned char *bank, int idx);
+
 #ifdef __cplusplus
 }
 #endif

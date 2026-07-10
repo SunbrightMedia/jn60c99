@@ -361,6 +361,45 @@ static void apply_bend_mod_sens(unsigned char *state, const unsigned char *blob)
     JF(state, 7360) = juno_curve(22, msv) * 10.0f;        /* Mod depth VCF  */
 }
 
+/* CONDITION — analog voice-scatter (leaf 114, record byte 498; value-tree idx 856).
+ * Broadcasts the clamped byte C (0..255) to the 8 voices as PER-VOICE-DISTINCT detune
+ * + re-level, i.e. component-tolerance emulation: each voice gets TUNE(5520), FINE
+ * (7600), GAIN(10320) = a fixed per-voice scalar times a C ramp. Bit-exact vs the
+ * plugin's per-voice setter methods (0x35bdb0/0x3595c0/0x3561a0), 240/240; SR-invariant.
+ * See scratchpad/oracle/condition_scatter_spec.md. Because these are per-voice-DISTINCT,
+ * this MUST run AFTER juno_driver_seed_voices (which replicates voice 0 and would
+ * clobber the scatter). The default patch value is 128 (both ramps = 1.0). */
+static const float COND_TUNE_SCAL[8] = { 0.02f, 0.01f, 0.025f, 0.015f,
+                                        -0.005f, -0.015f, 0.0f, -0.01f };
+static const float COND_FINE_SCAL[8] = { 0.0f, 0.00416666688f, 0.00186666672f, -0.00150833325f,
+                                         0.00208333344f, -0.00333333341f, -0.00249999994f, 0.000833333354f };
+static const float COND_GAIN_SCAL[8] = { -0.0f, -0.005f, -0.015f, -0.01f,
+                                         -0.02f, -0.0f, -0.02f, -0.008f };
+void juno_apply_condition(unsigned char *state, int cbyte)
+{
+    int v, C = cbyte < 0 ? 0 : (cbyte > 255 ? 255 : cbyte);   /* clamp 0..255 */
+    float recip = 1.0f / 129.0f;                              /* f32 reciprocal (0x3bfe03f8) */
+    float L    = (float)(C + 1) * recip;                      /* linear ramp (NOT (C+1)/129) */
+    float cube = (L * L) * L;                                 /* stepwise f32 cube          */
+    for (v = 0; v < 8; ++v) {
+        unsigned b = (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
+        JF(state, 5520u  + b) = L    * COND_TUNE_SCAL[v];     /* per-voice detune (tune-trim) */
+        JF(state, 7600u  + b) = cube * COND_FINE_SCAL[v];     /* per-voice fine detune        */
+        JF(state, 10320u + b) = cube * COND_GAIN_SCAL[v] + 1.0f; /* per-voice re-level        */
+        /* ZERO_A(3968)/ZERO_B(7616) stay 0.0 = engine baseline; no write needed. */
+    }
+}
+
+/* Read the CONDITION byte (leaf 114, record byte 498) from a bank record, for the
+ * bridge to apply post-seed. Defaults to 128 (the Script.xml default) on bad idx. */
+int juno_bank_condition(const unsigned char *bank, int idx)
+{
+    const unsigned char *blob;
+    if (idx < 0 || idx >= BANK_COUNT) return 128;
+    blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
+    return record_byte(blob, 498);
+}
+
 /* (F ENV VARIATION) (extended leaf 112, record byte 482 — the leaf immediately
  * before VCA MODE in the NAME2 block): the VCF ENVELOPE-SOURCE selector. This is
  * the switch that decides which envelope opens the filter, and it was the cause of

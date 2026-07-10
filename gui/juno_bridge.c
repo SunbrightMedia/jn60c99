@@ -88,6 +88,7 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
                                           * baseline (no capture; see src/juno_prepare.c) */
     default_patch(c->st);                /* FX power-on default (reverb off)               */
     juno_driver_seed_voices(c->st);      /* all 8 voices carry the same coeffs             */
+    juno_apply_condition(c->st, 128);    /* default CONDITION -> per-voice analog scatter  */
     c->chorus_mode = chorus_mode;
     for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
     /* arp: bit-exact CArpeggio, off by default. carp_init seeds the plugin's
@@ -147,6 +148,7 @@ void juno_gui_recall_factory(juno_ctx *c)
     /* clean slot-1 (v39): no stale DELAY TYPE from a prior patch */
     *(int32_t *)(c->st + JUNO_PROG_DLY) = 0;
     juno_driver_seed_voices(c->st);      /* propagate to all 8 voices */
+    juno_apply_condition(c->st, 128);    /* default CONDITION -> per-voice analog scatter */
     juno_driver_attach_host(c->st, &c->shim, c->chorus_mode);
 }
 
@@ -460,6 +462,10 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
     if (!c || !bank || len <= 0) return 0;
     n = juno_bank_apply(c->st, bank, idx);
     juno_driver_seed_voices(c->st);      /* all 8 voices play the applied patch */
+    /* CONDITION analog voice-scatter: per-voice detune/level, applied AFTER seed (it
+     * makes the 8 voices deliberately non-identical — the plugin's component-tolerance
+     * emulation). Default patch value 128 -> full scatter. */
+    juno_apply_condition(c->st, juno_bank_condition(bank, idx));
     /* Per-patch VOICE-ASSIGN recall (CAssignJu60): ASSIGN MODE (poly/mono/unison/
      * poly-variant), LEGATO, and PORTAMENTO-engaged drive the note allocator above. */
     juno_bank_voice_modes(bank, idx, &c->legato, &c->assign_mode, &porta);

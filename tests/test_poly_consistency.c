@@ -12,6 +12,14 @@
  * rendered, so the shared block at 84272 evolves identically in every run (both
  * start from the same init and apply the same shared-block ops). Thus voice v
  * alone must equal voice 0 alone, sample for sample.
+ *
+ * NOTE: bit-identity here holds because this test deliberately does NOT apply
+ * CONDITION (juno_apply_condition). In the full plugin/bridge path CONDITION writes
+ * per-voice-distinct detune/level coefficients (analog component-tolerance scatter),
+ * so the 8 voices are intentionally NON-identical when a patch is recalled — that
+ * property is the subject of test_condition_scatter, not this test. This test proves
+ * only that the render REGIONS are classified correctly (identical inputs -> identical
+ * outputs); the scatter is an input difference layered on top.
  */
 #include "../src/juno_engine.h"
 #include "../src/juno_driver.h"

@@ -45,3 +45,4 @@ tests/test_arp_onset
 tests/test_recall_rate
 tests/test_arp_release
 tests/test_bend_mod_sens
+tests/test_condition_scatter

@@ -1,6 +1,6 @@
 # Build + test for the JUNO-60 C99 port.
 CC      ?= cc
-CFLAGS  ?= -std=c99 -O2 -Wall -Wextra -Wno-unused-parameter -fno-strict-aliasing
+CFLAGS  ?= -std=c99 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -fno-strict-aliasing
 LDLIBS  ?= -lm
 
 SRC     := $(wildcard src/*.c)
@@ -22,7 +22,7 @@ dll: juno.dll
 juno.dll: gui/juno_bridge.c $(SRC)
 	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $^ $(LDLIBS)
 
-test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens
+test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter
 	./tests/test_helpers
 	./tests/test_voice_smoke
 	./tests/test_master_smoke
@@ -37,6 +37,7 @@ test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/te
 	./tests/test_recall_rate
 	./tests/test_arp_release
 	./tests/test_bend_mod_sens
+	./tests/test_condition_scatter
 
 tests/test_helpers: tests/test_helpers.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
@@ -61,7 +62,7 @@ tests/test_reverb_recall: tests/test_reverb_recall.c $(SRC)
 
 clean:
 	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke \
-	      tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens
+	      tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter
 
 # Validate the port's init against the live-plugin state dump (state_dump/).
 validate: tests/validate_state.c $(SRC)
@@ -93,4 +94,7 @@ tests/test_arp_release: tests/test_arp_release.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
 tests/test_bend_mod_sens: tests/test_bend_mod_sens.c $(SRC)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
+tests/test_condition_scatter: tests/test_condition_scatter.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
