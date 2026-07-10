@@ -19,10 +19,33 @@ recalled patch sound wrong are the ones that (a) *vary* across the bank and (b) 
 oracle-verified record formula (front-panel `byte = 2·leaf − 4`; extended NAME1/2/3
 `byte = 8·leaf − 430`), and diffs against the applier's read-set.
 
-**Result — every synthesis/DSP leaf that varies across the bank is recalled.** The
-scan surfaced exactly one *audible* gap, now fixed, plus a short list of residuals
-that are each inert-at-rest, voice-allocation, or master-path (unchanged from
-below):
+**Result — every synthesis/DSP leaf that varies across the bank IS recalled.** The
+current scan flags exactly **2** varying-unrecalled leaves, and both are
+**JU-06A-disabled hardware features** that drive no engine coefficient on the
+JUNO-60: `(OSC1 CROSS MOD)` (leaf 30, varies 37/64) and `(OSC3 WAVEFORM)` (leaf 126,
+varies 7/64) — the JUNO-60 has a single DCO with no cross-modulation and no third
+oscillator, so not recalling them is correct. Every other leaf that varies across
+the bank and is live on the JUNO-60 is now written by the applier, including the
+items historically listed as open (they have since been closed, each verified
+against the plugin's own machine code under Unicorn — never a capture):
+
+- **BEND SENS DCO/VCF, MOD SENS DCO/VCF** (leaves 116–119) — recalled bit-exact by
+  `apply_bend_mod_sens()` (`src/juno_apply.c`): `4128/7472 = curve22(sens)·curve4(range)·mode`,
+  `3984 = curve22(msd)`, `7360 = curve22(msv)·10`. Verified inert at rest (mod/bend
+  sources 0 with no wheel input), so writing the depths is safe and correct.
+- **LEGATO, ASSIGN MODE** (leaves 57/58) — recalled by `juno_bank_voice_modes()` and
+  driven by the ported `CAssignJu60` allocation logic (poly / mono / mono-legato /
+  unison) in `gui/juno_bridge.c`. No longer poly-only.
+- **CONDITION** (leaf 114) — recalled by `juno_apply_condition()`: the per-voice
+  analog component-tolerance scatter (detune 5520 / fine 7600 / gain 10320), bit-exact
+  vs the plugin's per-voice setters (240/240 under Unicorn). Not "unresolvable without
+  a capture" as an earlier edition claimed — it was resolved by emulating the plugin's
+  own code.
+- **SCATTER TYPE, SCATTER DEPTH** (leaves 92/93) — recalled by `juno_bank_scatter()`,
+  selecting the arpeggiator's STEP×SLOT pattern grid (all 64 factory patches = the
+  default grid; the engine handles all 110 reachable patterns bit-exact).
+
+The earlier one *audible* gap — `(F ENV VARIATION)` — remains documented below:
 
 - **`(F ENV VARIATION)` — leaf 112, record byte 482 — FIXED (this is the pluck
   bug).** 7 of 64 patches set it to 1 (`SQ Dynamic ARPG`, `LD Classic Lead`,
@@ -75,10 +98,11 @@ The gap is entirely accounted for — none of it is missing recall:
 |---|---|---|---|
 | Core synthesis (DCO/LFO/VCF/2×ADSR/VCA/porta/bend) | ~37 | **yes, bit-exact** | golden + emulation |
 | Extended DSP (VCA mode, **F ENV VARIATION / VCF env source**, LFO trig, HPF type, velocity sens, cutoff-HR) | ~8 | **yes, bit-exact** | value-tree verified; F ENV VARIATION derived from the decompiled voice render (offsets 7008/7024) |
-| Per-patch FX (delay, reverb, arpeggiator) | ~5 | **yes** | delay/reverb bit-exact; arp on/mode/octave |
-| Bend / mod-wheel sensitivity (BEND SENS DCO/VCF, MOD SENS DCO/VCF) | 4 | no (correct) | performance controls, **inert at rest**. The transform is now **derived bit-exact** — `juno_curve(22, raw_byte)`, dispatch 858–861 — and the engine offsets **corrected to 4128/7472 (bend) and 3984/7360 (mod)** (4112/7456 are the live pitch-bend *wheel*, not the sens depth). It is **deliberately not shipped as a flat recall**: the disassembly proves each engine coefficient is a **wheel-gated product** (`sens · gate · range`) whose gate is written only by the live pitch-bend/mod-wheel handler and is 0 at rest, so all four are 0 with no wheel input — and a flat one-curve→one-offset binding would overwrite that product with one partial factor (incorrect, not just redundant). Full derivation + the per-event formula for the future MIDI-wheel path: **docs/BEND_MOD_SENS.md**. |
-| Note-assign modes (LEGATO, ASSIGN MODE) | 2 | no | emulation confirms these write **voice-allocation flags, not DSP coefficients** — mono / mono-legato / poly behaviour. The browser preview allocates polyphonically; 20 factory patches are non-poly and would play monophonically on the real unit. This is the one *audible* item still open, and it needs a voice-allocator mode port, not a coefficient. |
-| CONDITION, EFFECT TONE | 2 | no | route through the master / flat-param / FX path that Hex-Rays could not decompile and that is fed by an external schema file absent from the binary. Unresolvable without a capture (forbidden). |
+| Per-patch FX (delay, reverb, arpeggiator + SCATTER grid) | ~6 | **yes, bit-exact** | delay/reverb bit-exact; arp on/mode/octave + the full STEP×SLOT pattern grid (SCATTER TYPE/DEPTH), verified 330/330 vs the plugin under Unicorn |
+| Bend / mod-wheel sensitivity (BEND SENS DCO/VCF, MOD SENS DCO/VCF) | 4 | **yes, bit-exact** | `apply_bend_mod_sens()`: `4128/7472 = curve22(sens)·curve4(range)·mode` (bend), `3984 = curve22(msd)`, `7360 = curve22(msv)·10` (mod), dispatch 858–861. Verified inert at rest (the wheel gate is 0 with no wheel input, so the recalled depths change nothing until a wheel event arrives — writing them is safe *and* correct). Full derivation: **docs/BEND_MOD_SENS.md**. |
+| Note-assign modes (LEGATO, ASSIGN MODE) | 2 | **yes** | recalled by `juno_bank_voice_modes()`; the ported `CAssignJu60` allocator (`gui/juno_bridge.c`) drives poly / mono / mono-legato / unison, so the 20 non-poly factory patches now play with the correct voice count instead of poly-only. |
+| CONDITION (per-voice analog scatter) | 1 | **yes, bit-exact** | `juno_apply_condition()`: per-voice detune/fine/gain (5520/7600/10320), 240/240 bit-exact vs the plugin's own per-voice setters under Unicorn — resolved by emulation, not a capture. |
+| EFFECT TONE | 1 | **yes** | recalled for modes 1 & 5 (`effect_modes.c`, record byte 642 → DS pan / chorus-5 LFO rate). |
 | EFFECT TYPE (chorus/effect select) | 1 | 55/64 | modes 2/3/4 all route to the same chorus block (byte-identical) — correct for 55 patches by the hardcoded chorus; modes 1 & 5 (9 patches) route to un-configured FX blocks (see `AUDIBLE_RECALL_PLAN.md`). |
 | JU-06A-only controls (2nd/3rd oscillator, ring, sync, cross-mod, pitch-env, sub/noise *type*, OSC/LFO "variation") | ~20 | n/a | **disabled on the JUNO-60**. They exist in the JU-06A value tree (shown parenthesized in `Script.xml`) but the JUNO-60 mode does not sound them, so recall writes nothing audible for them. *(Note: `(F ENV VARIATION)` is parenthesized in `Script.xml` too, but — unlike these — the decompiled voice render **does** read its engine offsets 7008/7024, so it is live on the JUNO-60 and is recalled; see the extended-DSP row above.)* |
 | Internal / derived engine state (LFO waveform one-hot switches, filter −12/−18/−24 dB taps, plugin-enable switches, tune/detune, `Q24C Initialize`, `read only`, M.CV/M.Gate note-control) | ~63 offsets | n/a | not per-patch data — they have **no byte in the patch record** (proven from the record layout). Set by engine init or derived from a recalled control; leaving them at their init value *is* the bit-exact behaviour. |
@@ -94,22 +118,24 @@ handful of positions in the table above — and each is explained (inert
 performance control, allocation flag, FX/master path, or JU-06A-disabled), not a
 missing binding.
 
-## What is deliberately *not* done (and why that is the correct call)
+## What is *not* recalled — and why each is correct
 
 Per the project's cardinal rule — ground truth is only the plugin binary, no
-captures, no fitted curves, no guessed orderings — the following are left
-unbound **on purpose** rather than shipped as guesses:
+captures, no fitted curves, no guessed orderings — the leaf variance audit now
+leaves **only** these unrecalled, each for a principled reason:
 
-- **BEND/MOD SENS transforms** — offset known, transform unverified. Inert at rest.
-- **CONDITION / EFFECT TONE** — route through the un-decompiled FX/flat path.
-- **EFFECT TYPE modes 1 & 5** — route to un-configured FX blocks; recovering them
-  would require a runtime capture, which is forbidden.
+- **`(OSC1 CROSS MOD)`, `(OSC3 WAVEFORM)`** and the other parenthesized value-tree
+  leaves — **JU-06A-disabled**. They exist in the JU-06A schema but the JUNO-60
+  mode does not sound them (single DCO, no cross-mod, no 3rd oscillator), so they
+  drive no engine coefficient. Recalling them would write to nothing.
+- **Internal / derived engine state** (LFO one-hot switches, filter dB taps,
+  tune/detune, note-control) — **no byte in the patch record**; set by engine init
+  or derived from a recalled control. Leaving them at their init value *is* the
+  bit-exact behaviour.
 
-## The one remaining audible item
-
-**Note-assign modes (mono / legato).** 16 factory patches use a non-poly assign
-mode and 4 use legato; on the real unit those play monophonically. The preview
-allocates polyphonically, so those patches are fuller than the hardware. This is
-a voice-allocator behaviour (not a recalled coefficient) and is the only place
-where a recalled patch can *sound* different from the plugin. Implementing it is
-a scoped port of the `CAssignJu60` mode logic — tracked, not guessed.
+Everything historically listed here as "deliberately unbound" — BEND/MOD SENS,
+CONDITION, EFFECT TONE, note-assign modes, the SCATTER arp grid, EFFECT TYPE modes
+1 & 5 — has since been **recalled and verified against the plugin's own code under
+Unicorn** (never a capture). There is no longer an open audible recall gap: every
+leaf that varies across the factory bank and is live on the JUNO-60 is reproduced
+bit-for-bit.
