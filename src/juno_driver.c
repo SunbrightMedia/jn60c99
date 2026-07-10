@@ -9,11 +9,16 @@
  * parameterised by voice index using the VERIFIED offset classification (diffing
  * the 8 specialised copies sub_180369070..sub_180383F20 proves every state
  * reference is main +v*10512, shared +0, or aux +v*32 — see docs/POLYPHONY.md).
- * So all 8 voices are rendered by the one exact transcription, in order 0..7 each
- * sample so the shared block chains exactly as the plugin's 8 calls do. Each
- * voice needs its own copy of the per-voice patch coefficients: juno_bank_apply
- * writes voice 0's block, and juno_driver_seed_voices replicates it to voices
- * 1..7 (call after apply). Global coeffs (e.g. VCA level at 101072) stay single.
+ * All 8 voices are rendered by the one exact transcription each sample. NOTE: the
+ * shared analog-noise block (84272..84436) must NOT chain across the 8 voices — the
+ * plugin runs 8 ISOLATED engine units (BUILD sub_7FF91E0268D0 = 9x operator
+ * new(0xA83010)), each stepping its OWN copy once/sample in lockstep, so every voice
+ * reads the same one-step advance. juno_driver_render_voices snapshots the block and
+ * restores it before each voice to reproduce that (chaining it, as an earlier version
+ * did, stepped the noise 8x too fast). Each voice needs its own copy of the per-voice
+ * patch coefficients: juno_bank_apply writes voice 0's block, and
+ * juno_driver_seed_voices replicates it to voices 1..7 (call after apply). Global
+ * coeffs (e.g. VCA level at 101072) stay single.
  */
 #include "juno_engine.h"
 #include "juno_driver.h"
@@ -62,6 +67,32 @@ void juno_driver_seed_voices(unsigned char *st)
                st + block, JUNO_VOICE_MAIN_STRIDE);
 }
 
+/* Shared analog-noise/LFSR block: a self-contained noise generator + one-pole
+ * filter at [84272, 84436) whose evolution reads only its own cells (no per-voice
+ * input — voice_render.c:573-631). The plugin BUILDs 9 isolated engine units
+ * (sub_7FF91E0268D0: nine operator new(0xA83010)); each of the 8 voice units owns
+ * its own copy and steps it exactly ONCE per sample (all units lockstep, so every
+ * voice reads the same value). Our single shared state would step it 8x/sample
+ * (once per chained voice) and hand each voice a different noise value. */
+#define JUNO_NOISE_BLOCK_OFF 84272u
+#define JUNO_NOISE_BLOCK_LEN 164u        /* [84272, 84436): 11 cells x 16 - 12 */
+
+void juno_driver_render_voices(unsigned char *st, float *vbuf)
+{
+    unsigned char nblk[JUNO_NOISE_BLOCK_LEN];
+    int v;
+    /* snapshot the block, then restore before EACH voice so all 8 step from the
+     * same state (nblk) and read the identical one-step advance; after the loop the
+     * block is left advanced exactly once (by the last voice) — matching the plugin. */
+    memcpy(nblk, st + JUNO_NOISE_BLOCK_OFF, JUNO_NOISE_BLOCK_LEN);
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+        float vr = 0.0f;
+        vbuf[v] = 0.0f;
+        memcpy(st + JUNO_NOISE_BLOCK_OFF, nblk, JUNO_NOISE_BLOCK_LEN);
+        juno_voice_render(st, v, &vbuf[v], &vr);
+    }
+}
+
 /* Render one stereo output sample: 8 voices -> 8 buffers -> master process.
  * Writes the final stereo pair to *outL / *outR. Returns 1 if the full master/
  * chorus path ran, 0 if the dry fallback was used (chorus coeffs not yet loaded). */
@@ -74,15 +105,9 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
 
     for (i = 0; i < 16; ++i) a2[i] = &scratch;        /* default: harmless */
 
-    /* All 8 voices, IN ORDER (the shared block at 84272 chains across them, as
-     * the plugin's 8 sequential voice calls do). Each voice reads/writes its own
-     * main block (+i*10512) and aux edge (+i*32); voice_render selects them. */
-    for (i = 0; i < JUNO_NUM_VOICES; ++i) {
-        float vr = 0.0f;
-        vbuf[i] = 0.0f;
-        juno_voice_render(st, i, &vbuf[i], &vr);
+    juno_driver_render_voices(st, vbuf);              /* 8 voices; noise block stepped once */
+    for (i = 0; i < JUNO_NUM_VOICES; ++i)
         a2[2 * i] = &vbuf[i];                          /* even slots = voices */
-    }
 
     /* Run the full master/chorus/output stage. Every coefficient it reads is now
      * supplied bit-exactly from the binary (juno_engine_init + juno_engine_prepare

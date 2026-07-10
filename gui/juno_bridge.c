@@ -560,14 +560,11 @@ int juno_gui_render_dry(juno_ctx *c, float *out, int nframes)
     if (!c) return 0;
     synth_reap(c);                         /* free voices whose release has decayed */
     for (i = 0; i < nframes; ++i) {
-        float mix = 0.0f;
+        float mix = 0.0f, vbuf[JUNO_NUM_VOICES];
         if (c->arp_on) arp_tick(c);        /* keep the arp advancing in the dry path too */
         juno_note_tick(c->st);
-        for (v = 0; v < JUNO_NUM_VOICES; ++v) {   /* all 8 voices, in order */
-            float vb = 0.0f, vr = 0.0f;
-            juno_voice_render(c->st, v, &vb, &vr);
-            mix += vb;
-        }
+        juno_driver_render_voices(c->st, vbuf);   /* 8 voices; noise block stepped once */
+        for (v = 0; v < JUNO_NUM_VOICES; ++v) mix += vbuf[v];
         out[2 * i]     = mix;                     /* mono mix -> both channels */
         out[2 * i + 1] = mix;
     }

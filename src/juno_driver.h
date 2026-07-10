@@ -37,6 +37,12 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
  * patch. Global coefficients (>=84272) are left as the applier set them. */
 void juno_driver_seed_voices(unsigned char *st);
 
+/* Render all 8 voices for one sample into vbuf[JUNO_NUM_VOICES]. Steps the shared
+ * analog-noise/LFSR block (84272..84436) exactly ONCE for the sample (not once per
+ * voice): every voice reads the same one-step advance, matching the plugin's 8
+ * lockstep engine units. See juno_driver.c. */
+void juno_driver_render_voices(unsigned char *st, float *vbuf);
+
 /* Render one stereo output sample (8 voices -> 8 buffers -> master process).
  * Always runs the full master/chorus/output path (every coefficient is supplied
  * by juno_engine_prepare + the per-patch recall — no captured baseline). Returns

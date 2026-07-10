@@ -57,9 +57,17 @@ Two independent confirmations that the layout is exactly this:
 1204 main references (`JF(a1, N)`) then auto-resolve to the voice's own block. The
 18 non-main sites are edited to use `base` directly:
 
-- the **15 shared** sites use `JF(base, 84xxx)` — unshifted, so all voices share
-  the block (it chains across voices in render order, exactly as the plugin's 8
-  sequential voice calls do);
+- the **15 shared** sites use `JF(base, 84xxx)` — unshifted, so all voices read the
+  block at the same offset. **Correction (end-to-end A/B):** the block `[84272,84436)`
+  is a self-contained analog-noise/LFSR generator, and the plugin does NOT chain it
+  across 8 sequential voice calls — it runs 8 *isolated* engine units (BUILD
+  `sub_7FF91E0268D0` allocates 9× `operator new(0xA83010)`), each stepping its OWN copy
+  once/sample in lockstep. So all voices must read the SAME one-step advance, not a
+  chained 8-step run. `juno_driver_render_voices` snapshots the block and restores it
+  before each voice to reproduce that; the earlier "chains across voices" claim was
+  wrong and made the noise step 8× too fast. (This does not affect the offset
+  classification below — the block is still at the shared offset; only its per-sample
+  stepping cardinality changed.)
 - the **3 aux** sites use `JF(base, 101504 + voice*32)`.
 
 `voice == 0` gives `a1 == base`, so voice 0 is bit-identical to the original
