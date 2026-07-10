@@ -66,7 +66,12 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
         write_struct(state, MODE5_STRUCT, MODE5_STRUCT_N);
         JF(state, 96400) = (float)depth / 255.0f;                      /* On/Off           */
         JF(state, 96352) = efx_bits(CHORUS5_LFORATE_LUT[tone & 0xFF]); /* LFO Rate         */
-        JF(state, 96384) = efx_bits(0x37ffd974u);                      /* Ip Fc gate       */
+        {   /* Ip Fc gate — SR-dependent (input high-pass; .rdata SR table, directly
+             * observed in mode5_gates_spec.md). 3-class select by host rate. */
+            int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+            JF(state, 96384) = efx_bits(Hr == 44100 ? 0x388b3cdfu :
+                                        Hr == 48000 ? 0x387fd974u : 0x37ffd974u);
+        }
         JF(state, 96416) = 1.0f;                                       /* Mute gate        */
     }
 }

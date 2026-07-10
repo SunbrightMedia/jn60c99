@@ -166,7 +166,9 @@ void juno_engine_prepare(unsigned char *st)
      * bit-exact vs the runtime baseline. Invariant (not per-patch, rate-indep). */
     JI(st,     84560) = 0x3f800000;  /*  1.0          Mute SW (OD/DS block)   */
     JI(st,     85152) = 0x41008081;  /*  8.03137      DS Level                */
-    JI(st,     91248) = 0x37ffd974;  /*  3.04996e-05  chorus Ip Fc            */
+    /* chorus Ip Fc — SR-dependent (input high-pass ~2.93 Hz; effect-setActive wrapper
+     * picks from an .rdata SR table, verified in mode5_gates_spec.md). 3-class select. */
+    JI(st,     91248) = (Hr == 44100) ? 0x388b3cdf : (Hr == 48000) ? 0x387fd974 : 0x37ffd974;
     JI(st,     91280) = 0x3f800000;  /*  1.0          chorus Mute/enable      */
     JI(st,    101136) = 0x3f800000;  /*  1.0          Expression (output)     */
     JI(st,    101744) = 0x3f800000;  /*  1.0          DLY Mute                */
