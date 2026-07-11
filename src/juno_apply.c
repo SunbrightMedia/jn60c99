@@ -716,6 +716,23 @@ int juno_bank_lfo_rate_byte(const unsigned char *bank, int idx)
     return ((blob[2 * 8] & 0xF) << 4) | (blob[2 * 8 + 1] & 0xF);
 }
 
+/* Decode the per-patch DELAY tempo-sync inputs for the host-tempo recompute
+ * (juno_apply_delay_tempo): *time_byte = DELAY TIME byte (blob 53), *sync =
+ * TEMPO SYNC engaged (blob 59 != 0 — the shared LFO/DELAY sync switch), *dtype =
+ * DELAY TYPE (record byte 650). Any out pointer may be NULL. Returns 1 on success. */
+int juno_bank_delay_modes(const unsigned char *bank, int idx,
+                          int *time_byte, int *sync, int *dtype)
+{
+    const unsigned char *rec, *blob;
+    if (idx < 0 || idx >= BANK_COUNT) return 0;
+    rec  = bank + BANK_HEADER + idx * BANK_STRIDE;
+    blob = rec + BANK_BLOB_OFF;
+    if (time_byte) *time_byte = ((blob[2 * 53] & 0xF) << 4) | (blob[2 * 53 + 1] & 0xF);
+    if (sync)      *sync      = (((blob[2 * 59] & 0xF) << 4) | (blob[2 * 59 + 1] & 0xF)) != 0;
+    if (dtype)     *dtype     = ((rec[650] & 0xF) << 4) | (rec[651] & 0xF);
+    return 1;
+}
+
 /* Decode LEGATO (CTRL leaf 57, front-panel blob_pos 55) and ASSIGN MODE (CTRL
  * leaf 58, blob_pos 56). These are front-panel nibble-pair bytes (stride-2:
  * blob byte = 2*blob_pos), the same decode the BINDINGS loop uses. Verified by the

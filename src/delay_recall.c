@@ -54,6 +54,49 @@ static const uint16_t DELAYTIME_MS[256] = {
   688, 695, 702, 709, 717, 724, 731, 738, 746, 753, 761, 768, 776, 784, 792, 800,
 };
 
+/* --- Tempo-synced DELAY TIME (TEMPO SYNC blob 59 != 0) ------------------------
+ * When the patch's TEMPO SYNC switch is on, the plugin IGNORES the manual ms table
+ * and quantizes the DELAY TIME byte into one of 16 note divisions, then computes
+ * ms = beats(division) * 60000 / BPM. Derived by driving the plugin's own dispatch
+ * under Unicorn (idx 797 time byte sweep 0..255 + idx 803 sync, all 3 rates):
+ *   division d = (byte == 0) ? 0 : (byte + 16) / 17     (byte 0 alone; then 17-wide)
+ *   d 0..15 = 1/32, 1/16T, 1/32D, 1/16, 1/8T, 1/16D, 1/8, 1/4T, 1/8D, 1/4,
+ *             1/2T, 1/4D, 1/2, 1T, 1/2D, 1/1   (beats 0.125 .. 4.0)
+ * The recall-time default tempo is the baked 128 BPM (TEMPO param default 880 ->
+ * 40 + 88.0), at which every division's ms is exactly representable in float32 —
+ * SYNC_MS_128 below. The resulting coefficient goes through the SAME 3-op affine
+ * formula as the manual path and is bit-exact 48/48 (16 divisions x 3 rates) vs the
+ * plugin's dispatch output; the live-tempo law ms=f32(beats*60000/BPM) is bit-exact
+ * vs the plugin's tempo pushes at 60/88/176 BPM. See juno_apply_delay_tempo. */
+static const double SYNC_BEATS[16] = {
+    0.125, 1.0 / 6.0, 0.1875, 0.25, 1.0 / 3.0, 0.375, 0.5, 2.0 / 3.0,
+    0.75, 1.0, 4.0 / 3.0, 1.5, 2.0, 8.0 / 3.0, 3.0, 4.0
+};
+static const float SYNC_MS_128[16] = {   /* beats * 468.75 (128 BPM), all exact */
+    58.59375f, 78.125f, 87.890625f, 117.1875f, 156.25f, 175.78125f, 234.375f,
+    312.5f, 351.5625f, 468.75f, 625.0f, 703.125f, 937.5f, 1250.0f, 1406.25f, 1875.0f
+};
+
+static int sync_division(int byte) { return byte == 0 ? 0 : (byte + 16) / 17; }
+
+/* ms -> engine coefficient: the plugin's exact 3-float-op sequence (order matters:
+ * H*ms exceeds 2^24 so the -2 must come after the scale). */
+static float dly_ms_to_coeff(int Hr, float ms)
+{
+    float dt = (float)Hr * ms;               /* mulss H,ms        */
+    dt = dt * (1.0f / 16384000.0f);          /* mulss C1          */
+    return dt - (2.0f / 16384.0f);           /* subss C2 (2^-13)  */
+}
+
+/* The patch's delay-time coefficient: synced (TEMPO SYNC blob 59 != 0, at the
+ * recall-default 128 BPM) or manual (per-byte ms table). */
+static float dly_time_coeff(int Hr, int time_byte, int sync)
+{
+    float ms = sync ? SYNC_MS_128[sync_division(time_byte & 0xFF)]
+                    : (float)DELAYTIME_MS[time_byte & 0xFF];
+    return dly_ms_to_coeff(Hr, ms);
+}
+
 /* DELAY slot-1 coefficient block (offset, bits) — the plugin's engine constants for
  * every DELAY-active (v39==0) patch. Extracted bit-for-bit from the captured MASTER
  * unit states (idstate64/state_pN_master.bin) and CONFIRMED constant across all 16
@@ -172,30 +215,28 @@ static const uint32_t S1REVERB[] = {
   10693328,0x3f800000u, 10693344,0xbf800000u, 10693360,0x3f800000u, 10759360,0x446f8000u,
   10759472,0x3d000000u, 10759840,0x3f29d800u
 };
-static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec)
+static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, float tc)
 {
-    int b52 = blob_val(rec, 52), b53 = blob_val(rec, 53);
-    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
-    unsigned k; uint32_t bits; float f, dt;
+    int b52 = blob_val(rec, 52);
+    unsigned k; uint32_t bits; float f;
     for (k = 0; k < sizeof(S1REVERB) / sizeof(S1REVERB[0]); k += 2) {
         bits = S1REVERB[k + 1]; memcpy(&f, &bits, sizeof f);
         JF(state, (int)S1REVERB[k]) = f;
     }
-    JF(state, 6497344) = (float)b52 / 255.0f;                     /* reverb depth       */
-    dt = (float)Hr * (float)DELAYTIME_MS[b53 & 0xFF];             /* time (manual; sync TODO) */
-    dt = dt * (1.0f / 16384000.0f);
-    dt = dt - (2.0f / 16384.0f);
-    JF(state, 6497168) = dt;
+    JF(state, 6497344) = (float)b52 / 255.0f;   /* reverb depth              */
+    JF(state, 6497168) = tc;                    /* delay time (sync-aware)   */
 }
 
-/* DELAY TYPE 1: dual delay — first instance (102xxx) + second instance (4297584..). */
-static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec)
+/* DELAY TYPE 1: dual delay — first instance (102xxx) + second instance (4297584..).
+ * Wired with the sync-aware time `tc`: populating both blocks exactly as the
+ * captured master states renders BIT-EXACT under our master path (proven by
+ * grafting the plugin's populated blocks into the tap-fixed patch-41 state —
+ * stereo-identical over the full 8000-sample capture). */
+static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, float tc)
 {
     int level = blob_val(rec, 52);            /* DELAY LEVEL */
-    int dtime = blob_val(rec, 53);            /* DELAY TIME byte (manual; sync TODO) */
-    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
     int on = (level >= 2);
-    unsigned k; uint32_t bits; float f, dt;
+    unsigned k; uint32_t bits; float f;
 
     /* constant cells for both instances */
     for (k = 0; k < sizeof(DLY1_A) / sizeof(DLY1_A[0]); k += 2) {
@@ -205,12 +246,9 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec)
         bits = DLY1_B[k + 1]; memcpy(&f, &bits, sizeof f); JF(state, (int)DLY1_B[k]) = f;
     }
 
-    /* DELAY TIME (same manual formula/order as TYPE 0), written to both taps. */
-    dt = (float)Hr * (float)DELAYTIME_MS[dtime & 0xFF];
-    dt = dt * (1.0f / 16384000.0f);
-    dt = dt - (2.0f / 16384.0f);
-    JF(state, 102352)  = dt;
-    JF(state, 4297584) = dt;
+    /* DELAY TIME (sync-aware, same value on both taps — matches every captured
+     * TYPE-1 state, synced and manual). 102352 was already written by the caller. */
+    JF(state, 4297584) = tc;
 
     /* WET = DELAY LEVEL / 255 on both taps. */
     JF(state, 102528)  = (float)level / 255.0f;
@@ -233,30 +271,38 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
                                                   patches had delay wrongly OFF.)            */
     int dtime  = blob_val(rec, 53);           /* DELAY TIME  (blob 53, NOT 49: blob 49 is
                                                   VCA TONE; 797->53.)                        */
+    int sync   = blob_val(rec, 59) != 0;      /* TEMPO SYNC (blob 59; also LFO sync) */
     int fb     = rec_byte(rec, 3057);         /* DELAY FEEDBACK                  */
     int direct = rec_byte(rec, 3060);         /* DELAY DIRECT LEVEL              */
+    int Hr = (int)JF(state, 16);
     unsigned k;
     uint32_t bits;
-    float f;
+    float f, tc;
+    if (Hr <= 0) Hr = 96000;
 
     *(int32_t *)(state + JUNO_PROG_DLY) = (int32_t)dtype;  /* per-patch slot-1 mode */
+
+    /* Delay Time (102352): SYNC-AWARE, written for EVERY DELAY TYPE — the plugin's
+     * recall dispatches the time leaf before the type routing, so 102352 carries
+     * the (synced or manual) time in every captured state regardless of slot-1
+     * mode. Rate-parameterized via the exact 3-op formula (dly_ms_to_coeff): the
+     * algebraically-equal ((H*ms-2)/16384) is wrong — H*ms exceeds 2^24 so the -2
+     * must come after the scale. Hr from state[16], unset => 96 kHz. */
+    tc = dly_time_coeff(Hr, dtime, sync);
+    JF(state, 102352) = tc;
 
     if (dtype == 2 || dtype == 3) {            /* slot 1 hosts chorus I/II */
         apply_slot1_chorus(state, rec, dtype);
         return;
     }
     if (dtype == 5) {                          /* slot 1 hosts reverb */
-        apply_slot1_reverb(state, rec);
+        apply_slot1_reverb(state, rec, tc);
         return;
     }
-    /* DELAY TYPE 1 (dual delay) is DERIVED but NOT wired: its whole constant block is
-     * bit-exact (apply_slot1_delay1 / DLY1_A / DLY1_B), but its TIME is tempo-synced
-     * and the manual byte formula lands the tap at the wrong sample for most TYPE-1
-     * patches — writing it REGRESSES the render (an audible early echo, e.g. patch 8
-     * diverged at sample 117). Left inert (no delay block) until the sync-time law is
-     * derived; that is strictly safer than a mistimed echo. See docs/FX_COLDLOAD_TODO.md
-     * and apply_slot1_delay1 below. (void) to keep it compiled + reviewable. */
-    (void)apply_slot1_delay1;
+    if (dtype == 1) {                          /* dual delay (both instances) */
+        apply_slot1_delay1(state, rec, tc);
+        return;
+    }
     if (dtype != 0)                            /* other types: slot 1 not the delay block */
         return;
 
@@ -268,15 +314,25 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     }
     JF(state, 102528) = (float)level  / 255.0f;             /* Wet (per-patch = LEVEL/255) */
     JF(state, 102576) = level >= 2 ? 1.0f : 0.0f;           /* On/Off (curve: v0,v1->0, v2->1) */
-    /* Delay Time (102352): rate-parameterized. coeff = ((float)H*ms)*(1/16384000)
-     * - (2/16384), in THIS three-op float32 order (the algebraically-equal
-     * ((H*ms-2)/16384) is wrong — H*ms exceeds 2^24 so the -2 vanishes before the
-     * scale). Hr from state[16] exactly as prepare/apply read it; unset => 96 kHz. */
-    {
-        int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
-        float dt = (float)Hr * (float)DELAYTIME_MS[dtime & 0xFF]; /* mulss H,ms   */
-        dt = dt * (1.0f / 16384000.0f);                          /* mulss C1      */
-        dt = dt - (2.0f / 16384.0f);                             /* subss C2 (2^-13) */
-        JF(state, 102352) = dt;
-    }
+}
+
+/* Host-tempo recompute for the tempo-synced delay time — the delay sibling of
+ * juno_apply_lfo_tempo. The plugin's tempo push (dispatch idx 375) rewrites the
+ * delay-time cells as ms = f32(beats(division) * 60000 / BPM) through the same
+ * 3-op coefficient formula — verified bit-exact vs the plugin's own dispatch at
+ * 60/88/176 BPM (the 128-BPM recall default equals the SYNC_MS_128 path). Inert
+ * while the patch's TEMPO SYNC is off. time_byte/sync/dtype are the loaded patch's
+ * DELAY TIME byte (blob 53), TEMPO SYNC (blob 59 != 0) and DELAY TYPE (rec 650). */
+void juno_apply_delay_tempo(unsigned char *state, int time_byte, int sync,
+                            int dtype, float bpm)
+{
+    int Hr;
+    float ms, tc;
+    if (!sync || bpm <= 0.0f) return;
+    Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+    ms = (float)(SYNC_BEATS[sync_division(time_byte & 0xFF)] * 60000.0 / (double)bpm);
+    tc = dly_ms_to_coeff(Hr, ms);
+    JF(state, 102352) = tc;                       /* always carries the time      */
+    if (dtype == 1) JF(state, 4297584) = tc;      /* dual-delay second instance   */
+    if (dtype == 5) JF(state, 6497168) = tc;      /* reverb-hosted delay instance */
 }

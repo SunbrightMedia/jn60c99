@@ -61,8 +61,43 @@ int main(void)
     chk(st, 10759680, 0xbf5b0982u, "T5LP01");
     chk(st, 10759808, 0x3f1e5e9du, "T5HP23m");
 
+    /* --- TYPE-dependent tap-index table (34 ints at 11022208; the plugin's own
+     * REVERB TYPE dispatch output under emulation — juno_write_reverb_taps). Types
+     * 0/1 run their own stage sets; types >= 2 the default. Entry [3] is the first
+     * type-dependent tap; [1] is predelay-only. Rate law: 44100 has its own integer
+     * table; other rates = the 96k table + (int)(0.019995*H) - 1919. --- */
+    {
+        static const struct { int Hr; int type; int tap1; int tap3; int tap33; } TT[] = {
+            { 96000, 0, 1919, 3128,  8659 },   /* dispatch dumps, verbatim */
+            { 96000, 1, 1919, 3620, 20141 },
+            { 96000, 2, 1919, 4792, 47511 },
+            { 48000, 0,  959, 2168,  7699 },   /* == 96k - 960 (captured p41/p62)  */
+            { 48000, 1,  959, 2660, 19181 },   /* == 96k - 960 (captured p8/p34)   */
+            { 44100, 0,  881, 1957,  4509 },   /* own 44.1k integer table          */
+            { 44100, 1,  881, 2183,  9783 },
+            { 44100, 5,  881, 2721, 22358 },   /* type 5 -> default table          */
+        };
+        int i;
+        for (i = 0; i < (int)(sizeof TT / sizeof TT[0]); ++i) {
+            memset(st, 0, JUNO_STATE_BYTES);
+            JF(st, 16) = (float)TT[i].Hr;
+            put_pair(rec, 658, TT[i].type);
+            juno_bank_apply(st, bank, 0);
+            if (JI(st, 11022208) != 1 ||
+                JI(st, 11022208 + 4)      != TT[i].tap1 ||
+                JI(st, 11022208 + 4 * 3)  != TT[i].tap3 ||
+                JI(st, 11022208 + 4 * 33) != TT[i].tap33) {
+                printf("  taps T%d@%d: [0]=%d [1]=%d [3]=%d [33]=%d != 1/%d/%d/%d\n",
+                       TT[i].type, TT[i].Hr, JI(st, 11022208), JI(st, 11022208 + 4),
+                       JI(st, 11022208 + 12), JI(st, 11022208 + 132),
+                       TT[i].tap1, TT[i].tap3, TT[i].tap33);
+                ++fails;
+            }
+        }
+    }
+
     free(st); free(bank);
     if (fails) { printf("FAIL: %d reverb-recall check(s) drifted\n", fails); return 1; }
-    printf("OK: per-patch reverb recall (level + TYPE + TIME, joint Hp/Lp) verified\n");
+    printf("OK: per-patch reverb recall (level + TYPE + TIME + tap tables, joint Hp/Lp) verified\n");
     return 0;
 }

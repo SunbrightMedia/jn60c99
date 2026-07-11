@@ -22,4 +22,12 @@
  * slot-1 delay coefficient block (102xxx). Leaves the block untouched otherwise. */
 void juno_apply_delay(unsigned char *state, const unsigned char *rec);
 
+/* Host-tempo recompute for the tempo-synced delay time (the delay sibling of
+ * juno_apply_lfo_tempo). Rewrites 102352 (+ the type-1/type-5 instance cell) as
+ * ms = beats(division(time_byte)) * 60000 / bpm through the exact 3-op coefficient
+ * formula. Inert while sync (TEMPO SYNC, blob 59 != 0) is off. Bit-exact vs the
+ * plugin's own tempo dispatch (see src/delay_recall.c). */
+void juno_apply_delay_tempo(unsigned char *state, int time_byte, int sync,
+                            int dtype, float bpm);
+
 #endif /* JUNO_DELAY_RECALL_H */

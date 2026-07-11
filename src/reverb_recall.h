@@ -12,4 +12,10 @@
 #ifndef JUNO_REVERB_RECALL_H
 #define JUNO_REVERB_RECALL_H
 void juno_apply_reverb(unsigned char *state, const unsigned char *rec);
+
+/* Write the 34-int reverb tap-index table (11022208..11022340) for REVERB TYPE
+ * `type` (0, 1, or default 2..5) at host rate Hr. The plugin's own REVERB TYPE
+ * dispatch output, verbatim (see reverb_recall.c). Used by juno_apply_reverb per
+ * patch and by juno_engine_prepare to seed the build default (type 2). */
+void juno_write_reverb_taps(unsigned char *state, int type, int Hr);
 #endif

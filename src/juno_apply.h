@@ -49,6 +49,12 @@ int juno_bank_scatter(const unsigned char *bank, int idx, int *type, int *depth)
 void juno_apply_lfo_tempo(unsigned char *state, int lfo_rate_byte, float bpm);
 int  juno_bank_lfo_rate_byte(const unsigned char *bank, int idx);
 
+/* Decode the per-patch DELAY tempo-sync inputs (DELAY TIME byte blob 53, TEMPO SYNC
+ * blob 59 != 0, DELAY TYPE record 650) for juno_apply_delay_tempo (delay_recall.h).
+ * Any out pointer may be NULL. Returns 1 on success. */
+int juno_bank_delay_modes(const unsigned char *bank, int idx,
+                          int *time_byte, int *sync, int *dtype);
+
 /* Decode the per-patch VOICE-ASSIGN settings (CTRL leaves at front-panel blob
  * positions): *legato (leaf 57 / bp 55, 0/1), *assign (ASSIGN MODE, leaf 58 / bp 56,
  * 0..3), *porta (PORTAMENTO, leaf 56 / bp 54, 0..255 — the raw byte; the assigner

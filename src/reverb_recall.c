@@ -123,6 +123,61 @@ static const uint32_t LP23[6][256] = {
 static const uint32_t REV_FC[6]   = {0x3d8596c4, 0x3e0566f8, 0x3e0566f8, 0x3d090dbb, 0x3f34be76, 0x3e0566f8};
 static const uint32_t REV_R488[6] = {0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x3e500000};
 
+/* --- Reverb tap-index table (34 ints at 11022208..11022340), TYPE-dependent. ---
+ * REVERB TYPE selects the reverb's stage/tap lengths, not just its damping: types 0
+ * and 1 (the short rooms) run their own tap tables; types 2..5 share the default.
+ * Ground truth: the plugin's own REVERB TYPE dispatch (idx 876) driven under Unicorn
+ * at 44100/48000/96000 — each table below is the dispatch's verbatim output. The
+ * rate law is the same as juno_prepare's Class E (which seeds the type-2 default):
+ * 44100 has its own integer stage set; every other rate = the 96 kHz set shifted
+ * uniformly by (predelay - 1919), predelay = (int)(0.019995 * H). Verified: the
+ * 48 kHz dispatch output == TAP96_Tn + (959-1919) for every entry, and the captured
+ * master states of ALL non-default factory patches (8/34 type 1, 41/62 type 0) match
+ * bit-for-bit. Output-proven: grafting only this table made patches 41/62 stereo-
+ * bit-exact over the full cold-load master A/B. REVERB TIME does not move the taps
+ * (probed). Entries 0..2 are predelay-only (type-independent). */
+static const int32_t RTAP96[3][34] = {
+  { 1, 1919, 2881,  3128,  3130,  3327,  3329,  3446,  3448,  3495,   /* TYPE 0 */
+       3497,  3672,  3674,  3849,  3851,  4026,  4028,  4203,  4205,  4746,
+       5112,  5128,  5130,  5639,  6081,  6111,  6113,  6558,  7170,  7370,
+       7372,  7847,  8461,  8659 },
+  { 1, 1919, 2881,  3620,  3622,  4209,  4211,  4562,  4564,  4705,   /* TYPE 1 */
+       4707,  5228,  5230,  5749,  5751,  6274,  6276,  6797,  6799,  8418,
+       9520,  9566,  9568, 11095, 12417, 12509, 12511, 13844, 15682, 16280,
+      16282, 17707, 19545, 20141 },
+  { 1, 1919, 2881,  4792,  4794,  6311,  6313,  7220,  7222,  7583,   /* TYPE 2..5 */
+       7585,  8932,  8934, 10275, 10277, 11628, 11630, 12977, 12979, 17168,
+      20024, 20144, 20146, 24095, 27523, 27761, 27763, 31214, 35972, 37518,
+      37520, 41209, 45967, 47511 }
+};
+static const int32_t RTAP44[3][34] = {
+  { 1,  881, 1843,  1957,  1959,  2050,  2052,  2106,  2108,  2130,   /* TYPE 0 */
+       2132,  2212,  2214,  2294,  2296,  2376,  2378,  2458,  2460,  2709,
+       2877,  2884,  2886,  3120,  3323,  3337,  3339,  3543,  3825,  3916,
+       3918,  4136,  4418,  4509 },
+  { 1,  881, 1843,  2183,  2185,  2455,  2457,  2618,  2620,  2685,   /* TYPE 1 */
+       2687,  2926,  2928,  3166,  3168,  3408,  3410,  3649,  3651,  4395,
+       4901,  4922,  4924,  5626,  6233,  6275,  6277,  6889,  7734,  8008,
+       8010,  8665,  9509,  9783 },
+  { 1,  881, 1843,  2721,  2723,  3420,  3422,  3839,  3841,  4007,   /* TYPE 2..5 */
+       4009,  4628,  4630,  5246,  5248,  5869,  5871,  6490,  6492,  8416,
+       9728,  9783,  9785, 11599, 13174, 13283, 13285, 14870, 17056, 17766,
+      17768, 19463, 21648, 22358 }
+};
+
+void juno_write_reverb_taps(unsigned char *state, int type, int Hr)
+{
+    int cls = (type == 0) ? 0 : (type == 1) ? 1 : 2;
+    int k;
+    if (Hr == 44100) {
+        for (k = 0; k < 34; ++k) JI(state, 11022208 + 4 * k) = RTAP44[cls][k];
+    } else {
+        const int shift = (int)(0.019995f * (float)Hr) - 1919;  /* floor via trunc */
+        JI(state, 11022208) = 1;
+        for (k = 1; k < 34; ++k) JI(state, 11022208 + 4 * k) = RTAP96[cls][k] + shift;
+    }
+}
+
 static int rec_byte(const unsigned char *rec, int off)
 {
     return ((rec[off] & 0xF) << 4) | (rec[off + 1] & 0xF);
@@ -160,4 +215,11 @@ void juno_apply_reverb(unsigned char *state, const unsigned char *rec)
     put_bits(state, 10759680, LP01[type][time]);   put_bits(state, 10759728, LP01[type][time]);
     put_bits(state, 10759760, HP23[type][time]);   put_bits(state, 10759808, HP23[type][time]);
     put_bits(state, 10759776, LP23[type][time]);   put_bits(state, 10759824, LP23[type][time]);
+
+    /* TYPE-dependent tap-index table (idx 876; always rewritten so switching from a
+     * type-0/1 patch back to a default-type patch restores the default taps). */
+    {
+        int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+        juno_write_reverb_taps(state, type, Hr);
+    }
 }

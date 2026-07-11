@@ -49,6 +49,7 @@
  * block [176,10688) is replicated to voices 1..7 by juno_driver_seed_voices.
  */
 #include "juno_engine.h"
+#include "reverb_recall.h"   /* juno_write_reverb_taps (Class E tap tables) */
 #include <stdint.h>
 #include <string.h>
 
@@ -210,27 +211,10 @@ void juno_engine_prepare(unsigned char *st)
     /* --- Class E: reverb tap-index table (34 ints, 11022208..11022340) ------ */
     /* Generator sub_0x3C1AC0: tap[0]=1; a continuous predelay = floor(T1*H) (T1 in
      * [0.01998958,0.02), ~19.99 ms) plus rate-class integer stage lengths. At
-     * H==44100 the whole stage table is the 44.1k set (TAP44); otherwise it is the
-     * 96k set (TAP96) shifted uniformly by (predelay-1919). Reproduces all 34 taps
-     * at 44100/48000/88200/96000 (naive floor(tap96*H/96000) is DISPROVEN). */
-    {
-        static const int32_t TAP96[34] = {
-                1,  1919,  2881,  4792,  4794,  6311,  6313,  7220,  7222,  7583,
-             7585,  8932,  8934, 10275, 10277, 11628, 11630, 12977, 12979, 17168,
-            20024, 20144, 20146, 24095, 27523, 27761, 27763, 31214, 35972, 37518,
-            37520, 41209, 45967, 47511 };
-        static const int32_t TAP44[34] = {
-                1,   881,  1843,  2721,  2723,  3420,  3422,  3839,  3841,  4007,
-             4009,  4628,  4630,  5246,  5248,  5869,  5871,  6490,  6492,  8416,
-             9728,  9783,  9785, 11599, 13174, 13283, 13285, 14870, 17056, 17766,
-            17768, 19463, 21648, 22358 };
-        int k;
-        if (Hr == 44100) {
-            for (k = 0; k < 34; ++k) JI(st, 11022208 + 4 * k) = TAP44[k];
-        } else {
-            const int shift = (int)(0.019995f * Hf) - 1919;   /* floor via trunc */
-            JI(st, 11022208) = 1;
-            for (k = 1; k < 34; ++k) JI(st, 11022208 + 4 * k) = TAP96[k] + shift;
-        }
-    }
+     * H==44100 the whole stage table is the 44.1k set; otherwise it is the 96k set
+     * shifted uniformly by (predelay-1919). Reproduces all 34 taps at 44100/48000/
+     * 88200/96000 (naive floor(tap96*H/96000) is DISPROVEN). The table is REVERB-
+     * TYPE-dependent; prepare seeds the build default (type 2) and the per-patch
+     * recall (juno_apply_reverb) rewrites it. Tables + writer: src/reverb_recall.c. */
+    juno_write_reverb_taps(st, 2, Hr);
 }

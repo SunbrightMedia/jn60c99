@@ -54,6 +54,14 @@ typedef struct {
      * factory patches sync the LFO to it. See juno_apply_lfo_tempo. */
     int   lfo_rate_byte;
 
+    /* DELAY tempo-sync inputs of the loaded patch (DELAY TIME byte blob 53, TEMPO
+     * SYNC blob 59 != 0, DELAY TYPE record 650), stashed so a host tempo change can
+     * recompute the tempo-synced delay time (102352 + the type-1/5 instance cell)
+     * via juno_apply_delay_tempo — the delay sibling of the LFO plumbing above. */
+    int   dly_time_byte;
+    int   dly_sync;
+    int   dly_type;
+
     /* Last CONDITION byte applied (128 at power-on, patch value on recall). A single
      * per-parameter edit (juno_gui_set_param) re-seeds all 8 voices, which would flatten
      * the CONDITION analog scatter — so the setter re-applies this byte afterwards,
@@ -487,8 +495,12 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, floa
     carp_set_range(&c->arp, (oct < 1 ? 1 : (oct > 3 ? 3 : oct)) - 1);
     if (bpm > 0.0f) {
         carp_set_bpm(&c->arp, (double)bpm);
-        /* Host tempo drives the synced LFO rate (cell 1072) too, not just the arp. */
+        /* Host tempo drives the synced LFO rate (cell 1072) AND the synced delay
+         * time (102352 + instance cells) too, not just the arp. Both are inert
+         * while the patch's TEMPO SYNC is off. */
         juno_apply_lfo_tempo(c->st, c->lfo_rate_byte, (float)c->arp.bpm);
+        juno_apply_delay_tempo(c->st, c->dly_time_byte, c->dly_sync, c->dly_type,
+                               (float)c->arp.bpm);
     }
     if (gate >= 0.0f) carp_set_gate_index(&c->arp, gate_frac_to_index(gate));
     c->arp_on = on ? 1 : 0;
@@ -552,6 +564,10 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
      * 1072 = 8.735357 for all 64 patches, with no transport. Computing it at load from
      * a placeholder BPM diverged from that reference. See docs/COLDLOAD_AB.md. */
     c->lfo_rate_byte = juno_bank_lfo_rate_byte(bank, idx);
+    /* Stash the DELAY tempo-sync inputs too (same host-tempo-change contract as the
+     * LFO byte above; the cold-load cells were already written by juno_bank_apply at
+     * the plugin's baked 128-BPM default). */
+    juno_bank_delay_modes(bank, idx, &c->dly_time_byte, &c->dly_sync, &c->dly_type);
     return n;
 }
 

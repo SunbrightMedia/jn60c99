@@ -68,14 +68,18 @@ int main(void)
     if (u32(st, 102368) != 0x3e1b31ce) {   /* high-cut filter constant 0.1515572 */
         printf("  case1: filter %08x != 3e1b31ce\n", u32(st, 102368)); ++fails; }
 
-    /* --- case 2: DELAY TYPE 2 (chorus in slot 1): delay block untouched --- */
+    /* --- case 2: DELAY TYPE 2 (chorus in slot 1): wet/enables untouched, but the
+     * TIME cell 102352 is written for EVERY type (the plugin's recall dispatches the
+     * time leaf before the type routing — every captured state carries it). --- */
     put_pair(rec, 650, 2);
     memset(st, 0, JUNO_STATE_BYTES);
     juno_bank_apply(st, bank, 0);
     if (*(int32_t *)(st + JUNO_PROG_DLY) != 2) {
         printf("  case2: v39 cell = %d, expected 2\n", *(int32_t *)(st + JUNO_PROG_DLY)); ++fails; }
-    if (JF(st, 102528) != 0.0f || JF(st, 102352) != 0.0f) {
-        printf("  case2: delay block written for non-delay mode\n"); ++fails; }
+    if (JF(st, 102528) != 0.0f) {
+        printf("  case2: delay wet written for non-delay mode\n"); ++fails; }
+    if (u32(st, 102352) != 0x3f96bc00) {   /* time carried for every type (manual b128 @96k) */
+        printf("  case2: Time %08x != 3f96bc00 (universal write)\n", u32(st, 102352)); ++fails; }
 
     /* --- case 3: DELAY TYPE 0 but LEVEL 0 (delay off): block muted --- */
     put_pair(rec, 650, 0);
@@ -86,6 +90,49 @@ int main(void)
      * for every factory patch), so it is NOT the level mute — only 102576 is checked. */
     if (JF(st, 102576) != 0.0f) {
         printf("  case3: delay not muted at LEVEL 0 (On=%g)\n", JF(st, 102576)); ++fails; }
+
+    /* --- case 4: TEMPO SYNC on (blob 59 != 0): TIME byte quantizes to a note
+     * division at the baked 128-BPM default. byte 128 -> division 8 (dotted 1/8) ->
+     * 351.5625 ms -> 0x4003d400 @96k (the plugin's own dispatch output; bit-exact
+     * 48/48 divisions x rates under emulation). --- */
+    put_pair(rec, 650, 0);
+    put_blob(rec, 52, 128);
+    put_blob(rec, 59, 1);       /* TEMPO SYNC on */
+    memset(st, 0, JUNO_STATE_BYTES);
+    juno_bank_apply(st, bank, 0);
+    if (u32(st, 102352) != 0x4003d400) {
+        printf("  case4: synced Time %08x != 4003d400 (d8 @96k)\n", u32(st, 102352)); ++fails; }
+
+    /* --- case 5: DELAY TYPE 1 (dual delay): both instances written, same time;
+     * second-instance constants + level gate present. --- */
+    put_pair(rec, 650, 1);
+    memset(st, 0, JUNO_STATE_BYTES);
+    juno_bank_apply(st, bank, 0);
+    if (*(int32_t *)(st + JUNO_PROG_DLY) != 1) {
+        printf("  case5: v39 cell = %d, expected 1\n", *(int32_t *)(st + JUNO_PROG_DLY)); ++fails; }
+    if (u32(st, 102352) != 0x4003d400 || u32(st, 4297584) != 0x4003d400) {
+        printf("  case5: dual-delay times %08x/%08x != 4003d400\n",
+               u32(st, 102352), u32(st, 4297584)); ++fails; }
+    if (u32(st, 102528) != 0x3f008081 || u32(st, 4297760) != 0x3f008081) {
+        printf("  case5: dual-delay wet %08x/%08x != 3f008081\n",
+               u32(st, 102528), u32(st, 4297760)); ++fails; }
+    if (u32(st, 102544) != 0x3f9bd7ca) {   /* type-1 first-instance variant constant */
+        printf("  case5: 102544 %08x != 3f9bd7ca\n", u32(st, 102544)); ++fails; }
+    if (JF(st, 4297824) != 1.0f || JF(st, 102576) != 1.0f) {
+        printf("  case5: dual-delay ON gates not set\n"); ++fails; }
+
+    /* --- case 6: host-tempo recompute (juno_apply_delay_tempo): 60 BPM, division 8
+     * -> ms = 750 exactly -> 0x40866300 @96k ((96000*750)/16384000 - 2/16384). The
+     * BPM law is bit-exact vs the plugin's own tempo dispatch at 60/88/176 BPM. --- */
+    juno_apply_delay_tempo(st, 128, 1, 1, 60.0f);
+    {
+        float ms = 750.0f;
+        float dt = 96000.0f * ms; dt = dt * (1.0f/16384000.0f); dt = dt - (2.0f/16384.0f);
+        unsigned int eb; memcpy(&eb, &dt, 4);
+        if ((unsigned)u32(st, 102352) != eb || (unsigned)u32(st, 4297584) != eb) {
+            printf("  case6: tempo recompute %08x/%08x != %08x\n",
+                   u32(st, 102352), u32(st, 4297584), eb); ++fails; }
+    }
 
     free(st); free(bank);
     if (fails) { printf("FAIL: %d delay-recall check(s) drifted\n", fails); return 1; }
