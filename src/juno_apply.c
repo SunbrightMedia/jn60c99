@@ -200,7 +200,15 @@ static const juno_bind BINDINGS[] = {
     { 10, 47, T_ID,  7344, "VCF LFO MOD"     }, /* -> LFO Level (VCF) (value tree c47) */
     { 12, 51, T_ID,  1872, "LFO KEY TRIG"    }, /* -> LFO Trig (value tree c51)        */
     { 14, 45, T_ID,  4144, "DCO PWM DEPTH"   }, /* -> PWM Level (value tree c45)       */
-    { 16,  5, T_ID,  3840, "DCO RANGE"       }, /* -> OSC1 Feet (value tree c5)        */
+    /* DCO RANGE: the plugin does NOT write the "feet" cell 3840 during recall — it
+     * stays at juno_engine_prepare's default of 1.0 for ALL 64 factory patches
+     * (proven by RUNNING the plugin's own recall dispatch under Unicorn: 3840 =
+     * 1.0 through prepare -> recall -> snap for every patch, regardless of the raw
+     * DCO-RANGE byte 0..169; scratchpad/oracle/id_feet_mcv_probe.py). The old row
+     * { 16, 5, T_ID, 3840 } wrote juno_curve(5,byte)/255 into it (e.g. 0.5 for
+     * patch 4), corrupting the DCO pitch scale one octave low — which cancelled the
+     * note/12 M.CV octave bug on pitch but left every patch ~1.3x off in level.
+     * Removed so 3840 keeps its prepare default. See docs/COLDLOAD_AB.md. */
     { 46, 38, T_ID,  3296, "ENV2 DECAY", 1   }, /* -> amp ENV Decay. SR-VARIANT 36/37/38 */
     { 47, 50, T_ID,  3280, "ENV2 SUSTAIN"    }, /* -> amp ENV Sustain (value tree c50) */
     { 54, 52, T_ID,   592, "PORTAMENTO"      }, /* -> Porta OnOff (value tree c52)     */

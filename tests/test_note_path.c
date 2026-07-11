@@ -4,7 +4,8 @@
  * bug it fixed: the earlier hand-written envelope reset + 1 ms gate ramp produced
  * an onset CLICK followed by a slow swell even for fast-attack patches ("attack
  * never snappy" + "clicking"). This test asserts:
- *   1. note_on writes M.CV (304)=note/12, M.Gate (320)=1.0, aux latch=1.0 (immediate)
+ *   1. note_on writes M.CV (304)=juno_note_pitch(note) [(note-12)/12 + analog tune],
+ *      M.Gate (320)=1.0, aux latch=1.0 (immediate)
  *   2. note_off writes M.Gate (320)=0.0 (immediate)
  *   3. with a FAST attack coefficient the audio reaches near-full level within a few
  *      ms and has NO large onset transient relative to the steady level (snappy, no
@@ -74,7 +75,11 @@ int main(void)
     juno_note_on(st, 3, 60, 100);
     unsigned b = 3u * JUNO_VOICE_MAIN_STRIDE;
     unsigned aux = JUNO_VOICE_AUX_BASE0 + 3u * JUNO_VOICE_AUX_STRIDE;
-    if (JF(st, b + 304) != 60.0f / 12.0f) { printf("FAIL: M.CV != note/12\n"); return 1; }
+    /* M.CV = the plugin's exact note-on pitch CV (base (note-12)/12 + analog
+     * stretch-tune), captured from the binary; note 60 -> ~3.99981 (NOT note/12). */
+    if (JF(st, b + 304) != juno_note_pitch(60)) { printf("FAIL: M.CV != juno_note_pitch(60)\n"); return 1; }
+    { float mcv = JF(st, b + 304);
+      if (mcv < 3.99f || mcv > 4.01f) { printf("FAIL: M.CV(60)=%g not ~3.9998 ((note-12)/12)\n", mcv); return 1; } }
     if (JF(st, b + 320) != 1.0f)          { printf("FAIL: M.Gate != 1.0 on note-on\n"); return 1; }
     if (JF(st, aux)     != 1.0f)          { printf("FAIL: aux retrigger latch not set\n"); return 1; }
     juno_note_off(st, 3);

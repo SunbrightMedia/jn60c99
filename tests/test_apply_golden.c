@@ -16,6 +16,14 @@
  * (off 2784) was corrected after the applier's blob_pos was fixed 44->40 (see
  * src/juno_apply.c): blob 44 is a bipolar knob (>=70 in all 64 patches, impossible
  * for an attack), blob 40 is the real attack (patch13 "Rip Lead" = 13 == panel).
+ *
+ * NOTE (cold-load audit): cell 3840 ("feet") was dropped from the frozen set. The
+ * value tree carries a per-patch feet node (1.0/1.0/2.0 for patches 0/5/40), but
+ * the plugin's ENGINE keeps cell 3840 = 1.0 for ALL 64 patches (recall never writes
+ * it — it stays at juno_engine_prepare's default; proven under Unicorn). The applier
+ * no longer writes 3840, so it is not an applier output to freeze here. This is a
+ * value-tree-vs-engine-state divergence; the engine state is ground truth. See
+ * docs/COLDLOAD_AB.md.
  */
 #include <stdio.h>
 #include <string.h>
@@ -81,7 +89,7 @@ static const golden_t G0[] = {
  {3264,0x40638f21},{3312,0x3c8c549d},{7408,0x3f03060c},{7392,0x40d57c89},{9584,0x00000000},
  {4208,0x3f11e430},{1920,0x36beff4a},{1936,0x3f800000},{1088,0x3eececed},{2064,0x3eececed},
  {101072,0x3f47f3aa},{4192,0x3f0de4b8},{4224,0x3f08a1f0},{6528,0x00000000},{4032,0x3a02371f},
- {7344,0x3c94d734},{1872,0x3f800000},{4144,0x3f16fdf5},{3840,0x3f800000},{3296,0x3c9396ff},
+ {7344,0x3c94d734},{1872,0x3f800000},{4144,0x3f16fdf5},{3296,0x3c9396ff},
  {3280,0x3f42739f},{592,0x3f800000},{624,0x3ad61183},{4128,0x00000000},{7472,0x00000000},
  {1056,0x3f800000},{3888,0x3f800000},{3904,0x00000000},{3920,0x00000000},{3936,0x00000000},
 };
@@ -91,7 +99,7 @@ static const golden_t G5[] = {
  {3264,0x3e4025dc},{3312,0x3d3cbba7},{7408,0x3ea952a5},{7392,0x3f665ec4},{9584,0x3e8d1a34},
  {4208,0x3f7d7b40},{1920,0x3a28acec},{1936,0x3f800000},{1088,0x3f028283},{2064,0x3f028283},
  {101072,0x3e7240cf},{4192,0x3f28684c},{4224,0x00000000},{6528,0x00000000},{4032,0x3d0f8ff8},
- {7344,0x1203efe4},{1872,0x00000000},{4144,0x3f4e8ffe},{3840,0x3f800000},{3296,0x40aaac0b},
+ {7344,0x1203efe4},{1872,0x00000000},{4144,0x3f4e8ffe},{3296,0x40aaac0b},
  {3280,0x3f800000},{592,0x3f800000},{624,0x3b81d8b7},{4128,0x00000000},{7472,0x00000000},
  {1056,0x3f800000},{3888,0x3f800000},{3904,0x00000000},{3920,0x00000000},{3936,0x00000000},
 };
@@ -101,7 +109,7 @@ static const golden_t G40[] = {
  {3264,0x40638f21},{3312,0x3be379d8},{7408,0x00000000},{7392,0x3fa740a5},{9584,0xbea952a5},
  {4208,0x3fa956ac},{1920,0x3c2aaa78},{1936,0x00000000},{1088,0x3f119192},{2064,0x3f119192},
  {101072,0x3ef92f80},{4192,0x3f189890},{4224,0x00000000},{6528,0x00000000},{4032,0x00000000},
- {7344,0x1203efe4},{1872,0x3f800000},{4144,0x3f6a3d70},{3840,0x40000000},{3296,0x40aaac0b},
+ {7344,0x1203efe4},{1872,0x3f800000},{4144,0x3f6a3d70},{3296,0x40aaac0b},
  {3280,0x3f800000},{592,0x00000000},{624,0x3d01499d},{4128,0x00000000},{7472,0x00000000},
  {1056,0x3f800000},{3888,0x00000000},{3904,0x3f800000},{3920,0x00000000},{3936,0x00000000},
 };
