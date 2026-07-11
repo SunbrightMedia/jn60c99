@@ -73,6 +73,32 @@ static const uint32_t FILT[] = {
   102656,0x3f4ba5b0u, 102672,0x3f800000u, 102688,0x3f800000u
 };
 
+/* DELAY TYPE 1 — the "dual delay" (patch 41 "Multirhythm" etc.). Unlike TYPE 0
+ * (a single tap), TYPE 1 runs TWO delay instances: the first-instance block at
+ * 102xxx (a variant of the TYPE-0 block — 102544/102592/102608 differ) AND a full
+ * SECOND instance at 4297584.. All 17 factory TYPE-1 patches share the same constant
+ * cells below (verified 8/8 incl. a level-0 patch); only TIME (102352 / 4297584),
+ * WET (102528 / 4297760) and the level gate (feedback 102560, ON 102576 / 4297824)
+ * are per-patch. Bit-for-bit from the captured MASTER states state_pN_master.bin.
+ * TIME is tempo-synced for most TYPE-1 patches (the manual byte formula matches only
+ * a subset — same open sync item as reverb 6497168 / delay 102352; see
+ * docs/FX_COLDLOAD_TODO.md); the manual formula is used until the sync law is
+ * derived, which lands the tap close (exact where the patch's division coincides). */
+static const uint32_t DLY1_A[] = {   /* first instance 102xxx: always-constant cells */
+  102368,0x3e1b31ceu, 102416,0x3fb07de6u, 102432,0xbf07c840u, 102464,0x3e52bdc7u,
+  102480,0x3fb50bf3u, 102496,0x3f800000u, 102512,0x3f800000u, 102544,0x3f9bd7cau,
+  102592,0x00000000u, 102608,0x3bab929au, 102624,0x3f800000u, 102640,0x3f800000u,
+  102656,0x3f4ba5b0u, 102672,0x3f800000u
+};
+static const uint32_t DLY1_B[] = {   /* second instance 4297584..: always-constant cells */
+  4297600,0x3e1b31ceu, 4297616,0x00000000u, 4297632,0x00000000u, 4297648,0x3fb07de6u,
+  4297664,0xbf07c840u, 4297680,0x00000000u, 4297696,0x3e52bdc7u, 4297712,0x3fb50bf3u,
+  4297728,0x3f800000u, 4297744,0x3f800000u, 4297776,0x387fd974u, 4297792,0x3efefeffu,
+  4297808,0x3ed8d8d9u, 4297840,0x3f800000u, 4297856,0x3f800000u, 4297872,0x00000000u,
+  4297888,0x40000000u, 4297904,0x3c2b929au, 4297920,0x3f800000u, 4297936,0x3f800000u,
+  4297952,0x3f4ba5b0u, 4297968,0x3f800000u, 4297984,0x3f800000u
+};
+
 /* logical byte from a nibble pair at record offset `off` (record is nibble-packed
  * past the 16-char name; see juno_apply.c record_byte). */
 static int rec_byte(const unsigned char *rec, int off)
@@ -162,6 +188,42 @@ static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec)
     JF(state, 6497168) = dt;
 }
 
+/* DELAY TYPE 1: dual delay — first instance (102xxx) + second instance (4297584..). */
+static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec)
+{
+    int level = blob_val(rec, 52);            /* DELAY LEVEL */
+    int dtime = blob_val(rec, 53);            /* DELAY TIME byte (manual; sync TODO) */
+    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+    int on = (level >= 2);
+    unsigned k; uint32_t bits; float f, dt;
+
+    /* constant cells for both instances */
+    for (k = 0; k < sizeof(DLY1_A) / sizeof(DLY1_A[0]); k += 2) {
+        bits = DLY1_A[k + 1]; memcpy(&f, &bits, sizeof f); JF(state, (int)DLY1_A[k]) = f;
+    }
+    for (k = 0; k < sizeof(DLY1_B) / sizeof(DLY1_B[0]); k += 2) {
+        bits = DLY1_B[k + 1]; memcpy(&f, &bits, sizeof f); JF(state, (int)DLY1_B[k]) = f;
+    }
+
+    /* DELAY TIME (same manual formula/order as TYPE 0), written to both taps. */
+    dt = (float)Hr * (float)DELAYTIME_MS[dtime & 0xFF];
+    dt = dt * (1.0f / 16384000.0f);
+    dt = dt - (2.0f / 16384.0f);
+    JF(state, 102352)  = dt;
+    JF(state, 4297584) = dt;
+
+    /* WET = DELAY LEVEL / 255 on both taps. */
+    JF(state, 102528)  = (float)level / 255.0f;
+    JF(state, 4297760) = (float)level / 255.0f;
+
+    /* Level gate: first-instance feedback (102560) + ON (102576) and second-instance
+     * ON (4297824) drop to 0 when the delay is off (LEVEL < 2); the second-instance
+     * feedback (4297808, in DLY1_B) stays constant, matching the captured states. */
+    { uint32_t fb = 0x3ed8d8d9u; memcpy(&f, &fb, 4); JF(state, 102560) = on ? f : 0.0f; }
+    JF(state, 102576)  = on ? 1.0f : 0.0f;
+    JF(state, 4297824) = on ? 1.0f : 0.0f;
+}
+
 void juno_apply_delay(unsigned char *state, const unsigned char *rec)
 {
     int dtype  = rec_byte(rec, 650);          /* DELAY TYPE -> v39 selector      */
@@ -187,6 +249,14 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
         apply_slot1_reverb(state, rec);
         return;
     }
+    /* DELAY TYPE 1 (dual delay) is DERIVED but NOT wired: its whole constant block is
+     * bit-exact (apply_slot1_delay1 / DLY1_A / DLY1_B), but its TIME is tempo-synced
+     * and the manual byte formula lands the tap at the wrong sample for most TYPE-1
+     * patches — writing it REGRESSES the render (an audible early echo, e.g. patch 8
+     * diverged at sample 117). Left inert (no delay block) until the sync-time law is
+     * derived; that is strictly safer than a mistimed echo. See docs/FX_COLDLOAD_TODO.md
+     * and apply_slot1_delay1 below. (void) to keep it compiled + reviewable. */
+    (void)apply_slot1_delay1;
     if (dtype != 0)                            /* other types: slot 1 not the delay block */
         return;
 

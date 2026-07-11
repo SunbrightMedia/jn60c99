@@ -21,25 +21,41 @@ captured MASTER-unit states, `idstate64/state_pN_master.bin`):
 - **Slot-1 reverb (DELAY TYPE 5)** — new `apply_slot1_reverb`: 42 constants + per-patch
   6497344=blob52/255.
 
-## Remaining (4 patches, bit-diff only — all inaudible, RMS ≥ 0.993)
+## Remaining (2 patches, bit-diff only — both inaudible, RMS 1.000)
 
-The 4 non-bit-exact patches (8, 34, 41, 62) diverge only late (the delay tail) at
-RMS ~1.000, from two items:
+`id_coldmaster_ab 2000` is now **62/64**. The 2 non-bit-exact patches — **41
+"SQ Multirhythm"** (DELAY TYPE 1) and **62 "BS Juno Grime"** (DELAY TYPE 2 / chorus) —
+both first diverge at sample **1660** with RMS ratio **1.000** (identical energy; only a
+tiny late-tail phase shift). Root cause is the **tempo-synced DELAY TIME**, one open item:
 
-1. **Tempo-synced DELAY TIME (cells 102352 / 6497168)** — Phase 4. Sync-on patches hold a
-   fixed synced value (e.g. 0x3f83d200 = 351.5625 ms @48k, dispatch idx 803) instead of the
-   manual per-byte time. TODO: find the DELAY SYNC record byte (correlate the sync-on
-   patches), derive synced_ms = f(host BPM, division) (mirror `juno_apply_lfo_tempo`), and
-   set the cold-load default. Affects patches 8/34/62.
-2. **DELAY-TYPE-1 second delay instance (block 4297584..)** — patch 41. For v39==1 the
-   plugin writes a second delay coefficient set (mirroring the 102xxx block + a few
-   instance-2 constants) that our recall leaves at 0. Inaudible here (RMS 1.000).
+### The one open item: tempo-synced DELAY TIME (`102352` / `4297584` / `6497168`)
+Sync-on patches hold a fixed *synced* time, not the manual per-byte value. Proven by
+correlating the captured `102352` against the manual byte formula across the 8 DELAY-TYPE-1
+patches: only 2/8 (patches 15, 55) match the manual formula; the other 6 hold a quantized
+value (e.g. byte 136 and byte 122 both → `0x3f83d200`, and byte 115 & 175 both → 2.0598).
+The captured set is small: {0.3432, 0.4576, 0.5887, 0.8700, 1.0298, 2.0598}. TODO: find the
+DELAY SYNC / division record byte, derive synced = f(default BPM, division) (mirror
+`juno_apply_lfo_tempo`), and write it. Until then the manual formula is used for TYPE 0/2/3/5
+(exact where the division coincides) and TYPE 1 is left inert (see below).
 
-Both are captured-at-48kHz where they involve filter constants; the slot-1 blocks note the
-rate caveat. Also inaudible/inert and not chased: the aux DCO-retrigger latches
-(101504+, re-phase silent voices only) and the reverb structural constants at 10759360+
-(never read by the output — 60 bit-exact patches carry them as 0).
+### DELAY TYPE 1 (dual delay) — fully derived, intentionally NOT wired
+DELAY TYPE 1 runs TWO delay taps: a first-instance block (102xxx, a variant of TYPE 0 —
+`102544`/`102592`/`102608` differ) plus a full SECOND instance at `4297584..4297984`. The
+entire **constant** block, the per-patch **WET** (LEVEL/255 on both taps) and the **level
+gate** (feedback `102560`, ON `102576`/`4297824`) are derived bit-for-bit and coded in
+`src/delay_recall.c` (`apply_slot1_delay1` / `DLY1_A` / `DLY1_B`, verified 8/8 TYPE-1
+patches incl. a level-0 one). It is **not called**, because the only remaining unknown —
+the TIME — is tempo-synced: wiring it with the manual formula REGRESSES the render (patch 8
+gained an audible early echo at sample 117, RMS 0.994). Leaving TYPE 1 inert (no delay
+block, RMS 1.000 in-window) is strictly safer than a mistimed echo. Wire it the moment the
+sync-time law lands — every other cell is ready.
+
+Inaudible/inert and not chased: the aux DCO-retrigger latches (`101504+`, re-phase silent
+voices only), the reverb structural constants at `10759360+` (never read by the output),
+and the near-zero denormal buffers at `11022040+` (per-patch in the plugin but e-42 —
+FTZ/DAZ flushes them in the render, so they cannot affect the output).
 
 ## Gate
-`id_coldmaster_ab` should reach 64/64 once (1) and (2) land. Voice gate
+`id_coldmaster_ab` reaches 62/64 (the 2 remaining need the synced DELAY TIME). Voice gate
 (`id_coldab_batch`) stays 64/64; random-patch voice gate (`id_random_ab 100`) 0 diffs.
+Audibility: all 64 patches within RMS [0.993, 1.000] — **0 audibly-off**.
