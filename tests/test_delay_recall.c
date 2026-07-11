@@ -56,14 +56,17 @@ int main(void)
         printf("  case1: v39 cell = %d, expected 0\n", *(int32_t *)(st + JUNO_PROG_DLY)); ++fails; }
     if (u32(st, 102528) != 0x3f008081) {   /* 128/255 = 0.50196 */
         printf("  case1: Wet %08x != 3f008081\n", u32(st, 102528)); ++fails; }
-    if (u32(st, 102560) != 0x3f666666) {   /* 255/255*0.9 = 0.9 */
-        printf("  case1: Feedback %08x != 3f666666\n", u32(st, 102560)); ++fails; }
+    /* Feedback/filter are ENGINE CONSTANTS (the plugin's engine holds the same block
+     * for every DELAY-active patch — proven vs all 16 v39==0 master states), NOT the
+     * value-tree byte curves the old test froze (feedback 0.9, filter 0x3f03df74). */
+    if (u32(st, 102560) != 0x3ed8d8d9) {   /* Feedback constant 0.4235294 */
+        printf("  case1: Feedback %08x != 3ed8d8d9\n", u32(st, 102560)); ++fails; }
     if (JF(st, 102576) != 1.0f) { printf("  case1: On/Off != 1\n"); ++fails; }
-    if (JF(st, 102592) != 1.0f) { printf("  case1: Mute != 1\n"); ++fails; }
-    if (u32(st, 102352) != 0x3f96bc00) {   /* DELAYTIME_LUT[128] = 1.17761 */
+    if (JF(st, 102592) != 1.0f) { printf("  case1: Enable != 1\n"); ++fails; }
+    if (u32(st, 102352) != 0x3f96bc00) {   /* DELAYTIME_LUT[128] = 1.17761 @96k (test default rate) */
         printf("  case1: Time %08x != 3f96bc00\n", u32(st, 102352)); ++fails; }
-    if (u32(st, 102368) != 0x3f03df74) {   /* high-cut filter constant */
-        printf("  case1: filter %08x != 3f03df74\n", u32(st, 102368)); ++fails; }
+    if (u32(st, 102368) != 0x3e1b31ce) {   /* high-cut filter constant 0.1515572 */
+        printf("  case1: filter %08x != 3e1b31ce\n", u32(st, 102368)); ++fails; }
 
     /* --- case 2: DELAY TYPE 2 (chorus in slot 1): delay block untouched --- */
     put_pair(rec, 650, 2);
@@ -79,9 +82,10 @@ int main(void)
     put_blob(rec, 52, 0);       /* DELAY LEVEL 0 (blob 52, corrected from 40) */
     memset(st, 0, JUNO_STATE_BYTES);
     juno_bank_apply(st, bank, 0);
-    if (JF(st, 102576) != 0.0f || JF(st, 102592) != 0.0f) {
-        printf("  case3: delay not muted at LEVEL 0 (On=%g Mute=%g)\n",
-               JF(st, 102576), JF(st, 102592)); ++fails; }
+    /* LEVEL 0 -> ON/OFF gate (102576) drops to 0. 102592 is a constant enable (=1.0
+     * for every factory patch), so it is NOT the level mute — only 102576 is checked. */
+    if (JF(st, 102576) != 0.0f) {
+        printf("  case3: delay not muted at LEVEL 0 (On=%g)\n", JF(st, 102576)); ++fails; }
 
     free(st); free(bank);
     if (fails) { printf("FAIL: %d delay-recall check(s) drifted\n", fails); return 1; }

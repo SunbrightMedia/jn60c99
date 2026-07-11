@@ -54,15 +54,23 @@ static const uint16_t DELAYTIME_MS[256] = {
   688, 695, 702, 709, 717, 724, 731, 738, 746, 753, 761, 768, 776, 784, 792, 800,
 };
 
-/* Constant high-cut + damp filter block (offset, bits) — the plugin's recomputed
- * coefficients for the default DELAY HIGH CUT (7) / LF+HF DAMP settings that every
- * bank patch uses. From value-tree dispatch idx 1180 (high cut) and 1182..1185
- * (LF/HF damp). Offsets 102448/102496 stay 0 (filter switches off). */
+/* DELAY slot-1 coefficient block (offset, bits) — the plugin's engine constants for
+ * every DELAY-active (v39==0) patch. Extracted bit-for-bit from the captured MASTER
+ * unit states (idstate64/state_pN_master.bin) and CONFIRMED constant across all 16
+ * v39==0 patches (1 distinct value per cell). Only WET (102528, per-patch =
+ * DELAY LEVEL/255), DELAY TIME (102352, per-patch / tempo-sync), and ON/OFF (102576)
+ * are per-patch; everything else — the high-cut/LF-HF-damp filter, feedback
+ * (102560=0.4235294 constant, NOT the byte the old code read), dry (102512=1.0), and
+ * the enable switches — is this fixed block. Captured at 48 kHz; the filter feedback
+ * coeffs (1.379/-0.530/0.206) are rate-dependent — see the rate caveat below.
+ * (The old FILT[] held WRONG values, e.g. 102368=0.515 vs 0.152, so all delay-active
+ * patches had the wrong delay tone/feedback.) */
 static const uint32_t FILT[] = {
-  102368,0x3f03df74u, 102384,0x3f83df74u, 102400,0x3f03df74u, 102416,0xbee549c0u,
-  102432,0xbf1cd8f1u, 102464,0x3f4ba5b0u, 102480,0x3fb50bf3u,
-  102608,0x3bab929au, 102624,0x3f800000u, 102640,0x3f800000u,
-  102656,0x3d28e14bu, 102672,0x3f800000u, 102688,0x3f800000u
+  102368,0x3e1b31ceu, 102384,0x00000000u, 102400,0x00000000u, 102416,0x3fb07de6u,
+  102432,0xbf07c840u, 102448,0x00000000u, 102464,0x3e52bdc7u, 102480,0x3fb50bf3u,
+  102496,0x3f800000u, 102512,0x3f800000u, 102544,0x387fd974u, 102560,0x3ed8d8d9u,
+  102592,0x3f800000u, 102608,0x3c2b929au, 102624,0x3f800000u, 102640,0x3f800000u,
+  102656,0x3f4ba5b0u, 102672,0x3f800000u, 102688,0x3f800000u
 };
 
 /* logical byte from a nibble pair at record offset `off` (record is nibble-packed
@@ -98,16 +106,14 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     if (dtype != 0)                            /* slot 1 not routing the delay block */
         return;
 
+    (void)fb; (void)direct;   /* feedback (102560) and dry (102512) are engine constants (in FILT) */
     for (k = 0; k < sizeof(FILT) / sizeof(FILT[0]); k += 2) {
         bits = FILT[k + 1];
         memcpy(&f, &bits, sizeof f);
         JF(state, (int)FILT[k]) = f;
     }
-    JF(state, 102528) = (float)level  / 255.0f;             /* Wet      */
-    JF(state, 102560) = (float)fb     / 255.0f * 0.9f;      /* Feedback */
+    JF(state, 102528) = (float)level  / 255.0f;             /* Wet (per-patch = LEVEL/255) */
     JF(state, 102576) = level >= 2 ? 1.0f : 0.0f;           /* On/Off (curve: v0,v1->0, v2->1) */
-    JF(state, 102592) = level >= 2 ? 1.0f : 0.0f;           /* Mute/enable */
-    JF(state, 102512) = (float)direct / 255.0f;             /* Dry      */
     /* Delay Time (102352): rate-parameterized. coeff = ((float)H*ms)*(1/16384000)
      * - (2/16384), in THIS three-op float32 order (the algebraically-equal
      * ((H*ms-2)/16384) is wrong — H*ms exceeds 2^24 so the -2 vanishes before the
