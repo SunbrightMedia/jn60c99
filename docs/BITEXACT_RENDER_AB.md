@@ -67,6 +67,50 @@ python3 run_ab64.py                  # runs both harnesses for all 64 -> ab64_re
 ```
 Full per-patch table: `scratchpad/oracle/ab64_findings.md`.
 
+## Phase 1 — expanded coverage (beyond the single held note)
+
+The 64/64 above covered note-on → sustain for one held note (MIDI 60, vel 105, 48k).
+The identical-state design was then extended across every playback dimension — same
+method (drive the plugin into the target state, dump it, load byte-identical into our
+engine, render forward, compare) — and **every case is bit-identical**, independently
+re-verified by re-running `id_voice_ab`/`id_master_ab` on the left-behind artifacts:
+
+- **Release tails** — note-on → sustain → note-off, then A/B the release-phase render
+  from the post-note-off state: patches 4/13/30, voice+master bit-identical over the
+  full tail (up to 36000 samples; envelopes decay 10³–10⁵× to the FTZ floor, so the
+  release curve + filter + FX tail are genuinely exercised).
+- **Polyphony + master summation** — 4- and 8-note chords: every sounding voice unit
+  *and* the summed master stereo bit-identical (24000 samples), so multi-voice mixing
+  is exact.
+- **Notes / velocities / sample rates** — ~36 cases over notes {36,48,72,96},
+  velocities {1,40,127}, rates {44100,48000,96000}: all bit-identical. 44.1 kHz (its own
+  coefficient arms) is fully covered and shows no systematic divergence.
+- **Pitch-bend / mod-wheel** — bend {±0.5, +1.0} and mod applied via the plugin's own
+  dispatch, then A/B from the bent state: bit-identical (each wheel value shifts
+  >8000/8192 samples vs baseline, so it genuinely reaches the audio).
+- **Arpeggiator** — reframed honestly: the arp is an *event generator* (proven 330/330
+  vs CArpeggio separately), not a render dimension; its fired notes render through the
+  already-proven voice path.
+
+### Velocity is correctly inert (verified, not assumed)
+
+vel 1 vs vel 127 render **bit-identical** in the real engine even on the "VeloRez" /
+"VeloMOD" patches. This is faithful, not a bug: the plugin's own recalled VCF/VCA
+VELOCITY SENS (cells 7424/9600) is **0.0 for every factory patch** (confirmed in the
+plugin's dumped state *and* the raw bank bytes 1862/2102), matching the
+velocity-insensitive JUNO-60 hardware. The "Velo" names are designer labels, not
+keyboard velocity.
+
+### One honest residual (untested, not a divergence)
+
+The A/B harness renders `voice_render`/`master_render` directly and does **not** tick
+the control-rate parameter smoother (our `juno_note_tick` / the plugin's
+`sub_7FF91E0224A0`) — which is a genuine no-op in all tested scenarios (recall snaps to
+target, no ramps armed, no knobs moved), so it does not affect any result here. It is
+therefore *not verified in-composition*: it would only matter for real-time knob
+automation *during* a sounding note (live tweaking), which patch playback does not do.
+The recall-time side of it is the "recall ramps" cold-load item.
+
 ## Scope note — what this proves and what it does NOT
 
 This proves the **render** (Tier B) is bit-exact given identical state. It does not by
