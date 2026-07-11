@@ -79,9 +79,29 @@ sens forced to 0 (velocity inert).
 - After P3c (LFO/PWM cluster): **0 patches off**; RMS ratio range **[0.984, 1.049]**,
   median 1.000; **47/64 patches bit-exact**.
 
-## Remaining (Category B — inaudible bit residuals)
+### P3d — the last per-patch cells (now 64/64 bit-exact)
+- **6736 (VCF cutoff)**: removed the `record_befloat(1870)` "high-res override" — the
+  engine holds the coarse `juno_curve(22, byte 35)` value for all 64 (0/64 mismatches);
+  the override was a value-tree artifact diverging on 11 patches (incl. patch 47, 0.14 vs 0.21).
+- **10240 (HPF TYPE≠0 cutoff)**: rate-scaled the 96k boost LUT by 96000/SR (see below).
+- **608 (porta mode)**: LEGATO==1 AND ASSIGN==1 only (was `as != 0`, wrong for ASSIGN==2).
+- **3968 (unison detune)**: ASSIGN==2 carries a fixed −0.0025 DCO pitch offset.
 
-The 17 not-yet-bit-exact patches are RMS-exact (~1.000); the residual bit-diffs are in
-genuinely per-patch cells with a small ULP/edge mismatch: 6736 (VCF cutoff high-res),
-10240 (HPF, a few TYPE/rate edge patches), 608 (porta mode, 1 patch), 3968 (1 patch).
-These are sub-audible; tracked as P3d.
+**Result: 64/64 factory patches render bit-exact at cold-load** (0 slot-7 state-cell
+diffs across the whole bank; 0 audibly off; RMS ratio [0.999, 1.000]).
+
+## Beyond the factory bank — random-patch verification
+
+Recall is per-parameter (each knob → its own curve → its own cell), so the factory 64
+(which span the full 0–255 range of every knob) verify the curves; the handful of
+cross-parameter interactions (HPF cutoff×type, bend×range, legato×assign, assign==2) are
+identified and handled. To prove this directly rather than argue it,
+`id_random_capture.py` generates random parameter combinations, runs the **plugin's own
+recall** on each under Unicorn, and `id_random_ab.c` compares our applier's slot-7 block
+cell-for-cell.
+
+40 random patches: **bit-identical except a 1-ULP HPF-boost rounding on 3 of 256 cutoff
+values at 48 kHz** — the plugin computes the boost cutoff coefficient independently at
+each rate, and `96k_value × 2` rounds 1 ULP away from the direct 48 kHz value for those
+three cutoffs. Sub-audible, but closed by capturing the boost LUT directly at 44.1/48/96 kHz
+and selecting by rate (`hpf_sweep_*.json` → `HPF_T1_10240_{44,48,96}k`).
