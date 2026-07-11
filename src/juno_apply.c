@@ -528,6 +528,10 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
     {
         static const struct { int off; unsigned int bits; } K[] = {
             {1088, 0x3f119192u}, {2064, 0x3f119192u},   /* LFO rate/noise-mix coeff (0.5686275) */
+            {1920, 0x3c2aaa78u},                        /* LFO delay coeff (0.01041662, the plugin's
+                                                         * recall value — the 96 kHz reference of
+                                                         * 1000/SR, constant for all 64 patches; NOT
+                                                         * juno_engine_prepare's host-rate 1000/48000) */
             {4144, 0x15a931dau},                        /* DCO PWM depth   (denormal ~0, DAZ) */
             {7344, 0x1203efe4u},                        /* VCF LFO mod     (denormal ~0, DAZ) */
         };

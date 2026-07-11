@@ -126,12 +126,23 @@ static float f_from_bits(uint32_t b)
 
 /* Apply the HPF TYPE recall. `cutoff` is the HPF CUTOFF FREQ byte (0..255), `type`
  * the HPF TYPE byte. TYPE 0 leaves the front-panel HPF coefficients in place; any
- * nonzero TYPE selects the boost tables (the plugin treats TYPE!=0 identically). */
+ * nonzero TYPE selects the boost tables (the plugin treats TYPE!=0 identically).
+ *
+ * Cell 10240 is the HPF cutoff COEFFICIENT (~ Fc/SR), so it is rate-dependent: the
+ * HPF_T1_10240 table is the 96 kHz reference and the host-rate value is
+ * table * (96000/SR) — exactly what the plugin holds (its captured 48 kHz states are
+ * 2x the 96 kHz table for every TYPE!=0 patch; verified ratio == 2.0). 10272/10288
+ * (boost LPF level + switch) are rate-invariant. See docs/COLDLOAD_AB.md. */
 void juno_apply_hpf_type(unsigned char *state, int cutoff, int type)
 {
+    int Hr;
+    float scale;
     if (type == 0) return;                 /* front-panel curves already correct */
     cutoff &= 0xFF;
-    JF(state, 10240) = f_from_bits(HPF_T1_10240[cutoff]);
+    Hr = (int)JF(state, 16);
+    if (Hr <= 0) Hr = 96000;
+    scale = 96000.0f / (float)Hr;
+    JF(state, 10240) = f_from_bits(HPF_T1_10240[cutoff]) * scale;
     JF(state, 10256) = 1.0f;
     JF(state, 10272) = f_from_bits(HPF_T1_10272[cutoff]);
     JF(state, 10288) = f_from_bits(HPF_T1_10288[cutoff]);
