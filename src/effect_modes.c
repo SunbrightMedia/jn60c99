@@ -71,12 +71,21 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
     } else if (etype == 5) {              /* CHORUS/ENSEMBLE variant (block 96336..96912) */
         write_struct(state, MODE5_STRUCT, MODE5_STRUCT_N);
         JF(state, 96400) = (float)depth / 255.0f;                      /* On/Off           */
-        JF(state, 96352) = efx_bits(CHORUS5_LFORATE_LUT[tone & 0xFF]); /* LFO Rate         */
-        {   /* Ip Fc gate — SR-dependent (input high-pass; .rdata SR table, directly
-             * observed in mode5_gates_spec.md). 3-class select by host rate. */
+        {
             int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+            /* LFO Rate (96352): the CHORUS5_LFORATE_LUT is the 96 kHz reference; the
+             * host-rate value is LUT * (96000/SR) (verified 2.0x @48k vs the captured
+             * mode-5 master states). */
+            JF(state, 96352) = efx_bits(CHORUS5_LFORATE_LUT[tone & 0xFF])
+                               * (96000.0f / (float)Hr);
+            /* Ip Fc gate (96384) — SR-dependent 3-class (mode5_gates_spec.md). */
             JF(state, 96384) = efx_bits(Hr == 44100 ? 0x388b3cdfu :
                                         Hr == 48000 ? 0x387fd974u : 0x37ffd974u);
+            /* Structural cell 96336 is rate-dependent and MODE5_STRUCT holds the 96 kHz
+             * value; the plugin's 48 kHz value is 0x3b98bc15 (const across mode-5 patches,
+             * captured direct — not a clean scale of the 96k value). Override at 48 kHz;
+             * 96k keeps the struct value; other rates approximate. See FX_COLDLOAD_TODO. */
+            if (Hr == 48000) { JF(state, 96336) = efx_bits(0x3b98bc15u); }
         }
         JF(state, 96416) = 1.0f;                                       /* Mute gate        */
     }

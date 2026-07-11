@@ -48,12 +48,20 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
     int tone  = cr_rec_byte(rec, 642);   /* EFFECT TONE  0..255 */
     int etype = cr_rec_byte(rec, 634);   /* EFFECT TYPE  0..5   */
 
-    if (etype >= 2 && etype <= 4) {                 /* block A (91120) — chorus */
+    if (etype >= 2 && etype <= 5) {                 /* block A (91120) — chorus modes 2/3/4/5 */
         JF(state, 91216) = 1.3f;                                    /* Dry (const) */
         JF(state, 91232) = cr_bits(CHORUS_WET_LUT[depth & 0xFF]);   /* Wet         */
         JF(state, 91200) = cr_bits(CHORUS_NOISE_LUT[tone & 0xFF]);  /* Noise       */
+        /* Mode 3 (chorus II) runs block A's LFO at a DIFFERENT rate than modes 2/4/5
+         * (which use the prepare default 91152=1.92e-05). The plugin holds mode 3 at
+         * 91152=0x380f4e2e (3.42e-05 @48k) — a genuinely different rate, not a scale of
+         * the default. Captured @48k; rate-dependent (see docs/FX_COLDLOAD_TODO.md). */
+        if (etype == 3) {
+            unsigned int b = 0x380f4e2eu; float f; memcpy(&f, &b, 4);
+            JF(state, 91152) = f;
+        }
     }
-    /* EFFECT TYPE mode 5 (block B, 96336) is now handled fully — structural block +
-     * On/Off + LFO Rate + enable gates — by src/effect_modes.c (juno_apply_effect_modes),
-     * alongside mode 1. This recall covers only the mode-2/3/4 chorus (block A). */
+    /* EFFECT TYPE mode 5 also drives block B (96336..) — structural + On/Off + LFO
+     * Rate + enable gates — via src/effect_modes.c (juno_apply_effect_modes). Block A
+     * above (levels) is written for mode 5 too (the plugin recalls both). */
 }
