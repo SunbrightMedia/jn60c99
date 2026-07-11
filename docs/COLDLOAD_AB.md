@@ -100,8 +100,12 @@ identified and handled. To prove this directly rather than argue it,
 recall** on each under Unicorn, and `id_random_ab.c` compares our applier's slot-7 block
 cell-for-cell.
 
-40 random patches: **bit-identical except a 1-ULP HPF-boost rounding on 3 of 256 cutoff
-values at 48 kHz** — the plugin computes the boost cutoff coefficient independently at
-each rate, and `96k_value × 2` rounds 1 ULP away from the direct 48 kHz value for those
-three cutoffs. Sub-audible, but closed by capturing the boost LUT directly at 44.1/48/96 kHz
-and selecting by rate (`hpf_sweep_*.json` → `HPF_T1_10240_{44,48,96}k`).
+First run (40 random patches, seed 1234): bit-identical except a 1-ULP HPF-boost rounding
+on 3 of 256 cutoff values at 48 kHz — the plugin computes the boost cutoff coefficient
+independently at each rate, and `96k_value × 2` rounds 1 ULP away from the direct 48 kHz
+value for those three cutoffs. Sub-audible, but closed by capturing the boost LUT directly
+at 44.1/48/96 kHz and selecting by rate (`hpf_sweep_*.json` → `HPF_T1_10240_{44,48,96}k`).
+
+After the fix, a fresh run of **100 random patches (seed 98765): 0 cell diffs — our
+applier is bit-identical to the plugin's own recall on every one.** Reproduce:
+`python3 id_random_capture.py --n 100 --seed 98765 && ./id_random_ab 100`.
