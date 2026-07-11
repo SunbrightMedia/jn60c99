@@ -97,9 +97,12 @@ import { decodeBank } from "./bank.js";
 
 /* Cache-buster: build.sh rewrites this to the WASM content hash each build, so a new
  * engine is always fetched fresh instead of served from the browser/CDN cache. */
-const BUILD_VER = "4b3af59f7a65";
+const BUILD_VER = "919d2313bcd1";
 
-const SR = 96000;
+// The plugin runs its DSP natively at the host sample rate (no oversampling, no
+// decimator). SR is replaced at boot with the AudioContext's ACTUAL rate so the
+// engine is built for exactly that rate and plays 1:1 — no resampler, no aliasing.
+let SR = 96000;
 const $ = s => document.querySelector(s);
 const status = m => $("#status").textContent = m;
 
@@ -137,7 +140,16 @@ async function boot() {
   getArpFn = M.cwrap("juno_gui_get_arp","number",["number"]);
   applyBankFn = M.cwrap("juno_gui_apply_bank","number",["number","number","number","number"]);
   malloc = M._malloc; free = M._free;
-  ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 2);  // chorus mode II
+  // Create the AudioContext at the device's native rate (usually 48 kHz) and build
+  // the engine for EXACTLY that rate. juno_gui_create writes state[16]=rate, and the
+  // rate-parameterized prepare + recall reproduce the plugin's own per-rate
+  // coefficients — so there is nothing to resample. Construction is allowed before a
+  // user gesture (the context starts suspended; we resume it on first play).
+  try {
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if (audioCtx.sampleRate > 0) SR = audioCtx.sampleRate | 0;
+  } catch (e) { console.warn("JUNO: AudioContext unavailable at boot; defaulting engine to", SR, "Hz", e); }
+  ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 2);  // engine at host rate, chorus mode II
   if (!ctx) { status("engine alloc failed"); return; }
 
   const raw = await fetch("params.json").then(r => r.json());
@@ -249,64 +261,24 @@ window.importPreset = (inp) => { const f=inp.files[0]; if(!f) return; const rd=n
 let audioCtx, procNode, rbuf = 0, rcap = 0;
 const BLK = 1024;
 function ensureAudio() {
-  if (audioCtx) { audioCtx.resume(); return; }
-  audioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate: SR});
-  // The engine's coefficients are computed for EXACTLY 96 kHz. Many browsers/devices
-  // won't honor a 96 kHz context and silently fall back (usually 48 kHz). Playing
-  // 96 kHz samples at that rate is the classic "octave-low, half-speed, sounds wrong".
-  // Instead we keep the engine bit-exact at 96 kHz and RESAMPLE its stereo output to
-  // whatever rate the context actually provides (linear interpolation via a bounded
-  // FIFO). ratio = engine samples consumed per output sample.
-  const outRate = audioCtx.sampleRate;
-  const ratio = SR / outRate;                  // 1.0 when the 96 kHz request is honored
-  const resampling = Math.abs(ratio - 1) > 1e-6;
-  if (resampling) {
-    status("audio at " + outRate + " Hz; engine runs at 96 kHz and is resampled to match "
-           + "(pitch & tempo correct).");
-    console.warn("JUNO: resampling 96000 ->", outRate, "ratio", ratio.toFixed(4));
+  // audioCtx was created at boot at the device's native rate, and the engine was
+  // built for exactly that rate — so the engine renders directly at the output rate,
+  // 1:1, with NO resampler. (This is what the plugin does: it runs its DSP natively
+  // at the host rate; there is no decimation stage to reproduce.)
+  if (!audioCtx) {                              // fallback if boot couldn't create one
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
   }
-  // engine scratch large enough for one output block's worth of engine samples + slack
-  const ENGCAP = Math.ceil(BLK * Math.max(ratio, 1)) + 8;
-  rbuf = malloc(ENGCAP * 2 * 4); rcap = ENGCAP;
-  // resample FIFO (interleaved L,R engine samples not yet consumed) + fractional read ptr
-  let fifo = new Float32Array(0), fifoN = 0, readPtr = 0.0;
+  audioCtx.resume();
+  if (procNode) return;                         // audio graph already installed
+  rbuf = malloc(BLK * 2 * 4); rcap = BLK;       // one output block of interleaved stereo
   const clamp1 = (x) => x > 1 ? 1 : x < -1 ? -1 : x;
   procNode = audioCtx.createScriptProcessor(BLK, 0, 2);
   procNode.onaudioprocess = (e) => {
     const L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
-    const n = L.length;                        // == BLK, at outRate
-    if (!resampling) {                         // 96 kHz honored: 1:1, no resample
-      renderFn(ctx, rbuf, n);
-      const s = new Float32Array(M.HEAPF32.buffer, rbuf, n * 2);
-      for (let i = 0; i < n; i++) { L[i] = clamp1(s[2*i]); R[i] = clamp1(s[2*i+1]); }
-      return;
-    }
-    // need engine frames up to index ceil(readPtr + (n-1)*ratio) + 1
-    const needIdx = Math.ceil(readPtr + (n - 1) * ratio) + 1;
-    if (fifoN < needIdx + 1) {                 // render more engine frames into the FIFO
-      let produce = (needIdx + 1) - fifoN;
-      const grown = new Float32Array((fifoN + produce) * 2);
-      grown.set(fifo.subarray(0, fifoN * 2), 0);
-      let dst = fifoN;
-      while (produce > 0) {
-        const chunk = Math.min(produce, ENGCAP);
-        renderFn(ctx, rbuf, chunk);            // advances the engine stream
-        const s = new Float32Array(M.HEAPF32.buffer, rbuf, chunk * 2);
-        grown.set(s, dst * 2);
-        dst += chunk; produce -= chunk;
-      }
-      fifo = grown; fifoN = needIdx + 1;
-    }
-    for (let i = 0; i < n; i++) {               // linear-interpolate the engine stream
-      const p = readPtr + i * ratio, j = Math.floor(p), fr = p - j;
-      L[i] = clamp1(fifo[2*j]   + (fifo[2*(j+1)]   - fifo[2*j])   * fr);
-      R[i] = clamp1(fifo[2*j+1] + (fifo[2*(j+1)+1] - fifo[2*j+1]) * fr);
-    }
-    readPtr += n * ratio;                        // advance, then drop consumed frames
-    const drop = Math.floor(readPtr);
-    if (drop > 0) {
-      fifo = fifo.slice(drop * 2); fifoN -= drop; readPtr -= drop;
-    }
+    const n = L.length;                         // == BLK, at the engine's own rate
+    renderFn(ctx, rbuf, n);
+    const s = new Float32Array(M.HEAPF32.buffer, rbuf, n * 2);
+    for (let i = 0; i < n; i++) { L[i] = clamp1(s[2*i]); R[i] = clamp1(s[2*i+1]); }
   };
   procNode.connect(audioCtx.destination);
 }
