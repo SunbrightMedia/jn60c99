@@ -127,6 +127,41 @@ static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, i
     }
 }
 
+/* SLOT-1-hosted REVERB block — DELAY TYPE (v39) 5 routes a reverb into slot 1.
+ * 42 engine constants (captured bit-for-bit from the v39==5 master states, same
+ * filter-constant family as the delay/chorus) + one per-patch depth (6497344 =
+ * blob52/255). 6497168 is a tempo-synced delay time (same Phase-4 sync gap as
+ * cell 102352; the manual-time formula is used until sync is derived — see
+ * docs/FX_COLDLOAD_TODO.md). Constants captured @48 kHz (rate-dependent filter). */
+static const uint32_t S1REVERB[] = {
+  6497184,0x3e1b31ceu, 6497232,0x3fb07de6u, 6497248,0xbf07c840u, 6497280,0x3e52bdc7u,
+  6497296,0x3fb50bf3u, 6497312,0x3f800000u, 6497328,0x3f800000u, 6497360,0x387fd974u,
+  6497376,0x3ed8d8d9u, 6497392,0x3f800000u, 6497408,0x3f800000u, 6497424,0x3c2b929au,
+  6497440,0x3f800000u, 6497456,0x3f800000u, 6497472,0x3f4ba5b0u, 6497488,0x3f800000u,
+  6497504,0x3f800000u, 10692016,0xc0bafafbu, 10692032,0x3f800000u, 10693008,0x3cef0001u,
+  10693040,0x3f000000u, 10693056,0x3f008081u, 10693072,0x3f03df74u, 10693088,0x3f83df74u,
+  10693104,0x3f03df74u, 10693120,0xbee549c0u, 10693136,0xbf1cd8f1u, 10693168,0x3f4ba5b0u,
+  10693184,0x3fb50bf3u, 10693200,0x3f800000u, 10693216,0x3b56774fu, 10693232,0x3f800000u,
+  10693248,0x3f800000u, 10693264,0x3f800000u, 10693280,0x387fd974u, 10693312,0x3f800000u,
+  10693328,0x3f800000u, 10693344,0xbf800000u, 10693360,0x3f800000u, 10759360,0x446f8000u,
+  10759472,0x3d000000u, 10759840,0x3f29d800u
+};
+static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec)
+{
+    int b52 = blob_val(rec, 52), b53 = blob_val(rec, 53);
+    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+    unsigned k; uint32_t bits; float f, dt;
+    for (k = 0; k < sizeof(S1REVERB) / sizeof(S1REVERB[0]); k += 2) {
+        bits = S1REVERB[k + 1]; memcpy(&f, &bits, sizeof f);
+        JF(state, (int)S1REVERB[k]) = f;
+    }
+    JF(state, 6497344) = (float)b52 / 255.0f;                     /* reverb depth       */
+    dt = (float)Hr * (float)DELAYTIME_MS[b53 & 0xFF];             /* time (manual; sync TODO) */
+    dt = dt * (1.0f / 16384000.0f);
+    dt = dt - (2.0f / 16384.0f);
+    JF(state, 6497168) = dt;
+}
+
 void juno_apply_delay(unsigned char *state, const unsigned char *rec)
 {
     int dtype  = rec_byte(rec, 650);          /* DELAY TYPE -> v39 selector      */
@@ -148,7 +183,11 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
         apply_slot1_chorus(state, rec, dtype);
         return;
     }
-    if (dtype != 0)                            /* dtype 5 = reverb in slot 1 (elsewhere) */
+    if (dtype == 5) {                          /* slot 1 hosts reverb */
+        apply_slot1_reverb(state, rec);
+        return;
+    }
+    if (dtype != 0)                            /* other types: slot 1 not the delay block */
         return;
 
     (void)fb; (void)direct;   /* feedback (102560) and dry (102512) are engine constants (in FILT) */
