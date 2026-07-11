@@ -422,28 +422,15 @@ int juno_bank_condition(const unsigned char *bank, int idx)
  * apply_fenv_variation() wrote ENV2 for 7 patches by ear (a divergence) and is removed;
  * leaving the init default (both 0.0) is bit-exact. */
 
-/* Read a big-endian IEEE-754 float stored as 8 nibbles in the record starting at
- * record byte offset `roff` (the `blob` pointer is record+16, i.e. blob-relative
- * index = roff-16). The plugin stores full-resolution companions of some params
- * this way and its recall applies them ON TOP OF the coarse front-panel byte.
- * Proven against the plugin's own recall (Unicorn oracle, tools/build_oracle.py):
- * VCF CUTOFF FREQ H at record byte 1870 equals engine off 6736 for all 64 patches
- * — bit-identical to the coarse juno_curve(22,byte) for 53, and the correct FINER
- * value for 11 (e.g. patch 47: 0.1424 vs the coarse 0.2078). */
-static float record_befloat(const unsigned char *blob, int roff)
-{
-    int b = roff - BANK_BLOB_OFF;                 /* blob-relative byte index */
-    unsigned int bits =
-        ((unsigned)(((blob[b+0] & 0xF) << 4) | (blob[b+1] & 0xF)) << 24) |
-        ((unsigned)(((blob[b+2] & 0xF) << 4) | (blob[b+3] & 0xF)) << 16) |
-        ((unsigned)(((blob[b+4] & 0xF) << 4) | (blob[b+5] & 0xF)) <<  8) |
-        ((unsigned)(((blob[b+6] & 0xF) << 4) | (blob[b+7] & 0xF)));
-    float f;
-    unsigned int t = bits;
-    { unsigned char *dst = (unsigned char *)&f, *src = (unsigned char *)&t;
-      dst[0]=src[0]; dst[1]=src[1]; dst[2]=src[2]; dst[3]=src[3]; }
-    return f;
-}
+/* VCF CUTOFF FREQ "high-resolution override" REMOVED (cold-load audit). The plugin
+ * stores a full-precision cutoff companion at record byte 1870, but its ENGINE cell
+ * 6736 holds the COARSE juno_curve(22, byte 35) value for ALL 64 patches — verified
+ * bit-for-bit against every captured post-recall engine state (0/64 mismatches). The
+ * former record_befloat(1870) override diverged from the engine on 11 patches: +1 ULP
+ * on 10 (float-storage rounding of the high-res companion) and a large error on patch
+ * 47 (engine 0.2078 = coarse byte 53, override read 0.1424). The earlier "proven equal
+ * for all 64" claim had compared against the value tree, not the engine. Dropped, so
+ * the coarse binding {35,22,T_ID,6736} alone drives the cutoff (engine-exact). */
 
 /* Apply patch `idx` from `bank` into the engine `state`. Returns #params set. */
 int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
@@ -477,9 +464,9 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
      * never leaves its prepare default. The old apply_pwm_source() wrote per-patch
      * flags from blob 15, diverging from the plugin's render. Removed (prepare already
      * sets 0,0,0,1). See docs/COLDLOAD_AB.md. */
-    /* VCF CUTOFF FREQ high-resolution override (see record_befloat): the plugin
-     * recalls the full-precision cutoff float and it supersedes the coarse byte. */
-    JF(state, 6736) = record_befloat(blob, 1870);
+    /* VCF CUTOFF FREQ (6736): driven solely by the coarse binding {35,22,T_ID} above —
+     * the high-res override was removed (it diverged from the engine; see comment at
+     * record_befloat's former site). */
 
     /* Extended engine parameters stored PAST the 222-byte front-panel blob. Their
      * record byte positions come from the in-binary leaf-order table + value-tree
@@ -497,12 +484,22 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
      * The prior apply_fenv_variation() call wrote ENV2 for 7 "plucky" patches by ear —
      * a divergence from the plugin — so it is removed (function deleted above). */
     {
-        /* PORTAMENTO MODE (off 608): the plugin sets it to 1.0 only when BOTH LEGATO
-         * and ASSIGN are engaged (isolated fresh-construct repro: leg-only=0, asg-only=0,
-         * both=1.0; oracle shows P5/P47 = 0x3f800000). Per-voice, seeded to all 8. */
+        /* PORTAMENTO MODE (off 608): the plugin sets it to 1.0 only when LEGATO is on
+         * (1) AND ASSIGN MODE == 1. Across all 64 patches the engine cell is 1.0 for
+         * exactly the (LEG=1, ASG=1) patches; (LEG=1, ASG=2) — patch 61 — is 0, so the
+         * old `as != 0` test was too loose. Per-voice, seeded to all 8. */
         int lg = ((blob[2 * 55] & 0xF) << 4) | (blob[2 * 55 + 1] & 0xF);
         int as = ((blob[2 * 56] & 0xF) << 4) | (blob[2 * 56 + 1] & 0xF);
-        JF(state, 608) = (lg != 0 && as != 0) ? 1.0f : 0.0f;
+        JF(state, 608) = (lg == 1 && as == 1) ? 1.0f : 0.0f;
+        /* ASSIGN MODE 2 (UNISON) carries a small fixed DCO detune in the pitch-sum
+         * term at 3968: -0.0025 (0xbb23d70a) for both ASSIGN==2 factory patches (61,
+         * 63), 0 otherwise. (Slot-7 value; a real unison chord may spread per voice —
+         * only the single sounding voice is ground-truthed here.) */
+        {
+            unsigned int b = (as == 2) ? 0xbb23d70au : 0x00000000u;
+            float f; memcpy(&f, &b, 4);
+            JF(state, 3968) = f;
+        }
     }
     {
         int t = record_byte(blob, 554);                  /* LFO TRIG ENV (leaf 121) */
