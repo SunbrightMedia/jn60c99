@@ -508,12 +508,14 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
         juno_bank_scatter(bank, idx, &stype, &sdepth);
         carp_set_scatter(&c->arp, stype, sdepth);
     }
-    /* Per-patch TEMPO-SYNCED LFO rate (cell 1072): 34/64 factory patches sync the LFO
-     * to host tempo; the voice DSP then uses 1072 (not the free knob rate). Feed it from
-     * the patch's LFO RATE byte + current host BPM (bit-exact curve48 x curve53). Stashed
-     * so a later tempo change recomputes it. Inert on patches with sync off. */
+    /* Per-patch TEMPO-SYNCED LFO rate (cell 1072): stash the LFO RATE byte so a later
+     * host tempo change (juno_gui_arp_config with bpm > 0) recomputes 1072 =
+     * curve48[byte] x curve53[BPM*10]. We do NOT compute it here at cold-load: the
+     * plugin holds 1072 at juno_engine_prepare's default (8.735357) until the host
+     * transport actively drives the tempo — every captured post-recall state has
+     * 1072 = 8.735357 for all 64 patches, with no transport. Computing it at load from
+     * a placeholder BPM diverged from that reference. See docs/COLDLOAD_AB.md. */
     c->lfo_rate_byte = juno_bank_lfo_rate_byte(bank, idx);
-    juno_apply_lfo_tempo(c->st, c->lfo_rate_byte, (float)c->arp.bpm);
     return n;
 }
 

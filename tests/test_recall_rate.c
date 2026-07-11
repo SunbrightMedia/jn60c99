@@ -39,7 +39,11 @@ int main(void)
     int atk = 37, dec = 91, lfod = 200, hpf = 150, porta = 173, cutoff = 153;
     put_blob(rec, 40, atk);     /* ENV1 ATTACK  (2784, curve 35 @96k) */
     put_blob(rec, 41, dec);     /* ENV1 DECAY   (2816, curve 38 @96k) */
-    put_blob(rec,  7, lfod);    /* LFO DELAY    (1920, curve 44 @96k) */
+    (void)lfod;                 /* LFO DELAY (1920): no longer an applier output — the
+                                 * plugin holds 1920 CONSTANT for all patches (set by
+                                 * juno_engine_prepare, rate-parameterized there). The
+                                 * per-patch recall binding was removed (cold-load audit,
+                                 * docs/COLDLOAD_AB.md), so it is not checked here. */
     put_blob(rec, 38, hpf);     /* HPF CUTOFF   (10240, curve 41 @96k) */
     put_blob(rec, 54, porta);   /* PORTAMENTO   (624, curve 7 @96k, C/H mult) */
     put_blob(rec, 35, cutoff);  /* VCF CUTOFF   (6736, curve 22, INVARIANT) */
@@ -57,7 +61,7 @@ int main(void)
         char tag[32];
         snprintf(tag, sizeof tag, "%dHz ATK", R[i].rate); expect(st, 2784, cbits(R[i].atk_arm, atk), tag);
         snprintf(tag, sizeof tag, "%dHz DEC", R[i].rate); expect(st, 2816, cbits(R[i].dec_arm, dec), tag);
-        snprintf(tag, sizeof tag, "%dHz LFOd", R[i].rate); expect(st, 1920, cbits(R[i].lfo_arm, lfod), tag);
+        (void)R[i].lfo_arm;   /* 1920 LFO DELAY no longer applier-written (see above) */
         snprintf(tag, sizeof tag, "%dHz HPF", R[i].rate); expect(st, 10240, cbits(R[i].hpf_arm, hpf), tag);
         /* portamento: juno_curve(7,porta) * (96000/rate) */
         float p = juno_curve(7, porta);
