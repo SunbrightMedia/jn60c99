@@ -86,6 +86,47 @@ static int blob_val(const unsigned char *rec, int bp)
     return ((b[2 * bp] & 0xF) << 4) | (b[2 * bp + 1] & 0xF);
 }
 
+/* SLOT-1-hosted chorus block — DELAY TYPE (v39) 2 or 3 route a second chorus (I/II)
+ * into slot 1 instead of the delay. The engine block at 6395312..6396448 is what the
+ * plugin recalls; 18 cells are constants (captured bit-for-bit from the master states,
+ * identical for modes 2 and 3), and two are per-patch, driven by the repurposed DELAY
+ * TIME / DELAY LEVEL bytes (blob 53 / 52):
+ *   6395312 (rate/level) = (blob53/255)*11 - 8   [verified bit-exact 14/14]
+ *   6396176 (depth)      =  blob52/255           [verified bit-exact 14/14]
+ * The constant filter coeffs (0x3f03df74 etc.) are captured @48 kHz and are
+ * rate-dependent — see docs/FX_COLDLOAD_TODO.md. */
+static const uint32_t S1CHORUS[] = {
+  6395328,0x3f800000u, 6396128,0x3cef0001u, 6396160,0x3f000000u, 6396192,0x3f03df74u,
+  6396208,0x3f83df74u, 6396224,0x3f03df74u, 6396240,0xbee549c0u, 6396256,0xbf1cd8f1u,
+  6396288,0x3f4ba5b0u, 6396304,0x3fb50bf3u, 6396320,0x3f800000u, 6396336,0x3b56774fu,
+  6396352,0x3f800000u, 6396368,0x3f800000u, 6396384,0x3f800000u, 6396400,0x387fd974u,
+  6396432,0x3f800000u, 6396448,0x3f800000u, 6396528,0x3db40000u
+};
+static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, int dtype)
+{
+    int b53 = blob_val(rec, 53), b52 = blob_val(rec, 52);
+    unsigned k; uint32_t bits; float f;
+    for (k = 0; k < sizeof(S1CHORUS) / sizeof(S1CHORUS[0]); k += 2) {
+        bits = S1CHORUS[k + 1]; memcpy(&f, &bits, sizeof f);
+        JF(state, (int)S1CHORUS[k]) = f;
+    }
+    JF(state, 6395312) = ((float)b53 / 255.0f) * 11.0f - 8.0f;   /* chorus rate/level */
+    JF(state, 6396176) = (float)b52 / 255.0f;                    /* chorus depth      */
+    /* Chorus I (dtype 2) vs II (dtype 3): these four routing/filter cells carry the
+     * I/II distinction (constant per mode; exact bits from the master states). */
+    {
+        static const uint32_t M2[] = {6396464,0x3f800000u, 6396480,0x00000000u,
+                                       6396496,0x3f800000u, 6396512,0x3f800000u};
+        static const uint32_t M3[] = {6396464,0x00000000u, 6396480,0x3f800000u,
+                                       6396496,0x3f353f7du, 6396512,0x3fb4dd2fu};
+        const uint32_t *M = (dtype == 3) ? M3 : M2;
+        for (k = 0; k < 8; k += 2) {
+            bits = M[k + 1]; memcpy(&f, &bits, sizeof f);
+            JF(state, (int)M[k]) = f;
+        }
+    }
+}
+
 void juno_apply_delay(unsigned char *state, const unsigned char *rec)
 {
     int dtype  = rec_byte(rec, 650);          /* DELAY TYPE -> v39 selector      */
@@ -103,7 +144,11 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
 
     *(int32_t *)(state + JUNO_PROG_DLY) = (int32_t)dtype;  /* per-patch slot-1 mode */
 
-    if (dtype != 0)                            /* slot 1 not routing the delay block */
+    if (dtype == 2 || dtype == 3) {            /* slot 1 hosts chorus I/II */
+        apply_slot1_chorus(state, rec, dtype);
+        return;
+    }
+    if (dtype != 0)                            /* dtype 5 = reverb in slot 1 (elsewhere) */
         return;
 
     (void)fb; (void)direct;   /* feedback (102560) and dry (102512) are engine constants (in FILT) */
