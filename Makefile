@@ -22,7 +22,7 @@ dll: juno.dll
 juno.dll: gui/juno_bridge.c $(SRC)
 	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $^ $(LDLIBS)
 
-test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter tests/test_arp_pattern
+test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter tests/test_arp_pattern tests/test_param_setter
 	./tests/test_helpers
 	./tests/test_voice_smoke
 	./tests/test_master_smoke
@@ -39,6 +39,10 @@ test: tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/te
 	./tests/test_bend_mod_sens
 	./tests/test_condition_scatter
 	./tests/test_arp_pattern
+	./tests/test_param_setter
+
+tests/test_param_setter: tests/test_param_setter.c $(SRC)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
 tests/test_helpers: tests/test_helpers.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)

@@ -264,6 +264,46 @@ static const juno_bind BINDINGS[] = {
 };
 #define N_BINDINGS ((int)(sizeof(BINDINGS)/sizeof(BINDINGS[0])))
 
+/* --- Per-parameter setter API: the "raw 0..255 byte -> parameter" interface. ---
+ * Each single-byte panel binding above is exposed as an indexable parameter driven
+ * by the EXACT recall dispatch (curve + transform + rate-variant + offset). Feeding
+ * juno_apply_param the raw byte a bank record would hold at that param's blob slot
+ * yields the identical engine float juno_bank_apply produces — so the interface is
+ * bit-for-bit the plugin's own value-tree recall, one parameter at a time. Index
+ * space is the BINDINGS order; juno_param_name/offset describe each slot. */
+int juno_param_count(void) { return N_BINDINGS; }
+
+const char *juno_param_name(int i)
+{
+    return (i >= 0 && i < N_BINDINGS) ? BINDINGS[i].name : "";
+}
+
+int juno_param_offset(int i)
+{
+    return (i >= 0 && i < N_BINDINGS) ? BINDINGS[i].offset : -1;
+}
+
+/* Apply raw byte (0..255) to parameter i via the recall dispatch. Hr = host rate
+ * (drives the SR-variant curve arm / portamento post-multiply, exactly as
+ * juno_bank_apply). Writes the engine cell and returns the float written (0.0 on a
+ * bad index). Writes voice-0's cell only; the caller replicates to the other voices
+ * (juno_gui_set_param seeds them + re-applies CONDITION scatter, mirroring recall). */
+float juno_apply_param(unsigned char *state, int i, int byte, int Hr)
+{
+    int cid;
+    float c;
+    if (i < 0 || i >= N_BINDINGS) return 0.0f;
+    if (Hr <= 0) Hr = 96000;
+    cid = BINDINGS[i].curve_id;
+    if (BINDINGS[i].sr_variant == 1)                 /* 3-class curve-arm select */
+        cid = rate_curve(cid, Hr);
+    c = juno_curve(cid, apply_tf(BINDINGS[i].tf, byte & 0xFF));
+    if (BINDINGS[i].sr_variant == 2 && Hr != 96000)  /* porta C/H post-multiply */
+        c *= 96000.0f / (float)Hr;
+    JF(state, BINDINGS[i].offset) = c;
+    return c;
+}
+
 int juno_bank_num_patches(const unsigned char *bank, unsigned long len)
 {
     if (len < BANK_HEADER || bank[0] != 'K') return 0;   /* "KoaBankFile00003" */

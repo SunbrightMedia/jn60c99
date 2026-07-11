@@ -53,6 +53,12 @@ typedef struct {
      * plugin feeds 1072 = curve48[byte] x curve53[BPM*10] from host tempo; 34/64
      * factory patches sync the LFO to it. See juno_apply_lfo_tempo. */
     int   lfo_rate_byte;
+
+    /* Last CONDITION byte applied (128 at power-on, patch value on recall). A single
+     * per-parameter edit (juno_gui_set_param) re-seeds all 8 voices, which would flatten
+     * the CONDITION analog scatter — so the setter re-applies this byte afterwards,
+     * exactly as the bank recall does (seed -> apply_condition). */
+    int   last_condition;
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -95,6 +101,7 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     default_patch(c->st);                /* FX power-on default (reverb off)               */
     juno_driver_seed_voices(c->st);      /* all 8 voices carry the same coeffs             */
     juno_apply_condition(c->st, 128);    /* default CONDITION -> per-voice analog scatter  */
+    c->last_condition = 128;
     c->chorus_mode = chorus_mode;
     for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
     /* arp: bit-exact CArpeggio, off by default. carp_init seeds the plugin's
@@ -155,7 +162,35 @@ void juno_gui_recall_factory(juno_ctx *c)
     *(int32_t *)(c->st + JUNO_PROG_DLY) = 0;
     juno_driver_seed_voices(c->st);      /* propagate to all 8 voices */
     juno_apply_condition(c->st, 128);    /* default CONDITION -> per-voice analog scatter */
+    c->last_condition = 128;
     juno_driver_attach_host(c->st, &c->shim, c->chorus_mode);
+}
+
+/* --- Per-parameter "0..255 byte -> parameter" setter (the interface for the final
+ * port: a raw panel value goes in, the engine coefficient changes bit-exactly). ---
+ * juno_gui_param_count / _name / _offset enumerate the exposed panel parameters (the
+ * juno_apply.c BINDINGS table); juno_gui_set_param applies a raw 0..255 byte to one of
+ * them through the plugin's own value-tree dispatch and makes it audible on all voices.
+ */
+int juno_gui_param_count(void) { return juno_param_count(); }
+
+const char *juno_gui_param_name(int i) { return juno_param_name(i); }
+
+int juno_gui_param_offset(int i) { return juno_param_offset(i); }
+
+/* Apply raw byte (0..255) to panel parameter `param_index`, bit-exact via the recall
+ * dispatch, then propagate to all 8 voices exactly as a bank recall does (seed voice 0
+ * -> re-apply the current CONDITION scatter). Returns the engine float written. */
+float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
+{
+    int Hr;
+    float w;
+    if (!c) return 0.0f;
+    Hr = (int)JF(c->st, 16); if (Hr <= 0) Hr = 96000;
+    w = juno_apply_param(c->st, param_index, byte, Hr);
+    juno_driver_seed_voices(c->st);              /* voice 0 -> all 8 (as recall) */
+    juno_apply_condition(c->st, c->last_condition); /* restore analog scatter       */
+    return w;
 }
 
 /* Switch chorus mode selector (0 = dry/bypass). */
@@ -478,7 +513,8 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
     /* CONDITION analog voice-scatter: per-voice detune/level, applied AFTER seed (it
      * makes the 8 voices deliberately non-identical — the plugin's component-tolerance
      * emulation). Default patch value 128 -> full scatter. */
-    juno_apply_condition(c->st, juno_bank_condition(bank, idx));
+    c->last_condition = juno_bank_condition(bank, idx);
+    juno_apply_condition(c->st, c->last_condition);
     /* Per-patch VOICE-ASSIGN recall (CAssignJu60): ASSIGN MODE (poly/mono/unison/
      * poly-variant), LEGATO, and PORTAMENTO-engaged drive the note allocator above. */
     juno_bank_voice_modes(bank, idx, &c->legato, &c->assign_mode, &porta);

@@ -13,6 +13,20 @@ int juno_bank_patch_name(const unsigned char *bank, int idx, char out[17]);
 /* Set engine coefficient slots for patch idx. Returns # params applied. */
 int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx);
 
+/* --- Per-parameter "raw 0..255 byte -> parameter" setter ---
+ * juno_param_count()  : number of exposed single-byte panel parameters.
+ * juno_param_name(i)  : static human name for parameter i ("" if out of range).
+ * juno_param_offset(i): engine state offset parameter i writes (-1 if out of range).
+ * juno_apply_param(state,i,byte,Hr): apply raw byte 0..255 to parameter i through the
+ *   EXACT recall dispatch (curve+transform+rate-variant) at host rate Hr; returns the
+ *   float written. Writes voice-0's cell only — replicate to the other voices after.
+ * Together these are the plugin's own value-tree recall exposed one parameter at a
+ * time (see the BINDINGS table + juno_apply_param in juno_apply.c). */
+int         juno_param_count(void);
+const char *juno_param_name(int i);
+int         juno_param_offset(int i);
+float       juno_apply_param(unsigned char *state, int i, int byte, int Hr);
+
 /* Decode the per-patch ARPEGGIATOR settings (NAME1 leaves 89/90/91 at record bytes
  * 298/306/314 — derived from the same value-tree leaf enumeration that lands the 5
  * oracle-anchored leaves exactly). Returns 1 if the arp is ON for patch idx; writes
