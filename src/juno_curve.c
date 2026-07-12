@@ -4083,7 +4083,14 @@ float juno_curve(int curve_id, int value)
     case 7: { int i = (value < 0) ? 0 : value; if (i > 255) i = 255; return juno__bits2f(JUNO_LUT7[i]); }
     case 8: { int i = (value < 0) ? 0 : value; if (i > 3) i = 3; return juno__bits2f(JUNO_LUT8[i]); }
     case 9: { int i = (value < 0) ? 0 : value; if (i > 3) i = 3; return juno__bits2f(JUNO_LUT9[i]); }
-    case 10: { int i = (value < 0) ? 0 : value; if (i > 3) i = 3; return juno__bits2f(JUNO_LUT10[i]); }
+    /* Curve 10 (HPF Boost LPF Level -> cell 10272): min(byte,3) is WRONG for the
+     * raw-byte dispatch — it lands byte 2 on LUT entry 2 (3.0), but the plugin's
+     * own blob-38 dispatch writes 0 for EVERY byte 0..255 (exhaustively measured:
+     * 256 bytes x 3 rates, scratchpad/oracle/param_exhaust.py). Entries 0/1/3 are
+     * all 0, so the plugin's raw-byte index law never reaches entry 2; map bytes
+     * >= 2 to entry 3. (No factory patch carries byte 2, which is why every recall
+     * A/B missed this — only the exhaustion sweep caught it.) */
+    case 10: { int i = (value < 0) ? 0 : (value >= 2) ? 3 : value; return juno__bits2f(JUNO_LUT10[i]); }
     case 11: { int i = (value < 0) ? 0 : value; if (i > 127) i = 127; return juno__bits2f(JUNO_LUT11[i]); }
     case 12: { int i = (value < 0) ? 0 : value; if (i > 255) i = 255; return juno__bits2f(JUNO_LUT12[i]); }
     case 13: { int i = (value < 0) ? 0 : value; if (i > 255) i = 255; return juno__bits2f(JUNO_LUT13[i]); }

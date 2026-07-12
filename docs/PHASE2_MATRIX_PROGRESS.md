@@ -87,3 +87,25 @@ bit-exact (`scratchpad/oracle/wasm_scen_check.mjs`).
   Residual open item: the browser runs chorus mode 2 (mode-0 was the bit-exact
   harness convention); a warm 44.1 kHz phase-metric sweep like WARM_ALL64 has not
   yet been repeated at 44.1 kHz — queued with the finite-domain exhaustion work.
+
+## Finite-domain exhaustion (MASTER_PLAN Phase-2 ledger)
+
+**Params x 256 (state-level, vs the plugin's own dispatch):** every exposed panel
+binding (25 rows over 21 blob positions) x all 256 byte values x 3 rates
+(44100/48000/96000) = 19200 comparisons, plugin dispatch (idx = blob+744, all 9
+units, snap) vs port `juno_apply_param`, engine cell compared bitwise
+(`scratchpad/oracle/param_exhaust.py`). Initial result 19197/19200: the 3
+mismatches were ONE bug at all 3 rates — HPF byte 2 -> cell 10272 landed on curve
+10's LUT entry 2 (3.0) where the plugin writes 0 for every byte (min(byte,3)
+transcription artifact; no factory patch carries byte 2, so every recall A/B
+missed it). Fixed in `juno_curve.c` (bytes >= 2 -> entry 3); re-swept: **19200/19200
+identical**. For finite domains, exhaustive testing IS proof.
+
+Inherited exhaustive counts (verified in earlier phases, same oracle standard):
+128/128 note->M.CV bits (`juno_mcv_bits`), full velocity sweep through curves
+56/57, 256/256 per SR-variant curve arm at 3 rates (`test_recall_rate`),
+REVERB (TYPE 0..5) x (TIME 0..255) tables, 48/48 sync divisions x rates.
+
+Remaining Phase-2 items: warm/mid-note variants of the param sweep (state-level),
+note x velocity state-write exhaustion runner, 44.1 kHz warm phase-metric sweep
+(chorus mode 2), then Gate G2 ledger consolidation.
