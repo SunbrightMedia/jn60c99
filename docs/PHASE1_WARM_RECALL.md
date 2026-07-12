@@ -78,6 +78,27 @@ the warm audio (all 29 are recall-overwritten), and it contradicted
 `test_prepare_rate`, which asserts the binary-traced pre-snap per-rate values. The
 snap-vs-ramp question for those cells is unresolved and does not gate the 1728 bug.
 
+## 4b. FINAL warm verdict: all 64 patches within the plugin's own behaviour envelope
+
+Definitive all-64 warm A/B (docs/WARM_ALL64_RESULTS.txt; scripts warm_all64.py +
+flag_selfband.py): 62/64 patches matched outright (corr 0.99-1.000, level error
+<= 0.36 dB, every EFFECT TYPE mode 1/2/3/5 represented). The two threshold flags
+were resolved by the plugin-SELF-band test (the plugin rendered against itself at
+four idle lengths):
+
+- Patch 5 (LD Classic Lead): plugin-vs-itself corr drops to 0.167-0.516 across
+  idle shifts; the port's 0.168 is statistically identical. Slow-LFO PWM: ANY two
+  press-moments decorrelate, including the plugin against itself. Not a defect.
+- Patch 22 (BS Ikonbass): plugin-vs-itself RMS swings +7% to -13.4% and corr
+  spans -0.341..0.833; the port (corr 0.874, -10% RMS) is TIGHTER than the
+  plugin's own self-variation. Detuned-oscillator beating: loudness depends on
+  the beat phase you catch. Not a defect.
+
+Conclusion: zero confirmed warm defects across the full factory bank. The earlier
+webapp caveat claiming "9 patches route to an un-decompiled FX block (kept at
+chorus)" is DISPROVEN by the same sweep (modes 3 and 5 verified faithful) and has
+been corrected in the UI.
+
 ## 5. Phase-2 resolution: two real DSP bugs fixed; warm allocation is oracle-bounded
 
 The per-sample state-diff drove the warm divergence to its roots and fixed two
