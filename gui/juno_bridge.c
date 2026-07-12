@@ -616,6 +616,29 @@ int juno_gui_render(juno_ctx *c, float *out, int nframes)
     return full;
 }
 
+/* Warm the engine to its steady idle state, exactly as a DAW does by rendering
+ * silence continuously from the moment the plugin is activated. A freshly
+ * prepared engine holds ~190 smoothed control cells at 0 that only converge
+ * toward their targets WHILE rendering (the per-sample smoother pump inside the
+ * voice/master renders); until they converge (~1.5-2 s) the first played note
+ * audibly swells (measured: first 250 ms ~7x quieter on Rip Lead). In a DAW the
+ * host has always rendered long before the user plays, so the swell is never
+ * heard there — the browser app must warm up at boot to match. Renders idle
+ * into a scratch buffer; no arp ticks (nothing is held). */
+void juno_gui_warmup(juno_ctx *c, int nsamples)
+{
+    float buf[2 * 512];
+    if (!c) return;
+    while (nsamples > 0) {
+        int b = nsamples > 512 ? 512 : nsamples, i;
+        for (i = 0; i < b; ++i) {
+            juno_note_tick(c->st);
+            juno_driver_render_sample(c->st, &buf[2 * i], &buf[2 * i + 1]);
+        }
+        nsamples -= b;
+    }
+}
+
 /* Render the DRY voice signal (voice 0 = the one exact per-sample render),
  * bypassing the master/chorus/output stage. This is the genuine pre-FX signal
  * and carries the bit-exact timbre of whatever coefficients are loaded (osc +

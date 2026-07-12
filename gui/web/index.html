@@ -97,7 +97,7 @@ import { decodeBank } from "./bank.js";
 
 /* Cache-buster: build.sh rewrites this to the WASM content hash each build, so a new
  * engine is always fetched fresh instead of served from the browser/CDN cache. */
-const BUILD_VER = "f6ea5f3971ce";
+const BUILD_VER = "a999c165483f";
 
 // The plugin runs its DSP natively at the host sample rate (no oversampling, no
 // decimator). SR is replaced at boot with the AudioContext's ACTUAL rate so the
@@ -119,7 +119,7 @@ function sectionOf(off) {
 }
 
 let M, ctx, get, set, factoryFn, chorusFn, gateFn, renderFn, malloc, free;
-let noteOnFn, noteOffFn, applyBankFn, renderDryFn, arpFn, getArpFn;
+let noteOnFn, noteOffFn, applyBankFn, renderDryFn, arpFn, getArpFn, warmupFn;
 let arpOn = false;
 let PARAMS = [], REAL = {};
 
@@ -139,6 +139,7 @@ async function boot() {
   arpFn = M.cwrap("juno_gui_arp_config",null,["number","number","number","number","number","number"]);
   getArpFn = M.cwrap("juno_gui_get_arp","number",["number"]);
   applyBankFn = M.cwrap("juno_gui_apply_bank","number",["number","number","number","number"]);
+  warmupFn = M.cwrap("juno_gui_warmup",null,["number","number"]);
   malloc = M._malloc; free = M._free;
   // Create the AudioContext at the device's native rate (usually 48 kHz) and build
   // the engine for EXACTLY that rate. juno_gui_create writes state[16]=rate, and the
@@ -151,6 +152,15 @@ async function boot() {
   } catch (e) { console.warn("JUNO: AudioContext unavailable at boot; defaulting engine to", SR, "Hz", e); }
   ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 2);  // engine at host rate, chorus mode II
   if (!ctx) { status("engine alloc failed"); return; }
+  // Warm the engine to its steady idle state, exactly as a DAW does by rendering
+  // silence from the moment the plugin is activated. ~190 smoothed control cells
+  // start at 0 and only converge toward their targets WHILE rendering; a freshly
+  // created engine plays its FIRST note with an audible ~1-2 s swell (the filter
+  // slowly opening) until they settle. A DAW never shows this because the host has
+  // always been rendering before you play. Measured: the first-note trajectory is
+  // fully converged (bit-stable) after ~1 s of warmup, so warm 1.5 s at the host
+  // rate. This is a one-time boot cost; later patch changes keep the warmed cells.
+  warmupFn(ctx, (SR * 3) >> 1);
 
   const raw = await fetch("params.json").then(r => r.json());
   try { REAL = await fetch("param_meta.json").then(r => r.ok ? r.json() : {}); } catch { REAL = {}; }
