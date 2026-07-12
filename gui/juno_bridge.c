@@ -307,20 +307,26 @@ static void poly_note_on(juno_ctx *c, int midi_note, int velocity, int variant)
                     { age = c->voice_age[w]; best = w; }
             pick = best;
         }
-        if (pick < 0) {                                 /* oldest GATE-OFF voice — free OR
-                                                           still-ringing, ONE oldest-by-age
-                                                           pick. Verified by executing the
-                                                           plugin's CAssignJu60 (RVA 0x353150)
-                                                           under Unicorn: its scan tests only
-                                                           the gate byte, with no reaped-vs-
-                                                           ringing preference. */
+        if (pick < 0) {                                 /* least-recently-used GATE-OFF voice.
+                                                           The plugin's CAssignJu60 keeps a
+                                                           voice-priority list initialised
+                                                           [0,1,..,7] and scans it from the TOP
+                                                           (slot 7) DOWN, taking the first
+                                                           gate-off voice — so from a fresh
+                                                           state it allocates 7,6,5,..,0, NOT
+                                                           0,1,.. (proven by a running-code diff
+                                                           vs CAssignJu60 sub_7FF91DFB3150: 10
+                                                           notes -> slots 7..0). Its LRU rule is
+                                                           the same "oldest free" as ours; only
+                                                           the tie-break differs — highest slot
+                                                           index wins, so we scan 7->0. */
             int w; unsigned oldest = 0;
-            for (w = 0; w < JUNO_NUM_VOICES; ++w)
+            for (w = JUNO_NUM_VOICES - 1; w >= 0; --w)
                 if (!c->voice_gated[w] && (pick < 0 || c->voice_age[w] < oldest))
                     { oldest = c->voice_age[w]; pick = w; }
         }
-    } else {                                            /* MODE 3: first free/release by index */
-        for (v = 0; v < JUNO_NUM_VOICES; ++v)
+    } else {                                            /* MODE 3: first free/release, top-down */
+        for (v = JUNO_NUM_VOICES - 1; v >= 0; --v)
             if (c->voice_note[v] < 0 || !c->voice_gated[v]) { pick = v; break; }
     }
     if (pick < 0)                                       /* steal: newest if porta, else oldest */
@@ -530,6 +536,15 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
     /* Per-patch VOICE-ASSIGN recall (CAssignJu60): ASSIGN MODE (poly/mono/unison/
      * poly-variant), LEGATO, and PORTAMENTO-engaged drive the note allocator above. */
     juno_bank_voice_modes(bank, idx, &c->legato, &c->assign_mode, &porta);
+    /* KEY ASSIGN (blob 56) is the JUNO-60's POLY-1(0) / POLY-2(1) / UNISON(2) selector —
+     * there is NO mono mode. The plugin plays value 1 POLYPHONICALLY (proven by a
+     * running-code diff vs CAssignJu60: a chord on an assign=1 patch uses multiple
+     * voices, slots 7/6/5), so it must NOT route to mono_note_on. Map 0 and 1 -> POLY
+     * (internal mode 0), 2 -> UNISON (internal mode 2). 14 factory patches carry
+     * assign=1 and were wrongly played mono before this fix. (POLY-1 vs POLY-2 differ
+     * only in same-note-reuse / steal order, not in fresh allocation, which is
+     * identical 7..0; that nuance is a documented follow-up.) */
+    c->assign_mode = (c->assign_mode == 2) ? 2 : 0;
     c->portamento_on = (porta != 0);
     /* Switching assign mode flushes sounding voices so the new allocator starts
      * clean (the plugin's mode-change reader flushes hold + all-notes-off). Release
