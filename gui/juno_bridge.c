@@ -15,6 +15,7 @@
 #include "../src/delay_recall.h"
 #include "../src/carp.h"
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     unsigned char *st;
@@ -156,6 +157,23 @@ float juno_gui_get(juno_ctx *c, int off)
 {
     if (off >= 0 && (unsigned)off + 4 <= JUNO_STATE_BYTES) return JF(c->st, off);
     return 0.0f;
+}
+
+/* Raw 32-bit cell access — exact bit patterns, no float conversion. Needed by
+ * the verification harness: integer counters, denormals and NaN payloads do not
+ * survive a float round-trip through juno_gui_set/get. */
+void juno_gui_poke(juno_ctx *c, int off, unsigned int bits)
+{
+    if (off >= 0 && (unsigned)off + 4 <= JUNO_STATE_BYTES)
+        memcpy(c->st + off, &bits, 4);
+}
+
+unsigned int juno_gui_peek(juno_ctx *c, int off)
+{
+    unsigned int bits = 0;
+    if (off >= 0 && (unsigned)off + 4 <= JUNO_STATE_BYTES)
+        memcpy(&bits, c->st + off, 4);
+    return bits;
 }
 
 /* Reset to the engine's binary power-on state (the plugin's own default patch):

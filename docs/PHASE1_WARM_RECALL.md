@@ -56,6 +56,28 @@ LFO phase**, which in real DAW use is itself arbitrary (it depends on exactly wh
 the key is pressed relative to activation). So the warmed note is a valid, settled
 patch voice; it is not bit-locked to one arbitrary idle length.
 
+## 4. Phase-2 follow-up: the warm divergence localises to ONE cell (1728)
+
+Driving port and plugin idle from the same clean state and diffing every DSP-read
+cell each sample (`idle_drift_diag.py`, `warm_survivors.py`, raw peek/poke via the
+new `juno_gui_peek/poke`) narrows the entire warm-note divergence to a single
+voice cell: **offset 1728** (a DCO PWM/sub-oscillator phase-fold output,
+`1728 = juno_triangle(v98 + cell2304) * cell2384` in voice_render.c). From idle
+sample 1 the port holds `+0.0002744` while the plugin holds `-0.9997256` — an
+**exact +1.0** offset (≈ 0.5 in the pre-fold phase v98). Every other voice cell
+stays bit-locked. It is idle-specific: the cold *note* render is bit-exact
+(0/144000), so 1728 is correct while a note plays and only diverges when the
+engine free-runs silent. The inputs to 1728 all match at idle=0, so the fault is
+a phase-fold edge case in the v98 computation/wrap, not a bad coefficient — still
+being traced.
+
+A separate attempt to align the prepared *idle default* state (setting 29 cells to
+the plugin's post-activation-snap SETTLED values instead of the pre-snap
+`setSampleRate` values) was REVERTED: it corrected state cells but did NOT change
+the warm audio (all 29 are recall-overwritten), and it contradicted
+`test_prepare_rate`, which asserts the binary-traced pre-snap per-rate values. The
+snap-vs-ramp question for those cells is unresolved and does not gate the 1728 bug.
+
 Status: swell root-caused; the warmup fix is shipped (it removes the swell and
 matches the plugin's settled first-note character — strictly more faithful than
 the cold swell, which a DAW never exposes). Remaining Phase-1 rigor: make the
