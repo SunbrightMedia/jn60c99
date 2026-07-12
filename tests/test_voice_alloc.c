@@ -63,6 +63,24 @@ int main(void)
     { int ng = 0; for (int v = 0; v < 8; ++v) if (g[v]) ++ng;
       if (ng < 3) { printf("FAIL: assign=0 chord collapsed to %d voice(s)\n", ng); ++fails; } }
 
+    /* --- assign = 2: proven POLYPHONIC too, NOT unison. Two factory patches carry
+     * assign=2 (61 Perc Lead, 63 FX Wind); routed to unison (8 stacked voices) they
+     * were ~8x too loud and matched the plugin's own render only as POLY. A chord must
+     * spread across distinct voices, and a SINGLE note must light exactly ONE voice
+     * (unison would light all 8). */
+    put_blob(rec, 56, 2);
+    juno_ctx *c3 = juno_gui_create(48000.0f, 2);
+    juno_gui_apply_bank(c3, bank, HDR + STRIDE, 0);
+    juno_gui_note_on(c3, 60, 100);
+    juno_gui_debug_voices(c3, notes, g);
+    { int ng = 0; for (int v = 0; v < 8; ++v) if (g[v]) ++ng;
+      if (ng != 1) { printf("FAIL: assign=2 single note lit %d voices — UNISON bug (want 1)\n", ng); ++fails; }
+      if (!(g[7] && notes[7] == 60)) { printf("FAIL: assign=2 single note not on voice 7\n"); ++fails; } }
+    juno_gui_note_on(c3, 64, 100); juno_gui_note_on(c3, 67, 100);
+    juno_gui_debug_voices(c3, notes, g);
+    { int ng = 0; for (int v = 0; v < 8; ++v) if (g[v]) ++ng;
+      if (ng < 3) { printf("FAIL: assign=2 chord collapsed to %d voice(s)\n", ng); ++fails; } }
+
     free(bank);
     if (fails) { printf("FAIL: %d voice-alloc check(s)\n", fails); return 1; }
     printf("OK: voice allocation 7->0 + KEY ASSIGN poly (no mono) verified\n");

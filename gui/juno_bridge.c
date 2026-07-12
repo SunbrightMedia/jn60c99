@@ -536,15 +536,16 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
     /* Per-patch VOICE-ASSIGN recall (CAssignJu60): ASSIGN MODE (poly/mono/unison/
      * poly-variant), LEGATO, and PORTAMENTO-engaged drive the note allocator above. */
     juno_bank_voice_modes(bank, idx, &c->legato, &c->assign_mode, &porta);
-    /* KEY ASSIGN (blob 56) is the JUNO-60's POLY-1(0) / POLY-2(1) / UNISON(2) selector —
-     * there is NO mono mode. The plugin plays value 1 POLYPHONICALLY (proven by a
-     * running-code diff vs CAssignJu60: a chord on an assign=1 patch uses multiple
-     * voices, slots 7/6/5), so it must NOT route to mono_note_on. Map 0 and 1 -> POLY
-     * (internal mode 0), 2 -> UNISON (internal mode 2). 14 factory patches carry
-     * assign=1 and were wrongly played mono before this fix. (POLY-1 vs POLY-2 differ
-     * only in same-note-reuse / steal order, not in fresh allocation, which is
-     * identical 7..0; that nuance is a documented follow-up.) */
-    c->assign_mode = (c->assign_mode == 2) ? 2 : 0;
+    /* KEY ASSIGN (blob 56) — the port originally read this as POLY(0)/MONO(1)/UNISON(2),
+     * but a full-play-path running-code A/B vs the plugin's own render (all 64 patches,
+     * note 60 vel 105) proves ALL THREE VALUES ARE POLYPHONIC: value 1 (14 patches:
+     * Rip Lead, Ouch Bass, ...) played mono was 8x wrong; value 2 (patches 61/63) played
+     * unison (8 stacked voices) was ~8x too loud. Both matched the plugin bit-for-bit
+     * only when routed to POLY. The JUNO-60's mono/unison, if present, are NOT this byte.
+     * So map every value -> POLY. (Any sub-mode difference between the three only affects
+     * chord voice-cycling, not the single-note render this A/B measures — documented
+     * follow-up.) mono_note_on / unison_note_on are retained for a future real selector. */
+    c->assign_mode = 0;   /* all KEY ASSIGN values -> POLY (proven vs plugin, 64 patches) */
     c->portamento_on = (porta != 0);
     /* Switching assign mode flushes sounding voices so the new allocator starts
      * clean (the plugin's mode-change reader flushes hold + all-notes-off). Release
