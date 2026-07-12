@@ -3208,6 +3208,22 @@ uint32_t juno_engine_init(unsigned char *a1)
   JI(a1, 10693440) = 1056964608;
   JI(a1, 10693456) = 1006632960;
   JI(a1, 10693472) = -1140850688;
+
+  /* BUILD-time state (not part of sub_1803990C0 itself; set by the engine BUILD
+   * wrapper 0x3C68D0). Arm the per-voice DCO-retrigger latch — aux Array A,
+   * offset 101504 + v*32 — to 1.0 for all 8 voices. Measured directly from the
+   * plugin's post-BUILD state (scratchpad/oracle/latch_arm_when.py: all 8 = 1.0
+   * before setSampleRate). voice_render consumes each voice's own slot on that
+   * voice's FIRST rendered sample (voice_render.c:566), forcing gate=0 for one
+   * sample to reset DCO phase for a clean cold attack. It is armed ONCE here and
+   * is NOT re-armed by note-on: the plugin's note-on writes the DSP-inert aux
+   * Array B (101520 + v*32) instead, never Array A — so a note that arrives after
+   * any rendering does NOT re-phase the DCO (free-running JUNO DCO). This restores
+   * the behaviour the old per-note re-arm in juno_note_on broke (phase-2 matrix
+   * Scenario C: 4th note after render diverged at the first post-note sample). */
+  for (unsigned av = 0; av < (unsigned)JUNO_NUM_VOICES; av++)
+    JF(a1, JUNO_VOICE_AUX_BASE0 + av * JUNO_VOICE_AUX_STRIDE) = 1.0f;
+
   return result;
 }
 

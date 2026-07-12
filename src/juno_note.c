@@ -53,12 +53,20 @@
  * edge that drives both ADSRs.
  *
  * ---------------------------------------------------------------------------
- * DCO RETRIGGER  ->  aux latch (offset 101504 + voice*32), immediate
+ * DCO RETRIGGER  ->  aux latch Array A (offset 101504 + voice*32)
  * ---------------------------------------------------------------------------
- * On note-on the plugin sets the per-voice one-shot latch state[101504+voice*32] =
- * 1.0. voice_render consumes it on the next sample (voice_render.c:567-572 forces
- * the gate to 0 for that one sample and clears state[320]; :2146-2149 restores
- * state[320] and clears the latch). This resets DCO phase for a consistent attack.
+ * voice_render consumes a per-voice one-shot latch state[101504+voice*32]==1.0 on
+ * a sample (voice_render.c:566-572 forces the gate to 0 for that one sample and
+ * clears state[320]; :2141-2149 restores state[320] and clears the latch) to reset
+ * DCO phase. CORRECTED (measured from the plugin's own code under Unicorn): this
+ * latch (call it Array A) is armed to 1.0 for all 8 voices ONCE at engine BUILD
+ * (juno_init.c), NOT by note-on. Each voice's first rendered sample consumes its
+ * own slot, so a cold first note resets DCO phase; thereafter the DCO free-runs.
+ * The plugin's note-on writes a DIFFERENT, DSP-inert cell — aux Array B at
+ * 101520+voice*32 — never Array A. An earlier port armed Array A on every note-on;
+ * that re-phased the DCO on notes played after rendering had begun (wrong; only
+ * masked in the cold single-note A/B because there note-on precedes any render).
+ * See scratchpad/oracle/latch_{probe,reads,arm_when}.py.
  *
  * ---------------------------------------------------------------------------
  * WHAT WE DELIBERATELY DO NOT DO
@@ -155,8 +163,19 @@ void juno_note_on(unsigned char *st, int voice, int midi_note, int velocity)
      * attack. The plugin writes this directly (descriptor en=0), no ramp. */
     JF(st, base + GATE_OFF) = GATE_OPEN;
 
-    /* Aux latch (immediate): one-shot DCO phase retrigger (consumed next sample). */
-    JF(st, AUX_EDGE(voice)) = 1.0f;
+    /* DCO retrigger latch: DO NOT arm here. Measured directly from the plugin's
+     * own note-on machine code under Unicorn (scratchpad/oracle/latch_probe.py,
+     * latch_arm_when.py): the plugin's note-on writes the DSP-INERT aux Array B
+     * (101520 + v*32), NOT the retrigger latch Array A (101504 + v*32) that
+     * voice_render consumes. Array A is armed ONCE at engine BUILD (juno_init.c)
+     * for all 8 voices and consumed on each voice's first rendered sample; it is
+     * never re-armed by note-on. An earlier version armed it here every note,
+     * which re-phased the DCO on every note-on — correct only for a cold note-on
+     * that precedes any rendering (which is why the cold A/B stayed bit-exact and
+     * masked it), but WRONG for any note arriving after rendering has begun
+     * (phase-2 matrix Scenario C). The free-running JUNO DCO does not re-phase per
+     * note; removing the re-arm restores that. Array B is inert (no voice_render
+     * read references 101520+v*32), so we do not model it. */
 
     /* Velocity coefficients (immediate). The plugin's note-on fires the per-voice
      * "gate notify" (poly allocator sub_7FF91DFB3150 -> dispatch case 450 ->

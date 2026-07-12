@@ -5,7 +5,11 @@
  * an onset CLICK followed by a slow swell even for fast-attack patches ("attack
  * never snappy" + "clicking"). This test asserts:
  *   1. note_on writes M.CV (304)=juno_note_pitch(note) [(note-12)/12 + analog tune],
- *      M.Gate (320)=1.0, aux latch=1.0 (immediate)
+ *      M.Gate (320)=1.0 (immediate). The DCO-retrigger latch (aux Array A,
+ *      101504+v*32) is armed to 1.0 at BUILD by juno_engine_init — NOT by note_on;
+ *      note_on must never (re-)arm it. Regression guard for the phase-2 matrix
+ *      Scenario-C bug (an earlier note_on armed it every note, re-phasing the DCO
+ *      on notes played after rendering had begun).
  *   2. note_off writes M.Gate (320)=0.0 (immediate)
  *   3. with a FAST attack coefficient the audio reaches near-full level within a few
  *      ms and has NO large onset transient relative to the steady level (snappy, no
@@ -81,10 +85,21 @@ int main(void)
     { float mcv = JF(st, b + 304);
       if (mcv < 3.99f || mcv > 4.01f) { printf("FAIL: M.CV(60)=%g not ~3.9998 ((note-12)/12)\n", mcv); return 1; } }
     if (JF(st, b + 320) != 1.0f)          { printf("FAIL: M.Gate != 1.0 on note-on\n"); return 1; }
-    if (JF(st, aux)     != 1.0f)          { printf("FAIL: aux retrigger latch not set\n"); return 1; }
+    /* aux DCO-retrigger latch is armed by juno_engine_init (BUILD), not note_on. */
+    if (JF(st, aux)     != 1.0f)          { printf("FAIL: aux retrigger latch not armed at BUILD\n"); return 1; }
     juno_note_off(st, 3);
     if (JF(st, b + 320) != 0.0f)          { printf("FAIL: M.Gate != 0.0 on note-off\n"); return 1; }
-    printf("OK: note_on/off write M.CV, M.Gate, aux latch immediately (binary en=0)\n");
+
+    /* Regression guard (Scenario C): once the latch is CONSUMED by rendering, a
+     * subsequent note_on must NOT re-arm it — the plugin's note-on never touches
+     * aux Array A. Consume voice 3's latch with one render, confirm it clears, then
+     * re-gate and confirm it stays 0. */
+    { float l, r; JF(st, b + 320) = 1.0f; juno_voice_render(st, 3, &l, &r); }
+    if (JF(st, aux) != 0.0f)              { printf("FAIL: aux latch not consumed by render\n"); return 1; }
+    juno_note_on(st, 3, 62, 100);
+    if (JF(st, aux) != 0.0f)              { printf("FAIL: note_on RE-ARMED aux latch after consume (Scenario C bug)\n"); return 1; }
+    juno_note_off(st, 3);
+    printf("OK: BUILD arms aux latch; note_on never (re-)arms it (Scenario C guard)\n");
 
     /* 2. sound present + NO onset click — on a REAL patch (complete bit-exact
      * envelope). The old bug was a hand-written 1 ms gate RAMP that produced an
