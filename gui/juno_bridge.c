@@ -63,10 +63,9 @@ typedef struct {
     int   dly_sync;
     int   dly_type;
 
-    /* Last CONDITION byte applied (128 at power-on, patch value on recall). A single
-     * per-parameter edit (juno_gui_set_param) re-seeds all 8 voices, which would flatten
-     * the CONDITION analog scatter — so the setter re-applies this byte afterwards,
-     * exactly as the bank recall does (seed -> apply_condition). */
+    /* Last CONDITION byte applied (128 at power-on, patch value on recall). Used by
+     * apply_bank recall; a live per-parameter edit (juno_gui_set_param) does NOT
+     * re-apply it — the plugin's live param dispatch writes only the target cell. */
     int   last_condition;
 } juno_ctx;
 
@@ -205,17 +204,32 @@ const char *juno_gui_param_name(int i) { return juno_param_name(i); }
 int juno_gui_param_offset(int i) { return juno_param_offset(i); }
 
 /* Apply raw byte (0..255) to panel parameter `param_index`, bit-exact via the recall
- * dispatch, then propagate to all 8 voices exactly as a bank recall does (seed voice 0
- * -> re-apply the current CONDITION scatter). Returns the engine float written. */
+ * dispatch, then propagate to all 8 voices as the plugin's LIVE param dispatch does:
+ * write the SAME engine float into every voice's copy of that ONE cell and touch
+ * NOTHING else. Returns the engine float written.
+ *
+ * A live param move is NOT a recall. Measured from the plugin's own dispatch under
+ * emulation (phase-2 matrix Scenario E): a live parameter change writes only the
+ * target cell — 8 per-voice copies at stride JUNO_VOICE_MAIN_STRIDE for a per-voice
+ * param, or the single master cell for a master param (e.g. VCA LEVEL @101072) —
+ * with 0 smoothers armed, and does NOT re-seed the voices or re-apply CONDITION.
+ * The former seed_voices() (whole-block copy voice0->1..7) + apply_condition() reset
+ * every voice's evolved runtime state (envelope/LFO phase, drift tables) to voice 0's
+ * / recall-time values, so any live move mid-note snapped the sound; this replicates
+ * only the changed cell, leaving each voice's independent evolution intact. */
 float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
 {
-    int Hr;
+    int Hr, off, v;
     float w;
     if (!c) return 0.0f;
     Hr = (int)JF(c->st, 16); if (Hr <= 0) Hr = 96000;
-    w = juno_apply_param(c->st, param_index, byte, Hr);
-    juno_driver_seed_voices(c->st);              /* voice 0 -> all 8 (as recall) */
-    juno_apply_condition(c->st, c->last_condition); /* restore analog scatter       */
+    off = juno_param_offset(param_index);
+    w = juno_apply_param(c->st, param_index, byte, Hr);   /* writes voice-0 / master cell */
+    /* Per-voice cell (voice-0 block): replicate the identical value to voices 1..7.
+     * Master cells (off >= voice span) are written once by juno_apply_param. */
+    if (off >= 176 && off < 176 + JUNO_VOICE_MAIN_STRIDE)
+        for (v = 1; v < JUNO_NUM_VOICES; ++v)
+            JF(c->st, (unsigned)off + (unsigned)v * JUNO_VOICE_MAIN_STRIDE) = w;
     return w;
 }
 
