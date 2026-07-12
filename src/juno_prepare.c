@@ -188,14 +188,20 @@ void juno_engine_prepare(unsigned char *st)
     JI(st,  10759392) = 0x3f000000;  /*  0.5          Rev Ecf Density         */
     JI(st,  10759424) = 0x3f800000;  /*  1.0          Rev Ecf Dir Lev         */
     JI(st,  10759440) = 0x3efefeff;  /*  0.498039     Rev Ecf Glb Lev         */
-    JI(st,  10759520) = 0x3f7f8b7e;  /*  0.998222     Rev Ecf HPF C0          */
-    JI(st,  10759536) = 0xbf7f8b7e;  /* -0.998222     Rev Ecf HPF A0          */
-    JI(st,  10759552) = 0x3f7f16fb;  /*  0.996444     Rev Ecf HPF B0          */
-    JI(st,  10759568) = 0x3d434c95;  /*  0.0476805    Rev Ecf LPF C0          */
-    JI(st,  10759584) = 0x3dc34c95;  /*  0.0953609    Rev Ecf LPF A0          */
-    JI(st,  10759600) = 0x3d434c95;  /*  0.0476805    Rev Ecf LPF A1          */
-    JI(st,  10759616) = 0x3fa5addf;  /*  1.29437      Rev Ecf LPF B0          */
-    JI(st,  10759632) = 0xbef85dc7;  /* -0.48509      Rev Ecf LPF B1          */
+    /* Rev Ecf HPF/LPF cascade — RATE-DEPENDENT, 2-class {44100 / else} (48000 ==
+     * 88200 == 96000 share the else arm; both arms measured bit-for-bit from the
+     * plugin's own cold state at 44100/48000/88200/96000, identical across every
+     * patch — build defaults, never recalled. scratchpad/oracle/rate_fullscan.py +
+     * rate88_dump.py. The former single 48k arm was one seed of the 44.1 kHz
+     * cold-render drift.) */
+    JI(st,  10759520) = (Hr == 44100) ? 0x3f7f02e7 : 0x3f7f8b7e; /* Rev Ecf HPF C0 */
+    JI(st,  10759536) = (Hr == 44100) ? 0xbf7f02e7 : 0xbf7f8b7e; /* Rev Ecf HPF A0 */
+    JI(st,  10759552) = (Hr == 44100) ? 0x3f7e05cf : 0x3f7f16fb; /* Rev Ecf HPF B0 */
+    JI(st,  10759568) = (Hr == 44100) ? 0x3e1ca4f3 : 0x3d434c95; /* Rev Ecf LPF C0 */
+    JI(st,  10759584) = (Hr == 44100) ? 0x3e9ca4f3 : 0x3dc34c95; /* Rev Ecf LPF A0 */
+    JI(st,  10759600) = (Hr == 44100) ? 0x3e1ca4f3 : 0x3d434c95; /* Rev Ecf LPF A1 */
+    JI(st,  10759616) = (Hr == 44100) ? 0x3f2180e3 : 0x3fa5addf; /* Rev Ecf LPF B0 */
+    JI(st,  10759632) = (Hr == 44100) ? 0xbe789759 : 0xbef85dc7; /* Rev Ecf LPF B1 */
     JI(st,  10759648) = 0x3e0566f8;  /*  0.130276     Rev Ecf DPF0 Fc         */
     JI(st,  10759664) = 0x3ebd52a3;  /*  0.369771     Rev Ecf DPF0 Hp         */
     JI(st,  10759696) = 0x3e0566f8;  /*  0.130276     Rev Ecf DPF1 Fc         */

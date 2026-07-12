@@ -68,6 +68,26 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
         JF(state, 86304) = efx_bits(0x41008081u);                      /* DS Level (const) */
         JF(state, 87056) = efx_bits(MODE1_DS_TONE_LUT[tone & 0xFF]);    /* DS TONE (pan)    */
         JF(state, 86320) = 1.0f;                                       /* DS Mute gate     */
+        /* 19 mode-1 filter cells are RATE-DEPENDENT, 2-class {44100 / else}: the
+         * MODE1_STRUCT capture (48 kHz) coincides with the 96 kHz values, so the
+         * single arm was invisible until the 44.1 kHz state diff. The 44.1 arm is
+         * measured bit-for-bit from the plugin's own recall of patch 9 (the only
+         * factory v551==1 patch) at 44100; 48000/96000 hold the struct values
+         * (scratchpad/oracle/ p9 fullscan). */
+        if ((int)JF(state, 16) == 44100) {
+            static const uint32_t M1_44[] = {
+                86368,0x407e0000u, 86384,0xc07e0000u, 86400,0x3f7e0000u,
+                86464,0x3dbcc000u, 86480,0x3c000000u, 86592,0x3a000000u,
+                86608,0x3d8178abu, 86624,0xbd8178abu, 86640,0x3f7f0000u,
+                86912,0x3c80135bu, 86928,0x3d708c41u, 86944,0x3e29e7b6u,
+                86960,0x3e84f967u, 87072,0x4054945cu, 87088,0xc03842f0u,
+                87104,0x3f0eba50u, 87120,0x3f86b818u, 87136,0xbf698bc4u,
+                87152,0x3f76fbf8u
+            };
+            unsigned k;
+            for (k = 0; k < sizeof(M1_44)/sizeof(M1_44[0]); k += 2)
+                JF(state, (int)M1_44[k]) = efx_bits(M1_44[k + 1]);
+        }
     } else if (etype == 5) {              /* CHORUS/ENSEMBLE variant (block 96336..96912) */
         write_struct(state, MODE5_STRUCT, MODE5_STRUCT_N);
         JF(state, 96400) = (float)depth / 255.0f;                      /* On/Off           */

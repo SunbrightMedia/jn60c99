@@ -116,10 +116,44 @@ int main(void)
     if (u32(st, 102528) != 0x3f008081 || u32(st, 4297760) != 0x3f008081) {
         printf("  case5: dual-delay wet %08x/%08x != 3f008081\n",
                u32(st, 102528), u32(st, 4297760)); ++fails; }
-    if (u32(st, 102544) != 0x3f9bd7ca) {   /* type-1 first-instance variant constant */
-        printf("  case5: 102544 %08x != 3f9bd7ca\n", u32(st, 102544)); ++fails; }
+    /* type-1 first-instance variant: RATE-ARMED (2sin(pi*10000/H) family; arms
+     * measured from the plugin at 44100/48000/88200/96000). Hr unset here -> the
+     * 96k arm. The old assertion pinned the 48k capture (0x3f9bd7ca) at 96k, which
+     * the plugin's own 96k post-recall state contradicts. */
+    if (u32(st, 102544) != 0x3f2493b7) {
+        printf("  case5: 102544 %08x != 3f2493b7 (96k arm)\n", u32(st, 102544)); ++fails; }
     if (JF(st, 4297824) != 1.0f || JF(st, 102576) != 1.0f) {
         printf("  case5: dual-delay ON gates not set\n"); ++fails; }
+
+    /* --- case 5b: FX rate arms (44.1 kHz drift fix). The rate-dependent cells of
+     * the TYPE-0 delay block must select the measured per-rate bits; the former
+     * 48k-only captures seeded the 44.1 kHz (and 96 kHz) cold-render drift. --- */
+    {
+        struct arm { float rate; unsigned c102608, c102544, c102448, c102656; };
+        static const struct arm A[3] = {
+            { 44100.0f, 0x3c3abeeau, 0x388b3cdfu, 0x3f800000u, 0x3f800000u },
+            { 48000.0f, 0x3c2b929au, 0x387fd974u, 0x00000000u, 0x3f4ba5b0u },
+            {     0.0f, 0x3bab929au, 0x37ffd974u, 0x00000000u, 0x3f4ba5b0u },  /* unset -> 96k */
+        };
+        int a;
+        put_pair(rec, 650, 0);                 /* DELAY TYPE 0 -> FILT block */
+        for (a = 0; a < 3; ++a) {
+            memset(st, 0, JUNO_STATE_BYTES);
+            JF(st, 16) = A[a].rate;
+            juno_bank_apply(st, bank, 0);
+            if ((unsigned)u32(st, 102608) != A[a].c102608 ||
+                (unsigned)u32(st, 102544) != A[a].c102544 ||
+                (unsigned)u32(st, 102448) != A[a].c102448 ||
+                (unsigned)u32(st, 102656) != A[a].c102656) {
+                printf("  case5b[arm %d]: 102608=%08x 102544=%08x 102448=%08x 102656=%08x\n",
+                       a, u32(st, 102608), u32(st, 102544), u32(st, 102448), u32(st, 102656));
+                ++fails;
+            }
+        }
+        put_pair(rec, 650, 1);                 /* restore TYPE 1 for case 6 */
+        memset(st, 0, JUNO_STATE_BYTES);
+        juno_bank_apply(st, bank, 0);
+    }
 
     /* --- case 6: host-tempo recompute (juno_apply_delay_tempo): 60 BPM, division 8
      * -> ms = 750 exactly -> 0x40866300 @96k ((96000*750)/16384000 - 2/16384). The

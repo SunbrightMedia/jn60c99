@@ -142,6 +142,33 @@ static const uint32_t DLY1_B[] = {   /* second instance 4297584..: always-consta
   4297952,0x3f4ba5b0u, 4297968,0x3f800000u, 4297984,0x3f800000u
 };
 
+/* --- Rate arms for the FX-config cells the constant tables got wrong. ---
+ * The FILT/DLY1/S1CHORUS/S1REVERB tables were captured at 48 kHz; a subset of
+ * their cells is RATE-DEPENDENT (the plugin's FX config writes per-rate values,
+ * same architecture as juno_prepare's rate classes). Measured bit-for-bit from
+ * the plugin's own build+recall at 44100/48000/88200/96000 (scratchpad/oracle/
+ * rate_fullscan.py + rate88_dump.py): cells fall into a continuous 2sin(pi*f/H)
+ * family (4 distinct arms), a 96k-clamped family (88200 uses the 96k bits), and
+ * 2-class {44100, else} switches. We store the exact measured bits per arm —
+ * bit-exact by construction at all four verified rates. This closes the 44.1 kHz
+ * (and 96 kHz) cold-render drift: a 1-ULP-seeded divergence at the delay/FX
+ * read-back onset (~frame 2722 @44.1k) that accumulated to ~1.7% RMS. */
+static void put_rate(unsigned char *state, int Hr, int off,
+                     uint32_t b44, uint32_t b48, uint32_t b88, uint32_t b96)
+{
+    uint32_t bits = (Hr == 44100) ? b44 : (Hr == 48000) ? b48
+                  : (Hr == 88200) ? b88 : b96;
+    float f; memcpy(&f, &bits, sizeof f);
+    JF(state, off) = f;
+}
+/* shared arm sets (same values appear in every FX block instance) */
+#define ARM_HCSW  0x3f800000u, 0x00000000u, 0x00000000u, 0x00000000u  /* High-Cut Sw   */
+#define ARM_HFDMP 0x3f800000u, 0x3f4ba5b0u, 0x3f4ba5b0u, 0x3f4ba5b0u  /* HF-Damp Fc    */
+#define ARM_LFX1  0x388b3cdfu, 0x387fd974u, 0x37ffd974u, 0x37ffd974u  /* 96k-clamped   */
+#define ARM_LFX2  0x3c3abeeau, 0x3c2b929au, 0x3bbabeeau, 0x3bab929au  /* 2sin(pi*80/H) */
+#define ARM_CHDEP 0x3cdb8001u, 0x3cef0001u, 0x3d5c0001u, 0x3d6f8001u  /* chorus depth  */
+#define ARM_CHLF  0x3b696eb3u, 0x3b56774fu, 0x3ae96eb3u, 0x3ad6774fu  /* chorus LF     */
+
 /* logical byte from a nibble pair at record offset `off` (record is nibble-packed
  * past the 16-char name; see juno_apply.c record_byte). */
 static int rec_byte(const unsigned char *rec, int off)
@@ -174,11 +201,23 @@ static const uint32_t S1CHORUS[] = {
 static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, int dtype)
 {
     int b53 = blob_val(rec, 53), b52 = blob_val(rec, 52);
+    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
     unsigned k; uint32_t bits; float f;
     for (k = 0; k < sizeof(S1CHORUS) / sizeof(S1CHORUS[0]); k += 2) {
         bits = S1CHORUS[k + 1]; memcpy(&f, &bits, sizeof f);
         JF(state, (int)S1CHORUS[k]) = f;
     }
+    /* rate-dependent cells (table holds the 48k arm; see put_rate above). 6396272
+     * (High-Cut Sw) is 44.1k-only=1.0 and was previously never written; 6396528 is
+     * 2-class {44100-arm, else}. The slot-1 delay's HF-Damp 102656 is written to the
+     * rate-CONSTANT 0x3f4ba5b0 by this config on every rate (plugin@44.1k holds
+     * 0.795 here, NOT prepare's 44.1 class-D default 1.0 — measured, rate_fullscan). */
+    put_rate(state, Hr, 6396128, ARM_CHDEP);
+    put_rate(state, Hr, 6396272, ARM_HCSW);
+    put_rate(state, Hr, 6396336, ARM_CHLF);
+    put_rate(state, Hr, 6396400, ARM_LFX1);
+    put_rate(state, Hr, 6396528, 0x3d256000u, 0x3db40000u, 0x3db40000u, 0x3db40000u);
+    { uint32_t hb = 0x3f4ba5b0u; memcpy(&f, &hb, sizeof f); JF(state, 102656) = f; }
     JF(state, 6395312) = ((float)b53 / 255.0f) * 11.0f - 8.0f;   /* chorus rate/level */
     JF(state, 6396176) = (float)b52 / 255.0f;                    /* chorus depth      */
     /* Chorus I (dtype 2) vs II (dtype 3): these four routing/filter cells carry the
@@ -218,11 +257,27 @@ static const uint32_t S1REVERB[] = {
 static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, float tc)
 {
     int b52 = blob_val(rec, 52);
+    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
     unsigned k; uint32_t bits; float f;
     for (k = 0; k < sizeof(S1REVERB) / sizeof(S1REVERB[0]); k += 2) {
         bits = S1REVERB[k + 1]; memcpy(&f, &bits, sizeof f);
         JF(state, (int)S1REVERB[k]) = f;
     }
+    /* rate-dependent cells (table holds the 48k arm; see put_rate above). The two
+     * High-Cut switches (6497264 / 10693152) are 44.1k-only=1.0 and were previously
+     * never written; 10759360 is the affine H*0.02-2 predelay (880/958/1762/1918);
+     * 102656 (slot-1 delay HF-Damp) is rate-CONSTANT 0x3f4ba5b0 under this config
+     * (same as the chorus config — measured, rate_fullscan/rate88_dump). */
+    put_rate(state, Hr, 6497264,  ARM_HCSW);
+    put_rate(state, Hr, 6497360,  ARM_LFX1);
+    put_rate(state, Hr, 6497424,  ARM_LFX2);
+    put_rate(state, Hr, 6497472,  ARM_HFDMP);
+    put_rate(state, Hr, 10693008, ARM_CHDEP);
+    put_rate(state, Hr, 10693152, ARM_HCSW);
+    put_rate(state, Hr, 10693216, ARM_CHLF);
+    put_rate(state, Hr, 10693280, ARM_LFX1);
+    put_rate(state, Hr, 10759360, 0x445c0000u, 0x446f8000u, 0x44dc4000u, 0x44efc000u);
+    { uint32_t hb = 0x3f4ba5b0u; memcpy(&f, &hb, sizeof f); JF(state, 102656) = f; }
     JF(state, 6497344) = (float)b52 / 255.0f;   /* reverb depth              */
     JF(state, 6497168) = tc;                    /* delay time (sync-aware)   */
 }
@@ -236,6 +291,7 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
 {
     int level = blob_val(rec, 52);            /* DELAY LEVEL */
     int on = (level >= 2);
+    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
     unsigned k; uint32_t bits; float f;
 
     /* constant cells for both instances */
@@ -245,6 +301,16 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
     for (k = 0; k < sizeof(DLY1_B) / sizeof(DLY1_B[0]); k += 2) {
         bits = DLY1_B[k + 1]; memcpy(&f, &bits, sizeof f); JF(state, (int)DLY1_B[k]) = f;
     }
+    /* rate-dependent cells (tables hold the 48k arm; see put_rate above).
+     * First instance: 102544 has TYPE-1-specific arms (2sin(pi*10000/H) family);
+     * 102608/102656 are rate-CONSTANT for TYPE 1 (verified: plugin@44.1k holds the
+     * same 0x3bab929a / 0x3f4ba5b0 the table writes). Second instance mirrors the
+     * TYPE-0 block cell-for-cell. */
+    put_rate(state, Hr, 102544, 0x3fa754b5u, 0x3f9bd7cau, 0x3f2493b7u, 0x3f2493b7u);
+    put_rate(state, Hr, 4297680, ARM_HCSW);
+    put_rate(state, Hr, 4297776, ARM_LFX1);
+    put_rate(state, Hr, 4297904, ARM_LFX2);
+    put_rate(state, Hr, 4297952, ARM_HFDMP);
 
     /* DELAY TIME (sync-aware, same value on both taps — matches every captured
      * TYPE-1 state, synced and manual). 102352 was already written by the caller. */
@@ -312,6 +378,11 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
         memcpy(&f, &bits, sizeof f);
         JF(state, (int)FILT[k]) = f;
     }
+    /* rate-dependent FILT cells (table holds the 48k arm; see put_rate above) */
+    put_rate(state, Hr, 102448, ARM_HCSW);
+    put_rate(state, Hr, 102544, ARM_LFX1);
+    put_rate(state, Hr, 102608, ARM_LFX2);
+    put_rate(state, Hr, 102656, ARM_HFDMP);
     JF(state, 102528) = (float)level  / 255.0f;             /* Wet (per-patch = LEVEL/255) */
     JF(state, 102576) = level >= 2 ? 1.0f : 0.0f;           /* On/Off (curve: v0,v1->0, v2->1) */
 }

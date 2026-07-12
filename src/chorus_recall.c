@@ -54,10 +54,16 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
         JF(state, 91200) = cr_bits(CHORUS_NOISE_LUT[tone & 0xFF]);  /* Noise       */
         /* Mode 3 (chorus II) runs block A's LFO at a DIFFERENT rate than modes 2/4/5
          * (which use the prepare default 91152=1.92e-05). The plugin holds mode 3 at
-         * 91152=0x380f4e2e (3.42e-05 @48k) — a genuinely different rate, not a scale of
-         * the default. Captured @48k; rate-dependent (see docs/FX_COLDLOAD_TODO.md). */
+         * a RATE-DEPENDENT value (continuous C/H family — the 44.1k/88.2k bits are
+         * exact x2 pairs of each other). Arms measured bit-for-bit from the plugin's
+         * own build+recall at 44100/48000/88200/96000 (scratchpad/oracle/
+         * rate_fullscan.py + the 88.2 probe); the old single 48k capture was one
+         * seed of the 44.1 kHz cold-render drift. */
         if (etype == 3) {
-            unsigned int b = 0x380f4e2eu; float f; memcpy(&f, &b, 4);
+            int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+            unsigned int b = (Hr == 44100) ? 0x381bfa89u : (Hr == 48000) ? 0x380f4e2eu
+                           : (Hr == 88200) ? 0x379bfa89u : 0x378f4e2eu;
+            float f; memcpy(&f, &b, 4);
             JF(state, 91152) = f;
         }
     }
