@@ -16,7 +16,7 @@ fixable defects (fixed + re-verified); the rest are known-legit or oracle-bounde
 | C chords + voice steal | divergence-found | **REAL BUG** (same latch) at 4th note; steal itself oracle-bounded | **FIXED** (through 8 voices); steal = Phase 4 |
 | D long render (5 s tails) | all-exact 2/2 | confirmed all-exact | — |
 | E live param move mid-note | divergence-found | **REAL BUG** (set_param over-reseed) | **FIXED** — all 9 params bit-exact |
-| rate-44k 44.1 kHz | (killed) | not run this session | pending |
+| rate-44k 44.1 kHz | (killed) | **REAL BUG** (FX tables 48k-baked; 96k too) | **FIXED** — bit-exact at 44.1k & 96k, every FX type |
 
 ## The two real bugs (found by the matrix, verified + fixed by me)
 
@@ -52,10 +52,11 @@ runtime state (envelope/LFO phase, drift tables) mid-note.
   first post-change sample in every case).
 
 ## Delivered WASM
-Rebuilt `gui/web/juno.wasm` (BUILD_VER 624cddea22d4). Verified the delivered artifact:
-cold browser-path A/B 57/64 bit-exact vs plugin (unchanged baseline; the 7 are SQ arp
-patches under the arp-on harness), Scenario B 45000-frame bit-exact, Scenario E all 9
-bit-exact (`scratchpad/oracle/wasm_scen_check.mjs`).
+Rebuilt `gui/web/juno.wasm` (BUILD_VER 78321a130687, includes the FX rate arms).
+Verified the delivered artifact: cold browser-path A/B 57/64 bit-exact vs plugin at
+48 kHz (unchanged baseline; the 7 are SQ arp patches under the arp-on harness), cold
+@44100 BIT-EXACT (4 patches, `wasm_rate44_check.mjs`), Scenario B 45000-frame
+bit-exact, Scenario E all 9 bit-exact (`scratchpad/oracle/wasm_scen_check.mjs`).
 
 ## Not fixed (correctly)
 - **Scenario A** (patch→patch switch): the divergence begins exactly at the mid-stream
