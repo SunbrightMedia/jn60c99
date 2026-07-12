@@ -873,6 +873,13 @@ LABEL_46:
   {
     fmodf(v107 + 1.0, 2.0);
   }
+  /* v107 (= v98 + cell2320) is the sub-osc TRIANGLE phase; its wrap is folded
+   * into juno_triangle below (the decompiler dropped the sub_180368FC0 argument,
+   * so an earlier transcription mis-fed v108 here — masked in recalled notes,
+   * where cells 2304 and 2320 coincide, but wrong for the free-running idle phase,
+   * where they differ by −0.5 and produced a half-cycle sub-osc error). v108
+   * (= v98 + cell2304) remains the PULSE phase used for v110. See
+   * dsp_dump/0021 lines 860-883 + docs/PHASE1_WARM_RECALL.md. */
   v108 = v98 + JF(a1, 2304);
   if ( v108 <= 1.0 )
   {
@@ -883,7 +890,7 @@ LABEL_46:
   {
     v108 = fmodf(v108 + 1.0, 2.0) - 1.0;
   }
-  v109 = juno_triangle(v108);
+  v109 = juno_triangle(v107);
   v110 = v108 + JF(a1, 2496);
   v111 = v109 * JF(a1, 2384);
   if ( v110 >= 0.0 )

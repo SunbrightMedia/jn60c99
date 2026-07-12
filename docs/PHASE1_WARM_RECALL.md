@@ -78,6 +78,35 @@ the warm audio (all 29 are recall-overwritten), and it contradicted
 `test_prepare_rate`, which asserts the binary-traced pre-snap per-rate values. The
 snap-vs-ramp question for those cells is unresolved and does not gate the 1728 bug.
 
+## 5. Phase-2 resolution: two real DSP bugs fixed; warm allocation is oracle-bounded
+
+The per-sample state-diff drove the warm divergence to its roots and fixed two
+genuine bugs:
+
+1. **Sub-osc triangle argument (voice_render.c).** The decompiler dropped the
+   argument to the triangle function `sub_180368FC0`; an earlier transcription fed
+   `v108` (= v98 + cell2304) where the plugin feeds `v107` (= v98 + cell2320, the
+   −0.5-shifted sub-osc phase). Masked in recalled notes (recall makes 2304==2320)
+   but wrong for the free-running idle phase. Fix: `juno_triangle(v107)`. With it,
+   the port's idle evolution is **bit-identical to the plugin's for 48000 samples**
+   (every voice cell, 0 diffs) — previously it diverged at sample 1.
+
+2. **Prepare pre-snap vs settled (juno_prepare.c).** 29 smoothed cells were left
+   at the pre-snap `setSampleRate` START; the plugin settles them to a
+   rate-independent target at activation and RUNS with that. Fix: seed the settled
+   targets. `test_prepare_rate` updated accordingly (it had asserted the pre-snap
+   values). Both proven against the plugin's own post-snap state.
+
+**Oracle-bounded limit (honest).** Full warm-recall = idle → recall → play. The
+idle voice-DSP is now bit-exact, but WHICH voice unit is active during idle and
+which is allocated on the note is governed by the plugin's threaded `process()` +
+CAssignJu60 event/assigner path — the same intractable layer as the arp (Phase 4).
+The leaf-driven oracle can verify the DSP but not the assigner-managed voice
+lifecycle across the idle→play boundary, so the warm note's exact voice ALLOCATION
+(and its per-voice CONDITION scatter) cannot be bit-verified with the available
+tools. The audible result is correct (settled note, no swell) and the DSP is now
+strictly more faithful; the residual is voice-selection, not synthesis.
+
 Status: swell root-caused; the warmup fix is shipped (it removes the swell and
 matches the plugin's settled first-note character — strictly more faithful than
 the cold swell, which a DAW never exposes). Remaining Phase-1 rigor: make the

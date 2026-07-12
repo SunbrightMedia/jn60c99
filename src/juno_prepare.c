@@ -208,6 +208,47 @@ void juno_engine_prepare(unsigned char *st)
     JI(st,  10759808) = 0x3e8f487e;  /*  0.27985      Rev Ecf DPF3 Hp         */
     JI(st,  10759824) = 0xbf044337;  /* -0.516651     Rev Ecf DPF3 Lp         */
 
+    /* --- SETTLED override: cells the plugin's activation SNAP settles to a
+     * rate-INDEPENDENT target that this prepare baseline otherwise leaves at the
+     * pre-snap value (or 0). The plugin RUNS with the settled state (setActive's
+     * snap completes before any audio), so idle / factory-default / warm-recall
+     * must match it. Proven by a full voice-window + master sweep vs the plugin's
+     * own post-snap state at 48000 == 44100 (rate-independent). The voice-window
+     * cells (<10672) are replicated to voices 1..7 by juno_driver_seed_voices.
+     * These feed the DCO/LFO phase accumulators (1536 etc.); leaving them at the
+     * pre-snap value made the free-running idle phase — and thus the warm first
+     * note — diverge from the plugin. Recall overwrites the recallable ones; this
+     * is the correct UNAPPLIED default. See docs/PHASE1_WARM_RECALL.md. */
+    JI(st,    624) = 0x3d01499d;  /* 0.031564344   Porta/env time base          */
+    JI(st,   1088) = 0x3f119192;  /* 0.56862748                                 */
+    JI(st,   1920) = 0x3c2aaa78;  /* 0.010416619   LFO delay                    */
+    JI(st,   2064) = 0x3f119192;  /* 0.56862748                                 */
+    JI(st,   2784) = 0x40638f21;  /* 3.5556109     ENV1 attack                  */
+    JI(st,   2800) = 0x3f800000;  /* 1.0           ENV1 stage gate              */
+    JI(st,   2816) = 0x40aaac0b;  /* 5.3335013     ENV1 decay                   */
+    JI(st,   2832) = 0x40aaac0b;  /* 5.3335013     ENV1 release                 */
+    JI(st,   3264) = 0x40638f21;  /* 3.5556109     ENV2 attack                  */
+    JI(st,   3280) = 0x3f800000;  /* 1.0           ENV2 stage gate              */
+    JI(st,   3296) = 0x40aaac0b;  /* 5.3335013     ENV2 decay                   */
+    JI(st,   3312) = 0x40aaac0b;  /* 5.3335013     ENV2 release                 */
+    JI(st,   3984) = 0x3db0b0b1;  /* 0.086274512                                */
+    JI(st,   4128) = 0x3e2cacad;  /* 0.16862746                                 */
+    JI(st,   4144) = 0x15a931da;  /* 6.8337208e-26                              */
+    JI(st,   4208) = 0x3f000000;  /* 0.5                                        */
+    JI(st,   6736) = 0x3f800000;  /* 1.0           VCF cutoff default           */
+    JI(st,   7344) = 0x1203efe4;  /* 4.1631999e-28                              */
+    JI(st,   7360) = 0x3f5cdcdd;  /* 0.86274511                                 */
+    JI(st,   7472) = 0x3e2cacad;  /* 0.16862746                                 */
+    JI(st,  10240) = 0x3b0d8c2e;  /* 0.0021598446  HPF cutoff default           */
+    JI(st,  91200) = 0x3b247b86;  /* 0.002509804   (master FX)                  */
+    JI(st,  91216) = 0x3fa66666;  /* 1.3           (master FX)                  */
+    JI(st, 101072) = 0x3f800000;  /* 1.0           (master FX)                  */
+    JI(st, 102512) = 0x3f800000;  /* 1.0           (output)                     */
+    JI(st, 102560) = 0x3ed8d8d9;  /* 0.42352942    (output)                     */
+    JI(st, 102592) = 0x3f800000;  /* 1.0           (output)                     */
+    JI(st, 102608) = 0x3bab929a;  /* 0.0052359821  LF-Damp Fc                   */
+    JI(st, 10759680) = 0xbf16c2f3; /* -0.58891219  Rev Ecf DPF0 Lp              */
+
     /* --- Class E: reverb tap-index table (34 ints, 11022208..11022340) ------ */
     /* Generator sub_0x3C1AC0: tap[0]=1; a continuous predelay = floor(T1*H) (T1 in
      * [0.01998958,0.02), ~19.99 ms) plus rate-class integer stage lengths. At
