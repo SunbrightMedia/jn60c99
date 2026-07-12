@@ -1,35 +1,69 @@
-# Phase-2 scenario-matrix — in-progress results (auto-saved)
+# Phase-2 scenario matrix — results + fixes (VERIFIED)
 
-Workflow run: `wf_793b296b-fe8`  
-Resume: `Workflow({scriptPath:"/root/.claude/projects/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/workflows/scripts/phase2-matrix-wf_793b296b-fe8.js", resumeFromRunId:"wf_793b296b-fe8"})`
+Workflow run: `wf_793b296b-fe8` (6 scenario classes A/B-ing the plugin machine code
+vs the port). 5/6 matrix agents completed; the `rate-44k` matrix agent and ALL five
+adversarial Verify agents were killed by a session limit, so every "divergence-found"
+below was **unverified by the workflow**. I re-derived and verified each one myself
+against the plugin's own code under Unicorn before touching any source. Two were real,
+fixable defects (fixed + re-verified); the rest are known-legit or oracle-bounded.
 
-NOTE: 'divergence-found' here is UNVERIFIED — the workflow's adversarial Verify phase (and my own
-re-check) must confirm whether each is a real defect or a scenario-harness artifact (wrong recall
-snap order, arp not forced off, or a not-bit-exact-able sequence). Do NOT treat as bugs until verified.
+## Summary
 
-Completed scenario agents: 4/6
+| Scenario | workflow verdict | after my verification | status |
+|---|---|---|---|
+| A patch→patch switch (warm recall) | divergence-found | known-legit: warm recall isn't bit-exact-able (free-running phase) | no fix needed |
+| B note lifecycle / retrigger | divergence-found | **REAL BUG** (DCO-retrigger latch) | **FIXED** — 45000-frame bit-exact |
+| C chords + voice steal | divergence-found | **REAL BUG** (same latch) at 4th note; steal itself oracle-bounded | **FIXED** (through 8 voices); steal = Phase 4 |
+| D long render (5 s tails) | all-exact 2/2 | confirmed all-exact | — |
+| E live param move mid-note | divergence-found | **REAL BUG** (set_param over-reseed) | **FIXED** — all 9 params bit-exact |
+| rate-44k 44.1 kHz | (killed) | not run this session | pending |
 
-## A — patch->patch switching with tails (cold start, bit-exact A/B, sr=48000, port chorus=0): cold-load P1 -> note_on(60,105) -> render 6000 -> note_off(60) -> render 6000 (release tail) -> recall/apply P2 (plugin: snap_all->recall_patch->snap_all->clear_latch, both recalls) -> note_on(64,100) -> render 12000; full 24000-frame stereo stream compared bitwise as uint32. Pairs: 13->4 (LD Rip Lead -> PD Classic Pad), 5->22 (LD Classic Lead -> BS Ikonbass), 12->21 (PD Ripple Pad -> LD Juno Lead).
-- verdict: **divergence-found**
-- cases bit-exact: 0 / 3
-- divergences: All 3 pairs share one signature: frames 0..11999 (note + full release tail, 24000 u32 channel-samples per pair) are BIT-EXACT; divergence starts at EXACTLY frame 12000 — the first sample rendered after the P2 recall — and 100% of the remaining 12000 frames differ. First samples: 13->4 plugin L=b9b3a5bd(-3.42650e-4)/R=b918988e vs port L=b9b3b2ff(-3.42749e-4)/R=b9187f31, RMS[11936..12064) plugin L=4.79e-4 R=2.02e-4 vs port L=3.94e-4 R=2.36e-4; 5->22 plugin L=bb7a7e63(-3.822e-3)/R=bb922e9f(-4.461e-3) vs port L=3a3c7a8c(+7.19e-4)/R=38a76f80(+7.98e-5), window RMS plugin L=3.26e-3 vs port L=5.13e-4; 12->21 plugin L=bbeb3865(-7.17835e-3)/R=bb13a2c3 vs port L=bbeb3740(-7.17822e-3)/R=bb13a3ed, window RMS plugin L=1.114e-2 vs port L=1.186e-2. MINIMIZED (pair 13->4): M3 double-recall with NO intervening render = BIT-IDENTICAL (recall chaining is fine); M1 tail+recall with NO second note = diverges at frame 12000 with byte-identical first-sample bits to the full run (second note_on not the cause); M2 NO note at all, 12000 idle frames then recall+note = still diverges at first post-recall sample (tail not required). Introducing event = the mid-stream recall itself, i.e. recall issued after ANY prior rendering (recall-after-render / warm recall). Post-switch band metrics (frames 12000..23999): diff-RMS = 1.6-3.7% of signal RMS (sig RMS 0.027-0.086), maxAbsDiff <= 5.6e-3 — both sides audibly close. Streams saved: scratchpad/scenA_{13_4,5_22,12_21}_{plugin,port}.npy; scripts scenA_switch.py,
-- caveats: The measured divergence maps onto the documented known-legit caveat: any recall issued after prior rendering is a warm recall and is NOT bit-exact-able (free-running phase) — confirmed here by minimization (idle render alone before recall breaks bit-exactness; back-to-back cold recalls do not). So Scenario A's second recall can never be bit-exact by construction; everything up to and including the release tail IS bit-exact in all 3 pairs, and the post-switch segment matches within 1.6-3.7% diff-RMS. No code was modified; no rebuilds; forbidden files untouched; arp patches not involved in these pairs.
+## The two real bugs (found by the matrix, verified + fixed by me)
 
-## Scenario B — note lifecycle (cold, bit-exact): patches 13 and 43 at 48 kHz, chorus=0; note_on(60,105)/6000 -> note_off/24000 tail -> retrigger note_on(60,105)/6000 -> note_off/3000 -> note_on(60,40)/6000; full-stream bit-compare plugin(Unicorn) vs port(libjuno.so) plus tail-decay verification
-- verdict: **divergence-found**
-- cases bit-exact: 0 / 2
-- divergences: Both patches: frames 0-30000 bit-exact (first note + entire 24000-frame release tail), first divergent frame 30001 = 2nd sample after the RETRIGGER note_on; every frame differs thereafter (14999/45000 diff frames each). Patch 13 @30001: plug L=bb01ace2 (-0.00197869) vs port L=bb0120cd (-0.00197034); RMS[29901:30101] plug L=0.0277038 vs port L=0.0275563. Patch 43 @30001: plug L=b9603d15 (-0.000213851) vs port L=b9603ad4 (-0.000213842); RMS ~equal. MINIMIZED: introducing event is ANY second note_on gate — a chord (2nd on, no note_off ever) diverges at the 1st post-event sample, so note_off/tail handling is exonerated (tail bit-exact). Voice allocation identical both sides (chord->slot6, retrigger->slot7). Measured root state: 6 dwords per idle voice-slot window (offsets +1472,+1488,+1504,+1520,+1840,+1856 within each 10512-byte slot) — bit-equal cold, desync at the FIRST note_on (plugin broadcasts 1.0 to +1856 of every idle slot, port does not) and during idle rendering (port ramp cells one update-step behind: port +1520 bit-equals plugin +1504; flags +1488/+1840/+1856 plugin=1.0 vs port=0.0, polarity inverting after a gate/release cycle). Cells are output-silent while slot gain=0; at the slot's next gate-on the attack trajectories split (retrigger: plugin restarts ramp step +1504=0.0104166=~1/96 while port holds ~0.999997; chord: mirror image). Tail decay verified: patch 43 monotonic, 3000-frame RMS 0.0013228->0.00026854 (ratio 0.203); patch 13 decays overall (held 0.00923 -> 
-- caveats: Port run with chorus=0 (the proven cold-baseline config). Patches 13/43 are not arp patches, so no arp_config forcing was needed. All sequences were canonical cold (build->snap_all->recall->snap_all->clear_latch->set_ftz). The scenario premise 'tail to near-silence' only weakly holds for patch 13: its release oscillates (LFO-like) and ends around -60 dBFS RMS after 0.5 s — both sides agree bit-exactly on this, so it does not affect the comparison. Cell labels (+1472 etc.) are raw state offsets with measured values; no semantic naming was assumed and no source was modified.
+### Bug 1 — DCO-retrigger latch armed on note-on instead of at BUILD  (Scenarios C & B)
+Root-caused with `scratchpad/oracle/latch_{probe,reads,arm_when}.py` (hook every write
+to the plugin's 9 unit states during its own note_on / note_off / build under Unicorn):
+- The DSP-consumed retrigger latch is **aux Array A**, state `101504 + v*32` (each voice
+  unit reads its own slot). The plugin arms all 8 copies to 1.0 **once at engine BUILD**
+  (before setSampleRate); each voice's first rendered sample consumes its slot; thereafter
+  the DCO free-runs. **note-on never re-arms Array A** — it writes a different, DSP-inert
+  cell (aux Array B, `101520 + v*32`).
+- The port armed Array A in `juno_note_on` on **every** note (masked in the cold single-note
+  A/B, where note-on precedes any render, so both sides have it set at sample 0). Any note
+  played after rendering had begun re-phased the DCO → divergence at the first post-note
+  sample (Scenario C 4th note @6001; Scenario B retrigger @30001).
+- Fix (`src/juno_init.c`, `src/juno_note.c`): arm Array A for all 8 voices in
+  `juno_engine_init` (mirroring BUILD); remove the arm from `juno_note_on`.
+- Verified: cold single-note **still bit-exact** (old==new==plugin, no regression);
+  Scenario B (note→tail→retrigger→soft retrigger) **BIT-IDENTICAL over 45000 frames**,
+  patches 13 & 43; Scenario C **bit-exact through all 8 held voices** (was @6001). Full
+  unit suite green + new `test_note_path` regression guard.
 
-## D — Long render, cold, bit-exact: patch 53 (LD Echo Chamber) and patch 28 (PD Your Majesty) at 48 kHz. Canonical cold sequence (build -> snap_all -> recall -> snap_all -> clear_latch -> set_ftz), then note_on(60,105) -> render 24000 -> note_off -> render 240000 (5 s of tails: delay repeats, chorus BBD, denormal territory). Plugin ground truth = plugin's own machine code under Unicorn (e2e_emu); port = libjuno.so via ctypes (juno_gui_create(48000, chorus=0), apply_bank; neither patch is an arp patch so no arp_config needed).
-- verdict: **all-exact**
-- cases bit-exact: 2 / 2
-- divergences: none — patch 53: 0 diff frames of 264000 stereo frames (528000 uint32 values compared, L and R); patch 28: 0 diff frames of 264000. Finiteness: 0 NaN/Inf values on either side for either patch (all 2,112,000 values checked). Tails decay sanely and identically on both sides — patch 53 RMS_L: 0.0168 (held) -> 0.00878 (tail 0-0.5s) -> 0.000242 (1.5-3s) -> 0.000111 (3-5s), peak abs 0.2087; patch 28 RMS_L: 0.0101 -> 0.00645 -> 0.00167 -> 0.000644, peak abs 0.0433. Deep-tail/denormal region (3-5 s, FTZ territory) is bit-identical. Scripts: /tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad/scenD_plugin.py and scenD_port_cmp.py; plugin dumps scenD_plug_p53.bin / scenD_plug_p28.bin, logs scenD_p53.log / scenD_p28.log in the same directory.
-- caveats: Renders were issued in 24000-frame chunks on both sides (plugin oracle internally blocks at 600 frames regardless; 24000 is a multiple of 600, so the block sequence is identical to single monolithic render calls). Port used chorus=0 at create, matching the proven cold baseline config. No source files were edited; libjuno.so was not rebuilt. Comparison covers master stereo output only, per the harness's exposed taps.
+### Bug 2 — live set_param re-seeded/re-conditioned all voices  (Scenario E)
+`juno_gui_set_param` ran `juno_driver_seed_voices` (whole per-voice block copy voice0→1..7)
++ `juno_apply_condition` after every edit — the RECALL propagation path. The plugin's LIVE
+param dispatch writes only the target cell (identical float in all 8 per-voice copies, or
+the single master cell), 0 smoothers, nothing else. The reseed reset each voice's evolved
+runtime state (envelope/LFO phase, drift tables) mid-note.
+- Fix (`gui/juno_bridge.c`): replicate only the one written value to the other voices
+  (per-voice cells), drop seed_voices/apply_condition from the live setter.
+- Verified against the plugin's live dispatch (`scratchpad/oracle/scenE_port_check.py`):
+  all 9 tested params **BIT-EXACT** over a 9000-frame mid-note move (was diverging at the
+  first post-change sample in every case).
 
-## C — chords + voice steal (cold, bit-exact): patch 0 "SY Poly Synth", 48 kHz, chorus=0. Chord note_on 60,64,67 (vel 100) -> render 6000; add 48,50,52,53,55,57 one at a time with render 500 after each (9 held notes, 8 voices -> steal at note 57); final render 6000. 15000 frames/channel compared as uint32 bits, canonical cold sequence on the plugin side (build->snap_all->recall->snap_all->clear_latch->set_ftz).
-- verdict: **divergence-found**
-- cases bit-exact: 2 / 9
-- divergences: MAIN RUN (V4): frames 0..6000 (chord segment) bit-exact; FIRST DIVERGENT SAMPLE = frame 6001 (both L and R), i.e. 1 frame after the 4th note-on (note 48) — long before the steal. plugin L=bde13c82 (-0.109978691) vs port L=bde11a36 (-0.109913275); R=be1d3788 (-0.153532147) vs be1d2661 (-0.153466716). RMS over frames 5751..6251: L plugin 0.0814435 vs port 0.0813949; R 0.0953102 vs 0.0952479. All 8999 frames from 6001 on differ, but only numerically: max abs float diff over the whole 15000-frame stream = 0.00196 (at frame 7818); per-segment RMS ratios 0.9992..1.0016 — both sides play the same notes and steal the same voice. MINIMIZED EVENT: the first note_on issued after ANY rendering has occurred. Evidence: (a) V3 = same 4 notes back-to-back with NO render gap -> 0/2000 mismatches (bit-exact); (b) V7 = 6000 idle frames then a single first note -> diverges at 6001, so no prior notes needed; (c) note value irrelevant — note 62 instead of 48 gives byte-identical first divergent samples; (d) delta grows with gap length: gap 100 -> 1-2 ULP, gap 500 -> 1 ULP (first diff at frame 503), gap 2000 -> max 0.002, gap 6000 -> ~6.5e-4 at first sample; (e) V8 = chord held 6500 frames, no new note -> bit-exact, so already-gated voices never drift apart. Voice allocation matches throughout (port v7->v0 descending = plugin slots 7->0; steal segment RMS matches to 0.07%). STATE-LEVEL MINIMIZATION (measured, not guessed): the per-voice one-shot DCO phase-retrigger latch, state cell 101504+voice*32
-- caveats: Steal-order equivalence at note 9 could not be verified bitwise because the stream was already contaminated by the latch divergence from note-on 4; it was verified by band metrics instead (per-segment RMS ratio <=1.0016, max abs sample diff 0.002 across the steal and tail segments) plus matching allocation traces (port juno_gui_debug_voices vs plugin per-slot gates). The 2 bit-exact cases are V3 (4 note-ons with no render gap, 1000 frames) and V8 (chord held with no later note-on, 6500 frames), confirming the divergence is introduced solely by note-ons that arrive after rendering has begun. All divergent cases (V4 main, V2, V5, V6, V7, V9, V10) trace to the single measured mechanism above; no code was modified and no rebuild was done. Repro scripts live in /tmp/claude-0/-home-user-jn60c99/
+## Delivered WASM
+Rebuilt `gui/web/juno.wasm` (BUILD_VER 624cddea22d4). Verified the delivered artifact:
+cold browser-path A/B 57/64 bit-exact vs plugin (unchanged baseline; the 7 are SQ arp
+patches under the arp-on harness), Scenario B 45000-frame bit-exact, Scenario E all 9
+bit-exact (`scratchpad/oracle/wasm_scen_check.mjs`).
 
+## Not fixed (correctly)
+- **Scenario A** (patch→patch switch): the divergence begins exactly at the mid-stream
+  recall = a **warm recall** (recall issued after rendering). Minimization (idle render
+  alone before recall breaks bit-exactness; back-to-back cold recalls stay bit-identical)
+  confirms it is the documented free-running-phase limit, not a defect. Everything up to
+  and including the release tail is bit-exact; post-switch matches within 1.6–3.7% diff-RMS.
+- **Scenario C voice steal** (9th note): after the latch fix, the only residual is the
+  9th-note steal, ~1 ULP / 0.1% RMS, in the assigner-managed voice-allocation layer that
+  the leaf-driven oracle cannot bit-verify (Phase 4 thread-pool splice).
+- **rate-44k**: not run this session (session limit). Re-run at 44.1 kHz pending.
