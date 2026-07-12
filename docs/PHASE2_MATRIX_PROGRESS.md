@@ -66,4 +66,18 @@ bit-exact (`scratchpad/oracle/wasm_scen_check.mjs`).
 - **Scenario C voice steal** (9th note): after the latch fix, the only residual is the
   9th-note steal, ~1 ULP / 0.1% RMS, in the assigner-managed voice-allocation layer that
   the leaf-driven oracle cannot bit-verify (Phase 4 thread-pool splice).
-- **rate-44k**: not run this session (session limit). Re-run at 44.1 kHz pending.
+- **rate-44k (44.1 kHz full-path)**: run this session — surfaces a **real, pre-existing**
+  divergence (NOT caused by the two fixes: the pre-fix build diverges at the identical
+  frames). At 44.1 kHz the cold render is **not** bit-exact: a single **1-ULP** difference
+  first appears at ~frame 2722 (bit-exact through 2721) and accumulates through the
+  recursive DSP to a max of ~1.7% of signal RMS by frame ~7849 (patch 13; other patches
+  ~2723/2739). 48 kHz stays bit-exact to 264000 frames (Scenario D), so this is strictly
+  rate-specific. The static rate-variant coefficients are already verified bit-exact
+  (`test_recall_rate` at 44100/48000/96000), so the seed is a **dynamic per-sample**
+  rate-dependent computation (candidate: the FX delay/chorus BBD interpolation, whose
+  read-back onset near ~2722 samples fits). It could NOT be localized by port↔plugin
+  state-diff: the leaf-driven oracle represents note/gate state differently from the port
+  (plugin gate cell 320 reads 0 in every unit; ~1421 state cells legitimately differ even
+  while the 48 kHz audio is bit-exact), the same assigner/note-state limit that bounds
+  Phase 4. Needs a rate-dependent per-sample code audit or a plugin dry-signal reference —
+  tracked as a follow-up, not fixed this session. Scripts: `scratchpad/oracle/rate44_*.py`.
