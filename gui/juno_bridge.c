@@ -74,6 +74,14 @@ typedef struct {
      * apply_bank recall; a live per-parameter edit (juno_gui_set_param) does NOT
      * re-apply it — the plugin's live param dispatch writes only the target cell. */
     int   last_condition;
+
+    /* Host tempo in BPM. 128 = the plugin's recall-default TEMPO (param default
+     * 880 -> 40+88.0); updated when the host pushes a tempo via juno_gui_arp_config.
+     * Distinct from the arp clock's own bpm (carp_init powers on at 120): the
+     * plugin re-times tempo-synced FX at the HOST tempo, not the arp power-on
+     * value (fuzz seed 57 — a live TEMPO SYNC flip on a non-arp patch must be
+     * value-neutral at 128 BPM, not jump to the arp's 120). */
+    float host_bpm;
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -126,6 +134,7 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     carp_init(&c->arp);
     c->arp_on = 0;
     c->arp_cur = -1;
+    c->host_bpm = 128.0f;   /* plugin recall-default TEMPO (880 -> 40+88.0) */
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
     return c;
 }
@@ -269,12 +278,14 @@ float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
     /* TEMPO SYNC leaf (blob 59): a live flip re-times the ACTIVE slot-1 delay
      * instance (synced at host BPM on engage, the patch's manual time on
      * disengage) — measured law in juno_live_delay_sync; the base cell 102352 is
-     * deliberately NOT touched on a live flip (fuzz seed 70). Host BPM = the arp
-     * clock's BPM (128 = the plugin's recall default when no host pushed tempo). */
+     * deliberately NOT touched on a live flip (fuzz seed 70). Host BPM = the HOST
+     * tempo (recall default 128), NOT the arp clock's power-on 120 (fuzz seed 57:
+     * the plugin's flip at 128 BPM is value-neutral on a division that matches the
+     * patch's manual time; re-timing at 120 re-points the delay read head). */
     if (blob == 59) {
         c->dly_sync = (byte != 0);
         juno_live_delay_sync(c->st, c->dly_time_byte, c->dly_sync, c->dly_type,
-                             c->arp.bpm > 0.0f ? (float)c->arp.bpm : 128.0f);
+                             c->host_bpm);
     }
     return w;
 }
@@ -578,6 +589,7 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, floa
     /* UI octaves 1..3 -> ARPEGGIO STEP 0..2 (carp_set_range maps step->range). */
     carp_set_range(&c->arp, (oct < 1 ? 1 : (oct > 3 ? 3 : oct)) - 1);
     if (bpm > 0.0f) {
+        c->host_bpm = bpm;               /* host tempo, also used by live TEMPO SYNC flips */
         carp_set_bpm(&c->arp, (double)bpm);
         /* Host tempo drives the synced LFO rate (cell 1072) AND the synced delay
          * time (102352 + instance cells) too, not just the arp. Both are inert

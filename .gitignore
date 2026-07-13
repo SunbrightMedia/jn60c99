@@ -49,3 +49,6 @@ tests/test_condition_scatter
 tests/test_arp_pattern
 tests/test_param_setter
 tests/test_voice_alloc
+maketest*.log
+fuzzregress*.log
+probe*.log
