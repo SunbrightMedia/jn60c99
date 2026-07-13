@@ -1,0 +1,138 @@
+=== plugin dispatch(idx 803, val 139) raw writes ===
+  u0 off=    1056 old=00000000 new=3f800000 sz=4
+  u0 off=   11568 old=00000000 new=3f800000 sz=4
+  u0 off=   22080 old=00000000 new=3f800000 sz=4
+  u0 off=   32592 old=00000000 new=3f800000 sz=4
+  u0 off=   43104 old=00000000 new=3f800000 sz=4
+  u0 off=   53616 old=00000000 new=3f800000 sz=4
+  u0 off=   64128 old=00000000 new=3f800000 sz=4
+  u0 off=   74640 old=00000000 new=3f800000 sz=4
+  u0 off= 4297584 old=3f16b800 new=3f83d200 sz=4
+  u0 off= 4297792 old=3efefeff new=3efefeff sz=4
+  u1 off=    1056 old=00000000 new=3f800000 sz=4
+  u1 off=   11568 old=00000000 new=3f800000 sz=4
+  u1 off=   22080 old=00000000 new=3f800000 sz=4
+  u1 off=   32592 old=00000000 new=3f800000 sz=4
+  u1 off=   43104 old=00000000 new=3f800000 sz=4
+  u1 off=   53616 old=00000000 new=3f800000 sz=4
+  u1 off=   64128 old=00000000 new=3f800000 sz=4
+  u1 off=   74640 old=00000000 new=3f800000 sz=4
+  u1 off= 4297584 old=3f16b800 new=3f83d200 sz=4
+  u1 off= 4297792 old=3efefeff new=3efefeff sz=4
+  u2 off=    1056 old=00000000 new=3f800000 sz=4
+  u2 off=   11568 old=00000000 new=3f800000 sz=4
+  u2 off=   22080 old=00000000 new=3f800000 sz=4
+  u2 off=   32592 old=00000000 new=3f800000 sz=4
+  u2 off=   43104 old=00000000 new=3f800000 sz=4
+  u2 off=   53616 old=00000000 new=3f800000 sz=4
+  u2 off=   64128 old=00000000 new=3f800000 sz=4
+  u2 off=   74640 old=00000000 new=3f800000 sz=4
+  u2 off= 4297584 old=3f16b800 new=3f83d200 sz=4
+  u2 off= 4297792 old=3efefeff new=3efefeff sz=4
+  u3 off=    1056 old=00000000 new=3f800000 sz=4
+  u3 off=   11568 old=00000000 new=3f800000 sz=4
+  u3 off=   22080 old=00000000 new=3f800000 sz=4
+  u3 off=   32592 old=00000000 new=3f800000 sz=4
+  u3 off=   43104 old=00000000 new=3f800000 sz=4
+  u3 off=   53616 old=00000000 new=3f800000 sz=4
+  u3 off=   64128 old=00000000 new=3f800000 sz=4
+  u3 off=   74640 old=00000000 new=3f800000 sz=4
+  u3 off= 4297584 old=3f16b800 new=3f83d200 sz=4
+  u3 off= 4297792 old=3efefeff new=3efefeff sz=4
+  u4 off=    1056 old=00000000 new=3f800000 sz=4
+  u4 off=   11568 old=00000000 new=3f800000 sz=4
+  u4 off=   22080 old=00000000 new=3f800000 sz=4
+  u4 off=   32592 old=00000000 new=3f800000 sz=4
+  u4 off=   43104 old=00000000 new=3f800000 sz=4
+  u4 off=   53616 old=00000000 new=3f800000 sz=4
+  u4 off=   64128 old=00000000 new=3f800000 sz=4
+  u4 off=   74640 old=00000000 new=3f800000 sz=4
+  u4 off= 4297584 old=3f16b800 new=3f83d200 sz=4
+  u4 off= 4297792 old=3efefeff new=3efefeff sz=4
+  u5 off=    1056 old=00000000 new=3f800000 sz=4
+  u5 off=   11568 old=00000000 new=3f800000 sz=4
+  u5 off=   22080 old=00000000 new=3f800000 sz=4
+  u5 off=   32592 old=00000000 new=3f800000 sz=4
+  u5 off=   43104 old=00000000 new=3f800000 sz=4
+  u5 off=   53616 old=00000000 new=3f800000 sz=4
+  u5 off=   64128 old=00000000 new=3f800000 sz=4
+  u5 off=   74640 old=00000000 new=3f800000 sz=4
+  u5 off= 4297584 old=3f16b800 new=3f83d200 sz=4
+  u5 off= 4297792 old=3efefeff new=3efefeff sz=4
+  u6 off=    1056 old=00000000 new=3f800000 sz=4
+  u6 off=   11568 old=00000000 new=3f800000 sz=4
+  u6 off=   22080 old=00000000 new=3f800000 sz=4
+  u6 off=   32592 old=00000000 new=3f800000 sz=4
+  u6 off=   43104 old=00000000 new=3f800000 sz=4
+  u6 off=   53616 old=00000000 new=3f800000 sz=4
+  u6 off=   64128 old=00000000 new=3f800000 sz=4
+  u6 off=   74640 old=00000000 new=3f800000 sz=4
+  u6 off= 4297584 old=3f16b800 new=3f83d200 sz=4
+  u6 off= 4297792 old=3efefeff new=3efefeff sz=4
+  u7 off=    1056 old=00000000 new=3f800000 sz=4
+  u7 off=   11568 old=00000000 new=3f800000 sz=4
+  u7 off=   22080 old=00000000 new=3f800000 sz=4
+  u7 off=   32592 old=00000000 new=3f800000 sz=4
+  u7 off=   43104 old=00000000 new=3f800000 sz=4
+  u7 off=   53616 old=00000000 new=3f800000 sz=4
+  u7 off=   64128 old=00000000 new=3f800000 sz=4
+  u7 off=   74640 old=00000000 new=3f800000 sz=4
+  u7 off= 4297584 old=3f16b800 new=3f83d200 sz=4
+  u7 off= 4297792 old=3efefeff new=3efefeff sz=4
+  u8 off=    1056 old=00000000 new=3f800000 sz=4 *
+  u8 off=   11568 old=00000000 new=3f800000 sz=4 *
+  u8 off=   22080 old=00000000 new=3f800000 sz=4 *
+  u8 off=   32592 old=00000000 new=3f800000 sz=4 *
+  u8 off=   43104 old=00000000 new=3f800000 sz=4 *
+  u8 off=   53616 old=00000000 new=3f800000 sz=4 *
+  u8 off=   64128 old=00000000 new=3f800000 sz=4 *
+  u8 off=   74640 old=00000000 new=3f800000 sz=4 *
+  u8 off= 4297584 old=3f16b800 new=3f83d200 sz=4 *
+  u8 off= 4297792 old=3efefeff new=3efefeff sz=4 *
+  total 90
+=== snap_all writes after dispatch (unit 8 only shown) ===
+  total(all units) 0
+=== port set_param(row 24, 139) state delta ===
+  off=    1056 old=00000000 new=3f800000
+  off=   11568 old=00000000 new=3f800000
+  off=   22080 old=00000000 new=3f800000
+  off=   32592 old=00000000 new=3f800000
+  off=   43104 old=00000000 new=3f800000
+  off=   53616 old=00000000 new=3f800000
+  off=   64128 old=00000000 new=3f800000
+  off=   74640 old=00000000 new=3f800000
+  off= 4297584 old=3f16b800 new=3f8c9c00
+=== baseline (pre-flip) unit8-vs-port mismatched cells: 29180 ===
+  (+29180 mismatches outside delay regions — count only)
+=== INTRODUCED by flip (post minus pre): 4 cells ===
+  off= 4297584 plug=3f83d200 port=3f8c9c00   (pre: match)
+  off=11023728 plug=0000008b port=00000000   (pre: match)
+  off=11029428 plug=0000007f port=00000000   (pre: match)
+  off=11029432 plug=00000001 port=00000000   (pre: match)
+=== key cells post-flip (plug u8 / port) ===
+  off= 4297440 plug=3f16b800 port=3f16b800
+  off= 4297456 plug=3f16b800 port=3f16b800
+  off= 4297472 plug=3f16b800 port=3f16b800
+  off= 4297488 plug=3f16b800 port=3f16b800
+  off= 4297504 plug=3f0f5c00 port=3f0f5c00
+  off= 4297520 plug=00000000 port=00000000
+  off= 4297536 plug=00000000 port=00000000
+  off= 4297584 plug=3f83d200 port=3f8c9c00  <-- MISMATCH
+  off= 4297760 plug=3d888889 port=3d888889
+  off= 4297792 plug=3efefeff port=3efefeff
+  off= 4297808 plug=3ed8d8d9 port=3ed8d8d9
+  off= 4297824 plug=3f800000 port=3f800000
+  off= 4297840 plug=3f800000 port=3f800000
+  off= 4297856 plug=3f800000 port=3f800000
+  off= 4297872 plug=00000000 port=00000000
+  off= 4297888 plug=40000000 port=40000000
+  off= 4298000 plug=3b6be99c port=3b6be99c
+  off= 4298016 plug=38800000 port=38800000
+  off= 4298032 plug=42000000 port=42000000
+  off= 4298048 plug=3c000000 port=3c000000
+  off= 4298064 plug=bc000000 port=bc000000
+  off= 4298080 plug=39aec33e port=39aec33e
+  off= 6395248 plug=0007dc29 port=0007dc29
+  off= 6395252 plug=00080000 port=00080000
+  off=  102352 plug=3f16b800 port=3f16b800
+  off=11022348 plug=00000001 port=00000001
