@@ -450,6 +450,18 @@ int juno_bank_condition(const unsigned char *bank, int idx)
     return record_byte(blob, 498);
 }
 
+/* Recalled HPF TYPE (record byte 618, leaf 129). The HPF engine cells are a JOINT
+ * function of (HPF CUTOFF byte, HPF TYPE); a LIVE cutoff move must recompute with
+ * the patch's current TYPE (fuzz seeds 49/52/58: the plugin's live blob-38 leaf
+ * dispatch writes the TYPE-joint values). The bridge stashes this at recall. */
+int juno_bank_hpf_type(const unsigned char *bank, int idx)
+{
+    const unsigned char *blob;
+    if (idx < 0 || idx >= BANK_COUNT) return 0;
+    blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
+    return record_byte(blob, 618);
+}
+
 /* (F ENV VARIATION) (extended leaf 112, record byte 482 — the leaf immediately
  * before VCA MODE in the NAME2 block): the VCF ENVELOPE-SOURCE selector. This is
  * the switch that decides which envelope opens the filter, and it was the cause of

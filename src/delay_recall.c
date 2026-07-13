@@ -407,3 +407,31 @@ void juno_apply_delay_tempo(unsigned char *state, int time_byte, int sync,
     if (dtype == 1) JF(state, 4297584) = tc;      /* dual-delay second instance   */
     if (dtype == 5) JF(state, 6497168) = tc;      /* reverb-hosted delay instance */
 }
+
+/* LIVE TEMPO SYNC flip (value-tree leaf blob 59, dispatch idx 803) — measured from
+ * the plugin's own live dispatch under emulation (fuzz seed 70 + sync probes,
+ * DELAY TYPE 1 and 5, both directions): the live flip rewrites ONLY the active
+ * slot-1 INSTANCE time cell — synced value (at the current host BPM) on engage,
+ * the patch's MANUAL time on disengage — and, unlike recall/tempo push, does NOT
+ * touch the first-instance/base cell 102352 (writing it would introduce a fresh
+ * divergence: the plugin provably leaves it at manual time on a live flip). The
+ * type-1 flip also rewrites 4297792 with its unchanged recall value (inert; not
+ * modeled). TYPE 0 (probed): the active instance IS the base cell — the live flip
+ * rewrites 102352 (synced ON / manual OFF). TYPES 2/3 (probed): the flip re-writes
+ * the repurposed chorus rate cell 6395312 with its UNCHANGED value (inert; not
+ * modeled). */
+void juno_live_delay_sync(unsigned char *state, int time_byte, int sync,
+                          int dtype, float bpm)
+{
+    int Hr = (int)JF(state, 16);
+    float ms, tc;
+    if (Hr <= 0) Hr = 96000;
+    if (sync && bpm > 0.0f)
+        ms = (float)(SYNC_BEATS[sync_division(time_byte & 0xFF)] * 60000.0 / (double)bpm);
+    else
+        ms = (float)DELAYTIME_MS[time_byte & 0xFF];
+    tc = dly_ms_to_coeff(Hr, ms);
+    if (dtype == 0) JF(state, 102352)  = tc;
+    if (dtype == 1) JF(state, 4297584) = tc;
+    if (dtype == 5) JF(state, 6497168) = tc;
+}

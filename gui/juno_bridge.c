@@ -10,6 +10,7 @@
 #include "../src/juno_engine.h"
 #include "../src/juno_driver.h"
 #include "../src/juno_apply.h"
+#include "../src/hpf_type_lut.h"
 #include "../src/juno_curve.h"
 #include "../src/juno_note.h"
 #include "../src/delay_recall.h"
@@ -62,6 +63,12 @@ typedef struct {
     int   dly_time_byte;
     int   dly_sync;
     int   dly_type;
+
+    /* Recalled HPF TYPE (record 618). The 4 HPF cells are a JOINT function of
+     * (cutoff byte, TYPE); the plugin's LIVE blob-38 leaf dispatch recomputes them
+     * with the patch's current TYPE (fuzz seeds 49/52/58 — the port's TYPE=0 panel
+     * curves were wrong on the 10 TYPE=1 patches). Used by juno_gui_set_param. */
+    int   hpf_type;
 
     /* Last CONDITION byte applied (128 at power-on, patch value on recall). Used by
      * apply_bank recall; a live per-parameter edit (juno_gui_set_param) does NOT
@@ -244,6 +251,31 @@ float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
             if (i == param_index) w = wi;
         }
     }
+    /* HPF leaf (blob 38): the 4 cells are a JOINT function of (cutoff byte, HPF
+     * TYPE). The rows above wrote the TYPE=0 panel-curve values; recompute with the
+     * patch's recalled TYPE exactly as the plugin's live dispatch does (fuzz seeds
+     * 49/52/58: plugin's written 10240 bits == juno_apply_hpf_type(byte, TYPE=1)
+     * bit-for-bit; probe made all three seeds bit-exact end-to-end). TYPE=0 makes
+     * this a no-op re-write of the same values. */
+    if (blob == 38) {
+        static const int HPF_CELLS[4] = { 10240, 10256, 10272, 10288 };
+        int k, v;
+        juno_apply_hpf_type(c->st, byte & 0xFF, c->hpf_type);   /* voice-0 cells */
+        for (k = 0; k < 4; ++k)
+            for (v = 1; v < JUNO_NUM_VOICES; ++v)
+                JF(c->st, (unsigned)HPF_CELLS[k] + (unsigned)v * JUNO_VOICE_MAIN_STRIDE) =
+                    JF(c->st, (unsigned)HPF_CELLS[k]);
+    }
+    /* TEMPO SYNC leaf (blob 59): a live flip re-times the ACTIVE slot-1 delay
+     * instance (synced at host BPM on engage, the patch's manual time on
+     * disengage) — measured law in juno_live_delay_sync; the base cell 102352 is
+     * deliberately NOT touched on a live flip (fuzz seed 70). Host BPM = the arp
+     * clock's BPM (128 = the plugin's recall default when no host pushed tempo). */
+    if (blob == 59) {
+        c->dly_sync = (byte != 0);
+        juno_live_delay_sync(c->st, c->dly_time_byte, c->dly_sync, c->dly_type,
+                             c->arp.bpm > 0.0f ? (float)c->arp.bpm : 128.0f);
+    }
     return w;
 }
 
@@ -272,21 +304,21 @@ void juno_gui_gate(juno_ctx *c, float v)
  * ringing), (4) STEAL the oldest voice. This "prefer free over release" ordering is
  * what preserves release tails until a voice is genuinely needed. The picked voice
  * gets M.CV / M.Gate / DCO-latch written immediately by juno_note_on (all en=0). */
-#define VCA_ENV_OFF 3072          /* per-voice amp-ADSR integrator (voice base rel.) */
-#define REAP_EPS    1.0e-3f       /* below this the release is over -> voice is free */
-
-/* Free any released voice whose amp envelope has decayed to silence (the plugin's
- * assigner clears a voice once its envelope completes). Call once per render block. */
-static void synth_reap(juno_ctx *c)
-{
-    int v;
-    for (v = 0; v < JUNO_NUM_VOICES; ++v)
-        if (c->voice_note[v] >= 0 && !c->voice_gated[v]) {
-            unsigned b = (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
-            float env = JF(c->st, b + VCA_ENV_OFF);
-            if (env < REAP_EPS && env > -REAP_EPS) c->voice_note[v] = -1;
-        }
-}
+/* NOTE->VOICE BINDING IS PERSISTENT — do NOT reap it on envelope decay.
+ *
+ * An earlier synth_reap() cleared voice_note[v] once a released voice's amp
+ * envelope decayed below 1e-3, assuming the plugin's assigner frees the slot.
+ * Measured FALSE (fuzz seed 7, plugin's own assigner under emulation): the
+ * plugin keeps a last-note-per-voice memory INDEFINITELY — a re-struck note
+ * returns to its previous voice even after a full second of silence, while
+ * other notes take LRU gate-off voices around it; the binding lives until the
+ * voice is reassigned. The port's reap sent the re-strike to a different voice
+ * (different CONDITION scatter + free-run DCO phase => audible divergence);
+ * removing it makes the seed-7 stream bit-exact (causally proven by forcing
+ * the plugin's voice pick). Consumers are safe without the reap: the LRU
+ * free-voice scan and by-key note-off classify by voice_gated, not by binding
+ * (a released-then-silent voice remains eligible for LRU reuse); only the
+ * same-note-reuse scan sees the persistent binding — which is the point. */
 
 /* Pick the lowest-age (oldest) voice matching predicate class, or -1. */
 static int pick_oldest(juno_ctx *c, int want_assigned, int want_gated)
@@ -578,6 +610,7 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
      * makes the 8 voices deliberately non-identical — the plugin's component-tolerance
      * emulation). Default patch value 128 -> full scatter. */
     c->last_condition = juno_bank_condition(bank, idx);
+    c->hpf_type = juno_bank_hpf_type(bank, idx);   /* joint HPF recompute context */
     juno_apply_condition(c->st, c->last_condition);
     /* Per-patch VOICE-ASSIGN recall (CAssignJu60): ASSIGN MODE (poly/mono/unison/
      * poly-variant), LEGATO, and PORTAMENTO-engaged drive the note allocator above. */
@@ -592,6 +625,15 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
      * chord voice-cycling, not the single-note render this A/B measures — documented
      * follow-up.) mono_note_on / unison_note_on are retained for a future real selector. */
     c->assign_mode = 0;   /* all KEY ASSIGN values -> POLY (proven vs plugin, 64 patches) */
+    /* LEGATO: neutralized for the same reason as KEY ASSIGN above. The plugin's
+     * assigner cache provably stays legato=0 through the committed recall path
+     * (fuzz seed 57: on a LEGATO=1+PORTA patch the plugin's second overlapping
+     * note-on writes ONLY the new voice's cells — it never glides the previous
+     * voice — while the blob-armed port poly-glide dragged v7's M.CV, audible to
+     * ~0.19 abs; restoring just the glided cells made the seed bit-exact).
+     * portamento_on is intentionally KEPT: the plugin reads param 798 fresh from
+     * the processor getter, which recall DOES populate (steal-newest rule). */
+    c->legato = 0;
     c->portamento_on = (porta != 0);
     /* Switching assign mode flushes sounding voices so the new allocator starts
      * clean (the plugin's mode-change reader flushes hold + all-notes-off). Release
@@ -653,7 +695,6 @@ int juno_gui_get_arp(juno_ctx *c)
 int juno_gui_render(juno_ctx *c, float *out, int nframes)
 {
     int i, full = 0;
-    synth_reap(c);                         /* free voices whose release has decayed */
     for (i = 0; i < nframes; ++i) {
         if (c->arp_on) arp_tick(c);        /* step the arp pattern in real time */
         juno_note_tick(c->st);
@@ -697,7 +738,6 @@ int juno_gui_render_dry(juno_ctx *c, float *out, int nframes)
 {
     int i, v;
     if (!c) return 0;
-    synth_reap(c);                         /* free voices whose release has decayed */
     for (i = 0; i < nframes; ++i) {
         float mix = 0.0f, vbuf[JUNO_NUM_VOICES];
         if (c->arp_on) arp_tick(c);        /* keep the arp advancing in the dry path too */

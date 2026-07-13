@@ -29,5 +29,7 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec);
  * plugin's own tempo dispatch (see src/delay_recall.c). */
 void juno_apply_delay_tempo(unsigned char *state, int time_byte, int sync,
                             int dtype, float bpm);
+void juno_live_delay_sync(unsigned char *state, int time_byte, int sync,
+                          int dtype, float bpm); /* live blob-59 flip: instance cell only */
 
 #endif /* JUNO_DELAY_RECALL_H */

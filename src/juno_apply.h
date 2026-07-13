@@ -72,6 +72,7 @@ int juno_bank_voice_modes(const unsigned char *bank, int idx,
  * (default 128). See src/juno_apply.c / scratchpad/oracle/condition_scatter_spec.md. */
 void juno_apply_condition(unsigned char *state, int cbyte);
 int  juno_bank_condition(const unsigned char *bank, int idx);
+int juno_bank_hpf_type(const unsigned char *bank, int idx); /* record 618; joint HPF recompute context */
 
 #ifdef __cplusplus
 }
