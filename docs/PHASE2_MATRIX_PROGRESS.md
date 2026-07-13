@@ -110,3 +110,33 @@ REVERB (TYPE 0..5) x (TIME 0..255) tables, 48/48 sync divisions x rates.
 Remaining Phase-2 items: warm/mid-note variants of the param sweep (state-level),
 note x velocity state-write exhaustion runner, 44.1 kHz warm phase-metric sweep
 (chorus mode 2), then Gate G2 ledger consolidation.
+
+## Warm 44.1 kHz sweep, the mode-5 bug, and GATE G2 CLOSURE
+
+The all-64 warm sweep at 44.1 kHz flagged 11 patches — including ALL 8 v551==5
+(mode-5 ensemble) patches with a right-channel correlation collapse. The cold
+A/B proved those 8 were a REAL bug (divergent from ~frame 7 at 44.1k, bit-exact
+at 48k): the mode-5 slot-2 block (96336..96848) carried 19 rate-dependent cells
+captured at 48 kHz only, plus a double-vs-float rounding difference in the LFO
+rate scale (96352). Fixed (commit "rate-arm the mode-5 slot-2 ensemble block");
+after the fix all 8 are BIT-EXACT cold at 44.1k AND 48k, and the warm re-sweep
+cleared 6/8 outright (corr 0.98-1.00).
+
+Self-band adjudication of the remaining warm flags (plugin rendered against
+ITSELF at 4 idle lengths, `tools/verify/selfband_bal.py`):
+- patch 34: CLEARS — plugin self-variation +168% RMS / 4.71 dB balance dwarfs
+  the port's 1.49 dB deviation.
+- patches 1, 22: CLEAR — port corr well inside plugin self-corr (which drops to
+  0.11 / 0.13).
+- patches 7, 39: correlation clears overwhelmingly (port ~0.99 vs plugin
+  self-corr ~0), but the stereo-balance deviation (0.68/0.60 dB) sits OUTSIDE
+  the plugin's own balance stability (<=0.04 dB). Cold is bit-exact, so the
+  residual is warm-only. The naive idle full-state diff cannot adjudicate it
+  (note-state representation differences dominate). OPEN LEDGER ITEM — to be
+  settled by the Phase-3 state-transplant instrument / Phase-4 assigner splice.
+
+**Gate G2: CLOSED.** Matrix verified (3 real bugs fixed), full-state diffs clean
+at 3 rates, exhaustion tables complete (57,600 param + 16,256 note/velocity
+comparisons, 1 bug found+fixed), warm sweeps adjudicated at both rates. Open
+residuals carried explicitly: patches 7/39 warm balance (44.1k), 9th-voice
+steal, warm-recall phase limit. Instruments promoted to `tools/verify/`.
