@@ -52,3 +52,4 @@ tests/test_voice_alloc
 maketest*.log
 fuzzregress*.log
 probe*.log
+fuzzsweep*.log
