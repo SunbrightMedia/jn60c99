@@ -232,4 +232,20 @@ void juno_apply_reverb(unsigned char *state, const unsigned char *rec)
         int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
         juno_write_reverb_taps(state, type, Hr);
     }
+
+    /* Re-arm the reverb lazy-wipe countdown (int cell 10759872 = 256). The plugin's
+     * recall re-arms it every time (measured directly from the plugin's own recall
+     * under emulation: 256 post-build, decremented to 0 by rendering, back to 256
+     * after recall_patch). While armed, master_render (2054..2110) wipes one
+     * 256-dword stripe of the reverb line (10758864..) per sample, holds the reverb
+     * crossfade (11022032) down, and re-latches the tap indices on completion —
+     * i.e. a patch change starts the reverb from a CLEAN line instead of ringing
+     * the previous patch's tail through the new tap layout. Prepare seeds the same
+     * 256, so cold renders are unaffected (recall rewrites the identical value);
+     * only warm recalls change. This closed the phase-2 ledger item on patches
+     * 7/39 (warm 44.1k balance +0.68/+0.60 dB -> -0.000 dB): proven by the
+     * state-transplant instrument — poking this single cell at the warm-recall
+     * point reproduces the plugin's balance exactly on both patches
+     * (tools/verify + scratchpad transplant run wf_e1e7df78). */
+    *(int32_t *)(state + 10759872) = 256;
 }
