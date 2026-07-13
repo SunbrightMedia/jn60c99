@@ -94,18 +94,41 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
         {
             int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
             /* LFO Rate (96352): the CHORUS5_LFORATE_LUT is the 96 kHz reference; the
-             * host-rate value is LUT * (96000/SR) (verified 2.0x @48k vs the captured
-             * mode-5 master states). */
-            JF(state, 96352) = efx_bits(CHORUS5_LFORATE_LUT[tone & 0xFF])
-                               * (96000.0f / (float)Hr);
+             * host-rate value is LUT * (96000/SR) computed in DOUBLE precision then
+             * rounded to float — a float32 multiply is +1 ULP off for some LUT
+             * entries (e.g. tone 128, LUT 0x37e6c674: plugin 0x387b2f14 @44.1k, the
+             * float op gives ..15). Proven against the plugin's own recall at
+             * 44100/88200 (2.0x @48k is exact either way). */
+            JF(state, 96352) = (float)((double)efx_bits(CHORUS5_LFORATE_LUT[tone & 0xFF])
+                               * (96000.0 / (double)Hr));
             /* Ip Fc gate (96384) — SR-dependent 3-class (mode5_gates_spec.md). */
             JF(state, 96384) = efx_bits(Hr == 44100 ? 0x388b3cdfu :
                                         Hr == 48000 ? 0x387fd974u : 0x37ffd974u);
-            /* Structural cell 96336 is rate-dependent and MODE5_STRUCT holds the 96 kHz
-             * value; the plugin's 48 kHz value is 0x3b98bc15 (const across mode-5 patches,
-             * captured direct — not a clean scale of the 96k value). Override at 48 kHz;
-             * 96k keeps the struct value; other rates approximate. See FX_COLDLOAD_TODO. */
-            if (Hr == 48000) { JF(state, 96336) = efx_bits(0x3b98bc15u); }
+            /* Structural cell 96336 is rate-dependent with FOUR distinct arms (all
+             * measured from the plugin's own recall; MODE5_STRUCT holds the 96k arm). */
+            JF(state, 96336) = efx_bits(Hr == 44100 ? 0x3b8c0000u :
+                                        Hr == 48000 ? 0x3b98bc15u :
+                                        Hr == 88200 ? 0x3c0e0000u : 0x3c1abc15u);
+            /* 17 further block-B cells are RATE-DEPENDENT, 2-class {44100 / else}
+             * (48000 == 88200 == 96000 hold the MODE5_STRUCT values). The single-arm
+             * struct capture broke every v551==5 patch cold at 44.1 kHz (divergence
+             * from ~frame 7; the 44.1k warm sweep flagged all 8 of them, right-channel
+             * corr collapse). 44.1 arms measured bit-for-bit from the plugin's own
+             * recall of patches 40/21 at 44100; 88200 confirmed on the else arm
+             * (scratchpad/oracle/ rate fullscan p40/p21 + 88.2 dump). */
+            if (Hr == 44100) {
+                static const uint32_t M5_44[] = {
+                    96432,0x3f7fb563u, 96448,0xbf7fb563u, 96464,0x3f7f6ac6u,
+                    96480,0x3da89881u, 96496,0x3e289881u, 96512,0x3da89881u,
+                    96528,0x3f6d4cfcu, 96544,0xbe833278u, 96560,0x3f7204f1u,
+                    96576,0xbf7204f1u, 96592,0x3f6409e3u, 96640,0x3ba05e31u,
+                    96688,0x3a001b94u, 96704,0x3b001b93u, 96784,0x35921658u,
+                    96800,0x402c4400u, 96848,0x3d000000u
+                };
+                unsigned k5;
+                for (k5 = 0; k5 < sizeof(M5_44)/sizeof(M5_44[0]); k5 += 2)
+                    JF(state, (int)M5_44[k5]) = efx_bits(M5_44[k5 + 1]);
+            }
         }
         JF(state, 96416) = 1.0f;                                       /* Mute gate        */
     }
