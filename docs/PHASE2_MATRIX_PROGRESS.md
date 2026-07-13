@@ -140,3 +140,15 @@ at 3 rates, exhaustion tables complete (57,600 param + 16,256 note/velocity
 comparisons, 1 bug found+fixed), warm sweeps adjudicated at both rates. Open
 residuals carried explicitly: patches 7/39 warm balance (44.1k), 9th-voice
 steal, warm-recall phase limit. Instruments promoted to `tools/verify/`.
+
+## POST-CLOSURE: the 7/39 residual is CLOSED (Phase-3 transplant instrument)
+
+The state-transplant step-equivalence instrument (Phase 3, workflow wf_e1e7df78,
+adversarially CONFIRMED) proved port and plugin step BIT-IDENTICALLY from shared
+warm state (patches 7/39/13, 6000 samples idle + note, end-state identical), then
+bisected the warm-STATE difference to ONE cell: 10759872, the reverb lazy-wipe
+countdown, which the plugin re-arms to 256 on every recall and the port did not.
+Fix: reverb_recall.c re-arms it. Warm re-sweep @44.1k: patches 7, 39 AND control
+13 all 0.00 dB / corr 1.000 1.000. Cold unaffected by construction (prepare seeds
+the same value) — all cold/scenario/suite regressions green. Every Phase-2 warm
+flag is now either fixed or self-band-cleared: zero open audio defects.

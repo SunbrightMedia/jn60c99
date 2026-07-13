@@ -80,9 +80,12 @@ repo root (`make libjuno.so`). WASM checks need node + the built `gui/web/`.
 
 ## Known open ledger items (as of Gate G2 closure)
 
-1. Patches 7 & 39: warm-only, 44.1k-only stereo-balance residual ≤0.7 dB
-   (corr ≈0.99, cold bit-exact). Root cause not isolated; Phase-3 transplant /
-   Phase-4 assigner splice will settle it.
+1. ~~Patches 7 & 39 warm-balance residual~~ — CLOSED by the Phase-3
+   state-transplant instrument: root cause was the reverb lazy-wipe countdown
+   (cell 10759872) that the plugin re-arms on every recall and the port didn't
+   (fix in reverb_recall.c). Warm re-sweep: 0.00 dB, corr 1.000/1.000.
+   Step-equivalence itself is now PROVEN (bit-identical stepping from
+   transplanted warm state, adversarially confirmed, run wf_e1e7df78).
 2. 9th-note voice steal: ~1 ULP, assigner-managed layer (Phase 4).
 3. Warm recall (patch switch after rendering): not bit-exact-able by
    construction (free-running phase); matches within 1.6–3.7% diff-RMS.
