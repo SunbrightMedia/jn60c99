@@ -219,17 +219,31 @@ int juno_gui_param_offset(int i) { return juno_param_offset(i); }
  * only the changed cell, leaving each voice's independent evolution intact. */
 float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
 {
-    int Hr, off, v;
-    float w;
+    int Hr, blob, i, n;
+    float w = 0.0f;
     if (!c) return 0.0f;
     Hr = (int)JF(c->st, 16); if (Hr <= 0) Hr = 96000;
-    off = juno_param_offset(param_index);
-    w = juno_apply_param(c->st, param_index, byte, Hr);   /* writes voice-0 / master cell */
-    /* Per-voice cell (voice-0 block): replicate the identical value to voices 1..7.
-     * Master cells (off >= voice span) are written once by juno_apply_param. */
-    if (off >= 176 && off < 176 + JUNO_VOICE_MAIN_STRIDE)
-        for (v = 1; v < JUNO_NUM_VOICES; ++v)
-            JF(c->st, (unsigned)off + (unsigned)v * JUNO_VOICE_MAIN_STRIDE) = w;
+    blob = juno_param_blob(param_index);
+    if (blob < 0) return 0.0f;
+    /* LEAF semantics: the plugin's value tree dispatches whole leaves — one panel
+     * change writes EVERY binding row sharing the blob byte (HPF blob 38 = 4 rows,
+     * PORTAMENTO blob 54 = 2 rows; measured under emulation: a single HPF dispatch
+     * writes 4 cells x 8 voice strides, and the port's per-row values reproduce the
+     * plugin's bits exactly — Phase-3 fuzz triage, seeds 0/1/2). Expanding here
+     * makes every consumer (GUI, fuzzer, MIDI CC mapping) faithful by default. */
+    n = juno_param_count();
+    for (i = 0; i < n; ++i) {
+        if (juno_param_blob(i) == blob) {
+            int off = juno_param_offset(i), v;
+            float wi = juno_apply_param(c->st, i, byte, Hr); /* voice-0 / master cell */
+            /* Per-voice cell (voice-0 block): replicate the identical value to
+             * voices 1..7. Master cells are written once by juno_apply_param. */
+            if (off >= 176 && off < 176 + JUNO_VOICE_MAIN_STRIDE)
+                for (v = 1; v < JUNO_NUM_VOICES; ++v)
+                    JF(c->st, (unsigned)off + (unsigned)v * JUNO_VOICE_MAIN_STRIDE) = wi;
+            if (i == param_index) w = wi;
+        }
+    }
     return w;
 }
 

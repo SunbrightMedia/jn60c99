@@ -98,8 +98,12 @@ int main(void)
     if (JF(st, aux) != 0.0f)              { printf("FAIL: aux latch not consumed by render\n"); return 1; }
     juno_note_on(st, 3, 62, 100);
     if (JF(st, aux) != 0.0f)              { printf("FAIL: note_on RE-ARMED aux latch after consume (Scenario C bug)\n"); return 1; }
+    /* ...but note-OFF must arm it (param 927 "Note Off Notify" — plugin-measured;
+     * fuzz seeds 1/2 regression: a released voice re-gated with no render between
+     * must delay its new attack by one sample exactly like the plugin). */
     juno_note_off(st, 3);
-    printf("OK: BUILD arms aux latch; note_on never (re-)arms it (Scenario C guard)\n");
+    if (JF(st, aux) != 1.0f)              { printf("FAIL: note_off did not arm aux latch (param 927)\n"); return 1; }
+    printf("OK: BUILD arms aux latch; note_on never re-arms; note_off arms (927)\n");
 
     /* 2. sound present + NO onset click — on a REAL patch (complete bit-exact
      * envelope). The old bug was a hand-written 1 ms gate RAMP that produced an

@@ -25,6 +25,7 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx);
 int         juno_param_count(void);
 const char *juno_param_name(int i);
 int         juno_param_offset(int i);
+int         juno_param_blob(int i);   /* front-panel blob position (leaf id); rows sharing it form one plugin leaf */
 float       juno_apply_param(unsigned char *state, int i, int byte, int Hr);
 
 /* Decode the per-patch ARPEGGIATOR settings (NAME1 leaves 89/90/91 at record bytes

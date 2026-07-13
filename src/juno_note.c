@@ -202,6 +202,19 @@ void juno_note_off(unsigned char *st, int voice)
     /* M.Gate (immediate): close the gate -> state[560] falls to 0 -> both ADSRs
      * enter release. Written directly, matching the descriptor's en=0 flag. */
     JF(st, base + GATE_OFF) = 0.0f;
+
+    /* Arm the per-voice DCO retrigger latch (aux Array A) — the descriptor's
+     * param 927 "Voice0 Note Off Notify" (documented in this file's header since
+     * the descriptor transcription, but previously unimplemented). Measured from
+     * the plugin's own note-off under emulation (Phase-3 fuzz triage, seeds 1/2:
+     * each note-off arms the released voice's 101504+32v to 1.0; causally proven
+     * by poke-and-render bit-exactness). Inert when the voice stays released —
+     * voice_render consumes the latch on the next sample while the gate is
+     * already 0 (voice_render.c:566-572 masks a gate that is already closed) —
+     * which is why every release/retrigger-after-render scenario passed without
+     * it. It changes audio exactly when a released voice is RE-GATED with no
+     * render in between: the plugin's new attack then starts one sample later. */
+    JF(st, AUX_EDGE(voice)) = 1.0f;
 }
 
 void juno_note_glide(unsigned char *st, int voice, int midi_note)

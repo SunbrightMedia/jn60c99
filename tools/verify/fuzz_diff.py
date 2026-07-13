@@ -18,6 +18,12 @@ Grammar per seed (deterministic from the seed — the seed IS the regression scr
   excluded: recall-after-render (warm recall: not bit-exact-able by construction,
             proven free-running-phase — scenA + transplant), arp stepping (Phase 4),
             bend/mod (not in the fuzz surface yet — noted in the certificate).
+  HARNESS CONVENTIONS (fuzz-triage seeds 0/1/2 — all three were harness artifacts):
+            arp-off must pass bpm=128.0 (the plugin's recall-default tempo; any other
+            value desyncs the tempo-synced delay/LFO cells on all TEMPO SYNC patches
+            and detonates at the synced delay's first echo). Param events rely on
+            juno_gui_set_param's LEAF expansion (one event writes every binding row
+            sharing the blob byte, matching the plugin's value-tree dispatch).
 
 Sequences are BIT-EXACT-able end to end (all event classes proven in the Phase-2
 matrix); any mismatch is a real finding. Verdict per seed: OK <n> frames, or
@@ -94,7 +100,7 @@ def run_seed(seed):
     bank = open(BANK, 'rb').read()
     c = lib.juno_gui_create(ctypes.c_float(rate), 0)
     lib.juno_gui_apply_bank(c, bank, len(bank), patch)
-    if patch in ARPS: lib.juno_gui_arp_config(c, 0, 0, 1, 120.0, 0.6)
+    if patch in ARPS: lib.juno_gui_arp_config(c, 0, 0, 1, 128.0, 0.6)  # 128 = plugin recall-default tempo
     Lb, Rb = [], []
     for x in ev:
         if x[0] == 'on': lib.juno_gui_note_on(c, x[1], x[2])

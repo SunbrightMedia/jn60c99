@@ -32,7 +32,7 @@ bank = open(BANK, "rb").read()
 def port_warm(p):
     c = lib.juno_gui_create(48000.0, 2); lib.juno_gui_warmup(c, IDLE)
     lib.juno_gui_apply_bank(c, bank, len(bank), p)
-    lib.juno_gui_arp_config(c, 0, 0, 1, 120.0, 0.6)   # arp OFF: synthesis-to-synthesis
+    lib.juno_gui_arp_config(c, 0, 0, 1, 128.0, 0.6)   # arp OFF: synthesis-to-synthesis
     lib.juno_gui_note_on(c, 60, 105)
     buf = (ctypes.c_float * (2 * NOTE))(); lib.juno_gui_render(c, buf, NOTE)
     a = np.ctypeslib.as_array(buf).astype(np.float64); return a[0::2], a[1::2]

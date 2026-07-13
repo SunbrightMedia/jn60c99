@@ -283,6 +283,18 @@ int juno_param_offset(int i)
     return (i >= 0 && i < N_BINDINGS) ? BINDINGS[i].offset : -1;
 }
 
+/* Blob position of binding row i. Several rows share one front-panel blob byte
+ * (HPF blob 38 -> the 4 rows for 10240/10256/10272/10288; PORTAMENTO blob 54 ->
+ * 2 rows): the plugin's value tree dispatches whole LEAVES, so one panel change
+ * writes EVERY cell bound to that blob (measured under emulation: a single HPF
+ * dispatch writes 4 cells x 8 voice strides). Callers mirroring a live panel
+ * move must apply the byte to all rows sharing the blob — juno_gui_set_param
+ * does this expansion. */
+int juno_param_blob(int i)
+{
+    return (i >= 0 && i < N_BINDINGS) ? BINDINGS[i].blob_pos : -1;
+}
+
 /* Apply raw byte (0..255) to parameter i via the recall dispatch. Hr = host rate
  * (drives the SR-variant curve arm / portamento post-multiply, exactly as
  * juno_bank_apply). Writes the engine cell and returns the float written (0.0 on a
