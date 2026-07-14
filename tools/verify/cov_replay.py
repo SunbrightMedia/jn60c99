@@ -58,7 +58,8 @@ def replay_event(c, x):
     else: render(c, x[1])
 
 def scen_fuzz():
-    for seed in range(103):
+    nseed = int(os.environ.get('NSEED', '103'))
+    for seed in range(nseed):
         rate, patch, ev, _ = gen_script(seed)
         c = create(rate, patch)
         for x in ev: replay_event(c, x)
@@ -105,8 +106,48 @@ def scen_voicealloc():
         render(c, 2000)
         destroy(c)
 
+def scen_dsp_params():
+    """Live-edit every DSP row (0..21) across its full byte range on several base
+    patches + a range of notes, rendering each — drives the voice_render DCO /
+    ENV / VCF / VCA branches gated on those cells. Port-side coverage only."""
+    for patch in (5, 20, 31, 45, 61, 63):
+        for row in range(22):
+            for byte in (0, 32, 64, 96, 128, 160, 192, 224, 255):
+                c = create(44100.0, patch)
+                lib.juno_gui_set_param(c, row, byte)
+                for note in (36, 60, 84):
+                    lib.juno_gui_note_on(c, note, 100)
+                render(c, 600)
+                lib.juno_gui_note_off(c, 60)
+                render(c, 600)
+                destroy(c)
+
+def scen_synth_discrete():
+    """Apply synthetic patches with out-of-factory DISCRETE mode bytes (DCO
+    range/waveform, sub/noise type, LFO variation/routing, octave shift) and
+    render extreme notes — drives the discrete voice_render branches."""
+    import e2e_emu as _E
+    H, S, BO = _E.HEADER, _E.STRIDE, _E.BLOB_OFF
+    base_bank = bytearray(_E.bank_bytes())
+    DISC = [(36,(0,1,2,3)),(42,(0,1,2,3)),(60,(0,1,2,3)),(62,(0,1,2,3)),
+            (64,(0,1,2)),(322,(0,1,2,3)),(578,(0,1,2,3)),(530,(0,1,2)),
+            (538,(0,1)),(474,(0,1,2)),(354,(0,1,2)),(362,(0,1,2)),(370,(0,1,2))]
+    for rb, vals in DISC:
+        for v in vals:
+            b = bytearray(base_bank)
+            off = H + 5 * S + BO + rb
+            b[off] = (v >> 4) & 0xF; b[off+1] = v & 0xF
+            bb = bytes(b)
+            c = lib.juno_gui_create(ctypes.c_float(44100.0), 0)
+            lib.juno_gui_apply_bank(c, bb, len(bb), 5)
+            for note in (24, 36, 60, 84, 96):
+                lib.juno_gui_note_on(c, note, 100); render(c, 500)
+            destroy(c)
+
 def main():
-    scen_fuzz();      print("fuzz corpus replayed (103 seeds)", flush=True)
+    scen_fuzz();      print("fuzz corpus replayed", flush=True)
+    scen_dsp_params();print("DSP param sweep replayed", flush=True)
+    scen_synth_discrete(); print("synthetic discrete-mode patches replayed", flush=True)
     scen_temposync(); print("tempo-sync engage/disengage replayed (64 patches)", flush=True)
     scen_chorus();    print("chorus modes replayed", flush=True)
     scen_arp();       print("arp scenarios replayed", flush=True)
