@@ -1,6 +1,14 @@
 # Build + test for the JUNO-60 C99 port.
 CC      ?= cc
-CFLAGS  ?= -std=c99 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -fno-strict-aliasing
+# -ffp-contract=off: FORBID fused multiply-add contraction. The engine's
+# bit-exactness is defined against the plugin's x86 SSE2 output, which has NO
+# FMA (verified: 0 vfmadd/vfmsub in libjuno.so, and a -ffp-contract=off build is
+# byte-identical to the default x86 build). On a target with hardware FMA (the
+# Teensy 4.1 / ARM Cortex-M7 VFPv5) the compiler could otherwise fuse a*b+c into a
+# single-rounding instruction and silently diverge. This flag keeps every multiply
+# and add separately rounded, matching the reference on every target. The FMA
+# canary (tests/test_fma_canary.c) fails loudly if contraction ever slips through.
+CFLAGS  ?= -std=c99 -O2 -ffp-contract=off -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -fno-strict-aliasing
 LDLIBS  ?= -lm
 
 SRC     := $(wildcard src/*.c)
@@ -22,7 +30,8 @@ dll: juno.dll
 juno.dll: gui/juno_bridge.c $(SRC)
 	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $^ $(LDLIBS)
 
-test: tests/test_voice_alloc tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter tests/test_arp_pattern tests/test_param_setter
+test: tests/test_fma_canary tests/test_voice_alloc tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter tests/test_arp_pattern tests/test_param_setter
+	./tests/test_fma_canary
 	./tests/test_helpers
 	./tests/test_voice_smoke
 	./tests/test_master_smoke
@@ -41,6 +50,9 @@ test: tests/test_voice_alloc tests/test_helpers tests/test_voice_smoke tests/tes
 	./tests/test_arp_pattern
 	./tests/test_param_setter
 	./tests/test_voice_alloc
+
+tests/test_fma_canary: tests/test_fma_canary.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)
 
 tests/test_param_setter: tests/test_param_setter.c $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
