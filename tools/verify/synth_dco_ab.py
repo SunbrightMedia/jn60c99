@@ -79,9 +79,15 @@ def first_div(La, Ra, Lb, Rb):
     return None
 
 def main():
-    only = sys.argv[1] if len(sys.argv) > 1 else None
+    # usage: synth_dco_ab.py [substr] | synth_dco_ab.py --range LO HI
+    only = None; lo, hi = 0, len(DISCRETE)
+    if len(sys.argv) >= 4 and sys.argv[1] == '--range':
+        lo, hi = int(sys.argv[2]), int(sys.argv[3])
+    elif len(sys.argv) > 1:
+        only = sys.argv[1]
     bad = 0; tot = 0
-    for (nm, rb, vals) in DISCRETE:
+    for idx, (nm, rb, vals) in enumerate(DISCRETE):
+        if not (lo <= idx < hi): continue
         if only and only not in nm: continue
         for v in vals:
             bank = synth(rb, v)
