@@ -82,6 +82,18 @@ typedef struct {
      * value (fuzz seed 57 — a live TEMPO SYNC flip on a non-arp patch must be
      * value-neutral at 128 BPM, not jump to the arp's 120). */
     float host_bpm;
+
+    /* Debug-only arp-event trace (Phase 4 direct arp-audio A/B). When
+     * arp_trace_cap > 0, arp_tick appends each fired event as
+     * (sample, kind, note, velocity) so a verifier can replay the EXACT
+     * schedule the port renders into the plugin oracle (e2e_emu) and A/B the
+     * audio. Zero effect on the audio path when arp_trace_cap == 0 (calloc
+     * zero-inits it), so shipped builds are unaffected. arp_trace_smp is the
+     * running render-sample index. */
+    long  arp_trace_smp;
+    int   arp_trace_cap;   /* 0 = disabled */
+    int   arp_trace_n;
+    int  *arp_trace_buf;   /* 4*cap ints: smp, kind, note, vel */
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -547,6 +559,11 @@ static void arp_tick(juno_ctx *c)
     carp_event ev[64];
     int i, n = carp_tick(&c->arp, sr, ev, 64);
     for (i = 0; i < n; ++i) {
+        if (c->arp_trace_cap && c->arp_trace_n < c->arp_trace_cap) {
+            int *r = c->arp_trace_buf + 4 * c->arp_trace_n++;
+            r[0] = (int)c->arp_trace_smp; r[1] = ev[i].kind;
+            r[2] = ev[i].note; r[3] = ev[i].velocity;
+        }
         if (ev[i].kind == 0) {                          /* note-off */
             synth_note_off(c, ev[i].note);
             if (ev[i].note == c->arp_cur) c->arp_cur = -1;
@@ -556,6 +573,17 @@ static void arp_tick(juno_ctx *c)
         }
     }
 }
+
+/* Debug-only: enable arp-event tracing into caller-owned buf (4*cap ints:
+ * sample,kind,note,vel). Returns nothing; read count with juno_gui_arp_trace_count.
+ * No audio effect (Phase 4 arp-audio A/B). */
+void juno_gui_arp_trace(juno_ctx *c, int *buf, int cap)
+{
+    if (!c) return;
+    c->arp_trace_buf = buf; c->arp_trace_cap = cap;
+    c->arp_trace_n = 0; c->arp_trace_smp = 0;
+}
+int juno_gui_arp_trace_count(juno_ctx *c) { return c ? c->arp_trace_n : 0; }
 
 /* Public note-on: feeds the arp's held-key set when enabled, else the synth. */
 void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
@@ -714,6 +742,7 @@ int juno_gui_render(juno_ctx *c, float *out, int nframes)
         if (c->arp_on) arp_tick(c);        /* step the arp pattern in real time */
         juno_note_tick(c->st);
         full = juno_driver_render_sample(c->st, &out[2 * i], &out[2 * i + 1]);
+        if (c->arp_trace_cap) c->arp_trace_smp++;
     }
     return full;
 }
