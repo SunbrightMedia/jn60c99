@@ -65,3 +65,7 @@ libjuno_cov.so
 # compiled test binaries
 tests/test_fma_canary
 tests/test_teensy_golden
+
+# generated web-app bundles (2MB+ base64; rebuild with tools/verify/bundle_webapp.py)
+tools/verify/juno-webapp.html
+tools/verify/juno-webapp-local.html
