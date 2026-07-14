@@ -61,3 +61,7 @@ libjuno_cov.so
 *.gcno
 *.gcda
 *.gcov
+
+# compiled test binaries
+tests/test_fma_canary
+tests/test_teensy_golden

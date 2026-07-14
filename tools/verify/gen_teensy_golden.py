@@ -101,5 +101,14 @@ def main():
         f.write(f"#define TG_NSCEN {len(rows)}\n\n#endif\n")
     print(f"wrote tests/teensy_golden.h ({len(rows)} scenarios)")
 
+    # Same corpus as JSON, for the WASM verifier (tools/verify/wasm_golden.mjs).
+    import json
+    js = [{"name": name, "patch": patch, "blob": list(blob_of(patch)),
+           "events": [list(e) for e in events], "nframes": n, "hash": f"{h:016x}"}
+          for (name, patch, events, n, h, first) in rows]
+    with open('/home/user/jn60c99/tools/verify/teensy_golden.json', 'w') as f:
+        json.dump(js, f)
+    print(f"wrote tools/verify/teensy_golden.json")
+
 if __name__ == '__main__':
     main()
