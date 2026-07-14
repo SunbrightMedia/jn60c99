@@ -53,3 +53,5 @@ maketest*.log
 fuzzregress*.log
 probe*.log
 fuzzsweep*.log
+mt8.log
+unison_verify.log
