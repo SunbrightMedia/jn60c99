@@ -17,12 +17,12 @@ then `NSEED=203 LIBJUNO=./libjuno_cov.so python3 tools/verify/cov_replay.py`, th
   MASTER_PLAN "~200+" target). Zero divergences. tools/verify/fuzz_diff.py.
 - **64 / 64 factory patches bit-exact** through a live TEMPO SYNC engage+disengage
   with a note held across the flip. tools/verify/temposync_engage_ab.py.
-- **Synthetic discrete-mode patches bit-exact** (out-of-factory DCO range/waveform,
-  sub/noise type, LFO variation/routing, octave shift, VCA mode) across notes
-  24–96. tools/verify/synth_dco_ab.py. Confirmed bit-exact: OSC2 WAVE, OSC2 RANGE,
-  MIX SUB/NOISE TYPE (0 divergences); remaining discrete params sweeping (clean so
-  far). Corroborated by the plugin block trace (§4): these modes add 0 new engine
-  blocks, and port coverage is unchanged by them (§3a).
+- **Synthetic discrete-mode patches bit-exact** across notes 24–96 — ALL 13
+  discrete-mode params swept (OSC2 WAVE/RANGE, MIX SUB/NOISE TYPE, VCO ENV, OCTAVE
+  SHIFT, OSC3 WAVEFORM, LFO VARIATION/TRIG/PITCH/FILTER/AMP, VCA MODE):
+  **0 divergences** over the full sweep. tools/verify/synth_dco_ab.py. Corroborated
+  by the plugin block trace (§4): these modes add 0 new engine blocks, and port
+  coverage is unchanged by them (§3a).
 - Carried from earlier gates: 57,600-combo recall exhaustion, 16,256 note×vel,
   state-transplant step-equivalence — all bit-exact.
 
