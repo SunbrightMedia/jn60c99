@@ -23,7 +23,6 @@ juno_js = rd(f"{ROOT}/gui/web/juno.js")
 bank_js = rd(f"{ROOT}/gui/web/bank.js")
 index   = rd(f"{ROOT}/gui/web/index.html")
 wasm    = rd(f"{ROOT}/gui/web/juno.wasm", "rb")
-params  = rd(f"{ROOT}/gui/web/params.json").strip()
 bankbin = rd(BANK, "rb")
 
 # --- glue: strip the ES export (module-scope function stays available) ---
@@ -56,13 +55,8 @@ app = app.replace(old, (
     "    return {};\n"
     "  } });"))
 
-# 3. params.json / param_meta.json fetches -> literals
-old = 'const raw = await fetch("params.json").then(r => r.json());'
-assert old in app
-app = app.replace(old, "const raw = PARAMS_JSON;")
-old = 'try { REAL = await fetch("param_meta.json").then(r => r.ok ? r.json() : {}); } catch { REAL = {}; }'
-assert old in app
-app = app.replace(old, "REAL = {};")
+# 3. (params.json/param_meta.json fetch seam removed — the panel now enumerates its
+#     controls straight from the WASM engine, no JSON side-files.)
 
 # 4. headless-test probe: track output peak in the audio callback
 old = "    for (let i = 0; i < n; i++) { L[i] = clamp1(s[2*i]); R[i] = clamp1(s[2*i+1]); }"
@@ -85,7 +79,9 @@ auto = """function autoBank() {
   btn.title = "the embedded factory bank \\u2014 pick a patch, Apply, then play the keys";
   btn.onclick = () => showBank();
   document.querySelector("header .row").appendChild(btn);
-  status("ready \\u2014 factory bank embedded (" + BANK.patch_count + " patches): open it, Apply a patch, play the keys");
+  // Load patch 0 so the front-panel sliders show a real patch's bytes out of the box.
+  applyPatchIndex(0);
+  status("ready \\u2014 factory bank embedded (" + BANK.patch_count + " patches): patch 0 loaded, tweak the sliders or open the bank to pick another, then play the keys");
 }
 boot().then(autoBank).catch(e => {"""
 app = app.replace(old, auto)
@@ -109,7 +105,6 @@ function b64bytes(s) {{
 }}
 const WASM_B64 = "{b64(wasm)}";
 const BANK_B64 = "{b64(bankbin)}";
-const PARAMS_JSON = {params};
 
 /* ---- emscripten glue (gui/web/juno.js, verbatim minus the ES export) ---- */
 {juno_js}

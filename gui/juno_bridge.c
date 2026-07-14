@@ -231,6 +231,12 @@ const char *juno_gui_param_name(int i) { return juno_param_name(i); }
 
 int juno_gui_param_offset(int i) { return juno_param_offset(i); }
 
+/* Value-tree blob position of exposed panel param `i`. The patch record stores each
+ * leaf as a nibble-pair, so the raw 0..255 byte for this param lives at record byte
+ * 2*blob_pos — the web panel uses this to show each slider at the LOADED patch's
+ * value (dec(record, 2*blob)) and to dedupe params that share a blob (HPF, PORTA). */
+int juno_gui_param_blob(int i) { return juno_param_blob(i); }
+
 /* Apply raw byte (0..255) to panel parameter `param_index`, bit-exact via the recall
  * dispatch, then propagate to all 8 voices as the plugin's LIVE param dispatch does:
  * write the SAME engine float into every voice's copy of that ONE cell and touch

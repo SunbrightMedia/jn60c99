@@ -4,9 +4,13 @@
 import { chromium } from "playwright-core";
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const SP = "/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad";
-const html = readFileSync(`${SP}/juno-webapp-local.html`);
+// The bundler (bundle_webapp.py) writes juno-webapp-local.html next to itself in
+// tools/verify — read that fresh output, not a stale scratchpad copy.
+const HERE = dirname(fileURLToPath(import.meta.url));
+const html = readFileSync(`${HERE}/juno-webapp-local.html`);
 const srv = createServer((req, res) => { res.setHeader("content-type", "text/html"); res.end(html); });
 await new Promise(r => srv.listen(8931, r));
 
@@ -34,6 +38,24 @@ await page.click("#bankdlg button.on");   // Apply to engine
 await page.waitForTimeout(200);
 console.log("status:", (await page.textContent("#status")).trim());
 
+// --- front-panel controls: rendered, sectioned, and reflecting patch 5's bytes ---
+const nRows = await page.$$eval("main#list .p", r => r.length);
+const nSecs = await page.$$eval("main#list .sec", r => r.map(e => e.textContent));
+console.log(`panel: ${nRows} controls in ${nSecs.length} sections:`, nSecs.join(" | "));
+// every control's number box must hold an integer in 0..255, and the panel must not
+// be all-zero (patch 5 loaded real bytes)
+const vals = await page.$$eval("main#list .p input[type=number]", ins => ins.map(i => +i.value));
+const swVals = await page.$$eval("main#list .p button.sw", bs => bs.map(b => b.textContent));
+const allByte = vals.every(v => Number.isInteger(v) && v >= 0 && v <= 255);
+const nonZero = vals.filter(v => v > 0).length;
+console.log(`  numeric controls: ${vals.length} (all 0..255: ${allByte}, non-zero: ${nonZero}); switches: ${swVals.join(",") || "none"}`);
+// move the first slider and confirm the model commits (no throw, value persists)
+await page.$eval("main#list .p input[type=range]", r => { r.value = 200; r.dispatchEvent(new Event("change")); });
+await page.waitForTimeout(50);
+const moved = await page.$eval("main#list .p input[type=number]", i => +i.value);
+console.log("  first slider set to 200 ->", moved);
+const panelOK = nRows >= 21 && nSecs.length >= 6 && allByte && nonZero >= 5 && moved === 200;
+
 // press + hold a piano key (mousedown fires note-on + ensureAudio)
 await page.dispatchEvent(".key.w", "mousedown");
 await page.waitForTimeout(900);
@@ -42,8 +64,8 @@ await page.dispatchEvent(".key.w", "mouseup");
 console.log("audio peak after keypress:", peak);
 console.log("console errors:", errors.length ? errors : "none");
 
-const ok = nOpts === 64 && peak > 1e-3 && errors.length === 0;
-console.log(ok ? "\nOK: bundled app boots, loads bank, applies patch, and MAKES SOUND"
-               : "\nFAIL");
+const ok = nOpts === 64 && peak > 1e-3 && errors.length === 0 && panelOK;
+console.log(ok ? "\nOK: bundled app boots, loads bank, applies patch, panel reflects patch bytes, and MAKES SOUND"
+               : `\nFAIL (bank=${nOpts===64} audio=${peak>1e-3} noErrors=${errors.length===0} panel=${panelOK})`);
 await browser.close(); srv.close();
 process.exit(ok ? 0 : 1);
