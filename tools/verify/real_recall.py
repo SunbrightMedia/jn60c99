@@ -40,12 +40,27 @@ v=2->0.5(16'), 3->1.0(8'), 4->2.0(4'), 5->4.0(2'). Likewise 758->PWM 4144, 759->
 src 3888/3936, 752->LFO rate 1072/1088/2064, 751->LFO delay 1920.
 (scratchpad/probe_skipped.py, scratchpad/diff_complete.py, scratchpad/desc_probe.py)
 
-=== THE ONE RECONSTRUCTED STEP: record byte -> descriptor value (value-tree load) ===
-The plugin's replaceState (raw bank record -> descriptor[i].value) was NOT executed
-(it is fed by a std::ifstream-backed schema; not drivable in budget). We emulate it by
-writing the patch record's nibble-decoded byte into the plugin's descriptor value
-store for each leaf. This decode is cross-validated NON-circularly:
-  - patch-name leaves decode to exact ASCII patch names ("BS Juno Grime", ...);
+=== THE BANK BYTE -> RECORD DECODE IS NOW PROVEN(executed), not reconstructed ===
+The nibble formula dec(b) = ((b0&0xF)<<4)|(b1&0xF) IS the plugin's own bank
+decode. presetbankog1.bin is a KoaBankFile00003 / PG-JU60 bank; its loader
+sub_7FF91DF91530 loops the PER-RECORD parser sub_7FF91DF90ED0 (rva 0x330ED0)
+over the 64 records. Driving that parser under Unicorn (tools/verify/
+real_bank_parse.py --verify, scratchpad/route_a_ju60.py) proves the PG-JU60
+record body is read into programmer state VERBATIM (a plain istream::read/memcpy,
+NO nibble transform), then the 16-char name is written at record byte 140.
+Executed on all 64 patches: the plugin's record == our input body byte-for-byte,
+and every leaf below matches dec() with 0 mismatches. So dec() == the plugin.
+  (The transform-heavy parser sub_7FF91DFB1710, previously ASSUMED to be THE bank
+  parser, is the JU-06A "PG-BTQJA" IMPORT of a different compact format; it is
+  gated off for PG-JU60 and never runs for this file -- proven by driving it too,
+  scratchpad/route_a_parser.py.)
+
+=== STILL cross-validated (not executed): the record-byte POSITION MAP ===
+Which record byte each value-tree leaf reads (the value-tree replaceState leaf
+serialization) is derived from Script.xml, not executed via the value tree. It is
+cross-validated NON-circularly:
+  - patch-name leaves land at record 140..170 -- CONFIRMED by executing the parser,
+    which writes the 16-char name there (record byte = 2*blob_pos, blob_pos 70..85);
   - DCO RANGE (index 760) decodes across all 64 patches to the clean enum {2,3,4,5}
     -- a 16'/8'/4' octave control, not garbage; matches the plugin default 3.
 dispatch index = Script.xml docpos + 740; record byte = 2*(docpos-2)-4 (SYNTH block)
@@ -97,8 +112,8 @@ CELLS = [(3840, "feet"), (4144, "PWM"), (3888, "PWMsrcA"), (3936, "PWMsrcB"),
 def recall(idx, bank, leaves, fullloop=False):
     e = E.E2E(); e.build(SR); e.snap_all()          # plugin applies defaults to all units
     blob = E.patch_blob(bank, idx)
-    for (disp, bb) in leaves:                        # value-tree load (reconstructed step)
-        wr_desc(e, disp, dec(blob, bb))
+    for (disp, bb) in leaves:                        # dec()=plugin decode (PROVEN verbatim,
+        wr_desc(e, disp, dec(blob, bb))              # real_bank_parse.py); position map cross-val'd
     # drive the plugin's setter with values sourced from the plugin descriptor table.
     # NOTE: we must dispatch EVERY leaf (not just value!=default): build post-processing
     # can leave a cell differing from a fresh setter write even when the descriptor value

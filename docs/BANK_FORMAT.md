@@ -1,8 +1,28 @@
 # JUNO-60 preset bank format (KoaBankFile00003 / PG-JU60)
 
-Reverse-engineered from the plugin's own loader (`sub_7FF91DFB2380` "Load JU-06A
-Bank" → per-patch parser `sub_7FF91DFB1710`) and verified by exact byte tiling +
-an adversarial cross-check. Decoder: `tools/decode_bank.py`.
+Reverse-engineered from the plugin's own loader and verified by exact byte tiling
++ an adversarial cross-check. Decoder: `tools/decode_bank.py`.
+
+## CORRECTION (Phase-0 verification redo, proven by execution)
+
+The loader for a `PG-JU60` bank is `sub_7FF91DF91530` (rva 0x331530), whose
+per-record parser is **`sub_7FF91DF90ED0` (rva 0x330ED0)**, and for this format
+that parser reads the record body **VERBATIM** into programmer state (a plain
+`istream::read`/memcpy — NO nibble transform), then writes the 16-char name at
+record byte 140. Proven by driving it under Unicorn on all 64 patches: the
+plugin's record == the input body byte-for-byte, 0 mismatches
+(`tools/verify/real_bank_parse.py --verify`).
+
+The transform-heavy parser **`sub_7FF91DFB1710`** cited below (and its 31-entry
+src→dest table) is **NOT** the loader for `PG-JU60`. In `sub_7FF91DFB2380`
+("Load JU-06A Bank") it is gated on a **`PG-BTQJA`** model tag — the JU-06A
+*import* of a different, compact format — and never runs for a `PG-JU60` file.
+Feeding presetbankog1.bin's blob to it produces spurious transformed output
+(e.g. DCO-RANGE byte 172 instead of 3). So the "19-case transform" decode below
+does not apply to this bank; the correct decode is a straight hi-nibble-first
+nibble join `value[k] = ((blob[2k]&0xF)<<4)|(blob[2k+1]&0xF)`, which IS the
+plugin's own decode (verbatim programmer state read as nibble pairs by the value
+tree). The sections below are retained for the historical `PG-BTQJA` analysis.
 
 ## Layout (VERIFIED — high confidence)
 
