@@ -440,6 +440,37 @@ void juno_apply_condition(unsigned char *state, int cbyte)
     }
 }
 
+/* ASSIGN MODE 2 (UNISON) per-voice DCO detune spread at 3968. Measured under the
+ * oracle from the running binary for BOTH ASSIGN==2 factory patches (61, 63) at
+ * 44100 and 96000 Hz — identical fixed table, rate- and patch-independent
+ * (tools/verify/triage/probe93.py; the old single-cell recall used entry [7],
+ * ground-truthed from the one sounding voice). Must run AFTER seed_voices (which
+ * would replicate voice 0's 0.0 over the spread), like juno_apply_condition. */
+static const unsigned int UNISON_3968[8] = {
+    0x00000000u, 0xbae33103u, 0x3b6101c6u, 0xbbf3d93au,
+    0x3bda740eu, 0xbba3d70au, 0x3b5a740eu, 0xbb23d70au,
+};
+void juno_apply_unison_spread(unsigned char *state, int assign)
+{
+    int v;
+    for (v = 0; v < 8; ++v) {
+        unsigned b = (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
+        unsigned int bits = (assign == 2) ? UNISON_3968[v] : 0x00000000u;
+        float f; memcpy(&f, &bits, 4);
+        JF(state, 3968u + b) = f;
+    }
+}
+
+/* Read the ASSIGN MODE nibble-pair (blob row 56) for patch idx, for the bridge to
+ * drive juno_apply_unison_spread post-seed. Defaults to 0 on bad idx. */
+int juno_bank_assign(const unsigned char *bank, int idx)
+{
+    const unsigned char *blob;
+    if (idx < 0 || idx >= BANK_COUNT) return 0;
+    blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
+    return ((blob[2 * 56] & 0xF) << 4) | (blob[2 * 56 + 1] & 0xF);
+}
+
 /* Read the CONDITION byte (leaf 114, record byte 498) from a bank record, for the
  * bridge to apply post-seed. Defaults to 128 (the Script.xml default) on bad idx. */
 int juno_bank_condition(const unsigned char *bank, int idx)
@@ -555,15 +586,14 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
         int lg = ((blob[2 * 55] & 0xF) << 4) | (blob[2 * 55 + 1] & 0xF);
         int as = ((blob[2 * 56] & 0xF) << 4) | (blob[2 * 56 + 1] & 0xF);
         JF(state, 608) = (lg == 1 && as == 1) ? 1.0f : 0.0f;
-        /* ASSIGN MODE 2 (UNISON) carries a small fixed DCO detune in the pitch-sum
-         * term at 3968: -0.0025 (0xbb23d70a) for both ASSIGN==2 factory patches (61,
-         * 63), 0 otherwise. (Slot-7 value; a real unison chord may spread per voice —
-         * only the single sounding voice is ground-truthed here.) */
-        {
-            unsigned int b = (as == 2) ? 0xbb23d70au : 0x00000000u;
-            float f; memcpy(&f, &b, 4);
-            JF(state, 3968) = f;
-        }
+        /* ASSIGN MODE 2 (UNISON) carries a per-voice DCO detune SPREAD in the
+         * pitch-sum term at 3968 (0 otherwise). The old single value here was
+         * voice 7's entry only; the full 8-voice table is written per voice by
+         * juno_apply_unison_spread AFTER seed_voices (fuzz seeds 93/83/61/27 —
+         * measured identical for patches 61+63 at 44.1k and 96k). Voice-0 value
+         * is written here so a bank apply without the bridge stays coherent. */
+        JF(state, 3968) = 0.0f;
+        (void)as;
     }
     {
         int t = record_byte(blob, 554);                  /* LFO TRIG ENV (leaf 121) */

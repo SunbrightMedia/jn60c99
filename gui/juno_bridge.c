@@ -621,6 +621,9 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
     /* CONDITION analog voice-scatter: per-voice detune/level, applied AFTER seed (it
      * makes the 8 voices deliberately non-identical — the plugin's component-tolerance
      * emulation). Default patch value 128 -> full scatter. */
+    /* UNISON (ASSIGN==2) per-voice 3968 detune spread — after seed_voices, which
+     * would replicate voice 0's 0.0 over it (fuzz seeds 93/83/61/27, patches 61+63). */
+    juno_apply_unison_spread(c->st, juno_bank_assign(bank, idx));
     c->last_condition = juno_bank_condition(bank, idx);
     c->hpf_type = juno_bank_hpf_type(bank, idx);   /* joint HPF recompute context */
     juno_apply_condition(c->st, c->last_condition);
