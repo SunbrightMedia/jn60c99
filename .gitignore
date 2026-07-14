@@ -55,3 +55,9 @@ probe*.log
 fuzzsweep*.log
 mt8.log
 unison_verify.log
+
+# coverage build artifacts
+libjuno_cov.so
+*.gcno
+*.gcda
+*.gcov
