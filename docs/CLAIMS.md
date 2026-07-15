@@ -46,6 +46,28 @@ Reproduce any row: run the script named in it. Rebuild first: `make libjuno.so`.
 |---|------|--------|
 | D1 | **Arp note SELECTION** (which notes each step picks + step timing) | Verified by binary transcription with cited provenance: tasks #36 (carp vs CArpeggio), #50 (24-PPQN tick accumulator), #52 (STEP×SLOT grid) — docs/ARP_PROVENANCE.md. The arp RENDER+DISPATCH is directly proven (A7); the SELECTION rests on transcription. The plugin pattern-grid was execution-validated for enable/latch/start/clock/selector but its grid-population (nslots) was not fired under emulation for an independent schedule diff. docs/PHASE4_ARP_AUDIO_CERT.md. |
 
+## E. RECALL PATH — building the reconstruction-free reference (current work)
+
+A1/A4 validated the port's `juno_bank_apply` (itself a reconstruction of the plugin's
+byte→parameter transform) against `real_recall.py`, which shares one reconstruction with
+it: the record-byte → value-tree POSITION MAP (Script.xml-derived — the C0 residual).
+Removing that shared blind spot means executing the plugin's OWN patch-load. Doing so
+(this session, `scratchpad/oracle/bridge_vec{A,B,C}.py`, all read-only under Unicorn)
+proved the architecture below — and why no processor-side "bridge" from a bank record to
+the engine was ever found: there is none.
+
+| # | Finding | Evidence (RVAs are the durable proof coordinates) |
+|---|---------|------|
+| E1 | **Two VST3 components.** PROCESSOR `CVstProcessor` (createInstance 0x349CA0, IComponent vtable 0x967A08) is the DSP and the only component `e2e_emu` builds / the port replicates; its `IComponent::setState` (slot 12 = 0x348770) is bytes `c2 00 00` = `ret 0` — restores nothing. CONTROLLER `CVstEditController` (createInstance 0x3473D0, IEditController vtable 0x967310) owns the 744-param model; `setComponentState` = slot 5 = 0x347650. Controller holds no engine, never calls the setter. | PROVEN(exec): drove processor setState on patch 62 → 0 setter calls, feet unchanged. |
+| E2 | **One engine writer, reachable for recall only via the apply node.** Setter 0x3B9A30 (proc vtable slot 11) is the sole engine writer; case 760 → feet 3840 = 2^(v−3); no direct callers. Recall reaches it through apply node 0x3C7AE0 (CWaveGen vtable slot 14), gated on the param-id map at 0xcb0e18 (empty in a processor-only build) that static-init 0xAD5A0 populates. | PROVEN(exec): after 0xAD5A0, 744-entry map; internal index 760 ↔ VST3 tag 0x600014; `apply(tag 0x600014, v)` → setter ×9 all rdx==760 → feet 2^(v−3) {2:0.5, 3:1.0, 4:2.0, 5:4.0}; empty-map control → 0 calls. Durable proof: `tools/verify/real_apply_node_probe.py`. |
+| E3 | **Bank load writes no engine cell.** Loader 0x331530 → parser 0x330ED0 copies each record verbatim into programmer container 0x9105B8; no engine write. A `.bin` patch-select changes sound only via a controller → host → processor param round-trip; the processor alone recalls nothing. | PROVEN(exec): real parser on patch 62 → 0 setter calls; feet stays at BUILD default 1.0. |
+| E4 | **OPEN (executing now).** The `record byte → param tag → plain value` transform lives controller-side and is unexecuted. Until it runs, patch 62's real DCO-RANGE feet is UNRESOLVED: blob byte = 2 (PROVEN); naive passthrough → 0.5; the controller's byte→normalized→plain conversion is unproven. The port's baseline feet 3840 = 1.0 for patch 62 is therefore **neither proven correct nor proven wrong**. | `controller-recall-probe` (this session); no feet value asserted without execution. |
+
+This reframes A1/C0: cold-recall bit-exactness was measured against a reference that
+shares the position-map reconstruction, so it is **pending re-validation** once E4's
+controller reference exists. The engine port is UNCHANGED (baseline 6b8edee) pending that
+proof — no recall code is edited until the plugin-native reference proves what is wrong.
+
 ## Verdict
 
 Cold-load behavior — recall, notes, velocities, live param/FX edits, voice
