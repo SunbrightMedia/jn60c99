@@ -709,19 +709,14 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
         juno_bank_scatter(bank, idx, &stype, &sdepth);
         carp_set_scatter(&c->arp, stype, sdepth);
     }
-    /* Per-patch TEMPO-SYNCED LFO rate (cell 1072): the plugin RECALLS it per-patch —
-     * its value-tree LFO RATE leaf setter (dispatch idx 752) writes 1072 =
-     * curve48[byte] x curve53[BPM*10] at the recall-default TEMPO (128 BPM, param
-     * default 880 -> 40+88). The prior "held at prepare default 8.735 for all 64
-     * patches" claim was CIRCULAR (from recall_patch, which skips leaf 752) — the
-     * RENDER A/B (tools/verify/recall_render_ab.py) DEMANDS it: tempo-synced patches
-     * (1056==1, e.g. 0/5) read 1072 in voice_render and diverged until it was recalled
-     * (non-synced patches are unaffected — they never read 1072, so this is inert for
-     * them). Compute it at cold-load from the recall-default host tempo; a later host
-     * tempo change (juno_gui_arp_config bpm>0) re-derives it. Runs AFTER seed_voices
-     * (juno_apply_lfo_tempo writes all 8 voice sub-blocks itself). */
+    /* Per-patch TEMPO-SYNCED LFO rate (cell 1072): stash the LFO RATE byte so a later
+     * host tempo change (juno_gui_arp_config with bpm > 0) recomputes 1072 =
+     * curve48[byte] x curve53[BPM*10]. We do NOT compute it here at cold-load: the
+     * plugin holds 1072 at juno_engine_prepare's default (8.735357) until the host
+     * transport actively drives the tempo — every captured post-recall state has
+     * 1072 = 8.735357 for all 64 patches, with no transport. Computing it at load from
+     * a placeholder BPM diverged from that reference. See docs/COLDLOAD_AB.md. */
     c->lfo_rate_byte = juno_bank_lfo_rate_byte(bank, idx);
-    juno_apply_lfo_tempo(c->st, c->lfo_rate_byte, c->host_bpm);   /* host_bpm = 128 default */
     /* Stash the DELAY tempo-sync inputs too (same host-tempo-change contract as the
      * LFO byte above; the cold-load cells were already written by juno_bank_apply at
      * the plugin's baked 128-BPM default). */

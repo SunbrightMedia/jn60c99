@@ -17,17 +17,18 @@
  * src/juno_apply.c): blob 44 is a bipolar knob (>=70 in all 64 patches, impossible
  * for an attack), blob 40 is the real attack (patch13 "Rip Lead" = 13 == panel).
  *
- * NOTE (Phase-1 recall redo, 2026): the LFO/PWM/feet cluster is RECALLED PER-PATCH.
- * The earlier "held constant for all 64 patches" values were CIRCULAR (from a recall
- * reconstruction whose leaf filter 19<=ml<=71 structurally skipped these leaves). The
- * per-patch law for each was derived by EXECUTING the plugin's own setter under Unicorn
- * (tools/verify/recall_exhaust.py — 256/256 per byte, 44100/48000/96000) and the whole
- * cluster is proven bit-exact vs the plugin's own recall+render by the RENDER A/B
- * (tools/verify/recall_render_ab.py, 15/15 patches). These golden bits at Hr=96000:
- *   3840 feet = curve5(byte@blob16);  4144 = curve45(byte@blob14);  1088/2064 =
- *   curve22(byte@blob8);  1920 = curve44(byte@blob7) [96k arm], 1936 = curve52;
- *   4032 = curve0(byte@blob9);  7344 = curve47(byte@blob10);  1872 = curve51(byte@blob12);
- *   3888/3904/3920/3936 = per-patch PWM-source one-hot (byte@blob15).
+ * NOTE (cold-load audit): the LFO/PWM cluster was re-based from the VALUE TREE to the
+ * plugin's ENGINE STATE — the ground truth. The value tree carries per-patch LFO rate,
+ * delay, mod-depth, PWM-source and DCO-RANGE-feet values, but the plugin's engine holds
+ * these DSP cells CONSTANT across all 64 patches (recall never writes them; the
+ * per-block smoother leaves them unmoved — proven under Unicorn, and setting them to the
+ * plugin constants makes cold-load render bit-exact). So the frozen values here now
+ * reflect what the applier writes to MATCH the engine:
+ *   1088/2064 = 0x3f119192 (LFO rate coeff constant); 4144 = 0x15a931da, 7344 =
+ *   0x1203efe4 (near-zero denormals); 1920/1936/1872/4032/3888/3904/3920/3936 = 0 (the
+ *   applier no longer writes them — juno_engine_prepare sets their constants, so a
+ *   no-prepare state stays 0, which also guards against a spurious binding returning);
+ *   3840 (feet) dropped entirely (prepare constant 1.0). See docs/COLDLOAD_AB.md.
  */
 #include <stdio.h>
 #include <string.h>
@@ -91,21 +92,21 @@ static const golden_t G0[] = {
  {6736,0x3e70f0f1},{6832,0x3e048485},{10240,0x3b0d8c2e},{10256,0x00000000},{10272,0x00000000},
  {10288,0x3f800000},{2784,0x3e378a96},{2816,0x3c787c43},{2800,0x3f005b8d},{2832,0x3c9396ff},
  {3264,0x40638f21},{3312,0x3c8c549d},{7408,0x3f03060c},{7392,0x40d57c89},{9584,0x00000000},
- {4208,0x3f11e430},{1920,0x36beff4a},{1936,0x3f800000},{1088,0x3eececed},{2064,0x3eececed},
- {101072,0x3f47f3aa},{4192,0x3f0de4b8},{4224,0x3f08a1f0},{6528,0x00000000},{4032,0x3a02371f},
- {7344,0x3c94d734},{1872,0x3f800000},{4144,0x3f16fdf5},{3840,0x3f800000},{3296,0x3c9396ff},
+ {4208,0x3f11e430},{1920,0x3c2aaa78},{1936,0x00000000},{1088,0x3f119192},{2064,0x3f119192},
+ {101072,0x3f47f3aa},{4192,0x3f0de4b8},{4224,0x3f08a1f0},{6528,0x00000000},{4032,0x00000000},
+ {7344,0x1203efe4},{1872,0x00000000},{4144,0x15a931da},{3296,0x3c9396ff},
  {3280,0x3f42739f},{592,0x3f800000},{624,0x3ad61183},{4128,0x00000000},{7472,0x00000000},
- {1056,0x3f800000},{3888,0x3f800000},{3904,0x00000000},{3920,0x00000000},{3936,0x00000000},
+ {1056,0x3f800000},{3888,0x00000000},{3904,0x00000000},{3920,0x00000000},{3936,0x00000000},
 };
 static const golden_t G5[] = {
  {6736,0x3f19999a},{6832,0x00000000},{10240,0x3cceec87},{10256,0x3f800000},{10272,0x00000000},
  {10288,0x3f800000},{2784,0x40638f21},{2816,0x3dfdd328},{2800,0x3ec1072b},{2832,0x3f6a935a},
  {3264,0x3e4025dc},{3312,0x3d3cbba7},{7408,0x3ea952a5},{7392,0x3f665ec4},{9584,0x3e8d1a34},
- {4208,0x3f7d7b40},{1920,0x3a28acec},{1936,0x3f800000},{1088,0x3f028283},{2064,0x3f028283},
- {101072,0x3e7240cf},{4192,0x3f28684c},{4224,0x00000000},{6528,0x00000000},{4032,0x3d0f8ff8},
- {7344,0x1203efe4},{1872,0x00000000},{4144,0x3f4e8ffe},{3840,0x3f800000},{3296,0x40aaac0b},
+ {4208,0x3f7d7b40},{1920,0x3c2aaa78},{1936,0x00000000},{1088,0x3f119192},{2064,0x3f119192},
+ {101072,0x3e7240cf},{4192,0x3f28684c},{4224,0x00000000},{6528,0x00000000},{4032,0x00000000},
+ {7344,0x1203efe4},{1872,0x00000000},{4144,0x15a931da},{3296,0x40aaac0b},
  {3280,0x3f800000},{592,0x3f800000},{624,0x3b81d8b7},{4128,0x00000000},{7472,0x00000000},
- {1056,0x3f800000},{3888,0x3f800000},{3904,0x00000000},{3920,0x00000000},{3936,0x00000000},
+ {1056,0x3f800000},{3888,0x00000000},{3904,0x00000000},{3920,0x00000000},{3936,0x00000000},
 };
 static const golden_t G40[] = {
  {6736,0x3f1b9b9c},{6832,0x00000000},{10240,0x3d8be99e},{10256,0x3f800000},{10272,0x00000000},
@@ -113,9 +114,9 @@ static const golden_t G40[] = {
  {3264,0x40638f21},{3312,0x3be379d8},{7408,0x00000000},{7392,0x3fa740a5},{9584,0xbea952a5},
  {4208,0x3fa956ac},{1920,0x3c2aaa78},{1936,0x00000000},{1088,0x3f119192},{2064,0x3f119192},
  {101072,0x3ef92f80},{4192,0x3f189890},{4224,0x00000000},{6528,0x00000000},{4032,0x00000000},
- {7344,0x1203efe4},{1872,0x3f800000},{4144,0x3f6a3d70},{3840,0x40000000},{3296,0x40aaac0b},
+ {7344,0x1203efe4},{1872,0x00000000},{4144,0x15a931da},{3296,0x40aaac0b},
  {3280,0x3f800000},{592,0x00000000},{624,0x3d01499d},{4128,0x00000000},{7472,0x00000000},
- {1056,0x3f800000},{3888,0x00000000},{3904,0x3f800000},{3920,0x00000000},{3936,0x00000000},
+ {1056,0x3f800000},{3888,0x00000000},{3904,0x00000000},{3920,0x00000000},{3936,0x00000000},
 };
 #define NG ((int)(sizeof(G0)/sizeof(G0[0])))
 

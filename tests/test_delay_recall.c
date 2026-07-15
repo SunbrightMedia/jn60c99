@@ -56,14 +56,11 @@ int main(void)
         printf("  case1: v39 cell = %d, expected 0\n", *(int32_t *)(st + JUNO_PROG_DLY)); ++fails; }
     if (u32(st, 102528) != 0x3f008081) {   /* 128/255 = 0.50196 */
         printf("  case1: Wet %08x != 3f008081\n", u32(st, 102528)); ++fails; }
-    /* DELAY FEEDBACK (102560 = fb/255*0.9) and DIRECT LEVEL (102512 = direct/255) are
-     * RECALLED per-patch (Phase-1 redo; executed law dispatch idx 1179/1181, proven
-     * 256/256 by recall_exhaust.py + the delay RENDER A/B). fb=255 -> 0.9; direct=255
-     * -> 1.0. The old test froze feedback at 0.4235294 (= fb byte 120) — a divergence. */
-    if (u32(st, 102560) != 0x3f666666) {   /* 255/255*0.9 = 0.9 */
-        printf("  case1: Feedback %08x != 3f666666\n", u32(st, 102560)); ++fails; }
-    if (u32(st, 102512) != 0x3f800000) {   /* 255/255 = 1.0 (direct level) */
-        printf("  case1: Direct %08x != 3f800000\n", u32(st, 102512)); ++fails; }
+    /* Feedback/filter are ENGINE CONSTANTS (the plugin's engine holds the same block
+     * for every DELAY-active patch — proven vs all 16 v39==0 master states), NOT the
+     * value-tree byte curves the old test froze (feedback 0.9, filter 0x3f03df74). */
+    if (u32(st, 102560) != 0x3ed8d8d9) {   /* Feedback constant 0.4235294 */
+        printf("  case1: Feedback %08x != 3ed8d8d9\n", u32(st, 102560)); ++fails; }
     if (JF(st, 102576) != 1.0f) { printf("  case1: On/Off != 1\n"); ++fails; }
     if (JF(st, 102592) != 1.0f) { printf("  case1: Enable != 1\n"); ++fails; }
     if (u32(st, 102352) != 0x3f96bc00) {   /* DELAYTIME_LUT[128] = 1.17761 @96k (test default rate) */
