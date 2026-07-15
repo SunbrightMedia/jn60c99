@@ -57,7 +57,9 @@ def main():
         ctx = lib.juno_gui_create(ctypes.c_float(SR), 0)
         lib.juno_gui_apply_bank(ctx, bank, len(bank), idx)
         if not feet_only:
-            blk = b''.join(struct.pack('<I', lib.juno_gui_peek(ctx, off)) for off in range(0, BLOCK, STRIDE))
+            # full 10512-byte unit-0 block (all bytes, matches plugin state[0]); cells
+            # live at 16-byte stride but we mirror every byte so byte-offset indexing works.
+            blk = b''.join(struct.pack('<I', lib.juno_gui_peek(ctx, off)) for off in range(0, BLOCK, 4))
             states[idx] = blk
         feet = as_f32(lib.juno_gui_peek(ctx, FEET_OFF))
         if idx in NONDEFAULT:
