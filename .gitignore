@@ -72,3 +72,6 @@ tools/verify/juno-webapp-local.html
 
 # Node test tooling (playwright-core for headless webapp verification)
 node_modules/
+
+# stray root-level run logs (Unicorn/verify stderr redirects)
+/*.log
