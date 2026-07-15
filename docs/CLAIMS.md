@@ -67,12 +67,20 @@ the engine was ever found: there is none.
 
 | E7 | **Complete recall-risk triage (reconstruction-free, executed).** Over all 150 plugin-writable cells (voice + FX/master), the port correctly recalls **98** (35 voice + 63 FX), freezes **19 provably-OK** (index not in the value-tree param map -> recall cannot emit), and freezes **33 CANDIDATE cells the recall could emit**: 22 voice (LFO cluster idx 759/752/756/751/753/754, DCO RANGE 760, PWM 758, VCA 1058) + 11 FX/master (reverb idx 876/1323, chorus/reverb 875/1180, idx 794/757/873). **SPURIOUS = 0** — the port recalls nothing the plugin's setter cannot write. The 33 candidates map onto all three user-reported symptom areas (octave=DCO RANGE, brightness=LFO/PWM, chorus=FX), surfaced with zero ear-guessing. | PROVEN(exec) dispatch (index_cell_map/param_cell_map) + port capture (port_state_dump); which candidates the recall EMITS is the host-mediated question. Tools: tools/verify/{index_cell_map,param_cell_map,port_state_dump,cross_check_recall,frozen_triage,full_recall_triage}.py. |
 
-**The linchpin (next work):** execute the plugin's OWN value-tree leaf application — the
-GUI/programmer path that reads the bank record and emits `performEdit(param_id, normalized)`
-per param — to PROVE the record-position→param_id map (does position 32 reach feet 3840, or
-not?). That requires a minimal VST3 host transport (IComponentHandler/IConnectionPoint) so
-the plugin's OWN transforms run; the transport is host plumbing, not plugin logic. Only then
-is the recall reference reconstruction-free and an AUDIO A/B possible.
+| E8 | **The recall map is EXTERNAL `Script.xml`, not the binary (PROVEN + schema-confirmed).** The plugin has NO embedded value-tree XML; it loads `Script.xml` ("Koa Script"), whose `<value>` entries (type/name/range/default) define the bank blob layout. Recall = JUCE programmer decodes the blob via this schema → (param_id,value) → `CVstProcessor::setParam 0x347180` → `AConductor` queue `0x3221F0` → audio thread → apply node → engine. The program-change path was DISPROVEN (0 setters). So the recall CANNOT be fully executed from binary+bank alone under emulation (it needs the JUCE ValueTree/programmer/timer stack). `Script.xml` IS the plugin's own schema (user-provided): its `DCO RANGE` entry (int2x4, range 0,5, **default 3**) matches the proven descriptor(760) exactly → Script.xml DCO RANGE = index 760 = feet. | PROVEN(exec) value law + param identity + program-path disproof; recall map = `Script.xml` (plugin schema — validatable, not binary-executable). scratchpad/oracle/host_recall*.py |
+| E9 | **DCO RANGE / feet is very likely NOT a bug (inference, strong).** DCO RANGE moves in FULL octaves (8'↔16' = one whole octave). The user's report was "*slightly* octaved," and feet 0.5 (16') was "WAY too low." A full-octave recall cannot cause a *slight* difference → the port's frozen feet (8'/1.0) is very likely correct and the earlier 0.5 fix was correctly reverted. The remaining recall candidates worth chasing are the SUBTLE ones (LFO cluster, PWM, chorus/FX), not the octave. | INFERRED from user A/B + the full-octave nature of the param; not independently PROVEN (recall not executable). |
+
+**Where this leaves the recall reference (honest, revised).** The prior "linchpin" (execute the
+plugin's own record→param map under a thin host transport) is now PROVEN infeasible: that map is
+not in the binary — it is the external `Script.xml` schema consumed by a JUCE stack. So a
+fully-executed, zero-reconstruction recall reference is **not achievable under emulation**. The
+best attainable reference is: parse `Script.xml` (the plugin's OWN schema, user-supplied) →
+per-patch (param_id,value) list → drive the plugin's OWN apply node + setter (executed) → engine
+state. Only the `Script.xml` *parse* (blob-position computation) is our code, and it is validatable
+against executed anchors (parser values, descriptor names/domains/defaults, ASCII patch names,
+apply-node cells). This is a **bounded, cross-checked** reference — legitimate (plugin's schema +
+plugin's code), with the parse as the disclosed residual. Whether to build the port's recall on it,
+and how to treat the octave, is a decision to confirm with the user before any engine change.
 
 This reframes A1/C0: cold-recall bit-exactness was measured against a reference sharing the
 leaf-map reconstruction, so it is **pending re-validation**. The engine port is UNCHANGED
