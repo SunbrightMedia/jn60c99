@@ -17,22 +17,22 @@ the host-mediated question (handled by the recall agent); this narrows where to 
 """
 import struct, pickle
 
-PCM  = '/home/user/jn60c99/scratchpad/param_cell_map.pkl'
+PCM  = '/home/user/jn60c99/scratchpad/index_cell_map.pkl'   # complete: {index: [cells]}
 PORT = '/home/user/jn60c99/scratchpad/port_state.pkl'
 VOICE = 10512
 STRIDE = 16
 
 
 def main():
-    pcm = pickle.load(open(PCM, 'rb'))       # {param_id: (idx, [cells])}
+    pcm = pickle.load(open(PCM, 'rb'))       # {index: [cells]}  (complete, direct setter)
     port = pickle.load(open(PORT, 'rb'))      # {patch: bytes(VOICE)}
 
-    # plugin voice-0 cells + which params write each
+    # plugin voice-0 cells + which dispatch index writes each
     cell_params = {}
-    for pid, (idx, cells) in pcm.items():
+    for idx, cells in pcm.items():
         for off in cells:
             if off < VOICE:
-                cell_params.setdefault(off, []).append((pid, idx))
+                cell_params.setdefault(off, []).append(idx)
     plugin_cells = set(cell_params)
 
     # port cells that vary across patches
@@ -51,7 +51,7 @@ def main():
     only_plugin = sorted(plugin_cells - port_cells)
     print("A) PLUGIN can write, PORT never varies  (%d) -- port may drop these:" % len(only_plugin))
     for off in only_plugin:
-        who = ", ".join("param %d/idx %d" % (p, i) for (p, i) in cell_params[off][:3])
+        who = ", ".join("idx %d" % i for i in cell_params[off][:5])
         print("   cell %5d  <- %s" % (off, who))
 
     only_port = sorted(port_cells - plugin_cells)
