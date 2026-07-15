@@ -17,6 +17,9 @@ sys.path.insert(0, '/home/user/jn60c99/tools/verify')
 import e2e_emu as E
 
 RATE = 44100.0
+TG_BLOB_LEN = 3062   # embed record bytes 16..3077 so the truncated
+#                    golden record covers every recall read, incl. DELAY FEEDBACK
+#                    (record 3057) + DIRECT LEVEL (3060). 704 was too short (fb read 0).
 BANK = E.bank_bytes()
 H, S, BO = E.HEADER, E.STRIDE, E.BLOB_OFF
 
@@ -30,7 +33,7 @@ lib.juno_gui_render.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float),
 
 def blob_of(patch):
     off = H + patch * S + BO
-    return BANK[off:off + 704]
+    return BANK[off:off + TG_BLOB_LEN]
 
 def fnv1a64(b):
     h = 0xcbf29ce484222325
@@ -83,13 +86,14 @@ def main():
         f.write(" * (docs/CLAIMS.md). tests/test_teensy_golden.c replays each and checks the hash. */\n")
         f.write("#ifndef TEENSY_GOLDEN_H\n#define TEENSY_GOLDEN_H\n#include <stdint.h>\n\n")
         f.write("#define TG_RATE 44100.0f\n")
+        f.write(f"#define TG_BLOB_LEN {TG_BLOB_LEN}\n")
         f.write("typedef struct { int at, kind, note, vel; } tg_event;\n")
         f.write("typedef struct { const char *name; int patch; const unsigned char *blob;\n")
         f.write("                 const tg_event *ev; int nev; int nframes; uint64_t hash;\n")
         f.write("                 uint32_t first_l, first_r; } tg_scenario;\n\n")
         for i, (name, patch, events, n, h, first) in enumerate(rows):
             blob = blob_of(patch)
-            f.write(f"static const unsigned char tg_blob_{i}[704] = {{")
+            f.write(f"static const unsigned char tg_blob_{i}[{TG_BLOB_LEN}] = {{")
             f.write(",".join(str(x) for x in blob)); f.write("};\n")
             f.write(f"static const tg_event tg_ev_{i}[] = {{")
             f.write(",".join("{%d,%d,%d,%d}" % e for e in events)); f.write("};\n")

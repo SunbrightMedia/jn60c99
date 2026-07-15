@@ -372,7 +372,6 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     if (dtype != 0)                            /* other types: slot 1 not the delay block */
         return;
 
-    (void)fb; (void)direct;   /* feedback (102560) and dry (102512) are engine constants (in FILT) */
     for (k = 0; k < sizeof(FILT) / sizeof(FILT[0]); k += 2) {
         bits = FILT[k + 1];
         memcpy(&f, &bits, sizeof f);
@@ -385,6 +384,16 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     put_rate(state, Hr, 102656, ARM_HFDMP);
     JF(state, 102528) = (float)level  / 255.0f;             /* Wet (per-patch = LEVEL/255) */
     JF(state, 102576) = level >= 2 ? 1.0f : 0.0f;           /* On/Off (curve: v0,v1->0, v2->1) */
+    /* DELAY FEEDBACK (102560) + DIRECT LEVEL (102512): RECALLED per-patch, not the
+     * FILT[] constants. The plugin's value-tree setters (dispatch idx 1179 / 1181)
+     * write them from record bytes 3057 / 3060; derived by EXECUTING those setters
+     * over the byte sweep 0..255 (scratchpad/sweep_delay_fx.py — 256/256 ground truth)
+     * and confirmed by the delay RENDER A/B (scratchpad/delay_render_ab.py): the frozen
+     * 0.4235294 (= feedback byte 120) diverged on patches 45 (fb 209) and 50 (fb 0).
+     *   102560 = fb/255 * 0.9   (v=255 -> 0.9)
+     *   102512 = direct/255     (v=255 -> 1.0) */
+    JF(state, 102560) = (float)fb / 255.0f * 0.9f;
+    JF(state, 102512) = (float)direct / 255.0f;
 }
 
 /* Host-tempo recompute for the tempo-synced delay time — the delay sibling of

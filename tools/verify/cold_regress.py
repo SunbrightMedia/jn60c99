@@ -21,12 +21,30 @@ def cmp(la, ra, lb, rb):
 
 if sys.argv[1] == 'plugin':
     import e2e_emu as E
+    import real_recall as R
+    # FAITHFUL recall (Phase-1 redo): the plugin's COMPLETE value-tree leaf set +
+    # the delay FX leaves, NOT e2e_emu.recall_patch (whose 19<=ml<=71 filter skips
+    # the DCO/LFO/PWM leaves — the contamination that hid DCO RANGE). Matches
+    # recall_render_ab.py's reference.
+    bank = E.bank_bytes(); leaves = R.leaf_table()
+    FX = [(1179, 3057), (1181, 3060)]      # DELAY FEEDBACK, DIRECT LEVEL
     out = {}
     for p in PATCHES:
-        e = E.E2E(); e.build(48000); e.snap_all(); E.recall_patch(e, p); e.snap_all(); e.clear_latch(); e.set_ftz()
-        e.note_on(NOTE, VEL); L, R = e.render(N)
-        out[p] = (L, R)
-        print(f"plugin patch {p}: rendered {len(L)} frames")
+        e = E.E2E(); e.build(48000); e.snap_all()
+        blob = E.patch_blob(bank, p)
+        for (disp, bb) in leaves: R.wr_desc(e, disp, R.dec(blob, bb))
+        for (disp, ro) in FX:     R.wr_desc(e, disp, R.dec(blob, ro - 16))
+        for u in range(9):
+            for (disp, bb) in leaves:
+                try: e.dispatch(u, disp, R.rd_desc(e, disp))
+                except RuntimeError: pass
+            for (disp, ro) in FX:
+                try: e.dispatch(u, disp, R.rd_desc(e, disp))
+                except RuntimeError: pass
+        e.snap_all(); e.clear_latch(); e.set_ftz()
+        e.note_on(NOTE, VEL); L, R2 = e.render(N)
+        out[p] = (L, R2)
+        print(f"plugin patch {p}: rendered {len(L)} frames (faithful complete-leaf recall)")
     pickle.dump(out, open(PKL, 'wb'))
     print("saved", PKL)
 else:

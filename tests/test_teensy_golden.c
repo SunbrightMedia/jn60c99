@@ -53,7 +53,7 @@ static int run_scenario(const tg_scenario *s)
     unsigned char *bank = (unsigned char *)calloc(1, BK_HEADER + BK_STRIDE);
     if (!bank) return 2;
     bank[0] = 'K';
-    memcpy(bank + BK_HEADER + BK_BLOB, s->blob, 704);
+    memcpy(bank + BK_HEADER + BK_BLOB, s->blob, TG_BLOB_LEN);
 
     juno_ctx *c = juno_gui_create(TG_RATE, 0);
     juno_gui_apply_bank(c, bank, BK_HEADER + BK_STRIDE, 0);
