@@ -91,10 +91,26 @@ lone open item is the pre-existing patch-50-class FX/master residual (voice stat
 
 ## Verdict
 
-Cold-load behavior — recall, notes, velocities, live param/FX edits, voice
-allocation, discrete oscillator modes, arp render+dispatch — is **proven
-bit-exact** against the running plugin across large exhaustions and a 203-seed
-differential corpus, with a dual-sided coverage certificate and float-determinism
-guards for the Teensy target. The accepted differences (B) are bounded and
-audio-inert or phase-only; the one transcription-only residual (D1) is the arp's
-per-step note selection, whose audio render is nonetheless directly proven exact.
+The machine-checked source of truth for status is **`PROVENANCE.tsv`** (repo root),
+run by `make verify`. As of this writing: the **voice path** — front-panel recall
+(incl. the 751-760 DCO RANGE / LFO / PWM cluster, gated 67/67 by recall_gate),
+notes, velocities, voice allocation, discrete oscillator modes, envelopes, and the
+voice+master render — is **proven bit-exact** against the running plugin across
+large exhaustions and a 203-seed differential corpus, with float-determinism guards
+for the Teensy target.
+
+**Not yet proven (the open finish line, from PROVENANCE.tsv):**
+- **FX render** is gated at the render level (recall_render_ab): **12/15 representative
+  patches bit-exact**; patches 50 (delay feedback, early), 6 & 45 (effect tail, late)
+  diverge. The delay feedback constant (102560) is **CAPTURED** ("captured at 48 kHz")
+  and proven WRONG for zero-feedback patches — it must be replaced with the plugin's
+  own per-patch law. A cold apply_bank FX gate is unreliable (FX state is prepare/
+  render-populated), so the render A/B is the arbiter.
+- Arp per-step SCHEDULE (render is proven; note-selection dispatch is transcription-only).
+- init/prepare constants cross-checked against a live state_dump (a capture), not pure
+  emulation.
+- Host rates other than 44100/48000/96000 fall back to the 96k arm (not bit-exact).
+
+Earlier phase docs that assert unqualified "recall complete" / FX completeness
+(e.g. docs/RECALL_COMPLETE.md, docs/COLDLOAD_AB.md) predate this ledger and are
+superseded by PROVENANCE.tsv where they conflict.
