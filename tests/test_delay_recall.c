@@ -56,11 +56,15 @@ int main(void)
         printf("  case1: v39 cell = %d, expected 0\n", *(int32_t *)(st + JUNO_PROG_DLY)); ++fails; }
     if (u32(st, 102528) != 0x3f008081) {   /* 128/255 = 0.50196 */
         printf("  case1: Wet %08x != 3f008081\n", u32(st, 102528)); ++fails; }
-    /* Feedback/filter are ENGINE CONSTANTS (the plugin's engine holds the same block
-     * for every DELAY-active patch — proven vs all 16 v39==0 master states), NOT the
-     * value-tree byte curves the old test froze (feedback 0.9, filter 0x3f03df74). */
-    if (u32(st, 102560) != 0x3ed8d8d9) {   /* Feedback constant 0.4235294 */
-        printf("  case1: Feedback %08x != 3ed8d8d9\n", u32(st, 102560)); ++fails; }
+    /* Feedback is PER-PATCH: the plugin's own dispatch law f32(byte/255)*f32(0.9),
+     * proven bit-exact over all 256 values x 3 rates (tools/verify/delay_fb_sweep.py).
+     * FEEDBACK byte 255 -> 0.9f (0x3f666666). The old expectation 0x3ed8d8d9 was a
+     * captured constant == the fb=120 special case, proven wrong by the 64-patch
+     * render A/B (patches 6/45/46/50/54). DRY (102512) = byte/255 -> 255 -> 1.0. */
+    if (u32(st, 102560) != 0x3f666666) {   /* law(255) = 0.9 */
+        printf("  case1: Feedback %08x != 3f666666\n", u32(st, 102560)); ++fails; }
+    if (u32(st, 102512) != 0x3f800000) {   /* law(255) = 1.0 */
+        printf("  case1: Dry %08x != 3f800000\n", u32(st, 102512)); ++fails; }
     if (JF(st, 102576) != 1.0f) { printf("  case1: On/Off != 1\n"); ++fails; }
     if (JF(st, 102592) != 1.0f) { printf("  case1: Enable != 1\n"); ++fails; }
     if (u32(st, 102352) != 0x3f96bc00) {   /* DELAYTIME_LUT[128] = 1.17761 @96k (test default rate) */

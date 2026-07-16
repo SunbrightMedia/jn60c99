@@ -85,11 +85,11 @@ attribution net; also audit-trails positive "captur*" comment mentions).
 
 ## Known open work (live list = PROVENANCE.tsv)
 
-- **Delay feedback 102560 is a CAPTURED constant proven wrong** (plugin law =
-  byte/255 × 0.9 per patch; port hardcodes 0.4235). A3's full 64-patch render A/B
-  (52/64 bit-exact) shows this ONE law bug accounts for all 5 delay-active fails
-  [6,45,46,50,54]; the other 7 fails [1,9,17,25,33,41,49] are exactly the
-  arp-enabled patches (arp SCHEDULE diff, #96).
+- **Render A/B: 57/64** (B1 fixed the delay-feedback capture with the executed
+  per-patch law — 102560 = f32(byte/255)×0.9, 102512 = byte/255, proven 768/768 via
+  tools/verify/delay_fb_sweep.py; zero CAPTURED rows remain). The 7 opens
+  [1,9,17,25,33,41,49] are exactly the arp-enabled patches — the arp SCHEDULE
+  execution-diff (#96) is the sole remaining render blocker.
 - Host rates other than 44100/48000/96000: UNVERIFIED (fall back to the 96k arm).
 - Arp SCHEDULE execution-diff open; init/prepare constants are RECONSTRUCTED
   (cross-checked against a live state dump — itself a capture — so eventually

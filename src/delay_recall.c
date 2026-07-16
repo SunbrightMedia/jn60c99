@@ -290,6 +290,8 @@ static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, f
 static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, float tc)
 {
     int level = blob_val(rec, 52);            /* DELAY LEVEL */
+    int fb    = rec_byte(rec, 3057);          /* DELAY FEEDBACK (per-patch law, see TYPE-0) */
+    int direct = rec_byte(rec, 3060);         /* DELAY DIRECT LEVEL */
     int on = (level >= 2);
     int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
     unsigned k; uint32_t bits; float f;
@@ -323,7 +325,13 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
     /* Level gate: first-instance feedback (102560) + ON (102576) and second-instance
      * ON (4297824) drop to 0 when the delay is off (LEVEL < 2); the second-instance
      * feedback (4297808, in DLY1_B) stays constant, matching the captured states. */
-    { uint32_t fb = 0x3ed8d8d9u; memcpy(&f, &fb, 4); JF(state, 102560) = on ? f : 0.0f; }
+    /* First-instance feedback: the plugin's own per-patch law (delay_fb_sweep.py,
+     * bit-exact 768/768), gated to 0 when the delay is off exactly as the captured
+     * OFF states show (render-equivalent either way: wet is 0). The old captured
+     * constant 0x3ed8d8d9 was the fb=120 special case. DRY (102512) likewise gets
+     * its per-patch law, overwriting the DLY1_A placeholder. */
+    JF(state, 102560)  = on ? ((float)fb / 255.0f) * 0.9f : 0.0f;
+    JF(state, 102512)  = (float)direct / 255.0f;
     JF(state, 102576)  = on ? 1.0f : 0.0f;
     JF(state, 4297824) = on ? 1.0f : 0.0f;
 }
@@ -372,12 +380,22 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     if (dtype != 0)                            /* other types: slot 1 not the delay block */
         return;
 
-    (void)fb; (void)direct;   /* feedback (102560) and dry (102512) are engine constants (in FILT) */
     for (k = 0; k < sizeof(FILT) / sizeof(FILT[0]); k += 2) {
         bits = FILT[k + 1];
         memcpy(&f, &bits, sizeof f);
         JF(state, (int)FILT[k]) = f;
     }
+    /* FEEDBACK (102560) and DRY (102512) are PER-PATCH, not engine constants: the
+     * plugin's own dispatch (idx 1179/1181, executed over all 256 values x 3 rates,
+     * tools/verify/delay_fb_sweep.py) gives the bit-exact, rate-independent laws
+     *   102560 = f32(byte/255) * f32(0.9)      (mulss order proven)
+     *   102512 = f32(byte)/255
+     * The old FILT constants (0.4235294 / 1.0) were a CAPTURE that coincided with
+     * the modal factory bytes (fb 120, direct 255) — proven wrong by the 64-patch
+     * render A/B for the 5 patches with other fb bytes {0,76,114,209} (A3). These
+     * overwrite the FILT placeholders after the block. */
+    JF(state, 102560) = ((float)fb / 255.0f) * 0.9f;
+    JF(state, 102512) = (float)direct / 255.0f;
     /* rate-dependent FILT cells (table holds the 48k arm; see put_rate above) */
     put_rate(state, Hr, 102448, ARM_HCSW);
     put_rate(state, Hr, 102544, ARM_LFX1);

@@ -49,11 +49,15 @@ static uint64_t render_hash(juno_ctx *c, uint64_t h, int n)
 
 static int run_scenario(const tg_scenario *s)
 {
-    /* minimal 1-patch bank: sentinel 'K' + the embedded 704-byte record prefix. */
+    /* minimal 1-patch bank: sentinel 'K' + the embedded TG_BLOB_LEN-byte record
+     * prefix. Must copy the FULL embedded blob: the per-patch DELAY FEEDBACK /
+     * DIRECT LEVEL bytes live at record 3057/3060, and the old hardcoded 704-byte
+     * copy silently zeroed them (invisible while feedback was a constant; exposed
+     * the moment the per-patch law landed). */
     unsigned char *bank = (unsigned char *)calloc(1, BK_HEADER + BK_STRIDE);
     if (!bank) return 2;
     bank[0] = 'K';
-    memcpy(bank + BK_HEADER + BK_BLOB, s->blob, 704);
+    memcpy(bank + BK_HEADER + BK_BLOB, s->blob, TG_BLOB_LEN);
 
     juno_ctx *c = juno_gui_create(TG_RATE, 0);
     juno_gui_apply_bank(c, bank, BK_HEADER + BK_STRIDE, 0);
