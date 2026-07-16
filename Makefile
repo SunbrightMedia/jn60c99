@@ -17,11 +17,30 @@ OBJ     := $(SRC:.c=.o)
 .PHONY: all test clean gui provenance verify
 all: $(OBJ)
 
-# The honest finish-line gate: functional tests must pass AND the provenance ledger
-# (PROVENANCE.tsv) must have zero CAPTURED / unproven rows. `make verify` stays RED
-# until every subsystem traces to the plugin via an executed gate. `make test` alone
-# checks that the code works; `make verify` checks that it is PROVEN.
-verify: test provenance
+# The honest finish-line gate: functional tests must pass AND the LIVE plugin
+# comparisons must pass AND the provenance ledger must have zero CAPTURED /
+# unproven rows. `make verify` stays RED while any of those fails, which is the
+# point: `make test` merely checks that the code works; `make verify` checks that
+# it is PROVEN against the plugin — the comparison actually RUNS, every time.
+#
+# Reference pickles are the plugin's OWN execution (Unicorn oracle) and live in
+# scratchpad/ (ephemeral); when missing they are regenerated from truth/ (slow,
+# one-time per container). The port side + diffs re-run fresh each time (seconds).
+# Two-process rule: each python3 below is a separate process (oracle vs libjuno).
+SCRATCH := $(abspath scratchpad)
+verify: test
+	@FAIL=0; \
+	test -f $(SCRATCH)/index_cell_map.pkl    || python3 tools/verify/index_cell_map.py    || FAIL=1; \
+	test -f $(SCRATCH)/plugin_recall_ref.pkl || python3 tools/verify/plugin_recall_ref.py || FAIL=1; \
+	test -f $(SCRATCH)/recall_render_ref.pkl || python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
+	python3 tools/verify/port_state_dump.py >/dev/null 2>&1 || FAIL=1; \
+	echo "=== LIVE GATE 1/2: recall_gate (port vs plugin's own recall) ==="; \
+	python3 tools/verify/recall_gate.py || FAIL=1; \
+	echo "=== LIVE GATE 2/2: render A/B (port render vs plugin's own render) ==="; \
+	python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
+	echo "=== LEDGER ==="; \
+	python3 tools/verify/provenance_check.py || FAIL=1; \
+	exit $$FAIL
 provenance:
 	python3 tools/verify/provenance_check.py
 

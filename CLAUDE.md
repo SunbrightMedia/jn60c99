@@ -53,8 +53,13 @@ from an old clone.
 ## Build & verify
 
 - `make libjuno.so` — the engine (GUI + ctypes gates load this).
-- `make test` — functional suite. `make verify` — test + provenance ledger check;
-  RED while any CAPTURED/RECONSTRUCTED/UNVERIFIED row remains. This is the finish line.
+- `make test` — functional suite (unit battery: self-consistency + frozen-recording
+  checks; it does NOT compare against the live plugin).
+- `make verify` — the finish line: `test` + the LIVE plugin comparisons (recall_gate
+  67-cell diff + full render A/B, both actually executed every run; reference
+  pickles auto-regenerate from truth/ when the scratchpad is fresh) + the
+  provenance ledger check. RED while any gate fails or any
+  CAPTURED/RECONSTRUCTED/UNVERIFIED row remains.
 - `bash gui/web/build.sh` — WASM rebuild (emsdk); `node tools/verify/wasm_golden.mjs`
   proves WASM == native.
 - `-ffp-contract=off` is load-bearing (reference is x86 SSE2, no FMA); the FMA

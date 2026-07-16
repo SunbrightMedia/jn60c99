@@ -13,8 +13,8 @@ bend/mod sensitivity	4128/7472/3984/7360	PROVEN	tests/test_bend_mod_sens.c	produ
 CONDITION analog scatter	5520/7600/10320 x8	PROVEN	tests/test_condition_scatter.c	per-voice detune/level, bit-exact
 VCA mode / LFO trig / HPF type	10176-10208 / 2560 / 10240	PROVEN	tests/test_apply_golden.c	extended-leaf recall, oracle-anchored
 sample-rate variant recall	ENV/LFO/HPF arms, porta	PROVEN	tests/test_recall_rate.c	bit-exact at 44100/48000/96000 ONLY
-voice render	src/voice_render.c	PROVEN	tests/test_teensy_golden.c	step-equivalent transcription; render == plugin given equal state
-master render	src/master_render.c	PROVEN	tests/test_master_smoke.c	sample-level vs sub_180363380 (Tier B)
+voice render	src/voice_render.c	PROVEN	tools/verify/recall_render_ab.py + tools/verify/recall_gate.py	whole-path render bit-exact vs the plugin on 12/15 patches (subsumes the voice path); the 3 opens are FX-side: patch 50's full 8-voice state matches the plugin exactly (divergence isolated to delay feedback), 6/45 diverge only late in the effect tail (FX attribution INFERRED from onset). test_teensy_golden guards x86==ARM reproducibility only.
+master render	src/master_render.c	RECONSTRUCTED	tools/verify/recall_render_ab.py	transcription Tier-B audited vs sub_180363380 (historical, not re-runnable); the runnable whole-path gate is render A/B at 12/15 and all 3 opens sit in this path (delay feedback + effect tails) -> not PROVEN until 15/15. test_master_smoke is a crash/NaN check only.
 voice allocation	juno_bridge poly/mono	PROVEN	tests/test_voice_alloc.c	CAssignJu60 slot order 7->0
 arpeggiator pattern/onset/release	src/carp.c	RECONSTRUCTED	tests/test_arp_pattern.c	transcribed from CArpeggio; pattern grid gated, SCHEDULE diff still open (#96)
 init / prepare constants	juno_init.c / juno_prepare.c	RECONSTRUCTED	Makefile	cross-checked against a LIVE state_dump (a capture), not pure emulation

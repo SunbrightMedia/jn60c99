@@ -129,6 +129,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == '--port':
         else: nfail += 1; fails.append(idx)
     print("\n%d/%d BIT-EXACT%s" % (npass, npass + nfail,
           "" if not fails else "  FAIL: " + str(fails)))
+    sys.exit(1 if nfail else 0)   # gate semantics: RED until every patch is bit-exact
 else:
     print("usage: recall_render_ab.py --ref | --port  [patches...]", file=sys.stderr)
     sys.exit(2)
