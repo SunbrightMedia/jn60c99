@@ -16,7 +16,7 @@ against the observed 256-entry table, per rate. Exact u32-bit match required.
 
 Output: scratchpad/delay_fb_sweep.pkl {rate: {idx: {cell: [bits]*256}}} + verdict.
 Two-process rule: E2E/Unicorn only.
-NEVER reads user_patch5_ableton.json or captured_coeffs.json.
+NEVER reads any runtime-capture file (the forbidden JSON captures per CLAUDE.md).
 """
 import sys, os, struct, pickle
 import numpy as np

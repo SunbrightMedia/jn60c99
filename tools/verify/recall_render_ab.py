@@ -53,7 +53,8 @@ def parse_patches(argv):
 # Master/FX value-tree leaves whose dispatch index is beyond real_recall.leaf_table's
 # voice range (disp <= 877) but which the plugin's replaceState still fires on recall.
 # (dispatch idx, RECORD byte): DELAY FEEDBACK -> 102560, DELAY DIRECT LEVEL -> 102512.
-# Executed law (scratchpad/sweep_delay_fx.py): 102560 = byte/255*0.9, 102512 = byte/255.
+# Executed law (tools/verify/delay_fb_sweep.py, bit-exact 768/768 over all 256 bytes
+# x 3 rates): 102560 = f32(byte/255)*f32(0.9), 102512 = byte/255.
 FX_LEAVES = [(1179, 3057), (1181, 3060)]
 
 
