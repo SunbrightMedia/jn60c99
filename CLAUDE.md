@@ -58,8 +58,10 @@ from an old clone.
 - `make verify` — the finish line: `test` + the LIVE plugin comparisons (recall_gate
   67-cell diff + full render A/B, both actually executed every run; reference
   pickles auto-regenerate from truth/ when the scratchpad is fresh) + the
-  provenance ledger check. RED while any gate fails or any
-  CAPTURED/RECONSTRUCTED/UNVERIFIED row remains.
+  provenance ledger check + the completeness scan (every constant-bearing source
+  file must be claimed by a ledger row's `sources` column — the net that catches
+  MISSING rows, which is how the delay-feedback capture survived). RED while any
+  gate fails or any CAPTURED/RECONSTRUCTED/UNVERIFIED row remains.
 - `bash gui/web/build.sh` — WASM rebuild (emsdk); `node tools/verify/wasm_golden.mjs`
   proves WASM == native.
 - `-ffp-contract=off` is load-bearing (reference is x86 SSE2, no FMA); the FMA
@@ -74,7 +76,9 @@ from an old clone.
 (port vs plugin recall, 67/67 voice cells, 64 patches) · `recall_render_ab.py`
 (render A/B vs the plugin's own recall+render — the ONLY reliable FX gate, because
 FX state is prepare/render-populated and cannot be gated from a cold apply_bank) ·
-`gen_teensy_golden.py`/`wasm_golden.mjs` (Teensy/WASM reproducibility).
+`gen_teensy_golden.py`/`wasm_golden.mjs` (Teensy/WASM reproducibility) ·
+`provenance_check.py` (ledger linter) · `completeness_scan.py` (constants→ledger
+attribution net; also audit-trails positive "captur*" comment mentions).
 
 ## Known open work (live list = PROVENANCE.tsv)
 

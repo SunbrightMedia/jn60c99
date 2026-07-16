@@ -40,6 +40,7 @@ verify: test
 	python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
 	echo "=== LEDGER ==="; \
 	python3 tools/verify/provenance_check.py || FAIL=1; \
+	python3 tools/verify/completeness_scan.py || FAIL=1; \
 	exit $$FAIL
 provenance:
 	python3 tools/verify/provenance_check.py
