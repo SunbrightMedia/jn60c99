@@ -7,7 +7,9 @@ Usage:
 import sys, struct, pickle, ctypes
 sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
 PKL = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad/cold_regress.pkl'
-BANK = "/root/.claude/uploads/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/ae5e8f1d-presetbankog1.bin"
+import os as _o, sys as _s; _s.path.insert(0, _o.path.join(_o.path.dirname(_o.path.abspath(__file__))))
+import truth
+BANK = truth.BANK  # ground truth via truth/ (single source)
 PATCHES = [13, 0, 22]
 NOTE, VEL, N = 60, 105, 8000
 

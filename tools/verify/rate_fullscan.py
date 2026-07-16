@@ -10,7 +10,9 @@ import sys, struct, ctypes
 import numpy as np
 sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
 import e2e_emu as E
-BANK = "/root/.claude/uploads/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/ae5e8f1d-presetbankog1.bin"
+import os as _o, sys as _s; _s.path.insert(0, _o.path.join(_o.path.dirname(_o.path.abspath(__file__))))
+import truth
+BANK = truth.BANK  # ground truth via truth/ (single source)
 bank = open(BANK, 'rb').read()
 STRIDE, STATE = 10512, 12*1024*1024
 PATCHES = [(13, 0), (4, 1), (11, 2), (19, 3), (5, 5)]   # (patch, v39 type)

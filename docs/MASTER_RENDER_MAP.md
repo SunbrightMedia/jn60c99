@@ -1,5 +1,14 @@
 # master_render (sub_180363380) — transcription map & dropped-arg resolutions
 
+
+> **Provenance note (2026-07):** the extraction folders cited below
+> (`dsp_dump/`, `init_dump/`, `host_layer/`, `audio_search/`, `master_deps/`,
+> `chorus_coeffs/`, `everything_static/`, `param_setter/`) were pruned from the
+> repo and its history. The decompile they came from is archived per-RVA in
+> `refs/allcode_decomp.tgz`, and everything is regenerable from
+> `truth/JUNO60.vst3` (see `docs/RUN_GUIDE.md`). Citations below are kept as
+> historical provenance coordinates.
+
 `sub_180363380` is the **master process**: 8-voice mix → stereo BBD chorus
 (multi-mode) → true-stereo output. Source: `init_dump/020_sub_180363380_*.c`
 (2875-line Hex-Rays body; `audio_search/000_*` is byte-identical). Ported to

@@ -1,5 +1,14 @@
 # Cloud 60 DSP architecture (derived from the IDA dump)
 
+
+> **Provenance note (2026-07):** the extraction folders cited below
+> (`dsp_dump/`, `init_dump/`, `host_layer/`, `audio_search/`, `master_deps/`,
+> `chorus_coeffs/`, `everything_static/`, `param_setter/`) were pruned from the
+> repo and its history. The decompile they came from is archived per-RVA in
+> `refs/allcode_decomp.tgz`, and everything is regenerable from
+> `truth/JUNO60.vst3` (see `docs/RUN_GUIDE.md`). Citations below are kept as
+> historical provenance coordinates.
+
 This is the map of the audio engine, reconstructed from `dsp_dump/`. It records
 what each function in the closure *is*, so transcription doesn't re-derive it.
 ImageBase `0x180000000`. The decompile is the spec (see `HANDOFF_IDA.md`).

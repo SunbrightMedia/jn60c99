@@ -1,5 +1,15 @@
 # Preset recall: complete bit-exact map (and what "79 parameters" really is)
 
+
+> **SUPERSEDED (2026-07): this document is historical.** Live status is
+> `PROVENANCE.tsv` (checked by `make verify`); the claims ledger is
+> `docs/CLAIMS.md`. Where this file conflicts with those, they win. In
+> particular, the "not recalled / held constant" conclusions about the DCO
+> RANGE / LFO / PWM cluster were REFUTED by the plugin's own recall enumerator
+> (rva 0x3B48A0, executed) — see CLAIMS §E11–E13; and recall is NOT complete:
+> the FX path has known open divergences (delay feedback 102560, patches
+> 50/6/45). Kept as a record of how the earlier conclusions were reached.
+
 This document answers the recurring question — *"the preset selector only changes
 ~47 things, the JUNO-60 panel has ~79, why isn't recall complete?"* — with the
 full parameter-by-parameter accounting, and records the **two fully independent**

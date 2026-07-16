@@ -1,5 +1,14 @@
 # How to run `extract_dsp.py` (beginner guide)
 
+
+> **Provenance note (2026-07):** the extraction folders cited below
+> (`dsp_dump/`, `init_dump/`, `host_layer/`, `audio_search/`, `master_deps/`,
+> `chorus_coeffs/`, `everything_static/`, `param_setter/`) were pruned from the
+> repo and its history. The decompile they came from is archived per-RVA in
+> `refs/allcode_decomp.tgz`, and everything is regenerable from
+> `truth/JUNO60.vst3` (see `docs/RUN_GUIDE.md`). Citations below are kept as
+> historical provenance coordinates.
+
 This produces the `dsp_dump/` folder I need to start the C99 port. You run it
 once, in **IDA Pro on Windows**, on the Cloud 60 plugin binary.
 

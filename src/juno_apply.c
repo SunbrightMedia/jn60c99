@@ -17,10 +17,14 @@
  * the value tree. Cross-check: patch 5 VCF CUTOFF FREQ = blob 153 -> juno_curve(22,153)
  * = 0.600000 == the value tree's own float for this patch.
  *
- * COVERAGE (honest, and now COMPLETE for recalled DSP coefficients): 49 logical
- * parameters (front-panel synthesis block + the extended DSP leaves: VCA mode, LFO
- * env-trigger, HPF type, velocity sensitivity, cutoff high-res) plus per-patch
- * delay / reverb / arpeggiator. VERIFIED TWO INDEPENDENT WAYS (no shared code):
+ * COVERAGE (honest): the VOICE recall set is COMPLETE and gate-proven — this applier
+ * writes every voice cell the plugin's own recall enumerator (rva 0x3B48A0) fires,
+ * matching the plugin's recall bit-for-bit (tools/verify/recall_gate.py: 67/67 cells,
+ * all 64 patches; docs/CLAIMS.md §E11-E13). That is the front-panel synthesis block
+ * (incl. the DCO RANGE / LFO / PWM cluster added 2026-07) + the extended DSP leaves
+ * (VCA mode, LFO env-trigger, HPF type) plus per-patch delay / reverb / arpeggiator.
+ * FX recall has known open items (delay feedback 102560 — see PROVENANCE.tsv).
+ * Earlier, the pre-2026-07 subset was VERIFIED TWO INDEPENDENT WAYS (no shared code):
  *   (a) 120 golden coefficient bit-patterns (40 x 3 real patches, test_apply_golden.c);
  *   (b) a FULL-INSTANCE Unicorn emulation that builds the real engine graph
  *       (operator new(0xA83010) 11MB state -> sub_7FF91DFE80F0 init -> wrapper ->

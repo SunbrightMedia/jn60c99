@@ -6,7 +6,9 @@ checksum the C code can assert against at build time.
 Usage: python3 gen_carp_patterns.py > carp_patterns.h
 """
 import pefile, hashlib, sys
-BIN="/root/.claude/uploads/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/aea4b19d-JUNO60VST3_64bit.vst3"
+import os as _o, sys as _s; _s.path.insert(0, _o.path.join(_o.path.dirname(_o.path.abspath(__file__)), "verify"))
+import truth
+BIN = truth.VST3  # ground truth via truth/ (single source)
 pe=pefile.PE(BIN); IMG=pe.get_memory_mapped_image()
 TABLE_RVA=0x9C4480; SLAB_STRIDE=8250; SUB_STRIDE=550; NSLABS=10; NSUBS=15
 LEN=SLAB_STRIDE*NSLABS   # 82500 covers slabs 0..9 (each 8250 = 15 subs)

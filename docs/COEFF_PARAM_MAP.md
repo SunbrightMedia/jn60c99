@@ -1,5 +1,14 @@
 # Coefficient → parameter map (from sub_180388170 registry)
 
+
+> **Provenance note (2026-07):** the extraction folders cited below
+> (`dsp_dump/`, `init_dump/`, `host_layer/`, `audio_search/`, `master_deps/`,
+> `chorus_coeffs/`, `everything_static/`, `param_setter/`) were pruned from the
+> repo and its history. The decompile they came from is archived per-RVA in
+> `refs/allcode_decomp.tgz`, and everything is regenerable from
+> `truth/JUNO60.vst3` (see `docs/RUN_GUIDE.md`). Citations below are kept as
+> historical provenance coordinates.
+
 The 349 runtime-applied coefficients are registered parameters. This maps each
 to its parameter NAME and registered default source, parsed from
 `chorus_coeffs/coeffgen_sub_180388170_180388170.asm`. 312 of 349 are covered

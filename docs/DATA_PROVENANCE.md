@@ -1,5 +1,14 @@
 # Data provenance & trust verdict
 
+
+> **Provenance note (2026-07):** the extraction folders cited below
+> (`dsp_dump/`, `init_dump/`, `host_layer/`, `audio_search/`, `master_deps/`,
+> `chorus_coeffs/`, `everything_static/`, `param_setter/`) were pruned from the
+> repo and its history. The decompile they came from is archived per-RVA in
+> `refs/allcode_decomp.tgz`, and everything is regenerable from
+> `truth/JUNO60.vst3` (see `docs/RUN_GUIDE.md`). Citations below are kept as
+> historical provenance coordinates.
+
 What is trustworthy as a coefficient/algorithm source for this port, and what is
 not. Recorded so it is never re-litigated. The project rule: the decompile is the
 spec; fitted/calibrated numbers are forbidden (see `HANDOFF_IDA.md`).
