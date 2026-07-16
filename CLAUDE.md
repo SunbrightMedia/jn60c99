@@ -95,6 +95,21 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   (cross-checked against a live state dump — itself a capture — so eventually
   re-prove via emulation).
 
+## Standing audit caveats (B1 confirmation audit, 2026-07-16)
+
+- `delay_fb_sweep.py` is one-shot EVIDENCE, not a recurring gate: it always exits 0
+  and is not in `make verify`. Ongoing enforcement of the delay law = exhaustive
+  recall + render A/B + test_delay_recall (mutation-tested: both catch a wrong
+  constant at exact coordinates).
+- Commit 603f927's "no previously-passing patch changed" was argued too broadly:
+  12 other TYPE-0 delay patches DID get new feedback coefficients; the gates
+  confirm they still pass, but the diff alone didn't prove it.
+- The feedback OFF-gate (102560 → 0 when DELAY LEVEL < 2) rests on captured OFF
+  states; render-equivalent either way (wet=0), but re-prove via emulation when
+  convenient.
+- `gui/web/build.sh` emcc lacks `-ffp-contract=off` (pre-existing; mitigated by
+  core WASM having no scalar-FMA opcode + the wasm_golden WASM==native gate).
+
 ## Git
 
 - Branch `claude/c99-gui-fable5-yfhak1`. `git push -u origin <branch>`, retry on
