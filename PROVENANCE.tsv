@@ -1,0 +1,23 @@
+subsystem	scope	status	gate	note
+# The single source of what is PROVEN vs not. Status: PROVEN (executed gate vs the
+# plugin) | RECONSTRUCTED (transcribed from the decompile, no per-value execution gate)
+# | CAPTURED (value came from a runtime capture, not the plugin's own recall - forbidden
+# ground truth, must be replaced) | UNVERIFIED (no gate). "Done" = zero non-PROVEN rows.
+# Checked structurally by tools/verify/provenance_check.py; run the gates via `make verify`.
+# gate column points at a runnable file (or '-'); '+' joins several.
+juno_curve	all 66 curve arms	PROVEN	tests/test_apply_golden.c	31,514 (curve,value) vs Unicorn, 0 mismatch
+juno_ftz	denormal flush	PROVEN	tests/test_denormal.c	FTZ/DAZ keeps recursive state clean
+voice recall (front panel)	67 voice-0 cells	PROVEN	tools/verify/recall_gate.py	67/67 vs plugin's own recall enumerator 0x3B48A0, all 64 patches
+DCO RANGE / LFO / PWM recall	751-760	PROVEN	tools/verify/verify_dropped_luts.py	896/896 setter outputs 44.1/48/96k (this session)
+bend/mod sensitivity	4128/7472/3984/7360	PROVEN	tests/test_bend_mod_sens.c	product-formula recall, 240/240 vs oracle
+CONDITION analog scatter	5520/7600/10320 x8	PROVEN	tests/test_condition_scatter.c	per-voice detune/level, bit-exact
+VCA mode / LFO trig / HPF type	10176-10208 / 2560 / 10240	PROVEN	tests/test_apply_golden.c	extended-leaf recall, oracle-anchored
+sample-rate variant recall	ENV/LFO/HPF arms, porta	PROVEN	tests/test_recall_rate.c	bit-exact at 44100/48000/96000 ONLY
+voice render	src/voice_render.c	PROVEN	tests/test_teensy_golden.c	step-equivalent transcription; render == plugin given equal state
+master render	src/master_render.c	PROVEN	tests/test_master_smoke.c	sample-level vs sub_180363380 (Tier B)
+voice allocation	juno_bridge poly/mono	PROVEN	tests/test_voice_alloc.c	CAssignJu60 slot order 7->0
+arpeggiator pattern/onset/release	src/carp.c	RECONSTRUCTED	tests/test_arp_pattern.c	transcribed from CArpeggio; pattern grid gated, SCHEDULE diff still open (#96)
+init / prepare constants	juno_init.c / juno_prepare.c	RECONSTRUCTED	Makefile	cross-checked against a LIVE state_dump (a capture), not pure emulation
+FX render (delay/reverb/chorus/modes)	master path, per patch	RECONSTRUCTED	tools/verify/recall_render_ab.py	render A/B is the ONLY reliable FX gate (FX state is prepare/render-populated, so cold apply_bank cannot be gated). 12/15 representative patches BIT-EXACT vs the plugin; open: patch 50 (delay feedback, early), 6 & 45 (effect-tail, late @12018/@9424).
+delay feedback	102560	CAPTURED	tools/verify/recall_render_ab.py	"captured at 48 kHz" constant 0.4235; PROVEN WRONG for zero-feedback patches (live plugin=0, port=0.4235 -> patch 50 render diverges). Must derive the per-patch law from the plugin's own delay recall.
+other host sample rates	!= 44100/48000/96000	UNVERIFIED	-	fall back to the 96k curve arm; not bit-exact

@@ -14,8 +14,16 @@ LDLIBS  ?= -lm
 SRC     := $(wildcard src/*.c)
 OBJ     := $(SRC:.c=.o)
 
-.PHONY: all test clean gui
+.PHONY: all test clean gui provenance verify
 all: $(OBJ)
+
+# The honest finish-line gate: functional tests must pass AND the provenance ledger
+# (PROVENANCE.tsv) must have zero CAPTURED / unproven rows. `make verify` stays RED
+# until every subsystem traces to the plugin via an executed gate. `make test` alone
+# checks that the code works; `make verify` checks that it is PROVEN.
+verify: test provenance
+provenance:
+	python3 tools/verify/provenance_check.py
 
 # Shared library for the test GUI (gui/juno_gui.py via ctypes).
 gui: libjuno.so
