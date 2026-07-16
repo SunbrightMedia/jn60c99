@@ -20,7 +20,8 @@ import sys, struct, pickle, ctypes
 ICM  = '/home/user/jn60c99/scratchpad/index_cell_map.pkl'
 PCM  = '/home/user/jn60c99/scratchpad/param_cell_map.pkl'
 LIB  = '/home/user/jn60c99/libjuno.so'
-BANK = '/root/.claude/uploads/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/ae5e8f1d-presetbankog1.bin'
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
+import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
 SR   = 48000.0
 VOICE, NVOICE, VOICES_END = 10512, 8, 84096
 

@@ -34,7 +34,8 @@ import sys, struct, pickle
 HERE = '/home/user/jn60c99/tools/verify'
 sys.path.insert(0, HERE)
 PKL  = '/home/user/jn60c99/scratchpad/recall_render_ref.pkl'
-BANK = '/root/.claude/uploads/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/ae5e8f1d-presetbankog1.bin'
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
+import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
 SR   = 48000.0
 NOTE, VEL, N = 60, 105, 16000
 

@@ -23,7 +23,8 @@ period exceeds it and mis-locks onto a harmonic (a measurement artifact, not a b
 import ctypes, struct
 
 LIB  = '/home/user/jn60c99/libjuno.so'
-BANK = '/root/.claude/uploads/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/ae5e8f1d-presetbankog1.bin'
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
+import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
 SR, N = 48000.0, 16000
 FEET_OFF, VOICE_STRIDE, NVOICE = 3840, 10512, 8
 

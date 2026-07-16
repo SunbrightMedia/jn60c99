@@ -16,7 +16,8 @@ Usage:
 import sys, struct, pickle, ctypes
 
 LIB   = '/home/user/jn60c99/libjuno.so'
-BANK  = '/root/.claude/uploads/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/ae5e8f1d-presetbankog1.bin'
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
+import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
 PKL   = '/home/user/jn60c99/scratchpad/port_state.pkl'
 SR    = 48000.0
 BLOCK = 10512          # per-voice unit-0 block (matches recall_fullstate_diff)

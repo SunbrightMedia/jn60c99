@@ -20,7 +20,8 @@ import pefile
 from unicorn import *
 from unicorn.x86_const import *
 
-BIN = "/root/.claude/uploads/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/aea4b19d-JUNO60VST3_64bit.vst3"
+import truth as _truth          # single source of ground-truth paths (truth/ folder)
+BIN = _truth.VST3
 pe = pefile.PE(BIN)
 IB = pe.OPTIONAL_HEADER.ImageBase
 IMG = pe.get_memory_mapped_image()
@@ -369,8 +370,8 @@ class E2E:
         if rip!=RET: raise RuntimeError(f"stub stopped at 0x{rip:x} (rva 0x{rip-IB:x})")
 
 # ---------------------------------------------------------------- patch recall
-SCRIPT_XML = "/root/.claude/uploads/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/7c621d41-Script.xml"
-BANK = "/root/.claude/uploads/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/ae5e8f1d-presetbankog1.bin"
+SCRIPT_XML = _truth.SCRIPT_XML
+BANK = _truth.BANK
 HEADER, STRIDE, BLOB_OFF, NPATCH = 23, 20223, 16, 64
 
 def load_leaves():

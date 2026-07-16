@@ -15,7 +15,8 @@ NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 import sys, struct, pickle
 sys.path.insert(0, '/home/user/jn60c99/tools/verify')
 
-BANK = '/root/.claude/uploads/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/ae5e8f1d-presetbankog1.bin'
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
+import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
 HEADER, STRIDE, BLOB_OFF = 23, 20223, 16
 REF = '/home/user/jn60c99/scratchpad/plugin_recall_ref.pkl'
 LUTS = '/home/user/jn60c99/scratchpad/dropped_luts.pkl'
