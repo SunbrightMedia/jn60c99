@@ -4,9 +4,17 @@
 Forces the DCO octave cell (3840, all 8 voices) BEFORE note-on and measures the
 rendered fundamental period. Result (note 72, periods in range): feet 0.5 -> ratio
 2.00 (one octave down), feet 2.0 -> ratio 0.50 (one octave up). So the port renders
-feet correctly; the earlier "feet 0.5 sounds WAY too low" the user reported was a
-CLEAN 16', which they rejected -> their real plugin plays patch 62 at ~8', i.e. the
-plugin does NOT apply DCO RANGE on recall and the port's freeze is correct.
+feet correctly.
+
+SUPERSEDED CONCLUSION (2026): an earlier version of this file concluded "the plugin
+does NOT apply DCO RANGE on recall" from the user's A/B ("feet 0.5 sounds WAY too
+low"). That is now REFUTED by the plugin's OWN recall enumerator (rva 0x3B48A0,
+executed under Unicorn), which DOES fire index 760 (DCO RANGE) on recall -> patch 62
+recalls feet 0.5 (16'). Per the self-proving mandate the plugin's code is ground
+truth, and the port now recalls DCO RANGE; recall_render_ab.py confirms patch 62 is
+BIT-EXACT to the plugin's own render. This test still validates the RENDER MECHANICS
+(feet -> clean octave); its role is that mechanics proof, not the emission verdict.
+See docs/CLAIMS.md E11-E13.
 
 libjuno-only (two-process rule). NOTE: use a high enough note (72) that one-octave-
 down stays within the autocorrelation search window (lag < 900); note 60's feet=0.5
@@ -60,8 +68,9 @@ def main():
         pr = period(render(62, f))
         print("  feet=%.1f: period %d ratio %.2f  [expect %s]  %s"
               % (f, pr, pr / pb, exp, 'CLEAN' if abs(pr / pb - (2.0 if f == 0.5 else 0.5)) < 0.05 else 'CHECK'))
-    print("=> feet render is a clean octave; so a clean 16' was what the user rejected")
-    print("   -> the plugin plays patch 62 at ~8' -> DCO RANGE not applied on recall.")
+    print("=> feet render is a clean octave (mechanics proof).")
+    print("   The plugin's own recall enumerator (0x3B48A0) DOES apply DCO RANGE:")
+    print("   patch 62 recalls feet 0.5 (16'); recall_render_ab.py confirms bit-exact.")
 
 
 if __name__ == '__main__':

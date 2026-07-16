@@ -72,23 +72,22 @@ the engine was ever found: there is none.
 
 | E10 | **Validated `Script.xml` recall reference built — its "bug" verdict rests on an UNPROVEN emission assumption that conflicts with the user's ear; NOT shipped.** A heavily-validated parse (563/577 leaves match executed descriptor default/range; name anchor at byte 140; provably-unique blob alignment) resolves the schema: patch 62 DCO RANGE (blob byte 32) = 2 = 16FEET, and 17 voice candidates (DCO RANGE, LFO cluster, PWM, velocity sens) + FX would differ from the port **IF** the recall applies all `Script.xml` leaves. BUT whether the recall EMITS each leaf is the walled JUCE/Script.xml step (UNPROVEN — the "reference" is "what the port *should* produce assuming full emission," not the plugin's observed recall). For DCO RANGE this conflicts with the user's A/B (feet 0.5/16' = "WAY too low"; 8' correct) → the plugin very likely does NOT audibly apply DCO RANGE for patch 62 → the port's freeze is correct and applying feet 0.5 would repeat the reverted error. The subtler candidates (LFO/PWM/FX) may be real (they match the user's brighter/chorus reports) but rest on the same unproven emission. **No engine change made.** | Schema PROVEN(validated); emission UNPROVEN (walled); DCO-RANGE "bug" verdict REFUTED by the user's A/B. |
 
-**Where this leaves the recall reference (honest, revised).** The prior "linchpin" (execute the
-plugin's own record→param map under a thin host transport) is now PROVEN infeasible: that map is
-not in the binary — it is the external `Script.xml` schema consumed by a JUCE stack. So a
-fully-executed, zero-reconstruction recall reference is **not achievable under emulation**. The
-best attainable reference is: parse `Script.xml` (the plugin's OWN schema, user-supplied) →
-per-patch (param_id,value) list → drive the plugin's OWN apply node + setter (executed) → engine
-state. Only the `Script.xml` *parse* (blob-position computation) is our code, and it is validatable
-against executed anchors (parser values, descriptor names/domains/defaults, ASCII patch names,
-apply-node cells). This is a **bounded, cross-checked** reference — legitimate (plugin's schema +
-plugin's code), with the parse as the disclosed residual. Whether to build the port's recall on it,
-and how to treat the octave, is a decision to confirm with the user before any engine change.
+| E11 | **The plugin ENUMERATES its own recall set — self-proven, no schema guess, no ear.** Proc vtable slot 8 (rva 0x3B48A0) is the plugin's own "apply patch params to the engine" method: it walks a FIXED internal index list, reads each via the value getter (+0x68) and dispatches to the engine setter (+0x58 = 0x3B9A30). Executed under Unicorn with a2!=0 (setter branch), hooking the setter reveals the EXACT recall index set — the plugin's own definition of which parameters a JUNO-60 patch recalls. It fires **165 distinct indices, including front-panel 751-754,756-760** (DCO RANGE 760, PWM 758/759, LFO 751-756). This is the plugin's machine code answering the emission question directly — refuting E6/E9/E10's "unproven emission" and the ear-based "DCO RANGE not recalled." | PROVEN(exec): `tools/verify/plugin_recall_set.py` (165 indices, a2=1 setter branch, reproduced). |
+| E12 | **Self-proven recall reference built + the port fixed to match it, bit-exact.** For every patch, the reference = the plugin's OWN pieces only: index set from 0x3B48A0 (E11), blob values from the plugin's OWN parser 0x330ED0 at the Script.xml-validated leaf positions, applied via the plugin's OWN setter 0x3B9A30 (`plugin_recall_ref.py`). The port dropped the recall of 751-760 (DCO RANGE feet, LFO rate/delay/key-trig, DCO/VCF LFO mod, PWM depth/source); those are now recalled in `src/juno_apply.c`, each law captured from the plugin's setter and proven bit-exact for all 256 inputs at 44100/48000/96000 (`extract_dropped_luts.py`/`verify_dropped_luts.py`, 896/896) and expressed via the already-proven `juno_curve` tables (1088/2064=c22, 4032=c0, 7344=c47, 4144=c45, 1920=SR-variant c42/43/44, 1072=c48×c53[1280]) plus small enum laws (3840=2^(min(v,5)−3), 1872/1936 switches, PWM one-hot). **GATE: 67/67 recall cells match the plugin, all 64 patches, 0 mismatches** (`tools/verify/recall_gate.py`). The 11 out-of-scope residual cells are all explained: 8 never read by the render (inert), 3 (2848/3328/6448 = ENV smoother coeffs + osc enable) equal the LIVE plugin state dump = 1.0 (the Unicorn build snapshot is pre-`prepareToPlay`, so the port is right). | PROVEN(exec) index set + values + setter; GATE 0 mismatches; residual classified inert/live-matched. |
+| E13 | **Independent AUDIBLE confirmation — port render == plugin render.** `recall_render_ab.py` renders the plugin's own recall+render (Unicorn, zero port code) and the port (libjuno), bit-compared on output audio. After the fix: patches 18, 53, **62 (BS Juno Grime — the DCO RANGE 16' patch) are BIT-EXACT**; before the fix all four diverged from sample ≤12. This overturns E9's ear-based "feet 0.5 too low / not a bug": the plugin's OWN recall applies DCO RANGE (patch 62 → 16'), and the port now reproduces the plugin's render sample-for-sample. (Patch 50 "KY Organish" retains a PRE-EXISTING FX/master divergence — its full 8-voice recall state matches the plugin bit-exactly; the residual is in the un-decompiled master/FX path, not the voice recall, and my fix improved it, not regressed it.) | PROVEN(exec) render A/B 3/4 bit-exact incl. the octave patch; patch-50 residual is FX-scoped + pre-existing. |
 
-This reframes A1/C0: cold-recall bit-exactness was measured against a reference sharing the
-leaf-map reconstruction, so it is **pending re-validation**. The engine port is UNCHANGED
-(baseline 6b8edee) — no recall code is edited until the plugin's real recall proves what is
-wrong. Port side of the eventual diff is captured (tools/verify/port_state_dump.py); the
-differ is ready (tools/verify/recall_ref_diff.py); both await the reconstruction-free reference.
+**Where this leaves the recall reference (RESOLVED).** The emission question — which parameters the
+plugin recalls — is now answered by the plugin's OWN machine code (E11: enumerator 0x3B48A0),
+executed under Unicorn, requiring neither the walled JUCE stack nor the user's ear. The prior E6/E9/E10
+hedges (emission unprovable; DCO RANGE "not a bug" from an A/B) are SUPERSEDED: the self-proving mandate
+takes the plugin's code as ground truth, and it recalls 751-760. The reconstruction-free recall
+reference IS built (E12: enumerator ∩ parser ∩ setter, all executed) and the port is fixed to match it
+bit-exactly (67/67 recall cells, 64 patches) and confirmed on the RENDER (E13, patch 62 bit-exact).
+The only disclosed residual in the reference build is the value-tree leaf POSITION map (Script.xml,
+validated against executed anchors); every value and law is the plugin's executed code. The permanent
+gate is `tools/verify/recall_gate.py` (regenerable from the .vst3: extract_dropped_luts → verify →
+recall_gate). A1/C0 cold-recall bit-exactness is thereby RE-VALIDATED for the voice recall path; the
+lone open item is the pre-existing patch-50-class FX/master residual (voice state proven bit-exact).
 
 ## Verdict
 

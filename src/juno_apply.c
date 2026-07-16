@@ -189,31 +189,36 @@ static const juno_bind BINDINGS[] = {
                                                   * bipolar sign-flipped, e.g. patch40 +0.197
                                                   * vs correct -0.331. Same +4 bug as ATTACK.) */
     { 26, 54, T_ID,  4208, "DCO PWM LEVEL"   }, /* -> JU OSC Sqr Lev (see note below)  */
-    /* LFO DELAY (1920/1936) and LFO RATE (1088/2064): the plugin holds these engine
-     * cells CONSTANT across all 64 patches (recall never writes them — the value-tree
-     * rate/delay nodes vary per patch but do NOT reach these DSP cells; the per-block
-     * smoother leaves them unmoved, inactive ramps). Our old bindings wrote the
-     * value-tree value here, diverging from the plugin's render. 1920/1936 match
-     * juno_engine_prepare's default already; 1088/2064 are set to the plugin constant
-     * in recall_engine_constants(). See docs/COLDLOAD_AB.md. */
+    /* LFO RATE (1088/2064) + LFO DELAY (1920): the plugin's OWN recall enumerator
+     * (proc vtable slot 8, rva 0x3B48A0) DOES recall these — executed under Unicorn it
+     * fires the engine setter for indices 751 (LFO DELAY) and 752 (LFO RATE) on every
+     * patch. The earlier "held constant" claim came from a DSP-only reconstruction that
+     * structurally never dispatched these indices; the plugin's self-proven setter gives
+     * cell 1088/2064 = juno_curve(22, LFO-RATE byte) and cell 1920 = the SR-variant
+     * LFO-delay curve (arms 42/43/44 @ 44100/48000/96000). Proven bit-exact vs the
+     * plugin's own setter for all 256 input values at all three rates, and vs the
+     * self-proven recall reference across all 64 patches (tools/verify/
+     * extract_dropped_luts.py + verify_dropped_luts.py). See docs/CLAIMS.md §E. */
+    { 8, 22, T_ID,  1088, "LFO RATE"        }, /* -> LFO rate (idx 752, curve 22)     */
+    { 8, 22, T_ID,  2064, "LFO RATE"        }, /* -> LFO rate mirror (idx 752)        */
+    { 7, 44, T_ID,  1920, "LFO DELAY", 1    }, /* -> LFO delay. SR-VARIANT arm 42/43/44 (idx 751) */
     { 66, 49, T_ID,101072, "VCA LEVEL"       }, /* -> Patch Level (value tree c49)     */
     { 27, 54, T_ID,  4192, "DCO SAW LEVEL"   }, /* -> JU OSC Saw Lev (value tree c54)  */
     { 28, 54, T_ID,  4224, "DCO SUB LEVEL"   }, /* -> JU OSC Sub Lev (value tree c54)  */
     { 29, 54, T_ID,  6528, "DCO NOISE LEVEL" }, /* -> Osc Noise Level (value tree c54) */
-    /* DCO LFO MOD (4032), VCF LFO MOD (7344), LFO KEY TRIG (1872), DCO PWM DEPTH
-     * (4144): same class — the plugin keeps these engine cells CONSTANT for all 64
-     * patches (the value-tree mod depths never reach them at recall). 4032/1872 match
-     * prepare's default; 7344/4144 are the plugin's near-zero denormals (DAZ-equal to
-     * prepare's 0 in the render). Bindings removed. See recall_engine_constants(). */
-    /* DCO RANGE: the plugin does NOT write the "feet" cell 3840 during recall — it
-     * stays at juno_engine_prepare's default of 1.0 for ALL 64 factory patches
-     * (proven by RUNNING the plugin's own recall dispatch under Unicorn: 3840 =
-     * 1.0 through prepare -> recall -> snap for every patch, regardless of the raw
-     * DCO-RANGE byte 0..169; scratchpad/oracle/id_feet_mcv_probe.py). The old row
-     * { 16, 5, T_ID, 3840 } wrote juno_curve(5,byte)/255 into it (e.g. 0.5 for
-     * patch 4), corrupting the DCO pitch scale one octave low — which cancelled the
-     * note/12 M.CV octave bug on pitch but left every patch ~1.3x off in level.
-     * Removed so 3840 keeps its prepare default. See docs/COLDLOAD_AB.md. */
+    /* DCO LFO MOD (4032), VCF LFO MOD (7344), DCO PWM DEPTH (4144): the plugin's own
+     * recall enumerator fires indices 753/754/758 for these on every patch (setter-
+     * proven, not held constant). 4032 = juno_curve(0, byte), 7344 = juno_curve(47,
+     * byte), 4144 = juno_curve(45, byte); each reproduces the plugin's setter output
+     * bit-exact for all 256 inputs and the recall reference for all 64 patches. The
+     * discrete cells this cluster also recalls (LFO KEY TRIG 1872, DCO RANGE feet 3840,
+     * PWM SOURCE 3888/3904/3920/3936, LFO DELAY switch 1936, tempo-baseline 1072) are
+     * applied below in juno_bank_apply (small enum/switch laws, not single-curve rows).
+     * The old "these cells are held constant / DCO RANGE never recalled" claims are
+     * refuted by the plugin's own enumerator+setter (docs/CLAIMS.md §E). */
+    { 9,  0, T_ID,  4032, "DCO LFO MOD"     }, /* -> DCO LFO mod depth (idx 753)      */
+    { 10, 47, T_ID, 7344, "VCF LFO MOD"     }, /* -> VCF LFO mod depth (idx 754)      */
+    { 14, 45, T_ID,  4144, "DCO PWM DEPTH"   }, /* -> DCO PWM depth (idx 758)          */
     { 46, 38, T_ID,  3296, "ENV2 DECAY", 1   }, /* -> amp ENV Decay. SR-VARIANT 36/37/38 */
     { 47, 50, T_ID,  3280, "ENV2 SUSTAIN"    }, /* -> amp ENV Sustain (value tree c50) */
     { 54, 52, T_ID,   592, "PORTAMENTO"      }, /* -> Porta OnOff (value tree c52)     */
@@ -334,13 +339,33 @@ int juno_bank_patch_name(const unsigned char *bank, int idx, char out[17])
     return 1;
 }
 
-/* DCO PWM SOURCE (blob 15) — the value tree carries a per-patch source enum
- * (0 Manual / 1 LFO / 2,3 ENV1± / 4,5 ENV2±), but the plugin's ENGINE keeps the four
- * PWM-source-select flags (3888/3904/3920/3936) CONSTANT at (0,0,0,1)="manual" for
- * every factory patch — the PWM MOD DEPTH cell 4144 is a near-zero denormal for all
- * patches, so the source select never leaves its prepare default. The former
- * apply_pwm_source() writer is therefore removed (it diverged from the plugin's
- * render); prepare already sets (0,0,0,1). See docs/COLDLOAD_AB.md. */
+/* DCO PWM SOURCE (blob 15, idx 759) — a 6-value enum the plugin's own recall
+ * enumerator DOES fire (setter-proven), recalled as a one-hot over the four source-
+ * select cells 3888(LFO)/3904(ENV1)/3920(ENV2)/3936(Manual), the ENV arms signed for
+ * invert. Proven bit-exact vs the plugin's setter for all 256 inputs
+ * (tools/verify/extract_dropped_luts.py):
+ *   0 -> Manual(3936=1)    1 -> LFO(3888=1)
+ *   2 -> ENV1+(3904=+1)    3 -> ENV1-(3904=-1)
+ *   4 -> ENV2+(3920=+1)    5 -> ENV2-(3920=-1)    >=6 -> Manual (default).
+ * (The earlier apply_pwm_source() was removed on a mistaken "held constant at
+ * (0,0,0,1)" reading; the plugin recalls it per patch. v=0/>=6 == the (0,0,0,1)
+ * prepare default, so unconditionally writing it is safe.) */
+static void apply_pwm_source(unsigned char *state, int v)
+{
+    float a = 0.0f, b = 0.0f, c = 0.0f, d = 0.0f;   /* 3888,3904,3920,3936 */
+    switch (v) {
+        case 1:  a =  1.0f; break;
+        case 2:  b =  1.0f; break;
+        case 3:  b = -1.0f; break;
+        case 4:  c =  1.0f; break;
+        case 5:  c = -1.0f; break;
+        default: d =  1.0f; break;   /* 0 and >=6 -> Manual */
+    }
+    JF(state, 3888) = a;
+    JF(state, 3904) = b;
+    JF(state, 3920) = c;
+    JF(state, 3936) = d;
+}
 
 /* Read one logical byte (a nibble pair) from an EXTENDED record position. The
  * record body past the 16-char name is nibble-packed: logical byte at record
@@ -553,12 +578,34 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
         JF(state, BINDINGS[i].offset) = c;
         ++n;
     }
-    /* DCO PWM SOURCE (3888/3904/3920/3936): the plugin holds these PWM-source-select
-     * flags CONSTANT at (0,0,0,1)="manual" across all 64 patches — the PWM MOD DEPTH
-     * (4144) is a near-zero denormal for every patch, so the source select is moot and
-     * never leaves its prepare default. The old apply_pwm_source() wrote per-patch
-     * flags from blob 15, diverging from the plugin's render. Removed (prepare already
-     * sets 0,0,0,1). See docs/COLDLOAD_AB.md. */
+    /* Discrete / multi-curve recalls the plugin's own enumerator (0x3B48A0) fires but
+     * that don't fit a single {curve,transform} BINDINGS row. Each is the plugin's
+     * exact setter law, proven bit-exact for all 256 input values against the plugin's
+     * own setter and against the self-proven recall reference for all 64 patches
+     * (tools/verify/extract_dropped_luts.py + verify_dropped_luts.py, 896/896):
+     *   751 LFO DELAY switch (1936) : byte==0 ? 0 : 1
+     *   752 LFO tempo-baseline (1072): curve48(byte) * curve53(1280)  [build BPM 128]
+     *   756 LFO KEY TRIG (1872)     : byte==0 ? 1 : 0
+     *   759 PWM SOURCE (3888..3936) : one-hot enum (LFO / ENV1± / ENV2± / Manual)
+     *   760 DCO RANGE feet (3840)   : 2^(min(byte,5)-3)   {16'..2', default 8'}
+     * These write voice-0 cells (<10512); juno_driver_seed_voices replicates to all 8.
+     * 1072 is the tempo-sync baseline (used only when TEMPO SYNC 1056==1); the runtime
+     * host-BPM path juno_apply_lfo_tempo overwrites it for a synced patch, exactly as
+     * the plugin recomputes it from live tempo — recall sets the default-BPM baseline. */
+    {
+        int b751 = ((blob[2 * 7]  & 0xF) << 4) | (blob[2 * 7  + 1] & 0xF);  /* LFO DELAY    */
+        int b752 = ((blob[2 * 8]  & 0xF) << 4) | (blob[2 * 8  + 1] & 0xF);  /* LFO RATE     */
+        int b756 = ((blob[2 * 12] & 0xF) << 4) | (blob[2 * 12 + 1] & 0xF);  /* LFO KEY TRIG */
+        int b759 = ((blob[2 * 15] & 0xF) << 4) | (blob[2 * 15 + 1] & 0xF);  /* PWM SOURCE   */
+        int b760 = ((blob[2 * 16] & 0xF) << 4) | (blob[2 * 16 + 1] & 0xF);  /* DCO RANGE    */
+        int rng  = b760 > 5 ? 5 : b760;
+        JF(state, 1936) = (b751 == 0) ? 0.0f : 1.0f;                        /* LFO delay switch  */
+        JF(state, 1072) = juno_curve(48, b752) * juno_curve(53, 1280);      /* LFO tempo baseline */
+        JF(state, 1872) = (b756 == 0) ? 1.0f : 0.0f;                        /* LFO key trig      */
+        JF(state, 3840) = 0.125f * (float)(1u << rng);                      /* DCO feet 2^(rng-3) */
+        apply_pwm_source(state, b759);                                      /* PWM source one-hot */
+        n += 5;
+    }
     /* VCF CUTOFF FREQ (6736): driven solely by the coarse binding {35,22,T_ID} above —
      * the high-res override was removed (it diverged from the engine; see comment at
      * record_befloat's former site). */
@@ -610,28 +657,11 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
     JF(state, 9600) = 0.0f;   /* VCA VEL SENS (inert) */
     n += 4;
 
-    /* Engine constants the plugin holds identical across all 64 patches but that
-     * juno_engine_prepare does NOT set (proven: every captured post-recall state has
-     * these exact bits, and the per-block smoother leaves them unmoved). Set them to
-     * the plugin's exact values so cold-load renders bit-identically. The remaining
-     * constant cells (1920/1936/1872/4032/3888..3936/9600/1072) already match prepare.
-     * See docs/COLDLOAD_AB.md. */
-    {
-        static const struct { int off; unsigned int bits; } K[] = {
-            {1088, 0x3f119192u}, {2064, 0x3f119192u},   /* LFO rate/noise-mix coeff (0.5686275) */
-            {1920, 0x3c2aaa78u},                        /* LFO delay coeff (0.01041662, the plugin's
-                                                         * recall value — the 96 kHz reference of
-                                                         * 1000/SR, constant for all 64 patches; NOT
-                                                         * juno_engine_prepare's host-rate 1000/48000) */
-            {4144, 0x15a931dau},                        /* DCO PWM depth   (denormal ~0, DAZ) */
-            {7344, 0x1203efe4u},                        /* VCF LFO mod     (denormal ~0, DAZ) */
-        };
-        unsigned k; float f;
-        for (k = 0; k < sizeof(K)/sizeof(K[0]); ++k) {
-            memcpy(&f, &K[k].bits, 4);
-            JF(state, K[k].off) = f;
-        }
-    }
+    /* (The former recall_engine_constants K[] block that froze 1088/2064/1920/4144/
+     * 7344 at fixed bit-patterns is removed: the plugin's own recall enumerator recalls
+     * all five per-patch, now driven by the BINDINGS rows + discrete block above. Their
+     * old "constant" values were the specific case of the recall for those patches whose
+     * LFO/PWM knobs happened to match — proven wrong for the 45-64 patches that vary.) */
 
     /* HPF TYPE (record 618, leaf 129): the HPF coefficients (10240/10256/10272/
      * 10288) are a JOINT function of HPF CUTOFF FREQ (blob 38) and HPF TYPE, and
