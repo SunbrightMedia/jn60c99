@@ -73,7 +73,10 @@ from an old clone.
 `real_bank_parse.py`/`real_recall.py` (plugin's own parser + recall) ·
 `plugin_recall_set.py` (plugin's own recall enumerator, rva 0x3B48A0) ·
 `plugin_recall_ref.py` (self-proven recall reference) · `recall_gate.py`
-(port vs plugin recall, 67/67 voice cells, 64 patches) · `recall_render_ab.py`
+(port vs plugin recall, 67/67 voice cells, 64 patches) · `recall_exhaustive_ref.py`
++ `recall_exhaustive_gate.py` (recall EXHAUSTED: every single-input front-panel cell
+vs the plugin's setter over all 256 byte values x 3 rates; multi-input product/joint
+cells deferred to recall_gate + formula tests) · `recall_render_ab.py`
 (render A/B vs the plugin's own recall+render — the ONLY reliable FX gate, because
 FX state is prepare/render-populated and cannot be gated from a cold apply_bank) ·
 `gen_teensy_golden.py`/`wasm_golden.mjs` (Teensy/WASM reproducibility) ·

@@ -9,6 +9,7 @@ juno_curve	all 66 curve arms	PROVEN	tests/test_apply_golden.c	31,514 (curve,valu
 juno_ftz	denormal flush	PROVEN	tests/test_denormal.c	FTZ/DAZ keeps recursive state clean	src/juno_ftz.c
 voice recall (front panel)	67 voice-0 cells	PROVEN	tools/verify/recall_gate.py	67/67 vs plugin's own recall enumerator 0x3B48A0, all 64 patches	src/juno_apply.c
 DCO RANGE / LFO / PWM recall	751-760	PROVEN	tools/verify/verify_dropped_luts.py	896/896 setter outputs 44.1/48/96k (this session)	src/juno_apply.c
+exhaustive recall (single-input)	40 front-panel cells	PROVEN	tools/verify/recall_exhaustive_gate.py	30,720/30,720: port recall == plugin setter for EVERY byte 0..255 x 44.1/48/96k, ALL single-input front-panel cells. Multi-input cells 592/1072/4128/7472/10240/10256 (products/joints) deferred to recall_gate factory combos + formula tests (256^k joint exhaustion out of scope)	src/juno_apply.c
 bend/mod sensitivity	4128/7472/3984/7360	PROVEN	tests/test_bend_mod_sens.c	product-formula recall, 240/240 vs oracle	src/juno_apply.c
 CONDITION analog scatter	5520/7600/10320 x8	PROVEN	tests/test_condition_scatter.c	per-voice detune/level, bit-exact	src/juno_apply.c
 VCA mode / LFO trig / HPF type	10176-10208 / 2560 / 10240	PROVEN	tests/test_apply_golden.c	extended-leaf recall, oracle-anchored	src/juno_apply.c;src/hpf_type_lut.c

@@ -33,10 +33,13 @@ verify: test
 	test -f $(SCRATCH)/index_cell_map.pkl    || python3 tools/verify/index_cell_map.py    || FAIL=1; \
 	test -f $(SCRATCH)/plugin_recall_ref.pkl || python3 tools/verify/plugin_recall_ref.py || FAIL=1; \
 	test -f $(SCRATCH)/recall_render_ref.pkl || python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
+	for r in 44100 48000 96000; do test -f $(SCRATCH)/recall_exhaustive_$$r.pkl || python3 tools/verify/recall_exhaustive_ref.py $$r || FAIL=1; done; \
 	python3 tools/verify/port_state_dump.py >/dev/null 2>&1 || FAIL=1; \
-	echo "=== LIVE GATE 1/2: recall_gate (port vs plugin's own recall) ==="; \
+	echo "=== LIVE GATE 1/3: recall_gate (port vs plugin's own recall, 64 patches) ==="; \
 	python3 tools/verify/recall_gate.py || FAIL=1; \
-	echo "=== LIVE GATE 2/2: render A/B (port render vs plugin's own render) ==="; \
+	echo "=== LIVE GATE 2/3: exhaustive recall (every byte 0..255 x 3 rates) ==="; \
+	python3 tools/verify/recall_exhaustive_gate.py || FAIL=1; \
+	echo "=== LIVE GATE 3/3: render A/B (port render vs plugin's own render) ==="; \
 	python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
 	echo "=== LEDGER ==="; \
 	python3 tools/verify/provenance_check.py || FAIL=1; \
