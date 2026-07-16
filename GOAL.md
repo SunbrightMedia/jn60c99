@@ -39,7 +39,8 @@ sound in the browser, kept portable enough to run on a Teensy later.
 
 ## Honest status pointer
 
-Current real state (params bound, what's verified, what's still wrong or missing)
-is tracked in `docs/AUDIBLE_RECALL_PLAN.md`. Keep that honest and current. When
-something is not done, or was found to be wrong, write that down — do not
-overstate coverage.
+Current real state — what is PROVEN vs RECONSTRUCTED vs CAPTURED vs UNVERIFIED,
+per subsystem, with the runnable gate for each — is tracked in **`PROVENANCE.tsv`**
+(checked by `make verify`). That ledger is the authority; keep it honest and
+current. When something is not done, or was found to be wrong, its row says so —
+do not overstate coverage. ("Done" = zero non-PROVEN rows / `make verify` green.)

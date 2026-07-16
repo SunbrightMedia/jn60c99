@@ -1,53 +1,53 @@
-# JUNO-60 DSP → C99 (exact-port restart)
+# JUNO-60 (JU-06A) → C99, bit-exact
 
-> ## ⭐ THE GOAL (see [GOAL.md](GOAL.md) — read it first)
+> ## ⭐ THE GOAL (see [GOAL.md](GOAL.md) — read it first, it is binding)
 > A **bit-exact C99 port of the DSP engine**, plus **whatever it takes to sound
 > EXACTLY the same as the original plugin, in the browser** — kept portable C99
-> so it can **eventually run on a microcontroller (Teensy)**. Ground truth is
-> ONLY the decompiled/compiled binary. "Sounds exactly the same" is the
-> acceptance test, not "N params bound." Full goal + rules in **[GOAL.md](GOAL.md)**.
+> so it can **eventually run on a microcontroller (Teensy 4.1)**. "Sounds exactly
+> the same" is the acceptance test, not "N params bound."
 
-A C99 port of the Roland Cloud **Cloud 60** (JUNO-60 emulation) **DSP audio
-engine**. The goal is an **exact, structural transcription** of the plugin's
-actual algorithm — same operations, same signal flow, same coefficients — not a
-sound-alike approximation.
+Ground truth is ONLY the original plugin binary, pinned in [`truth/`](truth/)
+(checksum-verified) and *executed* under emulation to produce every proof. The
+port is **self-proving**: no captures, no ear A/B, no fitted curves — if a value
+isn't derivable from the binary's own code, that is stated, not guessed. Agent
+rules live in [`CLAUDE.md`](CLAUDE.md).
 
-**THE RULE:** the decompiled plugin is the spec. We transcribe it. We do **not**
-fit curves, tune constants to match audio, or substitute an easier stand-in for
-a hard-to-read DSP block. Read `docs/HANDOFF_IDA.md` in full before touching code.
+**Live status: [`PROVENANCE.tsv`](PROVENANCE.tsv)** — the per-subsystem ledger of
+what is PROVEN vs RECONSTRUCTED vs CAPTURED vs UNVERIFIED. The project is done when
+`make verify` is green (zero non-PROVEN rows).
 
-## Target facts (binary-derived)
+## Quick start
 
-- Plugin: Roland Cloud **Cloud 60**, x86-64 PE.
-- **ImageBase `0x180000000`.**
-- **Per-voice render @ `0x180369070`** (RVA `0x369070`) — primary extraction seed.
-- 6-voice poly; DCO (saw + variable-pulse + square sub + noise), non-resonant
-  HPF, 24 dB/oct resonant LPF (IR3109-style 4-pole), two ADSRs (filter + amp),
-  one delayed triangle LFO, stereo BBD chorus (modes I / II / I+II).
-
-## Workflow
-
-1. **Extract** (Windows, IDA Pro 9.3, x86-64 decompiler): run
-   `tools/extract_dsp.py` on the auto-analyzed database. Output → `dsp_dump/`
-   (`MANIFEST.md`, `callgraph.txt`, `constants.txt`, per-function `.c`).
-2. **Transcribe** function-by-function from the dump, top of the call tree down,
-   naming struct fields as we go. Coefficients come from `constants.txt` only.
-3. **Validate per-stage** against the decompile's intermediate signals — never
-   end-to-end RMS. RMS/NaN checks are crash smoke-tests only.
-4. Assemble the full engine only once each stage matches.
-
-## Runtime constants (chorus)
-
-A few chorus coefficient *values* are heap-allocated at runtime and don't appear
-in the static `.rdata` dump. Reuse **only** the real Frida golden-dump value
-files from the old project when reaching the chorus — nothing else from the old
-project (no C source, no fitted curves, no RMS fingerprint).
+```
+make libjuno.so     # build the engine (shared lib for the GUI + gates)
+make test           # functional test suite
+make verify         # test + provenance ledger — the honest finish line
+python3 tools/verify/truth.py     # verify ground-truth checksums
+bash gui/web/build.sh             # rebuild the WASM app (needs emscripten)
+node tools/verify/wasm_golden.mjs # prove WASM == native, bit-exact
+```
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `docs/HANDOFF_IDA.md` | Authoritative project brief — read first. |
-| `tools/extract_dsp.py` | One-time IDA 9.3 DSP call-tree extractor. |
-| `dsp_dump/` | Decompiled extraction output (populated by the script). |
-| `src/` | The C99 port. |
+| `GOAL.md` / `CLAUDE.md` | The goal (user's words) / agent project memory. |
+| `PROVENANCE.tsv` | Per-subsystem proof ledger — the status authority. |
+| `truth/` | Ground truth: the `.vst3`, `Script.xml`, factory bank + SHA256SUMS. |
+| `src/` | The C99 port (engine, recall, render, arp, FX). |
+| `gui/` | ctypes bridge + the in-browser WASM app (`gui/web/`). |
+| `tests/` | Functional suite incl. golden corpora (Teensy 44.1 kHz). |
+| `tools/verify/` | The gates: the Unicorn oracle + the executable proofs. |
+| `refs/` | Full IDA decompile archive (provenance for transcriptions). |
+| `docs/` | CLAIMS.md (claims ledger) + subsystem notes. |
+
+## Engine facts (proven from the binary)
+
+- x86-64 PE, preferred ImageBase `0x180000000`; per-voice render RVA `0x369070`;
+  engine state block `0xA83010` bytes = 8 voice blocks (10512 B stride) +
+  master/FX; recall setter RVA `0x3B9A30`; recall enumerator RVA `0x3B48A0`.
+- Signal path: DCO (saw + variable-pulse + square sub + noise), HPF, 4-pole
+  resonant LPF, two ADSRs (filter + amp), delayed-triangle LFO, stereo BBD
+  chorus (I/II), per-patch delay + reverb + effect modes, arpeggiator.
+- Bit-exact at 44100 / 48000 / 96000 Hz (SR-variant curve arms).
+  `-ffp-contract=off` is load-bearing: the reference is x86 SSE2 with no FMA.
