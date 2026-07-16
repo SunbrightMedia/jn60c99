@@ -33,14 +33,16 @@ import sys, struct, pickle
 
 HERE = '/home/user/jn60c99/tools/verify'
 sys.path.insert(0, HERE)
-PKL  = '/home/user/jn60c99/scratchpad/recall_render_ref.pkl'
+import os
+PKL  = os.environ.get('JUNO_RENDER_REF_PKL',
+                     '/home/user/jn60c99/scratchpad/recall_render_ref.pkl')
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
 import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
 SR   = 48000.0
 NOTE, VEL, N = 60, 105, 16000
 
 # diff set (RANGE/PWM/LFO variation) + delay-active + no-divergence controls.
-DEFAULT_PATCHES = [62, 5, 18, 39, 6, 14, 31, 0, 21, 53, 50, 12, 45, 13, 22]
+DEFAULT_PATCHES = list(range(64))   # A3: every factory patch (complete preset coverage)
 
 
 def parse_patches(argv):
@@ -108,6 +110,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == '--port':
     lib.juno_gui_apply_bank.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
     lib.juno_gui_note_on.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
     lib.juno_gui_render.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+    lib.juno_gui_destroy.argtypes = [ctypes.c_void_p]
     import e2e_emu as E
     bank = E.bank_bytes()
     print("=== recall RENDER A/B: port vs plugin's own recall+render ===")
@@ -121,6 +124,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == '--port':
         buf = (ctypes.c_float * (2 * N))(); lib.juno_gui_render(c, buf, N)
         inter = struct.unpack("<%dI" % (2 * N), bytes(buf))
         L = list(inter[0::2]); R = list(inter[1::2])
+        lib.juno_gui_destroy(c)
         la, ra = ref[idx]
         n, nd, first = cmp_stream(la, ra, L, R)
         tag = 'BIT-EXACT' if nd == 0 else ('FIRST@%d diffs=%d' % (first, nd))

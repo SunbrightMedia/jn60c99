@@ -85,10 +85,11 @@ attribution net; also audit-trails positive "captur*" comment mentions).
 
 ## Known open work (live list = PROVENANCE.tsv)
 
-- **Delay feedback 102560 is a CAPTURED constant proven wrong** (live plugin holds 0
-  for zero-feedback patches; port hardcodes 0.4235) → patch 50 render diverges.
-  Derive the per-patch law from the plugin's own delay recall. Render A/B open:
-  patches 50 (early, feedback) and 6/45 (late effect-tail).
+- **Delay feedback 102560 is a CAPTURED constant proven wrong** (plugin law =
+  byte/255 × 0.9 per patch; port hardcodes 0.4235). A3's full 64-patch render A/B
+  (52/64 bit-exact) shows this ONE law bug accounts for all 5 delay-active fails
+  [6,45,46,50,54]; the other 7 fails [1,9,17,25,33,41,49] are exactly the
+  arp-enabled patches (arp SCHEDULE diff, #96).
 - Host rates other than 44100/48000/96000: UNVERIFIED (fall back to the 96k arm).
 - Arp SCHEDULE execution-diff open; init/prepare constants are RECONSTRUCTED
   (cross-checked against a live state dump — itself a capture — so eventually
