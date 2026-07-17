@@ -108,15 +108,40 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   fixed 5 real 44100-only reconstruction bugs (102656 spurious rate-case; 4 Rev Ecf
   DPF Fc missing the 44100 arm) the single-rate live dump never exercised.
 - **other host sample rates: PROVEN.** cold-state bit-exact at 88200/192000;
-  recall PROVEN (exhaustive 624 + HPF 10240 exact multiply-first law, any rate);
-  render is rate-agnostic (grep-verified: no state[16] read in voice/master render)
-  and the full non-standard render A/B at 88200 (LIVE GATE 7/7) is BIT-EXACT 57/57.
+  recall PROVEN (exhaustive 624 + HPF 10240 exact multiply-first law — audit
+  re-derived it independently and confirmed bit-exact at 60000 Hz too, 6144
+  comparisons 0 mismatch); render is rate-agnostic (grep-verified: no state[16]
+  read in voice/master render) and LIVE GATE 7/7 runs the full 57-patch render
+  A/B at BOTH 44100 and 88200 — both BIT-EXACT 57/57 (44.1k added post-audit:
+  it closed the one coverage gap, no render gate at the most common host rate).
 - **PROVENANCE.tsv is 17/17 PROVEN** — zero RECONSTRUCTED/CAPTURED/UNVERIFIED. The
   binding finish line (`make verify` green = zero non-PROVEN rows) is met.
 - WASM artifacts REBUILT + verified: `gui/web/build.sh` (now with `-ffp-contract=off`)
   regenerates `gui/web` + `docs` from current source; `wasm_golden.mjs` proves the
   delivered WASM is bit-exact to native (8/8) on the 44.1 kHz golden corpus. emsdk
   lives at `scratchpad/emsdk` (source `emsdk_env.sh` before building).
+
+## Standing audit caveats (Phase-E confirmation audit, 2026-07-17)
+
+- Commit be3f1db's "these only affected 44.1 kHz reverb" OVERSTATES audible impact:
+  recall unconditionally rewrites all 5 fixed prepare cells per patch
+  (juno_apply_reverb writes the 4 DPF Fc with its own independently-derived
+  REV_FC44/REV_FC tables — audit-verified == the plugin's setter; delay_recall
+  writes 102656), so the old bugs were recall-masked for every patch render. Their
+  only reachable surface was the pre-recall power-on state at 44.1k (reverb send 0).
+  The cold-state fix is still required — the plugin's cold state is the ground truth.
+- Of coldstate_ab's 6 excluded FX-recall-default cells, 2 (11022052 routing int,
+  11022344 master counter) are engine plumbing NEVER written by the port at all —
+  earlier phrasing "written by recall when a patch engages the effect" over-claimed
+  for them. All 6 audit-proven inert PER CELL (24 poke-renders, byte-identical
+  output, sentinel intact after 24000 frames; none read in any render source).
+- coldstate_ab.py hardcodes the main-tree libjuno.so + pickle paths — run from a
+  git worktree it silently gates the MAIN tree's library (project-wide convention,
+  but a sharp edge for worktree-based testing).
+- HPF 10240 law precision (audit re-trace): the divisor is cvtdq2ps of an INTEGER
+  rate dword (== f32(H) for every integer host rate; port mirrors the int
+  semantics), and the plugin SKIPS the mul/div at exactly 96000 (port does too via
+  the table arm). T96 fetch lives in helper rva 0x3563BE.., store via 0x3C2763.
 
 ## Standing audit caveats (B1 confirmation audit, 2026-07-16)
 

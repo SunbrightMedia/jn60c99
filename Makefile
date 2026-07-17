@@ -52,10 +52,12 @@ verify: test
 	  python3 tools/verify/coldstate_ab.py --port $$r >/dev/null || FAIL=1; \
 	  python3 tools/verify/coldstate_ab.py --ref  $$r || FAIL=1; \
 	done; \
-	echo "=== LIVE GATE 7/7: render A/B at NON-standard rate 88200 (recall->render chain) ==="; \
-	JUNO_RENDER_SR=88200 JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_88200.pkl sh -c '\
-	  test -f "$$JUNO_RENDER_REF_PKL" || python3 tools/verify/recall_render_ab.py --ref' || FAIL=1; \
-	JUNO_RENDER_SR=88200 JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_88200.pkl python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
+	echo "=== LIVE GATE 7/7: render A/B at 44100 + NON-standard 88200 (recall->render chain) ==="; \
+	for sr in 44100 88200; do \
+	  JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl sh -c '\
+	    test -f "$$JUNO_RENDER_REF_PKL" || python3 tools/verify/recall_render_ab.py --ref' || FAIL=1; \
+	  JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
+	done; \
 	echo "=== LEDGER ==="; \
 	python3 tools/verify/provenance_check.py || FAIL=1; \
 	python3 tools/verify/completeness_scan.py || FAIL=1; \
