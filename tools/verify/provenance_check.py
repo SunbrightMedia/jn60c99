@@ -10,7 +10,12 @@ Rules:
     not the plugin's own recall) -> exit nonzero until replaced
   - "done" = zero rows that are not PROVEN
 
-Exit 0 only when the ledger is well-formed AND no CAPTURED rows remain.
+Exit 0 only when the ledger is well-formed AND every row is PROVEN. This is what
+makes the project's finish-line definition literal: "done" = `make verify` green
+= zero non-PROVEN rows. (An earlier version exited 0 with RECONSTRUCTED/
+UNVERIFIED rows still open, which let `make verify` read green before the finish
+line was reached — an over-claim. CAPTURED remains the hard violation; open rows
+are the remaining work, and both keep the exit nonzero.)
 """
 import sys, os
 
@@ -57,8 +62,12 @@ def main():
         print("\n*** STRUCTURAL ERRORS ***")
         for e in errs:
             print("  " + e)
-    ok = not errs and not captured
-    print("\nCHECK:", "PASS" if ok else ("FAIL (%d captured, %d structural)" % (len(captured), len(errs))))
+    ok = not errs and not notproven
+    if ok:
+        print("\nCHECK: PASS -- all rows PROVEN")
+    else:
+        print("\nCHECK: FAIL (%d captured, %d other open, %d structural)"
+              % (len(captured), len(notproven) - len(captured), len(errs)))
     return 0 if ok else 1
 
 
