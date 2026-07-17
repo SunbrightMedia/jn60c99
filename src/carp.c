@@ -408,7 +408,7 @@ void carp_init(carp *e)
     /* Free-running tick grid: phase/counter run on the transport, the first step
      * is scheduled at tick_counter+1 on empty->held (never at pos 0). */
     e->tick_acc = 0; e->tick_period = 1; e->tick_counter = 0; e->next_step_tick = 0;
-    e->running = 0;
+    e->running = 0; e->beat_requant_armed = 0;
     /* Load the power-on SCATTER pattern (slab0/sub7): 1 slot, 1 step, velocity 127.
      * This is the proven default and collapses the step loop to the original
      * single-note-per-step behaviour. Sets the pattern/grid/slot state and vel_sens
@@ -437,6 +437,11 @@ void carp_set_range(carp *e, int step)
     if (step > 5) step = 5;
     e->range = MAP[step];
 }
+
+/* Arm the one-shot beat-quantize re-latch (called when the arp is ENABLED, i.e.
+ * the plugin controller SW method sets router+6). The next beat boundary consumes
+ * it; see the re-latch block in carp_tick. */
+void carp_arm_beat_requant(carp *e)              { e->beat_requant_armed = 1; }
 
 void carp_set_bpm(carp *e, double bpm)           { if (bpm > 0.0) e->bpm = bpm; }
 void carp_set_division(carp *e, int rate_sw)     { e->division = rate_sw; rebuild_gates(e); }
@@ -521,6 +526,45 @@ int carp_tick(carp *e, double sample_rate, carp_event *ev, int cap)
     if (e->tick_acc >= e->tick_period) {
         e->tick_acc -= e->tick_period;
         e->tick_counter++;
+
+        /* --- beat-quantize re-latch (plugin sub_7FF91E023C50) --------------
+         * The plugin arms a "changed" flag (router+6) when the arp is ENABLED,
+         * and its per-tick re-latch consumes it exactly ONCE at the first beat
+         * boundary (tick_counter % beat_div == 0, beat_div = 24/(2-(router+5!=0))
+         * = 12 or 24). Consuming it re-feeds the held notes, which re-quantizes
+         * the step grid to that beat: it forces a step to fire ON this tick
+         * (next_step_tick = tick_counter) and restarts the pattern step
+         * (pat_step = -1) WITHOUT resetting the selector index (the re-fed latch
+         * re-selects the current position, so the on-beat step re-fires the
+         * current note). One-time per enable; the flag is consumed even if no
+         * note is held (then it has no audible effect). Proven bit-exact vs the
+         * plugin's own arp under emulation (tools/verify/arp_sched_ab.py):
+         * factory arp presets step 1,7,12,18,24... not the free-run 1,7,13,19.
+         * NOT re-armed by later held-note changes (only by a fresh arp enable). */
+        if (e->beat_requant_armed) {
+            int beat_div = (e->division != 0) ? 24 : 12;
+            if (e->tick_counter % beat_div == 0) {
+                e->beat_requant_armed = 0;
+                if (e->running && e->count > 0) {
+                    /* Re-quantize the step clock to the beat: force a step to fire ON
+                     * this tick with the CURRENT selector state (a normal advancing
+                     * step, just one tick early). Proven vs the plugin: at the beat
+                     * the selector state == the post-previous-step state, so the
+                     * on-beat step advances it normally (UP&DOWN -> next octave note;
+                     * UP with one held note -> re-fires the current note because its
+                     * selector always wraps). Only the pattern step restarts. */
+                    e->next_step_tick = e->tick_counter;   /* fire a step ON the beat */
+                    e->pat_step = -1;                      /* restart the pattern step */
+                    /* The beat re-latch also restarts the OCTAVE cycle: oct_shift -> 0
+                     * (proven vs plugin: patch 1/49 UP arp, t12 entry oct==0 though the
+                     * post-t7 value was 1). Harmless for the UP&DOWN / DOWN-octave
+                     * selectors, which recompute oct_shift = sel/count each call; only
+                     * the UP selector (which carries oct_shift across steps) is affected.
+                     * sel_step is NOT reset — the selector index continues. */
+                    e->oct_shift = 0; e->oct_adv_flag = 0;
+                }
+            }
+        }
 
         /* (1) scheduled note-offs first (plugin fires offs before step trigger),
          * one per slot whose offTick == curTick. Plugin arp offs carry MIDI

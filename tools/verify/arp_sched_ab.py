@@ -23,15 +23,18 @@ Comparison is OFFSET-CONVENTION-FREE where it matters: we compare the ordered
 (kind, note, vel) event sequence AND the inter-event tick gaps, plus the absolute
 first-onset tick. A mismatch in any is a real schedule divergence.
 
-STATUS (2026-07-17): currently RED 0/7 — this gate EXPOSED a real carp.c omission.
-Executed finding (b2_slip.py / b2_scenarios.py, full instance under Unicorn):
-the plugin's per-beat re-latch sub_7FF91E023C50 (0x3C3C50) fires ONCE at the first
-12-tick beat boundary after note-on (gate: router+6 changed-flag && rtrTick % 12 == 0),
-re-feeds the held notes through the arp latch (0x3C3440), and RESTARTS the step
-sequence (patStep -> -1, next step fires ON the beat: plugin steps 1,7,12,18,24...
-vs port 1,7,13,19,25...). One-time: NOT re-triggered by later held-note changes
-(S2 probe); empty->held re-engage restarts as carp.c already models (S3 probe).
-The port must add the one-time beat-quantize restart; then this gate goes green.
+STATUS (2026-07-17): GREEN 7/7. This gate EXPOSED and drove the fix for a real
+carp.c omission: the plugin's per-beat re-latch sub_7FF91E023C50 (0x3C3C50) arms a
+one-shot at arp ENABLE (router+6) and consumes it at the first 24-PPQN beat boundary
+(rtrTick % 12 == 0). If a note is held, it re-quantizes the step grid to the beat --
+a normal advancing step fired ON the beat (next_step=tick, pat_step=-1) with the
+octave cycle reset (oct_shift=0), so the UP selector re-fires the current note while
+the UP&DOWN/DOWN selectors (which recompute oct_shift = sel/count) advance. Result:
+plugin steps 1,7,12,18,24... not the free-run 1,7,13,19. Implemented in
+src/carp.c (carp_arm_beat_requant + the beat-requant block in carp_tick) and
+gui/juno_bridge.c (arm on the arp-enable toggle). Proven bit-exact for all 7 factory
+arp patches; the exact restart contract was read out of the plugin's own selector
+state trajectory (scratchpad/b2_selstate.py).
 
 TWO-PROCESS (mandatory): never build E2E + load libjuno in one process.
   python3 arp_sched_ab.py --ref  [patches...]

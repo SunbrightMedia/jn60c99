@@ -638,6 +638,11 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, floa
         synth_note_off(c, -1);
         carp_remove_key(&c->arp, -1);
         c->arp_cur = -1;
+        /* Enabling the arp arms the one-shot beat-quantize re-latch (plugin sets
+         * router+6 at the controller SW method): the first 24-PPQN beat boundary
+         * re-quantizes the step grid to the beat. Matches the plugin's own arp
+         * schedule for the factory arp presets (tools/verify/arp_sched_ab.py). */
+        if (c->arp_on) carp_arm_beat_requant(&c->arp);
     }
 }
 

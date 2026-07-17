@@ -86,6 +86,9 @@ typedef struct {
     long long  tick_counter;    /* +24     : running 24-PPQN tick index         */
     long long  next_step_tick;  /* +3048   : tick at which the next step fires  */
     int        running;         /* +44>=2  : arp has been started (has notes)   */
+    int        beat_requant_armed; /* one-shot: armed at arp enable, consumed at the
+                                 * first 24-PPQN beat boundary by the plugin's re-latch
+                                 * quantizer sub_7FF91E023C50 (router+6 flag). */
 
     /* ---- SCATTER pattern grid (STEP x SLOT) --------------------------------
      * The plugin's arp is not one-note-per-step: it walks a runtime slot table
@@ -121,6 +124,7 @@ void carp_remove_key(carp *e, int note);      /* note < 0 => release all      */
 /* Configuration. */
 void carp_set_mode(carp *e, int type);        /* ARPEGGIO TYPE 0..5           */
 void carp_set_range(carp *e, int step);       /* ARPEGGIO STEP 0..5 -> octaves*/
+void carp_arm_beat_requant(carp *e);          /* arm one-shot beat re-latch on enable */
 void carp_set_bpm(carp *e, double bpm);
 void carp_set_division(carp *e, int rate_sw); /* 0 => 12 PPQN, !=0 => 24 PPQN */
 void carp_set_rate_index(carp *e, int idx);   /* 0..9 fine rate (opt-in)      */
