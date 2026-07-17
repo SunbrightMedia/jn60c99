@@ -42,7 +42,14 @@ SR   = 48000.0
 NOTE, VEL, N = 60, 105, 16000
 
 # diff set (RANGE/PWM/LFO variation) + delay-active + no-divergence controls.
-DEFAULT_PATCHES = list(range(64))   # A3: every factory patch (complete preset coverage)
+# Every factory patch EXCEPT the 7 arp-enabled ones. This oracle's recall does not
+# enable the arp and its render has no transport clock, so it CANNOT arpeggiate --
+# comparing its (sustained) reference against the port's (arpeggiated) render for the
+# arp patches is meaningless. The 7 arp patches [1,9,17,25,33,41,49] are covered by
+# dedicated gates instead: arp_sched_ab.py (schedule, 7/7 vs the plugin's own arp)
+# and arp_render_ab.py (render of that schedule). See docs + ROADMAP_TO_DONE.md.
+_ARP_PATCHES = {1, 9, 17, 25, 33, 41, 49}
+DEFAULT_PATCHES = [p for p in range(64) if p not in _ARP_PATCHES]
 
 
 def parse_patches(argv):
@@ -118,7 +125,10 @@ elif len(sys.argv) > 1 and sys.argv[1] == '--port':
     print("N=%d note %d vel %d SR %g\n" % (N, NOTE, VEL, SR))
     npass = nfail = 0
     fails = []
-    for idx in sorted(ref):
+    # Compare only the scoped patches (non-arp); robust against a stale pickle that
+    # may still contain arp entries. The 7 arp patches are covered by arp_sched_ab +
+    # arp_render_ab (this oracle cannot arpeggiate).
+    for idx in [p for p in sorted(ref) if p not in _ARP_PATCHES]:
         c = lib.juno_gui_create(ctypes.c_float(SR), 0)
         lib.juno_gui_apply_bank(c, bankbytes, len(bankbytes), idx)
         lib.juno_gui_note_on(c, NOTE, VEL)

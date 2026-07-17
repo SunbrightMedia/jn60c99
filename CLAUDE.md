@@ -85,11 +85,19 @@ attribution net; also audit-trails positive "captur*" comment mentions).
 
 ## Known open work (live list = PROVENANCE.tsv)
 
-- **Render A/B: 57/64** (B1 fixed the delay-feedback capture with the executed
-  per-patch law — 102560 = f32(byte/255)×0.9, 102512 = byte/255, proven 768/768 via
-  tools/verify/delay_fb_sweep.py; zero CAPTURED rows remain). The 7 opens
-  [1,9,17,25,33,41,49] are exactly the arp-enabled patches — the arp SCHEDULE
-  execution-diff (#96) is the sole remaining render blocker.
+- **Render A/B: 57/57 non-arp (green) + arp split into dedicated gates.** The 7 arp
+  patches [1,9,17,25,33,41,49] moved out of recall_render_ab (its oracle can't
+  arpeggiate — no transport clock) into two gates now in `make verify`:
+  - **arp SCHEDULE: PROVEN 7/7** — `arp_sched_ab.py` drives the plugin's OWN arp under
+    emulation (recall + controller-method enable + transport ticks, assigner hooked)
+    and diffs vs carp.c. Closed the #96 execution-diff: found + fixed a real carp.c
+    omission (the plugin's per-beat re-latch re-quantizes the step grid to the beat
+    once per enable; commit 527398e).
+  - **arp RENDER: 4/7** — `arp_render_ab.py` replays the (proven) schedule into the
+    plugin's render. Patches [1,33,41] diverge from the first arp note-change (sample
+    7000). NOT voice allocation (both assign the same voice units) — a small, growing
+    DSP-state seed difference on the newly-gated voice (~cross-voice CV / a smoother).
+    Open sub-task: execution-diff the newly-gated arp voice's start state vs plugin.
 - Host rates other than 44100/48000/96000: UNVERIFIED (fall back to the 96k arm).
 - Arp SCHEDULE execution-diff open; init/prepare constants are RECONSTRUCTED
   (cross-checked against a live state dump — itself a capture — so eventually

@@ -39,8 +39,14 @@ verify: test
 	python3 tools/verify/recall_gate.py || FAIL=1; \
 	echo "=== LIVE GATE 2/3: exhaustive recall (every byte 0..255 x 3 rates) ==="; \
 	python3 tools/verify/recall_exhaustive_gate.py || FAIL=1; \
-	echo "=== LIVE GATE 3/3: render A/B (port render vs plugin's own render) ==="; \
+	echo "=== LIVE GATE 3/5: render A/B (port render vs plugin's own render, 57 non-arp) ==="; \
 	python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
+	echo "=== LIVE GATE 4/5: arp SCHEDULE (plugin's own arp vs carp.c, 7 arp patches) ==="; \
+	test -f $(SCRATCH)/arp_sched_ref.pkl || python3 tools/verify/arp_sched_ab.py --ref || FAIL=1; \
+	python3 tools/verify/arp_sched_ab.py --port || FAIL=1; \
+	echo "=== LIVE GATE 5/5: arp RENDER (schedule replay into plugin, 7 arp patches) ==="; \
+	python3 tools/verify/arp_render_ab.py --port || FAIL=1; \
+	python3 tools/verify/arp_render_ab.py --ref || FAIL=1; \
 	echo "=== LEDGER ==="; \
 	python3 tools/verify/provenance_check.py || FAIL=1; \
 	python3 tools/verify/completeness_scan.py || FAIL=1; \
