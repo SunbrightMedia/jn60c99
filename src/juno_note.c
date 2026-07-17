@@ -188,9 +188,34 @@ void juno_note_on(unsigned char *st, int voice, int midi_note, int velocity)
      * output is scaled by 0 -> silent. See scratchpad/oracle/velocity_coeff_findings.md. */
     JF(st, base + 6864) = juno_curve(56, velocity);   /* VCF velocity (param 73) */
     JF(st, base + 9680) = juno_curve(57, velocity);   /* VCA velocity (param 98) */
-    /* The same gate-notify sets these two to 1.0 (velocity-independent). */
+    /* The same gate-notify sets these two to 1.0 (velocity-independent). 1856 is
+     * ALSO maintained globally across all voices — see juno_note_broadcast_held. */
     JF(st, base + 1856) = 1.0f;
     JF(st, base + 9824) = 1.0f;
+}
+
+/* Global "any key held" flag — cell 1856 on EVERY voice, not just the allocated
+ * one. Measured from the plugin's own note event handling under Unicorn
+ * (scratchpad/b2_bcast2.py / b2_bcast3.py, zero render between snapshots):
+ *   - note-on writes 1856 = 1.0 to ALL 8 voices (the allocated voice additionally
+ *     gets pitch/gate/velocity);
+ *   - note-off writes 1856 = 0.0 to ALL 8 voices ONLY when no key remains held
+ *     (releasing one note of a chord leaves it at 1.0 everywhere);
+ * i.e. 1856 = (held-note count > 0), broadcast on every transition. voice_render
+ * reads it every sample (voice_render.c:794, summed into a modulation CV, previous
+ * value shadowed at 1840) and never clears it, so a missed broadcast permanently
+ * diverges a free-running voice's state. The port originally set it only on the
+ * allocated voice: invisible for non-arp play (a never-gated voice is enveloped
+ * to silence) but the arp gating a previously-idle voice inherited the divergent
+ * seed — the proven root cause of the arp render A/B failures on patches 1/33/41
+ * (tools/verify/arp_render_ab.py). Caller = the assigner-level note paths in
+ * gui/juno_bridge.c, which own the held-note mask this flag reflects. */
+void juno_note_broadcast_held(unsigned char *st, int any_held)
+{
+    int v;
+    float f = any_held ? 1.0f : 0.0f;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        JF(st, VBASE(v) + 1856) = f;
 }
 
 void juno_note_off(unsigned char *st, int voice)

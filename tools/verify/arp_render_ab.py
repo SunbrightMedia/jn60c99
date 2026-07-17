@@ -18,34 +18,25 @@ TWO-PROCESS (mandatory):
   python3 arp_render_ab.py --port   # port render + arp schedule -> pickle
   python3 arp_render_ab.py --ref    # replay schedule into plugin, compare
 
-STATUS (2026-07-17): 4/7 BIT-EXACT. This gate EXPOSED a real render divergence
-that arp_audio_ab (chords @ BPM128) missed: patches [1, 33, 41] diverge starting
-at the FIRST arp note-change (sample 7000 = tick 7), even though their SCHEDULE is
-proven bit-exact (arp_sched_ab 7/7).
-ROOT CAUSE: PROVEN (executed, scratchpad/b2_statediff.py + b2_pregate.py). The port
-does NOT replicate the plugin's CROSS-VOICE note-on broadcast. The plugin's note-on
-reaches ALL voice units; when a note is played, it seeds even the NON-allocated
-voices. The port's voice_trigger touches ONLY the allocated voice (juno_note_on on
-the picked voice; no cross-voice update). Decisive isolation, port vs plugin voice
-state (correct layout: plugin voice v renders at state[v]+v*10512, NOT state[v]+0):
-  - sample 998, BEFORE the tick-1 note-60 broadcast: voice6 = 0 diff, voice7 = 0 diff.
-  - sample 6998, AFTER the broadcast, BEFORE voice6 gates: voice6 = 68 cells DIFFER,
-    voice7 (the ALLOCATED note-60 voice) = 0 diff (perfect).
-So playing note 60 (allocated to voice 7) diverges the NON-allocated voice 6's
-free-run state; when the arp gates voice 6 at tick 7, it inherits that divergent
-seed -> the render diverges from the first note-change (small growing delta,
-1.6e-5 -> 5.5e-4). Invisible for non-arp (an ungated voice is enveloped to silence,
-so its divergent free-run never reaches the mix) -> only the arp, which gates a
-previously-idle voice, exposes it. Patch-specific [1,33,41] because the seeded
-state only reaches the output for certain patches' modulation routing (that
-selectivity is the one piece still to pin). FIX = replicate the plugin's per-unit
-note-on effect on non-allocated voices (find what noteOn writes to a non-picked
-voice; the +1856 any-note flag is one such cell). Verify no regression to the
-57/57 non-arp render + voice-alloc tests.
-Both harnesses (interleave scratchpad/b2_render_ref.py + this replay) give the
-identical 3 failures at the identical sample -> real, not a harness artifact.
-The SCHEDULE (#96 deliverable) is proven; this render-state divergence is the
-remaining arp sub-task.
+STATUS (2026-07-17): 7/7 BIT-EXACT.
+HISTORY: this gate initially failed 3/7 ([1,33,41] diverging from the first arp
+note-change at sample 7000) even with the SCHEDULE proven (arp_sched_ab 7/7).
+ROOT CAUSE (PROVEN, executed — scratchpad/b2_statediff.py + b2_pregate.py +
+b2_bcast2.py): the port did not replicate the plugin's CROSS-VOICE note-on
+broadcast. Measured with zero intervening render (correct layout: plugin voice v
+renders at state[v]+v*10512): the plugin's note event writes the global "any key
+held" flag (cell +1856) to ALL 8 voices — 1.0 on note-on, 0.0 on the note-off
+that releases the last held key (chord-release keeps it 1.0) — while the
+allocated voice additionally gets pitch/gate/velocity. voice_render reads 1856
+every sample (line 794, summed into a modulation CV) and never clears it, so the
+missed broadcast permanently diverged a free-running voice's state (voice6: 68
+cells by sample 6998, allocated voice7: 0 diff); when the arp gated that idle
+voice it inherited the divergent seed. Invisible for non-arp play (a never-gated
+voice is enveloped to silence); patch-selective because the seeded CV only
+reaches the output where the patch's modulation routing lets it. FIX =
+juno_note_broadcast_held() (src/juno_note.c) called from the assigner-level
+note paths (gui/juno_bridge.c synth_note_on/synth_note_off + bank-apply flush).
+After the fix: 7/7 here, 57/57 non-arp unchanged.
 """
 import sys, os, struct, pickle
 sys.path.insert(0, '/home/user/jn60c99/tools/verify')

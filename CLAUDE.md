@@ -85,32 +85,27 @@ attribution net; also audit-trails positive "captur*" comment mentions).
 
 ## Known open work (live list = PROVENANCE.tsv)
 
-- **Render A/B: 57/57 non-arp (green) + arp split into dedicated gates.** The 7 arp
-  patches [1,9,17,25,33,41,49] moved out of recall_render_ab (its oracle can't
-  arpeggiate — no transport clock) into two gates now in `make verify`:
+- **Render A/B: ALL 64 factory patches BIT-EXACT.** 57 non-arp (recall_render_ab)
+  + 7 arp via two dedicated gates in `make verify` (recall_render_ab's oracle can't
+  arpeggiate — no transport clock):
   - **arp SCHEDULE: PROVEN 7/7** — `arp_sched_ab.py` drives the plugin's OWN arp under
     emulation (recall + controller-method enable + transport ticks, assigner hooked)
-    and diffs vs carp.c. Closed the #96 execution-diff: found + fixed a real carp.c
-    omission (the plugin's per-beat re-latch re-quantizes the step grid to the beat
-    once per enable; commit 527398e).
-  - **arp RENDER: 4/7** — `arp_render_ab.py` replays the (proven) schedule into the
-    plugin's render. Patches [1,33,41] diverge from the first arp note-change (sample
-    7000). Root cause PROVEN (b2_statediff.py, correct layout = plugin voice v at
-    state[v]+v*10512): the port does NOT replicate the plugin's CROSS-VOICE note-on
-    broadcast. Playing note 60 (allocated to voice 7) seeds even the NON-allocated
-    ALL non-allocated voices in the plugin (skeptical all-8 sweep: at sample 6998
-    voices 1-6 each = 68-cell diff, allocated voice 7 = 0-diff; the layout map is
-    proven — naive state[v]+0 gives ~220-diff). The port's voice_trigger touches only
-    the picked voice. When the arp gates a previously-idle voice, it inherits the
-    divergent seed. Invisible for non-arp (ungated voice enveloped to silence).
-    (Voice 0's 31 pre-note diffs are benign C++ object-header cells <176, only in
-    voice 0's window.) FIX: replicate the plugin's per-unit note-on effect on
-    non-allocated voices; verify no regression to 57/57 non-arp + voice-alloc.
-    Remaining: why only [1,33,41] audibly diverge (modulation routing).
-- Host rates other than 44100/48000/96000: UNVERIFIED (fall back to the 96k arm).
-- Arp SCHEDULE execution-diff open; init/prepare constants are RECONSTRUCTED
-  (cross-checked against a live state dump — itself a capture — so eventually
-  re-prove via emulation).
+    and diffs vs carp.c. Closed #96: the plugin's per-beat re-latch re-quantizes the
+    step grid to the beat once per enable (commit 527398e).
+  - **arp RENDER: PROVEN 7/7** — `arp_render_ab.py` replays the proven schedule into
+    the plugin's render. The former [1,33,41] divergence's root cause (PROVEN,
+    b2_statediff/b2_bcast2: the plugin's note events broadcast the "any key held"
+    flag — cell 1856, = held-count>0 — to ALL 8 voices; the port set it only on the
+    allocated voice, so an idle voice's free-run state diverged and the arp gating it
+    inherited the seed) is FIXED by `juno_note_broadcast_held()` called from the
+    assigner-level note paths (synth_note_on/off + bank-apply flush). Layout note:
+    plugin voice v renders at state[v]+v*10512, NOT state[v]+0.
+- Remaining non-PROVEN ledger rows (the Phase-E finish line):
+  - init/prepare constants: RECONSTRUCTED (cross-checked against a live state dump —
+    itself a capture — so re-prove via emulation).
+  - Host rates other than 44100/48000/96000: UNVERIFIED (fall back to the 96k arm).
+- WASM artifacts are STALE (predate the carp beat-requant + 1856 broadcast fixes);
+  rebuild needs emsdk (not in this container), then `wasm_golden.mjs` (#108).
 
 ## Standing audit caveats (B1 confirmation audit, 2026-07-16)
 

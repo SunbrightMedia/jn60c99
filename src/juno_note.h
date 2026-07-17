@@ -42,6 +42,10 @@ void juno_note_glide(unsigned char *st, int voice, int midi_note);
  * overlaps with a changed velocity. Verified vs CAssignJu60 under emulation. */
 void juno_note_velocity(unsigned char *st, int voice, int velocity);
 
+/* Broadcast the global "any key held" flag (cell 1856) to ALL voices; the plugin
+ * maintains it on every assigner-level note-on/note-off transition. */
+void juno_note_broadcast_held(unsigned char *st, int any_held);
+
 /* No-op: the gate is now an immediate write with no host-side ramp to advance.
  * Retained for API/source compatibility (callers tick it once per sample). */
 void juno_note_tick(unsigned char *st);
