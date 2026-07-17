@@ -100,10 +100,18 @@ attribution net; also audit-trails positive "captur*" comment mentions).
     inherited the seed) is FIXED by `juno_note_broadcast_held()` called from the
     assigner-level note paths (synth_note_on/off + bank-apply flush). Layout note:
     plugin voice v renders at state[v]+v*10512, NOT state[v]+0.
-- Remaining non-PROVEN ledger rows (the Phase-E finish line):
-  - init/prepare constants: RECONSTRUCTED (cross-checked against a live state dump —
-    itself a capture — so re-prove via emulation).
-  - Host rates other than 44100/48000/96000: UNVERIFIED (fall back to the 96k arm).
+- **init/prepare constants: PROVEN** (`coldstate_ab.py`, LIVE GATE 6/7). The port's
+  power-on state (init + prepare + chorus_init) is bit-identical to the plugin's own
+  constructor + setSampleRate under Unicorn at 44100/48000/88200/96000/192000 — only
+  the benign C++ header (<176, audio-inert) + 6 FX-recall-default cells (self-proved
+  inert) differ. Retired the live-state-dump cross-check (the last capture). Caught +
+  fixed 5 real 44100-only reconstruction bugs (102656 spurious rate-case; 4 Rev Ecf
+  DPF Fc missing the 44100 arm) the single-rate live dump never exercised.
+- Remaining Phase-E finish line:
+  - Host rates other than 44100/48000/96000: cold-state PROVEN at 88200/192000;
+    recall PROVEN (exhaustive 624 + HPF 10240 exact multiply-first law, any rate);
+    render is rate-agnostic (no state[16] read) and the non-standard render A/B at
+    88200 (LIVE GATE 7/7) is the end-to-end proof — flip UNVERIFIED->PROVEN on green.
 - WASM artifacts are STALE (predate the carp beat-requant + 1856 broadcast fixes);
   rebuild needs emsdk (not in this container), then `wasm_golden.mjs` (#108).
 
