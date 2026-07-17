@@ -21,15 +21,22 @@ TWO-PROCESS (mandatory):
 STATUS (2026-07-17): 4/7 BIT-EXACT. This gate EXPOSED a real render divergence
 that arp_audio_ab (chords @ BPM128) missed: patches [1, 33, 41] diverge starting
 at the FIRST arp note-change (sample 7000 = tick 7), even though their SCHEDULE is
-proven bit-exact (arp_sched_ab 7/7). Patches 1 and 49 have byte-identical arp
-schedules yet only 1 diverges -> it is patch-specific (voice DSP), i.e. a VOICE-
-ALLOCATION difference: on an arp step the current note is off'd and the next on'd
-on the SAME tick, and the port vs the plugin assign that on to different voices, so
-the voice's prior DSP state carries differently. Root-cause + fix tracked as the
-arp voice-allocation sub-task (the SCHEDULE, the #96 deliverable, is already proven).
-Both the interleave-render harness (scratchpad/b2_render_ref.py) and this replay
-harness give the identical 3 failures at the identical sample -> not a harness
-artifact.
+proven bit-exact (arp_sched_ab 7/7).
+ROOT CAUSE (characterized, scratchpad/b2_voice.py + b2_mag.py): it is NOT voice
+allocation -- both the port and the plugin assign the arp notes to the SAME voice
+units (60->unit7, 72->unit6; the port's LRU scan 7->0 matches the plugin). The
+divergence is a SMALL, PROGRESSIVELY-GROWING DSP-state difference on the newly-gated
+voice (1.6e-5 at sample 7000 growing to 5.5e-4 by 7011) -- the signature of a
+slightly different starting parameter (pitch/CV or a smoother), NOT a wrong voice
+(total mismatch) and NOT a sample-phase offset (fixed delta). Most likely cause:
+cross-voice pitch/CV tracking on the note broadcast (an arp note-on touches all 8
+voice units by 13 cells; a not-yet-gated voice that later gates starts from a CV the
+port seeds differently). Patch-specific because only some patches' params make the
+tiny difference diverge (patch 1 vs 49: identical schedule, only 1 diverges).
+Both harnesses (interleave scratchpad/b2_render_ref.py + this replay) give the
+identical 3 failures at the identical sample -> real, not a harness artifact.
+The SCHEDULE (#96 deliverable) is proven; this render-state divergence is the
+remaining arp sub-task.
 """
 import sys, os, struct, pickle
 sys.path.insert(0, '/home/user/jn60c99/tools/verify')
