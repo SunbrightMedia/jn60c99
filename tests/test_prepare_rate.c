@@ -39,7 +39,14 @@ static const expect E[] = {
     { 96336, 0x3b8c0000, 0x3b98bc15, 0x3c1abc15, "B affine" },
     {102352, 0x3f0a7867, 0x3f16b800, 0x3f96bc00, "B affine (out dly time)" },
     {102448, 0x3f800000, 0x00000000, 0x00000000, "D 2-class (High-Cut Sw)" },
-    {102656, 0x3f800000, 0x3f4ba5b0, 0x3f4ba5b0, "D 2-class (HF-damp Fc)" },
+    /* HF-damp Fc: SMOOTHED, not rate-dependent. setSampleRate's pre-snap START is
+     * 1.0 at 44100 (0x3f4ba5b0 at 48/96k), but setActive's snap SETTLES it to
+     * 0x3f4ba5b0 at EVERY rate — measured pre/post-snap under Unicorn
+     * (scratchpad/probe_102656). The engine runs with the settled value, so
+     * juno_engine_prepare writes it directly and this test asserts it (matching the
+     * settled-target rule in the header). The former v44=0x3f800000 asserted the
+     * pre-snap start — the same reconstruction the cold-state A/B disproved. */
+    {102656, 0x3f4ba5b0, 0x3f4ba5b0, 0x3f4ba5b0, "D->smoothed settled (HF-damp Fc)" },
     /* reverb tap generator: tap[1] (predelay) and a shifted stage tap */
     { 11022212, 881, 959, 1919, "E reverb tap[1] predelay" },
     { 11022340, 22358, 46551, 47511, "E reverb tap[33]" },
