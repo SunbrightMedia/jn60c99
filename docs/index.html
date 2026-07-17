@@ -170,7 +170,12 @@ async function boot() {
     audioCtx = new (window.AudioContext||window.webkitAudioContext)();
     if (audioCtx.sampleRate > 0) SR = audioCtx.sampleRate | 0;
   } catch (e) { console.warn("JUNO: AudioContext unavailable at boot; defaulting engine to", SR, "Hz", e); }
-  ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 2);  // engine at host rate, chorus mode II
+  ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 0);  // engine at host rate.
+  // chorus_mode MUST be 0: any nonzero mode writes a LEGACY hand-rolled chorus
+  // block (state 90624..90832) that the real plugin NEVER populates (proven by
+  // executing the plugin cold/warm/recalled/rendered — the block stays zero).
+  // Every proven gate runs mode 0; the webapp passing 2 was the one caller of an
+  // unproven path, smearing a non-plugin chorus over every chorus-engaged patch.
   if (!ctx) { status("engine alloc failed"); return; }
   // Warm the engine to its steady idle state, exactly as a DAW does by rendering
   // silence from the moment the plugin is activated. ~190 smoothed control cells
@@ -438,7 +443,7 @@ function mkKey(midi, cls, left) {
 function note(midi, on) {
   ensureAudio();
   if (on) noteOnFn(ctx, midi, 100); else noteOffFn(ctx, midi);
-  if (on) status(`note ${midi} — live 8-voice master path + stereo BBD chorus (mode II)`);
+  if (on) status(`note ${midi} — live 8-voice master path (patch-recalled FX)`);
 }
 
 boot().catch(e => { status("ERROR: "+e); $("#warn").textContent = e; console.error(e); });
