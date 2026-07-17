@@ -19,6 +19,23 @@ in `PROVENANCE.tsv` (the status authority; it supersedes GOAL.md's pointer to
 
 ## Hard rules (violating any of these corrupts the project)
 
+- **THE DIAGNOSTIC-CAPTURE COVENANT (user-granted 2026-07-17, THE MOST IMPORTANT
+  RULE).** The user provided DAW bounces of the real plugin (Ableton Live 12.0,
+  120 BPM, 44100 Hz, first 8 presets of bank 1, one note vel 100, 0.5 s silence +
+  2 s note + 1.5 s tail; session copies in `scratchpad/diag_bounces/presetN.wav`).
+  These are **DIAGNOSTIC USE ONLY** — the only captures this project will ever
+  receive, granted under that explicit condition:
+  - NEVER derive, copy, fit, or tune ANY coefficient, table, or constant from them.
+  - NEVER use them as a gate reference or as ledger provenance. PROVEN continues to
+    mean "the plugin's machine code executed under Unicorn" — nothing else.
+  - Their ONLY permitted roles: (1) locating WHERE the harness's driving of the
+    plugin diverges from a real host's, and (2) the completion test for that
+    harness investigation. Every fact they point to must then be re-derived by
+    executing the binary (e.g., controller defaults read from the controller's own
+    init code) before it may enter the port or the ledger.
+  - Never commit them to git. If they leak into a coefficient's history, that
+    coefficient is CAPTURED and must be replaced.
+
 - **Ground truth = the plugin binary executed under Unicorn.** Running its machine
   code is allowed and is NOT a capture. Reading the plugin's own `Script.xml`
   (in `truth/`) is allowed plugin data.
