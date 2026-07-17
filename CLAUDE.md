@@ -98,12 +98,15 @@ attribution net; also audit-trails positive "captur*" comment mentions).
     7000). Root cause PROVEN (b2_statediff.py, correct layout = plugin voice v at
     state[v]+v*10512): the port does NOT replicate the plugin's CROSS-VOICE note-on
     broadcast. Playing note 60 (allocated to voice 7) seeds even the NON-allocated
-    voice 6 in the plugin (voice6 0-diff before the broadcast → 68-cell diff after,
-    while voice7 stays 0-diff); the port's voice_trigger touches only the picked
-    voice. When the arp gates the previously-idle voice, it inherits the divergent
-    seed. Invisible for non-arp (ungated voice enveloped to silence). FIX: replicate
-    the plugin's per-unit note-on effect on non-allocated voices; verify no regression
-    to 57/57 non-arp + voice-alloc. Remaining: why only [1,33,41] (modulation routing).
+    ALL non-allocated voices in the plugin (skeptical all-8 sweep: at sample 6998
+    voices 1-6 each = 68-cell diff, allocated voice 7 = 0-diff; the layout map is
+    proven — naive state[v]+0 gives ~220-diff). The port's voice_trigger touches only
+    the picked voice. When the arp gates a previously-idle voice, it inherits the
+    divergent seed. Invisible for non-arp (ungated voice enveloped to silence).
+    (Voice 0's 31 pre-note diffs are benign C++ object-header cells <176, only in
+    voice 0's window.) FIX: replicate the plugin's per-unit note-on effect on
+    non-allocated voices; verify no regression to 57/57 non-arp + voice-alloc.
+    Remaining: why only [1,33,41] audibly diverge (modulation routing).
 - Host rates other than 44100/48000/96000: UNVERIFIED (fall back to the 96k arm).
 - Arp SCHEDULE execution-diff open; init/prepare constants are RECONSTRUCTED
   (cross-checked against a live state dump — itself a capture — so eventually
