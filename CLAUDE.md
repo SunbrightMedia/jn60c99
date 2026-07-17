@@ -107,13 +107,16 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   inert) differ. Retired the live-state-dump cross-check (the last capture). Caught +
   fixed 5 real 44100-only reconstruction bugs (102656 spurious rate-case; 4 Rev Ecf
   DPF Fc missing the 44100 arm) the single-rate live dump never exercised.
-- Remaining Phase-E finish line:
-  - Host rates other than 44100/48000/96000: cold-state PROVEN at 88200/192000;
-    recall PROVEN (exhaustive 624 + HPF 10240 exact multiply-first law, any rate);
-    render is rate-agnostic (no state[16] read) and the non-standard render A/B at
-    88200 (LIVE GATE 7/7) is the end-to-end proof — flip UNVERIFIED->PROVEN on green.
-- WASM artifacts are STALE (predate the carp beat-requant + 1856 broadcast fixes);
-  rebuild needs emsdk (not in this container), then `wasm_golden.mjs` (#108).
+- **other host sample rates: PROVEN.** cold-state bit-exact at 88200/192000;
+  recall PROVEN (exhaustive 624 + HPF 10240 exact multiply-first law, any rate);
+  render is rate-agnostic (grep-verified: no state[16] read in voice/master render)
+  and the full non-standard render A/B at 88200 (LIVE GATE 7/7) is BIT-EXACT 57/57.
+- **PROVENANCE.tsv is 17/17 PROVEN** — zero RECONSTRUCTED/CAPTURED/UNVERIFIED. The
+  binding finish line (`make verify` green = zero non-PROVEN rows) is met.
+- WASM artifacts REBUILT + verified: `gui/web/build.sh` (now with `-ffp-contract=off`)
+  regenerates `gui/web` + `docs` from current source; `wasm_golden.mjs` proves the
+  delivered WASM is bit-exact to native (8/8) on the 44.1 kHz golden corpus. emsdk
+  lives at `scratchpad/emsdk` (source `emsdk_env.sh` before building).
 
 ## Standing audit caveats (B1 confirmation audit, 2026-07-16)
 
@@ -127,8 +130,8 @@ attribution net; also audit-trails positive "captur*" comment mentions).
 - The feedback OFF-gate (102560 → 0 when DELAY LEVEL < 2) rests on captured OFF
   states; render-equivalent either way (wet=0), but re-prove via emulation when
   convenient.
-- `gui/web/build.sh` emcc lacks `-ffp-contract=off` (pre-existing; mitigated by
-  core WASM having no scalar-FMA opcode + the wasm_golden WASM==native gate).
+- `gui/web/build.sh` now passes `-ffp-contract=off` (matches the native build); the
+  wasm_golden WASM==native gate remains the standing safety net (8/8 bit-exact).
 
 ## Git
 
