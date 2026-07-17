@@ -35,9 +35,9 @@ verify: test
 	test -f $(SCRATCH)/recall_render_ref.pkl || python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
 	for r in 44100 48000 96000; do test -f $(SCRATCH)/recall_exhaustive_$$r.pkl || python3 tools/verify/recall_exhaustive_ref.py $$r || FAIL=1; done; \
 	python3 tools/verify/port_state_dump.py >/dev/null 2>&1 || FAIL=1; \
-	echo "=== LIVE GATE 1/3: recall_gate (port vs plugin's own recall, 64 patches) ==="; \
+	echo "=== LIVE GATE 1/5: recall_gate (port vs plugin's own recall, 64 patches) ==="; \
 	python3 tools/verify/recall_gate.py || FAIL=1; \
-	echo "=== LIVE GATE 2/3: exhaustive recall (every byte 0..255 x 3 rates) ==="; \
+	echo "=== LIVE GATE 2/5: exhaustive recall (every byte 0..255 x 3 rates) ==="; \
 	python3 tools/verify/recall_exhaustive_gate.py || FAIL=1; \
 	echo "=== LIVE GATE 3/5: render A/B (port render vs plugin's own render, 57 non-arp) ==="; \
 	python3 tools/verify/recall_render_ab.py --port || FAIL=1; \

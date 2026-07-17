@@ -22,17 +22,22 @@ STATUS (2026-07-17): 4/7 BIT-EXACT. This gate EXPOSED a real render divergence
 that arp_audio_ab (chords @ BPM128) missed: patches [1, 33, 41] diverge starting
 at the FIRST arp note-change (sample 7000 = tick 7), even though their SCHEDULE is
 proven bit-exact (arp_sched_ab 7/7).
-ROOT CAUSE (characterized, scratchpad/b2_voice.py + b2_mag.py): it is NOT voice
-allocation -- both the port and the plugin assign the arp notes to the SAME voice
-units (60->unit7, 72->unit6; the port's LRU scan 7->0 matches the plugin). The
-divergence is a SMALL, PROGRESSIVELY-GROWING DSP-state difference on the newly-gated
-voice (1.6e-5 at sample 7000 growing to 5.5e-4 by 7011) -- the signature of a
-slightly different starting parameter (pitch/CV or a smoother), NOT a wrong voice
-(total mismatch) and NOT a sample-phase offset (fixed delta). Most likely cause:
-cross-voice pitch/CV tracking on the note broadcast (an arp note-on touches all 8
-voice units by 13 cells; a not-yet-gated voice that later gates starts from a CV the
-port seeds differently). Patch-specific because only some patches' params make the
-tiny difference diverge (patch 1 vs 49: identical schedule, only 1 diverges).
+ROOT CAUSE: OPEN. What is PROVEN(executed): the divergence is a SMALL,
+PROGRESSIVELY-GROWING difference starting at the first arp note-change (1.6e-5 at
+sample 7000 growing to 5.5e-4 by 7011) -- NOT a sample-phase offset (delta grows)
+and NOT a grossly wrong note (the schedule is bit-exact, arp_sched_ab 7/7).
+Two live hypotheses, neither proven:
+  (a) same voice chosen, slightly different DSP-state seed on the newly-gated voice
+      (cross-voice CV / smoother). The same-voice claim rests only on WEAK evidence
+      (changed-cell counts 10-vs-9 in b2_voice.py -- INFERRED, not proven).
+  (b) DIFFERENT voice chosen: post-recall voices differ only by per-voice CONDITION
+      scatter, so a different pick would ALSO show as a small growing difference.
+Skeptical audit note: the simplest discriminator (CONDITION byte correlation) is
+dead -- CONDITION = 128 for ALL 7 arp patches, so neither hypothesis explains via
+CONDITION why patch 1 fails and patch 49 passes with byte-identical schedules.
+Resolving needs a real execution-diff of the gated voice's start state, which needs
+the port<->plugin voice-state LAYOUT map (b2_statediff.py showed the naive
+v*10512 <-> state[v] correspondence is wrong: plugin has pointers/headers there).
 Both harnesses (interleave scratchpad/b2_render_ref.py + this replay) give the
 identical 3 failures at the identical sample -> real, not a harness artifact.
 The SCHEDULE (#96 deliverable) is proven; this render-state divergence is the

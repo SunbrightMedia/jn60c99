@@ -95,9 +95,12 @@ attribution net; also audit-trails positive "captur*" comment mentions).
     once per enable; commit 527398e).
   - **arp RENDER: 4/7** — `arp_render_ab.py` replays the (proven) schedule into the
     plugin's render. Patches [1,33,41] diverge from the first arp note-change (sample
-    7000). NOT voice allocation (both assign the same voice units) — a small, growing
-    DSP-state seed difference on the newly-gated voice (~cross-voice CV / a smoother).
-    Open sub-task: execution-diff the newly-gated arp voice's start state vs plugin.
+    7000) with a small, GROWING delta (1.6e-5 → 5.5e-4/11smp). Root cause OPEN: either
+    a DSP-state seed difference on the newly-gated voice OR a different voice pick
+    expressed through per-voice state ("same voice" was only cellcount-INFERRED;
+    CONDITION=128 uniform across all 7 kills the simplest discriminator both ways —
+    patch 1 fails / 49 passes on byte-identical schedules, unexplained). Resolving
+    needs the port↔plugin voice-state LAYOUT map (naive v*10512↔state[v] is wrong).
 - Host rates other than 44100/48000/96000: UNVERIFIED (fall back to the 96k arm).
 - Arp SCHEDULE execution-diff open; init/prepare constants are RECONSTRUCTED
   (cross-checked against a live state dump — itself a capture — so eventually
