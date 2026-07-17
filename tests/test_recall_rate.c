@@ -15,6 +15,7 @@
 #include "../src/juno_engine.h"
 #include "../src/juno_apply.h"
 #include "../src/juno_curve.h"
+#include "../src/hpf_type_lut.h"
 
 #define HDR 23
 #define STRIDE 20223
@@ -74,8 +75,47 @@ int main(void)
         else if (c != cutoff96) { printf("  %dHz VCF CUTOFF changed with rate (%08x != %08x) — should be invariant\n", R[i].rate, c, cutoff96); ++fails; }
     }
 
+    /* NON-STANDARD host rates: cell 10240 (HPF TYPE!=0 boost cutoff) is the one
+     * recall cell that is genuinely rate-CONTINUOUS outside {44100,48000,96000}
+     * (all other recall setters either match the 96k arm — the plugin's own
+     * two-table design — or are single-input cells the exhaustive gate already
+     * proves at any rate; 10240 is a multi-input joint cell the exhaustive gate
+     * DEFERS). The plugin computes it as f32(f32(T96[c]*96000)/f32(H)) — multiply
+     * BEFORE divide — traced from its own machine code and proven bit-exact vs the
+     * plugin's setter at 44100/48000/88200/96000/192000 (scratchpad/hpf_*.py).
+     * This guards the exact arithmetic form: it must equal multiply-first, and
+     * must DIFFER from both prior-wrong forms (frozen-96k, and divide-first
+     * T96*(96000/H)) that this fix replaced. */
+    {
+        extern const unsigned int HPF_T1_10240_96k[256];   /* T96 base == plugin RVA 0x969bd0 */
+        int nsr[2] = { 88200, 192000 };
+        for (int i = 0; i < 2; ++i) {
+            int H = nsr[i];
+            int diff_froz = 0, diff_divf = 0;   /* cutoffs where the law differs from each wrong form */
+            for (int c = 0; c < 256; ++c) {
+                float t96; memcpy(&t96, &HPF_T1_10240_96k[c], 4);
+                unsigned want; { float v = (float)(t96 * 96000.0f) / (float)H; memcpy(&want, &v, 4); }
+                unsigned froz = HPF_T1_10240_96k[c];              /* wrong: frozen to 96k */
+                unsigned divf; { float v = t96 * (96000.0f / (float)H); memcpy(&divf, &v, 4); } /* wrong: divide-first */
+                if (want != froz) ++diff_froz;
+                if (want != divf) ++diff_divf;
+                memset(st, 0, JUNO_STATE_BYTES);
+                JF(st, 16) = (float)H;
+                juno_apply_hpf_type(st, c, 1);                    /* TYPE!=0 boost path */
+                unsigned got = u32(st, 10240);
+                if (got != want) { printf("  %dHz HPF c%d: %08x != law %08x\n", H, c, got, want); ++fails; }
+            }
+            /* the law must be MEANINGFULLY distinct from both prior-wrong forms, else a
+             * revert to frozen-96k or divide-first would pass unnoticed. divide-first
+             * differs from the law only where the two roundings diverge (a handful of
+             * cutoffs), so require >=1; frozen-96k differs at essentially every cutoff. */
+            if (diff_froz < 250) { printf("  %dHz: law barely differs from frozen-96k (%d/256)\n", H, diff_froz); ++fails; }
+            if (diff_divf < 1)   { printf("  %dHz: law identical to divide-first everywhere (weak guard)\n", H); ++fails; }
+        }
+    }
+
     free(st); free(bank);
     if (fails) { printf("FAIL: %d recall-rate check(s) drifted\n", fails); return 1; }
-    printf("OK: SR-variant recall (ENV/LFO/HPF arm-select + porta C/H) bit-exact at 44100/48000/96000\n");
+    printf("OK: SR-variant recall bit-exact at 44100/48000/96000 + HPF 10240 continuous law at 88200/192000\n");
     return 0;
 }

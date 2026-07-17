@@ -202,13 +202,25 @@ static const unsigned int HPF_T1_10240_44k[256] = {
  * the HPF TYPE byte. TYPE 0 leaves the front-panel HPF coefficients in place; any
  * nonzero TYPE selects the boost tables (the plugin treats TYPE!=0 identically).
  *
- * Cell 10240 is the HPF cutoff COEFFICIENT, rate-dependent via its OWN per-rate curve
- * (all 256 entries differ between rates — it is NOT a linear scale of one reference).
- * The plugin computes it directly at the host rate, so we hold a bit-exact table per
- * standard rate (44.1/48/96 kHz) and select by rate; a random-patch A/B showed the old
- * `96k table * (96000/SR)` was 1 ULP off on 3 of 256 cutoffs at 48 kHz. Non-standard
- * rates fall back to that scaling. 10256/10272/10288 are rate-invariant (0/256 diffs
- * across rates). See docs/COLDLOAD_AB.md. */
+ * Cell 10240 is the HPF cutoff COEFFICIENT on TYPE!=0, computed directly at the
+ * host rate. The plugin's EXACT computation (traced instruction-by-instruction
+ * under Unicorn, dispatch idx 871 -> RVA 0x356D3D..0x356D62; scratchpad/
+ * hpf_{trace,formula_check}.py):
+ *     H == 96000 : v = T96[c]                        (the mul/div is skipped)
+ *     else       : v = f32( f32(T96[c] * 96000) / f32(H) )   (mulss then divss)
+ * where T96 = the plugin's 96 kHz base table (image RVA 0x969bd0, == the
+ * HPF_T1_10240_96k table below). PROVEN bit-exact against the plugin's OWN setter
+ * at 44100/48000/88200/96000/192000 AND against the port's proven 44k/48k/96k
+ * tables (0/256 mismatches each) — so the three per-rate tables are just point
+ * evaluations of this one law, and it extends to ANY host rate.
+ *
+ * The multiply happens BEFORE the divide: `T96*96000` rounds to f32 first, then
+ * `/H`. The old fallback `T96 * (96000/H)` divided first and was 1 ULP off at
+ * non-standard (and rounding-unlucky standard) rates — that was the sole
+ * remaining non-bit-exact cell at host rates outside {44100,48000,96000}. We keep
+ * the standard-rate tables for the common path (unchanged, proven) and use the
+ * exact law for every other rate. 10256/10272/10288 are rate-invariant (0/256
+ * diffs across rates). See docs/COLDLOAD_AB.md. */
 void juno_apply_hpf_type(unsigned char *state, int cutoff, int type)
 {
     int Hr;
@@ -222,8 +234,10 @@ void juno_apply_hpf_type(unsigned char *state, int cutoff, int type)
         JF(state, 10240) = f_from_bits(HPF_T1_10240_44k[cutoff]);
     else if (Hr == 96000)
         JF(state, 10240) = f_from_bits(HPF_T1_10240_96k[cutoff]);
-    else                                   /* non-standard rate: scale the 96k reference */
-        JF(state, 10240) = f_from_bits(HPF_T1_10240_96k[cutoff]) * (96000.0f / (float)Hr);
+    else {                                 /* non-standard rate: the plugin's exact law */
+        float t96 = f_from_bits(HPF_T1_10240_96k[cutoff]);
+        JF(state, 10240) = (float)(t96 * 96000.0f) / (float)Hr;  /* mul rounds before divide */
+    }
     JF(state, 10256) = 1.0f;
     JF(state, 10272) = f_from_bits(HPF_T1_10272[cutoff]);
     JF(state, 10288) = f_from_bits(HPF_T1_10288[cutoff]);
