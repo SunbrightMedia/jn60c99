@@ -203,6 +203,20 @@ unsigned int juno_gui_peek(juno_ctx *c, int off)
     return bits;
 }
 
+/* Bulk-copy the raw engine state (verification harness only — the cold-state A/B
+ * gate reads the whole state in one shot instead of millions of peek() calls).
+ * Copies min(nbytes, JUNO_STATE_BYTES) bytes starting at byte offset `off`. */
+int juno_gui_dump(juno_ctx *c, int off, unsigned char *out, int nbytes)
+{
+    unsigned int end;
+    if (!c || !out || off < 0 || nbytes <= 0) return 0;
+    end = (unsigned)off + (unsigned)nbytes;
+    if (end > JUNO_STATE_BYTES) end = JUNO_STATE_BYTES;
+    if ((unsigned)off >= end) return 0;
+    memcpy(out, c->st + off, end - (unsigned)off);
+    return (int)(end - (unsigned)off);
+}
+
 /* Reset to the engine's binary power-on state (the plugin's own default patch):
  * re-run the constructor + the setSampleRate/snap-all prepared baseline. No
  * capture is involved — this is the genuine default the plugin boots into. */

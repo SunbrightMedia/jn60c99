@@ -35,18 +35,27 @@ verify: test
 	test -f $(SCRATCH)/recall_render_ref.pkl || python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
 	for r in 44100 48000 96000; do test -f $(SCRATCH)/recall_exhaustive_$$r.pkl || python3 tools/verify/recall_exhaustive_ref.py $$r || FAIL=1; done; \
 	python3 tools/verify/port_state_dump.py >/dev/null 2>&1 || FAIL=1; \
-	echo "=== LIVE GATE 1/5: recall_gate (port vs plugin's own recall, 64 patches) ==="; \
+	echo "=== LIVE GATE 1/7: recall_gate (port vs plugin's own recall, 64 patches) ==="; \
 	python3 tools/verify/recall_gate.py || FAIL=1; \
-	echo "=== LIVE GATE 2/5: exhaustive recall (every byte 0..255 x 3 rates) ==="; \
+	echo "=== LIVE GATE 2/7: exhaustive recall (every byte 0..255 x 3 rates) ==="; \
 	python3 tools/verify/recall_exhaustive_gate.py || FAIL=1; \
-	echo "=== LIVE GATE 3/5: render A/B (port render vs plugin's own render, 57 non-arp) ==="; \
+	echo "=== LIVE GATE 3/7: render A/B (port render vs plugin's own render, 57 non-arp) ==="; \
 	python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
-	echo "=== LIVE GATE 4/5: arp SCHEDULE (plugin's own arp vs carp.c, 7 arp patches) ==="; \
+	echo "=== LIVE GATE 4/7: arp SCHEDULE (plugin's own arp vs carp.c, 7 arp patches) ==="; \
 	test -f $(SCRATCH)/arp_sched_ref.pkl || python3 tools/verify/arp_sched_ab.py --ref || FAIL=1; \
 	python3 tools/verify/arp_sched_ab.py --port || FAIL=1; \
-	echo "=== LIVE GATE 5/5: arp RENDER (schedule replay into plugin, 7 arp patches) ==="; \
+	echo "=== LIVE GATE 5/7: arp RENDER (schedule replay into plugin, 7 arp patches) ==="; \
 	python3 tools/verify/arp_render_ab.py --port || FAIL=1; \
 	python3 tools/verify/arp_render_ab.py --ref || FAIL=1; \
+	echo "=== LIVE GATE 6/7: cold-state A/B (port init/prepare vs plugin build+setSR, 5 rates) ==="; \
+	for r in 44100 48000 96000 88200 192000; do \
+	  python3 tools/verify/coldstate_ab.py --port $$r >/dev/null || FAIL=1; \
+	  python3 tools/verify/coldstate_ab.py --ref  $$r || FAIL=1; \
+	done; \
+	echo "=== LIVE GATE 7/7: render A/B at NON-standard rate 88200 (recall->render chain) ==="; \
+	JUNO_RENDER_SR=88200 JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_88200.pkl sh -c '\
+	  test -f "$$JUNO_RENDER_REF_PKL" || python3 tools/verify/recall_render_ab.py --ref' || FAIL=1; \
+	JUNO_RENDER_SR=88200 JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_88200.pkl python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
 	echo "=== LEDGER ==="; \
 	python3 tools/verify/provenance_check.py || FAIL=1; \
 	python3 tools/verify/completeness_scan.py || FAIL=1; \

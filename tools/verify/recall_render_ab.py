@@ -38,7 +38,11 @@ PKL  = os.environ.get('JUNO_RENDER_REF_PKL',
                      '/home/user/jn60c99/scratchpad/recall_render_ref.pkl')
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
 import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
-SR   = 48000.0
+# Host rate (default 48 kHz). JUNO_RENDER_SR overrides it so the SAME render A/B can
+# prove the whole recall->render chain at NON-standard rates (88200/192000) — the
+# "other host sample rates" gate. Both processes read the same env, so the port and
+# the plugin oracle build at the same rate.
+SR   = float(os.environ.get('JUNO_RENDER_SR', '48000'))
 NOTE, VEL, N = 60, 105, 16000
 
 # diff set (RANGE/PWM/LFO variation) + delay-active + no-divergence controls.

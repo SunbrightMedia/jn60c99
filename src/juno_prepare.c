@@ -156,7 +156,11 @@ void juno_engine_prepare(unsigned char *st)
     JI(st,    102480) = 0x3fb50bf3;  /*  1.414430     High Cut Qc             */
     /* --- Class D: 2-class rate-selected {44100 / else} --------------------- */
     JI(st,    102448) = (Hr == 44100) ? 0x3f800000 : 0x00000000; /* High-Cut Sw   */
-    JI(st,    102656) = (Hr == 44100) ? 0x3f800000 : 0x3f4ba5b0; /* HF-Damp Fc    */
+    /* HF-Damp Fc: rate-INDEPENDENT (0x3f4ba5b0 at 44100/48000/88200/96000/192000 —
+     * measured from the plugin's own build+setSampleRate cold state, coldstate_ab).
+     * The former (Hr==44100)?1.0 arm was a reconstruction guess never checked at
+     * 44100; the plugin holds 0x3f4ba5b0 there too. */
+    JI(st,    102656) = 0x3f4ba5b0;                              /* HF-Damp Fc    */
     /* reverb-ECF rate — rate-INDEPENDENT (identical across the 4 rates) */
     JI(st,  10759504) = 0x37ae2650;  /*  2.07603e-05  Rev Ecf Rate            */
     JI(st,  10759872) = 0x00000100;  /*  int 256      reverb algo const        */
@@ -202,15 +206,21 @@ void juno_engine_prepare(unsigned char *st)
     JI(st,  10759600) = (Hr == 44100) ? 0x3e1ca4f3 : 0x3d434c95; /* Rev Ecf LPF A1 */
     JI(st,  10759616) = (Hr == 44100) ? 0x3f2180e3 : 0x3fa5addf; /* Rev Ecf LPF B0 */
     JI(st,  10759632) = (Hr == 44100) ? 0xbe789759 : 0xbef85dc7; /* Rev Ecf LPF B1 */
-    JI(st,  10759648) = 0x3e0566f8;  /*  0.130276     Rev Ecf DPF0 Fc         */
+    /* Rev Ecf DPF Fc (all 4 diffusers): RATE-DEPENDENT, 2-class {44100 / else},
+     * like the HPF/LPF cascade above — 48000 == 88200 == 96000 == 192000 share the
+     * else arm; 44100 uses 0x3e90d0c2 (0.2828427). Both arms measured bit-for-bit
+     * from the plugin's own cold state (coldstate_ab). The former single-arm
+     * 0x3e0566f8 was a reconstruction that never checked 44100 — a residual seed of
+     * the 44.1 kHz cold-render drift, in the same family as the HPF/LPF fix above. */
+    JI(st,  10759648) = (Hr == 44100) ? 0x3e90d0c2 : 0x3e0566f8; /* Rev Ecf DPF0 Fc */
     JI(st,  10759664) = 0x3ebd52a3;  /*  0.369771     Rev Ecf DPF0 Hp         */
-    JI(st,  10759696) = 0x3e0566f8;  /*  0.130276     Rev Ecf DPF1 Fc         */
+    JI(st,  10759696) = (Hr == 44100) ? 0x3e90d0c2 : 0x3e0566f8; /* Rev Ecf DPF1 Fc */
     JI(st,  10759712) = 0x3ebd52a3;  /*  0.369771     Rev Ecf DPF1 Hp         */
     JI(st,  10759728) = 0xbf16c2f3;  /* -0.588912     Rev Ecf DPF1 Lp         */
-    JI(st,  10759744) = 0x3e0566f8;  /*  0.130276     Rev Ecf DPF2 Fc         */
+    JI(st,  10759744) = (Hr == 44100) ? 0x3e90d0c2 : 0x3e0566f8; /* Rev Ecf DPF2 Fc */
     JI(st,  10759760) = 0x3e8f487e;  /*  0.27985      Rev Ecf DPF2 Hp         */
     JI(st,  10759776) = 0xbf044337;  /* -0.516651     Rev Ecf DPF2 Lp         */
-    JI(st,  10759792) = 0x3e0566f8;  /*  0.130276     Rev Ecf DPF3 Fc         */
+    JI(st,  10759792) = (Hr == 44100) ? 0x3e90d0c2 : 0x3e0566f8; /* Rev Ecf DPF3 Fc */
     JI(st,  10759808) = 0x3e8f487e;  /*  0.27985      Rev Ecf DPF3 Hp         */
     JI(st,  10759824) = 0xbf044337;  /* -0.516651     Rev Ecf DPF3 Lp         */
 
