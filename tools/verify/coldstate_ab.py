@@ -68,6 +68,27 @@ if sys.argv[1:2] == ['--port']:
     pickle.dump({'rate': rate, 'state': bytes(buf)}, open(PKL, 'wb'))
     print("PORT cold state @%g dumped (%d bytes)" % (rate, n))
 
+    # SELF-CHECK: prove the FX_RECALL_DEFAULT cells this gate excludes are AUDIO-INERT
+    # at the port's unapplied default (they are 0 there; the plugin front-loads them).
+    # Render the default with those cells at 0 vs poked to a distinctive sentinel; if
+    # the output is byte-identical, they cannot reach the audio path regardless of
+    # value, so leaving them 0 at cold state is safe (value- and rate-independent).
+    lib.juno_gui_note_on.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
+    lib.juno_gui_render.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+    lib.juno_gui_poke.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_uint]
+    def dflt_render(poke):
+        cc = lib.juno_gui_create(ctypes.c_float(rate), 0)
+        if poke:
+            for off in FX_RECALL_DEFAULT: lib.juno_gui_poke(cc, off, 0x3f000000)
+        lib.juno_gui_note_on(cc, 60, 105)
+        b = (ctypes.c_float * (2 * 24000))(); lib.juno_gui_render(cc, b, 24000)
+        return bytes(b)
+    inert = dflt_render(False) == dflt_render(True)
+    print("  FX-recall-default cells audio-inert at unapplied default:", inert)
+    if not inert:
+        print("  *** FX_RECALL_DEFAULT exclusion is UNSAFE — a cell reaches the output ***")
+        sys.exit(1)
+
 elif sys.argv[1:2] == ['--ref']:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import e2e_emu as E
