@@ -22,22 +22,26 @@ STATUS (2026-07-17): 4/7 BIT-EXACT. This gate EXPOSED a real render divergence
 that arp_audio_ab (chords @ BPM128) missed: patches [1, 33, 41] diverge starting
 at the FIRST arp note-change (sample 7000 = tick 7), even though their SCHEDULE is
 proven bit-exact (arp_sched_ab 7/7).
-ROOT CAUSE: OPEN. What is PROVEN(executed): the divergence is a SMALL,
-PROGRESSIVELY-GROWING difference starting at the first arp note-change (1.6e-5 at
-sample 7000 growing to 5.5e-4 by 7011) -- NOT a sample-phase offset (delta grows)
-and NOT a grossly wrong note (the schedule is bit-exact, arp_sched_ab 7/7).
-Two live hypotheses, neither proven:
-  (a) same voice chosen, slightly different DSP-state seed on the newly-gated voice
-      (cross-voice CV / smoother). The same-voice claim rests only on WEAK evidence
-      (changed-cell counts 10-vs-9 in b2_voice.py -- INFERRED, not proven).
-  (b) DIFFERENT voice chosen: post-recall voices differ only by per-voice CONDITION
-      scatter, so a different pick would ALSO show as a small growing difference.
-Skeptical audit note: the simplest discriminator (CONDITION byte correlation) is
-dead -- CONDITION = 128 for ALL 7 arp patches, so neither hypothesis explains via
-CONDITION why patch 1 fails and patch 49 passes with byte-identical schedules.
-Resolving needs a real execution-diff of the gated voice's start state, which needs
-the port<->plugin voice-state LAYOUT map (b2_statediff.py showed the naive
-v*10512 <-> state[v] correspondence is wrong: plugin has pointers/headers there).
+ROOT CAUSE: PROVEN (executed, scratchpad/b2_statediff.py + b2_pregate.py). The port
+does NOT replicate the plugin's CROSS-VOICE note-on broadcast. The plugin's note-on
+reaches ALL voice units; when a note is played, it seeds even the NON-allocated
+voices. The port's voice_trigger touches ONLY the allocated voice (juno_note_on on
+the picked voice; no cross-voice update). Decisive isolation, port vs plugin voice
+state (correct layout: plugin voice v renders at state[v]+v*10512, NOT state[v]+0):
+  - sample 998, BEFORE the tick-1 note-60 broadcast: voice6 = 0 diff, voice7 = 0 diff.
+  - sample 6998, AFTER the broadcast, BEFORE voice6 gates: voice6 = 68 cells DIFFER,
+    voice7 (the ALLOCATED note-60 voice) = 0 diff (perfect).
+So playing note 60 (allocated to voice 7) diverges the NON-allocated voice 6's
+free-run state; when the arp gates voice 6 at tick 7, it inherits that divergent
+seed -> the render diverges from the first note-change (small growing delta,
+1.6e-5 -> 5.5e-4). Invisible for non-arp (an ungated voice is enveloped to silence,
+so its divergent free-run never reaches the mix) -> only the arp, which gates a
+previously-idle voice, exposes it. Patch-specific [1,33,41] because the seeded
+state only reaches the output for certain patches' modulation routing (that
+selectivity is the one piece still to pin). FIX = replicate the plugin's per-unit
+note-on effect on non-allocated voices (find what noteOn writes to a non-picked
+voice; the +1856 any-note flag is one such cell). Verify no regression to the
+57/57 non-arp render + voice-alloc tests.
 Both harnesses (interleave scratchpad/b2_render_ref.py + this replay) give the
 identical 3 failures at the identical sample -> real, not a harness artifact.
 The SCHEDULE (#96 deliverable) is proven; this render-state divergence is the

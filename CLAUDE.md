@@ -95,12 +95,15 @@ attribution net; also audit-trails positive "captur*" comment mentions).
     once per enable; commit 527398e).
   - **arp RENDER: 4/7** — `arp_render_ab.py` replays the (proven) schedule into the
     plugin's render. Patches [1,33,41] diverge from the first arp note-change (sample
-    7000) with a small, GROWING delta (1.6e-5 → 5.5e-4/11smp). Root cause OPEN: either
-    a DSP-state seed difference on the newly-gated voice OR a different voice pick
-    expressed through per-voice state ("same voice" was only cellcount-INFERRED;
-    CONDITION=128 uniform across all 7 kills the simplest discriminator both ways —
-    patch 1 fails / 49 passes on byte-identical schedules, unexplained). Resolving
-    needs the port↔plugin voice-state LAYOUT map (naive v*10512↔state[v] is wrong).
+    7000). Root cause PROVEN (b2_statediff.py, correct layout = plugin voice v at
+    state[v]+v*10512): the port does NOT replicate the plugin's CROSS-VOICE note-on
+    broadcast. Playing note 60 (allocated to voice 7) seeds even the NON-allocated
+    voice 6 in the plugin (voice6 0-diff before the broadcast → 68-cell diff after,
+    while voice7 stays 0-diff); the port's voice_trigger touches only the picked
+    voice. When the arp gates the previously-idle voice, it inherits the divergent
+    seed. Invisible for non-arp (ungated voice enveloped to silence). FIX: replicate
+    the plugin's per-unit note-on effect on non-allocated voices; verify no regression
+    to 57/57 non-arp + voice-alloc. Remaining: why only [1,33,41] (modulation routing).
 - Host rates other than 44100/48000/96000: UNVERIFIED (fall back to the 96k arm).
 - Arp SCHEDULE execution-diff open; init/prepare constants are RECONSTRUCTED
   (cross-checked against a live state dump — itself a capture — so eventually
