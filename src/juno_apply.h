@@ -78,6 +78,23 @@ void juno_apply_unison_spread(unsigned char *state, int assign);
 int  juno_bank_assign(const unsigned char *bank, int idx);
 int juno_bank_hpf_type(const unsigned char *bank, int idx); /* record 618; joint HPF recompute context */
 
+/* Host-visible parameter panel: the ~79 parameters a VST3 host (Ableton) exposes,
+ * for the in-browser editor. Generated in src/juno_hostparams.c from Script.xml +
+ * the validated record-offset map. roff(i) is the RECORD byte offset of param i's
+ * low nibble-pair; editing rec[roff]/rec[roff+1] and re-running juno_bank_apply
+ * reproduces the plugin's own recall for that value (render-A/B bit-exact). */
+int         juno_host_param_count(void);
+const char *juno_host_param_name(int i);
+const char *juno_host_param_section(int i);
+int         juno_host_param_roff(int i);
+int         juno_host_param_type(int i);    /* 0=int1x7 (0..127), 1=int2x4, 2=int8x4 (both 0..255) */
+int         juno_host_param_max(int i);     /* value ceiling: 127 for int1x7, else 255 */
+int         juno_host_param_default(int i);
+int         juno_host_param_decode(const unsigned char *rec, int i);
+void        juno_host_param_encode(unsigned char *rec, int i, int v); /* type-aware record write */
+/* Start of patch idx's record (bank + BANK_HEADER + idx*BANK_STRIDE), or NULL. */
+unsigned char *juno_bank_record(unsigned char *bank, int idx);
+
 #ifdef __cplusplus
 }
 #endif

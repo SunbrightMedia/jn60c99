@@ -114,6 +114,15 @@
 #define BANK_BLOB_OFF 16
 #define BANK_COUNT    64
 
+/* Start of patch idx's record (== bank + BANK_HEADER + idx*BANK_STRIDE, the base
+ * the blob offsets are measured from). The host-param panel edits record bytes
+ * here and re-runs juno_bank_apply. Returns NULL for an out-of-range idx. */
+unsigned char *juno_bank_record(unsigned char *bank, int idx)
+{
+    if (!bank || idx < 0 || idx >= BANK_COUNT) return 0;
+    return bank + BANK_HEADER + idx * BANK_STRIDE;
+}
+
 /* Confirmed bindings: {blob parameter position, curve id, engine state offset}.
  * - blob_pos: aligned to the plugin's ordered param table, anchored to the known
  *   values of bank patch 5 "LD Classic Lead" (unique value matches).

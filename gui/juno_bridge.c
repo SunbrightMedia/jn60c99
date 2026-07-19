@@ -94,6 +94,14 @@ typedef struct {
     int   arp_trace_cap;   /* 0 = disabled */
     int   arp_trace_n;
     int  *arp_trace_buf;   /* 4*cap ints: smp, kind, note, vel */
+
+    /* Loaded-patch bank retained (malloc'd copy) so the host-parameter panel can
+     * edit a record byte and re-run the EXACT recall (juno_gui_host_set). bank is
+     * the whole KoaBankFile00003 image; patch_idx selects the record. NULL until a
+     * patch is applied. See juno_bank_record / juno_host_param_encode. */
+    unsigned char *bank;
+    int   bank_len;
+    int   patch_idx;
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -169,6 +177,7 @@ int juno_gui_debug_voices(juno_ctx *c, int *notes, unsigned char *gated)
 void juno_gui_destroy(juno_ctx *c)
 {
     if (!c) return;
+    free(c->bank);
     free(c->st);
     free(c);
 }
@@ -667,15 +676,15 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, floa
     }
 }
 
-/* Apply bank patch `idx` (raw KoaBankFile00003 bytes in `bank`, `len` bytes)
- * into this engine's coefficient slots via the bit-exact applier
- * (src/juno_apply.c). Returns # coefficients set. The bound subset is
- * reproduced EXACTLY (curve LUTs proven vs the real machine code); unbound
- * params keep their current (engine-default) value. */
-int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx)
+/* Core recall: apply patch `idx` from `bank` into the engine coefficient slots
+ * via the bit-exact applier (src/juno_apply.c), then re-derive the per-patch
+ * voice/arp/FX driver state. `flush` controls sounding voices: 1 = release them
+ * first (a fresh patch LOAD starts clean); 0 = leave held notes ringing (a live
+ * host-parameter EDIT — the voices are reseeded with the new coefficients but the
+ * gate stays on). Returns # coefficients set. */
+static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush)
 {
     int n, mode = 0, oct = 1, on, porta = 0;
-    if (!c || !bank || len <= 0) return 0;
     n = juno_bank_apply(c->st, bank, idx);
     juno_driver_seed_voices(c->st);      /* all 8 voices play the applied patch */
     /* CONDITION analog voice-scatter: per-voice detune/level, applied AFTER seed (it
@@ -712,8 +721,9 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
     c->portamento_on = (porta != 0);
     /* Switching assign mode flushes sounding voices so the new allocator starts
      * clean (the plugin's mode-change reader flushes hold + all-notes-off). Release
-     * ALL voices directly (mode-agnostic) and clear the held-note mask. */
-    {
+     * ALL voices directly (mode-agnostic) and clear the held-note mask. Skipped for
+     * a live host-parameter edit (flush=0) so a held note keeps ringing. */
+    if (flush) {
         int v;
         for (v = 0; v < JUNO_NUM_VOICES; ++v)
             if (c->voice_note[v] >= 0) { juno_note_off(c->st, v); c->voice_gated[v] = 0; }
@@ -749,6 +759,53 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
      * the plugin's baked 128-BPM default). */
     juno_bank_delay_modes(bank, idx, &c->dly_time_byte, &c->dly_sync, &c->dly_type);
     return n;
+}
+
+/* Apply bank patch `idx` (raw KoaBankFile00003 bytes in `bank`, `len` bytes) into
+ * this engine's coefficient slots. Retains a mutable copy of the bank so the
+ * host-parameter panel can edit a record byte and re-run the EXACT same recall.
+ * Returns # coefficients set. */
+int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx)
+{
+    if (!c || !bank || len <= 0) return 0;
+    if (c->bank_len != len) {
+        free(c->bank);
+        c->bank = malloc((size_t)len);
+        c->bank_len = c->bank ? len : 0;
+    }
+    if (c->bank) memcpy(c->bank, bank, (size_t)len);
+    c->patch_idx = idx;
+    /* Recall from the retained copy when we have it (so later edits persist); fall
+     * back to the caller's buffer if the copy failed to allocate. */
+    return ctx_recall(c, c->bank ? c->bank : bank, idx, 1);
+}
+
+/* --- Host-parameter panel bridge (the 79 Ableton-visible parameters) ----------
+ * The panel enumerates juno_gui_host_count() params, each a named slider in range
+ * [0, juno_gui_host_max(i)]. get() decodes the current value from the loaded
+ * patch's record; set() edits that record byte via the plugin's own leaf
+ * serialization (juno_host_param_encode) and re-runs the recall with flush=0, so
+ * a held note keeps ringing with the new coefficients. A patch must have been
+ * applied first (juno_gui_apply_bank retains the bank). */
+int         juno_gui_host_count(void)        { return juno_host_param_count(); }
+const char *juno_gui_host_name(int i)        { return juno_host_param_name(i); }
+const char *juno_gui_host_section(int i)     { return juno_host_param_section(i); }
+int         juno_gui_host_max(int i)         { return juno_host_param_max(i); }
+
+int juno_gui_host_get(juno_ctx *c, int i)
+{
+    if (!c || !c->bank) return -1;
+    return juno_host_param_decode(juno_bank_record(c->bank, c->patch_idx), i);
+}
+
+void juno_gui_host_set(juno_ctx *c, int i, int v)
+{
+    unsigned char *rec;
+    if (!c || !c->bank) return;
+    rec = juno_bank_record(c->bank, c->patch_idx);
+    if (!rec) return;
+    juno_host_param_encode(rec, i, v);
+    ctx_recall(c, c->bank, c->patch_idx, 0);
 }
 
 /* Packed arp state for the UI to read back after apply: bit0 = on, bits1-2 = mode

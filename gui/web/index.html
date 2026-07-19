@@ -30,6 +30,10 @@
   .p input[type=range] { width: 100%; }
   .p input[type=number] { width: 58px; text-align: right; }
   .p button.sw { min-width: 52px; }
+  .p.inert { opacity: .5; }                       /* recall-only: edits load but stay audio-inert here */
+  .p.inert input[type=range] { filter: grayscale(1); }
+  .tag { font-size: 9px; color: #b98; border: 1px solid #634; border-radius: 3px;
+         padding: 0 4px; margin-left: 6px; vertical-align: 1px; text-transform: uppercase; }
   #piano { position: relative; height: 90px; user-select: none; margin: 6px 0; }
   .key { position: absolute; bottom: 0; border: 1px solid #111; border-radius: 0 0 4px 4px; }
   .key.w { width: 26px; height: 90px; background: #eee; z-index: 1; }
@@ -70,6 +74,10 @@
     <label>Gate
       <input type="range" id="arpGate" min="0" max="1" step="0.05" value="0.6" oninput="arpApply()" style="vertical-align:middle">
       <span id="arpGateV">60%</span></label>
+    <span style="width:12px"></span>
+    <label title="Note-on velocity for the on-screen keys (VCF/VCA VELOCITY SENS respond to this)">Vel
+      <input type="range" id="vel" min="1" max="127" step="1" value="100" oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
+      <span id="velV">100</span></label>
   </div>
   <div class="row">
     <input type="text" id="filter" placeholder="filter parameters…" oninput="renderList()" style="flex:1">
@@ -96,7 +104,7 @@ import { decodeBank } from "./bank.js";
 
 /* Cache-buster: build.sh rewrites this to the WASM content hash each build, so a new
  * engine is always fetched fresh instead of served from the browser/CDN cache. */
-const BUILD_VER = "30a98b4fe885";
+const BUILD_VER = "682c05034a8e";
 
 // The plugin runs its DSP natively at the host sample rate (no oversampling, no
 // decimator). SR is replaced at boot with the AudioContext's ACTUAL rate so the
@@ -105,38 +113,56 @@ let SR = 96000;
 const $ = s => document.querySelector(s);
 const status = m => $("#status").textContent = m;
 
-// The panel exposes the JUNO-60's real front-panel controls, enumerated from the
-// engine itself (juno_gui_param_count / _name / _blob — the src/juno_apply.c
-// BINDINGS table) and grouped into the console's sections. Each control is a raw
-// 0..255 panel byte applied bit-exactly through juno_gui_set_param.
-const SECTIONS = [           // prefix -> section header, in front-panel order
-  ["DCO",  "DCO — Oscillator"],
-  ["HPF",  "HPF — High-Pass Filter"],
-  ["VCF",  "VCF — Filter"],
-  ["VCA",  "VCA — Amplifier"],
-  ["ENV1", "ENV-1 — Filter Envelope"],
-  ["ENV2", "ENV-2 — Amp Envelope"],
-];                           // anything else falls into "Global"
-// within-section ordering by keyword found in the raw name
-const RANK = [["SAW",0],["PWM",1],["SUB",2],["NOISE",3],
-  ["CUTOFF",0],["RESONANCE",1],["ENV MOD",2],["KEY FOLLOW",3],
-  ["TONE",0],["LEVEL",1],
-  ["ATTACK",0],["DECAY",1],["SUSTAIN",2],["RELEASE",3],
-  ["PORTAMENTO",0],["TEMPO",1]];
-const ACRONYM = { Pwm: "PWM", Vcf: "VCF", Vca: "VCA", Dco: "DCO", Hpf: "HPF", Lfo: "LFO" };
+// The panel exposes ALL 79 host-visible parameters (the set a VST3 host such as
+// Ableton exposes), enumerated from the engine itself (juno_gui_host_count /
+// _name / _section / _max — the Script.xml value-tree leaves in src/juno_hostparams.c)
+// and grouped into the console's sections. Editing a slider writes the parameter's
+// byte into the loaded patch's record with the plugin's own leaf serialization and
+// re-runs the EXACT recall (juno_gui_host_set), so what you hear is the plugin's own
+// value-tree recall for that value.
+const SECTION_LABEL = {
+  DCO:"DCO — Oscillator", HPF:"HPF — High-Pass Filter", VCF:"VCF — Filter",
+  VCA:"VCA — Amplifier", ENV1:"ENV-1 — Filter Envelope", ENV2:"ENV-2 — Amp Envelope",
+  LFO:"LFO", BEND:"Bender", MOD:"Modulation (wheel depth)", GLOBAL:"Global / Performance",
+  ARP:"Arpeggiator", EFFECT:"Effect (Chorus I/II · Flanger)", DELAY:"Delay",
+  CHORUS:"Chorus", REVERB:"Reverb"
+};
+const SECTION_ORDER = ["DCO","HPF","VCF","VCA","ENV1","ENV2","LFO","BEND","MOD",
+                       "GLOBAL","ARP","EFFECT","DELAY","CHORUS","REVERB"];
+const SECTION_PREFIX = { DCO:"DCO", HPF:"HPF", VCF:"VCF", VCA:"VCA", ENV1:"ENV1",
+  ENV2:"ENV2", LFO:"LFO", BEND:"BEND", MOD:"MOD", ARP:"ARPEGGIO", EFFECT:"EFFECT",
+  DELAY:"DELAY", CHORUS:"CHORUS", REVERB:"REVERB" };
+// Params that do NOT audibly change this port's output on a plain held note —
+// measured empirically by scratchpad/probe_liveness.py driving the PORT's own render
+// (libjuno.so, no capture) across all 64 factory patches. They fall into: redundant
+// high-res mirrors the port derives from the coarse control (VCF/LFO …H); modulation
+// depths that need a bend/mod wheel this webapp has no control for (BEND/MOD sens,
+// flanger); and fine delay/chorus/reverb voicing + master tune/octave that the port
+// recalls as aggregate FX coefficients rather than reading the individual byte. They
+// are still shown and editable (the edit loads into the patch record), just marked so
+// a silent slider doesn't read as broken.
+const INERT = new Set([
+  "VCF CUTOFF FREQ H","LFO RATE H","BEND RANGE","BEND GAIN","BEND SENS DCO",
+  "BEND SENS VCF","MOD SENS DCO","MOD SENS VCF","MASTER TUNE","OCTAVE SHIFT",
+  "KEY HOLD","FLANGER MANUAL","FLANGER RESONANCE","FLANGER LOW CUT","DELAY TAP TIME",
+  "DELAY HIGH CUT","DELAY LF DAMP","DELAY LF DAMP FREQ","DELAY HF DAMP",
+  "DELAY HF DAMP FREQ","CHORUS PRE DELAY","CHORUS LOW CUT","CHORUS HIGH CUT",
+  "REVERB PRE DELAY","REVERB LOW CUT","REVERB HIGH CUT","REVERB DENSITY",
+  "REVERB DIRECT LEVEL"]);
+const ACRONYM = { Pwm: "PWM", Vcf: "VCF", Vca: "VCA", Dco: "DCO", Hpf: "HPF", Lfo: "LFO",
+  Env: "ENV", Adsr: "ADSR", Lf: "LF", Hf: "HF", Vel: "Vel" };
 const titleCase = s => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
-  .replace(/\b(Pwm|Vcf|Vca|Dco|Hpf|Lfo)\b/g, m => ACRONYM[m]);
-
-// Patch-record geometry (bank.js constants): a control's raw 0..255 panel byte is
-// stored as a nibble-pair at record offset 2*blob_pos, the SAME decode the engine's
-// juno_bank_apply uses — so the slider shows exactly the byte the engine recalled.
-const REC_HEADER = 23, REC_STRIDE = 20223, REC_BLOB = 16;
-const decByte = (base, blob) =>
-  ((BANK_RAW[base + 2*blob] & 0xF) << 4) | (BANK_RAW[base + 2*blob + 1] & 0xF);
+  .replace(/\b(Pwm|Vcf|Vca|Dco|Hpf|Lfo|Lf|Hf)\b/g, m => ACRONYM[m]);
+function prettify(name, sec) {
+  const pfx = SECTION_PREFIX[sec];
+  let s = name;
+  if (pfx && (s === pfx || s.startsWith(pfx + " "))) s = s.slice(pfx.length).trim();
+  return titleCase(s || name);
+}
 
 let M, ctx, get, set, chorusFn, gateFn, renderFn, malloc, free;
 let noteOnFn, noteOffFn, applyBankFn, renderDryFn, arpFn, getArpFn, warmupFn;
-let paramCountFn, paramNameFn, paramBlobFn, setParamFn;
+let hostCountFn, hostNameFn, hostSectionFn, hostMaxFn, hostGetFn, hostSetFn;
 let arpOn = false;
 let PARAMS = [];
 
@@ -147,10 +173,12 @@ async function boot() {
   get = M.cwrap("juno_gui_get","number",["number","number"]);
   set = M.cwrap("juno_gui_set",null,["number","number","number"]);
   chorusFn = M.cwrap("juno_gui_set_chorus_mode",null,["number","number"]);
-  paramCountFn = M.cwrap("juno_gui_param_count","number",[]);
-  paramNameFn  = M.cwrap("juno_gui_param_name","string",["number"]);
-  paramBlobFn  = M.cwrap("juno_gui_param_blob","number",["number"]);
-  setParamFn   = M.cwrap("juno_gui_set_param","number",["number","number","number"]);
+  hostCountFn   = M.cwrap("juno_gui_host_count","number",[]);
+  hostNameFn    = M.cwrap("juno_gui_host_name","string",["number"]);
+  hostSectionFn = M.cwrap("juno_gui_host_section","string",["number"]);
+  hostMaxFn     = M.cwrap("juno_gui_host_max","number",["number"]);
+  hostGetFn     = M.cwrap("juno_gui_host_get","number",["number","number"]);
+  hostSetFn     = M.cwrap("juno_gui_host_set",null,["number","number","number"]);
   gateFn = M.cwrap("juno_gui_gate",null,["number","number"]);
   renderFn = M.cwrap("juno_gui_render","number",["number","number","number"]);
   renderDryFn = M.cwrap("juno_gui_render_dry","number",["number","number","number"]);
@@ -189,84 +217,73 @@ async function boot() {
 
   PARAMS = buildParams();
 
-  $("#meta").textContent = `· ${PARAMS.length} front-panel controls @ ${SR} Hz · build ${BUILD_VER} · runs entirely in your browser`;
+  $("#meta").textContent = `· ${PARAMS.length} host parameters @ ${SR} Hz · build ${BUILD_VER} · runs entirely in your browser`;
   $("#warn").innerHTML =
-    `<div class="info">✓ Ready — <b>Load bank → Apply → press a key</b>, then tweak the sliders below. The panel exposes the JUNO-60's <b>real front-panel controls</b> — DCO mix, HPF, VCF (cutoff/resonance/env/key-follow), VCA, both ADSR envelopes, portamento and LFO tempo-sync — each a <b>raw 0–255 panel value</b> applied bit-exactly through the plugin's own value-tree dispatch (<code>juno_gui_set_param</code>). Applying a patch loads the full recall (49 DSP coefficients incl. LFO, delay, reverb, arp) and the sliders snap to that patch's own bytes. You hear the <b>full signal path</b> — 8 voices + stereo BBD chorus + output stage — at the plugin's level.</div>` +
-    `<div class="caveat">Each slider shows the <b>exact 0–255 byte the engine recalled</b> for the loaded patch (decoded from the patch record the same way the engine's <code>juno_bank_apply</code> does), and moving it re-runs the plugin's live parameter dispatch on all 8 voices — no reseed, so edits mid-note don't snap. Shared leaves (HPF's 4 cells, portamento's on/time pair) are driven from their one panel byte, exactly as the hardware does. The <b>arpeggiator</b> (row above) is a bit-exact transcription of the plugin's CArpeggio and <b>auto-recalls per preset</b> (on/mode/octave from the patch record); Tempo/Gate stay local because the plugin's arp is host-tempo-synced. Chorus/delay/reverb are recalled per patch (the JUNO-60 stores its chorus switch in the patch), not manual controls here.</div>`;
+    `<div class="info">✓ Ready — <b>Load bank → Apply → press a key</b>, then tweak the sliders below. The panel exposes <b>all ${PARAMS.length} host-visible parameters</b> (the same set a VST3 host such as Ableton exposes), grouped by section — DCO, HPF, VCF, VCA, both envelopes, LFO, bender/mod, global, arp and the chorus/flanger/delay/reverb effects — enumerated straight from the plugin's <b>Script.xml value tree</b>. Moving a slider writes that parameter's byte into the loaded patch's record with the plugin's own serialization and re-runs the <b>exact bit-exact recall</b>, so you hear the plugin's own value-tree recall for that value across the full 8-voice + chorus + output path.</div>` +
+    `<div class="caveat">Each slider shows the <b>value the engine recalled</b> for the loaded patch (read back through the engine's own per-leaf decode). Editing re-runs the full recall (a held note keeps ringing, reseeded with the new coefficients — so it behaves like a patch edit, not a smooth mid-note knob). Sliders tagged <span class="tag">recall-only</span> load into the patch but produce <b>no audible change on a plain held note in this port</b>: they are either redundant high-res mirrors the port derives from the coarse control, modulation depths that need a bend/mod wheel this page has no control for, or fine delay/chorus/reverb voicing the port recalls as an aggregate coefficient. The <b>arpeggiator</b> (row above) auto-recalls per preset; Tempo/Gate stay local because the plugin's arp is host-tempo-synced.</div>`;
   buildPiano();
   refreshPresets();
   renderList();
   status("ready — running in-browser (no server)");
 }
 
-// Enumerate the exposed front-panel controls from the engine and dedupe by blob
-// leaf (HPF's 4 cells and portamento's on/time pair each share ONE panel byte, so
-// they collapse to a single control whose first binding index drives the whole
-// leaf). Returns them sorted into the console's sections / front-panel order.
+// Enumerate all 79 host-visible parameters from the engine, grouped into the
+// console's sections in front-panel order. Each carries its value ceiling (127 for
+// 7-bit leaves, else 255) and an `inert` flag (no audible change in this port; see
+// INERT above).
 function buildParams() {
-  const n = paramCountFn(), seen = new Set(), list = [];
+  const n = hostCountFn(), list = [];
   for (let i = 0; i < n; i++) {
-    const blob = paramBlobFn(i);
-    if (blob < 0 || seen.has(blob)) continue;
-    seen.add(blob);
-    const raw = paramNameFn(i) || ("param " + i);
-    let sord = 99, section = "Global", prefix = "";
-    for (let k = 0; k < SECTIONS.length; k++)
-      if (raw.startsWith(SECTIONS[k][0])) { sord = k; section = SECTIONS[k][1]; prefix = SECTIONS[k][0]; break; }
-    let rank = 50;
-    for (const [kw, r] of RANK) if (raw.includes(kw)) { rank = r; break; }
-    let label = (prefix && raw.startsWith(prefix + " ")) ? raw.slice(prefix.length + 1) : raw;
-    label = titleCase(label);
-    const isSwitch = /TEMPO SYNC/.test(raw);
-    list.push({ idx: i, blob, name: raw, label, section, sord, rank, isSwitch, byte: 0 });
+    const name = hostNameFn(i) || ("param " + i);
+    const sec = hostSectionFn(i) || "GLOBAL";
+    const max = hostMaxFn(i) || 255;
+    const sord = SECTION_ORDER.indexOf(sec);
+    list.push({ idx: i, name, section: sec, secLabel: SECTION_LABEL[sec] || sec,
+                label: prettify(name, sec), max, val: 0,
+                inert: INERT.has(name), sord: sord < 0 ? 99 : sord });
   }
-  list.sort((a, b) => a.sord - b.sord || a.rank - b.rank || a.blob - b.blob);
+  list.sort((a, b) => a.sord - b.sord || a.idx - b.idx);
   return list;
 }
-
-const clampByte = v => Math.max(0, Math.min(255, Math.round(v) || 0));
 
 function renderList() {
   const f = $("#filter").value.toLowerCase();
   const el = $("#list"); el.innerHTML = ""; let sec = null;
   for (const p of PARAMS) {
-    if (f && !p.name.toLowerCase().includes(f) && !p.label.toLowerCase().includes(f) && !p.section.toLowerCase().includes(f)) continue;
-    if (p.section !== sec) { sec = p.section; const h = document.createElement("div"); h.className="sec"; h.textContent=sec; el.appendChild(h); }
+    if (f && !p.name.toLowerCase().includes(f) && !p.label.toLowerCase().includes(f) && !p.secLabel.toLowerCase().includes(f)) continue;
+    if (p.secLabel !== sec) { sec = p.secLabel; const h = document.createElement("div"); h.className="sec"; h.textContent=sec; el.appendChild(h); }
     el.appendChild(rowFor(p));
   }
 }
 
 function rowFor(p) {
-  const d = document.createElement("div"); d.className = "p";
-  const lab = document.createElement("label"); lab.title = p.name + "  (blob " + p.blob + ")";
+  const d = document.createElement("div"); d.className = "p" + (p.inert ? " inert" : "");
+  const lab = document.createElement("label");
+  lab.title = p.name + (p.inert ? "  — recall-only / modulation-dependent: no audible change on a held note in this port" : "");
   lab.textContent = p.label;
+  if (p.inert) { const t = document.createElement("span"); t.className = "tag"; t.textContent = "recall-only"; lab.appendChild(t); }
   const mid = document.createElement("div");
   const num = document.createElement("input");
-  num.type="number"; num.min=0; num.max=255; num.step=1; num.value=p.byte;
-
-  if (p.isSwitch) {
-    const b = document.createElement("button"); b.className = "sw";
-    const paint = v => { b.textContent = v>=128?"ON":"OFF"; b.classList.toggle("on", v>=128); };
-    paint(p.byte);
-    b.onclick = () => { commit(p, b.classList.contains("on")?0:255); paint(p.byte); num.value=p.byte; };
-    num.style.display = "none"; mid.appendChild(b); p._paint = paint;
-  } else {
-    const r = document.createElement("input"); r.type="range";
-    r.min=0; r.max=255; r.step=1; r.value=p.byte;
-    r.oninput  = () => num.value = r.value;
-    r.onchange = () => { commit(p, +r.value); num.value=p.byte; };
-    mid.appendChild(r); p._range = r;
-  }
-  num.onchange = () => { commit(p, +num.value); if (p._range) p._range.value=p.byte; if (p._paint) p._paint(p.byte); num.value=p.byte; };
+  num.type="number"; num.min=0; num.max=p.max; num.step=1; num.value=p.val;
+  const r = document.createElement("input"); r.type="range";
+  r.min=0; r.max=p.max; r.step=1; r.value=p.val;
+  r.oninput  = () => num.value = r.value;
+  r.onchange = () => { commit(p, +r.value); num.value=p.val; r.value=p.val; };
+  num.onchange = () => { commit(p, +num.value); r.value=p.val; num.value=p.val; };
+  mid.appendChild(r); p._range = r; p._num = num;
   d.append(lab, mid, num); return d;
 }
 
-// Apply a raw 0..255 panel byte through the plugin's own value-tree dispatch
-// (bit-exact, all 8 voices, no reseed — see juno_gui_set_param). Updates the model.
-function commit(p, byte) {
-  p.byte = clampByte(byte);
-  setParamFn(ctx, p.idx, p.byte);
-  status(`${p.label} (${p.section.split(" ")[0]}) = ${p.byte}`);
+// Write value v into the loaded patch's record for this param and re-run the exact
+// plugin recall (juno_gui_host_set; flush=0 so a held note keeps ringing). Reads the
+// value back so the model reflects the byte the engine actually stored.
+function commit(p, v) {
+  if (!ctx) return;
+  v = Math.max(0, Math.min(p.max, Math.round(v) || 0));
+  hostSetFn(ctx, p.idx, v);
+  const rb = hostGetFn(ctx, p.idx);
+  p.val = rb < 0 ? v : rb;
+  status(`${p.label} (${p.section}) = ${p.val}${p.inert ? " · recall-only (no audible change here)" : ""}`);
 }
 
 // --- controls (exposed for inline handlers) ---
@@ -293,11 +310,11 @@ function refreshPresets() {
   const s = $("#presets"), names = Object.keys(store()).sort();
   s.innerHTML = names.map(n=>`<option>${n}</option>`).join("") || "<option disabled>(no saved patches)</option>";
 }
-// Presets snapshot the front-panel bytes, keyed by blob leaf (a stable id that
-// survives rebuilds).
-function snapshot() { const o={}; for (const p of PARAMS) o[p.blob]=p.byte; return o; }
+// Presets snapshot the host-parameter values, keyed by parameter name (a stable id
+// that survives rebuilds).
+function snapshot() { const o={}; for (const p of PARAMS) o[p.name]=p.val; return o; }
 function apply(o) {
-  for (const p of PARAMS) if (p.blob in o) commit(p, +o[p.blob]);
+  for (const p of PARAMS) if (p.name in o) commit(p, +o[p.name]);
   renderList();
 }
 window.savePreset = () => { const n=prompt("Patch name:"); if(!n) return; const all=store(); all[n]=snapshot(); localStorage.setItem(KEY, JSON.stringify(all)); refreshPresets(); $("#presets").value=n; status("saved "+n); };
@@ -372,12 +389,11 @@ function applyPatchIndex(idx) {
   status(`applied patch ${idx} "${BANK.patches[idx].name}" — ${n} bit-exact coefficients loaded${arpOn?" · arp ON":""} (press a key to hear it)`);
 }
 
-// Decode each front-panel control's raw byte straight from the patch record — the
-// SAME nibble-pair decode juno_bank_apply uses (record[2*blob]) — so every slider
-// shows exactly the byte the engine just recalled.
+// Snap every slider to the loaded patch's own value, read back through the engine
+// (juno_gui_host_get decodes the retained patch record with the plugin's per-leaf
+// decode) — so each slider shows exactly what the engine recalled.
 function reflectFromRecord(idx) {
-  const base = REC_HEADER + idx * REC_STRIDE + REC_BLOB;
-  for (const p of PARAMS) p.byte = decByte(base, p.blob);
+  for (const p of PARAMS) { const v = hostGetFn(ctx, p.idx); p.val = v < 0 ? 0 : v; }
   renderList();
 }
 
@@ -442,8 +458,9 @@ function mkKey(midi, cls, left) {
 // path (8-voice mix + stereo BBD chorus mode II + output stage) plays live.
 function note(midi, on) {
   ensureAudio();
-  if (on) noteOnFn(ctx, midi, 100); else noteOffFn(ctx, midi);
-  if (on) status(`note ${midi} — live 8-voice master path (patch-recalled FX)`);
+  const vel = +$("#vel").value;   // 1..127 from the Velocity slider (default 100)
+  if (on) noteOnFn(ctx, midi, vel); else noteOffFn(ctx, midi);
+  if (on) status(`note ${midi} · vel ${vel} — live 8-voice master path (patch-recalled FX)`);
 }
 
 boot().catch(e => { status("ERROR: "+e); $("#warn").textContent = e; console.error(e); });
