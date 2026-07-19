@@ -41,10 +41,12 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
      * per-patch recall writes so each slot follows the loaded patch's own routing:
      *   slot 1 -> state[JUNO_PROG_DLY] = DELAY TYPE  (juno_apply_delay)
      *   slot 2 -> state[JUNO_PROG_EFX] = EFFECT TYPE (juno_apply_effect_modes)
-     * Seed the EFFECT cell with the caller's default (chorus) so the unapplied sound
-     * uses the chorus until a patch overrides it. The v39 cell defaults to 0 = delay-
-     * with-muted-block = clean pass-through until a patch is applied. */
-    *(int32_t *)(st + JUNO_PROG_EFX) = chorus_mode;
+     * Pointer wiring ONLY — the cells' power-on values (DELAY 0, EFFECT 2) are
+     * part of the prepared baseline written by juno_engine_prepare, exactly as
+     * the plugin's constructor leaves them (poweron_routing proof). Do NOT seed
+     * from chorus_mode here: an earlier revision did, and every caller passing 0
+     * silently parked slot 2 in the Pan arm instead of the plugin's power-on
+     * chorus, so the warm (host-idled) state diverged on every chorus patch. */
     p39  = (int32_t *)(st + JUNO_PROG_DLY);
     p551 = (int32_t *)(st + JUNO_PROG_EFX);
     memcpy(shim->params + 136, &p39,  sizeof(void *));

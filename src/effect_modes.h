@@ -15,10 +15,17 @@
 #ifndef JUNO_EFFECT_MODES_H
 #define JUNO_EFFECT_MODES_H
 
-/* Slot-2 (EFFECT TYPE) program cell — a scratch state cell the driver points the
- * master's params+112 chase at (adjacent to JUNO_PROG_DLY = 11022056; the master
- * does not read 11022060, verified). Holds the int EFFECT TYPE 0..5. */
-#define JUNO_PROG_EFX  11022060
+/* Slot-2 (EFFECT TYPE) program cell — the plugin's OWN state cell for this int
+ * (Prog_ID_EFX; adjacent to JUNO_PROG_DLY = 11022056). PROVEN under Unicorn
+ * (scratchpad/ext_sweeps.py 2026-07-19): the plugin's EFFECT TYPE setter writes
+ * clamp(v,<=5) here for every value 0..255, and the constructor+setSampleRate
+ * leave it at the power-on default 2 (chorus I) — the same value the master's
+ * params+112 chase reads (v551==2 at power-on, read via the plugin's own pointer
+ * table). Holds the int EFFECT TYPE 0..5. (An earlier revision stored this at
+ * the free cell 11022060, which the plugin never writes; that hid the power-on
+ * routing from the state gates and made the webapp warm up in the wrong slot-2
+ * arm — the plugin free-runs the 2..4 chorus block from power-on.) */
+#define JUNO_PROG_EFX  11022052
 
 #ifdef __cplusplus
 extern "C" {

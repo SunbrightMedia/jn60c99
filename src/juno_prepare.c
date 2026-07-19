@@ -49,6 +49,7 @@
  * block [176,10688) is replicated to voices 1..7 by juno_driver_seed_voices.
  */
 #include "juno_engine.h"
+#include "delay_recall.h"    /* JUNO_PROG_DLY/EFX (power-on slot routing)   */
 #include "reverb_recall.h"   /* juno_write_reverb_taps (Class E tap tables) */
 #include <stdint.h>
 #include <string.h>
@@ -264,6 +265,19 @@ void juno_engine_prepare(unsigned char *st)
     JI(st, 102592) = 0x3f800000;  /* 1.0           (output)                     */
     JI(st, 102608) = 0x3bab929a;  /* 0.0052359821  LF-Damp Fc                   */
     JI(st, 10759680) = 0xbf16c2f3; /* -0.58891219  Rev Ecf DPF0 Lp              */
+
+    /* Power-on effect-slot routing (the master's v39/v551 program selectors).
+     * PROVEN by executing the plugin's constructor + setSampleRate under Unicorn
+     * (scratchpad poweron_routing.py 2026-07-19): slot 1 (DELAY) = 0, slot 2
+     * (EFFECT) = 2 (chorus I) — read both from the plugin's own params pointer
+     * table (state+136 -> +136/+112) and from its state cells 11022056/11022052.
+     * Slot 2 = 2 is LOAD-BEARING for warm fidelity: from power-on the plugin's
+     * master free-runs the v551==2..4 chorus arm (LFO phase 90624.., BBD ring
+     * 95824..) during host idle; seeding 0 here parked the port in the Pan arm
+     * until the first patch apply, so a DAW-warmed instance and the port
+     * diverged on every chorus patch (found via the BS Solid user report). */
+    JI(st, JUNO_PROG_DLY) = 0;
+    JI(st, JUNO_PROG_EFX) = 2;
 
     /* --- Class E: reverb tap-index table (34 ints, 11022208..11022340) ------ */
     /* Generator sub_0x3C1AC0: tap[0]=1; a continuous predelay = floor(T1*H) (T1 in

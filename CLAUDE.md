@@ -133,6 +133,33 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   it closed the one coverage gap, no render gate at the most common host rate).
 - **PROVENANCE.tsv is 17/17 PROVEN** — zero RECONSTRUCTED/CAPTURED/UNVERIFIED. The
   binding finish line (`make verify` green = zero non-PROVEN rows) is met.
+- **WARM (DAW-idled) parity: PROVEN for the driving tested.** Warm A/B = build →
+  72000 idle samples → recall → note → 24000 render, BIT-EXACT (chillwave patch 3
+  "BS Solid", the user-reported case; scratchpad warm_ab_p3.py). Root causes (both
+  invisible to every cold gate):
+  1. **Power-on slot-2 routing**: the plugin boots with EFFECT routing v551=2
+     (chorus I) — read from its own params chase AND its state cell 11022052
+     (= Prog_ID_EFX, the cell its EFFECT TYPE setter writes clamp(v,≤5) into,
+     proven all 256 values). Its master therefore FREE-RUNS the v551∈2..4 chorus
+     arm (LFO 90624.., BBD ring 95824..) from power-on. The port seeded 0 (Pan
+     arm, silent-input = frozen state) → every chorus patch diverged warm. Fixed:
+     JUNO_PROG_EFX moved 11022060→11022052 (the plugin's own cell), power-on
+     default 2 written by juno_engine_prepare, 11022052 REMOVED from
+     coldstate_ab's exclusion (gate strengthened).
+  2. **Warm apply clobbered per-voice runtime**: patch LOAD did a full
+     seed_voices block copy; the plugin's recall writes coefficient cells only.
+     After idle, per-voice smoother runtime (rel 3344/3360/4640/4752/5296/5312 —
+     outputs converged onto the per-voice CONDITION targets) is voice-distinct;
+     the copy falsified voices 1..7, and a warm note lands on a rotation voice
+     (not voice 0 — cold gates never see this). Fixed: ctx_recall LOADs now use
+     the same changed-bytes delta replication as live edits.
+  **Unit-mapping facts (per-unit diff harness = scratchpad idle_units.py):** the
+  oracle renders voice v from unit v and the MASTER from unit 8 (e2e_emu.render);
+  unit-0's master region is idle-dead. The aux one-shot array 101504+v*32 is
+  per-VOICE state (compare vs unit v; unit 8's copies are dead 1.0s). Post-fix
+  the idle-72000 per-unit diff is: voices 0/8 + noise + aux EXACT; master vs
+  unit 8 differs ONLY in the 5 still-excluded FX-recall-default cells (known
+  inert) — and warm note allocation lands on the same voice both sides.
 - WASM artifacts REBUILT + verified: `gui/web/build.sh` (now with `-ffp-contract=off`)
   regenerates `gui/web` + `docs` from current source; `wasm_golden.mjs` proves the
   delivered WASM is bit-exact to native (8/8) on the 44.1 kHz golden corpus. emsdk
@@ -147,11 +174,13 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   writes 102656), so the old bugs were recall-masked for every patch render. Their
   only reachable surface was the pre-recall power-on state at 44.1k (reverb send 0).
   The cold-state fix is still required — the plugin's cold state is the ground truth.
-- Of coldstate_ab's 6 excluded FX-recall-default cells, 2 (11022052 routing int,
-  11022344 master counter) are engine plumbing NEVER written by the port at all —
-  earlier phrasing "written by recall when a patch engages the effect" over-claimed
-  for them. All 6 audit-proven inert PER CELL (24 poke-renders, byte-identical
-  output, sentinel intact after 24000 frames; none read in any render source).
+- coldstate_ab now excludes 5 cells (was 6): 11022052 was NOT inert plumbing — it
+  is the plugin's slot-2 EFFECT-routing int (power-on 2), and its exclusion hid
+  the warm chorus-arm divergence (see WARM parity above). The old "none read in
+  any render source" claim was wrong for it (master reads it through the
+  params+112 chase every sample). The remaining 5 (102544, 10759360/472/840,
+  11022344) keep their audited inert status; 11022344 is the warmup-mute latch
+  the port never needs.
 - coldstate_ab.py hardcodes the main-tree libjuno.so + pickle paths — run from a
   git worktree it silently gates the MAIN tree's library (project-wide convention,
   but a sharp edge for worktree-based testing).

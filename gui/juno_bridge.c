@@ -338,11 +338,16 @@ float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
     return w;
 }
 
-/* Switch chorus mode selector (0 = dry/bypass). */
+/* Legacy slot-2 override (0 = Pan arm = effectively dry). attach_host no longer
+ * seeds the routing cell (juno_engine_prepare owns the power-on default 2), so
+ * this writes the EFFECT TYPE program cell directly — same effect the old
+ * attach-time seed had for callers of this API. A subsequent patch apply
+ * overrides it with the patch's own EFFECT TYPE, exactly as before. */
 void juno_gui_set_chorus_mode(juno_ctx *c, int mode)
 {
     c->chorus_mode = mode;
     juno_driver_attach_host(c->st, &c->shim, mode);
+    *(int32_t *)(c->st + JUNO_PROG_EFX) = mode;
 }
 
 /* Poke the voice-0 note-on edge state[101504]. KNOWN LIMITATION: the real
@@ -705,40 +710,50 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, floa
 
 /* Core recall: apply patch `idx` from `bank` into the engine coefficient slots
  * via the bit-exact applier (src/juno_apply.c), then re-derive the per-patch
- * voice/arp/FX driver state. `flush` controls sounding voices: 1 = release them
- * first and seed all 8 voices from voice 0 (a fresh patch LOAD starts clean);
- * 0 = live host-parameter EDIT — propagate ONLY the cells the recall actually
- * changed to voices 1..7, so every voice's evolved runtime state (gate, CV,
- * envelope/LFO phase, note velocity) survives the edit. A full seed here would
- * clone voice 0's ENTIRE block — killing a note held on voices 1..7 (idle state
- * overwrites it) or cloning a note held on voice 0 into a stuck 8-voice drone.
- * Returns # coefficients set (0 on alloc failure in the live-edit path). */
+ * voice/arp/FX driver state. `flush`: 1 = a patch LOAD (release sounding voices,
+ * reset the arp selector); 0 = live host-parameter EDIT (held notes keep
+ * ringing, unchanged-arp reconfig skipped).
+ *
+ * BOTH paths replicate the recall to voices 1..7 as a byte DELTA: snapshot
+ * voice 0's block, run the recall (it writes ONLY voice-0 coefficient cells +
+ * master/FX cells — never note runtime), then copy exactly the changed voice-0
+ * bytes across. That is the plugin's own recall semantics: its per-unit
+ * dispatch writes coefficient cells and leaves every voice's evolved RUNTIME
+ * (converged smoother outputs/history — e.g. the per-voice CONDITION-target
+ * smoothers at rel 4640/4752/5296.., which idle to per-voice-distinct values)
+ * untouched. The old load path instead memcpy'd voice 0's ENTIRE block over
+ * voices 1..7: invisible from a cold state (all runtime still identical, so
+ * every cold gate stayed green) but on a WARM engine — the DAW/webapp case —
+ * it falsified the rotation voice's smoother seeds, so the first warm note
+ * diverged from the plugin (BS Solid user report; proven by the per-unit
+ * idle_units state diff, 2026-07-19). Cells the recall left identical are
+ * already correct on the other voices (the last load/edit put them there);
+ * per-voice CONDITION/UNISON scatter is re-applied below on all 8 voices.
+ * Returns # coefficients set; on snapshot alloc failure the LOAD path falls
+ * back to full apply+seed (cold-equivalent, never skips the recall) while the
+ * EDIT path returns 0 unapplied. */
 static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush)
 {
     int n, mode = 0, oct = 1, on, porta = 0;
-    if (flush) {
-        n = juno_bank_apply(c->st, bank, idx);
-        juno_driver_seed_voices(c->st);  /* all 8 voices play the applied patch */
-    } else {
-        /* Live edit: snapshot voice 0's block, run the recall (it writes ONLY
-         * voice-0 coefficient cells + master/FX cells — never note runtime), then
-         * copy exactly the changed voice-0 bytes to voices 1..7. Cells the recall
-         * left identical are already correct on the other voices (last load/edit
-         * put them there; per-voice CONDITION/UNISON scatter is re-applied below,
-         * same order as the load path). */
+    {
         unsigned char *pre = malloc(JUNO_VOICE_MAIN_STRIDE);
         const unsigned char *v0 = c->st + 176;
         int v;
         unsigned i;
-        if (!pre) return 0;
-        memcpy(pre, c->st + 176, JUNO_VOICE_MAIN_STRIDE);
-        n = juno_bank_apply(c->st, bank, idx);
-        for (v = 1; v < JUNO_NUM_VOICES; ++v) {
-            unsigned char *dst = c->st + 176 + (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
-            for (i = 0; i < JUNO_VOICE_MAIN_STRIDE; ++i)
-                if (v0[i] != pre[i]) dst[i] = v0[i];
+        if (!pre) {
+            if (!flush) return 0;
+            n = juno_bank_apply(c->st, bank, idx);
+            juno_driver_seed_voices(c->st);  /* degraded fallback: full seed */
+        } else {
+            memcpy(pre, c->st + 176, JUNO_VOICE_MAIN_STRIDE);
+            n = juno_bank_apply(c->st, bank, idx);
+            for (v = 1; v < JUNO_NUM_VOICES; ++v) {
+                unsigned char *dst = c->st + 176 + (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
+                for (i = 0; i < JUNO_VOICE_MAIN_STRIDE; ++i)
+                    if (v0[i] != pre[i]) dst[i] = v0[i];
+            }
+            free(pre);
         }
-        free(pre);
     }
     /* CONDITION analog voice-scatter: per-voice detune/level, applied AFTER seed (it
      * makes the 8 voices deliberately non-identical — the plugin's component-tolerance

@@ -40,14 +40,19 @@ COND_LOCAL = (5520, 7600, 10320)
 
 # FX-recall DEFAULT cells: the plugin front-loads these delay/reverb defaults at
 # setSampleRate, but the PORT writes them lazily at per-patch recall (grep-confirmed:
-# src/delay_recall.c writes 102544 / 10759360 / 10759472 / 10759840; the routing int
-# 11022052 and the master block counter 11022344 are engine plumbing). They are 0 at
-# the port's unapplied default, where delay+reverb are OFF (reverb send=0, delay
-# TYPE=0 -> wet=0), so they are audio-inert there; once a patch engages the effect,
-# recall writes them and the render A/B is bit-exact on all 64 patches. They are NOT
-# init/prepare constants (this gate's subject), so they are excluded here and proven
-# by the FX-render row instead.
-FX_RECALL_DEFAULT = {102544, 10759360, 10759472, 10759840, 11022052, 11022344}
+# src/delay_recall.c writes 102544 / 10759360 / 10759472 / 10759840; the master
+# block counter 11022344 is engine plumbing). They are 0 at the port's unapplied
+# default, where delay+reverb are OFF (reverb send=0, delay TYPE=0 -> wet=0), so
+# they are audio-inert there; once a patch engages the effect, recall writes them
+# and the render A/B is bit-exact on all 64 patches. They are NOT init/prepare
+# constants (this gate's subject), so they are excluded here and proven by the
+# FX-render row instead.
+# (11022052 — the plugin's slot-2 EFFECT-routing int, power-on 2 — was excluded
+# here until 2026-07-19. That exclusion hid a REAL divergence: the port seeded its
+# routing 0, idling in the Pan arm while the plugin free-runs the chorus arm from
+# power-on, which broke warm/DAW-parity on every chorus patch (BS Solid report).
+# juno_engine_prepare now writes the proven power-on value, so the cell is GATED.)
+FX_RECALL_DEFAULT = {102544, 10759360, 10759472, 10759840, 11022344}
 
 def rate_arg():
     return float(sys.argv[2]) if len(sys.argv) > 2 else 48000.0

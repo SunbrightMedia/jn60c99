@@ -11,10 +11,12 @@
 #ifndef JUNO_DELAY_RECALL_H
 #define JUNO_DELAY_RECALL_H
 
-/* Engine cells holding the two effect-slot program selectors (int32). The master
- * reads them through the host-params pointer chase off state+136. */
-#define JUNO_PROG_DLY  11022056   /* v39  — DELAY TYPE (slot 1) */
-#define JUNO_PROG_EFX  11022060   /* v551 — EFFECT TYPE (slot 2) */
+/* Engine cells holding the two effect-slot program selectors (int32) — the
+ * plugin's OWN cells (setter-proven: the DELAY/EFFECT TYPE setters write
+ * clamp(v,<=5) to exactly these offsets for all 256 values; ext_sweeps.py).
+ * The master reads them through the host-params pointer chase off state+136. */
+#define JUNO_PROG_DLY  11022056   /* v39  — DELAY TYPE (slot 1), power-on 0  */
+#define JUNO_PROG_EFX  11022052   /* v551 — EFFECT TYPE (slot 2), power-on 2 */
 
 /* Apply the per-patch delay recall for one bank record (`rec` points at the start
  * of the 20223-byte patch record, i.e. bank + header + idx*stride). Writes the
