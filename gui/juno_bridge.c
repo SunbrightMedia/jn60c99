@@ -649,6 +649,26 @@ void juno_gui_note_off(juno_ctx *c, int midi_note)
  * plugin's arp is host-synced, so BPM is a host input, not a patch value). gate:
  * note-on fraction 0..1, quantised to the machine's GATE table (<0 keeps current).
  * Toggling on/off flushes held keys + any sounding step so play stays clean. */
+/* Host transport tempo push: re-time everything tempo-synced (arp clock, synced
+ * LFO rate cell 1072, synced delay time 102352 + instance cells) WITHOUT touching
+ * the arp pattern/selector state — the plugin's response to a DAW tempo change.
+ * The web host calls this after EVERY recall (patch apply AND live host-param
+ * edit): the recall re-bakes the synced delay cells at the plugin's 128-BPM
+ * recall default (proven: juno_apply_delay_tempo(128) reproduces the baked cells
+ * bit-identically), so without a re-push the tempo-synced echoes land 128/120 =
+ * 6.7% off the arp's step grid — audibly "off-time" on delay-heavy arp presets.
+ * Both appliers are patch-gated (inert while the patch's sync flags are off), so
+ * non-synced presets are byte-identical with or without the push. */
+void juno_gui_set_tempo(juno_ctx *c, float bpm)
+{
+    if (!c || bpm <= 0.0f) return;
+    c->host_bpm = bpm;
+    carp_set_bpm(&c->arp, (double)bpm);
+    juno_apply_lfo_tempo(c->st, c->lfo_rate_byte, (float)c->arp.bpm);
+    juno_apply_delay_tempo(c->st, c->dly_time_byte, c->dly_sync, c->dly_type,
+                           (float)c->arp.bpm);
+}
+
 void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, float gate)
 {
     int was, type;
