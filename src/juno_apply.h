@@ -87,8 +87,9 @@ int         juno_host_param_count(void);
 const char *juno_host_param_name(int i);
 const char *juno_host_param_section(int i);
 int         juno_host_param_roff(int i);
-int         juno_host_param_type(int i);    /* 0=int1x7 (0..127), 1=int2x4, 2=int8x4 (both 0..255) */
-int         juno_host_param_max(int i);     /* value ceiling: 127 for int1x7, else 255 */
+int         juno_host_param_type(int i);    /* 0=int1x7 (1 byte), 1=int2x4, 2=int8x4 (nibble-pair low byte) */
+int         juno_host_param_min(int i);     /* semantic Script.xml range; min<0 = two's-complement byte */
+int         juno_host_param_max(int i);
 int         juno_host_param_default(int i);
 int         juno_host_param_decode(const unsigned char *rec, int i);
 void        juno_host_param_encode(unsigned char *rec, int i, int v); /* type-aware record write */

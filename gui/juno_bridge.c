@@ -102,6 +102,13 @@ typedef struct {
     unsigned char *bank;
     int   bank_len;
     int   patch_idx;
+
+    /* Last raw SCATTER TYPE/DEPTH handed to carp_set_scatter, so a live edit can
+     * skip the arp reconfig when the patch's arp settings are unchanged (the
+     * reconfig resets the pattern selector to step 0 — audible restart on every
+     * slider move otherwise). calloc zero-init == carp_init's (0,0) default. */
+    int   last_scatter_type;
+    int   last_scatter_depth;
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -679,14 +686,40 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, floa
 /* Core recall: apply patch `idx` from `bank` into the engine coefficient slots
  * via the bit-exact applier (src/juno_apply.c), then re-derive the per-patch
  * voice/arp/FX driver state. `flush` controls sounding voices: 1 = release them
- * first (a fresh patch LOAD starts clean); 0 = leave held notes ringing (a live
- * host-parameter EDIT — the voices are reseeded with the new coefficients but the
- * gate stays on). Returns # coefficients set. */
+ * first and seed all 8 voices from voice 0 (a fresh patch LOAD starts clean);
+ * 0 = live host-parameter EDIT — propagate ONLY the cells the recall actually
+ * changed to voices 1..7, so every voice's evolved runtime state (gate, CV,
+ * envelope/LFO phase, note velocity) survives the edit. A full seed here would
+ * clone voice 0's ENTIRE block — killing a note held on voices 1..7 (idle state
+ * overwrites it) or cloning a note held on voice 0 into a stuck 8-voice drone.
+ * Returns # coefficients set (0 on alloc failure in the live-edit path). */
 static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush)
 {
     int n, mode = 0, oct = 1, on, porta = 0;
-    n = juno_bank_apply(c->st, bank, idx);
-    juno_driver_seed_voices(c->st);      /* all 8 voices play the applied patch */
+    if (flush) {
+        n = juno_bank_apply(c->st, bank, idx);
+        juno_driver_seed_voices(c->st);  /* all 8 voices play the applied patch */
+    } else {
+        /* Live edit: snapshot voice 0's block, run the recall (it writes ONLY
+         * voice-0 coefficient cells + master/FX cells — never note runtime), then
+         * copy exactly the changed voice-0 bytes to voices 1..7. Cells the recall
+         * left identical are already correct on the other voices (last load/edit
+         * put them there; per-voice CONDITION/UNISON scatter is re-applied below,
+         * same order as the load path). */
+        unsigned char *pre = malloc(JUNO_VOICE_MAIN_STRIDE);
+        const unsigned char *v0 = c->st + 176;
+        int v;
+        unsigned i;
+        if (!pre) return 0;
+        memcpy(pre, c->st + 176, JUNO_VOICE_MAIN_STRIDE);
+        n = juno_bank_apply(c->st, bank, idx);
+        for (v = 1; v < JUNO_NUM_VOICES; ++v) {
+            unsigned char *dst = c->st + 176 + (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
+            for (i = 0; i < JUNO_VOICE_MAIN_STRIDE; ++i)
+                if (v0[i] != pre[i]) dst[i] = v0[i];
+        }
+        free(pre);
+    }
     /* CONDITION analog voice-scatter: per-voice detune/level, applied AFTER seed (it
      * makes the 8 voices deliberately non-identical — the plugin's component-tolerance
      * emulation). Default patch value 128 -> full scatter. */
@@ -732,19 +765,31 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
     }
     /* Per-patch ARPEGGIATOR recall: on/mode/range come from the patch (bit-exact,
      * see juno_bank_arp); rate stays local (the plugin's arp is host-tempo-synced,
-     * no per-patch rate). This makes "arp presets" arpeggiate on load. */
-    on = juno_bank_arp(bank, idx, &mode, &oct);
-    juno_gui_arp_config(c, on, mode, oct, -1.0f, -1.0f);  /* keep UI bpm/gate */
-    /* Per-patch SCATTER pattern grid: SCATTER TYPE/DEPTH (proven leaf 92/93 ->
-     * record byte 322/330) select the arp's STEP x SLOT grid via carp_set_scatter.
-     * All 64 factory patches decode to (0,0) = the default slab0/sub7 grid, so this
-     * is inert for the stock bank but recalls correctly for any non-default patch.
-     * Applied AFTER arp_config (which resets the selector) so the pattern load lands
-     * last. See scratchpad/oracle/scatter_recall_spec.md. */
+     * no per-patch rate). This makes "arp presets" arpeggiate on load.
+     * On a LIVE EDIT (flush=0) the reconfig is SKIPPED when the recalled arp
+     * settings equal the running state: juno_gui_arp_config -> carp_set_mode
+     * unconditionally resets the pattern selector to step 0, so re-running it on
+     * every slider move audibly restarted the arpeggio mid-pattern. When the edit
+     * DID change an arp setting (SW/TYPE/STEP sliders), the reset is the correct
+     * mode-change semantics and runs as before. */
     {
         int stype = 0, sdepth = 0;
+        int cur_mode = (c->arp.type == 0) ? 0 : (c->arp.type == 1) ? 2 : 1;
+        int cur_oct  = c->arp.range + 1;
+        on = juno_bank_arp(bank, idx, &mode, &oct);
         juno_bank_scatter(bank, idx, &stype, &sdepth);
-        carp_set_scatter(&c->arp, stype, sdepth);
+        if (flush || on != c->arp_on || mode != cur_mode || oct != cur_oct
+                  || stype != c->last_scatter_type || sdepth != c->last_scatter_depth) {
+            juno_gui_arp_config(c, on, mode, oct, -1.0f, -1.0f);  /* keep UI bpm/gate */
+            /* Per-patch SCATTER pattern grid: SCATTER TYPE/DEPTH (proven leaf 92/93
+             * -> record byte 322/330) select the arp's STEP x SLOT grid. All 64
+             * factory patches decode to (0,0) = the default slab0/sub7 grid. Applied
+             * AFTER arp_config (which resets the selector) so the pattern load lands
+             * last. See scratchpad/oracle/scatter_recall_spec.md. */
+            carp_set_scatter(&c->arp, stype, sdepth);
+            c->last_scatter_type = stype;
+            c->last_scatter_depth = sdepth;
+        }
     }
     /* Per-patch TEMPO-SYNCED LFO rate (cell 1072): stash the LFO RATE byte so a later
      * host tempo change (juno_gui_arp_config with bpm > 0) recomputes 1072 =
@@ -764,10 +809,14 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
 /* Apply bank patch `idx` (raw KoaBankFile00003 bytes in `bank`, `len` bytes) into
  * this engine's coefficient slots. Retains a mutable copy of the bank so the
  * host-parameter panel can edit a record byte and re-run the EXACT same recall.
- * Returns # coefficients set. */
+ * Returns # coefficients set. Rejects any idx whose full record does not fit in
+ * len (juno_bank_num_patches): recall READS and the host-param panel WRITES
+ * record bytes, so applying a truncated bank would be an out-of-bounds access
+ * (native: segfault; WASM: silent heap corruption). */
 int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx)
 {
     if (!c || !bank || len <= 0) return 0;
+    if (idx < 0 || idx >= juno_bank_num_patches(bank, (unsigned long)len)) return 0;
     if (c->bank_len != len) {
         free(c->bank);
         c->bank = malloc((size_t)len);
@@ -790,6 +839,7 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
 int         juno_gui_host_count(void)        { return juno_host_param_count(); }
 const char *juno_gui_host_name(int i)        { return juno_host_param_name(i); }
 const char *juno_gui_host_section(int i)     { return juno_host_param_section(i); }
+int         juno_gui_host_min(int i)         { return juno_host_param_min(i); }
 int         juno_gui_host_max(int i)         { return juno_host_param_max(i); }
 
 int juno_gui_host_get(juno_ctx *c, int i)

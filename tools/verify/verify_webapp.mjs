@@ -67,14 +67,34 @@ console.log(`panel: ${nRows} controls in ${nSecs.length} sections:`, nSecs.join(
 // be all-zero (patch 5 loaded real bytes)
 const vals = await page.$$eval("main#list .p input[type=number]", ins => ins.map(i => +i.value));
 const swVals = await page.$$eval("main#list .p button.sw", bs => bs.map(b => b.textContent));
-const allByte = vals.every(v => Number.isInteger(v) && v >= 0 && v <= 255);
+const allByte = vals.every(v => Number.isInteger(v) && v >= -3 && v <= 255);   // OCTAVE SHIFT is signed -3..3
 const nonZero = vals.filter(v => v > 0).length;
-console.log(`  numeric controls: ${vals.length} (all 0..255: ${allByte}, non-zero: ${nonZero}); switches: ${swVals.join(",") || "none"}`);
-// move the first slider and confirm the model commits (no throw, value persists)
-await page.$eval("main#list .p input[type=range]", r => { r.value = 200; r.dispatchEvent(new Event("change")); });
+console.log(`  numeric controls: ${vals.length} (all in range: ${allByte}, non-zero: ${nonZero}); switches: ${swVals.join(",") || "none"}`);
+// ranges are the SEMANTIC Script.xml ranges, not the byte width: enums must be
+// stepped (DCO RANGE 0..5), knobs full 0..255
+const ranges = await page.$$eval("main#list .p", rows => rows.slice(0, 20).map(d => {
+  const l = d.querySelector("label"), r = d.querySelector("input[type=range]");
+  return { name: l.title.split("  ")[0] || l.textContent, min: +r.min, max: +r.max };
+}));
+const rangeByName = Object.fromEntries(ranges.map(r => [r.name, r]));
+const dcoRange = rangeByName["DCO RANGE"], cutoff = rangeByName["VCF CUTOFF FREQ"];
+console.log(`  semantic ranges: DCO RANGE ${dcoRange?.min}..${dcoRange?.max}, VCF CUTOFF FREQ ${cutoff?.min}..${cutoff?.max}`);
+const rangesOK = dcoRange && dcoRange.max === 5 && cutoff && cutoff.max === 255;
+// move the VCF CUTOFF slider (a full 0..255 knob) and confirm the model commits
+await page.$$eval("main#list .p", rows => {
+  for (const d of rows) if (d.querySelector("label").title.startsWith("VCF CUTOFF FREQ") &&
+                            !d.querySelector("label").title.includes(" H")) {
+    const r = d.querySelector("input[type=range]");
+    r.value = 200; r.dispatchEvent(new Event("change")); return;
+  }
+});
 await page.waitForTimeout(50);
-const moved = await page.$eval("main#list .p input[type=number]", i => +i.value);
-console.log("  first slider set to 200 ->", moved);
+const moved = await page.$$eval("main#list .p", rows => {
+  for (const d of rows) if (d.querySelector("label").title.startsWith("VCF CUTOFF FREQ") &&
+                            !d.querySelector("label").title.includes(" H"))
+    return +d.querySelector("input[type=number]").value;
+});
+console.log("  VCF CUTOFF FREQ slider set to 200 ->", moved);
 // a >16-char param name must have survived UTF8ToString intact (the TextDecoder
 // path is only taken for strings longer than 16 bytes — short names can render
 // fine while every long name throws, which is exactly the user-reported failure)
@@ -82,18 +102,32 @@ const longName = await page.$$eval("main#list .p label", ls =>
   ls.map(l => l.title.split("  ")[0]).find(t => t.length > 16) || "");
 console.log(`  >16-char param name rendered: "${longName}"`);
 const panelOK = nRows >= 21 && nSecs.length >= 6 && allByte && nonZero >= 5 && moved === 200
-  && longName.length > 16;
+  && longName.length > 16 && rangesOK;
 
 // press + hold a piano key (mousedown fires note-on + ensureAudio)
 await page.dispatchEvent(".key.w", "mousedown");
 await page.waitForTimeout(900);
 const peak = await page.evaluate(() => window.__peak || 0);
-await page.dispatchEvent(".key.w", "mouseup");
 console.log("audio peak after keypress:", peak);
+// MID-NOTE EDIT continuity: while the key is still held, move a slider — the
+// note must keep ringing (regression guard for the live-edit voice-clobber bug:
+// ctx_recall(flush=0) must not reseed runtime state over the sounding voice)
+await page.evaluate(() => { window.__peak = 0; });
+await page.$$eval("main#list .p", rows => {
+  for (const d of rows) if (d.querySelector("label").title.startsWith("VCF RESONANCE")) {
+    const r = d.querySelector("input[type=range]");
+    r.value = 30; r.dispatchEvent(new Event("change")); return;
+  }
+});
+await page.waitForTimeout(700);
+const peakAfterEdit = await page.evaluate(() => window.__peak || 0);
+await page.dispatchEvent(".key.w", "mouseup");
+console.log("audio peak AFTER mid-note edit (note still held):", peakAfterEdit);
+const midNoteOK = peakAfterEdit > 1e-3;
 console.log("console errors:", errors.length ? errors : "none");
 
-const ok = nOpts === 64 && peak > 1e-3 && errors.length === 0 && panelOK && rabOK;
-console.log(ok ? "\nOK: bundled app boots, loads bank, applies patch, panel reflects patch bytes, and MAKES SOUND"
-               : `\nFAIL (bank=${nOpts===64} audio=${peak>1e-3} noErrors=${errors.length===0} panel=${panelOK} resizableAB=${rabOK})`);
+const ok = nOpts === 64 && peak > 1e-3 && errors.length === 0 && panelOK && rabOK && midNoteOK;
+console.log(ok ? "\nOK: bundled app boots, loads bank, applies patch, panel reflects patch bytes, MAKES SOUND, and a held note survives a live edit"
+               : `\nFAIL (bank=${nOpts===64} audio=${peak>1e-3} noErrors=${errors.length===0} panel=${panelOK} resizableAB=${rabOK} midNote=${midNoteOK})`);
 await browser.close(); srv.close();
 process.exit(ok ? 0 : 1);

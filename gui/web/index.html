@@ -124,7 +124,7 @@ import { decodeBank } from "./bank.js";
 
 /* Cache-buster: build.sh rewrites this to the WASM content hash each build, so a new
  * engine is always fetched fresh instead of served from the browser/CDN cache. */
-const BUILD_VER = "fc87db18543d";
+const BUILD_VER = "809b19e246ad";
 
 // The plugin runs its DSP natively at the host sample rate (no oversampling, no
 // decimator). SR is replaced at boot with the AudioContext's ACTUAL rate so the
@@ -182,7 +182,7 @@ function prettify(name, sec) {
 
 let M, ctx, get, set, chorusFn, gateFn, renderFn, malloc, free;
 let noteOnFn, noteOffFn, applyBankFn, renderDryFn, arpFn, getArpFn, warmupFn;
-let hostCountFn, hostNameFn, hostSectionFn, hostMaxFn, hostGetFn, hostSetFn;
+let hostCountFn, hostNameFn, hostSectionFn, hostMinFn, hostMaxFn, hostGetFn, hostSetFn;
 let arpOn = false;
 let PARAMS = [];
 
@@ -196,6 +196,7 @@ async function boot() {
   hostCountFn   = M.cwrap("juno_gui_host_count","number",[]);
   hostNameFn    = M.cwrap("juno_gui_host_name","string",["number"]);
   hostSectionFn = M.cwrap("juno_gui_host_section","string",["number"]);
+  hostMinFn     = M.cwrap("juno_gui_host_min","number",["number"]);
   hostMaxFn     = M.cwrap("juno_gui_host_max","number",["number"]);
   hostGetFn     = M.cwrap("juno_gui_host_get","number",["number","number"]);
   hostSetFn     = M.cwrap("juno_gui_host_set",null,["number","number","number"]);
@@ -256,10 +257,11 @@ function buildParams() {
   for (let i = 0; i < n; i++) {
     const name = hostNameFn(i) || ("param " + i);
     const sec = hostSectionFn(i) || "GLOBAL";
-    const max = hostMaxFn(i) || 255;
-    const sord = SECTION_ORDER.indexOf(sec);
+    const min = hostMinFn(i);                 // semantic Script.xml range: enums get
+    const max = hostMaxFn(i) || 255;          // their true step count, OCTAVE SHIFT
+    const sord = SECTION_ORDER.indexOf(sec);  // is signed -3..3, knobs stay 0..255
     list.push({ idx: i, name, section: sec, secLabel: SECTION_LABEL[sec] || sec,
-                label: prettify(name, sec), max, val: 0,
+                label: prettify(name, sec), min, max, val: 0,
                 inert: INERT.has(name), sord: sord < 0 ? 99 : sord });
   }
   list.sort((a, b) => a.sord - b.sord || a.idx - b.idx);
@@ -284,9 +286,9 @@ function rowFor(p) {
   if (p.inert) { const t = document.createElement("span"); t.className = "tag"; t.textContent = "recall-only"; lab.appendChild(t); }
   const mid = document.createElement("div");
   const num = document.createElement("input");
-  num.type="number"; num.min=0; num.max=p.max; num.step=1; num.value=p.val;
+  num.type="number"; num.min=p.min; num.max=p.max; num.step=1; num.value=p.val;
   const r = document.createElement("input"); r.type="range";
-  r.min=0; r.max=p.max; r.step=1; r.value=p.val;
+  r.min=p.min; r.max=p.max; r.step=1; r.value=p.val;
   r.oninput  = () => num.value = r.value;
   r.onchange = () => { commit(p, +r.value); num.value=p.val; r.value=p.val; };
   num.onchange = () => { commit(p, +num.value); r.value=p.val; num.value=p.val; };
@@ -299,10 +301,13 @@ function rowFor(p) {
 // value back so the model reflects the byte the engine actually stored.
 function commit(p, v) {
   if (!ctx) return;
-  v = Math.max(0, Math.min(p.max, Math.round(v) || 0));
+  v = Math.max(p.min, Math.min(p.max, Math.round(v) || 0));
+  if (!BANK_RAW) { status(`${p.label}: load a bank first — edits apply to the loaded patch`); return; }
   hostSetFn(ctx, p.idx, v);
-  const rb = hostGetFn(ctx, p.idx);
-  p.val = rb < 0 ? v : rb;
+  // Read back through the engine's own decode (signed leaves like OCTAVE SHIFT
+  // return negatives, so a negative readback is a VALUE here, not an error —
+  // with a bank loaded the decode cannot fail).
+  p.val = hostGetFn(ctx, p.idx);
   status(`${p.label} (${p.section}) = ${p.val}${p.inert ? " · recall-only (no audible change here)" : ""}`);
 }
 
@@ -380,8 +385,9 @@ window.loadBank = (inp) => {
   const rd = new FileReader();
   rd.onload = () => {
     try {
-      BANK_RAW = new Uint8Array(rd.result);           // raw bytes for the C applier
-      BANK = decodeBank(rd.result); showBank();
+      BANK = decodeBank(rd.result);                   // validates magic/size — throws on junk
+      BANK_RAW = new Uint8Array(rd.result);           // retained ONLY after validation, so a
+      showBank();                                     // malformed file never reaches the C applier
       status(`bank loaded: ${BANK.patch_count} patches`);
     }
     catch (e) { status("bank error: " + e.message); alert("Could not read bank:\n" + e.message); }
@@ -413,7 +419,9 @@ function applyPatchIndex(idx) {
 // (juno_gui_host_get decodes the retained patch record with the plugin's per-leaf
 // decode) — so each slider shows exactly what the engine recalled.
 function reflectFromRecord(idx) {
-  for (const p of PARAMS) { const v = hostGetFn(ctx, p.idx); p.val = v < 0 ? 0 : v; }
+  // Called only after a successful apply (bank retained), so decode cannot fail;
+  // negative values are genuine (signed leaves, e.g. OCTAVE SHIFT -3..3).
+  for (const p of PARAMS) p.val = hostGetFn(ctx, p.idx);
   renderList();
 }
 

@@ -336,8 +336,14 @@ float juno_apply_param(unsigned char *state, int i, int byte, int Hr)
 
 int juno_bank_num_patches(const unsigned char *bank, unsigned long len)
 {
+    unsigned long n;
     if (len < BANK_HEADER || bank[0] != 'K') return 0;   /* "KoaBankFile00003" */
-    return BANK_COUNT;
+    /* Only count patches whose FULL record fits in len: a truncated file must not
+     * claim records it doesn't contain (recall reads + the host-param panel writes
+     * record bytes, so an over-count is an out-of-bounds access, not just a bad
+     * name in a list). */
+    n = (len - BANK_HEADER) / BANK_STRIDE;
+    return n > BANK_COUNT ? BANK_COUNT : (int)n;
 }
 
 int juno_bank_patch_name(const unsigned char *bank, int idx, char out[17])
