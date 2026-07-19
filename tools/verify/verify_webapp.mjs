@@ -28,6 +28,27 @@ await page.waitForSelector("#openbank", { timeout: 30000 });
 const meta = await page.textContent("#meta");
 console.log("boot meta:", meta.trim());
 
+// --- resizable-ArrayBuffer regression guards (the boot-killing TypeError class) ---
+// (1) the shipped engine glue must not opt into the resizable heap path at all;
+// (2) the page's TextDecoder shim must decode a view over a genuinely resizable
+//     ArrayBuffer — the exact operation that threw in end-user browsers whose
+//     TextDecoder rejects resizable buffers (headless CI Chromium lacks
+//     toResizableBuffer, so only these two checks cover that environment here).
+const rab = await page.evaluate(() => {
+  const out = { glueHasToResizable: /toResizableBuffer/.test(document.documentElement.innerHTML) };
+  // the shim marks itself — this proves it is INSTALLED, which a lenient-decoder
+  // browser (like headless CI Chromium) could not otherwise distinguish
+  out.shimInstalled = TextDecoder.prototype.decode.__junoRabShim === true;
+  try {
+    const b = new ArrayBuffer(24, { maxByteLength: 64 });
+    new Uint8Array(b).set([...Array(24)].map((_, i) => 65 + (i % 26)));
+    out.shimDecodesResizable = new TextDecoder().decode(new Uint8Array(b, 0, 20)).length === 20;
+  } catch (e) { out.shimDecodesResizable = false; out.err = String(e); }
+  return out;
+});
+console.log("resizable-AB guards:", JSON.stringify(rab));
+const rabOK = !rab.glueHasToResizable && rab.shimInstalled === true && rab.shimDecodesResizable === true;
+
 await page.click("#openbank");
 await page.waitForSelector("#banksel option", { state: "attached", timeout: 5000 });
 const nOpts = await page.$$eval("#banksel option", o => o.length);
@@ -54,7 +75,14 @@ await page.$eval("main#list .p input[type=range]", r => { r.value = 200; r.dispa
 await page.waitForTimeout(50);
 const moved = await page.$eval("main#list .p input[type=number]", i => +i.value);
 console.log("  first slider set to 200 ->", moved);
-const panelOK = nRows >= 21 && nSecs.length >= 6 && allByte && nonZero >= 5 && moved === 200;
+// a >16-char param name must have survived UTF8ToString intact (the TextDecoder
+// path is only taken for strings longer than 16 bytes — short names can render
+// fine while every long name throws, which is exactly the user-reported failure)
+const longName = await page.$$eval("main#list .p label", ls =>
+  ls.map(l => l.title.split("  ")[0]).find(t => t.length > 16) || "");
+console.log(`  >16-char param name rendered: "${longName}"`);
+const panelOK = nRows >= 21 && nSecs.length >= 6 && allByte && nonZero >= 5 && moved === 200
+  && longName.length > 16;
 
 // press + hold a piano key (mousedown fires note-on + ensureAudio)
 await page.dispatchEvent(".key.w", "mousedown");
@@ -64,8 +92,8 @@ await page.dispatchEvent(".key.w", "mouseup");
 console.log("audio peak after keypress:", peak);
 console.log("console errors:", errors.length ? errors : "none");
 
-const ok = nOpts === 64 && peak > 1e-3 && errors.length === 0 && panelOK;
+const ok = nOpts === 64 && peak > 1e-3 && errors.length === 0 && panelOK && rabOK;
 console.log(ok ? "\nOK: bundled app boots, loads bank, applies patch, panel reflects patch bytes, and MAKES SOUND"
-               : `\nFAIL (bank=${nOpts===64} audio=${peak>1e-3} noErrors=${errors.length===0} panel=${panelOK})`);
+               : `\nFAIL (bank=${nOpts===64} audio=${peak>1e-3} noErrors=${errors.length===0} panel=${panelOK} resizableAB=${rabOK})`);
 await browser.close(); srv.close();
 process.exit(ok ? 0 : 1);

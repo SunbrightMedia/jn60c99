@@ -102,9 +102,29 @@
 <script type="module">
 import { decodeBank } from "./bank.js";
 
+/* TextDecoder hardening: emscripten can back the WASM heap with a RESIZABLE
+ * ArrayBuffer (via the wasm memory's resizable-buffer accessor) in browsers that
+ * support it, and some browsers' TextDecoder then throws "provided ArrayBuffer
+ * value must not be resizable" on any heap view — killing boot on the first C
+ * string >16 bytes (param names). The engine is built with
+ * -sGROWABLE_ARRAYBUFFERS=0 so this path is off at the toolchain level; this shim
+ * is the defense-in-depth: copy any view over a resizable/growable buffer into a
+ * fresh fixed buffer before decoding. */
+{
+  const _decode = TextDecoder.prototype.decode;
+  const shimmed = function (input, opts) {
+    if (input && ArrayBuffer.isView(input) &&
+        (input.buffer.resizable === true || input.buffer.growable === true))
+      input = input.slice();           // copy -> non-resizable backing buffer
+    return _decode.call(this, input, opts);
+  };
+  shimmed.__junoRabShim = true;        // presence marker asserted by verify_webapp.mjs
+  TextDecoder.prototype.decode = shimmed;
+}
+
 /* Cache-buster: build.sh rewrites this to the WASM content hash each build, so a new
  * engine is always fetched fresh instead of served from the browser/CDN cache. */
-const BUILD_VER = "682c05034a8e";
+const BUILD_VER = "fc87db18543d";
 
 // The plugin runs its DSP natively at the host sample rate (no oversampling, no
 // decimator). SR is replaced at boot with the AudioContext's ACTUAL rate so the

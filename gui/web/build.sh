@@ -10,12 +10,27 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo root
 
-emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing gui/juno_bridge.c src/*.c -lm \
+# -sGROWABLE_ARRAYBUFFERS=0 is load-bearing: emcc 6.x defaults it ON, making the
+# WASM heap a resizable ArrayBuffer in browsers that support toResizableBuffer().
+# Some browsers' TextDecoder rejects views over resizable buffers ("must not be
+# resizable"), so UTF8ToString (any C string >16 bytes returned via cwrap) throws
+# at boot. Headless-CI Chromium lacks toResizableBuffer and silently falls back,
+# so ONLY end users hit it — hence the explicit off + the emitted-code guard below.
+emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing -sGROWABLE_ARRAYBUFFERS=0 \
+  gui/juno_bridge.c src/*.c -lm \
   -s EXPORTED_FUNCTIONS='["_juno_gui_create","_juno_gui_set","_juno_gui_get","_juno_gui_recall_factory","_juno_gui_set_chorus_mode","_juno_gui_gate","_juno_gui_note_on","_juno_gui_note_off","_juno_gui_arp_config","_juno_gui_get_arp","_juno_gui_apply_bank","_juno_gui_render","_juno_gui_render_dry","_juno_gui_param_count","_juno_gui_param_name","_juno_gui_param_offset","_juno_gui_param_blob","_juno_gui_set_param","_juno_gui_host_count","_juno_gui_host_name","_juno_gui_host_section","_juno_gui_host_max","_juno_gui_host_get","_juno_gui_host_set","_juno_gui_warmup","_malloc","_free"]' \
   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32","HEAPU8","UTF8ToString"]' \
   -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORT_NAME=JunoModule \
   -s ENVIRONMENT=web \
   -o gui/web/juno.js
+
+# Guard: if a future emsdk re-introduces the resizable-heap path despite the flag,
+# fail the build instead of shipping a latent boot crash (see comment above).
+if grep -q "toResizableBuffer" gui/web/juno.js; then
+  echo "ERROR: juno.js still calls toResizableBuffer — resizable-heap path re-enabled" >&2
+  echo "       (TextDecoder in some browsers rejects resizable buffers; see build.sh)" >&2
+  exit 1
+fi
 
 python3 - <<'PY'
 import re, json
@@ -30,9 +45,10 @@ json.dump(sorted(out), open("gui/web/params.json", "w"))
 print("params.json:", len(out), "params")
 PY
 
-# Cache-busting: stamp index.html with the WASM content hash so browsers/CDN fetch
-# the new engine instead of a stale juno.wasm (same filename would otherwise cache).
-VER=$(sha256sum gui/web/juno.wasm | cut -c1-12)
+# Cache-busting: stamp index.html with a hash of BOTH juno.wasm and juno.js —
+# a JS-glue-only change (e.g. a linker-flag fix) must also bust the cache, or
+# browsers keep serving the old glue under the unchanged ?v=.
+VER=$(cat gui/web/juno.wasm gui/web/juno.js | sha256sum | cut -c1-12)
 sed -i "s/const BUILD_VER = \"[^\"]*\"/const BUILD_VER = \"$VER\"/" gui/web/index.html
 echo "stamped BUILD_VER=$VER"
 
