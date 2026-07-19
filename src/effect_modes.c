@@ -62,6 +62,29 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
     /* Shared slot-2 wet control (read by master_render for EVERY mode at 84544). */
     JF(state, 84544) = efx_bits(EFFECT_SW_LUT[depth & 0xFF]);
 
+    /* EFFECT TYPE 0 — the slot-2 "Pan" arm (the render's v551<=1 branch, block
+     * 84960..85968): a clean level+pan stage sharing mode-1's laws (the DlyPan
+     * class without the distortion stage). The factory bank contains NO type-0
+     * patch, so this arm was invisible to every factory gate — the port left its
+     * two multiplicative enable gates at 0.0, muting the entire slot-2 output
+     * (the master chain is in series, so every type-0 patch rendered SILENT;
+     * found via a user bank with 8 type-0 patches). PROVEN from the plugin's own
+     * recall + 256-value DEPTH/TONE setter sweeps under Unicorn (state diff +
+     * scratchpad mode0 sweeps, 2026-07-19):
+     *   85136 = MODE1_DS_DRIVE_LUT[depth]  (bit-equal at all 256 depth values)
+     *   85984 = MODE1_DS_TONE_LUT[tone]    (bit-equal at all 256 tone values)
+     *   85168 = 85184 = 1.0                (enable gates)
+     * GUARDED to etype==0: the plugin's own recall of a TYPE-2 patch leaves all
+     * four cells at the prepare default 0 (chillwave patch-3 state dump — the
+     * live setters route by the CURRENT type, so the earlier "written for every
+     * type" reading of the type-sweep was staleness, not recall behavior). */
+    if (etype == 0) {
+        JF(state, 85136) = efx_bits(MODE1_DS_DRIVE_LUT[depth & 0xFF]);
+        JF(state, 85984) = efx_bits(MODE1_DS_TONE_LUT[tone & 0xFF]);
+        JF(state, 85168) = 1.0f;
+        JF(state, 85184) = 1.0f;
+    }
+
     if (etype == 1) {                     /* DISTORTION + PANNER (block 86288..87152) */
         write_struct(state, MODE1_STRUCT, MODE1_STRUCT_N);
         JF(state, 86288) = efx_bits(MODE1_DS_DRIVE_LUT[depth & 0xFF]);  /* DS Drive   */

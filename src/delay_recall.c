@@ -286,8 +286,22 @@ static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, f
  * Wired with the sync-aware time `tc`: populating both blocks exactly as the
  * captured master states renders BIT-EXACT under our master path (proven by
  * grafting the plugin's populated blocks into the tap-fixed patch-41 state —
- * stereo-identical over the full 8000-sample capture). */
-static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, float tc)
+ * stereo-identical over the full 8000-sample capture).
+ *
+ * DELAY TYPE 4 (`second`=0): the SAME first-instance delay block as TYPE 1, but
+ * NO second instance. The factory bank contains no type-4 patch, so this arm fell
+ * through the type routing entirely, leaving slot 1 at prepare defaults — TYPE-4
+ * patches rendered SILENT (found via a user bank; 7 patches affected). PROVEN from
+ * the plugin's own recall of a type-4 patch under Unicorn (chillwave patch 14,
+ * state dump 2026-07-19): the first instance carries the full TYPE-1 signature
+ * (102544 rate arm, 102608 0x3bab929a, 102592=0, wet=level/255, per-patch fb law,
+ * ON) while the second instance stays ALL ZERO.
+ *   INCOMPLETE (tracked): TYPE 4 ALSO drives a modulated delay-line/reverb block
+ *   at ~6429408..6430544 (mask 0x2000, -5.6 gain, DPF-family coefficients) that
+ *   this port does not yet populate — so TYPE-4 patches SOUND but are not yet
+ *   bit-exact (the reverb-tail component is missing). Deriving that block is a
+ *   separate task; the delay body above is faithful on its own. */
+static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, float tc, int second)
 {
     int level = blob_val(rec, 52);            /* DELAY LEVEL */
     int fb    = rec_byte(rec, 3057);          /* DELAY FEEDBACK (per-patch law, see TYPE-0) */
@@ -296,31 +310,34 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
     int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
     unsigned k; uint32_t bits; float f;
 
-    /* constant cells for both instances */
+    /* constant cells — first instance always; second instance only for TYPE 1 */
     for (k = 0; k < sizeof(DLY1_A) / sizeof(DLY1_A[0]); k += 2) {
         bits = DLY1_A[k + 1]; memcpy(&f, &bits, sizeof f); JF(state, (int)DLY1_A[k]) = f;
     }
-    for (k = 0; k < sizeof(DLY1_B) / sizeof(DLY1_B[0]); k += 2) {
-        bits = DLY1_B[k + 1]; memcpy(&f, &bits, sizeof f); JF(state, (int)DLY1_B[k]) = f;
-    }
+    if (second)
+        for (k = 0; k < sizeof(DLY1_B) / sizeof(DLY1_B[0]); k += 2) {
+            bits = DLY1_B[k + 1]; memcpy(&f, &bits, sizeof f); JF(state, (int)DLY1_B[k]) = f;
+        }
     /* rate-dependent cells (tables hold the 48k arm; see put_rate above).
      * First instance: 102544 has TYPE-1-specific arms (2sin(pi*10000/H) family);
      * 102608/102656 are rate-CONSTANT for TYPE 1 (verified: plugin@44.1k holds the
      * same 0x3bab929a / 0x3f4ba5b0 the table writes). Second instance mirrors the
      * TYPE-0 block cell-for-cell. */
     put_rate(state, Hr, 102544, 0x3fa754b5u, 0x3f9bd7cau, 0x3f2493b7u, 0x3f2493b7u);
-    put_rate(state, Hr, 4297680, ARM_HCSW);
-    put_rate(state, Hr, 4297776, ARM_LFX1);
-    put_rate(state, Hr, 4297904, ARM_LFX2);
-    put_rate(state, Hr, 4297952, ARM_HFDMP);
+    if (second) {
+        put_rate(state, Hr, 4297680, ARM_HCSW);
+        put_rate(state, Hr, 4297776, ARM_LFX1);
+        put_rate(state, Hr, 4297904, ARM_LFX2);
+        put_rate(state, Hr, 4297952, ARM_HFDMP);
 
-    /* DELAY TIME (sync-aware, same value on both taps — matches every captured
-     * TYPE-1 state, synced and manual). 102352 was already written by the caller. */
-    JF(state, 4297584) = tc;
+        /* DELAY TIME (sync-aware, same value on both taps — matches every captured
+         * TYPE-1 state, synced and manual). 102352 was already written by the caller. */
+        JF(state, 4297584) = tc;
+    }
 
-    /* WET = DELAY LEVEL / 255 on both taps. */
+    /* WET = DELAY LEVEL / 255 (both taps for TYPE 1). */
     JF(state, 102528)  = (float)level / 255.0f;
-    JF(state, 4297760) = (float)level / 255.0f;
+    if (second) JF(state, 4297760) = (float)level / 255.0f;
 
     /* Level gate: first-instance feedback (102560) + ON (102576) and second-instance
      * ON (4297824) drop to 0 when the delay is off (LEVEL < 2); the second-instance
@@ -333,7 +350,7 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
     JF(state, 102560)  = on ? ((float)fb / 255.0f) * 0.9f : 0.0f;
     JF(state, 102512)  = (float)direct / 255.0f;
     JF(state, 102576)  = on ? 1.0f : 0.0f;
-    JF(state, 4297824) = on ? 1.0f : 0.0f;
+    if (second) JF(state, 4297824) = on ? 1.0f : 0.0f;
 }
 
 void juno_apply_delay(unsigned char *state, const unsigned char *rec)
@@ -373,8 +390,11 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
         apply_slot1_reverb(state, rec, tc);
         return;
     }
-    if (dtype == 1) {                          /* dual delay (both instances) */
-        apply_slot1_delay1(state, rec, tc);
+    if (dtype == 1 || dtype == 4) {            /* delay family: 1 = dual (both instances),
+                                                  4 = single (first instance only — PROVEN
+                                                  from the plugin's own recall of a type-4
+                                                  user patch; no factory patch has type 4) */
+        apply_slot1_delay1(state, rec, tc, dtype == 1);
         return;
     }
     if (dtype != 0)                            /* other types: slot 1 not the delay block */

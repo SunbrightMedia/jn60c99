@@ -48,6 +48,14 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
     int tone  = cr_rec_byte(rec, 642);   /* EFFECT TONE  0..255 */
     int etype = cr_rec_byte(rec, 634);   /* EFFECT TYPE  0..5   */
 
+    if (etype == 0) {
+        /* EFFECT TYPE 0 (the slot-2 Pan arm): the plugin's post-recall state
+         * carries block-A Wet = CHORUS_WET_LUT[depth] here too, and ONLY Wet —
+         * Dry/Noise stay at their prepare values (PROVEN: chillwave state diff +
+         * doctored-depth full recalls at 0/128/255, bit-equal; the type-0 render
+         * branch does not read block A, so this is state-faithfulness). */
+        JF(state, 91232) = cr_bits(CHORUS_WET_LUT[depth & 0xFF]);
+    }
     if (etype >= 2 && etype <= 5) {                 /* block A (91120) — chorus modes 2/3/4/5 */
         JF(state, 91216) = 1.3f;                                    /* Dry (const) */
         JF(state, 91232) = cr_bits(CHORUS_WET_LUT[depth & 0xFF]);   /* Wet         */

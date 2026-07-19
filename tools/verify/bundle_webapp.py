@@ -18,12 +18,30 @@ loudly if the anchor is missing or ambiguous, so UI drift can't silently
 produce a broken bundle. The __peak probe is test plumbing for
 verify_webapp.mjs (audible-output assertion), not a UI feature.
 """
-import base64, os, sys
+import base64, json, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 sys.path.insert(0, HERE)
 import truth   # factory bank path + checksum authority
+
+# Optional extra banks baked into the bundle for evaluation (NOT part of the port):
+#   --extra-bank Name=/abs/path/to/bank.bin   (repeatable)
+# Each adds an "Open <Name> bank" button next to the factory one. The bank files
+# themselves are NOT committed; passing none produces the standard factory-only app.
+EXTRA_BANKS = []
+_args = sys.argv[1:]
+while _args:
+    a = _args.pop(0)
+    if a == '--extra-bank':
+        if not _args or '=' not in _args[0]:
+            raise SystemExit('bundle_webapp: --extra-bank needs Name=/path/to/bank.bin')
+        name, path = _args.pop(0).split('=', 1)
+        if not os.path.exists(path):
+            raise SystemExit('bundle_webapp: extra bank not found: %s' % path)
+        EXTRA_BANKS.append((name, path))
+    else:
+        raise SystemExit('bundle_webapp: unknown argument %r' % a)
 
 def rd(path, mode='r'):
     with open(path, mode if 'b' in mode else 'r', encoding=None if 'b' in mode else 'utf-8') as f:
@@ -66,13 +84,17 @@ assets = (
     '}\n'
     'const WASM_B64 = "%s";\n'
     'const BANK_B64 = "%s";\n'
+    '/* extra evaluation banks (bundler --extra-bank; empty in the standard build) */\n'
+    'const EXTRA_BANKS = %s;\n'
     '\n'
     '/* ---- emscripten glue (gui/web/juno.js, verbatim minus the ES export) ---- */\n'
     '%s\n'
     '\n'
     '/* ---- bank decoder (gui/web/bank.js, verbatim minus the export keyword) ---- */\n'
     '%s\n'
-) % (b64(os.path.join(ROOT, 'gui/web/juno.wasm')), b64(truth.BANK), juno_inline, bank_inline)
+) % (b64(os.path.join(ROOT, 'gui/web/juno.wasm')), b64(truth.BANK),
+     json.dumps([{'name': n, 'b64': b64(p)} for n, p in EXTRA_BANKS]),
+     juno_inline, bank_inline)
 
 page = replace_once(page, 'import { decodeBank } from "./bank.js";', assets, 'embedded assets')
 
@@ -110,8 +132,29 @@ page = replace_once(
     '  btn.id = "openbank";\n'
     '  btn.textContent = "Open factory bank (" + BANK.patch_count + " patches) \\u25b8";\n'
     '  btn.title = "the embedded factory bank \\u2014 pick a patch, Apply, then play the keys";\n'
-    '  btn.onclick = () => showBank();\n'
+    '  btn.onclick = () => {          /* re-select factory bytes: an extra bank may be active */\n'
+    '    const b = b64bytes(BANK_B64).buffer;\n'
+    '    BANK = decodeBank(b);\n'
+    '    BANK_RAW = new Uint8Array(b);\n'
+    '    showBank();\n'
+    '  };\n'
     '  document.querySelector("header .row").appendChild(btn);\n'
+    '  // Extra evaluation banks (bundler --extra-bank): one button each; selecting\n'
+    '  // one swaps BANK/BANK_RAW (validated first) and opens the patch picker.\n'
+    '  for (const xb of EXTRA_BANKS) {\n'
+    '    const xbtn = document.createElement("button");\n'
+    '    xbtn.id = "openbank_" + xb.name.replace(/\\W+/g, "_");\n'
+    '    xbtn.textContent = "Open " + xb.name + " bank \\u25b8";\n'
+    '    xbtn.title = "embedded evaluation bank \\u2014 for testing, not part of the port";\n'
+    '    xbtn.onclick = () => {\n'
+    '      const b = b64bytes(xb.b64).buffer;\n'
+    '      BANK = decodeBank(b);            /* validate before retaining */\n'
+    '      BANK_RAW = new Uint8Array(b);\n'
+    '      showBank();\n'
+    '      status(xb.name + " bank selected (" + BANK.patch_count + " patches) \\u2014 pick a patch, Apply, then play");\n'
+    '    };\n'
+    '    document.querySelector("header .row").appendChild(xbtn);\n'
+    '  }\n'
     '  // Load patch 0 so the front-panel sliders show a real patch\'s bytes out of the box.\n'
     '  applyPatchIndex(0);\n'
     '  status("ready \\u2014 factory bank embedded (" + BANK.patch_count + " patches): patch 0 loaded, '
