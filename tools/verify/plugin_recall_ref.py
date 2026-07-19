@@ -32,6 +32,12 @@ def main():
     print("recall set: %d indices; front-panel (in leaf_table): %d" % (len(recall_idx), len(fp)))
     print("  incl 751-760:", [i for i in fp if 751 <= i <= 760])
 
+    # Extended value-tree leaves the plugin's recall enumerator fires but which are
+    # NOT in leaf_table (they write render-read voice cells the port must reproduce).
+    # Blob byte positions from the validated Script.xml cumulative offset map.
+    # (dispatch index, blob byte): VCF VEL SENS -> 7424, VCA VEL SENS -> 9600.
+    EXTRA = [(1028, 1852), (1058, 2086)]
+
     recs = RB.parse_records(E.bank_bytes())           # plugin parser, 64 records
 
     e = E.E2E(); e.build(48000.0)                      # one build; every patch overwrites the same cells
@@ -40,6 +46,8 @@ def main():
         rec = recs[patch]
         for idx in fp:
             e.dispatch(0, idx, RB.record_value(rec, lt[idx]))
+        for (idx, bb) in EXTRA:
+            e.dispatch(0, idx, RB.record_value(rec, bb))
         ref[patch] = bytes(e.uc.mem_read(e.state[0], BLOCK))
         if patch % 16 == 0:
             sys.stderr.write("  patch %d done\n" % patch); sys.stderr.flush()

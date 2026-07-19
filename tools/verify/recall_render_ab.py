@@ -68,6 +68,15 @@ def parse_patches(argv):
 # x 3 rates): 102560 = f32(byte/255)*f32(0.9), 102512 = byte/255.
 FX_LEAVES = [(1179, 3057), (1181, 3060)]
 
+# Extended value-tree leaves the plugin's OWN recall (0x3B48A0) fires but which are
+# absent from real_recall.leaf_table (the 112-leaf voice set), yet write render-read
+# voice cells. Dropping them left the port velocity-flat (see src/juno_apply.c). Blob
+# byte positions from the validated Script.xml cumulative offset map (0 mismatches vs
+# all 112 proven leaves); setter maps (executed): 1028->7424, 1058->9600 = value/255.
+# (disp, blob byte)
+EXTRA_LEAVES = [(1028, 1852),   # VCF VELOCITY SENS -> cell 7424
+                (1058, 2086)]   # VCA VELOCITY SENS -> cell 9600
+
 
 def ref_render(idx, bank, leaves, E, R):
     e = E.E2E(); e.build(SR); e.snap_all()
@@ -76,11 +85,16 @@ def ref_render(idx, bank, leaves, E, R):
         R.wr_desc(e, disp, R.dec(blob, bb))
     for (disp, recoff) in FX_LEAVES:                  # record byte -> blob-relative
         R.wr_desc(e, disp, R.dec(blob, recoff - 16))
+    for (disp, bb) in EXTRA_LEAVES:
+        R.wr_desc(e, disp, R.dec(blob, bb))
     for u in range(9):
         for (disp, bb) in leaves:
             try: e.dispatch(u, disp, R.rd_desc(e, disp))
             except RuntimeError: pass
         for (disp, recoff) in FX_LEAVES:
+            try: e.dispatch(u, disp, R.rd_desc(e, disp))
+            except RuntimeError: pass
+        for (disp, bb) in EXTRA_LEAVES:
             try: e.dispatch(u, disp, R.rd_desc(e, disp))
             except RuntimeError: pass
     e.snap_all(); e.clear_latch(); e.set_ftz()

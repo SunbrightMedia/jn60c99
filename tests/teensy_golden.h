@@ -32,14 +32,14 @@ static const unsigned char tg_blob_7[3062] = {1,10,6,4,0,0,8,0,0,3,7,0,0,0,0,0,9
 static const tg_event tg_ev_7[] = {{0,1,96,100}};
 
 static const tg_scenario tg_scenarios[] = {
-  {"pluck_note",5,tg_blob_0,tg_ev_0,1,12000,0xee536e233aa31ab3ULL,0xaa309c73u,0xaa309c73u},
-  {"chord_rel",22,tg_blob_1,tg_ev_1,6,14000,0x4d483e7a2ff475a5ULL,0xaa309c73u,0xaa309c73u},
+  {"pluck_note",5,tg_blob_0,tg_ev_0,1,12000,0xec6118e472413de9ULL,0xaa309c73u,0xaa309c73u},
+  {"chord_rel",22,tg_blob_1,tg_ev_1,6,14000,0x32d0f384d5749b25ULL,0xaa309c73u,0xaa309c73u},
   {"bass_low",31,tg_blob_2,tg_ev_2,1,12000,0x65c4493b38af2d5fULL,0xaa309c73u,0xaa309c73u},
-  {"unison61",61,tg_blob_3,tg_ev_3,1,12000,0xce046b1bc49e7036ULL,0xaa309c73u,0xaa309c73u},
+  {"unison61",61,tg_blob_3,tg_ev_3,1,12000,0xadfeb970259b2cc2ULL,0xaa309c73u,0xaa309c73u},
   {"unison63",63,tg_blob_4,tg_ev_4,1,12000,0x218003177c0c6048ULL,0xaa309c73u,0xaa309c73u},
   {"pad_sustain",20,tg_blob_5,tg_ev_5,1,16000,0x8581339af7f9b34fULL,0xaa309c73u,0xaa309c73u},
-  {"restrike",0,tg_blob_6,tg_ev_6,3,14000,0xee4de867b8044776ULL,0xaa309c73u,0xaa309c73u},
-  {"high_note",40,tg_blob_7,tg_ev_7,1,10000,0x0184e5fb9994775bULL,0xaa309c73u,0xaa309c73u},
+  {"restrike",0,tg_blob_6,tg_ev_6,3,14000,0x1f5ffedf1e23a9c4ULL,0xaa309c73u,0xaa309c73u},
+  {"high_note",40,tg_blob_7,tg_ev_7,1,10000,0x88744a505bf1221bULL,0xaa309c73u,0xaa309c73u},
 };
 #define TG_NSCEN 8
 

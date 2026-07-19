@@ -54,7 +54,12 @@ JU60_PARSE  = IB + 0x330ED0     # sub_7FF91DF90ED0(a1_rec, a2_stream, a3_magic, 
 READ        = IB + 0x3F1330     # sub_7FF91E051330(stream, dst={start,end})
 
 HEADER, STRIDE, BLOB_OFF = 23, 20223, 16
-BODY_N = 700                    # record-body bytes to materialise (covers every leaf: max bb 651)
+BODY_N = 2200                   # record-body bytes to materialise. Covers the front-panel
+                                # leaves (max bb 651) AND the extended velocity-sens leaves
+                                # (VCF vel sens bb 1852, VCA vel sens bb 2086). Stays under
+                                # the 0x1000-byte outbuf capacity. Record body is a verbatim
+                                # memcpy, so materialising more bytes only exposes more of the
+                                # same record (existing positions unchanged).
 
 def _record_name_body(bank, idx):
     base = HEADER + idx * STRIDE

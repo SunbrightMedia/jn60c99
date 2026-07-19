@@ -651,14 +651,20 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
         JF(state, 2560) = t ? 1.0f : 0.0f;               /* both env-trigger switches */
         JF(state, 3040) = t ? 1.0f : 0.0f;
     }
-    /* VCF / VCA VELOCITY SENS: the plugin's engine holds BOTH sens cells at 0 for all
-     * 64 factory patches (velocity is inert on the JUNO-60 — see docs/BITEXACT_RENDER_AB.md).
-     * VCF (7424): record byte 1862 == 0 for every patch, so v/255 == 0 (correct). VCA
-     * (9600): record byte 2102 is NOT the VCA-vel-sens leaf (it holds nonzero data for
-     * 27 patches, but the plugin's engine cell 9600 == 0 for all) — writing v/255 there
-     * diverged. Set both to 0 to match the plugin. */
-    JF(state, 7424) = 0.0f;   /* VCF VEL SENS (inert) */
-    JF(state, 9600) = 0.0f;   /* VCA VEL SENS (inert) */
+    /* VCF / VCA VELOCITY SENS (extended value-tree leaves, dispatch indices 1028 /
+     * 1058). The JUNO-60 HARDWARE has no velocity, but the JU-06A plugin adds it as
+     * two extended parameters that its own recall enumerator (0x3B48A0) applies —
+     * setter 1028 -> engine cell 7424, 1058 -> 9600, both = value/255 (verified by
+     * executing the setter over all 256 inputs). The previous code read the WRONG
+     * record byte for VCF (1862 -> a zero) and dismissed VCA against a recall
+     * reference that DROPS these two indices, so it forced both cells to 0 and the
+     * port rendered velocity-flat while a real host (velocity 100) opens the filter.
+     * Validated record positions (Script.xml cumulative value-tree offset map, 0
+     * mismatches vs all 112 proven leaves): VCF vel sens blob byte 1852 (record_byte
+     * roff 1868), VCA vel sens blob byte 2086 (roff 2102). VCF nonzero on 19/64
+     * factory patches, VCA on 27/64. */
+    JF(state, 7424) = record_byte(blob, 1868) / 255.0f;   /* VCF VEL SENS (blob 1852) */
+    JF(state, 9600) = record_byte(blob, 2102) / 255.0f;   /* VCA VEL SENS (blob 2086) */
     n += 4;
 
     /* (The former recall_engine_constants K[] block that froze 1088/2064/1920/4144/

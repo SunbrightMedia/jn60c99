@@ -79,17 +79,25 @@ elif sys.argv[1:2] == ['--ref']:
     import real_recall as R
     data = pickle.load(open(PKL, 'rb'))
     bank = E.bank_bytes(); leaves = R.leaf_table(); FX = [(1179, 3057), (1181, 3060)]
+    # Extended velocity-sens leaves the plugin recalls but leaf_table drops (write
+    # render-read voice cells 7424/9600). 5 of the 7 arp patches use them. Blob byte
+    # positions validated vs the Script.xml cumulative offset map.
+    EXTRA = [(1028, 1852), (1058, 2086)]
 
     def plugin_replay(patch, sched):
         e = E.E2E(); e.build(SR); e.snap_all()
         blob = E.patch_blob(bank, patch)
         for (disp, bb) in leaves: R.wr_desc(e, disp, R.dec(blob, bb))
         for (disp, ro) in FX:     R.wr_desc(e, disp, R.dec(blob, ro - 16))
+        for (disp, bb) in EXTRA:  R.wr_desc(e, disp, R.dec(blob, bb))
         for u in range(9):
             for (disp, bb) in leaves:
                 try: e.dispatch(u, disp, R.rd_desc(e, disp))
                 except RuntimeError: pass
             for (disp, ro) in FX:
+                try: e.dispatch(u, disp, R.rd_desc(e, disp))
+                except RuntimeError: pass
+            for (disp, bb) in EXTRA:
                 try: e.dispatch(u, disp, R.rd_desc(e, disp))
                 except RuntimeError: pass
         e.snap_all(); e.clear_latch(); e.set_ftz()
