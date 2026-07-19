@@ -505,6 +505,35 @@ function note(midi, on) {
   if (on) status(`note ${midi} · vel ${vel} — live 8-voice master path (patch-recalled FX)`);
 }
 
-boot().catch(e => { status("ERROR: "+e); $("#warn").textContent = e; console.error(e); });
+// --- Web MIDI: play the engine from a hardware keyboard. Uses ONLY the proven
+// note path (the same noteOnFn/noteOffFn the on-screen keys call), with the
+// device's real per-note velocity. No sysex requested; silently unavailable in
+// browsers without Web MIDI (Safari/Firefox without flag) — the UI still works.
+function initMIDI() {
+  if (!navigator.requestMIDIAccess) return;
+  navigator.requestMIDIAccess({ sysex: false }).then(acc => {
+    const wire = inp => {
+      inp.onmidimessage = ev => {
+        const [st, d1, d2] = ev.data;
+        const cmd = st & 0xF0;
+        if (cmd === 0x90 && d2 > 0) {          // note on
+          ensureAudio();
+          noteOnFn(ctx, d1, d2);
+          status(`MIDI ${inp.name}: note ${d1} · vel ${d2}`);
+        } else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) {
+          noteOffFn(ctx, d1);                  // note off (or running-status vel 0)
+        }
+      };
+    };
+    for (const inp of acc.inputs.values()) wire(inp);
+    acc.onstatechange = e => {                 // hot-plug support
+      if (e.port.type === "input" && e.port.state === "connected") wire(e.port);
+    };
+    const n = [...acc.inputs.values()].map(i => i.name);
+    if (n.length) status("MIDI connected: " + n.join(", ") + " — play your keyboard");
+  }).catch(() => {});                          // permission denied: keep the on-screen keys
+}
+
+boot().then(initMIDI).catch(e => { status("ERROR: "+e); $("#warn").textContent = e; console.error(e); });
 </script>
 </html>

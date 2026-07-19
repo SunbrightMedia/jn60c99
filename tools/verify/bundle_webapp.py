@@ -122,7 +122,7 @@ page = replace_once(
 # 5. boot -> boot + embedded factory bank auto-load
 page = replace_once(
     page,
-    'boot().catch(e => { status("ERROR: "+e); $("#warn").textContent = e; console.error(e); });',
+    'boot().then(initMIDI).catch(e => { status("ERROR: "+e); $("#warn").textContent = e; console.error(e); });',
     'function autoBank() {\n'
     '  const buf = b64bytes(BANK_B64).buffer;\n'
     '  BANK_RAW = new Uint8Array(buf);\n'
@@ -160,7 +160,7 @@ page = replace_once(
     '  status("ready \\u2014 factory bank embedded (" + BANK.patch_count + " patches): patch 0 loaded, '
     'tweak the sliders or open the bank to pick another, then play the piano keys");\n'
     '}\n'
-    'boot().then(autoBank).catch(e => { status("ERROR: "+e); $("#warn").textContent = e; console.error(e); });',
+    'boot().then(initMIDI).then(autoBank).catch(e => { status("ERROR: "+e); $("#warn").textContent = e; console.error(e); });',
     'autoBank tail')
 
 # 6. drop the trailing </html> (the artifact wrapper closes the document)
