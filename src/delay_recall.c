@@ -371,7 +371,31 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     float f, tc;
     if (Hr <= 0) Hr = 96000;
 
+    /* The plugin CLAMPS out-of-range DELAY TYPE to 5 (routing int at 6/9/255 ==
+     * the type-5 value, PROVEN by the setter spot sweep under Unicorn,
+     * scratchpad/ext_sweeps.py 2026-07-19); the raw write diverged for >5. */
+    if (dtype > 5) dtype = 5;
     *(int32_t *)(state + JUNO_PROG_DLY) = (int32_t)dtype;  /* per-patch slot-1 mode */
+
+    /* Ring-buffer geometry ints — the plugin's recall writes these for EVERY
+     * patch (PROVEN: identical in the type-0 and type-4 full-state dumps at
+     * 44.1/48/88.2 kHz; the plugin's COLD state holds 0 here like the port's,
+     * so they are recall-written, not prepare constants). Factory renders never
+     * read them (57/57 was bit-exact before they were added), but the TYPE-4
+     * arm reads 6429412 as its ring MASK every sample — with the port's former
+     * 0 the mask underflowed to 0xFFFFFFFF and the ring addressing was garbage. */
+    *(int32_t *)(state + 95828)    = 0x400;
+    *(int32_t *)(state + 101028)   = 0x400;
+    *(int32_t *)(state + 2199956)  = 0x80000;
+    *(int32_t *)(state + 4297124)  = 0x80000;
+    *(int32_t *)(state + 6395252)  = 0x80000;
+    *(int32_t *)(state + 6429412)  = 0x2000;
+    *(int32_t *)(state + 6463716)  = 0x2000;
+    *(int32_t *)(state + 6496500)  = 0x2000;
+    *(int32_t *)(state + 8594772)  = 0x80000;
+    *(int32_t *)(state + 10691940) = 0x80000;
+    *(int32_t *)(state + 10726260) = 0x2000;
+    *(int32_t *)(state + 10759044) = 0x2000;
 
     /* Delay Time (102352): SYNC-AWARE, written for EVERY DELAY TYPE — the plugin's
      * recall dispatches the time leaf before the type routing, so 102352 carries
@@ -395,6 +419,56 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
                                                   from the plugin's own recall of a type-4
                                                   user patch; no factory patch has type 4) */
         apply_slot1_delay1(state, rec, tc, dtype == 1);
+        if (dtype == 4) {
+            /* TYPE-4 modulated-delay block (6429408..6430544), read by the
+             * master render's type-4 arm (ring mask at 6429412). Laws PROVEN by
+             * doctored-record full recalls of a type-4 user patch under Unicorn
+             * (scratchpad/dtype4_block_derive.py, 17 recalls: per-param 3-point
+             * sweeps + 44.1/88.2 rate runs + type-0 control):
+             *   6429472 = -(12 - (time*(1/255))*12)  (bit-exact op chain over
+             *             {0,136,255}; -0 at time 255 from the final negate)
+             *   6430512 = DELAY LEVEL / 255 (wet)
+             *   6429488 = 6430480 = 1.0 (enable gates)
+             *   6430496/6430528/6430544 = constants (invariant across level/
+             *             time/fb/hc/direct/tap sweeps and 44.1/88.2 rates)
+             * fb/hc/direct/tap do NOT touch this block (swept, zero cells). */
+            float t = (float)dtime * (1.0f / 255.0f);
+            int lvl32 = level * 32; if (lvl32 > 255) lvl32 = 255;
+            /* tail constants + the DPF stage [6430544..6430800], from the same
+             * derivation (invariant across level/time/fb/hc/direct + reverb
+             * level/time + effect depth/tone sweeps; three cells are rate-armed
+             * 2-class {44100, else} — 88200 confirmed on the else arm for the
+             * head block; tail follows the same family, noted in the comment). */
+            static const uint32_t T4_TAIL[] = {
+                6430496,0x3df465fcu, 6430528,0x3f03df74u, 6430544,0x3f83df74u,
+                6430560,0x3f03df74u, 6430576,0xbee549c0u, 6430592,0xbf1cd8f1u,
+                6430624,0x3f4ba5b0u, 6430640,0x3fb50bf3u, 6430672,0x3b56774fu,
+                6430688,0x3f800000u, 6430704,0x3f800000u, 6430720,0x3f800000u,
+                6430736,0x387fd974u, 6430752,0x3f4fcfd0u, 6430784,0x3f800000u,
+                6430800,0x3f800000u
+            };
+            unsigned k4;
+            for (k4 = 0; k4 < sizeof(T4_TAIL)/sizeof(T4_TAIL[0]); k4 += 2) {
+                uint32_t b4 = T4_TAIL[k4 + 1]; float f4; memcpy(&f4, &b4, 4);
+                JF(state, (int)T4_TAIL[k4]) = f4;
+            }
+            if (Hr == 44100) {          /* measured 44.1k arms (plugin recall) */
+                static const uint32_t T4_44[] = {
+                    6430608,0x3f800000u, 6430672,0x3b696eb3u, 6430736,0x388b3cdfu };
+                for (k4 = 0; k4 < sizeof(T4_44)/sizeof(T4_44[0]); k4 += 2) {
+                    uint32_t b4 = T4_44[k4 + 1]; float f4; memcpy(&f4, &b4, 4);
+                    JF(state, (int)T4_44[k4]) = f4;
+                }
+            }
+            JF(state, 6429472) = -(12.0f - t * 12.0f);
+            JF(state, 6429488) = 1.0f;
+            JF(state, 6430480) = 1.0f;
+            JF(state, 6430512) = (float)level / 255.0f;
+            /* 6430768 = min(level*32,255)/255 (candidate law: exact at the
+             * measured 0/3/255 points; 7/8/100 probe pending — the 7-patch A/B
+             * is the final arbiter) */
+            JF(state, 6430768) = (float)lvl32 / 255.0f;
+        }
         return;
     }
     if (dtype != 0)                            /* other types: slot 1 not the delay block */

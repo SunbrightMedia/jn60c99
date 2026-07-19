@@ -57,6 +57,10 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
     int etype = efx_rec_byte(rec, 634);   /* EFFECT TYPE  0..5   */
 
     /* Route slot 2 to the patch's EFFECT TYPE (the driver points params+112 here). */
+    /* The plugin CLAMPS out-of-range types to 5 (routing int + full state at
+     * 6/9/255 == the type-5 state, PROVEN by the setter spot sweep under
+     * Unicorn, scratchpad/ext_sweeps.py 2026-07-19); the raw write diverged. */
+    if (etype > 5) etype = 5;
     *(int32_t *)(state + JUNO_PROG_EFX) = (int32_t)etype;
 
     /* Shared slot-2 wet control (read by master_render for EVERY mode at 84544). */
