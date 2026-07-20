@@ -109,6 +109,8 @@ typedef struct {
      * slider move otherwise). calloc zero-init == carp_init's (0,0) default. */
     int   last_scatter_type;
     int   last_scatter_depth;
+    int   kbd_velocity_sw;   /* SYSTEM "Keyboard Velocity SW": 0 = force vel 100
+                              * (the wrapper's rule, see juno_gui_midi_note_on) */
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -633,7 +635,11 @@ void juno_gui_arp_trace(juno_ctx *c, int *buf, int cap)
 }
 int juno_gui_arp_trace_count(juno_ctx *c) { return c ? c->arp_trace_n : 0; }
 
-/* Public note-on: feeds the arp's held-key set when enabled, else the synth. */
+/* Public note-on: feeds the arp's held-key set when enabled, else the synth.
+ * This is the ENGINE/router-level entry (the oracle's NOTEON equivalent) — the
+ * verification gates drive it directly with raw velocities, exactly as they
+ * drive the plugin's engine under emulation. Hosts/UIs must enter through
+ * juno_gui_midi_note_on below (the wrapper layer), like a DAW does. */
 void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     if (!c) return;
@@ -647,6 +653,52 @@ void juno_gui_note_off(juno_ctx *c, int midi_note)
     if (!c) return;
     if (!c->arp_on) { synth_note_off(c, midi_note); return; }
     carp_remove_key(&c->arp, midi_note);     /* midi_note < 0 => release all */
+}
+
+/* --- Wrapper-level MIDI note path (what a DAW's events actually go through) ---
+ *
+ * The real plugin's VST3 wrapper converts host note events to 3-byte MIDI and
+ * applies the SYSTEM setting "fm.SYSTEM.COM.Keyboard Velocity SW" BEFORE the
+ * engine ever sees the note. READ (static decomp, three independent sites all
+ * implementing the identical rule: the event->MIDI queue push rva 0x31F4E0,
+ * the all-sound-off injector rva 0x3208E0, and the connect-path forwarder rva
+ * 0x320A30; the flag byte lives at wrapperqueue+572 and is refreshed from the
+ * settings object at rva 0x320420):
+ *   - note-on with velocity 0  -> converted to note-off, off-velocity 64
+ *   - Keyboard Velocity SW OFF -> every note-on velocity is REPLACED with 100
+ *                                 and every note-off velocity with 64
+ *   - Keyboard Velocity SW ON  -> velocities pass through unchanged
+ * So by default the real instrument IGNORES how hard you play — faithful to
+ * the velocity-insensitive JUNO-60 keyboard — while the port used to pass raw
+ * velocities through, making every patch's brightness/level vary per keystroke
+ * where the plugin is rock-steady (the user's "always sounded wrong" report;
+ * velocity-sens cells scale both VCF and VCA). Every A/B gate was blind to
+ * this: both gate sides drive the engine BELOW the wrapper.
+ *
+ * Default kbd_velocity_sw = 0 (forcing ON). Label: INFERRED — the SW's factory
+ * default is not yet execution-proven (the settings object needs the full VST3
+ * wrapper lifecycle, #112); supported by the JUNO-60 having no velocity and by
+ * the user's real instance exhibiting fixed-velocity behavior. The policy
+ * itself is READ from the binary. The engine below is untouched either way. */
+void juno_gui_set_kbd_velocity(juno_ctx *c, int on)
+{
+    if (c) c->kbd_velocity_sw = (on != 0);
+}
+
+void juno_gui_midi_note_off(juno_ctx *c, int midi_note)
+{
+    /* off-velocity (64 forced / raw) is inert in the engine: the assigner's
+     * noteOff zeroes velocity (oracle NOTEOFF, e2e_emu.py) and the port's
+     * note-off path carries none — so no velocity parameter here. */
+    juno_gui_note_off(c, midi_note);
+}
+
+void juno_gui_midi_note_on(juno_ctx *c, int midi_note, int velocity)
+{
+    if (!c) return;
+    if (velocity == 0) { juno_gui_midi_note_off(c, midi_note); return; }
+    if (!c->kbd_velocity_sw) velocity = 100;
+    juno_gui_note_on(c, midi_note, velocity);
 }
 
 /* Configure the arpeggiator. on: 0/1. mode: 0=up,1=down,2=up&down (the UI/patch

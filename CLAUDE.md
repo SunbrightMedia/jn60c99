@@ -165,6 +165,47 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   delivered WASM is bit-exact to native (8/8) on the 44.1 kHz golden corpus. emsdk
   lives at `scratchpad/emsdk` (source `emsdk_env.sh` before building).
 
+## Host-lifecycle fidelity (user "still sounds wrong" arc, 2026-07-20)
+
+- **THE GATES' STRUCTURAL BLIND SPOT (the lesson of this arc):** every gate
+  compares port vs the plugin driven by OUR harness entries (recall dispatch +
+  engine NOTEON). A real host enters through the VST3 wrapper (events→MIDI→
+  queue→engine), and that layer TRANSFORMS the input. Port==oracle can be green
+  while both differ from the real thing. Treat any user ear report that
+  survives green gates as evidence against the gates.
+- **Wrapper velocity policy (Stage 1, FIXED in port):** the wrapper's MIDI layer
+  applies SYSTEM "fm.SYSTEM.COM.Keyboard Velocity SW" (flag byte queue+572,
+  refreshed from the settings object in the connect path rva 0x320420). READ —
+  three decomp sites with the identical rule (0x31F4E0 queue push, 0x3208E0
+  all-sound-off injector, 0x320A30 connect forwarder): note-on vel 0 → becomes
+  note-off(64); SW OFF → every note-on vel := 100, note-off vel := 64; SW ON →
+  raw. So the real plugin by default IGNORES played velocity (JUNO-60-faithful)
+  while the port passed it raw — audible on EVERY patch when playing live
+  (velocity scales VCF+VCA). Port now mirrors the layering: engine entry
+  juno_gui_note_on stays RAW (gates drive it, = oracle NOTEON); new wrapper
+  entries juno_gui_midi_note_on/off + juno_gui_set_kbd_velocity carry the
+  policy; webapp keys + Web MIDI use the wrapper path with a Kbd Vel SW toggle
+  (default OFF = force 100). Default OFF is INFERRED (settings-object default
+  needs the full wrapper lifecycle, #112); the policy itself is READ.
+  Event→MIDI vel byte = trunc(velF*127.0)&0x7F (wrapper preamble 0x34A380).
+- **Bounce locator (covenant role 1; scratchpad bounce_locator.py + session
+  diag_bounces/):** port vs the user's 8 factory-preset Ableton bounces at the
+  session's exact driving (44.1k/120BPM/vel100/0.5+2+1.5s). Pitch, onset,
+  sustain RMS match. RESIDUAL (Stage 2, OPEN): port DARKER on 6/8 presets
+  (centroid −7..27%), attack-window RMS ±10..20% patch-dependent (preset 0
+  port louder, preset 5 port 22% quieter), stereo-corr differs, preset 6 lacks
+  a ±0.4Hz pitch wobble. NOT velocity (100→100 through the wrapper; no single
+  velocity reconciles brightness+level). Next: real-lifecycle state diff
+  (plugin-via-process()+events vs plugin-via-harness — plugin against itself).
+- **System tree map (for #112):** "fm.SYSTEM.COM.*" (Keyboard Velocity
+  SW/Fixed Velocity/Curve/Offset, Local SW, MASTER TUNE, Boost Mode, Output
+  Gain, ...): name table rva 0x9a0030 (SW = index 12), param DB {min,max,..}
+  rva 0x5EC040 + 16*id (4966 ids, formatter 0x3ABB40), engine iface vtable rva
+  0x9df1d8 (BUILD slot1, setSR slot3, process slot7, noteOff 15, noteOn 16).
+  Old real-process harness: scratchpad/oracle/real_process_run.py (per-block
+  render callback 0x3C7400 — BELOW the event layer; events enter via the
+  wrapper process preamble 0x34A380 → queue → consumer).
+
 ## Standing audit caveats (Phase-E confirmation audit, 2026-07-17)
 
 - Commit be3f1db's "these only affected 44.1 kHz reverb" OVERSTATES audible impact:

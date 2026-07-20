@@ -75,8 +75,10 @@
       <input type="range" id="arpGate" min="0" max="1" step="0.05" value="0.6" oninput="arpApply()" style="vertical-align:middle">
       <span id="arpGateV">60%</span></label>
     <span style="width:12px"></span>
-    <label title="Note-on velocity for the on-screen keys (VCF/VCA VELOCITY SENS respond to this)">Vel
-      <input type="range" id="vel" min="1" max="127" step="1" value="100" oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
+    <label title="SYSTEM 'Keyboard Velocity SW' — OFF (plugin default): every note plays at fixed velocity 100, exactly like the real plugin's wrapper (and the velocity-insensitive JUNO-60). ON: keys/MIDI use their real velocity.">Kbd&nbsp;Vel
+      <input type="checkbox" id="velSw" onchange="velSwApply()"></label>
+    <label id="velLbl" title="Note-on velocity for the on-screen keys (only when Kbd Vel is ON; VCF/VCA VELOCITY SENS respond to it)" style="opacity:.45">Vel
+      <input type="range" id="vel" min="1" max="127" step="1" value="100" disabled oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
       <span id="velV">100</span></label>
   </div>
   <div class="row">
@@ -124,7 +126,7 @@ import { decodeBank } from "./bank.js";
 
 /* Cache-buster: build.sh rewrites this to the WASM content hash each build, so a new
  * engine is always fetched fresh instead of served from the browser/CDN cache. */
-const BUILD_VER = "97c8af9ba0d4";
+const BUILD_VER = "df32ac4603eb";
 
 // The plugin runs its DSP natively at the host sample rate (no oversampling, no
 // decimator). SR is replaced at boot with the AudioContext's ACTUAL rate so the
@@ -181,7 +183,7 @@ function prettify(name, sec) {
 }
 
 let M, ctx, get, set, chorusFn, gateFn, renderFn, malloc, free;
-let noteOnFn, noteOffFn, applyBankFn, renderDryFn, arpFn, getArpFn, warmupFn, tempoFn;
+let noteOnFn, noteOffFn, midiNoteOnFn, midiNoteOffFn, velSwFn, applyBankFn, renderDryFn, arpFn, getArpFn, warmupFn, tempoFn;
 let hostCountFn, hostNameFn, hostSectionFn, hostMinFn, hostMaxFn, hostGetFn, hostSetFn;
 let arpOn = false;
 let PARAMS = [];
@@ -205,6 +207,9 @@ async function boot() {
   renderDryFn = M.cwrap("juno_gui_render_dry","number",["number","number","number"]);
   noteOnFn = M.cwrap("juno_gui_note_on",null,["number","number","number"]);
   noteOffFn = M.cwrap("juno_gui_note_off",null,["number","number"]);
+  midiNoteOnFn = M.cwrap("juno_gui_midi_note_on",null,["number","number","number"]);
+  midiNoteOffFn = M.cwrap("juno_gui_midi_note_off",null,["number","number"]);
+  velSwFn = M.cwrap("juno_gui_set_kbd_velocity",null,["number","number"]);
   arpFn = M.cwrap("juno_gui_arp_config",null,["number","number","number","number","number","number"]);
   tempoFn = M.cwrap("juno_gui_set_tempo",null,["number","number"]);
   getArpFn = M.cwrap("juno_gui_get_arp","number",["number"]);
@@ -500,9 +505,22 @@ function mkKey(midi, cls, left) {
 // path (8-voice mix + stereo BBD chorus mode II + output stage) plays live.
 function note(midi, on) {
   ensureAudio();
-  const vel = +$("#vel").value;   // 1..127 from the Velocity slider (default 100)
-  if (on) noteOnFn(ctx, midi, vel); else noteOffFn(ctx, midi);
-  if (on) status(`note ${midi} · vel ${vel} — live 8-voice master path (patch-recalled FX)`);
+  // Notes enter through the WRAPPER-level MIDI path (juno_gui_midi_note_on),
+  // exactly like a DAW's events enter the real plugin: with the SYSTEM
+  // "Keyboard Velocity SW" OFF (the default) the engine receives velocity 100
+  // no matter what the slider says — the plugin's own rule (see juno_bridge.c).
+  const vel = +$("#vel").value;   // 1..127; only honored when Kbd Vel SW is ON
+  if (on) midiNoteOnFn(ctx, midi, vel); else midiNoteOffFn(ctx, midi);
+  if (on) status(`note ${midi} · vel ${$("#velSw").checked ? vel : "100 (fixed — Kbd Vel SW off, plugin default)"} — live 8-voice master path`);
+}
+
+// SYSTEM "Keyboard Velocity SW" toggle: mirrors the plugin's wrapper flag.
+function velSwApply() {
+  const on = $("#velSw").checked;
+  velSwFn(ctx, on ? 1 : 0);
+  $("#vel").disabled = !on;
+  $("#velLbl").style.opacity = on ? "1" : ".45";
+  status(`Keyboard Velocity SW ${on ? "ON — real velocities" : "OFF — every note fixed at velocity 100 (the plugin's default behavior)"}`);
 }
 
 // --- Web MIDI: play the engine from a hardware keyboard. Uses ONLY the proven
@@ -518,10 +536,10 @@ function initMIDI() {
         const cmd = st & 0xF0;
         if (cmd === 0x90 && d2 > 0) {          // note on
           ensureAudio();
-          noteOnFn(ctx, d1, d2);
-          status(`MIDI ${inp.name}: note ${d1} · vel ${d2}`);
+          midiNoteOnFn(ctx, d1, d2);           // wrapper path: vel forced to 100
+          status(`MIDI ${inp.name}: note ${d1} · vel ${d2}`);   //  unless Kbd Vel SW on
         } else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) {
-          noteOffFn(ctx, d1);                  // note off (or running-status vel 0)
+          midiNoteOffFn(ctx, d1);              // note off (or running-status vel 0)
         }
       };
     };
