@@ -191,12 +191,40 @@ attribution net; also audit-trails positive "captur*" comment mentions).
 - **Bounce locator (covenant role 1; scratchpad bounce_locator.py + session
   diag_bounces/):** port vs the user's 8 factory-preset Ableton bounces at the
   session's exact driving (44.1k/120BPM/vel100/0.5+2+1.5s). Pitch, onset,
-  sustain RMS match. RESIDUAL (Stage 2, OPEN): port DARKER on 6/8 presets
-  (centroid −7..27%), attack-window RMS ±10..20% patch-dependent (preset 0
-  port louder, preset 5 port 22% quieter), stereo-corr differs, preset 6 lacks
-  a ±0.4Hz pitch wobble. NOT velocity (100→100 through the wrapper; no single
-  velocity reconciles brightness+level). Next: real-lifecycle state diff
-  (plugin-via-process()+events vs plugin-via-harness — plugin against itself).
+  sustain RMS match. Brightness delta is PER-PATCH and BIDIRECTIONAL (centroid:
+  p5 +2%, p1 +1%, p0 −9%, p3 −7%, p4 −10%, p6 −21%, p2 −24%, p7 −27%), levels
+  move both ways — NOT a global tilt, NOT velocity (rules out any single
+  controller-global setting). Signature of PER-PATCH recalled coefficients.
+- **STAGE 2 ROOT CAUSE — FOUND (2026-07-21), the fine-FX filter blind spot:**
+  the fine delay/chorus/reverb FILTER params (HIGH CUT, LOW CUT, PRE DELAY,
+  LF/HF DAMP — dispatch idx 1180/1182/1184/1210/1211/1212/1323..1326) are
+  **NOT in the recall reference's leaf table** (real_recall.leaf_table →
+  in_recall=False for all of them). So the ORACLE never applies them either →
+  port==oracle (render A/B stays GREEN) while BOTH leave these wet-signal
+  high-cut/low-cut coefficient cells at chorus_init's power-on ZERO. The REAL
+  plugin driven by a host DOES apply them (they are real, dispatchable setter
+  leaves that move FX-filter cells — proven by ext_sweeps sweeps). A wet-path
+  HIGH CUT stuck at 0 vs the patch's real value shifts brightness per-patch in
+  either direction — exactly the bounce pattern (worst on p2/p6, both DELAY
+  HIGH CUT=3; darkest p7 = the lone EFFECT TYPE 5). This is #116 promoted from
+  "nice to have" to THE Stage-2 fix. The setter laws are already largely
+  derived in scratchpad/ext_sweeps.pkl: DELAY HIGH CUT (cells 6497184..6497312),
+  CHORUS HIGH CUT (10693072..10693200), CHORUS LOW CUT (10693216/232), CHORUS
+  PRE DELAY (10693008), DELAY LF/HF DAMP (+FREQ) (6497424..6497488), REVERB PRE
+  DELAY. REVERB LOW/HIGH CUT/DENSITY setters returned no cells in the patch-5
+  context — need re-derivation in a reverb-active context. FIX PLAN: derive the
+  remaining laws by executing each leaf's setter, apply them in recall
+  (new fine-FX applier), and EXTEND the recall reference + render A/B to include
+  these leaves so the gate itself catches the darkness (closes the blind spot
+  permanently). Covenant-clean throughout (plugin's own setters under Unicorn).
+- **Process-lifecycle harness (real_process_run.py) — DEFERRED, not needed.**
+  Attempted plugin-via-process() as candidate. It FIGHTS emulation (spins 28min
+  in the thread-pool wait loop, single-thread drive won't converge — killed).
+  Ruled OUT as the darkness source on static grounds anyway: process()'s master
+  output stage IS rva 0x398EC0 == e2e_emu MASTER_WRAP, the SAME function our
+  render() already calls, and render A/B proves port==oracle bit-exact — the
+  preamble cannot introduce different DSP. The divergence is per-patch RECALL
+  (fine-FX above), not the per-block process path.
 - **System tree map (for #112):** "fm.SYSTEM.COM.*" (Keyboard Velocity
   SW/Fixed Velocity/Curve/Offset, Local SW, MASTER TUNE, Boost Mode, Output
   Gain, ...): name table rva 0x9a0030 (SW = index 12), param DB {min,max,..}
