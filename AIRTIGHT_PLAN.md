@@ -219,15 +219,35 @@ residual would be a named, bounded, visible-red item — never a silent green.
     (and reverb LOW/HIGH/DENSITY/DIRECT, flanger) are all done through Pillar 2.
     Reverted the contaminated chorus2 tables; only DELAY (unambiguous TYPE-0)
     stays wired via engine dispatch.
-  - **B-next order**: (B2 = Pillar 2) crack the controller path (RE of the
-    controller setState / per-param apply), derive every controller-only + mode-
-    ambiguous FX law through it, build the controller-path oracle (the #124 ground
-    truth), wire the port, render A/B green; fix the false-gap ledger rows along
-    the way (DIRECT LEVEL etc. — replace the diff-miss port_writeset signal with
-    the definitive "oracle dispatches leaf -> render A/B green" test). Then Pillar
-    3 (build ONE exhaustive gate over the full wired ledger: port applier vs a
-    FRESH truth/-derived setter sweep, all 256 bytes x 4 rates, non-circular) and
-    Stage D (seal every gate into make verify as the single RED/GREEN).
+  - **PILLAR-2 BREAKTHROUGH (RE agent, 2026-07-22) — there is NO separate
+    controller setter.** Every "controller-only" FX param (chorus PRE/LFO, flanger,
+    reverb LOW/HIGH/DENSITY/DIRECT) dispatches through the SAME value-tree dispatch
+    `sub_7FF91E019A30` (0x3B9A30) we already use, at its SAME index. The process()
+    preamble (0x34A380) only ENQUEUES; the flush consumer applies each via engine
+    vtable slot 112 == 0x3B9A30. So the spinning process() loop is NOT needed. The
+    "engine dispatch writes 0 cells" result was a STATE/CONTEXT artifact: these FX
+    setters write the engine's FX sub-object (engine+8176) and the coefficient CELL
+    only materializes when the FX unit's smoother settles / ticks.
+  - **THE CLEAN DERIVATION METHOD (proven): dispatch 0x3B9A30 -> `snap_all()` ->
+    read the coefficient cell.** snap_all settles the FX param SMOOTHER to its
+    TARGET (rec+20), which EQUALS the render-materialized coefficient bit-for-bit
+    (verified: reverb LOW CUT byte 2->3f7f8b7e / byte 17->3f722ed6 identical via
+    snap and via render(600)). This AVOIDS the render-diff confounding (reverb is
+    recursive; a dispatch-0-vs-255 render-diff over-captures ~140 evolving voice/
+    tank state cells). It is the same smoother-target method reverb_recall.c used
+    (hook 0x3C2E80), reachable directly through e2e_emu.snap_all. Reverb coeff
+    cells identified: LOW CUT 10759520/536/552, HIGH CUT 10759568..632, DENSITY
+    10759392 (all master_render-READ, so port-settable at recall).
+  - **B-next order (mechanism now in hand):** (B2) derive every remaining FX fine-
+    FX law by dispatch+snap over its byte range x 4 rates (reverb, then chorus all
+    modes, then flanger); wire the port appliers; EXTEND recall_render_ab's oracle
+    to dispatch these leaves so the gate covers them; verify identity-at-default
+    (render A/B stays 57/57) + a NON-default render A/B per family to confirm no
+    first-block materialization transient. Fix the false-gap ledger rows (replace
+    the diff-miss port_writeset signal with "oracle dispatches leaf -> render A/B
+    green"). Then Pillar 3 (ONE non-circular exhaustive gate over the full wired
+    ledger: port applier vs a FRESH truth/-derived dispatch+snap sweep, all bytes x
+    4 rates) and Stage D (seal every gate + the freshness guard into make verify).
 - **Stage C — widen Pillar 3** to the full ledger + repoint the fuzzer;
   attempt Pillar 2 setState (fallback ready).
 - **Stage D — seal**: wire all gates into make verify as the single RED/GREEN.
