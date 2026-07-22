@@ -23,7 +23,17 @@ predelay = max((byte·Hr)/1000-2, 0) — executed per byte × 4 rates × 3 REVER
 classes (idx 876=TYPE, not 877=TIME), wired in `reverb_recall.c`
 (`juno_write_reverb_taps_pd`), identity at default byte 20. Pillar-3 now
 **192512 comparisons over 9 contexts × 14 leaves × 4 rates, 0 mismatch**;
-COVERAGE 1323 GAP→APPLIED. Next: W2 (EFFECT TYPE 2/3/4 secondary cells).
+COVERAGE 1323 GAP→APPLIED. **W2 DONE:** EFFECT TYPE modes 2/3 proven no-gap;
+mode-4 (FLANGER) structural block wired. **W3-STRUCT + GATE DONE:** the
+synthetic-ET-mode A/B gate (`etmode_ab.py`, in make verify) proves the port's
+EFFECT TYPE 0..5 recall == plugin (864 cells 0 mismatch); also fixed a real
+stale-libjuno hole (make verify now has libjuno.so as a prerequisite). **GAP 10→8;
+every engine-dispatchable gap is closed.** The 8 remaining GAPs (7 FLANGER param
+leaves 1242-1248 + Patch Tempo 1118) are ALL controller-path (engine value-tree
+0x3B9A30 is a no-op for them; confirmed by 0→200 full-state sweep + leaf-table
+absence) → they need the **#112 controller lifecycle (W4)**, the documented hard
+problem (the work order says do NOT fight the threaded process() loop). W4/W5/W6
+are all gated on #112.
 
 ## The one rule everything else serves
 
