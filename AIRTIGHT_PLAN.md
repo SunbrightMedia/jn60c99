@@ -400,14 +400,19 @@ DISCOVERY (scratchpad/w3_flanger_struct.py):
   CONTROLLER-PATH params (same class as Patch Tempo / #112), unappliable from the
   engine value-tree. Full flanger closure is therefore BLOCKED on the #112
   controller lifecycle (W4).
-- **Gate infra still needed:** no factory patch reaches EFFECT TYPE 2-5, so the
-  whole ET-mode chorus/flanger recall (chorus_recall etype>=2 + effect_modes 1/5)
-  is validated by structural analysis, NOT the render-A/B gate. Closing this
-  RIGHT needs a synthetic-ET-mode oracle-vs-port state A/B (force 873=2..5,
-  diff the plugin's post-recall 91xxx/96xxx block vs the port's juno_apply) in
-  `make verify`. That gate (not just wiring the 4 constants) is the airtight
-  bar; also resolve whether the port's etype>=2 91216/91200 writes match the
-  plugin for a mode-4 patch (the plugin's mode-4 diff did not move them).
+- **Gate infra: DONE (2026-07-22).** `tools/verify/etmode_ab.py` is now in
+  `make verify`: a synthetic-ET-mode oracle-vs-port state A/B (base factory patch
+  with EFFECT TYPE doctored to each mode 0..5; oracle = e2e_emu recall+snap, port =
+  libjuno juno_gui_apply_bank; the ORACLE determines the per-mode writeset — anti-
+  circular). **PROVEN 864 cells, 6 modes x 4 rates x 3 base patches, 0 mismatch**,
+  which validated the flanger structural AND confirmed the port's etype>=2 91216/
+  91200 writes match the plugin for every mode. Building it also caught a real
+  infra gap: `make verify` was loading a STALE libjuno.so (the flanger arm, having
+  zero factory reach, passed every existing gate against an out-of-date library) —
+  fixed by making `libjuno.so` a `verify:` prerequisite.
+- **Remaining for W3 (BLOCKED on #112):** the 7 flanger PARAM leaves 1242-1248
+  are controller-path (engine dispatch is a no-op) — they need the controller
+  lifecycle. This is the same blocker as W4/Patch Tempo.
 
 ### W4 — Patch Tempo (1118) + #112 wrapper/system defaults
 

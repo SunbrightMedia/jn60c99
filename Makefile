@@ -34,7 +34,11 @@ SCRATCH := $(abspath scratchpad)
 # oracle edit (adding dispatched leaves) could pass unnoticed. Airtight: the ref
 # always tracks the code that made it.
 ORACLE_DEPS := $(wildcard tools/verify/*.py)
-verify: test
+# libjuno.so is a prerequisite so the libjuno-based gates (port_state_dump,
+# etmode_ab --port) never test a STALE binary: a src/*.c change that no factory
+# patch exercises (e.g. the EFFECT TYPE 4 flanger arm) would otherwise pass every
+# gate against an out-of-date library. Caught by etmode_ab.py, 2026-07-22.
+verify: test libjuno.so
 	@FAIL=0; \
 	fresh() { p="$$1"; shift; [ -f "$$p" ] || return 1; for d in "$$@"; do [ "$$p" -nt "$$d" ] || return 1; done; }; \
 	fresh $(SCRATCH)/index_cell_map.pkl $(ORACLE_DEPS)    || python3 tools/verify/index_cell_map.py    || FAIL=1; \
@@ -67,6 +71,9 @@ verify: test
 	echo "=== PILLAR-3: exhaustive fine-FX (port applier vs plugin's own setter, every byte x 4 rates) ==="; \
 	fresh $(SCRATCH)/finefx_cellsweep_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/finefx_cellsweep.py || FAIL=1; \
 	$(MAKE) -s tools/verify/finefx_port_dump && python3 tools/verify/finefx_pillar3_gate.py || FAIL=1; \
+	echo "=== ET-MODE A/B: synthetic EFFECT TYPE 0..5 recall (port vs plugin; no factory patch reaches modes 2-5) ==="; \
+	fresh $(SCRATCH)/etmode_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/etmode_ab.py --ref || FAIL=1; \
+	python3 tools/verify/etmode_ab.py --port || FAIL=1; \
 	echo "=== LEDGER ==="; \
 	python3 tools/verify/provenance_check.py || FAIL=1; \
 	python3 tools/verify/completeness_scan.py || FAIL=1; \
