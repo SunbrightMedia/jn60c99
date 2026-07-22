@@ -77,12 +77,26 @@ for _d, _i in cellmap.items():
         if _c not in port and is_audio(_c):
             _finegap_cells.add(_c)
 
+# The fine-FX filter leaves are blind (not in the recall ENUMERATOR), so the
+# isolated-dispatch cellmap over-attributes their cells (crosses FX contexts) and
+# the port_writeset heuristic can't cleanly confirm them. But finefx_pillar3_gate.py
+# now PROVES each one bit-exact vs the plugin's OWN setter over its full input
+# domain at all 4 rates (a strictly stronger statement than cells-subset-of-writeset)
+# -- so they are APPLIED-PROVEN by that gate regardless of the cellmap noise.
+FINEFX_PROVEN = {1180, 1181, 1182, 1183, 1184, 1185,   # DELAY fine filters + direct
+                 1210, 1211, 1212,                     # slot-1 CHORUS fine filters
+                 1324, 1325, 1326, 1327}               # REVERB fine filters + direct
+
 rows = []
 for disp in sorted(cellmap):
     info = cellmap[disp]
     row = leaves.get(disp)
     fam = row[2] if row else '?'; struct_ = info['struct']; name = info['name']
     cells = info['cells']
+    if disp in FINEFX_PROVEN:
+        rows.append((disp, fam, struct_, name, 'APPLIED',
+                     'finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates'))
+        continue
     # port_writeset is the RELIABLE audio signal (cells the port sets for recall);
     # render-read (is_audio) is used only to CATCH a gap the port misses. This
     # keeps APPLIED robust to any incompleteness in the render-read grep.
