@@ -147,11 +147,22 @@ residual would be a named, bounded, visible-red item — never a silent green.
 
 ## Staging (each stage independently verifiable)
 
-- **Stage A — build Pillar 1**: extract enumerations, generate COVERAGE.tsv,
-  ship completeness_gate.py, DELIVER THE GAP LIST. (This converts all unknown
-  unknowns into a finite worklist. Expected known gaps going in: fine-FX
-  filters #116/#124 — already root-caused, laws largely in ext_sweeps.pkl;
-  system params; VCA MODE >2; #122 FX combos; dispatch 375/493/495 defaults.)
+- **Stage A — build Pillar 1: LEDGER + GATE BUILT (2026-07-21).** COVERAGE.tsv
+  classifies all 269 dispatchable value-tree leaves (enumerated from the binary
+  via enumerate_leaves.py's canonical `dispatchable` column; generators
+  leaf_cellmap.py / leaf_cellmap_fx.py / port_writeset.py / build_coverage.py;
+  gate completeness_gate.py; `make completeness`). Result:
+  **APPLIED 54 | GAP 11 | UNRESOLVED 41 | INERT-PROVEN 163**, gate RED (honest).
+  - GAP worklist = the fine delay/chorus/reverb FILTER+LEVEL family + EFFECT
+    DEPTH + mode-router residuals (the darkness cause, fully enumerated).
+  - The gate caught the SYSTEM-8 param surface (→ documented JUNO-60-only scope)
+    and a 46-leaf hole in the first-pass ledger (VCA MODE / TYPE selectors).
+  - REMAINING to fully close Pillar 1 (two items, both need the full-value-tree
+    recall differential): (1) resolve the 41 UNRESOLVED extended-FX leaves
+    (load_leaves recall doesn't activate their blocks); (2) harden the INERT
+    'no_engine_write_in_12_contexts' soft edge (isolated dispatch misses
+    CONDITIONAL setters like F ENV VARIATION that the port DOES apply — those
+    are applied-but-mislabeled, not gaps). GAP + APPLIED buckets are solid now.
 - **Stage B — close the gaps**, highest-audibility first (fine-FX filters
   first: they are the user's current complaint). Each closure: derive by
   executing the plugin's own setter (PROVEN) → apply in port → flip ledger row.
