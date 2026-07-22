@@ -28,12 +28,19 @@ all: $(OBJ)
 # one-time per container). The port side + diffs re-run fresh each time (seconds).
 # Two-process rule: each python3 below is a separate process (oracle vs libjuno).
 SCRATCH := $(abspath scratchpad)
+# Oracle/generator sources: if ANY is newer than a cached reference pickle, that
+# pickle is STALE (it was built by an older oracle) and MUST be regenerated. A
+# stale ref silently gates the port against an outdated oracle -- exactly how an
+# oracle edit (adding dispatched leaves) could pass unnoticed. Airtight: the ref
+# always tracks the code that made it.
+ORACLE_DEPS := $(wildcard tools/verify/*.py)
 verify: test
 	@FAIL=0; \
-	test -f $(SCRATCH)/index_cell_map.pkl    || python3 tools/verify/index_cell_map.py    || FAIL=1; \
-	test -f $(SCRATCH)/plugin_recall_ref.pkl || python3 tools/verify/plugin_recall_ref.py || FAIL=1; \
-	test -f $(SCRATCH)/recall_render_ref.pkl || python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
-	for r in 44100 48000 96000; do test -f $(SCRATCH)/recall_exhaustive_$$r.pkl || python3 tools/verify/recall_exhaustive_ref.py $$r || FAIL=1; done; \
+	fresh() { p="$$1"; shift; [ -f "$$p" ] || return 1; for d in "$$@"; do [ "$$p" -nt "$$d" ] || return 1; done; }; \
+	fresh $(SCRATCH)/index_cell_map.pkl $(ORACLE_DEPS)    || python3 tools/verify/index_cell_map.py    || FAIL=1; \
+	fresh $(SCRATCH)/plugin_recall_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/plugin_recall_ref.py || FAIL=1; \
+	fresh $(SCRATCH)/recall_render_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
+	for r in 44100 48000 96000; do fresh $(SCRATCH)/recall_exhaustive_$$r.pkl $(ORACLE_DEPS) || python3 tools/verify/recall_exhaustive_ref.py $$r || FAIL=1; done; \
 	python3 tools/verify/port_state_dump.py >/dev/null 2>&1 || FAIL=1; \
 	echo "=== LIVE GATE 1/7: recall_gate (port vs plugin's own recall, 64 patches) ==="; \
 	python3 tools/verify/recall_gate.py || FAIL=1; \
@@ -42,7 +49,7 @@ verify: test
 	echo "=== LIVE GATE 3/7: render A/B (port render vs plugin's own render, 57 non-arp) ==="; \
 	python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
 	echo "=== LIVE GATE 4/7: arp SCHEDULE (plugin's own arp vs carp.c, 7 arp patches) ==="; \
-	test -f $(SCRATCH)/arp_sched_ref.pkl || python3 tools/verify/arp_sched_ab.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/arp_sched_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/arp_sched_ab.py --ref || FAIL=1; \
 	python3 tools/verify/arp_sched_ab.py --port || FAIL=1; \
 	echo "=== LIVE GATE 5/7: arp RENDER (schedule replay into plugin, 7 arp patches) ==="; \
 	python3 tools/verify/arp_render_ab.py --port || FAIL=1; \
@@ -54,8 +61,7 @@ verify: test
 	done; \
 	echo "=== LIVE GATE 7/7: render A/B at 44100 + NON-standard 88200 (recall->render chain) ==="; \
 	for sr in 44100 88200; do \
-	  JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl sh -c '\
-	    test -f "$$JUNO_RENDER_REF_PKL" || python3 tools/verify/recall_render_ab.py --ref' || FAIL=1; \
+	  fresh $(SCRATCH)/recall_render_ref_$$sr.pkl $(ORACLE_DEPS) || JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
 	  JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
 	done; \
 	echo "=== LEDGER ==="; \
