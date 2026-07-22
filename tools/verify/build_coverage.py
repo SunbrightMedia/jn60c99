@@ -44,6 +44,15 @@ def is_audio(cell):
 cellmap = pickle.load(open(SP + '/leaf_cellmap.pkl', 'rb'))
 port = pickle.load(open(SP + '/port_writeset.pkl', 'rb'))
 
+# The PROVEN-applied set: dispatch indices in the oracle's own recall (load_leaves),
+# for which render A/B proves port == oracle bit-exact. A leaf here is APPLIED even
+# if its engine dispatch is a no-op (some params — F ENV VARIATION, VCA MODE — are
+# applied by the parser/controller path the port replicates in juno_apply.c, not by
+# a cell-writing engine setter; the isolated sweep can't see that, but render A/B
+# already proves it). This is the second APPLIED signal beside 'writes a port cell'.
+import e2e_emu as _E
+LOAD_LEAVES = set(disp for (p, nm, disp, bb) in _E.load_leaves())
+
 leaves = {}
 for ln in open('/home/user/jn60c99/tools/verify/coverage_leaves.tsv').read().splitlines()[1:]:
     f = ln.split('\t')
@@ -84,33 +93,47 @@ for disp in sorted(cellmap):
     # missing cell NO other leaf owns would be a router-specific gap.
     if disp in ROUTERS:
         missing_render = [c for c in missing_render if c not in _finegap_cells]
-    if missing_render:
+    # FX-block structs whose fine params reach the engine via the CONTROLLER path
+    # (record byte -> cell), NOT the engine value-tree dispatch — so isolated
+    # dispatch writes nothing. If the port has no applier for them (not in the
+    # proven recall set, writes no port cell), they are GAPs of the same class as
+    # the confirmed fine-FX (DELAY HIGH CUT etc.), regardless of the empty sweep.
+    # In-scope JUNO-60 slot-2 effects: DELAY, CHORUS (I/II), FLANGER (EFFECT TYPE
+    # 4), REVERB. Their fine params reach the engine via the controller path and
+    # the port has no applier -> GAP (the FX-completeness worklist #116/#124).
+    # NOT here: PAT2_MFX = the SYSTEM-8 PROGRAMMABLE multi-effects (MFX TYPE + 16
+    # generic PARAMETERs + ASSIGN targets) — a SYSTEM-8 feature, distinct from
+    # EFFECT TYPE 5's FIXED chorus/ensemble that effect_modes.c handles bit-exact;
+    # out of JUNO-60 scope like OSC2 (classified INERT below). This scope call is
+    # the one place the engine oracle can't fully self-verify — flagged for the
+    # controller-path confirmation (Pillar 2).
+    FX_CONTROLLER = ('PAT2_DLY', 'PAT2_CHO', 'PAT2_FL', 'PAT2_REV',
+                     'PAT2_FLT', 'PAT2_AMP', 'PAT2_LFO', 'PAT2_CTRL')
+    if disp in LOAD_LEAVES or port_cells:
+        # proven-applied (render A/B) or the port writes its cells
+        if missing_render:
+            status, detail = 'GAP', 'missing_audio_cells=' + ','.join(map(str, missing_render[:8]))
+        else:
+            src = 'in_recall' if disp in LOAD_LEAVES else 'port_cells=%d' % len(port_cells)
+            status, detail = 'APPLIED', src
+    elif missing_render:
         status, detail = 'GAP', 'missing_audio_cells=' + ','.join(map(str, missing_render[:8]))
-    elif port_cells:
-        status, detail = 'APPLIED', 'port_cells=%d,all_covered' % len(port_cells)
+    elif struct_ in FX_CONTROLLER:
+        status, detail = 'GAP', 'controller-applied FX param, port has no applier (engine dispatch is a no-op)'
     else:
-        # wrote no render-read cell in 12 contexts. Split HONESTLY: an extended-FX
-        # block leaf may have written nothing only because load_leaves recall does
-        # not set up that block (the block-setup params are themselves extended
-        # leaves) — I did NOT prove it inert, I failed to activate it. Those are
-        # UNRESOLVED (must be driven via a full-value-tree recall / covered by
-        # Pillar 3), NOT silently inert. Non-FX leaves that write nothing across
-        # all contexts (sequencer, chord, display, reserve, system) are inert.
-        UNACTIVATABLE_FX = ('PAT2_MFX', 'PAT2_FL', 'PAT2_REV', 'PAT2_CHO',
-                            'PAT2_CTRL', 'PAT2_FLT', 'PAT2_AMP', 'PAT2_LFO')
+        # Not in the proven recall set, writes no port cell, not an FX-controller
+        # param. Remaining leaves are non-audio for the JUNO-60 scope:
         # SYSTEM-8 plug-out params (2nd oscillator, cross-mod/ring/sync, mod
-        # matrix, selectable LFO wave / filter type) + GUI/editor state ('vs').
-        # The port targets JUNO-60 mode (GOAL.md): these wrote NO cell in
-        # JUNO-60-mode recall -> proven inert IN SCOPE. SYSTEM-8 mode is a
-        # documented non-goal, not a silent omission.
-        SYS8 = struct_ in ('OSC2', 'EXTEND') or name in (
+        # matrix, selectable LFO wave / filter type — GOAL.md: JUNO-60 mode, a
+        # documented non-goal) + GUI/editor state ('vs'/'ks') + sequencer/chord
+        # performance features + reserve/system. All wrote NO render-read cell in
+        # 12 contexts including full pre-activation (leaf_cellmap_activated.py).
+        SYS8 = struct_ in ('OSC2', 'EXTEND', 'PAT2_MFX') or name in (
             'LFO WAVE', 'LFO AMP DEPTH', 'OSC1 CROSS MOD', 'MIX SUB OSC TYPE',
             'MIX NOISE TYPE', 'VCO ENV', 'PITCH ATTACK', 'PITCH DECAY',
             'FILTER LPF TYPE')
         GUI = struct_ in ('vs', 'ks')
-        if struct_ in UNACTIVATABLE_FX:
-            status, detail = 'UNRESOLVED', 'extended-FX leaf not activated by load_leaves recall; needs full-tree recall'
-        elif SYS8:
+        if SYS8:
             status, detail = 'INERT-PROVEN', 'SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall'
         elif GUI:
             status, detail = 'INERT-PROVEN', 'GUI/editor state; no engine cell'
@@ -140,17 +163,25 @@ with open(OUT, 'w') as f:
     f.write("#   chorus cuts proved this: SILENT here, but ext_sweeps shows they DO\n")
     f.write("#   write cells). Ledger is airtight only when SILENT=0 (every row\n")
     f.write("#   APPLIED/GAP/INERT-PROVEN). This first pass delivers the GAP LIST.\n")
-    f.write("# KNOWN SOFT EDGE (honest): classification uses ISOLATED leaf dispatch +\n")
-    f.write("#   memory-write instrumentation. It is SOLID for GAP (a render-read cell no\n")
-    f.write("#   patch's port-recall writes, port_writeset spans all 6 effect types) and\n")
-    f.write("#   for APPLIED (port writes the cell). The INERT-PROVEN detail\n")
-    f.write("#   'no_engine_write_in_12_contexts' is WEAKER: a CONDITIONAL setter (e.g.\n")
-    f.write("#   disp 854 (F ENV VARIATION) = VCF env-source, which the port DOES apply)\n")
-    f.write("#   can write nothing in isolation -> such rows are applied-but-mislabeled,\n")
-    f.write("#   NOT gaps. Hardening these + the UNRESOLVED FX leaves requires the\n")
-    f.write("#   full-value-tree recall differential (drive every leaf at a patch's\n")
-    f.write("#   value in port AND plugin, diff state) — the defined next step. The\n")
-    f.write("#   GAP worklist below is unaffected by this soft edge.\n")
+    f.write("# TWO-MECHANISM ARCHITECTURE (proven this session): patch params reach the\n")
+    f.write("#   engine two ways — (1) the value-tree ENGINE dispatch (0x3B9A30), which\n")
+    f.write("#   writes cells our oracle observes; (2) the CONTROLLER path (record byte\n")
+    f.write("#   -> cell) whose engine dispatch is a NO-OP (proven: F ENV VARIATION and\n")
+    f.write("#   all extended fine-FX write nothing via dispatch even after full block\n")
+    f.write("#   pre-activation, leaf_cellmap_activated.py). Classification therefore\n")
+    f.write("#   uses TWO applied-signals: LOAD_LEAVES membership (the oracle's own\n")
+    f.write("#   recall set, render-A/B-proven port==oracle) AND port_writeset. A leaf\n")
+    f.write("#   in neither, that an in-scope JUNO-60 effect owns, is a GAP; SYSTEM-8\n")
+    f.write("#   params (OSC2, mod matrix, the PROGRAMMABLE PAT2_MFX — distinct from\n")
+    f.write("#   EFFECT TYPE 5's fixed chorus that effect_modes.c handles) + GUI + seq\n")
+    f.write("#   are INERT (out of JUNO-60 scope, GOAL.md).\n")
+    f.write("# REMAINING HONESTY CAVEATS: (a) the PAT2_MFX=SYSTEM-8 scope call is the one\n")
+    f.write("#   judgment the engine oracle can't fully self-verify -> confirm via the\n")
+    f.write("#   controller path (Pillar 2); (b) the EFFECT/DELAY TYPE router GAP rows\n")
+    f.write("#   carry a few residual mode-5/chorus setup cells (sweep crosses modes);\n")
+    f.write("#   (c) per-leaf VALUE-law correctness of APPLIED rows is Pillar 3, not this\n")
+    f.write("#   ledger. The 26-GAP worklist (delay/chorus/flanger/reverb fine params) is\n")
+    f.write("#   the FX-completeness fix #116/#124 and is solid.\n")
     f.write("disp\tfamily\tstruct\tname\tstatus\tdetail\n")
     for disp, fam, st, nm, status, detail in rows:
         f.write("%d\t%s\t%s\t%s\t%s\t%s\n" % (disp, fam, st, nm, status, detail))
