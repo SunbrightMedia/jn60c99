@@ -248,12 +248,19 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   Teensy-golden truncation the fine-FX exposed (blob stopped at record 3077,
   before CHORUS 3286-3288 + REVERB 3948-3952) FIXED: TG_BLOB_LEN 3062→3968.
   Pillar-1 ledger (`COVERAGE.tsv`) reconciled with authoritative cell sets
-  (`finefx_authcells.py`): **GAP 25→10, APPLIED 127 | INERT-PROVEN 132**; W1
-  flipped REVERB PRE DELAY (1323) → **GAP now 9, APPLIED 128**. The remaining GAPs
-  are all any-preset/scope with ZERO factory reach (all 64 patches use EFFECT TYPE
-  0 / REVERB TYPE 0): FLANGER (EFFECT TYPE 4, #122), EFFECT TYPE 2/3/4 secondary
-  cells, Patch Tempo (controller path, #112). chorus-LFO (1213-1215) proven INERT
-  (write no engine cell). The per-family detail below is retained for history.
+  (`finefx_authcells.py`): **GAP 25→10** → W1 flipped REVERB PRE DELAY (1323) →
+  **W2/W3-struct flipped EFFECT TYPE (873): GAP now 8, APPLIED 129.** The 8
+  remaining GAPs are ALL controller-path (engine value-tree dispatch is a no-op —
+  they need the #112 controller lifecycle, W4): Patch Tempo (1118) + the 7 FLANGER
+  param leaves (1242-1248 MANUAL/RESONANCE/SEPARATION/LOW CUT/LFO SOURCE/LFO EXT
+  GAIN/LFO EXT OFFSET). **Every ENGINE-DISPATCHABLE GAP is now closed.** W2/W3
+  findings: EFFECT TYPE modes 2/3 have no secondary-cell gap (proven); mode 4
+  (FLANGER) re-shapes block-A structural cells 91120/91152/91168/91184 (rate-armed,
+  DEPTH/TONE-indep — the old "2/3/4 write bit-identical block A" note was wrong for
+  mode 4), now wired in chorus_recall.c (test_delay_recall case 11). Still owed for
+  a full ET-mode proof: a synthetic-ET-mode oracle-vs-port state A/B in make verify
+  (no factory patch reaches EFFECT TYPE 2-5). chorus-LFO (1213-1215) proven INERT.
+  The per-family detail below is retained for history.
 - **STAGE-2 PROGRESS — DELAY fine-FX WIRED (#116, first closure).** The DELAY
   TYPE-0 fine-FX filter leaves are now applied by `src/finefx_recall.c`
   (`juno_apply_delay_finefx`, called from `juno_apply_delay`'s TYPE-0 arm):

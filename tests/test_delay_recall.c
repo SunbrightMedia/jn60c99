@@ -269,6 +269,37 @@ int main(void)
         put_pair(rec, 650, 0); rec[3059] = 7; put_pair(rec, 3060, 255); rec[3288] = 13;
     }
 
+    /* --- case 11: EFFECT TYPE 4 (FLANGER) structural block (chorus_recall.c etype==4).
+     * The flanger re-shapes block-A structural cells 91120/91152/91168/91184 (the old
+     * "2/3/4 bit-identical block A" reading was wrong for mode 4). DEPTH/TONE-independent,
+     * rate-armed; values are the plugin's OWN EFFECT TYPE setter (idx 873) output under
+     * Unicorn (scratchpad/w3_flanger_struct.py). Checked at 44100 + 96000 (two rate arms).
+     * NB: the flanger PARAMETER leaves 1242-1248 are controller-path (engine dispatch is a
+     * no-op) and remain GAP (#112) -- this guards only the mode-selector structural cells. */
+    {
+        static const struct { int Hr; unsigned c91120, c91152; } FL[] = {
+            { 44100, 0x3c0f87aeu, 0x39dac024u },
+            { 96000, 0x3c9d6666u, 0x3948fa21u },
+        };
+        int i;
+        for (i = 0; i < (int)(sizeof FL / sizeof FL[0]); ++i) {
+            memset(st, 0, JUNO_STATE_BYTES);
+            JF(st, 16) = (float)FL[i].Hr;
+            put_pair(rec, 634, 4);          /* EFFECT TYPE 4 -> FLANGER                */
+            juno_bank_apply(st, bank, 0);
+            if ((unsigned)u32(st, 91120) != FL[i].c91120 ||
+                (unsigned)u32(st, 91152) != FL[i].c91152 ||
+                (unsigned)u32(st, 91168) != 0x00000000u ||
+                (unsigned)u32(st, 91184) != 0x399d4952u) {
+                printf("  case11 flanger@%d: 91120=%08x 91152=%08x 91168=%08x 91184=%08x "
+                       "!= %08x/%08x/0/399d4952\n", FL[i].Hr, u32(st, 91120), u32(st, 91152),
+                       u32(st, 91168), u32(st, 91184), FL[i].c91120, FL[i].c91152);
+                ++fails;
+            }
+        }
+        put_pair(rec, 634, 0);              /* restore EFFECT TYPE 0                    */
+    }
+
     free(st); free(bank);
     if (fails) { printf("FAIL: %d delay-recall check(s) drifted\n", fails); return 1; }
     printf("OK: per-patch delay recall (mode + coefficients) verified\n");

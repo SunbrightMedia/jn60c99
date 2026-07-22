@@ -74,6 +74,25 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
             float f; memcpy(&f, &b, 4);
             JF(state, 91152) = f;
         }
+        /* EFFECT TYPE 4 (FLANGER) re-shapes block A's structural cells to the flanger
+         * coefficients — the OLD "2/3/4 write bit-identical block A" reading was wrong
+         * for mode 4. Four cells, DEPTH/TONE-independent (verified across base patches
+         * 0/7/40), from the plugin's OWN EFFECT TYPE setter (idx 873) under Unicorn
+         * (scratchpad/w3_flanger_struct.py): 91168=0 and 91184=0x399d4952 constant;
+         * 91120/91152 rate-armed (4 distinct rate arms). No factory patch reaches
+         * mode 4, so this has zero factory-render reach — it is recall-correctness for
+         * any preset. NB: the flanger PARAMETER leaves (1242-1248 MANUAL/RESONANCE/…)
+         * write NO engine cell via dispatch 0x3B9A30 (controller-path, engine dispatch
+         * is a no-op) and remain GAP pending the #112 controller lifecycle. */
+        if (etype == 4) {
+            int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+            JF(state, 91120) = cr_bits(Hr == 44100 ? 0x3c0f87aeu : Hr == 48000 ? 0x3c1c6666u :
+                                       Hr == 88200 ? 0x3c9087aeu : 0x3c9d6666u);
+            JF(state, 91152) = cr_bits(Hr == 44100 ? 0x39dac024u : Hr == 48000 ? 0x39c8fa21u :
+                                       Hr == 88200 ? 0x395ac024u : 0x3948fa21u);
+            JF(state, 91168) = cr_bits(0x00000000u);
+            JF(state, 91184) = cr_bits(0x399d4952u);
+        }
     }
     /* EFFECT TYPE mode 5 also drives block B (96336..) — structural + On/Off + LFO
      * Rate + enable gates — via src/effect_modes.c (juno_apply_effect_modes). Block A

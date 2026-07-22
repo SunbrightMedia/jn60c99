@@ -372,23 +372,42 @@ default). test_reverb_recall PRE DELAY cases added. Bonus: proved reverb fine-FX
 1324-1327 TYPE-independent (revfinefx_typedep_probe.py) — W0's TIME-forced proof
 had no TYPE hole. COVERAGE 1323 GAP→APPLIED; PROVENANCE row 25 updated.
 
-### W2 — EFFECT TYPE 2/3/4 secondary cells (873) + #122 interactions
+### W2 — EFFECT TYPE 2/3/4 secondary cells (873) — SCOPED (2026-07-22)
 
-### W2 — EFFECT TYPE 2/3/4 secondary cells (873) + #122 interactions
+DISCOVERY (scratchpad/w2_et_sweep.py + full-state diff, idx 873 = REVERB… no,
+EFFECT TYPE; forced to each mode, diffed vs mode 0): **modes 2 and 3 have NO
+secondary-cell gap.** Their full-state diff vs mode 0 is only {85136/85168/
+85184/85984 (the mode-0 Pan-arm cells, written by the port ONLY under etype==0,
+so their reverting to 0 is correct-by-absence), 11022052 (routing int = etype,
+handled), 91152 (mode 3, already handled by chorus_recall etype==3)}. So the
+873 GAP row `missing_audio_cells=91120,91168,91184` is ENTIRELY the FLANGER
+(mode 4) structural block — folded into W3. There is nothing to wire for modes
+2/3; the chillwave #122 residual, if any, is not a missing-cell issue.
 
-The authoritative sweep shows ET writes 13 cells of which 91120/91168/91184
-are not in the port writeset (mode-block cells of the non-factory ET modes).
-Per-ET-context sweeps (ctx = force 873 to each of 1..5), derive the block
-laws, wire into effect_modes.c. Include the chillwave regression patches
-(24/32/38/56) as the completion check for #122's non-flanger half.
+### W3 — FLANGER (EFFECT TYPE 4) — SCOPED + PART-BLOCKED (2026-07-22)
 
-### W3 — FLANGER (EFFECT TYPE 4; leaves 1242-1248)
-
-The last DSP block. Same method that closed DELAY TYPE 4: structural block
-derivation in ET4 context + per-byte laws for the 7 leaves, port block
-implementation, render A/B in an ET4 context (synthetic patch — no factory
-patch reaches ET4, so ADD an oracle-vs-port A/B over synthetic ET4 patches as
-the gate), Pillar-3 rows. Flips the 7 flanger GAPs.
+DISCOVERY (scratchpad/w3_flanger_struct.py):
+- **Structural block = 4 cells**, DEPTH/TONE-independent, rate-armed (idx-873
+  setter, covenant-clean): 91168 = 0 and 91184 = 0x399d4952 (constant); 91120 =
+  {44100:0x3c0f87ae, 48000:0x3c1c6666, 88200:0x3c9087ae, 96000:0x3c9d6666};
+  91152 = {44100:0x39dac024, 48000:0x39c8fa21, 88200:0x395ac024, 96000:0x3948fa21}.
+  These are DERIVED and ready to wire into chorus_recall.c (etype==4 arm) — the
+  old "EFFECT TYPE 2/3/4 write bit-identical block A" note in chorus_recall.c is
+  WRONG for mode 4 (the flanger re-shapes 91120/91168/91184/91152).
+- **BLOCKER: the 7 flanger LEAVES (1242-1248, MANUAL/RESONANCE/SEPARATION/LOW
+  CUT/LFO SOURCE/LFO EXT GAIN/LFO EXT OFFSET) write ZERO engine cells via the
+  value-tree dispatch 0x3B9A30** (0→200 sweep, all 7 = 0 cells) — they are
+  CONTROLLER-PATH params (same class as Patch Tempo / #112), unappliable from the
+  engine value-tree. Full flanger closure is therefore BLOCKED on the #112
+  controller lifecycle (W4).
+- **Gate infra still needed:** no factory patch reaches EFFECT TYPE 2-5, so the
+  whole ET-mode chorus/flanger recall (chorus_recall etype>=2 + effect_modes 1/5)
+  is validated by structural analysis, NOT the render-A/B gate. Closing this
+  RIGHT needs a synthetic-ET-mode oracle-vs-port state A/B (force 873=2..5,
+  diff the plugin's post-recall 91xxx/96xxx block vs the port's juno_apply) in
+  `make verify`. That gate (not just wiring the 4 constants) is the airtight
+  bar; also resolve whether the port's etype>=2 91216/91200 writes match the
+  plugin for a mode-4 patch (the plugin's mode-4 diff did not move them).
 
 ### W4 — Patch Tempo (1118) + #112 wrapper/system defaults
 

@@ -143,7 +143,7 @@ disp	family	struct	name	status	detail
 870	NAME	PAT_NAME3	(OSC3 TUNE)	APPLIED	in_recall
 871	NAME	PAT_NAME3	HPF TYPE	APPLIED	in_recall
 872	NAME	PAT_NAME3	(FILTER TYPE)	APPLIED	in_recall
-873	NAME	PAT_NAME3	EFFECT TYPE	GAP	missing_audio_cells=91120,91168,91184
+873	NAME	PAT_NAME3	EFFECT TYPE	APPLIED	flanger (mode 4) structural cells 91120/91152/91168/91184 wired in chorus_recall.c from the plugin's own idx-873 setter (rate-armed, DEPTH/TONE-indep), test_delay_recall case 11; modes 2/3 proven no-gap. NB flanger PARAM leaves 1242-1248 stay GAP (controller-path)
 874	NAME	PAT_NAME3	EFFECT TONE	APPLIED	in_recall
 875	NAME	PAT_NAME3	DELAY TYPE	APPLIED	in_recall
 876	NAME	PAT_NAME3	REVERB TYPE	APPLIED	in_recall
