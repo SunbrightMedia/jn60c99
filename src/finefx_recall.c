@@ -79,9 +79,14 @@ void juno_apply_delay_finefx(unsigned char *state, const unsigned char *rec, int
 void juno_apply_reverb_finefx(unsigned char *state, const unsigned char *rec, int Hr)
 {
     int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
-    int lc = clampi(rec[3948] & 0x7F, 0, 127);   /* REVERB LOW CUT   (int1x7)     */
-    int hc = clampi(rec[3949] & 0x7F, 0, 127);   /* REVERB HIGH CUT  (int1x7)     */
-    int dn = clampi(rec[3950] & 0x7F, 0, 127);   /* REVERB DENSITY   (int1x7)     */
+    /* Clamp to the plugin's OWN param range (real host maps normalized->[0,1]->
+     * plain in [min,max], so out-of-range record bytes are unreachable). The
+     * reverb setter does NOT saturate internally past its range (it reads
+     * state-dependent garbage), so clamping here is load-bearing for any-preset
+     * robustness; proven bit-exact over [0,max] by finefx_pillar3_gate.py. */
+    int lc = clampi(rec[3948] & 0x7F, 0, 17);    /* REVERB LOW CUT   (int1x7)     */
+    int hc = clampi(rec[3949] & 0x7F, 0, 14);    /* REVERB HIGH CUT  (int1x7)     */
+    int dn = clampi(rec[3950] & 0x7F, 0, 10);    /* REVERB DENSITY   (int1x7)     */
     int dl = clampi(nib(rec, 3951),  0, 255);    /* REVERB DIRECT LV (int2x4)     */
     int k;
     for (k = 0; k < 3; k++) wr_bits(state, REV_LC_CELLS[k], REV_LC[arm][lc][k]);
@@ -102,9 +107,12 @@ void juno_apply_reverb_finefx(unsigned char *state, const unsigned char *rec, in
 void juno_apply_chorus_finefx(unsigned char *state, const unsigned char *rec, int Hr)
 {
     int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
-    int hc = clampi(rec[3288] & 0x7F, 0, 127);   /* CHORUS HIGH CUT (int1x7)      */
-    int lc = clampi(rec[3287] & 0x7F, 0, 127);   /* CHORUS LOW CUT  (int1x7)      */
-    int pd = clampi(rec[3286] & 0x7F, 0, 127);   /* CHORUS PRE DELAY(int1x7)      */
+    /* Clamp to the plugin's own param range (see reverb note above). The chorus
+     * setter DOES saturate internally, so the port matched bit-exact over 0..127
+     * before this too; clamping to range is kept for uniformity + robustness. */
+    int hc = clampi(rec[3288] & 0x7F, 0, 14);    /* CHORUS HIGH CUT (int1x7)      */
+    int lc = clampi(rec[3287] & 0x7F, 0, 17);    /* CHORUS LOW CUT  (int1x7)      */
+    int pd = clampi(rec[3286] & 0x7F, 0, 80);    /* CHORUS PRE DELAY(int1x7)      */
     int k;
     for (k = 0; k < 7; k++) wr_bits(state, CHO1_HC_CELLS[k], CHO1_HC[hc][k]);
     for (k = 0; k < 2; k++) wr_bits(state, CHO1_LC_CELLS[k], CHO1_LC[arm][lc][k]);

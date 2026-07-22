@@ -64,6 +64,9 @@ verify: test
 	  fresh $(SCRATCH)/recall_render_ref_$$sr.pkl $(ORACLE_DEPS) || JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
 	  JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
 	done; \
+	echo "=== PILLAR-3: exhaustive fine-FX (port applier vs plugin's own setter, every byte x 4 rates) ==="; \
+	fresh $(SCRATCH)/finefx_cellsweep_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/finefx_cellsweep.py || FAIL=1; \
+	$(MAKE) -s tools/verify/finefx_port_dump && python3 tools/verify/finefx_pillar3_gate.py || FAIL=1; \
 	echo "=== LEDGER ==="; \
 	python3 tools/verify/provenance_check.py || FAIL=1; \
 	python3 tools/verify/completeness_scan.py || FAIL=1; \
@@ -118,6 +121,11 @@ test: tests/test_fma_canary tests/test_teensy_golden tests/test_voice_alloc test
 
 tests/test_fma_canary: tests/test_fma_canary.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)
+
+# Pillar-3 exhaustive fine-FX gate: port-side coefficient dumper (compiled from the
+# shipping src/*.c). finefx_pillar3_gate.py diffs it against the oracle reference.
+tools/verify/finefx_port_dump: tools/verify/finefx_port_dump.c src/finefx_recall.h src/delay_recall.h $(SRC)
+	$(CC) $(CFLAGS) -o $@ tools/verify/finefx_port_dump.c $(SRC) $(LDLIBS)
 
 tests/test_teensy_golden: tests/test_teensy_golden.c tests/teensy_golden.h gui/juno_bridge.c $(SRC)
 	$(CC) $(CFLAGS) -Itests -o $@ tests/test_teensy_golden.c gui/juno_bridge.c $(SRC) $(LDLIBS)

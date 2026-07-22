@@ -75,3 +75,4 @@ node_modules/
 
 # stray root-level run logs (Unicorn/verify stderr redirects)
 /*.log
+tools/verify/finefx_port_dump
