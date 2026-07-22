@@ -43,6 +43,15 @@ int main(void)
     bank[0] = 'K';
     unsigned char *rec = bank + HDR;
 
+    /* The fine-FX filter params (DELAY HIGH CUT / LF+HF DAMP / LF+HF DAMP FREQ) are
+     * now live (src/finefx_recall.c). A real patch record always carries them, so
+     * seed the synthetic record with their DEFAULT bytes (HIGH CUT=7 raw at 3059;
+     * HF DAMP FREQ=13 nibble pair at 3092; LF DAMP / LF DAMP FREQ / HF DAMP default
+     * to 0, already zeroed by calloc). At the default byte the applier reproduces
+     * delay_recall.c's frozen FILT[]/put_rate constants, so the checks below hold. */
+    rec[3059] = 7;              /* DELAY HIGH CUT default (int1x7 raw)       */
+    put_pair(rec, 3092, 13);    /* DELAY HF DAMP FREQ default (int8x4 nibble) */
+
     /* --- case 1: DELAY TYPE 0, LEVEL 128, TIME 128, FEEDBACK 255, DIRECT 255 --- */
     put_pair(rec, 650, 0);      /* DELAY TYPE   */
     put_blob(rec,  52, 128);    /* DELAY LEVEL  (blob 52, corrected from 40)  */
@@ -170,6 +179,31 @@ int main(void)
         if ((unsigned)u32(st, 102352) != eb || (unsigned)u32(st, 4297584) != eb) {
             printf("  case6: tempo recompute %08x/%08x != %08x\n",
                    u32(st, 102352), u32(st, 4297584), eb); ++fails; }
+    }
+
+    /* --- case 7: NON-DEFAULT fine-FX filter (src/finefx_recall.c). The 18 factory
+     * TYPE-0 delay patches (p2/p6/p12/p13/... "Delicate Keys"/"Ouch Bass"/...) carry
+     * DELAY HIGH CUT=3, HF DAMP=12, HF DAMP FREQ=3 — NOT the defaults. Before the
+     * applier the port froze these at the default coefficients (too bright); it now
+     * writes the plugin's own per-byte law. Guard the exact cells at 44.1 kHz (the
+     * delivery rate; HF DAMP FREQ is rate-armed). Expected bits are the plugin's own
+     * setter output, executed under Unicorn (scratchpad/finefx_delay_rates.py). --- */
+    {
+        put_pair(rec, 650, 0);        /* DELAY TYPE 0                    */
+        rec[3059] = 3;                /* DELAY HIGH CUT = 3  (int1x7 raw) */
+        put_pair(rec, 3084, 12);      /* DELAY HF DAMP   = 12 (int8x4)    */
+        put_pair(rec, 3092, 3);       /* DELAY HF DAMP FREQ = 3 (int8x4)  */
+        memset(st, 0, JUNO_STATE_BYTES);
+        JF(st, 16) = 44100.0f;
+        juno_bank_apply(st, bank, 0);
+        if ((unsigned)u32(st, 102368) != 0x3ce64b15u) {   /* HIGH CUT=3 (rate-indep) */
+            printf("  case7: HIGH CUT %08x != 3ce64b15\n", u32(st, 102368)); ++fails; }
+        if ((unsigned)u32(st, 102672) != 0x3f004dceu) {   /* HF DAMP=12 (rate-indep) */
+            printf("  case7: HF DAMP %08x != 3f004dce\n", u32(st, 102672)); ++fails; }
+        if ((unsigned)u32(st, 102656) != 0x3e2e4a3fu) {   /* HF DAMP FREQ=3 @44.1k   */
+            printf("  case7: HF DAMP FREQ %08x != 3e2e4a3f\n", u32(st, 102656)); ++fails; }
+        /* restore defaults so the record stays a valid default patch */
+        rec[3059] = 7; put_pair(rec, 3084, 0); put_pair(rec, 3092, 13);
     }
 
     free(st); free(bank);

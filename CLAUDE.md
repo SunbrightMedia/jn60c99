@@ -217,6 +217,28 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   (new fine-FX applier), and EXTEND the recall reference + render A/B to include
   these leaves so the gate itself catches the darkness (closes the blind spot
   permanently). Covenant-clean throughout (plugin's own setters under Unicorn).
+- **STAGE-2 PROGRESS — DELAY fine-FX WIRED (#116, first closure).** The DELAY
+  TYPE-0 fine-FX filter leaves are now applied by `src/finefx_recall.c`
+  (`juno_apply_delay_finefx`, called from `juno_apply_delay`'s TYPE-0 arm):
+  HIGH CUT (1180 → 102368/384/400/416/432/464/496), LF/HF DAMP (1182/1184 →
+  102640/102672), LF/HF DAMP FREQ (1183/1185 → 102608/102656, rate-armed). The
+  law is the plugin's OWN per-byte setter output, executed under Unicorn at all
+  four host rates (`scratchpad/finefx_delay_rates.py` → `finefx_tables.h`); at
+  the default byte every row EQUALS delay_recall.c's frozen FILT[]/put_rate
+  constant (HIGH CUT byte 7, DAMP byte 0, LF/HF DAMP FREQ arms == ARM_LFX2/
+  ARM_HFDMP) — a strict generalization, identity at the default. The render-A/B
+  ORACLE now DISPATCHES these leaves for TYPE-0 patches (recall_render_ab.py
+  `DELAY_FILT_LEAVES`, gated on DELAY TYPE == 0), so the gate covers them: render
+  A/B stays BIT-EXACT 57/57 at 48k AND 44.1k WITH the fine-FX in the loop (DELAY
+  blind spot closed). Corrected 18 factory TYPE-0 patches (p2 Delicate Keys, p6
+  Ouch Bass, p12/13/20/29/30/32/37/43/45/46/50/52/53/54/59/60 — all HIGH CUT=3,
+  HF DAMP=12, HF DAMP FREQ=3) whose delay filter was frozen too-bright. Guarded
+  by test_delay_recall case 7. NOTE (scope + honesty): this is DELAY TYPE-0
+  only — TYPE-1/4 delay + the CHORUS/REVERB/EFFECT-DEPTH fine-FX are the same
+  mechanism, still GAP (follow-up). It closes ONE enumerated sub-class; the
+  GLOBAL bounce brightness gap (#124) is separate and larger and this does NOT
+  close it (the crude locator still shows a per-patch offset dominated by the
+  host-lifecycle path, not the delay filter).
 - **Process-lifecycle harness (real_process_run.py) — DEFERRED, not needed.**
   Attempted plugin-via-process() as candidate. It FIGHTS emulation (spins 28min
   in the thread-pool wait loop, single-thread drive won't converge — killed).

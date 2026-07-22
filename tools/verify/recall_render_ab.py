@@ -77,6 +77,29 @@ FX_LEAVES = [(1179, 3057), (1181, 3060)]
 EXTRA_LEAVES = [(1028, 1852),   # VCF VELOCITY SENS -> cell 7424
                 (1058, 2086)]   # VCA VELOCITY SENS -> cell 9600
 
+# DELAY fine-FX FILTER leaves (#116) — dispatchable setter leaves that the plugin's
+# recall ENUMERATOR (0x3B48A0) does NOT fire, but a real host's preset-load applies
+# via the controller path. They write the delay slot-1 high-cut/damp coefficient
+# cells (102368..102672). Absent here, BOTH the oracle and the port left those cells
+# frozen at the plugin default byte (the render-A/B blind spot that hid the darkness:
+# factory p2/p6 use DELAY HIGH CUT=3). Dispatching them here == what the host does;
+# the port applies the identical law (src/finefx_recall.c). (disp, record byte, raw)
+# where raw=True marks an int1x7 leaf (single record byte, DELAY HIGH CUT) vs the
+# int8x4 nibble-pair damp leaves. SCOPED to DELAY TYPE 0 (rec 650): for TYPE 1/4 the
+# delay uses a different cell signature and TYPE 2/3/5 slot-1 hosts chorus/reverb
+# (which own 102656) — exactly as src/delay_recall.c gates the applier.
+DELAY_FILT_LEAVES = [(1180, 3059, True),   # DELAY HIGH CUT    -> 102368..102496 (7 cells)
+                     (1182, 3068, False),  # DELAY LF DAMP     -> 102640
+                     (1183, 3076, False),  # DELAY LF DAMP FREQ-> 102608 (rate-armed)
+                     (1184, 3084, False),  # DELAY HF DAMP     -> 102672
+                     (1185, 3092, False)]  # DELAY HF DAMP FREQ-> 102656 (rate-armed)
+
+
+def _finefx_leaves(blob, R):
+    """The DELAY fine-FX leaves to fire for this patch — only when DELAY TYPE == 0
+    (rec 650, int8x4 low-byte nibble pair; blob index 650-16=634)."""
+    return DELAY_FILT_LEAVES if R.dec(blob, 634) == 0 else []
+
 
 def ref_render(idx, bank, leaves, E, R):
     e = E.E2E(); e.build(SR); e.snap_all()
@@ -87,6 +110,10 @@ def ref_render(idx, bank, leaves, E, R):
         R.wr_desc(e, disp, R.dec(blob, recoff - 16))
     for (disp, bb) in EXTRA_LEAVES:
         R.wr_desc(e, disp, R.dec(blob, bb))
+    finefx = _finefx_leaves(blob, R)
+    for (disp, recoff, raw) in finefx:                # int1x7 raw byte vs nibble pair
+        v = (blob[recoff - 16] & 0x7F) if raw else R.dec(blob, recoff - 16)
+        R.wr_desc(e, disp, v)
     for u in range(9):
         for (disp, bb) in leaves:
             try: e.dispatch(u, disp, R.rd_desc(e, disp))
@@ -95,6 +122,9 @@ def ref_render(idx, bank, leaves, E, R):
             try: e.dispatch(u, disp, R.rd_desc(e, disp))
             except RuntimeError: pass
         for (disp, bb) in EXTRA_LEAVES:
+            try: e.dispatch(u, disp, R.rd_desc(e, disp))
+            except RuntimeError: pass
+        for (disp, recoff, raw) in finefx:
             try: e.dispatch(u, disp, R.rd_desc(e, disp))
             except RuntimeError: pass
     e.snap_all(); e.clear_latch(); e.set_ftz()

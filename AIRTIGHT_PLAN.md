@@ -169,6 +169,18 @@ residual would be a named, bounded, visible-red item — never a silent green.
 - **Stage B — close the gaps**, highest-audibility first (fine-FX filters
   first: they are the user's current complaint). Each closure: derive by
   executing the plugin's own setter (PROVEN) → apply in port → flip ledger row.
+  - **B1 DONE (DELAY TYPE-0 fine-FX, #116).** src/finefx_recall.c applies HIGH
+    CUT / LF+HF DAMP / LF+HF DAMP FREQ from the plugin's own per-byte setter law
+    (derived at all 4 rates under Unicorn); recall_render_ab.py's oracle now
+    dispatches these leaves for TYPE-0 patches so render A/B COVERS them (BIT-
+    EXACT 57/57 @48k+44.1k, blind spot closed for DELAY). Corrected 18 factory
+    patches whose delay filter was frozen at the too-bright default. Ledger:
+    HF DAMP FREQ flipped GAP→APPLIED; HIGH CUT/LF DAMP/HF DAMP rows keep a
+    partial-GAP (their cell-map union spans TYPE-1/4/mfx contexts not yet wired).
+    Guarded by test_delay_recall case 7. HONEST SCOPE: closes one sub-class; the
+    GLOBAL bounce brightness gap (#124) is separate/larger and NOT closed by this.
+  - **B-next**: TYPE-1/4 delay fine-FX, then CHORUS/REVERB/EFFECT-DEPTH fine-FX
+    (same mechanism, same derivation harness).
 - **Stage C — widen Pillar 3** to the full ledger + repoint the fuzzer;
   attempt Pillar 2 setState (fallback ready).
 - **Stage D — seal**: wire all gates into make verify as the single RED/GREEN.

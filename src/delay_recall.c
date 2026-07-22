@@ -26,6 +26,7 @@
  */
 #include "juno_engine.h"
 #include "delay_recall.h"
+#include "finefx_recall.h"
 #include <string.h>
 
 /* DELAY TIME byte -> per-byte delay time in INTEGER MILLISECONDS (10..800 ms),
@@ -497,6 +498,14 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     put_rate(state, Hr, 102656, ARM_HFDMP);
     JF(state, 102528) = (float)level  / 255.0f;             /* Wet (per-patch = LEVEL/255) */
     JF(state, 102576) = level >= 2 ? 1.0f : 0.0f;           /* On/Off (curve: v0,v1->0, v2->1) */
+
+    /* Fine-FX filter params (DELAY HIGH CUT / LF+HF DAMP / LF+HF DAMP FREQ) — the
+     * leaves the plugin's recall enumerator does NOT fire but a host's preset-load
+     * applies (see finefx_recall.c). Overwrites the FILT[]/put_rate default cells
+     * with the per-byte law; a no-op for default-fine-FX patches (identity at the
+     * default byte). TYPE-0 only: TYPE 2/3/5 route slot-1 to chorus/reverb which
+     * own these cells, and TYPE 1/4 use the DLY1_A signature. */
+    juno_apply_delay_finefx(state, rec, Hr);
 }
 
 /* Host-tempo recompute for the tempo-synced delay time — the delay sibling of
