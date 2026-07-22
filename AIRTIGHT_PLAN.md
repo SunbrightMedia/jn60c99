@@ -179,8 +179,55 @@ residual would be a named, bounded, visible-red item — never a silent green.
     partial-GAP (their cell-map union spans TYPE-1/4/mfx contexts not yet wired).
     Guarded by test_delay_recall case 7. HONEST SCOPE: closes one sub-class; the
     GLOBAL bounce brightness gap (#124) is separate/larger and NOT closed by this.
-  - **B-next**: TYPE-1/4 delay fine-FX, then CHORUS/REVERB/EFFECT-DEPTH fine-FX
-    (same mechanism, same derivation harness).
+  - **DECISIVE GAP TRIAGE (2026-07-22, oracle render-probes).** Every remaining
+    GAP leaf was probed by rendering each factory patch with the leaf dispatched
+    at DEFAULT vs an EXTREME byte, and by checking engine-dispatchability (does
+    engine dispatch 0x3B9A30 write cells) + factory-value spread:
+    - **Only DELAY had non-default factory values (18 patches) — DONE (B1).** Every
+      other fine-FX (chorus/reverb/flanger) is DEFAULT in all 64 factory patches,
+      so wiring them changes ZERO factory renders (proven: chorus/reverb probes
+      diffs=0 at default). They are required for ANY-preset correctness (GOAL.md)
+      but are NOT the #124 bounce darkness. The Stage-2 "fine-FX cause the
+      darkness" hypothesis is DISPROVEN except for delay.
+    - **Engine-dispatchable & render-READ (wire like delay, airtight via engine
+      dispatch = the same engine setter the controller flush eventually calls):**
+      CHORUS II (ET3) HIGH CUT (1212) + LOW CUT (1211); REVERB PRE DELAY (1323,
+      34-cell block). Non-default bytes change the render (diffs 15820/15817/
+      11334) — real gaps for user presets.
+    - **Controller-only (engine dispatch is a NO-OP → the CONTROLLER PATH, Pillar
+      2):** CHORUS I (ET2) HIGH/LOW/PRE (33 patches), CHORUS PRE DELAY, CHORUS-LFO
+      (1213-1215), FLANGER (1242-1248), REVERB LOW/HIGH CUT/DENSITY/DIRECT
+      (1324-1327), Patch Tempo (1118).
+    - **False gaps (port DOES apply; port_writeset before/after diff missed them
+      because the value equals the cold state):** DELAY DIRECT LEVEL (102512, the
+      oracle already dispatches it via FX_LEAVES and render A/B is green), and the
+      LF/HF DAMP secondary constant cells. Fix = a non-diff-miss port write signal.
+  - **THE AIRTIGHT SEAL, refined:** render A/B closes a blind spot ONLY when the
+    ORACLE applies the leaf the way the HOST does. For engine-dispatchable leaves
+    the value-tree dispatch reaches the same engine setter as the host's controller
+    flush, so oracle-dispatch == host (airtight). For CONTROLLER-ONLY leaves the
+    value-tree dispatch is a no-op, so the oracle MUST use the controller path —
+    hence **Pillar 2 (controller path) is the linchpin**: it closes the ~13
+    controller-only gaps AND is the host-lifecycle #124 fix, in one mechanism.
+  - **CHORUS fine-FX needs the controller path, NOT piecemeal engine-dispatch.**
+    Attempted engine-dispatch derivation in an ET3 patch (p11) is CONTAMINATED:
+    7 of 22 ET3 patches ALSO carry DELAY TYPE 2/3 (a slot-1 chorus), so the
+    6396xxx cells a CHORUS HIGH CUT sweep writes there are ambiguous (slot-1 vs
+    slot-2 chorus). Chorus I (EFFECT TYPE 2, 33 patches) is controller-only
+    outright (engine dispatch writes 0 cells). The plugin's own controller-driven
+    setter writes the correct cells for each mode with no hand gating — so chorus
+    (and reverb LOW/HIGH/DENSITY/DIRECT, flanger) are all done through Pillar 2.
+    Reverted the contaminated chorus2 tables; only DELAY (unambiguous TYPE-0)
+    stays wired via engine dispatch.
+  - **B-next order**: (B2 = Pillar 2) crack the controller path (RE of the
+    controller setState / per-param apply), derive every controller-only + mode-
+    ambiguous FX law through it, build the controller-path oracle (the #124 ground
+    truth), wire the port, render A/B green; fix the false-gap ledger rows along
+    the way (DIRECT LEVEL etc. — replace the diff-miss port_writeset signal with
+    the definitive "oracle dispatches leaf -> render A/B green" test). Then Pillar
+    3 (build ONE exhaustive gate over the full wired ledger: port applier vs a
+    FRESH truth/-derived setter sweep, all 256 bytes x 4 rates, non-circular) and
+    Stage D (seal every gate into make verify as the single RED/GREEN).
 - **Stage C — widen Pillar 3** to the full ledger + repoint the fuzzer;
   attempt Pillar 2 setState (fallback ready).
 - **Stage D — seal**: wire all gates into make verify as the single RED/GREEN.
