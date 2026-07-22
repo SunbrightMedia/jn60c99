@@ -301,3 +301,102 @@ are evidence, not proof — the verifier must treat any user ear report that
 survives green gates as evidence against the gates (the standing lesson).
 After the Seal exists, the gate itself is the verifier; model roles no longer
 matter for correctness. That is the point of this plan.
+
+---
+
+## WORK ORDER — Fable 5 → Opus 4.8 (2026-07-22, binding until superseded)
+
+Verifier's audit of the 2026-07-22 session: the fine-FX Pillar-3 gate is sound
+(independent reference, anti-circular cell sourcing, saturation semantics
+correct) and `make verify` is honestly green. ONE structural hole survives it,
+and it is task W0 below. Execute W0→W6 in order; one reversible commit per
+closure; a task is done ONLY when `make verify` is green INCLUDING the task's
+new/extended gate. All standing rules apply (covenant, two-process, harness =
+plumbing only, PROVEN/READ/INFERRED labels, no model IDs in pushed artifacts).
+
+### W0 — Close the single-context hole in the fine-FX proof (FIRST, small)
+
+`finefx_cellsweep.py` derived each leaf's cell set in exactly ONE activating
+context (delay: patch 2 + DELAY TYPE 0; chorus: patch 0 + TYPE 2; reverb:
+max-reverb patch at default REVERB TYPE). The gate therefore proves the law in
+those contexts only. A skeptic asks — and the ledger's history gives reason to:
+the old cellmap attributed second-delay-instance cells (4297616/632/680, the
+DLY1_B block delay_recall.c already models for wet/fb/on) to leaf 1180.
+
+Prove context-independence or wire the missing arms:
+1. Sweep 1180-1185 in DELAY TYPE 1 and TYPE 4 contexts. If the setter writes
+   second-instance (4297xxx) or DLY1/TYPE-4-block cells there, derive the laws
+   (dispatch+snap, all bytes x 4 rates), add the applier arms (the port
+   currently calls juno_apply_delay_finefx from the TYPE-0 arm ONLY), and
+   extend the gate with per-context references. If it writes nothing beyond
+   the proven cells, record that as additional (context, leaf) rows in the
+   reference so the gate itself pins the claim.
+2. Same for 1210-1212 in DELAY TYPE 3 (only TYPE 2 was swept).
+3. Same for 1323-1327 across REVERB TYPE 1..5 (dispatch 877) — the earlier
+   ext_sweeps note ("no cells in the patch-5 context") already proved reverb
+   fine-FX cell materialization IS context-dependent once; do not assume the
+   default-TYPE cell set is the whole story.
+Acceptance: finefx_pillar3_gate covers every (context, leaf) pair, 0 mismatch;
+render A/B 57/57 at 48k+44.1k+88.2k; ledger/provenance untouched or extended.
+
+### W1 — REVERB PRE DELAY (1323): the most tractable real GAP
+
+Joint law: value byte (0..100, int1x7 at record 3947) x REVERB TYPE → the
+34-cell tap array at 11022208+ (plus 10759872 companions). Derive by executing
+the plugin's own setter per (TYPE, byte) under Unicorn (dispatch+snap, 4 rates
+if rate-armed); REQUIRED cross-check: at byte 20 (default) the output must
+equal juno_write_reverb_taps' current values for every TYPE — identity at the
+default, exactly like every prior fine-FX. Wire into reverb_recall.c, extend
+the render-A/B oracle leaf set + the Pillar-3 gate (joint dimension), add a
+test + PROVENANCE row. Flips ledger row 1323 GAP→APPLIED.
+
+### W2 — EFFECT TYPE 2/3/4 secondary cells (873) + #122 interactions
+
+The authoritative sweep shows ET writes 13 cells of which 91120/91168/91184
+are not in the port writeset (mode-block cells of the non-factory ET modes).
+Per-ET-context sweeps (ctx = force 873 to each of 1..5), derive the block
+laws, wire into effect_modes.c. Include the chillwave regression patches
+(24/32/38/56) as the completion check for #122's non-flanger half.
+
+### W3 — FLANGER (EFFECT TYPE 4; leaves 1242-1248)
+
+The last DSP block. Same method that closed DELAY TYPE 4: structural block
+derivation in ET4 context + per-byte laws for the 7 leaves, port block
+implementation, render A/B in an ET4 context (synthetic patch — no factory
+patch reaches ET4, so ADD an oracle-vs-port A/B over synthetic ET4 patches as
+the gate), Pillar-3 rows. Flips the 7 flanger GAPs.
+
+### W4 — Patch Tempo (1118) + #112 wrapper/system defaults
+
+Controller path: prove the settings-object default for Keyboard Velocity SW
+(currently INFERRED — flip to PROVEN by executing the wrapper lifecycle far
+enough to read it) and map Patch Tempo record → the port's existing host-bpm/
+tempo-sync plumbing (juno_apply_delay_tempo). Flips 1118.
+
+### W5 — PILLAR 2 primary: the plugin's own preset-load under Unicorn
+
+Execute the controller setState/preset-load path (NOT our leaf loop) to
+populate engine state for all 64 factory patches; diff the full engine state
+vs the leaf-recall oracle state, then vs the port. Zero diff = load ORDER and
+interactions proven (failure class 3). If setState will not execute cleanly,
+use the documented fallback (multi-writer ordering checks + differential
+fuzz) — do NOT fight the threaded process() loop. THEN re-run the bounce
+locator (covenant role 1 ONLY) to re-measure the #124 residual now that the
+fine-FX are live — report the new per-patch centroid deltas; do not tune
+anything from them.
+
+### W6 — Stage C/D seal
+
+1. Widen the per-setter exhaustive to the full APPLIED ledger (the machinery:
+   recall_exhaustive + finefx_pillar3 patterns), 2. repoint the Phase-3 fuzzer
+   at the Pillar-2 oracle, 3. make build_coverage.py's FINEFX_PROVEN/APPLIED
+   claims conditional on their gate references existing (no assertion without
+   its gate), 4. wire completeness_gate.py into `make verify` the moment GAP=0
+   so any future ledger drift is RED. Done = the SEAL section's 7 conditions.
+
+### Priority note
+
+W0 protects work already shipped — do it first and do not skip it because the
+gate "is already green"; the gate is green over the contexts it saw. W1-W4
+drive GAP 10→0 (Pillar 1 truly complete). W5 is the highest-USER-value item
+(#124 is the standing ear report); if W2/W3 stall, jump to W5 and return.

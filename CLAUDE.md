@@ -8,6 +8,11 @@ analysis tool only; nothing emulated may be required at runtime. Recall must be
 correct for ANY preset value, not just the factory bank's ("this byte is 0 in every
 factory patch" is not an excuse to skip it).
 
+**LIVE WORK ORDER: `AIRTIGHT_PLAN.md` § "WORK ORDER — Fable 5 → Opus 4.8"**
+(W0→W6, binding). Execute in order; W0 (single-context hole in the fine-FX
+proof) comes FIRST and must not be skipped because the gate is green — the
+gate is green over the contexts it saw.
+
 ## The one rule everything else serves
 
 **The original `.vst3` is the ONLY ground truth.** The port must be SELF-PROVING:
