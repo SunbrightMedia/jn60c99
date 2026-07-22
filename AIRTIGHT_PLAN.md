@@ -166,6 +166,35 @@ residual would be a named, bounded, visible-red item — never a silent green.
   - Honesty caveats carried to Stage B/Pillar 2: (a) PAT2_MFX=SYSTEM-8 scope
     call needs controller-path confirmation; (b) router GAP rows carry residual
     cross-mode cells; (c) APPLIED value-law correctness is Pillar 3.
+- **STAGE B + PILLAR 3 fine-FX — DONE (2026-07-22, session 2).** The whole fine-FX
+  family is now wired AND exhaustively proven, and the Pillar-1 ledger is accurate:
+  - **All 13 fine-FX leaves APPLIED + Pillar-3 PROVEN.** DELAY (1180-1185), slot-1
+    CHORUS (1210-1212), REVERB (1324-1327) filter/gain leaves are applied by
+    src/finefx_recall.c (+ delay_recall.c) from the plugin's OWN per-byte setter
+    law at all 4 rates. `tools/verify/finefx_pillar3_gate.py` (sealed into
+    `make verify`) proves each one BIT-EXACT vs the plugin's setter over its full
+    input domain: **32768 comparisons, 13 leaves × 4 rates × 256 bytes, 0 mismatch**,
+    with correct out-of-range saturation (int1x7 clamps tightened to the plugin's
+    own param ranges after the gate found the reverb setter reads state-dependent
+    garbage past range — unreachable via a real controller). Reference =
+    finefx_cellsweep.py (authoritative full-byte UNION sweep, supersedes the old
+    0-vs-127 diff); port side = finefx_port_dump.c (shipping src/*.c). Render A/B
+    stays 57/57 @48k+44.1k+88.2k. Teensy golden truncation bug the fine-FX exposed
+    (TG_BLOB_LEN 3062→3968, covers CHORUS 3286-3288 + REVERB 3948-3952) fixed.
+  - **Ledger GAP 25→10, every remaining GAP genuine + zero-factory-impact.** The
+    fine-FX rows were false GAPs (blind leaves → over-attributed leaf_cellmap);
+    finefx_authcells.py re-derives the TRUE cell set per leaf (plugin dispatch+snap
+    full-byte sweep in the activating context) and build_coverage.py consumes it:
+    794/875 → APPLIED (all cells in port), 1213/1214/1215 chorus-LFO → INERT-PROVEN
+    (write no engine cell), 795 REVERB LEVEL → APPLIED (render-A/B proven across 58
+    factory patches spanning the range). **Counts: APPLIED 127 | INERT-PROVEN 132 |
+    GAP 10.** The 10 GAPs are all any-preset/scope, NO factory patch reaches them
+    (all 64 use EFFECT TYPE 0, REVERB TYPE 0, default REVERB PRE DELAY 20):
+    FLANGER (1242-1248, EFFECT TYPE 4 — JU-06A feature, #122), EFFECT TYPE 2/3/4
+    secondary cells (873), REVERB PRE DELAY (1323, joint TYPE×34-cell tap array),
+    Patch Tempo (1118, host-tempo controller path, #112). These are the honest
+    any-preset frontier; wiring them is future work (large, zero factory benefit).
+
 - **Stage B — close the gaps**, highest-audibility first (fine-FX filters
   first: they are the user's current complaint). Each closure: derive by
   executing the plugin's own setter (PROVEN) → apply in port → flip ledger row.

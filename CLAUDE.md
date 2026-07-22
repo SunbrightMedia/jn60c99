@@ -217,6 +217,27 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   (new fine-FX applier), and EXTEND the recall reference + render A/B to include
   these leaves so the gate itself catches the darkness (closes the blind spot
   permanently). Covenant-clean throughout (plugin's own setters under Unicorn).
+- **FINE-FX COMPLETE + PILLAR 3 SEALED (2026-07-22).** The full fine-FX family —
+  DELAY (1180-1185), slot-1 CHORUS (1210-1212), REVERB (1324-1327) — is wired
+  (`src/finefx_recall.c` + `delay_recall.c`) AND exhaustively proven.
+  `tools/verify/finefx_pillar3_gate.py` (in `make verify`) diffs the port applier
+  vs the plugin's OWN value-tree setter over EVERY byte × 4 rates: **32768
+  comparisons, 0 mismatch**, with correct out-of-range saturation (int1x7 clamps
+  tightened to the plugin's param ranges — the gate found the reverb setter reads
+  state-dependent garbage past range, unreachable via a real controller). Reference
+  = `finefx_cellsweep.py` (authoritative full-byte UNION sweep; supersedes the
+  0-vs-127 diff, which could miss an intermediate-only cell); port side =
+  `finefx_port_dump.c` (shipping `src/*.c`). Render A/B 57/57 @48k+44.1k+88.2k.
+  Teensy-golden truncation the fine-FX exposed (blob stopped at record 3077,
+  before CHORUS 3286-3288 + REVERB 3948-3952) FIXED: TG_BLOB_LEN 3062→3968.
+  Pillar-1 ledger (`COVERAGE.tsv`) reconciled with authoritative cell sets
+  (`finefx_authcells.py`): **GAP 25→10, APPLIED 127 | INERT-PROVEN 132**. The 10
+  remaining GAPs are all any-preset/scope with ZERO factory reach (all 64 patches
+  use EFFECT TYPE 0 / REVERB TYPE 0 / default REVERB PRE DELAY): FLANGER (EFFECT
+  TYPE 4, #122), EFFECT TYPE 2/3/4 secondary cells, REVERB PRE DELAY (joint
+  TYPE×34-cell tap array), Patch Tempo (controller path, #112). chorus-LFO
+  (1213-1215) proven INERT (write no engine cell). The per-family detail below is
+  retained for history.
 - **STAGE-2 PROGRESS — DELAY fine-FX WIRED (#116, first closure).** The DELAY
   TYPE-0 fine-FX filter leaves are now applied by `src/finefx_recall.c`
   (`juno_apply_delay_finefx`, called from `juno_apply_delay`'s TYPE-0 arm):
