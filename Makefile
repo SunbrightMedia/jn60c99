@@ -119,7 +119,7 @@ test: tests/test_fma_canary tests/test_teensy_golden tests/test_voice_alloc test
 tests/test_fma_canary: tests/test_fma_canary.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)
 
-tests/test_teensy_golden: tests/test_teensy_golden.c gui/juno_bridge.c $(SRC)
+tests/test_teensy_golden: tests/test_teensy_golden.c tests/teensy_golden.h gui/juno_bridge.c $(SRC)
 	$(CC) $(CFLAGS) -Itests -o $@ tests/test_teensy_golden.c gui/juno_bridge.c $(SRC) $(LDLIBS)
 
 tests/test_param_setter: tests/test_param_setter.c $(SRC)

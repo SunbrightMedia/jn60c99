@@ -206,6 +206,26 @@ int main(void)
         rec[3059] = 7; put_pair(rec, 3084, 0); put_pair(rec, 3092, 13);
     }
 
+    /* --- case 8: SLOT-1 CHORUS fine-FX (DELAY TYPE 2/3, finefx_recall.c). CHORUS
+     * HIGH CUT (3288) / LOW CUT (3287) / PRE DELAY (3286) apply to the slot-1
+     * chorus cells 6396xxx (the slot-2 EFFECT-TYPE chorus has none). Non-default
+     * at 44.1 kHz: HIGH CUT=0, LOW CUT=17, PRE DELAY=80 -- vs the plugin's own
+     * smoother-target coeffs. int1x7 raw record bytes. --- */
+    {
+        memset(st, 0, JUNO_STATE_BYTES);
+        JF(st, 16) = 44100.0f;
+        put_pair(rec, 650, 2);          /* DELAY TYPE 2 -> slot-1 chorus I         */
+        rec[3288] = 0;                  /* CHORUS HIGH CUT  = 0                     */
+        rec[3287] = 17;                 /* CHORUS LOW CUT   = 17                    */
+        rec[3286] = 80;                 /* CHORUS PRE DELAY = 80                    */
+        juno_bank_apply(st, bank, 0);
+        if ((unsigned)u32(st, 6396192) != 0x3bf819beu) { printf("  case8: choHC0 %08x != 3bf819be\n", u32(st, 6396192)); ++fails; }
+        if ((unsigned)u32(st, 6396336) != 0x3de967e3u) { printf("  case8: choLC17 %08x != 3de967e3\n", u32(st, 6396336)); ++fails; }
+        if ((unsigned)u32(st, 6396352) != 0x3f800000u) { printf("  case8: choLC17b %08x != 3f800000\n", u32(st, 6396352)); ++fails; }
+        if ((unsigned)u32(st, 6396128) != 0x3ddc4001u) { printf("  case8: choPD80 %08x != 3ddc4001\n", u32(st, 6396128)); ++fails; }
+        rec[3288] = 13; rec[3287] = 2; rec[3286] = 20;   /* restore defaults        */
+    }
+
     free(st); free(bank);
     if (fails) { printf("FAIL: %d delay-recall check(s) drifted\n", fails); return 1; }
     printf("OK: per-patch delay recall (mode + coefficients) verified\n");

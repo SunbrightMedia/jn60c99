@@ -89,3 +89,24 @@ void juno_apply_reverb_finefx(unsigned char *state, const unsigned char *rec, in
     wr_bits(state, REV_DENS_CELL,   REV_DENS[dn]);
     wr_bits(state, REV_DIRECT_CELL, REV_DIRECT[dl]);
 }
+
+/* SLOT-1 CHORUS fine-FX (DELAY TYPE 2/3): CHORUS HIGH CUT (1212) / LOW CUT (1211) /
+ * PRE DELAY (1210). The slot-2 EFFECT-TYPE chorus has NO fine filters (0 cells,
+ * proven); these apply ONLY to the DELAY-TYPE-2/3 slot-1 chorus (cells 6396xxx).
+ * Law = the plugin's own smoother target via 0x3B9A30 + snap_all at all 4 rates
+ * (chorus_finefx_derive.py). At the default byte (HIGH CUT 13 / LOW CUT 2 / PRE
+ * DELAY 20) every value EQUALS delay_recall.c's S1CHORUS/ARM_CHLF/ARM_CHDEP
+ * constants -- identity at the default, correct for any value. Called from
+ * delay_recall.c apply_slot1_chorus. HIGH CUT rate-indep; LOW CUT/PRE DELAY armed.
+ * int1x7 record bytes (HIGH 3288 / LOW 3287 / PRE 3286). */
+void juno_apply_chorus_finefx(unsigned char *state, const unsigned char *rec, int Hr)
+{
+    int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
+    int hc = clampi(rec[3288] & 0x7F, 0, 127);   /* CHORUS HIGH CUT (int1x7)      */
+    int lc = clampi(rec[3287] & 0x7F, 0, 127);   /* CHORUS LOW CUT  (int1x7)      */
+    int pd = clampi(rec[3286] & 0x7F, 0, 127);   /* CHORUS PRE DELAY(int1x7)      */
+    int k;
+    for (k = 0; k < 7; k++) wr_bits(state, CHO1_HC_CELLS[k], CHO1_HC[hc][k]);
+    for (k = 0; k < 2; k++) wr_bits(state, CHO1_LC_CELLS[k], CHO1_LC[arm][lc][k]);
+    wr_bits(state, CHO1_PD_CELL, CHO1_PD[arm][pd]);
+}

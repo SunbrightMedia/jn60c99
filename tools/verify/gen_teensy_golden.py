@@ -17,9 +17,14 @@ sys.path.insert(0, '/home/user/jn60c99/tools/verify')
 import e2e_emu as E
 
 RATE = 44100.0
-TG_BLOB_LEN = 3062   # embed record bytes 16..3077 so the truncated
-#                    golden record covers every recall read, incl. DELAY FEEDBACK
-#                    (record 3057) + DIRECT LEVEL (3060). 704 was too short (fb read 0).
+TG_BLOB_LEN = 3968   # embed record bytes 16..3983 so the truncated golden record
+#                    covers EVERY recall read. The highest recalled record byte is
+#                    REVERB DIRECT LEVEL (3951/3952, finefx_recall.c); CHORUS fine-FX
+#                    live at 3286-3288 and REVERB fine-FX at 3948-3952. The old 3062
+#                    (record 16..3077) stopped before them, so once the fine-FX went
+#                    live the truncated on-device record zeroed those bytes and the
+#                    replay diverged from the full-bank generator. (3062 was itself a
+#                    bump from 704, which had zeroed DELAY FEEDBACK 3057.)
 BANK = E.bank_bytes()
 H, S, BO = E.HEADER, E.STRIDE, E.BLOB_OFF
 

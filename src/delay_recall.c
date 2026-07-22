@@ -234,6 +234,9 @@ static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, i
             JF(state, (int)M[k]) = f;
         }
     }
+    /* Fine-FX filters (CHORUS HIGH/LOW CUT / PRE DELAY) — generalize the S1CHORUS/
+     * ARM defaults above to the patch's actual byte (identity at the default). */
+    juno_apply_chorus_finefx(state, rec, Hr);
 }
 
 /* SLOT-1-hosted REVERB block — DELAY TYPE (v39) 5 routes a reverb into slot 1.

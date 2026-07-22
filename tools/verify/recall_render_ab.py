@@ -105,12 +105,24 @@ REVERB_FINEFX_LEAVES = [(1324, 3948, True),   # REVERB LOW CUT   -> 10759520/536
                         (1327, 3951, False)]  # REVERB DIRECT LV -> 10759424
 
 
+# SLOT-1 CHORUS fine-FX leaves (#116) — the CHORUS HIGH/LOW CUT / PRE DELAY params
+# apply ONLY to the DELAY-TYPE-2/3 slot-1 chorus (the slot-2 EFFECT-TYPE chorus has
+# no fine filters). Port: finefx_recall.c juno_apply_chorus_finefx via apply_slot1_
+# chorus. (disp, record byte, raw=int1x7). Cells 6396xxx.
+CHORUS_FINEFX_LEAVES = [(1210, 3286, True),   # CHORUS PRE DELAY -> 6396128
+                        (1211, 3287, True),   # CHORUS LOW CUT   -> 6396336/352
+                        (1212, 3288, True)]   # CHORUS HIGH CUT  -> 6396192..320
+
+
 def _finefx_leaves(blob, R):
     """The extra FX fine-FX leaves to fire for this patch (beyond the recall
-    enumerator): DELAY filter leaves only when DELAY TYPE == 0 (rec 650, blob 634);
-    REVERB filter/gain leaves unconditionally (reverb tank always runs)."""
-    dly = DELAY_FILT_LEAVES if R.dec(blob, 634) == 0 else []
-    return dly + REVERB_FINEFX_LEAVES
+    enumerator): DELAY filter leaves when DELAY TYPE == 0; SLOT-1 CHORUS filter
+    leaves when DELAY TYPE in {2,3}; REVERB filter/gain leaves unconditionally
+    (reverb tank always runs). DELAY TYPE = rec 650 (blob index 650-16=634)."""
+    dtype = R.dec(blob, 634)
+    dly = DELAY_FILT_LEAVES if dtype == 0 else []
+    cho = CHORUS_FINEFX_LEAVES if dtype in (2, 3) else []
+    return dly + cho + REVERB_FINEFX_LEAVES
 
 
 def ref_render(idx, bank, leaves, E, R):

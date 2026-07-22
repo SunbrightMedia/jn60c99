@@ -18,4 +18,9 @@ void juno_apply_delay_finefx(unsigned char *state, const unsigned char *rec, int
  * (joint TYPE x tap-array, handled in reverb_recall.c). */
 void juno_apply_reverb_finefx(unsigned char *state, const unsigned char *rec, int Hr);
 
+/* Apply the SLOT-1 chorus fine-FX (CHORUS HIGH/LOW CUT / PRE DELAY) for a DELAY
+ * TYPE 2/3 patch (the slot-1 chorus; the slot-2 EFFECT-TYPE chorus has none).
+ * Identity at the default byte. Called from delay_recall.c apply_slot1_chorus. */
+void juno_apply_chorus_finefx(unsigned char *state, const unsigned char *rec, int Hr);
+
 #endif
