@@ -9,9 +9,15 @@ correct for ANY preset value, not just the factory bank's ("this byte is 0 in ev
 factory patch" is not an excuse to skip it).
 
 **LIVE WORK ORDER: `AIRTIGHT_PLAN.md` § "WORK ORDER — Fable 5 → Opus 4.8"**
-(W0→W6, binding). Execute in order; W0 (single-context hole in the fine-FX
-proof) comes FIRST and must not be skipped because the gate is green — the
-gate is green over the contexts it saw.
+(W0→W6, binding). Execute in order. **W0 DONE (2026-07-22):** the fine-FX proof
+was single-context; `finefx_multictx_probe.py` + `finefx_fullctx_audit.py` (sweep
+every leaf × DELAY TYPE 0..5 / REVERB TYPE / EFFECT TYPE) found the DELAY fine-FX
+are slot-1-routing-dependent — TYPE 1 → 2nd instance 4297xxx, TYPE 5 → slot-1-
+reverb 6497xxx (delay) + 10693xxx (chorus), TYPE 4 → no cells; chorus DT2≡DT3,
+reverb RT/ET context-independent. All wired (`juno_apply_delay_finefx_2nd` /
+`_slot1rev`, `juno_apply_chorus_finefx_slot1rev`), identity at default (factory
+unchanged), and the Pillar-3 gate is now CONTEXT-AWARE: **88064 comparisons over
+7 contexts × 13 leaves × 4 rates, 0 mismatch.** Next: W1 (REVERB PRE DELAY).
 
 ## The one rule everything else serves
 

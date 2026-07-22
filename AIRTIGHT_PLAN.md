@@ -314,7 +314,20 @@ closure; a task is done ONLY when `make verify` is green INCLUDING the task's
 new/extended gate. All standing rules apply (covenant, two-process, harness =
 plumbing only, PROVEN/READ/INFERRED labels, no model IDs in pushed artifacts).
 
-### W0 — Close the single-context hole in the fine-FX proof (FIRST, small)
+### W0 — Close the single-context hole in the fine-FX proof — DONE (2026-07-22)
+
+**Result:** the DELAY fine-FX law IS context-dependent by slot-1 routing (as the
+skeptic feared). `finefx_multictx_probe.py` + `finefx_fullctx_audit.py` swept every
+fine-FX leaf × DELAY TYPE 0..5 + REVERB/EFFECT TYPE and found: TYPE 0 → 102xxx (had
+it), TYPE 1 → SECOND instance 4297xxx (the old 4297xxx attribution was REAL, not
+noise), TYPE 5 → slot-1-reverb 6497xxx (delay) + 10693xxx (chorus) — a context W0
+did not even name — and TYPE 4 → no cells. Chorus DT2≡DT3, reverb RT0..5≡ET0..5
+(context-independent). All wired with identity-at-default (factory bank unchanged,
+render A/B 57/57 @48k+44.1k+88.2k). The Pillar-3 gate is now context-aware: 7
+contexts {DT0,DT1,DT2,DT3,DT5,RT0,RT5} × 13 leaves × 4 rates = 88064 comparisons,
+0 mismatch. Guarded by test_delay_recall cases 9+10. Commit a4100af. Original brief:
+
+
 
 `finefx_cellsweep.py` derived each leaf's cell set in exactly ONE activating
 context (delay: patch 2 + DELAY TYPE 0; chorus: patch 0 + TYPE 2; reverb:
