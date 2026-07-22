@@ -14,7 +14,7 @@ LDLIBS  ?= -lm
 SRC     := $(wildcard src/*.c)
 OBJ     := $(SRC:.c=.o)
 
-.PHONY: all test clean gui provenance verify
+.PHONY: all test clean gui provenance verify completeness
 all: $(OBJ)
 
 # The honest finish-line gate: functional tests must pass AND the LIVE plugin
@@ -64,6 +64,16 @@ verify: test
 	exit $$FAIL
 provenance:
 	python3 tools/verify/provenance_check.py
+
+# PILLAR 1 completeness gate (AIRTIGHT_PLAN.md). Regenerates the value-tree leaf
+# enumeration from truth/Script.xml and checks COVERAGE.tsv: RED on any ledger
+# drift, any UNRESOLVED/SILENT row, or any GAP (a parameter the port does not
+# apply). Standalone for now; folds into `verify` at the Seal (Stage D), once
+# the GAP rows are closed. Rebuild the ledger (needs Unicorn) with:
+#   python3 tools/verify/leaf_cellmap.py && python3 tools/verify/leaf_cellmap_fx.py \
+#     && python3 tools/verify/port_writeset.py && python3 tools/verify/build_coverage.py
+completeness:
+	python3 tools/verify/completeness_gate.py
 
 # Shared library for the test GUI (gui/juno_gui.py via ctypes).
 gui: libjuno.so

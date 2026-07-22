@@ -58,12 +58,26 @@ def family(s):
     if s.startswith('PAT_NAME') or s == 'name0': return 'NAME'
     return 'PATCH'
 
+# CANONICAL dispatchable rule (single source of truth for leaf_cellmap.py,
+# build_coverage.py, completeness_gate.py — they read the 'dispatchable' column
+# so the three can never drift). A leaf is a real, ledger-tracked parameter
+# unless it is structural padding or a patch-name string/char slot. NOTE: the
+# 'PAT_NAME1/2/3' structs are MISNAMED — they hold real params (ARP, OCTAVE
+# SHIFT, KEY HOLD, VCA MODE, CONDITION, BEND/MOD SENS, EFFECT/DELAY/REVERB
+# TYPE); only the literal 'PATCH NAME' char slots + name0 string are excluded.
+def dispatchable(r):
+    nm, st = r['name'], r['struct']
+    if nm == '_reserve_' or nm == 'DUMMY': return False
+    if nm.startswith('PATCH NAME'): return False
+    if st == 'name0': return False
+    return True
+
 with open(OUT, 'w') as f:
-    f.write("pos\tdisp\tfamily\tstruct\tname\ttype\trange\tdefault\n")
+    f.write("pos\tdisp\tfamily\tstruct\tname\ttype\trange\tdefault\tdispatchable\n")
     for r in rows:
-        f.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\n" % (
+        f.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n" % (
             r['pos'], r['disp'], family(r['struct']), r['struct'],
-            r['name'], r['type'], r['range'], r['default']))
+            r['name'], r['type'], r['range'], r['default'], 1 if dispatchable(r) else 0))
 
 from collections import Counter
 fam = Counter(family(r['struct']) for r in rows)

@@ -23,8 +23,9 @@ SZ  = 0xA83010
 def real_leaves():
     rows = []
     for ln in open('/home/user/jn60c99/tools/verify/coverage_leaves.tsv').read().splitlines()[1:]:
-        pos, disp, fam, struct_, name, ty, rng, dflt = ln.split('\t')
-        if name == '_reserve_' or fam == 'NAME':
+        f = ln.split('\t')
+        pos, disp, fam, struct_, name, ty, rng, dflt, disp_ok = f
+        if disp_ok != '1':            # canonical dispatchable column
             continue
         try:
             rmax = int(rng.split(',')[1])

@@ -37,7 +37,10 @@ allcells = set()
 covered = []
 for idx in range(64):
     allcells |= writeset_for(fac, idx)
-for idx in (3, 4, 5, 24, 32, 38, 56):     # chillwave: fine-FX-heavy + flanger/mode combos
+# chillwave patches chosen to span EVERY EFFECT TYPE so the union covers each
+# mode's cells (factory omits type 0 and type 4): t0=14 t1=6 t2=3 t3=0 t4=32
+# t5=30, plus the fine-FX-heavy BS patches + the #122 combos.
+for idx in (14, 15, 6, 3, 4, 5, 0, 32, 30, 38, 24, 56):
     allcells |= writeset_for(cw, idx)
 allcells = sorted(allcells)
 pickle.dump(set(allcells), open(OUT, 'wb'))

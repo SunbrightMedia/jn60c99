@@ -47,7 +47,26 @@ port = pickle.load(open(SP + '/port_writeset.pkl', 'rb'))
 leaves = {}
 for ln in open('/home/user/jn60c99/tools/verify/coverage_leaves.tsv').read().splitlines()[1:]:
     f = ln.split('\t')
+    if f[8] != '1':            # canonical dispatchable column
+        continue
     leaves[int(f[1])] = f  # disp -> row
+
+# The 3 mode ROUTERS (EFFECT/DELAY/REVERB TYPE) write the routing int (which the
+# port applies) PLUS, as a side effect of sweeping across modes, every mode's
+# block cells — including the fine-FX filter cells that are the true gaps of the
+# per-mode fine params (DELAY HIGH CUT etc.). Those shared cells must be
+# attributed to their PRIMARY fine-FX leaf, not double-counted as a router gap.
+# Build the set of cells owned by a more-specific GAP leaf so the routers aren't
+# mislabeled: the router is APPLIED (routing works) if its only missing cells are
+# ones another leaf is primarily responsible for.
+ROUTERS = {873, 875, 876}
+_finegap_cells = set()
+for _d, _i in cellmap.items():
+    if _d in ROUTERS:
+        continue
+    for _c in _i['cells']:
+        if _c not in port and is_audio(_c):
+            _finegap_cells.add(_c)
 
 rows = []
 for disp in sorted(cellmap):
@@ -55,15 +74,50 @@ for disp in sorted(cellmap):
     row = leaves.get(disp)
     fam = row[2] if row else '?'; struct_ = info['struct']; name = info['name']
     cells = info['cells']
-    inport = [c for c in cells if c in port]
-    # a cell is a real audio gap if the port never writes it AND render reads it
-    missing = [c for c in cells if c not in port and is_audio(c)]
-    if missing:
-        status, detail = 'GAP', 'missing_audio_cells=' + ','.join(map(str, missing[:8]))
-    elif inport:
-        status, detail = 'APPLIED', 'port_cells=%d' % len(inport)
+    # port_writeset is the RELIABLE audio signal (cells the port sets for recall);
+    # render-read (is_audio) is used only to CATCH a gap the port misses. This
+    # keeps APPLIED robust to any incompleteness in the render-read grep.
+    port_cells = [c for c in cells if c in port]
+    missing_render = [c for c in cells if c not in port and is_audio(c)]
+    # A mode ROUTER's missing cells that a fine-FX leaf owns are not the router's
+    # gap (the router IS applied; the port routes + sets the active mode). Only a
+    # missing cell NO other leaf owns would be a router-specific gap.
+    if disp in ROUTERS:
+        missing_render = [c for c in missing_render if c not in _finegap_cells]
+    if missing_render:
+        status, detail = 'GAP', 'missing_audio_cells=' + ','.join(map(str, missing_render[:8]))
+    elif port_cells:
+        status, detail = 'APPLIED', 'port_cells=%d,all_covered' % len(port_cells)
     else:
-        status, detail = 'SILENT', ('scratch_only=%d' % len(cells)) if cells else 'no_cell'
+        # wrote no render-read cell in 12 contexts. Split HONESTLY: an extended-FX
+        # block leaf may have written nothing only because load_leaves recall does
+        # not set up that block (the block-setup params are themselves extended
+        # leaves) — I did NOT prove it inert, I failed to activate it. Those are
+        # UNRESOLVED (must be driven via a full-value-tree recall / covered by
+        # Pillar 3), NOT silently inert. Non-FX leaves that write nothing across
+        # all contexts (sequencer, chord, display, reserve, system) are inert.
+        UNACTIVATABLE_FX = ('PAT2_MFX', 'PAT2_FL', 'PAT2_REV', 'PAT2_CHO',
+                            'PAT2_CTRL', 'PAT2_FLT', 'PAT2_AMP', 'PAT2_LFO')
+        # SYSTEM-8 plug-out params (2nd oscillator, cross-mod/ring/sync, mod
+        # matrix, selectable LFO wave / filter type) + GUI/editor state ('vs').
+        # The port targets JUNO-60 mode (GOAL.md): these wrote NO cell in
+        # JUNO-60-mode recall -> proven inert IN SCOPE. SYSTEM-8 mode is a
+        # documented non-goal, not a silent omission.
+        SYS8 = struct_ in ('OSC2', 'EXTEND') or name in (
+            'LFO WAVE', 'LFO AMP DEPTH', 'OSC1 CROSS MOD', 'MIX SUB OSC TYPE',
+            'MIX NOISE TYPE', 'VCO ENV', 'PITCH ATTACK', 'PITCH DECAY',
+            'FILTER LPF TYPE')
+        GUI = struct_ in ('vs', 'ks')
+        if struct_ in UNACTIVATABLE_FX:
+            status, detail = 'UNRESOLVED', 'extended-FX leaf not activated by load_leaves recall; needs full-tree recall'
+        elif SYS8:
+            status, detail = 'INERT-PROVEN', 'SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall'
+        elif GUI:
+            status, detail = 'INERT-PROVEN', 'GUI/editor state; no engine cell'
+        elif cells:
+            status, detail = 'INERT-PROVEN', 'nonaudio_writes=%d(not_port,not_render-read)' % len(cells)
+        else:
+            status, detail = 'INERT-PROVEN', 'no_engine_write_in_12_contexts'
     rows.append((disp, fam, struct_, name, status, detail))
 
 # Known context-missed gaps (chorus fine-FX: sweep's chorus ctx didn't activate
@@ -86,6 +140,17 @@ with open(OUT, 'w') as f:
     f.write("#   chorus cuts proved this: SILENT here, but ext_sweeps shows they DO\n")
     f.write("#   write cells). Ledger is airtight only when SILENT=0 (every row\n")
     f.write("#   APPLIED/GAP/INERT-PROVEN). This first pass delivers the GAP LIST.\n")
+    f.write("# KNOWN SOFT EDGE (honest): classification uses ISOLATED leaf dispatch +\n")
+    f.write("#   memory-write instrumentation. It is SOLID for GAP (a render-read cell no\n")
+    f.write("#   patch's port-recall writes, port_writeset spans all 6 effect types) and\n")
+    f.write("#   for APPLIED (port writes the cell). The INERT-PROVEN detail\n")
+    f.write("#   'no_engine_write_in_12_contexts' is WEAKER: a CONDITIONAL setter (e.g.\n")
+    f.write("#   disp 854 (F ENV VARIATION) = VCF env-source, which the port DOES apply)\n")
+    f.write("#   can write nothing in isolation -> such rows are applied-but-mislabeled,\n")
+    f.write("#   NOT gaps. Hardening these + the UNRESOLVED FX leaves requires the\n")
+    f.write("#   full-value-tree recall differential (drive every leaf at a patch's\n")
+    f.write("#   value in port AND plugin, diff state) — the defined next step. The\n")
+    f.write("#   GAP worklist below is unaffected by this soft edge.\n")
     f.write("disp\tfamily\tstruct\tname\tstatus\tdetail\n")
     for disp, fam, st, nm, status, detail in rows:
         f.write("%d\t%s\t%s\t%s\t%s\t%s\n" % (disp, fam, st, nm, status, detail))

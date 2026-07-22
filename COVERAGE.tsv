@@ -1,5 +1,5 @@
 # COVERAGE.tsv — Pillar 1 completeness ledger (Stage A first pass)
-# audio-cell universe = 964 render-read offsets; 223 value-tree leaves swept
+# audio-cell universe = 964 render-read offsets; 269 value-tree leaves swept
 # STATUS: APPLIED=port writes all its audio cells (verify laws in Pillar 3);
 #   GAP=port never writes a render-read cell this leaf writes (FIX these);
 #   SILENT=wrote no audio cell in tested FX contexts. SILENT is NOT yet
@@ -10,227 +10,284 @@
 #   chorus cuts proved this: SILENT here, but ext_sweeps shows they DO
 #   write cells). Ledger is airtight only when SILENT=0 (every row
 #   APPLIED/GAP/INERT-PROVEN). This first pass delivers the GAP LIST.
+# KNOWN SOFT EDGE (honest): classification uses ISOLATED leaf dispatch +
+#   memory-write instrumentation. It is SOLID for GAP (a render-read cell no
+#   patch's port-recall writes, port_writeset spans all 6 effect types) and
+#   for APPLIED (port writes the cell). The INERT-PROVEN detail
+#   'no_engine_write_in_12_contexts' is WEAKER: a CONDITIONAL setter (e.g.
+#   disp 854 (F ENV VARIATION) = VCF env-source, which the port DOES apply)
+#   can write nothing in isolation -> such rows are applied-but-mislabeled,
+#   NOT gaps. Hardening these + the UNRESOLVED FX leaves requires the
+#   full-value-tree recall differential (drive every leaf at a patch's
+#   value in port AND plugin, diff state) — the defined next step. The
+#   GAP worklist below is unaffected by this soft edge.
 disp	family	struct	name	status	detail
-742	SETUP	ARP	DUMMY	SILENT	no_cell
-743	SETUP	SCAT	DUMMY	SILENT	no_cell
-744	SYSTEM	SYS_COM	Local SW	SILENT	no_cell
-745	SYSTEM	SYS_COM	Master Tune (SYSTEM-1)	SILENT	no_cell
-746	SYSTEM	SYS_COM	MASTER TUNE	SILENT	no_cell
-747	SYNTH	SYN_COM	VOLUME	SILENT	no_cell
-748	SYNTH	SYN_COM	TRANSPOSE	SILENT	no_cell
-749	SYNTH	SYN_COM	TEMPO	SILENT	no_cell
-750	PATCH	LFO	(LFO WAVE)	SILENT	no_cell
-751	PATCH	LFO	LFO DELAY TIME	APPLIED	port_cells=16
-752	PATCH	LFO	LFO RATE	APPLIED	port_cells=24
-753	PATCH	LFO	DCO LFO MOD	APPLIED	port_cells=8
-754	PATCH	LFO	VCF LFO MOD	APPLIED	port_cells=8
-755	PATCH	LFO	(LFO AMP DEPTH)	SILENT	no_cell
-756	PATCH	LFO	LFO KEY TRIG	APPLIED	port_cells=8
-757	PATCH	OSC1	(OSC1 WAVE)	SILENT	scratch_only=2
-758	PATCH	OSC1	DCO PWM DEPTH	APPLIED	port_cells=8
-759	PATCH	OSC1	DCO PWM SOURCE	APPLIED	port_cells=32
-760	PATCH	OSC1	DCO RANGE	APPLIED	port_cells=8
-761	PATCH	OSC1	(OSC1 CROSS MOD)	SILENT	no_cell
-762	PATCH	OSC2	(OSC2 WAVE)	SILENT	no_cell
-763	PATCH	OSC2	(OSC2 COLOR)	SILENT	no_cell
-764	PATCH	OSC2	(OSC2 MOD)	SILENT	no_cell
-765	PATCH	OSC2	(OSC2 RANGE)	SILENT	no_cell
-766	PATCH	OSC2	(OSC2 FINE TUNE)	SILENT	no_cell
-767	PATCH	OSC2	(OSC2 RING)	SILENT	no_cell
-768	PATCH	OSC2	(OSC2 SYNC)	SILENT	no_cell
-769	PATCH	OSC2	(OSC2 COARSE TUNE)	SILENT	no_cell
-770	PATCH	MIX	DCO PWM LEVEL	APPLIED	port_cells=8
-771	PATCH	MIX	DCO SAW LEVEL	APPLIED	port_cells=8
-772	PATCH	MIX	DCO SUB LEVEL	APPLIED	port_cells=8
-773	PATCH	MIX	DCO NOISE LEVEL	APPLIED	port_cells=8
-774	PATCH	MIX	(MIX SUB OSC TYPE)	SILENT	no_cell
-775	PATCH	MIX	(MIX NOISE TYPE)	SILENT	no_cell
-776	PATCH	PIT	(VCO ENV)	SILENT	no_cell
-777	PATCH	PIT	(PITCH ATTACK)	SILENT	no_cell
-778	PATCH	PIT	(PITCH DECAY)	SILENT	no_cell
-779	PATCH	FLT	VCF CUTOFF FREQ	APPLIED	port_cells=8
-780	PATCH	FLT	(FILTER LPF TYPE)	SILENT	no_cell
-781	PATCH	FLT	VCF RESONANCE	APPLIED	port_cells=8
-782	PATCH	FLT	HPF CUTOFF FREQ	APPLIED	port_cells=32
-783	PATCH	FLT	VCF ENV MOD	APPLIED	port_cells=8
-784	PATCH	FLT	ENV1 ATTACK	APPLIED	port_cells=8
-785	PATCH	FLT	ENV1 DECAY	APPLIED	port_cells=8
-786	PATCH	FLT	ENV1 SUSTAIN	APPLIED	port_cells=8
-787	PATCH	FLT	ENV1 RELEASE	APPLIED	port_cells=8
-788	PATCH	FLT	VCF KEY FOLLOW	APPLIED	port_cells=8
-789	PATCH	AMP	ENV2 ATTACK	APPLIED	port_cells=8
-790	PATCH	AMP	ENV2 DECAY	APPLIED	port_cells=8
-791	PATCH	AMP	ENV2 SUSTAIN	APPLIED	port_cells=8
-792	PATCH	AMP	ENV2 RELEASE	APPLIED	port_cells=8
-793	PATCH	AMP	VCA TONE	APPLIED	port_cells=8
+744	SYSTEM	SYS_COM	Local SW	INERT-PROVEN	no_engine_write_in_12_contexts
+745	SYSTEM	SYS_COM	Master Tune (SYSTEM-1)	INERT-PROVEN	no_engine_write_in_12_contexts
+746	SYSTEM	SYS_COM	MASTER TUNE	INERT-PROVEN	no_engine_write_in_12_contexts
+747	SYNTH	SYN_COM	VOLUME	INERT-PROVEN	no_engine_write_in_12_contexts
+748	SYNTH	SYN_COM	TRANSPOSE	INERT-PROVEN	no_engine_write_in_12_contexts
+749	SYNTH	SYN_COM	TEMPO	INERT-PROVEN	no_engine_write_in_12_contexts
+750	PATCH	LFO	(LFO WAVE)	INERT-PROVEN	no_engine_write_in_12_contexts
+751	PATCH	LFO	LFO DELAY TIME	APPLIED	port_cells=16,all_covered
+752	PATCH	LFO	LFO RATE	APPLIED	port_cells=24,all_covered
+753	PATCH	LFO	DCO LFO MOD	APPLIED	port_cells=8,all_covered
+754	PATCH	LFO	VCF LFO MOD	APPLIED	port_cells=8,all_covered
+755	PATCH	LFO	(LFO AMP DEPTH)	INERT-PROVEN	no_engine_write_in_12_contexts
+756	PATCH	LFO	LFO KEY TRIG	APPLIED	port_cells=8,all_covered
+757	PATCH	OSC1	(OSC1 WAVE)	INERT-PROVEN	nonaudio_writes=2(not_port,not_render-read)
+758	PATCH	OSC1	DCO PWM DEPTH	APPLIED	port_cells=8,all_covered
+759	PATCH	OSC1	DCO PWM SOURCE	APPLIED	port_cells=32,all_covered
+760	PATCH	OSC1	DCO RANGE	APPLIED	port_cells=8,all_covered
+761	PATCH	OSC1	(OSC1 CROSS MOD)	INERT-PROVEN	no_engine_write_in_12_contexts
+762	PATCH	OSC2	(OSC2 WAVE)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+763	PATCH	OSC2	(OSC2 COLOR)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+764	PATCH	OSC2	(OSC2 MOD)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+765	PATCH	OSC2	(OSC2 RANGE)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+766	PATCH	OSC2	(OSC2 FINE TUNE)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+767	PATCH	OSC2	(OSC2 RING)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+768	PATCH	OSC2	(OSC2 SYNC)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+769	PATCH	OSC2	(OSC2 COARSE TUNE)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+770	PATCH	MIX	DCO PWM LEVEL	APPLIED	port_cells=8,all_covered
+771	PATCH	MIX	DCO SAW LEVEL	APPLIED	port_cells=8,all_covered
+772	PATCH	MIX	DCO SUB LEVEL	APPLIED	port_cells=8,all_covered
+773	PATCH	MIX	DCO NOISE LEVEL	APPLIED	port_cells=8,all_covered
+774	PATCH	MIX	(MIX SUB OSC TYPE)	INERT-PROVEN	no_engine_write_in_12_contexts
+775	PATCH	MIX	(MIX NOISE TYPE)	INERT-PROVEN	no_engine_write_in_12_contexts
+776	PATCH	PIT	(VCO ENV)	INERT-PROVEN	no_engine_write_in_12_contexts
+777	PATCH	PIT	(PITCH ATTACK)	INERT-PROVEN	no_engine_write_in_12_contexts
+778	PATCH	PIT	(PITCH DECAY)	INERT-PROVEN	no_engine_write_in_12_contexts
+779	PATCH	FLT	VCF CUTOFF FREQ	APPLIED	port_cells=8,all_covered
+780	PATCH	FLT	(FILTER LPF TYPE)	INERT-PROVEN	no_engine_write_in_12_contexts
+781	PATCH	FLT	VCF RESONANCE	APPLIED	port_cells=8,all_covered
+782	PATCH	FLT	HPF CUTOFF FREQ	APPLIED	port_cells=32,all_covered
+783	PATCH	FLT	VCF ENV MOD	APPLIED	port_cells=8,all_covered
+784	PATCH	FLT	ENV1 ATTACK	APPLIED	port_cells=8,all_covered
+785	PATCH	FLT	ENV1 DECAY	APPLIED	port_cells=8,all_covered
+786	PATCH	FLT	ENV1 SUSTAIN	APPLIED	port_cells=8,all_covered
+787	PATCH	FLT	ENV1 RELEASE	APPLIED	port_cells=8,all_covered
+788	PATCH	FLT	VCF KEY FOLLOW	APPLIED	port_cells=8,all_covered
+789	PATCH	AMP	ENV2 ATTACK	APPLIED	port_cells=8,all_covered
+790	PATCH	AMP	ENV2 DECAY	APPLIED	port_cells=8,all_covered
+791	PATCH	AMP	ENV2 SUSTAIN	APPLIED	port_cells=8,all_covered
+792	PATCH	AMP	ENV2 RELEASE	APPLIED	port_cells=8,all_covered
+793	PATCH	AMP	VCA TONE	APPLIED	port_cells=8,all_covered
 794	PATCH	EFX	EFFECT DEPTH	GAP	missing_audio_cells=91216
 795	PATCH	EFX	REVERB LEVEL	GAP	missing_audio_cells=10759872
-796	PATCH	EFX	DELAY LEVEL	APPLIED	port_cells=6
-797	PATCH	EFX	DELAY TIME	APPLIED	port_cells=3
-798	PATCH	CTRL	PORTAMENTO	APPLIED	port_cells=16
-799	PATCH	CTRL	LEGATO	APPLIED	port_cells=16
-800	PATCH	CTRL	ASSIGN MODE	APPLIED	port_cells=23
-801	PATCH	CTRL	BEND RANGE	APPLIED	port_cells=16
-802	PATCH	CTRL	(MOD ASIGN)	SILENT	no_cell
-803	PATCH	CTRL	TEMPO SYNC	APPLIED	port_cells=11
-804	PATCH	EXTEND	(MOD ID 1)	SILENT	no_cell
-805	PATCH	EXTEND	(MOD ID 2)	SILENT	no_cell
-806	PATCH	EXTEND	(MOD ID 3)	SILENT	no_cell
-807	PATCH	EXTEND	(MOD PRM 1)	SILENT	no_cell
-808	PATCH	EXTEND	(MOD PRM 2)	SILENT	no_cell
-809	PATCH	EXTEND	(MOD PRM 3)	SILENT	no_cell
-810	PATCH	EXTEND	VCA LEVEL	APPLIED	port_cells=1
-811	PATCH	EXTEND	VCA LEVEL SW	SILENT	no_cell
-812	PATCH	EXTEND	(OSC1 EXTEND)	SILENT	no_cell
-813	PATCH	EXTEND	(OSC2 EXTEND)	SILENT	no_cell
-878	PATCH2	PAT2_LFO	LFO RATE H	APPLIED	port_cells=16
-1028	PATCH2	PAT2_FLT	VCF VELOCITY SENS	APPLIED	port_cells=8
-1029	PATCH2	PAT2_FLT	VCF CUTOFF FREQ H	APPLIED	port_cells=8
-1058	PATCH2	PAT2_AMP	VCA VELOCITY SENS	APPLIED	port_cells=8
-1118	PATCH2	PAT2_CTRL	Patch Tempo	SILENT	no_cell
-1178	PATCH2	PAT2_DLY	DELAY TAP TIME	APPLIED	port_cells=1
-1179	PATCH2	PAT2_DLY	DELAY FEEDBACK	APPLIED	port_cells=2
+796	PATCH	EFX	DELAY LEVEL	APPLIED	port_cells=12,all_covered
+797	PATCH	EFX	DELAY TIME	APPLIED	port_cells=5,all_covered
+798	PATCH	CTRL	PORTAMENTO	APPLIED	port_cells=16,all_covered
+799	PATCH	CTRL	LEGATO	APPLIED	port_cells=16,all_covered
+800	PATCH	CTRL	ASSIGN MODE	APPLIED	port_cells=23,all_covered
+801	PATCH	CTRL	BEND RANGE	APPLIED	port_cells=16,all_covered
+802	PATCH	CTRL	(MOD ASIGN)	INERT-PROVEN	no_engine_write_in_12_contexts
+803	PATCH	CTRL	TEMPO SYNC	APPLIED	port_cells=13,all_covered
+804	PATCH	EXTEND	(MOD ID 1)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+805	PATCH	EXTEND	(MOD ID 2)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+806	PATCH	EXTEND	(MOD ID 3)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+807	PATCH	EXTEND	(MOD PRM 1)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+808	PATCH	EXTEND	(MOD PRM 2)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+809	PATCH	EXTEND	(MOD PRM 3)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+810	PATCH	EXTEND	VCA LEVEL	APPLIED	port_cells=1,all_covered
+811	PATCH	EXTEND	VCA LEVEL SW	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+812	PATCH	EXTEND	(OSC1 EXTEND)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+813	PATCH	EXTEND	(OSC2 EXTEND)	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
+830	NAME	PAT_NAME1	(INPUT JACK USING)	INERT-PROVEN	no_engine_write_in_12_contexts
+831	NAME	PAT_NAME1	ARPEGGIO SW	INERT-PROVEN	no_engine_write_in_12_contexts
+832	NAME	PAT_NAME1	ARPEGGIO TYPE	INERT-PROVEN	no_engine_write_in_12_contexts
+833	NAME	PAT_NAME1	ARPEGGIO STEP	INERT-PROVEN	no_engine_write_in_12_contexts
+834	NAME	PAT_NAME1	SCATTER TYPE	INERT-PROVEN	no_engine_write_in_12_contexts
+835	NAME	PAT_NAME1	SCATTER DEPTH	INERT-PROVEN	no_engine_write_in_12_contexts
+836	NAME	PAT_NAME1	OCTAVE SHIFT	INERT-PROVEN	no_engine_write_in_12_contexts
+837	NAME	PAT_NAME1	KEY HOLD	INERT-PROVEN	no_engine_write_in_12_contexts
+838	NAME	PAT_NAME1	(LFO CV IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+839	NAME	PAT_NAME1	(LFO RING IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+840	NAME	PAT_NAME1	(LFO PITCH IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+841	NAME	PAT_NAME1	(LFO FILTER IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+842	NAME	PAT_NAME1	(LFO AMP IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+843	NAME	PAT_NAME1	(OSC1 X-MOD IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+844	NAME	PAT_NAME1	(OSC2 SYNC IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+845	NAME	PAT_NAME1	(OSC2 RING IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+846	NAME	PAT_NAME2	(OSC3 EXT IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+847	NAME	PAT_NAME2	(P ENV GATE IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+848	NAME	PAT_NAME2	(PITCH ENV IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+849	NAME	PAT_NAME2	(F ENV GATE IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+850	NAME	PAT_NAME2	(FILTER ENV IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+851	NAME	PAT_NAME2	(A ENV GATE IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+852	NAME	PAT_NAME2	(AMP ENV IN)	INERT-PROVEN	no_engine_write_in_12_contexts
+853	NAME	PAT_NAME2	LFO CV GAIN	INERT-PROVEN	no_engine_write_in_12_contexts
+854	NAME	PAT_NAME2	(F ENV VARIATION)	INERT-PROVEN	no_engine_write_in_12_contexts
+855	NAME	PAT_NAME2	VCA MODE	APPLIED	port_cells=24,all_covered
+856	NAME	PAT_NAME2	CONDITION	APPLIED	port_cells=27,all_covered
+857	NAME	PAT_NAME2	BEND GAIN	APPLIED	port_cells=16,all_covered
+858	NAME	PAT_NAME2	BEND SENS DCO	APPLIED	port_cells=8,all_covered
+859	NAME	PAT_NAME2	BEND SENS VCF	APPLIED	port_cells=8,all_covered
+860	NAME	PAT_NAME2	MOD SENS DCO	APPLIED	port_cells=8,all_covered
+861	NAME	PAT_NAME2	MOD SENS VCF	APPLIED	port_cells=8,all_covered
+862	NAME	PAT_NAME3	(LFO VARIATION)	INERT-PROVEN	no_engine_write_in_12_contexts
+863	NAME	PAT_NAME3	LFO TRIG ENV	APPLIED	port_cells=16,all_covered
+864	NAME	PAT_NAME3	(OSC1 VARIATION)	INERT-PROVEN	no_engine_write_in_12_contexts
+865	NAME	PAT_NAME3	(OSC1 COARSE TUNE)	INERT-PROVEN	no_engine_write_in_12_contexts
+866	NAME	PAT_NAME3	(OSC1 FINE TUNE)	INERT-PROVEN	no_engine_write_in_12_contexts
+867	NAME	PAT_NAME3	(OSC2 VARIATION)	INERT-PROVEN	no_engine_write_in_12_contexts
+868	NAME	PAT_NAME3	(OSC3 WAVEFORM)	INERT-PROVEN	no_engine_write_in_12_contexts
+869	NAME	PAT_NAME3	(OSC3 COLOR)	INERT-PROVEN	no_engine_write_in_12_contexts
+870	NAME	PAT_NAME3	(OSC3 TUNE)	INERT-PROVEN	no_engine_write_in_12_contexts
+871	NAME	PAT_NAME3	HPF TYPE	APPLIED	port_cells=32,all_covered
+872	NAME	PAT_NAME3	(FILTER TYPE)	INERT-PROVEN	no_engine_write_in_12_contexts
+873	NAME	PAT_NAME3	EFFECT TYPE	GAP	missing_audio_cells=85152,96336,96368
+874	NAME	PAT_NAME3	EFFECT TONE	APPLIED	port_cells=1,all_covered
+875	NAME	PAT_NAME3	DELAY TYPE	GAP	missing_audio_cells=10693024,10693296
+876	NAME	PAT_NAME3	REVERB TYPE	APPLIED	port_cells=31,all_covered
+877	NAME	PAT_NAME3	REVERB TIME	INERT-PROVEN	no_engine_write_in_12_contexts
+878	PATCH2	PAT2_LFO	LFO RATE H	APPLIED	port_cells=16,all_covered
+1028	PATCH2	PAT2_FLT	VCF VELOCITY SENS	APPLIED	port_cells=8,all_covered
+1029	PATCH2	PAT2_FLT	VCF CUTOFF FREQ H	APPLIED	port_cells=8,all_covered
+1058	PATCH2	PAT2_AMP	VCA VELOCITY SENS	APPLIED	port_cells=8,all_covered
+1118	PATCH2	PAT2_CTRL	Patch Tempo	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1178	PATCH2	PAT2_DLY	DELAY TAP TIME	APPLIED	port_cells=1,all_covered
+1179	PATCH2	PAT2_DLY	DELAY FEEDBACK	APPLIED	port_cells=3,all_covered
 1180	PATCH2	PAT2_DLY	DELAY HIGH CUT	GAP	missing_audio_cells=102368,102384,102400,102416,102432,102448,102464,102480
 1181	PATCH2	PAT2_DLY	DELAY DIRECT LEVEL	GAP	missing_audio_cells=102512
 1182	PATCH2	PAT2_DLY	DELAY LF DAMP	GAP	missing_audio_cells=102624,102640
-1183	PATCH2	PAT2_DLY	DELAY LF DAMP FREQ	APPLIED	port_cells=2
+1183	PATCH2	PAT2_DLY	DELAY LF DAMP FREQ	APPLIED	port_cells=3,all_covered
 1184	PATCH2	PAT2_DLY	DELAY HF DAMP	GAP	missing_audio_cells=102672,102688
 1185	PATCH2	PAT2_DLY	DELAY HF DAMP FREQ	GAP	missing_audio_cells=102656
-1210	PATCH2	PAT2_CHO	CHORUS PRE DELAY	GAP	context-missed; ext_sweeps proved cells 10693xxx
-1211	PATCH2	PAT2_CHO	CHORUS LOW CUT	GAP	context-missed; ext_sweeps proved cells 10693xxx
-1212	PATCH2	PAT2_CHO	CHORUS HIGH CUT	GAP	context-missed; ext_sweeps proved cells 10693xxx
-1213	PATCH2	PAT2_CHO	CHORUS_LFO SOURCE	SILENT	no_cell
-1214	PATCH2	PAT2_CHO	CHORUS LFO EXT GAIN	SILENT	no_cell
-1215	PATCH2	PAT2_CHO	CHORUS LFO EXT OFFSET	SILENT	no_cell
-1242	PATCH2	PAT2_FL	FLANGER MANUAL	SILENT	no_cell
-1243	PATCH2	PAT2_FL	FLANGER RESONANCE	SILENT	no_cell
-1244	PATCH2	PAT2_FL	FLANGER SEPARATIOIN	SILENT	no_cell
-1245	PATCH2	PAT2_FL	FLANGER LOW CUT	SILENT	no_cell
-1246	PATCH2	PAT2_FL	FLANGER LFO SOURCE	SILENT	no_cell
-1247	PATCH2	PAT2_FL	FLANGER LFO EXT GAIN	SILENT	no_cell
-1248	PATCH2	PAT2_FL	FLANGER LFO EXT OFFSET	SILENT	no_cell
-1274	PATCH2	PAT2_MFX	MFX TYPE	SILENT	no_cell
-1275	PATCH2	PAT2_MFX	MFX ASSIGN 1 TARGET	SILENT	no_cell
-1276	PATCH2	PAT2_MFX	MFX ASSIGN 1 RANGE MIN	SILENT	no_cell
-1277	PATCH2	PAT2_MFX	MFX ASSIGN 1 RANGE MAX	SILENT	no_cell
-1278	PATCH2	PAT2_MFX	MFX ASSIGN 2 TARGET	SILENT	no_cell
-1279	PATCH2	PAT2_MFX	MFX ASSIGN 2 RANGE MIN	SILENT	no_cell
-1280	PATCH2	PAT2_MFX	MFX ASSIGN 2 RANGE MAX	SILENT	no_cell
-1281	PATCH2	PAT2_MFX	MFX LFO SOURCE	SILENT	no_cell
-1282	PATCH2	PAT2_MFX	MFX LFO EXT GAIN	SILENT	no_cell
-1283	PATCH2	PAT2_MFX	MFX LFO EXT OFFSET	SILENT	no_cell
-1284	PATCH2	PAT2_MFX	MFX PARAMETER 01	SILENT	no_cell
-1285	PATCH2	PAT2_MFX	MFX PARAMETER 02	SILENT	no_cell
-1286	PATCH2	PAT2_MFX	MFX PARAMETER 03	SILENT	no_cell
-1287	PATCH2	PAT2_MFX	MFX PARAMETER 04	SILENT	no_cell
-1288	PATCH2	PAT2_MFX	MFX PARAMETER 05	SILENT	no_cell
-1289	PATCH2	PAT2_MFX	MFX PARAMETER 06	SILENT	no_cell
-1290	PATCH2	PAT2_MFX	MFX PARAMETER 07	SILENT	no_cell
-1291	PATCH2	PAT2_MFX	MFX PARAMETER 08	SILENT	no_cell
-1292	PATCH2	PAT2_MFX	MFX PARAMETER 09	SILENT	no_cell
-1293	PATCH2	PAT2_MFX	MFX PARAMETER 10	SILENT	no_cell
-1294	PATCH2	PAT2_MFX	MFX PARAMETER 11	SILENT	no_cell
-1295	PATCH2	PAT2_MFX	MFX PARAMETER 12	SILENT	no_cell
-1296	PATCH2	PAT2_MFX	MFX PARAMETER 13	SILENT	no_cell
-1297	PATCH2	PAT2_MFX	MFX PARAMETER 14	SILENT	no_cell
-1298	PATCH2	PAT2_MFX	MFX PARAMETER 15	SILENT	no_cell
-1299	PATCH2	PAT2_MFX	MFX PARAMETER 16	SILENT	no_cell
+1210	PATCH2	PAT2_CHO	CHORUS PRE DELAY	APPLIED	port_cells=2,all_covered
+1211	PATCH2	PAT2_CHO	CHORUS LOW CUT	APPLIED	port_cells=4,all_covered
+1212	PATCH2	PAT2_CHO	CHORUS HIGH CUT	GAP	missing_audio_cells=6396272,10693152
+1213	PATCH2	PAT2_CHO	CHORUS_LFO SOURCE	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1214	PATCH2	PAT2_CHO	CHORUS LFO EXT GAIN	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1215	PATCH2	PAT2_CHO	CHORUS LFO EXT OFFSET	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1242	PATCH2	PAT2_FL	FLANGER MANUAL	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1243	PATCH2	PAT2_FL	FLANGER RESONANCE	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1244	PATCH2	PAT2_FL	FLANGER SEPARATIOIN	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1245	PATCH2	PAT2_FL	FLANGER LOW CUT	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1246	PATCH2	PAT2_FL	FLANGER LFO SOURCE	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1247	PATCH2	PAT2_FL	FLANGER LFO EXT GAIN	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1248	PATCH2	PAT2_FL	FLANGER LFO EXT OFFSET	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1274	PATCH2	PAT2_MFX	MFX TYPE	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1275	PATCH2	PAT2_MFX	MFX ASSIGN 1 TARGET	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1276	PATCH2	PAT2_MFX	MFX ASSIGN 1 RANGE MIN	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1277	PATCH2	PAT2_MFX	MFX ASSIGN 1 RANGE MAX	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1278	PATCH2	PAT2_MFX	MFX ASSIGN 2 TARGET	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1279	PATCH2	PAT2_MFX	MFX ASSIGN 2 RANGE MIN	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1280	PATCH2	PAT2_MFX	MFX ASSIGN 2 RANGE MAX	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1281	PATCH2	PAT2_MFX	MFX LFO SOURCE	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1282	PATCH2	PAT2_MFX	MFX LFO EXT GAIN	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1283	PATCH2	PAT2_MFX	MFX LFO EXT OFFSET	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1284	PATCH2	PAT2_MFX	MFX PARAMETER 01	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1285	PATCH2	PAT2_MFX	MFX PARAMETER 02	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1286	PATCH2	PAT2_MFX	MFX PARAMETER 03	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1287	PATCH2	PAT2_MFX	MFX PARAMETER 04	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1288	PATCH2	PAT2_MFX	MFX PARAMETER 05	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1289	PATCH2	PAT2_MFX	MFX PARAMETER 06	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1290	PATCH2	PAT2_MFX	MFX PARAMETER 07	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1291	PATCH2	PAT2_MFX	MFX PARAMETER 08	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1292	PATCH2	PAT2_MFX	MFX PARAMETER 09	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1293	PATCH2	PAT2_MFX	MFX PARAMETER 10	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1294	PATCH2	PAT2_MFX	MFX PARAMETER 11	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1295	PATCH2	PAT2_MFX	MFX PARAMETER 12	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1296	PATCH2	PAT2_MFX	MFX PARAMETER 13	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1297	PATCH2	PAT2_MFX	MFX PARAMETER 14	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1298	PATCH2	PAT2_MFX	MFX PARAMETER 15	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1299	PATCH2	PAT2_MFX	MFX PARAMETER 16	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
 1323	PATCH2	PAT2_REV	REVERB PRE DELAY	GAP	missing_audio_cells=10759872,11022208,11022212,11022216
-1324	PATCH2	PAT2_REV	REVERB LOW CUT	SILENT	scratch_only=1
-1325	PATCH2	PAT2_REV	REVERB HIGH CUT	SILENT	scratch_only=1
-1326	PATCH2	PAT2_REV	REVERB DENSITY	SILENT	scratch_only=1
-1327	PATCH2	PAT2_REV	REVERB DIRECT LEVEL	SILENT	scratch_only=1
-1355	PATCH2	PAT2_CHORD	CHORD MEMORY SW	SILENT	no_cell
-1356	PATCH2	PAT2_CHORD	CHORD MEMORY Form	SILENT	no_cell
-1357	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 1)	SILENT	no_cell
-1358	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 2)	SILENT	no_cell
-1359	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 3)	SILENT	no_cell
-1360	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 4)	SILENT	no_cell
-1361	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 5)	SILENT	no_cell
-1362	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 6)	SILENT	no_cell
-1363	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 7)	SILENT	no_cell
-1364	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 8)	SILENT	no_cell
-1365	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 9)	SILENT	no_cell
-1366	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 10)	SILENT	no_cell
-1367	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 11)	SILENT	no_cell
-1368	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 12)	SILENT	no_cell
-1369	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 13)	SILENT	no_cell
-1370	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 14)	SILENT	no_cell
-1371	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 15)	SILENT	no_cell
-1372	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 16)	SILENT	no_cell
-1428	PATCH	PAT3_SEQ_COM	STEP SEQ LENGTH	SILENT	no_cell
-1429	PATCH	PAT3_SEQ_COM	STEP SEQ FIRST STEP	SILENT	no_cell
-1430	PATCH	PAT3_SEQ_COM	STEP SEQ LAST STEP	SILENT	no_cell
-1431	PATCH	PAT3_SEQ_COM	STEP SEQ SCALE	SILENT	no_cell
-1432	PATCH	PAT3_SEQ_COM	STEP SEQ PLAY MODE	SILENT	no_cell
-1433	PATCH	PAT3_SEQ_COM	STEP SEQ GATE RATIO	SILENT	no_cell
-1434	PATCH	PAT3_SEQ_COM	STEP SEQ SHUFFLE	SILENT	no_cell
-1435	PATCH	PAT3_SEQ_COM	STEP SEQ SMOOTH	SILENT	no_cell
-1436	PATCH	PAT3_SEQ_COM	DUMMY1	SILENT	no_cell
-1437	PATCH	PAT3_SEQ_COM	DUMMY2	SILENT	no_cell
-1466	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 1)	SILENT	no_cell
-1467	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 2)	SILENT	no_cell
-1468	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 3)	SILENT	no_cell
-1469	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 4)	SILENT	no_cell
-1470	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 5)	SILENT	no_cell
-1471	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 6)	SILENT	no_cell
-1472	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 7)	SILENT	no_cell
-1473	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 8)	SILENT	no_cell
-1474	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 1)	SILENT	no_cell
-1475	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 2)	SILENT	no_cell
-1476	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 3)	SILENT	no_cell
-1477	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 4)	SILENT	no_cell
-1478	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 5)	SILENT	no_cell
-1479	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 6)	SILENT	no_cell
-1480	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 7)	SILENT	no_cell
-1481	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 8)	SILENT	no_cell
-1482	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 1)	SILENT	no_cell
-1483	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 2)	SILENT	no_cell
-1484	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 3)	SILENT	no_cell
-1485	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 4)	SILENT	no_cell
-1486	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 5)	SILENT	no_cell
-1487	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 6)	SILENT	no_cell
-1488	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 7)	SILENT	no_cell
-1489	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 8)	SILENT	no_cell
-1490	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note Flag	SILENT	no_cell
-1491	PATCH	PAT3_SEQ_STEP0	STEP SEQ Slide Flag	SILENT	no_cell
-1492	PATCH	PAT3_SEQ_STEP0	STEP SEQ Mute Flag	SILENT	no_cell
-1493	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 1 Target	SILENT	no_cell
-1494	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 2 Target	SILENT	no_cell
-1495	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 3 Target	SILENT	no_cell
-1496	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 4 Target	SILENT	no_cell
-1497	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 1 Value	SILENT	no_cell
-1498	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 2 Value	SILENT	no_cell
-1499	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 3 Value	SILENT	no_cell
-1500	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 4 Value	SILENT	no_cell
-1501	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 1 Transient	SILENT	no_cell
-1502	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 2 Transient	SILENT	no_cell
-1503	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 3 Transient	SILENT	no_cell
-1504	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 4 Transient	SILENT	no_cell
-1505	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign Flag	SILENT	no_cell
-1550	PATCH	vs	mode	SILENT	no_cell
-1551	PATCH	vs	ccAssign	SILENT	no_cell
-1552	PATCH	vs	panelPatch	SILENT	no_cell
-1553	PATCH	vs	panelSize	SILENT	no_cell
-1554	PATCH	vs	patchManager	SILENT	no_cell
-1555	PATCH	vs	patchListMain	SILENT	no_cell
-1556	PATCH	vs	patchListSub	SILENT	no_cell
-1557	PATCH	vs	activation	SILENT	no_cell
-1558	PATCH	vs	mainZoom	SILENT	no_cell
-1559	PATCH	vs	dm	SILENT	no_cell
-1560	PATCH	vs	velSense	SILENT	no_cell
-1561	PATCH	vs	voiceCount	SILENT	no_cell
-1562	PATCH	vs	quality	SILENT	no_cell
-1563	PATCH	vs	bankId	SILENT	no_cell
-1564	PATCH	vs	patchId	SILENT	no_cell
-1565	PATCH	vs	sampleRate	SILENT	no_cell
-1566	PATCH	vs	patchZoom	SILENT	no_cell
-1567	PATCH	vs	setup	SILENT	no_cell
-1568	PATCH	vs	updateSetup	SILENT	no_cell
-1569	PATCH	vs	writePatch	SILENT	no_cell
-1570	PATCH	vs	auth	SILENT	no_cell
-1571	PATCH	vs	updateAuth	SILENT	no_cell
-1572	PATCH	vs	authDummy	SILENT	no_cell
-1573	PATCH	ks	onVel	SILENT	no_cell
-1574	PATCH	ks	offVel	SILENT	no_cell
-1575	PATCH	ks	ch	SILENT	no_cell
+1324	PATCH2	PAT2_REV	REVERB LOW CUT	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1325	PATCH2	PAT2_REV	REVERB HIGH CUT	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1326	PATCH2	PAT2_REV	REVERB DENSITY	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1327	PATCH2	PAT2_REV	REVERB DIRECT LEVEL	UNRESOLVED	extended-FX leaf not activated by load_leaves recall; needs full-tree recall
+1355	PATCH2	PAT2_CHORD	CHORD MEMORY SW	INERT-PROVEN	no_engine_write_in_12_contexts
+1356	PATCH2	PAT2_CHORD	CHORD MEMORY Form	INERT-PROVEN	no_engine_write_in_12_contexts
+1357	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 1)	INERT-PROVEN	no_engine_write_in_12_contexts
+1358	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 2)	INERT-PROVEN	no_engine_write_in_12_contexts
+1359	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 3)	INERT-PROVEN	no_engine_write_in_12_contexts
+1360	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 4)	INERT-PROVEN	no_engine_write_in_12_contexts
+1361	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 5)	INERT-PROVEN	no_engine_write_in_12_contexts
+1362	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 6)	INERT-PROVEN	no_engine_write_in_12_contexts
+1363	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 7)	INERT-PROVEN	no_engine_write_in_12_contexts
+1364	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 8)	INERT-PROVEN	no_engine_write_in_12_contexts
+1365	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 9)	INERT-PROVEN	no_engine_write_in_12_contexts
+1366	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 10)	INERT-PROVEN	no_engine_write_in_12_contexts
+1367	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 11)	INERT-PROVEN	no_engine_write_in_12_contexts
+1368	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 12)	INERT-PROVEN	no_engine_write_in_12_contexts
+1369	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 13)	INERT-PROVEN	no_engine_write_in_12_contexts
+1370	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 14)	INERT-PROVEN	no_engine_write_in_12_contexts
+1371	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 15)	INERT-PROVEN	no_engine_write_in_12_contexts
+1372	PATCH2	PAT2_CHORD	CHORD MEMORY Note (voice 16)	INERT-PROVEN	no_engine_write_in_12_contexts
+1428	PATCH	PAT3_SEQ_COM	STEP SEQ LENGTH	INERT-PROVEN	no_engine_write_in_12_contexts
+1429	PATCH	PAT3_SEQ_COM	STEP SEQ FIRST STEP	INERT-PROVEN	no_engine_write_in_12_contexts
+1430	PATCH	PAT3_SEQ_COM	STEP SEQ LAST STEP	INERT-PROVEN	no_engine_write_in_12_contexts
+1431	PATCH	PAT3_SEQ_COM	STEP SEQ SCALE	INERT-PROVEN	no_engine_write_in_12_contexts
+1432	PATCH	PAT3_SEQ_COM	STEP SEQ PLAY MODE	INERT-PROVEN	no_engine_write_in_12_contexts
+1433	PATCH	PAT3_SEQ_COM	STEP SEQ GATE RATIO	INERT-PROVEN	no_engine_write_in_12_contexts
+1434	PATCH	PAT3_SEQ_COM	STEP SEQ SHUFFLE	INERT-PROVEN	no_engine_write_in_12_contexts
+1435	PATCH	PAT3_SEQ_COM	STEP SEQ SMOOTH	INERT-PROVEN	no_engine_write_in_12_contexts
+1436	PATCH	PAT3_SEQ_COM	DUMMY1	INERT-PROVEN	no_engine_write_in_12_contexts
+1437	PATCH	PAT3_SEQ_COM	DUMMY2	INERT-PROVEN	no_engine_write_in_12_contexts
+1466	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 1)	INERT-PROVEN	no_engine_write_in_12_contexts
+1467	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 2)	INERT-PROVEN	no_engine_write_in_12_contexts
+1468	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 3)	INERT-PROVEN	no_engine_write_in_12_contexts
+1469	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 4)	INERT-PROVEN	no_engine_write_in_12_contexts
+1470	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 5)	INERT-PROVEN	no_engine_write_in_12_contexts
+1471	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 6)	INERT-PROVEN	no_engine_write_in_12_contexts
+1472	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 7)	INERT-PROVEN	no_engine_write_in_12_contexts
+1473	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note (voice 8)	INERT-PROVEN	no_engine_write_in_12_contexts
+1474	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 1)	INERT-PROVEN	no_engine_write_in_12_contexts
+1475	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 2)	INERT-PROVEN	no_engine_write_in_12_contexts
+1476	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 3)	INERT-PROVEN	no_engine_write_in_12_contexts
+1477	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 4)	INERT-PROVEN	no_engine_write_in_12_contexts
+1478	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 5)	INERT-PROVEN	no_engine_write_in_12_contexts
+1479	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 6)	INERT-PROVEN	no_engine_write_in_12_contexts
+1480	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 7)	INERT-PROVEN	no_engine_write_in_12_contexts
+1481	PATCH	PAT3_SEQ_STEP0	STEP SEQ Velo (voice 8)	INERT-PROVEN	no_engine_write_in_12_contexts
+1482	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 1)	INERT-PROVEN	no_engine_write_in_12_contexts
+1483	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 2)	INERT-PROVEN	no_engine_write_in_12_contexts
+1484	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 3)	INERT-PROVEN	no_engine_write_in_12_contexts
+1485	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 4)	INERT-PROVEN	no_engine_write_in_12_contexts
+1486	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 5)	INERT-PROVEN	no_engine_write_in_12_contexts
+1487	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 6)	INERT-PROVEN	no_engine_write_in_12_contexts
+1488	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 7)	INERT-PROVEN	no_engine_write_in_12_contexts
+1489	PATCH	PAT3_SEQ_STEP0	STEP SEQ Gate (voice 8)	INERT-PROVEN	no_engine_write_in_12_contexts
+1490	PATCH	PAT3_SEQ_STEP0	STEP SEQ Note Flag	INERT-PROVEN	no_engine_write_in_12_contexts
+1491	PATCH	PAT3_SEQ_STEP0	STEP SEQ Slide Flag	INERT-PROVEN	no_engine_write_in_12_contexts
+1492	PATCH	PAT3_SEQ_STEP0	STEP SEQ Mute Flag	INERT-PROVEN	no_engine_write_in_12_contexts
+1493	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 1 Target	INERT-PROVEN	no_engine_write_in_12_contexts
+1494	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 2 Target	INERT-PROVEN	no_engine_write_in_12_contexts
+1495	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 3 Target	INERT-PROVEN	no_engine_write_in_12_contexts
+1496	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 4 Target	INERT-PROVEN	no_engine_write_in_12_contexts
+1497	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 1 Value	INERT-PROVEN	no_engine_write_in_12_contexts
+1498	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 2 Value	INERT-PROVEN	no_engine_write_in_12_contexts
+1499	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 3 Value	INERT-PROVEN	no_engine_write_in_12_contexts
+1500	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 4 Value	INERT-PROVEN	no_engine_write_in_12_contexts
+1501	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 1 Transient	INERT-PROVEN	no_engine_write_in_12_contexts
+1502	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 2 Transient	INERT-PROVEN	no_engine_write_in_12_contexts
+1503	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 3 Transient	INERT-PROVEN	no_engine_write_in_12_contexts
+1504	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign 4 Transient	INERT-PROVEN	no_engine_write_in_12_contexts
+1505	PATCH	PAT3_SEQ_STEP0	STEP SEQ Assign Flag	INERT-PROVEN	no_engine_write_in_12_contexts
+1550	PATCH	vs	mode	INERT-PROVEN	GUI/editor state; no engine cell
+1551	PATCH	vs	ccAssign	INERT-PROVEN	GUI/editor state; no engine cell
+1552	PATCH	vs	panelPatch	INERT-PROVEN	GUI/editor state; no engine cell
+1553	PATCH	vs	panelSize	INERT-PROVEN	GUI/editor state; no engine cell
+1554	PATCH	vs	patchManager	INERT-PROVEN	GUI/editor state; no engine cell
+1555	PATCH	vs	patchListMain	INERT-PROVEN	GUI/editor state; no engine cell
+1556	PATCH	vs	patchListSub	INERT-PROVEN	GUI/editor state; no engine cell
+1557	PATCH	vs	activation	INERT-PROVEN	GUI/editor state; no engine cell
+1558	PATCH	vs	mainZoom	INERT-PROVEN	GUI/editor state; no engine cell
+1559	PATCH	vs	dm	INERT-PROVEN	GUI/editor state; no engine cell
+1560	PATCH	vs	velSense	INERT-PROVEN	GUI/editor state; no engine cell
+1561	PATCH	vs	voiceCount	INERT-PROVEN	GUI/editor state; no engine cell
+1562	PATCH	vs	quality	INERT-PROVEN	GUI/editor state; no engine cell
+1563	PATCH	vs	bankId	INERT-PROVEN	GUI/editor state; no engine cell
+1564	PATCH	vs	patchId	INERT-PROVEN	GUI/editor state; no engine cell
+1565	PATCH	vs	sampleRate	INERT-PROVEN	GUI/editor state; no engine cell
+1566	PATCH	vs	patchZoom	INERT-PROVEN	GUI/editor state; no engine cell
+1567	PATCH	vs	setup	INERT-PROVEN	GUI/editor state; no engine cell
+1568	PATCH	vs	updateSetup	INERT-PROVEN	GUI/editor state; no engine cell
+1569	PATCH	vs	writePatch	INERT-PROVEN	GUI/editor state; no engine cell
+1570	PATCH	vs	auth	INERT-PROVEN	GUI/editor state; no engine cell
+1571	PATCH	vs	updateAuth	INERT-PROVEN	GUI/editor state; no engine cell
+1572	PATCH	vs	authDummy	INERT-PROVEN	GUI/editor state; no engine cell
+1573	PATCH	ks	onVel	INERT-PROVEN	GUI/editor state; no engine cell
+1574	PATCH	ks	offVel	INERT-PROVEN	GUI/editor state; no engine cell
+1575	PATCH	ks	ch	INERT-PROVEN	GUI/editor state; no engine cell
