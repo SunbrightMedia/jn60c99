@@ -116,12 +116,16 @@ CHORUS_FINEFX_LEAVES = [(1210, 3286, True),   # CHORUS PRE DELAY -> 6396128
 
 def _finefx_leaves(blob, R):
     """The extra FX fine-FX leaves to fire for this patch (beyond the recall
-    enumerator): DELAY filter leaves when DELAY TYPE == 0; SLOT-1 CHORUS filter
-    leaves when DELAY TYPE in {2,3}; REVERB filter/gain leaves unconditionally
-    (reverb tank always runs). DELAY TYPE = rec 650 (blob index 650-16=634)."""
+    enumerator): DELAY filter leaves when DELAY TYPE in {0,1} (TYPE 0 -> first
+    instance 102xxx, TYPE 1 -> second instance 4297xxx -- context-dependent, both
+    applied by the port; finefx_multictx_probe.py); SLOT-1 CHORUS filter leaves when
+    DELAY TYPE in {2,3}; REVERB filter/gain leaves unconditionally (reverb tank
+    always runs). DELAY TYPE = rec 650 (blob index 650-16=634)."""
     dtype = R.dec(blob, 634)
-    dly = DELAY_FILT_LEAVES if dtype == 0 else []
-    cho = CHORUS_FINEFX_LEAVES if dtype in (2, 3) else []
+    # DELAY TYPE 5 (slot-1 reverb) hosts BOTH a delay-filter block (6497xxx, delay
+    # leaves) and a chorus-filter block (10693xxx, chorus leaves) -- dispatch both.
+    dly = DELAY_FILT_LEAVES if dtype in (0, 1, 5) else []
+    cho = CHORUS_FINEFX_LEAVES if dtype in (2, 3, 5) else []
     return dly + cho + REVERB_FINEFX_LEAVES
 
 

@@ -44,8 +44,9 @@ NAME = {1180: 'DELAY HIGH CUT', 1181: 'DELAY DIRECT LEVEL', 1182: 'DELAY LF DAMP
         1324: 'REVERB LOW CUT', 1325: 'REVERB HIGH CUT', 1326: 'REVERB DENSITY',
         1327: 'REVERB DIRECT LEVEL'}
 
-def run_port(rate, leaf, cells):
-    out = subprocess.check_output([DUMP, str(int(rate)), str(leaf)] + [str(c) for c in cells])
+def run_port(rate, leaf, ctx, cells):
+    out = subprocess.check_output(
+        [DUMP, str(int(rate)), str(leaf), ctx] + [str(c) for c in cells])
     rows = {}
     for line in out.decode().strip().split('\n'):
         p = line.split()
@@ -58,44 +59,41 @@ def main():
     if not os.path.exists(DUMP):
         print('MISSING port binary %s -- build it (see Makefile finefx target)' % DUMP); return 1
     ref = pickle.load(open(REF, 'rb'))
-    rates = sorted({r for (_, r) in ref.keys()})
-    leaves = sorted({d for (d, _) in ref.keys()})
+    keys = sorted(ref.keys(), key=lambda k: (k[1], k[0], k[2]))   # (leaf, ctx, rate)
+    rates = sorted({k[2] for k in keys}); ctxs = sorted({k[1] for k in keys})
+    leaves = sorted({k[0] for k in keys})
     total_cmp = 0; total_mismatch = 0; bad = []
-    for rate in rates:
-        for leaf in leaves:
-            tbl = ref.get((leaf, rate))
-            if not tbl:
-                continue
-            cells = sorted(tbl.keys())
-            port = run_port(rate, leaf, cells)
-            raw = RAW[leaf]; pmax = PMAX[leaf]
-            n = 0; mm = 0; first = None
-            for b in range(256):
-                value = (b & 0x7F) if raw else b
-                idx = value if value <= pmax else pmax   # host clamps to [0,max]
-                for ci, c in enumerate(cells):
-                    exp = tbl[c][idx]
-                    got = port[b][ci]
-                    n += 1
-                    if exp != got:
-                        mm += 1
-                        if first is None:
-                            first = (b, c, exp, got)
-            total_cmp += n; total_mismatch += mm
-            status = 'OK' if mm == 0 else 'MISMATCH'
-            if mm:
-                bad.append((rate, leaf, mm, first))
-            print('  %-6g leaf %d %-20s cells=%d cmp=%d %s%s' % (
-                rate, leaf, NAME[leaf], len(cells), n, status,
-                '' if not mm else '  first b=%d cell=%d exp=%08x got=%08x' % first))
+    for (leaf, ctx, rate) in keys:
+        tbl = ref[(leaf, ctx, rate)]
+        if not tbl:
+            continue
+        cells = sorted(tbl.keys())
+        port = run_port(rate, leaf, ctx, cells)
+        raw = RAW[leaf]; pmax = PMAX[leaf]
+        n = 0; mm = 0; first = None
+        for b in range(256):
+            value = (b & 0x7F) if raw else b
+            idx = value if value <= pmax else pmax   # host clamps to [0,max]
+            for ci, c in enumerate(cells):
+                exp = tbl[c][idx]; got = port[b][ci]; n += 1
+                if exp != got:
+                    mm += 1
+                    if first is None:
+                        first = (b, c, exp, got)
+        total_cmp += n; total_mismatch += mm
+        if mm:
+            bad.append((rate, leaf, ctx, mm, first))
+        print('  %-6g %-4s leaf %d %-20s cells=%d cmp=%d %s%s' % (
+            rate, ctx, leaf, NAME[leaf], len(cells), n, 'OK' if mm == 0 else 'MISMATCH',
+            '' if not mm else '  first b=%d cell=%d exp=%08x got=%08x' % first))
     print()
     if total_mismatch == 0:
-        print('PILLAR-3 fine-FX: PROVEN  (%d comparisons, %d rates x %d leaves, 0 mismatch)'
-              % (total_cmp, len(rates), len(leaves)))
+        print('PILLAR-3 fine-FX: PROVEN  (%d comparisons, %d rates x %d contexts {%s} x %d leaves, 0 mismatch)'
+              % (total_cmp, len(rates), len(ctxs), ','.join(ctxs), len(leaves)))
         return 0
     print('PILLAR-3 fine-FX: RED  (%d/%d mismatches)' % (total_mismatch, total_cmp))
-    for rate, leaf, mm, first in bad:
-        print('  RED %g leaf %d %s: %d mismatches, first %s' % (rate, leaf, NAME[leaf], mm, first))
+    for rate, leaf, ctx, mm, first in bad:
+        print('  RED %g %s leaf %d %s: %d mismatches, first %s' % (rate, ctx, leaf, NAME[leaf], mm, first))
     return 1
 
 if __name__ == '__main__':

@@ -65,6 +65,66 @@ void juno_apply_delay_finefx(unsigned char *state, const unsigned char *rec, int
     wr_bits(state, 102656, DLY_HFDF[arm][hff]);
 }
 
+/* DELAY TYPE 1 (dual delay) SECOND-INSTANCE fine-FX. In TYPE 1 the HIGH CUT / DAMP /
+ * DIRECT knobs move the SECOND delay instance (cells 4297xxx), NOT the first — proven
+ * by dispatch+snap in a DELAY TYPE 1 context (tools/verify/finefx_multictx_probe.py:
+ * dispatch 1180-1185 write only 4297xxx there, 102xxx untouched). The per-byte law is
+ * IDENTICAL to the TYPE-0 first-instance law (same DLY_* tables; verified law(DT1)==
+ * law(DT0) for every leaf), only the target cells differ. Identity at the default
+ * byte: every default value equals delay_recall.c's DLY1_B block constant (4297600=
+ * 0x3e1b31ce, 4297744/4297936/4297968=1.0, 4297904=ARM_LFX2, 4297952=ARM_HFDMP), so
+ * this overwrites the DLY1_B placeholders and is a no-op for default-fine-FX patches.
+ * Cell offset from the TYPE-0 cell: +4195232 (HIGH CUT/DIRECT), +4195296 (DAMP).
+ * (TYPE 4 writes NO fine-FX cell — proven — so no TYPE-4 applier.) */
+static const int DLY_HC_CELLS2[7] = {4297600, 4297616, 4297632, 4297648,
+                                     4297664, 4297696, 4297728};
+void juno_apply_delay_finefx_2nd(unsigned char *state, const unsigned char *rec, int Hr)
+{
+    int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
+    int hc  = clampi(rec[3059] & 0x7F, 0, 14);   /* HIGH CUT      (int1x7, raw)  */
+    int dl  = clampi(nib(rec, 3060),   0, 255);  /* DIRECT LEVEL  (int2x4)       */
+    int lfd = clampi(nib(rec, 3068),   0, 81);   /* LF DAMP       (int8x4)       */
+    int lff = clampi(nib(rec, 3076),   0, 10);   /* LF DAMP FREQ  (int8x4, rate) */
+    int hfd = clampi(nib(rec, 3084),   0, 81);   /* HF DAMP       (int8x4)       */
+    int hff = clampi(nib(rec, 3092),   0, 13);   /* HF DAMP FREQ  (int8x4, rate) */
+    int k;
+    for (k = 0; k < 7; k++)
+        wr_bits(state, DLY_HC_CELLS2[k], DLY_HC[hc][k]);
+    JF(state, 4297744) = (float)dl / 255.0f;     /* DIRECT LEVEL = byte/255      */
+    wr_bits(state, 4297936, DLY_LFDMP[lfd]);
+    wr_bits(state, 4297968, DLY_HFDMP[hfd]);
+    wr_bits(state, 4297904, DLY_LFDF[arm][lff]);
+    wr_bits(state, 4297952, DLY_HFDF[arm][hff]);
+}
+
+/* DELAY TYPE 5 (slot-1 hosts REVERB) SLOT-1-REVERB delay-filter fine-FX. In TYPE 5
+ * the HIGH CUT / DAMP / DIRECT knobs move the slot-1 reverb's delay-style filter
+ * block (cells 6497xxx), with the per-byte law IDENTICAL to the TYPE-0 first-instance
+ * law (proven law-identical, tools/verify (finefx_fullctx_audit.py + dt5_derive.py)).
+ * Identity at the default byte (== delay_recall.c's S1REVERB constants:
+ * 6497184=0x3e1b31ce, 6497328/6497456/6497488=1.0, 6497424=ARM_LFX2, 6497472=ARM_HFDMP).
+ * Called from delay_recall.c's apply_slot1_reverb. */
+static const int DLY_HC_CELLS5[7] = {6497184, 6497200, 6497216, 6497232,
+                                     6497248, 6497280, 6497312};
+void juno_apply_delay_finefx_slot1rev(unsigned char *state, const unsigned char *rec, int Hr)
+{
+    int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
+    int hc  = clampi(rec[3059] & 0x7F, 0, 14);
+    int dl  = clampi(nib(rec, 3060),   0, 255);
+    int lfd = clampi(nib(rec, 3068),   0, 81);
+    int lff = clampi(nib(rec, 3076),   0, 10);
+    int hfd = clampi(nib(rec, 3084),   0, 81);
+    int hff = clampi(nib(rec, 3092),   0, 13);
+    int k;
+    for (k = 0; k < 7; k++)
+        wr_bits(state, DLY_HC_CELLS5[k], DLY_HC[hc][k]);
+    JF(state, 6497328) = (float)dl / 255.0f;
+    wr_bits(state, 6497456, DLY_LFDMP[lfd]);
+    wr_bits(state, 6497488, DLY_HFDMP[hfd]);
+    wr_bits(state, 6497424, DLY_LFDF[arm][lff]);
+    wr_bits(state, 6497472, DLY_HFDF[arm][hff]);
+}
+
 /* REVERB fine-FX (LOW CUT 1324 / HIGH CUT 1325 / DENSITY 1326 / DIRECT LEVEL 1327):
  * NOT in the plugin's recall enumerator (blind spot), but a host's preset-load
  * applies them via 0x3B9A30; the coefficient CELL materializes when the reverb
@@ -117,4 +177,25 @@ void juno_apply_chorus_finefx(unsigned char *state, const unsigned char *rec, in
     for (k = 0; k < 7; k++) wr_bits(state, CHO1_HC_CELLS[k], CHO1_HC[hc][k]);
     for (k = 0; k < 2; k++) wr_bits(state, CHO1_LC_CELLS[k], CHO1_LC[arm][lc][k]);
     wr_bits(state, CHO1_PD_CELL, CHO1_PD[arm][pd]);
+}
+
+/* DELAY TYPE 5 (slot-1 reverb) SLOT-1-REVERB chorus-filter fine-FX. In TYPE 5 the
+ * CHORUS HIGH CUT / LOW CUT / PRE DELAY knobs move the slot-1 reverb's chorus-style
+ * filter block (cells 10693xxx), with the per-byte law IDENTICAL to the DELAY-TYPE-2/3
+ * slot-1 chorus law (proven law-identical, dt5_derive.py). Identity at the default
+ * byte (== delay_recall.c's S1REVERB constants: 10693072=0x3f03df74, 10693008=ARM_CHDEP,
+ * 10693216=ARM_CHLF). Called from delay_recall.c apply_slot1_reverb. */
+static const int CHO_HC_CELLS5[7] = {10693072, 10693088, 10693104, 10693120,
+                                     10693136, 10693168, 10693200};
+static const int CHO_LC_CELLS5[2] = {10693216, 10693232};
+void juno_apply_chorus_finefx_slot1rev(unsigned char *state, const unsigned char *rec, int Hr)
+{
+    int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
+    int hc = clampi(rec[3288] & 0x7F, 0, 14);
+    int lc = clampi(rec[3287] & 0x7F, 0, 17);
+    int pd = clampi(rec[3286] & 0x7F, 0, 80);
+    int k;
+    for (k = 0; k < 7; k++) wr_bits(state, CHO_HC_CELLS5[k], CHO1_HC[hc][k]);
+    for (k = 0; k < 2; k++) wr_bits(state, CHO_LC_CELLS5[k], CHO1_LC[arm][lc][k]);
+    wr_bits(state, 10693008, CHO1_PD[arm][pd]);
 }

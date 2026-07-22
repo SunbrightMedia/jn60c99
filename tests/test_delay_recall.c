@@ -226,6 +226,49 @@ int main(void)
         rec[3288] = 13; rec[3287] = 2; rec[3286] = 20;   /* restore defaults        */
     }
 
+    /* --- case 9: DELAY TYPE 1 SECOND-INSTANCE fine-FX (finefx_recall.c
+     * juno_apply_delay_finefx_2nd). In dual delay (TYPE 1) the HIGH CUT / DAMP /
+     * DIRECT knobs move the SECOND instance (4297xxx) with the SAME law as TYPE 0's
+     * first instance -- proven by finefx_multictx_probe.py. Non-default @44.1k:
+     * HIGH CUT=3 -> 4297600 (== TYPE-0 102368 @byte3, rate-indep); HF DAMP=12 ->
+     * 4297968; DIRECT=128 -> 4297744 (=128/255); HF DAMP FREQ=3 -> 4297952 @44.1k
+     * (== case-7's 102656 value, identical rate-armed law). --- */
+    {
+        memset(st, 0, JUNO_STATE_BYTES);
+        JF(st, 16) = 44100.0f;
+        put_pair(rec, 650, 1);          /* DELAY TYPE 1 -> dual delay              */
+        rec[3059] = 3;                  /* DELAY HIGH CUT = 3 (int1x7 raw)         */
+        put_pair(rec, 3060, 128);       /* DELAY DIRECT LEVEL = 128 (int2x4)       */
+        put_pair(rec, 3084, 12);        /* DELAY HF DAMP = 12 (int8x4)             */
+        put_pair(rec, 3092, 3);         /* DELAY HF DAMP FREQ = 3 (int8x4)         */
+        juno_bank_apply(st, bank, 0);
+        if ((unsigned)u32(st, 4297600) != 0x3ce64b15u) { printf("  case9: 2nd HIGH CUT %08x != 3ce64b15\n", u32(st, 4297600)); ++fails; }
+        if ((unsigned)u32(st, 4297968) != 0x3f004dceu) { printf("  case9: 2nd HF DAMP %08x != 3f004dce\n", u32(st, 4297968)); ++fails; }
+        if ((unsigned)u32(st, 4297744) != 0x3f008081u) { printf("  case9: 2nd DIRECT %08x != 3f008081\n", u32(st, 4297744)); ++fails; }
+        if ((unsigned)u32(st, 4297952) != 0x3e2e4a3fu) { printf("  case9: 2nd HF DAMP FREQ %08x != 3e2e4a3f\n", u32(st, 4297952)); ++fails; }
+        rec[3059] = 7; put_pair(rec, 3060, 255); put_pair(rec, 3084, 0); put_pair(rec, 3092, 13);
+    }
+
+    /* --- case 10: DELAY TYPE 5 (slot-1 reverb) fine-FX (finefx_recall.c
+     * juno_apply_delay_finefx_slot1rev + juno_apply_chorus_finefx_slot1rev). The DELAY
+     * fine-FX knobs move the slot-1-reverb delay-filter block (6497xxx), the CHORUS
+     * knobs its chorus-filter block (10693xxx), same laws as TYPE 0 / TYPE 2,3 (proven
+     * law-identical, dt5_derive.py). Rate-independent cells @44.1k: delay HIGH CUT=3 ->
+     * 6497184; delay DIRECT=128 -> 6497328; chorus HIGH CUT=0 -> 10693072. --- */
+    {
+        memset(st, 0, JUNO_STATE_BYTES);
+        JF(st, 16) = 44100.0f;
+        put_pair(rec, 650, 5);          /* DELAY TYPE 5 -> slot-1 reverb           */
+        rec[3059] = 3;                  /* DELAY HIGH CUT = 3                       */
+        put_pair(rec, 3060, 128);       /* DELAY DIRECT LEVEL = 128                 */
+        rec[3288] = 0;                  /* CHORUS HIGH CUT = 0                      */
+        juno_bank_apply(st, bank, 0);
+        if ((unsigned)u32(st, 6497184) != 0x3ce64b15u) { printf("  case10: s1rev dlyHC %08x != 3ce64b15\n", u32(st, 6497184)); ++fails; }
+        if ((unsigned)u32(st, 6497328) != 0x3f008081u) { printf("  case10: s1rev dlyDIR %08x != 3f008081\n", u32(st, 6497328)); ++fails; }
+        if ((unsigned)u32(st, 10693072) != 0x3bf819beu) { printf("  case10: s1rev choHC %08x != 3bf819be\n", u32(st, 10693072)); ++fails; }
+        put_pair(rec, 650, 0); rec[3059] = 7; put_pair(rec, 3060, 255); rec[3288] = 13;
+    }
+
     free(st); free(bank);
     if (fails) { printf("FAIL: %d delay-recall check(s) drifted\n", fails); return 1; }
     printf("OK: per-patch delay recall (mode + coefficients) verified\n");

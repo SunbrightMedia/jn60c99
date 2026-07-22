@@ -284,6 +284,12 @@ static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, f
     { uint32_t hb = 0x3f4ba5b0u; memcpy(&f, &hb, sizeof f); JF(state, 102656) = f; }
     JF(state, 6497344) = (float)b52 / 255.0f;   /* reverb depth              */
     JF(state, 6497168) = tc;                    /* delay time (sync-aware)   */
+    /* Slot-1-reverb fine-FX: the DELAY fine-FX knobs move the reverb's delay-filter
+     * block (6497xxx), the CHORUS fine-FX knobs its chorus-filter block (10693xxx),
+     * same laws as TYPE 0 / TYPE 2,3; identity at the default byte (overwrites the
+     * S1REVERB placeholders). See finefx_recall.c (proven by finefx_pillar3_gate DT5). */
+    juno_apply_delay_finefx_slot1rev(state, rec, Hr);
+    juno_apply_chorus_finefx_slot1rev(state, rec, Hr);
 }
 
 /* DELAY TYPE 1: dual delay — first instance (102xxx) + second instance (4297584..).
@@ -423,6 +429,12 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
                                                   from the plugin's own recall of a type-4
                                                   user patch; no factory patch has type 4) */
         apply_slot1_delay1(state, rec, tc, dtype == 1);
+        if (dtype == 1) {
+            /* TYPE 1 second-instance fine-FX: HIGH CUT / DAMP / DIRECT move the
+             * second delay instance (4297xxx), same law as TYPE-0, identity at the
+             * default byte (overwrites the DLY1_B placeholders). See finefx_recall.c. */
+            juno_apply_delay_finefx_2nd(state, rec, Hr);
+        }
         if (dtype == 4) {
             /* TYPE-4 modulated-delay block (6429408..6430544), read by the
              * master render's type-4 arm (ring mask at 6429412). Laws PROVEN by
