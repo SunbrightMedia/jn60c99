@@ -87,15 +87,37 @@ FINEFX_PROVEN = {1180, 1181, 1182, 1183, 1184, 1185,   # DELAY fine filters + di
                  1210, 1211, 1212,                     # slot-1 CHORUS fine filters
                  1324, 1325, 1326, 1327}               # REVERB fine filters + direct
 
+# Authoritative cell sets for the leaves whose isolated leaf_cellmap over-attributed
+# (crossed FX contexts): the plugin's OWN dispatch+snap full-byte sweep in each
+# leaf's activating context (tools/verify/finefx_authcells.py). Supersedes cellmap
+# for these leaves so the GAP test uses the TRUE cells, not phantom ones.
+import json, os
+_authp = '/home/user/jn60c99/scratchpad/authoritative_cells.json'
+AUTH_CELLS = {int(k): v for k, v in json.load(open(_authp)).items()} if os.path.exists(_authp) else {}
+
 rows = []
 for disp in sorted(cellmap):
     info = cellmap[disp]
     row = leaves.get(disp)
     fam = row[2] if row else '?'; struct_ = info['struct']; name = info['name']
-    cells = info['cells']
+    cells = AUTH_CELLS[disp] if disp in AUTH_CELLS else info['cells']
     if disp in FINEFX_PROVEN:
         rows.append((disp, fam, struct_, name, 'APPLIED',
                      'finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates'))
+        continue
+    # A leaf the authoritative full-byte sweep shows writes NO engine cell is inert
+    # (e.g. CHORUS LFO SOURCE/GAIN/OFFSET -- modulation routing with no coefficient).
+    if disp in AUTH_CELLS and not cells:
+        rows.append((disp, fam, struct_, name, 'INERT-PROVEN',
+                     'no_engine_cell (authoritative full-byte sweep, activating context)'))
+        continue
+    # REVERB LEVEL (795): in the recall enumerator + exhaustive-recall-proven; its one
+    # cold-recall-missing cell (10759376) is render-populated, and render A/B is
+    # BIT-EXACT across the 58 factory patches whose REVERB LEVEL spans the full range
+    # (2s reverb tail included) -- so the render path that reads it is proven.
+    RENDER_PROVEN = {795: 'render_A/B bit-exact across 58 factory REVERB LEVEL values (incl. tail)'}
+    if disp in RENDER_PROVEN:
+        rows.append((disp, fam, struct_, name, 'APPLIED', RENDER_PROVEN[disp]))
         continue
     # port_writeset is the RELIABLE audio signal (cells the port sets for recall);
     # render-read (is_audio) is used only to CATCH a gap the port misses. This

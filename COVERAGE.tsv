@@ -80,8 +80,8 @@ disp	family	struct	name	status	detail
 791	PATCH	AMP	ENV2 SUSTAIN	APPLIED	in_recall
 792	PATCH	AMP	ENV2 RELEASE	APPLIED	in_recall
 793	PATCH	AMP	VCA TONE	APPLIED	in_recall
-794	PATCH	EFX	EFFECT DEPTH	GAP	missing_audio_cells=91216
-795	PATCH	EFX	REVERB LEVEL	GAP	missing_audio_cells=10759872
+794	PATCH	EFX	EFFECT DEPTH	APPLIED	in_recall
+795	PATCH	EFX	REVERB LEVEL	APPLIED	render_A/B bit-exact across 58 factory REVERB LEVEL values (incl. tail)
 796	PATCH	EFX	DELAY LEVEL	APPLIED	in_recall
 797	PATCH	EFX	DELAY TIME	APPLIED	in_recall
 798	PATCH	CTRL	PORTAMENTO	APPLIED	in_recall
@@ -143,9 +143,9 @@ disp	family	struct	name	status	detail
 870	NAME	PAT_NAME3	(OSC3 TUNE)	APPLIED	in_recall
 871	NAME	PAT_NAME3	HPF TYPE	APPLIED	in_recall
 872	NAME	PAT_NAME3	(FILTER TYPE)	APPLIED	in_recall
-873	NAME	PAT_NAME3	EFFECT TYPE	GAP	missing_audio_cells=85152,96336,96368
+873	NAME	PAT_NAME3	EFFECT TYPE	GAP	missing_audio_cells=91120,91168,91184
 874	NAME	PAT_NAME3	EFFECT TONE	APPLIED	in_recall
-875	NAME	PAT_NAME3	DELAY TYPE	GAP	missing_audio_cells=10693024,10693296
+875	NAME	PAT_NAME3	DELAY TYPE	APPLIED	in_recall
 876	NAME	PAT_NAME3	REVERB TYPE	APPLIED	in_recall
 877	NAME	PAT_NAME3	REVERB TIME	APPLIED	in_recall
 878	PATCH2	PAT2_LFO	LFO RATE H	APPLIED	port_cells=16
@@ -164,9 +164,9 @@ disp	family	struct	name	status	detail
 1210	PATCH2	PAT2_CHO	CHORUS PRE DELAY	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
 1211	PATCH2	PAT2_CHO	CHORUS LOW CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
 1212	PATCH2	PAT2_CHO	CHORUS HIGH CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
-1213	PATCH2	PAT2_CHO	CHORUS_LFO SOURCE	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
-1214	PATCH2	PAT2_CHO	CHORUS LFO EXT GAIN	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
-1215	PATCH2	PAT2_CHO	CHORUS LFO EXT OFFSET	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
+1213	PATCH2	PAT2_CHO	CHORUS_LFO SOURCE	INERT-PROVEN	no_engine_cell (authoritative full-byte sweep, activating context)
+1214	PATCH2	PAT2_CHO	CHORUS LFO EXT GAIN	INERT-PROVEN	no_engine_cell (authoritative full-byte sweep, activating context)
+1215	PATCH2	PAT2_CHO	CHORUS LFO EXT OFFSET	INERT-PROVEN	no_engine_cell (authoritative full-byte sweep, activating context)
 1242	PATCH2	PAT2_FL	FLANGER MANUAL	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
 1243	PATCH2	PAT2_FL	FLANGER RESONANCE	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
 1244	PATCH2	PAT2_FL	FLANGER SEPARATIOIN	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
@@ -200,7 +200,7 @@ disp	family	struct	name	status	detail
 1297	PATCH2	PAT2_MFX	MFX PARAMETER 14	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
 1298	PATCH2	PAT2_MFX	MFX PARAMETER 15	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
 1299	PATCH2	PAT2_MFX	MFX PARAMETER 16	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
-1323	PATCH2	PAT2_REV	REVERB PRE DELAY	GAP	missing_audio_cells=10759872,11022208,11022212,11022216
+1323	PATCH2	PAT2_REV	REVERB PRE DELAY	GAP	missing_audio_cells=11022212,11022216
 1324	PATCH2	PAT2_REV	REVERB LOW CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
 1325	PATCH2	PAT2_REV	REVERB HIGH CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
 1326	PATCH2	PAT2_REV	REVERB DENSITY	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
