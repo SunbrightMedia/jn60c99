@@ -36,6 +36,7 @@
  */
 #include "juno_engine.h"
 #include "reverb_recall.h"
+#include "finefx_recall.h"
 #include <string.h>
 
 /* REVERB LEVEL byte -> engine 10759408 (send/wet), value-tree idx 795. Bit-exact 256/256. */
@@ -231,6 +232,15 @@ void juno_apply_reverb(unsigned char *state, const unsigned char *rec)
     {
         int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
         juno_write_reverb_taps(state, type, Hr);
+    }
+
+    /* Fine-FX filter/gain params (LOW/HIGH CUT / DENSITY / DIRECT LEVEL) — the
+     * leaves the plugin's recall enumerator does NOT fire but a host applies via
+     * 0x3B9A30 (see finefx_recall.c). Identity at the default byte, correct for any
+     * user value. Unconditional (the master always runs the reverb tank). */
+    {
+        int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+        juno_apply_reverb_finefx(state, rec, Hr);
     }
 
     /* Re-arm the reverb lazy-wipe countdown (int cell 10759872 = 256). The plugin's

@@ -12,4 +12,10 @@
  * default byte, so it is a no-op for default-fine-FX patches. */
 void juno_apply_delay_finefx(unsigned char *state, const unsigned char *rec, int Hr);
 
+/* Apply the REVERB fine-FX filter/gain params (LOW/HIGH CUT / DENSITY / DIRECT
+ * LEVEL) — the plugin's own smoother-target coefficients (see finefx_recall.c).
+ * Unconditional (the master always runs the reverb tank). PRE DELAY excluded
+ * (joint TYPE x tap-array, handled in reverb_recall.c). */
+void juno_apply_reverb_finefx(unsigned char *state, const unsigned char *rec, int Hr);
+
 #endif

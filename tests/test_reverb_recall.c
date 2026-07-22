@@ -96,6 +96,27 @@ int main(void)
         }
     }
 
+    /* --- reverb fine-FX (src/finefx_recall.c): LOW/HIGH CUT / DENSITY / DIRECT
+     * LEVEL, the plugin's own smoother-target coeffs (dispatch 1324..1327 + snap).
+     * Non-default bytes at 44.1 kHz: LOW CUT=17, HIGH CUT=0, DENSITY=5, DIRECT=128.
+     * int1x7 (raw byte) for LOW/HIGH/DENSITY, int2x4 (nibble pair) for DIRECT. --- */
+    {
+        memset(st, 0, JUNO_STATE_BYTES);
+        JF(st, 16) = 44100.0f;
+        put_pair(rec, 658, 2); put_pair(rec, 666, 128);   /* reverb TYPE 2 active */
+        rec[3948] = 17;                 /* REVERB LOW CUT  = 17 (int1x7 raw)      */
+        rec[3949] = 0;                  /* REVERB HIGH CUT = 0                     */
+        rec[3950] = 5;                  /* REVERB DENSITY  = 5                     */
+        put_pair(rec, 3951, 128);       /* REVERB DIRECT LEVEL = 128 (int2x4)      */
+        juno_bank_apply(st, bank, 0);
+        chk(st, 10759520, 0x3f639db5u, "revLC17a"); chk(st, 10759536, 0xbf639db5u, "revLC17b");
+        chk(st, 10759552, 0x3f473b6au, "revLC17c");
+        chk(st, 10759568, 0x3af7c943u, "revHC0a");  chk(st, 10759616, 0x3fefc7b0u, "revHC0d");
+        chk(st, 10759632, 0xbf617ef2u, "revHC0e");
+        chk(st, 10759392, 0x3e9c0000u, "revDENS5"); chk(st, 10759424, 0x3e266800u, "revDIR128");
+        rec[3948] = 2; rec[3949] = 11; rec[3950] = 10; put_pair(rec, 3951, 255);  /* restore defaults */
+    }
+
     free(st); free(bank);
     if (fails) { printf("FAIL: %d reverb-recall check(s) drifted\n", fails); return 1; }
     printf("OK: per-patch reverb recall (level + TYPE + TIME + tap tables, joint Hp/Lp) verified\n");

@@ -95,10 +95,22 @@ DELAY_FILT_LEAVES = [(1180, 3059, True),   # DELAY HIGH CUT    -> 102368..102496
                      (1185, 3092, False)]  # DELAY HF DAMP FREQ-> 102656 (rate-armed)
 
 
+# REVERB fine-FX leaves (#116) — same blind spot as DELAY: dispatchable via 0x3B9A30,
+# absent from the recall enumerator, the port applies them (finefx_recall.c
+# juno_apply_reverb_finefx). Unconditional (the master always runs the reverb tank).
+# (disp, record byte, raw=int1x7). REVERB PRE DELAY (1323) excluded (joint TYPE x tap).
+REVERB_FINEFX_LEAVES = [(1324, 3948, True),   # REVERB LOW CUT   -> 10759520/536/552
+                        (1325, 3949, True),   # REVERB HIGH CUT  -> 10759568..632
+                        (1326, 3950, True),   # REVERB DENSITY   -> 10759392
+                        (1327, 3951, False)]  # REVERB DIRECT LV -> 10759424
+
+
 def _finefx_leaves(blob, R):
-    """The DELAY fine-FX leaves to fire for this patch — only when DELAY TYPE == 0
-    (rec 650, int8x4 low-byte nibble pair; blob index 650-16=634)."""
-    return DELAY_FILT_LEAVES if R.dec(blob, 634) == 0 else []
+    """The extra FX fine-FX leaves to fire for this patch (beyond the recall
+    enumerator): DELAY filter leaves only when DELAY TYPE == 0 (rec 650, blob 634);
+    REVERB filter/gain leaves unconditionally (reverb tank always runs)."""
+    dly = DELAY_FILT_LEAVES if R.dec(blob, 634) == 0 else []
+    return dly + REVERB_FINEFX_LEAVES
 
 
 def ref_render(idx, bank, leaves, E, R):
