@@ -147,22 +147,25 @@ residual would be a named, bounded, visible-red item — never a silent green.
 
 ## Staging (each stage independently verifiable)
 
-- **Stage A — build Pillar 1: LEDGER + GATE BUILT (2026-07-21).** COVERAGE.tsv
-  classifies all 269 dispatchable value-tree leaves (enumerated from the binary
-  via enumerate_leaves.py's canonical `dispatchable` column; generators
-  leaf_cellmap.py / leaf_cellmap_fx.py / port_writeset.py / build_coverage.py;
-  gate completeness_gate.py; `make completeness`). Result:
-  **APPLIED 54 | GAP 11 | UNRESOLVED 41 | INERT-PROVEN 163**, gate RED (honest).
-  - GAP worklist = the fine delay/chorus/reverb FILTER+LEVEL family + EFFECT
-    DEPTH + mode-router residuals (the darkness cause, fully enumerated).
-  - The gate caught the SYSTEM-8 param surface (→ documented JUNO-60-only scope)
-    and a 46-leaf hole in the first-pass ledger (VCA MODE / TYPE selectors).
-  - REMAINING to fully close Pillar 1 (two items, both need the full-value-tree
-    recall differential): (1) resolve the 41 UNRESOLVED extended-FX leaves
-    (load_leaves recall doesn't activate their blocks); (2) harden the INERT
-    'no_engine_write_in_12_contexts' soft edge (isolated dispatch misses
-    CONDITIONAL setters like F ENV VARIATION that the port DOES apply — those
-    are applied-but-mislabeled, not gaps). GAP + APPLIED buckets are solid now.
+- **Stage A — Pillar 1 COMPLETE (2026-07-21).** COVERAGE.tsv classifies all 269
+  dispatchable leaves with ZERO UNRESOLVED / ZERO SILENT; gate completeness_gate.py
+  (`make completeness`) enforces zero-drift + zero-unresolved, RED on any GAP.
+  Final: **APPLIED 114 | GAP 26 | INERT-PROVEN 129**, gate RED (honest — the
+  port has real unapplied params). Generators: enumerate_leaves.py (canonical
+  `dispatchable` column) · leaf_cellmap.py + _fx.py + _activated.py (Unicorn
+  setter cell-maps) · port_writeset.py · build_coverage.py.
+  - KEY FINDING — two-mechanism architecture: params reach the engine via the
+    value-tree ENGINE dispatch (oracle-observable) OR the CONTROLLER path
+    (record→cell, dispatch is a proven no-op). Classification uses two
+    applied-signals: LOAD_LEAVES (render-A/B-proven recall set) + port_writeset.
+  - GAP worklist (the darkness, fully enumerated) = FX-completeness #116/#124:
+    DELAY 5 + CHORUS 4 + FLANGER 7 + REVERB 5 fine params + EFFECT DEPTH +
+    REVERB LEVEL + 2 router residuals.
+  - Gate caught: the SYSTEM-8 param surface (documented JUNO-60-only scope) and
+    a 46-leaf hole in my own first-pass ledger (VCA MODE / TYPE selectors).
+  - Honesty caveats carried to Stage B/Pillar 2: (a) PAT2_MFX=SYSTEM-8 scope
+    call needs controller-path confirmation; (b) router GAP rows carry residual
+    cross-mode cells; (c) APPLIED value-law correctness is Pillar 3.
 - **Stage B — close the gaps**, highest-audibility first (fine-FX filters
   first: they are the user's current complaint). Each closure: derive by
   executing the plugin's own setter (PROVEN) → apply in port → flip ledger row.
