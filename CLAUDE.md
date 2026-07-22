@@ -16,8 +16,14 @@ are slot-1-routing-dependent — TYPE 1 → 2nd instance 4297xxx, TYPE 5 → slo
 reverb 6497xxx (delay) + 10693xxx (chorus), TYPE 4 → no cells; chorus DT2≡DT3,
 reverb RT/ET context-independent. All wired (`juno_apply_delay_finefx_2nd` /
 `_slot1rev`, `juno_apply_chorus_finefx_slot1rev`), identity at default (factory
-unchanged), and the Pillar-3 gate is now CONTEXT-AWARE: **88064 comparisons over
-7 contexts × 13 leaves × 4 rates, 0 mismatch.** Next: W1 (REVERB PRE DELAY).
+unchanged), and the Pillar-3 gate is now CONTEXT-AWARE. **W1 DONE (2026-07-22):**
+REVERB PRE DELAY (1323) shifts the reverb tap array (33 ints 11022212..340)
+uniformly by predelay(byte)-predelay(20) + writes master predelay cell 10759360,
+predelay = max((byte·Hr)/1000-2, 0) — executed per byte × 4 rates × 3 REVERB TYPE
+classes (idx 876=TYPE, not 877=TIME), wired in `reverb_recall.c`
+(`juno_write_reverb_taps_pd`), identity at default byte 20. Pillar-3 now
+**192512 comparisons over 9 contexts × 14 leaves × 4 rates, 0 mismatch**;
+COVERAGE 1323 GAP→APPLIED. Next: W2 (EFFECT TYPE 2/3/4 secondary cells).
 
 ## The one rule everything else serves
 
@@ -242,13 +248,12 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   Teensy-golden truncation the fine-FX exposed (blob stopped at record 3077,
   before CHORUS 3286-3288 + REVERB 3948-3952) FIXED: TG_BLOB_LEN 3062→3968.
   Pillar-1 ledger (`COVERAGE.tsv`) reconciled with authoritative cell sets
-  (`finefx_authcells.py`): **GAP 25→10, APPLIED 127 | INERT-PROVEN 132**. The 10
-  remaining GAPs are all any-preset/scope with ZERO factory reach (all 64 patches
-  use EFFECT TYPE 0 / REVERB TYPE 0 / default REVERB PRE DELAY): FLANGER (EFFECT
-  TYPE 4, #122), EFFECT TYPE 2/3/4 secondary cells, REVERB PRE DELAY (joint
-  TYPE×34-cell tap array), Patch Tempo (controller path, #112). chorus-LFO
-  (1213-1215) proven INERT (write no engine cell). The per-family detail below is
-  retained for history.
+  (`finefx_authcells.py`): **GAP 25→10, APPLIED 127 | INERT-PROVEN 132**; W1
+  flipped REVERB PRE DELAY (1323) → **GAP now 9, APPLIED 128**. The remaining GAPs
+  are all any-preset/scope with ZERO factory reach (all 64 patches use EFFECT TYPE
+  0 / REVERB TYPE 0): FLANGER (EFFECT TYPE 4, #122), EFFECT TYPE 2/3/4 secondary
+  cells, Patch Tempo (controller path, #112). chorus-LFO (1213-1215) proven INERT
+  (write no engine cell). The per-family detail below is retained for history.
 - **STAGE-2 PROGRESS — DELAY fine-FX WIRED (#116, first closure).** The DELAY
   TYPE-0 fine-FX filter leaves are now applied by `src/finefx_recall.c`
   (`juno_apply_delay_finefx`, called from `juno_apply_delay`'s TYPE-0 arm):

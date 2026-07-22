@@ -172,17 +172,38 @@ static const int32_t RTAP44[3][34] = {
       17768, 19463, 21648, 22358 }
 };
 
-void juno_write_reverb_taps(unsigned char *state, int type, int Hr)
+/* REVERB PRE DELAY -> pre-delay in samples. Executed law (W1,
+ * tools/verify/reverb_predelay_derive.py; exact over byte 0..127 x 4 rates x 3 TYPE
+ * classes, and == the master reverb predelay cell 10759360): predelay =
+ * max((pd_byte*Hr)/1000 - 2, 0). At the default byte 20 this reproduces every tap
+ * baseline (RTAP44/RTAP96 entry1 = predelay+1) exactly -- identity at the default. */
+int juno_reverb_predelay(int pd_byte, int Hr)
+{
+    long v = (long)pd_byte * (long)Hr / 1000L - 2L;
+    return v < 0 ? 0 : (int)v;
+}
+
+/* Write the 34-int reverb tap array for (type, Hr) with REVERB PRE DELAY `pd_byte`.
+ * PRE DELAY shifts every tap (entries 1..33) uniformly by predelay(pd)-predelay(20);
+ * entry 0 stays 1 (the plugin's own PRE DELAY setter, W1: it moves the same 33 taps).
+ * At pd_byte == 20 the shift is 0, so this is bit-identical to the pre-W1 baseline. */
+void juno_write_reverb_taps_pd(unsigned char *state, int type, int Hr, int pd_byte)
 {
     int cls = (type == 0) ? 0 : (type == 1) ? 1 : 2;
+    int shift_pd = juno_reverb_predelay(pd_byte, Hr) - juno_reverb_predelay(20, Hr);
     int k;
+    JI(state, 11022208) = 1;
     if (Hr == 44100) {
-        for (k = 0; k < 34; ++k) JI(state, 11022208 + 4 * k) = RTAP44[cls][k];
+        for (k = 1; k < 34; ++k) JI(state, 11022208 + 4 * k) = RTAP44[cls][k] + shift_pd;
     } else {
         const int shift = (int)(0.019995f * (float)Hr) - 1919;  /* floor via trunc */
-        JI(state, 11022208) = 1;
-        for (k = 1; k < 34; ++k) JI(state, 11022208 + 4 * k) = RTAP96[cls][k] + shift;
+        for (k = 1; k < 34; ++k) JI(state, 11022208 + 4 * k) = RTAP96[cls][k] + shift + shift_pd;
     }
+}
+
+void juno_write_reverb_taps(unsigned char *state, int type, int Hr)
+{
+    juno_write_reverb_taps_pd(state, type, Hr, 20);   /* PRE DELAY default byte */
 }
 
 static int rec_byte(const unsigned char *rec, int off)
@@ -205,7 +226,9 @@ void juno_apply_reverb(unsigned char *state, const unsigned char *rec)
     int level = blob_val(rec, 51);                 /* REVERB LEVEL (blob 51)      */
     int type  = rec_byte(rec, 658);                /* REVERB TYPE  (record 658)   */
     int time  = rec_byte(rec, 666) & 0xFF;         /* REVERB TIME  (record 666)   */
+    int predl = rec[3947] & 0x7F;                  /* REVERB PRE DELAY (idx 1323) */
     if (type < 0) type = 0; else if (type > 5) type = 5;   /* defensive 0..5 clamp */
+    if (predl > 100) predl = 100;                  /* param range 0..100 (host clamp) */
 
     /* LEVEL (idx 795) */
     put_bits(state, 10759408, REVLVL_LUT[level & 0xFF]);
@@ -228,10 +251,15 @@ void juno_apply_reverb(unsigned char *state, const unsigned char *rec)
     put_bits(state, 10759776, LP23[type][time]);   put_bits(state, 10759824, LP23[type][time]);
 
     /* TYPE-dependent tap-index table (idx 876; always rewritten so switching from a
-     * type-0/1 patch back to a default-type patch restores the default taps). */
+     * type-0/1 patch back to a default-type patch restores the default taps), shifted
+     * by REVERB PRE DELAY (idx 1323; the plugin's own PRE DELAY setter moves the same
+     * 33 taps + the master predelay cell 10759360). Identity at the default byte 20:
+     * shift 0, taps == pre-W1 baseline, 10759360 == 880/958/1762/1918 (== the value
+     * delay_recall.c already writes for the DELAY-TYPE-5 slot-1 reverb). */
     {
         int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
-        juno_write_reverb_taps(state, type, Hr);
+        juno_write_reverb_taps_pd(state, type, Hr, predl);
+        JF(state, 10759360) = (float)juno_reverb_predelay(predl, Hr);
     }
 
     /* Fine-FX filter/gain params (LOW/HIGH CUT / DENSITY / DIRECT LEVEL) — the

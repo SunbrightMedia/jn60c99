@@ -24,15 +24,19 @@
 #include "../../src/juno_engine.h"
 #include "../../src/finefx_recall.h"
 #include "../../src/delay_recall.h"
+#include "../../src/reverb_recall.h"
 
 /* leaf -> (record offset, int1x7? , applier selector) */
 typedef struct { int leaf, roff, raw, fam; } LeafSpec;
 /* fam: 0=delay_finefx, 1=delay(direct, via juno_apply_delay), 2=chorus_finefx,
- *      3=reverb_finefx, 4=delay_finefx_2nd (DELAY TYPE 1 second instance) */
+ *      3=reverb_finefx, 4=delay_finefx_2nd (DELAY TYPE 1 second instance),
+ *      5=delay_finefx_slot1rev, 6=chorus_finefx_slot1rev,
+ *      7=reverb PRE DELAY (juno_write_reverb_taps_pd; ctx RT0/RT1/RT2 -> TYPE 0/1/2) */
 static const LeafSpec SPECS[] = {
     {1180, 3059, 1, 0}, {1181, 3060, 0, 1}, {1182, 3068, 0, 0}, {1183, 3076, 0, 0},
     {1184, 3084, 0, 0}, {1185, 3092, 0, 0},
     {1210, 3286, 1, 2}, {1211, 3287, 1, 2}, {1212, 3288, 1, 2},
+    {1323, 3947, 1, 7},
     {1324, 3948, 1, 3}, {1325, 3949, 1, 3}, {1326, 3950, 1, 3}, {1327, 3951, 0, 3},
 };
 
@@ -98,10 +102,17 @@ int main(int argc, char **argv)
             case 4: juno_apply_delay_finefx_2nd(st, rec, rate); break;      /* DT1 2nd inst  */
             case 5: juno_apply_delay_finefx_slot1rev(st, rec, rate); break; /* DT5 dly filt  */
             case 6: juno_apply_chorus_finefx_slot1rev(st, rec, rate); break;/* DT5 cho filt  */
+            case 7: {                                                       /* REVERB PRE DELAY */
+                int t = (strcmp(ctx, "RT1") == 0) ? 1 : (strcmp(ctx, "RT2") == 0) ? 2 : 0;
+                int pd = v & 0x7F; if (pd > 100) pd = 100;   /* mirror juno_apply_reverb */
+                juno_write_reverb_taps_pd(st, t, rate, pd);
+                JF(st, 10759360) = (float)juno_reverb_predelay(pd, rate);
+                break;
+            }
         }
         printf("%d", v);
         for (int i = 0; i < ncells; i++) {
-            unsigned int b; float f = JF(st, cells[i]); memcpy(&b, &f, 4);
+            unsigned int b; memcpy(&b, st + cells[i], 4);   /* raw 32-bit word (int taps + float) */
             printf(" %08x", b);
         }
         printf("\n");

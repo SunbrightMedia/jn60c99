@@ -352,16 +352,27 @@ Prove context-independence or wire the missing arms:
 Acceptance: finefx_pillar3_gate covers every (context, leaf) pair, 0 mismatch;
 render A/B 57/57 at 48k+44.1k+88.2k; ledger/provenance untouched or extended.
 
-### W1 — REVERB PRE DELAY (1323): the most tractable real GAP
+### W1 — REVERB PRE DELAY (1323): DONE (2026-07-22)
 
-Joint law: value byte (0..100, int1x7 at record 3947) x REVERB TYPE → the
-34-cell tap array at 11022208+ (plus 10759872 companions). Derive by executing
-the plugin's own setter per (TYPE, byte) under Unicorn (dispatch+snap, 4 rates
-if rate-armed); REQUIRED cross-check: at byte 20 (default) the output must
-equal juno_write_reverb_taps' current values for every TYPE — identity at the
-default, exactly like every prior fine-FX. Wire into reverb_recall.c, extend
-the render-A/B oracle leaf set + the Pillar-3 gate (joint dimension), add a
-test + PROVENANCE row. Flips ledger row 1323 GAP→APPLIED.
+Executed law (tools/verify/reverb_predelay_derive.py, covenant-clean, dispatch
+idx 1323 + snap — NB idx 876 is REVERB TYPE, 877 is TIME; the first cut wrongly
+forced 877 and was caught + re-run): PRE DELAY shifts the whole reverb tap array
+(33 ints 11022212..11022340) uniformly by predelay(byte)-predelay(20), and
+writes the master predelay cell 10759360 = (float)predelay, with
+predelay = max((byte*Hr)/1000 - 2, 0). Proven exact over EVERY byte x 4 rates x
+3 REVERB TYPE classes (uniform shift + byte-20 == RTAP44/RTAP96 baseline for all
+classes; scratchpad/w1_fit.py 1536 comparisons, 0 mismatch). Wired into
+src/reverb_recall.c (juno_reverb_predelay + juno_write_reverb_taps_pd; identity
+at default byte 20 → pre-W1 taps unchanged, so zero factory regression — all 64
+factory patches are PRE DELAY 20). Extended: finefx_port_dump fam 7 +
+finefx_cellsweep RT0/RT1/RT2 (TYPE-class contexts) + finefx_pillar3_gate
+(RAW/PMAX/NAME 1323) — PILLAR-3 PROVEN 192512 comparisons, 0 mismatch;
+recall_render_ab REVERB_FINEFX_LEAVES now dispatches 1323 (identity at factory
+default). test_reverb_recall PRE DELAY cases added. Bonus: proved reverb fine-FX
+1324-1327 TYPE-independent (revfinefx_typedep_probe.py) — W0's TIME-forced proof
+had no TYPE hole. COVERAGE 1323 GAP→APPLIED; PROVENANCE row 25 updated.
+
+### W2 — EFFECT TYPE 2/3/4 secondary cells (873) + #122 interactions
 
 ### W2 — EFFECT TYPE 2/3/4 secondary cells (873) + #122 interactions
 

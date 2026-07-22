@@ -19,7 +19,11 @@ import numpy as np, e2e_emu as E
 
 SP = '/home/user/jn60c99/scratchpad'
 SZ = 0xA83010; NW = SZ // 4
-ET, DT, RT = 873, 875, 877
+# ET/DT/RT = the FX TYPE selectors (EFFECT/DELAY/REVERB TYPE). RT = 876 = REVERB TYPE
+# (moves the reverb tap array -> the PRE DELAY baseline; verified idx 876 not 877,
+# which is REVERB TIME). The reverb fine-FX leaves 1324-1327 are proven both TYPE- and
+# TIME-independent, so RT0/RT5 (now TYPE 0 vs 5) prove their independence just as well.
+ET, DT, RT = 873, 875, 876
 NOTE, VEL = 60, 105
 fac = E.bank_bytes(); std = E.load_leaves()
 
@@ -54,13 +58,20 @@ def build(base, dtype=None, rtype=None):
 # -- both with the same laws as DT0 / DT2 (proven, dt5_derive.py). _dt5p = a factory
 # DELAY-TYPE-5 patch (reverb active natively).
 _dt5p = next(i for i in range(64) if E.dec(E.patch_blob(fac, i), 634) == 5)
+# REVERB PRE DELAY (1323, W1) is a joint (byte x REVERB TYPE) shift of the reverb
+# tap array (34 ints at 11022208) + the master predelay cell 10759360. The tap
+# baseline is TYPE-class dependent (0, 1, 2..5-share), so pin all three classes with
+# RT0/RT1/RT2. The reverb fine-FX filter leaves (1324-1327) are TYPE-independent
+# (RT0==RT5, proven) so they stay in RT0/RT5 only.
 CONTEXTS = {
     'DT0': ([1180, 1181, 1182, 1183, 1184, 1185], 2, 0, None),
     'DT1': ([1180, 1181, 1182, 1183, 1184, 1185], _dt1p, 1, None),
     'DT5': ([1180, 1181, 1182, 1183, 1184, 1185, 1210, 1211, 1212], _dt5p, 5, None),
     'DT2': ([1210, 1211, 1212], 0, 2, None),
     'DT3': ([1210, 1211, 1212], 0, 3, None),
-    'RT0': ([1324, 1325, 1326, 1327], _revp, None, 0),
+    'RT0': ([1324, 1325, 1326, 1327, 1323], _revp, None, 0),
+    'RT1': ([1323], _revp, None, 1),
+    'RT2': ([1323], _revp, None, 2),
     'RT5': ([1324, 1325, 1326, 1327], _revp, None, 5),
 }
 

@@ -16,6 +16,17 @@ void juno_apply_reverb(unsigned char *state, const unsigned char *rec);
 /* Write the 34-int reverb tap-index table (11022208..11022340) for REVERB TYPE
  * `type` (0, 1, or default 2..5) at host rate Hr. The plugin's own REVERB TYPE
  * dispatch output, verbatim (see reverb_recall.c). Used by juno_apply_reverb per
- * patch and by juno_engine_prepare to seed the build default (type 2). */
+ * patch and by juno_engine_prepare to seed the build default (type 2). This is the
+ * PRE-DELAY-default (byte 20) form; equivalent to juno_write_reverb_taps_pd(...,20). */
 void juno_write_reverb_taps(unsigned char *state, int type, int Hr);
+
+/* REVERB PRE DELAY (idx 1323, record byte 3947, int1x7, range 0..100). The plugin's
+ * PRE DELAY setter shifts the whole reverb tap array uniformly by the pre-delay in
+ * samples. Closed form (executed, W1: tools/verify/reverb_predelay_derive.py, exact
+ * over every byte x 4 rates x 3 TYPE classes): predelay = max((pd_byte*Hr)/1000-2, 0).
+ * juno_write_reverb_taps_pd writes the taps with the pre-delay shift (identity at
+ * byte 20 == juno_write_reverb_taps); the master reverb predelay cell 10759360 is
+ * (float)predelay, written by juno_apply_reverb. */
+int  juno_reverb_predelay(int pd_byte, int Hr);
+void juno_write_reverb_taps_pd(unsigned char *state, int type, int Hr, int pd_byte);
 #endif

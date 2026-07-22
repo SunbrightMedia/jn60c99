@@ -29,6 +29,7 @@ DUMP = os.path.join(HERE, 'finefx_port_dump')
 # indexed at (byte & 0x7F); False => nibble-pair value, indexed directly).
 RAW = {1180: True, 1181: False, 1182: False, 1183: False, 1184: False, 1185: False,
        1210: True, 1211: True, 1212: True,
+       1323: True,
        1324: True, 1325: True, 1326: True, 1327: False}
 # leaf -> the plugin's OWN param-range max (from src/juno_hostparams.c). A real
 # host clamps normalized->[0,1]->plain in [0,max], so a record value v > max is
@@ -37,10 +38,12 @@ RAW = {1180: True, 1181: False, 1182: False, 1183: False, 1184: False, 1185: Fal
 # out-of-range garbage, which is state-dependent, not a pure function).
 PMAX = {1180: 14, 1181: 255, 1182: 81, 1183: 10, 1184: 81, 1185: 13,
         1210: 80, 1211: 17, 1212: 14,
+        1323: 100,
         1324: 17, 1325: 14, 1326: 10, 1327: 255}
 NAME = {1180: 'DELAY HIGH CUT', 1181: 'DELAY DIRECT LEVEL', 1182: 'DELAY LF DAMP',
         1183: 'DELAY LF DAMP FREQ', 1184: 'DELAY HF DAMP', 1185: 'DELAY HF DAMP FREQ',
         1210: 'CHORUS PRE DELAY', 1211: 'CHORUS LOW CUT', 1212: 'CHORUS HIGH CUT',
+        1323: 'REVERB PRE DELAY',
         1324: 'REVERB LOW CUT', 1325: 'REVERB HIGH CUT', 1326: 'REVERB DENSITY',
         1327: 'REVERB DIRECT LEVEL'}
 

@@ -200,7 +200,7 @@ disp	family	struct	name	status	detail
 1297	PATCH2	PAT2_MFX	MFX PARAMETER 14	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
 1298	PATCH2	PAT2_MFX	MFX PARAMETER 15	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
 1299	PATCH2	PAT2_MFX	MFX PARAMETER 16	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
-1323	PATCH2	PAT2_REV	REVERB PRE DELAY	GAP	missing_audio_cells=11022212,11022216
+1323	PATCH2	PAT2_REV	REVERB PRE DELAY	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates x 3 TYPE classes (taps 11022208-340 + predelay 10759360)
 1324	PATCH2	PAT2_REV	REVERB LOW CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
 1325	PATCH2	PAT2_REV	REVERB HIGH CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
 1326	PATCH2	PAT2_REV	REVERB DENSITY	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates

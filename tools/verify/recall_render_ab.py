@@ -98,8 +98,13 @@ DELAY_FILT_LEAVES = [(1180, 3059, True),   # DELAY HIGH CUT    -> 102368..102496
 # REVERB fine-FX leaves (#116) — same blind spot as DELAY: dispatchable via 0x3B9A30,
 # absent from the recall enumerator, the port applies them (finefx_recall.c
 # juno_apply_reverb_finefx). Unconditional (the master always runs the reverb tank).
-# (disp, record byte, raw=int1x7). REVERB PRE DELAY (1323) excluded (joint TYPE x tap).
-REVERB_FINEFX_LEAVES = [(1324, 3948, True),   # REVERB LOW CUT   -> 10759520/536/552
+# (disp, record byte, raw=int1x7). REVERB PRE DELAY (1323, W1) shifts the reverb tap
+# array (34 ints at 11022208) + master predelay cell 10759360 -- port applies it in
+# juno_apply_reverb (juno_write_reverb_taps_pd). Factory bank is all PRE DELAY 20
+# (default), so dispatching it here is identity (no render change); it closes the
+# blind spot so the oracle can't leave PRE DELAY unapplied.
+REVERB_FINEFX_LEAVES = [(1323, 3947, True),   # REVERB PRE DELAY -> taps + 10759360
+                        (1324, 3948, True),   # REVERB LOW CUT   -> 10759520/536/552
                         (1325, 3949, True),   # REVERB HIGH CUT  -> 10759568..632
                         (1326, 3950, True),   # REVERB DENSITY   -> 10759392
                         (1327, 3951, False)]  # REVERB DIRECT LV -> 10759424

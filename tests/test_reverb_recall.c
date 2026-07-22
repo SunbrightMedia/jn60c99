@@ -67,6 +67,7 @@ int main(void)
      * type-dependent tap; [1] is predelay-only. Rate law: 44100 has its own integer
      * table; other rates = the 96k table + (int)(0.019995*H) - 1919. --- */
     {
+        rec[3947] = 20;   /* REVERB PRE DELAY = default 20 (identity: byte-20 taps) */
         static const struct { int Hr; int type; int tap1; int tap3; int tap33; } TT[] = {
             { 96000, 0, 1919, 3128,  8659 },   /* dispatch dumps, verbatim */
             { 96000, 1, 1919, 3620, 20141 },
@@ -94,6 +95,42 @@ int main(void)
                 ++fails;
             }
         }
+    }
+
+    /* --- REVERB PRE DELAY (idx 1323, record byte 3947, int1x7 0..100; W1): shifts the
+     * whole tap array uniformly by predelay(byte)-predelay(20), predelay =
+     * max((byte*Hr)/1000-2, 0), + writes the master predelay cell 10759360 = (float)
+     * predelay. The plugin's own PRE DELAY setter (executed, reverb_predelay_derive.py;
+     * exact over every byte x 4 rates x 3 TYPE classes). Values below are dispatch
+     * dumps, verbatim. --- */
+    {
+        static const struct {
+            int Hr; int type; int pd; int tap1; int tap3; int tap33; unsigned c360;
+        } PD[] = {
+            { 44100, 0, 100, 4409, 5485,  8037, 0x4589c000u },  /* predelay 4408    */
+            { 96000, 1,   0,    1, 1702, 18223, 0x00000000u },  /* predelay 0 (clamp)*/
+            { 48000, 2,  60, 2879, 5752, 48471, 0x4533e000u },  /* predelay 2878    */
+        };
+        int i;
+        for (i = 0; i < (int)(sizeof PD / sizeof PD[0]); ++i) {
+            memset(st, 0, JUNO_STATE_BYTES);
+            JF(st, 16) = (float)PD[i].Hr;
+            put_pair(rec, 658, PD[i].type);
+            rec[3947] = (unsigned char)PD[i].pd;
+            juno_bank_apply(st, bank, 0);
+            if (JI(st, 11022208) != 1 ||
+                JI(st, 11022208 + 4)      != PD[i].tap1 ||
+                JI(st, 11022208 + 4 * 3)  != PD[i].tap3 ||
+                JI(st, 11022208 + 4 * 33) != PD[i].tap33 ||
+                u32(st, 10759360)         != PD[i].c360) {
+                printf("  PRE DELAY T%d pd%d@%d: [1]=%d [3]=%d [33]=%d 360=%08x "
+                       "!= %d/%d/%d/%08x\n", PD[i].type, PD[i].pd, PD[i].Hr,
+                       JI(st, 11022208 + 4), JI(st, 11022208 + 12), JI(st, 11022208 + 132),
+                       u32(st, 10759360), PD[i].tap1, PD[i].tap3, PD[i].tap33, PD[i].c360);
+                ++fails;
+            }
+        }
+        rec[3947] = 20;   /* restore default for subsequent blocks */
     }
 
     /* --- reverb fine-FX (src/finefx_recall.c): LOW/HIGH CUT / DENSITY / DIRECT
