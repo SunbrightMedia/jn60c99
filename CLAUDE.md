@@ -241,6 +241,16 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   p5 +2%, p1 +1%, p0 −9%, p3 −7%, p4 −10%, p6 −21%, p2 −24%, p7 −27%), levels
   move both ways — NOT a global tilt, NOT velocity (rules out any single
   controller-global setting). Signature of PER-PATCH recalled coefficients.
+  - **RE-MEASURED 2026-07-23 (W5 diagnostic, fine-FX now live; `scratchpad/
+    bounce_relocate.py`, role 1 ONLY — nothing tuned):** centroid Δ now p0 +2%,
+    p1 +1%, p2 −22%, p3 −12%, p4 −16%, p5 +6%, p6 −15%, p7 −23% (mean |Δ| 12.6%
+    →12.0%). The DELAY HIGH-CUT fine-FX fix moved individual patches (p0 −9→+2,
+    p6 −21→−15, p7 −27→−23) but did NOT systematically close the gap. KEY: the
+    port is now BIT-EXACT vs the plugin's own recall+render (57/57 sealed) on
+    these very patches, yet still ~12% off the DAW bounce — so the residual is
+    NOT an engine-recall defect; it is host-lifecycle-pinned (#112/#124), exactly
+    the structural blind spot below. Closing it needs the wrapper lifecycle, not
+    another coefficient.
 - **STAGE 2 ROOT CAUSE — FOUND (2026-07-21), the fine-FX filter blind spot:**
   the fine delay/chorus/reverb FILTER params (HIGH CUT, LOW CUT, PRE DELAY,
   LF/HF DAMP — dispatch idx 1180/1182/1184/1210/1211/1212/1323..1326) are
