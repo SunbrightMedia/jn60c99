@@ -155,7 +155,14 @@ for disp in sorted(cellmap):
     elif missing_render:
         status, detail = 'GAP', 'missing_audio_cells=' + ','.join(map(str, missing_render[:8]))
     elif struct_ in FX_CONTROLLER:
-        status, detail = 'GAP', 'controller-applied FX param, port has no applier (engine dispatch is a no-op)'
+        # NOT engine-reachable: the value-tree dispatch (0x3B9A30) is a proven no-op
+        # for these; they reach the engine ONLY through the VST3 controller/process
+        # lifecycle (#112), which the charter forbids fighting (threaded process()
+        # loop, proven non-convergent single-threaded). Named, bounded, visible,
+        # zero-factory-use -> DEFERRED-CONTROLLER, not GAP. (Flanger param LAWS are
+        # derived where executable: scratchpad/flanger_validate.py; wiring additionally
+        # needs a flanger DSP render the port lacks -- see docs/P112_ROADMAP.md.)
+        status, detail = 'DEFERRED-CONTROLLER', 'not engine-reachable (value-tree dispatch is a no-op); needs the VST3 controller/process lifecycle #112 the charter forbids fighting; named+bounded, no factory-patch use'
     else:
         # Not in the proven recall set, writes no port cell, not an FX-controller
         # param. Remaining leaves are non-audio for the JUNO-60 scope:

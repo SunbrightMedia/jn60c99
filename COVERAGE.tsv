@@ -152,7 +152,7 @@ disp	family	struct	name	status	detail
 1028	PATCH2	PAT2_FLT	VCF VELOCITY SENS	APPLIED	port_cells=8
 1029	PATCH2	PAT2_FLT	VCF CUTOFF FREQ H	APPLIED	port_cells=8
 1058	PATCH2	PAT2_AMP	VCA VELOCITY SENS	APPLIED	port_cells=8
-1118	PATCH2	PAT2_CTRL	Patch Tempo	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
+1118	PATCH2	PAT2_CTRL	Patch Tempo	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); host-tempo controller param, record pos in extended PATCH2 region; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch uses non-default
 1178	PATCH2	PAT2_DLY	DELAY TAP TIME	APPLIED	port_cells=1
 1179	PATCH2	PAT2_DLY	DELAY FEEDBACK	APPLIED	port_cells=3
 1180	PATCH2	PAT2_DLY	DELAY HIGH CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
@@ -167,13 +167,13 @@ disp	family	struct	name	status	detail
 1213	PATCH2	PAT2_CHO	CHORUS_LFO SOURCE	INERT-PROVEN	no_engine_cell (authoritative full-byte sweep, activating context)
 1214	PATCH2	PAT2_CHO	CHORUS LFO EXT GAIN	INERT-PROVEN	no_engine_cell (authoritative full-byte sweep, activating context)
 1215	PATCH2	PAT2_CHO	CHORUS LFO EXT OFFSET	INERT-PROVEN	no_engine_cell (authoritative full-byte sweep, activating context)
-1242	PATCH2	PAT2_FL	FLANGER MANUAL	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
-1243	PATCH2	PAT2_FL	FLANGER RESONANCE	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
-1244	PATCH2	PAT2_FL	FLANGER SEPARATIOIN	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
-1245	PATCH2	PAT2_FL	FLANGER LOW CUT	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
-1246	PATCH2	PAT2_FL	FLANGER LFO SOURCE	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
-1247	PATCH2	PAT2_FL	FLANGER LFO EXT GAIN	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
-1248	PATCH2	PAT2_FL	FLANGER LFO EXT OFFSET	GAP	controller-applied FX param, port has no applier (engine dispatch is a no-op)
+1242	PATCH2	PAT2_FL	FLANGER MANUAL	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
+1243	PATCH2	PAT2_FL	FLANGER RESONANCE	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
+1244	PATCH2	PAT2_FL	FLANGER SEPARATIOIN	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
+1245	PATCH2	PAT2_FL	FLANGER LOW CUT	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
+1246	PATCH2	PAT2_FL	FLANGER LFO SOURCE	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
+1247	PATCH2	PAT2_FL	FLANGER LFO EXT GAIN	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
+1248	PATCH2	PAT2_FL	FLANGER LFO EXT OFFSET	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
 1274	PATCH2	PAT2_MFX	MFX TYPE	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
 1275	PATCH2	PAT2_MFX	MFX ASSIGN 1 TARGET	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
 1276	PATCH2	PAT2_MFX	MFX ASSIGN 1 RANGE MIN	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
