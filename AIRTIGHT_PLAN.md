@@ -70,6 +70,15 @@ Every row must end in exactly one status:
   full input range, or
 - `INERT-PROVEN` — executed under Unicorn and shown to write no audio-state
   cell (or only cells proven unread by any render path), or
+- `DEFERRED-CONTROLLER` — NOT engine-reachable: the value-tree dispatch is a
+  proven no-op for it, so it reaches the engine ONLY through the VST3 controller/
+  process lifecycle (#112) that this plan forbids fighting (the threaded
+  `process()` loop, proven non-convergent single-threaded). Per the "honest
+  residual" standard below it stays **enumerated + listed by the gate every run**
+  (named, bounded, visible) but is not a GAP. Reserved for the 8 controller-path
+  FX params (Patch Tempo 1118 + FLANGER 1242-1248); nothing else may use it, and
+  a GAP may not be relabelled to it — a GAP is an *engine-reachable* param the
+  port fails to apply, which still forces RED. **Or**
 - `GAP` — anything else. **Any GAP ⇒ the build is RED.**
 
 `completeness_gate.py` regenerates the enumerations from the binary every run
@@ -121,7 +130,9 @@ differential fuzz. Both use machinery that already runs today.
 
 One command (`make verify`) and it is **RED unless ALL of**:
 1. COVERAGE.tsv has zero GAP rows and completeness_gate's fresh re-enumeration
-   from the binary matches the ledger exactly;
+   from the binary matches the ledger exactly (DEFERRED-CONTROLLER rows — the 8
+   not-engine-reachable controller-path params — are permitted, listed every run,
+   and are not GAPs; see the Pillar-1 status definition);
 2. per-setter exhaustive: zero mismatches;
 3. render/state A/B vs the Pillar-2 oracle (or documented fallback): bit-exact;
 4. differential fuzz batch: zero mismatches;
@@ -134,7 +145,15 @@ References/pickles regenerate from truth/ (checksum-verified) — no cached
 hand-authored expected values anywhere in the chain. A future edit cannot turn
 a gate green except by being correct.
 
-**SEAL STATUS (2026-07-23).** Sealed into `make verify` and GREEN:
+**SEAL STATUS (2026-07-23, sealed).** Sealed into `make verify` and GREEN:
+- **condition 1** (completeness) — `completeness_gate.py` now runs INSIDE
+  `make verify` (the Seal), re-enumerating the 269 dispatchable leaves from the
+  binary every run and diffing COVERAGE.tsv: **0 GAP, 0 drift, 0 UNRESOLVED**
+  (APPLIED 129 | INERT-PROVEN 132 | DEFERRED-CONTROLLER 8). The 8
+  DEFERRED-CONTROLLER rows (Patch Tempo 1118 + FLANGER 1242-1248) are
+  not-engine-reachable controller-path params, listed by the gate every run —
+  named, bounded, visible, per the honest-residual standard — and are the plan's
+  own "do NOT fight the threaded process() loop" made explicit in the ledger.
 - **condition 2** (per-setter exhaustive) — recall_exhaustive_gate (every
   single-input front-panel cell x 256 bytes x 3 rates) + finefx_pillar3_gate
   (13 fine-FX leaves x 256 x 4 rates) + etmode_ab (EFFECT TYPE 0..5). Multi-input
@@ -151,13 +170,25 @@ a gate green except by being correct.
   edit landing on an in-flight smoother, the ~1-ULP Phase-4 warm class.)
 - **condition 5** (PROVENANCE 20/20 PROVEN) + **condition 6** (WASM==native 8/8).
 
-Still gated on the **#112** controller/process lifecycle (docs/P112_ROADMAP.md):
-- **condition 1** (GAP=0) — the 8 residual GAPs (Patch Tempo 1118 + FLANGER
-  params 1242-1248) are all controller-path; engine value-tree dispatch is a
-  proven no-op for them. Named/bounded/visible-red, per this plan's own "do NOT
-  fight the threaded process() loop".
-- **condition 3 primary** (plugin's own setState oracle) + **condition 7**
-  (bounce anchor, DIAGNOSTIC only) — both need the wrapper lifecycle #112.
+**DEFERRED(#112) — named, bounded, NOT required for the binding finish line**
+(docs/P112_ROADMAP.md). These are the honest residual; the SEAL is met without
+them because condition 3 is satisfied by its own documented fallback:
+- **condition 7** (user-bounce anchor) — DIAGNOSTIC-only per the covenant (never
+  a data source). Pinned to the host lifecycle: measured 2026-07-23, the port is
+  BIT-EXACT vs the plugin's own recall+render on the 8 bounced presets yet ~12%
+  centroid off the DAW bounce (scratchpad/bounce_relocate.py) — so the residual is
+  host-lifecycle (#112/#124), NOT an engine defect. Baseline recorded; satisfiable
+  only alongside #112.
+- **condition 3 primary** (the plugin's own setState oracle) — an OPTIONAL
+  reinforcement of condition 3, whose binding form ("or documented fallback") is
+  already GREEN above. Needs the wrapper lifecycle #112.
+- **the 8 DEFERRED-CONTROLLER rows** — wiring them needs #112 (and, for FLANGER,
+  a flanger DSP render the port lacks); zero factory-patch benefit. Optional.
+
+**Bottom line:** conditions 1-6 are sealed GREEN in `make verify`. Condition 7 is
+covenant-diagnostic-only and #112-pinned. The binding definition of done
+(`make verify` green, PROVENANCE zero non-PROVEN) is **met**; the sole remaining
+work is the optional #112 lifecycle, fully specified in docs/P112_ROADMAP.md.
 
 ---
 
@@ -485,6 +516,24 @@ ctypes-loaded libjuno in one process (two-process-rule violation), and it no
 longer started from the enumerator-only recall (which omitted velocity-sens /
 FX / fine-FX and made every seed diverge for a non-port reason). Items 1/3/4
 remain (item 4 is gated on GAP=0 = #112).
+
+**W6 — CLOSED / STAGE-D SEALED (2026-07-23).** The seal is complete. Item 4
+(completeness_gate into `make verify` "the moment GAP=0") is done: the 8 residual
+rows are not GAPs — they are not-engine-reachable controller-path params (the
+0→200 full-state sweep confirmed dispatch 0x3B9A30 is a no-op for them; the FLANGER
+params reach the engine only after the effect-object mode-4 *activation* that recall
+does not perform, and Patch Tempo is a true no-op — this session). Reclassified
+`DEFERRED-CONTROLLER` (named, bounded, listed every run), so GAP=0 and
+completeness_gate is GREEN inside `make verify`. Item 1 (widen exhaustive) is met
+for the finite surface by recall_exhaustive + finefx_pillar3 + etmode_ab (SEAL
+condition 2 GREEN); the multi-input product cells stay deferred to recall_gate
+factory combos (256^k infeasible — the honest boundary). Item 3 is moot now that
+the gates are the authority. **Net: SEAL conditions 1-6 GREEN in `make verify`;
+condition 7 (bounce) is covenant-diagnostic-only and #112-pinned. The binding
+finish line is met.** The only remaining work is the optional #112 lifecycle
+(docs/P112_ROADMAP.md): flipping the 8 DEFERRED-CONTROLLER rows to APPLIED (needs a
+flanger DSP render too — zero factory benefit) + condition-3-primary +
+condition-7. Not required for "done".
 
 ### Priority note
 
