@@ -107,11 +107,20 @@ the threaded process() pool — via the plugin's own effect machine code:
   LOW CUT=+0x68 (0x35F320); each also registers a slot in the coeff table via
   sub_7FF91DFB6380(&tbl, slot, val) (MANUAL slot 19 val 255-a3; RESON slot 22 val a3;
   LOWCUT slot 65 val a3).
+- VALIDATED (scratchpad/flanger_validate.py): FLANGER MANUAL's coefficient at
+  eff+137560 is a CLEAN strictly-monotonic law of a3 (a3=0 -> 0.026042 decreasing
+  smoothly to a3=255 -> 0), confirming the derivation produces real coefficients,
+  not garbage from a half-ready object. eff = master effect obj = proc[8]; the coeff
+  lands at eff+137560 / eff+137572 (two cells) + the raw a3 at FlSt+72.
 - REMAINING for a full flanger closure: sweep a3 0..255 x 4 rates for each of the 7
-  leaves, map the coefficient cells to the port master-render offsets, confirm the
-  port renders EFFECT TYPE 4 (else the params have nothing to feed), wire an applier
-  + a synthetic gate (etmode_ab pattern). Zero factory benefit (no factory patch is
-  EFFECT TYPE 4), so this is pure SEAL-1 ledger completion.
+  leaves; MAP eff+137560-relative offsets to the port's master-render cell numbering
+  (the hard part: oracle proc[8] effect-object offset -> port single-block master
+  offset); confirm the port's master_render.c actually READS those cells for
+  EFFECT TYPE 4 (it routes on JUNO_PROG_EFX but has no flanger-specific DSP today, so
+  this likely ALSO needs the flanger render ported — a much larger task than the
+  param law); then wire an applier + synthetic gate. Zero factory benefit (no factory
+  patch is EFFECT TYPE 4), so this is pure SEAL-1 ledger completion, and its true cost
+  is the flanger DSP port, not the (now-solved) param derivation.
 
 ## Honest status
 This is genuinely research-grade. The construction blocker prior attempts (#69-72/
