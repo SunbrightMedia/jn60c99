@@ -122,6 +122,24 @@ the threaded process() pool — via the plugin's own effect machine code:
   patch is EFFECT TYPE 4), so this is pure SEAL-1 ledger completion, and its true cost
   is the flanger DSP port, not the (now-solved) param derivation.
 
+## Flanger closure cost — MEASURED (2026-07-23, decisive)
+- **The port has NO flanger DSP render.** master_render.c dispatches the slot-2
+  effect on v551 (=JUNO_PROG_EFX) at src/master_render.c:2352; modes 2/3/4 share a
+  middle branch that renders the chorus/BBD block (6395xxx). The flanger coefficient
+  cells the param setters write (master offset 137560/137572, from
+  flanger_validate.py) are **never referenced anywhere in src/** (grep: 0 hits). So
+  even with the param laws fully derived, the port would render nothing different for
+  EFFECT TYPE 4 — closing the 7 flanger GAPs requires **porting the flanger DSP
+  render** (transcribing sCDSPSystem8DlyFlSt's process method from the decompile +
+  a bit-exact render gate), a chorus-scale effort with **zero factory benefit** (no
+  factory patch is EFFECT TYPE 4). The param derivation (the novel RE) is solved;
+  the remaining cost is the DSP port, not the params.
+- **Patch Tempo (1118):** dispatch 1118 -> ml=376, beyond real_recall.leaf_table's
+  8..71 / 88..135 record-byte ranges, so its value isn't at a leaf_table-mapped
+  record position — it lives in the extended PATCH2 region and is genuinely
+  controller-path (engine dispatch is a no-op, confirmed). Deriving its DSP effect
+  needs the controller/process path (same #112 host-bridge), not a quick record read.
+
 ## Honest status
 This is genuinely research-grade. The construction blocker prior attempts (#69-72/
 #112) hit is now PAST: both VST3 components construct cleanly under Unicorn
