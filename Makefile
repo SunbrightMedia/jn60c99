@@ -74,6 +74,9 @@ verify: test libjuno.so
 	echo "=== ET-MODE A/B: synthetic EFFECT TYPE 0..5 recall (port vs plugin; no factory patch reaches modes 2-5) ==="; \
 	fresh $(SCRATCH)/etmode_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/etmode_ab.py --ref || FAIL=1; \
 	python3 tools/verify/etmode_ab.py --port || FAIL=1; \
+	echo "=== DIFFERENTIAL FUZZ (SEAL 4 / Pillar-2b): random polyphonic sequences, port vs plugin, 24 seeds x 3 rates ==="; \
+	fresh $(SCRATCH)/fuzz_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/fuzz_diff.py --ref || FAIL=1; \
+	python3 tools/verify/fuzz_diff.py --port || FAIL=1; \
 	echo "=== LEDGER ==="; \
 	python3 tools/verify/provenance_check.py || FAIL=1; \
 	python3 tools/verify/completeness_scan.py || FAIL=1; \

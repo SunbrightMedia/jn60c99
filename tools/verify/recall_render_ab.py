@@ -134,8 +134,16 @@ def _finefx_leaves(blob, R):
     return dly + cho + REVERB_FINEFX_LEAVES
 
 
-def ref_render(idx, bank, leaves, E, R):
-    e = E.E2E(); e.build(SR); e.snap_all()
+def prepare_recall(idx, bank, leaves, E, R, sr):
+    """Build a plugin engine and drive its OWN complete recall for patch idx at rate
+    sr, leaving it noteless/settled (snap+clear_latch+set_ftz done). This is the
+    proven-bit-exact recall (the port's juno_gui_apply_bank reproduces it, 57/57
+    render A/B): the value-tree leaves PLUS the extended cells the enumerator omits
+    (FX feedback/direct, VCF/VCA velocity-sens, DELAY/CHORUS/REVERB fine-FX). Reused
+    by the differential fuzz (fuzz_diff.py) so its oracle starts from the SAME state
+    the port does — otherwise an omitted leaf (e.g. velocity-sens at vel<127) makes
+    every event-sequence diverge for a reason that is NOT the port."""
+    e = E.E2E(); e.build(sr); e.snap_all()
     blob = E.patch_blob(bank, idx)
     for (disp, bb) in leaves:
         R.wr_desc(e, disp, R.dec(blob, bb))
@@ -161,6 +169,11 @@ def ref_render(idx, bank, leaves, E, R):
             try: e.dispatch(u, disp, R.rd_desc(e, disp))
             except RuntimeError: pass
     e.snap_all(); e.clear_latch(); e.set_ftz()
+    return e
+
+
+def ref_render(idx, bank, leaves, E, R):
+    e = prepare_recall(idx, bank, leaves, E, R, SR)
     e.note_on(NOTE, VEL)
     return e.render(N)
 
@@ -174,7 +187,10 @@ def cmp_stream(la, ra, lb, rb):
     return n, nd, first
 
 
-if len(sys.argv) > 1 and sys.argv[1] == '--ref':
+# CLI dispatch is gated on __main__ so this module is safely importable (fuzz_diff.py
+# reuses prepare_recall); otherwise importing it would run a render here.
+_MODE = sys.argv[1] if (__name__ == '__main__' and len(sys.argv) > 1) else None
+if _MODE == '--ref':
     import e2e_emu as E
     import real_recall as R
     patches = parse_patches(sys.argv[2:])
@@ -189,7 +205,7 @@ if len(sys.argv) > 1 and sys.argv[1] == '--ref':
     print("REF: saved %d patch render streams (N=%d, note %d vel %d, SR %g)" %
           (len(out), N, NOTE, VEL, SR))
 
-elif len(sys.argv) > 1 and sys.argv[1] == '--port':
+elif _MODE == '--port':
     import ctypes
     ref = pickle.load(open(PKL, 'rb'))
     bankbytes = open(BANK, 'rb').read()
@@ -226,6 +242,6 @@ elif len(sys.argv) > 1 and sys.argv[1] == '--port':
     print("\n%d/%d BIT-EXACT%s" % (npass, npass + nfail,
           "" if not fails else "  FAIL: " + str(fails)))
     sys.exit(1 if nfail else 0)   # gate semantics: RED until every patch is bit-exact
-else:
+elif __name__ == '__main__':
     print("usage: recall_render_ab.py --ref | --port  [patches...]", file=sys.stderr)
     sys.exit(2)
