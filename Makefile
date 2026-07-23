@@ -79,6 +79,8 @@ verify: test libjuno.so
 	python3 tools/verify/fuzz_diff.py --port || FAIL=1; \
 	echo "=== PILLAR-1 completeness gate (fresh re-enumeration from binary vs COVERAGE.tsv) ==="; \
 	python3 tools/verify/completeness_gate.py || FAIL=1; \
+	echo "=== PILLAR-1 DEFERRED-CONTROLLER executed no-op lock (each deferred row proven not engine-reachable) ==="; \
+	python3 tools/verify/deferred_noop_gate.py || FAIL=1; \
 	echo "=== LEDGER ==="; \
 	python3 tools/verify/provenance_check.py || FAIL=1; \
 	python3 tools/verify/completeness_scan.py || FAIL=1; \
