@@ -49,12 +49,34 @@ ProcessData offsets the wrapper checks: +0x08 numSamples (>=1), +0x10 numOutputs
 (>=1), +0x20 outputs* (each AudioBusBuffers, [bus]=numChannels>=2, stride 0x18),
 +0x28 inputParameterChanges, +0x38 inputEvents.
 
+## Progress (executed 2026-07-23) — BOTH components construct cleanly
+The piece this roadmap flagged as "the hard, uncertain piece" is DONE for both
+components (proc_create.py / ctrl_create.py, PROVEN under Unicorn, 0 faults, no
+unhandled imports):
+- **Processor** `CVstProcessor::createInstance` = `IB+0x349CA0` → object with
+  IComponent iface vtable **rva 0x967b68** (runtime; the static 0x967A08 is the
+  class vtable). Slots: setState=12 (0x34a904), setActive=11, activateBus=10,
+  getRoutingInfo=9 (0x34a380 — NB this is getRoutingInfo, NOT process(); process
+  lives on the IAudioProcessor sub-object, reached via queryInterface).
+- **Controller** `CVstEditController::createInstance` = `IB+0x3473D0` → IEditController
+  iface vtable **rva 0x967468**. Slots: setComponentState=5 (0x347f20),
+  setState=6, getState=7, getParameterCount=8, getParameterInfo=9,
+  getParamNormalized=14, setParamNormalized=15 (0x3486f0), setComponentHandler=16.
+- **Consequence for #124/preset-load:** the processor's IComponent::setState is a
+  bare-ret no-op (bridge_vecC), so the engine does NOT get presets via setState.
+  The engine must receive them as PARAM CHANGES the controller emits on load
+  (setComponentState → the controller's param cache → param changes → the
+  processor's param-apply). Our recall enumerator fires only a subset of those
+  params; the COMPLEMENT (controller-path-only params) is exactly where the ~12%
+  bounce residual lives (bounce_relocate.py, 2026-07-23). So the setState oracle
+  and #124 are the SAME investigation: enumerate the controller's full param set
+  on preset-load and apply it via the processor, then diff engine state vs recall.
+
 ## Build spec (the remaining work = task #112)
-1. Construct the VST3 processor component: `CVstProcessor::createInstance` =
-   `IB+0x349CA0` (its IComponent primary vtable IB+0x967A08; setState slot 12 is a
-   bare ret). e.build() constructs the ENGINE (CWaveGen 0x3C68D0), not this wrapper —
-   so the wrapper "this" must be constructed/obtained (the hard, uncertain piece:
-   COM factory + IHostApplication context).
+1. Construct the VST3 components — DONE (above). Remaining: wire IHostApplication /
+   a minimal component-handler so setComponentState + the controller→processor param
+   relay run (the controller populates a param cache; bridging it to the processor's
+   engine is the next milestone).
 2. Fabricate 3 COM objects in Unicorn memory (vtables -> small x86 stubs, like
    e2e_emu.build_voice_stub): IParamValueQueue (getParameterId->flangerID,
    getPointCount->1, getPoint->(0,normValue)); IParameterChanges
@@ -70,8 +92,14 @@ ProcessData offsets the wrapper checks: +0x08 numSamples (>=1), +0x10 numOutputs
    path (this wrapper) is where CLAUDE.md pins the darkness residual.
 
 ## Honest status
-This is genuinely research-grade (constructing the VST3 component under Unicorn is
-the piece prior attempts, tasks #69-72/#112, did not complete). Every EARLIER piece
-in the plan — the entire engine-dispatchable coefficient surface — is proven
-bit-exact and sealed. This roadmap is what remains between "engine port complete" and
-"all 7 SEAL conditions green".
+This is genuinely research-grade. The construction blocker prior attempts (#69-72/
+#112) hit is now PAST: both VST3 components construct cleanly under Unicorn
+(2026-07-23). What remains is the HOST BRIDGE — a minimal IHostApplication +
+component-handler so the controller's preset-load param set reaches the processor's
+engine (and, for the flanger, so the mode-4 effect object gets constructed). That
+bridge is the next milestone and is where the setState oracle (SEAL #3-primary), the
+8 controller-path GAPs (SEAL #1), and the #124 residual (SEAL #7) all converge.
+Every EARLIER piece — the entire engine-dispatchable coefficient surface — is proven
+bit-exact and sealed (make verify green, incl. the differential-fuzz Pillar-2
+fallback). This roadmap is what remains between "engine port complete" and "all 7
+SEAL conditions green".
