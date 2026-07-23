@@ -419,3 +419,33 @@ Simplest fix that holds; reuse proven `juno_curve` tables and existing gates bef
 adding machinery. One reversible commit per fix; a change isn't done until its gate
 is green. Proceed autonomously on reversible work; stop only for destructive or
 scope-changing decisions.
+
+## ★ WORK ORDER — Fable 5 → Opus 4.8 (2026-07-23, SUPERSEDES ALL "OPTIONAL" LANGUAGE)
+
+**REDEFINITION OF DONE (user-binding): if the port sounds different from the
+user's DAW instance, it is NOT correct.** #112 is MANDATORY. The seal's
+conditions 1-6 remain necessary but are NOT sufficient. Bounces stay
+covenant-diagnostic (locate + completion-test only — never reference/tuning).
+
+**The known fact chain:** port == plugin's own recall+render (bit-exact 57/57)
+yet ~12-24% centroid off the DAW bounces ⇒ a REAL HOST puts the plugin in a
+DIFFERENT state than our recall dispatch does. The bug surface is exactly that
+delta. So:
+
+- **H1 — host-state differential (the whole plan).** Single-threaded, no
+  process()-loop fight: construct BOTH VST3 components under Unicorn (already
+  works: proc_create/ctrl_create), drive `setComponentState`/`setState` with the
+  real preset blob for preset N (the blob the plugin's own bank/preset path
+  produces), flush controller→processor param sync (the connect path 0x320420 /
+  queue consumer called directly, not via the pool), then FULL-STATE DIFF vs our
+  recall-driven engine state for the same preset. Every differing cell is a bug,
+  by definition.
+- **H2 — re-derive each divergent cell's law** by executing the wrapper/
+  controller code that wrote it (PROVEN standard, per-byte where param-driven);
+  wire into the port; extend recall refs + render A/B so the gate covers it.
+- **H3 — completion test:** bounce_relocate.py centroid deltas → ≈0 on all 8
+  presets (covenant role 2). Iterate H1→H3 until so. Then re-run make verify +
+  WASM rebuild + artifact republish.
+- **Guardrails:** two-process rule; no thread-pool spin (kill any run >5 min in
+  the wait loop — call consumers directly); no hand value maps; label
+  PROVEN/READ/INFERRED; one reversible commit per closed cell-family.
