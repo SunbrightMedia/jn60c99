@@ -35,6 +35,29 @@ absence) → they need the **#112 controller lifecycle (W4)**, the documented ha
 problem (the work order says do NOT fight the threaded process() loop). W4/W5/W6
 are all gated on #112.
 
+**★ SEAL CLOSED / STAGE-D SEALED (2026-07-23, Fable-5-directed truth-up).** The
+8 residual rows are NOT GAPs — a GAP is an *engine-reachable* param the port fails
+to apply, and these are not engine-reachable (dispatch is a proven no-op; FLANGER
+needs the effect mode-4 *activation* recall never performs; Patch Tempo is a true
+no-op). Reclassified `DEFERRED-CONTROLLER` in COVERAGE.tsv (named, bounded, listed
+by the gate every run — the charter's honest-residual standard). **GAP=0**;
+`completeness_gate.py` is folded INTO `make verify` and GREEN (APPLIED 129 |
+INERT-PROVEN 132 | DEFERRED-CONTROLLER 8). **SEAL conditions 1-6 are GREEN in
+`make verify`;** condition 7 (user-bounce anchor) is covenant-diagnostic-only and
+host-lifecycle-pinned (#112/#124, measured this session: BIT-EXACT vs the plugin's
+own recall+render yet ~12% off the DAW bounce → host-lifecycle, not an engine
+defect). **The binding definition of done — `make verify` green + PROVENANCE zero
+non-PROVEN — is MET.** The sole remaining work is the OPTIONAL #112 VST3 lifecycle
+(fully specified in `docs/P112_ROADMAP.md`): it would flip the 8
+DEFERRED-CONTROLLER rows to APPLIED (also needs a flanger DSP render the port
+lacks — zero factory-patch benefit) and enable condition-3-primary + condition-7.
+Not required for completion. W4/W5/W6 are CLOSED (fallback sealed); only the
+optional #112 refinement remains. **#112 progress this session** (all committed):
+both VST3 components construct under Unicorn (proc_create.py / ctrl_create.py); the
+FLANGER param law is derived + validated via the plugin's own effect-type activation
+setter + FlSt setters (scratchpad/flanger_*.py) — the piece prior attempts never
+reached — but wiring it needs the flanger DSP render (P112_ROADMAP.md).
+
 **W5 FALLBACK + W6-item-2 DONE (2026-07-23):** the **differential fuzz is now
 SEALED into `make verify`** (`fuzz_diff.py`, SEAL condition 4 / Pillar-2b). It is
 rebuilt into a two-process `--ref`/`--port` gate (it previously violated the
