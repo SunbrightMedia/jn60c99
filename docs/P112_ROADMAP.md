@@ -91,6 +91,28 @@ unhandled imports):
    proves load order/interactions. #124 (SEAL #7): the host-lifecycle note+param
    path (this wrapper) is where CLAUDE.md pins the darkness residual.
 
+## FLANGER derivation UNBLOCKED (executed 2026-07-23)
+The flanger param laws (leaves 1242-1248, EFFECT TYPE 4) are now derivable WITHOUT
+the threaded process() pool — via the plugin's own effect machine code:
+- The flanger sub-object `sCDSPSystem8DlyFlSt` (effect+7616, vtable rva 0x9c17c0) is
+  constructed for all 9 units during `build()` (FlSt ctor 0x35EAD0). Mode field is
+  effect+1480.
+- Activate flanger: call the plugin's OWN effect-type setter `sub_7FF91E0193E0`
+  (0x3B93E0) with (effect, 0, mode=4). It sets [+1480]=4 AND runs the activation
+  `sub_7FF91E018180` — 0 faults, FlSt vtable valid after (scratchpad/flanger_vtbl.py).
+- Apply a param: call the FlSt setter directly (vtable method). The VALUE is the 3rd
+  arg a3 (a2 is a flag). e.g. MANUAL = vtable+0xB8 (0x35F690): stores a3 at FlSt+72
+  and computes 2 float coefficients (scratchpad/flanger_derive4.py, a3=0→200 gave
+  0.026→0.0019 and 0.5→0.036 at per-instance cells). RESONANCE=+0x78 (0x35EE60),
+  LOW CUT=+0x68 (0x35F320); each also registers a slot in the coeff table via
+  sub_7FF91DFB6380(&tbl, slot, val) (MANUAL slot 19 val 255-a3; RESON slot 22 val a3;
+  LOWCUT slot 65 val a3).
+- REMAINING for a full flanger closure: sweep a3 0..255 x 4 rates for each of the 7
+  leaves, map the coefficient cells to the port master-render offsets, confirm the
+  port renders EFFECT TYPE 4 (else the params have nothing to feed), wire an applier
+  + a synthetic gate (etmode_ab pattern). Zero factory benefit (no factory patch is
+  EFFECT TYPE 4), so this is pure SEAL-1 ledger completion.
+
 ## Honest status
 This is genuinely research-grade. The construction blocker prior attempts (#69-72/
 #112) hit is now PAST: both VST3 components construct cleanly under Unicorn
