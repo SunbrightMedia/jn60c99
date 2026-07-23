@@ -27,13 +27,15 @@ COVERAGE 1323 GAP→APPLIED. **W2 DONE:** EFFECT TYPE modes 2/3 proven no-gap;
 mode-4 (FLANGER) structural block wired. **W3-STRUCT + GATE DONE:** the
 synthetic-ET-mode A/B gate (`etmode_ab.py`, in make verify) proves the port's
 EFFECT TYPE 0..5 recall == plugin (864 cells 0 mismatch); also fixed a real
-stale-libjuno hole (make verify now has libjuno.so as a prerequisite). **GAP 10→8;
-every engine-dispatchable gap is closed.** The 8 remaining GAPs (7 FLANGER param
-leaves 1242-1248 + Patch Tempo 1118) are ALL controller-path (engine value-tree
-0x3B9A30 is a no-op for them; confirmed by 0→200 full-state sweep + leaf-table
-absence) → they need the **#112 controller lifecycle (W4)**, the documented hard
-problem (the work order says do NOT fight the threaded process() loop). W4/W5/W6
-are all gated on #112.
+stale-libjuno hole (make verify now has libjuno.so as a prerequisite). **Every
+engine-dispatchable gap is closed → GAP=0** (see the SEAL CLOSED note directly
+below). The 8 remaining rows (7 FLANGER param leaves 1242-1248 + Patch Tempo 1118)
+are NOT GAPs but `DEFERRED-CONTROLLER`: they are controller-path only (engine
+value-tree 0x3B9A30 is a proven no-op for them — 0→200 full-state sweep +
+leaf-table absence + the executed `deferred_noop_gate.py`), so reaching them needs
+the **#112 controller lifecycle (W4)**, the documented hard problem (the work order
+says do NOT fight the threaded process() loop). #112 is OPTIONAL — the binding
+finish line is already met (SEAL note below); W4/W5/W6 are CLOSED.
 
 **★ SEAL CLOSED / STAGE-D SEALED (2026-07-23, Fable-5-directed truth-up).** The
 8 residual rows are NOT GAPs — a GAP is an *engine-reachable* param the port fails
@@ -200,8 +202,9 @@ attribution net; also audit-trails positive "captur*" comment mentions).
   read in voice/master render) and LIVE GATE 7/7 runs the full 57-patch render
   A/B at BOTH 44100 and 88200 — both BIT-EXACT 57/57 (44.1k added post-audit:
   it closed the one coverage gap, no render gate at the most common host rate).
-- **PROVENANCE.tsv is 17/17 PROVEN** — zero RECONSTRUCTED/CAPTURED/UNVERIFIED. The
-  binding finish line (`make verify` green = zero non-PROVEN rows) is met.
+- **PROVENANCE.tsv is 20/20 PROVEN** — zero RECONSTRUCTED/CAPTURED/UNVERIFIED
+  (grew from 17 with the fine-FX + REVERB PRE DELAY rows). The binding finish line
+  (`make verify` green = zero non-PROVEN rows) is met.
 - **WARM (DAW-idled) parity: PROVEN for the driving tested.** Warm A/B = build →
   72000 idle samples → recall → note → 24000 render, BIT-EXACT (chillwave patch 3
   "BS Solid", the user-reported case; scratchpad warm_ab_p3.py). Root causes (both

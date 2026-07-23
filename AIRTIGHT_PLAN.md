@@ -537,7 +537,9 @@ condition-7. Not required for "done".
 
 ### Priority note
 
-W0 protects work already shipped — do it first and do not skip it because the
-gate "is already green"; the gate is green over the contexts it saw. W1-W4
-drive GAP 10→0 (Pillar 1 truly complete). W5 is the highest-USER-value item
+**(SUPERSEDED 2026-07-23 — see "W6 — CLOSED / STAGE-D SEALED" above: W0-W4 are
+done, GAP=0, and W5's fallback is sealed. This original ordering guidance is kept
+for history.)** W0 protects work already shipped — do it first and do not skip it
+because the gate "is already green"; the gate is green over the contexts it saw.
+W1-W4 drive GAP 10→0 (Pillar 1 truly complete). W5 is the highest-USER-value item
 (#124 is the standing ear report); if W2/W3 stall, jump to W5 and return.
