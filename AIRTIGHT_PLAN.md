@@ -134,6 +134,31 @@ References/pickles regenerate from truth/ (checksum-verified) — no cached
 hand-authored expected values anywhere in the chain. A future edit cannot turn
 a gate green except by being correct.
 
+**SEAL STATUS (2026-07-23).** Sealed into `make verify` and GREEN:
+- **condition 2** (per-setter exhaustive) — recall_exhaustive_gate (every
+  single-input front-panel cell x 256 bytes x 3 rates) + finefx_pillar3_gate
+  (13 fine-FX leaves x 256 x 4 rates) + etmode_ab (EFFECT TYPE 0..5). Multi-input
+  cells deferred to recall_gate factory combos + formula tests (256^k infeasible).
+- **condition 3 fallback** — render/state A/B: recall_render_ab 57/57 @48k/44.1k/
+  88.2k + recall_gate (the plugin's OWN recall dispatch ORDER, 64 patches x 67
+  cells, = the multi-writer ordering check) + the 7-patch arp gates.
+- **condition 4** (differential fuzz) — `fuzz_diff.py`, now a two-process
+  --ref/--port gate: 24 seeds x 3 rates over RANDOM polyphonic sequences
+  (8-voice alloc+steal, note lifecycle, release tails, per-patch FX, block-
+  boundary renders), ~500k samples, **0 diverged**. Proves the synthesis whole
+  is equal — the Pillar-2(b) fallback. (Live param-edits scoped out: their
+  per-byte value laws are proven by conditions 2; the only residual is a live
+  edit landing on an in-flight smoother, the ~1-ULP Phase-4 warm class.)
+- **condition 5** (PROVENANCE 20/20 PROVEN) + **condition 6** (WASM==native 8/8).
+
+Still gated on the **#112** controller/process lifecycle (docs/P112_ROADMAP.md):
+- **condition 1** (GAP=0) — the 8 residual GAPs (Patch Tempo 1118 + FLANGER
+  params 1242-1248) are all controller-path; engine value-tree dispatch is a
+  proven no-op for them. Named/bounded/visible-red, per this plan's own "do NOT
+  fight the threaded process() loop".
+- **condition 3 primary** (plugin's own setState oracle) + **condition 7**
+  (bounce anchor, DIAGNOSTIC only) — both need the wrapper lifecycle #112.
+
 ---
 
 ## Standard of proof — stated honestly, once
@@ -433,6 +458,16 @@ locator (covenant role 1 ONLY) to re-measure the #124 residual now that the
 fine-FX are live — report the new per-patch centroid deltas; do not tune
 anything from them.
 
+**W5 FALLBACK — DELIVERED (2026-07-23).** The primary (setState oracle) needs
+#112. The documented fallback is now SEALED into `make verify`:
+(a) multi-writer ordering = recall_gate executes the plugin's OWN recall
+dispatch order over all 64 patches and the port matches bit-exact (67 cells);
+(b) differential fuzz = `fuzz_diff.py` (rebuilt two-process, 24 seeds x 3 rates,
+0 diverged) proves the synthesis whole equal over random polyphony. The Pillar-2
+guarantee explicitly does NOT rest on the primary; the fallback composite meets
+condition 3's fallback + condition 4. The setState primary + bounce re-locate
+remain #112 work.
+
 ### W6 — Stage C/D seal
 
 1. Widen the per-setter exhaustive to the full APPLIED ledger (the machinery:
@@ -441,6 +476,15 @@ anything from them.
    claims conditional on their gate references existing (no assertion without
    its gate), 4. wire completeness_gate.py into `make verify` the moment GAP=0
    so any future ledger drift is RED. Done = the SEAL section's 7 conditions.
+
+**W6 item 2 — DONE (2026-07-23).** The Phase-3 fuzzer (`fuzz_diff.py`) is
+repointed at the proven-complete recall oracle (recall_render_ab.prepare_recall,
+the recall the port reproduces bit-exact) and sealed into `make verify` as a
+two-process --ref/--port gate — it no longer built a Unicorn E2E instance and
+ctypes-loaded libjuno in one process (two-process-rule violation), and it no
+longer started from the enumerator-only recall (which omitted velocity-sens /
+FX / fine-FX and made every seed diverge for a non-port reason). Items 1/3/4
+remain (item 4 is gated on GAP=0 = #112).
 
 ### Priority note
 

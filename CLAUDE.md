@@ -35,6 +35,25 @@ absence) → they need the **#112 controller lifecycle (W4)**, the documented ha
 problem (the work order says do NOT fight the threaded process() loop). W4/W5/W6
 are all gated on #112.
 
+**W5 FALLBACK + W6-item-2 DONE (2026-07-23):** the **differential fuzz is now
+SEALED into `make verify`** (`fuzz_diff.py`, SEAL condition 4 / Pillar-2b). It is
+rebuilt into a two-process `--ref`/`--port` gate (it previously violated the
+two-process rule by building a Unicorn E2E instance AND ctypes-loading libjuno in
+one process) that drives seeded RANDOM polyphonic sequences into both the plugin
+(Unicorn) and the port: **24 seeds × 3 rates × 20 patches, ~500k samples, 0
+diverged** — the synthesis whole (8-voice alloc+steal, note lifecycle, release
+tails, per-patch FX, block-boundary renders) is bit-exact over random sequences,
+a surface no other gate exercises. Two harness fixes it forced: the oracle now
+starts from the proven-complete recall (`recall_render_ab.prepare_recall`, factored
+out; the old enumerator-only recall omitted velocity-sens/FX/fine-FX so every seed
+diverged for a non-port reason), and arp patches are drawn out (their tempo-sync
+stepping has dedicated gates). Scope: live param-edits are excluded — a fresh edit
+of every param at every byte is bit-exact and the per-byte value laws are proven by
+recall_exhaustive + finefx_pillar3; the only residual is a live edit landing on an
+in-flight smoother (the documented ~1-ULP Phase-4 warm class), not a value defect
+(`scratchpad/param_probe_*`). This completes the Pillar-2 fallback; the setState
+primary (W5) + GAP=0 (W6-item-4) + bounce anchor stay #112-gated.
+
 ## The one rule everything else serves
 
 **The original `.vst3` is the ONLY ground truth.** The port must be SELF-PROVING:
