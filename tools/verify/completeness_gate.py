@@ -63,6 +63,20 @@ gaps = {d: s for d, s in have.items() if s == 'GAP'}
 # the gate RED. A real GAP (an engine-reachable param the port fails to apply) still
 # fails the gate.
 deferred = {d: s for d, s in have.items() if s == 'DEFERRED-CONTROLLER'}
+# ANTI-GAMING LOCK: DEFERRED-CONTROLLER is un-gameable because this frozen set is the
+# ONLY thing that may ever carry it. It is the fixed, binary-confirmed set of leaves
+# whose value-tree dispatch (0x3B9A30) is a proven no-op (0->200 full-state sweep,
+# CLAUDE.md) — Patch Tempo 1118 + the 7 FLANGER params 1242-1248. Any OTHER disp
+# marked DEFERRED-CONTROLLER means someone tried to excuse an engine-reachable GAP
+# by relabelling it -> RED. (A row here that becomes APPLIED later, via #112, is fine
+# — this is a ceiling, not a floor.) Changing this set requires editing gate code in
+# the open, not a silent ledger relabel.
+DEFERRED_CONTROLLER_ALLOWED = frozenset({1118, 1242, 1243, 1244, 1245, 1246, 1247, 1248})
+illegal_deferred = sorted(set(deferred) - DEFERRED_CONTROLLER_ALLOWED)
+if illegal_deferred:
+    red.append("ILLEGAL DEFERRED-CONTROLLER (a GAP cannot be hidden by relabelling): "
+               "%d disp not in the frozen not-engine-reachable allowlist -> %s"
+               % (len(illegal_deferred), illegal_deferred))
 if bad:
     red.append("UNRESOLVED/SILENT rows (ledger not complete): %d -> %s"
                % (len(bad), sorted(bad)[:12]))
