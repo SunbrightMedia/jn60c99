@@ -152,3 +152,32 @@ Every EARLIER piece — the entire engine-dispatchable coefficient surface — i
 bit-exact and sealed (make verify green, incl. the differential-fuzz Pillar-2
 fallback). This roadmap is what remains between "engine port complete" and "all 7
 SEAL conditions green".
+
+## #124 RESIDUAL — PRECISELY LOCALIZED (2026-07-23, Opus 4.8, executed)
+The DAW-bounce brightness residual is the **velocity → VCF/VCA modulation path**, and it
+is wrapper-lifecycle-gated (confirming H1's thesis). Chain PROVEN by execution:
+- voice_render.c:1194-1196 adds to the cutoff:  `(JF(7440)+JF(7248)) * JF(7504) * JF(7424)`.
+  7248 := 6896 each sample (voice_render:1186). So the velocity term =
+  `(7440 + 6896) * 7504 * 7424`.
+- Init defaults (both plugin + port, cold-state A/B exact): 7504 = 8.0 (0x3990C0 voice
+  init), 7440 = -0.5039. These are RIGHT.
+- 7424 = VCF VELOCITY SENS, recall idx 1028 -> byte/255 (PROVEN all bytes x rates,
+  derive_velsens.py). recall_render_ab already applies it as an EXTRA_LEAF but the port
+  drops it — and it is INERT anyway because:
+- **6896 = 0 after note_on(60,105) for ALL patches in the oracle (= plugin under our
+  harness).** 6896 is the velocity INPUT to the filter mod (smoothed toward a target
+  v205 via 6928). Our engine note_on writes 6864 = curve56(vel) but NEVER feeds 6896's
+  target -> 6896 stays 0 -> the whole velocity term is 0 -> the plugin, driven by our
+  harness, is VELOCITY-FLAT. That is why render A/B (port vs harness-driven plugin) is
+  bit-exact while both differ from the DAW (wrapper-driven, vel 100).
+- CONCLUSION: the residual is NOT recall (7424 is inert without 6896) and NOT the engine
+  render (bit-exact vs the plugin). It is the **wrapper note-on lifecycle**: the real
+  host's event->MIDI->engine path populates 6896's velocity target (and the descriptor
+  for 1028 -> 7424), activating velocity->cutoff/amp brightening. Our harness engine
+  note_on does not. Closing it = deriving how the wrapper note path sets 6896's target
+  from MIDI velocity (find the setter of v205/6896-target; execute it; add to
+  juno_note.c) — covenant-clean IF done by executing that specific setter, NOT by
+  spinning the process() thread pool. This is the concrete, bounded remainder of #112
+  for audible DAW parity. Suspects to trace: the AmpVoice/FltVoice note-trigger path
+  (sub_7FF91DFB9F30 is only the velocity->coeff-table register; the 6896 target is set
+  by the voice note-on/trigger, rva near 0x3990C0's caller).
