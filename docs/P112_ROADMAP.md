@@ -181,3 +181,27 @@ is wrapper-lifecycle-gated (confirming H1's thesis). Chain PROVEN by execution:
   for audible DAW parity. Suspects to trace: the AmpVoice/FltVoice note-trigger path
   (sub_7FF91DFB9F30 is only the velocity->coeff-table register; the 6896 target is set
   by the voice note-on/trigger, rva near 0x3990C0's caller).
+
+## CORRECTION + SPECTRAL FINDING (2026-07-23 later, Opus 4.8) — velocity-mod note RETRACTED
+The "velocity-mod path is inactive in the port (6896=0, velocity-flat)" claim above is
+**WRONG** — it was a wrong-VOICE measurement (read voice 0; the mono test note allocates
+to voice 7). Re-measured with a correct per-voice reader (st + v*10512 + off, base 0 —
+NOT +176; a temp juno_dbg_cell, since reverted): on the PLAYING voice the port has
+6864=0.787, 6896=0.787, 7424=0.4118 (=VCF vel-sens 105/255, APPLIED), 9600 = VCA vel-sens
+byte/255 (patch2 0.349, patch7 0.345, APPLIED), 7440=-0.504, 7504=8.0 -> the velocity
+term (7440+6896)*7504*7424 ≈ 0.93 is LIVE. **The port DOES apply VCF+VCA velocity
+sensitivity and velocity->cutoff modulation, bit-exact to the plugin (render A/B).** The
+whole "dropped vel-sens" lead was a measurement artifact; the port is faithful here.
+- SPECTRAL A/B (scratchpad/spectral_ab.py, port render vs diag bounce, steady window,
+  covenant role-1 diagnostic ONLY): for the "dark" patches the port MATCHES the DAW in
+  the dominant low bands (patch7 low 76%|73%, lomid 16%|16%); the entire centroid gap is
+  in tiny HF bands (patch7 mid 1.0|2.3, himid 0.1|0.5, hi 0.0|0.2, air 0.0|0.4 %). A
+  262 Hz bell has no musical signal at 8-20 kHz, so the DAW's HF is host-chain
+  artifact (dither / internal resample / summing), not a filter/coeff error — yet it
+  pulls the energy-weighted centroid up (the "-23%"). Patch 0 shows a sub/low balance
+  diff (16|6 sub, 28|48 low) but its centroid already matches (+1.6%).
+- BOTTOM LINE (executed): the ENGINE is faithful to the plugin including velocity; the
+  #124 bounce residual is dominated by the DAW render chain (resampling/dither/summing/
+  onset-window alignment), which is NOT an engine coefficient the covenant lets us fit.
+  A true engine fix would require the wrapper lifecycle (#112) to prove the plugin is
+  driven identically — and the spectral evidence says even then the HF gap is host-side.
