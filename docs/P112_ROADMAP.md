@@ -1,3 +1,23 @@
+> ## ⚠ SUPERSEDED IN PART — read `docs/P112_FINDINGS.md` first (2026-07-24)
+> #112 was executed. Two headline claims below are **RETRACTED** as vtable-alignment
+> errors (the slot dump ran past the end of the IAudioProcessor vtable into the RTTI
+> pointer and the next vtable):
+> * "the processor's IComponent::setState is a bare-ret no-op" — false; the real
+>   `IComponent::setState` is 0x34aaa0 and is a full IBStream implementation.
+> * "process() spins in the thread-pool drain loop" — false; `process()` = 0x34A380
+>   does the whole event/parameter intake on the calling thread and never calls
+>   0x3C7400. The pool is only under the DSP render.
+>
+> Also superseded: the "Consequence for #124/preset-load" inference, which was built
+> on the setState claim. The slot table under "Progress (executed 2026-07-23)" is the
+> misaligned one — use the corrected table in `P112_FINDINGS.md` §1.
+>
+> **Still valid and unchanged:** the flanger sections (the param law derivation, the
+> effect-object/FlSt mapping) and the flanger closure-cost analysis — the port has no
+> flanger DSP render, no factory patch is EFFECT TYPE 4, and #112 re-confirmed from
+> the host side that the 8 DEFERRED-CONTROLLER rows are not engine-reachable under
+> either role.
+
 # #112 VST3-lifecycle oracle — concrete roadmap (mapped 2026-07-23)
 
 The remaining 8 COVERAGE GAPs (7 FLANGER param leaves 1242-1248 + Patch Tempo 1118)

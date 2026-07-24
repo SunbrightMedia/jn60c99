@@ -14,6 +14,7 @@
 #include "../src/juno_curve.h"
 #include "../src/juno_note.h"
 #include "../src/delay_recall.h"
+#include "../src/juno_mod.h"
 #include "../src/carp.h"
 #include <stdlib.h>
 #include <string.h>
@@ -338,6 +339,56 @@ float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
                              c->host_bpm);
     }
     return w;
+}
+
+/* --- LIVE MODULATION layer (#112) ------------------------------------------
+ * The plugin's value tree carries six dispatch indices (312..317) that a patch
+ * RECALL never applies — they are no-ops in the recall role — but that a real VST3
+ * host's parameter changes DO drive: each lays a signed percentage offset over a
+ * front-panel parameter's recalled base byte and re-drives that parameter.
+ *
+ * This is the ONE place where the plugin's host-driven parameter path differs from
+ * its recall path; every other recalled index behaves identically under both roles
+ * (tools/verify/hostpath_roles.py re-derives that from the binary every run). The
+ * offset law in juno_mod_byte() is proven bit-exact against the plugin's own
+ * modulation setters — 308736 comparisons over every base byte 0..255 x every
+ * offset -100..100 x all six slots, 0 mismatch (tools/verify/hostmod_gate.py).
+ *
+ * The caller supplies the base byte (the loaded patch's value for that parameter,
+ * which is what the plugin's own base cache holds) so no hidden state is
+ * introduced: modulation is applied on top of the patch, never accumulated.
+ *
+ * SCOPE, stated plainly: the offset LAW is proven for all six slots, but only five
+ * are wired end-to-end here. Slot 5 (EFFECT DEPTH) has no row in juno_apply.c's
+ * BINDINGS table — it is an FX leaf applied by the chorus/effect recall path, not
+ * by the panel-parameter path — so juno_gui_mod_param_index(5) returns -1 and
+ * juno_gui_set_mod() on it returns 0 without touching the engine. Routing slot 5
+ * needs an FX-leaf live applier; it is NOT silently approximated.
+ */
+int juno_gui_mod_count(void) { return JUNO_MOD_COUNT; }
+
+const char *juno_gui_mod_name(int slot) { return juno_mod_base_name(slot); }
+
+/* Panel-parameter index (juno_apply.c BINDINGS order) the slot modulates, -1 if
+ * the slot is out of range or the name is not exposed. */
+int juno_gui_mod_param_index(int slot)
+{
+    const char *nm = juno_mod_base_name(slot);
+    int i, n;
+    if (!nm || !*nm) return -1;
+    n = juno_param_count();
+    for (i = 0; i < n; ++i)
+        if (!strcmp(juno_param_name(i), nm)) return i;
+    return -1;
+}
+
+/* Apply modulation `off` (percent, -100..100) over `base_byte` (the patch's value
+ * for the slot's parameter). Returns the engine float written, 0 if unavailable. */
+float juno_gui_set_mod(juno_ctx *c, int slot, int base_byte, int off)
+{
+    int i = juno_gui_mod_param_index(slot);
+    if (!c || i < 0) return 0.0f;
+    return juno_gui_set_param(c, i, juno_mod_byte(base_byte, off));
 }
 
 /* Legacy slot-2 override (0 = Pan arm = effectively dry). attach_host no longer

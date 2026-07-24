@@ -79,6 +79,59 @@ in-flight smoother (the documented ~1-ULP Phase-4 warm class), not a value defec
 (`scratchpad/param_probe_*`). This completes the Pillar-2 fallback; the setState
 primary (W5) + GAP=0 (W6-item-4) + bounce anchor stay #112-gated.
 
+**★ #112 EXECUTED (2026-07-24) — the VST3 host path is now mapped, gated, and
+partly ported. Full detail in `docs/P112_FINDINGS.md`; it SUPERSEDES the mapping
+half of `docs/P112_ROADMAP.md`.** Headlines:
+- **The roadmap's VST3 vtable map was MISALIGNED** (it labelled the IAudioProcessor
+  vtable with IComponent names and ran off its end into the RTTI pointer). Resolved
+  at runtime via the object's own `queryInterface`: IComponent = class+48 (vt rva
+  0x967af0), IAudioProcessor = class+272 (vt 0x967b68), `createInstance` returns the
+  IAudioProcessor pointer so class base = p-272. **RETRACTED: "IComponent::setState
+  is a bare-ret no-op"** — that read the wrong vtable; the real setState is 0x34aaa0
+  and is a full IBStream implementation (getState 0x349ea0 is its inverse).
+- **RETRACTED: "process() spins in the thread pool".** `process()` = 0x34A380 does
+  the entire event->MIDI and param->queue intake ON THE CALLING THREAD and calls the
+  queue consumer 0x320B20 directly; it never calls 0x3C7400 at all. The pool is only
+  under the DSP render, which `e2e_emu.render()` already replaces. **The param/MIDI
+  half of the host lifecycle never needed the pool.**
+- **The host param entry is the ENGINE vtable +112 = 0x3C7AE0.** It maps VST3
+  paramID -> internal index, applies per-index value transforms, range-checks against
+  the descriptor table (rva 0x98c040 + 16*idx) and dispatches
+  `0x3B9A30(proc[u], idx, flag=0, v)` on all 9 units. The plugin's OWN recall
+  enumerator 0x3B48A0 dispatches the same function with **flag=1** — which is exactly
+  what the port and every existing gate drive, so **the recall path is confirmed
+  faithful a second time, from the host side.**
+- **The flag is a ROLE selector, not ramp-vs-immediate** (0x3B9A30 forwards it to
+  each leaf setter as that setter's own 2nd argument).
+- **NEW SURFACE FOUND AND PORTED — the live MODULATION layer.** Indices 312..317 are
+  no-ops under recall and, under the host role, lay a signed percentage offset over a
+  front-panel parameter's recalled base: VCF CUTOFF (779), HPF CUTOFF (782), VCF
+  RESONANCE (781), DCO PWM DEPTH (758), PORTAMENTO (798), EFFECT DEPTH (794). Law
+  `out = base + off*(off>0 ? 255-base : base)/100` (trunc toward 0; paramDB range
+  {-100,100}). `src/juno_mod.c` + `juno_gui_set_mod`; **PROVEN exhaustively** —
+  308736 comparisons (6 slots x every base byte x every offset), 0 mismatch. Identity
+  at off==0, so no factory patch or existing gate is affected.
+- **Two new gates in `make verify`:** `hostpath_roles.py` re-derives from the binary
+  every run WHICH indices differ between the two roles and locks it to exactly those
+  six; `hostmod_gate.py` proves the port's law against the plugin's own setters.
+- **The 8 DEFERRED-CONTROLLER rows survive the host path too** (EFFECT TYPE=4 leaves
+  every effect object's mode at 0 and never calls 0x3B93E0 under either role), so the
+  seal's honest-residual accounting is unchanged.
+- **Still open (honest):** the wrapper's own engine is not constructible under
+  emulation — `IComponent::initialize` reaches the engine factory, which trips a CRT
+  invalid-parameter inside a magic-static string parse (a TEB/TLS emulation artefact);
+  neutralising that lets it continue but it faults at rva 0x284c04. The paramID->index
+  map (rva 0xCB0E18) is NULL after build/proc-create/ctrl-create, so host param IDs
+  cannot be enumerated yet. Neither blocks the above, because the wrapper's entire
+  contribution to engine state is the enumerated engine-vtable calls, all of which are
+  the plugin's own code and directly callable.
+- **METHODOLOGY WARNING (read before any new differential over this engine):** four
+  separate protocol errors each produced a large, tidy-looking set of false
+  divergences — partial state restore (proc/assign caches leak between probes),
+  dispatching without writing the descriptor DB[idx].value, probing outside the
+  index's own paramDB range, and baselining on a pristine engine instead of a
+  recalled patch. See `docs/P112_FINDINGS.md` §8.
+
 ## The one rule everything else serves
 
 **The original `.vst3` is the ONLY ground truth.** The port must be SELF-PROVING:
@@ -427,10 +480,20 @@ user's DAW instance, it is NOT correct.** #112 is MANDATORY. The seal's
 conditions 1-6 remain necessary but are NOT sufficient. Bounces stay
 covenant-diagnostic (locate + completion-test only — never reference/tuning).
 
-**The known fact chain:** port == plugin's own recall+render (bit-exact 57/57)
-yet ~12-24% centroid off the DAW bounces ⇒ a REAL HOST puts the plugin in a
-DIFFERENT state than our recall dispatch does. The bug surface is exactly that
-delta. So:
+**STATUS 2026-07-24: H1 IS ANSWERED — see the "#112 EXECUTED" block at the top.**
+The host-state differential was built and run: the host's parameter path and the
+plugin's own recall path converge on the SAME dispatch (0x3B9A30) and differ in
+exactly one place, the six-index live MODULATION family, which is the identity at
+its default and is now ported + exhaustively gated. So a real host does NOT put the
+engine's recalled coefficients in a different state than our recall dispatch does;
+the remaining candidates for #124 are the wrapper's note/velocity lifecycle and the
+DAW's own render chain (the spectral evidence below already points at the latter).
+H2/H3 below stay as written for the note-path half.
+
+**The known fact chain (as originally stated):** port == plugin's own recall+render
+(bit-exact 57/57) yet ~12-24% centroid off the DAW bounces ⇒ a REAL HOST puts the
+plugin in a DIFFERENT state than our recall dispatch does. The bug surface is exactly
+that delta. So:
 
 - **H1 — host-state differential (the whole plan).** Single-threaded, no
   process()-loop fight: construct BOTH VST3 components under Unicorn (already

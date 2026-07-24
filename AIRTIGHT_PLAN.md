@@ -543,3 +543,32 @@ for history.)** W0 protects work already shipped — do it first and do not skip
 because the gate "is already green"; the gate is green over the contexts it saw.
 W1-W4 drive GAP 10→0 (Pillar 1 truly complete). W5 is the highest-USER-value item
 (#124 is the standing ear report); if W2/W3 stall, jump to W5 and return.
+
+## WORK ORDER RESULT — #112 EXECUTED (2026-07-24, Opus 5)
+
+The mandatory-#112 work order above was executed. Its central hypothesis (H1: "a
+real host puts the plugin in a DIFFERENT state than our recall dispatch does") was
+tested directly and is **answered NO for the recalled coefficient surface**:
+
+* The host's parameter path and the plugin's own recall path converge on the SAME
+  function, `0x3B9A30`. The host entry (engine vtable +112, rva 0x3C7AE0) dispatches
+  it with flag=0; the plugin's own recall enumerator 0x3B48A0 dispatches it with
+  flag=1 — which is exactly what the port and every existing gate drive.
+* `tools/verify/hostpath_roles.py` re-derives from the binary, every run, which of
+  the plugin's own recall indices behave differently under the two roles, and locks
+  that set. It is exactly the six-index live MODULATION family (312..317), which is
+  the identity at its default offset — hence invisible to every prior gate.
+* That family is now ported (`src/juno_mod.c`) and proven exhaustively against the
+  plugin's own setters: 308736 comparisons, 0 mismatch (`hostmod_gate.py`).
+* Two roadmap claims that shaped the earlier plan were RETRACTED as vtable-alignment
+  errors: "IComponent::setState is a bare-ret no-op" and "process() spins in the
+  thread pool". Neither is true; see `docs/P112_FINDINGS.md` §1–2.
+
+Consequence for the seal: SEAL conditions 1–6 remain GREEN and now cover one more
+surface (the host role). Condition 7 (the DAW-bounce anchor) is NOT closed by this
+work — the engine's recalled state is confirmed correct from the host side, so the
+remaining #124 candidates are the wrapper NOTE/velocity lifecycle and the DAW's own
+render chain, not a recalled coefficient. What #112 could not deliver is recorded
+honestly in `docs/P112_FINDINGS.md` §7: the wrapper's own engine still does not
+construct under emulation (CRT magic-static fault in the engine factory), and the
+VST3 paramID->index map is not populated by any reachable entry point.

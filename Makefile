@@ -77,6 +77,11 @@ verify: test libjuno.so
 	echo "=== DIFFERENTIAL FUZZ (SEAL 4 / Pillar-2b): random polyphonic sequences, port vs plugin, 24 seeds x 3 rates ==="; \
 	fresh $(SCRATCH)/fuzz_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/fuzz_diff.py --ref || FAIL=1; \
 	python3 tools/verify/fuzz_diff.py --port || FAIL=1; \
+	echo "=== #112 HOST-PATH ROLES: which dispatch indices behave differently for a HOST than for RECALL ==="; \
+	python3 tools/verify/hostpath_roles.py || FAIL=1; \
+	echo "=== #112 HOST MODULATION: port juno_mod_byte vs the plugin's own modulation setters ==="; \
+	fresh $(SCRATCH)/hostmod_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/hostmod_gate.py --ref || FAIL=1; \
+	python3 tools/verify/hostmod_gate.py --port || FAIL=1; \
 	echo "=== PILLAR-1 completeness gate (fresh re-enumeration from binary vs COVERAGE.tsv) ==="; \
 	python3 tools/verify/completeness_gate.py || FAIL=1; \
 	echo "=== PILLAR-1 DEFERRED-CONTROLLER executed no-op lock (each deferred row proven not engine-reachable) ==="; \
