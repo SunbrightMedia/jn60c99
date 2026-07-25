@@ -272,3 +272,58 @@ slot 1 it is exactly the #122/#124 class. Also established: the role flag gates
 the activation's routing write (flag 1 skips it), and dispatching the full
 recall with flag=0 vs flag=1 is state-identical for BS Solid (task #132's
 value-level comparison, executed for this patch's values: no diff).
+
+---
+
+## ROUND 3 (2026-07-25, later) — RETRACTION + the real mechanism localized
+
+The user then supplied a screenshot of a **freshly-recalled factory instance** of
+BS Solid. That falsifies Round 2's conclusion ("the user's project state was
+edited") — **retracted**. The knob position is what a REAL recall produces:
+EFFECT DEPTH displaying ~60–65 % while the bank record byte is 92 (36 %).
+
+Putting the two user artifacts together with the port's own proven law:
+
+- The capture's relative chorus modulation (AM/env 0.112) lands on the port's own
+  EFFECT DEPTH law at ≈ **190–210**, not at the record's 92 (0.043).
+- The fresh-recall knob shows ~**60–65 %** ≈ 160–185. Same number, two
+  independent sources.
+- Therefore **the real plugin's preset path drives the slot-2 chorus at an
+  effective depth ≈ 2× the raw record byte** (or at a JUNO-60-model fixed deep
+  setting) — while the ENGINE-side recall enumerator (rva 0x3B48A0, the ground
+  truth for our entire recall reference) dispatches the raw byte 92. Our port
+  bit-exactly matches the engine enumerator; the REAL preset path goes through
+  the CONTROLLER, which decodes the record itself and pushes its own values.
+- READ: the host param entry 0x3C7AE0's transform table is tiny (769→v−11,
+  20/665→v−100, 22→v−12, 871→bool) — identity for 794 EFFECT DEPTH. So the
+  scaling lives in the controller's record→param decode, not the engine entry.
+- Hardware context that makes this plausible: the JUNO-60 has NO chorus depth
+  control (OFF/I/II buttons, fixed deep BBD chorus). The JUNO-60 PLUG-OUT model
+  overriding/re-scaling the JU-06A DEPTH byte is exactly the kind of
+  model-specific behavior a controller implements.
+- **Blast radius: every EFFECT TYPE 2 patch** — including all 8 factory bounce
+  presets — which makes this the strongest #124 candidate found to date
+  (bidirectional per-patch brightness/width deltas: each patch's record DEPTH
+  sits on a different side of the model's effective value).
+
+### New execution facts (PROVEN, this round)
+- `CVstEditController` (createInstance 0x3473D0) constructs with 0 faults AND
+  **`initialize` returns kResultOk** under emulation — the #133 magic-static
+  fault is PROCESSOR-only. Controller vtable mapped (setComponentState slot 5 =
+  rva 0x347f20, setParamNormalized 15 = 0x3486f0, normalizedParamToPlain 12 =
+  0x3d21e0).
+- `getParameterCount` returns 0 after initialize — the param table populates
+  from component state / model config. **Next step:** drive slot-5
+  `setComponentState` with a component-state stream (its own code), then
+  enumerate `getParameterInfo`/`getParamNormalized` and read the controller's
+  own EFFECT DEPTH for a recalled patch; alternatively trace the controller's
+  bank-record decode directly. Deriving THAT law from the binary — never from
+  the capture — is the covenant-clean fix path.
+
+### Status of the user-facing claim
+The user is right: the port audibly differs from a real factory instance on
+BS Solid. The engine is a faithful port of the engine; the CONTROLLER's
+preset-path value law for the chorus (and possibly other model-adapted params)
+is the missing layer. No number measured from the capture may be wired into the
+port; the controller derivation above is the way the real value enters the
+ledger.
