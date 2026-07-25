@@ -168,3 +168,43 @@ python3 scratchpad/moddefaults.py     # modulation defaults, from the binary
 
 All probes are diagnostic; none is wired into `make verify`, and none derives a
 constant from anything but the plugin binary.
+
+---
+
+## RESOLVED (same day, follow-up session)
+
+The concrete, user-audible cause was found one layer above everything examined
+here: **the web app shipped with the SYSTEM "Keyboard Velocity SW" OFF**, which
+forces every note to fixed velocity 100 at the wrapper layer (the plugin's own
+factory-default rule). On BS Solid, played velocity is the *only* control that
+opens the filter beyond cutoff 15 (`VCF VELOCITY SENS 157`, `VCA VELOCITY SENS
+0`), so with the switch off the app pins the centroid at 136 Hz **no matter how
+hard you play** (vel 1 and vel 127 render identically), while a
+velocity-responsive setup reaches 163 Hz / +1.6 dB noise at vel 127. §3's
+measurement ("noise audibility is a monotone function of filter opening") is the
+mechanism; the fixed-velocity gate is why the user could never reach the open
+part of that curve.
+
+Fix (commit 18d47d3): the web app now defaults Kbd Vel **ON** (the toggle still
+restores the plugin's factory fixed-100 rule in one click). Engine, WASM, and
+the wrapper policy in `juno_bridge.c` are untouched — this is a UI default, not
+a coefficient.
+
+Also settled here:
+- **Bank-wide sweep** (56 non-arp Chillwave patches, oracle vs port, 44.1 kHz):
+  **52/56 BIT-EXACT**. The 4 divergers — 24 KY Flanged, 38 LD Juno Dreams,
+  56 PL Floaty Sq (all EFFECT TYPE 3/5 + DELAY TYPE 4/5 beyond-factory combos =
+  tracked #122) and 49 PD Motion (12 samples, the known ~1-ULP class).
+- The deployed bundle was **current** (embedded WASM sha == freshly built
+  `gui/web/juno.wasm`), ruling out a stale deploy.
+- §4's setState lead stays open as #124/#133 (the ~12–23 % factory-bounce
+  centroid delta is still unexplained), with one new datum: the two bounce
+  presets that *match* the DAW (p0 +2 %, p5 +6 %) are the only two with high
+  `VCF VELOCITY SENS` (105/92); every non-arp vel-sens-0 preset is dark
+  (−12…−23 %). Whatever #124 is, it is masked or compensated on
+  velocity-sensitive patches — a usable constraint for the state diff.
+- #133 progress: the `initialize` abort is now precisely located — MSVC
+  aligned-free sanity checks inside the `GT::CIniProfile` load
+  (`BufferObject/Value` key, magic static at 0x3E4930, abort from
+  `sub_7FF91DEE45B0`'s error stubs at 0x284bec) — i.e. harness file-I/O
+  plumbing, not plugin logic.
