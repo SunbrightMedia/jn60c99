@@ -78,8 +78,8 @@
     <label title="SYSTEM 'Keyboard Velocity SW' — ON (default here): keys/MIDI use their real velocity, so patches with VCF/VCA VELOCITY SENS (e.g. BS Solid) open up when you play hard, like a velocity-enabled DAW setup. OFF: every note plays at fixed velocity 100 (the plugin's factory SYSTEM default — Roland stores this switch as a global user setting).">Kbd&nbsp;Vel
       <input type="checkbox" id="velSw" checked onchange="velSwApply()"></label>
     <label id="velLbl" title="Note-on velocity for the on-screen keys (MIDI keys use their own; VCF/VCA VELOCITY SENS respond to it)">Vel
-      <input type="range" id="vel" min="1" max="127" step="1" value="100" oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
-      <span id="velV">100</span></label>
+      <input type="range" id="vel" min="1" max="127" step="1" value="127" oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
+      <span id="velV">127</span></label>
   </div>
   <div class="row">
     <input type="text" id="filter" placeholder="filter parameters…" oninput="renderList()" style="flex:1">
