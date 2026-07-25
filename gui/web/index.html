@@ -75,10 +75,10 @@
       <input type="range" id="arpGate" min="0" max="1" step="0.05" value="0.6" oninput="arpApply()" style="vertical-align:middle">
       <span id="arpGateV">60%</span></label>
     <span style="width:12px"></span>
-    <label title="SYSTEM 'Keyboard Velocity SW' — OFF (plugin default): every note plays at fixed velocity 100, exactly like the real plugin's wrapper (and the velocity-insensitive JUNO-60). ON: keys/MIDI use their real velocity.">Kbd&nbsp;Vel
-      <input type="checkbox" id="velSw" onchange="velSwApply()"></label>
-    <label id="velLbl" title="Note-on velocity for the on-screen keys (only when Kbd Vel is ON; VCF/VCA VELOCITY SENS respond to it)" style="opacity:.45">Vel
-      <input type="range" id="vel" min="1" max="127" step="1" value="100" disabled oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
+    <label title="SYSTEM 'Keyboard Velocity SW' — ON (default here): keys/MIDI use their real velocity, so patches with VCF/VCA VELOCITY SENS (e.g. BS Solid) open up when you play hard, like a velocity-enabled DAW setup. OFF: every note plays at fixed velocity 100 (the plugin's factory SYSTEM default — Roland stores this switch as a global user setting).">Kbd&nbsp;Vel
+      <input type="checkbox" id="velSw" checked onchange="velSwApply()"></label>
+    <label id="velLbl" title="Note-on velocity for the on-screen keys (MIDI keys use their own; VCF/VCA VELOCITY SENS respond to it)">Vel
+      <input type="range" id="vel" min="1" max="127" step="1" value="100" oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
       <span id="velV">100</span></label>
   </div>
   <div class="row">
@@ -507,9 +507,11 @@ function mkKey(midi, cls, left) {
 function note(midi, on) {
   ensureAudio();
   // Notes enter through the WRAPPER-level MIDI path (juno_gui_midi_note_on),
-  // exactly like a DAW's events enter the real plugin: with the SYSTEM
-  // "Keyboard Velocity SW" OFF (the default) the engine receives velocity 100
-  // no matter what the slider says — the plugin's own rule (see juno_bridge.c).
+  // exactly like a DAW's events enter the real plugin. The SYSTEM "Keyboard
+  // Velocity SW" ships ON here so VELOCITY SENS patches are playable (with it
+  // OFF — the plugin's factory SYSTEM default, one click away — the engine
+  // receives fixed velocity 100 no matter what: the plugin's own wrapper rule,
+  // see juno_bridge.c).
   const vel = +$("#vel").value;   // 1..127; only honored when Kbd Vel SW is ON
   if (on) midiNoteOnFn(ctx, midi, vel); else midiNoteOffFn(ctx, midi);
   if (on) status(`note ${midi} · vel ${$("#velSw").checked ? vel : "100 (fixed — Kbd Vel SW off, plugin default)"} — live 8-voice master path`);
