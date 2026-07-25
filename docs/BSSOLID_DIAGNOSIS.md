@@ -208,3 +208,67 @@ Also settled here:
   (`BufferObject/Value` key, magic static at 0x3E4930, abort from
   `sub_7FF91DEE45B0`'s error stubs at 0x284bec) — i.e. harness file-I/O
   plumbing, not plugin logic.
+
+---
+
+## ROUND 2 (2026-07-25, new capture `lastcatpureEVER.wav`) — the instance-state finding
+
+User supplied a second diagnostic capture (C3, vel 100, 44.1 kHz, 0.5 s + 2 s + tail)
+plus a screenshot of their DAW instance, reporting it STILL sounds wrong. Full
+structural comparison against the port at identical driving (`scratchpad/lastcap_ab.py`
+and successors). Covenant roles only: the capture located the divergence; nothing
+from it entered the port or the ledger.
+
+### What matches (MEASURED)
+- Pitch: f0 130.0 Hz both (C3 = MIDI 60; the port is in tune).
+- Chorus LFO rate: the sustain has an amplitude modulation at **0.65–0.67 Hz in
+  both** (harmonics 1.3/1.95 Hz both), same comb geometry (autocorr lag trace
+  identical), L/R envelope correlation +0.97 both (the modulation is pre-stereo).
+- Release: both decay ~2.5–2.6 s; tails match in shape.
+- Pitch stability: 0.6 Hz FM is ~1–2 cents on both sides — the wobble is NOT pitch.
+
+### What differs (MEASURED)
+1. **Global level**: capture peak 0.728 vs port 0.233 (~2.9× peak, ~1.5–1.7×
+   envelope-mean, i.e. +4.5…+9 dB flat gain). A scalar; no timbre content.
+2. **Chorus modulation depth**: relative AM (AM/mean-env) capture **0.112** vs port
+   at the bank's EFFECT DEPTH 92 **0.043**. The port reproduces the capture's
+   relative depth at **EFFECT DEPTH ≈ 200** (0.107 @200, 0.132 @220) — its own law,
+   just a different input byte.
+3. Harmonics 6–8 (780–1040 Hz) +5–8 dB in the capture — chorus-ripple-consistent.
+
+### The screenshot corroborates it (READ)
+In the DAW screenshot the EFFECT **DEPTH knob points right-of-vertical (>128)**
+while TONE points left-of-vertical (≈71 ✓). The uploaded Chillwave bank decodes
+BS Solid EFFECT TONE=71, **DEPTH=92** — at 92 the two knobs would sit at nearly
+the same angle. They visibly do not.
+
+### Conclusion
+**The user's DAW instance is not playing the uploaded bank's BS Solid.** An
+Ableton project restores the plugin's *saved project state* (including any
+edits made after the patch was loaded), not the bank file; the web app plays
+the bank file. At minimum the instance's EFFECT DEPTH is ≈180–210 vs the bank's
+92, plus a flat +4.5–9 dB somewhere in the chain (Roland SYSTEM Output Gain /
+Boost Mode / interface gain — indistinguishable from here, timbre-neutral).
+The engine remains bit-exact against the plugin's own recall+render for this
+patch under every driving tested.
+
+**10-second verification for the user:** in Ableton, re-select BS Solid from the
+plugin's own PATCH browser (a fresh recall from the bank). The DEPTH knob should
+snap left (~10–11 o'clock) and the instance should then sound like the web app.
+Conversely, setting the web app's EFFECT DEPTH slider to ≈200 should reproduce
+the DAW instance's swirl.
+
+### Genuinely new engine finding from this dig (PROVEN, kept)
+The EFFECT-TYPE **activation** path (0x3B93E0 — the setter the flanger work
+validated) does things recall never does: with role flag 0 it writes a SECOND
+program selector at state **11022056** (owned by DELAY TYPE leaf 875; the
+master chases it at params+136, i.e. the slot-1 program) and fully configures
+the **6396xxx chorus block** (pre-delay, low/high-cut biquads, five enable
+gates — 20 cells, real coefficients). Our recall — and therefore every render
+gate's oracle — leaves all of it at zero. For BS Solid this is inaudible
+(DELAY LEVEL 0 = the slot-1 block gets no input; verified by rendering with the
+block armed: bit-identical env/AM), but for patches that route audio through
+slot 1 it is exactly the #122/#124 class. Also established: the role flag gates
+the activation's routing write (flag 1 skips it), and dispatching the full
+recall with flag=0 vs flag=1 is state-identical for BS Solid (task #132's
+value-level comparison, executed for this patch's values: no diff).
