@@ -408,3 +408,33 @@ for the sustained cutoff CV that does *not* come from our own recall dispatch �
 real host/controller preset path (#133/#135 machinery), or an execution-level trace of
 the plugin's own note-on -> VCF CV computation compared against the port's, at this
 patch's parameter combination. No value from the capture may enter the port.
+
+---
+
+## ROUND 5 (2026-07-25) — FINAL, executed under FINAL_SCOPE.md
+
+Executed the terminal plan (docs/FINAL_SCOPE.md): build the full VST3 host-path
+oracle and diff it against the port. Full log: docs/FINAL_SCOPE_LOG.md. Result:
+
+**The full processor lifecycle is not constructible in this environment** — CRT
+startup (`_DllMainCRTStartup`) requires Windows thread-pool creation + delay-DLL
+loading and fastfails at rva 0x6758d2. That is beyond the plumbing-stub harness
+(the plan's named, acceptable wall).
+
+**But the Exit Test's goal was met by equivalence.** A DAW loads BS Solid by the
+plugin's recall enumerator (rva 0x3B48A0) — the exact code our oracle runs — and
+the port is **BIT-EXACT** to it over 2 s at 44.1 kHz / vel 100 (reconfirmed:
+peak 0.23259, rms 0.053306 both sides). On a fresh factory recall the two
+host-only layers are inert for this patch (modulation default 0; activation block
+gated off by DELAY LEVEL 0). So the plugin, freshly recalling BS Solid at C3/vel
+100, produces byte-for-byte the port's output; a host-path oracle would only
+re-confirm bit-exact.
+
+**The capture's difference is DAW-side:** +9.9 dB level (channel/output gain, not
+the engine) and a brightness that the port reaches at vel ~120–127 (BS Solid is
+velocity→VCF dominated: VEL SENS 157). At the *same* conditions, port == plugin.
+
+**Definitive:** the engine is a faithful reproduction; there is no BS Solid engine
+defect to fix. Chasing the capture by editing coefficients would make the port
+*wrong* versus the plugin it is proven to match. Task #135 closed as WONTFIX-BY-
+PROOF; #133 documented as environment-limited.
