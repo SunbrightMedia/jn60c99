@@ -327,3 +327,84 @@ preset-path value law for the chorus (and possibly other model-adapted params)
 is the missing layer. No number measured from the capture may be wired into the
 port; the controller derivation above is the way the real value enters the
 ledger.
+
+---
+
+## ROUND 4 (2026-07-25, final) — measured correctly at last
+
+**Two of my own measurement errors invalidated Rounds 2 and 3. Both retracted.**
+
+1. **Round 2/3 "chorus modulation is 2.6x shallower in the port" — WRONG.** Artifact of a
+   coarse envelope + no decay detrend. Measured properly (Hilbert envelope, 2nd-order
+   log-domain detrend), the modulation spectra are near-identical: capture 1.43 Hz
+   2.22 dB / 0.72 Hz 1.78 dB, port 1.43 Hz 2.79 dB / 0.72 Hz 2.15 dB. Same rates, same
+   harmonic structure, port marginally *deeper*. **The EFFECT DEPTH / controller-scaling
+   hypothesis (task #135) has no support and is withdrawn.**
+2. **"The port is brighter than the plugin" — WRONG, and it was a window-alignment bug.**
+   The port render used for that table carried 0.5 s of pre-note silence, so the port's
+   *attack* was compared against the capture's *sustain*.
+
+### The correct measurement (both windows 0.5-1.9 s AFTER note-on)
+Median of per-window RMS-normalized spectra (immune to chorus phase), dither floor
+checked per harmonic:
+
+| harmonic | Hz | capture | port | delta |
+|---|---|---|---|---|
+| 1-5 | 130-650 | — | — | **-0.0 .. +0.3 dB (match)** |
+| 6 | 780 | -11.0 | -18.4 | **-7.5** |
+| 7 | 910 | +0.9 | -6.4 | **-7.3** |
+| 8 | 1040 | -8.5 | -26.8 | **-18.3** |
+| 10 | 1300 | -13.8 | -34.0 | **-20.2** |
+| 13 | 1690 | -12.7 | -33.3 | **-20.6** |
+
+**Harmonics 1-5 match to 0.3 dB. Above ~700 Hz the port is 7-21 dB too dark.** The user's
+original report ("not enough noise") was accurate: this band is what reads as air/noise.
+
+### It is NOT the noise source
+Forcing DCO NOISE LEVEL to 255 lifts the 975 Hz inter-harmonic floor only to -26.6 dB;
+the capture is at **-17.5 dB**. The port cannot reach the capture's broadband level at
+any noise setting. The deficit is filter-side, and it is both harmonic and broadband.
+
+### It IS the filter's sustained opening
+Sweeping the port's VCF CUTOFF with the corrected metric brackets the capture:
+
+| port variant | h7 910 Hz | h10 1300 Hz | h13 1690 Hz |
+|---|---|---|---|
+| capture (target) | **+0.9** | **-13.8** | **-12.7** |
+| port as recalled (cutoff 15) | -6.4 | -34.0 | -33.3 |
+| port cutoff 64 | +25.1 | +0.5 | -1.9 |
+
+The capture sits between the port at cutoff 15 and cutoff 64 — the real instance's
+**sustained** filter opening is equivalent to roughly cutoff byte 30-40. ENV1 SUSTAIN is
+equally sensitive (23->128 overshoots hugely), so the same deficit is expressible as the
+VCF envelope decaying too far/too fast. Attack and low harmonics agree, so the error is
+specifically in **where the VCF envelope settles during sustain**, not in the filter's
+low-frequency response, the oscillator mix, the chorus, or the noise.
+
+### Why every gate misses it, precisely
+`recall_exhaustive` proves the per-byte cutoff CELL; the render A/B proves the port's
+voice render against the plugin's own voice render **driven from those same cells**. Both
+sides therefore share any error in the *sustained CV sum* (base + ENV1xENV MOD +
+velocity x VEL SENS). BS Solid is nearly unique in stressing it: **VCF CUTOFF 15 (lowest
+byte in either bank), VCF ENV MOD 215, VCF VELOCITY SENS 157 (factory-bank median: 0)**.
+
+### Systematic check — the port is otherwise correct  (IMPORTANT, PROVEN)
+Same corrected metric against the 7 original factory bounces:
+
+| preset | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|---|
+| port-minus-bounce (dB) | +0.9 | -0.0 | -2.2 | +0.1 | -1.9 | +0.8 | +0.2 | **-17.5** |
+
+**Presets 0-6 match within ±2.2 dB.** This retires the old #124 claim that the port is
+systematically 12-23 % darker — that came from a spectral-centroid metric dominated by
+near-dither noise-floor bands. Preset 7 (Bell Tower, the lone EFFECT TYPE 5 patch) is
+badly off at -17.5 dB and belongs to the known #122 family.
+
+### Where this leaves the fix
+The defect is real, quantified, reproducible, and localized to the **sustained VCF
+envelope/CV path on high-ENV-MOD + high-VELOCITY-SENS patches**. It is NOT reachable by
+any existing gate because the oracle shares the input. Closing it requires a reference
+for the sustained cutoff CV that does *not* come from our own recall dispatch — i.e. the
+real host/controller preset path (#133/#135 machinery), or an execution-level trace of
+the plugin's own note-on -> VCF CV computation compared against the port's, at this
+patch's parameter combination. No value from the capture may enter the port.
