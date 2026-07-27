@@ -326,3 +326,79 @@ Executing the map outright would need the controller preset path, which stays
 walled (`docs/FINAL_SCOPE_LOG.md`); the engine-side value getter is a bare
 `return 0;` stub (rva 0x3B6C30), so the recall enumerator cannot read values
 back to confirm it from the engine side.
+
+---
+
+## STEP 4 — Fix the port — **N/A (STEP 3 found no divergence)**
+
+The scope makes STEP 4 conditional on STEP 3 diverging. It did not. No
+speculative change was made to `src/juno_driver.c` or the WASM driver: per the
+scope's hard DON'Ts, the port is not "fixed" from a theory, only from an
+executed structure, and the executed structure says the driver is already right.
+
+Two REAL defects were nonetheless found and dealt with while executing the scope:
+
+1. **Webapp velocity default (FIXED, commit 8c93286).** The app defaulted to
+   Keyboard Velocity SW **ON** with the slider at **127**; a fresh plugin
+   instance defaults the switch **OFF**, which forces every note-on to velocity
+   **100** (READ from three decompiled sites). Velocity drives VCF/VCA VELOCITY
+   SENS, so the webapp and a DAW instance were being given different velocities
+   on every velocity-sensitive patch — a guaranteed mismatch, and it was our
+   code. Defaults now mirror the plugin.
+2. **DELAY TAP TIME (1178) — documented, not wired.** DELAY-TYPE-1-gated, writes
+   cell 4297792 = `f32(trunc(255*byte/100)/255)`; the port freezes tap=50. Every
+   patch in both known banks decodes tap=50, so it is identity today, but
+   GOAL.md requires correctness for ANY value. Tracked; BS Solid is TYPE 0 so it
+   is not a factor here.
+
+## STEP 5 — Freeze the blind-spot closure — **DONE**
+
+`tools/verify/renderstruct_ab.py` is written and wired into `make verify`. It
+gates the two dimensions this scope proved and that no previous gate touched:
+block-size invariance (1/64/128/512/600) and the warm apply-on-a-running-engine
+lifecycle. **22/22 checks bit-exact.**
+
+## STEP 6 — Ship — **DONE**
+
+- `gui/web/juno.wasm` was already current with `src/` (`git log <wasm-rebuild>..HEAD
+  -- src/` is empty and the wasm mtime is newer than every source), and this
+  scope changed no `src/` file, so no WASM rebuild was required.
+- Webapp re-bundled with the Chillwave bank and the velocity fix;
+  `node tools/verify/verify_webapp.mjs` passes (boots, loads bank, applies
+  patch, panel reflects patch bytes, makes sound, survives a live edit).
+- Artifact republished to the same URL
+  (https://claude.ai/code/artifact/4c5a4e67-86ed-43e5-871c-695aa6275ac7).
+- Branch `claude/c99-gui-fable5-yfhak1` pushed at every step.
+
+---
+
+## THE EXIT TEST — determination
+
+The scope's Exit Test has two branches. **Branch 2 is the one that applies:**
+
+> "STEP 3 exonerated the render loop at every tested block size AND the Q4
+> noise-lockstep and Q5 note-terminus questions are answered PROVEN — in which
+> case the log states plainly that the engine + its drivers are structurally
+> faithful and names the remaining candidate surface."
+
+Both required questions are answered PROVEN:
+- **Q4 (noise lockstep while playing)** — lane D: units 0..7 byte-identical at
+  6 checkpoints × 5 scenarios; LFSR closed and autonomous; the master reads no
+  cell in the block.
+- **Q5 (note terminus)** — lane E: the engine's noteOn IS the per-voice
+  Note/Gate bus; all three routes give 0 differing cells on factory 0 and BS Solid.
+
+**Statement, plainly: the engine and its drivers are structurally faithful.**
+Given the decoded patch values, the port's output IS the plugin's output —
+bit-for-bit, cold, warm, at every block size, over the whole engine state.
+
+**The remaining candidate surface, named:** the record-byte ↔ parameter POSITION
+MAP is the only step in the chain that has never been *executed*. It is
+validated four independent ways (above) and no check has ever contradicted it,
+but validation is not execution. Executing it requires the plugin's controller
+preset path (`IEditController::setComponentState` → value tree), which remains
+walled by the CRT/thread-pool problem documented in `docs/FINAL_SCOPE_LOG.md`;
+the engine-side value getter is a bare `return 0;` stub (rva 0x3B6C30), so the
+engine side cannot be used to read the values back either.
+
+Per the scope's rules, no new investigation thread is opened here.
