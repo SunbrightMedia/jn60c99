@@ -75,10 +75,10 @@
       <input type="range" id="arpGate" min="0" max="1" step="0.05" value="0.6" oninput="arpApply()" style="vertical-align:middle">
       <span id="arpGateV">60%</span></label>
     <span style="width:12px"></span>
-    <label title="SYSTEM 'Keyboard Velocity SW' — OFF (plugin default): every note plays at fixed velocity 100, exactly like the real plugin's wrapper (and the velocity-insensitive JUNO-60). ON: keys/MIDI use their real velocity.">Kbd&nbsp;Vel
+    <label title="SYSTEM 'Keyboard Velocity SW'. OFF (default here, matching a fresh plugin instance): every note plays at fixed velocity 100 — the plugin's own wrapper rule, READ from three decompiled sites, and what a JUNO-60 does. ON: keys/MIDI use their real velocity, so patches with VCF/VCA VELOCITY SENS (e.g. BS Solid) open up when you play hard. Turn it ON only if your DAW instance has it on too — otherwise the port and the plugin get different velocities and will not sound the same.">Kbd&nbsp;Vel
       <input type="checkbox" id="velSw" onchange="velSwApply()"></label>
-    <label id="velLbl" title="Note-on velocity for the on-screen keys (only when Kbd Vel is ON; VCF/VCA VELOCITY SENS respond to it)" style="opacity:.45">Vel
-      <input type="range" id="vel" min="1" max="127" step="1" value="100" disabled oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
+    <label id="velLbl" title="Note-on velocity for the on-screen keys (MIDI keys use their own; VCF/VCA VELOCITY SENS respond to it). Only honoured when Kbd Vel SW is ON.">Vel
+      <input type="range" id="vel" min="1" max="127" step="1" value="100" oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
       <span id="velV">100</span></label>
   </div>
   <div class="row">
@@ -126,7 +126,7 @@ import { decodeBank } from "./bank.js";
 
 /* Cache-buster: build.sh rewrites this to the WASM content hash each build, so a new
  * engine is always fetched fresh instead of served from the browser/CDN cache. */
-const BUILD_VER = "01884c8ddf00";
+const BUILD_VER = "28d91e3c7f5c";
 
 // The plugin runs its DSP natively at the host sample rate (no oversampling, no
 // decimator). SR is replaced at boot with the AudioContext's ACTUAL rate so the
@@ -227,6 +227,7 @@ async function boot() {
   } catch (e) { console.warn("JUNO: AudioContext unavailable at boot; defaulting engine to", SR, "Hz", e); }
   ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 0);  // engine at host rate.
   velSwFn(ctx, document.getElementById("velSw").checked ? 1 : 0);  // sync switch set before engine was ready
+  velSwApply();                                  // reflect the default (SW OFF) in the Vel slider's enabled state
   // chorus_mode MUST be 0: any nonzero mode writes a LEGACY hand-rolled chorus
   // block (state 90624..90832) that the real plugin NEVER populates (proven by
   // executing the plugin cold/warm/recalled/rendered — the block stays zero).
@@ -507,9 +508,11 @@ function mkKey(midi, cls, left) {
 function note(midi, on) {
   ensureAudio();
   // Notes enter through the WRAPPER-level MIDI path (juno_gui_midi_note_on),
-  // exactly like a DAW's events enter the real plugin: with the SYSTEM
-  // "Keyboard Velocity SW" OFF (the default) the engine receives velocity 100
-  // no matter what the slider says — the plugin's own rule (see juno_bridge.c).
+  // exactly like a DAW's events enter the real plugin. The SYSTEM "Keyboard
+  // Velocity SW" ships ON here so VELOCITY SENS patches are playable (with it
+  // OFF — the plugin's factory SYSTEM default, one click away — the engine
+  // receives fixed velocity 100 no matter what: the plugin's own wrapper rule,
+  // see juno_bridge.c).
   const vel = +$("#vel").value;   // 1..127; only honored when Kbd Vel SW is ON
   if (on) midiNoteOnFn(ctx, midi, vel); else midiNoteOffFn(ctx, midi);
   if (on) status(`note ${midi} · vel ${$("#velSw").checked ? vel : "100 (fixed — Kbd Vel SW off, plugin default)"} — live 8-voice master path`);
