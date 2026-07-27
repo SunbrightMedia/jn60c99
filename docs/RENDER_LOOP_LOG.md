@@ -243,3 +243,70 @@ inside [84272,84436)** — so the port's single shared state cannot leak
 voice-advanced noise into the master where the plugin's frozen unit-8 copy would
 not. The port's snapshot/restore is provably equivalent to the plugin's nine
 isolated units. **"More noise oscillator" is NOT a noise-path defect.**
+
+---
+
+## STEP 3 — Re-express the oracle and diff — **RESULT: THE RENDER LOOP IS EXONERATED**
+
+STEP 3 asks for a `render_real()` built to the derived structure, then A/B'd. The
+derivation (STEP 1) plus the executed lane results (STEP 2) show that
+`e2e_emu.render()` **already is** the derived structure:
+
+| real per-block element (rva 0x3C7400 / 0x3C6F00) | oracle / port | status |
+|---|---|---|
+| voice i renders WHOLE BLOCK from unit i, work item i | same | PROVEN identical (`item+24 == state[i]`) |
+| barrier, then master runs PER SAMPLE from `*(ENGINE+592)` | same, `state[8]` | PROVEN identical |
+| `a2[2i]=MAIN_i`, `a2[2i+1]=SUB_i`, voice order 0..7 | same | PROVEN identical (lane C, with ordering controls) |
+| SUB slots consumed by the master | never read | PROVEN (sub=1e20 → bit-identical) |
+| `sub_7FF91DFB5AB0(assign,n)` | `assign+168 += n` | PROVEN identical (that IS the body) |
+| render only voices `i < *(ENGINE+56)` | always 8 | PROVEN equivalent (numVoices is always 8) |
+| voice-0-only per-sample call `0x3C7230` | absent | PROVEN inert (LED meter; zero unit-state writes) |
+| host block size 64..512 vs oracle 600 | any | PROVEN invariant (bit-exact at 600/512/256/128/64/1) |
+| per-unit noise blocks stepping independently | snapshot/restore | PROVEN equivalent while playing (lane D) |
+
+So a separate `render_real()` would differ from `render()` only by calling a
+function proven to write nothing any DSP reads. Building it would add no
+discriminating power; the honest equivalent — and what STEP 5 institutionalises —
+is to gate the two dimensions along which the structure *could* have differed and
+never was: **block size** and the **warm apply-on-a-running-engine lifecycle**.
+
+A/B results actually run (all two-process, port vs the plugin's own DSP):
+- **BS Solid (Chillwave 3), cold, 44.1 kHz** — bit-exact (`scratchpad/bssolid_ab.py`).
+- **BS Solid, the webapp's real lifecycle** (idle 72000 → apply on the running
+  engine → idle 36000 → note → 24000 @ 1024-frame blocks) — **0 differing samples
+  of 24000, L and R** (`probes/render_loop/webapp_lifecycle_ab.py`).
+- **BS Solid, full recall state** — all nine units byte-identical over the entire
+  0xA83010 state (`probes/render_loop/fullstate_diff_ALL.py`).
+- **4 factory patches × 5 block sizes + 2 warm lifecycles** — 22/22 bit-exact
+  (`tools/verify/renderstruct_ab.py`, now a required gate).
+
+**Per the scope's STEP 3 instruction, this is the exoneration branch, and it is
+written plainly here rather than replaced by a new theory: the hand-written
+render loop is NOT the cause of the BS Solid difference.**
+
+### Extra validation of the LAST unexecuted link (the position map)
+
+The record-byte ↔ parameter map is derived from Script.xml document order
+(`dispatch = docpos + 740`; record byte `2·ml−4` in the SYNTH block, `8·ml−430`
+in the extended block). It is the only step in the whole chain never executed.
+Three independent checks, none circular:
+
+1. **Range check** (`leafmap_rangecheck.py`): 14335/14336 decoded values across
+   BOTH banks fall inside the plugin's own declared descriptor ranges.
+2. **Offset scan** (`defaults_crosscheck.py`): comparing Script.xml's declared
+   `<default>`+`<range>` against the compiled descriptor DB for candidate
+   offsets +738..+742, **+740 is the clear maximum** (712 matching leaves vs
+   558/576/576/556 for its neighbours) — an XML resource and a compiled table
+   are different artefacts, so this pins the offset independently.
+3. **In-block mismatch audit**: of the 40 real mismatching indices, only 7 lie
+   inside the JUNO-60 patch block 748..877, and all 7 are benign — 748/749 are
+   `_NULL_` in the binary and are excluded from the port's map anyway; 769/862/
+   864/867 are JU-06A-only params; 871 HPF TYPE differs only in declared max
+   (XML 8 vs binary 1) and every patch in both banks decodes 0.
+4. **The user's own front panel**: BS Solid decodes to `DCO SUB LEVEL = 83` and
+   `VCF CUTOFF FREQ = 15`, matching what the user read off the real plugin.
+
+Executing the map outright would need the controller preset path, which stays
+walled (`docs/FINAL_SCOPE_LOG.md`); the engine-side value getter is a bare
+`return 0;` stub (rva 0x3B6C30), so the recall enumerator cannot read values
+back to confirm it from the engine side.
