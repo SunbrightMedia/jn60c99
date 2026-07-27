@@ -92,6 +92,20 @@ Reading blob bytes 54/55/56 through the plugin's own parser:
    and the port's, over patches spanning ASSIGN 0/1/2 × LEGATO × PORTAMENTO at
    44.1 and 48 kHz, and requires bit-exact audio.
 
+## What this does NOT fix (honest scope)
+
+The #124 DAW-bounce centroid residual on the 8 factory presets is **essentially
+unchanged**: mean |Δ| 12.0% → 12.2% (`scratchpad/bounce_relocate.py`, covenant role 1,
+diagnostic only — nothing tuned). That is the expected result, not a disappointment:
+of those 8 presets only p5 and p6 are ASSIGN=1 and **none** is ASSIGN=2, and on a
+single sustained note MONO differs from POLY only by which voice's CONDITION scatter
+is used. Those bounces could never have surfaced this defect, which is precisely why
+it survived so long. #124 stays open and host-lifecycle-pinned.
+
+The user's actual report was about **Chillwave BS Solid (3) and its neighbour
+BS Glide (4)** — both ASSIGN=2 — where the fix is worth +16.65 dB and +17.43 dB
+against the plugin's own render.
+
 ## Methodology note — add to `docs/P112_FINDINGS.md` §8's list
 
 A fifth protocol error, and the most expensive one so far: **validating a
