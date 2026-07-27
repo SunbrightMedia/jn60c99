@@ -25,7 +25,10 @@ real per-block DSP under the pool (0x3C7400) — voice order, host block sizes
 snapshot/restore policy — was never derived from the binary. User's ear ("more
 noise oscillator" in the real plugin) matches a noise-block-policy difference.
 NEXT: derive the real per-block structure from 0x3C7400 + pool work items,
-re-express the oracle to match, re-run render A/B.
+re-express the oracle to match, re-run render A/B. **THE BINDING PLAN FOR THIS
+IS `docs/RENDER_LOOP_SCOPE.md` (STEP 0-6 + Exit Test, written for Opus 5 to
+execute to the letter) — it supersedes the NEXT sentence above and is the live
+work order.**
 
 **Read `GOAL.md` first — it is the user's own statement of the goal and is binding.**
 Short form: a bit-exact C99 port of the Roland Cloud JUNO-60 (JU-06A) VST3 DSP that
