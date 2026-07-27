@@ -262,3 +262,72 @@ comparison has ~8 dB of intrinsic scatter. Any future attempt should either
 (a) reduce that scatter (identical session, documented velocity and Kbd Vel SW
 state, several patches bounced together), or (b) work from a comparison that is
 not bounce-based at all — i.e. the controller preset path, still walled.
+
+---
+
+# ROUND 5 — A CONCRETE BUG FOUND (user's tip: "the next patch also sounds off")
+
+The user reported that the patch AFTER BS Solid also sounds wrong. That single
+fact broke the deadlock, because it moved the question from "what is wrong with
+BS Solid" to "what do the failing patches SHARE". Both are CHILLWAVE patches;
+all 8 bounces I had been comparing against are FACTORY patches — **and every
+gate in this project validates against the factory bank.**
+
+## Chillwave 4 is "BS Glide" — and the port cannot glide
+
+| param | factory range (all 64) | CW4 |
+|---|---|---|
+| PORTAMENTO (798) | 0..54 | **65 — outside all factory coverage** |
+| MOD SENS DCO (860) | 0..38 | **109 — outside all factory coverage** |
+
+**PROVEN by execution** (`probes/attack_transient/glide_check.py`): play note 48,
+then overlap note 60. On CW4 the pitch **jumps instantly** (50 Hz -> 75 Hz, one
+distinct pitch during the transition). A portamento patch must sweep. **The port
+never glides.**
+
+Root cause, in the port's own hand-written glue:
+
+```
+gui/juno_bridge.c:891     c->legato = 0;                       /* hard override */
+gui/juno_bridge.c:533     if (!variant && c->legato && c->portamento_on)   /* glide gate */
+```
+
+`juno_bank_voice_modes()` reads the patch's real LEGATO at line 872 — and line
+891 throws it away. The glide is gated on `legato && portamento_on`, so with
+legato forced to 0 the glide can never run, no matter what the patch says.
+
+## WHY EVERY GATE MISSED IT (the important part)
+
+The override's own comment cites a proof: *"fuzz seed 57: on a LEGATO=1+PORTA
+patch the plugin's second overlapping note-on writes ONLY the new voice's cells —
+it never glides"*. That proof is **circular in the same way as everything else in
+this project**: our harness drives notes through the ENGINE's noteOn
+(rva 0x3C7330), which **bypasses the assigner object entirely** — and the
+assigner (CAssignJu60) is precisely what implements legato, portamento, mono and
+unison. So:
+
+- oracle: engine noteOn -> no assigner -> no glide
+- port: matched to the oracle -> legato forced 0 -> no glide
+- **real plugin in a real host: MIDI -> queue -> assigner -> glide**
+
+Both sides of the comparison bypassed the same component, so the gate agreed
+while both differed from the real thing. This is the identical structural defect
+that hid the recall-enumerator gap, the fine-FX gap and the warm-lifecycle gap.
+
+## Scope
+
+This explains CW4 ("BS Glide") directly and completely: a glide bass that cannot
+glide. It does NOT by itself explain CW3 (BS Solid), whose PORTAMENTO is 0 — but
+it proves the mechanism (assigner bypass + a hand-written override justified by a
+blind-spot proof), and the assigner also owns note stealing, mono/unison and the
+legato retrigger path, all of which shape how a patch actually sounds when played.
+
+## What has to happen next
+
+1. Drive the plugin's OWN assigner under emulation (the machinery exists —
+   `arp_sched_ab.py` already does exactly this: "recall + controller-method
+   enable + transport ticks, **assigner hooked**") and derive the real
+   legato/portamento/assign behaviour from it.
+2. Restore the patch's real LEGATO and ASSIGN MODE, validated against THAT
+   reference rather than against the assigner-bypassing note path.
+3. Add an assigner-level gate so the note path stops being a shared blind spot.
