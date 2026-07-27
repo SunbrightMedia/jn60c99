@@ -1,6 +1,54 @@
 # JUNO-60 (JU-06A) C99 port — project memory
 
-**★★ NEWEST (2026-07-27, Opus 5) — RENDER_LOOP_SCOPE EXECUTED; THE RENDER LOOP IS
+**★★★ NEWEST (2026-07-27, Opus 5) — THE "STILL SOUNDS WRONG" ROOT CAUSE IS FOUND
+AND FIXED: the plugin's voice allocator never learned KEY ASSIGN. Read
+`docs/ASSIGNER_MODE_FINDING.md` (probes in `probes/assigner/`).**
+`CAssignJu60` caches ASSIGN MODE (param 800) at `assigner+16` and LEGATO (799) at
+`assigner+20`. The ONLY writer is `sub_7FF91DFB49B0(assigner, 4)`, and the ONLY
+caller of that is the engine's HOST parameter entry `sub_7FF91E027AE0`, which after
+EVERY parameter write does, per unit: `proc[u]->+88(idx,0,v)` **and then**
+`assign[u]->+8(4)`. Our recall made the first call and never the second, so under
+the oracle the plugin's own allocator sat in **POLY for every patch**. An earlier
+A/B measured the port against that oracle, concluded "all three KEY ASSIGN values
+are polyphonic", and hard-forced `assign_mode = 0` / `legato = 0` in the bridge —
+**oracle and port were then wrong together, so every render A/B was comparing two
+copies of the same mistake.** (Exactly the user's own hypothesis: "if the issue is
+truly invisible, there is something wrong with our tests.")
+- PROVEN: assigner vptr rva `0x969740`, slot 1 (+8) = `0x3549B0` (`laneX_slot8.py`);
+  after our recall the fields are (0,0) on all 9 units for every patch, after the
+  plugin's own refresh BS Solid = mode 2, LD Classic Lead = mode 1
+  (`laneX_mode_field.py`); notify-once == the host's notify-per-write, 0 differing
+  cells over all 9 × 0xA83010 (`laneX_notify_placement.py`).
+- **Audio impact, plugin vs ITSELF** (`laneX_audio_impact.py`, refresh the only
+  difference): Chillwave 3 **BS Solid +16.65 dB**, Chillwave 4 **BS Glide
+  +17.43 dB**, Chillwave 30 +7.61 dB, factory 61 +13.05 dB — ~every sample
+  differing. Factory 5 (MONO) is level-neutral but every sample differs (voice 0 vs
+  the port's voice 7 → different CONDITION scatter — the per-patch, bidirectional
+  timbre shift #124's bounce locator kept reporting). Factory 0 (ASSIGN 0) is
+  **bit-identical**: the non-vacuity control.
+- Scope: **16/64 factory patches** (14 MONO, 2 UNISON) plus much of the Chillwave
+  bank were played in the wrong voice-assign mode by the port AND by every gate.
+- Fix: `e2e_emu.assigner_notify()` (the plugin's own 0x3549B0 on all 9 units);
+  `prepare_recall` calls it, so render A/B, `fuzz_diff` and `renderstruct_ab` now
+  drive a plugin in the patch's real mode; the bridge's two overrides are removed
+  (the MONO/UNISON code in `docs/VOICE_MODES.md` was already correct — only
+  switched off); new gate `tools/verify/assigner_ab.py` in `make verify` drives
+  NOTE SEQUENCES (a single note cannot tell POLY from MONO — which is why the old
+  single-note A/B "proved" the wrong thing) through both allocators.
+- Post-fix the port reproduces the plugin's own RMS to 5 decimals on every mode:
+  F0 0.07770, F5 0.03268, F61 0.10803, CW3 0.65162, CW4 1.12641, CW30 0.16745.
+- **METHODOLOGY (add to `docs/P112_FINDINGS.md` §8): never validate a hand-written
+  component against an oracle in which the plugin component it replaces was never
+  reachable.** Before concluding "the plugin does X", check that the plugin's own
+  code for *not*-X could have run in the harness at all.
+- Also mapped (no gap): the host entry special-routes idx 831-835 (ARPEGGIO
+  SW/TYPE/STEP, SCATTER TYPE/DEPTH) and 756 to the arpeggiator object at
+  `HOST+136+64u` instead of the dispatch, and applies host-write-only value
+  transforms to idx 20/22/665/707/769/871. The port implements the arp separately
+  (`carp.c`, bit-exact 7/7) and correctly does not apply the host-only transforms
+  on preset recall.
+
+**★★ (2026-07-27, Opus 5) — RENDER_LOOP_SCOPE EXECUTED; THE RENDER LOOP IS
 EXONERATED. Read `docs/RENDER_LOOP_LOG.md` (probes in `probes/render_loop/`).**
 The real per-block render was derived from the binary and every hand-written
 assumption was checked by execution. Findings, all PROVEN unless noted:

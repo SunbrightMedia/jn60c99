@@ -254,6 +254,38 @@ void juno_note_glide(unsigned char *st, int voice, int midi_note)
     JF(st, base + PITCH_OFF) = juno_note_pitch(midi_note);
 }
 
+/* Per-voice PORTAMENTO GATE — the note-bus leaf 467+v that the POLY allocator's
+ * LEGATO arm writes (sub_7FF91DFB3150 LABEL_21). PROVEN by dispatching the
+ * plugin's own setter over indices 467/468/474 on a recalled engine and diffing
+ * the full 9-unit state (probes/assigner/laneX_legato_bus.py + _restore.py):
+ *
+ *     467+v touches exactly two cells, voice v's  592 + v*10512  and  9824 + v*10512
+ *     value 1 -> BOTH forced to 0
+ *     value 0 -> 592 back to the recalled PORTAMENTO on/off; 9824 NOT WRITTEN
+ *
+ * The asymmetry is real and was measured, not inferred — the decompiler dropped
+ * the value argument of the else-branch call, so the whole-sequence trace
+ * probes/assigner/laneX_p55_trace.py settled it: across note-on 60 (silent, all
+ * 592 and 9824 -> 0 except the triggered voice's 9824, which its gate leaf sets
+ * back to 1), note-on 67 (all 592 -> 1, every 9824 unchanged), note-off and a
+ * third note, cell 9824 only ever moves via the gate leaf 450+v (1 on note-on
+ * with velocity, 0 on an explicit gate-off) and via the `off` arm here.
+ *
+ * Cell 592 is the DCO glide gate (voice_render.c:674 `v45 = (v43+1)*JF(a1,592)`;
+ * v45 == 0 bypasses the glide conditioner entirely); 9824 feeds the second
+ * smoother at voice_render.c:1517 and is juno_note_on's gate twin.
+ *
+ * `porta_base` is the recalled 592 value, which the caller reads back from the
+ * engine after recall — exactly the value the plugin's own param store holds. */
+void juno_note_porta_gate(unsigned char *st, int voice, int off, float porta_base)
+{
+    unsigned int base;
+    if (voice < 0 || voice >= JUNO_NUM_VOICES) return;
+    base = VBASE(voice);
+    JF(st, base + 592) = off ? 0.0f : porta_base;
+    if (off) JF(st, base + 9824) = 0.0f;
+}
+
 /* Refresh the velocity coefficients (VCF 6864 / VCA 9680) WITHOUT a gate edge —
  * used by MONO legato / UNISON glide overlaps. Verified by executing the plugin's
  * CAssignJu60 (RVA 0x353150) under Unicorn: a legato/glide note arriving with a

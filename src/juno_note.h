@@ -38,6 +38,12 @@ void juno_note_off(unsigned char *st, int voice);
  * keep running — see docs, mono/unison legato + poly-portamento-glide). */
 void juno_note_glide(unsigned char *st, int voice, int midi_note);
 
+/* Per-voice PORTAMENTO GATE (note-bus leaf 467+v): off!=0 zeroes voice v's glide
+ * gate 592 (bypassing the DCO glide conditioner) and its twin 9824; off==0 puts
+ * 592 back to `porta_base` (the recalled PORTAMENTO on/off) and still zeroes 9824.
+ * Written by the POLY allocator's LEGATO arm. See the comment in juno_note.c. */
+void juno_note_porta_gate(unsigned char *st, int voice, int off, float porta_base);
+
 /* Refresh velocity coeffs (VCF/VCA) without a gate edge — MONO legato / UNISON glide
  * overlaps with a changed velocity. Verified vs CAssignJu60 under emulation. */
 void juno_note_velocity(unsigned char *st, int voice, int velocity);

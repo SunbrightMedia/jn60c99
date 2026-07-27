@@ -38,6 +38,9 @@ typedef struct {
     int assign_mode;                    /* 0..3 */
     int legato;                         /* 0/1  */
     int portamento_on;                  /* 0/1 (PORTAMENTO byte != 0) */
+    unsigned legato_mask;               /* assigner+68: voices the LEGATO arm still drags */
+    float porta_base;                   /* recalled cell 592 (PORTAMENTO on/off), the value
+                                           leaf 467+v restores — read back after recall */
     unsigned held_notes[4];             /* bit n = MIDI note n currently held */
 
     /* Arpeggiator — the plugin's CArpeggio transcribed BIT-EXACTLY in src/carp.c
@@ -326,6 +329,14 @@ float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
                 JF(c->st, (unsigned)HPF_CELLS[k] + (unsigned)v * JUNO_VOICE_MAIN_STRIDE) =
                     JF(c->st, (unsigned)HPF_CELLS[k]);
     }
+    /* PORTAMENTO leaf (blob 54): the plugin's POLY allocator does NOT cache this —
+     * sub_7FF91DFB3870 re-reads param 798 through the value getter on EVERY note
+     * and passes (v != 0) to sub_7FF91DFB3150 as its steal rule (newest voice when
+     * portamento is engaged, oldest otherwise). A live edit therefore takes effect
+     * on the next note in the real plugin, so mirror it here instead of leaving the
+     * bank-apply value stale. (LEGATO/ASSIGN MODE are not panel leaves — they reach
+     * the allocator only through recall; see docs/ASSIGNER_MODE_FINDING.md.) */
+    if (blob == 54) c->portamento_on = ((byte & 0xFF) != 0);
     /* TEMPO SYNC leaf (blob 59): a live flip re-times the ACTIVE slot-1 delay
      * instance (synced at host BPM on engage, the patch's manual time on
      * disengage) — measured law in juno_live_delay_sync; the base cell 102352 is
@@ -528,16 +539,44 @@ static void poly_note_on(juno_ctx *c, int midi_note, int velocity, int variant)
         pick = c->portamento_on ? pick_newest(c, 1, 1) : pick_oldest(c, 1, 1);
     if (pick < 0) pick = 0;
 
-    /* MODE 0 legato+portamento poly-glide (§4.3): drag every OTHER still-gated
-     * voice's pitch to the new note without a gate edge. */
-    if (!variant && c->legato && c->portamento_on)
+    /* LEGATO arm — the ONE place the binary reads the LEGATO field, and only in
+     * POLY with portamento engaged (sub_7FF91DFB3150 LABEL_21:
+     * `if (a1[5] && a4 == 1)`, a4 = the freshly-read PORTAMENTO != 0):
+     *
+     *   silent = no voice currently gated
+     *   if (silent) { every voice: leaf 467+v := 1 ; legato_mask := all voices }
+     *   else        { every voice: leaf 467+v := 0 }
+     *   for i != pick with bit i of legato_mask: move voice i to the new note
+     *   ...trigger pick...
+     *   legato_mask &= ~(1 << pick)
+     *
+     * Leaf 467+v is the per-voice PORTAMENTO GATE (juno_note_porta_gate, cells
+     * 592/9824 — PROVEN by dispatching the plugin's own setter, see that function).
+     * So the FIRST note after silence bypasses the glide conditioner on every voice
+     * (you do not glide from nothing) and every later note re-arms it — which is
+     * exactly what makes a legato+portamento line glide only between overlapping
+     * notes.
+     *
+     * The pitch drag covers every voice still in legato_mask, GATED OR NOT. The
+     * previous version dragged only GATED voices and never touched leaf 467, which
+     * diverged from the plugin on the very first note (assigner_ab patch 55, first
+     * differing sample at index 2). */
+    if (!variant && c->legato && c->portamento_on) {
+        int silent = 1, i;
         for (v = 0; v < JUNO_NUM_VOICES; ++v)
-            if (v != pick && c->voice_gated[v] && c->voice_note[v] >= 0) {
-                juno_note_glide(c->st, v, midi_note);
-                c->voice_note[v] = midi_note;
+            if (c->voice_gated[v]) { silent = 0; break; }
+        for (v = 0; v < JUNO_NUM_VOICES; ++v)
+            juno_note_porta_gate(c->st, v, silent, c->porta_base);
+        if (silent) c->legato_mask = (1u << JUNO_NUM_VOICES) - 1u;
+        for (i = 0; i < JUNO_NUM_VOICES; ++i)
+            if (i != pick && ((c->legato_mask >> i) & 1u)) {
+                if (c->voice_note[i] != midi_note) juno_note_glide(c->st, i, midi_note);
+                c->voice_note[i] = midi_note;
             }
+    }
 
     voice_trigger(c, pick, midi_note, velocity);        /* chosen voice always retriggers */
+    c->legato_mask &= ~(1u << pick);
 }
 
 /* MODE 1 MONO (sub_7FF91DFB38F0): one fixed voice (0). Overlapping (still-gated)
@@ -871,6 +910,9 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
      * poly-variant), LEGATO, and PORTAMENTO-engaged drive the note allocator above. */
     juno_bank_voice_modes(bank, idx, &c->legato, &c->assign_mode, &porta);
     c->portamento_on = (porta != 0);
+    /* The value leaf 467+v restores into cell 592 is the PORTAMENTO on/off the
+     * recall above just wrote there, so read it back rather than recomputing it. */
+    c->porta_base = JF(c->st, 592);
     /* HISTORY — why ASSIGN MODE and LEGATO were forced to 0 here, and why that was
      * wrong (docs/ASSIGNER_MODE_FINDING.md). An earlier full-play-path A/B against
      * "the plugin's own render" concluded that all three KEY ASSIGN values are
@@ -899,6 +941,8 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
             if (c->voice_note[v] >= 0) { juno_note_off(c->st, v); c->voice_gated[v] = 0; }
         c->held_notes[0] = c->held_notes[1] = c->held_notes[2] = c->held_notes[3] = 0;
         juno_note_broadcast_held(c->st, 0);   /* nothing held after the flush */
+        c->legato_mask = 0;                   /* assigner+68, zeroed by the mode-change
+                                                 path sub_7FF91DFB49F0 */
     }
     /* Per-patch ARPEGGIATOR recall: on/mode/range come from the patch (bit-exact,
      * see juno_bank_arp); rate stays local (the plugin's arp is host-tempo-synced,

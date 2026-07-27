@@ -77,6 +77,9 @@ verify: test libjuno.so
 	echo "=== DIFFERENTIAL FUZZ (SEAL 4 / Pillar-2b): random polyphonic sequences, port vs plugin, 24 seeds x 3 rates ==="; \
 	fresh $(SCRATCH)/fuzz_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/fuzz_diff.py --ref || FAIL=1; \
 	python3 tools/verify/fuzz_diff.py --port || FAIL=1; \
+	echo "=== VOICE ASSIGN (KEY ASSIGN/LEGATO/PORTAMENTO): note SEQUENCES through the plugin's own allocator vs the port's ==="; \
+	fresh $(SCRATCH)/assigner_ab_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/assigner_ab.py --ref || FAIL=1; \
+	python3 tools/verify/assigner_ab.py --port || FAIL=1; \
 	echo "=== RENDER-LOOP STRUCTURE: block-size invariance (1/64/128/512/600) + warm apply-on-running-engine ==="; \
 	fresh $(SCRATCH)/renderstruct_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/renderstruct_ab.py --ref || FAIL=1; \
 	python3 tools/verify/renderstruct_ab.py --port || FAIL=1; \
