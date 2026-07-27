@@ -75,11 +75,11 @@
       <input type="range" id="arpGate" min="0" max="1" step="0.05" value="0.6" oninput="arpApply()" style="vertical-align:middle">
       <span id="arpGateV">60%</span></label>
     <span style="width:12px"></span>
-    <label title="SYSTEM 'Keyboard Velocity SW' — ON (default here): keys/MIDI use their real velocity, so patches with VCF/VCA VELOCITY SENS (e.g. BS Solid) open up when you play hard, like a velocity-enabled DAW setup. OFF: every note plays at fixed velocity 100 (the plugin's factory SYSTEM default — Roland stores this switch as a global user setting).">Kbd&nbsp;Vel
-      <input type="checkbox" id="velSw" checked onchange="velSwApply()"></label>
-    <label id="velLbl" title="Note-on velocity for the on-screen keys (MIDI keys use their own; VCF/VCA VELOCITY SENS respond to it)">Vel
-      <input type="range" id="vel" min="1" max="127" step="1" value="127" oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
-      <span id="velV">127</span></label>
+    <label title="SYSTEM 'Keyboard Velocity SW'. OFF (default here, matching a fresh plugin instance): every note plays at fixed velocity 100 — the plugin's own wrapper rule, READ from three decompiled sites, and what a JUNO-60 does. ON: keys/MIDI use their real velocity, so patches with VCF/VCA VELOCITY SENS (e.g. BS Solid) open up when you play hard. Turn it ON only if your DAW instance has it on too — otherwise the port and the plugin get different velocities and will not sound the same.">Kbd&nbsp;Vel
+      <input type="checkbox" id="velSw" onchange="velSwApply()"></label>
+    <label id="velLbl" title="Note-on velocity for the on-screen keys (MIDI keys use their own; VCF/VCA VELOCITY SENS respond to it). Only honoured when Kbd Vel SW is ON.">Vel
+      <input type="range" id="vel" min="1" max="127" step="1" value="100" oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
+      <span id="velV">100</span></label>
   </div>
   <div class="row">
     <input type="text" id="filter" placeholder="filter parameters…" oninput="renderList()" style="flex:1">
@@ -227,6 +227,7 @@ async function boot() {
   } catch (e) { console.warn("JUNO: AudioContext unavailable at boot; defaulting engine to", SR, "Hz", e); }
   ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 0);  // engine at host rate.
   velSwFn(ctx, document.getElementById("velSw").checked ? 1 : 0);  // sync switch set before engine was ready
+  velSwApply();                                  // reflect the default (SW OFF) in the Vel slider's enabled state
   // chorus_mode MUST be 0: any nonzero mode writes a LEGACY hand-rolled chorus
   // block (state 90624..90832) that the real plugin NEVER populates (proven by
   // executing the plugin cold/warm/recalled/rendered — the block stays zero).
