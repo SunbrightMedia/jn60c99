@@ -77,6 +77,9 @@ verify: test libjuno.so
 	echo "=== DIFFERENTIAL FUZZ (SEAL 4 / Pillar-2b): random polyphonic sequences, port vs plugin, 24 seeds x 3 rates ==="; \
 	fresh $(SCRATCH)/fuzz_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/fuzz_diff.py --ref || FAIL=1; \
 	python3 tools/verify/fuzz_diff.py --port || FAIL=1; \
+	echo "=== RENDER-LOOP STRUCTURE: block-size invariance (1/64/128/512/600) + warm apply-on-running-engine ==="; \
+	fresh $(SCRATCH)/renderstruct_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/renderstruct_ab.py --ref || FAIL=1; \
+	python3 tools/verify/renderstruct_ab.py --port || FAIL=1; \
 	echo "=== #112 HOST-PATH ROLES: which dispatch indices behave differently for a HOST than for RECALL ==="; \
 	python3 tools/verify/hostpath_roles.py || FAIL=1; \
 	echo "=== #112 HOST MODULATION: port juno_mod_byte vs the plugin's own modulation setters ==="; \

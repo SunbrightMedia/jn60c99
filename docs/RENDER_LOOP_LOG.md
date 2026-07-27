@@ -210,3 +210,36 @@ INFERRED from those: numVoices is 8 for the whole life of a real instance, so
 `0x3C7400` always renders all 8 voices — exactly what the oracle does. The `0`
 our probe read after `build()` is a harness artefact (e2e_emu hand-allocates a
 zeroed engine buffer and calls only BUILD, which does not write +56).
+
+### LANE C — master call ABI / per-sample pointer array: **NO-EQUIVALENT**
+PROVEN: voice i's two buffers are `ENGINE+656+48i` (MAIN) and `ENGINE+680+48i`
+(SUB), and they are exactly work item i's `+32` / `+40` — all 16 pointers
+distinct. READ: the plugin builds `arr[2i] = MAIN_i + 4s`, `arr[2i+1] = SUB_i + 4s`.
+READ: the master DSP `sub_7FF91DFC3380` (rva 0x363380 — the very function the
+port transcribes as `sub_180363380`, reached through the thin wrapper 0x398EC0)
+references `a2` in exactly 8 places, **all even slots**, storing to
+`masterState + 10672 + 10512*i`. PROVEN by per-slot sentinels that even slot 2i
+carries voice i's MAIN in voice order 0..7. **PROVEN that the odd (SUB) slots are
+never read: forcing all 8 sub buffers to 1e20 leaves L and R bit-identical** —
+which independently validates the port's `a2[odd] = &scratch`. PROVEN: the plugin's
+master loop vs the oracle's master stub is bit-exact (0 differing samples) at
+blocks 13/64/512, and the test is ordering-sensitive (main↔sub swap → 63/64
+samples differ; a2 pre-advanced by one sample → 63/64 differ; voices 0↔2 swapped
+→ 6/64 differ), so the null result is meaningful, not vacuous.
+
+### LANE D — the analog-noise policy WHILE PLAYING: **EXONERATED** (the user-ear suspect)
+PROVEN (44.1 kHz, Chillwave patch 3 = BS Solid, the plugin's own recall+render):
+after 1 / 64 / 600 / 601 / 1200 / 8000 rendered samples the 164-byte noise block
+at `state+84272` is **byte-identical across units 0..7 at every checkpoint in
+every scenario** — 0 notes, 1 note, 4 notes, CONDITION 40, CONDITION 220. The
+unit-0 LFSR trajectory is bit-identical in all five scenarios (e.g. cell 84336 =
+0x33800000 @1, 0x3f2faaab @64, 0xbf361c3f @600, 0xbe8502ec @8000 in all of them),
+so the generator is a closed autonomous LFSR with no per-voice input. The
+CONDITION probe was PROVEN non-vacuous (dispatching 856 changes 20 dwords, all at
+`176+v*10512+{5344,7424,10144}`, none inside the noise block).
+**And the last structural concern is closed by READ of `src/master_render.c`: the
+84xxx offsets it references jump 84256 → 84448, i.e. the master reads NO cell
+inside [84272,84436)** — so the port's single shared state cannot leak
+voice-advanced noise into the master where the plugin's frozen unit-8 copy would
+not. The port's snapshot/restore is provably equivalent to the plugin's nine
+isolated units. **"More noise oscillator" is NOT a noise-path defect.**
