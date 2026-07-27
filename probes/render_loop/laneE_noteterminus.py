@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SUPERSEDED / KNOWN-BAD RESULT: this probe installs its 0x3B9A30 hook AFTER
+# prepare_recall has already executed that block, and Unicorn caches translated
+# blocks -- so it reports "0 dispatch calls" for a path that actually fires 18.
+# Use laneE_terminus_ab.py / laneE_seq_ab.py (hooks installed on a virgin uc).
 """LANE E — note-path terminus, PROVEN.
 
 Q: a real host's MIDI note reaches the engine via the queue consumer 0x320B20 ->

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SUPERSEDED / KNOWN-BAD RESULT: this probe installs its 0x3B9A30 hook AFTER
+# prepare_recall has already executed that block, and Unicorn caches translated
+# blocks -- so it reports "0 dispatch calls" for a path that actually fires 18.
+# Use laneE_terminus_ab.py / laneE_seq_ab.py (hooks installed on a virgin uc).
 """LANE E — trace the ACTUAL call chain of the plugin's own engine noteOn under
 Unicorn on a RECALLED engine. Hooks the candidate rvas and reports hit counts +
 argument tuples. Also dumps the proc-object vtable (rva 0x9C3018) slot 11, which

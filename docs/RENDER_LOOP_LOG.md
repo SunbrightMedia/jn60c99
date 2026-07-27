@@ -244,6 +244,22 @@ voice-advanced noise into the master where the plugin's frozen unit-8 copy would
 not. The port's snapshot/restore is provably equivalent to the plugin's nine
 isolated units. **"More noise oscillator" is NOT a noise-path defect.**
 
+### LANE E — the NOTE-PATH TERMINUS (scope question Q5): **NO-EQUIVALENT**
+PROVEN by hooking the value-tree dispatch while calling the engine's own
+`noteOn` (rva 0x3C7330): the engine noteOn **is** the per-voice Note/Gate bus
+internally — it dispatches `idx 433+v` (Note) with the note number and
+`idx 450+v` (Gate) with the **velocity**, on all 9 units (observed
+`(440, 60)` + `(457, 100)`, i.e. the allocator's chosen slot). `noteOff`
+dispatches `Gate = 0`. Three routes were then compared on a full state snapshot:
+A = engine `noteOn`/`noteOff` (what the oracle and the port drive),
+B = dispatching that same Note/Gate bus directly with the observed flag,
+C = the same bus under the recall role (flag=1). Result on BOTH factory patch 0
+and Chillwave patch 3 (BS Solid): **A-vs-B(on)=0, A-vs-B(off)=0, A-vs-C(on)=0
+differing cells.** The port's note terminus is the same one a real host reaches.
+(probes: `probes/render_loop/laneE_*.py`, results in `laneE_terminus_ab_p*.json`)
+
+**All five lanes returned NO-EQUIVALENT / no divergence.**
+
 ---
 
 ## STEP 3 — Re-express the oracle and diff — **RESULT: THE RENDER LOOP IS EXONERATED**
