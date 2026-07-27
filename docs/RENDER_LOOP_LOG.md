@@ -21,7 +21,11 @@ Covenant intact throughout: no capture data enters any derivation.
 
 ---
 
-## STEP 1 — Static map of the real per-block path — **IN PROGRESS**
+## STEP 1 — Static map of the real per-block path — **DONE**
+*(Note: the OCTAVE SHIFT "bug" recorded further down in this STEP-1 section was
+later RETRACTED by execution — see the retraction paragraph below. The port's
+binding is correct; it uses a record-offset convention that differs from
+`real_recall`'s blob-relative one by exactly 16.)*
 
 ### Confirmed entry points (PROVEN by dumping the engine vtable at rva 0x9df1d8)
 
