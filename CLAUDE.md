@@ -1,5 +1,63 @@
 # JUNO-60 (JU-06A) C99 port — project memory
 
+**★★ NEWEST (2026-07-27, Opus 5) — RENDER_LOOP_SCOPE EXECUTED; THE RENDER LOOP IS
+EXONERATED. Read `docs/RENDER_LOOP_LOG.md` (probes in `probes/render_loop/`).**
+The real per-block render was derived from the binary and every hand-written
+assumption was checked by execution. Findings, all PROVEN unless noted:
+- Real structure = `0x3C7400` (per-block) + work item `0x3C6F00`; item i base =
+  `ENGINE+1152+128*i`, `item+24 == state[i]`. Voices render whole-block via pool
+  items → barrier → master runs PER SAMPLE from `*(ENGINE+592)` **== state[8]**.
+  That IS what `e2e_emu.render()` does. `sub_7FF91DFB5AB0` really is just
+  `*(assign+168) += n` (the oracle's hand-written bump is exact).
+- The ONE extra thing the plugin does — a **voice-0-only per-sample call**
+  (engine vtable slot13, rva `0x3C7230`) — is a **front-panel LED meter**: zero
+  writes inside any of the 9 unit states (4096+256 executed calls, write hooks
+  over all 9×12 MB), read path pure-load by construction, and its accumulator
+  (`ENGINE+1040..1060`) is touched by exactly 2 functions in the whole binary,
+  neither in the audio path. Correctly omitted.
+- `*(ENGINE+56)` (numVoices) is **always 8** (sole engine factory `0x3C6790`);
+  the only other writer needs a paramID occurring exactly once in the binary (its
+  own compare immediate) → unreachable. Rendering all 8 voices is correct.
+- Master ABI: `a2[2i]=MAIN_i`, `a2[2i+1]=SUB_i`, voice order 0..7; the master
+  reads **only even slots** — forcing all SUB buffers to 1e20 leaves output
+  bit-identical, which validates the port's `a2[odd]=&scratch`. Ordering
+  controls prove the null result is non-vacuous.
+- **Noise policy EXONERATED** (the "more noise oscillator" suspect): the 164-byte
+  block at `state+84272` is byte-identical across units 0..7 at 6 checkpoints ×
+  5 scenarios (0/1/4 notes, CONDITION 40/220) while a note plays; the LFSR is
+  closed and autonomous; `master_render.c` reads NO cell in [84272,84436). The
+  port's snapshot/restore is provably equivalent to 9 isolated units.
+- **Block size is irrelevant**: bit-exact at 600/512/256/128/64/**1**.
+- Also closed this scope: the **Chillwave (user's own) bank decode** PROVEN via
+  the plugin's own record parser (64/64 verbatim, 0 leaf mismatches — a hole no
+  gate could see); the **position map** validated non-circularly against the
+  plugin's declared ranges (14335/14336, the one outlier is a signed leaf the
+  port already handles); the port's **BINDINGS table 31/31 correct** vs the
+  plugin's own name table; **full-state recall identical over the WHOLE
+  0xA83010 × 9 units** for BS Solid (the earlier diff covered only unit-0's
+  first 10512 bytes — FX/master was never compared until now); the **webapp's
+  real lifecycle** (idle → apply-on-running-engine → idle → note) bit-exact;
+  and **task #134 CLOSED** — the EFFECT-TYPE activation second stage changes
+  ZERO cells after recall (no gap).
+- **NEW REQUIRED GATE** `tools/verify/renderstruct_ab.py` in `make verify`:
+  locks block-size invariance + the warm apply-on-a-running-engine lifecycle
+  (22/22 bit-exact). Those two surfaces were previously ungated.
+- **Webapp fidelity fix:** the velocity default was reverted to the plugin's own
+  (Kbd Vel SW **OFF** → every note forced to velocity 100). It had been set to
+  SW ON + 127 "for A/B testing", which guarantees a mismatch against a DAW
+  instance on any velocity-sensitive patch.
+- **Independent confirmation the port recalls the right values:** reading the
+  plugin's own name table, BS Solid decodes to `DCO SUB LEVEL = 83` and
+  `VCF CUTOFF FREQ = 15` — exactly the two numbers the user read off their real
+  plugin's front panel. (Also corrects long-standing label errors in this repo's
+  notes: 770 is DCO PWM LEVEL, not SAW; VCF ENV MOD is 783, not 780.)
+- **The single remaining unexecuted link in the entire chain** is the
+  record-byte ↔ parameter POSITION MAP (Script.xml document order). It is
+  validated but not executed; executing it needs the controller preset path,
+  which is walled by the CRT/thread-pool issue (`docs/FINAL_SCOPE_LOG.md`). The
+  engine-side value getter is a `return 0;` stub (`0x3B6C30`), so the recall
+  enumerator cannot be used to read values back.
+
 **★ NEWEST (2026-07-27) — RECALL COMPLETENESS PROVEN; BS Solid hunt narrowed to
 the RENDER LOOP STRUCTURE. Read `docs/ENUM_HUNT_STATUS.md` first (probes in
 `probes/enum_hunt/`, full 5-lane reports in LANE_REPORTS.md).** Headlines: the
