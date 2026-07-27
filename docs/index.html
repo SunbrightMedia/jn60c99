@@ -80,6 +80,9 @@
     <label id="velLbl" title="Note-on velocity for the on-screen keys (MIDI keys use their own; VCF/VCA VELOCITY SENS respond to it). Only honoured when Kbd Vel SW is ON.">Vel
       <input type="range" id="vel" min="1" max="127" step="1" value="100" oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
       <span id="velV">100</span></label>
+    <label id="outLbl" title="MONITOR FADER (the fader a DAW track gives you — NOT part of the synth). The engine's output is bit-exact to the plugin's, and on UNISON patches (BS Solid, BS Glide, ...) the plugin genuinely peaks up to ~2.0: measured, and Boost Mode / Output Gain are proven no-ops in its engine. A DAW mixes that in floating point; a browser hard-clamps at 0 dBFS, which sounds like harsh digital clipping. Default 0.45 (~-7 dB) keeps the hottest bank patch under full scale. Set to 1.00 for the raw engine signal (unison patches will clip at the DAC, exactly as they would on an unattenuated DAW master).">Out
+      <input type="range" id="outVol" min="0" max="127" step="1" value="57" oninput="outVolApply()" style="vertical-align:middle">
+      <span id="outVolV">0.45</span></label>
   </div>
   <div class="row">
     <input type="text" id="filter" placeholder="filter parameters…" oninput="renderList()" style="flex:1">
@@ -382,7 +385,14 @@ function ensureAudio() {
     const n = L.length;                         // == BLK, at the engine's own rate
     renderFn(ctx, rbuf, n);
     const s = new Float32Array(M.HEAPF32.buffer, rbuf, n * 2);
-    for (let i = 0; i < n; i++) { L[i] = clamp1(s[2*i]); R[i] = clamp1(s[2*i+1]); }
+    // MONITOR FADER, applied AFTER the bit-exact engine (the DAW-fader role).
+    // Why it exists: UNISON patches genuinely peak up to ~2.0 in the plugin's own
+    // engine (measured; Boost Mode idx 21 / Output Gain idx 22 are executed no-ops
+    // — probes/assigner/boost_dispatch.py), a level a DAW carries in float but a
+    // browser hard-clamps at the DAC. This scales the MONITORED signal only; the
+    // engine state, WASM golden hashes and every A/B are upstream and untouched.
+    const g = OUT_GAIN;
+    for (let i = 0; i < n; i++) { L[i] = clamp1(s[2*i] * g); R[i] = clamp1(s[2*i+1] * g); }
   };
   procNode.connect(audioCtx.destination);
 }
@@ -519,6 +529,14 @@ function note(midi, on) {
 }
 
 // SYSTEM "Keyboard Velocity SW" toggle: mirrors the plugin's wrapper flag.
+// Monitor fader state (slider 0..127 -> gain 0..1, default 57 -> 0.45).
+let OUT_GAIN = 0.45;
+function outVolApply() {
+  OUT_GAIN = (+$("#outVol").value) / 127;
+  $("#outVolV").textContent = OUT_GAIN.toFixed(2);
+}
+window.outVolApply = outVolApply;
+
 function velSwApply() {
   const on = $("#velSw").checked;
   $("#vel").disabled = !on;                    // UI first — engine call below must not block it

@@ -113,8 +113,8 @@ page = replace_once(
 # 4. __peak test probe in the audio callback (verify_webapp.mjs asserts real audio)
 page = replace_once(
     page,
-    'for (let i = 0; i < n; i++) { L[i] = clamp1(s[2*i]); R[i] = clamp1(s[2*i+1]); }',
-    'for (let i = 0; i < n; i++) { L[i] = clamp1(s[2*i]); R[i] = clamp1(s[2*i+1]); }\n'
+    'for (let i = 0; i < n; i++) { L[i] = clamp1(s[2*i] * g); R[i] = clamp1(s[2*i+1] * g); }',
+    'for (let i = 0; i < n; i++) { L[i] = clamp1(s[2*i] * g); R[i] = clamp1(s[2*i+1] * g); }\n'
     '    let pk = 0; for (let i = 0; i < n; i++) { const a = Math.abs(L[i]); if (a > pk) pk = a; }\n'
     '    if (pk > (window.__peak || 0)) window.__peak = pk;   /* test probe */',
     '__peak probe')
