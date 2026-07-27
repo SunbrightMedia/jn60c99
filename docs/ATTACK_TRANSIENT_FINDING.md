@@ -71,3 +71,64 @@ capture the VCF cutoff-CV and ENV1 output cells sample-by-sample for the first
 under Unicorn. The two are bit-exact in aggregate, so any divergence must be in
 what the voice is initialised to, and a per-sample trace of the attack will show
 it directly.
+
+---
+
+# ROUND 2 (same session): sharpened to a single quantitative discriminator
+
+## The measurement that matters
+
+Onset-aligned (verified: onset offset is only **0.3 ms**, so the earlier
+window-misalignment failure mode is excluded), the capture is **~+8 dB richer
+than the port on harmonics 2..18 across the WHOLE note**, settling to ~+2 dB in
+long sustain. The single sharpest number:
+
+**SUB(65 Hz) / MAIN(130 Hz) amplitude ratio, early note:**
+
+| | ratio |
+|---|---|
+| capture (real plugin, real DAW) | **0.450** |
+| port | 0.096 |
+| **plugin under emulation, same recall** | **0.100** |
+
+The port reproduces the plugin-as-we-drive-it (0.096 vs 0.100). Both differ from
+the real instance by ~4.5x. Everything except the fundamental is lifted:
+harmonics +8 dB, sub 4.5x, inter-harmonic broadband +1.2 dB.
+
+## Hypotheses tested and REFUTED this round (each by execution)
+
+| hypothesis | result |
+|---|---|
+| webapp / Web-Audio delivery | **refuted** — a plain WAV rendered straight from the engine sounds wrong the same way (user-confirmed) |
+| a wrong recalled value | **refuted** — full-range sweep of VCF ENV MOD, VCF VELOCITY SENS, ENV1 A/D/S, VCF RESONANCE, VCF CUTOFF, VCF KEY FOLLOW: best single change only moves attack error 9.6 -> 5-6 dB, never near zero, and the biggest movers destroy the sustain match (3.2 -> 17 / 56 dB) |
+| DCO mix leaves swapped (SUB<->SAW etc.) | **refuted** — every permutation tested; best total 12.05 vs baseline 13.11, and each improves attack only by worsening sustain |
+| velocity | **partial at best** — attack fits best at ~120-127 vs 100, but still ~6 dB RMS scatter; the forced-velocity constant was re-read in the binary and is 100 (`BYTE10 = 100`), i.e. ours is right |
+| JU-06A-only leaves being wrongly applied | **refuted** — every parenthesised/`_NULL_` leaf in our map is either 0 on BS Solid or writes no cells; 0 suspects |
+| output-stage saturation (Boost Mode / Output Gain, which write ZERO engine cells and are absent from the port) | **refuted as the explanation** — best soft-clip only 13.1 -> 10.8 and needs an implausible 12x drive |
+| ASSIGN MODE 2 = UNISON not honoured (bridge hard-overrides to POLY) | **refuted** — forcing the patch's real UNISON makes it far worse (error 13.1 -> 25.4, peak 0.25 -> 1.53). The existing POLY override is correct |
+| sample rate (webapp 48k vs DAW 44.1k) | **refuted** — the plugin's own DSP has the same spectral shape at both |
+
+## Where this leaves it — stated precisely
+
+The port faithfully reproduces the plugin **as our recall drives it** — confirmed
+again this round on the sub/main ratio itself. And **no setting reachable from
+our recall reproduces the captured sound**: if this were a wrong recalled value,
+some value would have fitted. None did.
+
+So the real instance sits in a state our recall cannot produce, and the
+divergence is now pinned to one concrete, quantitative target rather than a
+subjective impression:
+
+> **make the DCO SUB(65 Hz)/MAIN(130 Hz) early-note ratio 0.45 instead of 0.10,
+> without disturbing the sustain match — at the same displayed DCO SUB LEVEL of
+> 83, which the user independently read off their own front panel.**
+
+That is a much sharper target than "sounds wrong" and any future attempt can be
+scored against it directly. It remains consistent with the one link in the chain
+that has never been *executed* (the record-byte -> parameter position map,
+reachable only through the walled controller preset path), and it is the natural
+next thing to attack.
+
+Covenant note: the capture was used ONLY to locate and to score hypotheses. No
+number from it has entered the port, a gate, or the ledger; every refutation
+above was produced by executing the plugin or the port, not by fitting.
