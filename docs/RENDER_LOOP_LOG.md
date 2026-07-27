@@ -362,6 +362,14 @@ gates the two dimensions this scope proved and that no previous gate touched:
 block-size invariance (1/64/128/512/600) and the warm apply-on-a-running-engine
 lifecycle. **22/22 checks bit-exact.**
 
+**FINAL CONFIRMATION: the full `make verify` WITH the new gate ran end-to-end
+(all references regenerated from truth/ after a container restart — nothing
+cached) and exited 0.** Highlights: recall gate + exhaustive recall PASS; render
+A/B **57/57 BIT-EXACT at 48000, 44100 AND 88200**; arp schedule + render 7/7;
+cold-state bit-exact at all 5 rates; differential fuzz 24 seeds 0 diverged;
+**RENDERSTRUCT 22/22 PASS**; completeness 0 GAP 0 UNRESOLVED; deferred rows
+proven not engine-reachable; ledger all PROVEN; completeness scan OK.
+
 ## STEP 6 — Ship — **DONE**
 
 - `gui/web/juno.wasm` was already current with `src/` (`git log <wasm-rebuild>..HEAD
