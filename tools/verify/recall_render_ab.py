@@ -168,6 +168,14 @@ def prepare_recall(idx, bank, leaves, E, R, sr):
         for (disp, recoff, raw) in finefx:
             try: e.dispatch(u, disp, R.rd_desc(e, disp))
             except RuntimeError: pass
+    # What the HOST does that a bare dispatch does not: the engine's parameter
+    # entry 0x3C7AE0 follows every 0x3B9A30 write with assigner->slot+8(4), which
+    # re-caches ASSIGN MODE (800) and LEGATO (799). Skipping it pins the plugin's
+    # own allocator to POLY, so a MONO/UNISON patch renders polyphonically on BOTH
+    # sides of every render A/B -- the shared blind spot this closes. Idempotent:
+    # it re-reads the current values, so once after the writes == after each write
+    # (proven by probes/assigner/laneX_notify_placement.py).
+    e.assigner_notify()
     e.snap_all(); e.clear_latch(); e.set_ftz()
     return e
 

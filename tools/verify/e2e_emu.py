@@ -32,6 +32,16 @@ SETSR   = IB + 0x3C7A20
 DISPATCH= IB + 0x3B9A30
 NOTEON  = IB + 0x3C7330   # sub_7FF91E027330 -> noteobj 0242D0 -> assigner noteOn (vtbl+8), carries velocity
 NOTEOFF = IB + 0x3C72D0   # sub_7FF91E0272D0 -> noteobj 024230 -> assigner noteOff (vtbl+16, zeroes vel)
+# The SECOND call the HOST parameter entry makes after every parameter write.
+# sub_7FF91E027AE0 (engine vtable +112), per unit u, does exactly two things:
+#     (*(vtbl(proc[u])   + 88))(proc[u], idx, 0, value)   <- DISPATCH above
+#     (*(vtbl(assign[u]) +  8))(assign[u], 4)             <- THIS
+# and slot+8 on the assigner's own vptr (rva 0x969740) is sub_7FF91DFB49B0, which
+# re-reads ASSIGN MODE (param 800) into assigner+16 and LEGATO (799) into
+# assigner+20 -- the fields the note dispatcher sub_7FF91DFB5820 switches on
+# (1 = MONO, 2 = UNISON, else POLY). Recall that only DISPATCHes leaves the
+# assigner permanently in POLY; see docs/ASSIGNER_MODE_FINDING.md.
+ASG_NOTIFY = IB + 0x3549B0
 VOICE_WRAP  = IB + 0x398F30   # (state, voiceIdx, DWORD** outPair)
 MASTER_WRAP = IB + 0x398EC0   # (state, float** a2x16, ptr-> {outL*, outR*})
 ALLOC   = IB + 0x67522C
@@ -283,6 +293,14 @@ class E2E:
         return self.call(DISPATCH, rcx=self.proc[unit], rdx=idx, r8=flag, r9=val)
     def dispatch_all(self,idx,val,flag=1):
         for u in range(9): self.dispatch(u,idx,val,flag)
+    def assigner_notify(self):
+        """Run the plugin's own assigner parameter refresh on all 9 units -- the
+        call the HOST parameter entry (0x3C7AE0) makes after EVERY parameter
+        write, and the one a bare recall dispatch omits. Without it the plugin's
+        own allocator stays in POLY no matter what the patch says (executed
+        proof: probes/assigner/)."""
+        for u in range(9):
+            self.call(ASG_NOTIFY, rcx=self.assign[u], rdx=4)
     def note_on(self,note,vel):  self.call(NOTEON,  rcx=self.HOST, rdx=note, r8=vel)
     def note_off(self,note,vel=64): self.call(NOTEOFF, rcx=self.HOST, rdx=note, r8=vel)
     def snap_all(self):

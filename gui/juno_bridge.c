@@ -870,26 +870,25 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
     /* Per-patch VOICE-ASSIGN recall (CAssignJu60): ASSIGN MODE (poly/mono/unison/
      * poly-variant), LEGATO, and PORTAMENTO-engaged drive the note allocator above. */
     juno_bank_voice_modes(bank, idx, &c->legato, &c->assign_mode, &porta);
-    /* KEY ASSIGN (blob 56) — the port originally read this as POLY(0)/MONO(1)/UNISON(2),
-     * but a full-play-path running-code A/B vs the plugin's own render (all 64 patches,
-     * note 60 vel 105) proves ALL THREE VALUES ARE POLYPHONIC: value 1 (14 patches:
-     * Rip Lead, Ouch Bass, ...) played mono was 8x wrong; value 2 (patches 61/63) played
-     * unison (8 stacked voices) was ~8x too loud. Both matched the plugin bit-for-bit
-     * only when routed to POLY. The JUNO-60's mono/unison, if present, are NOT this byte.
-     * So map every value -> POLY. (Any sub-mode difference between the three only affects
-     * chord voice-cycling, not the single-note render this A/B measures — documented
-     * follow-up.) mono_note_on / unison_note_on are retained for a future real selector. */
-    c->assign_mode = 0;   /* all KEY ASSIGN values -> POLY (proven vs plugin, 64 patches) */
-    /* LEGATO: neutralized for the same reason as KEY ASSIGN above. The plugin's
-     * assigner cache provably stays legato=0 through the committed recall path
-     * (fuzz seed 57: on a LEGATO=1+PORTA patch the plugin's second overlapping
-     * note-on writes ONLY the new voice's cells — it never glides the previous
-     * voice — while the blob-armed port poly-glide dragged v7's M.CV, audible to
-     * ~0.19 abs; restoring just the glided cells made the seed bit-exact).
-     * portamento_on is intentionally KEPT: the plugin reads param 798 fresh from
-     * the processor getter, which recall DOES populate (steal-newest rule). */
-    c->legato = 0;
     c->portamento_on = (porta != 0);
+    /* HISTORY — why ASSIGN MODE and LEGATO were forced to 0 here, and why that was
+     * wrong (docs/ASSIGNER_MODE_FINDING.md). An earlier full-play-path A/B against
+     * "the plugin's own render" concluded that all three KEY ASSIGN values are
+     * polyphonic. That A/B was measuring an ORACLE WHOSE ALLOCATOR HAD NEVER BEEN
+     * TOLD THE MODE. The plugin's allocator (CAssignJu60) caches ASSIGN MODE at
+     * assigner+16 and LEGATO at assigner+20, and the ONLY thing that fills them is
+     * sub_7FF91DFB49B0(assigner, 4) — which the engine's HOST parameter entry
+     * (0x3C7AE0) calls after EVERY parameter write, right after the 0x3B9A30
+     * dispatch, but which a bare recall dispatch never calls. So the oracle stayed
+     * in POLY for every patch, the port was "corrected" to match it, and both were
+     * wrong together — a textbook shared blind spot.
+     * Executed proof (probes/assigner/laneX_audio_impact.py): running the plugin's
+     * OWN refresh after its OWN recall, changing nothing else, moves its OWN audio
+     * by +16.65 dB on BS Solid (Chillwave 3, ASSIGN=2) and +17.43 dB on BS Glide,
+     * with every sample differing; ASSIGN=0 patches stay bit-identical (control).
+     * The patch's real values are therefore used, and the allocator modes below
+     * (mono_note_on / unison_note_on, transcribed from sub_7FF91DFB38F0 /
+     * sub_7FF91DFB3B60) are live. Gated by tools/verify/assigner_ab.py. */
     /* Switching assign mode flushes sounding voices so the new allocator starts
      * clean (the plugin's mode-change reader flushes hold + all-notes-off). Release
      * ALL voices directly (mode-agnostic) and clear the held-note mask. Skipped for
