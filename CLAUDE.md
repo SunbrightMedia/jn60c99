@@ -1,5 +1,32 @@
 # JUNO-60 (JU-06A) C99 port — project memory
 
+**★ NEWEST (2026-07-27) — RECALL COMPLETENESS PROVEN; BS Solid hunt narrowed to
+the RENDER LOOP STRUCTURE. Read `docs/ENUM_HUNT_STATUS.md` first (probes in
+`probes/enum_hunt/`, full 5-lane reports in LANE_REPORTS.md).** Headlines: the
+plugin's recall enumerator (0x3B48A0) fires 165 indices vs the port's 129, BUT a
+full-state A/B (enum-order 165-idx recall vs port recall, identical per-patch
+values) = **0 differing cells** on 15 factory + 4 Chillwave patches incl. BS
+Solid; every dropped index is a SYSTEM/live-runtime param (Note/Gate/Mute
+per-voice bus 433-474, MIDI CCs 493/495/498, MASTER TUNE 20, scale 128-141,
+PERFORM 614+, GUI switches 553-555, redundant H float twins 878/1029 — proven
+bit-identical to the byte setters) that is identity at its descriptor default,
+and Script.xml only produces dispatch >= 748 so preset load feeds them defaults.
+The connect path (0x320420) pushes ONLY Keyboard-Velocity-SW + transport; Boost
+Mode/Output Gain write ZERO engine cells; CONDITION = per-patch idx 856, already
+applied. → **Recall/preset/settings are EXONERATED for the BS Solid mid-band
+deficit.** One real generalization gap found (not the bug — identity in all 128
+known patches, BS Solid is TYPE 0): DELAY TAP TIME 1178 is DELAY-TYPE-1-gated,
+writes 4297792 = f32(trunc(255*byte/100)/255), record byte 3056 (INFERRED);
+port freezes tap=50 in delay_recall.c DLY1_B — wire when convenient. **PRIME
+SUSPECT NOW: the hand-written render loop structure** — e2e_emu.render() and
+juno_driver.c agree with each other by construction (shared blind spot): the
+real per-block DSP under the pool (0x3C7400) — voice order, host block sizes
+(64-512 vs oracle's 600), and the shared analog-noise block (84272..84436)
+snapshot/restore policy — was never derived from the binary. User's ear ("more
+noise oscillator" in the real plugin) matches a noise-block-policy difference.
+NEXT: derive the real per-block structure from 0x3C7400 + pool work items,
+re-express the oracle to match, re-run render A/B.
+
 **Read `GOAL.md` first — it is the user's own statement of the goal and is binding.**
 Short form: a bit-exact C99 port of the Roland Cloud JUNO-60 (JU-06A) VST3 DSP that
 sounds EXACTLY like the original, playable in the browser (WASM), portable to a
