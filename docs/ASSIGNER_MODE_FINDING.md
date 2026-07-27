@@ -39,6 +39,28 @@ issue is truly invisible, there is something wrong with our tests."
 | 5 | After our recall the fields are `(0,0)` on all 9 units for **every** patch; after running the plugin's own `0x3549B0(asg,4)` they become the patch's real values — BS Solid `mode=2`, LD Classic Lead `mode=1`, LD Porta `mode=2 legato=1` | **PROVEN** (`probes/assigner/laneX_mode_field.py`) |
 | 6 | Notifying once after the recall writes is identical to the host's notify-after-every-write: same assigner fields, same audio, **0 differing cells over all 9 × 0xA83010 bytes** | **PROVEN** (`probes/assigner/laneX_notify_placement.py`) |
 
+## Independent corroboration — the plugin's own descriptor table
+
+`probes/assigner/laneX_descriptors.py` reads the plugin's parameter DB
+(rva `0x98c040 + 16*idx` = {min,max,default,flags}) and name table (rva `0x9a0030`):
+
+| idx | the plugin's own name | range | default |
+|---|---|---|---|
+| 798 | `PORTAMENTO` | 0..255 | 0 |
+| 799 | `LEGATO` | 0..1 | 0 |
+| **800** | **`ASSIGN MODE`** | **0..3** | 0 |
+| 433 | `Note (voice 1)` | 0..127 | 36 |
+| 450 | `Gate (voice 1)` | 0..127 | 0 |
+| **467** | **`Mute (voice 1)`** | 0..1 | 0 |
+
+`ASSIGN MODE` has **max = 3** — a four-way switch, exactly the four allocators
+`sub_7FF91DFB5820` dispatches to. The plugin's own metadata refutes "all three KEY
+ASSIGN values are polyphonic" without running anything.
+
+And the leaf the LEGATO arm writes is literally named **"Mute (voice v)"**: the arm
+mutes the glide on the first note after silence and un-mutes it on every note after
+— which is exactly the law derived by execution above, arrived at independently.
+
 ## The audio impact — plugin vs itself
 
 Same engine, same recall, same note (60 @ vel 100), same render. The **only**

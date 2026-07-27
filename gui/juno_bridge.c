@@ -336,7 +336,10 @@ float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
      * on the next note in the real plugin, so mirror it here instead of leaving the
      * bank-apply value stale. (LEGATO/ASSIGN MODE are not panel leaves — they reach
      * the allocator only through recall; see docs/ASSIGNER_MODE_FINDING.md.) */
-    if (blob == 54) c->portamento_on = ((byte & 0xFF) != 0);
+    if (blob == 54) {
+        c->portamento_on = ((byte & 0xFF) != 0);
+        c->porta_base = JF(c->st, 592);   /* the value leaf 467+v restores */
+    }
     /* TEMPO SYNC leaf (blob 59): a live flip re-times the ACTIVE slot-1 delay
      * instance (synced at host BPM on engage, the patch's manual time on
      * disengage) — measured law in juno_live_delay_sync; the base cell 102352 is
