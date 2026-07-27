@@ -132,3 +132,64 @@ next thing to attack.
 Covenant note: the capture was used ONLY to locate and to score hypotheses. No
 number from it has entered the port, a gate, or the ledger; every refutation
 above was produced by executing the plugin or the port, not by fitting.
+
+---
+
+# ROUND 3: the requirement is OUTSIDE the reachable parameter range
+
+## The decisive normalisation test
+
+Gain-matching on H1 cannot distinguish "harmonics too quiet" from "fundamental
+too loud". Re-normalising on TOTAL RMS settles it:
+
+| window | port H1 vs capture H1 (RMS-normalised) | 400-3000 Hz band | H1-vs-band tilt |
+|---|---|---|---|
+| ATTACK | port **+3.3 dB** louder | port **-8.1 dB** quieter | **-11.4 dB** |
+| SUSTAIN | port +1.2 dB | port -0.9 dB | -2.0 dB |
+
+Both signals put their resonant peak at the SAME frequency (129 / 131 Hz), so
+the cutoff mapping is NOT displaced. The requirement is specifically:
+
+> **~+11 dB more filter opening during the ATTACK, while the SUSTAIN stays put.**
+
+## Why no parameter can deliver that
+
+- **Velocity** moves both windows together: vel 115 fixes the attack
+  (9.45 -> 3.88) but *breaks* the sustain (3.65 -> 7.00). Grid over
+  velocity x DCO SUB LEVEL (20 combinations): best total 10.88 vs baseline
+  13.11 — no combination collapses both. Attack and sustain trade off.
+- **VCF ENV MOD** is already 215 of a 255 maximum. Going to the ceiling buys
+  only ~1.4 dB of extra envelope depth — an order of magnitude short of the
+  +11 dB required. Even at max, the attack cannot reach the captured brightness.
+- **DCO SUB LEVEL** moves the sub/main ratio but not the mid band; the capture's
+  0.450 is unreachable without wrecking the harmonic fit.
+
+**So the needed attack brightness lies OUTSIDE the range the parameters can
+produce.** That is the strongest structural statement available from this data:
+it is not a mis-decoded value, because no legal value — including the maximum —
+gets there.
+
+## Honest status
+
+**The cause is NOT identified.** What is established:
+
+1. The port reproduces the plugin-as-our-recall-drives-it (sub/main 0.096 vs
+   the emulated plugin's 0.100; render A/B bit-exact everywhere else).
+2. The real instance needs ~+11 dB more attack-phase filter opening at an
+   unchanged sustain, plus ~4.5x the sub content.
+3. **No parameter, or combination, within the legal ranges produces that** —
+   which rules out the "one wrong recalled byte" family of explanations
+   entirely, and points at something structural in how the filter envelope's
+   peak contribution is formed, or at a signal path we do not model.
+
+Everything in rounds 1-3 was produced by executing the plugin or the port. The
+capture was used only to locate and to score; no number from it has been written
+into the port, a gate, or the ledger.
+
+## The one avenue not yet possible here
+
+Both remaining candidates (the un-executed record-byte -> parameter POSITION MAP,
+and any wrapper-side signal path) live behind the plugin's controller preset
+lifecycle, which cannot be constructed in this environment (CRT/thread-pool wall,
+`docs/FINAL_SCOPE_LOG.md`). Until that is reachable, this specific residual
+cannot be closed from the engine side.
