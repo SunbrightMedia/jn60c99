@@ -114,6 +114,22 @@ Reading blob bytes 54/55/56 through the plugin's own parser:
    and the port's, over patches spanning ASSIGN 0/1/2 × LEGATO × PORTAMENTO at
    44.1 and 48 kHz, and requires bit-exact audio.
 
+## Post-fix verification
+
+* **`tools/verify/assigner_ab.py` (in `make verify`): 28/28 BIT-EXACT** — factory
+  patches spanning ASSIGN 0/1/2 × LEGATO × PORTAMENTO, two note scripts (overlapping
+  notes; a 4-note chord released out of order), 44.1 and 48 kHz.
+* **Chillwave bank, `probes/assigner/chillwave_seq_{ref,port}.py`: 16/16 BIT-EXACT** —
+  including **BS Solid (3)** and **BS Glide (4)**, the patches actually reported, plus
+  p6/p10 (ASSIGN 1), p12 (ASSIGN 2), p30/p35 (ASSIGN 2 + LEGATO), p31 (ASSIGN 0) as a
+  control. A probe rather than a gate only because that bank is not in `truth/`.
+* Single-note RMS now matches the plugin's own to five decimals in every mode:
+  F0 0.07770, F5 0.03268, F61 0.10803, CW3 0.65162, CW4 1.12641, CW30 0.16745.
+* `tests/teensy_golden.h` regenerated: the 5 scenarios whose hash moved are exactly
+  patches 5/22/31 (ASSIGN 1) and 61/63 (ASSIGN 2); the 3 unchanged are 0/20/40, all
+  ASSIGN 0 — a one-to-one correspondence that independently confirms the change
+  touches only the patches whose mode was wrong.
+
 ## What this does NOT fix (honest scope)
 
 The #124 DAW-bounce centroid residual on the 8 factory presets is **essentially
