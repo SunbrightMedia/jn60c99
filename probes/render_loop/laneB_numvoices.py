@@ -9,7 +9,12 @@ PROVEN facts gathered by executing the plugin's own machine code under Unicorn:
   * assigner vtable slots +128 / +136 and what the setter does to allocation state
 Two-process rule: this file NEVER ctypes-loads libjuno.so.
 """
-import sys, struct, json
+import sys, struct, json, time
+T0=time.time()
+def mark(m):
+    print("[%7.1fs] %s"%(time.time()-T0,m),flush=True)
+def dump():
+    print(json.dumps(out,indent=1),flush=True)
 sys.path.insert(0, "/home/user/jn60c99/tools/verify")
 import e2e_emu as E
 from e2e_emu import E2E, IB
@@ -21,8 +26,11 @@ ENG_VT    = IB + 0x9df1d8
 
 out = {}
 
+mark("ctor")
 e = E2E()
+mark("build")
 e.build(48000.0)
+mark("built")
 uc = e.uc
 def u32(a): return struct.unpack("<I", uc.mem_read(a, 4))[0]
 def i32(a): return struct.unpack("<i", uc.mem_read(a, 4))[0]
@@ -66,6 +74,7 @@ for i in range(9):
         a168_samplecounter=u64(asg + 168),
     ))
 out["units"] = units
+mark("units done"); dump()
 
 AVPTR = u64(u64(H + 104))
 avt = {}
@@ -83,7 +92,9 @@ a0 = u64(H + 104)
 out["getter_returns_on_unit0"] = e.call(GET, rcx=a0) & 0xFFFFFFFF
 
 # ---- what the plugin's OWN engine factory produces (the real-host path)
+mark("calling FACTORY 0x3C6790"); dump()
 newe = e.call(FACTORY)
+mark("factory returned")
 out["factory_0x3C6790"] = {
     "ptr": hex(newe),
     "+8 sampleRate f32": f32(newe + 8),
@@ -93,6 +104,7 @@ out["factory_0x3C6790"] = {
     "vptr_rva": hex(u64(newe) - IB),
 }
 
+mark("hostparam"); dump()
 # ---- host param entry with the magic paramID
 for v in (4, 8, 1, 0, 8):
     e.call(HOSTPARAM, rcx=H, rdx=268419086, r8=v)
@@ -112,6 +124,7 @@ def asnap(a):
                 p84=u64(a + 84), p92=i32(a + 92), p152=i32(a + 152),
                 order=[i32(a + 120 + 4 * k) for k in range(8)],
                 p168=u64(a + 168))
+mark("setter"); dump()
 out["assign0_before_setter"] = asnap(a0)
 e.call(SET, rcx=a0, rdx=4)
 out["assign0_after_set4"] = asnap(a0)
@@ -120,4 +133,6 @@ out["assign0_after_set99_clamp"] = asnap(a0)
 e.call(SET, rcx=a0, rdx=8)
 out["assign0_after_restore8"] = asnap(a0)
 
-print(json.dumps(out, indent=1))
+
+
+mark("DONE"); dump()

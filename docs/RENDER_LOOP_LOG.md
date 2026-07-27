@@ -144,3 +144,69 @@ the correct parameter**. The single flagged row is a cosmetic label shortening
 **Delivery freshness — CHECKED.** `gui/web/juno.wasm` is newer than every
 `src/*.c` and `git log 5fc3918..HEAD -- src/` is empty: the shipped WASM is
 current with the sources (the user is not hearing a stale engine).
+
+**RETRACTION of the OCTAVE-SHIFT "bug" above.** The range-check outlier is
+explained and is NOT a port defect. The port's `record_byte(blob, roff)` uses a
+RECORD-offset convention (`blob_index = roff - 16`) while `real_recall.leaf_table`
+is blob-relative, so the two differ by exactly 16 and agree on every leaf. Checked
+by execution: record/blob index 282 is the arp ENABLE flag (value 1 on exactly the
+7 arp patches, 0 on all 57 others — perfect discrimination,
+`probes/render_loop/arp_binding_check.py`), and the port reads precisely that byte.
+The port also ALREADY decodes the signed `SCATTER DEPTH` as int8. Only 3 signed
+leaves exist in the entire map (`probes/render_loop/signed_leaves.py`); the sole
+one carrying a negative value in either bank is `OCTAVE SHIFT` (Chillwave 53),
+and executing its setter shows it writes **zero engine cells at every value**
+(`probes/render_loop/octave_shift_law.py`) — it is an arpeggiator-side parameter,
+engine-inert. Residual: the port does not consume OCTAVE SHIFT from the bank
+(minor, arp-only, engine-inert) — logged, not a BS Solid factor.
+
+**Full-state recall completeness — RE-PROVEN over the WHOLE state (this closes a
+hole in the earlier proof).** The previous enum-vs-port diff compared only unit-0's
+first 10512 bytes; the FX/master region (chorus 6396xxx/10693xxx, delay 102xxx/
+6497xxx, reverb 10759xxx, routing 11022xxx) was never compared, and BS Solid is an
+EFFECT TYPE 2 + reverb patch. `probes/render_loop/fullstate_diff_ALL.py` now diffs
+the FULL 0xA83010 state for ALL NINE units: **every unit byte-identical, 0
+differing cells** for BS Solid. Recall is complete over the entire engine state.
+
+**The webapp's ACTUAL lifecycle — A/B'd and BIT-EXACT.** Every prior gate drives
+cold. `probes/render_loop/webapp_lifecycle_ab.py` reproduces what the webapp really
+does — engine created, ScriptProcessor renders silence from boot (72000 samples),
+patch applied to the RUNNING engine, more idle (36000), then note — at 44.1 kHz in
+1024-frame blocks, port vs the plugin: **0 differing samples of 24000, L and R.**
+
+**Plugin-vs-plugin rate check (webapp runs at the browser rate, DAW at 44.1k).**
+`probes/render_loop/rate_timbre_check.py` renders BS Solid through the PLUGIN'S OWN
+DSP at 44100 and 48000: the dominant band (50-200 Hz) differs by only −1.19 dB and
+the sustained spectrum shape is the same. Rate is not a material timbre factor here.
+Incidentally this measurement shows BS Solid's sustain is, in the plugin itself,
+overwhelmingly sub-bass: 50-200 Hz sits ~66 dB above the 400-780 Hz band.
+
+---
+
+## STEP 2 — Execute and confirm — lane results
+
+### LANE A — the voice-0-only per-sample call (rva 0x3C7230): **NO-EQUIVALENT (inert)**
+PROVEN(executed): called 4096× plus 256× interleaved with per-sample render on a
+recalled patch + note, with `UC_HOOK_MEM_WRITE` over all nine
+`state[u]..state[u]+0xA83010` regions → **zero writes inside any unit state**. Its
+entire write footprint is `ENGINE+40` (a lock word, net-zero) and
+`ENGINE+1040..1060`. READ(disasm): its read path `0x3C10B0 → 0x3C2520` is pure
+load (`movsxd/lea/mov/test/cmp/movss/xorps/ret`, zero stores); its write path
+`0x324A30` is `acc::push` into a 6-field display accumulator. PROVEN(static, whole
+`.text` decoded, 2 966 379 instructions): that accumulator is touched by exactly
+two functions in the entire binary — slot13 (push) and slot10 (a GUI read that
+normalises against a 9600-sample = 5 Hz blink reference) — and by nothing in the
+audio path; `0x3C7400` contains no reference to it at all.
+**It is a front-panel LED/meter feed. The oracle and the port are correct to omit it.**
+
+### LANE B — the numVoices gate `*(ENGINE+56)`: **NO-EQUIVALENT (always 8)**
+PROVEN(executed): the plugin's sole engine factory `0x3C6790` returns an engine
+with `*(int*)(this+56) == 8`; the constructor `0x3C5A50` also writes 8. The only
+other writer is the host param entry `0x3C7AE0`, and only for paramID
+`0x0FFFC00E` — PROVEN by binary scan that this dword occurs **exactly once** in
+`truth/JUNO60.vst3`, as its own compare immediate inside `0x3C7AE0`; it is in no
+parameter table, so no host or internal path can ever deliver it.
+INFERRED from those: numVoices is 8 for the whole life of a real instance, so
+`0x3C7400` always renders all 8 voices — exactly what the oracle does. The `0`
+our probe read after `build()` is a harness artefact (e2e_emu hand-allocates a
+zeroed engine buffer and calls only BUILD, which does not write +56).
