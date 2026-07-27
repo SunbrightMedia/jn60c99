@@ -47,12 +47,42 @@ stack; the stack retriggers together only when it was idle, otherwise it glides.
 **POLY-variant (3).** First free/release voice by linear index, else steal; no same-note
 reuse and no legato glide. Unused by the factory bank; ported for completeness.
 
-**LEGATO.** Read in exactly one place in the binary (POLY, and only when PORTAMENTO ≠ 0):
-a newly played note drags every currently-held voice's pitch to the new note
-(poly-portamento-on-legato). It does **not** gate an envelope-retrigger latch and has no
-effect in modes 1/2/3 or with portamento off. (The mono/unison "no-retrigger-on-overlap"
-legato is hard-wired into those modes, keyed on whether the target voice is still gated —
-not on the LEGATO param.)
+**LEGATO.** Read in exactly one place in the binary — `sub_7FF91DFB3150` LABEL_21,
+i.e. POLY only, and only when PORTAMENTO ≠ 0 (`if (a1[5] && a4 == 1)`). It has no
+effect in modes 1/2/3 or with portamento off. (The mono/unison
+"no-retrigger-on-overlap" legato is hard-wired into those modes, keyed on whether the
+target voice is still gated — not on the LEGATO param.)
+
+**CORRECTED 2026-07-27** — the rule below replaces the earlier "drags every
+currently-held voice's pitch to the new note", which was hand-invented and diverged
+from the plugin on the *first* note of a legato line (`assigner_ab` patch 55, first
+differing sample at index 2):
+
+```
+silent = no voice currently gated
+if (silent) { every voice: leaf 467+v := 1 ; legato_mask := all voices }
+else        { every voice: leaf 467+v := 0 }
+for i != pick with bit i of legato_mask:      # GATED OR NOT
+    if (voice_note[i] != note) move voice i's pitch to the new note   # no gate edge
+    voice_note[i] = note
+...trigger pick...
+legato_mask &= ~(1 << pick)          # legato_mask is assigner+68
+```
+
+**Leaf 467+v is the per-voice PORTAMENTO GATE**, PROVEN by dispatching the plugin's
+own setter (`probes/assigner/laneX_legato_bus.py`, `_restore.py`, `_gate_9824.py`,
+`_p55_trace.py`): it touches exactly voice v's `592 + v*10512` and `9824 + v*10512`;
+value 1 forces **both** to 0, value 0 puts 592 back to the recalled PORTAMENTO on/off
+and does **not** write 9824. (The decompiler dropped the else-branch call's value
+argument, so the asymmetry was settled by tracing the plugin's own cells across a
+whole note sequence.) Cell 592 is the DCO glide gate — `voice_render.c:674`
+`v45 = (v43+1)*JF(a1,592)`, and `v45 == 0` bypasses the glide conditioner entirely —
+so the first note after silence does not glide from nothing, and every later note
+re-arms the glide. Ported as `juno_note_porta_gate()`.
+
+Per-voice note bus, all mapped by execution: **433+v** = M.CV, **450+v** =
+gate/velocity (cells 320, 1856 on every voice, 6864, 9680, 9824), **467+v** = the
+portamento gate above.
 
 ## Verification
 `gui/juno_bridge.c` gains `juno_gui_debug_voices()` (voice notes + gate state). Playing a
