@@ -1,5 +1,20 @@
 # JUNO-60 (JU-06A) C99 port — project memory
 
+**⚑ LIVE WORK ORDER (2026-07-27, user-binding, supersedes all other NEXT
+pointers): `docs/HOSTPATH_PARITY_SCOPE.md` — execute STEP 0→5 to the letter.**
+User symptoms after the assigner fix (peaking unison first notes, other peaks,
+"filter even quieter", more): S1/S2 levels are PROVEN the plugin's own (BS Glide
+peak 1.981; Boost 21 / Output Gain 22 executed no-ops — `probes/assigner/
+boost_dispatch.py`; wrapper output has NO gain stage, only a license-gated
+demo bit-crusher at decomp_300000.c:27702). The browser was hard-clamping at
+0 dBFS → webapp now has a MONITOR fader (delivery-only, default 0.45; the
+DAW-fader role — engine untouched). The remaining surface is the WRAPPER
+LIFECYCLE: SYSTEM defaults (Kbd Vel SW still INFERRED; Velocity Curve/Offset/
+Fixed Velocity never derived), the event→MIDI→queue note path, and setState —
+all specced with anchors in the scope doc. STEP 0 = finish `make verify`
+(references regenerating post-assigner-fix; resumable, restart on container
+death; 0 failures so far).
+
 **★★★ NEWEST (2026-07-27, Opus 5) — THE "STILL SOUNDS WRONG" ROOT CAUSE IS FOUND
 AND FIXED: the plugin's voice allocator never learned KEY ASSIGN. Read
 `docs/ASSIGNER_MODE_FINDING.md` (probes in `probes/assigner/`).**
