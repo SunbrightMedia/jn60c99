@@ -80,9 +80,9 @@
     <label id="velLbl" title="Note-on velocity for the on-screen keys (MIDI keys use their own; VCF/VCA VELOCITY SENS respond to it). Only honoured when Kbd Vel SW is ON.">Vel
       <input type="range" id="vel" min="1" max="127" step="1" value="100" oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
       <span id="velV">100</span></label>
-    <label id="outLbl" title="MONITOR FADER (the fader a DAW track gives you — NOT part of the synth). The engine's output is bit-exact to the plugin's, and on UNISON patches (BS Solid, BS Glide, ...) the plugin genuinely peaks up to ~2.0: measured, and Boost Mode / Output Gain are proven no-ops in its engine. A DAW mixes that in floating point; a browser hard-clamps at 0 dBFS, which sounds like harsh digital clipping. Default 0.45 (~-7 dB) keeps the hottest bank patch under full scale. Set to 1.00 for the raw engine signal (unison patches will clip at the DAC, exactly as they would on an unattenuated DAW master).">Out
-      <input type="range" id="outVol" min="0" max="127" step="1" value="57" oninput="outVolApply()" style="vertical-align:middle">
-      <span id="outVolV">0.45</span></label>
+    <label id="outLbl" title="MONITOR FADER — the fader a DAW track gives you. It is NOT part of the synth: it is applied after the bit-exact engine, and the engine, its state and every A/B gate are upstream of it. Why it is needed: the engine's master stage ends with out = 2 x (x * cell101312), and cell 101312 has exactly ONE writer in the whole plugin binary — the constructor, storing 1.0 — so there is no master attenuation anywhere, and Boost Mode / Output Gain are executed no-ops. The plugin really is this hot. Measured across all 128 patches in both banks, warmed (the state a real instance is always in): worst single-note peak 1.110 (Chillwave 30), worst 4-note-chord peak 1.937 (factory 38). A DAW carries that in floating point and you pull the fader; a browser hard-clamps at 0 dBFS and it becomes harsh digital clipping. The default 0.50 is 1/1.937 rounded down, i.e. the measured value that keeps the hottest four-note chord in either bank just under full scale. Set it to 1.00 for the raw engine signal.">Out
+      <input type="range" id="outVol" min="0" max="127" step="1" value="64" oninput="outVolApply()" style="vertical-align:middle">
+      <span id="outVolV">0.50</span></label>
   </div>
   <div class="row">
     <input type="text" id="filter" placeholder="filter parameters…" oninput="renderList()" style="flex:1">
@@ -242,10 +242,32 @@ async function boot() {
   // start at 0 and only converge toward their targets WHILE rendering; a freshly
   // created engine plays its FIRST note with an audible ~1-2 s swell (the filter
   // slowly opening) until they settle. A DAW never shows this because the host has
-  // always been rendering before you play. Measured: the first-note trajectory is
-  // fully converged (bit-stable) after ~1 s of warmup, so warm 1.5 s at the host
-  // rate. This is a one-time boot cost; later patch changes keep the warmed cells.
-  warmupFn(ctx, (SR * 3) >> 1);
+  // always been rendering before you play.
+  //
+  // 1.5 s used to be enough for the ~190 smoothed control cells, but it is FAR too
+  // short for the second thing free-running fixes: DCO PHASE DECORRELATION. The
+  // engine constructor arms every voice's DCO retrigger latch, so a note played on
+  // a cold engine starts all 8 voices EXACTLY in phase. That is harmless in POLY
+  // (one voice sounds) but on a UNISON patch all 8 voices sum coherently, which is
+  // both far too loud and far too dark — the fundamental adds x8 while the upper
+  // partials do not. Per-voice CONDITION scatter detunes the voices, so they drift
+  // apart over the first few seconds of free-run and the sum becomes the normal
+  // incoherent one. Measured (probes/hostpath/warm_curve.py, warm_all_unison.py),
+  // cold -> 4 s warm, note 60 vel 100 at 44.1 kHz:
+  //     Chillwave 3  BS Solid : peak 1.736 -> 0.810 , centroid  235 ->  487 Hz
+  //     Chillwave 4  BS Glide : peak 1.981 -> 0.931 , centroid  128 ->  858 Hz
+  //     Chillwave 12          : peak 1.849 -> 0.782 , centroid  206 ->  421 Hz
+  //     factory 61            : peak 0.527 -> 0.202 , centroid  830 -> 1488 Hz
+  //     POLY controls (CW0/1, F0/1/2)      : peak and centroid both ~flat
+  // i.e. every unison patch was playing about twice as hot and 2-6x darker than it
+  // does in any real instance. The port itself is faithful in BOTH conditions —
+  // cold is gated bit-exact by recall_render_ab (57/57) and assigner_ab (28/28),
+  // warm by renderstruct_ab's warm-lifecycle A/B — so the cold->warm change is
+  // identical inside the plugin. The web app was simply presenting the cold state,
+  // which a real DAW instance is never actually played in.
+  // 4 s covers the slowest patch measured (BS Glide settles ~4 s). One-time boot
+  // cost; later patch changes keep the warmed cells.
+  warmupFn(ctx, (SR * 4) | 0);
 
   PARAMS = buildParams();
 
@@ -530,7 +552,7 @@ function note(midi, on) {
 
 // SYSTEM "Keyboard Velocity SW" toggle: mirrors the plugin's wrapper flag.
 // Monitor fader state (slider 0..127 -> gain 0..1, default 57 -> 0.45).
-let OUT_GAIN = 0.45;
+let OUT_GAIN = 0.50;   /* = 1/1.937 rounded down: the measured worst 4-note-chord WARM peak */
 function outVolApply() {
   OUT_GAIN = (+$("#outVol").value) / 127;
   $("#outVolV").textContent = OUT_GAIN.toFixed(2);
