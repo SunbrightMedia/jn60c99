@@ -81,6 +81,39 @@ across all 128 patches in both banks rather than the cold one (`warm_worst_peak.
 — see `gui/web/index.html` for the number and its justification. It remains a
 delivery-only control occupying the DAW-fader role; the engine is untouched.
 
+## Related: the velocity family is no longer INFERRED (HOSTPATH scope STEP 1)
+
+`probes/hostpath/system_velocity_defaults.py` reads the plugin's own descriptor
+table (rva `0x98c040 + 16*idx`) against its own name table (rva `0x9a0030`):
+
+| idx | the plugin's own name | range | default |
+|---|---|---|---|
+| 12 | `Keyboard Velocity SW` | 0..1 | **0 = OFF** |
+| 13 | `Keyboard Fixed Velocity` | 0..126 | 126 |
+| 14 | `Keyboard Velocity Curve` | 0..2 | **1** |
+| 15 | `Keyboard Velocity Offset` | −10..10 | **0** |
+| 18 | `Local SW` | 0..2 | 1 |
+| 20 | `MASTER TUNE` | −100..100 | 0 |
+
+Each range matches its own name (a 0..1 "SW", a ±10 "Offset"), which self-validates
+that this is the right table. Consequences:
+
+* The port's `kbd_velocity_sw` default of **OFF** — until now the last INFERRED item
+  in the whole note path — is **READ and correct**. A fresh instance really does
+  force every note to the constant 100 that the three decompiled wrapper sites
+  hardcode.
+* **Velocity Curve and Velocity Offset are identity at their defaults** (curve 1 =
+  the middle of 0..2, offset 0), so the port not modelling them cannot affect a
+  default instance. Their laws stay underived; that is now a bounded, named residual
+  rather than an unknown, and only matters if those SYSTEM settings are ever exposed.
+* Note `Keyboard Fixed Velocity` defaults to 126, **not** the 100 the SW-OFF rule
+  substitutes — so that constant is genuinely hardcoded in the wrapper and is not
+  sourced from this setting. The three independent decomp sites already said so.
+
+Caveat, recorded honestly: `CLAUDE.md` states the SYSTEM param DB lives at rva
+`0x5EC040 + 16*id`. Dumping that region yields x86 opcode bytes, not descriptors, so
+that note is wrong — the usable table is the engine descriptor DB above.
+
 ## Methodology note
 
 This is a sixth entry for the protocol-error list in `docs/P112_FINDINGS.md` §8:

@@ -768,11 +768,22 @@ void juno_gui_note_off(juno_ctx *c, int midi_note)
  * velocity-sens cells scale both VCF and VCA). Every A/B gate was blind to
  * this: both gate sides drive the engine BELOW the wrapper.
  *
- * Default kbd_velocity_sw = 0 (forcing ON). Label: INFERRED — the SW's factory
- * default is not yet execution-proven (the settings object needs the full VST3
- * wrapper lifecycle, #112); supported by the JUNO-60 having no velocity and by
- * the user's real instance exhibiting fixed-velocity behavior. The policy
- * itself is READ from the binary. The engine below is untouched either way. */
+ * Default kbd_velocity_sw = 0 (forcing ON). Label: READ (upgraded from INFERRED
+ * 2026-07-28, probes/hostpath/system_velocity_defaults.py). The plugin's own
+ * descriptor table (rva 0x98c040 + 16*idx) read against its own name table
+ * (rva 0x9a0030) gives, for the fm.SYSTEM.COM keyboard family:
+ *     idx 12 'Keyboard Velocity SW'      min 0  max 1    default 0   <- OFF
+ *     idx 13 'Keyboard Fixed Velocity'   min 0  max 126  default 126
+ *     idx 14 'Keyboard Velocity Curve'   min 0  max 2    default 1
+ *     idx 15 'Keyboard Velocity Offset'  min -10 max 10  default 0
+ * so a fresh instance really does default to SW OFF, i.e. every note forced to
+ * the constant 100 that the three decompiled wrapper sites hardcode. (Each range
+ * matches its own name — a 0..1 "SW", a +-10 "Offset" — which self-validates that
+ * this is the right table.) Velocity Curve and Velocity Offset are separate
+ * SYSTEM settings the port does not model; both sit at an identity default
+ * (curve 1 = the middle of 0..2, offset 0), so a default instance is unaffected.
+ * Deriving their laws is only needed if those settings are ever exposed.
+ * The policy itself is READ from the binary. The engine below is untouched. */
 void juno_gui_set_kbd_velocity(juno_ctx *c, int on)
 {
     if (c) c->kbd_velocity_sw = (on != 0);
