@@ -141,6 +141,61 @@ is why the original Teensy instinct was closer to right.** The Daisy's advantage
 is memory (64 MB SDRAM, no soldering); the Teensy's is clock. For *this* engine,
 which is CPU-bound and — per §2 — barely memory-bound at all, clock wins.
 
+## 4b. MEASURED: the bare-metal bring-up risks, all four closed
+
+Everything a hardware port can fail on *before* it gets to cycle counts. All
+measured today from the real Cortex-M7 objects.
+
+**Link surface — 9 external symbols.** Everything the engine needs from outside
+itself:
+
+```
+libm   : expf, fmodf
+heap   : calloc, malloc, free        (create-time only; NONE in the audio path)
+string : memcpy, memmove, memset, strcmp
+helpers: __aeabi_d2lz, __aeabi_ldivmod   (1 call each: double->int64, int64 div)
+```
+
+**Zero soft-float helpers.** No `__aeabi_dadd/dsub/dmul/fadd/…` anywhere, so
+every floating-point operation is hardware VFP. On a target without an FPU this
+list would be hundreds of entries long.
+
+**Stack — 584 bytes for the entire audio path.**
+
+```
+juno_driver_render_voices  200      juno_master_render   112
+juno_driver_render_sample  136      juno_triangle         16
+juno_voice_render          120      ---- audio path      584 bytes
+```
+
+(`juno_gui_warmup` has a 4,120-byte frame, but it is one-time setup, not the
+callback.) Nothing here strains a default stack, let alone DTCM.
+
+**libm bit-exactness — the one real risk, and it is closed.** The engine calls
+libm inside the per-sample path: `fmodf` (24 sites) and `expf`
+(`voice_render.c:776`, `:1239`). `arm_golden.sh` proves the engine against
+**glibc**; a Teensy links **newlib**. Different implementation, possible ULP
+differences, and one differing bit propagates through the filter state.
+
+- `fmodf` is safe **by construction**: IEEE-754 defines `fmod` as an *exact*
+  operation — the result is exactly representable, there is no rounding — so
+  every conforming implementation returns identical bits.
+- `expf` is **not** exactly specified, so it had to be tested.
+  `tools/embed/libm_expf_ab.sh` lifts `expf` out of the toolchain's
+  `thumb/v7e-m+dp/hard/libm.a` — the exact Cortex-M7 hard-float multilib a
+  Teensy links — renames the symbol, links it beside glibc's in one armhf
+  binary, and compares raw bit patterns on identical inputs.
+
+```
+compared 32000423 inputs
+RESULT: glibc expf == newlib expf, BIT-IDENTICAL on all 32000423
+```
+
+Domain covered: `[-120,120]` at 1e-5 steps, exact integers `[-200,200]`,
+exponent-stepped bit patterns from 2^-30 to 2^7 (both signs), and the
+zero/subnormal/overflow-knee/infinity edges. **PROVEN.** Both libms now derive
+`expf` from ARM's optimized-routines, which is why they agree.
+
 ## 5. Why a voice costs 3,518 instructions, and the fast way down
 
 A hand-written Juno voice is 100–300 instructions/sample. Ours is 3,518 because
@@ -173,17 +228,29 @@ Ordered by value per hour:
 
 ## 6. What I would actually do, in order
 
-1. **Done today, no hardware needed:** ARM bit-exactness ✅, real memory
-   footprint ✅, M7 compile ✅, instruction counts ✅.
-2. **Fix the two `_QWORD` pointer chases** in `master_render.c` (§1). Hours.
-3. **Bring up on a Teensy 4.1 @ 816 MHz** with both PSRAM chips: state in PSRAM,
-   hot 416 KiB in DTCM, code in ITCM. Run `test_teensy_golden` on the device —
-   it is already self-contained (patch blob + events + hash, no bank file). 8/8
-   converts every ESTIMATE in §4 into a measurement via the DWT cycle counter.
-4. **Then and only then** decide polyphony from real numbers, and spend the
-   hoisting effort where the profiler points.
+1. ✅ **Done, no hardware:** ARM bit-exactness (8/8), real memory footprint,
+   M7 compile, instruction counts, link surface, stack depth, libm parity.
+2. ✅ **Done:** the two `_QWORD` pointer chases in `master_render.c` (§1) now read
+   at pointer width. `make test` 29/29, `arm_golden.sh` 8/8 on both legs with
+   hashes unchanged, clean `-Wall -Wextra` on x86 and Cortex-M7.
+3. ⏳ **Needs a board — firmware is written, in `teensy/`.** `juno60_teensy.cpp`
+   + `platformio.ini` + `README.md`: PSRAM via `-Wl,--wrap=calloc`, `FPSCR.FZ`
+   set, and it runs `tests/test_teensy_golden.c` itself (via
+   `-Dmain=juno_golden_main`) so the device executes the same code as the host
+   gate. Needs **no audio hardware** — a bare Teensy 4.1 and USB serial. Prints
+   the 8 hashes and DWT cycles/sample at 0/1/2/4/8 voices.
+4. **Then** decide polyphony from real numbers and spend the hoisting effort
+   where the profiler points.
 
-Step 3 is a day of work once a board is in hand. Nothing here is weeks.
+Step 3 is one session once a board is in hand. Nothing here is weeks.
+
+**Status of `teensy/`, stated plainly: written, never executed.** No board has
+been attached, and `juno60_teensy.cpp` has never been compiled against
+Teensyduino — expect to fix small integration details (header paths,
+`printf`-to-Serial routing, `extmem_malloc` on your core version) on first
+flash. The engine underneath it *is* proven: bare-metal M7 compile is clean and
+ARM32 is bit-exact 8/8. The firmware is the instrument; the measurements are the
+deliverable.
 
 ## 7. What is still honestly unknown
 
