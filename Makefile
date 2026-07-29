@@ -77,6 +77,8 @@ verify: test libjuno.so
 	echo "=== DIFFERENTIAL FUZZ (SEAL 4 / Pillar-2b): random polyphonic sequences, port vs plugin, 24 seeds x 3 rates ==="; \
 	fresh $(SCRATCH)/fuzz_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/fuzz_diff.py --ref || FAIL=1; \
 	python3 tools/verify/fuzz_diff.py --port || FAIL=1; \
+	echo "=== COLD/WARM UNISON: the app must not present the phase-aligned cold engine (docs/COLDSTART_UNISON_FINDING.md) ==="; \
+	python3 tools/verify/coldwarm_unison.py || FAIL=1; \
 	echo "=== VOICE ASSIGN (KEY ASSIGN/LEGATO/PORTAMENTO): note SEQUENCES through the plugin's own allocator vs the port's ==="; \
 	fresh $(SCRATCH)/assigner_ab_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/assigner_ab.py --ref || FAIL=1; \
 	python3 tools/verify/assigner_ab.py --port || FAIL=1; \
