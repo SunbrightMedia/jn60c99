@@ -30,6 +30,7 @@
 #include "juno_dsp.h"
 #include <math.h>
 #include <stdbool.h>
+#include <string.h>
 
 /* IDA pseudocode primitive types / macros, so the decompile compiles verbatim. */
 typedef uint8_t  _BYTE;
@@ -38,6 +39,31 @@ typedef uint32_t _DWORD;
 typedef uint64_t _QWORD;
 #define __int16 short            /* so `unsigned __int16` -> `unsigned short` */
 #define LODWORD(x)  (*((_DWORD *)&(x)))
+
+/* The host-params selector chase: state+136 -> params, params+off -> int32_t*,
+ * deref. Two call sites (slot 1 / DELAY TYPE at off 136, slot 2 / EFFECT TYPE at
+ * off 112); see juno_driver.h for the shim those pointers land in.
+ *
+ * DEVIATION FROM THE VERBATIM DECOMPILE (portability, audio-inert). Hex-Rays
+ * rendered both hops as _QWORD loads because the reference build is x86-64:
+ *     **(_DWORD **)(*(_QWORD *)(a1 + 136) + 136LL)
+ * A pointer is 4 bytes on a 32-bit target (Cortex-M7), and the writer
+ * (juno_driver_attach_host) stores these with sizeof(void *) -- so an 8-byte
+ * load reads 4 bytes of unrelated memory as the pointer's high half and only
+ * yields the right address by little-endian truncation. At shim->params+140
+ * that memory is uninitialized, making the old form UB as well as unportable.
+ * Reading at pointer width is bit-identical on x86-64 (where the extra 4 bytes
+ * were always the same pointer's zero half) and correct everywhere else.
+ * Locked by tools/embed/arm_golden.sh, whose ARM32 leg is the only gate that
+ * actually exercises the 32-bit path. */
+static int32_t juno_host_sel(const unsigned char *a1, size_t sel_off)
+{
+  const unsigned char *params;
+  const int32_t *sel;
+  memcpy(&params, a1 + 136, sizeof params);
+  memcpy(&sel, params + sel_off, sizeof sel);
+  return *sel;
+}
 
 float *juno_master_render(unsigned char *a1, float **a2, float **a3)
 {
@@ -858,7 +884,7 @@ float *juno_master_render(unsigned char *a1, float **a2, float **a3)
   *(float *)(a1 + 84880) = v37;
   v38 = v34 * v37;
   *(float *)(a1 + 101120) = v38;
-  v39 = **(_DWORD **)(*(_QWORD *)(a1 + 136) + 136LL);
+  v39 = juno_host_sel(a1, 136);   /* was **(_DWORD **)(*(_QWORD *)(a1 + 136) + 136LL) */
   if ( v39 == 1 )
   {
     if ( *(_DWORD *)(a1 + 11022348) != 1 )
@@ -2349,7 +2375,7 @@ LABEL_105:
   *(float *)(a1 + 101280) = v550;
   *(float *)(a1 + 32) = v548;
   *(float *)(a1 + 36) = v550;
-  v551 = **(_DWORD **)(*(_QWORD *)(a1 + 136) + 112LL);
+  v551 = juno_host_sel(a1, 112);  /* was **(_DWORD **)(*(_QWORD *)(a1 + 136) + 112LL) */
   if ( v551 == 1 )
   {
     v713 = *(float *)(a1 + 84624);

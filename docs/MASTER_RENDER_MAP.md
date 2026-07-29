@@ -23,6 +23,35 @@ the whole algorithm is preserved bit-for-bit; only the lines Hex-Rays mangled ar
 rewritten. Those rewrites are the table below, each pinned to the disassembly
 (`master_deps/master_sub_180363380_180363380.asm`) — none guessed.
 
+### The one non-asm deviation: the host-params pointer chase (2026-07-29)
+
+Two lines are **not** verbatim, and not because Hex-Rays mangled them — because
+the verbatim form is x86-64-only. Both read a selector through two pointer hops:
+
+```c
+v39  = **(_DWORD **)(*(_QWORD *)(a1 + 136) + 136LL);   /* slot 1, DELAY TYPE  */
+v551 = **(_DWORD **)(*(_QWORD *)(a1 + 136) + 112LL);   /* slot 2, EFFECT TYPE */
+```
+
+`_QWORD` is right for the reference build, where a pointer is 8 bytes. On a
+32-bit target (Cortex-M7) a pointer is 4 bytes, and the **writer**
+(`juno_driver_attach_host`, `src/juno_driver.c`) stores these with
+`sizeof(void *)`. So an 8-byte load takes 4 bytes of unrelated memory as the
+pointer's high half and yields the right address only by little-endian
+truncation — and at `shim->params + 140` that memory is *uninitialized*, so the
+verbatim form is UB as well as unportable.
+
+Replaced by `juno_host_sel(a1, off)`, which does both hops with `memcpy` at
+pointer width. **Bit-identical on x86-64** (the extra 4 bytes were always the
+same pointer's zero half); correct on every target. Everything else IDA typed
+`_QWORD` in this engine is either a genuine 8-byte zero store or pointer
+arithmetic on `a1` itself — neither assumes pointer width, both verified clean.
+
+Locked by `tools/embed/arm_golden.sh`, whose ARM32 leg is the only gate that
+executes the 32-bit path (8/8 bit-exact, hashes identical to x86-64). Note that
+every x86-only gate — `make verify` included — is blind to this class of defect
+by construction.
+
 ## Signature / I/O
 `float *juno_master_render(unsigned char *a1, float **a2, float **a3)`
 - `a2[0,2,4,…,14]` = the 8 voice current-sample pointers (read at decompile
