@@ -1,5 +1,16 @@
 # Daisy Seed feasibility report — JUNO-60 C99 port on the Electrosmith Daisy
 
+> **⚠ SUPERSEDED IN PART — read `docs/ARM_MEASURED.md` first.** Later the same
+> day the ARM work was actually *executed*, and it corrects two claims below:
+> (1) the 12 MB is an **allocation**, not a working set — the hot set is
+> **1.14 MB/patch**, of which only ~416 KiB is random-access, so memory is not
+> the constraint this report treats it as; (2) ARM is **denser** than x86 for
+> this code (M7 issues 28% fewer instructions/sample), not more expensive.
+> The golden corpus is now **PROVEN 8/8 bit-exact on 32-bit ARM**, and the whole
+> engine compiles for bare-metal Cortex-M7. §7 step 2 below is **done**.
+> `ARM_MEASURED.md` also replaces this report's A4 (idle-voice fast-forward)
+> with block-level loop-invariant hoisting, which unlike A4 *is* bit-exact.
+
 *2026-07-29. Every number in this report is measured in this repo unless explicitly
 labelled ESTIMATE. Benchmarks: `/tmp/bench2.c` pattern (in-repo engine via
 `juno_gui_*`), gprof over the same run. Nothing here has executed on ARM yet —
