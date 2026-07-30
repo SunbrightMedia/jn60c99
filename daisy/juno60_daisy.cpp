@@ -503,6 +503,37 @@ int main(void)
                  (int)(g_budget_live + 0.5f));
     hw.PrintLine("SDRAM pool %d KB   corpus rate %d Hz",
                  (int)(sizeof g_sdram_pool / 1024u), (int)E2_RATE);
+
+    /* HARD GUARD: on an old bootloader our SDRAM does not exist.
+     *
+     * DaisySeed::Init (src/daisy_seed.cpp:113-131) skips BOTH sdram_handle.Init()
+     * and -- via syscfg.skip_clocks -- System::ConfigureClocks()/ConfigureMpu()
+     * (src/sys/system.cpp:220-224) when the bootloader predates v6.0 AND the app
+     * does not run from internal flash. This firmware is APP_TYPE=BOOT_QSPI, so
+     * it always runs from QSPI and always trips that condition on an old
+     * bootloader. The 13 MB DSY_SDRAM_BSS pool would then be un-clocked memory:
+     * the memset in __wrap_calloc faults or silently writes garbage, and with no
+     * MPU programming 0xC0000000 falls back to non-cacheable Device memory, which
+     * would make E3/E4 measure nonsense even if it did not crash.
+     *
+     * Detect it and refuse, rather than fail in a way that looks like a port bug. */
+    {
+        auto bv = System::GetBootloaderVersion();
+        auto mr = System::GetProgramMemoryRegion();
+        hw.PrintLine("bootloader v%s   program memory region %d",
+                     bv == System::BootInfo::Version::LT_v6_0 ? "<6.0" : ">=6.0",
+                     (int)mr);
+        if (bv == System::BootInfo::Version::LT_v6_0
+            && mr != System::MemoryRegion::INTERNAL_FLASH) {
+            hw.PrintLine("!! FATAL: bootloader is older than v6.0 and we run from");
+            hw.PrintLine("!! QSPI, so libDaisy SKIPPED SDRAM init and MPU config.");
+            hw.PrintLine("!! The 10.5 MB engine state has nowhere to live.");
+            hw.PrintLine("!! Fix: reflash the Daisy bootloader (make program-boot),");
+            hw.PrintLine("!! then flash this app again. Halting -- this is NOT a");
+            hw.PrintLine("!! port defect.");
+            while (1) { System::Delay(1000); }
+        }
+    }
     if (!dwt_ok) {
         hw.PrintLine("!! DWT cycle counter is NOT ticking. E2-E4 are invalid.");
         hw.PrintLine("!! Fix that before believing any timing below.");

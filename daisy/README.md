@@ -162,3 +162,21 @@ No MIDI input yet — it self-plays instead. The Daisy's micro-USB is taken by t
 serial log, so MIDI would mean UART MIDI (a DIN socket and two resistors) or
 moving the log off USB. Small follow-up, deliberately not in the way of the first
 flash.
+
+## Bootloader must be v6.0 or newer
+
+`DaisySeed::Init` (`src/daisy_seed.cpp:113-131`) skips **both** `sdram_handle.Init()`
+and — via `syscfg.skip_clocks` — `System::ConfigureClocks()/ConfigureMpu()`
+(`src/sys/system.cpp:220-224`) when the bootloader predates v6.0 *and* the app
+does not run from internal flash. This firmware is `BOOT_QSPI`, so it always runs
+from QSPI and always trips that condition on an old bootloader.
+
+The result would be a 13 MB `DSY_SDRAM_BSS` pool in un-clocked memory: the
+`memset` in `__wrap_calloc` faults or silently writes garbage, and with no MPU
+programming `0xC0000000` falls back to non-cacheable Device memory, so E3/E4 would
+measure nonsense even if it survived.
+
+The firmware checks `System::GetBootloaderVersion()` and
+`System::GetProgramMemoryRegion()` at startup and **halts with an explanation**
+rather than failing in a way that looks like a port defect. Fix is
+`make program-boot`, then reflash the app.
