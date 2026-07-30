@@ -359,6 +359,131 @@ static void measure_memory(void)
     }
 }
 
+/* ========================= E5: PLAY IT (live audio) ======================
+ * Everything above runs without touching the codec. This part actually makes
+ * sound, so you can hear the engine and hear whether it keeps up.
+ *
+ * It is self-playing: no MIDI hardware, no keyboard, no extra wiring. Plug in
+ * audio out and it cycles the 8 factory patches embedded in teensy_golden.h,
+ * playing an 8-note chord (all eight voices at once) then an arpeggio.
+ *
+ * The real-time verdict comes out two ways at once: by ear (dropouts are
+ * audible) and by number (worst-case block cycles vs the budget, printed from
+ * the main loop -- never from the callback, which runs at interrupt priority
+ * where PrintLine is unsafe). */
+
+static juno_ctx *g_play;
+static unsigned char *g_play_bank;
+
+/* Delivery-only output trim. The engine's master stage ends in 2*(sat*1.0) and
+ * can legitimately exceed +-1.0, which a codec would clip. This is the same role
+ * the webapp's MONITOR fader plays -- it is NOT part of the engine and does not
+ * touch a single coefficient. */
+#define OUT_TRIM 0.45f
+
+static volatile uint32_t g_worst_cyc, g_last_cyc, g_blocks, g_overruns;
+static volatile int      g_cur_patch, g_want_patch = -1;
+static float             g_budget_block;
+
+/* Self-playing sequencer state, advanced from the callback. */
+static uint32_t g_seq_frames;
+static int      g_seq_step = -1;
+static const int CHORD[8] = {36, 43, 48, 55, 60, 64, 67, 72};
+
+static void seq_advance(void)
+{
+    /* 0: 8-note chord on   1: release   2..9: arpeggio   10: next patch */
+    g_seq_step = (g_seq_step + 1) % 11;
+    if (g_seq_step == 0) {
+        for (int v = 0; v < 8; ++v) juno_gui_note_on(g_play, CHORD[v], 100);
+    } else if (g_seq_step == 1) {
+        for (int v = 0; v < 8; ++v) juno_gui_note_off(g_play, CHORD[v]);
+    } else if (g_seq_step >= 2 && g_seq_step <= 9) {
+        int prev = CHORD[(g_seq_step - 3) & 7];
+        if (g_seq_step > 2) juno_gui_note_off(g_play, prev);
+        juno_gui_note_on(g_play, CHORD[g_seq_step - 2], 100);
+    } else {
+        juno_gui_note_off(g_play, CHORD[7]);
+        g_want_patch = (g_cur_patch + 1) % TG_NSCEN;
+    }
+}
+
+/* Frames each step lasts: long for the chord, short for the arp steps. */
+static uint32_t seq_len(int step)
+{
+    if (step == 0) return (uint32_t)(LIVE_RATE * 2.0f);   /* chord held  */
+    if (step == 1) return (uint32_t)(LIVE_RATE * 1.0f);   /* tail        */
+    if (step == 10) return (uint32_t)(LIVE_RATE * 1.0f);  /* gap         */
+    return (uint32_t)(LIVE_RATE * 0.16f);                 /* arp step    */
+}
+
+static void AudioCB(AudioHandle::InterleavingInputBuffer  in,
+                    AudioHandle::InterleavingOutputBuffer out,
+                    size_t                                size)
+{
+    /* libDaisy's interleaved `size` is the TOTAL sample count (L and R counted
+     * separately -- see AudioHandle::Impl::InternalCallback, which steps i += 2).
+     * juno_gui_render takes FRAMES. Passing `size` would render twice the buffer
+     * and corrupt memory past the end. */
+    const int frames = (int)(size / 2u);
+    uint32_t t0 = cyc();
+    (void)in;
+
+    /* Patch changes happen here, at a block boundary, so the engine state is
+     * never torn by a concurrent recall. A full recall costs far more than one
+     * block, so it deliberately produces ONE dropout -- audible as a click, the
+     * same as switching patches on the real thing. */
+    if (g_want_patch >= 0) {
+        int p = g_want_patch;
+        g_want_patch = -1;
+        memcpy(g_play_bank + BK_HEADER + BK_BLOB, tg_scenarios[p].blob, TG_BLOB_LEN);
+        juno_gui_apply_bank(g_play, g_play_bank, BK_HEADER + BK_STRIDE, 0);
+        g_cur_patch = p;
+    }
+
+    if (g_seq_step < 0 || g_seq_frames >= seq_len(g_seq_step)) {
+        g_seq_frames = 0;
+        seq_advance();
+    }
+    g_seq_frames += (uint32_t)frames;
+
+    juno_gui_render(g_play, out, frames);
+    for (size_t i = 0; i < size; ++i) {
+        float s = out[i] * OUT_TRIM;
+        out[i] = s > 1.0f ? 1.0f : (s < -1.0f ? -1.0f : s);
+    }
+
+    uint32_t d = cyc() - t0;
+    g_last_cyc = d;
+    if (d > g_worst_cyc) g_worst_cyc = d;
+    if ((float)d > g_budget_block) g_overruns++;
+    g_blocks++;
+}
+
+static void start_playing(void)
+{
+    g_play_bank = (unsigned char *)sdram_alloc(BK_HEADER + BK_STRIDE);
+    g_play = juno_gui_create(LIVE_RATE, 0);
+    if (!g_play || !g_play_bank) { hw.PrintLine("  E5: allocation FAILED"); return; }
+    memset(g_play_bank, 0, BK_HEADER + BK_STRIDE);
+    memcpy(g_play_bank + BK_HEADER + BK_BLOB, tg_scenarios[0].blob, TG_BLOB_LEN);
+    juno_gui_apply_bank(g_play, g_play_bank, BK_HEADER + BK_STRIDE, 0);
+    g_cur_patch = 0;
+
+    /* Cold-start warm-up. All 8 DCOs boot phase-aligned, which makes the first
+     * note of a UNISON patch peak roughly 2x hot and read several times darker
+     * until the per-voice CONDITION scatter decorrelates them. Measured on x86:
+     * ~4 s is where it settles (docs/COLDSTART_UNISON_FINDING.md). This is not
+     * instant on the Daisy -- it is 4 s of DSP, possibly slower than real time. */
+    hw.PrintLine("  warming up 4 s of DSP (cold DCO phase alignment)...");
+    juno_gui_warmup(g_play, (int)(LIVE_RATE * 4.0f));
+
+    g_budget_block = (float)System::GetSysClkFreq() / LIVE_RATE * (float)BLOCK;
+    hw.PrintLine("  budget %d cycles per %d-frame block",
+                 (int)(g_budget_block + 0.5f), BLOCK);
+    hw.StartAudio(AudioCB);
+}
+
 /* ================================= main ================================== */
 int main(void)
 {
@@ -415,9 +540,29 @@ int main(void)
     measure_memory();
 
     hw.PrintLine("");
-    hw.PrintLine("=== done. E2's 8-voice row against the budget IS the answer");
-    hw.PrintLine("=== to 'can the Daisy do 8 voices bit-exact'. E3/E4 say");
-    hw.PrintLine("=== whether memory placement can close any gap.");
+    hw.PrintLine("=== E2's 8-voice row against the budget IS the answer to");
+    hw.PrintLine("=== 'can the Daisy do 8 voices bit-exact'. E3/E4 say whether");
+    hw.PrintLine("=== memory placement can close any gap.");
 
-    while (1) { System::Delay(1000); }
+    /* --- E5: make sound ------------------------------------------------- */
+    hw.PrintLine("");
+    hw.PrintLine("--- E5: LIVE AUDIO (self-playing, no MIDI needed) ---");
+    start_playing();
+
+    /* Live real-time verdict, once a second, from the main loop. */
+    uint32_t last_blocks = 0;
+    while (1) {
+        System::Delay(1000);
+        uint32_t blocks = g_blocks, worst = g_worst_cyc, over = g_overruns;
+        if (blocks == last_blocks) { hw.PrintLine("audio callback STALLED"); continue; }
+        last_blocks = blocks;
+        hw.PrintLine("patch %d/%d '%s'  worst %d cyc/block (%d%% of budget)"
+                     "  overruns %d/%d",
+                     g_cur_patch + 1, TG_NSCEN, tg_scenarios[g_cur_patch].name,
+                     (int)worst, (int)(100.0f * worst / g_budget_block),
+                     (int)over, (int)blocks);
+        /* Reset the peak so a single patch-change dropout does not dominate the
+         * reading forever -- that one block is expected to overrun. */
+        g_worst_cyc = 0;
+    }
 }

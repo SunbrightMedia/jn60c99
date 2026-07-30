@@ -4,9 +4,18 @@ Firmware to answer one question with measurements instead of arithmetic: **can a
 Daisy Seed run 8 voices of the bit-exact JUNO-60 port in real time, and if not,
 why not and by how much?**
 
-**No audio hardware needed.** No codec wiring, no shield, no audio library. A
-Daisy Seed and a USB cable — every result comes out over serial. Correctness and
-cost first; sound after.
+**It plays.** Flash it, plug audio out into anything, and it self-plays through
+the 8 factory patches embedded in `tests/teensy_golden.h` — an 8-note chord (all
+eight voices at once) then an arpeggio, cycling patches. **No MIDI keyboard, no
+audio shield, no extra wiring**: the Daisy Seed's codec is on-board.
+
+Before it starts playing it runs four silent measurement passes over USB serial,
+so one flash gives you both the numbers and the sound. You need nothing but a
+Daisy Seed, a USB cable, and something to listen on.
+
+**Voice count: always 8.** All eight free-run every sample — that is what the
+plugin does and it is not configurable without breaking bit-exactness. Whether
+all 8 *sustain* in real time here is the open question, and E2/E5 answer it.
 
 ## Status: builds and links, never run on hardware
 
@@ -89,7 +98,7 @@ bootloader flashed once (`make program-boot`).
 | **E2** | DWT cycles/sample at 0/1/2/4/8 voices | the headline number; replaces every estimate in `docs/ARM_MEASURED.md` §4 |
 | **E3** | same workload, D-cache on vs off | how much of the cost is SDRAM latency rather than compute? |
 | **E4** | 256 KB walk in SDRAM vs AXI SRAM, sequential and scattered | what would relocating hot state into internal RAM buy? |
-| **E5** | voices that fit the 48 kHz budget | the actual answer to the question |
+| **E5** | **live audio** — self-playing, worst-case block cycles, overrun count | the answer by ear *and* by number |
 
 E3 and E4 exist because `docs/ARM_MEASURED.md` §4 estimates cost purely from
 instruction counts and implicitly assumes memory is free. It is not. The engine's
@@ -115,8 +124,41 @@ anything.** Check in order — (a) did `-ffp-contract=off` reach the compiler
 newlib's Cortex-M7 multilib over 32,000,423 inputs
 (`tools/embed/libm_expf_ab.sh`), and `fmodf` is exact by IEEE-754.
 
+## E5, and reading the real-time verdict
+
+After the silent passes, `start_playing()` warms up (see below), starts the
+codec, and the main loop prints once a second:
+
+```
+patch 3/8 'bass_low'  worst 4820 cyc/block (48% of budget)  overruns 0/1000
+```
+
+- **`overruns 0/N` and under 100%** → it keeps up. That is 8 voices bit-exact in
+  real time on a Daisy.
+- **Steady overruns** → it does not, and the percentage tells you by how much.
+- Expect **one** overrun per patch change: a full recall costs far more than one
+  block, so it is applied at a block boundary and produces a single audible
+  click, exactly as switching patches on the real thing does. The peak resets
+  each second so that one block does not poison the reading forever.
+
+Three implementation notes that matter:
+
+- **`size` is not frames.** libDaisy's interleaved callback passes the *total*
+  sample count (L and R separately — `InternalCallback` steps `i += 2`), while
+  `juno_gui_render` takes frames. Passing `size` straight through renders twice
+  the buffer and corrupts memory past the end. It is `size / 2`.
+- **4-second warm-up before audio starts.** All 8 DCOs boot phase-aligned, which
+  makes the first note of a UNISON patch peak ~2× hot and read several times
+  darker until the per-voice CONDITION scatter decorrelates them
+  (`docs/COLDSTART_UNISON_FINDING.md`). That is 4 s of real DSP, so first sound
+  is not instant.
+- **`OUT_TRIM 0.45`** is a delivery-only output trim, the same role the webapp's
+  MONITOR fader plays. The engine's master stage ends in `2*(sat*1.0)` and can
+  legitimately exceed ±1.0, which a codec would clip. It touches no coefficient.
+
 ## What this is not
 
-It does not produce audio, take MIDI, or drive the codec. Those are
-straightforward once E1 and E2 are answered and premature before — an engine that
-is not bit-exact or not real-time is not worth wiring to a DAC.
+No MIDI input yet — it self-plays instead. The Daisy's micro-USB is taken by the
+serial log, so MIDI would mean UART MIDI (a DIN socket and two resistors) or
+moving the log off USB. Small follow-up, deliberately not in the way of the first
+flash.
