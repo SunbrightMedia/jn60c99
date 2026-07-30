@@ -163,19 +163,26 @@ void juno_note_on(unsigned char *st, int voice, int midi_note, int velocity)
      * attack. The plugin writes this directly (descriptor en=0), no ramp. */
     JF(st, base + GATE_OFF) = GATE_OPEN;
 
-    /* DCO retrigger latch: DO NOT arm here. Measured directly from the plugin's
-     * own note-on machine code under Unicorn (scratchpad/oracle/latch_probe.py,
-     * latch_arm_when.py): the plugin's note-on writes the DSP-INERT aux Array B
-     * (101520 + v*32), NOT the retrigger latch Array A (101504 + v*32) that
-     * voice_render consumes. Array A is armed ONCE at engine BUILD (juno_init.c)
-     * for all 8 voices and consumed on each voice's first rendered sample; it is
-     * never re-armed by note-on. An earlier version armed it here every note,
-     * which re-phased the DCO on every note-on — correct only for a cold note-on
-     * that precedes any rendering (which is why the cold A/B stayed bit-exact and
-     * masked it), but WRONG for any note arriving after rendering has begun
-     * (phase-2 matrix Scenario C). The free-running JUNO DCO does not re-phase per
-     * note; removing the re-arm restores that. Array B is inert (no voice_render
-     * read references 101520+v*32), so we do not model it. */
+    /* DCO retrigger latch (aux Array A, 101504 + v*32): NOT armed here.
+     *
+     * The arming rule is MODE-DEPENDENT, which is why two earlier measurements
+     * appeared to contradict each other. Measured against the plugin on a WARM
+     * engine (probes/assigner/mono_stack_ref.py: 747 idle frames, then notes,
+     * reading BOTH arrays from the unit that renders each voice):
+     *
+     *   patch 0  ASSIGN=0 POLY : on 64/29 -> v4[g1 A0 B1]   Array B, A untouched
+     *   patch 15 ASSIGN=1 MONO : on 69/36 -> v0[g1 A1 B0]   Array A armed
+     *
+     * So POLY note-on writes only the DSP-inert Array B (101520 + v*32) — the old
+     * comment here was right about POLY — while a MONO retrigger arms Array A,
+     * which voice_render consumes to reset DCO phase. Arming unconditionally is
+     * measurably wrong: it takes fuzz_diff from 1 diverged seed to 18 and
+     * assigner_ab from 28/28 to 20/28, because it re-phases every POLY note.
+     *
+     * The MONO arm therefore lives in the allocator (gui/juno_bridge.c
+     * mono_note_on), which is the only place that knows the mode and can tell a
+     * retrigger from a legato slide. See juno_note_retrig(). */
+
 
     /* Velocity coefficients (immediate). The plugin's note-on fires the per-voice
      * "gate notify" (poly allocator sub_7FF91DFB3150 -> dispatch case 450 ->
@@ -216,6 +223,19 @@ void juno_note_broadcast_held(unsigned char *st, int any_held)
     float f = any_held ? 1.0f : 0.0f;
     for (v = 0; v < JUNO_NUM_VOICES; ++v)
         JF(st, VBASE(v) + 1856) = f;
+}
+
+/* Arm the DCO retrigger latch (aux Array A) for one voice.
+ *
+ * voice_render consumes it as a one-shot on the next rendered sample: it forces
+ * that sample's gate to 0 and clears state[320], which resets DCO phase. The
+ * plugin does this for a MONO retrigger and NOT for a POLY note-on (measured —
+ * see the note in juno_note_on), so the caller must know the assign mode. Only
+ * gui/juno_bridge.c's mono_note_on calls it. */
+void juno_note_retrig(unsigned char *st, int voice)
+{
+    if (voice < 0 || voice >= JUNO_NUM_VOICES) return;
+    JF(st, AUX_EDGE(voice)) = 1.0f;
 }
 
 void juno_note_off(unsigned char *st, int voice)

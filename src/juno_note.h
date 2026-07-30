@@ -30,6 +30,9 @@ extern "C" {
 void juno_note_on(unsigned char *st, int voice, int midi_note, int velocity);
 
 /* Release `voice`: writes M.Gate = 0 (immediate) so both ADSRs enter release. */
+/* Arm the DCO retrigger latch for `voice` (MONO retrigger only — see .c). */
+void juno_note_retrig(unsigned char *st, int voice);
+
 void juno_note_off(unsigned char *st, int voice);
 
 /* Glide `voice` to `midi_note`: writes M.CV (pitch) ONLY — no gate edge, no DCO

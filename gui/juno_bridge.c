@@ -589,6 +589,11 @@ static void mono_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     int v;
     if (!c->voice_gated[0]) {                            /* idle/releasing -> retrigger */
+        /* MONO retrigger arms the DCO phase-reset latch; POLY note-on does not.
+         * Measured on a warm engine, both modes (probes/assigner/mono_stack_*).
+         * Without this the port's first sample after any MONO note that follows
+         * rendering differs from the plugin — fuzz_diff seed 15. */
+        juno_note_retrig(c->st, 0);
         voice_trigger(c, 0, midi_note, velocity);
     } else {                                             /* legato: pitch move, keep envelope */
         juno_note_glide(c->st, 0, midi_note);
