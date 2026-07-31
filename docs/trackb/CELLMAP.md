@@ -815,10 +815,21 @@ autonomous, and `master_render.c` reads none of [84272,84436).
 
 ## 2. Per-sample dataflow — equations with line cites
 
-All arithmetic is single-precision f32 in the exact association the source
-shows (`-ffp-contract=off` is load-bearing). `[N]` = float cell at a1+N,
+All arithmetic is single-precision f32 (`-ffp-contract=off` is load-bearing),
+EXCEPT the pitch spline (:1641-1663), which accumulates in `double` over
+`double` coefficients — see §3 and §5 item 8. `[N]` = float cell at a1+N,
 `[[N]]` = int bit-copy. `'` marks the value written this sample. The transcribed
 code is the spec; these equations are the map, not a substitute.
+
+**Association discipline (READ, and load-bearing for a −90 dB null):**
+`lerp(a,b,t)` here is shorthand for the source's OWN distributed form
+`(t*b − t*a) + a` (a few sites spell it `a + (t*b − t*a)`; identical, since
+IEEE `+` and `*` are commutative). It is NEVER `a + t*(b−a)` — that rounds
+`b−a` first and does not null. Every other equation below is given in the
+source's parenthesization; where a line is deliberately normalized instead
+(e.g. a `Σ` or a `poly11(...)` gloss), the transcription in
+`src/voice_render.c` at the cited lines is the authority. Lines tagged
+"exact association" have been re-derived character-for-character.
 
 **Evaluation order inside one voice-sample (structural, critical):**
 retrig-latch head → shared noise advance → input conditioning → gate → glide →
@@ -883,12 +894,21 @@ Ext gate: `[1488]' = clamp([944]*[1904] + [1856], -1, 1)` (:816-825);
 `[1840]=[1856]` (:818).
 Phase inc: `[1664]' = min([2128], [1136]'*2^-16) * [2144]` (:826-834).
 Delay ramp: `v89 = (1-[1504prev])*[1920] + [1504prev]`, clamp [-1,1]; on a
-falling ext-gate edge (`[1504shift] - [1488]' < 0`) force 0 → `[1504]'`
-(:809-840). Level: `[1472]' = max(0, ([1504]'+[2272])*[2256])` (:841-853).
+**RISING** ext-gate edge (`v92 = [1488prev] - [1488]' < 0`, i.e. the new gate
+EXCEEDS the previous one — musically the note-on reset, when any-key-held
+[1856] drives [1488] 0→1) force 0 → `[1504]'` (:809-840).
+`[1488prev]` is the value loaded at :805, i.e. LAST sample's [1488]; it is
+also what :810 shifts into [1504] before :840 overwrites [1504] with `v90`.
+So the compare operand is **not** `[1504]'` (= v90) — see the Phase line.
+Level: `[1472]' = max(0, ([1504]'+[2272])*[2256])` (:841-853).
 Noise smoother: `[1568]' = ([1424]-[1584])*[2464] + [1584]` (:851-852);
 `[1408]' = (lerp([1424], [1568]'*[2448], [2064]))*[2432]` (:855-870).
-Phase: `v93 = [1664]' + [1536]`; `v94 = ([1504]'-[1488]'<0) ? [1872] : 1`;
-`[1536]' = wrap±1((v93*v94)*[1888])` (:835-868; prepare sets [1888]=1.0).
+Phase: `v93 = [1664]' + [1536]`; `v94 = (v92 < 0) ? [1872] : 1` where `v92` is
+the SAME rising-edge difference as the delay ramp above, `[1488prev] - [1488]'`
+(:833, tested :836/:842) — **not** `[1504]' - [1488]'`. Getting this wrong
+multiplies the phase by [1872] on every sample while the gate is high instead
+of once at the edge. `[1536]' = wrap±1((v93*v94)*[1888])` (:835-868;
+prepare sets [1888]=1.0).
 S&H: if `[1552old]<0 && phase'>0` → `[1600]'=[1424]` else hold (:871-882);
 `[1760]' = [1600]'*[2416]` (:883-886).
 Waves (each phase wrapped to [-1,1) by ±1/fmod2):
@@ -896,9 +916,17 @@ Waves (each phase wrapped to [-1,1) by ±1/fmod2):
 `[1728]' = juno_triangle(ph+[2320])*[2384]` (:887-928, arg resolved per
 docs/VOICE_RENDER_MAP.md:59); `[1824]' = sign(wrap(ph+[2304])+[2496])`,
 `[1712]' = [1824]'*[2368] + [2512]` (:905-941);
-sine: `u = |wrap(ph+[2336])|`,
-`[1744]' = (u^4*[2224] + u^3*[2208] + u^2*[2192] + u*[2176] + [2160] + [2240])*[2400]`
-(exact association :927-952).
+sine: `u = |wrap(ph+[2336])|` (:927-940),
+```
+[1744]' = ( ( (u*((u*u)*u))*[2224]
+            + ( ((u*u)*u)*[2208]
+              + ( (u*[2176] + [2160]) + ((u*u)*[2192]) ) ) )
+          + [2240] ) * [2400]
+```
+(exact association, :946-951). The nesting is NOT a flat descending-power
+sum: the CONSTANT and LINEAR terms are added first, then the quadratic, then
+the cubic, then the quartic, then [2240], then the scale. Writing it as
+`u^4*c4 + u^3*c3 + … + c0` rounds differently and will not null.
 Mix: `[1776]' = ([1936]*[1472]'-[1936])+1` (:955-959);
 `[1808]' = [1968]*[1728]' + [2032]*[1760]' + [2000]*[1680]' + [2016]*[1696]'
 + [1984]*[1712]' + [1744]'*[1952] + [2048]*[1408]'` (:943-960);
@@ -919,11 +947,19 @@ Region: `v130 = ([2624]'+[2880] < 0) ? 0 : 1`; overridden to `1-v125` when
 Target: `v134 = (1-v125)*([2800]*[2928]) - [2944]*(1-v125) + [2944]`; if
 `v134-[2688]' > 0` → `v134 = [2688]' + [2704]'`; `[2672]' = min([2928], v134)`
 (:998-1009).
-Rate: `v136 = ([2816]/256)*v130 + ([2784]/256)*(1-v125)*(1-v130)`;
-`[2720]' = lerp([2736]', v136, [2976])` (:1003-1014).
-Accum: `v140 = ((1-v125)*[2912] + v130*[2672]') - [2608]`;
-`[2592]' = ((([2832]/256)*v125 - v125*[2720]') + [2720]')*v140 + [2608]`
-(:1011-1017).
+Attack mask: `v135 = v126 * (1-v130)` where `v126 = 1-v125` (:1003) — i.e.
+`v135 = (1-v125)*(1-v130)`, nonzero ONLY when not released and not in the
+v130 region.
+Rate: `v136 = ([2816]*(1/256))*v130 + ([2784]*(1/256))*v135` (:1004);
+`[2720]' = lerp([2736]', v136, [2976])` (:1012-1014).
+Accum: `v140 = (v135*[2912] + v130*[2672]') - [2608]` (:1011).
+**The `(1-v130)` factor carried inside `v135` is load-bearing and must not be
+dropped:** wherever `v130 == 1` (the decay/sustain region) it zeroes the
+`[2912]` term outright, so an ADSR written as `(1-v125)*[2912] + v130*[2672]'`
+diverges on every note in that region. ENV2 mirrors this exactly —
+`v157 = v148*(1-v152)` (:1058), consumed at :1066.
+`[2592]' = ((([2832]*(1/256))*v125 - v125*[2720]') + [2720]')*v140 + [2608]`
+(:1015-1017).
 Outputs: `[2752]' = ([2592]'*[2992])*[3008]`, `[2768]' = [2752]'*[3024]`
 (:1018-1021). (ENV1 A/D/S/R coeffs 2784/2816/2800/2832 are the recall rows,
 juno_apply.c:177-189; the exact branch structure :980-1017 is the spec — the
