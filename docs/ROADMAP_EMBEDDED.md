@@ -103,20 +103,43 @@ the JU-06A Roland sells today is 4-voice.
 ## 4. The plan
 
 ### P0 — STABILIZE (now; no hardware; mostly this session)
-1. ✅ kicked off: full end-to-end `make verify` (first complete run since the
-   MONO-retrigger fix; refs cached).
-2. Fold the seed-15 warm-note case into `assigner_ab` as a permanent script +
-   add patch 15 (MONO) to its patch list. Until then the retrigger law is
-   guarded only by fuzz.
-3. Stale-artifact guards: `--port` gates fail loudly if `libjuno.so` is older
-   than any `src/*.c`/`gui/*.c`; `make test` must rebuild (not reuse) test
-   binaries.
+1. ✅ full end-to-end `make verify` (first complete run since the MONO-retrigger
+   fix). RE-RUNNING after items 2/3/5 below: every `tools/verify/*.py` is an
+   ORACLE_DEP, so editing any gate correctly invalidates all cached reference
+   pickles and they regenerate from `truth/`.
+2. ✅ **DONE** — `assigner_ab` gained patch 15 (MONO) and the `warmmono` script:
+   the fuzz seed-15 sequence verbatim, including its **747-sample warm-render
+   prefix**. That prefix is the load-bearing part: `juno_init` arms the DCO
+   retrigger latch at BUILD, so on a cold engine a missing re-arm is invisible
+   and every cold gate in the repo is structurally blind to it. 17 cases/rate,
+   34 runs. The gate now also refuses a reference pickle built for a different
+   case set instead of silently comparing a subset.
+3. ✅ **DONE, two holes, both with teeth demonstrated** (commit 956784a):
+   - *header prerequisites*: no build rule listed `src/*.h`, yet the constant
+     TABLES live in headers (`juno_tables.h`, `chorus_luts.h`, `effect_luts.h`,
+     `finefx_tables.h`, `carp_patterns.h`, `hpf_type_lut.h`) — a coefficient
+     edit touching only a header rebuilt NOTHING and every gate reported green
+     on the old constants. Every rule now depends on `$(HDR)`; recipes use
+     `$(filter %.c,$^)`. Verified by touching a header and watching the relink.
+   - *stale library*: `tools/verify/freshlib.py` — the 13 port-side gates load
+     libjuno through it, and it refuses any library older than `src/*.c`,
+     `src/*.h` or `gui/juno_bridge.c`. `__file__`-relative, so a worktree gates
+     its own library (the `coldstate_ab` sharp edge). Teeth: touching
+     `src/voice_render.c` makes `port_state_dump.py` exit STALE-GUARD.
 4. Rebuild + wasm_golden + republish the webapp — **the published artifact
    predates the MONO retrigger fix**, which audibly affects all 14 MONO factory
-   patches.
-5. Fold `tools/embed/arm_golden.sh` into `make verify` (skip-with-message when
-   the cross toolchain is absent) — #144.
-6. CLAUDE.md truth-up (done with this document).
+   patches. Sequenced AFTER the verify run is green (do not ship on an unproven
+   engine).
+5. ✅ **DONE** — `tools/embed/arm_golden.sh` runs inside `make verify`. Its
+   exit 3 ("MISSING: <tool>") prints SKIP and is explicitly labelled *not a
+   pass*; any other non-zero exit fails the gate.
+6. ✅ CLAUDE.md truth-up (done with this document).
+
+Also landed alongside P0: `make juno_cand.so` — the Track B candidate engine,
+where `native/<x>.c` replaces `src/<x>.c` by filename. With `native/` empty it
+is a byte-identical twin of the sealed engine and `tools/trackb/null_ab.py
+--cand` reports **EXACTLY 0** on all five scenarios, which is the comparator's
+own passthrough proof.
 
 ### P1 — MEASURE (needs the ~$41 board; one afternoon)
 Flash `daisy/` (bootloader ≥v6.0 first: `make program-boot`). Read three things:

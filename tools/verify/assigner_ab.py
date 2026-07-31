@@ -56,12 +56,13 @@ RATES = [44100.0, 48000.0]
 #   p5  ASSIGN 1, LEGATO 1, PORTA 4 mono + legato + glide
 #   p6  ASSIGN 1                    mono, no glide
 #   p13 ASSIGN 1, PORTA 12          mono + glide
+#   p15 ASSIGN 1                    mono, the seed-15 retrigger-latch case
 #   p55 ASSIGN 0, LEGATO 1, PORTA 33  poly legato-glide (the one LEGATO read site)
 #   p61 ASSIGN 2, LEGATO 1          unison + legato
 #   p63 ASSIGN 2                    unison
 # Arp patches {1,9,17,25,33,41,49} are excluded (no transport clock in this
 # oracle, exactly as recall_render_ab documents).
-PATCHES = [0, 5, 6, 13, 55, 61, 63]
+PATCHES = [0, 5, 6, 13, 15, 55, 61, 63]
 
 # Event scripts. A single note cannot distinguish the modes, so both scripts
 # overlap notes and release them out of order -- the exact surface where POLY,
@@ -78,6 +79,40 @@ SCRIPTS = {
                 ('off', 52),     ('r', 2000),
                 ('off', 48), ('off', 55), ('off', 60), ('r', 5000)],
 }
+
+# PATCH-SPECIFIC scripts. `warmmono` is the fuzz seed-15 sequence, verbatim: the
+# exact events that exposed the MONO retrigger-latch bug (commit e611f7d) and the
+# only surface in the repo that distinguishes the two arming policies.
+#
+# Its two load-bearing properties, neither present in the scripts above:
+#   * the 747-sample WARM RENDER PREFIX. juno_init arms the DCO retrigger latch
+#     (aux Array A, 101504+v*32) at BUILD, so on a COLD engine a missing re-arm
+#     is invisible -- every cold gate in this repo is structurally blind to it.
+#     The prefix runs the latch down before the first note, which is what a DAW
+#     (and the fuzz driver) actually does.
+#   * a 6-note stack pressed into a MONO patch, then one release, then a further
+#     press -- the retrigger branch of mono_note_on, reached only when a note
+#     arrives while another is already held.
+# Applied to patch 15 only: running it on all eight patches would triple the
+# Unicorn reference cost for coverage the scripts above already give.
+EXTRA = {
+    15: {'warmmono': [('r', 747),
+                      ('on', 69, 36), ('on', 57, 45), ('on', 64, 29),
+                      ('on', 89, 54), ('on', 86, 11), ('on', 96, 103),
+                      ('off', 96),    ('on', 75, 100),
+                      ('r', 3000)]},
+}
+
+
+def runs():
+    """(patch, script_name, script) for every case the gate drives."""
+    for p in PATCHES:
+        for name, s in sorted(SCRIPTS.items()):
+            yield p, name, s
+        for name, s in sorted(EXTRA.get(p, {}).items()):
+            yield p, name, s
+
+
 BLOCK = 512
 
 
@@ -89,26 +124,27 @@ def _ref():
     leaves = R.leaf_table()
     out = {'rates': RATES, 'runs': {}}
     for sr in RATES:
+        modes = {}
         for p in PATCHES:
             e = RA.prepare_recall(p, bank, leaves, E, R, sr)
             # Record what the plugin's OWN allocator believes, so a --port run
             # can report the mode alongside a divergence.
-            mode = e.rd_i32(e.assign[0] + 16)
-            leg = e.rd_i32(e.assign[0] + 20)
+            modes[p] = (e.rd_i32(e.assign[0] + 16), e.rd_i32(e.assign[0] + 20))
             del e
-            for name, script in sorted(SCRIPTS.items()):
-                e = RA.prepare_recall(p, bank, leaves, E, R, sr)
-                L, Rr = [], []
-                for ev in script:
-                    if ev[0] == 'on':    e.note_on(ev[1], ev[2])
-                    elif ev[0] == 'off': e.note_off(ev[1])
-                    else:
-                        a, b = e.render(ev[1], block=BLOCK)
-                        L += a; Rr += b
-                del e
-                out['runs'][(sr, p, name)] = (mode, leg, L, Rr)
-                print("  ref: sr %g patch %2d %-8s mode=%d legato=%d  %d samples"
-                      % (sr, p, name, mode, leg, len(L)), flush=True)
+        for p, name, script in runs():
+            mode, leg = modes[p]
+            e = RA.prepare_recall(p, bank, leaves, E, R, sr)
+            L, Rr = [], []
+            for ev in script:
+                if ev[0] == 'on':    e.note_on(ev[1], ev[2])
+                elif ev[0] == 'off': e.note_off(ev[1])
+                else:
+                    a, b = e.render(ev[1], block=BLOCK)
+                    L += a; Rr += b
+            del e
+            out['runs'][(sr, p, name)] = (mode, leg, L, Rr)
+            print("  ref: sr %g patch %2d %-9s mode=%d legato=%d  %d samples"
+                  % (sr, p, name, mode, leg, len(L)), flush=True)
     pickle.dump(out, open(PKL, 'wb'))
     print("assigner_ab ref -> %s" % PKL)
     return 0
@@ -131,13 +167,19 @@ def _port():
     bank = open(truth.BANK, 'rb').read()
     bits = lambda f: struct.unpack('<I', struct.pack('<f', f))[0]
 
+    script_of = {(p, name): s for p, name, s in runs()}
     fails = checks = 0
+    if set(script_of) != {(p, n) for _, p, n in d['runs']}:
+        print("*** REFERENCE IS STALE: it was generated for a different case set "
+              "(%d cases) than this gate drives (%d). Regenerate: --ref ***"
+              % (len({(p, n) for _, p, n in d['runs']}), len(script_of)))
+        return 1
     for (sr, p, name), (mode, leg, rl, rr) in sorted(
             d['runs'].items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2])):
         c = lib.juno_gui_create(ctypes.c_float(sr), 0)
         lib.juno_gui_apply_bank(c, bank, len(bank), p)
         L, Rr = [], []
-        for ev in SCRIPTS[name]:
+        for ev in script_of[(p, name)]:
             if ev[0] == 'on':    lib.juno_gui_note_on(c, ev[1], ev[2])
             elif ev[0] == 'off': lib.juno_gui_note_off(c, ev[1])
             else:
@@ -156,7 +198,7 @@ def _port():
         checks += 1
         ok = (dl == 0 and dr == 0 and len(L) == len(rl))
         if not ok: fails += 1
-        print("  sr %6g patch %2d %-8s ASSIGN=%d LEGATO=%d : %s (L %d, R %d of %d%s)"
+        print("  sr %6g patch %2d %-9s ASSIGN=%d LEGATO=%d : %s (L %d, R %d of %d%s)"
               % (sr, p, name, mode, leg,
                  "BIT-EXACT" if ok else "*** DIVERGES ***", dl, dr, len(rl),
                  "" if first is None else ", first @ %d" % first))
