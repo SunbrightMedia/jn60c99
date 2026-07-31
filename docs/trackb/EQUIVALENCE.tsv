@@ -1,0 +1,10 @@
+# EQUIVALENCE.tsv -- the Track B audit trail. One row per module per accepted
+# revision; rows are NEVER edited in place, a re-accepted module gets a new row.
+# Column meanings: docs/trackb/PLAN.md 4.2. A row with a blank gate column is
+# PENDING, not green -- the per-module loop's steps 1/4/5/8 are what make the
+# null in step 6 mean anything, so a null recorded without them is an
+# unexamined number.
+# M0 is the harness itself: it is listed because the gates had to be repaired
+# before any module could be accepted behind them.
+module	file	lines_ref	cells_out	date	commit	src_sha	ref_sha	cand_sha	marker	coverage	branch_cov	observ	iso	null_scen	null_block	null_full	null_fuzz	null_arm	opt_levels	ftz	canary	teeth	carriage_rev	risks_closed	state_parity	status	notes
+M0-HARNESS	tools/trackb/*	n/a	n/a	2026-07-31	a5b203c	FROZEN at a5b203c	libjuno.so bb86025eae53f86f3387c86c104fad1e (make verify RUNNING)	passthrough fork	fork_check PASS	1161/1188 lines, >=1156 per scenario	NOT YET RUN (F6 open)	3520 CARRIED 7/7 @-128.8dB; 432/528/4928 0/7	passthrough null EXACTLY 0 (7 scen + 384 bank + 24 fuzz)	EXACTLY 0	EXACTLY 0	384 / 0 over / 5 silent / EXACTLY 0	24 seeds / 0 over / EXACTLY 0	SKIP: --arch arm not implemented (M0-7 open)	-O2 only (F16 open)	NOT YET MEASURED (F17 open)	noisegain 2/7, dcopitch 7/7, nochorus 7/7, envslow 7/7, tailquiet 7/7	2026-07-31 PASS (after the SCEN release change)	7-scenario sweep, fingerprint in TSV header	F1,F2,F3,F7,F8,F11,F13	Y (fork is verbatim)	GREEN	Harness only -- NO voice code has been rewritten yet. Open from PLAN 6: F4 spectral, F6 branch coverage, F9 teeth-over-bulk-gates, F10 per-module mutations, F12 silent-count baseline, F15 ARM null, F16 opt levels, F17 FTZ, F19 three-run determinism.

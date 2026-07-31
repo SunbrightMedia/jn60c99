@@ -60,7 +60,7 @@ Writing that mutation also exposed a coverage hole: the first five scenarios
 never released a note at all, so five of seven reported EXACTLY 0 against a
 release-path bug. Every scenario now ends with note-offs and a tail.
 
-**`--teeth` is not optional after any change to the gate.** It builds four
+**`--teeth` is not optional after any change to the gate.** It builds five
 known-broken engines and requires each to be caught *in a specified number of
 scenarios*, plus a clean control that must be EXACTLY 0:
 
