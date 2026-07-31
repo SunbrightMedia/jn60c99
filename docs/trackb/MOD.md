@@ -68,7 +68,7 @@ inputs, `928/960/992/1024` their shadows. **None of 368, 384, 912, 944, 976,
 | 1088 | LFO RATE — recall curve 22 (`{8,22,T_ID,1088}`), prepare default 0.56862748 | input |
 | 1104 | smoothed modded rate | **CARRIED** (read :736, written :786) |
 | 1120 | shadow of 1104 (:741) | tap |
-| 1136 | effective rate after tempo select (:819) | SCRATCH |
+| 1136 | effective rate after tempo select (:819) | tap — the only occurrence of 1136 in the file is that store; the phase-inc clamp at :826 uses the register `v83` |
 | 1152, 1168, 1184, 1200, 1216 | rate constants (§4) | const |
 
 ### 1.4 LFO oscillator `[1408..2544]`
@@ -135,7 +135,10 @@ env→pitch path is dead), `4112` (0, live bend), `4128` BEND depth DCO,
 ### 1.7 LFO → VCF hand-off `[7088..7232]` (VCF.md owns the cutoff sum)
 `7088` A-smoother state (**CARRIED**, input `[1792]`), `7104` its output
 (dead store at :1189, live at :1194); `7168` B-smoother state (**CARRIED**,
-input `[1808]`), `7184` its output (dead store :1197, live :1203). Coefficients
+input `[1808]`), `7184` its output (dead store :1197, final store :1203 — but
+**`[7184]` is never read anywhere in `voice_render.c`**; the cutoff sum at
+:1220-1221 consumes the register `v221`, so `[7184]` is a tap, not a hand-off
+cell. `[7104]` by contrast IS genuinely re-loaded, at :1204). Coefficients
 `7120`/`7200` (rate-armed), `7136`/`7216` (0), `7152`/`7232` (1.0).
 
 ### 1.8 CONDITION per-voice analog scatter — **render READS ONLY**
@@ -144,7 +147,7 @@ input `[1808]`), `7184` its output (dead store :1197, live :1203). Coefficients
 | 5520 "Duty Tune" | **:1706** | `[4816]' = [5520] + [3808]` (:1711) — the DCO **pulse width** |
 | 7600 "Cutoff Tune" | **:1240** | `v232 = [7568]'*[7696] + [7600]`, summed into the cutoff at :1248 |
 | 7616 "Resonance Tune" | **:1243** | `[7536]' = [6848]*[7792] + [7616]` |
-| 10320 "AMP LEVEL" | **:1598** | `v367 = v364 * [10320]` — per-voice output level |
+| 10320 "AMP LEVEL" | **:1598** | `v367 = v366 * [10320]` (`v366 = v364`, :1597) — per-voice output level |
 
 These four offsets appear in `voice_render.c` at **exactly those four lines and
 nowhere else**, always on the right-hand side of an assignment (verified by
@@ -171,7 +174,7 @@ retrig-latch head (:587-594)
   → ENV1 / ENV2         (:967-1075)         [ENV.md]
   → mod router          (:1076-1091)        → [3616], [3648], [3664], [3696]
   → PITCH SUM  [3776]   (:1092-1114)
-  → PWM  SUM   [3808]   (:1116-1123)
+  → PWM  SUM   [3808]   (:1117-1123)
   → …VCF input, keyfollow (:1176-1179), LFO→VCF smoothers (:1187-1203),
      cutoff sum (:1210-1228), CONDITION cutoff/res trims (:1240-1243)…
   → VCA, CONDITION level (:1598), output write (:1640)
@@ -222,9 +225,13 @@ Inputs: `g = [560]'` (binary gate, §ENV 2.3), `cv = [464]'` (conditioned pitch,
 ```
 
 Semantics (INFERRED): a leaky-integrator glide. `[704]` is the **current
-value**, `cv = [464]` is the **target** (written by the note path —
-`juno_note.c:274` for a legato pitch change, `:97` / PITCH_OFF for a note-on).
-`[656]`/`[672]` are the integrator and its rate; `[688]` is an arrival ramp that
+value**, `cv = [464]` is the **target**. `[464]` is **not** written by the note
+path — it is computed in-render at `voice_render.c:659` (`[464] = ((v12·[448]) −
+([448]·[336])) + [336]`, the conditioner's lerp) from the raw note pitch `[304]`.
+`[304]` is what the note path writes: `PITCH_OFF 304` (`juno_note.c:97` is the
+`#define`), stored at `juno_note.c:160` on a note-on and at `:274` for a legato
+pitch-only change. So the note path moves the target one cell upstream of the
+glide. `[656]`/`[672]` are the integrator and its rate; `[688]` is an arrival ramp that
 lerps the output onto the target once `|current − target| < 0.05`.
 
 Three traps, all READ from the code above:
@@ -243,10 +250,16 @@ Three traps, all READ from the code above:
 ### 3.2 Mod-CV sum — :724-732
 ```
 :724  v57  = [384] * [864]
+:725  [896] = [[880]]                 // shadow of the PREVIOUS sample's value —
+                                      //   this store precedes the :732 update
 :729  v61  = v57 + ([368] * [848])
 :732  [880] = v61                     // == 0.0f (368/384 have no writer)
-:725  [896] = [[880]]                 // shadow of the previous value
 ```
+Order is load-bearing in principle: `[896]` is written **before** `[880]` is
+updated, so it holds the previous sample's value, not this one's. `[896]` has no
+reader anywhere, and `[880]` is identically 0.0f in the shipping engine, so
+getting the order wrong is currently unobservable — but the listing follows the
+source.
 
 ### 3.3 LFO rate — :726-819
 
@@ -279,8 +292,8 @@ and `[1040] = 0`, the whole block collapses to
 **Keep the full form** — the collapse depends on four cells that only a host
 parameter path could make nonzero.
 
-`expf` is a real libm call at :798 (the second in the voice, after the VCF's at
-:1261). CLAUDE.md records glibc `expf` == newlib `expf` bit-identical over
+`expf` is a real libm call at :798 — the **first** of exactly two in the voice
+(the VCF's at :1261 is the second; grep returns no others). CLAUDE.md records glibc `expf` == newlib `expf` bit-identical over
 32,000,423 inputs (PROVEN); a native port must not substitute its own exp.
 
 ### 3.4 LFO ext gate, phase increment, delay ramp — :800-853
@@ -320,7 +333,8 @@ exactly `[1856]`, the **any-key-held** flag broadcast to every voice
 (`juno_note.c:220-226`), so the LFO delay restarts on the **first key of a
 phrase**, not on every key, and simultaneously on all 8 voices.
 
-`[2272]/[2256] = −0.63212102 / 2.7182819` ⇒ the level stays at 0 until the ramp
+`[2272]/[2256] = −0.63212103 / 2.7182820` (the §4 roundings; the exact decoded
+values are −0.6321210265159607 and 2.7182819843292236) ⇒ the level stays at 0 until the ramp
 passes `1 − 1/e`, i.e. exactly one time constant, then rises to 1.0. That is the
 LFO DELAY.
 

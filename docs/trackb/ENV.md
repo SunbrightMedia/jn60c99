@@ -86,15 +86,14 @@ Exact structural clone of ENV1 with offset map +480: 2560→3040, 2576→3056,
 CONST; 9600 VCA VEL SENS recall (juno_apply.c:682) → per-sample int copy 9648
 (lines 1517–1519); 9616 CONST base 0.93 (prepare:90) → copy 9664 (line 1520);
 9760 blend; 9776 STATE final VCA velocity gain (9792 shadow, 9808 CONST).
-9824 gate-twin (note-on 1.0, juno_note.c:201; porta-gate may zero it,
-juno_note.c:306) — **but see the power-on default below**; 9840/9872 shadows,
-9856 STATE smoothed twin, 9888 CONST.
-9824 gate-twin — **power-on 1.0**, `juno_prepare.c:91` (`JI(st,9824)=0x3f800000`;
-inside the replicated block [176,10688) so all 8 voices get it — prepare header
-:49). `juno_init.c` never writes it and note-OFF never clears it; only note-on
-(→1.0) and the porta-gate `off` arm (→0.0) move it afterwards. Its smoother
-9856 is zeroed by `chorus_init.c:328` (9840/9872 too, :327/:329), so at power-on
-9856 ramps 0→1 — see §4.
+9824 gate-twin, 9840/9872 shadows, 9856 STATE smoothed twin, 9888 CONST.
+⚠ **9824's power-on value is 1.0, not 0** — `juno_prepare.c:91`
+(`JI(st,9824)=0x3f800000`), inside the replicated block [176,10688) so all 8
+voices get it (prepare header :49). `juno_init.c` never writes it and note-OFF
+never clears it; afterwards it moves only via note-on (→1.0, juno_note.c:201)
+and the porta-gate `off` arm (→0.0, juno_note.c:306). Its smoother 9856 is
+zeroed by `chorus_init.c:328` (9840/9872 too, :327/:329), so at power-on 9856
+ramps 0→1 during host idle — see §4.
 9584 VCA TONE (recalled, juno_apply.c:200 `{49, 24, T_ID, 9584}`) → per-sample
 int copy 9632 (line 1518); 9632 is the tone-blend selector of the output
 bright/dark pair 10480–10640 (§2.11 / §5.1). NOT part of 9552.
@@ -274,10 +273,11 @@ ENV1 drives the filter.
 (1108–1114); PWM sum uses `JF(3904)*JF(3648)`, `JF(3920)*JF(3664)` inside
 **`JF(3808)`** (1117–1123):
 ```
-JF(3808) = (((((v186*JF(4160)) + JF(4176)) * JF(3888))
-             + (JF(3904)*JF(3648)))
-             + (JF(3920)*JF(3664)))
-             + JF(3936)) * JF(4144);      // :1117–1123  — the real PWM MOD SUM
+// :1117–1123 — the real PWM MOD SUM (7 roundings, exactly as written)
+JF(3808) = ((((((v186*JF(4160)) + JF(4176)) * JF(3888))
+                + (JF(3904)*JF(3648)))
+                + (JF(3920)*JF(3664)))
+                + JF(3936)) * JF(4144);
 ```
 ⚠ **Not 3824.** `JF(3824)` is written one line later, at :1124, from `v188`
 (:1116) = `(JF(3744) + JF(3696)) + JF(3760)` — an unrelated tap with **no reader
@@ -351,7 +351,7 @@ patterns (store the BITS, not the decimals).
 | 2912, 3392 | 0x416c0000 | 14.75 | attack target (overshoot) | init:970/981 |
 | 2928, 3408 | 0x410c0000 | 8.75 | envelope peak / sustain scale | init:971/982 |
 | 2944, 3424 | 0x41026666 | 8.1499996 | sustain base | init:972/983 |
-| 2960, 3440 | 0x39ce11c1 @44100 / 0x393d5383 else | 3.9304610e−4 / 1.8055555e−4 | sustain slew-step INPUT — ⚠ **not** equal to the computed JF(2704)/JF(2184); see §2.4 | init:973/984 |
+| 2960, 3440 | 0x39ce11c1 @44100 / 0x393d5383 else | 3.9304610e−4 / 1.8055555e−4 | sustain slew-step INPUT — ⚠ **not** equal to the computed JF(2704)/JF(3184) (cancellation, §2.4); do NOT substitute | init:973/984 |
 | 2976, 3456 | 0x3e9166f5 @44100 / 0x3e05f213 else | 0.28398862 / 0.13080625 | rate-coefficient smoother | init:974/985 |
 | 2992, 3472 | 0x3dea0ea1 | 0.11428571 (=1/8.75) | output normalizer | init:975/986 |
 | 3008/3024, 3488/3504 | 0x3f800000 | 1.0 | output gains | init:976–977/987–988 |
@@ -364,6 +364,8 @@ patterns (store the BITS, not the decimals).
 | 7504 | 0x41000000 | 8.0 | VCF velocity scale | init:1078 |
 | 7424 / 9600 | byte/255 | VCF / VCA VEL SENS | juno_apply.c:681–682 |
 | 9616 | 0x3f6e147a | 0.92999995 | VCA velocity base gain | prepare:90 |
+| **9824** | **0x3f800000** | **1.0** | **gate-twin POWER-ON default** (replicated to all 8 voices; `juno_init.c` never writes it, note-off never clears it) | **prepare:91** |
+| 9840, 9856, 9872 | 0x00000000 | 0.0 | gate-twin shadows + smoother state, power-on | chorus_init.c:327–329 |
 | 9952 | 0xbd7914c2 | −0.060810812 | gate-env attack-mode threshold | init:1144 |
 | 9968 | 0x3c96c6dc @44100 / 0x3c0a8719 else | 0.018405370 / 0.0084550614 | gate-env attack one-pole | init:587→1145 |
 | 9984 | 0x3d005da8 @44100 / 0x3c6bdf4b else | 0.031339318 / 0.014396499 | gate-env linear attack step | init:586→1146 |
@@ -405,34 +407,112 @@ values from the initialized state or replicate both branches, not re-derive).
   `JF(7632)==1.0`), NOT an envelope; the envelopes only enter it through the CV
   v227 terms of §2.5/§2.6. The only other envelope-adjacent `expf` is line 798
   (LFO-delay shaper, coeffs 1184/1200/1216).
-- **Retrig latch arming** is owned by juno_note.c / the bridge (MONO retrigger
-  + every note-off); voice_render only CONSUMES (§2.1–2.2). Array B
-  (101520+v·32) is written by POLY note-on and read by nothing.
+- **Retrig latch arming** happens at three sites — engine BUILD for all 8 voices
+  (`juno_init.c:3225`), MONO retrigger (`juno_note_retrig`, bridge-only caller),
+  and every note-off (`juno_note.c:262`). voice_render only CONSUMES
+  (§2.1–2.2). The BUILD arm is the one a native port is most likely to miss:
+  it is what masks each voice's first rendered sample. Array B (101520+v·32) is
+  written by POLY note-on and read by nothing.
 - **VCA MODE=2 (GATE)** makes 9936 the sole amp CV — organ-style, no ADSR
   (juno_apply.c:403–409); modes 0/1 select ENV1/ENV2 normalized outputs.
 - **Voice output** `JF(10672)` (lines 1640, 2180–2182) is the product of the
   filter/amp path with BOTH the VCA velocity gain 9776 and the smoothed gate
-  twin 9856 — a voice with 9824 never set renders silent.
+  twin 9856.
+  ⚠ **The gate twin 9824 is 1.0 from power-on** (`juno_prepare.c:91`, replicated
+  to all 8 voices), not 0. Its smoother 9856 starts at 0
+  (`chorus_init.c:328`) and converges toward 1.0 as a one-pole with coefficient
+  `JF(9888)` = 0.0075585791 @44.1k (`voice_render.c:1543`) — τ ≈ 132 samples
+  ≈ 3.0 ms, settled in ~4.6τ ≈ 14 ms — **while the host idles, before any note**.
+  A native port that leaves 9824 at 0 until note-on therefore fades in the first
+  note of every voice over ~14 ms, which is far above the −90 dB null target.
+  9824 is only cleared by the porta-gate `off` arm (juno_note.c:306); note-off
+  does not touch it.
 
 ## 5) Open questions
 
-1. **Cell 9552** (→ copies 9568/9632/10064; used at lines 1614, 1623–1636 and
-   in the v360 mix) has no writer anywhere in src/ — 0 from calloc. INFERRED
-   inert (its coefficient 10224 also has no writer → 0). Confirm against the
-   binary before hard-coding the simplification `v360 = X`, `v383 = v375`.
+1. **Cell 9552** copies to **9568** (line 1516) and **10064** (v352 read at 1572,
+   stored at 1576) — and to nothing else. Its only writer in `src/` is
+   `chorus_init.c:316` (`= 0`), i.e. it is explicitly zeroed at power-on and
+   never written again. Its coefficient partner 10224 has no writer at all → 0.
+   So the v360 mix at 1586–1588 does collapse to `v360 = X` (INFERRED inert;
+   confirm against the binary before hard-coding it).
+
+   ⚠ **CORRECTION — 9632 is NOT a 9552 copy.** `voice_render.c:1518` is
+   `JI(a1, 9632) = JI(a1, 9584);` and **9584 is VCA TONE**, a recalled per-patch
+   cell (`juno_apply.c:200`, BINDINGS row `{ 49, 24, T_ID, 9584, "VCA TONE" }`).
+   Everything at :1614 (`v376 = JF(a1, 9632)`) and in the branches at :1623
+   (`v376 <= 0.0`), :1631 (`v376 < -0.0`) and :1635 (`v376 >= 0.0`) is therefore
+   driven by VCA TONE, not by an inert cell. That block is a signed
+   bright/dark tone blend over the two 3-tap filters v377/v378 (states
+   10480/10496/10512/10528, coeffs 10560–10640):
+   ```
+   v379 = (v376 <= 0.0f) ? 0.0f : v376;              // :1623–1626
+   v381 = ((v379*v377) - (v379*v375)) + v375;        // :1630   bright blend
+   v382 = (v376 < -0.0f) ? -v376 : 0.0f;             // :1631–1633 (v19 inits 0.0 at :633)
+   v383 = v375 + ((v382*v378) - (v382*v375));        // :1634   dark blend
+   if (v376 >= 0.0f) v383 = v381;                    // :1635–1636
+   JF(10544) = v383;                                 // :1637
+   ```
+   **`v383 = v375` is only true when VCA TONE == 0**, which is the default but
+   NOT true for any patch that recalls a non-zero VCA TONE. Do not hard-code it.
+   (chorus_init.c also zeroes 9632 at :318, but recall + the :1518 copy overwrite
+   it every sample.) READ.
 2. **2768/3248** are written (lines 1021/1075) but never read by voice or
    master render (grep). Keep the stores for state A/B equality; confirm no
    cross-unit reader under emulation.
-3. **JF(2704)** is recomputed per sample as a lerp that collapses to JF(2960)
-   only because 2848==1.0 (prepare). If any path ever writes 2848≠1, the slew
-   changes — a native port should keep the three-term expression.
+3. **JF(2704)** is recomputed per sample from 2848/2928/2960. With 2848 == 1.0
+   (prepare:73) it is *algebraically* JF(2960) but **not** numerically — the
+   source's `(s − 8.75f) + 8.75f` truncates the step's low mantissa bits
+   (PROVEN, §2.4). Keep the three-term expression verbatim; it is required for
+   bit-exactness today, and also for correctness if any path ever writes
+   2848 ≠ 1.
 4. **>1 smoother coefficient** (6928/9744 = 1.3072726 @44.1k) overshoots on
    velocity changes; bit-exactness requires the exact single-precision order
    `(target − state)*coef + state`.
 5. **init "else" branch coverage**: proven bit-exact at 48000/88200/96000/
    192000 per CLAUDE.md cold-state gate, i.e. the plugin itself uses one
    non-44100 constant set; do not "fix" the apparent time-constant mismatch.
-6. **Gate magnitudes**: conditioner tolerates any positive gate (bias 544);
-   port always writes 1.0. If host ramps are ever implemented, v29 becomes
-   fractional during transitions and 560 can differ from (320 != 0) only for
-   negative gates > −JF(544) — unreachable in the current port. INFERRED.
+6. **Gate magnitudes**: the conditioner tolerates any positive gate (bias 544);
+   the port always writes 1.0. Exact law from :662–683 —
+   `560 = 1 iff (v29 != 0.0f) && ((v29 + JF(544)) >= 0.0f)`.
+   ⚠ **Corrected disagreement region.** For `v29 ∈ (−JF(544), 0)` — a negative
+   gate *smaller in magnitude* than the bias — `v32 = 0.0 → v34 = 0.0 → v36 =
+   1.0`, so 560 = 1 and `(320 != 0)` = 1: they **agree**. 560 differs from
+   `(320 != 0)` exactly when `v29 + JF(544) < 0`, i.e. **`v29 < −JF(544)`**
+   (e.g. v29 = −0.05 against the 44.1k bias 0.0226757 → 560 = 0 while
+   `320 != 0`). With host ramps, `v29 != 0` while `320 == 0` on a decaying ramp
+   tail is a second disagreement case. All unreachable in the current port
+   (240/272 == 0, gate ∈ {0, 1.0}). READ.
+
+---
+
+## 6) Verification notes (adversarial re-derivation, 2026-07-31)
+
+An adversarial verifier re-derived every claim in this doc against the source.
+Nine defects were reported; **I re-checked all nine independently against the
+current sources and all nine were real**. Every one is now fixed above. Log:
+
+| # | Where | Defect | How I re-checked it | Result |
+|---|---|---|---|---|
+| 1 | §2.4, §3 row `2960/3440` | "collapses to JF(2960) exactly" | Recomputed `((1.0f*s)-(8.75f*1.0f))+8.75f` in single precision from the §3 bit patterns, both rate branches | **CONFIRMED, PROVEN** — 0x39ce0000 vs 0x39ce11c1 (44100), 0x393d0000 vs 0x393d5383 (else) |
+| 2 | §5.1 | "9552 → copies 9568/**9632**/10064", no writer | Read `voice_render.c:1516/1518/1572/1576`; grepped `[^0-9]9552)` and `9584` across `src/` | **CONFIRMED** — :1518 copies **9584** (VCA TONE, `juno_apply.c:200`); 9552 *is* written (`chorus_init.c:316` = 0) |
+| 3 | §2.7 | ENV→PWM terms "inside JF(3824)" | Read `voice_render.c:1108–1124` with line numbers | **CONFIRMED** — the terms are in `JF(3808)` (:1117–1123); :1124 stores the unrelated `v188` into 3824 |
+| 4 | §2.2, §4 | "MONO retrigger + note-off **only**" | Grepped every writer of `JUNO_VOICE_AUX_BASE0`/`AUX_EDGE` in `src/` + `gui/` | **CONFIRMED** — three sites: `juno_init.c:3225` (BUILD, all 8), `juno_note.c:238`, `juno_note.c:262` |
+| 5 | §4, §1, §3 | "a voice with 9824 never set renders silent" | Grepped 9824 across `src/`; read `juno_prepare.c:80–95` + header :49; checked `chorus_init.c` does not touch 9824 and the init order at `gui/juno_bridge.c:152–154` | **CONFIRMED** — `juno_prepare.c:91` sets 9824 = 1.0 for all 8 voices at power-on; §3 had no row for it |
+| 6 | §5.6 | disagreement region stated as `> −JF(544)` | Traced :662–683 case by case | **CONFIRMED** — that is the *agreement* region; disagreement is `v29 < −JF(544)` |
+| 7 | §1 preamble | "shadows never feed back" | Grepped readers of every shadow cell in `voice_render.c` + `master_render.c` | **CONFIRMED** — 2608/2656/2688/2736 (+ ENV2 3088/3136/3168/3216) are the sole carriers of the previous sample into the ADSR; the rest really are write-only |
+| 8 | §0 | remap "636–669 → 682–693" | Opened 658, 682, 683, 691, 693 | **CONFIRMED wrong** — 636→658, 661–669→683–691; 682 and 693 are unrelated lines. (The other two remaps, 587–594 and 2175–2179, I re-opened and they are correct.) |
+| 9 | §2.4 | two algebraic paraphrases (factored lerp; "release = R/256 per sample") | Read :989–991 and :1015–1016 | **CONFIRMED** — both are non-float-identical glosses in a doc whose premise is that parenthesization is load-bearing; both are now flagged as gloss-only with the source form mandated |
+
+Nothing was rejected. Two things the verifier reported that I additionally
+confirmed while checking, and which are now in the doc: 9856/9840/9872 are
+explicitly zeroed at power-on by `chorus_init.c:327–329` (so the gate-twin
+smoother genuinely ramps 0→1 during host idle), and `v19` — the fallback for
+`v382` in the VCA TONE blend — is initialised to 0.0 far upstream at
+`voice_render.c:633`, its only other assignment being :1632.
+
+Everything the verifier explicitly re-derived and passed is left untouched: the
+28 constant rows of §3 (hex, decimal, rate branch, line cite), the §2.1/§2.2
+latch head/tail, the §2.3 gate conditioner including every shadow store, the
+§2.4 ADSR core term-for-term, the ENV2 +480 offset map, §2.5/§2.6/§2.8–§2.11,
+and the `2768`/`3248` "no reader" claims (I re-grepped both: write-only).

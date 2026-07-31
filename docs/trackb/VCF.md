@@ -49,7 +49,7 @@ Classification used throughout:
 
 | cell | class | R@ | W@ | role |
 |---|---|---|---|---|
-| 6576 | INPUT-CONST (=0) | 1154 | — | cutoff key-CV alt input; **no writer anywhere in `src/`** |
+| 6576 | INPUT-CONST (=0) | 1154 | — | cutoff key-CV alt input; **only writer is `chorus_init.c:233`, which stores 0** (it runs *before* `juno_engine_init`) ⇒ 0 |
 | 6592 | SHADOW | — | 1150 | int shadow of 6576 |
 | 6608 | INPUT-CONST (=0) | 1151, 1207 | — | live cutoff/bend mod source |
 | 6624 | SHADOW | — | 1151 | int shadow of 6608 |
@@ -61,6 +61,14 @@ Classification used throughout:
 | 6720 | INPUT-CONST (=0) | 1154, 1155 | — | "Griffer SW" — no writer ⇒ 0 |
 | 6736 | INPUT-CONST | 1155, 1156 | — | **VCF CUTOFF FREQ** (recall, `juno_apply.c:169`) |
 | 6752/6768/6784/6800/6816 | INPUT-CONST | 1157-1160 | — | quartic taper c0..c4 (`juno_init.c:1063-1067`) |
+
+`[6576]`, `[6592]`, `[6608]`, `[6624]`, `[6640]`, `[6656]`, `[6672]`, `[6688]`
+are each explicitly stored as 0 by `chorus_init.c:233-240` — the transcribed
+constructor `sub_1803A1300`, which `juno_engine.h:62-67` requires to run
+**before** `juno_engine_init`. No later writer exists in `src/`, and the
+calloc'd block is 0 anyway, so the value is 0 either way; but a grep-based
+audit of "no writer" claims will find these stores, so they are named here
+rather than left implicit (READ). `[6720]` really does have no writer at all.
 
 ### 1.2 Resonance + VCF velocity `[6832..6928]` (READ :1170-1175)
 
@@ -112,13 +120,18 @@ Classification used throughout:
 
 ### 1.4 Cutoff → coefficient mapper `[7520..8192]` (READ :1230-1297)
 
-Entirely inside `if ([7632] == 1.0)`; `[7632]` is 1.0 from `juno_prepare.c:87`
-and has no other writer, so the else-branch (:1294-1297) is unreachable in the
-port.
+The **coefficient computation** (:1235-1293) is inside `if ([7632] == 1.0)`;
+`[7632]` is 1.0 from `juno_prepare.c:87` and has no other writer, so the
+else-branch (:1294-1297) is unreachable in the port. **The gate does not open
+the block**: `if (JF(a1,7632) == 1.0)` is at **:1235**, so :1230-1234 —
+`v228=[6704]`, `v229=[6848]`, the rename `[[7584]]=[[7568]]`, `v230=[7552]`
+and the dead store `[7568]=v230` — execute **unconditionally**, every sample,
+gate or no gate. A native port that folds :1230-1234 into the `if` changes the
+held-branch state (see §1.8 "Minor" and §6.1 item 8).
 
 | cell | class | R@ | W@ | role |
 |---|---|---|---|---|
-| 7520 | **SCRATCH** while gate on; CARRIED in the held branch | 1296 | 1292 | ladder integrator gain `G = g/(1+g)` |
+| 7520 | **SHADOW** while gate on; CARRIED in the held branch | 1296 | 1292 | ladder integrator gain `G = g/(1+g)` — see note below |
 | 7536 | **SCRATCH** while gate on; CARRIED in the held branch | 1299 | 1243 | resonance drive `k` |
 | 7552 | **CARRIED** | 1233 | 1241 | cutoff-dither phase (`juno_wrap24` chain) |
 | 7568 | **CARRIED** | — | 1234, 1239 | dither smoother state (see the dead store at :1234) |
@@ -142,14 +155,34 @@ port.
 | 8048..8192 (10 cells) | INPUT-CONST | 1275-1289 | — | `tan` rational (sin numerator / cos denominator) |
 
 `8192` is written by `juno_init.c:1113` as `JI(a1, 0x2000)` and read at :1275 as
-`*(float *)(a1 + 0x2000)` — the same cell, spelled differently. CELLMAP §T also
-lists a read at :607; that is a **false positive** (see §1.8 item 5).
+`*(float *)(a1 + 0x2000)` — the same cell, spelled differently. (An older
+CELLMAP also listed a read at :607; that was a substring collision on `0x2000`
+and CELLMAP has since fixed it — see §1.8 item 5.)
+
+**Why `[7520]` is SHADOW and `[7536]`/`[9040]` are SCRATCH.** By this doc's own
+definition (§1) SCRATCH means *written and read inside the same sample*.
+`[7520]` is written at :1292 and is **never read that sample** — the value is
+carried forward in register `v241`, and its only read (:1296) is inside the
+mutually exclusive `else` (:1294-1297). While the gate is on it is therefore a
+SHADOW, not SCRATCH: a native port may drop the store entirely (subject to §6.1
+item 8). `[7536]` (written :1243, read :1299) and `[9040]` (written :1514, read
+:1568) are different — both reads are **outside** their gated block and do
+execute in the same sample, so those two are genuinely SCRATCH.
 
 ### 1.5 Ladder core + decimator `[8208..9536]` (READ :1298-1515)
 
-Entirely inside `if ([9056] == 1.0)`; `[9056]` is 1.0 from `juno_prepare.c:88`.
+The **ladder computation** (:1339-1515) is inside `if ([9056] == 1.0)`;
+`[9056]` is 1.0 from `juno_prepare.c:88` and has no other writer. **The shifts
+are not**: `if (JF(a1,9056) == 1.0)` is at **:1338**, so the whole shift block
+runs unconditionally every sample — the ladder stage-state chain (:1300-1306),
+all four 8-cell dispersion-line shifts (:1307-1334), `[[8960]]=[[8944]]`
+(:1335) and `v244=[8976]` / `[8992]=v244` (:1336-1337). Moving them inside the
+`if` would change the held-branch state (§6.1 item 8).
 
-**Pipeline** (7 cells, shifted at :1300-1306) — all **CARRIED**:
+**Pipeline** — the chain `[8208..8320]` is **8 cells** carrying **7 distinct
+values**: the shift at :1300-1306 is 7 assignments (`8320←8304 … 8224←8208`),
+and `[8208]` is only ever consumed by that shift, so its content is renamed
+into `[8224]` and re-supplied at :1466. All 8 are **CARRIED**:
 
 | cell | holds after the shift | consumed at |
 |---|---|---|
@@ -184,7 +217,7 @@ Written at the end of the sample by sub-step 4: 8208 (:1466), 8224 (:1469),
 
 | cell | class | R@ | W@ | role |
 |---|---|---|---|---|
-| 8944 | **CARRIED** | 1335, 1347, 1383, 1386, 1411, 1418, 1453 | 1343 | VCF input drive |
+| 8944 | **CARRIED** | 1335, 1347, 1386, 1411, 1453 | 1343 | VCF input drive (:1383 and :1418 read `[8960]`, not this cell) |
 | 8960 | **CARRIED** (read z⁻¹ of 8944) | 1348, 1383, 1418 | 1335 | previous 8944 |
 | 8976 | **CARRIED** | 1336 | 1342 | ladder dither phase |
 | 8992 | SHADOW | — | 1337 | z⁻¹ of 8976 |
@@ -208,7 +241,7 @@ The envelope, velocity, mute and gate-ramp cells `9680..10032` (and `9712`,
 
 | cell | class | R@ | W@ | role |
 |---|---|---|---|---|
-| 9552 | INPUT-CONST (=0) | 1516, 1572 | — | external VCA env input; no writer in `src/` |
+| 9552 | INPUT-CONST (=0) | 1516, 1572 | — | external VCA env input; only writer is `chorus_init.c:316`, which stores 0 ⇒ 0 |
 | 9568 | SHADOW | — | 1516 | int shadow of 9552 |
 | 9584 | INPUT-CONST | 1518 | — | **VCA TONE** (recall, `juno_apply.c:200`, bipolar curve 24) |
 | 9600 | INPUT-CONST | 1517 | — | **VCA VEL SENS** = `record_byte/255` (`juno_apply.c:682`) |
@@ -263,38 +296,62 @@ The envelope, velocity, mute and gate-ramp cells `9680..10032` (and `9712`,
 
 ### 1.8 Where I disagree with `CELLMAP.md`
 
-Four corrections; the CELLMAP tables are otherwise accurate and I used them as
-the cross-check.
+**Cite basis.** All line numbers below are the **current** `CELLMAP.md`
+(1345 lines), re-checked 2026-07-31 *after* CELLMAP's own adversarial
+re-derivation pass (its `## Verification notes`, CELLMAP:1278-1345, fixed 12
+defects). Three of the five items originally listed here have since been fixed
+upstream and are kept only as resolved history; two are still live. The cites
+in the first draft of this section were taken against the pre-pass CELLMAP and
+were stale — that is what this rewrite corrects.
 
-1. **"VCF 4-pole ladder core, 3× oversampled"** (CELLMAP §U heading, line 598)
-   — it is **4×**, not 3×. Four sub-steps run per host sample with input
-   interpolation weights 0.25 / 0.5 / 0.75 / 1.0 (`[9216]`/`[9232]` swapped for
-   sub-steps 1 and 3, `[9248]` for 2, `[9200]` for 4 — READ :1350-1352, :1386,
-   :1421, :1456), four dispersion lines of 8 cells each = 32 samples of 4×
-   history, and a 32-tap decimating FIR. CELLMAP's own *dataflow* section
-   (line 996-1013) correctly says "4 sub-steps" — only the heading is wrong.
-2. **"Amp tone filter … 3-tap FIRs A/B"** (CELLMAP §AA heading and dataflow
-   line 1035) — they are **1-pole/1-zero IIRs**, not FIRs. `[10592]` and
-   `[10640]` multiply `[10512]` / `[10528]`, which after the :1615-1617 shift
-   hold the *previous outputs* `yA[n−1]` / `yB[n−1]`, not input history (READ
-   :1619-1622 against the writes at :1627/:1629). This matters: an FIR
-   re-implementation would not null.
-3. **CELLMAP §U names `[7520]` "g" and `1−2[7520]` "G"** (line 1000). `[7520]`
-   is already `g/(1+g)` (the integrator gain); `1−2·[7520]` is the bilinear
-   pole coefficient. I use `G = [7520]` and `A = 1−2G` below to avoid the trap.
-4. **`[7808]`** is listed nowhere in CELLMAP §T and is indeed **never read** —
-   `juno_init.c:1089` writes −4.75 into it and `voice_render.c` never touches
-   it. Worth recording as a known-dead init cell rather than a gap.
+**Still live (CELLMAP is wrong today):**
 
-5. **CELLMAP §T lists `[8192]` as "read @ 607, 1275"** (line 597). Line 607 is
-   `v10 = v8 & 0x200000;` — an integer bit mask inside `juno_wrap24`'s inlined
-   copy in the noise block, not a cell access. The textual `0x2000` matched
-   `0x200000`. `[8192]` is read **only** at :1275. (READ; I read line 607.)
+1. **"VCF 4-pole ladder core, 3x oversampled"** (CELLMAP §1 sub-table U
+   heading, **CELLMAP:598** — still says "3x") — it is **4×**, not 3×. Four
+   sub-steps run per host sample with input interpolation weights
+   0.25 / 0.5 / 0.75 / 1.0 (`[9216]`/`[9232]` swapped for sub-steps 1 and 3,
+   `[9248]` for 2, `[9200]` for 4 — READ :1350-1352, :1386, :1421, :1456),
+   four dispersion lines of 8 cells each = 32 samples of 4× history, and a
+   32-tap decimating FIR. CELLMAP's own §2 dataflow section
+   (**CELLMAP:1049-1069**, "VCF ladder, 4 sub-steps", and CELLMAP:1051-1054
+   which now says "**FOUR**" dispersion lines) is correct — only the §1
+   heading still carries the old "3x".
+2. **CELLMAP §2 U names `[7520]` "g" and `1−2·[7520]` "G"**
+   (**CELLMAP:1057**, `` `g = [7520]'`; `G = 1-2g` ``; the §1 row at
+   CELLMAP:555 calls it "ladder coefficient g/(1+g)"). `[7520]` is *already*
+   `g/(1+g)` — the integrator gain — so CELLMAP's "g" is this doc's `G`. I use
+   `G = [7520]` and `A = 1−2G` throughout §3 to avoid the collision. Not a
+   defect in CELLMAP's equations, but the two docs' letters do **not** mean
+   the same thing and a reader moving between them will be caught.
 
-Minor: CELLMAP §T's `[7568]` row does not record the **dead store at :1234**
-(`JF(7568) = v230`, overwritten at :1239 whenever `[7632]==1`). It only matters
-in the unreachable held branch, but a native port that "optimises" by moving
-the store inside the `if` changes the held-branch state.
+**Resolved upstream (recorded so the history is auditable):**
+
+3. **`[7808]`** is listed nowhere in CELLMAP (grep: no occurrence of 7808 in
+   the file) and is indeed **never read** — `juno_init.c:1089` writes −4.75
+   into it and `voice_render.c` never touches it (grep). Still a genuine gap in
+   CELLMAP's coverage, but a gap of omission, not an error; recorded here as a
+   known-dead init cell (§8 item 2).
+4. **`[8192]`'s phantom ":607" read cite** — FIXED in CELLMAP. **CELLMAP:596**
+   now reads "`:607` is NOT an access: it is `v8 & 0x200000` inside the inline
+   wrap24", and CELLMAP:1317-1319 records the fix. (:607 in `voice_render.c` is
+   `v10 = v8 & 0x200000;`, an integer bit mask inside `juno_wrap24`'s inlined
+   copy in the noise block; the textual `0x2000` matched `0x200000`. `[8192]`
+   is read **only** at :1275.) Nothing left to correct.
+5. **"Amp tone filter … 3-tap FIRs A/B"** — FIXED in CELLMAP. The phrase no
+   longer occurs (grep); **CELLMAP:1100-1111** now writes out both filters as
+   recursive `y[n] = b0·x[n] + b1·x[n−1] + a1·y[n−1]` and explicitly warns
+   "a native rewrite built as a 3-tap FIR … will not null — the third tap is
+   feedback", and CELLMAP:1335-1338 records the fix. The §1 §AA heading
+   (CELLMAP:770) never made the FIR claim. The substance stands and is stated
+   independently in §3.13 / R5; the disagreement does not.
+
+Minor (**withdrawn**): the first draft said CELLMAP's `[7568]` row does not
+record the dead store at :1234. It does — **CELLMAP:558** lists `written @
+1234,1239`. The underlying source fact is still worth stating, and is now
+stated in §1.4: `JF(7568) = v230` at :1234 is overwritten at :1239 whenever
+`[7632]==1`, so it only matters in the unreachable held branch — but a native
+port that "optimises" by moving the store inside the `if` changes the
+held-branch state.
 
 ---
 
@@ -358,6 +415,26 @@ operands this is provably identical to the float-only computation (double
 rounding is innocuous when `p2 ≥ 2·p1 + 2`, i.e. 53 ≥ 50), so a native
 implementation may use plain float there. That equivalence is per-operation:
 it does **not** license re-association.
+
+**Double-declared *locals* in this subsystem** (a separate hazard from double
+literals — "a typed local CONVERTS where memory REINTERPRETS" is the failure
+mode that broke pilot 1, CLAUDE.md). Five locals on the filter path are
+declared `double` in the transcription:
+
+| local | declared | role | round-trip |
+|---|---|---|---|
+| `v19` | :71 | tone-blend `-tone` magnitude (§3.13) | `v19` used directly in float products :1634 |
+| `v42` | :94 | cutoff-taper `<1.0` clamp result (§3.1) | stored to `[6704]` :1169 |
+| `v202` | :254 | cutoff-taper `<=0.0` clamp temp (§3.1) | copied to float `v203` :1165 |
+| `v364` | :416 | amp-CV `<=0.0` clamp temp (§3.11) | copied to float `v366` :1597 |
+| `v379` | :431 | tone-blend `<=0.0` clamp temp (§3.13) | copied to float `v380` :1628 |
+
+`v202`, `v364` and `v379` each receive a float and are copied straight back
+into a float with no arithmetic in between, so the double round-trip is exact
+and the float rendering used in §3.1 / §3.11 / §3.13 is numerically correct —
+they are listed for symmetry with `v42` / `v19`, which are called out in the
+prose because they are *seeded outside the block* (:689 and :633) and their
+NaN / `-0.0` paths are load-bearing (§7 R10). READ.
 
 ### 3.1 Cutoff-CV taper → `[6704]`  (READ :1154-1169)
 
