@@ -31,6 +31,28 @@ static inline uint32_t bits_from_f32(float f){ uint32_t b; memcpy(&b,&f,4); retu
  * sample so the shared block chains exactly as the plugin's 8 calls do. */
 uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *outR)
 {
+  /* PILOT 2: scratch-cell register promotion, SINGLE-TYPED cells only.
+   * These cells are written before read, never carry across samples, and are
+   * touched through exactly one of JF/JI -- so the int/float reinterpret hazard
+   * that broke pilot 1 (155 dual-typed cells) cannot arise. The memory STORE is
+   * kept so master_render/recall/probes are unaffected; only redundant RELOADS
+   * go away, which is what stalls an in-order M7 (measured IPC 0.44). Seeded
+   * from the cell so any control-flow path is safe. Bit-identical by
+   * construction; render A/B + fuzz are the proof. */
+  float _s4656 = _s4656;
+  float _s4784 = _s4784;
+  float _s4800 = _s4800;
+  float _s4816 = _s4816;
+  float _s4896 = _s4896;
+  float _s8336 = _s8336;
+  float _s8352 = _s8352;
+  float _s8368 = _s8368;
+  float _s8384 = _s8384;
+  float _s8400 = _s8400;
+  float _s8416 = _s8416;
+  float _s9008 = _s9008;
+  float _s9024 = _s9024;
+
   float v2; // xmm4_4
   float v5; // xmm0_4
   float v6; // xmm1_4
@@ -1321,15 +1343,15 @@ LABEL_46:
     JF(a1, 8944) = v245;
     v246 = 1.0 - (float)(v241 + v241);
     v247 = 1.0 / (float)((float)((float)((float)(v241 * v241) * (float)(v241 * v241)) * v243) + 1.0);
-    JF(a1, 9024) = v247;
+    JF(a1, 9024) = _s9024 = v247;
     v248 = JF(a1, 8944);
     v249 = JF(a1, 8960);
-    JF(a1, 9008) = v247 * v243;
+    JF(a1, 9008) = _s9008 = v247 * v243;
     v250 = v249 * JF(a1, 9216);
     v251 = JF(a1, 8304);
     v252 = v248 * JF(a1, 9232);
     v253 = JF(a1, 8320);
-    JF(a1, 8416) = v251;
+    JF(a1, 8416) = _s8416 = v251;
     v254 = (float)((float)(v250 + v252) * v247)
          - (float)((float)((float)(v251 * JF(a1, 9520)) + (float)(v253 * JF(a1, 9536)))
                  * (float)(v247 * v243));
@@ -1338,122 +1360,122 @@ LABEL_46:
     else
       v255 = -1.0;
     v256 = v255 + (float)((float)((float)((float)(v255 * v255) * v255) * v255) * (float)(v255 * JF(a1, 9184)));
-    JF(a1, 8336) = v256;
+    JF(a1, 8336) = _s8336 = v256;
     v257 = JF(a1, 8240);
     v258 = (float)(v241 * (float)(v256 + JF(a1, 8224))) + (float)(v257 * v246);
-    JF(a1, 8352) = v258;
+    JF(a1, 8352) = _s8352 = v258;
     v259 = JF(a1, 8256);
     v260 = v241 * (float)(v258 + v257);
     v261 = v241 * (float)((float)((float)(v241 * v256) + (float)(v246 * v258)) + v258);
     v262 = v260 + (float)(v259 * v246);
-    JF(a1, 8368) = v262;
+    JF(a1, 8368) = _s8368 = v262;
     v263 = JF(a1, 8272);
     v264 = (float)(v241 * (float)(v262 + v259)) + (float)(v263 * v246);
-    JF(a1, 8384) = v264;
+    JF(a1, 8384) = _s8384 = v264;
     v265 = (float)((float)(v263 + v264) * v241) + (float)(v246 * JF(a1, 8288));
-    JF(a1, 8400) = v265;
+    JF(a1, 8400) = _s8400 = v265;
     v266 = (float)(v241
                  * (float)((float)((float)(v241 * (float)((float)(v261 + (float)(v246 * v262)) + v262))
                                  + (float)(v246 * v264))
                          + v264))
          + (float)(v246 * v265);
-    v267 = (float)(JF(a1, 8384) * JF(a1, 9088)) + (float)(v265 * JF(a1, 9104));
+    v267 = (float)(_s8384 * JF(a1, 9088)) + (float)(v265 * JF(a1, 9104));
     v268 = JF(a1, 8960);
-    JF(a1, 8816) = v267 + (float)(JF(a1, 9072) * JF(a1, 8368));
-    v269 = JF(a1, 8416);
-    v270 = (float)((float)(v268 + JF(a1, 8944)) * JF(a1, 9248)) * JF(a1, 9024);
-    JF(a1, 8416) = v266;
+    JF(a1, 8816) = v267 + (float)(JF(a1, 9072) * _s8368);
+    v269 = _s8416;
+    v270 = (float)((float)(v268 + JF(a1, 8944)) * JF(a1, 9248)) * _s9024;
+    JF(a1, 8416) = _s8416 = v266;
     v271 = v270
          - (float)((float)((float)(v266 * JF(a1, 9520)) + (float)(v269 * JF(a1, 9536)))
-                 * JF(a1, 9008));
+                 * _s9008);
     if ( v271 >= -1.0 )
       v272 = fminf(v271, 1.0);
     else
       v272 = -1.0;
     v273 = v272 + (float)((float)((float)((float)(v272 * v272) * v272) * v272) * (float)(v272 * JF(a1, 9184)));
-    v274 = JF(a1, 8336);
-    JF(a1, 8336) = v273;
-    v275 = JF(a1, 8352);
+    v274 = _s8336;
+    JF(a1, 8336) = _s8336 = v273;
+    v275 = _s8352;
     v276 = (float)(v241 * (float)(v273 + v274)) + (float)(v275 * v246);
-    JF(a1, 8352) = v276;
-    v277 = JF(a1, 8368);
+    JF(a1, 8352) = _s8352 = v276;
+    v277 = _s8368;
     v278 = v241 * (float)(v276 + v275);
     v279 = v241 * (float)((float)((float)(v241 * v273) + (float)(v246 * v276)) + v276);
     v280 = v278 + (float)(v277 * v246);
-    JF(a1, 8368) = v280;
-    v281 = JF(a1, 8384);
+    JF(a1, 8368) = _s8368 = v280;
+    v281 = _s8384;
     v282 = (float)(v241 * (float)(v280 + v277)) + (float)(v281 * v246);
-    JF(a1, 8384) = v282;
-    v283 = (float)((float)(v281 + v282) * v241) + (float)(v246 * JF(a1, 8400));
-    JF(a1, 8400) = v283;
+    JF(a1, 8384) = _s8384 = v282;
+    v283 = (float)((float)(v281 + v282) * v241) + (float)(v246 * _s8400);
+    JF(a1, 8400) = _s8400 = v283;
     v284 = JF(a1, 8944);
     v285 = (float)(v241
                  * (float)((float)((float)(v241 * (float)((float)(v279 + (float)(v246 * v280)) + v280))
                                  + (float)(v246 * v282))
                          + v282))
          + (float)(v246 * v283);
-    v286 = (float)(JF(a1, 8384) * JF(a1, 9088)) + (float)(v283 * JF(a1, 9104));
+    v286 = (float)(_s8384 * JF(a1, 9088)) + (float)(v283 * JF(a1, 9104));
     v287 = JF(a1, 8960);
-    JF(a1, 8688) = v286 + (float)(JF(a1, 9072) * JF(a1, 8368));
-    v288 = JF(a1, 8416);
+    JF(a1, 8688) = v286 + (float)(JF(a1, 9072) * _s8368);
+    v288 = _s8416;
     v289 = (float)((float)(v287 * JF(a1, 9232)) + (float)(v284 * JF(a1, 9216)))
-         * JF(a1, 9024);
-    JF(a1, 8416) = v285;
+         * _s9024;
+    JF(a1, 8416) = _s8416 = v285;
     v290 = v289
          - (float)((float)((float)(v285 * JF(a1, 9520)) + (float)(v288 * JF(a1, 9536)))
-                 * JF(a1, 9008));
+                 * _s9008);
     if ( v290 >= -1.0 )
       v291 = fminf(v290, 1.0);
     else
       v291 = -1.0;
     v292 = v291 + (float)((float)((float)((float)(v291 * v291) * v291) * v291) * (float)(v291 * JF(a1, 9184)));
-    v293 = JF(a1, 8336);
-    JF(a1, 8336) = v292;
-    v294 = JF(a1, 8352);
+    v293 = _s8336;
+    JF(a1, 8336) = _s8336 = v292;
+    v294 = _s8352;
     v295 = (float)(v241 * (float)(v292 + v293)) + (float)(v294 * v246);
-    JF(a1, 8352) = v295;
-    v296 = JF(a1, 8368);
+    JF(a1, 8352) = _s8352 = v295;
+    v296 = _s8368;
     v297 = v241 * (float)(v295 + v294);
     v298 = v241 * (float)((float)((float)(v241 * v292) + (float)(v246 * v295)) + v295);
     v299 = v297 + (float)(v296 * v246);
-    JF(a1, 8368) = v299;
-    v300 = JF(a1, 8384);
+    JF(a1, 8368) = _s8368 = v299;
+    v300 = _s8384;
     v301 = (float)(v241 * (float)(v299 + v296)) + (float)(v300 * v246);
-    JF(a1, 8384) = v301;
-    v302 = (float)((float)(v300 + v301) * v241) + (float)(v246 * JF(a1, 8400));
-    JF(a1, 8400) = v302;
+    JF(a1, 8384) = _s8384 = v301;
+    v302 = (float)((float)(v300 + v301) * v241) + (float)(v246 * _s8400);
+    JF(a1, 8400) = _s8400 = v302;
     v303 = (float)(v241
                  * (float)((float)((float)(v241 * (float)((float)(v298 + (float)(v246 * v299)) + v299))
                                  + (float)(v246 * v301))
                          + v301))
          + (float)(v246 * v302);
-    v304 = (float)(JF(a1, 8384) * JF(a1, 9088)) + (float)(v302 * JF(a1, 9104));
+    v304 = (float)(_s8384 * JF(a1, 9088)) + (float)(v302 * JF(a1, 9104));
     v305 = JF(a1, 8944);
-    JF(a1, 8560) = v304 + (float)(JF(a1, 9072) * JF(a1, 8368));
-    v306 = JF(a1, 8416);
-    v307 = (float)(v305 * JF(a1, 9200)) * JF(a1, 9024);
+    JF(a1, 8560) = v304 + (float)(JF(a1, 9072) * _s8368);
+    v306 = _s8416;
+    v307 = (float)(v305 * JF(a1, 9200)) * _s9024;
     JF(a1, 8304) = v303;
     v308 = v307
          - (float)((float)((float)(v303 * JF(a1, 9520)) + (float)(v306 * JF(a1, 9536)))
-                 * JF(a1, 9008));
+                 * _s9008);
     if ( v308 >= -1.0 )
       v309 = fminf(v308, 1.0);
     else
       v309 = -1.0;
     v310 = v309 + (float)((float)((float)((float)(v309 * v309) * v309) * v309) * (float)(v309 * JF(a1, 9184)));
     JF(a1, 8208) = v310;
-    v311 = JF(a1, 8352);
-    v312 = (float)(v241 * (float)(v310 + JF(a1, 8336))) + (float)(v311 * v246);
+    v311 = _s8352;
+    v312 = (float)(v241 * (float)(v310 + _s8336)) + (float)(v311 * v246);
     JF(a1, 8224) = v312;
-    v313 = JF(a1, 8368);
+    v313 = _s8368;
     v314 = v241 * (float)(v312 + v311);
     v315 = v241 * (float)((float)((float)(v241 * v310) + (float)(v246 * v312)) + v312);
     v316 = v314 + (float)(v313 * v246);
     JF(a1, 8240) = v316;
-    v317 = JF(a1, 8384);
+    v317 = _s8384;
     v318 = (float)(v241 * (float)(v316 + v313)) + (float)(v317 * v246);
     JF(a1, 8256) = v318;
-    v319 = (float)((float)(v317 + v318) * v241) + (float)(v246 * JF(a1, 8400));
+    v319 = (float)((float)(v317 + v318) * v241) + (float)(v246 * _s8400);
     v320 = v241
          * (float)((float)((float)(v241 * (float)((float)(v315 + (float)(v246 * v316)) + v316)) + (float)(v246 * v318))
                  + v318);
@@ -1685,17 +1707,17 @@ LABEL_46:
   JI(a1, 4768) = v386_lo;
   v398 = fmaxf(JF(a1, 5568), v396);
   v399 = (float)(v395 * JF(a1, 6320)) + JF(a1, 6288);
-  JF(a1, 4784) = v398;
-  JF(a1, 4816) = v397 + JF(a1, 3808);
+  JF(a1, 4784) = _s4784 = v398;
+  JF(a1, 4816) = _s4816 = v397 + JF(a1, 3808);
   if ( v399 <= 0.0 )
     v400 = 0.0;
   else
     v400 = v399;
-  JF(a1, 4800) = 0.00390625 / v398;
+  JF(a1, 4800) = _s4800 = 0.00390625 / v398;
   JF(a1, 5456) = v400;
   v401 = JF(a1, 4880);
   v402 = JI(a1, 4848);
-  JF(a1, 4656) = v401;
+  JF(a1, 4656) = _s4656 = v401;
   v403 = v401 + v398;
   JI(a1, 4672) = v402;
   if ( v403 <= 1.0 )
@@ -1710,7 +1732,7 @@ LABEL_46:
   JF(a1, 4640) = v403;
   v404 = v403 * JF(a1, 5648);
   *(float *)&v405 = juno_triangle((v403 + 1.0f) * 0.5f);
-  v406 = (float)((float)(*(float *)&v405 * 256.0) * JF(a1, 4800)) * JF(a1, 5600);
+  v406 = (float)((float)(*(float *)&v405 * 256.0) * _s4800) * JF(a1, 5600);
   if ( v406 >= -1.0 )
     v407 = fminf(v406, 1.0);
   else
@@ -1722,8 +1744,8 @@ LABEL_46:
                        * (float)((float)(v408 * v408) * (float)(v408 * v408)))
                + (float)((float)((float)(v408 * v408) * JF(a1, 5984)) + JF(a1, 5968)))
        * (float)(v409 * (float)(v408 * v408));
-  v412 = JF(a1, 4816) + v403;
-  JF(a1, 4896) = (float)((float)(v411 + v410) + v408) * v404;
+  v412 = _s4816 + v403;
+  JF(a1, 4896) = _s4896 = (float)((float)(v411 + v410) + v408) * v404;
   v413 = v412;
   if ( v412 >= 0.0 )
   {
@@ -1736,14 +1758,14 @@ LABEL_46:
   }
   v414 = JF(a1, 4640);
   v415 = v413 * JF(a1, 5664);
-  *(float *)&v416 = juno_triangle(v412 / (v412 < 0.0f ? JF(a1, 4816) - 1.0f : JF(a1, 4816) + 1.0f));
+  *(float *)&v416 = juno_triangle(v412 / (v412 < 0.0f ? _s4816 - 1.0f : _s4816 + 1.0f));
   v417 = *(float *)&v416;
   v418 = JF(a1, 5584);
-  if ( v414 < v418 || v418 <= JF(a1, 4656) )
+  if ( v414 < v418 || v418 <= _s4656 )
     v419 = JF(a1, 4672);
   else
     v419 = JF(a1, 4672) + 2.0;
-  v420 = (float)((float)(v417 * JF(a1, 4800)) * 256.0) * JF(a1, 5616);
+  v420 = (float)((float)(v417 * _s4800) * 256.0) * JF(a1, 5616);
   if ( v419 >= 4.0 )
     v419 = 0.0;
   if ( v420 >= -1.0 )
@@ -1774,7 +1796,7 @@ LABEL_46:
     v423 = -1.0;
   }
   v426 = v423 * JF(a1, 5680);
-  v427 = (float)((float)((float)(*(float *)&v425 + 1.0) * JF(a1, 4800)) * 512.0) * JF(a1, 5632);
+  v427 = (float)((float)((float)(*(float *)&v425 + 1.0) * _s4800) * 512.0) * JF(a1, 5632);
   if ( v427 >= -1.0 )
     v428 = fminf(v427, 1.0);
   else
@@ -1797,11 +1819,11 @@ LABEL_46:
                                                 + v429)
                                         * v426)
                                 * JF(a1, 4768))
-                        + (float)((float)(JF(a1, 4896) * JF(a1, 4736))
+                        + (float)((float)(_s4896 * JF(a1, 4736))
                                 + (float)(v424 * JF(a1, 4752)));
-  JF(a1, 4656) = v430;
+  JF(a1, 4656) = _s4656 = v430;
   JI(a1, 4672) = v431;
-  v432 = v430 + JF(a1, 4784);
+  v432 = v430 + _s4784;
   if ( v432 <= 1.0 )
   {
     if ( v432 < -1.0 )
@@ -1814,7 +1836,7 @@ LABEL_46:
   JF(a1, 4640) = v432;
   v433 = v432 * JF(a1, 5648);
   *(float *)&v434 = juno_triangle((v432 + 1.0f) * 0.5f);
-  v435 = (float)((float)(*(float *)&v434 * 256.0) * JF(a1, 4800)) * JF(a1, 5600);
+  v435 = (float)((float)(*(float *)&v434 * 256.0) * _s4800) * JF(a1, 5600);
   if ( v435 >= -1.0 )
     v436 = fminf(v435, 1.0);
   else
@@ -1826,8 +1848,8 @@ LABEL_46:
                        * (float)((float)(v437 * v437) * (float)(v437 * v437)))
                + (float)((float)((float)(v437 * v437) * JF(a1, 5984)) + JF(a1, 5968)))
        * (float)(v438 * (float)(v437 * v437));
-  v441 = JF(a1, 4816) + v432;
-  JF(a1, 4896) = (float)((float)(v440 + v439) + v437) * v433;
+  v441 = _s4816 + v432;
+  JF(a1, 4896) = _s4896 = (float)((float)(v440 + v439) + v437) * v433;
   v442 = v441;
   if ( v441 >= 0.0 )
   {
@@ -1840,14 +1862,14 @@ LABEL_46:
   }
   v443 = JF(a1, 4640);
   v444 = v442 * JF(a1, 5664);
-  *(float *)&v445 = juno_triangle(v441 / (v441 < 0.0f ? JF(a1, 4816) - 1.0f : JF(a1, 4816) + 1.0f));
+  *(float *)&v445 = juno_triangle(v441 / (v441 < 0.0f ? _s4816 - 1.0f : _s4816 + 1.0f));
   v446 = *(float *)&v445;
   v447 = JF(a1, 5584);
-  if ( v443 < v447 || v447 <= JF(a1, 4656) )
+  if ( v443 < v447 || v447 <= _s4656 )
     v448 = JF(a1, 4672);
   else
     v448 = JF(a1, 4672) + 2.0;
-  v449 = (float)((float)(v446 * JF(a1, 4800)) * 256.0) * JF(a1, 5616);
+  v449 = (float)((float)(v446 * _s4800) * 256.0) * JF(a1, 5616);
   if ( v448 >= 4.0 )
     v448 = 0.0;
   if ( v449 >= -1.0 )
@@ -1878,7 +1900,7 @@ LABEL_46:
     v452 = -1.0;
   }
   v455 = v452 * JF(a1, 5680);
-  v456 = (float)((float)((float)(*(float *)&v454 + 1.0) * JF(a1, 4800)) * 512.0) * JF(a1, 5632);
+  v456 = (float)((float)((float)(*(float *)&v454 + 1.0) * _s4800) * 512.0) * JF(a1, 5632);
   if ( v456 >= -1.0 )
     v457 = fminf(v456, 1.0);
   else
@@ -1901,11 +1923,11 @@ LABEL_46:
                                                 + v458)
                                         * v455)
                                 * JF(a1, 4768))
-                        + (float)((float)(JF(a1, 4896) * JF(a1, 4736))
+                        + (float)((float)(_s4896 * JF(a1, 4736))
                                 + (float)(v453 * JF(a1, 4752)));
-  JF(a1, 4656) = v459;
+  JF(a1, 4656) = _s4656 = v459;
   JI(a1, 4672) = v460;
-  v461 = v459 + JF(a1, 4784);
+  v461 = v459 + _s4784;
   if ( v461 <= 1.0 )
   {
     if ( v461 < -1.0 )
@@ -1918,7 +1940,7 @@ LABEL_46:
   JF(a1, 4640) = v461;
   v462 = v461 * JF(a1, 5648);
   *(float *)&v463 = juno_triangle((v461 + 1.0f) * 0.5f);
-  v464 = (float)((float)(*(float *)&v463 * 256.0) * JF(a1, 4800)) * JF(a1, 5600);
+  v464 = (float)((float)(*(float *)&v463 * 256.0) * _s4800) * JF(a1, 5600);
   if ( v464 >= -1.0 )
     v465 = fminf(v464, 1.0);
   else
@@ -1930,8 +1952,8 @@ LABEL_46:
                        * (float)((float)(v466 * v466) * (float)(v466 * v466)))
                + (float)((float)((float)(v466 * v466) * JF(a1, 5984)) + JF(a1, 5968)))
        * (float)(v467 * (float)(v466 * v466));
-  v470 = JF(a1, 4816) + v461;
-  JF(a1, 4896) = (float)((float)(v469 + v468) + v466) * v462;
+  v470 = _s4816 + v461;
+  JF(a1, 4896) = _s4896 = (float)((float)(v469 + v468) + v466) * v462;
   v471 = v470;
   if ( v470 >= 0.0 )
   {
@@ -1944,14 +1966,14 @@ LABEL_46:
   }
   v472 = JF(a1, 4640);
   v473 = v471 * JF(a1, 5664);
-  *(float *)&v474 = juno_triangle(v470 / (v470 < 0.0f ? JF(a1, 4816) - 1.0f : JF(a1, 4816) + 1.0f));
+  *(float *)&v474 = juno_triangle(v470 / (v470 < 0.0f ? _s4816 - 1.0f : _s4816 + 1.0f));
   v475 = *(float *)&v474;
   v476 = JF(a1, 5584);
-  if ( v472 < v476 || v476 <= JF(a1, 4656) )
+  if ( v472 < v476 || v476 <= _s4656 )
     v477 = JF(a1, 4672);
   else
     v477 = JF(a1, 4672) + 2.0;
-  v478 = (float)((float)(v475 * JF(a1, 4800)) * 256.0) * JF(a1, 5616);
+  v478 = (float)((float)(v475 * _s4800) * 256.0) * JF(a1, 5616);
   if ( v477 >= 4.0 )
     v477 = 0.0;
   if ( v478 >= -1.0 )
@@ -1982,7 +2004,7 @@ LABEL_46:
     v481 = -1.0;
   }
   v484 = v481 * JF(a1, 5680);
-  v485 = (float)((float)((float)(*(float *)&v483 + 1.0) * JF(a1, 4800)) * 512.0) * JF(a1, 5632);
+  v485 = (float)((float)((float)(*(float *)&v483 + 1.0) * _s4800) * 512.0) * JF(a1, 5632);
   if ( v485 >= -1.0 )
     v486 = fminf(v485, 1.0);
   else
@@ -2005,11 +2027,11 @@ LABEL_46:
                                                 + v487)
                                         * v484)
                                 * JF(a1, 4768))
-                        + (float)((float)(JF(a1, 4896) * JF(a1, 4736))
+                        + (float)((float)(_s4896 * JF(a1, 4736))
                                 + (float)(v482 * JF(a1, 4752)));
-  JF(a1, 4656) = v488;
+  JF(a1, 4656) = _s4656 = v488;
   JI(a1, 4672) = v489;
-  v490 = v488 + JF(a1, 4784);
+  v490 = v488 + _s4784;
   if ( v490 <= 1.0 )
   {
     if ( v490 < -1.0 )
@@ -2022,7 +2044,7 @@ LABEL_46:
   JF(a1, 4640) = v490;
   v491 = v490 * JF(a1, 5648);
   *(float *)&v492 = juno_triangle((v490 + 1.0f) * 0.5f);
-  v493 = (float)((float)(*(float *)&v492 * 256.0) * JF(a1, 4800)) * JF(a1, 5600);
+  v493 = (float)((float)(*(float *)&v492 * 256.0) * _s4800) * JF(a1, 5600);
   if ( v493 >= -1.0 )
     v494 = fminf(v493, 1.0);
   else
@@ -2034,8 +2056,8 @@ LABEL_46:
                        * (float)((float)(v495 * v495) * (float)(v495 * v495)))
                + (float)((float)((float)(v495 * v495) * JF(a1, 5984)) + JF(a1, 5968)))
        * (float)(v496 * (float)(v495 * v495));
-  v499 = JF(a1, 4816) + v490;
-  JF(a1, 4896) = (float)((float)(v498 + v497) + v495) * v491;
+  v499 = _s4816 + v490;
+  JF(a1, 4896) = _s4896 = (float)((float)(v498 + v497) + v495) * v491;
   v500 = v499;
   if ( v499 >= 0.0 )
   {
@@ -2048,14 +2070,14 @@ LABEL_46:
   }
   v501 = JF(a1, 4640);
   v502 = v500 * JF(a1, 5664);
-  *(float *)&v503 = juno_triangle(v499 / (v499 < 0.0f ? JF(a1, 4816) - 1.0f : JF(a1, 4816) + 1.0f));
+  *(float *)&v503 = juno_triangle(v499 / (v499 < 0.0f ? _s4816 - 1.0f : _s4816 + 1.0f));
   v504 = *(float *)&v503;
   v505 = JF(a1, 5584);
-  if ( v501 < v505 || v505 <= JF(a1, 4656) )
+  if ( v501 < v505 || v505 <= _s4656 )
     v506 = JF(a1, 4672);
   else
     v506 = JF(a1, 4672) + 2.0;
-  v507 = (float)((float)(v504 * JF(a1, 4800)) * 256.0) * JF(a1, 5616);
+  v507 = (float)((float)(v504 * _s4800) * 256.0) * JF(a1, 5616);
   if ( v506 >= 4.0 )
     v506 = 0.0;
   if ( v507 >= -1.0 )
@@ -2086,7 +2108,7 @@ LABEL_46:
     v510 = -1.0;
   }
   v513 = v510 * JF(a1, 5680);
-  v514 = (float)((float)(v512 * JF(a1, 4800)) * 512.0) * JF(a1, 5632);
+  v514 = (float)((float)(v512 * _s4800) * 512.0) * JF(a1, 5632);
   if ( v514 >= -1.0 )
     v33 = fminf(v514, 1.0);
   v515 = v33 * JF(a1, 5552);
@@ -2107,7 +2129,7 @@ LABEL_46:
                                                 + v515)
                                         * v513)
                                 * JF(a1, 4768))
-                        + (float)((float)(JF(a1, 4896) * JF(a1, 4736))
+                        + (float)((float)(_s4896 * JF(a1, 4736))
                                 + (float)(v511 * JF(a1, 4752)));
   v518 = JF(a1, 5440);
   JI(a1, 4864) = v516;
