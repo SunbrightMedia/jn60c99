@@ -2218,12 +2218,18 @@ LABEL_46:
    * EXACTLY 0 under the perturbation is blind to that subsystem, and its PASS is
    * worth nothing for it -- the situation that made four of five scenarios
    * report EXACTLY 0 against a mutated noise-generator gain (they were correct:
-   * their patches have DCO NOISE at zero, so the value is multiplied out). */
+   * their patches have DCO NOISE at zero, so the value is multiplied out).
+   *
+   * The cell list comes from tools/trackb/perturb_rt.c at RUNTIME, so sweeping
+   * every cell one at a time costs one build, not one build per cell. Because it
+   * fires after the sample is complete, what it measures is CARRIAGE across the
+   * sample boundary -- not whether the cell is used at all. */
   {
-    static const int _tb_cells[] = { TRACKB_PERTURB_CELLS };
-    unsigned _tb_i;
-    for (_tb_i = 0; _tb_i < sizeof(_tb_cells) / sizeof(_tb_cells[0]); _tb_i++)
-      JF(a1, _tb_cells[_tb_i]) *= 1.00000012f;
+    extern int juno_tb_cells[64];
+    extern int juno_tb_ncells;
+    int _tb_i;
+    for (_tb_i = 0; _tb_i < juno_tb_ncells; _tb_i++)
+      JF(a1, juno_tb_cells[_tb_i]) *= 1.00000012f;
   }
 #endif
   *outL = JF(a1, 10672);
