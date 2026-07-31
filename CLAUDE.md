@@ -1,7 +1,52 @@
 # JUNO-60 (JU-06A) C99 port — project memory
 
-**⚑ LIVE WORK ORDER (2026-07-27, user-binding, supersedes all other NEXT
-pointers): `docs/HOSTPATH_PARITY_SCOPE.md` — execute STEP 0→5 to the letter.**
+**⚑⚑ LIVE WORK ORDER (2026-07-31, user-binding, supersedes the 07-27 pointer
+below): `docs/ROADMAP_EMBEDDED.md` — the embedded big-picture plan. Execute
+P0 (stabilize) → P1 (measure on silicon) → P2 (decide) → P3. The DAW-parity
+work (HOSTPATH_PARITY_SCOPE STEP 2–5, #141/#124/#140) is now the PARALLEL
+track, still valid, no longer the head pointer.**
+
+**★★★★ NEWEST (2026-07-31, embedded arc truth-up — read before trusting any
+older embedded claim in this file):**
+- **MONO retrigger latch FIXED (e611f7d):** the DCO retrigger latch (aux Array A,
+  101504+v*32) arming is **MODE-DEPENDENT** — POLY note-on writes only inert
+  Array B (101520); a MONO retrigger arms Array A. Port arms it in
+  `mono_note_on`'s retrigger branch via `juno_note_retrig()`. Found by fuzz
+  seed 15 (patch 15 BS VeloRez Bass, warm engine); invisible to every cold gate
+  because juno_init arms Array A at BUILD. Fuzz 24/24 again; the old "never
+  re-armed by note-on" comment in juno_note.c was measured on POLY only.
+  **Plugin MONO law (PROVEN): last-note priority on press, LOWEST-held fallback
+  on release.** ⚠ The published WASM artifact predates this fix (P0 item).
+- **ARM/embedded PROVEN set:** golden corpus 8/8 bit-identical on ARM32 under
+  qemu (`tools/embed/arm_golden.sh`); bare-metal M7 compile clean (373 KB text);
+  expf glibc==newlib bit-identical over 32,000,423 inputs; whole audio path
+  stack = 584 B; 32-bit pointer-width bug in master_render.c host-param chase
+  FIXED (was x86-64-only `_QWORD` loads). `daisy/` firmware BUILDS AND LINKS
+  (self-playing, E1–E5 instrumentation, bootloader-version guard); `teensy/`
+  written but never compiled. Memory truth: voice = 10,512 B (+164 B shared
+  noise), 8 voices = 86 KB; full-FX hot set ≈1.14 MB in a 10.5 MB span; chorus
+  lives entirely in the low ~102 KB block.
+- **Performance: NO SILICON NUMBER EXISTS.** x86 MEASURED 14,500 cyc/sample;
+  M7 MODELED (llvm-mca, calibrated 2.15× on the x86 case) 30–42k; executed-path
+  arithmetic says the honest band is **18–42k** (the model charges both sides of
+  ~200 branches/voice). Daisy@480 budget 10,884 @44.1k → 1.7–4× over for
+  8v+FX; **Teensy@816 (18,503) is ON THE BUBBLE**. Label discipline + standing
+  rule "no optimization before a SILICON number" are in the roadmap.
+- **Measured optimization levers (do not re-litigate):** block hoisting 2.8%
+  (ceiling 17.4%), idle-voice skip 25.2%/silent voice but 0% at full polyphony
+  (74.8% of voice arithmetic feeds next-sample state), triangle LUT ~11%
+  STATIC, FTZ 2.4%. Scratch-cell story CORRECTED: the 202 scratch stores/voice
+  are in **Roland's own binary** (Hex-Rays doesn't invent stores) — desktop
+  OoO hides them, in-order M7 can't; elimination is legit (cells provably don't
+  carry) but needs an AST tool, not regex (pilot 3 failed to parse; pilot 2 =
+  13 single-typed cells committed, bit-exact, 0.6%). 155 cells are dual JF/JI-
+  typed — typed locals CONVERT instead of REINTERPRET (pilot 1 broke 0/57).
+- **⚠ STALE-ARTIFACT TRAP (bit twice in one day):** prebuilt `tests/test_*`
+  binaries and a stale `libjuno.so` after a FAILED compile both produced false
+  greens. Always fresh-build before trusting any --port gate run manually.
+
+**⚑ prior LIVE WORK ORDER (2026-07-27, now the parallel DAW-parity track):
+`docs/HOSTPATH_PARITY_SCOPE.md` — execute STEP 0→5 to the letter.**
 User symptoms after the assigner fix (peaking unison first notes, other peaks,
 "filter even quieter", more): S1/S2 levels are PROVEN the plugin's own (BS Glide
 peak 1.981; Boost 21 / Output Gain 22 executed no-ops — `probes/assigner/
