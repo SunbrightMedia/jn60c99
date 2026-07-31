@@ -593,7 +593,7 @@ One sub-table per subsystem; together these are ALL cells the voice render touch
 | 8144 | JF | R | 1284 | -- | tan-map denom c4 [I] |
 | 8160 | JF | R | 1276 | -- | tan-map num c4 [I] |
 | 8176 | JF | R | 1283 | -- | tan-map denom c5 [I] |
-| 8192 | JF* | R | 607,1275 | -- | tan-map num c5 (accessed as *(a1+0x2000), :1275) [I] |
+| 8192 | JF* | R | 1275 | -- | tan-map num c5 — the ONLY access is `*(float *)(a1 + 0x2000)` at :1275 (this cell alone escapes the JF/JI macros). :607 is NOT an access: it is `v8 & 0x200000` inside the inline wrap24 [I] |
 
 ### U. VCF 4-pole ladder core, 3x oversampled (gated by 9056==1)  `[8208..9536]` (84 cells)
 
@@ -825,11 +825,14 @@ code is the spec; these equations are the map, not a substitute.
 `lerp(a,b,t)` here is shorthand for the source's OWN distributed form
 `(t*b − t*a) + a` (a few sites spell it `a + (t*b − t*a)`; identical, since
 IEEE `+` and `*` are commutative). It is NEVER `a + t*(b−a)` — that rounds
-`b−a` first and does not null. Every other equation below is given in the
-source's parenthesization; where a line is deliberately normalized instead
-(e.g. a `Σ` or a `poly11(...)` gloss), the transcription in
-`src/voice_render.c` at the cited lines is the authority. Lines tagged
-"exact association" have been re-derived character-for-character.
+`b−a` first and does not null. Lines tagged **"exact association"** have been
+re-derived character-for-character against the cited source lines and may be
+copied verbatim. Every OTHER line below is a *map*, not a transcription:
+multi-term sums are written flat (`a*x + b*y + c*z`) and glosses like `Σ`,
+`poly11(...)`, `rational(...)` and `clamp01(...)` compress real structure, so
+their left-to-right order is NOT guaranteed to be the source's. For anything
+not tagged, `src/voice_render.c` at the cited lines is the authority — read it
+before committing an association to a native rewrite.
 
 **Evaluation order inside one voice-sample (structural, critical):**
 retrig-latch head → shared noise advance → input conditioning → gate → glide →
@@ -940,8 +943,9 @@ Trigger: `v123 = ([1824]>0) ? 1 : 0`, forced 1 if `[2560]==0`;
 Shifts: `2608←2592, 2656←2640, 2640←2624, 2688←2672, 2736←2720` (:975-979).
 `v125 = ([2576]'+[2864] >= 0) ? 0 : 1` (release flag; :980-983).
 `[2624]' = (1-v125) * ([2896]*[2656]' + [2608])` (:985-986).
-`[2704]' = lerp([2928], [2848]*[2960], [2848])` exact form
-`([2848]*[2960] - [2928]*[2848]) + [2928]` (:989-991).
+`[2704]' = lerp([2928], [2960], [2848])`, exact form
+`([2848]*[2960] - [2928]*[2848]) + [2928]` (:989-991). (The interpolation
+endpoint is `[2960]`, not `[2848]*[2960]` — matches §1 row 2704.)
 Region: `v130 = ([2624]'+[2880] < 0) ? 0 : 1`; overridden to `1-v125` when
 `[2624]' - [2640old] < 0` → `[2640]'` (:987-1000).
 Target: `v134 = (1-v125)*([2800]*[2928]) - [2944]*(1-v125) + [2944]`; if
@@ -994,17 +998,28 @@ Input `n = base[84432]'`. `[[4320]]=[[4304]]`; `[4304]' = [4288]*[4336] +
 `[6480]' = [6448]*[3536]` (prev-sample osc), `[6496]' = [6432]*[4320]'`
 (:1141-1147); `[6544]' = [6496]'*[6528] + [6480]'*[6512]` (:1148-1149).
 Shifts 6592/6624/6656/6688 (:1150-1153).
-`v200 = ([6720]*[6576] - [6736]*[6720]) + [6736]` = lerp(cutoff, keyCV, sw);
-`[6704]' = clamp01(v200^4*[6816] + v200^3*[6800] + v200^2*[6784] +
-v200*[6768] + [6752])` (:1154-1169).
+`v200 = ([6720]*[6576] - [6736]*[6720]) + [6736]` = lerp(cutoff, keyCV, sw)
+(:1154-1156);
+```
+[6704]' = clamp01( (((v200*v200)*v200)*v200)*[6816]
+                 + ( (((v200*v200)*v200)*[6800])
+                   + ( (v200*[6768] + [6752]) + ((v200*v200)*[6784]) ) ) )
+```
+(exact association, :1157-1160 — the same const+linear-first nesting as the
+LFO sine shaper, NOT a flat descending-power sum; clamp is `max(0,·)` then
+`min(·,1)`, :1161-1169).
 `[[6848]]=[[6832]]` (:1170); velocity smoother
 `[6896]' = ([6864]-[6896])*[6928] + [6896]` (:1171-1175).
 
 ### S. VCF mod matrix (:1176-1229)
 `[6976]' = [880]'*[6960] + [752]'*[6944]` (:1176-1179).
-F-ENV select: `[[7040]]=[[7008]]`; `v210 = [2752]' + [7040]*([3232]'-[2752]')`;
-`[7072]' = ([7024]*([6640]-v210)) + v210` (:1180-1186; juno_apply.c:540-562 —
-never recalled, both 0 → pure ENV1).
+F-ENV select: `[[7040]]=[[7008]]`;
+`v210 = lerp([2752]', [3232]', [7040])`, exact form
+`[2752]' + ([7040]*[3232]' - [7040]*[2752]')` (:1183-1185);
+`[7072]' = lerp(v210, [6640], [7024])`, exact form
+`([7024]*[6640] - [7024]*v210) + v210` (:1186). Neither is the
+`a + t*(b-a)` shape — the difference is never formed. (:1180-1186;
+juno_apply.c:540-562 — never recalled, both 0 → pure ENV1.)
 LFO smoothers: `[7088]' = ([1792]'-[7088])*[7120] + [7088]`;
 `[7104]' = ([1792]'-[7088])*[7136] + [7152]*[7088]'` (:1187-1194); same for
 input `[1808]'` via 7168/7200/7216/7232 → `[7184]'` (:1195-1203).
@@ -1017,7 +1032,9 @@ Cutoff-mod sum (:1207-1229):
 (the two lerp terms share `v226=[7312]*[6672]`; transcribed form is the spec).
 
 ### T. VCF coefficient compute (:1230-1297, only when `[7632]==1.0`)
-`[7568]' = [7584] + [7712]*([7552]-[7584])`; `v232 = [7568]'*[7696]+[7600]`;
+`[7568]' = lerp([7584], [7552], [7712])`, exact form
+`[7584] + ([7712]*[7552] - [7712]*[7584])` (:1237-1238);
+`v232 = [7568]'*[7696]+[7600]`;
 `[7552]' = juno_wrap24(-[7552])` (:1237-1241, dither osc).
 `[7536]' = [6848]*[7792] + [7616]` (res drive; :1242-1243).
 `c = clamp(v227*[7680] + [6704]'*[7648] + v232 + min([7744],
@@ -1030,7 +1047,11 @@ Split `i = floor(c)` (int-indefinite guard 0x80000000 :1257), `f = c-i`,
 :1275); `[7520]' = v240/(v240+1)` (:1291-1292). Else `[7520]` held (:1294-1297).
 
 ### U. VCF ladder, 4 sub-steps (:1298-1515, only when `[9056]==1.0`)
-Shifts: three 8-deep dispersion lines + input chain (:1300-1335).
+Shifts (:1300-1335): the 8-deep ladder stage-state chain `8320←…←8208`
+(:1300-1306), then **FOUR** 8-deep dispersion lines — A `8544←…←8432`
+(:1307-1313), B `8672←…←8560` (:1314-1320), C `8800←…←8688` (:1321-1327),
+D `8928←…←8816` (:1328-1334) — and the input shadow `[[8960]]=[[8944]]`
+(:1335). Four, matching §1 sub-table U and the 4-line output sum below.
 Input: `[8944]' = (([7536]'*[9168]+1)*([6544]'*[9136])) - [8976]*[9120]`;
 `[8976]' = juno_wrap24(-[8976])` (:1336-1343).
 `g = [7520]'`; `G = 1-2g`; `[9024]' = 1/(g⁴*[7536]'+1)`;
@@ -1052,7 +1073,9 @@ Latches `[[9568]]=[[9552]], [[9632]]=[[9584]], [[9648]]=[[9600]],
 [[9664]]=[[9616]]` (:1516-1520).
 Velocity: `[9712]' = ([9680]-[9712])*[9744] + [9712]`;
 `[9760]' = lerp([9664], [9712]', [9648])` (:1521-1529);
-`[9776]' = max(0, [9808]*[9760]' + (1-[9808])*[9776])` (:1530-1538).
+`[9776]' = max(0, lerp([9776], [9760]', [9808]))`, exact form
+`max(0, ([9808]*[9760]' - [9808]*[9776]) + [9776])` (:1530-1538) — the
+`(1-[9808])` complement is never formed.
 Mute: `[9856]' = max(0, [9888]*[9824] - [9888]*[9856] + [9856])` (:1539-1549).
 Gate ramp (:1550-1567): with `gt=[560]'`:
 if `gt!=0`: `[9904]' = ([9904]+[9952]>=0) ? lerp([9904], gt, [9968])
@@ -1066,22 +1089,40 @@ Env combine (:1568-1605): `[[10048]]=[[3232]]', [[10064]]=[[9552]]`;
 `env = lerp(([2752]'*[10192] + [10176]*[9936]') + [10208]*[10048],
 [10064], [10224])`;
 `lvl = max(0, env*[10304]) * [10320]`;
-`y = lerp([9040]', boost, [10256]) * ([10080]'+1)`;
-`[10128]' = [10144] + [10384]*(y-[10144])`;
-`[10160]' = (([10272]*[10128]' + [10288]*y)*lvl)*[10400]`.
-DC block (:1606-1612): `[10416]' = v371-[10448]`;
-`[10432]' = [10464]*[10416]' + [10448]`.
-Tone (:1613-1637): 3-tap FIRs A/B over `10480/10496/10512/10528` history with
-coeffs `10560..10592` / `10608..10640`; `[10544]' = tone>=0 ?
-lerp([10416]', A, tone) : lerp([10416]', B, -tone)`, `tone=[9632]`.
+`y = ([10256]*boost + [9040]'*(1-[10256])) * ([10080]'+1)` (:1591,:1599 —
+NOTE: this one really is the `t*b + a*(1-t)` shape, the complement IS formed,
+so it is not the distributed `lerp` used elsewhere);
+`[10128]' = lerp([10144], y, [10384])`, exact form
+`[10144] + ([10384]*y - [10384]*[10144])` (:1601-1602);
+`[10160]' = (([10272]*[10128]' + [10288]*y)*lvl)*[10400]` (:1604-1605).
+DC block (:1606-1612): `[10416]' = v371-[10448]` (`v371` is the value just
+stored to [10160] at :1605 — the STORE is dead, the VALUE is not; see §5
+item 1); `[10432]' = [10464]*[10416]' + [10448]`.
+Tone (:1613-1637): TWO **RECURSIVE** 1-pole/1-zero filters A/B (NOT FIRs) over
+`10480/10496/10512/10528`. The shift chain `10528←10512←10496←10480` (:1615-1617)
+then `[10480]=x` (:1618) leaves, at read time: `[10496]` = PREVIOUS input `x₋₁`,
+`[10512]` = filter A's PREVIOUS OUTPUT, `[10528]` = filter B's PREVIOUS OUTPUT —
+because :1627 writes `[10496]=A` and :1629 writes `[10512]=B`, and next sample's
+shift carries them one slot further. With `x = [10416]'`:
+`A = ([10496]*[10576] + x*[10560]) + [10592]*[10512]` (:1619-1620);
+`B = ([10496]*[10624] + x*[10608]) + [10640]*[10528]` (:1621-1622).
+Output `[10544]' = tone>=0 ? lerp(x, A, tone) : lerp(x, B, -tone)`,
+`tone=[9632]` (:1623-1637). A native rewrite built as a 3-tap FIR from the
+coefficient list alone will not null — the third tap is feedback.
 Output: `[10656]' = [10544]'*[9776]'`; `[10672]' = [10656]'*[9856]'`
 (:1638-1640); returned as bits and copied to `*outL/*outR` (:2180-2183).
 
 ### M/N. Pitch spline + DCO bank (:1641-2174) — runs AFTER the output write
-`p = clamp([4448] + [3776]', -20, 8.9)`;
+`p = clamp((float)([4448] + [3776]'), -20, 8.9)` — the sum and clamp are f32,
+but `p` is then held in a `double` (`v385`, voice_render.c:437);
 `[4416]' = clamp(poly13(juno_pitch_table[(int)(p+20)], p), ±512) * [3792]`
-(:1641-1665; 13 even-index doubles per row — same law as juno_pitch_poly,
-juno_dsp.c:77-98, but f32-stored).
+(:1641-1665; 13 even-index **doubles** per row — same law as juno_pitch_poly,
+juno_dsp.c:77-98). **PRECISION (READ):** the entire 13-term Horner-free sum
+at :1649-1661 is `double` arithmetic over `double` coefficients; the powers
+`v386/v388/v389/v390` are `double` too. Only the input `(float)([4448]+[3776]')`
+and the result are single — the double sum is narrowed to f32 by the
+`fminf/fmaxf` clamp (:1647-1663) before the `*[3792]`. A native rewrite that
+stores this table as f32, or accumulates in f32, will not null.
 Setup (:1666-1722): shift the four 8-deep FIR histories + `5488/5472/5504`
 chain; `[[4736]]=[[4240]], [[4752]]=[[4256]], [[4768]]=[[4272]]`;
 `[5456]' = max(0, ([3776]'+[6304])*[6320] + [6288])`;
@@ -1116,7 +1157,7 @@ histories; feedback path `[5488]' = [5488]*[6256] + [5504]`,
 | `0.000000059604645` | :640 | 2^−24 — wrap24 rescale |
 | `2.3283064e-10` | :744,:765 | 2^−32 — exp-table underflow arm |
 | `0.000015258789` | :826 | 2^−16 — LFO rate → phase inc |
-| `0.00390625` | :1004,:1059,:1065,:1070,:1716 | 1/256 — env rate scale; BLEP base scale |
+| `0.00390625` | :1004,:1015 (ENV1), :1059,:1065 (ENV2), :1716 | 1/256 — env rate scale; BLEP base scale. (Exhaustive: these five lines are every occurrence in the file. :1070 has none — it is ENV2's `v164` accumulate.) |
 | `0.25` | :1260 | frac² scale in the exp2 poly |
 | `256.0` / `512.0` | :1735,:1768,:1799 (+3 more iterations) | BLEP scale saw+pulse / sub |
 | `±1.0`, `2.0` | throughout | phase wrap to [−1,1) via `fmodf(x±1,2)∓1` |
@@ -1125,7 +1166,7 @@ histories; feedback path `[5488]' = [5488]*[6256] + [5504]`,
 | `(int)0x80000000` | :1257 | int-indefinite guard in floor split |
 | 32 / −32 clamp | :742-781 | exp-table index clamps |
 | `juno_exp_ad3c[33]`, `juno_exp_acc0[33]` | :751,:756,:772,:777 | 2^±n tables (juno_tables.h) |
-| `juno_pitch_table` | :1643 | 29 rows × 13 even-indexed doubles (0x1809894E0, stride 208) |
+| `juno_pitch_table` | :1643 | 29 rows × 13 even-indexed **doubles** (0x1809894E0, stride 208). Declared `static const double [29][26]` (juno_tables.h:12), fetched through `const double *` (voice_render.c:439). The whole spline evaluates in `double`; only its f32 input and the stored `[4416]` are single |
 | helpers | `juno_triangle` (0x180368FC0), `juno_wrap24` (0x180368D60) | juno_dsp.c:20-71; dropped-XMM args resolved in docs/VOICE_RENDER_MAP.md:52-69 |
 
 All other numeric behaviour comes from state cells written by
@@ -1170,10 +1211,16 @@ init/prepare/recall — the voice render itself embeds NO other magic numbers.
 
 ## 5. Open questions (for the native rewrite)
 
-1. **Write-only cells (82 in-file).** Most are shadows (`prev` copies) or
-   register-promoted scratch whose live value continues in a register
-   (_s4656.., :34-54). True compute-dead in-file: 2768, 3248 (scaled env
-   outs), 3824 (VCF-bound CV sum), 10160 (pre-DC sample). None are read by
+1. **Write-only cells (82 a1-relative in-file, plus 4 shared shadows).** Most
+   are shadows (`prev` copies) or register-promoted scratch whose live value
+   continues in a register (_s4656.., :34-54). True compute-dead in-file —
+   both the store AND the arithmetic feeding it are unread here: 2768, 3248
+   (scaled env outs) and 3824 (VCF-bound CV sum).
+   **10160 is NOT in that class:** only its STORE (:1605) is dead — the value
+   `v371` is consumed one line later by the DC blocker (:1610 `v374 = v371 -
+   v372` → [10416]) and is the voice's entire audio sample. Dropping the store
+   is legal for a −90 dB null; dropping the computation silences the voice.
+   None of 2768/3248/3824 are read by
    master_render.c (grep-verified); before DROPPING any in a native
    implementation, verify no probe/gate/GUI reader relies on them —
    the render A/B gates compare FULL state, so a dropped store fails the
@@ -1185,11 +1232,17 @@ init/prepare/recall — the voice render itself embeds NO other magic numbers.
    subsystem + wrapper mod layer (src/juno_mod.c targets some). They are 0 /
    identity at rest; a native voice must keep them as INPUT PORTS, not fold
    them away.
-3. **Dual-typed cells** (accessed as both JF and JI — e.g. 320, 496, 560,
-   880, 912, 1808/2544, 1824/2528, 3520/3536, 3232, 2752, 6544, 6608/7264,
-   6896/7248): the int accesses are BIT copies. A native port must memcpy,
-   never float-assign (denormal/NaN preservation), and FTZ/DAZ semantics
-   (juno_ftz.c) are load-bearing on WASM.
+3. **Dual-typed cells** (accessed as both JF and JI in this file — 320, 496,
+   560, 880, 1808, 1824, 3520, 3536, 3232, 2752, 6544, 6896, 7248): the int
+   accesses are BIT copies. A native port must memcpy, never float-assign
+   (denormal/NaN preservation), and FTZ/DAZ semantics (juno_ftz.c) are
+   load-bearing on WASM.
+   **Not dual-typed** (corrected — verified by exhausting every JF/JI/JU site):
+   **912** is touched exactly once and only as a float (:727 `JF(a1, 912)`), so
+   it carries none of this hazard; **2528/2544/7264** are written bit-only (JI),
+   and **6608** is read bit-only (JI :1151, JU :1207) and never as JF — those
+   are the same memcpy discipline seen from the pure-bits side, and their
+   float-valued partners are the cells listed above.
 4. **ENV state-machine labels** (G/H sub-tables) are INFERRED; the branch
    structure :980-1017 is the spec. Deriving the clean piecewise ADSR form
    and proving branch-for-branch equality is the main analytic task left.
@@ -1205,9 +1258,15 @@ init/prepare/recall — the voice render itself embeds NO other magic numbers.
    DCO PWM LEVEL; 770 is DCO PWM LEVEL (CLAUDE.md correction).
 8. **Precision:** the exp2/tan-rational (7872..8192), quintic shapers, and
    FIR sums must keep the EXACT f32 association transcribed here
-   (`-ffp-contract=off`); the pitch spline mixes f64 accumulation over f32
-   coeffs (:1641-1665). These are the numerically-hot spots where a naive
-   refactor will break a −90 dB null first.
+   (`-ffp-contract=off`). The pitch spline is the one place the engine leaves
+   f32 entirely: it is **f64 accumulation over f64 coefficients** —
+   `juno_pitch_table` is `static const double [29][26]` (juno_tables.h:12),
+   read through a `const double *` (voice_render.c:439,:1643), with a `double`
+   accumulator and `double` powers (:437, :1642-1661). Only the input
+   `(float)([4448]+[3776]')` and the stored `[4416]` are single, the narrowing
+   happening at the `fminf/fmaxf` clamp (:1647-1663). Storing that table as f32,
+   or accumulating the 13 terms in f32, will not null. These are the
+   numerically-hot spots where a naive refactor will break a −90 dB null first.
 9. **JX-3P reuse recipe:** (1) diff the per-voice function copies to get
    region strides (POLYPHONY.md method); (2) run the §0 scanner
    (scratchpad cellscan.py pattern) over the transcription; (3) pull names
@@ -1215,3 +1274,72 @@ init/prepare/recall — the voice render itself embeds NO other magic numbers.
    (4) group by dataflow into §1 sub-tables; (5) write §2 equations from the
    transcription with line cites; (6) only then attempt a native rewrite,
    gated by full-state bit-exact A/B first, −90 dB null second.
+
+## Verification notes (2026-07-31 adversarial re-derivation pass)
+
+An independent verifier re-derived this document against `src/voice_render.c`
+(2185 lines) rather than proofreading it, and reported 12 defects. **All 12
+were re-checked here against the source and all 12 were CONFIRMED; none were
+rejected.** The cell tables themselves (§0/§1) survived the pass intact — 610
+distinct a1-relative cells + 11 shared base cells, all 28 sub-table counts and
+ranges, all 621 rows' read/write cites and JF/JI/JU typing, and all 105 [REG]
+names — with exactly one exception (the phantom `:607` cite on row 8192, fixed).
+Every correction below is READ (source inspection); nothing here was executed.
+
+Fixed, in the order reported:
+
+1. **ENV accumulator dropped the `(1-v130)` gate** (§2 G/H). Source computes
+   `v135 = v126 * (1.0 - v130)` (:1003) and uses `v135`, not `(1-v125)`, at
+   :1011. Mirrored in ENV2 at :1058/:1066. This was the most damaging error —
+   a native ADSR built from the old line diverges on every note in the
+   decay/sustain region. Now stated with the mask broken out and flagged.
+2. **LFO phase-trigger operand** (§2 F). `v92 = v80 - v86` (:833) where `v80`
+   is the PREVIOUS sample's [1488] (:805), not `[1504]'` (= `v90`, written
+   :840). Both the delay-ramp line and the phase line now name `[1488prev]`
+   and cross-reference each other; the old text contradicted itself.
+3. **False "exact association" on the LFO sine shaper** (§2 F). :946-951 sums
+   const+linear first, then quadratic, cubic, quartic. Replaced with the
+   source's parenthesization. The same normalization was corrected at the
+   cutoff-CV quartic (:1157-1160), `v210` (:1183-1185), `[7072]'` (:1186),
+   `[7568]'` (:1237-1238), `[9776]'` (:1532) and `[10128]'` (:1601-1602).
+   To stop this class recurring, §2's preamble now DEFINES `lerp(a,b,t)` as
+   the source's own distributed `(t*b − t*a) + a` and states explicitly that
+   it is never `a + t*(b−a)`. Two consequences of adopting that definition,
+   found while applying it and fixed at the same time: the VCA `y` line
+   (:1591,:1599) genuinely IS `t*b + a*(1-t)` and is now flagged as the
+   exception, and `[9776]'` (:1532) is a distributed lerp, not the
+   complement form the doc had.
+4. **Pitch spline precision** (§5 item 8, §3, §2 M/N). `juno_pitch_table` is
+   `static const double [29][26]` (juno_tables.h:12), reached via
+   `const double *` (:439), accumulated in `double` (:437, :1642-1661) — f64
+   over f64, not "f64 over f32 coeffs". §3's table was already right; §5
+   contradicted it and is the line an implementer would act on.
+5. **Row 8192's `:607` cite** (§1 sub-table T). :607 is `v10 = v8 & 0x200000`
+   inside the inline wrap24 — a substring collision on `0x2000`, not a cell
+   access. Only :1275 touches this cell, and only as `*(float *)(a1 + 0x2000)`.
+6. **`0.00390625` site list** (§3). Exhaustively: :1004, :1015, :1059, :1065,
+   :1716. The doc listed :1070 (which contains no constant) and omitted :1015,
+   the ENV1 counterpart of :1065.
+7. **Cell 912 listed as dual-typed** (§5 item 3). It has exactly one access in
+   the whole file, `JF(a1, 912)` at :727. Also tightened in the same list:
+   2528/2544/7264 are JI-only and 6608 is JI/JU-only (never JF) — the bit-copy
+   hazard from the other side, now stated as such.
+8. **"three 8-deep dispersion lines"** (§2 U). There are FOUR (A :1307-1313,
+   B :1314-1320, C :1321-1327, D :1328-1334), as §1 sub-table U and this
+   section's own 4-line output sum already said. The 8208..8320 chain shifted
+   at :1300-1306 is the ladder stage-state chain, now named separately.
+9. **"falling ext-gate edge"** (§2 F). `prev − new < 0` is a RISING edge. The
+   formula was right and the word was inverted; since this is the only prose
+   describing the intent (the note-on reset of the LFO delay ramp), it is now
+   spelled out.
+10. **"3-tap FIRs A/B"** (§2 V..AA). Both tone filters are RECURSIVE: after the
+    :1615-1617 shift, [10512]/[10528] hold A's and B's previous OUTPUTS (put
+    there by :1627/:1629 one sample earlier), so each is a 1-pole/1-zero IIR.
+    The per-filter equations are now written out rather than glossed.
+11. **`[2704]'` lerp gloss** (§2 G/H). Endpoint is [2960], not [2848]*[2960].
+    §1 row 2704 and the "exact form" beside the gloss were both already right;
+    only the shorthand was wrong.
+12. **10160 called compute-dead** (§5 item 1). Its stored value `v371` feeds
+    the DC blocker at :1610 and is the voice's audio sample; only the STORE is
+    dead. 2768/3248/3824 are genuinely dead computations and keep that status.
+    A cross-reference was added at the DC-block line in §2.
