@@ -178,13 +178,32 @@ Written down because they are the general lessons, not JUNO-specific ones.
 
 ## Redoing this for another synth (JX-3P, …)
 
-Reusable as-is — the method and most of the code:
+**Honest status: the METHOD is reusable, the CODE is copy-and-adapt, not
+point-it-at-a-new-synth.** There is no adapter layer yet. Audited by grepping for
+JUNO-specific references: `coverage_probe.py` 2, `fork_check.py` 2 (both in prose),
+`canary.py` 7, `observability.py` 16, `null_ab.py` 37. So two files carry nearly
+all the coupling, and it is of exactly three kinds:
 
-* the three-question structure, and the rule that the second and third exist
-  because the first cannot answer them;
-* `coverage_probe.py` entirely (it only needs `SCEN` and a candidate build);
-* `observability.py` and `perturb_rt.c` entirely, given a render function with a
-  flat state pointer and a place to put the hook;
+1. **API names** — the eight `juno_gui_*` entry points in `load()`.
+2. **Paths** — `libjuno.so`, `src/voice_render.c`, `native/voice_render.c`,
+   `truth.BANK`.
+3. **Content** — the scenario set, the five mutation anchors (each is a literal
+   string from this engine's source), the `JF(a1, N)` cell syntax, and the blob
+   table read from `src/juno_apply.c`.
+
+Kinds 1 and 2 are mechanical and belong in a single small config module; that
+extraction is the one piece of reuse work still owed. **Kind 3 is irreducibly
+per-synth and should be** — a scenario set that transfers unexamined is exactly
+the failure this harness exists to catch.
+
+Reusable as-is — the method, and the logic of most of the code:
+
+* the four-question structure, and the rule that questions 2–4 exist because
+  question 1 cannot answer them;
+* `coverage_probe.py` — it only needs `SCEN` and a candidate build;
+* `canary.py` — needs the file paths and an assignment-statement regex;
+* `observability.py` and `perturb_rt.c` — need the cell-access syntax and a
+  render function with a flat state pointer and somewhere to put the hook;
 * `null_ab.py`'s comparator, thresholds, non-vacuity floor, `--full`/`--fuzz`
   structure and the teeth discipline;
 * the `native/<x>.c` shadowing rule in the Makefile;
