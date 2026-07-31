@@ -12,7 +12,16 @@ CFLAGS  ?= -std=c99 -O2 -ffp-contract=off -Wall -Wextra -Wno-unused-parameter -W
 LDLIBS  ?= -lm
 
 SRC     := $(wildcard src/*.c)
+# HEADERS ARE BUILD INPUTS, NOT DOCUMENTATION. Constant TABLES live in headers
+# (juno_tables.h, chorus_luts.h, effect_luts.h, finefx_tables.h, carp_patterns.h,
+# hpf_type_lut.h): a coefficient edit that touches ONLY a header used to rebuild
+# NOTHING, so every test binary and libjuno.so silently kept testing the old
+# constants -- a false-green generator of exactly the class that bit this project
+# twice on 2026-07-31. Every link rule below lists $(HDR); recipes use
+# $(filter %.c,$^) so the headers stay prerequisites without reaching the driver.
+HDR     := $(wildcard src/*.h) $(wildcard gui/*.h)
 OBJ     := $(SRC:.c=.o)
+$(OBJ): $(HDR)
 
 .PHONY: all test clean gui provenance verify completeness
 all: $(OBJ)
@@ -94,6 +103,10 @@ verify: test libjuno.so
 	python3 tools/verify/completeness_gate.py || FAIL=1; \
 	echo "=== PILLAR-1 DEFERRED-CONTROLLER executed no-op lock (each deferred row proven not engine-reachable) ==="; \
 	python3 tools/verify/deferred_noop_gate.py || FAIL=1; \
+	echo "=== ARM/EMBEDDED: same corpus, ARM32 under qemu + bare-metal M7 compile (#144) ==="; \
+	bash tools/embed/arm_golden.sh; rc=$$?; \
+	if [ $$rc -eq 3 ]; then echo "SKIP: ARM cross toolchain absent (apt-get install gcc-arm-linux-gnueabihf qemu-user-static gcc-arm-none-eabi) -- NOT a pass"; \
+	elif [ $$rc -ne 0 ]; then FAIL=1; fi; \
 	echo "=== LEDGER ==="; \
 	python3 tools/verify/provenance_check.py || FAIL=1; \
 	python3 tools/verify/completeness_scan.py || FAIL=1; \
@@ -113,16 +126,32 @@ completeness:
 
 # Shared library for the test GUI (gui/juno_gui.py via ctypes).
 gui: libjuno.so
-libjuno.so: gui/juno_bridge.c $(SRC)
-	$(CC) $(CFLAGS) -shared -fPIC -o $@ $^ $(LDLIBS)
+libjuno.so: gui/juno_bridge.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -shared -fPIC -o $@ $(filter %.c,$^) $(LDLIBS)
+
+# TRACK B candidate engine: the sealed engine with hand-written NATIVE kernels
+# substituted for their transcribed counterparts (native/*.c shadow src/*.c by
+# filename). Never shipped by `make verify` -- it is the SUBJECT of the Track B
+# null A/B, not a party to the bit-exact seal:
+#   make juno_cand.so && python3 tools/trackb/null_ab.py --cand ./juno_cand.so
+# With native/ empty this builds a byte-identical twin of libjuno.so, whose
+# residual must be EXACTLY 0 -- the comparator's own passthrough proof.
+NATIVE     := $(wildcard native/*.c)
+NATIVE_OUT := $(patsubst native/%.c,src/%.c,$(NATIVE))
+CAND_SRC   := $(filter-out $(NATIVE_OUT),$(SRC)) $(NATIVE)
+.PHONY: cand
+cand: juno_cand.so
+juno_cand.so: gui/juno_bridge.c $(CAND_SRC) $(HDR) $(wildcard native/*.h)
+	@echo "candidate = $(words $(NATIVE)) native kernel(s) replacing: $(NATIVE_OUT)"
+	$(CC) $(CFLAGS) -Isrc -shared -fPIC -o $@ $(filter %.c,$^) $(LDLIBS)
 
 # Windows DLL for the GUI (cross-compile with mingw-w64, or native MinGW).
 # -static: no MinGW runtime DLLs needed; imports only KERNEL32 + msvcrt.
 # A prebuilt juno.dll is committed so Windows users can run the GUI directly.
 CC_WIN ?= x86_64-w64-mingw32-gcc
 dll: juno.dll
-juno.dll: gui/juno_bridge.c $(SRC)
-	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $^ $(LDLIBS)
+juno.dll: gui/juno_bridge.c $(SRC) $(HDR)
+	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $(filter %.c,$^) $(LDLIBS)
 
 test: tests/test_fma_canary tests/test_teensy_golden tests/test_voice_alloc tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter tests/test_arp_pattern tests/test_param_setter
 	./tests/test_fma_canary
@@ -146,43 +175,43 @@ test: tests/test_fma_canary tests/test_teensy_golden tests/test_voice_alloc test
 	./tests/test_param_setter
 	./tests/test_voice_alloc
 
-tests/test_fma_canary: tests/test_fma_canary.c
+tests/test_fma_canary: tests/test_fma_canary.c $(HDR)
 	$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)
 
 # Pillar-3 exhaustive fine-FX gate: port-side coefficient dumper (compiled from the
 # shipping src/*.c). finefx_pillar3_gate.py diffs it against the oracle reference.
-tools/verify/finefx_port_dump: tools/verify/finefx_port_dump.c src/finefx_recall.h src/delay_recall.h $(SRC)
+tools/verify/finefx_port_dump: tools/verify/finefx_port_dump.c src/finefx_recall.h src/delay_recall.h $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -o $@ tools/verify/finefx_port_dump.c $(SRC) $(LDLIBS)
 
-tests/test_teensy_golden: tests/test_teensy_golden.c tests/teensy_golden.h gui/juno_bridge.c $(SRC)
+tests/test_teensy_golden: tests/test_teensy_golden.c tests/teensy_golden.h gui/juno_bridge.c $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -Itests -o $@ tests/test_teensy_golden.c gui/juno_bridge.c $(SRC) $(LDLIBS)
 
-tests/test_param_setter: tests/test_param_setter.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_param_setter: tests/test_param_setter.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_voice_alloc: tests/test_voice_alloc.c $(SRC) gui/juno_bridge.c
+tests/test_voice_alloc: tests/test_voice_alloc.c $(SRC) gui/juno_bridge.c $(HDR)
 	$(CC) $(CFLAGS) -o $@ tests/test_voice_alloc.c gui/juno_bridge.c $(SRC) $(LDLIBS)
 
-tests/test_helpers: tests/test_helpers.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_helpers: tests/test_helpers.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_voice_smoke: tests/test_voice_smoke.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_voice_smoke: tests/test_voice_smoke.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_master_smoke: tests/test_master_smoke.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_master_smoke: tests/test_master_smoke.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_apply_golden: tests/test_apply_golden.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_apply_golden: tests/test_apply_golden.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_poly_consistency: tests/test_poly_consistency.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_poly_consistency: tests/test_poly_consistency.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_delay_recall: tests/test_delay_recall.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_delay_recall: tests/test_delay_recall.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_reverb_recall: tests/test_reverb_recall.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_reverb_recall: tests/test_reverb_recall.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
 clean:
 	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke \
@@ -199,29 +228,29 @@ print('\n'.join(str(o) for o in sorted(o for o in r if 0<o<=12058620)))" > state
 	$(CC) $(CFLAGS) -o tests/validate_state tests/validate_state.c $(SRC) $(LDLIBS)
 	./tests/validate_state state_dump/state_t0.bin state_dump/state_t1.bin state_dump/.dspreads.txt
 
-tests/test_denormal: tests/test_denormal.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_denormal: tests/test_denormal.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_note_path: tests/test_note_path.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_note_path: tests/test_note_path.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_prepare_rate: tests/test_prepare_rate.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_prepare_rate: tests/test_prepare_rate.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_arp_onset: tests/test_arp_onset.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_arp_onset: tests/test_arp_onset.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_recall_rate: tests/test_recall_rate.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_recall_rate: tests/test_recall_rate.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_arp_release: tests/test_arp_release.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_arp_release: tests/test_arp_release.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_bend_mod_sens: tests/test_bend_mod_sens.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_bend_mod_sens: tests/test_bend_mod_sens.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_condition_scatter: tests/test_condition_scatter.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_condition_scatter: tests/test_condition_scatter.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_arp_pattern: tests/test_arp_pattern.c $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+tests/test_arp_pattern: tests/test_arp_pattern.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)

@@ -152,7 +152,8 @@ def build_ref(lo, hi):
 # -------------------------------------------------------------------------- port
 def _load_lib():
     import ctypes
-    lib = ctypes.CDLL(os.path.join(REPO, "libjuno.so"))
+    import freshlib  # stale-artifact guard (ROADMAP P0.3): refuse a libjuno.so older than src
+    lib = freshlib.load()
     for fn, rt, at in [
         ("juno_gui_create", ctypes.c_void_p, [ctypes.c_float, ctypes.c_int]),
         ("juno_gui_apply_bank", None, [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]),

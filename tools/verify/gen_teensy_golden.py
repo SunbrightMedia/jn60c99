@@ -28,7 +28,8 @@ TG_BLOB_LEN = 3968   # embed record bytes 16..3983 so the truncated golden recor
 BANK = E.bank_bytes()
 H, S, BO = E.HEADER, E.STRIDE, E.BLOB_OFF
 
-lib = ctypes.CDLL('/home/user/jn60c99/libjuno.so')
+import freshlib  # stale-artifact guard (ROADMAP P0.3): refuse a libjuno.so older than src
+lib = freshlib.load()
 lib.juno_gui_create.restype = ctypes.c_void_p
 lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
 lib.juno_gui_apply_bank.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]

@@ -117,7 +117,8 @@ def _ref():
 def _port():
     import ctypes
     d = pickle.load(open(PKL, 'rb'))
-    lib = ctypes.CDLL('/home/user/jn60c99/libjuno.so')
+    import freshlib  # stale-artifact guard (ROADMAP P0.3): refuse a libjuno.so older than src
+    lib = freshlib.load()
     lib.juno_gui_create.restype = ctypes.c_void_p
     lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
     lib.juno_gui_apply_bank.argtypes = [ctypes.c_void_p, ctypes.c_char_p,

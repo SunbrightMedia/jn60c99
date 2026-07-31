@@ -110,7 +110,8 @@ def run_port_and_diff():
     if not obs:
         print('hostmod_gate: RED -- reference is EMPTY (oracle observed no setter calls)')
         return 1
-    lib = ctypes.CDLL('/home/user/jn60c99/libjuno.so')
+    import freshlib  # stale-artifact guard (ROADMAP P0.3): refuse a libjuno.so older than src
+    lib = freshlib.load()
     lib.juno_mod_byte.argtypes = [ctypes.c_int, ctypes.c_int]
     lib.juno_mod_byte.restype = ctypes.c_int
 
