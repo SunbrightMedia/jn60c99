@@ -19,8 +19,9 @@ all 8 *sustain* in real time here is the open question, and E2/E5 answer it.
 
 ## Status: builds and links, never run on hardware
 
-Unlike `teensy/`, this was **compiled and linked here** against real libDaisy,
-and both post-link assertions pass:
+**Re-verified 2026-07-31 from a clean room** — fresh `--recursive` clone of
+libDaisy, `rm -rf build`, full rebuild — after the MONO retrigger fix and the
+32-bit pointer fixes landed in `src/`. Both post-link assertions pass:
 
 ```
 build exit=0
@@ -29,22 +30,37 @@ build exit=0
 OK: no FMA -- bit-exactness preserved
 OK: Reset_Handler -> main, and main survived the link
 
-           SRAM:      288480 B       512 KB     55.02%
+            SRAM:      288520 B       512 KB     55.03%
+      RAM_D2_DMA:       16384 B        32 KB     50.00%
          ITCMRAM:           0 B        64 KB      0.00%
-          SDRAM:      13568 KB        64 MB     20.70%
-      QSPIFLASH:      501392 B      7936 KB      6.17%
+           SDRAM:      13568 KB        64 MB     20.70%
+       QSPIFLASH:      536192 B      7936 KB      6.60%
 ```
 
-It has still never executed on silicon, so expect runtime surprises. But it is a
-flashable `.bin`, the memory map fits with room to spare, and the two things that
-would silently destroy the experiment are asserted at build time.
+`build/juno60_daisy.bin` = 536 192 B. (Up from 501 392 B when this file was first
+written; the engine has gained the MONO retrigger arming and the pointer-width
+fixes since. SDRAM and SRAM are unchanged.)
+
+It has still **never executed on silicon**, so expect runtime surprises. But the
+build is reproducible from nothing, the memory map fits with room to spare, and
+the two failures that would silently destroy the experiment are asserted at
+build time.
 
 ## Build
 
+Clone libDaisy anywhere and point `LIBDAISY_DIR` at it — the path below assumes
+you put it beside this repo, but any absolute path works (that is how the
+2026-07-31 verification was run):
+
 ```
 git clone --recursive https://github.com/electro-smith/libDaisy
-make -C libDaisy
-cd daisy && make LIBDAISY_DIR=../../libDaisy && make check
+make -C libDaisy                         # ~3 min
+
+cd daisy
+make LIBDAISY_DIR=/abs/path/to/libDaisy  # produces build/juno60_daisy.bin
+make LIBDAISY_DIR=/abs/path/to/libDaisy check
+make program-boot                        # ONCE per board: the QSPI bootloader
+make program-dfu                         # hold BOOT, tap RESET, then run this
 ```
 
 `--recursive` matters: the ST HAL is a submodule and the build fails cryptically
