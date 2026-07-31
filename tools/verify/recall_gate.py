@@ -49,10 +49,21 @@ def as_f(u):
 def render_read_offsets():
     reads = set()
     for f in ('src/voice_render.c', 'src/master_render.c'):
-        s = open(ROOT + '/' + f).read()
-        for m in re.findall(r'a1, ?(\d+)\)', s): reads.add(int(m))
-        for m in re.findall(r'base, ?(\d+)\)', s): reads.add(int(m))
-        for m in re.findall(r'a1 \+ (\d+)\b', s): reads.add(int(m))
+        for line in open(ROOT + '/' + f):
+            # juno_host_sel(a1, off) call sites pass SHIM-relative offsets (the
+            # second hop of the host-params pointer chase lands in the driver's
+            # params block, NOT in engine state), so their literals must not be
+            # classified as state-cell reads. The helper's own body still reads
+            # a1 + 136 (the genuine state cell holding the shim pointer), and
+            # that line matches below, so cell 136 stays correctly classified.
+            # Without this skip, header cell 112 (<176, the plugin's smoother-
+            # list heap pointer, audited benign) is misread as "render-read"
+            # and flips the gate to REVIEW. 2026-07-31.
+            if 'juno_host_sel' in line:
+                continue
+            for m in re.findall(r'a1, ?(\d+)\)', line): reads.add(int(m))
+            for m in re.findall(r'base, ?(\d+)\)', line): reads.add(int(m))
+            for m in re.findall(r'a1 \+ (\d+)\b', line): reads.add(int(m))
     return reads
 
 
