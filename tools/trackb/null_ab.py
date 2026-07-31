@@ -62,6 +62,7 @@ def load(lib_path):
     lib.juno_gui_warmup.argtypes = [ctypes.c_void_p, ctypes.c_int]
     lib.juno_gui_render.argtypes = [ctypes.c_void_p,
                                     ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+    lib.juno_gui_destroy.argtypes = [ctypes.c_void_p]
     return lib
 
 
@@ -72,7 +73,12 @@ def render(lib, bank, patch, notes, warm):
     for n in notes: lib.juno_gui_note_on(c, n, 100)
     buf = (ctypes.c_float * (2 * NFR))()
     lib.juno_gui_render(c, buf, NFR)
-    return list(buf)
+    out = list(buf)
+    # DESTROY. An engine context is ~11 MB (the full state span). Leaking one per
+    # render is invisible at the gate's 10 renders and fatal at the carriage
+    # sweep's 1415: the first sweep attempt was OOM-killed at 11.6 GB RSS.
+    lib.juno_gui_destroy(c)
+    return out
 
 
 def db(x): return 20.0 * math.log10(max(x, 1e-30))

@@ -2228,8 +2228,17 @@ LABEL_46:
     extern int juno_tb_cells[64];
     extern int juno_tb_ncells;
     int _tb_i;
+    /* Multiply AND add. A purely multiplicative nudge cannot move a cell whose
+     * value is 0.0f -- and many state cells sit at zero at rest -- so a
+     * multiply-only probe reports those cells NOT-CARRIED whether they are or
+     * not. That is the dangerous direction of error (it would license keeping a
+     * genuinely carried value in a register). The 1e-20f term is a normal float,
+     * far above the denormal range that juno_ftz would flush, and negligible
+     * against any real signal value. Cells holding INT bit patterns get a large
+     * relative change; that over-reports CARRIED, which is the safe direction. */
     for (_tb_i = 0; _tb_i < juno_tb_ncells; _tb_i++)
-      JF(a1, juno_tb_cells[_tb_i]) *= 1.00000012f;
+      JF(a1, juno_tb_cells[_tb_i]) = JF(a1, juno_tb_cells[_tb_i]) * 1.00000012f
+                                   + 1e-20f;
   }
 #endif
   *outL = JF(a1, 10672);
