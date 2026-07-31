@@ -46,6 +46,51 @@
 static inline float    f32_from_bits(uint32_t b){ float f; memcpy(&f,&b,4); return f; }
 static inline uint32_t bits_from_f32(float f){ uint32_t b; memcpy(&b,&f,4); return b; }
 
+/* ---- Track B observability hook (tools/trackb/observability.py) -------------
+ * Emits NO code unless -DTRACKB_PERTURB_CELLS is passed, so the shipping
+ * candidate is byte-for-byte the unperturbed engine. When defined, TB_HOOK(site)
+ * nudges the selected per-voice cells by ~2 ULP at that point in the render.
+ *
+ * SITE 0 is the tail: it measures CARRIAGE across the sample boundary, which is
+ * what licenses keeping a cell in a register. SITES >= 1 sit at module
+ * boundaries INSIDE the render, where a cell consumed within the same sample is
+ * still visible.
+ *
+ * WHAT THIS DOES NOT MEASURE (measured, do not re-add the claim): it does NOT
+ * answer "would an error in this module be noticed". The transcription computes
+ * into LOCALS and stores to cells, so most consumers never reload; and some
+ * consumers SATURATE -- multiplying the gate cell 560 by 3 changes nothing at
+ * all while adding 1 changes 83996 of 84000 samples, because downstream the
+ * value is clamped. Module admissibility is decided by tools/trackb/canary.py,
+ * which plants the error in the module's own arithmetic instead.
+ *
+ * Multiply AND add, both settable at runtime (tools/trackb/perturb_rt.c). A
+ * purely multiplicative nudge cannot move a cell holding 0.0f, and reporting
+ * such a cell as unobservable is the dangerous direction. The additive term also
+ * has to SURVIVE: with 1e-20f the gate cell 560 read NOT-CARRIED at every site,
+ * because the first multiply annihilates it. Classification therefore runs at
+ * 1.001 / 1e-6 (over-reporting CARRIED is the safe direction); calibration, the
+ * "2 ULP is worth -129 dB" figure, runs at 1.00000012 / 0.
+ */
+#ifdef TRACKB_PERTURB_CELLS
+extern int juno_tb_cells[64];
+extern int juno_tb_ncells;
+extern int juno_tb_site;
+extern float juno_tb_mul;
+extern float juno_tb_add;
+#define TB_HOOK(site)                                                          \
+  do {                                                                         \
+    if (juno_tb_site == (site)) {                                              \
+      int _tb_i;                                                               \
+      for (_tb_i = 0; _tb_i < juno_tb_ncells; _tb_i++)                         \
+        JF(a1, juno_tb_cells[_tb_i]) =                                         \
+            JF(a1, juno_tb_cells[_tb_i]) * juno_tb_mul + juno_tb_add;          \
+    }                                                                          \
+  } while (0)
+#else
+#define TB_HOOK(site) ((void)0)
+#endif
+
 /* Render one voice (0..7) of the 8-voice engine.
  *
  * The plugin compiled 8 specialised copies of this function (sub_180369070 =
@@ -722,6 +767,7 @@ LABEL_11:
   JF(a1, 560) = v36;
   JI(a1, 576) = v39;
   JF(a1, 720) = v40;
+  TB_HOOK(1);   /* M1a: conditioner + gate (src :623-693) */
   v43 = (float)(v36 * v35) - v35;
   v44 = JF(a1, 816);
   v45 = (float)(v43 + 1.0) * JF(a1, 592);
@@ -1178,6 +1224,7 @@ LABEL_46:
   JF(a1, 6496) = v199;
   JI(a1, 6560) = JI(a1, 6544);
   JF(a1, 6544) = (float)(v199 * JF(a1, 6528)) + (float)(v198 * JF(a1, 6512));
+  TB_HOOK(2);   /* M1b: noise SVF + source mix (src :1129-1149) */
   JI(a1, 6592) = JI(a1, 6576);
   JI(a1, 6624) = JI(a1, 6608);
   JI(a1, 6656) = JI(a1, 6640);
@@ -2208,39 +2255,7 @@ LABEL_46:
     JI(a1, 320) = v528;
     JI(base, auxoff) = 0;
   }
-#ifdef TRACKB_PERTURB_CELLS
-  /* OBSERVABILITY HOOK (tools/trackb/observability.py). Emits NO code unless the
-   * macro is defined on the command line, so the shipping candidate is byte-for-
-   * byte the unperturbed engine. When defined it nudges the listed per-voice
-   * cells by one part in ~8.4 million AFTER the render, which answers the only
-   * question a null A/B cannot answer by itself: would this scenario NOTICE if
-   * this subsystem's outputs were slightly wrong? A scenario that reports
-   * EXACTLY 0 under the perturbation is blind to that subsystem, and its PASS is
-   * worth nothing for it -- the situation that made four of five scenarios
-   * report EXACTLY 0 against a mutated noise-generator gain (they were correct:
-   * their patches have DCO NOISE at zero, so the value is multiplied out).
-   *
-   * The cell list comes from tools/trackb/perturb_rt.c at RUNTIME, so sweeping
-   * every cell one at a time costs one build, not one build per cell. Because it
-   * fires after the sample is complete, what it measures is CARRIAGE across the
-   * sample boundary -- not whether the cell is used at all. */
-  {
-    extern int juno_tb_cells[64];
-    extern int juno_tb_ncells;
-    int _tb_i;
-    /* Multiply AND add. A purely multiplicative nudge cannot move a cell whose
-     * value is 0.0f -- and many state cells sit at zero at rest -- so a
-     * multiply-only probe reports those cells NOT-CARRIED whether they are or
-     * not. That is the dangerous direction of error (it would license keeping a
-     * genuinely carried value in a register). The 1e-20f term is a normal float,
-     * far above the denormal range that juno_ftz would flush, and negligible
-     * against any real signal value. Cells holding INT bit patterns get a large
-     * relative change; that over-reports CARRIED, which is the safe direction. */
-    for (_tb_i = 0; _tb_i < juno_tb_ncells; _tb_i++)
-      JF(a1, juno_tb_cells[_tb_i]) = JF(a1, juno_tb_cells[_tb_i]) * 1.00000012f
-                                   + 1e-20f;
-  }
-#endif
+  TB_HOOK(0);
   *outL = JF(a1, 10672);
   result = JU(a1, 10672);
   *outR = JF(a1, 10672);
