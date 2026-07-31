@@ -14,10 +14,18 @@ signal RMS above a floor) so silence==silence can never pass as identity.
 USAGE
     null_ab.py --cand /path/candidate.so            gate a candidate
     null_ab.py --teeth                              mutation battery: builds
-        known-broken candidates (detuned DCO, killed chorus) and asserts the
-        gate CATCHES each, plus a clean rebuild that must PASS with residual
+        known-broken candidates (detuned DCO, wrong noise gain, killed chorus,
+        slowed envelope) and asserts the gate CATCHES each IN THE EXPECTED
+        NUMBER OF SCENARIOS, plus a clean rebuild that must PASS with residual
         exactly 0 — the gate is itself tested before it counts (the project
         rule bought by every past false-green).
+
+        The per-mutation scenario count is load-bearing, not decoration: the
+        noise-gain mutation is caught by 1 of 5 because four of the patches have
+        DCO NOISE at zero, so "caught somewhere" would have hidden the fact that
+        four scenarios are blind to that subsystem. Anything globally relevant
+        (pitch, chorus, envelope) is required in all 5. See
+        tools/trackb/observability.py, which measures that blindness directly.
 
 Scenario set covers the risk surface: POLY pluck, MONO (retrigger law),
 UNISON (phase pile-up), chorus-heavy pad, high-resonance patch, warm start.
@@ -96,10 +104,29 @@ def build(dst, mutate=None):
     tmp = tempfile.mkdtemp(prefix="trackb_")
     for d in ("src", "gui"):
         shutil.copytree(os.path.join(REPO, d), os.path.join(tmp, d))
-    if mutate == "detune":     # DCO frequency scale off by 0.1% (voice kernel)
+    if mutate == "noisegain":
+        # The NOISE generator's 2^-24 output scale, off by 0.1% (voice_render.c
+        # :640 -- the shared LFSR block at base+84272..84436, not a DCO cell).
+        # It is caught by ONE scenario, not five, and that is the correct answer:
+        # the other four patches have DCO NOISE at zero, so the value is
+        # multiplied out downstream. Kept in the battery precisely BECAUSE it is
+        # scenario-specific -- it is the case that proved "the line executed" and
+        # "the error is observable" are different questions (see
+        # tools/trackb/observability.py). It was mislabelled "detune" until
+        # 2026-07-31; it never had anything to do with pitch.
         p = os.path.join(tmp, "src", "voice_render.c"); s = open(p).read()
         s = s.replace("* 0.000000059604645", "* 0.000000059664245", 1)
         assert "0.000000059664245" in s; open(p, "w").write(s)
+    elif mutate == "dcopitch":
+        # A REAL detune: the Hz -> phase-increment scale (cell 5536 = 220/44100
+        # at 44.1 kHz, juno_init.c:592), moved by 100 ULP ~= 6e-6 relative, about
+        # 0.01 cent. Every patch with an oscillator must hear it, so unlike
+        # noisegain this one is expected in ALL scenarios -- the battery's check
+        # that a globally-relevant error is globally caught.
+        p = os.path.join(tmp, "src", "juno_init.c"); s = open(p).read()
+        assert s.count("v32 = 1000568814;") == 1
+        s = s.replace("v32 = 1000568814;", "v32 = 1000568914;", 1)
+        open(p, "w").write(s)
     elif mutate == "nochorus":  # slot-2 select forced to Pan arm: chorus dead
         p = os.path.join(tmp, "src", "master_render.c"); s = open(p).read()
         s = s.replace("v551 = juno_host_sel(a1, 112);", "v551 = 0;", 1)
@@ -126,19 +153,23 @@ def main():
     if "--teeth" in sys.argv:
         print("=== TRACK B GATE TEETH TEST: the gate must catch planted bugs ===")
         bad = 0
-        for mut, expect_fail in ((None, False), ("detune", True),
-                                 ("nochorus", True), ("envslow", True)):
+        # (mutation, must the gate fail?, how many scenarios must catch it)
+        for mut, expect_fail, min_catch in ((None, False, 0),
+                                            ("noisegain", True, 1),
+                                            ("dcopitch", True, 5),
+                                            ("nochorus", True, 5),
+                                            ("envslow", True, 5)):
             dst = "/tmp/trackb_%s.so" % (mut or "clean")
             build(dst, mut)
             print("candidate: %s" % (mut or "clean rebuild (control)"))
             fails, worst = compare(ref, load(dst), bank)
             caught = fails > 0
-            ok = (caught == expect_fail)
+            ok = (caught == expect_fail) and fails >= min_catch
             if not ok: bad += 1
-            print("  -> %s (expected %s, got %s)\n"
+            print("  -> %s (expected %s in >=%d scenario(s), got %s in %d)\n"
                   % ("OK" if ok else "*** TEETH FAILURE ***",
-                     "FAIL" if expect_fail else "PASS",
-                     "FAIL" if caught else "PASS"))
+                     "FAIL" if expect_fail else "PASS", min_catch,
+                     "FAIL" if caught else "PASS", fails))
         print("TEETH: %s" % ("PASS — the gate catches every planted bug and "
                              "passes the clean control" if bad == 0
                              else "FAIL — the gate is BLIND to %d case(s); "
