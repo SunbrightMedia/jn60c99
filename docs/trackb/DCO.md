@@ -29,8 +29,10 @@ implementation must keep the op tree; re-association will not null at −90 dB.
 
 **CARRIED vs SCRATCH (READ; mechanically enumerated over every `JF/JI(a1,N)`
 access in voice_render.c:34-2183, in source order).** The criterion is exact and
-decidable: the per-sample code is straight-line and identical every sample, so a
-cell is
+decidable: the body runs identically every sample, and every FIRST access listed
+below is unconditional — none falls inside an `if`/`else` block (checked; the
+function's branches are the wrap, the sign clamps, the sub edge test and the
+§2.0 latch bracket, none of which gates a first access). So a cell is
 
 - **CARRIED** ⇔ its FIRST access in the sample is a READ — the value stored on
   sample *n* is consumed on sample *n+1*. These are the only cells a native
@@ -121,9 +123,11 @@ on note-off reproduces that bug exactly:
 3. **MONO retrigger only**: `juno_note_retrig()`, `juno_note.c:238`, whose sole
    caller is `gui/juno_bridge.c:596` in `mono_note_on`'s idle/releasing branch.
    A **POLY note-on does NOT arm it** — the plugin's POLY note-on writes only
-   the DSP-inert aux Array B at `101520 + 32v` (measured; see the mode-dependence
-   note at juno_note.c:166-184). Arming unconditionally is measurably wrong: it
-   re-phases every POLY note.
+   the DSP-inert aux Array B at `101520 + 32v` (READ from the mode-dependence
+   note at juno_note.c:166-184, which records the measurement against the plugin
+   on a warm engine). Arming unconditionally is measurably wrong: per that same
+   note it takes fuzz_diff from 1 diverged seed to 18, because it re-phases every
+   POLY note.
 
 The latch is consumed and cleared by the render itself (:2175-2179), so it is a
 true one-shot; `juno_note_glide` deliberately leaves it untouched (legato slide
@@ -156,7 +160,8 @@ cv   = (s176*k - k*s304) + s304       → s464   // v28, :657 — THREE rounding
 g    = (s208*k - gate_in*k) + gate_in → s480   // v29, :658 — THREE roundings
 s192 = s176 ; s224 = s208 ; s288 = s272 ; s256 = s240 ; s336 = s304 ; s352 = gate_in
 s512.bits = s496.bits (previous) ; s432 = 0
-t    = g + s544                                // s544 ≈ 0.0104166 (rate-armed)
+t    = g + s544                                // s544 rate-armed: 0.022675700 @44100
+                                               //                / 0.010416600 @else (§3)
 u    = (g == 0.0f) ? -1.0f : (t < 0 ? t : 0)   → s496 (pre-clamp value)
 u    = clamp_sign(u)                           // <0→-1, >0→+1, 0 stays 0
 bin  = u + 1.0f                       → s528, s560     // binary gate ∈ {0,1}
@@ -199,9 +204,11 @@ Recall: s592 = PORTAMENTO on/off, s624 = porta time, SR-variant
 does write `f32(0x3d01499d) * (96000/H)`, but that store is **dead**: the later
 SETTLED-override block rewrites the cell unconditionally at
 `juno_prepare.c:239` — `JI(st, 624) = 0x3d01499d;` — and `juno_engine_prepare`
-is straight-line (there is no conditional anywhere in the file, so :239 always
-executes after :107). The cold/pre-recall value is therefore **0x3D01499D =
-0.031564344 at every host rate**, not 0.068711 at 44100. (The rate-dependent
+has NO statement-level control flow (no `if`/`switch`/loop/early return; the
+file's only conditionals are inline `?:` rate-selects on assignment right-hand
+sides, e.g. :159, :177, :202-224), so :239 always executes after :107. The
+cold/pre-recall value is therefore **0x3D01499D = 0.031564344 at every host
+rate**, not 0.068711 at 44100. (The rate-dependent
 `96000/H` post-multiply is real, but it lives on the RECALL path — juno_apply
 row `{54, 7, T_ID, 624}` — not in the cold state.)
 
@@ -494,7 +501,8 @@ it directly inline (:1643); `juno_exp_acc0/ad3c` are ENV-side, not DCO.
   through the SAME-SAMPLE latched copies `s3648/s3664`. **There is NO delay on
   this path (corrected — an earlier revision of this bullet said "one-sample-
   delayed", which is false and would put a spurious z⁻¹ on the ENV→pulse-width
-  path).** READ, in straight-line execution order: ENV1 writes its output cell at
+  path).** READ, in unconditional execution order (none of these lines sits
+  inside a branch — checked): ENV1 writes its output cell at
   :1020 (`JF(a1,2752) = v143;`) and ENV2 at :1074 (`JF(a1,3232) = v165;`); the
   copies are loaded at :1084-1085 and stored at :1090-1091; and 3648/3664 are
   read by the pitch sum at :1109/:1108 and by the PWM sum at :1120/:1121 — all
@@ -573,9 +581,10 @@ nothing in the report was left unapplied. What was checked and what changed:
    §4 was the outlier. Both now say the same thing.
 2. **§3 row 624 + §2.3 (major, FIXED).** Confirmed `juno_prepare.c:107`'s
    `·(96000/H)` store is dead — :239 rewrites `JI(st,624)=0x3d01499d`
-   unconditionally, and `juno_engine.prepare` contains no conditional at all
-   (grep for `if`/`switch`/`case` in the file returns nothing in code). Cold
-   value is 0.031564344 at every rate; the old text was 2.177× high at 44100.
+   unconditionally, and `juno_engine_prepare` has no statement-level control
+   flow that could skip it (enumerated the whole function body: the only
+   conditionals are inline `?:` rate-selects inside assignments). Cold value is
+   0.031564344 at every rate; the old text was 2.177× high at 44100.
 3. **§2.0 latch arming (major, FIXED).** Confirmed :255 is a comment and the
    write is :262; confirmed the two missing armers exist —
    `juno_init.c:3225` (BUILD, all 8 voices) and `juno_note.c:238`

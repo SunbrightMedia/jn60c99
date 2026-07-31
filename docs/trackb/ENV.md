@@ -8,8 +8,14 @@ in the source is load-bearing — `-ffp-contract=off`, no FMA).
 
 **Line numbers**: all cites are the CURRENT `src/voice_render.c` (2185 lines,
 pilot-2 header included). Older docs (`src/juno_note.c` header, the task brief)
-cite pre-pilot-2 numbers that are ~21–30 lines lower (e.g. "636–669" → actual
-682–693, "566–572" → actual 587–594, "2141–2149" → actual 2175–2179). READ.
+cite pre-pilot-2 numbers that are ~21–34 lines lower, and the offset is NOT
+uniform (the decompiler's line breaking changed too), so remap by CONTENT, never
+by a fixed delta. Verified examples (READ, each opened at the target line):
+`juno_note.c:45–46`'s ":636 v29==state[320]" → actual **658**, and its
+":661-669 state[560] = 1.0" → actual **683–691** (683 is `v36 = v34 + 1.0`, 691
+is `JF(a1,560) = v36`; 682 is the unrelated `v35 = JF(a1,608)` and 693 the
+unrelated `JF(a1,720) = v40`); `juno_note.c:59–60`'s "566–572" → actual 587–594
+and "2141–2149" → actual 2175–2179.
 
 Notation: `JF(a1,N)` = float cell at per-voice offset N (`a1 = base +
 voice*10512`); `JI` = same cell as int32 bits. `[N] = x` means the cell is
@@ -22,9 +28,21 @@ coefficients from `src/juno_apply.c` BINDINGS.
 
 ## 1) Subsystem boundary — cells owned
 
-Per-voice offsets (add `voice*10512`). "shadow" = previous-sample copy kept for
-probes/master; a native port must still WRITE them (other code may read them)
-but they never feed back into this subsystem except where marked STATE.
+Per-voice offsets (add `voice*10512`). "shadow" = a cell written from another
+cell at a fixed point in the sample; a native port must WRITE all of them (other
+code may read them, and state A/B compares them).
+
+⚠ **A shadow is not automatically SCRATCH.** In the two ADSRs the shadow cells
+are the *only* read path by which the previous sample's values reach the
+equations: the shift chain at :975–979 copies STATE→shadow at the top of the
+block, and every later read is of the shadow, not of the STATE cell. So
+2608/2656/2688/2736 (and the ENV2 twins 3088/3136/3168/3216) are CARRIED —
+read at :985 (2656, 2608), :1001 + :1005–1006 (2688), :1007 (2608), :1012–1013
+(2736); ENV2: 3136 and 3088 at :1040, 3168 at :1056, 3088 again at :1062, 3216
+at :1067–1068. READ (grepped: those are the only reads).
+The shadows that really are SCRATCH for this subsystem (written, no reader
+inside it) are 352, 512, 576, 2528/2544, 6880/6912, 9696/9728, 9792, 9840/9872,
+9920, and the two aux outputs 2768/3248 (see §5).
 
 ### Gate conditioner (input 320 → binary gate 560)
 | cell | role |
@@ -69,7 +87,17 @@ CONST; 9600 VCA VEL SENS recall (juno_apply.c:682) → per-sample int copy 9648
 (lines 1517–1519); 9616 CONST base 0.93 (prepare:90) → copy 9664 (line 1520);
 9760 blend; 9776 STATE final VCA velocity gain (9792 shadow, 9808 CONST).
 9824 gate-twin (note-on 1.0, juno_note.c:201; porta-gate may zero it,
-juno_note.c:306), 9840/9872 shadows, 9856 STATE smoothed twin, 9888 CONST.
+juno_note.c:306) — **but see the power-on default below**; 9840/9872 shadows,
+9856 STATE smoothed twin, 9888 CONST.
+9824 gate-twin — **power-on 1.0**, `juno_prepare.c:91` (`JI(st,9824)=0x3f800000`;
+inside the replicated block [176,10688) so all 8 voices get it — prepare header
+:49). `juno_init.c` never writes it and note-OFF never clears it; only note-on
+(→1.0) and the porta-gate `off` arm (→0.0) move it afterwards. Its smoother
+9856 is zeroed by `chorus_init.c:328` (9840/9872 too, :327/:329), so at power-on
+9856 ramps 0→1 — see §4.
+9584 VCA TONE (recalled, juno_apply.c:200 `{49, 24, T_ID, 9584}`) → per-sample
+int copy 9632 (line 1518); 9632 is the tone-blend selector of the output
+bright/dark pair 10480–10640 (§2.11 / §5.1). NOT part of 9552.
 9904 STATE gate-mode envelope (9920 shadow, out 9936), consts 9952/9968/9984/
 10000/10016/10032.
 VCA source switches (recall, juno_apply.c:410–420): 10176 GATE, 10192 ENV1,
@@ -102,8 +130,23 @@ if (JF(base, auxoff) == 1.0f) { JI(320) = saved; JI(base, auxoff) = 0; }
 ```
 Bit-exact restore; the latch self-clears. Net effect: one sample of gate-low
 (phase-resets the DCO; delays a coincident re-attack by one sample —
-juno_note.c:251–262). Arming: MONO retrigger + note-off only, never POLY
-note-on (juno_note.c:166–184, PROVEN per CLAUDE.md).
+juno_note.c:251–262).
+
+**Arming — three sites, all of them required (READ, grepped: these are the only
+writers of `101504+v*32` in `src/` + `gui/`):**
+1. **Engine BUILD, all 8 voices** — `juno_init.c:3225`
+   `JF(a1, JUNO_VOICE_AUX_BASE0 + av*JUNO_VOICE_AUX_STRIDE) = 1.0f;` inside the
+   `for (av = 0..7)` loop (comment :3212–3223). This is the arm that fires on
+   each voice's **very first rendered sample** — it is what produces the §2.1
+   head mask and the cold DCO phase reset at power-on. A native port that starts
+   the latch clear silently loses that first-sample mask on every voice.
+2. **MONO retrigger** — `juno_note_retrig()` (`juno_note.c:235–239`), whose only
+   caller is `gui/juno_bridge.c:596` (`mono_note_on`).
+3. **Every note-off** — `juno_note.c:262`, inside `juno_note_off`.
+
+A **POLY note-on does NOT arm it** (it writes the DSP-inert Array B
+101520+v*32 instead) — `juno_note.c:166–184`, PROVEN per CLAUDE.md. That is a
+statement about note-on only; it does not exempt site 1.
 
 ### 2.3 Binary gate conditioner — lines 623–693
 ```
@@ -144,9 +187,27 @@ JF(2624) = h;
 v128 = h + JF(2880);                    // −8.75
 v129 = h - [2640];                      // h − previous h
 ```
-Slew const (989–991): `JF(2704) = JF(2928) + JF(2848)*(JF(2960)-JF(2928))`
-— with 2848==1.0 this evaluates to JF(2960) exactly (lerp end-point), but keep
-the expression: `(2848*2960 - 2928*2848) + 2928`.
+Slew const (989–991) — **write it EXACTLY as the source, no algebra**:
+```
+JF(2704) = ((JF(2848)*JF(2960)) - (JF(2928)*JF(2848))) + JF(2928);
+```
+⚠ **Do NOT simplify this to `JF(2960)` (or to the factored lerp
+`JF(2928) + JF(2848)*(JF(2960)-JF(2928))`).** With 2848 == 1.0 the algebraic
+value is JF(2960), but the source form is `(s − 8.75f) + 8.75f`, which is
+catastrophic cancellation at exponent 2^3: ulp(8.75) = 2^-20, so the low
+mantissa bits of the ~3.9e−4 slew step are destroyed. PROVEN (I recomputed both
+branches in single precision from the §3 bit patterns in the source's exact
+order):
+
+| rate branch | JF(2960) | computed JF(2704) | rel. error |
+|---|---|---|---|
+| 44100 | `0x39ce11c1` | `0x39ce0000` | 3.37e−4 |
+| else  | `0x393d5383` | `0x393d0000` | 1.72e−3 |
+
+JF(2704) is consumed at :1006 (`v134 = v133 + JF(2704)`, the sustain up-slew),
+so the substitution changes every slewing sustain sample. The factored lerp form
+is likewise not float-identical (it rounds twice, the source rounds three
+times — one multiply per operand).
 
 Phase flag (992–1000):
 ```
@@ -171,7 +232,12 @@ rate = ((JF(2832)*0.00390625f)*rel - rel*r) + r;      // release bypasses smooth
 y = rate*err + [2608];   JF(2592) = y;                // (v142, 1015–1017)
 ```
 (v142 source form: `(((R*0.00390625)*rel − rel*r) + r)*err + prev`.)
-Release: atk=p=0 → err = −prev → exponential to 0 at R/256 per sample.
+Release (gloss only — code the source form above): atk = p = 0 → err = −prev, so
+the output decays exponentially toward 0. ⚠ The per-sample coefficient is *not*
+simply `R/256`: with rel == 1 the source computes `((R*0.00390625) − r) + r`,
+which in single precision differs from `R*0.00390625` whenever the smoothed rate
+`r` is non-zero on that sample (same cancellation shape as the slew const above).
+Keep the `rel`/`r` terms.
 Outputs (1018–1021):
 ```
 JF(2752) = (y * JF(2992)) * JF(3008);   // × 1/8.75 × 1.0 → normalized 0..1
@@ -206,7 +272,19 @@ ENV1 drives the filter.
 `JI(3648)=JI(2752); JI(3664)=JI(3232)` (1090–1091); pitch-mod sum uses
 `JF(4080)*JF(3664) + JF(4064)*JF(3648)` scaled by `JF(4096)` inside `JF(3776)`
 (1108–1114); PWM sum uses `JF(3904)*JF(3648)`, `JF(3920)*JF(3664)` inside
-`JF(3824)` (1117–1123).
+**`JF(3808)`** (1117–1123):
+```
+JF(3808) = (((((v186*JF(4160)) + JF(4176)) * JF(3888))
+             + (JF(3904)*JF(3648)))
+             + (JF(3920)*JF(3664)))
+             + JF(3936)) * JF(4144);      // :1117–1123  — the real PWM MOD SUM
+```
+⚠ **Not 3824.** `JF(3824)` is written one line later, at :1124, from `v188`
+(:1116) = `(JF(3744) + JF(3696)) + JF(3760)` — an unrelated tap with **no reader
+in voice or master render**. 3808 is the cell the pulse-width path consumes
+(via s4816 at :1711). Routing the ENV→PWM terms into 3824 would leave the pulse
+width unmodulated and write a dead cell. Matches DCO.md:169/172 and
+CELLMAP.md:306–307. READ.
 
 ### 2.8 VCA velocity gain — lines 1516–1538
 ```
@@ -273,7 +351,7 @@ patterns (store the BITS, not the decimals).
 | 2912, 3392 | 0x416c0000 | 14.75 | attack target (overshoot) | init:970/981 |
 | 2928, 3408 | 0x410c0000 | 8.75 | envelope peak / sustain scale | init:971/982 |
 | 2944, 3424 | 0x41026666 | 8.1499996 | sustain base | init:972/983 |
-| 2960, 3440 | 0x39ce11c1 @44100 / 0x393d5383 else | 3.9304610e−4 / 1.8055555e−4 | sustain slew step (== JF(2704/3184)) | init:973/984 |
+| 2960, 3440 | 0x39ce11c1 @44100 / 0x393d5383 else | 3.9304610e−4 / 1.8055555e−4 | sustain slew-step INPUT — ⚠ **not** equal to the computed JF(2704)/JF(2184); see §2.4 | init:973/984 |
 | 2976, 3456 | 0x3e9166f5 @44100 / 0x3e05f213 else | 0.28398862 / 0.13080625 | rate-coefficient smoother | init:974/985 |
 | 2992, 3472 | 0x3dea0ea1 | 0.11428571 (=1/8.75) | output normalizer | init:975/986 |
 | 3008/3024, 3488/3504 | 0x3f800000 | 1.0 | output gains | init:976–977/987–988 |
