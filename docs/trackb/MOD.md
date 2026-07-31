@@ -188,7 +188,8 @@ Two ordering facts a native rewrite must not lose:
 1. **The LFO is computed BEFORE both envelopes** and `[1824]` is the envelope
    trigger when `[2560]/[3040] != 0` (`ENV.md §2.4`). Moving the LFO after the
    ENVs changes which sample's LFO polarity gates the ADSR.
-2. **`[3776]` is consumed twice, at :1641 (pitch spline) and :1704**, both
+2. **`[3776]` is consumed twice, at :1641 (pitch spline) and :1666** (into
+   `v392`, whose consumer is :1705), both
    *after* the voice output is written at :1640. The PWM total `[4816]` is
    likewise assembled at :1711. Modulation is therefore produced early and
    consumed late inside the same sample — there is no extra delay, but the DCO
@@ -660,8 +661,8 @@ rate-scaled values.
 | gate binarizer | `560` → glide enable at :694 | same sample, :691 |
 | input conditioner | `464` (conditioned pitch CV) → glide target at :702, :721 | same sample, :659 |
 | shared noise block | `base[84432]` → `[1424]` at :814 | same sample, :646-653 |
-| DCO | consumes `[3776]` (:1641, :1704) and `[4816]` (:1711) | after the output write |
-| VCF | consumes `[6976]` (:1206/:1227), `[7104]`, `[7184]`, `[7600]`, `[7616]` | :1187-1254 |
+| DCO | consumes `[3776]` (:1641, :1666) and `[4816]` (:1711) | after the output write |
+| VCF | consumes `[6976]` (:1206/:1227), `[7104]` (:1204), `[7600]` (:1240), `[7616]` (:1243). **Not `[7184]`** — that cell is written twice (:1197, :1203) and never read; the B-path enters the cutoff sum as the register `v221` | :1187-1254 |
 | VCA | consumes `[10320]` (:1598) | :1598 |
 | ENV1/ENV2 | consume `[1824]` (:967, :1022) | after :929 |
 | recall (`juno_apply.c`) | every "recall" row of §4 | patch load / live edit |
@@ -840,3 +841,62 @@ the "×1.0 exactly" collapse of the rate ladder (§3.3), the delay-envelope's
 **INFERRED** from the source. The equations, cells, line numbers, constant bit
 patterns and writer sites are **READ**. Nothing here was executed against the
 plugin by me.
+
+---
+
+## Verification notes
+
+An adversarial re-derivation pass (2026-07-31) re-checked this document against
+`src/voice_render.c` line by line. It found **no numerically wrong equation, no
+wrong constant bit pattern, no wrong parenthesization and no wrong CARRIED /
+SCRATCH classification** — the ten items it raised were cite-drift, naming and
+prose slips. All ten were independently re-checked here against the source
+(READ, by grep + reading the cited lines) before being applied:
+
+1. **§3.3 `expf` ordinal — CORRECTED.** Grep returns exactly two `expf` calls,
+   :798 and :1261; :798 is the **first**. The doc had said "second".
+2. **§6.2 `[3616]` misgrouped — CORRECTED.** `3616` occurs only at :1080 (shadow
+   into the dead `[3632]`) and :1082 (the store). The `[3776]` sum at :1112 uses
+   the register `v169`. Moved to the "no in-file reader" group.
+3. **§5 VCF row listed `[7184]` — CORRECTED.** `7184` occurs only at :1197 and
+   :1203, both stores; the cutoff sum at :1220-1221 uses `v221`. `[7104]` by
+   contrast really is re-loaded at :1204, so that half of the row stood. §1.7
+   updated to match.
+4. **§1.8 row 10320 named the wrong register — CORRECTED.** :1598 is
+   `v367 = v366 * JF(a1, 10320)`; `v366 = v364` at :1597. Same value, wrong name.
+5. **§3.9 / §2 `[3824]` and `[3808]` line cites — CORRECTED.** :1116 computes
+   `v188`; the `[3824]` store is at :1124 (as §1.5 already said) and the
+   `[3808]` assignment spans :1117-1123 (as §3.10's header already said).
+6. **§3.2 listing order — CORRECTED.** :725 (`[896] = [[880]]`) precedes :732
+   (`[880] = v61`). Consequence is nil (`[896]` has no reader, `[880]` is 0.0f),
+   but §3 promises source order.
+7. **§3.1 `[464]` provenance — CORRECTED.** The note path writes cell **304**
+   (`PITCH_OFF`; `juno_note.c:97` is the `#define`, the stores are :160 and
+   :274). `[464]` is computed in-render at :657/:659. §3.1's own header and the
+   §5 table were already right; only the prose slipped.
+8. **§1.3 `[1136]` class + §6.2 roster — CORRECTED.** `1136` occurs once (:819),
+   so by §1.1's definition it is a **tap**, not SCRATCH. Added it and the other
+   write-only shadows to §6.2's keep-the-store list.
+   **Sub-claim REJECTED:** the report listed `[1552]` (:811) among those
+   write-only shadows. It is not one — it is read at :854 in the same sample
+   (that is the whole point of R9). `[1552]` is recorded in §6.2 as belonging to
+   neither group.
+9. **§3.9 `[3536]`/`[3520]` — CORRECTED (expanded).** `[3520]` is written at the
+   voice tail (:2174) and `[3536]` is read at :1144, so :1076 is a genuine
+   one-sample delay, not a shadow. The cells sit outside §1.5's scope, so this
+   was a boundary gap rather than a false statement; §3.9 now classifies it
+   explicitly.
+10. **§3.4 vs §4 decimal disagreement — CORRECTED.** Decoded: `0x402DF855` =
+    2.7182819843292236, `0xBF21D2AF` = −0.6321210265159607. §4's roundings
+    (2.7182820 / −0.63212103) are the correctly-rounded ones; §3.4's prose was
+    truncating. The prose now matches §4 and quotes the exact values. The bit
+    patterns — the authoritative form — were correct throughout.
+
+One further cite error, found while checking item 2 and not in the report:
+`[3776]`'s second reader is **:1666** (`v392`, consumed at :1705), not :1704 —
+grep returns 3776 at exactly :1108 (store), :1641 and :1666. §2 and the §5 DCO
+row were corrected.
+
+Provenance of this pass: **READ** (grep and line reads over `src/voice_render.c`,
+`src/juno_note.c`) plus float-bit decoding of the two constants in item 10. No
+gate was run and nothing was executed against the plugin.

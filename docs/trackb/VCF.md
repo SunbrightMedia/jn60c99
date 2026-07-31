@@ -958,7 +958,31 @@ PROVEN elsewhere). Do **not** "fix" this into a continuous law.
 | 10608 | 0x3f86b818 / 1.0524931 | 0x3f831cb4 / 1.0243134 | tone B b0 | init:1159 |
 | 10624 | 0xbf698bc4 / −0.91228890 | 0xbf759990 / −0.95937443 | tone B b1 | init:1160 |
 | 10640 | 0x3f76fbf8 / 0.96478224 | 0x3f7bd2fc / 0.98368812 | tone B a1 | init:1161 |
-| 10240 | 0x3b9a10b5 / 0.0047016987 | 48k 0x3b8d8c28 / 0.0043196864; else 0x3b0d8c2e / 0.0021598446 | HPF cutoff default — **3-class**, not 2-class | prepare:135, 259 |
+**`[10240]` is NOT rate-armed — it was listed here in error and the row is
+withdrawn.** `juno_prepare.c:135` does write a 3-class `SELC(0x3b9a10b5,
+0x3b8d8c28, 0x3b0d8c2e)`, but **`juno_prepare.c:259` unconditionally
+overwrites it with `0x3b0d8c2e` later in the same function**. Both lines sit at
+brace depth 1 inside `juno_engine_prepare` (lines 60-291) — :259 is in the
+"SETTLED override" block (:235-262) and is in no `if` (verified by a
+brace-depth scan of the file, READ). The line-135 SELC for this cell is
+therefore **dead code**: the post-prepare value is **0.0021598446 at every host
+rate**, which is what §4.3 states. This is deliberate, not an accident of
+ordering — `juno_prepare.c:228-238` documents the block as the plugin's
+activation-SNAP settled state, whose target is *rate-independent* and which
+completes before any audio, so the rate-independent value is the one the
+plugin actually runs with. A native port that seeds a 3-class table
+here gets the wrong pre-recall HPF coefficient at 44100 and 48000; it survives
+`null_ab.py` only because every scenario recalls a patch first and recall
+rewrites `[10240]` (`juno_apply.c:171`) — i.e. the gate does not protect you
+here.
+
+⚠ **The same override pattern applies to six other cells** and is worth knowing
+before reading any `prepare:1xx` SELC row in *any* Track-B doc: the SETTLED
+override block (comment :228-238, stores :239-262) also unconditionally
+rewrites `[1920]`, `[2784]`, `[2816]`, `[2832]`, `[3264]`, `[3296]` and
+`[3312]` with the 96 kHz-family value, killing the SELC written for them at
+:128-134. Those are LFO/ENV cells (`MOD.md` / `ENV.md` territory, not
+re-derived here) — flagged, not claimed. READ.
 
 ### 4.3 Recalled (per patch, `juno_apply.c` BINDINGS)
 
@@ -1017,10 +1041,12 @@ These carry information across samples and **cannot** be restructured away:
    dither** — two independent free-running `juno_wrap24` oscillators plus a
    one-pole. They are audio-independent, so they *can* be generated ahead of
    time, but their exact sequence is part of the sound.
-2. **The 7-cell ladder pipeline** `[8208..8320]` — the correct native form is
-   seven named variables `xz1, y1z, y2z, y3z, y4z, Sprev, Sprev2` rotated once
-   per host sample. It is *not* a uniform delay line: `8288`/`8304` hold state
-   contributions `S`, not stage outputs.
+2. **The ladder pipeline** `[8208..8320]` — **8 cells** carrying **7 distinct
+   values** (`[8208]`'s content is renamed into `[8224]` by the :1306 shift and
+   is not otherwise read). The correct native form is seven named variables
+   `xz1, y1z, y2z, y3z, y4z, Sprev, Sprev2` rotated once per host sample. It is
+   *not* a uniform delay line: `8288`/`8304` hold state contributions `S`, not
+   stage outputs.
 3. **The four 8-cell dispersion lines** `[8432..8928]` = 32 samples of 4×
    history. A circular buffer with a modulo index is legitimate; the FIR
    summation order is not negotiable (§3.10).
@@ -1038,7 +1064,13 @@ These carry information across samples and **cannot** be restructured away:
 8. **`[7520]`, `[7536]`, `[9040]`** — carried only in the `[7632]!=1` /
    `[9056]!=1` held branches, which are unreachable in the port (both cells are
    1.0 from prepare and have no other writer). Keep the branch or document its
-   removal; do not silently drop the hold semantics.
+   removal; do not silently drop the hold semantics. **If you keep the branch,
+   keep its true extent**: the gates are at :1235 and :1338, so :1230-1234 (the
+   `[7568]`/`[7584]` rename and dither load) and :1300-1337 (the stage-state
+   shift, all four dispersion-line shifts, `[[8960]]=[[8944]]` and
+   `[8992]=v244`) run **outside** them, every sample. Pulling those inside the
+   `if` — the natural thing to do when "tidying" the branch — silently changes
+   what the held branch holds. See §1.4 and §1.5.
 
 ### 6.2 What is pure memory round-tripping
 
@@ -1115,7 +1147,7 @@ isolation test that does not need the full engine.
 
 | # | Risk | Why it bites | Isolation test |
 |---|---|---|---|
-| R1 | **`expf`/`tan` chain re-implemented as "the obvious" `tanf(M_PI*fc/fs)`** | Changes `G` in the last bits on *every* sample, so *every* patch drifts. The plugin's `tan` is a 5-term rational; its `exp` is `expf(floor) × a woven Taylor`. | Drive `v227` over its full clamped range `[-3, 11]` in 2²⁴ steps through both the transcribed :1255-1292 and the candidate; require bit-identical `[7520]`. No audio needed. |
+| R1 | **`expf`/`tan` chain re-implemented as "the obvious" `tanf(M_PI*fc/fs)`** | Changes `G` in the last bits on *every* sample, so *every* patch drifts. The plugin's `tan` is a 5-term rational; its `exp` is `expf(floor) × a woven Taylor`. | Drive the clamp output over its full range — `[-3, [7760]]`, i.e. `[-3, 10.397]` at 44100 and `[-3, 11]` elsewhere, so run the test at **both** arms — in 2²⁴ steps through both the transcribed :1255-1292 and the candidate; require bit-identical `[7520]`. Post-affine that is `v227 ∈ [-5.3718905, 3.9142027]` / `[-5.3718905, 4.3321700]`, which is what fixes the `expf` table size (§3.7). No audio needed. |
 | R2 | **FIR summation re-ordered** (natural `t0→t15`, or a `for` loop) | 16 float adds; reordering shifts the result ~1 ULP per sample, which at 30000 frames is well above −90 dB on resonant patches. | Feed a fixed 32-sample vector into both FIR expressions; require bit-identical output. |
 | R3 | **`1/(1+G⁴k)` via reciprocal approximation or `-ffast-math`** | Silent, compiler-flag-driven; scales the whole resonance path. | Compile the candidate and disassemble for `rcpss`/`vrcp`; plus a unit test `v247` over `G∈[0,0.3]`, `k∈[0,5.4]`. |
 | R4 | **The ladder pipeline treated as a uniform 7-tap delay line** | `[8288]`/`[8304]`/`[8320]` hold *state contributions*, not stage outputs; a uniform shift feeds the wrong values into the feedback and into stage 4. Fails loudly on high resonance, subtly at low resonance. | Single-voice impulse into `[6544]` with `[6832]` swept 0→255; compare `[9040]` sample-by-sample against the transcription. |
@@ -1141,9 +1173,25 @@ R3, R4, R9 and R13 do their damage (the resonance loop multiplies the error by
 `1/(1+G⁴k)` every sub-step). Before trusting a −90 dB pass on this subsystem,
 add a scenario on a patch with `blob37` (VCF RESONANCE) near maximum and a low
 cutoff, plus a cutoff sweep (live `juno_gui_set_param` on the VCF CUTOFF row)
-so `[7520]` actually moves during the render — every current scenario holds the
-cutoff constant, so the whole `:1230-1292` mapper is exercised at exactly one
-operating point per patch. **READ from the tool source; not executed here.**
+so `[7520]` traverses a wide range during the render.
+
+**Correction to the justification originally given here.** An earlier draft
+argued for this by claiming "every current scenario holds the cutoff constant,
+so the whole `:1230-1292` mapper is exercised at exactly one operating point
+per patch". That is **false**, and the doc contradicts it elsewhere. `v227`
+moves every sample in every scenario, from three independent sources: the
+free-running cutoff dither (`v232 = (v231*[7696]) + [7600]` at :1240, driven by
+`[7552] = juno_wrap24(-v230)` at :1241 — and `juno_wrap24(0)` returns
+`5.960464e-08`, not 0, `juno_dsp.c:23-25`, so the oscillator leaves its
+calloc'd zero from power-on, exactly as §6.1 item 1 says); the filter-envelope
+term `(v223*[7392])` at :1228; and the LFO term `(v222*v225)*[7344]` at :1226.
+The mapper is therefore already exercised over a *range* per patch. The
+recommendation still stands, on the narrower and correct ground that the range
+is **patch-determined and never near the top of the resonance axis** — `[7536]`
+(the resonance drive `k`, which sets the `1/(1+G⁴k)` loop gain) *is* constant
+within a scenario, and no current scenario sets it high. R3/R4/R9/R13 are
+error-multiplied by that loop gain, so the gap is in the resonance axis, not
+the cutoff axis. **READ from the tool source; not executed here.**
 
 ### 7.2 Suggested build order for the native VCF
 
@@ -1164,11 +1212,18 @@ confirm the gate still has teeth on the current tree.
 
 ## 8. Open questions
 
-1. **`[6576]`, `[6608]`, `[6640]`, `[6672]`, `[7008]`, `[7024]`, `[7312]`,
-   `[7328]`, `[7376]`, `[7456]`, `[9552]`, `[10224]`, `[7616]`** have no writer
-   anywhere in `src/` ⇒ 0 from calloc. Several of them are *settable parameter
-   descriptors* in the plugin (`[7008]` "Env1/2", `[7024]` "Int/Env" are named
-   in the registry). The simplifications they enable (`v200 == [6736]`,
+1. **`[7008]`, `[7024]`, `[7312]`, `[7328]`, `[7376]`, `[7456]`, `[10224]`,
+   `[7616]`, `[6720]`, `[9072]`, `[9088]`** have no writer anywhere in `src/`
+   ⇒ 0 from calloc (grep-verified against every `.c` in `src/`, including
+   `master_render.c` and `chorus_init.c`). **`[6576]`, `[6608]`, `[6640]`,
+   `[6672]` and `[9552]` are 0 for a different reason** and the earlier "no
+   writer" wording for them was wrong: `chorus_init.c:233-240` and
+   `chorus_init.c:316` explicitly store 0 into them before `juno_engine_init`
+   runs (§1.1). The *value* is 0 either way and nothing downstream changes, but
+   a grep-based audit of this list would flag the old wording. Several of these
+   cells are *settable parameter descriptors* in the plugin (`[7008]` "Env1/2",
+   `[7024]` "Int/Env" are named in the registry). The simplifications they
+   enable (`v200 == [6736]`,
    `[7072] == [2752]`, `v360 == v357 + [10208]*[10048]`, `v226 == 0`) are
    correct **today**; confirm against the binary before hard-coding any of
    them, exactly as `ENV.md` §5 flags for `[9552]`/`[10224]`.
@@ -1177,10 +1232,14 @@ confirm the gate still has teeth on the current tree.
    constructor writes a cell the render abandoned. Worth a single grep against
    the decompile before declaring it dead. INFERRED dead.
 3. **The `[7760]` clamp at non-44100 rates.** At 44100 the constant places
-   `fc_max` exactly at the host Nyquist (§3.7); at 96000 the stored 11.0 does
-   *not* produce the analogous relation. Consistent with the plugin's frozen
-   2-arm design, but it means the filter's top end is rate-dependent in a way
-   that is not a simple scaling. INFERRED; do not "correct" it.
+   `fc_max` at 22048.006 Hz — **close to** the host Nyquist (22050 Hz) but not
+   exactly on it, a 2 Hz / 9e−5 relative gap (§3.7; an earlier draft said
+   "exactly", which overstated §3.7's own correct "≈ H/2"). At 96000 the stored
+   11.0 does *not* produce the analogous relation at all. Consistent with the
+   plugin's frozen 2-arm design, but it means the filter's top end is
+   rate-dependent in a way that is not a simple scaling — and it is the reason
+   `expf`'s argument set gains an eleventh entry above 44100 (§3.7).
+   INFERRED; do not "correct" it.
 4. **`[8288]`'s write at :1484 uses `v320 + (v246*v319)`** while the in-loop `S`
    uses the full :1377-1381 form. They are the same expression with `v320`
    playing the role of the inner nest — I verified the shapes match, but the
@@ -1201,3 +1260,129 @@ confirm the gate still has teeth on the current tree.
    relative difference, i.e. the constant was stored to float precision from a
    slightly different expression). The "440 Hz" and "4×" readings are therefore
    INFERRED, not exact; the *cell value* is what a native port must use.
+
+---
+
+## 9. Verification notes (2026-07-31 adversarial re-derivation pass)
+
+An independent verifier re-derived this document against `src/voice_render.c`
+(2185 lines), `src/juno_init.c`, `src/juno_prepare.c`, `src/juno_apply.c`,
+`src/chorus_init.c` and `docs/trackb/CELLMAP.md` rather than proofreading it,
+and reported 12 defects. **Each was re-checked here against the source before
+being applied.** Ten were confirmed and fixed; two were confirmed in substance
+but the verifier's own replacement facts were wrong and are recorded below.
+
+The document's core survived: all 13 equation blocks in §3.1-§3.13, the ~118
+cell rows in §1.1-§1.6, and every constant, bit-pattern and init/prepare/apply
+cite in §4.1-§4.3 were re-derived and stand unchanged apart from the items
+listed. Everything in this section is **READ** (source inspection) except where
+marked; the two rate-conditional numeric fixes are **PROVEN(decode+float32
+eval)** — recomputed in `numpy.float32` through this doc's own chain.
+
+**Confirmed and fixed — the two that would change a native port's output:**
+
+1. **§4.2's `[10240]` row (major).** The 3-class rate-armed HPF default was
+   wrong: `juno_prepare.c:259` unconditionally overwrites `juno_prepare.c:135`,
+   at brace depth 1 with no enclosing `if` (verified by a brace-depth scan of
+   lines 60-291). Post-prepare `[10240]` is `0.0021598446` at **every** rate,
+   as §4.3 already said — the doc contradicted itself. Row withdrawn and
+   replaced with the override explanation, plus a warning that the same SETTLED
+   block also kills the SELC for `[1920]`, `[2784]`, `[2816]`, `[2832]`,
+   `[3264]`, `[3296]`, `[3312]` (ENV/LFO cells, flagged not claimed).
+2. **§3.7's `expf` argument set (major).** `{-6 … 3}`, 10 values, is true only
+   at 44100. `[7760] = 11.0` at every other rate gives `v227_max = 4.3321700`,
+   so the set is `{-6 … 4}`, **11 values**. A 10-entry table sized from the
+   44100 figure runs off its end at 48000/88200/96000/192000, and the project
+   gates render A/B at 88200 (CLAUDE.md). Replaced with a per-rate table.
+
+**Confirmed and fixed — presentation and classification:**
+
+3. **§1.4 and §1.5 headers.** Neither block is "entirely inside" its gate. The
+   gates are at :1235 and :1338, so :1230-1234 and :1300-1337 (all the shifts
+   and latches) run unconditionally. Harmless today — both gate cells are 1.0
+   with no other writer — but §6.1 item 8 tells the implementer to keep the
+   branch, and moving the shifts inside it would change the held-branch state.
+   Both headers rewritten; §6.1 item 8 now states the true extent.
+4. **§1.5's `[8944]` read list** double-counted :1383 and :1418, which read
+   `[8960]` (`v268 = JF(a1, 8960);`, `v287 = JF(a1, 8960);`). Corrected to
+   1335, 1347, 1386, 1411, 1453.
+5. **§1.4's `[7520]` class.** By this doc's own §1 definition it is **SHADOW**
+   while the gate is on, not SCRATCH: written :1292, never read that sample
+   (the value lives in `v241`), and its only read :1296 is in the mutually
+   exclusive `else`. `[7536]` and `[9040]` are correctly SCRATCH — their reads
+   (:1299, :1568) are outside the gated block. Note added.
+6. **§3.7's `P` polynomial.** The printed parenthesisation had 11 opening
+   parens for a 17-rounding, 17-level nest and underflowed to negative depth —
+   the one expression R1 names as highest-risk was the one that could not be
+   transcribed literally. The *term order* was correct and matches :1262-1272.
+   Rewritten as an explicit step list plus a balanced (verified) one-liner.
+7. **§3.7's `g_max` / `G_max`.** Recomputed in float32: `0.41417196` and
+   `0.29287243`, not `0.41413` / `0.29285` — the doc was wrong in the 5th
+   significant figure. `arg_max = 0.39266357` was correct.
+8. **§8 item 3's "exactly at the host Nyquist".** `fc_max = 22048.006` vs
+   `H/2 = 22050` — §3.7's own "≈ H/2" was right and §8 upgraded it. Corrected,
+   and `fc_max` given to full precision in §3.7.
+9. **"No writer anywhere in `src/`" for `[6576]`, `[6608]`, `[6640]`,
+   `[6672]`, `[9552]`** (§1.1, §1.6, §8 item 1). False as worded:
+   `chorus_init.c:233-240` and `:316` store 0 into them before
+   `juno_engine_init`. The value (0) and every downstream simplification are
+   unaffected, but a grep-based audit would flag it. Reworded; the remaining
+   cells in the §8 list (`[7008]`, `[7024]`, `[7312]`, `[7328]`, `[7376]`,
+   `[7456]`, `[10224]`, `[7616]`, `[6720]`, `[9072]`, `[9088]`) were
+   re-grepped and genuinely have no writer.
+10. **§3.13's `[10672] = [10656] * [9856]`.** Source is
+    `JF(a1,10672) = v384 * JF(a1,9856);` (:1640) — it uses the register and
+    never reloads `[10656]`, which is what makes `[10656]` a SHADOW that a
+    native port may drop. Numerically identical, but the doc disagreed with its
+    own §1.6 table. Also: `[8208..8320]` is **8 cells holding 7 distinct
+    values**, so §1.5's "7 cells" heading over an 8-row table and §6.1 item 2's
+    "7-cell pipeline" are now stated precisely.
+11. **Three unflagged `double`-declared locals.** `v202` (:254), `v364` (:416)
+    and `v379` (:431) are declared `double` alongside the already-flagged `v42`
+    (:94) and `v19` (:71). All three receive a float and are copied straight
+    back to a float with no arithmetic between, so the round-trip is exact and
+    §3.1/§3.11/§3.13's float rendering is numerically correct — but given that
+    "a typed local CONVERTS where memory REINTERPRETS" is the failure mode that
+    broke pilot 1, the omission was asymmetric. All five are now tabulated in
+    the §3 preamble.
+12. **§7.1's justification.** The recommendation (add a high-resonance /
+    cutoff-sweep scenario) is sound; the reason given for it was false. "Every
+    current scenario holds the cutoff constant" is contradicted by this doc's
+    own §6.1 item 1: the cutoff dither free-runs from power-on because
+    `juno_wrap24(0)` returns `5.960464e-08`, not 0 (`juno_dsp.c:23-25`), and
+    `v227` also moves via the filter-envelope term at :1228 and the LFO term at
+    :1226. Rewritten on the correct ground — it is `[7536]` (the resonance
+    drive `k`, a same-sample latch of the recalled `[6832]` via :1170/:1231)
+    that is constant within a scenario and never set high, and R3/R4/R9/R13 are
+    error-multiplied by the `1/(1+G⁴k)` loop gain.
+
+**Confirmed in substance, but the verifier's replacement facts were wrong
+(§1.8's CELLMAP cross-references).** The verifier was right that §1.8's cites
+were stale and that it says "Four corrections" over five numbered items plus a
+"Minor". It was wrong about what the current CELLMAP contains, because
+`CELLMAP.md` was itself revised by its own adversarial pass *after* this doc's
+first draft (CELLMAP:1278-1345, 12 fixes). Checked against the current file:
+
+- The verifier placed "3-tap FIRs A/B" at CELLMAP:1038 and "three 8-deep
+  dispersion lines" at CELLMAP:997. **Neither string exists in CELLMAP any
+  more** (grep). CELLMAP:1038 is `` `[7552]' = juno_wrap24(-[7552])` `` and
+  CELLMAP:997 is the `### P/Q/R` heading. Both were fixed upstream —
+  CELLMAP:1100-1111 now writes the tone filters out as recursive and warns
+  against the FIR reading, and CELLMAP:1051-1054 says "**FOUR**" dispersion
+  lines. So the alleged sixth uncaught CELLMAP defect does not exist, and
+  §1.8's item 2 is resolved history, not a live disagreement.
+- The `[8192]` cite: the verifier's "CELLMAP:596, not 597" is correct as far as
+  it goes, but the row at :596 now *itself* states that ":607 is NOT an
+  access". That defect is fixed too (CELLMAP:1317-1319), so §1.8 item 5 is also
+  resolved history.
+- §1.8's "Minor" — that CELLMAP's `[7568]` row omits the :1234 dead store — is
+  **withdrawn**: CELLMAP:558 lists `written @ 1234,1239`. The underlying source
+  fact is real and has been moved into §1.4, where it belongs.
+- Still genuinely wrong in CELLMAP, and kept: the §1 sub-table U heading at
+  CELLMAP:598 still says "3x oversampled" (it is 4×), and CELLMAP:1057's
+  `` `g = [7520]'`; `G = 1-2g` `` uses the letters `g`/`G` for what this doc
+  calls `G`/`A`. §1.8 has been rewritten around those two, with the resolved
+  three retained as auditable history and every cite re-verified against the
+  current 1345-line CELLMAP.
+
+Nothing in §2, §5, §6.2 or §6.3 was changed by this pass.
