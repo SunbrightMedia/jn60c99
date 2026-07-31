@@ -562,11 +562,21 @@ a pure state oscillator that never depends on audio.
   v236 = v227 - v234                                              // :1259   frac in [0,1)
   v237 = (v236*v236) * 0.25                                       // :1260   q = f^2/4
 
-  P = ((((((((((( (v236*[8032]) + [8016]) * v237) + (v236*[8000])) + [7984]) * v237)
-              + (v236*[7968])) + [7952]) * v237)
-              + (v236*[7936])) + [7920]) * v237)
-              + (v236*[7904])) + [7888]) * v237)
-              + (v236*[7872])) + 1.0                              // :1262-1272 (exact nesting in source)
+  // P: :1262-1272. A pure LEFT-TO-RIGHT Horner chain, 17 roundings, written
+  // here as a step list because the fully-parenthesised one-liner is 17 levels
+  // deep and is the single easiest expression in this doc to mis-transcribe.
+  t  = (v236*[8032])
+  t  = t + [8016]      ; t = t * v237 ; t = t + (v236*[8000])
+  t  = t + [7984]      ; t = t * v237 ; t = t + (v236*[7968])
+  t  = t + [7952]      ; t = t * v237 ; t = t + (v236*[7936])
+  t  = t + [7920]      ; t = t * v237 ; t = t + (v236*[7904])
+  t  = t + [7888]      ; t = t * v237 ; t = t + (v236*[7872])
+  P  = t + 1.0
+  // equivalently, and this form IS balanced and may be transcribed literally:
+  // P = (((((((((((((((((v236*[8032]) + [8016]) * v237) + (v236*[8000]))
+  //       + [7984]) * v237) + (v236*[7968])) + [7952]) * v237)
+  //       + (v236*[7936])) + [7920]) * v237) + (v236*[7904])) + [7888])
+  //       * v237) + (v236*[7872])) + 1.0)
   v238 = (expf(v234) * P) * [7856]                                // :1261-1273
   v239 = v238 * v238
   NUM = ((((((((v238*v238) * *(a1+0x2000)) + [8160]) * (v239*v239))
@@ -600,20 +610,34 @@ g    = tan(arg)                                        // v240
 G    = g/(1+g)                                         // [7520]
 ```
 
-At 44100 Hz the clamp hi `[7760] = 10.397000` puts `fc_max` at **22048.0 Hz**
-(≈ H/2), `arg_max` at 0.3926635 (≈ π/8 = 0.3926991), `g_max ≈ 0.41413` and
-`G_max ≈ 0.29285`; `fc_min` (E = −3) is **2.0439 Hz**. At every other rate
-`[7760] = 11.0`, giving `fc_max ≈ 33488 Hz` — which is *not* the analogous
-Nyquist relation, because `[7760]` is a fixed 96 kHz-family constant, not a
-continuous law (the same 2-arm design `juno_init.c:313-314` uses everywhere).
-All numbers PROVEN(decode) from the cited cells; the *identification* as
-`fc`/`tan`/`G` is INFERRED, the ops are READ.
+At 44100 Hz the clamp hi `[7760] = 10.397000` puts `fc_max` at **22048.006 Hz**
+(≈ H/2 = 22050, *near* it but not equal to it), `arg_max` at 0.39266357
+(≈ π/8 = 0.39269908), `g_max = 0.41417196` and `G_max = 0.29287243`; `fc_min`
+(E = −3) is **2.0439 Hz**. At every other rate `[7760] = 11.0`, giving
+`fc_max ≈ 33488 Hz` — which is *not* the analogous Nyquist relation, because
+`[7760]` is a fixed 96 kHz-family constant, not a continuous law (the same
+2-arm design `juno_init.c:313-314` uses everywhere). The cell values are
+PROVEN(decode); `g_max`/`G_max`/`fc_max` are PROVEN(decode+float32 eval) —
+recomputed in `numpy.float32` through this section's own chain — and the
+*identification* as `fc`/`tan`/`G` is INFERRED, the ops are READ.
 
-`expf` is called only on integers (the floor of a value bounded by the clamp),
-so its argument set is `{-6 … 3}` — 10 distinct values. CLAUDE.md records that
-glibc and newlib `expf` agree bit-for-bit over 32,000,423 inputs (PROVEN
-elsewhere), so a native port may tabulate these 10 results, but must not
-substitute its own `exp`.
+**`expf`'s argument set is RATE-DEPENDENT — size it for the widest rate.**
+`expf` is called only on integers (`v234 = floorf(v227)`, and `v227` is bounded
+by the clamp at :1244-1252), but the bound moves with `[7760]`:
+
+| rate | `[7760]` | `v227` range = `clamp·[7824] + [7840]` | `floor` range | count |
+|---|---|---|---|---|
+| 44100 | 10.397000 | [−5.3718905, **3.9142027**] | −6 … **3** | **10** |
+| 48000 / 88200 / 96000 / 192000 | 11.0 | [−5.3718905, **4.3321700**] | −6 … **4** | **11** |
+
+(Lower end is `[7776] = −3.0` at every rate: `−3.0·0.6931472 + (−3.2924490) =
+−5.3718905`, floor −6. PROVEN(decode+float32 eval).) So a native port may
+tabulate the results — CLAUDE.md records that glibc and newlib `expf` agree
+bit-for-bit over 32,000,423 inputs (PROVEN elsewhere) — but the table must
+cover **`{-6 … 4}`, 11 entries**. A 10-entry table sized from the 44100 figure
+runs off its end at the top of the cutoff range at every other rate, and the
+project's render A/B gate runs at 88200 as well as 44100 (CLAUDE.md). Whatever
+the table size, do not substitute a different `exp`.
 
 ### 3.8 Ladder input node  (READ :1298-1349)
 
@@ -796,10 +820,20 @@ v19  = 0.0 ; if (v376 < -0.0) v19 = -v376                         // seeded :633
 v383 = v375 + ((v19*v378) - (v19*v375))                           // :1634
 if (v376 >= 0.0) v383 = v381                                      // :1635-1636
 [10544] = v383                                                    // :1637
-[10656] = v383 * [9776]                                           // :1638-1639
-[10672] = [10656] * [9856]                                        // :1640
+v384    = v383 * [9776]                                           // :1638
+[10656] = v384                                                    // :1639  (SHADOW)
+[10672] = v384 * [9856]                                           // :1640  reads v384, NOT [10656]
 *outL = *outR = [10672] ; return bits([10672])                    // :2180-2182
 ```
+
+The last two lines are worth reading twice: :1640 is
+`JF(a1,10672) = v384 * JF(a1,9856);` — it multiplies the **register**, and
+never loads `[10656]` back. Numerically the two are identical (`[10656]` was
+just written from `v384`), but the distinction is what makes `[10656]` a
+SHADOW (§1.6) that a native port may drop outright. Writing the chain as
+`[10672] = [10656] * [9856]` would make the store look load-bearing.
+(`CELLMAP.md:1112` glosses it in the `[10656]'` form; this doc's §1.6 table and
+this block are the accurate statement.)
 
 Both shelves are `y[n] = b0·x[n] + b1·x[n−1] + a1·y[n−1]`. With the §4
 coefficients, tone A has DC gain 1.0 and Nyquist gain 3.981 (+12 dB treble) and

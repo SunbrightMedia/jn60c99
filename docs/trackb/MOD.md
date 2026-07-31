@@ -226,12 +226,13 @@ Inputs: `g = [560]'` (binary gate, §ENV 2.3), `cv = [464]'` (conditioned pitch,
 
 Semantics (INFERRED): a leaky-integrator glide. `[704]` is the **current
 value**, `cv = [464]` is the **target**. `[464]` is **not** written by the note
-path — it is computed in-render at `voice_render.c:659` (`[464] = ((v12·[448]) −
-([448]·[336])) + [336]`, the conditioner's lerp) from the raw note pitch `[304]`.
-`[304]` is what the note path writes: `PITCH_OFF 304` (`juno_note.c:97` is the
-`#define`), stored at `juno_note.c:160` on a note-on and at `:274` for a legato
-pitch-only change. So the note path moves the target one cell upstream of the
-glide. `[656]`/`[672]` are the integrator and its rate; `[688]` is an arrival ramp that
+path — it is computed in-render by the input conditioner, `w = [272]·[240]`
+(:652), `[464] = (([176]·w) − (w·[304])) + [304]` (computed :657, stored :659):
+a lerp from the raw note pitch `[304]` toward `[176]`. `[304]` is what the note
+path writes — `PITCH_OFF 304` (`juno_note.c:97` is the `#define`, not a store),
+assigned at `juno_note.c:160` on a note-on and at `:274` for a legato pitch-only
+change. So the note path sets the target one cell upstream of the glide.
+`[656]`/`[672]` are the integrator and its rate; `[688]` is an arrival ramp that
 lerps the output onto the target once `|current − target| < 0.05`.
 
 Three traps, all READ from the code above:
@@ -438,7 +439,9 @@ enables are engine-reachable cells that recall simply never writes.
 
 ### 3.9 Pitch modulation sum `[3776]` — :1076-1114
 ```
-:1076 [[3536]] = [[3520]]   :1077 [[3568]] = [[3552]]   :1080 [[3632]] = [[3616]]
+:1076 [[3536]] = [[3520]]   // NOT a dead shadow — a genuine ONE-SAMPLE DELAY;
+                            //   see the note below the block
+:1077 [[3568]] = [[3552]]   :1080 [[3632]] = [[3616]]
 :1081 v169 = ([880] * [3600]) + ([752] * [3584])   → [3616]   // keyboard CV, unity weights
 :1087 [[3680]] = [[3552]]   :1088 [[3696]] = [[752]]
 :1090 [[3648]] = [[2752]]   (ENV1)      :1091 [[3664]] = [[3232]]  (ENV2)
@@ -456,10 +459,25 @@ enables are engine-reachable cells that recall simply never writes.
                     + [3952] )
                   + [3968] )
 :1115 [[3792]] = [[3840]]                         // DCO RANGE feet, staged
-:1116 [3824] = ([3744] + [3696]) + [3760]         // write-only tap
+:1116 v188  = ([3744] + [3696]) + [3760]
+:1124 [3824] = v188                               // write-only tap
 ```
+(The `[3824]` **store** is at :1124, after the `[3808]` assignment of §3.10; only
+the arithmetic is at :1116. §1.5 cites the store line.)
+
 `[4064]/[4080]/[4096]` and `[3952]` have no writer ⇒ the env→pitch and the spare
 offset terms are 0. `[3968]` is the **per-voice** UNISON detune.
+
+**`[3536]` / `[3520]` (boundary note, not MOD-owned).** Unlike the other latches
+in the block, `:1076` is a real one-sample delay, not a same-sample shadow:
+`[3520]` is written at the very **tail** of the voice (`:2174 [3520] = v526`),
+so at `:1076` it still holds the **previous** sample's value; `[3536]` receives
+that and is read this sample at `:1144` (`v198 = [6448] * [3536]` → `[6480]`).
+⇒ `[3520]` is **CARRIED**; `[3536]` is SCRATCH *carrying a delayed value*. A
+native port must not "optimize" `:1076` by reading `[3520]` after `:2174`, and
+must not drop the pair as a dead shadow. (Both cells belong to the DCO/VCF tail,
+outside §1.5's `3552…` enumeration — recorded here because reading §3.9 alone
+invites the wrong classification.)
 
 ### 3.10 PWM sum `[3808]` and the pulse width — :1117-1123, :1706-1711
 ```
@@ -704,11 +722,23 @@ the source is ENV1/ENV2 (the envelopes are per-voice). Do not hoist it.
 1. **Six carried floats are the whole LFO.** `rateSm, extGatePrev, delayRamp,
    phase, noiseSm, shHold`. Everything else in `[1408..2544]` can be locals as
    long as the memory stores remain for any outside reader.
-2. **Keep the memory stores.** `[1792]`, `[1808]`, `[1824]`, `[752]`, `[3616]`,
-   `[3776]`, `[3808]`, `[6976]` are read by other subsystems *through the
-   cells* later in the same sample; `[1744]`, `[1776]`, `[3824]`, `[1664]`,
-   `[1520]`, `[1840]`, `[720]`, `[736]` have no in-file reader but should still
-   be written until proven dead (same policy as ENV.md/DCO.md).
+2. **Keep the memory stores.** Two groups:
+   * *Read through the cell later in the same sample* — the store is
+     load-bearing: `[1792]` (:1083, :1187), `[1808]` (:964, :1094, :1196),
+     `[1824]` (:967, :1022), `[752]` (:1078, :1086, :1176), `[3776]` (:1641,
+     :1666), `[3808]` (:1711), `[6976]` (:1206).
+   * *No in-file reader* — write them anyway until proven dead (same policy as
+     ENV.md/DCO.md): `[3616]` (written :1082; its only other occurrence is the
+     `:1080` shadow into `[3632]`, and the `[3776]` sum at :1112 uses the
+     **register** `v169`, not the cell), `[1744]`, `[1776]`, `[3824]`, `[1664]`,
+     `[1520]`, `[1840]`, `[720]`, `[736]`, `[1136]` (:819), `[7184]` (:1203),
+     and the pure write-only shadows `[896]` (:725), `[928]` (:738), `[960]`
+     (:737), `[992]` (:739), `[1024]` (:740), `[1120]` (:741), `[1648]` (:807),
+     `[2528]`/`[2544]` (:965-966), `[3568]` (:1077), `[3632]` (:1080), `[6992]`
+     (:1178).
+
+   `[1552]` (:811) is in **neither** group: it is written and read (:854) inside
+   the same sample, so a native port may keep it in a register — see §7 R9.
 3. **Three dead stores may be dropped** (verified: no reader between the store
    and its overwrite): `[1504]` at :810, `[7104]` at :1189, `[7184]` at :1197.
    Also the two `fmodf` calls at :892 and :896 whose results are discarded —

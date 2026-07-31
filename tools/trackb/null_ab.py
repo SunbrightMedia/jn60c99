@@ -12,7 +12,13 @@ plus a NON-VACUITY assertion (the reference must actually be making sound:
 signal RMS above a floor) so silence==silence can never pass as identity.
 
 USAGE
-    null_ab.py --cand /path/candidate.so            gate a candidate
+    null_ab.py --cand /path/candidate.so            5-scenario smoke gate
+    null_ab.py --cand X --all                       ACCEPTANCE gate: + all 64
+        factory patches x 3 scripts x 2 rates (384 comparisons) + 24 seeded
+        random polyphonic sequences WITH live parameter edits. Costs seconds --
+        both sides are plain C, no emulation -- so there is no reason for the
+        five-scenario gate to be the one a rewrite is accepted on.
+    null_ab.py --cand X --full / --fuzz [N]         either bulk gate alone
     null_ab.py --teeth                              mutation battery: builds
         known-broken candidates (detuned DCO, wrong noise gain, killed chorus,
         slowed envelope) and asserts the gate CATCHES each IN THE EXPECTED
@@ -62,6 +68,9 @@ def load(lib_path):
     lib.juno_gui_warmup.argtypes = [ctypes.c_void_p, ctypes.c_int]
     lib.juno_gui_render.argtypes = [ctypes.c_void_p,
                                     ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+    lib.juno_gui_note_off.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    lib.juno_gui_set_param.restype = ctypes.c_float
+    lib.juno_gui_set_param.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
     lib.juno_gui_destroy.argtypes = [ctypes.c_void_p]
     return lib
 
@@ -81,7 +90,38 @@ def render(lib, bank, patch, notes, warm):
     return out
 
 
+def render_script(lib, bank, sr, patch, events):
+    """Drive an arbitrary event script; return the interleaved stereo stream.
+
+    ('on', note, vel) | ('off', note) | ('param', blob_idx, byte) |
+    ('render', nframes)
+    """
+    c = lib.juno_gui_create(ctypes.c_float(sr), 0)
+    lib.juno_gui_apply_bank(c, bank, len(bank), patch)
+    out = []
+    for ev in events:
+        if ev[0] == 'on':      lib.juno_gui_note_on(c, ev[1], ev[2])
+        elif ev[0] == 'off':   lib.juno_gui_note_off(c, ev[1])
+        elif ev[0] == 'param': lib.juno_gui_set_param(c, ev[1], ev[2])
+        else:
+            n = ev[1]
+            buf = (ctypes.c_float * (2 * n))()
+            lib.juno_gui_render(c, buf, n)
+            out += list(buf)
+    lib.juno_gui_destroy(c)
+    return out
+
+
 def db(x): return 20.0 * math.log10(max(x, 1e-30))
+
+
+def rel_residual(r, c):
+    """(signal dBFS, residual dB relative to signal or None if bit-identical)."""
+    if len(r) != len(c):
+        return db(0.0), 0.0                      # length mismatch: maximal failure
+    sig = math.sqrt(sum(v * v for v in r) / len(r))
+    res = math.sqrt(sum((a - b) ** 2 for a, b in zip(r, c)) / len(r))
+    return db(sig), (None if res == 0.0 else db(res) - db(sig))
 
 
 def compare(ref_lib, cand_lib, bank):
@@ -103,6 +143,102 @@ def compare(ref_lib, cand_lib, bank):
                  ("EXACTLY 0" if res == 0.0 else "%6.1f dB rel" % rel),
                  "PASS" if ok else "FAIL"))
     return fails, worst
+
+
+
+# ---------------------------------------------------------------- bulk gates
+# WHY THESE EXIST. The five scenarios above are a fast smoke test over five
+# patches. The bit-exact seal they are replacing covered all 64 factory patches,
+# every parameter byte and 24 random polyphonic sequences -- so gating a rewrite
+# on five patches would be a large, silent reduction in coverage at exactly the
+# moment coverage matters most. Unlike the seal's gates, these cost nothing: both
+# sides are plain C, no Unicorn, so the full bank runs in seconds. There is no
+# excuse for the smaller gate to be the acceptance gate.
+
+FULL_SCRIPTS = {
+    'hold':    [('on', 60, 100), ('render', 20000), ('off', 60), ('render', 12000)],
+    'overlap': [('on', 48, 100), ('render', 3000), ('on', 55, 90), ('render', 3000),
+                ('off', 48), ('render', 3000), ('on', 67, 120), ('render', 4000),
+                ('off', 55), ('off', 67), ('render', 9000)],
+    'warmpad': [('render', 8000), ('on', 43, 70), ('on', 50, 70), ('on', 59, 70),
+                ('render', 14000), ('off', 50), ('render', 10000)],
+}
+FULL_RATES = [44100.0, 48000.0]
+
+
+def gate_full(ref_lib, cand_lib, bank, verbose=False):
+    """All 64 factory patches x 3 scripts x 2 rates = 384 comparisons."""
+    fails = vac = 0; worst = None; n = 0
+    for sr in FULL_RATES:
+        for patch in range(64):
+            for name, script in sorted(FULL_SCRIPTS.items()):
+                r = render_script(ref_lib, bank, sr, patch, script)
+                c = render_script(cand_lib, bank, sr, patch, script)
+                sig, rel = rel_residual(r, c)
+                n += 1
+                if sig < SIG_FLOOR_DB:
+                    vac += 1                      # patch silent under this script
+                    continue
+                if rel is not None:
+                    worst = rel if worst is None else max(worst, rel)
+                    if rel > THRESH_DB:
+                        fails += 1
+                        print("  FAIL sr %g patch %2d %-8s  sig %.1f dBFS  residual "
+                              "%.1f dB rel" % (sr, patch, name, sig, rel))
+                    elif verbose:
+                        print("  ok   sr %g patch %2d %-8s  residual %.1f dB rel"
+                              % (sr, patch, name, rel))
+    print("FULL BANK: %d comparisons, %d over threshold, %d skipped as silent, "
+          "worst %s" % (n, fails, vac,
+                        "EXACTLY 0 everywhere" if worst is None else
+                        "%.1f dB rel" % worst))
+    if vac > n // 3:
+        print("  *** %d of %d cases were SILENT and proved nothing. Check the "
+              "scripts before trusting this. ***" % (vac, n))
+    return fails
+
+
+def gate_fuzz(ref_lib, cand_lib, bank, nseeds, verbose=False):
+    """Seeded random polyphonic sequences, reusing the sealed fuzz generator.
+
+    Live parameter edits are INCLUDED here, unlike tools/verify/fuzz_diff.py.
+    That gate excludes them because the plugin-vs-port comparison has a known
+    ~1-ULP warm-smoother interaction class; between two builds of the SAME C
+    engine there is no such excuse, and a param edit landing on an in-flight
+    smoother is exactly the kind of state a rewritten kernel could get wrong.
+    FUZZ_PARAMS is set BEFORE the import because fuzz_diff reads it at module
+    level -- setting it afterwards would silently do nothing.
+    """
+    os.environ['FUZZ_PARAMS'] = '1'
+    sys.path.insert(0, os.path.join(REPO, "tools", "verify"))
+    import fuzz_diff as F                          # module import only: no Unicorn
+    if not F.INCLUDE_PARAMS:
+        print("  note: fuzz_diff was already imported without FUZZ_PARAMS; "
+              "running WITHOUT live param edits")
+    fails = nsil = 0; worst = None
+    for seed in range(nseeds):
+        rate, patch, ev, total = F.gen_script(seed)
+        r = render_script(ref_lib, bank, rate, patch, ev)
+        c = render_script(cand_lib, bank, rate, patch, ev)
+        if not r:
+            continue
+        sig, rel = rel_residual(r, c)
+        if sig < SIG_FLOOR_DB:
+            nsil += 1
+            if verbose:
+                print("  seed %2d: silent (%.1f dBFS) -- proves nothing" % (seed, sig))
+            continue
+        if rel is not None:
+            worst = rel if worst is None else max(worst, rel)
+            if rel > THRESH_DB:
+                fails += 1
+                print("  FAIL seed %2d rate %g patch %2d (%d events, %d frames): "
+                      "residual %.1f dB rel"
+                      % (seed, rate, patch, len(ev), total, rel))
+    print("FUZZ: %d seeds (%d silent), %d over threshold, worst %s"
+          % (nseeds, nsil, fails,
+             "EXACTLY 0 everywhere" if worst is None else "%.1f dB rel" % worst))
+    return fails
 
 
 def build(dst, mutate=None):
@@ -185,12 +321,27 @@ def main():
     if "--cand" not in sys.argv:
         raise SystemExit(__doc__)
     cand = load(sys.argv[sys.argv.index("--cand") + 1])
+    verbose = "-v" in sys.argv
     print("=== TRACK B NULL A/B: candidate vs sealed reference (thresh %.0f dB rel) ==="
           % THRESH_DB)
     fails, worst = compare(ref, cand, bank)
-    print("NULL A/B: %s (worst residual %s)"
+    print("SCENARIOS: %s (worst residual %s)"
           % ("PASS" if fails == 0 else "FAIL (%d scenario(s))" % fails,
              "0" if worst == -1e9 else "%.1f dB rel" % worst))
+
+    if "--full" in sys.argv or "--all" in sys.argv:
+        print("\n--- FULL BANK: 64 patches x %d scripts x %d rates ---"
+              % (len(FULL_SCRIPTS), len(FULL_RATES)))
+        fails += gate_full(ref, cand, bank, verbose)
+    if "--fuzz" in sys.argv or "--all" in sys.argv:
+        n = 24
+        if "--fuzz" in sys.argv:
+            i = sys.argv.index("--fuzz") + 1
+            if i < len(sys.argv) and sys.argv[i].isdigit(): n = int(sys.argv[i])
+        print("\n--- RANDOM SEQUENCES: %d seeds, live param edits included ---" % n)
+        fails += gate_fuzz(ref, cand, bank, n, verbose)
+
+    print("\nVERDICT: %s" % ("PASS" if fails == 0 else "FAIL (%d case(s))" % fails))
     return 1 if fails else 0
 
 

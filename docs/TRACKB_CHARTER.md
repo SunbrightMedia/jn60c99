@@ -53,3 +53,50 @@ Before rewriting subsystem X: run gate #3 on X's output cells. If **0/5**
 scenarios observe them, the scenario set cannot validate that rewrite — add a
 scenario that uses X, or record X as out of scope in the EQUIVALENCE ledger.
 Never rewrite behind a blind gate.
+
+### Gate #1 grew up — the acceptance gate is the whole bank, not five patches
+
+The five scenarios were a *smoke test* being used as an acceptance test. The
+bit-exact seal they replace covered all 64 factory patches, every parameter byte
+and 24 random polyphonic sequences; gating the rewrite on five patches would have
+been a large silent reduction in coverage at exactly the moment coverage matters
+most. And unlike the seal's gates, these cost nothing — both sides are plain C,
+no emulation:
+
+    null_ab.py --cand X --all      384 full-bank comparisons (64 patches x 3
+                                   scripts x 2 rates) + 24 seeded random
+                                   polyphonic sequences WITH live parameter
+                                   edits. ~2 minutes.
+
+**Measured coverage gain, on the mutation that motivated all of this.** The
+noise-gain mutation is caught by **1 of 5** scenarios and by **84 of 384**
+full-bank comparisons (28 distinct patch/script/rate combinations, residuals
+−45 dB up to +4 dB). Same bug, 28× the evidence, two minutes.
+
+Live parameter edits are *included* in the Track B fuzz, unlike
+`tools/verify/fuzz_diff.py`. That gate excludes them because the plugin-vs-port
+comparison has a known ~1-ULP warm-smoother interaction class; between two builds
+of the same C engine there is no such excuse, and an edit landing on an in-flight
+smoother is exactly what a rewritten kernel could get wrong.
+
+### The near-miss that proves the probe needed probing
+
+The first carriage sweep used a purely multiplicative nudge (`v *= 1.00000012f`).
+`0.0f * anything` is `0.0f`, so every cell sitting at zero at rest was reported
+NOT-CARRIED whether it was or not — and NOT-CARRIED is precisely the licence to
+drop a value from memory into a register. After switching to
+`v*1.00000012f + 1e-20f`, **cell 320 flipped from NOT-CARRIED (0/5) to CARRIED
+(5/5)**. The old probe would have authorised discarding genuinely carried state,
+and every downstream null would still have been green until the exact input that
+exercised it. Any probe this project relies on gets its own teeth test.
+
+### The measured carriage map — docs/trackb/CARRIAGE.tsv
+
+283 per-voice cells the render writes: **94 CARRIED, 189 NOT-CARRIED (66.8%
+register-legal)**, MEASURED over the five scenarios. This is the scratch lever
+stated honestly and for the first time by execution rather than by static
+argument: two thirds of the per-sample stores do not survive the sample and can
+live in registers, but 94 of them must not. It also explains why the
+whole-function `regcache.py` transform came out SLOWER — it created a local for
+all 609 touched cells and spilled; the lever is real but has to be applied with
+this map in hand, inside the rewrite, not as a blanket transform.
