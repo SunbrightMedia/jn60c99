@@ -43,6 +43,23 @@ lands at −129 dB — 39 dB below the threshold. So the gate ignores errors up 
 roughly 200 ULP (≈2.4 × 10⁻⁵ relative) per sample and catches anything larger.
 Under audibility by a wide margin, over float noise by a wide margin.
 
+**Two metrics, both gating.** One RMS over a whole render is normalised by the
+loud part, so an error confined to a release tail contributes almost nothing to
+it. Every comparison therefore also reports the **worst 1024-sample block**
+residual, measured against that block's *own* level (floored at 1e-3 of the
+global RMS so silence cannot divide by zero), threshold −70 dB.
+
+That second metric is not decoration, and the number that says so is measured:
+the `tailquiet` mutation — a 0.1 % gain error that exists only while the gate is
+released — is caught by the global metric in **5 of 7** scenarios and by the
+block metric in **7 of 7**. Two scenarios sit at −93.0 and −94.7 dB globally,
+i.e. they would have walked straight through the −90 dB gate, while the block
+metric sees them at −66.8 and −66.3 dB.
+
+Writing that mutation also exposed a coverage hole: the first five scenarios
+never released a note at all, so five of seven reported EXACTLY 0 against a
+release-path bug. Every scenario now ends with note-offs and a tail.
+
 **`--teeth` is not optional after any change to the gate.** It builds four
 known-broken engines and requires each to be caught *in a specified number of
 scenarios*, plus a clean control that must be EXACTLY 0:
@@ -53,6 +70,13 @@ scenarios*, plus a clean control that must be EXACTLY 0:
 | `dcopitch` | Hz→phase-increment scale, 100 ULP ≈ 0.01 cent | all 7 |
 | `nochorus` | slot-2 routing forced to the Pan arm | all 7 |
 | `envslow` | one envelope coefficient, 1 % | all 7 |
+| `tailquiet` | 0.1 % gain error **only while the gate is released** | all 7 |
+
+Mutations are planted in the file that is **actually compiled** — if
+`native/<x>.c` shadows `src/<x>.c`, the mutation goes into the fork, so the
+battery exercises the same substitution path a real candidate uses. A battery
+that patched a file the candidate build never sees would report the gate as
+blind when in truth the experiment never happened.
 
 `noisegain` is required in only one because four scenario patches have DCO NOISE
 at zero, so the value is multiplied out — the case that taught this harness that

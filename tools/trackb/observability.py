@@ -60,7 +60,7 @@ USAGE
 Offsets are per-voice cell offsets as used by JF(a1, N) -- take them from the
 subsystem's "cells owned" table in docs/trackb/*.md.
 """
-import sys, os, re, glob, math, ctypes, subprocess
+import sys, os, re, glob, math, ctypes, hashlib, subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -93,6 +93,15 @@ def build(dst=PROBE):
     lib = null_ab.load(dst)
     lib.juno_tb_set_cells.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.c_int]
     return lib
+
+
+def scen_fingerprint():
+    """Hash of the scenario set. A carriage map is only valid for the scenarios
+    that produced it: a cell reads NOT-CARRIED whenever nothing exercised it, so
+    a map swept under a smaller SCEN silently over-reports register-legal cells.
+    Written into the TSV header; consumers must refuse a map whose fingerprint
+    does not match the SCEN they are running under."""
+    return hashlib.sha256(repr(null_ab.SCEN).encode()).hexdigest()[:16]
 
 
 def set_cells(lib, cells):
@@ -162,6 +171,9 @@ def main():
                  100.0 * (len(cells) - carried) / max(len(cells), 1)))
         if out_path:
             with open(out_path, "w") as fh:
+                fh.write("# scenarios=%d fingerprint=%s  (a map is only valid "
+                         "for the scenario set that produced it)\n"
+                         % (len(null_ab.SCEN), scen_fingerprint()))
                 fh.write("cell\tclass\tscenarios_observing\tloudest_dB_rel\n")
                 for cell, seen, worst in rows:
                     fh.write("%d\t%s\t%d\t%s\n"

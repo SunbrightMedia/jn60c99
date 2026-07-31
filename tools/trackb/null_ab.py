@@ -65,14 +65,24 @@ NFR = 30000
 #   * SLOW STATE. A 30000-frame render is 0.68 s. An LFO phase or envelope-tail
 #     error too small to see there is still audible over ten seconds, so one
 #     scenario renders 300000 frames (6.8 s) with a long release tail.
+# Every scenario RELEASES its notes and renders a tail. The first five did not,
+# and the "tailquiet" teeth mutation -- a gain error that exists only while the
+# gate is released -- proved it: five of seven scenarios reported EXACTLY 0
+# against it, because they never once left the sustain. The release path is where
+# denormals, envelope tails and FTZ live; it cannot be the part nothing tests.
 SCEN = [
-    (5,  [('on', 60, 100), ('render', NFR)],                        "pluck POLY"),
+    (5,  [('on', 60, 100), ('render', NFR), ('off', 60), ('render', 12000)],
+                                                                    "pluck POLY"),
     (15, [('render', 4000), ('on', 45, 100), ('on', 52, 100),
-          ('on', 45, 100), ('render', NFR)],                        "MONO retrigger"),
-    (61, [('render', 8000), ('on', 48, 100), ('render', NFR)],      "UNISON pile-up"),
+          ('on', 45, 100), ('render', NFR), ('off', 45), ('off', 52),
+          ('render', 12000)],                                       "MONO retrigger"),
+    (61, [('render', 8000), ('on', 48, 100), ('render', NFR),
+          ('off', 48), ('render', 12000)],                          "UNISON pile-up"),
     (20, [('on', 48, 100), ('on', 55, 100), ('on', 64, 100),
-          ('render', NFR)],                                         "chorus pad"),
-    (2,  [('on', 60, 100), ('on', 67, 100), ('render', NFR)],       "delay keys"),
+          ('render', NFR), ('off', 48), ('off', 55), ('off', 64),
+          ('render', 12000)],                                       "chorus pad"),
+    (2,  [('on', 60, 100), ('on', 67, 100), ('render', NFR),
+          ('off', 60), ('off', 67), ('render', 12000)],             "delay keys"),
     (5,  [('on', 36, 100), ('render', 6000), ('on', 60, 100),
           ('render', 6000), ('off', 60), ('render', 6000),
           ('on', 72, 100), ('render', 6000), ('off', 72), ('off', 36),
@@ -130,13 +140,58 @@ def render_script(lib, bank, sr, patch, events):
 def db(x): return 20.0 * math.log10(max(x, 1e-30))
 
 
+BLOCK = 1024                  # ~23 ms at 44.1 kHz: a click, a bad note-on edge
+BLOCK_THRESH_DB = -70.0       # looser than the global gate; see block_residual()
+
+
+def block_residual(r, c, sig_global):
+    """Worst per-block residual, relative to what is PLAYING in that block.
+
+    The global RMS is dominated by the loud part of a render, so an error
+    confined to a release tail or to thirty samples at note-on contributes almost
+    nothing to it. This measures each 1024-sample block against its OWN level,
+    floored at 1e-3 of the global RMS so digital silence cannot divide by zero
+    and turn a rounding difference into a -0 dB "failure".
+
+    The threshold is looser than the global one on purpose: a single block has
+    1/30th the averaging, so its noise floor is higher. It is a starting value,
+    and like every other threshold here it is only worth what --teeth proves.
+    """
+    floor = sig_global * 1e-3
+    worst = None
+    for i in range(0, len(r) - BLOCK + 1, BLOCK):
+        rb, cb = r[i:i + BLOCK], c[i:i + BLOCK]
+        res = math.sqrt(sum((a - b) ** 2 for a, b in zip(rb, cb)) / BLOCK)
+        if res == 0.0:
+            continue
+        loc = max(math.sqrt(sum(v * v for v in rb) / BLOCK), floor)
+        rel = db(res) - db(loc)
+        if worst is None or rel > worst:
+            worst = rel
+    return worst
+
+
 def rel_residual(r, c):
     """(signal dBFS, residual dB relative to signal or None if bit-identical)."""
     if len(r) != len(c):
-        return db(0.0), 0.0                      # length mismatch: maximal failure
+        # Scored as a loud failure, never as "silent". Returning a tiny signal
+        # here would have routed a candidate that renders the WRONG NUMBER OF
+        # FRAMES into the non-vacuity skip -- a hard defect reported as "nothing
+        # to see". +999 dB cannot be mistaken for a pass by any caller.
+        return 0.0, 999.0
     sig = math.sqrt(sum(v * v for v in r) / len(r))
     res = math.sqrt(sum((a - b) ** 2 for a, b in zip(r, c)) / len(r))
     return db(sig), (None if res == 0.0 else db(res) - db(sig))
+
+
+def judge(r, c):
+    """(sig_dBFS, global_rel or None, block_rel or None, ok). Both metrics gate."""
+    sig, rel = rel_residual(r, c)
+    if rel is not None and rel > 900:            # length mismatch sentinel
+        return sig, rel, None, False
+    blk = None if rel is None else block_residual(r, c, 10 ** (sig / 20.0))
+    ok = (rel is None or rel <= THRESH_DB) and (blk is None or blk <= BLOCK_THRESH_DB)
+    return sig, rel, blk, ok
 
 
 def compare(ref_lib, cand_lib, bank):
@@ -144,18 +199,19 @@ def compare(ref_lib, cand_lib, bank):
     for patch, script, tag in SCEN:
         r = render_script(ref_lib, bank, SR, patch, script)
         cnd = render_script(cand_lib, bank, SR, patch, script)
-        sig = math.sqrt(sum(v * v for v in r) / len(r))
-        res = math.sqrt(sum((a - b) ** 2 for a, b in zip(r, cnd)) / len(r))
-        if db(sig) < SIG_FLOOR_DB:
+        sig, rel, blk, ok = judge(r, cnd)
+        if len(r) != len(cnd):
+            print("  %-16s *** LENGTH MISMATCH %d vs %d -> FAIL ***"
+                  % (tag, len(r), len(cnd))); fails += 1; continue
+        if sig < SIG_FLOOR_DB:
             print("  %-16s VACUOUS (ref RMS %.1f dBFS < %.0f) -> scenario invalid"
-                  % (tag, db(sig), SIG_FLOOR_DB)); fails += 1; continue
-        rel = db(res) - db(sig)
-        worst = max(worst, rel)
-        ok = rel <= THRESH_DB
+                  % (tag, sig, SIG_FLOOR_DB)); fails += 1; continue
+        if rel is not None: worst = max(worst, rel)
         if not ok: fails += 1
-        print("  %-16s sig %6.1f dBFS   residual %s   -> %s"
-              % (tag, db(sig),
-                 ("EXACTLY 0" if res == 0.0 else "%6.1f dB rel" % rel),
+        print("  %-16s sig %6.1f dBFS   residual %-14s worst block %-12s -> %s"
+              % (tag, sig,
+                 ("EXACTLY 0" if rel is None else "%.1f dB rel" % rel),
+                 ("--" if blk is None else "%.1f dB rel" % blk),
                  "PASS" if ok else "FAIL"))
     return fails, worst
 
@@ -189,20 +245,27 @@ def gate_full(ref_lib, cand_lib, bank, verbose=False):
             for name, script in sorted(FULL_SCRIPTS.items()):
                 r = render_script(ref_lib, bank, sr, patch, script)
                 c = render_script(cand_lib, bank, sr, patch, script)
-                sig, rel = rel_residual(r, c)
                 n += 1
+                if len(r) != len(c):
+                    fails += 1
+                    print("  FAIL sr %g patch %2d %-8s  LENGTH %d vs %d"
+                          % (sr, patch, name, len(r), len(c)))
+                    continue
+                sig, rel, blk, ok = judge(r, c)
                 if sig < SIG_FLOOR_DB:
                     vac += 1                      # patch silent under this script
                     continue
                 if rel is not None:
                     worst = rel if worst is None else max(worst, rel)
-                    if rel > THRESH_DB:
-                        fails += 1
-                        print("  FAIL sr %g patch %2d %-8s  sig %.1f dBFS  residual "
-                              "%.1f dB rel" % (sr, patch, name, sig, rel))
-                    elif verbose:
-                        print("  ok   sr %g patch %2d %-8s  residual %.1f dB rel"
-                              % (sr, patch, name, rel))
+                if not ok:
+                    fails += 1
+                    print("  FAIL sr %g patch %2d %-8s  sig %.1f dBFS  residual "
+                          "%.1f dB rel  worst block %s"
+                          % (sr, patch, name, sig, rel,
+                             "--" if blk is None else "%.1f dB rel" % blk))
+                elif verbose and rel is not None:
+                    print("  ok   sr %g patch %2d %-8s  residual %.1f dB rel"
+                          % (sr, patch, name, rel))
     print("FULL BANK: %d comparisons, %d over threshold, %d skipped as silent, "
           "worst %s" % (n, fails, vac,
                         "EXACTLY 0 everywhere" if worst is None else
@@ -228,8 +291,9 @@ def gate_fuzz(ref_lib, cand_lib, bank, nseeds, verbose=False):
     sys.path.insert(0, os.path.join(REPO, "tools", "verify"))
     import fuzz_diff as F                          # module import only: no Unicorn
     if not F.INCLUDE_PARAMS:
-        print("  note: fuzz_diff was already imported without FUZZ_PARAMS; "
-              "running WITHOUT live param edits")
+        raise SystemExit("ABORT: fuzz_diff was imported without FUZZ_PARAMS, so "
+                         "this run would silently drop live parameter edits and "
+                         "report a weaker gate as the stronger one.")
     fails = nsil = 0; worst = None
     for seed in range(nseeds):
         rate, patch, ev, total = F.gen_script(seed)
@@ -237,7 +301,11 @@ def gate_fuzz(ref_lib, cand_lib, bank, nseeds, verbose=False):
         c = render_script(cand_lib, bank, rate, patch, ev)
         if not r:
             continue
-        sig, rel = rel_residual(r, c)
+        if len(r) != len(c):
+            fails += 1
+            print("  FAIL seed %2d: LENGTH %d vs %d" % (seed, len(r), len(c)))
+            continue
+        sig, rel, blk, ok = judge(r, c)
         if sig < SIG_FLOOR_DB:
             nsil += 1
             if verbose:
@@ -245,22 +313,40 @@ def gate_fuzz(ref_lib, cand_lib, bank, nseeds, verbose=False):
             continue
         if rel is not None:
             worst = rel if worst is None else max(worst, rel)
-            if rel > THRESH_DB:
-                fails += 1
-                print("  FAIL seed %2d rate %g patch %2d (%d events, %d frames): "
-                      "residual %.1f dB rel"
-                      % (seed, rate, patch, len(ev), total, rel))
+        if not ok:
+            fails += 1
+            print("  FAIL seed %2d rate %g patch %2d (%d events, %d frames): "
+                  "residual %.1f dB rel  worst block %s"
+                  % (seed, rate, patch, len(ev), total, rel,
+                     "--" if blk is None else "%.1f dB rel" % blk))
     print("FUZZ: %d seeds (%d silent), %d over threshold, worst %s"
           % (nseeds, nsil, fails,
              "EXACTLY 0 everywhere" if worst is None else "%.1f dB rel" % worst))
     return fails
 
 
+def _mut_target(tmp, name):
+    """Path of the file that will ACTUALLY be compiled for src/<name>.
+
+    If native/<name> shadows it, the mutation has to go there -- otherwise the
+    battery patches a file the candidate build never sees, every mutant comes out
+    identical to the reference, and --teeth reports the gate as blind when in
+    fact the experiment never happened. Mutating the compiled file also means the
+    battery exercises the same substitution path a real candidate uses.
+    """
+    nat = os.path.join(tmp, "native", name)
+    return nat if os.path.exists(nat) else os.path.join(tmp, "src", name)
+
+
 def build(dst, mutate=None):
-    """Build a candidate .so from src/ (optionally with a named mutation)."""
+    """Build a candidate .so the way `make juno_cand.so` does (native/ shadows
+    src/ by filename), optionally with a named mutation applied to whichever
+    copy of the file is really compiled."""
     tmp = tempfile.mkdtemp(prefix="trackb_")
     for d in ("src", "gui"):
         shutil.copytree(os.path.join(REPO, d), os.path.join(tmp, d))
+    if os.path.isdir(os.path.join(REPO, "native")):
+        shutil.copytree(os.path.join(REPO, "native"), os.path.join(tmp, "native"))
     if mutate == "noisegain":
         # The NOISE generator's 2^-24 output scale, off by 0.1% (voice_render.c
         # :640 -- the shared LFSR block at base+84272..84436, not a DCO cell).
@@ -271,7 +357,7 @@ def build(dst, mutate=None):
         # "the error is observable" are different questions (see
         # tools/trackb/observability.py). It was mislabelled "detune" until
         # 2026-07-31; it never had anything to do with pitch.
-        p = os.path.join(tmp, "src", "voice_render.c"); s = open(p).read()
+        p = _mut_target(tmp, "voice_render.c"); s = open(p).read()
         s = s.replace("* 0.000000059604645", "* 0.000000059664245", 1)
         assert "0.000000059664245" in s; open(p, "w").write(s)
     elif mutate == "dcopitch":
@@ -280,23 +366,40 @@ def build(dst, mutate=None):
         # 0.01 cent. Every patch with an oscillator must hear it, so unlike
         # noisegain this one is expected in ALL scenarios -- the battery's check
         # that a globally-relevant error is globally caught.
-        p = os.path.join(tmp, "src", "juno_init.c"); s = open(p).read()
+        p = _mut_target(tmp, "juno_init.c"); s = open(p).read()
         assert s.count("v32 = 1000568814;") == 1
         s = s.replace("v32 = 1000568814;", "v32 = 1000568914;", 1)
         open(p, "w").write(s)
     elif mutate == "nochorus":  # slot-2 select forced to Pan arm: chorus dead
-        p = os.path.join(tmp, "src", "master_render.c"); s = open(p).read()
+        p = _mut_target(tmp, "master_render.c"); s = open(p).read()
         s = s.replace("v551 = juno_host_sel(a1, 112);", "v551 = 0;", 1)
         assert "v551 = 0;" in s; open(p, "w").write(s)
     elif mutate == "envslow":   # one envelope coefficient nudged 1%
-        p = os.path.join(tmp, "src", "voice_render.c"); s = open(p).read()
+        p = _mut_target(tmp, "voice_render.c"); s = open(p).read()
         s = s.replace("(float)(v236 * v236) * 0.25", "(float)(v236 * v236) * 0.2525", 1)
         assert "0.2525" in s; open(p, "w").write(s)
+    elif mutate == "tailquiet":
+        # A 0.1% gain error that exists ONLY while the gate is released -- i.e.
+        # only in the quiet part of the render. This is the mutation the whole-
+        # render RMS is designed to miss: the global metric normalises by the
+        # loud sustained portion, where the candidate is exact. It exists to
+        # answer "is the block metric earning its place, or is it decoration?"
+        p = _mut_target(tmp, "voice_render.c"); s = open(p).read()
+        anchor = "  *outL = JF(a1, 10672);"
+        assert s.count(anchor) == 1
+        s = s.replace(anchor,
+                      "  if (JF(a1, 560) == 0.0f) JF(a1, 10672) = "
+                      "JF(a1, 10672) * 1.001f;\n" + anchor, 1)
+        open(p, "w").write(s)
     elif mutate is not None:
         raise SystemExit("unknown mutation %s" % mutate)
-    srcs = sorted(__import__("glob").glob(os.path.join(tmp, "src", "*.c")))
+    glob = __import__("glob")
+    native = sorted(glob.glob(os.path.join(tmp, "native", "*.c")))
+    shadow = {os.path.join(tmp, "src", os.path.basename(n)) for n in native}
+    srcs = [x for x in sorted(glob.glob(os.path.join(tmp, "src", "*.c")))
+            if x not in shadow] + native
     cmd = ["cc", "-std=c99", "-O2", "-ffp-contract=off", "-fno-strict-aliasing",
-           "-shared", "-fPIC", "-o", dst,
+           "-I" + os.path.join(tmp, "src"), "-shared", "-fPIC", "-o", dst,
            os.path.join(tmp, "gui", "juno_bridge.c")] + srcs + ["-lm"]
     subprocess.run(cmd, check=True, capture_output=True)
     shutil.rmtree(tmp)
@@ -305,17 +408,22 @@ def build(dst, mutate=None):
 def main():
     truth.require()
     bank = open(truth.BANK, "rb").read()
+    sys.path.insert(0, os.path.join(REPO, "tools", "verify"))
+    import freshlib          # the reference must not be a stale build either:
+    freshlib.check()         # a null against yesterday's libjuno proves nothing
     ref = load(os.path.join(REPO, "libjuno.so"))
 
     if "--teeth" in sys.argv:
         print("=== TRACK B GATE TEETH TEST: the gate must catch planted bugs ===")
         bad = 0
         # (mutation, must the gate fail?, how many scenarios must catch it)
+        ALL = len(SCEN)      # not a literal: the count must track the scenario set
         for mut, expect_fail, min_catch in ((None, False, 0),
                                             ("noisegain", True, 1),
-                                            ("dcopitch", True, 5),
-                                            ("nochorus", True, 5),
-                                            ("envslow", True, 5)):
+                                            ("dcopitch", True, ALL),
+                                            ("nochorus", True, ALL),
+                                            ("envslow", True, ALL),
+                                            ("tailquiet", True, ALL)):
             dst = "/tmp/trackb_%s.so" % (mut or "clean")
             build(dst, mut)
             print("candidate: %s" % (mut or "clean rebuild (control)"))
