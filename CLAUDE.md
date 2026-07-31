@@ -6,7 +6,61 @@ P0 (stabilize) → P1 (measure on silicon) → P2 (decide) → P3. The DAW-parit
 work (HOSTPATH_PARITY_SCOPE STEP 2–5, #141/#124/#140) is now the PARALLEL
 track, still valid, no longer the head pointer.**
 
-**★★★★ NEWEST (2026-07-31, embedded arc truth-up — read before trusting any
+**★★★★★ NEWEST (2026-07-31 evening, Opus 5) — SEAL RE-PROVEN + WASM REPUBLISHED +
+TRACK B HARNESS BUILT AND ITS OWN DEFECTS FOUND. Read `docs/trackb/PLAN.md` (685
+lines, the execution plan) and `docs/TRACKB_CHARTER.md` (the gates).**
+- **`make verify` GREEN end-to-end, EXIT=0**, first full run since the MONO
+  retrigger fix, all references regenerated from `truth/`. ASSIGNER A/B is now
+  **34/34** — patch 15 + the fuzz seed-15 `warmmono` script (with its 747-sample
+  WARM PREFIX, the load-bearing part: `juno_init` arms the retrigger latch at
+  BUILD, so every COLD gate is structurally blind to a missing re-arm).
+  `arm_golden.sh` is folded in (#144); its missing-toolchain exit reports SKIP
+  and is labelled NOT a pass.
+- **WASM rebuilt + republished** (`wasm_golden` 8/8 bit-exact). The published
+  artifact had predated the MONO fix, which audibly affects 14 factory patches.
+- **Two stale-artifact holes closed:** no build rule depended on `src/*.h`, yet
+  the constant TABLES live in headers — a coefficient edit touching only a header
+  rebuilt NOTHING and every gate went green on the old constants. And
+  `tools/verify/freshlib.py` now refuses a `libjuno.so` older than any engine
+  source in the 13 port-side gates (teeth demonstrated both).
+- **TRACK B (option C, the user's choice: Daisy + 8 voices + all FX, sonic
+  identity instead of bit-exactness).** Substrate: `native/<x>.c` shadows
+  `src/<x>.c` in `make juno_cand.so`; `native/voice_render.c` is a verbatim fork
+  (passthrough null EXACTLY 0). **`src/` stays frozen and bit-exact — the two
+  claims must never be conflated.** Four gates in `tools/trackb/`:
+  `null_ab.py` (identity: 7 scenarios + 384 full-bank + 24 fuzz-with-param-edits;
+  global RMS **and** worst-1024-block, both gating), `coverage_probe.py` (gcov:
+  was it reached), `observability.py` (carriage + stored-value sensitivity),
+  `canary.py` (**module admissibility** — plant 0.1% in each assignment).
+- **The harness found five defects in ITSELF, all by being run:** (1) a
+  multiplicative-only probe reported every at-rest-zero cell register-legal —
+  cell 320 flipped to CARRIED once fixed; (2) an 11 MB context leak per render —
+  OOM at 11.6 GB during the sweep; (3) the additive term `1e-20` does not survive
+  the first multiply — the gate cell read NOT-CARRIED at every site with it and
+  changed 83996/84000 samples with `+1.0`; (4) five of seven scenarios never
+  RELEASED a note; (5) **gate #3 was over-claimed** — it cannot answer "would a
+  wrong answer be noticed" (consumers read locals, and some SATURATE: ×3 on the
+  gate cell changes nothing, +1 changes everything), so the claim is narrowed and
+  `canary.py` answers module admissibility instead.
+- **MEASURED, and the numbers to quote:** the −90 dB gate ignores errors up to
+  ~200 ULP/sample (2 ULP lands at −129 dB); a tail-only 0.1% error is caught by
+  the global metric in 5/7 scenarios and the block metric in **7/7**; the
+  `noisegain` mutation is caught by 1 of 5 scenarios and **84 of 384** full-bank
+  comparisons; carriage = **95 CARRIED / 188 NOT-CARRIED** of 283 written
+  per-voice cells (`docs/trackb/CARRIAGE.tsv`, scenario-fingerprinted).
+- **⚠ THE STANDING WARNING FOR THE NEXT SESSION:** the canary's first run, on M1b
+  (`src/voice_render.c:1129-1149`), found **3 of 18 assignments observable, 15
+  BLIND** — the whole Chamberlin noise SVF is invisible to the scenario set. NO
+  MODULE MAY BE REWRITTEN BEHIND A BLIND GATE. Add scenarios that reach it first.
+  Also unclosed from PLAN §6: F4 spectral, F6 branch coverage, F9 teeth over the
+  bulk gates, F10 per-module mutations, F12 silent-count baseline, F15 ARM null,
+  F16 optimization levels, F17 FTZ, F19 three-run determinism.
+- **PLAN's own STOP rule S1 fires BEFORE any voice code is written:** if the P1
+  silicon numbers show `F + 8V` fits the Teensy budget, or a bit-exact 4-voice
+  Daisy is acceptable, Track B is abandoned in favour of fewer voices. There is
+  still NO SILICON NUMBER.
+
+**★★★★ (2026-07-31, embedded arc truth-up — read before trusting any
 older embedded claim in this file):**
 - **MONO retrigger latch FIXED (e611f7d):** the DCO retrigger latch (aux Array A,
   101504+v*32) arming is **MODE-DEPENDENT** — POLY note-on writes only inert
