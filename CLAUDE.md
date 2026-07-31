@@ -1,3 +1,5 @@
+**Adhere to and only respond in ASD-STE100 Simplified Technical English.**
+
 # JUNO-60 (JU-06A) C99 port — project memory
 
 **⚑⚑ LIVE WORK ORDER (2026-07-31, user-binding, supersedes the 07-27 pointer
