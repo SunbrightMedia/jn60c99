@@ -90,6 +90,15 @@ SCEN = [
     (55, [('on', 40, 90), ('render', 8000), ('on', 59, 90),
           ('render', 232000), ('off', 40), ('off', 59),
           ('render', 60000)],                                       "long LFO+tail"),
+    # DCO NOISE. The canary found the whole Chamberlin noise SVF
+    # (src/voice_render.c:1129-1140) invisible: the noise reaches the mix as
+    # 6432 * 4320 * DCO NOISE LEVEL (6528), and the only scenario patches
+    # carrying noise were 2 and 55 at levels 0.027 and 0.039 -- so a 0.1% error
+    # inside the filter landed ~30 dB under the gate. Patch 32 runs the level at
+    # 0.68, the loudest in the bank (14 of 64 patches use noise at all; the
+    # census is in the commit message).
+    (32, [('on', 52, 100), ('render', NFR), ('off', 52), ('render', 12000)],
+                                                                    "DCO noise"),
 ]
 
 
@@ -195,25 +204,27 @@ def judge(r, c):
 
 
 def compare(ref_lib, cand_lib, bank):
-    worst = -1e9; fails = 0
+    worst = -1e9; fails = 0; caught = set()
     for patch, script, tag in SCEN:
         r = render_script(ref_lib, bank, SR, patch, script)
         cnd = render_script(cand_lib, bank, SR, patch, script)
         sig, rel, blk, ok = judge(r, cnd)
         if len(r) != len(cnd):
             print("  %-16s *** LENGTH MISMATCH %d vs %d -> FAIL ***"
-                  % (tag, len(r), len(cnd))); fails += 1; continue
+                  % (tag, len(r), len(cnd)))
+            fails += 1; caught.add(tag); continue
         if sig < SIG_FLOOR_DB:
             print("  %-16s VACUOUS (ref RMS %.1f dBFS < %.0f) -> scenario invalid"
-                  % (tag, sig, SIG_FLOOR_DB)); fails += 1; continue
+                  % (tag, sig, SIG_FLOOR_DB))
+            fails += 1; caught.add(tag); continue
         if rel is not None: worst = max(worst, rel)
-        if not ok: fails += 1
+        if not ok: fails += 1; caught.add(tag)
         print("  %-16s sig %6.1f dBFS   residual %-14s worst block %-12s -> %s"
               % (tag, sig,
                  ("EXACTLY 0" if rel is None else "%.1f dB rel" % rel),
                  ("--" if blk is None else "%.1f dB rel" % blk),
                  "PASS" if ok else "FAIL"))
-    return fails, worst
+    return fails, worst, caught
 
 
 
@@ -416,25 +427,48 @@ def main():
     if "--teeth" in sys.argv:
         print("=== TRACK B GATE TEETH TEST: the gate must catch planted bugs ===")
         bad = 0
-        # (mutation, must the gate fail?, how many scenarios must catch it)
-        ALL = len(SCEN)      # not a literal: the count must track the scenario set
-        for mut, expect_fail, min_catch in ((None, False, 0),
-                                            ("noisegain", True, 1),
-                                            ("dcopitch", True, ALL),
-                                            ("nochorus", True, ALL),
-                                            ("envslow", True, ALL),
-                                            ("tailquiet", True, ALL)):
+        # EXPECTED CATCH SETS, MEASURED, not assumed.
+        #
+        # The first version of this required "all scenarios" for any mutation
+        # thought to be globally relevant. That rule is unsound: patches
+        # legitimately differ, and adding the DCO-noise scenario immediately
+        # produced two failures that were not gate weakness. What IS sound is to
+        # record the set of scenarios measured to catch each mutation and require
+        # it never to SHRINK -- a scenario that used to see a bug and stops is a
+        # regression in the gate; a new scenario that does not see it is a fact to
+        # record, not a failure to paper over.
+        #
+        # "DCO noise" (patch 32) does not catch nochorus or tailquiet. UNEXPLAINED:
+        # patch 32 carries EFX routing 2, the same as patch 5, which does catch
+        # nochorus -- so the obvious explanation is wrong and no substitute has
+        # been established. Recorded as a measured fact and flagged, rather than
+        # given a plausible story. Do not remove this note by guessing.
+        EXPECT = {
+            "noisegain": {"delay keys", "long LFO+tail", "DCO noise"},
+            "dcopitch":  {t for _, _, t in SCEN},
+            "nochorus":  {t for _, _, t in SCEN} - {"DCO noise"},
+            "envslow":   {t for _, _, t in SCEN},
+            "tailquiet": {t for _, _, t in SCEN} - {"DCO noise"},
+        }
+        for mut, expect_fail in ((None, False), ("noisegain", True),
+                                 ("dcopitch", True), ("nochorus", True),
+                                 ("envslow", True), ("tailquiet", True)):
             dst = "/tmp/trackb_%s.so" % (mut or "clean")
             build(dst, mut)
             print("candidate: %s" % (mut or "clean rebuild (control)"))
-            fails, worst = compare(ref, load(dst), bank)
+            fails, worst, caught_set = compare(ref, load(dst), bank)
             caught = fails > 0
-            ok = (caught == expect_fail) and fails >= min_catch
+            want = EXPECT.get(mut, set())
+            missing = sorted(want - caught_set)
+            extra = sorted(caught_set - want)
+            ok = (caught == expect_fail) and not missing
             if not ok: bad += 1
-            print("  -> %s (expected %s in >=%d scenario(s), got %s in %d)\n"
+            print("  -> %s (%d/%d caught%s%s)\n"
                   % ("OK" if ok else "*** TEETH FAILURE ***",
-                     "FAIL" if expect_fail else "PASS", min_catch,
-                     "FAIL" if caught else "PASS", fails))
+                     len(caught_set), len(SCEN),
+                     "" if not missing else
+                     "; *** LOST: %s -- these caught it before ***" % ", ".join(missing),
+                     "" if not extra else "; newly catching: %s" % ", ".join(extra)))
         print("TEETH: %s" % ("PASS — the gate catches every planted bug and "
                              "passes the clean control" if bad == 0
                              else "FAIL — the gate is BLIND to %d case(s); "
@@ -447,7 +481,7 @@ def main():
     verbose = "-v" in sys.argv
     print("=== TRACK B NULL A/B: candidate vs sealed reference (thresh %.0f dB rel) ==="
           % THRESH_DB)
-    fails, worst = compare(ref, cand, bank)
+    fails, worst, _ = compare(ref, cand, bank)
     print("SCENARIOS: %s (worst residual %s)"
           % ("PASS" if fails == 0 else "FAIL (%d scenario(s))" % fails,
              "0" if worst == -1e9 else "%.1f dB rel" % worst))
