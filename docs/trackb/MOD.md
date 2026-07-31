@@ -47,7 +47,7 @@ master / future readers) but it never feeds back.
 | 656 | glide error integrator | **CARRIED** (read :698, written :703) |
 | 672 | glide rate state | **CARRIED** (read :697, written :705) |
 | 688 | arrival ramp | **CARRIED** (read :701, written :720) |
-| 704 | glided pitch (the "current value") | **CARRIED** (read :687, written :734) |
+| 704 | glided pitch (the "current value" / glide state) | **CARRIED** (read :687, written :734) |
 | 720 | shadow of previous 704 (:693) | tap |
 | 736 | glide-enable v45 (:699) | tap |
 | 752 | FINAL PITCH CV out (:735) — read same-sample at :1078, :1086, :1176 | SCRATCH |
@@ -205,7 +205,8 @@ Inputs: `g = [560]'` (binary gate, §ENV 2.3), `cv = [464]'` (conditioned pitch,
 :694  v43  = (g * [608]) - [608]
 :696  v45  = (v43 + 1.0f) * [592]        → [736]      // glide enable (:699)
 :697  v46  = ([672] / (([768] * [624]) + [800])) * [768]
-:700  v48  = [656] - v46
+:698  v47  = [656]
+:700  v48  = v47 - v46
 :702  v50  = (v48 + cv) - [704]
 :703  [656] = v50                                     // integrator, UNCONDITIONAL
 :704  v51  = v50 * ([624] + [784])                    // v41 formed at :688
@@ -376,27 +377,28 @@ curve-22 value again (recall row `{8,22,T_ID,2064}`) — that is not a typo.
 Each shaper adds its own offset to the master phase and re-wraps it with the
 same `fmodf(±1)` law.
 ```
-saw   :869  v104 = wrap(v98 + [2288])          // [2288] = −1.0
-      :884  [1680] = (v104 * [2352]) + [2480]  // ×0.5, −0.5   ⇒ range [−1, 0)
-      :888  [1696] = -[1680]                   // exact negation
+saw   :869  v104 = wrap(v98 + [2288])          // [2288] = −1.0  (wrap at :873-881)
+      :884  v106 = (v104 * [2352]) + [2480];  :885 [1680] = v106   // ×0.5, −0.5 ⇒ [−1, 0)
+      :888  [1696] = -v106                    // exact negation of the register
 
 tri   :887  v107 = v98 + [2320]                // [2320] = −0.5  (NOT re-wrapped here:
       :889-897 the fmodf results are DISCARDED — the wrap lives inside juno_triangle)
       :915  v109 = juno_triangle(v107)         // src/juno_dsp.c:54-71
-      :917  [1728] = v109 * [2384]
+      :917  v111 = v109 * [2384];   :928 [1728] = v111
 
 sqr   :905  v108 = wrap(v98 + [2304])          // [2304] = 0.0
       :916  v110 = v108 + [2496]               // [2496] = 0.0
       :918  v110 = (v110 >= 0) ? ((v110 > 0) ? 1.0f : v110) : -1.0f    // sign, keeps ±0
       :929  [1824] = v110                      // ← the ENV1/ENV2 trigger
-      :930  [1712] = (v110 * [2368]) + [2512]
+      :930  v113 = (v110 * [2368]) + [2512];   :941 [1712] = v113
 
 sine  :927  v112 = wrap(v98 + [2336])          // [2336] = 0.0
       :940  u = fabsf(v112)
-      :946  [1744] = ( ( (u*((u*u)*u))*[2224]
-                         + ( (((u*u)*u)*[2208])
-                             + ( ((u*[2176]) + [2160]) + ((u*u)*[2192]) ) ) )
-                       + [2240] ) * [2400]
+      :946  v117 = ( ( (u*((u*u)*u))*[2224]
+                       + ( (((u*u)*u)*[2208])
+                           + ( ((u*[2176]) + [2160]) + ((u*u)*[2192]) ) ) )
+                     + [2240] ) * [2400]
+      :952  [1744] = v117                      // the MIX at :956 uses the REGISTER v117
 ```
 The "sine" is a quartic in `|phase|` — a smoothed triangle, evaluated in exactly
 the grouping above (:946-951). **Do not substitute `sinf`.** Its value at u=0 is
@@ -528,7 +530,7 @@ Tables (`juno_apply.c:466-471`):
 Ordering constraint (`juno_apply.c:463-465`): `juno_apply_condition` **must run
 after** `juno_driver_seed_voices`, which replicates voice 0 over voices 1..7 and
 would otherwise flatten the scatter. Same for `juno_apply_unison_spread`
-(`juno_apply.c:491-493`).
+(`juno_apply.c:491-492`).
 
 ---
 
@@ -546,7 +548,7 @@ means `juno_init.c`'s two-arm switch (44100 arm = lines 315-614, else arm =
 | 816 | 0x3D4CCCCD | 0.05 | init:922 | arrival window |
 | 832 | 0x3089705F | 9.9999997e−10 | init:923 | arrival ramp step |
 | 848, 864 | 0x3F800000 | 1.0 | init:924-925 | mod-CV weights |
-| 624 | 0x3D01499D · (96000/H) | 0.031564344 @96k | prep:107, override :239 | portamento time base (recall curve 7, sr_variant 2) |
+| 624 | 0x3D01499D | 0.031564344 | prep:107 computes `·(96000/H)`, **prep:239 then overrides it with the raw 96 k value** | portamento time base (recall curve 7, sr_variant 2) |
 | 592, 608 | recall | 0 / 1 | apply row 237, apply:654 | PORTAMENTO on/off, MODE |
 | 1152 | 0x3D06090A | 0.032723464 | init:926 | **rate-INVARIANT** rate-smoother coeff |
 | 1168 | 0xC1A00000 | −20.0 | init:927 | rate-mod exponent (nets to ×1.0) |
@@ -596,7 +598,7 @@ means `juno_init.c`'s two-arm switch (44100 arm = lines 315-614, else arm =
 | 4128 | recall `c22·c4·mode` | dflt 0x3E2CACAD = 0.16862746 | apply:452, prep:252 | BEND depth DCO |
 | 4144 | recall curve 45 | dflt 0x15A931DA = 6.8337208e−26 | apply row 234, prep:253 | DCO PWM DEPTH |
 | 3888/3904/3920/3936 | recall one-hot ±1 | — | apply:363-386 | PWM SOURCE |
-| 3968 | recall `UNISON_3968[v]` or 0 | per voice | apply:504-514 | UNISON detune |
+| 3968 | recall `UNISON_3968[v]` or 0 | per voice | apply:497-506 | UNISON detune |
 | 5520 | prep 0x392291E6 = 1.5503875e−4, then CONDITION | per voice | prep:83, apply:480 | pulse-width base ("Duty Tune") |
 | 7600 | CONDITION | per voice | apply:481 | cutoff fine trim |
 | 7616 | — | 0.0 | none | resonance trim (CONDITION deliberately skips it) |
@@ -607,11 +609,13 @@ means `juno_init.c`'s two-arm switch (44100 arm = lines 315-614, else arm =
 | 7296 | 0x3F800000 | 1.0 | prep:85 | LFO gain into VCF |
 | — | `juno_exp_acc0[32]`, `juno_exp_ad3c[33]` | exact powers of two | juno_tables.h:47-52 | rate-mod exponent ladder |
 
-**`[1920]` note (READ, easy to get wrong):** `juno_prepare.c:128` writes a
-3-class rate-armed default, and then `juno_prepare.c:241` — inside the "SETTLED
-override" block, i.e. *later in the same function* — overwrites it with the
-rate-INDEPENDENT `0x3C2AAA78`. The override wins. Recall then supplies the
-per-patch rate-armed value.
+**`[1920]` and `[624]` note (READ, easy to get wrong):** `juno_prepare.c:128`
+writes a 3-class rate-armed default for `[1920]` and `:107` writes a continuous
+`·(96000/H)` default for `[624]` — and then the "SETTLED override" block *later
+in the same function* overwrites **both** with rate-INDEPENDENT values
+(`:241` → `0x3C2AAA78`, `:239` → `0x3D01499D`). The overrides win; the unapplied
+defaults are rate-independent. Recall then supplies the per-patch rate-armed /
+rate-scaled values.
 
 ---
 
@@ -619,7 +623,7 @@ per-patch rate-armed value.
 
 | source | cells | when written |
 |---|---|---|
-| note path (`juno_note.c`) | `304` M.CV (:97/:274), `320` M.Gate, `1856` any-key-held (broadcast, :220-226), `9824` gate twin, `592` porta gate (:300-307) | note on/off, immediate |
+| note path (`juno_note.c`) | `304` M.CV (note-on :160, legato pitch-only :274), `320` M.Gate (:164 open, :249 close), `1856` any-key-held (broadcast, :220-226), `9824` gate twin (:201), `592` porta gate (:300-307) | note on/off, immediate |
 | ENV section | `2752` (ENV1 out), `3232` (ENV2 out) → latched to `3648`/`3664` at :1090-1091 | same sample, before :1092 |
 | gate binarizer | `560` → glide enable at :694 | same sample, :691 |
 | input conditioner | `464` (conditioned pitch CV) → glide target at :702, :721 | same sample, :659 |

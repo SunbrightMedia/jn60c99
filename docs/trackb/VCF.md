@@ -505,11 +505,15 @@ a pure state oscillator that never depends on audio.
 ```
 
 **Identification (INFERRED, ops are READ).** `P` is the interleaved
-sinh/cosh Taylor split of `exp(frac)` in `q = frac²/4`:
-`[7888],[7920],[7952],[7984],[8016]` = 2, 2/3, 2/45, 2/315, 2/14175 (cosh) and
-`[7872],[7904],[7936],[7968],[8000],[8032]` = 1, 2/3, 2/15, 2/157.5, … (sinh/f)
-— PROVEN(decode) values in §4. `NUM/DEN` is `sin(x)/cos(x) = tan(x)` from the
-first five odd / five even Taylor terms. So
+sinh/cosh Taylor split of `exp(frac)` in `q = frac²/4`. In `q`, the even
+(`cosh`) coefficients are `[7888],[7920],[7952],[7984],[8016]` =
+2, 2/3, 4/45, 2/315, 4/14175 and the odd (`sinh(f)/f`, multiplied by `v236`)
+coefficients are `[7872],[7904],[7936],[7968],[8000],[8032]` =
+1, 2/3, 2/15, 4/315, 2/2835, 4/155925 — each matching the decoded cell to
+float precision (PROVEN(decode); values in §4.1). `P(0) = 1.0` exactly.
+`NUM/DEN` is `sin(x)/cos(x) = tan(x)` from the first five odd / five even
+Taylor terms (`−1/3!, 1/5!, −1/7!, 1/9!, −1/11!` over
+`−1/2!, 1/4!, −1/6!, 1/8!, −1/10!`, all PROVEN(decode)). So
 
 ```
 E    = clamp(cutoff_sum, [7776]=-3.0, [7760])          // :1244-1252
@@ -1075,7 +1079,14 @@ confirm the gate still has teeth on the current tree.
 5. **`[7104]` vs `[7184]` asymmetry** (§3.4): LFO-A round-trips through memory,
    LFO-B does not. Numerically identical; if the plugin ever adds a consumer of
    `[7184]` the asymmetry becomes meaningful. INFERRED harmless.
-6. **The 32 FIR taps sum to exactly 0.5** (PROVEN(decode), §3.10) and
-   `[9152]·[9136] = 1.0`. This is a strong internal consistency check that the
-   tap→lag mapping in §3.10 is right; it does not prove the *pairing*, only the
-   gain. A candidate that pairs the lines wrongly would still sum to 0.5.
+6. **The 16 FIR taps sum to 0.49999999** (PROVEN(decode), §3.10) and
+   `[9152]·[9136] = 1.0` exactly. This is a strong internal consistency check
+   that the tap→lag mapping in §3.10 is right; it does **not** prove the
+   *pairing*, only the gain — a candidate that pairs the lines wrongly would
+   still sum to 0.5. The pairing itself is READ from the source expression, not
+   proven by a null.
+7. **`[7856]` = π·440/(4·H)** matches to 7 significant figures (PROVEN(decode):
+   cell 0.007836172357201576 vs π·440/176400 = 0.007836172151811276 — a 2.6e−8
+   relative difference, i.e. the constant was stored to float precision from a
+   slightly different expression). The "440 Hz" and "4×" readings are therefore
+   INFERRED, not exact; the *cell value* is what a native port must use.
