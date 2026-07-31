@@ -83,13 +83,47 @@ at zero, so the value is multiplied out — the case that taught this harness th
 "caught somewhere" is not a coverage statement. On the full bank the same
 mutation is caught by **84 of 384** comparisons.
 
-### 2. `coverage_probe.py` — was the code reached?
+### 2. `canary.py` — can the gate see an error in this module's arithmetic?
+
+Plants a 0.1 % error in each assignment of a line range, one build each, and
+reports how many scenarios catch it. A line caught by **0** scenarios is a place
+an error would ship.
+
+```
+canary.py --lines 1129-1149          every assignment in the range
+canary.py --lines 623-693 --max 12   cap the number of builds
+```
+
+Run it **before** rewriting a module, not only after. First run, on M1b (noise
+SVF + source mix, `src/voice_render.c:1129-1149`): **3 of 18 assignments
+observable, 15 blind** — the whole Chamberlin noise SVF is invisible to the
+current scenario set. That is the answer to "how do we know the test is not
+lying" in its most concrete form, and it arrived before a single line was
+rewritten.
+
+### 2b. `coverage_probe.py` — was the code reached?
 
 gcov line counts from a coverage build, per scenario, each scenario in its own
 process so counters do not accumulate. `--lines A-B` names any scenario that
 misses the range you rewrote, and any target line no scenario reaches at all.
 
-### 3. `observability.py` — would a wrong answer be noticed?
+### 3. `observability.py` — does this cell's stored value matter?
+
+**Corrected claim (2026-07-31).** This tool was first written as "would a wrong
+answer be noticed". Measurement says it does not answer that, for two reasons,
+both from module M1:
+
+* the transcription computes into **locals** and stores to cells; most consumers
+  use the local, not a reload, so perturbing the cell after the store changes
+  nothing even though the value is used;
+* some consumers **saturate** — on the gate cell 560, multiplying by 3 changes
+  nothing at all while adding 1 changes 83 996 of 84 000 samples, because
+  downstream the value is clamped. That is a real property of the engine, not a
+  probe defect: a native gate computing 1.0000001 instead of 1.0 *is* inaudible.
+
+So what this tool actually measures is **carriage and stored-value sensitivity**,
+which is what licenses register promotion. Module admissibility is decided by
+`canary.py` below.
 
 Multiplies chosen per-voice cells by ~2 ULP **after** the sample, via an
 `#ifdef`-guarded hook in `native/voice_render.c` that emits no code unless

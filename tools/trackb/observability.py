@@ -57,6 +57,13 @@ USAGE
   observability.py --cells 3520 --require 3    fail unless >=3 scenarios observe
   observability.py --cells 320,336,352 --each  classify each cell separately
   observability.py --sweep [--out map.tsv]     classify EVERY written cell
+  observability.py --cells ... --site 1        perturb at a MODULE BOUNDARY
+        inside the render instead of at the tail. Site 0 answers "does this
+        value survive the sample" (carriage); site N answers "if this module's
+        output were wrong, would anything notice" -- the question a rewrite
+        needs. They differ: M1's 27 outputs are seen by 2 of 7 scenarios at
+        site 0 because most of them are consumed within the same sample.
+        Sites are declared by TB_HOOK(N) calls in native/voice_render.c.
 Offsets are per-voice cell offsets as used by JF(a1, N) -- take them from the
 subsystem's "cells owned" table in docs/trackb/*.md.
 """
@@ -92,6 +99,8 @@ def build(dst=PROBE):
         raise SystemExit("build failed:\n" + r.stderr[-1500:])
     lib = null_ab.load(dst)
     lib.juno_tb_set_cells.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.c_int]
+    lib.juno_tb_set_site.argtypes = [ctypes.c_int]
+    lib.juno_tb_set_gain.argtypes = [ctypes.c_float, ctypes.c_float]
     return lib
 
 
@@ -104,9 +113,15 @@ def scen_fingerprint():
     return hashlib.sha256(repr(null_ab.SCEN).encode()).hexdigest()[:16]
 
 
-def set_cells(lib, cells):
+CLASSIFY = (1.001, 1e-6)      # "does this cell matter" -- max sensitivity
+CALIBRATE = (1.00000012, 0.0)  # "what is a 2-ULP error worth in dB"
+
+
+def set_cells(lib, cells, site=0, gain=CLASSIFY):
     arr = (ctypes.c_int * max(len(cells), 1))(*cells) if cells else (ctypes.c_int * 1)()
     lib.juno_tb_set_cells(arr, len(cells))
+    lib.juno_tb_set_site(site)
+    lib.juno_tb_set_gain(ctypes.c_float(gain[0]), ctypes.c_float(gain[1]))
 
 
 def written_cells(path):
@@ -157,7 +172,7 @@ def main():
               " %d scenarios)\n" % len(null_ab.SCEN))
         rows, carried = [], 0
         for i, cell in enumerate(cells):
-            set_cells(lib, [cell])
+            set_cells(lib, [cell], site, gain)
             rr = residuals(lib, base, bank)
             seen = [t for t, rel in rr if rel is not None]
             worst = max([rel for _, rel in rr if rel is not None], default=None)
@@ -186,11 +201,13 @@ def main():
         raise SystemExit(__doc__)
     cells = [int(x) for x in argv[argv.index("--cells") + 1].split(",") if x.strip()]
     need = int(argv[argv.index("--require") + 1]) if "--require" in argv else 1
+    site = int(argv[argv.index("--site") + 1]) if "--site" in argv else 0
+    gain = CALIBRATE if "--calibrate" in argv else CLASSIFY
 
     if "--each" in argv:
         print("=== TRACK B CARRIAGE CLASSIFICATION BY EXECUTION (one cell at a time) ===")
         for cell in cells:
-            set_cells(lib, [cell])
+            set_cells(lib, [cell], site, gain)
             rr = residuals(lib, base, bank)
             seen = [t for t, rel in rr if rel is not None]
             worst = max([rel for _, rel in rr if rel is not None], default=None)
@@ -202,9 +219,14 @@ def main():
                      "" if worst is None else ", loudest %.1f dB rel" % worst))
         return 0
 
-    set_cells(lib, cells)
-    print("=== TRACK B OBSERVABILITY: perturb cells %s by ~2 ULP, who notices? ==="
-          % ",".join(map(str, cells)))
+    set_cells(lib, cells, site, gain)
+    print("=== TRACK B OBSERVABILITY: perturb cells %s by ~2 ULP at SITE %d, who "
+          "notices? ===" % (",".join(map(str, cells)), site))
+    if site == 0:
+        print("  (site 0 = the render TAIL: this measures CARRIAGE across the "
+              "sample boundary.\n   For MODULE observability use the site at that "
+              "module's boundary -- a cell\n   consumed within the same sample is "
+              "invisible here by construction.)")
     seen = 0
     for tag, rel in residuals(lib, base, bank):
         if rel is None:

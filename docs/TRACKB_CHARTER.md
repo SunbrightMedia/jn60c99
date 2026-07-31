@@ -100,3 +100,46 @@ live in registers, but 94 of them must not. It also explains why the
 whole-function `regcache.py` transform came out SLOWER — it created a local for
 all 609 touched cells and spilled; the lever is real but has to be applied with
 this map in hand, inside the rewrite, not as a blanket transform.
+
+---
+
+## Correction, and the fourth gate — 2026-07-31
+
+**Gate #3 was over-claimed.** It was introduced as "would a wrong answer be
+noticed". It does not answer that. Two measured reasons, both from module M1:
+
+1. The transcription computes into **locals** and stores to cells; most consumers
+   read the local, not a reload. Perturbing the cell after the store changes
+   nothing even though the value is used.
+2. Some consumers **saturate**. On the gate cell 560, multiplying by 3 changes
+   *nothing*, while adding 1 changes 83 996 of 84 000 samples — downstream the
+   value is clamped. A native gate computing 1.0000001 instead of 1.0 really is
+   inaudible; the probe was right and the question was wrong.
+
+What gate #3 measures is **carriage and stored-value sensitivity** — exactly what
+licenses keeping a cell in a register, and nothing more. The claim in the earlier
+section is narrowed accordingly.
+
+### Gate #4 — `tools/trackb/canary.py` — module admissibility
+Plant a 0.1 % error in each assignment of the module's line range, one build
+each, and require the gate to catch it. A line caught by 0 scenarios is a place
+where an error would ship.
+
+**First run, M1b (noise SVF + source mix, `src/voice_render.c:1129-1149`): 3 of
+18 assignments observable, 15 BLIND.** The entire Chamberlin noise state-variable
+filter is invisible to the current scenario set — the same root cause as the
+`noisegain` mutation being caught by 1 scenario of 7. No rewrite of those lines
+is admissible until a scenario reaches them.
+
+**The rule, restated:** a module is admissible only when its canary is caught.
+Coverage says the code ran; carriage says the value persists; only the canary
+says the gate can see the module being wrong.
+
+### A third probe defect, found the same way
+The perturbation's additive term was `1e-20f` — chosen to move a cell resting at
+zero. It does not survive: the first multiply annihilates it. The gate cell read
+NOT-CARRIED at every site with `+1e-20f` and changed 83 996 samples with `+1.0f`.
+Classification now runs at `v*1.001 + 1e-6` (maximum sensitivity; over-reporting
+CARRIED is the safe direction) and calibration at `v*1.00000012` (the 2-ULP
+figure). Three probe defects so far, all found by *using* the probe rather than
+by reading it.
