@@ -51,8 +51,8 @@ sys.path.insert(0, %(here)r)
 import null_ab
 lib = null_ab.load(%(so)r)
 bank = open(%(bank)r, "rb").read()
-patch, notes, warm, tag = null_ab.SCEN[%(i)d]
-null_ab.render(lib, bank, patch, notes, warm)
+patch, script, tag = null_ab.SCEN[%(i)d]
+null_ab.render(lib, bank, patch, script)
 '''
 
 
@@ -144,7 +144,7 @@ def main():
     so, _ = build(tmp)
 
     per_scen, union = {}, {}
-    for i, (patch, notes, warm, tag) in enumerate(null_ab.SCEN):
+    for i, (patch, script, tag) in enumerate(null_ab.SCEN):
         prefix = os.path.join(tmp, "run%d" % i)
         run_scenario(so, i, prefix)
         cov = gcov_lines(prefix, tmp, want)
@@ -160,7 +160,7 @@ def main():
         exec_lines = {L for L, c in u.items() if c > 0}
         print("\n%s: %d instrumented lines, %d executed by at least one scenario"
               % (f, len(u), len(exec_lines)))
-        for tag in [s[3] for s in null_ab.SCEN]:
+        for tag in [s[2] for s in null_ab.SCEN]:
             lines = per_scen.get(tag, {}).get(f, {})
             hit = {L for L, c in lines.items() if c > 0}
             note = ""

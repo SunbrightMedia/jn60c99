@@ -33,8 +33,9 @@ USAGE
         (pitch, chorus, envelope) is required in all 5. See
         tools/trackb/observability.py, which measures that blindness directly.
 
-Scenario set covers the risk surface: POLY pluck, MONO (retrigger law),
-UNISON (phase pile-up), chorus-heavy pad, high-resonance patch, warm start.
+Scenario set covers the risk surface: POLY pluck, MONO retrigger, UNISON phase
+pile-up, chorus pad, delay keys, MONO glide (portamento integrator) and a 6.8 s
+long-tail render for slow LFO/envelope state.
 Same juno_gui_* API both sides -> the reference-driving layer that caused
 every historical harness failure does not exist here.
 """
@@ -48,14 +49,38 @@ import truth
 THRESH_DB = -90.0
 SIG_FLOOR_DB = -50.0          # reference must be at least this loud vs FS
 SR = 44100.0
-SCEN = [  # (patch, notes, warm_samples, tag)
-    (5,  [60],           0,     "pluck POLY"),
-    (15, [45, 52, 45],   4000,  "MONO retrigger"),
-    (61, [48],           8000,  "UNISON pile-up"),
-    (20, [48, 55, 64],   0,     "chorus pad"),
-    (2,  [60, 67],       2000,  "delay keys"),
-]
 NFR = 30000
+
+# Scenario set. Each entry is (patch, script, tag); the script is the same event
+# language render_script() drives:
+#     ('on', note, vel) | ('off', note) | ('param', blob, byte) | ('render', n)
+#
+# The last two exist because the carriage sweep exposed what the first five do
+# NOT cover:
+#   * GLIDE. Cells 656/672/688 (glide integrator, rate, arrival flag) measured
+#     NOT-CARRIED, which is false in general -- the portamento integrator plainly
+#     carries. It measured that way because no scenario ever changed pitch on a
+#     portamento patch, so the integrator had nothing to integrate. A subsystem
+#     that never runs looks like a subsystem with no state.
+#   * SLOW STATE. A 30000-frame render is 0.68 s. An LFO phase or envelope-tail
+#     error too small to see there is still audible over ten seconds, so one
+#     scenario renders 300000 frames (6.8 s) with a long release tail.
+SCEN = [
+    (5,  [('on', 60, 100), ('render', NFR)],                        "pluck POLY"),
+    (15, [('render', 4000), ('on', 45, 100), ('on', 52, 100),
+          ('on', 45, 100), ('render', NFR)],                        "MONO retrigger"),
+    (61, [('render', 8000), ('on', 48, 100), ('render', NFR)],      "UNISON pile-up"),
+    (20, [('on', 48, 100), ('on', 55, 100), ('on', 64, 100),
+          ('render', NFR)],                                         "chorus pad"),
+    (2,  [('on', 60, 100), ('on', 67, 100), ('render', NFR)],       "delay keys"),
+    (5,  [('on', 36, 100), ('render', 6000), ('on', 60, 100),
+          ('render', 6000), ('off', 60), ('render', 6000),
+          ('on', 72, 100), ('render', 6000), ('off', 72), ('off', 36),
+          ('render', 6000)],                                        "MONO glide"),
+    (55, [('on', 40, 90), ('render', 8000), ('on', 59, 90),
+          ('render', 232000), ('off', 40), ('off', 59),
+          ('render', 60000)],                                       "long LFO+tail"),
+]
 
 
 def load(lib_path):
@@ -75,19 +100,9 @@ def load(lib_path):
     return lib
 
 
-def render(lib, bank, patch, notes, warm):
-    c = lib.juno_gui_create(ctypes.c_float(SR), 0)
-    lib.juno_gui_apply_bank(c, bank, len(bank), patch)
-    if warm: lib.juno_gui_warmup(c, warm)
-    for n in notes: lib.juno_gui_note_on(c, n, 100)
-    buf = (ctypes.c_float * (2 * NFR))()
-    lib.juno_gui_render(c, buf, NFR)
-    out = list(buf)
-    # DESTROY. An engine context is ~11 MB (the full state span). Leaking one per
-    # render is invisible at the gate's 10 renders and fatal at the carriage
-    # sweep's 1415: the first sweep attempt was OOM-killed at 11.6 GB RSS.
-    lib.juno_gui_destroy(c)
-    return out
+def render(lib, bank, patch, script, _unused=None):
+    """Render one scenario. (Thin alias for render_script at the gate rate.)"""
+    return render_script(lib, bank, SR, patch, script)
 
 
 def render_script(lib, bank, sr, patch, events):
@@ -126,9 +141,9 @@ def rel_residual(r, c):
 
 def compare(ref_lib, cand_lib, bank):
     worst = -1e9; fails = 0
-    for patch, notes, warm, tag in SCEN:
-        r = render(ref_lib, bank, patch, notes, warm)
-        cnd = render(cand_lib, bank, patch, notes, warm)
+    for patch, script, tag in SCEN:
+        r = render_script(ref_lib, bank, SR, patch, script)
+        cnd = render_script(cand_lib, bank, SR, patch, script)
         sig = math.sqrt(sum(v * v for v in r) / len(r))
         res = math.sqrt(sum((a - b) ** 2 for a, b in zip(r, cnd)) / len(r))
         if db(sig) < SIG_FLOOR_DB:

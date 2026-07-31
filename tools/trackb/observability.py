@@ -112,9 +112,9 @@ def written_cells(path):
 def residuals(lib, base, bank):
     """[(tag, rel_dB or None)] for the currently-selected cell set."""
     out = []
-    for p, n, w, tag in null_ab.SCEN:
+    for p, sc, tag in null_ab.SCEN:
         r = base[tag]
-        c = null_ab.render(lib, bank, p, n, w)
+        c = null_ab.render(lib, bank, p, sc)
         res = math.sqrt(sum((a - b) ** 2 for a, b in zip(r, c)) / len(r))
         if res == 0.0:
             out.append((tag, None))
@@ -129,7 +129,7 @@ def main():
     null_ab.truth.require()
     bank = open(null_ab.truth.BANK, "rb").read()
     ref = null_ab.load(os.path.join(REPO, "libjuno.so"))
-    base = {tag: null_ab.render(ref, bank, p, n, w) for p, n, w, tag in null_ab.SCEN}
+    base = {tag: null_ab.render(ref, bank, p, sc) for p, sc, tag in null_ab.SCEN}
 
     lib = build()
     set_cells(lib, [])
