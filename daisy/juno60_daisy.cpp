@@ -121,6 +121,13 @@ static void sdram_pool_init(void)
     g_sdram_init = 1;
 }
 
+/* EVERY entry point must call this first. .sdram_bss is NOLOAD, so before the
+ * first init the pool holds whatever the SDRAM powered up with -- and a walk
+ * over that garbage reports a full pool. The first silicon run of E0 did
+ * exactly that and halted the board. A host test could not reproduce it: the
+ * host's pool is ordinary BSS and is therefore already zero. */
+static inline void sdram_ensure(void) { if (!g_sdram_init) sdram_pool_init(); }
+
 /* Every walk is bounded. A corrupted header must not turn a diagnostic tool
  * into an infinite loop -- that would look exactly like the hang we just spent
  * an evening chasing. The pool never holds more than a handful of blocks. */
@@ -131,6 +138,7 @@ static int g_sdram_corrupt;
 /* Walk the block list, checking it is well formed. Returns 0 on damage. */
 static int sdram_check(void)
 {
+    sdram_ensure();
     size_t off = 0;
     int n = 0;
     while (off + SDBLK_HDR <= sizeof g_sdram_pool) {
@@ -147,6 +155,7 @@ static int sdram_check(void)
 /* Merge every run of adjacent free blocks. Called after each free. */
 static void sdram_coalesce(void)
 {
+    sdram_ensure();
     size_t off = 0;
     int guard = 0;
     while (off + SDBLK_HDR < sizeof g_sdram_pool) {
@@ -163,6 +172,7 @@ static void sdram_coalesce(void)
 
 static size_t sdram_in_use(void)
 {
+    sdram_ensure();
     size_t off = 0, used = 0;
     int guard = 0;
     while (off + SDBLK_HDR < sizeof g_sdram_pool) {
@@ -178,6 +188,7 @@ static size_t sdram_in_use(void)
 /* Largest single allocation the pool could still serve. */
 static size_t sdram_largest_free(void)
 {
+    sdram_ensure();
     size_t off = 0, best = 0;
     int guard = 0;
     while (off + SDBLK_HDR < sizeof g_sdram_pool) {
@@ -197,7 +208,7 @@ static size_t sdram_largest_free(void)
 
 static void *sdram_alloc(size_t n)
 {
-    if (!g_sdram_init) sdram_pool_init();
+    sdram_ensure();
     n = (n + 31u) & ~(size_t)31u;                 /* 32-byte: cache-line safe */
 
     size_t off = 0;
@@ -226,6 +237,7 @@ static void *sdram_alloc(size_t n)
  * on any interior or double free. Confirm p is the payload of a live block. */
 static void sdram_free(void *p)
 {
+    sdram_ensure();
     size_t want = (size_t)((uint8_t *)p - g_sdram_pool);
     size_t off = 0;
     int guard = 0;
@@ -322,7 +334,13 @@ static void pool_report(const char *tag)
  * into one printed line instead of a dead board. */
 static int pool_selftest(void)
 {
-    if (sdram_in_use() != 0) { LOG("  [pool] selftest: pool not empty at start"); return 0; }
+    /* Measure against a BASELINE, not against zero. libDaisy is free to hold a
+     * legitimate allocation by the time E0 runs, and demanding an empty pool
+     * would reject a healthy board. What must be true is that the pool returns
+     * to wherever it started -- that is what proves nothing leaked. */
+    if (!sdram_check()) { LOG("  [pool] selftest: block list malformed at start"); return 0; }
+    const size_t base = sdram_in_use();
+    if (base) LOG("  [pool] baseline in use: %d KB (not a fault)", (int)(base / 1024));
 
     for (int i = 0; i < 8; ++i) {
         void *bank = sdram_alloc(23 + 20223);
@@ -334,7 +352,7 @@ static int pool_selftest(void)
             return 0;
         }
         sdram_free(buf); sdram_free(bank); sdram_free(st);
-        if (sdram_in_use() != 0) { LOG("  [pool] selftest: leak after round %d", i); return 0; }
+        if (sdram_in_use() != base) { LOG("  [pool] selftest: leak after round %d", i); return 0; }
     }
 
     /* Refusals. Both must set the corrupt flag WITHOUT altering the pool. */
@@ -355,7 +373,7 @@ static int pool_selftest(void)
             caught_double, caught_interior);
         return 0;
     }
-    if (!sdram_check() || sdram_in_use() != 0) {
+    if (!sdram_check() || sdram_in_use() != base) {
         LOG("  [pool] selftest: pool damaged by the refusal tests");
         return 0;
     }

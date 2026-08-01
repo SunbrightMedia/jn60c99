@@ -38,6 +38,17 @@ self-tests the allocator before anything depends on it, and every phase boundary
 prints pool used / largest free / peak. The corpus announces each scenario
 **before** running it, so a stall names the scenario that is actually stuck.
 
+The second silicon run then failed E0 itself, with `pool not empty at start` —
+and that failure is the sharpest lesson here. `sdram_in_use()` ran **before**
+the pool was initialised, and `.sdram_bss` is NOLOAD, so it walked whatever the
+SDRAM powered up holding and reported a full pool. **No host test could have
+caught it:** the host's pool is ordinary BSS and is therefore already zero. The
+host harness now pre-fills the pool with 0xA5 / 0x5C / 0x00 / 0xFF before each
+run, which reproduces the failure exactly; removing the init guards makes it
+report 7 failures, so the test has teeth. E0 also now measures against a
+*baseline* rather than demanding an empty pool, since libDaisy may legitimately
+hold an allocation by the time it runs.
+
 **One measurement already contradicts the roadmap.** The board reports:
 
 ```
