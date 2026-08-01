@@ -76,7 +76,39 @@ CPPFLAGS += -ffp-contract=off
 
 # Two post-link assertions. Run both after every build:  make check
 .PHONY: check
-check: check-fpcontract verify-entry
+check: check-fpcontract verify-entry check-placement
+
+# The placement A/B is only science if the two arms differ in PLACEMENT ALONE.
+# Three ways that silently breaks, all seen or nearly seen during development:
+# the ITCM glob matches nothing (links fine, empty section, "ITCM" rows are
+# really QSPI rows); the glob matches TOO MUCH and drags the baseline copy into
+# ITCM as well (both arms ITCM, ratio reports a confident 1.00x); or the two
+# copies are not the same compilation at all. Assert against all three here, at
+# build time, so a bad image is never flashed. The firmware re-checks the first
+# two at boot as well -- flashing is expensive enough to be worth both.
+.PHONY: check-placement
+check-placement:
+	@echo "checking the placement A/B is real..."
+	@[ -f $(BUILD_DIR)/$(TARGET).elf ] || { echo "  build first"; exit 2; }
+	@nm=$$($(PREFIX)nm -S $(BUILD_DIR)/$(TARGET).elf); \
+	 get() { echo "$$nm" | awk -v s="$$1" '$$4==s {print $$1, $$2}'; }; \
+	 vq=$$(get juno_voice_render); vi=$$(get juno_voice_render_itcm); \
+	 mq=$$(get juno_master_render); mi=$$(get juno_master_render_itcm); \
+	 [ -n "$$vi" ] && [ -n "$$mi" ] \
+	   || { echo "FAIL: an ITCM copy is missing from the ELF"; exit 1; }; \
+	 echo "  voice  QSPI $$vq   ITCM $$vi"; \
+	 echo "  master QSPI $$mq   ITCM $$mi"; \
+	 [ "$$(echo $$vq | cut -d' ' -f2)" = "$$(echo $$vi | cut -d' ' -f2)" ] \
+	   || { echo "FAIL: voice_render copies differ in SIZE -- not the same build"; exit 1; }; \
+	 [ "$$(echo $$mq | cut -d' ' -f2)" = "$$(echo $$mi | cut -d' ' -f2)" ] \
+	   || { echo "FAIL: master_render copies differ in SIZE -- not the same build"; exit 1; }; \
+	 for a in "$$(echo $$vi | cut -d' ' -f1)" "$$(echo $$mi | cut -d' ' -f1)"; do \
+	   case "$$a" in 0000*) ;; *) echo "FAIL: ITCM copy at $$a is not in ITCM"; exit 1;; esac; \
+	 done; \
+	 for a in "$$(echo $$vq | cut -d' ' -f1)" "$$(echo $$mq | cut -d' ' -f1)"; do \
+	   case "$$a" in 90*) ;; *) echo "FAIL: baseline copy at $$a is not in QSPI"; exit 1;; esac; \
+	 done; \
+	 echo "OK: baseline in QSPI, shadow in ITCM, identical sizes -- the A/B is real"
 
 # Reset_Handler must branch to OUR main, and main must survive the link. A global
 # -Dmain= (or anything else that renames main) silently redirects the entry point

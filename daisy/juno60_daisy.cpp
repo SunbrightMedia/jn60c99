@@ -1,29 +1,46 @@
-/* juno60_daisy.cpp — EXPERIMENTAL bring-up + instrumentation for the JUNO-60
- * C99 port on an Electrosmith Daisy Seed (STM32H750IBK6, Cortex-M7 @ 480 MHz).
+/* juno60_daisy.cpp — EXPERIMENT PLATFORM for the JUNO-60 C99 port on an
+ * Electrosmith Daisy Seed (STM32H750IBK6, Cortex-M7).
  *
- * PURPOSE: find out whether the Daisy can run 8 voices bit-exact in real time,
- * and if not, WHY not and by how much. Every number this prints replaces an
- * ESTIMATE in docs/ARM_MEASURED.md §4. No audio hardware is used or needed --
- * results come out over USB serial.
+ * THIS WAS AN EXPERIMENT AND IS NOW A PLATFORM. The difference matters, and it
+ * is the user's own reason: flashing this board costs them real mental effort,
+ * and they expect to do it for a long time. So ONE BOOT MUST RETURN A TABLE,
+ * NOT A NUMBER. Every cheap orthogonal question is answered in a single run,
+ * and anything that used to need a second image now lives in this one and is
+ * selected at run time.
  *
- * Five experiments, in dependency order:
- *   E1  golden corpus         is the engine bit-exact on real M7 silicon?
- *   E2  cycles/sample         the headline cost, at 0/1/2/4/8 voices
- *   E3  D-cache on vs off     how much of the cost is SDRAM latency?
- *   E4  SDRAM vs AXI-SRAM     what would relocating hot state buy?
- *   E5  verdict               voices that fit the 48 kHz real-time budget
+ * What one boot now answers:
+ *   PRE-FLIGHT  are the preconditions met? (printed FIRST, so a bad build is
+ *               obvious before any table rather than after one)
+ *   E0          the SDRAM pool allocator
+ *   E1          golden corpus -- is the engine bit-exact on real M7 silicon?
+ *   MATRIX      placement {QSPI, voice-ITCM, voice+master-ITCM}
+ *               x I-cache {on,off} x D-cache {on,off} x voices {0,1,2,4,8}
+ *   E4          SDRAM vs AXI-SRAM, generic walk
+ *   E7          SDRAM vs AXI at the ENGINE'S OWN MEASURED access pattern,
+ *               16-byte stride (today) vs 4-byte (compacted)
+ *   E5          live self-playing audio, then park in DFU
  *
- * WHY E3 AND E4 EXIST. docs/ARM_MEASURED.md §4 estimates cost from instruction
- * counts and assumes memory is free. It is not: the engine's state is a single
- * ~10.5 MB span that must live in SDRAM, its per-sample working set is ~416 KB
- * of random access (docs/ARM_MEASURED.md §2), and the Cortex-M7 L1 D-cache is
- * only 16 KB. That is a >25x oversubscription, so SDRAM latency could plausibly
- * dominate everything the instruction count predicts. E3 and E4 measure it
- * instead of arguing about it.
+ * THE QUESTION THE MATRIX EXISTS TO SETTLE. The port measures 93,288
+ * cyc/sample for 8 voices against an 8,333 budget (SILICON, 400 MHz). Two
+ * analyses in docs/trackb/CONFLICT.md disagree about where ~50,742 of those
+ * cycles go: scattered SDRAM DATA stalls, or INSTRUCTION FETCH, because
+ * APP_TYPE=BOOT_QSPI means we execute XIP from external QSPI flash and the hot
+ * .text is ~32.8 KB against a 16 KB L1 I-cache. The old E3 toggled the D-cache
+ * only, so it was structurally blind to an I-side cost. The placement and
+ * I-cache columns are the instruction side; the D-cache column and E7 are the
+ * data side. Both sides now come out of the same run, off the same context,
+ * with the same warmup -- which is what makes the rows comparable at all.
  *
- * HONEST STATUS: written from the real libDaisy headers (SampleRate enum,
- * AudioHandle typedefs, DSY_SDRAM_BSS, the H750 linker scripts) but NEVER RUN
- * ON HARDWARE. Expect to fix integration details on first flash.
+ * PLACEMENT IS A RUN-TIME AXIS, NOT A BUILD. The image contains two
+ * compilations of voice_render and of master_render: the originals in QSPI and
+ * identical copies the linker put in ITCM (daisy/voice_render_itcm.c,
+ * daisy/master_render_itcm.c, daisy/juno_itcm.lds). src/juno_driver.c calls
+ * both through function pointers, so assigning a pointer switches placement
+ * mid-run. That indirection changes NO arithmetic and the host golden corpus
+ * stays 8/8; it is the only change src/ was allowed.
+ *
+ * STATUS: the previous revision RAN ON THIS BOARD. Everything here that is
+ * labelled SILICON was measured on it.
  */
 
 /* The corpus driver's main/printf renames live in daisy/golden_shim.c and are
@@ -549,28 +566,12 @@ static void set_placement(Placement p)
 static float    g_budget_live;    /* cycles/sample available at LIVE_RATE */
 static uint32_t g_sysclk_hz = 1;  /* for the elapsed-seconds column         */
 
-/* Every timing row now prints the WALL TIME of the interval it came from, and a
- * SECOND cycles/sample figure derived from the millisecond tick instead of the
- * DWT. The two clocks are independent, so agreement is a real cross-check: it
- * is exactly what the first silicon run lacked, and its absence let a 3x wrap
- * error be filed as "unexplained" instead of found. */
-static void report(const char *tag, span s, uint32_t samples)
-{
-    float per     = (float)s.cyc / (float)samples;
-    float per_ms  = (float)s.ms * 0.001f * (float)g_sysclk_hz / (float)samples;
-    uint32_t ds   = (uint32_t)(s.cyc * 10u / g_sysclk_hz);  /* tenths of a second */
-    /* libDaisy's logger has limited float formatting; print scaled integers so
-     * the numbers are always readable regardless of %f support. */
-    LOG("  %-24s %7d cyc/sample   budget %5d   %d.%02dx %s",
-        tag, (int)(per + 0.5f), (int)(g_budget_live + 0.5f),
-        (int)(per / g_budget_live), (int)(per / g_budget_live * 100.0f) % 100,
-        per <= g_budget_live ? "OK" : "OVER");
-    LOG("      %d smp | DWT %d.%d s | tick %d.%03d s | tick says %7d cyc/sample %s",
-        (int)samples, (int)(ds / 10u), (int)(ds % 10u),
-        (int)(s.ms / 1000u), (int)(s.ms % 1000u), (int)(per_ms + 0.5f),
-        (per_ms > per * 1.10f || per_ms < per * 0.90f)
-            ? "!! CLOCKS DISAGREE -- DWT WRAPPED" : "(agrees)");
-}
+/* The old per-row `report()` helper is gone. Every timing row now comes out of
+ * ONE table printer in the matrix, so no two rows can be formatted -- or
+ * normalised -- by different code. Each row still carries its own independent
+ * millisecond-tick cross-check, which is the thing that would have caught the
+ * DWT wrap that invalidated the first silicon run.
+ */
 
 /* Rebuild the 1-patch bank the corpus embeds, so E2 profiles a real patch
  * rather than power-on defaults. Layout from tools/verify/e2e_emu.py. */
@@ -587,179 +588,228 @@ static unsigned char *build_bank(const tg_scenario *s)
     return bank;
 }
 
-/* ============================ E2: cycles/sample ==========================
- * E3 replicates this function's 8-voice point, so the two MUST be set up the
- * same way or their numbers are not comparable. One warmup length, one block
- * count, one timing helper -- shared here rather than restated in each. */
-#define WARMUP_N ((int)E2_RATE)          /* 1 s of DSP, both E2 and E3 */
+/* ==================== THE MATRIX: one flash, one table ====================
+ *
+ * WHY THIS REPLACED E2, E3 AND E6a. Those were three separate experiments, each
+ * with its own context, its own warmup and its own block count. Two of them
+ * disagreed by 3x about the SAME nominal workload, and reconciling that cost a
+ * flash. Every cheap orthogonal question now runs as one point of one sweep,
+ * off one context, with one warmup and one timing helper -- so the rows are
+ * comparable BY CONSTRUCTION, not by inspection of three sets of constants.
+ *
+ * The cross product:
+ *     placement { QSPI, voice in ITCM, voice+master in ITCM }
+ *     I-cache   { on, off }
+ *     D-cache   { on, off }
+ *     voices    { 0, 1, 2, 4, 8 }
+ *
+ * The first two placements run the FULL 2x2x5 = 20 points each. The third runs
+ * only its 8-voice, caches-on point: its job is to report the TOTAL that code
+ * placement can ever buy, which is the number that decides whether placement
+ * alone gets meaningfully toward the budget. 41 points.
+ *
+ * READING IT. The disagreement in docs/trackb/CONFLICT.md is between an
+ * INSTRUCTION-FETCH hypothesis (we execute XIP from QSPI, hot .text ~32.8 KB
+ * against a 16 KB L1 I-cache) and a DATA-STALL hypothesis (scattered SDRAM
+ * cells). The placement and I-cache columns are the instruction side; the
+ * D-cache column and E7 are the data side. One table, both sides.
+ */
+#define WARMUP_N ((int)E2_RATE)      /* 1 s of DSP, ONCE, at context setup */
 
-static span     g_e2_8v;                 /* E2's 8-voice row, for E3 to check */
-static uint32_t g_e2_8v_smp;
+/* Per point: an equal short re-warm then an equal measurement. The re-warm runs
+ * with the point's OWN cache and placement configuration already applied, so
+ * each point is measured in its own steady state rather than through the tail
+ * of the previous point's. An UNEQUAL warmup is precisely the defect that made
+ * the old E3 not a replicate of the old E2, so this length is one constant used
+ * by every point, deliberately. */
+#define MTX_WARM_BLK  (((int)E2_RATE / 16) / BLOCK)
+#define MTX_MEAS_BLK  (((int)E2_RATE /  8) / BLOCK)
 
-static void measure_cost(void)
+typedef struct {
+    Placement pl;
+    int       ic, dc, voices;
+    uint32_t  per;          /* cycles per sample                        */
+    uint32_t  worst;        /* worst single block                       */
+    uint32_t  ms;           /* wall time, from the independent ms tick   */
+    uint32_t  per_ms;       /* cyc/sample derived from that tick         */
+    int       valid;
+} mrow;
+
+#define MTX_MAX 48
+static mrow g_mtx[MTX_MAX];
+static int  g_mtx_n;
+
+/* Cache control, written once so no point can configure itself differently.
+ *
+ * The D-cache sequence is load-bearing and must not be simplified. CMSIS's
+ * SCB_EnableDCache() EARLY-RETURNS when CCR.DC is already set (cachel1_armv7.h);
+ * without that guard the call would invalidate by set/way and DISCARD the dirty
+ * engine state the warmup just wrote. So: clean-invalidate BEFORE disabling
+ * (dirty lines reach SDRAM), and on re-enable let CMSIS invalidate a cache that
+ * is already clean and empty. Never disable without cleaning first. */
+static void caches_set(int ic, int dc)
+{
+    if (dc) { SCB_EnableDCache(); }
+    else    { SCB_CleanInvalidateDCache(); SCB_DisableDCache(); }
+    if (ic) { SCB_EnableICache(); SCB_InvalidateICache(); }
+    else    { SCB_DisableICache(); }
+    __DSB(); __ISB();
+}
+
+/* Every point ends here, whatever it measured, so the next point starts from
+ * the same machine state. A point that left the D-cache off would corrupt every
+ * row after it and the table would look plausible while being wrong. */
+static void caches_restore(void)
+{
+    caches_set(1, 1);
+}
+
+static void matrix_point(juno_ctx *c, float *buf, Placement pl,
+                         int ic, int dc, int voices)
+{
+    if (g_mtx_n >= MTX_MAX) return;
+    mrow *r = &g_mtx[g_mtx_n++];
+    r->pl = pl; r->ic = ic; r->dc = dc; r->voices = voices; r->valid = 0;
+
+    /* Notes first, while the machine is in its normal configuration: a recall
+     * or note event is not what we are timing. */
+    for (int v = 0; v < 8; ++v) juno_gui_note_off(c, 36 + v * 5);
+    juno_gui_render(c, buf, BLOCK);
+    for (int v = 0; v < voices; ++v) juno_gui_note_on(c, 36 + v * 5, 100);
+
+    set_placement(pl);
+    caches_set(ic, dc);
+
+    (void)timed_render(c, buf, MTX_WARM_BLK);          /* equal warm, discarded */
+    span s = timed_render(c, buf, MTX_MEAS_BLK);
+
+    caches_restore();
+
+    uint32_t n = (uint32_t)(MTX_MEAS_BLK * BLOCK);
+    r->per    = (uint32_t)(s.cyc / n);
+    r->worst  = s.worst;
+    r->ms     = s.ms;
+    r->per_ms = (uint32_t)((uint64_t)s.ms * g_sysclk_hz / (1000ull * n));
+    r->valid  = 1;
+}
+
+/* Find a row by its coordinates; 0 if that point was not run. */
+static const mrow *mtx_find(Placement pl, int ic, int dc, int voices)
+{
+    for (int i = 0; i < g_mtx_n; ++i) {
+        const mrow *r = &g_mtx[i];
+        if (r->valid && r->pl == pl && r->ic == ic && r->dc == dc
+            && r->voices == voices) return r;
+    }
+    return nullptr;
+}
+
+/* Ratio of two rows as an integer percentage, so no float formatting is needed
+ * and a missing row cannot print as a confident 0.00x. */
+static void ratio_line(const char *what, const mrow *num, const mrow *den)
+{
+    if (!num || !den || !den->per) { LOG("  %-38s (not measured)", what); return; }
+    uint32_t r100 = (uint32_t)(((uint64_t)num->per * 100u) / den->per);
+    LOG("  %-38s %d.%02dx", what, (int)(r100 / 100), (int)(r100 % 100));
+}
+
+static void run_matrix(void)
 {
     static float buf[2 * BLOCK];
     const tg_scenario *s = &tg_scenarios[0];
     unsigned char *bank = build_bank(s);
     juno_ctx *c = juno_gui_create(E2_RATE, 0);
     if (!c || !bank) {
-        LOG("  E2: allocation FAILED (ctx=%d bank=%d)", c != nullptr, bank != nullptr);
-        pool_report("E2 alloc fail");
+        LOG("!! MATRIX: allocation FAILED (ctx=%d bank=%d) -- NO TABLE.",
+            c != nullptr, bank != nullptr);
+        pool_report("matrix alloc fail");
         if (c) juno_gui_destroy(c);
         if (bank) sdram_free(bank);
         return;
     }
-
     juno_gui_apply_bank(c, bank, BK_HEADER + BK_STRIDE, 0);
-    juno_gui_warmup(c, WARMUP_N);             /* past the cold-start transient */
+    juno_gui_warmup(c, WARMUP_N);          /* past the cold-start transient */
 
-    /* WHOLE BLOCKS ONLY. The old form was `N = 22050; for (i=0;i<N;i+=48)`,
-     * which runs 460 blocks = 22080 samples and then divides by 22050 -- every
-     * row was 0.136% high. E3 had the identical bias (11040 rendered / 11025
-     * divisor), so it cancelled in the E2/E3 comparison and hid behind the wrap.
-     * Now the divisor is exactly what was rendered. */
-    const int NBLK = ((int)E2_RATE / 2) / BLOCK;   /* half a second per point */
-    const int N    = NBLK * BLOCK;
+    const int NV[5] = {0, 1, 2, 4, 8};
+    for (int p = 0; p <= 1; ++p)
+        for (int ic = 1; ic >= 0; --ic)
+            for (int dc = 1; dc >= 0; --dc)
+                for (int k = 0; k < 5; ++k)
+                    matrix_point(c, buf, (Placement)p, ic, dc, NV[k]);
 
-    /* Idle first. All 8 voices free-run even with nothing held -- this fixed
-     * floor is ~84% of the cost on x86 and is the thing to attack. */
-    report("0 voices (idle)", timed_render(c, buf, NBLK), (uint32_t)N);
+    /* Third placement arm: the 8-voice, caches-on point only. That single row
+     * is the TOTAL placement ceiling; the full cross product for it would add
+     * minutes for questions the first two arms already answer. */
+    matrix_point(c, buf, PL_BOTH_ITCM, 1, 1, 8);
 
-    const int NV[] = {1, 2, 4, 8};
-    for (int k = 0; k < 4; ++k) {
-        for (int v = 0; v < NV[k]; ++v) juno_gui_note_on(c, 36 + v * 5, 100);
-        span d = timed_render(c, buf, NBLK);
-        char tag[32]; snprintf(tag, sizeof tag, "%d voice%s sounding",
-                               NV[k], NV[k] > 1 ? "s" : "");
-        report(tag, d, (uint32_t)N);
-        if (NV[k] == 8) { g_e2_8v = d; g_e2_8v_smp = (uint32_t)N; }
-        for (int v = 0; v < NV[k]; ++v) juno_gui_note_off(c, 36 + v * 5);
-        timed_render(c, buf, NBLK);
+    /* --------------------------------------------------------- the table */
+    LOG("");
+    LOG("place    ic dc  vox   cyc/sample   x-budget   worst-block   tick-check");
+    LOG("-------  -- --  ---   ----------   --------   -----------   ----------");
+    for (int i = 0; i < g_mtx_n; ++i) {
+        const mrow *r = &g_mtx[i];
+        if (!r->valid) continue;
+        uint32_t x100 = (uint32_t)(r->per * 100.0f / g_budget_live + 0.5f);
+        /* The millisecond tick is an INDEPENDENT clock. If it disagrees with the
+         * DWT the DWT wrapped, and the row is not to be believed -- that is the
+         * exact failure that invalidated the first silicon E2. */
+        int bad = (r->per_ms > r->per + r->per / 10u)
+               || (r->per_ms + r->per / 10u < r->per);
+        LOG("%-7s  %-2s %-2s  %3d   %10d   %4d.%02dx   %11d   %s",
+            PL_NAME[r->pl], r->ic ? "on" : "OFF", r->dc ? "on" : "OFF",
+            r->voices, (int)r->per, (int)(x100 / 100), (int)(x100 % 100),
+            (int)r->worst, bad ? "!! WRAPPED" : "ok");
     }
     if (g_wrap_suspect)
-        LOG("  !! a single block exceeded 2^31 cycles -- DWT cannot time this.");
+        LOG("!! a single block exceeded 2^31 cycles -- DWT cannot time this.");
 
-    /* E2 held 12 MB. E3 and E5 each need their own; without this the pool is
-     * full and both report "allocation FAILED" -- no cache numbers and, worse,
-     * no audio at all. */
+    /* --------------------------------------------------------- derived */
+    const mrow *base = mtx_find(PL_QSPI,       1, 1, 8);
+    const mrow *vit  = mtx_find(PL_VOICE_ITCM, 1, 1, 8);
+    const mrow *both = mtx_find(PL_BOTH_ITCM,  1, 1, 8);
+    const mrow *noi  = mtx_find(PL_QSPI,       0, 1, 8);
+    const mrow *nod  = mtx_find(PL_QSPI,       1, 0, 8);
+    const mrow *idle = mtx_find(PL_QSPI,       1, 1, 0);
+
+    LOG("");
+    LOG("--- DERIVED (all at 8 voices, QSPI/caches-on as the reference) ---");
+    ratio_line("voice_render QSPI -> ITCM",        vit,  base);
+    ratio_line("voice+master QSPI -> ITCM",        both, base);
+    ratio_line("cost of disabling the I-cache",    noi,  base);
+    ratio_line("cost of disabling the D-cache",    nod,  base);
+    ratio_line("idle floor as a fraction of 8v",   idle, base);
+
+    if (base && vit && both) {
+        LOG("");
+        LOG("VERDICT (SILICON, this board, this boot):");
+        /* State the rule BEFORE the numbers decide it, so the reading is not
+         * fitted to whatever came out. */
+        uint32_t iratio = noi ? (uint32_t)(((uint64_t)noi->per * 100u) / base->per) : 0;
+        uint32_t bratio = (uint32_t)(((uint64_t)both->per * 100u) / base->per);
+        if (bratio <= 80u || iratio >= 150u) {
+            LOG("  INSTRUCTION FETCH is a major term: moving the hot text off");
+            LOG("  QSPI changed the cost materially. COST_ATTRIBUTION.md's side");
+            LOG("  of docs/trackb/CONFLICT.md is supported, and placement -- a");
+            LOG("  linker script, zero arithmetic, still bit-exact -- is real.");
+        } else {
+            LOG("  INSTRUCTION FETCH is NOT the dominant term: the hot text in");
+            LOG("  ITCM barely moved the cost, and disabling the I-cache barely");
+            LOG("  hurt. That refutes COST_ATTRIBUTION.md's residual and points");
+            LOG("  at the DATA side -- read E7 below, which replays the engine's");
+            LOG("  own measured access pattern rather than a generic walk.");
+        }
+        if (both->per > (uint32_t)g_budget_live)
+            LOG("  Placement alone still leaves %d.%02dx over budget.",
+                (int)(both->per / (uint32_t)g_budget_live),
+                (int)((uint32_t)(both->per * 100.0f / g_budget_live) % 100));
+    }
+
+    /* Leave the machine in the reference configuration and RELEASE THE 12 MB.
+     * Every phase must give the pool back or later phases starve; that defect
+     * has already cost this project a dead board and two flashes. */
+    set_placement(PL_QSPI);
+    caches_restore();
     juno_gui_destroy(c);
-    sdram_free(bank);
-}
-
-/* ===================== E3: how much of it is SDRAM latency? ==============
- * Same workload, D-cache enabled then disabled. The ratio is a direct,
- * assumption-free measure of how much the 16 KB D-cache is saving us against
- * a ~416 KB working set -- and therefore an upper bound on what relocating
- * hot state into internal SRAM could recover. */
-/* E6a: the same 8-voice workload with the I-CACHE on, then off. If the engine
- * is paying QSPI instruction-fetch latency, the I-cache is the only thing
- * standing between it and disaster, so turning it off should be catastrophic
- * (many x). If it barely moves, instruction fetch is not the bottleneck.
- * Read this ALONGSIDE E3: E3 did the same for the D-cache and got 1.05x. */
-static void measure_icache(void)
-{
-    static float buf[2 * BLOCK];
-    const tg_scenario *sc = &tg_scenarios[0];
-    unsigned char *bank = build_bank(sc);
-    juno_ctx *c = juno_gui_create(E2_RATE, 0);
-    if (!c || !bank) {
-        LOG("  E6a: allocation FAILED (ctx=%d bank=%d)", c != nullptr, bank != nullptr);
-        pool_report("E6a alloc fail");
-        if (c) juno_gui_destroy(c);
-        if (bank) sdram_free(bank);
-        return;
-    }
-    juno_gui_apply_bank(c, bank, BK_HEADER + BK_STRIDE, 0);
-    juno_gui_warmup(c, WARMUP_N);      /* same warmup as E2/E3, so it replicates */
-    for (int v = 0; v < 8; ++v) juno_gui_note_on(c, 36 + v * 5, 100);
-
-    const int NBLK = ((int)E2_RATE / 4) / BLOCK;
-    const int N    = NBLK * BLOCK;
-
-    SCB_EnableICache();
-    SCB_InvalidateICache();
-    span on = timed_render(c, buf, NBLK);
-    report("8 voices, I-cache ON", on, (uint32_t)N);
-
-    SCB_DisableICache();
-    span off = timed_render(c, buf, NBLK);
-    SCB_EnableICache();
-    SCB_InvalidateICache();
-    report("8 voices, I-cache OFF", off, (uint32_t)N);
-
-    if (on.cyc) {
-        uint32_t r100 = (uint32_t)((off.cyc * 100u) / on.cyc);
-        LOG("  -> I-cache is worth %d.%02dx here.", (int)(r100 / 100), (int)(r100 % 100));
-    }
-    LOG("     Read this AGAINST E3's D-cache ratio. A LARGE I ratio with a small");
-    LOG("     D ratio means the bottleneck is INSTRUCTION fetch from QSPI, and");
-    LOG("     the fix is a linker script, not a rewrite of the DSP.");
-
-    juno_gui_destroy(c);
-    sdram_free(bank);
-}
-
-static void measure_dcache(void)
-{
-    static float buf[2 * BLOCK];
-    const tg_scenario *s = &tg_scenarios[0];
-    unsigned char *bank = build_bank(s);
-    juno_ctx *c = juno_gui_create(E2_RATE, 0);
-    if (!c || !bank) {
-        LOG("  E3: allocation FAILED (ctx=%d bank=%d)", c != nullptr, bank != nullptr);
-        pool_report("E3 alloc fail");
-        if (c) juno_gui_destroy(c);
-        if (bank) sdram_free(bank);
-        return;
-    }
-    juno_gui_apply_bank(c, bank, BK_HEADER + BK_STRIDE, 0);
-    juno_gui_warmup(c, WARMUP_N);     /* was E2_RATE/4 -- E2 uses E2_RATE, and */
-                                      /* an unequal warmup makes E3 not a      */
-                                      /* replicate of E2's 8-voice point.      */
-    for (int v = 0; v < 8; ++v) juno_gui_note_on(c, 36 + v * 5, 100);
-
-    const int NBLK = ((int)E2_RATE / 4) / BLOCK;
-    const int N    = NBLK * BLOCK;
-
-    /* NOTE: this CMSIS SCB_EnableDCache() early-returns when CCR.DC is already
-     * set (cachel1_armv7.h). That guard is load-bearing here -- without it the
-     * call would invalidate-by-set/way and DISCARD the dirty engine state the
-     * warmup just wrote. Do not port this file to an older CMSIS without
-     * re-checking that line. */
-    SCB_EnableDCache();
-    SCB_CleanInvalidateDCache();
-    span on = timed_render(c, buf, NBLK);
-    report("8 voices, D-cache ON", on, (uint32_t)N);
-
-    SCB_CleanInvalidateDCache();
-    SCB_DisableDCache();
-    span off = timed_render(c, buf, NBLK);
-    report("8 voices, D-cache OFF", off, (uint32_t)N);
-    SCB_EnableDCache();
-
-    if (on.cyc) {
-        float r = (float)off.cyc / (float)on.cyc;
-        LOG("  -> D-cache is worth %d.%02dx here. A large ratio means SDRAM",
-            (int)r, (int)(r * 100.0f) % 100);
-    }
-    LOG("     latency dominates and moving hot state to internal RAM pays.");
-
-    /* THE RECONCILIATION GATE. E3's ON row and E2's 8-voice row are the same
-     * nominal workload; if they disagree by more than a few percent one of the
-     * two is not measuring what its label says. The first silicon run had them
-     * 3.08x apart (DWT wrap) and nothing in the firmware noticed. */
-    if (g_e2_8v_smp && on.cyc) {
-        float e2 = (float)g_e2_8v.cyc / (float)g_e2_8v_smp;
-        float e3 = (float)on.cyc / (float)N;
-        int   pct = (int)(100.0f * (e3 - e2) / e2 + (e3 >= e2 ? 0.5f : -0.5f));
-        LOG("  cross-check: E3 ON %d vs E2 8v %d cyc/sample -> %d%% %s",
-            (int)(e3 + 0.5f), (int)(e2 + 0.5f), pct,
-            (pct > 5 || pct < -5) ? "!! DISAGREE, one of them is wrong" : "OK");
-    }
-    if (g_wrap_suspect)
-        LOG("  !! a single block exceeded 2^31 cycles -- DWT cannot time this.");
-
-    juno_gui_destroy(c);            /* E5 needs this 12 MB back */
     sdram_free(bank);
 }
 
@@ -829,6 +879,170 @@ static void measure_memory(void)
             a ? (int)((float)s / a) : 0,
             a ? (int)((float)s / a * 100.0f) % 100 : 0);
     }
+}
+
+
+/* ============ E7: REPLAY THE ENGINE'S OWN ACCESS PATTERN ================
+ *
+ * E4 above walks 256 KB sequentially and with a coprime stride. That is a
+ * generic proxy for "scattered", and a proxy is exactly what the two analyses
+ * in docs/trackb/CONFLICT.md have been arguing over. We no longer need a proxy:
+ * docs/trackb/MEMORY_LEVER.md MEASURED the real thing on the host --
+ *
+ *   1,155 accesses per voice per sample (817 loads, 338 stores)
+ *   620 DISTINCT 4-byte cells per voice
+ *   and the finding that matters: EVERY touched cell sits on its own 16-BYTE
+ *   boundary. That is the plugin's SSE layout carried over verbatim. A 32-byte
+ *   Cortex-M7 line therefore holds at most 2 useful cells, and 75.6% of every
+ *   line fill is thrown away.
+ *
+ * E7 replays THAT, in four arms with an identical access count:
+ *
+ *   16 B stride, SDRAM     <- what the engine does today
+ *   16 B stride, AXI SRAM
+ *    4 B stride, SDRAM     <- what COMPACTING the cell layout would give
+ *    4 B stride, AXI SRAM
+ *
+ * It therefore answers two questions off one flash. First: how much of the cost
+ * is data stall UNDER THE REAL PATTERN (the data side of CONFLICT.md, which E3's
+ * D-cache toggle measures only indirectly). Second, and this is the one that can
+ * change the plan: what compaction would buy BEFORE anyone attempts the invasive
+ * offset remap that compaction requires. If 4-byte stride in SDRAM lands near
+ * 16-byte stride in AXI, then compaction is a much cheaper route to the same win
+ * than relocating the state, and the whole memory plan changes.
+ *
+ * ORDER MATTERS AND IS NOT ASCENDING. The measured pattern is ~70% jumps. A
+ * purely ascending sweep would let the M7's automatic linefill prefetcher hide
+ * precisely the cost we are trying to measure, and the arms would converge on a
+ * comfortable, wrong answer. The index list below is a fixed pseudo-random
+ * permutation-ish walk, built once at run time and REUSED BY ALL FOUR ARMS, so
+ * the arms differ in stride and memory only.
+ *
+ * ANTI-FOLDING. An earlier version of E4 used a plain array filled by memset:
+ * GCC proved every word constant, deleted the loads, garbage-collected the
+ * buffer, and the benchmark printed a plausible number while measuring nothing.
+ * It was caught by inspecting the symbol table, not the build log. So: the
+ * buffers are volatile, they are filled from a run-time-seeded PRNG whose values
+ * cannot be known at compile time, the accumulator is stored to a volatile sink,
+ * and E7 PRINTS THE ACTUAL ADDRESSES it walked. AXI SRAM must read 0x24xxxxxx
+ * and SDRAM must read 0xC0xxxxxx. If they do not, the arms are not in the
+ * memories their labels claim and every ratio below is meaningless. */
+
+#define E7_CELLS   (620 * 8)          /* 620 cells x 8 voices, the real set  */
+#define E7_STRIDE16 4                 /* 16 B, expressed in 4-byte words     */
+#define E7_WORDS16 (E7_CELLS * E7_STRIDE16)   /* 19,840 words = 79.4 KB      */
+#define E7_ACCESS  200000             /* identical in every arm              */
+
+/* Two buffers, each big enough for the 16-byte-stride arm. The 4-byte arm uses
+ * the first E7_CELLS words of the same buffer, so the two strides differ in
+ * FOOTPRINT exactly as the real layouts would: 79.4 KB scattered versus 19.8 KB
+ * compact. That difference IS the effect being measured -- it is not a flaw in
+ * the comparison, it is the point of it. */
+static volatile uint32_t g_e7_axi[E7_WORDS16];
+static volatile uint32_t DSY_SDRAM_BSS g_e7_sdr[E7_WORDS16];
+static uint32_t g_e7_idx[4096];       /* the shared jumpy visit order */
+
+__attribute__((noinline))
+static uint32_t e7_walk(volatile uint32_t *p, uint32_t stride_words, int iters)
+{
+    uint32_t acc = 0;
+    uint32_t k = 0;
+    uint32_t t0 = cyc();
+    for (int i = 0; i < iters; ++i) {
+        uint32_t cell = g_e7_idx[k];
+        k = (k + 1u) & 4095u;
+        /* ~70% of the measured accesses are loads and the rest stores; mirror
+         * that rather than reading only, because a store miss on a write-back
+         * cache costs a line fill too. */
+        if ((i & 3) == 3) p[cell * stride_words] = acc;
+        else              acc += p[cell * stride_words];
+    }
+    uint32_t d = cyc() - t0;
+    g_sink = acc;
+    return d;
+}
+
+static void measure_real_pattern(void)
+{
+    uint32_t seed = cyc() | 1u;
+
+    /* Runtime-derived contents: unknowable at compile time, so unfoldable. */
+    for (uint32_t i = 0; i < E7_WORDS16; ++i) {
+        seed = seed * 1664525u + 1013904223u;
+        g_e7_axi[i] = seed;
+        g_e7_sdr[i] = seed;
+    }
+    /* The jumpy visit order, built once and shared by all four arms. */
+    for (uint32_t i = 0; i < 4096u; ++i) {
+        seed = seed * 1664525u + 1013904223u;
+        g_e7_idx[i] = (seed >> 8) % (uint32_t)E7_CELLS;
+    }
+
+    /* PROVE THE PLACEMENT. A label is not evidence; an address is. */
+    LOG("  buffers: AXI at 0x%08lx   SDRAM at 0x%08lx   (%d KB each)",
+        (unsigned long)(uintptr_t)g_e7_axi, (unsigned long)(uintptr_t)g_e7_sdr,
+        (int)(sizeof g_e7_axi / 1024u));
+    int axi_ok = (((uintptr_t)g_e7_axi >> 24) == 0x24u);
+    int sdr_ok = (((uintptr_t)g_e7_sdr >> 24) == 0xC0u);
+    if (!axi_ok || !sdr_ok) {
+        LOG("  !! WRONG MEMORY: AXI must be 0x24xxxxxx (%s), SDRAM 0xC0xxxxxx (%s).",
+            axi_ok ? "ok" : "NOT", sdr_ok ? "ok" : "NOT");
+        LOG("  !! The arms below are NOT in the memories they are labelled with.");
+        LOG("  !! Do not quote any ratio from this table.");
+    }
+
+    struct { const char *name; volatile uint32_t *buf; uint32_t stride; }
+    ARM[4] = {
+        {"16B SDRAM (today)", g_e7_sdr, E7_STRIDE16},
+        {"16B AXI",           g_e7_axi, E7_STRIDE16},
+        {"4B  SDRAM (compact)", g_e7_sdr, 1},
+        {"4B  AXI  (compact)", g_e7_axi, 1},
+    };
+    uint32_t cyc100[4];
+
+    LOG("");
+    LOG("  arm                   cyc/access");
+    LOG("  --------------------  ----------");
+    for (int i = 0; i < 4; ++i) {
+        /* Start every arm from the same cache state, or the arm that happens to
+         * run second inherits the first one's residency and reads faster for a
+         * reason that has nothing to do with stride. */
+        SCB_CleanInvalidateDCache();
+        uint32_t d = e7_walk(ARM[i].buf, ARM[i].stride, E7_ACCESS);
+        cyc100[i] = (uint32_t)((uint64_t)d * 100u / (uint32_t)E7_ACCESS);
+        LOG("  %-20s  %5d.%02d", ARM[i].name,
+            (int)(cyc100[i] / 100), (int)(cyc100[i] % 100));
+    }
+
+    LOG("");
+    LOG("  DERIVED:");
+    if (cyc100[1]) LOG("    SDRAM penalty at the real 16B stride   %d.%02dx",
+                       (int)(cyc100[0] * 100u / cyc100[1] / 100u),
+                       (int)((cyc100[0] * 100u / cyc100[1]) % 100u));
+    if (cyc100[2]) LOG("    compaction 16B->4B, in SDRAM           %d.%02dx",
+                       (int)(cyc100[0] * 100u / cyc100[2] / 100u),
+                       (int)((cyc100[0] * 100u / cyc100[2]) % 100u));
+    if (cyc100[3]) LOG("    compaction 16B->4B, in AXI             %d.%02dx",
+                       (int)(cyc100[1] * 100u / cyc100[3] / 100u),
+                       (int)((cyc100[1] * 100u / cyc100[3]) % 100u));
+    /* THE DECISION LINE. Compaction is a pure offset remap of the port's own
+     * layout; relocation needs 21 KB of the hot set moved into internal SRAM and
+     * the rest left behind. If compacted SDRAM is already near scattered AXI,
+     * compaction is the cheaper route to the same win. */
+    if (cyc100[1] && cyc100[2]) {
+        uint32_t r = cyc100[2] * 100u / cyc100[1];
+        LOG("    compacted-SDRAM vs scattered-AXI       %d.%02dx",
+            (int)(r / 100u), (int)(r % 100u));
+        if (r <= 130u)
+            LOG("    -> COMPACTION alone gets close to relocation. It is a pure");
+        else
+            LOG("    -> Relocation still beats compaction here. Compaction is a");
+        LOG("       offset remap of our own layout and needs no new memory.");
+    }
+    LOG("  NOTE: this measures the MEMORY SYSTEM under the engine's measured");
+    LOG("  pattern. It does not by itself say what fraction of the engine's");
+    LOG("  93,288 cyc/sample is data stall -- read it with the matrix's");
+    LOG("  D-cache column, which is the same question asked from the other end.");
 }
 
 /* ========================= E5: PLAY IT (live audio) ======================
@@ -967,13 +1181,110 @@ static void start_playing(void)
     hw.StartAudio(AudioCB);
 }
 
+/* ======================= PRE-FLIGHT SELF-CHECK ===========================
+ * DO NOT WASTE A FLASH ON A BAD BUILD. Every number below this point depends on
+ * a handful of preconditions that can silently fail: the ITCM copy may be empty
+ * (a linker glob that matched nothing still links cleanly), the DWT may not
+ * tick, the counter may wrap inside a measurement. When one of those fails the
+ * firmware still prints a full, plausible, WRONG table -- which is how this
+ * project lost a flash before.
+ *
+ * So the verdict is printed HERE, at the TOP, before any measurement, and it is
+ * loud. A reader who sees FAIL on this block can stop reading immediately. */
+static int preflight(uint32_t itcm_bytes, bool dwt_ok)
+{
+    int ok = 1;
+    uint32_t vsz = (uint32_t)((uint8_t *)&_evoice_itcm - (uint8_t *)&_svoice_itcm);
+    uint32_t msz = (uint32_t)((uint8_t *)&_emaster_itcm - (uint8_t *)&_smaster_itcm);
+
+    hw.PrintLine("");
+    hw.PrintLine("--- PRE-FLIGHT (every row below is a precondition) ---");
+    hw.PrintLine("  ITCM copied            %6d B from 0x%08lx to 0x%08lx",
+                 (int)itcm_bytes, (unsigned long)(uintptr_t)&_siitcm,
+                 (unsigned long)(uintptr_t)&_sitcm);
+    hw.PrintLine("    voice_render_itcm    %6d B   %s", (int)vsz,
+                 vsz ? "ok" : "!! EMPTY -- the ITCM arm is not real");
+    hw.PrintLine("    master_render_itcm   %6d B   %s", (int)msz,
+                 msz ? "ok" : "!! EMPTY -- the ITCM arm is not real");
+    if (!vsz || !msz || !itcm_bytes) ok = 0;
+    if (itcm_bytes > 64u * 1024u) {
+        hw.PrintLine("  !! ITCM section is %d B but ITCMRAM is only 65536 B.",
+                     (int)itcm_bytes);
+        ok = 0;
+    }
+    /* Prove the pointers really select DIFFERENT code. If both arms resolved to
+     * the same address the sweep would compare a thing with itself and report a
+     * confident 1.00x -- the most misleading result this firmware could give. */
+    hw.PrintLine("  voice_render  QSPI 0x%08lx   ITCM 0x%08lx   %s",
+                 (unsigned long)(uintptr_t)juno_voice_render,
+                 (unsigned long)(uintptr_t)juno_voice_render_itcm,
+                 (uintptr_t)juno_voice_render != (uintptr_t)juno_voice_render_itcm
+                     ? "distinct" : "!! SAME -- no A/B is possible");
+    hw.PrintLine("  master_render QSPI 0x%08lx   ITCM 0x%08lx   %s",
+                 (unsigned long)(uintptr_t)juno_master_render,
+                 (unsigned long)(uintptr_t)juno_master_render_itcm,
+                 (uintptr_t)juno_master_render != (uintptr_t)juno_master_render_itcm
+                     ? "distinct" : "!! SAME -- no A/B is possible");
+    if ((uintptr_t)juno_voice_render == (uintptr_t)juno_voice_render_itcm) ok = 0;
+    if ((uintptr_t)juno_master_render == (uintptr_t)juno_master_render_itcm) ok = 0;
+    /* The ITCM copies must actually be AT ITCM addresses (0x0000xxxx). A glob
+     * that missed would leave them in QSPI and the "ITCM" rows would be a
+     * second QSPI measurement wearing an ITCM label. */
+    int in_itcm = ((uintptr_t)juno_voice_render_itcm < 0x10000u)
+               && ((uintptr_t)juno_master_render_itcm < 0x10000u);
+    hw.PrintLine("  ITCM copies are at ITCM addresses          %s",
+                 in_itcm ? "ok" : "!! NO -- they are still in flash");
+    if (!in_itcm) ok = 0;
+
+    hw.PrintLine("  DWT cycle counter ticking                  %s",
+                 dwt_ok ? "ok" : "!! NO -- every cycle number is invalid");
+    if (!dwt_ok) ok = 0;
+    hw.PrintLine("  wrap canary (set if a block exceeded 2^31) %s",
+                 g_wrap_suspect ? "!! FIRED" : "clear");
+    if (g_wrap_suspect) ok = 0;
+    hw.PrintLine("  SysClk %d Hz   budget %d cyc/sample at %d Hz",
+                 (int)g_sysclk_hz, (int)(g_budget_live + 0.5f), (int)LIVE_RATE);
+    hw.PrintLine("  SDRAM pool %d KB   corpus rate %d Hz",
+                 (int)(sizeof g_sdram_pool / 1024u), (int)E2_RATE);
+
+    hw.PrintLine("  ==> PRE-FLIGHT %s", ok ? "PASS" : "*** FAIL ***");
+    if (!ok) {
+        hw.PrintLine("  *** ONE OR MORE PRECONDITIONS FAILED. The table below");
+        hw.PrintLine("  *** would be nonsense. Fix the build; do not read it.");
+    }
+    return ok;
+}
+
+/* ===================== PARK IN DFU WHEN THE RUN IS DONE ==================
+ * Flashing costs the user real effort, and the button dance (BOOT + RESET,
+ * timed) is the worst part of it. When everything above has run and the audio
+ * has played for a while, put the board into DFU with an INFINITE timeout: it
+ * then sits there waiting for dfu-util with no buttons touched at all.
+ *
+ * GUARDED, because parking is destructive to the thing a listener may still
+ * want: the audio. A power cycle re-runs the firmware from the top and plays
+ * again, so nothing is lost permanently -- and the countdown below announces
+ * the park well in advance instead of cutting the sound off as a surprise. */
+#define PARK_AFTER_S 90
+
+static void park_in_dfu(void)
+{
+    hw.PrintLine("");
+    hw.PrintLine("=== parking in DFU (infinite timeout) -- run dfu-util when");
+    hw.PrintLine("=== ready, no buttons needed. Power-cycle to hear audio again.");
+    System::Delay(300);            /* let the last line reach the terminal */
+    System::ResetToBootloader(System::BootloaderMode::DAISY_INFINITE_TIMEOUT);
+    while (1) { }                  /* not reached */
+}
+
 /* ================================= main ================================== */
 int main(void)
 {
-#if ITCM_HOT
-    /* FIRST: nothing may call the relocated code until the bytes are in ITCM. */
+    /* FIRST: nothing may call the relocated code until the bytes are in ITCM.
+     * The linker gave those functions ITCM addresses; until this copy runs,
+     * calling one executes whatever ITCM powered up holding. */
     uint32_t itcm_bytes = itcm_install();
-#endif
+
     hw.Init();                       /* also brings up the 64 MB SDRAM        */
     hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
     hw.SetAudioBlockSize(BLOCK);
@@ -985,29 +1296,21 @@ int main(void)
     g_sysclk_hz   = System::GetSysClkFreq();
     g_budget_live = (float)g_sysclk_hz / LIVE_RATE;
 
-    hw.PrintLine("=== JUNO-60 C99 port : Daisy Seed EXPERIMENT ===");
-    hw.PrintLine("SysClk %d Hz   live rate %d Hz   budget %d cyc/sample",
-                 (int)g_sysclk_hz, (int)LIVE_RATE,
-                 (int)(g_budget_live + 0.5f));
+    hw.PrintLine("=== JUNO-60 C99 port : Daisy Seed EXPERIMENT PLATFORM ===");
+    hw.PrintLine("One boot returns a TABLE, not a number. Placement x I-cache x");
+    hw.PrintLine("D-cache x voices, plus a replay of the engine's real access");
+    hw.PrintLine("pattern. Every arm is in THIS image; no second flash is needed.");
     /* Print the wrap period every run. It is the number that invalidated the
      * first E2 and it is not derivable from any other line in this log. */
     hw.PrintLine("DWT CYCCNT is 32-bit: wraps every %d ms. No single timed",
                  (int)(4294967296.0f / (float)g_sysclk_hz * 1000.0f));
-    hw.PrintLine("interval below may exceed that (E2/E3 time one block each).");
+    hw.PrintLine("interval below may exceed that (each point times one block).");
     /* The cost rows are measured at E2_RATE but scored against the LIVE_RATE
      * budget. That is deliberate (per-sample cost is rate-independent to within
      * the rate-armed coefficient branches) but it must be stated, not assumed. */
     hw.PrintLine("Cost rows: MEASURED at %d Hz, scored against the %d Hz budget.",
                  (int)E2_RATE, (int)LIVE_RATE);
-#if ITCM_HOT
-    hw.PrintLine("E6b IMAGE: hot render code in ITCM (%d B copied from QSPI)",
-                 (int)itcm_bytes);
-    hw.PrintLine("  compare E2 below against the QSPI baseline: 93288 cyc/sample");
-#else
-    hw.PrintLine("BASELINE IMAGE: hot render code executes XIP from QSPI flash");
-#endif
-    hw.PrintLine("SDRAM pool %d KB   corpus rate %d Hz",
-                 (int)(sizeof g_sdram_pool / 1024u), (int)E2_RATE);
+    hw.PrintLine("All timing below is SILICON -- measured on this board.");
 
     /* HARD GUARD: on an old bootloader our SDRAM does not exist.
      *
@@ -1019,7 +1322,7 @@ int main(void)
      * bootloader. The 13 MB DSY_SDRAM_BSS pool would then be un-clocked memory:
      * the memset in __wrap_calloc faults or silently writes garbage, and with no
      * MPU programming 0xC0000000 falls back to non-cacheable Device memory, which
-     * would make E3/E4 measure nonsense even if it did not crash.
+     * would make the cache columns measure nonsense even if it did not crash.
      *
      * Detect it and refuse, rather than fail in a way that looks like a port bug. */
     {
@@ -1039,16 +1342,15 @@ int main(void)
             while (1) { System::Delay(1000); }
         }
     }
-    if (!dwt_ok) {
-        hw.PrintLine("!! DWT cycle counter is NOT ticking. E2-E4 are invalid.");
-        hw.PrintLine("!! Fix that before believing any timing below.");
-    }
+
+    /* --- pre-flight: say it LOUDLY and say it FIRST --------------------- */
+    int pf = preflight(itcm_bytes, dwt_ok);
 
     /* --- E0: prove the allocator before anything relies on it ------------ */
     hw.PrintLine("");
     hw.PrintLine("--- E0: SDRAM pool self-test ---");
     if (!pool_selftest()) {
-        hw.PrintLine("!! The pool cannot serve the pattern E1-E5 need. Every");
+        hw.PrintLine("!! The pool cannot serve the pattern E1-E7 need. Every");
         hw.PrintLine("!! result below would be meaningless. Halting.");
         while (1) { System::Delay(1000); }
     }
@@ -1071,48 +1373,71 @@ int main(void)
         hw.PrintLine("    over 32,000,423 inputs, so unlikely -- but confirm.");
     }
 
-    /* --- E2..E4 --------------------------------------------------------- */
-    hw.PrintLine("");
-    hw.PrintLine("--- E2: cost (DWT cycles/sample) ---");
-    measure_cost();
-    pool_report("after E2");
-    hw.PrintLine("  Expect near-FLAT scaling: the plugin renders all 8 voices");
-    hw.PrintLine("  every sample by design. Flatness is the finding, not a bug.");
+    /* E1 runs the corpus through the DEFAULT (QSPI) pointers. Re-run one
+     * scenario's worth of the corpus through the ITCM copies as well? No: the
+     * two copies are the same source compiled with the same flags, and E1's own
+     * 8/8 already proves the source. What must be checked, and is checked in
+     * pre-flight, is that they are DISTINCT ADDRESSES -- a placement question,
+     * not an arithmetic one. */
 
+    /* --- THE MATRIX ----------------------------------------------------- */
     hw.PrintLine("");
-    hw.PrintLine("--- E3: is the cost CPU or SDRAM? ---");
-    measure_dcache();
-    pool_report("after E3");
+    hw.PrintLine("--- MATRIX: placement x I-cache x D-cache x voices (SILICON) ---");
+    run_matrix();
+    pool_report("after matrix");
 
+    /* --- E4 / E7: the memory system ------------------------------------- */
     hw.PrintLine("");
-    hw.PrintLine("--- E4: SDRAM vs internal AXI-SRAM ---");
+    hw.PrintLine("--- E4: SDRAM vs internal AXI-SRAM (generic walk) ---");
     measure_memory();
     pool_report("after E4");
 
     hw.PrintLine("");
-    hw.PrintLine("=== E2's 8-voice row against the budget IS the answer to");
-    hw.PrintLine("=== 'can the Daisy do 8 voices bit-exact'. E3/E4 say whether");
-    hw.PrintLine("=== memory placement can close any gap.");
+    hw.PrintLine("--- E7: the ENGINE'S OWN measured access pattern ---");
+    measure_real_pattern();
+    pool_report("after E7");
+
+    hw.PrintLine("");
+    if (!pf) {
+        hw.PrintLine("*** REMINDER: PRE-FLIGHT FAILED. Everything above is suspect.");
+    }
+    hw.PrintLine("=== The matrix's QSPI/on/on/8 row against the budget IS the");
+    hw.PrintLine("=== answer to 'can the Daisy do 8 voices bit-exact'. The");
+    hw.PrintLine("=== placement and I-cache columns are the instruction side of");
+    hw.PrintLine("=== docs/trackb/CONFLICT.md; the D-cache column and E7 are the");
+    hw.PrintLine("=== data side. Both sides, one flash.");
 
     /* --- E5: make sound ------------------------------------------------- */
     hw.PrintLine("");
     hw.PrintLine("--- E5: LIVE AUDIO (self-playing, no MIDI needed) ---");
     start_playing();
 
-    /* Live real-time verdict, once a second, from the main loop. */
+    /* Live real-time verdict, once a second, from the main loop, then park in
+     * DFU so the next flash needs no buttons. */
     uint32_t last_blocks = 0;
-    while (1) {
+    for (uint32_t sec = 0; ; ++sec) {
         System::Delay(1000);
         uint32_t blocks = g_blocks, worst = g_worst_cyc, over = g_overruns;
-        if (blocks == last_blocks) { hw.PrintLine("audio callback STALLED"); continue; }
-        last_blocks = blocks;
-        hw.PrintLine("patch %d/%d '%s'  worst %d cyc/block (%d%% of budget)"
-                     "  overruns %d/%d",
-                     g_cur_patch + 1, TG_NSCEN, tg_scenarios[g_cur_patch].name,
-                     (int)worst, (int)(100.0f * worst / g_budget_block),
-                     (int)over, (int)blocks);
-        /* Reset the peak so a single patch-change dropout does not dominate the
-         * reading forever -- that one block is expected to overrun. */
-        g_worst_cyc = 0;
+        if (blocks == last_blocks) {
+            hw.PrintLine("audio callback STALLED");
+        } else {
+            last_blocks = blocks;
+            hw.PrintLine("patch %d/%d '%s'  worst %d cyc/block (%d%% of budget)"
+                         "  overruns %d/%d",
+                         g_cur_patch + 1, TG_NSCEN, tg_scenarios[g_cur_patch].name,
+                         (int)worst, (int)(100.0f * worst / g_budget_block),
+                         (int)over, (int)blocks);
+            /* Reset the peak so a single patch-change dropout does not dominate
+             * the reading forever -- that one block is expected to overrun. */
+            g_worst_cyc = 0;
+        }
+        /* Announced, not sprung. The listener gets the whole countdown. */
+        if (sec + 10 >= PARK_AFTER_S && sec < PARK_AFTER_S)
+            hw.PrintLine("  ... parking in DFU in %d s (power-cycle to keep playing)",
+                         (int)(PARK_AFTER_S - sec));
+        if (sec >= PARK_AFTER_S) {
+            hw.StopAudio();
+            park_in_dfu();
+        }
     }
 }
