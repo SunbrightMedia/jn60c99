@@ -1,5 +1,56 @@
 # EMBEDDED ROADMAP — the honest big picture (2026-07-31)
 
+> ## ⚑ P1 IS CLOSED. SILICON NUMBERS EXIST (2026-08-01, Daisy Seed, user's board)
+>
+> The whole document below was written while the SILICON row of the label table
+> was empty. It is no longer empty. Read this box before trusting any estimate
+> further down.
+>
+> | quantity | SILICON | what the doc assumed |
+> |---|---|---|
+> | SysClk | **400 MHz** | 480 MHz |
+> | budget @48 kHz | **8,333 cyc/sample** | 10,884 @44.1k |
+> | 8 voices + FX | **93,288 cyc/sample → 11.19× OVER** | MODELED 30–42k; "honest band" 18–42k |
+> | 0 voices (idle floor) | **85,137 cyc/sample** | — |
+> | 4 voices | **84,560** | — |
+> | D-cache ON vs OFF | **1.05×** | E3 existed because this might dominate |
+> | AXI vs SDRAM, scattered | **6.26×** | — |
+> | golden corpus on M7 | **8/8 BIT-EXACT** | PROVEN under qemu only |
+>
+> **Three conclusions follow immediately, and they close P2.**
+>
+> 1. **The measurement is 2.2× worse than the worst case we modeled.** The
+>    "honest band" of 18–42k was optimistic by more than a factor of two. Every
+>    INFERRED "N× over" claim below is understated.
+> 2. **Reducing polyphony does not help.** The idle floor is 85,137 of the
+>    93,288 — **91%**. Cutting 8 voices to 4 saves 9%, not 50%. The plugin
+>    free-runs all 8 voices every sample by design, so "fewer voices" was never
+>    a lever. This kills the cheapest escape route in the plan.
+> 3. **Memory placement cannot close the gap.** E3 measures the D-cache as worth
+>    only 1.05×, so the engine is not SDRAM-latency-bound, and relocating hot
+>    state into internal RAM has at most 5% to give against an 11.19× deficit.
+>    E4's 6.26× scattered-access penalty is real but is not what dominates.
+>
+> Boosting the H750 to 480 MHz buys 1.2× and leaves 9.3× over. There is no
+> combination of clock, polyphony and memory placement that reaches 1.0×.
+>
+> **Track B's STOP rule S1 does NOT fire.** S1 abandons Track B if `F + 8V` fits
+> the Teensy budget or if a bit-exact 4-voice Daisy is acceptable. Neither holds:
+> a 4-voice Daisy is still 10.1× over, and the Teensy at 816 MHz has an
+> 18,503 cyc/sample budget against 93,288 cycles of measured work — ~5× over,
+> even before its slower memory. Track B (sonic identity instead of
+> bit-exactness) is now the only remaining path to 8 voices on this class of
+> part, and it must find better than 10×, which no listed lever approaches.
+>
+> **Unexplained, and flagged rather than smoothed over:** E3 reports 287,075
+> cyc/sample for the same nominal 8-voice workload that E2 measures at 93,288 —
+> a 3× discrepancy between two measurements in the same run. E3's *ratio* is
+> internally consistent and is what conclusion 3 rests on, but its absolute
+> numbers are not reconciled with E2's and must not be quoted until they are.
+>
+> Raw log: the user's first full run, 2026-08-01. E1/E2/E4 numbers above are
+> SILICON. Everything else in this document keeps its original label.
+
 *Written after a week in which the embedded verdict swung from "1.5× over" to
 "maybe fine" to "3–4× over" to "hopeless." The swings were the mess. This
 document fixes the method, corrects the record, and lays out the plan. It is

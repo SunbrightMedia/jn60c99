@@ -97,12 +97,21 @@ static int run_scenario(const tg_scenario *s, int idx, int total)
         return 1;
     }
     if (h != s->hash) {
-        printf("FAIL: %-14s patch %2d  got %016llx  want %016llx\n",
-               s->name, s->patch, (unsigned long long)h, (unsigned long long)s->hash);
+        /* Two 32-bit halves, not %016llx: newlib-nano's vsnprintf -- which is
+         * what the Daisy logger uses -- does not implement the ll length
+         * modifier and printed a literal "lx" on target, so every hash in the
+         * first full silicon log was unreadable. The verdict was still sound
+         * (the comparison is on the value, not the text), but a corpus whose
+         * printed hash cannot be compared by hand is only half a diagnostic. */
+        printf("FAIL: %-14s patch %2d  got %08lx%08lx  want %08lx%08lx\n",
+               s->name, s->patch,
+               (unsigned long)(h >> 32), (unsigned long)(h & 0xFFFFFFFFu),
+               (unsigned long)(s->hash >> 32), (unsigned long)(s->hash & 0xFFFFFFFFu));
         return 1;
     }
-    printf("OK:   %-14s patch %2d  hash %016llx\n",
-           s->name, s->patch, (unsigned long long)h);
+    printf("OK:   %-14s patch %2d  hash %08lx%08lx\n",
+           s->name, s->patch,
+           (unsigned long)(h >> 32), (unsigned long)(h & 0xFFFFFFFFu));
     return 0;
 }
 

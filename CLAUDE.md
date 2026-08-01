@@ -8,7 +8,38 @@ P0 (stabilize) → P1 (measure on silicon) → P2 (decide) → P3. The DAW-parit
 work (HOSTPATH_PARITY_SCOPE STEP 2–5, #141/#124/#140) is now the PARALLEL
 track, still valid, no longer the head pointer.**
 
-**★★★★★ NEWEST (2026-07-31 evening, Opus 5) — SEAL RE-PROVEN + WASM REPUBLISHED +
+**★★★★★★ NEWEST (2026-08-01) — P1 CLOSED. THE PORT HAS RUN ON SILICON. The
+SILICON row of the label table is no longer empty; see the box at the top of
+`docs/ROADMAP_EMBEDDED.md`.** Daisy Seed, the user's own board:
+- **E1: golden corpus 8/8 BIT-EXACT on real M7.** Bit-exactness survives the
+  real part, not just qemu. Everything else is a performance question now.
+- **E2: 8 voices + FX = 93,288 cyc/sample against a 8,333 budget → 11.19× OVER.**
+  SysClk is **400 MHz, not 480** (so the budget is 8,333 @48k, not 10,884). The
+  measurement is **2.2× worse than the worst case we modeled** (band was 18–42k).
+- **Polyphony is not a lever: the idle floor is 85,137 of the 93,288 (91%).**
+  4 voices = 84,560, i.e. 9% cheaper than 8. "Fewer voices" is dead as an escape.
+- **Memory placement is not a lever either: E3 measures D-cache ON vs OFF at
+  1.05×.** The engine is not SDRAM-latency-bound. E4's scattered AXI-vs-SDRAM
+  penalty is 6.26×, real but not dominant. ⚠ E3's ABSOLUTE numbers (287k
+  cyc/sample for the same 8-voice workload E2 puts at 93k) are a 3× discrepancy
+  that is UNRECONCILED — quote its ratio only.
+- **Track B's STOP rule S1 does NOT fire** (4-voice Daisy = 10.1× over; Teensy@816
+  = ~5× over on these numbers). Track B is now the only path to 8 voices — and it
+  needs better than 10×, which no measured lever approaches. **P2 is now a real
+  decision, not a formality.**
+- Audio DOES come out of the codec and is audibly glitchy — the correct symptom
+  of an 11× overrun, not a wiring or engine defect.
+- **Five firmware defects were found by running it, four by the board itself:**
+  the corpus leaked a 12 MB context per scenario; the SDRAM pool was a bump
+  allocator that could not reclaim (fixing the leak alone changed nothing —
+  `free` was a no-op); E2/E3 leaked their contexts too; the pool was READ before
+  it was initialised and `.sdram_bss` is NOLOAD, so E0 walked power-on garbage;
+  and newlib-nano's vsnprintf has no `%ll`, so every printed hash read `...lx`.
+  **The host harness could not have caught the NOLOAD one — its pool is ordinary
+  BSS and is already zero.** It now pre-fills 0xA5/0x5C/0x00/0xFF, and is
+  mutation-checked (removing the guards → 7 failures).
+
+**★★★★★ (2026-07-31 evening, Opus 5) — SEAL RE-PROVEN + WASM REPUBLISHED +
 TRACK B HARNESS BUILT AND ITS OWN DEFECTS FOUND. Read `docs/trackb/PLAN.md` (685
 lines, the execution plan) and `docs/TRACKB_CHARTER.md` (the gates).**
 - **`make verify` GREEN end-to-end, EXIT=0**, first full run since the MONO
