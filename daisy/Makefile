@@ -46,7 +46,7 @@ C_INCLUDES += -I$(ROOT)/src -I$(ROOT)/gui -I$(ROOT)/tests
 C_DEFS += -ffp-contract=off -fno-strict-aliasing
 
 # Serve the engine's one big allocation from SDRAM without editing engine source.
-LDFLAGS += -Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=free
+LDFLAGS += -Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=free -Wl,--wrap=realloc
 
 SYSTEM_FILES_DIR = $(LIBDAISY_DIR)/core
 include $(SYSTEM_FILES_DIR)/Makefile

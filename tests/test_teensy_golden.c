@@ -37,26 +37,38 @@ static uint64_t fnv_bytes(uint64_t h, const unsigned char *p, int n)
     return h;
 }
 
+/* Set when an allocation fails, so the scenario reports FAIL and the run
+ * continues. The old code called exit(2): on a desktop that is a clean abort,
+ * but on bare metal under --specs=nosys.specs exit() spins forever with nothing
+ * printed -- a silent hang, the exact failure mode this corpus must never have. */
+static int g_tg_oom;
+
 /* Render `n` frames and fold their raw bytes into the running hash. */
 static uint64_t render_hash(juno_ctx *c, uint64_t h, int n)
 {
     float *buf = (float *)malloc(sizeof(float) * 2 * n);
-    if (!buf) { fprintf(stderr, "OOM\n"); exit(2); }
+    if (!buf) { g_tg_oom = 1; return h; }
     juno_gui_render(c, buf, n);
     h = fnv_bytes(h, (const unsigned char *)buf, (int)(sizeof(float) * 2 * n));
     free(buf);
     return h;
 }
 
-static int run_scenario(const tg_scenario *s)
+static int run_scenario(const tg_scenario *s, int idx, int total)
 {
+    /* Announce BEFORE the work, not after. The first silicon run printed only
+     * completed scenarios, so a stall looked like "stuck on scenario 1" when
+     * scenario 1 had in fact finished and scenario 2 was the dead one. */
+    printf("[%d/%d] %-14s patch %2d  %d frames ...\n",
+           idx + 1, total, s->name, s->patch, s->nframes);
+    g_tg_oom = 0;
     /* minimal 1-patch bank: sentinel 'K' + the embedded TG_BLOB_LEN-byte record
      * prefix. Must copy the FULL embedded blob: the per-patch DELAY FEEDBACK /
      * DIRECT LEVEL bytes live at record 3057/3060, and the old hardcoded 704-byte
      * copy silently zeroed them (invisible while feedback was a constant; exposed
      * the moment the per-patch law landed). */
     unsigned char *bank = (unsigned char *)calloc(1, BK_HEADER + BK_STRIDE);
-    if (!bank) return 2;
+    if (!bank) { printf("FAIL: %-14s bank alloc\n", s->name); return 2; }
     bank[0] = 'K';
     memcpy(bank + BK_HEADER + BK_BLOB, s->blob, TG_BLOB_LEN);
 
@@ -80,6 +92,10 @@ static int run_scenario(const tg_scenario *s)
 
     free(bank);
     juno_gui_destroy(c);
+    if (g_tg_oom) {
+        printf("FAIL: %-14s patch %2d  render buffer alloc failed\n", s->name, s->patch);
+        return 1;
+    }
     if (h != s->hash) {
         printf("FAIL: %-14s patch %2d  got %016llx  want %016llx\n",
                s->name, s->patch, (unsigned long long)h, (unsigned long long)s->hash);
@@ -93,7 +109,7 @@ static int run_scenario(const tg_scenario *s)
 int main(void)
 {
     int i, bad = 0;
-    for (i = 0; i < TG_NSCEN; ++i) bad += run_scenario(&tg_scenarios[i]);
+    for (i = 0; i < TG_NSCEN; ++i) bad += run_scenario(&tg_scenarios[i], i, TG_NSCEN);
     if (bad) { printf("FAIL: %d/%d golden scenarios diverged\n", bad, TG_NSCEN); return 1; }
     printf("ALL OK: %d/%d Teensy golden scenarios bit-exact\n", TG_NSCEN, TG_NSCEN);
     return 0;

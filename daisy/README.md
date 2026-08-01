@@ -17,7 +17,42 @@ Daisy Seed, a USB cable, and something to listen on.
 plugin does and it is not configurable without breaking bit-exactness. Whether
 all 8 *sustain* in real time here is the open question, and E2/E5 answer it.
 
-## Status: builds and links, never run on hardware
+## Status: FIRST SILICON RUN 2026-08-01 — it boots, and it found two defects
+
+The first execution on a real Daisy Seed reached E1 and printed one `OK:` line,
+then stopped dead. Two defects, neither visible to any host gate:
+
+1. `tests/test_teensy_golden.c` never released the 12 MB engine context. On a
+   desktop that leak is invisible and the corpus has always passed.
+2. The SDRAM pool here was a **bump allocator** whose comment asserted the
+   firmware "never frees, so reclaiming would be dead code". False: E1 needs a
+   context per scenario and E2/E3/E5 one each — ten 12 MB lifetimes through a
+   13 MB pool. Scenario 2 got `nullptr`, fell back to the AXI heap (which cannot
+   serve 12 MB either), and `juno_gui_create` returned NULL.
+
+Fixing (1) alone would have changed nothing, because `free()` was a no-op inside
+the pool. Both are fixed; the pool now does first fit, split, and full
+coalescing, refuses double and interior frees, bounds every walk, and wraps
+`realloc` (previously unwrapped — a latent corruption). E0 is a new phase that
+self-tests the allocator before anything depends on it, and every phase boundary
+prints pool used / largest free / peak. The corpus announces each scenario
+**before** running it, so a stall names the scenario that is actually stuck.
+
+**One measurement already contradicts the roadmap.** The board reports:
+
+```
+SysClk 400000000 Hz   live rate 48000 Hz   budget 8333 cyc/sample
+```
+
+The clock is **400 MHz, not 480**, so the real-time budget is **8333 cycles per
+sample**, not the 10,884 assumed throughout `docs/ROADMAP_EMBEDDED.md`. The
+target is 23% tighter than planned. libDaisy can boost the H750 to 480 MHz; per
+the standing rule, that is not to be touched until E2 has produced a number.
+
+Also confirmed on silicon: bootloader ≥ v6.0, program memory region 7, SDRAM
+pool 13312 KB, and scenario 1 (`pluck_note`, patch 5) bit-exact on the M7.
+
+## Build status: builds and links
 
 **Re-verified 2026-07-31 from a clean room** — fresh `--recursive` clone of
 libDaisy, `rm -rf build`, full rebuild — after the MONO retrigger fix and the

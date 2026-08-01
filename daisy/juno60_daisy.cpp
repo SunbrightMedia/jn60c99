@@ -121,13 +121,39 @@ static void sdram_pool_init(void)
     g_sdram_init = 1;
 }
 
+/* Every walk is bounded. A corrupted header must not turn a diagnostic tool
+ * into an infinite loop -- that would look exactly like the hang we just spent
+ * an evening chasing. The pool never holds more than a handful of blocks. */
+#define SDBLK_MAX 4096
+
+static int g_sdram_corrupt;
+
+/* Walk the block list, checking it is well formed. Returns 0 on damage. */
+static int sdram_check(void)
+{
+    size_t off = 0;
+    int n = 0;
+    while (off + SDBLK_HDR <= sizeof g_sdram_pool) {
+        sdblk *b = (sdblk *)&g_sdram_pool[off];
+        if (b->used > 1) return 0;                       /* flag is 0 or 1     */
+        if (b->size == 0) return 0;                      /* zero never happens */
+        if (off + SDBLK_HDR + (size_t)b->size > sizeof g_sdram_pool) return 0;
+        off += SDBLK_HDR + b->size;
+        if (++n > SDBLK_MAX) return 0;
+    }
+    return off == sizeof g_sdram_pool;                   /* must tile exactly  */
+}
+
 /* Merge every run of adjacent free blocks. Called after each free. */
 static void sdram_coalesce(void)
 {
     size_t off = 0;
+    int guard = 0;
     while (off + SDBLK_HDR < sizeof g_sdram_pool) {
+        if (++guard > 2 * SDBLK_MAX) { g_sdram_corrupt = 1; return; }
         sdblk *b = (sdblk *)&g_sdram_pool[off];
         size_t nxt = off + SDBLK_HDR + b->size;
+        if (nxt > sizeof g_sdram_pool) { g_sdram_corrupt = 1; return; }
         if (b->used || nxt + SDBLK_HDR >= sizeof g_sdram_pool) { off = nxt; continue; }
         sdblk *n = (sdblk *)&g_sdram_pool[nxt];
         if (!n->used) { b->size += SDBLK_HDR + n->size; continue; }  /* retry same b */
@@ -138,12 +164,30 @@ static void sdram_coalesce(void)
 static size_t sdram_in_use(void)
 {
     size_t off = 0, used = 0;
+    int guard = 0;
     while (off + SDBLK_HDR < sizeof g_sdram_pool) {
+        if (++guard > SDBLK_MAX) { g_sdram_corrupt = 1; break; }
         sdblk *b = (sdblk *)&g_sdram_pool[off];
+        if (b->size == 0) { g_sdram_corrupt = 1; break; }
         if (b->used) used += b->size;
         off += SDBLK_HDR + b->size;
     }
     return used;
+}
+
+/* Largest single allocation the pool could still serve. */
+static size_t sdram_largest_free(void)
+{
+    size_t off = 0, best = 0;
+    int guard = 0;
+    while (off + SDBLK_HDR < sizeof g_sdram_pool) {
+        if (++guard > SDBLK_MAX) break;
+        sdblk *b = (sdblk *)&g_sdram_pool[off];
+        if (b->size == 0) break;
+        if (!b->used && b->size > best) best = b->size;
+        off += SDBLK_HDR + b->size;
+    }
+    return best;
 }
 
 /* 8 KB threshold: the 12 MB state and the corpus driver's render buffers go to
@@ -177,17 +221,40 @@ static void *sdram_alloc(size_t n)
     return nullptr;
 }
 
+/* Free by SEARCH, not by pointer arithmetic. Subtracting the header from an
+ * arbitrary pointer and trusting what is there would silently corrupt the pool
+ * on any interior or double free. Confirm p is the payload of a live block. */
 static void sdram_free(void *p)
 {
-    sdblk *b = (sdblk *)((uint8_t *)p - SDBLK_HDR);
-    b->used = 0;
-    sdram_coalesce();
+    size_t want = (size_t)((uint8_t *)p - g_sdram_pool);
+    size_t off = 0;
+    int guard = 0;
+    while (off + SDBLK_HDR < sizeof g_sdram_pool) {
+        if (++guard > SDBLK_MAX) { g_sdram_corrupt = 1; return; }
+        sdblk *b = (sdblk *)&g_sdram_pool[off];
+        if (b->size == 0) { g_sdram_corrupt = 1; return; }
+        if (off + SDBLK_HDR == want) {
+            if (!b->used) { g_sdram_corrupt = 1; return; }   /* double free */
+            b->used = 0;
+            sdram_coalesce();
+            return;
+        }
+        off += SDBLK_HDR + b->size;
+    }
+    g_sdram_corrupt = 1;                                     /* interior pointer */
 }
 
 extern "C" {
 void *__real_malloc(size_t);
 void *__real_calloc(size_t, size_t);
+void *__real_realloc(void *, size_t);
 void  __real_free(void *);
+
+static int sdram_owns(const void *p)
+{
+    const uint8_t *b = (const uint8_t *)p;
+    return b >= g_sdram_pool && b < g_sdram_pool + sizeof g_sdram_pool;
+}
 
 void *__wrap_malloc(size_t n)
 {
@@ -210,16 +277,98 @@ void *__wrap_calloc(size_t n, size_t sz)
 void __wrap_free(void *p)
 {
     if (!p) return;
-    uint8_t *b = (uint8_t *)p;
-    if (b >= g_sdram_pool && b < g_sdram_pool + sizeof g_sdram_pool) { sdram_free(p); return; }
+    if (sdram_owns(p)) { sdram_free(p); return; }
     __real_free(p);
 }
+
+/* realloc was NOT wrapped, which was a latent corruption: handing a pool
+ * pointer to the newlib allocator makes it read a heap header that does not
+ * exist. Nothing in the engine calls realloc today -- this closes the hole so
+ * that adding such a call later cannot silently destroy the pool. The block's
+ * own size is not recorded here, so copy the smaller of old and new and let the
+ * spare bytes be whatever the caller writes. */
+void *__wrap_realloc(void *p, size_t n)
+{
+    if (!p) return __wrap_malloc(n);
+    if (!sdram_owns(p)) return __real_realloc(p, n);
+    if (n == 0) { sdram_free(p); return nullptr; }
+
+    sdblk *b = (sdblk *)((uint8_t *)p - SDBLK_HDR);
+    size_t old = b->size;
+    if (n <= old) return p;                       /* shrink in place */
+    void *q = __wrap_malloc(n);
+    if (!q) return nullptr;
+    memcpy(q, p, old);
+    sdram_free(p);
+    return q;
+}
 } /* extern "C" */
+
+/* Print the pool state. Called at every phase boundary so that an exhausted or
+ * leaking pool is visible in the log the moment it happens, instead of being
+ * inferred hours later from a missing line. */
+static void pool_report(const char *tag)
+{
+    size_t used = sdram_in_use();
+    LOG("  [pool] %-16s used %4d KB   largest free %4d KB   peak %4d KB%s",
+        tag, (int)(used / 1024), (int)(sdram_largest_free() / 1024),
+        (int)(g_sdram_hwm / 1024), g_sdram_corrupt ? "   !! CORRUPT" : "");
+}
+
+/* Exercise the allocator before anything depends on it: the exact shape E1
+ * uses (bank + 12 MB context + a render buffer, eight times over), plus a
+ * deliberate double free and an interior free, which must be REFUSED rather
+ * than obeyed. Runs in a few microseconds and turns an allocator regression
+ * into one printed line instead of a dead board. */
+static int pool_selftest(void)
+{
+    if (sdram_in_use() != 0) { LOG("  [pool] selftest: pool not empty at start"); return 0; }
+
+    for (int i = 0; i < 8; ++i) {
+        void *bank = sdram_alloc(23 + 20223);
+        void *st   = sdram_alloc(12u * 1024u * 1024u);
+        void *buf  = sdram_alloc(2u * 16000u * sizeof(float));
+        if (!bank || !st || !buf) {
+            LOG("  [pool] selftest FAILED on round %d (bank=%d st=%d buf=%d)",
+                i, bank != nullptr, st != nullptr, buf != nullptr);
+            return 0;
+        }
+        sdram_free(buf); sdram_free(bank); sdram_free(st);
+        if (sdram_in_use() != 0) { LOG("  [pool] selftest: leak after round %d", i); return 0; }
+    }
+
+    /* Refusals. Both must set the corrupt flag WITHOUT altering the pool. */
+    void *p = sdram_alloc(65536);
+    sdram_free(p);
+    g_sdram_corrupt = 0;
+    sdram_free(p);                                   /* double free  */
+    int caught_double = g_sdram_corrupt;
+    g_sdram_corrupt = 0;
+    void *q = sdram_alloc(65536);
+    sdram_free((uint8_t *)q + 64);                   /* interior ptr */
+    int caught_interior = g_sdram_corrupt;
+    g_sdram_corrupt = 0;
+    sdram_free(q);
+
+    if (!caught_double || !caught_interior) {
+        LOG("  [pool] selftest: bad free NOT refused (double=%d interior=%d)",
+            caught_double, caught_interior);
+        return 0;
+    }
+    if (!sdram_check() || sdram_in_use() != 0) {
+        LOG("  [pool] selftest: pool damaged by the refusal tests");
+        return 0;
+    }
+    g_sdram_hwm = 0;                                 /* do not report the test's peak */
+    LOG("  [pool] selftest OK  (8 rounds, leak-free, bad frees refused)");
+    return 1;
+}
 
 /* ----------------------------------------------------------------- engine API */
 extern "C" {
 typedef struct juno_ctx juno_ctx;
 juno_ctx *juno_gui_create(float sample_rate, int chorus_mode);
+void      juno_gui_destroy(juno_ctx *c);
 int  juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx);
 void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity);
 void juno_gui_note_off(juno_ctx *c, int midi_note);
@@ -298,7 +447,13 @@ static void measure_cost(void)
     const tg_scenario *s = &tg_scenarios[0];
     unsigned char *bank = build_bank(s);
     juno_ctx *c = juno_gui_create(E2_RATE, 0);
-    if (!c || !bank) { LOG("  E2: allocation FAILED"); return; }
+    if (!c || !bank) {
+        LOG("  E2: allocation FAILED (ctx=%d bank=%d)", c != nullptr, bank != nullptr);
+        pool_report("E2 alloc fail");
+        if (c) juno_gui_destroy(c);
+        if (bank) sdram_free(bank);
+        return;
+    }
 
     juno_gui_apply_bank(c, bank, BK_HEADER + BK_STRIDE, 0);
     juno_gui_warmup(c, (int)E2_RATE);         /* past the cold-start transient */
@@ -323,6 +478,12 @@ static void measure_cost(void)
         for (int v = 0; v < NV[k]; ++v) juno_gui_note_off(c, 36 + v * 5);
         for (int i = 0; i < N; i += BLOCK) juno_gui_render(c, buf, BLOCK);
     }
+
+    /* E2 held 12 MB. E3 and E5 each need their own; without this the pool is
+     * full and both report "allocation FAILED" -- no cache numbers and, worse,
+     * no audio at all. */
+    juno_gui_destroy(c);
+    sdram_free(bank);
 }
 
 /* ===================== E3: how much of it is SDRAM latency? ==============
@@ -336,7 +497,13 @@ static void measure_dcache(void)
     const tg_scenario *s = &tg_scenarios[0];
     unsigned char *bank = build_bank(s);
     juno_ctx *c = juno_gui_create(E2_RATE, 0);
-    if (!c || !bank) { LOG("  E3: allocation FAILED"); return; }
+    if (!c || !bank) {
+        LOG("  E3: allocation FAILED (ctx=%d bank=%d)", c != nullptr, bank != nullptr);
+        pool_report("E3 alloc fail");
+        if (c) juno_gui_destroy(c);
+        if (bank) sdram_free(bank);
+        return;
+    }
     juno_gui_apply_bank(c, bank, BK_HEADER + BK_STRIDE, 0);
     juno_gui_warmup(c, (int)E2_RATE / 4);
     for (int v = 0; v < 8; ++v) juno_gui_note_on(c, 36 + v * 5, 100);
@@ -362,6 +529,9 @@ static void measure_dcache(void)
         LOG("  -> D-cache is worth %d.%02dx here. A large ratio means SDRAM",
             (int)((float)off / on), (int)((float)off / on * 100.0f) % 100);
     LOG("     latency dominates and moving hot state to internal RAM pays.");
+
+    juno_gui_destroy(c);            /* E5 needs this 12 MB back */
+    sdram_free(bank);
 }
 
 /* ============ E4: SDRAM vs AXI-SRAM, sequential and random ==============
@@ -537,7 +707,15 @@ static void start_playing(void)
 {
     g_play_bank = (unsigned char *)sdram_alloc(BK_HEADER + BK_STRIDE);
     g_play = juno_gui_create(LIVE_RATE, 0);
-    if (!g_play || !g_play_bank) { hw.PrintLine("  E5: allocation FAILED"); return; }
+    if (!g_play || !g_play_bank) {
+        hw.PrintLine("  E5: allocation FAILED (ctx=%d bank=%d) -- NO AUDIO.",
+                     g_play != nullptr, g_play_bank != nullptr);
+        hw.PrintLine("  This means an earlier phase did not release its 12 MB.");
+        pool_report("E5 alloc fail");
+        if (g_play) { juno_gui_destroy(g_play); g_play = nullptr; }
+        if (g_play_bank) { sdram_free(g_play_bank); g_play_bank = nullptr; }
+        return;
+    }
     memset(g_play_bank, 0, BK_HEADER + BK_STRIDE);
     memcpy(g_play_bank + BK_HEADER + BK_BLOB, tg_scenarios[0].blob, TG_BLOB_LEN);
     juno_gui_apply_bank(g_play, g_play_bank, BK_HEADER + BK_STRIDE, 0);
@@ -548,7 +726,10 @@ static void start_playing(void)
      * until the per-voice CONDITION scatter decorrelates them. Measured on x86:
      * ~4 s is where it settles (docs/COLDSTART_UNISON_FINDING.md). This is not
      * instant on the Daisy -- it is 4 s of DSP, possibly slower than real time. */
+    pool_report("E5 running");
     hw.PrintLine("  warming up 4 s of DSP (cold DCO phase alignment)...");
+    hw.PrintLine("  (this is real DSP and may take longer than 4 s -- wait for");
+    hw.PrintLine("   the 'budget' line below, THEN expect sound.)");
     juno_gui_warmup(g_play, (int)(LIVE_RATE * 4.0f));
 
     g_budget_block = (float)System::GetSysClkFreq() / LIVE_RATE * (float)BLOCK;
@@ -612,10 +793,21 @@ int main(void)
         hw.PrintLine("!! Fix that before believing any timing below.");
     }
 
+    /* --- E0: prove the allocator before anything relies on it ------------ */
+    hw.PrintLine("");
+    hw.PrintLine("--- E0: SDRAM pool self-test ---");
+    if (!pool_selftest()) {
+        hw.PrintLine("!! The pool cannot serve the pattern E1-E5 need. Every");
+        hw.PrintLine("!! result below would be meaningless. Halting.");
+        while (1) { System::Delay(1000); }
+    }
+    pool_report("after E0");
+
     /* --- E1 ------------------------------------------------------------- */
     hw.PrintLine("");
     hw.PrintLine("--- E1: golden corpus (bit-exactness on real M7) ---");
     int rc = juno_golden_main();
+    pool_report("after E1");
     hw.PrintLine("E1 verdict: %s", rc == 0 ? "ALL 8/8 BIT-EXACT"
                                            : "MISMATCH (see above)");
     if (rc != 0) {
@@ -632,16 +824,19 @@ int main(void)
     hw.PrintLine("");
     hw.PrintLine("--- E2: cost (DWT cycles/sample) ---");
     measure_cost();
+    pool_report("after E2");
     hw.PrintLine("  Expect near-FLAT scaling: the plugin renders all 8 voices");
     hw.PrintLine("  every sample by design. Flatness is the finding, not a bug.");
 
     hw.PrintLine("");
     hw.PrintLine("--- E3: is the cost CPU or SDRAM? ---");
     measure_dcache();
+    pool_report("after E3");
 
     hw.PrintLine("");
     hw.PrintLine("--- E4: SDRAM vs internal AXI-SRAM ---");
     measure_memory();
+    pool_report("after E4");
 
     hw.PrintLine("");
     hw.PrintLine("=== E2's 8-voice row against the budget IS the answer to");
