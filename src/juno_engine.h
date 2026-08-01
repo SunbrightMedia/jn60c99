@@ -95,6 +95,13 @@ int  juno_hw_ftz_available(void);
  * Returns the sample as a bit pattern (the decompile returns it in eax). */
 uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *outR);
 
+/* The driver's single call site goes through this pointer. It defaults to
+ * juno_voice_render; an embedded harness may point it at an identically
+ * compiled copy placed in another memory, to A/B code placement inside one
+ * boot. Swapping it changes NO arithmetic. See src/juno_driver.c. */
+extern uint32_t (*juno_voice_render_fn)(unsigned char *base, int voice,
+                                        float *outL, float *outR);
+
 /* juno_master_render — exact transcription of sub_180363380. The master process:
  * sums the 8 voice samples, runs the stereo BBD chorus, and writes the final
  * true-stereo output. Per-sample.
@@ -108,6 +115,9 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
  * the binary by juno_engine_prepare (the effect prepare/enable state) + the
  * per-patch recall (delay/reverb/chorus). See docs/MASTER_RENDER_MAP.md. */
 float *juno_master_render(unsigned char *a1, float **a2, float **a3);
+
+/* Placement A/B indirection for the master stage — see juno_voice_render_fn. */
+extern float *(*juno_master_render_fn)(unsigned char *a1, float **a2, float **a3);
 
 #ifdef __cplusplus
 }

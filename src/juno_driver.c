@@ -79,6 +79,23 @@ void juno_driver_seed_voices(unsigned char *st)
 #define JUNO_NOISE_BLOCK_OFF 84272u
 #define JUNO_NOISE_BLOCK_LEN 164u        /* [84272, 84436): 11 cells x 16 - 12 */
 
+/* INDIRECTION FOR PLACEMENT A/B ONLY — NOT AN ARITHMETIC CHANGE.
+ * juno_voice_render has exactly one call site (below). Calling it through a
+ * function pointer lets an embedded harness swap in a SECOND COMPILATION OF THE
+ * SAME SOURCE that the linker placed in a different memory (e.g. ITCM instead of
+ * XIP QSPI flash), so ONE boot can measure both placements. The default value is
+ * juno_voice_render itself, so every host build behaves exactly as before; the
+ * only cost is one indirect branch per voice, paid identically in both arms of
+ * the A/B, so it cannot bias the comparison. No operand, no rounding, no order
+ * of operations changes — the golden corpus must stay 8/8 (verified with
+ * `make test`). */
+uint32_t (*juno_voice_render_fn)(unsigned char *, int, float *, float *)
+    = juno_voice_render;
+
+/* Same purpose, same guarantee, for the master stage's single call site. */
+float *(*juno_master_render_fn)(unsigned char *, float **, float **)
+    = juno_master_render;
+
 void juno_driver_render_voices(unsigned char *st, float *vbuf)
 {
     unsigned char nblk[JUNO_NOISE_BLOCK_LEN];
@@ -91,7 +108,7 @@ void juno_driver_render_voices(unsigned char *st, float *vbuf)
         float vr = 0.0f;
         vbuf[v] = 0.0f;
         memcpy(st + JUNO_NOISE_BLOCK_OFF, nblk, JUNO_NOISE_BLOCK_LEN);
-        juno_voice_render(st, v, &vbuf[v], &vr);
+        juno_voice_render_fn(st, v, &vbuf[v], &vr);
     }
 }
 
@@ -118,7 +135,7 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
     {
         float *a3[2] = { outL, outR };
         *outL = 0.0f; *outR = 0.0f;
-        juno_master_render(st, a2, a3);
+        juno_master_render_fn(st, a2, a3);
         /* Reproduce the x86 plugin's FTZ/DAZ: flush decayed recursive state out
          * of the denormal range so the next sample reads zeros (as it would on
          * the real CPU). Removes the denormal-op load behind the crackle. */

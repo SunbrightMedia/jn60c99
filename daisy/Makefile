@@ -26,6 +26,13 @@ C_SOURCES  = $(wildcard $(ROOT)/src/*.c)
 C_SOURCES += $(ROOT)/gui/juno_bridge.c
 C_SOURCES += golden_shim.c
 
+# Second compilations of the two hot render TUs, renamed so the linker can put
+# them in ITCM while the originals stay in QSPI. The firmware then A/Bs code
+# PLACEMENT inside a single boot instead of needing two images and two flashes.
+# They add ~32 KB of QSPI (the load copies) and no arithmetic whatsoever.
+C_SOURCES += voice_render_itcm.c
+C_SOURCES += master_render_itcm.c
+
 C_INCLUDES += -I$(ROOT)/src -I$(ROOT)/gui -I$(ROOT)/tests
 
 # ---------------------------------------------------------------------------
@@ -49,14 +56,15 @@ C_DEFS += -ffp-contract=off -fno-strict-aliasing
 LDFLAGS += -Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=free -Wl,--wrap=realloc
 
 SYSTEM_FILES_DIR = $(LIBDAISY_DIR)/core
-# E6b: hot render code runs from ITCM, not XIP QSPI flash. Set ITCM_HOT=0 to
-# build the baseline image that executes from QSPI (that is what produced the
-# 93,288 cyc/sample SILICON figure, so the two images are a clean A/B).
-ITCM_HOT ?= 1
-ifeq ($(ITCM_HOT),1)
+
+# THE ITCM LINKER SCRIPT IS NOW THE ONLY BUILD. There is no ITCM_HOT=0 image
+# any more and there must not be one: the image contains BOTH placements at
+# once (QSPI originals + ITCM shadow copies) and selects between them at run
+# time, so the A/B is one flash rather than two. Removing the two-image scheme
+# is the point -- a second image would reintroduce the flash it was built to
+# avoid, and would also compare numbers taken from two different link layouts.
 LDSCRIPT = $(CURDIR)/juno_itcm.lds
 C_DEFS  += -DITCM_HOT=1
-endif
 
 include $(SYSTEM_FILES_DIR)/Makefile
 
@@ -94,7 +102,8 @@ verify-entry:
 .PHONY: check-fpcontract
 check-fpcontract:
 	@echo "scanning for fused multiply-add in the engine objects..."
-	@found=0; for o in $(BUILD_DIR)/voice_render.o $(BUILD_DIR)/master_render.o; do \
+	@found=0; for o in $(BUILD_DIR)/voice_render.o $(BUILD_DIR)/master_render.o \
+	                   $(BUILD_DIR)/voice_render_itcm.o $(BUILD_DIR)/master_render_itcm.o; do \
 	  [ -f "$$o" ] || { echo "  MISSING $$o (build first)"; exit 2; }; \
 	  n=$$($(PREFIX)objdump -d "$$o" | grep -cE "vfma|vfms|vfnma|vfnms" || true); \
 	  echo "  $$o: $$n fused ops"; [ "$$n" = "0" ] || found=1; \

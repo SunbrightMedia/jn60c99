@@ -31,17 +31,41 @@ SECTIONS
 		. = ALIGN(4);
 	} > QSPIFLASH
 
-	/* E6b: the hot render code executes from ITCM instead of XIP QSPI flash.
-	 * Load address stays in QSPI; main() copies it to ITCM before first use.
-	 * Placed BEFORE .text so these objects are claimed here and not there. */
+	/* PLACEMENT A/B, INSIDE ONE BOOT.
+	 *
+	 * The *_itcm.o objects are SECOND COMPILATIONS of src/voice_render.c and
+	 * src/master_render.c (see daisy/voice_render_itcm.c). Only those copies
+	 * live here; the ORIGINAL voice_render.o / master_render.o stay in .text
+	 * below and execute XIP from QSPI. Both placements therefore exist in the
+	 * same image at once, and the firmware picks between them at run time
+	 * through juno_voice_render_fn / juno_master_render_fn. The old scheme
+	 * needed two images and two flashes to learn the same thing.
+	 *
+	 * The glob is anchored on the _itcm suffix: `*voice_render.o` would ALSO
+	 * match voice_render_itcm.o, which would silently move the baseline arm
+	 * into ITCM and make the A/B compare ITCM against ITCM.
+	 *
+	 * juno_dsp.o and juno_ftz.o deliberately stay in QSPI in BOTH arms. They
+	 * are shared by both copies, so relocating them would change the baseline
+	 * too and there would be no baseline left. The consequence must be stated
+	 * when the numbers are read: the ITCM arms are a LOWER BOUND on what full
+	 * placement buys, because their helper calls still fetch from QSPI.
+	 *
+	 * Load address stays in QSPI; main() copies the bytes to ITCM before
+	 * anything calls them. Placed BEFORE .text so these objects are claimed
+	 * here and are not also emitted there. */
 	.itcmram :
 	{
 		. = ALIGN(4);
 		_sitcm = .;
-		*voice_render.o(.text .text*)
-		*master_render.o(.text .text*)
-		*juno_dsp.o(.text .text*)
-		*juno_ftz.o(.text .text*)
+		_svoice_itcm = .;
+		*voice_render_itcm.o(.text .text*)
+		. = ALIGN(4);
+		_evoice_itcm = .;
+		_smaster_itcm = .;
+		*master_render_itcm.o(.text .text*)
+		. = ALIGN(4);
+		_emaster_itcm = .;
 		. = ALIGN(4);
 		_eitcm = .;
 	} > ITCMRAM AT > QSPIFLASH

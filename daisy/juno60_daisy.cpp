@@ -491,8 +491,8 @@ static span timed_render(juno_ctx *c, float *buf, int nblocks)
  *     below, so E2 in THIS image measures ITCM-resident code. Compare it against
  *     the QSPI-resident SILICON baseline of 93,288 already measured on this
  *     board. Build the baseline with: make ITCM_HOT=0 */
-#if ITCM_HOT
 extern uint32_t _sitcm, _eitcm, _siitcm;
+extern uint32_t _svoice_itcm, _evoice_itcm, _smaster_itcm, _emaster_itcm;
 
 /* MUST run before anything calls the relocated code. The linker gave those
  * functions ITCM addresses; until the bytes are actually there, calling one
@@ -510,7 +510,40 @@ static uint32_t itcm_install(void)
     __ISB();
     return n;
 }
-#endif
+
+/* ------------------------------------------------- the placement axis itself
+ * The engine calls its two hot functions through pointers (src/juno_driver.c).
+ * The image holds two compilations of each: the original in QSPI and an
+ * identical ITCM copy. Selecting between them changes NOTHING but the address
+ * the instructions are fetched from -- no operand, no rounding, no ordering --
+ * so the arms remain bit-exact with respect to one another and the whole
+ * placement question is answered inside ONE boot. */
+extern "C" {
+uint32_t juno_voice_render(unsigned char *, int, float *, float *);
+uint32_t juno_voice_render_itcm(unsigned char *, int, float *, float *);
+float   *juno_master_render(unsigned char *, float **, float **);
+float   *juno_master_render_itcm(unsigned char *, float **, float **);
+extern uint32_t (*juno_voice_render_fn)(unsigned char *, int, float *, float *);
+extern float   *(*juno_master_render_fn)(unsigned char *, float **, float **);
+}
+
+enum Placement { PL_QSPI = 0, PL_VOICE_ITCM = 1, PL_BOTH_ITCM = 2 };
+static const char *PL_NAME[3] = { "QSPI", "V-ITCM", "VM-ITCM" };
+
+static void set_placement(Placement p)
+{
+    juno_voice_render_fn  = (p == PL_QSPI) ? juno_voice_render
+                                           : juno_voice_render_itcm;
+    juno_master_render_fn = (p == PL_BOTH_ITCM) ? juno_master_render_itcm
+                                                : juno_master_render;
+    /* The I-side may hold lines fetched through the OTHER copy's addresses.
+     * Invalidating is not strictly required (the addresses differ, so there is
+     * no aliasing) but it makes each point start from the same I-cache state,
+     * which is the whole reason the matrix is trustworthy. */
+    SCB_InvalidateICache();
+    __DSB();
+    __ISB();
+}
 
 /* ------------------------------------------------------------------ reporting */
 static float    g_budget_live;    /* cycles/sample available at LIVE_RATE */
