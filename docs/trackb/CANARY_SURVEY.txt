@@ -214,3 +214,96 @@ CANARY: 8/14 assignments observable; 6 BLIND (lines [1720, 1726, 1735, 1737, 173
   Add a scenario that exercises them, or record them in the ledger as
   out of scope with the reason.
 exit=1
+
+################################################################################
+=== DCO RE-SURVEY, 2026-08-01 (M2/M3 unblocking; MODULE_ORDER.md step 1) ===
+################################################################################
+
+WHAT WAS ADDED
+  One scenario, `DCO reset arm` (patch 22), in tools/trackb/null_ab.py SCEN.
+  Cells 2560 (DCO1) and 3040 (DCO2) are the per-oscillator RESET ARM, both
+  written from record byte 554 -- front-panel LFO TRIG ENV, value-tree leaf 121
+  (src/juno_apply.c:665-668). While the arm cell is 0, voice_render.c:971 / 1026
+  overwrite v123 / v145 with 1.0 unconditionally, so the gate-sign arm above it
+  (:967-970 / :1022-1025) is dead code. PROVEN by census over
+  truth/presetbankog1.bin: patch 22 is the ONLY one of the 64 factory patches
+  with byte 554 set (value 1). Patch 22 is therefore the whole of the bank's
+  coverage of this arm.
+
+REACHABILITY, MEASURED (instrumented build, counters in the render loop)
+  Samples in which IGNORING the arm (forcing v123 = 1.0) changes the branch at
+  :980:
+      pluck POLY 0   MONO retrigger 0   UNISON 0   chorus pad 0   delay keys 0
+      MONO glide 0   long LFO+tail 0    DCO noise 0
+      DCO reset arm  19322            <-- the new scenario
+  Confirmed the arm cell is live for the whole render of the new scenario
+  (2560 != 0 and 3040 != 0 in 432000/432000 samples).
+
+WHY THE MULTIPLICATIVE CANARY STILL REPORTS THOSE LINES 0/9
+  Not a scenario problem. Two statement shapes cannot be moved by *1.001 at all:
+    * `v123 = 0.0;`  -- scaling a literal zero is the identity.
+    * a value whose ONLY consumer is a sign test. 1.001*x has the sign of x for
+      every finite x, so `if (v128 < 0.0)` can never flip. v124/v128/v129 (and
+      the M3 twins v146/v150/v151) have exactly one consumer each, all sign
+      tests (:980, :992, :996 / :1035, :1047, :1051 -- grepped).
+    Additionally the gate cell 560 is measured to take only {0,1} (max 1.0 over
+    every scenario), so v124 = 560*v123 sits 0.5 away from the :980 threshold of
+    -JF(2864) = 0.5 -- a 50% margin. A 0.1% error there is bit-exactly inaudible.
+  canary.py therefore gained `--add D` (additive perturbation, opt-in, default
+  behaviour and thresholds unchanged).
+
+RESULT — src/voice_render.c:964-1021 (M2 DCO), --add 1.0, 9 scenarios
+  :968   v123 = 0.0;                       1/9  loudest 11.2 dB   <- was BLIND
+  :973   v124 = JF(a1, 560) * v123;        8/9  loudest 24.3 dB   <- was BLIND
+  :974   JF(a1, 2576) = v124;              0/9
+  :981   v125 = 0.0;                       8/9  loudest 18.0 dB   <- was BLIND
+  :983   v125 = 1.0;                       8/9  loudest 18.3 dB
+  :984   v126 = 1.0 - v125;                8/9  loudest 49.4 dB
+  :985   v127 = ...                        8/9  loudest -3.2 dB
+  :986   JF(a1, 2624) = v127;              8/9  loudest 18.0 dB
+  :987   v128 = v127 + JF(a1, 2880);       8/9  loudest -3.2 dB   <- was BLIND
+  :988   v129 = v127 - JF(a1, 2640);       0/9
+  :993   v130 = 0.0;                       8/9  loudest 43.9 dB   <- was BLIND
+  :995   v130 = 1.0;                       8/9
+  CANARY: 10/12 observable; 2 BLIND [974, 988]     (was 5/12, 7 BLIND)
+
+RESULT — src/voice_render.c:1022-1075 (M3 DCO2), --add 1.0, 9 scenarios
+  :1023  v145 = 0.0;                       1/9  loudest 3.9 dB    <- was BLIND
+  :1028  v146 = JF(a1, 560) * v145;        6/9  loudest 84.7 dB   <- was BLIND
+  :1029  JF(a1, 3056) = v146;              0/9
+  :1036  v147 = 0.0;                       6/9                    <- was BLIND
+  :1038  v147 = 1.0;                       6/9
+  :1039  v148 = 1.0 - v147;                6/9  loudest 85.4 dB
+  :1040  v149 = ...                        6/9
+  :1041  JF(a1, 3104) = v149;              6/9
+  :1042  v150 = v149 + JF(a1, 3360);       6/9                    <- was BLIND
+  :1043  v151 = v149 - JF(a1, 3120);       0/9
+  :1048  v152 = 0.0;                       6/9  loudest 68.5 dB   <- was BLIND
+  :1050  v152 = 1.0;                       6/9
+  CANARY: 10/12 observable; 2 BLIND [1029, 1043]   (was 5/12, 7 BLIND)
+  M3 opened on the same scenario as M2, as predicted -- verified, not assumed.
+
+THE FOUR RESIDUALS, CLASSIFIED WITH EVIDENCE (none are "closed")
+  :974 JF(a1,2576) = v124   and  :1029 JF(a1,3056) = v146
+      WRITE-ONLY SHADOW. `grep -n "2576\|3056" src/voice_render.c
+      src/master_render.c` returns only these two writes; every other hit is an
+      FX offset (102576, 10693056, 10692576) at a different base. No reader
+      exists anywhere in the audio path. Same class as :1143 in M1b.
+  :988 v129 = v127 - JF(a1,2640)  and  :1043 v151 = v149 - JF(a1,3120)
+      OUTCOME-DEGENERATE BRANCH INPUT. Sole consumer is
+      `if (v129 < 0.0) v130 = 1.0 - v125;`. Instrumented count of samples where
+      that guard fires AND the assigned value differs from what v130 already
+      holds: 0. Measured over all 9 scenarios AND all 64 factory patches under a
+      2-note hold+release script (M2 total 0, M3 total 0). The guard fires often;
+      it has never once changed a value. So no error confined to v129/v151 can
+      reach the output in any state measured. NOT proven unreachable in general
+      -- proven inert over 64 patches and ~5.9M rendered samples.
+  A native rewrite may drop :974/:1029 under the sonic-identity claim (never
+  under the bit-exact one) and must keep :988/:1043 structurally unless it can
+  extend the degeneracy proof; both belong in EQUIVALENCE.tsv's state_parity
+  column.
+
+NON-REGRESSION
+  `null_ab.py --cand juno_cand.so` (native/voice_render.c = verbatim fork):
+  9/9 PASS, residual EXACTLY 0 on every scenario including the new one
+  (sig -13.1 dBFS, the loudest scenario in the set -- non-vacuous).

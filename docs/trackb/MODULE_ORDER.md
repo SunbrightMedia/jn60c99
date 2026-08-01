@@ -12,8 +12,8 @@ not the simplest one." Done. Raw output in `CANARY_SURVEY.txt`.
 | 4 | M4 VCF | 1516-1640 | 9/14 | 1522, 1524, 1529, 1531, 1534 |
 | 5 | M5 PWM | 1076-1128 | 9/14 | 1079, 1082, 1092, 1096, 1097 |
 | 6 | M8 VCA / output | 1718-1830 | 8/14 | 1720, 1726, 1735, 1737, 1739, 1740 |
-| 7 | **M2 DCO** | 964-1021 | **5/12** | 968, 973, 974, 981, 987, 988, 993 |
-| 8 | **M3 DCO2** | 1022-1075 | **5/12** | 1023, 1028, 1029, 1036, 1042, 1043, 1048 |
+| 7 | **M2 DCO** | 964-1021 | **5/12** → **10/12** | 968, 973, 974, 981, 987, 988, 993 → **974, 988** |
+| 8 | **M3 DCO2** | 1022-1075 | **5/12** → **10/12** | 1023, 1028, 1029, 1036, 1042, 1043, 1048 → **1029, 1043** |
 | 9 | M1a conditioner + gate | 654-693 | **2/13** | 11 of 13 |
 
 ## What this changes
@@ -38,10 +38,38 @@ anywhere in voice_render.c or master_render.c. Write-only shadows -- droppable
 under a sonic-identity claim, though NOT under the bit-exact one, and they belong
 in the ledger's `state_parity` column.
 
+## UPDATE 2026-08-01 — the DCO prerequisite is DONE (step 1 below)
+
+M2 and M3 are now **10/12 observable**, four residuals classified with evidence.
+Two things were needed, and only one of them was scenarios:
+
+1. **A scenario that arms the DCO reset.** Cells 2560/3040 come from record byte
+   554 (LFO TRIG ENV, leaf 121); with them at 0 the whole gate-sign arm is
+   overwritten one line later and is dead code. **Patch 22 is the only one of the
+   64 factory patches that sets that byte**, so scenario `DCO reset arm` (patch
+   22) was added to null_ab's SCEN. Measured effect: ignoring the arm changes the
+   :980 branch in 19322 samples of the new scenario and in **0** samples of all
+   eight old ones.
+2. **A canary the lines can respond to.** Seven of twelve assignments per module
+   are either `x = 0.0;` or feed nothing but a sign test — and multiplying by
+   1.001 can move neither (scaling a zero is the identity; a positive scale never
+   flips a sign). This was a probe limitation being read as a coverage number.
+   `canary.py --add D` (additive, opt-in, thresholds untouched) resolves it.
+
+Residuals: `:974`/`:1029` are write-only shadows (no reader anywhere in
+voice_render.c or master_render.c); `:988`/`:1043` are outcome-degenerate — the
+guard they feed fires often but was measured to change its target's value in
+**0** samples across all 9 scenarios and all 64 patches. Full numbers, method
+and grep/instrumentation evidence: `CANARY_SURVEY.txt`, last section.
+
+**Caveat for the other seven modules:** their BLIND counts in the table above
+were all taken with the multiplicative canary, and every `= 0.0;` line in them
+(1162, 1534, ...) is in the same structurally-unperturbable class. Re-run them
+with `--add` before treating any of those numbers as a coverage fact.
+
 ## Order of work
 
-1. Close the DCO blind gates (M2/M3) -- prerequisite, blocks the highest-value
-   rewrites.
+1. ~~Close the DCO blind gates (M2/M3)~~ — DONE, see the update above.
 2. M1b, then M7, then M6 -- rewrite where the gate can already see.
 3. M1a last, or never: if the gate cannot see it, the cycles it costs are better
    attacked structurally than by rewriting arithmetic nobody can validate.
