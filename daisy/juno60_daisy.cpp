@@ -477,6 +477,41 @@ static span timed_render(juno_ctx *c, float *buf, int nblocks)
     return s;
 }
 
+/* ======================= E6: is the cost INSTRUCTION FETCH? ===============
+ * Two analyses disagreed about where 50,742 of the 93,288 cyc/sample go. One
+ * says scattered SDRAM DATA stalls; the other says INSTRUCTION FETCH, because
+ * APP_TYPE=BOOT_QSPI means we execute XIP from external QSPI flash and the hot
+ * .text is ~32.8 KB against a 16 KB L1 I-cache -- every byte touched every
+ * sample. E3 toggled the D-cache ONLY, so an I-side cost is exactly what it is
+ * structurally unable to see.
+ *
+ * E6a toggles the I-CACHE around the E2 workload.
+ * E6b is the linker script: with ITCM_HOT=1 the hot render objects are linked
+ *     to ITCM (load address stays in QSPI) and copied there by itcm_install()
+ *     below, so E2 in THIS image measures ITCM-resident code. Compare it against
+ *     the QSPI-resident SILICON baseline of 93,288 already measured on this
+ *     board. Build the baseline with: make ITCM_HOT=0 */
+#if ITCM_HOT
+extern uint32_t _sitcm, _eitcm, _siitcm;
+
+/* MUST run before anything calls the relocated code. The linker gave those
+ * functions ITCM addresses; until the bytes are actually there, calling one
+ * executes whatever ITCM powered up holding. */
+static uint32_t itcm_install(void)
+{
+    uint32_t *dst = &_sitcm, *src = &_siitcm;
+    uint32_t  n   = (uint32_t)((uint8_t *)&_eitcm - (uint8_t *)&_sitcm);
+    while (dst < &_eitcm) *dst++ = *src++;
+    /* The code was just written as DATA. Without this the I-side can fetch
+     * stale bytes for addresses it has already cached. */
+    SCB_CleanDCache();
+    SCB_InvalidateICache();
+    __DSB();
+    __ISB();
+    return n;
+}
+#endif
+
 /* ------------------------------------------------------------------ reporting */
 static float    g_budget_live;    /* cycles/sample available at LIVE_RATE */
 static uint32_t g_sysclk_hz = 1;  /* for the elapsed-seconds column         */
@@ -583,6 +618,54 @@ static void measure_cost(void)
  * assumption-free measure of how much the 16 KB D-cache is saving us against
  * a ~416 KB working set -- and therefore an upper bound on what relocating
  * hot state into internal SRAM could recover. */
+/* E6a: the same 8-voice workload with the I-CACHE on, then off. If the engine
+ * is paying QSPI instruction-fetch latency, the I-cache is the only thing
+ * standing between it and disaster, so turning it off should be catastrophic
+ * (many x). If it barely moves, instruction fetch is not the bottleneck.
+ * Read this ALONGSIDE E3: E3 did the same for the D-cache and got 1.05x. */
+static void measure_icache(void)
+{
+    static float buf[2 * BLOCK];
+    const tg_scenario *sc = &tg_scenarios[0];
+    unsigned char *bank = build_bank(sc);
+    juno_ctx *c = juno_gui_create(E2_RATE, 0);
+    if (!c || !bank) {
+        LOG("  E6a: allocation FAILED (ctx=%d bank=%d)", c != nullptr, bank != nullptr);
+        pool_report("E6a alloc fail");
+        if (c) juno_gui_destroy(c);
+        if (bank) sdram_free(bank);
+        return;
+    }
+    juno_gui_apply_bank(c, bank, BK_HEADER + BK_STRIDE, 0);
+    juno_gui_warmup(c, WARMUP_N);      /* same warmup as E2/E3, so it replicates */
+    for (int v = 0; v < 8; ++v) juno_gui_note_on(c, 36 + v * 5, 100);
+
+    const int NBLK = ((int)E2_RATE / 4) / BLOCK;
+    const int N    = NBLK * BLOCK;
+
+    SCB_EnableICache();
+    SCB_InvalidateICache();
+    span on = timed_render(c, buf, NBLK);
+    report("8 voices, I-cache ON", on, (uint32_t)N);
+
+    SCB_DisableICache();
+    span off = timed_render(c, buf, NBLK);
+    SCB_EnableICache();
+    SCB_InvalidateICache();
+    report("8 voices, I-cache OFF", off, (uint32_t)N);
+
+    if (on.cyc) {
+        uint32_t r100 = (uint32_t)((off.cyc * 100u) / on.cyc);
+        LOG("  -> I-cache is worth %d.%02dx here.", (int)(r100 / 100), (int)(r100 % 100));
+    }
+    LOG("     Read this AGAINST E3's D-cache ratio. A LARGE I ratio with a small");
+    LOG("     D ratio means the bottleneck is INSTRUCTION fetch from QSPI, and");
+    LOG("     the fix is a linker script, not a rewrite of the DSP.");
+
+    juno_gui_destroy(c);
+    sdram_free(bank);
+}
+
 static void measure_dcache(void)
 {
     static float buf[2 * BLOCK];
@@ -854,6 +937,10 @@ static void start_playing(void)
 /* ================================= main ================================== */
 int main(void)
 {
+#if ITCM_HOT
+    /* FIRST: nothing may call the relocated code until the bytes are in ITCM. */
+    uint32_t itcm_bytes = itcm_install();
+#endif
     hw.Init();                       /* also brings up the 64 MB SDRAM        */
     hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
     hw.SetAudioBlockSize(BLOCK);
@@ -879,6 +966,13 @@ int main(void)
      * the rate-armed coefficient branches) but it must be stated, not assumed. */
     hw.PrintLine("Cost rows: MEASURED at %d Hz, scored against the %d Hz budget.",
                  (int)E2_RATE, (int)LIVE_RATE);
+#if ITCM_HOT
+    hw.PrintLine("E6b IMAGE: hot render code in ITCM (%d B copied from QSPI)",
+                 (int)itcm_bytes);
+    hw.PrintLine("  compare E2 below against the QSPI baseline: 93288 cyc/sample");
+#else
+    hw.PrintLine("BASELINE IMAGE: hot render code executes XIP from QSPI flash");
+#endif
     hw.PrintLine("SDRAM pool %d KB   corpus rate %d Hz",
                  (int)(sizeof g_sdram_pool / 1024u), (int)E2_RATE);
 

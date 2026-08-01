@@ -49,6 +49,15 @@ C_DEFS += -ffp-contract=off -fno-strict-aliasing
 LDFLAGS += -Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=free -Wl,--wrap=realloc
 
 SYSTEM_FILES_DIR = $(LIBDAISY_DIR)/core
+# E6b: hot render code runs from ITCM, not XIP QSPI flash. Set ITCM_HOT=0 to
+# build the baseline image that executes from QSPI (that is what produced the
+# 93,288 cyc/sample SILICON figure, so the two images are a clean A/B).
+ITCM_HOT ?= 1
+ifeq ($(ITCM_HOT),1)
+LDSCRIPT = $(CURDIR)/juno_itcm.lds
+C_DEFS  += -DITCM_HOT=1
+endif
+
 include $(SYSTEM_FILES_DIR)/Makefile
 
 # Belt and braces: also append after the include, in case a future libDaisy
