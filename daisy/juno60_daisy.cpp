@@ -93,10 +93,58 @@ extern "C" int jd_printf(const char *fmt, ...)
  *
  * .sdram_bss is declared NOLOAD in the linker script, so it is NOT zeroed by
  * startup -- the explicit memset below is load-bearing, not defensive.
- * A bump allocator is correct here: this firmware allocates during setup and
- * never frees, so reclaiming would be dead code. */
+ *
+ * THIS WAS A BUMP ALLOCATOR AND THAT WAS WRONG. Its comment claimed "this
+ * firmware allocates during setup and never frees, so reclaiming would be dead
+ * code". The first run on silicon disproved it: E1 builds and drops a 12 MB
+ * juno_ctx for EACH of its 8 scenarios, and E2/E3/E5 build one more each. With
+ * no reclaim, scenario 2 asks for 12 MB of a 13 MB pool, gets nullptr, falls
+ * back to the AXI heap (which cannot serve 12 MB either), and juno_gui_create
+ * returns NULL -- then the corpus driver dereferences it and the board stops
+ * dead after printing exactly one OK line. Free is now real: first fit, split
+ * on alloc, full coalescing pass on free. Block count stays in single digits,
+ * so a linear scan costs nothing measurable. */
 static uint8_t DSY_SDRAM_BSS g_sdram_pool[13u * 1024u * 1024u];
-static size_t  g_sdram_used;
+
+/* 32-byte header keeps every payload cache-line aligned, as the bump version did. */
+typedef struct sdblk { uint32_t size; uint32_t used; uint32_t pad[6]; } sdblk;
+#define SDBLK_HDR 32u
+
+static int    g_sdram_init;
+static size_t g_sdram_hwm;                        /* high-water mark, for the log */
+
+static void sdram_pool_init(void)
+{
+    sdblk *b = (sdblk *)g_sdram_pool;
+    b->size  = (uint32_t)(sizeof g_sdram_pool - SDBLK_HDR);
+    b->used  = 0;
+    g_sdram_init = 1;
+}
+
+/* Merge every run of adjacent free blocks. Called after each free. */
+static void sdram_coalesce(void)
+{
+    size_t off = 0;
+    while (off + SDBLK_HDR < sizeof g_sdram_pool) {
+        sdblk *b = (sdblk *)&g_sdram_pool[off];
+        size_t nxt = off + SDBLK_HDR + b->size;
+        if (b->used || nxt + SDBLK_HDR >= sizeof g_sdram_pool) { off = nxt; continue; }
+        sdblk *n = (sdblk *)&g_sdram_pool[nxt];
+        if (!n->used) { b->size += SDBLK_HDR + n->size; continue; }  /* retry same b */
+        off = nxt;
+    }
+}
+
+static size_t sdram_in_use(void)
+{
+    size_t off = 0, used = 0;
+    while (off + SDBLK_HDR < sizeof g_sdram_pool) {
+        sdblk *b = (sdblk *)&g_sdram_pool[off];
+        if (b->used) used += b->size;
+        off += SDBLK_HDR + b->size;
+    }
+    return used;
+}
 
 /* 8 KB threshold: the 12 MB state and the corpus driver's render buffers go to
  * SDRAM; juno_ctx and libDaisy's own small allocations stay on the AXI-SRAM
@@ -105,11 +153,35 @@ static size_t  g_sdram_used;
 
 static void *sdram_alloc(size_t n)
 {
+    if (!g_sdram_init) sdram_pool_init();
     n = (n + 31u) & ~(size_t)31u;                 /* 32-byte: cache-line safe */
-    if (g_sdram_used + n > sizeof g_sdram_pool) return nullptr;
-    void *p = &g_sdram_pool[g_sdram_used];
-    g_sdram_used += n;
-    return p;
+
+    size_t off = 0;
+    while (off + SDBLK_HDR < sizeof g_sdram_pool) {
+        sdblk *b = (sdblk *)&g_sdram_pool[off];
+        if (!b->used && b->size >= n) {
+            /* split only if the remainder can hold a header plus a useful payload */
+            if (b->size >= n + SDBLK_HDR + 32u) {
+                sdblk *r = (sdblk *)&g_sdram_pool[off + SDBLK_HDR + n];
+                r->size  = (uint32_t)(b->size - n - SDBLK_HDR);
+                r->used  = 0;
+                b->size  = (uint32_t)n;
+            }
+            b->used = 1;
+            size_t u = sdram_in_use();
+            if (u > g_sdram_hwm) g_sdram_hwm = u;
+            return &g_sdram_pool[off + SDBLK_HDR];
+        }
+        off += SDBLK_HDR + b->size;
+    }
+    return nullptr;
+}
+
+static void sdram_free(void *p)
+{
+    sdblk *b = (sdblk *)((uint8_t *)p - SDBLK_HDR);
+    b->used = 0;
+    sdram_coalesce();
 }
 
 extern "C" {
@@ -134,11 +206,12 @@ void *__wrap_calloc(size_t n, size_t sz)
     return p;
 }
 
-/* Pool memory is never individually freed; anything outside it is real heap. */
+/* Pool memory now returns to the pool; anything outside it is real heap. */
 void __wrap_free(void *p)
 {
+    if (!p) return;
     uint8_t *b = (uint8_t *)p;
-    if (b >= g_sdram_pool && b < g_sdram_pool + sizeof g_sdram_pool) return;
+    if (b >= g_sdram_pool && b < g_sdram_pool + sizeof g_sdram_pool) { sdram_free(p); return; }
     __real_free(p);
 }
 } /* extern "C" */

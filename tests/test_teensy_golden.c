@@ -22,6 +22,7 @@ int  juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int id
 void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity);
 void juno_gui_note_off(juno_ctx *c, int midi_note);
 int  juno_gui_render(juno_ctx *c, float *out, int nframes);
+void juno_gui_destroy(juno_ctx *c);
 
 /* Bank layout (tools/verify/e2e_emu.py: HEADER=23, STRIDE=20223, BLOB_OFF=16). */
 #define BK_HEADER 23
@@ -60,6 +61,11 @@ static int run_scenario(const tg_scenario *s)
     memcpy(bank + BK_HEADER + BK_BLOB, s->blob, TG_BLOB_LEN);
 
     juno_ctx *c = juno_gui_create(TG_RATE, 0);
+    /* The context is 12 MB (JUNO_STATE_BYTES). On a desktop a failure here is
+     * unthinkable and a leak is invisible; on the Daisy the whole SDRAM pool is
+     * 13 MB, so scenario 2 gets NULL and the board dies on the next call. Both
+     * the check and the matching destroy below are load-bearing on target. */
+    if (!c) { free(bank); printf("FAIL: %-14s alloc\n", s->name); return 2; }
     juno_gui_apply_bank(c, bank, BK_HEADER + BK_STRIDE, 0);
 
     uint64_t h = fnv_init();
@@ -73,6 +79,7 @@ static int run_scenario(const tg_scenario *s)
     if (s->nframes > cur) h = render_hash(c, h, s->nframes - cur);
 
     free(bank);
+    juno_gui_destroy(c);
     if (h != s->hash) {
         printf("FAIL: %-14s patch %2d  got %016llx  want %016llx\n",
                s->name, s->patch, (unsigned long long)h, (unsigned long long)s->hash);
