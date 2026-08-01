@@ -429,18 +429,79 @@ static bool dwt_init(void)
 }
 static inline uint32_t cyc(void) { return DWT->CYCCNT; }
 
-/* ------------------------------------------------------------------ reporting */
-static float g_budget_live;    /* cycles/sample available at LIVE_RATE */
+/* ------------------------------------------------- WRAP-SAFE BLOCK TIMING
+ * DWT->CYCCNT is 32 bits and has no overflow flag. At the MEASURED SysClk of
+ * 400 MHz it wraps every 2^32/400e6 = 10.74 s.
+ *
+ * THE FIRST SILICON RUN WAS BITTEN BY EXACTLY THIS. E2 timed a whole
+ * half-second-of-audio loop with one cyc()-t0 pair. At the real cost (~288k
+ * cyc/sample) 22080 samples take 15.9 s -- PAST the wrap -- so the uint32
+ * subtraction silently returned (true - 2^32) and E2 under-reported every row
+ * by 2^32/N = 194,783 cyc/sample. E3 escaped only because its N was half as
+ * large: 7.9 s, just inside the wrap. That, and nothing else, is the "3x E2/E3
+ * discrepancy": 287,075 / 93,288 = 3.077, and (93,288 + 2^32/22050) / 93,288 =
+ * 3.088.
+ *
+ * THE ORIGINAL PRINTS DO NOT PIN THE ABSOLUTE LEVEL. E2 rendered exactly twice
+ * E3's samples, so E2_true = 2*E3_true and the wrap counts satisfy
+ * k_E2 = 2*k_E3 + 1 for EVERY k_E3 >= 0. Both (k_E2,k_E3) = (1,0) -> 287,680
+ * cyc/sample and (3,1) -> 676,717 cyc/sample reproduce both printed numbers to
+ * within 0.4%. A 32-bit counter compared only against itself cannot settle
+ * this, so the fix carries an INDEPENDENT time base (System::GetNow(), a
+ * millisecond tick that does not wrap for 49 days) alongside the DWT and prints
+ * both. If they disagree, the DWT wrapped and by how many turns is then
+ * arithmetic, not inference.
+ *
+ * Fix: time ONE BLOCK at a time (~13.8M cycles, 300x inside the wrap period)
+ * and accumulate in 64 bits. Also carry a canary: a single block whose delta
+ * exceeds half the counter means the counter wrapped inside even one block, at
+ * which point DWT alone can no longer measure this workload. */
+static int g_wrap_suspect;
 
-static void report(const char *tag, uint32_t cycles, uint32_t samples)
+/* Cycles AND milliseconds for the same interval, from two independent clocks. */
+typedef struct { uint64_t cyc; uint32_t ms; uint32_t worst; } span;
+
+static span timed_render(juno_ctx *c, float *buf, int nblocks)
 {
-    float per = (float)cycles / (float)samples;
+    span s = {0, 0, 0};
+    uint32_t m0 = System::GetNow();
+    for (int b = 0; b < nblocks; ++b) {
+        uint32_t t0 = cyc();
+        juno_gui_render(c, buf, BLOCK);
+        uint32_t d = cyc() - t0;
+        if (d > 0x80000000u) g_wrap_suspect = 1;   /* wrapped inside one block */
+        if (d > s.worst) s.worst = d;
+        s.cyc += d;
+    }
+    s.ms = System::GetNow() - m0;
+    return s;
+}
+
+/* ------------------------------------------------------------------ reporting */
+static float    g_budget_live;    /* cycles/sample available at LIVE_RATE */
+static uint32_t g_sysclk_hz = 1;  /* for the elapsed-seconds column         */
+
+/* Every timing row now prints the WALL TIME of the interval it came from, and a
+ * SECOND cycles/sample figure derived from the millisecond tick instead of the
+ * DWT. The two clocks are independent, so agreement is a real cross-check: it
+ * is exactly what the first silicon run lacked, and its absence let a 3x wrap
+ * error be filed as "unexplained" instead of found. */
+static void report(const char *tag, span s, uint32_t samples)
+{
+    float per     = (float)s.cyc / (float)samples;
+    float per_ms  = (float)s.ms * 0.001f * (float)g_sysclk_hz / (float)samples;
+    uint32_t ds   = (uint32_t)(s.cyc * 10u / g_sysclk_hz);  /* tenths of a second */
     /* libDaisy's logger has limited float formatting; print scaled integers so
      * the numbers are always readable regardless of %f support. */
-    LOG("  %-24s %6d cyc/sample   budget %5d   %d.%02dx %s",
+    LOG("  %-24s %7d cyc/sample   budget %5d   %d.%02dx %s",
         tag, (int)(per + 0.5f), (int)(g_budget_live + 0.5f),
         (int)(per / g_budget_live), (int)(per / g_budget_live * 100.0f) % 100,
         per <= g_budget_live ? "OK" : "OVER");
+    LOG("      %d smp | DWT %d.%d s | tick %d.%03d s | tick says %7d cyc/sample %s",
+        (int)samples, (int)(ds / 10u), (int)(ds % 10u),
+        (int)(s.ms / 1000u), (int)(s.ms % 1000u), (int)(per_ms + 0.5f),
+        (per_ms > per * 1.10f || per_ms < per * 0.90f)
+            ? "!! CLOCKS DISAGREE -- DWT WRAPPED" : "(agrees)");
 }
 
 /* Rebuild the 1-patch bank the corpus embeds, so E2 profiles a real patch
@@ -458,7 +519,15 @@ static unsigned char *build_bank(const tg_scenario *s)
     return bank;
 }
 
-/* ============================ E2: cycles/sample ========================== */
+/* ============================ E2: cycles/sample ==========================
+ * E3 replicates this function's 8-voice point, so the two MUST be set up the
+ * same way or their numbers are not comparable. One warmup length, one block
+ * count, one timing helper -- shared here rather than restated in each. */
+#define WARMUP_N ((int)E2_RATE)          /* 1 s of DSP, both E2 and E3 */
+
+static span     g_e2_8v;                 /* E2's 8-voice row, for E3 to check */
+static uint32_t g_e2_8v_smp;
+
 static void measure_cost(void)
 {
     static float buf[2 * BLOCK];
@@ -474,28 +543,33 @@ static void measure_cost(void)
     }
 
     juno_gui_apply_bank(c, bank, BK_HEADER + BK_STRIDE, 0);
-    juno_gui_warmup(c, (int)E2_RATE);         /* past the cold-start transient */
+    juno_gui_warmup(c, WARMUP_N);             /* past the cold-start transient */
 
-    const int N = (int)E2_RATE / 2;           /* half a second per point      */
+    /* WHOLE BLOCKS ONLY. The old form was `N = 22050; for (i=0;i<N;i+=48)`,
+     * which runs 460 blocks = 22080 samples and then divides by 22050 -- every
+     * row was 0.136% high. E3 had the identical bias (11040 rendered / 11025
+     * divisor), so it cancelled in the E2/E3 comparison and hid behind the wrap.
+     * Now the divisor is exactly what was rendered. */
+    const int NBLK = ((int)E2_RATE / 2) / BLOCK;   /* half a second per point */
+    const int N    = NBLK * BLOCK;
 
     /* Idle first. All 8 voices free-run even with nothing held -- this fixed
      * floor is ~84% of the cost on x86 and is the thing to attack. */
-    uint32_t t0 = cyc();
-    for (int i = 0; i < N; i += BLOCK) juno_gui_render(c, buf, BLOCK);
-    report("0 voices (idle)", cyc() - t0, (uint32_t)N);
+    report("0 voices (idle)", timed_render(c, buf, NBLK), (uint32_t)N);
 
     const int NV[] = {1, 2, 4, 8};
     for (int k = 0; k < 4; ++k) {
         for (int v = 0; v < NV[k]; ++v) juno_gui_note_on(c, 36 + v * 5, 100);
-        t0 = cyc();
-        for (int i = 0; i < N; i += BLOCK) juno_gui_render(c, buf, BLOCK);
-        uint32_t d = cyc() - t0;
+        span d = timed_render(c, buf, NBLK);
         char tag[32]; snprintf(tag, sizeof tag, "%d voice%s sounding",
                                NV[k], NV[k] > 1 ? "s" : "");
         report(tag, d, (uint32_t)N);
+        if (NV[k] == 8) { g_e2_8v = d; g_e2_8v_smp = (uint32_t)N; }
         for (int v = 0; v < NV[k]; ++v) juno_gui_note_off(c, 36 + v * 5);
-        for (int i = 0; i < N; i += BLOCK) juno_gui_render(c, buf, BLOCK);
+        timed_render(c, buf, NBLK);
     }
+    if (g_wrap_suspect)
+        LOG("  !! a single block exceeded 2^31 cycles -- DWT cannot time this.");
 
     /* E2 held 12 MB. E3 and E5 each need their own; without this the pool is
      * full and both report "allocation FAILED" -- no cache numbers and, worse,
@@ -523,30 +597,51 @@ static void measure_dcache(void)
         return;
     }
     juno_gui_apply_bank(c, bank, BK_HEADER + BK_STRIDE, 0);
-    juno_gui_warmup(c, (int)E2_RATE / 4);
+    juno_gui_warmup(c, WARMUP_N);     /* was E2_RATE/4 -- E2 uses E2_RATE, and */
+                                      /* an unequal warmup makes E3 not a      */
+                                      /* replicate of E2's 8-voice point.      */
     for (int v = 0; v < 8; ++v) juno_gui_note_on(c, 36 + v * 5, 100);
 
-    const int N = (int)E2_RATE / 4;
+    const int NBLK = ((int)E2_RATE / 4) / BLOCK;
+    const int N    = NBLK * BLOCK;
 
+    /* NOTE: this CMSIS SCB_EnableDCache() early-returns when CCR.DC is already
+     * set (cachel1_armv7.h). That guard is load-bearing here -- without it the
+     * call would invalidate-by-set/way and DISCARD the dirty engine state the
+     * warmup just wrote. Do not port this file to an older CMSIS without
+     * re-checking that line. */
     SCB_EnableDCache();
     SCB_CleanInvalidateDCache();
-    uint32_t t0 = cyc();
-    for (int i = 0; i < N; i += BLOCK) juno_gui_render(c, buf, BLOCK);
-    uint32_t on = cyc() - t0;
+    span on = timed_render(c, buf, NBLK);
     report("8 voices, D-cache ON", on, (uint32_t)N);
 
     SCB_CleanInvalidateDCache();
     SCB_DisableDCache();
-    t0 = cyc();
-    for (int i = 0; i < N; i += BLOCK) juno_gui_render(c, buf, BLOCK);
-    uint32_t off = cyc() - t0;
+    span off = timed_render(c, buf, NBLK);
     report("8 voices, D-cache OFF", off, (uint32_t)N);
     SCB_EnableDCache();
 
-    if (on)
+    if (on.cyc) {
+        float r = (float)off.cyc / (float)on.cyc;
         LOG("  -> D-cache is worth %d.%02dx here. A large ratio means SDRAM",
-            (int)((float)off / on), (int)((float)off / on * 100.0f) % 100);
+            (int)r, (int)(r * 100.0f) % 100);
+    }
     LOG("     latency dominates and moving hot state to internal RAM pays.");
+
+    /* THE RECONCILIATION GATE. E3's ON row and E2's 8-voice row are the same
+     * nominal workload; if they disagree by more than a few percent one of the
+     * two is not measuring what its label says. The first silicon run had them
+     * 3.08x apart (DWT wrap) and nothing in the firmware noticed. */
+    if (g_e2_8v_smp && on.cyc) {
+        float e2 = (float)g_e2_8v.cyc / (float)g_e2_8v_smp;
+        float e3 = (float)on.cyc / (float)N;
+        int   pct = (int)(100.0f * (e3 - e2) / e2 + (e3 >= e2 ? 0.5f : -0.5f));
+        LOG("  cross-check: E3 ON %d vs E2 8v %d cyc/sample -> %d%% %s",
+            (int)(e3 + 0.5f), (int)(e2 + 0.5f), pct,
+            (pct > 5 || pct < -5) ? "!! DISAGREE, one of them is wrong" : "OK");
+    }
+    if (g_wrap_suspect)
+        LOG("  !! a single block exceeded 2^31 cycles -- DWT cannot time this.");
 
     juno_gui_destroy(c);            /* E5 needs this 12 MB back */
     sdram_free(bank);
@@ -767,12 +862,23 @@ int main(void)
     enable_hw_ftz();
     bool dwt_ok = dwt_init();
 
-    g_budget_live = (float)System::GetSysClkFreq() / LIVE_RATE;
+    g_sysclk_hz   = System::GetSysClkFreq();
+    g_budget_live = (float)g_sysclk_hz / LIVE_RATE;
 
     hw.PrintLine("=== JUNO-60 C99 port : Daisy Seed EXPERIMENT ===");
     hw.PrintLine("SysClk %d Hz   live rate %d Hz   budget %d cyc/sample",
-                 (int)System::GetSysClkFreq(), (int)LIVE_RATE,
+                 (int)g_sysclk_hz, (int)LIVE_RATE,
                  (int)(g_budget_live + 0.5f));
+    /* Print the wrap period every run. It is the number that invalidated the
+     * first E2 and it is not derivable from any other line in this log. */
+    hw.PrintLine("DWT CYCCNT is 32-bit: wraps every %d ms. No single timed",
+                 (int)(4294967296.0f / (float)g_sysclk_hz * 1000.0f));
+    hw.PrintLine("interval below may exceed that (E2/E3 time one block each).");
+    /* The cost rows are measured at E2_RATE but scored against the LIVE_RATE
+     * budget. That is deliberate (per-sample cost is rate-independent to within
+     * the rate-armed coefficient branches) but it must be stated, not assumed. */
+    hw.PrintLine("Cost rows: MEASURED at %d Hz, scored against the %d Hz budget.",
+                 (int)E2_RATE, (int)LIVE_RATE);
     hw.PrintLine("SDRAM pool %d KB   corpus rate %d Hz",
                  (int)(sizeof g_sdram_pool / 1024u), (int)E2_RATE);
 
