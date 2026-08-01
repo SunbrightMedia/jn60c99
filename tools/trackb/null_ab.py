@@ -99,6 +99,18 @@ SCEN = [
     # census is in the commit message).
     (32, [('on', 52, 100), ('render', NFR), ('off', 52), ('render', 12000)],
                                                                     "DCO noise"),
+    # DCO SYNC/RESET ARM. Targets the blind arms of M2 (src/voice_render.c:964-
+    # 1021) and M3 (:1022-1075): lines 968/973/974 and 1023/1028/1029. The
+    # per-oscillator reset enable lives in cells 2560 (DCO1) and 3040 (DCO2),
+    # both written from record byte 554 (LFO TRIG ENV, value-tree leaf 121 --
+    # src/juno_apply.c:665-668). While that byte is 0 the cells are 0, line 971
+    # forces v123 = 1.0 unconditionally, and the whole gate-sign arm above it is
+    # dead code. Patch 22 is the ONLY patch of the 64 in the factory bank with
+    # that byte set (census over truth/presetbankog1.bin), so without it the
+    # entire scenario set holds the arm switched off.
+    (22, [('on', 43, 100), ('render', 10000), ('on', 55, 100),
+          ('render', NFR), ('off', 43), ('off', 55), ('render', 14000)],
+                                                                    "DCO reset arm"),
 ]
 
 

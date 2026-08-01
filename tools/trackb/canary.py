@@ -36,6 +36,23 @@ USAGE
   canary.py --lines 623-693                 every assignment in the range
   canary.py --lines 623-693 --factor 1.01   louder canary
   canary.py --lines 1129-1149 --max 12      cap the number of builds
+  canary.py --lines 964-1021 --add 1.0      ADDITIVE canary (see below)
+
+WHY --add EXISTS (measured on M2/M3, the DCO oscillators, 2026-08-01)
+  The default canary multiplies the right-hand side by 1.001. That probe is
+  structurally incapable of moving two statement shapes, whatever the scenario
+  set does:
+    * `v123 = 0.0;`  -- 0.0 * 1.001 is 0.0. A literal zero cannot be scaled.
+    * any value whose ONLY consumer is a sign test (`if (v128 < 0.0)`).
+      For finite x, 1.001*x has the sign of x, always. Scaling can never flip
+      a sign test, so the canary reports 0/N no matter how loud the real error
+      would be.
+  Seven of the twelve assignments in EACH DCO module are one of those two
+  shapes, which is why the multiplicative survey reports them BLIND even after
+  a scenario reaches them. `--add D` adds D to the right-hand side instead,
+  which moves both shapes. It does NOT change the null threshold or the
+  scenario set -- it is a different perturbation, not a weaker gate, and the
+  default behaviour is unchanged.
 Line numbers are in src/voice_render.c (the blueprints' numbering); they are
 mapped onto native/voice_render.c by matching the statement text, so the fork's
 header offset does not have to be tracked by hand.
@@ -98,6 +115,7 @@ def main():
         raise SystemExit(__doc__)
     lo, hi = (int(x) for x in argv[argv.index("--lines") + 1].split("-"))
     factor = argv[argv.index("--factor") + 1] if "--factor" in argv else "1.001"
+    addend = argv[argv.index("--add") + 1] if "--add" in argv else None
     cap = int(argv[argv.index("--max") + 1]) if "--max" in argv else 10 ** 6
 
     null_ab.truth.require()
@@ -108,13 +126,20 @@ def main():
 
     cands = candidates(os.path.join(REPO, "src", "voice_render.c"), lo, hi)[:cap]
     print("=== TRACK B CANARY: %d assignments in src/voice_render.c:%d-%d, each "
-          "scaled by %s ===" % (len(cands), lo, hi, factor))
+          "%s ===" % (len(cands), lo, hi,
+                      ("offset by +%s" % addend) if addend else
+                      ("scaled by %s" % factor)))
     print("  a line caught by 0 scenarios is a place the gate is BLIND: an error "
           "there would ship.\n")
     blind, tested, skipped = [], 0, 0
     for ln, text in cands:
         m = ASSIGN.match(text)
-        mutated = "%s%s = (%s) * %sf;" % (m.group(1), m.group(2), m.group(3), factor)
+        if addend:
+            mutated = "%s%s = (float)(%s) + %sf;" % (m.group(1), m.group(2),
+                                                     m.group(3), addend)
+        else:
+            mutated = "%s%s = (%s) * %sf;" % (m.group(1), m.group(2), m.group(3),
+                                              factor)
         so = "/tmp/canary_%d.so" % ln
         if not build_with(mutated, text, so):
             skipped += 1
