@@ -126,3 +126,48 @@ reach them without inventing engine state.
 **Standing rule for this module:** the DCO may not be rewritten until :1726 and
 :1739 are either opened by a scenario or proven unreachable. A dead store is a
 safe residual; an unreached branch is not.
+
+### The DCO blind lines, resolved by execution counting and margin measurement
+
+Guessing at parameters did not open them: three scenarios built specifically to
+drive pitch negative (`DCO neg pitch sweep`, `DCO neg wrap + PWM clamp`,
+`DCO neg warm chorus`, using DCO LFO MOD at depth with a slow LFO RATE) left the
+count at 11/14. So the lines were **instrumented and counted** instead.
+
+**Execution counts across all 30 scenarios:**
+
+| line | executions | conclusion |
+|---|---|---|
+| `:1720` prev-phase store | **240,000-737,000 per scenario** | executes constantly. NOT unreached — **UNOBSERVABLE**, i.e. a dead store, the same shape as `:974`. |
+| `:1726` negative phase wrap | **0** | never executes |
+| `:1739` negative pulse clamp | **0** | never executes |
+
+**Then the margin**, because "the branch did not fire" says nothing about how
+close it came, and a rewrite changes exactly that:
+
+| test | minimum value seen | threshold | margin |
+|---|---|---|---|
+| `:1725` `v403 < -1.0` | **−0.999657** | −1.0 | **0.000343** |
+| `:1738` `v406 < -1.0` | **0.000000** | −1.0 | 1.0 |
+
+**These two are NOT the same finding, and treating them alike would be the bug.**
+
+* **`:1739` is safely dead.** Its input never goes negative at all, let alone
+  below −1. The clamp cannot fire, and engine B may omit it. Margin 1.0.
+* **`:1726` is a hair from firing.** The phase reaches −0.999657, i.e. within
+  **0.0003** of the threshold, because the positive wrap at `:1730` lands it just
+  above −1 and it climbs from there. It is not dead code — it is a boundary the
+  engine rides against every wrap cycle. **A rewritten DCO whose wrap arithmetic
+  rounds a fraction differently WILL cross it**, and the branch must be
+  implemented. Omitting it because "no scenario reached it" would be exactly the
+  `eb_triangle` mistake again: there, replacing `fmodf(p+1,2)-1` with `p-2` was
+  mathematically identical and disagreed on 8,388,608 inputs because of rounding.
+
+**Revised rule for this module.** The DCO may be rewritten, provided:
+1. `:1726` is implemented, not omitted, and
+2. the rewrite's phase-wrap output is compared against the reference over the
+   whole float domain the way `eb_triangle` was — the margin is 0.0003, which is
+   far too thin for a scenario-based gate to protect.
+
+`:1720` still needs the dead-store proof (mutate it and confirm bit-identity over
+the full bank and fuzz set) before it is recorded as a safe residual.

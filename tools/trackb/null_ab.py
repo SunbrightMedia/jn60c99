@@ -205,6 +205,32 @@ SCEN += [
                                                                     "realloc chorus"),
 ]
 
+# --- DCO negative-going scenarios, 2026-08-02 -------------------------------
+# The DCO range (1718-1830) has two blind lines that are UNREACHED rather than
+# unobservable, and both are the NEGATIVE half of something:
+#   :1726  v403 = fmodf(v403 - 1.0, 2.0) + 1.0;   the negative phase-wrap arm
+#   :1739  v407 = -1.0;                            the negative clamp of the pulse shaper
+# A rewritten DCO handling only the positive side would null perfectly on every
+# other scenario and break the first time a patch drives pitch downward. That is
+# the failure the gate must be able to see BEFORE the module is written.
+#
+# DCO LFO MOD (blob 9) at depth with a slow LFO RATE (blob 8) sweeps the pitch CV
+# through a full cycle including its negative half; DCO PWM DEPTH (blob 14) with
+# PWM LEVEL (blob 26) drives the pulse shaper to its negative clamp. Both are
+# front-panel bytes, so no engine state is invented.
+SCEN += [
+    (5,  [('param', 8, 8), ('param', 9, 255),      # slow LFO, full DCO pitch mod
+          ('on', 45, 100), ('render', 60000),      # >1 full LFO cycle while held
+          ('off', 45), ('render', 20000)],                          "DCO neg pitch sweep"),
+    (5,  [('param', 8, 4), ('param', 9, 255), ('param', 14, 255), ('param', 26, 255),
+          ('on', 33, 100), ('render', 80000),      # low note: slowest phase, deepest sweep
+          ('off', 33), ('render', 20000)],                          "DCO neg wrap + PWM clamp"),
+    (20, [('render', 4410),                        # warm, so the LFO is mid-cycle
+          ('param', 8, 6), ('param', 9, 220), ('param', 14, 200),
+          ('on', 40, 100), ('render', 60000),
+          ('off', 40), ('render', 20000)],                          "DCO neg warm chorus"),
+]
+
 IDLE_TAGS = {t for _, _, t in SCEN} - COLD_TAGS
 
 
