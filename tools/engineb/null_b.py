@@ -264,16 +264,21 @@ def _plant(tmp, mutate):
                       "    if ( JF(a1, 1856) != 0.0f ) JI(base, 11900000) = 1;\n"
                       "    else { *outL = 0.0f; *outR = 0.0f; return 0; }\n"
                       "  }\n" + anchor, 1)
-    elif mutate == "reverbwet":
-        # MODULE REVERB, non-vacuity. The tank's own output gain is moved by
-        # 6e-5 relative. If the reverb send were silent in every scenario, the
-        # module's EXACTLY-0 null would prove nothing; this is the mutation that
-        # says otherwise, and it is planted in engine B's own file rather than
-        # in src/, so it is the module under test that moves.
+    elif mutate in ("reverbwet", "reverbwet10"):
+        # MODULE REVERB, CALIBRATION -- where does the gate bite on the reverb
+        # PATH, as opposed to on the whole output? The tank's own output gain is
+        # moved by 6.25e-5 ("reverbwet") and by 6.25e-4 ("reverbwet10").
+        # MEASURED 2026-08-02: the first lands at -100.5 dB rel and must PASS,
+        # the second at -80.5 dB and must FAIL. That brackets the -100 dB
+        # threshold from both sides FROM INSIDE THE REVERB, and it also fixes
+        # the module's leverage: an error in the tank arrives at the gate about
+        # 20 dB quieter than the same relative error on the whole output, so
+        # this module is gated to roughly 6e-5 of its own signal.
         p = os.path.join(tmp, "engine_b", "eb_reverb.c"); s = open(p).read()
         a = "(((SL * c->wet) * 16.0f) * m)"
         assert s.count(a) == 1
-        s = s.replace(a, "(((SL * c->wet) * 16.001f) * m)", 1)
+        s = s.replace(a, "(((SL * c->wet) * %s) * m)"
+                      % ("16.001f" if mutate == "reverbwet" else "16.01f"), 1)
     elif mutate == "reverbtap":
         # MODULE REVERB, addressing. One stereo output tap reads one sample
         # earlier. The split-buffer rewrite's whole risk is addressing, so the
@@ -287,13 +292,20 @@ def _plant(tmp, mutate):
     elif mutate == "reverbskip":
         # MODULE REVERB, LOCKSTEP -- the error class docs/trackb/
         # ACCURACY_STANDARD.md names. The tank's state advance is skipped
-        # whenever its input sample is exactly zero, which is the "obvious"
-        # saving a silent-input reverb invites and is wrong: the tank is still
-        # ringing, and the pre-delay modulation is still free-running.
+        # whenever its input sample is INAUDIBLE, which is the "obvious" saving
+        # a silent-input reverb invites and is wrong: the tank is still ringing,
+        # and the pre-delay modulation is still free-running.
+        #
+        # The threshold is 1e-6 and not "== 0.0f". MEASURED 2026-08-02: the
+        # exact-zero form produced NO residual at all -- once the tank is
+        # running its input is never bit-zero, so that mutation was unreachable
+        # and measured nothing. A teeth case that cannot reach its own mutation
+        # is worse than no teeth case.
         p = os.path.join(tmp, "engine_b", "eb_reverb.c"); s = open(p).read()
         a = "        float v477 = c->f_in[1] * s->s0;"
         assert s.count(a) == 1
-        s = s.replace(a, "        if (x == 0.0f) { *outA = c->dry * inB;\n"
+        s = s.replace(a, "        if (x > -1e-6f && x < 1e-6f) {\n"
+                         "            *outA = c->dry * inB;\n"
                          "            *outB = c->dry * inA; return; }\n" + a, 1)
     else:
         raise SystemExit("unknown mutation %s" % mutate)
@@ -444,7 +456,8 @@ def teeth(quick):
     cases = [(None, (), False), ("onelsb", (), False), ("justover", (), True),
              ("tailquiet", (), True), ("dcopitch", (), True),
              ("idleskip", (), True),
-             (None, ("reverb",), False), ("reverbwet", ("reverb",), True),
+             (None, ("reverb",), False), ("reverbwet", ("reverb",), False),
+             ("reverbwet10", ("reverb",), True),
              ("reverbtap", ("reverb",), True), ("reverbskip", ("reverb",), True)]
     # ONE reference render, reused by every mutant: the mutations are planted in
     # the CANDIDATE build, so the oracle side is invariant across the battery.
@@ -460,8 +473,8 @@ def teeth(quick):
                                    verbose=False)
         got = fails > 0
         ok = (got == want_fail) and (mut is not None or worst is None)
-        if mut in ("onelsb", "justover", "reverbwet", "reverbtap",
-                   "reverbskip") and worst is None:
+        if mut in ("onelsb", "justover", "reverbwet", "reverbwet10",
+                   "reverbtap", "reverbskip") and worst is None:
             print("    *** the planted error produced NO residual at all -- the "
                   "mutation did not take, so this case measured nothing ***")
             ok = False
