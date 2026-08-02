@@ -1117,12 +1117,23 @@ LABEL_46:
     int j, same;
 
     for ( j = 0; j < 24; ++j ) raw[j] = JF(a1, EBMCELL[j]);
-    same = EBMHAVE[voice];
-    for ( j = 0; j < 24 && same; ++j )
-      if ( EBMRAW[voice][j] != raw[j] ) same = 0;
+      /* CHANGE DETECTION BY memcmp, not float-by-float. MEASURED: the
+       * float loop below cost 2,192 executed instructions per sample -- it
+       * is a loop-carried condition over 24 elements, per voice, per sample,
+       * and it is pure HARNESS cost: the shipped engine computes these
+       * coefficients once at recall and never checks again.
+       *
+       * memcmp is EXACT here and is in fact STRICTER than the float compare.
+       * It differs only where the bits differ but the floats compare equal --
+       * +0.0 against -0.0 -- and there it says "changed" and recomputes. A
+       * needless recompute produces the same coefficients, so the result is
+       * unchanged; the only cost is doing the work occasionally when it was
+       * not required. Being conservative in that direction is safe; the
+       * reverse would not be. */
+    same = EBMHAVE[voice] && !memcmp(EBMRAW[voice], raw, 24 * sizeof(float));
     if ( !same )
     {
-      for ( j = 0; j < 24; ++j ) EBMRAW[voice][j] = raw[j];
+      memcpy(EBMRAW[voice], raw, 24 * sizeof(float));
       eb_modcv_set(&EBMC[voice], raw[0], raw[1], raw[2], raw[3], raw[4],
                    raw[5], raw[6], raw[7], raw[8], raw[9], raw[10], raw[11],
                    raw[12], raw[13], raw[14], raw[15], raw[16], raw[17],

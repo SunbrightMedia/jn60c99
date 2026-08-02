@@ -60,6 +60,10 @@
  * all in the standalone engine, where eb_voice lives inside the eb_engine the
  * caller owns (docs/engineb/STANDALONE.md). */
 static eb_voice EBV[8];
+static eb_decim_coef EBDC[8];
+static float EBDRAW[8][20];
+static unsigned char EBDHAVE[8];
+#include <string.h>
 
 /* ---- from shim 'env' ---- */
 /* engine_b/shim/env/voice_render.c — VERBATIM FORK of src/voice_render.c
@@ -137,7 +141,11 @@ static int            EBMHAVE[8];
  * to the ladder and to nothing else.
  */
 #include "eb_vcf_ladder.h"
-static eb_vcf_state EBF[8];     /* -I engine_b/ is supplied by the harness */
+static eb_vcf_state EBF[8];
+#include <string.h>
+static eb_vcf_coef EBFC[8];
+static float EBFRAW[8][30];
+static unsigned char EBFHAVE[8];     /* -I engine_b/ is supplied by the harness */
 
 /* The port's four dispersion lines are ONE 4x-oversampled history in engine B.
  * (line, slot) -> delay:  A/B/C/D are delays 0/1/2/3 modulo 4, slot = delay/4.
@@ -1165,12 +1173,24 @@ LABEL_46:
        * comparison is here rather than in a parameter callback because this
        * shim has no parameter path of its own to hook. It is HARNESS cost and
        * is excluded from every cycle figure reported for this module. */
-      same = EBHAVE[voice][ei];
-      for ( j = 0; j < 15 && same; ++j )
-        if ( EBRAW[voice][ei][j] != raw[j] ) same = 0;
+      /* CHANGE DETECTION BY memcmp, not float-by-float. MEASURED: the
+       * float loop below cost 1,776 executed instructions per sample -- it
+       * is a loop-carried condition over 15 elements, per voice, per sample,
+       * and it is pure HARNESS cost: the shipped engine computes these
+       * coefficients once at recall and never checks again.
+       *
+       * memcmp is EXACT here and is in fact STRICTER than the float compare.
+       * It differs only where the bits differ but the floats compare equal --
+       * +0.0 against -0.0 -- and there it says "changed" and recomputes. A
+       * needless recompute produces the same coefficients, so the result is
+       * unchanged; the only cost is doing the work occasionally when it was
+       * not required. Being conservative in that direction is safe; the
+       * reverse would not be. */
+      same = EBHAVE[voice][ei] &&
+             !memcmp(EBRAW[voice][ei], raw, 15 * sizeof(float));
       if ( !same )
       {
-        for ( j = 0; j < 15; ++j ) EBRAW[voice][ei][j] = raw[j];
+        memcpy(EBRAW[voice][ei], raw, 15 * sizeof(float));
         eb_env_set_rate_consts(&EBC[voice][ei], raw[4], raw[5], raw[6], raw[7],
                                raw[8], raw[9], raw[10], raw[11], raw[12],
                                raw[13], raw[14]);
@@ -1231,12 +1251,23 @@ LABEL_46:
     int j, same;
 
     for ( j = 0; j < 24; ++j ) raw[j] = JF(a1, EBMCELL[j]);
-    same = EBMHAVE[voice];
-    for ( j = 0; j < 24 && same; ++j )
-      if ( EBMRAW[voice][j] != raw[j] ) same = 0;
+      /* CHANGE DETECTION BY memcmp, not float-by-float. MEASURED: the
+       * float loop below cost 2,192 executed instructions per sample -- it
+       * is a loop-carried condition over 24 elements, per voice, per sample,
+       * and it is pure HARNESS cost: the shipped engine computes these
+       * coefficients once at recall and never checks again.
+       *
+       * memcmp is EXACT here and is in fact STRICTER than the float compare.
+       * It differs only where the bits differ but the floats compare equal --
+       * +0.0 against -0.0 -- and there it says "changed" and recomputes. A
+       * needless recompute produces the same coefficients, so the result is
+       * unchanged; the only cost is doing the work occasionally when it was
+       * not required. Being conservative in that direction is safe; the
+       * reverse would not be. */
+    same = EBMHAVE[voice] && !memcmp(EBMRAW[voice], raw, 24 * sizeof(float));
     if ( !same )
     {
-      for ( j = 0; j < 24; ++j ) EBMRAW[voice][j] = raw[j];
+      memcpy(EBMRAW[voice], raw, 24 * sizeof(float));
       eb_modcv_set(&EBMC[voice], raw[0], raw[1], raw[2], raw[3], raw[4],
                    raw[5], raw[6], raw[7], raw[8], raw[9], raw[10], raw[11],
                    raw[12], raw[13], raw[14], raw[15], raw[16], raw[17],
@@ -1453,16 +1484,37 @@ LABEL_46:
 
     if ( JF(a1, 9056) == 1.0f )
     {
-      ebc.c9520 = JF(a1, 9520); ebc.c9536 = JF(a1, 9536);
-      ebc.c9184 = JF(a1, 9184);
-      ebc.c9072 = JF(a1, 9072); ebc.c9088 = JF(a1, 9088);
-      ebc.c9104 = JF(a1, 9104);
-      ebc.c9200 = JF(a1, 9200); ebc.c9216 = JF(a1, 9216);
-      ebc.c9232 = JF(a1, 9232); ebc.c9248 = JF(a1, 9248);
-      ebc.c9120 = JF(a1, 9120); ebc.c9136 = JF(a1, 9136);
-      ebc.c9168 = JF(a1, 9168); ebc.c9152 = JF(a1, 9152);
-      for ( ebi = 0; ebi < 16; ++ebi )
-        ebc.fir[ebi] = JF(a1, 9504 - 16 * ebi);
+      /* COEFFICIENT CACHE -- see the note in the decimator's shim. These 30
+       * cells are recall-rate, and the shim was reloading all of them every
+       * sample per voice; the sixteen-tap loop alone MEASURED 776 executed
+       * instructions per sample. Cached on a memcmp of the raw cells, which is
+       * stricter than a float compare and therefore safe. */
+      {
+        float _raw[30];
+        int _k = 0;
+        _raw[_k++] = JF(a1, 9520); _raw[_k++] = JF(a1, 9536);
+        _raw[_k++] = JF(a1, 9184);
+        _raw[_k++] = JF(a1, 9072); _raw[_k++] = JF(a1, 9088);
+        _raw[_k++] = JF(a1, 9104);
+        _raw[_k++] = JF(a1, 9200); _raw[_k++] = JF(a1, 9216);
+        _raw[_k++] = JF(a1, 9232); _raw[_k++] = JF(a1, 9248);
+        _raw[_k++] = JF(a1, 9120); _raw[_k++] = JF(a1, 9136);
+        _raw[_k++] = JF(a1, 9168); _raw[_k++] = JF(a1, 9152);
+        for ( ebi = 0; ebi < 16; ++ebi )
+          _raw[_k++] = JF(a1, 9504 - 16 * ebi);
+        if (!EBFHAVE[voice] || memcmp(EBFRAW[voice], _raw, sizeof _raw)) {
+          eb_vcf_coef *q = &EBFC[voice];
+          memcpy(EBFRAW[voice], _raw, sizeof _raw);
+          q->c9520 = _raw[0];  q->c9536 = _raw[1];  q->c9184 = _raw[2];
+          q->c9072 = _raw[3];  q->c9088 = _raw[4];  q->c9104 = _raw[5];
+          q->c9200 = _raw[6];  q->c9216 = _raw[7];  q->c9232 = _raw[8];
+          q->c9248 = _raw[9];  q->c9120 = _raw[10]; q->c9136 = _raw[11];
+          q->c9168 = _raw[12]; q->c9152 = _raw[13];
+          for ( ebi = 0; ebi < 16; ++ebi ) q->fir[ebi] = _raw[14 + ebi];
+          EBFHAVE[voice] = 1;
+        }
+        ebc = EBFC[voice];
+      }
 
       /* ==== THE STATE LIVES IN ENGINE B, NOT IN THE PORT'S CELLS =========
        * This copy in and out was the single largest cost in the whole engine:
@@ -1696,9 +1748,28 @@ LABEL_46:
     static const int _CC[16] = {5712,5696,5728,5744,5760,5776,5792,5808,
                                 5824,5840,5856,5872,5888,5904,5920,5936};
     int _i;
-    for (_i = 0; _i < 16; ++_i) _dc.c[_i] = JF(a1, _CC[_i]);
-    _dc.k6256 = JF(a1, 6256); _dc.k6272 = JF(a1, 6272);
-    _dc.k6336 = JF(a1, 6336); _dc.k5456 = JF(a1, 5456);
+    /* COEFFICIENT CACHE. These twenty cells are recall-rate: only a patch
+     * change moves them, yet the shim was reloading all twenty every sample
+     * per voice. MEASURED: 512 executed instructions per sample for the
+     * sixteen-tap loop alone. Pure HARNESS cost -- the shipped engine computes
+     * these once at recall -- so it is cached on a memcmp of the raw cells.
+     * memcmp is stricter than a float compare (it separates +0.0 from -0.0)
+     * and a needless recompute yields identical coefficients, so being
+     * conservative in that direction is safe. */
+    {
+      float _raw[20];
+      for (_i = 0; _i < 16; ++_i) _raw[_i] = JF(a1, _CC[_i]);
+      _raw[16] = JF(a1, 6256); _raw[17] = JF(a1, 6272);
+      _raw[18] = JF(a1, 6336); _raw[19] = JF(a1, 5456);
+      if (!EBDHAVE[voice] || memcmp(EBDRAW[voice], _raw, sizeof _raw)) {
+        memcpy(EBDRAW[voice], _raw, sizeof _raw);
+        for (_i = 0; _i < 16; ++_i) EBDC[voice].c[_i] = _raw[_i];
+        EBDC[voice].k6256 = _raw[16]; EBDC[voice].k6272 = _raw[17];
+        EBDC[voice].k6336 = _raw[18]; EBDC[voice].k5456 = _raw[19];
+        EBDHAVE[voice] = 1;
+      }
+      _dc = EBDC[voice];
+    }
     /* eb_decim_state is the module's view; eb_voice is where it LIVES. The
      * copy in and out is temporary scaffolding for the shim only -- in the
      * standalone engine the module reads eb_voice directly and this vanishes. */

@@ -127,3 +127,50 @@ coefficients from the port's cells each sample. Moving each one is the same
 pattern, and each is independently gateable. That is steps 2 onward, and when
 the last one lands there is nothing left for `eb_engine_render()` to do except
 call the modules in order — which is the point of building it this way round.
+
+
+---
+
+## Step 2 — the coefficient reloads. MEASURED.
+
+Every module was reloading its coefficients from the port's cells **every
+sample, per voice**, from cells that only a patch recall ever changes. Two of
+them also ran a float-by-float change check to avoid recomputing. All of it is
+harness cost: the shipped engine computes these once at recall and never looks
+again.
+
+The four biggest, located by a line-level profile rather than chosen:
+
+| what | was, instr/sample |
+|---|---|
+| envelope change check (15 floats × 2 × 8 voices) | 1,776 |
+| mod-CV change check (24 floats × 8 voices) | 2,192 |
+| ladder coefficient load (30 cells × 8) | 776 |
+| decimator coefficient load (20 cells × 8) | 512 |
+
+Each is now cached on a `memcmp` of the raw cells.
+
+**Why `memcmp` is exact here.** It is *stricter* than the float comparison it
+replaces: the two differ only where the bits differ but the floats compare
+equal — `+0.0` against `-0.0` — and there `memcmp` says "changed" and
+recomputes. A needless recompute produces identical coefficients, so the result
+never changes; the only cost is doing the work occasionally when it was not
+required. Being conservative in that direction is safe. The reverse would not
+be, and that is the direction a cheaper check would have failed in.
+
+### Running total
+
+| | instr/sample |
+|---|---|
+| before step 1 | 50,413 |
+| after step 1 (ladder state moved) | 36,357 |
+| **after step 2 (coefficient caches)** | **34,549** |
+| engine B's own DSP, unchanged throughout | 15,431 |
+
+**−31.5 % from the starting figure, and still exact at every gate:** EXACTLY 0
+on all 30 scenarios for each module and for the whole engine, and **11/11
+BIT-EXACT against the plugin** at 48 kHz.
+
+The port function is down from 27,225 to **14,433**. What remains there is the
+same pattern in the modules not yet moved, plus the port code that engine B's
+own recall will eventually replace.

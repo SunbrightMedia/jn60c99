@@ -35,6 +35,10 @@
  * all in the standalone engine, where eb_voice lives inside the eb_engine the
  * caller owns (docs/engineb/STANDALONE.md). */
 static eb_voice EBV[8];
+static eb_decim_coef EBDC[8];
+static float EBDRAW[8][20];
+static unsigned char EBDHAVE[8];
+#include <string.h>
 
 /* voice_render.c — exact C99 transcription of sub_180369070 (Cloud 60 voice
  * render). Generated first-pass by tools/translate_voice.py then finished by
@@ -2163,9 +2167,28 @@ LABEL_46:
     static const int _CC[16] = {5712,5696,5728,5744,5760,5776,5792,5808,
                                 5824,5840,5856,5872,5888,5904,5920,5936};
     int _i;
-    for (_i = 0; _i < 16; ++_i) _dc.c[_i] = JF(a1, _CC[_i]);
-    _dc.k6256 = JF(a1, 6256); _dc.k6272 = JF(a1, 6272);
-    _dc.k6336 = JF(a1, 6336); _dc.k5456 = JF(a1, 5456);
+    /* COEFFICIENT CACHE. These twenty cells are recall-rate: only a patch
+     * change moves them, yet the shim was reloading all twenty every sample
+     * per voice. MEASURED: 512 executed instructions per sample for the
+     * sixteen-tap loop alone. Pure HARNESS cost -- the shipped engine computes
+     * these once at recall -- so it is cached on a memcmp of the raw cells.
+     * memcmp is stricter than a float compare (it separates +0.0 from -0.0)
+     * and a needless recompute yields identical coefficients, so being
+     * conservative in that direction is safe. */
+    {
+      float _raw[20];
+      for (_i = 0; _i < 16; ++_i) _raw[_i] = JF(a1, _CC[_i]);
+      _raw[16] = JF(a1, 6256); _raw[17] = JF(a1, 6272);
+      _raw[18] = JF(a1, 6336); _raw[19] = JF(a1, 5456);
+      if (!EBDHAVE[voice] || memcmp(EBDRAW[voice], _raw, sizeof _raw)) {
+        memcpy(EBDRAW[voice], _raw, sizeof _raw);
+        for (_i = 0; _i < 16; ++_i) EBDC[voice].c[_i] = _raw[_i];
+        EBDC[voice].k6256 = _raw[16]; EBDC[voice].k6272 = _raw[17];
+        EBDC[voice].k6336 = _raw[18]; EBDC[voice].k5456 = _raw[19];
+        EBDHAVE[voice] = 1;
+      }
+      _dc = EBDC[voice];
+    }
     /* eb_decim_state is the module's view; eb_voice is where it LIVES. The
      * copy in and out is temporary scaffolding for the shim only -- in the
      * standalone engine the module reads eb_voice directly and this vanishes. */

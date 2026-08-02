@@ -6,7 +6,11 @@
  * to the ladder and to nothing else.
  */
 #include "eb_vcf_ladder.h"
-static eb_vcf_state EBF[8];     /* -I engine_b/ is supplied by the harness */
+static eb_vcf_state EBF[8];
+#include <string.h>
+static eb_vcf_coef EBFC[8];
+static float EBFRAW[8][30];
+static unsigned char EBFHAVE[8];     /* -I engine_b/ is supplied by the harness */
 
 /* The port's four dispersion lines are ONE 4x-oversampled history in engine B.
  * (line, slot) -> delay:  A/B/C/D are delays 0/1/2/3 modulo 4, slot = delay/4.
@@ -1335,16 +1339,37 @@ LABEL_46:
 
     if ( JF(a1, 9056) == 1.0f )
     {
-      ebc.c9520 = JF(a1, 9520); ebc.c9536 = JF(a1, 9536);
-      ebc.c9184 = JF(a1, 9184);
-      ebc.c9072 = JF(a1, 9072); ebc.c9088 = JF(a1, 9088);
-      ebc.c9104 = JF(a1, 9104);
-      ebc.c9200 = JF(a1, 9200); ebc.c9216 = JF(a1, 9216);
-      ebc.c9232 = JF(a1, 9232); ebc.c9248 = JF(a1, 9248);
-      ebc.c9120 = JF(a1, 9120); ebc.c9136 = JF(a1, 9136);
-      ebc.c9168 = JF(a1, 9168); ebc.c9152 = JF(a1, 9152);
-      for ( ebi = 0; ebi < 16; ++ebi )
-        ebc.fir[ebi] = JF(a1, 9504 - 16 * ebi);
+      /* COEFFICIENT CACHE -- see the note in the decimator's shim. These 30
+       * cells are recall-rate, and the shim was reloading all of them every
+       * sample per voice; the sixteen-tap loop alone MEASURED 776 executed
+       * instructions per sample. Cached on a memcmp of the raw cells, which is
+       * stricter than a float compare and therefore safe. */
+      {
+        float _raw[30];
+        int _k = 0;
+        _raw[_k++] = JF(a1, 9520); _raw[_k++] = JF(a1, 9536);
+        _raw[_k++] = JF(a1, 9184);
+        _raw[_k++] = JF(a1, 9072); _raw[_k++] = JF(a1, 9088);
+        _raw[_k++] = JF(a1, 9104);
+        _raw[_k++] = JF(a1, 9200); _raw[_k++] = JF(a1, 9216);
+        _raw[_k++] = JF(a1, 9232); _raw[_k++] = JF(a1, 9248);
+        _raw[_k++] = JF(a1, 9120); _raw[_k++] = JF(a1, 9136);
+        _raw[_k++] = JF(a1, 9168); _raw[_k++] = JF(a1, 9152);
+        for ( ebi = 0; ebi < 16; ++ebi )
+          _raw[_k++] = JF(a1, 9504 - 16 * ebi);
+        if (!EBFHAVE[voice] || memcmp(EBFRAW[voice], _raw, sizeof _raw)) {
+          eb_vcf_coef *q = &EBFC[voice];
+          memcpy(EBFRAW[voice], _raw, sizeof _raw);
+          q->c9520 = _raw[0];  q->c9536 = _raw[1];  q->c9184 = _raw[2];
+          q->c9072 = _raw[3];  q->c9088 = _raw[4];  q->c9104 = _raw[5];
+          q->c9200 = _raw[6];  q->c9216 = _raw[7];  q->c9232 = _raw[8];
+          q->c9248 = _raw[9];  q->c9120 = _raw[10]; q->c9136 = _raw[11];
+          q->c9168 = _raw[12]; q->c9152 = _raw[13];
+          for ( ebi = 0; ebi < 16; ++ebi ) q->fir[ebi] = _raw[14 + ebi];
+          EBFHAVE[voice] = 1;
+        }
+        ebc = EBFC[voice];
+      }
 
       /* ==== THE STATE LIVES IN ENGINE B, NOT IN THE PORT'S CELLS =========
        * This copy in and out was the single largest cost in the whole engine:
