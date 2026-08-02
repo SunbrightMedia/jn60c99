@@ -81,14 +81,25 @@ Gate quality only. It must still be crossed with cost before scheduling.
 
 ## Genuinely blind lines, classified with proof rather than suspicion
 
-* **974** — stores to cell 2576, which has **no reader** in `voice_render.c` or
-  `master_render.c`. A mutant writing 12345.0 there is bit-identical over 384
-  full-bank comparisons and 24 fuzz seeds. Dead store.
+* **974** — stores to cell 2576. **DEAD, PROVEN by execution**
+  (`tools/trackb/deadstore.py 974`, 2026-08-02): the line is instrumented and
+  shown to execute (438/438 comparisons change when its execution is made
+  audible), and three different absurd stored values — 12345.0, -7.7e18 and 0.0 —
+  are each bit-identical across 30 scenarios + 384 full-bank + 24 fuzz = 438
+  comparisons, scored EXACTLY rather than against a threshold.
 * **988** — feeds a branch that DOES fire (planting a marker in the override body
   is caught 25/26 at 57.7 dB) but is **outcome-neutral**: deleting the override
   entirely is bit-identical over the same 384 + 24. Where `h` falls, the value
   the override writes already equals what the preceding lines wrote.
-* **1132, 1143** — write-only shadows, classified previously.
+* **1132, 1143, 1146, 1147** — **DEAD, PROVEN by execution** as of 2026-08-02
+  (`deadstore.py 1132 1143 1146 1147`): each executes, and each is bit-identical
+  under all three absurd stored values over the same 438 comparisons.
+  **They were previously classified by READING** — ":1132 is overwritten at
+  :1134", ":1143 has no readers" — which was not evidence. A grep for a numeric
+  offset in this engine finds textual matches, not readers: the state is a flat
+  byte block addressed by number, aliased by JF/JI over the same memory, and
+  several cells have register-promoted shadow locals. The reading happened to be
+  right; that is luck, not method.
 
 ## Standing lesson
 
@@ -106,7 +117,7 @@ and two of them are the dangerous kind.
 
 | line | code | cause |
 |---|---|---|
-| `:1720` | `JF(a1,4656) = _s4656 = v401;` | **dead store, suspected.** Cell 4656 is "prev phase"; the value is also kept in the local `_s4656`, so consumers may never reload it. Same shape as `:974`, which was proven dead over 384 bank comparisons and 24 fuzz seeds. **Not yet proven here — do that before relying on it.** |
+| `:1720` | `JF(a1,4656) = _s4656 = v401;` | **DEAD STORE, PROVEN by execution 2026-08-02** (`deadstore.py 1720`). The line executes; corrupting only the MEMORY STORE with 12345.0, -7.7e18 and 0.0 — while the shadow local `_s4656` still receives the real value — is bit-identical over all 438 comparisons. Cell 4656 has no reader. **Read the caveat below: the STORE is dead, the VALUE is not.** |
 | `:1726` | `v403 = fmodf(v403 - 1.0, 2.0) + 1.0;` | **UNREACHED — the NEGATIVE phase-wrap arm.** Taken only when the accumulated phase falls below −1. No scenario drives it. |
 | `:1739` | `v407 = -1.0;` | **UNREACHED — the negative clamp arm** of the pulse shaper, taken only when its input falls below −1. |
 
@@ -138,7 +149,7 @@ count at 11/14. So the lines were **instrumented and counted** instead.
 
 | line | executions | conclusion |
 |---|---|---|
-| `:1720` prev-phase store | **240,000-737,000 per scenario** | executes constantly. NOT unreached — **UNOBSERVABLE**, i.e. a dead store, the same shape as `:974`. |
+| `:1720` prev-phase store | **240,000-737,000 per scenario** | executes constantly. NOT unreached — **UNOBSERVABLE**, and now **PROVEN a dead store** by `deadstore.py`, no longer inferred from the shape of `:974`. |
 | `:1726` negative phase wrap | **0** | never executes |
 | `:1739` negative pulse clamp | **0** | never executes |
 
@@ -169,5 +180,56 @@ close it came, and a rewrite changes exactly that:
    whole float domain the way `eb_triangle` was — the margin is 0.0003, which is
    far too thin for a scenario-based gate to protect.
 
-`:1720` still needs the dead-store proof (mutate it and confirm bit-identity over
-the full bank and fuzz set) before it is recorded as a safe residual.
+`:1720` **has the dead-store proof** as of 2026-08-02 and is recorded as a safe
+residual. See the section below.
+
+
+## Dead stores — proven, and what "dead" does and does not license
+
+`tools/trackb/deadstore.py` decides this question by execution and nothing else.
+Per line it builds five engines and scores each EXACTLY (bytewise sample streams,
+not RMS, not a dB threshold) over the full evidence set — **30 scenarios + 384
+full-bank comparisons + 24 fuzz seeds = 438 comparisons**:
+
+* a **CONTROL** clean rebuild, which must be bit-identical or the run is void;
+* a **REACH** mutant that leaves the store alone and instead makes its execution
+  audible, which must FAIL — otherwise "the mutants changed nothing" only means
+  the line never ran;
+* three **VALUE** mutants storing 12345.0, -7.7e18 and 0.0. Three, not one,
+  because a consumer can saturate: the canary work already measured a cell where
+  multiplying by 3 changed nothing and adding 1 changed everything.
+
+The RHS is still evaluated and any shadow local on the same line still receives
+the real value, so only the MEMORY STORE is corrupted.
+
+**Results, MEASURED 2026-08-02, all six identical:**
+
+| line | cell | control | reach | 12345.0 | -7.7e18 | 0.0 | verdict |
+|---|---|---|---|---|---|---|---|
+| `:974`  | 2576 | 0/438 | 438/438 | 0/438 | 0/438 | 0/438 | **DEAD** |
+| `:1132` | 4304 | 0/438 | 438/438 | 0/438 | 0/438 | 0/438 | **DEAD** |
+| `:1143` | 6464 | 0/438 | 438/438 | 0/438 | 0/438 | 0/438 | **DEAD** |
+| `:1146` | 6480 | 0/438 | 438/438 | 0/438 | 0/438 | 0/438 | **DEAD** |
+| `:1147` | 6496 | 0/438 | 438/438 | 0/438 | 0/438 | 0/438 | **DEAD** |
+| `:1720` | 4656 | 0/438 | 438/438 | 0/438 | 0/438 | 0/438 | **DEAD** |
+
+**THE CAVEAT THAT MATTERS MOST. A dead STORE is not a dead COMPUTATION.** Five of
+the six lines write a value that is consumed immediately afterwards through a
+local or a shadow local — `v197` at `:1143` feeds `:1144`; `v401` at `:1720` is
+`_s4656`, read at `:1764`. Engine B may drop the store to memory. It may not drop
+the arithmetic, and it may not drop the local. Deleting the whole line is a
+different edit than the one that was tested here, and this table does not license
+it. Re-run `deadstore.py` against any variant you actually intend to ship.
+
+**Second caveat: this is a statement about the 438 comparisons, not about all
+possible inputs.** The evidence set is the strongest one available and it is what
+the sonic-identity claim rests on, but a cell read only under a parameter
+combination no scenario reaches would report DEAD here. That is the same residual
+risk every gate in this project carries; it is bounded by the scenario set, and
+the scenario set is the thing to extend, not the verdict to soften.
+
+**Third: this proof is about `src/voice_render.c`, deliberately.** `deadstore.py`
+removes the `native/` shadow before building, because `native/voice_render.c`
+carries a 31-line header and its line numbers are offset from `src/`'s by 31.
+Mutating "line 974" of the file that really compiles would have corrupted a
+different statement than the one reported — a precise, confident, wrong answer.

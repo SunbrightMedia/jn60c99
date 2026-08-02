@@ -48,12 +48,28 @@ Start with the highest-observability module, not the simplest one.
 
 ## Open, and named rather than forgotten
 
-* **Four blind lines in M1b are not a coverage hole:** `:1143/:1146/:1147` write
-  cells 6464/6480/6496, which have **zero readers** anywhere in `voice_render.c`
-  or `master_render.c`; `:1132`'s store to 4304 is overwritten at `:1134` before
-  the next sample's read at `:1130`. Write-only shadows — droppable under a
-  sonic-identity claim, **not** under the bit-exact one. They belong in the
-  ledger's `state_parity` column.
+* **Four blind lines in M1b are not a coverage hole — and as of 2026-08-02 that
+  is PROVEN, not read off the page.** `:1132/:1143/:1146/:1147` (cells
+  4304/6464/6480/6496), plus `:974` (2576) and `:1720` (4656), were each put
+  through `tools/trackb/deadstore.py`: the line is shown to execute, and three
+  absurd stored values (12345.0, -7.7e18, 0.0) are each bit-identical over 30
+  scenarios + 384 full-bank + 24 fuzz = **438 comparisons scored EXACTLY**.
+  All six: **DEAD**. Table and caveats in `MODULE_ORDER.md`.
+
+  **The old wording here was the defect, and it is worth naming.** It argued
+  "zero readers anywhere" and "overwritten at `:1134`" — both from reading. That
+  is not evidence in this engine: state is a flat byte block addressed by numeric
+  offset, aliased by JF/JI over the same memory, shared across voice_render,
+  master_render, recall and the probes, and several cells have register-promoted
+  shadow locals. A grep for an offset finds textual matches, not readers. The
+  reading turned out to be correct; it was still not a proof, and a store
+  classified dead by reading is not dead.
+
+  Droppable under a sonic-identity claim, **not** under the bit-exact one — that
+  part stands. They belong in the ledger's `state_parity` column. **But a dead
+  STORE is not a dead COMPUTATION:** five of the six feed a local consumed
+  immediately afterwards, so engine B may drop the store to memory and may not
+  drop the arithmetic.
 * **UNEXPLAINED, do not paper over:** the `DCO noise` scenario (patch 32) does not
   catch the `nochorus` or `tailquiet` mutations. Patch 32 carries EFX routing 2 —
   the same as patch 5, which *does* catch `nochorus` — so the obvious explanation

@@ -490,7 +490,15 @@ def build(dst, mutate=None):
         shutil.copytree(os.path.join(REPO, d), os.path.join(tmp, d))
     if os.path.isdir(os.path.join(REPO, "native")):
         shutil.copytree(os.path.join(REPO, "native"), os.path.join(tmp, "native"))
-    if mutate == "noisegain":
+    if callable(mutate):
+        # Programmatic mutation (tools/trackb/deadstore.py). Receives the temp
+        # tree root and must edit whichever file _mut_target() resolves to; it is
+        # expected to assert its own anchors, for the same reason every named
+        # mutation below does -- a mutation that silently fails to apply produces
+        # a bit-identical build and reads as "no effect", which is precisely the
+        # false green this file exists to prevent.
+        mutate(tmp)
+    elif mutate == "noisegain":
         # The NOISE generator's 2^-24 output scale, off by 0.1% (voice_render.c
         # :640 -- the shared LFSR block at base+84272..84436, not a DCO cell).
         # It is caught by ONE scenario, not five, and that is the correct answer:
