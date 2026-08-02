@@ -119,6 +119,31 @@ typedef struct {
     float cond_detune;         /* CONDITION scatter, per voice, deterministic */
     float cond_scale;
 
+    /* ---- group 2b: state the SHIMS still keep in the port's cells --------
+     * These fields are the standalone engine's whole reason for existing
+     * (docs/engineb/STANDALONE.md). While a module is gated as a shim it keeps
+     * its state in the port's memory cells and reloads it every sample, so the
+     * null harness can substitute one module at a time. That reload is not
+     * free and it is not small: MEASURED on the host, 8 voices, 48 kHz, the
+     * marshalling costs 27,585 executed instructions per sample, 56.6 % of the
+     * whole engine, and the two lines that copy the ladder history in and out
+     * account for 9,088 of it on their own.
+     *
+     * Declaring the fields here does NOT switch anything over. The shims keep
+     * working exactly as they do until the standalone render path is gated;
+     * these are the destination, added first so the modules being written now
+     * have a home and are not written twice.
+     *
+     * A note on the decimator, because it is the one that proved the point:
+     * it is the first module that tried to own its state, and it could not be
+     * gated as a shim at all -- a `static` array outlives the engine context,
+     * and the harness builds a new context per scenario. See
+     * engine_b/wip/README.md. */
+    float vcf_hist[24];        /* ladder delay chain, port cells 8208..8544  */
+    float decim_h[4][8];       /* 4x polyphase FIR history, cells 4944..5440 */
+    unsigned decim_w;          /* rotating index; the port shifts 30 cells   */
+    float decim_b1, decim_b2, decim_b3;   /* biquad, cells 5488/5472/5504    */
+
     /* ---- group 3: allocator / note bookkeeping -------------------------- */
     uint32_t age;              /* allocation order (LRU)                     */
     uint8_t  note;             /* MIDI note, 0xFF = none                     */
