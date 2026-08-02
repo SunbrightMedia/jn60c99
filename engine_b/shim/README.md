@@ -57,3 +57,25 @@ The shim keeps engine B's five state floats in the port's own state cells
 `null_b.py`'s doc sanctions, so the module inherits the port's create/destroy/
 eight-voice lifecycle exactly. No cycle figure is ever taken from the shim: the
 cost rig measures `eb_envgen.c` alone.
+
+## dco — THE DCO OSCILLATOR
+
+Forks `src/voice_render.c` and replaces ONE range, lines 1718-2136, with four
+calls into `engine_b/eb_dco.c`. The brief names 1718-1830; that is sub-block ONE
+of the four 4x-oversampled sub-blocks, and sub-blocks 1/2/3 are PROVEN
+token-identical after renaming decompiler temporaries (only the polyphase output
+cell differs) while sub-block 4 differs in three decompiler artefacts that are
+the same arithmetic. So the module is one function called four times.
+
+`null_b.py --module dco` -> **30/30 EXACTLY 0**, including all 17 idle-prefix
+scenarios. Non-vacuity is MEASURED: planting the "obvious" wrap simplification
+(drop the rounding `+1`/`-1` and subtract 2 directly -- algebraically identical)
+fails **15 of 30** scenarios, worst global **-62.1 dB**, 38 dB above the gate.
+
+The phase wrap is additionally PROVEN over ALL 2^32 float32 bit patterns
+(`engine_b/test_dco_wrap.c`, 0 mismatches, NaN payloads included), because the
+negative arm at `src/voice_render.c:1726` executes in NONE of the 30 scenarios
+and comes within 0.0003 of firing -- no scenario gate can protect that margin.
+
+**The module is ACCURATE and it is NOT AFFORDABLE.** MEASURED cost and the
+options are in the commit message and in `engine_b/eb_dco.h`.
