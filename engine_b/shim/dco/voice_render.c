@@ -5,6 +5,7 @@
  * divergence under tools/engineb/null_b.py --module dco is attributable to the
  * DCO module and to nothing else. See engine_b/eb_dco.h.
  */
+#include <stdio.h>
 #include "eb_dco.h"     /* -I engine_b/ is supplied by the harness */
 
 /* voice_render.c — exact C99 transcription of sub_180369070 (Cloud 60 voice
@@ -1769,6 +1770,10 @@ LABEL_46:
      * is under the gate too. It is the same divide. */
     eb_dco_set_pitch(&ebc, _s4784, _s4816);
 
+    { static int dmp=0; if(!dmp && JF(a1,4736)!=0.0f){ dmp=1;
+      fprintf(stderr,"EBDCO %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g\n",
+       ebc.inc,ebc.g,ebc.pw,ebc.lvl_saw,ebc.lvl_pulse,ebc.lvl_sub,ebc.gn_saw,ebc.gn_pulse,ebc.gn_sub,
+       ebc.amp_saw,ebc.amp_pulse,ebc.amp_sub,ebc.sat_in,ebc.k3,ebc.k5,ebc.k7,ebc.k9,ebc.k11); fprintf(stderr,"EBTHR %.9g\n",ebc.subthr);} }
     ebs.phase  = JF(a1, 4864);
     ebs.subcnt = JF(a1, 4832);
 

@@ -532,7 +532,19 @@ def check(rerun=False):
     tool_sha = sha_many([os.path.join(HERE, "cost.py"),
                          os.path.join(HERE, "ledger.py")])
     bad = 0
-    for r in rows:
+    # SUPERSESSION. row_id carries the commit, so re-emitting a module APPENDS a
+    # new row and keeps the old one as history. History rows are stale BY
+    # DEFINITION -- that is what supersession means -- so counting their
+    # staleness as a problem makes `check` permanently red after the first
+    # re-emission and trains everyone to ignore it. Only the LAST row per module
+    # is CURRENT and must re-hash clean. History rows are still checked for
+    # FORGED and MALFORMED, which are never excusable, and are printed as
+    # SUPERSEDED so they cannot be mistaken for live claims.
+    current = {}
+    for i, r in enumerate(rows):
+        current[r.get("module")] = i
+    for i, r in enumerate(rows):
+        live = current.get(r.get("module")) == i
         missing = [c for c in COLUMNS if c not in r]
         if missing:
             bad += 1
@@ -575,13 +587,22 @@ def check(rerun=False):
             elif sha_text(res["out"]) != r["gate_stdout_sha"]:
                 problems.append("RE-RUN DIFFERS: the gate no longer prints what "
                                 "this row recorded")
-        if problems:
+        forged = [p for p in problems if p.startswith(("FORGED", "UNKNOWN"))]
+        if not live:
+            # history: only dishonesty counts, not age.
+            if forged:
+                bad += 1
+                print("[%-12s] SUPERSEDED but %s" % (r["row_id"], forged[0]))
+            else:
+                print("[%-12s] SUPERSEDED (history; not a live claim)"
+                      % r["row_id"])
+        elif problems:
             bad += 1
             print("[%-12s] %s" % (r["row_id"], problems[0]))
             for p in problems[1:]:
                 print("               %s" % p)
         else:
-            print("[%-12s] OK" % r["row_id"])
+            print("[%-12s] OK (current)" % r["row_id"])
     print("\n%d row(s), %d problem(s)" % (len(rows), bad))
     return 1 if bad else 0
 
@@ -648,7 +669,17 @@ def teeth():
 
 
 def show():
-    _, rows = read_tsv()
+    _, allrows = read_tsv()
+    # CURRENT ROWS ONLY. The ledger is append-only, so a re-emitted module has
+    # more than one row; summing all of them would double-count a module and
+    # report a budget figure that is simply wrong.
+    keep = {}
+    for r in allrows:
+        keep[r.get("module")] = r
+    rows = list(keep.values())
+    if len(rows) != len(allrows):
+        print("(%d superseded history row(s) not shown or summed)"
+              % (len(allrows) - len(rows)))
     tot = [0.0, 0.0, 0.0]
     print("%-12s %-22s %-30s %s" % ("module", "accuracy", "s3 cyc/sample",
                                     "% of 3,500"))
