@@ -41,11 +41,36 @@ what changes.
 
 ### Three ways out, in order of preference
 
-1. **`eb_env_atrest` — already written.** An envelope at its fixed point with the
-   gate low does not change when ticked, so skipping it is EXACT, not an
-   approximation, and lockstep is preserved by definition rather than by
-   argument. This removes the cost of every silent voice. It does not help the
-   worst case of eight sounding voices, which is what a budget must cover.
+1. **`eb_env_atrest` — WRITTEN, AND NOT SAFE AS IT STANDS. Correction, tested.**
+   I recorded this as "exact, lockstep preserved by definition". **That was
+   wrong.** The reset state is a fixed point only for particular coefficient
+   sets. Swept over 162 plausible combinations of `k_susbase`, `k_peak`,
+   `k_peakthr` and `k_slew`, ticking 64 times with the gate low:
+
+       9 of 162 combinations hold the rest state
+
+   For the other 153 the state MOVES while the envelope looks "at rest", so
+   skipping the tick silently desynchronises the voice — precisely the lockstep
+   failure the new idle-prefix scenarios were built to catch, introduced by the
+   optimisation that was supposed to be free.
+
+   The mechanism: with `k_susbase != 0` the sustain target is non-zero, the
+   upward-slew branch fires, and `t` climbs away from zero even with the gate
+   low. `eb_env_atrest` tests `y`, `h`, `t`, `r` but the tick also rewrites `p`
+   unconditionally, so `p` is not preserved by a skip either.
+
+   **The correct form** is to decide rest-stability from the COEFFICIENTS, once,
+   when a patch is recalled — not from the state, every sample. If a coefficient
+   set is rest-stable, cache a flag and the skip is exact for that patch; if it
+   is not, that patch does not get the optimisation. The test is O(1) per patch
+   change rather than per sample, so it costs nothing.
+
+   **Still unmeasured, and it decides how much this is worth:** the sweep used
+   synthetic coefficients. Whether REAL JUNO-60 patches land in the stable region
+   has not been checked. Extract the coefficient sets for all 64 factory patches
+   from the oracle and count. If most real patches are rest-stable this recovers
+   most silent-voice cost; if few are, it recovers almost nothing and option 3
+   carries the weight.
 2. **Fewer invocations.** Confirm both envelopes are genuinely needed for each
    voice for each sample, rather than computed and discarded when unrouted.
 3. **Control-rate decimation.** Envelopes move slowly, so ticking at 1/8 or 1/16
