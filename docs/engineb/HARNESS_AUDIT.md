@@ -8,7 +8,7 @@ harness, not from the engine. This audit looks for that class only.
 
 ---
 
-## F1 — SHIM COLLISION. Composite builds linked 2 modules of 10. **FIXED.**
+## F1 — SHIM COLLISION. Composite builds linked 2 modules of 10. **FIXED, and the whole-engine test now exists.**
 
 `null_b.build()` overlays each module's shim onto `src/` with `copyfile`. Six
 modules ship their own `voice_render.c` (dco, env, pwm_cv, vca_hpf, vcf_cv,
@@ -28,7 +28,28 @@ Effect: every whole-engine claim is withdrawn. Per-module gates are unaffected �
 one module shadows one file. `--check-port` is unaffected — it substitutes
 nothing.
 
-Fix: a collision is now a hard build failure that names both modules.
+Fix, part 1: a collision is now a hard build failure that names both modules.
+
+Fix, part 2 — **engine B has now been tested as a whole engine, for the first
+time.** `tools/engineb/merge_shims.py` GENERATES one composite shim,
+`engine_b/shim/engine_all/`, by applying each member's edit regions to one copy
+of the port file. The regions are disjoint, and the generator CHECKS that rather
+than assuming it: overlapping shims are a hard stop naming both, never an
+automatic resolution. `make engineb` regenerates the composite before any null
+runs, and `--check` fails on a stale one, so it cannot drift from its members.
+
+RESULTS, and both were verified by coverage rather than by the label — which is
+the mistake that started this audit:
+
+| comparison | result |
+|---|---|
+| whole engine vs the **plugin** (authority), 11 scenarios, 5 with idle prefixes | **11/11 BIT-EXACT** |
+| whole engine vs the port, 30 scenarios | **EXACTLY 0 everywhere** |
+
+Coverage of the composite build over the full 30-scenario set: eb_delay 100 %,
+eb_chorus_shim 96.5 %, eb_chorus 96.1 %, eb_reverb 93.6 %, eb_vca_hpf 91.7 %,
+eb_vcf_cv 90.9 %, eb_envgen 89.4 %, eb_vcf_ladder 87.3 %, eb_dco 82.8 %,
+eb_pwm_cv 61.1 %. **Every DSP module executes.**
 
 ---
 
@@ -225,9 +246,20 @@ because it shows the class is recurrent, not a one-off.
 4. ~~F5~~ DONE — and every DCO cost figure before it was too high.
 5. ~~F6~~ DONE.
 6. ~~F8~~ DONE — and then committed again by me, and fixed again. See F2.
-7. **F1 follow-up — merge the colliding shims so a whole-engine test can exist.
-   This is the only open item, and it is the one that matters most: engine B has
-   still never been compared to anything as a whole engine.**
+7. ~~F1 follow-up~~ DONE — the composite is generated and gated, and the whole
+   engine is BIT-EXACT against the plugin.
+
+**Every audit finding is now closed.** What remains open is not a harness fault
+but a stated limit:
+
+* `eb_engine.c`'s voice allocator and note handling are unproven and un-gated.
+  They must not be switched on before they are gated against the port's
+  allocator — the same surface that produced the KEY ASSIGN failure.
+* `skeleton` is un-gateable: its shim discards `eb_engine_process()`'s result.
+* Every number on this page is 44,100 Hz. 48 kHz, the delivery rate, has never
+  been compared against the authority.
+* Coverage here is LINE coverage. A line can execute with one branch never
+  taken.
 
 
 ## F8 — NEW, found by running the new battery: a calibration probe had drifted
