@@ -1,54 +1,77 @@
-# RESUME — 2026-08-01, Track B start
+# RESUME — 2026-08-02, engine B under construction
 
-## Live workflow runs (resume these; completed agents replay FREE from cache)
+## Live workflow runs (resume with resumeFromRunId; completed agents replay free)
 
-    Workflow({scriptPath: "/tmp/claude-0/-home-user-jn60c99/851980e2-931d-52da-bb74-16fb8562b242/scratchpad/mem_lever.js",
-              resumeFromRunId: "wf_bb26ffa8-cb1"})   # memory lever  <- HIGHEST VALUE
-    Workflow({scriptPath: ".../workflows/scripts/trackb-cost-attribution-wf_e520c39d-046.js",
-              resumeFromRunId: "wf_2d260d91-659"})   # cost attribution
-    Workflow({scriptPath: ".../workflows/scripts/ssx-portable-harness-wf_37c70714-d7d.js",
-              resumeFromRunId: "wf_1e2ac6fe-eb1"})   # portable framework
-
-Scripts also live under
-`/root/.claude/projects/-home-user-jn60c99/851980e2-931d-52da-bb74-16fb8562b242/workflows/scripts/`.
-If the container is gone, rebuild from docs/trackb/CONSTRAINTS.md + MODULE_ORDER.md.
-
-An earlier pair of runs (wf_e520c39d-046, wf_37c70714-d7d) had all 25 agents
-killed by turn interrupts. Their journals hold NULL results — do not try to
-recover them, just re-run.
+    scripts in /tmp/claude-0/-home-user-jn60c99/851980e2-931d-52da-bb74-16fb8562b242/scratchpad/
+      wf_found.js  -> wf_a09fe521-882   foundation completion (seal phase running)
+      wf_fx.js     -> wf_2f043aa9-3d2   chorus/delay/reverb: extract + implement
+      wf_voice.js  -> wf_23c72bdd-1ca   voice modules: VCF ladder, DCO, CV, VCA
+    Also under .../workflows/scripts/ . If the container is gone, rebuild from
+    docs/engineb/SCOPE.md + docs/trackb/{CONSTRAINTS,ACCURACY_STANDARD,MODULE_ORDER}.md
 
 ## State
 
-**P1 CLOSED.** The port ran on real silicon. Numbers in CLAUDE.md and the box at
-the top of docs/ROADMAP_EMBEDDED.md. Headline: 8 voices = 93,288 cyc/sample
-against a 8,333 budget = **11.19x OVER**, SysClk 400 MHz not 480.
+**The port (`src/`) is sealed and bit-exact.** It is now the ORACLE, not the
+product. It is 80x too slow on hardware.
 
-**Track B: still ZERO voice code rewritten.** native/voice_render.c is a verbatim
-fork. What exists now that did not before:
+**Engine B: 3 modules done, all EXACT, none spending error budget.**
 
-* `docs/trackb/CONSTRAINTS.md` — the user's binding target. 8 voices, ALL FX,
-  48 kHz. 6 voices is the ONLY permitted compromise and only as a last resort —
-  and it buys ~5%, so it is never the plan.
-* `docs/trackb/MODULE_ORDER.md` + `CANARY_SURVEY.txt` — all nine module ranges
-  surveyed. Order is now decided by measurement, not by PLAN §3's guess.
+| module | proof | S3 cost |
+|---|---|---|
+| noise LFSR | bit-identical over 200,000 oracle samples | 24 instr |
+| triangle | bit-identical over ALL 2^32 float inputs | 73 instr |
+| envelopes | 26/26 scenarios residual EXACTLY 0 | **1,188 cyc/sample = 34% of budget** |
 
-## Do next, in this order
+**Memory: the architecture works.** eb_voice 204 B (port: 10,512), whole engine
+138,748 B (port: 12 MB). Under 1 KB/voice and under 200 KB total, both met.
 
-1. **Read the memory-lever verdict.** It tests the largest known lever: per-voice
-   state is 10,512 B x 8 = 86 KB and fits AXI SRAM many times over, while E4
-   measures scattered SDRAM at 6.26x the cost of AXI. A pure relocation changes
-   NO float operation, so it stays bit-exact and needs no sonic gate. Cheapest
-   possible win.
-2. **Close the DCO blind gates.** M2 (964-1021) and M3 (1022-1075) are 5/12
-   observable. Charter gate #4 forbids rewriting behind a blind gate, so the
-   highest-value rewrites are BLOCKED until the scenario set reaches those lines.
-3. Only then rewrite modules, in gate-quality order crossed with cost share.
+**Target: ESP32-S3, one core, 240 MHz, 48 kHz, 3,500 cyc/sample** with 30%
+headroom against the 5,000 hard limit.
 
-## Standing corrections a future session must not undo
+## The open question
 
-* "Memory placement is not a lever" was WRONG and is withdrawn. E3's 1.05x shows
-  the CACHE cannot help (416 KB working set vs 16 KB L1), not that memory is not
-  the bottleneck. See CONSTRAINTS.md.
-* PLAN §3's module order is disproven. M1a is the worst-gated module at 2/13.
-* E3's ABSOLUTE numbers (287k vs E2's 93k for the same workload) are a 3x
-  discrepancy and UNRECONCILED. Quote the ratio only.
+Envelopes alone are 34%. ~2,300 cyc/sample remain for the DCO, VCF, mixers and
+ALL FX. The FX are the largest piece by code volume (master_render.c is 4,774
+instructions against the voice path's 3,491) and are 0% written. **Whether it
+fits is genuinely unknown** and the two running workflows are measuring it.
+
+## Foundation, and what it guarantees
+
+* `tools/engineb/null_b.py` — engine B vs oracle, --module stubbing, 30
+  scenarios (17 idle-prefix). Teeth proven: 1 ULP = -130.7 dB passes, 3e-5 =
+  -90.4 dB fails, lockstep break = +5.5 dB fails in 17.
+* `tools/engineb/cost.py` — host + Cortex-M7 + ESP32-S3, calibrated to silicon.
+* `tools/engineb/plugin_check.py` — the AUTHORITATIVE comparison, against the
+  plugin binary rather than the port.
+* `tools/trackb/canary.py` — DUAL-PROBE. BLIND only if neither shape moves a line.
+* `tools/trackb/verify_labels.py` — a label must match the cells it touches.
+* `tools/trackb/deadstore.py` — a store is dead only if a mutation is
+  bit-identical over 30 scenarios + 384 bank comparisons + fuzz.
+
+## Traps found the hard way — do not re-learn these
+
+1. **A 32-bit cycle counter is a 10.7-second ruler.** Every hardware number this
+   project had was wrong by 7x until the wrap was caught. The real Daisy cost is
+   669,682 cyc/sample, not 93,288.
+2. **A multiplicative probe cannot move a literal zero, a sign test or a
+   saturating consumer.** It under-reported observability and set the entire work
+   order. Fixed in one tool and left in another, where it came back.
+3. **Six of nine module labels were wrong**, three swapped between subsystems.
+   "M2 DCO" was the ENV1 ADSR; the real DCO was called "VCA/output".
+4. **eb_triangle's obvious fmodf replacement** was mathematically identical and
+   disagreed on 8,388,608 of 2^32 inputs through rounding. Caught only by an
+   exhaustive test.
+5. **eb_env_atrest looked like a free exact skip** and holds for 9 of 162
+   coefficient sets. Rest-stability must be decided from the coefficients at
+   recall, not from the state each sample.
+6. **The DCO's negative phase wrap sits 0.0003 from firing.** It is not dead code
+   and MUST be implemented; a scenario gate cannot protect a margin that thin.
+
+## Next, in order
+
+1. Read the FX verdict — it decides whether PSRAM is needed and whether the
+   budget closes.
+2. Read the voice budget roll-up.
+3. Whatever is left of the voice path.
+4. **Get engine B's hot loop onto an actual ESP32-S3 EARLY.** The single largest
+   process error in this project was measuring on the target too late.
