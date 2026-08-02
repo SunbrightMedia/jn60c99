@@ -452,13 +452,16 @@ def teeth(quick):
     # NameError before any work, so this battery had NEVER EXECUTED despite the
     # docstring and two documents claiming "teeth proven". Found by running it.
     ref = oracle_render(quick)
-    for mut, want_fail in cases:
-        fails, worst, caught = run((), quick, mutate=mut, ref=ref,
-                                   label="planted: %s" % (mut or "CLEAN CONTROL"),
+    for mut, mods, want_fail in cases:
+        fails, worst, caught = run(mods, quick, mutate=mut, ref=ref,
+                                   label="planted: %s%s"
+                                   % (mut or "CLEAN CONTROL",
+                                      " [%s]" % ",".join(mods) if mods else ""),
                                    verbose=False)
         got = fails > 0
         ok = (got == want_fail) and (mut is not None or worst is None)
-        if mut in ("onelsb", "justover") and worst is None:
+        if mut in ("onelsb", "justover", "reverbwet", "reverbtap",
+                   "reverbskip") and worst is None:
             print("    *** the planted error produced NO residual at all -- the "
                   "mutation did not take, so this case measured nothing ***")
             ok = False
