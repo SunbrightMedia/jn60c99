@@ -32,7 +32,7 @@
 #define EB_HAVE_HPF     1   /* eb_vca_hpf.c: null 30/30 EXACTLY 0             */
 #define EB_HAVE_ENV     1   /* ENV1 + ENV2: eb_envgen.c, null 30/30 EXACTLY 0 (ledger) */
 #define EB_HAVE_VCA     1   /* eb_vca_hpf.c: null 30/30 EXACTLY 0; 1,543 cyc/sample S3 */
-#define EB_HAVE_CHORUS  0   /* the signature BBD chorus                       */
+#define EB_HAVE_CHORUS  1   /* eb_chorus.c: null 30/30 EXACTLY 0 (ledger)      */
 #define EB_HAVE_DELAY   1   /* eb_delay.c: DELAY TYPE 0 ONLY, null 30/30 EXACTLY 0.
                              * TYPES 1..5 are NOT written -- see docs/engineb/M-DELAY_RESULT.md */
 #define EB_HAVE_REVERB  0
