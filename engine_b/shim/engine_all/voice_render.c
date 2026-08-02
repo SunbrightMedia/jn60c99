@@ -1,6 +1,6 @@
 /* GENERATED FILE -- DO NOT EDIT.
  * tools/engineb/merge_shims.py built this from the individual shims:
- *     dco, decim, env, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
+ *     dco, decim, env, noise_svf, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
  * Edit those, then re-run the generator (make engineb does it).
  * Its purpose: engine B cannot be tested as a WHOLE ENGINE while each
  * module shadows the same port file -- see docs/engineb/HARNESS_AUDIT.md
@@ -64,6 +64,22 @@ static eb_voice EBV[8];
  */
 #include "eb_envgen.h"     /* -I engine_b/ is supplied by the harness */
 
+/* ---- from shim 'noise_svf' ---- */
+/* SHIM — MODULE NOISE_SVF (engine_b/eb_noise_svf.{h,c}).
+ * Replaces src/voice_render.c:1129-1140, the Chamberlin noise filter. Nothing
+ * else in this file differs from the port, so a divergence under
+ * `null_b.py --module noise_svf` is attributable to this filter alone.
+ *
+ * State lives in eb_voice, not the port's cells, with the same power-on marker
+ * the decimator uses -- cell 5440 is zeroed by src/chorus_init.c:218 and, once
+ * the decimator's shim removes the 30-move shift, nothing else writes it. Here
+ * the marker cell must be one THIS shim owns, so it uses 4288 instead: the port
+ * zeroes it at power-on (chorus_init) and only this filter writes it.
+ */
+#include "eb_noise_svf.h"
+#include "eb_types.h"
+static eb_nsvf_state EBN[8];
+static unsigned char EBN_seen[8];
 /* ---- from shim 'pwm_cv' ---- */
 /* engine_b/shim/pwm_cv/voice_render.c — VERBATIM FORK of src/voice_render.c
  * with ONE range replaced: the pitch / PWM modulation CV block,
@@ -1247,18 +1263,29 @@ LABEL_46:
     JI(a1, 4272) = JI(a1, 4224);
   }
   /* =============== END ENGINE B MODULE M-MODCV ============================ */
-  v190 = JF(base, 84432);
-  JI(a1, 4320) = JI(a1, 4304);
-  v191 = JF(a1, 4288);
-  JF(a1, 4304) = v191;
-  v192 = (float)(v191 * JF(a1, 4336)) + JF(a1, 4320);
-  JF(a1, 4304) = v192;
-  v193 = (float)(v191 * JF(a1, 4352)) + v192;
-  v194 = v192 * JF(a1, 4400);
-  v195 = v190 - v193;
-  v196 = (float)(v195 * JF(a1, 4336)) + v191;
-  JF(a1, 4288) = v196;
-  JF(a1, 4320) = (float)((float)(v195 * JF(a1, 4368)) + v194) + (float)(v196 * JF(a1, 4384));
+  /* ==== ENGINE B MODULE NOISE_SVF ====================================== */
+  {
+    eb_nsvf_coef _nc;
+    float _n04, _n20;
+    _nc.k36 = JF(a1, 4336); _nc.k52 = JF(a1, 4352); _nc.k68 = JF(a1, 4368);
+    _nc.k84 = JF(a1, 4384); _nc.k00 = JF(a1, 4400);
+    if (!EBN_seen[voice] || JF(a1, 4288) == 0.0f) {
+      /* fresh context: the port zeroes 4288 at power-on and only this filter
+       * writes it, so a zero there means "just built" -- the same trick the
+       * decimator uses on cell 5440, and for the same reason: a static array
+       * outlives the engine context and malloc reuses addresses. */
+      EBN[voice].s88 = JF(a1, 4288);
+      EBN[voice].s04 = JF(a1, 4304);
+      EBN_seen[voice] = 1;
+    }
+    _n20 = eb_nsvf_tick(&EBN[voice], &_nc, JF(base, 84432), &_n04);
+    /* the port's cells are still written: other code may read them, and this
+     * module is not the place to prove it does not. */
+    JF(a1, 4288) = EBN[voice].s88;
+    JF(a1, 4304) = _n04;
+    JF(a1, 4320) = _n20;
+  }
+  /* ==== END ENGINE B MODULE NOISE_SVF ================================== */
   JI(a1, 6432) = JI(a1, 6416);
   v197 = JF(a1, 6448);
   JF(a1, 6464) = v197;

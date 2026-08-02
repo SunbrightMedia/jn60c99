@@ -315,6 +315,9 @@ _OUT_ANCHOR = {
               "        *(float *)(a1 + 102336) = ebR;",
               "        *(float *)(a1 + 102320) *= %s;\n"
               "        *(float *)(a1 + 102336) *= %s;"),
+    "noise_svf": ("voice_render.c",
+                  "    JF(a1, 4320) = _n20;",
+                  "    JF(a1, 4320) *= %s;"),
     "decim": ("voice_render.c",
               "  JF(a1, 3520) = v526;",
               "  JF(a1, 4928) *= %s; JF(a1, 3520) *= %s;"),
@@ -362,6 +365,10 @@ _BRACKET = {
     "vcf_ladder": ("3.16e-5", "3.16e-6"),
     "env":        ("3.7e-6",  "3.7e-7"),
     "decim":      ("3.16e-5", "3.16e-6"),   # measured below, unity gain
+    # The noise SVF ATTENUATES: MEASURED -12.6 dB, so its bracket is coarser by
+    # that much. This is the weakest-coupled block in the engine and the one
+    # whose bracket had to be derived from a measured gain rather than reused.
+    "noise_svf":  ("1.35e-4", "1.35e-5"),
     "vcf_cv":     ("4.8e-6",  "4.8e-7"),
     # pwm_cv is fail-only; see teeth(). Its FAIL case would need a factor of
     # about 1.9e-10 to land at -90 dB, which is far below one ULP of 1.0f.
