@@ -39,24 +39,45 @@ generators and they read 10/12 additively; the real DCO is elsewhere and is amon
 the better-gated ranges. A rewrite scheduled from the old table would have been
 driven by `DCO.md` while editing envelope code.
 
+## The labels, CORRECTED from CELLMAP.md's own cell names
+
+Six of the nine were wrong. Three were swapped between entirely different
+subsystems. Identified by taking every cell each range touches and reading the
+name `CELLMAP.md` gives it — the plugin's own registry where available — rather
+than trusting `PLAN.md`.
+
+| range | old label | **what it actually is** | decisive evidence |
+|---|---|---|---|
+| 654-693 | conditioner+gate | **CV/gate conditioning** ✔ | 304 "M.CV — note pitch CV", 448 smoother-enable |
+| 964-1021 | M2 DCO | **ENV1 ADSR** | 32 of 35 cells named ENV |
+| 1022-1075 | M3 DCO2 | **ENV2 ADSR** | 33 ENV cells; 3040 "LFO trigger env sw" |
+| 1076-1128 | M5 PWM | **pitch/PWM modulation CV** | 752 "FINAL PITCH CV", 1792 "LFO OUT" |
+| 1129-1149 | M1b noise SVF | **noise SVF** ✔ | 4288/4304 "noise SVF state 1/2" |
+| 1150-1229 | M6 mix | **VCF cutoff CV summing** | 18 VCF + 16 LFO cells |
+| 1298-1400 | M7 envelope | **VCF LADDER CORE** | 6544 "VCF AUDIO INPUT", 7536 "resonance drive", 8208 "ladder stage-1 nl out" |
+| 1516-1640 | M4 VCF | **VCA + HPF output** | 12 VCA + 7 HPF cells; 2752/3232 "ENV OUT raw" |
+| 1718-1830 | M8 VCA/output | **DCO OSCILLATOR** | 4640 "DCO master phase (wrap [-1,1))", 4672 sub-osc counter, saw/pulse |
+
+Only three of nine were right. The three most consequential — the DCO, the VCF
+ladder and the envelopes — were each pointing at a different subsystem's code.
+
+`tools/trackb/verify_labels.py` now carries the corrected table and exits 0.
+
 ## The order, corrected
 
 Gate quality only. It must still be crossed with cost before scheduling.
 
-| rank | range | what it is | observable |
+| rank | range | module | observable |
 |---|---|---|---|
-| 1 | 1129-1149 | noise SVF + source mix | 12/14 |
-| 2 | 1076-1128 | PWM | 11/14 |
-| 2 | 1150-1229 | mix | 11/14 |
-| 2 | 1298-1400 | envelope (per `MODULE_ORDER` legacy name) | 11/14 |
-| 5 | 964-1021 | **ENV1 ADSR** | 10/12 |
-| 5 | 1022-1075 | **ENV2 ADSR** | 10/12 |
-| 7 | 1516-1640 | VCF | 9/14 |
-| — | 1718-1830 | **DCO** | re-run needed for the summary |
-| last | 654-693 | conditioner + gate | **4/13** |
-
-654-693 remains the worst by a wide margin and is still the module PLAN §3 wanted
-first.
+| 1 | 1129-1149 | noise SVF | 12/14 |
+| 2 | 1076-1128 | pitch/PWM modulation CV | 11/14 |
+| 2 | 1150-1229 | VCF cutoff CV | 11/14 |
+| 2 | 1298-1400 | **VCF ladder core** | 11/14 |
+| 5 | 964-1021 | ENV1 ADSR | 10/12 |
+| 5 | 1022-1075 | ENV2 ADSR | 10/12 |
+| 7 | 1516-1640 | VCA + HPF output | 9/14 |
+| — | 1718-1830 | **DCO oscillator** | re-run for the summary |
+| last | 654-693 | CV/gate conditioning | **4/13** |
 
 ## Genuinely blind lines, classified with proof rather than suspicion
 

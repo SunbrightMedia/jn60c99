@@ -27,15 +27,18 @@ DOCS = os.path.join(REPO, "docs", "trackb")
 
 # The declared ranges, from MODULE_ORDER.md. Edit here when a module is added.
 RANGES = [
-    ("654-693",   "conditioner+gate", None),
-    ("964-1021",  "ENV1 ADSR",        "ENV.md"),
-    ("1022-1075", "ENV2 ADSR",        "ENV.md"),
-    ("1076-1128", "PWM",              "DCO.md"),
-    ("1129-1149", "noise SVF",        None),
-    ("1150-1229", "mix",              None),
-    ("1298-1400", "envelope",         "ENV.md"),
-    ("1516-1640", "VCF",              "VCF.md"),
-    ("1718-1830", "DCO",              "DCO.md"),
+    # CORRECTED 2026-08-02 from CELLMAP.md's own cell names, not from PLAN.md.
+    # Six of the nine original labels were wrong; three were swapped between
+    # entirely different subsystems.
+    ("654-693",   "CV/gate conditioning", None),      # 304 M.CV, 448 smoother-enable
+    ("964-1021",  "ENV1 ADSR",        "ENV.md"),      # 32 ENV cells
+    ("1022-1075", "ENV2 ADSR",        "ENV.md"),      # 33 ENV cells
+    ("1076-1128", "pitch/PWM mod CV", "DCO.md"),      # 752 FINAL PITCH CV, 1792 LFO OUT
+    ("1129-1149", "noise SVF",        None),          # 4288/4304 noise SVF state
+    ("1150-1229", "VCF cutoff CV",    "VCF.md"),      # 18 VCF + 16 LFO cells
+    ("1298-1400", "VCF ladder core",  "VCF.md"),      # 6544 VCF AUDIO INPUT, 8208 ladder stage-1
+    ("1516-1640", "VCA + HPF output", None),          # 12 VCA, 7 HPF, 2752/3232 ENV OUT
+    ("1718-1830", "DCO oscillator",   "DCO.md"),      # 4640 DCO master phase, sub/saw/pulse
 ]
 
 CELL = re.compile(r"J[FIU]\(a1,\s*(\d+)\)")
