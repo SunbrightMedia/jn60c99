@@ -62,7 +62,18 @@ COST -- MEASURED, not guessed
     emulation on its own). Bulk coverage belongs on the fast proxy; this gate
     confirms the authority agrees at a handful of load-bearing points.
 
-FIRST RESULT (MEASURED 2026-08-02, first run of this file) -- A PORT DIVERGENCE
+CURRENT RESULT (MEASURED 2026-08-02, after the UNISON fix and after the
+idle-prefix variants were added) -- `--check-port`, 11 scenarios, 44100 Hz:
+    ALL 11 BIT-EXACT, including `UNISON pile` and `UNISON 1-idle`, the two rows
+    that were red before the fix. The divergence recorded below was a REAL PORT
+    BUG, found by this tool, and it is closed: the bridge never armed the
+    per-voice DCO retrigger latch on any voice, and `juno_init` arms it at
+    BUILD, so a cold note matched by accident. Fixed in gui/juno_bridge.c.
+    Signal levels this run: -18.7 to -35.7 dBFS.
+
+HISTORY (MEASURED 2026-08-02, first run of this file) -- THE PORT DIVERGENCE
+THIS TOOL WAS BUILT TO FIND. Retained because it is the evidence that the
+idle-prefix variants earn their runtime.
     `--check-port`, 6 scenarios, 44100 Hz, 98 s wall:
         pluck POLY   BIT-EXACT      chorus pad  BIT-EXACT
         MONO retrig  BIT-EXACT      delay keys  BIT-EXACT
@@ -79,8 +90,8 @@ FIRST RESULT (MEASURED 2026-08-02, first run of this file) -- A PORT DIVERGENCE
     is exactly the class recall_render_ab cannot see: all 57 of its patches are
     driven COLD. Root cause NOT yet established, and a harness defect is not
     fully excluded -- but the same harness path is bit-exact on POLY and MONO
-    with idle prefixes, which is evidence against that. Treat as a CANDIDATE NEW
-    PORT BUG and triage before any engine B unison result is believed.
+    with idle prefixes, which is evidence against that. [RESOLVED: it was a port bug,
+    not a harness defect. See CURRENT RESULT above.]
 
 USAGE
     plugin_check.py --check-port [--quick] [--scen TAG ...]
@@ -133,8 +144,42 @@ SCEN = [
       ('off', 67), ('render', 4000)]),
     ("DCO noise", 32,
      [('on', 52, 100), ('render', 10000), ('off', 52), ('render', 4000)]),
+
+    # ---- IDLE-PREFIX VARIANTS (added 2026-08-02) ----------------------------
+    # WHY THESE EXIST. The UNISON divergence recorded above was a REAL PORT BUG
+    # (the per-voice DCO retrigger latch was armed on no voice by the bridge;
+    # fixed in gui/juno_bridge.c). It was invisible to every cold gate because
+    # juno_init arms the latch at BUILD, so a note on the very first sample
+    # matches by accident. ONE idle sample was enough to expose it.
+    #
+    # The four scenarios above other than MONO retrig and UNISON pile were
+    # COLD, which is the same structural blind spot inside the tool built to
+    # catch it. These variants re-run them with a free-running idle prefix.
+    # The prefix lengths are deliberately unequal and not multiples of each
+    # other: the chorus LFO, the noise LFSR and the DCO phase all free-run at
+    # different periods, and an aligned prefix can be silently harmless.
+    ("pluck POLY idle", 5,
+     [('render', 1777), ('on', 60, 100), ('render', 10000), ('off', 60),
+      ('render', 4000)]),
+    ("chorus pad idle", 20,
+     [('render', 6113), ('on', 48, 100), ('on', 55, 100), ('on', 64, 100),
+      ('render', 10000), ('off', 48), ('off', 55), ('off', 64),
+      ('render', 4000)]),
+    ("delay keys idle", 2,
+     [('render', 4391), ('on', 60, 100), ('on', 67, 100), ('render', 10000),
+      ('off', 60), ('off', 67), ('render', 4000)]),
+    ("DCO noise idle", 32,
+     [('render', 953), ('on', 52, 100), ('render', 10000), ('off', 52),
+      ('render', 4000)]),
+    # A one-sample prefix on the patch the bug was found on. This is the
+    # cheapest scenario in the set and it is the one that failed before the
+    # fix, so it is the regression guard: if the retrigger arming is ever lost
+    # again, THIS row goes red first.
+    ("UNISON 1-idle", 61,
+     [('render', 1), ('on', 48, 100), ('render', 6000), ('off', 48),
+      ('render', 2000)]),
 ]
-QUICK_TAGS = ["pluck POLY", "chorus pad"]
+QUICK_TAGS = ["pluck POLY", "chorus pad", "UNISON 1-idle"]
 
 # Scenarios whose patch is ARP-enabled would be meaningless: this oracle has no
 # transport clock and cannot arpeggiate (see recall_render_ab). Guard it.

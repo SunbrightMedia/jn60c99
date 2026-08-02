@@ -40,14 +40,19 @@ binary, not to our transcription of it.
 
 ## What this baseline does NOT cover, stated plainly
 
-* **Six scenarios, not thirty.** The Unicorn oracle costs ~12 s of wall time per
+* **Eleven scenarios, not thirty.** The Unicorn oracle costs ~12 s of wall time per
   scenario, so `plugin_check` is deliberately a small set of authoritative
   points, not a sweep. The 30-scenario set still runs against `src/`.
 * **44,100 Hz only.** 48 kHz is the delivery rate and is not covered here.
-* **No idle-prefix scenarios.** The UNISON bug needed exactly one idle sample to
-  appear, and `plugin_check`'s six scenarios are cold. **This is the same
-  structural blind spot that hid the bug in the first place**, now present in the
-  tool built to catch it. It must be closed.
+* ~~**No idle-prefix scenarios.**~~ **CLOSED 2026-08-02.** Five idle-prefix
+  variants were added (`pluck POLY idle` 1,777 frames, `chorus pad idle` 6,113,
+  `delay keys idle` 4,391, `DCO noise idle` 953, `UNISON 1-idle` 1). The prefix
+  lengths are unequal and mutually non-multiple on purpose, because the chorus
+  LFO, the noise LFSR and the DCO phase free-run at different periods and an
+  aligned prefix can be silently harmless. MEASURED against the authority:
+  `--check-port` **11/11 BIT-EXACT** and `--module all` **11/11 BIT-EXACT**.
+  `UNISON 1-idle` is the regression guard for the retrigger-latch bug — it is
+  the row that was red before the fix, and it is the cheapest in the set.
 * **Delay TYPES 1–5, EFFECT TYPE 4 (flanger), and REVERB TYPE 5** are not written
   or not selected by any scenario.
 * The unwritten blocks — decimator, noise SVF, CV conditioning, voice summing —
@@ -55,5 +60,6 @@ binary, not to our transcription of it.
 
 ## The immediate next thing
 
-Add idle-prefix scenarios to `plugin_check`. A tool whose purpose is to catch
-what the cold gates miss should not itself be cold-only.
+**Extend `plugin_check` to 48,000 Hz.** 48 kHz is the delivery rate for engine B
+and no authoritative comparison has ever been made at it. That is now the
+largest uncovered surface in this table.
