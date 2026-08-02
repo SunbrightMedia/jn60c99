@@ -21,7 +21,7 @@ change that makes hardware possible, and it is now measured rather than planned.
 |---|---|
 | noise LFSR | 200,000 samples, bit-identical |
 | triangle | **all 2^32 float inputs**, bit-identical |
-| envelopes (M7) | **26/26 scenarios, residual EXACTLY 0**, verified independently |
+| envelopes (M7) | **30/30 scenarios, residual EXACTLY 0** (2026-08-02 re-run; was 26 when written), verified independently |
 
 No module has spent any of the error budget. Nothing is an approximation.
 

@@ -36,7 +36,7 @@ bytes, each on its own 16-byte boundary, which is why it costs 669,682 cycles a
 sample on a Daisy Seed.
 
 ```
-tools/engineb/null_b.py --module skeleton   26/26 scenarios EXACTLY 0
+tools/engineb/null_b.py --module skeleton   30/30 scenarios EXACTLY 0
 engine_b/tests                              BUDGET / FREE-RUN CONTRACT /
                                             PARAMETER PATH all PASS
 tools/engineb/patch_roundtrip.py --teeth    64/64 patches bit-exact

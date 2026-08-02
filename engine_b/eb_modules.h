@@ -29,7 +29,7 @@
 #define EB_HAVE_DCO     0   /* saw + pulse + sub + noise mix, PWM             */
 #define EB_HAVE_VCF     0   /* 4-pole low pass, resonance, key follow         */
 #define EB_HAVE_HPF     0   /* the JUNO's high pass, 4 TYPEs                  */
-#define EB_HAVE_ENV     1   /* ENV1 + ENV2: eb_envgen.c, null 26/26 EXACTLY 0 */
+#define EB_HAVE_ENV     1   /* ENV1 + ENV2: eb_envgen.c, null 30/30 EXACTLY 0 (ledger) */
 #define EB_HAVE_VCA     0   /* amp, incl. the GATE / ENV1 / ENV2 mode switch  */
 #define EB_HAVE_CHORUS  0   /* the signature BBD chorus                       */
 #define EB_HAVE_DELAY   0

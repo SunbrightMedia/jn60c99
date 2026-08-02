@@ -46,7 +46,7 @@ into `engine_b/eb_envgen.c`. Everything else in the file is the port's own code
 byte for byte, so a divergence is attributable to the envelopes and to nothing
 else.
 
-`null_b.py --module env` -> **26/26 EXACTLY 0**, including all 17 idle-prefix
+`null_b.py --module env` -> **30/30 EXACTLY 0** (re-run 2026-08-02; the set was 26 when this was written), including all 17 idle-prefix
 scenarios. Non-vacuity is MEASURED, not assumed: planting the documented slew-
 constant simplification in `eb_envgen.c` fails 10 of 25 scenarios at -66.9 dB,
 33 dB above the gate. Full numbers, the cost measurement and one restructuring
