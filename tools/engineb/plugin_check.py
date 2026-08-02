@@ -107,7 +107,18 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(REPO, "tools", "trackb"))
 sys.path.insert(0, os.path.join(REPO, "tools", "verify"))
 
-SR = 44100.0                     # null_ab.SR; the rate both sides are built at
+# THE RATE BOTH SIDES ARE BUILT AT. Read from the environment so the two worker
+# subprocesses inherit exactly the driver's choice -- recall_render_ab reads the
+# same variable, and the reference asserts the two agree before it renders, so a
+# rate that failed to propagate stops the run instead of producing a full set of
+# divergences with a non-engine cause.
+#
+# 44,100 Hz is the default because every historical result on this gate was
+# measured there. 48,000 Hz is engine B's DELIVERY rate and is selected with
+# --rate 48000. Until 2026-08-02 this gate had never run at the rate the engine
+# actually ships at (docs/engineb/HARNESS_AUDIT.md, "what the audit did not
+# cover").
+SR = float(os.environ.get("JUNO_RENDER_SR", 44100.0))
 
 # ---------------------------------------------------------------------------
 # SCENARIOS. Same event language as null_ab.render_script:
@@ -325,10 +336,21 @@ def main():
     ap.add_argument("--strict", action="store_true",
                     help="apply the engine B band (-100/-80) instead of -90/-70")
     ap.add_argument("--scen", nargs="*", default=None)
+    ap.add_argument("--rate", type=float, default=None,
+                    help="host sample rate for BOTH sides (default 44100). "
+                         "48000 is engine B's delivery rate.")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--teeth", action="store_true",
                     help="mutation battery: the gate is tested before it counts")
     a = ap.parse_args()
+    if a.rate:
+        # Set BOTH the driver's own SR and the variable the workers inherit.
+        # recall_render_ab reads JUNO_RENDER_SR and ref_main asserts the two
+        # agree, so a rate that fails to propagate aborts the run rather than
+        # producing a full set of divergences with a non-engine cause.
+        global SR
+        SR = a.rate
+        os.environ["JUNO_RENDER_SR"] = "%g" % a.rate
 
     if a.list:
         for t, p, s in SCEN:

@@ -256,8 +256,22 @@ but a stated limit:
   They must not be switched on before they are gated against the port's
   allocator — the same surface that produced the KEY ASSIGN failure.
 * `skeleton` is un-gateable: its shim discards `eb_engine_process()`'s result.
-* Every number on this page is 44,100 Hz. 48 kHz, the delivery rate, has never
-  been compared against the authority.
+* ~~48 kHz has never been compared against the authority.~~ **CLOSED
+  2026-08-02.** `plugin_check.py --rate` was added and both sides were run at
+  **48,000 Hz**, engine B's delivery rate:
+
+  | comparison at 48 kHz | result |
+  |---|---|
+  | whole engine (`--module all`) vs the plugin | **11/11 BIT-EXACT** |
+  | the port (`--check-port`) vs the plugin | **11/11 BIT-EXACT** |
+
+  NON-VACUITY, which matters because a rate that fails to propagate would give a
+  full set of false greens: the signal levels differ from the 44.1 kHz run —
+  `pluck POLY` reads −43.2 dBFS at 48 kHz against −35.7 dBFS at 44.1 kHz, and
+  every other scenario also moved. The rate change reached the DSP. On top of
+  that, `ref_main` asserts the reference's own `SR` equals the gate's before it
+  renders a single frame, so a variable that did not propagate aborts the run
+  instead of producing divergences with a non-engine cause.
 * Coverage here is LINE coverage. A line can execute with one branch never
   taken.
 
