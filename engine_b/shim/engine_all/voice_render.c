@@ -1,6 +1,6 @@
 /* GENERATED FILE -- DO NOT EDIT.
  * tools/engineb/merge_shims.py built this from the individual shims:
- *     dco, decim, env, noise_svf, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
+ *     dco, decim, env, noise_svf, pitch, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
  * Edit those, then re-run the generator (make engineb does it).
  * Its purpose: engine B cannot be tested as a WHOLE ENGINE while each
  * module shadows the same port file -- see docs/engineb/HARNESS_AUDIT.md
@@ -80,6 +80,12 @@ static eb_voice EBV[8];
 #include "eb_types.h"
 static eb_nsvf_state EBN[8];
 static unsigned char EBN_seen[8];
+/* ---- from shim 'pitch' ---- */
+/* SHIM — MODULE PITCH (engine_b/eb_pitch.{h,c}).
+ * Replaces src/voice_render.c:1641-1664, the pitch polynomial. STATELESS, so
+ * unlike every other module written this week it needs no home for its state
+ * and no power-on marker. Nothing else in this file differs from the port. */
+#include "eb_pitch.h"
 /* ---- from shim 'pwm_cv' ---- */
 /* engine_b/shim/pwm_cv/voice_render.c — VERBATIM FORK of src/voice_render.c
  * with ONE range replaced: the pitch / PWM modulation CV block,
@@ -1558,31 +1564,14 @@ LABEL_46:
     JF(a1, 10480) = ebvs.x1;    JF(a1, 10496) = ebvs.yA;
     JF(a1, 10512) = ebvs.yB;
   }
-  v385 = fmin(fmax((float)(JF(a1, 4448) + JF(a1, 3776)), -20.0), 8.9);
-  v386 = v385 * v385 * v385;
-  v387 = juno_pitch_table[(int)(v385 + 20.0)];
-  v388 = v386 * v385 * v385;
-  v389 = v388 * v385 * v385 * v385;
-  v390 = v389 * v385 * v385;
-  v391 = fmaxf(
-           fminf(
-             v385 * v387[2]
-           + *v387
-           + v385 * v385 * v387[4]
-           + v386 * v387[6]
-           + v386 * v385 * v387[8]
-           + v388 * v387[10]
-           + v388 * v385 * v387[12]
-           + v388 * v385 * v385 * v387[14]
-           + v389 * v387[16]
-           + v389 * v385 * v387[18]
-           + v390 * v387[20]
-           + v390 * v385 * v387[22]
-           + v390 * v385 * v385 * v387[24],
-             512.0),
-           -512.0)
-       * JF(a1, 3792);
+  /* ==== ENGINE B MODULE PITCH ========================================== */
+  {
+    float _cv = JF(a1, 4448) + JF(a1, 3776);
+    v391 = eb_pitch_eval(_cv, juno_pitch_table[eb_pitch_row(_cv)],
+                         JF(a1, 3792));
+  }
   JF(a1, 4416) = v391;
+  /* ==== END ENGINE B MODULE PITCH ====================================== */
   v392 = JF(a1, 3776);
   v393 = JI(a1, 4240);
   v394 = JI(a1, 4256);

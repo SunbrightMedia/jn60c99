@@ -315,6 +315,9 @@ _OUT_ANCHOR = {
               "        *(float *)(a1 + 102336) = ebR;",
               "        *(float *)(a1 + 102320) *= %s;\n"
               "        *(float *)(a1 + 102336) *= %s;"),
+    "pitch": ("voice_render.c",
+              "  JF(a1, 4416) = v391;",
+              "  v391 *= %s; JF(a1, 4416) = v391;"),
     "noise_svf": ("voice_render.c",
                   "    JF(a1, 4320) = _n20;",
                   "    JF(a1, 4320) *= %s;"),
@@ -369,6 +372,10 @@ _BRACKET = {
     # that much. This is the weakest-coupled block in the engine and the one
     # whose bracket had to be derived from a measured gain rather than reused.
     "noise_svf":  ("1.35e-4", "1.35e-5"),
+    # 'pitch' is FAIL-ONLY and is absent from this table on purpose -- see
+    # teeth(). Like pwm_cv it is gated finer than one ULP of 1.0f, so no pass
+    # case can exist: MEASURED, 1.8e-8 gives EXACTLY 0 because
+    # `1.0f + 1.8e-8f == 1.0f`, i.e. that build perturbs nothing at all.
     "vcf_cv":     ("4.8e-6",  "4.8e-7"),
     # pwm_cv is fail-only; see teeth(). Its FAIL case would need a factor of
     # about 1.9e-10 to land at -90 dB, which is far below one ULP of 1.0f.
@@ -719,8 +726,15 @@ def teeth(quick):
     # result, so it cannot be perturbed into the output at all. It is
     # un-gateable by this harness by construction -- see _OUT_ANCHOR.
     for _m in sorted(_OUT_ANCHOR):
-        if _m == "pwm_cv":
-            cases.append(("out:pwm_cv:(1.0f + 1e-7f)", ("pwm_cv",), True))
+        if _m in ("pwm_cv", "pitch"):
+            # Both carry a CONTROL value -- a cutoff and a pitch -- so a
+            # relative error on them is amplified enormously at the output, and
+            # both are gated finer than one ULP of 1.0f. A pass case is
+            # impossible, not merely absent: MEASURED, pwm_cv at 1e-8 and pitch
+            # at 1.8e-8 both give EXACTLY 0, because those factors round to
+            # 1.0f and the build perturbs nothing. At one ULP, 1e-7, pwm_cv
+            # fails at -35.5 dB in 22/30 and pitch at -35.6 dB in 20/30.
+            cases.append(("out:%s:(1.0f + 1e-7f)" % _m, (_m,), True))
             continue
         _fail, _pass = _BRACKET[_m]
         cases.append(("out:%s:(1.0f + %sf)" % (_m, _fail), (_m,), True))
