@@ -6,11 +6,35 @@
  * to the ladder and to nothing else.
  */
 #include "eb_vcf_ladder.h"
+/* COEFFICIENT GENERATION GUARD. See the note on eb_coef_gen in
+ * gui/juno_bridge.c. The full memcmp check below is skipped while nothing can
+ * have changed. Build with -DEB_VERIFY_GEN to run the check ANYWAY and abort if
+ * the counter ever said "clean" while the cells had changed -- that build is
+ * run over all 30 scenarios, so this is proven by execution, not by reading. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
 static eb_vcf_state EBF[8];
 #include <string.h>
 static eb_vcf_coef EBFC[8];
 static float EBFRAW[8][30];
-static unsigned char EBFHAVE[8];     /* -I engine_b/ is supplied by the harness */
+static unsigned char EBFHAVE[8];
+static unsigned long EBFGEN_SEEN[8];     /* -I engine_b/ is supplied by the harness */
 
 /* The port's four dispersion lines are ONE 4x-oversampled history in engine B.
  * (line, slot) -> delay:  A/B/C/D are delays 0/1/2/3 modulo 4, slot = delay/4.
@@ -1357,7 +1381,12 @@ LABEL_46:
         _raw[_k++] = JF(a1, 9168); _raw[_k++] = JF(a1, 9152);
         for ( ebi = 0; ebi < 16; ++ebi )
           _raw[_k++] = JF(a1, 9504 - 16 * ebi);
-        if (!EBFHAVE[voice] || memcmp(EBFRAW[voice], _raw, sizeof _raw)) {
+        int _ch = 0;
+        if (!EBFGEN_SEEN[voice] || EB_GEN_STALE(2, EBFGEN_SEEN[voice])) {
+          _ch = !EBFHAVE[voice] || memcmp(EBFRAW[voice], _raw, sizeof _raw) != 0;
+          EB_GEN_CHECK(2, EBFGEN_SEEN[voice], _ch, "ladder");
+        }
+        if (_ch) {
           eb_vcf_coef *q = &EBFC[voice];
           memcpy(EBFRAW[voice], _raw, sizeof _raw);
           q->c9520 = _raw[0];  q->c9536 = _raw[1];  q->c9184 = _raw[2];

@@ -36,6 +36,29 @@
  * checked by grep over src/ before this shim was written and is re-checked by
  * the null: if anything else read them, the residual would not be zero. */
 #include "eb_decim.h"
+/* COEFFICIENT GENERATION GUARD. See the note on eb_coef_gen in
+ * gui/juno_bridge.c. The full memcmp check below is skipped while nothing can
+ * have changed. Build with -DEB_VERIFY_GEN to run the check ANYWAY and abort if
+ * the counter ever said "clean" while the cells had changed -- that build is
+ * run over all 30 scenarios, so this is proven by execution, not by reading. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
 #include "eb_types.h"
 /* ENGINE B OWNS THIS STATE, in eb_voice -- not in the port's cells.
  *
@@ -63,6 +86,7 @@ static eb_voice EBV[8];
 static eb_decim_coef EBDC[8];
 static float EBDRAW[8][20];
 static unsigned char EBDHAVE[8];
+static unsigned long EBDGEN_SEEN[8];
 #include <string.h>
 
 /* ---- from shim 'env' ---- */
@@ -72,7 +96,30 @@ static unsigned char EBDHAVE[8];
  * divergence under tools/engineb/null_b.py --module env is attributable to the
  * envelope module and to nothing else. See engine_b/eb_envgen.h.
  */
-#include "eb_envgen.h"     /* -I engine_b/ is supplied by the harness */
+#include "eb_envgen.h"
+/* COEFFICIENT GENERATION GUARD. See the note on eb_coef_gen in
+ * gui/juno_bridge.c. The full memcmp check below is skipped while nothing can
+ * have changed. Build with -DEB_VERIFY_GEN to run the check ANYWAY and abort if
+ * the counter ever said "clean" while the cells had changed -- that build is
+ * run over all 30 scenarios, so this is proven by execution, not by reading. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+     /* -I engine_b/ is supplied by the harness */
 
 /* ---- from shim 'noise_svf' ---- */
 /* SHIM — MODULE NOISE_SVF (engine_b/eb_noise_svf.{h,c}).
@@ -103,12 +150,36 @@ static unsigned char EBN_seen[8];
  * (engine_b/eb_pwm_cv.{h,c}). Plus one line at the port's :2174 that hands the
  * module its one-sample delay input. Nothing else in this file differs.
  */
-#include "eb_pwm_cv.h"     /* -I engine_b/ is supplied by the harness */
+#include "eb_pwm_cv.h"
+/* COEFFICIENT GENERATION GUARD. See the note on eb_coef_gen in
+ * gui/juno_bridge.c. The full memcmp check below is skipped while nothing can
+ * have changed. Build with -DEB_VERIFY_GEN to run the check ANYWAY and abort if
+ * the counter ever said "clean" while the cells had changed -- that build is
+ * run over all 30 scenarios, so this is proven by execution, not by reading. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+     /* -I engine_b/ is supplied by the harness */
 
 /* ENGINE B M-MODCV: file scope so the delay can be fed at the port's :2174,
  * after the block that reads it. JUNO_NUM_VOICES comes from the port headers
  * included below. */
 static eb_modcv_coef  EBMC[8];
+static unsigned long  EBMGEN_SEEN[8];
 static float          EBMRAW[8][24];
 static int            EBMHAVE[8];
 
@@ -141,11 +212,35 @@ static int            EBMHAVE[8];
  * to the ladder and to nothing else.
  */
 #include "eb_vcf_ladder.h"
+/* COEFFICIENT GENERATION GUARD. See the note on eb_coef_gen in
+ * gui/juno_bridge.c. The full memcmp check below is skipped while nothing can
+ * have changed. Build with -DEB_VERIFY_GEN to run the check ANYWAY and abort if
+ * the counter ever said "clean" while the cells had changed -- that build is
+ * run over all 30 scenarios, so this is proven by execution, not by reading. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
 static eb_vcf_state EBF[8];
 #include <string.h>
 static eb_vcf_coef EBFC[8];
 static float EBFRAW[8][30];
-static unsigned char EBFHAVE[8];     /* -I engine_b/ is supplied by the harness */
+static unsigned char EBFHAVE[8];
+static unsigned long EBFGEN_SEEN[8];     /* -I engine_b/ is supplied by the harness */
 
 /* The port's four dispersion lines are ONE 4x-oversampled history in engine B.
  * (line, slot) -> delay:  A/B/C/D are delays 0/1/2/3 modulo 4, slot = delay/4.
@@ -1140,6 +1235,7 @@ LABEL_46:
    */
   {
     static eb_env_coef  EBC[JUNO_NUM_VOICES][2];
+    static unsigned long EBGEN_SEEN[JUNO_NUM_VOICES][2];
     static float        EBRAW[JUNO_NUM_VOICES][2][15];
     static int          EBHAVE[JUNO_NUM_VOICES][2];
     int ei;
@@ -1186,8 +1282,12 @@ LABEL_46:
        * unchanged; the only cost is doing the work occasionally when it was
        * not required. Being conservative in that direction is safe; the
        * reverse would not be. */
-      same = EBHAVE[voice][ei] &&
-             !memcmp(EBRAW[voice][ei], raw, 15 * sizeof(float));
+      if (!EBGEN_SEEN[voice][ei] || EB_GEN_STALE(0, EBGEN_SEEN[voice][ei])) {
+        int _ch = !EBHAVE[voice][ei] ||
+                  memcmp(EBRAW[voice][ei], raw, 15 * sizeof(float)) != 0;
+        EB_GEN_CHECK(0, EBGEN_SEEN[voice][ei], _ch, "env");
+        same = !_ch;
+      } else same = 1;
       if ( !same )
       {
         memcpy(EBRAW[voice][ei], raw, 15 * sizeof(float));
@@ -1264,7 +1364,12 @@ LABEL_46:
        * unchanged; the only cost is doing the work occasionally when it was
        * not required. Being conservative in that direction is safe; the
        * reverse would not be. */
-    same = EBMHAVE[voice] && !memcmp(EBMRAW[voice], raw, 24 * sizeof(float));
+    if (!EBMGEN_SEEN[voice] || EB_GEN_STALE(1, EBMGEN_SEEN[voice])) {
+      int _ch = !EBMHAVE[voice] ||
+                memcmp(EBMRAW[voice], raw, 24 * sizeof(float)) != 0;
+      EB_GEN_CHECK(1, EBMGEN_SEEN[voice], _ch, "modcv");
+      same = !_ch;
+    } else same = 1;
     if ( !same )
     {
       memcpy(EBMRAW[voice], raw, 24 * sizeof(float));
@@ -1502,7 +1607,12 @@ LABEL_46:
         _raw[_k++] = JF(a1, 9168); _raw[_k++] = JF(a1, 9152);
         for ( ebi = 0; ebi < 16; ++ebi )
           _raw[_k++] = JF(a1, 9504 - 16 * ebi);
-        if (!EBFHAVE[voice] || memcmp(EBFRAW[voice], _raw, sizeof _raw)) {
+        int _ch = 0;
+        if (!EBFGEN_SEEN[voice] || EB_GEN_STALE(2, EBFGEN_SEEN[voice])) {
+          _ch = !EBFHAVE[voice] || memcmp(EBFRAW[voice], _raw, sizeof _raw) != 0;
+          EB_GEN_CHECK(2, EBFGEN_SEEN[voice], _ch, "ladder");
+        }
+        if (_ch) {
           eb_vcf_coef *q = &EBFC[voice];
           memcpy(EBFRAW[voice], _raw, sizeof _raw);
           q->c9520 = _raw[0];  q->c9536 = _raw[1];  q->c9184 = _raw[2];
@@ -1761,7 +1871,12 @@ LABEL_46:
       for (_i = 0; _i < 16; ++_i) _raw[_i] = JF(a1, _CC[_i]);
       _raw[16] = JF(a1, 6256); _raw[17] = JF(a1, 6272);
       _raw[18] = JF(a1, 6336); _raw[19] = JF(a1, 5456);
-      if (!EBDHAVE[voice] || memcmp(EBDRAW[voice], _raw, sizeof _raw)) {
+      int _ch = 0;
+      if (!EBDGEN_SEEN[voice] || EB_GEN_STALE(3, EBDGEN_SEEN[voice])) {
+        _ch = !EBDHAVE[voice] || memcmp(EBDRAW[voice], _raw, sizeof _raw) != 0;
+        EB_GEN_CHECK(3, EBDGEN_SEEN[voice], _ch, "decim");
+      }
+      if (_ch) {
         memcpy(EBDRAW[voice], _raw, sizeof _raw);
         for (_i = 0; _i < 16; ++_i) EBDC[voice].c[_i] = _raw[_i];
         EBDC[voice].k6256 = _raw[16]; EBDC[voice].k6272 = _raw[17];

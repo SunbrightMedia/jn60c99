@@ -11,6 +11,29 @@
  * checked by grep over src/ before this shim was written and is re-checked by
  * the null: if anything else read them, the residual would not be zero. */
 #include "eb_decim.h"
+/* COEFFICIENT GENERATION GUARD. See the note on eb_coef_gen in
+ * gui/juno_bridge.c. The full memcmp check below is skipped while nothing can
+ * have changed. Build with -DEB_VERIFY_GEN to run the check ANYWAY and abort if
+ * the counter ever said "clean" while the cells had changed -- that build is
+ * run over all 30 scenarios, so this is proven by execution, not by reading. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
 #include "eb_types.h"
 /* ENGINE B OWNS THIS STATE, in eb_voice -- not in the port's cells.
  *
@@ -38,6 +61,7 @@ static eb_voice EBV[8];
 static eb_decim_coef EBDC[8];
 static float EBDRAW[8][20];
 static unsigned char EBDHAVE[8];
+static unsigned long EBDGEN_SEEN[8];
 #include <string.h>
 
 /* voice_render.c — exact C99 transcription of sub_180369070 (Cloud 60 voice
@@ -2180,7 +2204,12 @@ LABEL_46:
       for (_i = 0; _i < 16; ++_i) _raw[_i] = JF(a1, _CC[_i]);
       _raw[16] = JF(a1, 6256); _raw[17] = JF(a1, 6272);
       _raw[18] = JF(a1, 6336); _raw[19] = JF(a1, 5456);
-      if (!EBDHAVE[voice] || memcmp(EBDRAW[voice], _raw, sizeof _raw)) {
+      int _ch = 0;
+      if (!EBDGEN_SEEN[voice] || EB_GEN_STALE(3, EBDGEN_SEEN[voice])) {
+        _ch = !EBDHAVE[voice] || memcmp(EBDRAW[voice], _raw, sizeof _raw) != 0;
+        EB_GEN_CHECK(3, EBDGEN_SEEN[voice], _ch, "decim");
+      }
+      if (_ch) {
         memcpy(EBDRAW[voice], _raw, sizeof _raw);
         for (_i = 0; _i < 16; ++_i) EBDC[voice].c[_i] = _raw[_i];
         EBDC[voice].k6256 = _raw[16]; EBDC[voice].k6272 = _raw[17];

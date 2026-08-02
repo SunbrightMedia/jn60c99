@@ -111,6 +111,13 @@ SIG_FLOOR_DB = null_ab.SIG_FLOOR_DB          # non-vacuity: ref must make sound
 SR = null_ab.SR
 
 CFLAGS = ["-std=c99", "-O2", "-ffp-contract=off", "-fno-strict-aliasing"]
+# EB_VERIFY_GEN: build the shims so the coefficient generation counter is NOT
+# trusted -- every module runs its full memcmp anyway and aborts if the counter
+# ever claimed "clean" while the cells had changed. Set JUNO_EB_VERIFY_GEN=1 to
+# turn it on for a run. It is how "no other writer exists" is proven by
+# execution instead of by reading the call graph.
+if os.environ.get("JUNO_EB_VERIFY_GEN"):
+    CFLAGS = CFLAGS + ["-DEB_VERIFY_GEN"]
 
 # ---------------------------------------------------------------- scenarios
 # The nine port-risk scenarios are reused verbatim from the Track B gate: they

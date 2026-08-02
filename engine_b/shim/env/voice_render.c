@@ -4,7 +4,30 @@
  * divergence under tools/engineb/null_b.py --module env is attributable to the
  * envelope module and to nothing else. See engine_b/eb_envgen.h.
  */
-#include "eb_envgen.h"     /* -I engine_b/ is supplied by the harness */
+#include "eb_envgen.h"
+/* COEFFICIENT GENERATION GUARD. See the note on eb_coef_gen in
+ * gui/juno_bridge.c. The full memcmp check below is skipped while nothing can
+ * have changed. Build with -DEB_VERIFY_GEN to run the check ANYWAY and abort if
+ * the counter ever said "clean" while the cells had changed -- that build is
+ * run over all 30 scenarios, so this is proven by execution, not by reading. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+     /* -I engine_b/ is supplied by the harness */
 
 /* voice_render.c — exact C99 transcription of sub_180369070 (Cloud 60 voice
  * render). Generated first-pass by tools/translate_voice.py then finished by
@@ -997,6 +1020,7 @@ LABEL_46:
    */
   {
     static eb_env_coef  EBC[JUNO_NUM_VOICES][2];
+    static unsigned long EBGEN_SEEN[JUNO_NUM_VOICES][2];
     static float        EBRAW[JUNO_NUM_VOICES][2][15];
     static int          EBHAVE[JUNO_NUM_VOICES][2];
     int ei;
@@ -1043,8 +1067,12 @@ LABEL_46:
        * unchanged; the only cost is doing the work occasionally when it was
        * not required. Being conservative in that direction is safe; the
        * reverse would not be. */
-      same = EBHAVE[voice][ei] &&
-             !memcmp(EBRAW[voice][ei], raw, 15 * sizeof(float));
+      if (!EBGEN_SEEN[voice][ei] || EB_GEN_STALE(0, EBGEN_SEEN[voice][ei])) {
+        int _ch = !EBHAVE[voice][ei] ||
+                  memcmp(EBRAW[voice][ei], raw, 15 * sizeof(float)) != 0;
+        EB_GEN_CHECK(0, EBGEN_SEEN[voice][ei], _ch, "env");
+        same = !_ch;
+      } else same = 1;
       if ( !same )
       {
         memcpy(EBRAW[voice][ei], raw, 15 * sizeof(float));

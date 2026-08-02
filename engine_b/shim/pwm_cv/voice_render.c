@@ -4,12 +4,36 @@
  * (engine_b/eb_pwm_cv.{h,c}). Plus one line at the port's :2174 that hands the
  * module its one-sample delay input. Nothing else in this file differs.
  */
-#include "eb_pwm_cv.h"     /* -I engine_b/ is supplied by the harness */
+#include "eb_pwm_cv.h"
+/* COEFFICIENT GENERATION GUARD. See the note on eb_coef_gen in
+ * gui/juno_bridge.c. The full memcmp check below is skipped while nothing can
+ * have changed. Build with -DEB_VERIFY_GEN to run the check ANYWAY and abort if
+ * the counter ever said "clean" while the cells had changed -- that build is
+ * run over all 30 scenarios, so this is proven by execution, not by reading. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+     /* -I engine_b/ is supplied by the harness */
 
 /* ENGINE B M-MODCV: file scope so the delay can be fed at the port's :2174,
  * after the block that reads it. JUNO_NUM_VOICES comes from the port headers
  * included below. */
 static eb_modcv_coef  EBMC[8];
+static unsigned long  EBMGEN_SEEN[8];
 static float          EBMRAW[8][24];
 static int            EBMHAVE[8];
 
@@ -1130,7 +1154,12 @@ LABEL_46:
        * unchanged; the only cost is doing the work occasionally when it was
        * not required. Being conservative in that direction is safe; the
        * reverse would not be. */
-    same = EBMHAVE[voice] && !memcmp(EBMRAW[voice], raw, 24 * sizeof(float));
+    if (!EBMGEN_SEEN[voice] || EB_GEN_STALE(1, EBMGEN_SEEN[voice])) {
+      int _ch = !EBMHAVE[voice] ||
+                memcmp(EBMRAW[voice], raw, 24 * sizeof(float)) != 0;
+      EB_GEN_CHECK(1, EBMGEN_SEEN[voice], _ch, "modcv");
+      same = !_ch;
+    } else same = 1;
     if ( !same )
     {
       memcpy(EBMRAW[voice], raw, 24 * sizeof(float));

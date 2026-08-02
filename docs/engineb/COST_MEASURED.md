@@ -174,3 +174,67 @@ BIT-EXACT against the plugin** at 48 kHz.
 The port function is down from 27,225 to **14,433**. What remains there is the
 same pattern in the modules not yet moved, plus the port code that engine B's
 own recall will eventually replace.
+
+
+---
+
+## Step 3 — the coefficient generation counter, and how it was proven
+
+After step 2 the remaining cost was the *check*, not the work. MEASURED over the
+30-scenario set, how often each cached coefficient set actually changed:
+
+| module | recomputes | of |
+|---|---|---|
+| envelopes | 272 | 30,494,720 |
+| mod CV | 128 | 15,247,360 |
+| ladder | 8 | 15,247,360 |
+| decimator | 8 | 15,247,360 |
+
+So the cells are recall-rate and the per-sample `memcmp` is almost always a
+wasted read of 15 to 30 cells per voice.
+
+`gui/juno_bridge.c` now carries `eb_coef_gen`, bumped by every entry point that
+is not a plain render. A shim skips its check while the counter is unchanged.
+
+### The counter is NOT trusted, it is PROVEN
+
+A counter like this is exactly the kind of shortcut that is right until some
+writer nobody thought of moves a cell. So it is not believed on argument.
+Building with `-DEB_VERIFY_GEN` (`JUNO_EB_VERIFY_GEN=1`) makes every shim run
+its full `memcmp` **anyway** and abort if the counter ever claimed "clean" while
+the cells had in fact changed.
+
+| run | result |
+|---|---|
+| `JUNO_EB_VERIFY_GEN=1 --module all`, 30 scenarios | **PASS** |
+| same build with the counter FROZEN (teeth) | **ABORTS**, naming the module |
+
+The teeth case matters more than the pass. The first two attempts at it did
+**not** abort, and both were my error rather than the mechanism's:
+
+1. The first froze only `set_param` and `apply_bank`, but `juno_gui_create` also
+   bumps the counter and every scenario builds a new context — so the counter
+   still advanced exactly when it needed to.
+2. The second ran against a **stale composite shim**. The guard had been added
+   to the individual shims and the composite had not been regenerated, so both
+   runs tested a build with no guard in it at all. That is the stale-artifact
+   class this project keeps meeting; `merge_shims.py --check` exists for it and
+   `make engineb` runs the regeneration, but I invoked the gate directly and
+   skipped it.
+
+Only after both were fixed did freezing the counter produce the abort. **A
+verification that has never been seen to fail is not a verification.**
+
+### Running total
+
+| | instr/sample |
+|---|---|
+| before step 1 | 50,413 |
+| after step 1 (ladder state) | 36,357 |
+| after step 2 (coefficient caches) | 34,549 |
+| **after step 3 (generation counter)** | **33,750** |
+| engine B's own DSP, unchanged throughout | 15,431 |
+
+**−33.0 % from the start.** The port function is down from 27,225 to **13,634**.
+Every gate is still green: EXACTLY 0 on all 30 scenarios per module and
+whole-engine, and 11/11 BIT-EXACT against the plugin at 48 kHz.

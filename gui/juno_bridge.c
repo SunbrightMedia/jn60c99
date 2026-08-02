@@ -139,8 +139,30 @@ static void default_patch(unsigned char *st)
 
 /* Create + fully init an engine. sample_rate should be 96000 to match the
  * captured patch. Returns NULL on alloc failure. */
+
+/* ENGINE B COEFFICIENT GENERATION COUNTER.
+ *
+ * The engine B shims cache each module's coefficients and check them against
+ * the port's cells with a memcmp every sample. MEASURED over the 30-scenario
+ * set: those checks miss 272 times in 30,494,720 (envelopes), 128 in
+ * 15,247,360 (mod CV) and 8 in 15,247,360 (ladder, decimator). So the cells are
+ * recall-rate, and the check -- not the work -- is what costs.
+ *
+ * This counter lets a shim skip the check while nothing can have changed. It is
+ * bumped by every bridge entry point EXCEPT the plain render calls.
+ *
+ * IT IS NOT TRUSTED ON ITS OWN. Building with -DEB_VERIFY_GEN makes every shim
+ * run the full memcmp anyway and abort if the counter said "clean" while the
+ * cells had in fact changed. That build is run over all 30 scenarios, so the
+ * claim "no other writer exists" is PROVEN by execution rather than by reading
+ * the call graph. This file is compiled into BOTH sides of the null, so the
+ * counter itself cannot cause a divergence.
+ */
+unsigned long eb_coef_gen = 1;
+
 juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
 {
+    ++eb_coef_gen;
     juno_ctx *c = calloc(1, sizeof *c);
     int v;
     if (!c) return NULL;
@@ -199,6 +221,7 @@ void juno_gui_destroy(juno_ctx *c)
  * setter (sub_1803C1090 semantics). Offset bounds-checked against the block. */
 void juno_gui_set(juno_ctx *c, int off, float v)
 {
+    ++eb_coef_gen;
     if (off >= 0 && (unsigned)off + 4 <= JUNO_STATE_BYTES) JF(c->st, off) = v;
 }
 
@@ -213,6 +236,7 @@ float juno_gui_get(juno_ctx *c, int off)
  * survive a float round-trip through juno_gui_set/get. */
 void juno_gui_poke(juno_ctx *c, int off, unsigned int bits)
 {
+    ++eb_coef_gen;
     if (off >= 0 && (unsigned)off + 4 <= JUNO_STATE_BYTES)
         memcpy(c->st + off, &bits, 4);
 }
@@ -244,6 +268,7 @@ int juno_gui_dump(juno_ctx *c, int off, unsigned char *out, int nbytes)
  * capture is involved — this is the genuine default the plugin boots into. */
 void juno_gui_recall_factory(juno_ctx *c)
 {
+    ++eb_coef_gen;
     juno_engine_init(c->st);             /* constructor state                    */
     juno_engine_prepare(c->st);          /* binary prepared baseline (no capture) */
     default_patch(c->st);
@@ -289,6 +314,7 @@ int juno_gui_param_blob(int i) { return juno_param_blob(i); }
  * only the changed cell, leaving each voice's independent evolution intact. */
 float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
 {
+    ++eb_coef_gen;
     int Hr, blob, i, n;
     float w = 0.0f;
     if (!c) return 0.0f;
@@ -412,6 +438,7 @@ float juno_gui_set_mod(juno_ctx *c, int slot, int base_byte, int off)
  * overrides it with the patch's own EFFECT TYPE, exactly as before. */
 void juno_gui_set_chorus_mode(juno_ctx *c, int mode)
 {
+    ++eb_coef_gen;
     c->chorus_mode = mode;
     juno_driver_attach_host(c->st, &c->shim, mode);
     *(int32_t *)(c->st + JUNO_PROG_EFX) = mode;
@@ -423,6 +450,7 @@ void juno_gui_set_chorus_mode(juno_ctx *c, int mode)
  * for experimentation only (see docs/CONTROL_LAYER.md sound-test). */
 void juno_gui_gate(juno_ctx *c, float v)
 {
+    ++eb_coef_gen;
     JF(c->st, JUNO_VOICE_AUX_BASE0) = v;
 }
 
@@ -762,6 +790,7 @@ int juno_gui_arp_trace_count(juno_ctx *c) { return c ? c->arp_trace_n : 0; }
  * juno_gui_midi_note_on below (the wrapper layer), like a DAW does. */
 void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
 {
+    ++eb_coef_gen;
     if (!c) return;
     if (!c->arp_on) { synth_note_on(c, midi_note, velocity); return; }
     carp_add_key(&c->arp, midi_note, velocity);
@@ -770,6 +799,7 @@ void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
 /* Public note-off. midi_note < 0 releases everything. */
 void juno_gui_note_off(juno_ctx *c, int midi_note)
 {
+    ++eb_coef_gen;
     if (!c) return;
     if (!c->arp_on) { synth_note_off(c, midi_note); return; }
     carp_remove_key(&c->arp, midi_note);     /* midi_note < 0 => release all */
@@ -1037,6 +1067,7 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
  * (native: segfault; WASM: silent heap corruption). */
 int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx)
 {
+    ++eb_coef_gen;
     if (!c || !bank || len <= 0) return 0;
     if (idx < 0 || idx >= juno_bank_num_patches(bank, (unsigned long)len)) return 0;
     if (c->bank_len != len) {
