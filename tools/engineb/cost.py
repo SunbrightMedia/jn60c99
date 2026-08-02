@@ -617,6 +617,8 @@ def cmd_density(a):
                           label="MEASURED", divisor=div)
     print("\nTOTAL host instructions/sample [MEASURED]: %s"
           % fmt(dyn.get("__TOTAL__", sum(dyn.values()))))
+    res["__TOTAL__"] = dict(dyn_per_sample=dyn.get("__TOTAL__", sum(dyn.values())),
+                            label="MEASURED", note="whole process, per audio sample")
     if a.save:
         os.makedirs(os.path.dirname(DENSITY_FILE), exist_ok=True)
         old = load_density()

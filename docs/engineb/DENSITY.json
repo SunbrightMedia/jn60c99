@@ -40,5 +40,10 @@
   "static": 60,
   "label": "MEASURED",
   "divisor": 1
+ },
+ "__TOTAL__": {
+  "dyn_per_sample": 30459.123,
+  "label": "MEASURED",
+  "note": "whole process, per audio sample"
  }
 }
