@@ -77,7 +77,7 @@ typedef struct {
     float bx1[2], bx2[2], by1[2], by2[2]; /* input DF-I biquad          */
     float lp[2], hp[2], dc[2];          /* loop damping filter          */
     float fbtap[2];                     /* loop output, one sample late */
-    float t_step, t_smooth;             /* delay-time smoother          */
+    float t_last, t_step, t_smooth;     /* delay-time smoother pipeline */
     float fade, fadesum;                /* mute fade                    */
     int32_t w[2];                       /* ring write index (DECREMENTS)*/
     int32_t overrun;                    /* tap did not fit EB_DELAY_LEN */

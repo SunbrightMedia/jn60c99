@@ -74,8 +74,14 @@ void eb_delay_process(const eb_delay_cfg *c, eb_delay_state *s,
     s->fade = f * c->mute;
 
     /* ---- DELAY TIME smoother ------------------------------------------ */
+    /* A 4-deep pipeline in the sealed engine (cells 102208 -> 102224 ->
+     * 102240 -> 102256, rotated at the top of the sample). Its meaning: the
+     * glide DISTANCE is latched when the TARGET CHANGES, and held while it does
+     * not -- a constant-TIME glide, not a constant-rate one. Getting this wrong
+     * is what the first null run caught at -33.9 dB. */
     tt = c->time_target;
-    v369 = (tt - s->t_step != 0.0f) ? (tt - tprev) : tprev;
+    v369 = (tt - s->t_last != 0.0f) ? (tt - tprev) : s->t_step;
+    s->t_last = tt;
     s->t_step = v369;
     d  = fabsf(v369) * c->slew;
     sm = fmaxf(tprev - d, tt);
