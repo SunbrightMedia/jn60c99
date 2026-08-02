@@ -183,6 +183,22 @@ python3 tools/engineb/ledger.py check || die "the equivalence ledger does not ma
     "     python3 tools/engineb/ledger.py emit --all" \
     "     There is no --accuracy and no --cycles argument, by design."
 
+# Advisory, printed last so it is not lost: a shim that nulls green but has no
+# ledger row has NO recorded cost and NO recorded accuracy evidence. Green here
+# and absent there is the shape of a claim nobody can reproduce later.
+UNLEDGERED=""
+for m in $MODS; do
+    [ "$m" = "skeleton" ] && continue
+    grep -q "^$m@" docs/trackb/EQUIVALENCE.tsv 2>/dev/null || UNLEDGERED="$UNLEDGERED $m"
+done
+if [ -n "$UNLEDGERED" ]; then
+    printf '\nADVISORY -- shim module(s) with NO ledger row:%s\n' "$UNLEDGERED"
+    printf '  They nulled green above, but nothing recorded WHAT was proven or\n'
+    printf '  what they COST. Close with: python3 tools/engineb/ledger.py emit <m>\n'
+    printf '  (add a PROOFS entry first). Advisory, not a failure: a module can\n'
+    printf '  legitimately be mid-flight. A module that ships without one cannot.\n'
+fi
+
 printf '\n########################################################\n'
 printf '### make engineb: GREEN (%s tier)\n' \
     "$([ $QUICK = 1 ] && echo quick || echo full)"
