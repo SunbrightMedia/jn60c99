@@ -68,6 +68,32 @@ typedef struct {
     float k7440, k7456, k7472, k7488, k7504;   /* the final sum's weights   */
 } eb_vcf_cv_coef;
 
+/* -------------------------------------------------------------- derived
+ * What eb_vcf_cv_prepare() folds out of the per-sample path. EVERY member is
+ * the value of a sub-expression whose operands are ALL recall-constant, so
+ * hoisting it is BIT-EXACT: same operations, same operands, same order, same
+ * rounding -- only evaluated once per recall instead of 8 times per sample.
+ * Nothing algebraic is done to any of them; a product of two coefficients is
+ * pre-multiplied ONLY where the source itself brackets it that way.
+ * MEASURED effect: S3 970 -> 686 cyc/sample nominal (-29%), null still
+ * EXACTLY 0 in all 30 scenarios.
+ */
+typedef struct {
+    float f6704;      /* the WHOLE quartic spline leg + its clamp. It reads no
+                       * live input at all, so per-sample it was 14 flops and 8
+                       * loads spent recomputing a constant.                  */
+    float f6848;      /* [6832], copied                                       */
+    float termA;      /* ((((x6608*k7328)-(k7456*k7328))+k7456)*k7472)        */
+    float v226;       /* k7312 * x6672                                        */
+    float c7024x6640; /* k7024 * x6640                                        */
+    float k6864, k6928, k6944, k6960, k7008, k7024;
+    float k7120, k7136, k7152, k7200, k7216, k7232;
+    float k7296, k7312, k7344, k7360, k7376, k7392, k7408, k7424;
+    float k7440, k7488, k7504;
+} eb_vcf_cv_derived;
+
+void eb_vcf_cv_prepare(eb_vcf_cv_derived *d, const eb_vcf_cv_coef *c);
+
 /* ------------------------------------------------------------------- API
  * One host sample of ONE voice. `in752`/`in880`/`in1792`/`in1808`/`in2752`/
  * `in3232` are the six live inputs the block reads from outside itself.
@@ -78,7 +104,7 @@ typedef struct {
  * has nothing a silent voice could skip. It is a pure function of its inputs
  * and its 12 bytes of state.
  */
-float eb_vcf_cv_tick(eb_vcf_cv_state *st, const eb_vcf_cv_coef *c,
+float eb_vcf_cv_tick(eb_vcf_cv_state *st, const eb_vcf_cv_derived *c,
                      float in752, float in880, float in1792, float in1808,
                      float in2752, float in3232,
                      float *out6704, float *out6848);

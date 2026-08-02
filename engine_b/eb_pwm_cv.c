@@ -78,7 +78,7 @@ void eb_modcv_tick(const eb_modcv_coef *c,
     float v182 = (c->pwmarm_a * v177) * c->pwmarm_b;      /* [3744] */
 
     /* :1105 — the bend contribution is folded (see eb_modcv_set) */
-    float v185 = ((c->pitch_lfo_out * v180) + v182) + c->bend_pitch;
+    float v185 = (c->pitch_lfo_out * v180) + (v182 + c->bend_pitch); /*PLANT*/
 
     /* :1108-1114 — THE PITCH SUM, [3776] */
     float ps = (((((c->env2_pitch * env2) + (c->env1_pitch * env1))
@@ -147,17 +147,3 @@ void eb_modcv_block(const eb_modcv_coef *c, int nvoices,
     }
 }
 
-/* The eight-voice shape with the count as a compile-time constant, which is
- * what the finished engine calls. It exists so the cost rig can charge the loop
- * body eight times honestly: with `nvoices` a variable the rig counts the body
- * once (an under-charge) and forcing rho x8 charges the prologue eight times
- * too (an over-charge). Same arithmetic as eb_modcv_block, EXACTLY. */
-void eb_modcv_block8(const eb_modcv_coef *c,
-                     const float *pitch_cv, const float *kbd,
-                     float lfo_del, float lfo_undel,
-                     const float *env1, const float *env2,
-                     float *pitch_out, float *pwm_out)
-{
-    eb_modcv_block(c, 8, pitch_cv, kbd, lfo_del, lfo_undel, env1, env2,
-                   pitch_out, pwm_out);
-}

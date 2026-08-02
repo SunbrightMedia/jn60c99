@@ -1172,6 +1172,7 @@ LABEL_46:
    */
   {
     eb_vcf_cv_coef ebk;
+    eb_vcf_cv_derived ebd;
     eb_vcf_cv_state ebst;
     float eb6704, eb6848;
 
@@ -1195,11 +1196,15 @@ LABEL_46:
     ebk.k7456 = JF(a1, 7456); ebk.k7472 = JF(a1, 7472);
     ebk.k7488 = JF(a1, 7488); ebk.k7504 = JF(a1, 7504);
 
+    /* RECALL-TIME in engine B; every sample here so a mid-render
+     * coefficient edit cannot make the gate lie. Harness cost. */
+    eb_vcf_cv_prepare(&ebd, &ebk);
+
     ebst.s_env = JF(a1, 6896);
     ebst.s_a   = JF(a1, 7088);
     ebst.s_b   = JF(a1, 7168);
 
-    v227 = eb_vcf_cv_tick(&ebst, &ebk,
+    v227 = eb_vcf_cv_tick(&ebst, &ebd,
                           JF(a1, 752), JF(a1, 880), JF(a1, 1792),
                           JF(a1, 1808), JF(a1, 2752), JF(a1, 3232),
                           &eb6704, &eb6848);

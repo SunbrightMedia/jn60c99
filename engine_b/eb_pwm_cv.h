@@ -133,4 +133,13 @@ void  eb_modcv_latch(eb_modcv_state *s, float v3520);
  * the plugin's own power-on value and not a convenient default. */
 void eb_modcv_reset(eb_modcv_state *s);
 
+/* The eight-voice shape, MEASURED cheaper (eb_pwm_cv.c and the commit message):
+ * identical arithmetic, identical roundings, with the 21 coefficient loads and
+ * the two global LFO arms hoisted out of the per-voice loop. */
+void eb_modcv_block(const eb_modcv_coef *c, int nvoices,
+                    const float *pitch_cv, const float *kbd,
+                    float lfo_del, float lfo_undel,
+                    const float *env1, const float *env2,
+                    float *pitch_out, float *pwm_out);
+
 #endif /* ENGINEB_EB_PWM_CV_H */
