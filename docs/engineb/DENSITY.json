@@ -1,0 +1,44 @@
+{
+ "juno_voice_render": {
+  "rho": 0.8036,
+  "dyn_per_sample": 22288.6225,
+  "static": 3467,
+  "label": "MEASURED",
+  "divisor": 8.0
+ },
+ "juno_triangle": {
+  "rho": 22.629,
+  "dyn_per_sample": 1968.7245,
+  "static": 87,
+  "label": "MEASURED",
+  "divisor": 1
+ },
+ "juno_flush_denormals": {
+  "rho": 51.8519,
+  "dyn_per_sample": 1400.0,
+  "static": 27,
+  "label": "MEASURED",
+  "divisor": 1
+ },
+ "juno_master_render": {
+  "rho": 0.2903,
+  "dyn_per_sample": 1305.9015,
+  "static": 4498,
+  "label": "MEASURED",
+  "divisor": 1
+ },
+ "juno_wrap24": {
+  "rho": 9.7675,
+  "dyn_per_sample": 341.861,
+  "static": 35,
+  "label": "MEASURED",
+  "divisor": 1
+ },
+ "juno_wrap_unit": {
+  "rho": 0.5333,
+  "dyn_per_sample": 32.0,
+  "static": 60,
+  "label": "MEASURED",
+  "divisor": 1
+ }
+}
