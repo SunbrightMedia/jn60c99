@@ -97,3 +97,32 @@ left in `canary.py`'s default — where it silently produced the survey that set
 the work order. **Fixing a probe defect in one tool is not fixing it.** When a
 measurement instrument is found to under-report, every tool sharing that
 technique must be re-run before its output is trusted.
+
+## DCO (1718-1830) — survey completed, and its three blind lines classified
+
+Dual-probe run, 2026-08-02: **11/14 observable**, not the 8/14 the multiplicative
+probe reported. BLIND: 1720, 1726, 1739. Three lines, three different causes,
+and two of them are the dangerous kind.
+
+| line | code | cause |
+|---|---|---|
+| `:1720` | `JF(a1,4656) = _s4656 = v401;` | **dead store, suspected.** Cell 4656 is "prev phase"; the value is also kept in the local `_s4656`, so consumers may never reload it. Same shape as `:974`, which was proven dead over 384 bank comparisons and 24 fuzz seeds. **Not yet proven here — do that before relying on it.** |
+| `:1726` | `v403 = fmodf(v403 - 1.0, 2.0) + 1.0;` | **UNREACHED — the NEGATIVE phase-wrap arm.** Taken only when the accumulated phase falls below −1. No scenario drives it. |
+| `:1739` | `v407 = -1.0;` | **UNREACHED — the negative clamp arm** of the pulse shaper, taken only when its input falls below −1. |
+
+**Why the two unreached arms matter more than a dead store.** They are the
+*negative-going* halves of a wrap and a clamp. A rewritten DCO that handles only
+the positive side would null perfectly on all 27 scenarios and then break the
+first time a patch drives pitch downward. That is exactly the shape of the
+`fmodf` rounding defect found in `eb_triangle`, where the obvious replacement
+disagreed on 8,388,608 inputs — except here the gate would not even complain.
+
+**To open them**, drive the phase negative with the parameters that reach it:
+`DCO LFO MOD` (blob 9) at depth with a slow `LFO RATE` (blob 8) so the modulation
+sweeps a full cycle, and `DCO PWM DEPTH` (blob 14) for the pulse-shaper clamp.
+Both are front-panel bytes, so `('param', 9, N)` and `('param', 14, N)` scenarios
+reach them without inventing engine state.
+
+**Standing rule for this module:** the DCO may not be rewritten until :1726 and
+:1739 are either opened by a scenario or proven unreachable. A dead store is a
+safe residual; an unreached branch is not.
