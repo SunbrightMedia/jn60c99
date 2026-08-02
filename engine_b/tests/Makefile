@@ -2,7 +2,7 @@
 # The bank-reading test walks up to find truth/presetbankog1.bin.
 CC     ?= cc
 CFLAGS ?= -std=c99 -O2 -Wall -Wextra -ffp-contract=off -I..
-BIN     = test_sizes test_freerun test_patch118 test_modcv_block test_decim
+BIN     = test_sizes test_freerun test_patch118 test_modcv_block test_decim test_render_guard
 
 # HEADERS ARE BUILD INPUTS. Every constant, the whole free-run contract and the
 # patch layout live in ../*.h. Until 2026-08-02 the recipes below listed only
@@ -18,12 +18,14 @@ all: $(BIN)
 	@echo; ./test_patch118
 	@echo; ./test_modcv_block
 	@echo; ./test_decim
+	@echo; ./test_render_guard
 
 test_sizes:    test_sizes.c $(HDR) ; $(CC) $(CFLAGS) -o $@ $<
 test_freerun:  test_freerun.c ../eb_engine.c ../eb_patch.c $(HDR) ; $(CC) $(CFLAGS) -o $@ $< ../eb_engine.c ../eb_patch.c -lm
 test_patch118: test_patch118.c ../eb_patch.c $(HDR) ; $(CC) $(CFLAGS) -o $@ $< ../eb_patch.c
 test_modcv_block: test_modcv_block.c ../eb_pwm_cv.c $(HDR) ; $(CC) $(CFLAGS) -o $@ $< ../eb_pwm_cv.c -lm
 test_decim: test_decim.c ../eb_decim.c $(HDR) ; $(CC) $(CFLAGS) -o $@ $< ../eb_decim.c -lm
+test_render_guard: test_render_guard.c $(wildcard ../eb_*.c) $(HDR) ; $(CC) $(CFLAGS) -DEB_DELAY_LEN=65536 -I../../src -o $@ $< $(filter-out ../eb_engine.c,$(wildcard ../eb_*.c)) -lm
 
 clean: ; rm -f $(BIN)
 .PHONY: all clean

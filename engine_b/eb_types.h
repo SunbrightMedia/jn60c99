@@ -252,6 +252,16 @@ typedef struct {
     eb_params p;
     eb_voice  v[EB_NUM_VOICES];
     eb_fx     fx;
+
+    /* eb_engine_render() refuses to run unless this is set, and NOTHING sets
+     * it today. See eb_render.h: the render is not a complete engine yet, and a
+     * half-finished render that silently produces plausible audio is how a
+     * project ships something it never gated.
+     *
+     * The per-voice COEFFICIENT sets live in eb_render.h, not here: this header
+     * is included by every module header, so pulling their types in would be
+     * circular. */
+    int render_ok;
 } eb_engine;
 
 /* ------------------------------------------------------------------ budgets */
