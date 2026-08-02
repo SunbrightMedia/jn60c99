@@ -44,4 +44,38 @@ static inline float eb_triangle(float phase)
     return -2.0f - v2;
 }
 
+/* ---------------------------------------------------------------- specialised
+ * Two of the DCO's three triangle call sites have a PROVEN input range, so the
+ * wrap and both range compares are dead code there. MEASURED over the inputs'
+ * full domain, not over the scenario set:
+ *
+ *     SAW   arg (p+1)*0.5   with p in [-1,1)   ->  [0, 1]
+ *     SUB   arg -|t|                            ->  [-1, 0]
+ *     PULSE arg t/half                          ->  [-63, +63]   <- NOT in range
+ *
+ * So the pulse site keeps eb_triangle; the other two use these, which are
+ * bit-identical to it over their domains: 0 mismatches over all 2,130,706,433
+ * in-domain float32 patterns.
+ *
+ * THE TRAP, and it cost a run to find: the saw's second arm must be written
+ * 2.0f - (p + 1.0f), NOT the algebraically identical 1.0f - p. The reference
+ * computes 2.0f - v2 where v2 == fl(p+1), and fl(2 - fl(p+1)) differs from
+ * fl(1 - p) whenever p+1 rounds -- on 104,857,600 of the 2.13 billion in-domain
+ * floats, about 5%. This is the same class as the fmodf simplification that
+ * disagreed on 8,388,608 inputs. Algebra is not arithmetic. */
+
+/* eb_triangle((p + 1.0f) * 0.5f) for p in [-1, 1). */
+static inline float eb_triangle_saw(float p)
+{
+    float v = p + 1.0f;                 /* == the reference's v2, rounding and all */
+    return (p <= 0.0f) ? v : (2.0f - v);
+}
+
+/* eb_triangle(x) for x in [-1, 0]. */
+static inline float eb_triangle_sub(float x)
+{
+    float v = x + x;
+    return (x >= -0.5f) ? v : (-2.0f - v);
+}
+
 #endif

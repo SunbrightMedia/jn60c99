@@ -138,7 +138,7 @@ float eb_dco_step(eb_dco_state *s, const eb_dco_coef *c)
 
     /* ---- SAW: the wrapped ramp through the triangle, edge-scaled by g ---- */
     if (c->lvl_saw != 0.0f) {
-        e   = eb_clamp1(((eb_triangle((p + 1.0f) * 0.5f) * 256.0f) * c->g)
+        e   = eb_clamp1(((eb_triangle_saw(p) * 256.0f) * c->g)
                         * c->amp_saw);
         saw = eb_sat_c(e, c) * (p * c->gn_saw);
     } else saw = 0.0f;
@@ -172,7 +172,7 @@ float eb_dco_step(eb_dco_state *s, const eb_dco_coef *c)
 
     if (c->lvl_sub != 0.0f) {
         t   = (((cnt + p) + 1.0f) * 0.5f) - 1.0f;
-        e   = eb_clamp1((((eb_triangle(-fabsf(t)) + 1.0f) * c->g) * 512.0f)
+        e   = eb_clamp1((((eb_triangle_sub(-fabsf(t)) + 1.0f) * c->g) * 512.0f)
                         * c->amp_sub);
         sub = eb_sat_c(e, c) * (eb_sgn(t) * c->gn_sub);
     } else sub = 0.0f;
