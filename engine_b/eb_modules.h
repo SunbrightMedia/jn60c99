@@ -25,6 +25,7 @@
 #define EB_HAVE_PARAM   0   /* patch bytes -> coefficients (laws per module)  */
 #define EB_HAVE_ALLOC   0   /* voice allocator: POLY / MONO / UNISON, LEGATO  */
 #define EB_HAVE_LFO     0   /* global LFO + delay envelope                    */
+#define EB_HAVE_MODCV   1   /* eb_pwm_cv.c: pitch/PWM mod CV, null 30/30 EXACTLY 0 */
 #define EB_HAVE_NOISE   1   /* shared LFSR: PROVEN bit-identical, 200k samples */
 #define EB_HAVE_DCO     1   /* eb_dco.c: null 30/30 EXACTLY 0; wrap proven 2^32 */
 #define EB_HAVE_VCF     0   /* 4-pole low pass, resonance, key follow         */
@@ -38,6 +39,7 @@
 #define EB_MODULES_COMPLETE                                                   \
     (EB_HAVE_PARAM && EB_HAVE_ALLOC && EB_HAVE_LFO && EB_HAVE_NOISE &&        \
      EB_HAVE_DCO && EB_HAVE_VCF && EB_HAVE_HPF && EB_HAVE_ENV &&              \
+     EB_HAVE_MODCV &&              \
      EB_HAVE_VCA && EB_HAVE_CHORUS && EB_HAVE_DELAY && EB_HAVE_REVERB)
 
 #endif /* ENGINEB_EB_MODULES_H */

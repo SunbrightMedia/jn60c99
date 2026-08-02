@@ -98,3 +98,44 @@ measures `eb_vcf_ladder.c` alone, and it says **4,273 cyc/sample on the S3 —
 1.86x the budget that remains after the envelopes**. Full numbers, the seven
 planted errors, the exhaustive wrap test and the priced levers:
 `docs/engineb/MVCF_LADDER_RESULT.md`.
+
+## pwm_cv — MODULE M-MODCV, the pitch / PWM modulation CV block
+
+Forks `src/voice_render.c` and replaces ONE range, lines 1076-1128 (the mod
+router, the PITCH SUM `[3776]` and the PWM SUM `[3808]`), with a call into
+`engine_b/eb_pwm_cv.c`. Everything else in the file is the port's own code byte
+for byte.
+
+`null_b.py --module pwm_cv` -> **30/30 EXACTLY 0**, including all 17
+idle-prefix scenarios.
+
+**THE GATE IS PARTLY BLIND HERE, MEASURED — read this before touching the
+module.** Instrumenting the block and running the whole scenario set records
+these maxima over all 30 scenarios:
+
+    v169 (kbd/pitch CV mix)     5.00018     LIVE
+    LFO arms [3712]/v176        0.9981      LIVE
+    v180 (LFO -> pitch)         0.0349807   LIVE
+    PWM LFO term                0.999049    LIVE
+    [3936] PWM offset           1.0         LIVE
+    [4144] PWM out gain         0.915       LIVE
+    v182  ([3744] arm)          0           IDENTICALLY ZERO
+    bend term [3760] x [3872]   0           IDENTICALLY ZERO
+    env -> pitch mix            0           IDENTICALLY ZERO
+    env1/env2 -> PWM            0           IDENTICALLY ZERO
+
+So 9 of the module's 21 coefficients ([3984], [4000], [3856], [3872], [4112],
+[4128], [4064], [4080], [4096] plus [3904]/[3920] and the mod source [3552])
+CANNOT be seen by this gate: their terms are exactly zero in every scenario.
+Two "algebraically identical regrouping" plants on those paths therefore pass at
+EXACTLY 0, and that is a property of the scenarios, not of the code. The module
+transcribes those lines verbatim from the port for exactly this reason; any
+future SIMPLIFICATION of them is unguarded and needs new scenarios first.
+
+Non-vacuity on the paths that ARE live is MEASURED: `x1.00003` on the pitch sum
+fails **29/29** quick scenarios, worst **-8.5 dB** global (91 dB above the
+gate); `x1.00003` on the PWM sum fails **22/29**.
+
+`eb_modcv_block()` — the eight-voice shape the finished engine calls — is PROVEN
+bit-identical to the gated `eb_modcv_tick()` over 16,000,000 random comparisons
+(`engine_b/test_modcv_block.c`, 0 mismatches).
