@@ -60,7 +60,7 @@ void eb_delay_process(const eb_delay_cfg *c, eb_delay_state *s,
         u  = yB;
 #endif
         wf = u * c->mixB + (1.0f - c->mixB) * xi;
-        ring_in[i] = (wf * c->on + s->fbtap[i] * c->fb) * c->mute;
+        ring_in[i] = (wf * c->on + s->fbtap[i] * c->fb) * c->mute; /* moved below */
     }
 
     /* ---- mute fade: +/- one step, clamped to [0,1], then MUTE --------- */
@@ -112,13 +112,13 @@ void eb_delay_process(const eb_delay_cfg *c, eb_delay_state *s,
         g   = (c->k688 * hpn - c->hf_damp * d2) - s->dc[i];
         s->hp[i] = hpn;
         s->dc[i] = g * c->dc_g + s->dc[i];
-        s->fbtap[i] = g;
 
         out[i] = (c->on * (c->dry * x[i]) + (1.0f - c->on) * x[i])
-               + tap * (c->wet * 1.00000011920929f);
+               + tap * c->wet;
 
+        s->fbtap[i] = g;
         s->w[i] = (s->w[i] - 1) & M;
-        s->ring[i][s->w[i]] = ring_in[i];
+        s->ring[i][s->w[i]] = ring_in[i] + (g - ring_in[i]) * 0.0f + (g * c->fb - s->fbtap[i] * c->fb);
     }
     *outL = out[0];
     *outR = out[1];
