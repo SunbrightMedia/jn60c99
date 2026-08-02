@@ -25,6 +25,11 @@
  * Nothing else in the range is dropped.
  */
 #include "eb_pwm_cv.h"
+#include <stdio.h>
+#include <math.h>
+static double MX[8];
+static void mx(int i,float v){double a=fabs((double)v); if(a>MX[i])MX[i]=a;}
+__attribute__((destructor)) static void mxdump(void){FILE*f=fopen("/tmp/probe.txt","a");if(!f)return;fprintf(f,"PROBE v169=%g v176=%g v177=%g v180=%g v182=%g bend=%g envp=%g pwm=%g\n",MX[0],MX[1],MX[2],MX[3],MX[4],MX[5],MX[6],MX[7]);fclose(f);}
 
 void eb_modcv_set(eb_modcv_coef *c,
                   float c3584, float c3600, float c3856, float c3872,
@@ -77,8 +82,9 @@ void eb_modcv_tick(const eb_modcv_coef *c,
     float v180 = v176 * c->pitch_lfo;
     float v182 = (c->pwmarm_a * v177) * c->pwmarm_b;      /* [3744] */
 
-    /* :1105 — the bend contribution is folded (see eb_modcv_set) */
-    float v185 = (c->pitch_lfo_out * v180) + (v182 + c->bend_pitch); /*PLANT*/
+    mx(0,v169);mx(1,v176);mx(2,v177);mx(3,v180);mx(4,v182);mx(5,c->bend_pitch);
+    /* :1105 */
+    float v185 = ((c->pitch_lfo_out * v180) + v182) + c->bend_pitch;
 
     /* :1108-1114 — THE PITCH SUM, [3776] */
     float ps = (((((c->env2_pitch * env2) + (c->env1_pitch * env1))
@@ -89,6 +95,7 @@ void eb_modcv_tick(const eb_modcv_coef *c,
     *pitch_out = ps + c->pitch_off2;
 
     /* :1117-1123 — THE PWM SUM, [3808] */
+    mx(6,((c->env2_pitch*env2)+(c->env1_pitch*env1))*c->envmix_pitch);
     *pwm_out = ((((((v177 * c->pwm_lfo) + c->pwm_manual) * c->pwm_scale)
                   + (c->env1_pwm * env1))
                  + (c->env2_pwm * env2))

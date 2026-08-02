@@ -120,6 +120,14 @@ if [ -z "$MODS" ]; then
     say "$STEP" "no shim module exists yet -- nothing to null"
 else
     for m in $MODS; do
+        # The list is snapshotted above; re-check, because a run takes minutes
+        # and a shim can be created or removed under it. A module that vanished
+        # must be reported as SKIPPED, never reported as a null failure -- a
+        # gate that blames the code for a race is a gate people stop believing.
+        if [ ! -d "engine_b/shim/$m" ]; then
+            say "$STEP" "SKIPPED '$m' -- its shim directory disappeared mid-run"
+            continue
+        fi
         say "$STEP" "null_b --module $m"
         python3 tools/engineb/null_b.py --module "$m" $Q || die "module '$m' does not null against src/" \
             "engine B's '$m' is audibly different from the frozen port." \
