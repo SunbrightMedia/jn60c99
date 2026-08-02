@@ -1776,10 +1776,14 @@ LABEL_46:
     ebs.phase  = JF(a1, 4864);
     ebs.subcnt = JF(a1, 4832);
 
-    JF(a1, 4944) = eb_dco_step(&ebs, &ebc);
-    JF(a1, 5072) = eb_dco_step(&ebs, &ebc);
-    JF(a1, 5200) = eb_dco_step(&ebs, &ebc);
-    JF(a1, 5328) = eb_dco_step(&ebs, &ebc);
+    {
+      float _o[4];
+      eb_dco_step4(&ebs, &ebc, _o);
+      JF(a1, 4944) = _o[0];
+      JF(a1, 5072) = _o[1];
+      JF(a1, 5200) = _o[2];
+      JF(a1, 5328) = _o[3];
+    }
 
     JF(a1, 4864) = ebs.phase;
     JF(a1, 4832) = ebs.subcnt;

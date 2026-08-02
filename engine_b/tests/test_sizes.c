@@ -18,8 +18,13 @@
 int main(void)
 {
     size_t fx = sizeof(eb_fx);
-    size_t bufs = sizeof(((eb_fx *)0)->cho) + sizeof(((eb_fx *)0)->dly)
-                + sizeof(((eb_fx *)0)->rev);
+    /* The reverb tank is NO LONGER a member of eb_fx: it outgrew its
+     * placeholder by 6x and moved to eb_reverb_state in engine_b/eb_reverb.h,
+     * with a per-element budget. This file still referenced the old `rev`
+     * member and EB_REVERB_LEN, so it had not compiled since that move -- which
+     * means `make -C engine_b/tests` was FAILING and, with it, step 2 of
+     * `make engineb`. Found 2026-08-02 by running it. */
+    size_t bufs = sizeof(((eb_fx *)0)->cho) + sizeof(((eb_fx *)0)->dly);
     int over = 0;
 
     printf("ENGINE B STRUCT SIZES (host build)\n");
@@ -41,9 +46,10 @@ int main(void)
     printf("  engine B ratio:                                         %.1fx "
            "smaller per voice\n", 10512.0 / (double)sizeof(eb_voice));
     printf("\n  delay-line budget is COMPILE-TIME (eb_types.h): "
-           "EB_CHORUS_LEN=%d EB_DELAY_LEN=%d EB_REVERB_LEN=%d -- placeholders "
-           "until each FX module measures its own.\n",
-           EB_CHORUS_LEN, EB_DELAY_LEN, EB_REVERB_LEN);
+           "EB_CHORUS_LEN=%d EB_DELAY_LEN=%d. The reverb's budget is per "
+           "element in engine_b/eb_reverb.h (EB_REV_CAP_*), because the four "
+           "long loop delays dominate it.\n",
+           EB_CHORUS_LEN, EB_DELAY_LEN);
 
     if (sizeof(eb_voice) > 1024) over++;
     if (sizeof(eb_voice) * EB_NUM_VOICES > 8192) over++;

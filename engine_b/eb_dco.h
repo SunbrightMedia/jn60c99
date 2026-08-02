@@ -165,6 +165,12 @@ typedef struct {
  * the four polyphase inputs, in order. */
 float eb_dco_step(eb_dco_state *s, const eb_dco_coef *c);
 
+/* The four sub-samples of one audio sample, against ONE coefficient load.
+ * Bit-identical to four eb_dco_step calls -- same operands, same order, same
+ * roundings; only the place the coefficients are read from differs. See the
+ * comment above eb_dco_step_i in eb_dco.c. */
+void  eb_dco_step4(eb_dco_state *s, const eb_dco_coef *c, float *out);
+
 /* Per-sample coefficient build (the two modulated numbers -> inc, g, pw). */
 void  eb_dco_set_pitch(eb_dco_coef *c, float inc, float pw);
 
