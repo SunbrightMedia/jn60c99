@@ -235,6 +235,26 @@ CPI = {
 # MEASURED fact that expf glibc==newlib bit-identical, but no cycle count.
 LIBM_CALL = (80.0, 150.0, 300.0)
 
+# MEASURED EXECUTION OVERRIDES.  symbol -> executions per invocation.
+#
+# WHY THIS EXISTS (docs/engineb/HARNESS_AUDIT.md F5). The counts above are
+# STATIC: how many call sites the compiler emitted. A call site inside a branch
+# that is never taken costs nothing at run time, and charging it inflates the
+# top of the band on exactly the modules that are being optimised.
+#
+# An entry here must be MEASURED by counting executions, never assumed. The one
+# entry present was measured by planting a counter in the fallback arms of
+# eb_dco_wrap and eb_triangle and rendering the full 30-scenario set: 0
+# executions in 60,989,440 DCO steps. Those arms exist for out-of-domain phase
+# values that a phase accumulator does not reach, and they are kept because
+# removing them would change behaviour outside the measured domain -- they are
+# unreached, not dead.
+#
+# Set from the command line with --exec SYMBOL=N. A symbol that is NOT listed
+# keeps its static count, which is the conservative direction.
+EXEC_OVERRIDE = {}
+
+
 # Cost of one compiler soft-float helper call, MODELED, wide on purpose.
 # __divsf3 sits at the low end, a soft-double multiply at the high end.
 SOFT_CALL = (25.0, 70.0, 180.0)
@@ -379,10 +399,24 @@ def model_cycles(tgt_key, stat, rho_band, tier):
         for c in CLASSES:
             issue += stat["classes"][c] * CPI[tgt_key][c][i]
         mem = stat["accesses"] * lat[i]
-        libm = stat["libm"] * LIBM_CALL[i]
-        soft = stat.get("soft", 0) * SOFT_CALL[i]
+        libm = _charged(stat, "libm", "callnames") * LIBM_CALL[i]
+        soft = _charged(stat, "soft", "softnames") * SOFT_CALL[i]
         res.append((issue + mem + libm + soft) * rho)
     return tuple(res)
+
+
+def _charged(stat, key, namekey):
+    """Static call count, with any MEASURED execution count substituted in.
+
+    Falls back to the static number for every symbol not measured, so an
+    unlisted symbol is never quietly discounted."""
+    names = stat.get(namekey) or []
+    if not names or not EXEC_OVERRIDE:
+        return stat.get(key, 0)
+    n = 0.0
+    for nm in names:
+        n += EXEC_OVERRIDE.get(nm, 1.0)
+    return n
 
 
 def fmt(x):
@@ -404,6 +438,15 @@ def cmd_measure(a):
     extra = ["-I" + i for i in (a.include or [])] + ["-D" + d for d in (a.define or [])]
     dens = load_density()
     calls = dict((x.split("=")[0], float(x.split("=")[1])) for x in (a.calls or []))
+    EXEC_OVERRIDE.clear()
+    for x in (getattr(a, "exec", None) or []):
+        k, v = x.split("=", 1)
+        EXEC_OVERRIDE[k] = float(v)
+    if EXEC_OVERRIDE:
+        print("MEASURED EXECUTION OVERRIDES in force: %s"
+              "\n   (these replace the STATIC call count for those symbols; "
+              "every other symbol keeps its static count)"
+              % ", ".join("%s=%g" % kv for kv in sorted(EXEC_OVERRIDE.items())))
 
     print("=" * 78)
     print("ENGINE B COST RIG   sources: %s" % ", ".join(os.path.basename(s) for s in a.source))
@@ -830,6 +873,11 @@ def main():
     m.add_argument("--calls", action="append",
                    help="FUNC=N invocations per sample for that function; "
                         "overrides --per-sample in the breakdown. Repeatable.")
+    m.add_argument("--exec", action="append", default=[], metavar="SYM=N",
+                   help="MEASURED executions per invocation for a libm or "
+                        "soft-float symbol, e.g. --exec fmodf=0. Unlisted "
+                        "symbols keep their STATIC count. Never assume a "
+                        "value here -- count it.")
     m.add_argument("--json")
     m.set_defaults(func_=cmd_measure)
 

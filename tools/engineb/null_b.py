@@ -286,6 +286,49 @@ _OUT_ANCHOR = {
                "&v529, &v530);",
                "    { float _f = %s; v529 *= _f; v530 *= _f; }"),
 }
+# PER-MODULE TEETH BRACKETS.  module -> (factor that must FAIL, factor that
+# must PASS). Both are relative errors on that module's own output.
+#
+# THESE ARE COMPUTED FROM MEASURED GAIN, NOT CHOSEN.  The first version of this
+# battery used 1e-5 / 1e-6 for every module and was WRONG in a way worth
+# recording, because it is the same mistake as audit finding F8 committed an
+# hour after F8 was written up.
+#
+# A pure relative scale of 1e-5 on a module whose error reaches the output at
+# unity gain produces a residual of exactly 1e-5, which is exactly -100 dB,
+# which is exactly the threshold. Six of the eight modules sit at unity gain, so
+# six brackets landed ON the line: they read -100.0 / -100.1 dB and passed or
+# failed essentially at random (dco 1/30, delay 17/30, chorus 21/30). I then
+# read "dco 1/30" as "the DCO is the weakest module in the set" and wrote that
+# down. IT IS NOT TRUE. The DCO transmits its error at unity gain like the rest;
+# the probe was on the threshold.
+#
+# MEASURED gain of each module's output error at the gate, G = residual_dB
+# minus 20*log10(factor), from the 30-scenario sweep:
+#
+#     chorus 0.0   dco +0.2   delay 0.0   reverb 0.0   vca_hpf 0.0
+#     vcf_ladder 0.0          env +18.6   vcf_cv +16.3   pwm_cv +104.5
+#
+# Modules that AMPLIFY (env, vcf_cv, pwm_cv) do so because their output is not
+# an audio signal but a control value -- an envelope level or a cutoff -- and a
+# relative error on a control moves the audio by much more than itself.
+#
+# Each bracket below is placed so the FAIL case lands near -90 dB and the PASS
+# case near -110 dB, about 10 dB clear of the threshold on both sides. Both
+# figures are re-measured and recorded in docs/engineb/HARNESS_AUDIT.md.
+_BRACKET = {
+    "chorus":     ("3.16e-5", "3.16e-6"),
+    "dco":        ("3.16e-5", "3.16e-6"),
+    "delay":      ("3.16e-5", "3.16e-6"),
+    "reverb":     ("3.16e-5", "3.16e-6"),
+    "vca_hpf":    ("3.16e-5", "3.16e-6"),
+    "vcf_ladder": ("3.16e-5", "3.16e-6"),
+    "env":        ("3.7e-6",  "3.7e-7"),
+    "vcf_cv":     ("4.8e-6",  "4.8e-7"),
+    # pwm_cv is fail-only; see teeth(). Its FAIL case would need a factor of
+    # about 1.9e-10 to land at -90 dB, which is far below one ULP of 1.0f.
+}
+
 # 'skeleton' is absent ON PURPOSE: its shim discards eb_engine_process()'s
 # result, so no perturbation of it can reach the output. See _plant's comment.
 
@@ -634,8 +677,9 @@ def teeth(quick):
         if _m == "pwm_cv":
             cases.append(("out:pwm_cv:(1.0f + 1e-7f)", ("pwm_cv",), True))
             continue
-        cases.append(("out:%s:(1.0f + 1e-5f)" % _m, (_m,), True))
-        cases.append(("out:%s:(1.0f + 1e-6f)" % _m, (_m,), False))
+        _fail, _pass = _BRACKET[_m]
+        cases.append(("out:%s:(1.0f + %sf)" % (_m, _fail), (_m,), True))
+        cases.append(("out:%s:(1.0f + %sf)" % (_m, _pass), (_m,), False))
     # ONE reference render, reused by every mutant: the mutations are planted in
     # the CANDIDATE build, so the oracle side is invariant across the battery.
     # This line was missing until 2026-08-02 -- `run(..., ref=ref, ...)` raised

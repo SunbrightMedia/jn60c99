@@ -391,9 +391,23 @@ def main():
             if mods == ["all"]:
                 mods = null_b.module_list()
             lib = os.path.join(tmp, "cand.so")
-            null_b.build(lib, mods, quiet=False)
-            label = ("src/ (THE PORT, built fresh)" if not mods
-                     else "engine B, modules: %s" % ",".join(mods))
+            # REPORT WHAT WAS LINKED, NOT WHAT WAS ASKED FOR
+            # (docs/engineb/HARNESS_AUDIT.md F6). This line used to be built
+            # from `mods`, the REQUEST. While the shim-collision defect was
+            # live it therefore printed all ten module names for a build that
+            # contained two. `build()` returns the list of port translation
+            # units it actually overwrote, so the label is now derived from the
+            # build's own result and the two are cross-checked.
+            shadowed, _cmd = null_b.build(lib, mods, quiet=False)
+            if not mods:
+                label = "src/ (THE PORT, built fresh)"
+            else:
+                if len(set(shadowed)) != len(shadowed):
+                    raise SystemExit(
+                        "plugin_check: build reported a duplicated shadow %s -- "
+                        "modules collided and the report would be wrong" % shadowed)
+                label = ("engine B, modules: %s  [linked, shadowing %s]"
+                         % (",".join(mods), ",".join(sorted(set(shadowed)))))
         if a.check_port and (a.module or a.cand):
             raise SystemExit("--check-port is exclusive with --module/--cand")
 
