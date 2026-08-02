@@ -39,4 +39,21 @@ not a DSP result. Compile it with `-DEB_SKELETON_FORCE_HANDOVER=1` to force the
 hand-over branch: the null then fails in 25/25 scenarios, which is how the
 hand-over line is known to be live rather than unreachable.
 
-No DSP module exists yet.
+## env — MODULE M7, the two ADSR envelopes (the first real DSP module)
+
+Forks `src/voice_render.c` and replaces ONE block, lines 964-1075, with a call
+into `engine_b/eb_envgen.c`. Everything else in the file is the port's own code
+byte for byte, so a divergence is attributable to the envelopes and to nothing
+else.
+
+`null_b.py --module env` -> **26/26 EXACTLY 0**, including all 17 idle-prefix
+scenarios. Non-vacuity is MEASURED, not assumed: planting the documented slew-
+constant simplification in `eb_envgen.c` fails 10 of 25 scenarios at -66.9 dB,
+33 dB above the gate. Full numbers, the cost measurement and one restructuring
+that was measured and REJECTED: `docs/engineb/M7_ENV_RESULT.md`.
+
+The shim keeps engine B's five state floats in the port's own state cells
+(2592/2624/2640/2672/2720 and the +480 ENV2 twins), which is what
+`null_b.py`'s doc sanctions, so the module inherits the port's create/destroy/
+eight-voice lifecycle exactly. No cycle figure is ever taken from the shim: the
+cost rig measures `eb_envgen.c` alone.
