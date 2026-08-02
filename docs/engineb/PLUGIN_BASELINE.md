@@ -50,7 +50,9 @@ binary, not to our transcription of it.
   lengths are unequal and mutually non-multiple on purpose, because the chorus
   LFO, the noise LFSR and the DCO phase free-run at different periods and an
   aligned prefix can be silently harmless. MEASURED against the authority:
-  `--check-port` **11/11 BIT-EXACT** and `--module all` **11/11 BIT-EXACT**.
+  `--check-port` **11/11 BIT-EXACT**. The `--module all` run of the same date
+  also read 11/11 BIT-EXACT, and **that result is RETRACTED** — see the
+  composite-build defect below.
   `UNISON 1-idle` is the regression guard for the retrigger-latch bug — it is
   the row that was red before the fix, and it is the cheapest in the set.
 * **Delay TYPES 1–5, EFFECT TYPE 4 (flanger), and REVERB TYPE 5** are not written
@@ -63,3 +65,48 @@ binary, not to our transcription of it.
 **Extend `plugin_check` to 48,000 Hz.** 48 kHz is the delivery rate for engine B
 and no authoritative comparison has ever been made at it. That is now the
 largest uncovered surface in this table.
+
+
+## RETRACTION 2026-08-02 — the composite `--module all` result
+
+**Any claim of the form "engine B, all modules, N/N exact" made before this date
+is withdrawn.** It was never measuring what it said.
+
+`null_b.build()` overlays each module's shim onto `src/` with `copyfile`. Six
+modules ship their own `voice_render.c` (dco, env, pwm_cv, vca_hpf, vcf_cv,
+vcf_ladder) and three ship their own `master_render.c` (chorus, delay, reverb).
+The second write destroyed the first, so an alphabetical `all` build linked
+**vcf_ladder's voice path and reverb's master path and no other engine B
+module**, while the `ENGINEB_MODULE` string still named all ten. The build even
+printed `voice_render.c` six times in its own "shadowed" line, and no one read
+it.
+
+**PROVEN by execution, not by reading.** An increment planted in `eb_dco_step`
+counted:
+
+| build | `eb_dco_step` calls over the 30 scenarios |
+|---|---|
+| `--module all` | **0** |
+| `--module dco` | **60,989,440** |
+
+So the DCO — the module that dominates the cost budget — contributed nothing to
+any composite result.
+
+**What is NOT affected.** The per-module gates. One module shadows one file, so
+`--module dco`, `--module vcf_ladder` and every other single-module run were
+always valid, and every per-module accuracy number in this repo stands.
+`--check-port` is also unaffected: it substitutes no module at all.
+
+**What is affected.** Every composite claim, in this file and in
+`docs/engineb/FX_VERDICT.md` and `docs/engineb/VOICE_BUDGET.md`, wherever the
+whole engine was said to be exact. Engine B has never been proven exact **as a
+whole engine**, only module by module.
+
+**Fixed how.** `null_b.build()` now refuses a collision with a hard stop that
+names both modules and says what to do. A composite build is impossible until
+the shims that share a translation unit are merged into one.
+
+**The next task, and it is now the top one.** Merge the six `voice_render.c`
+shims into a single composite shim and the three `master_render.c` shims into
+another, then re-run the whole-engine comparison against the plugin. Until that
+runs, the engine's whole-path accuracy is UNPROVEN.

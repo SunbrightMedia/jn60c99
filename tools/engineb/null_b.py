@@ -167,6 +167,24 @@ def build(dst_so, modules=(), mutate=None, quiet=True):
     try:
         _copy_tree(tmp)
         shadowed = []
+        # WHO WROTE EACH SHADOWED FILE. Two shims that name the same port
+        # translation unit CANNOT both be in one build: the second copyfile
+        # silently destroys the first, and the build then reports every module
+        # as present while linking only the last one's code.
+        #
+        # THIS IS NOT HYPOTHETICAL. It was live until 2026-08-02 and it made
+        # `--module all` a lie: six modules ship voice_render.c (dco, env,
+        # pwm_cv, vca_hpf, vcf_cv, vcf_ladder) and three ship master_render.c
+        # (chorus, delay, reverb), so an alphabetical `all` build linked
+        # vcf_ladder's voice path and reverb's master path and nothing else,
+        # while ENGINEB_MODULE still named all ten. MEASURED: an execution
+        # counter planted in eb_dco_step counted 0 calls in an `all` build and
+        # 60,989,440 in a `--module dco` build.
+        #
+        # The per-module gates were never affected -- one module shadows one
+        # file. Only composite builds were. The guard below makes the collision
+        # a hard stop instead of a silent overwrite.
+        owner = {}
         for m in modules:
             mdir = os.path.join(REPO, "engine_b", "shim", m)
             if not os.path.isdir(mdir):
@@ -179,6 +197,19 @@ def build(dst_so, modules=(), mutate=None, quiet=True):
                         "shim %s/%s shadows nothing in src/ -- a shim file must "
                         "be named after the port translation unit it replaces, or "
                         "the build silently compiles BOTH." % (m, base))
+                if base in owner:
+                    raise SystemExit(
+                        "SHIM COLLISION: modules '%s' and '%s' both provide "
+                        "src/%s.\n"
+                        "  Overwriting would link only '%s' while still "
+                        "reporting both, which is a green gate that is wrong.\n"
+                        "  WHAT TO DO: these modules cannot be composed by "
+                        "file shadowing. Either run them one at a time\n"
+                        "  (--module %s), or merge them into ONE shim that "
+                        "calls both engine B modules and declare that\n"
+                        "  merged shim as a single module directory."
+                        % (owner[base], m, base, m, owner[base]))
+                owner[base] = m
                 shutil.copyfile(f, target)      # overwrite the port's copy
                 shadowed.append(base)
         if mutate:
