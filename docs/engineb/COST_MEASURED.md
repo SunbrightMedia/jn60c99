@@ -74,3 +74,56 @@ so a silent run would report a cheaper engine than the one that ships. It needs
 driving from a real recalled patch. The guard is deliberate: a benchmark that
 quietly measures silence is exactly the class of fault this project keeps
 finding.
+
+
+---
+
+## Step 1 of the standalone engine — the ladder's state moved. MEASURED.
+
+Date 2026-08-02, after the measurement above.
+
+`eb_engine_render()` is a large build, and this project's history says that
+writing the whole thing and then debugging a whole-engine divergence is the
+expensive way — the CV/gate block took most of its time to a defect whose values
+were all bit-identical. So it is being built in gated steps, biggest cost first,
+with the state moving to its final home as it goes.
+
+**Step 1: the VCF ladder's state moved out of the port's cells into engine B.**
+It was the largest single cost in the engine — the copy in and out was 17,008
+instructions per sample, 62 % of the port function's self cost and 34 % of the
+whole engine, and none of it is DSP.
+
+Stopping the cell maintenance was CHECKED, not assumed: an exact search over
+every `src/*.c` for each of the eleven scalar cells and the four history bases
+finds **no reader outside the ladder block**. The only other code that touches
+them is `chorus_init.c`, zeroing them at power-on — which is what supplies the
+fresh-context marker (cell 8320, claimed by engine B on the same pattern the
+decimator uses on 5440 and the noise SVF on 4288).
+
+### The result
+
+| | before | after | change |
+|---|---|---|---|
+| `juno_voice_render` self (marshalling) | 27,225 | **16,241** | **−40 %** |
+| engine B's own functions | 17,943 | 15,431 | −2,512 (the two hist accessors are gone) |
+| **whole engine through the harness** | **50,413** | **36,357** | **−27.9 %** |
+
+And it is still exact:
+
+| gate | result |
+|---|---|
+| `--module vcf_ladder`, 30 scenarios | EXACTLY 0 |
+| `--module all`, 30 scenarios | EXACTLY 0 |
+| vs the PLUGIN at 48 kHz | 11/11 BIT-EXACT |
+
+**Engine B's DSP is now 15,431 instructions per sample**, and unlike the earlier
+figure this one contains no marshalling functions at all — the 3,072 spent on
+`eb_vcf_hist_set`/`get` are gone rather than subtracted on paper.
+
+### What is left in the port's 16,241
+
+That is the remaining marshalling: every other module still reloads its
+coefficients from the port's cells each sample. Moving each one is the same
+pattern, and each is independently gateable. That is steps 2 onward, and when
+the last one lands there is nothing left for `eb_engine_render()` to do except
+call the modules in order — which is the point of building it this way round.

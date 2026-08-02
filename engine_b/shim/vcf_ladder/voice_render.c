@@ -5,7 +5,8 @@
  * divergence under tools/engineb/null_b.py --module vcf_ladder is attributable
  * to the ladder and to nothing else.
  */
-#include "eb_vcf_ladder.h"     /* -I engine_b/ is supplied by the harness */
+#include "eb_vcf_ladder.h"
+static eb_vcf_state EBF[8];     /* -I engine_b/ is supplied by the harness */
 
 /* The port's four dispersion lines are ONE 4x-oversampled history in engine B.
  * (line, slot) -> delay:  A/B/C/D are delays 0/1/2/3 modulo 4, slot = delay/4.
@@ -1345,24 +1346,36 @@ LABEL_46:
       for ( ebi = 0; ebi < 16; ++ebi )
         ebc.fir[ebi] = JF(a1, 9504 - 16 * ebi);
 
-      ebs.nl = JF(a1, 8208); ebs.y1 = JF(a1, 8224); ebs.y2 = JF(a1, 8240);
-      ebs.y3 = JF(a1, 8256); ebs.y4 = JF(a1, 8272);
-      ebs.s1 = JF(a1, 8288); ebs.s2 = ebs2in = JF(a1, 8304);
-      ebs.drive_prev = ebprev = JF(a1, 8944);
-      ebs.dith = JF(a1, 8976);
-      ebs.hi = 31;
-      for ( ebi = 0; ebi < 32; ++ebi )
-        eb_vcf_hist_set(&ebs, ebi, JF(a1, EB_HCELL(ebi)));
+      /* ==== THE STATE LIVES IN ENGINE B, NOT IN THE PORT'S CELLS =========
+       * This copy in and out was the single largest cost in the whole engine:
+       * MEASURED, host, 8 voices, 48 kHz, the two hist accessors alone were
+       * 3,072 executed instructions per sample and the surrounding block
+       * 17,008 -- 62 % of the port function's self cost and 34 % of the entire
+       * engine. None of it is DSP. It exists only so one module can be
+       * substituted at a time.
+       *
+       * IT IS SAFE TO STOP MAINTAINING THESE CELLS, and that was CHECKED
+       * rather than assumed: an exact search over every src/*.c for each of
+       * 8208/8224/8240/8256/8272/8288/8304/8320/8944/8960/8976 and the four
+       * history bases 8432/8560/8688/8816 finds NO reader outside this block.
+       * The only other code that touches them is src/chorus_init.c, which
+       * zeroes them at power-on -- and that is what gives the fresh-context
+       * marker below.
+       *
+       * THE MARKER is cell 8320. chorus_init zeroes it at power-on; the only
+       * other writer was this block (the delayed copy of s2), and nothing reads
+       * it, so engine B claims it. A static array outlives the engine context
+       * and malloc reuses addresses, so the "is this context new?" question has
+       * to be answered by the PORT, not by a pointer. Same pattern as the
+       * decimator (cell 5440) and the noise SVF (cell 4288). */
+      if (JF(a1, 8320) == 0.0f) {
+        eb_vcf_reset(&EBF[voice]);
+        JF(a1, 8320) = 1.0f;
+      }
 
-      JF(a1, 9040) = eb_vcf_tick(&ebs, &ebc, JF(a1, 6544), v241, JF(a1, 7536));
-
-      JF(a1, 8208) = ebs.nl; JF(a1, 8224) = ebs.y1; JF(a1, 8240) = ebs.y2;
-      JF(a1, 8256) = ebs.y3; JF(a1, 8272) = ebs.y4;
-      JF(a1, 8288) = ebs.s1; JF(a1, 8304) = ebs.s2; JF(a1, 8320) = ebs2in;
-      JF(a1, 8944) = ebs.drive_prev; JF(a1, 8960) = ebprev;
-      JF(a1, 8976) = ebs.dith;
-      for ( ebi = 0; ebi < 32; ++ebi )
-        JF(a1, EB_HCELL(ebi)) = eb_vcf_hist_get(&ebs, ebi);
+      JF(a1, 9040) = eb_vcf_tick(&EBF[voice], &ebc,
+                                 JF(a1, 6544), v241, JF(a1, 7536));
+      (void)ebs; (void)ebs2in; (void)ebprev; (void)ebi;
     }
     else
     {
