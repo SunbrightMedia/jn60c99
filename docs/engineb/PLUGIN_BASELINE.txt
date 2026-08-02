@@ -1,0 +1,234 @@
+=== dco ===
+  built cand.so: 34 src + 18 engine_b TU, shadowed: voice_render.c
+rendering the AUTHORITY (plugin under Unicorn) -- 6 scenario(s), expect ~72 s
+  [AUTHORITY=plugin] pluck POLY    patch  5 (LD Classic Lead): 14000 frames
+  [AUTHORITY=plugin] MONO retrig   patch 15 (BS VeloRez Bass): 16000 frames
+  [AUTHORITY=plugin] UNISON pile   patch 61 (LD Perc Lead): 17000 frames
+  [AUTHORITY=plugin] chorus pad    patch 20 (PD Saturate Pad): 14000 frames
+  [AUTHORITY=plugin] delay keys    patch  2 (KY Delicate Keys): 14000 frames
+  [AUTHORITY=plugin] DCO noise     patch 32 (SY Snow Drops): 14000 frames
+=== PLUGIN CROSS-CHECK ===
+  AUTHORITATIVE SIDE : the JUNO60.vst3 binary, executed under Unicorn
+                       (its own recall + its own render; no port code)
+  CANDIDATE SIDE     : engine B, modules: dco
+  metrics            : tools/trackb/null_ab.py (imported, not rewritten)
+  thresholds         : global -90 dB / block -70 dB
+  rate               : 44100 Hz
+
+  scenario       sig dBFS   global dB    block dB  verdict
+  pluck POLY        -35.7   BIT-EXACT           -  ok
+  MONO retrig       -20.2   BIT-EXACT           -  ok
+  UNISON pile       -23.1   BIT-EXACT           -  ok
+  chorus pad        -26.2   BIT-EXACT           -  ok
+  delay keys        -19.2   BIT-EXACT           -  ok
+  DCO noise         -28.5   BIT-EXACT           -  ok
+
+  6/6 agree with the PLUGIN (authority).
+=== vcf_ladder ===
+  built cand.so: 34 src + 18 engine_b TU, shadowed: voice_render.c
+rendering the AUTHORITY (plugin under Unicorn) -- 6 scenario(s), expect ~72 s
+  [AUTHORITY=plugin] pluck POLY    patch  5 (LD Classic Lead): 14000 frames
+  [AUTHORITY=plugin] MONO retrig   patch 15 (BS VeloRez Bass): 16000 frames
+  [AUTHORITY=plugin] UNISON pile   patch 61 (LD Perc Lead): 17000 frames
+  [AUTHORITY=plugin] chorus pad    patch 20 (PD Saturate Pad): 14000 frames
+  [AUTHORITY=plugin] delay keys    patch  2 (KY Delicate Keys): 14000 frames
+  [AUTHORITY=plugin] DCO noise     patch 32 (SY Snow Drops): 14000 frames
+=== PLUGIN CROSS-CHECK ===
+  AUTHORITATIVE SIDE : the JUNO60.vst3 binary, executed under Unicorn
+                       (its own recall + its own render; no port code)
+  CANDIDATE SIDE     : engine B, modules: vcf_ladder
+  metrics            : tools/trackb/null_ab.py (imported, not rewritten)
+  thresholds         : global -90 dB / block -70 dB
+  rate               : 44100 Hz
+
+  scenario       sig dBFS   global dB    block dB  verdict
+  pluck POLY        -35.7   BIT-EXACT           -  ok
+  MONO retrig       -20.2   BIT-EXACT           -  ok
+  UNISON pile       -23.1   BIT-EXACT           -  ok
+  chorus pad        -26.2   BIT-EXACT           -  ok
+  delay keys        -19.2   BIT-EXACT           -  ok
+  DCO noise         -28.5   BIT-EXACT           -  ok
+
+  6/6 agree with the PLUGIN (authority).
+=== env ===
+  built cand.so: 34 src + 19 engine_b TU, shadowed: voice_render.c
+rendering the AUTHORITY (plugin under Unicorn) -- 6 scenario(s), expect ~72 s
+  [AUTHORITY=plugin] pluck POLY    patch  5 (LD Classic Lead): 14000 frames
+  [AUTHORITY=plugin] MONO retrig   patch 15 (BS VeloRez Bass): 16000 frames
+  [AUTHORITY=plugin] UNISON pile   patch 61 (LD Perc Lead): 17000 frames
+  [AUTHORITY=plugin] chorus pad    patch 20 (PD Saturate Pad): 14000 frames
+  [AUTHORITY=plugin] delay keys    patch  2 (KY Delicate Keys): 14000 frames
+  [AUTHORITY=plugin] DCO noise     patch 32 (SY Snow Drops): 14000 frames
+=== PLUGIN CROSS-CHECK ===
+  AUTHORITATIVE SIDE : the JUNO60.vst3 binary, executed under Unicorn
+                       (its own recall + its own render; no port code)
+  CANDIDATE SIDE     : engine B, modules: env
+  metrics            : tools/trackb/null_ab.py (imported, not rewritten)
+  thresholds         : global -90 dB / block -70 dB
+  rate               : 44100 Hz
+
+  scenario       sig dBFS   global dB    block dB  verdict
+  pluck POLY        -35.7   BIT-EXACT           -  ok
+  MONO retrig       -20.2   BIT-EXACT           -  ok
+  UNISON pile       -23.1   BIT-EXACT           -  ok
+  chorus pad        -26.2   BIT-EXACT           -  ok
+  delay keys        -19.2   BIT-EXACT           -  ok
+  DCO noise         -28.5   BIT-EXACT           -  ok
+
+  6/6 agree with the PLUGIN (authority).
+=== chorus ===
+  built cand.so: 34 src + 19 engine_b TU, shadowed: chorus_init.c, master_render.c
+rendering the AUTHORITY (plugin under Unicorn) -- 6 scenario(s), expect ~72 s
+  [AUTHORITY=plugin] pluck POLY    patch  5 (LD Classic Lead): 14000 frames
+  [AUTHORITY=plugin] MONO retrig   patch 15 (BS VeloRez Bass): 16000 frames
+  [AUTHORITY=plugin] UNISON pile   patch 61 (LD Perc Lead): 17000 frames
+  [AUTHORITY=plugin] chorus pad    patch 20 (PD Saturate Pad): 14000 frames
+  [AUTHORITY=plugin] delay keys    patch  2 (KY Delicate Keys): 14000 frames
+  [AUTHORITY=plugin] DCO noise     patch 32 (SY Snow Drops): 14000 frames
+=== PLUGIN CROSS-CHECK ===
+  AUTHORITATIVE SIDE : the JUNO60.vst3 binary, executed under Unicorn
+                       (its own recall + its own render; no port code)
+  CANDIDATE SIDE     : engine B, modules: chorus
+  metrics            : tools/trackb/null_ab.py (imported, not rewritten)
+  thresholds         : global -90 dB / block -70 dB
+  rate               : 44100 Hz
+
+  scenario       sig dBFS   global dB    block dB  verdict
+  pluck POLY        -35.7   BIT-EXACT           -  ok
+  MONO retrig       -20.2   BIT-EXACT           -  ok
+  UNISON pile       -23.1   BIT-EXACT           -  ok
+  chorus pad        -26.2   BIT-EXACT           -  ok
+  delay keys        -19.2   BIT-EXACT           -  ok
+  DCO noise         -28.5   BIT-EXACT           -  ok
+
+  6/6 agree with the PLUGIN (authority).
+=== delay ===
+  built cand.so: 34 src + 19 engine_b TU, shadowed: master_render.c
+rendering the AUTHORITY (plugin under Unicorn) -- 6 scenario(s), expect ~72 s
+  [AUTHORITY=plugin] pluck POLY    patch  5 (LD Classic Lead): 14000 frames
+  [AUTHORITY=plugin] MONO retrig   patch 15 (BS VeloRez Bass): 16000 frames
+  [AUTHORITY=plugin] UNISON pile   patch 61 (LD Perc Lead): 17000 frames
+  [AUTHORITY=plugin] chorus pad    patch 20 (PD Saturate Pad): 14000 frames
+  [AUTHORITY=plugin] delay keys    patch  2 (KY Delicate Keys): 14000 frames
+  [AUTHORITY=plugin] DCO noise     patch 32 (SY Snow Drops): 14000 frames
+=== PLUGIN CROSS-CHECK ===
+  AUTHORITATIVE SIDE : the JUNO60.vst3 binary, executed under Unicorn
+                       (its own recall + its own render; no port code)
+  CANDIDATE SIDE     : engine B, modules: delay
+  metrics            : tools/trackb/null_ab.py (imported, not rewritten)
+  thresholds         : global -90 dB / block -70 dB
+  rate               : 44100 Hz
+
+  scenario       sig dBFS   global dB    block dB  verdict
+  pluck POLY        -35.7   BIT-EXACT           -  ok
+  MONO retrig       -20.2   BIT-EXACT           -  ok
+  UNISON pile       -23.1   BIT-EXACT           -  ok
+  chorus pad        -26.2   BIT-EXACT           -  ok
+  delay keys        -19.2   BIT-EXACT           -  ok
+  DCO noise         -28.5   BIT-EXACT           -  ok
+
+  6/6 agree with the PLUGIN (authority).
+=== reverb ===
+  built cand.so: 34 src + 19 engine_b TU, shadowed: master_render.c
+rendering the AUTHORITY (plugin under Unicorn) -- 6 scenario(s), expect ~72 s
+  [AUTHORITY=plugin] pluck POLY    patch  5 (LD Classic Lead): 14000 frames
+  [AUTHORITY=plugin] MONO retrig   patch 15 (BS VeloRez Bass): 16000 frames
+  [AUTHORITY=plugin] UNISON pile   patch 61 (LD Perc Lead): 17000 frames
+  [AUTHORITY=plugin] chorus pad    patch 20 (PD Saturate Pad): 14000 frames
+  [AUTHORITY=plugin] delay keys    patch  2 (KY Delicate Keys): 14000 frames
+  [AUTHORITY=plugin] DCO noise     patch 32 (SY Snow Drops): 14000 frames
+=== PLUGIN CROSS-CHECK ===
+  AUTHORITATIVE SIDE : the JUNO60.vst3 binary, executed under Unicorn
+                       (its own recall + its own render; no port code)
+  CANDIDATE SIDE     : engine B, modules: reverb
+  metrics            : tools/trackb/null_ab.py (imported, not rewritten)
+  thresholds         : global -90 dB / block -70 dB
+  rate               : 44100 Hz
+
+  scenario       sig dBFS   global dB    block dB  verdict
+  pluck POLY        -35.7   BIT-EXACT           -  ok
+  MONO retrig       -20.2   BIT-EXACT           -  ok
+  UNISON pile       -23.1   BIT-EXACT           -  ok
+  chorus pad        -26.2   BIT-EXACT           -  ok
+  delay keys        -19.2   BIT-EXACT           -  ok
+  DCO noise         -28.5   BIT-EXACT           -  ok
+
+  6/6 agree with the PLUGIN (authority).
+=== vca_hpf ===
+  built cand.so: 34 src + 19 engine_b TU, shadowed: voice_render.c
+rendering the AUTHORITY (plugin under Unicorn) -- 6 scenario(s), expect ~72 s
+  [AUTHORITY=plugin] pluck POLY    patch  5 (LD Classic Lead): 14000 frames
+  [AUTHORITY=plugin] MONO retrig   patch 15 (BS VeloRez Bass): 16000 frames
+  [AUTHORITY=plugin] UNISON pile   patch 61 (LD Perc Lead): 17000 frames
+  [AUTHORITY=plugin] chorus pad    patch 20 (PD Saturate Pad): 14000 frames
+  [AUTHORITY=plugin] delay keys    patch  2 (KY Delicate Keys): 14000 frames
+  [AUTHORITY=plugin] DCO noise     patch 32 (SY Snow Drops): 14000 frames
+=== PLUGIN CROSS-CHECK ===
+  AUTHORITATIVE SIDE : the JUNO60.vst3 binary, executed under Unicorn
+                       (its own recall + its own render; no port code)
+  CANDIDATE SIDE     : engine B, modules: vca_hpf
+  metrics            : tools/trackb/null_ab.py (imported, not rewritten)
+  thresholds         : global -90 dB / block -70 dB
+  rate               : 44100 Hz
+
+  scenario       sig dBFS   global dB    block dB  verdict
+  pluck POLY        -35.7   BIT-EXACT           -  ok
+  MONO retrig       -20.2   BIT-EXACT           -  ok
+  UNISON pile       -23.1   BIT-EXACT           -  ok
+  chorus pad        -26.2   BIT-EXACT           -  ok
+  delay keys        -19.2   BIT-EXACT           -  ok
+  DCO noise         -28.5   BIT-EXACT           -  ok
+
+  6/6 agree with the PLUGIN (authority).
+=== vcf_cv ===
+  built cand.so: 34 src + 19 engine_b TU, shadowed: voice_render.c
+rendering the AUTHORITY (plugin under Unicorn) -- 6 scenario(s), expect ~72 s
+  [AUTHORITY=plugin] pluck POLY    patch  5 (LD Classic Lead): 14000 frames
+  [AUTHORITY=plugin] MONO retrig   patch 15 (BS VeloRez Bass): 16000 frames
+  [AUTHORITY=plugin] UNISON pile   patch 61 (LD Perc Lead): 17000 frames
+  [AUTHORITY=plugin] chorus pad    patch 20 (PD Saturate Pad): 14000 frames
+  [AUTHORITY=plugin] delay keys    patch  2 (KY Delicate Keys): 14000 frames
+  [AUTHORITY=plugin] DCO noise     patch 32 (SY Snow Drops): 14000 frames
+=== PLUGIN CROSS-CHECK ===
+  AUTHORITATIVE SIDE : the JUNO60.vst3 binary, executed under Unicorn
+                       (its own recall + its own render; no port code)
+  CANDIDATE SIDE     : engine B, modules: vcf_cv
+  metrics            : tools/trackb/null_ab.py (imported, not rewritten)
+  thresholds         : global -90 dB / block -70 dB
+  rate               : 44100 Hz
+
+  scenario       sig dBFS   global dB    block dB  verdict
+  pluck POLY        -35.7   BIT-EXACT           -  ok
+  MONO retrig       -20.2   BIT-EXACT           -  ok
+  UNISON pile       -23.1   BIT-EXACT           -  ok
+  chorus pad        -26.2   BIT-EXACT           -  ok
+  delay keys        -19.2   BIT-EXACT           -  ok
+  DCO noise         -28.5   BIT-EXACT           -  ok
+
+  6/6 agree with the PLUGIN (authority).
+=== pwm_cv ===
+  built cand.so: 34 src + 19 engine_b TU, shadowed: voice_render.c
+rendering the AUTHORITY (plugin under Unicorn) -- 6 scenario(s), expect ~72 s
+  [AUTHORITY=plugin] pluck POLY    patch  5 (LD Classic Lead): 14000 frames
+  [AUTHORITY=plugin] MONO retrig   patch 15 (BS VeloRez Bass): 16000 frames
+  [AUTHORITY=plugin] UNISON pile   patch 61 (LD Perc Lead): 17000 frames
+  [AUTHORITY=plugin] chorus pad    patch 20 (PD Saturate Pad): 14000 frames
+  [AUTHORITY=plugin] delay keys    patch  2 (KY Delicate Keys): 14000 frames
+  [AUTHORITY=plugin] DCO noise     patch 32 (SY Snow Drops): 14000 frames
+=== PLUGIN CROSS-CHECK ===
+  AUTHORITATIVE SIDE : the JUNO60.vst3 binary, executed under Unicorn
+                       (its own recall + its own render; no port code)
+  CANDIDATE SIDE     : engine B, modules: pwm_cv
+  metrics            : tools/trackb/null_ab.py (imported, not rewritten)
+  thresholds         : global -90 dB / block -70 dB
+  rate               : 44100 Hz
+
+  scenario       sig dBFS   global dB    block dB  verdict
+  pluck POLY        -35.7   BIT-EXACT           -  ok
+  MONO retrig       -20.2   BIT-EXACT           -  ok
+  UNISON pile       -23.1   BIT-EXACT           -  ok
+  chorus pad        -26.2   BIT-EXACT           -  ok
+  delay keys        -19.2   BIT-EXACT           -  ok
+  DCO noise         -28.5   BIT-EXACT           -  ok
+
+  6/6 agree with the PLUGIN (authority).
