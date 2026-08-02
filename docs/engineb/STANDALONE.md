@@ -107,3 +107,45 @@ Step 5 is the point. Everything before it exists so that the number is real.
   model overcharged 12,000 cyc/sample of calls that never execute.
 * No change to `src/`. It stays frozen and remains the proxy oracle; the plugin
   stays the authority.
+
+---
+
+## Observability of the three unwritten blocks — MEASURED 2026-08-02
+
+The project carries a standing warning (CLAUDE.md): the Chamberlin noise SVF was
+found to be **BLIND** to the scenario set — 15 of 18 assignments invisible — and
+the rule is that **no module may be rewritten behind a blind gate.** That warning
+predates the current 30-scenario set, so it was re-measured rather than assumed.
+
+Method: plant a 0.1 % relative error in the port itself and run all 30 scenarios.
+
+| block | src lines | scenarios reacting | worst residual |
+|---|---|---|---|
+| noise SVF | 1129-1149 | 6/30 | −72.6 dB |
+| CV/gate conditioning | 654-693 | **30/30** | +3.6 dB |
+| pitch table + DCO prep | 1641-1717 | **30/30** | +4.9 dB |
+
+**All three are observable. The standing blind-gate warning no longer applies to
+this scenario set**, and all three may be written.
+
+The noise SVF is the weakest of the three: a 0.1 % error reaches the output
+12.6 dB attenuated, so the −100 dB gate catches an error of about 2.3e-5 in that
+block. That is still far inside the standard, but it is the one to give a teeth
+bracket with real margin.
+
+### The probe defect this measurement hit, again
+
+The **first** run of this probe reported CV/gate and pitch as BLIND — EXACTLY 0,
+no scenario reacting. That was wrong, and the cause is the same one that has
+bitten this project repeatedly: the probe perturbed the **stored cell**
+(`JF(a1,464) = v28;` → `v28 * 1.001f`), and those cells are **DEAD STORES** —
+the live value flows on through the C local, so scaling what is written to
+memory changes nothing anyone reads.
+
+Perturbing the local instead (`v28 *= 1.001f;` before the store) moved every one
+of the thirty scenarios.
+
+**A store is not a signal.** An observability probe has to perturb the value that
+flows on, not the value that is filed away. Two blocks were one commit away from
+being declared untestable on the strength of a probe that could not have moved
+them.
