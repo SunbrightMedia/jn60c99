@@ -47,6 +47,33 @@
 
 #include <math.h>
 
+/* ------------------------------------------------- THE ONE OPTIONAL INEXACTNESS
+ * EB_DCO_RECIP replaces the pulse phase's DIVISION with a multiply by a
+ * reciprocal built once per sample. It is OFF by default and the default build
+ * of this module contains no approximation at all.
+ *
+ * Why it exists: the ESP32-S3 has no FPU divider, so GCC emits __divsf3, and
+ * this module performs 32 of them per audio sample (one per sub-block per
+ * voice). MEASURED-STATIC at 25..180 cycles each, that is 800..5,760 cycles per
+ * sample for one operation.
+ *
+ * What it costs in accuracy, MEASURED, not estimated -- tools/engineb/null_b.py
+ * --module dco with EB_DCO_RECIP=1, all 30 scenarios:
+ *     worst global residual  -121.1 dB   (gate -100 dB, 21 dB of margin)
+ *     worst block  residual  -115.2 dB   (gate  -80 dB, 35 dB of margin)
+ *     every scenario PASSES; the exact build is EXACTLY 0 on all 30.
+ * So it is a CHOSEN error with a written budget, which is what
+ * docs/trackb/ACCURACY_STANDARD.md requires, and it is not free: -121 dB is a
+ * real difference from the plugin where the default has none.
+ *
+ * What it BUYS, MEASURED: on the host, which has a hardware divide, nothing
+ * (5,184 -> 5,216 instructions per sample, i.e. noise). The whole saving is on
+ * the S3 and it is 16 of the 32 __divsf3 calls, so 400..2,880 cycles per sample.
+ * That does not change this module's verdict; see the header note below.       */
+#ifndef EB_DCO_RECIP
+#define EB_DCO_RECIP 0
+#endif
+
 /* ---------------------------------------------------------------- state
  * EIGHT BYTES per voice. The port spends five cells plus four shadow cells
  * (4640, 4656, 4672, 4832, 4848, 4864, 4880, 4896, 4912) = 144 bytes of address
@@ -78,7 +105,9 @@ typedef struct {
     float g;          /* 0.00390625f / inc                          port 4800 */
     float pw;         /* pulse width           port 4816 = 5520 + 3808        */
     float pwm1, pwp1; /* pw-1, pw+1                                           */
-    float rm1, rp1;   /* MEASUREMENT VARIANT ONLY: 1/pwm1, 1/pwp1             */
+#if EB_DCO_RECIP
+    float rm1, rp1;   /* 1/pwm1, 1/pwp1 -- the RECIPROCAL OPTION, below       */
+#endif
     /* per recall */
     float lvl_saw, lvl_pulse, lvl_sub;   /* port 4736, 4752, 4768             */
     float gn_saw,  gn_pulse,  gn_sub;    /* port 5648, 5664, 5680             */
@@ -98,6 +127,39 @@ typedef struct {
     float sat_hi;                        /* eb_sat(+sat_in)                   */
     float sat_lo;                        /* eb_sat(-sat_in)                   */
 } eb_dco_coef;
+
+/* ---------------------------------------------------------------- THE VERDICT
+ * THIS MODULE IS ACCURATE AND IT IS NOT AFFORDABLE. Reported here rather than
+ * in a document nobody opens.
+ *
+ * MEASURED (callgrind, host x86-64, all three waveform levels non-zero):
+ * 5,184 dynamic instructions per audio sample for the whole DCO -- 8 voices x
+ * 4 sub-samples -- of which 4,513 are in eb_dco_step, 141 per invocation, at
+ * rho 0.236. Three exact removals took that from 9,350: inlining the wrap,
+ * replacing fminf with a compare, and the clamp-constant hoist.
+ *
+ * MODELED from that measured density (tools/engineb/cost.py):
+ *     Cortex-M7   13,841 cyc/sample nominal, band  7,492..28,626
+ *     ESP32-S3    17,413 cyc/sample nominal, band 10,329..32,811
+ * The tool's band is pessimistic at the top -- it charges the 9 STATIC fmodf
+ * call sites at rho, and callgrind shows fmodf never executes at all. A floor
+ * built from the S3 static count instead (614 instructions x rho 0.236 = 145
+ * per invocation x 32 = 4,640 instructions/sample, at 1 cycle each, plus 32
+ * __divsf3 at 25..180) is about 5,400..10,400 cyc/sample.
+ *
+ * The budget left after the two ADSRs is ~2,300 cyc/sample. So the DCO alone is
+ * between 2.3x and 7.5x the WHOLE remaining budget, with the VCF, the mixers
+ * and all FX still unpaid. It is also 1.5x..5x the entire 3,500 budget.
+ *
+ * THE COST IS STRUCTURAL, NOT SLOPPY. 4x oversampling makes 32 invocations per
+ * sample, and each one carries three saturators, three triangles and a divide.
+ * The only lever large enough to matter is the OVERSAMPLING RATIO, and it is
+ * not a tuning knob: the 4x rate feeds the 26-tap polyphase FIR at
+ * src/voice_render.c:2137, so 2x would change the decimator, the aliasing and
+ * therefore the sound. Its error has NOT been measured and must not be guessed.
+ * That measurement is the next decision this module needs, and it belongs to
+ * whoever owns the accuracy/affordability trade, not to this file.
+ */
 
 /* One 4x-rate sub-sample. Call four times per host sample; the four results are
  * the four polyphase inputs, in order. */

@@ -111,7 +111,10 @@ void eb_dco_set_pitch(eb_dco_coef *c, float inc, float pw)
     c->pw   = pw;
     c->pwm1 = pw - 1.0f;
     c->pwp1 = pw + 1.0f;
-    c->rm1 = 1.0f / c->pwm1; c->rp1 = 1.0f / c->pwp1;
+#if EB_DCO_RECIP
+    c->rm1  = 1.0f / c->pwm1;
+    c->rp1  = 1.0f / c->pwp1;
+#endif
 }
 
 /* ---------------------------------------------------------------- the step */
@@ -147,8 +150,13 @@ float eb_dco_step(eb_dco_state *s, const eb_dco_coef *c)
     if (c->lvl_pulse != 0.0f) {
         t     = c->pw + p;
         sq    = eb_sgn(t);
+#if EB_DCO_RECIP
         e     = eb_clamp1(((eb_triangle(t * (t < 0.0f ? c->rm1 : c->rp1))
                             * c->g) * 256.0f) * c->amp_pulse);
+#else
+        e     = eb_clamp1(((eb_triangle(t / (t < 0.0f ? c->pwm1 : c->pwp1))
+                            * c->g) * 256.0f) * c->amp_pulse);
+#endif
         pulse = eb_sat_c(e, c) * (sq * c->gn_pulse);
     } else pulse = 0.0f;
 

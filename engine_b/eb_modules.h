@@ -26,7 +26,7 @@
 #define EB_HAVE_ALLOC   0   /* voice allocator: POLY / MONO / UNISON, LEGATO  */
 #define EB_HAVE_LFO     0   /* global LFO + delay envelope                    */
 #define EB_HAVE_NOISE   1   /* shared LFSR: PROVEN bit-identical, 200k samples */
-#define EB_HAVE_DCO     0   /* saw + pulse + sub + noise mix, PWM             */
+#define EB_HAVE_DCO     1   /* eb_dco.c: null 30/30 EXACTLY 0; wrap proven 2^32 */
 #define EB_HAVE_VCF     0   /* 4-pole low pass, resonance, key follow         */
 #define EB_HAVE_HPF     0   /* the JUNO's high pass, 4 TYPEs                  */
 #define EB_HAVE_ENV     1   /* ENV1 + ENV2: eb_envgen.c, null 30/30 EXACTLY 0 (ledger) */
