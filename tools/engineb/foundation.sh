@@ -112,10 +112,28 @@ else
         "     it still compiles into the candidate)."
 fi
 
+# ------------------------------------------------- 4b composite regeneration
+# The composite shim engine_b/shim/engine_all/ is GENERATED from the individual
+# shims. Regenerate it here, BEFORE anything is nulled, so a whole-engine run
+# can never test a composite built from an older version of a module. A
+# hand-merged composite would drift the first time one module was touched and
+# nobody would notice until a gate went quietly green on stale code.
+STEP="4b composite shim"
+say "$STEP" "regenerating engine_b/shim/engine_all from its members"
+python3 tools/engineb/merge_shims.py || die "the composite shim could not be generated" \
+    "The usual cause is OVERLAPPING SHIMS: two modules editing the same lines" \
+    "of the same port translation unit. The generator names both and refuses" \
+    "to choose between them." \
+    "FIX: rework one shim so the two edit regions are disjoint. Do NOT merge" \
+    "     them by hand without gating the result."
+
 # ---------------------------------------------------------------- 5 modules
 STEP="5 modules"
+# engine_all is EXCLUDED here: it is the generated composite and is run once,
+# explicitly, at the end of this step. Listing it as a per-module run would
+# double its cost and make the output read as if it were an eleventh module.
 MODS=$(ls engine_b/shim 2>/dev/null | while read -r m; do
-           [ -d "engine_b/shim/$m" ] && echo "$m"; done)
+           [ -d "engine_b/shim/$m" ] && [ "$m" != "engine_all" ] && echo "$m"; done)
 if [ -z "$MODS" ]; then
     say "$STEP" "no shim module exists yet -- nothing to null"
 else
@@ -144,6 +162,16 @@ else
             "     global / -80 dB block) are calibrated by the teeth battery" \
             "     in step 4 and moving one invalidates the other."
     done
+    # THE WHOLE ENGINE. Every per-module run above substitutes ONE translation
+    # unit, so none of them can see a module that is correct only inside the
+    # port's surrounding code. This step is the only one that can.
+    say "$STEP" "null_b --module all  (THE WHOLE ENGINE, every module at once)"
+    python3 tools/engineb/null_b.py --module all $Q || die "the WHOLE ENGINE diverged from the port" \
+        "Every module passed on its own and they fail together, so the defect" \
+        "is in how two modules INTERACT -- shared state, or an ordering the" \
+        "single-module runs never exercised." \
+        "FIX: bisect by regenerating the composite from a subset of members" \
+        "     (edit merge_shims.py's member scan), not by widening a threshold."
 fi
 
 # ---------------------------------------------------------------- 6 teeth (A/B)

@@ -146,15 +146,45 @@ def _copy_tree(dst):
     return dst
 
 
-def module_list():
+# The GENERATED composite (tools/engineb/merge_shims.py). It holds every
+# module's shim in one set of files, which is the only way a whole-engine run
+# can exist: shims are applied by file name, and six modules name the same port
+# translation unit, so asking for them together is a collision by construction.
+COMPOSITE = "engine_all"
+
+
+def module_list(include_composite=False):
+    """The individually gateable modules. The composite is EXCLUDED by default
+    -- it collides with every module it is built from, and including it in a
+    list meant for one-at-a-time runs is how `all` came to mean 'two of ten'."""
     root = os.path.join(REPO, "engine_b", "shim")
     if not os.path.isdir(root):
         return []
     return sorted(d for d in os.listdir(root)
-                  if os.path.isdir(os.path.join(root, d)))
+                  if os.path.isdir(os.path.join(root, d))
+                  and (include_composite or d != COMPOSITE))
 
 
 MODULES = module_list()
+
+
+def resolve_modules(mods):
+    """`all` means THE COMPOSITE, not 'every shim directory at once'.
+
+    It used to mean the latter, and because shims are applied by file name that
+    silently linked whichever module sorted last -- docs/engineb/
+    HARNESS_AUDIT.md F1. It now resolves to the one generated composite, which
+    contains every module's code in files that do not collide.
+    """
+    if list(mods) == ["all"]:
+        d = os.path.join(REPO, "engine_b", "shim", COMPOSITE)
+        if not os.path.isdir(d):
+            raise SystemExit(
+                "'--module all' needs the generated composite %s, which does "
+                "not exist.\n  WHAT TO DO: run tools/engineb/merge_shims.py "
+                "(make engineb runs it for you)." % COMPOSITE)
+        return [COMPOSITE]
+    return list(mods)
 
 
 def build(dst_so, modules=(), mutate=None, quiet=True):
@@ -748,7 +778,8 @@ def main():
     mods = ()
     if "--module" in a:
         m = a[a.index("--module") + 1]
-        mods = tuple(MODULES) if m == "all" else () if m == "none" else (m,)
+        mods = tuple(resolve_modules(["all"])) if m == "all" \
+            else () if m == "none" else (m,)
     print("=== ENGINE B NULL: oracle (src/, built fresh) vs engine B ===")
     print("gates: global <= %.0f dB rel, worst-1024-block <= %.0f dB rel; "
           "non-vacuity: ref RMS >= %.0f dBFS" % (THRESH_DB, BLOCK_THRESH_DB,

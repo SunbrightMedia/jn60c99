@@ -1,0 +1,1683 @@
+/* GENERATED FILE -- DO NOT EDIT.
+ * tools/engineb/merge_shims.py built this from the individual shims:
+ *     dco, env, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
+ * Edit those, then re-run the generator (make engineb does it).
+ * Its purpose: engine B cannot be tested as a WHOLE ENGINE while each
+ * module shadows the same port file -- see docs/engineb/HARNESS_AUDIT.md
+ * finding F1, where a composite build silently linked 2 modules of 10.
+ */
+/* ---- from shim 'dco' ---- */
+/* engine_b/shim/dco/voice_render.c — VERBATIM FORK of src/voice_render.c with
+ * ONE block replaced: the DCO oscillator, src/voice_render.c:1718-2136 (the
+ * four 4x-oversampled sub-blocks; the brief's 1718-1830 is sub-block one).
+ * Everything else in this file is the port's own code, byte for byte, so a
+ * divergence under tools/engineb/null_b.py --module dco is attributable to the
+ * DCO module and to nothing else. See engine_b/eb_dco.h.
+ */
+#include "eb_dco.h"     /* -I engine_b/ is supplied by the harness */
+
+/* ---- from shim 'env' ---- */
+/* engine_b/shim/env/voice_render.c — VERBATIM FORK of src/voice_render.c
+ * with ONE block replaced: the two ADSR envelope generators (module M7).
+ * Everything else in this file is the port's own code, byte for byte, so a
+ * divergence under tools/engineb/null_b.py --module env is attributable to the
+ * envelope module and to nothing else. See engine_b/eb_envgen.h.
+ */
+#include "eb_envgen.h"     /* -I engine_b/ is supplied by the harness */
+
+/* ---- from shim 'pwm_cv' ---- */
+/* engine_b/shim/pwm_cv/voice_render.c — VERBATIM FORK of src/voice_render.c
+ * with ONE range replaced: the pitch / PWM modulation CV block,
+ * src/voice_render.c:1076-1128, which is module M-MODCV
+ * (engine_b/eb_pwm_cv.{h,c}). Plus one line at the port's :2174 that hands the
+ * module its one-sample delay input. Nothing else in this file differs.
+ */
+#include "eb_pwm_cv.h"     /* -I engine_b/ is supplied by the harness */
+
+/* ENGINE B M-MODCV: file scope so the delay can be fed at the port's :2174,
+ * after the block that reads it. JUNO_NUM_VOICES comes from the port headers
+ * included below. */
+static eb_modcv_coef  EBMC[8];
+static float          EBMRAW[8][24];
+static int            EBMHAVE[8];
+
+/* ---- from shim 'vca_hpf' ---- */
+/* engine_b/shim/vca_hpf/voice_render.c — VERBATIM FORK of src/voice_render.c
+ * with ONE block replaced: the VCA + HPF output stage, lines 1516-1640, which
+ * is module M-VCA (engine_b/eb_vca_hpf.{h,c}). Diff this file against
+ * src/voice_render.c: that block and this include are the only changes, so a
+ * divergence under tools/engineb/null_b.py --module vca_hpf is attributable to
+ * the VCA/HPF stage and to nothing else.
+ */
+#include "eb_vca_hpf.h"        /* -I engine_b/ is supplied by the harness */
+
+/* ---- from shim 'vcf_cv' ---- */
+/* engine_b/shim/vcf_cv/voice_render.c — VERBATIM FORK of src/voice_render.c
+ * with ONE block replaced: the VCF cutoff CV summing network, lines 1150-1229,
+ * which is module M-VCFCV (engine_b/eb_vcf_cv.{h,c}). Diff this file against
+ * src/voice_render.c: that block and this include are the only changes, so a
+ * divergence under tools/engineb/null_b.py --module vcf_cv is attributable to
+ * the CV summing and to nothing else.
+ */
+#include "eb_vcf_cv.h"     /* -I engine_b/ is supplied by the harness */
+
+/* ---- from shim 'vcf_ladder' ---- */
+/* engine_b/shim/vcf_ladder/voice_render.c — VERBATIM FORK of src/voice_render.c
+ * with ONE block replaced: the 4-pole VCF ladder core, lines 1298-1515, which
+ * is module M-VCF (engine_b/eb_vcf_ladder.{h,c}). Diff this file against
+ * src/voice_render.c: that block and this include are the only changes, so a
+ * divergence under tools/engineb/null_b.py --module vcf_ladder is attributable
+ * to the ladder and to nothing else.
+ */
+#include "eb_vcf_ladder.h"     /* -I engine_b/ is supplied by the harness */
+
+/* The port's four dispersion lines are ONE 4x-oversampled history in engine B.
+ * (line, slot) -> delay:  A/B/C/D are delays 0/1/2/3 modulo 4, slot = delay/4.
+ * READ src/voice_render.c:1307-1334 (the shifts) and :1489-1511 (the folded
+ * FIR); the mapping is what makes those two agree. */
+#define EB_HCELL(i)  ( (((i) & 3) == 0 ? 8432 : ((i) & 3) == 1 ? 8560 : \
+                        ((i) & 3) == 2 ? 8688 : 8816) + 16 * ((i) >> 2) )
+
+/* voice_render.c — exact C99 transcription of sub_180369070 (Cloud 60 voice
+ * render). Generated first-pass by tools/translate_voice.py then finished by
+ * hand for the helper-call args (resolved from asm_dump) and SIMD idioms.
+ * The decompile in dsp_dump is the spec; coefficients live in the voice state
+ * (written by sub_1803990C0, see init_dump). Build with -fno-strict-aliasing.
+ */
+#include "juno_engine.h"
+#include "juno_dsp.h"
+#include "juno_tables.h"
+#include <math.h>
+#include <string.h>
+
+#define JU(st, off)  (*(uint32_t *)((unsigned char *)(st) + (off)))
+
+static inline float    f32_from_bits(uint32_t b){ float f; memcpy(&f,&b,4); return f; }
+static inline uint32_t bits_from_f32(float f){ uint32_t b; memcpy(&b,&f,4); return b; }
+
+/* Render one voice (0..7) of the 8-voice engine.
+ *
+ * The plugin compiled 8 specialised copies of this function (sub_180369070 =
+ * voice 0 .. sub_180383F20 = voice 7). Diffing their decompiled offset constants
+ * proves each copy is byte-identical modulo THREE region strides (derived, not
+ * guessed — see docs/POLYPHONY.md):
+ *   - main per-voice block  offsets [176,10672]  -> +voice*10512   (via a1 below)
+ *   - shared global block   offsets [84272,84432] -> +0 (all voices, chained)
+ *   - aux one-shot edge      offset 101504         -> +voice*32
+ * So this one exact transcription serves every voice: `a1` is the voice's main
+ * base (base + voice*10512), the 15 shared sites use `base` unshifted, and the 3
+ * aux sites use `base` at 101504+voice*32. voice==0 gives a1==base -> identical
+ * to the original voice-0 function bit-for-bit. Render voices in order 0..7 each
+ * sample so the shared block chains exactly as the plugin's 8 calls do. */
+uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *outR)
+{
+  /* PILOT 2: scratch-cell register promotion, SINGLE-TYPED cells only.
+   * These cells are written before read, never carry across samples, and are
+   * touched through exactly one of JF/JI -- so the int/float reinterpret hazard
+   * that broke pilot 1 (155 dual-typed cells) cannot arise. The memory STORE is
+   * kept so master_render/recall/probes are unaffected; only redundant RELOADS
+   * go away, which is what stalls an in-order M7 (measured IPC 0.44). Seeded
+   * from the cell so any control-flow path is safe. Bit-identical by
+   * construction; render A/B + fuzz are the proof. */
+  float _s4656 = _s4656;
+  float _s4784 = _s4784;
+  float _s4800 = _s4800;
+  float _s4816 = _s4816;
+  float _s4896 = _s4896;
+  float _s8336 = _s8336;
+  float _s8352 = _s8352;
+  float _s8368 = _s8368;
+  float _s8384 = _s8384;
+  float _s8400 = _s8400;
+  float _s8416 = _s8416;
+  float _s9008 = _s9008;
+  float _s9024 = _s9024;
+
+  float v2; // xmm4_4
+  float v5; // xmm0_4
+  float v6; // xmm1_4
+  float v7; // xmm2_4
+  int v8; // edx
+  int v9; // edx
+  int v10; // eax
+  float v11; // xmm3_4
+  float v12; // xmm6_4
+  int v13; // eax
+  float v14; // xmm8_4
+  int v15; // ecx
+  float v16; // xmm7_4
+  signed int v17; // edx
+  float v18; // xmm1_4
+  double v19; // xmm10_8
+  float v20; // xmm0_4
+  float v21; // xmm0_4
+  float v22; // xmm1_4
+  float v23; // xmm2_4
+  float v24; // xmm1_4
+  float v25; // xmm0_4
+  float v26; // xmm2_4
+  float v27; // xmm1_4
+  float v28; // xmm6_4
+  float v29; // xmm3_4
+  float v30; // xmm1_4
+  float v31; // xmm3_4
+  double v32; // xmm0_8
+  float v33; // xmm15_4
+  float v34; // xmm5_4
+  float v35; // xmm0_4
+  float v36; // xmm5_4
+  float v37; // xmm2_4
+  float v38; // xmm1_4
+  int v39; // eax
+  float v40; // xmm4_4
+  float v41; // xmm3_4
+  double v42; // xmm12_8
+  float v43; // xmm5_4
+  float v44; // xmm0_4
+  float v45; // xmm5_4
+  float v46; // xmm1_4
+  float v47; // xmm2_4
+  float v48; // xmm2_4
+  float v49; // xmm1_4
+  float v50; // xmm2_4
+  float v51; // xmm2_4
+  float v52; // xmm2_4
+  float v53; // xmm1_4
+  double v54; // xmm0_8
+  float v55; // xmm1_4
+  float v56; // xmm1_4
+  float v57; // xmm7_4
+  float v58; // xmm0_4
+  float v59; // xmm2_4
+  int v60; // xmm9_4
+  float v61; // xmm7_4
+  int v62; // xmm8_4
+  int v63; // eax
+  float v64; // xmm7_4
+  float v65; // xmm1_4
+  int v66; // eax
+  float v67; // xmm0_4
+  float v68; // xmm2_4
+  float v69; // xmm1_4
+  float v70; // xmm2_4
+  double v71; // xmm0_8
+  float v72; // xmm1_4
+  double v73; // xmm0_8
+  float v74; // xmm6_4
+  float v75; // xmm0_4
+  float v76; // xmm1_4
+  float v77; // xmm0_4
+  float v78; // xmm3_4
+  float v79; // xmm7_4
+  float v80; // xmm2_4
+  float v81; // xmm4_4
+  int v82; // eax
+  float v83; // xmm1_4
+  float v84; // xmm0_4
+  float v85; // xmm7_4
+  float v86; // xmm7_4
+  float v87; // xmm6_4
+  float v88; // xmm6_4
+  float v89; // xmm0_4
+  float v90; // xmm0_4
+  float v91; // xmm6_4
+  float v92; // xmm2_4
+  float v93; // xmm6_4
+  float v94; // xmm1_4
+  float v95; // xmm11_4
+  float v96; // xmm0_4
+  float v97; // xmm0_4
+  float v98; // xmm6_4
+  double v99; // xmm1_8
+  float v100; // xmm0_4
+  float v101; // xmm7_4
+  float v102; // xmm7_4
+  float v103; // xmm8_4
+  float v104; // xmm0_4
+  float v105; // xmm8_4
+  float v106; // xmm0_4
+  float v107; // xmm8_4
+  float v108; // xmm7_4
+  float v109; // xmm0_4
+  float v110; // xmm7_4
+  float v111; // xmm0_4
+  float v112; // xmm6_4
+  float v113; // xmm7_4
+  float v114; // xmm6_4
+  float v115; // xmm4_4
+  float v116; // xmm3_4
+  float v117; // xmm6_4
+  float v118; // xmm4_4
+  float v119; // xmm2_4
+  float v120; // xmm3_4
+  float v121; // xmm4_4
+  int v122; // xmm0_4
+  float v123; // xmm0_4
+  float v124; // xmm1_4
+  float v125; // xmm8_4
+  float v126; // xmm5_4
+  float v127; // xmm7_4
+  float v128; // xmm4_4
+  float v129; // xmm7_4
+  float v130; // xmm6_4
+  float v131; // xmm2_4
+  float v132; // xmm3_4
+  float v133; // xmm4_4
+  float v134; // xmm3_4
+  float v135; // xmm5_4
+  float v136; // xmm7_4
+  float v137; // xmm4_4
+  float v138; // xmm0_4
+  float v139; // xmm3_4
+  float v140; // xmm5_4
+  float v141; // xmm2_4
+  float v142; // xmm3_4
+  float v143; // xmm3_4
+  float v144; // xmm0_4
+  float v145; // xmm0_4
+  float v146; // xmm1_4
+  float v147; // xmm8_4
+  float v148; // xmm5_4
+  float v149; // xmm6_4
+  float v150; // xmm4_4
+  float v151; // xmm6_4
+  float v152; // xmm7_4
+  float v153; // xmm0_4
+  float v154; // xmm2_4
+  float v155; // xmm4_4
+  float v156; // xmm3_4
+  float v157; // xmm5_4
+  float v158; // xmm6_4
+  float v159; // xmm4_4
+  float v160; // xmm0_4
+  float v161; // xmm3_4
+  float v162; // xmm5_4
+  float v163; // xmm2_4
+  float v164; // xmm3_4
+  float v165; // xmm3_4
+  float v166; // xmm0_4
+  float v167; // xmm0_4
+  float v168; // xmm8_4
+  float v169; // xmm8_4
+  float v170; // xmm7_4
+  int v171; // xmm1_4
+  int v172; // xmm2_4
+  int v173; // xmm0_4
+  float v174; // xmm4_4
+  float v175; // xmm5_4
+  float v176; // xmm7_4
+  float v177; // xmm4_4
+  float v178; // xmm2_4
+  float v179; // xmm3_4
+  float v180; // xmm7_4
+  float v181; // xmm6_4
+  float v182; // xmm5_4
+  float v183; // xmm0_4
+  float v184; // xmm3_4
+  float v185; // xmm6_4
+  float v186; // xmm3_4
+  int v187; // xmm0_4
+  float v188; // xmm2_4
+  int v189; // xmm0_4
+  float v190; // xmm4_4
+  float v191; // xmm2_4
+  float v192; // xmm3_4
+  float v193; // xmm0_4
+  float v194; // xmm3_4
+  float v195; // xmm4_4
+  float v196; // xmm1_4
+  float v197; // xmm1_4
+  float v198; // xmm1_4
+  float v199; // xmm0_4
+  float v200; // xmm4_4
+  float v201; // xmm0_4
+  double v202; // xmm0_8
+  float v203; // xmm1_4
+  float v204; // xmm0_4
+  float v205; // xmm1_4
+  float v206; // xmm0_4
+  float v207; // xmm1_4
+  float v208; // xmm0_4
+  float v209; // xmm3_4
+  float v210; // xmm2_4
+  float v211; // xmm3_4
+  float v212; // xmm0_4
+  float v213; // xmm3_4
+  float v214; // xmm1_4
+  float v215; // xmm0_4
+  float v216; // xmm0_4
+  float v217; // xmm7_4
+  float v218; // xmm7_4
+  float v219; // xmm1_4
+  float v220; // xmm0_4
+  float v221; // xmm7_4
+  float v222; // xmm4_4
+  float v223; // xmm5_4
+  float v224; // xmm6_4
+  float v225; // xmm0_4
+  float v226; // xmm3_4
+  float v227; uint32_t v227_bits;
+  float v228; // xmm7_4
+  float v229; // xmm8_4
+  float v230; // xmm0_4
+  float v231; // xmm6_4
+  float v232; // xmm6_4
+  float v233; // xmm2_4
+  float v234; // xmm1_4
+  int v235; // ecx
+  float v236; // xmm9_4
+  float v237; // xmm6_4
+  float v238; // xmm4_4
+  float v239; // xmm3_4
+  float v240; // xmm8_4
+  float v241; // xmm8_4
+  float v242; // xmm1_4
+  float v243; // xmm9_4
+  float v244; // xmm0_4
+  float v245; // xmm6_4
+  float v246; // xmm6_4
+  float v247; // xmm3_4
+  float v248; // xmm1_4
+  float v249; // xmm5_4
+  float v250; // xmm5_4
+  float v251; // xmm2_4
+  float v252; // xmm1_4
+  float v253; // xmm0_4
+  float v254; // xmm5_4
+  float v255; // xmm5_4
+  float v256; // xmm5_4
+  float v257; // xmm3_4
+  float v258; // xmm4_4
+  float v259; // xmm1_4
+  float v260; // xmm3_4
+  float v261; // xmm4_4
+  float v262; // xmm3_4
+  float v263; // xmm5_4
+  float v264; // xmm2_4
+  float v265; // xmm5_4
+  float v266; // xmm4_4
+  float v267; // xmm2_4
+  float v268; // xmm5_4
+  float v269; // xmm0_4
+  float v270; // xmm5_4
+  float v271; // xmm5_4
+  float v272; // xmm5_4
+  float v273; // xmm5_4
+  float v274; // xmm1_4
+  float v275; // xmm3_4
+  float v276; // xmm4_4
+  float v277; // xmm1_4
+  float v278; // xmm3_4
+  float v279; // xmm4_4
+  float v280; // xmm3_4
+  float v281; // xmm5_4
+  float v282; // xmm2_4
+  float v283; // xmm5_4
+  float v284; // xmm1_4
+  float v285; // xmm4_4
+  float v286; // xmm2_4
+  float v287; // xmm5_4
+  float v288; // xmm0_4
+  float v289; // xmm5_4
+  float v290; // xmm5_4
+  float v291; // xmm5_4
+  float v292; // xmm5_4
+  float v293; // xmm1_4
+  float v294; // xmm3_4
+  float v295; // xmm4_4
+  float v296; // xmm1_4
+  float v297; // xmm3_4
+  float v298; // xmm4_4
+  float v299; // xmm3_4
+  float v300; // xmm5_4
+  float v301; // xmm2_4
+  float v302; // xmm5_4
+  float v303; // xmm3_4
+  float v304; // xmm1_4
+  float v305; // xmm5_4
+  float v306; // xmm0_4
+  float v307; // xmm5_4
+  float v308; // xmm5_4
+  float v309; // xmm5_4
+  float v310; // xmm5_4
+  float v311; // xmm3_4
+  float v312; // xmm4_4
+  float v313; // xmm1_4
+  float v314; // xmm3_4
+  float v315; // xmm4_4
+  float v316; // xmm3_4
+  float v317; // xmm5_4
+  float v318; // xmm2_4
+  float v319; // xmm5_4
+  float v320; // xmm8_4
+  float v321; // xmm3_4
+  float v322; // xmm4_4
+  float v323; // xmm5_4
+  float v324; // xmm5_4
+  float v325; // xmm0_4
+  float v326; // xmm4_4
+  int v327; // xmm0_4
+  float v328; // xmm2_4
+  float v329; // xmm0_4
+  float v330; // xmm2_4
+  float v331; // xmm2_4
+  float v332; // xmm1_4
+  float v333; // xmm3_4
+  double v334; // xmm0_8
+  float v335; // xmm0_4
+  float v336; // xmm1_4
+  float v337; // xmm2_4
+  float v338; // xmm3_4
+  double v339; // xmm0_8
+  float v340; // xmm0_4
+  float v341; // xmm5_4
+  float v342; // xmm6_4
+  float v343; // xmm4_4
+  float v344; // xmm3_4
+  float v345; // xmm4_4
+  float v346; // xmm2_4
+  float v347; // xmm0_4
+  float v348; // xmm7_4
+  float v349; // xmm6_4
+  float v350; // xmm3_4
+  int v351; // xmm0_4
+  int v352; // xmm1_4
+  float v353; // xmm4_4
+  float v354; // xmm2_4
+  float v355; // xmm3_4
+  float v356; // xmm1_4
+  float v357; // xmm6_4
+  float v358; // xmm4_4
+  float v359; // xmm3_4
+  float v360; // xmm1_4
+  float v361; // xmm6_4
+  float v362; // xmm1_4
+  float v363; // xmm7_4
+  double v364; // xmm0_8
+  float v365; // xmm4_4
+  float v366; // xmm5_4
+  float v367; // xmm5_4
+  float v368; // xmm6_4
+  float v369; // xmm2_4
+  float v370; // xmm3_4
+  float v371; // xmm4_4
+  float v372; // xmm0_4
+  float v373; // xmm1_4
+  float v374; // xmm4_4
+  float v375; // xmm2_4
+  float v376; // xmm6_4
+  float v377; // xmm5_4
+  float v378; // xmm4_4
+  double v379; // xmm0_8
+  float v380; // xmm3_4
+  float v381; // xmm3_4
+  float v382; // xmm1_4
+  float v383; // xmm2_4
+  float v384; // xmm2_4
+  double v385; // xmm12_8
+  double v386; int v386_lo;
+  const double *v387;
+  double v388; // xmm4_8
+  double v389; // xmm8_8
+  double v390; // xmm10_8
+  float v391; // xmm3_4
+  float v392; // xmm5_4
+  int v393; // xmm0_4
+  int v394; // xmm1_4
+  float v395; // xmm5_4
+  float v396; // xmm3_4
+  float v397; // xmm0_4
+  float v398; // xmm2_4
+  float v399; // xmm5_4
+  double v400; // xmm0_8
+  float v401; // xmm6_4
+  int v402; // xmm1_4
+  float v403; // xmm6_4
+  float v404; // xmm7_4
+  double v405; // xmm0_8
+  float v406; // xmm5_4
+  float v407; // xmm5_4
+  float v408; // xmm5_4
+  float v409; // xmm0_4
+  float v410; // xmm3_4
+  float v411; // xmm4_4
+  float v412; // xmm0_4
+  float v413; // xmm6_4
+  float v414; // xmm8_4
+  float v415; // xmm6_4
+  double v416; // xmm0_8
+  float v417; // xmm4_4
+  float v418; // xmm0_4
+  float v419; // xmm7_4
+  float v420; // xmm4_4
+  float v421; // xmm4_4
+  float v422; // xmm4_4
+  float v423; // xmm7_4
+  float v424; // xmm9_4
+  double v425; // xmm0_8
+  float v426; // xmm7_4
+  float v427; // xmm8_4
+  float v428; // xmm8_4
+  float v429; // xmm8_4
+  float v430; // xmm6_4
+  int v431; // xmm5_4
+  float v432; // xmm6_4
+  float v433; // xmm7_4
+  double v434; // xmm0_8
+  float v435; // xmm5_4
+  float v436; // xmm5_4
+  float v437; // xmm5_4
+  float v438; // xmm0_4
+  float v439; // xmm3_4
+  float v440; // xmm4_4
+  float v441; // xmm0_4
+  float v442; // xmm6_4
+  float v443; // xmm8_4
+  float v444; // xmm6_4
+  double v445; // xmm0_8
+  float v446; // xmm4_4
+  float v447; // xmm0_4
+  float v448; // xmm7_4
+  float v449; // xmm4_4
+  float v450; // xmm4_4
+  float v451; // xmm4_4
+  float v452; // xmm7_4
+  float v453; // xmm9_4
+  double v454; // xmm0_8
+  float v455; // xmm7_4
+  float v456; // xmm8_4
+  float v457; // xmm8_4
+  float v458; // xmm8_4
+  float v459; // xmm6_4
+  int v460; // xmm5_4
+  float v461; // xmm6_4
+  float v462; // xmm7_4
+  double v463; // xmm0_8
+  float v464; // xmm5_4
+  float v465; // xmm5_4
+  float v466; // xmm5_4
+  float v467; // xmm0_4
+  float v468; // xmm3_4
+  float v469; // xmm4_4
+  float v470; // xmm0_4
+  float v471; // xmm6_4
+  float v472; // xmm8_4
+  float v473; // xmm6_4
+  double v474; // xmm0_8
+  float v475; // xmm4_4
+  float v476; // xmm0_4
+  float v477; // xmm7_4
+  float v478; // xmm4_4
+  float v479; // xmm4_4
+  float v480; // xmm4_4
+  float v481; // xmm7_4
+  float v482; // xmm9_4
+  double v483; // xmm0_8
+  float v484; // xmm7_4
+  float v485; // xmm8_4
+  float v486; // xmm8_4
+  float v487; // xmm8_4
+  float v488; // xmm6_4
+  int v489; // xmm5_4
+  float v490; // xmm6_4
+  float v491; // xmm7_4
+  double v492; // xmm0_8
+  float v493; // xmm5_4
+  float v494; // xmm5_4
+  float v495; // xmm5_4
+  float v496; // xmm0_4
+  float v497; // xmm3_4
+  float v498; // xmm4_4
+  float v499; // xmm0_4
+  float v500; // xmm6_4
+  float v501; // xmm8_4
+  float v502; // xmm6_4
+  double v503; // xmm0_8
+  float v504; // xmm4_4
+  float v505; // xmm0_4
+  float v506; // xmm7_4
+  float v507; // xmm4_4
+  float v508; // xmm4_4
+  float v509; // xmm4_4
+  float v510; // xmm7_4
+  float v511; // xmm8_4
+  float v512; // xmm0_4
+  float v513; // xmm7_4
+  float v514; // xmm0_4
+  float v515; // xmm15_4
+  int v516; // xmm5_4
+  int v517; // xmm6_4
+  float v518; // xmm2_4
+  float v519; // xmm5_4
+  float v520; // xmm2_4
+  float v521; // xmm4_4
+  float v522; // xmm5_4
+  float v523; // xmm1_4
+  float v524; // xmm5_4
+  float v525; // xmm3_4
+  float v526; // xmm4_4
+  uint32_t result;
+  int v528; // [rsp+D0h] [rbp+8h]
+  float v529; // [rsp+E0h] [rbp+18h]
+
+  /* Per-voice region bases (see the header comment above). */
+  unsigned char *a1 = base + (unsigned)voice * JUNO_VOICE_MAIN_STRIDE;
+  unsigned auxoff  = JUNO_VOICE_AUX_BASE0 + (unsigned)voice * JUNO_VOICE_AUX_STRIDE;
+
+  v2 = JF(a1, 320);
+  v528 = 0;
+  if ( JF(base, auxoff) == 1.0 )
+  {
+    v528 = JI(a1, 320);
+    v2 = 0.0;
+    JI(a1, 320) = 0;
+  }
+  v5 = JF(base, 84336);
+  v6 = JF(base, 84272);
+  v7 = JF(base, 84304);
+  JF(base, 84352) = v5;
+  JF(base, 84288) = v6;
+  JF(base, 84320) = v7;
+  v8 = (int)(float)(v5 * -16777216.0);
+  if ( !v8 )
+  {
+    v9 = 1;
+    goto LABEL_11;
+  }
+  v10 = v8 & 0x200000;
+  if ( (v8 & 0x800000) != 0 )
+  {
+    if ( !v10 )
+    {
+      v9 = 2 * v8;
+      goto LABEL_11;
+    }
+  }
+  else if ( v10 )
+  {
+    v9 = 2 * v8;
+    goto LABEL_11;
+  }
+  v9 = 2 * v8 + 1;
+LABEL_11:
+  v11 = JF(a1, 208);
+  v12 = JF(a1, 176);
+  v13 = v9 & 0xFFFFFF;
+  v14 = JF(a1, 368);
+  v15 = v9;
+  v16 = JF(a1, 384);
+  v17 = v9 | 0xFF000000;
+  v18 = v6 * v7;
+  JI(a1, 432) = 0;
+  JF(a1, 224) = v11;
+  v19 = 0.0;
+  if ( (v15 & 0x1000000) == 0 )
+    v17 = v13;
+  JF(a1, 192) = v12;
+  JI(base, 84384) = JI(base, 84368);
+  JI(a1, 512) = JI(a1, 496);
+  JF(a1, 352) = v2;
+  v20 = (float)v17 * 0.000000059604645;
+  JF(a1, 400) = v14;
+  JF(a1, 416) = v16;
+  JF(base, 84336) = v20;
+  v21 = (float)(v20 * JF(base, 84400)) + JF(base, 84416);
+  JF(base, 84368) = v21;
+  v22 = v18 - (float)(v7 * v21);
+  v23 = JF(a1, 272);
+  JF(a1, 288) = v23;
+  v24 = v22 + v21;
+  v25 = JF(a1, 240);
+  v26 = v23 * v25;
+  JF(a1, 256) = v25;
+  JF(base, 84432) = v24;
+  v27 = JF(a1, 304);
+  JF(a1, 336) = v27;
+  JF(a1, 448) = v26;
+  v28 = (float)((float)(v12 * v26) - (float)(v26 * v27)) + v27;
+  v29 = (float)((float)(v11 * v26) - (float)(v2 * v26)) + v2;
+  JF(a1, 464) = v28;
+  JF(a1, 480) = v29;
+  v30 = v29;
+  v31 = v29 + JF(a1, 544);
+  if ( v31 < 0.0 )
+    v32 = v31;
+  else
+    v32 = 0.0;
+  v33 = -1.0;
+  if ( v30 == 0.0 )
+    v34 = -1.0;
+  else
+    v34 = v32;
+  JF(a1, 496) = v34;
+  if ( v34 >= 0.0 )
+  {
+    if ( v34 > 0.0 )
+      v34 = 1.0;
+  }
+  else
+  {
+    v34 = -1.0;
+  }
+  v35 = JF(a1, 608);
+  v36 = v34 + 1.0;
+  v37 = JF(a1, 768);
+  v38 = JF(a1, 624);
+  v39 = JI(a1, 560);
+  v40 = JF(a1, 704);
+  v41 = v38 + JF(a1, 784);
+  v42 = 1.0;
+  JF(a1, 528) = v36;
+  JF(a1, 560) = v36;
+  JI(a1, 576) = v39;
+  JF(a1, 720) = v40;
+  v43 = (float)(v36 * v35) - v35;
+  v44 = JF(a1, 816);
+  v45 = (float)(v43 + 1.0) * JF(a1, 592);
+  v46 = (float)(JF(a1, 672) / (float)((float)(v37 * v38) + JF(a1, 800))) * v37;
+  v47 = JF(a1, 656);
+  JF(a1, 736) = v45;
+  v48 = v47 - v46;
+  v49 = JF(a1, 688);
+  v50 = (float)(v48 + v28) - v40;
+  JF(a1, 656) = v50;
+  v51 = v50 * v41;
+  JF(a1, 672) = v51;
+  v52 = v51 + v40;
+  if ( (float)(v44 - fabs(v40 - v28)) < 0.0 )
+  {
+    v53 = 0.0;
+LABEL_25:
+    v54 = v53;
+    goto LABEL_26;
+  }
+  v53 = v49 + JF(a1, 832);
+  if ( v53 < 1.0 )
+    goto LABEL_25;
+  v54 = 1.0;
+LABEL_26:
+  v55 = v54;
+  JF(a1, 688) = v55;
+  v56 = (float)((float)(v55 * v28) - (float)(v55 * v52)) + v52;
+  if ( v45 == 0.0 )
+    v56 = v28;
+  v57 = v16 * JF(a1, 864);
+  JI(a1, 896) = JI(a1, 880);
+  v58 = JF(a1, 1168);
+  v59 = JF(a1, 912);
+  v60 = JI(a1, 1008);
+  v61 = v57 + (float)(v14 * JF(a1, 848));
+  v62 = JI(a1, 976);
+  v63 = (int)v58;
+  JF(a1, 880) = v61;
+  v64 = JF(a1, 944);
+  JF(a1, 704) = v56;
+  JF(a1, 752) = v56;
+  v65 = JF(a1, 1104);
+  JF(a1, 960) = v64;
+  JF(a1, 928) = v59;
+  JI(a1, 992) = v62;
+  JI(a1, 1024) = v60;
+  JF(a1, 1120) = v65;
+  if ( (int)v58 < -32 )
+  {
+    v59 = v59 * 2.3283064e-10;
+    goto LABEL_38;
+  }
+  if ( v63 > 32 )
+  {
+    v63 = 32;
+LABEL_37:
+    v59 = v59 * juno_exp_ad3c[v63];
+    goto LABEL_38;
+  }
+  if ( v63 < 0 )
+  {
+    v59 = v59 * juno_exp_acc0[~v63];
+    goto LABEL_38;
+  }
+  if ( v63 > 0 )
+    goto LABEL_37;
+LABEL_38:
+  v66 = (int)(float)-v58;
+  if ( v66 < -32 )
+  {
+    v59 = v59 * 2.3283064e-10;
+    goto LABEL_46;
+  }
+  if ( v66 > 32 )
+  {
+    v66 = 32;
+LABEL_45:
+    v59 = v59 * juno_exp_ad3c[v66];
+    goto LABEL_46;
+  }
+  if ( v66 < 0 )
+  {
+    v59 = v59 * juno_exp_acc0[~v66];
+    goto LABEL_46;
+  }
+  if ( v66 > 0 )
+    goto LABEL_45;
+LABEL_46:
+  v67 = JF(a1, 1040);
+  v68 = (float)((float)(v59 - v65) * JF(a1, 1152)) + v65;
+  v69 = JF(a1, 1088);
+  JF(a1, 1104) = v68;
+  v70 = (float)((float)(v68 * v67) - (float)(v67 * v69)) + v69;
+  if ( v70 <= 0.0 )
+    v71 = 0.0;
+  else
+    v71 = v70;
+  v72 = v71;
+  if ( v72 < 1.0 )
+    v73 = v72;
+  else
+    v73 = 1.0;
+  v74 = JF(a1, 1056);
+  v75 = expf((float)v73 * JF(a1, 1200)) * JF(a1, 1184);
+  v76 = v74 * JF(a1, 1072);
+  JI(a1, 1584) = JI(a1, 1568);
+  v77 = v75 + JF(a1, 1216);
+  v78 = JF(a1, 1504);
+  v79 = v64 * JF(a1, 1904);
+  JI(a1, 1616) = JI(a1, 1600);
+  v80 = JF(a1, 1488);
+  v81 = JF(a1, 1536);
+  JI(a1, 1648) = JI(a1, 1632);
+  v82 = JI(base, 84432);
+  JF(a1, 1520) = v78;
+  JF(a1, 1504) = v80;
+  JF(a1, 1552) = v81;
+  JI(a1, 1440) = v62;
+  JI(a1, 1456) = v60;
+  JI(a1, 1424) = v82;
+  v83 = (float)(v76 - (float)(v74 * v77)) + v77;
+  v84 = JF(a1, 1856);
+  v85 = v79 + v84;
+  JF(a1, 1840) = v84;
+  JF(a1, 1136) = v83;
+  if ( v85 >= -1.0 )
+    v86 = fminf(v85, 1.0);
+  else
+    v86 = -1.0;
+  v87 = JF(a1, 2128);
+  JF(a1, 1488) = v86;
+  v88 = fminf(v87, v83 * 0.000015258789);
+  v89 = (float)((float)(1.0 - v78) * JF(a1, 1920)) + v78;
+  if ( v89 >= -1.0 )
+    v90 = fminf(v89, 1.0);
+  else
+    v90 = -1.0;
+  v91 = v88 * JF(a1, 2144);
+  v92 = v80 - v86;
+  JF(a1, 1664) = v91;
+  v93 = v91 + v81;
+  if ( v92 < 0.0 )
+    v90 = 0.0;
+  v94 = JF(a1, 1872);
+  v95 = JF(a1, 1424);
+  JF(a1, 1504) = v90;
+  v96 = v90 + JF(a1, 2272);
+  if ( v92 >= 0.0 )
+    v94 = 1.0;
+  v97 = v96 * JF(a1, 2256);
+  v98 = (float)(v93 * v94) * JF(a1, 1888);
+  if ( v97 <= 0.0 )
+    v99 = 0.0;
+  else
+    v99 = v97;
+  v100 = v99;
+  v101 = (float)((float)(v95 - JF(a1, 1584)) * JF(a1, 2464)) + JF(a1, 1584);
+  JF(a1, 1568) = v101;
+  JF(a1, 1472) = v100;
+  v529 = JF(a1, 1552);
+  v102 = (float)((float)((float)(v101 * JF(a1, 2448)) * JF(a1, 2064))
+               - (float)(v95 * JF(a1, 2064)))
+       + v95;
+  if ( v98 <= 1.0 )
+  {
+    if ( v98 < -1.0 )
+      v98 = fmodf(v98 - 1.0, 2.0) + 1.0;
+  }
+  else
+  {
+    v98 = fmodf(v98 + 1.0, 2.0) - 1.0;
+  }
+  v103 = JF(a1, 1616);
+  JF(a1, 1536) = v98;
+  v104 = v98 + JF(a1, 2288);
+  JF(a1, 1408) = v102 * JF(a1, 2432);
+  if ( v529 < 0.0 && v98 > 0.0 )
+    v103 = v95;
+  if ( v104 <= 1.0 )
+  {
+    if ( v104 < -1.0 )
+      v104 = fmodf(v104 - 1.0, 2.0) + 1.0;
+  }
+  else
+  {
+    v104 = fmodf(v104 + 1.0, 2.0) - 1.0;
+  }
+  JF(a1, 1600) = v103;
+  v105 = v103 * JF(a1, 2416);
+  v106 = (float)(v104 * JF(a1, 2352)) + JF(a1, 2480);
+  JF(a1, 1680) = v106;
+  JF(a1, 1760) = v105;
+  v107 = v98 + JF(a1, 2320);
+  JF(a1, 1696) = -v106;
+  if ( v107 <= 1.0 )
+  {
+    if ( v107 < -1.0 )
+      fmodf(v107 - 1.0, 2.0);
+  }
+  else
+  {
+    fmodf(v107 + 1.0, 2.0);
+  }
+  /* v107 (= v98 + cell2320) is the sub-osc TRIANGLE phase; its wrap is folded
+   * into juno_triangle below (the decompiler dropped the sub_180368FC0 argument,
+   * so an earlier transcription mis-fed v108 here — masked in recalled notes,
+   * where cells 2304 and 2320 coincide, but wrong for the free-running idle phase,
+   * where they differ by −0.5 and produced a half-cycle sub-osc error). v108
+   * (= v98 + cell2304) remains the PULSE phase used for v110. See
+   * dsp_dump/0021 lines 860-883 + docs/PHASE1_WARM_RECALL.md. */
+  v108 = v98 + JF(a1, 2304);
+  if ( v108 <= 1.0 )
+  {
+    if ( v108 < -1.0 )
+      v108 = fmodf(v108 - 1.0, 2.0) + 1.0;
+  }
+  else
+  {
+    v108 = fmodf(v108 + 1.0, 2.0) - 1.0;
+  }
+  v109 = juno_triangle(v107);
+  v110 = v108 + JF(a1, 2496);
+  v111 = v109 * JF(a1, 2384);
+  if ( v110 >= 0.0 )
+  {
+    if ( v110 > 0.0 )
+      v110 = 1.0;
+  }
+  else
+  {
+    v110 = -1.0;
+  }
+  v112 = v98 + JF(a1, 2336);
+  JF(a1, 1728) = v111;
+  JF(a1, 1824) = v110;
+  v113 = (float)(v110 * JF(a1, 2368)) + JF(a1, 2512);
+  if ( v112 <= 1.0 )
+  {
+    if ( v112 < -1.0 )
+      v112 = fmodf(v112 - 1.0, 2.0) + 1.0;
+  }
+  else
+  {
+    v112 = fmodf(v112 + 1.0, 2.0) - 1.0;
+  }
+  v114 = fabs(v112);
+  JF(a1, 1712) = v113;
+  v115 = JF(a1, 1968);
+  v116 = (float)((float)(JF(a1, 2032) * JF(a1, 1760))
+               + (float)(JF(a1, 2000) * JF(a1, 1680)))
+       + (float)(JF(a1, 2016) * JF(a1, 1696));
+  v117 = (float)((float)((float)((float)(v114 * (float)((float)(v114 * v114) * v114)) * JF(a1, 2224))
+                       + (float)((float)((float)((float)(v114 * v114) * v114) * JF(a1, 2208))
+                               + (float)((float)((float)(v114 * JF(a1, 2176)) + JF(a1, 2160))
+                                       + (float)((float)(v114 * v114) * JF(a1, 2192)))))
+               + JF(a1, 2240))
+       * JF(a1, 2400);
+  JF(a1, 1744) = v117;
+  v118 = (float)(v115 * JF(a1, 1728)) + v116;
+  v119 = JF(a1, 2080);
+  v120 = (float)((float)(JF(a1, 1936) * JF(a1, 1472)) - JF(a1, 1936)) + 1.0;
+  v121 = (float)((float)(v118 + (float)(JF(a1, 1984) * JF(a1, 1712)))
+               + (float)(v117 * JF(a1, 1952)))
+       + (float)(JF(a1, 2048) * JF(a1, 1408));
+  JF(a1, 1776) = v120;
+  JF(a1, 1808) = v121;
+  JF(a1, 1792) = (float)((float)(JF(a1, 2096) * JF(a1, 1440))
+                                + (float)(JF(a1, 2112) * JF(a1, 1456)))
+                        + (float)((float)(v119 * v120) * v121);
+  /* ================= ENGINE B MODULE M7 — the two ADSR envelopes ==========
+   * REPLACES src/voice_render.c:964-1075 verbatim. Diff this file against
+   * src/voice_render.c: this block is the ONLY change, plus the include above.
+   *
+   * The port's 111 lines here do three separable things: shuffle ten shadow
+   * cells so that last sample's values can be read back, recompute six
+   * loop-invariant products from cells that only a patch recall can change, and
+   * run two identical ADSR state machines. Engine B keeps the third and deletes
+   * the first two. eb_envgen.c holds the arithmetic; this block is only the
+   * plumbing that connects it to the port's cells.
+   *
+   * STATE LIVES IN THE PORT'S OWN STATE CELLS (2592/2624/2640/2672/2720 and the
+   * +480 ENV2 twins) rather than in a static of this file. That is deliberate
+   * and it is not laziness: those five cells are zeroed at power-on by
+   * chorus_init.c:118-127 and replicated per voice, so using them gives the
+   * module the port's exact lifecycle -- create, destroy, re-create, eight
+   * voices -- with no ownership question for the harness to get wrong.
+   * engine_b/shim/README.md sanctions exactly this ("a shim may read and write
+   * the port's cells"). The <1 KB/voice layout arrives when the module owns the
+   * whole voice; the CYCLE claim is measured on eb_envgen.c itself, never here.
+   *
+   * The TEN shadow cells (2608/2656/2688/2736 + ENV2 twins, and 2576/3056) and
+   * the four write-only outputs (2528/2544/2768/3248) are NOT written. GREPPED:
+   * no reader outside this block anywhere in src/ or gui/. Audio is unaffected;
+   * per-cell state parity is not, and that is a sonic-identity claim.
+   */
+  {
+    static eb_env_coef  EBC[JUNO_NUM_VOICES][2];
+    static float        EBRAW[JUNO_NUM_VOICES][2][15];
+    static int          EBHAVE[JUNO_NUM_VOICES][2];
+    int ei;
+
+    for ( ei = 0; ei < 2; ++ei )
+    {
+      unsigned off = (unsigned)ei * 480u;            /* ENV2 = ENV1 + 480 */
+      float raw[15];
+      eb_env_state es;
+      float k, gin;
+      int j, same;
+
+      /* the fifteen cells the coefficients are a pure function of */
+      raw[0]  = JF(a1, 2784 + off);   /* A */
+      raw[1]  = JF(a1, 2800 + off);   /* S */
+      raw[2]  = JF(a1, 2816 + off);   /* D */
+      raw[3]  = JF(a1, 2832 + off);   /* R */
+      raw[4]  = JF(a1, 2864 + off);
+      raw[5]  = JF(a1, 2880 + off);
+      raw[6]  = JF(a1, 2896 + off);
+      raw[7]  = JF(a1, 2912 + off);
+      raw[8]  = JF(a1, 2928 + off);
+      raw[9]  = JF(a1, 2944 + off);
+      raw[10] = JF(a1, 2960 + off);
+      raw[11] = JF(a1, 2848 + off);
+      raw[12] = JF(a1, 2976 + off);
+      raw[13] = JF(a1, 2992 + off);
+      raw[14] = JF(a1, 3008 + off);
+
+      /* Rebuild only on change. In a real host that is once per recall; the
+       * comparison is here rather than in a parameter callback because this
+       * shim has no parameter path of its own to hook. It is HARNESS cost and
+       * is excluded from every cycle figure reported for this module. */
+      same = EBHAVE[voice][ei];
+      for ( j = 0; j < 15 && same; ++j )
+        if ( EBRAW[voice][ei][j] != raw[j] ) same = 0;
+      if ( !same )
+      {
+        for ( j = 0; j < 15; ++j ) EBRAW[voice][ei][j] = raw[j];
+        eb_env_set_rate_consts(&EBC[voice][ei], raw[4], raw[5], raw[6], raw[7],
+                               raw[8], raw[9], raw[10], raw[11], raw[12],
+                               raw[13], raw[14]);
+        eb_env_set_adsr(&EBC[voice][ei], raw[0], raw[1], raw[2], raw[3]);
+        EBHAVE[voice][ei] = 1;
+      }
+
+      /* gated input: gate x LFO-pulse polarity, unless the per-envelope LFO
+       * TRIG switch (2560 / 3040) is off, in which case the gate passes. Both
+       * operands belong to other modules, so they are read, not recomputed. */
+      if ( JF(a1, 1824) <= 0.0f ) k = 0.0f; else k = 1.0f;
+      if ( JF(a1, 2560 + off) == 0.0f ) k = 1.0f;
+      gin = JF(a1, 560) * k;
+
+      es.y = JF(a1, 2592 + off);
+      es.h = JF(a1, 2624 + off);
+      es.p = JF(a1, 2640 + off);
+      es.t = JF(a1, 2672 + off);
+      es.r = JF(a1, 2720 + off);
+
+      JF(a1, 2752 + off) = eb_env_tick(&es, &EBC[voice][ei], gin);
+
+      JF(a1, 2592 + off) = es.y;
+      JF(a1, 2624 + off) = es.h;
+      JF(a1, 2640 + off) = es.p;
+      JF(a1, 2672 + off) = es.t;
+      JF(a1, 2720 + off) = es.r;
+    }
+  }
+  /* =============== END ENGINE B MODULE M7 ================================ */
+
+  /* ============ ENGINE B MODULE M-MODCV — pitch / PWM modulation CV ========
+   * REPLACES src/voice_render.c:1076-1128 verbatim. Diff this file against
+   * src/voice_render.c: this block, the one below at :2174 that feeds the
+   * module's single delay, and the include at the top are the ONLY changes, so
+   * a divergence under tools/engineb/null_b.py --module pwm_cv is attributable
+   * to this module and to nothing else. See engine_b/eb_pwm_cv.h.
+   *
+   * STATE AND COEFFICIENTS LIVE IN THIS SHIM, not in the port's cells, because
+   * the module owns both: eb_modcv_state is one float per voice and the
+   * coefficient set is rebuilt only when one of the 24 recall cells it is a
+   * pure function of changes. The rebuild COMPARISON is harness cost (this shim
+   * has no parameter path of its own to hook) and is excluded from every cycle
+   * figure reported for this module; the cost rig measures eb_pwm_cv.c alone.
+   *
+   * The five dead cells ([3568], [3616], [3632], [3696], [3824]) are NOT
+   * written — GREPPED, no reader outside the block that writes them. The four
+   * STAGING copies ([3792], [4240], [4256], [4272]) ARE written, because their
+   * consumers at :1664 and :1667-1669 are the port's own code.
+   */
+  {
+    static const int      EBMCELL[24] = { 3584, 3600, 3856, 3872, 3888, 3904,
+                                          3920, 3936, 3952, 3968, 3984, 4000,
+                                          4016, 4032, 4048, 4064, 4080, 4096,
+                                          4112, 4128, 4144, 4160, 4176, 3552 };
+    float raw[24];
+    float pitch_sum, pwm_sum;
+    int j, same;
+
+    for ( j = 0; j < 24; ++j ) raw[j] = JF(a1, EBMCELL[j]);
+    same = EBMHAVE[voice];
+    for ( j = 0; j < 24 && same; ++j )
+      if ( EBMRAW[voice][j] != raw[j] ) same = 0;
+    if ( !same )
+    {
+      for ( j = 0; j < 24; ++j ) EBMRAW[voice][j] = raw[j];
+      eb_modcv_set(&EBMC[voice], raw[0], raw[1], raw[2], raw[3], raw[4],
+                   raw[5], raw[6], raw[7], raw[8], raw[9], raw[10], raw[11],
+                   raw[12], raw[13], raw[14], raw[15], raw[16], raw[17],
+                   raw[18], raw[19], raw[20], raw[21], raw[22], raw[23]);
+      EBMHAVE[voice] = 1;
+    }
+
+    /* The range's one-sample delay: [3536] = last sample's [3520] (:1076).
+     * The state is BOUND TO THE PORT'S OWN CELL [3520] here rather than kept in
+     * a static of this file: the port writes that cell at :2174, i.e. after
+     * this block, and binding it gives the module the port's exact create /
+     * destroy / eight-voice lifecycle with no ownership question for the
+     * harness to get wrong (engine_b/shim/README.md sanctions this). In the
+     * finished engine the same float is eb_modcv_state. */
+    {
+      eb_modcv_state ds;
+      eb_modcv_latch(&ds, JF(a1, 3520));
+      JF(a1, 3536) = eb_modcv_tap(&ds);
+    }
+
+    eb_modcv_tick(&EBMC[voice],
+                  JF(a1, 752), JF(a1, 880), JF(a1, 1792), JF(a1, 1808),
+                  JF(a1, 2752), JF(a1, 3232),
+                  &pitch_sum, &pwm_sum);
+    JF(a1, 3776) = pitch_sum;
+    JF(a1, 3808) = pwm_sum;
+
+    /* staging copies of recall constants (:1115, :1126-1128) */
+    JI(a1, 3792) = JI(a1, 3840);
+    JI(a1, 4240) = JI(a1, 4192);
+    JI(a1, 4256) = JI(a1, 4208);
+    JI(a1, 4272) = JI(a1, 4224);
+  }
+  /* =============== END ENGINE B MODULE M-MODCV ============================ */
+  v190 = JF(base, 84432);
+  JI(a1, 4320) = JI(a1, 4304);
+  v191 = JF(a1, 4288);
+  JF(a1, 4304) = v191;
+  v192 = (float)(v191 * JF(a1, 4336)) + JF(a1, 4320);
+  JF(a1, 4304) = v192;
+  v193 = (float)(v191 * JF(a1, 4352)) + v192;
+  v194 = v192 * JF(a1, 4400);
+  v195 = v190 - v193;
+  v196 = (float)(v195 * JF(a1, 4336)) + v191;
+  JF(a1, 4288) = v196;
+  JF(a1, 4320) = (float)((float)(v195 * JF(a1, 4368)) + v194) + (float)(v196 * JF(a1, 4384));
+  JI(a1, 6432) = JI(a1, 6416);
+  v197 = JF(a1, 6448);
+  JF(a1, 6464) = v197;
+  v198 = v197 * JF(a1, 3536);
+  v199 = JF(a1, 6432) * JF(a1, 4320);
+  JF(a1, 6480) = v198;
+  JF(a1, 6496) = v199;
+  JI(a1, 6560) = JI(a1, 6544);
+  JF(a1, 6544) = (float)(v199 * JF(a1, 6528)) + (float)(v198 * JF(a1, 6512));
+  /* ============ ENGINE B MODULE M-VCFCV — the cutoff CV summing =========
+   * REPLACES src/voice_render.c:1150-1229 verbatim.
+   *
+   * STATE LIVES IN THE PORT'S OWN CELLS, exactly as modules M7 and M-VCF do
+   * and as engine_b/shim/README.md sanctions: the module's three state floats
+   * are loaded from [6896]/[7088]/[7168] at the top and stored back at the
+   * bottom, so it inherits the port's create/destroy/eight-voice lifecycle.
+   * That copying, and the coefficient gather, are HARNESS cost and are
+   * excluded from every cycle figure reported for this module — the cost rig
+   * measures eb_vcf_cv.c alone.
+   *
+   * NOT written back: the 16 dead stores enumerated in eb_vcf_cv.c. GREPPED:
+   * no reader outside this block anywhere in src/ or gui/.
+   */
+  {
+    eb_vcf_cv_coef ebk;
+    eb_vcf_cv_derived ebd;
+    eb_vcf_cv_state ebst;
+    float eb6704, eb6848;
+
+    ebk.x6576 = JF(a1, 6576); ebk.x6608 = JF(a1, 6608);
+    ebk.x6640 = JF(a1, 6640); ebk.x6672 = JF(a1, 6672);
+    ebk.k6720 = JF(a1, 6720); ebk.k6736 = JF(a1, 6736);
+    ebk.k6752 = JF(a1, 6752); ebk.k6768 = JF(a1, 6768);
+    ebk.k6784 = JF(a1, 6784); ebk.k6800 = JF(a1, 6800);
+    ebk.k6816 = JF(a1, 6816); ebk.x6832 = JF(a1, 6832);
+    ebk.k6864 = JF(a1, 6864); ebk.k6928 = JF(a1, 6928);
+    ebk.k6944 = JF(a1, 6944); ebk.k6960 = JF(a1, 6960);
+    ebk.k7008 = JF(a1, 7008); ebk.k7024 = JF(a1, 7024);
+    ebk.k7120 = JF(a1, 7120); ebk.k7136 = JF(a1, 7136);
+    ebk.k7152 = JF(a1, 7152); ebk.k7200 = JF(a1, 7200);
+    ebk.k7216 = JF(a1, 7216); ebk.k7232 = JF(a1, 7232);
+    ebk.k7296 = JF(a1, 7296); ebk.k7312 = JF(a1, 7312);
+    ebk.k7328 = JF(a1, 7328); ebk.k7344 = JF(a1, 7344);
+    ebk.k7360 = JF(a1, 7360); ebk.k7376 = JF(a1, 7376);
+    ebk.k7392 = JF(a1, 7392); ebk.k7408 = JF(a1, 7408);
+    ebk.k7424 = JF(a1, 7424); ebk.k7440 = JF(a1, 7440);
+    ebk.k7456 = JF(a1, 7456); ebk.k7472 = JF(a1, 7472);
+    ebk.k7488 = JF(a1, 7488); ebk.k7504 = JF(a1, 7504);
+
+    /* RECALL-TIME in engine B; every sample here so a mid-render
+     * coefficient edit cannot make the gate lie. Harness cost. */
+    eb_vcf_cv_prepare(&ebd, &ebk);
+
+    ebst.s_env = JF(a1, 6896);
+    ebst.s_a   = JF(a1, 7088);
+    ebst.s_b   = JF(a1, 7168);
+
+    v227 = eb_vcf_cv_tick(&ebst, &ebd,
+                          JF(a1, 752), JF(a1, 880), JF(a1, 1792),
+                          JF(a1, 1808), JF(a1, 2752), JF(a1, 3232),
+                          &eb6704, &eb6848);
+
+    JF(a1, 6704) = eb6704;
+    JF(a1, 6848) = eb6848;
+    JF(a1, 6896) = ebst.s_env;
+    JF(a1, 7088) = ebst.s_a;
+    JF(a1, 7168) = ebst.s_b;
+  }
+  v228 = JF(a1, 6704);
+  v229 = JF(a1, 6848);
+  JI(a1, 7584) = JI(a1, 7568);
+  v230 = JF(a1, 7552);
+  JF(a1, 7568) = v230;
+  if ( JF(a1, 7632) == 1.0 )
+  {
+    v231 = JF(a1, 7584)
+         + (float)((float)(JF(a1, 7712) * v230) - (float)(JF(a1, 7712) * JF(a1, 7584)));
+    JF(a1, 7568) = v231;
+    v232 = (float)(v231 * JF(a1, 7696)) + JF(a1, 7600);
+    JF(a1, 7552) = juno_wrap24(-v230);
+    v233 = (float)(1.0 - v229) * JF(a1, 7728);
+    JF(a1, 7536) = (float)(v229 * JF(a1, 7792)) + JF(a1, 7616);
+    v227 = (float)(fmaxf(
+                                 fminf(
+                                   (float)((float)((float)((float)(v227 * JF(a1, 7680))
+                                                         + (float)(v228 * JF(a1, 7648)))
+                                                 + v232)
+                                         + fminf(JF(a1, 7744), v233))
+                                 + JF(a1, 7664),
+                                   JF(a1, 7760)),
+                                 JF(a1, 7776))
+                             * JF(a1, 7824))
+                     + JF(a1, 7840);
+    v234 = v227;
+    v235 = (int)v227;
+    if ( v235 != (int)0x80000000 && (float)v235 != v227 )
+      v234 = (float)(v235 - (int)((bits_from_f32(v227) >> 31) & 1u));
+    v236 = v227 - v234;
+    v237 = (float)(v236 * v236) * 0.25;
+    v238 = (float)(expf(v234)
+                 * (float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)(v236 * JF(a1, 8032)) + JF(a1, 8016)) * v237) + (float)(v236 * JF(a1, 8000))) + JF(a1, 7984)) * v237) + (float)(v236 * JF(a1, 7968)))
+                                                                                                 + JF(a1, 7952))
+                                                                                         * v237)
+                                                                                 + (float)(v236 * JF(a1, 7936)))
+                                                                         + JF(a1, 7920))
+                                                                 * v237)
+                                                         + (float)(v236 * JF(a1, 7904)))
+                                                 + JF(a1, 7888))
+                                         * v237)
+                                 + (float)(v236 * JF(a1, 7872)))
+                         + 1.0))
+         * JF(a1, 7856);
+    v239 = v238 * v238;
+    v240 = (float)((float)((float)((float)((float)((float)((float)((float)(v238 * v238) * *(float *)(a1 + 0x2000))
+                                                         + JF(a1, 8160))
+                                                 * (float)(v239 * v239))
+                                         + (float)((float)((float)(v238 * v238) * JF(a1, 8128))
+                                                 + JF(a1, 8096)))
+                                 * (float)((float)((float)(v238 * v238) * v238) * (float)(v238 * v238)))
+                         + (float)((float)((float)(v238 * v238) * v238) * JF(a1, 8064)))
+                 + v238)
+         / (float)((float)((float)((float)((float)((float)((float)((float)((float)(v238 * v238) * JF(a1, 8176))
+                                                                 + JF(a1, 8144))
+                                                         * (float)(v239 * v239))
+                                                 + (float)((float)(v238 * v238) * JF(a1, 8112)))
+                                         + JF(a1, 8080))
+                                 * (float)(v239 * v239))
+                         + (float)((float)(v238 * v238) * JF(a1, 8048)))
+                 + 1.0);
+    v241 = v240 / (float)(v240 + 1.0);
+    JF(a1, 7520) = v241;
+  }
+  else
+  {
+    v241 = JF(a1, 7520);
+  }
+  /* ============ ENGINE B MODULE M-VCF — the 4-pole ladder core ===========
+   * REPLACES src/voice_render.c:1298-1515 verbatim.
+   *
+   * STATE LIVES IN THE PORT'S OWN CELLS, exactly as module M7's shim does and
+   * as engine_b/shim/README.md sanctions: the module's 41 floats are loaded
+   * from the port's cells at the top of the sample and stored back at the
+   * bottom, so the module inherits the port's create/destroy/eight-voice
+   * lifecycle with no ownership question for the harness to get wrong. That
+   * copying is HARNESS cost and is excluded from every cycle figure reported
+   * for this module -- the cost rig measures eb_vcf_ladder.c alone.
+   *
+   * NOT written back (the SHADOW stores named in eb_vcf_ladder.h item 3):
+   * [8992] and the six scratch cells [8336..8416]. GREPPED: no reader outside
+   * this block anywhere in src/ or gui/.
+   */
+  {
+    static eb_vcf_coef ebc;
+    eb_vcf_state ebs;
+    int ebi;
+    float ebprev, ebs2in;
+
+    if ( JF(a1, 9056) == 1.0f )
+    {
+      ebc.c9520 = JF(a1, 9520); ebc.c9536 = JF(a1, 9536);
+      ebc.c9184 = JF(a1, 9184);
+      ebc.c9072 = JF(a1, 9072); ebc.c9088 = JF(a1, 9088);
+      ebc.c9104 = JF(a1, 9104);
+      ebc.c9200 = JF(a1, 9200); ebc.c9216 = JF(a1, 9216);
+      ebc.c9232 = JF(a1, 9232); ebc.c9248 = JF(a1, 9248);
+      ebc.c9120 = JF(a1, 9120); ebc.c9136 = JF(a1, 9136);
+      ebc.c9168 = JF(a1, 9168); ebc.c9152 = JF(a1, 9152);
+      for ( ebi = 0; ebi < 16; ++ebi )
+        ebc.fir[ebi] = JF(a1, 9504 - 16 * ebi);
+
+      ebs.nl = JF(a1, 8208); ebs.y1 = JF(a1, 8224); ebs.y2 = JF(a1, 8240);
+      ebs.y3 = JF(a1, 8256); ebs.y4 = JF(a1, 8272);
+      ebs.s1 = JF(a1, 8288); ebs.s2 = ebs2in = JF(a1, 8304);
+      ebs.drive_prev = ebprev = JF(a1, 8944);
+      ebs.dith = JF(a1, 8976);
+      ebs.hi = 31;
+      for ( ebi = 0; ebi < 32; ++ebi )
+        eb_vcf_hist_set(&ebs, ebi, JF(a1, EB_HCELL(ebi)));
+
+      JF(a1, 9040) = eb_vcf_tick(&ebs, &ebc, JF(a1, 6544), v241, JF(a1, 7536));
+
+      JF(a1, 8208) = ebs.nl; JF(a1, 8224) = ebs.y1; JF(a1, 8240) = ebs.y2;
+      JF(a1, 8256) = ebs.y3; JF(a1, 8272) = ebs.y4;
+      JF(a1, 8288) = ebs.s1; JF(a1, 8304) = ebs.s2; JF(a1, 8320) = ebs2in;
+      JF(a1, 8944) = ebs.drive_prev; JF(a1, 8960) = ebprev;
+      JF(a1, 8976) = ebs.dith;
+      for ( ebi = 0; ebi < 32; ++ebi )
+        JF(a1, EB_HCELL(ebi)) = eb_vcf_hist_get(&ebs, ebi);
+    }
+    else
+    {
+      /* The gate cell [9056] is 1.0 from juno_prepare.c:88 and has no other
+       * writer, so this arm is unreachable in the port. It is the port's own
+       * unconditional shift block (:1300-1337) reproduced verbatim, because
+       * "unreachable" is a claim about today's recall and not a licence to
+       * change behaviour. */
+      JI(a1, 8320) = JI(a1, 8304); JI(a1, 8304) = JI(a1, 8288);
+      JI(a1, 8288) = JI(a1, 8272); JI(a1, 8272) = JI(a1, 8256);
+      JI(a1, 8256) = JI(a1, 8240); JI(a1, 8240) = JI(a1, 8224);
+      JI(a1, 8224) = JI(a1, 8208);
+      for ( ebi = 7; ebi >= 1; --ebi )
+      {
+        JI(a1, 8432 + 16 * ebi) = JI(a1, 8432 + 16 * (ebi - 1));
+        JI(a1, 8560 + 16 * ebi) = JI(a1, 8560 + 16 * (ebi - 1));
+        JI(a1, 8688 + 16 * ebi) = JI(a1, 8688 + 16 * (ebi - 1));
+        JI(a1, 8816 + 16 * ebi) = JI(a1, 8816 + 16 * (ebi - 1));
+      }
+      JI(a1, 8960) = JI(a1, 8944);
+      JF(a1, 8992) = JF(a1, 8976);
+    }
+  }
+  /* =============== END ENGINE B MODULE M-VCF ============================= */
+  /* ========= ENGINE B MODULE M-VCA — the VCA + HPF output stage ==========
+   * REPLACES src/voice_render.c:1516-1640 verbatim.
+   *
+   * STATE LIVES IN THE PORT'S OWN CELLS, exactly as modules M7 and M-VCF do
+   * and as engine_b/shim/README.md sanctions: the module's 10 floats are
+   * loaded from the port's cells at the top and stored back at the bottom, so
+   * the module inherits the port's create/destroy/eight-voice lifecycle AND
+   * the port's per-sample denormal flush (src/juno_ftz.c flushes 9904, 10432,
+   * 10480 and 10496 — every one of the module's cells that the port flushes).
+   * That copying is HARNESS cost and is excluded from every cycle figure
+   * reported for this module: the cost rig measures eb_vca_hpf.c alone.
+   *
+   * NOT written back (the SHADOW stores named in eb_vca_hpf.h item 2):
+   * [9568] [9696] [9728] [9760] [9792] [9840] [9872] [9920] [9936] [10048]
+   * [10064] [10080] [10112] [10144] [10160] [10416] [10448] [10544] [10656].
+   * GREPPED across src/ and gui/: each is write-only or read only inside this
+   * block.
+   */
+  {
+    static eb_vca_coef ebvc;
+    eb_vca_state ebvs;
+
+    ebvc.c9552  = JF(a1, 9552);  ebvc.c9584  = JF(a1, 9584);
+    ebvc.c9600  = JF(a1, 9600);  ebvc.c9616  = JF(a1, 9616);
+    ebvc.c9680  = JF(a1, 9680);  ebvc.c9744  = JF(a1, 9744);
+    ebvc.c9808  = JF(a1, 9808);  ebvc.c9824  = JF(a1, 9824);
+    ebvc.c9888  = JF(a1, 9888);  ebvc.c9952  = JF(a1, 9952);
+    ebvc.c9968  = JF(a1, 9968);  ebvc.c9984  = JF(a1, 9984);
+    ebvc.c10000 = JF(a1, 10000); ebvc.c10016 = JF(a1, 10016);
+    ebvc.c10032 = JF(a1, 10032); ebvc.c10176 = JF(a1, 10176);
+    ebvc.c10192 = JF(a1, 10192); ebvc.c10208 = JF(a1, 10208);
+    ebvc.c10224 = JF(a1, 10224); ebvc.c10240 = JF(a1, 10240);
+    ebvc.c10256 = JF(a1, 10256); ebvc.c10272 = JF(a1, 10272);
+    ebvc.c10288 = JF(a1, 10288); ebvc.c10304 = JF(a1, 10304);
+    ebvc.c10320 = JF(a1, 10320); ebvc.c10336 = JF(a1, 10336);
+    ebvc.c10352 = JF(a1, 10352); ebvc.c10368 = JF(a1, 10368);
+    ebvc.c10384 = JF(a1, 10384); ebvc.c10400 = JF(a1, 10400);
+    ebvc.c10464 = JF(a1, 10464); ebvc.c10560 = JF(a1, 10560);
+    ebvc.c10576 = JF(a1, 10576); ebvc.c10592 = JF(a1, 10592);
+    ebvc.c10608 = JF(a1, 10608); ebvc.c10624 = JF(a1, 10624);
+    ebvc.c10640 = JF(a1, 10640);
+
+    ebvs.sm     = JF(a1, 9712);  ebvs.g1  = JF(a1, 9776);
+    ebvs.g2     = JF(a1, 9856);  ebvs.gate_y = JF(a1, 9904);
+    ebvs.lp     = JF(a1, 10096); ebvs.lp2 = JF(a1, 10128);
+    ebvs.dcacc  = JF(a1, 10432);
+    ebvs.x1     = JF(a1, 10480); ebvs.yA = JF(a1, 10496);
+    ebvs.yB     = JF(a1, 10512);
+
+    JF(a1, 10672) = eb_vca_tick(&ebvs, &ebvc,
+                                JF(a1, 9040), JF(a1, 2752), JF(a1, 3232),
+                                JF(a1, 6848), JF(a1, 560));
+
+    JF(a1, 9712)  = ebvs.sm;    JF(a1, 9776)  = ebvs.g1;
+    JF(a1, 9856)  = ebvs.g2;    JF(a1, 9904)  = ebvs.gate_y;
+    JF(a1, 10096) = ebvs.lp;    JF(a1, 10128) = ebvs.lp2;
+    JF(a1, 10432) = ebvs.dcacc;
+    JF(a1, 10480) = ebvs.x1;    JF(a1, 10496) = ebvs.yA;
+    JF(a1, 10512) = ebvs.yB;
+  }
+  v385 = fmin(fmax((float)(JF(a1, 4448) + JF(a1, 3776)), -20.0), 8.9);
+  v386 = v385 * v385 * v385;
+  v387 = juno_pitch_table[(int)(v385 + 20.0)];
+  v388 = v386 * v385 * v385;
+  v389 = v388 * v385 * v385 * v385;
+  v390 = v389 * v385 * v385;
+  v391 = fmaxf(
+           fminf(
+             v385 * v387[2]
+           + *v387
+           + v385 * v385 * v387[4]
+           + v386 * v387[6]
+           + v386 * v385 * v387[8]
+           + v388 * v387[10]
+           + v388 * v385 * v387[12]
+           + v388 * v385 * v385 * v387[14]
+           + v389 * v387[16]
+           + v389 * v385 * v387[18]
+           + v390 * v387[20]
+           + v390 * v385 * v387[22]
+           + v390 * v385 * v385 * v387[24],
+             512.0),
+           -512.0)
+       * JF(a1, 3792);
+  JF(a1, 4416) = v391;
+  v392 = JF(a1, 3776);
+  v393 = JI(a1, 4240);
+  v394 = JI(a1, 4256);
+  v386_lo = JI(a1, 4272);
+  JI(a1, 4848) = JI(a1, 4832);
+  JI(a1, 4880) = JI(a1, 4864);
+  JI(a1, 5056) = JI(a1, 5040);
+  JI(a1, 5040) = JI(a1, 5024);
+  JI(a1, 5024) = JI(a1, 5008);
+  JI(a1, 5008) = JI(a1, 4992);
+  JI(a1, 4992) = JI(a1, 4976);
+  JI(a1, 4976) = JI(a1, 4960);
+  JI(a1, 4960) = JI(a1, 4944);
+  JI(a1, 5184) = JI(a1, 5168);
+  JI(a1, 5168) = JI(a1, 5152);
+  JI(a1, 5152) = JI(a1, 5136);
+  JI(a1, 5136) = JI(a1, 5120);
+  JI(a1, 5120) = JI(a1, 5104);
+  JI(a1, 5104) = JI(a1, 5088);
+  JI(a1, 5088) = JI(a1, 5072);
+  JI(a1, 5312) = JI(a1, 5296);
+  JI(a1, 5296) = JI(a1, 5280);
+  JI(a1, 5280) = JI(a1, 5264);
+  JI(a1, 5264) = JI(a1, 5248);
+  JI(a1, 5248) = JI(a1, 5232);
+  JI(a1, 5232) = JI(a1, 5216);
+  JI(a1, 5216) = JI(a1, 5200);
+  JI(a1, 5440) = JI(a1, 5424);
+  JI(a1, 5424) = JI(a1, 5408);
+  JI(a1, 5408) = JI(a1, 5392);
+  JI(a1, 5392) = JI(a1, 5376);
+  JI(a1, 5376) = JI(a1, 5360);
+  JI(a1, 5360) = JI(a1, 5344);
+  JI(a1, 5344) = JI(a1, 5328);
+  JI(a1, 5504) = JI(a1, 5488);
+  JI(a1, 5488) = JI(a1, 5472);
+  JI(a1, 4736) = v393;
+  JI(a1, 4752) = v394;
+  v395 = v392 + JF(a1, 6304);
+  v396 = v391 * JF(a1, 5536);
+  v397 = JF(a1, 5520);
+  JI(a1, 4768) = v386_lo;
+  v398 = fmaxf(JF(a1, 5568), v396);
+  v399 = (float)(v395 * JF(a1, 6320)) + JF(a1, 6288);
+  JF(a1, 4784) = _s4784 = v398;
+  JF(a1, 4816) = _s4816 = v397 + JF(a1, 3808);
+  if ( v399 <= 0.0 )
+    v400 = 0.0;
+  else
+    v400 = v399;
+  JF(a1, 4800) = _s4800 = 0.00390625 / v398;
+  JF(a1, 5456) = v400;
+  /* ================= ENGINE B MODULE — THE DCO OSCILLATOR =================
+   * REPLACES src/voice_render.c:1718-2136 verbatim. Diff this file against
+   * src/voice_render.c: this block is the ONLY change, plus the include above.
+   *
+   * The port writes the four 4x-rate oscillator samples out to the polyphase
+   * cells 4944 / 5072 / 5200 / 5328; those cells are read by the decimator at
+   * :2137 (via the shift at :1672-1699), so they are written here too. The
+   * NINE cells that only carry a value from the bottom of the sample back to
+   * the top or hold an intra-sample tap -- 4640, 4656, 4672, 4848, 4880, 4896,
+   * 4912 -- are NOT written. GREPPED: no reader outside this range anywhere in
+   * src/ or gui/. Audio is unaffected; per-cell state parity is not, and that
+   * is a sonic-identity claim rather than a bit-exact-state one.
+   *
+   * STATE LIVES IN THE PORT'S OWN CELLS 4864 (phase) and 4832 (sub counter),
+   * which are exactly the two the port hands from sample to sample, so the
+   * module inherits the port's power-on, create/destroy and eight-voice
+   * lifecycle with no ownership question for the harness to get wrong.
+   * engine_b/shim/README.md sanctions this. No cycle figure is ever taken from
+   * the shim: the cost rig measures eb_dco.c alone.
+   */
+  {
+    eb_dco_state ebs;
+    eb_dco_coef  ebc;
+
+    ebc.lvl_saw   = JF(a1, 4736);
+    ebc.lvl_pulse = JF(a1, 4752);
+    ebc.lvl_sub   = JF(a1, 4768);
+    ebc.gn_saw    = JF(a1, 5648);
+    ebc.gn_pulse  = JF(a1, 5664);
+    ebc.gn_sub    = JF(a1, 5680);
+    ebc.amp_saw   = JF(a1, 5600);
+    ebc.amp_pulse = JF(a1, 5616);
+    ebc.amp_sub   = JF(a1, 5632);
+    ebc.sat_in    = JF(a1, 5552);
+    ebc.k3        = JF(a1, 5952);
+    ebc.k5        = JF(a1, 5968);
+    ebc.k7        = JF(a1, 5984);
+    ebc.k9        = JF(a1, 6000);
+    ebc.k11       = JF(a1, 6016);
+    ebc.subthr    = JF(a1, 5584);
+    /* inc and pw are the two modulated numbers the CV module hands over; g is
+     * rebuilt here rather than copied from cell 4800 so that eb_dco_set_pitch
+     * is under the gate too. It is the same divide. */
+    eb_dco_set_shape(&ebc);          /* recall-rate in the engine; per sample
+                                      * here because this shim has no parameter
+                                      * path of its own to hook. HARNESS cost,
+                                      * excluded from every cycle figure. */
+    eb_dco_set_pitch(&ebc, _s4784, _s4816);
+
+    ebs.phase  = JF(a1, 4864);
+    ebs.subcnt = JF(a1, 4832);
+
+    JF(a1, 4944) = eb_dco_step(&ebs, &ebc);
+    JF(a1, 5072) = eb_dco_step(&ebs, &ebc);
+    JF(a1, 5200) = eb_dco_step(&ebs, &ebc);
+    JF(a1, 5328) = eb_dco_step(&ebs, &ebc);
+
+    JF(a1, 4864) = ebs.phase;
+    JF(a1, 4832) = ebs.subcnt;
+  }
+  v518 = JF(a1, 5440);
+  /* =============== END ENGINE B MODULE — DCO ============================== */
+
+  v519 = (float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)(JF(a1, 5312) + JF(a1, 5072))
+                                                                                               * JF(a1, 5712))
+                                                                                       + (float)((float)(v518 + JF(a1, 4944))
+                                                                                               * JF(a1, 5696)))
+                                                                               + (float)((float)(JF(a1, 5200)
+                                                                                               + JF(a1, 5184))
+                                                                                       * JF(a1, 5728)))
+                                                                       + (float)((float)(JF(a1, 5328)
+                                                                                       + JF(a1, 5056))
+                                                                               * JF(a1, 5744)))
+                                                               + (float)((float)(JF(a1, 5424)
+                                                                               + JF(a1, 4960))
+                                                                       * JF(a1, 5760)))
+                                                       + (float)((float)(JF(a1, 5296) + JF(a1, 5088))
+                                                               * JF(a1, 5776)))
+                                               + (float)((float)(JF(a1, 5216) + JF(a1, 5168))
+                                                       * JF(a1, 5792)))
+                                       + (float)((float)(JF(a1, 5344) + JF(a1, 5040))
+                                               * JF(a1, 5808)))
+                               + (float)((float)(JF(a1, 5408) + JF(a1, 4976)) * JF(a1, 5824)))
+                       + (float)((float)(JF(a1, 5104) + JF(a1, 5280)) * JF(a1, 5840)))
+               + (float)((float)(JF(a1, 5232) + JF(a1, 5152)) * JF(a1, 5856)))
+       + (float)((float)(JF(a1, 5024) + JF(a1, 5360)) * JF(a1, 5872));
+  v520 = JF(a1, 5488);
+  v521 = (float)(v520 * JF(a1, 6256)) + JF(a1, 5504);
+  v522 = (float)((float)(v519 + (float)((float)(JF(a1, 5392) + JF(a1, 4992)) * JF(a1, 5888)))
+               + (float)((float)(JF(a1, 5264) + JF(a1, 5120)) * JF(a1, 5904)))
+       + (float)((float)(JF(a1, 5248) + JF(a1, 5136)) * JF(a1, 5920));
+  v523 = (float)(JF(a1, 5376) + JF(a1, 5008)) * JF(a1, 5936);
+  JF(a1, 5488) = v521;
+  v524 = v522 + v523;
+  v525 = v524 - (float)((float)(v520 * JF(a1, 6272)) + v521);
+  JF(a1, 5472) = (float)(v525 * JF(a1, 6256)) + v520;
+  v526 = (float)((float)((float)(v521 - (float)(v525 * JF(a1, 5456))) * JF(a1, 6336))
+               - (float)(JF(a1, 6336) * v524))
+       + v524;
+  JF(a1, 4928) = v526;
+  JF(a1, 3520) = v526;
+  if ( JF(base, auxoff) == 1.0 )
+  {
+    JI(a1, 320) = v528;
+    JI(base, auxoff) = 0;
+  }
+  *outL = JF(a1, 10672);
+  result = JU(a1, 10672);
+  *outR = JF(a1, 10672);
+  return result;
+}
+

@@ -389,7 +389,9 @@ def main():
         else:
             mods = [] if a.check_port else (a.module or [])
             if mods == ["all"]:
-                mods = null_b.module_list()
+                # 'all' is the GENERATED COMPOSITE, not every shim directory --
+                # see docs/engineb/HARNESS_AUDIT.md F1.
+                mods = null_b.resolve_modules(["all"])
             lib = os.path.join(tmp, "cand.so")
             # REPORT WHAT WAS LINKED, NOT WHAT WAS ASKED FOR
             # (docs/engineb/HARNESS_AUDIT.md F6). This line used to be built
