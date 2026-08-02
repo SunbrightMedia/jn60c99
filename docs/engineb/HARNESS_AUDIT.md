@@ -32,8 +32,7 @@ Fix: a collision is now a hard build failure that names both modules.
 
 ---
 
-## F2 — 9 of the 10 modules have NO teeth. The gate has never been shown to
-## catch an error inside them.
+## F2 — 9 of the 10 modules had NO teeth. **FIXED 2026-08-02.**
 
 `null_b.teeth()` plants errors in the port and in **reverb**. There is no
 planted-error case for chorus, dco, delay, env, pwm_cv, skeleton, vca_hpf,
@@ -52,7 +51,35 @@ So the DCO is gated to about **1e-5 of its own output**, and it clears the
 a 1e-5 DCO error at all. This is the module that dominates the cost budget and
 the one most likely to be changed for speed.
 
-Required: a teeth case for every module, each with its measured leverage.
+**FIXED.** Every module now has a measured bracket in `null_b.py --teeth`: the
+smallest relative error on its own output that the gate catches, and the next one
+down that it lets through. Battery result: **TEETH: PASS**, 28 cases.
+
+| module | 1e-5 error | scenarios reacting | 1e-6 error |
+|---|---|---|---|
+| chorus | −100.0 dB FAIL | 21/30 | −120.1 dB pass |
+| **dco** | **−99.8 dB FAIL** | **1/30** | −115.5 dB pass |
+| delay | −100.0 dB FAIL | 17/30 | −120.4 dB pass |
+| env | −81.4 dB FAIL | 30/30 | −101.8 dB pass |
+| reverb | −100.0 dB FAIL | 30/30 | −120.4 dB pass |
+| vca_hpf | −100.0 dB FAIL | 30/30 | −119.9 dB pass |
+| vcf_cv | −83.7 dB FAIL | 17/30 | −104.0 dB pass |
+| vcf_ladder | −100.0 dB FAIL | 30/30 | −119.7 dB pass |
+
+Two results that must be read before this battery is trusted:
+
+* **The DCO is the weakest module in the set.** A 1e-5 error clears the −100 dB
+  threshold by 0.2 dB, and only **1 of 30 scenarios** reacts. It is also the
+  module most likely to be rewritten for speed. A scenario that leans harder on
+  the DCO is owed, and until it exists, DCO optimisation is being checked by one
+  scenario.
+* **`pwm_cv` has no pass case and cannot have one.** 1e-7 fails at −35.5 dB in
+  22/30; 1e-8 gives EXACTLY 0 because `1.0f + 1e-8f == 1.0f`, so that build
+  perturbs nothing. Since 1e-7 is one ULP, `pwm_cv` is gated at the finest error
+  a float can carry. It gets the fail half only, and a written note instead of a
+  fake pass.
+* **`skeleton` is un-gateable and is excluded on purpose.** Its shim discards
+  `eb_engine_process()`'s result, so no perturbation of it reaches the output.
 
 ---
 
@@ -125,9 +152,27 @@ because it shows the class is recurrent, not a one-off.
 
 ## Order of repair
 
-1. F2 — a teeth case per module. Without it a green gate means nothing.
+1. ~~F2~~ DONE. Next: a scenario that leans on the DCO (see F8).
 2. F1 follow-up — merge the colliding shims so a whole-engine test can exist.
 3. F4 — scenarios that reach the unexecuted parts of `pwm_cv`.
 4. F3 — cover or delete `eb_patch.c`.
 5. F5 — stop the cost model charging unreachable calls.
 6. F6 — report the linked module list from the library, not the request.
+
+
+## F8 — NEW, found by running the new battery: a calibration probe had drifted
+## onto the threshold. **FIXED.**
+
+The reverb's pass-side probe (`reverbwet`) was recorded at −100.5 dB against a
+−100 dB threshold — 0.5 dB inside the line. Re-running the battery measured it
+at **−99.2 dB**, so it had crossed, and the battery reported a TEETH FAILURE.
+
+Nothing was wrong with the reverb. The probe was sitting on the line.
+
+**The gate was not moved. The probe was.** It is now 16.0005f (3.1e-5 relative),
+MEASURED at −105.2 dB. 16.00025f was also measured, at −111.2 dB, and was not
+chosen: a bracket should sit near the line, only not on it.
+
+The general lesson, and it applies to every calibration probe in this repo: a
+probe within about 1 dB of its threshold will eventually report drift as a
+defect. Give it margin, and record the measured margin next to it.

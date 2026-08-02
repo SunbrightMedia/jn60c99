@@ -241,6 +241,55 @@ def build(dst_so, modules=(), mutate=None, quiet=True):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# THE PER-MODULE TEETH ANCHORS.  module -> (shim file, unique marker, statement)
+# The statement is inserted immediately AFTER the marker and scales exactly the
+# values that module hands to the rest of the engine. It carries one "%s", the
+# relative factor.
+#
+# Each marker is asserted to occur EXACTLY ONCE at plant time. If a shim is
+# edited so a marker moves, the teeth case stops silently and says so.
+_OUT_ANCHOR = {
+    # Four sub-samples per audio sample, all four scaled together.
+    "dco": ("voice_render.c",
+            "    JF(a1, 5328) = eb_dco_step(&ebs, &ebc);",
+            "    JF(a1,4944)*=%s; JF(a1,5072)*=%s; "
+            "JF(a1,5200)*=%s; JF(a1,5328)*=%s;"),
+    "env": ("voice_render.c",
+            "      JF(a1, 2752 + off) = eb_env_tick(&es, &EBC[voice][ei], gin);",
+            "      JF(a1, 2752 + off) *= %s;"),
+    "pwm_cv": ("voice_render.c",
+               "    JF(a1, 3776) = pitch_sum;",
+               "    JF(a1, 3776) *= %s;"),
+    "vcf_cv": ("voice_render.c",
+               "    JF(a1, 6848) = eb6848;",
+               "    v227 *= %s;"),
+    "vcf_ladder": ("voice_render.c",
+                   "      JF(a1, 9040) = eb_vcf_tick(&ebs, &ebc, JF(a1, 6544),"
+                   " v241, JF(a1, 7536));",
+                   "      JF(a1, 9040) *= %s;"),
+    "vca_hpf": ("voice_render.c",
+                "                                JF(a1, 6848), JF(a1, 560));",
+                "    JF(a1, 10672) *= %s;"),
+    "chorus": ("master_render.c",
+               "      memcpy(&v593, &_ebR, 4);",
+               "      { float _f = %s; _ebL *= _f; _ebR *= _f;\n"
+               "        memcpy((unsigned char *)a1 + 84672, &_ebL, 4);\n"
+               "        memcpy((unsigned char *)a1 + 91088, &_ebL, 4);\n"
+               "        memcpy((unsigned char *)a1 + 91104, &_ebR, 4);\n"
+               "        memcpy(&v593, &_ebR, 4); }"),
+    "delay": ("master_render.c",
+              "        *(float *)(a1 + 102336) = ebR;",
+              "        *(float *)(a1 + 102320) *= %s;\n"
+              "        *(float *)(a1 + 102336) *= %s;"),
+    "reverb": ("master_render.c",
+               "                      (int32_t *)(a1 + 10759872), v176, v177, "
+               "&v529, &v530);",
+               "    { float _f = %s; v529 *= _f; v530 *= _f; }"),
+}
+# 'skeleton' is absent ON PURPOSE: its shim discards eb_engine_process()'s
+# result, so no perturbation of it can reach the output. See _plant's comment.
+
+
 def _plant(tmp, mutate):
     """--teeth only: plant a known error in the tree that is REALLY compiled.
 
@@ -248,6 +297,42 @@ def _plant(tmp, mutate):
     two harnesses fail on the same planted bugs and a teeth regression in either
     is visible against the other.
     """
+    # ------------------------------------------------------------------ #
+    # PER-MODULE OUTPUT PERTURBATION.  "out:<module>:<factor>"
+    #
+    # WHY THIS FORM. Until 2026-08-02 only the reverb had a teeth case, so for
+    # nine of the ten modules "the gate is green" had never been paired with
+    # "the gate can go red" (docs/engineb/HARNESS_AUDIT.md F2). A per-module
+    # case has to satisfy two things: it must be planted where that module's
+    # result ENTERS the port's signal path, so the perturbation is the module's
+    # own output and not something upstream; and it must be a RELATIVE scale, so
+    # the factor means the same thing in a loud module and a quiet one.
+    #
+    # The anchors below are exactly those crossings. Each is asserted unique, so
+    # a shim edit that moves one breaks the teeth loudly instead of silently
+    # planting nothing -- a teeth case that cannot reach its own mutation
+    # measures nothing, which this harness has already been bitten by once.
+    #
+    # NOT COVERED: 'skeleton'. Its shim runs eb_engine_process() and DISCARDS
+    # the result (see the shim's own header), so no perturbation of it can reach
+    # the output. It is un-gateable by this harness by construction and is
+    # listed as such rather than given a case that would always pass.
+    if mutate.startswith("out:"):
+        _, mod, fac = mutate.split(":", 2)
+        fname, marker, stmt = _OUT_ANCHOR[mod]
+        f = os.path.join(tmp, "src", fname)
+        s = open(f).read()
+        if s.count(marker) != 1:
+            raise SystemExit(
+                "teeth anchor for module '%s' matched %d times in %s, expected "
+                "exactly 1.\n  marker: %s\n  WHAT TO DO: the shim moved. Update "
+                "_OUT_ANCHOR so the teeth case still reaches its own mutation; a "
+                "case that cannot reach its mutation measures nothing."
+                % (mod, s.count(marker), fname, marker.strip()))
+        s = s.replace(marker, marker + "\n" +
+                      stmt.replace("%s", "(" + fac + ")") + "\n", 1)
+        open(f, "w").write(s)
+        return
     if mutate == "onelsb":
         # The smallest error this harness should still SEE: one output sample
         # scaled by 1 + 2^-23 (~1 ULP), on every sample of every voice.
@@ -299,8 +384,21 @@ def _plant(tmp, mutate):
         # MODULE REVERB, CALIBRATION -- where does the gate bite on the reverb
         # PATH, as opposed to on the whole output? The tank's own output gain is
         # moved by 6.25e-5 ("reverbwet") and by 6.25e-4 ("reverbwet10").
-        # MEASURED 2026-08-02: the first lands at -100.5 dB rel and must PASS,
-        # the second at -80.5 dB and must FAIL. That brackets the -100 dB
+        # RE-CALIBRATED 2026-08-02, second time that day. The pass-side probe
+        # was 16.001f (6.25e-5 relative) and was recorded at -100.5 dB, i.e.
+        # 0.5 dB inside a -100 dB threshold. Re-running the battery after the
+        # per-module cases were added measured it at -99.2 dB, so it had
+        # crossed and the battery reported a TEETH FAILURE. Nothing was wrong
+        # with the reverb: the probe was simply sitting on the threshold, and a
+        # calibration probe that close to the line reports drift as a defect.
+        #
+        # The GATE WAS NOT MOVED. The PROBE was: 16.0005f (3.1e-5 relative),
+        # MEASURED at -105.2 dB, 5.2 dB inside the line. 16.00025f was also
+        # measured, at -111.2 dB, and was not chosen because a bracket wants to
+        # be near the line, only not ON it.
+        #
+        # MEASURED 2026-08-02: the pass probe lands at -105.2 dB and must PASS,
+        # the fail probe at -80.5 dB and must FAIL. That brackets the -100 dB
         # threshold from both sides FROM INSIDE THE REVERB, and it also fixes
         # the module's leverage: an error in the tank arrives at the gate about
         # 20 dB quieter than the same relative error on the whole output, so
@@ -309,7 +407,7 @@ def _plant(tmp, mutate):
         a = "(((SL * c->wet) * 16.0f) * m)"
         assert s.count(a) == 1
         s = s.replace(a, "(((SL * c->wet) * %s) * m)"
-                      % ("16.001f" if mutate == "reverbwet" else "16.01f"), 1)
+                      % ("16.0005f" if mutate == "reverbwet" else "16.01f"), 1)
     elif mutate == "reverbtap":
         # MODULE REVERB, addressing. One stereo output tap reads one sample
         # earlier. The split-buffer rewrite's whole risk is addressing, so the
@@ -490,6 +588,54 @@ def teeth(quick):
              (None, ("reverb",), False), ("reverbwet", ("reverb",), False),
              ("reverbwet10", ("reverb",), True),
              ("reverbtap", ("reverb",), True), ("reverbskip", ("reverb",), True)]
+
+    # ---- PER-MODULE OUTPUT TEETH (added 2026-08-02, audit finding F2) -------
+    # Until this battery existed, nine of the ten modules had never been shown
+    # to be catchable at all: only the reverb had a planted error. "Green" for
+    # those nine meant nothing, because nobody had made them go red.
+    #
+    # Each module gets a BRACKET: the smallest relative error on its own output
+    # that the gate CATCHES, and the next one down that it lets through. A
+    # battery of catchable errors alone measures nothing about where the floor
+    # is; the pass half is what fixes it.
+    #
+    # The factors are MEASURED, not chosen. Worst global residual over the full
+    # 30-scenario set, and how many scenarios reacted:
+    #
+    #   module      1e-5 error              1e-6 error
+    #   chorus      -100.0 dB  21/30 FAIL   -120.1 dB  pass
+    #   dco          -99.8 dB   1/30 FAIL   -115.5 dB  pass
+    #   delay       -100.0 dB  17/30 FAIL   -120.4 dB  pass
+    #   env          -81.4 dB  30/30 FAIL   -101.8 dB  pass
+    #   reverb      -100.0 dB  30/30 FAIL   -120.4 dB  pass
+    #   vca_hpf     -100.0 dB  30/30 FAIL   -119.9 dB  pass
+    #   vcf_cv       -83.7 dB  17/30 FAIL   -104.0 dB  pass
+    #   vcf_ladder  -100.0 dB  30/30 FAIL   -119.7 dB  pass
+    #
+    # TWO RESULTS WORTH READING BEFORE TRUSTING THIS BATTERY:
+    #
+    # 1. THE DCO IS THE WEAKEST MODULE IN THE SET. A 1e-5 error on it lands at
+    #    -99.8 dB -- it clears the -100 dB threshold by 0.2 dB -- and only ONE
+    #    of the thirty scenarios reacts. The DCO is also the module most likely
+    #    to be rewritten for speed. A scenario that leans harder on it is owed.
+    #
+    # 2. pwm_cv HAS NO PASS CASE AND CANNOT HAVE ONE. Its bracket was measured
+    #    separately: 1e-7 fails at -35.5 dB in 22/30 scenarios, and 1e-8 gives a
+    #    residual of EXACTLY 0 because `1.0f + 1e-8f == 1.0f` -- that build
+    #    perturbs nothing and would be a vacuous pass case. Since 1e-7 IS one
+    #    ULP of the scale factor, pwm_cv is gated at the finest error a float
+    #    can carry: every representable error in its output is caught. It gets
+    #    the FAIL half only, and this note instead of a fake pass.
+    #
+    # NOT IN THIS BATTERY: 'skeleton'. Its shim discards eb_engine_process()'s
+    # result, so it cannot be perturbed into the output at all. It is
+    # un-gateable by this harness by construction -- see _OUT_ANCHOR.
+    for _m in sorted(_OUT_ANCHOR):
+        if _m == "pwm_cv":
+            cases.append(("out:pwm_cv:(1.0f + 1e-7f)", ("pwm_cv",), True))
+            continue
+        cases.append(("out:%s:(1.0f + 1e-5f)" % _m, (_m,), True))
+        cases.append(("out:%s:(1.0f + 1e-6f)" % _m, (_m,), False))
     # ONE reference render, reused by every mutant: the mutations are planted in
     # the CANDIDATE build, so the oracle side is invariant across the battery.
     # This line was missing until 2026-08-02 -- `run(..., ref=ref, ...)` raised
