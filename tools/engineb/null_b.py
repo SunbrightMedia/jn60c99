@@ -315,6 +315,9 @@ _OUT_ANCHOR = {
               "        *(float *)(a1 + 102336) = ebR;",
               "        *(float *)(a1 + 102320) *= %s;\n"
               "        *(float *)(a1 + 102336) *= %s;"),
+    "cvgate": ("voice_render.c",
+               "  v34 = v33;",
+               "  v34 *= %s;"),
     "pitch": ("voice_render.c",
               "  JF(a1, 4416) = v391;",
               "  v391 *= %s; JF(a1, 4416) = v391;"),
@@ -372,6 +375,12 @@ _BRACKET = {
     # that much. This is the weakest-coupled block in the engine and the one
     # whose bracket had to be derived from a measured gain rather than reused.
     "noise_svf":  ("1.35e-4", "1.35e-5"),
+    # 'cvgate' is FAIL-ONLY and absent here on purpose -- see teeth(). Its
+    # output is a three-way GATE SIGN in {-1, 0, +1}, a switch rather than a
+    # continuous value, so a relative perturbation SATURATES: MEASURED, both
+    # 3.16e-5 and 3.16e-6 give the SAME +3.3 dB residual in the same 4
+    # scenarios. A bracket needs a response that varies with the factor, and
+    # this one does not, so there is nothing to bracket.
     # 'pitch' is FAIL-ONLY and is absent from this table on purpose -- see
     # teeth(). Like pwm_cv it is gated finer than one ULP of 1.0f, so no pass
     # case can exist: MEASURED, 1.8e-8 gives EXACTLY 0 because
@@ -726,7 +735,7 @@ def teeth(quick):
     # result, so it cannot be perturbed into the output at all. It is
     # un-gateable by this harness by construction -- see _OUT_ANCHOR.
     for _m in sorted(_OUT_ANCHOR):
-        if _m in ("pwm_cv", "pitch"):
+        if _m in ("pwm_cv", "pitch", "cvgate"):
             # Both carry a CONTROL value -- a cutoff and a pitch -- so a
             # relative error on them is amplified enormously at the output, and
             # both are gated finer than one ULP of 1.0f. A pass case is
@@ -734,6 +743,13 @@ def teeth(quick):
             # at 1.8e-8 both give EXACTLY 0, because those factors round to
             # 1.0f and the build perturbs nothing. At one ULP, 1e-7, pwm_cv
             # fails at -35.5 dB in 22/30 and pitch at -35.6 dB in 20/30.
+            #
+            # 'cvgate' is here for a DIFFERENT reason, and the distinction
+            # matters: its output is a three-way gate sign, a SWITCH, so a
+            # relative perturbation saturates instead of scaling. MEASURED,
+            # 3.16e-5 and 3.16e-6 give the identical +3.3 dB in the identical 4
+            # scenarios. There is no bracket to draw because the response does
+            # not vary with the factor.
             cases.append(("out:%s:(1.0f + 1e-7f)" % _m, (_m,), True))
             continue
         _fail, _pass = _BRACKET[_m]

@@ -1,11 +1,17 @@
 /* GENERATED FILE -- DO NOT EDIT.
  * tools/engineb/merge_shims.py built this from the individual shims:
- *     dco, decim, env, noise_svf, pitch, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
+ *     cvgate, dco, decim, env, noise_svf, pitch, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
  * Edit those, then re-run the generator (make engineb does it).
  * Its purpose: engine B cannot be tested as a WHOLE ENGINE while each
  * module shadows the same port file -- see docs/engineb/HARNESS_AUDIT.md
  * finding F1, where a composite build silently linked 2 modules of 10.
  */
+/* ---- from shim 'cvgate' ---- */
+/* SHIM — MODULE CVGATE (engine_b/eb_cvgate.{h,c}).
+ * Replaces the ARITHMETIC of src/voice_render.c:657-680. The cell writes keep
+ * the port's own positions and order -- see the note inside. STATELESS, so no
+ * home for state and no power-on marker. */
+#include "eb_cvgate.h"
 /* ---- from shim 'dco' ---- */
 /* engine_b/shim/dco/voice_render.c — VERBATIM FORK of src/voice_render.c with
  * ONE block replaced: the DCO oscillator, src/voice_render.c:1718-2136 (the
@@ -795,31 +801,26 @@ LABEL_11:
   v27 = JF(a1, 304);
   JF(a1, 336) = v27;
   JF(a1, 448) = v26;
-  v28 = (float)((float)(v12 * v26) - (float)(v26 * v27)) + v27;
-  v29 = (float)((float)(v11 * v26) - (float)(v2 * v26)) + v2;
+  /* ==== ENGINE B MODULE CVGATE =========================================
+   * Only the ARITHMETIC is replaced. The port's cell writes stay exactly where
+   * and in the order the port has them -- an earlier version of this shim moved
+   * all five writes to the end of the block, proved every value bit-identical
+   * by assertion, and STILL diverged at 6.9 dB on all 30 scenarios. The values
+   * were never the problem; the ORDER was. Recorded because "the numbers match,
+   * so the change is safe" is exactly the reasoning that failed. */
+  {
+    eb_cvgate_in _gi;
+    eb_cvgate_out _go;
+    _gi.t28 = v12;  _gi.t29 = v11;  _gi.k = v26;
+    _gi.p28 = v27;  _gi.p29 = v2;   _gi.gate_off = JF(a1, 544);
+    eb_cvgate(&_gi, &_go);
+    v28 = _go.c464;  v29 = _go.c480;  v34 = _go.c496;  v33 = _go.sign;
+  }
   JF(a1, 464) = v28;
   JF(a1, 480) = v29;
-  v30 = v29;
-  v31 = v29 + JF(a1, 544);
-  if ( v31 < 0.0 )
-    v32 = v31;
-  else
-    v32 = 0.0;
-  v33 = -1.0;
-  if ( v30 == 0.0 )
-    v34 = -1.0;
-  else
-    v34 = v32;
   JF(a1, 496) = v34;
-  if ( v34 >= 0.0 )
-  {
-    if ( v34 > 0.0 )
-      v34 = 1.0;
-  }
-  else
-  {
-    v34 = -1.0;
-  }
+  v34 = v33;
+  /* ==== END ENGINE B MODULE CVGATE ===================================== */
   v35 = JF(a1, 608);
   v36 = v34 + 1.0;
   v37 = JF(a1, 768);
