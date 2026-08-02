@@ -35,7 +35,14 @@ USAGE
 
 Scenario set covers the risk surface: POLY pluck, MONO retrigger, UNISON phase
 pile-up, chorus pad, delay keys, MONO glide (portamento integrator) and a 6.8 s
-long-tail render for slow LFO/envelope state.
+long-tail render for slow LFO/envelope state — plus, since 2026-08-02, 17
+IDLE-PREFIX scenarios (see the block below SCEN) that render N free-running
+samples BEFORE the first note, N in {1, 48, 441, 4410, 44100}, over a chorus, a
+unison and a noise patch, and two allocate/release/idle/re-allocate scenarios.
+Those exist because every other scenario here starts COLD, which makes the set
+structurally blind to a LOCKSTEP failure — the exact failure mode engine B's
+idle-voice skip risks. The "idleskip" mutation in --teeth measures that: seven
+of the nine cold scenarios cannot catch it at all.
 Same juno_gui_* API both sides -> the reference-driving layer that caused
 every historical harness failure does not exist here.
 """
@@ -112,6 +119,71 @@ SCEN = [
           ('render', NFR), ('off', 43), ('off', 55), ('render', 14000)],
                                                                     "DCO reset arm"),
 ]
+
+COLD_TAGS = {t for _, _, t in SCEN}   # the pre-2026-08-02 set, frozen for the
+                                      # teeth matrix: "which scenarios existed
+                                      # before idle prefixes were added".
+
+# ------------------------------------------------------ IDLE-PREFIX SCENARIOS
+# WHY. Every scenario above starts from a COLD engine — juno_gui_create, then
+# apply_bank, then straight into notes. Two of them (MONO retrigger, UNISON
+# pile-up) happen to carry a leading ('render', 4000/8000), but that is a fixed
+# incidental prefix, not a swept one, and seven of the nine have none at all.
+#
+# That makes the whole set structurally incapable of catching a LOCKSTEP
+# failure. MEASURED (docs/trackb/ACCURACY_STANDARD.md): the same patch and the
+# same note sound DIFFERENT after 1, 48, 441, 4410 and 44100 idle samples,
+# because the DCO phases, the noise LFSR and the FX LFOs free-run and where they
+# stand at note-on is part of the sound. Engine B's single largest optimisation
+# — skip the AUDIO work for a silent voice — is one mistake away from also
+# skipping that voice's STATE ADVANCE, and a wrong skip is invisible to a gate
+# that never idles. This is the same shape as the warm chorus-arm divergence and
+# the MONO retrigger latch: both were invisible to every cold gate.
+#
+# THE SWEEP. Three patches x five idle lengths, chosen for what free-runs:
+#   * patch 20 CHORUS — the chorus LFO free-runs from power-on and the EFFECT
+#     routing default v551=2 arms it before any note exists.
+#   * patch 61 UNISON — all 8 DCOs boot phase-aligned and take seconds of DSP to
+#     decorrelate (docs/COLDSTART_UNISON_FINDING.md: peak 0.527 cold -> 0.202
+#     after 4 s, centroid 830 -> 1488 Hz on this very patch). Phase alignment is
+#     where idle state is loudest.
+#   * patch 32 DCO NOISE at 0.68, the loudest noise level in the bank, so the
+#     shared LFSR's position at note-on actually reaches the output.
+# The five N values are the ones the standard measured, 1 included: one sample of
+# idling already changes every sample of the note that follows.
+#
+# RE-ALLOCATION AFTER IDLE. The last entries play a note, release it, idle, then
+# play again. The port's own warm bug lived exactly there — a warm note lands on
+# a rotation voice, not voice 0, and that voice's free-running smoother state is
+# voice-distinct — so "allocate, release, idle, allocate" is its own case and not
+# covered by prefixing a single note.
+IDLE_N = [1, 48, 441, 4410, 44100]
+
+_IDLE_BASE = [
+    (20, [('on', 48, 100), ('on', 55, 100), ('render', 20000),
+          ('off', 48), ('off', 55), ('render', 10000)],             "idle chorus"),
+    (61, [('on', 48, 100), ('render', 20000),
+          ('off', 48), ('render', 10000)],                          "idle unison"),
+    (32, [('on', 52, 100), ('render', 20000),
+          ('off', 52), ('render', 10000)],                          "idle noise"),
+]
+for _p, _s, _t in _IDLE_BASE:
+    for _n in IDLE_N:
+        SCEN.append((_p, [('render', _n)] + _s, "%s %d" % (_t, _n)))
+
+# allocate -> release -> IDLE -> allocate again, on a unison and a chorus patch.
+SCEN += [
+    (61, [('on', 45, 100), ('render', 12000), ('off', 45), ('render', 6000),
+          ('render', 44100),                       # the idle between the notes
+          ('on', 52, 100), ('render', 20000), ('off', 52), ('render', 10000)],
+                                                                    "realloc unison"),
+    (20, [('on', 43, 100), ('render', 12000), ('off', 43), ('render', 6000),
+          ('render', 4410),
+          ('on', 59, 100), ('render', 20000), ('off', 59), ('render', 10000)],
+                                                                    "realloc chorus"),
+]
+
+IDLE_TAGS = {t for _, _, t in SCEN} - COLD_TAGS
 
 
 def load(lib_path):
@@ -414,6 +486,54 @@ def build(dst, mutate=None):
                       "  if (JF(a1, 560) == 0.0f) JF(a1, 10672) = "
                       "JF(a1, 10672) * 1.001f;\n" + anchor, 1)
         open(p, "w").write(s)
+    elif mutate == "idleskip":
+        # THE LOCKSTEP MUTATION. Engine B's largest optimisation is "do not do
+        # the audio work for a silent voice". This is that optimisation done
+        # WRONG: the voice's STATE ADVANCE is skipped too, until the first note
+        # the engine ever sees. Free-running DCO phase, the shared noise LFSR and
+        # every per-voice smoother therefore stand where they stood at power-on
+        # when the first note arrives, instead of where N samples of free-running
+        # would have put them.
+        #
+        # It is deliberately the SUBTLE version — it stops at the first note-on
+        # and never fires again — because the loud version (freeze whenever no
+        # key is held) also fires in every release tail, which the old cold
+        # scenarios do exercise. Restricting it to the pre-first-note window is
+        # what isolates the surface the old set cannot reach: a scenario that
+        # renders nothing before its first note-on is BIT-IDENTICAL under it, by
+        # construction, and no threshold can change that.
+        #
+        # The "has any note ever been played" latch lives at byte offset 11900000
+        # of the 12 MB state array: past the highest cell any engine source
+        # touches (~11,022,xxx) and calloc-zeroed by juno_gui_create, so it is a
+        # per-context flag with no aliasing and no leakage between scenarios.
+        # 1856 is the plugin's own broadcast "any key held" flag (src/juno_note.c
+        # :204-225), so the latch is set by the plugin's own note bookkeeping.
+        p = _mut_target(tmp, "voice_render.c"); s = open(p).read()
+        anchor = "  v2 = JF(a1, 320);\n"
+        assert s.count(anchor) == 1
+        s = s.replace(anchor,
+                      "  if ( JI(base, 11900000) == 0 ) {\n"
+                      "    if ( JF(a1, 1856) != 0.0f ) JI(base, 11900000) = 1;\n"
+                      "    else { *outL = 0.0f; *outR = 0.0f; return 0; }\n"
+                      "  }\n" + anchor, 1)
+        open(p, "w").write(s)
+    elif mutate == "gapskip":
+        # The MID-RUN half of the same failure: the voice's state advance is
+        # skipped whenever no key is held. Needed because "idleskip" cannot test
+        # the re-allocation scenarios (their first event is a note-on, so its
+        # pre-first-note window is empty and they are bit-identical under it).
+        # This one fires in every gap and every release tail, so plenty of cold
+        # scenarios catch it as well — that is expected and is not the claim.
+        # The claim it supports is narrow: the realloc-after-idle scenarios are
+        # not decoration, they do detect a state advance that stops in a gap.
+        p = _mut_target(tmp, "voice_render.c"); s = open(p).read()
+        anchor = "  v2 = JF(a1, 320);\n"
+        assert s.count(anchor) == 1
+        s = s.replace(anchor,
+                      "  if ( JF(a1, 1856) == 0.0f ) { *outL = 0.0f; "
+                      "*outR = 0.0f; return 0; }\n" + anchor, 1)
+        open(p, "w").write(s)
     elif mutate is not None:
         raise SystemExit("unknown mutation %s" % mutate)
     glob = __import__("glob")
@@ -455,16 +575,43 @@ def main():
         # nochorus -- so the obvious explanation is wrong and no substitute has
         # been established. Recorded as a measured fact and flagged, rather than
         # given a plausible story. Do not remove this note by guessing.
+        ALL = COLD_TAGS | IDLE_TAGS
+        NOISE_IDLE = {t for t in IDLE_TAGS if t.startswith("idle noise")}
+        REALLOC = {t for t in IDLE_TAGS if t.startswith("realloc")}
         EXPECT = {
-            "noisegain": {"delay keys", "long LFO+tail", "DCO noise"},
-            "dcopitch":  {t for _, _, t in SCEN},
-            "nochorus":  {t for _, _, t in SCEN} - {"DCO noise"},
-            "envslow":   {t for _, _, t in SCEN},
-            "tailquiet": {t for _, _, t in SCEN} - {"DCO noise"},
+            # MEASURED 2026-08-02 over the 26-scenario set (9 cold + 17 idle).
+            "noisegain": {"delay keys", "long LFO+tail", "DCO noise"} | NOISE_IDLE,
+            "dcopitch":  set(ALL),
+            # "DCO reset arm" (patch 22) does NOT catch nochorus. It was listed
+            # as expected by the previous all-minus-DCO-noise formula, which was
+            # written before that scenario existed and was never re-measured
+            # against it. Recorded here as the measured fact. UNEXPLAINED, like
+            # the patch-32 case below it; do not replace either with a guess.
+            "nochorus":  ALL - {"DCO noise", "DCO reset arm"} - NOISE_IDLE,
+            "envslow":   set(ALL),
+            "tailquiet": ALL - {"DCO noise"},
+            # LOCKSTEP, and the SHAPE of this set is the whole point: 15 of the
+            # 17 idle-prefix scenarios catch it, and of the 9 cold scenarios only
+            # the two that happen to carry a leading ('render', N) do. The seven
+            # genuinely cold ones are blind by construction, not by threshold.
+            # The two realloc scenarios are also blind to THIS mutation by
+            # construction — their first event is a note-on, so its
+            # pre-first-note window is empty. "gapskip" is the mutation that
+            # tests them.
+            "idleskip":  (IDLE_TAGS - REALLOC) | {"MONO retrigger", "UNISON pile-up"},
+            "gapskip":   set(ALL),
+        }
+        # A scenario whose first event is a note-on CANNOT catch idleskip. Making
+        # that an assertion, split cold vs idle, is what proves the new scenarios
+        # are load-bearing rather than redundant with the cold ones.
+        IDLE_EXPECT = {
+            "idleskip": (IDLE_TAGS - REALLOC, {"MONO retrigger", "UNISON pile-up"}),
+            "gapskip":  (set(IDLE_TAGS), set(COLD_TAGS)),
         }
         for mut, expect_fail in ((None, False), ("noisegain", True),
                                  ("dcopitch", True), ("nochorus", True),
-                                 ("envslow", True), ("tailquiet", True)):
+                                 ("envslow", True), ("tailquiet", True),
+                                 ("idleskip", True), ("gapskip", True)):
             dst = "/tmp/trackb_%s.so" % (mut or "clean")
             build(dst, mut)
             print("candidate: %s" % (mut or "clean rebuild (control)"))
@@ -474,6 +621,18 @@ def main():
             missing = sorted(want - caught_set)
             extra = sorted(caught_set - want)
             ok = (caught == expect_fail) and not missing
+            if mut in IDLE_EXPECT:
+                want_idle, want_cold = IDLE_EXPECT[mut]
+                got_idle = caught_set & IDLE_TAGS
+                got_cold = caught_set & COLD_TAGS
+                print("  CATCH MATRIX: idle-prefix %d/%d caught, cold %d/%d caught"
+                      % (len(got_idle), len(IDLE_TAGS), len(got_cold), len(COLD_TAGS)))
+                if got_idle != want_idle or got_cold != want_cold:
+                    print("    *** MATRIX MISMATCH: idle missing %s; cold "
+                          "unexpectedly catching %s ***"
+                          % (sorted(want_idle - got_idle) or "none",
+                             sorted(got_cold - want_cold) or "none"))
+                    ok = False
             if not ok: bad += 1
             print("  -> %s (%d/%d caught%s%s)\n"
                   % ("OK" if ok else "*** TEETH FAILURE ***",
