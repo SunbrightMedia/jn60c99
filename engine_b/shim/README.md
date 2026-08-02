@@ -162,3 +162,35 @@ is non-zero at that moment or if the tap does not fit `EB_DELAY_LEN`.
 Full numbers, the 14-configuration offline test against the literal
 transcription, the exhaustive double-to-float proof and the PSRAM warning:
 `docs/engineb/M-DELAY_RESULT.md`.
+
+## vca_hpf — MODULE M-VCA, the VCA + HPF output stage
+
+Forks `src/voice_render.c` and replaces ONE block, lines 1516-1640 (the four
+latches, the velocity and mute smoothers, the gate ramp, the VCA source
+combine, the HPF/boost network, the DC blocker, the amp TONE crossfade and the
+two final gains), with a call into `engine_b/eb_vca_hpf.c`. Everything else in
+the file is the port's own code byte for byte.
+
+`null_b.py --module vca_hpf` -> **30/30 EXACTLY 0**, including all 17
+idle-prefix scenarios. Non-vacuity is MEASURED: swapping the two tone filters'
+feedback taps -- the "3-tap FIR" misreading `docs/trackb/CELLMAP.md` warns about
+-- fails **15 of 30** scenarios, worst global **-8.8 dB**; inflating the boost
+path by 1.5x fails **13 of 30**; `x 1.00003` on the output fails **30/30** at
+**-90.4 dB**. The 15 scenarios that survive the tone swap have AMP TONE
+`[9584]` = 0, so the crossfade selects the dry path in both engines.
+
+TWO GATE HOLES FOUND AND REPORTED, not worked around:
+  * `[10256]` HPF SWITCH is `juno_curve(52, byte)`, which is EXECUTED over all
+    256 bytes to be **0.0 at byte 0 and 1.0 at bytes 1..255 -- never
+    intermediate** (and constant 1.0 for HPF TYPE=1, `src/hpf_type_lut.c`). So
+    the `t*b + a*(1-t)` crossfade at :1591/:1599 is a SWITCH over the whole
+    reachable parameter domain, and rewriting it as `a + t*(b-a)` nulls
+    EXACTLY 0 in all 30 scenarios. The source's own form is kept anyway:
+    `a + fl(b-a) == b` is not a theorem, only an observation over these signals.
+  * the same undistributed rewrite of the velocity blend at :1527 also nulls
+    EXACTLY 0. Both scenario sets are blind to that class of regrouping HERE;
+    they are not blind to it in general (the DCO wrap plant fails 15/30).
+
+No cycle figure is taken from the shim: the cost rig measures `eb_vca_hpf.c`
+alone, and it says **1,543 cyc/sample on the S3 at 8 voices** (nominal;
+MODELED band 958..4,106).

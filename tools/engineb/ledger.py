@@ -385,6 +385,48 @@ PROOFS = {
               "constant loses the step's low mantissa bits through exponent 2^3, "
               "and the release rate keeps its rel/r cancellation terms.",
     ),
+    "chorus": dict(
+        file="engine_b/eb_chorus.c",
+        replaces="src/master_render.c:2753-2937 (the EFFECT TYPE 2/3/4 chorus "
+                 "arm: input filter, BBD line + 2 interpolating taps, LFO, "
+                 "delay smoother, 2 output SVFs, BBD noise, dry/wet mix)",
+        proof=proof_null("chorus"),
+        proof_src=["engine_b/shim/chorus/master_render.c",
+                   "engine_b/shim/chorus/chorus_init.c",
+                   "engine_b/eb_chorus_shim.c", "engine_b/eb_chorus.h",
+                   "tools/engineb/fx_chorus_frac_proof.c"],
+        gate="python3 tools/engineb/null_b.py --module chorus",
+        cost_src=None,
+        cost_sources=["engine_b/eb_chorus.c"],
+        cost_func="eb_chorus_tick_x",
+        inv=1,
+        inv_label="STATIC",
+        inv_source="the chorus is a MASTER-stage effect: src/master_render.c "
+                   "runs the arm once per rendered sample, not once per voice",
+        strip_libm=True,
+        cost_caveat="THE RIG'S STATIC COUNT CHARGES 4 fmodf CALLS THAT DO NOT "
+                    "EXECUTE. eb_wrap_unit only calls fmodf when the LFO phase "
+                    "crosses +/-1, which is once per LFO period = once in "
+                    "100,000 samples at 48 kHz. MEASURED with callgrind over a "
+                    "200,000-sample delta: 0 fmodf calls appear at all, and the "
+                    "module executes 445 x86 instructions per sample in total. "
+                    "The libm term is therefore subtracted. NOT subtracted, and "
+                    "so still charged: fminf, 2 out-of-line calls per sample, "
+                    "12 executed instructions",
+        notes="Nulls EXACTLY 0, not to -100 dB. The one departure from the "
+              "port's arithmetic is the tap fraction, which the port computes "
+              "in DOUBLE: tools/engineb/fx_chorus_frac_proof.c enumerates all "
+              "2,298,478,592 float bit patterns in (-1024,1024) -- containing "
+              "the MEASURED 72..456 sample range -- and the float form agrees "
+              "bit for bit on every one, removing 8 soft-float helper calls per "
+              "sample on the S3. fmodf is NOT replaced: the reachable phase "
+              "exceeds 1 by only ~2e-5 so x-2 looks equivalent and is not "
+              "proven so, and MEASURED it costs nothing anyway. The BBD noise "
+              "generator is NOT dropped: MEASURED, removing only its two "
+              "injection terms moves the null to -54.3 dB worst global (17 of "
+              "30 scenarios fail, several 1024-blocks at 0.0 dB) and saves 21 "
+              "x86 instructions per sample.",
+    ),
 }
 
 
