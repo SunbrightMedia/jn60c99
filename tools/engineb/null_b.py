@@ -280,9 +280,13 @@ def build(dst_so, modules=(), mutate=None, quiet=True):
 # edited so a marker moves, the teeth case stops silently and says so.
 _OUT_ANCHOR = {
     # Four sub-samples per audio sample, all four scaled together.
+    # The marker moved on 2026-08-02 when the DCO went from four eb_dco_step
+    # calls to one eb_dco_step4. The uniqueness assert caught it and refused to
+    # plant, which is the behaviour this anchor scheme exists for: a teeth case
+    # that silently plants nothing is worse than no teeth case.
     "dco": ("voice_render.c",
-            "    JF(a1, 5328) = eb_dco_step(&ebs, &ebc);",
-            "    JF(a1,4944)*=%s; JF(a1,5072)*=%s; "
+            "      JF(a1, 5328) = _o[3];",
+            "      JF(a1,4944)*=%s; JF(a1,5072)*=%s; "
             "JF(a1,5200)*=%s; JF(a1,5328)*=%s;"),
     "env": ("voice_render.c",
             "      JF(a1, 2752 + off) = eb_env_tick(&es, &EBC[voice][ei], gin);",
@@ -311,6 +315,9 @@ _OUT_ANCHOR = {
               "        *(float *)(a1 + 102336) = ebR;",
               "        *(float *)(a1 + 102320) *= %s;\n"
               "        *(float *)(a1 + 102336) *= %s;"),
+    "decim": ("voice_render.c",
+              "  JF(a1, 3520) = v526;",
+              "  JF(a1, 4928) *= %s; JF(a1, 3520) *= %s;"),
     "reverb": ("master_render.c",
                "                      (int32_t *)(a1 + 10759872), v176, v177, "
                "&v529, &v530);",
@@ -354,6 +361,7 @@ _BRACKET = {
     "vca_hpf":    ("3.16e-5", "3.16e-6"),
     "vcf_ladder": ("3.16e-5", "3.16e-6"),
     "env":        ("3.7e-6",  "3.7e-7"),
+    "decim":      ("3.16e-5", "3.16e-6"),   # measured below, unity gain
     "vcf_cv":     ("4.8e-6",  "4.8e-7"),
     # pwm_cv is fail-only; see teeth(). Its FAIL case would need a factor of
     # about 1.9e-10 to land at -90 dB, which is far below one ULP of 1.0f.

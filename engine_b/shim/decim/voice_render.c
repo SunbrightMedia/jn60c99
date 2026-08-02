@@ -11,12 +11,30 @@
  * checked by grep over src/ before this shim was written and is re-checked by
  * the null: if anything else read them, the residual would not be zero. */
 #include "eb_decim.h"
-static eb_decim_state EBD[8];
-/* DIAGNOSTIC ONLY -- is the divergence a state-lifetime problem? Engine B's
- * per-voice decimator state is a static here, and the harness builds a NEW
- * engine context for every scenario, so scenario N+1 would start with scenario
- * N's filter history. Reset on a context change to test that. */
-static const unsigned char *EBD_base;
+#include "eb_types.h"
+/* ENGINE B OWNS THIS STATE, in eb_voice -- not in the port's cells.
+ *
+ * THE PROBLEM A SHIM HAS, and it is why this module could not be gated at all
+ * before: a shim has nowhere per-context to put state. The harness builds a NEW
+ * engine context for every scenario, so a plain `static` array carries scenario
+ * N's filter history into scenario N+1. Keying on the context pointer does not
+ * fix it either -- malloc reuses addresses, so a fresh context can land on the
+ * old pointer and skip the reset. That is a silent wrong answer, which is the
+ * one kind of failure this project cannot afford.
+ *
+ * THE MARKER. src/chorus_init.c:218 zeroes cell 5440 at power-on. Once this
+ * shim removes the 30-move shift, NOTHING else in the engine writes 5440: the
+ * DCO writes only 4944/5072/5200/5328 (:1807, :1911, :2015, :2117) and the only
+ * reader of 5440 was the FIR itself, which now lives in engine B. So a zero in
+ * 5440 means "this context has just been built", exactly once per context, and
+ * it survives address reuse because it is the PORT that zeroes it.
+ *
+ * LIMITATION, stated rather than discovered later: EBV is one array, so exactly
+ * one engine context may be rendered at a time in a process. The harness renders
+ * scenarios sequentially, so that holds today. It stops being a limitation at
+ * all in the standalone engine, where eb_voice lives inside the eb_engine the
+ * caller owns (docs/engineb/STANDALONE.md). */
+static eb_voice EBV[8];
 
 /* voice_render.c — exact C99 transcription of sub_180369070 (Cloud 60 voice
  * render). Generated first-pass by tools/translate_voice.py then finished by
@@ -2130,21 +2148,37 @@ LABEL_46:
    * The 32-tap polyphase FIR and the correction biquad, in engine_b/eb_decim.c.
    * v518 (the port's JF(a1,5440), the oldest phase-3 tap) is NOT passed in: it
    * is a tap the module already owns. The four fresh sub-samples are. */
-  if (base != EBD_base) { int _z; EBD_base = base;
-      for (_z = 0; _z < 8; ++_z) { eb_decim_state _e0; int _q;
-          for (_q = 0; _q < 32; ++_q) ((float *)_e0.h)[_q] = 0.0f;
-          _e0.w = 0; _e0.b1 = _e0.b2 = _e0.b3 = 0.0f; EBD[_z] = _e0; } }
   {
     eb_decim_coef _dc;
-    eb_decim_state *_ds = &EBD[voice];
+    eb_decim_state _ds;
+    eb_voice *_v = &EBV[voice];
+    int _q;
+    /* fresh context? the port zeroed cell 5440 -- see the note above */
+    if (JF(a1, 5440) == 0.0f) {
+        for (_q = 0; _q < 32; ++_q) ((float *)_v->decim_h)[_q] = 0.0f;
+        _v->decim_w = 0;
+        _v->decim_b1 = _v->decim_b2 = _v->decim_b3 = 0.0f;
+        JF(a1, 5440) = 1.0f;              /* claim it; the port never reads it */
+    }
     static const int _CC[16] = {5712,5696,5728,5744,5760,5776,5792,5808,
                                 5824,5840,5856,5872,5888,5904,5920,5936};
     int _i;
     for (_i = 0; _i < 16; ++_i) _dc.c[_i] = JF(a1, _CC[_i]);
     _dc.k6256 = JF(a1, 6256); _dc.k6272 = JF(a1, 6272);
     _dc.k6336 = JF(a1, 6336); _dc.k5456 = JF(a1, 5456);
-    v526 = eb_decim_tick(_ds, &_dc, JF(a1, 4944), JF(a1, 5072),
-                                    JF(a1, 5200), JF(a1, 5328));
+    /* eb_decim_state is the module's view; eb_voice is where it LIVES. The
+     * copy in and out is temporary scaffolding for the shim only -- in the
+     * standalone engine the module reads eb_voice directly and this vanishes. */
+    for (_q = 0; _q < 32; ++_q) ((float *)_ds.h)[_q] = ((float *)_v->decim_h)[_q];
+    _ds.w = _v->decim_w;
+    _ds.b1 = _v->decim_b1; _ds.b2 = _v->decim_b2; _ds.b3 = _v->decim_b3;
+
+    v526 = eb_decim_tick(&_ds, &_dc, JF(a1, 4944), JF(a1, 5072),
+                                     JF(a1, 5200), JF(a1, 5328));
+
+    for (_q = 0; _q < 32; ++_q) ((float *)_v->decim_h)[_q] = ((float *)_ds.h)[_q];
+    _v->decim_w = _ds.w;
+    _v->decim_b1 = _ds.b1; _v->decim_b2 = _ds.b2; _v->decim_b3 = _ds.b3;
   }
   JF(a1, 4928) = v526;
   JF(a1, 3520) = v526;

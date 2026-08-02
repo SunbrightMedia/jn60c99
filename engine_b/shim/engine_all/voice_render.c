@@ -1,6 +1,6 @@
 /* GENERATED FILE -- DO NOT EDIT.
  * tools/engineb/merge_shims.py built this from the individual shims:
- *     dco, env, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
+ *     dco, decim, env, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
  * Edit those, then re-run the generator (make engineb does it).
  * Its purpose: engine B cannot be tested as a WHOLE ENGINE while each
  * module shadows the same port file -- see docs/engineb/HARNESS_AUDIT.md
@@ -15,6 +15,45 @@
  * DCO module and to nothing else. See engine_b/eb_dco.h.
  */
 #include "eb_dco.h"     /* -I engine_b/ is supplied by the harness */
+
+/* ---- from shim 'decim' ---- */
+/* SHIM — MODULE DECIM (engine_b/eb_decim.{h,c}).
+ * Replaces two separate pieces of src/voice_render.c that belong to ONE block:
+ * the 30-cell delay-line shift at :1697-1702 and the 32-tap polyphase FIR plus
+ * correction biquad at :2134-2173. Nothing else in this file differs from the
+ * port -- diff them -- so a divergence under `null_b.py --module decim` is
+ * attributable to the decimator and to nothing else.
+ *
+ * The per-voice state lives in engine B, not in the port's cells, so the cells
+ * the shift used to maintain (4944..5440, 5472, 5488, 5504) are no longer
+ * written. That is only safe because the FIR is their sole reader, which was
+ * checked by grep over src/ before this shim was written and is re-checked by
+ * the null: if anything else read them, the residual would not be zero. */
+#include "eb_decim.h"
+#include "eb_types.h"
+/* ENGINE B OWNS THIS STATE, in eb_voice -- not in the port's cells.
+ *
+ * THE PROBLEM A SHIM HAS, and it is why this module could not be gated at all
+ * before: a shim has nowhere per-context to put state. The harness builds a NEW
+ * engine context for every scenario, so a plain `static` array carries scenario
+ * N's filter history into scenario N+1. Keying on the context pointer does not
+ * fix it either -- malloc reuses addresses, so a fresh context can land on the
+ * old pointer and skip the reset. That is a silent wrong answer, which is the
+ * one kind of failure this project cannot afford.
+ *
+ * THE MARKER. src/chorus_init.c:218 zeroes cell 5440 at power-on. Once this
+ * shim removes the 30-move shift, NOTHING else in the engine writes 5440: the
+ * DCO writes only 4944/5072/5200/5328 (:1807, :1911, :2015, :2117) and the only
+ * reader of 5440 was the FIR itself, which now lives in engine B. So a zero in
+ * 5440 means "this context has just been built", exactly once per context, and
+ * it survives address reuse because it is the PORT that zeroes it.
+ *
+ * LIMITATION, stated rather than discovered later: EBV is one array, so exactly
+ * one engine context may be rendered at a time in a process. The harness renders
+ * scenarios sequentially, so that holds today. It stops being a limitation at
+ * all in the standalone engine, where eb_voice lives inside the eb_engine the
+ * caller owns (docs/engineb/STANDALONE.md). */
+static eb_voice EBV[8];
 
 /* ---- from shim 'env' ---- */
 /* engine_b/shim/env/voice_render.c — VERBATIM FORK of src/voice_render.c
@@ -1523,36 +1562,8 @@ LABEL_46:
   v386_lo = JI(a1, 4272);
   JI(a1, 4848) = JI(a1, 4832);
   JI(a1, 4880) = JI(a1, 4864);
-  JI(a1, 5056) = JI(a1, 5040);
-  JI(a1, 5040) = JI(a1, 5024);
-  JI(a1, 5024) = JI(a1, 5008);
-  JI(a1, 5008) = JI(a1, 4992);
-  JI(a1, 4992) = JI(a1, 4976);
-  JI(a1, 4976) = JI(a1, 4960);
-  JI(a1, 4960) = JI(a1, 4944);
-  JI(a1, 5184) = JI(a1, 5168);
-  JI(a1, 5168) = JI(a1, 5152);
-  JI(a1, 5152) = JI(a1, 5136);
-  JI(a1, 5136) = JI(a1, 5120);
-  JI(a1, 5120) = JI(a1, 5104);
-  JI(a1, 5104) = JI(a1, 5088);
-  JI(a1, 5088) = JI(a1, 5072);
-  JI(a1, 5312) = JI(a1, 5296);
-  JI(a1, 5296) = JI(a1, 5280);
-  JI(a1, 5280) = JI(a1, 5264);
-  JI(a1, 5264) = JI(a1, 5248);
-  JI(a1, 5248) = JI(a1, 5232);
-  JI(a1, 5232) = JI(a1, 5216);
-  JI(a1, 5216) = JI(a1, 5200);
-  JI(a1, 5440) = JI(a1, 5424);
-  JI(a1, 5424) = JI(a1, 5408);
-  JI(a1, 5408) = JI(a1, 5392);
-  JI(a1, 5392) = JI(a1, 5376);
-  JI(a1, 5376) = JI(a1, 5360);
-  JI(a1, 5360) = JI(a1, 5344);
-  JI(a1, 5344) = JI(a1, 5328);
-  JI(a1, 5504) = JI(a1, 5488);
-  JI(a1, 5488) = JI(a1, 5472);
+    /* ==== ENGINE B MODULE DECIM: the 30-move delay-line and biquad shift
+     * is a rotating index in eb_decim.c and moves nothing. ==== */
   JI(a1, 4736) = v393;
   JI(a1, 4752) = v394;
   v395 = v392 + JF(a1, 6304);
@@ -1636,44 +1647,45 @@ LABEL_46:
   v518 = JF(a1, 5440);
   /* =============== END ENGINE B MODULE — DCO ============================== */
 
-  v519 = (float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)(JF(a1, 5312) + JF(a1, 5072))
-                                                                                               * JF(a1, 5712))
-                                                                                       + (float)((float)(v518 + JF(a1, 4944))
-                                                                                               * JF(a1, 5696)))
-                                                                               + (float)((float)(JF(a1, 5200)
-                                                                                               + JF(a1, 5184))
-                                                                                       * JF(a1, 5728)))
-                                                                       + (float)((float)(JF(a1, 5328)
-                                                                                       + JF(a1, 5056))
-                                                                               * JF(a1, 5744)))
-                                                               + (float)((float)(JF(a1, 5424)
-                                                                               + JF(a1, 4960))
-                                                                       * JF(a1, 5760)))
-                                                       + (float)((float)(JF(a1, 5296) + JF(a1, 5088))
-                                                               * JF(a1, 5776)))
-                                               + (float)((float)(JF(a1, 5216) + JF(a1, 5168))
-                                                       * JF(a1, 5792)))
-                                       + (float)((float)(JF(a1, 5344) + JF(a1, 5040))
-                                               * JF(a1, 5808)))
-                               + (float)((float)(JF(a1, 5408) + JF(a1, 4976)) * JF(a1, 5824)))
-                       + (float)((float)(JF(a1, 5104) + JF(a1, 5280)) * JF(a1, 5840)))
-               + (float)((float)(JF(a1, 5232) + JF(a1, 5152)) * JF(a1, 5856)))
-       + (float)((float)(JF(a1, 5024) + JF(a1, 5360)) * JF(a1, 5872));
-  v520 = JF(a1, 5488);
-  v521 = (float)(v520 * JF(a1, 6256)) + JF(a1, 5504);
-  v522 = (float)((float)(v519 + (float)((float)(JF(a1, 5392) + JF(a1, 4992)) * JF(a1, 5888)))
-               + (float)((float)(JF(a1, 5264) + JF(a1, 5120)) * JF(a1, 5904)))
-       + (float)((float)(JF(a1, 5248) + JF(a1, 5136)) * JF(a1, 5920));
-  v523 = (float)(JF(a1, 5376) + JF(a1, 5008)) * JF(a1, 5936);
-  JF(a1, 5488) = v521;
-  v524 = v522 + v523;
-  v525 = v524 - (float)((float)(v520 * JF(a1, 6272)) + v521);
-  JF(a1, 5472) = (float)(v525 * JF(a1, 6256)) + v520;
-  v526 = (float)((float)((float)(v521 - (float)(v525 * JF(a1, 5456))) * JF(a1, 6336))
-               - (float)(JF(a1, 6336) * v524))
-       + v524;
+  /* ==== ENGINE B MODULE DECIM ============================================
+   * The 32-tap polyphase FIR and the correction biquad, in engine_b/eb_decim.c.
+   * v518 (the port's JF(a1,5440), the oldest phase-3 tap) is NOT passed in: it
+   * is a tap the module already owns. The four fresh sub-samples are. */
+  {
+    eb_decim_coef _dc;
+    eb_decim_state _ds;
+    eb_voice *_v = &EBV[voice];
+    int _q;
+    /* fresh context? the port zeroed cell 5440 -- see the note above */
+    if (JF(a1, 5440) == 0.0f) {
+        for (_q = 0; _q < 32; ++_q) ((float *)_v->decim_h)[_q] = 0.0f;
+        _v->decim_w = 0;
+        _v->decim_b1 = _v->decim_b2 = _v->decim_b3 = 0.0f;
+        JF(a1, 5440) = 1.0f;              /* claim it; the port never reads it */
+    }
+    static const int _CC[16] = {5712,5696,5728,5744,5760,5776,5792,5808,
+                                5824,5840,5856,5872,5888,5904,5920,5936};
+    int _i;
+    for (_i = 0; _i < 16; ++_i) _dc.c[_i] = JF(a1, _CC[_i]);
+    _dc.k6256 = JF(a1, 6256); _dc.k6272 = JF(a1, 6272);
+    _dc.k6336 = JF(a1, 6336); _dc.k5456 = JF(a1, 5456);
+    /* eb_decim_state is the module's view; eb_voice is where it LIVES. The
+     * copy in and out is temporary scaffolding for the shim only -- in the
+     * standalone engine the module reads eb_voice directly and this vanishes. */
+    for (_q = 0; _q < 32; ++_q) ((float *)_ds.h)[_q] = ((float *)_v->decim_h)[_q];
+    _ds.w = _v->decim_w;
+    _ds.b1 = _v->decim_b1; _ds.b2 = _v->decim_b2; _ds.b3 = _v->decim_b3;
+
+    v526 = eb_decim_tick(&_ds, &_dc, JF(a1, 4944), JF(a1, 5072),
+                                     JF(a1, 5200), JF(a1, 5328));
+
+    for (_q = 0; _q < 32; ++_q) ((float *)_v->decim_h)[_q] = ((float *)_ds.h)[_q];
+    _v->decim_w = _ds.w;
+    _v->decim_b1 = _ds.b1; _v->decim_b2 = _ds.b2; _v->decim_b3 = _ds.b3;
+  }
   JF(a1, 4928) = v526;
   JF(a1, 3520) = v526;
+  /* ==== END ENGINE B MODULE DECIM ======================================= */
   if ( JF(base, auxoff) == 1.0 )
   {
     JI(a1, 320) = v528;
