@@ -611,7 +611,29 @@ static void unison_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     int v, was_idle = !c->voice_gated[0];
     for (v = 0; v < JUNO_NUM_VOICES; ++v) {
-        if (was_idle) voice_trigger(c, v, midi_note, velocity);
+        if (was_idle) {
+            /* UNISON retrigger arms the DCO phase-reset latch on ALL EIGHT
+             * voices, exactly as MONO arms it on voice 0. Its absence made the
+             * port diverge from the plugin by -34.6 dB global / -16.3 dB block
+             * on patch 61 after ANY idle -- one single idle frame was enough.
+             *
+             * Cold it matched by accident: juno_init arms Array A at BUILD, the
+             * first rendered sample consumes the one-shot, and from then on the
+             * port left all 8 DCOs un-rephased while the plugin re-phased them.
+             * UNISON is 8 detuned copies of one note, so 8 wrong phases is a
+             * large error. Every cold gate was structurally blind to it.
+             *
+             * PROVEN: after note-on the port/plugin state diff is exactly the 8
+             * cells 101504+32v (plugin 1.0f, port 0.0f) plus the inert Array B
+             * twin, and nothing else. Arming them makes patch 61 and patch 63 --
+             * the bank's only ASSIGN=2 patches -- BIT-EXACT warm.
+             *
+             * The arm belongs in the was_idle branch ONLY: the glide branch is
+             * bit-exact without it, and arming there breaks it. Same law and
+             * same defect class as the MONO latch above (e611f7d). */
+            juno_note_retrig(c->st, v);
+            voice_trigger(c, v, midi_note, velocity);
+        }
         else { juno_note_glide(c->st, v, midi_note); juno_note_velocity(c->st, v, velocity);
                c->voice_note[v] = midi_note; c->voice_age[v] = ++c->age_counter; }
     }

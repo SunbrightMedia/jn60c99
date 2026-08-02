@@ -13,9 +13,6 @@
  */
 #include "eb_vca_hpf.h"
 #include <math.h>
-#include <stdio.h>
-static float _seen[64]; static int _n;
-static void _rec(float v){FILE*f;for(int i=0;i<_n;i++) if(_seen[i]==v) return; if(_n<64){_seen[_n++]=v; f=fopen("/tmp/ebprobe.txt","a"); if(f){fprintf(f,"c10256=%.9g\n",v);fclose(f);} } }
 
 void eb_vca_reset(eb_vca_state *st)
 {
@@ -84,7 +81,6 @@ float eb_vca_tick(eb_vca_state *st, const eb_vca_coef *c,
     if (lvl <= 0.0f) lvl = 0.0f;                                    /* :1592 */
     lvl = lvl * c->c10320;                                          /* :1598 */
 
-    _rec(c->c10256);
     /* The ONE place in this range where the (1-t) complement IS formed, and
      * the resonance-compensation gain (1 + [6848]*[10336]).  :1591,:1599 */
     y  = ((c->c10256 * boost) + (vcf * (1.0f - c->c10256)))
