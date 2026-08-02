@@ -27,8 +27,8 @@
 #include <string.h>
 
 /* ---- ENGINE B (1/2): the skeleton, alongside the port ------------------- */
-#include "../../eb_engine.h"
-#include "../../eb_modules.h"
+#include "eb_engine.h"      /* -I engine_b/ is supplied by the harness */
+#include "eb_modules.h"
 
 /* One engine, in BSS, exactly as firmware would hold it -- no allocation, no
  * handle, no init order to get wrong. The null harness renders one context at a
@@ -148,6 +148,14 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
         float ebL = 0.0f, ebR = 0.0f;
         if (!EB_READY) { eb_engine_init(&EB, 44100.0f); EB_READY = 1; }
         eb_ok = (eb_engine_process(&EB, &ebL, &ebR) == EB_OK);
+#ifdef EB_SKELETON_FORCE_HANDOVER
+        /* TEETH ONLY. Forces the hand-over branch that EB_INCOMPLETE otherwise
+         * makes unreachable, so that "the null is EXACTLY 0" is demonstrated to
+         * be a property of engine B not yet claiming the output, and NOT of a
+         * dead branch the harness could never reach. Engine B currently computes
+         * silence, so with this defined the null must FAIL loudly. */
+        eb_ok = 1;
+#endif
         eb_l = ebL; eb_r = ebR;
     }
 

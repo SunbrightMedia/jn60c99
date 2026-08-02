@@ -158,6 +158,7 @@ typedef struct {
     uint8_t chorus_mode, reverb_level, delay_level, delay_time;
     uint8_t portamento, assign_mode, bend_range, delay_sync, vca_level;
     uint8_t vca_mode, condition, hpf_type, delay_type, vcf_env_src;
+    uint8_t arp_sw, arp_type, arp_step;
 
     /* --- NOT YET LOCATED. These are real JUNO-60 parameters engine B will
      *     need; their blob positions have not been derived here and are NOT

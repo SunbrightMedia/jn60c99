@@ -1,9 +1,49 @@
 /* eb_patch.h — THE PARAMETER PATH. Engine B's only parameter input.
  *
- * Engine B takes the 118-byte COMPACT PATCH (docs/preset/COMPACT_FORMAT.md),
- * not the plugin's 20,223-byte record. That format is PROVEN for the factory
- * bank: reconstructing each patch from its 118 bytes written into a fixed
- * template record reproduces the engine state EXACTLY for 64/64 patches.
+ * Engine B takes a COMPACT PATCH -- a few dozen bytes -- instead of the plugin's
+ * 20,223-byte record. The starting point is docs/preset/COMPACT_FORMAT.md's
+ * 118-byte set.
+ *
+ * *** THAT SET IS INSUFFICIENT. MEASURED THIS SESSION, AND IT IS A REAL DEFECT
+ * IN THE FORMAT, NOT A DETAIL. ***
+ *
+ * Reconstructing each patch from its 118 bytes into patch 0's record as a
+ * template and RENDERING it through the oracle (48 kHz, note 60 velocity 100,
+ * 8,000 frames) diverges from the original record on 7 of the 64 factory
+ * patches -- 1, 9, 17, 25, 33, 41, 49 -- by between -3.3 dB and +2.6 dB relative.
+ * Those are the seven ARPEGGIATOR patches, and the cause is that the format
+ * carries none of ARPEGGIO SW, TYPE or STEP (blob 282/283, 290/291, 298/299).
+ *
+ * The reason is visible in the format's own stated method: the live-byte scan
+ * hashed AUDIO CELLS, and with no transport clock the arpeggiator writes none.
+ * A byte set derived by probing is only as complete as the probe, which is the
+ * same structural blindness that hid KEY ASSIGN, the fine-FX leaf table and the
+ * MONO retrigger latch from the port's gates.
+ *
+ * Adding those six bytes gives 64/64 BIT-EXACT rendered audio -- a strictly
+ * stronger check than the engine-state hash the 118-byte claim rests on.
+ * Three more are added on top, and they cost nothing because they are constant
+ * across the factory bank -- which is exactly why the scan could not see them:
+ *   blob 112  the high-nibble byte of ASSIGN MODE. Without it, KEY ASSIGN is
+ *             recoverable only because the template happens to supply a zero
+ *             nibble. KEY ASSIGN is the single parameter this project has
+ *             already been bitten hardest by; it must not be carried by luck.
+ *   blob 466/467  F ENV VARIATION, the VCF envelope SOURCE -- the port's own
+ *             "pluck has a slow attack" bug. It VARIES across the bank (value 1
+ *             in patches 1, 5, 10, 35, 36, 47, 61) yet the 118-byte set carries
+ *             neither of its bytes. MEASURED: dropping it happens to be audio-
+ *             inert under this driving, so it is a latent hole rather than a
+ *             demonstrated audible defect -- but it is a parameter that varies
+ *             and is not stored, which is not a state a format may ship in.
+ *
+ * TOTAL: 127 bytes. Still 159 patches in a 24LC256, versus the 277 the 118-byte
+ * figure promises.
+ *
+ * WHAT IS STILL OWED, and it is the same debt COMPACT_FORMAT.md already lists:
+ * this was derived by driving the PORT. Per docs/trackb/THREE_WAY_GATE.md only
+ * a scan against the PLUGIN can retire the claim, and the factory bank cannot
+ * exercise a parameter no factory patch moves (EFFECT TYPE 4 / FLANGER remains
+ * the named example).
  *
  * It is wired in from the first commit ON PURPOSE. A parameter path retro-fitted
  * later is a parameter path that quietly grew a second, undocumented input --
@@ -30,7 +70,10 @@
 #include <stddef.h>
 #include "eb_types.h"
 
-#define EB_PATCH_BYTES   118        /* docs/preset/COMPACT_FORMAT.md          */
+/* 127, NOT the 118 of docs/preset/COMPACT_FORMAT.md. MEASURED here, against the
+ * oracle, and the difference is a real defect in that format -- see the header
+ * comment above and docs/engineb/COMPACT_FORMAT_FINDING.md. */
+#define EB_PATCH_BYTES   127
 #define EB_RECORD_BYTES  20223
 #define EB_BANK_HEADER   23
 #define EB_BANK_BLOB_OFF 16
@@ -38,9 +81,9 @@
 
 typedef struct { uint8_t b[EB_PATCH_BYTES]; } eb_patch;
 
-/* The 118 live blob offsets, ascending. Same set as
- * docs/preset/compact_bytes.json; eb_patch_selftest() re-checks the count and
- * the ordering rather than trusting the transcription. */
+/* The live blob offsets, ascending: docs/preset/compact_bytes.json PLUS the nine
+ * this session measured it to be missing. eb_patch_selftest() re-checks the
+ * count and the ordering rather than trusting the transcription. */
 extern const uint16_t eb_patch_offsets[EB_PATCH_BYTES];
 
 /* Pull patch `idx` out of a full factory bank image into 118 bytes.

@@ -1,4 +1,4 @@
-/* eb_patch.c — the 118-byte compact patch, decoded into eb_params.
+/* eb_patch.c — the compact patch (127 bytes, MEASURED), decoded into eb_params.
  *
  * PROVENANCE OF THE POSITIONS. Every `roff` in TAB below is transcribed from the
  * sealed port's own recall (src/juno_apply.c), which is itself gated bit-for-bit
@@ -20,18 +20,21 @@
 #include "eb_patch.h"
 #include <string.h>
 
-/* docs/preset/compact_bytes.json, ascending. */
+/* docs/preset/compact_bytes.json (118) + the nine this session MEASURED it to be
+ * missing: 112 (ASSIGN MODE high nibble), 282/283 290/291 298/299 (ARPEGGIO
+ * SW / TYPE / STEP), 466/467 (F ENV VARIATION). Ascending. */
 const uint16_t eb_patch_offsets[EB_PATCH_BYTES] = {
       14,   15,   16,   17,   18,   19,   20,   21,   24,   25,   28,   29,
       30,   31,   32,   33,   52,   53,   54,   55,   56,   57,   58,   59,
       70,   71,   74,   75,   76,   77,   78,   79,   80,   81,   82,   83,
       84,   85,   86,   87,   88,   89,   90,   91,   92,   93,   94,   95,
       96,   97,   98,   99,  100,  101,  102,  103,  104,  105,  106,  107,
-     108,  109,  111,  113,  114,  115,  118,  119,  132,  133,  474,  475,
-     482,  483,  498,  499,  506,  507,  514,  515,  522,  523,  538,  539,
-     602,  603,  618,  619,  626,  627,  634,  635,  642,  643,  650,  651,
-    1852, 1853, 2086, 2087, 3041, 3042, 3043, 3044, 3045, 3052, 3053, 3060,
-    3061, 3068, 3069, 3076, 3077, 3931, 3932, 3933, 3935, 3936,
+     108,  109,  111,  112,  113,  114,  115,  118,  119,  132,  133,  282,
+     283,  290,  291,  298,  299,  466,  467,  474,  475,  482,  483,  498,
+     499,  506,  507,  514,  515,  522,  523,  538,  539,  602,  603,  618,
+     619,  626,  627,  634,  635,  642,  643,  650,  651, 1852, 1853, 2086,
+    2087, 3041, 3042, 3043, 3044, 3045, 3052, 3053, 3060, 3061, 3068, 3069,
+    3076, 3077, 3931, 3932, 3933, 3935, 3936,
 };
 
 /* Front-panel parameter p sits at record offset 16 + 2p (src/juno_apply.c). */
@@ -81,6 +84,9 @@ static const eb_bind TAB[] = {
     {        498, F(condition),    "CONDITION"        },   /* leaf 114 */
     {        618, F(hpf_type),     "HPF TYPE"         },   /* leaf 129 */
     {        650, F(delay_type),   "DELAY TYPE"       },
+    {        298, F(arp_sw),       "ARPEGGIO SW"      },   /* leaf 89  */
+    {        306, F(arp_type),     "ARPEGGIO TYPE"    },   /* leaf 90  */
+    {        314, F(arp_step),     "ARPEGGIO STEP"    },   /* leaf 91  */
     /* ---- UNRESOLVED: position not derived. Never guessed. ----------------- */
     { -1, F(effect_type),   "EFFECT TYPE"     },
     { -1, F(effect_depth),  "EFFECT DEPTH"    },
@@ -103,6 +109,15 @@ static const eb_bind TAB[] = {
 };
 #undef F
 #define NTAB ((int)(sizeof(TAB) / sizeof(TAB[0])))
+
+/* WHY 127 AND NOT THE DOCUMENTED 118: see eb_patch.h. Short version, MEASURED
+ * against the oracle this session -- the 118-byte set drops ARPEGGIO SW/TYPE/STEP
+ * and 7 of the 64 factory patches do not reproduce; with the six arp bytes added,
+ * all 64 render BIT-EXACTLY. Three further bytes (ASSIGN MODE's high nibble and
+ * F ENV VARIATION) are added because they are parameters that are not stored,
+ * which the byte scan could not see precisely because they are constant or inert
+ * in the factory bank.
+ */
 
 /* ---------------------------------------------------------------- lookup */
 static int index_of(int blob_off)

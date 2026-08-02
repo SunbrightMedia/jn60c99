@@ -2,16 +2,16 @@
  *
  * Three questions, all answered against the real factory bank:
  *
- *   1. ROUND TRIP. Extract 118 bytes, write them into patch 0's record as a
- *      template, and the reconstructed record must be byte-identical to the
- *      original ON EVERY ONE OF THE 118 LIVE BYTES, for 64/64 patches. This is
- *      the claim docs/preset/COMPACT_FORMAT.md makes; it is re-checked here
- *      rather than inherited, because engine B's parameter path depends on it.
+ *   1. ROUND TRIP. Extract the compact bytes, write them into patch 0's record as
+ *      a template, and the reconstructed record must be byte-identical to the
+ *      original on every one of them, for 64/64 patches.
  *
- *   2. COVERAGE. Does the 118-byte set actually carry every parameter engine B
+ *   2. COVERAGE. Does the byte set actually carry every parameter engine B
  *      READS? This is a different question from 1, and it is the one the format
- *      has never been asked. A byte set derived by hashing audio cells can miss a
- *      parameter whose effect the probe was blind to.
+ *      had never been asked. A byte set derived by hashing audio cells can miss a
+ *      parameter whose effect the probe was blind to -- and MEASURED this
+ *      session, the documented 118-byte set misses three
+ *      (tools/engineb/patch_roundtrip.py is the render-level gate).
  *
  *   3. NON-VACUITY. A decoder that returned zeros would pass 1 and 2. So the
  *      decoded parameters must actually VARY across the bank, and the count of
@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     FILE *f = fopen(path, "rb");
     unsigned char *bank, *tpl, *rec;
     long len;
-    int p, i, fails = 0;
+    int p, i, fails = 0, rt_bad = 0;
     static eb_patch pk[EB_BANK_COUNT];
     static eb_params pm[EB_BANK_COUNT];
 
@@ -59,21 +59,22 @@ int main(int argc, char **argv)
         for (i = 0; i < EB_PATCH_BYTES; ++i) {
             int off = 16 + (int)eb_patch_offsets[i];
             if (rec[off] != orig[off]) {
+                rt_bad++;
                 printf("FAIL: patch %d blob %d: %02x != %02x\n",
                        p, (int)eb_patch_offsets[i], rec[off], orig[off]);
                 fails++;
             }
         }
     }
-    printf("round trip: %d/%d patches reproduce all 118 live bytes\n",
-           EB_BANK_COUNT - (fails ? 1 : 0) * 0 + 0, EB_BANK_COUNT);
+    printf("round trip: %d/%d patches reproduce all %d live bytes\n",
+           EB_BANK_COUNT - rt_bad, EB_BANK_COUNT, EB_PATCH_BYTES);
 
     /* ---- 2. coverage ---------------------------------------------------- */
     {
         int miss[64], n = eb_patch_coverage(miss, 64);
         const char *un[64]; int u = eb_patch_unresolved(un, 64);
         printf("coverage: %d parameter(s) engine B reads are NOT carried by the "
-               "118-byte format\n", n);
+               "compact format\n", n);
         for (i = 0; i < n && i < 64; ++i)
             printf("    MISSING  record %4d  %s\n", miss[i],
                    eb_patch_name_of(miss[i]));

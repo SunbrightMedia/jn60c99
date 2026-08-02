@@ -28,4 +28,15 @@ surrounding code. `--module all` is the acceptance shape, and B-vs-plugin
 (docs/trackb/THREE_WAY_GATE.md) is the only comparison that retires a claim.
 `src/` is a fast proxy, never the authority.
 
-No modules exist yet.
+## skeleton
+
+The only shim at this commit. It is a verbatim fork of `src/juno_driver.c` — diff
+it, the only additions are two marked ENGINE B blocks — that runs the engine B
+skeleton alongside the port on every sample and DISCARDS its output while
+`eb_engine_process()` returns `EB_INCOMPLETE`. `null_b.py --module skeleton` is
+therefore EXACTLY 0 in all 26 scenarios, and that zero is a plumbing baseline,
+not a DSP result. Compile it with `-DEB_SKELETON_FORCE_HANDOVER=1` to force the
+hand-over branch: the null then fails in 25/25 scenarios, which is how the
+hand-over line is known to be live rather than unreachable.
+
+No DSP module exists yet.

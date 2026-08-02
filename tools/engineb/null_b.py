@@ -183,8 +183,13 @@ def build(dst_so, modules=(), mutate=None, quiet=True):
                 shadowed.append(base)
         if mutate:
             _plant(tmp, mutate)
+        # engine_b/test_*.c are STANDALONE unit tests, each with its own main().
+        # They are not the engine and must not be linked into the library under
+        # test: two of them in one .so is a duplicate-main link error, and one of
+        # them in the .so is a main() nobody wants in a shared library.
         srcs = sorted(glob.glob(os.path.join(tmp, "src", "*.c"))) + \
-            sorted(glob.glob(os.path.join(tmp, "engine_b", "*.c")))
+            [f for f in sorted(glob.glob(os.path.join(tmp, "engine_b", "*.c")))
+             if not os.path.basename(f).startswith("test_")]
         cmd = ["cc"] + CFLAGS + [
             "-DENGINEB_MODULE=\"%s\"" % (",".join(modules) or "none"),
             "-I" + os.path.join(tmp, "src"),

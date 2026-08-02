@@ -14,7 +14,7 @@
 /* Return codes of eb_engine_process(). */
 enum {
     EB_OK = 0,
-    EB_INCOMPLETE = 1     /* a module is missing; *outL/*outR are NOT audio and
+    EB_INCOMPLETE = 1     /* a module is missing; the outputs are NOT audio and
                              the caller must fall back to the oracle. See
                              eb_modules.h -- this is a structural refusal. */
 };
