@@ -194,6 +194,26 @@ for rate in RATES:
                       "pow2_line_bytes": (1 << (mx).bit_length()) * 4}
 out["memory"] = mem
 
+# ------------------------------------ 5b. isolation: the reverb is a pure send
+iso2 = {}
+for rate in RATES:
+    c = mk(rate)
+    J.juno_gui_set(c, 10759408, F32(0.0)); J.juno_gui_set(c, 10759424, F32(0.0))
+    render(c, np.zeros(6000, F32))
+    sig = (0.3 * np.sin(2 * np.pi * 220 * np.arange(8000) / rate)).astype(F32)
+    l, r, _ = render(c, sig)
+    c2 = mk(rate); render(c2, np.zeros(6000, F32))
+    J.juno_gui_set(c2, 10759408, F32(0.0)); J.juno_gui_set(c2, 10759424, F32(0.0))
+    l2, _, _ = render(c2, np.zeros(200000, F32))
+    iso2[str(rate)] = {
+        "send0_dry0_from_cold_peak": float(np.max(np.abs(l))),
+        "send0_dry0_from_cold_exact_zero": bool(np.all(l == 0) and np.all(r == 0)),
+        "post_warm_residual_peak_first1k": float(np.max(np.abs(l2[:1000]))),
+        "post_warm_residual_peak_last1k": float(np.max(np.abs(l2[-1000:]))),
+    }
+    J.juno_gui_destroy(c); J.juno_gui_destroy(c2)
+out["isolation_send_only"] = iso2
+
 # ------- 6. wipe coverage: does the lazy wipe clear the whole line the DSP reads?
 c = mk(48000)
 b0 = np.zeros(NBUF, F32)
