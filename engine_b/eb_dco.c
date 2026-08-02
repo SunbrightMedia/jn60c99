@@ -84,6 +84,26 @@ static inline float eb_sat(float x, const eb_dco_coef *c)
     return ((hi + (x3 * c->k3)) + x);
 }
 
+/* THE CLAMP SHORTCUT. See eb_dco.h. `e` is the output of eb_clamp1, so `e ==
+ * 1.0f` and `e == -1.0f` are exact tests on values the clamp itself produced,
+ * and 1.0f*sat_in / -1.0f*sat_in are exact products. The returned number is
+ * therefore the one the polynomial would have returned, bit for bit, and this
+ * is a hoist rather than an approximation. MEASURED: it fires on the large
+ * majority of sub-samples at any musical pitch, because the unclamped window is
+ * only the few phase steps either side of the waveform's edge. */
+static inline float eb_sat_c(float e, const eb_dco_coef *c)
+{
+    if (e ==  1.0f) return c->sat_hi;
+    if (e == -1.0f) return c->sat_lo;
+    return eb_sat(e * c->sat_in, c);
+}
+
+void eb_dco_set_shape(eb_dco_coef *c)
+{
+    c->sat_hi = eb_sat( c->sat_in, c);
+    c->sat_lo = eb_sat(-c->sat_in, c);
+}
+
 void eb_dco_set_pitch(eb_dco_coef *c, float inc, float pw)
 {
     c->inc  = inc;
@@ -91,33 +111,46 @@ void eb_dco_set_pitch(eb_dco_coef *c, float inc, float pw)
     c->pw   = pw;
     c->pwm1 = pw - 1.0f;
     c->pwp1 = pw + 1.0f;
+    c->rm1 = 1.0f / c->pwm1; c->rp1 = 1.0f / c->pwp1;
 }
 
 /* ---------------------------------------------------------------- the step */
 float eb_dco_step(eb_dco_state *s, const eb_dco_coef *c)
 {
     const float prev = s->phase;
-    float p, e, x, saw, pulse, sub, sq, cnt, t;
+    float p, e, saw, pulse, sub, sq, cnt, t;
 
     p = eb_dco_wrap(prev + c->inc);
     s->phase = p;
 
+    /* ---- LEVEL GATES. The three waveform terms are each multiplied by a
+     * recalled level, and a JUNO patch very often has one or two of them at
+     * exactly 0 (the patch these numbers were MEASURED on has DCO SUB LEVEL
+     * exactly 0.0f). `finite * 0.0f` is +/-0.0f and adding a zero of either
+     * sign leaves the other terms unchanged, so skipping the term is exact,
+     * not "inaudible". The inputs are bounded -- the saturator argument is a
+     * clamp to +/-1 -- so no inf or NaN can reach the multiply and turn the
+     * zero into a NaN. What must NOT be skipped is the SUB COUNTER, which is
+     * free-running state: it is advanced below whatever lvl_sub is. */
+
     /* ---- SAW: the wrapped ramp through the triangle, edge-scaled by g ---- */
-    e   = eb_clamp1(((eb_triangle((p + 1.0f) * 0.5f) * 256.0f) * c->g)
-                    * c->amp_saw);
-    x   = e * c->sat_in;
-    saw = eb_sat(x, c) * (p * c->gn_saw);
+    if (c->lvl_saw != 0.0f) {
+        e   = eb_clamp1(((eb_triangle((p + 1.0f) * 0.5f) * 256.0f) * c->g)
+                        * c->amp_saw);
+        saw = eb_sat_c(e, c) * (p * c->gn_saw);
+    } else saw = 0.0f;
 
     /* ---- PULSE: phase offset by the pulse width, squared and edge-scaled --
      * The divisor switches on the SIGN of the offset phase, so the two halves
      * of the pulse get different edge slopes -- that asymmetry is the pulse
      * width. Kept as a division: see the header. */
-    t     = c->pw + p;
-    sq    = eb_sgn(t);
-    e     = eb_clamp1(((eb_triangle(t / (t < 0.0f ? c->pwm1 : c->pwp1)) * c->g)
-                       * 256.0f) * c->amp_pulse);
-    x     = e * c->sat_in;
-    pulse = eb_sat(x, c) * (sq * c->gn_pulse);
+    if (c->lvl_pulse != 0.0f) {
+        t     = c->pw + p;
+        sq    = eb_sgn(t);
+        e     = eb_clamp1(((eb_triangle(t * (t < 0.0f ? c->rm1 : c->rp1))
+                            * c->g) * 256.0f) * c->amp_pulse);
+        pulse = eb_sat_c(e, c) * (sq * c->gn_pulse);
+    } else pulse = 0.0f;
 
     /* ---- SUB: a divide-by-two counter clocked by a rising crossing of
      * subthr, added to the phase. The port's test (:1774-1777) is written
@@ -129,11 +162,12 @@ float eb_dco_step(eb_dco_state *s, const eb_dco_coef *c)
     if (cnt >= 4.0f) cnt = 0.0f;
     s->subcnt = cnt;
 
-    t   = (((cnt + p) + 1.0f) * 0.5f) - 1.0f;
-    e   = eb_clamp1((((eb_triangle(-fabsf(t)) + 1.0f) * c->g) * 512.0f)
-                    * c->amp_sub);
-    x   = e * c->sat_in;
-    sub = eb_sat(x, c) * (eb_sgn(t) * c->gn_sub);
+    if (c->lvl_sub != 0.0f) {
+        t   = (((cnt + p) + 1.0f) * 0.5f) - 1.0f;
+        e   = eb_clamp1((((eb_triangle(-fabsf(t)) + 1.0f) * c->g) * 512.0f)
+                        * c->amp_sub);
+        sub = eb_sat_c(e, c) * (eb_sgn(t) * c->gn_sub);
+    } else sub = 0.0f;
 
     /* ---- mix (:1807-1823). The association is the port's: the sub term is
      * added to the SUM of the saw and pulse terms, not folded left to right. */

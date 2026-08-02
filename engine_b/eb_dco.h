@@ -78,6 +78,7 @@ typedef struct {
     float g;          /* 0.00390625f / inc                          port 4800 */
     float pw;         /* pulse width           port 4816 = 5520 + 3808        */
     float pwm1, pwp1; /* pw-1, pw+1                                           */
+    float rm1, rp1;   /* MEASUREMENT VARIANT ONLY: 1/pwm1, 1/pwp1             */
     /* per recall */
     float lvl_saw, lvl_pulse, lvl_sub;   /* port 4736, 4752, 4768             */
     float gn_saw,  gn_pulse,  gn_sub;    /* port 5648, 5664, 5680             */
@@ -85,6 +86,17 @@ typedef struct {
     float sat_in;                        /* port 5552                         */
     float k3, k5, k7, k9, k11;           /* port 5952, 5968, 5984, 6000, 6016 */
     float subthr;                        /* port 5584                         */
+    /* THE CLAMP CONSTANTS. MEASURED: the saturator's input is a clamp to
+     * +/-1 of an expression whose magnitude is the phase-ramp slope divided by
+     * the phase increment, so it is PINNED at exactly +1.0f or exactly -1.0f
+     * for ~97% of sub-samples at a musical pitch. 1.0f*sat_in and -1.0f*sat_in
+     * are exact, so on those sub-samples the eleven-term polynomial always
+     * evaluates at the SAME two arguments and can be replaced by its two
+     * precomputed values. That is a lookup of a number the polynomial would
+     * have produced bit for bit -- not an approximation of it.
+     * Built by eb_dco_set_shape() on a recall. */
+    float sat_hi;                        /* eb_sat(+sat_in)                   */
+    float sat_lo;                        /* eb_sat(-sat_in)                   */
 } eb_dco_coef;
 
 /* One 4x-rate sub-sample. Call four times per host sample; the four results are
@@ -93,6 +105,10 @@ float eb_dco_step(eb_dco_state *s, const eb_dco_coef *c);
 
 /* Per-sample coefficient build (the two modulated numbers -> inc, g, pw). */
 void  eb_dco_set_pitch(eb_dco_coef *c, float inc, float pw);
+
+/* Per-RECALL coefficient build: fills sat_hi/sat_lo from sat_in and k3..k11.
+ * Must be called after any of those six change and before eb_dco_step. */
+void  eb_dco_set_shape(eb_dco_coef *c);
 
 /* THE PHASE WRAP. Lives in the header and is INLINE for a MEASURED reason: as
  * an out-of-line call it cost 320 host instructions per audio sample -- 10 per

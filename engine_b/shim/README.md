@@ -79,3 +79,22 @@ and comes within 0.0003 of firing -- no scenario gate can protect that margin.
 
 **The module is ACCURATE and it is NOT AFFORDABLE.** MEASURED cost and the
 options are in the commit message and in `engine_b/eb_dco.h`.
+
+## vcf_ladder — MODULE M-VCF, the 4-pole ladder core
+
+Forks `src/voice_render.c` and replaces ONE block, lines 1298-1515 (the input
+node, the four 4x sub-steps, the four dispersion lines and the decimating FIR),
+with a call into `engine_b/eb_vcf_ladder.c`. Everything else in the file is the
+port's own code byte for byte.
+
+`null_b.py --module vcf_ladder` -> **30/30 EXACTLY 0**, including all 17
+idle-prefix scenarios. Non-vacuity is MEASURED: removing the saturation fails
+29/29 at **-13.9 dB**, 86 dB above the gate; `x 1.00003` fails at -90.4 dB and
+1 ULP passes at -128.7 dB, which brackets the threshold from both sides.
+
+The shim keeps the module's 41 floats in the port's own cells, so it inherits
+the port's lifecycle. No cycle figure is ever taken from the shim: the cost rig
+measures `eb_vcf_ladder.c` alone, and it says **4,273 cyc/sample on the S3 —
+1.86x the budget that remains after the envelopes**. Full numbers, the seven
+planted errors, the exhaustive wrap test and the priced levers:
+`docs/engineb/MVCF_LADDER_RESULT.md`.

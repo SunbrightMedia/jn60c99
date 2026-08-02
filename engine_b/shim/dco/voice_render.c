@@ -1767,6 +1767,10 @@ LABEL_46:
     /* inc and pw are the two modulated numbers the CV module hands over; g is
      * rebuilt here rather than copied from cell 4800 so that eb_dco_set_pitch
      * is under the gate too. It is the same divide. */
+    eb_dco_set_shape(&ebc);          /* recall-rate in the engine; per sample
+                                      * here because this shim has no parameter
+                                      * path of its own to hook. HARNESS cost,
+                                      * excluded from every cycle figure. */
     eb_dco_set_pitch(&ebc, _s4784, _s4816);
 
     ebs.phase  = JF(a1, 4864);
