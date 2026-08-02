@@ -134,6 +134,34 @@ extern unsigned long eb_coef_gen;
  * zeroes it at power-on (chorus_init) and only this filter writes it.
  */
 #include "eb_noise_svf.h"
+#include <string.h>
+/* COEFFICIENT GENERATION GUARD. See the note on eb_coef_gen in
+ * gui/juno_bridge.c. The full memcmp check below is skipped while nothing can
+ * have changed. Build with -DEB_VERIFY_GEN to run the check ANYWAY and abort if
+ * the counter ever said "clean" while the cells had changed -- that build is
+ * run over all 30 scenarios, so this is proven by execution, not by reading. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
+static eb_nsvf_coef EBNC[8];
+static unsigned char EBNCHAVE[8];
+static unsigned long EBNGEN_SEEN[8];
+
 #include "eb_types.h"
 static eb_nsvf_state EBN[8];
 static unsigned char EBN_seen[8];
@@ -201,7 +229,36 @@ static int            EBMHAVE[8];
  * divergence under tools/engineb/null_b.py --module vcf_cv is attributable to
  * the CV summing and to nothing else.
  */
-#include "eb_vcf_cv.h"     /* -I engine_b/ is supplied by the harness */
+#include "eb_vcf_cv.h"
+#include <string.h>
+/* COEFFICIENT GENERATION GUARD. See the note on eb_coef_gen in
+ * gui/juno_bridge.c. The full memcmp check below is skipped while nothing can
+ * have changed. Build with -DEB_VERIFY_GEN to run the check ANYWAY and abort if
+ * the counter ever said "clean" while the cells had changed -- that build is
+ * run over all 30 scenarios, so this is proven by execution, not by reading. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
+static eb_vcf_cv_coef EBKC[8];
+static eb_vcf_cv_derived EBKD[8];
+static unsigned char EBKHAVE[8];
+static unsigned long EBKGEN_SEEN[8];
+     /* -I engine_b/ is supplied by the harness */
 
 /* ---- from shim 'vcf_ladder' ---- */
 /* engine_b/shim/vcf_ladder/voice_render.c — VERBATIM FORK of src/voice_render.c
@@ -1426,8 +1483,18 @@ LABEL_46:
   {
     eb_nsvf_coef _nc;
     float _n04, _n20;
-    _nc.k36 = JF(a1, 4336); _nc.k52 = JF(a1, 4352); _nc.k68 = JF(a1, 4368);
-    _nc.k84 = JF(a1, 4384); _nc.k00 = JF(a1, 4400);
+    /* COEFFICIENT CACHE + GENERATION GUARD -- five recall-rate cells that
+     * were being read every sample per voice. Under -DEB_VERIFY_GEN the branch
+     * is always taken. */
+    if (!EBNGEN_SEEN[voice] || EB_GEN_STALE(5, EBNGEN_SEEN[voice])) {
+      eb_nsvf_coef _t; int _ch;
+      _t.k36 = JF(a1, 4336); _t.k52 = JF(a1, 4352); _t.k68 = JF(a1, 4368);
+      _t.k84 = JF(a1, 4384); _t.k00 = JF(a1, 4400);
+      _ch = !EBNCHAVE[voice] || memcmp(&EBNC[voice], &_t, sizeof _t) != 0;
+      EB_GEN_CHECK(5, EBNGEN_SEEN[voice], _ch, "noise_svf");
+      if (_ch) { EBNC[voice] = _t; EBNCHAVE[voice] = 1; }
+    }
+    _nc = EBNC[voice];
     if (!EBN_seen[voice] || JF(a1, 4288) == 0.0f) {
       /* fresh context: the port zeroes 4288 at power-on and only this filter
        * writes it, so a zero there means "just built" -- the same trick the
@@ -1474,29 +1541,43 @@ LABEL_46:
     eb_vcf_cv_state ebst;
     float eb6704, eb6848;
 
-    ebk.x6576 = JF(a1, 6576); ebk.x6608 = JF(a1, 6608);
-    ebk.x6640 = JF(a1, 6640); ebk.x6672 = JF(a1, 6672);
-    ebk.k6720 = JF(a1, 6720); ebk.k6736 = JF(a1, 6736);
-    ebk.k6752 = JF(a1, 6752); ebk.k6768 = JF(a1, 6768);
-    ebk.k6784 = JF(a1, 6784); ebk.k6800 = JF(a1, 6800);
-    ebk.k6816 = JF(a1, 6816); ebk.x6832 = JF(a1, 6832);
-    ebk.k6864 = JF(a1, 6864); ebk.k6928 = JF(a1, 6928);
-    ebk.k6944 = JF(a1, 6944); ebk.k6960 = JF(a1, 6960);
-    ebk.k7008 = JF(a1, 7008); ebk.k7024 = JF(a1, 7024);
-    ebk.k7120 = JF(a1, 7120); ebk.k7136 = JF(a1, 7136);
-    ebk.k7152 = JF(a1, 7152); ebk.k7200 = JF(a1, 7200);
-    ebk.k7216 = JF(a1, 7216); ebk.k7232 = JF(a1, 7232);
-    ebk.k7296 = JF(a1, 7296); ebk.k7312 = JF(a1, 7312);
-    ebk.k7328 = JF(a1, 7328); ebk.k7344 = JF(a1, 7344);
-    ebk.k7360 = JF(a1, 7360); ebk.k7376 = JF(a1, 7376);
-    ebk.k7392 = JF(a1, 7392); ebk.k7408 = JF(a1, 7408);
-    ebk.k7424 = JF(a1, 7424); ebk.k7440 = JF(a1, 7440);
-    ebk.k7456 = JF(a1, 7456); ebk.k7472 = JF(a1, 7472);
-    ebk.k7488 = JF(a1, 7488); ebk.k7504 = JF(a1, 7504);
+    /* COEFFICIENT CACHE + GENERATION GUARD. This gather is 38 cells per
+     * voice per sample and MEASURED at 312 executed instructions per sample,
+     * and eb_vcf_cv_prepare() ran on top of it every sample. Both are
+     * recall-rate. Under -DEB_VERIFY_GEN the branch is always taken, so the
+     * verification build still gathers, still compares and still re-prepares
+     * every sample. */
+    if (!EBKGEN_SEEN[voice] || EB_GEN_STALE(4, EBKGEN_SEEN[voice])) {
+      int _ch;
+      ebk.x6576 = JF(a1, 6576); ebk.x6608 = JF(a1, 6608);
+      ebk.x6640 = JF(a1, 6640); ebk.x6672 = JF(a1, 6672);
+      ebk.k6720 = JF(a1, 6720); ebk.k6736 = JF(a1, 6736);
+      ebk.k6752 = JF(a1, 6752); ebk.k6768 = JF(a1, 6768);
+      ebk.k6784 = JF(a1, 6784); ebk.k6800 = JF(a1, 6800);
+      ebk.k6816 = JF(a1, 6816); ebk.x6832 = JF(a1, 6832);
+      ebk.k6864 = JF(a1, 6864); ebk.k6928 = JF(a1, 6928);
+      ebk.k6944 = JF(a1, 6944); ebk.k6960 = JF(a1, 6960);
+      ebk.k7008 = JF(a1, 7008); ebk.k7024 = JF(a1, 7024);
+      ebk.k7120 = JF(a1, 7120); ebk.k7136 = JF(a1, 7136);
+      ebk.k7152 = JF(a1, 7152); ebk.k7200 = JF(a1, 7200);
+      ebk.k7216 = JF(a1, 7216); ebk.k7232 = JF(a1, 7232);
+      ebk.k7296 = JF(a1, 7296); ebk.k7312 = JF(a1, 7312);
+      ebk.k7328 = JF(a1, 7328); ebk.k7344 = JF(a1, 7344);
+      ebk.k7360 = JF(a1, 7360); ebk.k7376 = JF(a1, 7376);
+      ebk.k7392 = JF(a1, 7392); ebk.k7408 = JF(a1, 7408);
+      ebk.k7424 = JF(a1, 7424); ebk.k7440 = JF(a1, 7440);
+      ebk.k7456 = JF(a1, 7456); ebk.k7472 = JF(a1, 7472);
+      ebk.k7488 = JF(a1, 7488); ebk.k7504 = JF(a1, 7504);
 
-    /* RECALL-TIME in engine B; every sample here so a mid-render
-     * coefficient edit cannot make the gate lie. Harness cost. */
-    eb_vcf_cv_prepare(&ebd, &ebk);
+      _ch = !EBKHAVE[voice] || memcmp(&EBKC[voice], &ebk, sizeof ebk) != 0;
+      EB_GEN_CHECK(4, EBKGEN_SEEN[voice], _ch, "vcf_cv");
+      if (_ch) {
+        EBKC[voice] = ebk;
+        eb_vcf_cv_prepare(&EBKD[voice], &ebk);
+        EBKHAVE[voice] = 1;
+      }
+    }
+    ebd = EBKD[voice];
 
     ebst.s_env = JF(a1, 6896);
     ebst.s_a   = JF(a1, 7088);

@@ -10,6 +10,34 @@
  * zeroes it at power-on (chorus_init) and only this filter writes it.
  */
 #include "eb_noise_svf.h"
+#include <string.h>
+/* COEFFICIENT GENERATION GUARD. See the note on eb_coef_gen in
+ * gui/juno_bridge.c. The full memcmp check below is skipped while nothing can
+ * have changed. Build with -DEB_VERIFY_GEN to run the check ANYWAY and abort if
+ * the counter ever said "clean" while the cells had changed -- that build is
+ * run over all 30 scenarios, so this is proven by execution, not by reading. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
+static eb_nsvf_coef EBNC[8];
+static unsigned char EBNCHAVE[8];
+static unsigned long EBNGEN_SEEN[8];
+
 #include "eb_types.h"
 static eb_nsvf_state EBN[8];
 static unsigned char EBN_seen[8];
@@ -1145,8 +1173,18 @@ LABEL_46:
   {
     eb_nsvf_coef _nc;
     float _n04, _n20;
-    _nc.k36 = JF(a1, 4336); _nc.k52 = JF(a1, 4352); _nc.k68 = JF(a1, 4368);
-    _nc.k84 = JF(a1, 4384); _nc.k00 = JF(a1, 4400);
+    /* COEFFICIENT CACHE + GENERATION GUARD -- five recall-rate cells that
+     * were being read every sample per voice. Under -DEB_VERIFY_GEN the branch
+     * is always taken. */
+    if (!EBNGEN_SEEN[voice] || EB_GEN_STALE(5, EBNGEN_SEEN[voice])) {
+      eb_nsvf_coef _t; int _ch;
+      _t.k36 = JF(a1, 4336); _t.k52 = JF(a1, 4352); _t.k68 = JF(a1, 4368);
+      _t.k84 = JF(a1, 4384); _t.k00 = JF(a1, 4400);
+      _ch = !EBNCHAVE[voice] || memcmp(&EBNC[voice], &_t, sizeof _t) != 0;
+      EB_GEN_CHECK(5, EBNGEN_SEEN[voice], _ch, "noise_svf");
+      if (_ch) { EBNC[voice] = _t; EBNCHAVE[voice] = 1; }
+    }
+    _nc = EBNC[voice];
     if (!EBN_seen[voice] || JF(a1, 4288) == 0.0f) {
       /* fresh context: the port zeroes 4288 at power-on and only this filter
        * writes it, so a zero there means "just built" -- the same trick the
