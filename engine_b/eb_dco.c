@@ -47,39 +47,6 @@
 #include "triangle.h"
 #include <math.h>
 
-/* ---------------------------------------------------------------- the wrap
- * Reference, src/voice_render.c:1723-1731:
- *     if (p <= 1.0f) { if (p < -1.0f) p = fmodf(p - 1.0f, 2.0f) + 1.0f; }
- *     else                            p = fmodf(p + 1.0f, 2.0f) - 1.0f;
- *
- * BOTH ARMS ARE LIVE. The negative arm (:1726) fires in none of the 30 null
- * scenarios and is 0.0003 away from firing in one of them, so a scenario gate
- * cannot protect it and only the exhaustive test can.
- *
- * The leading add is kept because it rounds. Only the libm call is removed, and
- * only where the remainder is provably a single exact operation: for
- * t = p+1 in [2,4) the value t-2 is exact (both operands within a factor of
- * two), and for t in [0,2) fmodf(t,2) == t, which the |t|<4 branch also gives
- * since t-2 would be wrong there -- but t >= 2 always holds in this arm because
- * p > 1. The mirror argument covers the negative arm. Non-finite inputs and
- * anything beyond +/-4 fall through to fmodf, so nothing is assumed about the
- * domain. */
-float eb_dco_wrap(float p)
-{
-    if (p <= 1.0f) {
-        if (p < -1.0f) {
-            float t = p - 1.0f;                       /* rounds -- keep it */
-            return (t > -4.0f) ? (t + 2.0f) + 1.0f
-                               : fmodf(t, 2.0f) + 1.0f;
-        }
-        return p;
-    } else {
-        float t = p + 1.0f;                           /* rounds -- keep it */
-        return (t < 4.0f) ? (t - 2.0f) - 1.0f
-                          : fmodf(t, 2.0f) - 1.0f;
-    }
-}
-
 /* ---------------------------------------------------------------- helpers
  * sign(): the port's exact three-way form (:1750-1758). It is NOT copysign and
  * it is NOT (x>0)-(x<0): zero maps to ITSELF, so -0.0f comes back as -0.0f, and
@@ -95,7 +62,13 @@ static inline float eb_sgn(float x)
  * the session brief -- margin 1.0, never taken -- and it is one instruction. */
 static inline float eb_clamp1(float v)
 {
-    return (v >= -1.0f) ? fminf(v, 1.0f) : -1.0f;
+    /* fminf is a CALL on both targets (MEASURED: 576 host instructions per
+     * audio sample, 18 per invocation, for what is one compare). The guard
+     * above already excludes NaN -- a NaN fails `v >= -1.0f` -- which is the
+     * only input on which fminf and a compare disagree. So this is the same
+     * function, not a relaxed one. */
+    if (v < -1.0f) return -1.0f;
+    return (v > 1.0f) ? 1.0f : v;
 }
 
 /* The odd-polynomial saturator, shared by saw, pulse and sub. The three copies

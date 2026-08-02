@@ -416,6 +416,14 @@ def read_tsv():
 
 
 def write_tsv(rows):
+    # No two rows may share a row_id (module@commit); the later one wins. See
+    # the note in emit(). Applied here as well so a file that already contains
+    # historical twins is cleaned by the next legitimate emission rather than by
+    # a hand edit, which is the one thing this file forbids.
+    seen = {}
+    for r in rows:
+        seen[r.get("row_id")] = r
+    rows = list(seen.values())
     with open(TSV, "w") as f:
         f.write(HEADER_DOC)
         f.write("\t".join(COLUMNS) + "\n")
@@ -511,6 +519,12 @@ def emit(names):
             notes=notes,
         )
         row["row_digest"] = digest(row)
+        # row_id is module@commit. Re-emitting the SAME module at the SAME
+        # commit replaces its row instead of appending a twin: two rows with an
+        # identical id are distinguishable only by file position, which is not a
+        # property anyone should have to know. Rows from OTHER commits are kept
+        # as history and marked SUPERSEDED by `check`.
+        rows = [r for r in rows if r.get("row_id") != row["row_id"]]
         rows.append(row)
         print("    s3 %s cyc/sample = %s of the %d budget"
               % (row["cyc_s3"], row["s3_pct_budget"], int(S3_BUDGET)))

@@ -45,6 +45,8 @@
 #ifndef ENGINEB_EB_DCO_H
 #define ENGINEB_EB_DCO_H
 
+#include <math.h>
+
 /* ---------------------------------------------------------------- state
  * EIGHT BYTES per voice. The port spends five cells plus four shadow cells
  * (4640, 4656, 4672, 4832, 4848, 4864, 4880, 4896, 4912) = 144 bytes of address
@@ -92,8 +94,45 @@ float eb_dco_step(eb_dco_state *s, const eb_dco_coef *c);
 /* Per-sample coefficient build (the two modulated numbers -> inc, g, pw). */
 void  eb_dco_set_pitch(eb_dco_coef *c, float inc, float pw);
 
-/* Exposed for engine_b/test_dco_wrap.c, which proves it over all 2^32 inputs. */
-float eb_dco_wrap(float p);
+/* THE PHASE WRAP. Lives in the header and is INLINE for a MEASURED reason: as
+ * an out-of-line call it cost 320 host instructions per audio sample -- 10 per
+ * invocation, 32 invocations -- to wrap a float that is in range on 217 of
+ * every 218 sub-samples.
+ *
+ * Reference, src/voice_render.c:1723-1731:
+ *     if (p <= 1.0f) { if (p < -1.0f) p = fmodf(p - 1.0f, 2.0f) + 1.0f; }
+ *     else                            p = fmodf(p + 1.0f, 2.0f) - 1.0f;
+ *
+ * BOTH ARMS ARE LIVE. The negative arm (:1726) fires in none of the 30 null
+ * scenarios and is 0.0003 away from firing in one of them, so a scenario gate
+ * cannot protect it and only the exhaustive test can.
+ *
+ * The leading add is KEPT because it rounds -- that rounding is exactly what
+ * made eb_triangle's "obvious" replacement disagree on 8,388,608 of 2^32
+ * inputs. Only the libm CALL is removed, and only where the remainder is
+ * provably one exact operation: for t = p+1 in [2,4) the subtraction t-2 is
+ * exact because both operands are within a factor of two, and t >= 2 always
+ * holds in that arm because p > 1. The mirror argument covers the negative arm.
+ * Non-finite inputs and anything past +/-4 keep the fmodf path, so nothing is
+ * assumed about the domain.
+ *
+ * PROVEN bit-identical to the reference over ALL 2^32 float32 bit patterns,
+ * NaN payloads included: engine_b/test_dco_wrap.c, 0 mismatches. */
+static inline float eb_dco_wrap(float p)
+{
+    if (p <= 1.0f) {
+        if (p < -1.0f) {
+            float t = p - 1.0f;                       /* rounds -- keep it */
+            return (t > -4.0f) ? (t + 2.0f) + 1.0f
+                               : fmodf(t, 2.0f) + 1.0f;
+        }
+        return p;
+    } else {
+        float t = p + 1.0f;                           /* rounds -- keep it */
+        return (t < 4.0f) ? (t - 2.0f) - 1.0f
+                          : fmodf(t, 2.0f) - 1.0f;
+    }
+}
 
 /* Free-run contract (eb_freerun.h). READ THE LIMITATION, it is stated here
  * rather than discovered on silicon: this advance is O(n), NOT O(1), and the

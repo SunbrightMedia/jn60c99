@@ -157,5 +157,5 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
     for (j = 1; j < 16; ++j)
         acc += (h[(hi - (15 - j)) & 31] + h[(hi - (16 + j)) & 31]) * c->fir[j];
 
-    return (acc * c->c9152) * 1.00000011920929f;                                      /* :1513 */
+    return acc * c->c9152;                                      /* :1513 */
 }
