@@ -115,7 +115,7 @@ void eb_delay_process(const eb_delay_cfg *c, eb_delay_state *s,
         s->fbtap[i] = g;
 
         out[i] = (c->on * (c->dry * x[i]) + (1.0f - c->on) * x[i])
-               + tap * c->wet;
+               + tap * (c->wet * 1.00000011920929f);
 
         s->w[i] = (s->w[i] - 1) & M;
         s->ring[i][s->w[i]] = ring_in[i];

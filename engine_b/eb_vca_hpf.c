@@ -37,7 +37,7 @@ float eb_vca_tick(eb_vca_state *st, const eb_vca_coef *c,
     sm  = st->sm;
     sm  = ((c->c9680 - sm) * c->c9744) + sm;                        /* :1525 */
     st->sm = sm;
-    vel = ((sm * c->c9600) - (c->c9600 * c->c9616)) + c->c9616;     /* :1527 */
+    vel = c->c9616 + (c->c9600 * (sm - c->c9616)); /* PLANTED */
 
     g1  = st->g1;
     g1  = ((c->c9808 * vel) - (c->c9808 * g1)) + g1;                /* :1532 */
@@ -83,8 +83,8 @@ float eb_vca_tick(eb_vca_state *st, const eb_vca_coef *c,
 
     /* The ONE place in this range where the (1-t) complement IS formed, and
      * the resonance-compensation gain (1 + [6848]*[10336]).  :1591,:1599 */
-    y  = (vcf + (c->c10256 * (boost - vcf)))
-       * ((rescomp * c->c10336) + 1.0f);   /* PLANTED: undistributed lerp */
+    y  = ((c->c10256 * boost) + (vcf * (1.0f - c->c10256)))
+       * ((rescomp * c->c10336) + 1.0f);
 
     y2 = st->lp2;
     y2 = y2 + ((c->c10384 * y) - (c->c10384 * y2));                 /* :1601-2 */

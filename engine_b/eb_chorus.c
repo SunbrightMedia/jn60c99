@@ -171,8 +171,14 @@ void eb_chorus_tick_x(eb_chorus_state *s, const eb_chorus_coef *k,
                                                   - v637) + 1))];
     s->t860 = s->line[(int32_t)(mask & (int32_t)(((int64_t)(uint32_t)s->w
                                                   - v637) + 2))];
-    v638 = (float)((double)(v636 * 16384.0f)
-                   - (double)(int)(v636 * 16384.0f));
+    /* The port does this subtraction in DOUBLE. Here it is done in float.
+     * PROVEN, not argued: tools/engineb/fx_chorus_frac_proof.c enumerates
+     * every float bit pattern in (-1024, 1024) -- 2,298,478,592 of them,
+     * strictly containing the MEASURED reachable range of 72..456 samples --
+     * and the two forms agree bit for bit on all of them, 0 mismatches. On the
+     * ESP32-S3 the double form costs 8 soft-float helper calls per sample
+     * (MEASURED-STATIC, cost.py). */
+    v638 = v636 * 16384.0f - (float)(int)(v636 * 16384.0f);
     s->t864 = v638;
     v639 = v635 + s->c816;
     v640 = s->t856 + ((v638 * s->t860) - (v638 * s->t856));
@@ -185,8 +191,7 @@ void eb_chorus_tick_x(eb_chorus_state *s, const eb_chorus_coef *k,
         s->t876 = s->line[(int32_t)(mask & (int32_t)(((int64_t)(uint32_t)s->w
                                                       - v637r) + 2))];
     }
-    v641 = (float)((double)(v639 * 16384.0f)
-                   - (double)(int)(v639 * 16384.0f));
+    v641 = v639 * 16384.0f - (float)(int)(v639 * 16384.0f);   /* same proof */
     s->t880 = v641;
     v642 = s->t872;
     v643 = s->c560;

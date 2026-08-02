@@ -93,7 +93,7 @@ void eb_modcv_tick(const eb_modcv_coef *c,
                   + (c->env1_pwm * env1))
                  + (c->env2_pwm * env2))
                 + c->pwm_off)
-               * c->out_gain * 1.00003f;  /*PLANT*/
+               * c->out_gain;
 }
 
 float eb_modcv_tap(eb_modcv_state *s)      { return s->z_pitch; }
