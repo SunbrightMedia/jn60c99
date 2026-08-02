@@ -407,6 +407,12 @@ def teeth(quick):
     # the floor is.
     cases = [(None, False), ("onelsb", False), ("justover", True),
              ("tailquiet", True), ("dcopitch", True), ("idleskip", True)]
+    # ONE reference render, reused by every mutant: the mutations are planted in
+    # the CANDIDATE build, so the oracle side is invariant across the battery.
+    # This line was missing until 2026-08-02 -- `run(..., ref=ref, ...)` raised
+    # NameError before any work, so this battery had NEVER EXECUTED despite the
+    # docstring and two documents claiming "teeth proven". Found by running it.
+    ref = oracle_render(quick)
     for mut, want_fail in cases:
         fails, worst, caught = run((), quick, mutate=mut, ref=ref,
                                    label="planted: %s" % (mut or "CLEAN CONTROL"),

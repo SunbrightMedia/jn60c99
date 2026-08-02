@@ -636,7 +636,13 @@ def main():
         NOISE_IDLE = {t for t in IDLE_TAGS if t.startswith("idle noise")}
         REALLOC = {t for t in IDLE_TAGS if t.startswith("realloc")}
         EXPECT = {
-            # MEASURED 2026-08-02 over the 26-scenario set (9 cold + 17 idle).
+            # MEASURED 2026-08-02 over the 30-scenario set (10 COLD_TAGS +
+            # 20 IDLE_TAGS -- and note that IDLE_TAGS is a SET DIFFERENCE against
+            # a frozen COLD_TAGS, so three scenarios appended after that freeze
+            # ("DCO neg ...") are tagged "idle" while two of them open with a
+            # ('param',...) event, not a ('render',...). The expectations below
+            # that must partition by structure use PREFIXED, computed from the
+            # scripts, not the tag names.
             "noisegain": {"delay keys", "long LFO+tail", "DCO noise"} | NOISE_IDLE,
             "dcopitch":  set(ALL),
             # "DCO reset arm" (patch 22) does NOT catch nochorus. It was listed
@@ -644,7 +650,16 @@ def main():
             # written before that scenario existed and was never re-measured
             # against it. Recorded here as the measured fact. UNEXPLAINED, like
             # the patch-32 case below it; do not replace either with a guess.
-            "nochorus":  ALL - {"DCO noise", "DCO reset arm"} - NOISE_IDLE,
+            # "ENV trig arm warm" (patch 22, warm) joined "DCO reset arm"
+            # (patch 22, cold) here on 2026-08-02. It is NOT gate weakness and it
+            # is no longer UNEXPLAINED in the way the note below still is for
+            # patch 32: under the chorus-kill mutation both patch-22 scenarios
+            # render EXACTLY 0 -- BIT-IDENTICAL, not merely below threshold -- so
+            # the mutated code has no path at all to patch 22's output. A gate
+            # cannot be blamed for missing a bug that does not reach the samples
+            # it compares. MEASURED (bitwise), not inferred from a dB number.
+            "nochorus":  ALL - {"DCO noise", "DCO reset arm",
+                                "ENV trig arm warm"} - NOISE_IDLE,
             "envslow":   set(ALL),
             "tailquiet": ALL - {"DCO noise"},
             # LOCKSTEP, and the SHAPE of this set is the whole point: 15 of the
