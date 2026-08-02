@@ -264,6 +264,37 @@ def _plant(tmp, mutate):
                       "    if ( JF(a1, 1856) != 0.0f ) JI(base, 11900000) = 1;\n"
                       "    else { *outL = 0.0f; *outR = 0.0f; return 0; }\n"
                       "  }\n" + anchor, 1)
+    elif mutate == "reverbwet":
+        # MODULE REVERB, non-vacuity. The tank's own output gain is moved by
+        # 6e-5 relative. If the reverb send were silent in every scenario, the
+        # module's EXACTLY-0 null would prove nothing; this is the mutation that
+        # says otherwise, and it is planted in engine B's own file rather than
+        # in src/, so it is the module under test that moves.
+        p = os.path.join(tmp, "engine_b", "eb_reverb.c"); s = open(p).read()
+        a = "(((SL * c->wet) * 16.0f) * m)"
+        assert s.count(a) == 1
+        s = s.replace(a, "(((SL * c->wet) * 16.001f) * m)", 1)
+    elif mutate == "reverbtap":
+        # MODULE REVERB, addressing. One stereo output tap reads one sample
+        # earlier. The split-buffer rewrite's whole risk is addressing, so the
+        # harness has to be shown catching an addressing error of the smallest
+        # possible size.
+        p = os.path.join(tmp, "engine_b", "eb_reverb.c"); s = open(p).read()
+        a = "s->ot[k][0] = s->taps[EB_REV_OT[k][1]] - s->taps[EB_REV_OT[k][0]];"
+        assert s.count(a) == 1
+        s = s.replace(a, "s->ot[k][0] = s->taps[EB_REV_OT[k][1]] - "
+                         "s->taps[EB_REV_OT[k][0]] + 1;", 1)
+    elif mutate == "reverbskip":
+        # MODULE REVERB, LOCKSTEP -- the error class docs/trackb/
+        # ACCURACY_STANDARD.md names. The tank's state advance is skipped
+        # whenever its input sample is exactly zero, which is the "obvious"
+        # saving a silent-input reverb invites and is wrong: the tank is still
+        # ringing, and the pre-delay modulation is still free-running.
+        p = os.path.join(tmp, "engine_b", "eb_reverb.c"); s = open(p).read()
+        a = "        float v477 = c->f_in[1] * s->s0;"
+        assert s.count(a) == 1
+        s = s.replace(a, "        if (x == 0.0f) { *outA = c->dry * inB;\n"
+                         "            *outB = c->dry * inA; return; }\n" + a, 1)
     else:
         raise SystemExit("unknown mutation %s" % mutate)
     open(p, "w").write(s)
@@ -405,8 +436,16 @@ def teeth(quick):
     # the -100 dB threshold from both sides and proves it bites where it claims
     # to. A teeth battery of only catchable bugs measures nothing about where
     # the floor is.
-    cases = [(None, False), ("onelsb", False), ("justover", True),
-             ("tailquiet", True), ("dcopitch", True), ("idleskip", True)]
+    #
+    # A case also carries the MODULES to build with. The port-side mutations use
+    # none; a mutation planted inside an engine B module is only compiled into
+    # the signal path when that module's shim is in the build, and a case that
+    # cannot reach its own mutation is a teeth case that measures nothing.
+    cases = [(None, (), False), ("onelsb", (), False), ("justover", (), True),
+             ("tailquiet", (), True), ("dcopitch", (), True),
+             ("idleskip", (), True),
+             (None, ("reverb",), False), ("reverbwet", ("reverb",), True),
+             ("reverbtap", ("reverb",), True), ("reverbskip", ("reverb",), True)]
     # ONE reference render, reused by every mutant: the mutations are planted in
     # the CANDIDATE build, so the oracle side is invariant across the battery.
     # This line was missing until 2026-08-02 -- `run(..., ref=ref, ...)` raised
