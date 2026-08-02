@@ -1,0 +1,200 @@
+=== RANGE 654-693 ===
+=== TRACK B CANARY: 14 assignments in src/voice_render.c:654-693, each offset by +1.0 ===
+  a line caught by 0 scenarios is a place the gate is BLIND: an error there would ship.
+
+  :654   v27 = JF(a1, 304);                                         27/27  loudest 19.5 dB
+  :655   JF(a1, 336) = v27;                                         0/27
+  :656   JF(a1, 448) = v26;                                         0/27
+  :657   v28 = (float)((float)(v12 * v26) - (float)(v26 * v27)) + v 27/27  loudest 19.5 dB
+  :658   v29 = (float)((float)(v11 * v26) - (float)(v2 * v26)) + v2 27/27  loudest 90.2 dB
+  :659   JF(a1, 464) = v28;                                         0/27
+  :660   JF(a1, 480) = v29;                                         0/27
+  :661   v30 = v29;                                                 27/27  loudest 90.2 dB
+  :662   v31 = v29 + JF(a1, 544);                                   0/27
+  :664   v32 = v31;                                                 0/27
+  :666   v32 = 0.0;                                                 0/27
+  :667   v33 = -1.0;                                                0/27
+  :669   SKIP (not uniquely locatable, or does not compile)
+  :671   v34 = v32;                                                 0/27
+
+CANARY: 4/13 assignments observable; 9 BLIND (lines [655, 656, 659, 660, 662, 664, 666, 667, 671]); 1 skipped
+  A rewrite touching those lines cannot be validated by this scenario set.
+  Add a scenario that exercises them, or record them in the ledger as
+  out of scope with the reason.
+=== RANGE 1129-1149 ===
+=== TRACK B CANARY: 14 assignments in src/voice_render.c:1129-1149, each offset by +1.0 ===
+  a line caught by 0 scenarios is a place the gate is BLIND: an error there would ship.
+
+  :1129  v190 = JF(base, 84432);                                    8/27  loudest -0.5 dB
+  :1131  v191 = JF(a1, 4288);                                       8/27  loudest 4.2 dB
+  :1132  JF(a1, 4304) = v191;                                       0/27
+  :1133  v192 = (float)(v191 * JF(a1, 4336)) + JF(a1, 4320);        8/27  loudest 8.0 dB
+  :1134  JF(a1, 4304) = v192;                                       8/27  loudest 8.0 dB
+  :1135  v193 = (float)(v191 * JF(a1, 4352)) + v192;                8/27  loudest 0.1 dB
+  :1136  v194 = v192 * JF(a1, 4400);                                8/27  loudest -2.1 dB
+  :1137  v195 = v190 - v193;                                        8/27  loudest -0.5 dB
+  :1138  v196 = (float)(v195 * JF(a1, 4336)) + v191;                8/27  loudest 4.2 dB
+  :1139  JF(a1, 4288) = v196;                                       8/27  loudest 4.2 dB
+  :1140  JF(a1, 4320) = (float)((float)(v195 * JF(a1, 4368)) + v194 8/27  loudest -2.1 dB
+  :1142  v197 = JF(a1, 6448);                                       27/27  loudest 2.9 dB
+  :1143  JF(a1, 6464) = v197;                                       0/27
+  :1144  v198 = v197 * JF(a1, 3536);                                27/27  loudest 11.3 dB
+
+CANARY: 12/14 assignments observable; 2 BLIND (lines [1132, 1143]); 0 skipped
+  A rewrite touching those lines cannot be validated by this scenario set.
+  Add a scenario that exercises them, or record them in the ledger as
+  out of scope with the reason.
+=== RANGE 964-1021 ===
+=== TRACK B CANARY: 14 assignments in src/voice_render.c:964-1021, each offset by +1.0 ===
+  a line caught by 0 scenarios is a place the gate is BLIND: an error there would ship.
+
+  :968   v123 = 0.0;                                                2/27  loudest 18.4 dB
+  :970   SKIP (not uniquely locatable, or does not compile)
+  :972   SKIP (not uniquely locatable, or does not compile)
+  :973   v124 = JF(a1, 560) * v123;                                 26/27  loudest 90.2 dB
+  :974   JF(a1, 2576) = v124;                                       0/27
+  :981   v125 = 0.0;                                                26/27  loudest 18.4 dB
+  :983   v125 = 1.0;                                                26/27  loudest 18.3 dB
+  :984   v126 = 1.0 - v125;                                         26/27  loudest 96.5 dB
+  :985   v127 = (float)(1.0 - v125) * (float)((float)(JF(a1, 2896)  26/27  loudest -3.2 dB
+  :986   JF(a1, 2624) = v127;                                       26/27  loudest 18.4 dB
+  :987   v128 = v127 + JF(a1, 2880);                                26/27  loudest -3.2 dB
+  :988   v129 = v127 - JF(a1, 2640);                                0/27
+  :993   v130 = 0.0;                                                26/27  loudest 90.5 dB
+  :995   v130 = 1.0;                                                26/27  loudest nan dB
+
+CANARY: 10/12 assignments observable; 2 BLIND (lines [974, 988]); 2 skipped
+  A rewrite touching those lines cannot be validated by this scenario set.
+  Add a scenario that exercises them, or record them in the ledger as
+  out of scope with the reason.
+=== RANGE 1022-1075 ===
+=== TRACK B CANARY: 14 assignments in src/voice_render.c:1022-1075, each offset by +1.0 ===
+  a line caught by 0 scenarios is a place the gate is BLIND: an error there would ship.
+
+  :1023  v145 = 0.0;                                                2/27  loudest 59.5 dB
+  :1025  SKIP (not uniquely locatable, or does not compile)
+  :1027  SKIP (not uniquely locatable, or does not compile)
+  :1028  v146 = JF(a1, 560) * v145;                                 13/27  loudest 84.7 dB
+  :1029  JF(a1, 3056) = v146;                                       0/27
+  :1036  v147 = 0.0;                                                13/27  loudest 0.0 dB
+  :1038  v147 = 1.0;                                                13/27  loudest 4.2 dB
+  :1039  v148 = 1.0 - v147;                                         13/27  loudest 85.4 dB
+  :1040  v149 = (float)(1.0 - v147) * (float)((float)(JF(a1, 3376)  13/27  loudest -2.2 dB
+  :1041  JF(a1, 3104) = v149;                                       13/27  loudest -0.0 dB
+  :1042  v150 = v149 + JF(a1, 3360);                                13/27  loudest -2.2 dB
+  :1043  v151 = v149 - JF(a1, 3120);                                0/27
+  :1048  v152 = 0.0;                                                13/27  loudest 68.5 dB
+  :1050  v152 = 1.0;                                                13/27  loudest 0.1 dB
+
+CANARY: 10/12 assignments observable; 2 BLIND (lines [1029, 1043]); 2 skipped
+  A rewrite touching those lines cannot be validated by this scenario set.
+  Add a scenario that exercises them, or record them in the ledger as
+  out of scope with the reason.
+=== RANGE 1516-1640 ===
+=== TRACK B CANARY: 14 assignments in src/voice_render.c:1516-1640, each offset by +1.0 ===
+  a line caught by 0 scenarios is a place the gate is BLIND: an error there would ship.
+
+  :1521  v328 = JF(a1, 9680);                                       11/27  loudest -6.3 dB
+  :1522  JF(a1, 9696) = v328;                                       0/27
+  :1523  v329 = JF(a1, 9712);                                       11/27  loudest -18.8 dB
+  :1524  JF(a1, 9728) = v329;                                       0/27
+  :1525  v330 = (float)((float)(v328 - v329) * JF(a1, 9744)) + v329 11/27  loudest -8.6 dB
+  :1526  JF(a1, 9712) = v330;                                       11/27  loudest -18.8 dB
+  :1529  JF(a1, 9760) = v331;                                       0/27
+  :1530  v332 = JF(a1, 9776);                                       27/27  loudest 44.1 dB
+  :1531  JF(a1, 9792) = v332;                                       0/27
+  :1532  v333 = (float)((float)(JF(a1, 9808) * v331) - (float)(JF(a 27/27  loudest 44.1 dB
+  :1534  v334 = 0.0;                                                0/27
+  :1536  v334 = v333;                                               27/27  loudest 44.1 dB
+  :1537  v335 = v334;                                               27/27  loudest 44.1 dB
+  :1538  JF(a1, 9776) = v335;                                       27/27  loudest 44.1 dB
+
+CANARY: 9/14 assignments observable; 5 BLIND (lines [1522, 1524, 1529, 1531, 1534]); 0 skipped
+  A rewrite touching those lines cannot be validated by this scenario set.
+  Add a scenario that exercises them, or record them in the ledger as
+  out of scope with the reason.
+=== RANGE 1076-1128 ===
+=== TRACK B CANARY: 14 assignments in src/voice_render.c:1076-1128, each offset by +1.0 ===
+  a line caught by 0 scenarios is a place the gate is BLIND: an error there would ship.
+
+  :1078  v167 = JF(a1, 752);                                        27/27  loudest 19.5 dB
+  :1079  v168 = JF(a1, 880);                                        27/27  loudest 19.5 dB
+  :1081  v169 = (float)(v168 * JF(a1, 3600)) + (float)(v167 * JF(a1 27/27  loudest 19.5 dB
+  :1082  JF(a1, 3616) = v169;                                       0/27
+  :1083  v170 = JF(a1, 1792);                                       10/27  loudest 7.7 dB
+  :1089  v174 = JF(a1, 4016);                                       18/27  loudest 9.2 dB
+  :1092  v175 = JF(a1, 3984);                                       0/27
+  :1093  v176 = v170 * v174;                                        10/27  loudest 7.7 dB
+  :1094  v177 = v174 * JF(a1, 1808);                                17/27  loudest 4.5 dB
+  :1095  JF(a1, 3712) = v177;                                       17/27  loudest 4.5 dB
+  :1096  v178 = JF(a1, 4112);                                       27/27  loudest 24.6 dB
+  :1097  v179 = JF(a1, 3856);                                       0/27
+  :1098  v180 = v176 * JF(a1, 4032);                                27/27  loudest 19.5 dB
+  :1099  v181 = JF(a1, 4048);                                       10/27  loudest 9.2 dB
+
+CANARY: 11/14 assignments observable; 3 BLIND (lines [1082, 1092, 1097]); 0 skipped
+  A rewrite touching those lines cannot be validated by this scenario set.
+  Add a scenario that exercises them, or record them in the ledger as
+  out of scope with the reason.
+=== RANGE 1150-1229 ===
+=== TRACK B CANARY: 14 assignments in src/voice_render.c:1150-1229, each offset by +1.0 ===
+  a line caught by 0 scenarios is a place the gate is BLIND: an error there would ship.
+
+  :1162  v202 = 0.0;                                                0/27
+  :1164  v202 = v201;                                               27/27  loudest 18.8 dB
+  :1165  v203 = v202;                                               27/27  loudest 18.8 dB
+  :1167  v42 = v203;                                                27/27  loudest 18.8 dB
+  :1168  v204 = v42;                                                27/27  loudest 18.8 dB
+  :1169  JF(a1, 6704) = v204;                                       27/27  loudest 18.8 dB
+  :1171  v205 = JF(a1, 6864);                                       6/27  loudest 11.9 dB
+  :1172  JF(a1, 6880) = v205;                                       0/27
+  :1173  v206 = JF(a1, 6896);                                       6/27  loudest 10.1 dB
+  :1174  JF(a1, 6912) = v206;                                       0/27
+  :1175  JF(a1, 6896) = (float)((float)(v205 - v206) * JF(a1, 6928) 6/27  loudest 10.9 dB
+  :1176  v207 = JF(a1, 752);                                        25/27  loudest 7.6 dB
+  :1177  v208 = JF(a1, 880);                                        25/27  loudest 7.6 dB
+  :1179  JF(a1, 6976) = (float)(v208 * JF(a1, 6960)) + (float)(v207 25/27  loudest 7.6 dB
+
+CANARY: 11/14 assignments observable; 3 BLIND (lines [1162, 1172, 1174]); 0 skipped
+  A rewrite touching those lines cannot be validated by this scenario set.
+  Add a scenario that exercises them, or record them in the ledger as
+  out of scope with the reason.
+=== RANGE 1298-1400 ===
+=== TRACK B CANARY: 14 assignments in src/voice_render.c:1298-1400, each offset by +1.0 ===
+  a line caught by 0 scenarios is a place the gate is BLIND: an error there would ship.
+
+  :1298  v242 = JF(a1, 6544);                                       27/27  loudest 11.2 dB
+  :1299  v243 = JF(a1, 7536);                                       27/27  loudest 5.6 dB
+  :1336  v244 = JF(a1, 8976);                                       13/27  loudest -65.1 dB
+  :1337  JF(a1, 8992) = v244;                                       0/27
+  :1342  JF(a1, 8976) = juno_wrap24(-v244);                         13/27  loudest -65.1 dB
+  :1343  JF(a1, 8944) = v245;                                       27/27  loudest 21.7 dB
+  :1344  v246 = 1.0 - (float)(v241 + v241);                         27/27  loudest nan dB
+  :1345  v247 = 1.0 / (float)((float)((float)((float)(v241 * v241)  27/27  loudest 1.6 dB
+  :1346  JF(a1, 9024) = _s9024 = v247;                              0/27
+  :1347  v248 = JF(a1, 8944);                                       27/27  loudest -0.8 dB
+  :1348  v249 = JF(a1, 8960);                                       27/27  loudest 8.4 dB
+  :1349  JF(a1, 9008) = _s9008 = v247 * v243;                       0/27
+  :1350  v250 = v249 * JF(a1, 9216);                                27/27  loudest 9.7 dB
+  :1351  v251 = JF(a1, 8304);                                       22/27  loudest -3.3 dB
+
+CANARY: 11/14 assignments observable; 3 BLIND (lines [1337, 1346, 1349]); 0 skipped
+  A rewrite touching those lines cannot be validated by this scenario set.
+  Add a scenario that exercises them, or record them in the ledger as
+  out of scope with the reason.
+=== RANGE 1718-1830 ===
+=== TRACK B CANARY: 14 assignments in src/voice_render.c:1718-1830, each offset by +1.0 ===
+  a line caught by 0 scenarios is a place the gate is BLIND: an error there would ship.
+
+  :1718  v401 = JF(a1, 4880);                                       27/27  loudest 22.8 dB
+  :1720  JF(a1, 4656) = _s4656 = v401;                              0/27
+  :1721  v403 = v401 + v398;                                        27/27  loudest 0.9 dB
+  :1726  v403 = fmodf(v403 - 1.0, 2.0) + 1.0;                       0/27
+  :1730  v403 = fmodf(v403 + 1.0, 2.0) - 1.0;                       27/27  loudest 23.8 dB
+  :1732  JF(a1, 4640) = v403;                                       27/27  loudest 5.5 dB
+  :1733  v404 = v403 * JF(a1, 5648);                                17/27  loudest -6.9 dB
+  :1735  v406 = (float)((float)(*(float *)&v405 * 256.0) * _s4800)  17/27  loudest -33.6 dB
+  :1737  v407 = fminf(v406, 1.0);                                   17/27  loudest -14.5 dB
+  :1739  v407 = -1.0;                                               0/27
+  :1740  v408 = v407 * JF(a1, 5552);                                17/27  loudest -21.3 dB
+  :1741  v409 = (float)(v408 * v408) * v408;                        17/27  loudest -30.9 dB
