@@ -51,7 +51,8 @@ static float eb_wrap24(float x)
 
 void eb_chorus_reset(eb_chorus_state *s) { memset(s, 0, sizeof *s); }
 
-void eb_chorus_tick_x(eb_chorus_state *s, const eb_chorus_coef *k,
+void eb_chorus_tick_x(eb_chorus_state *restrict s,
+                      const eb_chorus_coef *restrict k,
                       float in, float *outL, float *outR,
                       float v56, float v58)
 {
@@ -63,6 +64,9 @@ void eb_chorus_tick_x(eb_chorus_state *s, const eb_chorus_coef *k,
     float v649, v650, v651, v652, v653, v654, v655, v656, v657, v658, v659;
     float v660, v661, v662;
     int   v637;
+    /* the 17 per-sample scratch cells the port keeps in the flat block */
+    float _c368, _c384, _c768, _c784, _c800, _c816, _c1056, _c1072;
+    float _c1088, _c1104, _line_in, _t856, _t860, _t864, _t872, _t876, _t880;
     int32_t v663;
     const int32_t mask = (int32_t)EB_CHORUS_RING - 1;
 
@@ -82,8 +86,8 @@ void eb_chorus_tick_x(eb_chorus_state *s, const eb_chorus_coef *k,
     s->c1040 = s->c1024; s->c1024 = s->c1008; s->c1008 = s->c992;
     s->c992 = s->c976; s->c976 = s->c960;
 
-    s->c368 = in;                                   /* :2781 */
-    s->c384 = in;                                   /* :2782 */
+    _c368 = in;                                   /* :2781 */
+    _c384 = in;                                   /* :2782 */
 
     /* LFO ---------------------------------------------------------- :2783 */
     v595 = eb_wrap_unit((s->c672 + s->c640) + k->rate);
@@ -114,20 +118,20 @@ void eb_chorus_tick_x(eb_chorus_state *s, const eb_chorus_coef *k,
                 + (k->nf[5] * s->c912)) + (v607 * s->c928))
               + (k->nf[7] * s->c944);
     s->c1008 = v609;
-    s->c768 = v608;
+    _c768 = v608;
 
     /* modulation --------------------------------------------------- :2819 */
     v610 = k->depth;
     v611 = fabsf(eb_wrap_unit(s->c656 + k->phase_off));
-    s->c784 = v611;
+    _c784 = v611;
     v612 = k->mod_scale;
     v613 = k->mod_off;
-    v614 = s->c384;
-    s->c800 = ((v608 * v610) * v612) + v613;
-    s->c816 = (((v610 * k->depth_r) * v611) * v612) + v613;
+    v614 = _c384;
+    _c800 = ((v608 * v610) * v612) + v613;
+    _c816 = (((v610 * k->depth_r) * v611) * v612) + v613;
 
     /* input mix + two biquads + DC block ---------------------------- :2827 */
-    v615 = (v614 + s->c368) * 0.5f;
+    v615 = (v614 + _c368) * 0.5f;
     s->c400 = v615;
     v616 = s->c448;
     v617 = s->c464;
@@ -145,7 +149,7 @@ void eb_chorus_tick_x(eb_chorus_state *s, const eb_chorus_coef *k,
     v626 = ((v620 * k->hb1) + (k->ha1 * s->c512)) + (v623 * k->hb0);
     s->c496 = v626;
     v627 = v625 + k->ramp_inc;
-    s->line_in = v624 * v626;                       /* :2851 cell 95840 */
+    _line_in = v624 * v626;                       /* :2851 cell 95840 */
 
     /* startup ramp + delay-time smoother ---------------------------- :2852 */
     v628 = fminf(k->ramp_max, v627) * v622;
@@ -165,11 +169,11 @@ void eb_chorus_tick_x(eb_chorus_state *s, const eb_chorus_coef *k,
     v635 = v631;
 
     /* tap L --------------------------------------------------------- :2871 */
-    v636 = v631 + s->c800;
+    v636 = v631 + _c800;
     v637 = (int)(v636 * -16384.0f);
-    s->t856 = s->line[(int32_t)(mask & (int32_t)(((int64_t)(uint32_t)s->w
+    _t856 = s->line[(int32_t)(mask & (int32_t)(((int64_t)(uint32_t)s->w
                                                   - v637) + 1))];
-    s->t860 = s->line[(int32_t)(mask & (int32_t)(((int64_t)(uint32_t)s->w
+    _t860 = s->line[(int32_t)(mask & (int32_t)(((int64_t)(uint32_t)s->w
                                                   - v637) + 2))];
     /* The port does this subtraction in DOUBLE. Here it is done in float.
      * PROVEN, not argued: tools/engineb/fx_chorus_frac_proof.c enumerates
@@ -179,24 +183,24 @@ void eb_chorus_tick_x(eb_chorus_state *s, const eb_chorus_coef *k,
      * ESP32-S3 the double form costs 8 soft-float helper calls per sample
      * (MEASURED-STATIC, cost.py). */
     v638 = v636 * 16384.0f - (float)(int)(v636 * 16384.0f);
-    s->t864 = v638;
-    v639 = v635 + s->c816;
-    v640 = s->t856 + ((v638 * s->t860) - (v638 * s->t856));
+    _t864 = v638;
+    v639 = v635 + _c816;
+    v640 = _t856 + ((v638 * _t860) - (v638 * _t856));
 
     /* tap R --------------------------------------------------------- :2882 */
     {
         int v637r = (int)(v639 * -16384.0f);
-        s->t872 = s->line[(int32_t)(mask & (int32_t)(((int64_t)(uint32_t)s->w
+        _t872 = s->line[(int32_t)(mask & (int32_t)(((int64_t)(uint32_t)s->w
                                                       - v637r) + 1))];
-        s->t876 = s->line[(int32_t)(mask & (int32_t)(((int64_t)(uint32_t)s->w
+        _t876 = s->line[(int32_t)(mask & (int32_t)(((int64_t)(uint32_t)s->w
                                                       - v637r) + 2))];
     }
     v641 = v639 * 16384.0f - (float)(int)(v639 * 16384.0f);   /* same proof */
-    s->t880 = v641;
-    v642 = s->t872;
+    _t880 = v641;
+    v642 = _t872;
     v643 = s->c560;
     v644 = s->c608;
-    v645 = (v641 * s->t876) - (v641 * v642);
+    v645 = (v641 * _t876) - (v641 * v642);
 
     /* the two output state-variable filters ------------------------- :2895 */
     v646 = k->svf_f;
@@ -213,30 +217,31 @@ void eb_chorus_tick_x(eb_chorus_state *s, const eb_chorus_coef *k,
     /* noise injection, wet gain, dry/wet mix ------------------------ :2909 */
     v652 = k->noise;
     v653 = s->c752;
-    v654 = s->c368;
+    v654 = _c368;
     v655 = k->wet;
-    v656 = ((((k->n_off + s->c768) * s->c1008) * v652)) + v650;
+    v656 = ((((k->n_off + _c768) * s->c1008) * v652)) + v650;
     v657 = k->dry;
     v658 = v656 * v653;
-    v659 = v653 * (v651 + (((k->n_off + s->c784) * s->c912) * v652));
-    v660 = s->c384;
+    v659 = v653 * (v651 + (((k->n_off + _c784) * s->c912) * v652));
+    v660 = _c384;
     v661 = v659 * v655;
-    s->c1056 = v658 * v655;
-    s->c1072 = v661;
+    _c1056 = v658 * v655;
+    _c1072 = v661;
     v662 = k->onoff;
-    s->c1088 = ((v662 * (v657 * v654)) + ((1.0f - v662) * v654)) + s->c1056;
-    s->c1104 = ((v662 * (v657 * v660)) + ((1.0f - v662) * v660)) + v661;
+    _c1088 = ((v662 * (v657 * v654)) + ((1.0f - v662) * v654)) + _c1056;
+    _c1104 = ((v662 * (v657 * v660)) + ((1.0f - v662) * v660)) + v661;
 
     /* ring write, AFTER both reads ---------------------------------- :2933 */
     v663 = (int32_t)(((uint32_t)s->w - 1u) & (uint32_t)mask);
     s->w = v663;
-    s->line[v663] = s->line_in;
+    s->line[v663] = _line_in;
 
-    *outL = s->c1088;
-    *outR = s->c1104;
+    *outL = _c1088;
+    *outR = _c1104;
 }
 
-void eb_chorus_tick(eb_chorus_state *s, const eb_chorus_coef *k,
+void eb_chorus_tick(eb_chorus_state *restrict s,
+                    const eb_chorus_coef *restrict k,
                     float in, float *outL, float *outR)
 {
     /* MEASURED: 0.0 / -1.0 at every one of 14,000 chorus-arm entries. */

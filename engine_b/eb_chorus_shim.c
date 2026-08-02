@@ -51,8 +51,6 @@ void ebsh_snapshot(eb_chorus_state *s, const unsigned char *b)
     int i;
     for (i = 0; i < EB_CHORUS_RING; ++i) s->line[i] = ld(b, 91728 + 4 * i);
     s->w = ldi(b, 95824);
-    s->line_in = ld(b, 95840);
-    s->c368 = ld(b, 90368); s->c384 = ld(b, 90384);
     s->c400 = ld(b, 90400); s->c416 = ld(b, 90416); s->c432 = ld(b, 90432);
     s->c448 = ld(b, 90448); s->c464 = ld(b, 90464); s->c480 = ld(b, 90480);
     s->c496 = ld(b, 90496); s->c512 = ld(b, 90512);
@@ -62,17 +60,14 @@ void ebsh_snapshot(eb_chorus_state *s, const unsigned char *b)
     s->c672 = ld(b, 90672);
     s->c688 = ld(b, 90688); s->c704 = ld(b, 90704); s->c720 = ld(b, 90720);
     s->c736 = ld(b, 90736); s->c752 = ld(b, 90752);
-    s->c768 = ld(b, 90768); s->c784 = ld(b, 90784); s->c800 = ld(b, 90800);
-    s->c816 = ld(b, 90816);
     s->c832 = ld(b, 90832); s->c848 = ld(b, 90848);
     s->c864 = ld(b, 90864); s->c880 = ld(b, 90880); s->c896 = ld(b, 90896);
     s->c912 = ld(b, 90912); s->c928 = ld(b, 90928); s->c944 = ld(b, 90944);
     s->c960 = ld(b, 90960); s->c976 = ld(b, 90976); s->c992 = ld(b, 90992);
     s->c1008 = ld(b, 91008); s->c1024 = ld(b, 91024); s->c1040 = ld(b, 91040);
-    s->c1056 = ld(b, 91056); s->c1072 = ld(b, 91072);
-    s->c1088 = ld(b, 91088); s->c1104 = ld(b, 91104);
-    s->t856 = ld(b, 95856); s->t860 = ld(b, 95860); s->t864 = ld(b, 95864);
-    s->t872 = ld(b, 95872); s->t876 = ld(b, 95876); s->t880 = ld(b, 95880);
+    /* 90368/90384, 90768..90816, 91056/91072, 91088/91104, 95840 and
+     * 95856..95880 are NOT snapshotted: they are per-sample scratch in the
+     * module (eb_chorus.h), so there is nothing to carry. */
 }
 
 void ebsh_load_coef(eb_chorus_coef *k, const unsigned char *b)

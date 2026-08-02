@@ -37,7 +37,7 @@ float eb_vca_tick(eb_vca_state *st, const eb_vca_coef *c,
     sm  = st->sm;
     sm  = ((c->c9680 - sm) * c->c9744) + sm;                        /* :1525 */
     st->sm = sm;
-    vel = c->c9616 + (c->c9600 * (sm - c->c9616)); /* PLANTED */
+    vel = ((sm * c->c9600) - (c->c9600 * c->c9616)) + c->c9616;     /* :1527 */
 
     g1  = st->g1;
     g1  = ((c->c9808 * vel) - (c->c9808 * g1)) + g1;                /* :1532 */
@@ -104,8 +104,9 @@ float eb_vca_tick(eb_vca_state *st, const eb_vca_coef *c,
      * previous output — a 3-tap FIR built from the coefficient list will not
      * null (docs/trackb/CELLMAP.md). */
     tone = c->c9584;
-    tA = ((st->x1 * c->c10576) + (x * c->c10560)) + (c->c10592 * st->yA);
-    tB = ((st->x1 * c->c10624) + (x * c->c10608)) + (c->c10640 * st->yB);
+    /* PLANTED: the 3-tap FIR reading of the coefficient list */
+    tA = ((st->x1 * c->c10576) + (x * c->c10560)) + (c->c10592 * st->yB);
+    tB = ((st->x1 * c->c10624) + (x * c->c10608)) + (c->c10640 * st->yA);
     st->x1 = x;
     st->yA = tA;
     st->yB = tB;

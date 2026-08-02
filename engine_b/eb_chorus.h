@@ -28,10 +28,10 @@
  *   -100 dB, and tools/engineb/null_b.py --module chorus is what decides.
  *
  * MEMORY, stated in bytes (the brief asks for this explicitly)
- *   eb_chorus_state : EB_CHORUS_RING*4 + 56 floats/ints
- *                   = 4096 + 224 = 4,320 B at the default ring
- *   eb_chorus_coef  : 40 floats + 1 int = 164 B
- *   TOTAL 4,484 B, of which the delay line is 4,096 B and is the only
+ *   eb_chorus_state : EB_CHORUS_RING*4 + 39 floats + 1 int
+ *                   = 4096 + 160 = 4,256 B at the default ring
+ *   eb_chorus_coef  : 38 floats + 1 int = 156 B
+ *   TOTAL 4,412 B, of which the delay line is 4,096 B and is the only
  *   allocation that scales. EB_CHORUS_RING is a COMPILE-TIME budget: define it
  *   to 512 and the struct is 2,272 B. MEASURED (FX_CHORUS.md §2) the longest
  *   delay ever reached at 48 kHz is 456 samples, so 512 is provably sufficient
@@ -100,19 +100,24 @@ typedef struct {
 typedef struct {
     float line[EB_CHORUS_RING];   /* 91728.. the BBD line, 4,096 B by default */
     int32_t w;                    /* 95824   write index, decrements          */
-    float line_in;                /* 95840   value written to the line        */
-    float c368, c384;             /* chorus input L / R                       */
     float c400, c416, c432, c448, c464, c480, c496, c512;   /* input filter   */
     float c528, c544, c560, c576, c592, c608;               /* output SVFs    */
     float c624, c640, c656, c672;                           /* LFO            */
     float c688, c704, c720, c736, c752;                     /* smoother, ramp */
-    float c768, c784, c800, c816;                           /* modulation     */
     float c832, c848;                                       /* noise source   */
     float c864, c880, c896, c912, c928, c944;               /* noise filt L   */
     float c960, c976, c992, c1008, c1024, c1040;            /* noise filt R   */
-    float c1056, c1072;                                     /* wet L / R      */
-    float c1088, c1104;                                     /* block output   */
-    float t856, t860, t864, t872, t876, t880;   /* 95856.. tap scratch cells  */
+
+    /* 17 CELLS THAT ARE NOT HERE. The port's arm also stores the chorus input
+     * (90368/90384), the four modulation cells (90768/90784/90800/90816), the
+     * two wet cells (91056/91072), the two block outputs (91088/91104), the
+     * line-write value (95840) and the six tap scratch cells (95856..95880).
+     * Every one of them is written and read inside the SAME sample and never
+     * read again, so here they are locals. That claim is not asserted, it is
+     * DECIDED BY EXECUTION: with them removed tools/engineb/null_b.py --module
+     * chorus is still EXACTLY 0 on all 30 scenarios, including the five
+     * idle-prefix ones that make free-running state audible. It removes 17
+     * stores per sample and 68 bytes of state. */
 } eb_chorus_state;
 
 /* Zero-initialise. MEASURED (FX_CHORUS.md §3): the plugin's power-on LFO phase
@@ -129,10 +134,12 @@ void eb_chorus_reset(eb_chorus_state *s);
  * eb_chorus_tick() (the engine entry) hard-codes them, while
  * eb_chorus_tick_x() takes them and is what the null shim calls, so the null
  * cannot be green because of an assumption. */
-void eb_chorus_tick_x(eb_chorus_state *s, const eb_chorus_coef *k,
+void eb_chorus_tick_x(eb_chorus_state *restrict s,
+                      const eb_chorus_coef *restrict k,
                       float in, float *outL, float *outR,
                       float v56, float v58);
-void eb_chorus_tick(eb_chorus_state *s, const eb_chorus_coef *k,
+void eb_chorus_tick(eb_chorus_state *restrict s,
+                    const eb_chorus_coef *restrict k,
                     float in, float *outL, float *outR);
 
 #endif /* ENGINEB_EB_CHORUS_H */
