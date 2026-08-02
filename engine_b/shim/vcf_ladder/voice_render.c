@@ -1371,6 +1371,8 @@ LABEL_46:
       {
         float _raw[30];
         int _k = 0;
+        int _ch = 0;
+        if (!EBFGEN_SEEN[voice] || EB_GEN_STALE(2, EBFGEN_SEEN[voice])) {
         _raw[_k++] = JF(a1, 9520); _raw[_k++] = JF(a1, 9536);
         _raw[_k++] = JF(a1, 9184);
         _raw[_k++] = JF(a1, 9072); _raw[_k++] = JF(a1, 9088);
@@ -1381,8 +1383,6 @@ LABEL_46:
         _raw[_k++] = JF(a1, 9168); _raw[_k++] = JF(a1, 9152);
         for ( ebi = 0; ebi < 16; ++ebi )
           _raw[_k++] = JF(a1, 9504 - 16 * ebi);
-        int _ch = 0;
-        if (!EBFGEN_SEEN[voice] || EB_GEN_STALE(2, EBFGEN_SEEN[voice])) {
           _ch = !EBFHAVE[voice] || memcmp(EBFRAW[voice], _raw, sizeof _raw) != 0;
           EB_GEN_CHECK(2, EBFGEN_SEEN[voice], _ch, "ladder");
         }

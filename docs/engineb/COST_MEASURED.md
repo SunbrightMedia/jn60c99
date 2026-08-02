@@ -238,3 +238,52 @@ verification that has never been seen to fail is not a verification.**
 **−33.0 % from the start.** The port function is down from 27,225 to **13,634**.
 Every gate is still green: EXACTLY 0 on all 30 scenarios per module and
 whole-engine, and 11/11 BIT-EXACT against the plugin at 48 kHz.
+
+
+---
+
+## Step 4 — the gathers moved inside the generation check
+
+Step 3 stopped the modules *comparing* their coefficients every sample, but they
+were still **reading** them: each shim gathered its 15 to 30 cells into a local
+array and only then asked whether anything could have changed. The read was the
+remaining cost.
+
+| module | gather, instr/sample |
+|---|---|
+| mod CV (24 cells × 8 voices) | 768 |
+| decimator (20 × 8) | 536 |
+| ladder (30 × 8) | 776 |
+| envelopes (15 × 2 × 8) | 336 |
+
+All four gathers now sit **inside** the generation check. Under
+`-DEB_VERIFY_GEN` the branch is always taken, so the verification build still
+gathers and still compares every sample — the proof is unweakened by the
+optimisation it is proving.
+
+### Running total
+
+| | instr/sample | port function self |
+|---|---|---|
+| before step 1 | 50,413 | 27,225 |
+| after step 1 (ladder state) | 36,357 | 16,241 |
+| after step 2 (coefficient caches) | 34,549 | 14,433 |
+| after step 3 (generation counter) | 33,750 | 13,634 |
+| **after step 4 (gathers moved)** | **30,758** | **10,642** |
+| engine B's own DSP, unchanged throughout | 15,431 | — |
+
+**−39.0 % from the start**, and the port function is down by **61 %**.
+
+Gates, all green after regenerating the composite:
+
+| gate | result |
+|---|---|
+| each of the four modules, 30 scenarios | EXACTLY 0 |
+| `--module all`, 30 scenarios | EXACTLY 0 |
+| `JUNO_EB_VERIFY_GEN=1 --module all` | PASS |
+| vs the PLUGIN at 48 kHz | 11/11 BIT-EXACT |
+
+**Half of what is left is now engine B itself.** Of 30,758, engine B's DSP is
+15,431 and the port function is 10,642. The marshalling has stopped being the
+dominant term, which is the point at which `eb_engine_render()` becomes worth
+writing: there is little left for it to delete, and what remains is real work.

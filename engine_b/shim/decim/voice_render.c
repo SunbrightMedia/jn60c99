@@ -2200,12 +2200,18 @@ LABEL_46:
      * and a needless recompute yields identical coefficients, so being
      * conservative in that direction is safe. */
     {
+      /* STEP 4: THE GATHER MOVED INSIDE THE GENERATION CHECK.
+       * Reading these cells was itself the cost -- MEASURED 536 executed
+       * instructions per sample -- and there is no point gathering values in
+       * order to compare them when the counter already says nothing can have
+       * changed. Under -DEB_VERIFY_GEN the branch is always taken, so the
+       * verification build still gathers and still compares every sample. */
       float _raw[20];
-      for (_i = 0; _i < 16; ++_i) _raw[_i] = JF(a1, _CC[_i]);
-      _raw[16] = JF(a1, 6256); _raw[17] = JF(a1, 6272);
-      _raw[18] = JF(a1, 6336); _raw[19] = JF(a1, 5456);
       int _ch = 0;
       if (!EBDGEN_SEEN[voice] || EB_GEN_STALE(3, EBDGEN_SEEN[voice])) {
+        for (_i = 0; _i < 16; ++_i) _raw[_i] = JF(a1, _CC[_i]);
+        _raw[16] = JF(a1, 6256); _raw[17] = JF(a1, 6272);
+        _raw[18] = JF(a1, 6336); _raw[19] = JF(a1, 5456);
         _ch = !EBDHAVE[voice] || memcmp(EBDRAW[voice], _raw, sizeof _raw) != 0;
         EB_GEN_CHECK(3, EBDGEN_SEEN[voice], _ch, "decim");
       }

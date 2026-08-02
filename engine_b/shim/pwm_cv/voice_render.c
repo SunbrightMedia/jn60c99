@@ -1140,7 +1140,7 @@ LABEL_46:
     float pitch_sum, pwm_sum;
     int j, same;
 
-    for ( j = 0; j < 24; ++j ) raw[j] = JF(a1, EBMCELL[j]);
+
       /* CHANGE DETECTION BY memcmp, not float-by-float. MEASURED: the
        * float loop below cost 2,192 executed instructions per sample -- it
        * is a loop-carried condition over 24 elements, per voice, per sample,
@@ -1154,9 +1154,17 @@ LABEL_46:
        * unchanged; the only cost is doing the work occasionally when it was
        * not required. Being conservative in that direction is safe; the
        * reverse would not be. */
+      /* STEP 4: THE GATHER MOVED INSIDE THE GENERATION CHECK.
+       * Reading these cells was itself the cost -- MEASURED 768 executed
+       * instructions per sample -- and there is no point gathering values in
+       * order to compare them when the counter already says nothing can have
+       * changed. Under -DEB_VERIFY_GEN the branch is always taken, so the
+       * verification build still gathers and still compares every sample. */
     if (!EBMGEN_SEEN[voice] || EB_GEN_STALE(1, EBMGEN_SEEN[voice])) {
-      int _ch = !EBMHAVE[voice] ||
-                memcmp(EBMRAW[voice], raw, 24 * sizeof(float)) != 0;
+      int _ch;
+      for ( j = 0; j < 24; ++j ) raw[j] = JF(a1, EBMCELL[j]);
+      _ch = !EBMHAVE[voice] ||
+            memcmp(EBMRAW[voice], raw, 24 * sizeof(float)) != 0;
       EB_GEN_CHECK(1, EBMGEN_SEEN[voice], _ch, "modcv");
       same = !_ch;
     } else same = 1;

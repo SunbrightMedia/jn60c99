@@ -1033,22 +1033,6 @@ LABEL_46:
       float k, gin;
       int j, same;
 
-      /* the fifteen cells the coefficients are a pure function of */
-      raw[0]  = JF(a1, 2784 + off);   /* A */
-      raw[1]  = JF(a1, 2800 + off);   /* S */
-      raw[2]  = JF(a1, 2816 + off);   /* D */
-      raw[3]  = JF(a1, 2832 + off);   /* R */
-      raw[4]  = JF(a1, 2864 + off);
-      raw[5]  = JF(a1, 2880 + off);
-      raw[6]  = JF(a1, 2896 + off);
-      raw[7]  = JF(a1, 2912 + off);
-      raw[8]  = JF(a1, 2928 + off);
-      raw[9]  = JF(a1, 2944 + off);
-      raw[10] = JF(a1, 2960 + off);
-      raw[11] = JF(a1, 2848 + off);
-      raw[12] = JF(a1, 2976 + off);
-      raw[13] = JF(a1, 2992 + off);
-      raw[14] = JF(a1, 3008 + off);
 
       /* Rebuild only on change. In a real host that is once per recall; the
        * comparison is here rather than in a parameter callback because this
@@ -1067,9 +1051,32 @@ LABEL_46:
        * unchanged; the only cost is doing the work occasionally when it was
        * not required. Being conservative in that direction is safe; the
        * reverse would not be. */
+      /* STEP 4: THE GATHER MOVED INSIDE THE GENERATION CHECK. Reading these
+       * fifteen cells, twice per voice, was itself MEASURED at 336 executed
+       * instructions per sample, and there is no point gathering values to
+       * compare when the counter already says nothing can have changed. Under
+       * -DEB_VERIFY_GEN the branch is always taken, so the verification build
+       * still gathers and still compares every sample. */
       if (!EBGEN_SEEN[voice][ei] || EB_GEN_STALE(0, EBGEN_SEEN[voice][ei])) {
-        int _ch = !EBHAVE[voice][ei] ||
-                  memcmp(EBRAW[voice][ei], raw, 15 * sizeof(float)) != 0;
+        int _ch;
+        /* the fifteen cells the coefficients are a pure function of */
+      raw[0]  = JF(a1, 2784 + off);   /* A */
+      raw[1]  = JF(a1, 2800 + off);   /* S */
+      raw[2]  = JF(a1, 2816 + off);   /* D */
+      raw[3]  = JF(a1, 2832 + off);   /* R */
+      raw[4]  = JF(a1, 2864 + off);
+      raw[5]  = JF(a1, 2880 + off);
+      raw[6]  = JF(a1, 2896 + off);
+      raw[7]  = JF(a1, 2912 + off);
+      raw[8]  = JF(a1, 2928 + off);
+      raw[9]  = JF(a1, 2944 + off);
+      raw[10] = JF(a1, 2960 + off);
+      raw[11] = JF(a1, 2848 + off);
+      raw[12] = JF(a1, 2976 + off);
+      raw[13] = JF(a1, 2992 + off);
+      raw[14] = JF(a1, 3008 + off);
+        _ch = !EBHAVE[voice][ei] ||
+              memcmp(EBRAW[voice][ei], raw, 15 * sizeof(float)) != 0;
         EB_GEN_CHECK(0, EBGEN_SEEN[voice][ei], _ch, "env");
         same = !_ch;
       } else same = 1;
