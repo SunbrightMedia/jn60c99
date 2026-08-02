@@ -124,44 +124,81 @@ def main():
     base = {tag: null_ab.render_script(ref, bank, null_ab.SR, p, sc)
             for p, sc, tag in null_ab.SCEN}
 
+    # BOTH probe shapes run by default. A single shape UNDER-REPORTS, and that
+    # defect was found in observability.py, fixed there, and left here -- where
+    # it silently set this project's work order (docs/trackb/MODULE_ORDER.md).
+    # A line is BLIND only when NEITHER shape can move it.
+    if "--mult-only" in argv:  kinds = ["mult"]
+    elif "--add-only" in argv: kinds = ["add"]
+    else:                      kinds = ["mult", "add"]
+
     cands = candidates(os.path.join(REPO, "src", "voice_render.c"), lo, hi)[:cap]
     print("=== TRACK B CANARY: %d assignments in src/voice_render.c:%d-%d, each "
           "%s ===" % (len(cands), lo, hi,
-                      ("offset by +%s" % addend) if addend else
-                      ("scaled by %s" % factor)))
+                      "probed BOTH ways (x%s and +%s)" % (factor, addend or "1.0")
+                      if len(kinds) > 1 else
+                      (("offset by +%s" % (addend or "1.0")) if kinds == ["add"]
+                       else ("scaled by %s" % factor))))
     print("  a line caught by 0 scenarios is a place the gate is BLIND: an error "
           "there would ship.\n")
     blind, tested, skipped = [], 0, 0
-    for ln, text in cands:
-        m = ASSIGN.match(text)
-        if addend:
+    def probe(ln, text, m, kind):
+        """Run ONE probe shape. Returns (built, scenarios_seen, worst_dB)."""
+        if kind == "add":
             mutated = "%s%s = (float)(%s) + %sf;" % (m.group(1), m.group(2),
-                                                     m.group(3), addend)
+                                                     m.group(3), addend or "1.0")
         else:
             mutated = "%s%s = (%s) * %sf;" % (m.group(1), m.group(2), m.group(3),
                                               factor)
-        so = "/tmp/canary_%d.so" % ln
+        so = "/tmp/canary_%s_%d.so" % (kind, ln)
         if not build_with(mutated, text, so):
-            skipped += 1
-            print("  :%-5d SKIP (not uniquely locatable, or does not compile)" % ln)
-            continue
+            return False, 0, None
         cand = null_ab.load(so)
         seen, worst = 0, None
-        for p, sc, tag in null_ab.SCEN:
-            out = null_ab.render_script(cand, bank, null_ab.SR, p, sc)
-            sig, rel, blk, ok = null_ab.judge(base[tag], out)
+        for pp, sc, tag in null_ab.SCEN:
+            out = null_ab.render_script(cand, bank, null_ab.SR, pp, sc)
+            _sig, rel, blk, ok = null_ab.judge(base[tag], out)
             if not ok:
                 seen += 1
                 m2 = max(x for x in (rel, blk) if x is not None)
                 worst = m2 if worst is None else max(worst, m2)
-        tested += 1
-        if seen == 0:
-            blind.append(ln)
-        print("  :%-5d %-58s %d/%d%s" % (ln, text.strip()[:58], seen,
-                                         len(null_ab.SCEN),
-                                         "" if worst is None else
-                                         "  loudest %.1f dB" % worst))
         os.unlink(so)
+        return True, seen, worst
+
+    mult_only = sum(1 for _ in ())      # counters for the summary
+    add_only = 0
+    for ln, text in cands:
+        m = ASSIGN.match(text)
+        results = {}
+        for kind in kinds:
+            built, seen, worst = probe(ln, text, m, kind)
+            if built:
+                results[kind] = (seen, worst)
+        if not results:
+            skipped += 1
+            print("  :%-5d SKIP (not uniquely locatable, or does not compile)" % ln)
+            continue
+        tested += 1
+        seen_any = max(v[0] for v in results.values())
+        worsts = [v[1] for v in results.values() if v[1] is not None]
+        worst = max(worsts) if worsts else None
+        if seen_any == 0:
+            blind.append(ln)
+        # Which probe SAW it matters: a line only one shape can move is a line
+        # whose consumer has a specific insensitivity, and that is a fact about
+        # the engine worth printing rather than averaging away.
+        if len(results) > 1:
+            mseen = results.get("mult", (0, None))[0]
+            aseen = results.get("add", (0, None))[0]
+            if aseen and not mseen: tag_probe = " [ADD only]"
+            elif mseen and not aseen: tag_probe = " [MULT only]"
+            else: tag_probe = ""
+        else:
+            tag_probe = " [%s]" % list(results)[0]
+        print("  :%-5d %-52s %d/%d%s%s" % (ln, text.strip()[:52], seen_any,
+                                           len(null_ab.SCEN),
+                                           "" if worst is None else
+                                           "  %.1f dB" % worst, tag_probe))
     print("\nCANARY: %d/%d assignments observable; %d BLIND%s; %d skipped"
           % (tested - len(blind), tested, len(blind),
              (" (lines %s)" % blind[:20]) if blind else "", skipped))
