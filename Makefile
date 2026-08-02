@@ -23,7 +23,7 @@ HDR     := $(wildcard src/*.h) $(wildcard gui/*.h)
 OBJ     := $(SRC:.c=.o)
 $(OBJ): $(HDR)
 
-.PHONY: all test clean gui provenance verify completeness
+.PHONY: all test clean gui provenance verify completeness engineb engineb-quick
 all: $(OBJ)
 
 # The honest finish-line gate: functional tests must pass AND the LIVE plugin
@@ -212,6 +212,15 @@ tests/test_delay_recall: tests/test_delay_recall.c $(SRC) $(HDR)
 
 tests/test_reverb_recall: tests/test_reverb_recall.c $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
+
+# ENGINE B FOUNDATION, one command. Runs every foundation gate in dependency
+# order and stops at the first red with a message that says what to DO. The
+# whole policy (order, why, what --quick omits) is in tools/engineb/foundation.sh
+# and docs/engineb/FOUNDATION.md. Never add a gate here without adding it there.
+engineb:
+	@bash tools/engineb/foundation.sh
+engineb-quick:
+	@bash tools/engineb/foundation.sh --quick
 
 clean:
 	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke \
