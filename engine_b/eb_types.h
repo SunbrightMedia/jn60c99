@@ -186,9 +186,15 @@ typedef struct {
 #ifndef EB_DELAY_LEN
 #define EB_DELAY_LEN  12000       /* 250 ms at 48 kHz, per channel            */
 #endif
-#ifndef EB_REVERB_LEN
-#define EB_REVERB_LEN 8192        /* whole comb/allpass network, both channels */
-#endif
+/* EB_REVERB_LEN IS GONE. It was a skeleton placeholder of 8,192 floats for
+ * "the whole comb/allpass network", and it was 6.0x too small: the reverb is 13
+ * separate delay elements totalling 49,824 floats = 199,296 B at the 48 kHz
+ * worst case (MEASURED, docs/engineb/FX_REVERB.md section 7 and
+ * sizeof(eb_reverb_state)). The budget now lives in engine_b/eb_reverb.h as one
+ * EB_REV_CAP_* per element, because the four long loop delays (138,104 B) must
+ * be placeable separately from the nine short ones (61,192 B). A single length
+ * cannot express that, which is why the placeholder is deleted rather than
+ * corrected. */
 
 typedef struct {
     /* free-running: the chorus LFO must advance while the engine idles, which
@@ -200,7 +206,7 @@ typedef struct {
     float    rev_fb, rev_mix;
     float    cho[2][EB_CHORUS_LEN];
     float    dly[2][EB_DELAY_LEN];
-    float    rev[EB_REVERB_LEN];
+    /* the reverb tank is eb_reverb_state (engine_b/eb_reverb.h), 199,640 B */
 } eb_fx;
 
 /* ------------------------------------------------------------------ engine */

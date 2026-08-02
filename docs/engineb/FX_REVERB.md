@@ -379,6 +379,17 @@ module; the sample-domain null is the whole standard.
 
 ## 10. Open items for whoever implements this
 
+> **IMPLEMENTED 2026-08-02 — read `docs/engineb/M-REVERB_RESULT.md`.**
+> `engine_b/eb_reverb.c` nulls **30/30 EXACTLY 0** against the sealed engine.
+> Items 1, 3 and 4 below are DONE; item 5 is respected. The split-buffer
+> substitution this document proposed is now itself PROVEN bit-exact against the
+> masked line (`tools/engineb/fx_reverb_split_proof.py`). Numbers that changed:
+> the state is **199,640 B** (not 197,624 — the pre-delay ring carries a further
+> 416 samples because the TYPE-5 modulation only ever reads DEEPER), the PSRAM
+> group is **138,104 B in 16 accesses/sample** (not 12 — the recirculation read
+> was missed here), and the built module costs **812 cyc/sample** MODELED on S3
+> internal SRAM against the 636 estimated from the candidate.
+
 1. `EB_REVERB_LEN` must become 49,406 floats and be split into 13 named
    elements, with the four long delays in a separately-placed section.
 2. TYPE 0 and 1 use shorter tap sets; the buffers still have to be sized for

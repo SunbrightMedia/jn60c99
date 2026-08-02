@@ -35,7 +35,9 @@
 #define EB_HAVE_CHORUS  1   /* eb_chorus.c: null 30/30 EXACTLY 0 (ledger)      */
 #define EB_HAVE_DELAY   1   /* eb_delay.c: DELAY TYPE 0 ONLY, null 30/30 EXACTLY 0.
                              * TYPES 1..5 are NOT written -- see docs/engineb/M-DELAY_RESULT.md */
-#define EB_HAVE_REVERB  0
+#define EB_HAVE_REVERB  1   /* eb_reverb.c: null 30/30 EXACTLY 0; split-buffer
+                             * equivalence to the plugin's masked line PROVEN
+                             * bit-exact -- docs/engineb/M-REVERB_RESULT.md */
 
 #define EB_MODULES_COMPLETE                                                   \
     (EB_HAVE_PARAM && EB_HAVE_ALLOC && EB_HAVE_LFO && EB_HAVE_NOISE &&        \

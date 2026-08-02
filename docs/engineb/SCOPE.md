@@ -24,11 +24,11 @@ This is a first plan. Measurement replaces it.
 |---|---|---|
 | 8 voices | 2,000 | 250 for each voice |
 | chorus | 400 | the signature effect. Do not make it worse. |
-| delay | 300 | |
-| reverb | 500 | |
+| delay | 300 | MEASURED-shaped: 207 cyc/sample for the 48 kHz build, but its 524 KB ring does not fit (docs/engineb/M-DELAY_RESULT.md) |
+| reverb | ~~500~~ **850** | MEASURED-shaped, 2026-08-02: the built module models at **812 cyc/sample** on S3 internal SRAM (band 614…1,297) and ~900 with its long delays in PSRAM. docs/engineb/M-REVERB_RESULT.md |
 | control rate work | 200 | envelopes, LFO, smoothers |
 | headroom | 100 | |
-| **total** | **3,500** | |
+| **total** | **3,850** | **350 OVER the 3,500 budget, and this is the honest state of it.** The reverb's 500 was a guess; the measurement says 850. Nothing has been rebalanced to hide that: the three parts still unmeasured (voices, chorus, control rate) are where the 350 has to come from, or the budget moves. |
 
 ## Memory
 
