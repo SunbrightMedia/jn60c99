@@ -118,6 +118,28 @@ SCEN = [
     (22, [('on', 43, 100), ('render', 10000), ('on', 55, 100),
           ('render', NFR), ('off', 43), ('off', 55), ('render', 14000)],
                                                                     "DCO reset arm"),
+    # ENV1/ENV2 LFO-TRIG ARM, second drive. Targets M2 (:968, the ENV1 gate-kill
+    # arm) and M3 (:1023, the ENV2 arm) -- and, with its long hold, the thin
+    # peak-detector lines :985/:987 (margin only -3.2 dB). Those two arms were
+    # held open by exactly ONE scenario ("DCO reset arm" above) at a 0.78 dB
+    # global margin, and Option B rewrites both envelope generators, so a single
+    # scenario deep is not a gate. Patch 22 again because it is the ONLY patch of
+    # the 64 with record byte 554 (LFO TRIG ENV) set -- re-verified this session
+    # against truth/presetbankog1.bin -- and its VCA MODE byte 490 is 1 (= ENV2),
+    # so one patch reaches both arms. Redundancy therefore has to come from a
+    # DIFFERENT DRIVE of patch 22, not from a second patch, and this one differs
+    # in every way that moves those lines: a 20000-sample WARM prefix (the LFO
+    # free-runs, so the trig phase at note-on differs from the cold scenario), a
+    # 120000-sample (2.7 s) polyphonic hold that spans many LFO-trig periods so
+    # the ADSRs are driven through repeated attack/release cycles instead of one,
+    # a STAGGERED release, and a re-note after a full release. Every note is
+    # released and a 20000-sample tail is rendered.
+    (22, [('render', 20000), ('on', 31, 100), ('render', 4000),
+          ('on', 43, 100), ('on', 55, 100), ('render', 120000),
+          ('off', 31), ('render', 8000), ('off', 43), ('off', 55),
+          ('render', 20000),
+          ('on', 47, 100), ('render', 60000), ('off', 47),
+          ('render', 20000)],                                       "ENV trig arm warm"),
 ]
 
 COLD_TAGS = {t for _, _, t in SCEN}   # the pre-2026-08-02 set, frozen for the
@@ -576,6 +598,7 @@ def main():
         # been established. Recorded as a measured fact and flagged, rather than
         # given a plausible story. Do not remove this note by guessing.
         ALL = COLD_TAGS | IDLE_TAGS
+        PREFIXED = {t for _, sc, t in SCEN if sc and sc[0][0] == 'render'}
         NOISE_IDLE = {t for t in IDLE_TAGS if t.startswith("idle noise")}
         REALLOC = {t for t in IDLE_TAGS if t.startswith("realloc")}
         EXPECT = {
@@ -598,14 +621,24 @@ def main():
             # construction — their first event is a note-on, so its
             # pre-first-note window is empty. "gapskip" is the mutation that
             # tests them.
-            "idleskip":  (IDLE_TAGS - REALLOC) | {"MONO retrigger", "UNISON pile-up"},
+            "idleskip":  PREFIXED,
             "gapskip":   set(ALL),
         }
         # A scenario whose first event is a note-on CANNOT catch idleskip. Making
         # that an assertion, split cold vs idle, is what proves the new scenarios
         # are load-bearing rather than redundant with the cold ones.
+        # STRUCTURAL, not by tag. A scenario can catch idleskip if and only if it
+        # RENDERS BEFORE ITS FIRST NOTE-ON -- the mutation's window closes at the
+        # first note the engine ever sees. Deriving that from the scripts rather
+        # than from tag names removes a whole class of bookkeeping bug: the
+        # "ENV trig arm warm" scenario was declared above the line that freezes
+        # COLD_TAGS, so it was tagged cold while opening with ('render', 20000),
+        # and a name-based expectation would have called its correct catch a
+        # matrix mismatch. Two scenarios tagged idle (the realloc pair) likewise
+        # CANNOT catch it, because their idle sits between notes.
+        PREFIXED = {t for _, sc, t in SCEN if sc and sc[0][0] == 'render'}
         IDLE_EXPECT = {
-            "idleskip": (IDLE_TAGS - REALLOC, {"MONO retrigger", "UNISON pile-up"}),
+            "idleskip": (PREFIXED & IDLE_TAGS, PREFIXED & COLD_TAGS),
             "gapskip":  (set(IDLE_TAGS), set(COLD_TAGS)),
         }
         for mut, expect_fail in ((None, False), ("noisegain", True),
