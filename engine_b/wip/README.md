@@ -32,15 +32,41 @@ EXACTLY 0, so the transcription is close but is wrong somewhere specific.
   by resetting on a context change: it fixed exactly ONE scenario, 18 → 17.
   So it is real but it is not the main cause.
 
-### What to try next
+### RESOLVED: the MODULE is correct. The defect is in the SHIM.
 
-1. Unit-level A/B: drive `eb_decim_tick` and the port's own FIR with the same
-   32 taps and the same biquad state, and find the first differing sample. That
-   localises it in minutes; the scenario gate only says "somewhere".
-2. Suspect the biquad's state rotation ordering before anything else. The
-   port rotates 5504/5488 at line 1701, several hundred lines before the biquad
-   runs at 2159, which is exactly the kind of split this transcription had to
-   reassemble by hand.
+`engine_b/tests/test_decim.c` was written and run. It drives `eb_decim_tick`
+and a verbatim transcription of the port's own arithmetic — the 30-move shift
+from `:1697-1702` and the FIR and biquad from `:2134-2173`, in a plain cell
+array — from the same inputs, and compares bit patterns.
+
+MEASURED: **300,000 samples, 0 differing. PASS.**
+
+So the tap map, the accumulation order, the biquad's state rotation and the
+rotating-index replacement for the shift are all correct. **The remaining defect
+is in how the shim is wired, not in `eb_decim.c`.**
+
+The unit test is a DIFFERENTIAL, not a proof: its reference side is a hand
+transcription and could share a misreading with the module. What it does prove
+is that the module matches that reading exactly, which moves the search from
+sixty lines of arithmetic to the shim.
+
+### What to try next, in order
+
+1. **State lifetime.** The strongest remaining suspect and the one the
+   standalone engine removes. The shim's `static eb_decim_state EBD[8]`
+   outlives the engine context; the harness builds a new context per scenario.
+   Resetting on a base-pointer change fixed one scenario of thirty, but that
+   test is unreliable — `malloc` reuses addresses, so a new context can land on
+   the old pointer and skip the reset. A trustworthy test needs one scenario per
+   process.
+2. ~~**Cell readers.**~~ CHECKED and clear. Outside the FIR, the only code that
+   touches cells 4944..5440 / 5472 / 5488 / 5504 is the DCO writing the four
+   fresh sub-samples (`src/voice_render.c` :1807, :1911, :2015, :2117, all
+   after the shift and before the FIR) and `src/chorus_init.c` zeroing them at
+   power-on — which is exactly what engine B's zero-initialised state matches.
+   No reader is left unserved by dropping the shift.
+3. Then finish the module in `eb_voice`, where the state belongs — the fields
+   are already declared (`decim_h`, `decim_w`, `decim_b1..b3`).
 
 ### The design finding, which outlives this bug
 
