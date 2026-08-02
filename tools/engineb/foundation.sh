@@ -129,8 +129,15 @@ else
             continue
         fi
         say "$STEP" "null_b --module $m"
-        python3 tools/engineb/null_b.py --module "$m" $Q || die "module '$m' does not null against src/" \
-            "engine B's '$m' is audibly different from the frozen port." \
+        python3 tools/engineb/null_b.py --module "$m" $Q || die "module '$m' did not clear the null against src/" \
+            "TWO DIFFERENT FAILURES LOOK ALIKE HERE -- read the output above:" \
+            " (a) the candidate did not BUILD or did not LOAD (a link error, an" \
+            "     undefined symbol, a RENDER WORKER FAILED traceback). Then no" \
+            "     DSP was compared at all and this says nothing about accuracy;" \
+            "     finish the shim. A half-written shim in engine_b/shim/ is" \
+            "     picked up by this step the moment the directory exists." \
+            " (b) it built, ran, and DIVERGED -- scenario lines with a dB" \
+            "     residual. That is engine B sounding different from the port." \
             "FIX: the failing scenarios are listed with a dB residual and a" \
             "     worst-1024-block figure. Reproduce one alone, then bisect" \
             "     the shim. Do NOT widen the threshold: the bands (-100 dB" \
