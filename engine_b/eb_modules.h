@@ -33,7 +33,8 @@
 #define EB_HAVE_ENV     1   /* ENV1 + ENV2: eb_envgen.c, null 30/30 EXACTLY 0 (ledger) */
 #define EB_HAVE_VCA     0   /* amp, incl. the GATE / ENV1 / ENV2 mode switch  */
 #define EB_HAVE_CHORUS  0   /* the signature BBD chorus                       */
-#define EB_HAVE_DELAY   0
+#define EB_HAVE_DELAY   1   /* eb_delay.c: DELAY TYPE 0 ONLY, null 30/30 EXACTLY 0.
+                             * TYPES 1..5 are NOT written -- see docs/engineb/M-DELAY_RESULT.md */
 #define EB_HAVE_REVERB  0
 
 #define EB_MODULES_COMPLETE                                                   \

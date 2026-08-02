@@ -89,9 +89,18 @@ void eb_delay_process(const eb_delay_cfg *c, eb_delay_state *s,
     s->t_smooth = sm;
 
     /* ---- tap position: integer part NEGATED, fraction from the positive */
-    di2  = (int32_t)(float)(sm * -16384.0);        /* <= 0 */
-    P    = (float)(sm * 16384.0);
-    frac = (float)((double)P - (double)(int)P);
+    /* The sealed engine does these three in DOUBLE. Engine B does them in
+     * float, and that is not an assumption: the two forms were compared over
+     * EVERY float32 bit pattern with |sm| <= 1e6 -- 2,464,696,322 values --
+     * with 0 mismatches in the int cast and 0 in the fraction (the scaling is
+     * by a power of two, so it is exact, and P - trunc(P) is a difference of
+     * neighbouring floats). Values outside that domain set `overrun` below and
+     * are refused, so the untested tail is not reachable. This matters on the
+     * ESP32-S3, whose FPU is single-precision only: one double here would be a
+     * softfloat call per sample. */
+    di2  = (int32_t)(sm * -16384.0f);              /* <= 0 */
+    P    = sm * 16384.0f;
+    frac = P - (float)(int)P;
     if (-di2 + 2 >= EB_DELAY_LEN) s->overrun = 1;  /* never wrap silently */
 
     /* ---- read, loop damping filter, output, write ---------------------- */

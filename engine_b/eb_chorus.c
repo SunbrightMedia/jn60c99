@@ -25,14 +25,14 @@
 #include <string.h>
 
 /* ---- the two wrappers, verbatim from src/juno_dsp.c ---------------------- */
-static float eb_wrap_unit(float x)
+static inline float eb_wrap_unit(float x)
 {
     if (x > 1.0f)  return fmodf(x + 1.0f, 2.0f) - 1.0f;
     if (x < -1.0f) return fmodf(x - 1.0f, 2.0f) + 1.0f;
     return x;
 }
 
-static float eb_wrap24(float x)
+static inline float eb_wrap24(float x)
 {
     int v1 = (int)(x * 16777216.0f);
     int v2, v5, v6;

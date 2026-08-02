@@ -19,8 +19,9 @@
  *
  * MEMORY (EB_DELAY_LEN = 65536, the default)
  *   ring          2 * 65536 * 4 = 524,288 B
- *   scalars                          120 B
- *   sizeof(eb_delay_state)       524,408 B
+ *   scalars                          112 B
+ *   sizeof(eb_delay_state)       524,400 B   (MEASURED, sizeof)
+ *   sizeof(eb_delay_cfg)             108 B   (MEASURED, sizeof)
  *   This does not fit the 200 KB internal budget of docs/engineb/SCOPE.md and
  *   is the allocation that forces PSRAM. EB_DELAY_LEN is a COMPILE-TIME
  *   constant and the ring is the LAST member of the struct precisely so the

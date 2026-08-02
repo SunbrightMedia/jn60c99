@@ -139,3 +139,26 @@ gate); `x1.00003` on the PWM sum fails **22/29**.
 `eb_modcv_block()` — the eight-voice shape the finished engine calls — is PROVEN
 bit-identical to the gated `eb_modcv_tick()` over 16,000,000 random comparisons
 (`engine_b/test_modcv_block.c`, 0 mismatches).
+
+## delay — MODULE M-DELAY, the DELAY TYPE 0 stage
+
+Forks `src/master_render.c` and replaces ONE range, lines 1055-1264 (the whole
+`LABEL_69` delay stage), with a call into `engine_b/eb_delay.c`. Everything else
+in the file is the port's own code byte for byte.
+
+`null_b.py --module delay` -> **30/30 EXACTLY 0**, including all 17 idle-prefix
+scenarios. Non-vacuity is MEASURED, not assumed, and it was measured by
+accident: the FIRST version of this module got the delay-time smoother's 4-deep
+cell pipeline wrong and failed **15 of 30** scenarios at **-33.9 dB**, so 15
+scenarios are known to reach this module's output. Planted afterwards on
+purpose: the tap index moved by one sample fails 15/30 at -38.4 dB, and the
+feedback taken before the loop damping fails 6/30 at -13.6 dB.
+
+The module's state lives at `a1+102800`, ON TOP of the port's own left delay
+ring, which the replaced block no longer uses. It is seeded once from the port's
+own power-on cells, and the shim ABORTS rather than continue if either port ring
+is non-zero at that moment or if the tap does not fit `EB_DELAY_LEN`.
+
+Full numbers, the 14-configuration offline test against the literal
+transcription, the exhaustive double-to-float proof and the PSRAM warning:
+`docs/engineb/M-DELAY_RESULT.md`.
