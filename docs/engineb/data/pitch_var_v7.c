@@ -1,4 +1,4 @@
-/* eb_pitch.c — VARIANT V3 "compensated dekker" (PROBE BUILD, decision measurement only).
+/* eb_pitch.c — VARIANT V7 "v3 + error-free product lo-paths + best final rounding" (PROBE).
  *
  * Double-float (Dekker) arithmetic: every value is an unevaluated sum of two
  * floats (hi + lo), ~49 effective mantissa bits. Products via Dekker TwoProd
@@ -56,21 +56,31 @@ static df df_add(df a, df b)
     return two_sum(s.hi, lo);
 }
 
-/* df * df. v3: the a.lo*b.lo term is KEPT (dekker dropped it). One extra
- * multiply buys the last ~2^-48 of the product. */
+/* df * df, v7: every cross term enters through two_prod/two_sum so the lo
+ * path itself no longer rounds first-order error away. */
 static df df_mul(df a, df b)
 {
-    df p = two_prod(a.hi, b.hi);
-    float lo = ((p.lo + a.lo * b.lo) + a.hi * b.lo) + a.lo * b.hi;
-    return two_sum(p.hi, lo);
+    df p  = two_prod(a.hi, b.hi);
+    df q1 = two_prod(a.hi, b.lo);
+    df q2 = two_prod(a.lo, b.hi);
+    df s1 = two_sum(p.lo, q1.hi);
+    df s2 = two_sum(s1.hi, q2.hi);
+    float lo = s2.hi;
+    float e  = ((s1.lo + s2.lo) + (q1.lo + q2.lo)) + a.lo * b.lo;
+    df r = two_sum(p.hi, lo);
+    r.lo += e;
+    return two_sum(r.hi, r.lo);
 }
 
-/* df * float. */
+/* df * float, v7: the a.lo*b product keeps its own error term. */
 static df df_mulf(df a, float b)
 {
     df p = two_prod(a.hi, b);
-    float lo = p.lo + a.lo * b;
-    return two_sum(p.hi, lo);
+    df q = two_prod(a.lo, b);
+    df s = two_sum(p.lo, q.hi);
+    df r = two_sum(p.hi, s.hi);
+    r.lo += s.lo + q.lo;
+    return two_sum(r.hi, r.lo);
 }
 
 static df df_from(float x) { df r; r.hi = x; r.lo = 0.0f; return r; }
@@ -139,7 +149,10 @@ float eb_pitch_eval(float cv, const double *tab, float gain)
     A = acc_add(A, df_mul(df_mulf(df_mulf(x10, x), x), df_coef(tab[24])));
 
     {
-        float out = A.s.hi + (A.s.lo + A.c);
+        /* best-effort correctly-rounded collapse of (hi, lo, c) to one float */
+        df t = two_sum(A.s.lo, A.c);
+        df u = two_sum(A.s.hi, t.hi);
+        float out = u.hi + (u.lo + t.lo);
         return fmaxf(fminf(out, 512.0f), -512.0f) * gain;
     }
 }

@@ -1,4 +1,4 @@
-/* eb_pitch.c — VARIANT V3 "compensated dekker" (PROBE BUILD, decision measurement only).
+/* eb_pitch.c — VARIANT V6 "compensated dekker + exact-double fallback below x=-6" (PROBE).
  *
  * Double-float (Dekker) arithmetic: every value is an unevaluated sum of two
  * floats (hi + lo), ~49 effective mantissa bits. Products via Dekker TwoProd
@@ -113,10 +113,53 @@ static acc3 acc_add(acc3 A, df t)
     return out;
 }
 
+/* THE HYBRID SPLIT. v3 passes 29/30; the one failure is 'DCO neg pitch
+ * sweep' at -99.1 dB, and its cause is arithmetic, not chance: at large
+ * negative x the 13 terms reach ~x^12 = 4e15 and cancel to <= 512, eating
+ * ~52 bits -- double survives with margin, ~49-bit df does not. Below the
+ * threshold this function therefore runs the PORT'S OWN double evaluation,
+ * bit for bit; above it, the compensated float path. The choice is per call
+ * from the input alone: no state, no seam, and the threshold sits in a region
+ * (pitch CV < -9, deep sub-audio) that music rarely enters, so the S3 pays
+ * the soft-double price only on rare samples. */
+static float eb_pitch_eval_double(float x, const double *tab, float gain)
+{
+    double v385 = (double)x;
+    double v386 = v385 * v385 * v385;
+    double v388 = v386 * v385 * v385;
+    double v389 = v388 * v385 * v385 * v385;
+    double v390 = v389 * v385 * v385;
+    double s = v385 * tab[2]
+             + tab[0]
+             + v385 * v385 * tab[4]
+             + v386 * tab[6]
+             + v386 * v385 * tab[8]
+             + v388 * tab[10]
+             + v388 * v385 * tab[12]
+             + v388 * v385 * v385 * tab[14]
+             + v389 * tab[16]
+             + v389 * v385 * tab[18]
+             + v390 * tab[20]
+             + v390 * v385 * tab[22]
+             + v390 * v385 * v385 * tab[24];
+    return fmaxf(fminf((float)s, 512.0f), -512.0f) * gain;
+}
+
 float eb_pitch_eval(float cv, const double *tab, float gain)
 {
     float x = eb_pitch_clamp(cv);
     df dx   = df_from(x);
+    /* THE SPLIT, placed by MEASUREMENT (ULP sweep, 15.2M points, /tmp/psweep):
+     * v3-vs-double disagreement peaks at 27,571 ULP in row 6 (x near -14) and
+     * decays to <= 1-2 ULP above row 12; from x >= -6 the worst row is 8 ULP
+     * and every scenario that exercises that range passes at -135 dB or
+     * better. Below -6 the 13 terms cancel so hard that even double keeps only
+     * ~14-20 good bits; ~49-bit double-float cannot follow it, and matching
+     * the port there means using the port's own arithmetic. x < -6 is the
+     * deep pitch-down region, rare in music, so the S3 pays the soft-double
+     * price only on the voices and samples that actually go there. */
+    if (x < -6.0f)
+        return eb_pitch_eval_double(x, tab, gain);
     df x3   = df_mulf(df_mulf(dx, x), x);         /* v386 */
     df x5   = df_mulf(df_mulf(x3, x), x);         /* v388 */
     df x8   = df_mulf(df_mulf(df_mulf(x5, x), x), x); /* v389 */

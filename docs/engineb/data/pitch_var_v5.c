@@ -1,4 +1,4 @@
-/* eb_pitch.c — VARIANT V3 "compensated dekker" (PROBE BUILD, decision measurement only).
+/* eb_pitch.c — VARIANT V5 "compensated dekker + PORT-VERBATIM double clamp/row" (PROBE).
  *
  * Double-float (Dekker) arithmetic: every value is an unevaluated sum of two
  * floats (hi + lo), ~49 effective mantissa bits. Products via Dekker TwoProd
@@ -84,14 +84,28 @@ static df df_coef(double v)
     return r;
 }
 
+/* The clamp and the row are the PORT'S OWN DOUBLE forms, verbatim. v4 proved
+ * the remaining -99.1 dB does NOT live in the eval below x=-9; the sweep
+ * scenario crosses every row boundary, and the float row (x + 20.0f, coarse
+ * rounding) can pick a different spline row than the port's exact double
+ * (x + 20.0). A row flip evaluates the wrong coefficients: a small, persistent
+ * pitch offset that integrates -- the -99 dB signature. These four double
+ * fmin/fmax + one conversion per call are cheap (~112 instr on the S3) next to
+ * the 3,419 the full double eval cost; an exact float-only replacement (TwoSum
+ * boundary test) is a later, gated step. */
+static double eb_pitch_clamp_d(double cv)
+{
+    return fmin(fmax((float)cv, -20.0), 8.9);
+}
+
 static float eb_pitch_clamp(float cv)
 {
-    return fminf(fmaxf(cv, -20.0f), 8.9f);
+    return (float)eb_pitch_clamp_d(cv);
 }
 
 int eb_pitch_row(float cv)
 {
-    return (int)(eb_pitch_clamp(cv) + 20.0f);
+    return (int)(eb_pitch_clamp_d(cv) + 20.0);
 }
 
 /* v3 ACCUMULATOR: a df plus a separate compensation float. df_add loses bits

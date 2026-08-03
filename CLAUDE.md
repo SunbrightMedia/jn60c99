@@ -19,19 +19,29 @@ CORRECTED. Read `docs/engineb/S3_ASSESSMENT.md` FIRST; it supersedes the
   budget, invisible on host (536 instr/sample). Corrected capacity: 5,000
   cyc/sample/core EXACT; two-core working budget ~9,500 (the binding
   constraints rank 8 voices + all FX above the one-core preference).
-- **Precision nulls MEASURED (30 scenarios): float32 pitch FAIL 30/30
-  (pitch error integrates in phase); Dekker double-float FAIL only 2/30 by
-  ≤4.2 dB (summation precision, proven by control variant).** v3 = compensated
-  sum, was BUILDING at session end (workflow `engineb-pitch-v3-and-qemu`,
-  run wf_81cbdf87-34f — script + resume path in the workflows dir; re-run it
-  if it died). Integration spec: `#if EB_PITCH_FAST`, default 0 = bit-exact.
-- **A WORKING ESP32-S3 QEMU is in the scratchpad** (Espressif 9.2.2, verified
-  boots the S3 mask ROM, -icount OK, no TCG plugins → count via CCOUNT;
-  re-download recipe in the qemu scout section of the workflow journal if the
-  scratchpad died). `tools/engineb/qemu/` harness was being built by the same
-  workflow. **Post-fix modeled total: 17,700–22,300 instr/sample vs 9,500 →
-  1.9–3.5x gap; the model is UNVALIDATED (M7 precedent erred 2.2x); the first
-  real executed number is one QEMU run away.**
+- **THE PITCH FIX IS DONE AND GATED (v7).** `engine_b/eb_pitch.c` now carries
+  `#if EB_PITCH_FAST` (default 0 = bit-exact double; PROVEN EXACTLY 0).
+  `JUNO_EB_PITCH_FAST=1 null_b.py --module pitch`, full 30 scenarios: **PASS,
+  worst global −123.6 dB** (23.6 dB margin). The road (float32 FAIL 30/30;
+  Dekker FAIL 2/30; v4/v5/v6 threshold/clamp/row variants BIT-IDENTICAL
+  residuals = the error was a distributed 1-ULP carpet; v7 = error-free
+  product lo-paths + compensated accumulator) is in
+  `docs/engineb/data/pitch_precision_null.md` with the reproducible probe.
+  **OWED NEXT: hoist the df_coef split** (13 `__subdf3`/call remain on S3,
+  ~800–900 instr/call vs double's 3,419; needs the ROW at the eval call —
+  API change — because `juno_pitch_table` is `static` per TU), re-gate both
+  builds, re-measure in the QEMU harness with `-DEB_PITCH_FAST=1`.
+- **THE QEMU HARNESS RAN — first executed-Xtensa numbers exist**
+  (`docs/engineb/data/qemu_instr_counts.md`; raw log + harness committed in
+  `tools/engineb/qemu/`; QEMU binary in the scratchpad, re-download recipe in
+  the doc). **CCOUNT ticks once per 25 instructions in this build** (icount
+  1 ns/instr × 40 MHz machine clock — the harness's own comment says
+  per-instruction and is WRONG; scale cross-checked on four branch-light
+  functions). MEASURED: whole chain 71,051 instr/sample; pitch-double
+  27,351 (validates the model); dco_step4 17,581 (worst-case-ish — synthetic
+  levels defeat the saturator shortcut; replay a REAL scenario to bound it);
+  ladder 8,850; ALL FX only 1,635. vs 9,500 two-core budget: 7.5× today,
+  ~4.6× after the pitch fix. Instructions ≠ cycles; c/i ≥ 1 on top.
 - **Ranked plan (S3_ASSESSMENT §5): pitch v3 → QEMU measurement → EB_DCO_RECIP
   (MEASURED −121 dB, passes the −100 gate) → VCF reciprocal → inline clamps →
   blockwise structure → two-core split → silicon → memory plan (256 KB delay

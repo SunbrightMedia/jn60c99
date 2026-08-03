@@ -118,6 +118,12 @@ CFLAGS = ["-std=c99", "-O2", "-ffp-contract=off", "-fno-strict-aliasing"]
 # execution instead of by reading the call graph.
 if os.environ.get("JUNO_EB_VERIFY_GEN"):
     CFLAGS = CFLAGS + ["-DEB_VERIFY_GEN"]
+# EB_PITCH_FAST: build engine B's pitch with the v7 double-float path (the S3
+# build). Default OFF = bit-exact double. JUNO_EB_PITCH_FAST=1 turns it on so
+# the -100 dB gate can be run against the REAL integrated file, not a probe
+# copy. MEASURED 2026-08-03: worst global -123.6 dB over all 30 scenarios.
+if os.environ.get("JUNO_EB_PITCH_FAST"):
+    CFLAGS = CFLAGS + ["-DEB_PITCH_FAST=1"]
 
 # ---------------------------------------------------------------- scenarios
 # The nine port-risk scenarios are reused verbatim from the Track B gate: they

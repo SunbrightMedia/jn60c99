@@ -22,6 +22,11 @@ VARIANTS = {
     "float32": os.path.join(SCRATCH, "pitch_var_float32.c"),
     "dekker":  os.path.join(SCRATCH, "pitch_var_dekker.c"),
     "dekker_drow": os.path.join(SCRATCH, "pitch_var_dekker_drow.c"),
+    "v3": os.path.join(SCRATCH, "pitch_var_v3.c"),
+    "v4": os.path.join(SCRATCH, "pitch_var_v4.c"),
+    "v5": os.path.join(SCRATCH, "pitch_var_v5.c"),
+    "v6": os.path.join(SCRATCH, "pitch_var_v6.c"),
+    "v7": os.path.join(SCRATCH, "pitch_var_v7.c"),
 }
 
 

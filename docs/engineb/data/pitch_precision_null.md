@@ -209,3 +209,35 @@ Labels: all residual tables MEASURED (harness executed, commands above);
 census STATIC; "row never flipped" INFERRED from B == B2; nothing here is
 PROVEN against the plugin binary — the null is vs the sealed port, per the
 Engine B accuracy standard.
+
+---
+
+## v3–v7 (2026-08-03, second half): THE PASSING VARIANT EXISTS
+
+| variant | change | result (full 30, gates −100/−80) |
+|---|---|---|
+| v3 | compensated (hi,lo,c) accumulator + kept a.lo·b.lo | FAIL 1/30: `DCO neg pitch sweep` −99.1 dB (was −95.8) |
+| v4 | v3 + exact-double fallback below x=−9 | FAIL 1/30, residual BIT-IDENTICAL to v3 |
+| v5 | v3 + port-verbatim double clamp/row | FAIL 1/30, residual BIT-IDENTICAL to v3 |
+| v6 | v3 + fallback below x=−6 | FAIL 1/30, residual BIT-IDENTICAL to v3 |
+| **v7** | v3 + error-free product lo-paths + best final rounding | **PASS 30/30, worst global −123.6 dB** |
+
+The three identical failures (v4/v5/v6) are themselves the diagnosis: the
+residual was NOT a special region, a clamp, or a row flip. A 15.2M-point ULP
+sweep (`/tmp/psweep.c` pattern, rebuildable) showed a distributed ~1-ULP
+carpet over ~30 % of the musical range plus a cancellation peak (27,571 ULP,
+row 6). v7 shrank both enough that the integrating scenario clears the gate
+with 23.6 dB of margin.
+
+INTEGRATED: `engine_b/eb_pitch.c` behind `#if EB_PITCH_FAST` (default 0 =
+bit-exact double). Gated through the REAL harness, not the probe:
+- default build: `null_b.py --module pitch --quick` → EXACTLY 0. PROVEN.
+- `JUNO_EB_PITCH_FAST=1 null_b.py --module pitch` (full 30) → PASS, worst
+  global −123.6 dB. PROVEN.
+
+STILL OWED (stated in the file itself): the per-call df_coef split costs 13
+`__subdf3` + 26 conversions on the S3 (~800–900 instr/call, still 4× cheaper
+than double's 3,419). Hoisting it needs the ROW at the eval call (API change;
+`juno_pitch_table` is `static` per TU, so pointer arithmetic cannot recover
+the row). Change the API, pre-split into a static table, re-run both gates,
+then re-measure the call in the QEMU harness.
