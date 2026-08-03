@@ -46,6 +46,27 @@ the real figure is far lower and most of it is already replaced.
 **Consequence: the 8 unclaimed blocks contain no hidden soft-double cost.
 The pitch polynomial was the only one, and it is handled.**
 
+## 2a. STATUS OF THE HOLES (updated 2026-08-03 evening, Opus 5)
+
+| hole | status |
+|---|---|
+| **H1** no null at 48 kHz | **CLOSED** — `null_b.py --rate`; the S3 shipping build (fast pitch + reciprocal, whole engine) passes at **−121.5 dB at 48 kHz**. `data/null_48k.md` |
+| **H2** composite never run with fast pitch | **CLOSED** — passes both rates, and its residual equals the pitch-alone residual, confirming the other twelve modules are still EXACTLY 0. |
+| **H3** ~69,000 is an estimate of an engine that does not exist | OPEN — needs P5 then P6. Revised down by P3, see below. |
+| **H4** DCO cost unknown | **CLOSED** — MEASURED×STATIC, no QEMU: **~11,610 instr/sample**, not 17,581. `data/dco_real_cost.md` |
+| **H5** instructions ≠ cycles | OPEN — silicon only (P10). |
+
+**P3 also changed the arithmetic in §4.** The DCO was carried there at its QEMU
+worst case; its real cost is 5,971 instructions per sample lower, and the
+reciprocal takes off 1,408 more. Both corrections land inside the "DCO real-mix"
+row of that table, which is now MEASURED rather than a guessed band.
+
+**A harness defect P1 found, recorded because the class matters:** the first
+teeth battery ever run at 48 kHz showed the `dcopitch` mutation planting into
+`juno_init.c`'s 44,100-only constant arm — at any other rate it modified dead
+code and the case measured nothing. Fixed. Same class as everything else here:
+a verification that had never been seen to fail.
+
 ## 3. HOLES the doubt found (each with its retiring measurement)
 
 **H1 — no −100 dB null has EVER run at 48,000 Hz.**

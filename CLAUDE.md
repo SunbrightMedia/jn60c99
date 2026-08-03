@@ -2,7 +2,41 @@
 
 # JUNO-60 (JU-06A) C99 port — project memory
 
-**★★★★★★★★ NEWEST (2026-08-03 evening, Fable 5) — THE DOUBT AUDIT. Read
+**★★★★★★★★★ NEWEST (2026-08-03 night, Opus 5) — P1 AND P3 CLOSED. Read
+`docs/engineb/data/null_48k.md` and `docs/engineb/data/dco_real_cost.md`.**
+- **P1 / HOLE H1+H2 CLOSED. The −100 dB gate now runs at 48,000 Hz**
+  (`null_b.py --rate`, worker-argv plumbed, plus a hard refusal to compare an
+  oracle and candidate rendered at different rates). Added
+  `JUNO_EB_DCO_RECIP=1` so that lever's null stops resting on a hand-edited
+  header. **THE S3 SHIPPING BUILD (fast pitch + reciprocal, WHOLE ENGINE) NOW
+  HAS A SONIC GATE AT ITS OWN RATE: −121.5 dB @48k, −121.1 dB @44.1k, all 30
+  scenarios, ~21 dB margin.** Fast pitch alone: **−148.4 dB @48k** — 48 kHz is
+  BETTER than 44.1k, not worse. The 44.1k figures reproduce the published
+  −123.6/−121.1 exactly (the evidence the plumbing perturbed nothing), and the
+  composite residual EQUALS the pitch-alone residual, so the other 12 modules
+  are still EXACTLY 0 with the fast path integrated.
+- **A harness defect found by running the teeth at 48k for the first time:** the
+  `dcopitch` mutation planted into `juno_init.c`'s **44,100-only** constant arm
+  (`:314 if (result == 44100)`; both arms define v32), so at any other rate it
+  modified DEAD CODE and the case measured NOTHING. Fixed to plant into the arm
+  the run's rate executes. Same class as every other defect here.
+- **P3 / HOLE H4 CLOSED — the DCO's real cost, MEASURED×STATIC, NO QEMU in
+  either half.** Host branch counters (`-DEB_DCO_COUNT`, write-only, bit-exact
+  build re-proven EXACTLY 0 both rates) over the real gated scenario set on real
+  recalled patches = 60,989,440 sub-sample steps, priced by static Xtensa
+  `objdump` counts **including libgcc helper bodies** (`__divsf3` = 30 instr).
+  MEASURED rates: **clamp shortcut fires 99.2–99.7 %**, saw arm on 53.4 %, sub
+  arm on 38.6 %, **fmodf wrap taken 0 times in 61 M steps** — the two branches
+  the synthetic QEMU run had defeated. **Real cost ~11,610 instr/sample, not
+  17,581: QEMU was 51 % HIGH.** Priced on QEMU's own configuration the two
+  methods agree to within 18 %. **EB_DCO_RECIP saves a further 1,408 (12 %)** and
+  is now the best-evidenced unadopted lever (gated −121.5/−121.1 dB).
+  Tools: `dco_rates.py` (rates) + `dco_paths.c`/`dco_price.py` (pricing), kept
+  separate on purpose.
+- Still open: H3 (~69,000 is an estimate of an engine that does not exist —
+  needs P5 then P6) and H5 (instructions ≠ cycles — silicon only).
+
+**★★★★★★★★ (2026-08-03 evening, Fable 5) — THE DOUBT AUDIT. Read
 `docs/engineb/DOUBT_AUDIT.md` FIRST; its plan P1–P12 SUPERSEDES
 S3_ASSESSMENT §5.** What it found, in one breath:
 - **HOLE H1 (real): no −100 dB null has EVER run at 48,000 Hz.** null_b.py
