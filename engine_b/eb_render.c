@@ -52,6 +52,8 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
         float dly_env, pitch_cv, lfo_del, lfo_undel, lfo_pulse;
         float gate_sign, pit_in;
         float q[4], nsv04, nsvo, decimo, vcfo, cv;
+        float reso, o7536, nmixo, inc, g_edge, pw_live, pwm_out;
+
         eb_cvgate_in gi;
         eb_cvgate_out go;
 
@@ -120,16 +122,36 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
         cut = eb_vcf_cv_tick(&st->cv[v], &c->cv[v], pit, pwm,
                              lfo_del, lfo_undel, e1, e2, &o6704, &o6848);
 
+        /* the resonance shaper takes the cutoff CV and the two side outputs,
+         * and returns the ladder's feedback term (the port's v241). */
+        reso = eb_vcf_res_tick(&st->res[v], &c->res[v], cut, o6704, o6848,
+                               &o7536);
+
         /* ---- audio rate --------------------------------------------------- */
         if (!st->dco_live_seeded[v]) {
             st->dco_live[v] = c->dco[v];
             st->dco_live_seeded[v] = 1;
         }
-        eb_dco_set_pitch(&st->dco_live[v], cv, pwm);
+        /* DCO PREP is the port's own increment/width derivation (:1702-1717).
+         * It supersedes the earlier eb_dco_set_pitch(cv, pwm) shortcut, which
+         * guessed this block's inputs before the block was a module: the
+         * increment is NOT the raw pitch CV, it is fmaxf(k5568, cv*k5536),
+         * and the width comes from cell 5520 plus the per-sample 3808. */
+        inc = eb_dcoprep_tick(&c->dprep[v], cv, pwm, n->pwm_width,
+                              &g_edge, &pw_live, &pwm_out);
+        st->dco_live[v].inc  = inc;
+        st->dco_live[v].g    = g_edge;
+        st->dco_live[v].pw   = pw_live;
+        st->dco_live[v].pwm1 = pw_live - 1.0f;
+        st->dco_live[v].pwp1 = pw_live + 1.0f;
         eb_dco_step4(&st->dco[v], &st->dco_live[v], q);
         decimo = eb_decim_tick(&st->dec[v], &c->dec[v], q[0], q[1], q[2], q[3]);
         nsvo   = eb_nsvf_tick(&st->nsv[v], &c->nsv[v], noise_v, &nsv04);
-        vcfo   = eb_vcf_tick(&st->vcf[v], &c->vcf[v], decimo + nsvo, cut, o6848);
+        /* the noise mix consumes the SVF's cell-4320 output and the per-sample
+         * cell 3536; its result is the ladder's noise input (cell 6544). */
+        nmixo  = eb_noisemix_tick(&c->nmix[v], nsv04, n->noise_scale);
+        vcfo   = eb_vcf_tick(&st->vcf[v], &c->vcf[v], nmixo, reso, o7536);
+        (void)decimo; (void)pwm_out;
         mix   += eb_vca_tick(&st->vca[v], &c->vca[v], vcfo, e1, e2,
                              o6704, go.sign);
     }

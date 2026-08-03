@@ -57,6 +57,9 @@
 #include "eb_lfo.h"
 #include "eb_glide.h"
 #include "eb_notecv.h"
+#include "eb_noisemix.h"
+#include "eb_vcf_res.h"
+#include "eb_dcoprep.h"
 #include "eb_pitch.h"
 #include "eb_chorus.h"
 #include "eb_delay.h"
@@ -86,6 +89,9 @@ typedef struct {
      * sample. Carrying it per voice would step it eight times too fast, which
      * is audible and is a bug an earlier driver version actually shipped. */
     eb_notecv_coef    notecv;
+    eb_noisemix_coef  nmix[EB_NUM_VOICES];
+    eb_vcf_res_coef   res[EB_NUM_VOICES];
+    eb_dcoprep_coef   dprep[EB_NUM_VOICES];
     /* eb_cvgate's inputs. MEASURED against the port (:657-681): they are cells
      * 176, 208, 272*240, 304 and 544 -- all recall values. The envelopes do
      * NOT feed this block; an earlier draft of eb_engine_render passed e1/e2
@@ -141,6 +147,7 @@ typedef struct {
     eb_lfo_state    lfo[EB_NUM_VOICES];
     eb_glide_state  glide[EB_NUM_VOICES];
     eb_notecv_state notecv;         /* engine-wide; see eb_render_coefs */
+    eb_vcf_res_state res[EB_NUM_VOICES];
     /* cell 320 after the port's aux latch: eb_notecv_tick's gate_in. */
     float           gate_cell320[EB_NUM_VOICES];
     eb_chorus_state chorus;
@@ -151,40 +158,28 @@ typedef struct {
     int32_t         rev_wipe;
 } eb_render_state;
 
-/* EB_RENDER_NEEDS — THE LIST IS EMPTY.
+/* EB_RENDER_NEEDS — the inputs this function cannot yet compute.
  *
- * It started at eight, and every entry was removed by claiming the block that
- * produces it, not by choosing a default:
+ * It started at eight and every entry was removed by claiming the block that
+ * produces it. Wiring the last three modules (vcf_res, dcoprep, noisemix) put
+ * TWO back, and they are recorded here rather than defaulted to zero inside
+ * the render, because a silent default is precisely the failure this struct
+ * exists to prevent -- the mistake was made and caught twice in one session.
  *
- *   lfo_del, lfo_undel -> eb_lfo_tick()    (cells 1792/1808)
- *   pitch_cv           -> eb_glide_tick()  (cell 752)
- *   gate               -> derived from cell 560 (glide's state) and cell 1824
- *                         (the LFO's pulse), exactly as the port's envelope
- *                         block derives it
- *   kbd, vel           -> plain recall cells 368/384, now coefficients
- *   drive, held        -> NOT per-sample inputs at all. Reading the port's own
- *                         :657-681 shows eb_cvgate's arguments are cells 176,
- *                         208, 272*240, 304 and 544 -- every one a recall
- *                         value. They were only ever "needs" because an
- *                         earlier draft of eb_engine_render guessed at this
- *                         call's inputs instead of deriving them.
+ *   pwm_width    cell 3808, written at src/voice_render.c:1117 -- a long
+ *                product chain in the PWM/mod-CV region. eb_dcoprep needs it
+ *                for the pulse width. The region IS claimed (by pwm_cv), but
+ *                that module does not currently RETURN this value.
+ *   noise_scale  cell 3536, written at :1076 as a delayed copy of 3520. Same
+ *                situation: claimed region, unreturned value.
  *
- * THE GUARD DOES NOT COME OFF YET, and this struct being empty is not the
- * reason it would. Still outstanding, and each is a real thing:
- *   - the DCO's per-voice coefficient copy: this function calls
- *     eb_dco_set_pitch() every sample from eb_dcoprep's outputs, but the port
- *     writes those into the promoted scratch locals the DCO block reads. The
- *     two are believed equivalent and that is NOT the same as gated.
- *   - eb_engine.c's allocator and note handling are still unproven (audit
- *     finding F4), so nothing constructs a valid eb_render_coefs yet.
- *   - the voice's one remaining unclaimed port range, :1665-1671, is pure
- *     cell shuffling with no arithmetic and is left in the port on purpose
- *     (see eb_dcoprep.h) -- but it does mean this function does not yet do
- *     the two delayed copies 4848<-4832 and 4880<-4864 that it contains.
- * The three gates named at the top of this header have not been run against
- * eb_engine_render, and until they have, render_ok stays unset. */
+ * Both are one-line extensions of modules that already exist and are already
+ * gated; neither is new transcription work. They are the last two entries.
+ *
+ * When this struct is empty the function is the engine. */
 typedef struct {
-    int unused;                 /* deliberately empty; see above */
+    float pwm_width;
+    float noise_scale;
 } eb_render_needs;
 
 /* Render one stereo sample. `n` supplies the values listed above.
