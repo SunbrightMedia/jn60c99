@@ -98,3 +98,44 @@ blockwise evaluation), not from thinner arithmetic.
 * 48 kHz is the HARDER rate for weakened pitch arithmetic (−95.4 vs −110/−106)
   even though it is the EASIER rate for v7 (−148.4 vs −123.6). Rate coverage
   is not a formality; neither rate dominates the other in general.
+
+
+## 6. C1 (control-rate pitch) — CLOSED, NEGATIVE, and the law it uncovered
+
+Date 2026-08-03, same session, P8 candidate C1 executed to its end.
+
+**The ladder of designs, each killed by measurement:**
+
+| design | worst null @48k | killed by |
+|---|---|---|
+| linear extrapolation of the output | −54.8 dB (N=2) | sample-rate content in the CV (env attacks, S&H/noise LFO) |
+| + first-order Taylor in the true per-sample CV | −50.8 dB | float derivative: WRONG SIGN (−0.104 vs +0.022) — the 2^37 cancellation applied to P′ |
+| + df/double derivatives, second order, knot re-anchor, clamped-domain δ, pre-gain anchors, radius 0.005 | **−89.5 dB, 4 scenarios** | see below |
+
+**The closing measurement, and it is the finding.** Replaying the REAL
+pluck-POLY trajectory (336,000 logged (voice, cv, gain) calls) through the
+final evaluator against the exact one: worst pointwise error 1.03e-7
+relative, RMS 4.2e-8 — pointwise −134 dB. The audio null still fails at
+−89.5 dB. The pitch values were never the problem: **a smooth deterministic
+error is a BIAS, and the DCO phase integrates a bias.** 5e-8 sustained over a
+voice's 42,000 samples at increment ~0.01 is ~2e-5 of phase — −89 dB. v7
+passes not because it is merely accurate but because its ±1-ULP errors DITHER
+around zero.
+
+**THE LAW, for every future P8 candidate:** classify the target by its
+consumer.
+* **Phase-integrated quantities** (the pitch increment → DCO phase; the LFO
+  rate → LFO phase) require BIAS below ~1e-9. No causal approximation —
+  interpolation, Taylor, incremental exp, control-rate anything — delivers
+  that. Only exact-to-dither evaluation passes. Pitch's 21,792 instr/sample
+  is the price of the gate, now proven from two independent directions.
+* **Memorylessly-consumed quantities** (VCF cutoff/resonance coefficients,
+  VCA gains, mix levels) tolerate ~1e-5–1e-6 bias — the −100 dB gate applied
+  directly, with no integrator behind it. Control-rate evaluation remains a
+  live candidate THERE and only there.
+
+Consequences recorded in P8_PLAN.md: C1 dead; C3 (incremental LFO expf) dead
+by the same law (the LFO rate feeds the LFO phase); C2 narrowed to the
+non-integrating CV blocks. The code stays behind `EB_PITCH_CR` with a
+compile-time refusal above N=1, N=1 being bit-exact and kept as the harness
+self-test.

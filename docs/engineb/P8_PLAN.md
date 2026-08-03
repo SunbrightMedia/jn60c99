@@ -18,7 +18,23 @@ project. A candidate that cannot is dead, whatever it saves.
 | vcf_res | 4,232 | 8 % | | envgen | 1,296 |
 | FX (all three) | 2,241 | 4 % | | decim | 1,216 |
 
-## The candidates, ranked by expected saving per unit of risk
+## ⚠ REVISED THE SAME NIGHT — C1 and C3 are DEAD, by measurement
+
+C1 was built and executed to its end (`data/pitch_p2_study.md` §6). Its final
+form was accurate to 1e-7 on the real trajectory and STILL failed at
+−89.5 dB, because a smooth deterministic error is a bias and the DCO phase
+integrates it. **The law: phase-integrated quantities (pitch increment, LFO
+rate) need bias < ~1e-9 — only exact evaluation passes. Memorylessly-consumed
+quantities (filter coefficients, gains) tolerate ~1e-5.** C3 dies with C1
+(the LFO rate feeds the LFO phase integrator). C2 survives ONLY for the
+non-integrating targets: vcf_res's expf and shaper (consumed as filter
+coefficients), the vcf_cv smoother outputs. The honest ceiling of this plan
+drops accordingly: pitch's 21,792 is irreducible by approximation, and the
+remaining levers are C2-narrowed (~3,500), C5 fusion (~2,000), C4
+fixed-point/SIMD on the audio path (the big one left), and C6 behind it.
+Six voices stays last, per the user's order.
+
+## The candidates, ranked by expected saving per unit of risk (original text)
 
 **C1 — CONTROL-RATE PITCH WITH INCREMENT INTERPOLATION. The big one.**
 Evaluate the v7 polynomial every N samples per voice; between evaluations,

@@ -248,6 +248,188 @@ float eb_pitch_eval(float cv, float gain)
     return ebpf_eval_row(cv, ebpf_row(cv), gain);
 }
 
+#if EB_PITCH_CR > 0
+/* Control-rate evaluation, SECOND design. The first (linear extrapolation of
+ * the OUTPUT from past anchors) was built and FAILED the gate hard -- N=2
+ * -54.8 dB in 9 scenarios, N=4 -26.6, N=8 -12.9, worse than any curvature
+ * model predicts -- because the pitch CV is not smooth at the sample scale:
+ * envelope attacks, the LFO's S&H and NOISE modes put sample-rate content in
+ * it, and no scheme that ignores the per-sample input can track that.
+ * Recorded in docs/engineb/data/pitch_p2_study.md as the measured death of
+ * output-side decimation.
+ *
+ * THIS form anchors the polynomial AND its first derivative every N samples,
+ * then per sample applies A + D*(cv - cv0) with the TRUE per-sample cv --
+ * which the caller has already computed; it was never the expensive part.
+ * Sample-rate content in cv passes through the linear term. The residual is
+ * second order, (P''/2)*(cv-cv0)^2, and the RADIUS GUARD re-anchors whenever
+ * |cv - cv0| exceeds EB_PITCH_CR_RADIUS, so a patch whose modulation is too
+ * hot for the linearisation degenerates toward anchoring every sample --
+ * slower, never wrong. Cost failure, not correctness failure, by design.
+ *
+ * The derivative is evaluated in PLAIN FLOAT from the hi halves of the split
+ * coefficients: its error multiplies (cv - cv0), which the radius bounds, so
+ * a float derivative moves the output by < 2^-24 * radius * |P'| -- far below
+ * the gate. The anchor value itself is the full v7 evaluation, unchanged.
+ *
+ * THE CLAMP: the port clamps the polynomial to +/-512 BEFORE the gain. The
+ * anchor is taken through eb_pitch_eval (clamped, gained); if the anchor sits
+ * on the clamp, the local derivative is meaningless and D is zeroed -- the
+ * output holds the clamped value, which is exactly what the port does in
+ * saturation. */
+/* THE DERIVATIVES CANNOT BE FLOAT, and this was measured, not assumed: at
+ * cv = -4.963 the float Horner returns -0.104 where the true P' is +0.022 --
+ * wrong SIGN -- because the derivative terms reach ~1e6 and cancel to 0.02, a
+ * 5e7 cancellation ratio that eats every float bit. This is P2's §2 finding
+ * (the port's own sum structure amplifies rounding by up to 2^37) applied to
+ * the derivative, where it bites even harder because d_k = k*c_k grows the
+ * high terms. So P' and P'' are evaluated with the same double-float
+ * machinery as the polynomial itself, over derivative coefficients pre-split
+ * ONCE at first use (double arithmetic at init only -- the same license the
+ * original split-at-first-call used). Anchors are 1-in-N, so the df cost sits
+ * off the per-sample path.
+ *
+ * The second-order term is carried because the first-order form failed every
+ * sustained-slew scenario: (P''/2)*delta^2 error is one-signed for any
+ * modulation direction (exp-like P'' > 0), a bias, and a bias in the
+ * increment integrates in phase. With it carried the leading error is odd in
+ * delta and alternates under vibrato. */
+static float eb_d1_hi[EB_PITCH_ROWS][12], eb_d1_lo[EB_PITCH_ROWS][12];
+static float eb_d2_hi[EB_PITCH_ROWS][11], eb_d2_lo[EB_PITCH_ROWS][11];
+static int   eb_deriv_ready = 0;
+
+static void ebpf_deriv_init(void)
+{
+    int r, k;
+    for (r = 0; r < EB_PITCH_ROWS; ++r) {
+        for (k = 1; k <= 12; ++k) {
+            double c = (double)eb_pitch_hi[r][k] + (double)eb_pitch_lo[r][k];
+            double d = c * (double)k;
+            eb_d1_hi[r][k-1] = (float)d;
+            eb_d1_lo[r][k-1] = (float)(d - (double)eb_d1_hi[r][k-1]);
+        }
+        for (k = 2; k <= 12; ++k) {
+            double c = (double)eb_pitch_hi[r][k] + (double)eb_pitch_lo[r][k];
+            double d = c * (double)(k * (k - 1));
+            eb_d2_hi[r][k-2] = (float)d;
+            eb_d2_lo[r][k-2] = (float)(d - (double)eb_d2_hi[r][k-2]);
+        }
+    }
+    eb_deriv_ready = 1;
+}
+
+/* simple Dekker add: enough here -- the requirement on P' is ~5e-6 relative
+ * and df carries ~1e-14 per op against the 5e7 cancellation = ~5e-7. */
+static df df_add_s(df a, df b)
+{
+    df s = two_sum(a.hi, b.hi);
+    float lo = s.lo + a.lo + b.lo;
+    return two_sum(s.hi, lo);
+}
+
+static float ebpf_horner_df(const float *dh, const float *dl, int n, float x)
+{
+    df acc; int k;
+    acc.hi = dh[n-1]; acc.lo = dl[n-1];
+    for (k = n - 2; k >= 0; --k) {
+        df c; c.hi = dh[k]; c.lo = dl[k];
+        acc = df_add_s(df_mulf(acc, x), c);
+    }
+    return acc.hi + acc.lo;
+}
+
+#ifndef EB_PITCH_CR_DFDERIV
+/* DOUBLE Horner for the anchor derivatives. On the S3 this is soft-double at
+ * ANCHOR rate only (1-in-N samples, ~24 df3 calls per anchor). The df variant
+ * below (EB_PITCH_CR_DFDERIV) is cheaper; whether its ~1e-6-relative error
+ * survives the gate is a measured question, not an assumed one. */
+static float ebpf_deriv(float x, int row)
+{
+    double d = 0.0; int k;
+    for (k = 11; k >= 0; --k)
+        d = d * (double)x + ((double)eb_d1_hi[row][k] + (double)eb_d1_lo[row][k]);
+    return (float)d;
+}
+static float ebpf_deriv2(float x, int row)
+{
+    double d = 0.0; int k;
+    for (k = 10; k >= 0; --k)
+        d = d * (double)x + ((double)eb_d2_hi[row][k] + (double)eb_d2_lo[row][k]);
+    return (float)d;
+}
+#else
+static float ebpf_deriv(float x, int row)
+{
+    return ebpf_horner_df(eb_d1_hi[row], eb_d1_lo[row], 12, x);
+}
+static float ebpf_deriv2(float x, int row)
+{
+    return ebpf_horner_df(eb_d2_hi[row], eb_d2_lo[row], 11, x);
+}
+#endif
+
+float eb_pitch_eval_cr(eb_pitch_cr_state *s, float cv, float gain)
+{
+    /* THE DELTA LIVES IN THE CLAMPED DOMAIN, and the first Taylor build got
+     * this wrong in a way the radius could not fix: the negative-sweep
+     * scenarios pin the input clamp at x = -20, where the true output is
+     * CONSTANT -- but the raw cv keeps moving, so D*(cv - cv0) charged a
+     * biased error against a pinned truth, and a bias integrates. MEASURED:
+     * shrinking the radius tenfold moved the worst residual only -51.6 ->
+     * -60.1 dB, the signature of an error the radius does not govern. With
+     * delta = clamp(cv) - clamp(cv0), a pinned input gives delta = 0 and the
+     * held anchor is exact. The clamp here is compare-based, not fminf --
+     * this is the approximation path, and 16 libm calls per sample would be
+     * the cost problem this candidate exists to remove. */
+    float xs = cv;
+    if (xs < -20.0f) xs = -20.0f;
+    else if (xs > 8.9f) xs = 8.9f;
+
+    if (!eb_deriv_ready)
+        ebpf_deriv_init();
+    /* THE KNOT CHECK: the polynomial is a spline, and a Taylor step taken in
+     * row R is wrong the moment xs crosses into row R+1 -- the synthetic
+     * probe's worst error sat exactly on a knot. Crossing re-anchors. */
+    /* THE ANCHOR IS PRE-GAIN. The gain is NOT a constant: the port writes
+     * its cell (3792) EVERY SAMPLE at :1115 -- it is envelope-driven. The
+     * earlier builds baked gain into A and D, and the pluck scenario sat at
+     * exactly -89.5 dB through five unrelated fixes because the error was
+     * (gain_now - gain_anchor) * A the whole time -- insensitive to radius,
+     * knots, Taylor order and derivative precision alike. Found by asking
+     * what stayed frozen that the port moves. The per-sample multiply is one
+     * instruction, and the anchor-sample value is bit-identical either way:
+     * ebpf_eval_row's final step with gain = 1.0f rounds to clamp(s) exactly,
+     * and clamp(s) * gain is then the same single rounding the plain path
+     * performs. */
+    if (!s->primed || s->k == 0
+        || fabsf(xs - s->x0) > (float)EB_PITCH_CR_RADIUS
+        || (int)(xs + 20.0f) != s->row0) {
+        float x   = ebpf_clamp(cv);
+        int   row = ebpf_row(cv);
+        float A   = ebpf_eval_row(cv, row, 1.0f);
+        s->x0 = x;
+        s->row0 = row;
+        s->a_cur = A;
+        if (fabsf(A) >= 512.0f) {
+            s->slope = 0.0f;                    /* pinned on the clamp */
+            s->half2 = 0.0f;
+        } else {
+            s->slope = ebpf_deriv(x, row);
+            s->half2 = 0.5f * ebpf_deriv2(x, row);
+        }
+        s->primed = 1;
+        s->k = (EB_PITCH_CR > 1) ? 1 : 0;
+        return A * gain;
+    }
+    {
+        float d   = xs - s->x0;
+        float out = (s->a_cur + d * (s->slope + d * s->half2)) * gain;
+        if (++s->k >= EB_PITCH_CR) s->k = 0;
+        return out;
+    }
+}
+#endif /* EB_PITCH_CR */
+
 int eb_pitch_row(float cv)
 {
     return ebpf_row(cv);

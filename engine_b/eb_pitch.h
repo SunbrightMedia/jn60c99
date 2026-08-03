@@ -47,4 +47,54 @@ float eb_pitch_eval(float cv, float gain);
 int   eb_pitch_tab_selfcheck(void);
 #endif
 
+/* ------------------------------------------------- CONTROL-RATE PITCH (C1)
+ * EB_PITCH_CR = N evaluates the full v7 polynomial every Nth call per voice
+ * and, between anchors, EXTRAPOLATES linearly from the last two anchors.
+ *
+ * THE DESIGN IS FIRST-ORDER TAYLOR IN THE INPUT, and the road matters: the
+ * first build extrapolated the OUTPUT from past anchors and FAILED the gate
+ * hard (N=2 -54.8 dB; the pitch CV carries sample-rate content -- envelope
+ * attacks, S&H and noise LFO modes -- that no output-side scheme can track).
+ * The Taylor form uses the TRUE per-sample cv, which the caller computes
+ * anyway, and decimates only the expensive polynomial: per sample it applies
+ * A + D*(cv - cv0). A radius guard re-anchors on large excursions, so hot
+ * modulation degenerates toward per-sample anchoring: slower, never wrong.
+ *
+ * Note events bump eb_coef_gen, which the shim uses to reset this state --
+ * a note step therefore re-anchors immediately.
+ *
+ * N = 1 anchors every call: BIT-IDENTICAL to the plain fast build by
+ * construction, and the harness proves it (the ladder's self-test).
+ * State is per voice and owned by the CALLER (shim or engine). */
+#ifndef EB_PITCH_CR
+#define EB_PITCH_CR 0
+#endif
+#if EB_PITCH_CR > 1
+#error "Control-rate pitch is DEAD, by measurement (2026-08-03): on the real pluck-POLY trajectory the Taylor evaluator is accurate to 1e-7 worst / 4e-8 RMS and the null STILL fails at -89.5 dB, because a smooth deterministic error is a BIAS and the DCO phase integrates it. The gate demands bias below ~1e-9 on any phase-integrated quantity; no causal approximation delivers that. See docs/engineb/data/pitch_p2_study.md section 6. N=1 (exact, anchors every call) remains for the harness self-test only."
+#endif
+#if EB_PITCH_CR > 0
+#if !EB_PITCH_FAST
+#error "EB_PITCH_CR anchors with the v7 fast path; build with EB_PITCH_FAST=1."
+#endif
+/* Re-anchor radius, in CV units (one unit here is about an octave of pitch).
+ * Within it the first-order error is (P''/2)*radius^2, relative ~1e-4 at the
+ * instant worst case and far smaller on average; beyond it the evaluator
+ * re-anchors. Tightening it trades anchors for accuracy at run time. */
+#ifndef EB_PITCH_CR_RADIUS
+#define EB_PITCH_CR_RADIUS 0.005f
+#endif
+
+typedef struct {
+    float x0;                  /* anchor input, CLAMPED domain             */
+    int   row0;                /* anchor row -- crossing a knot re-anchors  */
+    float a_cur;               /* anchor output A = P(cv0) * gain          */
+    float slope;               /* D = P'(cv0) * gain                       */
+    float half2;               /* P''(cv0)/2 * gain (second-order term)    */
+    int   k;                   /* samples since the anchor (0 = anchor due)*/
+    int   primed;              /* 0 until the first anchor exists          */
+} eb_pitch_cr_state;
+
+float eb_pitch_eval_cr(eb_pitch_cr_state *s, float cv, float gain);
+#endif /* EB_PITCH_CR */
+
 #endif /* ENGINEB_EB_PITCH_H */

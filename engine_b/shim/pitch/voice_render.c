@@ -1,8 +1,21 @@
 /* SHIM — MODULE PITCH (engine_b/eb_pitch.{h,c}).
- * Replaces src/voice_render.c:1641-1664, the pitch polynomial. STATELESS, so
- * unlike every other module written this week it needs no home for its state
- * and no power-on marker. Nothing else in this file differs from the port. */
+ * Replaces src/voice_render.c:1641-1664, the pitch polynomial. STATELESS in
+ * every build except EB_PITCH_CR, whose per-voice extrapolation state lives
+ * below and is RESET whenever eb_coef_gen moves. The port bumps that counter
+ * on every note event and every recall, which are exactly the moments the
+ * pitch CV steps -- so the same signal that invalidates coefficient caches
+ * re-anchors the extrapolator. A scenario change in the harness also moves it
+ * (fresh recall), so state cannot leak across scenarios, which is the decim
+ * lesson applied in advance instead of learned again. */
 #include "eb_pitch.h"
+#ifdef EB_PITCH_LOG
+#include <stdio.h>
+#endif
+#if EB_PITCH_CR > 0
+extern unsigned long eb_coef_gen;
+static eb_pitch_cr_state EBPCRS[8];
+static unsigned long     EBPCR_seen[8];
+#endif
 /* voice_render.c — exact C99 transcription of sub_180369070 (Cloud 60 voice
  * render). Generated first-pass by tools/translate_voice.py then finished by
  * hand for the helper-call args (resolved from asm_dump) and SIMD idioms.
@@ -1646,7 +1659,21 @@ LABEL_46:
   /* ==== ENGINE B MODULE PITCH ========================================== */
   {
     float _cv = JF(a1, 4448) + JF(a1, 3776);
+#ifdef EB_PITCH_LOG
+    { static FILE *_f; if (!_f) _f = fopen("/tmp/pitchlog.bin","wb");
+      float _rec[3] = {(float)voice, _cv, JF(a1, 3792)};
+      fwrite(_rec, 4, 3, _f); fflush(_f); }
+#endif
+#if EB_PITCH_CR > 0
+    if (EBPCR_seen[voice] != eb_coef_gen) {
+        EBPCRS[voice].primed = 0;
+        EBPCRS[voice].k = 0;
+        EBPCR_seen[voice] = eb_coef_gen;
+    }
+    v391 = eb_pitch_eval_cr(&EBPCRS[voice], _cv, JF(a1, 3792));
+#else
     v391 = eb_pitch_eval(_cv, JF(a1, 3792));
+#endif
   }
   JF(a1, 4416) = v391;
   /* ==== END ENGINE B MODULE PITCH ====================================== */

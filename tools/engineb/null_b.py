@@ -147,6 +147,12 @@ if os.environ.get("JUNO_EB_PITCH_FAST"):
 # the rate it was rendered at.
 if os.environ.get("JUNO_EB_DCO_RECIP"):
     CFLAGS = CFLAGS + ["-DEB_DCO_RECIP=1"]
+# EB_PITCH_CR: control-rate pitch, anchor every N samples with linear
+# extrapolation between (P8 candidate C1, docs/engineb/P8_PLAN.md). Needs the
+# fast path for its anchors; N=1 must reproduce the plain fast build exactly.
+if os.environ.get("JUNO_EB_PITCH_CR"):
+    CFLAGS = CFLAGS + ["-DEB_PITCH_CR=%d"
+                       % int(os.environ["JUNO_EB_PITCH_CR"])]
 
 # ---------------------------------------------------------------- scenarios
 # The nine port-risk scenarios are reused verbatim from the Track B gate: they
