@@ -21,12 +21,25 @@
  * the S3 path -- but it is not used here YET, on purpose. This module's first
  * gate must attribute any divergence to the transcription and to nothing else.
  * Swapping the wrap is a separate change with its own null run. */
+/* EB_LFO_COUNT (P3's method): write-only branch counters, compiled out unless
+ * -DEB_LFO_COUNT. ctr[0] = wrap calls, ctr[1] = slow (fmodf) arms taken. The
+ * cost tool charges every fmodf CALL SITE its full body; these rates say how
+ * often one actually runs on the real gated scenario set. */
+#ifdef EB_LFO_COUNT
+unsigned long long eb_lfo_ctr[2];
+#define EBLC(i) (++eb_lfo_ctr[i])
+#else
+#define EBLC(i) ((void)0)
+#endif
+
 static float eb_lfo_wrap(float p)
 {
+    EBLC(0);
     if (p <= 1.0f) {
-        if (p < -1.0f) return fmodf(p - 1.0f, 2.0f) + 1.0f;
+        if (p < -1.0f) { EBLC(1); return fmodf(p - 1.0f, 2.0f) + 1.0f; }
         return p;
     }
+    EBLC(1);
     return fmodf(p + 1.0f, 2.0f) - 1.0f;
 }
 

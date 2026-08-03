@@ -52,7 +52,13 @@ CFLAGS = ["-std=c99", "-O2", "-ffp-contract=off", "-fno-strict-aliasing",
 # instructions. __muldf3 = 105 and __adddf3 = 116 agree with the figures this
 # project recorded independently, which cross-checks the method.
 HELPERS = {"__divsf3": 30, "__muldf3": 105, "__adddf3": 116, "__subdf3": 148,
-           "__truncdfsf2": 59, "__extendsfdf2": 37, "__fixdfsi": 28}
+           "__truncdfsf2": 59, "__extendsfdf2": 37, "__fixdfsi": 28,
+           # LIBM IS NOT FREE, and the first version of this tool charged it at
+           # ZERO -- a hole in the flattering direction, caught in review.
+           # MEASURED from this toolchain's own libm.a (wrapper + the
+           # __ieee754_* body it calls): expf = 34+150, fmodf = 27+110.
+           "expf": 184, "fmodf": 137, "fminf": 22, "fmaxf": 22, "fabsf": 4,
+           "fmin": 22, "fmax": 22}
 
 # (source, entry symbol, calls per audio sample, note)
 # 8 voices unless stated. The DCO is priced separately by dco_price.py because
@@ -80,6 +86,20 @@ CHAIN = [
 ]
 
 BUDGET_LO, BUDGET_HI = 6300, 9500      # 9,500 two-core cycles at c/i 1.5..1.0
+
+# MEASURED HELPER RATES, applied PER CALL SITE. Call-site charging is the
+# tool's default and is the safe direction -- but for a module whose helper
+# sits in a rarely-taken guard arm it becomes a gross overstatement, the DCO
+# worst-case problem in miniature. Where a rate has been MEASURED over the real
+# gated scenario set it replaces the implicit 1.0 per site.
+# eb_lfo's fmodf (EB_LFO_COUNT counters, 48 kHz, all 30 scenarios): 60,989,440
+# wrap calls, 5,945,944 slow arms taken = 9.75% per wrap call. A wrap call has
+# TWO fmodf sites and at most one fires, so the PER-SITE rate is 9.75/2 =
+# 4.9% -- the first version of this override used 0.39 (the per-TICK count)
+# per site and overstated the charge eightfold. Per tick the corrected charge
+# is 4 wraps x 2 sites x 0.049 x 137 = 54 instructions, which matches the
+# measured 0.39 executions x 137 directly.
+RATE_OVERRIDES = {("eb_lfo.c", "fmodf"): 0.049}
 
 
 def module_cost(src, entry, extra=()):
@@ -159,10 +179,19 @@ def module_cost(src, entry, extra=()):
         c = body[fn]
         for t in calls[fn]:
             r = resolve(t)
-            if r is not None and r != fn:
+            if r is None or r == fn:
+                continue
+            mult = RATE_OVERRIDES.get((os.path.basename(src), r))
+            if mult is not None and r in HELPERS:
+                c += HELPERS[r] * mult
+            else:
                 c += cost(r)
         seen.discard(fn)
         return c
+
+    # apply measured helper rates for this source file
+    def helper_charge(fn, mult):
+        return HELPERS[fn] * mult
 
     if entry not in body:
         raise SystemExit("entry symbol %s not found in %s -- the module was "

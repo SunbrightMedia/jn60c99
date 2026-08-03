@@ -20,27 +20,30 @@ the noise LFSR and the three FX once for the whole engine.
 `sample_total` of the complete engine needs `eb_engine_render` gated and
 running, which it is not yet.
 
-## THE RESULT
+## THE RESULT (CORRECTED IN REVIEW — see §"the fourth error" below)
 
 | build | instr/sample | vs the 6,300–9,500 two-core instruction budget |
 |---|---|---|
-| default (bit-exact double pitch, division) | **63,484** | 6.7× – 10.1× over |
-| **S3 shipping (fast pitch v7 + DCO reciprocal)** | **48,564** | **5.1× – 7.7× over** |
+| default (bit-exact double pitch, division) | **69,735** | 7.3× – 11.1× over |
+| **S3 shipping (fast pitch v7 + DCO reciprocal)** | **55,167** | **5.8× – 8.8× over** |
 
-Per module, shipping build, per audio sample:
+(First published as 63,484 / 48,564; review found libm charged at zero.)
+
+Per module, shipping build, per audio sample (corrected):
 
 | module | per sample | | module | per sample |
 |---|---|---|---|---|
-| **dco** | **10,202** | | vca_hpf | 1,664 |
-| **pitch (v7)** | **20,736** | | glide | 1,584 |
-| lfo | 3,768 | | decim | 1,216 |
-| vcf_res | 2,232 | | envgen | 1,296 |
-| vcf_ladder | 1,840 | | all three FX | 1,583 |
+| **pitch (v7)** | **21,792** | | vca_hpf | 1,840 |
+| **dco** | **10,202** | | vcf_ladder | 1,840 |
+| **lfo** | **6,305** | | glide | 1,584 |
+| vcf_res | 4,232 | | envgen | 1,296 |
+| all three FX | 2,241 | | decim | 1,216 |
 
 ## Cross-checks — this is why the number is credible
 
-* The **default** build totals 63,484 against `DOUBT_AUDIT.md`'s independently
-  MODELED **~69,000**. Two methods, 8 % apart.
+* The **default** build totals 69,735 against `DOUBT_AUDIT.md`'s independently
+  MODELED **~69,000**. Two methods, **1 % apart** after the libm correction —
+  before it, the 8 % gap was pointing at the hole.
 * `eb_pitch_eval` prices at **4,281** instructions per call in the default build
   and **2,592** in the fast build, against **~4,450** and **~3,126** recorded
   independently in `pitch_hoist_result.md`. 4 % and 17 % apart.
@@ -50,13 +53,14 @@ Per module, shipping build, per audio sample:
 ## THE TRIPWIRE IS TRIPPED
 
 The plan's P6 tripwire was: **above 19,000 instructions per sample, start P8
-immediately.** The shipping build is **48,564** — two and a half times the
+immediately.** The shipping build is **55,167** — nearly three times the
 tripwire. P8, the restructure track, is not a contingency any more; it is the
 only remaining lever class with the right magnitude.
 
-**The two targets are now unambiguous, and they are the same two the plan
-already named.** Pitch (20,736, 43 % of the engine) and the DCO (10,202, 21 %)
-are 64 % of the total between them. P2 closed the cheaper-arithmetic exits for
+**The three targets are now unambiguous.** Pitch (21,792, 40 % of the
+engine), the DCO (10,202, 18 %) and the LFO (6,305, 11 % — most of it the
+per-voice `expf` and the transcribed sine polynomial) are 69 % of the total
+between them. P2 closed the cheaper-arithmetic exits for
 pitch by measurement, so what is left for both is structural: loop fusion,
 control-rate evaluation, reduced oversampling with a matched decimator, and
 fixed-point with the S3's PIE SIMD. Every candidate still has to null at
@@ -83,6 +87,18 @@ fixed-point with the S3's PIE SIMD. Every candidate still has to null at
 All three made the engine look cheaper than it is. A measurement that flatters
 the thing being measured deserves the same suspicion as a gate that has never
 failed.
+
+**The fourth error, found in review (Fable 5), same direction:** libm was
+charged at ZERO. `expf` is 184 instructions on this toolchain (wrapper + the
+`__ieee754_expf` body it calls), `fmodf` 137, and the LFO alone calls `expf`
+once per voice per sample. Worth ~6,600 instructions per sample across the
+engine. And the first correction over-swung: charging the LFO's ten
+conditional `fmodf` SITES at full body overstated that module by ~1,300 per
+call, the DCO worst-case problem in miniature — so the rate was MEASURED
+(EB_LFO_COUNT counters, all 30 scenarios: the slow arm fires on 9.75 % of
+wrap calls, 0.39 executions per tick) and the tool now charges measured rates
+where they exist. After the correction the default build lands 1 % from the
+audit's independent estimate, from two different methods.
 
 ## What this number excludes, stated rather than buried
 
