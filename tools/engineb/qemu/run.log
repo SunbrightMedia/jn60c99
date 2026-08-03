@@ -38,3 +38,4 @@ SINK cal 0x00000000
 ACC 0x468b1fa8
 OVERRUN delay 0 reverb 0
 =EBQ DONE=
+qemu-system-xtensa: terminating on signal 15 from pid 23794 (timeout)
