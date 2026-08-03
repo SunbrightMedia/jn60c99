@@ -2,6 +2,45 @@
 
 # JUNO-60 (JU-06A) C99 port — project memory
 
+**★★★★★★★★★★ NEWEST (2026-08-03 late, Opus 5) — P5 IN PROGRESS: THREE MORE
+BLOCKS CLAIMED AND `eb_render_needs` IS EMPTY.** New modules, each gated
+EXACTLY 0 on all 30 scenarios at BOTH rates on its first run:
+`eb_lfo` (:797-963), `eb_glide` (:682-796), `eb_notecv` (:595-656, the shared
+25-bit noise LFSR). Composite regenerated to **13 voice modules: EXACTLY 0 at
+both rates, 11/11 BIT-EXACT vs the PLUGIN at both rates.**
+- **METHOD THAT WORKED, reuse it:** pick the block boundary by a LIVE-VARIABLE
+  analysis (eb_lfo's range has 4 live-in and ZERO live-out — that is why it
+  lifts cleanly), then classify every RW cell by READ-BEFORE-WRITE. Of eb_lfo's
+  18 RW cells only **5 are state**; the rest are the port's delayed-copy idiom
+  or write-then-read locals. Same finding as the noise SVF's cell 4320. Do this
+  BY SCRIPT, never by reading.
+- **`eb_render_needs` went 8 → 0, and `drive`/`held` were never needs at all:**
+  the port's :657-681 shows eb_cvgate's arguments are cells 176/208/272*240/
+  304/544 — all recall values. An earlier eb_engine_render draft had GUESSED
+  that call's inputs (it passed the envelopes). Fixing it also removed a
+  one-sample skew: the port runs notecv→glide→LFO BEFORE the envelopes,
+  because the envelope gate is built from cells 560 and 1824 which those
+  blocks write in the SAME sample.
+- **THE GUARD STAYS ON and the empty list is not a reason to lift it.** Real
+  remaining work, now named in eb_render.h: eb_engine_render advances the noise
+  LFSR INSIDE the voice loop (8× too fast vs the port's once-per-sample law —
+  juno_driver.c's snapshot/restore is what enforces it); four port line ranges
+  are still unclaimed (1141-1149, 1230-1297, 1665-1671, 1702-1717);
+  eb_engine.c's allocator is unproven.
+- **TWO HARNESS DEFECTS FOUND BY RUNNING IT — both now teeth-proven:**
+  (1) `merge_shims.py`'s overlap guard kept only each module's **LAST** edit
+  region (`owner` was a dict keyed by module). cvgate edits THREE ranges; a new
+  module spanning the first two merged clean, compiled, and nulled at **0.0 dB
+  on all 30 scenarios**. It is a LIST now. (2) Two shims independently chose
+  the same file-scope static name — compiles alone, collides only in the
+  composite, error names neither module. Refused now, naming both.
+- Teeth: brackets MEASURED for lfo (1e-6 FAIL −83.6 dB / 1e-7 PASS −105.9) and
+  notecv (1e-4 FAIL −92.6 / 1e-5 PASS −112.0, coarse because noise is the most
+  weakly-coupled signal); **glide is FAIL-ONLY** (its output is the pitch CV;
+  1e-8 is below one ULP of 1.0f so a pass case is impossible), joining pitch,
+  pwm_cv and cvgate. Xtensa census: **zero soft-double in all three** (468/168/
+  82 static instructions), confirming DOUBT_AUDIT's M2.
+
 **★★★★★★★★★ NEWEST (2026-08-03 night, Opus 5) — P1 AND P3 CLOSED. Read
 `docs/engineb/data/null_48k.md` and `docs/engineb/data/dco_real_cost.md`.**
 - **P1 / HOLE H1+H2 CLOSED. The −100 dB gate now runs at 48,000 Hz**
