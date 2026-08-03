@@ -348,6 +348,9 @@ _OUT_ANCHOR = {
                    "                                 JF(a1, 6544), v241,"
                    " JF(a1, 7536));",
                    "      JF(a1, 9040) *= %s;"),
+    "lfo": ("voice_render.c",
+            "    JF(a1, 1808) = eb1808;",
+            "    JF(a1, 1792) *= %s;"),
     "vca_hpf": ("voice_render.c",
                 "                                JF(a1, 6848), JF(a1, 560));",
                 "    JF(a1, 10672) *= %s;"),
@@ -432,6 +435,11 @@ _BRACKET = {
     # teeth(). Like pwm_cv it is gated finer than one ULP of 1.0f, so no pass
     # case can exist: MEASURED, 1.8e-8 gives EXACTLY 0 because
     # `1.0f + 1.8e-8f == 1.0f`, i.e. that build perturbs nothing at all.
+    # MEASURED 2026-08-03 at 48 kHz over all 30 scenarios: 1e-6 FAILS at
+    # -83.6 dB in 4 scenarios, 1e-7 PASSES at -105.9 dB. The LFO carries a
+    # CONTROL value, so a relative error on it is amplified at the output --
+    # which is why its bracket sits two decades finer than the audio modules'.
+    "lfo":        ("1e-6",    "1e-7"),
     "vcf_cv":     ("4.8e-6",  "4.8e-7"),
     # pwm_cv is fail-only; see teeth(). Its FAIL case would need a factor of
     # about 1.9e-10 to land at -90 dB, which is far below one ULP of 1.0f.
