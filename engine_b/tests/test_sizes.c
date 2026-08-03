@@ -46,10 +46,10 @@ int main(void)
     printf("  engine B ratio:                                         %.1fx "
            "smaller per voice\n", 10512.0 / (double)sizeof(eb_voice));
     printf("\n  delay-line budget is COMPILE-TIME (eb_types.h): "
-           "EB_CHORUS_LEN=%d EB_DELAY_LEN=%d. The reverb's budget is per "
+           "EB_CHORUS_LEN=%d EB_FX_DLY_LEN=%d. The reverb's budget is per "
            "element in engine_b/eb_reverb.h (EB_REV_CAP_*), because the four "
            "long loop delays dominate it.\n",
-           EB_CHORUS_LEN, EB_DELAY_LEN);
+           EB_CHORUS_LEN, EB_FX_DLY_LEN);
 
     if (sizeof(eb_voice) > 1024) over++;
     if (sizeof(eb_voice) * EB_NUM_VOICES > 8192) over++;

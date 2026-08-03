@@ -208,8 +208,19 @@ typedef struct {
 #ifndef EB_CHORUS_LEN
 #define EB_CHORUS_LEN 1024        /* BBD line, per channel                    */
 #endif
-#ifndef EB_DELAY_LEN
-#define EB_DELAY_LEN  12000       /* 250 ms at 48 kHz, per channel            */
+/* NAME CLASH, FOUND BY BUILDING 2026-08-02. This was EB_DELAY_LEN, and so is
+ * the delay MODULE's ring length in engine_b/eb_delay.h -- two different
+ * quantities with one name. eb_delay.h requires a power of two and asserts it;
+ * this one is 12,000. Any translation unit that included both got
+ * "#error EB_DELAY_LEN must be a power of two", which is what eb_render.h
+ * doing the obvious thing immediately produced.
+ *
+ * This one belongs to eb_fx, the OLDER skeleton FX layout with raw buffers, and
+ * is renamed rather than reconciled: the two are not the same number and
+ * pretending they are is how the clash happened. The module's ring in
+ * eb_delay.h is the real one. */
+#ifndef EB_FX_DLY_LEN
+#define EB_FX_DLY_LEN 12000       /* 250 ms at 48 kHz, per channel            */
 #endif
 /* EB_REVERB_LEN IS GONE. It was a skeleton placeholder of 8,192 floats for
  * "the whole comb/allpass network", and it was 6.0x too small: the reverb is 13
@@ -230,7 +241,7 @@ typedef struct {
     float    dly_fb, dly_mix; uint32_t dly_taps;
     float    rev_fb, rev_mix;
     float    cho[2][EB_CHORUS_LEN];
-    float    dly[2][EB_DELAY_LEN];
+    float    dly[2][EB_FX_DLY_LEN];
     /* the reverb tank is eb_reverb_state (engine_b/eb_reverb.h), 199,640 B */
 } eb_fx;
 
