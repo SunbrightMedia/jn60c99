@@ -127,7 +127,6 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
          * [3808]"), which is eb_dcoprep's per-sample input. The second need
          * was likewise a value already computed and merely not routed. */
         n_3808 = pwm;
-        eb_modcv_latch(&st->mod[v], pwm);
 
         cv = eb_pitch_eval(pit, 1.0f);
 
@@ -162,8 +161,17 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
         /* the noise mix consumes the SVF's cell-4320 output and the per-sample
          * cell 3536; its result is the ladder's noise input (cell 6544). */
         nmixo  = eb_noisemix_tick(&c->nmix[v], nsv04, n_3536);
+        /* REVIEW FIX (Fable): the latch input is NOT the PWM sum. Cell 3520
+         * is v526 = eb_decim_tick's RETURN VALUE, written at the port's :2174
+         * -- the one-sample-delayed decimator output that noisemix scales into
+         * the ladder input next sample. The earlier draft latched `pwm` here,
+         * a guess this function inherited from before dcoprep existed; it was
+         * caught by reading :2170's operands (decimator coefficients 5456 and
+         * 6336, not PWM cells). The latch therefore happens AFTER the decim
+         * call, below. */
         vcfo   = eb_vcf_tick(&st->vcf[v], &c->vcf[v], nmixo, reso, o7536);
-        (void)decimo; (void)pwm_out;
+        eb_modcv_latch(&st->mod[v], decimo);
+        (void)pwm_out;
         mix   += eb_vca_tick(&st->vca[v], &c->vca[v], vcfo, e1, e2,
                              o6704, go.sign);
     }

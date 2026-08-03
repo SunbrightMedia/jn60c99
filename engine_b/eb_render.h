@@ -165,9 +165,11 @@ typedef struct {
  * transcription at all, because both were values engine B already computed
  * and simply had not routed:
  *   cell 3808 IS eb_modcv_tick's `pwm_out` (eb_pwm_cv.c:91 says so);
- *   cell 3536 IS eb_modcv_tap()'s one-sample delay of 3520 (:1076).
- * The tap is taken BEFORE the latch, because the port feeds that consumer
- * last sample's value.
+ *   cell 3536 IS eb_modcv_tap()'s one-sample delay of 3520 (:1076) --
+ * and 3520 is the DECIMATOR's return value (:2174), so the latch stores
+ * `decimo` after the decim call, and the tap is taken at the top of the next
+ * sample. The first routing latched the PWM sum here; review caught it by
+ * reading :2170's operands.
  *
  * The struct is kept, empty, on purpose: it is the place a future input goes
  * if one is ever found, and a caller that passes NULL still compiles.
