@@ -108,6 +108,18 @@ import truth
 THRESH_DB = -100.0
 BLOCK_THRESH_DB = -80.0
 SIG_FLOOR_DB = null_ab.SIG_FLOOR_DB          # non-vacuity: ref must make sound
+# THE RENDER RATE. Until 2026-08-03 this was hardwired to null_ab.SR (44,100)
+# and there was NO WAY to run this gate at any other rate -- so no -100 dB null
+# had ever run at 48,000 Hz, which is the rate the ESP32-S3 build ships at. The
+# fast-pitch -123.6 dB and the EB_DCO_RECIP -121.1 dB results were therefore
+# 44.1k-only results being quoted as if they were the shipping configuration's.
+# That was hole H1 in docs/engineb/DOUBT_AUDIT.md. `--rate 48000` closes it.
+#
+# The rate is carried into the render WORKER as an explicit argv element rather
+# than an environment variable: the worker is a separate process, and a rate
+# that silently defaulted back to 44,100 on one side of the comparison would
+# produce two streams of different lengths and a +999 dB residual -- loud, but
+# for the wrong reason. Both sides are given the same number by construction.
 SR = null_ab.SR
 
 CFLAGS = ["-std=c99", "-O2", "-ffp-contract=off", "-fno-strict-aliasing"]
@@ -124,6 +136,14 @@ if os.environ.get("JUNO_EB_VERIFY_GEN"):
 # copy. MEASURED 2026-08-03: worst global -123.6 dB over all 30 scenarios.
 if os.environ.get("JUNO_EB_PITCH_FAST"):
     CFLAGS = CFLAGS + ["-DEB_PITCH_FAST=1"]
+# EB_DCO_RECIP: replace the pulse phase's division with a multiply by a
+# reciprocal. Added as an env hook 2026-08-03: its -121.1 dB result had been
+# measured by hand-editing the header, so the gate that certified it was not
+# reproducible by anyone reading this file. It is now driven the same way the
+# pitch fast path is, and the same rule applies -- the result is only valid at
+# the rate it was rendered at.
+if os.environ.get("JUNO_EB_DCO_RECIP"):
+    CFLAGS = CFLAGS + ["-DEB_DCO_RECIP=1"]
 
 # ---------------------------------------------------------------- scenarios
 # The nine port-risk scenarios are reused verbatim from the Track B gate: they
@@ -472,9 +492,26 @@ def _plant(tmp, mutate):
         s = s.replace(a, "  if (JF(a1, 560) == 0.0f) JF(a1, 10672) = "
                          "JF(a1, 10672) * 1.001f;\n" + a, 1)
     elif mutate == "dcopitch":
+        # THE PLANTED CONSTANT MUST LIVE IN THE ARM THIS RUN ACTUALLY EXECUTES.
+        # juno_init.c:314 selects one of two precomputed constant sets --
+        # `if (result == 44100)` and its else -- and BOTH define v32. Until
+        # 2026-08-03 this mutation planted unconditionally in the 44,100 arm,
+        # so at any other host rate it modified DEAD CODE: the teeth case
+        # reported "planted error produced no residual", i.e. the harness
+        # silently measured nothing.
+        #
+        # FOUND BY RUNNING IT, on the first ever teeth battery at 48,000 Hz
+        # (DOUBT_AUDIT.md H1). It is the same class as every other defect this
+        # project has hit: a verification that had never been seen to fail.
         p = os.path.join(tmp, "src", "juno_init.c"); s = open(p).read()
-        assert s.count("v32 = 1000568814;") == 1
-        s = s.replace("v32 = 1000568814;", "v32 = 1000568914;", 1)
+        old, new = ("v32 = 1000568814;", "v32 = 1000568914;") \
+            if SR == 44100.0 else ("v32 = 991309769;", "v32 = 991309869;")
+        if s.count(old) != 1:
+            raise SystemExit(
+                "dcopitch: anchor %r occurs %d times in juno_init.c -- it must "
+                "occur exactly once or the mutation is planting somewhere "
+                "unintended." % (old, s.count(old)))
+        s = s.replace(old, new, 1)
     elif mutate == "idleskip":
         # THE LOCKSTEP MUTATION -- engine B's own largest risk, planted. It is
         # the verbatim patch tools/trackb/null_ab.py uses, on purpose: the two
@@ -559,9 +596,11 @@ def _plant(tmp, mutate):
 
 
 # ---------------------------------------------------------------- worker
-def worker(lib_path, out_path, quick):
+def worker(lib_path, out_path, quick, sr):
     """Separate process: load ONE library, render every scenario, pickle it."""
     import array
+    global SR
+    SR = sr
     lib = null_ab.load(lib_path)
     bank = open(truth.BANK, "rb").read()
     ident = None
@@ -572,7 +611,7 @@ def worker(lib_path, out_path, quick):
         ident = (lib.engineb_build_id().decode(), lib.engineb_modules().decode())
     except AttributeError:
         pass                      # engine_b/ not linked -- the caller checks
-    out = {"ident": ident, "streams": {}}
+    out = {"ident": ident, "sr": SR, "streams": {}}
     for patch, script, tag in scenarios(quick):
         out["streams"][tag] = array.array(
             'f', null_ab.render_script(lib, bank, SR, patch, script))
@@ -583,7 +622,7 @@ def worker(lib_path, out_path, quick):
 def render_side(lib_path, quick, tmpdir, tag):
     p = os.path.join(tmpdir, "%s.pkl" % tag)
     r = subprocess.run([sys.executable, os.path.abspath(__file__), "--worker",
-                        lib_path, p, "1" if quick else "0"],
+                        lib_path, p, "1" if quick else "0", repr(SR)],
                        capture_output=True)
     if r.returncode:
         sys.stderr.write(r.stderr.decode()[-4000:])
@@ -660,6 +699,16 @@ def run(modules, quick, mutate=None, label=None, verbose=True, ref=None):
         if ref is None:
             ref = build_and_render((), quick, None, tmp, "ref", verbose)
         cnd = build_and_render(modules, quick, mutate, tmp, "cand", verbose)
+        # THE TWO SIDES MUST HAVE BEEN RENDERED AT THE SAME RATE. `ref` is
+        # reusable across a whole teeth battery, and a reused oracle is exactly
+        # the object that could outlive a rate change and be compared against a
+        # candidate rendered at a different one. That would null at +999 dB (a
+        # length mismatch) and look like a catastrophic engine defect. Checked,
+        # not assumed.
+        if ref.get("sr") != cnd.get("sr"):
+            raise SystemExit("RATE MISMATCH: oracle rendered at %r, candidate "
+                             "at %r. These streams are not comparable."
+                             % (ref.get("sr"), cnd.get("sr")))
         if cnd["ident"] is None:
             raise SystemExit("engine_b/ was not linked into the candidate -- a "
                              "passthrough build that dropped engine B would "
@@ -688,6 +737,12 @@ def teeth(quick):
     of scenarios; the clean control must be EXACTLY 0."""
     print("=== ENGINE B NULL HARNESS TEETH (thresh %.0f / block %.0f dB) ==="
           % (THRESH_DB, BLOCK_THRESH_DB))
+    # The brackets below were MEASURED at 44,100 Hz. Run at another rate they
+    # remain a valid catch/miss test of the harness, but the recorded dB figures
+    # in the table are not re-derived, and a bracket could in principle move.
+    print("teeth render rate: %.0f Hz%s" % (
+        SR, "" if SR == null_ab.SR else
+        "   (NOTE: the recorded brackets were measured at %.0f)" % null_ab.SR))
     bad = 0
     # (mutation, must the gate FAIL on it?). Two of these are CALIBRATION, not
     # bug-catching: "onelsb" must PASS and "justover" must FAIL, which brackets
@@ -821,10 +876,12 @@ def teeth(quick):
 def main():
     a = sys.argv[1:]
     if a and a[0] == "--worker":
-        worker(a[1], a[2], a[3] == "1")
+        worker(a[1], a[2], a[3] == "1", float(a[4]))
         return 0
     truth.require()
-    global THRESH_DB, BLOCK_THRESH_DB
+    global THRESH_DB, BLOCK_THRESH_DB, SR
+    if "--rate" in a:
+        SR = float(a[a.index("--rate") + 1])
     if "--thresh" in a:
         THRESH_DB = float(a[a.index("--thresh") + 1])
     if "--block-thresh" in a:
@@ -839,6 +896,8 @@ def main():
         mods = tuple(resolve_modules(["all"])) if m == "all" \
             else () if m == "none" else (m,)
     print("=== ENGINE B NULL: oracle (src/, built fresh) vs engine B ===")
+    print("render rate: %.0f Hz%s" % (SR, "" if SR != 48000.0 else
+                                      "   (the ESP32-S3 shipping rate)"))
     print("gates: global <= %.0f dB rel, worst-1024-block <= %.0f dB rel; "
           "non-vacuity: ref RMS >= %.0f dBFS" % (THRESH_DB, BLOCK_THRESH_DB,
                                                  SIG_FLOOR_DB))

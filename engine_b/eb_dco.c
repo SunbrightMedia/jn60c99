@@ -47,6 +47,36 @@
 #include "triangle.h"
 #include <math.h>
 
+/* ------------------------------------------------- EB_DCO_COUNT (P3, off by
+ * default and compiled out entirely unless -DEB_DCO_COUNT is given).
+ *
+ * WHY THIS EXISTS. The DCO's cost is dominated by branches whose rates depend
+ * on the PATCH: three level gates that a real patch very often leaves at zero,
+ * and the saturator's clamp shortcut, which fires whenever the waveform is not
+ * within a few phase steps of an edge. The QEMU harness measured this module at
+ * 17,581 instr/sample using SYNTHETIC levels that defeat the shortcut, and its
+ * per-call figures are known untrustworthy besides (see
+ * docs/engineb/data/pitch_hoist_result.md). So the number in the table is a
+ * worst case wearing the clothes of a measurement.
+ *
+ * These counters supply the missing half of a MEASURED x STATIC estimate: the
+ * host counts how often each path is TAKEN while rendering the real gated
+ * scenario set on real recalled patches, and static Xtensa instruction counts
+ * price each path. Neither half involves QEMU or its 25-instruction counter
+ * quantisation.
+ *
+ * The counters are unsigned long long and are never read by the DSP, so an
+ * instrumented build computes exactly the same samples as a clean one. */
+#ifdef EB_DCO_COUNT
+unsigned long long eb_dco_ctr[12];
+#define EBC(i) (++eb_dco_ctr[i])
+#else
+#define EBC(i) ((void)0)
+#endif
+/* 0 steps  1 wrapslow  2 sawon  3 pulseon  4 subon
+ * 5 sawfull  6 sawshort  7 pulsefull  8 pulseshort  9 subfull  10 subshort
+ * 11 subcnt bump */
+
 /* ---------------------------------------------------------------- helpers
  * sign(): the port's exact three-way form (:1750-1758). It is NOT copysign and
  * it is NOT (x>0)-(x<0): zero maps to ITSELF, so -0.0f comes back as -0.0f, and
@@ -91,10 +121,15 @@ static inline float eb_sat(float x, const eb_dco_coef *c)
  * is a hoist rather than an approximation. MEASURED: it fires on the large
  * majority of sub-samples at any musical pitch, because the unclamped window is
  * only the few phase steps either side of the waveform's edge. */
-static inline float eb_sat_c(float e, const eb_dco_coef *c)
+/* `cb` is the counter-pair base for this call site and is used ONLY by the
+ * EB_DCO_COUNT build; it costs nothing otherwise. The three call sites price
+ * differently on Xtensa, so a single shared counter would not answer P3. */
+static inline float eb_sat_c(float e, const eb_dco_coef *c, int cb)
 {
-    if (e ==  1.0f) return c->sat_hi;
-    if (e == -1.0f) return c->sat_lo;
+    (void)cb;
+    if (e ==  1.0f) { EBC(cb); return c->sat_hi; }
+    if (e == -1.0f) { EBC(cb); return c->sat_lo; }
+    EBC(cb - 1);
     return eb_sat(e * c->sat_in, c);
 }
 
@@ -153,6 +188,12 @@ static EB_ALWAYS_INLINE float eb_dco_step_i(eb_dco_state *s,
     const float prev = s->phase;
     float p, e, saw, pulse, sub, sq, cnt, t;
 
+    EBC(0);
+#ifdef EB_DCO_COUNT
+    { float _q = prev + c->inc;
+      if (_q > 1.0f ? !(_q + 1.0f < 4.0f)
+                    : (_q < -1.0f && !(_q - 1.0f > -4.0f))) EBC(1); }
+#endif
     p = eb_dco_wrap(prev + c->inc);
     s->phase = p;
 
@@ -168,9 +209,10 @@ static EB_ALWAYS_INLINE float eb_dco_step_i(eb_dco_state *s,
 
     /* ---- SAW: the wrapped ramp through the triangle, edge-scaled by g ---- */
     if (c->lvl_saw != 0.0f) {
+        EBC(2);
         e   = eb_clamp1(((eb_triangle_saw(p) * 256.0f) * c->g)
                         * c->amp_saw);
-        saw = eb_sat_c(e, c) * (p * c->gn_saw);
+        saw = eb_sat_c(e, c, 6) * (p * c->gn_saw);
     } else saw = 0.0f;
 
     /* ---- PULSE: phase offset by the pulse width, squared and edge-scaled --
@@ -178,6 +220,7 @@ static EB_ALWAYS_INLINE float eb_dco_step_i(eb_dco_state *s,
      * of the pulse get different edge slopes -- that asymmetry is the pulse
      * width. Kept as a division: see the header. */
     if (c->lvl_pulse != 0.0f) {
+        EBC(3);
         t     = c->pw + p;
         sq    = eb_sgn(t);
 #if EB_DCO_RECIP
@@ -187,7 +230,7 @@ static EB_ALWAYS_INLINE float eb_dco_step_i(eb_dco_state *s,
         e     = eb_clamp1(((eb_triangle(t / (t < 0.0f ? c->pwm1 : c->pwp1))
                             * c->g) * 256.0f) * c->amp_pulse);
 #endif
-        pulse = eb_sat_c(e, c) * (sq * c->gn_pulse);
+        pulse = eb_sat_c(e, c, 8) * (sq * c->gn_pulse);
     } else pulse = 0.0f;
 
     /* ---- SUB: a divide-by-two counter clocked by a rising crossing of
@@ -196,15 +239,16 @@ static EB_ALWAYS_INLINE float eb_dco_step_i(eb_dco_state *s,
      * edge and nothing else. The counter steps by 2 and wraps at 4, so it is a
      * one-octave-down square. */
     cnt = s->subcnt;
-    if (!(p < c->subthr || c->subthr <= prev)) cnt += 2.0f;
+    if (!(p < c->subthr || c->subthr <= prev)) { EBC(11); cnt += 2.0f; }
     if (cnt >= 4.0f) cnt = 0.0f;
     s->subcnt = cnt;
 
     if (c->lvl_sub != 0.0f) {
+        EBC(4);
         t   = (((cnt + p) + 1.0f) * 0.5f) - 1.0f;
         e   = eb_clamp1((((eb_triangle_sub(-fabsf(t)) + 1.0f) * c->g) * 512.0f)
                         * c->amp_sub);
-        sub = eb_sat_c(e, c) * (eb_sgn(t) * c->gn_sub);
+        sub = eb_sat_c(e, c, 10) * (eb_sgn(t) * c->gn_sub);
     } else sub = 0.0f;
 
     /* ---- mix (:1807-1823). The association is the port's: the sub term is
