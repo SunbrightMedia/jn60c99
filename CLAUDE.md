@@ -2,6 +2,32 @@
 
 # JUNO-60 (JU-06A) C99 port — project memory
 
+**★★★★★★★★★★★★★ NEWEST (2026-08-04, Fable 5) — P8 C1 EXECUTED TO ITS END:
+DEAD, AND IT UNCOVERED THE LAW THAT STEERS EVERYTHING LEFT. Read
+`docs/engineb/data/pitch_p2_study.md` §6.**
+- **C1 (control-rate pitch) is CLOSED NEGATIVE by the strongest measurement in
+  this repo:** the final Taylor form is accurate to 1e-7 worst / 4e-8 RMS on
+  the REAL pluck-POLY trajectory (336,000 logged calls) — and the null still
+  fails at −89.5 dB. A smooth deterministic error is a BIAS and the DCO phase
+  INTEGRATES it; v7 passes because its ±1-ULP errors DITHER around zero, not
+  because it is accurate. The design ladder (output extrapolation → Taylor →
+  df/double derivatives + 2nd order + knot re-anchor + clamped-domain δ +
+  pre-gain anchors) is in the study with each rung's kill. Also found on the
+  way: the FLOAT derivative of the pitch polynomial has the WRONG SIGN
+  (−0.104 vs +0.022) — the 2^37 cancellation applies to P′ too.
+- **★ THE LAW (apply to every future candidate):** classify the target by its
+  CONSUMER. Phase-integrated quantities (pitch increment → DCO phase, LFO
+  rate → LFO phase) need bias < ~1e-9: NO causal approximation passes — only
+  exact-to-dither evaluation. Memorylessly-consumed quantities (VCF
+  coefficients, gains) tolerate ~1e-5. **So: pitch 21,792 instr/sample is
+  IRREDUCIBLE by approximation (proven twice); C3 (incremental LFO expf) is
+  dead by the same law; C2 survives only for non-integrating targets
+  (vcf_res/vcf_cv coefficient paths, ~3,500).** Remaining big lever: C4
+  fixed-point+PIE SIMD on the audio path. P8_PLAN.md carries the revision.
+- EB_PITCH_CR > 1 is a #error pointing at the study; N=1 is bit-exact
+  (reproduces −148.4 dB exactly) and stays as the harness self-test. The
+  shipping default is untouched and re-proven.
+
 **★★★★★★★★★★★★ NEWEST (2026-08-03 latest, Fable 5) — THE NUMBER CORRECTED
 IN REVIEW, AND P8 IS PLANNED. Read `docs/engineb/P8_PLAN.md`.**
 - **THE FOURTH PRICING ERROR, same flattering direction as Opus's three: libm
