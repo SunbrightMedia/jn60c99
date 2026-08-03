@@ -178,3 +178,27 @@ The alternative — gating engine B's VOICE output against the port's voice
 output, below the master — is cheaper and is genuinely useful, but it is a
 WEAKER claim than "the standalone engine reproduces the instrument", and it
 should be labelled as such if it is taken. I have not taken it unilaterally.
+
+
+## RULING ON THE SCOPE FINDING (Fable 5, 2026-08-04 — USER-VISIBLE)
+
+The finding is accepted and the measurement is correct. The trunk is the FULL
+instrument; a voice-only gate is not certification. Phase 1 is re-sequenced:
+
+**1b-0 (interim, one session): the VOICE-LEVEL gate.** Gate eb_engine_render's
+voice chain against the port's voice output (tap point: the eight per-voice
+buffers before juno_master_render). LABELLED WEAKER, not certification — its
+purpose is to execute the render function for the first time and flush the
+remaining draft defects out of it CHEAPLY, before the master work multiplies
+the surface. Eight guesses were found in that function by reading; the ninth
+is found by running.
+
+**1b-1: transcribe the master chain.** Same method as the voice work, block
+by block in master_render.c: voice summing, EFFECT-TYPE routing (the v551 arm
+— warm-state load-bearing, see the WARM parity block in CLAUDE.md), gain
+staging, boost/output path, warmup-mute latch, stereo assembly. Each block:
+live-variable boundary, cell classification with the FOUR LIES checked, shim,
+EXACTLY-0 null, teeth, census. The FX modules stay as they are.
+
+**1b-2: the standalone gate as originally specified.** Then 1d, C5, playbook,
+certification. Nothing else in the orders changes.
