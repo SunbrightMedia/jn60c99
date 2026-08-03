@@ -20,6 +20,7 @@
  * measurement.
  */
 #include "eb_engine.h"
+#include "eb_alloc.h"
 #include "eb_modules.h"
 #include <string.h>
 
@@ -67,37 +68,65 @@ int eb_engine_set_patch(eb_engine *e, const eb_patch *p)
 }
 
 /* ------------------------------------------------------------------ notes */
+/* THE SKELETON ALLOCATOR IS GONE. It was "free voice first, else oldest" and
+ * said so; the instrument's law is CAssignJu60 -- POLY with a four-tier
+ * priority and a TOP-DOWN gate-off scan, MONO on voice 0, UNISON across all
+ * eight, a POLY variant, LEGATO with portamento, last-note priority on press
+ * and LOWEST-held fallback on release. That law now lives in
+ * engine_b/eb_alloc.{h,c} and is GATED: tools/engineb/alloc_ab.py compares its
+ * bindings against the port's after EVERY event over 270 note sequences and
+ * all nine assign configurations the factory bank contains, and its teeth
+ * prove the gate catches four named allocator errors including the historic
+ * POLY-only one.
+ *
+ * These entry points forward to it. The emitted events are the cell writes the
+ * port performs (trigger, glide, velocity, note-off, retrigger latch,
+ * portamento gate, held broadcast); applying them belongs to the CV modules and
+ * is NOT done here, which is one of the reasons render_ok stays unset. */
 void eb_engine_note_on(eb_engine *e, int note, int vel)
 {
-    int i, pick = -1;
-    uint32_t oldest = 0xFFFFFFFFu;
+    eb_alloc_ev ev[EB_ALLOC_MAX_EV];
+    int n, i;
     if (note < 0 || note > 127) return;
+    n = eb_alloc_note_on(&e->alloc, note, vel, ev);
+    for (i = 0; i < n; ++i) {
+        int v = ev[i].voice;
+        if (v < 0) continue;
+        switch (ev[i].kind) {
+        case EB_EV_TRIGGER:
+            e->v[v].note = (uint8_t)ev[i].a;
+            e->v[v].vel  = (uint8_t)(ev[i].b < 0 ? 0 : ev[i].b > 127 ? 127 : ev[i].b);
+            e->v[v].gate = 1; e->v[v].active = 1; e->v[v].atrest = 0;
+            break;
+        case EB_EV_GLIDE:
+            e->v[v].note = (uint8_t)ev[i].a;
+            break;
+        case EB_EV_VELOCITY:
+            e->v[v].vel = (uint8_t)(ev[i].a < 0 ? 0 : ev[i].a > 127 ? 127 : ev[i].a);
+            break;
+        case EB_EV_NOTE_OFF:
+            e->v[v].gate = 0;
+            break;
+        default:
+            break;                 /* RETRIG / PORTA_GATE are CV-module work */
+        }
+    }
     e->held[note >> 5] |= 1u << (note & 31);
-    /* Skeleton allocator: free voice first, else oldest. The real law is
-     * CAssignJu60 (POLY / MONO / UNISON, LEGATO, last-note priority on press and
-     * LOWEST-held fallback on release) and belongs to EB_HAVE_ALLOC. Getting
-     * this wrong is not a subtlety -- the port shipped a POLY-only allocator for
-     * months and 16 of 64 factory patches played in the wrong mode. */
-    for (i = 0; i < EB_NUM_VOICES; ++i)
-        if (!e->v[i].active) { pick = i; break; }
-    if (pick < 0)
-        for (i = 0; i < EB_NUM_VOICES; ++i)
-            if (e->v[i].age < oldest) { oldest = e->v[i].age; pick = i; }
-    e->v[pick].note   = (uint8_t)note;
-    e->v[pick].vel    = (uint8_t)(vel < 0 ? 0 : vel > 127 ? 127 : vel);
-    e->v[pick].gate   = 1;
-    e->v[pick].active = 1;
-    e->v[pick].atrest = 0;
-    e->v[pick].age    = ++e->age_counter;
 }
 
 void eb_engine_note_off(eb_engine *e, int note)
 {
-    int i;
+    eb_alloc_ev ev[EB_ALLOC_MAX_EV];
+    int n, i;
     if (note < 0 || note > 127) return;
+    n = eb_alloc_note_off(&e->alloc, note, ev);
+    for (i = 0; i < n; ++i) {
+        int v = ev[i].voice;
+        if (v < 0) continue;
+        if (ev[i].kind == EB_EV_NOTE_OFF) e->v[v].gate = 0;
+        else if (ev[i].kind == EB_EV_GLIDE) e->v[v].note = (uint8_t)ev[i].a;
+    }
     e->held[note >> 5] &= ~(1u << (note & 31));
-    for (i = 0; i < EB_NUM_VOICES; ++i)
-        if (e->v[i].active && e->v[i].note == (uint8_t)note) e->v[i].gate = 0;
 }
 
 /* ------------------------------------------------------------- free run */

@@ -37,6 +37,7 @@
 #define ENGINEB_EB_TYPES_H
 
 #include <stdint.h>
+#include "eb_alloc.h"
 #include "eb_freerun.h"
 
 #define EB_NUM_VOICES 8
@@ -273,6 +274,9 @@ typedef struct {
      * is included by every module header, so pulling their types in would be
      * circular. */
     int render_ok;
+    /* the voice allocator (CAssignJu60's law), gated by
+     * tools/engineb/alloc_ab.py against the port's. */
+    eb_alloc alloc;
 } eb_engine;
 
 /* ------------------------------------------------------------------ budgets */
