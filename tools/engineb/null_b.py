@@ -330,9 +330,20 @@ _OUT_ANCHOR = {
     "vcf_cv": ("voice_render.c",
                "    JF(a1, 6848) = eb6848;",
                "    v227 *= %s;"),
+    # ANCHOR REFRESHED 2026-08-03. It had been stale since commit ed0fd50
+    # ("standalone engine step 4"), which changed this call's state argument
+    # from `&ebs` to `&EBF[voice]` and split it over two lines. The anchor still
+    # named the old one-line form, matched 0 times, and the uniqueness guard
+    # hard-stopped the teeth battery here -- which is the guard working, but it
+    # also means THE vcf_ladder TEETH CASES HAD NOT RUN SINCE THAT COMMIT.
+    # vcf_ladder sorts LAST, so exactly its own two cases were lost and no
+    # earlier case was affected: 32 of the 34 ran. Found by running the battery
+    # at 48 kHz. Nothing was wrong with the module; the harness had gone blind
+    # to it, which is this project's most repeated failure mode.
     "vcf_ladder": ("voice_render.c",
-                   "      JF(a1, 9040) = eb_vcf_tick(&ebs, &ebc, JF(a1, 6544),"
-                   " v241, JF(a1, 7536));",
+                   "      JF(a1, 9040) = eb_vcf_tick(&EBF[voice], &ebc,\n"
+                   "                                 JF(a1, 6544), v241,"
+                   " JF(a1, 7536));",
                    "      JF(a1, 9040) *= %s;"),
     "vca_hpf": ("voice_render.c",
                 "                                JF(a1, 6848), JF(a1, 560));",
