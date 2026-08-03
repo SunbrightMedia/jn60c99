@@ -351,6 +351,12 @@ _OUT_ANCHOR = {
     "notecv": ("voice_render.c",
                "    JF(base, 84432) = eb_notecv_tick(&ebns, &EBTC[voice]);",
                "    JF(base, 84432) *= %s;"),
+    "vcf_res": ("voice_render.c",
+                "    JF(a1, 7520) = ebrs.s7520;",
+                "    v241 *= %s;"),
+    "noisemix": ("voice_render.c",
+                 "    JF(a1, 6544) = eb_noisemix_tick(&EBXC[voice], JF(a1, 4320), JF(a1, 3536));",
+                 "    JF(a1, 6544) *= %s;"),
     "glide": ("voice_render.c",
               "      JF(a1, 752) = eb752;",
               "      JF(a1, 752) *= %s;"),
@@ -450,6 +456,17 @@ _BRACKET = {
     # at -92.6 dB in 6 scenarios, 1e-5 passes at -112.0 dB. The bracket is
     # coarse for the same reason the noise SVF's is -- the noise is the most
     # weakly-coupled signal in the voice.
+    # MEASURED 2026-08-03 at 48 kHz: 1e-5 FAILS at -87.4 dB in 17 scenarios,
+    # 1e-6 PASSES at -106.9 dB.
+    "vcf_res":    ("1e-5",    "1e-6"),
+    # MEASURED 2026-08-03 at 48 kHz. The FAIL case is 3e-5 (-90.3 dB, 30/30)
+    # and NOT the tighter 1e-5, deliberately: 1e-5 lands at -99.8 dB, which
+    # clears the -100 dB gate by 0.2 dB. That is a probe sitting ON the
+    # threshold -- the exact failure this harness was already caught by twice
+    # (audit findings F8 and the first per-module bracket set), where a probe
+    # drifts across the line and the battery reports on the probe instead of
+    # on the module. The pass side stays 1e-6 (-112.4 dB).
+    "noisemix":   ("3e-5",    "1e-6"),
     "notecv":     ("1e-4",    "1e-5"),
     "vcf_cv":     ("4.8e-6",  "4.8e-7"),
     # pwm_cv is fail-only; see teeth(). Its FAIL case would need a factor of

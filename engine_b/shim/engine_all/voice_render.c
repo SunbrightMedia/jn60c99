@@ -1,6 +1,6 @@
 /* GENERATED FILE -- DO NOT EDIT.
  * tools/engineb/merge_shims.py built this from the individual shims:
- *     cvgate, dco, decim, env, glide, lfo, noise_svf, notecv, pitch, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
+ *     cvgate, dco, decim, env, glide, lfo, noise_svf, noisemix, notecv, pitch, pwm_cv, vca_hpf, vcf_cv, vcf_ladder, vcf_res
  * Edit those, then re-run the generator (make engineb does it).
  * Its purpose: engine B cannot be tested as a WHOLE ENGINE while each
  * module shadows the same port file -- see docs/engineb/HARNESS_AUDIT.md
@@ -227,6 +227,34 @@ static unsigned long EBNGEN_SEEN[8];
 #include "eb_types.h"
 static eb_nsvf_state EBN[8];
 static unsigned char EBN_seen[8];
+/* ---- from shim 'noisemix' ---- */
+/* engine_b/shim/noisemix/voice_render.c — VERBATIM FORK of src/voice_render.c
+ * with ONE block replaced: the noise SVF output mix, lines 1141-1149, module
+ * engine_b/eb_noisemix.{h,c}.
+ */
+#include "eb_noisemix.h"
+#include <string.h>
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu).\n",              \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
+static eb_noisemix_coef EBXC[8];
+static unsigned char    EBXHAVE[8];
+static unsigned long    EBXGEN_SEEN[8];
+
 /* ---- from shim 'notecv' ---- */
 /* engine_b/shim/notecv/voice_render.c — VERBATIM FORK of src/voice_render.c
  * with ONE block replaced: the shared noise generator and the note/gate/
@@ -395,6 +423,34 @@ static unsigned long EBFGEN_SEEN[8];     /* -I engine_b/ is supplied by the harn
  * FIR); the mapping is what makes those two agree. */
 #define EB_HCELL(i)  ( (((i) & 3) == 0 ? 8432 : ((i) & 3) == 1 ? 8560 : \
                         ((i) & 3) == 2 ? 8688 : 8816) + 16 * ((i) >> 2) )
+
+/* ---- from shim 'vcf_res' ---- */
+/* engine_b/shim/vcf_res/voice_render.c — VERBATIM FORK of src/voice_render.c
+ * with ONE block replaced: the VCF resonance/drive shaper, lines 1230-1297,
+ * module engine_b/eb_vcf_res.{h,c}.
+ */
+#include "eb_vcf_res.h"
+#include <string.h>
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu).\n",              \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
+static eb_vcf_res_coef EBRC[8];
+static unsigned char   EBRHAVE[8];
+static unsigned long   EBRGEN_SEEN[8];
 
 /* voice_render.c — exact C99 transcription of sub_180369070 (Cloud 60 voice
  * render). Generated first-pass by tools/translate_voice.py then finished by
@@ -1420,15 +1476,27 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
     JF(a1, 4320) = _n20;
   }
   /* ==== END ENGINE B MODULE NOISE_SVF ================================== */
-  JI(a1, 6432) = JI(a1, 6416);
-  v197 = JF(a1, 6448);
-  JF(a1, 6464) = v197;
-  v198 = v197 * JF(a1, 3536);
-  v199 = JF(a1, 6432) * JF(a1, 4320);
-  JF(a1, 6480) = v198;
-  JF(a1, 6496) = v199;
-  JI(a1, 6560) = JI(a1, 6544);
-  JF(a1, 6544) = (float)(v199 * JF(a1, 6528)) + (float)(v198 * JF(a1, 6512));
+  /* ============ ENGINE B MODULE M-NOISEMIX ==============================
+   * REPLACES src/voice_render.c:1141-1149 verbatim. This is the block
+   * eb_noise_svf.h deliberately left in the port; now that its neighbours are
+   * modules it can be proven.
+   *
+   * Cell 3536 is passed PER SAMPLE, not cached: it is written at :1076 as a
+   * delayed copy. See eb_noisemix.h.
+   * NOT written back: five dead stores (6432, 6464, 6480, 6496, 6560).
+   */
+  {
+    if (!EBXGEN_SEEN[voice] || EB_GEN_STALE(17, EBXGEN_SEEN[voice])) {
+      eb_noisemix_coef ebx;
+      int _ch;
+      ebx.k6416 = JF(a1, 6416); ebx.k6448 = JF(a1, 6448);
+      ebx.k6512 = JF(a1, 6512); ebx.k6528 = JF(a1, 6528);
+      _ch = !EBXHAVE[voice] || memcmp(&EBXC[voice], &ebx, sizeof ebx) != 0;
+      EB_GEN_CHECK(17, EBXGEN_SEEN[voice], _ch, "noisemix");
+      if (_ch) { EBXC[voice] = ebx; EBXHAVE[voice] = 1; }
+    }
+    JF(a1, 6544) = eb_noisemix_tick(&EBXC[voice], JF(a1, 4320), JF(a1, 3536));
+  }
   /* ============ ENGINE B MODULE M-VCFCV — the cutoff CV summing =========
    * REPLACES src/voice_render.c:1150-1229 verbatim.
    *
@@ -1502,73 +1570,78 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
     JF(a1, 7088) = ebst.s_a;
     JF(a1, 7168) = ebst.s_b;
   }
-  v228 = JF(a1, 6704);
-  v229 = JF(a1, 6848);
-  JI(a1, 7584) = JI(a1, 7568);
-  v230 = JF(a1, 7552);
-  JF(a1, 7568) = v230;
-  if ( JF(a1, 7632) == 1.0 )
+  /* ============ ENGINE B MODULE M-VCFRES ================================
+   * REPLACES src/voice_render.c:1230-1297 verbatim.
+   *
+   * FOUR state cells -- 7520/7536/7552/7568. Two of them (7520, 7536) are
+   * written only inside the block's `if` arm and read in its `else` arm, so
+   * they carry across samples even though a read-before-write scan calls them
+   * locals. See eb_vcf_res.h.
+   *
+   * Cell 8192 is gathered with JF here even though the port reaches it as
+   * *(float *)(a1 + 0x2000); same address, same load.
+   */
   {
-    v231 = JF(a1, 7584)
-         + (float)((float)(JF(a1, 7712) * v230) - (float)(JF(a1, 7712) * JF(a1, 7584)));
-    JF(a1, 7568) = v231;
-    v232 = (float)(v231 * JF(a1, 7696)) + JF(a1, 7600);
-    JF(a1, 7552) = juno_wrap24(-v230);
-    v233 = (float)(1.0 - v229) * JF(a1, 7728);
-    JF(a1, 7536) = (float)(v229 * JF(a1, 7792)) + JF(a1, 7616);
-    v227 = (float)(fmaxf(
-                                 fminf(
-                                   (float)((float)((float)((float)(v227 * JF(a1, 7680))
-                                                         + (float)(v228 * JF(a1, 7648)))
-                                                 + v232)
-                                         + fminf(JF(a1, 7744), v233))
-                                 + JF(a1, 7664),
-                                   JF(a1, 7760)),
-                                 JF(a1, 7776))
-                             * JF(a1, 7824))
-                     + JF(a1, 7840);
-    v234 = v227;
-    v235 = (int)v227;
-    if ( v235 != (int)0x80000000 && (float)v235 != v227 )
-      v234 = (float)(v235 - (int)((bits_from_f32(v227) >> 31) & 1u));
-    v236 = v227 - v234;
-    v237 = (float)(v236 * v236) * 0.25;
-    v238 = (float)(expf(v234)
-                 * (float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)(v236 * JF(a1, 8032)) + JF(a1, 8016)) * v237) + (float)(v236 * JF(a1, 8000))) + JF(a1, 7984)) * v237) + (float)(v236 * JF(a1, 7968)))
-                                                                                                 + JF(a1, 7952))
-                                                                                         * v237)
-                                                                                 + (float)(v236 * JF(a1, 7936)))
-                                                                         + JF(a1, 7920))
-                                                                 * v237)
-                                                         + (float)(v236 * JF(a1, 7904)))
-                                                 + JF(a1, 7888))
-                                         * v237)
-                                 + (float)(v236 * JF(a1, 7872)))
-                         + 1.0))
-         * JF(a1, 7856);
-    v239 = v238 * v238;
-    v240 = (float)((float)((float)((float)((float)((float)((float)((float)(v238 * v238) * *(float *)(a1 + 0x2000))
-                                                         + JF(a1, 8160))
-                                                 * (float)(v239 * v239))
-                                         + (float)((float)((float)(v238 * v238) * JF(a1, 8128))
-                                                 + JF(a1, 8096)))
-                                 * (float)((float)((float)(v238 * v238) * v238) * (float)(v238 * v238)))
-                         + (float)((float)((float)(v238 * v238) * v238) * JF(a1, 8064)))
-                 + v238)
-         / (float)((float)((float)((float)((float)((float)((float)((float)((float)(v238 * v238) * JF(a1, 8176))
-                                                                 + JF(a1, 8144))
-                                                         * (float)(v239 * v239))
-                                                 + (float)((float)(v238 * v238) * JF(a1, 8112)))
-                                         + JF(a1, 8080))
-                                 * (float)(v239 * v239))
-                         + (float)((float)(v238 * v238) * JF(a1, 8048)))
-                 + 1.0);
-    v241 = v240 / (float)(v240 + 1.0);
-    JF(a1, 7520) = v241;
-  }
-  else
-  {
-    v241 = JF(a1, 7520);
+    eb_vcf_res_state ebrs;
+    float ebr7536;
+
+    if (!EBRGEN_SEEN[voice] || EB_GEN_STALE(16, EBRGEN_SEEN[voice])) {
+      eb_vcf_res_coef ebr;
+      int _ch;
+      ebr.k7600 = JF(a1, 7600);
+      ebr.k7616 = JF(a1, 7616);
+      ebr.k7632 = JF(a1, 7632);
+      ebr.k7648 = JF(a1, 7648);
+      ebr.k7664 = JF(a1, 7664);
+      ebr.k7680 = JF(a1, 7680);
+      ebr.k7696 = JF(a1, 7696);
+      ebr.k7712 = JF(a1, 7712);
+      ebr.k7728 = JF(a1, 7728);
+      ebr.k7744 = JF(a1, 7744);
+      ebr.k7760 = JF(a1, 7760);
+      ebr.k7776 = JF(a1, 7776);
+      ebr.k7792 = JF(a1, 7792);
+      ebr.k7824 = JF(a1, 7824);
+      ebr.k7840 = JF(a1, 7840);
+      ebr.k7856 = JF(a1, 7856);
+      ebr.k7872 = JF(a1, 7872);
+      ebr.k7888 = JF(a1, 7888);
+      ebr.k7904 = JF(a1, 7904);
+      ebr.k7920 = JF(a1, 7920);
+      ebr.k7936 = JF(a1, 7936);
+      ebr.k7952 = JF(a1, 7952);
+      ebr.k7968 = JF(a1, 7968);
+      ebr.k7984 = JF(a1, 7984);
+      ebr.k8000 = JF(a1, 8000);
+      ebr.k8016 = JF(a1, 8016);
+      ebr.k8032 = JF(a1, 8032);
+      ebr.k8048 = JF(a1, 8048);
+      ebr.k8064 = JF(a1, 8064);
+      ebr.k8080 = JF(a1, 8080);
+      ebr.k8096 = JF(a1, 8096);
+      ebr.k8112 = JF(a1, 8112);
+      ebr.k8128 = JF(a1, 8128);
+      ebr.k8144 = JF(a1, 8144);
+      ebr.k8160 = JF(a1, 8160);
+      ebr.k8176 = JF(a1, 8176);
+      ebr.k8192 = JF(a1, 8192);
+      _ch = !EBRHAVE[voice] || memcmp(&EBRC[voice], &ebr, sizeof ebr) != 0;
+      EB_GEN_CHECK(16, EBRGEN_SEEN[voice], _ch, "vcf_res");
+      if (_ch) { EBRC[voice] = ebr; EBRHAVE[voice] = 1; }
+    }
+
+    ebrs.s7520 = JF(a1, 7520);
+    ebrs.s7536 = JF(a1, 7536);
+    ebrs.s7552 = JF(a1, 7552);
+    ebrs.s7568 = JF(a1, 7568);
+
+    v241 = eb_vcf_res_tick(&ebrs, &EBRC[voice], v227,
+                           JF(a1, 6704), JF(a1, 6848), &ebr7536);
+
+    JF(a1, 7520) = ebrs.s7520;
+    JF(a1, 7536) = ebrs.s7536;
+    JF(a1, 7552) = ebrs.s7552;
+    JF(a1, 7568) = ebrs.s7568;
   }
   /* ============ ENGINE B MODULE M-VCF — the 4-pole ladder core ===========
    * REPLACES src/voice_render.c:1298-1515 verbatim.
