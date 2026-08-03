@@ -43,6 +43,7 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
     for (v = 0; v < EB_NUM_VOICES; ++v) {
         eb_voice *vc = &e->v[v];
         float e1, e2, pit, pwm, cut, o6704, o6848;
+        float dly_env, pitch_cv, lfo_del, lfo_undel, lfo_pulse;
         float q[4], nsv04, nsvo, decimo, vcfo, cv;
         eb_cvgate_in gi;
         eb_cvgate_out go;
@@ -65,14 +66,27 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
         gi.p28 = e1;       gi.p29 = e2;       gi.gate_off = n->held;
         eb_cvgate(&gi, &go);
 
-        eb_modcv_tick(&c->mod[v], n->pitch_cv, n->kbd,
-                      n->lfo_del, n->lfo_undel, e1, e2, &pit, &pwm);
+        /* GLIDE first: it produces the final pitch CV and the LFO's own
+         * delay-envelope input, in that order in the port. */
+        dly_env = eb_glide_tick(&st->glide[v], &c->glide[v],
+                                go.sign, n->kbd, n->vel, n->pitch_in, &pitch_cv);
+
+        /* THE LFO, then, because both CV blocks below read its two outputs.
+         * It is per voice, not per engine: the port runs one LFO inside each
+         * voice's render and they are not in lockstep. */
+        lfo_del = eb_lfo_tick(&st->lfo[v], &c->lfo[v], dly_env,
+                              c->lfo_ext_gate[v], c->lfo_ext0[v],
+                              c->lfo_ext1[v], noise, &lfo_undel, &lfo_pulse);
+        (void)lfo_pulse;
+
+        eb_modcv_tick(&c->mod[v], pitch_cv, n->kbd,
+                      lfo_del, lfo_undel, e1, e2, &pit, &pwm);
         eb_modcv_latch(&st->mod[v], pwm);
 
         cv = eb_pitch_eval(pit, 1.0f);
 
         cut = eb_vcf_cv_tick(&st->cv[v], &c->cv[v], pit, pwm,
-                             n->lfo_del, n->lfo_undel, e1, e2, &o6704, &o6848);
+                             lfo_del, lfo_undel, e1, e2, &o6704, &o6848);
 
         /* ---- audio rate --------------------------------------------------- */
         if (!st->dco_live_seeded[v]) {

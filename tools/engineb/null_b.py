@@ -348,6 +348,9 @@ _OUT_ANCHOR = {
                    "                                 JF(a1, 6544), v241,"
                    " JF(a1, 7536));",
                    "      JF(a1, 9040) *= %s;"),
+    "glide": ("voice_render.c",
+              "      JF(a1, 752) = eb752;",
+              "      JF(a1, 752) *= %s;"),
     "lfo": ("voice_render.c",
             "    JF(a1, 1808) = eb1808;",
             "    JF(a1, 1792) *= %s;"),
@@ -825,7 +828,7 @@ def teeth(quick):
     # result, so it cannot be perturbed into the output at all. It is
     # un-gateable by this harness by construction -- see _OUT_ANCHOR.
     for _m in sorted(_OUT_ANCHOR):
-        if _m in ("pwm_cv", "pitch", "cvgate"):
+        if _m in ("pwm_cv", "pitch", "cvgate", "glide"):
             # Both carry a CONTROL value -- a cutoff and a pitch -- so a
             # relative error on them is amplified enormously at the output, and
             # both are gated finer than one ULP of 1.0f. A pass case is
@@ -833,6 +836,13 @@ def teeth(quick):
             # at 1.8e-8 both give EXACTLY 0, because those factors round to
             # 1.0f and the build perturbs nothing. At one ULP, 1e-7, pwm_cv
             # fails at -35.5 dB in 22/30 and pitch at -35.6 dB in 20/30.
+            #
+            # 'glide' joins them for the same reason as 'pitch': its output
+            # IS the final pitch CV, so an error on it integrates in the DCO
+            # phase. MEASURED at 48 kHz: 1e-7 fails at -38.4/-56.5 dB in 30/19
+            # scenarios, and 1e-8 gives EXACTLY 0 because 1.0f + 1e-8f == 1.0f
+            # -- that build perturbs nothing, so a pass case is impossible
+            # rather than merely absent.
             #
             # 'cvgate' is here for a DIFFERENT reason, and the distinction
             # matters: its output is a three-way gate sign, a SWITCH, so a

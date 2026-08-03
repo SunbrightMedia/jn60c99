@@ -54,6 +54,8 @@
 #include "eb_decim.h"
 #include "eb_noise_svf.h"
 #include "eb_cvgate.h"
+#include "eb_lfo.h"
+#include "eb_glide.h"
 #include "eb_pitch.h"
 #include "eb_chorus.h"
 #include "eb_delay.h"
@@ -73,6 +75,13 @@ typedef struct {
     eb_dco_coef       dco[EB_NUM_VOICES];
     eb_decim_coef     dec[EB_NUM_VOICES];
     eb_nsvf_coef      nsv[EB_NUM_VOICES];
+    eb_lfo_coef       lfo[EB_NUM_VOICES];
+    eb_glide_coef     glide[EB_NUM_VOICES];
+    /* the external LFO inputs and gate: plain recall cells 944/976/1008 that
+     * the port reads inside the LFO's line range. Coefficients, not state. */
+    float             lfo_ext_gate[EB_NUM_VOICES];
+    float             lfo_ext0[EB_NUM_VOICES];
+    float             lfo_ext1[EB_NUM_VOICES];
     /* The FX are engine-wide, not per voice. They live here for the same
      * reason as the rest: eb_types.h cannot see the module types. eb_fx in
      * eb_types.h is the older skeleton layout and holds raw buffers, not
@@ -103,6 +112,8 @@ typedef struct {
     unsigned char   dco_live_seeded[EB_NUM_VOICES];
     eb_decim_state  dec[EB_NUM_VOICES];
     eb_nsvf_state   nsv[EB_NUM_VOICES];
+    eb_lfo_state    lfo[EB_NUM_VOICES];
+    eb_glide_state  glide[EB_NUM_VOICES];
     eb_chorus_state chorus;
     eb_delay_state  delay;
     eb_reverb_state reverb;
@@ -117,10 +128,20 @@ typedef struct {
  * has not been made a module. The list IS the remaining work, and it shrinks by
  * one entry per block claimed.
  *
+ * CLAIMED 2026-08-03 and therefore GONE from this struct:
+ *   lfo_del, lfo_undel  -> eb_lfo_tick() (cells 1792/1808), gated EXACTLY 0
+ *   pitch_cv            -> eb_glide_tick() (cell 752),      gated EXACTLY 0
+ * The LFO's own delay-envelope input came with eb_glide, so claiming those two
+ * blocks removed three entries and added none.
+ *
+ * ADDED by claiming eb_glide, and NOT hidden: the glide integrator needs the
+ * PRE-glide pitch CV (the port's v28), which is computed in the block before
+ * it. Defaulting it to zero inside the render would have been a silent need,
+ * which is the whole failure mode this struct exists to prevent. Net: the two
+ * blocks removed three entries and added one, 8 -> 6.
+ *
  *   gate        the three-way gate sign and its ramp        (partly: eb_cvgate)
- *   lfo_del     the delayed LFO output                      (LFO block)
- *   lfo_undel   the undelayed LFO output                    (LFO block)
- *   pitch_cv    the final pitch CV before the polynomial    (glide/portamento)
+ *   pitch_in    the PRE-glide pitch CV, the port's v28      (lines 564-681)
  *   kbd         key-follow amount for this voice            (key tracking)
  *   vel         velocity contribution                       (note handling)
  *   drive       the VCF drive / resonance compensation      (VCF CV remainder)
@@ -129,8 +150,7 @@ typedef struct {
  * When this struct is empty the function is the engine. */
 typedef struct {
     float gate;
-    float lfo_del, lfo_undel;
-    float pitch_cv;
+    float pitch_in;
     float kbd;
     float vel;
     float drive;

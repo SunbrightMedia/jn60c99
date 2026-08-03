@@ -1,6 +1,6 @@
 /* GENERATED FILE -- DO NOT EDIT.
  * tools/engineb/merge_shims.py built this from the individual shims:
- *     cvgate, dco, decim, env, noise_svf, pitch, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
+ *     cvgate, dco, decim, env, glide, lfo, noise_svf, pitch, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
  * Edit those, then re-run the generator (make engineb does it).
  * Its purpose: engine B cannot be tested as a WHOLE ENGINE while each
  * module shadows the same port file -- see docs/engineb/HARNESS_AUDIT.md
@@ -120,6 +120,68 @@ extern unsigned long eb_coef_gen;
 #define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
 #endif
      /* -I engine_b/ is supplied by the harness */
+
+/* ---- from shim 'glide' ---- */
+/* engine_b/shim/glide/voice_render.c — VERBATIM FORK of src/voice_render.c with
+ * ONE block replaced: portamento/glide + the pitch CV + the LFO rate and
+ * delay-envelope chain, lines 682-796, module engine_b/eb_glide.{h,c}.
+ */
+#include "eb_glide.h"
+#include <string.h>
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu).\n",              \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
+static eb_glide_coef  EBGC[8];
+static unsigned char  EBGHAVE[8];
+static unsigned long  EBGGEN_SEEN[8];
+
+/* ---- from shim 'lfo' ---- */
+/* engine_b/shim/lfo/voice_render.c — VERBATIM FORK of src/voice_render.c with
+ * ONE block replaced: the LFO, lines 797-963, which is module
+ * engine_b/eb_lfo.{h,c}. Diff this file against src/voice_render.c: that block
+ * and this preamble are the only changes, so a divergence under
+ * tools/engineb/null_b.py --module lfo is attributable to the LFO and to
+ * nothing else.
+ */
+#include "eb_lfo.h"
+#include <string.h>
+/* COEFFICIENT GENERATION GUARD -- see the note on eb_coef_gen in
+ * gui/juno_bridge.c and the identical preamble in the other shims. */
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu). The counter is "  \
+                     "missing a writer and the fast path is UNSOUND.\n",        \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
+static eb_lfo_coef   EBLC[8];
+static unsigned char EBLHAVE[8];
+static unsigned long EBLGEN_SEEN[8];
 
 /* ---- from shim 'noise_svf' ---- */
 /* SHIM — MODULE NOISE_SVF (engine_b/eb_noise_svf.{h,c}).
@@ -982,288 +1044,131 @@ LABEL_11:
   JF(a1, 496) = v34;
   v34 = v33;
   /* ==== END ENGINE B MODULE CVGATE ===================================== */
-  v35 = JF(a1, 608);
-  v36 = v34 + 1.0;
-  v37 = JF(a1, 768);
-  v38 = JF(a1, 624);
-  v39 = JI(a1, 560);
-  v40 = JF(a1, 704);
-  v41 = v38 + JF(a1, 784);
+  /* ============ ENGINE B MODULE M-GLIDE ==================================
+   * REPLACES src/voice_render.c:682-796 verbatim. State lives in the port's
+   * own cells (seven floats), as every other shim does.
+   *
+   * KEPT OUTSIDE THE MODULE, because the port hoisted them into this range but
+   * they belong to code after it: the constant v42 = 1.0, and the three
+   * external-LFO coefficient reads v60/v62/v64. They are plain cell reads, so
+   * reading them here is identical to reading them there.
+   *
+   * NOT written back: the ten dead stores 528/576/720/736/896/928/960/992/
+   * 1024/1120, grepped to have no reader in src/ or gui/.
+   */
   v42 = 1.0;
-  JF(a1, 528) = v36;
-  JF(a1, 560) = v36;
-  JI(a1, 576) = v39;
-  JF(a1, 720) = v40;
-  v43 = (float)(v36 * v35) - v35;
-  v44 = JF(a1, 816);
-  v45 = (float)(v43 + 1.0) * JF(a1, 592);
-  v46 = (float)(JF(a1, 672) / (float)((float)(v37 * v38) + JF(a1, 800))) * v37;
-  v47 = JF(a1, 656);
-  JF(a1, 736) = v45;
-  v48 = v47 - v46;
-  v49 = JF(a1, 688);
-  v50 = (float)(v48 + v28) - v40;
-  JF(a1, 656) = v50;
-  v51 = v50 * v41;
-  JF(a1, 672) = v51;
-  v52 = v51 + v40;
-  if ( (float)(v44 - fabs(v40 - v28)) < 0.0 )
-  {
-    v53 = 0.0;
-LABEL_25:
-    v54 = v53;
-    goto LABEL_26;
-  }
-  v53 = v49 + JF(a1, 832);
-  if ( v53 < 1.0 )
-    goto LABEL_25;
-  v54 = 1.0;
-LABEL_26:
-  v55 = v54;
-  JF(a1, 688) = v55;
-  v56 = (float)((float)(v55 * v28) - (float)(v55 * v52)) + v52;
-  if ( v45 == 0.0 )
-    v56 = v28;
-  v57 = v16 * JF(a1, 864);
-  JI(a1, 896) = JI(a1, 880);
-  v58 = JF(a1, 1168);
-  v59 = JF(a1, 912);
   v60 = JI(a1, 1008);
-  v61 = v57 + (float)(v14 * JF(a1, 848));
   v62 = JI(a1, 976);
-  v63 = (int)v58;
-  JF(a1, 880) = v61;
   v64 = JF(a1, 944);
-  JF(a1, 704) = v56;
-  JF(a1, 752) = v56;
-  v65 = JF(a1, 1104);
-  JF(a1, 960) = v64;
-  JF(a1, 928) = v59;
-  JI(a1, 992) = v62;
-  JI(a1, 1024) = v60;
-  JF(a1, 1120) = v65;
-  if ( (int)v58 < -32 )
   {
-    v59 = v59 * 2.3283064e-10;
-    goto LABEL_38;
+    eb_glide_state ebgs;
+
+    if (!EBGGEN_SEEN[voice] || EB_GEN_STALE(14, EBGGEN_SEEN[voice])) {
+      eb_glide_coef ebg;
+      int _ch;
+      ebg.k592  = JF(a1, 592);  ebg.k608  = JF(a1, 608);
+      ebg.k624  = JF(a1, 624);  ebg.k768  = JF(a1, 768);
+      ebg.k784  = JF(a1, 784);  ebg.k800  = JF(a1, 800);
+      ebg.k816  = JF(a1, 816);  ebg.k832  = JF(a1, 832);
+      ebg.k848  = JF(a1, 848);  ebg.k864  = JF(a1, 864);
+      ebg.k912  = JF(a1, 912);  ebg.k1040 = JF(a1, 1040);
+      ebg.k1088 = JF(a1, 1088); ebg.k1152 = JF(a1, 1152);
+      ebg.k1168 = JF(a1, 1168);
+      _ch = !EBGHAVE[voice] || memcmp(&EBGC[voice], &ebg, sizeof ebg) != 0;
+      EB_GEN_CHECK(14, EBGGEN_SEEN[voice], _ch, "glide");
+      if (_ch) { EBGC[voice] = ebg; EBGHAVE[voice] = 1; }
+    }
+
+    ebgs.s560  = JF(a1, 560);  ebgs.s656  = JF(a1, 656);
+    ebgs.s672  = JF(a1, 672);  ebgs.s688  = JF(a1, 688);
+    ebgs.s704  = JF(a1, 704);  ebgs.s880  = JF(a1, 880);
+    ebgs.s1104 = JF(a1, 1104);
+
+    {
+      float eb752;
+      v73 = eb_glide_tick(&ebgs, &EBGC[voice], v34, v14, v16, v28, &eb752);
+      JF(a1, 752) = eb752;
+    }
+
+    JF(a1, 560)  = ebgs.s560;  JF(a1, 656)  = ebgs.s656;
+    JF(a1, 672)  = ebgs.s672;  JF(a1, 688)  = ebgs.s688;
+    JF(a1, 704)  = ebgs.s704;  JF(a1, 880)  = ebgs.s880;
+    JF(a1, 1104) = ebgs.s1104;
   }
-  if ( v63 > 32 )
+
+  /* ============ ENGINE B MODULE M-LFO — the LFO ==========================
+   * REPLACES src/voice_render.c:797-963 verbatim.
+   *
+   * STATE LIVES IN THE PORT'S OWN CELLS, as every other shim does: the
+   * module's FIVE state floats are loaded from [1488]/[1504]/[1536]/[1568]/
+   * [1600] at the top and stored back at the bottom, so it inherits the port's
+   * create/destroy/eight-voice lifecycle. That copying and the coefficient
+   * gather are HARNESS cost.
+   *
+   * The three int-copied cells are passed as FLOATS: the port does
+   * `JI(dst)=JI(src)` then reads `JF(dst)`, which is a reinterpret and is
+   * therefore exactly the float at `src`. See eb_lfo.h.
+   *
+   * NOT written back: the seven dead stores 1136/1520/1648/1664/1744/1776/
+   * 1840, grepped to have no reader in src/ or gui/ (master_render.c's
+   * pointer-arithmetic forms included).
+   */
   {
-    v63 = 32;
-LABEL_37:
-    v59 = v59 * juno_exp_ad3c[v63];
-    goto LABEL_38;
+    eb_lfo_state ebls;
+    float eb1808, eb1824;
+
+    if (!EBLGEN_SEEN[voice] || EB_GEN_STALE(13, EBLGEN_SEEN[voice])) {
+      eb_lfo_coef ebl;
+      int _ch;
+      ebl.k1056 = JF(a1, 1056); ebl.k1072 = JF(a1, 1072);
+      ebl.k1184 = JF(a1, 1184); ebl.k1200 = JF(a1, 1200);
+      ebl.k1216 = JF(a1, 1216); ebl.k1856 = JF(a1, 1856);
+      ebl.k1872 = JF(a1, 1872); ebl.k1888 = JF(a1, 1888);
+      ebl.k1904 = JF(a1, 1904); ebl.k1920 = JF(a1, 1920);
+      ebl.k1936 = JF(a1, 1936); ebl.k1952 = JF(a1, 1952);
+      ebl.k1968 = JF(a1, 1968); ebl.k1984 = JF(a1, 1984);
+      ebl.k2000 = JF(a1, 2000); ebl.k2016 = JF(a1, 2016);
+      ebl.k2032 = JF(a1, 2032); ebl.k2048 = JF(a1, 2048);
+      ebl.k2064 = JF(a1, 2064); ebl.k2080 = JF(a1, 2080);
+      ebl.k2096 = JF(a1, 2096); ebl.k2112 = JF(a1, 2112);
+      ebl.k2128 = JF(a1, 2128); ebl.k2144 = JF(a1, 2144);
+      ebl.k2160 = JF(a1, 2160); ebl.k2176 = JF(a1, 2176);
+      ebl.k2192 = JF(a1, 2192); ebl.k2208 = JF(a1, 2208);
+      ebl.k2224 = JF(a1, 2224); ebl.k2240 = JF(a1, 2240);
+      ebl.k2256 = JF(a1, 2256); ebl.k2272 = JF(a1, 2272);
+      ebl.k2288 = JF(a1, 2288); ebl.k2304 = JF(a1, 2304);
+      ebl.k2320 = JF(a1, 2320); ebl.k2336 = JF(a1, 2336);
+      ebl.k2352 = JF(a1, 2352); ebl.k2368 = JF(a1, 2368);
+      ebl.k2384 = JF(a1, 2384); ebl.k2400 = JF(a1, 2400);
+      ebl.k2416 = JF(a1, 2416); ebl.k2432 = JF(a1, 2432);
+      ebl.k2448 = JF(a1, 2448); ebl.k2464 = JF(a1, 2464);
+      ebl.k2480 = JF(a1, 2480); ebl.k2496 = JF(a1, 2496);
+      ebl.k2512 = JF(a1, 2512);
+      _ch = !EBLHAVE[voice] || memcmp(&EBLC[voice], &ebl, sizeof ebl) != 0;
+      EB_GEN_CHECK(13, EBLGEN_SEEN[voice], _ch, "lfo");
+      if (_ch) { EBLC[voice] = ebl; EBLHAVE[voice] = 1; }
+    }
+
+    ebls.s1488 = JF(a1, 1488);
+    ebls.s1504 = JF(a1, 1504);
+    ebls.s1536 = JF(a1, 1536);
+    ebls.s1568 = JF(a1, 1568);
+    ebls.s1600 = JF(a1, 1600);
+
+    JF(a1, 1792) = eb_lfo_tick(&ebls, &EBLC[voice],
+                               v73, v64,
+                               JF(a1, 976), JF(a1, 1008), JF(base, 84432),
+                               &eb1808, &eb1824);
+    JF(a1, 1808) = eb1808;
+    JF(a1, 1824) = eb1824;
+
+    JF(a1, 1488) = ebls.s1488;
+    JF(a1, 1504) = ebls.s1504;
+    JF(a1, 1536) = ebls.s1536;
+    JF(a1, 1568) = ebls.s1568;
+    JF(a1, 1600) = ebls.s1600;
   }
-  if ( v63 < 0 )
-  {
-    v59 = v59 * juno_exp_acc0[~v63];
-    goto LABEL_38;
-  }
-  if ( v63 > 0 )
-    goto LABEL_37;
-LABEL_38:
-  v66 = (int)(float)-v58;
-  if ( v66 < -32 )
-  {
-    v59 = v59 * 2.3283064e-10;
-    goto LABEL_46;
-  }
-  if ( v66 > 32 )
-  {
-    v66 = 32;
-LABEL_45:
-    v59 = v59 * juno_exp_ad3c[v66];
-    goto LABEL_46;
-  }
-  if ( v66 < 0 )
-  {
-    v59 = v59 * juno_exp_acc0[~v66];
-    goto LABEL_46;
-  }
-  if ( v66 > 0 )
-    goto LABEL_45;
-LABEL_46:
-  v67 = JF(a1, 1040);
-  v68 = (float)((float)(v59 - v65) * JF(a1, 1152)) + v65;
-  v69 = JF(a1, 1088);
-  JF(a1, 1104) = v68;
-  v70 = (float)((float)(v68 * v67) - (float)(v67 * v69)) + v69;
-  if ( v70 <= 0.0 )
-    v71 = 0.0;
-  else
-    v71 = v70;
-  v72 = v71;
-  if ( v72 < 1.0 )
-    v73 = v72;
-  else
-    v73 = 1.0;
-  v74 = JF(a1, 1056);
-  v75 = expf((float)v73 * JF(a1, 1200)) * JF(a1, 1184);
-  v76 = v74 * JF(a1, 1072);
-  JI(a1, 1584) = JI(a1, 1568);
-  v77 = v75 + JF(a1, 1216);
-  v78 = JF(a1, 1504);
-  v79 = v64 * JF(a1, 1904);
-  JI(a1, 1616) = JI(a1, 1600);
-  v80 = JF(a1, 1488);
-  v81 = JF(a1, 1536);
-  JI(a1, 1648) = JI(a1, 1632);
-  v82 = JI(base, 84432);
-  JF(a1, 1520) = v78;
-  JF(a1, 1504) = v80;
-  JF(a1, 1552) = v81;
-  JI(a1, 1440) = v62;
-  JI(a1, 1456) = v60;
-  JI(a1, 1424) = v82;
-  v83 = (float)(v76 - (float)(v74 * v77)) + v77;
-  v84 = JF(a1, 1856);
-  v85 = v79 + v84;
-  JF(a1, 1840) = v84;
-  JF(a1, 1136) = v83;
-  if ( v85 >= -1.0 )
-    v86 = fminf(v85, 1.0);
-  else
-    v86 = -1.0;
-  v87 = JF(a1, 2128);
-  JF(a1, 1488) = v86;
-  v88 = fminf(v87, v83 * 0.000015258789);
-  v89 = (float)((float)(1.0 - v78) * JF(a1, 1920)) + v78;
-  if ( v89 >= -1.0 )
-    v90 = fminf(v89, 1.0);
-  else
-    v90 = -1.0;
-  v91 = v88 * JF(a1, 2144);
-  v92 = v80 - v86;
-  JF(a1, 1664) = v91;
-  v93 = v91 + v81;
-  if ( v92 < 0.0 )
-    v90 = 0.0;
-  v94 = JF(a1, 1872);
-  v95 = JF(a1, 1424);
-  JF(a1, 1504) = v90;
-  v96 = v90 + JF(a1, 2272);
-  if ( v92 >= 0.0 )
-    v94 = 1.0;
-  v97 = v96 * JF(a1, 2256);
-  v98 = (float)(v93 * v94) * JF(a1, 1888);
-  if ( v97 <= 0.0 )
-    v99 = 0.0;
-  else
-    v99 = v97;
-  v100 = v99;
-  v101 = (float)((float)(v95 - JF(a1, 1584)) * JF(a1, 2464)) + JF(a1, 1584);
-  JF(a1, 1568) = v101;
-  JF(a1, 1472) = v100;
-  v529 = JF(a1, 1552);
-  v102 = (float)((float)((float)(v101 * JF(a1, 2448)) * JF(a1, 2064))
-               - (float)(v95 * JF(a1, 2064)))
-       + v95;
-  if ( v98 <= 1.0 )
-  {
-    if ( v98 < -1.0 )
-      v98 = fmodf(v98 - 1.0, 2.0) + 1.0;
-  }
-  else
-  {
-    v98 = fmodf(v98 + 1.0, 2.0) - 1.0;
-  }
-  v103 = JF(a1, 1616);
-  JF(a1, 1536) = v98;
-  v104 = v98 + JF(a1, 2288);
-  JF(a1, 1408) = v102 * JF(a1, 2432);
-  if ( v529 < 0.0 && v98 > 0.0 )
-    v103 = v95;
-  if ( v104 <= 1.0 )
-  {
-    if ( v104 < -1.0 )
-      v104 = fmodf(v104 - 1.0, 2.0) + 1.0;
-  }
-  else
-  {
-    v104 = fmodf(v104 + 1.0, 2.0) - 1.0;
-  }
-  JF(a1, 1600) = v103;
-  v105 = v103 * JF(a1, 2416);
-  v106 = (float)(v104 * JF(a1, 2352)) + JF(a1, 2480);
-  JF(a1, 1680) = v106;
-  JF(a1, 1760) = v105;
-  v107 = v98 + JF(a1, 2320);
-  JF(a1, 1696) = -v106;
-  if ( v107 <= 1.0 )
-  {
-    if ( v107 < -1.0 )
-      fmodf(v107 - 1.0, 2.0);
-  }
-  else
-  {
-    fmodf(v107 + 1.0, 2.0);
-  }
-  /* v107 (= v98 + cell2320) is the sub-osc TRIANGLE phase; its wrap is folded
-   * into juno_triangle below (the decompiler dropped the sub_180368FC0 argument,
-   * so an earlier transcription mis-fed v108 here — masked in recalled notes,
-   * where cells 2304 and 2320 coincide, but wrong for the free-running idle phase,
-   * where they differ by −0.5 and produced a half-cycle sub-osc error). v108
-   * (= v98 + cell2304) remains the PULSE phase used for v110. See
-   * dsp_dump/0021 lines 860-883 + docs/PHASE1_WARM_RECALL.md. */
-  v108 = v98 + JF(a1, 2304);
-  if ( v108 <= 1.0 )
-  {
-    if ( v108 < -1.0 )
-      v108 = fmodf(v108 - 1.0, 2.0) + 1.0;
-  }
-  else
-  {
-    v108 = fmodf(v108 + 1.0, 2.0) - 1.0;
-  }
-  v109 = juno_triangle(v107);
-  v110 = v108 + JF(a1, 2496);
-  v111 = v109 * JF(a1, 2384);
-  if ( v110 >= 0.0 )
-  {
-    if ( v110 > 0.0 )
-      v110 = 1.0;
-  }
-  else
-  {
-    v110 = -1.0;
-  }
-  v112 = v98 + JF(a1, 2336);
-  JF(a1, 1728) = v111;
-  JF(a1, 1824) = v110;
-  v113 = (float)(v110 * JF(a1, 2368)) + JF(a1, 2512);
-  if ( v112 <= 1.0 )
-  {
-    if ( v112 < -1.0 )
-      v112 = fmodf(v112 - 1.0, 2.0) + 1.0;
-  }
-  else
-  {
-    v112 = fmodf(v112 + 1.0, 2.0) - 1.0;
-  }
-  v114 = fabs(v112);
-  JF(a1, 1712) = v113;
-  v115 = JF(a1, 1968);
-  v116 = (float)((float)(JF(a1, 2032) * JF(a1, 1760))
-               + (float)(JF(a1, 2000) * JF(a1, 1680)))
-       + (float)(JF(a1, 2016) * JF(a1, 1696));
-  v117 = (float)((float)((float)((float)(v114 * (float)((float)(v114 * v114) * v114)) * JF(a1, 2224))
-                       + (float)((float)((float)((float)(v114 * v114) * v114) * JF(a1, 2208))
-                               + (float)((float)((float)(v114 * JF(a1, 2176)) + JF(a1, 2160))
-                                       + (float)((float)(v114 * v114) * JF(a1, 2192)))))
-               + JF(a1, 2240))
-       * JF(a1, 2400);
-  JF(a1, 1744) = v117;
-  v118 = (float)(v115 * JF(a1, 1728)) + v116;
-  v119 = JF(a1, 2080);
-  v120 = (float)((float)(JF(a1, 1936) * JF(a1, 1472)) - JF(a1, 1936)) + 1.0;
-  v121 = (float)((float)(v118 + (float)(JF(a1, 1984) * JF(a1, 1712)))
-               + (float)(v117 * JF(a1, 1952)))
-       + (float)(JF(a1, 2048) * JF(a1, 1408));
-  JF(a1, 1776) = v120;
-  JF(a1, 1808) = v121;
-  JF(a1, 1792) = (float)((float)(JF(a1, 2096) * JF(a1, 1440))
-                                + (float)(JF(a1, 2112) * JF(a1, 1456)))
-                        + (float)((float)(v119 * v120) * v121);
+
   /* ================= ENGINE B MODULE M7 — the two ADSR envelopes ==========
    * REPLACES src/voice_render.c:964-1075 verbatim. Diff this file against
    * src/voice_render.c: this block is the ONLY change, plus the include above.
