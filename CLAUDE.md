@@ -2,6 +2,25 @@
 
 # JUNO-60 (JU-06A) C99 port — project memory
 
+**⚑⚑⚑ LIVE WORK ORDER (2026-08-04, USER-BINDING, supersedes all prior engine B
+sequencing): `docs/engineb/PHASE1_ORDERS.md`.** The user has decided the
+strategy: **the TRUNK is the full EXACT engine B — the splitting point for
+every microcontroller (and future project-ssx synths); targets are FORKS by
+build flags.** Phase 1 (Opus): step 2 (coef constructor + the standalone
+engine gate), C5 fusion (EXACT only), the METHOD PLAYBOOK (user requires the
+making to be portable), certification sweep. NO approximations in the trunk —
+C2 moved OUT of trunk work (it is a −100 dB candidate, my earlier phase
+assignment was wrong). Phase 2 (Fable, S3 fork): recentered pitch with a
+0.05-CENT exhaustive gate (the plugin's own numerical noise bound, ~1000×
+below its own 18.2-cent UNISON scatter — `data/pitch_cents_study.md`;
+NAIVE float is measured DEAD: up to 2.7 OCTAVES wrong), LFO-rate ppm gate,
+C4 fixed-point+SIMD, 6 voices @48 kHz as build constants; global-LFO only if
+the hardware fact is verified AND silicon still needs it; reserve dials:
+44.1 kHz, half-oversampling. Phase 3: Teensy fork, full standard. **The S3
+verdict that forced this: full-standard 8-voice S3 is IMPOSSIBLE (pitch alone
+= 2–3 budgets, irreducibility proven twice); the reporting lesson — when the
+numbers say a goal is probably unreachable, that sentence goes FIRST.**
+
 **★★★★★★★★★★★★★ NEWEST (2026-08-04, Fable 5) — P8 C1 EXECUTED TO ITS END:
 DEAD, AND IT UNCOVERED THE LAW THAT STEERS EVERYTHING LEFT. Read
 `docs/engineb/data/pitch_p2_study.md` §6.**
