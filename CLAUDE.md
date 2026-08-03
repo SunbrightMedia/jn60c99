@@ -27,10 +27,28 @@ CORRECTED. Read `docs/engineb/S3_ASSESSMENT.md` FIRST; it supersedes the
   residuals = the error was a distributed 1-ULP carpet; v7 = error-free
   product lo-paths + compensated accumulator) is in
   `docs/engineb/data/pitch_precision_null.md` with the reproducible probe.
-  **OWED NEXT: hoist the df_coef split** (13 `__subdf3`/call remain on S3,
-  ~800–900 instr/call vs double's 3,419; needs the ROW at the eval call —
-  API change — because `juno_pitch_table` is `static` per TU), re-gate both
-  builds, re-measure in the QEMU harness with `-DEB_PITCH_FAST=1`.
+  **THE HOIST IS DONE (2026-08-03, Opus 5) — and the saving is 22 %, not the
+  ~65 % this file used to imply. See `docs/engineb/data/pitch_hoist_result.md`.**
+  API is now `eb_pitch_eval(cv, gain)` (the module reads its own row);
+  `engine_b/eb_pitch_tab.h` is the generated build-time split, CHECKED against
+  `df_coef` by `test_pitch_tab` (0 of 377 pairs differ). S3 census: NO
+  soft-double on the per-sample path. All gates re-PROVEN (default EXACTLY 0;
+  fast −123.6 dB, bit-identical to before the hoist; whole engine EXACTLY 0;
+  11/11 vs the PLUGIN at 48k; 7/7 unit tests).
+  **THE CORRECTION THAT MATTERS: removing soft-double does NOT remove the
+  cost.** STATIC per call: double ~4,450 (230 body + 4,228 helpers), fast
+  ~3,126 (324 body + 2,802 df helpers). Per sample 27,351 → ~21,300. Whole
+  chain ~71,000 → **~65,000 vs ~9,500 two-core = ~6.8× over**, not ~4.6×.
+  WHY, MEASURED: `always_inline` on the df helpers is WORSE (3,452 vs 3,126);
+  the inlined mix is 1,254 `lsi` + 423 `ssi` — **1,677 of 3,452 instructions
+  are float SPILLS**. The LX7 has 16 float registers and compensated
+  double-float keeps more live than that. Left as calls on purpose.
+  **NEXT IDEA (hypothesis, not a plan): move the precision to the DCO's PHASE
+  ACCUMULATOR, not the polynomial.** The −100 dB failure was a pitch error
+  INTEGRATING in phase; plain-float pitch failed only through that. One
+  compensated add per sub-sample may buy what a whole compensated 13-term
+  polynomial per sample is buying now. Build it and gate it like everything
+  else.
 - **THE QEMU HARNESS RAN — first executed-Xtensa numbers exist**
   (`docs/engineb/data/qemu_instr_counts.md`; raw log + harness committed in
   `tools/engineb/qemu/`; QEMU binary in the scratchpad, re-download recipe in
@@ -40,8 +58,16 @@ CORRECTED. Read `docs/engineb/S3_ASSESSMENT.md` FIRST; it supersedes the
   functions). MEASURED: whole chain 71,051 instr/sample; pitch-double
   27,351 (validates the model); dco_step4 17,581 (worst-case-ish — synthetic
   levels defeat the saturator shortcut; replay a REAL scenario to bound it);
-  ladder 8,850; ALL FX only 1,635. vs 9,500 two-core budget: 7.5× today,
-  ~4.6× after the pitch fix. Instructions ≠ cycles; c/i ≥ 1 on top.
+  ladder 8,850; ALL FX only 1,635. vs 9,500 two-core budget: 7.5× today.
+  Instructions ≠ cycles; c/i ≥ 1 on top.
+  **⚠ THE PER-CALL FIGURES IN THAT TABLE ARE NOT TRUSTWORTHY (found 2026-08-03).**
+  Two harness runs differing ONLY in `EB_PITCH_FAST` disagree by exactly
+  500,000/1,000,000 raw counter units on UNCHANGED functions (chorus 302,276 vs
+  1,302,275). CCOUNT advances 25 at a time at translation-block boundaries, so
+  short spans sample the quantisation systematically and a code-layout change
+  moves it. `sample_total` (~70,000-instruction span) is still sound; for
+  per-function cost use STATIC `objdump` counts, which is what
+  `pitch_hoist_result.md` does.
 - **Ranked plan (S3_ASSESSMENT §5): pitch v3 → QEMU measurement → EB_DCO_RECIP
   (MEASURED −121 dB, passes the −100 gate) → VCF reciprocal → inline clamps →
   blockwise structure → two-core split → silicon → memory plan (256 KB delay
