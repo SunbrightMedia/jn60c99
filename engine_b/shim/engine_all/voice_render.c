@@ -1839,8 +1839,7 @@ LABEL_46:
   /* ==== ENGINE B MODULE PITCH ========================================== */
   {
     float _cv = JF(a1, 4448) + JF(a1, 3776);
-    v391 = eb_pitch_eval(_cv, juno_pitch_table[eb_pitch_row(_cv)],
-                         JF(a1, 3792));
+    v391 = eb_pitch_eval(_cv, JF(a1, 3792));
   }
   JF(a1, 4416) = v391;
   /* ==== END ENGINE B MODULE PITCH ====================================== */

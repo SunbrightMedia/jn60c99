@@ -336,10 +336,9 @@ static void run_sample(long i, int measure)
         if ((lnext() & 63u) == 0u) cv += (lnext() & 1u) ? 40.0f : -40.0f;
         if (measure)
             MEAS(R_PITCH,
-                 pev = eb_pitch_eval(cv, juno_pitch_table[eb_pitch_row(cv)],
-                                     1.0f));
+                 pev = eb_pitch_eval(cv, 1.0f));
         else
-            pev = eb_pitch_eval(cv, juno_pitch_table[eb_pitch_row(cv)], 1.0f);
+            pev = eb_pitch_eval(cv, 1.0f);
         rsink[R_PITCH] += pev;
 
         if (measure)

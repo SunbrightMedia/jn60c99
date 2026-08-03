@@ -186,7 +186,7 @@ int main(int argc, char **argv)
             eb_modcv_latch(&s->mod, pwm);
 
             cv = pit + 0.01f * (float)v;
-            (void)eb_pitch_eval(cv, juno_pitch_table[eb_pitch_row(cv)], 1.0f);
+            (void)eb_pitch_eval(cv, 1.0f);
 
             cut = eb_vcf_cv_tick(&s->cv, &CD[v], pit, pwm, 0.1f, 0.2f, e1, e2,
                                  &o6704, &o6848);

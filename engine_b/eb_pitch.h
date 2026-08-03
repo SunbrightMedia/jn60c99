@@ -28,11 +28,23 @@
 #ifndef ENGINEB_EB_PITCH_H
 #define ENGINEB_EB_PITCH_H
 
-/* `tab` is the port's juno_pitch_table row (26 doubles; even indices used).
- * `cv` is the port's JF(4448) + JF(3776); `gain` is its cell 3792.
- * The caller selects the row, because the row index is (int)(clamped + 20.0)
- * and the clamp happens here -- see eb_pitch_row(). */
+/* THE MODULE OWNS THE TABLE. `cv` is the port's JF(4448) + JF(3776); `gain` is
+ * its cell 3792. The row is selected inside, from the same clamp the port uses.
+ *
+ * The row pointer used to be a parameter, and that was the one thing blocking
+ * the EB_PITCH_FAST build from being float-only on the ESP32-S3: a pointer to
+ * a row cannot be turned back into a row INDEX (`juno_pitch_table` is `static`
+ * per translation unit), so the pre-split coefficient table could not be
+ * indexed and the split had to run per call in soft-double. Taking the CV
+ * instead costs nothing and removes 13 `__subdf3` per call from the S3's
+ * per-sample path. */
 int   eb_pitch_row(float cv);
-float eb_pitch_eval(float cv, const double *tab, float gain);
+float eb_pitch_eval(float cv, float gain);
+
+#if EB_PITCH_FAST
+/* 0 if the generated pre-split table matches df_coef bit for bit on all
+ * 29x13 entries. Only exists in the fast build; see eb_pitch.c. */
+int   eb_pitch_tab_selfcheck(void);
+#endif
 
 #endif /* ENGINEB_EB_PITCH_H */

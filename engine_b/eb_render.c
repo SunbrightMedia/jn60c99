@@ -69,7 +69,7 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
                       n->lfo_del, n->lfo_undel, e1, e2, &pit, &pwm);
         eb_modcv_latch(&st->mod[v], pwm);
 
-        cv = eb_pitch_eval(pit, juno_pitch_table[eb_pitch_row(pit)], 1.0f);
+        cv = eb_pitch_eval(pit, 1.0f);
 
         cut = eb_vcf_cv_tick(&st->cv[v], &c->cv[v], pit, pwm,
                              n->lfo_del, n->lfo_undel, e1, e2, &o6704, &o6848);

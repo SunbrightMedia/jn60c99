@@ -1,6 +1,7 @@
 /* eb_pitch.c — see eb_pitch.h. Double precision throughout until the final
  * fminf/fmaxf, exactly as the port. */
 #include "eb_pitch.h"
+#include "juno_tables.h"
 #include <math.h>
 
 /* ------------------------------------------------- THE ONE OPTIONAL INEXACTNESS
@@ -34,6 +35,16 @@
 #endif
 
 #if EB_PITCH_FAST
+#include "eb_pitch_tab.h"
+
+/* NOT INLINED, AND THAT IS MEASURED, NOT AN OVERSIGHT. Forcing
+ * always_inline on the df helpers makes this function WORSE on the S3:
+ * 3,452 static instructions inlined against 3,126 as calls. The reason is in
+ * the mnemonic mix of the inlined build -- 1,254 `lsi` plus 423 `ssi`, i.e.
+ * 1,677 of 3,452 instructions are float loads and stores. The LX7 has 16
+ * float registers; the compensated double-float arithmetic keeps far more
+ * values live than that, so inlining converts call overhead into spill
+ * traffic and loses. Left as calls deliberately. */
 typedef struct { float hi, lo; } df;
 
 /* Knuth TwoSum: a + b = s + e exactly. */
@@ -96,10 +107,19 @@ static df df_mulf(df a, float b)
     return two_sum(r.hi, r.lo);
 }
 
+/* the pre-split coefficient for term k of the selected row */
+static df ebpf_c(const float *ch, const float *cl, int k)
+{
+    df r; r.hi = ch[k]; r.lo = cl[k]; return r;
+}
+
 static df df_from(float x) { df r; r.hi = x; r.lo = 0.0f; return r; }
 
-/* Split a double coefficient into a df pair (exact; see the note above
- * eb_pitch_eval about hoisting this off the per-sample path). */
+/* Split a double coefficient into a df pair. NO LONGER ON THE PER-SAMPLE PATH:
+ * eb_pitch_tab.h carries the same split as build-time constants. It is kept
+ * because engine_b/tests/test_pitch_tab.c re-derives every generated pair with
+ * THIS function and requires bit equality -- the generated table is checked
+ * against the arithmetic it claims to replace, not trusted. */
 static df df_coef(double v)
 {
     df r;
@@ -137,8 +157,10 @@ static acc3 acc_add(acc3 A, df t)
     return out;
 }
 
-static float ebpf_eval(float cv, const double *tab, float gain)
+static float ebpf_eval_row(float cv, int row, float gain)
 {
+    const float *ch = eb_pitch_hi[row];
+    const float *cl = eb_pitch_lo[row];
     float x = ebpf_clamp(cv);
     df dx   = df_from(x);
     df x3   = df_mulf(df_mulf(dx, x), x);         /* v386 */
@@ -147,20 +169,20 @@ static float ebpf_eval(float cv, const double *tab, float gain)
     df x10  = df_mulf(df_mulf(x8, x), x);         /* v390 */
 
     acc3 A;
-    A.s = df_mulf(df_coef(tab[2]), x);
+    A.s = df_mulf(ebpf_c(ch, cl, 1), x);
     A.c = 0.0f;
-    A = acc_add(A, df_coef(tab[0]));
-    A = acc_add(A, df_mulf(df_mulf(df_coef(tab[4]), x), x));
-    A = acc_add(A, df_mul(x3, df_coef(tab[6])));
-    A = acc_add(A, df_mul(df_mulf(x3, x), df_coef(tab[8])));
-    A = acc_add(A, df_mul(x5, df_coef(tab[10])));
-    A = acc_add(A, df_mul(df_mulf(x5, x), df_coef(tab[12])));
-    A = acc_add(A, df_mul(df_mulf(df_mulf(x5, x), x), df_coef(tab[14])));
-    A = acc_add(A, df_mul(x8, df_coef(tab[16])));
-    A = acc_add(A, df_mul(df_mulf(x8, x), df_coef(tab[18])));
-    A = acc_add(A, df_mul(x10, df_coef(tab[20])));
-    A = acc_add(A, df_mul(df_mulf(x10, x), df_coef(tab[22])));
-    A = acc_add(A, df_mul(df_mulf(df_mulf(x10, x), x), df_coef(tab[24])));
+    A = acc_add(A, ebpf_c(ch, cl, 0));
+    A = acc_add(A, df_mulf(df_mulf(ebpf_c(ch, cl, 2), x), x));
+    A = acc_add(A, df_mul(x3, ebpf_c(ch, cl, 3)));
+    A = acc_add(A, df_mul(df_mulf(x3, x), ebpf_c(ch, cl, 4)));
+    A = acc_add(A, df_mul(x5, ebpf_c(ch, cl, 5)));
+    A = acc_add(A, df_mul(df_mulf(x5, x), ebpf_c(ch, cl, 6)));
+    A = acc_add(A, df_mul(df_mulf(df_mulf(x5, x), x), ebpf_c(ch, cl, 7)));
+    A = acc_add(A, df_mul(x8, ebpf_c(ch, cl, 8)));
+    A = acc_add(A, df_mul(df_mulf(x8, x), ebpf_c(ch, cl, 9)));
+    A = acc_add(A, df_mul(x10, ebpf_c(ch, cl, 10)));
+    A = acc_add(A, df_mul(df_mulf(x10, x), ebpf_c(ch, cl, 11)));
+    A = acc_add(A, df_mul(df_mulf(df_mulf(x10, x), x), ebpf_c(ch, cl, 12)));
 
     {
         /* best-effort correctly-rounded collapse of (hi, lo, c) to one float */
@@ -172,18 +194,34 @@ static float ebpf_eval(float cv, const double *tab, float gain)
 }
 
 
-/* STILL OWED for the S3 build (stated, not hidden): the per-term df_coef
- * split above converts the double coefficients at USE -- 13 __subdf3 + 26
- * conversions per call on the S3, roughly 800-900 instructions. That is 4x
- * cheaper than the 3,419 the full double eval costs, but the float-only goal
- * needs the split HOISTED to a pre-split static table. That needs the row
- * index at the eb_pitch_eval call (the API passes a row POINTER, and
- * juno_pitch_table is `static` per translation unit, so pointer arithmetic
- * cannot recover the row across TUs). API change + re-gate = a follow-up
- * step, measured like everything else. */
-float eb_pitch_eval(float cv, const double *tab, float gain)
+/* THE SPLIT IS HOISTED (2026-08-03). It used to happen at USE: 13 __subdf3
+ * plus 26 conversions per call on the S3, on the per-sample path, 8 times a
+ * sample. eb_pitch_tab.h now carries the same two floats as build-time
+ * constants, so this path executes NO double arithmetic at all. The API change
+ * that made it possible: eb_pitch_eval takes the CV and reads its own row,
+ * instead of being handed a row pointer it could not turn back into an index
+ * (juno_pitch_table is `static` per translation unit). */
+/* THE GENERATED TABLE IS CHECKED, NOT TRUSTED. Re-derives every one of the
+ * 29x13 pre-split pairs with df_coef -- the arithmetic eb_pitch_tab.h claims to
+ * replace -- and returns the number of pairs that do not match BIT FOR BIT.
+ * Must be 0. engine_b/tests/test_pitch_tab.c calls it; if the table is ever
+ * regenerated from a changed juno_pitch_table and drifts, that test goes red
+ * instead of the engine going quietly wrong. */
+int eb_pitch_tab_selfcheck(void)
 {
-    return ebpf_eval(cv, tab, gain);
+    int r, k, bad = 0;
+    for (r = 0; r < EB_PITCH_ROWS; ++r)
+        for (k = 0; k < EB_PITCH_TERMS; ++k) {
+            df want = df_coef(juno_pitch_table[r][2 * k]);
+            if (want.hi != eb_pitch_hi[r][k] || want.lo != eb_pitch_lo[r][k])
+                ++bad;
+        }
+    return bad;
+}
+
+float eb_pitch_eval(float cv, float gain)
+{
+    return ebpf_eval_row(cv, ebpf_row(cv), gain);
 }
 
 int eb_pitch_row(float cv)
@@ -205,8 +243,12 @@ int eb_pitch_row(float cv)
     return (int)(eb_pitch_clamp(cv) + 20.0);
 }
 
-float eb_pitch_eval(float cv, const double *tab, float gain)
+float eb_pitch_eval(float cv, float gain)
 {
+    /* The module reads its own row -- see the header. juno_pitch_table is
+     * header-static, so this is the same constant data the caller used to pass
+     * in, indexed by the same clamp. Bit-identical, one parameter fewer. */
+    const double *tab = juno_pitch_table[eb_pitch_row(cv)];
     double x   = eb_pitch_clamp(cv);
     double x3  = x * x * x;                 /* v386 */
     double x5  = x3 * x * x;                /* v388 */

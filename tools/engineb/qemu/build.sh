@@ -27,8 +27,15 @@ MODS="engine_b/eb_envgen.c engine_b/eb_pwm_cv.c engine_b/eb_vcf_cv.c \
       engine_b/eb_decim.c engine_b/eb_noise_svf.c engine_b/eb_pitch.c \
       engine_b/eb_cvgate.c engine_b/eb_chorus.c engine_b/eb_delay.c \
       engine_b/eb_reverb.c"
+# EB_PITCH_FAST: pass 1 to measure the SHIPPING S3 pitch path (double-float,
+# pre-split table, no soft-double); omit for the bit-exact double path. Both
+# are gated at -100 dB; this switch only chooses which one is timed.
+#   tools/engineb/qemu/build.sh            -> double pitch (the old number)
+#   EB_PITCH_FAST=1 tools/engineb/qemu/build.sh  -> the S3 build
+PITCHDEF=""
+[ -n "$EB_PITCH_FAST" ] && PITCHDEF="-DEB_PITCH_FAST=1"
 CFLAGS="-std=c99 -O2 -ffp-contract=off -fno-strict-aliasing \
-        -Iengine_b -Isrc -I$QDIR -DEB_DELAY_LEN=32768"
+        -Iengine_b -Isrc -I$QDIR -DEB_DELAY_LEN=32768 $PITCHDEF"
 
 if [ "$1" = "host" ]; then
     gcc $CFLAGS -DEB_HOST -o "$QDIR/harness_host" "$QDIR/harness.c" $MODS -lm

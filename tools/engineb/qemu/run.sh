@@ -2,8 +2,17 @@
 # run.sh -- run harness.elf under Espressif QEMU (esp32s3) with icount and
 # parse the printed table into per-call / per-sample instruction counts.
 #
-# Under -icount shift=0 the CCOUNT special register advances once per executed
-# instruction, so every figure is 'QEMU-executed instructions', NOT cycles.
+# THE COUNTER SCALE. Under -icount shift=0 virtual time advances 1 ns per
+# executed instruction, and this machine's CPU clock is modeled at 40 MHz, so
+# CCOUNT advances once per 25 INSTRUCTIONS -- not once per instruction, which
+# harness.c's own comment claims and which is WRONG. Evidence, both re-checked
+# by this script on every run:
+#   * the CAL region measures an empty rsr..rsr span at ~0.04 ticks. At one
+#     tick per instruction an empty span could not read below 1.
+#   * CHECK below compares four branch-light functions against their STATIC
+#     instruction counts from the ELF. They agree within call overhead only if
+#     the scale is 25.
+# If a future QEMU build changes the modeled clock, CHECK goes loud.
 set -e
 cd "$(dirname "$0")/../../.."          # repo root
 
@@ -33,8 +42,10 @@ txt = open(sys.argv[1]).read()
 reg = {}
 for m in re.finditer(r"REGION (\S+) CALLS (\d+) TOT (\d+)", txt):
     reg[m.group(1)] = (int(m.group(2)), int(m.group(3)))
+SCALE = 25.0        # CCOUNT ticks -> executed instructions; see the note above
 cal_calls, cal_tot = reg["cal"]
-cal = cal_tot / cal_calls
+cal = cal_tot / cal_calls * SCALE
+print("counter scale: %g instructions per CCOUNT tick" % SCALE)
 print("calibration span (empty rsr..rsr): %.2f instr, subtracted per call" % cal)
 print()
 print("%-12s %9s %14s %10s %6s %14s" %
@@ -42,7 +53,7 @@ print("%-12s %9s %14s %10s %6s %14s" %
 roll = 0.0
 for name, rate in RATE.items():
     calls, tot = reg[name]
-    gross = tot / calls
+    gross = tot / calls * SCALE
     net = gross - cal
     per_sample = net * rate
     roll += per_sample
@@ -52,7 +63,32 @@ print("%-12s %s" % ("", "-" * 55))
 print("%-12s %40s %14.0f" % ("ROLL-UP", "", roll))
 tcalls, ttot = reg["sample_total"]
 print("%-12s %55.0f  (incl. %d measurement spans/sample of harness glue)" %
-      ("sample_total", ttot / tcalls, sum(RATE.values()) + 2))
+      ("sample_total", ttot / tcalls * SCALE, sum(RATE.values()) + 2))
+
+# SCALE CROSS-CHECK: branch-free leaf functions must land within call overhead
+# of their static size. If the scale were 1, these would read ~25x too small.
+import subprocess, os
+elf = "tools/engineb/qemu/harness.elf"
+od = subprocess.run(["xtensa-esp32s3-elf-objdump", "-d", elf],
+                    capture_output=True, env=dict(os.environ, PATH=os.environ["PATH"]))
+static = {}
+cur = None
+for line in od.stdout.decode(errors="replace").split("\n"):
+    m = re.match(r"^[0-9a-f]+ <(\w+)>:", line)
+    if m:
+        cur = m.group(1); static[cur] = 0; continue
+    if cur and re.match(r"^\s+[0-9a-f]+:\s", line):
+        static[cur] += 1
+print()
+print("SCALE CHECK -- branch-light leaves: measured vs static ELF size")
+for fn, reg_name in (("eb_env_tick", "env"), ("eb_decim_tick", "decim"),
+                     ("eb_cvgate", "cvgate"), ("eb_nsvf_tick", "nsvf")):
+    if fn not in static:
+        continue
+    calls, tot = reg[reg_name]
+    meas = tot / calls * SCALE - cal
+    ok = "ok" if 0.6 * static[fn] <= meas <= 2.5 * static[fn] + 40 else "** OFF **"
+    print("  %-16s measured %7.0f   static %5d   %s" % (fn, meas, static[fn], ok))
 for m in re.finditer(r"SINK (\S+) (0x[0-9a-f]+)( SANITY-FAIL)?", txt):
     if m.group(3):
         print("SANITY FAIL:", m.group(1))
