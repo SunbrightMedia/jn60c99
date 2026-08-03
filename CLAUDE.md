@@ -2,6 +2,48 @@
 
 # JUNO-60 (JU-06A) C99 port — project memory
 
+**★★★★★★★ NEWEST (2026-08-03, Fable 5) — ENGINE B GREEN + THE S3 VERDICT
+CORRECTED. Read `docs/engineb/S3_ASSESSMENT.md` FIRST; it supersedes the
+"unreachable" verdict in `docs/engineb/LEVERS.md`.**
+- **Engine B: 13 modules, whole-engine composite (`--module all`), EXACTLY 0 vs
+  the port on all 30 scenarios AND 11/11 BIT-EXACT vs the PLUGIN at 44.1k and
+  48k. Certified again 2026-08-03.** Gates: `null_b.py` (teeth for every
+  module), `plugin_check.py --rate`, `merge_shims.py --check` (the composite is
+  GENERATED; a stale one bit us once). `eb_engine_render` exists but REFUSES to
+  run (render_ok guard) until `eb_render_needs` is empty — 8 named inputs
+  (LFO, glide, key follow, velocity, CONDITION scatter...) are still port code.
+- **The S3 feasibility analysis was redone with real Xtensa numbers:**
+  `eb_pitch.c` computes its 13-term polynomial in DOUBLE, 8x/sample; the S3 has
+  no double FPU → 18,200–22,300 executed instr/sample of soft-double (STATIC
+  common-path census from libgcc's own bodies) — 3.6–4.5x the ENTIRE one-core
+  budget, invisible on host (536 instr/sample). Corrected capacity: 5,000
+  cyc/sample/core EXACT; two-core working budget ~9,500 (the binding
+  constraints rank 8 voices + all FX above the one-core preference).
+- **Precision nulls MEASURED (30 scenarios): float32 pitch FAIL 30/30
+  (pitch error integrates in phase); Dekker double-float FAIL only 2/30 by
+  ≤4.2 dB (summation precision, proven by control variant).** v3 = compensated
+  sum, was BUILDING at session end (workflow `engineb-pitch-v3-and-qemu`,
+  run wf_81cbdf87-34f — script + resume path in the workflows dir; re-run it
+  if it died). Integration spec: `#if EB_PITCH_FAST`, default 0 = bit-exact.
+- **A WORKING ESP32-S3 QEMU is in the scratchpad** (Espressif 9.2.2, verified
+  boots the S3 mask ROM, -icount OK, no TCG plugins → count via CCOUNT;
+  re-download recipe in the qemu scout section of the workflow journal if the
+  scratchpad died). `tools/engineb/qemu/` harness was being built by the same
+  workflow. **Post-fix modeled total: 17,700–22,300 instr/sample vs 9,500 →
+  1.9–3.5x gap; the model is UNVALIDATED (M7 precedent erred 2.2x); the first
+  real executed number is one QEMU run away.**
+- **Ranked plan (S3_ASSESSMENT §5): pitch v3 → QEMU measurement → EB_DCO_RECIP
+  (MEASURED −121 dB, passes the −100 gate) → VCF reciprocal → inline clamps →
+  blockwise structure → two-core split → silicon → memory plan (256 KB delay
+  ring vs 512 KB SRAM; the user's board has 8 MB PSRAM). Oversampling redesign
+  ONLY if still over; 6 voices LAST (does not close the gap alone).**
+- **Session lessons that must not be relearned:** host x86 counts are not S3
+  costs in EITHER direction; the accuracy standard is the −100 dB SONIC gate
+  (bit-exact kept where free); a store is not a signal (dead-store probes lie);
+  regenerate the composite before trusting any whole-engine run; a
+  verification that has never been seen to fail is not a verification.
+
+
 **⚑⚑ LIVE WORK ORDER (2026-07-31, user-binding, supersedes the 07-27 pointer
 below): `docs/ROADMAP_EMBEDDED.md` — the embedded big-picture plan. Execute
 P0 (stabilize) → P1 (measure on silicon) → P2 (decide) → P3. The DAW-parity
