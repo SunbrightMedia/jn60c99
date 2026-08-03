@@ -2,9 +2,35 @@
 
 # JUNO-60 (JU-06A) C99 port — project memory
 
-**★★★★★★★ NEWEST (2026-08-03, Fable 5) — ENGINE B GREEN + THE S3 VERDICT
-CORRECTED. Read `docs/engineb/S3_ASSESSMENT.md` FIRST; it supersedes the
-"unreachable" verdict in `docs/engineb/LEVERS.md`.**
+**★★★★★★★★ NEWEST (2026-08-03 evening, Fable 5) — THE DOUBT AUDIT. Read
+`docs/engineb/DOUBT_AUDIT.md` FIRST; its plan P1–P12 SUPERSEDES
+S3_ASSESSMENT §5.** What it found, in one breath:
+- **HOLE H1 (real): no −100 dB null has EVER run at 48,000 Hz.** null_b.py
+  renders every scenario at 44,100 (null_ab.SR). The fast-pitch −123.6 dB and
+  RECIP −121.1 dB results are 44.1k-ONLY; quote them so until P1 closes this
+  (null_b rate parameter + re-runs). The composite also never ran with
+  EB_PITCH_FAST=1 (H2).
+- **MEASURED CLEAN (new, STATIC Xtensa census): there is no second soft-double
+  bomb.** Only eb_pitch.o carries df3 relocs among all engine B objects; the
+  port-side remainder's non-pitch double sites are 5 power-of-two scales in
+  voice_render.c (exact in float — WHY the float transcriptions null EXACTLY 0)
+  + 15 once-per-sample master/FX sites mostly already replaced. The 8 unclaimed
+  blocks hide no soft-double.
+- **The honest complete-engine number is ~69,000 nominal instr/sample, not
+  ~65,000** (that figure had ~6,800 harness scaffold in it and the ~11,300 of
+  unwritten blocks missing from it). Best case after EVERY staged lever:
+  ~35,000–42,000 vs an instruction budget of 6,300–9,500 (9,500 cycles at c/i
+  1.0–1.5) → **~4–7× over. Tuning alone cannot close it.** The plan therefore
+  contains a restructure track (P8: loop fusion EXACTLY-0-able; control-rate
+  CV decimation; reduced oversampling w/ matched decimator; fixed-point + PIE
+  SIMD) — every candidate must null at −100/−80 like everything else.
+- Biggest cost unknowns, with retiring measurements: DCO real-mix (host branch
+  rates × static Xtensa paths, NOT QEMU per-call — P3) and c/i (silicon, P10).
+
+**★★★★★★★ (2026-08-03, Fable 5) — ENGINE B GREEN + THE S3 VERDICT
+CORRECTED. Read `docs/engineb/S3_ASSESSMENT.md`; it supersedes the
+"unreachable" verdict in `docs/engineb/LEVERS.md` (its §5 ranking is now
+superseded by DOUBT_AUDIT.md).**
 - **Engine B: 13 modules, whole-engine composite (`--module all`), EXACTLY 0 vs
   the port on all 30 scenarios AND 11/11 BIT-EXACT vs the PLUGIN at 44.1k and
   48k. Certified again 2026-08-03.** Gates: `null_b.py` (teeth for every
