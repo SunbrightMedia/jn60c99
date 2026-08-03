@@ -2,6 +2,32 @@
 
 # JUNO-60 (JU-06A) C99 port — project memory
 
+**★★★★★★★★★★★★ NEWEST (2026-08-03 latest, Fable 5) — THE NUMBER CORRECTED
+IN REVIEW, AND P8 IS PLANNED. Read `docs/engineb/P8_PLAN.md`.**
+- **THE FOURTH PRICING ERROR, same flattering direction as Opus's three: libm
+  was charged at ZERO.** expf = 184 instr on this toolchain (wrapper +
+  __ieee754_expf body), fmodf = 137; the LFO alone runs expf per voice per
+  sample. ~6,600/sample. The first correction then OVER-swung (10 conditional
+  fmodf sites at full body = the DCO worst-case problem in miniature), so the
+  rate was MEASURED: slow arm fires 9.75 % of wrap calls (EB_LFO_COUNT, 61 M
+  calls, all 30 scenarios). **Corrected totals: default 69,735 (1 % from the
+  audit's independent ~69,000 — two methods now agree), S3 shipping 55,167 =
+  5.8–8.8× over.** Third restructure target now visible: **LFO 6,305/sample**
+  joins pitch (21,792) and DCO (10,202) = 69 % of the engine.
+- **P8 PLAN (supersedes the P8 sketch in DOUBT_AUDIT):** C1 control-rate pitch
+  w/ increment interpolation (N=2/4/8 ladder, ~−15,300, Fable — the argument
+  why it can pass where plain float failed: interpolation between CORRECT
+  values is bounded zero-mean path error, not an integrating value error;
+  vibrato decides); C2 control-rate CV for vcf_res/glide/pwm_cv/vcf_cv
+  (~−5,500, Opus, after C1's gate shape exists); C3 LFO expf incrementally
+  (~−1,300); C5 call fusion (EXACTLY-0-able, ~−2,000); C4 fixed-point+PIE SIMD
+  on the audio path (the only ×2–3 lever, one-filter prototype first); C6
+  reduced oversampling BEHIND all of those; 6 voices LAST, user's order.
+  **Honest end-to-end arithmetic: full ladder ≈ 15,000/sample → 1.6–2.4× —
+  near budget only at c/i ≈ 1.0. Silicon (P10) decides; the plan does not
+  promise the goal.** Step 2 (eb_render_coefs constructor + eb_engine_render
+  gate) is still OWED before silicon and unaffected.
+
 **★★★★★★★★★★★ NEWEST (2026-08-03 late night, Opus 5) — STEP 1 DONE, AND THE
 HONEST WHOLE-ENGINE NUMBER EXISTS. Read `docs/engineb/data/engine_cost.md`.**
 - **THE ALLOCATOR IS ENGINE B'S AND IS GATED.** `eb_engine.c`'s SKELETON
