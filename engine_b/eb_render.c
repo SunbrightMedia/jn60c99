@@ -23,7 +23,7 @@
 int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c,
                      const eb_render_needs *n, float *outL, float *outR)
 {
-    float mix = 0.0f;
+    float mix = 0.0f, noise_v;
     int v;
 
     /* THE GUARD. Nothing sets render_ok, so this returns silence today. It is
@@ -38,17 +38,19 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
         return EB_RENDER_INCOMPLETE;
     }
 
-    /* The noise LFSR now advances inside eb_notecv_tick, which is where the
-     * port advances it. The engine-wide single-advance law is preserved by
-     * the same mechanism the port uses (juno_driver.c's snapshot/restore),
-     * and reproducing that is part of the remaining engine work -- it is
-     * NOT done here, which is one more reason render_ok stays unset. */
+    /* THE NOISE, ONCE, FOR ALL EIGHT VOICES. juno_driver.c restores the shared
+     * noise block before each voice, so every voice steps from the same state
+     * and reads the SAME value, and the block ends the sample advanced exactly
+     * once. Since the state and the coefficients are both shared, that is
+     * identical to computing it once here -- and unlike a per-voice call it
+     * cannot drift to eight times too fast. */
+    noise_v = eb_notecv_tick(&st->notecv, &c->notecv);
 
     for (v = 0; v < EB_NUM_VOICES; ++v) {
         eb_voice *vc = &e->v[v];
         float e1, e2, pit, pwm, cut, o6704, o6848;
         float dly_env, pitch_cv, lfo_del, lfo_undel, lfo_pulse;
-        float gate_sign, pit_in, noise_v;
+        float gate_sign, pit_in;
         float q[4], nsv04, nsvo, decimo, vcfo, cv;
         eb_cvgate_in gi;
         eb_cvgate_out go;
@@ -74,10 +76,6 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
          * sample's values. That is a one-sample skew: inaudible in a cold
          * start and wrong everywhere else, which is this project's most
          * repeated bug shape. */
-        /* THE NOISE, first, as the port has it: its LFSR advance sits at
-         * :595-656, ahead of everything else in the voice. */
-        noise_v = eb_notecv_tick(&st->notecv[v], &c->notecv[v]);
-
         /* CV/GATE next (:657-681). Its inputs are ALL recall cells plus the
          * aux-latched cell 320 -- NOT the envelopes, which is what this call
          * wrongly passed while the surrounding blocks were still caller-

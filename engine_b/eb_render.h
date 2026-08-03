@@ -78,7 +78,14 @@ typedef struct {
     eb_nsvf_coef      nsv[EB_NUM_VOICES];
     eb_lfo_coef       lfo[EB_NUM_VOICES];
     eb_glide_coef     glide[EB_NUM_VOICES];
-    eb_notecv_coef    notecv[EB_NUM_VOICES];
+    /* THE NOISE IS ENGINE-WIDE, NOT PER VOICE, and the singular here is the
+     * whole point. Its cells live in the port's SHARED region (base+84272..),
+     * not in any voice's block, and juno_driver.c snapshots and RESTORES that
+     * region before each voice so all eight step from the same state and read
+     * an identical one-step advance -- leaving it advanced exactly once per
+     * sample. Carrying it per voice would step it eight times too fast, which
+     * is audible and is a bug an earlier driver version actually shipped. */
+    eb_notecv_coef    notecv;
     /* eb_cvgate's inputs. MEASURED against the port (:657-681): they are cells
      * 176, 208, 272*240, 304 and 544 -- all recall values. The envelopes do
      * NOT feed this block; an earlier draft of eb_engine_render passed e1/e2
@@ -133,7 +140,7 @@ typedef struct {
     eb_nsvf_state   nsv[EB_NUM_VOICES];
     eb_lfo_state    lfo[EB_NUM_VOICES];
     eb_glide_state  glide[EB_NUM_VOICES];
-    eb_notecv_state notecv[EB_NUM_VOICES];
+    eb_notecv_state notecv;         /* engine-wide; see eb_render_coefs */
     /* cell 320 after the port's aux latch: eb_notecv_tick's gate_in. */
     float           gate_cell320[EB_NUM_VOICES];
     eb_chorus_state chorus;
@@ -164,14 +171,16 @@ typedef struct {
  *
  * THE GUARD DOES NOT COME OFF YET, and this struct being empty is not the
  * reason it would. Still outstanding, and each is a real thing:
- *   - the noise LFSR must advance ONCE PER SAMPLE for the whole engine, not
- *     once per voice. The port achieves that with juno_driver.c's
- *     snapshot/restore; eb_engine_render calls eb_notecv_tick inside the voice
- *     loop, which advances it eight times too fast. That is a genuine defect
- *     in THIS function, stated here rather than discovered by ear.
- *   - the voice's remaining unclaimed port lines (1141-1149, 1230-1297,
- *     1665-1671, 1702-1717) are not modules yet.
- *   - eb_engine.c's allocator and note handling are still unproven.
+ *   - the DCO's per-voice coefficient copy: this function calls
+ *     eb_dco_set_pitch() every sample from eb_dcoprep's outputs, but the port
+ *     writes those into the promoted scratch locals the DCO block reads. The
+ *     two are believed equivalent and that is NOT the same as gated.
+ *   - eb_engine.c's allocator and note handling are still unproven (audit
+ *     finding F4), so nothing constructs a valid eb_render_coefs yet.
+ *   - the voice's one remaining unclaimed port range, :1665-1671, is pure
+ *     cell shuffling with no arithmetic and is left in the port on purpose
+ *     (see eb_dcoprep.h) -- but it does mean this function does not yet do
+ *     the two delayed copies 4848<-4832 and 4880<-4864 that it contains.
  * The three gates named at the top of this header have not been run against
  * eb_engine_render, and until they have, render_ok stays unset. */
 typedef struct {
