@@ -5,6 +5,14 @@ completed the build AND the run before it hit the session limit; only its
 report was lost. The harness, its build scripts and the raw log are committed
 in `tools/engineb/qemu/`.
 
+## Rebuilding the QEMU install (the binary lives in the session scratchpad and dies with the container)
+
+1. URL: `https://github.com/espressif/qemu/releases/download/esp-develop-9.2.2-20260417/qemu-xtensa-softmmu-esp_develop_9.2.2_20260417-x86_64-linux-gnu.tar.xz`
+   (15,619,396 bytes; the authoritative sha256 is in `/home/user/esp-idf/tools/tools.json`, tool `qemu-xtensa` — verify against it.)
+2. `curl -sL` through the preconfigured proxy works. Extract into the scratchpad.
+3. The binary needs two apt packages: `apt-get install -y libsdl2-2.0-0 libslirp0`.
+4. Run: `qemu-system-xtensa -M esp32s3 -nographic -icount shift=0,align=off,sleep=off -kernel tools/engineb/qemu/harness.elf` (build with `tools/engineb/qemu/build.sh`).
+
 ## What was measured
 
 Espressif QEMU 9.2.2, `-M esp32s3 -icount shift=0`, bare-metal ELF in internal
