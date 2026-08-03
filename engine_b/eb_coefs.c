@@ -219,6 +219,8 @@ void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
         c->cvg_gate_off[v] = CF(a1, 544);
 
         /* ---- key follow / velocity (cells 368/384) ----------------------- */
+        c->pitch_off[v]  = CF(a1, 4448);
+        c->pitch_gain[v] = CF(a1, 3840);
         c->kbd[v] = CF(a1, 368);
         c->vel[v] = CF(a1, 384);
 

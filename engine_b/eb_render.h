@@ -102,6 +102,13 @@ typedef struct {
     float             cvg_k[EB_NUM_VOICES];         /* 272 * 240 */
     float             cvg_p28[EB_NUM_VOICES];       /* cell 304  */
     float             cvg_gate_off[EB_NUM_VOICES];  /* cell 544  */
+    /* THE PITCH BLOCK's two inputs, both recall cells (no writer anywhere in
+     * voice_render): the polynomial's CV OFFSET and its GAIN. An earlier draft
+     * of eb_engine_render called eb_pitch_eval(pit, 1.0f) -- dropping the
+     * offset and inventing the gain. Found by the audit Fable ordered after
+     * two other inherited guesses were caught in this same function. */
+    float             pitch_off[EB_NUM_VOICES];     /* cell 4448 */
+    float             pitch_gain[EB_NUM_VOICES];    /* cell 3840 -> 3792 */
     /* cells 368/384: key-follow and velocity. Plain recall reads that the
      * port makes inside the notecv range, so they are coefficients here
      * rather than per-sample inputs. */

@@ -121,16 +121,26 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
          * unrouted value. Tapping after latching would hand this sample's
          * value to a consumer the port feeds with last sample's. */
         n_3536 = eb_modcv_tap(&st->mod[v]);
-        eb_modcv_tick(&c->mod[v], pitch_cv, c->kbd[v],
+        /* THE SECOND ARGUMENT IS CELL 880, glide's own state -- the
+         * key-follow + velocity SUM it computes -- NOT the raw key-follow cell
+         * 368. The shim passes JF(a1, 880); this function passed c->kbd[v].
+         * Third inherited guess found by the audit. */
+        eb_modcv_tick(&c->mod[v], pitch_cv, st->glide[v].s880,
                       lfo_del, lfo_undel, e1, e2, &pit, &pwm);
         /* eb_modcv_tick's `pwm_out` IS cell 3808 (eb_pwm_cv.c:91 "THE PWM SUM,
          * [3808]"), which is eb_dcoprep's per-sample input. The second need
          * was likewise a value already computed and merely not routed. */
         n_3808 = pwm;
 
-        cv = eb_pitch_eval(pit, 1.0f);
+        /* THE PORT: fmin(fmax(cell4448 + cell3776, -20), 8.9), gained by
+         * cell 3792 (a delayed copy of recall cell 3840). `pit` IS cell 3776,
+         * modcv's pitch sum. The offset and the gain were both missing. */
+        cv = eb_pitch_eval(c->pitch_off[v] + pit, c->pitch_gain[v]);
 
-        cut = eb_vcf_cv_tick(&st->cv[v], &c->cv[v], pit, pwm,
+        /* SAME two inputs as modcv, per the shim: cells 752 and 880. `pit`
+         * here is cell 752 (the glide output), NOT modcv's pitch_sum -- the
+         * shim reads JF(a1, 752) for both calls. */
+        cut = eb_vcf_cv_tick(&st->cv[v], &c->cv[v], pitch_cv, st->glide[v].s880,
                              lfo_del, lfo_undel, e1, e2, &o6704, &o6848);
 
         /* the resonance shaper takes the cutoff CV and the two side outputs,
@@ -148,7 +158,9 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
          * guessed this block's inputs before the block was a module: the
          * increment is NOT the raw pitch CV, it is fmaxf(k5568, cv*k5536),
          * and the width comes from cell 5520 plus the per-sample 3808. */
-        inc = eb_dcoprep_tick(&c->dprep[v], cv, pwm, n_3808,
+        /* THE SECOND ARGUMENT IS CELL 3776 (the port's v392 = modcv's pitch
+         * sum), NOT the PWM sum. Fourth inherited guess. */
+        inc = eb_dcoprep_tick(&c->dprep[v], cv, pit, n_3808,
                               &g_edge, &pw_live, &pwm_out);
         st->dco_live[v].inc  = inc;
         st->dco_live[v].g    = g_edge;
@@ -160,7 +172,11 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
         nsvo   = eb_nsvf_tick(&st->nsv[v], &c->nsv[v], noise_v, &nsv04);
         /* the noise mix consumes the SVF's cell-4320 output and the per-sample
          * cell 3536; its result is the ladder's noise input (cell 6544). */
-        nmixo  = eb_noisemix_tick(&c->nmix[v], nsv04, n_3536);
+        /* eb_nsvf_tick RETURNS cell 4320 and reports cell 4304 through
+         * `s04_out`; noisemix consumes 4320. Passing nsv04 here would have fed
+         * it the wrong one of the two -- sixth inherited guess, found by the
+         * same audit. */
+        nmixo  = eb_noisemix_tick(&c->nmix[v], nsvo, n_3536);
         /* REVIEW FIX (Fable): the latch input is NOT the PWM sum. Cell 3520
          * is v526 = eb_decim_tick's RETURN VALUE, written at the port's :2174
          * -- the one-sample-delayed decimator output that noisemix scales into
@@ -171,9 +187,12 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
          * call, below. */
         vcfo   = eb_vcf_tick(&st->vcf[v], &c->vcf[v], nmixo, reso, o7536);
         eb_modcv_latch(&st->mod[v], decimo);
-        (void)pwm_out;
+        (void)pwm_out; (void)nsv04;
+        /* THE LAST TWO ARGUMENTS ARE CELL 6848 and CELL 560, per the shim
+         * (JF(a1, 6848), JF(a1, 560)) -- not o6704 and the gate sign. Fifth
+         * inherited guess. */
         mix   += eb_vca_tick(&st->vca[v], &c->vca[v], vcfo, e1, e2,
-                             o6704, go.sign);
+                             o6848, st->glide[v].s560);
     }
 
     /* ---- FX, once for the whole engine. The chorus LFO free-runs whether or
