@@ -129,3 +129,52 @@ No C2, no C4, no oversampling changes, no voice-count changes, no pitch or
 LFO relaxations, no EB_PITCH_CR>1 (compile-refused anyway), no new
 approximations of any kind. Those are fork work, Fable's numeric design, and
 they start only from a certified trunk.
+
+
+---
+
+## ⚠ TASK 1b SCOPE FINDING (Opus 5, 2026-08-04) — the standalone gate is NOT
+## reachable from where the orders assumed, and this is why
+
+Before writing the shim I measured what `eb_engine_render` would have to
+reproduce to null EXACTLY 0 against the port. The orders (and my own earlier
+reporting) assumed the coefficient constructor was the last obstacle. **It is
+not.**
+
+`null_b.py --module standalone` replaces `juno_driver.c`, so engine B must
+produce the WHOLE output — voice chain AND master chain. Engine B owns:
+
+| translation unit | claimed by engine B |
+|---|---|
+| `src/voice_render.c` | 96 % of the executable body — effectively complete |
+| `src/master_render.c` | **22 %** — the three FX and nothing else |
+
+MEASURED on `master_render.c`: of ~1,333 executable lines after the
+declarations, **946 are unclaimed**, touching **540 distinct master cells**
+spanning offsets 136 … 11,022,348. That is the master signal chain: the
+per-sample voice summing, the EFFECT-TYPE routing switch (the v551 arm this
+project already learned is load-bearing warm), the gain staging, the boost and
+output-gain path, the warmup-mute latch, and the stereo output assembly.
+
+**Consequence, stated plainly:** the standalone engine cannot be gated until
+the master chain is transcribed. That is a body of work comparable to the
+voice modules — a dozen or so blocks, each needing the same boundary analysis,
+teeth and null. It is NOT a finishing touch on the coefficient constructor.
+
+**What this does not change.** The sixteen voice modules and the FX remain
+gated and EXACTLY 0; the allocator remains gated; the cost measurement in
+`data/engine_cost.md` remains valid, because it prices the per-sample DSP
+chain and always said so. What changes is the ROUTE to a certified trunk: one
+more transcription phase sits between here and it.
+
+**Recommended revision to Phase 1**, for the user and Fable to rule on:
+1. **1b-master** — transcribe `master_render.c`'s chain as modules, same
+   method, same gates. The FX are already done, so this is the summing,
+   routing, gain and output stages.
+2. **1b-gate** — then the standalone gate as originally specified.
+3. C5, the playbook and the certification sweep follow unchanged.
+
+The alternative — gating engine B's VOICE output against the port's voice
+output, below the master — is cheaper and is genuinely useful, but it is a
+WEAKER claim than "the standalone engine reproduces the instrument", and it
+should be labelled as such if it is taken. I have not taken it unilaterally.
