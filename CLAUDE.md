@@ -2,44 +2,66 @@
 
 # JUNO-60 (JU-06A) C99 port — project memory
 
-**★★★★★★★★★★ NEWEST (2026-08-03 late, Opus 5) — P5 IN PROGRESS: THREE MORE
-BLOCKS CLAIMED AND `eb_render_needs` IS EMPTY.** New modules, each gated
-EXACTLY 0 on all 30 scenarios at BOTH rates on its first run:
-`eb_lfo` (:797-963), `eb_glide` (:682-796), `eb_notecv` (:595-656, the shared
-25-bit noise LFSR). Composite regenerated to **13 voice modules: EXACTLY 0 at
-both rates, 11/11 BIT-EXACT vs the PLUGIN at both rates.**
-- **METHOD THAT WORKED, reuse it:** pick the block boundary by a LIVE-VARIABLE
+**★★★★★★★★★★ NEWEST (2026-08-03 late, Opus 5) — P5 SUBSTANTIALLY DONE. SIX
+BLOCKS CLAIMED, `eb_render_needs` IS EMPTY, 96 % OF THE VOICE FUNCTION IS
+ENGINE B'S.** New modules, each **EXACTLY 0 on all 30 scenarios at BOTH rates
+on its FIRST run**: `eb_notecv` (:595-656, the shared 25-bit noise LFSR),
+`eb_glide` (:682-796, portamento + FINAL PITCH CV + LFO rate chain), `eb_lfo`
+(:797-963), `eb_noisemix` (:1141-1149), `eb_vcf_res` (:1230-1297, the VCF
+resonance shaper), `eb_dcoprep` (:1702-1717, the DCO phase increment).
+**Composite = 16 voice modules: EXACTLY 0 at both rates, 11/11 BIT-EXACT vs
+the PLUGIN at both rates.**
+- **THE METHOD THAT WORKED — REUSE IT.** Pick the boundary by a LIVE-VARIABLE
   analysis (eb_lfo's range has 4 live-in and ZERO live-out — that is why it
-  lifts cleanly), then classify every RW cell by READ-BEFORE-WRITE. Of eb_lfo's
-  18 RW cells only **5 are state**; the rest are the port's delayed-copy idiom
-  or write-then-read locals. Same finding as the noise SVF's cell 4320. Do this
-  BY SCRIPT, never by reading.
-- **`eb_render_needs` went 8 → 0, and `drive`/`held` were never needs at all:**
-  the port's :657-681 shows eb_cvgate's arguments are cells 176/208/272*240/
-  304/544 — all recall values. An earlier eb_engine_render draft had GUESSED
-  that call's inputs (it passed the envelopes). Fixing it also removed a
-  one-sample skew: the port runs notecv→glide→LFO BEFORE the envelopes,
-  because the envelope gate is built from cells 560 and 1824 which those
-  blocks write in the SAME sample.
-- **THE GUARD STAYS ON and the empty list is not a reason to lift it.** Real
-  remaining work, now named in eb_render.h: eb_engine_render advances the noise
-  LFSR INSIDE the voice loop (8× too fast vs the port's once-per-sample law —
-  juno_driver.c's snapshot/restore is what enforces it); four port line ranges
-  are still unclaimed (1141-1149, 1230-1297, 1665-1671, 1702-1717);
-  eb_engine.c's allocator is unproven.
-- **TWO HARNESS DEFECTS FOUND BY RUNNING IT — both now teeth-proven:**
+  lifts), then classify every RW cell by READ-BEFORE-WRITE. Of eb_lfo's 18 RW
+  cells only **5 are state**; the rest are the port's delayed-copy idiom or
+  write-then-read locals. Do it BY SCRIPT — but see the four ways the script
+  LIES, below.
+- **★ THE SCRIPT LIES IN FOUR WAYS, ALL FOUND BY READING THE CODE AFTERWARDS.
+  Check every one of these on the next block:**
+  1. **Branch-split cells.** vcf_res's 7520/7536 are written in the `if` arm
+     and read in the `else` arm → they CARRY across samples, but a
+     read-before-write scan calls them locals. Treating them as locals zeroes
+     the filter on every else path.
+  2. **Raw-pointer cells.** `*(float *)(a1 + 0x2000)` (= cell 8192) is
+     invisible to a `JF(a1,N)` grep. A sweep of the whole function found
+     EXACTLY ONE such access, so every other block's inventory is sound —
+     because it was checked.
+  3. **Self-assigned live-ins.** `v227 = f(v227, ...)` makes v227 look
+     "assigned" to a naive live-in check; it is a genuine live-in. Split
+     statements on `;` with DOTALL to catch it.
+  4. **Per-sample cells masquerading as coefficients.** noisemix's 3536 is
+     written at :1076 as a delayed copy. Caching it with the real coefficients
+     would freeze a per-sample value, and **the generation guard could never
+     catch it** because the cell does not change at recall time. ALWAYS grep
+     `J[FI](a1, N) =` across the whole function before calling a cell a coef.
+- **`eb_render_needs` went 8 → 0. `drive`/`held` were NEVER needs:** the port's
+  :657-681 shows eb_cvgate's arguments are cells 176/208/272*240/304/544 — all
+  recall values. An earlier eb_engine_render draft had GUESSED that call's
+  inputs (it passed the envelopes). Fixing it also removed a one-sample skew
+  (the port runs notecv→glide→LFO BEFORE the envelopes, whose gate is built
+  from cells 560 and 1824 written in the SAME sample), and a noise-lockstep
+  bug (the LFSR was being advanced per voice = 8× too fast; it is ONE call
+  before the loop now, and the struct fields are singular so per-voice is no
+  longer expressible).
+- **THE GUARD STAYS ON.** Honestly remaining: the DCO coefficient-copy
+  equivalence (believed, NOT gated), eb_engine.c's unproven allocator (F4), and
+  the two delayed copies in :1665-1671. **That range is left in the port ON
+  PURPOSE — it has NO arithmetic** (4 loads, 3 delayed copies); wrapping cell
+  motion in a function would improve only the block count.
+- **TWO HARNESS DEFECTS, both found by running it, both teeth-proven:**
   (1) `merge_shims.py`'s overlap guard kept only each module's **LAST** edit
-  region (`owner` was a dict keyed by module). cvgate edits THREE ranges; a new
+  region (`owner` was a dict keyed by module). cvgate edits THREE ranges; a
   module spanning the first two merged clean, compiled, and nulled at **0.0 dB
-  on all 30 scenarios**. It is a LIST now. (2) Two shims independently chose
-  the same file-scope static name — compiles alone, collides only in the
-  composite, error names neither module. Refused now, naming both.
-- Teeth: brackets MEASURED for lfo (1e-6 FAIL −83.6 dB / 1e-7 PASS −105.9) and
-  notecv (1e-4 FAIL −92.6 / 1e-5 PASS −112.0, coarse because noise is the most
-  weakly-coupled signal); **glide is FAIL-ONLY** (its output is the pitch CV;
-  1e-8 is below one ULP of 1.0f so a pass case is impossible), joining pitch,
-  pwm_cv and cvgate. Xtensa census: **zero soft-double in all three** (468/168/
-  82 static instructions), confirming DOUBT_AUDIT's M2.
+  on all 30 scenarios**. It is a LIST now. (2) Two shims independently chose the
+  same file-scope static name — compiles alone, collides only in the composite,
+  error names neither module. Both refused now, by name.
+- Teeth: brackets MEASURED for lfo/notecv/vcf_res/noisemix; **glide and
+  dcoprep are FAIL-ONLY** (both carry pitch, so error integrates), joining
+  pitch/pwm_cv/cvgate. **noisemix's FAIL case is 3e-5, NOT 1e-5** — 1e-5 lands
+  at −99.8 dB, clearing the gate by 0.2 dB, i.e. a probe ON the threshold, the
+  trap this harness was already caught by twice. Xtensa census: **zero
+  soft-double in all six** modules.
 
 **★★★★★★★★★ NEWEST (2026-08-03 night, Opus 5) — P1 AND P3 CLOSED. Read
 `docs/engineb/data/null_48k.md` and `docs/engineb/data/dco_real_cost.md`.**
