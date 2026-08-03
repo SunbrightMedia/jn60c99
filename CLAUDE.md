@@ -2,6 +2,45 @@
 
 # JUNO-60 (JU-06A) C99 port — project memory
 
+**★★★★★★★★★★★ NEWEST (2026-08-03 late night, Opus 5) — STEP 1 DONE, AND THE
+HONEST WHOLE-ENGINE NUMBER EXISTS. Read `docs/engineb/data/engine_cost.md`.**
+- **THE ALLOCATOR IS ENGINE B'S AND IS GATED.** `eb_engine.c`'s SKELETON
+  allocator ("free voice first, else oldest" — it said so) is replaced by
+  `engine_b/eb_alloc.{h,c}`, CAssignJu60's real law transcribed from
+  gui/juno_bridge.c (itself PROVEN 34/34 vs the plugin by assigner_ab.py).
+  **`tools/engineb/alloc_ab.py`: 270/270 note sequences agree with the port's
+  allocator after EVERY event, over all NINE assign configurations in the
+  bank.** Audio is a POOR detector here (two allocators can differ only through
+  CONDITION scatter — exactly how the POLY-only bug survived), so the gate
+  compares BINDINGS. **Teeth PASS on four named errors:** bottom-up scan,
+  reaped binding, forced POLY, highest-held release.
+  Two defects in that gate, both found by running it: patch 1 has the ARP on so
+  note-ons never reach the allocator (30 false failures), and *skipping* arp
+  patches then silently dropped UNISON + every LEGATO config (9 → 4). Fixed by
+  keeping the recalled config and forcing the arp off, asserted.
+- **★ THE NUMBER: S3 shipping build (fast pitch v7 + DCO reciprocal) =
+  48,564 instr/sample = 5.1×–7.7× OVER the 6,300–9,500 two-core budget.**
+  Default bit-exact build = 63,484. MEASURED×STATIC via call-graph pricing,
+  NO QEMU (`tools/engineb/engine_price.py`).
+  Cross-checks: default 63,484 vs DOUBT_AUDIT's independent ~69,000 (8 %);
+  pitch/call 4,281 & 2,592 vs the recorded ~4,450 & ~3,126 (4 % / 17 %).
+- **THE P6 TRIPWIRE IS TRIPPED (>19,000 → start P8 at once).** Pitch (20,736,
+  43 %) + DCO (10,202, 21 %) = **64 % of the engine**. P2 already killed the
+  cheaper-arithmetic exits for pitch, so what remains for both is STRUCTURAL —
+  P8's loop fusion / control-rate CV / reduced oversampling / fixed-point+SIMD,
+  each still gated at −100/−80 dB.
+- **THREE TOOL ERRORS, ALL CAUGHT, ALL FLATTERING:** summing whole-TU symbols
+  counts a static helper ONCE though df_mul is called 11× (921 vs ~2,600);
+  skipping `.text+0xNNN` relocations drops every intra-module call (priced
+  eb_pitch_eval at **18**); `grep -l` for libgcc helpers finds objects that
+  REFERENCE not DEFINE them (_divdc3.o "is" __muldf3 at 903 instr — the real
+  105). **A measurement that flatters its subject deserves the suspicion a
+  never-failing gate does.**
+- **NOT DONE — step 2.** `eb_engine_render` is still NOT gated: nothing builds
+  an `eb_render_coefs` yet. `render_ok` stays unset. The number above prices the
+  per-sample DSP chain and EXCLUDES allocation, recall-time coefficient
+  derivation, and eb_engine_render's own plumbing.
+
 **★★★★★★★★★★ NEWEST (2026-08-03 late, Opus 5) — P5 SUBSTANTIALLY DONE. SIX
 BLOCKS CLAIMED, `eb_render_needs` IS EMPTY, 96 % OF THE VOICE FUNCTION IS
 ENGINE B'S.** New modules, each **EXACTLY 0 on all 30 scenarios at BOTH rates
