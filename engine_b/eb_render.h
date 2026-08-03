@@ -56,6 +56,7 @@
 #include "eb_cvgate.h"
 #include "eb_lfo.h"
 #include "eb_glide.h"
+#include "eb_notecv.h"
 #include "eb_pitch.h"
 #include "eb_chorus.h"
 #include "eb_delay.h"
@@ -77,6 +78,24 @@ typedef struct {
     eb_nsvf_coef      nsv[EB_NUM_VOICES];
     eb_lfo_coef       lfo[EB_NUM_VOICES];
     eb_glide_coef     glide[EB_NUM_VOICES];
+    eb_notecv_coef    notecv[EB_NUM_VOICES];
+    /* eb_cvgate's inputs. MEASURED against the port (:657-681): they are cells
+     * 176, 208, 272*240, 304 and 544 -- all recall values. The envelopes do
+     * NOT feed this block; an earlier draft of eb_engine_render passed e1/e2
+     * here, which is why 'drive' and 'held' looked like unknown per-sample
+     * inputs when they are in fact coefficients. */
+    float             cvg_t28[EB_NUM_VOICES];       /* cell 176  */
+    float             cvg_t29[EB_NUM_VOICES];       /* cell 208  */
+    float             cvg_k[EB_NUM_VOICES];         /* 272 * 240 */
+    float             cvg_p28[EB_NUM_VOICES];       /* cell 304  */
+    float             cvg_gate_off[EB_NUM_VOICES];  /* cell 544  */
+    /* cells 368/384: key-follow and velocity. Plain recall reads that the
+     * port makes inside the notecv range, so they are coefficients here
+     * rather than per-sample inputs. */
+    float             kbd[EB_NUM_VOICES];
+    float             vel[EB_NUM_VOICES];
+    /* cell 2560+off: the per-envelope LFO TRIG switch. */
+    float             env_lfo_trig[EB_NUM_VOICES][2];
     /* the external LFO inputs and gate: plain recall cells 944/976/1008 that
      * the port reads inside the LFO's line range. Coefficients, not state. */
     float             lfo_ext_gate[EB_NUM_VOICES];
@@ -114,6 +133,9 @@ typedef struct {
     eb_nsvf_state   nsv[EB_NUM_VOICES];
     eb_lfo_state    lfo[EB_NUM_VOICES];
     eb_glide_state  glide[EB_NUM_VOICES];
+    eb_notecv_state notecv[EB_NUM_VOICES];
+    /* cell 320 after the port's aux latch: eb_notecv_tick's gate_in. */
+    float           gate_cell320[EB_NUM_VOICES];
     eb_chorus_state chorus;
     eb_delay_state  delay;
     eb_reverb_state reverb;
@@ -122,39 +144,38 @@ typedef struct {
     int32_t         rev_wipe;
 } eb_render_state;
 
-/* EB_RENDER_NEEDS — the inputs this function cannot yet compute.
+/* EB_RENDER_NEEDS — THE LIST IS EMPTY.
  *
- * Each is supplied per sample by the caller today. Each is a port block that
- * has not been made a module. The list IS the remaining work, and it shrinks by
- * one entry per block claimed.
+ * It started at eight, and every entry was removed by claiming the block that
+ * produces it, not by choosing a default:
  *
- * CLAIMED 2026-08-03 and therefore GONE from this struct:
- *   lfo_del, lfo_undel  -> eb_lfo_tick() (cells 1792/1808), gated EXACTLY 0
- *   pitch_cv            -> eb_glide_tick() (cell 752),      gated EXACTLY 0
- * The LFO's own delay-envelope input came with eb_glide, so claiming those two
- * blocks removed three entries and added none.
+ *   lfo_del, lfo_undel -> eb_lfo_tick()    (cells 1792/1808)
+ *   pitch_cv           -> eb_glide_tick()  (cell 752)
+ *   gate               -> derived from cell 560 (glide's state) and cell 1824
+ *                         (the LFO's pulse), exactly as the port's envelope
+ *                         block derives it
+ *   kbd, vel           -> plain recall cells 368/384, now coefficients
+ *   drive, held        -> NOT per-sample inputs at all. Reading the port's own
+ *                         :657-681 shows eb_cvgate's arguments are cells 176,
+ *                         208, 272*240, 304 and 544 -- every one a recall
+ *                         value. They were only ever "needs" because an
+ *                         earlier draft of eb_engine_render guessed at this
+ *                         call's inputs instead of deriving them.
  *
- * ADDED by claiming eb_glide, and NOT hidden: the glide integrator needs the
- * PRE-glide pitch CV (the port's v28), which is computed in the block before
- * it. Defaulting it to zero inside the render would have been a silent need,
- * which is the whole failure mode this struct exists to prevent. Net: the two
- * blocks removed three entries and added one, 8 -> 6.
- *
- *   gate        the three-way gate sign and its ramp        (partly: eb_cvgate)
- *   pitch_in    the PRE-glide pitch CV, the port's v28      (lines 564-681)
- *   kbd         key-follow amount for this voice            (key tracking)
- *   vel         velocity contribution                       (note handling)
- *   drive       the VCF drive / resonance compensation      (VCF CV remainder)
- *   held        the engine-wide "any key held" flag         (note handling)
- *
- * When this struct is empty the function is the engine. */
+ * THE GUARD DOES NOT COME OFF YET, and this struct being empty is not the
+ * reason it would. Still outstanding, and each is a real thing:
+ *   - the noise LFSR must advance ONCE PER SAMPLE for the whole engine, not
+ *     once per voice. The port achieves that with juno_driver.c's
+ *     snapshot/restore; eb_engine_render calls eb_notecv_tick inside the voice
+ *     loop, which advances it eight times too fast. That is a genuine defect
+ *     in THIS function, stated here rather than discovered by ear.
+ *   - the voice's remaining unclaimed port lines (1141-1149, 1230-1297,
+ *     1665-1671, 1702-1717) are not modules yet.
+ *   - eb_engine.c's allocator and note handling are still unproven.
+ * The three gates named at the top of this header have not been run against
+ * eb_engine_render, and until they have, render_ok stays unset. */
 typedef struct {
-    float gate;
-    float pitch_in;
-    float kbd;
-    float vel;
-    float drive;
-    float held;
+    int unused;                 /* deliberately empty; see above */
 } eb_render_needs;
 
 /* Render one stereo sample. `n` supplies the values listed above.

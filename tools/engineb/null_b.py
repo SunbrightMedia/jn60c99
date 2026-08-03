@@ -348,6 +348,9 @@ _OUT_ANCHOR = {
                    "                                 JF(a1, 6544), v241,"
                    " JF(a1, 7536));",
                    "      JF(a1, 9040) *= %s;"),
+    "notecv": ("voice_render.c",
+               "    JF(base, 84432) = eb_notecv_tick(&ebns, &EBTC[voice]);",
+               "    JF(base, 84432) *= %s;"),
     "glide": ("voice_render.c",
               "      JF(a1, 752) = eb752;",
               "      JF(a1, 752) *= %s;"),
@@ -443,6 +446,11 @@ _BRACKET = {
     # CONTROL value, so a relative error on it is amplified at the output --
     # which is why its bracket sits two decades finer than the audio modules'.
     "lfo":        ("1e-6",    "1e-7"),
+    # MEASURED 2026-08-03 at 48 kHz, perturbing the NOISE output: 1e-4 fails
+    # at -92.6 dB in 6 scenarios, 1e-5 passes at -112.0 dB. The bracket is
+    # coarse for the same reason the noise SVF's is -- the noise is the most
+    # weakly-coupled signal in the voice.
+    "notecv":     ("1e-4",    "1e-5"),
     "vcf_cv":     ("4.8e-6",  "4.8e-7"),
     # pwm_cv is fail-only; see teeth(). Its FAIL case would need a factor of
     # about 1.9e-10 to land at -90 dB, which is far below one ULP of 1.0f.

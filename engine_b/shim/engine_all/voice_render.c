@@ -1,6 +1,6 @@
 /* GENERATED FILE -- DO NOT EDIT.
  * tools/engineb/merge_shims.py built this from the individual shims:
- *     cvgate, dco, decim, env, glide, lfo, noise_svf, pitch, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
+ *     cvgate, dco, decim, env, glide, lfo, noise_svf, notecv, pitch, pwm_cv, vca_hpf, vcf_cv, vcf_ladder
  * Edit those, then re-run the generator (make engineb does it).
  * Its purpose: engine B cannot be tested as a WHOLE ENGINE while each
  * module shadows the same port file -- see docs/engineb/HARNESS_AUDIT.md
@@ -227,6 +227,34 @@ static unsigned long EBNGEN_SEEN[8];
 #include "eb_types.h"
 static eb_nsvf_state EBN[8];
 static unsigned char EBN_seen[8];
+/* ---- from shim 'notecv' ---- */
+/* engine_b/shim/notecv/voice_render.c — VERBATIM FORK of src/voice_render.c
+ * with ONE block replaced: the shared noise generator and the note/gate/
+ * velocity conditioning, lines 594-681, module engine_b/eb_notecv.{h,c}.
+ */
+#include "eb_notecv.h"
+#include <string.h>
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu).\n",              \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
+static eb_notecv_coef EBTC[8];
+static unsigned char  EBTHAVE[8];
+static unsigned long  EBTGEN_SEEN[8];
+
 /* ---- from shim 'pitch' ---- */
 /* SHIM — MODULE PITCH (engine_b/eb_pitch.{h,c}).
  * Replaces src/voice_render.c:1641-1664, the pitch polynomial. STATELESS, so
@@ -962,68 +990,43 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
     v2 = 0.0;
     JI(a1, 320) = 0;
   }
-  v5 = JF(base, 84336);
-  v6 = JF(base, 84272);
-  v7 = JF(base, 84304);
-  JF(base, 84352) = v5;
-  JF(base, 84288) = v6;
-  JF(base, 84320) = v7;
-  v8 = (int)(float)(v5 * -16777216.0);
-  if ( !v8 )
+  /* ============ ENGINE B MODULE M-NOTECV — the shared noise generator ====
+   * REPLACES src/voice_render.c:595-656. The boundary is set by module
+   * 'cvgate', which owns :657-681 -- see eb_notecv.h.
+   *
+   * The plain recall reads the port makes inside this range stay here: they
+   * are cell reads, so reading them here is identical to reading them there.
+   * NOT written back: eleven dead stores, listed in eb_notecv.h.
+   */
   {
-    v9 = 1;
-    goto LABEL_11;
-  }
-  v10 = v8 & 0x200000;
-  if ( (v8 & 0x800000) != 0 )
-  {
-    if ( !v10 )
-    {
-      v9 = 2 * v8;
-      goto LABEL_11;
+    eb_notecv_state ebns;
+
+    if (!EBTGEN_SEEN[voice] || EB_GEN_STALE(15, EBTGEN_SEEN[voice])) {
+      eb_notecv_coef ebn;
+      int _ch;
+      ebn.n84272 = JF(base, 84272); ebn.n84304 = JF(base, 84304);
+      ebn.n84400 = JF(base, 84400); ebn.n84416 = JF(base, 84416);
+      _ch = !EBTHAVE[voice] || memcmp(&EBTC[voice], &ebn, sizeof ebn) != 0;
+      EB_GEN_CHECK(15, EBTGEN_SEEN[voice], _ch, "notecv");
+      if (_ch) { EBTC[voice] = ebn; EBTHAVE[voice] = 1; }
     }
+
+    ebns.n84336 = JF(base, 84336);
+    ebns.n84368 = JF(base, 84368);
+    JF(base, 84432) = eb_notecv_tick(&ebns, &EBTC[voice]);
+    JF(base, 84336) = ebns.n84336;
+    JF(base, 84368) = ebns.n84368;
+
+    v11 = JF(a1, 208);
+    v12 = JF(a1, 176);
+    v14 = JF(a1, 368);
+    v16 = JF(a1, 384);
+    v19 = 0.0;
+    v23 = JF(a1, 272);
+    v25 = JF(a1, 240);
+    v26 = v23 * v25;
+    v27 = JF(a1, 304);
   }
-  else if ( v10 )
-  {
-    v9 = 2 * v8;
-    goto LABEL_11;
-  }
-  v9 = 2 * v8 + 1;
-LABEL_11:
-  v11 = JF(a1, 208);
-  v12 = JF(a1, 176);
-  v13 = v9 & 0xFFFFFF;
-  v14 = JF(a1, 368);
-  v15 = v9;
-  v16 = JF(a1, 384);
-  v17 = v9 | 0xFF000000;
-  v18 = v6 * v7;
-  JI(a1, 432) = 0;
-  JF(a1, 224) = v11;
-  v19 = 0.0;
-  if ( (v15 & 0x1000000) == 0 )
-    v17 = v13;
-  JF(a1, 192) = v12;
-  JI(base, 84384) = JI(base, 84368);
-  JI(a1, 512) = JI(a1, 496);
-  JF(a1, 352) = v2;
-  v20 = (float)v17 * 0.000000059604645;
-  JF(a1, 400) = v14;
-  JF(a1, 416) = v16;
-  JF(base, 84336) = v20;
-  v21 = (float)(v20 * JF(base, 84400)) + JF(base, 84416);
-  JF(base, 84368) = v21;
-  v22 = v18 - (float)(v7 * v21);
-  v23 = JF(a1, 272);
-  JF(a1, 288) = v23;
-  v24 = v22 + v21;
-  v25 = JF(a1, 240);
-  v26 = v23 * v25;
-  JF(a1, 256) = v25;
-  JF(base, 84432) = v24;
-  v27 = JF(a1, 304);
-  JF(a1, 336) = v27;
-  JF(a1, 448) = v26;
   /* ==== ENGINE B MODULE CVGATE =========================================
    * Only the ARITHMETIC is replaced. The port's cell writes stay exactly where
    * and in the order the port has them -- an earlier version of this shim moved

@@ -23,7 +23,7 @@
 int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c,
                      const eb_render_needs *n, float *outL, float *outR)
 {
-    float noise, mix = 0.0f;
+    float mix = 0.0f;
     int v;
 
     /* THE GUARD. Nothing sets render_ok, so this returns silence today. It is
@@ -38,12 +38,17 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
         return EB_RENDER_INCOMPLETE;
     }
 
-    noise = eb_noise_step(&e->noise);          /* ONCE, for all eight voices */
+    /* The noise LFSR now advances inside eb_notecv_tick, which is where the
+     * port advances it. The engine-wide single-advance law is preserved by
+     * the same mechanism the port uses (juno_driver.c's snapshot/restore),
+     * and reproducing that is part of the remaining engine work -- it is
+     * NOT done here, which is one more reason render_ok stays unset. */
 
     for (v = 0; v < EB_NUM_VOICES; ++v) {
         eb_voice *vc = &e->v[v];
         float e1, e2, pit, pwm, cut, o6704, o6848;
         float dly_env, pitch_cv, lfo_del, lfo_undel, lfo_pulse;
+        float gate_sign, pit_in, noise_v;
         float q[4], nsv04, nsvo, decimo, vcfo, cv;
         eb_cvgate_in gi;
         eb_cvgate_out go;
@@ -58,28 +63,57 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
             continue;
         }
 
-        /* ---- control rate ------------------------------------------------ */
-        e1 = eb_env_tick(&st->env[v][0], &c->env[v][0], n->gate);
-        e2 = eb_env_tick(&st->env[v][1], &c->env[v][1], n->gate);
+        /* ---- control rate ------------------------------------------------
+         * THE ORDER BELOW IS THE PORT'S, and it is not the order this
+         * function used to have. The port runs notecv (:594-681), then glide
+         * (:682-796), then the LFO (:797-963), and only THEN the envelopes
+         * (:964+). The envelopes' gate input is built from cell 560, which
+         * glide writes, and cell 1824, which the LFO writes -- both in the
+         * SAME sample. Ticking the envelopes first, as this function did while
+         * those two blocks were still caller-supplied, would feed them last
+         * sample's values. That is a one-sample skew: inaudible in a cold
+         * start and wrong everywhere else, which is this project's most
+         * repeated bug shape. */
+        /* THE NOISE, first, as the port has it: its LFSR advance sits at
+         * :595-656, ahead of everything else in the voice. */
+        noise_v = eb_notecv_tick(&st->notecv[v], &c->notecv[v]);
 
-        gi.t28 = n->kbd;   gi.t29 = n->vel;   gi.k = n->drive;
-        gi.p28 = e1;       gi.p29 = e2;       gi.gate_off = n->held;
+        /* CV/GATE next (:657-681). Its inputs are ALL recall cells plus the
+         * aux-latched cell 320 -- NOT the envelopes, which is what this call
+         * wrongly passed while the surrounding blocks were still caller-
+         * supplied placeholders. Corrected against the port. Its outputs are
+         * the pre-glide pitch CV (c464) and the gate sign. */
+        gi.t28 = c->cvg_t28[v];  gi.t29 = c->cvg_t29[v];
+        gi.k   = c->cvg_k[v];    gi.p28 = c->cvg_p28[v];
+        gi.p29 = st->gate_cell320[v];
+        gi.gate_off = c->cvg_gate_off[v];
         eb_cvgate(&gi, &go);
+        pit_in    = go.c464;
+        gate_sign = go.sign;
 
-        /* GLIDE first: it produces the final pitch CV and the LFO's own
-         * delay-envelope input, in that order in the port. */
         dly_env = eb_glide_tick(&st->glide[v], &c->glide[v],
-                                go.sign, n->kbd, n->vel, n->pitch_in, &pitch_cv);
+                                gate_sign, c->kbd[v], c->vel[v], pit_in,
+                                &pitch_cv);
 
-        /* THE LFO, then, because both CV blocks below read its two outputs.
-         * It is per voice, not per engine: the port runs one LFO inside each
-         * voice's render and they are not in lockstep. */
         lfo_del = eb_lfo_tick(&st->lfo[v], &c->lfo[v], dly_env,
                               c->lfo_ext_gate[v], c->lfo_ext0[v],
-                              c->lfo_ext1[v], noise, &lfo_undel, &lfo_pulse);
-        (void)lfo_pulse;
+                              c->lfo_ext1[v], noise_v, &lfo_undel, &lfo_pulse);
 
-        eb_modcv_tick(&c->mod[v], pitch_cv, n->kbd,
+        /* the envelope gate, exactly as the port's envelope block builds it:
+         * cell 560 (= gate_sign + 1, glide's own state) gated by the LFO pulse
+         * polarity unless that envelope's LFO TRIG switch is off. */
+        {
+            float k0 = (lfo_pulse <= 0.0f) ? 0.0f : 1.0f;
+            float k1 = k0;
+            if (c->env_lfo_trig[v][0] == 0.0f) k0 = 1.0f;
+            if (c->env_lfo_trig[v][1] == 0.0f) k1 = 1.0f;
+            e1 = eb_env_tick(&st->env[v][0], &c->env[v][0],
+                             st->glide[v].s560 * k0);
+            e2 = eb_env_tick(&st->env[v][1], &c->env[v][1],
+                             st->glide[v].s560 * k1);
+        }
+
+        eb_modcv_tick(&c->mod[v], pitch_cv, c->kbd[v],
                       lfo_del, lfo_undel, e1, e2, &pit, &pwm);
         eb_modcv_latch(&st->mod[v], pwm);
 
@@ -96,7 +130,7 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
         eb_dco_set_pitch(&st->dco_live[v], cv, pwm);
         eb_dco_step4(&st->dco[v], &st->dco_live[v], q);
         decimo = eb_decim_tick(&st->dec[v], &c->dec[v], q[0], q[1], q[2], q[3]);
-        nsvo   = eb_nsvf_tick(&st->nsv[v], &c->nsv[v], noise, &nsv04);
+        nsvo   = eb_nsvf_tick(&st->nsv[v], &c->nsv[v], noise_v, &nsv04);
         vcfo   = eb_vcf_tick(&st->vcf[v], &c->vcf[v], decimo + nsvo, cut, o6848);
         mix   += eb_vca_tick(&st->vca[v], &c->vca[v], vcfo, e1, e2,
                              o6704, go.sign);

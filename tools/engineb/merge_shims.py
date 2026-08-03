@@ -38,6 +38,7 @@ USAGE
     merge_shims.py            regenerate every composite, report what changed
     merge_shims.py --check    exit non-zero if a composite is stale (for CI)
 """
+import re
 import sys, os, glob, difflib, argparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -88,14 +89,22 @@ def build_one(name, base, verbose=True):
     if not mods:
         raise SystemExit("no member shims found for %s" % base)
 
-    heads, edits, owner = [], [], {}
+    heads, edits, owner = [], [], []
     for m in mods:
         h, b = regions(port, open(os.path.join(SHIM, m, base)).read().split("\n"))
         heads.append((m, h))
         for i1, i2, rep in b:
             # OVERLAP CHECK. Two modules editing the same port lines cannot be
             # merged mechanically and must not be merged by guesswork.
-            for om, (oi1, oi2) in owner.items():
+            # `owner` USED TO BE A DICT KEYED BY MODULE, which kept only each
+            # module's LAST region and therefore compared against a fraction of
+            # what existed. MEASURED 2026-08-03: module 'cvgate' edits three
+            # ranges (657-658, 661-671, 673-681); with only the last recorded,
+            # a new module spanning 595-672 overlapped the first two and the
+            # guard said nothing. The composite merged, compiled, and nulled at
+            # 0.0 dB on all 30 scenarios -- a total divergence that this check
+            # exists precisely to prevent. It is a LIST now.
+            for om, oi1, oi2 in owner:
                 if i1 < oi2 and oi1 < i2:
                     raise SystemExit(
                         "OVERLAPPING SHIMS: '%s' edits %s lines %d-%d and '%s' "
@@ -105,8 +114,26 @@ def build_one(name, base, verbose=True):
                         "regions are disjoint, or write the composite by hand "
                         "AND gate it.\n  Do not resolve this automatically."
                         % (om, base, oi1 + 1, oi2, m, i1 + 1, i2))
-            owner[m] = (i1, i2)
+            owner.append((m, i1, i2))
             edits.append((i1, i2, rep, m))
+
+    # DUPLICATE FILE-SCOPE STATICS. Each shim declares its own coefficient
+    # cache at file scope; two shims that happen to pick the same name compile
+    # fine ALONE and collide only in the composite. MEASURED 2026-08-03:
+    # 'noise_svf' and a new 'notecv' both chose EBNC, and the composite failed
+    # to compile with a conflicting-types error that named neither module.
+    # Caught here instead, where the message can say which two.
+    _seen = {}
+    for _m in mods:
+        _txt = open(os.path.join(SHIM, _m, base)).read()
+        for _mt in re.finditer(r"^static\s+[\w ]+?\s+(\w+)\s*\[", _txt, re.M):
+            _seen.setdefault(_mt.group(1), set()).add(_m)
+    _dup = {k: sorted(v) for k, v in _seen.items() if len(v) > 1}
+    if _dup:
+        raise SystemExit(
+            "DUPLICATE FILE-SCOPE STATICS across shims of %s: %s\n"
+            "  Each compiles alone and collides only in the composite.\n"
+            "  WHAT TO DO: rename one module's statics." % (base, _dup))
 
     out = list(port)
     for i1, i2, rep, m in sorted(edits, key=lambda e: -e[0]):   # bottom-up
