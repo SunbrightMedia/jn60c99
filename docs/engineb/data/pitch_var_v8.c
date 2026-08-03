@@ -1,3 +1,10 @@
+/* eb_pitch.c — VARIANT V8 (PROBE): the shipping v7 fast path with ONE change:
+ * the compensated (hi,lo,c) accumulator acc3/acc_add is replaced by the plain
+ * Dekker df_add. v7 contains TWO independent upgrades over the failed plain
+ * Dekker variant -- error-free product lo-paths AND the compensated
+ * accumulator -- and the record never established which was necessary. If this
+ * passes, the 12 acc_add calls (4 two_sum each) come off the S3 cost. */
+#define EB_PITCH_FAST 1
 /* eb_pitch.c — see eb_pitch.h. Double precision throughout until the final
  * fminf/fmaxf, exactly as the port. */
 #include "eb_pitch.h"
@@ -32,30 +39,6 @@
  * conversions at first call, then never again).                              */
 #ifndef EB_PITCH_FAST
 #define EB_PITCH_FAST 0
-#endif
-
-/* CHEAPER VARIANTS WERE BUILT, MEASURED, AND REJECTED — do not rebuild them.
- * (P2 study, docs/engineb/data/pitch_p2_study.md, 2026-08-03.) v7 contains two
- * independent upgrades over plain Dekker, and single-change probes measured
- * each alone over the full 30-scenario null at BOTH rates:
- *
- *              products     accumulator   44,100 Hz    48,000 Hz    instr/call
- *   v8         error-free   simple add    -110.2 dB    FAIL -95.4   2,224
- *   v9         simple       compensated   -106.0 dB    FAIL -95.4   1,792
- *   v7 (this)  error-free   compensated   -123.6 dB    -148.4 dB    2,640
- *
- * BOTH cheaper variants pass 44.1 kHz and FAIL the SHIPPING rate — the exact
- * trap DOUBT_AUDIT.md H1 was about, caught because P1 gave the null a --rate.
- * The guard below makes requesting them a compile error instead of a silently
- * better-than-asked-for v7. Also killed in the same study, by measurement, not
- * by taste: moving precision into the DCO phase accumulator (the port's own
- * increment is a float; a value difference cannot be repaired downstream), and
- * recentered/higher-precision evaluation (the port's sum structure amplifies
- * its OWN double rounding by up to 2^37 near the polynomial's zeros, so a more
- * accurate result diverges from the port exactly there — only structural
- * mimicry can match it). */
-#if EB_PITCH_FAST > 1
-#error "EB_PITCH_FAST levels above 1 (v8/v9) FAILED the 48 kHz null at -95.4 dB. See docs/engineb/data/pitch_p2_study.md."
 #endif
 
 #if EB_PITCH_FAST
@@ -167,18 +150,11 @@ static int ebpf_row(float cv)
  * scenarios that failed variant B are cancellation cases. Here every rounding
  * of the lo path is captured by a further two_sum and banked in c, giving the
  * SUM ~70+ effective bits while the terms stay ~49-bit dfs. */
-typedef struct { df s; float c; } acc3;
-
-static acc3 acc_add(acc3 A, df t)
+static df df_add(df a, df b)
 {
-    df s1 = two_sum(A.s.hi, t.hi);          /* exact */
-    df s2 = two_sum(A.s.lo, t.lo);          /* exact */
-    df s3 = two_sum(s1.lo, s2.hi);          /* exact */
-    df r  = two_sum(s1.hi, s3.hi);          /* exact renormalize */
-    acc3 out;
-    out.s = r;
-    out.c = (A.c + s2.lo) + s3.lo;
-    return out;
+    df s = two_sum(a.hi, b.hi);
+    float lo = s.lo + a.lo + b.lo;
+    return two_sum(s.hi, lo);
 }
 
 static float ebpf_eval_row(float cv, int row, float gain)
@@ -192,27 +168,22 @@ static float ebpf_eval_row(float cv, int row, float gain)
     df x8   = df_mulf(df_mulf(df_mulf(x5, x), x), x); /* v389 */
     df x10  = df_mulf(df_mulf(x8, x), x);         /* v390 */
 
-    acc3 A;
-    A.s = df_mulf(ebpf_c(ch, cl, 1), x);
-    A.c = 0.0f;
-    A = acc_add(A, ebpf_c(ch, cl, 0));
-    A = acc_add(A, df_mulf(df_mulf(ebpf_c(ch, cl, 2), x), x));
-    A = acc_add(A, df_mul(x3, ebpf_c(ch, cl, 3)));
-    A = acc_add(A, df_mul(df_mulf(x3, x), ebpf_c(ch, cl, 4)));
-    A = acc_add(A, df_mul(x5, ebpf_c(ch, cl, 5)));
-    A = acc_add(A, df_mul(df_mulf(x5, x), ebpf_c(ch, cl, 6)));
-    A = acc_add(A, df_mul(df_mulf(df_mulf(x5, x), x), ebpf_c(ch, cl, 7)));
-    A = acc_add(A, df_mul(x8, ebpf_c(ch, cl, 8)));
-    A = acc_add(A, df_mul(df_mulf(x8, x), ebpf_c(ch, cl, 9)));
-    A = acc_add(A, df_mul(x10, ebpf_c(ch, cl, 10)));
-    A = acc_add(A, df_mul(df_mulf(x10, x), ebpf_c(ch, cl, 11)));
-    A = acc_add(A, df_mul(df_mulf(df_mulf(x10, x), x), ebpf_c(ch, cl, 12)));
+    df A = df_mulf(ebpf_c(ch, cl, 1), x);
+    A = df_add(A, ebpf_c(ch, cl, 0));
+    A = df_add(A, df_mulf(df_mulf(ebpf_c(ch, cl, 2), x), x));
+    A = df_add(A, df_mul(x3, ebpf_c(ch, cl, 3)));
+    A = df_add(A, df_mul(df_mulf(x3, x), ebpf_c(ch, cl, 4)));
+    A = df_add(A, df_mul(x5, ebpf_c(ch, cl, 5)));
+    A = df_add(A, df_mul(df_mulf(x5, x), ebpf_c(ch, cl, 6)));
+    A = df_add(A, df_mul(df_mulf(df_mulf(x5, x), x), ebpf_c(ch, cl, 7)));
+    A = df_add(A, df_mul(x8, ebpf_c(ch, cl, 8)));
+    A = df_add(A, df_mul(df_mulf(x8, x), ebpf_c(ch, cl, 9)));
+    A = df_add(A, df_mul(x10, ebpf_c(ch, cl, 10)));
+    A = df_add(A, df_mul(df_mulf(x10, x), ebpf_c(ch, cl, 11)));
+    A = df_add(A, df_mul(df_mulf(df_mulf(x10, x), x), ebpf_c(ch, cl, 12)));
 
     {
-        /* best-effort correctly-rounded collapse of (hi, lo, c) to one float */
-        df t = two_sum(A.s.lo, A.c);
-        df u = two_sum(A.s.hi, t.hi);
-        float out = u.hi + (u.lo + t.lo);
+        float out = A.hi + A.lo;
         return fmaxf(fminf(out, 512.0f), -512.0f) * gain;
     }
 }

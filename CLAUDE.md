@@ -35,6 +35,21 @@
   separate on purpose.
 - Still open: H3 (~69,000 is an estimate of an engine that does not exist —
   needs P5 then P6) and H5 (instructions ≠ cycles — silicon only).
+- **P2 CLOSED, NEGATIVE (same night, Fable 5) — read
+  `docs/engineb/data/pitch_p2_study.md`. All three cheaper-pitch exits are
+  dead, two by measurement:** (1) the phase-accumulator hypothesis CANNOT work
+  — the port's increment is itself a float, a value difference cannot be
+  repaired downstream; (2) recentering/truer-value schemes CANNOT match the
+  port — its own sum structure amplifies its double rounding by up to 2^37
+  near the polynomial's zeros (measured from juno_pitch_table in exact
+  rationals), so only structural mimicry matches; (3) v7's two upgrades were
+  isolated (v8 = simple accumulator −16 %, v9 = simple products −32 %): both
+  **PASS 44.1 kHz (−110.2 / −106.0) and FAIL 48 kHz at −95.4 dB** on 'DCO neg
+  pitch sweep' — the H1 trap live, caught only because P1 exists. **v7 stays;
+  EB_PITCH_FAST > 1 is now a #error; pitch's ~21,300 instr/sample is the
+  measured price of the gate.** DOUBT_AUDIT §4's best case worsens to
+  ~54,000–61,000 → the P8 restructure track is more mandatory, not less.
+  Probe variants v8/v9 + the 48k probe wrapper are in docs/engineb/data/.
 
 **★★★★★★★★ (2026-08-03 evening, Fable 5) — THE DOUBT AUDIT. Read
 `docs/engineb/DOUBT_AUDIT.md` FIRST; its plan P1–P12 SUPERSEDES

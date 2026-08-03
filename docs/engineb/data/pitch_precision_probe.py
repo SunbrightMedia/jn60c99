@@ -27,6 +27,8 @@ VARIANTS = {
     "v5": os.path.join(SCRATCH, "pitch_var_v5.c"),
     "v6": os.path.join(SCRATCH, "pitch_var_v6.c"),
     "v7": os.path.join(SCRATCH, "pitch_var_v7.c"),
+    "v8": os.path.join(SCRATCH, "pitch_var_v8.c"),
+    "v9": os.path.join(SCRATCH, "pitch_var_v9.c"),
 }
 
 

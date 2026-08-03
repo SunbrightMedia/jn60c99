@@ -1,3 +1,10 @@
+/* eb_pitch.c — VARIANT V9 (PROBE): the shipping v7 fast path with ONE change,
+ * the complement of v8: the error-free product lo-paths (v7 df_mul/df_mulf)
+ * are replaced by the simple Dekker forms, while the compensated (hi,lo,c)
+ * accumulator is KEPT. Plain Dekker (simple products + simple add) failed
+ * 2/30; v8 (error-free products + simple add) passed at -110.2 dB. This
+ * variant isolates which upgrade carries the margin.  */
+#define EB_PITCH_FAST 1
 /* eb_pitch.c — see eb_pitch.h. Double precision throughout until the final
  * fminf/fmaxf, exactly as the port. */
 #include "eb_pitch.h"
@@ -32,30 +39,6 @@
  * conversions at first call, then never again).                              */
 #ifndef EB_PITCH_FAST
 #define EB_PITCH_FAST 0
-#endif
-
-/* CHEAPER VARIANTS WERE BUILT, MEASURED, AND REJECTED — do not rebuild them.
- * (P2 study, docs/engineb/data/pitch_p2_study.md, 2026-08-03.) v7 contains two
- * independent upgrades over plain Dekker, and single-change probes measured
- * each alone over the full 30-scenario null at BOTH rates:
- *
- *              products     accumulator   44,100 Hz    48,000 Hz    instr/call
- *   v8         error-free   simple add    -110.2 dB    FAIL -95.4   2,224
- *   v9         simple       compensated   -106.0 dB    FAIL -95.4   1,792
- *   v7 (this)  error-free   compensated   -123.6 dB    -148.4 dB    2,640
- *
- * BOTH cheaper variants pass 44.1 kHz and FAIL the SHIPPING rate — the exact
- * trap DOUBT_AUDIT.md H1 was about, caught because P1 gave the null a --rate.
- * The guard below makes requesting them a compile error instead of a silently
- * better-than-asked-for v7. Also killed in the same study, by measurement, not
- * by taste: moving precision into the DCO phase accumulator (the port's own
- * increment is a float; a value difference cannot be repaired downstream), and
- * recentered/higher-precision evaluation (the port's sum structure amplifies
- * its OWN double rounding by up to 2^37 near the polynomial's zeros, so a more
- * accurate result diverges from the port exactly there — only structural
- * mimicry can match it). */
-#if EB_PITCH_FAST > 1
-#error "EB_PITCH_FAST levels above 1 (v8/v9) FAILED the 48 kHz null at -95.4 dB. See docs/engineb/data/pitch_p2_study.md."
 #endif
 
 #if EB_PITCH_FAST
@@ -108,27 +91,17 @@ static df two_prod(float a, float b)
  * path itself no longer rounds first-order error away. */
 static df df_mul(df a, df b)
 {
-    df p  = two_prod(a.hi, b.hi);
-    df q1 = two_prod(a.hi, b.lo);
-    df q2 = two_prod(a.lo, b.hi);
-    df s1 = two_sum(p.lo, q1.hi);
-    df s2 = two_sum(s1.hi, q2.hi);
-    float lo = s2.hi;
-    float e  = ((s1.lo + s2.lo) + (q1.lo + q2.lo)) + a.lo * b.lo;
-    df r = two_sum(p.hi, lo);
-    r.lo += e;
-    return two_sum(r.hi, r.lo);
+    df p = two_prod(a.hi, b.hi);
+    p.lo += a.hi * b.lo + a.lo * b.hi;
+    return two_sum(p.hi, p.lo);
 }
 
 /* df * float, v7: the a.lo*b product keeps its own error term. */
 static df df_mulf(df a, float b)
 {
     df p = two_prod(a.hi, b);
-    df q = two_prod(a.lo, b);
-    df s = two_sum(p.lo, q.hi);
-    df r = two_sum(p.hi, s.hi);
-    r.lo += s.lo + q.lo;
-    return two_sum(r.hi, r.lo);
+    p.lo += a.lo * b;
+    return two_sum(p.hi, p.lo);
 }
 
 /* the pre-split coefficient for term k of the selected row */

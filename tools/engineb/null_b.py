@@ -135,7 +135,10 @@ if os.environ.get("JUNO_EB_VERIFY_GEN"):
 # the -100 dB gate can be run against the REAL integrated file, not a probe
 # copy. MEASURED 2026-08-03: worst global -123.6 dB over all 30 scenarios.
 if os.environ.get("JUNO_EB_PITCH_FAST"):
-    CFLAGS = CFLAGS + ["-DEB_PITCH_FAST=1"]
+    # The value is a LADDER LEVEL, not a boolean (1 = v7, 2 = v8, 3 = v9 --
+    # see the table in eb_pitch.c). "1" keeps the old boolean meaning.
+    CFLAGS = CFLAGS + ["-DEB_PITCH_FAST=%d"
+                       % int(os.environ["JUNO_EB_PITCH_FAST"])]
 # EB_DCO_RECIP: replace the pulse phase's division with a multiply by a
 # reciprocal. Added as an env hook 2026-08-03: its -121.1 dB result had been
 # measured by hand-editing the header, so the gate that certified it was not

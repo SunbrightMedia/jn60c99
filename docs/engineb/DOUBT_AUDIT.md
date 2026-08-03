@@ -56,6 +56,21 @@ The pitch polynomial was the only one, and it is handled.**
 | **H4** DCO cost unknown | **CLOSED** — MEASURED×STATIC, no QEMU: **~11,610 instr/sample**, not 17,581. `data/dco_real_cost.md` |
 | **H5** instructions ≠ cycles | OPEN — silicon only (P10). |
 
+**P2 is CLOSED with a negative result (2026-08-03 night, Fable 5) —
+`data/pitch_p2_study.md`.** The phase-accumulator hypothesis is dead by
+argument (the port's increment is itself a float; a value difference cannot be
+repaired downstream), recentering is dead by measurement (the port's sum
+structure amplifies its own double rounding by up to 2^37 near the
+polynomial's zeros — only structural mimicry can match it), and the two
+single-downgrade variants of v7 (v8: simple accumulator, −16 %; v9: simple
+products, −32 %) both **pass 44.1 kHz and FAIL 48 kHz at −95.4 dB** — the
+exact H1 trap, caught because P1 exists. v7 stays; levels above 1 are now a
+compile error. The pitch block's ~21,300 instr/sample is the measured price of
+matching the port; the §4 best-case row "phase-accumulator pitch lands
+(−~19,000)" is struck, which moves the honest best case to **~54,000–61,000**
+before P7/P8 structural work — strengthening, not weakening, §4's conclusion
+that the restructure track is mandatory.
+
 **P3 also changed the arithmetic in §4.** The DCO was carried there at its QEMU
 worst case; its real cost is 5,971 instructions per sample lower, and the
 reciprocal takes off 1,408 more. Both corrections land inside the "DCO real-mix"
