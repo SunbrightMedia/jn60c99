@@ -1,6 +1,6 @@
 /* GENERATED FILE -- DO NOT EDIT.
  * tools/engineb/merge_shims.py built this from the individual shims:
- *     cvgate, dco, decim, env, glide, lfo, noise_svf, noisemix, notecv, pitch, pwm_cv, vca_hpf, vcf_cv, vcf_ladder, vcf_res
+ *     cvgate, dco, dcoprep, decim, env, glide, lfo, noise_svf, noisemix, notecv, pitch, pwm_cv, vca_hpf, vcf_cv, vcf_ladder, vcf_res
  * Edit those, then re-run the generator (make engineb does it).
  * Its purpose: engine B cannot be tested as a WHOLE ENGINE while each
  * module shadows the same port file -- see docs/engineb/HARNESS_AUDIT.md
@@ -21,6 +21,34 @@
  * DCO module and to nothing else. See engine_b/eb_dco.h.
  */
 #include "eb_dco.h"     /* -I engine_b/ is supplied by the harness */
+
+/* ---- from shim 'dcoprep' ---- */
+/* engine_b/shim/dcoprep/voice_render.c — VERBATIM FORK of src/voice_render.c
+ * with ONE block replaced: the DCO pitch/PWM preparation, lines 1702-1717,
+ * module engine_b/eb_dcoprep.{h,c}.
+ */
+#include "eb_dcoprep.h"
+#include <string.h>
+extern unsigned long eb_coef_gen;
+#ifdef EB_VERIFY_GEN
+#include <stdio.h>
+#include <stdlib.h>
+#define EB_GEN_STALE(slot, seen)  (1)
+#define EB_GEN_CHECK(slot, seen, changed, name)                                \
+    do { if ((changed) && (seen) == eb_coef_gen) {                             \
+             fprintf(stderr, "EB_VERIFY_GEN: %s coefficients CHANGED while the "\
+                     "generation counter was unchanged (%lu).\n",              \
+                     name, eb_coef_gen);                                       \
+             abort(); }                                                        \
+         (seen) = eb_coef_gen; } while (0)
+#else
+#define EB_GEN_STALE(slot, seen)  ((seen) != eb_coef_gen)
+#define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
+#endif
+
+static eb_dcoprep_coef EBPC[8];
+static unsigned char   EBPHAVE[8];
+static unsigned long   EBPGEN_SEEN[8];
 
 /* ---- from shim 'decim' ---- */
 /* SHIM — MODULE DECIM (engine_b/eb_decim.{h,c}).
@@ -1832,22 +1860,38 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
   JI(a1, 4880) = JI(a1, 4864);
     /* ==== ENGINE B MODULE DECIM: the 30-move delay-line and biquad shift
      * is a rotating index in eb_decim.c and moves nothing. ==== */
+  /* ============ ENGINE B MODULE M-DCOPREP ===============================
+   * REPLACES src/voice_render.c:1702-1717 verbatim.
+   *
+   * The three cell/local pairs 4784, 4800 and 4816 are assigned BOTH ways: the
+   * cells are dead but the promoted scratch locals are read by the DCO block
+   * below. See eb_dcoprep.h.
+   */
   JI(a1, 4736) = v393;
   JI(a1, 4752) = v394;
-  v395 = v392 + JF(a1, 6304);
-  v396 = v391 * JF(a1, 5536);
-  v397 = JF(a1, 5520);
   JI(a1, 4768) = v386_lo;
-  v398 = fmaxf(JF(a1, 5568), v396);
-  v399 = (float)(v395 * JF(a1, 6320)) + JF(a1, 6288);
-  JF(a1, 4784) = _s4784 = v398;
-  JF(a1, 4816) = _s4816 = v397 + JF(a1, 3808);
-  if ( v399 <= 0.0 )
-    v400 = 0.0;
-  else
-    v400 = v399;
-  JF(a1, 4800) = _s4800 = 0.00390625 / v398;
-  JF(a1, 5456) = v400;
+  {
+    float ebp4800, ebp4816, ebp5456;
+
+    if (!EBPGEN_SEEN[voice] || EB_GEN_STALE(18, EBPGEN_SEEN[voice])) {
+      eb_dcoprep_coef ebp;
+      int _ch;
+      ebp.k5520 = JF(a1, 5520); ebp.k5536 = JF(a1, 5536);
+      ebp.k5568 = JF(a1, 5568); ebp.k6288 = JF(a1, 6288);
+      ebp.k6304 = JF(a1, 6304); ebp.k6320 = JF(a1, 6320);
+      _ch = !EBPHAVE[voice] || memcmp(&EBPC[voice], &ebp, sizeof ebp) != 0;
+      EB_GEN_CHECK(18, EBPGEN_SEEN[voice], _ch, "dcoprep");
+      if (_ch) { EBPC[voice] = ebp; EBPHAVE[voice] = 1; }
+    }
+
+    v398 = eb_dcoprep_tick(&EBPC[voice], v391, v392, JF(a1, 3808),
+                           &ebp4800, &ebp4816, &ebp5456);
+
+    JF(a1, 4784) = _s4784 = v398;
+    JF(a1, 4800) = _s4800 = ebp4800;
+    JF(a1, 4816) = _s4816 = ebp4816;
+    JF(a1, 5456) = ebp5456;
+  }
   /* ================= ENGINE B MODULE — THE DCO OSCILLATOR =================
    * REPLACES src/voice_render.c:1718-2136 verbatim. Diff this file against
    * src/voice_render.c: this block is the ONLY change, plus the include above.

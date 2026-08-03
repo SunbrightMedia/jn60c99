@@ -351,6 +351,9 @@ _OUT_ANCHOR = {
     "notecv": ("voice_render.c",
                "    JF(base, 84432) = eb_notecv_tick(&ebns, &EBTC[voice]);",
                "    JF(base, 84432) *= %s;"),
+    "dcoprep": ("voice_render.c",
+                "    JF(a1, 5456) = ebp5456;",
+                "    _s4784 *= %s;"),
     "vcf_res": ("voice_render.c",
                 "    JF(a1, 7520) = ebrs.s7520;",
                 "    v241 *= %s;"),
@@ -853,7 +856,7 @@ def teeth(quick):
     # result, so it cannot be perturbed into the output at all. It is
     # un-gateable by this harness by construction -- see _OUT_ANCHOR.
     for _m in sorted(_OUT_ANCHOR):
-        if _m in ("pwm_cv", "pitch", "cvgate", "glide"):
+        if _m in ("pwm_cv", "pitch", "cvgate", "glide", "dcoprep"):
             # Both carry a CONTROL value -- a cutoff and a pitch -- so a
             # relative error on them is amplified enormously at the output, and
             # both are gated finer than one ULP of 1.0f. A pass case is
@@ -868,6 +871,12 @@ def teeth(quick):
             # scenarios, and 1e-8 gives EXACTLY 0 because 1.0f + 1e-8f == 1.0f
             # -- that build perturbs nothing, so a pass case is impossible
             # rather than merely absent.
+            #
+            # 'dcoprep' is fail-only for the same reason as 'glide' and
+            # 'pitch': its output IS the DCO phase increment, so an error on it
+            # integrates. MEASURED at 48 kHz: 1e-6 fails at -49.7 dB in 23
+            # scenarios and 1e-7 still fails at -64.7 dB in 16; the next step
+            # down, 1e-8, is below one ULP of 1.0f and perturbs nothing.
             #
             # 'cvgate' is here for a DIFFERENT reason, and the distinction
             # matters: its output is a three-way gate sign, a SWITCH, so a
