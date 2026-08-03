@@ -158,28 +158,31 @@ typedef struct {
     int32_t         rev_wipe;
 } eb_render_state;
 
-/* EB_RENDER_NEEDS — the inputs this function cannot yet compute.
+/* EB_RENDER_NEEDS — THE LIST IS EMPTY, and this time nothing is defaulted.
  *
- * It started at eight and every entry was removed by claiming the block that
- * produces it. Wiring the last three modules (vcf_res, dcoprep, noisemix) put
- * TWO back, and they are recorded here rather than defaulted to zero inside
- * the render, because a silent default is precisely the failure this struct
- * exists to prevent -- the mistake was made and caught twice in one session.
+ * It started at eight. Every entry was removed by claiming the block that
+ * produces it, never by choosing a value. The last two closed without any new
+ * transcription at all, because both were values engine B already computed
+ * and simply had not routed:
+ *   cell 3808 IS eb_modcv_tick's `pwm_out` (eb_pwm_cv.c:91 says so);
+ *   cell 3536 IS eb_modcv_tap()'s one-sample delay of 3520 (:1076).
+ * The tap is taken BEFORE the latch, because the port feeds that consumer
+ * last sample's value.
  *
- *   pwm_width    cell 3808, written at src/voice_render.c:1117 -- a long
- *                product chain in the PWM/mod-CV region. eb_dcoprep needs it
- *                for the pulse width. The region IS claimed (by pwm_cv), but
- *                that module does not currently RETURN this value.
- *   noise_scale  cell 3536, written at :1076 as a delayed copy of 3520. Same
- *                situation: claimed region, unreturned value.
+ * The struct is kept, empty, on purpose: it is the place a future input goes
+ * if one is ever found, and a caller that passes NULL still compiles.
  *
- * Both are one-line extensions of modules that already exist and are already
- * gated; neither is new transcription work. They are the last two entries.
- *
- * When this struct is empty the function is the engine. */
+ * THE GUARD DOES NOT COME OFF FOR THIS. An empty list is not the finish line;
+ * the three gates named at the top of this header are. Outstanding:
+ *   - the standalone shim (eb_coefs feeds it) is not written yet, so
+ *     eb_engine_render has never rendered a scenario;
+ *   - eb_engine.c's note handling drives eb_alloc (gated) but does not yet
+ *     apply its RETRIG / PORTA_GATE events to the CV modules;
+ *   - the two delayed copies in port range :1665-1671 are still unmodelled.
+ * render_ok stays unset until null_b, plugin_check and a teeth bracket have
+ * all run against this function. */
 typedef struct {
-    float pwm_width;
-    float noise_scale;
+    int unused;
 } eb_render_needs;
 
 /* Render one stereo sample. `n` supplies the values listed above.
