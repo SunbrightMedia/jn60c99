@@ -372,6 +372,14 @@ _OUT_ANCHOR = {
     "master_out": ("master_render.c",
                    "      EBMO_L = _oL; EBMO_R = _oR;",
                    "      EBMO_L *= %s; EBMO_R *= %s;"),
+    # A DELAY DISPATCH ARM (task 1b-1). Perturbed at the two channel signals it
+    # returns. NOTE it can only be caught by the scenarios that SELECT this arm
+    # -- DELAY types 2 and 3 -- which is exactly why those scenarios had to
+    # exist before the module was written.
+    "delay_t23": ("master_render.c",
+                  "      eb_dly23_tick(&st23, &EBD23C, v36, v38, v5, "
+                  "&v176, &v177, &v56, &v58);",
+                  "      v176 *= %s; v177 *= %s;"),
     # THE WHOLE VOICE CHAIN, at the point its samples enter the port's master.
     # This module is the 1b-0 voice-level gate (docs/engineb/PHASE1_ORDERS.md):
     # engine B's own render function driving its own state, with the master
@@ -506,6 +514,13 @@ _BRACKET = {
     # for the same reason -- all three perturb the signal at unity gain on its
     # way out, so a relative error on them means the same thing at the output.
     "master_in":  ("3.16e-5", "3.16e-6"),
+    # A DELAY ARM. MEASURED 2026-08-04 at 48 kHz: 3.16e-5 FAILS at -90.0 dB but
+    # in only 2 of the 33 scenarios -- precisely the two DELAY-type-2 and -3
+    # scenarios added for arm coverage. 3.16e-6 PASSES at -109.8 dB. That 2/33
+    # is the proof the coverage work was a PREREQUISITE and not a nicety:
+    # before those scenarios existed this module's teeth would have caught
+    # NOTHING, and a green gate would have meant the arm never ran.
+    "delay_t23":  ("3.16e-5", "3.16e-6"),
     "master_out": ("3.16e-5", "3.16e-6"),
     # The 1b-0 whole-voice-chain gate. MEASURED 2026-08-04 at 48 kHz over all
     # 30 scenarios: 3.16e-5 FAILS at -90.0 dB in 30/30, 3.16e-6 PASSES at
