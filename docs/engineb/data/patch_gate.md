@@ -59,7 +59,31 @@ caller-owned (`eb_master_rings`, 6.10 MB) and separate from this.
 So on-device recall is a PAGING problem, not a rewrite: `JF`/`JI` in
 `src/juno_engine.h` are macros over `(state, offset)`, so a build that
 substitutes a translating accessor would let the SAME recall source run against
-a compact arena. The obstacle to doing it mechanically is that the recall also
-uses `memcpy`/`memset` over ranges and some raw pointer arithmetic, which the
-macros do not cover — those sites need finding first. Recorded as the concrete
-next step rather than attempted at the end of a session.
+a compact arena. ### The size of that job, MEASURED rather than guessed
+
+| recall TU | `JF`/`JI` | `mem*()` | raw ptr |
+|---|---|---|---|
+| `juno_init.c` | 2,296 | 0 | 0 |
+| `juno_prepare.c` | 127 | 1 | 0 |
+| `delay_recall.c` | 44 | 11 | 13 |
+| `juno_apply.c` | 32 | 1 | 0 |
+| `effect_modes.c` | 18 | 1 | 2 |
+| `juno_note.c` | 16 | 1 | 0 |
+| `chorus_recall.c` | 11 | 2 | 0 |
+| `reverb_recall.c` | 8 | 1 | 1 |
+| `finefx_recall.c` | 3 | 1 | 0 |
+| **`chorus_init.c`** | **0** | **0** | **2,966** |
+| TOTAL | 2,555 | 20 | 2,981 |
+
+A translating accessor covers the **2,555** macro sites for free. Of the 3,001
+that it does not, **2,966 are in `chorus_init.c` alone and every one of them is
+the SAME shape** — `*(_DWORD *)(a1 + N)`, 2,966 of 2,966, with no `memcpy` or
+`memset` anywhere in that file. That is one mechanical rewrite to `JI(a1, N)`,
+not 2,966 decisions.
+
+**So the real manual surface is about 35 sites**, concentrated in
+`delay_recall.c` (11 `mem*` + 13 raw). That is a bounded, one-session job — and
+`src/` is frozen, so it must be done as an engine B FORK of those TUs with its
+own gate: the coefficients it produces must be identical, cell for cell, to the
+ones the port's recall produces. Recorded with the number so the next session
+starts from a size rather than from a phrase.
