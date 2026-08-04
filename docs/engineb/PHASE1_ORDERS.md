@@ -222,3 +222,23 @@ EXACTLY-0 null, teeth, census. The FX modules stay as they are.
 
 **1b-2: the standalone gate as originally specified.** Then 1d, C5, playbook,
 certification. Nothing else in the orders changes.
+
+### ✔ 1b-2 DONE (Opus 5, 2026-08-04). Read `data/standalone_gate.md`.
+
+`null_b.py --module standalone`: all 33 scenarios, **EXACTLY 0 at BOTH rates**.
+`plugin_check.py --module standalone`: **11/11 BIT-EXACT vs the PLUGIN at BOTH
+rates**. Teeth MEASURED at 48 kHz (3.16e-5 FAIL −90.0 dB 33/33; 3.16e-6 PASS
+−109.8 dB; `seedpoison` FAIL 21/33). Engine B renders the whole instrument from
+its own state. 1d is done with it: `eb_engine_render` delegates to the real
+master chain instead of the insert-shaped model it used to contain.
+
+Of the three residuals the ruling listed, two are RESOLVED by the null
+(`:1665-1671`, `dco_live`) and the third — the allocator's RETRIG/PORTA_GATE
+events — is NOT, because under this gate notes still enter through the port and
+engine B's own note path never runs. That one belongs to `eb_patch`.
+
+**1b-3 (new, from F1):** DELAY TYPE 4 and the EFFECT LABEL_164 core. No factory
+patch selects either, so no scenario can gate them; they need a synthetic-recall
+gate of the `etmode_ab.py` kind BEFORE transcription. The trunk is the full
+instrument, so they are not optional — a user preset can select what no factory
+patch does. Scheduled before certification.

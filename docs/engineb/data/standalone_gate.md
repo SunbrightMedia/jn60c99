@@ -89,3 +89,28 @@ the **EFFECT LABEL_164 core** (EFFECT 0 and ≥ 6). No factory patch selects
 either, so no scenario can gate them. Refusing loudly is the only honest option:
 silence would be indistinguishable from a working effect nobody tested. That is
 task **1b-3**, which needs a synthetic-recall gate first.
+
+## The three residuals F1 ordered resolved inside 1b-2
+
+Fable's ruling listed three things the standalone null was expected to settle.
+Two are settled BY MEASUREMENT; the third is not reachable by this gate and
+saying otherwise would be the over-claim this file exists to avoid.
+
+**1. The `:1665-1671` delayed copies — RESOLVED.** Engine B does not model that
+range. The standalone gate reproduces every sample of all 33 scenarios EXACTLY
+at both rates, so those copies are either dead or already equivalent. A gate
+that reproduces the whole output bit for bit has answered the question.
+
+**2. The `dco_live` coefficient-copy equivalence — RESOLVED.** Same argument,
+and this one is now actually EXERCISED: the standalone engine seeds `dco_live`
+from the recall coefficients and drives it per sample, and the output is
+EXACTLY 0 against the port. It was "believed, not gated" for months.
+
+**3. The allocator's RETRIG / PORTA_GATE events — NOT RESOLVED, and this gate
+cannot resolve them.** `eb_alloc` emits those events, and no CV module consumes
+them yet. Under the standalone gate notes are still driven into the PORT by
+`gui/juno_bridge.c`, and engine B mirrors the resulting cells (320 and the aux
+one-shot) at generation bumps — so engine B's own note path never runs and the
+events are never delivered. They belong to engine B's own recall and note
+handling, which is task **O4 (`eb_patch`)**. Recorded as open rather than
+counted as done.
