@@ -141,3 +141,52 @@ FOUR LIES check before any of them may be called a coefficient — and the DCO
 oscillator-level defect above is the standing reason to run
 `coef_audit.py`-style checking on BOTH accessors, since `master_render.c`
 copies with `_DWORD` as freely as `voice_render.c` copies with `JI`.
+
+### The measured cut map for the whole master chain
+
+`tools/engineb/master_cuts.py` reports the CUT WIDTH at every line of
+`juno_master_render` — the number of decompiler locals assigned before that line
+and read after it. The voice modules were carved this way and the master must be
+too; a range with a wide cut is not a module, it is a marshalling exercise.
+
+MEASURED: 2,120 executable lines, 754 locals, and the function cuts into roughly
+fourteen blocks with only **2 to 6 locals crossing** each boundary:
+
+```
+  :826     0 crossing   (function entry)
+  :886     3            end of the master INPUT STAGE
+  :942     4
+  :1043    6
+  :1548    6
+  :1656    6
+  :1747    6
+  :1858    6
+  :1959    4
+  :2015    5
+  :2066    4
+  :2107    5
+  :2278    6
+  :2337    4
+  :2378    2            v551 = juno_host_sel(a1, 112)  <- the EFFECT-TYPE routing read
+  :2427    4
+  :2497    3
+  :2550    6
+  :2632    3
+  :2679    3
+  :2744    3
+  :2784    4
+  :2827    4
+  :2868    2
+  :2941    0            the stereo output assembly
+```
+
+Two of these are worth naming now. **:2378 is the EFFECT-TYPE routing read** —
+the `v551` arm this project already learned is load-bearing warm (the WARM
+parity block in CLAUDE.md), and it has the narrowest interior cut in the whole
+function at 2. **:2941 cuts at 0**, so the stereo output assembly lifts as
+cleanly as a block can.
+
+This map is the ROUTE for 1b-1, not the work. Every chosen range still needs its
+cells classified read-before-write with all FOUR LIES checked, and
+`master_render.c` copies with `_DWORD` exactly as freely as `voice_render.c`
+copies with `JI` — which is how the DCO oscillator levels were missed above.
