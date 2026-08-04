@@ -829,6 +829,61 @@ def oracle_render(quick):
 
 
 # ---------------------------------------------------------------- teeth
+def _coef_audit_teeth():
+    """THE COEFFICIENT AUDIT, run here so it cannot go stale.
+
+    tools/engineb/coef_audit.py refuses any cell that eb_coefs.c caches as a
+    coefficient while src/voice_render.c writes it every sample. It was written
+    after exactly that defect shipped -- the three DCO oscillator levels, cached
+    from cells the port rewrites at :1702-1707, which made the DCO emit silence
+    (docs/engineb/data/voice_gate.md). A check that only ever runs by hand is a
+    check that goes stale, and this harness has already been bitten by a stale
+    anchor once, so the audit runs in the battery and gets teeth of its own: a
+    tree in which eb_coefs.c reads the bad cell again, on which the audit MUST
+    fail. An audit never seen to fail is not an audit.
+    """
+    import re as _re
+    print("--- coefficient audit (static; both accessors) ---")
+    bad = 0
+    aud = os.path.join(HERE, "coef_audit.py")
+    r = subprocess.run([sys.executable, aud], capture_output=True)
+    print("  clean tree: %s" % r.stdout.decode().strip().split("\n")[0])
+    if r.returncode != 0:
+        print("  *** the audit FAILS on the clean tree ***")
+        bad += 1
+    # planted: put the per-sample cell back and require a refusal.
+    tmp = tempfile.mkdtemp(prefix="coefaudit_")
+    try:
+        for d in ("src", "engine_b"):
+            shutil.copytree(os.path.join(REPO, d), os.path.join(tmp, d))
+        shutil.copyfile(aud, os.path.join(tmp, "coef_audit.py"))
+        f = os.path.join(tmp, "engine_b", "eb_coefs.c")
+        t = open(f).read()
+        a = "q->lvl_saw   = CF(a1, 4192);"
+        if t.count(a) != 1:
+            print("  *** planted-case anchor moved; the audit teeth planted "
+                  "NOTHING and measured nothing ***")
+            return bad + 1
+        open(f, "w").write(t.replace(a, "q->lvl_saw   = CF(a1, 4736);", 1))
+        # the script derives REPO from its own path: <repo>/tools/engineb/x.py
+        stage = os.path.join(tmp, "tools", "engineb")
+        os.makedirs(stage)
+        shutil.move(os.path.join(tmp, "coef_audit.py"),
+                    os.path.join(stage, "coef_audit.py"))
+        r2 = subprocess.run([sys.executable,
+                             os.path.join(stage, "coef_audit.py")],
+                            capture_output=True)
+        out = r2.stdout.decode().strip().split("\n")[0]
+        if r2.returncode == 0:
+            print("  planted 4736: *** NOT REFUSED -- the audit is blind ***")
+            bad += 1
+        else:
+            print("  planted 4736: refused, as required (%s)" % out)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return bad
+
+
 def teeth(quick):
     """The harness is tested before it is used. Each planted error is built
     through the REAL engine B build path and must be caught in the recorded set
@@ -981,6 +1036,7 @@ def teeth(quick):
             bad += 1
         print("  -> %s   caught %d scenario(s)\n"
               % ("OK" if ok else "*** TEETH FAILURE ***", len(caught)))
+    bad += _coef_audit_teeth()
     print("TEETH: %s" % ("PASS" if bad == 0 else
                          "FAIL -- the harness is blind in %d case(s); it must "
                          "not be used" % bad))
