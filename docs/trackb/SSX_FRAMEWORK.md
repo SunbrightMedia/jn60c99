@@ -1,3 +1,14 @@
+> **⚠ SUPERSEDED BY PRACTICE — read `docs/engineb/METHOD_PLAYBOOK.md` instead.**
+>
+> This document is a DESIGN that predates the real work and was never
+> implemented in this form. The method that actually produced engine B — the
+> hybrid-shim null harness, boundary selection by live-variable analysis, the
+> five ways the cell classifier lies, teeth with measured brackets, the
+> arm-coverage prerequisite, the seeding rules, mechanical transcription, the
+> divergence-hunting techniques, MEASURED×STATIC costing and the bias law — is
+> written up there, distilled from what was DONE and with the measured numbers
+> attached. Keep this file for its history; do not start a new synth from it.
+
 > **STATUS NOTE (2026-08-01, added after generation).** §10 below says "Track B
 > can still be abandoned by stop rule S1". **It cannot.** The user has decided,
 > in binding terms recorded in `docs/trackb/CONSTRAINTS.md`: 8 voices, ALL FX,
