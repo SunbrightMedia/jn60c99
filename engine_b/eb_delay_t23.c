@@ -19,7 +19,7 @@ void eb_dly23_tick(eb_dly23_state *s, const eb_dly23_coef *c,
     float v58;
     float v176;
     float v177;
-    int v253;
+    float v253;
     float v254;
     float v255;
     float v256;

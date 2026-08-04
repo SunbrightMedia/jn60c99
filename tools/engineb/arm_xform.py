@@ -50,6 +50,14 @@ SRC = os.path.join(REPO, "src", "master_render.c")
 # arm has FOUR of these, which is why it is not a one-liner to port.
 RINGS = [(6429408, 6429412, 6396640)]
 
+# The type-5 arm's FOUR rings. Each ring's control pair sits immediately AFTER
+# the PREVIOUS ring's data, so the index cell of a ring is nowhere near its own
+# base -- read the write expression to pair them, never the addresses.
+RINGS_T5 = [(8594768,  8594772,  6497616),
+            (10691936, 10691940, 8594784),
+            (10726256, 10726260, 10693488),
+            (10759040, 10759044, 10726272)]
+
 
 def classify(lo, hi):
     L = open(SRC).read().split("\n")
@@ -72,16 +80,65 @@ def classify(lo, hi):
     return out
 
 
-def emit(lo, hi, cls):
+def carriers(lo, hi):
+    """Locals IDA declares `int` that in fact carry FLOAT BIT PATTERNS.
+
+    THE TRAP, and it is the port's own documented one (CLAUDE.md: "typed locals
+    CONVERT instead of REINTERPRET"). The decompile writes
+
+        v99 = *(_DWORD *)(a1 + 10692032);      /* bit copy out of a float cell */
+        *(_DWORD *)(a1 + 10692064) = v99;      /* bit copy into another        */
+
+    and declares v99 as `int`. Transcribe that literally with a float state
+    field and BOTH assignments become numeric CONVERSIONS: the value is
+    destroyed twice.
+
+    MEASURED: this made the type-5 arm's v176 output exactly 0 on every sample
+    while v177 -- which happened not to pass through a carrier -- tracked the
+    port perfectly. The type-2/3 arm has one too (v253), and that module nulled
+    EXACTLY 0 anyway, purely because the coefficient it carries holds a value
+    the double conversion happens to round-trip. A latent bug that the data hid.
+
+    A local is a carrier when EVERY use of it is a bare cell load or a bare cell
+    store -- no arithmetic anywhere. Those are declared `float` in the generated
+    module, so both copies stay bit-exact. Ring indices are NOT carriers: they
+    are used in arithmetic, and the same test excludes them automatically.
+    """
+    L = open(SRC).read().split("\n")
+    decls = "\n".join(L[:825])
+    blk = "\n".join(L[lo - 1:hi])
+    out = []
+    for loc in sorted({x for x in re.findall(r"\bv\d+\b", blk)}):
+        d = re.search(r"^\s*(.*?)\s+%s;" % loc, decls, re.M)
+        t = d.group(1) if d else "?"
+        if "float" in t or "double" in t:
+            continue
+        uses = [l for l in blk.split("\n") if re.search(r"\b%s\b" % loc, l)]
+        if uses and all(
+                re.fullmatch(r"\s*%s = \*\((?:_DWORD|float) \*\)\(a1 \+ \d+\);\s*"
+                             % loc, u) or
+                re.fullmatch(r"\s*\*\((?:_DWORD|float) \*\)\(a1 \+ \d+\) = %s;\s*"
+                             % loc, u) for u in uses):
+            out.append(loc)
+    return out
+
+
+def emit(lo, hi, cls, rings=None):
     L = open(SRC).read().split("\n")
     blob = "\n".join(L[lo - 1:hi])
-    for i, (idx, ln, base) in enumerate(RINGS):
-        tag = "" if len(RINGS) == 1 else str(i)
+    for i, (idx, ln, base) in enumerate(rings if rings is not None else RINGS):
+        rs = rings if rings is not None else RINGS
+        tag = "" if len(rs) == 1 else str(i)
+        # THE SUBTRAHEND IS NOT ALWAYS A PLAIN LOCAL. One type-5 read spells it
+        # `(int)(float)(v55 * -16384.0)` inline, so a `(v\d+)` capture silently
+        # leaves that access untouched -- and the result still compiles. The
+        # capture is a non-greedy anything, and the refusal guard is what proves
+        # every access was converted.
         blob = re.sub(
             r"\*\(_DWORD \*\)\(a1\s*\+\s*4\s*\*\s*\(\(\*\(int \*\)\(a1 \+ %d\)"
-            r" - 1LL\)\s*&\s*\(\*\(_DWORD \*\)\(a1 \+ %d\) - (v\d+) \+ (\d+)LL"
+            r" - 1LL\)\s*&\s*\(\*\(_DWORD \*\)\(a1 \+ %d\) - (.+?) \+ (\d+)LL"
             r"\)\)\s*\+ %d\)" % (ln, idx, base),
-            r"RINGR%s(s->s%d - \1 + \2)" % (tag, idx), blob, flags=re.S)
+            r"RINGR%s(s->s%d - (\1) + \2)" % (tag, idx), blob, flags=re.S)
         blob = re.sub(r"\*\(_DWORD \*\)\(a1 \+ 4LL \* (v\d+) \+ %d\)" % base,
                       r"RINGI%s(\1)" % tag, blob)
     known = {c: "c->k%d" % c for c in cls["COEF"]}
@@ -110,12 +167,15 @@ def main():
     lo, hi = int(sys.argv[1]), int(sys.argv[2])
     cls = classify(lo, hi)
     if "--emit" in sys.argv:
-        b = emit(lo, hi, cls)
+        b = emit(lo, hi, cls, RINGS_T5 if "--t5" in sys.argv else None)
         if b is None:
             return 1
         print(b)
         return 0
     print("block %d-%d" % (lo, hi))
+    car = carriers(lo, hi)
+    print("  CARRIERS (int-declared, float bits -- MUST be float in the module):"
+          " %s" % (car or "none"))
     for k in ("COEF", "EXT", "STATE", "WONLY"):
         print("  %-6s %3d  %s" % (k, len(cls[k]), cls[k]))
     if cls["EXT"]:
