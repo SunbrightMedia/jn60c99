@@ -313,7 +313,7 @@ So types 0, 1 and >=6 SHARE a core, and that core is already the claimed
 
 | piece | lines | gateable today |
 |---|---|---|
-| type-1 pre-stage `:889-1051` | 164 | yes |
+| type-1 algorithm `:890-1048` | 159 | yes (see the correction below) |
 | type-2/3 `:1271-1452` | 184 | **yes, newly** |
 | type-5 `:1458-1866` | 409 | yes |
 | type-4 `:1870-2076` | 207 | **no — needs a synthetic gate** |
@@ -351,3 +351,44 @@ assignment-before-use analysis of the shared core before that arm is
 transcribed. Recorded rather than discovered later by a null that will not
 close: a boundary tool that flatters its block deserves the same suspicion as a
 gate that never fails.
+
+
+## ★ CORRECTION: the DELAY dispatch, read properly
+
+An earlier note here said types 0, 1 and >=6 SHARE the core at LABEL_69, making
+`:890-1048` a "type-1 pre-stage". **That is wrong.** Line 1049-1050 is `}`
+followed by `else`: type 1 does NOT reach the core. The core serves type 0 and,
+via `goto LABEL_69`, types >= 6. `:890-1048` is the COMPLETE type-1 algorithm.
+
+How the error was caught is the useful part. Taking the fall-through reading at
+face value, `v176`/`v177` assigned at :1046-1047 would be dead, because the core
+assigns both unconditionally at :1266-1267 (and `v56`/`v58` at :1177/:1182). I
+checked that much and it held. Then I asked which of the block's 33 written
+cells anything later reads, and the answer was **none** — which would make the
+whole block a no-op. That is the result that did not add up, and disbelieving it
+is what sent me back to the control flow.
+
+MEASURED confirmation, after the fact: perturbing this module's `v176`/`v177` by
+3.16e-5 is caught by **10 of the 33 scenarios**. Dead values catch nothing.
+
+**The module was correct the whole time**, because it reproduces what the port
+does rather than acting on a liveness conclusion — a choice made before the
+conclusion turned out to be wrong. Two tools pointed the wrong way here
+(`master_cuts.py` over-approximates live-out, and a "nothing reads these cells"
+scan invites a no-op conclusion); reproducing the port is what made that
+survivable.
+
+## 1b-1 status
+
+| module | port range | null |
+|---|---|---|
+| `master_in` | `:826-886` | EXACTLY 0, both rates |
+| `delay_t1` | `:890-1048` | EXACTLY 0 |
+| `delay_t23` | `:1271-1452` | EXACTLY 0, both rates |
+| `delay_t5` | `:1459-1866` | EXACTLY 0, both rates |
+| `master_out` | `:2338-2377` + tail | EXACTLY 0, both rates |
+
+All three REACHABLE delay arms are now modules. Remaining: the `v551` EFFECT
+dispatch arms (`:2378-2752`, the chorus inside it already claimed), the DELAY
+type-4 arm (`:1870-2076`, ungateable until a synthetic-recall gate exists), and
+a full teeth battery.

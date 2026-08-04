@@ -385,6 +385,11 @@ _OUT_ANCHOR = {
     "delay_t5": ("master_render.c",
                  "                         &v176, &v177, &v56, &v58);",
                  "            v176 *= %s; v177 *= %s;"),
+    # The DELAY TYPE 1 algorithm. Its v176/v177 ARE live -- type 1 does not
+    # reach the shared core (:1050 is an `else`).
+    "delay_t1": ("master_render.c",
+                 "      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177);",
+                 "      v176 *= %s; v177 *= %s;"),
     # THE WHOLE VOICE CHAIN, at the point its samples enter the port's master.
     # This module is the 1b-0 voice-level gate (docs/engineb/PHASE1_ORDERS.md):
     # engine B's own render function driving its own state, with the master
@@ -527,6 +532,7 @@ _BRACKET = {
     # NOTHING, and a green gate would have meant the arm never ran.
     "delay_t23":  ("3.16e-5", "3.16e-6"),
     "delay_t5":   ("3.16e-5", "3.16e-6"),   # measured with the others
+    "delay_t1":   ("3.16e-5", "3.16e-6"),   # measured with the others
     "master_out": ("3.16e-5", "3.16e-6"),
     # The 1b-0 whole-voice-chain gate. MEASURED 2026-08-04 at 48 kHz over all
     # 30 scenarios: 3.16e-5 FAILS at -90.0 dB in 30/30, 3.16e-6 PASSES at
