@@ -1,16 +1,19 @@
 /* eb_delay_t1.c -- GENERATED from src/master_render.c:890-1048, the DELAY
- * TYPE 1 PRE-STAGE. It runs BEFORE the shared delay core (LABEL_69), which
- * types 0, 1 and >=6 all use.
+ * TYPE 1 ALGORITHM -- the whole of it, not a pre-stage.
  *
- * ITS LOCAL OUTPUTS ARE DEAD, and establishing that took the
- * assignment-before-use analysis that master_cuts.py cannot do: the block
- * assigns v176 and v177, but control falls through into the shared core,
- * which assigns v176, v177, v56 and v58 UNCONDITIONALLY (:1177, :1182,
- * :1266, :1267) before anything reads them. The pre-stage therefore
- * communicates with the rest of the function through CELLS only.
+ * :1049-1050 is `}` followed by `else`, so type 1 does NOT fall through to
+ * the shared core at LABEL_69; that core serves type 0 and (via goto) types
+ * >= 6. An earlier revision of this comment claimed the opposite and called
+ * v176/v177 dead. They are the arm OUTPUTS. MEASURED: perturbing them is
+ * caught by 10 of the 33 scenarios.
  *
- * They are computed and returned anyway. Reproducing what the port does is
- * cheaper than depending on my own liveness reasoning being right.
+ * v56/v58 are returned too. A POISON TEST measured them dead on this path
+ * in all 33 scenarios -- writing 98765.0 into the caller's copies changed
+ * no sample -- because the chorus consumes them only in sub-modes these
+ * patches do not select. They are returned anyway: the port computes them
+ * here and the other three arms return them, and dropping a value because
+ * todays scenario set cannot tell the difference is how a gate quietly
+ * becomes the specification.
  */
 #include "eb_delay_t1.h"
 #include "juno_dsp.h"
@@ -24,7 +27,7 @@
 
 void eb_dly1_tick(eb_dly1_state *s, const eb_dly1_coef *c,
                   float in36, float in38, float k5,
-                  float *o176, float *o177)
+                  float *o176, float *o177, float *o56, float *o58)
 {
     float v5;
     float v36;
@@ -236,5 +239,5 @@ void eb_dly1_tick(eb_dly1_state *s, const eb_dly1_coef *c,
     v473 = c->k101744;
     v176 = v473 * s->s4297568;
     v177 = v473 * s->s4297552;
-    *o176 = v176; *o177 = v177;
+    *o176 = v176; *o177 = v177; *o56 = v56; *o58 = v58;
 }

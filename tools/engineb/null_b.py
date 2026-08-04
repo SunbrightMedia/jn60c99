@@ -402,6 +402,12 @@ _OUT_ANCHOR = {
               "        eb_fx_e5_tick(&stf, &EBC_, *(float *)(a1 + 84624), "
               "&_o56, &_o58, &_o593);",
               "        _o593 *= %s;"),
+    # THE WHOLE ENGINE: voices AND master, engine B's own state throughout.
+    # This is the 1b-2 standalone gate's anchor -- the point where engine B's
+    # finished stereo sample leaves the driver.
+    "standalone": ("juno_driver.c",
+                   "    rc = eb_master_render(&MS, &MC, &RG, vbuf, outL, outR);",
+                   "    *outL *= %s; *outR *= %s;"),
     # THE WHOLE VOICE CHAIN, at the point its samples enter the port's master.
     # This module is the 1b-0 voice-level gate (docs/engineb/PHASE1_ORDERS.md):
     # engine B's own render function driving its own state, with the master
@@ -567,6 +573,7 @@ _BRACKET = {
     # one factory patch in the bank.
     "fx_e1":      ("3.16e-5", "3.16e-6"),
     "fx_e5":      ("3.16e-5", "3.16e-6"),
+    "standalone": ("3.16e-5", "3.16e-6"),   # measured with the others
     "master_out": ("3.16e-5", "3.16e-6"),
     # The 1b-0 whole-voice-chain gate. MEASURED 2026-08-04 at 48 kHz over all
     # 30 scenarios: 3.16e-5 FAILS at -90.0 dB in 30/30, 3.16e-6 PASSES at
@@ -781,6 +788,18 @@ def _plant(tmp, mutate):
         s = s.replace(a, "        if (x > -1e-6f && x < 1e-6f) {\n"
                          "            *outA = c->dry * inB;\n"
                          "            *outB = c->dry * inA; return; }\n" + a, 1)
+    elif mutate == "seedpoison":
+        # FABLE'S REQUIRED CASE (F1). The standalone engine seeds its state
+        # ONCE per context, from a near-cold port. A state field MISSING from
+        # the seed whose post-recall value happens to be zero would therefore
+        # hide forever -- the memset would supply the same zero the port has.
+        # This perturbs ONE seeded field, the master input stage's one-pole
+        # history, and the gate must fail. If it does not, the seed is not
+        # being read at all and every "seeded correctly" claim is empty.
+        p = os.path.join(tmp, "engine_b", "eb_master_coefs.c"); s = open(p).read()
+        a = "    s->in.s84768 = CF(base, 84768);"
+        assert s.count(a) == 1, "seedpoison anchor moved"
+        s = s.replace(a, "    s->in.s84768 = CF(base, 84768) + 1e-3f;", 1)
     elif mutate == "voicereseed":
         # THE LOCKSTEP CASE, and it is a REAL defect this harness let through
         # once. Engine B's state lives in file statics and the render worker
@@ -1034,7 +1053,9 @@ def teeth(quick):
              ("reverbtap", ("reverb",), True), ("reverbskip", ("reverb",), True),
              (None, ("voices",), False),
              ("voicereseed", ("voices",), True),
-             ("voiceidleskip", ("voices",), True)]
+             ("voiceidleskip", ("voices",), True),
+             (None, ("standalone",), False),
+             ("seedpoison", ("standalone",), True)]
 
     # ---- PER-MODULE OUTPUT TEETH (added 2026-08-02, audit finding F2) -------
     # Until this battery existed, nine of the ten modules had never been shown

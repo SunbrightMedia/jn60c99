@@ -78,6 +78,6 @@ typedef struct {
 
 void eb_dly1_tick(eb_dly1_state *s, const eb_dly1_coef *c,
                   float in36, float in38, float k5,
-                  float *o176, float *o177);
+                  float *o176, float *o177, float *o56, float *o58);
 
 #endif

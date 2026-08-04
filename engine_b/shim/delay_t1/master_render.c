@@ -888,9 +888,9 @@ float *juno_master_render(unsigned char *a1, float **a2, float **a3)
   v39 = juno_host_sel(a1, 136);   /* was **(_DWORD **)(*(_QWORD *)(a1 + 136) + 136LL) */
   if ( v39 == 1 )
   {
-    /* ==== ENGINE B: MODULE DELAY-TYPE-1 PRE-STAGE (src :890-1048) ====
-     * See eb_delay_t1.c for why its local outputs are dead and it still
-     * returns them. State copied in and out per sample; ring by pointer. */
+    /* ==== ENGINE B: MODULE DELAY-TYPE-1 (src :890-1048) ==============
+     * The complete DELAY TYPE 1 algorithm. State copied in and out per
+     * sample; ring by pointer. */
     {
       static eb_dly1_coef EBD1C; static unsigned char EBD1HAVE;
       static unsigned long EBD1GEN; extern unsigned long eb_coef_gen;
@@ -965,7 +965,7 @@ float *juno_master_render(unsigned char *a1, float **a2, float **a3)
       st1.s6395248 = *(int32_t *)(a1 + 6395248);
       st1.s11022348 = *(int32_t *)(a1 + 11022348);
       st1.ring = (float *)(a1 + 4298096);
-      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177);
+      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177, &v56, &v58);
       *(float *)(a1 + 4297200) = st1.s4297200;
       *(float *)(a1 + 4297216) = st1.s4297216;
       *(float *)(a1 + 4297232) = st1.s4297232;
@@ -1000,7 +1000,7 @@ float *juno_master_render(unsigned char *a1, float **a2, float **a3)
       *(int32_t *)(a1 + 6395248) = st1.s6395248;
       *(int32_t *)(a1 + 11022348) = st1.s11022348;
     }
-    /* == END ENGINE B: MODULE DELAY-TYPE-1 PRE-STAGE =============== */
+    /* == END ENGINE B: MODULE DELAY-TYPE-1 ======================== */
   }
   else
   {

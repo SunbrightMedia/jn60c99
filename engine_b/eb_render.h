@@ -170,7 +170,10 @@ typedef struct {
     eb_delay_state  delay;
     eb_reverb_state reverb;
     /* the reverb's pending-tap array and wipe arm: real storage, never NULL */
-    int32_t         rev_pending[33];
+    /* EB_REV_NTAP (34), not 33: eb_reverb_process reads EB_REV_NTAP entries.
+     * The [33] here was the same off-by-one found in eb_master_state, where it
+     * cost the reverb's B channel its last bits. Fixed in both. */
+    int32_t         rev_pending[EB_REV_NTAP];
     int32_t         rev_wipe;
 } eb_render_state;
 
