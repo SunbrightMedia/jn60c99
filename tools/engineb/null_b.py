@@ -388,7 +388,7 @@ _OUT_ANCHOR = {
     # The DELAY TYPE 1 algorithm. Its v176/v177 ARE live -- type 1 does not
     # reach the shared core (:1050 is an `else`).
     "delay_t1": ("master_render.c",
-                 "      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177);",
+                 "      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177, &v56, &v58);",
                  "      v176 *= %s; v177 *= %s;"),
     # THE TWO REACHABLE EFFECT-TYPE ARMS. Perturbed at v593, which is the
     # value the arm hands the next sample through cell 84704 -- the effect
