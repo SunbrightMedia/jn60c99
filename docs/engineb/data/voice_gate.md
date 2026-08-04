@@ -253,3 +253,70 @@ single piece of 1b-1 and it is deliberately NOT started here.
 * the middle blocks between `:887` and `:2337`, narrowest cut first
 * a full `--teeth` battery run once the middle blocks land (the two new
   brackets are measured; the battery itself was last run green before them)
+
+## ★ THE GATE WAS BLIND TO HALF THE MASTER CHAIN (measured before writing any
+## arm module)
+
+`src/master_render.c` is not one signal path. Two host-selector switches choose
+between whole alternative algorithms:
+
+```
+v39  = juno_host_sel(a1, 136)   :887    DELAY TYPE  (slot 1)
+v551 = juno_host_sel(a1, 112)   :2378   EFFECT TYPE (slot 2)
+```
+
+MEASURED with the thirty inherited scenarios, by counting samples per arm
+through the port's own code (`tools/engineb/arm_coverage.py`):
+
+| switch | reached | NEVER reached |
+|---|---|---|
+| DELAY TYPE | 0, 1, 5 | **2, 3, 4** |
+| EFFECT TYPE | 2, 3, 5 | **0, 1, 4** |
+
+**A module written for an unreached arm cannot be gated at all.** The null would
+compare two code paths neither of which runs and report EXACTLY 0 — for the same
+reason a disconnected meter reads zero. Half of 1b-1's remaining work sat behind
+that.
+
+Closed with REAL factory patches, measured by recalling all 64 and reading
+`JUNO_PROG_DLY`/`JUNO_PROG_EFX` — not synthetic parameter edits:
+
+* patch 11 → DELAY 2 · patch 19 → DELAY 3 · patch 9 → EFFECT 1
+
+Patch 9 is the ONLY patch in the whole bank with EFFECT TYPE 1 and its
+arpeggiator is on, so an arp scenario is the only route to that arm; both sides
+run the port's own arpeggiator, so the comparison stays deterministic.
+
+**HONESTLY STILL UNREACHABLE: DELAY 4, EFFECT 0, EFFECT 4.** No factory patch
+selects any of them, and EFFECT 4 (FLANGER) is additionally documented as
+engine-unreachable under recall. They need a synthetic-recall gate of the
+`etmode_ab.py` kind, and **no module may be written for them until one exists.**
+`arm_coverage.py` distinguishes the two cases and only fails on an arm a patch
+could actually select.
+
+## The DELAY dispatch is not five parallel arms
+
+Reading the control flow rather than the line ranges:
+
+```
+if (v39 == 1)      { :889-1051   type-1 pre-stage }
+if (v39 <= 1)      { LABEL_69: :1054-1267  THE SHARED CORE -> LABEL_105 }
+else if (v39<=3)   { :1271-1452  type-2/3 algorithm }
+else if (v39 != 4) { if (v39==5) { :1458-1866 type-5 -> LABEL_105 }
+                     goto LABEL_69;  /* >=6 uses the shared core */ }
+else               { :1870-2076  type-4 algorithm }
+LABEL_105: :2077...
+```
+
+So types 0, 1 and >=6 SHARE a core, and that core is already the claimed
+`eb_delay` module. The unclaimed delay work is four pieces, not five:
+
+| piece | lines | gateable today |
+|---|---|---|
+| type-1 pre-stage `:889-1051` | 164 | yes |
+| type-2/3 `:1271-1452` | 184 | **yes, newly** |
+| type-5 `:1458-1866` | 409 | yes |
+| type-4 `:1870-2076` | 207 | **no — needs a synthetic gate** |
+
+The type-2/3 arm's live-in is `v36`/`v38` — exactly `eb_master_in`'s two
+outputs, so the module chain already lines up.

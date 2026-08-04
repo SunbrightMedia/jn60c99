@@ -167,6 +167,47 @@ if os.environ.get("JUNO_EB_PITCH_CR"):
 # place to extend it. If that set ever loses its idle entries this harness fails
 # loudly rather than quietly gating a cold-start-only surface.
 BASE_SCEN = list(null_ab.SCEN)
+
+# ---- ARM-COVERAGE SCENARIOS (added 2026-08-04, task 1b-1) ------------------
+# MEASURED, and it is why these exist: the thirty inherited scenarios drive the
+# master's two dispatch switches through only HALF their arms.
+#
+#   DELAY TYPE  (v39,  master_render.c:887)  reached 0, 1, 5   -- NOT 2, 3, 4
+#   EFFECT TYPE (v551, master_render.c:2378) reached 2, 3, 5   -- NOT 0, 1, 4
+#
+# Every unreached arm is a different algorithm, hundreds of lines each, and a
+# module written for one of them could not be gated at all: the null would be
+# comparing two code paths neither of which runs. That is the standing warning
+# in docs/trackb/PLAN.md -- NO MODULE MAY BE REWRITTEN BEHIND A BLIND GATE --
+# arriving in the master chain.
+#
+# The patches below come from the REAL factory bank (measured by recalling all
+# 64 and reading JUNO_PROG_DLY / JUNO_PROG_EFX), so these are the plugin's own
+# configurations and not synthetic parameter edits:
+#   patch 11  DELAY 2, EFFECT 3   arp off
+#   patch 19  DELAY 3, EFFECT 3   arp off
+#   patch  9  DELAY 1, EFFECT 1   arp ON -- and it is the ONLY patch in the
+#             whole bank with EFFECT TYPE 1, so an arp scenario is the only
+#             route to that arm. Both sides run the port's own arpeggiator, so
+#             the comparison stays deterministic.
+#
+# STILL UNREACHED, and honestly so: DELAY TYPE 4 and EFFECT TYPE 0 and 4 appear
+# in NO factory patch. EFFECT TYPE 4 (FLANGER) is additionally documented as
+# engine-unreachable under recall (CLAUDE.md: recall leaves every effect
+# object's mode at 0 and never calls the activation). Those arms need a
+# synthetic-recall gate of the etmode_ab.py kind, not a scenario, and no module
+# may be written for them until one exists.
+BASE_SCEN += [
+    (11, [('render', 2000), ('on', 50, 100), ('on', 57, 100),
+          ('render', 26000), ('off', 50), ('off', 57), ('render', 12000)],
+     'DELAY type 2'),
+    (19, [('render', 2000), ('on', 43, 100), ('on', 55, 100),
+          ('render', 26000), ('off', 43), ('off', 55), ('render', 12000)],
+     'DELAY type 3'),
+    (9,  [('render', 2000), ('on', 48, 100), ('on', 52, 100),
+          ('render', 30000), ('off', 48), ('off', 52), ('render', 12000)],
+     'EFFECT type 1 (arp)'),
+]
 IDLE_TAGS = getattr(null_ab, "IDLE_TAGS", set())
 if not IDLE_TAGS:
     raise SystemExit("ABORT: tools/trackb/null_ab.py has no IDLE-PREFIX scenarios "
