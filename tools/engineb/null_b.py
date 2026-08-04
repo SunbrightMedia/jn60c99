@@ -521,6 +521,21 @@ _OUT_ANCHOR = {
 # Each bracket below is placed so the FAIL case lands near -90 dB and the PASS
 # case near -110 dB, about 10 dB clear of the threshold on both sides. Both
 # figures are re-measured and recorded in docs/engineb/HARNESS_AUDIT.md.
+# ANCHOR NAME -> SHIM DIRECTORY. Almost every teeth anchor is named after the
+# shim directory that carries its module, and the battery builds `(_m,)` on
+# that assumption. The two EFFECT arms broke it: they are separate ANCHORS
+# (each needs its own bracket and its own catch set) inside ONE shim directory,
+# fx_arms -- two arms of one dispatch cannot be two shims, they edit the same
+# file. Without this mapping the battery calls build() with a directory that
+# does not exist and HARD-STOPS at the first fx case.
+#
+# FOUND IN REVIEW (Fable, F1), not by running: the full battery had been
+# killed mid-run to start the EFFECT work and was never restarted, so the
+# crash had simply not been reached yet. "The battery passed" had quietly
+# become "the battery passed the last time it was run to completion, which
+# predates five of the modules it now covers."
+_ANCHOR_DIR = {"fx_e1": "fx_arms", "fx_e5": "fx_arms"}
+
 _BRACKET = {
     "chorus":     ("3.16e-5", "3.16e-6"),
     "dco":        ("3.16e-5", "3.16e-6"),
@@ -1091,11 +1106,14 @@ def teeth(quick):
             # 3.16e-5 and 3.16e-6 give the identical +3.3 dB in the identical 4
             # scenarios. There is no bracket to draw because the response does
             # not vary with the factor.
-            cases.append(("out:%s:(1.0f + 1e-7f)" % _m, (_m,), True))
+            cases.append(("out:%s:(1.0f + 1e-7f)" % _m,
+                          (_ANCHOR_DIR.get(_m, _m),), True))
             continue
         _fail, _pass = _BRACKET[_m]
-        cases.append(("out:%s:(1.0f + %sf)" % (_m, _fail), (_m,), True))
-        cases.append(("out:%s:(1.0f + %sf)" % (_m, _pass), (_m,), False))
+        cases.append(("out:%s:(1.0f + %sf)" % (_m, _fail),
+                      (_ANCHOR_DIR.get(_m, _m),), True))
+        cases.append(("out:%s:(1.0f + %sf)" % (_m, _pass),
+                      (_ANCHOR_DIR.get(_m, _m),), False))
     # ONE reference render, reused by every mutant: the mutations are planted in
     # the CANDIDATE build, so the oracle side is invariant across the battery.
     # This line was missing until 2026-08-02 -- `run(..., ref=ref, ...)` raised
