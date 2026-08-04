@@ -462,3 +462,34 @@ which is correct whatever the field's declared type.
 That makes three distinct forms of the same underlying trap found in one
 session — a cached per-sample cell, a pure bit-carrier local, and a `LODWORD`
 store — each of which produced a green gate before it produced a red one.
+
+
+## O2 FINAL RESULT — full (non-quick) runs, both rates
+
+| module | 44,100 | 48,000 |
+|---|---|---|
+| `master_in` | PASS | PASS |
+| `master_out` | PASS | PASS |
+| `delay_t1` | PASS | PASS |
+| `delay_t23` | PASS | PASS |
+| `delay_t5` | PASS | PASS |
+| `fx_arms` (e1 + e5) | PASS | PASS |
+| `voices` (the whole voice chain) | PASS | PASS |
+| **`all` — the composite, every module at once** | **PASS** | **PASS** |
+
+`make test` green · `arm_coverage.py` PASS · `coef_audit.py` PASS (266 cells).
+
+### One more self-inflicted detour worth recording
+
+The composite failed to compile with `EBMO_R undeclared here (not in a
+function)` — which reads exactly like a merge bug in a file ten shims edit, and
+I started debugging `merge_shims.py` on that assumption. The regions it produced
+were correct. **The cause was my own leftover diagnostic shim `e5dbg` being a
+composite member**: a debug shim keeps the PORT's block and runs the module
+beside it, so merging it emits both, and the duplicated code closed the function
+early.
+
+That is the second diagnostic shim to pollute the composite in one session
+(`delay_t5dbg` was the first). Deleting a directory fixes one instance, so
+`merge_shims.py` now excludes any shim whose name ends in `dbg` by rule. The
+merge tool was never at fault, and suspecting it first cost the detour.

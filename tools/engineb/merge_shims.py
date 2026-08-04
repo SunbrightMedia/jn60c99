@@ -60,13 +60,26 @@ MERGED = ("voice_render.c", "master_render.c")
 # both would claim the same arithmetic by different routes.
 STANDALONE = ("voices",)
 
+# DIAGNOSTIC shims are excluded by NAME SUFFIX. A debug shim keeps the PORT's
+# block and runs the module alongside it to compare them; merged into the
+# composite that produces the port's code AND the module's, which is a brace
+# imbalance at best and a duplicated signal path at worst.
+#
+# THIS HAPPENED TWICE IN ONE SESSION -- 'delay_t5dbg' and 'e5dbg' -- and the
+# second time cost a real debugging detour: the composite failed to compile
+# with `EBMO_R undeclared`, which looks like a merge bug in a 10-shim file and
+# is nothing of the kind. Deleting the directory fixes one instance; this rule
+# fixes the class. Any shim whose name ends in 'dbg' is never a member.
+def _is_diagnostic(name):
+    return name.endswith("dbg")
+
 
 def members(base):
     """Every module directory that ships a shim for this port file, except the
     generated composites themselves."""
     out = []
     for d in sorted(os.listdir(SHIM)):
-        if d in (COMPOSITE,) + STANDALONE or \
+        if d in (COMPOSITE,) + STANDALONE or _is_diagnostic(d) or \
                 not os.path.isdir(os.path.join(SHIM, d)):
             continue
         if os.path.exists(os.path.join(SHIM, d, base)):
@@ -192,7 +205,7 @@ def main():
     # otherwise `--module engine_all` would silently omit them.
     seen = {}
     for d in sorted(os.listdir(SHIM)):
-        if d in (COMPOSITE,) + STANDALONE or \
+        if d in (COMPOSITE,) + STANDALONE or _is_diagnostic(d) or \
                 not os.path.isdir(os.path.join(SHIM, d)):
             continue
         for f in sorted(glob.glob(os.path.join(SHIM, d, "*.c"))):

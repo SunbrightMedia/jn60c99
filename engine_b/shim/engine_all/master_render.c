@@ -1,6 +1,6 @@
 /* GENERATED FILE -- DO NOT EDIT.
  * tools/engineb/merge_shims.py built this from the individual shims:
- *     chorus, delay, delay_t1, delay_t23, delay_t5, e5dbg, fx_arms, master_in, master_out, reverb
+ *     chorus, delay, delay_t1, delay_t23, delay_t5, fx_arms, master_in, master_out, reverb
  * Edit those, then re-run the generator (make engineb does it).
  * Its purpose: engine B cannot be tested as a WHOLE ENGINE while each
  * module shadows the same port file -- see docs/engineb/HARNESS_AUDIT.md
@@ -69,10 +69,6 @@
 #endif
 #include "eb_fx_e1.h"
 #include "eb_fx_e5.h"
-#include "eb_fx_e5.h"
-#include <stdio.h>
-#include <string.h>
-float EB5[3]; float EB5S[33];
 #include "eb_delay_t5.h"
 #include "eb_delay_t23.h"
 #include "eb_delay_t1.h"
@@ -2343,162 +2339,6 @@ LABEL_164:
         memcpy(&v593, &_o593, 4);   /* BIT copy: v593 is int-declared */
       }
       /* === END ENGINE B: MODULE EFFECT-E5 ==================== */
-        }
-        v552 = *(_DWORD *)(a1 + 84624);
-        *(_DWORD *)(a1 + 95952) = *(_DWORD *)(a1 + 95936);
-        *(_DWORD *)(a1 + 95936) = *(_DWORD *)(a1 + 95920);
-        *(_DWORD *)(a1 + 96112) = *(_DWORD *)(a1 + 96096);
-        *(_DWORD *)(a1 + 96096) = *(_DWORD *)(a1 + 96080);
-        *(_DWORD *)(a1 + 96080) = *(_DWORD *)(a1 + 96064);
-        *(_DWORD *)(a1 + 96064) = *(_DWORD *)(a1 + 96048);
-        *(_DWORD *)(a1 + 96048) = *(_DWORD *)(a1 + 96032);
-        *(_DWORD *)(a1 + 96032) = *(_DWORD *)(a1 + 96016);
-        *(_DWORD *)(a1 + 96016) = *(_DWORD *)(a1 + 96000);
-        *(_DWORD *)(a1 + 96000) = *(_DWORD *)(a1 + 95984);
-        *(_DWORD *)(a1 + 95984) = *(_DWORD *)(a1 + 95968);
-        *(_DWORD *)(a1 + 96144) = *(_DWORD *)(a1 + 96128);
-        *(_DWORD *)(a1 + 96176) = *(_DWORD *)(a1 + 96160);
-        *(_DWORD *)(a1 + 96208) = *(_DWORD *)(a1 + 96192);
-        *(_DWORD *)(a1 + 96256) = *(_DWORD *)(a1 + 96240);
-        *(_DWORD *)(a1 + 96240) = *(_DWORD *)(a1 + 96224);
-        *(_DWORD *)(a1 + 95888) = v552;
-        *(_DWORD *)(a1 + 95904) = v552;
-        v553 = juno_wrap_unit((float)((float)( *(float *)(a1 + 96176) + *(float *)(a1 + 96144) ) + *(float *)(a1 + 96352)));
-        v554 = *(float *)&v553;
-        v555 = *(float *)&v553 < 0.0;
-        *(_DWORD *)(a1 + 96160) = LODWORD(v553);
-        v556 = *(float *)(a1 + 96784);
-        if ( v555 )
-          v556 = -v556;
-        v557 = fabs(v554);
-        *(float *)(a1 + 96128) = v556;
-        *(float *)(a1 + 96272) = v557;
-        v558 = *(float *)(a1 + 95904);
-        *(float *)(a1 + 96288) = (float)((float)(v557 * *(float *)(a1 + 96368)) * *(float *)(a1 + 96800))
-                               + *(float *)(a1 + 96816);
-        v559 = *(float *)(a1 + 96416);
-        v560 = *(float *)(a1 + 96400);
-        v561 = (float)(v558 + *(float *)(a1 + 95888)) * 0.5;
-        *(float *)(a1 + 95920) = v561;
-        v562 = *(float *)(a1 + 96240);
-        v563 = (float)((float)(*(float *)(a1 + 96448) * *(float *)(a1 + 95936))
-                     + (float)(*(float *)(a1 + 96464) * *(float *)(a1 + 95952)))
-             + (float)(v561 * *(float *)(a1 + 96432));
-        *(float *)(a1 + 95936) = v563;
-        v564 = v562 + *(float *)(a1 + 96832);
-        *(float *)(a1 + 101040) = (float)(v560 * v559) * v563;
-        v565 = fminf(*(float *)(a1 + 96848), v564) * v559;
-        *(float *)(a1 + 96224) = v565;
-        if ( (float)(v565 - *(float *)(a1 + 96208)) >= 0.0 )
-          v566 = *(float *)(a1 + 96864);
-        else
-          v566 = *(float *)(a1 + 96880);
-        v567 = v566 + *(float *)(a1 + 96256);
-        v568 = *(float *)(a1 + 96336);
-        v569 = *(float *)(a1 + 96208);
-        if ( v567 > 0.0 )
-          v56 = v567;
-        v570 = v56;
-        v571 = (float)((float)(*(float *)(a1 + 96336) - v569) * *(float *)(a1 + 96384)) + v569;
-        if ( v570 >= -1.0 )
-          v58 = fminf(v570, 1.0);
-        *(float *)(a1 + 96240) = v58 * *(float *)(a1 + 96416);
-        if ( (float)(v571 - v569) != 0.0 )
-          v568 = v571;
-        *(float *)(a1 + 96192) = v568;
-        v572 = v568 + *(float *)(a1 + 96288);
-        v573 = (int)(float)(v572 * -16384.0);
-        *(_DWORD *)(a1 + 101056) = *(_DWORD *)(a1
-                                             + 4
-                                             * ((*(int *)(a1 + 101028) - 1LL) & (*(_DWORD *)(a1 + 101024) - v573 + 1LL))
-                                             + 96928);
-        *(_DWORD *)(a1 + 101060) = *(_DWORD *)(a1
-                                             + 4
-                                             * ((*(int *)(a1 + 101028) - 1LL) & (*(_DWORD *)(a1 + 101024) - v573 + 2LL))
-                                             + 96928);
-        v574 = (float)(v572 * 16384.0) - (double)(int)(float)(v572 * 16384.0);
-        *(float *)(a1 + 101064) = v574;
-        v575 = (float)((float)((float)(v574 * *(float *)(a1 + 101060)) - (float)(v574 * *(float *)(a1 + 101056)))
-                     + *(float *)(a1 + 101056))
-             * *(float *)(a1 + 96256);
-        *(float *)(a1 + 95968) = v575;
-        v576 = *(float *)(a1 + 96016);
-        v577 = (float)((float)((float)(*(float *)(a1 + 96512) * *(float *)(a1 + 96000))
-                             + (float)(*(float *)(a1 + 96496) * *(float *)(a1 + 95984)))
-                     + (float)(v575 * *(float *)(a1 + 96480)))
-             + (float)((float)(v576 * *(float *)(a1 + 96528)) + (float)(*(float *)(a1 + 96544) * *(float *)(a1 + 96032)));
-        *(float *)(a1 + 96000) = v577;
-        v578 = (float)((float)(v576 * *(float *)(a1 + 96576)) + (float)(*(float *)(a1 + 96592) * *(float *)(a1 + 96048)))
-             + (float)(v577 * *(float *)(a1 + 96560));
-        *(float *)(a1 + 96032) = v578;
-        v579 = *(float *)(a1 + 96064);
-        v580 = (float)(v578 * *(float *)(a1 + 96624)) + (float)(v577 * *(float *)(a1 + 96608));
-        v581 = *(float *)(a1 + 96080);
-        *(float *)(a1 + 96048) = (float)((float)(v580 - v579) * *(float *)(a1 + 96640)) + v579;
-        v582 = (float)((float)((float)(v580 - v579) * *(float *)(a1 + 96672)) + (float)(v580 * *(float *)(a1 + 96656)))
-             - v581;
-        v583 = (float)(v582 * *(float *)(a1 + 96688)) + v581;
-        v584 = *(float *)(a1 + 96096);
-        v585 = *(float *)(a1 + 96272) - 1.0;
-        *(float *)(a1 + 96064) = v583;
-        v586 = v582 - v584;
-        *(float *)(a1 + 96096) = v586;
-        v587 = *(float *)(a1 + 96112);
-        v588 = (float)(1.0 - (float)(v585 * v585)) * *(float *)(a1 + 96768);
-        *(float *)(a1 + 96080) = (float)(v586 * *(float *)(a1 + 96704)) + v584;
-        v589 = (float)(v587 * *(float *)(a1 + 96736)) + (float)(v586 * *(float *)(a1 + 96720));
-        v590 = *(float *)(a1 + 96400);
-        v591 = (float)((float)((float)(v589 * (float)(v588 + *(float *)(a1 + 96752))) * *(float *)(a1 + 96912))
-                     - (float)(v590 * *(float *)(a1 + 95904)))
-             + *(float *)(a1 + 95904);
-        *(float *)(a1 + 96304) = (float)((float)((float)(*(float *)(a1 + 96896) * *(float *)(a1 + 95920)) * v590)
-                                       - (float)(v590 * *(float *)(a1 + 95888)))
-                               + *(float *)(a1 + 95888);
-        *(float *)(a1 + 96320) = v591;
-        v592 = (*(_DWORD *)(a1 + 101024) - 1) & (*(_DWORD *)(a1 + 101028) - 1);
-        *(_DWORD *)(a1 + 101024) = v592;
-        *(_DWORD *)(a1 + 4LL * v592 + 96928) = *(_DWORD *)(a1 + 101040);
-        *(_DWORD *)(a1 + 84672) = *(_DWORD *)(a1 + 96304);
-        v593 = *(_DWORD *)(a1 + 96320);
-        {
-          static int S2; int k; float pc;
-          if (S2<6) {
-            if (memcmp(&EB5[2],&v593,4)) { fprintf(stderr,"E5 v593 differs\n"); S2++; }
-            pc = *(float *)(a1 + 84672); if (memcmp(&EB5S[0],&pc,4)) { fprintf(stderr,"E5 cell 84672: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[0]); S2++; }
-            pc = *(float *)(a1 + 95888); if (memcmp(&EB5S[1],&pc,4)) { fprintf(stderr,"E5 cell 95888: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[1]); S2++; }
-            pc = *(float *)(a1 + 95904); if (memcmp(&EB5S[2],&pc,4)) { fprintf(stderr,"E5 cell 95904: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[2]); S2++; }
-            pc = *(float *)(a1 + 95920); if (memcmp(&EB5S[3],&pc,4)) { fprintf(stderr,"E5 cell 95920: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[3]); S2++; }
-            pc = *(float *)(a1 + 95936); if (memcmp(&EB5S[4],&pc,4)) { fprintf(stderr,"E5 cell 95936: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[4]); S2++; }
-            pc = *(float *)(a1 + 95952); if (memcmp(&EB5S[5],&pc,4)) { fprintf(stderr,"E5 cell 95952: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[5]); S2++; }
-            pc = *(float *)(a1 + 95968); if (memcmp(&EB5S[6],&pc,4)) { fprintf(stderr,"E5 cell 95968: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[6]); S2++; }
-            pc = *(float *)(a1 + 95984); if (memcmp(&EB5S[7],&pc,4)) { fprintf(stderr,"E5 cell 95984: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[7]); S2++; }
-            pc = *(float *)(a1 + 96000); if (memcmp(&EB5S[8],&pc,4)) { fprintf(stderr,"E5 cell 96000: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[8]); S2++; }
-            pc = *(float *)(a1 + 96016); if (memcmp(&EB5S[9],&pc,4)) { fprintf(stderr,"E5 cell 96016: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[9]); S2++; }
-            pc = *(float *)(a1 + 96032); if (memcmp(&EB5S[10],&pc,4)) { fprintf(stderr,"E5 cell 96032: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[10]); S2++; }
-            pc = *(float *)(a1 + 96048); if (memcmp(&EB5S[11],&pc,4)) { fprintf(stderr,"E5 cell 96048: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[11]); S2++; }
-            pc = *(float *)(a1 + 96064); if (memcmp(&EB5S[12],&pc,4)) { fprintf(stderr,"E5 cell 96064: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[12]); S2++; }
-            pc = *(float *)(a1 + 96080); if (memcmp(&EB5S[13],&pc,4)) { fprintf(stderr,"E5 cell 96080: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[13]); S2++; }
-            pc = *(float *)(a1 + 96096); if (memcmp(&EB5S[14],&pc,4)) { fprintf(stderr,"E5 cell 96096: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[14]); S2++; }
-            pc = *(float *)(a1 + 96112); if (memcmp(&EB5S[15],&pc,4)) { fprintf(stderr,"E5 cell 96112: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[15]); S2++; }
-            pc = *(float *)(a1 + 96128); if (memcmp(&EB5S[16],&pc,4)) { fprintf(stderr,"E5 cell 96128: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[16]); S2++; }
-            pc = *(float *)(a1 + 96144); if (memcmp(&EB5S[17],&pc,4)) { fprintf(stderr,"E5 cell 96144: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[17]); S2++; }
-            pc = *(float *)(a1 + 96160); if (memcmp(&EB5S[18],&pc,4)) { fprintf(stderr,"E5 cell 96160: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[18]); S2++; }
-            pc = *(float *)(a1 + 96176); if (memcmp(&EB5S[19],&pc,4)) { fprintf(stderr,"E5 cell 96176: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[19]); S2++; }
-            pc = *(float *)(a1 + 96192); if (memcmp(&EB5S[20],&pc,4)) { fprintf(stderr,"E5 cell 96192: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[20]); S2++; }
-            pc = *(float *)(a1 + 96208); if (memcmp(&EB5S[21],&pc,4)) { fprintf(stderr,"E5 cell 96208: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[21]); S2++; }
-            pc = *(float *)(a1 + 96224); if (memcmp(&EB5S[22],&pc,4)) { fprintf(stderr,"E5 cell 96224: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[22]); S2++; }
-            pc = *(float *)(a1 + 96240); if (memcmp(&EB5S[23],&pc,4)) { fprintf(stderr,"E5 cell 96240: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[23]); S2++; }
-            pc = *(float *)(a1 + 96256); if (memcmp(&EB5S[24],&pc,4)) { fprintf(stderr,"E5 cell 96256: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[24]); S2++; }
-            pc = *(float *)(a1 + 96272); if (memcmp(&EB5S[25],&pc,4)) { fprintf(stderr,"E5 cell 96272: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[25]); S2++; }
-            pc = *(float *)(a1 + 96288); if (memcmp(&EB5S[26],&pc,4)) { fprintf(stderr,"E5 cell 96288: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[26]); S2++; }
-            pc = *(float *)(a1 + 96304); if (memcmp(&EB5S[27],&pc,4)) { fprintf(stderr,"E5 cell 96304: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[27]); S2++; }
-            pc = *(float *)(a1 + 96320); if (memcmp(&EB5S[28],&pc,4)) { fprintf(stderr,"E5 cell 96320: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[28]); S2++; }
-            pc = *(float *)(a1 + 101040); if (memcmp(&EB5S[29],&pc,4)) { fprintf(stderr,"E5 cell 101040: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[29]); S2++; }
-            pc = *(float *)(a1 + 101056); if (memcmp(&EB5S[30],&pc,4)) { fprintf(stderr,"E5 cell 101056: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[30]); S2++; }
-            pc = *(float *)(a1 + 101060); if (memcmp(&EB5S[31],&pc,4)) { fprintf(stderr,"E5 cell 101060: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[31]); S2++; }
-            pc = *(float *)(a1 + 101064); if (memcmp(&EB5S[32],&pc,4)) { fprintf(stderr,"E5 cell 101064: port=%.9g mod=%.9g\n",(double)pc,(double)EB5S[32]); S2++; }
-          }
-        }
         goto LABEL_205;
       }
       goto LABEL_164;
