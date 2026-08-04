@@ -158,6 +158,18 @@ def emit(lo, hi, cls, rings=None, ext=None):
     blob = re.sub(r"\*\(int \*\)\(a1 \+ (\d+)\)",
                   lambda m: known.get(int(m.group(1)),
                                       "/*UNKNOWN %s*/" % m.group(1)), blob)
+    # ★ A `LODWORD` STORE IS A BIT COPY, NOT AN ASSIGNMENT. The port writes
+    #     *(_DWORD *)(a1 + 96160) = LODWORD(v553);
+    # to put a float's BITS into a cell. Emitted as `s->s96160 = LODWORD(v553)`
+    # against a float field, that CONVERTS the bit pattern into a number: cell
+    # 96160 read back 947597056 where the port had 5.99e-05.
+    #
+    # This is the third form of the int/float reinterpretation trap in this
+    # file, and carriers() cannot catch it -- the local is used in arithmetic
+    # elsewhere, so it is not a pure carrier. memcpy is correct whatever the
+    # field's declared type.
+    blob = re.sub(r"(s->s\d+) = LODWORD\((v\d+)\);",
+                  r"memcpy(&\1, &\2, 4);", blob)
     left = len(re.findall(r"a1 \+", blob))
     unk = blob.count("UNKNOWN")
     if left or unk:

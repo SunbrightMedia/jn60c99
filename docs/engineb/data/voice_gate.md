@@ -426,3 +426,39 @@ Teeth brackets, all MEASURED at 48 kHz, all 3.16e-5 FAIL / 3.16e-6 PASS:
 `delay_t1` −90.0 (10 scenarios), `delay_t5` −90.0, `fx_e1` −93.2 (1 scenario),
 `fx_e5` −93.6 (1 scenario). The small catch counts are not weak coverage — they
 are the whole of it. EFFECT TYPE 1 has exactly one patch in the entire bank.
+
+
+## ★★ A CORRECTION I HAVE TO MAKE, AND THE TRAP BEHIND IT
+
+Earlier in this document and in two commit messages I wrote that the EFFECT arms
+null "EXACTLY 0 on all 33 scenarios". **That was measured with `--quick`, which
+renders 32.** The scenario `--quick` drops is `long LFO+tail` — and MEASURED
+from the teeth, that is the ONLY scenario in the whole set that exercises
+`fx_e5`. So the quick PASS for that module was **vacuous**: the arm never ran.
+
+The full run failed it at −5.7 dB, and the module was genuinely wrong.
+
+**THE RULE, and it is now the only safe one: a module result may never be quoted
+from a `--quick` run.** `--quick` exists to shorten iteration, and for a module
+whose only exercising scenario is the long one it measures nothing at all. The
+`--teeth` catch counts are what reveal this: an arm caught by ONE scenario is
+one `--quick` away from being ungated.
+
+### The defect it was hiding: a third form of the int/float trap
+
+```c
+*(_DWORD *)(a1 + 96160) = LODWORD(v553);   /* the port: store a float's BITS */
+s->s96160 = LODWORD(v553);                 /* the module: CONVERTS them      */
+```
+
+MEASURED: cell 96160 read back **947597056** where the port had **5.99e-05** —
+the integer value of the float's own bit pattern.
+
+`carriers()` cannot catch this one. `v553` is used in arithmetic elsewhere, so
+it is not a pure bit carrier; only this one STORE is a bit operation.
+`arm_xform.py` now rewrites `s->sN = LODWORD(vX);` into `memcpy(&s->sN, &vX, 4)`,
+which is correct whatever the field's declared type.
+
+That makes three distinct forms of the same underlying trap found in one
+session — a cached per-sample cell, a pure bit-carrier local, and a `LODWORD`
+store — each of which produced a green gate before it produced a red one.

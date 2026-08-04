@@ -79,7 +79,7 @@ void eb_fx_e5_tick(eb_fx_e5_state *s, const eb_fx_e5_coef *c,
         v553 = juno_wrap_unit((float)((float)( s->s96176 + s->s96144 ) + c->k96352));
         v554 = *(float *)&v553;
         v555 = *(float *)&v553 < 0.0;
-        s->s96160 = LODWORD(v553);
+        memcpy(&s->s96160, &v553, 4);
         v556 = c->k96784;
         if ( v555 )
           v556 = -v556;

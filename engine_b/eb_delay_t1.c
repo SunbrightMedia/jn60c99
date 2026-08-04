@@ -1,24 +1,16 @@
 /* eb_delay_t1.c -- GENERATED from src/master_render.c:890-1048, the DELAY
- * TYPE 1 ALGORITHM -- the whole of it, not a pre-stage.
+ * TYPE 1 PRE-STAGE. It runs BEFORE the shared delay core (LABEL_69), which
+ * types 0, 1 and >=6 all use.
  *
- * ★ I HAD THIS BACKWARDS FIRST, AND THE RECORD SHOULD SAY SO. From the line
- * ranges it looks like `if (v39 == 1) {...}` runs and then falls through into
- * the shared core at LABEL_69, which would make v176/v177 here DEAD -- the
- * core assigns both unconditionally at :1266-1267. I checked that, found the
- * core also unconditionally assigns v56 and v58, and concluded this block
- * spoke to the rest of the function through cells alone. Then I looked for
- * which of its 33 written cells anything later reads, and the answer was NONE
- * -- which would have made the entire block a no-op. That is the result that
- * did not add up, and it was right not to believe it.
+ * ITS LOCAL OUTPUTS ARE DEAD, and establishing that took the
+ * assignment-before-use analysis that master_cuts.py cannot do: the block
+ * assigns v176 and v177, but control falls through into the shared core,
+ * which assigns v176, v177, v56 and v58 UNCONDITIONALLY (:1177, :1182,
+ * :1266, :1267) before anything reads them. The pre-stage therefore
+ * communicates with the rest of the function through CELLS only.
  *
- * :1049-1050 is `}` followed by `else`. Type 1 does NOT reach the core: the
- * core serves type 0 and (via `goto LABEL_69`) types >= 6. So this IS the
- * complete type-1 algorithm and v176/v177 ARE its outputs.
- *
- * The module was correct throughout, because it reproduces what the port does
- * instead of acting on a liveness conclusion. That choice was made before the
- * conclusion turned out to be wrong, and it is the reason this cost a comment
- * rather than a debugging session.
+ * They are computed and returned anyway. Reproducing what the port does is
+ * cheaper than depending on my own liveness reasoning being right.
  */
 #include "eb_delay_t1.h"
 #include "juno_dsp.h"
