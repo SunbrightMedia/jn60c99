@@ -762,6 +762,19 @@ static void arp_tick(juno_ctx *c)
             r[0] = (int)c->arp_trace_smp; r[1] = ev[i].kind;
             r[2] = ev[i].note; r[3] = ev[i].velocity;
         }
+        /* THE ARPEGGIATOR'S EVENTS ARE NOTE EVENTS, so they bump the
+         * coefficient generation counter like every other note event does.
+         *
+         * They did not until now, and the consequence was total: engine B
+         * mirrors the port's event-written cells on a generation bump, so an
+         * arp-driven note was invisible to it and an arpeggiated patch played
+         * SILENCE. Seven of the sixty-four factory patches use the arpeggiator.
+         *
+         * It survived because no null scenario used an arp patch. It was found
+         * the moment one was added -- for EFFECT TYPE 1, whose only patch in
+         * the bank happens to have the arp on. Coverage added for one reason
+         * found a defect of another. */
+        ++eb_coef_gen;
         if (ev[i].kind == 0) {                          /* note-off */
             synth_note_off(c, ev[i].note);
             if (ev[i].note == c->arp_cur) c->arp_cur = -1;
