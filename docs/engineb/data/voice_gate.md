@@ -320,3 +320,34 @@ So types 0, 1 and >=6 SHARE a core, and that core is already the claimed
 
 The type-2/3 arm's live-in is `v36`/`v38` — exactly `eb_master_in`'s two
 outputs, so the module chain already lines up.
+
+## The DELAY arms share ONE interface
+
+MEASURED for all three unclaimed reachable arms:
+
+| arm | lines | cells touched / written | live-in | live-out |
+|---|---|---|---|---|
+| type-1 pre-stage `:889-1051` | 163 | 67 / 33 | `v36 v38 v5` | `v176 v177 v56 v58` |
+| type-2/3 `:1271-1452` | 184 | 83 / 41 | `v36 v38 v5` | `v176 v177 v56 v58` |
+| type-5 `:1458-1866` | 409 | 170 / 101 | `v36 v38 v5` | `v176 v177 v56 v58` |
+
+Every arm is the same function shape: `(v36, v38, v5) -> (v176, v177, v56, v58)`,
+where `v36`/`v38` are exactly `eb_master_in`'s two outputs and `v5` its
+coefficient `k84496`. So the delay dispatch is POLYMORPHIC: one call signature,
+several implementations, selected by `v39`. Engine B can mirror that directly —
+one `eb_delay_arm_*` per type behind a single call — and the arms are mutually
+exclusive at runtime, so they cost flash and not per-sample time.
+
+### ⚠ A LIMITATION OF `master_cuts.py`, found while using it
+
+Its live-out set is an OVER-APPROXIMATION. It reports a local as live-out if the
+block assigns it and ANY later line mentions it — it does not check whether the
+successor ASSIGNS the local before reading it. For the two arms that
+`goto LABEL_105` (type-2/3 and type-5) that makes no difference: they jump past
+everything between. **For the type-1 pre-stage it does**, because control falls
+through into the shared core at LABEL_69, which assigns `v176`/`v177` itself.
+So the pre-stage's true outputs are NOT yet known and must be derived by an
+assignment-before-use analysis of the shared core before that arm is
+transcribed. Recorded rather than discovered later by a null that will not
+close: a boundary tool that flatters its block deserves the same suspicion as a
+gate that never fails.
