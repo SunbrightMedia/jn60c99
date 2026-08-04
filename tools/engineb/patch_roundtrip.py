@@ -62,9 +62,29 @@ def doc_offsets():
                                               "compact_bytes.json"))))
 
 
-def load_lib():
-    so = os.path.join(REPO, "libjuno.so")
-    subprocess.run(["make", "-s", "libjuno.so"], cwd=REPO, check=True)
+def load_lib(module=None):
+    """Without --module: the port's own libjuno.so, which is what this gate
+    originally asked -- does the compact format carry everything the PORT
+    needs?
+
+    With --module M: a hybrid library built exactly as null_b.py builds one,
+    with shim M overlaid. `--module standalone` therefore asks the question
+    that matters for firmware: does the compact format carry everything
+    ENGINE B needs? That is NOT the same question. Engine B reads its own
+    subset of cells through eb_render_coefs_build and eb_master_coefs_build, so
+    a parameter the port consumes and engine B ignores would pass the original
+    form of this gate and still be missing from the engine, and a parameter
+    engine B needs that the format drops would fail here and nowhere else."""
+    if module:
+        import tempfile
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import null_b
+        d = tempfile.mkdtemp(prefix="patchgate_")
+        so = os.path.join(d, "cand.so")
+        null_b.build(so, [module])
+    else:
+        so = os.path.join(REPO, "libjuno.so")
+        subprocess.run(["make", "-s", "libjuno.so"], cwd=REPO, check=True)
     lib = ctypes.CDLL(so)
     lib.juno_gui_create.restype = ctypes.c_void_p
     lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
@@ -118,9 +138,13 @@ def run(lib, bank, offsets, label):
 
 def main():
     truth.require()
-    lib = load_lib()
+    module = None
+    if "--module" in sys.argv:
+        module = sys.argv[sys.argv.index("--module") + 1]
+    lib = load_lib(module)
     bank = open(truth.BANK, "rb").read()
-    print("=== COMPACT PRESET FORMAT, gated at the OUTPUT ===")
+    print("=== COMPACT PRESET FORMAT, gated at the OUTPUT%s ==="
+          % ("" if not module else " THROUGH ENGINE B [%s]" % module))
     print("48 kHz, note 60 vel 100, %d frames, patch 0's record as the template\n"
           % NFRAMES)
 
