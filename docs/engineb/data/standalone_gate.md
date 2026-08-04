@@ -114,3 +114,33 @@ one-shot) at generation bumps — so engine B's own note path never runs and the
 events are never delivered. They belong to engine B's own recall and note
 handling, which is task **O4 (`eb_patch`)**. Recorded as open rather than
 counted as done.
+
+## The full teeth battery, 48 kHz — PASS (67 cases)
+
+Every module in the tree, including the seven new master modules and the
+standalone engine:
+
+| case | result |
+|---|---|
+| `out:standalone` 3.16e-5 / 3.16e-6 | FAIL −90.0 dB **33/33** / PASS −109.8 dB |
+| `seedpoison` | FAIL −85.2 dB, 21/33 |
+| `out:master_in` / `out:master_out` | FAIL −90.0 dB 33/33 / PASS −109.8 dB |
+| `out:delay_t1` | FAIL −90.0 dB, **10** scenarios |
+| `out:delay_t23` | FAIL −90.0 dB, **2** scenarios |
+| `out:delay_t5` | FAIL −90.0 dB, **4** scenarios |
+| `out:fx_e1` | FAIL −93.2 dB, **1** scenario |
+| `out:fx_e5` | FAIL −95.5 dB, **1** scenario |
+| `voicereseed` / `voiceidleskip` | FAIL 32/33 / FAIL 33/33 |
+
+**Read the catch counts, not just the PASSes.** The arm modules are caught by
+2, 4 and 1 scenarios — precisely the arm-coverage scenarios added at the start
+of this work. Before those existed, every one of those cases would have caught
+NOTHING, and each module's green null would have meant only that its code never
+ran. The standalone and master modules are caught by all 33, because every
+patch goes through them.
+
+The battery also hard-stopped once, at case 53, with "teeth anchor for module
+'delay_t1' matched 0 times": `eb_dly1_tick` had gained two return arguments and
+the anchor still named the old call. That is the uniqueness guard doing exactly
+its job — the third stale anchor this project has had, and the third time the
+guard stopped the run rather than letting two cases silently plant nothing.
