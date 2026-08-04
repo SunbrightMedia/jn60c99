@@ -120,3 +120,24 @@ reaching.** The braces are now load-bearing and commented as such.
 * `tools/engineb/coef_audit.py` — the constructor's cell-writer audit.
 * `tools/engineb/merge_shims.py` — whole-chain shims are excluded from the
   composite by name, with the reason.
+
+## Groundwork for 1b-1 (measured, not yet transcribed)
+
+The first master block was chosen the way every voice module's boundary was
+chosen — by a live-variable analysis, not by eye.
+
+**`src/master_render.c:826-886` — the MASTER INPUT STAGE: ZERO live-in, three
+live-out (`v36`, `v38`, `v5`), 40 cells touched, 26 written.**
+
+That is the same shape that made `eb_lfo` lift (four live-in, zero live-out).
+It is the voice summing, the per-pair gain staging and the two channel signals
+(cells 101104 and 101120) that the DELAY routing switch at :887 consumes.
+`juno_host_sel(a1, 136)` at :887 is the natural end of the block: it is the
+EFFECT/DELAY-TYPE routing read, and the routing switch belongs to the next
+block, not this one.
+
+The 26 written cells still need the read-before-write classification and the
+FOUR LIES check before any of them may be called a coefficient — and the DCO
+oscillator-level defect above is the standing reason to run
+`coef_audit.py`-style checking on BOTH accessors, since `master_render.c`
+copies with `_DWORD` as freely as `voice_render.c` copies with `JI`.

@@ -21,7 +21,55 @@ verdict that forced this: full-standard 8-voice S3 is IMPOSSIBLE (pitch alone
 = 2–3 budgets, irreducibility proven twice); the reporting lesson — when the
 numbers say a goal is probably unreachable, that sentence goes FIRST.**
 
-**★★★★★★★★★★★★★ NEWEST (2026-08-04, Fable 5) — P8 C1 EXECUTED TO ITS END:
+**★★★★★★★★★★★★★★ NEWEST (2026-08-04, Opus 5) — 1b-0 DONE: ENGINE B'S RENDER
+FUNCTION HAS RUN, AND IT NULLS EXACTLY 0. Read `docs/engineb/data/voice_gate.md`.**
+- **`null_b.py --module voices`, all 30 scenarios, EXACTLY 0 vs the port at BOTH
+  44,100 and 48,000 Hz.** `eb_engine_render_voices()` — the 16 gated modules
+  PLUS the wiring between them, driving engine B's OWN state from an
+  `eb_render_coefs` — reproduces the port's eight per-voice samples bit for bit.
+  **Full `--teeth` battery at 48 kHz: PASS (49 cases).** New teeth: bracket
+  MEASURED 3.16e-5 FAIL −90.0 dB 30/30 / 3.16e-6 PASS −109.8 dB; `voicereseed`
+  caught 29/30; `voiceidleskip` caught 30/30. Composite + decim re-gated PASS
+  both rates; `make test` green.
+- **STILL THE WEAKER GATE, as ruled.** The MASTER is still the port's (78 %
+  untranscribed), recall is still the port's, the at-rest shortcut is still
+  unexercised, `render_ok` stays UNSET. 1b-1 (master transcription) then 1b-2
+  (standalone gate) are next.
+- **FOUR defects found by RUNNING it, after eight had been found by reading it.
+  Two were SILENT:**
+  1. **The DCO oscillator levels were cached from per-sample cells** (4736/4752/
+     4768, written at :1702-1707) → DCO emitted exactly 0 → the whole chain
+     nulled at 0.0 dB rel, i.e. SILENCE. The coefficients are 4192/4208/4224.
+     **★ WHY THE CHECK MISSED IT: it grepped `JF(a1,N) =` and the port copies
+     all three with `JI`, as ints. A cell-writer audit that names only ONE
+     ACCESSOR is not an audit.** `tools/engineb/coef_audit.py` now does it
+     mechanically, both accessors, scoped to the constructor.
+  2. **Cell 5456 cached too** (LATENT — fixing it changed no sample): it is
+     eb_dcoprep's third output and the decimator's per-sample feedback term,
+     discarded as `(void)pwm_out`. `k5456` is now a per-sample ARGUMENT so the
+     type system refuses it. **The decim shim caches it too, so that gate is
+     blind to this cell by scenario coverage, not by construction.**
+  3. **The DCO retrigger one-shot (101504+v*32) belonged to NO module** — read
+     at :589, cleared at :2178, both outside every boundary. A standalone engine
+     would silently never retrigger; no COLD scenario can see it.
+  4. **★ THE LOCKSTEP DEFECT: engine B's statics were never re-seeded per
+     context.** The worker renders all 30 scenarios in ONE process, so scenario
+     1 nulled EXACTLY 0 and all 28 others failed from their FIRST FRAME — first
+     differing sample 42000, exactly scenario 1's length. It looks exactly like
+     a broken DSP chain and is nothing of the kind. Re-seed is keyed on a MARKER
+     in the state block's unused tail, not the pointer (freed addresses are
+     reused); re-init and chorus-mode calls deliberately do NOT re-seed. Now a
+     permanent teeth plant.
+- **★ A THIRD "teeth case that could not reach its own mutation":** the output
+  anchor inserts after the assignment and the crossing loop had no BRACES, so
+  the statement landed outside it with `v == JUNO_NUM_VOICES`, wrote past the
+  end of `vbuf`, and perturbed nothing — both bracket factors measured EXACTLY
+  0. The uniqueness assert PASSED, because the anchor did match once.
+  **Matching is not reaching.**
+- 1b-1 groundwork MEASURED: `master_render.c:826-886` is the master input stage
+  with **ZERO live-in, three live-out** — the eb_lfo shape, the first block.
+
+**★★★★★★★★★★★★★ (2026-08-04, Fable 5) — P8 C1 EXECUTED TO ITS END:
 DEAD, AND IT UNCOVERED THE LAW THAT STEERS EVERYTHING LEFT. Read
 `docs/engineb/data/pitch_p2_study.md` §6.**
 - **C1 (control-rate pitch) is CLOSED NEGATIVE by the strongest measurement in
