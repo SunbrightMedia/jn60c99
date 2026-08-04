@@ -64,6 +64,7 @@
 #include "eb_chorus.h"
 #include "eb_delay.h"
 #include "eb_reverb.h"
+#include "eb_master.h"
 
 /* The per-voice coefficient sets. In the shipped engine these are computed once
  * at recall. They are here rather than in eb_types.h because that header is
@@ -217,7 +218,10 @@ typedef struct {
 #define EB_RENDER_INCOMPLETE  1
 
 int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c,
-                     const eb_render_needs *n, float *outL, float *outR);
+                     const eb_render_needs *n,
+                     eb_master_state *ms, const eb_master_coef *mc,
+                     const eb_master_rings *rings,
+                     float *outL, float *outR);
 
 /* THE VOICE CHAIN ALONE: one mono sample per voice into vout[EB_NUM_VOICES],
  * no summing and no FX. eb_engine_render() is this plus the mix and the FX.

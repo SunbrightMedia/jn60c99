@@ -19,6 +19,7 @@
  */
 #include "eb_render.h"
 #include "juno_tables.h"
+#include "eb_master.h"
 #ifdef EB_VOICES_DEBUG
 #include <stdio.h>
 unsigned long ebdbg_n;
@@ -222,35 +223,35 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
 }
 
 int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c,
-                     const eb_render_needs *n, float *outL, float *outR)
+                     const eb_render_needs *n,
+                     eb_master_state *ms, const eb_master_coef *mc,
+                     const eb_master_rings *rings,
+                     float *outL, float *outR)
 {
     float vbuf[EB_NUM_VOICES];
-    float mix = 0.0f;
-    int v;
 
     if (eb_engine_render_voices(e, st, c, n, vbuf) != EB_RENDER_OK) {
         *outL = 0.0f;
         *outR = 0.0f;
         return EB_RENDER_INCOMPLETE;
     }
-    for (v = 0; v < EB_NUM_VOICES; ++v) mix += vbuf[v];
-
-    /* ---- FX, once for the whole engine. The chorus LFO free-runs whether or
-     * not anything is sounding, which is why it is outside the voice loop and
-     * unconditional.
+    /* THE MASTER IS eb_master_render's, NOT A MODEL OF IT.
      *
-     * NOT GATED. This summing and this FX call are engine B's MODEL of the
-     * port's master stage, and the master stage is 78 % untranscribed (see the
-     * scope finding in docs/engineb/PHASE1_ORDERS.md). The voice-level gate
-     * does not reach this code at all -- it feeds the port's own master. */
-    {
-        float l = mix, r = mix;
-        eb_chorus_tick_x(&st->chorus, &c->chorus, mix, &l, &r, 0, 0.0f);
-        eb_delay_process(&c->delay, &st->delay, 0, l, r, &l, &r);
-        eb_reverb_process(&c->reverb, &st->reverb,
-                          st->rev_pending, &st->rev_wipe, l, r, &l, &r);
-        *outL = l;
-        *outR = r;
+     * This function used to sum the voices and call the three FX directly.
+     * That was a MODEL of the master stage and it was wrong in a way worth
+     * recording, because it looked entirely reasonable: it treated the effect
+     * send as an INSERT. The port forms its output BEFORE dispatching the
+     * effect arms, and an arm's result reaches the audio only through cells
+     * 84672/84704 on the NEXT sample. It also had no DELAY or EFFECT type
+     * dispatch at all -- one chorus, one delay, one reverb, always.
+     *
+     * eb_master_render is the real chain and is gated: null_b.py
+     * --module standalone, all 33 scenarios, EXACTLY 0 at both rates. */
+    if (eb_master_render(ms, mc, rings, vbuf, outL, outR) != EB_MASTER_OK) {
+        *outL = 0.0f;
+        *outR = 0.0f;
+        return EB_RENDER_INCOMPLETE;
     }
     return EB_RENDER_OK;
 }
+

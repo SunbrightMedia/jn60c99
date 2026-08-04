@@ -797,9 +797,21 @@ def _plant(tmp, mutate):
         # history, and the gate must fail. If it does not, the seed is not
         # being read at all and every "seeded correctly" claim is empty.
         p = os.path.join(tmp, "engine_b", "eb_master_coefs.c"); s = open(p).read()
-        a = "    s->in.s84768 = CF(base, 84768);"
+        # THE FIELD MATTERS. The first version of this case perturbed
+        # s->in.s84768, the master input stage's one-pole history, and MEASURED
+        # a residual of EXACTLY 0 on all 33 scenarios -- the case could not
+        # fail. That is not a broken test, it is a REAL measurement: 84768 is
+        # multiplied by coefficient 84816, and 84816 is 0.0 in ALL SIXTY-FOUR
+        # factory patches (MEASURED, not assumed), so its seeded value is inert
+        # and that whole one-pole feedback path is dead for this bank. A teeth case pointed at an inert
+        # field proves nothing about the seed, and would have been recorded as
+        # proof that the seed is read.
+        #
+        # fb84704 is the EFFECT stage's feedback into the input stage's v19,
+        # and it is unambiguously live: it is the R channel's whole path.
+        a = "    s->fb84704 = CF(base, 84704);"
         assert s.count(a) == 1, "seedpoison anchor moved"
-        s = s.replace(a, "    s->in.s84768 = CF(base, 84768) + 1e-3f;", 1)
+        s = s.replace(a, "    s->fb84704 = CF(base, 84704) + 1e-3f;", 1)
     elif mutate == "voicereseed":
         # THE LOCKSTEP CASE, and it is a REAL defect this harness let through
         # once. Engine B's state lives in file statics and the render worker

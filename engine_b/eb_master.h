@@ -36,6 +36,14 @@
  * linker error. This follows eb_delay.h's precedent, where EB_DELAY_LEN is a
  * compile-time budget with an overrun flag and the ring is last in the struct
  * so it can live in external memory.
+ *
+ * ⚠ ONE PORTABILITY DEBT, found by LINKING the chain outside the harness for
+ * the first time: eb_delay_t23 and eb_delay_t5 call `juno_pitch_poly` and
+ * `juno_triangle`, which live in src/juno_dsp.c -- the PORT. Engine B cannot
+ * be built for a target without them, so either src/juno_dsp.c comes along or
+ * those two get engine B implementations (engine_b/triangle.h already has one
+ * candidate). Recorded here because the null gates link the whole port and
+ * would never have surfaced it; the first firmware build would have.
  */
 #ifndef ENGINEB_EB_MASTER_H
 #define ENGINEB_EB_MASTER_H

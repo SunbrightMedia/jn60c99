@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "eb_render.h"
+#include "eb_master.h"
 
 int main(void)
 {
@@ -20,6 +21,9 @@ int main(void)
     static eb_render_state S;
     static eb_render_coefs C;
     eb_render_needs N;
+    static eb_master_state MS;
+    static eb_master_coef  MC;
+    static eb_master_rings RG;
     float l = 12345.0f, r = 12345.0f;
     int rc, bad = 0;
 
@@ -27,9 +31,12 @@ int main(void)
     memset(&S, 0, sizeof S);
     memset(&C, 0, sizeof C);
     memset(&N, 0, sizeof N);
+    memset(&MS, 0, sizeof MS);
+    memset(&MC, 0, sizeof MC);
+    memset(&RG, 0, sizeof RG);
 
     /* render_ok is 0, as it is everywhere in the tree today. */
-    rc = eb_engine_render(&E, &S, &C, &N, &l, &r);
+    rc = eb_engine_render(&E, &S, &C, &N, &MS, &MC, &RG, &l, &r);
 
     if (rc != EB_RENDER_INCOMPLETE) {
         fprintf(stderr, "  FAIL: expected EB_RENDER_INCOMPLETE (%d), got %d\n",
@@ -45,9 +52,16 @@ int main(void)
     /* And the guard must be the ONLY thing standing in the way -- if someone
      * sets render_ok the function must actually run, so that the day the gates
      * pass, removing the guard is a one-line change and not a rewrite. */
+    /* A SUPPORTED DISPATCH ARM. eb_master_render refuses EFFECT TYPE 0 (the
+     * untranscribed LABEL_164 core), and a zeroed coef struct selects exactly
+     * that -- so without this the second half of the test would see a refusal
+     * and read it as the guard still being on. Two different refusals with one
+     * return code is precisely the confusion this test exists to prevent. */
+    MC.effect_type = 2;        /* chorus */
+    MC.delay_type  = 0;        /* the shared core */
     E.render_ok = 1;
     l = r = 12345.0f;
-    rc = eb_engine_render(&E, &S, &C, &N, &l, &r);
+    rc = eb_engine_render(&E, &S, &C, &N, &MS, &MC, &RG, &l, &r);
     if (rc != EB_RENDER_OK) {
         fprintf(stderr, "  FAIL: render_ok set but still refused (%d)\n", rc);
         ++bad;
