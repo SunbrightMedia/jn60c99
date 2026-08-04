@@ -190,3 +190,66 @@ This map is the ROUTE for 1b-1, not the work. Every chosen range still needs its
 cells classified read-before-write with all FOUR LIES checked, and
 `master_render.c` copies with `_DWORD` exactly as freely as `voice_render.c`
 copies with `JI` — which is how the DCO oscillator levels were missed above.
+
+---
+
+# 1b-1 — the master chain, first blocks (Opus 5, 2026-08-04)
+
+## Done and gated
+
+| module | port range | null | teeth bracket @48k |
+|---|---|---|---|
+| `master_in` | `:826-886` | **EXACTLY 0**, 30 scenarios, 44.1k AND 48k | 3.16e-5 FAIL −90.0 dB 30/30 · 3.16e-6 PASS −109.8 dB |
+| `master_out` | `:2338-2377` + the `:2941-2943` tail | **EXACTLY 0**, 30 scenarios (both rates: see below) | 3.16e-5 FAIL −90.0 dB 30/30 · 3.16e-6 PASS −109.8 dB |
+
+Both brackets are MEASURED, and measuring them is also what proved the two new
+teeth anchors reachable — the residual moved, so the mutation was planted where
+it claims to be. That check exists because this harness has now had three cases
+that matched their anchor and reached nothing.
+
+## Two rules the master chain has already taught
+
+**1. A read-before-write scan of one block is not a classification.** Cells
+84672 and 84704 are read at the top of `master_in` and WRITTEN at :2496, :2625,
+:2747, :2936 and :2940 — by the chorus/output stage, at the far end of the same
+sample. Scanned inside `:826-886` alone they look exactly like coefficients.
+They are cross-sample feedback. The scan has to cover the whole function.
+
+**2. A shim may cache COEFFICIENTS in file statics. It may never hold STATE
+there.** `master_in`'s first version kept its one-pole history in a static; the
+null worker renders all thirty scenarios in one process, so scenario 2 onward
+inherited scenario 1's history. MEASURED: 7 scenarios failed at worst −63.5 dB,
+every one of them a small-signal noise case. Same class as the voices shim's
+missing per-context re-seed, reached by a different route, one day apart. State
+lives in the port's cell and is copied in and out per sample, as the other
+shims do.
+
+Also worth keeping: two plausible causes were killed by measurement rather than
+argued away. Restoring all 23 dropped dead stores changed nothing, and a
+line-by-line differential of the module against the port's own code showed zero
+difference on every sample. Neither was the fault, and guessing would have
+"fixed" the wrong thing.
+
+## The cut map needed one correction, and the routing region is bigger than it
+## looks
+
+The map's zero-width cut at :2941 suggested an "output assembly" module. It is
+three lines — `out = cell + cell` on two cells — with no arithmetic worth a
+call. It is folded into `master_out`, which writes those cells, exactly as
+`eb_dcoprep` folded the port's arithmetic-free :1665-1671.
+
+**The `v551` routing switch at :2378 is NOT a block.** MEASURED: it opens a
+~562-line region running to :2939 with several `v551` arms, `goto LABEL_164`
+and `goto LABEL_205` control flow, and the already-claimed M-CHORUS module
+inside it. The narrow cut the map reports at :2378 is the cut at the switch
+STATEMENT, not the extent of what the switch governs. It needs to be carved
+into arms, and the warm-state hazard applies to all of them (the v551 arm is
+load-bearing warm — see the WARM parity block in CLAUDE.md). It is the largest
+single piece of 1b-1 and it is deliberately NOT started here.
+
+## Remaining for 1b-1
+
+* the `v551` routing region `:2378-2939`, in arms
+* the middle blocks between `:887` and `:2337`, narrowest cut first
+* a full `--teeth` battery run once the middle blocks land (the two new
+  brackets are measured; the battery itself was last run green before them)

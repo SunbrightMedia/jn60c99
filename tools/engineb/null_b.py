@@ -321,6 +321,16 @@ def build(dst_so, modules=(), mutate=None, quiet=True):
 # Each marker is asserted to occur EXACTLY ONCE at plant time. If a shim is
 # edited so a marker moves, the teeth case stops silently and says so.
 _OUT_ANCHOR = {
+    # THE MASTER CHAIN's first two blocks (task 1b-1). Each is perturbed where
+    # its own result enters the port's remaining code: master_in at the two
+    # channel signals it hands the routing switch, master_out at the final
+    # stereo pair.
+    "master_in": ("master_render.c",
+                  "    v38 = _o38;",
+                  "    v36 *= %s; v38 *= %s;"),
+    "master_out": ("master_render.c",
+                   "      EBMO_L = _oL; EBMO_R = _oR;",
+                   "      EBMO_L *= %s; EBMO_R *= %s;"),
     # THE WHOLE VOICE CHAIN, at the point its samples enter the port's master.
     # This module is the 1b-0 voice-level gate (docs/engineb/PHASE1_ORDERS.md):
     # engine B's own render function driving its own state, with the master
@@ -449,6 +459,13 @@ _BRACKET = {
     "vcf_ladder": ("3.16e-5", "3.16e-6"),
     "env":        ("3.7e-6",  "3.7e-7"),
     "decim":      ("3.16e-5", "3.16e-6"),   # measured below, unity gain
+    # The first two MASTER-chain blocks (1b-1). MEASURED 2026-08-04 at 48 kHz
+    # over all 30 scenarios: both FAIL at 3.16e-5 (-90.0 dB, 30/30) and PASS at
+    # 3.16e-6 (-109.8 dB). They land on the same bracket as the voice chain and
+    # for the same reason -- all three perturb the signal at unity gain on its
+    # way out, so a relative error on them means the same thing at the output.
+    "master_in":  ("3.16e-5", "3.16e-6"),
+    "master_out": ("3.16e-5", "3.16e-6"),
     # The 1b-0 whole-voice-chain gate. MEASURED 2026-08-04 at 48 kHz over all
     # 30 scenarios: 3.16e-5 FAILS at -90.0 dB in 30/30, 3.16e-6 PASSES at
     # -109.8 dB. It sits where vca_hpf's does because it IS the same crossing
