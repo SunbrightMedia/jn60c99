@@ -53,6 +53,8 @@ RINGS = [(6429408, 6429412, 6396640)]
 # The type-5 arm's FOUR rings. Each ring's control pair sits immediately AFTER
 # the PREVIOUS ring's data, so the index cell of a ring is nowhere near its own
 # base -- read the write expression to pair them, never the addresses.
+RINGS_E5 = [(101024, 101028, 96928)]
+
 RINGS_T1 = [(6395248, 6395252, 4298096)]
 
 RINGS_T5 = [(8594768,  8594772,  6497616),
@@ -125,7 +127,7 @@ def carriers(lo, hi):
     return out
 
 
-def emit(lo, hi, cls, rings=None):
+def emit(lo, hi, cls, rings=None, ext=None):
     L = open(SRC).read().split("\n")
     blob = "\n".join(L[lo - 1:hi])
     for i, (idx, ln, base) in enumerate(rings if rings is not None else RINGS):
@@ -144,6 +146,11 @@ def emit(lo, hi, cls, rings=None):
         blob = re.sub(r"\*\(_DWORD \*\)\(a1 \+ 4LL \* (v\d+) \+ %d\)" % base,
                       r"RINGI%s(\1)" % tag, blob)
     known = {c: "c->k%d" % c for c in cls["COEF"]}
+    # EXT cells are cross-block feedback: written by ANOTHER block in the same
+    # sample, so they are ARGUMENTS. Passing a name here is what stops them
+    # being frozen into a coefficient cache -- the eb_master_in 84672/84704
+    # mistake, refused by construction.
+    known.update(ext or {})
     known.update({c: "s->s%d" % c for c in cls["STATE"] + cls["WONLY"]})
     blob = re.sub(r"\*\((?:float|_DWORD|_WORD|_BYTE) \*\)\(a1 \+ (\d+)\)",
                   lambda m: known.get(int(m.group(1)),
@@ -169,7 +176,7 @@ def main():
     lo, hi = int(sys.argv[1]), int(sys.argv[2])
     cls = classify(lo, hi)
     if "--emit" in sys.argv:
-        b = emit(lo, hi, cls, RINGS_T5 if "--t5" in sys.argv else RINGS_T1 if "--t1" in sys.argv else None)
+        b = emit(lo, hi, cls, RINGS_T5 if "--t5" in sys.argv else RINGS_T1 if "--t1" in sys.argv else RINGS_E5 if "--e5" in sys.argv else None)
         if b is None:
             return 1
         print(b)

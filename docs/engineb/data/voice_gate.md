@@ -388,7 +388,41 @@ survivable.
 | `delay_t5` | `:1459-1866` | EXACTLY 0, both rates |
 | `master_out` | `:2338-2377` + tail | EXACTLY 0, both rates |
 
-All three REACHABLE delay arms are now modules. Remaining: the `v551` EFFECT
-dispatch arms (`:2378-2752`, the chorus inside it already claimed), the DELAY
-type-4 arm (`:1870-2076`, ungateable until a synthetic-recall gate exists), and
-a full teeth battery.
+All three REACHABLE delay arms are now modules.
+
+
+## O2 COMPLETE — the master chain is 82 % claimed, and the rest is unreachable
+
+Both reachable EFFECT arms are modules too: `eb_fx_e1` (`:2381-2497`) and
+`eb_fx_e5` (`:2633-2748`), each EXACTLY 0. Both take cell 84624 — the master
+input stage's one-pole output — as an ARGUMENT, because `arm_xform.py`
+classified it EXT: written by another block earlier in the same sample. Caching
+it would have been the eb_master_in mistake a third time; the tool refuses it by
+construction now.
+
+Both arms also carry `v593`, an int-declared local holding FLOAT BITS, so the
+shim bit-copies it out instead of assigning. Assigning would convert and destroy
+it — the same trap that made the type-5 arm's output exactly zero.
+
+MEASURED claim of `juno_master_render` (2,119 executable lines):
+
+| | lines | share |
+|---|---|---|
+| claimed by engine B modules | 1,737 | **82 %** |
+| unclaimed, in arms NO factory patch can select | 331 | 16 % |
+| dispatch glue | 51 | 2 % |
+
+The scope finding that opened 1b-1 measured 22 %. **Everything still unclaimed is
+unreachable**: the DELAY type-4 arm (`:1870-2076`) and the EFFECT `LABEL_164`
+core (`:2503-2626`, serving EFFECT 0 and >= 6). Neither can be gated until a
+synthetic-recall gate of the `etmode_ab.py` kind exists, and no module may be
+written for them before then.
+
+**The composite — all 16 voice modules AND all 10 master modules together —
+nulls EXACTLY 0.**
+
+Teeth brackets, all MEASURED at 48 kHz, all 3.16e-5 FAIL / 3.16e-6 PASS:
+`master_in` −90.0, `master_out` −90.0, `delay_t23` −90.0 (2 scenarios),
+`delay_t1` −90.0 (10 scenarios), `delay_t5` −90.0, `fx_e1` −93.2 (1 scenario),
+`fx_e5` −93.6 (1 scenario). The small catch counts are not weak coverage — they
+are the whole of it. EFFECT TYPE 1 has exactly one patch in the entire bank.

@@ -390,6 +390,18 @@ _OUT_ANCHOR = {
     "delay_t1": ("master_render.c",
                  "      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177);",
                  "      v176 *= %s; v177 *= %s;"),
+    # THE TWO REACHABLE EFFECT-TYPE ARMS. Perturbed at v593, which is the
+    # value the arm hands the next sample through cell 84704 -- the effect
+    # stage feeds the master input stage, so its error appears one sample on.
+    # Only the scenarios selecting that EFFECT TYPE can catch either.
+    "fx_e1": ("master_render.c",
+              "        eb_fx_e1_tick(&stf, &EBC_, *(float *)(a1 + 84624), "
+              "&_o56, &_o58, &_o593);",
+              "        _o593 *= %s;"),
+    "fx_e5": ("master_render.c",
+              "        eb_fx_e5_tick(&stf, &EBC_, *(float *)(a1 + 84624), "
+              "&_o56, &_o58, &_o593);",
+              "        _o593 *= %s;"),
     # THE WHOLE VOICE CHAIN, at the point its samples enter the port's master.
     # This module is the 1b-0 voice-level gate (docs/engineb/PHASE1_ORDERS.md):
     # engine B's own render function driving its own state, with the master
@@ -533,6 +545,13 @@ _BRACKET = {
     "delay_t23":  ("3.16e-5", "3.16e-6"),
     "delay_t5":   ("3.16e-5", "3.16e-6"),   # measured with the others
     "delay_t1":   ("3.16e-5", "3.16e-6"),   # measured with the others
+    # The two reachable EFFECT arms. MEASURED at 48 kHz: 3.16e-5 FAILS at
+    # -93.2 dB (e1) and -93.6 dB (e5), each in exactly ONE scenario -- the one
+    # that selects that EFFECT TYPE; 3.16e-6 PASSES at -113 dB. One scenario
+    # apiece is not weak coverage, it is the whole of it: EFFECT 1 has exactly
+    # one factory patch in the bank.
+    "fx_e1":      ("3.16e-5", "3.16e-6"),
+    "fx_e5":      ("3.16e-5", "3.16e-6"),
     "master_out": ("3.16e-5", "3.16e-6"),
     # The 1b-0 whole-voice-chain gate. MEASURED 2026-08-04 at 48 kHz over all
     # 30 scenarios: 3.16e-5 FAILS at -90.0 dB in 30/30, 3.16e-6 PASSES at

@@ -26,9 +26,8 @@
  * delay/reverb/chorus recall — no captured baseline. The algorithm here is
  * complete and exact.
  */
-#include "eb_delay_t5.h"
-#include <stdio.h>
-float EBD5_M[4];
+#include "eb_fx_e1.h"
+#include "eb_fx_e5.h"
 #include "juno_engine.h"
 #include "juno_dsp.h"
 #include <math.h>
@@ -1459,194 +1458,6 @@ LABEL_69:
       {
         if ( v39 == 5 )
         {
-          {
-            static eb_dly5_coef EBD5C; static unsigned char EBD5HAVE;
-            static unsigned long EBD5GEN; extern unsigned long eb_coef_gen;
-            static int SH; static unsigned long NN;
-            eb_dly5_state st5; float m176,m177,m56,m58;
-            float sv0,sv1,sv2,sv3; int i0,i1,i2,i3;
-            if (!EBD5HAVE || EBD5GEN != eb_coef_gen) {
-              EBD5C.k101744 = *(float *)(a1 + 101744);
-              EBD5C.k6497168 = *(float *)(a1 + 6497168);
-              EBD5C.k6497184 = *(float *)(a1 + 6497184);
-              EBD5C.k6497200 = *(float *)(a1 + 6497200);
-              EBD5C.k6497216 = *(float *)(a1 + 6497216);
-              EBD5C.k6497232 = *(float *)(a1 + 6497232);
-              EBD5C.k6497248 = *(float *)(a1 + 6497248);
-              EBD5C.k6497264 = *(float *)(a1 + 6497264);
-              EBD5C.k6497280 = *(float *)(a1 + 6497280);
-              EBD5C.k6497296 = *(float *)(a1 + 6497296);
-              EBD5C.k6497312 = *(float *)(a1 + 6497312);
-              EBD5C.k6497328 = *(float *)(a1 + 6497328);
-              EBD5C.k6497344 = *(float *)(a1 + 6497344);
-              EBD5C.k6497376 = *(float *)(a1 + 6497376);
-              EBD5C.k6497392 = *(float *)(a1 + 6497392);
-              EBD5C.k6497408 = *(float *)(a1 + 6497408);
-              EBD5C.k6497424 = *(float *)(a1 + 6497424);
-              EBD5C.k6497440 = *(float *)(a1 + 6497440);
-              EBD5C.k6497456 = *(float *)(a1 + 6497456);
-              EBD5C.k6497472 = *(float *)(a1 + 6497472);
-              EBD5C.k6497488 = *(float *)(a1 + 6497488);
-              EBD5C.k6497504 = *(float *)(a1 + 6497504);
-              EBD5C.k6497520 = *(float *)(a1 + 6497520);
-              EBD5C.k6497536 = *(float *)(a1 + 6497536);
-              EBD5C.k6497568 = *(float *)(a1 + 6497568);
-              EBD5C.k6497584 = *(float *)(a1 + 6497584);
-              EBD5C.k6497600 = *(float *)(a1 + 6497600);
-              EBD5C.k8594772 = *(int32_t *)(a1 + 8594772);
-              EBD5C.k10691940 = *(int32_t *)(a1 + 10691940);
-              EBD5C.k10692016 = *(float *)(a1 + 10692016);
-              EBD5C.k10692032 = *(float *)(a1 + 10692032);
-              EBD5C.k10692112 = *(float *)(a1 + 10692112);
-              EBD5C.k10692352 = *(float *)(a1 + 10692352);
-              EBD5C.k10692368 = *(float *)(a1 + 10692368);
-              EBD5C.k10692400 = *(float *)(a1 + 10692400);
-              EBD5C.k10692416 = *(float *)(a1 + 10692416);
-              EBD5C.k10693008 = *(float *)(a1 + 10693008);
-              EBD5C.k10693024 = *(float *)(a1 + 10693024);
-              EBD5C.k10693040 = *(float *)(a1 + 10693040);
-              EBD5C.k10693056 = *(float *)(a1 + 10693056);
-              EBD5C.k10693072 = *(float *)(a1 + 10693072);
-              EBD5C.k10693088 = *(float *)(a1 + 10693088);
-              EBD5C.k10693104 = *(float *)(a1 + 10693104);
-              EBD5C.k10693120 = *(float *)(a1 + 10693120);
-              EBD5C.k10693136 = *(float *)(a1 + 10693136);
-              EBD5C.k10693152 = *(float *)(a1 + 10693152);
-              EBD5C.k10693168 = *(float *)(a1 + 10693168);
-              EBD5C.k10693184 = *(float *)(a1 + 10693184);
-              EBD5C.k10693200 = *(float *)(a1 + 10693200);
-              EBD5C.k10693216 = *(float *)(a1 + 10693216);
-              EBD5C.k10693232 = *(float *)(a1 + 10693232);
-              EBD5C.k10693248 = *(float *)(a1 + 10693248);
-              EBD5C.k10693264 = *(float *)(a1 + 10693264);
-              EBD5C.k10693280 = *(float *)(a1 + 10693280);
-              EBD5C.k10693296 = *(float *)(a1 + 10693296);
-              EBD5C.k10693312 = *(float *)(a1 + 10693312);
-              EBD5C.k10693328 = *(float *)(a1 + 10693328);
-              EBD5C.k10693344 = *(float *)(a1 + 10693344);
-              EBD5C.k10693360 = *(float *)(a1 + 10693360);
-              EBD5C.k10693376 = *(float *)(a1 + 10693376);
-              EBD5C.k10693392 = *(float *)(a1 + 10693392);
-              EBD5C.k10693408 = *(float *)(a1 + 10693408);
-              EBD5C.k10693424 = *(float *)(a1 + 10693424);
-              EBD5C.k10693440 = *(float *)(a1 + 10693440);
-              EBD5C.k10693456 = *(float *)(a1 + 10693456);
-              EBD5C.k10693472 = *(float *)(a1 + 10693472);
-              EBD5C.k10726260 = *(int32_t *)(a1 + 10726260);
-              EBD5C.k10759044 = *(int32_t *)(a1 + 10759044);
-              EBD5HAVE=1; EBD5GEN=eb_coef_gen; }
-            st5.s6496576 = *(float *)(a1 + 6496576);
-            st5.s6496592 = *(float *)(a1 + 6496592);
-            st5.s6496608 = *(float *)(a1 + 6496608);
-            st5.s6496624 = *(float *)(a1 + 6496624);
-            st5.s6496640 = *(float *)(a1 + 6496640);
-            st5.s6496656 = *(float *)(a1 + 6496656);
-            st5.s6496672 = *(float *)(a1 + 6496672);
-            st5.s6496688 = *(float *)(a1 + 6496688);
-            st5.s6496704 = *(float *)(a1 + 6496704);
-            st5.s6496720 = *(float *)(a1 + 6496720);
-            st5.s6496736 = *(float *)(a1 + 6496736);
-            st5.s6496752 = *(float *)(a1 + 6496752);
-            st5.s6496768 = *(float *)(a1 + 6496768);
-            st5.s6496784 = *(float *)(a1 + 6496784);
-            st5.s6496800 = *(float *)(a1 + 6496800);
-            st5.s6496816 = *(float *)(a1 + 6496816);
-            st5.s6496832 = *(float *)(a1 + 6496832);
-            st5.s6496848 = *(float *)(a1 + 6496848);
-            st5.s6496864 = *(float *)(a1 + 6496864);
-            st5.s6496880 = *(float *)(a1 + 6496880);
-            st5.s6496896 = *(float *)(a1 + 6496896);
-            st5.s6496912 = *(float *)(a1 + 6496912);
-            st5.s6496928 = *(float *)(a1 + 6496928);
-            st5.s6496944 = *(float *)(a1 + 6496944);
-            st5.s6496960 = *(float *)(a1 + 6496960);
-            st5.s6496976 = *(float *)(a1 + 6496976);
-            st5.s6496992 = *(float *)(a1 + 6496992);
-            st5.s6497008 = *(float *)(a1 + 6497008);
-            st5.s6497024 = *(float *)(a1 + 6497024);
-            st5.s6497040 = *(float *)(a1 + 6497040);
-            st5.s6497056 = *(float *)(a1 + 6497056);
-            st5.s6497072 = *(float *)(a1 + 6497072);
-            st5.s6497088 = *(float *)(a1 + 6497088);
-            st5.s6497104 = *(float *)(a1 + 6497104);
-            st5.s6497120 = *(float *)(a1 + 6497120);
-            st5.s6497136 = *(float *)(a1 + 6497136);
-            st5.s6497152 = *(float *)(a1 + 6497152);
-            st5.s10691952 = *(float *)(a1 + 10691952);
-            st5.s10691968 = *(float *)(a1 + 10691968);
-            st5.s10691972 = *(float *)(a1 + 10691972);
-            st5.s10691976 = *(float *)(a1 + 10691976);
-            st5.s10691984 = *(float *)(a1 + 10691984);
-            st5.s10692000 = *(float *)(a1 + 10692000);
-            st5.s10692004 = *(float *)(a1 + 10692004);
-            st5.s10692008 = *(float *)(a1 + 10692008);
-            st5.s10692048 = *(float *)(a1 + 10692048);
-            st5.s10692064 = *(float *)(a1 + 10692064);
-            st5.s10692080 = *(float *)(a1 + 10692080);
-            st5.s10692304 = *(float *)(a1 + 10692304);
-            st5.s10692320 = *(float *)(a1 + 10692320);
-            st5.s10692336 = *(float *)(a1 + 10692336);
-            st5.s10692384 = *(float *)(a1 + 10692384);
-            st5.s10692432 = *(float *)(a1 + 10692432);
-            st5.s10692448 = *(float *)(a1 + 10692448);
-            st5.s10692464 = *(float *)(a1 + 10692464);
-            st5.s10692480 = *(float *)(a1 + 10692480);
-            st5.s10692496 = *(float *)(a1 + 10692496);
-            st5.s10692512 = *(float *)(a1 + 10692512);
-            st5.s10692528 = *(float *)(a1 + 10692528);
-            st5.s10692544 = *(float *)(a1 + 10692544);
-            st5.s10692560 = *(float *)(a1 + 10692560);
-            st5.s10692576 = *(float *)(a1 + 10692576);
-            st5.s10692592 = *(float *)(a1 + 10692592);
-            st5.s10692608 = *(float *)(a1 + 10692608);
-            st5.s10692624 = *(float *)(a1 + 10692624);
-            st5.s10692640 = *(float *)(a1 + 10692640);
-            st5.s10692656 = *(float *)(a1 + 10692656);
-            st5.s10692672 = *(float *)(a1 + 10692672);
-            st5.s10692688 = *(float *)(a1 + 10692688);
-            st5.s10692704 = *(float *)(a1 + 10692704);
-            st5.s10692720 = *(float *)(a1 + 10692720);
-            st5.s10692736 = *(float *)(a1 + 10692736);
-            st5.s10692752 = *(float *)(a1 + 10692752);
-            st5.s10692768 = *(float *)(a1 + 10692768);
-            st5.s10692784 = *(float *)(a1 + 10692784);
-            st5.s10692800 = *(float *)(a1 + 10692800);
-            st5.s10692816 = *(float *)(a1 + 10692816);
-            st5.s10692832 = *(float *)(a1 + 10692832);
-            st5.s10692848 = *(float *)(a1 + 10692848);
-            st5.s10692864 = *(float *)(a1 + 10692864);
-            st5.s10692880 = *(float *)(a1 + 10692880);
-            st5.s10692896 = *(float *)(a1 + 10692896);
-            st5.s10692912 = *(float *)(a1 + 10692912);
-            st5.s10692928 = *(float *)(a1 + 10692928);
-            st5.s10692944 = *(float *)(a1 + 10692944);
-            st5.s10692960 = *(float *)(a1 + 10692960);
-            st5.s10692976 = *(float *)(a1 + 10692976);
-            st5.s10692992 = *(float *)(a1 + 10692992);
-            st5.s10759056 = *(float *)(a1 + 10759056);
-            st5.s10759072 = *(float *)(a1 + 10759072);
-            st5.s10759076 = *(float *)(a1 + 10759076);
-            st5.s10759080 = *(float *)(a1 + 10759080);
-            st5.s10759088 = *(float *)(a1 + 10759088);
-            st5.s10759104 = *(float *)(a1 + 10759104);
-            st5.s10759108 = *(float *)(a1 + 10759108);
-            st5.s10759112 = *(float *)(a1 + 10759112);
-            st5.s8594768 = *(int32_t *)(a1 + 8594768);
-            st5.s10691936 = *(int32_t *)(a1 + 10691936);
-            st5.s10726256 = *(int32_t *)(a1 + 10726256);
-            st5.s10759040 = *(int32_t *)(a1 + 10759040);
-            st5.s11022348 = *(int32_t *)(a1 + 11022348);
-            st5.ring0=(float *)(a1+6497616); st5.ring1=(float *)(a1+8594784);
-            st5.ring2=(float *)(a1+10693488); st5.ring3=(float *)(a1+10726272);
-            i0=(st5.s8594768-1)&(EBD5C.k8594772-1); sv0=st5.ring0[i0];
-            i1=(st5.s10691936-1)&(EBD5C.k10691940-1); sv1=st5.ring1[i1];
-            i2=(st5.s10726256-1)&(EBD5C.k10726260-1); sv2=st5.ring2[i2];
-            i3=(st5.s10759040-1)&(EBD5C.k10759044-1); sv3=st5.ring3[i3];
-            eb_dly5_tick(&st5,&EBD5C,v36,v38,v5,&m176,&m177,&m56,&m58);
-            st5.ring0[i0]=sv0; st5.ring1[i1]=sv1;
-            st5.ring2[i2]=sv2; st5.ring3[i3]=sv3;
-            EBD5_M[0]=m176; EBD5_M[1]=m177; EBD5_M[2]=m56; EBD5_M[3]=m58;
-          }
           if ( *(_DWORD *)(a1 + 11022348) != 5 )
           {
             *(_DWORD *)(a1 + 6497088) = 0;
@@ -2055,12 +1866,6 @@ LABEL_69:
           v175 = *(float *)(a1 + 101744);
           v176 = v175 * *(float *)(a1 + 10692992);
           v177 = v175 * *(float *)(a1 + 10692976);
-          {
-            static int SH2; extern float EBD5_M[4];
-            if (SH2<10 && (EBD5_M[0]!=v176 || EBD5_M[1]!=v177)) {
-              fprintf(stderr,"T5DIFF port176=%.9g mod176=%.9g port177=%.9g mod177=%.9g\n",
-                      (double)v176,(double)EBD5_M[0],(double)v177,(double)EBD5_M[1]); SH2++; }
-          }
           goto LABEL_105;
         }
         goto LABEL_69;
@@ -2575,123 +2380,118 @@ LABEL_105:
   v551 = juno_host_sel(a1, 112);  /* was **(_DWORD **)(*(_QWORD *)(a1 + 136) + 112LL) */
   if ( v551 == 1 )
   {
-    v713 = *(float *)(a1 + 84624);
-    *(_DWORD *)(a1 + 86272) = *(_DWORD *)(a1 + 86256);
-    *(_DWORD *)(a1 + 86256) = *(_DWORD *)(a1 + 86240);
-    *(_DWORD *)(a1 + 86240) = *(_DWORD *)(a1 + 86224);
-    *(_DWORD *)(a1 + 86224) = *(_DWORD *)(a1 + 86208);
-    *(_DWORD *)(a1 + 86208) = *(_DWORD *)(a1 + 86192);
-    *(_DWORD *)(a1 + 86192) = *(_DWORD *)(a1 + 86176);
-    *(_DWORD *)(a1 + 86176) = *(_DWORD *)(a1 + 86160);
-    *(_DWORD *)(a1 + 86672) = *(_DWORD *)(a1 + 86656);
-    *(_DWORD *)(a1 + 86704) = *(_DWORD *)(a1 + 86688);
-    *(_DWORD *)(a1 + 86736) = *(_DWORD *)(a1 + 86720);
-    *(_DWORD *)(a1 + 86768) = *(_DWORD *)(a1 + 86752);
-    *(_DWORD *)(a1 + 86800) = *(_DWORD *)(a1 + 86784);
-    *(float *)(a1 + 86096) = v713;
-    *(float *)(a1 + 86112) = v713;
-    v714 = *(float *)(a1 + 86288);
-    v715 = (float)(v713 + v713) * *(float *)(a1 + 86352);
-    v716 = (float)(v714 * (float)(v714 * v714)) * *(float *)(a1 + 86560);
-    v717 = (float)((float)(v714 * *(float *)(a1 + 86528)) + *(float *)(a1 + 86512))
-         + (float)((float)(v714 * v714) * *(float *)(a1 + 86544));
-    v718 = v714;
-    v719 = *(float *)(a1 + 86176);
-    v720 = v717 + v716;
-    v721 = fmax(v718, 0.19);
-    v722 = (float)(v721 * v721) * *(float *)(a1 + 86448);
-    v723 = (float)(v721 * *(float *)(a1 + 86432)) + *(float *)(a1 + 86416);
-    *(float *)(a1 + 86160) = v715;
-    v724 = v723 + v722;
-    v725 = (float)((float)(v719 * *(float *)(a1 + 86384)) + (float)(v715 * *(float *)(a1 + 86368)))
-         + (float)(*(float *)(a1 + 86400) * *(float *)(a1 + 86192));
-    if ( v724 >= -1.0 )
-      v726 = fminf(v724, 1.0);
-    else
-      v726 = -1.0;
-    v727 = *(float *)(a1 + 86224);
-    *(float *)(a1 + 86176) = v725;
-    v728 = v725 - v727;
-    v729 = (float)(v726 * *(float *)(a1 + 86464)) + *(float *)(a1 + 86480);
-    *(float *)(a1 + 86192) = v728;
-    v730 = *(float *)(a1 + 86240);
-    v731 = v729 * v728;
-    v732 = v728 * *(float *)(a1 + 86496);
-    *(float *)(a1 + 86208) = v731 + v727;
-    v733 = (float)((float)(v720 + *(float *)(a1 + 86576)) * v732) - v730;
-    v734 = *(float *)(a1 + 86320) * v733;
-    *(float *)(a1 + 86224) = (float)(v733 * *(float *)(a1 + 86592)) + v730;
-    v735 = *(float *)(a1 + 86256);
-    *(float *)(a1 + 86656) = v734;
-    v736 = *(float *)(a1 + 86864);
-    v737 = *(float *)(a1 + 86672);
-    if ( (float)(v734 * v736) >= -1.0 )
-      v738 = fminf(v734 * v736, 1.0);
-    else
-      v738 = -1.0;
-    v739 = (float)((float)(v737 * *(float *)(a1 + 86832)) + (float)(v734 * *(float *)(a1 + 86848))) * v736;
-    *(float *)(a1 + 86688) = (float)((float)((float)(v738 * v738) * v738) * *(float *)(a1 + 86896))
-                           + (float)(v738 * *(float *)(a1 + 86880));
-    if ( v739 >= -1.0 )
-      v740 = fminf(v739, 1.0);
-    else
-      v740 = -1.0;
-    v741 = *(float *)(a1 + 86672);
-    v742 = (float)((float)(v737 + *(float *)(a1 + 86656)) * *(float *)(a1 + 86816)) * *(float *)(a1 + 86864);
-    *(float *)(a1 + 86720) = (float)((float)((float)(v740 * v740) * v740) * *(float *)(a1 + 86896))
-                           + (float)(v740 * *(float *)(a1 + 86880));
-    if ( v742 >= -1.0 )
-      v743 = fminf(v742, 1.0);
-    else
-      v743 = -1.0;
-    v744 = *(float *)(a1 + 86688);
-    v745 = (float)((float)(v741 * *(float *)(a1 + 86848)) + (float)(*(float *)(a1 + 86832) * *(float *)(a1 + 86656)))
-         * *(float *)(a1 + 86864);
-    *(float *)(a1 + 86752) = (float)((float)((float)(v743 * v743) * v743) * *(float *)(a1 + 86896))
-                           + (float)(v743 * *(float *)(a1 + 86880));
-    if ( v745 >= -1.0 )
-      v58 = fminf(v745, 1.0);
-    v746 = *(float *)(a1 + 86768);
-    v747 = (float)((float)(v744 + *(float *)(a1 + 86800)) * *(float *)(a1 + 86912))
-         + (float)(*(float *)(a1 + 86928) * *(float *)(a1 + 86720));
-    v748 = (float)((float)((float)(v58 * v58) * v58) * *(float *)(a1 + 86896)) + (float)(v58 * *(float *)(a1 + 86880));
-    *(float *)(a1 + 86784) = v748;
-    v749 = (float)((float)((float)(*(float *)(a1 + 86752) + *(float *)(a1 + 86736)) * *(float *)(a1 + 86944))
-                 + (float)((float)(v746 * *(float *)(a1 + 86928)) + v747))
-         + (float)((float)(v748 + *(float *)(a1 + 86704)) * *(float *)(a1 + 86960));
-    *(float *)(a1 + 86240) = v749;
-    v750 = (float)((float)(v735 * *(float *)(a1 + 86624)) + (float)(v749 * *(float *)(a1 + 86608)))
-         + (float)(*(float *)(a1 + 86640) * *(float *)(a1 + 86272));
-    *(float *)(a1 + 86256) = v750;
-    v751 = (float)(v750 * *(float *)(a1 + 86304)) * *(float *)(a1 + 86320);
-    *(float *)(a1 + 86128) = v751;
-    *(float *)(a1 + 86144) = v751;
-    *(_DWORD *)(a1 + 87024) = *(_DWORD *)(a1 + 87008);
-    *(_DWORD *)(a1 + 87008) = *(_DWORD *)(a1 + 86992);
-    *(_DWORD *)(a1 + 86992) = *(_DWORD *)(a1 + 86976);
-    *(float *)(a1 + 86976) = v751;
-    v752 = *(float *)(a1 + 87056);
-    v753 = (float)((float)(*(float *)(a1 + 86992) * *(float *)(a1 + 87088)) + (float)(v751 * *(float *)(a1 + 87072)))
-         + (float)(*(float *)(a1 + 87104) * *(float *)(a1 + 87008));
-    v754 = (float)((float)(*(float *)(a1 + 86992) * *(float *)(a1 + 87136)) + (float)(v751 * *(float *)(a1 + 87120)))
-         + (float)(*(float *)(a1 + 87152) * *(float *)(a1 + 87024));
-    if ( v752 <= 0.0 )
-      v755 = 0.0;
-    else
-      v755 = v752;
-    v756 = v755;
-    *(float *)(a1 + 86992) = v753;
-    *(float *)(a1 + 87008) = v754;
-    v757 = (float)((float)(v756 * v753) - (float)(v756 * v751)) + v751;
-    if ( v752 < -0.0 )
-      v56 = (float)-v752;
-    v758 = v56;
-    v759 = v751 + (float)((float)(v758 * v754) - (float)(v758 * v751));
-    if ( v752 >= 0.0 )
-      v759 = v757;
-    *(float *)(a1 + 87040) = v759;
-    *(float *)(a1 + 84672) = v759;
-    v593 = *(_DWORD *)(a1 + 87040);
+      /* ===== ENGINE B: MODULE EFFECT-E1 (src :2381-2497) ============
+       * An EFFECT-TYPE dispatch arm. Cell 84624 is an ARGUMENT: the master
+       * input stage writes it earlier in the same sample. v593 carries float
+       * BITS through an int-declared local, so it is bit-copied out, not
+       * assigned -- assigning would convert and destroy it. */
+      {
+        static eb_fx_e1_coef EBC_; static unsigned char EBH_;
+        static unsigned long EBG_; extern unsigned long eb_coef_gen;
+        eb_fx_e1_state stf; float _o56, _o58, _o593;
+        if (!EBH_ || EBG_ != eb_coef_gen) {
+          EBC_.k86288 = *(float *)(a1 + 86288);
+          EBC_.k86304 = *(float *)(a1 + 86304);
+          EBC_.k86320 = *(float *)(a1 + 86320);
+          EBC_.k86352 = *(float *)(a1 + 86352);
+          EBC_.k86368 = *(float *)(a1 + 86368);
+          EBC_.k86384 = *(float *)(a1 + 86384);
+          EBC_.k86400 = *(float *)(a1 + 86400);
+          EBC_.k86416 = *(float *)(a1 + 86416);
+          EBC_.k86432 = *(float *)(a1 + 86432);
+          EBC_.k86448 = *(float *)(a1 + 86448);
+          EBC_.k86464 = *(float *)(a1 + 86464);
+          EBC_.k86480 = *(float *)(a1 + 86480);
+          EBC_.k86496 = *(float *)(a1 + 86496);
+          EBC_.k86512 = *(float *)(a1 + 86512);
+          EBC_.k86528 = *(float *)(a1 + 86528);
+          EBC_.k86544 = *(float *)(a1 + 86544);
+          EBC_.k86560 = *(float *)(a1 + 86560);
+          EBC_.k86576 = *(float *)(a1 + 86576);
+          EBC_.k86592 = *(float *)(a1 + 86592);
+          EBC_.k86608 = *(float *)(a1 + 86608);
+          EBC_.k86624 = *(float *)(a1 + 86624);
+          EBC_.k86640 = *(float *)(a1 + 86640);
+          EBC_.k86816 = *(float *)(a1 + 86816);
+          EBC_.k86832 = *(float *)(a1 + 86832);
+          EBC_.k86848 = *(float *)(a1 + 86848);
+          EBC_.k86864 = *(float *)(a1 + 86864);
+          EBC_.k86880 = *(float *)(a1 + 86880);
+          EBC_.k86896 = *(float *)(a1 + 86896);
+          EBC_.k86912 = *(float *)(a1 + 86912);
+          EBC_.k86928 = *(float *)(a1 + 86928);
+          EBC_.k86944 = *(float *)(a1 + 86944);
+          EBC_.k86960 = *(float *)(a1 + 86960);
+          EBC_.k87056 = *(float *)(a1 + 87056);
+          EBC_.k87072 = *(float *)(a1 + 87072);
+          EBC_.k87088 = *(float *)(a1 + 87088);
+          EBC_.k87104 = *(float *)(a1 + 87104);
+          EBC_.k87120 = *(float *)(a1 + 87120);
+          EBC_.k87136 = *(float *)(a1 + 87136);
+          EBC_.k87152 = *(float *)(a1 + 87152);
+          EBH_ = 1; EBG_ = eb_coef_gen;
+        }
+        stf.s84672 = *(float *)(a1 + 84672);
+        stf.s86096 = *(float *)(a1 + 86096);
+        stf.s86112 = *(float *)(a1 + 86112);
+        stf.s86128 = *(float *)(a1 + 86128);
+        stf.s86144 = *(float *)(a1 + 86144);
+        stf.s86160 = *(float *)(a1 + 86160);
+        stf.s86176 = *(float *)(a1 + 86176);
+        stf.s86192 = *(float *)(a1 + 86192);
+        stf.s86208 = *(float *)(a1 + 86208);
+        stf.s86224 = *(float *)(a1 + 86224);
+        stf.s86240 = *(float *)(a1 + 86240);
+        stf.s86256 = *(float *)(a1 + 86256);
+        stf.s86272 = *(float *)(a1 + 86272);
+        stf.s86656 = *(float *)(a1 + 86656);
+        stf.s86672 = *(float *)(a1 + 86672);
+        stf.s86688 = *(float *)(a1 + 86688);
+        stf.s86704 = *(float *)(a1 + 86704);
+        stf.s86720 = *(float *)(a1 + 86720);
+        stf.s86736 = *(float *)(a1 + 86736);
+        stf.s86752 = *(float *)(a1 + 86752);
+        stf.s86768 = *(float *)(a1 + 86768);
+        stf.s86784 = *(float *)(a1 + 86784);
+        stf.s86800 = *(float *)(a1 + 86800);
+        stf.s86976 = *(float *)(a1 + 86976);
+        stf.s86992 = *(float *)(a1 + 86992);
+        stf.s87008 = *(float *)(a1 + 87008);
+        stf.s87024 = *(float *)(a1 + 87024);
+        stf.s87040 = *(float *)(a1 + 87040);
+        eb_fx_e1_tick(&stf, &EBC_, *(float *)(a1 + 84624), &_o56, &_o58, &_o593);
+        *(float *)(a1 + 84672) = stf.s84672;
+        *(float *)(a1 + 86096) = stf.s86096;
+        *(float *)(a1 + 86112) = stf.s86112;
+        *(float *)(a1 + 86128) = stf.s86128;
+        *(float *)(a1 + 86144) = stf.s86144;
+        *(float *)(a1 + 86160) = stf.s86160;
+        *(float *)(a1 + 86176) = stf.s86176;
+        *(float *)(a1 + 86192) = stf.s86192;
+        *(float *)(a1 + 86208) = stf.s86208;
+        *(float *)(a1 + 86224) = stf.s86224;
+        *(float *)(a1 + 86240) = stf.s86240;
+        *(float *)(a1 + 86256) = stf.s86256;
+        *(float *)(a1 + 86272) = stf.s86272;
+        *(float *)(a1 + 86656) = stf.s86656;
+        *(float *)(a1 + 86672) = stf.s86672;
+        *(float *)(a1 + 86688) = stf.s86688;
+        *(float *)(a1 + 86704) = stf.s86704;
+        *(float *)(a1 + 86720) = stf.s86720;
+        *(float *)(a1 + 86736) = stf.s86736;
+        *(float *)(a1 + 86752) = stf.s86752;
+        *(float *)(a1 + 86768) = stf.s86768;
+        *(float *)(a1 + 86784) = stf.s86784;
+        *(float *)(a1 + 86800) = stf.s86800;
+        *(float *)(a1 + 86976) = stf.s86976;
+        *(float *)(a1 + 86992) = stf.s86992;
+        *(float *)(a1 + 87008) = stf.s87008;
+        *(float *)(a1 + 87024) = stf.s87024;
+        *(float *)(a1 + 87040) = stf.s87040;
+        v56 = _o56; v58 = _o58;
+        memcpy(&v593, &_o593, 4);   /* BIT copy: v593 is int-declared */
+      }
+      /* === END ENGINE B: MODULE EFFECT-E1 ==================== */
   }
   else
   {
@@ -2827,122 +2627,130 @@ LABEL_164:
     {
       if ( v551 == 5 )
       {
-        v552 = *(_DWORD *)(a1 + 84624);
-        *(_DWORD *)(a1 + 95952) = *(_DWORD *)(a1 + 95936);
-        *(_DWORD *)(a1 + 95936) = *(_DWORD *)(a1 + 95920);
-        *(_DWORD *)(a1 + 96112) = *(_DWORD *)(a1 + 96096);
-        *(_DWORD *)(a1 + 96096) = *(_DWORD *)(a1 + 96080);
-        *(_DWORD *)(a1 + 96080) = *(_DWORD *)(a1 + 96064);
-        *(_DWORD *)(a1 + 96064) = *(_DWORD *)(a1 + 96048);
-        *(_DWORD *)(a1 + 96048) = *(_DWORD *)(a1 + 96032);
-        *(_DWORD *)(a1 + 96032) = *(_DWORD *)(a1 + 96016);
-        *(_DWORD *)(a1 + 96016) = *(_DWORD *)(a1 + 96000);
-        *(_DWORD *)(a1 + 96000) = *(_DWORD *)(a1 + 95984);
-        *(_DWORD *)(a1 + 95984) = *(_DWORD *)(a1 + 95968);
-        *(_DWORD *)(a1 + 96144) = *(_DWORD *)(a1 + 96128);
-        *(_DWORD *)(a1 + 96176) = *(_DWORD *)(a1 + 96160);
-        *(_DWORD *)(a1 + 96208) = *(_DWORD *)(a1 + 96192);
-        *(_DWORD *)(a1 + 96256) = *(_DWORD *)(a1 + 96240);
-        *(_DWORD *)(a1 + 96240) = *(_DWORD *)(a1 + 96224);
-        *(_DWORD *)(a1 + 95888) = v552;
-        *(_DWORD *)(a1 + 95904) = v552;
-        v553 = juno_wrap_unit((float)((float)( *(float *)(a1 + 96176) + *(float *)(a1 + 96144) ) + *(float *)(a1 + 96352)));
-        v554 = *(float *)&v553;
-        v555 = *(float *)&v553 < 0.0;
-        *(_DWORD *)(a1 + 96160) = LODWORD(v553);
-        v556 = *(float *)(a1 + 96784);
-        if ( v555 )
-          v556 = -v556;
-        v557 = fabs(v554);
-        *(float *)(a1 + 96128) = v556;
-        *(float *)(a1 + 96272) = v557;
-        v558 = *(float *)(a1 + 95904);
-        *(float *)(a1 + 96288) = (float)((float)(v557 * *(float *)(a1 + 96368)) * *(float *)(a1 + 96800))
-                               + *(float *)(a1 + 96816);
-        v559 = *(float *)(a1 + 96416);
-        v560 = *(float *)(a1 + 96400);
-        v561 = (float)(v558 + *(float *)(a1 + 95888)) * 0.5;
-        *(float *)(a1 + 95920) = v561;
-        v562 = *(float *)(a1 + 96240);
-        v563 = (float)((float)(*(float *)(a1 + 96448) * *(float *)(a1 + 95936))
-                     + (float)(*(float *)(a1 + 96464) * *(float *)(a1 + 95952)))
-             + (float)(v561 * *(float *)(a1 + 96432));
-        *(float *)(a1 + 95936) = v563;
-        v564 = v562 + *(float *)(a1 + 96832);
-        *(float *)(a1 + 101040) = (float)(v560 * v559) * v563;
-        v565 = fminf(*(float *)(a1 + 96848), v564) * v559;
-        *(float *)(a1 + 96224) = v565;
-        if ( (float)(v565 - *(float *)(a1 + 96208)) >= 0.0 )
-          v566 = *(float *)(a1 + 96864);
-        else
-          v566 = *(float *)(a1 + 96880);
-        v567 = v566 + *(float *)(a1 + 96256);
-        v568 = *(float *)(a1 + 96336);
-        v569 = *(float *)(a1 + 96208);
-        if ( v567 > 0.0 )
-          v56 = v567;
-        v570 = v56;
-        v571 = (float)((float)(*(float *)(a1 + 96336) - v569) * *(float *)(a1 + 96384)) + v569;
-        if ( v570 >= -1.0 )
-          v58 = fminf(v570, 1.0);
-        *(float *)(a1 + 96240) = v58 * *(float *)(a1 + 96416);
-        if ( (float)(v571 - v569) != 0.0 )
-          v568 = v571;
-        *(float *)(a1 + 96192) = v568;
-        v572 = v568 + *(float *)(a1 + 96288);
-        v573 = (int)(float)(v572 * -16384.0);
-        *(_DWORD *)(a1 + 101056) = *(_DWORD *)(a1
-                                             + 4
-                                             * ((*(int *)(a1 + 101028) - 1LL) & (*(_DWORD *)(a1 + 101024) - v573 + 1LL))
-                                             + 96928);
-        *(_DWORD *)(a1 + 101060) = *(_DWORD *)(a1
-                                             + 4
-                                             * ((*(int *)(a1 + 101028) - 1LL) & (*(_DWORD *)(a1 + 101024) - v573 + 2LL))
-                                             + 96928);
-        v574 = (float)(v572 * 16384.0) - (double)(int)(float)(v572 * 16384.0);
-        *(float *)(a1 + 101064) = v574;
-        v575 = (float)((float)((float)(v574 * *(float *)(a1 + 101060)) - (float)(v574 * *(float *)(a1 + 101056)))
-                     + *(float *)(a1 + 101056))
-             * *(float *)(a1 + 96256);
-        *(float *)(a1 + 95968) = v575;
-        v576 = *(float *)(a1 + 96016);
-        v577 = (float)((float)((float)(*(float *)(a1 + 96512) * *(float *)(a1 + 96000))
-                             + (float)(*(float *)(a1 + 96496) * *(float *)(a1 + 95984)))
-                     + (float)(v575 * *(float *)(a1 + 96480)))
-             + (float)((float)(v576 * *(float *)(a1 + 96528)) + (float)(*(float *)(a1 + 96544) * *(float *)(a1 + 96032)));
-        *(float *)(a1 + 96000) = v577;
-        v578 = (float)((float)(v576 * *(float *)(a1 + 96576)) + (float)(*(float *)(a1 + 96592) * *(float *)(a1 + 96048)))
-             + (float)(v577 * *(float *)(a1 + 96560));
-        *(float *)(a1 + 96032) = v578;
-        v579 = *(float *)(a1 + 96064);
-        v580 = (float)(v578 * *(float *)(a1 + 96624)) + (float)(v577 * *(float *)(a1 + 96608));
-        v581 = *(float *)(a1 + 96080);
-        *(float *)(a1 + 96048) = (float)((float)(v580 - v579) * *(float *)(a1 + 96640)) + v579;
-        v582 = (float)((float)((float)(v580 - v579) * *(float *)(a1 + 96672)) + (float)(v580 * *(float *)(a1 + 96656)))
-             - v581;
-        v583 = (float)(v582 * *(float *)(a1 + 96688)) + v581;
-        v584 = *(float *)(a1 + 96096);
-        v585 = *(float *)(a1 + 96272) - 1.0;
-        *(float *)(a1 + 96064) = v583;
-        v586 = v582 - v584;
-        *(float *)(a1 + 96096) = v586;
-        v587 = *(float *)(a1 + 96112);
-        v588 = (float)(1.0 - (float)(v585 * v585)) * *(float *)(a1 + 96768);
-        *(float *)(a1 + 96080) = (float)(v586 * *(float *)(a1 + 96704)) + v584;
-        v589 = (float)(v587 * *(float *)(a1 + 96736)) + (float)(v586 * *(float *)(a1 + 96720));
-        v590 = *(float *)(a1 + 96400);
-        v591 = (float)((float)((float)(v589 * (float)(v588 + *(float *)(a1 + 96752))) * *(float *)(a1 + 96912))
-                     - (float)(v590 * *(float *)(a1 + 95904)))
-             + *(float *)(a1 + 95904);
-        *(float *)(a1 + 96304) = (float)((float)((float)(*(float *)(a1 + 96896) * *(float *)(a1 + 95920)) * v590)
-                                       - (float)(v590 * *(float *)(a1 + 95888)))
-                               + *(float *)(a1 + 95888);
-        *(float *)(a1 + 96320) = v591;
-        v592 = (*(_DWORD *)(a1 + 101024) - 1) & (*(_DWORD *)(a1 + 101028) - 1);
-        *(_DWORD *)(a1 + 101024) = v592;
-        *(_DWORD *)(a1 + 4LL * v592 + 96928) = *(_DWORD *)(a1 + 101040);
-        *(_DWORD *)(a1 + 84672) = *(_DWORD *)(a1 + 96304);
-        v593 = *(_DWORD *)(a1 + 96320);
+      /* ===== ENGINE B: MODULE EFFECT-E5 (src :2633-2748) ============
+       * An EFFECT-TYPE dispatch arm. Cell 84624 is an ARGUMENT: the master
+       * input stage writes it earlier in the same sample. v593 carries float
+       * BITS through an int-declared local, so it is bit-copied out, not
+       * assigned -- assigning would convert and destroy it. */
+      {
+        static eb_fx_e5_coef EBC_; static unsigned char EBH_;
+        static unsigned long EBG_; extern unsigned long eb_coef_gen;
+        eb_fx_e5_state stf; float _o56, _o58, _o593;
+        if (!EBH_ || EBG_ != eb_coef_gen) {
+          EBC_.k96336 = *(float *)(a1 + 96336);
+          EBC_.k96352 = *(float *)(a1 + 96352);
+          EBC_.k96368 = *(float *)(a1 + 96368);
+          EBC_.k96384 = *(float *)(a1 + 96384);
+          EBC_.k96400 = *(float *)(a1 + 96400);
+          EBC_.k96416 = *(float *)(a1 + 96416);
+          EBC_.k96432 = *(float *)(a1 + 96432);
+          EBC_.k96448 = *(float *)(a1 + 96448);
+          EBC_.k96464 = *(float *)(a1 + 96464);
+          EBC_.k96480 = *(float *)(a1 + 96480);
+          EBC_.k96496 = *(float *)(a1 + 96496);
+          EBC_.k96512 = *(float *)(a1 + 96512);
+          EBC_.k96528 = *(float *)(a1 + 96528);
+          EBC_.k96544 = *(float *)(a1 + 96544);
+          EBC_.k96560 = *(float *)(a1 + 96560);
+          EBC_.k96576 = *(float *)(a1 + 96576);
+          EBC_.k96592 = *(float *)(a1 + 96592);
+          EBC_.k96608 = *(float *)(a1 + 96608);
+          EBC_.k96624 = *(float *)(a1 + 96624);
+          EBC_.k96640 = *(float *)(a1 + 96640);
+          EBC_.k96656 = *(float *)(a1 + 96656);
+          EBC_.k96672 = *(float *)(a1 + 96672);
+          EBC_.k96688 = *(float *)(a1 + 96688);
+          EBC_.k96704 = *(float *)(a1 + 96704);
+          EBC_.k96720 = *(float *)(a1 + 96720);
+          EBC_.k96736 = *(float *)(a1 + 96736);
+          EBC_.k96752 = *(float *)(a1 + 96752);
+          EBC_.k96768 = *(float *)(a1 + 96768);
+          EBC_.k96784 = *(float *)(a1 + 96784);
+          EBC_.k96800 = *(float *)(a1 + 96800);
+          EBC_.k96816 = *(float *)(a1 + 96816);
+          EBC_.k96832 = *(float *)(a1 + 96832);
+          EBC_.k96848 = *(float *)(a1 + 96848);
+          EBC_.k96864 = *(float *)(a1 + 96864);
+          EBC_.k96880 = *(float *)(a1 + 96880);
+          EBC_.k96896 = *(float *)(a1 + 96896);
+          EBC_.k96912 = *(float *)(a1 + 96912);
+          EBC_.k101028 = *(int32_t *)(a1 + 101028);
+          EBH_ = 1; EBG_ = eb_coef_gen;
+        }
+        stf.s84672 = *(float *)(a1 + 84672);
+        stf.s95888 = *(float *)(a1 + 95888);
+        stf.s95904 = *(float *)(a1 + 95904);
+        stf.s95920 = *(float *)(a1 + 95920);
+        stf.s95936 = *(float *)(a1 + 95936);
+        stf.s95952 = *(float *)(a1 + 95952);
+        stf.s95968 = *(float *)(a1 + 95968);
+        stf.s95984 = *(float *)(a1 + 95984);
+        stf.s96000 = *(float *)(a1 + 96000);
+        stf.s96016 = *(float *)(a1 + 96016);
+        stf.s96032 = *(float *)(a1 + 96032);
+        stf.s96048 = *(float *)(a1 + 96048);
+        stf.s96064 = *(float *)(a1 + 96064);
+        stf.s96080 = *(float *)(a1 + 96080);
+        stf.s96096 = *(float *)(a1 + 96096);
+        stf.s96112 = *(float *)(a1 + 96112);
+        stf.s96128 = *(float *)(a1 + 96128);
+        stf.s96144 = *(float *)(a1 + 96144);
+        stf.s96160 = *(float *)(a1 + 96160);
+        stf.s96176 = *(float *)(a1 + 96176);
+        stf.s96192 = *(float *)(a1 + 96192);
+        stf.s96208 = *(float *)(a1 + 96208);
+        stf.s96224 = *(float *)(a1 + 96224);
+        stf.s96240 = *(float *)(a1 + 96240);
+        stf.s96256 = *(float *)(a1 + 96256);
+        stf.s96272 = *(float *)(a1 + 96272);
+        stf.s96288 = *(float *)(a1 + 96288);
+        stf.s96304 = *(float *)(a1 + 96304);
+        stf.s96320 = *(float *)(a1 + 96320);
+        stf.s101040 = *(float *)(a1 + 101040);
+        stf.s101056 = *(float *)(a1 + 101056);
+        stf.s101060 = *(float *)(a1 + 101060);
+        stf.s101064 = *(float *)(a1 + 101064);
+        stf.s101024 = *(int32_t *)(a1 + 101024);
+        stf.ring = (float *)(a1 + 96928);
+        eb_fx_e5_tick(&stf, &EBC_, *(float *)(a1 + 84624), &_o56, &_o58, &_o593);
+        *(float *)(a1 + 84672) = stf.s84672;
+        *(float *)(a1 + 95888) = stf.s95888;
+        *(float *)(a1 + 95904) = stf.s95904;
+        *(float *)(a1 + 95920) = stf.s95920;
+        *(float *)(a1 + 95936) = stf.s95936;
+        *(float *)(a1 + 95952) = stf.s95952;
+        *(float *)(a1 + 95968) = stf.s95968;
+        *(float *)(a1 + 95984) = stf.s95984;
+        *(float *)(a1 + 96000) = stf.s96000;
+        *(float *)(a1 + 96016) = stf.s96016;
+        *(float *)(a1 + 96032) = stf.s96032;
+        *(float *)(a1 + 96048) = stf.s96048;
+        *(float *)(a1 + 96064) = stf.s96064;
+        *(float *)(a1 + 96080) = stf.s96080;
+        *(float *)(a1 + 96096) = stf.s96096;
+        *(float *)(a1 + 96112) = stf.s96112;
+        *(float *)(a1 + 96128) = stf.s96128;
+        *(float *)(a1 + 96144) = stf.s96144;
+        *(float *)(a1 + 96160) = stf.s96160;
+        *(float *)(a1 + 96176) = stf.s96176;
+        *(float *)(a1 + 96192) = stf.s96192;
+        *(float *)(a1 + 96208) = stf.s96208;
+        *(float *)(a1 + 96224) = stf.s96224;
+        *(float *)(a1 + 96240) = stf.s96240;
+        *(float *)(a1 + 96256) = stf.s96256;
+        *(float *)(a1 + 96272) = stf.s96272;
+        *(float *)(a1 + 96288) = stf.s96288;
+        *(float *)(a1 + 96304) = stf.s96304;
+        *(float *)(a1 + 96320) = stf.s96320;
+        *(float *)(a1 + 101040) = stf.s101040;
+        *(float *)(a1 + 101056) = stf.s101056;
+        *(float *)(a1 + 101060) = stf.s101060;
+        *(float *)(a1 + 101064) = stf.s101064;
+        *(int32_t *)(a1 + 101024) = stf.s101024;
+        v56 = _o56; v58 = _o58;
+        memcpy(&v593, &_o593, 4);   /* BIT copy: v593 is int-declared */
+      }
+      /* === END ENGINE B: MODULE EFFECT-E5 ==================== */
         goto LABEL_205;
       }
       goto LABEL_164;
