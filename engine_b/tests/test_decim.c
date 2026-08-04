@@ -107,12 +107,12 @@ int main(void)
     C(6256) = rf() * 0.5f;  co.k6256 = C(6256);
     C(6272) = rf() * 0.5f;  co.k6272 = C(6272);
     C(6336) = rf() * 0.5f;  co.k6336 = C(6336);
-    C(5456) = rf() * 0.5f;  co.k5456 = C(5456);
+    C(5456) = rf() * 0.5f;
 
     for (i = 0; i < n; ++i) {
         float s0 = rf(), s1 = rf(), s2 = rf(), s3 = rf();
         float a = port_tick(s0, s1, s2, s3);
-        float b = eb_decim_tick(&st, &co, s0, s1, s2, s3);
+        float b = eb_decim_tick(&st, &co, C(5456), s0, s1, s2, s3);
         uint32_t x, y;
         memcpy(&x, &a, 4); memcpy(&y, &b, 4);
         if (x != y) {

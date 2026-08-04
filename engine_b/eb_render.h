@@ -157,6 +157,15 @@ typedef struct {
     eb_vcf_res_state res[EB_NUM_VOICES];
     /* cell 320 after the port's aux latch: eb_notecv_tick's gate_in. */
     float           gate_cell320[EB_NUM_VOICES];
+    /* THE DCO RETRIGGER ONE-SHOT, port cell 101504 + v*32. It is NOT inside any
+     * claimed module: the port reads it at :589, and when it is 1.0 it forces
+     * this sample's cell-320 read to 0.0 (:592), then clears the one-shot at
+     * :2178. Both sites are outside every module boundary, so the standalone
+     * engine has to own the latch itself or it silently never retriggers -- the
+     * exact defect class the MONO retrigger fix (e611f7d) already cost this
+     * project once, and one that no COLD scenario can see. Set by a note event,
+     * consumed by the first sample after it. */
+    unsigned char   aux_edge[EB_NUM_VOICES];
     eb_chorus_state chorus;
     eb_delay_state  delay;
     eb_reverb_state reverb;
@@ -206,5 +215,22 @@ typedef struct {
 
 int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c,
                      const eb_render_needs *n, float *outL, float *outR);
+
+/* THE VOICE CHAIN ALONE: one mono sample per voice into vout[EB_NUM_VOICES],
+ * no summing and no FX. eb_engine_render() is this plus the mix and the FX.
+ *
+ * WHY IT IS SEPARATE, and it is not a convenience. `null_b.py --module voices`
+ * gates exactly this against the port by feeding vout into the PORT's own
+ * master stage, so the residual it measures is the voice chain's and nothing
+ * else. That gate is WEAKER than the standalone gate -- the master chain is
+ * still the port's -- and docs/engineb/PHASE1_ORDERS.md labels it so. It exists
+ * because eb_engine_render had never been EXECUTED, and eight wrong inputs had
+ * already been found in it by reading alone.
+ *
+ * Obeys the same guard as eb_engine_render: silence and EB_RENDER_INCOMPLETE
+ * unless the caller has set e->render_ok. */
+int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
+                            const eb_render_coefs *c, const eb_render_needs *n,
+                            float *vout);
 
 #endif /* ENGINEB_EB_RENDER_H */

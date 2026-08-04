@@ -321,6 +321,13 @@ def build(dst_so, modules=(), mutate=None, quiet=True):
 # Each marker is asserted to occur EXACTLY ONCE at plant time. If a shim is
 # edited so a marker moves, the teeth case stops silently and says so.
 _OUT_ANCHOR = {
+    # THE WHOLE VOICE CHAIN, at the point its samples enter the port's master.
+    # This module is the 1b-0 voice-level gate (docs/engineb/PHASE1_ORDERS.md):
+    # engine B's own render function driving its own state, with the master
+    # still the port's.
+    "voices": ("juno_driver.c",
+               "        vbuf[v] = ebv[v];",
+               "        vbuf[v] *= %s;"),
     # Four sub-samples per audio sample, all four scaled together.
     # The marker moved on 2026-08-02 when the DCO went from four eb_dco_step
     # calls to one eb_dco_step4. The uniqueness assert caught it and refused to
@@ -442,6 +449,12 @@ _BRACKET = {
     "vcf_ladder": ("3.16e-5", "3.16e-6"),
     "env":        ("3.7e-6",  "3.7e-7"),
     "decim":      ("3.16e-5", "3.16e-6"),   # measured below, unity gain
+    # The 1b-0 whole-voice-chain gate. MEASURED 2026-08-04 at 48 kHz over all
+    # 30 scenarios: 3.16e-5 FAILS at -90.0 dB in 30/30, 3.16e-6 PASSES at
+    # -109.8 dB. It sits where vca_hpf's does because it IS the same crossing
+    # -- the voice's own output entering the master -- now produced by engine
+    # B's render function instead of the port's voice function.
+    "voices":     ("3.16e-5", "3.16e-6"),
     # The noise SVF ATTENUATES: MEASURED -12.6 dB, so its bracket is coarser by
     # that much. This is the weakest-coupled block in the engine and the one
     # whose bracket had to be derived from a measured gain rather than reused.
@@ -649,6 +662,32 @@ def _plant(tmp, mutate):
         s = s.replace(a, "        if (x > -1e-6f && x < 1e-6f) {\n"
                          "            *outA = c->dry * inB;\n"
                          "            *outB = c->dry * inA; return; }\n" + a, 1)
+    elif mutate == "voicereseed":
+        # THE LOCKSTEP CASE, and it is a REAL defect this harness let through
+        # once. Engine B's state lives in file statics and the render worker
+        # renders every scenario in ONE process, so without a per-context
+        # re-seed each scenario inherits the previous scenario's ENDING state.
+        # MEASURED when it was live: scenario 1 nulled EXACTLY 0 and all 28
+        # others failed from their first frame, the first differing sample
+        # being 42000 -- exactly scenario 1's length. Planting it keeps the
+        # harness from ever going blind to the class again.
+        p = os.path.join(tmp, "src", "juno_driver.c"); s = open(p).read()
+        a = "void ebsh_new_context(void) { EB_STARTED = 0; }"
+        assert s.count(a) == 1, "voicereseed anchor moved"
+        s = s.replace(a, "void ebsh_new_context(void) { }", 1)
+    elif mutate == "voiceidleskip":
+        # A GATE-CLOSED VOICE SKIPS ITS STATE ADVANCE as well as its audio work.
+        # The port never skips anything, so this is wrong on every sample of
+        # every voice that is not sounding -- and it is INVISIBLE to a cold
+        # start, because a voice that has never sounded and is skipped from
+        # sample 0 has nothing to diverge from yet. The idle-prefix scenarios
+        # are what make it observable, which is why they exist.
+        p = os.path.join(tmp, "engine_b", "eb_render.c"); s = open(p).read()
+        a = "        vout[v] = 0.0f;\n        if (vc->atrest) {"
+        assert s.count(a) == 1, "voiceidleskip anchor moved"
+        s = s.replace(a, "        vout[v] = 0.0f;\n"
+                         "        if (st->glide[v].s560 == 0.0f) continue;\n"
+                         "        if (vc->atrest) {", 1)
     else:
         raise SystemExit("unknown mutation %s" % mutate)
     open(p, "w").write(s)
@@ -818,7 +857,10 @@ def teeth(quick):
              ("idleskip", (), True),
              (None, ("reverb",), False), ("reverbwet", ("reverb",), False),
              ("reverbwet10", ("reverb",), True),
-             ("reverbtap", ("reverb",), True), ("reverbskip", ("reverb",), True)]
+             ("reverbtap", ("reverb",), True), ("reverbskip", ("reverb",), True),
+             (None, ("voices",), False),
+             ("voicereseed", ("voices",), True),
+             ("voiceidleskip", ("voices",), True)]
 
     # ---- PER-MODULE OUTPUT TEETH (added 2026-08-02, audit finding F2) -------
     # Until this battery existed, nine of the ten modules had never been shown

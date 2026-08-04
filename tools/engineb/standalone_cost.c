@@ -147,7 +147,7 @@ int main(int argc, char **argv)
         eb_dco_set_pitch(&DC[v], 0.01f + 0.001f * (float)v, 0.3f);
         for (j = 0; j < 16; ++j) XC[v].c[j] = 0.03f + 0.001f * (float)j;
         XC[v].k6256 = 0.5f; XC[v].k6272 = 0.25f;
-        XC[v].k6336 = 0.9f; XC[v].k5456 = 0.1f;
+        XC[v].k6336 = 0.9f;
         NC[v].k36 = 0.2f; NC[v].k52 = 0.3f; NC[v].k68 = 0.4f;
         NC[v].k84 = 0.5f; NC[v].k00 = 0.6f;
         /* The VCF and VCA coefficient structs are pure float (checked), so
@@ -193,7 +193,7 @@ int main(int argc, char **argv)
 
             /* audio blocks */
             eb_dco_step4(&s->dco, &DC[v], dcoq);
-            decimo = eb_decim_tick(&s->dec, &XC[v],
+            decimo = eb_decim_tick(&s->dec, &XC[v], 0.1f,
                                    dcoq[0], dcoq[1], dcoq[2], dcoq[3]);
             nsvo = eb_nsvf_tick(&s->nsv, &NC[v], noise, &nsv04);
             vcfo = eb_vcf_tick(&s->vcf, &FC[v], decimo + nsvo * 0.05f,

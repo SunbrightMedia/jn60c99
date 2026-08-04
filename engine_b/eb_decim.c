@@ -7,7 +7,7 @@
  */
 #include "eb_decim.h"
 
-float eb_decim_tick(eb_decim_state *s, const eb_decim_coef *c,
+float eb_decim_tick(eb_decim_state *s, const eb_decim_coef *c, float k5456,
                     float s0, float s1, float s2, float s3)
 {
     const float *k = c->c;
@@ -63,7 +63,7 @@ float eb_decim_tick(eb_decim_state *s, const eb_decim_coef *c,
     v524 = v522 + v523;
     v525 = v524 - (v520 * c->k6272 + v521);
     s->b2 = v525 * c->k6256 + v520;
-    v526 = ((v521 - v525 * c->k5456) * c->k6336 - c->k6336 * v524) + v524;
+    v526 = ((v521 - v525 * k5456) * c->k6336 - c->k6336 * v524) + v524;
 
 #undef H
     return v526;

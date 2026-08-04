@@ -39,4 +39,18 @@ void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c);
  * state per sample is exactly what would mask a lockstep defect. */
 void eb_render_state_seed(const unsigned char *base, eb_render_state *s);
 
+/* EVENT MIRRORING, at an event boundary only (a bump of eb_coef_gen).
+ *
+ * Note events do not go through engine B's own note path under the null gates;
+ * they are driven into the PORT by gui/juno_bridge.c, exactly as every other
+ * gate in this project drives them. This re-reads the cells such an event
+ * writes that are NOT coefficients -- the gate cell 320 and the DCO retrigger
+ * one-shot -- and consumes the one-shot on the port's side, because the port's
+ * own voice function (which normally clears it) is the thing being replaced.
+ *
+ * PER-SAMPLE re-reading is forbidden here and always will be: it would re-seed
+ * free-run state from the oracle and mask precisely the lockstep defects these
+ * gates exist to find. `base` is non-const for the one-shot clear alone. */
+void eb_render_events_mirror(unsigned char *base, eb_render_state *s);
+
 #endif /* ENGINEB_EB_COEFS_H */

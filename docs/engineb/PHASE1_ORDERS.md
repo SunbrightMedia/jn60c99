@@ -193,6 +193,26 @@ remaining draft defects out of it CHEAPLY, before the master work multiplies
 the surface. Eight guesses were found in that function by reading; the ninth
 is found by running.
 
+### ✔ 1b-0 DONE (Opus 5, 2026-08-04). Read `data/voice_gate.md`.
+
+`null_b.py --module voices`, all 30 scenarios, **EXACTLY 0 at BOTH 44,100 and
+48,000 Hz**; teeth bracket MEASURED at 48 kHz (3.16e-5 FAILS at −90.0 dB in
+30/30, 3.16e-6 PASSES at −109.8 dB) plus two lockstep plants. Engine B's own
+render function drives its own state from its own coefficients and reproduces
+the port's eight per-voice samples bit for bit. The master is still the port's,
+recall is still the port's, the at-rest shortcut is still unexercised, and
+`render_ok` stays unset — this is the WEAKER gate, as ruled.
+
+Its purpose was met: running the function found FOUR more defects after the
+eight that reading had found. Two were silent — the DCO oscillator levels cached
+from per-sample cells (the whole chain nulled at 0.0 dB rel, i.e. silence,
+because the audit that placed them grepped `JF(a1,N) =` and the port copies them
+with `JI`), and cell 5456 cached while it is `eb_dcoprep`'s third output. One
+was a latch no module owned (the DCO retrigger one-shot). One was the lockstep
+class: engine B's statics were never re-seeded per context, so scenario 1 passed
+EXACTLY 0 and every later scenario failed from its first frame. A third
+"teeth case that could not reach its own mutation" was also found and fixed.
+
 **1b-1: transcribe the master chain.** Same method as the voice work, block
 by block in master_render.c: voice summing, EFFECT-TYPE routing (the v551 arm
 — warm-state load-bearing, see the WARM parity block in CLAUDE.md), gain

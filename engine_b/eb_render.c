@@ -19,11 +19,16 @@
  */
 #include "eb_render.h"
 #include "juno_tables.h"
+#ifdef EB_VOICES_DEBUG
+#include <stdio.h>
+unsigned long ebdbg_n;
+#endif
 
-int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c,
-                     const eb_render_needs *n, float *outL, float *outR)
+int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
+                            const eb_render_coefs *c, const eb_render_needs *n,
+                            float *vout)
 {
-    float mix = 0.0f, noise_v;
+    float noise_v;
     (void)n;
     int v;
 
@@ -34,8 +39,7 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
      * mistake gets silence and a return code, not plausible-sounding audio
      * nobody has compared to anything. */
     if (!e->render_ok) {
-        *outL = 0.0f;
-        *outR = 0.0f;
+        for (v = 0; v < EB_NUM_VOICES; ++v) vout[v] = 0.0f;
         return EB_RENDER_INCOMPLETE;
     }
 
@@ -59,6 +63,7 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
         eb_cvgate_in gi;
         eb_cvgate_out go;
 
+        vout[v] = 0.0f;
         if (vc->atrest) {
             /* State advance only. The DCO's phase and its sub counter must keep
              * running; eb_dco_advance does exactly that and no audio work.
@@ -87,7 +92,18 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
          * the pre-glide pitch CV (c464) and the gate sign. */
         gi.t28 = c->cvg_t28[v];  gi.t29 = c->cvg_t29[v];
         gi.k   = c->cvg_k[v];    gi.p28 = c->cvg_p28[v];
-        gi.p29 = st->gate_cell320[v];
+        /* THE RETRIGGER ONE-SHOT, port :587-594 and :2175-2179, which no module
+         * claims. When the aux edge is armed this sample's cell-320 read is
+         * FORCED to 0.0 and the edge is consumed; cell 320 itself is unchanged
+         * (the port saves and restores it). Modelling it here rather than in a
+         * module is deliberate: it is engine-level event state, not arithmetic,
+         * and the two port sites sit either side of the whole voice function. */
+        if (st->aux_edge[v]) {
+            gi.p29 = 0.0f;
+            st->aux_edge[v] = 0;
+        } else {
+            gi.p29 = st->gate_cell320[v];
+        }
         gi.gate_off = c->cvg_gate_off[v];
         eb_cvgate(&gi, &go);
         pit_in    = go.c464;
@@ -168,7 +184,12 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
         st->dco_live[v].pwm1 = pw_live - 1.0f;
         st->dco_live[v].pwp1 = pw_live + 1.0f;
         eb_dco_step4(&st->dco[v], &st->dco_live[v], q);
-        decimo = eb_decim_tick(&st->dec[v], &c->dec[v], q[0], q[1], q[2], q[3]);
+        /* pwm_out IS CELL 5456, eb_dcoprep's third output, and the decimator's
+         * per-sample feedback term. It was discarded here as `(void)pwm_out`
+         * while the decimator read a CACHED 5456 -- the tenth inherited defect,
+         * and the second of the same class as the DCO levels. */
+        decimo = eb_decim_tick(&st->dec[v], &c->dec[v], pwm_out,
+                               q[0], q[1], q[2], q[3]);
         nsvo   = eb_nsvf_tick(&st->nsv[v], &c->nsv[v], noise_v, &nsv04);
         /* the noise mix consumes the SVF's cell-4320 output and the per-sample
          * cell 3536; its result is the ladder's noise input (cell 6544). */
@@ -187,17 +208,41 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
          * call, below. */
         vcfo   = eb_vcf_tick(&st->vcf[v], &c->vcf[v], nmixo, reso, o7536);
         eb_modcv_latch(&st->mod[v], decimo);
-        (void)pwm_out; (void)nsv04;
+        (void)nsv04;
         /* THE LAST TWO ARGUMENTS ARE CELL 6848 and CELL 560, per the shim
          * (JF(a1, 6848), JF(a1, 560)) -- not o6704 and the gate sign. Fifth
          * inherited guess. */
-        mix   += eb_vca_tick(&st->vca[v], &c->vca[v], vcfo, e1, e2,
-                             o6848, st->glide[v].s560);
+        vout[v] = eb_vca_tick(&st->vca[v], &c->vca[v], vcfo, e1, e2,
+                              o6848, st->glide[v].s560);
     }
+#ifdef EB_VOICES_DEBUG
+    { extern unsigned long ebdbg_n; ++ebdbg_n; }
+#endif
+    return EB_RENDER_OK;
+}
+
+int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c,
+                     const eb_render_needs *n, float *outL, float *outR)
+{
+    float vbuf[EB_NUM_VOICES];
+    float mix = 0.0f;
+    int v;
+
+    if (eb_engine_render_voices(e, st, c, n, vbuf) != EB_RENDER_OK) {
+        *outL = 0.0f;
+        *outR = 0.0f;
+        return EB_RENDER_INCOMPLETE;
+    }
+    for (v = 0; v < EB_NUM_VOICES; ++v) mix += vbuf[v];
 
     /* ---- FX, once for the whole engine. The chorus LFO free-runs whether or
      * not anything is sounding, which is why it is outside the voice loop and
-     * unconditional. */
+     * unconditional.
+     *
+     * NOT GATED. This summing and this FX call are engine B's MODEL of the
+     * port's master stage, and the master stage is 78 % untranscribed (see the
+     * scope finding in docs/engineb/PHASE1_ORDERS.md). The voice-level gate
+     * does not reach this code at all -- it feeds the port's own master. */
     {
         float l = mix, r = mix;
         eb_chorus_tick_x(&st->chorus, &c->chorus, mix, &l, &r, 0, 0.0f);

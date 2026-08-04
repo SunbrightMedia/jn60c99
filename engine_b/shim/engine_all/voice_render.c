@@ -313,10 +313,23 @@ static unsigned long  EBTGEN_SEEN[8];
 
 /* ---- from shim 'pitch' ---- */
 /* SHIM — MODULE PITCH (engine_b/eb_pitch.{h,c}).
- * Replaces src/voice_render.c:1641-1664, the pitch polynomial. STATELESS, so
- * unlike every other module written this week it needs no home for its state
- * and no power-on marker. Nothing else in this file differs from the port. */
+ * Replaces src/voice_render.c:1641-1664, the pitch polynomial. STATELESS in
+ * every build except EB_PITCH_CR, whose per-voice extrapolation state lives
+ * below and is RESET whenever eb_coef_gen moves. The port bumps that counter
+ * on every note event and every recall, which are exactly the moments the
+ * pitch CV steps -- so the same signal that invalidates coefficient caches
+ * re-anchors the extrapolator. A scenario change in the harness also moves it
+ * (fresh recall), so state cannot leak across scenarios, which is the decim
+ * lesson applied in advance instead of learned again. */
 #include "eb_pitch.h"
+#ifdef EB_PITCH_LOG
+#include <stdio.h>
+#endif
+#if EB_PITCH_CR > 0
+extern unsigned long eb_coef_gen;
+static eb_pitch_cr_state EBPCRS[8];
+static unsigned long     EBPCR_seen[8];
+#endif
 /* ---- from shim 'pwm_cv' ---- */
 /* engine_b/shim/pwm_cv/voice_render.c — VERBATIM FORK of src/voice_render.c
  * with ONE range replaced: the pitch / PWM modulation CV block,
@@ -1848,7 +1861,21 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
   /* ==== ENGINE B MODULE PITCH ========================================== */
   {
     float _cv = JF(a1, 4448) + JF(a1, 3776);
+#ifdef EB_PITCH_LOG
+    { static FILE *_f; if (!_f) _f = fopen("/tmp/pitchlog.bin","wb");
+      float _rec[3] = {(float)voice, _cv, JF(a1, 3792)};
+      fwrite(_rec, 4, 3, _f); fflush(_f); }
+#endif
+#if EB_PITCH_CR > 0
+    if (EBPCR_seen[voice] != eb_coef_gen) {
+        EBPCRS[voice].primed = 0;
+        EBPCRS[voice].k = 0;
+        EBPCR_seen[voice] = eb_coef_gen;
+    }
+    v391 = eb_pitch_eval_cr(&EBPCRS[voice], _cv, JF(a1, 3792));
+#else
     v391 = eb_pitch_eval(_cv, JF(a1, 3792));
+#endif
   }
   JF(a1, 4416) = v391;
   /* ==== END ENGINE B MODULE PITCH ====================================== */
@@ -1998,7 +2025,7 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
       if (!EBDGEN_SEEN[voice] || EB_GEN_STALE(3, EBDGEN_SEEN[voice])) {
         for (_i = 0; _i < 16; ++_i) _raw[_i] = JF(a1, _CC[_i]);
         _raw[16] = JF(a1, 6256); _raw[17] = JF(a1, 6272);
-        _raw[18] = JF(a1, 6336); _raw[19] = JF(a1, 5456);
+        _raw[18] = JF(a1, 6336); _raw[19] = 0.0f;   /* 5456 is PER SAMPLE */
         _ch = !EBDHAVE[voice] || memcmp(EBDRAW[voice], _raw, sizeof _raw) != 0;
         EB_GEN_CHECK(3, EBDGEN_SEEN[voice], _ch, "decim");
       }
@@ -2006,7 +2033,7 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
         memcpy(EBDRAW[voice], _raw, sizeof _raw);
         for (_i = 0; _i < 16; ++_i) EBDC[voice].c[_i] = _raw[_i];
         EBDC[voice].k6256 = _raw[16]; EBDC[voice].k6272 = _raw[17];
-        EBDC[voice].k6336 = _raw[18]; EBDC[voice].k5456 = _raw[19];
+        EBDC[voice].k6336 = _raw[18];
         EBDHAVE[voice] = 1;
       }
       _dc = EBDC[voice];
@@ -2018,7 +2045,8 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
     _ds.w = _v->decim_w;
     _ds.b1 = _v->decim_b1; _ds.b2 = _v->decim_b2; _ds.b3 = _v->decim_b3;
 
-    v526 = eb_decim_tick(&_ds, &_dc, JF(a1, 4944), JF(a1, 5072),
+    v526 = eb_decim_tick(&_ds, &_dc, JF(a1, 5456),
+                                     JF(a1, 4944), JF(a1, 5072),
                                      JF(a1, 5200), JF(a1, 5328));
 
     for (_q = 0; _q < 32; ++_q) ((float *)_v->decim_h)[_q] = ((float *)_ds.h)[_q];

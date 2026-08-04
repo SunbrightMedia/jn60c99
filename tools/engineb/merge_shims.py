@@ -52,13 +52,22 @@ SHIM = os.path.join(REPO, "engine_b", "shim")
 COMPOSITE = "engine_all"
 MERGED = ("voice_render.c", "master_render.c")
 
+# WHOLE-CHAIN shims, which are NOT composite members. The composite answers
+# "every module at once, each inside the port's own voice function". A
+# whole-chain shim answers a different question -- it replaces the driver and
+# runs engine B's own render function instead of the port's -- so composing it
+# with the per-module shims is not merely a file collision, it is meaningless:
+# both would claim the same arithmetic by different routes.
+STANDALONE = ("voices",)
+
 
 def members(base):
     """Every module directory that ships a shim for this port file, except the
     generated composites themselves."""
     out = []
     for d in sorted(os.listdir(SHIM)):
-        if d == COMPOSITE or not os.path.isdir(os.path.join(SHIM, d)):
+        if d in (COMPOSITE,) + STANDALONE or \
+                not os.path.isdir(os.path.join(SHIM, d)):
             continue
         if os.path.exists(os.path.join(SHIM, d, base)):
             out.append(d)
@@ -183,7 +192,8 @@ def main():
     # otherwise `--module engine_all` would silently omit them.
     seen = {}
     for d in sorted(os.listdir(SHIM)):
-        if d == COMPOSITE or not os.path.isdir(os.path.join(SHIM, d)):
+        if d in (COMPOSITE,) + STANDALONE or \
+                not os.path.isdir(os.path.join(SHIM, d)):
             continue
         for f in sorted(glob.glob(os.path.join(SHIM, d, "*.c"))):
             b = os.path.basename(f)

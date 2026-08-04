@@ -108,8 +108,27 @@ void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
          * fields are per sample and are set by eb_dcoprep's outputs. -------- */
         {
             eb_dco_coef *q = &c->dco[v];
-            q->lvl_saw   = CF(a1, 4736); q->lvl_pulse = CF(a1, 4752);
-            q->lvl_sub   = CF(a1, 4768);
+            /* THE OSCILLATOR LEVELS ARE NOT WHERE THE SHIM READS THEM.
+             *
+             * The dco shim gathers cells 4736/4752/4768, and that is correct
+             * FOR THE SHIM, which runs inside the port at a point where those
+             * cells have already been written this sample. They are not
+             * coefficients: src/voice_render.c writes all three every sample,
+             * at :1702-1707, with JI -- which is why the audit that built this
+             * file did not see them. It grepped `JF(a1, N) =` only, and every
+             * one of these three cells is copied as an INT.
+             *
+             * MEASURED, and this is how it was found: with the copies cached
+             * from a power-on state they are 0, the DCO emits exactly 0 on
+             * every sub-sample, and the whole voice chain nulls at 0.0 dB rel
+             * -- silence. The first run of the 1b-0 gate reported it.
+             *
+             * The real chain is same-sample and lag-free: recall cell 4192 ->
+             * 4240 (:1126) -> v393 (:1667) -> 4736 (:1702), all before the DCO
+             * reads it. 4192/4208/4224 have NO writer anywhere in the voice
+             * function, so THEY are the coefficients. */
+            q->lvl_saw   = CF(a1, 4192); q->lvl_pulse = CF(a1, 4208);
+            q->lvl_sub   = CF(a1, 4224);
             q->gn_saw    = CF(a1, 5648); q->gn_pulse  = CF(a1, 5664);
             q->gn_sub    = CF(a1, 5680);
             q->amp_saw   = CF(a1, 5600); q->amp_pulse = CF(a1, 5616);
@@ -127,7 +146,7 @@ void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
                                        5824,5840,5856,5872,5888,5904,5920,5936};
             for (i = 0; i < 16; ++i) c->dec[v].c[i] = CF(a1, CC[i]);
             c->dec[v].k6256 = CF(a1, 6256); c->dec[v].k6272 = CF(a1, 6272);
-            c->dec[v].k6336 = CF(a1, 6336); c->dec[v].k5456 = CF(a1, 5456);
+            c->dec[v].k6336 = CF(a1, 6336);
         }
 
         /* ---- noise SVF (shim noise_svf) ---------------------------------- */
@@ -303,9 +322,37 @@ void eb_render_state_seed(const unsigned char *base, eb_render_state *s)
         s->glide[v].s704  = CF(a1, 704);  s->glide[v].s880  = CF(a1, 880);
         s->glide[v].s1104 = CF(a1, 1104);
         s->gate_cell320[v] = CF(a1, 320);
+        s->aux_edge[v] = (CF(base, 101504u + (unsigned)v * 32u) == 1.0f);
         (void)i;
     }
     s->notecv.n84336 = CF(base, 84336);
     s->notecv.n84368 = CF(base, 84368);
     ebsh_snapshot(&s->chorus, base);
+}
+
+void eb_render_events_mirror(unsigned char *base, eb_render_state *s)
+{
+    int v;
+    for (v = 0; v < EB_NUM_VOICES; ++v) {
+        unsigned char *a1 = (unsigned char *)VBASE(base, v);
+        unsigned aux = 101504u + (unsigned)v * 32u;
+        /* Cell 320 is written ONLY by note events (src/juno_note.c); inside
+         * src/voice_render.c its only two writers are the save/restore pair at
+         * :593 and :2177, which leave it unchanged. So re-reading it at an event
+         * boundary is exact, and re-reading it PER SAMPLE would be neither
+         * necessary nor honest. */
+        s->gate_cell320[v] = CF(a1, 320);
+        if (CF(base, aux) == 1.0f) {
+            s->aux_edge[v] = 1;
+            /* CONSUME IT ON THE PORT'S SIDE TOO. The port clears this one-shot
+             * at :2178 when its voice function runs; under this gate that
+             * function does not run, so an uncleared 1.0 would be re-armed by
+             * every later event and the retrigger would fire repeatedly. */
+            *(float *)(base + aux) = 0.0f;
+        }
+    }
+    /* the DCO's live coefficient copy is seeded from the recall coefficients,
+     * so a coefficient rebuild must invalidate it or the voice keeps last
+     * patch's non-pitch DCO fields. */
+    memset(s->dco_live_seeded, 0, sizeof s->dco_live_seeded);
 }

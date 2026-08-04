@@ -55,12 +55,19 @@ typedef struct {
 typedef struct {
     float c[16];          /* the 16 FIR pair coefficients, in the order above */
     float k6256, k6272, k6336;   /* the biquad's three coefficients          */
-    float k5456;                 /* the feedback term read from cell 5456    */
+    /* CELL 5456 IS NOT HERE, AND THAT IS THE POINT. It used to be, and it was
+     * wrong: src/voice_render.c WRITES it every sample, at :1717, as
+     * fmaxf(0, (cell3776 + k6304) * k6320 + k6288) -- it is eb_dcoprep's third
+     * output, derived from the modulated pitch sum. Caching it froze a moving
+     * value. It is a per-sample ARGUMENT below, so the type system now refuses
+     * the mistake. See tools/engineb/coef_audit.py, which is the check that
+     * found it. */
 } eb_decim_coef;
 
 /* Push one audio sample's four sub-samples and produce the decimated output.
- * s0..s3 are the port's 4944 / 5072 / 5200 / 5328 for THIS sample. */
-float eb_decim_tick(eb_decim_state *s, const eb_decim_coef *c,
+ * s0..s3 are the port's 4944 / 5072 / 5200 / 5328 for THIS sample; k5456 is
+ * this sample's cell 5456 (eb_dcoprep_tick's out5456). */
+float eb_decim_tick(eb_decim_state *s, const eb_decim_coef *c, float k5456,
                     float s0, float s1, float s2, float s3);
 
 #endif /* ENGINEB_EB_DECIM_H */
