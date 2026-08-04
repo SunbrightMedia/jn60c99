@@ -21,7 +21,62 @@ verdict that forced this: full-standard 8-voice S3 is IMPOSSIBLE (pitch alone
 = 2–3 budgets, irreducibility proven twice); the reporting lesson — when the
 numbers say a goal is probably unreachable, that sentence goes FIRST.**
 
-**★★★★★★★★★★★★★★ NEWEST (2026-08-04, Opus 5) — 1b-0 DONE: ENGINE B'S RENDER
+**★★★★★★★★★★★★★★★ NEWEST (2026-08-04, Opus 5) — 1b-1 AND 1b-2 DONE: ENGINE B
+RENDERS THE WHOLE INSTRUMENT. Read `docs/engineb/data/standalone_gate.md`.**
+- **`null_b.py --module standalone`: all 33 scenarios, EXACTLY 0 vs the port at
+  BOTH rates. `plugin_check`: 11/11 BIT-EXACT vs the PLUGIN at BOTH rates.**
+  Voice chain AND master chain, engine B's own state throughout; the port's
+  voice/master functions are linked and never called. Teeth MEASURED at 48 kHz:
+  3.16e-5 FAIL −90.0 dB 33/33, 3.16e-6 PASS −109.8 dB, `seedpoison` FAIL 21/33.
+- **1b-1: `master_render.c` went 22 % → 82 % claimed.** Seven new modules
+  (master_in, master_out, delay_t1/t23/t5, fx_e1/e5), each EXACTLY 0.
+  Everything still unclaimed is in an arm NO factory patch can select.
+- **★ THE GATE WAS BLIND TO HALF THE MASTER.** The 30 inherited scenarios drove
+  DELAY TYPE 0/1/5 and EFFECT 2/3/5 only — a module for any other arm could not
+  be gated at all. Three scenarios from REAL factory patches closed DELAY 2/3
+  and EFFECT 1; `tools/engineb/arm_coverage.py` checks it every run.
+- **★ THAT COVERAGE FOUND A DEFECT ON ITS FIRST RUN: the arpeggiator never
+  bumped `eb_coef_gen`,** so engine B was blind to arp notes and would have
+  played SILENCE on all seven arpeggiated factory patches. The scenario that
+  caught it was added for an unrelated reason (EFFECT TYPE 1's only patch has
+  the arp on).
+- **★ THE EFFECT SEND IS A ONE-SAMPLE FEEDBACK LOOP, NOT AN INSERT.** The port
+  forms its output at :2367/:2375 and only THEN dispatches the effect arms at
+  :2378; an arm reaches the audio through cells 84672/84704 on the NEXT sample.
+  `eb_engine_render`'s old master modelled it as an insert and had no type
+  dispatch at all.
+- **★ THREE FORMS OF ONE TRAP, all int/float reinterpretation, each green
+  before it was red:** a per-sample cell cached as a coefficient; an
+  `int`-declared local carrying float BITS (converted twice, made an output
+  exactly 0); and a `LODWORD` store into a float field (cell read back
+  947597056 where the port had 5.99e-05). Guards: `coef_audit.py` (in the
+  teeth), `arm_xform.carriers()`, and a `memcpy` rewrite.
+- **★ `rev_pending[33]` WAS ONE SHORT** — EB_REV_NTAP is 34, so the reverb read
+  past the array and its last tap latched garbage. Visible only as the B
+  channel drifting in its last bits. Found by exporting the PORT's own
+  intermediates (v530 diverged first) then comparing the two `eb_reverb_state`s
+  BYTE FOR BYTE: first difference at byte 196 = `taps[33]`. `eb_render.h` had
+  the identical off-by-one.
+- **★ A `--quick` PASS IS NOT A RESULT.** `--quick` drops `long LFO+tail`,
+  which is the ONLY scenario exercising `fx_e5`; that module's quick PASS was
+  VACUOUS and it was genuinely broken. No module result may be quoted from a
+  quick run.
+- **★ F1's SEED-POISON CASE COULD NOT FIRE, and that was a measurement.**
+  Perturbing the seeded cell 84768 changed nothing on all 33 scenarios: cell
+  84816 multiplies it and is 0.0 in ALL 64 FACTORY PATCHES, so that feedback
+  path is dead for this bank. Re-pointed at `fb84704` it fails 21/33.
+- **MEASURED: the master chain's six delay rings need 6.10 MB** (three of 2 MB).
+  `eb_master_rings` is CALLER-OWNED so no target can be misled about it.
+- **⚠ PORTABILITY DEBT:** `eb_delay_t23`/`eb_delay_t5` call `juno_pitch_poly`
+  and `juno_triangle` from `src/juno_dsp.c` — the PORT. Found by LINKING
+  outside the harness; the null gates link the whole port and hid it.
+- **OPEN:** 1b-3 (DELAY TYPE 4 + the EFFECT LABEL_164 core — no factory patch
+  selects them, so they need a synthetic-recall gate BEFORE transcription, and
+  they are NOT optional since the trunk is the full instrument); the
+  allocator's RETRIG/PORTA_GATE events (belong to `eb_patch`); C5; the METHOD
+  PLAYBOOK; the certification sweep.
+
+**★★★★★★★★★★★★★★ (2026-08-04, Opus 5) — 1b-0 DONE: ENGINE B'S RENDER
 FUNCTION HAS RUN, AND IT NULLS EXACTLY 0. Read `docs/engineb/data/voice_gate.md`.**
 - **`null_b.py --module voices`, all 30 scenarios, EXACTLY 0 vs the port at BOTH
   44,100 and 48,000 Hz.** `eb_engine_render_voices()` — the 16 gated modules
