@@ -15,6 +15,21 @@
 #include "triangle.h"
 #include <math.h>
 
+/* FORK EXP SWITCH: the LFO delay envelope; its result reaches the LFO RATE, which INTEGRATES
+ * into LFO phase -- so this site is gated by the end-to-end LFO-RATE ppm
+ * gate (tools/engineb/lfo_rate_gate.py), not by the exponential's own ppm
+ * figure. An exp error that is small can still matter after a cancelling
+ * expression amplifies it; that is measured there, not assumed here.
+ */
+#include "eb_fork_config.h"
+#if EB_EXP_FORK
+#include "eb_exp_fork.h"
+#define EB_EXPF eb_exp_fork
+#else
+#define EB_EXPF expf
+#endif
+
+
 /* The port's phase wrap, verbatim, including the fmodf. eb_dco_wrap() is a
  * PROVEN bit-identical replacement for exactly this shape (all 2^32 inputs,
  * engine_b/test_dco_wrap.c) and would remove four fmodf calls per sample from
@@ -57,7 +72,7 @@ float eb_lfo_tick(eb_lfo_state *s, const eb_lfo_coef *c,
     float L1680, L1696, L1712, L1728, L1760;
 
     v74 = c->k1056;
-    v75 = expf((float)dly_env * c->k1200) * c->k1184;
+    v75 = EB_EXPF((float)dly_env * c->k1200) * c->k1184;
     v76 = v74 * c->k1072;
     L1584 = s->s1568;
     v77 = v75 + c->k1216;

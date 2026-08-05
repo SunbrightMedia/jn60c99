@@ -39,11 +39,24 @@
 #define ENGINEB_EB_FORK_CONFIG_H
 
 #ifdef EB_FORK_S3
+#ifndef EB_FORK_VOICES
 #define EB_FORK_VOICES 6
+#endif
+#ifndef EB_FORK_SR
 #define EB_FORK_SR     48000
+#endif
+/* Each evaluator is overridable on the command line so the gates can build
+ * the flag surface with the substitutions OFF -- the build that proves the
+ * flag itself changes nothing. See JUNO_EB_FORK in tools/engineb/null_b.py. */
+#ifndef EB_PITCH_FORK
 #define EB_PITCH_FORK  1
+#endif
+#ifndef EB_EXP_FORK
 #define EB_EXP_FORK    1
+#endif
+#ifndef EB_C4_SIMD_RECURSIVE
 #define EB_C4_SIMD_RECURSIVE 0
+#endif
 #endif
 
 #endif

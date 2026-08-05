@@ -154,6 +154,33 @@ if os.environ.get("JUNO_EB_PITCH_CR"):
     CFLAGS = CFLAGS + ["-DEB_PITCH_CR=%d"
                        % int(os.environ["JUNO_EB_PITCH_CR"])]
 
+# ------------------------------------------------------------- THE S3 FORK
+# JUNO_EB_FORK selects the fork's numeric build (docs/engineb/
+# F3_S3_FORK_DESIGN.md). Values:
+#     off      : the trunk, unchanged (default)
+#     flagonly : EB_FORK_S3 defined but BOTH evaluators forced OFF. This build
+#                MUST null EXACTLY 0 against the trunk, and that is the point:
+#                it proves the flag surface itself introduces no change, so any
+#                residual in the builds below is attributable to the evaluator
+#                and to nothing else. Without it, "the fork differs by X" would
+#                be a claim about the whole flag, not about the substitution.
+#     pitch    : + fork pitch only
+#     exp      : + fork exp only
+#     both     : the shipping fork numerics
+_FORK = os.environ.get("JUNO_EB_FORK")
+if _FORK:
+    _map = {"flagonly": ["-DEB_PITCH_FORK=0", "-DEB_EXP_FORK=0"],
+            "pitch":    ["-DEB_PITCH_FORK=1", "-DEB_EXP_FORK=0"],
+            "exp":      ["-DEB_PITCH_FORK=0", "-DEB_EXP_FORK=1"],
+            "both":     ["-DEB_PITCH_FORK=1", "-DEB_EXP_FORK=1"]}
+    if _FORK not in _map:
+        raise SystemExit("JUNO_EB_FORK must be one of %s" % sorted(_map))
+    # -U first: eb_fork_config.h defines these under EB_FORK_S3, and a
+    # command-line -D of a macro the header also defines is a redefinition
+    # error, not an override. The header's #ifdef guard is the one place the
+    # constants belong; these switches select AMONG them.
+    CFLAGS = CFLAGS + ["-DEB_FORK_S3"] + _map[_FORK]
+
 # ---------------------------------------------------------------- scenarios
 # The nine port-risk scenarios are reused verbatim from the Track B gate: they
 # were not guessed, they were grown by the canary and observability probes

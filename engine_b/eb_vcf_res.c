@@ -5,6 +5,19 @@
 #include <math.h>
 #include <string.h>
 
+/* FORK EXP SWITCH: a VCF coefficient path: memorylessly consumed, so the bias law's ~1e-5
+ * tolerance applies and the exponential's own 0.119 ppm is three orders
+ * inside it.
+ */
+#include "eb_fork_config.h"
+#if EB_EXP_FORK
+#include "eb_exp_fork.h"
+#define EB_EXPF eb_exp_fork
+#else
+#define EB_EXPF expf
+#endif
+
+
 static unsigned ebr_bits(float f) { unsigned b; memcpy(&b, &f, 4); return b; }
 
 /* juno_wrap24, transcribed from src/juno_dsp.c so this module calls no port
@@ -68,7 +81,7 @@ float eb_vcf_res_tick(eb_vcf_res_state *s, const eb_vcf_res_coef *c,
       v234 = (float)(v235 - (int)((ebr_bits(v227) >> 31) & 1u));
     v236 = v227 - v234;
     v237 = (float)(v236 * v236) * 0.25;
-    v238 = (float)(expf(v234)
+    v238 = (float)(EB_EXPF(v234)
                  * (float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)(v236 * c->k8032) + c->k8016) * v237) + (float)(v236 * c->k8000)) + c->k7984) * v237) + (float)(v236 * c->k7968))
                                                                                                  + c->k7952)
                                                                                          * v237)

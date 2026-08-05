@@ -1,8 +1,45 @@
 /* eb_pitch.c — see eb_pitch.h. Double precision throughout until the final
  * fminf/fmaxf, exactly as the port. */
 #include "eb_pitch.h"
+#include "eb_fork_config.h"
 #include "juno_tables.h"
 #include <math.h>
+
+/* ------------------------------------------------------------------ FORK
+ * THE S3 FORK'S PITCH, switched in at ONE point. EB_PITCH_FORK is defined
+ * only by eb_fork_config.h under EB_FORK_S3, so no trunk build and no trunk
+ * gate compiles a single line of it -- `--module all`, plugin_check and the
+ * whole teeth battery still exercise the double path below, unchanged.
+ *
+ * The clamp-and-gain TAIL is kept identical to the trunk's on purpose. The
+ * fork replaces the polynomial EVALUATION, which is what the exhaustive
+ * cents gate measured (tools/engineb/pitch_cents_gate.py, 2^32 inputs,
+ * worst 0.00074 cents); it does not get to change the +/-512 saturation or
+ * the gain multiply, because those were never the cost and a second
+ * difference would make the gate's result an incomplete answer about the
+ * function the engine actually calls.
+ */
+#if EB_PITCH_FORK
+#include "eb_pitch_fork.h"
+
+float eb_pitch_eval(float cv, float gain)
+{
+    return fmaxf(fminf(eb_pitch_fork_eval(cv), 512.0f), -512.0f) * gain;
+}
+
+int eb_pitch_row(float cv)
+{
+    /* Same row law as the trunk (floor of the clamped value + 20); kept so
+     * anything that asks for a row agrees with the evaluator that uses it. */
+    float x = cv;
+    if (x != x) x = -20.0f;
+    if (x < -20.0f) x = -20.0f;
+    if (x > 8.9f)   x = 8.9f;
+    {   int r = (int)floorf(x) + 20;
+        return r > 28 ? 28 : (r < 0 ? 0 : r); }
+}
+
+#else
 
 /* ------------------------------------------------- THE ONE OPTIONAL INEXACTNESS
  * EB_PITCH_FAST replaces the DOUBLE evaluation with compensated double-float
@@ -479,3 +516,5 @@ float eb_pitch_eval(float cv, float gain)
 }
 
 #endif /* !EB_PITCH_FAST */
+
+#endif /* EB_PITCH_FORK */

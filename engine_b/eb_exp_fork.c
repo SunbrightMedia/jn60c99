@@ -21,7 +21,14 @@ float eb_exp_fork(float x)
         return expf(x);
 
     {
-        float n = floorf(x * 1.44269504088896341f + 0.5f);
+        /* floorf(y + 0.5) on the guarded domain: |x| <= 88 makes
+         * y = x*log2(e) + 0.5 lie in about [-125, 127.5], well inside int
+         * range, and the same truncate-toward-zero correction applies. The
+         * exhaustive ppm gate is re-run after this change. */
+        float y = x * 1.44269504088896341f + 0.5f;
+        int ni0 = (int)y;
+        if (y < 0.0f && (float)ni0 != y) --ni0;
+        float n = (float)ni0;
         /* r = x - n*ln2, ln2 split so each product is exact in float. */
         float r = (x - n * 0.693359375f) - n * -2.12194440e-4f;
         float z = r * r;
@@ -36,8 +43,7 @@ float eb_exp_fork(float x)
         /* 2^n by bit construction: n in [-126, 127] here, so the biased
          * exponent stays in [1, 254] and no denormal path is needed. */
         {
-            int32_t ni = (int32_t)n;
-            uint32_t bits = (uint32_t)(ni + 127) << 23;
+            uint32_t bits = (uint32_t)(ni0 + 127) << 23;
             float s;
             memcpy(&s, &bits, 4);
             return p * s;

@@ -31,7 +31,17 @@ float eb_pitch_fork_eval(float x)
      * rounding anywhere. floorf here is the same function. An earlier shape
      * of this line was (int)(x + 20.0f) -- WRONG, because the FLOAT add can
      * round up across an integer boundary and select the next row. */
-    int r = (int)floorf(x) + 20;
+    /* floorf REPLACED BY THE INT-CAST IDIOM (F3 §5 item 3). C truncates
+     * toward zero, so floor differs from the cast only for negative
+     * non-integers -- subtract one there. PROVEN, not assumed: exhaustive
+     * over every float in the clamped domain [-20, 8.9], 2,192,467,560
+     * inputs, ZERO mismatches against floorf. Saves the libm call from the
+     * per-voice per-sample path; the exhaustive cents gate is re-run after
+     * this change, because a proof about floor is not a proof about the
+     * evaluator that uses it. */
+    int r = (int)x;
+    if (x < 0.0f && (float)r != x) --r;
+    r += 20;
     if (r > 28) r = 28;             /* x == +8.x -> row 28 */
     if (r < 0)  r = 0;              /* unreachable after the clamp; belt */
 
