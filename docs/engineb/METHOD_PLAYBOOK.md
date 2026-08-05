@@ -155,6 +155,19 @@ said so.
    module** until a synthetic-recall gate exists. Silence is indistinguishable
    from a working effect nobody tested.
 
+**THE SYNTHETIC-RECALL GATE, concretely: DOCTOR THE PRESET, not the engine.**
+Overwrite the parameter's own bytes in a copy of the factory preset record and
+let the instrument's OWN recall path run. That is a preset a user could save,
+so the arm is reached the way it will really be reached — unlike poking the
+engine's dispatch cell, which reaches the arm while skipping everything recall
+does on the way. Three arms here were closed exactly this way, and one of them
+was an arm a shipped module had always handled and no gate had ever executed.
+
+**And then make the coverage tool use the SAME driving.** Ours rendered the
+doctored scenarios against the PRISTINE preset bank, so it reported two arms
+NOT REACHABLE while the null gate was covering them. **A coverage tool that
+does not reproduce the gate's own driving is describing a different run.**
+
 **Coverage added for one reason finds defects of another.** The scenario added
 here to reach one effect type happened to use an arpeggiated patch — and
 immediately exposed that the arpeggiator never bumped the coefficient generation
@@ -434,6 +447,8 @@ checklist.
 | 23 | Unit test stopped LINKING when a dependency was added, and was not in `make test` | a test that does not build is not failing, it is absent — for two days |
 | 24 | Cost model omitted code the engine always executes (the whole master chain) | understated the engine; fifth flattering error of the same shape |
 | 25 | Gate run with the tool's DEFAULT module set (the port), reported as an engine result | "11/11 vs the plugin" measured the port, not engine B |
+| 26 | Coverage tool drove the doctored scenarios against the PRISTINE data | called two arms unreachable while the gate was covering them |
+| 27 | Teeth battery run across a tree that changed under it mid-run | not a certification of any one tree; had to be restarted |
 
 **#18 is the one to internalise.** Before concluding "the original does X", check
 that the original's code for *not*-X could have run in your harness at all.
