@@ -49,6 +49,7 @@ ORACLE_DEPS := $(wildcard tools/verify/*.py)
 # gate against an out-of-date library. Caught by etmode_ab.py, 2026-07-22.
 verify: test libjuno.so
 	@FAIL=0; \
+	python3 tools/verify/pathcheck.py || FAIL=1; \
 	fresh() { p="$$1"; shift; [ -f "$$p" ] || return 1; for d in "$$@"; do [ "$$p" -nt "$$d" ] || return 1; done; }; \
 	fresh $(SCRATCH)/index_cell_map.pkl $(ORACLE_DEPS)    || python3 tools/verify/index_cell_map.py    || FAIL=1; \
 	fresh $(SCRATCH)/plugin_recall_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/plugin_recall_ref.py || FAIL=1; \

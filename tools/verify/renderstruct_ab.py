@@ -41,9 +41,18 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import truth
 
+# THE DEFAULT MUST BE A PATH THAT EXISTS IN EVERY SESSION.
+# It used to be a hardcoded /tmp/claude-.../<session-uuid>/scratchpad -- the
+# scratch directory of the session that WROTE this gate. That session is gone,
+# so in any other container both halves of this gate died with
+# FileNotFoundError and `make verify` exited non-zero for a reason that has
+# nothing to do with the port. CLAUDE.md already recorded this sharp edge for
+# coldstate_ab.py; it was live in three more gates.
+# The repo's own scratchpad/ is always there and is already what most gates use.
 SCRATCH = os.environ.get(
     'JUNO_SCRATCH',
-    '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad')
+    os.path.join(os.path.dirname(HERE), 'scratchpad')  # <repo>/scratchpad
+)
 PKL = os.environ.get('JUNO_RSTRUCT_PKL', os.path.join(SCRATCH, 'renderstruct_ref.pkl'))
 SR  = float(os.environ.get('JUNO_RSTRUCT_SR', '44100'))
 

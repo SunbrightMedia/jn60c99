@@ -6,7 +6,17 @@ Usage:
 """
 import sys, struct, pickle, ctypes
 sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
-PKL = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad/cold_regress.pkl'
+# THE DEFAULT MUST BE A PATH THAT EXISTS IN EVERY SESSION.
+# It used to be a hardcoded /tmp/claude-.../<session-uuid>/scratchpad -- the
+# scratch directory of the session that WROTE this gate. That session is gone,
+# so in any other container both halves of this gate died with
+# FileNotFoundError and `make verify` exited non-zero for a reason that has
+# nothing to do with the port. CLAUDE.md already recorded this sharp edge for
+# coldstate_ab.py; it was live in three more gates.
+# The repo's own scratchpad/ is always there and is already what most gates use.
+PKL = os.environ.get('JUNO_COLDREG_PKL', os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    'scratchpad', 'cold_regress.pkl'))
 import os as _o, sys as _s; _s.path.insert(0, _o.path.join(_o.path.dirname(_o.path.abspath(__file__))))
 import truth
 BANK = truth.BANK  # ground truth via truth/ (single source)
