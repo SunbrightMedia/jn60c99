@@ -78,7 +78,17 @@ def main():
         bank = open(truth.BANK, "rb").read()
         scen = null_b.scenarios(False)
         for patch, script, tag in scen:
-            null_ab.render_script(lib, bank, null_ab.SR, patch, script)
+            # THE DOCTORED SCENARIOS MUST BE DOCTORED HERE TOO. This tool
+            # rendered every scenario against the PRISTINE bank, so the two
+            # scenarios that exist precisely to reach DELAY 4 and EFFECT 0 were
+            # driven into whatever arm patch 2 normally selects -- and the tool
+            # then reported those arms NOT REACHABLE while the null gate was
+            # covering them. A coverage tool that does not reproduce the gate's
+            # own driving reports the coverage of a different run.
+            bnk = bank
+            if tag in null_b.DOCTOR:
+                bnk = null_b.doctor_bank(bank, patch, *null_b.DOCTOR[tag])
+            null_ab.render_script(lib, bnk, null_ab.SR, patch, script)
         t39 = list((ctypes.c_ulong * 8).in_dll(lib, "EBARM39"))
         t551 = list((ctypes.c_ulong * 8).in_dll(lib, "EBARM551"))
     finally:
@@ -88,6 +98,11 @@ def main():
     print("=== MASTER DISPATCH ARM COVERAGE (%d scenarios) ===" % len(scen))
     # Arms with no factory patch anywhere in the bank. Listed by name so an
     # unreached arm that SHOULD be reachable stands out from one that cannot be.
+    # Arms no FACTORY patch selects. DELAY 4 and EFFECT 0 are still in
+    # this set -- no factory patch selects them -- but they are no longer
+    # unreached: the DOCTORED-bank scenarios (task 1b-3) drive them
+    # through the instrument's own recall. EFFECT 4 (FLANGER) is the one
+    # that remains genuinely uncovered.
     NO_PATCH = {("DELAY", 4), ("EFFECT", 0), ("EFFECT", 4)}
     for name, tot in (("DELAY", t39), ("EFFECT", t551)):
         print("%s TYPE:" % name)
