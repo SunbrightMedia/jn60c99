@@ -49,8 +49,19 @@ region sinks BIT-IDENTICAL to host/QEMU (the S3's FPU reproduces the host's
 floats exactly); FX states ran FROM PSRAM, memory test OK. Full fork = ~23,400
 cycles vs ~10,000 two-core = 2.3x over, and the ladder down is measured:
 half-OS 1.9x, +C2 1.4x, +44.1k-or-4-voices AT/NEAR FIT. The S3 is ALIVE.
-`esp32s3/flash/` holds the flash kit. The head pointer is C2 (control-rate CV
-for non-integrating targets, gated at -100/-80), then the fit decision.** NO approximations in the trunk —
+`esp32s3/flash/` holds the flash kit. **C2 IS CLOSED NEGATIVE (O7, same night) -- read `data/c2_result.md`. The
+premise was wrong three ways: glide/pwm_cv carry PITCH (bias law forbids
+them, so the prize was ~2,800 not ~5,500); vcf_res and vcf_cv both move ~100 %
+PER SAMPLE (measured over 4.75M calls) because they carry the wrap24 DITHER,
+and a stochastic term cannot be approximated -- holding and interpolating
+both REMOVE it; and vcf_cv's smoother state update IS its computation. Gate:
+N=1 EXACTLY 0 (identity, which is what makes the next row mean something),
+N=2 FAILS at -39.3 dB on all 36 -- 60 dB above the gate. FOURTH modelled
+lever killed by measurement (C1 integration, C4 resolution, C5 registers, C2
+stochastic content). CONSEQUENCE, stated: 6 voices @44.1k is ~1.55x over
+after both (still ungated) half-oversampling levers; 4 voices reaches ~1.1x.
+The head pointer is F5 (half-oversampling design) with the voice-count
+decision now a real one.** NO approximations in the trunk —
 C2 moved OUT of trunk work (it is a −100 dB candidate, my earlier phase
 assignment was wrong). Phase 2 (Fable, S3 fork): recentered pitch with a
 0.05-CENT exhaustive gate (the plugin's own numerical noise bound, ~1000×

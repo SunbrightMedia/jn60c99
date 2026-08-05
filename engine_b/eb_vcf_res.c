@@ -3,6 +3,14 @@
  */
 #include "eb_vcf_res.h"
 #include "eb_fork_config.h"
+/* EB_VCF_RES_CR -- C2, control-rate resonance. CLOSED NEGATIVE 2026-08-05:
+ * N=2, the gentlest decimation that exists, FAILS at -39.3 dB on all 36
+ * scenarios (the gate is -100). N=1 is EXACTLY 0, which is what makes that
+ * failure attributable to the decimation alone. The cause is measured, not
+ * guessed: this module's output moves 107 % per sample because it carries a
+ * wrap24 DITHER -- a stochastic term no causal approximation can reproduce.
+ * Read docs/engineb/data/c2_result.md before reviving this idea.
+ * The flag stays so the negative is reproducible in one command. */
 #ifndef EB_VCF_RES_CR
 #define EB_VCF_RES_CR 1
 #endif
