@@ -206,6 +206,34 @@ open to the user: the proof is at the trunk's own standard, but the trunk's
 identity as a structure-preserving transcription is a policy, and policy is
 not this document's to change.
 
+## 8. THE EXECUTED CHECK — QEMU, fork vs default (2026-08-05, Fable 5)
+
+The QEMU harness (re-downloaded by its own recorded recipe; two updates to
+compile against today's engine B — the k5456 argument promotion and an
+EB_FORK build knob) ran the SAME workload both ways. Only `sample_total` is
+quoted, per the standing warning about per-function spans; CCOUNT ticks once
+per 25 instructions in this build.
+
+| build | sample_total raw / 12,500 | executed instr/sample |
+|---|---|---|
+| default (double pitch) | 33,910,555 | **67,821** |
+| EB_FORK (fork pitch linked) | 20,137,563 | **40,275** |
+
+Every region sink nonzero in both runs, overruns 0. The default figure is
+consistent with the 71,051 recorded before the decim contract changed. The
+delta — **27,546 executed instructions/sample** — is the fork pitch lever as
+EXECUTED on this harness's 13-module chain (its module set predates the LFO
+and vcf_res modules, so the fork exp is linked but not exercised; the pitch
+saving dominates regardless). The static model charged the same lever
+34,408; executed is 20 % less, the usual band between the two methods, and
+the direction is the safe one — the static model does not flatter the fork.
+
+One incidental cross-check: the pitch region's SINK is bit-identical between
+the two runs (0x4a3bd250). That is not evidence the evaluators agree — the
+sink accumulates ~30-unit values into a ~3e6 float, whose ULP is 0.25, five
+orders above the fork's cents-scale differences. It is evidence the sink
+cannot detect them, noted so nobody quotes it as a null.
+
 ## 5. What O6 adopts, in order
 
 1. `EB_FORK_S3` build wiring: eb_fork_config.h constants into the render
