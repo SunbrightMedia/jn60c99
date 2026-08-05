@@ -17,7 +17,7 @@ WHAT IS AND IS NOT ALLOWED. A gate may take a path from the environment — that
 is how a caller redirects scratch — and it may default to anything under the
 repository. It may not DEFAULT to an absolute path outside it. The distinction
 matters: `os.environ.get('JUNO_SCRATCH', <repo>/scratchpad)` is fine;
-`os.environ.get('JUNO_SCRATCH', '/tmp/claude-.../scratchpad')` is the defect.
+defaulting to a /tmp/claude session directory is the defect.
 
 SCOPE: only the scripts `make verify` actually runs. The one-shot derivation
 tools in tools/verify carry the same dead paths and are deliberately not

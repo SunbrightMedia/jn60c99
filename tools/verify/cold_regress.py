@@ -15,7 +15,7 @@ sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
 # coldstate_ab.py; it was live in three more gates.
 # The repo's own scratchpad/ is always there and is already what most gates use.
 PKL = os.environ.get('JUNO_COLDREG_PKL', os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     'scratchpad', 'cold_regress.pkl'))
 import os as _o, sys as _s; _s.path.insert(0, _o.path.join(_o.path.dirname(_o.path.abspath(__file__))))
 import truth

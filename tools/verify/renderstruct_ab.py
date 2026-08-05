@@ -51,7 +51,7 @@ import truth
 # The repo's own scratchpad/ is always there and is already what most gates use.
 SCRATCH = os.environ.get(
     'JUNO_SCRATCH',
-    os.path.join(os.path.dirname(HERE), 'scratchpad')  # <repo>/scratchpad
+    os.path.join(os.path.dirname(os.path.dirname(HERE)), 'scratchpad')  # <repo>/scratchpad (HERE = tools/verify, so TWO dirnames)
 )
 PKL = os.environ.get('JUNO_RSTRUCT_PKL', os.path.join(SCRATCH, 'renderstruct_ref.pkl'))
 SR  = float(os.environ.get('JUNO_RSTRUCT_SR', '44100'))

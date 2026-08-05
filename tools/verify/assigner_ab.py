@@ -53,7 +53,7 @@ import truth
 # The repo's own scratchpad/ is always there and is already what most gates use.
 SCRATCH = os.environ.get(
     'JUNO_SCRATCH',
-    os.path.join(os.path.dirname(HERE), 'scratchpad')  # <repo>/scratchpad
+    os.path.join(os.path.dirname(os.path.dirname(HERE)), 'scratchpad')  # <repo>/scratchpad (HERE = tools/verify, so TWO dirnames)
 )
 PKL = os.environ.get('JUNO_ASGAB_PKL', os.path.join(SCRATCH, 'assigner_ab_ref.pkl'))
 
