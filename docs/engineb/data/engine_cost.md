@@ -20,14 +20,38 @@ the noise LFSR and the three FX once for the whole engine.
 `sample_total` of the complete engine needs `eb_engine_render` gated and
 running, which it is not yet.
 
-## THE RESULT (CORRECTED IN REVIEW — see §"the fourth error" below)
+## THE RESULT (REFRESHED 2026-08-05 — the master chain is now in it)
 
 | build | instr/sample | vs the 6,300–9,500 two-core instruction budget |
 |---|---|---|
-| default (bit-exact double pitch, division) | **69,735** | 7.3× – 11.1× over |
-| **S3 shipping (fast pitch v7 + DCO reciprocal)** | **55,167** | **5.8× – 8.8× over** |
+| default (bit-exact double pitch, division) | **71,535** | 7.5× – 11.4× over |
+| **S3 shipping (fast pitch v7 + DCO reciprocal)** | **56,967** | **6.0× – 9.0× over** |
 
-(First published as 63,484 / 48,564; review found libm charged at zero.)
+**THE FIFTH PRICING ERROR, and the same flattering direction as the other
+four: the MASTER CHAIN was not in the table at all.** `master_in` and
+`master_out` run once per sample on every patch and were simply absent; the
+five DELAY arms and four EFFECT arms transcribed in tasks 1b-1 and 1b-3 were
+absent too. The table priced a delay of 320 (the shared core) as if it were the
+only one. Adding them moves the default from 69,735 to 71,535 — small in
+proportion, and the point is not the size: **a cost model that omits code the
+engine always executes flatters its subject**, and this project has now caught
+that shape five times.
+
+**THE DISPATCH ARMS ARE PRICED SEPARATELY, because exactly one of each group
+runs.** Charging all five delay arms would bill a patch for four delays it does
+not have. The tool prints every arm and adds only the WORST of each group to
+the headline — the safe direction, stated rather than buried:
+
+| group | cheapest arm | worst arm, charged |
+|---|---|---|
+| DELAY | 320 (type 0, shared core) | **1,979** (type 5) |
+| EFFECT | 488 (type 0) | **1,156** (chorus, types 2/3/4) |
+
+A patch on DELAY type 0 with the chorus therefore really pays 1,476 where the
+headline charges 3,135.
+
+(First published as 63,484 / 48,564; review found libm charged at zero, then
+69,735 / 55,167 before the master chain existed.)
 
 Per module, shipping build, per audio sample (corrected):
 

@@ -80,9 +80,34 @@ CHAIN = [
     ("eb_noisemix.c",   "eb_noisemix_tick",  8,  "noise mix"),
     ("eb_vcf_ladder.c", "eb_vcf_tick",       8,  "VCF ladder"),
     ("eb_vca_hpf.c",    "eb_vca_tick",       8,  "VCA + HPF"),
-    ("eb_chorus.c",     "eb_chorus_tick_x",  1,  "chorus, ENGINE-WIDE"),
-    ("eb_delay.c",      "eb_delay_process",  1,  "delay, ENGINE-WIDE"),
     ("eb_reverb.c",     "eb_reverb_process", 1,  "reverb, ENGINE-WIDE"),
+    # THE MASTER CHAIN (task 1b-1/1b-3). These two ALWAYS run, once per sample
+    # for the whole engine: the input stage that sums the voices and the output
+    # stage that forms the stereo pair. They were missing from this table until
+    # 2026-08-05, which understated the engine -- a cost model that omits code
+    # the engine always executes flatters its subject, the fourth time this
+    # project has caught that shape.
+    ("eb_master_in.c",  "eb_master_in_tick", 1,  "master input, ENGINE-WIDE"),
+    ("eb_master_out.c", "eb_master_out_tick",1,  "master output, ENGINE-WIDE"),
+]
+
+# THE DISPATCH ARMS ARE MUTUALLY EXCLUSIVE and are priced SEPARATELY for that
+# reason. Exactly one DELAY arm and exactly one EFFECT arm runs per sample, so
+# adding them all to the total would charge a patch for five delays it does not
+# have. The report prints the arm a patch actually pays for, and the WORST arm,
+# and adds only the worst to the headline -- the safe direction, stated.
+ARMS_DELAY = [
+    ("eb_delay.c",      "eb_delay_process",  "DELAY type 0 (shared core)"),
+    ("eb_delay_t1.c",   "eb_dly1_tick",      "DELAY type 1"),
+    ("eb_delay_t23.c",  "eb_dly23_tick",     "DELAY type 2/3"),
+    ("eb_dly_t4.c",     "eb_dly_t4_tick",    "DELAY type 4"),
+    ("eb_delay_t5.c",   "eb_dly5_tick",      "DELAY type 5"),
+]
+ARMS_EFFECT = [
+    ("eb_fx_e0.c",      "eb_fx_e0_tick",     "EFFECT type 0 / >= 6"),
+    ("eb_fx_e1.c",      "eb_fx_e1_tick",     "EFFECT type 1"),
+    ("eb_chorus.c",     "eb_chorus_tick_x",  "EFFECT type 2/3/4 (chorus)"),
+    ("eb_fx_e5.c",      "eb_fx_e5_tick",     "EFFECT type 5"),
 ]
 
 BUDGET_LO, BUDGET_HI = 6300, 9500      # 9,500 two-core cycles at c/i 1.5..1.0
@@ -225,6 +250,23 @@ def main():
     print("  %-18s %7s %6s %10d   %s"
           % ("dco", "--", "32", dco,
              "MEASURED branch rates x static paths (dco_price.py)"))
+    # THE ARMS. One DELAY arm and one EFFECT arm run per sample; the rest of
+    # the arm code is not executed for that patch. Printing them all and adding
+    # only the worst keeps the headline on the safe side without pretending a
+    # patch pays for arms it never selects.
+    print("\n  -- DISPATCH ARMS: exactly ONE of each group runs per sample --")
+    worst = 0
+    for group, label in ((ARMS_DELAY, "DELAY"), (ARMS_EFFECT, "EFFECT")):
+        gmax = 0
+        for src, sym, note in group:
+            c = module_cost(src, sym, [])
+            gmax = max(gmax, c)
+            print("  %-18s %7d %6d %10d   %s" % (src[3:-2], c, 1, c, note))
+        print("  %-18s %7s %6s %10d   worst %s arm, charged to the total"
+              % ("", "", "", gmax, label))
+        worst += gmax
+    total += worst
+
     print("\n  %-18s %25d instructions per audio sample" % ("TOTAL", total))
     print("\nAgainst the two-core instruction budget %d-%d "
           "(9,500 cycles at c/i 1.5..1.0):" % (BUDGET_LO, BUDGET_HI))

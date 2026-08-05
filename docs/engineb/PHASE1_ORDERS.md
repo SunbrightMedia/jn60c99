@@ -83,7 +83,13 @@ GOAL: `eb_engine_render` runs as THE engine and is gated. The guard
     EB_RENDER_INCOMPLETE guard note, update eb_render.h's honesty block, and
     record the certification in CLAUDE.md.
 
-## TASK 2 — C5 fusion (trunk: EXACT only)
+## TASK 2 — C5 fusion (trunk: EXACT only) — DONE, CLOSED NEGATIVE
+
+**Executed 2026-08-05. C5 does not pay and nothing was adopted; the
+trunk is untouched. Read `docs/engineb/data/c5_fusion.md`.** The order
+below said to back a fusion step out if it cannot hold EXACTLY 0; the
+measurement never got that far, because no fusion step is worth taking.
+ORIGINAL ORDER FOLLOWS.
 
 One loop per voice instead of the call chain, batching only — identical
 arithmetic, identical order, so the gate is EXACTLY 0, not −100 dB. Re-run

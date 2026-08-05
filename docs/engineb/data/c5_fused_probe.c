@@ -1,0 +1,20 @@
+/* C5 PROBE: every per-voice module plus the render loop in ONE translation
+ * unit, so the compiler may inline across the module boundaries. Nothing
+ * arithmetic is reordered -- this is batching only. */
+#include "eb_notecv.c"
+#include "eb_glide.c"
+#include "eb_lfo.c"
+#include "eb_envgen.c"
+#include "eb_cvgate.c"
+#include "eb_pwm_cv.c"
+#include "eb_pitch.c"
+#include "eb_vcf_cv.c"
+#include "eb_vcf_res.c"
+#include "eb_dcoprep.c"
+#include "eb_dco.c"
+#include "eb_decim.c"
+#include "eb_noise_svf.c"
+#include "eb_noisemix.c"
+#include "eb_vcf_ladder.c"
+#include "eb_vca_hpf.c"
+#include "eb_render.c"

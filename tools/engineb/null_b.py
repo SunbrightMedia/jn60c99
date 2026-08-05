@@ -432,11 +432,13 @@ _OUT_ANCHOR = {
     # Only the scenarios selecting that EFFECT TYPE can catch either.
     "fx_e1": ("master_render.c",
               "        eb_fx_e1_tick(&stf, &EBC_, *(float *)(a1 + 84624), "
-              "&_o56, &_o58, &_o593);",
+              "(float)v56, v58,\n"
+              "                      &_o56, &_o58, &_o593);",
               "        _o593 *= %s;"),
     "fx_e5": ("master_render.c",
               "        eb_fx_e5_tick(&stf, &EBC_, *(float *)(a1 + 84624), "
-              "&_o56, &_o58, &_o593);",
+              "(float)v56, v58,\n"
+              "                      &_o56, &_o58, &_o593);",
               "        _o593 *= %s;"),
     # THE WHOLE ENGINE: voices AND master, engine B's own state throughout.
     # This is the 1b-2 standalone gate's anchor -- the point where engine B's
@@ -874,9 +876,15 @@ def _plant(tmp, mutate):
             raise SystemExit("delayscratch anchor matched %d times -- the case "
                              "cannot reach its own mutation and measures "
                              "nothing." % s.count(a))
+        # SUBSTITUTE A WRONG VALUE, do not DELETE the statement. The first
+        # version of this case deleted it and MEASURED a residual of EXACTLY 0
+        # on all 35 scenarios -- because an uninitialised local's value is not
+        # controlled, and this build's register allocation happened to leave
+        # 0.0 there anyway. A teeth case whose planted error is undefined
+        # measures the compiler, not the engine.
         i = s.index(a)
-        j = s.index("        v56 = 0.0;\n", i)
-        s = s[:j] + s[j + len("        v56 = 0.0;\n"):]
+        j = s.index("        v56 = 0.0;", i)
+        s = s[:j] + "        v56 = 0.25;" + s[j + len("        v56 = 0.0;"):]
     elif mutate == "voicereseed":
         # THE LOCKSTEP CASE, and it is a REAL defect this harness let through
         # once. Engine B's state lives in file statics and the render worker

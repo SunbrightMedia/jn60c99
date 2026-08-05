@@ -68,7 +68,12 @@ part and the largest single piece of work: a fixed-point ladder that nulls at
 float original. Start it ONLY after C1/C2 land, with a one-filter prototype
 gated before any wider adoption.
 
-**C5 — CALL-STRUCTURE FUSION.** One loop per voice instead of thirteen calls;
+**C5 — CALL-STRUCTURE FUSION. CLOSED NEGATIVE 2026-08-05 — read
+`docs/engineb/data/c5_fusion.md`. The prize is ~640 instr/sample, not
+~2,000 (the register-window `entry` makes a call nearly free), and one
+translation unit removes 2 of 118 call sites while forced inlining costs
+2.6x across code size and float traffic. The text below is the ORIGINAL
+proposal, kept for the record.** One loop per voice instead of thirteen calls;
 EXACTLY-0-able since it reorders nothing arithmetic. MODELED saving ~1,500–
 3,000 (call overhead + window traffic + re-loads). Do it LAST of the cheap
 ones: it makes the code harder to attribute, and the null must be re-run per
