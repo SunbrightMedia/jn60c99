@@ -60,8 +60,25 @@ N=2 FAILS at -39.3 dB on all 36 -- 60 dB above the gate. FOURTH modelled
 lever killed by measurement (C1 integration, C4 resolution, C5 registers, C2
 stochastic content). CONSEQUENCE, stated: 6 voices @44.1k is ~1.55x over
 after both (still ungated) half-oversampling levers; 4 voices reaches ~1.1x.
-The head pointer is F5 (half-oversampling design) with the voice-count
-decision now a real one.** NO approximations in the trunk —
+**F5 IS DONE (same night, Fable 5) -- read `docs/engineb/F5_HALFOS_DESIGN.md`.
+THE FINDING THAT MAKES HALF-OS ADMISSIBLE, measured on patch 32's real
+recalled coefficients: the plugin's OWN alias floor is -43..-54 dB at high
+pitch (audible BY DESIGN, as eb_dco.h always said), those aliases are born
+at the SHAPING that both rates share, and the 2x fork lands within +/-0.7 dB
+of the plugin's own floor in five of six bands. Half-OS preserves the alias
+LEVEL; it cannot preserve alias POSITIONS (the fold pivot halves) -- that
+one-sentence relaxation is the USER decision the design requests, same class
+as the 0.05-cent pitch bound. The VCF transform is exact algebra needing no
+frequency knowledge: G' = 2G/(1-G^2). Gates for O8: cascade |H| match 0.1 dB
+computed; alias level +1 dB per band measured; band-limited null -80/-60
+through an 18 kHz low-pass (the trunk's -100/-80 is unreachable BY
+CONSTRUCTION under repositioned aliases and saying otherwise would only
+prove the gate never ran). The probe took THREE revisions -- fake reference
+FIR, per-sample cells read as coefficients, folded positions masked as
+harmonics -- all recorded in the design so O8 does not re-learn them.
+Expected after O8: ~15,500 cycles = 1.42x, with O9 (~-2,900 tabulation) and
+O10 (DCO) remaining. The head pointer is O8, pending the user's alias
+decision.** NO approximations in the trunk —
 C2 moved OUT of trunk work (it is a −100 dB candidate, my earlier phase
 assignment was wrong). Phase 2 (Fable, S3 fork): recentered pitch with a
 0.05-CENT exhaustive gate (the plugin's own numerical noise bound, ~1000×
