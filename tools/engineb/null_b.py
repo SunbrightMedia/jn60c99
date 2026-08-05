@@ -181,6 +181,13 @@ if _FORK:
     # constants belong; these switches select AMONG them.
     CFLAGS = CFLAGS + ["-DEB_FORK_S3"] + _map[_FORK]
 
+# JUNO_EB_LFO_SHARED=1: ONE LFO for the whole engine (the fork's global-LFO
+# lever). Independent of JUNO_EB_FORK on purpose, so it can be nulled against
+# the pure trunk: if the shared build is EXACTLY 0, the per-voice LFOs are
+# redundant computation and the removal is proven, not argued.
+if os.environ.get("JUNO_EB_LFO_SHARED"):
+    CFLAGS = CFLAGS + ["-DEB_LFO_SHARED=1"]
+
 # ---------------------------------------------------------------- scenarios
 # The nine port-risk scenarios are reused verbatim from the Track B gate: they
 # were not guessed, they were grown by the canary and observability probes

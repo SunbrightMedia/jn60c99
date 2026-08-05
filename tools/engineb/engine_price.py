@@ -236,6 +236,11 @@ def main():
     # pretending it does is exactly the flattering error this tool has made
     # five times already.
     fork = "--fork" in sys.argv[1:]
+    # --shared-lfo: ONE LFO for the engine (the global-LFO lever). Only
+    # meaningful with --fork; the LFO line is charged once instead of per
+    # voice. Priced only because the EXACTLY-0 gate exists; a lever without
+    # its gate does not belong in a price.
+    shared_lfo = "--shared-lfo" in sys.argv[1:]
     fvoices = 6
     print("=== ENGINE B, WHOLE PER-SAMPLE DSP CHAIN, STATIC Xtensa "
           "instructions ===")
@@ -258,6 +263,9 @@ def main():
         cost = module_cost(src, sym, extra)
         if fork and calls == 8:
             calls = fvoices            # per-voice modules only
+        if shared_lfo and src == "eb_lfo.c":
+            calls = 1
+            note = "LFO, SHARED (gated EXACTLY 0)" 
         if fork and calls == 16:
             calls = 2 * fvoices        # the two envelopes per voice
         total += cost * calls

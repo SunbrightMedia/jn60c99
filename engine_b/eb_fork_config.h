@@ -57,6 +57,15 @@
 #ifndef EB_C4_SIMD_RECURSIVE
 #define EB_C4_SIMD_RECURSIVE 0
 #endif
+/* EB_LFO_SHARED stays DEFAULT OFF even in the fork: the charter's second
+ * condition (silicon still needs it) is F4's to establish. Condition (a) is
+ * MET and gated: the phase identity was measured across the bank under
+ * staggered notes, forced LFO TRIG ENV, and maximum LFO DELAY TIME, and the
+ * shared build nulls against the port -- see eb_render.c's note and
+ * F3_S3_FORK_DESIGN.md. Turn it on with -DEB_LFO_SHARED=1. */
+#ifndef EB_LFO_SHARED
+#define EB_LFO_SHARED 0
+#endif
 #endif
 
 #endif

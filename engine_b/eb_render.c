@@ -30,6 +30,9 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
                             float *vout)
 {
     float noise_v;
+#if EB_LFO_SHARED
+    float sh_lfo_del = 0.0f, sh_lfo_und = 0.0f, sh_lfo_pul = 0.0f;
+#endif
     (void)n;
     int v;
 
@@ -114,9 +117,34 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
                                 gate_sign, c->kbd[v], c->vel[v], pit_in,
                                 &pitch_cv);
 
+#if EB_LFO_SHARED
+        /* THE SHARED LFO (fork lever, gated EXACTLY 0 -- see the flag's note
+         * in eb_fork_config.h). MEASURED FIRST, IMPLEMENTED SECOND: across
+         * all 64 factory patches with STAGGERED note-ons, with LFO TRIG ENV
+         * forced on, and with LFO DELAY TIME doctored to its maximum, the
+         * eight per-voice LFO phases are IDENTICAL -- because the LFO's key
+         * input is the any-key-held flag the plugin itself BROADCASTS to all
+         * voices (the b2_bcast2 finding). So voice 0's tick is every voice's
+         * tick, and this is a removal of redundant computation, not an
+         * approximation. The gate that holds it to that claim is the full
+         * null at EXACTLY 0: any input this reasoning missed fails loudly.
+         * Voices 1..N keep their state untouched; only voice 0's advances. */
+        if (v == 0) {
+            lfo_del = eb_lfo_tick(&st->lfo[0], &c->lfo[0], dly_env,
+                                  c->lfo_ext_gate[0], c->lfo_ext0[0],
+                                  c->lfo_ext1[0], noise_v,
+                                  &lfo_undel, &lfo_pulse);
+            sh_lfo_del = lfo_del; sh_lfo_und = lfo_undel;
+            sh_lfo_pul = lfo_pulse;
+        } else {
+            lfo_del = sh_lfo_del; lfo_undel = sh_lfo_und;
+            lfo_pulse = sh_lfo_pul;
+        }
+#else
         lfo_del = eb_lfo_tick(&st->lfo[v], &c->lfo[v], dly_env,
                               c->lfo_ext_gate[v], c->lfo_ext0[v],
                               c->lfo_ext1[v], noise_v, &lfo_undel, &lfo_pulse);
+#endif
 
         /* the envelope gate, exactly as the port's envelope block builds it:
          * cell 560 (= gate_sign + 1, glide's own state) gated by the LFO pulse
