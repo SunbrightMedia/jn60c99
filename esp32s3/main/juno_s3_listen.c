@@ -217,8 +217,9 @@ void app_main(void)
 
     if (!i2s_start()) { printf("HALT: I2S would not start.\n"); return; }
     printf("chord of %d voice(s), wake mask 0x%02x, "
-           "1.5 s held / 0.7 s released, looping\n\n",
-           S3L_NVOICE[CH], WAKE);
+           "%.2f s held / %.2f s released, looping\n\n",
+           S3L_NVOICE[CH], WAKE,
+           (double)S3L_HOLD_FRAMES / SR, (double)S3L_REL_FRAMES / SR);
 
     for (;;) {
         int64_t t0 = esp_timer_get_time();
@@ -241,8 +242,16 @@ void app_main(void)
             pcm[2 * i]     = (int16_t)(L * 30000.0f);
             pcm[2 * i + 1] = (int16_t)(R * 30000.0f);
 
-            /* one chord, held then released, repeating. `gate` 0 = held. */
-            if (++frame >= (unsigned long)(gate ? SR * 7 / 10 : SR * 3 / 2)) {
+            /* One chord, held then released, repeating. `gate` 0 = held.
+             *
+             * THE TIMES ARE THE BLOB'S, NOT THIS FILE'S. Releasing copies the
+             * OFF snapshot's voice state in (the gate lives in state -- with
+             * coefficients alone the note does not release at all, measured),
+             * so the hold length here MUST equal the one the snapshot was
+             * captured at or the copy is a jump. It was: 1024 frames captured
+             * against 1.5 s held, a 4,716-count step, audible as a pluck at
+             * the end of every note. */
+            if (++frame >= (unsigned long)(gate ? S3L_REL_FRAMES : S3L_HOLD_FRAMES)) {
                 frame = 0;
                 gate = !gate;
                 load_coefs(CH, gate);

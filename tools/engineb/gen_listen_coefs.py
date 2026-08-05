@@ -33,6 +33,28 @@ import truth, null_ab, null_b
 # measures almost nothing. Chord k holds k notes.
 CHORD = [48, 55, 60, 64, 67, 72, 76, 79]
 NOTES = list(range(1, 9))          # chord sizes
+
+# THE HOLD LENGTH IS SHARED WITH THE FIRMWARE, and it has to be.
+#
+# The note-off snapshot's VOICE STATE is copied into the running engine when
+# the firmware releases the chord, because the gate lives in state and not in
+# the coefficients (verified: swapping coefficients alone does not release the
+# note at all -- the level sits at full for the whole release window). So the
+# state being copied in must be the state the engine would ALREADY be in at
+# that instant, or the copy is a jump.
+#
+# It was a jump: the first version captured note-off after 1024 samples while
+# the firmware held for 1.5 s, so releasing teleported the envelope back to
+# 23 ms into the note. MEASURED as a 4,716-count single-sample step and a
+# level that RISES on release -- audible as a pluck at the end of every note,
+# which is exactly what it was reported as.
+#
+# Capturing at the same 1.5 s makes the copy continuous, and it is continuous
+# to the last bit rather than approximately: engine B nulls EXACTLY 0 against
+# the port, so the state the port reaches after 1.5 s IS the state engine B
+# reaches after 1.5 s.
+HOLD_FRAMES = 44100 * 3 // 2
+REL_FRAMES  = 44100 * 7 // 10
 PATCH = int(sys.argv[1]) if len(sys.argv) > 1 else 0
 OUT = os.path.join(REPO, "esp32s3", "main", "s3_listen.bin")
 
@@ -83,7 +105,7 @@ def main():
             lib.juno_gui_note_on(c, CHORD[q], 100)
         lib.juno_gui_render(c, buf, 1)           # one sample: coefs are built
         on = _grab(lib, ncoef, nmcoef, nstate, nmstate, nvoice)
-        lib.juno_gui_render(c, buf, 1024)
+        _render(lib, c, HOLD_FRAMES)
         for q in range(k):
             lib.juno_gui_note_off(c, CHORD[q])
         lib.juno_gui_render(c, buf, 1)
@@ -130,6 +152,13 @@ def main():
                 "#define S3L_RSTATE_SZ %du\n#define S3L_MSTATE_SZ %du\n"
                 "#define S3L_VOICE_SZ %du\n"
                 % (ncoef, nmcoef, nstate, nmstate, nvoice))
+        f.write("/* The hold/release lengths the OFF snapshot was captured\n"
+                " * at. The firmware MUST use these: the release copies a\n"
+                " * voice state in, and a state captured at a different\n"
+                " * instant is a jump -- measured as a 4,716-count step and\n"
+                " * heard as a pluck at the end of every note. */\n"
+                "#define S3L_HOLD_FRAMES %du\n#define S3L_REL_FRAMES %du\n"
+                % (HOLD_FRAMES, REL_FRAMES))
         f.write("/* chord size of each step */\n"
                 "static const int S3L_NVOICE[S3L_NNOTE] = {%s};\n"
                 % ",".join(str(r[0]) for r in rows))
@@ -168,6 +197,16 @@ def main():
     print("masks (measured): %s" % ["0x%02x" % m for m in masks])
     print("wrote %s (%.2f MB) + _meta.h"
           % (OUT, os.path.getsize(OUT) / 1048576.0))
+
+
+def _render(lib, c, n):
+    """Render n frames in chunks (the scratch buffer is 1024 frames)."""
+    buf = (ctypes.c_float * 2048)()
+    left = n
+    while left > 0:
+        k = 1024 if left > 1024 else left
+        lib.juno_gui_render(c, buf, k)
+        left -= k
 
 
 def _grab(lib, *sz):
