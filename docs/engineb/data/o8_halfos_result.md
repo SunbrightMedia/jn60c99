@@ -1,15 +1,19 @@
-# O8 — half-oversampling, DCO path: BUILT, GATED, and it needs a decision
+# O8 — half-oversampling: the DCO rung SHIPS at 1.82x, the VCF rung is CLOSED NEGATIVE
 
 Date 2026-08-05 (Opus 5), executing O8 against `../F5_HALFOS_DESIGN.md`.
 Reversible throughout: `EB_HALF_OS` defaults to 0 and the 4x path is
 untouched, so nothing here changes any build until a flag is set.
 
-**The sentence first: the DCO half-oversampling path works, it costs 3,826
+**The sentence first: the DCO half-oversampling rung works and costs 3,826
 instructions less at 6 voices (2.15x -> 1.82x over the 44.1 kHz two-core
-budget), and it changes the instrument's sound MORE than the relaxation the
-user approved. The extra change is that the fork is 16-17 dB CLEANER than the
-plugin at high pitch, not merely differently-aliased. That is the decision
-this document asks for.**
+budget). It changes the sound MORE than the relaxation F5 described -- the
+fork is 16-17 dB CLEANER than the plugin above ~7 kHz, not merely
+differently-aliased -- and the user accepted that on 2026-08-05. The VCF rung
+was then built and is CLOSED NEGATIVE (§7): it moves the filter's own skirt by
+2.6 to 12.4 dB, which is a different question and was not accepted.**
+
+**Sections 1 and 6 below were written before the VCF rung was built and are
+kept as the record of that moment; §7 and §8 are the result.**
 
 ## 1. What was built
 
@@ -19,7 +23,7 @@ this document asks for.**
 | `eb_dco_step4` at 2 sub-steps | done |
 | `eb_render.c` increment wiring (`inc*2`, `g` UNCHANGED) | done |
 | 24-tap designed 2x FIR (`eb_halfos_fir.h`) + `eb_decim_tick` fork arm | done |
-| VCF path (F5 §3, `G' = 2G/(1-G^2)`) | **NOT started** — see §6 |
+| VCF path (F5 §3) | built, measured, **DECLINED** — see §7 |
 
 ## 2. Gate 1 — response match: PASS
 
