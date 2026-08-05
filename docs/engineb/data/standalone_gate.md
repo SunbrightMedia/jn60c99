@@ -2,6 +2,54 @@
 
 Date 2026-08-04 (Opus 5), executing Fable's F1 ruling.
 
+## UPDATE 2026-08-05 — TASK 1b-3: THE LAST TWO ARMS
+
+DELAY TYPE 4 and the EFFECT LABEL_164 core (EFFECT TYPE 0 and >= 6) are now
+engine B's. **`eb_master_render` no longer refuses any dispatch arm**, and the
+gate below is re-run over **35 scenarios** — the 33 plus two DOCTORED-bank
+scenarios that select those arms. Result unchanged in kind: **EXACTLY 0 at both
+rates**, including the two new arms.
+
+Neither arm is selected by any factory patch, so neither could be gated from
+the bank as shipped. The bank is doctored the way `tools/verify/etmode_ab.py`
+already doctors it — the record's own nibble pair for DELAY TYPE (offset 650)
+or EFFECT TYPE (634) is overwritten, and the instrument's OWN recall path then
+runs with a value a factory patch does not happen to carry. That is a user
+preset the trunk must play, not a synthetic engine state.
+
+### The defect this found, and why only the composite could find it
+
+Every DELAY arm in the port ends with `v56 = 0.0; v58 = -1.0;`. It reads as
+decompiler register scratch. It is not: the EFFECT arms that follow assign
+`v56` on ONE branch only, so on the other branch `v56` carries the delay
+stage's zero forward. **All four delay shims had dropped the pair**, and
+nothing could reach the omission until an EFFECT arm with that branch existed.
+
+MEASURED: `--module delay` alone was EXACTLY 0. `--module arms_1b3` alone was
+EXACTLY 0. A two-member composite of exactly those two failed at **−11.7 dB**,
+first differing sample 4050. **A module's contract is the state it LEAVES as
+well as the value it RETURNS**, and no per-module gate can test that, because
+each module is exact inside the other's port code. `eb_master.c` — the trunk —
+always set both constants; only the hybrid shims lacked them.
+
+Found on the way: three delay shims passed `&v56`, a pointer to a `double`,
+where the module expects `float *` — four float bytes stored into an eight-byte
+object. The compiler had warned on every build and nobody had read it.
+
+### The teeth case, and its own first failure
+
+`delayscratch` plants the omission back into the DELAY-0 arm. Two things about
+it are worth copying:
+
+* **The arm matters.** A generic "first `v56 = 0.0` in the file" anchor lands in
+  the DELAY-1 arm, which no scenario in the battery selects; the case would have
+  measured nothing while looking planted.
+* **The planted error must be DEFINED.** The first version DELETED the
+  statement and measured EXACTLY 0 on all 35 scenarios — an uninitialised
+  local's value is not controlled, and this build's register allocation happened
+  to leave 0.0 there. A teeth case whose planted error is undefined measures the
+  compiler, not the engine. It substitutes a wrong value now.
+
 ## The result
 
 **`null_b.py --module standalone`, all 33 scenarios, EXACTLY 0 against the port,
