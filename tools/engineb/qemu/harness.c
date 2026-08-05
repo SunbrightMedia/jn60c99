@@ -75,7 +75,8 @@
 static void uart_putc(char c)      { putchar(c); }
 static void uart_puts(const char *s){ fputs(s, stdout); }
 static void uart_u64(uint64_t v)   { printf("%llu", (unsigned long long)v); }
-static void uart_hex32(uint32_t v) { printf("0x%08x", v); }
+#include <inttypes.h>
+static void uart_hex32(uint32_t v) { printf("0x%08" PRIx32, v); }
 #ifdef EB_IDF
 static inline uint32_t ccount(void)
 {
@@ -163,9 +164,22 @@ static eb_vca_coef      AC[NV];
 static eb_dco_coef      DC[NV];
 static eb_decim_coef    XC[NV];
 static eb_nsvf_coef     NC[NV];
-static eb_chorus_state  CH;
-static eb_delay_state   DL;
-static eb_reverb_state  RV;
+/* THE THREE BIG FX STATES. On the IDF build they overflow internal DRAM by
+ * 187 KB beside the RTOS, so they carry EXT_RAM_BSS_ATTR and live in PSRAM --
+ * which is where the SHIPPING engine keeps the delay rings anyway, so the
+ * silicon cycle number includes real PSRAM traffic on the FX path rather
+ * than flattering it from SRAM. On QEMU/host builds the attribute is empty
+ * and nothing changes. (Requires CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY,
+ * set in esp32s3/sdkconfig.defaults.) */
+#ifdef EB_IDF
+#include "esp_attr.h"
+#define EBQ_PSRAM EXT_RAM_BSS_ATTR
+#else
+#define EBQ_PSRAM
+#endif
+static EBQ_PSRAM eb_chorus_state  CH;
+static EBQ_PSRAM eb_delay_state   DL;
+static EBQ_PSRAM eb_reverb_state  RV;
 static eb_chorus_coef   CHC;
 static eb_delay_cfg     DLC;
 static eb_reverb_cfg    RVC;
