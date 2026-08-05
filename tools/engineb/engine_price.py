@@ -228,8 +228,19 @@ def module_cost(src, entry, extra=()):
 def main():
     fast = "--fast-pitch" in sys.argv[1:]
     recip = "--recip" in sys.argv[1:]
+    # --fork: the S3 FORK build (docs/engineb/F3_S3_FORK_DESIGN.md). Prices
+    # eb_pitch_fork in place of the pitch module, charges the fork exponential
+    # at the two expf sites, and scales the PER-VOICE modules to the fork's
+    # voice count. Engine-wide modules and the dispatch arms do NOT scale --
+    # a delay line does not get cheaper because there are fewer voices, and
+    # pretending it does is exactly the flattering error this tool has made
+    # five times already.
+    fork = "--fork" in sys.argv[1:]
+    fvoices = 6
     print("=== ENGINE B, WHOLE PER-SAMPLE DSP CHAIN, STATIC Xtensa "
           "instructions ===")
+    if fork:
+        print("build: THE S3 FORK -- %d voices, fork pitch, fork exp\n" % fvoices)
     print("build: pitch=%s  dco=%s\n"
           % ("EB_PITCH_FAST=1 (v7)" if fast else "double (default)",
              "EB_DCO_RECIP=1" if recip else "division (default)"))
@@ -240,12 +251,32 @@ def main():
         extra = []
         if src == "eb_pitch.c" and fast:
             extra.append("-DEB_PITCH_FAST=1")
+        if fork and src == "eb_pitch.c":
+            src, sym, note = ("eb_pitch_fork.c", "eb_pitch_fork_eval",
+                              "pitch, FORK (recentered float)")
+            extra = ["-DEB_FORK_S3"]
         cost = module_cost(src, sym, extra)
+        if fork and calls == 8:
+            calls = fvoices            # per-voice modules only
+        if fork and calls == 16:
+            calls = 2 * fvoices        # the two envelopes per voice
         total += cost * calls
         print("  %-18s %7d %6d %10d   %s" % (src[3:-2], cost, calls,
                                              cost * calls, note))
+    if fork:
+        # The fork exponential at the two expf sites, once per voice each.
+        # The saving is (expf body) - (fork body), charged as a NEGATIVE line
+        # so the table shows what was traded rather than hiding it in a total.
+        ef = module_cost("eb_exp_fork.c", "eb_exp_fork", ["-DEB_FORK_S3"])
+        delta = (HELPERS.get("expf", 184) - ef) * 2 * fvoices
+        total -= delta
+        print("  %-18s %7d %6d %10d   %s"
+              % ("exp fork", ef, 2 * fvoices, -delta,
+                 "replaces expf at the LFO and VCF-res sites"))
     # THE DCO: real-mix figure from dco_price.py, not a static body count.
     dco = 10202 if recip else 11610
+    if fork:
+        dco = int(round(dco * fvoices / 8.0))   # per-voice
     total += dco
     print("  %-18s %7s %6s %10d   %s"
           % ("dco", "--", "32", dco,

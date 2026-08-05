@@ -10,11 +10,14 @@
  * inside it.
  */
 #include "eb_fork_config.h"
+
+#ifndef EB_EXPF
 #if EB_EXP_FORK
 #include "eb_exp_fork.h"
 #define EB_EXPF eb_exp_fork
 #else
 #define EB_EXPF expf
+#endif
 #endif
 
 

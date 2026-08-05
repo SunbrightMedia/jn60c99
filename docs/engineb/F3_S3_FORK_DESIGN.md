@@ -6,7 +6,7 @@ runnable; nothing is judged by ear.
 ## The sentence that goes first
 
 **With both fork evaluators adopted and 6 voices at 48 kHz, the fork prices at
-≈27,300 instructions per sample against the 6,300–9,500 two-core budget:
+28,626 instructions per sample (MEASURED in O6; the estimate here was 27,300) against the 6,300–9,500 two-core budget:
 still 2.9×–4.3× OVER on instruction count.** The reserve dials (44.1 kHz,
 half-oversampling) reach ≈21,700 ≈ 2.1×–3.2× over. F3 delivers the two
 largest levers that exist and the fork still does not fit by arithmetic
@@ -115,6 +115,64 @@ master chain and worst arms included).
 Against 6,300–9,500: **2.9×–4.3× over as specified; 2.1×–3.2× with every
 reserve pulled.** Instructions are not cycles; silicon (F4) decides, and the
 remaining structural options are listed in the first paragraph.
+
+## 6. O6 EXECUTION RESULTS (2026-08-05, Opus 5) — what running it changed
+
+**The measured fork price is 28,626 instr/sample, not the 25,850 §4 modelled
+— 3.0x-4.5x over.** Two corrections, both against the estimate:
+
+**C4 FEED-FORWARD IS ALSO DEAD.** §3 kept feed-forward spans alive on the
+reasoning that a FIR does not recycle its quantization error. True, and
+irrelevant: measured on the decimator's own 32-tap folded structure
+(`scratchpad probe, same shape as eb_vcf_ladder.c`), Q15 gives **−49.6 dB
+global / −33.7 dB worst block** and even Q20 gives −79.7/−63.8, both failing
+the −100/−80 audio gate. Only Q24 passes (−103.7/−87.9), and Q24 has no SIMD
+carrier on this chip. **C4 is CLOSED NEGATIVE ENTIRELY — recursive and
+feed-forward alike.** The −1,500 credit §4 took for it is withdrawn. The
+lesson: "no feedback" answers the ACCUMULATION question, not the RESOLUTION
+question, and 15 fractional bits is short of a −100 dB standard before any
+processing happens.
+
+**The exponential saves more than estimated** (two sites, not one: the LFO
+and the VCF-resonance shaper), which partly offsets the above.
+
+### The gates, and what each is worth
+
+| gate | result | what it proves |
+|---|---|---|
+| `pitch_cents_gate.py` (2^32, exhaustive) | worst **0.00074 cents** vs 0.05 | the pitch substitution, everywhere |
+| `exp_ppm_gate.py` (2^32, exhaustive) | worst **0.119 ppm** vs 2 | the exponential, everywhere |
+| `lfo_rate_gate.py` (16 bank coefficient sets) | worst **1.108 ppm** vs 2 | the INTEGRATED rate |
+| `--module standalone`, `JUNO_EB_FORK=flagonly` | **EXACTLY 0** | the flag surface changes nothing |
+| `JUNO_EB_FORK=exp` | EXACTLY 0 | **almost nothing — see below** |
+| `JUNO_EB_FORK=pitch` / `both` | −46.4 dB, 17/36 | the expected cents-scale detune |
+
+**THE LFO-RATE GATE EARNED ITS EXISTENCE.** expf's own error is 0.119 ppm,
+but the cancelling expression between it and the phase accumulator
+(`v83 = (v76 - v74*v77) + v77`) **amplifies it 9x to 1.108 ppm**. Inside the
+bound, but at 1.8x margin rather than 17x. Quoting the exponential's own
+figure for the integrated quantity would have overstated the case by an order
+of magnitude — the pitch polynomial's 2^37 lesson, at small scale.
+
+**AND THE `exp` AUDIO NULL IS NEARLY VACUOUS, WHICH ONLY A PROBE COULD SHOW.**
+It reports EXACTLY 0. A tap on both call sites over six real scenarios
+measured **2,016,000 calls each and ZERO differences — because the engine
+presents only FOUR distinct arguments at the LFO site and EIGHT at the
+VCF-res site.** The arguments are recall coefficients, not signal. So that
+EXACTLY 0 means "these dozen values agree bitwise", not "the substitution is
+safe"; the correctness claim rests on the exhaustive ppm gate and the rate
+gate, and it would have been an over-claim to report the null as the proof.
+(The probe itself first reported n=0 at both sites — its `EB_EXPF` macro was
+redefined by the fork block that follows it. A probe that measures nothing
+looks exactly like a site that is never called.)
+
+**THE GLOBAL-LFO HARDWARE FACT IS NOW MEASURED, AND IT HOLDS.** Across all 64
+factory patches with STAGGERED note-ons the LFO phase cell is identical in
+all eight voices; forcing LFO TRIG ENV on (record byte 554, the
+doctored-preset technique) leaves it identical in all 64. The per-voice LFOs
+are redundant computation for every configuration reachable from a preset.
+That satisfies F3's condition (a); condition (b), silicon need, is F4's.
+Worth ~4,100 instr/sample and now the largest single lever left.
 
 ## 5. What O6 adopts, in order
 

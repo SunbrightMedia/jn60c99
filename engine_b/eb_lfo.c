@@ -22,11 +22,19 @@
  * expression amplifies it; that is measured there, not assumed here.
  */
 #include "eb_fork_config.h"
+
+/* #ifndef so a diagnostic build can define EB_EXPF first and tap this site.
+ * That tap produced the finding recorded in F3_S3_FORK_DESIGN: the engine
+ * presents only FOUR distinct arguments here across 2,016,000 calls, so the
+ * audio null's EXACTLY 0 for the exp substitution is nearly vacuous and the
+ * correctness claim rests on the exhaustive ppm gate, not on it. */
+#ifndef EB_EXPF
 #if EB_EXP_FORK
 #include "eb_exp_fork.h"
 #define EB_EXPF eb_exp_fork
 #else
 #define EB_EXPF expf
+#endif
 #endif
 
 
