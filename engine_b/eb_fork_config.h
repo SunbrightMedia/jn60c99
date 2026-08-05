@@ -73,6 +73,21 @@
 #ifndef EB_HALF_OS
 #define EB_HALF_OS 0
 #endif
+/* EB_HALF_OS_VCF -- half-oversampling of the VCF LADDER. SEPARATE from
+ * EB_HALF_OS and DEFAULTED OFF EVEN WHEN EB_HALF_OS IS ON, because O8
+ * measured it and it does not hold: the cutoff transform is exact and the
+ * decimator is the same designed filter, yet the ladder's response above the
+ * cutoff diverges by -0.9 dB at 6 kHz, -2.6 dB at 9 kHz and -12.4 dB at
+ * 16 kHz. That is not aliasing at -43 dB, it is the filter's own skirt --
+ * i.e. audible brightness, per patch. A bilinear filter run at half the rate
+ * cannot have the same shape near Nyquist; the transform fixes the cutoff and
+ * nothing fixes the shape. See docs/engineb/data/o8_halfos_result.md §7.
+ * The code stays in the tree so the negative result is reproducible in one
+ * command instead of re-derived. */
+#ifndef EB_HALF_OS_VCF
+#define EB_HALF_OS_VCF 0
+#endif
+
 #if EB_HALF_OS
 #define EB_DCO_SUBSTEPS 2
 #else

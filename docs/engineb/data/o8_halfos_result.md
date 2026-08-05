@@ -162,3 +162,72 @@ If that is acceptable, O8 finishes the VCF rung and the fork lands at roughly
 1.55x. If it is not, `EB_HALF_OS` stays 0, everything above remains in the
 tree as a measured negative result, and the fit ladder keeps only the levers
 that preserve the instrument exactly.
+
+## 7. The VCF rung — BUILT, MEASURED, CLOSED NEGATIVE
+
+The user accepted the alias relaxation, so the VCF rung was built. It does not
+hold, and the reason is not the relaxation that was accepted.
+
+**Two things had to be corrected first, and both were caught by the gate
+rather than by reading.**
+
+1. **F5 §3's parameterisation is wrong.** It states `G = tan(pi f / fs)` and
+   derives `G' = 2G/(1-G^2)`. Matching the port's own one-pole,
+   `H(z) = G(1+z^-1)/(1 - (1-2G)z^-1)`, against the bilinear lowpass shows
+   `G = g/(1+g)` with `g = tan(pi f/fs)` — G is the bilinear GAIN, not the
+   prewarped tangent. The correct map goes through g and back:
+   `g4 = G/(1-G)`, `g2 = 2g4/(1-g4^2)`, `G' = g2/(1+g2)`. F5's form measured
+   up to **29 dB** of error; the corrected form fixes the cutoff exactly.
+2. **The sub-step weights are READ, not designed.** Dumped from a recalled
+   engine: c9216=0.75, c9232=0.25, c9248=0.5, c9200=1.0 — exactly linear
+   interpolation at 1/4, 1/2, 3/4, 1. The two half-rate instants are 1/2 and
+   1, which are the port's OWN second and fourth inputs, used verbatim.
+
+**With both corrections the rung still fails, structurally.** Measured on the
+shipping ladder at G=0.1 (cutoff 5,596 Hz), k=2.0:
+
+| band | 4x response rel. peak | 2x error |
+|---|---|---|
+| 20-200 Hz | −7.3 dB | +0.01 dB |
+| 200-1000 Hz | −6.7 | −0.03 |
+| 1-4 kHz | −2.6 | −0.50 |
+| 4-6 kHz | 0.0 | −0.88 |
+| 6-9 kHz | −3.2 | **−2.56** |
+| 9-13 kHz | −17.8 | **−6.28** |
+| 13-16 kHz | −29.8 | **−12.36** |
+
+DC gain matches to 0.05 %, so this is not a level error, and gate 1 already
+proved the decimator matches to 0.078 dB, so it is not the filter design.
+**It is the ladder itself**: a bilinear filter run at half the rate cannot
+have the same shape near its own Nyquist. The transform fixes the CUTOFF and
+nothing fixes the SHAPE. At 16 kHz the 2x filter sits at 0.63 of its Nyquist
+where the 4x filter sits at 0.32.
+
+**Why that is a different decision from the one the user made.** The DCO rung
+changes alias content at −43 to −51 dB. This changes the FILTER'S OWN SKIRT by
+2.6 to 12.4 dB in the audible band, per patch — i.e. brightness, on every
+patch whose cutoff is below about 8 kHz, which is most of them. Accepting the
+alias relaxation does not imply accepting this, and treating it as covered
+would be exactly the "gate loosened until it passed" failure this document
+already records twice.
+
+`EB_HALF_OS_VCF` is therefore a SEPARATE flag, defaulted 0 **even when
+EB_HALF_OS is 1**. The code stays in the tree so the negative result is one
+command away instead of a paragraph.
+
+MEASURED cost of what was declined: 762 -> 476 executed Xtensa instructions
+per voice per sample, i.e. **1,716 at 6 voices** — not F5's modelled 3,150.
+
+## 8. Where O8 ends
+
+| build | instr/sample | cycles (x0.95) | vs ~10,900 |
+|---|---|---|---|
+| fork + shared LFO | 24,686 | ~23,450 | 2.15x |
+| **+ half-OS DCO (shipping O8)** | **20,860** | **~19,817** | **1.82x** |
+| + half-OS VCF (DECLINED) | 19,144 | ~18,187 | 1.67x |
+
+**Fifth modelled lever killed by measurement** (C1 integration, C4 resolution,
+C5 registers, C2 stochastic content, now the VCF half-OS rung's response
+shape). O8 delivers 2.15x -> 1.82x and no more. O9 (tabulation, ~-2,900) and
+O10 (DCO structural, ~8,700 available) are what remain between here and 1.0x
+at 6 voices; 4 voices with the DCO rung is roughly 1.2x.

@@ -196,6 +196,12 @@ if os.environ.get("JUNO_EB_VCF_RES_CR"):
     CFLAGS = CFLAGS + ["-DEB_VCF_RES_CR=%d"
                        % int(os.environ["JUNO_EB_VCF_RES_CR"])]
 
+# JUNO_EB_VCF_GRANGE=1: write-only instrumentation that reports the RANGE of
+# the VCF's G over the whole scenario set, so the half-OS cutoff guard's fire
+# rate is measured rather than assumed. It changes no arithmetic.
+if os.environ.get("JUNO_EB_VCF_GRANGE"):
+    CFLAGS = CFLAGS + ["-DEB_VCF_GRANGE=1"]
+
 # JUNO_EB_HALF_OS=1: half-oversample the DCO path (F5 design, O8 build). The
 # residual is NOT expected to be EXACTLY 0 and NOT expected to clear -100 dB:
 # the fork standard for this lever is a BAND-LIMITED null at -80/-60 through

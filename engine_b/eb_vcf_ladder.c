@@ -13,6 +13,47 @@
  * division is a soft-float call, and it is measured rather than avoided.
  */
 #include "eb_vcf_ladder.h"
+#include "eb_fork_config.h"
+#if EB_HALF_OS_VCF
+#include "eb_halfos_fir.h"
+#ifndef EB_VCF_CLAMP_COUNT
+#define EB_VCF_CLAMP_COUNT 0
+#endif
+#if EB_VCF_CLAMP_COUNT
+unsigned long eb_vcf_clamp_hits = 0;
+#endif
+#endif
+
+/* EB_VCF_GRANGE -- write-only instrumentation for the half-OS guard. G's
+ * range decides whether the G' = 2G/(1-G^2) clamp is a real limitation or a
+ * line that never executes, and this project's rule is that a branch rate is
+ * MEASURED over the real scenario set rather than reasoned about. Off in
+ * every shipping build; the counters are never read by the DSP. */
+#ifndef EB_VCF_GRANGE
+#define EB_VCF_GRANGE 0
+#endif
+#if EB_VCF_GRANGE
+#include <stdio.h>
+static float eb_g_lo = 1e30f, eb_g_hi = -1e30f;
+static unsigned long eb_g_n = 0, eb_g_over = 0;
+static void eb_g_report(void) __attribute__((destructor));
+static void eb_g_report(void)
+{
+    /* A FILE, not stderr: the null harness runs its scenarios in worker
+     * subprocesses whose stderr is captured and discarded, so the first
+     * version of this reported nothing at all and looked like "G never moved"
+     * -- a measurement that silently measures nothing is the trap this
+     * project keeps a catalogue of. */
+    FILE *f;
+    if (!eb_g_n) return;
+    f = fopen("/tmp/eb_grange.log", "a");
+    if (!f) return;
+    fprintf(f, "calls=%lu G in [%.6f, %.6f] over-0.41421=%lu (%.4f%%)\n",
+            eb_g_n, (double)eb_g_lo, (double)eb_g_hi, eb_g_over,
+            100.0 * eb_g_over / eb_g_n);
+    fclose(f);
+}
+#endif
 
 /* ------------------------------------------------------------- wrap24
  * Verbatim from src/juno_dsp.c:20-45 (0x180368D60). Copied rather than called
@@ -125,13 +166,106 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
     prev  = st->drive_prev;
     st->drive_prev = drive;
 
+#if EB_VCF_GRANGE
+    ++eb_g_n;
+    if (G < eb_g_lo) eb_g_lo = G;
+    if (G > eb_g_hi) eb_g_hi = G;
+    if (G > 0.41421354f) ++eb_g_over;
+#endif
     A  = 1.0f - (G + G);                                        /* :1344 */
     R  = 1.0f / ((((G * G) * (G * G)) * k) + 1.0f);             /* :1345 */
     Rk = R * k;                                                 /* :1349 */
 
-    /* ------------------------------------- four sub-steps, 4x oversampled
-     * The input interpolation weights are the port's own cells, applied in the
-     * port's own order (:1350-1352, :1386, :1421, :1456).                    */
+#if EB_HALF_OS_VCF
+    /* ================================================ HALF-OVERSAMPLED PATH
+     * TWO sub-steps at 88.2 kHz instead of four at 176.4 kHz.
+     *
+     * THE CUTOFF TRANSFORM IS EXACT ALGEBRA AND NEEDS NO FREQUENCY --
+     * BUT NOT THE ALGEBRA F5 WROTE. F5 §3 says G = tan(pi f / fs) and hence
+     * G' = 2G/(1-G^2). That is wrong about this filter, and the gate caught
+     * it: up to 29 dB of error at high cutoff and high resonance.
+     *
+     * Read the one-pole above instead of assuming its parameterisation:
+     *
+     *     H(z) = G (1 + z^-1) / (1 - A z^-1),   A = 1 - 2G
+     *
+     * Matching that against the bilinear lowpass gives pole (1-g)/(1+g) and
+     * gain g/(1+g) with g = tan(pi f / fs). Both identities hold at once
+     * only if
+     *
+     *     G = g / (1 + g),   i.e.   g = G / (1 - G)
+     *
+     * -- G is the bilinear gain, NOT the prewarped tangent. So the correct
+     * half-rate map goes through g and back:
+     *
+     *     g4 = G / (1 - G)                      (recover the tangent)
+     *     g2 = tan(2 atan g4) = 2 g4/(1 - g4^2) (same cutoff, half the rate)
+     *     G' = g2 / (1 + g2)                    (back to the port's variable)
+     *
+     * Still exact, still needs no frequency, and it is what the response
+     * gate passes on.
+     *
+     * THE GUARD IS REAL, not defensive decoration: g2 runs to infinity as
+     * g4 -> 1 (f -> fs4/4 = 44.1 kHz). MEASURED over the whole gated battery
+     * (17,199,360 calls, JUNO_EB_VCF_GRANGE=1), G lands in
+     * [0.000119, 0.209771], so g4 <= 0.2655 and the clamp NEVER FIRES on any
+     * factory patch. It is kept because "no factory patch reaches it" has
+     * been an excuse in this project before, and because an unstable filter
+     * is a worse failure than a wrong cutoff.
+     *
+     * THE INPUT WEIGHTS ARE READ, NOT DESIGNED. Dumped from a recalled engine
+     * the port's four cells are c9216=0.75, c9232=0.25, c9248=0.5, c9200=1.0
+     * -- exactly linear interpolation of the drive ramp at 1/4, 1/2, 3/4, 1.
+     * The two half-rate sub-instants are therefore 1/2 and 1, which are the
+     * port's OWN second and fourth inputs, used verbatim. */
+    {
+        float g4, g2, Gp, Ap, Rp, Rkp;
+        g4 = G / (1.0f - G);
+        if (g4 > 0.41421354f) {
+            g4 = 0.41421354f;
+#if EB_VCF_CLAMP_COUNT
+            ++eb_vcf_clamp_hits;
+#endif
+        }
+        g2  = (g4 + g4) / (1.0f - (g4 * g4));
+        Gp  = g2 / (1.0f + g2);
+        Ap  = 1.0f - (Gp + Gp);
+        Rp  = 1.0f / ((((Gp * Gp) * (Gp * Gp)) * k) + 1.0f);
+        Rkp = Rp * k;
+
+        hi = (hi + 1) & 31;
+        h[hi] = eb_vcf_substep(st, c, ((prev + drive) * c->c9248) * Rp,
+                               Gp, Ap, Rkp);
+        hi = (hi + 1) & 31;
+        h[hi] = eb_vcf_substep(st, c, (drive * c->c9200) * Rp,
+                               Gp, Ap, Rkp);
+        st->hi = hi;
+        (void)A; (void)R; (void)Rk;
+    }
+
+    /* THE 2x DECIMATOR. The same designed 24-tap FIR the DCO path uses, and
+     * that is not a convenience: dumped from a recalled engine, the VCF's
+     * sixteen cells (9504 - 16i) and the DCO decimator's (5696 + 16i) hold
+     * the SAME MULTISET of values -- one filter, written in two orders. So
+     * gate 1's 0.0783 dB response match covers this decimator as well, and
+     * a second design would have been a second chance to be wrong.
+     *
+     * Folded and unrolled for the same measured reason as eb_decim.c: the
+     * rolled form was more expensive than the 4x code it replaces. */
+    {
+        int base = hi + 32;
+        float a0, b0;
+        acc = 0.0f;
+#if defined(__GNUC__)
+#pragma GCC unroll 12
+#endif
+        for (j = 0; j < EB_HALFOS_FIR_TAPS / 2; ++j) {
+            a0 = h[(base - j) & 31];
+            b0 = h[(base - (EB_HALFOS_FIR_TAPS - 1) + j) & 31];
+            acc += (a0 + b0) * eb_halfos_fir[j];
+        }
+    }
+#else
     hi = (hi + 1) & 31;
     h[hi] = eb_vcf_substep(st, c, ((prev * c->c9216) + (drive * c->c9232)) * R,
                            G, A, Rk);
@@ -156,6 +290,7 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
     acc = (h[(hi - 15) & 31] + h[(hi - 16) & 31]) * c->fir[0];
     for (j = 1; j < 16; ++j)
         acc += (h[(hi - (15 - j)) & 31] + h[(hi - (16 + j)) & 31]) * c->fir[j];
+#endif  /* EB_HALF_OS_VCF */
 
     return acc * c->c9152;                                      /* :1513 */
 }
