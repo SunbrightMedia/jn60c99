@@ -98,7 +98,9 @@ the full gate set after each boundary removed. Measure the saving with
 EXACTLY 0, back it out — fusion is cost work, not correctness work, and the
 trunk does not trade correctness for cost.
 
-## TASK 3 — the method playbook (the user's portability requirement)
+## TASK 3 — the method playbook — DONE (`docs/engineb/METHOD_PLAYBOOK.md`,
+11 sections, 27-entry harness-defect catalogue; SSX_FRAMEWORK.md marked
+superseded-by-practice)
 
 The user requires engine B's MAKING to be portable to other project-ssx
 synths. Today it is scattered: SSX_FRAMEWORK.md is a design that predates the
@@ -121,7 +123,14 @@ what was DONE, not what was planned:
    verification, one line each, as a pre-flight checklist.
 Mark SSX_FRAMEWORK.md's header as superseded-by-practice with a pointer.
 
-## TASK 4 — certification sweep and record
+## TASK 4 — certification sweep — DONE 2026-08-05, ALL GREEN. Nulls
+EXACTLY 0 (chorus/standalone/composite x both rates, 36 scenarios, every
+dispatch arm); plugin_check --module standalone 11/11 vs the PLUGIN at both
+rates; --teeth @48k PASS 70 cases 0 defects; alloc_ab 270/270 + teeth 4/4;
+patch_roundtrip 64/64; make verify GREEN all 21 rows PROVEN; engine_price
+refreshed (71,535 / 56,967 with the master chain + worst arms in).
+Certified by Fable 5 (F2). Record: CLAUDE.md top block +
+docs/engineb/data/standalone_gate.md.
 
 Full `null_b --teeth` at 48 kHz; composite both rates; plugin_check both
 rates; `alloc_ab.py` + `--teeth`; the port-side `make verify` untouched and

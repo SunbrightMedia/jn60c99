@@ -6,9 +6,11 @@
 sequencing): `docs/engineb/PHASE1_ORDERS.md`.** The user has decided the
 strategy: **the TRUNK is the full EXACT engine B — the splitting point for
 every microcontroller (and future project-ssx synths); targets are FORKS by
-build flags.** Phase 1 (Opus): step 2 (coef constructor + the standalone
-engine gate), C5 fusion (EXACT only), the METHOD PLAYBOOK (user requires the
-making to be portable), certification sweep. NO approximations in the trunk —
+build flags.** **Phase 1 is COMPLETE and CERTIFIED (2026-08-05, block below).** Phase 1 was:
+step 2 (coef constructor + the standalone engine gate) DONE; C5 fusion CLOSED
+NEGATIVE by measurement (`data/c5_fusion.md`); the METHOD PLAYBOOK written
+(`METHOD_PLAYBOOK.md`, 27-entry defect catalogue); certification sweep GREEN.
+**The head pointer is now Phase 2 (Fable, S3 fork).** NO approximations in the trunk —
 C2 moved OUT of trunk work (it is a −100 dB candidate, my earlier phase
 assignment was wrong). Phase 2 (Fable, S3 fork): recentered pitch with a
 0.05-CENT exhaustive gate (the plugin's own numerical noise bound, ~1000×
@@ -20,6 +22,74 @@ the hardware fact is verified AND silicon still needs it; reserve dials:
 verdict that forced this: full-standard 8-voice S3 is IMPOSSIBLE (pitch alone
 = 2–3 budgets, irreducibility proven twice); the reporting lesson — when the
 numbers say a goal is probably unreachable, that sentence goes FIRST.**
+
+**★★★★★★★★★★★★★★★★ NEWEST (2026-08-05, Opus 5; CERTIFIED by Fable 5 same night — F2 CLOSED, evidence re-examined not re-told: eb_dsp diffed verbatim against the port by hand, no port symbol in any engine B object, 6/6 null verdicts read from the logs, teeth log read 70/0. Reviewer defect recorded: I passed a fix after testing only that its checker catches the OLD bug; the NEW default was wrong by one dirname and cost a verify cycle) — PHASE 1 COMPLETE: THE TRUNK
+IS THE WHOLE INSTRUMENT, EVERY ARM, AND IT BUILDS WITHOUT THE PORT. Read
+`docs/engineb/data/standalone_gate.md` and `docs/engineb/data/c5_fusion.md`.**
+- **EVERY DISPATCH ARM IS ENGINE B'S AND EVERY ONE IS GATED.** 1b-3 transcribed
+  DELAY TYPE 4 and the EFFECT LABEL_164 core (types 0 and >= 6); a third
+  doctored scenario closed EFFECT TYPE 4 (FLANGER), which `eb_chorus` has
+  always handled and no gate had ever executed. `eb_master_render` refuses
+  nothing. **36 scenarios; `--module chorus`, `--module standalone` and the
+  composite are EXACTLY 0 at BOTH 44,100 and 48,000 Hz.**
+- **THE PORTABILITY DEBT IS PAID.** Four modules called `juno_pitch_poly`,
+  `juno_triangle`, `juno_wrap_unit`, `juno_wrap_hi` out of `src/juno_dsp.c`, so
+  the TRUNK could not be built for a target at all. `engine_b/eb_dsp.c` now
+  holds verbatim copies; `tests/test_eb_dsp` holds them to the port's own
+  (520,043 comparisons, BIT-IDENTICAL, three planted mutations caught, two
+  measured INERT — the triangle's branch boundaries are continuous).
+  **VERIFIED: engine B links with NO `src/` object.** `tests/test_standalone_link`
+  keeps it that way by linking only `engine_b/eb_*.c`.
+  **★ NO NULL GATE COULD EVER HAVE SEEN THIS** — every null build links the
+  whole port by construction. It was found by linking engine B by hand, once.
+- **★ C5 (call fusion) IS CLOSED NEGATIVE, and the model was the problem.** The
+  prize is **~640 instr/sample (0.9 %), not ~2,000**: on a register-window
+  machine `entry` rotates the window instead of spilling it, so a call is nearly
+  free. And the mechanism costs more than the prize — one TU removes **2 of 118**
+  call sites and grows code 1.3 %; forced inlining is **2.6x worse** on
+  instructions, float loads and stores, with call sites RISING 116 -> 247.
+  Same wall as `pitch_hoist_result.md`: sixteen float registers. Nothing adopted.
+- **★ THE FIFTH PRICING ERROR, same flattering direction as the other four:
+  `engine_price.py` had NO MASTER CHAIN in it.** `master_in`/`master_out` run
+  every sample on every patch and were absent, as were all nine dispatch arms.
+  **Default 71,535, S3 shipping 56,967** (was 69,735 / 55,167). Arms are priced
+  in their own table because exactly one of each group runs — charging all five
+  delays would bill a patch for four it does not have.
+- **★ THE DEFECT ONLY A COMPOSITE COULD FIND.** Every DELAY arm ends with
+  `v56 = 0.0; v58 = -1.0;`, which reads as decompiler register scratch. It is
+  not: the EFFECT arms assign those on ONE branch only. All four delay shims had
+  dropped the pair. `--module delay` alone EXACTLY 0; `--module arms_1b3` alone
+  EXACTLY 0; **the two TOGETHER failed at -11.7 dB**, first differing sample
+  4050. **A module's contract is the state it LEAVES as well as the value it
+  RETURNS**, and no per-module gate can test that.
+- **★ THE TEETH CASE FOR IT TOOK THREE REVISIONS, EACH A LESSON.** (1) It
+  planted into DELAY-1's arm, which no scenario selects. (2) It DELETED the
+  statement and measured EXACTLY 0 — an uninitialised local's value is not
+  controlled, so the case measured the compiler. (3) MEASURED, perturbing each
+  alone: **`v56 = 0.25` EXACTLY 0 (INERT), `v58 = -0.5` -27.8 dB (CAUGHT)**,
+  both dropped -16.5 dB. The shims restore both; **the proof covers one**, and
+  saying "the pair is gated" would be an over-claim.
+- **★ TWO GATES WERE MEASURING SOMETHING ELSE.** `plugin_check` with no
+  `--module` builds `src/` and certifies THE PORT — its own log said so while
+  the headline read "11/11 agree with the PLUGIN". And `arm_coverage.py`
+  rendered the DOCTORED scenarios against the PRISTINE bank, so it called two
+  arms NOT REACHABLE while the null gate was covering them.
+- **★ `tests/test_freerun` HAD NOT LINKED SINCE STEP 1** (the real allocator
+  needs `eb_alloc.c`; the rule was never updated) and nobody saw it, because
+  `engine_b/tests` is not in the top-level `make test`. **A unit test that does
+  not build is not a failing test, it is an absent one.**
+- **CERTIFICATION, all on ONE frozen tree:** nulls EXACTLY 0 as above ·
+  `plugin_check --module standalone` **11/11 BIT-EXACT vs the PLUGIN at BOTH rates** · full `--teeth` at 48 kHz
+  **PASS, 70 cases, zero gate defects and zero stale anchors** (`out:standalone` 3.16e-5 FAIL -90.0 dB 36/36 / 3.16e-6 PASS -109.8 dB; `out:chorus` FAIL 25 scenarios -- 24 before the EFFECT-4 scenario existed; `seedpoison` FAIL 24/36; `voicereseed` 35/36; `voiceidleskip` 36/36; `delayscratch` FAIL -28.3 dB in exactly ONE scenario, the doctored EFFECT-0 one, which is the only arm that reaches the branch) · `alloc_ab.py` 270/270 over all nine assign configurations,
+  teeth 4/4 CAUGHT · `patch_roundtrip.py` 64/64 BIT-EXACT · `make test` green ·
+  the `engine_b` unit suite green · `coef_audit` PASS (266 cells, both
+  accessors) · `merge_shims --check` up to date · port-side `make verify`
+  **GREEN, EXIT=0, all 21 ledger rows PROVEN** (it took three runs: run 1 died on gates whose scratch DEFAULT was a dead session directory, run 2 died on the FIX being wrong by one dirname -- `tools/verify/pathcheck.py` now fails the build on any gate that defaults outside the repo, teeth-proven both ways).
+- **OPEN, and none of it is a Phase-1 item:** the allocator's RETRIG/PORTA_GATE
+  events (they belong to `eb_patch`); engine B's own recall (coefficients still
+  come from the PORT's recalled cells through `eb_render_coefs_build` /
+  `eb_master_coefs_build`, which is HARNESS PLUMBING and says so); the at-rest
+  voice shortcut, still unexercised.
 
 **★★★★★★★★★★★★★★★ NEWEST (2026-08-04, Opus 5) — 1b-1 AND 1b-2 DONE: ENGINE B
 RENDERS THE WHOLE INSTRUMENT. Read `docs/engineb/data/standalone_gate.md`.**
