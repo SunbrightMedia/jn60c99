@@ -234,6 +234,42 @@ sink accumulates ~30-unit values into a ~3e6 float, whose ULP is 0.25, five
 orders above the fork's cents-scale differences. It is evidence the sink
 cannot detect them, noted so nobody quotes it as a null.
 
+## 9. F4 FIRST SILICON (2026-08-05, the user's own ESP32-S3): c/i = 0.95
+
+The board: ESP32-S3 QFN56 rev v0.2, 240 MHz, embedded 8 MB octal PSRAM
+(AP_3v3), flashed from `esp32s3/flash/juno_s3_octal_psram.bin`, output read
+over UART. The identical program that QEMU executed.
+
+    sample_total: 477,612,660 / 12,500 = 38,209 CYCLES/sample
+    QEMU, same program:                  40,275 instructions/sample
+    c/i = 0.95
+
+**THE DAISY PATTERN DID NOT REPEAT.** The M7 arc measured 2.2x worse than its
+worst model; the S3 executes this engine slightly BETTER than one instruction
+per cycle (the LX7 dual-issues some pairs). Every instruction count in this
+project is now, within 5 %, a cycle count for this chip.
+
+Three certification-grade facts from the same run:
+1. `FORK EVALUATOR VECTORS: BIT-EXACT` -- the fork arithmetic on silicon
+   matches the host exactly, over every branch including the NaN and the
+   overflow tail.
+2. **Every region SINK is bit-identical to the QEMU and host runs** (fourteen
+   accumulators over 1.2 M module calls). The S3's FPU produced the same
+   floats, bit for bit, across the whole workload. The bit-exact trunk claim
+   survives real hardware.
+3. The FX states ran FROM PSRAM (EXT_RAM_BSS) with the memory test passing --
+   the 2,620 cycles/sample of FX include real PSRAM traffic. Per-module spot
+   checks: dco 11,417 cycles/sample on silicon vs 11,610 static; the static
+   model and the silicon agree to 2 % where both exist.
+
+WHAT IT MEANS. The full fork (6 voices, shared LFO) prices 24,686
+instructions = ~23,400 cycles against the ~10,000 two-core budget: **2.3x
+over, with instructions now equal to cycles.** The ladder down, every rung
+either gated or gateable: half-oversampling ~19,300 (1.9x); + C2
+control-rate CV ~14,100 (1.4x); + 44.1 kHz or 4 voices ~9,000-12,000 --
+AT or NEAR FIT. The S3 is alive, and what remains is engineering with
+measured rungs, not hope. C2 is the next letter-sized task.
+
 ## 5. What O6 adopts, in order
 
 1. `EB_FORK_S3` build wiring: eb_fork_config.h constants into the render

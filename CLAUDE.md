@@ -41,8 +41,16 @@ fact showing through the plugin's own any-key-held broadcast. Preconditions
 were forced first: LFO TRIG ENV on AND LFO DELAY TIME at max, 0 of 64
 divergent. EB_LFO_SHARED stays default OFF (charter: silicon need is F4's;
 trunk promotion is the USER's call -- the proof meets the trunk's standard).
-Fork price with it: 24,686 = 2.6-3.9x over; ~20,400 with reserves. The head
-pointer is now F4 (silicon).** NO approximations in the trunk —
+Fork price with it: 24,686 = 2.6-3.9x over; ~20,400 with reserves. **F4 FIRST SILICON IS IN (2026-08-05, the user's own S3): c/i = 0.95.**
+38,209 cycles/sample vs QEMU's 40,275 instructions for the IDENTICAL program
+-- the Daisy pattern did NOT repeat; instruction counts ARE cycle counts on
+this chip (within 5 %). Evaluator vectors BIT-EXACT on silicon; all fourteen
+region sinks BIT-IDENTICAL to host/QEMU (the S3's FPU reproduces the host's
+floats exactly); FX states ran FROM PSRAM, memory test OK. Full fork = ~23,400
+cycles vs ~10,000 two-core = 2.3x over, and the ladder down is measured:
+half-OS 1.9x, +C2 1.4x, +44.1k-or-4-voices AT/NEAR FIT. The S3 is ALIVE.
+`esp32s3/flash/` holds the flash kit. The head pointer is C2 (control-rate CV
+for non-integrating targets, gated at -100/-80), then the fit decision.** NO approximations in the trunk —
 C2 moved OUT of trunk work (it is a −100 dB candidate, my earlier phase
 assignment was wrong). Phase 2 (Fable, S3 fork): recentered pitch with a
 0.05-CENT exhaustive gate (the plugin's own numerical noise bound, ~1000×
