@@ -49,6 +49,22 @@ it are worth copying:
   local's value is not controlled, and this build's register allocation happened
   to leave 0.0 there. A teeth case whose planted error is undefined measures the
   compiler, not the engine. It substitutes a wrong value now.
+* **And it must perturb the RIGHT constant.** The second version substituted a
+  wrong `v56` and still measured EXACTLY 0. Perturbing each alone on the
+  EFFECT-TYPE-0 scenario, composite build:
+
+  | perturbation | residual |
+  |---|---|
+  | `v56 = 0.25` | **EXACTLY 0 — inert** |
+  | `v58 = -0.5` | **−27.8 dB rel — caught** |
+  | both dropped (the original defect) | −16.5 dB rel |
+
+  So of the pair the port leaves behind, **only `v58` is read on a branch any
+  scenario reaches**. The shims restore both, because the port writes both and
+  `v56` may matter on some arm or branch this battery does not select — but the
+  proof covers one of the two, and saying "the pair is gated" would be an
+  over-claim. Three revisions to make one teeth case mean something is the
+  normal cost of a case that means something.
 
 ## The result
 

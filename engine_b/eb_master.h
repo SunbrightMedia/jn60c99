@@ -37,13 +37,20 @@
  * compile-time budget with an overrun flag and the ring is last in the struct
  * so it can live in external memory.
  *
- * ⚠ ONE PORTABILITY DEBT, found by LINKING the chain outside the harness for
- * the first time: eb_delay_t23 and eb_delay_t5 call `juno_pitch_poly` and
- * `juno_triangle`, which live in src/juno_dsp.c -- the PORT. Engine B cannot
- * be built for a target without them, so either src/juno_dsp.c comes along or
- * those two get engine B implementations (engine_b/triangle.h already has one
- * candidate). Recorded here because the null gates link the whole port and
- * would never have surfaced it; the first firmware build would have.
+ * THE PORTABILITY DEBT IS PAID (2026-08-05). It was: four modules called
+ * `juno_pitch_poly`, `juno_triangle`, `juno_wrap_unit` and `juno_wrap_hi` out
+ * of src/juno_dsp.c -- the PORT -- so engine B could not be built for a target
+ * at all. It is `engine_b/eb_dsp.c` now, verbatim copies, held to the port's
+ * own by `tests/test_eb_dsp` (520,043 comparisons, BIT-IDENTICAL, and three
+ * planted mutations caught).
+ *
+ * KEEP THE REASON IT HID. Every null gate links the whole port by
+ * construction, so no gate could see the dependency; it was found by linking
+ * engine B by hand, once. `tests/test_standalone_link` makes that hand check
+ * permanent -- its rule links ONLY engine_b/eb_*.c, so the next call into the
+ * port fails there and names the symbol. Constant tables (juno_tables.h) are
+ * still shared: proven port DATA that a target ships is a different thing from
+ * linking port CODE, and conflating the two is what left this open.
  */
 #ifndef ENGINEB_EB_MASTER_H
 #define ENGINEB_EB_MASTER_H

@@ -1,6 +1,6 @@
 /* eb_dly_t4.c -- GENERATED from src/master_render.c:1871-2074. */
 #include "eb_dly_t4.h"
-#include "juno_dsp.h"
+#include "eb_dsp.h"
 #include "juno_tables.h"
 #include <math.h>
 #include <string.h>
@@ -107,16 +107,16 @@ void eb_dly_t4_tick(eb_dly_t4_state *s, const eb_dly_t4_coef *c,
       v178 = c->k6429488;
       s->s6429504 = c->k6429472;
       s->s6429520 = v178;
-      v179 = juno_pitch_poly((double)(float)( c->k6429472 + c->k6429568 ));
+      v179 = eb_pitch_poly((double)(float)( c->k6429472 + c->k6429568 ));
       s->s6429536 = fmaxf(fminf(v179, 512.0), -512.0);
       v180 = s->s6429520;
       s->s6429776 = s->s6429760;
       { float _inc3 = (float)(s->s6429536 * c->k6429808);
     if ( _inc3 < 4.0 ) { if ( _inc3 >= 2.0 ) _inc3 = _inc3 + -2.0; } else _inc3 = _inc3 + -4.0;
     if ( _inc3 == 0.0 ) _inc3 = c->k6429824;
-    v181 = juno_wrap_hi((float)(s->s6429760 + _inc3)); }
+    v181 = eb_wrap_hi((float)(s->s6429760 + _inc3)); }
       v182 = *(float *)&v181;
-      v183 = juno_triangle(v181);
+      v183 = eb_triangle_wrap(v181);
       s->s6429792 = v183;
       s->s6429760 = (float)(v182 * v180) + (float)(v180 - 1.0);
       v184 = (float)(v183 * c->k6429856) + c->k6429872;

@@ -1378,8 +1378,11 @@ LABEL_69:
       /* THE PORT'S DELAY STAGE ALSO INITIALISES v56/v58, and this shim dropped
        * them. EVERY delay arm contains the pair `v56 = 0.0; v58 = -1.0;`. It
        * reads as decompiler register scratch and it is not: the EFFECT arms that
-       * follow assign v56 on ONE branch only, so on the other branch v56 carries
-       * the delay stage's 0.0 forward. The omission was unreachable until an
+       * follow assign v56 and v58 on ONE branch only, so on the other branch they
+       * carry the delay stage's constants forward. MEASURED, perturbing each
+alone on the EFFECT-TYPE-0 scenario: v58 is worth -27.8 dB and v56 is
+INERT in every scenario this battery has -- so restore both, and know that
+only one of them is proven. The omission was unreachable until an
        * EFFECT arm with that branch existed (task 1b-3, EFFECT TYPE 0), and then
        * it cost a bisect to find: `--module delay` alone was EXACTLY 0,
        * `--module arms_1b3` alone was EXACTLY 0, and the two TOGETHER failed at

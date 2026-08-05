@@ -1,6 +1,6 @@
 /* eb_delay_t23.c -- GENERATED SKELETON, see the .c header note */
 #include "eb_delay_t23.h"
-#include "juno_dsp.h"
+#include "eb_dsp.h"
 #include "juno_tables.h"
 #include <math.h>
 #include <string.h>
@@ -101,7 +101,7 @@ void eb_dly23_tick(eb_dly23_state *s, const eb_dly23_coef *c,
       v253 = c->k6395328;
       s->s6395344 = c->k6395312;
       s->s6395360 = v253;
-      v254 = juno_pitch_poly((double)(float)( c->k6395312 + c->k6395408 ));
+      v254 = eb_pitch_poly((double)(float)( c->k6395312 + c->k6395408 ));
       v255 = fmaxf(fminf(v254, 512.0), -512.0);
       s->s6395376 = v255;
       v256 = s->s6395600;
@@ -122,7 +122,7 @@ void eb_dly23_tick(eb_dly23_state *s, const eb_dly23_coef *c,
       *(float *)&v256 = *(float *)&v256 + v258;
       if ( *(float *)&v256 > 1.0 )
         *(float *)&v256 = fmodf(*(float *)&v256 + 1.0, 2.0) - 1.0;
-      v259 = juno_triangle(v256);
+      v259 = eb_triangle_wrap(v256);
       s->s6395632 = v259;
       s->s6395600 = (float)(*(float *)&v256 * v257) + (float)(v257 - 1.0);
       v260 = (float)(v259 * c->k6395696) + c->k6395712;

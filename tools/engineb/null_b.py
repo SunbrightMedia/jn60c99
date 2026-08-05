@@ -882,9 +882,18 @@ def _plant(tmp, mutate):
         # controlled, and this build's register allocation happened to leave
         # 0.0 there anyway. A teeth case whose planted error is undefined
         # measures the compiler, not the engine.
+        # AND IT MUST PERTURB v58, NOT v56. MEASURED on the EFFECT-TYPE-0
+        # scenario, composite build, each constant perturbed alone:
+        #     v56 = 0.25   -> residual EXACTLY 0     (INERT here)
+        #     v58 = -0.5   -> residual -27.8 dB rel  (CAUGHT)
+        #     both dropped -> residual -16.5 dB rel  (the original defect)
+        # So of the pair the port leaves behind, only v58 is read on a branch
+        # any scenario reaches. v56 may still matter on some arm/branch this
+        # battery does not select; that is stated, not assumed, and it is why
+        # the shims restore BOTH while the teeth case can only prove one.
         i = s.index(a)
-        j = s.index("        v56 = 0.0;", i)
-        s = s[:j] + "        v56 = 0.25;" + s[j + len("        v56 = 0.0;"):]
+        j = s.index("        v58 = -1.0;", i)
+        s = s[:j] + "        v58 = -0.5;" + s[j + len("        v58 = -1.0;"):]
     elif mutate == "voicereseed":
         # THE LOCKSTEP CASE, and it is a REAL defect this harness let through
         # once. Engine B's state lives in file statics and the render worker

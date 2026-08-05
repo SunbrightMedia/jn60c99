@@ -16,7 +16,7 @@
  * becomes the specification.
  */
 #include "eb_delay_t1.h"
-#include "juno_dsp.h"
+
 #include "juno_tables.h"
 #include <math.h>
 #include <string.h>

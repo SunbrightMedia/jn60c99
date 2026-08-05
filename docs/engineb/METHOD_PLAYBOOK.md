@@ -429,6 +429,11 @@ checklist.
 | 18 | Gate validated a component against an oracle in which the component it replaced was never reachable | oracle and port were wrong together; every comparison green |
 | 19 | Two modules each EXACTLY 0 alone, wrong together (dropped scratch constants) | composite failed at −11.7 dB; neither per-module gate could see it |
 | 20 | Module wrote a `float` result through a pointer to a `double` local | compiler warned, nobody read it; the local was garbage on the branch that used it |
+| 21 | Teeth case DELETED a statement instead of substituting a wrong value | the uninitialised local happened to hold the right value; case measured the compiler |
+| 22 | Teeth case perturbed the inert half of a two-constant defect | passed while the defect it was written for was real |
+| 23 | Unit test stopped LINKING when a dependency was added, and was not in `make test` | a test that does not build is not failing, it is absent — for two days |
+| 24 | Cost model omitted code the engine always executes (the whole master chain) | understated the engine; fifth flattering error of the same shape |
+| 25 | Gate run with the tool's DEFAULT module set (the port), reported as an engine result | "11/11 vs the plugin" measured the port, not engine B |
 
 **#18 is the one to internalise.** Before concluding "the original does X", check
 that the original's code for *not*-X could have run in your harness at all.

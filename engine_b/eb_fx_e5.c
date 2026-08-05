@@ -1,6 +1,6 @@
 /* eb_fx_e5.c -- GENERATED from src/master_render.c:2633-2748. */
 #include "eb_fx_e5.h"
-#include "juno_dsp.h"
+#include "eb_dsp.h"
 #include "juno_tables.h"
 #include <math.h>
 #include <string.h>
@@ -79,7 +79,7 @@ void eb_fx_e5_tick(eb_fx_e5_state *s, const eb_fx_e5_coef *c,
         s->s96240 = s->s96224;
         s->s95888 = v552;
         s->s95904 = v552;
-        v553 = juno_wrap_unit((float)((float)( s->s96176 + s->s96144 ) + c->k96352));
+        v553 = eb_wrap_unit((float)((float)( s->s96176 + s->s96144 ) + c->k96352));
         v554 = *(float *)&v553;
         v555 = *(float *)&v553 < 0.0;
         memcpy(&s->s96160, &v553, 4);

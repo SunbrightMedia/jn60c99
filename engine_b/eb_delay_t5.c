@@ -9,7 +9,7 @@
  * plain-local capture would have skipped silently.
  */
 #include "eb_delay_t5.h"
-#include "juno_dsp.h"
+#include "eb_dsp.h"
 #include "juno_tables.h"
 #include <math.h>
 #include <string.h>
@@ -360,16 +360,16 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           v99 = c->k10692032;
           s->s10692048 = c->k10692016;
           s->s10692064 = v99;
-          v100 = juno_pitch_poly((double)(float)( c->k10692016 + c->k10692112 ));
+          v100 = eb_pitch_poly((double)(float)( c->k10692016 + c->k10692112 ));
           s->s10692080 = fmaxf(fminf(v100, 512.0), -512.0);
           v101 = s->s10692064;
           s->s10692320 = s->s10692304;
           { float _inc2 = (float)(s->s10692080 * c->k10692352);
     if ( _inc2 < 4.0 ) { if ( _inc2 >= 2.0 ) _inc2 = _inc2 + -2.0; } else _inc2 = _inc2 + -4.0;
     if ( _inc2 == 0.0 ) _inc2 = c->k10692368;
-    v102 = juno_wrap_hi((float)(s->s10692304 + _inc2)); }
+    v102 = eb_wrap_hi((float)(s->s10692304 + _inc2)); }
           v103 = *(float *)&v102;
-          v104 = juno_triangle(v102);
+          v104 = eb_triangle_wrap(v102);
           s->s10692336 = v104;
           s->s10692304 = (float)(v103 * v101) + (float)(v101 - 1.0);
           v105 = (float)(v104 * c->k10692400) + c->k10692416;
