@@ -1,6 +1,6 @@
 /* GENERATED FILE -- DO NOT EDIT.
  * tools/engineb/merge_shims.py built this from the individual shims:
- *     chorus, delay, delay_t1, delay_t23, delay_t5, fx_arms, master_in, master_out, reverb
+ *     arms_1b3, chorus, delay, delay_t1, delay_t23, delay_t5, fx_arms, master_in, master_out, reverb
  * Edit those, then re-run the generator (make engineb does it).
  * Its purpose: engine B cannot be tested as a WHOLE ENGINE while each
  * module shadows the same port file -- see docs/engineb/HARNESS_AUDIT.md
@@ -72,6 +72,8 @@
 #include "eb_delay_t5.h"
 #include "eb_delay_t23.h"
 #include "eb_delay_t1.h"
+#include "eb_dly_t4.h"
+#include "eb_fx_e0.h"
 #include "juno_engine.h"
 #include "juno_dsp.h"
 #include <math.h>
@@ -971,13 +973,13 @@ float *juno_master_render(unsigned char *a1, float **a2, float **a3)
   v39 = juno_host_sel(a1, 136);   /* was **(_DWORD **)(*(_QWORD *)(a1 + 136) + 136LL) */
   if ( v39 == 1 )
   {
-    /* ==== ENGINE B: MODULE DELAY-TYPE-1 PRE-STAGE (src :890-1048) ====
-     * See eb_delay_t1.c for why its local outputs are dead and it still
-     * returns them. State copied in and out per sample; ring by pointer. */
+    /* ==== ENGINE B: MODULE DELAY-TYPE-1 (src :890-1048) ==============
+     * The complete DELAY TYPE 1 algorithm. State copied in and out per
+     * sample; ring by pointer. */
     {
       static eb_dly1_coef EBD1C; static unsigned char EBD1HAVE;
       static unsigned long EBD1GEN; extern unsigned long eb_coef_gen;
-      eb_dly1_state st1;
+      eb_dly1_state st1; float _c56, _c58;
       if (!EBD1HAVE || EBD1GEN != eb_coef_gen) {
         EBD1C.k101744 = *(float *)(a1 + 101744);
         EBD1C.k4297584 = *(float *)(a1 + 4297584);
@@ -1048,7 +1050,20 @@ float *juno_master_render(unsigned char *a1, float **a2, float **a3)
       st1.s6395248 = *(int32_t *)(a1 + 6395248);
       st1.s11022348 = *(int32_t *)(a1 + 11022348);
       st1.ring = (float *)(a1 + 4298096);
-      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177);
+      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177, &_c56, &_c58);
+      /* THE PORT'S DELAY STAGE ALSO INITIALISES v56/v58, and this shim dropped
+       * them. EVERY delay arm contains the pair `v56 = 0.0; v58 = -1.0;`. It
+       * reads as decompiler register scratch and it is not: the EFFECT arms that
+       * follow assign v56 on ONE branch only, so on the other branch v56 carries
+       * the delay stage's 0.0 forward. The omission was unreachable until an
+       * EFFECT arm with that branch existed (task 1b-3, EFFECT TYPE 0), and then
+       * it cost a bisect to find: `--module delay` alone was EXACTLY 0,
+       * `--module arms_1b3` alone was EXACTLY 0, and the two TOGETHER failed at
+       * -11.7 dB. Two modules that are each exact compose exactly only if each
+       * also leaves behind the STATE the other reads. eb_master.c has always set
+       * these two constants; only the hybrid shims lacked them. */
+      v56 = 0.0;
+      v58 = -1.0;
       *(float *)(a1 + 4297200) = st1.s4297200;
       *(float *)(a1 + 4297216) = st1.s4297216;
       *(float *)(a1 + 4297232) = st1.s4297232;
@@ -1083,7 +1098,7 @@ float *juno_master_render(unsigned char *a1, float **a2, float **a3)
       *(int32_t *)(a1 + 6395248) = st1.s6395248;
       *(int32_t *)(a1 + 11022348) = st1.s11022348;
     }
-    /* == END ENGINE B: MODULE DELAY-TYPE-1 PRE-STAGE =============== */
+    /* == END ENGINE B: MODULE DELAY-TYPE-1 ======================== */
   }
   else
   {
@@ -1177,6 +1192,19 @@ LABEL_69:
         }
         *(float *)(a1 + 102320) = ebL;
         *(float *)(a1 + 102336) = ebR;
+        /* THE PORT'S DELAY STAGE ALSO INITIALISES v56/v58, and this shim dropped
+         * them. EVERY delay arm contains the pair `v56 = 0.0; v58 = -1.0;`. It
+         * reads as decompiler register scratch and it is not: the EFFECT arms that
+         * follow assign v56 on ONE branch only, so on the other branch v56 carries
+         * the delay stage's 0.0 forward. The omission was unreachable until an
+         * EFFECT arm with that branch existed (task 1b-3, EFFECT TYPE 0), and then
+         * it cost a bisect to find: `--module delay` alone was EXACTLY 0,
+         * `--module arms_1b3` alone was EXACTLY 0, and the two TOGETHER failed at
+         * -11.7 dB. Two modules that are each exact compose exactly only if each
+         * also leaves behind the STATE the other reads. eb_master.c has always set
+         * these two constants; only the hybrid shims lacked them. */
+        v56 = 0.0;
+        v58 = -1.0;
       }
       /* ================= END ENGINE B: MODULE DELAY ===================== */
       v418 = *(float *)(a1 + 101744);
@@ -1203,7 +1231,7 @@ LABEL_69:
       static unsigned char EBD23HAVE;
       static unsigned long EBD23GEN;
       extern unsigned long eb_coef_gen;
-      eb_dly23_state st23;
+      eb_dly23_state st23; float _c56, _c58;
       if (!EBD23HAVE || EBD23GEN != eb_coef_gen) {
         EBD23C.k101744 = *(float *)(a1 + 101744);
         EBD23C.k6395312 = *(float *)(a1 + 6395312);
@@ -1290,7 +1318,20 @@ LABEL_69:
       st23.s6429408 = *(int32_t *)(a1 + 6429408);
       st23.s11022348 = *(int32_t *)(a1 + 11022348);
       st23.ring = (float *)(a1 + 6396640);
-      eb_dly23_tick(&st23, &EBD23C, v36, v38, v5, &v176, &v177, &v56, &v58);
+      eb_dly23_tick(&st23, &EBD23C, v36, v38, v5, &v176, &v177, &_c56, &_c58);
+      /* THE PORT'S DELAY STAGE ALSO INITIALISES v56/v58, and this shim dropped
+       * them. EVERY delay arm contains the pair `v56 = 0.0; v58 = -1.0;`. It
+       * reads as decompiler register scratch and it is not: the EFFECT arms that
+       * follow assign v56 on ONE branch only, so on the other branch v56 carries
+       * the delay stage's 0.0 forward. The omission was unreachable until an
+       * EFFECT arm with that branch existed (task 1b-3, EFFECT TYPE 0), and then
+       * it cost a bisect to find: `--module delay` alone was EXACTLY 0,
+       * `--module arms_1b3` alone was EXACTLY 0, and the two TOGETHER failed at
+       * -11.7 dB. Two modules that are each exact compose exactly only if each
+       * also leaves behind the STATE the other reads. eb_master.c has always set
+       * these two constants; only the hybrid shims lacked them. */
+      v56 = 0.0;
+      v58 = -1.0;
       *(float *)(a1 + 6395344) = st23.s6395344;
       *(float *)(a1 + 6395360) = st23.s6395360;
       *(float *)(a1 + 6395376) = st23.s6395376;
@@ -1356,7 +1397,7 @@ LABEL_69:
             static unsigned char EBD5HAVE;
             static unsigned long EBD5GEN;
             extern unsigned long eb_coef_gen;
-            eb_dly5_state st5;
+            eb_dly5_state st5; float _c56, _c58;
             if (!EBD5HAVE || EBD5GEN != eb_coef_gen) {
               EBD5C.k101744 = *(float *)(a1 + 101744);
               EBD5C.k6497168 = *(float *)(a1 + 6497168);
@@ -1534,7 +1575,20 @@ LABEL_69:
             st5.ring2 = (float *)(a1 + 10693488);
             st5.ring3 = (float *)(a1 + 10726272);
             eb_dly5_tick(&st5, &EBD5C, v36, v38, v5,
-                         &v176, &v177, &v56, &v58);
+                         &v176, &v177, &_c56, &_c58);
+                         /* THE PORT'S DELAY STAGE ALSO INITIALISES v56/v58, and this shim dropped
+                          * them. EVERY delay arm contains the pair `v56 = 0.0; v58 = -1.0;`. It
+                          * reads as decompiler register scratch and it is not: the EFFECT arms that
+                          * follow assign v56 on ONE branch only, so on the other branch v56 carries
+                          * the delay stage's 0.0 forward. The omission was unreachable until an
+                          * EFFECT arm with that branch existed (task 1b-3, EFFECT TYPE 0), and then
+                          * it cost a bisect to find: `--module delay` alone was EXACTLY 0,
+                          * `--module arms_1b3` alone was EXACTLY 0, and the two TOGETHER failed at
+                          * -11.7 dB. Two modules that are each exact compose exactly only if each
+                          * also leaves behind the STATE the other reads. eb_master.c has always set
+                          * these two constants; only the hybrid shims lacked them. */
+                         v56 = 0.0;
+                         v58 = -1.0;
             *(float *)(a1 + 6496576) = st5.s6496576;
             *(float *)(a1 + 6496592) = st5.s6496592;
             *(float *)(a1 + 6496608) = st5.s6496608;
@@ -1642,210 +1696,176 @@ LABEL_69:
         }
         goto LABEL_69;
       }
-      if ( *(_DWORD *)(a1 + 11022348) != 4 )
+      /* ==== ENGINE B: MODULE DLY_T4 (src :1871-2074) ==============
+       * An arm NO factory patch selects. It is reachable only by the
+       * doctored-bank scenario in null_b.py -- see task 1b-3. Writing it
+       * before that scenario existed would have produced a module whose
+       * gate could never execute it. */
       {
-        *(_DWORD *)(a1 + 6430320) = 0;
-        *(_DWORD *)(a1 + 6430336) = 0;
-        *(_DWORD *)(a1 + 6430352) = 0;
+        static eb_dly_t4_coef C_dly_t4; static unsigned char H_dly_t4;
+        static unsigned long G_dly_t4; extern unsigned long eb_coef_gen;
+        eb_dly_t4_state st_dly_t4;
+        float _o176, _o177, _o56, _o58;
+        if (!H_dly_t4 || G_dly_t4 != eb_coef_gen) {
+          C_dly_t4.k101744 = *(float *)(a1 + 101744);
+          C_dly_t4.k6429472 = *(float *)(a1 + 6429472);
+          C_dly_t4.k6429488 = *(float *)(a1 + 6429488);
+          C_dly_t4.k6429568 = *(float *)(a1 + 6429568);
+          C_dly_t4.k6429808 = *(float *)(a1 + 6429808);
+          C_dly_t4.k6429824 = *(float *)(a1 + 6429824);
+          C_dly_t4.k6429856 = *(float *)(a1 + 6429856);
+          C_dly_t4.k6429872 = *(float *)(a1 + 6429872);
+          C_dly_t4.k6430464 = *(float *)(a1 + 6430464);
+          C_dly_t4.k6430480 = *(float *)(a1 + 6430480);
+          C_dly_t4.k6430496 = *(float *)(a1 + 6430496);
+          C_dly_t4.k6430512 = *(float *)(a1 + 6430512);
+          C_dly_t4.k6430528 = *(float *)(a1 + 6430528);
+          C_dly_t4.k6430544 = *(float *)(a1 + 6430544);
+          C_dly_t4.k6430560 = *(float *)(a1 + 6430560);
+          C_dly_t4.k6430576 = *(float *)(a1 + 6430576);
+          C_dly_t4.k6430592 = *(float *)(a1 + 6430592);
+          C_dly_t4.k6430608 = *(float *)(a1 + 6430608);
+          C_dly_t4.k6430624 = *(float *)(a1 + 6430624);
+          C_dly_t4.k6430640 = *(float *)(a1 + 6430640);
+          C_dly_t4.k6430656 = *(float *)(a1 + 6430656);
+          C_dly_t4.k6430672 = *(float *)(a1 + 6430672);
+          C_dly_t4.k6430688 = *(float *)(a1 + 6430688);
+          C_dly_t4.k6430704 = *(float *)(a1 + 6430704);
+          C_dly_t4.k6430720 = *(float *)(a1 + 6430720);
+          C_dly_t4.k6430736 = *(float *)(a1 + 6430736);
+          C_dly_t4.k6430752 = *(float *)(a1 + 6430752);
+          C_dly_t4.k6430768 = *(float *)(a1 + 6430768);
+          C_dly_t4.k6430784 = *(float *)(a1 + 6430784);
+          C_dly_t4.k6430800 = *(float *)(a1 + 6430800);
+          C_dly_t4.k6430816 = *(float *)(a1 + 6430816);
+          C_dly_t4.k6430832 = *(float *)(a1 + 6430832);
+          C_dly_t4.k6430848 = *(float *)(a1 + 6430848);
+          C_dly_t4.k6430864 = *(float *)(a1 + 6430864);
+          C_dly_t4.k6430880 = *(float *)(a1 + 6430880);
+          C_dly_t4.k6430896 = *(float *)(a1 + 6430896);
+          C_dly_t4.k6430912 = *(float *)(a1 + 6430912);
+          C_dly_t4.k6430928 = *(float *)(a1 + 6430928);
+          C_dly_t4.k6463716 = *(int32_t *)(a1 + 6463716);
+          C_dly_t4.k6496500 = *(int32_t *)(a1 + 6496500);
+          H_dly_t4 = 1; G_dly_t4 = eb_coef_gen;
+        }
+        st_dly_t4.s6429504 = *(float *)(a1 + 6429504);
+        st_dly_t4.s6429520 = *(float *)(a1 + 6429520);
+        st_dly_t4.s6429536 = *(float *)(a1 + 6429536);
+        st_dly_t4.s6429760 = *(float *)(a1 + 6429760);
+        st_dly_t4.s6429776 = *(float *)(a1 + 6429776);
+        st_dly_t4.s6429792 = *(float *)(a1 + 6429792);
+        st_dly_t4.s6429840 = *(float *)(a1 + 6429840);
+        st_dly_t4.s6429888 = *(float *)(a1 + 6429888);
+        st_dly_t4.s6429904 = *(float *)(a1 + 6429904);
+        st_dly_t4.s6429920 = *(float *)(a1 + 6429920);
+        st_dly_t4.s6429936 = *(float *)(a1 + 6429936);
+        st_dly_t4.s6429952 = *(float *)(a1 + 6429952);
+        st_dly_t4.s6429968 = *(float *)(a1 + 6429968);
+        st_dly_t4.s6429984 = *(float *)(a1 + 6429984);
+        st_dly_t4.s6430000 = *(float *)(a1 + 6430000);
+        st_dly_t4.s6430016 = *(float *)(a1 + 6430016);
+        st_dly_t4.s6430032 = *(float *)(a1 + 6430032);
+        st_dly_t4.s6430048 = *(float *)(a1 + 6430048);
+        st_dly_t4.s6430064 = *(float *)(a1 + 6430064);
+        st_dly_t4.s6430080 = *(float *)(a1 + 6430080);
+        st_dly_t4.s6430096 = *(float *)(a1 + 6430096);
+        st_dly_t4.s6430112 = *(float *)(a1 + 6430112);
+        st_dly_t4.s6430128 = *(float *)(a1 + 6430128);
+        st_dly_t4.s6430144 = *(float *)(a1 + 6430144);
+        st_dly_t4.s6430160 = *(float *)(a1 + 6430160);
+        st_dly_t4.s6430176 = *(float *)(a1 + 6430176);
+        st_dly_t4.s6430192 = *(float *)(a1 + 6430192);
+        st_dly_t4.s6430208 = *(float *)(a1 + 6430208);
+        st_dly_t4.s6430224 = *(float *)(a1 + 6430224);
+        st_dly_t4.s6430240 = *(float *)(a1 + 6430240);
+        st_dly_t4.s6430256 = *(float *)(a1 + 6430256);
+        st_dly_t4.s6430272 = *(float *)(a1 + 6430272);
+        st_dly_t4.s6430288 = *(float *)(a1 + 6430288);
+        st_dly_t4.s6430304 = *(float *)(a1 + 6430304);
+        st_dly_t4.s6430320 = *(float *)(a1 + 6430320);
+        st_dly_t4.s6430336 = *(float *)(a1 + 6430336);
+        st_dly_t4.s6430352 = *(float *)(a1 + 6430352);
+        st_dly_t4.s6430368 = *(float *)(a1 + 6430368);
+        st_dly_t4.s6430384 = *(float *)(a1 + 6430384);
+        st_dly_t4.s6430400 = *(float *)(a1 + 6430400);
+        st_dly_t4.s6430416 = *(float *)(a1 + 6430416);
+        st_dly_t4.s6430432 = *(float *)(a1 + 6430432);
+        st_dly_t4.s6430448 = *(float *)(a1 + 6430448);
+        st_dly_t4.s6496512 = *(float *)(a1 + 6496512);
+        st_dly_t4.s6496528 = *(float *)(a1 + 6496528);
+        st_dly_t4.s6496532 = *(float *)(a1 + 6496532);
+        st_dly_t4.s6496536 = *(float *)(a1 + 6496536);
+        st_dly_t4.s6496544 = *(float *)(a1 + 6496544);
+        st_dly_t4.s6496560 = *(float *)(a1 + 6496560);
+        st_dly_t4.s6496564 = *(float *)(a1 + 6496564);
+        st_dly_t4.s6496568 = *(float *)(a1 + 6496568);
+        st_dly_t4.s6463712 = *(int32_t *)(a1 + 6463712);
+        st_dly_t4.s6496496 = *(int32_t *)(a1 + 6496496);
+        st_dly_t4.s11022348 = *(int32_t *)(a1 + 11022348);
+        st_dly_t4.ring0 = (float *)(a1 + 6430944);
+        st_dly_t4.ring1 = (float *)(a1 + 6463728);
+        eb_dly_t4_tick(&st_dly_t4, &C_dly_t4, v36, v38, v5, &_o176, &_o177, &_o56, &_o58);
+        *(float *)(a1 + 6429504) = st_dly_t4.s6429504;
+        *(float *)(a1 + 6429520) = st_dly_t4.s6429520;
+        *(float *)(a1 + 6429536) = st_dly_t4.s6429536;
+        *(float *)(a1 + 6429760) = st_dly_t4.s6429760;
+        *(float *)(a1 + 6429776) = st_dly_t4.s6429776;
+        *(float *)(a1 + 6429792) = st_dly_t4.s6429792;
+        *(float *)(a1 + 6429840) = st_dly_t4.s6429840;
+        *(float *)(a1 + 6429888) = st_dly_t4.s6429888;
+        *(float *)(a1 + 6429904) = st_dly_t4.s6429904;
+        *(float *)(a1 + 6429920) = st_dly_t4.s6429920;
+        *(float *)(a1 + 6429936) = st_dly_t4.s6429936;
+        *(float *)(a1 + 6429952) = st_dly_t4.s6429952;
+        *(float *)(a1 + 6429968) = st_dly_t4.s6429968;
+        *(float *)(a1 + 6429984) = st_dly_t4.s6429984;
+        *(float *)(a1 + 6430000) = st_dly_t4.s6430000;
+        *(float *)(a1 + 6430016) = st_dly_t4.s6430016;
+        *(float *)(a1 + 6430032) = st_dly_t4.s6430032;
+        *(float *)(a1 + 6430048) = st_dly_t4.s6430048;
+        *(float *)(a1 + 6430064) = st_dly_t4.s6430064;
+        *(float *)(a1 + 6430080) = st_dly_t4.s6430080;
+        *(float *)(a1 + 6430096) = st_dly_t4.s6430096;
+        *(float *)(a1 + 6430112) = st_dly_t4.s6430112;
+        *(float *)(a1 + 6430128) = st_dly_t4.s6430128;
+        *(float *)(a1 + 6430144) = st_dly_t4.s6430144;
+        *(float *)(a1 + 6430160) = st_dly_t4.s6430160;
+        *(float *)(a1 + 6430176) = st_dly_t4.s6430176;
+        *(float *)(a1 + 6430192) = st_dly_t4.s6430192;
+        *(float *)(a1 + 6430208) = st_dly_t4.s6430208;
+        *(float *)(a1 + 6430224) = st_dly_t4.s6430224;
+        *(float *)(a1 + 6430240) = st_dly_t4.s6430240;
+        *(float *)(a1 + 6430256) = st_dly_t4.s6430256;
+        *(float *)(a1 + 6430272) = st_dly_t4.s6430272;
+        *(float *)(a1 + 6430288) = st_dly_t4.s6430288;
+        *(float *)(a1 + 6430304) = st_dly_t4.s6430304;
+        *(float *)(a1 + 6430320) = st_dly_t4.s6430320;
+        *(float *)(a1 + 6430336) = st_dly_t4.s6430336;
+        *(float *)(a1 + 6430352) = st_dly_t4.s6430352;
+        *(float *)(a1 + 6430368) = st_dly_t4.s6430368;
+        *(float *)(a1 + 6430384) = st_dly_t4.s6430384;
+        *(float *)(a1 + 6430400) = st_dly_t4.s6430400;
+        *(float *)(a1 + 6430416) = st_dly_t4.s6430416;
+        *(float *)(a1 + 6430432) = st_dly_t4.s6430432;
+        *(float *)(a1 + 6430448) = st_dly_t4.s6430448;
+        *(float *)(a1 + 6496512) = st_dly_t4.s6496512;
+        *(float *)(a1 + 6496528) = st_dly_t4.s6496528;
+        *(float *)(a1 + 6496532) = st_dly_t4.s6496532;
+        *(float *)(a1 + 6496536) = st_dly_t4.s6496536;
+        *(float *)(a1 + 6496544) = st_dly_t4.s6496544;
+        *(float *)(a1 + 6496560) = st_dly_t4.s6496560;
+        *(float *)(a1 + 6496564) = st_dly_t4.s6496564;
+        *(float *)(a1 + 6496568) = st_dly_t4.s6496568;
+        *(int32_t *)(a1 + 6463712) = st_dly_t4.s6463712;
+        *(int32_t *)(a1 + 6496496) = st_dly_t4.s6496496;
+        *(int32_t *)(a1 + 11022348) = st_dly_t4.s11022348;
+        v176 = _o176;
+        v177 = _o177;
+        v56 = _o56;
+        v58 = _o58;
       }
-      *(_DWORD *)(a1 + 11022348) = 4;
-      v178 = *(_DWORD *)(a1 + 6429488);
-      *(_DWORD *)(a1 + 6429504) = *(_DWORD *)(a1 + 6429472);
-      *(_DWORD *)(a1 + 6429520) = v178;
-      v179 = juno_pitch_poly((double)(float)( *(float *)(a1 + 6429472) + *(float *)(a1 + 6429568) ));
-      *(float *)(a1 + 6429536) = fmaxf(fminf(v179, 512.0), -512.0);
-      v180 = *(float *)(a1 + 6429520);
-      *(_DWORD *)(a1 + 6429776) = *(_DWORD *)(a1 + 6429760);
-      { float _inc3 = (float)(*(float *)(a1 + 6429536) * *(float *)(a1 + 6429808));
-    if ( _inc3 < 4.0 ) { if ( _inc3 >= 2.0 ) _inc3 = _inc3 + -2.0; } else _inc3 = _inc3 + -4.0;
-    if ( _inc3 == 0.0 ) _inc3 = *(float *)(a1 + 6429824);
-    v181 = juno_wrap_hi((float)(*(float *)(a1 + 6429760) + _inc3)); }
-      v182 = *(float *)&v181;
-      v183 = juno_triangle(v181);
-      *(float *)(a1 + 6429792) = v183;
-      *(float *)(a1 + 6429760) = (float)(v182 * v180) + (float)(v180 - 1.0);
-      v184 = (float)(v183 * *(float *)(a1 + 6429856)) + *(float *)(a1 + 6429872);
-      *(float *)(a1 + 6429840) = v184;
-      *(_DWORD *)(a1 + 6430016) = *(_DWORD *)(a1 + 6430000);
-      *(_DWORD *)(a1 + 6430000) = *(_DWORD *)(a1 + 6429984);
-      *(_DWORD *)(a1 + 6429984) = *(_DWORD *)(a1 + 6429968);
-      *(_DWORD *)(a1 + 6429968) = *(_DWORD *)(a1 + 6429952);
-      *(_DWORD *)(a1 + 6429952) = *(_DWORD *)(a1 + 6429936);
-      *(_DWORD *)(a1 + 6430112) = *(_DWORD *)(a1 + 6430096);
-      *(_DWORD *)(a1 + 6430096) = *(_DWORD *)(a1 + 6430080);
-      *(_DWORD *)(a1 + 6430080) = *(_DWORD *)(a1 + 6430064);
-      *(_DWORD *)(a1 + 6430064) = *(_DWORD *)(a1 + 6430048);
-      *(_DWORD *)(a1 + 6430048) = *(_DWORD *)(a1 + 6430032);
-      *(_DWORD *)(a1 + 6430192) = *(_DWORD *)(a1 + 6430176);
-      *(_DWORD *)(a1 + 6430176) = *(_DWORD *)(a1 + 6430160);
-      *(_DWORD *)(a1 + 6430160) = *(_DWORD *)(a1 + 6430144);
-      *(_DWORD *)(a1 + 6430144) = *(_DWORD *)(a1 + 6430128);
-      *(_DWORD *)(a1 + 6430272) = *(_DWORD *)(a1 + 6430256);
-      *(_DWORD *)(a1 + 6430256) = *(_DWORD *)(a1 + 6430240);
-      *(_DWORD *)(a1 + 6430240) = *(_DWORD *)(a1 + 6430224);
-      *(_DWORD *)(a1 + 6430224) = *(_DWORD *)(a1 + 6430208);
-      *(_DWORD *)(a1 + 6430304) = *(_DWORD *)(a1 + 6430288);
-      *(_DWORD *)(a1 + 6430352) = *(_DWORD *)(a1 + 6430336);
-      *(_DWORD *)(a1 + 6430336) = *(_DWORD *)(a1 + 6430320);
-      *(float *)(a1 + 6429920) = v184;
-      v185 = *(float *)(a1 + 6430496);
-      v186 = (float)(v184 * *(float *)(a1 + 6430800)) + *(float *)(a1 + 6430816);
-      *(float *)(a1 + 6429888) = v36;
-      *(float *)(a1 + 6429904) = v38;
-      v187 = *(float *)(a1 + 6430480);
-      v188 = v184
-           + (float)((float)((float)((float)((float)(v184 * 0.5) + v185) * (float)((float)(v184 * 0.5) + v185)) * v187)
-                   - (float)(v187 * v184));
-      v189 = v186
-           + (float)((float)((float)((float)((float)(v186 * 0.5) + v185) * (float)((float)(v186 * 0.5) + v185)) * v187)
-                   - (float)(v187 * v186));
-      v190 = *(float *)(a1 + 6430832);
-      v191 = *(float *)(a1 + 6430848);
-      v192 = *(float *)(a1 + 6430512) * v189;
-      *(float *)(a1 + 6430368) = (float)((float)(*(float *)(a1 + 6430512) * v188) * v190) + v191;
-      *(float *)(a1 + 6430384) = (float)(v192 * v190) + v191;
-      *(float *)(a1 + 6430128) = v36;
-      v193 = (float)((float)((float)((float)(v36 * *(float *)(a1 + 6430528))
-                                   + (float)(*(float *)(a1 + 6430544) * *(float *)(a1 + 6430144)))
-                           + (float)(*(float *)(a1 + 6430560) * *(float *)(a1 + 6430160)))
-                   + (float)(*(float *)(a1 + 6430176) * *(float *)(a1 + 6430576)))
-           + (float)(*(float *)(a1 + 6430592) * *(float *)(a1 + 6430192));
-      *(float *)(a1 + 6430160) = v193;
-      *(float *)(a1 + 6429936) = (float)((float)((float)(v36
-                                                       - (float)(*(float *)(a1 + 6429952) * *(float *)(a1 + 6430640)))
-                                               - *(float *)(a1 + 6429968))
-                                       * *(float *)(a1 + 6430624))
-                               + *(float *)(a1 + 6429952);
-      v194 = (float)(*(float *)(a1 + 6429952) * *(float *)(a1 + 6430624)) + *(float *)(a1 + 6429968);
-      *(float *)(a1 + 6429952) = v194;
-      v195 = *(float *)(a1 + 6430608);
-      v196 = (float)(1.0 - v195) * v194;
-      v197 = *(float *)(a1 + 6429984);
-      v198 = (float)((float)(v196 + (float)(v195 * v193)) * *(float *)(a1 + 6430656))
-           + (float)((float)(1.0 - *(float *)(a1 + 6430656)) * v36);
-      v199 = *(float *)(a1 + 6430768);
-      v200 = (float)((float)(v198 - v197) * *(float *)(a1 + 6430672)) + v197;
-      v201 = v198
-           + (float)((float)(*(float *)(a1 + 6430688) * (float)(v198 - v197)) - (float)(*(float *)(a1 + 6430688) * v198));
-      v202 = *(float *)(a1 + 6430752);
-      *(float *)(a1 + 6429968) = v200;
-      *(float *)(a1 + 6496512) = (float)((float)(v202 * *(float *)(a1 + 6430000)) + (float)(v199 * v201))
-                               * *(float *)(a1 + 6430784);
-      v203 = *(float *)(a1 + 6429904);
-      *(float *)(a1 + 6430208) = v203;
-      v204 = (float)((float)((float)((float)(*(float *)(a1 + 6430224) * *(float *)(a1 + 6430544))
-                                   + (float)(v203 * *(float *)(a1 + 6430528)))
-                           + (float)(*(float *)(a1 + 6430560) * *(float *)(a1 + 6430240)))
-                   + (float)(*(float *)(a1 + 6430256) * *(float *)(a1 + 6430576)))
-           + (float)(*(float *)(a1 + 6430272) * *(float *)(a1 + 6430592));
-      *(float *)(a1 + 6430240) = v204;
-      *(float *)(a1 + 6430032) = (float)((float)((float)(v203
-                                                       - (float)(*(float *)(a1 + 6430048) * *(float *)(a1 + 6430640)))
-                                               - *(float *)(a1 + 6430064))
-                                       * *(float *)(a1 + 6430624))
-                               + *(float *)(a1 + 6430048);
-      v205 = (float)(*(float *)(a1 + 6430048) * *(float *)(a1 + 6430624)) + *(float *)(a1 + 6430064);
-      *(float *)(a1 + 6430048) = v205;
-      v206 = *(float *)(a1 + 6430608);
-      v207 = *(float *)(a1 + 6430656);
-      v208 = (float)(1.0 - v206) * v205;
-      v209 = *(float *)(a1 + 6430080);
-      v210 = v208 + (float)(v206 * v204);
-      v211 = (float)(1.0 - v207) * v203;
-      v212 = *(float *)(a1 + 6430752);
-      v213 = (float)(v210 * v207) + v211;
-      v214 = *(float *)(a1 + 6430768);
-      v215 = (float)((float)(v213 - v209) * *(float *)(a1 + 6430672)) + v209;
-      v216 = v213
-           + (float)((float)(*(float *)(a1 + 6430688) * (float)(v213 - v209)) - (float)(*(float *)(a1 + 6430688) * v213));
-      *(float *)(a1 + 6430064) = v215;
-      v217 = *(float *)(a1 + 6430784);
-      v218 = *(float *)(a1 + 6430880) + *(float *)(a1 + 6430336);
-      *(float *)(a1 + 6496544) = v217 * (float)((float)(v212 * *(float *)(a1 + 6430096)) + (float)(v214 * v216));
-      v219 = fminf(*(float *)(a1 + 6430896), v218) * v217;
-      *(float *)(a1 + 6430320) = v219;
-      v220 = *(float *)(a1 + 6430352);
-      if ( (float)(v219 - *(float *)(a1 + 6430304)) >= 0.0 )
-        v221 = v220 + *(float *)(a1 + 6430912);
-      else
-        v221 = v220 + *(float *)(a1 + 6430928);
-      v222 = *(float *)(a1 + 6430464);
-      v56 = 0.0;
-      v223 = *(float *)(a1 + 6430304);
-      if ( v221 <= 0.0 )
-        v224 = 0.0;
-      else
-        v224 = v221;
-      v58 = -1.0;
-      v225 = v224;
-      v226 = (float)((float)(*(float *)(a1 + 6430464) - v223) * *(float *)(a1 + 6430736)) + v223;
-      if ( v225 >= -1.0 )
-        v227 = fminf(v225, 1.0);
-      else
-        v227 = -1.0;
-      *(float *)(a1 + 6430336) = v227 * *(float *)(a1 + 6430784);
-      if ( (float)(v226 - v223) != 0.0 )
-        v222 = v226;
-      v228 = v222;
-      *(float *)(a1 + 6430288) = v222;
-      v229 = v222 + *(float *)(a1 + 6430368);
-      v230 = (int)(float)(v229 * -16384.0);
-      *(_DWORD *)(a1 + 6496528) = *(_DWORD *)(a1
-                                            + 4
-                                            * ((*(int *)(a1 + 6463716) - 1LL) & (*(_DWORD *)(a1 + 6463712) - v230 + 1LL))
-                                            + 6430944);
-      *(_DWORD *)(a1 + 6496532) = *(_DWORD *)(a1
-                                            + 4
-                                            * ((*(int *)(a1 + 6463716) - 1LL) & (*(_DWORD *)(a1 + 6463712) - v230 + 2LL))
-                                            + 6430944);
-      v231 = (float)(v229 * 16384.0) - (double)(int)(float)(v229 * 16384.0);
-      *(float *)(a1 + 6496536) = v231;
-      v232 = *(float *)(a1 + 6496528);
-      v233 = *(float *)(a1 + 6430352);
-      v234 = v228 + *(float *)(a1 + 6430384);
-      v235 = (int)(float)(v234 * -16384.0);
-      *(_DWORD *)(a1 + 6496560) = *(_DWORD *)(a1
-                                            + 4
-                                            * ((*(int *)(a1 + 6496500) - 1LL) & (*(_DWORD *)(a1 + 6496496) - v235 + 1LL))
-                                            + 6463728);
-      *(_DWORD *)(a1 + 6496564) = *(_DWORD *)(a1
-                                            + 4
-                                            * ((*(int *)(a1 + 6496500) - 1LL) & (*(_DWORD *)(a1 + 6496496) - v235 + 2LL))
-                                            + 6463728);
-      v236 = (float)(v234 * 16384.0) - (double)(int)(float)(v234 * 16384.0);
-      *(float *)(a1 + 6496568) = v236;
-      v237 = *(float *)(a1 + 6430016);
-      v238 = (float)((float)(v231 * *(float *)(a1 + 6496532)) - (float)(v231 * v232)) + v232;
-      v239 = *(float *)(a1 + 6496560);
-      v240 = v238 * v233;
-      *(float *)(a1 + 6429984) = v240 - v237;
-      *(float *)(a1 + 6430000) = (float)((float)(v240 - v237) * *(float *)(a1 + 6430864)) + v237;
-      v241 = *(float *)(a1 + 6430112);
-      v242 = (float)((float)((float)(v236 * *(float *)(a1 + 6496564)) - (float)(v236 * v239)) + v239) * v233;
-      v243 = v242 - v241;
-      *(float *)(a1 + 6430080) = v242 - v241;
-      v244 = *(float *)(a1 + 6430720);
-      v245 = v242 * v244;
-      *(float *)(a1 + 6430096) = (float)(v243 * *(float *)(a1 + 6430864)) + v241;
-      v246 = *(float *)(a1 + 6429904);
-      v247 = *(float *)(a1 + 6429888);
-      v248 = *(float *)(a1 + 6430704);
-      *(float *)(a1 + 6430400) = v240 * v244;
-      *(float *)(a1 + 6430416) = v245;
-      v249 = *(float *)(a1 + 6430768);
-      *(float *)(a1 + 6430432) = (float)((float)(v249 * (float)(v248 * v247)) + (float)((float)(1.0 - v249) * v247))
-                               + *(float *)(a1 + 6430400);
-      *(float *)(a1 + 6430448) = (float)((float)(v249 * (float)(v248 * v246)) + (float)((float)(1.0 - v249) * v246))
-                               + v245;
-      v250 = (*(_DWORD *)(a1 + 6463712) - 1) & (*(_DWORD *)(a1 + 6463716) - 1);
-      *(_DWORD *)(a1 + 6463712) = v250;
-      *(_DWORD *)(a1 + 4LL * v250 + 6430944) = *(_DWORD *)(a1 + 6496512);
-      v251 = (*(_DWORD *)(a1 + 6496496) - 1) & (*(_DWORD *)(a1 + 6496500) - 1);
-      *(_DWORD *)(a1 + 6496496) = v251;
-      *(_DWORD *)(a1 + 4LL * v251 + 6463728) = *(_DWORD *)(a1 + 6496544);
-      v252 = *(float *)(a1 + 101744);
-      v176 = v252 * *(float *)(a1 + 6430448);
-      v177 = v252 * *(float *)(a1 + 6430432);
+      /* == END ENGINE B: MODULE DLY_T4 =================== */
     }
   }
 LABEL_105:
@@ -2047,7 +2067,8 @@ LABEL_105:
         stf.s87008 = *(float *)(a1 + 87008);
         stf.s87024 = *(float *)(a1 + 87024);
         stf.s87040 = *(float *)(a1 + 87040);
-        eb_fx_e1_tick(&stf, &EBC_, *(float *)(a1 + 84624), &_o56, &_o58, &_o593);
+        eb_fx_e1_tick(&stf, &EBC_, *(float *)(a1 + 84624), (float)v56, v58,
+                      &_o56, &_o58, &_o593);
         *(float *)(a1 + 84672) = stf.s84672;
         *(float *)(a1 + 86096) = stf.s86096;
         *(float *)(a1 + 86112) = stf.s86112;
@@ -2086,129 +2107,132 @@ LABEL_105:
     if ( v551 <= 1 )
     {
 LABEL_164:
-      v664 = *(float *)(a1 + 84624);
-      *(_DWORD *)(a1 + 85088) = *(_DWORD *)(a1 + 85072);
-      *(_DWORD *)(a1 + 85072) = *(_DWORD *)(a1 + 85056);
-      *(_DWORD *)(a1 + 85056) = *(_DWORD *)(a1 + 85040);
-      *(_DWORD *)(a1 + 85040) = *(_DWORD *)(a1 + 85024);
-      *(_DWORD *)(a1 + 85024) = *(_DWORD *)(a1 + 85008);
-      *(_DWORD *)(a1 + 85008) = *(_DWORD *)(a1 + 84992);
-      *(_DWORD *)(a1 + 84992) = *(_DWORD *)(a1 + 84976);
-      *(_DWORD *)(a1 + 84976) = *(_DWORD *)(a1 + 84960);
-      *(_DWORD *)(a1 + 85120) = *(_DWORD *)(a1 + 85104);
-      *(_DWORD *)(a1 + 85600) = *(_DWORD *)(a1 + 85584);
-      *(_DWORD *)(a1 + 85632) = *(_DWORD *)(a1 + 85616);
-      *(_DWORD *)(a1 + 85664) = *(_DWORD *)(a1 + 85648);
-      *(_DWORD *)(a1 + 85696) = *(_DWORD *)(a1 + 85680);
-      *(_DWORD *)(a1 + 85728) = *(_DWORD *)(a1 + 85712);
-      *(float *)(a1 + 84896) = v664;
-      *(float *)(a1 + 84912) = v664;
-      v665 = *(float *)(a1 + 85136);
-      v666 = *(float *)(a1 + 85360);
-      v667 = *(float *)(a1 + 84976);
-      v668 = (float)(v664 + v664) * *(float *)(a1 + 85200);
-      v669 = (float)(v665 * *(float *)(a1 + 85328)) + *(float *)(a1 + 85312);
-      v670 = fminf(*(float *)(a1 + 85568) + *(float *)(a1 + 85120), *(float *)(a1 + 85184));
-      v671 = (float)(v665 * v665) * v665;
-      v672 = (float)(v665 * v665) * *(float *)(a1 + 85344);
-      *(float *)(a1 + 84960) = v668;
-      v673 = v667 * *(float *)(a1 + 85232);
-      v674 = v668 * *(float *)(a1 + 85216);
-      v675 = *(float *)(a1 + 84992);
-      v676 = *(float *)(a1 + 85008);
-      *(float *)(a1 + 85104) = v670;
-      v677 = v676 * *(float *)(a1 + 85296);
-      v678 = (float)(v673 + v674) + (float)(v675 * *(float *)(a1 + 85248));
-      *(float *)(a1 + 84976) = v678;
-      v679 = (float)((float)(v675 * *(float *)(a1 + 85280)) + (float)(v678 * *(float *)(a1 + 85264))) + v677;
-      *(float *)(a1 + 84992) = v679;
-      v680 = *(float *)(a1 + 85040);
-      v681 = *(float *)(a1 + 85168);
-      v682 = (float)((float)((float)((float)((float)(v666 * v671) + (float)(v669 + v672)) + *(float *)(a1 + 85376))
-                           * v679)
-                   + (float)(v678 * *(float *)(a1 + 85392)))
-           - v680;
-      *(float *)(a1 + 85008) = v682;
-      *(float *)(a1 + 85024) = (float)(v682 * *(float *)(a1 + 85408)) + v680;
-      v683 = *(float *)(a1 + 84976);
-      v684 = (float)((float)(v670 * *(float *)(a1 + 85424)) * 0.125) + (float)(v681 * v682);
-      *(float *)(a1 + 85584) = v684;
-      v685 = *(float *)(a1 + 85792);
-      v686 = *(float *)(a1 + 85600);
-      if ( (float)(v684 * v685) >= -1.0 )
-        v687 = fminf(v684 * v685, 1.0);
-      else
-        v687 = -1.0;
-      v688 = (float)((float)(v684 * *(float *)(a1 + 85776)) + (float)(v686 * *(float *)(a1 + 85760))) * v685;
-      *(float *)(a1 + 85616) = (float)((float)((float)(v687 * v687) * v687) * *(float *)(a1 + 85824))
-                             + (float)(v687 * *(float *)(a1 + 85808));
-      if ( v688 >= -1.0 )
-        v689 = fminf(v688, 1.0);
-      else
-        v689 = -1.0;
-      v690 = *(float *)(a1 + 85600);
-      v691 = (float)((float)(v686 + *(float *)(a1 + 85584)) * *(float *)(a1 + 85744)) * *(float *)(a1 + 85792);
-      *(float *)(a1 + 85648) = (float)((float)((float)(v689 * v689) * v689) * *(float *)(a1 + 85824))
-                             + (float)(v689 * *(float *)(a1 + 85808));
-      if ( v691 >= -1.0 )
-        v692 = fminf(v691, 1.0);
-      else
-        v692 = -1.0;
-      v693 = *(float *)(a1 + 85616);
-      v694 = (float)((float)(v690 * *(float *)(a1 + 85776)) + (float)(*(float *)(a1 + 85760) * *(float *)(a1 + 85584)))
-           * *(float *)(a1 + 85792);
-      *(float *)(a1 + 85680) = (float)((float)((float)(v692 * v692) * v692) * *(float *)(a1 + 85824))
-                             + (float)(v692 * *(float *)(a1 + 85808));
-      if ( v694 >= -1.0 )
-        v58 = fminf(v694, 1.0);
-      v695 = *(float *)(a1 + 85696);
-      v696 = (float)((float)(v693 + *(float *)(a1 + 85728)) * *(float *)(a1 + 85840))
-           + (float)(*(float *)(a1 + 85856) * *(float *)(a1 + 85648));
-      v697 = (float)((float)((float)(v58 * v58) * v58) * *(float *)(a1 + 85824)) + (float)(v58 * *(float *)(a1 + 85808));
-      *(float *)(a1 + 85712) = v697;
-      v698 = (float)((float)(*(float *)(a1 + 85680) + *(float *)(a1 + 85664)) * *(float *)(a1 + 85872))
-           + (float)((float)(v695 * *(float *)(a1 + 85856)) + v696);
-      v699 = *(float *)(a1 + 85056);
-      v700 = (float)((float)(v698 + (float)((float)(v697 + *(float *)(a1 + 85632)) * *(float *)(a1 + 85888)))
-                   * *(float *)(a1 + 85440))
-           + (float)(v683 * *(float *)(a1 + 85456));
-      *(float *)(a1 + 85040) = v700;
-      v701 = *(float *)(a1 + 85072);
-      v702 = (float)((float)(v699 * *(float *)(a1 + 85488)) + (float)(v700 * *(float *)(a1 + 85472)))
-           + (float)(v701 * *(float *)(a1 + 85504));
-      *(float *)(a1 + 85056) = v702;
-      v703 = (float)((float)(v701 * *(float *)(a1 + 85536)) + (float)(v702 * *(float *)(a1 + 85520)))
-           + (float)(*(float *)(a1 + 85552) * *(float *)(a1 + 85088));
-      *(float *)(a1 + 85072) = v703;
-      v704 = (float)(v703 * *(float *)(a1 + 85152)) * *(float *)(a1 + 85168);
-      *(float *)(a1 + 84928) = v704;
-      *(float *)(a1 + 84944) = v704;
-      *(_DWORD *)(a1 + 85952) = *(_DWORD *)(a1 + 85936);
-      *(_DWORD *)(a1 + 85936) = *(_DWORD *)(a1 + 85920);
-      *(_DWORD *)(a1 + 85920) = *(_DWORD *)(a1 + 85904);
-      *(float *)(a1 + 85904) = v704;
-      v705 = *(float *)(a1 + 85984);
-      v706 = (float)((float)(*(float *)(a1 + 85920) * *(float *)(a1 + 86016)) + (float)(v704 * *(float *)(a1 + 86000)))
-           + (float)(*(float *)(a1 + 86032) * *(float *)(a1 + 85936));
-      v707 = (float)((float)(*(float *)(a1 + 85920) * *(float *)(a1 + 86064)) + (float)(v704 * *(float *)(a1 + 86048)))
-           + (float)(*(float *)(a1 + 86080) * *(float *)(a1 + 85952));
-      if ( v705 <= 0.0 )
-        v708 = 0.0;
-      else
-        v708 = v705;
-      v709 = v708;
-      *(float *)(a1 + 85920) = v706;
-      *(float *)(a1 + 85936) = v707;
-      v710 = (float)((float)(v709 * v706) - (float)(v709 * v704)) + v704;
-      if ( v705 < -0.0 )
-        v56 = (float)-v705;
-      v711 = v56;
-      v712 = v704 + (float)((float)(v711 * v707) - (float)(v711 * v704));
-      if ( v705 >= 0.0 )
-        v712 = v710;
-      *(float *)(a1 + 85968) = v712;
-      *(float *)(a1 + 84672) = v712;
-      v593 = *(_DWORD *)(a1 + 85968);
+      /* ==== ENGINE B: MODULE FX_E0 (src :2504-2626) ==============
+       * An arm NO factory patch selects. It is reachable only by the
+       * doctored-bank scenario in null_b.py -- see task 1b-3. Writing it
+       * before that scenario existed would have produced a module whose
+       * gate could never execute it. */
+      {
+        static eb_fx_e0_coef C_fx_e0; static unsigned char H_fx_e0;
+        static unsigned long G_fx_e0; extern unsigned long eb_coef_gen;
+        eb_fx_e0_state st_fx_e0;
+        float _o56, _o58, _o593;
+        if (!H_fx_e0 || G_fx_e0 != eb_coef_gen) {
+          C_fx_e0.k85136 = *(float *)(a1 + 85136);
+          C_fx_e0.k85152 = *(float *)(a1 + 85152);
+          C_fx_e0.k85168 = *(float *)(a1 + 85168);
+          C_fx_e0.k85184 = *(float *)(a1 + 85184);
+          C_fx_e0.k85200 = *(float *)(a1 + 85200);
+          C_fx_e0.k85216 = *(float *)(a1 + 85216);
+          C_fx_e0.k85232 = *(float *)(a1 + 85232);
+          C_fx_e0.k85248 = *(float *)(a1 + 85248);
+          C_fx_e0.k85264 = *(float *)(a1 + 85264);
+          C_fx_e0.k85280 = *(float *)(a1 + 85280);
+          C_fx_e0.k85296 = *(float *)(a1 + 85296);
+          C_fx_e0.k85312 = *(float *)(a1 + 85312);
+          C_fx_e0.k85328 = *(float *)(a1 + 85328);
+          C_fx_e0.k85344 = *(float *)(a1 + 85344);
+          C_fx_e0.k85360 = *(float *)(a1 + 85360);
+          C_fx_e0.k85376 = *(float *)(a1 + 85376);
+          C_fx_e0.k85392 = *(float *)(a1 + 85392);
+          C_fx_e0.k85408 = *(float *)(a1 + 85408);
+          C_fx_e0.k85424 = *(float *)(a1 + 85424);
+          C_fx_e0.k85440 = *(float *)(a1 + 85440);
+          C_fx_e0.k85456 = *(float *)(a1 + 85456);
+          C_fx_e0.k85472 = *(float *)(a1 + 85472);
+          C_fx_e0.k85488 = *(float *)(a1 + 85488);
+          C_fx_e0.k85504 = *(float *)(a1 + 85504);
+          C_fx_e0.k85520 = *(float *)(a1 + 85520);
+          C_fx_e0.k85536 = *(float *)(a1 + 85536);
+          C_fx_e0.k85552 = *(float *)(a1 + 85552);
+          C_fx_e0.k85568 = *(float *)(a1 + 85568);
+          C_fx_e0.k85744 = *(float *)(a1 + 85744);
+          C_fx_e0.k85760 = *(float *)(a1 + 85760);
+          C_fx_e0.k85776 = *(float *)(a1 + 85776);
+          C_fx_e0.k85792 = *(float *)(a1 + 85792);
+          C_fx_e0.k85808 = *(float *)(a1 + 85808);
+          C_fx_e0.k85824 = *(float *)(a1 + 85824);
+          C_fx_e0.k85840 = *(float *)(a1 + 85840);
+          C_fx_e0.k85856 = *(float *)(a1 + 85856);
+          C_fx_e0.k85872 = *(float *)(a1 + 85872);
+          C_fx_e0.k85888 = *(float *)(a1 + 85888);
+          C_fx_e0.k85984 = *(float *)(a1 + 85984);
+          C_fx_e0.k86000 = *(float *)(a1 + 86000);
+          C_fx_e0.k86016 = *(float *)(a1 + 86016);
+          C_fx_e0.k86032 = *(float *)(a1 + 86032);
+          C_fx_e0.k86048 = *(float *)(a1 + 86048);
+          C_fx_e0.k86064 = *(float *)(a1 + 86064);
+          C_fx_e0.k86080 = *(float *)(a1 + 86080);
+          H_fx_e0 = 1; G_fx_e0 = eb_coef_gen;
+        }
+        st_fx_e0.s84672 = *(float *)(a1 + 84672);
+        st_fx_e0.s84896 = *(float *)(a1 + 84896);
+        st_fx_e0.s84912 = *(float *)(a1 + 84912);
+        st_fx_e0.s84928 = *(float *)(a1 + 84928);
+        st_fx_e0.s84944 = *(float *)(a1 + 84944);
+        st_fx_e0.s84960 = *(float *)(a1 + 84960);
+        st_fx_e0.s84976 = *(float *)(a1 + 84976);
+        st_fx_e0.s84992 = *(float *)(a1 + 84992);
+        st_fx_e0.s85008 = *(float *)(a1 + 85008);
+        st_fx_e0.s85024 = *(float *)(a1 + 85024);
+        st_fx_e0.s85040 = *(float *)(a1 + 85040);
+        st_fx_e0.s85056 = *(float *)(a1 + 85056);
+        st_fx_e0.s85072 = *(float *)(a1 + 85072);
+        st_fx_e0.s85088 = *(float *)(a1 + 85088);
+        st_fx_e0.s85104 = *(float *)(a1 + 85104);
+        st_fx_e0.s85120 = *(float *)(a1 + 85120);
+        st_fx_e0.s85584 = *(float *)(a1 + 85584);
+        st_fx_e0.s85600 = *(float *)(a1 + 85600);
+        st_fx_e0.s85616 = *(float *)(a1 + 85616);
+        st_fx_e0.s85632 = *(float *)(a1 + 85632);
+        st_fx_e0.s85648 = *(float *)(a1 + 85648);
+        st_fx_e0.s85664 = *(float *)(a1 + 85664);
+        st_fx_e0.s85680 = *(float *)(a1 + 85680);
+        st_fx_e0.s85696 = *(float *)(a1 + 85696);
+        st_fx_e0.s85712 = *(float *)(a1 + 85712);
+        st_fx_e0.s85728 = *(float *)(a1 + 85728);
+        st_fx_e0.s85904 = *(float *)(a1 + 85904);
+        st_fx_e0.s85920 = *(float *)(a1 + 85920);
+        st_fx_e0.s85936 = *(float *)(a1 + 85936);
+        st_fx_e0.s85952 = *(float *)(a1 + 85952);
+        st_fx_e0.s85968 = *(float *)(a1 + 85968);
+        eb_fx_e0_tick(&st_fx_e0, &C_fx_e0, *(float *)(a1 + 84624), (float)v56, v58, &_o56, &_o58, &_o593);
+        *(float *)(a1 + 84672) = st_fx_e0.s84672;
+        *(float *)(a1 + 84896) = st_fx_e0.s84896;
+        *(float *)(a1 + 84912) = st_fx_e0.s84912;
+        *(float *)(a1 + 84928) = st_fx_e0.s84928;
+        *(float *)(a1 + 84944) = st_fx_e0.s84944;
+        *(float *)(a1 + 84960) = st_fx_e0.s84960;
+        *(float *)(a1 + 84976) = st_fx_e0.s84976;
+        *(float *)(a1 + 84992) = st_fx_e0.s84992;
+        *(float *)(a1 + 85008) = st_fx_e0.s85008;
+        *(float *)(a1 + 85024) = st_fx_e0.s85024;
+        *(float *)(a1 + 85040) = st_fx_e0.s85040;
+        *(float *)(a1 + 85056) = st_fx_e0.s85056;
+        *(float *)(a1 + 85072) = st_fx_e0.s85072;
+        *(float *)(a1 + 85088) = st_fx_e0.s85088;
+        *(float *)(a1 + 85104) = st_fx_e0.s85104;
+        *(float *)(a1 + 85120) = st_fx_e0.s85120;
+        *(float *)(a1 + 85584) = st_fx_e0.s85584;
+        *(float *)(a1 + 85600) = st_fx_e0.s85600;
+        *(float *)(a1 + 85616) = st_fx_e0.s85616;
+        *(float *)(a1 + 85632) = st_fx_e0.s85632;
+        *(float *)(a1 + 85648) = st_fx_e0.s85648;
+        *(float *)(a1 + 85664) = st_fx_e0.s85664;
+        *(float *)(a1 + 85680) = st_fx_e0.s85680;
+        *(float *)(a1 + 85696) = st_fx_e0.s85696;
+        *(float *)(a1 + 85712) = st_fx_e0.s85712;
+        *(float *)(a1 + 85728) = st_fx_e0.s85728;
+        *(float *)(a1 + 85904) = st_fx_e0.s85904;
+        *(float *)(a1 + 85920) = st_fx_e0.s85920;
+        *(float *)(a1 + 85936) = st_fx_e0.s85936;
+        *(float *)(a1 + 85952) = st_fx_e0.s85952;
+        *(float *)(a1 + 85968) = st_fx_e0.s85968;
+        v56 = _o56;
+        v58 = _o58;
+        memcpy(&v593, &_o593, 4);  /* BIT copy */
+      }
+      /* == END ENGINE B: MODULE FX_E0 =================== */
       goto LABEL_205;
     }
     if ( v551 > 4 )
@@ -2300,7 +2324,8 @@ LABEL_164:
         stf.s101064 = *(float *)(a1 + 101064);
         stf.s101024 = *(int32_t *)(a1 + 101024);
         stf.ring = (float *)(a1 + 96928);
-        eb_fx_e5_tick(&stf, &EBC_, *(float *)(a1 + 84624), &_o56, &_o58, &_o593);
+        eb_fx_e5_tick(&stf, &EBC_, *(float *)(a1 + 84624), (float)v56, v58,
+                      &_o56, &_o58, &_o593);
         *(float *)(a1 + 84672) = stf.s84672;
         *(float *)(a1 + 95888) = stf.s95888;
         *(float *)(a1 + 95904) = stf.s95904;

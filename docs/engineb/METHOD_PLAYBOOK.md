@@ -93,7 +93,7 @@ touches, decide: coefficient (read, never written anywhere), state (read and
 written), or dead store (written, never read). Do it **by script** — and then
 know that the script lies in five distinct ways.
 
-### THE FIVE WAYS THE CLASSIFIER LIES
+### THE SIX WAYS THE CLASSIFIER LIES
 
 Each of these shipped a defect here.
 
@@ -116,6 +116,16 @@ Each of these shipped a defect here.
    the bottom of block Z, in the same sample. A scan of block A *alone* calls it
    a coefficient. Only a whole-function scan sees it. These must be ARGUMENTS to
    the module, not state, because they belong to the block that writes them.
+6. **Constant scratch a block leaves behind.** A block's last statements may
+   assign plain constants to locals it never uses again — decompiled register
+   reuse, and easy to drop as noise. They are not noise if a LATER block reads
+   the local on a branch where it does not assign it first. Here every DELAY arm
+   ended with `v56 = 0.0; v58 = -1.0;`; all four delay modules dropped the pair,
+   and the omission was unreachable until an EFFECT arm that assigns `v56` on
+   only one branch was transcribed. **A module's contract is the state it LEAVES
+   as well as the value it RETURNS** — and no per-module gate can test that,
+   because each module is exact inside the other's port code. It took a
+   two-member composite bisect to find.
 
 **Make the check mechanical and put it in the battery.** A check that runs by
 hand goes stale. Give it teeth of its own: a planted tree in which the bad cell
@@ -417,6 +427,8 @@ checklist.
 | 16 | Differential rendered a truncated script | reported "no differences" over one sample |
 | 17 | Shadow-state diagnostic mirrored events in the wrong order | showed a divergence that did not exist |
 | 18 | Gate validated a component against an oracle in which the component it replaced was never reachable | oracle and port were wrong together; every comparison green |
+| 19 | Two modules each EXACTLY 0 alone, wrong together (dropped scratch constants) | composite failed at −11.7 dB; neither per-module gate could see it |
+| 20 | Module wrote a `float` result through a pointer to a `double` local | compiler warned, nobody read it; the local was garbage on the branch that used it |
 
 **#18 is the one to internalise.** Before concluding "the original does X", check
 that the original's code for *not*-X could have run in your harness at all.

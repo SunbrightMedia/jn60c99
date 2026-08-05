@@ -894,7 +894,7 @@ float *juno_master_render(unsigned char *a1, float **a2, float **a3)
     {
       static eb_dly1_coef EBD1C; static unsigned char EBD1HAVE;
       static unsigned long EBD1GEN; extern unsigned long eb_coef_gen;
-      eb_dly1_state st1;
+      eb_dly1_state st1; float _c56, _c58;
       if (!EBD1HAVE || EBD1GEN != eb_coef_gen) {
         EBD1C.k101744 = *(float *)(a1 + 101744);
         EBD1C.k4297584 = *(float *)(a1 + 4297584);
@@ -965,7 +965,20 @@ float *juno_master_render(unsigned char *a1, float **a2, float **a3)
       st1.s6395248 = *(int32_t *)(a1 + 6395248);
       st1.s11022348 = *(int32_t *)(a1 + 11022348);
       st1.ring = (float *)(a1 + 4298096);
-      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177, &v56, &v58);
+      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177, &_c56, &_c58);
+      /* THE PORT'S DELAY STAGE ALSO INITIALISES v56/v58, and this shim dropped
+       * them. EVERY delay arm contains the pair `v56 = 0.0; v58 = -1.0;`. It
+       * reads as decompiler register scratch and it is not: the EFFECT arms that
+       * follow assign v56 on ONE branch only, so on the other branch v56 carries
+       * the delay stage's 0.0 forward. The omission was unreachable until an
+       * EFFECT arm with that branch existed (task 1b-3, EFFECT TYPE 0), and then
+       * it cost a bisect to find: `--module delay` alone was EXACTLY 0,
+       * `--module arms_1b3` alone was EXACTLY 0, and the two TOGETHER failed at
+       * -11.7 dB. Two modules that are each exact compose exactly only if each
+       * also leaves behind the STATE the other reads. eb_master.c has always set
+       * these two constants; only the hybrid shims lacked them. */
+      v56 = 0.0;
+      v58 = -1.0;
       *(float *)(a1 + 4297200) = st1.s4297200;
       *(float *)(a1 + 4297216) = st1.s4297216;
       *(float *)(a1 + 4297232) = st1.s4297232;

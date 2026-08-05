@@ -53,6 +53,9 @@ RINGS = [(6429408, 6429412, 6396640)]
 # The type-5 arm's FOUR rings. Each ring's control pair sits immediately AFTER
 # the PREVIOUS ring's data, so the index cell of a ring is nowhere near its own
 # base -- read the write expression to pair them, never the addresses.
+RINGS_D4 = [(6463712, 6463716, 6430944),
+            (6496496, 6496500, 6463728)]
+
 RINGS_E5 = [(101024, 101028, 96928)]
 
 RINGS_T1 = [(6395248, 6395252, 4298096)]
@@ -188,7 +191,7 @@ def main():
     lo, hi = int(sys.argv[1]), int(sys.argv[2])
     cls = classify(lo, hi)
     if "--emit" in sys.argv:
-        b = emit(lo, hi, cls, RINGS_T5 if "--t5" in sys.argv else RINGS_T1 if "--t1" in sys.argv else RINGS_E5 if "--e5" in sys.argv else None)
+        b = emit(lo, hi, cls, RINGS_T5 if "--t5" in sys.argv else RINGS_T1 if "--t1" in sys.argv else RINGS_E5 if "--e5" in sys.argv else RINGS_D4 if "--d4" in sys.argv else None)
         if b is None:
             return 1
         print(b)

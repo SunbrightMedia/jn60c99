@@ -58,7 +58,7 @@ MERGED = ("voice_render.c", "master_render.c")
 # runs engine B's own render function instead of the port's -- so composing it
 # with the per-module shims is not merely a file collision, it is meaningless:
 # both would claim the same arithmetic by different routes.
-STANDALONE = ("voices",)
+STANDALONE = ("voices", "standalone")
 
 # DIAGNOSTIC shims are excluded by NAME SUFFIX. A debug shim keeps the PORT's
 # block and runs the module alongside it to compare them; merged into the

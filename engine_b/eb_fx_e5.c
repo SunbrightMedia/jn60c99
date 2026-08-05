@@ -11,7 +11,8 @@
 #define RINGI(i)   (s->ring[(i)])
 
 void eb_fx_e5_tick(eb_fx_e5_state *s, const eb_fx_e5_coef *c,
-                   float in84624, float *o56, float *o58, float *o593)
+                   float in84624, float in56, float in58,
+                   float *o56, float *o58, float *o593)
 {
     double v56;
     float v58;
@@ -57,6 +58,8 @@ void eb_fx_e5_tick(eb_fx_e5_state *s, const eb_fx_e5_coef *c,
     float v591;
     int v592;
     float v593;
+    v56 = in56;   /* IN-OUT: assigned only on one branch below */
+    v58 = in58;
         v552 = in84624;
         s->s95952 = s->s95936;
         s->s95936 = s->s95920;

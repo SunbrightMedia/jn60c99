@@ -29,14 +29,8 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
     *outL = 0.0f;
     *outR = 0.0f;
 
-    /* Refuse BEFORE computing anything, so an unsupported patch cannot leave
-     * half a sample of state advanced behind it. */
-    if (c->delay_type == 4)
-        return EB_MASTER_UNSUPPORTED_ARM;
-    if (c->effect_type <= 1 && c->effect_type != 1)
-        return EB_MASTER_UNSUPPORTED_ARM;          /* EFFECT 0 -> LABEL_164 */
-    if (c->effect_type >= 6)
-        return EB_MASTER_UNSUPPORTED_ARM;          /* also LABEL_164 */
+    /* No refusals left: task 1b-3 gave DELAY TYPE 4 and the EFFECT LABEL_164
+     * core their modules, so every value either dispatch can take is covered. */
 
     /* ---- 1. the input stage. The feedback pair is LAST sample's. -------- */
     eb_master_in_tick(&s->in, &c->in, voices, s->fb84672, s->fb84704,
@@ -72,6 +66,10 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
         s->d23.ring = r->t23;
         eb_dly23_tick(&s->d23, &c->d23, v36, v38, c->in.k84496,
                       &v176, &v177, &v56, &v58);
+    } else if (c->delay_type == 4) {
+        s->d4.ring0 = r->t4_0; s->d4.ring1 = r->t4_1;
+        eb_dly_t4_tick(&s->d4, &c->d4, v36, v38, c->in.k84496,
+                       &v176, &v177, &v56, &v58);
     } else {                                        /* delay_type == 5 */
         s->d5.ring0 = r->t5_0; s->d5.ring1 = r->t5_1;
         s->d5.ring2 = r->t5_2; s->d5.ring3 = r->t5_3;
@@ -96,13 +94,20 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
     }
 
     /* ---- 5. the EFFECT dispatch, which feeds the NEXT sample ------------ */
-    if (c->effect_type == 1) {
-        eb_fx_e1_tick(&s->e1, &c->e1, v32, &v56, &v58, &v593);
+    if (c->effect_type == 0 || c->effect_type >= 6) {
+        /* the LABEL_164 core */
+        eb_fx_e0_tick(&s->e0, &c->e0, v32, v56, v58, &v56, &v58, &v593);
+        s->fb84672 = s->e0.s84672;
+    } else if (c->effect_type == 1) {
+        eb_fx_e1_tick(&s->e1, &c->e1, v32, v56, v58, &v56, &v58, &v593);
         s->fb84672 = s->e1.s84672;
     } else if (c->effect_type == 5) {
         s->e5.ring = r->e5;
-        eb_fx_e5_tick(&s->e5, &c->e5, v32, &v56, &v58, &v593);
+        eb_fx_e5_tick(&s->e5, &c->e5, v32, v56, v58, &v56, &v58, &v593);
         s->fb84672 = s->e5.s84672;
+        /* v56/v58 go IN as well as out: the port assigns them only on one
+         * branch of this arm, so on the other branch they keep what the DELAY
+         * stage left. See eb_fx_e1.h. */
     } else {                                        /* 2, 3, 4 -> chorus */
         float chL, chR;
         eb_chorus_tick_x(&s->cho, &c->cho, v32, &chL, &chR, v56, v58);

@@ -86,7 +86,16 @@ typedef struct {
  * in the same sample by another block -- an argument, never a cached
  * coefficient. `o593` carries FLOAT BITS through an int-declared local in
  * the port, so the caller must bit-copy it, not assign it. */
+/* v56 and v58 are IN-OUT. The port assigns both CONDITIONALLY inside
+ * this arm -- `if (x >= -1.0) v58 = ...` -- so on the other branch they
+ * keep the value the DELAY stage left, which is a genuine live-in that a
+ * live-variable check calls `assigned in block`. MEASURED: taking them as
+ * pure outputs left them uninitialised, and the EFFECT-0 arm produced
+ * -0.9845 where the port had exactly -1. The e1 and e5 arms passed their
+ * gates that way only because the conditions happened to hold in every
+ * scenario that reaches them. */
 void eb_fx_e5_tick(eb_fx_e5_state *s, const eb_fx_e5_coef *c,
-                   float in84624, float *o56, float *o58, float *o593);
+                   float in84624, float in56, float in58,
+                   float *o56, float *o58, float *o593);
 
 #endif

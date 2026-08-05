@@ -197,6 +197,42 @@ BASE_SCEN = list(null_ab.SCEN)
 # object's mode at 0 and never calls the activation). Those arms need a
 # synthetic-recall gate of the etmode_ab.py kind, not a scenario, and no module
 # may be written for them until one exists.
+# ---- SYNTHETIC-ARM SCENARIOS (task 1b-3) ---------------------------------
+# DELAY TYPE 4 and EFFECT TYPE 0 appear in NO factory patch, so no scenario
+# built from the bank can reach those dispatch arms and no module written for
+# them could be gated. The bank is DOCTORED instead: the record's own nibble
+# pair for that parameter is overwritten, exactly as tools/verify/etmode_ab.py
+# already does to reach the unreachable EFFECT modes.
+#
+# This is the instrument's OWN recall path driven with a value a factory patch
+# does not happen to carry -- not a synthetic engine state. A user preset can
+# select these arms, so the trunk (which is the full instrument) needs them.
+HDR_REC, STRIDE_REC = 23, 20223
+ET_REC_OFF, DT_REC_OFF = 634, 650      # EFFECT TYPE / DELAY TYPE nibble pairs
+
+DOCTOR = {
+    "DELAY type 4  (synthetic)":  (DT_REC_OFF, 4),
+    "EFFECT type 0 (synthetic)":  (ET_REC_OFF, 0),
+}
+
+
+def doctor_bank(bank, patch, rec_off, value):
+    b = bytearray(bank)
+    off = HDR_REC + patch * STRIDE_REC + rec_off
+    b[off] = (value >> 4) & 0xF
+    b[off + 1] = value & 0xF
+    return bytes(b)
+
+
+BASE_SCEN += [
+    (2, [('render', 2000), ('on', 52, 100), ('on', 59, 100),
+         ('render', 26000), ('off', 52), ('off', 59), ('render', 12000)],
+     'DELAY type 4  (synthetic)'),
+    (2, [('render', 2000), ('on', 45, 100), ('on', 57, 100),
+         ('render', 26000), ('off', 45), ('off', 57), ('render', 12000)],
+     'EFFECT type 0 (synthetic)'),
+]
+
 BASE_SCEN += [
     (11, [('render', 2000), ('on', 50, 100), ('on', 57, 100),
           ('render', 26000), ('off', 50), ('off', 57), ('render', 12000)],
@@ -378,17 +414,17 @@ _OUT_ANCHOR = {
     # exist before the module was written.
     "delay_t23": ("master_render.c",
                   "      eb_dly23_tick(&st23, &EBD23C, v36, v38, v5, "
-                  "&v176, &v177, &v56, &v58);",
+                  "&v176, &v177, &_c56, &_c58);",
                   "      v176 *= %s; v177 *= %s;"),
     # THE OTHER DELAY ARM. Same note as delay_t23: only the scenarios that
     # SELECT DELAY TYPE 5 can catch it.
     "delay_t5": ("master_render.c",
-                 "                         &v176, &v177, &v56, &v58);",
+                 "                         &v176, &v177, &_c56, &_c58);",
                  "            v176 *= %s; v177 *= %s;"),
     # The DELAY TYPE 1 algorithm. Its v176/v177 ARE live -- type 1 does not
     # reach the shared core (:1050 is an `else`).
     "delay_t1": ("master_render.c",
-                 "      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177, &v56, &v58);",
+                 "      eb_dly1_tick(&st1, &EBD1C, v36, v38, v5, &v176, &v177, &_c56, &_c58);",
                  "      v176 *= %s; v177 *= %s;"),
     # THE TWO REACHABLE EFFECT-TYPE ARMS. Perturbed at v593, which is the
     # value the arm hands the next sample through cell 84704 -- the effect
@@ -812,6 +848,35 @@ def _plant(tmp, mutate):
         a = "    s->fb84704 = CF(base, 84704);"
         assert s.count(a) == 1, "seedpoison anchor moved"
         s = s.replace(a, "    s->fb84704 = CF(base, 84704) + 1e-3f;", 1)
+    elif mutate == "delayscratch":
+        # THE COMPOSITION CASE, and it is a REAL defect this harness let through.
+        # Every DELAY arm in the port ends with `v56 = 0.0; v58 = -1.0;`. It
+        # reads as decompiler register scratch. It is not: the EFFECT arms that
+        # follow assign v56 on ONE branch only, so on the other branch v56
+        # carries the delay stage's 0.0 forward. All four delay shims dropped
+        # the pair, and the omission was UNREACHABLE until an EFFECT arm with
+        # that branch existed (task 1b-3, EFFECT TYPE 0).
+        #
+        # MEASURED when it was live: `--module delay` alone was EXACTLY 0 and
+        # `--module arms_1b3` alone was EXACTLY 0, and the COMPOSITE of the two
+        # failed at -11.7 dB, first differing sample 4050. Two modules that are
+        # each exact compose exactly only if each also leaves behind the state
+        # the other reads -- and no per-module gate can see that.
+        p = os.path.join(tmp, "src", "master_render.c"); s = open(p).read()
+        # THE ARM MATTERS. The EFFECT-TYPE-0 scenario plays patch 2, whose
+        # DELAY TYPE is 0 -- the shared core, the 'delay' shim. A generic
+        # "first v56 = 0.0 in the file" anchor lands in delay_t1's arm, which
+        # no scenario in this battery selects, and the case would measure
+        # NOTHING while looking planted. The anchor is therefore the delay-0
+        # module's own output write.
+        a = "        *(float *)(a1 + 102336) = ebR;"
+        if s.count(a) != 1:
+            raise SystemExit("delayscratch anchor matched %d times -- the case "
+                             "cannot reach its own mutation and measures "
+                             "nothing." % s.count(a))
+        i = s.index(a)
+        j = s.index("        v56 = 0.0;\n", i)
+        s = s[:j] + s[j + len("        v56 = 0.0;\n"):]
     elif mutate == "voicereseed":
         # THE LOCKSTEP CASE, and it is a REAL defect this harness let through
         # once. Engine B's state lives in file statics and the render worker
@@ -861,8 +926,11 @@ def worker(lib_path, out_path, quick, sr):
         pass                      # engine_b/ not linked -- the caller checks
     out = {"ident": ident, "sr": SR, "streams": {}}
     for patch, script, tag in scenarios(quick):
+        bnk = bank
+        if tag in DOCTOR:
+            bnk = doctor_bank(bank, patch, *DOCTOR[tag])
         out["streams"][tag] = array.array(
-            'f', null_ab.render_script(lib, bank, SR, patch, script))
+            'f', null_ab.render_script(lib, bnk, SR, patch, script))
     with open(out_path, "wb") as f:
         pickle.dump(out, f, 2)
 
@@ -1067,7 +1135,9 @@ def teeth(quick):
              ("voicereseed", ("voices",), True),
              ("voiceidleskip", ("voices",), True),
              (None, ("standalone",), False),
-             ("seedpoison", ("standalone",), True)]
+             ("seedpoison", ("standalone",), True),
+             (None, ("engine_all",), False),
+             ("delayscratch", ("engine_all",), True)]
 
     # ---- PER-MODULE OUTPUT TEETH (added 2026-08-02, audit finding F2) -------
     # Until this battery existed, nine of the ten modules had never been shown

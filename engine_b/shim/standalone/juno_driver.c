@@ -214,18 +214,20 @@ void juno_driver_render_voices(unsigned char *st, float *vbuf)
          * Copied from the port at seed time rather than zeroed, so a context
          * that starts warm is seeded correctly too. */
         {
-            static const struct { unsigned data, len; } RD[7] = {
+            static const struct { unsigned data, len; } RD[9] = {
                 {4298096, 6395252}, {6396640, 6429412}, {6497616, 8594772},
                 {8594784, 10691940}, {10693488, 10726260},
-                {10726272, 10759044}, {96928, 101028}
+                {10726272, 10759044}, {96928, 101028},
+                {6430944, 6463716}, {6463728, 6496500}
             };
-            float **dst[7] = { &RG.t1, &RG.t23, &RG.t5_0, &RG.t5_1,
-                               &RG.t5_2, &RG.t5_3, &RG.e5 };
-            int32_t *dlen[7] = { &RG.t1_len, &RG.t23_len, &RG.t5_0_len,
+            float **dst[9] = { &RG.t1, &RG.t23, &RG.t5_0, &RG.t5_1,
+                               &RG.t5_2, &RG.t5_3, &RG.e5,
+                               &RG.t4_0, &RG.t4_1 };
+            int32_t *dlen[9] = { &RG.t1_len, &RG.t23_len, &RG.t5_0_len,
                                  &RG.t5_1_len, &RG.t5_2_len, &RG.t5_3_len,
-                                 &RG.e5_len };
+                                 &RG.e5_len, &RG.t4_0_len, &RG.t4_1_len };
             int q;
-            for (q = 0; q < 7; ++q) {
+            for (q = 0; q < 9; ++q) {
                 int32_t n = *(const int32_t *)(st + RD[q].len);
                 if (*dst[q]) free(*dst[q]);
                 *dst[q] = (float *)malloc((size_t)n * sizeof(float));

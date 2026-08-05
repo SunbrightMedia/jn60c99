@@ -9,7 +9,8 @@
 #define LODWORD(x) (*(uint32_t *)&(x))
 
 void eb_fx_e1_tick(eb_fx_e1_state *s, const eb_fx_e1_coef *c,
-                   float in84624, float *o56, float *o58, float *o593)
+                   float in84624, float in56, float in58,
+                   float *o56, float *o58, float *o593)
 {
     double v56;
     float v58;
@@ -61,6 +62,8 @@ void eb_fx_e1_tick(eb_fx_e1_state *s, const eb_fx_e1_coef *c,
     float v757;
     float v758;
     float v759;
+    v56 = in56;   /* IN-OUT: assigned only on one branch below */
+    v58 = in58;
     v713 = in84624;
     s->s86272 = s->s86256;
     s->s86256 = s->s86240;

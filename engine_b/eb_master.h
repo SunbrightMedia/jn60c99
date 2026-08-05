@@ -56,19 +56,22 @@
 #include "eb_delay_t5.h"
 #include "eb_fx_e1.h"
 #include "eb_fx_e5.h"
+#include "eb_dly_t4.h"
+#include "eb_fx_e0.h"
 #include "eb_delay.h"
 #include "eb_reverb.h"
 #include "eb_chorus.h"
 
 enum {
     EB_MASTER_OK = 0,
-    /* The selected DELAY or EFFECT type has no engine B module. The two that
-     * do not are DELAY TYPE 4 and the EFFECT LABEL_164 core (EFFECT 0 and
-     * >= 6): MEASURED, NO factory patch selects either, so no null scenario
-     * can reach them and no module may be written for them until a
-     * synthetic-recall gate exists (task 1b-3). Refusing loudly is the only
-     * honest thing to do until then -- silence would be indistinguishable
-     * from a working effect nobody happened to test. */
+    /* RETIRED BY TASK 1b-3, and kept in the enum so a caller that still tests
+     * for it compiles. Every DELAY TYPE (0-5) and every EFFECT TYPE (0-5) now
+     * has a module. The two that had none -- DELAY TYPE 4 and the EFFECT
+     * LABEL_164 core -- are selected by NO factory patch, so they were reached
+     * by DOCTORING the bank's own nibble pair (null_b.py's DOCTOR table), which
+     * drives the instrument's own recall with a value the factory bank happens
+     * not to carry. A user preset can select them, and the trunk is the full
+     * instrument, so they were never optional. */
     EB_MASTER_UNSUPPORTED_ARM = 1
 };
 
@@ -83,11 +86,15 @@ typedef struct {
     float *t5_2;  int32_t t5_2_len;    /* port 10693488 */
     float *t5_3;  int32_t t5_3_len;    /* port 10726272 */
     float *e5;    int32_t e5_len;      /* port 96928    */
+    float *t4_0;  int32_t t4_0_len;    /* port 6430944  */
+    float *t4_1;  int32_t t4_1_len;    /* port 6463728  */
 } eb_master_rings;
 
 typedef struct {
     eb_master_in_coef  in;
     eb_dly1_coef       d1;
+    eb_dly_t4_coef     d4;
+    eb_fx_e0_coef      e0;
     eb_delay_cfg       dcore;
     eb_dly23_coef      d23;
     eb_dly5_coef       d5;
@@ -108,6 +115,8 @@ typedef struct {
 typedef struct {
     eb_master_in_state in;
     eb_dly1_state      d1;
+    eb_dly_t4_state    d4;
+    eb_fx_e0_state     e0;
     eb_dly23_state     d23;
     eb_dly5_state      d5;
     eb_fx_e1_state     e1;

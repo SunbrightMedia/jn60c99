@@ -1473,7 +1473,7 @@ LABEL_69:
             static unsigned char EBD5HAVE;
             static unsigned long EBD5GEN;
             extern unsigned long eb_coef_gen;
-            eb_dly5_state st5;
+            eb_dly5_state st5; float _c56, _c58;
             if (!EBD5HAVE || EBD5GEN != eb_coef_gen) {
               EBD5C.k101744 = *(float *)(a1 + 101744);
               EBD5C.k6497168 = *(float *)(a1 + 6497168);
@@ -1651,7 +1651,20 @@ LABEL_69:
             st5.ring2 = (float *)(a1 + 10693488);
             st5.ring3 = (float *)(a1 + 10726272);
             eb_dly5_tick(&st5, &EBD5C, v36, v38, v5,
-                         &v176, &v177, &v56, &v58);
+                         &v176, &v177, &_c56, &_c58);
+                         /* THE PORT'S DELAY STAGE ALSO INITIALISES v56/v58, and this shim dropped
+                          * them. EVERY delay arm contains the pair `v56 = 0.0; v58 = -1.0;`. It
+                          * reads as decompiler register scratch and it is not: the EFFECT arms that
+                          * follow assign v56 on ONE branch only, so on the other branch v56 carries
+                          * the delay stage's 0.0 forward. The omission was unreachable until an
+                          * EFFECT arm with that branch existed (task 1b-3, EFFECT TYPE 0), and then
+                          * it cost a bisect to find: `--module delay` alone was EXACTLY 0,
+                          * `--module arms_1b3` alone was EXACTLY 0, and the two TOGETHER failed at
+                          * -11.7 dB. Two modules that are each exact compose exactly only if each
+                          * also leaves behind the STATE the other reads. eb_master.c has always set
+                          * these two constants; only the hybrid shims lacked them. */
+                         v56 = 0.0;
+                         v58 = -1.0;
             *(float *)(a1 + 6496576) = st5.s6496576;
             *(float *)(a1 + 6496592) = st5.s6496592;
             *(float *)(a1 + 6496608) = st5.s6496608;
