@@ -1,0 +1,49 @@
+/* eb_fork_config.h — the S3 FORK's build constants (F3). THE TRUNK IGNORES
+ * THIS FILE ENTIRELY: nothing in engine_b compiles differently unless a
+ * TARGET build defines EB_FORK_S3, and no gate in the trunk battery does.
+ *
+ * The values are the user's Phase-2 charter, as constants rather than prose:
+ * targets are FORKS BY BUILD FLAGS off the certified trunk, and this header
+ * is that flag surface. O6 (fork execution) consumes it; F3 defines it.
+ *
+ *   EB_FORK_VOICES 6      -- the S3 build's polyphony, a compile constant so
+ *                            loops unroll and buffers size statically.
+ *   EB_FORK_SR 48000      -- design rate. 44100 is a RESERVE DIAL: it buys
+ *                            8.8 % budget and is only pulled if silicon says.
+ *   EB_PITCH_FORK 1       -- eb_pitch_fork_eval replaces eb_pitch_eval.
+ *                            Gate: tools/engineb/pitch_cents_gate.py,
+ *                            EXHAUSTIVE 2^32, PASS at worst 0.00074 cents
+ *                            against the 0.05-cent bound (67x margin).
+ *   EB_EXP_FORK 1         -- eb_exp_fork replaces expf in the LFO path.
+ *                            Gate: tools/engineb/exp_ppm_gate.py, EXHAUSTIVE
+ *                            2^32, PASS at worst 0.119 ppm against 2 ppm,
+ *                            tails bit-identical to libm.
+ *   EB_C4_SIMD_RECURSIVE 0 -- CLOSED NEGATIVE, do not revisit without new
+ *                            evidence: Q15 lanes on the resonant ladder
+ *                            measure +3.9 dB worst-block (the error is as
+ *                            loud as the signal near self-oscillation), and
+ *                            even Q28 scalar sits AT the -80 dB block bound
+ *                            with no margin. docs/engineb/data/
+ *                            c4_ladder_probe.c is the evidence. Fixed-point
+ *                            SIMD remains a candidate ONLY for feed-forward
+ *                            spans (FIR decimators, mix stages).
+ *
+ * OPEN, deliberately not decided here: the global-LFO reduction (one LFO for
+ * the engine instead of six) is worth ~4,100 instr/sample but is conditional
+ * on BOTH of: (a) verifying the hardware fact that the real JUNO-60 shares
+ * one LFO across voices INCLUDING how the plugin's per-voice CONDITION
+ * scatter perturbs it, and (b) silicon still needing it. Neither is
+ * established tonight, so it is not a constant.
+ */
+#ifndef ENGINEB_EB_FORK_CONFIG_H
+#define ENGINEB_EB_FORK_CONFIG_H
+
+#ifdef EB_FORK_S3
+#define EB_FORK_VOICES 6
+#define EB_FORK_SR     48000
+#define EB_PITCH_FORK  1
+#define EB_EXP_FORK    1
+#define EB_C4_SIMD_RECURSIVE 0
+#endif
+
+#endif

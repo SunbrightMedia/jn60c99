@@ -10,7 +10,20 @@ build flags.** **Phase 1 is COMPLETE and CERTIFIED (2026-08-05, block below).** 
 step 2 (coef constructor + the standalone engine gate) DONE; C5 fusion CLOSED
 NEGATIVE by measurement (`data/c5_fusion.md`); the METHOD PLAYBOOK written
 (`METHOD_PLAYBOOK.md`, 27-entry defect catalogue); certification sweep GREEN.
-**The head pointer is now Phase 2 (Fable, S3 fork).** NO approximations in the trunk —
+**Phase 2 numeric design (F3) is DONE (2026-08-05, Fable 5) — read
+`docs/engineb/F3_S3_FORK_DESIGN.md`. The sentence first: with both fork
+evaluators and 6 voices @48 kHz the fork prices at ~27,300 instr/sample =
+STILL 2.9-4.3x OVER; reserves reach ~21,550 = 2.1-3.2x. Silicon (F4) decides.
+What passed, both EXHAUSTIVE over all 2^32 float inputs: fork PITCH
+(recentered rows, exact-rational coefficient transform, worst 0.00074 cents
+vs the 0.05 bound, 67x margin; the first run FAILED on the signaling-NaN
+payload class, which no sweep can visit) and fork EXP (0.119 ppm vs 2 ppm,
+tails bit-identical). What died: C4 16-bit SIMD on EVERY recursive module —
+Q15 lanes measure +3.9 dB worst-block on the resonant ladder (error as loud
+as the signal; `data/c4_ladder_probe.c`), and even scalar Q28 sits AT −80
+with no margin; only feed-forward spans survive. The head pointer is O6
+(fork execution): `eb_fork_config.h` is the flag surface, F3_S3_FORK_DESIGN
+§5 is the ordered adoption list.** NO approximations in the trunk —
 C2 moved OUT of trunk work (it is a −100 dB candidate, my earlier phase
 assignment was wrong). Phase 2 (Fable, S3 fork): recentered pitch with a
 0.05-CENT exhaustive gate (the plugin's own numerical noise bound, ~1000×
