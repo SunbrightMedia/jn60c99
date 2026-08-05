@@ -46,6 +46,13 @@
 #define ENGINEB_EB_DCO_H
 
 #include <math.h>
+#include "eb_fork_config.h"
+
+#if defined(__GNUC__)
+#define EB_INLINE static __inline__
+#else
+#define EB_INLINE static
+#endif
 
 /* ------------------------------------------------- THE ONE OPTIONAL INEXACTNESS
  * EB_DCO_RECIP replaces the pulse phase's DIVISION with a multiply by a
@@ -172,6 +179,35 @@ float eb_dco_step(eb_dco_state *s, const eb_dco_coef *c);
 void  eb_dco_step4(eb_dco_state *s, const eb_dco_coef *c, float *out);
 
 /* Per-sample coefficient build (the two modulated numbers -> inc, g, pw). */
+/* THE SUB-STEP INCREMENT SCALE, IN ONE EXPRESSION, USED BY EVERY PATH.
+ *
+ * Under EB_HALF_OS the DCO runs 2 sub-steps per audio sample instead of 4, so
+ * each step must advance twice the phase to cover the same sample. Getting
+ * this wrong is exactly one octave, and it has now been got wrong TWICE, in
+ * opposite directions, because the factor lived somewhere only one of the two
+ * callers went through:
+ *
+ *   1. In eb_render.c only -> the SHIM path never doubled -> every note an
+ *      octave DOWN. Reported by ear, by the user, after every numeric gate in
+ *      the project had passed.
+ *   2. Moved into eb_dco_set_pitch only -> eb_render.c assigns
+ *      dco_live[v].inc DIRECTLY and never calls set_pitch, so the STANDALONE
+ *      path -- the one the listen firmware uses -- went an octave down in its
+ *      turn. Caught by fork_authority.py at -1212.1 cents, AFTER I had looked
+ *      at a 64.6 Hz fundamental under a 130.8 Hz note and talked myself into
+ *      "that will be the sub-oscillator".
+ *
+ * So it is a function and both callers call it. There is no third place left
+ * to put a factor of two. */
+EB_INLINE float eb_dco_inc_scale(float inc4)
+{
+#if EB_DCO_SUBSTEPS == 2
+    return inc4 * 2.0f;
+#else
+    return inc4;
+#endif
+}
+
 void  eb_dco_set_pitch(eb_dco_coef *c, float inc, float pw);
 
 /* Per-RECALL coefficient build: fills sat_hi/sat_lo from sat_in and k3..k11.

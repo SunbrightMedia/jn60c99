@@ -152,13 +152,19 @@ def main():
                 "#define S3L_RSTATE_SZ %du\n#define S3L_MSTATE_SZ %du\n"
                 "#define S3L_VOICE_SZ %du\n"
                 % (ncoef, nmcoef, nstate, nmstate, nvoice))
+        # +1 ON BOTH: each capture happens after ONE extra rendered sample
+        # (the render-1 that rebuilds the coefficient cache), so the firmware
+        # must render that sample too before copying the state in. MEASURED:
+        # without it the release tail sat at -33.8 dB vs the port and moved to
+        # -37.2 when the port was shifted by exactly one sample -- the
+        # signature of a state copied one sample early.
         f.write("/* The hold/release lengths the OFF snapshot was captured\n"
                 " * at. The firmware MUST use these: the release copies a\n"
                 " * voice state in, and a state captured at a different\n"
                 " * instant is a jump -- measured as a 4,716-count step and\n"
                 " * heard as a pluck at the end of every note. */\n"
                 "#define S3L_HOLD_FRAMES %du\n#define S3L_REL_FRAMES %du\n"
-                % (HOLD_FRAMES, REL_FRAMES))
+                % (HOLD_FRAMES + 1, REL_FRAMES + 1))
         f.write("/* chord size of each step */\n"
                 "static const int S3L_NVOICE[S3L_NNOTE] = {%s};\n"
                 % ",".join(str(r[0]) for r in rows))

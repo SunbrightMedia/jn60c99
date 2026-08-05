@@ -160,11 +160,7 @@ void eb_dco_set_shape(eb_dco_coef *c)
  * (MEASURED -- see the note in eb_render.c). */
 void eb_dco_set_pitch(eb_dco_coef *c, float inc, float pw)
 {
-#if EB_DCO_SUBSTEPS == 2
-    c->inc  = inc * 2.0f;
-#else
-    c->inc  = inc;
-#endif
+    c->inc  = eb_dco_inc_scale(inc);
     c->g    = 0.00390625f / inc;
     c->pw   = pw;
     c->pwm1 = pw - 1.0f;

@@ -12,8 +12,8 @@
  * voice state in, and a state captured at a different
  * instant is a jump -- measured as a 4,716-count step and
  * heard as a pluck at the end of every note. */
-#define S3L_HOLD_FRAMES 66150u
-#define S3L_REL_FRAMES 30870u
+#define S3L_HOLD_FRAMES 66151u
+#define S3L_REL_FRAMES 30871u
 /* chord size of each step */
 static const int S3L_NVOICE[S3L_NNOTE] = {1,2,3,4,5,6,7,8};
 static const int S3L_RING_LEN[9] = {524288,8192,524288,524288,8192,8192,1024,8192,8192};

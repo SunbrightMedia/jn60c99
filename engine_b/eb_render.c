@@ -208,14 +208,10 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
          * sum), NOT the PWM sum. Fourth inherited guess. */
         inc = eb_dcoprep_tick(&c->dprep[v], cv, pit, n_3808,
                               &g_edge, &pw_live, &pwm_out);
-        /* THE HALF-OS INCREMENT IS NOT APPLIED HERE. It lives in
-         * eb_dco_set_pitch (engine_b/eb_dco.c), which is the ONE place both
-         * this path and the shim path go through. It used to be applied
-         * here instead, and the shim path -- the one that renders audio a
-         * human listens to -- never got it: every note came out EXACTLY AN
-         * OCTAVE DOWN in the half-OS build, and no numeric gate in the
-         * project could see it. Doubling here as well would put it an
-         * octave up.
+        /* THE HALF-OS INCREMENT COMES FROM eb_dco_inc_scale(), the single
+         * expression every path uses -- see the long note on it in eb_dco.h,
+         * which records the two opposite octave errors that got it there.
+         * This line does NOT reimplement the factor.
          *
          * `g` IS NOT RESCALED, and this is the one thing here that reasoning
          * got backwards and measurement corrected. g = 0.00390625/inc, so
@@ -230,7 +226,7 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
          * The cost of that choice is the honest one: the edge now spans one
          * sub-sample instead of two, so it is less band-limited -- which is
          * precisely the alias increase gate 2 exists to bound. */
-        st->dco_live[v].inc  = inc;
+        st->dco_live[v].inc  = eb_dco_inc_scale(inc);
         st->dco_live[v].g    = g_edge;
         st->dco_live[v].pw   = pw_live;
         st->dco_live[v].pwm1 = pw_live - 1.0f;
