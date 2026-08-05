@@ -140,9 +140,31 @@ void eb_dco_set_shape(eb_dco_coef *c)
     c->sat_lo = eb_sat(-c->sat_in, c);
 }
 
+/* THE HALF-OS INCREMENT LIVES HERE, IN ONE PLACE, AND THAT IS THE WHOLE
+ * POINT OF THE FIX. It used to live in eb_render.c only, so the STANDALONE
+ * path doubled and the SHIM path did not -- and the shim path is what
+ * renders audio for listening. The result was every note EXACTLY AN OCTAVE
+ * DOWN in the half-OS build: two sub-steps at the un-doubled increment
+ * advance 2*inc per audio sample where the 4x path advances 4*inc.
+ *
+ * FOUND BY EAR, on the first WAV anyone ever listened to, after every
+ * numeric gate in the project had passed. The gates could not see it: the
+ * trunk build (EB_HALF_OS=0) is unaffected, o8_alias_probe.c does its own
+ * coefficient fill and doubles correctly, and o8_gate2 compares two builds
+ * that were both driven through that probe. A wrong PITCH is also invisible
+ * to an alias-floor measurement by construction -- it just moves which bins
+ * are called harmonics.
+ *
+ * `g` is deliberately built from the UNDOUBLED increment: it is the saw
+ * edge's smoothing ramp and must keep its width in TIME, not in sub-samples
+ * (MEASURED -- see the note in eb_render.c). */
 void eb_dco_set_pitch(eb_dco_coef *c, float inc, float pw)
 {
+#if EB_DCO_SUBSTEPS == 2
+    c->inc  = inc * 2.0f;
+#else
     c->inc  = inc;
+#endif
     c->g    = 0.00390625f / inc;
     c->pw   = pw;
     c->pwm1 = pw - 1.0f;
@@ -301,7 +323,13 @@ void eb_dco_advance(eb_dco_state *s, const eb_dco_coef *c, unsigned n)
     float p = s->phase, cnt = s->subcnt, prev;
     unsigned i, k;
     for (i = 0; i < n; ++i) {
-        for (k = 0; k < 4; ++k) {
+        /* EB_DCO_SUBSTEPS, NOT 4. The same defect as the increment above and
+         * found in the same reading: a hardcoded 4 here would free-run an
+         * at-rest voice at twice the sounding rate under half-OS, so a note
+         * would start from a phase the engine never actually reached. The
+         * free-run contract (eb_freerun.h) is that this equals n calls of the
+         * step path, and with a hardcoded 4 it did not. */
+        for (k = 0; k < EB_DCO_SUBSTEPS; ++k) {
             prev = p;
             p = eb_dco_wrap(p + c->inc);
             if (!(p < c->subthr || c->subthr <= prev)) cnt += 2.0f;

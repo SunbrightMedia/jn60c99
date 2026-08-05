@@ -170,6 +170,7 @@ float *(*juno_master_render_fn)(unsigned char *, float **, float **)
 #include "eb_coefs.h"
 #include "eb_master.h"
 #include "eb_master_coefs.h"
+#include <stddef.h>
 
 static eb_engine       EBE;
 static eb_render_state EBS;
@@ -186,6 +187,39 @@ static unsigned long   EB_GEN_SEEN;
  * harness drives; two live contexts would need two instances and this file is
  * not the place that decides engine B's ownership model. */
 void ebsh_new_context(void) { EB_STARTED = 0; MS_REFUSED = 0; }
+
+/* ---- LISTEN-FIRMWARE DUMP HOOK (tools/engineb/gen_listen_coefs.py) -------
+ * Read-only access to the four blocks the standalone engine renders from, so
+ * a target with no recall path of its own can be given host-built ones. It
+ * writes nothing and is never called during a gate run; the gate's own
+ * numbers cannot depend on it. */
+void ebsh_dump_sizes(int *out)
+{
+    out[0] = (int)sizeof EBC; out[1] = (int)sizeof MC;
+    out[2] = (int)sizeof EBS; out[3] = (int)sizeof MS;
+    /* THE VOICE PREFIX. eb_render_state still carries a whole chorus, delay
+     * and reverb after its per-voice members -- 724 KB of the 735 KB, and
+     * legacy: the master owns the FX now and eb_engine_render_voices does not
+     * touch them. Everything a NOTE consists of (envelopes, phases, glide,
+     * gate cells) lives in the first ~7 KB, so a target can carry one
+     * snapshot per note for the price of a rounding error. offsetof, not a
+     * hand-counted number: the struct will change again. */
+    out[4] = (int)offsetof(eb_render_state, chorus);
+}
+
+void ebsh_dump_blob(int which, unsigned char *dst)
+{
+    const void *src = 0; size_t n = 0;
+    switch (which) {
+    case 0: src = &EBC; n = sizeof EBC; break;
+    case 1: src = &MC;  n = sizeof MC;  break;
+    case 2: src = &EBS; n = sizeof EBS; break;
+    case 3: src = &MS;  n = sizeof MS;  break;
+    case 4: src = &EBS; n = offsetof(eb_render_state, chorus); break;
+    default: return;
+    }
+    memcpy(dst, src, n);
+}
 extern unsigned long   eb_coef_gen;    /* gui/juno_bridge.c bumps it */
 
 void juno_driver_render_voices(unsigned char *st, float *vbuf)
