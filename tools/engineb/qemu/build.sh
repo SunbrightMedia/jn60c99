@@ -34,6 +34,15 @@ MODS="engine_b/eb_envgen.c engine_b/eb_pwm_cv.c engine_b/eb_vcf_cv.c \
 #   EB_PITCH_FAST=1 tools/engineb/qemu/build.sh  -> the S3 build
 PITCHDEF=""
 [ -n "$EB_PITCH_FAST" ] && PITCHDEF="-DEB_PITCH_FAST=1"
+# EB_FORK=1: measure the S3 FORK numerics (recentered pitch + fork exp).
+# Links the two fork evaluators; eb_pitch.c's own switch selects them under
+# EB_FORK_S3. Only sample_total is quotable from any run of this harness --
+# the per-function spans carry the CCOUNT translation-block quantisation
+# (docs/engineb/data/qemu_instr_counts.md).
+if [ -n "$EB_FORK" ]; then
+    PITCHDEF="-DEB_FORK_S3"
+    MODS="$MODS engine_b/eb_pitch_fork.c engine_b/eb_exp_fork.c"
+fi
 CFLAGS="-std=c99 -O2 -ffp-contract=off -fno-strict-aliasing \
         -Iengine_b -Isrc -I$QDIR -DEB_DELAY_LEN=32768 $PITCHDEF"
 

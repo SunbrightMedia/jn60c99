@@ -65,13 +65,27 @@
 #include "juno_tables.h"
 #include "fx_coefs.h"
 
-#ifdef EB_HOST
+#if defined(EB_HOST) || defined(EB_IDF)
+/* EB_IDF: the SAME harness compiled into the S3 firmware (esp32s3/main),
+ * printf-backed like the host build but with the REAL CCOUNT -- so on
+ * silicon the identical workload reports CYCLES where QEMU reported
+ * executed instructions, and c/i is their ratio with nothing else varied.
+ * One source; the firmware carries no drifting copy. */
 #include <stdio.h>
 static void uart_putc(char c)      { putchar(c); }
 static void uart_puts(const char *s){ fputs(s, stdout); }
 static void uart_u64(uint64_t v)   { printf("%llu", (unsigned long long)v); }
 static void uart_hex32(uint32_t v) { printf("0x%08x", v); }
+#ifdef EB_IDF
+static inline uint32_t ccount(void)
+{
+    uint32_t r;
+    __asm__ volatile ("rsr.ccount %0" : "=a"(r));
+    return r;
+}
+#else
 static inline uint32_t ccount(void){ return 0; }
+#endif
 #else
 #include "uart.h"
 static inline uint32_t ccount(void)
@@ -200,7 +214,11 @@ static void setup(void)
 
         for (j = 0; j < 16; ++j) XC[v].c[j] = 0.03f + 0.001f * (float)j;
         XC[v].k6256 = 0.5f; XC[v].k6272 = 0.25f;
-        XC[v].k6336 = 0.9f; XC[v].k5456 = 0.1f;
+        XC[v].k6336 = 0.9f;
+        /* k5456 was a COEF here when this harness was written; task 1b-0
+         * proved it is a PER-SAMPLE value (eb_dcoprep's third output) and
+         * made it an argument so the type system refuses the cache. The
+         * harness passes the same 0.1f it used to seed. */
         NC[v].k36 = 0.2f; NC[v].k52 = 0.3f; NC[v].k68 = 0.4f;
         NC[v].k84 = 0.5f; NC[v].k00 = 0.6f;
         fill_pattern((float *)&FC[v], (int)(sizeof FC[v] / sizeof(float)),
@@ -353,10 +371,11 @@ static void run_sample(long i, int measure)
         else eb_dco_step4(&s->dco, &DC[v], dcoq);
 
         if (measure)
-            MEAS(R_DECIM, decimo = eb_decim_tick(&s->dec, &XC[v], dcoq[0],
-                                                 dcoq[1], dcoq[2], dcoq[3]));
+            MEAS(R_DECIM, decimo = eb_decim_tick(&s->dec, &XC[v], 0.1f,
+                                                 dcoq[0], dcoq[1], dcoq[2],
+                                                 dcoq[3]));
         else
-            decimo = eb_decim_tick(&s->dec, &XC[v], dcoq[0], dcoq[1],
+            decimo = eb_decim_tick(&s->dec, &XC[v], 0.1f, dcoq[0], dcoq[1],
                                    dcoq[2], dcoq[3]);
 
         if (measure) MEAS(R_NSVF, nsvo = eb_nsvf_tick(&s->nsv, &NC[v], noise,
@@ -430,7 +449,11 @@ static int finite_nonzero(float f)
     return f != 0.0f;
 }
 
+#ifdef EB_IDF
+int harness_main(void)
+#else
 int main(void)
+#endif
 {
     long i;
     int k, fail = 0;

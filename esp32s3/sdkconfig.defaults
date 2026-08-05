@@ -1,0 +1,13 @@
+CONFIG_IDF_TARGET="esp32s3"
+# 8 MB PSRAM (octal) -- the delay rings need 6.1 MB and this is the
+# allocation the whole memory plan hinges on. If the actual module is quad,
+# change SPIRAM_MODE_OCT to QUAD; the malloc path is the same.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
+# 240 MHz, the budget's denominator
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+# the FPU stays on in the main task; no lazy context tricks
+CONFIG_FREERTOS_FPU_IN_ISR=n
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
