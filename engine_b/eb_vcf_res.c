@@ -2,6 +2,10 @@
  * src/voice_render.c:1230-1297, with the port's variable numbers kept.
  */
 #include "eb_vcf_res.h"
+#include "eb_fork_config.h"
+#ifndef EB_VCF_RES_CR
+#define EB_VCF_RES_CR 1
+#endif
 #include <math.h>
 #include <string.h>
 
@@ -78,6 +82,20 @@ float eb_vcf_res_tick(eb_vcf_res_state *s, const eb_vcf_res_coef *c,
                                  c->k7776)
                              * c->k7824)
                      + c->k7840;
+#if EB_VCF_RES_CR > 1
+    /* C2, CONTROL-RATE RESONANCE (fork lever; docs/engineb/data/c2_result.md).
+     * Everything from here to the division is a PURE FUNCTION of v227 -- no
+     * state -- so it is the natural control-rate candidate: evaluate it on
+     * every Nth sample and reuse the cached s7520 between. The per-sample
+     * state ABOVE this point (the wrap24 dither and its smoother) keeps
+     * running every sample, because a free-running oscillator that is
+     * stepped at 1/N is a different oscillator, not an approximated one.
+     *
+     * The port's own k7632 != 1.0 arm has exactly this shape, which is what
+     * makes the transformation expressible at all. */
+    if (s->cr_phase == 0)
+#endif
+    {
     v234 = v227;
     v235 = (int)v227;
     if ( v235 != (int)0x80000000 && (float)v235 != v227 )
@@ -116,6 +134,11 @@ float eb_vcf_res_tick(eb_vcf_res_state *s, const eb_vcf_res_coef *c,
                  + 1.0);
     v241 = v240 / (float)(v240 + 1.0);
     s->s7520 = v241;
+    }
+#if EB_VCF_RES_CR > 1
+    if (++s->cr_phase >= EB_VCF_RES_CR) s->cr_phase = 0;
+    v241 = s->s7520;
+#endif
   }
   else
   {

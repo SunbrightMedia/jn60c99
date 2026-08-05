@@ -188,6 +188,14 @@ if _FORK:
 if os.environ.get("JUNO_EB_LFO_SHARED"):
     CFLAGS = CFLAGS + ["-DEB_LFO_SHARED=1"]
 
+# JUNO_EB_VCF_RES_CR=N: C2, control-rate resonance -- evaluate eb_vcf_res's
+# pure tail every Nth sample and reuse the cache between. N=1 is the trunk and
+# must null EXACTLY 0 (the transformation must be identity at N=1, or the
+# gate at N>1 is measuring two changes at once).
+if os.environ.get("JUNO_EB_VCF_RES_CR"):
+    CFLAGS = CFLAGS + ["-DEB_VCF_RES_CR=%d"
+                       % int(os.environ["JUNO_EB_VCF_RES_CR"])]
+
 # ---------------------------------------------------------------- scenarios
 # The nine port-risk scenarios are reused verbatim from the Track B gate: they
 # were not guessed, they were grown by the canary and observability probes

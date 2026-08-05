@@ -35,6 +35,7 @@
 
 typedef struct {
     float s7520, s7536, s7552, s7568;
+    int   cr_phase;        /* C2 control-rate counter; unused when CR == 1 */
 } eb_vcf_res_state;
 
 typedef struct {
