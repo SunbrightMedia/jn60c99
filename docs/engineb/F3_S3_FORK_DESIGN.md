@@ -6,9 +6,12 @@ runnable; nothing is judged by ear.
 ## The sentence that goes first
 
 **With both fork evaluators adopted and 6 voices at 48 kHz, the fork prices at
-28,626 instructions per sample (MEASURED in O6; the estimate here was 27,300) against the 6,300–9,500 two-core budget:
-still 2.9×–4.3× OVER on instruction count.** The reserve dials (44.1 kHz,
-half-oversampling) reach ≈21,700 ≈ 2.1×–3.2× over. F3 delivers the two
+**28,626** instructions per sample against the 6,300–9,500 two-core budget:
+still **3.0×–4.5× OVER** on instruction count. (That figure is O6's MEASURED
+one; §4 below estimated 25,850 and §6 records the two corrections.) The
+reserve dials (44.1 kHz, half-oversampling) reach ≈24,300 ≈ 2.6×–3.9× over;
+the global LFO, whose hardware precondition O6 verified, would take it to
+≈20,200 ≈ 2.1×–3.2×. F3 delivers the two
 largest levers that exist and the fork still does not fit by arithmetic
 alone; the decision moves to silicon (F4), where cycles-per-instruction and
 the remaining structural options (global LFO, half-oversampling adoption,
@@ -94,8 +97,9 @@ resonance the Q15 error is as loud as the signal. Even the Q28 scalar — which
 has no SIMD carrier on this chip — sits AT the −80 block bound with no
 margin. **16-bit SIMD is dead for the ladder and, by the same mechanism, for
 every feedback module (VCF, HPF, envelopes, chorus/delay/reverb lines).**
-What survives of C4: feed-forward spans only — the FIR decimators and mix
-stages — worth roughly 1,000–2,000 instr/sample, not the modeled ×2–3.
+What was thought to survive of C4: feed-forward spans — the FIR decimators
+and mix stages. **§6 KILLS THAT TOO, by measurement.** Nothing of C4
+survives.
 `EB_C4_SIMD_RECURSIVE 0` in eb_fork_config.h records the closure.
 
 ## 4. The fork bill of accounts (instructions/sample, MEASURED×STATIC)
@@ -108,13 +112,13 @@ master chain and worst arms included).
 | pitch v7 → fork | −21,150 | 35,800 |
 | LFO expf → fork | −700 | 35,100 |
 | 8 → 6 voices (per-voice portion ×0.75) | −7,750 | 27,350 |
-| C4 feed-forward (upper estimate) | −1,500 | ≈25,850 |
+| ~~C4 feed-forward~~ | ~~−1,500~~ **WITHDRAWN, §6** | — |
 | reserve: 44.1 kHz | budget +8.8 % | — |
 | reserve: half-oversampling (DCO+decim) | ≈−4,300 | ≈21,550 |
 
-Against 6,300–9,500: **2.9×–4.3× over as specified; 2.1×–3.2× with every
-reserve pulled.** Instructions are not cycles; silicon (F4) decides, and the
-remaining structural options are listed in the first paragraph.
+Against 6,300–9,500: this table's estimate was 2.9×–4.3×. **§6 supersedes it
+with the measured 28,626 = 3.0×–4.5×.** Instructions are not cycles; silicon
+(F4) decides, and the remaining structural options are in the first paragraph.
 
 ## 6. O6 EXECUTION RESULTS (2026-08-05, Opus 5) — what running it changed
 
@@ -124,7 +128,7 @@ remaining structural options are listed in the first paragraph.
 **C4 FEED-FORWARD IS ALSO DEAD.** §3 kept feed-forward spans alive on the
 reasoning that a FIR does not recycle its quantization error. True, and
 irrelevant: measured on the decimator's own 32-tap folded structure
-(`scratchpad probe, same shape as eb_vcf_ladder.c`), Q15 gives **−49.6 dB
+(`docs/engineb/data/c4_fir_probe.c`, same shape as eb_vcf_ladder.c), Q15 gives **−49.6 dB
 global / −33.7 dB worst block** and even Q20 gives −79.7/−63.8, both failing
 the −100/−80 audio gate. Only Q24 passes (−103.7/−87.9), and Q24 has no SIMD
 carrier on this chip. **C4 is CLOSED NEGATIVE ENTIRELY — recursive and

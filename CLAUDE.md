@@ -21,9 +21,20 @@ payload class, which no sweep can visit) and fork EXP (0.119 ppm vs 2 ppm,
 tails bit-identical). What died: C4 16-bit SIMD on EVERY recursive module —
 Q15 lanes measure +3.9 dB worst-block on the resonant ladder (error as loud
 as the signal; `data/c4_ladder_probe.c`), and even scalar Q28 sits AT −80
-with no margin; only feed-forward spans survive. The head pointer is O6
-(fork execution): `eb_fork_config.h` is the flag surface, F3_S3_FORK_DESIGN
-§5 is the ordered adoption list.** NO approximations in the trunk —
+with no margin; only feed-forward spans survive. **O6 IS DONE (2026-08-05, Opus 5) — F3_S3_FORK_DESIGN §6 holds the results.
+MEASURED fork price 28,626 instr/sample at 6 voices = 3.0-4.5x over (the
+estimate was 25,850). C4 IS NOW CLOSED ENTIRELY: feed-forward was kept alive
+on the reasoning that a FIR does not recycle error -- true and irrelevant,
+since Q15 measures -33.7 dB worst-block on the decimator and even Q20 fails;
+"no feedback" answers ACCUMULATION, not RESOLUTION. THE LFO-RATE GATE EARNED
+ITSELF: a cancelling expression amplifies expf's 0.119 ppm 9x to 1.108 ppm
+before the phase accumulator. THE `exp` AUDIO NULL IS NEARLY VACUOUS and now
+says so -- EXACTLY 0, but a tap found only FOUR distinct arguments at the LFO
+site across 2,016,000 calls, so correctness rests on the exhaustive gates and
+not on that null. GLOBAL-LFO PRECONDITION VERIFIED: LFO phase is identical in
+all 8 voices across all 64 patches with staggered notes AND with LFO TRIG ENV
+forced on -- ~4,100 instr/sample, the largest lever left, pending only
+silicon need. The head pointer is now F4 (silicon).** NO approximations in the trunk —
 C2 moved OUT of trunk work (it is a −100 dB candidate, my earlier phase
 assignment was wrong). Phase 2 (Fable, S3 fork): recentered pitch with a
 0.05-CENT exhaustive gate (the plugin's own numerical noise bound, ~1000×
