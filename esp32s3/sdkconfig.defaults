@@ -14,3 +14,7 @@ CONFIG_COMPILER_OPTIMIZATION_PERF=y
 # big FX states (chorus/delay/reverb, ~470 KB) live in PSRAM .bss -- the
 # product keeps its rings there, so the cycle number should too
 CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+# custom table: the listen app embeds a 1.69 MB coefficient blob
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y

@@ -1,0 +1,6 @@
+# The listen firmware embeds s3_listen.bin (1.69 MB of host-built
+# coefficients), so the app is ~2 MB and the default 1 MB factory partition
+# overflows. 4 MB fits every S3 devkit (8 MB flash minimum).
+nvs,      data, nvs,     0x9000,  0x6000,
+phy_init, data, phy,     0xf000,  0x1000,
+factory,  app,  factory, 0x10000, 4M,

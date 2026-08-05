@@ -20,14 +20,19 @@ idf_component_register(
     SRCS ${APP_SRC} ${EB_SRCS}
     INCLUDE_DIRS "." "../../engine_b" "../../src" "../../tools/engineb/qemu"
     EMBED_FILES ${APP_EMBED}
-    REQUIRES driver esp_timer)
+    REQUIRES esp_driver_i2s driver esp_timer)
 
 # The project's load-bearing flags, verbatim from the host build. FMA does
 # not exist on the LX7, but the flag stays uniform so nobody has to reason
 # about which build has it.
+# -std=c99 ONLY on the ENGINE sources. The app file includes IDF headers,
+# and IDF's xtensa headers use `asm`, which strict ISO C rejects -- the
+# listen build failed exactly there. The engine's contract (c99, no
+# contraction) applies to the engine; the app file keeps IDF's own default.
 target_compile_options(${COMPONENT_LIB} PRIVATE
-    -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing
+    -O2 -ffp-contract=off -fno-strict-aliasing
     -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_IDF)
+set_source_files_properties(${EB_SRCS} PROPERTIES COMPILE_OPTIONS "-std=c99")
 
 if(NOT S3_LISTEN)
     # EB_DELAY_LEN: 32768 here, NOT the shipping 524288. The harness keeps its
