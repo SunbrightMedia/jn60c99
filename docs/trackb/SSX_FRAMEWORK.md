@@ -3,7 +3,7 @@
 > This document is a DESIGN that predates the real work and was never
 > implemented in this form. The method that actually produced engine B — the
 > hybrid-shim null harness, boundary selection by live-variable analysis, the
-> five ways the cell classifier lies, teeth with measured brackets, the
+> six ways the cell classifier lies, teeth with measured brackets, the
 > arm-coverage prerequisite, the seeding rules, mechanical transcription, the
 > divergence-hunting techniques, MEASURED×STATIC costing and the bias law — is
 > written up there, distilled from what was DONE and with the measured numbers
