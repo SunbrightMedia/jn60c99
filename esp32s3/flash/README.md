@@ -59,3 +59,17 @@ the big states. It does NOT play patches (engine B's device-side recall is
 the known open item) and its voice-coefficient set is the harness's driven
 synthetic one, not a recalled patch. It is a c/i and cycles measurement,
 not a sound demo.
+
+## The LISTEN image (audio out of I2S)
+
+`juno_s3_listen_2voice.bin` — engine B plays a 2-note chord from factory
+patch 0, out of an I2S DAC. OCTAL-PSRAM build (N8R8/N16R8 devkits).
+
+Wire a PCM5102 or MAX98357A: BCK->GPIO5, LRCK/WS->GPIO6, DIN->GPIO7,
+3.3V, GND. Then:
+
+    pip install esptool
+    esptool --chip esp32s3 -p <PORT> write-flash 0x0 juno_s3_listen_2voice.bin
+
+Serial monitor at 115200 prints `underruns=` and measured us/sample every
+second. `underruns=0` = it fits. Full guide: ../LISTEN.md.
