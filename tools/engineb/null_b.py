@@ -213,6 +213,11 @@ ET_REC_OFF, DT_REC_OFF = 634, 650      # EFFECT TYPE / DELAY TYPE nibble pairs
 DOCTOR = {
     "DELAY type 4  (synthetic)":  (DT_REC_OFF, 4),
     "EFFECT type 0 (synthetic)":  (ET_REC_OFF, 0),
+    # EFFECT TYPE 4 (FLANGER) shares eb_chorus with types 2 and 3, and only 2
+    # and 3 were ever driven -- so the module's mode-4 arm was carried by a
+    # gate that could not reach it. tools/engineb/arm_coverage.py named it as
+    # the last genuinely uncovered arm and this closes it.
+    "EFFECT type 4 (synthetic)":  (ET_REC_OFF, 4),
 }
 
 
@@ -231,6 +236,9 @@ BASE_SCEN += [
     (2, [('render', 2000), ('on', 45, 100), ('on', 57, 100),
          ('render', 26000), ('off', 45), ('off', 57), ('render', 12000)],
      'EFFECT type 0 (synthetic)'),
+    (2, [('render', 2000), ('on', 48, 100), ('on', 55, 100),
+         ('render', 26000), ('off', 48), ('off', 55), ('render', 12000)],
+     'EFFECT type 4 (synthetic)'),
 ]
 
 BASE_SCEN += [
