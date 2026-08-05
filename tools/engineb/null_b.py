@@ -196,6 +196,16 @@ if os.environ.get("JUNO_EB_VCF_RES_CR"):
     CFLAGS = CFLAGS + ["-DEB_VCF_RES_CR=%d"
                        % int(os.environ["JUNO_EB_VCF_RES_CR"])]
 
+# JUNO_EB_HALF_OS=1: half-oversample the DCO path (F5 design, O8 build). The
+# residual is NOT expected to be EXACTLY 0 and NOT expected to clear -100 dB:
+# the fork standard for this lever is a BAND-LIMITED null at -80/-60 through
+# an 18 kHz low-pass, plus a group-delay alignment, because the 2x decimator
+# is 1.87 output samples longer than the port's and a pure delay is not a
+# defect. Use tools/engineb/halfos_gate.py, which applies both; running plain
+# null_b here reports a number that is real but is not the gate.
+if os.environ.get("JUNO_EB_HALF_OS"):
+    CFLAGS = CFLAGS + ["-DEB_FORK_S3", "-DEB_HALF_OS=1"]
+
 # ---------------------------------------------------------------- scenarios
 # The nine port-risk scenarios are reused verbatim from the Track B gate: they
 # were not guessed, they were grown by the canary and observability probes

@@ -18,6 +18,7 @@
  *      precisely that bug in its teeth battery.
  */
 #include "eb_render.h"
+#include "eb_fork_config.h"
 #include "juno_tables.h"
 #include "eb_master.h"
 #ifdef EB_VOICES_DEBUG
@@ -207,8 +208,20 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
          * sum), NOT the PWM sum. Fourth inherited guess. */
         inc = eb_dcoprep_tick(&c->dprep[v], cv, pit, n_3808,
                               &g_edge, &pw_live, &pwm_out);
+#if EB_HALF_OS
+        /* HALF-OVERSAMPLING: two sub-steps per sample instead of four, so
+         * each step must advance TWICE the phase to cover the same audio
+         * sample. `g` is 0.00390625/inc in the port and is the ramp slope
+         * per sub-step, so it halves for the same reason -- getting one of
+         * these two right and the other wrong would produce a correctly
+         * pitched oscillator with the wrong waveform, which is exactly the
+         * kind of defect that sounds plausible. */
+        st->dco_live[v].inc  = inc * 2.0f;
+        st->dco_live[v].g    = g_edge * 0.5f;
+#else
         st->dco_live[v].inc  = inc;
         st->dco_live[v].g    = g_edge;
+#endif
         st->dco_live[v].pw   = pw_live;
         st->dco_live[v].pwm1 = pw_live - 1.0f;
         st->dco_live[v].pwp1 = pw_live + 1.0f;

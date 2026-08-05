@@ -46,9 +46,18 @@
 #ifndef ENGINEB_EB_DECIM_H
 #define ENGINEB_EB_DECIM_H
 
+#define EB_HALFOS_RING 32u
+
 typedef struct {
     float h[4][8];        /* four phases, eight samples of history each      */
     unsigned w;           /* rotating index; the newest sample sits at h[p][w] */
+    /* HALF-OVERSAMPLING ring (EB_HALF_OS). Declared UNCONDITIONALLY so the
+     * struct's size and layout do not depend on a build flag -- a state
+     * struct that changes shape with a fork flag is how a saved/restored
+     * context silently means something different in two builds. 32 floats is
+     * 128 bytes per voice; the 4x path leaves them zero. */
+    float hb[32];
+    unsigned wb;
     float b1, b2, b3;     /* the biquad state: port cells 5488, 5472, 5504   */
 } eb_decim_state;
 

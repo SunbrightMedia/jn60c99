@@ -44,6 +44,7 @@
  * 0, and if it is not, the difference is a defect and not a budget.
  */
 #include "eb_dco.h"
+#include "eb_fork_config.h"
 #include "triangle.h"
 #include <math.h>
 
@@ -283,8 +284,16 @@ void eb_dco_step4(eb_dco_state *EB_RESTRICT s,
      * the binary, and a `k` that never escapes, so its fields are promoted to
      * registers for the whole loop. */
     int i;
-    for (i = 0; i < 4; ++i)
+    for (i = 0; i < EB_DCO_SUBSTEPS; ++i)
         out[i] = eb_dco_step_i(s, c);
+#if EB_DCO_SUBSTEPS < 4
+    /* HALF-OVERSAMPLING (EB_HALF_OS): only the first EB_DCO_SUBSTEPS entries
+     * are produced; the rest are zeroed so a caller that still reads four
+     * gets a defined value rather than stack litter. The decimator under the
+     * same flag reads only what was produced. */
+    for (; i < 4; ++i)
+        out[i] = 0.0f;
+#endif
 }
 
 void eb_dco_advance(eb_dco_state *s, const eb_dco_coef *c, unsigned n)

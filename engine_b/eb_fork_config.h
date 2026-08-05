@@ -57,6 +57,28 @@
 #ifndef EB_C4_SIMD_RECURSIVE
 #define EB_C4_SIMD_RECURSIVE 0
 #endif
+/* EB_HALF_OS -- half-oversampling of the DCO path (F5 design, O8 build).
+ * DEFAULT 0, AND THAT IS A COMMITMENT, NOT A PLACEHOLDER: the user approved
+ * the alias-position relaxation on the explicit condition that it stays
+ * REVERSIBLE. The exact 4x path remains compiled in the binary; setting this
+ * back to 0 restores it completely, with no other edit anywhere.
+ *
+ * What it changes when 1: the DCO runs 2 sub-steps per sample at a DOUBLED
+ * increment instead of 4, and eb_decim_tick uses the 24-tap designed FIR
+ * (eb_halfos_fir.h) instead of the port's 32-tap polyphase set. The biquad,
+ * and everything else, is untouched.
+ *
+ * THE RELAXATION, in one sentence, as signed: alias LEVEL matched within
+ * +1 dB per band; alias POSITIONS not preserved. */
+#ifndef EB_HALF_OS
+#define EB_HALF_OS 0
+#endif
+#if EB_HALF_OS
+#define EB_DCO_SUBSTEPS 2
+#else
+#define EB_DCO_SUBSTEPS 4
+#endif
+
 /* EB_LFO_SHARED stays DEFAULT OFF even in the fork: the charter's second
  * condition (silicon still needs it) is F4's to establish. Condition (a) is
  * MET and gated: the phase identity was measured across the bank under
@@ -66,6 +88,16 @@
 #ifndef EB_LFO_SHARED
 #define EB_LFO_SHARED 0
 #endif
+#endif
+
+/* OUTSIDE the fork guard on purpose: eb_dco.c and eb_decim.c compile in the
+ * TRUNK build too, and an undefined EB_DCO_SUBSTEPS there would be a silent
+ * 0 in the #if -- a DCO that produces no sub-samples at all. */
+#ifndef EB_HALF_OS
+#define EB_HALF_OS 0
+#endif
+#ifndef EB_DCO_SUBSTEPS
+#define EB_DCO_SUBSTEPS 4
 #endif
 
 #endif

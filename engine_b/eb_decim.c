@@ -6,7 +6,58 @@
  * is, because the reference is x86 SSE2 with no fused multiply-add.
  */
 #include "eb_decim.h"
+#include "eb_fork_config.h"
+#if EB_HALF_OS
+#include "eb_halfos_fir.h"
+#endif
 
+#if EB_HALF_OS
+/* HALF-OVERSAMPLING DECIMATOR (EB_HALF_OS=1). Two sub-samples in, one out,
+ * through the DESIGNED 24-tap symmetric FIR whose in-band magnitude matches
+ * the port's own 4x FIR to 0.078 dB over 20 Hz..16 kHz (see
+ * tools/engineb/gen_halfos_fir.py, which MEASURES the 4x reference by
+ * executing the code below rather than reading its tap order off a comment).
+ *
+ * The biquad tail is the port's, byte for byte, including the state rotation
+ * at the top and the k5456 feedback term -- only the FIR changes. That is
+ * deliberate: the biquad is rate-dependent recall data and reproducing it is
+ * free, so the half-OS relaxation stays confined to the one thing it must
+ * touch.
+ *
+ * The ring holds 2x samples newest-first; `w` counts down like the 4x path's.
+ */
+float eb_decim_tick(eb_decim_state *s, const eb_decim_coef *c, float k5456,
+                    float s0, float s1, float s2, float s3)
+{
+    unsigned w;
+    float v519, v520, v521, v524, v525, v526;
+    int t;
+
+    (void)s2; (void)s3;                 /* not produced when EB_DCO_SUBSTEPS==2 */
+
+    s->b3 = s->b1;
+    s->b1 = s->b2;
+
+    /* push the two new sub-samples, newest last */
+    s->hb[s->wb] = s0; s->wb = (s->wb + 1u) & (EB_HALFOS_RING - 1u);
+    s->hb[s->wb] = s1; s->wb = (s->wb + 1u) & (EB_HALFOS_RING - 1u);
+    w = s->wb;
+
+    v519 = 0.0f;
+    for (t = 0; t < EB_HALFOS_FIR_TAPS; ++t)
+        v519 += s->hb[(w - 1u - (unsigned)t) & (EB_HALFOS_RING - 1u)]
+              * eb_halfos_fir[t];
+    v524 = v519;
+
+    v520 = s->b1;
+    v521 = v520 * c->k6256 + s->b3;
+    s->b1 = v521;
+    v525 = v524 - (v520 * c->k6272 + v521);
+    s->b2 = v525 * c->k6256 + v520;
+    v526 = ((v521 - v525 * k5456) * c->k6336 - c->k6336 * v524) + v524;
+    return v526;
+}
+#else
 float eb_decim_tick(eb_decim_state *s, const eb_decim_coef *c, float k5456,
                     float s0, float s1, float s2, float s3)
 {
@@ -68,3 +119,4 @@ float eb_decim_tick(eb_decim_state *s, const eb_decim_coef *c, float k5456,
 #undef H
     return v526;
 }
+#endif  /* EB_HALF_OS */
