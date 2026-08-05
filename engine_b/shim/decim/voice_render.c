@@ -61,6 +61,9 @@ static eb_voice EBV[8];
 static eb_decim_coef EBDC[8];
 static float EBDRAW[8][20];
 static unsigned char EBDHAVE[8];
+/* the half-OS decimator's persistent ring; see the fresh-context note below */
+static float EBDHB[8][64];
+static unsigned EBDWB[8];
 static unsigned long EBDGEN_SEEN[8];
 #include <string.h>
 
@@ -2186,6 +2189,16 @@ LABEL_46:
         for (_q = 0; _q < 32; ++_q) ((float *)_v->decim_h)[_q] = 0.0f;
         _v->decim_w = 0;
         _v->decim_b1 = _v->decim_b2 = _v->decim_b3 = 0.0f;
+        /* THE HALF-OS RING TOO. O8 added hb/wb to eb_decim_state and this
+         * shim's copy-in/copy-out did not learn about them, so the half-OS
+         * arm ran with a GARBAGE stack index -- an out-of-bounds write that
+         * segfaulted the composite on its first audible render. Every
+         * half-OS number measured THROUGH THIS SHIM before 2026-08-05 late
+         * (halfos_gate's -33..-45 dB battery) was computed on that garbage
+         * state and is void; the standalone probes (o8_gate2, o8_alias_probe)
+         * used the real persistent state and are unaffected. */
+        for (_q = 0; _q < 64; ++_q) EBDHB[voice][_q] = 0.0f;
+        EBDWB[voice] = 0u;
         JF(a1, 5440) = 1.0f;              /* claim it; the port never reads it */
     }
     static const int _CC[16] = {5712,5696,5728,5744,5760,5776,5792,5808,
@@ -2229,6 +2242,8 @@ LABEL_46:
      * standalone engine the module reads eb_voice directly and this vanishes. */
     for (_q = 0; _q < 32; ++_q) ((float *)_ds.h)[_q] = ((float *)_v->decim_h)[_q];
     _ds.w = _v->decim_w;
+    for (_q = 0; _q < 64; ++_q) _ds.hb[_q] = EBDHB[voice][_q];
+    _ds.wb = EBDWB[voice];
     _ds.b1 = _v->decim_b1; _ds.b2 = _v->decim_b2; _ds.b3 = _v->decim_b3;
 
     v526 = eb_decim_tick(&_ds, &_dc, JF(a1, 5456),
@@ -2237,6 +2252,8 @@ LABEL_46:
 
     for (_q = 0; _q < 32; ++_q) ((float *)_v->decim_h)[_q] = ((float *)_ds.h)[_q];
     _v->decim_w = _ds.w;
+    for (_q = 0; _q < 64; ++_q) EBDHB[voice][_q] = _ds.hb[_q];
+    EBDWB[voice] = _ds.wb;
     _v->decim_b1 = _ds.b1; _v->decim_b2 = _ds.b2; _v->decim_b3 = _ds.b3;
   }
   JF(a1, 4928) = v526;
