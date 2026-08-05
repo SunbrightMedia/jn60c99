@@ -10,8 +10,8 @@ runnable; nothing is judged by ear.
 still **3.0×–4.5× OVER** on instruction count. (That figure is O6's MEASURED
 one; §4 below estimated 25,850 and §6 records the two corrections.) The
 reserve dials (44.1 kHz, half-oversampling) reach ≈24,300 ≈ 2.6×–3.9× over;
-the global LFO, whose hardware precondition O6 verified, would take it to
-≈20,200 ≈ 2.1×–3.2×. F3 delivers the two
+the global LFO — now PROVEN EXACTLY 0, §7 — takes it to 24,686 = 2.6×–3.9×
+alone, ≈20,400 ≈ 2.1×–3.2× with the reserves. F3 delivers the two
 largest levers that exist and the fork still does not fit by arithmetic
 alone; the decision moves to silicon (F4), where cycles-per-instruction and
 the remaining structural options (global LFO, half-oversampling adoption,
@@ -177,6 +177,34 @@ doctored-preset technique) leaves it identical in all 64. The per-voice LFOs
 are redundant computation for every configuration reachable from a preset.
 That satisfies F3's condition (a); condition (b), silicon need, is F4's.
 Worth ~4,100 instr/sample and now the largest single lever left.
+
+## 7. THE SHARED LFO IS PROVEN — EXACTLY 0 (2026-08-05, Fable 5)
+
+`JUNO_EB_LFO_SHARED=1 null_b.py --module standalone`: **EXACTLY 0 on all 36
+scenarios at BOTH 44,100 and 48,000 Hz, against the pure trunk oracle.** One
+LFO computed once and broadcast is THE SAME NUMBERS as eight per-voice LFOs —
+a removal of redundant computation, proven at the trunk's own certification
+standard, not an approximation under a relaxed one.
+
+The chain of evidence, in the order it was built:
+1. Phase identity measured across all 64 patches, staggered notes.
+2. The two parameters that could break it forced: LFO TRIG ENV on, LFO DELAY
+   TIME at maximum (k1184 is nonzero in every patch, so the exp path is live
+   in the rate — the identity is NOT a dead-gain artifact). Still 0 of 64.
+3. The mechanism located: the LFO's key input is the any-key-held flag the
+   plugin itself BROADCASTS to all voices (the b2_bcast2 finding). One LFO is
+   the JUNO-60's hardware fact showing through the plugin's own structure.
+4. The flagged build nulled EXACTLY 0, both rates.
+
+**Price with the lever pulled: 24,686 instr/sample = 2.6×–3.9× over** (the
+LFO line falls 4,728 → 788). With the reserve dials on top: ≈20,400 ≈
+2.1×–3.2×.
+
+Status: `EB_LFO_SHARED` default OFF. Charter condition (a) is met and gated;
+condition (b) — silicon still needing it — is F4's. PROMOTION TO THE TRUNK is
+open to the user: the proof is at the trunk's own standard, but the trunk's
+identity as a structure-preserving transcription is a policy, and policy is
+not this document's to change.
 
 ## 5. What O6 adopts, in order
 

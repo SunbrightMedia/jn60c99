@@ -34,7 +34,15 @@ site across 2,016,000 calls, so correctness rests on the exhaustive gates and
 not on that null. GLOBAL-LFO PRECONDITION VERIFIED: LFO phase is identical in
 all 8 voices across all 64 patches with staggered notes AND with LFO TRIG ENV
 forced on -- ~4,100 instr/sample, the largest lever left, pending only
-silicon need. The head pointer is now F4 (silicon).** NO approximations in the trunk —
+silicon need. THE SHARED LFO IS PROVEN EXACTLY 0 (same night, Fable 5): one LFO broadcast
+to all voices nulls EXACTLY 0 on all 36 scenarios at BOTH rates against the
+trunk oracle -- the per-voice LFOs are redundant computation, the hardware
+fact showing through the plugin's own any-key-held broadcast. Preconditions
+were forced first: LFO TRIG ENV on AND LFO DELAY TIME at max, 0 of 64
+divergent. EB_LFO_SHARED stays default OFF (charter: silicon need is F4's;
+trunk promotion is the USER's call -- the proof meets the trunk's standard).
+Fork price with it: 24,686 = 2.6-3.9x over; ~20,400 with reserves. The head
+pointer is now F4 (silicon).** NO approximations in the trunk —
 C2 moved OUT of trunk work (it is a −100 dB candidate, my earlier phase
 assignment was wrong). Phase 2 (Fable, S3 fork): recentered pitch with a
 0.05-CENT exhaustive gate (the plugin's own numerical noise bound, ~1000×
