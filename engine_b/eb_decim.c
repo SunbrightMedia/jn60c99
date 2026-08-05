@@ -38,15 +38,45 @@ float eb_decim_tick(eb_decim_state *s, const eb_decim_coef *c, float k5456,
     s->b3 = s->b1;
     s->b1 = s->b2;
 
-    /* push the two new sub-samples, newest last */
-    s->hb[s->wb] = s0; s->wb = (s->wb + 1u) & (EB_HALFOS_RING - 1u);
-    s->hb[s->wb] = s1; s->wb = (s->wb + 1u) & (EB_HALFOS_RING - 1u);
-    w = s->wb;
+    /* PUSH, into a DOUBLE-WRITTEN linear buffer rather than a masked ring.
+     * Each sub-sample is stored twice, at wb and wb+32, so the newest 24
+     * samples are always CONTIGUOUS and the tap loop walks two plain
+     * pointers with no index masking. That is worth measuring rather than
+     * asserting: the masked-ring form cost 176 executed Xtensa instructions
+     * against the 4x path's 151, i.e. the "half" decimator was MORE
+     * expensive than the one it replaces. This form is what makes the line
+     * a saving instead of a cost. */
+    s->hb[s->wb] = s0; s->hb[s->wb + EB_HALFOS_RING] = s0;
+    s->wb = (s->wb + 1u) & (EB_HALFOS_RING - 1u);
+    s->hb[s->wb] = s1; s->hb[s->wb + EB_HALFOS_RING] = s1;
+    w = s->wb + EB_HALFOS_RING;         /* absolute index of the newest */
+    s->wb = (s->wb + 1u) & (EB_HALFOS_RING - 1u);
 
-    v519 = 0.0f;
-    for (t = 0; t < EB_HALFOS_FIR_TAPS; ++t)
-        v519 += s->hb[(w - 1u - (unsigned)t) & (EB_HALFOS_RING - 1u)]
-              * eb_halfos_fir[t];
+    /* FOLDED, and the fold is not an optimisation invented here: the port's
+     * own 4x FIR is written as sixteen (a+b)*k pairs for exactly this reason.
+     * The designed FIR is symmetric by construction (gen_halfos_fir.py builds
+     * it from the half-length cosine basis), so a[t] == a[N-1-t] holds
+     * exactly, not approximately.
+     *
+     * (a*k + b*k) -> (a+b)*k is a DIFFERENT float, and in the trunk that
+     * would be forbidden. Here it is the fork, whose standard is gate 1 and
+     * gate 2, and both are re-run after this. */
+    {
+        const float *a = s->hb + w;                          /* walks down */
+        const float *b = s->hb + w - (EB_HALFOS_FIR_TAPS - 1);  /* walks up */
+        v519 = 0.0f;
+        /* UNROLLED, because it was MEASURED: the rolled loop costs 166
+         * executed Xtensa instructions and the 4x path it replaces costs
+         * 151. Three of the ten instructions in the loop body are pointer
+         * arithmetic; unrolling turns them into constant offsets. A "half"
+         * decimator that is slower than the whole one is not a saving, and
+         * the only way to know which it is, is to count. */
+#if defined(__GNUC__)
+#pragma GCC unroll 12
+#endif
+        for (t = 0; t < EB_HALFOS_FIR_TAPS / 2; ++t)
+            v519 += (a[-t] + b[t]) * eb_halfos_fir[t];
+    }
     v524 = v519;
 
     v520 = s->b1;

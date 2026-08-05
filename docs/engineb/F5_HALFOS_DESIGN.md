@@ -1,5 +1,21 @@
 # F5 — half-oversampling design: DCO path and VCF path (the spec O8 executes)
 
+> **★ SUPERSEDED IN THREE PLACES by the O8 execution (2026-08-05, Opus 5) —
+> read `data/o8_halfos_result.md` before trusting any number below.**
+> 1. **§1's alias table is WRONG.** Its probe halved `g` (it divided by the
+>    already-doubled increment), the exact mis-wiring the null later rejected.
+>    Re-measured on the shipping code the fork's alias floor DROPS 16-17 dB at
+>    7.1 and 10.6 kHz instead of matching within ±0.7 dB. That is a bigger
+>    change to the instrument than §6's relaxation describes, and it is the
+>    decision O8 stops for.
+> 2. **§4 gate 1's "to 18 kHz" is unachievable** — the port's 4x decimator has
+>    a −28.9 dB NOTCH there. The match band is 16 kHz. PASSED at 0.0783 dB.
+> 3. **§4 gate 3 is INVALID as written.** Repositioned aliases land IN BAND, so
+>    an 18 kHz low-pass cannot separate the approved change from a defect; no
+>    correct implementation could pass it. Gates 1 and 2 do the discriminating.
+>
+> §7's account is also optimistic by ~450: the decimator MEASURED zero saving.
+
 Date 2026-08-05 (Fable 5). The probe is `data/c6_halfos_probe.c` +
 `tools/engineb/gen_c6_halfband.py --measure`; every number below is from its
 third revision, and §5 records what the first two revisions measured instead

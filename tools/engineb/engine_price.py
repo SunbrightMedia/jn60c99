@@ -241,6 +241,14 @@ def main():
     # voice. Priced only because the EXACTLY-0 gate exists; a lever without
     # its gate does not belong in a price.
     shared_lfo = "--shared-lfo" in sys.argv[1:]
+    # --half-os: EB_HALF_OS=1 (O8). The DCO runs 2 sub-steps instead of 4, so
+    # its MEASURED branch-rate figure halves. The DECIMATOR does NOT get
+    # cheaper: F5 modelled -450 for it, and the built code measures 151
+    # Xtensa instructions either way -- 24 folded-and-unrolled taps at 2x
+    # cost exactly what 32 folded taps at 4x cost. The line is printed at
+    # zero rather than dropped, because a modelled saving that measured zero
+    # is the fifth such result in this project and deserves to stay visible.
+    half_os = "--half-os" in sys.argv[1:]
     fvoices = 6
     print("=== ENGINE B, WHOLE PER-SAMPLE DSP CHAIN, STATIC Xtensa "
           "instructions ===")
@@ -283,12 +291,19 @@ def main():
                  "replaces expf at the LFO and VCF-res sites"))
     # THE DCO: real-mix figure from dco_price.py, not a static body count.
     dco = 10202 if recip else 11610
+    if half_os:
+        dco //= 2                       # EB_DCO_SUBSTEPS 4 -> 2
     if fork:
         dco = int(round(dco * fvoices / 8.0))   # per-voice
     total += dco
     print("  %-18s %7s %6s %10d   %s"
           % ("dco", "--", "32", dco,
-             "MEASURED branch rates x static paths (dco_price.py)"))
+             "MEASURED branch rates x static paths (dco_price.py)"
+             + (", HALVED by EB_HALF_OS" if half_os else "")))
+    if half_os:
+        print("  %-18s %7d %6d %10d   %s"
+              % ("decim half-OS", 0, 0, 0,
+                 "MEASURED 151 instr either way -- F5's -450 was wrong"))
     # THE ARMS. One DELAY arm and one EFFECT arm run per sample; the rest of
     # the arm code is not executed for that patch. Printing them all and adding
     # only the worst keeps the headline on the safe side without pretending a

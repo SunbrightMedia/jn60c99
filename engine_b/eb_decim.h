@@ -54,9 +54,15 @@ typedef struct {
     /* HALF-OVERSAMPLING ring (EB_HALF_OS). Declared UNCONDITIONALLY so the
      * struct's size and layout do not depend on a build flag -- a state
      * struct that changes shape with a fork flag is how a saved/restored
-     * context silently means something different in two builds. 32 floats is
-     * 128 bytes per voice; the 4x path leaves them zero. */
-    float hb[32];
+     * context silently means something different in two builds. 64 floats is
+     * 256 bytes per voice; the 4x path leaves them zero.
+     *
+     * SIXTY-FOUR, not thirty-two, and the doubling is the point: every
+     * sub-sample is written at wb AND wb+32, so the newest 24 samples are
+     * always contiguous and the tap loop needs no index masking. See the
+     * measurement in eb_decim.c -- the masked form made the half-OS
+     * decimator MORE expensive than the 4x one it replaces. */
+    float hb[64];
     unsigned wb;
     float b1, b2, b3;     /* the biquad state: port cells 5488, 5472, 5504   */
 } eb_decim_state;
