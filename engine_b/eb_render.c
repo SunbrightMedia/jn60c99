@@ -210,14 +210,24 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
                               &g_edge, &pw_live, &pwm_out);
 #if EB_HALF_OS
         /* HALF-OVERSAMPLING: two sub-steps per sample instead of four, so
-         * each step must advance TWICE the phase to cover the same audio
-         * sample. `g` is 0.00390625/inc in the port and is the ramp slope
-         * per sub-step, so it halves for the same reason -- getting one of
-         * these two right and the other wrong would produce a correctly
-         * pitched oscillator with the wrong waveform, which is exactly the
-         * kind of defect that sounds plausible. */
+         * each step advances TWICE the phase to cover the same audio sample.
+         *
+         * `g` IS NOT RESCALED, and this is the one thing here that reasoning
+         * got backwards and measurement corrected. g = 0.00390625/inc, so
+         * 256*g = 1/inc, and the saw's edge term is clamp1(tri(p)/inc): a
+         * smoothing ramp whose width IN PHASE is proportional to inc. Scaling
+         * g with the new increment keeps the edge the same number of
+         * SUB-SAMPLES wide -- which is twice the TIME, i.e. a duller
+         * oscillator. MEASURED with g halved: -0.30 dB at f0 1.8 kHz, -3.56 dB
+         * at 7 kHz, -4.95 dB at 10.6 kHz. With g UNCHANGED the level matches
+         * the 4x path within 0.01 dB at every pitch tested. The edge must keep
+         * its width in TIME, so g keeps the value the 4x path gave it.
+         *
+         * The cost of that choice is the honest one: the edge now spans one
+         * sub-sample instead of two, so it is less band-limited -- which is
+         * precisely the alias increase gate 2 exists to bound. */
         st->dco_live[v].inc  = inc * 2.0f;
-        st->dco_live[v].g    = g_edge * 0.5f;
+        st->dco_live[v].g    = g_edge;
 #else
         st->dco_live[v].inc  = inc;
         st->dco_live[v].g    = g_edge;
