@@ -33,6 +33,42 @@ pitch (1.7 % of the engine) and call overhead (~1 %) while the DCO sat at
 **1.11x is within ordinary tuning of a fit.** Nothing above requires a
 different chip.
 
+## PHASE 1 — CORRECTED BY MEASUREMENT BEFORE IT WAS BUILT
+
+**The version below is WRONG and is kept so the correction is legible.**
+
+MEASURED on the Xtensa build: `eb_dco_step_i` has **no separate symbol** --
+gcc already inlines it at -O2. The DCO is ONE 484-instruction body whose four
+sub-steps are a loop, and the recall-rate coefficients are already hoisted
+out of it. The only per-iteration loads left are `inc`, `g`, `pw`, `pwm1`,
+`pwp1` -- and those **change every sample** (eb_render.c:229-233 writes them
+from eb_dcoprep_tick's modulation), so no amount of blocking removes them.
+
+**Blocking per voice therefore buys almost nothing, and the estimated
+1.56 -> 1.15 was wrong.**
+
+**What c/i actually is.** Spills are only **9.3 %** of instructions
+(MEASURED, O-b). The 1.56 is FPU DEPENDENCY LATENCY: a serial chain of
+single-precision operations where each waits on the previous. Blocking one
+voice does not break a serial chain -- **it is still the same chain, just
+looped differently.**
+
+**The only thing that fills those stalls is INDEPENDENT work, and the engine
+has six independent copies of it: the voices.** LTO already demonstrated the
+mechanism at small scale -- it inlined across the voice loop and the measured
+per-voice slope fell 5,343 -> 5,031 cycles (-5.8 %) with no arithmetic change.
+Hand-interleaving two voices' DCO sub-steps in one loop body is the same
+mechanism applied deliberately instead of incidentally.
+
+**REVISED PHASE 1: VOICE-PAIR INTERLEAVING.** Process voices two at a time
+through the DCO and the ladder, their arithmetic interleaved in one body, so
+each voice's independent operations fill the other's dependency stalls.
+Exact -- the voices never interact, so the null must still be EXACTLY 0.
+Expected c/i 1.56 -> 1.2-1.3 (LTO's incidental 5.8 % is the floor, not the
+ceiling); the number must be MEASURED on the board, not estimated again.
+
+### The original (wrong) text follows
+
 ## PHASE 1 — BLOCK PROCESSING (the one that changes the multiplier)
 
 **What it is.** The engine renders sample-by-sample: for each sample, for
