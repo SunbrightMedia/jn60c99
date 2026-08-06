@@ -16,4 +16,10 @@
 [mapping:main]
 archive: libmain.a
 entries:
-    * (noflash)
+    * (noflash_text)
+
+# noflash_TEXT, not noflash. `noflash` moves rodata into DRAM as well, and
+# this component's rodata is the 1.69 MB embedded coefficient blob -- the
+# link failed with `dram0_0_seg overflowed by 1631392 bytes`, which is that
+# blob almost exactly. Only the CODE needs to leave flash; constants are read
+# through the data cache and were never the measured cost.
