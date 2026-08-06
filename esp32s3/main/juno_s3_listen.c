@@ -72,6 +72,10 @@
  * all, so nothing in the per-sample path reaches PSRAM except the voice
  * state. It is the smallest build that makes sound, and it isolates the
  * question: if this fits, the overrun is placement and not arithmetic. */
+#ifndef S3L_OFFLINE
+#define S3L_OFFLINE 0
+#endif
+
 #ifndef S3L_NOFX
 #define S3L_NOFX 0
 #endif
@@ -334,6 +338,62 @@ void app_main(void)
            S3L_NVOICE[CH], WAKE,
            (double)S3L_HOLD_FRAMES / SR, (double)S3L_REL_FRAMES / SR);
 
+    /* ================= OFFLINE RENDER, THEN REAL-TIME PLAYBACK =========
+     * The engine is 1.4x too slow to feed the codec live at one voice. That
+     * is a scheduling problem, not a sound problem: rendered into memory
+     * first, every sample is correct and the DAC gets a perfectly-timed
+     * stream. This is how you HEAR the port today while the real-time work
+     * continues -- and it is honest about what it is, because the render is
+     * timed and printed, so the shortfall stays visible instead of hidden.
+     *
+     * 10 seconds of stereo int16 = 1.76 MB in PSRAM. The DMA reads from
+     * PSRAM at playback, which is trivially fast enough: 176 KB/s. */
+#if S3L_OFFLINE
+    {
+        const unsigned long NFR = (unsigned long)SR * 10u;
+        int16_t *buf = heap_caps_malloc(NFR * 2u * sizeof(int16_t),
+                                        MALLOC_CAP_SPIRAM);
+        unsigned long f;
+        int64_t t0;
+        if (!buf) { printf("HALT: no PSRAM for the render buffer.\n"); return; }
+        printf("rendering %lu s offline... (slower than real time; that is "
+               "the point)\n", NFR / SR);
+        t0 = esp_timer_get_time();
+        frame = 0; gate = 0;
+        load_coefs(CH, 0);
+        for (f = 0; f < NFR; ++f) {
+            float vb[EB_NUM_VOICES], L = 0.0f, R;
+            int k;
+            for (k = 0; k < EB_NUM_VOICES; ++k)
+                EBE.v[k].atrest = !((WAKE >> k) & 1u);
+            for (k = 0; k < EB_NUM_VOICES; ++k) vb[k] = 0.0f;
+            eb_engine_render_voices(&EBE, RS, &RC,
+                                    (const eb_render_needs *)0, vb);
+            for (k = 0; k < EB_NUM_VOICES; ++k) L += vb[k];
+            R = L;
+            if (L > 1.0f) L = 1.0f; else if (L < -1.0f) L = -1.0f;
+            if (R > 1.0f) R = 1.0f; else if (R < -1.0f) R = -1.0f;
+            buf[2 * f]     = (int16_t)(L * 30000.0f);
+            buf[2 * f + 1] = (int16_t)(R * 30000.0f);
+            if (++frame >= (unsigned long)(gate ? S3L_REL_FRAMES
+                                                : S3L_HOLD_FRAMES)) {
+                frame = 0; gate = !gate; load_coefs(CH, gate);
+            }
+            if ((f % (SR / 2)) == 0)
+                printf("  %lu%%\n", 100u * f / NFR);
+        }
+        printf("rendered %lu frames in %.1f s (%.2fx real time)\n", NFR,
+               (double)(esp_timer_get_time() - t0) / 1e6,
+               (double)(esp_timer_get_time() - t0) / 1e6
+                   / ((double)NFR / SR));
+        printf("PLAYING, looping. This is engine B on your board.\n");
+        for (;;) {
+            size_t wrote = 0;
+            i2s_channel_write(TX, buf, NFR * 2u * sizeof(int16_t), &wrote,
+                              portMAX_DELAY);
+        }
+    }
+#endif
     for (;;) {
         int64_t t0 = esp_timer_get_time();
         int64_t te = 0;

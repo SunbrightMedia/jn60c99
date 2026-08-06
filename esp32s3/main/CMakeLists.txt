@@ -77,3 +77,10 @@ endif()
 if(S3_LTO)
     target_link_options(${COMPONENT_LIB} INTERFACE -flto)
 endif()
+
+# -DS3_OFFLINE=1: render into PSRAM first, then loop playback. Sidesteps the
+# real-time shortfall entirely so the engine can be HEARD while the
+# performance work continues.
+if(S3_OFFLINE)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE S3L_OFFLINE=1)
+endif()
