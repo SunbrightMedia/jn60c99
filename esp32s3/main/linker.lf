@@ -1,0 +1,19 @@
+# THE ENGINE RUNS FROM IRAM, NOT FROM FLASH.
+#
+# MEASURED, and it is what two placement steps eliminated: removing the FX
+# chain took 20,465 -> 12,720 cycles/sample at two voices, and then moving the
+# voice STATE from PSRAM to internal RAM changed it by 2 cycles (12,720 ->
+# 12,718). So the remaining 2x over the instruction model is not data at all.
+#
+# What is left is INSTRUCTION fetch. The app's code sits in flash, XIP-mapped
+# at 0x42000020 (98 KB in this build), behind a small instruction cache. The
+# per-sample voice chain touches a large fraction of that code every sample,
+# so it thrashes. F4's c/i = 0.95 was measured on a tight harness loop that
+# fit in cache; the real engine does not.
+#
+# Placing the whole main archive (which is where the eb_*.c objects land) in
+# IRAM removes the flash fetch entirely.
+[mapping:main]
+archive: libmain.a
+entries:
+    * (noflash)

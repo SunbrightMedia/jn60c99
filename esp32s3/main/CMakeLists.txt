@@ -20,6 +20,7 @@ idf_component_register(
     SRCS ${APP_SRC} ${EB_SRCS}
     INCLUDE_DIRS "." "../../engine_b" "../../src" "../../tools/engineb/qemu"
     EMBED_FILES ${APP_EMBED}
+    LDFRAGMENTS "linker.lf"
     REQUIRES esp_driver_i2s driver esp_timer)
 
 # The project's load-bearing flags, verbatim from the host build. FMA does
