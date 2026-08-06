@@ -229,6 +229,12 @@ if os.environ.get("JUNO_EB_VCF_RES_RANGE"):
 # so its standard is the fork's, not EXACTLY 0 -- but the tail's LIFT into its
 # own function is separately proven EXACTLY 0, so a failure here is the table
 # and nothing else.
+# JUNO_EB_PW_RANGE=1: write-only instrumentation reporting how far the DCO's
+# pulse width travels per sample. Decides whether a mip-mapped wavetable DCO is
+# buildable at all. Reports to /tmp/eb_pw.log.
+if os.environ.get("JUNO_EB_PW_RANGE"):
+    CFLAGS = CFLAGS + ["-DEB_PW_RANGE=1"]
+
 if os.environ.get("JUNO_EB_VCF_RES_LUT"):
     CFLAGS = CFLAGS + ["-DEB_VCF_RES_LUT=%d"
                        % int(os.environ["JUNO_EB_VCF_RES_LUT"])]

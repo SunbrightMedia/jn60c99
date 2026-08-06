@@ -3,6 +3,40 @@
 #include "eb_dcoprep.h"
 #include <math.h>
 
+/* EB_PW_RANGE -- write-only instrumentation, and the one question that
+ * decides the WAVETABLE DCO. A mip-mapped wavetable is the only remaining
+ * lever that changes the DCO's order of magnitude, and it has to be rebuilt
+ * whenever the PULSE WIDTH moves. If pw is static on most patches, one table
+ * per note serves. If it moves every sample, a table is useless and the lever
+ * dies before it is written.
+ *
+ * Reports to /tmp/eb_pw.log, for the reason eb_vcf_ladder.c records: the null
+ * harness discards its workers' stderr, so a stderr report reads as "pw never
+ * moved" -- a measurement that silently measures nothing. */
+#ifndef EB_PW_RANGE
+#define EB_PW_RANGE 0
+#endif
+#if EB_PW_RANGE
+#include <stdio.h>
+#include <math.h>
+static float ebpw_prev[8], ebpw_lo = 1e30f, ebpw_hi = -1e30f;
+static float ebpw_dmax = 0.0f;
+static int ebpw_seen[8], ebpw_slot = 0;
+static unsigned long ebpw_n = 0, ebpw_moved = 0;
+static void ebpw_report(void) __attribute__((destructor));
+static void ebpw_report(void)
+{
+    FILE *f;
+    if (!ebpw_n) return;
+    f = fopen("/tmp/eb_pw.log", "a");
+    if (!f) return;
+    fprintf(f, "calls=%lu moved=%lu span=[%.6f,%.6f] worststep=%.8f\n",
+            ebpw_n, ebpw_moved, (double)ebpw_lo, (double)ebpw_hi,
+            (double)ebpw_dmax);
+    fclose(f);
+}
+#endif
+
 float eb_dcoprep_tick(const eb_dcoprep_coef *c, float pitch, float pwmcv,
                       float in3808,
                       float *out4800, float *out4816, float *out5456)
@@ -15,6 +49,26 @@ float eb_dcoprep_tick(const eb_dcoprep_coef *c, float pitch, float pwmcv,
     float v400;
 
     *out4816 = v397 + in3808;
+#if EB_PW_RANGE
+    {   float pw = *out4816;
+        ++ebpw_n;
+        if (pw < ebpw_lo) ebpw_lo = pw;
+        if (pw > ebpw_hi) ebpw_hi = pw;
+        /* PER VOICE, through an 8-slot ring. The first version compared
+         * consecutive calls, which are DIFFERENT VOICES: it reported pw
+         * moving on 100 % of samples with a worst step of 0.83, which is the
+         * CONDITION scatter between voices and not motion in time at all. A
+         * measurement that compares the wrong two numbers is not a small
+         * error -- it would have killed the wavetable lever outright. */
+        int q = ebpw_slot; ebpw_slot = (ebpw_slot + 1) & 7;
+        if (ebpw_seen[q]) {
+            float d = fabsf(pw - ebpw_prev[q]);
+            if (d > 0.0f) ++ebpw_moved;
+            if (d > ebpw_dmax) ebpw_dmax = d;
+        }
+        ebpw_seen[q] = 1; ebpw_prev[q] = pw;
+    }
+#endif
     if (v399 <= 0.0f)
         v400 = 0.0f;
     else
