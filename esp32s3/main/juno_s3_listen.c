@@ -260,7 +260,23 @@ void app_main(void)
     /* the chord index for this build's voice count, clamped to what exists */
     const int CH = (S3L_VOICES < 1 ? 1 :
                     S3L_VOICES > S3L_NNOTE ? S3L_NNOTE : S3L_VOICES) - 1;
+    /* OFFLINE RENDERS EVERY VOICE. The cap exists for the REAL-TIME build,
+     * where cycles are the constraint; rendering into memory has no such
+     * constraint, and capping there deletes real sound. MEASURED against the
+     * plugin on patch 0, C3, full master chain:
+     *
+     *     1 voice awake   best-fit gain 0.955   residual -10.8 dB
+     *     all 8 awake     best-fit gain 1.0002  residual -72.5 dB
+     *
+     * -72.5 dB is the 16-bit floor. The 29 % of signal the cap was throwing
+     * away is the free-running output of the seven voices the JUNO renders
+     * whether or not they are sounding -- the instrument's own character,
+     * not noise, and the thing that made the capped build sound dead. */
+#if S3L_OFFLINE
+    unsigned WAKE = 0xffu;
+#else
     unsigned WAKE = S3L_MASK[CH];
+#endif
     /* THE SLOPE, MEASURED INSTEAD OF EXTRAPOLATED.
      *
      * The 1-voice cost was never measured -- it was the priced slope times a
@@ -379,72 +395,87 @@ void app_main(void)
      * PSRAM at playback, which is trivially fast enough: 176 KB/s. */
 #if S3L_OFFLINE
     {
-        /* A WHOLE NUMBER OF NOTE CYCLES, so the loop seam is a note-on
-         * against a decayed tail instead of a splice mid-release. 4 cycles
-         * of (1.5 s held + 0.7 s released) = 8.8 s. */
-        const unsigned long CYC = (unsigned long)S3L_HOLD_FRAMES
+        /* THE FULL INSTRUMENT, OFFLINE. The FX were cut for the REAL-TIME
+         * build and then carried forward out of momentum; offline there is
+         * no reason for it. MEASURED: the dry voice bus differs from the
+         * port's own output by -10.8 dB, and patch 0's stereo width (L-R
+         * 0.054 rms against a 0.066 signal) is entirely chorus. Without the
+         * master chain this patch is a dry mono voice, which is what "the
+         * VCF melts away" was describing -- the filter envelope itself
+         * matches the port to within 10 % on spectral centroid.
+         *
+         * PSRAM: rings 6.46 MB + states 1.46 MB leaves room for ONE note
+         * cycle. So the peak is found by rendering TWICE rather than by
+         * keeping a float buffer -- offline, time is the cheap resource. */
+        const unsigned long NFR = (unsigned long)S3L_HOLD_FRAMES
                                 + (unsigned long)S3L_REL_FRAMES;
-        const unsigned long NFR = CYC * 4u;
-        float *fb = heap_caps_malloc(NFR * sizeof(float), MALLOC_CAP_SPIRAM);
         int16_t *buf = heap_caps_malloc(NFR * 2u * sizeof(int16_t),
                                         MALLOC_CAP_SPIRAM);
         unsigned long f;
-        float pk = 0.0f, g;
+        float pk = 0.0f, g = 1.0f;
         uint32_t rnd = 22222u;
+        int pass;
         int64_t t0;
-        if (!fb || !buf) { printf("HALT: no PSRAM for the buffers.\n"); return; }
-        printf("rendering %lu frames (%.1f s, %lu note cycles) offline...\n",
-               NFR, (double)NFR / SR, NFR / CYC);
+        if (!buf) { printf("HALT: no PSRAM for the audio buffer.\n"); return; }
+        printf("rendering %lu frames (%.2f s, ONE note cycle) with the FULL "
+               "master chain: chorus, delay, reverb, stereo.\n",
+               NFR, (double)NFR / SR);
         t0 = esp_timer_get_time();
-        frame = 0; gate = 0;
-        load_coefs(CH, 0);
-        for (f = 0; f < NFR; ++f) {
-            float vb[EB_NUM_VOICES], L = 0.0f;
-            int k;
-            for (k = 0; k < EB_NUM_VOICES; ++k)
-                EBE.v[k].atrest = !((WAKE >> k) & 1u);
-            for (k = 0; k < EB_NUM_VOICES; ++k) vb[k] = 0.0f;
-            eb_engine_render_voices(&EBE, RS, &RC,
-                                    (const eb_render_needs *)0, vb);
-            for (k = 0; k < EB_NUM_VOICES; ++k) L += vb[k];
-            fb[f] = L;
-            if (L < 0.0f) { if (-L > pk) pk = -L; } else if (L > pk) pk = L;
-            if (++frame >= (unsigned long)(gate ? S3L_REL_FRAMES
-                                                : S3L_HOLD_FRAMES)) {
-                frame = 0; gate = !gate; load_coefs(CH, gate);
+        for (pass = 0; pass < 2; ++pass) {
+            /* RE-SEED EVERY PASS. The FX carry state across the whole render
+             * -- a second pass on a warm reverb is a different signal, and
+             * the peak from pass 1 would then be the wrong number for
+             * pass 2's audio. */
+            memcpy(RS, B_RSTATE, S3L_RSTATE_SZ);
+            ms_load(B_MSTATE);
+            frame = 0; gate = 0;
+            load_coefs(CH, 0);
+            for (f = 0; f < NFR; ++f) {
+                float vb[EB_NUM_VOICES], L = 0.0f, R = 0.0f;
+                int k;
+                for (k = 0; k < EB_NUM_VOICES; ++k)
+                    EBE.v[k].atrest = !((WAKE >> k) & 1u);
+                for (k = 0; k < EB_NUM_VOICES; ++k) vb[k] = 0.0f;
+                eb_engine_render_voices(&EBE, RS, &RC,
+                                        (const eb_render_needs *)0, vb);
+                eb_master_render(MS, &MC, &RG, vb, &L, &R);
+                if (pass == 0) {
+                    float a1 = L < 0.0f ? -L : L, a2 = R < 0.0f ? -R : R;
+                    if (a1 > pk) pk = a1;
+                    if (a2 > pk) pk = a2;
+                } else {
+                    float d, v;
+                    rnd = rnd * 1664525u + 1013904223u;
+                    d  = (float)(int32_t)(rnd >> 16) / 32768.0f;
+                    rnd = rnd * 1664525u + 1013904223u;
+                    d += (float)(int32_t)(rnd >> 16) / 32768.0f;
+                    v = L * g * 32767.0f + d * 0.5f;
+                    if (v > 32767.0f) v = 32767.0f;
+                    else if (v < -32768.0f) v = -32768.0f;
+                    buf[2 * f] = (int16_t)v;
+                    v = R * g * 32767.0f + d * 0.5f;
+                    if (v > 32767.0f) v = 32767.0f;
+                    else if (v < -32768.0f) v = -32768.0f;
+                    buf[2 * f + 1] = (int16_t)v;
+                }
+                if (++frame >= (unsigned long)(gate ? S3L_REL_FRAMES
+                                                    : S3L_HOLD_FRAMES)) {
+                    frame = 0; gate = !gate; load_coefs(CH, gate);
+                }
+                if ((f % (SR / 2)) == 0)
+                    printf("  pass %d  %lu%%\n", pass + 1, 100u * f / NFR);
             }
-            if ((f % (SR / 2)) == 0) printf("  %lu%%\n", 100u * f / NFR);
+            if (pass == 0) {
+                g = (pk > 1e-9f) ? (0.891f / pk) : 1.0f;
+                printf("peak %.4f -> gain x%.3f (-1 dBFS)\n",
+                       (double)pk, (double)g);
+            }
         }
-        /* NORMALISE TO -1 dBFS. The engine's own idle floor is -85.5 dBFS
-         * (measured on the identical host render), so the hiss in the room
-         * is analog, and every dB of headroom left unused here is a dB the
-         * listener has to make up on the interface gain -- which lifts that
-         * analog noise with it. The old build peaked at -9.2 dBFS and threw
-         * away 8 dB of signal-to-noise for nothing. */
-        g = (pk > 1e-9f) ? (0.891f / pk) : 1.0f;
-        printf("peak %.4f -> gain x%.3f (normalising to -1 dBFS)\n",
-               (double)pk, (double)g);
-        for (f = 0; f < NFR; ++f) {
-            /* TPDF DITHER, +/-1 LSB. The conversion was a bare truncation,
-             * which correlates its error with the signal and makes quiet
-             * tails grainy. Two independent uniform draws summed is the
-             * standard triangular distribution. */
-            float d, v;
-            rnd = rnd * 1664525u + 1013904223u;
-            d  = (float)(int32_t)(rnd >> 16) / 32768.0f;
-            rnd = rnd * 1664525u + 1013904223u;
-            d += (float)(int32_t)(rnd >> 16) / 32768.0f;
-            v = fb[f] * g * 32767.0f + d * 0.5f;
-            if (v > 32767.0f) v = 32767.0f;
-            else if (v < -32768.0f) v = -32768.0f;
-            buf[2 * f] = buf[2 * f + 1] = (int16_t)v;
-        }
-        free(fb);
         printf("rendered in %.1f s (%.2fx real time)\n",
                (double)(esp_timer_get_time() - t0) / 1e6,
                (double)(esp_timer_get_time() - t0) / 1e6
-                   / ((double)NFR / SR));
-        printf("PLAYING C3 on patch 0, looping. This is engine B.\n");
+                   / (2.0 * (double)NFR / SR));
+        printf("PLAYING C3 on patch 0, FULL CHAIN, stereo, looping.\n");
         for (;;) {
             size_t wrote = 0;
             i2s_channel_write(TX, buf, NFR * 2u * sizeof(int16_t), &wrote,
