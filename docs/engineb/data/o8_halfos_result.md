@@ -344,3 +344,43 @@ would, and that is DSP work this project has already closed four times.
 
 **O-b closes NEGATIVE.** The remaining lever is O-c, the second core, which is
 idle and which the project's budget always assumed.
+
+## 12. O-c: THE SLOPE SAYS DUAL-CORE CANNOT FIX IT ALONE
+
+Before building the split, the per-voice slope was priced and calibrated
+against the board:
+
+    base (0 voices)   1,596 instructions
+    per voice         3,302 instructions
+    c/i               1.56  (measured, §10)
+
+    predicts 2 voices = 12,792 cycles;  MEASURED 12,820.  0.2 % error.
+
+The model is now calibrated on real silicon, and it says:
+
+| configuration | cycles | vs one core (5,442 @44.1k) |
+|---|---|---|
+| 1 voice, one core | 7,640 | **1.40x** |
+| 2 voices, one core | 12,792 | 2.35x |
+| **dual core, 1 voice each** | **7,640/core** | **1.40x** |
+
+**A SINGLE VOICE ALREADY EXCEEDS ONE CORE.** A voice is indivisible -- its
+modules are a serial dependency chain -- so no core-count arrangement helps:
+splitting 2 voices across 2 cores leaves each core running one voice plus the
+shared base, which is the 1.40x row. **O-c alone does not reach real time and
+building it would not have changed that.**
+
+What the same arithmetic says WOULD reach it, at 44.1 kHz, 2 voices, dual core:
+
+| step | saving | cycles/core |
+|---|---|---|
+| dual core, 1 voice each | -- | 7,640 |
+| + EB_HALF_OS (DCO 4x -> 2x, already built and gated) | ~1,000 | 6,640 |
+| + EB_NUM_VOICES=2 (stop advancing 6 voices that cannot sound) | ~450 | 6,190 |
+| **remaining gap to 5,442** | | **1.14x** |
+
+So the honest position: **2 voices at 44.1 kHz is ~14 % short after every
+lever now known**, and the last 14 % has no identified source. 6 voices is
+3.5x short. Lowering the sample rate would close it immediately but 22,050 Hz
+is not a rate the plugin supports, so its coefficients are unvalidated and
+that is not a shortcut this project may take.
