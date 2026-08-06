@@ -208,6 +208,16 @@ if os.environ.get("JUNO_EB_VCF_RES_CR"):
 if os.environ.get("JUNO_EB_VCF_GRANGE"):
     CFLAGS = CFLAGS + ["-DEB_VCF_GRANGE=1"]
 
+# JUNO_EB_RING_PROBE=1: write-only instrumentation that reports, per FX ring,
+# the DEEPEST read behind the write pointer over the whole scenario set. The
+# rings are ALLOCATED at the port's own length cells -- 6.10 MB, three of them
+# 2 MB -- and 2 MB of floats at 44,100 Hz is 11.9 seconds. The used depth is
+# what decides whether a ring fits the S3's internal RAM, and it is not
+# readable from a coefficient (the read index is a smoothed, modulated value),
+# so it is measured. Reports to /tmp/eb_ring.log; changes no arithmetic.
+if os.environ.get("JUNO_EB_RING_PROBE"):
+    CFLAGS = CFLAGS + ["-DEB_RING_PROBE=1"]
+
 # JUNO_EB_HALF_OS=1: half-oversample the DCO path (F5 design, O8 build). The
 # residual is NOT expected to be EXACTLY 0 and NOT expected to clear -100 dB:
 # the fork standard for this lever is a BAND-LIMITED null at -80/-60 through

@@ -1,5 +1,6 @@
 /* eb_fx_e5.c -- GENERATED from src/master_render.c:2633-2748. */
 #include "eb_fx_e5.h"
+#include "eb_ring_probe.h"
 #include "eb_dsp.h"
 #include "juno_tables.h"
 #include <math.h>
@@ -7,7 +8,7 @@
 #include <stdbool.h>
 
 #define LODWORD(x) (*(uint32_t *)&(x))
-#define RINGR(i)   (s->ring[(c->k101028 - 1) & (int32_t)(i)])
+#define RINGR(i)   (s->ring[EB_RP_R(EB_RP_E5, c->k101028, (i), s->s101024)])
 #define RINGI(i)   (s->ring[(i)])
 
 void eb_fx_e5_tick(eb_fx_e5_state *s, const eb_fx_e5_coef *c,

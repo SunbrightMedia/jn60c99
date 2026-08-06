@@ -1,5 +1,6 @@
 /* eb_dly_t4.c -- GENERATED from src/master_render.c:1871-2074. */
 #include "eb_dly_t4.h"
+#include "eb_ring_probe.h"
 #include "eb_dsp.h"
 #include "juno_tables.h"
 #include <math.h>
@@ -7,9 +8,9 @@
 #include <stdbool.h>
 
 #define LODWORD(x) (*(uint32_t *)&(x))
-#define RINGR0(i)  (s->ring0[(c->k6463716 - 1) & (int32_t)(i)])
+#define RINGR0(i)  (s->ring0[EB_RP_R(EB_RP_T4_0, c->k6463716, (i), s->s6463712)])
 #define RINGI0(i)  (s->ring0[(i)])
-#define RINGR1(i)  (s->ring1[(c->k6496500 - 1) & (int32_t)(i)])
+#define RINGR1(i)  (s->ring1[EB_RP_R(EB_RP_T4_1, c->k6496500, (i), s->s6496496)])
 #define RINGI1(i)  (s->ring1[(i)])
 
 void eb_dly_t4_tick(eb_dly_t4_state *s, const eb_dly_t4_coef *c,

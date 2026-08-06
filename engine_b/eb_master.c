@@ -17,6 +17,37 @@
  *   == 5 -> the e5 arm (:2633) | >= 6 -> LABEL_164 | else (2,3,4) -> chorus
  */
 #include "eb_master.h"
+#include "eb_ring_probe.h"
+
+#if EB_RING_PROBE
+/* THE PROBE'S STORAGE. One definition, in the one module that owns the rings.
+ * Not built by any gate: tools/verify and tools/engineb never define
+ * EB_RING_PROBE, so the shipping object has neither the counters nor the
+ * compare. */
+#include <stdio.h>
+int eb_rp_maxlag[EB_RP_N];
+int eb_rp_len[EB_RP_N];
+/* A FILE, not stderr, for the reason eb_vcf_ladder.c records: the null
+ * harness runs its scenarios in worker subprocesses whose stderr is captured
+ * and discarded, so a stderr report would print nothing and read as "no ring
+ * was ever used". */
+static void eb_rp_report(void) __attribute__((destructor));
+static void eb_rp_report(void)
+{
+    static const char *N[EB_RP_N] = { "t1", "t23", "t5_0", "t5_1", "t5_2",
+                                      "t5_3", "e5", "t4_0", "t4_1" };
+    FILE *f; int i;
+    for (i = 0; i < EB_RP_N; ++i) if (eb_rp_len[i]) break;
+    if (i == EB_RP_N) return;
+    f = fopen("/tmp/eb_ring.log", "a");
+    if (!f) return;
+    for (i = 0; i < EB_RP_N; ++i)
+        if (eb_rp_len[i])
+            fprintf(f, "%s maxlag=%d len=%d\n", N[i], eb_rp_maxlag[i],
+                    eb_rp_len[i]);
+    fclose(f);
+}
+#endif
 #include <string.h>
 
 int eb_master_render(eb_master_state *s, const eb_master_coef *c,

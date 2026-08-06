@@ -1,12 +1,13 @@
 /* eb_delay_t23.c -- GENERATED SKELETON, see the .c header note */
 #include "eb_delay_t23.h"
+#include "eb_ring_probe.h"
 #include "eb_dsp.h"
 #include "juno_tables.h"
 #include <math.h>
 #include <string.h>
 
 #define LODWORD(x)  (*(uint32_t *)&(x))
-#define RINGR(i)    (s->ring[(c->k6429412 - 1) & (int32_t)(i)])
+#define RINGR(i)    (s->ring[EB_RP_R(EB_RP_T23, c->k6429412, (i), s->s6429408)])
 #define RINGI(i)    (s->ring[(i)])
 
 void eb_dly23_tick(eb_dly23_state *s, const eb_dly23_coef *c,

@@ -9,16 +9,17 @@
  * plain-local capture would have skipped silently.
  */
 #include "eb_delay_t5.h"
+#include "eb_ring_probe.h"
 #include "eb_dsp.h"
 #include "juno_tables.h"
 #include <math.h>
 #include <string.h>
 
 #define LODWORD(x)  (*(uint32_t *)&(x))
-#define RINGR0(i)   (s->ring0[(c->k8594772  - 1) & (int32_t)(i)])
-#define RINGR1(i)   (s->ring1[(c->k10691940 - 1) & (int32_t)(i)])
-#define RINGR2(i)   (s->ring2[(c->k10726260 - 1) & (int32_t)(i)])
-#define RINGR3(i)   (s->ring3[(c->k10759044 - 1) & (int32_t)(i)])
+#define RINGR0(i)   (s->ring0[EB_RP_R(EB_RP_T5_0, c->k8594772,  (i), s->s8594768)])
+#define RINGR1(i)   (s->ring1[EB_RP_R(EB_RP_T5_1, c->k10691940, (i), s->s10691936)])
+#define RINGR2(i)   (s->ring2[EB_RP_R(EB_RP_T5_2, c->k10726260, (i), s->s10726256)])
+#define RINGR3(i)   (s->ring3[EB_RP_R(EB_RP_T5_3, c->k10759044, (i), s->s10759040)])
 #define RINGI0(i)   (s->ring0[(i)])
 #define RINGI1(i)   (s->ring1[(i)])
 #define RINGI2(i)   (s->ring2[(i)])

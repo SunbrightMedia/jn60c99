@@ -16,13 +16,14 @@
  * becomes the specification.
  */
 #include "eb_delay_t1.h"
+#include "eb_ring_probe.h"
 
 #include "juno_tables.h"
 #include <math.h>
 #include <string.h>
 
 #define LODWORD(x)  (*(uint32_t *)&(x))
-#define RINGR(i)    (s->ring[(c->k6395252 - 1) & (int32_t)(i)])
+#define RINGR(i)    (s->ring[EB_RP_R(EB_RP_T1, c->k6395252, (i), s->s6395248)])
 #define RINGI(i)    (s->ring[(i)])
 
 void eb_dly1_tick(eb_dly1_state *s, const eb_dly1_coef *c,
