@@ -30,8 +30,23 @@ idf_component_register(
 # and IDF's xtensa headers use `asm`, which strict ISO C rejects -- the
 # listen build failed exactly there. The engine's contract (c99, no
 # contraction) applies to the engine; the app file keeps IDF's own default.
+# -flto: THE CHEAPEST ROUTE TO THE ILP THE BOARD SAYS IS MISSING.
+#
+# MEASURED slope: 5,343 cycles per voice, flat -- two voices cost exactly
+# twice one, so nothing overlaps today. c/i is 1.56 because dependent
+# single-precision chains stall, and the fix is to give the FPU independent
+# work to fill the stalls with: the OTHER voice's arithmetic.
+#
+# The obstacle is that every module is a separate translation unit, so the
+# compiler cannot interleave across the per-voice calls in eb_render.c even
+# though the voices are provably independent. Link-time optimisation removes
+# exactly that obstacle without touching a line of DSP. If it does not move
+# the number, hand-fusing the DCO and ladder for two voices is next.
+#
+# -ffp-contract=off still applies, so no FMA can appear; LTO reorders and
+# inlines, it does not re-associate float arithmetic.
 target_compile_options(${COMPONENT_LIB} PRIVATE
-    -O2 -ffp-contract=off -fno-strict-aliasing
+    -O2 -flto -ffp-contract=off -fno-strict-aliasing
     -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_IDF)
 set_source_files_properties(${EB_SRCS} PROPERTIES COMPILE_OPTIONS "-std=c99")
 
@@ -57,4 +72,8 @@ endif()
 # placement cost from arithmetic cost.
 if(S3_NOFX)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE S3L_NOFX=1)
+endif()
+
+if(S3_LTO)
+    target_link_options(${COMPONENT_LIB} INTERFACE -flto)
 endif()
