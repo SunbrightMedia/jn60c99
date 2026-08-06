@@ -146,9 +146,19 @@ The fork's standard is indistinguishability, not bit-exactness, so §6's −100 
 verdict does not bind it. C1 was re-opened on that reasoning and MEASURED on
 the full 36-scenario battery (§6's number was 4 scenarios):
 
-| N | worst global | worst block |
-|---|---|---|
-| 2 | **−76.4 dB** | −71.1 dB |
+| N | worst global | worst block | failing scenarios |
+|---|---|---|---|
+| 2 | **−76.4 dB** | −71.1 dB | 9 |
+| 4 | −80.0 dB | — | 11 |
+| 8 | −80.7 dB | — | 12 |
+
+**More decimation measured BETTER, not worse**, which no error model here
+predicts and which is recorded rather than explained: N=8 is 4.3 dB quieter
+than N=2 while failing more scenarios. The likely reading is that the
+re-anchor radius (EB_PITCH_CR_RADIUS) dominates over N -- a larger N spends
+longer inside one anchor but re-anchors on the same CV excursions -- but
+nothing was measured to confirm it, and since the lever is worthless in the
+fork (below) nothing was.
 
 **The integrating-bias fear is MEASURED FALSE.** §6 predicted the error would
 grow with note length, so long notes would be worst. They are not: `long
