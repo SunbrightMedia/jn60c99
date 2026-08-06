@@ -261,10 +261,41 @@ void app_main(void)
 
     if (!blob_open()) { printf("HALT: no usable coefficient blob.\n"); return; }
 
+    /* THE VOICE STATE GOES TO INTERNAL RAM, and the reason is measured.
+     * With the FX chain removed the board still ran at 12,720 cycles/sample
+     * for two voices against a ~6,000-instruction model -- the only PSRAM
+     * left in the per-sample path was this struct.
+     *
+     * It is 735 KB and internal RAM has 218 KB, but the VOICE CHAIN ONLY
+     * TOUCHES THE FIRST 6,808 BYTES: everything after offsetof(chorus) is a
+     * legacy copy of the FX state that eb_engine_render_voices never reads --
+     * verified by grepping eb_render.c for st->chorus / st->delay /
+     * st->reverb / st->rev_*, which returns nothing.
+     *
+     * So the full struct is allocated in PSRAM (the master chain still wants
+     * it when FX are on) and, when FX are OFF, a 6,808-byte INTERNAL copy is
+     * used instead. Under S3L_NOFX nothing can reach past the prefix. */
+#if S3L_NOFX
+    RS = heap_caps_malloc(S3L_VOICE_SZ + 64u, MALLOC_CAP_INTERNAL);
+#else
     RS = heap_caps_malloc(sizeof *RS, MALLOC_CAP_SPIRAM);
+#endif
+#if S3L_NOFX
+    MS = 0;
+#else
     MS = heap_caps_malloc(sizeof *MS, MALLOC_CAP_SPIRAM);
+#endif
+#if S3L_NOFX
+    if (!RS) { printf("HALT: internal alloc for voice state failed.\n"); return; }
+    printf("voice state in INTERNAL RAM (%u bytes)\n", (unsigned)S3L_VOICE_SZ);
+#else
     if (!RS || !MS) { printf("HALT: PSRAM alloc for states failed.\n"); return; }
+#endif
+#if S3L_NOFX
+    memcpy(RS, B_RSTATE, S3L_VOICE_SZ);      /* the prefix is all that exists */
+#else
     memcpy(RS, B_RSTATE, S3L_RSTATE_SZ);
+#endif
 #if !S3L_NOFX
     ms_load(B_MSTATE);
     if (!rings_alloc()) { printf("HALT: rings.\n"); return; }
