@@ -50,3 +50,10 @@ endif()
 if(S3_VOICES)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE S3L_VOICES=${S3_VOICES})
 endif()
+
+# STEP 1: -DS3_NOFX=1 builds the VOICE-CHAIN-ONLY firmware (no master/FX, no
+# PSRAM rings). It is the smallest build that makes sound and it isolates
+# placement cost from arithmetic cost.
+if(S3_NOFX)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE S3L_NOFX=1)
+endif()

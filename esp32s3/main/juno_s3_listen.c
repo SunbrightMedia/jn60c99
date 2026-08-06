@@ -57,6 +57,25 @@
  * voices it wakes are the ones the probe MEASURED as sounding for that chord.
  * That matters: the port's allocator fills from voice 7 downward, so waking
  * voices 0..N-1 wakes exactly the silent ones. */
+/* S3L_NOFX -- STEP 1: the VOICE CHAIN ONLY, no master/FX stage.
+ *
+ * WHY IT EXISTS. The first board run measured 20,465 cycles/sample at TWO
+ * voices against a 22.68 us budget -- 3.7x over -- while the same engine
+ * prices at ~20,860 INSTRUCTIONS for SIX voices. The difference is memory:
+ * this build puts 6.2 MB of FX rings and 1.4 MB of state in PSRAM at 80 MHz
+ * and touches them every sample. F4's own firmware header warned that its
+ * cycles-per-sample was an INTERNAL-SRAM figure and must not be quoted as the
+ * product's until a PSRAM-resident run existed. This is that run, and it says
+ * the placement costs about 4x.
+ *
+ * With S3L_NOFX the master chain is not called and NO ring is allocated at
+ * all, so nothing in the per-sample path reaches PSRAM except the voice
+ * state. It is the smallest build that makes sound, and it isolates the
+ * question: if this fits, the overrun is placement and not arithmetic. */
+#ifndef S3L_NOFX
+#define S3L_NOFX 0
+#endif
+
 #ifndef S3L_VOICES
 #define S3L_VOICES 2
 #endif
@@ -226,6 +245,8 @@ void app_main(void)
     static int16_t pcm[CHUNK * 2];
     unsigned long frame = 0, underrun = 0, chunks = 0;
     unsigned long busy_us = 0;
+    int64_t t_start;
+    int behind = 0;
     int step = 0, gate = 0;
     /* the chord index for this build's voice count, clamped to what exists */
     const int CH = (S3L_VOICES < 1 ? 1 :
@@ -244,8 +265,12 @@ void app_main(void)
     MS = heap_caps_malloc(sizeof *MS, MALLOC_CAP_SPIRAM);
     if (!RS || !MS) { printf("HALT: PSRAM alloc for states failed.\n"); return; }
     memcpy(RS, B_RSTATE, S3L_RSTATE_SZ);
+#if !S3L_NOFX
     ms_load(B_MSTATE);
     if (!rings_alloc()) { printf("HALT: rings.\n"); return; }
+#else
+    printf("BUILD: VOICES ONLY -- master/FX chain not called, no rings.\n");
+#endif
 
     eb_engine_init(&EBE, (float)SR);
     /* render_ok is the standalone engine's own guard. Setting it here is
@@ -256,6 +281,7 @@ void app_main(void)
     load_coefs(CH, 0);
 
     if (!i2s_start()) { printf("HALT: I2S would not start.\n"); return; }
+    t_start = esp_timer_get_time();
     printf("chord of %d voice(s), wake mask 0x%02x, "
            "%.2f s held / %.2f s released, looping\n\n",
            S3L_NVOICE[CH], WAKE,
@@ -276,7 +302,15 @@ void app_main(void)
             for (k = 0; k < EB_NUM_VOICES; ++k) vb[k] = 0.0f;
             eb_engine_render_voices(&EBE, RS, &RC,
                                     (const eb_render_needs *)0, vb);
+#if S3L_NOFX
+            /* The port's master sums the voices; everything after that is
+             * FX. Summing here is NOT a claim to be the master stage -- it
+             * is the dry voice bus, which is what this build measures. */
+            for (k = 0; k < EB_NUM_VOICES; ++k) L += vb[k];
+            R = L;
+#else
             eb_master_render(MS, &MC, &RG, vb, &L, &R);
+#endif
             if (L > 1.0f) L = 1.0f; else if (L < -1.0f) L = -1.0f;
             if (R > 1.0f) R = 1.0f; else if (R < -1.0f) R = -1.0f;
             pcm[2 * i]     = (int16_t)(L * 30000.0f);
@@ -303,18 +337,31 @@ void app_main(void)
         {   /* A FULL DMA QUEUE MEANS WE ARE AHEAD; a timeout means we are
              * behind and the codec ran dry. That is the underrun. */
             size_t wrote = 0;
+            /* A TIMEOUT IS NOT THE ONLY UNDERRUN, and the first board run
+             * proved it: the engine ran at 27 % of real time and this
+             * counter stayed at 0 for eight seconds, because when you are
+             * permanently behind there is ALWAYS free DMA space and the
+             * write never blocks. The real test is the wall clock. */
             if (i2s_channel_write(TX, pcm, sizeof pcm, &wrote,
                                   pdMS_TO_TICKS(50)) != ESP_OK
                 || wrote != sizeof pcm)
                 ++underrun;
         }
 
+        vTaskDelay(1);          /* feed the watchdog; the loop had starved IDLE0 */
         if (++chunks % (SR / CHUNK) == 0) {
             /* cycles/sample, from the real render loop rather than a model */
             double us_per_sample = (double)busy_us / (double)(chunks * CHUNK);
-            printf("t=%lus  underruns=%lu  render %.2f us/sample "
+            /* THE WALL-CLOCK TEST, which is the one that decides. */
+            {   double real_us = (double)esp_timer_get_time() - (double)t_start;
+                double audio_us = (double)(chunks * CHUNK) * 1e6 / (double)SR;
+                if (real_us > audio_us * 1.02) behind = 1;
+            }
+            printf("t=%lus  %s  underruns=%lu  render %.2f us/sample "
                    "(~%.0f cycles at 240 MHz)  budget %.2f us  %s\n",
-                   chunks / (SR / CHUNK), underrun, us_per_sample,
+                   chunks / (SR / CHUNK),
+                   behind ? "BEHIND REAL TIME" : "realtime OK",
+                   underrun, us_per_sample,
                    us_per_sample * 240.0, 1e6 / (double)SR,
                    us_per_sample < 1e6 / (double)SR ? "FITS" : "OVER");
         }
