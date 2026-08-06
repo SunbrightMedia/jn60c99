@@ -20,8 +20,48 @@
 #include "eb_master_coefs.h"
 #include "s3_listen_meta.h"
 
+
 static eb_engine EBE; static eb_render_coefs RC; static eb_master_coef MC;
 static eb_master_rings RG; static eb_render_state *RS; static eb_master_state *MS;
+/* THE MASTER STATE IS COPIED MEMBER BY MEMBER, and this is not tidiness.
+ * Five of its FX sub-states end in `float *ring` -- 8 bytes on the host that
+ * generated the blob, 4 bytes here -- so sizeof(eb_master_state) is 729,824
+ * there and 729,768 here. The first firmware copied the blob whole: every
+ * field past the first pointer landed at the wrong offset, the reverb read a
+ * garbage ring depth, and the board died with a LoadStoreError at an
+ * unmapped address on its first rendered sample.
+ *
+ * min(host, target) bytes of each member is EXACT, because every pointer is
+ * the LAST member of its struct and eb_master_render re-assigns all of them
+ * from eb_master_rings before use. */
+static const unsigned char *ms_load(const unsigned char *p)
+{
+    void *dst[S3L_NMSEC];
+    unsigned tgt[S3L_NMSEC];
+    int i;
+    dst[0]=&MS->in;   tgt[0]=sizeof MS->in;
+    dst[1]=&MS->d1;   tgt[1]=sizeof MS->d1;
+    dst[2]=&MS->d4;   tgt[2]=sizeof MS->d4;
+    dst[3]=&MS->e0;   tgt[3]=sizeof MS->e0;
+    dst[4]=&MS->d23;  tgt[4]=sizeof MS->d23;
+    dst[5]=&MS->d5;   tgt[5]=sizeof MS->d5;
+    dst[6]=&MS->e1;   tgt[6]=sizeof MS->e1;
+    dst[7]=&MS->e5;   tgt[7]=sizeof MS->e5;
+    dst[8]=&MS->rev;  tgt[8]=sizeof MS->rev;
+    dst[9]=&MS->cho;  tgt[9]=sizeof MS->cho;
+    dst[10]=&MS->dcore; tgt[10]=sizeof MS->dcore;
+    dst[11]=&MS->fb84672; tgt[11]=2u*sizeof(float);
+    dst[12]=&MS->route_change; tgt[12]=sizeof MS->route_change;
+    dst[13]=MS->rev_pending;   tgt[13]=sizeof MS->rev_pending;
+    dst[14]=&MS->rev_wipe;     tgt[14]=sizeof MS->rev_wipe;
+    for (i = 0; i < S3L_NMSEC; ++i) {
+        unsigned n = S3L_MSEC[i] < tgt[i] ? S3L_MSEC[i] : tgt[i];
+        memcpy(dst[i], p, n);
+        p += S3L_MSEC[i];          /* the blob stride is the HOST size */
+    }
+    return p;
+}
+
 
 int main(int argc, char **argv)
 {
@@ -53,7 +93,7 @@ int main(int argc, char **argv)
         for (v = 0; v < EB_NUM_VOICES; ++v) {
             double pk = 0.0; int i, k;
             memcpy(RS, B_RS, S3L_RSTATE_SZ);
-            memcpy(MS, B_MS, S3L_MSTATE_SZ);
+            ms_load(B_MS);
             memcpy(&RC, p, S3L_COEF_SZ);
             memcpy(&MC, p + S3L_COEF_SZ, S3L_MCOEF_SZ);
             memcpy(RS, p + S3L_COEF_SZ + S3L_MCOEF_SZ, S3L_VOICE_SZ);
@@ -70,6 +110,7 @@ int main(int argc, char **argv)
             }
             /* the VOICE's own sample, not the master's: the FX tail of a
              * previous chord would otherwise mark a silent voice as sounding */
+            if (c==0) fprintf(stderr,"  chord0 voice%d pk=%.6g\n",v,pk);
             if (pk > 1e-4) mask |= 1u << v;
         }
         printf("%d 0x%02x\n", c, mask);

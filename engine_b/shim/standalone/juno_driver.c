@@ -205,6 +205,18 @@ void ebsh_dump_sizes(int *out)
      * snapshot per note for the price of a rounding error. offsetof, not a
      * hand-counted number: the struct will change again. */
     out[4] = (int)offsetof(eb_render_state, chorus);
+    {   /* the 15 master-state member sizes, in dump order 10..24 */
+        int i = 5;
+        out[i++] = (int)sizeof MS.in;    out[i++] = (int)sizeof MS.d1;
+        out[i++] = (int)sizeof MS.d4;    out[i++] = (int)sizeof MS.e0;
+        out[i++] = (int)sizeof MS.d23;   out[i++] = (int)sizeof MS.d5;
+        out[i++] = (int)sizeof MS.e1;    out[i++] = (int)sizeof MS.e5;
+        out[i++] = (int)sizeof MS.rev;   out[i++] = (int)sizeof MS.cho;
+        out[i++] = (int)sizeof MS.dcore; out[i++] = (int)(2 * sizeof(float));
+        out[i++] = (int)sizeof MS.route_change;
+        out[i++] = (int)sizeof MS.rev_pending;
+        out[i++] = (int)sizeof MS.rev_wipe;
+    }
 }
 
 void ebsh_dump_blob(int which, unsigned char *dst)
@@ -216,6 +228,33 @@ void ebsh_dump_blob(int which, unsigned char *dst)
     case 2: src = &EBS; n = sizeof EBS; break;
     case 3: src = &MS;  n = sizeof MS;  break;
     case 4: src = &EBS; n = offsetof(eb_render_state, chorus); break;
+    /* THE MASTER STATE, MEMBER BY MEMBER. It CANNOT be shipped as one blob:
+     * five of its FX sub-states end in `float *ring` pointers, 8 bytes on the
+     * host and 4 on a 32-bit target, so sizeof(eb_master_state) is 729,824
+     * here and 729,768 on Xtensa. Copying the blob whole put every field past
+     * the first pointer at the wrong offset; the reverb read a garbage ring
+     * depth and the firmware died with a LoadStoreError at an unmapped
+     * address on its first rendered sample.
+     *
+     * Every pointer is the LAST member of its struct (verified in all five),
+     * and eb_master_render re-assigns all of them from eb_master_rings before
+     * use, so copying the common PREFIX of each member is exact and the
+     * pointers are re-established by the engine itself. */
+    case 10: src = &MS.in;    n = sizeof MS.in;    break;
+    case 11: src = &MS.d1;    n = sizeof MS.d1;    break;
+    case 12: src = &MS.d4;    n = sizeof MS.d4;    break;
+    case 13: src = &MS.e0;    n = sizeof MS.e0;    break;
+    case 14: src = &MS.d23;   n = sizeof MS.d23;   break;
+    case 15: src = &MS.d5;    n = sizeof MS.d5;    break;
+    case 16: src = &MS.e1;    n = sizeof MS.e1;    break;
+    case 17: src = &MS.e5;    n = sizeof MS.e5;    break;
+    case 18: src = &MS.rev;   n = sizeof MS.rev;   break;
+    case 19: src = &MS.cho;   n = sizeof MS.cho;   break;
+    case 20: src = &MS.dcore; n = sizeof MS.dcore; break;
+    case 21: src = &MS.fb84672; n = 2 * sizeof(float); break;
+    case 22: src = &MS.route_change; n = sizeof MS.route_change; break;
+    case 23: src = MS.rev_pending; n = sizeof MS.rev_pending; break;
+    case 24: src = &MS.rev_wipe; n = sizeof MS.rev_wipe; break;
     default: return;
     }
     memcpy(dst, src, n);

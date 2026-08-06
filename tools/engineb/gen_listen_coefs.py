@@ -79,16 +79,21 @@ def main():
                 "Add it to engine_b/shim/standalone/juno_driver.c." % fn)
     bank = open(truth.BANK, "rb").read()
 
-    sizes = (ctypes.c_int * 5)()
+    sizes = (ctypes.c_int * 20)()
     lib.ebsh_dump_sizes(sizes)
-    ncoef, nmcoef, nstate, nmstate, nvoice = list(sizes)
+    ncoef, nmcoef, nstate, nmstate, nvoice = list(sizes)[:5]
+    # THE MASTER STATE'S 15 MEMBERS, sized individually. See the long note in
+    # the shim: sizeof(eb_master_state) is NOT the same on the host and on a
+    # 32-bit target, because five FX sub-states end in a `float *ring`.
+    MSEC = list(sizes)[5:20]
     print("sizes: coefs %d  mcoefs %d  rstate %d  mstate %d  voice-prefix %d"
-          % (ncoef, nmcoef, nstate, nmstate, nvoice))
+          % (ncoef, nmcoef, nstate, sum(MSEC), nvoice))
 
     # the port's nine ring-length cells (eb_master.h's own list)
     RING_LEN_CELLS = [6395252, 6429412, 8594772, 10691940, 10726260,
                       10759044, 101028, 6463716, 6496500]
     ring_lens = []
+    msec_blob = []
     rows = []
     for k in NOTES:
         # A FRESH CONTEXT PER CHORD. WHICH voices the port allocates is NOT
@@ -105,6 +110,8 @@ def main():
             lib.juno_gui_note_on(c, CHORD[q], 100)
         lib.juno_gui_render(c, buf, 1)           # one sample: coefs are built
         on = _grab(lib, ncoef, nmcoef, nstate, nmstate, nvoice)
+        if not msec_blob:
+            msec_blob.extend(_one(lib, w, MSEC[w - 10]) for w in range(10, 25))
         _render(lib, c, HOLD_FRAMES)
         for q in range(k):
             lib.juno_gui_note_off(c, CHORD[q])
@@ -132,11 +139,12 @@ def main():
     # note is expressed by swapping the coefficient set, which is where the
     # pitch and the gate live.
     hdr = struct.pack("<8I", 0x4A554E4F, len(rows), ncoef, nmcoef,
-                      nstate, nmstate, nvoice, 0)
+                      nstate, sum(MSEC), nvoice, 0)
     with open(OUT, "wb") as f:
         f.write(hdr)
         f.write(rows[0][1][2])            # render state, note 0, gate on
-        f.write(rows[0][1][3])            # master state, note 0, gate on
+        for b in msec_blob:               # master state, MEMBER BY MEMBER
+            f.write(b)
         for note, on, off in rows:
             for blob in (on, off):
                 f.write(blob[0])          # coefficients
@@ -151,7 +159,14 @@ def main():
         f.write("#define S3L_COEF_SZ %du\n#define S3L_MCOEF_SZ %du\n"
                 "#define S3L_RSTATE_SZ %du\n#define S3L_MSTATE_SZ %du\n"
                 "#define S3L_VOICE_SZ %du\n"
-                % (ncoef, nmcoef, nstate, nmstate, nvoice))
+                % (ncoef, nmcoef, nstate, sum(MSEC), nvoice))
+        f.write("/* the master state's members, HOST sizes, in blob order.\n"
+                " * The firmware copies min(host, target) bytes of each --\n"
+                " * every differing member ends in a pointer the engine\n"
+                " * re-assigns from eb_master_rings before use. */\n")
+        f.write("#define S3L_NMSEC %d\n" % len(MSEC))
+        f.write("static const unsigned S3L_MSEC[S3L_NMSEC] = {%s};\n"
+                % ",".join("%du" % v for v in MSEC))
         # +1 ON BOTH: each capture happens after ONE extra rendered sample
         # (the render-1 that rebuilds the coefficient cache), so the firmware
         # must render that sample too before copying the state in. MEASURED:
@@ -213,6 +228,12 @@ def _render(lib, c, n):
         k = 1024 if left > 1024 else left
         lib.juno_gui_render(c, buf, k)
         left -= k
+
+
+def _one(lib, which, n):
+    b = (ctypes.c_ubyte * n)()
+    lib.ebsh_dump_blob(which, b)
+    return bytes(b)
 
 
 def _grab(lib, *sz):

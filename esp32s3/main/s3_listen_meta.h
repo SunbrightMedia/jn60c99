@@ -5,8 +5,14 @@
 #define S3L_COEF_SZ 10436u
 #define S3L_MCOEF_SZ 1704u
 #define S3L_RSTATE_SZ 735236u
-#define S3L_MSTATE_SZ 729824u
+#define S3L_MSTATE_SZ 729816u
 #define S3L_VOICE_SZ 6808u
+/* the master state's members, HOST sizes, in blob order.
+ * The firmware copies min(host, target) bytes of each --
+ * every differing member ends in a pointer the engine
+ * re-assigns from eb_master_rings before use. */
+#define S3L_NMSEC 15
+static const unsigned S3L_MSEC[S3L_NMSEC] = {4u,144u,232u,124u,176u,440u,112u,144u,199640u,4248u,524400u,8u,4u,136u,4u};
 /* The hold/release lengths the OFF snapshot was captured
  * at. The firmware MUST use these: the release copies a
  * voice state in, and a state captured at a different
