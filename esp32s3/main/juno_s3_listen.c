@@ -29,6 +29,7 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/i2s_std.h"
@@ -378,19 +379,27 @@ void app_main(void)
      * PSRAM at playback, which is trivially fast enough: 176 KB/s. */
 #if S3L_OFFLINE
     {
-        const unsigned long NFR = (unsigned long)SR * 10u;
+        /* A WHOLE NUMBER OF NOTE CYCLES, so the loop seam is a note-on
+         * against a decayed tail instead of a splice mid-release. 4 cycles
+         * of (1.5 s held + 0.7 s released) = 8.8 s. */
+        const unsigned long CYC = (unsigned long)S3L_HOLD_FRAMES
+                                + (unsigned long)S3L_REL_FRAMES;
+        const unsigned long NFR = CYC * 4u;
+        float *fb = heap_caps_malloc(NFR * sizeof(float), MALLOC_CAP_SPIRAM);
         int16_t *buf = heap_caps_malloc(NFR * 2u * sizeof(int16_t),
                                         MALLOC_CAP_SPIRAM);
         unsigned long f;
+        float pk = 0.0f, g;
+        uint32_t rnd = 22222u;
         int64_t t0;
-        if (!buf) { printf("HALT: no PSRAM for the render buffer.\n"); return; }
-        printf("rendering %lu s offline... (slower than real time; that is "
-               "the point)\n", NFR / SR);
+        if (!fb || !buf) { printf("HALT: no PSRAM for the buffers.\n"); return; }
+        printf("rendering %lu frames (%.1f s, %lu note cycles) offline...\n",
+               NFR, (double)NFR / SR, NFR / CYC);
         t0 = esp_timer_get_time();
         frame = 0; gate = 0;
         load_coefs(CH, 0);
         for (f = 0; f < NFR; ++f) {
-            float vb[EB_NUM_VOICES], L = 0.0f, R;
+            float vb[EB_NUM_VOICES], L = 0.0f;
             int k;
             for (k = 0; k < EB_NUM_VOICES; ++k)
                 EBE.v[k].atrest = !((WAKE >> k) & 1u);
@@ -398,23 +407,44 @@ void app_main(void)
             eb_engine_render_voices(&EBE, RS, &RC,
                                     (const eb_render_needs *)0, vb);
             for (k = 0; k < EB_NUM_VOICES; ++k) L += vb[k];
-            R = L;
-            if (L > 1.0f) L = 1.0f; else if (L < -1.0f) L = -1.0f;
-            if (R > 1.0f) R = 1.0f; else if (R < -1.0f) R = -1.0f;
-            buf[2 * f]     = (int16_t)(L * 30000.0f);
-            buf[2 * f + 1] = (int16_t)(R * 30000.0f);
+            fb[f] = L;
+            if (L < 0.0f) { if (-L > pk) pk = -L; } else if (L > pk) pk = L;
             if (++frame >= (unsigned long)(gate ? S3L_REL_FRAMES
                                                 : S3L_HOLD_FRAMES)) {
                 frame = 0; gate = !gate; load_coefs(CH, gate);
             }
-            if ((f % (SR / 2)) == 0)
-                printf("  %lu%%\n", 100u * f / NFR);
+            if ((f % (SR / 2)) == 0) printf("  %lu%%\n", 100u * f / NFR);
         }
-        printf("rendered %lu frames in %.1f s (%.2fx real time)\n", NFR,
+        /* NORMALISE TO -1 dBFS. The engine's own idle floor is -85.5 dBFS
+         * (measured on the identical host render), so the hiss in the room
+         * is analog, and every dB of headroom left unused here is a dB the
+         * listener has to make up on the interface gain -- which lifts that
+         * analog noise with it. The old build peaked at -9.2 dBFS and threw
+         * away 8 dB of signal-to-noise for nothing. */
+        g = (pk > 1e-9f) ? (0.891f / pk) : 1.0f;
+        printf("peak %.4f -> gain x%.3f (normalising to -1 dBFS)\n",
+               (double)pk, (double)g);
+        for (f = 0; f < NFR; ++f) {
+            /* TPDF DITHER, +/-1 LSB. The conversion was a bare truncation,
+             * which correlates its error with the signal and makes quiet
+             * tails grainy. Two independent uniform draws summed is the
+             * standard triangular distribution. */
+            float d, v;
+            rnd = rnd * 1664525u + 1013904223u;
+            d  = (float)(int32_t)(rnd >> 16) / 32768.0f;
+            rnd = rnd * 1664525u + 1013904223u;
+            d += (float)(int32_t)(rnd >> 16) / 32768.0f;
+            v = fb[f] * g * 32767.0f + d * 0.5f;
+            if (v > 32767.0f) v = 32767.0f;
+            else if (v < -32768.0f) v = -32768.0f;
+            buf[2 * f] = buf[2 * f + 1] = (int16_t)v;
+        }
+        free(fb);
+        printf("rendered in %.1f s (%.2fx real time)\n",
                (double)(esp_timer_get_time() - t0) / 1e6,
                (double)(esp_timer_get_time() - t0) / 1e6
                    / ((double)NFR / SR));
-        printf("PLAYING, looping. This is engine B on your board.\n");
+        printf("PLAYING C3 on patch 0, looping. This is engine B.\n");
         for (;;) {
             size_t wrote = 0;
             i2s_channel_write(TX, buf, NFR * 2u * sizeof(int16_t), &wrote,
