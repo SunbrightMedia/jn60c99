@@ -231,6 +231,12 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
         st->dco_live[v].pw   = pw_live;
         st->dco_live[v].pwm1 = pw_live - 1.0f;
         st->dco_live[v].pwp1 = pw_live + 1.0f;
+#if EB_DCO_PULSEFAST
+        /* g just changed, so the edge thresholds must be re-derived. The
+         * shim path gets this through eb_dco_set_pitch; this path assigns
+         * the fields directly and would otherwise run on stale values. */
+        eb_dco_set_edge_thresholds(&st->dco_live[v]);
+#endif
         eb_dco_step4(&st->dco[v], &st->dco_live[v], q);
         /* pwm_out IS CELL 5456, eb_dcoprep's third output, and the decimator's
          * per-sample feedback term. It was discarded here as `(void)pwm_out`

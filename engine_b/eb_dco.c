@@ -134,21 +134,6 @@ static inline float eb_sat_c(float e, const eb_dco_coef *c, int cb)
     return eb_sat(e * c->sat_in, c);
 }
 
-static void eb_dco_set_pulse_h(eb_dco_coef *c)
-{
-    /* 1.02x margin so the fast path is only taken where the clamp is
-     * UNAMBIGUOUSLY saturated: within one part in fifty of the boundary the
-     * full expression runs, so a float rounding disagreement at the
-     * threshold cannot change the result. That margin is what makes this a
-     * SHORT-CIRCUIT and not an approximation -- the null must be EXACTLY 0. */
-    float d = (c->g * 256.0f) * c->amp_pulse;
-    c->pulse_h = (d > 1e-12f) ? (0.51f / d) : 2.0f;
-    d = (c->g * 256.0f) * c->amp_saw;
-    c->saw_h   = (d > 1e-12f) ? (1.02f / d) : 2.0f;   /* slope 1 */
-    d = (c->g * 512.0f) * c->amp_sub;
-    c->sub_h   = (d > 1e-12f) ? (0.51f / d) : 2.0f;   /* slope 2 */
-}
-
 void eb_dco_set_shape(eb_dco_coef *c)
 {
     c->sat_hi = eb_sat( c->sat_in, c);
@@ -177,7 +162,7 @@ void eb_dco_set_pitch(eb_dco_coef *c, float inc, float pw)
 {
     c->inc  = eb_dco_inc_scale(inc);
     c->g    = 0.00390625f / inc;
-    eb_dco_set_pulse_h(c);
+    eb_dco_set_edge_thresholds(c);
     c->pw   = pw;
     c->pwm1 = pw - 1.0f;
     c->pwp1 = pw + 1.0f;

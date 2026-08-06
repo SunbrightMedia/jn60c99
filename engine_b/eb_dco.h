@@ -221,6 +221,28 @@ void  eb_dco_step4(eb_dco_state *s, const eb_dco_coef *c, float *out);
  *
  * So it is a function and both callers call it. There is no third place left
  * to put a factor of two. */
+/* THE EDGE-SATURATION THRESHOLDS, IN ONE PLACE, USED BY EVERY PATH.
+ *
+ * They depend on `g`, which CHANGES EVERY SAMPLE (eb_render.c:230 sets it
+ * from eb_dcoprep_tick's modulated edge gain). The first version derived
+ * them only inside eb_dco_set_pitch, which the SHIM calls per sample but
+ * eb_render.c does not -- it assigns dco_live's fields directly. The shim
+ * null therefore passed EXACTLY 0 while the STANDALONE path would have run
+ * on thresholds frozen at their first value.
+ *
+ * That is the eb_dco_inc_scale mistake exactly: a derived quantity living
+ * where only one of two callers goes through it. It is a function now, and
+ * both callers call it. */
+EB_INLINE void eb_dco_set_edge_thresholds(eb_dco_coef *c)
+{
+    float d = (c->g * 256.0f) * c->amp_pulse;
+    c->pulse_h = (d > 1e-12f) ? (0.51f / d) : 2.0f;   /* tri slope 2 */
+    d = (c->g * 256.0f) * c->amp_saw;
+    c->saw_h   = (d > 1e-12f) ? (1.02f / d) : 2.0f;   /* tri_saw slope 1 */
+    d = (c->g * 512.0f) * c->amp_sub;
+    c->sub_h   = (d > 1e-12f) ? (0.51f / d) : 2.0f;   /* tri_sub slope 2 */
+}
+
 EB_INLINE float eb_dco_inc_scale(float inc4)
 {
 #if EB_DCO_SUBSTEPS == 2
