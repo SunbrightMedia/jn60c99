@@ -1,181 +1,205 @@
 # THE PLAN THAT FITS — 6 voices + full FX on the ESP32-S3
 
 Date 2026-08-06 (Opus 5), at the user's order: "find me a plan that fits, with
-6 VOICES AND FULL FX".
+6 VOICES AND FULL FX", then "please complete plan that fits".
 
-**THE SENTENCE FIRST.** The previous ladder (`S3_STRATEGY_6VOICE.md`) ends at
-1.2x to 1.25x over budget. It does not fit. This document replaces it. The
-plan below ends at **0.97x**, but it needs **two structural changes that this
-project has never tried**, and both are ESTIMATES until they are built.
+**REVISED THE SAME DAY, by measurement.** The first version of this document
+had a row 5 whose premise was wrong and no row 6 at all. Both corrections are
+below, and the wrong reasoning is named rather than deleted.
 
 ---
 
-## 1. The budget, and the honest starting point
+## 1. The budget
 
 | item | value | status |
 |---|---|---|
 | S3 clock | 240 MHz | MEASURED |
 | sample rate | 44,100 Hz | fixed |
 | cycles per sample per core | 5,442 | MEASURED |
-| two cores | **10,884** | the target |
+| **two cores** | **10,884** | the target |
 
-Today's S3 fork, 6 voices, with `EB_LFO_SHARED`:
+Cycles per instruction, measured on the user's own board: **1.56 for the voice
+chain, 2.36 for the FX chain**. The FX chain is slower because it waits for
+PSRAM.
 
-| chain | instr/sample | c/i | cycles |
+---
+
+## 2. Where the engine stands today
+
+Three levers are **built, gated and priced**. All three are in the same
+category, and that category is the finding of this whole exercise.
+
+| lever | saving | gate | status |
 |---|---|---|---|
-| voice chain | 20,143 | **1.56** (MEASURED on the board) | 31,423 |
-| FX chain | 4,729 | **2.36** (MEASURED, PSRAM-bound) | 11,160 |
-| **total** | **24,872** | | **42,583** |
+| DCO edge short-circuits | −1,640 | **EXACTLY 0** | DONE |
+| glide exponent hoist | −216 | **EXACTLY 0** | DONE |
+| vcf_res tail tabulated | **−1,980** | **−108.8 dB** | DONE |
 
-**Today = 3.9x over.** Every number in this table is measured on the user's
-own board. The plan must remove 31,700 cycles.
+Fork total: 24,536 → **20,700 instructions per sample**.
 
----
+| chain | instr | c/i | cycles |
+|---|---|---|---|
+| voice | 16,659 | 1.56 | 25,988 |
+| FX | 4,041 | 2.36 | 9,537 |
+| **total** | **20,700** | | **35,525 = 3.26×** |
 
-## 2. Why the previous ladder failed
-
-It attacked instruction counts inside the existing structure. The structure
-is the cost. Two facts show this:
-
-* **The engine oversamples 4x.** The DCO, the decimator and the VCF ladder all
-  run at 176,400 Hz. That is 4 times more work than the audio rate needs.
-* **Every per-voice control block runs at audio rate.** Glide, PWM CV, VCF CV,
-  VCF resonance, the envelopes and pitch all update 44,100 times per second.
-  A control voltage does not change that fast. These blocks are 5,607
-  instructions per sample, which is 27 % of the voice chain.
-
-Roland's own hardware did neither of these things. That is the answer to
-"Roland did this in 2015 with less resources".
+Down from 3.91×.
 
 ---
 
-## 3. The ladder
+## 3. THE PATTERN — read this before proposing any lever
 
-Each row states what it removes and how sure the number is.
+| lever | idea | result |
+|---|---|---|
+| C1 control-rate pitch | compute less often | **DEAD**, −89.5 dB |
+| C2 control-rate CV | compute less often | **DEAD**, −39.3 dB |
+| C3 incremental LFO exp | compute less often | **DEAD** by the bias law |
+| C4 fixed point + SIMD | compute at less precision | **DEAD**, +3.9 dB |
+| C5 call fusion | remove call overhead | **DEAD**, 2.6× worse |
+| DCO edge short-circuits | compute the same thing faster | **WORKS**, EXACTLY 0 |
+| glide exponent hoist | compute the same thing faster | **WORKS**, EXACTLY 0 |
+| vcf_res tabulation | compute the same thing faster | **WORKS**, −108.8 dB |
 
-| # | change | voice instr | FX instr | voice c/i | FX c/i | cycles | vs budget |
+**Every lever that tried to compute LESS OFTEN has died. Every lever that
+computed the SAME THING FASTER has worked.** Levers below are ordered by
+that finding, not by modelled size.
+
+---
+
+## 4. The ladder
+
+| # | change | voice | FX | v c/i | f c/i | cycles | vs budget |
 |---|---|---|---|---|---|---|---|
-| — | today | 20,143 | 4,729 | 1.56 | 2.36 | 42,583 | 3.91x |
-| 0 | DCO edge short-circuits | 18,503 | 4,729 | 1.56 | 2.36 | 40,025 | 3.68x |
-| 1 | FX rings to internal RAM | 18,503 | 4,729 | 1.56 | 1.30 | 34,999 | 3.22x |
-| 2 | FX at half rate | 18,503 | 2,365 | 1.56 | 1.30 | 31,929 | 2.93x |
-| 3 | voice-pair interleaving | 18,503 | 2,365 | 1.25 | 1.30 | 26,203 | 2.41x |
-| 4 | **oversampling 4x to 1x** | 10,845 | 2,365 | 1.25 | 1.30 | 16,631 | 1.53x |
-| 5 | **control blocks at 1/8 rate** | 5,945 | 2,365 | 1.25 | 1.30 | **10,505** | **0.97x** |
+| — | **today** | 16,659 | 4,041 | 1.56 | 2.36 | **35,525** | **3.26×** |
+| 1 | FX rings to internal RAM | 16,659 | 4,041 | 1.56 | 1.30 | 31,241 | 2.87× |
+| 2 | FX at half rate | 16,659 | 2,021 | 1.56 | 1.30 | 28,615 | 2.63× |
+| 3 | voice-pair interleaving | 16,659 | 2,021 | 1.25 | 1.30 | 23,451 | 2.15× |
+| 4 | **oversampling 4× to 1×** | 9,001 | 2,021 | 1.25 | 1.30 | 13,878 | 1.28× |
+| 5 | envelopes at 1/8 rate | 8,151 | 2,021 | 1.25 | 1.30 | 12,816 | 1.18× |
+| 6 | **more tabulation** | 6,651 | 2,021 | 1.25 | 1.30 | **10,941** | **1.005×** |
 
-**Status of each row:**
-
-| # | status |
-|---|---|
-| 0 | **DONE. MEASURED. Null EXACTLY 0.** Not a relaxation — the output is bit-identical. |
-| 1 | Not built. The 1.30 value is an ESTIMATE from the voice chain's own 1.56. |
-| 2 | Not built. ESTIMATE. |
-| 3 | Not built. The 1.25 value is an ESTIMATE. LTO gave 5.8 % from the same effect. |
-| 4 | **Not built. STRUCTURAL. This is a new DSP design.** |
-| 5 | **Not built. STRUCTURAL. C2 died here once — see §5.** |
-
-**Rows 4 and 5 carry 15,700 of the 31,700 cycles.** Rows 0 to 3 alone reach
-2.41x. The plan fits only if both structural rows work.
+Rows 1 to 6 are **all estimates**. Only the "today" row is measured.
 
 ---
 
-## 4. Row 4 — remove the oversampling
+## 5. Row 1 — FX rings to internal RAM
 
-**What it is.** The DCO runs 4 sub-steps per sample, then a 16-tap decimator
-reduces them to one. The VCF ladder runs 4 sub-steps. Row 4 makes all of them
-run once per sample.
+**MEASURED and possible.** `data/ring_depth.md`.
 
-**Why the oversampling exists.** The DCO makes hard edges. A hard edge at
-44,100 Hz makes aliases. Oversampling pushes the aliases up, and the
-decimator removes them.
+The nine rings allocate 6.16 MB and use **0.26 MB**. The deepest read in the
+whole engine is 31,007 samples = 0.70 seconds. The rings were sized for 11.9
+seconds.
 
-**The replacement: band-limited step correction (BLEP).** Instead of making
-the edge four times and filtering, the DCO computes WHERE the edge falls
-between two samples and adds a small correction. This is standard practice in
-software synthesizers. It gives a lower alias level than 4x oversampling, at
-about 1/6 of the cost.
+266 KB fits the S3's 512 KB of internal SRAM. This removes the PSRAM wait that
+makes the FX chain's c/i 2.36.
 
-**The saving:**
+**The competition for that RAM is real:** the vcf_res table wants 98 KB of the
+same 512 KB. 266 + 98 = 364 KB. That trade is not yet decided.
+
+**Not yet measured:** the actual cycle gain, and the shipping ring lengths,
+which must come from the parameter maximum and not from these 36 scenarios.
+
+---
+
+## 6. Row 4 — remove the oversampling
+
+The DCO, decimator and VCF ladder run at 176,400 Hz. Row 4 makes them run at
+44,100 Hz, and replaces the oversampling with **band-limited step correction
+(BLEP)**: compute where the edge falls between two samples and add a
+correction, instead of making the edge four times and filtering it.
 
 | part | now | after | saving |
 |---|---|---|---|
-| DCO phase overhead (`p_fixed`) | 2,088 | 522 | 1,566 |
+| DCO phase overhead | 2,088 | 522 | 1,566 |
 | DCO edge blocks | ~5,000 | ~1,300 | 3,700 |
 | decimator | 912 | 0 | 912 |
 | VCF ladder | 2,766 | 692 | 2,074 |
 | BLEP correction | 0 | ~600 | −600 |
 | **total** | | | **7,658** |
 
-**The risk, stated:** the VCF ladder at 1x has a different high-frequency
-skirt. The O8 half-rate VCF rung was DECLINED for exactly this reason. The
-fix that was never tried is a **corrective one-pole after the ladder**. If
-that fails, the VCF stays at 2x and row 4 gives 6,275 instead of 7,658. The
-plan then ends at 1.05x, not 0.97x.
+**The risk:** the VCF ladder at 1× has a different high-frequency skirt. The
+O8 half-rate VCF rung was DECLINED for that reason. The fix never tried is a
+corrective one-pole after the ladder. If it fails the VCF stays at 2× and row
+4 gives 6,275, which moves the endpoint from 1.005× to 1.09×.
 
-**The gate:** alias level per band within +1 dB of the plugin's own floor
-(F5's gate 2, which already exists and runs), plus the VCF cascade magnitude
-match to 0.1 dB (F5's gate 1, which also already exists).
+**The gates already exist:** F5's gate 1 (cascade magnitude to 0.1 dB) and
+gate 2 (alias level +1 dB per band).
 
 ---
 
-## 5. Row 5 — control blocks at 1/8 rate
+## 7. Row 5 — CORRECTED, and it is much smaller than claimed
 
-**What it is.** Glide, PWM CV, VCF CV, VCF resonance, the envelopes and pitch
-update once every 8 samples (5,512 Hz) instead of every sample. The values
-between are interpolated in a straight line.
+**The first version of this document was wrong.** It said C2 failed because it
+"decimated the dither together with the smooth part", and proposed splitting
+them.
 
-**Why this is not C2.** C2 was closed negative and the reason is recorded in
-`data/c2_result.md`: `vcf_res` and `vcf_cv` move about 100 % per sample
-because they carry the **wrap24 dither**, which is a random term. Holding or
-interpolating a random term removes it. The null failed at −39.3 dB.
+**C2 already did that split.** `data/c2_result.md` states it plainly: the
+decimation ran "with the dither still stepping EVERY sample", and it still
+failed at −39.3 dB. There is no split left to make.
 
-**The design that answers that.** Split each block into two parts:
+So row 5's target list collapses:
 
-1. the **smooth** part — the envelope, the glide, the LFO depth. This is what
-   gets decimated and interpolated.
-2. the **dither** part — the wrap24 term. This stays at full rate. It is
-   cheap: the dither is one wrap, not the whole block.
+| module | instr | verdict |
+|---|---|---|
+| glide | 816 | forbidden — carries pitch into the DCO phase |
+| pwm_cv | 852 | forbidden — carries pitch |
+| pitch | 360 | forbidden — phase-integrated |
+| lfo | 489 | forbidden — LFO rate is phase-integrated |
+| vcf_res | 1,200 | **dead** — C2, −39.3 dB |
+| vcf_cv | 570 | **dead** — C2, its state update IS its computation |
+| envgen | 972 | the only survivor |
 
-C2 decimated both together. That is why it failed. The measurement in
-`c2_result.md` is correct and it does not forbid this split — it forbids the
-thing C2 actually did.
-
-**The saving:** 5,607 instructions per sample become 5,607/8 + dither cost.
-Estimated at **4,900 saved**.
-
-**The gate:** this is a FORK change, so the standard is indistinguishability,
-not −100 dB. Gate it as the pitch fork was gated: a stated numeric bound on
-the control value itself, then a listening-band null. Pitch is inside this
-set and pitch is phase-integrated, so **pitch keeps its own bound of 0.05
-cents** and may need to stay at full rate. Pitch is only 360 instructions, so
-excluding it costs almost nothing.
+Row 5 is **−850, not −4,900**. The plan absorbs that loss through row 6.
 
 ---
 
-## 6. What must happen next, in order
+## 8. Row 6 — more tabulation
 
-1. **Row 1 — FX rings to internal RAM.** Cheapest. It changes no arithmetic.
-   First measure what delay times the factory patches really use: the rings
-   are sized for 11.9 seconds and no patch is likely to need that. If the real
-   maximum is under 1 second, all nine rings fit in internal RAM.
-2. **Row 3 — voice-pair interleaving.** Also changes no arithmetic. Its
-   result gives the real c/i value, which every later row depends on.
-3. **Row 4 — BLEP.** The large structural change. Build the DCO first and gate
-   it with the alias probe that already exists. Then the VCF.
-4. **Row 5 — control rate with the dither split.**
-5. **Row 2 — FX at half rate.** Last, because it is the smallest structural
-   row and the FX chain may already fit after row 1.
+**The one row with a proven method behind it.** `data/res_lut.md` removed
+1,980 instructions from one module at −108.8 dB by tabulating a pure function
+of one scalar.
+
+Two modules have not been read for the same pattern:
+
+| module | instr/call | at 6 voices |
+|---|---|---|
+| vca_hpf | 230 | 1,380 |
+| pwm_cv | 142 | 852 |
+
+Row 6 estimates **−1,500** from them. That is an estimate. The method is not.
+
+**What to look for:** a span with no state, consumed memorylessly, whose only
+varying input is one scalar. Lift it into its own function and gate that lift
+**EXACTLY 0 first**, then tabulate it. Measure the argument's range before
+choosing the domain, and fall back to the exact evaluation outside it rather
+than clamping.
 
 ---
 
-## 7. The honest summary
+## 9. Order of work
 
-* Rows 0 to 3 are ordinary engineering. They reach **2.41x**. They do not fit.
-* Rows 4 and 5 are DSP redesigns. They are the plan. With both, it reaches
-  **0.97x**.
-* Every number in rows 1 to 5 is an ESTIMATE. Only row 0 is measured.
-* If row 4's VCF part fails, the plan ends at **1.05x** and 6 voices at
-  44.1 kHz needs one more lever.
+1. **Row 1** — FX rings to internal RAM. Cheapest, changes no arithmetic, and
+   its memory precondition is already measured.
+2. **Row 3** — voice-pair interleaving. Changes no arithmetic. Its result
+   gives the real c/i, which every later row depends on.
+3. **Row 6** — more tabulation. Proven method, host-gateable, no board needed.
+4. **Row 4** — BLEP. The large structural change.
+5. **Row 5** — envelopes at 1/8 rate.
+6. **Row 2** — FX at half rate. Last; the FX chain may already fit after row 1.
 
-**This plan can fit. It is not proven to fit.** The difference matters and it
-is stated here so that no later document has to correct it.
+Rows 1, 2 and 3 need the user's board. Rows 4, 5 and 6 can be gated here.
+
+---
+
+## 10. The honest summary
+
+* Today is **3.26×**, down from 3.91× this morning, by three measured levers.
+* The ladder ends at **1.005×**, which fits with no margin.
+* Rows 1 to 6 are all estimates. Only today's row is measured.
+* If row 4's VCF part fails, the endpoint is **1.09×**.
+* Rows 5 and 6 together carry only 2,900 instructions. If row 6 finds nothing,
+  the endpoint is **1.28×** and one more lever is needed.
+
+**This plan can fit. It is not proven to fit.** The difference is stated here
+so that no later document has to correct it — which is exactly what happened
+to row 5 of the first version, on the same day it was written.
