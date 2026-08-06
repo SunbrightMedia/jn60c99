@@ -77,6 +77,10 @@
  * (5,184 -> 5,216 instructions per sample, i.e. noise). The whole saving is on
  * the S3 and it is 16 of the 32 __divsf3 calls, so 400..2,880 cycles per sample.
  * That does not change this module's verdict; see the header note below.       */
+#ifndef EB_DCO_PULSEFAST
+#define EB_DCO_PULSEFAST 0
+#endif
+
 #ifndef EB_DCO_RECIP
 #define EB_DCO_RECIP 0
 #endif
@@ -119,6 +123,16 @@ typedef struct {
     float lvl_saw, lvl_pulse, lvl_sub;   /* port 4736, 4752, 4768             */
     float gn_saw,  gn_pulse,  gn_sub;    /* port 5648, 5664, 5680             */
     float amp_saw, amp_pulse, amp_sub;   /* port 5600, 5616, 5632             */
+    /* PULSE EDGE SHORT-CIRCUIT (EB_DCO_PULSEFAST). Half-width, in triangle-
+     * argument units, of the region around each of tri()'s zero crossings
+     * where the clamped edge is NOT saturated. Outside it the edge is
+     * EXACTLY +/-1 and neither the triangle nor the saturator polynomial
+     * needs evaluating. Derived at recall: the edge is
+     * clamp1(tri(x) * g * 256 * amp_pulse), tri has slope 2, so |tri| >= 1
+     * once |x - zero| >= 1/(2 * g * 256 * amp_pulse). MEASURED: the
+     * saturator's own shortcut already fires on 98.85 % of sub-steps, which
+     * is the same population this skips the work for. */
+    float pulse_h;
     float sat_in;                        /* port 5552                         */
     float k3, k5, k7, k9, k11;           /* port 5952, 5968, 5984, 6000, 6016 */
     float subthr;                        /* port 5584                         */

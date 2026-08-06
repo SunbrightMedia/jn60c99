@@ -134,6 +134,17 @@ static inline float eb_sat_c(float e, const eb_dco_coef *c, int cb)
     return eb_sat(e * c->sat_in, c);
 }
 
+static void eb_dco_set_pulse_h(eb_dco_coef *c)
+{
+    /* 1.02x margin so the fast path is only taken where the clamp is
+     * UNAMBIGUOUSLY saturated: within one part in fifty of the boundary the
+     * full expression runs, so a float rounding disagreement at the
+     * threshold cannot change the result. That margin is what makes this a
+     * SHORT-CIRCUIT and not an approximation -- the null must be EXACTLY 0. */
+    float d = (c->g * 256.0f) * c->amp_pulse;
+    c->pulse_h = (d > 1e-12f) ? (0.51f / d) : 2.0f;
+}
+
 void eb_dco_set_shape(eb_dco_coef *c)
 {
     c->sat_hi = eb_sat( c->sat_in, c);
@@ -162,6 +173,7 @@ void eb_dco_set_pitch(eb_dco_coef *c, float inc, float pw)
 {
     c->inc  = eb_dco_inc_scale(inc);
     c->g    = 0.00390625f / inc;
+    eb_dco_set_pulse_h(c);
     c->pw   = pw;
     c->pwm1 = pw - 1.0f;
     c->pwp1 = pw + 1.0f;
@@ -243,8 +255,23 @@ static EB_ALWAYS_INLINE float eb_dco_step_i(eb_dco_state *s,
         t     = c->pw + p;
         sq    = eb_sgn(t);
 #if EB_DCO_RECIP
+#if EB_DCO_PULSEFAST
+        {   /* THE EDGE IS ALREADY SATURATED ALMOST ALWAYS -- skip the
+             * triangle and the saturator when it provably is. Exact: outside
+             * the guarded band clamp1() returns exactly +/-1 and eb_sat_c
+             * returns the precomputed sat_hi/sat_lo, which is what the slow
+             * path would produce. */
+            float x = t * (t < 0.0f ? c->rm1 : c->rp1);
+            float h = c->pulse_h;
+            if (x >= h && x <= 1.0f - h)        e =  1.0f;
+            else if (x <= -h && x >= h - 1.0f)  e = -1.0f;
+            else e = eb_clamp1(((eb_triangle(x) * c->g) * 256.0f)
+                               * c->amp_pulse);
+        }
+#else
         e     = eb_clamp1(((eb_triangle(t * (t < 0.0f ? c->rm1 : c->rp1))
                             * c->g) * 256.0f) * c->amp_pulse);
+#endif
 #else
         e     = eb_clamp1(((eb_triangle(t / (t < 0.0f ? c->pwm1 : c->pwp1))
                             * c->g) * 256.0f) * c->amp_pulse);

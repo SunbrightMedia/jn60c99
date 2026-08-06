@@ -76,3 +76,36 @@ nothing has ever been tabulated.
 None of these is a DSP redesign. They are the same arithmetic, evaluated
 cheaper — a different category from every lever that died this week, all of
 which tried to compute LESS OFTEN rather than compute the same thing FASTER.
+
+## FIRST RESULT: the pulse short-circuit — EXACTLY 0, −1,160 instr/sample
+
+`EB_DCO_PULSEFAST=1`. The pulse edge is
+`clamp1(tri(x) · g · 256 · amp_pulse)`, and `g·256 = 1/inc`, so the scale is
+`amp_pulse/inc` — typically ~20. Since `tri` has slope 2 and range [−1,1],
+the clamp is saturated unless `x` is within `inc/amp_pulse` of one of tri's
+zero crossings. **So the answer is exactly ±1 almost always, and that can be
+known from `x` alone without evaluating the triangle.**
+
+Outside a guarded band the fast path returns ±1 directly, and `eb_sat_c`'s
+existing shortcut then returns the precomputed `sat_hi`/`sat_lo`. The band is
+widened by 2 % (0.51 rather than 0.5) so the full expression runs anywhere a
+float rounding disagreement at the threshold could matter.
+
+| | |
+|---|---|
+| **null, all 36 scenarios** | **EXACTLY 0** |
+| hit rate | 98.85 % of sub-steps (the saturator shortcut's own measured rate) |
+| saving | ~48 instructions per sub-step |
+| at 6 voices | **−1,160 instructions/sample, −4.7 %** |
+| at 2 voices | −387 instructions/sample |
+
+**This is not a relaxation.** It costs nothing in accuracy — the output is
+bit-identical — because `clamp1` of anything ≥ 1 IS exactly 1. It is the
+first saving in this project that required no permission, no gate relaxation
+and no user decision.
+
+**And it is the category the profile pointed at**: not "compute less often"
+(C1, C2, C5 — all dead) but "compute the same thing without the work that
+cannot change the answer". `eb_triangle_wrap`'s 53 instructions were being
+spent 24 times per audio sample to produce a value that was thrown away by a
+clamp 99 % of the time.

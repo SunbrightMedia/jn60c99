@@ -145,6 +145,12 @@ if os.environ.get("JUNO_EB_PITCH_FAST"):
 # reproducible by anyone reading this file. It is now driven the same way the
 # pitch fast path is, and the same rule applies -- the result is only valid at
 # the rate it was rendered at.
+# JUNO_EB_DCO_PULSEFAST=1: skip the triangle and the saturator on pulse steps
+# whose clamped edge is provably already at +/-1. A SHORT-CIRCUIT, not an
+# approximation -- it must null EXACTLY 0 or it is wrong.
+if os.environ.get("JUNO_EB_DCO_PULSEFAST"):
+    CFLAGS = CFLAGS + ["-DEB_DCO_PULSEFAST=1"]
+
 if os.environ.get("JUNO_EB_DCO_RECIP"):
     CFLAGS = CFLAGS + ["-DEB_DCO_RECIP=1"]
 # EB_PITCH_CR: control-rate pitch, anchor every N samples with linear
