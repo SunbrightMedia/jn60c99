@@ -44,7 +44,21 @@ typedef struct {
     float k7904, k7920, k7936, k7952, k7968, k7984, k8000, k8016, k8032;
     float k8048, k8064, k8080, k8096, k8112, k8128, k8144, k8160, k8176;
     float k8192;                      /* the raw-pointer cell; see above */
+#ifndef EB_VCF_RES_LUT
+#define EB_VCF_RES_LUT 0
+#endif
+#if EB_VCF_RES_LUT
+    /* LAST in the struct, so a target can place it. One extra entry so the
+     * interpolation's i+1 is always in range without a branch. */
+    float lut[EB_VCF_RES_LUT + 1];
+#endif
 } eb_vcf_res_coef;
+
+#if EB_VCF_RES_LUT
+/* Fills the table. MUST be called after the k members are set and before the
+ * first tick -- every coefficient builder calls it. */
+void eb_vcf_res_prepare(eb_vcf_res_coef *c);
+#endif
 
 /* One sample. `cv` is the port's v227 (module vcf_cv's output); `in6704` and
  * `in6848` are that module's two side outputs. Returns the port's v241, the

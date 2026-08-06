@@ -249,6 +249,11 @@ def main():
     # zero rather than dropped, because a modelled saving that measured zero
     # is the fifth such result in this project and deserves to stay visible.
     half_os = "--half-os" in sys.argv[1:]
+    # --res-lut: EB_VCF_RES_LUT=4096. eb_vcf_res's tail is a pure function of
+    # one scalar and 150 of the module's instructions are in it; the table
+    # replaces it with a load pair and a lerp. Gated at -108.8 dB over all 36
+    # scenarios, which is the TRUNK gate, not merely the fork's.
+    res_lut = "--res-lut" in sys.argv[1:]
     fvoices = 6
     print("=== ENGINE B, WHOLE PER-SAMPLE DSP CHAIN, STATIC Xtensa "
           "instructions ===")
@@ -262,6 +267,8 @@ def main():
     total = 0
     for src, sym, calls, note in CHAIN:
         extra = []
+        if src == "eb_vcf_res.c" and res_lut:
+            extra.append("-DEB_VCF_RES_LUT=4096")
         if src == "eb_pitch.c" and fast:
             extra.append("-DEB_PITCH_FAST=1")
         if fork and src == "eb_pitch.c":

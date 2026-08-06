@@ -726,7 +726,7 @@ LABEL_11:
     eb_glide_state ebgs;
 
     if (!EBGGEN_SEEN[voice] || EB_GEN_STALE(14, EBGGEN_SEEN[voice])) {
-      eb_glide_coef ebg;
+      eb_glide_coef ebg = {0};   /* zeroed: memcmp reads padding too */
       int _ch;
       ebg.k592  = JF(a1, 592);  ebg.k608  = JF(a1, 608);
       ebg.k624  = JF(a1, 624);  ebg.k768  = JF(a1, 768);
@@ -736,6 +736,10 @@ LABEL_11:
       ebg.k912  = JF(a1, 912);  ebg.k1040 = JF(a1, 1040);
       ebg.k1088 = JF(a1, 1088); ebg.k1152 = JF(a1, 1152);
       ebg.k1168 = JF(a1, 1168);
+      /* BEFORE the memcmp, not after: d_exp is part of the struct the cache
+       * compares, so filling it later would make every sample look changed
+       * and the generation check would fire on a patch that never moved. */
+      eb_glide_prepare(&ebg);
       _ch = !EBGHAVE[voice] || memcmp(&EBGC[voice], &ebg, sizeof ebg) != 0;
       EB_GEN_CHECK(14, EBGGEN_SEEN[voice], _ch, "glide");
       if (_ch) { EBGC[voice] = ebg; EBGHAVE[voice] = 1; }

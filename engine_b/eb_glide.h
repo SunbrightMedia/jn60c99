@@ -48,7 +48,21 @@ typedef struct {
 typedef struct {
     float k592, k608, k624, k768, k784, k800, k816, k832;
     float k848, k864, k912, k1040, k1088, k1152, k1168;
+    /* DERIVED, by eb_glide_prepare. The port's two exponent-table ladders
+     * (:757-796) are indexed by (int)k1168 and (int)-k1168 and scale k912 --
+     * every operand is RECALL-CONSTANT, so the whole ladder produces the same
+     * float on every sample of a patch. It was being walked once per voice per
+     * sample. Not an approximation: the value is identical, so the null is
+     * EXACTLY 0. */
+    float d_exp;
 } eb_glide_coef;
+
+/* Fills the derived member. MUST be called after the k members are set and
+ * before the first tick. Both coefficient builders call it -- the engine's
+ * eb_render_coefs_build and the null harness's glide shim -- because a
+ * derived value computed in only one of them is the defect class this project
+ * has hit three times (the DCO edge thresholds, twice). */
+void eb_glide_prepare(eb_glide_coef *c);
 
 /* One sample.
  *   gate_sign  the port's v34, the three-way gate sign (+1/-1)

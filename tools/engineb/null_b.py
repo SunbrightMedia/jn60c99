@@ -218,6 +218,21 @@ if os.environ.get("JUNO_EB_VCF_GRANGE"):
 if os.environ.get("JUNO_EB_RING_PROBE"):
     CFLAGS = CFLAGS + ["-DEB_RING_PROBE=1"]
 
+# JUNO_EB_VCF_RES_RANGE=1: write-only instrumentation reporting the range of
+# eb_vcf_res's tail argument, so a lookup table for that tail is sized from a
+# measurement instead of a guess. Reports to /tmp/eb_res_range.log.
+if os.environ.get("JUNO_EB_VCF_RES_RANGE"):
+    CFLAGS = CFLAGS + ["-DEB_VCF_RES_RANGE=1"]
+
+# JUNO_EB_VCF_RES_LUT=N: tabulate eb_vcf_res's pure tail, N entries over the
+# MEASURED argument span. N=0 is off and is the default. This is a FORK lever,
+# so its standard is the fork's, not EXACTLY 0 -- but the tail's LIFT into its
+# own function is separately proven EXACTLY 0, so a failure here is the table
+# and nothing else.
+if os.environ.get("JUNO_EB_VCF_RES_LUT"):
+    CFLAGS = CFLAGS + ["-DEB_VCF_RES_LUT=%d"
+                       % int(os.environ["JUNO_EB_VCF_RES_LUT"])]
+
 # JUNO_EB_HALF_OS=1: half-oversample the DCO path (F5 design, O8 build). The
 # residual is NOT expected to be EXACTLY 0 and NOT expected to clear -100 dB:
 # the fork standard for this lever is a BAND-LIMITED null at -80/-60 through

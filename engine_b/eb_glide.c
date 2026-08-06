@@ -15,6 +15,45 @@
 #include "juno_tables.h"
 #include <math.h>
 
+/* ---------------------------------------------------------------- prepare
+ * THE TWO EXPONENT LADDERS, LIFTED. Their operands are k1168 and k912, both
+ * recall constants, so the ladder below is byte for byte the port's :757-796
+ * with `v59` and `v58` renamed and nothing else changed. Lifting it cannot
+ * change a float, which is why the null stays EXACTLY 0 rather than merely
+ * quiet.
+ *
+ * The goto ladder is KEPT as a goto ladder, for the reason the file header
+ * gives: rewriting it as structured control flow is the kind of "obviously
+ * equivalent" edit this project has repeatedly found not to be.
+ */
+void eb_glide_prepare(eb_glide_coef *c)
+{
+    float v58 = c->k1168, v59 = c->k912;
+    int v63 = (int)v58, v66;
+
+    if ((int)v58 < -32) {
+        v59 = v59 * 2.3283064e-10f;
+        goto LABEL_38;
+    }
+    if (v63 > 32) { v63 = 32; goto LABEL_37; }
+    if (v63 < 0) { v59 = v59 * juno_exp_acc0[~v63]; goto LABEL_38; }
+    if (v63 > 0) goto LABEL_37;
+    goto LABEL_38;
+LABEL_37:
+    v59 = v59 * juno_exp_ad3c[v63];
+LABEL_38:
+    v66 = (int)(float)-v58;
+    if (v66 < -32) { v59 = v59 * 2.3283064e-10f; goto LABEL_46; }
+    if (v66 > 32) { v66 = 32; goto LABEL_45; }
+    if (v66 < 0) { v59 = v59 * juno_exp_acc0[~v66]; goto LABEL_46; }
+    if (v66 > 0) goto LABEL_45;
+    goto LABEL_46;
+LABEL_45:
+    v59 = v59 * juno_exp_ad3c[v66];
+LABEL_46:
+    c->d_exp = v59;
+}
+
 float eb_glide_tick(eb_glide_state *s, const eb_glide_coef *c,
                     float gate_sign, float kbd, float vel, float pitch_in,
                     float *out752)
@@ -22,8 +61,6 @@ float eb_glide_tick(eb_glide_state *s, const eb_glide_coef *c,
     float v35, v36, v37, v38, v39, v40, v41, v43, v44, v45, v46, v47, v48;
     float v49, v50, v51, v52, v53, v54, v55, v56, v57, v59, v61, v65;
     float v67, v68, v69, v70, v71, v72, v73;
-    float v58;
-    int v63, v66;
 
     v35 = c->k608;
     v36 = gate_sign + 1.0f;
@@ -64,52 +101,13 @@ LABEL_26:
     if (v45 == 0.0f)
         v56 = pitch_in;
     v57 = vel * c->k864;
-    v58 = c->k1168;
-    v59 = c->k912;
+    v59 = c->d_exp;                 /* was two table ladders; see prepare */
     v61 = v57 + (float)(kbd * c->k848);
-    v63 = (int)v58;
     s->s880 = v61;
     s->s704 = v56;
     *out752 = v56;
     v65 = s->s1104;
 
-    if ((int)v58 < -32) {
-        v59 = v59 * 2.3283064e-10f;
-        goto LABEL_38;
-    }
-    if (v63 > 32) {
-        v63 = 32;
-        goto LABEL_37;
-    }
-    if (v63 < 0) {
-        v59 = v59 * juno_exp_acc0[~v63];
-        goto LABEL_38;
-    }
-    if (v63 > 0)
-        goto LABEL_37;
-    goto LABEL_38;
-LABEL_37:
-    v59 = v59 * juno_exp_ad3c[v63];
-LABEL_38:
-    v66 = (int)(float)-v58;
-    if (v66 < -32) {
-        v59 = v59 * 2.3283064e-10f;
-        goto LABEL_46;
-    }
-    if (v66 > 32) {
-        v66 = 32;
-        goto LABEL_45;
-    }
-    if (v66 < 0) {
-        v59 = v59 * juno_exp_acc0[~v66];
-        goto LABEL_46;
-    }
-    if (v66 > 0)
-        goto LABEL_45;
-    goto LABEL_46;
-LABEL_45:
-    v59 = v59 * juno_exp_ad3c[v66];
-LABEL_46:
     v67 = c->k1040;
     v68 = (float)((float)(v59 - v65) * c->k1152) + v65;
     v69 = c->k1088;

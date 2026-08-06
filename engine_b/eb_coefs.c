@@ -181,6 +181,9 @@ void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
             q->k8128 = CF(a1, 8128); q->k8144 = CF(a1, 8144);
             q->k8160 = CF(a1, 8160); q->k8176 = CF(a1, 8176);
             q->k8192 = CF(a1, 8192);
+#if EB_VCF_RES_LUT
+            eb_vcf_res_prepare(q);
+#endif
         }
 
         /* ---- DCO prep (shim dcoprep) ------------------------------------- */
@@ -197,6 +200,7 @@ void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
         c->glide[v].k912  = CF(a1, 912);  c->glide[v].k1040 = CF(a1, 1040);
         c->glide[v].k1088 = CF(a1, 1088); c->glide[v].k1152 = CF(a1, 1152);
         c->glide[v].k1168 = CF(a1, 1168);
+        eb_glide_prepare(&c->glide[v]);
 
         /* ---- LFO (shim lfo) ---------------------------------------------- */
         {

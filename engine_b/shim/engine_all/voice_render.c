@@ -492,6 +492,14 @@ extern unsigned long eb_coef_gen;
 #define EB_GEN_CHECK(slot, seen, changed, name)  do { (seen) = eb_coef_gen; } while (0)
 #endif
 
+#include <stddef.h>
+#if EB_VCF_RES_LUT
+#define EBR_CMP_BYTES  offsetof(eb_vcf_res_coef, lut)
+#define EBR_PREPARE(q) eb_vcf_res_prepare(q)
+#else
+#define EBR_CMP_BYTES  sizeof(eb_vcf_res_coef)
+#define EBR_PREPARE(q) ((void)0)
+#endif
 static eb_vcf_res_coef EBRC[8];
 static unsigned char   EBRHAVE[8];
 static unsigned long   EBRGEN_SEEN[8];
@@ -1167,7 +1175,7 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
     eb_glide_state ebgs;
 
     if (!EBGGEN_SEEN[voice] || EB_GEN_STALE(14, EBGGEN_SEEN[voice])) {
-      eb_glide_coef ebg;
+      eb_glide_coef ebg = {0};   /* zeroed: memcmp reads padding too */
       int _ch;
       ebg.k592  = JF(a1, 592);  ebg.k608  = JF(a1, 608);
       ebg.k624  = JF(a1, 624);  ebg.k768  = JF(a1, 768);
@@ -1177,6 +1185,10 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
       ebg.k912  = JF(a1, 912);  ebg.k1040 = JF(a1, 1040);
       ebg.k1088 = JF(a1, 1088); ebg.k1152 = JF(a1, 1152);
       ebg.k1168 = JF(a1, 1168);
+      /* BEFORE the memcmp, not after: d_exp is part of the struct the cache
+       * compares, so filling it later would make every sample look changed
+       * and the generation check would fire on a patch that never moved. */
+      eb_glide_prepare(&ebg);
       _ch = !EBGHAVE[voice] || memcmp(&EBGC[voice], &ebg, sizeof ebg) != 0;
       EB_GEN_CHECK(14, EBGGEN_SEEN[voice], _ch, "glide");
       if (_ch) { EBGC[voice] = ebg; EBGHAVE[voice] = 1; }
@@ -1669,9 +1681,19 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
       ebr.k8160 = JF(a1, 8160);
       ebr.k8176 = JF(a1, 8176);
       ebr.k8192 = JF(a1, 8192);
-      _ch = !EBRHAVE[voice] || memcmp(&EBRC[voice], &ebr, sizeof ebr) != 0;
+      /* THE PREFIX, not the whole struct. With EB_VCF_RES_LUT the coef ends
+       * in a table that this local never fills, so comparing sizeof would
+       * read uninitialised bytes and report "changed" on every sample. The
+       * table is LAST in the struct precisely so offsetof gives the exact
+       * boundary between the inputs and the derived value. */
+      _ch = !EBRHAVE[voice]
+          || memcmp(&EBRC[voice], &ebr, EBR_CMP_BYTES) != 0;
       EB_GEN_CHECK(16, EBRGEN_SEEN[voice], _ch, "vcf_res");
-      if (_ch) { EBRC[voice] = ebr; EBRHAVE[voice] = 1; }
+      if (_ch) {
+        memcpy(&EBRC[voice], &ebr, EBR_CMP_BYTES);
+        EBR_PREPARE(&EBRC[voice]);
+        EBRHAVE[voice] = 1;
+      }
     }
 
     ebrs.s7520 = JF(a1, 7520);
