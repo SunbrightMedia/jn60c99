@@ -245,7 +245,9 @@ EB_INLINE void eb_dco_set_edge_thresholds(eb_dco_coef *c)
 
 EB_INLINE float eb_dco_inc_scale(float inc4)
 {
-#if EB_DCO_SUBSTEPS == 2
+#if EB_DCO_SUBSTEPS == 1
+    return inc4 * 4.0f;
+#elif EB_DCO_SUBSTEPS == 2
     return inc4 * 2.0f;
 #else
     return inc4;

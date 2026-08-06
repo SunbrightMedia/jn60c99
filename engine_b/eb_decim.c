@@ -7,11 +7,49 @@
  */
 #include "eb_decim.h"
 #include "eb_fork_config.h"
-#if EB_HALF_OS
+#if EB_HALF_OS && !EB_QUARTER_OS
 #include "eb_halfos_fir.h"
 #endif
 
-#if EB_HALF_OS
+#if EB_QUARTER_OS
+/* QUARTER-OVERSAMPLING (EB_QUARTER_OS=1): one sub-sample in, one out. There
+ * is NO decimation left to do, so there is no FIR -- an anti-imaging filter
+ * with one input per output is a delay, and F5's own measurement showed the
+ * 4x reference's passband is flat to 0.078 dB, so the honest 1x "filter" is
+ * the identity.
+ *
+ * THE BIQUAD TAIL STAYS, byte for byte, including the state rotation at the
+ * top and the k5456 feedback term. It is rate-dependent recall data, not part
+ * of the anti-aliasing, and reproducing it is free. Confining the relaxation
+ * to the one thing it must touch is the discipline the half-OS arm follows.
+ *
+ * WHAT THIS ARM CANNOT FIX, stated where it is done rather than in a result
+ * document afterwards: removing the FIR removes nothing that was aliasing.
+ * The aliasing at 1x is created UPSTREAM, in the DCO, by sampling a
+ * fixed-duration edge once instead of four times. No filter here recovers it.
+ * This arm exists so the alias gate measures the DCO's own 1x floor with
+ * nothing else in the way.
+ */
+float eb_decim_tick(eb_decim_state *s, const eb_decim_coef *c, float k5456,
+                    float s0, float s1, float s2, float s3)
+{
+    float v520, v521, v524, v525, v526;
+
+    (void)s1; (void)s2; (void)s3;
+
+    s->b3 = s->b1;
+    s->b1 = s->b2;
+
+    v524 = s0;
+    v520 = s->b1;
+    v521 = v520 * c->k6256 + s->b3;
+    s->b1 = v521;
+    v525 = v524 - (v520 * c->k6272 + v521);
+    s->b2 = v525 * c->k6256 + v520;
+    v526 = ((v521 - v525 * k5456) * c->k6336 - c->k6336 * v524) + v524;
+    return v526;
+}
+#elif EB_HALF_OS
 /* HALF-OVERSAMPLING DECIMATOR (EB_HALF_OS=1). Two sub-samples in, one out,
  * through the DESIGNED 24-tap symmetric FIR whose in-band magnitude matches
  * the port's own 4x FIR to 0.078 dB over 20 Hz..16 kHz (see

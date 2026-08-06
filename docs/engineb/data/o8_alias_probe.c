@@ -35,12 +35,24 @@
 static void fill_coef(eb_dco_coef *c, float inc4)
 {
     memset(c, 0, sizeof *c);
-#if EB_HALF_OS
-    c->inc = inc4 * 2.0f;
-#else
-    c->inc = inc4;
-#endif
-    c->g = 0.00390625f / inc4;          /* NOT rescaled -- see the header */
+    c->inc = eb_dco_inc_scale(inc4);   /* the engine's own scaler, not a copy:
+                                        * a second copy of this rule is how
+                                        * the octave bug survived twice */
+    /* THE EDGE WIDTH. g sets the ramp's DURATION: the pulse edge spans
+     * inc4/amp in phase, and g*256 = 1/inc4, so dividing g by W widens the
+     * ramp by W in time. At 4x the ramp is about a quarter of an output
+     * sample wide and is sampled four times. At 1x it is sampled ONCE, and
+     * where that sample lands is the aliasing. Widening the ramp toward one
+     * output sample is the first-order band-limited step.
+     *
+     * Swept from the environment rather than fixed, because at 2x the SAME
+     * reasoning said "halve g" and MEASUREMENT said the opposite (4.95 dB of
+     * in-band tilt). A knob whose sign has already been wrong once is swept,
+     * not chosen. */
+    {   const char *w = getenv("EB_PROBE_GW");
+        float W = w ? (float)atof(w) : 1.0f;
+        c->g = (0.00390625f / inc4) / W;
+    }
     c->pw = RC_pw; c->pwm1 = c->pw - 1.0f; c->pwp1 = c->pw + 1.0f;
 #if EB_DCO_RECIP
     c->rm1 = 1.0f / c->pwm1; c->rp1 = 1.0f / c->pwp1;

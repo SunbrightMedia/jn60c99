@@ -41,11 +41,12 @@ ALIAS_BOUND = 1.0          # dB rise over the plugin's own floor
 HARM_BOUND = 1.0           # dB; REPORTED, not gated (see the header)
 
 
-def build(half, tmp):
-    exe = os.path.join(tmp, "probe_%d" % half)
+def build(half, tmp, quarter=0):
+    exe = os.path.join(tmp, "probe_%d_%d" % (half, quarter))
     subprocess.run(
         ["cc", "-std=c99", "-O2", "-ffp-contract=off",
          "-DEB_FORK_S3=1", "-DEB_HALF_OS=%d" % half,
+         "-DEB_QUARTER_OS=%d" % quarter,
          "-I" + EB, "-I" + DATA, "-o", exe,
          os.path.join(DATA, "o8_alias_probe.c"),
          os.path.join(EB, "eb_dco.c"), os.path.join(EB, "eb_decim.c"), "-lm"],
@@ -62,20 +63,31 @@ def spectrum(x):
 
 def main():
     tmp = tempfile.mkdtemp(prefix="o8g2_")
-    exes = {4: build(0, tmp), 2: build(1, tmp)}
+    exes = {4: build(0, tmp), 2: build(1, tmp), 1: build(0, tmp, 1)}
     print("=== F5 GATE 2 on the SHIPPING implementation (O8) ===")
-    print("%10s | %9s %9s %6s | %9s %6s"
-          % ("~f0 Hz", "alias 4x", "alias 2x", "rise", "harm dmax", "state"))
+    print("%10s | %9s %9s %6s | %9s %6s | %9s %6s %8s"
+          % ("~f0 Hz", "alias 4x", "alias 2x", "rise", "harm dmax", "state",
+             "alias 1x", "rise1x", "harm1x"))
     ok = True
     for inc in (0.005, 0.01, 0.02, 0.04, 0.08, 0.12):
         s = {}
         for mode, exe in exes.items():
-            r = subprocess.run([exe, repr(inc), "131072"],
+            # THE INCREMENT IS THE 4x ONE for every build. The probe's own
+            # fill_coef applies eb_dco_inc_scale, so passing a pre-scaled
+            # value here would scale it twice -- the octave bug this project
+            # has now hit three times.
+            env = dict(os.environ)
+            if mode == 1:
+                env["EB_PROBE_GW"] = os.environ.get("EB_GW", "1.0")
+            else:
+                env["EB_PROBE_GW"] = "1.0"
+            r = subprocess.run([exe, repr(inc), "131072"], env=env,
                                capture_output=True, check=True)
             s[mode] = np.frombuffer(r.stdout, dtype=np.float32)[2048:]
-        n = min(len(s[4]), len(s[2]))
+        n = min(len(s[4]), len(s[2]), len(s[1]))
         f, A = spectrum(s[4][:n].astype(float))
         _, B = spectrum(s[2][:n].astype(float))
+        _, B1 = spectrum(s[1][:n].astype(float))
         f0 = inc / 2.0 * 4 * FS
         # TRUE harmonics only, unfolded. Folded content is alias content and
         # must land in the alias columns for BOTH paths -- F5's second probe
@@ -110,8 +122,16 @@ def main():
         rise = a2 - a4
         good = rise <= ALIAS_BOUND
         ok &= good
-        print("%10.0f | %9.1f %9.1f %+6.1f | %9.2f %6s   (notch 16-18k: "
-              "%.1f dB)" % (f0, a4, a2, rise, dh, "ok" if good else "FAIL", dn))
+        a1 = B1[band & ~harm].max()
+        # THE HARMONICS FOR THE 1x BUILD TOO, and this column is the point.
+        # The 1x arm's edge is WIDENED to band-limit it, and widening an edge
+        # is a low-pass: it lowers the alias floor and the harmonics together.
+        # Reporting only the alias floor would show a widening as pure gain
+        # and call a duller instrument a success.
+        dh1 = float(np.abs(A[hb] - B1[hb]).max()) if hb.any() else 0.0
+        print("%10.0f | %9.1f %9.1f %+6.1f | %9.2f %6s | %9.1f %+6.1f %8.2f"
+              % (f0, a4, a2, rise, dh, "ok" if good else "FAIL",
+                 a1, a1 - a4, dh1))
     print("\nF5's stated bound: alias floor rise <= +%.1f dB" % ALIAS_BOUND)
     print("GATE 2 (that bound): %s" % ("PASS" if ok else "FAIL"))
     print("MEASURED BESIDE IT, and NOT covered by the bound: the floor DROPS "

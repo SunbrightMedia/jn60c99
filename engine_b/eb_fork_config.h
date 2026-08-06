@@ -73,6 +73,9 @@
 #ifndef EB_HALF_OS
 #define EB_HALF_OS 0
 #endif
+#ifndef EB_QUARTER_OS
+#define EB_QUARTER_OS 0
+#endif
 /* EB_HALF_OS_VCF -- half-oversampling of the VCF LADDER. SEPARATE from
  * EB_HALF_OS and DEFAULTED OFF EVEN WHEN EB_HALF_OS IS ON, because O8
  * measured it and it does not hold: the cutoff transform is exact and the
@@ -88,7 +91,28 @@
 #define EB_HALF_OS_VCF 0
 #endif
 
-#if EB_HALF_OS
+/* EB_QUARTER_OS: run the DCO at the OUTPUT rate, one sub-sample per sample.
+ * Row 4 of docs/engineb/S3_PLAN_THAT_FITS.md, and the row that carries the
+ * plan on its own.
+ *
+ * WHAT THE PHYSICS SAYS BEFORE ANY CODE RUNS. The port's edge is
+ * clamp1(tri(x) * g * 256 * amp) with g = (1/256)/inc4, so g*256 = 1/inc4 and
+ * the edge spans inc4/amp in phase -- a FIXED DURATION in time, independent
+ * of how many sub-samples that duration is cut into. Oversampling therefore
+ * does not change the edge's spectrum; it changes how accurately the edge is
+ * SAMPLED. At 4x the ramp is sampled four times and decimated. At 1x it is
+ * sampled once, and where that one sample lands in the ramp is what aliases.
+ *
+ * So this is the rung F5 stopped short of, and it is not obviously
+ * admissible. It is built to be MEASURED by the alias gate that already
+ * exists (tools/engineb/o8_gate2.py), not because it is expected to pass. */
+#ifndef EB_QUARTER_OS
+#define EB_QUARTER_OS 0
+#endif
+
+#if EB_QUARTER_OS
+#define EB_DCO_SUBSTEPS 1
+#elif EB_HALF_OS
 #define EB_DCO_SUBSTEPS 2
 #else
 #define EB_DCO_SUBSTEPS 4
@@ -110,6 +134,9 @@
  * 0 in the #if -- a DCO that produces no sub-samples at all. */
 #ifndef EB_HALF_OS
 #define EB_HALF_OS 0
+#endif
+#ifndef EB_QUARTER_OS
+#define EB_QUARTER_OS 0
 #endif
 #ifndef EB_DCO_SUBSTEPS
 #define EB_DCO_SUBSTEPS 4

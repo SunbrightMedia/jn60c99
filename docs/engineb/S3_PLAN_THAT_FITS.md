@@ -3,9 +3,16 @@
 Date 2026-08-06 (Opus 5), at the user's order: "find me a plan that fits, with
 6 VOICES AND FULL FX", then "please complete plan that fits".
 
-**REVISED THE SAME DAY, by measurement.** The first version of this document
-had a row 5 whose premise was wrong and no row 6 at all. Both corrections are
-below, and the wrong reasoning is named rather than deleted.
+**REVISED TWICE THE SAME DAY, by measurement, and the second revision is
+fatal.** Row 5's premise was wrong, row 6 measured nearly empty, and **row 4's
+DCO half is now CLOSED NEGATIVE** (`data/quarter_os_result.md`). Row 4 carried
+6,178 of the plan's remaining instructions.
+
+**THE HONEST ENDPOINT IS 1.48×, NOT 1.02×. 6 voices with full FX at 44.1 kHz
+does not fit on today's evidence.** The same ladder reaches 1.27× at 5 voices
+and **1.07× at 4 voices**. Every wrong number below is named rather than
+deleted, because the plan was wrong three times in one day and the pattern in
+how it was wrong is worth more than the numbers were.
 
 ---
 
@@ -76,17 +83,29 @@ that finding, not by modelled size.
 
 ## 4. The ladder
 
+Today's row now includes half-oversampling, which is gated and was not
+counted before.
+
 | # | change | voice | FX | v c/i | f c/i | cycles | vs budget |
 |---|---|---|---|---|---|---|---|
-| — | **today** | 15,867 | 4,041 | 1.56 | 2.36 | **34,289** | **3.15×** |
-| 1 | FX rings to internal RAM | 15,867 | 4,041 | 1.56 | 1.30 | 30,005 | 2.76× |
-| 2 | FX at half rate | 15,867 | 2,021 | 1.56 | 1.30 | 27,379 | 2.52× |
-| 3 | voice-pair interleaving | 15,867 | 2,021 | 1.25 | 1.30 | 22,461 | 2.06× |
-| 4 | **oversampling 4× to 1×** | 8,209 | 2,021 | 1.25 | 1.30 | 12,888 | 1.18× |
-| 5 | envelopes at 1/8 rate | 7,359 | 2,021 | 1.25 | 1.30 | 11,826 | 1.09× |
-| 6 | three divisions | 6,819 | 2,021 | 1.25 | 1.30 | **11,151** | **1.02×** |
+| — | **today, all gated levers** | 12,861 | 4,041 | 1.56 | 2.36 | **29,600** | **2.72×** |
+| 1 | FX rings to internal RAM | 12,861 | 4,041 | 1.56 | 1.30 | 25,316 | 2.33× |
+| 2 | FX at half rate | 12,861 | 2,021 | 1.56 | 1.30 | 22,690 | 2.08× |
+| 3 | voice-pair interleaving | 12,861 | 2,021 | 1.25 | 1.30 | 18,703 | 1.72× |
+| 4 | VCF ladder 4× to 2× | 12,171 | 2,021 | 1.25 | 1.30 | 17,841 | 1.64× |
+| 5 | envelopes at 1/8 rate | 11,321 | 2,021 | 1.25 | 1.30 | 16,778 | 1.54× |
+| 6 | three divisions | 10,781 | 2,021 | 1.25 | 1.30 | **16,103** | **1.48×** |
 
 Rows 1 to 6 are **all estimates**. Only the "today" row is measured.
+
+**The same ladder at other voice counts**, since the voice chain scales and
+the FX chain does not:
+
+| voices | cycles | vs budget |
+|---|---|---|
+| 6 | 16,103 | 1.48× |
+| 5 | 13,857 | 1.27× |
+| **4** | **11,611** | **1.07×** |
 
 ---
 
@@ -109,29 +128,29 @@ which must come from the parameter maximum and not from these 36 scenarios.
 
 ---
 
-## 6. Row 4 — remove the oversampling
+## 6. Row 4 — the DCO half is CLOSED NEGATIVE
 
-The DCO, decimator and VCF ladder run at 176,400 Hz. Row 4 makes them run at
-44,100 Hz, and replaces the oversampling with **band-limited step correction
-(BLEP)**: compute where the edge falls between two samples and add a
-correction, instead of making the edge four times and filtering it.
+**Read `data/quarter_os_result.md`.** Built as `EB_QUARTER_OS=1` and measured
+with the alias gate that already existed.
 
-| part | now | after | saving |
-|---|---|---|---|
-| DCO phase overhead | 2,088 | 522 | 1,566 |
-| DCO edge blocks | ~5,000 | ~1,300 | 3,700 |
-| decimator | 912 | 0 | 912 |
-| VCF ladder | 2,766 | 692 | 2,074 |
-| BLEP correction | 0 | ~600 | −600 |
-| **total** | | | **7,658** |
+The DCO's edge is a FIXED DURATION in time, so oversampling does not change
+its spectrum — it changes how accurately the edge is sampled. At 1× the alias
+floor rises up to +5.6 dB against F5's +1.0 dB bound. Widening the edge (the
+first-order band-limited step) fixes that at ×6 — **and destroys the
+instrument**, because widening an edge is a low-pass that removes the alias
+floor and the harmonics together. Worst harmonic error at ×6: **73 dB**.
 
-**The risk:** the VCF ladder at 1× has a different high-frequency skirt. The
-O8 half-rate VCF rung was DECLINED for that reason. The fix never tried is a
-corrective one-pole after the ladder. If it fails the VCF stays at 2× and row
-4 gives 6,275, which moves the endpoint from 1.005× to 1.09×.
+**The finding is not about edges.** Even at ×1, with the port's own edge, the
+harmonics are 7.1 to 13.6 dB wrong. The DCO's harmonics come from its
+**shaping nonlinearity**, which runs per sub-sample. No filter placed after a
+nonlinearity recovers harmonics the nonlinearity never generated.
 
-**The gates already exist:** F5's gate 1 (cascade magnitude to 0.1 dB) and
-gate 2 (alias level +1 dB per band).
+**What survives:** half-oversampling (2×) stands, gated, worth 3,826
+instructions, worst harmonic error 3.27 dB. And the **VCF half of row 4 is
+untouched** — a ladder is a linear filter with no nonlinearity, so its rate
+reduction is F5's algebra problem (`G' = 2G/(1−G²)`), not a
+harmonic-generation problem. It is worth 690 and still needs the corrective
+one-pole that was never tried.
 
 ---
 
