@@ -139,3 +139,54 @@ by the same law (the LFO rate feeds the LFO phase); C2 narrowed to the
 non-integrating CV blocks. The code stays behind `EB_PITCH_CR` with a
 compile-time refusal above N=1, N=1 being bit-exact and kept as the harness
 self-test.
+
+## 7. C1 RE-OPENED FOR THE FORK (2026-08-06) — and it is worth NOTHING there
+
+The fork's standard is indistinguishability, not bit-exactness, so §6's −100 dB
+verdict does not bind it. C1 was re-opened on that reasoning and MEASURED on
+the full 36-scenario battery (§6's number was 4 scenarios):
+
+| N | worst global | worst block |
+|---|---|---|
+| 2 | **−76.4 dB** | −71.1 dB |
+
+**The integrating-bias fear is MEASURED FALSE.** §6 predicted the error would
+grow with note length, so long notes would be worst. They are not: `long
+LFO+tail` is **−99.2 dB**, among the BEST scenarios, while the worst is `DCO
+neg wrap + PWM clamp` at −76.4 dB — a fast pitch sweep. The error is largest
+where the CV MOVES, i.e. where the evaluator re-anchors, not where the phase
+has had time to accumulate. §6's law is right about the mechanism and wrong
+about which scenarios expose it.
+
+And −76.4 dB would have been acceptable: the signal sits at −31.7 dBFS, so the
+error is at −108 dBFS absolute, and it is 28 dB quieter than the alias
+relaxation already accepted for half-oversampling.
+
+**BUT THE SAVING IS GONE, because the fork already solved pitch another way.**
+C1's ~15,300 instructions/sample was measured against the TRUNK's v7
+double-float evaluator (4,281 instructions per call). The fork does not use
+it. F3's recentered evaluator, `eb_pitch_fork_eval`, costs **60 instructions
+per call — 360 per sample at 6 voices**, and is exhaustively gated to 0.00074
+cents over all 2^32 float inputs. There is nothing left for a control-rate
+scheme to save.
+
+**C1 IS CLOSED FOR THE FORK, for a reason that has nothing to do with §6.**
+The lever was real, the bias law is real, and both are irrelevant: the fork
+retired the expensive evaluator before this question was ever asked.
+
+**Where the fork's 24,686 instructions/sample actually go at 6 voices:**
+
+| line | instr/sample | share |
+|---|---|---|
+| **dco** | **7,652** | 31 % |
+| vcf_res | 3,174 | 13 % |
+| the DELAY + EFFECT arms | 3,135 | 13 % |
+| vca_hpf | 1,380 | 6 % |
+| vcf_ladder | 1,380 | 6 % |
+| glide | 1,188 | 5 % |
+| envgen | 972 | 4 % |
+| decim | 912 | 4 % |
+| pitch (fork) | **360** | **1.5 %** |
+
+Pitch is 1.5 % of the fork. Any further work belongs on the DCO, which is a
+third of everything and has never been restructured.

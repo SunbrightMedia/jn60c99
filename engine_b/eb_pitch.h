@@ -69,8 +69,30 @@ int   eb_pitch_tab_selfcheck(void);
 #ifndef EB_PITCH_CR
 #define EB_PITCH_CR 0
 #endif
-#if EB_PITCH_CR > 1
-#error "Control-rate pitch is DEAD, by measurement (2026-08-03): on the real pluck-POLY trajectory the Taylor evaluator is accurate to 1e-7 worst / 4e-8 RMS and the null STILL fails at -89.5 dB, because a smooth deterministic error is a BIAS and the DCO phase integrates it. The gate demands bias below ~1e-9 on any phase-integrated quantity; no causal approximation delivers that. See docs/engineb/data/pitch_p2_study.md section 6. N=1 (exact, anchors every call) remains for the harness self-test only."
+/* CONTROL-RATE PITCH: DEAD FOR THE TRUNK, RE-OPENED FOR THE FORK.
+ *
+ * The measurement (2026-08-03) stands and is not being softened: on the real
+ * pluck-POLY trajectory the Taylor evaluator is accurate to 1e-7 worst /
+ * 4e-8 RMS and the null STILL fails at -89.5 dB, because a smooth
+ * deterministic error is a BIAS and the DCO phase integrates it. For the
+ * TRUNK, whose standard is -100 dB and whose purpose is bit-exactness, that
+ * is fatal and the refusal below still fires.
+ *
+ * WHAT WAS WRONG WAS APPLYING THAT VERDICT TO THE FORK. -89.5 dB is
+ * inaudible: it is 46 dB below the alias relaxation the user has already
+ * accepted for half-oversampling (the plugin's own alias floor is -43 dB at
+ * high pitch). The fork's standard is indistinguishability, not
+ * bit-exactness, and this lever is worth ~15,300 instructions/sample -- the
+ * largest in the project. Killing it against the trunk's bar was the same
+ * category of error as quoting F4's c/i outside its workload.
+ *
+ * So: N>1 is refused UNLESS EB_FORK_S3 is defined, and the fork build must
+ * re-earn it on the full 36-scenario battery INCLUDING long sustained notes
+ * -- the error integrates, so "inaudible at 2 seconds" is not the same claim
+ * as "inaudible at 30". docs/engineb/data/pitch_p2_study.md section 6 holds
+ * the original ladder; the fork's own result goes beside it. */
+#if EB_PITCH_CR > 1 && !defined(EB_FORK_S3)
+#error "Control-rate pitch is DEAD FOR THE TRUNK by measurement (-89.5 dB against a -100 dB gate; the DCO phase integrates the bias). It is re-opened for the FORK only: build with EB_FORK_S3. See docs/engineb/data/pitch_p2_study.md section 6."
 #endif
 #if EB_PITCH_CR > 0
 #if !EB_PITCH_FAST
