@@ -235,3 +235,46 @@ C5 registers, C2 stochastic content, now the VCF half-OS rung's response
 shape). O8 delivers 2.15x -> 1.82x and no more. O9 (tabulation, ~-2,900) and
 O10 (DCO structural, ~8,700 available) are what remain between here and 1.0x
 at 6 voices; 4 voices with the DCO rung is roughly 1.2x.
+
+## 9. THE BOARD'S VERDICT: c/i IS ~2.0, NOT 0.95 (2026-08-06)
+
+Measured on the user's S3, 2 voices, 44,100 Hz:
+
+| build | cycles/sample | priced instructions | c/i |
+|---|---|---|---|
+| full engine, FX rings in PSRAM | 20,465 | 10,201 | **2.01** |
+| voices only, no rings | 12,720 | ~6,925 | **1.84** |
+| + voice state PSRAM -> internal RAM | 12,718 | " | " |
+| + engine CODE flash -> IRAM | 12,820 | " | " |
+
+**PLACEMENT IS ELIMINATED, by three experiments.** Moving the voice state out
+of PSRAM changed the figure by 2 cycles. Moving all engine code out of flash
+into IRAM made it 100 cycles WORSE. Data placement and instruction placement
+are both worth nothing here.
+
+**What is left is the cycles-per-instruction ratio itself.** F4 measured
+c/i = 0.95 on the QEMU harness workload and this project has quoted every
+cycle figure through that number since. The real engine measures **c/i ~= 2.0**
+-- twice as expensive per instruction. The harness was branch-light straight
+line code; the engine is dependent float arithmetic, and the pitch work
+already measured what that costs on this core (1,677 of 3,452 instructions
+were float SPILLS, because the LX7 has 16 float registers). A dependent FPU
+chain stalls; a synthetic loop does not.
+
+**CONSEQUENCE, stated plainly. Every cycle number in this project derived
+from c/i = 0.95 is optimistic by about 2x.** The corrected picture at 44.1 kHz
+against a 5,443-cycle single-core budget:
+
+| configuration | cycles | vs 1 core | vs 2 cores (~10,900) |
+|---|---|---|---|
+| 2 voices, full engine | 20,465 | 3.8x | 1.9x |
+| 2 voices, no FX | 12,820 | 2.4x | 1.2x |
+
+O8's "1.82x at 6 voices" was an INSTRUCTION figure scaled by 0.95. At the
+measured c/i it is roughly 3.8x, and 6 voices at 44.1 kHz is not reachable by
+any lever now known. The honest options are fewer voices, a second core, or a
+different target.
+
+**The methodological lesson, which is the fifth of its kind here: F4's own
+header warned its number came from a workload that was not the engine. The
+warning was about MEMORY. It should have been about the WORKLOAD.**
