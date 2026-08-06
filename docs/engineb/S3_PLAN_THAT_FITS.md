@@ -35,15 +35,23 @@ category, and that category is the finding of this whole exercise.
 | glide exponent hoist | −216 | **EXACTLY 0** | DONE |
 | vcf_res tail tabulated | **−1,980** | **−108.8 dB** | DONE |
 
-Fork total: 24,536 → **20,700 instructions per sample**.
+A fourth correction came out of pricing them — **the sixth pricing error in
+this project, in the same flattering direction as the other five.** The fork
+exponential line charged `2 x voices` sites unconditionally. Both of its
+assumptions had since been broken by levers the same tool prices: the shared
+LFO runs ONCE, not once per voice, and the `vcf_res` table moved that site to
+recall time while the module's own cost had ALREADY dropped to reflect it. The
+saving was being counted twice. Sites are counted now, and printed.
+
+Fork total: 24,536 → **19,908 instructions per sample**.
 
 | chain | instr | c/i | cycles |
 |---|---|---|---|
-| voice | 16,659 | 1.56 | 25,988 |
+| voice | 15,867 | 1.56 | 24,752 |
 | FX | 4,041 | 2.36 | 9,537 |
-| **total** | **20,700** | | **35,525 = 3.26×** |
+| **total** | **19,908** | | **34,289 = 3.15×** |
 
-Down from 3.91×.
+Down from 3.91× this morning.
 
 ---
 
@@ -70,13 +78,13 @@ that finding, not by modelled size.
 
 | # | change | voice | FX | v c/i | f c/i | cycles | vs budget |
 |---|---|---|---|---|---|---|---|
-| — | **today** | 16,659 | 4,041 | 1.56 | 2.36 | **35,525** | **3.26×** |
-| 1 | FX rings to internal RAM | 16,659 | 4,041 | 1.56 | 1.30 | 31,241 | 2.87× |
-| 2 | FX at half rate | 16,659 | 2,021 | 1.56 | 1.30 | 28,615 | 2.63× |
-| 3 | voice-pair interleaving | 16,659 | 2,021 | 1.25 | 1.30 | 23,451 | 2.15× |
-| 4 | **oversampling 4× to 1×** | 9,001 | 2,021 | 1.25 | 1.30 | 13,878 | 1.28× |
-| 5 | envelopes at 1/8 rate | 8,151 | 2,021 | 1.25 | 1.30 | 12,816 | 1.18× |
-| 6 | **more tabulation** | 6,651 | 2,021 | 1.25 | 1.30 | **10,941** | **1.005×** |
+| — | **today** | 15,867 | 4,041 | 1.56 | 2.36 | **34,289** | **3.15×** |
+| 1 | FX rings to internal RAM | 15,867 | 4,041 | 1.56 | 1.30 | 30,005 | 2.76× |
+| 2 | FX at half rate | 15,867 | 2,021 | 1.56 | 1.30 | 27,379 | 2.52× |
+| 3 | voice-pair interleaving | 15,867 | 2,021 | 1.25 | 1.30 | 22,461 | 2.06× |
+| 4 | **oversampling 4× to 1×** | 8,209 | 2,021 | 1.25 | 1.30 | 12,888 | 1.18× |
+| 5 | envelopes at 1/8 rate | 7,359 | 2,021 | 1.25 | 1.30 | 11,826 | 1.09× |
+| 6 | three divisions | 6,819 | 2,021 | 1.25 | 1.30 | **11,151** | **1.02×** |
 
 Rows 1 to 6 are **all estimates**. Only the "today" row is measured.
 
@@ -153,28 +161,39 @@ Row 5 is **−850, not −4,900**. The plan absorbs that loss through row 6.
 
 ---
 
-## 8. Row 6 — more tabulation
+## 8. Row 6 — CORRECTED: the well is nearly dry
 
-**The one row with a proven method behind it.** `data/res_lut.md` removed
-1,980 instructions from one module at −108.8 dB by tabulating a pure function
-of one scalar.
+`data/res_lut.md` removed 1,980 instructions from one module at −108.8 dB by
+tabulating a pure function of one scalar. The obvious next step was to apply
+the same method to `vca_hpf` (1,380) and `pwm_cv` (366).
 
-Two modules have not been read for the same pattern:
+**MEASURED: there is nothing there.** Every per-voice module was disassembled
+for the S3 and scanned for expensive helper calls — divisions, exponentials,
+double conversions:
 
-| module | instr/call | at 6 voices |
-|---|---|---|
-| vca_hpf | 230 | 1,380 |
-| pwm_cv | 142 | 852 |
+| module | expensive calls |
+|---|---|
+| vca_hpf | **0** |
+| pwm_cv | **0** |
+| vcf_cv | **0** |
+| envgen | **0** |
+| notecv | **0** |
+| noisemix | **0** |
+| glide | 1 × `__divsf3` |
+| dcoprep | 1 × `__divsf3` |
+| vcf_ladder | 1 × `__divsf3` |
 
-Row 6 estimates **−1,500** from them. That is an estimate. The method is not.
+`pwm_cv` is already fully block-hoisted and is straight multiply-add.
+`vca_hpf` is 230 instructions of one-poles and clamps. Neither contains a
+transcendental, a division or a span worth tabulating.
 
-**What to look for:** a span with no state, consumed memorylessly, whose only
-varying input is one scalar. Lift it into its own function and gate that lift
-**EXACTLY 0 first**, then tabulate it. Measure the argument's range before
-choosing the domain, and fall back to the exact evaluation outside it rather
-than clamping.
+**Three divisions remain in the entire per-voice chain.** At 30 instructions
+each over six voices that is 540, and removing them needs the reciprocal
+trick, which is a fork relaxation (the `EB_DCO_RECIP` precedent), not a free
+saving.
 
----
+**Row 6 is −540, not −1,500.** The `vcf_res` table was the one large fish in
+this pond and it is caught.
 
 ## 9. Order of work
 
@@ -182,9 +201,10 @@ than clamping.
    its memory precondition is already measured.
 2. **Row 3** — voice-pair interleaving. Changes no arithmetic. Its result
    gives the real c/i, which every later row depends on.
-3. **Row 6** — more tabulation. Proven method, host-gateable, no board needed.
-4. **Row 4** — BLEP. The large structural change.
-5. **Row 5** — envelopes at 1/8 rate.
+3. **Row 4** — BLEP. The large structural change, and now the only large one
+   left. Host-gateable: F5's two gates already exist.
+4. **Row 5** — envelopes at 1/8 rate.
+5. **Row 6** — the three divisions.
 6. **Row 2** — FX at half rate. Last; the FX chain may already fit after row 1.
 
 Rows 1, 2 and 3 need the user's board. Rows 4, 5 and 6 can be gated here.
@@ -193,13 +213,17 @@ Rows 1, 2 and 3 need the user's board. Rows 4, 5 and 6 can be gated here.
 
 ## 10. The honest summary
 
-* Today is **3.26×**, down from 3.91× this morning, by three measured levers.
-* The ladder ends at **1.005×**, which fits with no margin.
+* Today is **3.15×**, down from 3.91× this morning, by three measured levers
+  and one pricing correction.
+* The ladder ends at **1.02×**. It fits, with no margin at all.
 * Rows 1 to 6 are all estimates. Only today's row is measured.
-* If row 4's VCF part fails, the endpoint is **1.09×**.
-* Rows 5 and 6 together carry only 2,900 instructions. If row 6 finds nothing,
-  the endpoint is **1.28×** and one more lever is needed.
+* **Row 4 now carries the plan.** It is 7,658 of the 9,048 instructions the
+  ladder still has to remove. If its VCF part fails, the endpoint is 1.09×;
+  if the whole row fails, nothing else on the list reaches the budget.
+* Rows 5 and 6 together are 1,390 instructions. They are trim, not levers.
 
-**This plan can fit. It is not proven to fit.** The difference is stated here
-so that no later document has to correct it — which is exactly what happened
-to row 5 of the first version, on the same day it was written.
+**This plan can fit. It is not proven to fit.** Two of its six rows were
+already corrected downward by measurement on the day they were written, and
+both corrections came from re-reading a result this project had already
+recorded. Read `data/c2_result.md` and `data/res_lut.md` before proposing a
+seventh row.

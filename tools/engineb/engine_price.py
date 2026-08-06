@@ -290,12 +290,23 @@ def main():
         # The fork exponential at the two expf sites, once per voice each.
         # The saving is (expf body) - (fork body), charged as a NEGATIVE line
         # so the table shows what was traded rather than hiding it in a total.
+        # THE SIXTH PRICING ERROR, and in the same flattering direction as the
+        # other five: this line charged 2*fvoices sites unconditionally. Both
+        # of its assumptions had since been broken by levers this same tool
+        # prices. With --shared-lfo the LFO runs ONCE, not once per voice. With
+        # --res-lut the VCF-res site is inside the table build and does not run
+        # per sample at all -- and its module cost has ALREADY dropped from 530
+        # to 200 to reflect that, so charging a saving for it counted the same
+        # saving twice. Sites are now counted, and the count is printed.
         ef = module_cost("eb_exp_fork.c", "eb_exp_fork", ["-DEB_FORK_S3"])
-        delta = (HELPERS.get("expf", 184) - ef) * 2 * fvoices
+        sites = (1 if shared_lfo else fvoices) + (0 if res_lut else fvoices)
+        delta = (HELPERS.get("expf", 184) - ef) * sites
         total -= delta
         print("  %-18s %7d %6d %10d   %s"
-              % ("exp fork", ef, 2 * fvoices, -delta,
-                 "replaces expf at the LFO and VCF-res sites"))
+              % ("exp fork", ef, sites, -delta,
+                 "replaces expf: %d LFO + %d VCF-res site(s)"
+                 % (1 if shared_lfo else fvoices,
+                    0 if res_lut else fvoices)))
     # THE DCO: real-mix figure from dco_price.py, not a static body count.
     dco = 10202 if recip else 11610
     if half_os:
