@@ -313,3 +313,34 @@ F4's number used outside its own measurement.
 
 2 voices without FX is within 18 % of a two-core fit BEFORE any compiler
 tuning. That is the live path (O-b, O-c), and it is much better than §9 said.
+
+## 11. O-b: COMPILER TUNING IS A DEAD END, and the spill theory was wrong too
+
+MEASURED across the fourteen hot voice-path modules, Xtensa, counting float
+loads/stores whose base is the STACK POINTER (i.e. actual register spills,
+not ordinary coefficient loads):
+
+| flags | spill ld | spill st | total instr |
+|---|---|---|---|
+| **-O2 (shipping)** | **195** | **129** | **3,468** |
+| -O3 | 204 | 153 | 3,872 |
+| -O2 -funroll-loops | 213 | 151 | 4,097 |
+| -O3 -fsched-pressure | 203 | 157 | 3,865 |
+| -O2 -fsched-pressure -fschedule-insns2 | 194 | 133 | 3,461 |
+
+**-O2 is already the best available**: every higher setting spills MORE and
+emits more instructions, and the scheduling flags move it by under 1 %.
+`-ffast-math` is disqualified outright rather than measured -- it changes
+float semantics, and this engine's whole claim is bit-exactness.
+
+**And it corrects §10's explanation of c/i.** Spills are only **9.3 %** of
+instructions in the shipping build (324 of 3,468). The 1,677-of-3,452 figure
+quoted from the pitch work was measured on the INLINED double-float path
+specifically, and generalising it to the whole engine was wrong. So c/i ~ 1.56
+is FPU dependency latency -- chains of dependent single-precision ops on a
+core whose FPU results are not available the next cycle -- and not register
+pressure. No compiler flag addresses that; only restructuring the arithmetic
+would, and that is DSP work this project has already closed four times.
+
+**O-b closes NEGATIVE.** The remaining lever is O-c, the second core, which is
+idle and which the project's budget always assumed.
