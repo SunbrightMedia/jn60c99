@@ -278,3 +278,38 @@ different target.
 **The methodological lesson, which is the fifth of its kind here: F4's own
 header warned its number came from a workload that was not the engine. The
 warning was about MEMORY. It should have been about the WORKLOAD.**
+
+## 10. O-a CORRECTION: c/i is ~1.56 for the voice chain, not 2.0
+
+§9 priced the wrong build. It ran `engine_price.py --half-os`; the LISTEN
+firmware has **no `-DEB_HALF_OS`** in its CMake flags and runs the 4x DCO.
+Priced correctly for the configuration that actually ran:
+
+| | instructions | measured cycles | c/i |
+|---|---|---|---|
+| 2 voices, full engine | 11,476 | 20,465 | 1.78 |
+| 2 voices, voices only | 8,200 | 12,820 | **1.56** |
+| the FX chain alone | 3,276 | 7,745 | **2.36** |
+
+So there are TWO different ratios and lumping them was the error. The voice
+chain runs at **c/i ~= 1.56** -- float-dependency stalls on a core with 16
+float registers, consistent with the pitch work's measured 1,677 spills in
+3,452 instructions. The FX chain runs at **c/i ~= 2.36**, and that one IS
+memory: its rings are 6.2 MB in PSRAM.
+
+§9's claim that "F4's harness was branch-light straight-line code" is also
+wrong: F4 ran the real engine modules. What differs is the WORKLOAD --
+synthetic coefficient fills and 8 sounding voices there, a real recalled
+patch and 2 sounding + 6 advancing here. c/i is workload-dependent and 0.95
+was true of its own workload. The error was quoting it universally, which is
+F4's number used outside its own measurement.
+
+**Corrected standing, 44.1 kHz, two-core budget ~10,886 cycles:**
+
+| configuration | cycles | vs two cores |
+|---|---|---|
+| 2 voices, no FX | 12,820 | **1.18x** |
+| 2 voices, full engine | 20,465 | 1.88x |
+
+2 voices without FX is within 18 % of a two-core fit BEFORE any compiler
+tuning. That is the live path (O-b, O-c), and it is much better than §9 said.
