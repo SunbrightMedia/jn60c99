@@ -77,7 +77,7 @@ None of these is a DSP redesign. They are the same arithmetic, evaluated
 cheaper — a different category from every lever that died this week, all of
 which tried to compute LESS OFTEN rather than compute the same thing FASTER.
 
-## FIRST RESULT: the pulse short-circuit — EXACTLY 0, −1,160 instr/sample
+## FIRST RESULT: the DCO edge short-circuits — EXACTLY 0, all three arms
 
 `EB_DCO_PULSEFAST=1`. The pulse edge is
 `clamp1(tri(x) · g · 256 · amp_pulse)`, and `g·256 = 1/inc`, so the scale is
@@ -103,6 +103,27 @@ float rounding disagreement at the threshold could matter.
 bit-identical — because `clamp1` of anything ≥ 1 IS exactly 1. It is the
 first saving in this project that required no permission, no gate relaxation
 and no user decision.
+
+### EXTENDED TO THE SAW AND SUB ARMS, same argument, same result
+
+Both of their triangles are NON-NEGATIVE, so their clamps can only saturate
+to +1 and the guarded band is one-sided in value:
+
+* **saw** — `tri_saw(p)` peaks at 1 for p=0 and reaches 0 only at p=±1, slope
+  1, so the edge is saturated for `p` in `[saw_h - 1, 1 - saw_h]`.
+* **sub** — `tri_sub(-|t|) + 1` peaks at 1 for |t| = 0 and 1 and is zero at
+  |t| = 0.5, slope 2, so the edge is saturated for `| |t| - 0.5 | >= sub_h`.
+
+**Null after all three: EXACTLY 0 on all 36 scenarios.**
+
+### THIS IS A TRUNK CANDIDATE, NOT A FORK RELAXATION
+
+It was assumed on sight to be "the first S3 deviation from the plugin". It is
+not a deviation at all — the output is BIT-IDENTICAL, which is why the null
+is EXACTLY 0 rather than merely quiet. That makes it eligible for the TRUNK
+under the project's own charter, where it would benefit every target
+including the Teensy, not just the S3 fork. Promotion is the user's call, as
+the charter requires; the evidence meets the trunk's standard.
 
 **And it is the category the profile pointed at**: not "compute less often"
 (C1, C2, C5 — all dead) but "compute the same thing without the work that

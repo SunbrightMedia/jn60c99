@@ -133,6 +133,14 @@ typedef struct {
      * saturator's own shortcut already fires on 98.85 % of sub-steps, which
      * is the same population this skips the work for. */
     float pulse_h;
+    /* Same short-circuit for the SAW and SUB edges. Both their triangles are
+     * NON-NEGATIVE, so the clamp can only saturate to +1 and the guarded
+     * band is one-sided in value:
+     *   saw: tri_saw(p) peaks 1 at p=0, zero at p=+/-1, slope 1
+     *        -> saturated for p in [saw_h - 1, 1 - saw_h]
+     *   sub: (tri_sub(-|t|)+1) peaks 1 at |t|=0 and 1, zero at |t|=0.5,
+     *        slope 2 -> saturated for | |t| - 0.5 | >= sub_h */
+    float saw_h, sub_h;
     float sat_in;                        /* port 5552                         */
     float k3, k5, k7, k9, k11;           /* port 5952, 5968, 5984, 6000, 6016 */
     float subthr;                        /* port 5584                         */

@@ -143,6 +143,10 @@ static void eb_dco_set_pulse_h(eb_dco_coef *c)
      * SHORT-CIRCUIT and not an approximation -- the null must be EXACTLY 0. */
     float d = (c->g * 256.0f) * c->amp_pulse;
     c->pulse_h = (d > 1e-12f) ? (0.51f / d) : 2.0f;
+    d = (c->g * 256.0f) * c->amp_saw;
+    c->saw_h   = (d > 1e-12f) ? (1.02f / d) : 2.0f;   /* slope 1 */
+    d = (c->g * 512.0f) * c->amp_sub;
+    c->sub_h   = (d > 1e-12f) ? (0.51f / d) : 2.0f;   /* slope 2 */
 }
 
 void eb_dco_set_shape(eb_dco_coef *c)
@@ -241,8 +245,16 @@ static EB_ALWAYS_INLINE float eb_dco_step_i(eb_dco_state *s,
     /* ---- SAW: the wrapped ramp through the triangle, edge-scaled by g ---- */
     if (c->lvl_saw != 0.0f) {
         EBC(2);
+#if EB_DCO_PULSEFAST
+        {   float hs = c->saw_h;
+            if (p >= hs - 1.0f && p <= 1.0f - hs) e = 1.0f;
+            else e = eb_clamp1(((eb_triangle_saw(p) * 256.0f) * c->g)
+                               * c->amp_saw);
+        }
+#else
         e   = eb_clamp1(((eb_triangle_saw(p) * 256.0f) * c->g)
                         * c->amp_saw);
+#endif
         saw = eb_sat_c(e, c, 6) * (p * c->gn_saw);
     } else saw = 0.0f;
 
@@ -292,8 +304,17 @@ static EB_ALWAYS_INLINE float eb_dco_step_i(eb_dco_state *s,
     if (c->lvl_sub != 0.0f) {
         EBC(4);
         t   = (((cnt + p) + 1.0f) * 0.5f) - 1.0f;
+#if EB_DCO_PULSEFAST
+        {   float a = fabsf(t), hb = c->sub_h, dd = a - 0.5f;
+            if (dd < 0.0f) dd = -dd;
+            if (dd >= hb && a <= 1.0f) e = 1.0f;
+            else e = eb_clamp1((((eb_triangle_sub(-a) + 1.0f) * c->g) * 512.0f)
+                               * c->amp_sub);
+        }
+#else
         e   = eb_clamp1((((eb_triangle_sub(-fabsf(t)) + 1.0f) * c->g) * 512.0f)
                         * c->amp_sub);
+#endif
         sub = eb_sat_c(e, c, 10) * (eb_sgn(t) * c->gn_sub);
     } else sub = 0.0f;
 
