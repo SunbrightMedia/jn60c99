@@ -251,7 +251,23 @@ void app_main(void)
     /* the chord index for this build's voice count, clamped to what exists */
     const int CH = (S3L_VOICES < 1 ? 1 :
                     S3L_VOICES > S3L_NNOTE ? S3L_NNOTE : S3L_VOICES) - 1;
-    const unsigned WAKE = S3L_MASK[CH];
+    unsigned WAKE = S3L_MASK[CH];
+    /* THE SLOPE, MEASURED INSTEAD OF EXTRAPOLATED.
+     *
+     * The 1-voice cost was never measured -- it was the priced slope times a
+     * c/i that had itself been DEFINED as measured-cycles / priced-
+     * instructions at 2 voices, so predicting the 2-voice point back agreed
+     * to 0.2 % by construction and validated nothing.
+     *
+     * This sweep measures three points on the real board: NO voices awake
+     * (the shared base -- notecv, the shared LFO, the idle advances -- plus
+     * every non-engine cost in the loop), ONE voice, and TWO. The slope and
+     * the intercept then come from silicon, and the engine time is timed
+     * SEPARATELY from the chunk so the PCM conversion and I2S call cannot be
+     * charged to the DSP. */
+    static const unsigned SWEEP[3] = { 0x00u, 0x80u, 0xc0u };
+    int phase = 0;
+    unsigned long eng_us = 0, ph_chunks = 0;
 
     printf("\n=== JUNO ENGINE B — S3 LISTEN FIRMWARE ===\n");
     printf("voices allowed: %d   sample rate: %d\n", S3L_VOICES, SR);
@@ -320,7 +336,9 @@ void app_main(void)
 
     for (;;) {
         int64_t t0 = esp_timer_get_time();
+        int64_t te = 0;
         int i;
+        WAKE = SWEEP[phase];
         for (i = 0; i < CHUNK; ++i) {
             float vb[EB_NUM_VOICES], L = 0.0f, R = 0.0f;
             int k;
@@ -331,8 +349,11 @@ void app_main(void)
             for (k = 0; k < EB_NUM_VOICES; ++k)
                 EBE.v[k].atrest = !((WAKE >> k) & 1u);
             for (k = 0; k < EB_NUM_VOICES; ++k) vb[k] = 0.0f;
-            eb_engine_render_voices(&EBE, RS, &RC,
-                                    (const eb_render_needs *)0, vb);
+            {   int64_t e0 = esp_timer_get_time();
+                eb_engine_render_voices(&EBE, RS, &RC,
+                                        (const eb_render_needs *)0, vb);
+                te += esp_timer_get_time() - e0;
+            }
 #if S3L_NOFX
             /* The port's master sums the voices; everything after that is
              * FX. Summing here is NOT a claim to be the master stage -- it
@@ -364,6 +385,8 @@ void app_main(void)
             (void)step;
         }
         busy_us += (unsigned long)(esp_timer_get_time() - t0);
+        eng_us  += (unsigned long)te;
+        ++ph_chunks;
 
         {   /* A FULL DMA QUEUE MEANS WE ARE AHEAD; a timeout means we are
              * behind and the codec ran dry. That is the underrun. */
@@ -387,6 +410,17 @@ void app_main(void)
             {   double real_us = (double)esp_timer_get_time() - (double)t_start;
                 double audio_us = (double)(chunks * CHUNK) * 1e6 / (double)SR;
                 if (real_us > audio_us * 1.02) behind = 1;
+            }
+            {   double n = (double)(ph_chunks * CHUNK);
+                double e = (double)eng_us / n, w = (double)busy_us / n;
+                printf("SWEEP wake=0x%02x  engine %.2f us (%.0f cyc)  "
+                       "whole loop %.2f us (%.0f cyc)  overhead %.0f cyc\n",
+                       SWEEP[phase], e, e * 240.0, w, w * 240.0,
+                       (w - e) * 240.0);
+                if (chunks / (SR / CHUNK) % 8 == 0) {
+                    phase = (phase + 1) % 3;
+                    eng_us = busy_us = ph_chunks = 0;
+                }
             }
             printf("t=%lus  %s  underruns=%lu  render %.2f us/sample "
                    "(~%.0f cycles at 240 MHz)  budget %.2f us  %s\n",
