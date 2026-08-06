@@ -72,6 +72,10 @@
  * all, so nothing in the per-sample path reaches PSRAM except the voice
  * state. It is the smallest build that makes sound, and it isolates the
  * question: if this fits, the overrun is placement and not arithmetic. */
+#ifndef S3L_TONE
+#define S3L_TONE 0
+#endif
+
 #ifndef S3L_OFFLINE
 #define S3L_OFFLINE 0
 #endif
@@ -332,6 +336,30 @@ void app_main(void)
     load_coefs(CH, 0);
 
     if (!i2s_start()) { printf("HALT: I2S would not start.\n"); return; }
+#if S3L_TONE
+    /* A LOUD SQUARE WAVE, NO ENGINE AT ALL.
+     *
+     * This exists to split one question into two. The firmware is provably
+     * clocking data out of GPIO 5/6/7 -- it prints that it is playing -- yet
+     * nothing is audible. Either the DAC/wiring is not carrying it, or the
+     * engine's own samples are the problem. A full-scale 440 Hz square is
+     * unmistakable through any working chain: if this is silent the fault is
+     * hardware, and if it is audible the fault is upstream of the codec and
+     * I stop blaming the wiring. */
+    {
+        static int16_t t[CHUNK * 2];
+        int n = 0, hi = 1;
+        printf("TEST TONE: 440 Hz square, FULL SCALE. No engine in the path.\n");
+        for (;;) {
+            size_t wrote = 0; int i;
+            for (i = 0; i < CHUNK; ++i) {
+                if (++n >= 50) { n = 0; hi = !hi; }   /* 44100/50/2 = 441 Hz */
+                t[2*i] = t[2*i+1] = hi ? 22000 : -22000;
+            }
+            i2s_channel_write(TX, t, sizeof t, &wrote, portMAX_DELAY);
+        }
+    }
+#endif
     t_start = esp_timer_get_time();
     printf("chord of %d voice(s), wake mask 0x%02x, "
            "%.2f s held / %.2f s released, looping\n\n",

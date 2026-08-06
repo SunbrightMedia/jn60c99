@@ -84,3 +84,7 @@ endif()
 if(S3_OFFLINE)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE S3L_OFFLINE=1)
 endif()
+
+if(S3_TONE)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE S3L_TONE=1)
+endif()
