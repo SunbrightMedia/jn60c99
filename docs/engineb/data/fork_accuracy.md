@@ -103,3 +103,62 @@ engine sounds right.
 
 That gate is the next piece of work, and it is the one that answers this
 question properly.
+
+---
+
+# 2026-08-08 — THE SONIC GATE, AND THE FIRST EVIDENCE THAT BEARS ON HEARING
+
+`tools/engineb/sonic_gate.py`. Third-octave level match, trunk against fork,
+whole engine, all 36 scenarios, bound 1.0 dB per band (F5's own alias-level
+tolerance).
+
+**RESULT: PASS on all 36. Worst band anywhere: 0.40 dB**, at 10 kHz on the two
+noise-heavy patches.
+
+## Why a null was the wrong question, and this is not special pleading
+
+* The **pitch fork** is 0.00074 cents off, EXHAUSTIVELY proven over all 2^32
+  float inputs, against the plugin's OWN 18.2-cent UNISON scatter. Eight voices
+  beating drift into a different beat pattern over seconds, so the null
+  collapses — measured at −46 dB — while the instrument does the same thing.
+  The null measures WHICH beat, not whether it beats.
+* The **band-limited DCO** repositions aliases by construction. F5 established
+  that relaxation for half-oversampling and the user approved it there: alias
+  LEVEL preserved, alias POSITION not.
+
+Welch averaging is the mechanism and the point: it measures level and discards
+phase, which is exactly the line between what this fork may change and what it
+may not.
+
+## THE TEETH, because it passed on its first run
+
+| planted defect | verdict | worst band |
+|---|---|---|
+| gain ×1.12 (0.98 dB) | FAIL 19/36 | 1.33 dB |
+| low-pass at 8 kHz | FAIL 36/36 | 81.2 dB |
+| **added noise at −50 dB** | **FAIL 36/36** | **67.7 dB** |
+| spectral tilt (one pole, a=0.3) | FAIL 36/36 | 5.03 dB |
+
+The gain case also CALIBRATES it: a 0.98 dB error reads as 0.99 dB per band. So
+the fork's 0.40 dB is a real 0.40 dB and not a blunt metric's rounding.
+
+**THE NOISE CASE IS THE DECISIVE ONE.** It proves the gate catches an added
+broadband floor 50 dB below the signal, and catches it at 67 dB worst band. The
+fork's null error sits in that same −36 to −74 dB range. **If that error were
+added noise or aliasing, this gate would have destroyed it. It did not.** So the
+fork's error is not added content; it is timing and phase, landing in bands
+where the signal already lives.
+
+## What this does NOT establish
+
+* It cannot prove inaudibility. Nothing can without listening, and this project
+  forbids validating by ear.
+* It measures LEVEL per third-octave band. Phase differences within a band, and
+  transient behaviour finer than the band, are outside it.
+* It is one day old. The whole-engine null, by contrast, has caught nine
+  defects today.
+
+## The null, for the record, on the same tree
+
+−36.5 to −74.4 dB global, all lag +0.000, no uncorrelated blocks, against the
+−80/−60 bound. Session start was −16 to −51 with blocks at +4.7.
