@@ -63,7 +63,30 @@ int main(int argc, char **argv)
     wc.gn_saw=dc.gn_saw; wc.gn_pulse=dc.gn_pulse; wc.gn_sub=dc.gn_sub;
     wc.subthr=dc.subthr;
     eb_dco_wt_set_pitch(&wc, inc4*4.0f, dc.pw);
-    for (i = 0; i < N; ++i) B[i] = eb_dco_wt_tick(&ws,&wc);
+    /* THE BIQUAD RUNS ON THIS SIDE TOO, exactly as eb_render.c does it: the
+     * wavetable replaces the decimator's FIR, and the biquad tail stays
+     * because it is rate-dependent recall data. Comparing an un-biquadded
+     * candidate against a biquadded reference measures the biquad. */
+    {   eb_decim_state ys; eb_decim_coef yc; int j;
+        memset(&ys,0,sizeof ys); memset(&yc,0,sizeof yc);
+        for (j = 0; j < 16; ++j) yc.c[j] = RC_fir[j];
+        yc.k6256 = RC_k6256; yc.k6272 = RC_k6272; yc.k6336 = RC_k6336;
+        for (i = 0; i < N; ++i) {
+            float w = eb_dco_wt_tick(&ws,&wc);
+            /* the biquad alone: feed the sample in and zero the other three,
+             * which is what the EB_QUARTER_OS arm does */
+            ys.b3 = ys.b1; ys.b1 = ys.b2;
+            {   float v524 = w, v520 = ys.b1;
+                float v521 = v520 * yc.k6256 + ys.b3;
+                float v525;
+                ys.b1 = v521;
+                v525 = v524 - (v520 * yc.k6272 + v521);
+                ys.b2 = v525 * yc.k6256 + v520;
+                B[i] = ((v521 - v525 * 0.0f) * yc.k6336 - yc.k6336 * v524)
+                     + v524;
+            }
+        }
+    }
     for (i = 2000; i < N; ++i) { ra += A[i]*A[i]; rb += B[i]*B[i]; }
     printf("f0 %.0f Hz   ref rms %.4f   wt rms %.4f\n",
            inc4/2*4*44100.0, sqrt(ra/(N-2000)), sqrt(rb/(N-2000)));

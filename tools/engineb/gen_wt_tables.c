@@ -248,32 +248,68 @@ static double naive_at(const eb_dco_coef *c, int arm, double phe, double dsub,
  * replaces -- so the residual carries the decimator's response by
  * CONSTRUCTION rather than by a filter designed to imitate it.
  */
-static void build_one(float pw, int arm, int which, int o, float *out)
+static void build_one(float pw, int arm, int which, int o, float *out,
+                      float *nout)
 {
-    eb_dco_coef c; eb_dco_state s; eb_decim_state xs; eb_decim_coef xc;
+    eb_dco_coef c; eb_dco_state s;
+    /* THE FIR ONLY -- NOT eb_decim_tick. That function is the FIR *plus a
+     * biquad*, and eb_render.c runs the biquad AGAIN on this module's output
+     * (the EB_QUARTER_OS arm keeps it, because it is rate-dependent recall
+     * data and not anti-aliasing). Building the residual with eb_decim_tick
+     * therefore put the biquad in TWICE.
+     *
+     * The tap map is the one derived in the row-6 probe: stream p at age a is
+     * delayed 4a + (3-p) sub-samples, and the sequence comes out symmetric
+     * about d = 15.5 without being made to. */
+    static const int TAP[32] = {
+        3, 2, 0, 1, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12,
+        12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 1, 0, 2, 3
+    };
+    float hist[64]; int hp = 0;
     int j, i;
     long warm;
     double frac = (double)o / EB_WT_RES_OVER;
-    float ring[512]; int rp = 0;
+    float ring[512], nring[512]; int rp = 0;
     float pprev, uprev = 0.0f;
     int edge = -1, got = 0;
-    memset(&s,0,sizeof s); memset(&xs,0,sizeof xs); memset(&xc,0,sizeof xc);
-    for (j = 0; j < 16; ++j) xc.c[j] = RC_fir[j];
-    xc.k6256 = RC_k6256; xc.k6272 = RC_k6272; xc.k6336 = RC_k6336;
+    memset(&s,0,sizeof s); memset(hist,0,sizeof hist);
     fill(&c, BUILD_INC, pw, arm);
+    (void)j;
     /* THE FRACTIONAL OFFSET is applied to the STARTING PHASE, which is the
      * only way to move an edge inside a sample without changing the pitch. */
     s.phase = (float)(-1.0 + frac * 4.0 * (double)BUILD_INC);
-    memset(ring, 0, sizeof ring);
+    memset(ring, 0, sizeof ring); memset(nring, 0, sizeof nring);
     for (i = 0; i < 20000 && !got; ++i) {
         float q[4], y, u;
         pprev = s.phase;
         uprev = (((s.subcnt + s.phase) + 1.0f) * 0.5f) - 1.0f;
         q[0]=eb_dco_step(&s,&c); q[1]=eb_dco_step(&s,&c);
         q[2]=eb_dco_step(&s,&c); q[3]=eb_dco_step(&s,&c);
-        y = eb_decim_tick(&xs,&xc,0.0f,q[0],q[1],q[2],q[3]);
+        hist[hp & 63] = q[0]; hist[(hp+1) & 63] = q[1];
+        hist[(hp+2) & 63] = q[2]; hist[(hp+3) & 63] = q[3];
+        hp += 4;
+        {   int d; double acc = 0.0;
+            for (d = 0; d < 32; ++d)
+                acc += (double)hist[(hp - 1 - d) & 63] * RC_fir[TAP[d]];
+            y = (float)acc;
+        }
         u = (((s.subcnt + s.phase) + 1.0f) * 0.5f) - 1.0f;
         ring[rp & 511] = y;
+        /* THE REFERENCE IS WHAT THE TICK PRODUCES, sample for sample -- not
+         * two constants read off the window's ends. The saw is a RAMP, so a
+         * constant reference leaves the ramp inside the residual, and the
+         * residual then has to carry a whole period of signal instead of one
+         * edge. Computed here from the phase AFTER the four sub-steps, which
+         * is the phase eb_dco_wt_tick has when it emits this sample. */
+        {   float pn = s.phase, tn = c.pw + pn;
+            float un = (((s.subcnt + pn) + 1.0f) * 0.5f) - 1.0f;
+            nring[rp & 511] =
+                (arm == ARM_SAW)   ? (pn * c.gn_saw) * c.sat_hi :
+                (arm == ARM_PULSE) ? (tn < 0.0f ? -c.gn_pulse : c.gn_pulse)
+                                     * c.sat_hi
+                                   : (un < 0.0f ? -c.gn_sub : c.gn_sub)
+                                     * c.sat_hi;
+        }
         if (edge < 0 && i > 200) {
             int hit = 0;
             if (which == 0 && s.phase < pprev) hit = 1;
@@ -298,6 +334,17 @@ static void build_one(float pw, int arm, int which, int o, float *out)
      * Located by scanning for the midpoint crossing rather than by subtracting
      * a constant, so the delay is measured from the chain each time instead of
      * being a number that could go stale. */
+    /* CENTRED ON THE PHASE EDGE, which is where the TICK writes its residual.
+     * Centring on the OUTPUT edge instead looks tidier -- the residual comes
+     * out small and symmetric -- but it is WRONG, because the tick's flat
+     * reference steps at the phase edge and the two must agree about where
+     * tap HALF is. Measured both ways: output-centred gave RMS 1.10 against
+     * the reference's 0.81, because the step height was then taken across the
+     * ramp instead of across the step.
+     *
+     * The FIR's 3.875 samples of group delay therefore live INSIDE the
+     * residual, which makes it larger. That is the honest shape: the residual
+     * has to move the edge as well as band-limit it. */
     {   int oe = edge, k;
         double lo2 = ring[(edge - 12) & 511], hi2 = ring[(edge + 12) & 511];
         double mid = (lo2 + hi2) * 0.5;
@@ -307,7 +354,8 @@ static void build_one(float pw, int arm, int which, int o, float *out)
         }
         for (i = 0; i < EB_WT_RES_LEN; ++i) {
             int j = oe + (i - HALF);
-            out[i] = (j >= 0 && j < rp) ? ring[j & 511] : 0.0f;
+            out[i]  = (j >= 0 && j < rp) ? ring[j & 511]  : 0.0f;
+            nout[i] = (j >= 0 && j < rp) ? nring[j & 511] : 0.0f;
         }
     }
 }
@@ -322,14 +370,22 @@ static void emit2(const char *name, float pw, int arm, int which,
         float w = slices ? lo + (hi - lo) * (sl + 0.5f) / slices : pw;
         printf("  { /* pw %.4f */\n", w);
         for (o = 0; o < EB_WT_RES_OVER; ++o) {
-            float y[EB_WT_RES_LEN];
+            float y[EB_WT_RES_LEN], nvw[EB_WT_RES_LEN];
             double lvl0, lvl1, h;
-            build_one(w, arm, which, o, y);
-            /* the two flat levels the chain settles to, read from the window's
-             * own ends rather than assembled from constants */
+            build_one(w, arm, which, o, y, nvw);
+            /* THE TWO SETTLED LEVELS, read from the window's own ends.
+             *
+             * The tick's own per-sample reference was tried instead and is
+             * WORSE -- -3.8 dB against this form's -19.9 at 441 Hz -- because
+             * the window is centred on the OUTPUT edge while that reference
+             * steps at the PHASE edge four samples earlier, so the height came
+             * out as the saw's ramp slope rather than its step. Both
+             * formulations were measured; this is the one that wins, and the
+             * other is recorded so it is not retried blind. */
             lvl0 = y[2]; lvl1 = y[EB_WT_RES_LEN - 3];
             h = lvl1 - lvl0;
             if (fabs(h) < 1e-9) h = 1.0;
+            (void)nvw;
             printf("    {");
             for (i = 0; i < EB_WT_RES_LEN; ++i) {
                 double naive = (i < HALF) ? lvl0 : lvl1;

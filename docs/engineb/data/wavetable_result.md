@@ -414,3 +414,61 @@ to do, and the design does not hold above a few hundred Hz.
 * **Accurate: no.** −10.3 dB at 441 Hz against a −80 dB requirement, and worse
   as pitch rises.
 * **The trunk is untouched and still nulls EXACTLY 0.**
+
+---
+
+# BEST MEASURED STATE OF THE SHIPPING MODULE
+
+After eight formulations, each measured rather than argued. Module A/B against
+the port's own 4x path, with the biquad applied to BOTH sides exactly as
+`eb_render.c` applies it:
+
+| f0 | reference RMS | wavetable RMS | aligned residual |
+|---|---|---|---|
+| 220 Hz | 0.8323 | 0.8359 | **−23.2 dB** |
+| 441 Hz | 0.8076 | 0.8151 | −19.9 dB |
+| 1,764 Hz | 0.6445 | 0.6781 | −13.0 dB |
+| 7,056 Hz | 0.2329 | 0.4267 | +2.0 dB |
+
+The level now tracks the reference closely at low pitch, and at 220 Hz the
+correlation finds a lag of **+28**, close to the designed +32 -- confirming the
+timing is right and that the wandering lags at higher pitch were period
+aliasing in the correlation, not a defect.
+
+**It needs −80 dB. It is at −23.2 dB.**
+
+## The two bugs that mattered most, both found by measurement
+
+**THE BIQUAD WAS APPLIED TWICE.** `eb_decim_tick` is the FIR *plus* a biquad,
+and `eb_render.c` runs that biquad again on this module's output -- correctly,
+since it is rate-dependent recall data and not anti-aliasing. Building the
+residual with `eb_decim_tick` therefore put it in twice. The generator now
+applies the 32-tap FIR directly, using the tap map derived in the row-6 probe.
+Fixing it took 441 Hz from −10.3 dB to −19.9 dB.
+
+**THE REFERENCE FORM WAS MEASURED, NOT CHOSEN.** Two settled levels read from
+the window's ends beats the tick's own per-sample reference -- −19.9 dB against
+−3.8 -- because the window is centred on the OUTPUT edge while the tick's
+reference steps at the PHASE edge four samples earlier, so the step height came
+out as the saw's ramp slope. Both were built and measured; the loser is
+recorded so it is not retried blind.
+
+## The trend is the finding
+
+−23.2, −19.9, −13.0, +2.0 dB across four octaves. **The error grows about 4 dB
+per octave**, which is the flat-model limit stated above: the edge is a fixed
+2.4290 samples wide while the period shrinks, so the fraction of each period
+that is genuinely flat falls, and with it the premise the module rests on.
+
+Extrapolating the other way, −80 dB is roughly six octaves below 220 Hz. The
+scheme does not reach the fork's bound by refinement; it needs the residual to
+be measured against the RAMP the port actually produces, which reintroduces the
+pitch dimension.
+
+## Status, unchanged in substance
+
+* **6 voices + full FX: yes, in the design.**
+* **Real time: the arithmetic says yes** -- 0.90x worst patch, 0.64x typical,
+  on a flat path measured at 72 Xtensa instructions. Untouched by any of this.
+* **Accurate to the plugin: NO.** −23.2 dB at best against −80.
+* **The trunk is untouched and still nulls EXACTLY 0.**
