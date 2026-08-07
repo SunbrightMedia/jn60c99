@@ -58,6 +58,9 @@ static void eb_wt_add(eb_dco_wt_state *s, const float *tab, float frac,
     const float *r0, *r1;
     float g1, g0;
     int i, p = s->rpos;
+#if EB_WT_CONV & 1
+    frac = 1.0f - frac;
+#endif
     if (frac < 0.0f) frac = 0.0f;
     if (frac > 0.99999f) frac = 0.99999f;
     frac *= (float)EB_WT_RES_OVER;
@@ -93,7 +96,25 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      * +/-1, which is what eb_sat_c returns whenever the clamped edge is
      * saturated -- and it is, except within a fraction of a sample of a
      * crossing. Those samples are corrected by the residuals below. */
-    saw   = (p * c->gn_saw) * c->sat_hi;
+    /* THE SAW'S PHASE IS DELAYED BY THE DECIMATOR'S GROUP DELAY, and this is
+     * the saw arm's whole problem.
+     *
+     * The pulse and the sub are SQUARE: a filter delays a square and the flat
+     * value either side is unchanged, so a residual can carry the delay. The
+     * saw is a RAMP, and a delayed ramp is not the same ramp -- it is the ramp
+     * minus d*slope, a constant offset PROPORTIONAL TO THE SLOPE. The slope is
+     * inc*gn_saw*sat_hi, so that offset changes with pitch and CANNOT live in
+     * a pitch-independent table. It has to be here.
+     *
+     * MEASURED before this: the saw was the worst arm by a wide margin,
+     * -16.7 dB at 441 Hz and -5.2 at 1,764, against the pulse's -27.0 and
+     * -39.8 -- and it degraded with pitch exactly as a slope-proportional
+     * error must.
+     *
+     * 3.875 is the FIR's group delay: 15.5 sub-samples at four to the output
+     * sample, derived from the tap map and confirmed by the alignment shift
+     * the first diagnostic needed. */
+    saw   = ((p - 3.875f * c->inc) * c->gn_saw) * c->sat_hi;
 
     t     = c->pw + p;
     /* MEASURED, not derived. eb_dco.c computes pulse = eb_sat_c(e) * sgn(t) *

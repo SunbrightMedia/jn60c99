@@ -275,8 +275,19 @@ static void build_one(float pw, int arm, int which, int o, float *out,
     memset(&s,0,sizeof s); memset(hist,0,sizeof hist);
     fill(&c, BUILD_INC, pw, arm);
     (void)j;
-    /* THE FRACTIONAL OFFSET is applied to the STARTING PHASE, which is the
-     * only way to move an edge inside a sample without changing the pitch. */
+    /* THE FRACTIONAL OFFSET is applied to the STARTING PHASE.
+     *
+     * SOLVING p0 BACKWARDS from the known edge phase was tried -- so that the
+     * crossing lands at exactly 200+frac samples -- and it measures WORSE:
+     * the pulse went from -39.8 dB to -19.1 at 1,764 Hz. The reason is an
+     * interaction, not a flaw in the idea: the crossing is then DETECTED in
+     * sample 200 when frac is 0 and in sample 201 when it is not, so `edge`
+     * jumps by one between sub-positions and collides with the window's own
+     * +1 offset.
+     *
+     * Making both right at once needs the detection and the placement derived
+     * together rather than adjusted against each other. Recorded here because
+     * the idea is sound and the implementation is what failed. */
     s.phase = (float)(-1.0 + frac * 4.0 * (double)BUILD_INC);
     memset(ring, 0, sizeof ring); memset(nring, 0, sizeof nring);
     for (i = 0; i < 20000 && !got; ++i) {

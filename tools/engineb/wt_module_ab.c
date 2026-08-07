@@ -112,6 +112,23 @@ int main(int argc, char **argv)
         if (c > bc) { bc = c; best = i; }
     }
     printf("best lag %+d samples (B leads A by this)\n", best);
+    /* WHERE the error is, not just how big. A single dB figure cannot say
+     * whether a residual is wrong at the edge or everywhere. */
+    if (getenv("EB_AB_DUMP")) {
+        int k, e0 = -1;
+        for (k = 6000; k < 6400; ++k) {
+            int j = k + best;
+            if (fabs((double)A[k] - A[k-1]) > 0.25) { e0 = k; break; }   /* the port's edge spans several samples, so no single step is large */
+        }
+        if (e0 > 0) {
+            printf("  around an edge at sample %d:\n", e0);
+            for (k = e0 - 4; k < e0 + 12; ++k) {
+                int j = k + best;
+                printf("    %+3d  port %+9.5f  wt %+9.5f  err %+9.5f\n",
+                       k - e0, A[k], B[j], B[j] - A[k]);
+            }
+        }
+    }
     {   double e = 0, s2 = 0; int k;
         for (k = 4000; k < N-200; ++k) {
             int j = k + best; if (j < 0 || j >= N) continue;
