@@ -514,8 +514,16 @@ static void emit2(const char *name, float pw, int arm, int which,
                  * 1/256 of a sample, which is far below what the resolution
                  * itself carries, and it costs nothing at run time -- a
                  * clamp in the tick would have cost a compare per edge. */
+                /* AND THE TOP ROW IS PULLED THE SAME QUARTER BELOW ONE, for
+                 * the same reason mirrored. A target of exactly 1.0 puts the
+                 * crossing on the far boundary, where detection lands a sample
+                 * LATER than the rows below it. That was the pulse's own
+                 * outlier -- -31.3 dB at inc 0.0115 with the module running a
+                 * sample EARLY, the exact mirror of row 0's late edge. */
                 double target = (o == 0) ? (0.25 / EB_WT_RES_OVER)
-                                         : ((double)o / EB_WT_RES_OVER);
+                              : (o == EB_WT_RES_OVER)
+                                  ? (1.0 - 0.25 / EB_WT_RES_OVER)
+                                  : ((double)o / EB_WT_RES_OVER);
                 double p0 = pe - dp * (200.0 + target), got = -1.0;
                 int it;
                 p0 = fmod(p0 + 1.0, 2.0); if (p0 < 0.0) p0 += 2.0; p0 -= 1.0;
