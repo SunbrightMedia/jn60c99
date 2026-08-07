@@ -82,6 +82,7 @@ def main():
                                          capture_output=True, check=True)
                           .stdout, dtype=np.float32)[2048:]
         b = np.frombuffer(subprocess.run([cand, repr(inc), str(n), "wt"],
+                                         env=dict(os.environ),
                                          capture_output=True, check=True)
                           .stdout, dtype=np.float32)[2048:]
         m = min(len(a), len(b))

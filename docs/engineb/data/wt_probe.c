@@ -214,7 +214,23 @@ int main(int argc, char **argv)
         static float tab[WT_LEN];
         double ph = 0.0, dph;
         int hmax;
-        wt_build(tab, inc);
+        /* THE TABLE'S REFERENCE PITCH. If EB_WT_REF is set, the table is
+         * built at THAT increment and played at the test increment.
+         *
+         * WHY IT SHOULD WORK, and the reason is worth stating before the
+         * measurement contradicts it or not: `g` fixes the edge's width in
+         * TIME at about a quarter of an output sample, and band-limiting to
+         * Nyquist smooths every edge over about one whole sample. The
+         * band-limit therefore DOMINATES the port's own edge almost
+         * everywhere, so the table's shape should not depend on the pitch it
+         * was built at -- only on the mip level it is band-limited to.
+         *
+         * If that holds, one table set serves every note, and the wavetable
+         * costs kilobytes instead of a rebuild per note-on. If it does not,
+         * the lever needs a table per pitch and is unaffordable. */
+        {   const char *r = getenv("EB_WT_REF");
+            wt_build(tab, r ? (float)atof(r) : inc);
+        }
         /* Harmonics below Nyquist. One table period is 2 DCO cycles, so the
          * DCO's fundamental is harmonic 2 and the sub is harmonic 1. The
          * output rate is 4/(4*inc) table periods per sample... expressed

@@ -82,6 +82,38 @@ the algebra: harmonic 72 of the table is 15,876 Hz, and `72·0.005/4 × 176,400`
 is 15,876 while `/8` gives half that. A frequency mapping is worth checking
 against a known frequency every time.
 
+## THE TABLE IS PITCH-DEPENDENT, and how tightly was MEASURED
+
+The obvious hope was that one table serves every note. The reasoning for it
+was written down before the measurement: `g` fixes the edge's width in TIME at
+about a quarter of an output sample, and band-limiting to Nyquist smooths
+every edge over about one whole sample, so the band-limit should dominate the
+port's own edge and the table's shape should not depend on the pitch it was
+built at.
+
+**That was backwards, and the measurement says so.** The edge's width in PHASE
+is proportional to `inc`, and the band-limit's resolution is also proportional
+to `inc` — they scale together, so the ratio is fixed, but a table built at one
+pitch and played at another carries the WRONG ratio.
+
+Harmonic error, table built at `ref` and played at `play`:
+
+| play f0 | ref/play 1.00 | 1.19 (3 semitones) | 1.41 | 2.00 (octave) |
+|---|---|---|---|---|
+| 441 Hz | 2.39 | 4.33 | 11.39 | **44.58** |
+| 1,764 Hz | 2.88 | 5.40 | 11.58 | 27.15 |
+| 7,056 Hz | 0.19 | 1.88 | 3.59 | 6.97 |
+
+**One mip level stretches about one semitone**, not an octave. Three semitones
+already breaks the 3.3 dB bound.
+
+That is a real cost and it is stated rather than smoothed over: the design
+needs roughly 60 mip levels across the keyboard, not 8. Their lengths shrink
+with pitch — a level only needs about `2/inc` entries — so the total is
+dominated by the lowest level and lands near 125 KB **per patch**. It is per
+patch and not per voice only if the per-voice CONDITION scatter factors out as
+a gain, which is **not yet measured**.
+
 ## What is NOT answered
 
 **The pulse width is fixed in this probe, on purpose.** Measured, per voice
