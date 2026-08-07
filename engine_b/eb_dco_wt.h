@@ -151,8 +151,24 @@
  * decimator FIR, 3.875 samples. Everything downstream then sees the timing it
  * saw before. The residual keeps EB_WT_DELAY taps before the step instead of
  * half the window. */
+/* SWEPT, 0/1/2/4, and the arms do not want the same thing:
+ *
+ *   DELAY  saw @0.0025  saw @0.02   pulse    sub
+ *     0      -16.6        -7.7      BROKEN   BROKEN
+ *     1      -57.9       -36.5      -71.9    -48.5
+ *     2      -65.3       -49.1      -71.9    -48.5
+ *     4      -68.2       -50.7      -71.9    -48.5
+ *
+ * THE PULSE AND THE SUB ARE IDENTICAL AT 1, 2 AND 4 -- they are square, so
+ * their correction is causal once the FIR's own delay is inside it. ONLY THE
+ * SAW needs pre-ring, because its correction has to undo a ramp offset as well
+ * as band-limit a step, and DELAY 0 breaks all three.
+ *
+ * 2 is the smallest delay that keeps the saw within 1.6 dB of its best. Every
+ * sample of delay here is a sample of timing error inside the voice, so the
+ * choice is the smallest that the saw survives, not the best per-arm number. */
 #ifndef EB_WT_DELAY
-#define EB_WT_DELAY      4
+#define EB_WT_DELAY      2
 #endif
 
 /* THE PULSE-WIDTH GRID. Measured range of pw over all 36 scenarios is
