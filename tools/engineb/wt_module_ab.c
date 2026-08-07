@@ -122,7 +122,13 @@ int main(int argc, char **argv)
         }
         if (e0 > 0) {
             printf("  around an edge at sample %d:\n", e0);
-            for (k = e0 - 4; k < e0 + 12; ++k) {
+            /* THE WINDOW IS SETTABLE. A fixed 16-sample dump cannot say
+             * whether an error is a misplacement or a TAIL that runs past the
+             * residual's own length, and the sub arm needed exactly that
+             * question answered. */
+            int lo = getenv("EB_AB_LO") ? atoi(getenv("EB_AB_LO")) : -4;
+            int hi = getenv("EB_AB_HI") ? atoi(getenv("EB_AB_HI")) : 12;
+            for (k = e0 + lo; k < e0 + hi; ++k) {
                 int j = k + best;
                 printf("    %+3d  port %+9.5f  wt %+9.5f  err %+9.5f\n",
                        k - e0, A[k], B[j], B[j] - A[k]);

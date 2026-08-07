@@ -22,15 +22,26 @@ void eb_dco_wt_bind_tables(eb_dco_wt_coef *c)
     c->res_pulse_b = &eb_wt_res_pulse_b[0][0][0];
 }
 
-/* THERE IS NOTHING TO DERIVE. The residual is pitch-independent (eb_dco_wt.h,
- * finding 5 -- MEASURED at 2.4290 output samples across five octaves), so this
- * carries the two per-sample numbers and nothing else. The mip-index
- * arithmetic that used to live here, exponent extraction and all, is gone
- * because the dimension it indexed does not exist. */
+/* TWO PER-SAMPLE NUMBERS AND ONE INDEX. The saw's and the pulse's residuals are
+ * pitch-independent (eb_dco_wt.h, finding 5 -- MEASURED at 2.4290 output samples
+ * across five octaves), so they need no level. THE SUB'S IS NOT (finding 9), and
+ * the exponent extraction below is the whole of what that costs. */
 void eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc, float pw)
 {
     c->inc = inc;
     c->pw  = pw;
+    /* THE SUB'S MIP LEVEL, one per octave, taken from the FLOAT EXPONENT so it
+     * costs no logarithm. inc/EB_WT_SUB_INC0 in [1,2) is level 0, [2,4) is
+     * level 1, and so on; the biased exponent of that ratio minus 127 IS the
+     * level. Only the sub needs this -- see eb_dco_wt.h, finding 9. */
+    {   union { float f; unsigned u; } z;
+        int lv;
+        z.f = inc * (1.0f / EB_WT_SUB_OINC0);
+        lv = (int)((z.u >> 23) & 0xFFu) - 127;
+        if (lv < 0) lv = 0;
+        if (lv >= EB_WT_SUB_MIPS) lv = EB_WT_SUB_MIPS - 1;
+        c->sub_mip = lv;
+    }
 }
 
 /* Schedule a residual. `frac` is where in the sample the crossing fell, in
@@ -261,17 +272,23 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
     if ((u < 0.0f) != ((((cnt_old + prev) + 1.0f) * 0.5f - 1.0f) < 0.0f)) {
         /* the sub's own crossing; its step is the same height as the pulse's
          * because both are square */
-        /* THE SUB'S OWN FRACTION, not a hardcoded 0.5. Its ramp is
-         * u = ((cnt + p + 1)/2) - 1, which is zero exactly when cnt + p = 1,
-         * and with cnt in {0,2} that means p = +/-1 -- so the sub's crossing
-         * COINCIDES WITH THE PHASE WRAP and shares its fraction.
+        /* THE SUB'S OWN FRACTION. Its ramp is u = ((cnt + p + 1)/2) - 1 with
+         * cnt in {0,2}: at cnt = 0 that is (p+1)/2 - 1, ALWAYS negative for
+         * p in [-1,1); at cnt = 2 it is (p+1)/2, ALWAYS non-negative. So u's
+         * SIGN IS THE COUNTER, and the sub's edge is exactly where the counter
+         * toggles -- the rising crossing of `subthr`, which is about -0.005.
          *
-         * With 0.5 hardcoded the sub was the only arm that did not improve
-         * when the tables were rebuilt at exact fractional positions: it stayed
-         * at -25.6 dB while the pulse went from -27.0 to -61.7. A table indexed
-         * by a fraction the caller never supplies is a table indexed by
-         * nothing. */
-        eb_wt_add(s, c->res_sub, (1.0f - prev) / c->inc, h_sub);
+         * TWO WRONG FRACTIONS CAME BEFORE THIS, and both are the same mistake.
+         * A hardcoded 0.5 gave the table an index the caller never really
+         * supplied. Then (1-prev)/inc assumed the crossing coincides with the
+         * PHASE WRAP -- it does not; subthr sits near zero, half a period away.
+         * The sub stayed the worst arm at -26.6 dB through both.
+         *
+         * The toggle test is `prev < subthr <= p`, so subthr - prev lies in
+         * (0, inc] and the fraction is in [0,1) by construction. */
+        eb_wt_add(s, c->res_sub
+                     + (size_t)c->sub_mip * EB_WT_RES_OVER * EB_WT_RES_LEN,
+                  (c->subthr - prev) / c->inc, h_sub);
     }
     }
 

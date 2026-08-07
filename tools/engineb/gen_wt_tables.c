@@ -50,7 +50,18 @@
  *
  * Choosing the pitch freely is legitimate BECAUSE the residual is
  * pitch-independent, measured at 2.4290 samples across five octaves. */
+#ifndef BUILD_INC
 #define BUILD_INC 0.0005f
+#endif
+
+/* THE BUILD PITCH IS A VARIABLE, NOT A CONSTANT, because ONE ARM NEEDS IT TO
+ * BE. The saw's and the pulse's residuals are pitch-independent -- MEASURED,
+ * and re-measured here: rebuilding them at 0.0005, 0.005 and 0.02 moves them
+ * by under 1.5 dB. The SUB'S IS NOT. Its matched-pitch error is -41.8, -42.9,
+ * -54.1 and -58.9 dB at inc 0.0025, 0.005, 0.01 and 0.02, and every
+ * off-diagonal entry of that matrix is 10 to 20 dB worse. So the sub gets a
+ * MIP DIMENSION and the other two arms do not. */
+static float g_build_inc = BUILD_INC;
 
 /* ARM SELECTOR, same convention as the row-6 probe. */
 enum { ARM_SAW = 1, ARM_PULSE = 2, ARM_SUB = 3 };
@@ -96,7 +107,7 @@ static float *trace(float pw, int arm, int which, long *n_out, long *edge_out,
                     float *uedge)
 {
     eb_dco_coef c; eb_dco_state s;
-    double sub = (double)BUILD_INC * 4.0 / OS;
+    double sub = (double)g_build_inc * 4.0 / OS;
     /* THE TRACE MUST OUTLAST THE WINDOW ON BOTH SIDES. The residual spans
      * EB_WT_RES_LEN output samples and the reconstruction filter reaches 16
      * more, so an edge needs about 48 output samples of trace either side of
@@ -128,7 +139,7 @@ static float *trace(float pw, int arm, int which, long *n_out, long *edge_out,
     float *utrace = (float *)malloc(sizeof(float) * (size_t)n);
     float pprev;
     memset(&s, 0, sizeof s);
-    fill(&c, BUILD_INC, pw, arm);
+    fill(&c, g_build_inc, pw, arm);
     c.inc = (float)sub;
     /* start well before the edge so the window has room on both sides */
     pprev = s.phase;
@@ -275,7 +286,7 @@ static double build_one(float pw, int arm, int which, int o, float *out,
     float pprev, uprev = 0.0f;
     int edge = -1, got = 0;
     memset(&s,0,sizeof s); memset(hist,0,sizeof hist);
-    fill(&c, BUILD_INC, pw, arm);
+    fill(&c, g_build_inc, pw, arm);
     (void)j;
     /* THE STARTING PHASE IS SOLVED BACKWARDS from the known edge phase, so the
      * crossing lands at exactly `frac` of the way through a sample -- which is
@@ -324,7 +335,7 @@ static double build_one(float pw, int arm, int which, int o, float *out,
              * against must be the flat path the tick actually computes, term
              * for term -- a reference that differs from the tick by anything
              * puts that difference into every residual. */
-            float pd = pn - 3.875f * (4.0f * BUILD_INC);
+            float pd = pn - 3.875f * (4.0f * g_build_inc);
             if (pd < -1.0f) pd += 2.0f;   /* wrapped, as the tick wraps it */
             nring[rp & 511] =
                 (arm == ARM_SAW)   ? (pd * c.gn_saw) * c.sat_hi :
@@ -339,7 +350,14 @@ static double build_one(float pw, int arm, int which, int o, float *out,
              * eb_dco_wt.c computes it, so the two can be COMPARED instead of
              * assumed equal. Printed under EB_WT_TRACEFRAC. */
             double dpo = (double)c.inc * 4.0;
+            /* THE SUB'S FRACTION IS ITS OWN. Its ramp's sign is the counter,
+             * and the counter toggles at the rising crossing of subthr (near
+             * -0.005) -- NOT at the phase wrap. Using the wrap's fraction here
+             * indexed every sub residual by a position half a period from the
+             * edge it was meant to describe. */
             double fr = (which == 1) ? (-(double)(pw + pprev) / dpo)
+                      : (which == 2) ? (((double)RC_subthr - (double)pprev)
+                                        / dpo)
                                      : ((1.0 - (double)pprev) / dpo);
             if (getenv("EB_WT_TRACEFRAC")) { /* set below once hit is known */ }
             (void)fr;
@@ -420,14 +438,22 @@ static double build_one(float pw, int arm, int which, int o, float *out,
     }
 }
 
+/* `mips` turns the first dimension from PULSE-WIDTH SLICES into PITCH LEVELS.
+ * Only the sub uses it (eb_dco_wt.h, finding 9). */
 static void emit2(const char *name, float pw, int arm, int which,
-                  int slices, float lo, float hi)
+                  int slices, float lo, float hi, int mips)
 {
-    int sl, o, i, nsl = slices ? slices : 1;
+    int sl, o, i, nsl = mips ? mips : (slices ? slices : 1);
     printf("static const float %s[%d][%d][%d] = {\n", name, nsl,
            EB_WT_RES_OVER, EB_WT_RES_LEN);
     for (sl = 0; sl < nsl; ++sl) {
-        float w = slices ? lo + (hi - lo) * (sl + 0.5f) / slices : pw;
+        float w = (!mips && slices) ? lo + (hi - lo) * (sl + 0.5f) / slices : pw;
+        if (mips) {
+            int e2;
+            g_build_inc = EB_WT_SUB_INC0;
+            for (e2 = 0; e2 < sl; ++e2) g_build_inc *= 2.0f;
+            printf("  { /* mip %d, inc %.5f */\n", sl, g_build_inc);
+        } else
         printf("  { /* pw %.4f */\n", w);
         for (o = 0; o < EB_WT_RES_OVER; ++o) {
             float y[EB_WT_RES_LEN], nvw[EB_WT_RES_LEN];
@@ -441,8 +467,13 @@ static void emit2(const char *name, float pw, int arm, int which,
              * frac is linear in p0, so one Newton step converges; two are
              * taken and the result is asserted. This replaces a formula that
              * was right in principle with a loop that is right in fact. */
-            {   double dp = 4.0 * (double)BUILD_INC;
-                double pe = (which == 1) ? -(double)w : 1.0;
+            {   double dp = 4.0 * (double)g_build_inc;
+                /* THE EDGE PHASE, per arm: the pulse's moving edge is at
+                 * t = pw + p = 0, the sub's is at the counter's toggle
+                 * p = subthr, and the saw's (and the pulse's fixed edge) is
+                 * the phase wrap at p = 1. */
+                double pe = (which == 1) ? -(double)w
+                          : (which == 2) ? (double)RC_subthr : 1.0;
                 double target = (double)o / EB_WT_RES_OVER;
                 double p0 = pe - dp * (200.0 + target), got = -1.0;
                 int it;
@@ -569,12 +600,15 @@ int main(void)
            " * dimension: the edge width in samples is |pw-1|/(8*amp) and inc\n"
            " * cancels, MEASURED at 2.4290 samples across five octaves. */\n");
     printf("#ifndef ENGINEB_EB_WT_TABLES_H\n#define ENGINEB_EB_WT_TABLES_H\n\n");
-    emit2("eb_wt_res_saw",     RC_pw, ARM_SAW,   0, 0, 0, 0);
-    emit2("eb_wt_res_sub",     RC_pw, ARM_SUB,   2, 0, 0, 0);
+    emit2("eb_wt_res_saw",     RC_pw, ARM_SAW,   0, 0, 0, 0, 0);
+    g_build_inc = BUILD_INC;
+    emit2("eb_wt_res_sub",     RC_pw, ARM_SUB,   2, 0, 0, 0,
+          EB_WT_SUB_MIPS);
+    g_build_inc = BUILD_INC;
     emit2("eb_wt_res_pulse_a", 0.0f,  ARM_PULSE, 1, EB_WT_PW_SLICES,
-         EB_WT_PW_LO, EB_WT_PW_LO + EB_WT_PW_STEP * EB_WT_PW_SLICES);
+         EB_WT_PW_LO, EB_WT_PW_LO + EB_WT_PW_STEP * EB_WT_PW_SLICES, 0);
     emit2("eb_wt_res_pulse_b", 0.0f,  ARM_PULSE, 0, EB_WT_PWB_SLICES,
-         EB_WT_PW_LO, EB_WT_PW_LO + EB_WT_PW_STEP * EB_WT_PW_SLICES);
+         EB_WT_PW_LO, EB_WT_PW_LO + EB_WT_PW_STEP * EB_WT_PW_SLICES, 0);
     printf("#endif\n");
     return 0;
 }

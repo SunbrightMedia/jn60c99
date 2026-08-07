@@ -104,8 +104,16 @@
  * Sixteen positions with a linear blend between adjacent ones removes it.
  *
  * The two changes pay for each other: 16x16 is the same memory as 64x4. */
+/* Both are OVERRIDABLE so they can be SWEPT. A length compiled in as a plain
+ * #define cannot be measured, and a first attempt to sweep it silently
+ * measured the same 16 four times. The length must stay a POWER OF TWO: the
+ * ring is masked, not divided. */
+#ifndef EB_WT_RES_LEN
 #define EB_WT_RES_LEN    16
+#endif
+#ifndef EB_WT_RES_OVER
 #define EB_WT_RES_OVER   16
+#endif
 
 /* THE PULSE-WIDTH GRID. Measured range of pw over all 36 scenarios is
  * [-0.015, 0.939]; the grid spans [-0.05, 1.00] at 0.01, the spacing the
@@ -121,9 +129,40 @@
 #define EB_WT_PW_SLICES  106
 #define EB_WT_PWB_SLICES   8
 
-/* NO MIP LEVELS. See finding 5: the residual is pitch-independent, so a
- * dimension that would have cost 72x and forced a per-patch rebuild is simply
- * not there. */
+/* NO MIP LEVELS FOR THE SAW OR THE PULSE. See finding 5: their residuals are
+ * pitch-independent, so a dimension that would have cost 72x and forced a
+ * per-patch rebuild is simply not there.
+ *
+ * 9. THE SUB IS THE EXCEPTION, AND ONLY MEASUREMENT FOUND IT. Finding 5 was
+ *    proven on the PULSE edge, and it was quietly assumed to hold for all three
+ *    arms. Building the sub's residual at four pitches and testing each at four
+ *    pitches gives a matrix whose DIAGONAL is -41.8, -42.9, -54.1 and -58.9 dB
+ *    and whose off-diagonal entries are 10 to 20 dB worse. The sub's edge width
+ *    in samples DOES scale with pitch.
+ *
+ *    Why: the pulse's edge width carries `g = 0.00390625/inc`, so inc cancels.
+ *    The sub's ramp is (cnt + p + 1)/2 and its amplitude does not carry g, so
+ *    nothing cancels.
+ *
+ *    The cost of admitting this is small -- the sub's table is 1 KB per level,
+ *    against the pulse's 106 slices -- so it gets one level per octave.
+ *
+ *    THE TOP TWO LEVELS ARE NOT BUILT, and this is a limit of the GENERATOR,
+ *    not of the method: above inc 0.04 the sub's period approaches the residual
+ *    window plus the filter's reach, so a second edge enters the window. The
+ *    index therefore CLAMPS, and a note above about 3.5 kHz uses the highest
+ *    built level. Measured cost of that clamp: -42.0 dB at inc 0.04 against the
+ *    -58.9 a matched level gives. It is recorded here because a clamp that is
+ *    not written down reads as a table that covers everything.
+ *
+ *    TWO INCREMENTS, AND THEY ARE NOT THE SAME NUMBER. The generator builds
+ *    at the SUB-STEP increment; the tick holds the OUTPUT-rate one, which is
+ *    four times larger. Indexing one by the other picked a level two octaves
+ *    out and left the sub at -36 dB where a matched level gives -43. Both
+ *    constants are spelled out below so the two cannot be confused again. */
+#define EB_WT_SUB_INC0  (0.00125f)   /* level 0, SUB-STEP rate: the generator */
+#define EB_WT_SUB_OINC0 (0.005f)     /* level 0, OUTPUT rate: the tick        */
+#define EB_WT_SUB_MIPS  5            /* octaves, to sub-step inc 0.02         */
 
 typedef struct {
     float phase;      /* [-1,1), the port's own DCO phase   */
@@ -146,6 +185,7 @@ typedef struct {
     float lvl_saw, lvl_pulse, lvl_sub;
     float gn_saw,  gn_pulse,  gn_sub;
     float subthr;
+    int   sub_mip;             /* the sub's pitch level -- finding 9         */
     /* THE RESIDUAL TABLES, caller-owned and SHARED BY ALL VOICES (finding 4)
      * AND BY EVERY PITCH (finding 5). saw and sub are single tables; the
      * pulse's two edges are sliced by the pulse width, which is the only thing
