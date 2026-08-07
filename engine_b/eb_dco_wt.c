@@ -388,7 +388,8 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
                 int e2, j;
                 z.f = 1.0f - c->pw;
                 e2 = (int)((z.u >> 23) & 0xFFu) - 127;
-                j  = (int)((z.u >> 19) & 15u);
+                j  = (int)((z.u >> EB_WT_PWA_SHIFT)
+                           & (unsigned)(EB_WT_PWA_PER_OCT - 1));
                 sl = (e2 - (EB_WT_PWA_EMIN)) * EB_WT_PWA_PER_OCT + j;
             }
             if (sl < 0) sl = 0;

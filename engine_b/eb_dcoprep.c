@@ -32,6 +32,11 @@ static unsigned long ebpw_bkt[8];
  * can ever hand it a negative increment is not a thing to reason about: the
  * expression is fmaxf(k5568, pitch*k5536), floored by a RECALLED cell, and the
  * sign of that cell across the bank is a measurement. */
+/* WHERE pw SPENDS ITS TIME. The span [-0.015, 0.939] says nothing about the
+ * distribution, and the pulse's residual quality varies 30 dB across that
+ * span -- so which end it sits at decides whether the variation matters. Ten
+ * equal buckets over [-0.05, 1.00], the grid's own range. */
+static unsigned long ebpw_vbkt[10];
 static float ebpw_ilo = 1e30f, ebpw_ihi = -1e30f;
 static unsigned long ebpw_ineg = 0;
 static void ebpw_report(void) __attribute__((destructor));
@@ -43,6 +48,10 @@ static void ebpw_report(void)
     if (!f) return;
     fprintf(f, "inc=[%.9f,%.9f] negcalls=%lu\n",
             (double)ebpw_ilo, (double)ebpw_ihi, ebpw_ineg);
+    fprintf(f, "pwhist=%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu\n",
+            ebpw_vbkt[0], ebpw_vbkt[1], ebpw_vbkt[2], ebpw_vbkt[3],
+            ebpw_vbkt[4], ebpw_vbkt[5], ebpw_vbkt[6], ebpw_vbkt[7],
+            ebpw_vbkt[8], ebpw_vbkt[9]);
     fprintf(f, "calls=%lu moved=%lu span=[%.6f,%.6f] worststep=%.8f "
             "bkt=%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu\n",
             ebpw_n, ebpw_moved, (double)ebpw_lo, (double)ebpw_hi,
@@ -65,6 +74,9 @@ float eb_dcoprep_tick(const eb_dcoprep_coef *c, float pitch, float pwmcv,
 
     *out4816 = v397 + in3808;
 #if EB_PW_RANGE
+    {   int b = (int)((*out4816 + 0.05f) * (10.0f / 1.05f));
+        if (b < 0) b = 0; if (b > 9) b = 9;
+        ++ebpw_vbkt[b]; }
     if (v398 < ebpw_ilo) ebpw_ilo = v398;
     if (v398 > ebpw_ihi) ebpw_ihi = v398;
     if (v398 < 0.0f) ++ebpw_ineg;

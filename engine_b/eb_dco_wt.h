@@ -196,8 +196,28 @@
  * and puts them where the width is changing. */
 #define EB_WT_PW_LO     (-0.05f)
 #define EB_WT_PW_STEP    (0.01f)
+/* GUARDED so it can be SWEPT. This file already carries a note that a plain
+ * #define cannot be measured, and this constant was added as one anyway -- the
+ * first sweep of it returned three identical columns. */
+#ifndef EB_WT_PWA_PER_OCT
 #define EB_WT_PWA_PER_OCT 16
+#endif
 #define EB_WT_PWA_EMIN   (-5)          /* u down to 1/32 */
+/* THE MANTISSA BITS THE INDEX USES, derived from the slice count instead of
+ * written out. Hardcoding four bits made every resolution but 16 mis-index --
+ * measured as the pulse falling to -16 dB at 32 per octave, which is the
+ * signature of reading the wrong table row, not of a coarse one. */
+#if   EB_WT_PWA_PER_OCT == 8
+#define EB_WT_PWA_SHIFT 20
+#elif EB_WT_PWA_PER_OCT == 16
+#define EB_WT_PWA_SHIFT 19
+#elif EB_WT_PWA_PER_OCT == 32
+#define EB_WT_PWA_SHIFT 18
+#elif EB_WT_PWA_PER_OCT == 64
+#define EB_WT_PWA_SHIFT 17
+#else
+#error "EB_WT_PWA_PER_OCT must be 8, 16, 32 or 64"
+#endif
 #define EB_WT_PW_SLICES  (6 * EB_WT_PWA_PER_OCT)
 #ifndef EB_WT_PWB_SLICES
 #define EB_WT_PWB_SLICES   8
