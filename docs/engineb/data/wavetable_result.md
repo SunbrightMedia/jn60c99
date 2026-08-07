@@ -599,3 +599,113 @@ Table cost at OVER 64: saw 4,160 B, sub 20,800 B, pulse_a 440,960 B, pulse_b
 * **Accurate to the plugin: NOT YET, and the gap is now two named pitches in
   one arm** rather than every arm at every pitch.
 * **The trunk is untouched and still nulls EXACTLY 0.**
+
+---
+
+# 2026-08-07, later — the module was right and the ENGINE was wrong
+
+The per-arm figures above are the module in isolation. Put inside
+`eb_engine_render_voices` the same module took all 36 whole-engine scenarios to
+−16…−51 dB. **The engine gate found four defects the module's own gate could
+not have seen, and every one of them is a claim that holds for an oscillator
+and not for the voice around it.**
+
+## The measurement that made it findable
+
+Running the identical gate with `EB_FORK_S3` and no wavetable DCO:
+
+    27 of 36 PASS, lag +0.000, most scenarios −85 to −288 dB
+
+Adding `EB_DCO_WT` took every scenario to −16…−51 dB with a clean 16-sample
+lag. Without that baseline the failure could have been blamed on the pitch or
+exp forks, which are already known to be marginal on nine of these scenarios.
+
+## 1. The delay is a pure delay of the OSCILLATOR, not of the VOICE
+
+The module delayed its flat path by half its ring — eight samples — and the
+header argued a uniform delay "IS a pure delay, which the gate can and does
+remove". It is, of the oscillator. The DCO feeds a filter whose cutoff,
+resonance and envelope come from control signals that are **not** delayed, and
+its own chain output is latched back into the modulation CV. Delaying one input
+of a time-varying system does not delay its output.
+
+Swept 0/1/2/4: the pulse and the sub measure **identically** at 1, 2 and 4 and
+break at 0, so only the saw needs pre-ring — its correction has to undo a ramp
+offset as well as band-limit a step. `EB_WT_DELAY` is 2, the smallest the saw
+survives.
+
+## 2. An at-rest voice's wavetable phase was frozen
+
+`eb_render.c`'s at-rest shortcut keeps a silent voice's DCO phase and
+divide-by-two counter running — by advancing `st->dco[v]`, the **trunk's**
+state. Under `EB_DCO_WT` the sounding path runs `st->wt[v]`. A voice that fell
+silent had its wavetable phase stop dead, so when it sounded again the two
+oscillators sat at unrelated points in their cycle.
+
+That is why the idle scenarios were the worst of the 36 and why several
+reported a worst block **above 0 dB** — uncorrelated, not merely wrong.
+
+## 3. The pulse's moving edge was detected TWICE per crossing under PWM
+
+The edge test rebuilt the previous sample's `t` as `pw + prev`, using the
+**current** `pw`. Traced at a modulation depth of 0.2:
+
+    4289  MOVE  frac 0.9986  pw 0.2001  tprev -0.0200  t +0.0000
+    4290  MOVE  frac 0.0006  pw 0.2000  tprev -0.0000  t +0.0200
+
+The signal crossed zero once. A `pw` change of 1e-4 flipped the rebuilt `tprev`
+on its own, and the module corrected the same crossing twice — its output
+reached −1.91 where its own flat level is ±0.85.
+
+The previous `t` is now remembered in the state. Module pulse arm:
+
+| pw sweep | before | after |
+|---|---|---|
+| 0 | −62.9 | −62.9 |
+| 0.05 | −37.1 | −55.5 |
+| 0.2 | −32.2 | −45.9 |
+| 0.4 | −35.1 | −39.6 |
+
+**With `pw` still the wrong form and the right one are identical**, which is
+exactly why a static-coefficient probe could not see it.
+
+A companion note worth keeping: `frac = tprev/(tprev − t)` was tried once
+BEFORE, with the rebuilt `tprev`, and measured −27.7 dB static against −62.9.
+It looks like the more general expression and was the wrong one until the
+stored `tprev` made it true.
+
+## 4. The sub's mip levels were an octave apart
+
+At one level per octave a note halfway between levels uses a table built up to
+half an octave away. Quarter-octave levels — the exponent plus the top two
+mantissa bits, still a shift and a mask — take the pitch-modulated sub from
+−40.9 to −56.5 dB.
+
+**The static column flatters the octave scheme and says so:** every test pitch
+in it is an exact power of two of `INC0`, which is precisely where an octave
+table lands on its own build pitch. The engine never holds a pitch still.
+
+## Where the whole engine stands
+
+| build | verdict |
+|---|---|
+| `EB_FORK_S3` alone | 27/36 PASS, −85 to −288 dB |
+| `+ EB_DCO_WT`, at the start | 0/36, −16 to −51 dB |
+| `+ delay fix` | 0/36, −21 to −56 dB |
+| `+ at-rest fix` | 0/36, −22 to −60 dB |
+| `+ PWM fix` | 0/36, −26 to −60 dB; many scenarios −42 to −51 |
+
+Still failing the −80/−60 bound, and the floor is now two named things: the
+five noise-heavy scenarios sit at −27 to −29 dB and have **not moved through
+any of the four fixes**, and the sub arm remains the weakest of the three.
+
+## The probe's own defects, recorded because they cost time
+
+* **The alignment search ran over ±128 samples** while a saw's period is 25 to
+  60, so it locked onto whole-period offsets and reported the module compared
+  against itself one cycle over.
+* **Four table sweeps measured nothing at all.** `eb_dco_wt.c` includes
+  `"eb_wt_tables.h"` in quotes, so the preprocessor searches `engine_b/` first
+  and `-I` never wins.
+* **The modulation probe used the reference loop's leftover `pw`** as the
+  candidate's base, and reported +1.8 dB at a modulation depth of 0.001.
