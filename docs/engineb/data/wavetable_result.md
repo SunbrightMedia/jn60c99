@@ -114,6 +114,38 @@ dominated by the lowest level and lands near 125 KB **per patch**. It is per
 patch and not per voice only if the per-voice CONDITION scatter factors out as
 a gain, which is **not yet measured**.
 
+## ONE TABLE SET SERVES ALL EIGHT VOICES — measured
+
+The memory cost is per PATCH if the voices share a table set and per VOICE if
+they do not: 125 KB against 750 KB, which is the difference between fitting the
+S3's internal RAM and not.
+
+`tools/engineb/dco_scatter.c`, over all 51 factory patches, comparing the eight
+voices' built `eb_dco_coef`:
+
+| group | worst per-voice relative spread |
+|---|---|
+| SHAPE — `amp_saw/pulse/sub`, `subthr`, `sat_in`, `k3..k11` | **0.000000** |
+| GAIN — `lvl_saw/pulse/sub`, `gn_saw/pulse/sub` | **0.000000** |
+
+**CONDITION's analog scatter does not touch the DCO's waveform shape at all.**
+It enters through the PITCH — the per-voice detune — which at runtime selects
+the mip level and the phase increment. Both are per-voice for free.
+
+### The control, because a zero result is the one that needs proof it ran
+
+Voice 0 against voice 1, raw state bytes after recall, seed and CONDITION:
+**8 of 10,512 bytes differ.** The scatter is present and the zero above is a
+real finding, not a probe that applied nothing.
+
+**The first version of this probe reported zero for both groups and was
+VACUOUS.** It called `juno_bank_apply` alone, which writes VOICE 0 ONLY; the
+other seven still held their power-on values, and "eight copies of the power-on
+value" reads exactly like "the voices agree". The three calls that make voices
+different — `juno_driver_seed_voices`, then `juno_apply_condition`, then
+`juno_apply_unison_spread` — were all missing. The control was added
+afterwards and would have caught it.
+
 ## What is NOT answered
 
 **The pulse width is fixed in this probe, on purpose.** Measured, per voice
