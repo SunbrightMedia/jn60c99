@@ -297,3 +297,65 @@ is writing the shipping module.
 At the plan's c/i that is **4,505 cycles**, which moves 6 voices with full FX
 at 44.1 kHz from 1.58× to **1.17×**, and to 0.91× on the patch a typical
 preset selects.
+
+---
+
+# THE SHIPPING MODULE — built, running, NOT yet accurate
+
+Date 2026-08-06, later the same day.
+
+`engine_b/eb_dco_wt.{h,c}` now exists, its residual tables are generated
+(`tools/engineb/gen_wt_tables.c` -> `engine_b/eb_wt_tables.h`, 116 KB of data),
+and it is wired into `eb_render.c` under `EB_DCO_WT`. It **runs inside the
+engine and produces audio.**
+
+**It is not yet accurate.** Module-level A/B against the 4x oscillator it
+replaces (`tools/engineb/wt_module_ab.c`):
+
+| f0 | reference RMS | wavetable RMS | best-aligned residual |
+|---|---|---|---|
+| 441 Hz | 0.8442 | 0.8647 | **−15.3 dB** |
+| 1,764 Hz | 0.8070 | 0.8678 | −9.1 dB |
+| 7,056 Hz | 0.6366 | 0.9319 | −1.6 dB |
+
+The amplitude is right at low pitch and the waveform is approximately correct.
+−15 dB is not close to the −80 the fork needs.
+
+## Five defects found and fixed getting this far
+
+1. **The pulse's flat value was a constant.** `(t<0 ? −gn : gn) · (t<0 ?
+   sat_lo : sat_hi)` — and `sat_lo` is negative, so the two sign flips
+   cancelled. Measured: the flat output is exactly ±`gn_pulse` following the
+   sign of `t`.
+2. **The residual's reference was a step where it must be the naive arm
+   value.** The saw is a ramp.
+3. **The generator's trace was shorter than its own window.**
+4. **The sub's edge is where its ramp crosses zero**, not where its counter is
+   non-zero — and that crossing coincides with a phase wrap.
+5. **The residual arrived 32 samples after the signal it corrects.** A
+   band-limited step has energy on both sides of its edge, so the flat path
+   must be delayed to meet it. Fixed by writing the flat value into the same
+   ring at +HALF.
+
+## Two defects in the PROBES, both of which blamed the module
+
+* The module A/B built its reference with `eb_dco_step4` while compiling with
+  `EB_DCO_WT` — which implies `EB_QUARTER_OS`, so `step4` emitted one
+  sub-sample and three zeros and the reference was a quarter of the real
+  amplitude. Fixed to call `eb_dco_step` four times, which is one sub-step
+  whatever the flag says.
+* The composite gate's alignment search was pinned at ±8 samples and reported
+  its own limit as the lag. A lag that comes back exactly at the limit is the
+  gate saying "I could not find it".
+
+## What is left
+
+The residual is roughly −15 dB, and the best-aligned lag WANDERS with pitch
+(−68, −119, −106 samples) instead of being the constant delay the design
+predicts. A delay that changes with pitch is not a delay; something in the
+fractional-crossing indexing or the residual's phase reference is still wrong.
+
+**That is the remaining work, and it is the only thing between this module and
+an answer to "is it accurate".** Everything it depends on now exists: the
+tables, the wiring, the module A/B, and a composite gate that can search a
+wide enough lag.

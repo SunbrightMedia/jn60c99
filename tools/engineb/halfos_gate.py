@@ -41,7 +41,7 @@ def lowpass(x, fs, fc=18000.0, ntap=127):
     return np.convolve(x, h, mode="same")
 
 
-def align(a, b, span=8, step=1.0 / 32.0):
+def align(a, b, span=None, step=1.0 / 32.0):
     """Remove the delay between the two streams -- INCLUDING ITS FRACTIONAL
     PART -- and return (b_shifted, lag).
 
@@ -58,6 +58,14 @@ def align(a, b, span=8, step=1.0 / 32.0):
 
     The shift is done in the frequency domain, which gives an exact fractional
     delay rather than an interpolated approximation of one."""
+    # THE SEARCH SPAN IS A PARAMETER because a lever can introduce more than a
+    # couple of samples of latency. The band-limited DCO's residual is centred
+    # 32 taps into its window, so it delays by 32 -- and with the span pinned
+    # at 8 the gate reported the SEARCH LIMIT as the lag and measured a
+    # 24-sample misalignment as a defect. A lag that comes back exactly at the
+    # limit is the gate saying "I could not find it", not a measurement.
+    if span is None:
+        span = float(os.environ.get("EB_ALIGN_SPAN", "8"))
     n = min(len(a), len(b))
     a, b = a[:n], b[:n]
     seg = slice(n // 4, n // 4 + min(200000, n // 2))

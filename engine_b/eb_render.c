@@ -237,7 +237,37 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
          * the fields directly and would otherwise run on stale values. */
         eb_dco_set_edge_thresholds(&st->dco_live[v]);
 #endif
+#if EB_DCO_WT
+        /* THE BAND-LIMITED DCO. It replaces eb_dco_step4 AND the decimator's
+         * FIR; the biquad tail below still runs, because it is rate-dependent
+         * recall data and not anti-aliasing.
+         *
+         * The per-recall fields are copied from the SAME eb_dco_coef the 4x
+         * path uses, so the two builds cannot disagree about a level, a gain
+         * or the saturator -- and if they ever do, it is one struct to look at
+         * rather than two derivations to compare. */
+        {
+            eb_dco_wt_coef *w = &st->wt_live[v];
+            const eb_dco_coef *d = &st->dco_live[v];
+            if (!w->res_saw) eb_dco_wt_bind_tables(w);
+            w->sat_hi = d->sat_hi;   w->sat_lo = d->sat_lo;
+            w->lvl_saw = d->lvl_saw; w->lvl_pulse = d->lvl_pulse;
+            w->lvl_sub = d->lvl_sub;
+            w->gn_saw = d->gn_saw;   w->gn_pulse = d->gn_pulse;
+            w->gn_sub = d->gn_sub;   w->subthr = d->subthr;
+            /* THE INCREMENT COMES FROM dco_live, which already holds
+             * eb_dco_inc_scale(inc) -- inc*4 under EB_QUARTER_OS, which is
+             * exactly one output sample of phase. Writing "inc * 4" here
+             * instead would be a SECOND copy of that rule, and a second copy
+             * is how this project's octave bug survived twice. There is one
+             * expression and this line reads it. */
+            eb_dco_wt_set_pitch(w, st->dco_live[v].inc, pw_live);
+            q[0] = eb_dco_wt_tick(&st->wt[v], w);
+            q[1] = q[2] = q[3] = 0.0f;
+        }
+#else
         eb_dco_step4(&st->dco[v], &st->dco_live[v], q);
+#endif
         /* pwm_out IS CELL 5456, eb_dcoprep's third output, and the decimator's
          * per-sample feedback term. It was discarded here as `(void)pwm_out`
          * while the decimator read a CACHED 5456 -- the tenth inherited defect,

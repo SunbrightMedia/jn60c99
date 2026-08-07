@@ -235,6 +235,15 @@ if os.environ.get("JUNO_EB_VCF_RES_RANGE"):
 if os.environ.get("JUNO_EB_PW_RANGE"):
     CFLAGS = CFLAGS + ["-DEB_PW_RANGE=1"]
 
+# JUNO_EB_DCO_WT=1: the BAND-LIMITED DCO (row 6). Replaces eb_dco_step4 and
+# the decimator's FIR with a flat arithmetic path plus a residual at each edge.
+# It implies EB_QUARTER_OS, so plain null_b's -100 dB is NOT its gate -- the
+# fork standard applies, and the composite is measured by halfos_gate.py with
+# EB_FORK_FLAGS. Running it here reports a number that is real and is not the
+# gate, exactly as for EB_HALF_OS.
+if os.environ.get("JUNO_EB_DCO_WT"):
+    CFLAGS = CFLAGS + ["-DEB_FORK_S3", "-DEB_DCO_WT=1"]
+
 if os.environ.get("JUNO_EB_VCF_RES_LUT"):
     CFLAGS = CFLAGS + ["-DEB_VCF_RES_LUT=%d"
                        % int(os.environ["JUNO_EB_VCF_RES_LUT"])]

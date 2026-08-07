@@ -51,6 +51,7 @@
 #include "eb_vcf_ladder.h"
 #include "eb_vca_hpf.h"
 #include "eb_dco.h"
+#include "eb_dco_wt.h"
 #include "eb_decim.h"
 #include "eb_noise_svf.h"
 #include "eb_cvgate.h"
@@ -150,6 +151,13 @@ typedef struct {
      * or two threads shared one. */
     eb_dco_coef     dco_live[EB_NUM_VOICES];
     unsigned char   dco_live_seeded[EB_NUM_VOICES];
+#if EB_DCO_WT
+    /* THE BAND-LIMITED DCO's per-voice state and its live coefficients. The
+     * residual TABLES are not here: they are shared by every voice and every
+     * pitch (eb_dco_wt.h findings 4 and 5), so they live once in the module. */
+    eb_dco_wt_state wt[EB_NUM_VOICES];
+    eb_dco_wt_coef  wt_live[EB_NUM_VOICES];
+#endif
     eb_decim_state  dec[EB_NUM_VOICES];
     eb_nsvf_state   nsv[EB_NUM_VOICES];
     eb_lfo_state    lfo[EB_NUM_VOICES];

@@ -110,6 +110,22 @@
 #define EB_QUARTER_OS 0
 #endif
 
+/* DEFAULTED HERE, not left to the preprocessor's implicit 0. This file's own
+ * note on EB_DCO_SUBSTEPS says why: a silent 0 from an undefined macro reads
+ * exactly like a deliberate setting. */
+#ifndef EB_DCO_WT
+#define EB_DCO_WT 0
+#endif
+
+/* EB_DCO_WT implies EB_QUARTER_OS: the band-limited DCO produces ONE sample
+ * per sample and the decimator's FIR has nothing left to decimate. The biquad
+ * tail still runs -- it is rate-dependent recall data, not anti-aliasing. */
+#if EB_DCO_WT && !defined(EB_QUARTER_OS_SET)
+#undef EB_QUARTER_OS
+#define EB_QUARTER_OS 1
+#define EB_QUARTER_OS_SET 1
+#endif
+
 #if EB_QUARTER_OS
 #define EB_DCO_SUBSTEPS 1
 #elif EB_HALF_OS

@@ -12,6 +12,15 @@
 
 #include <math.h>
 #include <string.h>
+#include "eb_wt_tables.h"
+
+void eb_dco_wt_bind_tables(eb_dco_wt_coef *c)
+{
+    c->res_saw     = &eb_wt_res_saw[0][0][0];
+    c->res_sub     = &eb_wt_res_sub[0][0][0];
+    c->res_pulse_a = &eb_wt_res_pulse_a[0][0][0];
+    c->res_pulse_b = &eb_wt_res_pulse_b[0][0][0];
+}
 
 /* THERE IS NOTHING TO DERIVE. The residual is pitch-independent (eb_dco_wt.h,
  * finding 5 -- MEASURED at 2.4290 output samples across five octaves), so this
@@ -99,15 +108,21 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
     if (p < prev) {                      /* the saw's wrap, and the pulse's
                                           * FIXED edge, both at the phase wrap */
         float frac = (1.0f - prev) / c->inc;
+        /* THE LEVEL BELONGS ON THE RESIDUAL TOO. The generator normalises
+         * each residual by its step height measured at LEVEL 1, and the flat
+         * path below applies the recalled level -- so a residual added without
+         * it is scaled by 1/lvl relative to the signal it corrects. Measured:
+         * the module's RMS came out 0.85 against the 4x path's 0.21, which is
+         * exactly the missing lvl_pulse of 0.25. */
         eb_wt_add(s, c->res_saw, frac,
-                  -2.0f * c->gn_saw * c->sat_hi);
+                  -2.0f * c->gn_saw * c->sat_hi * c->lvl_saw);
         {   int sb = (int)((c->pw - EB_WT_PW_LO)
                            * (float)EB_WT_PWB_SLICES);
             if (sb < 0) sb = 0;
             if (sb >= EB_WT_PWB_SLICES) sb = EB_WT_PWB_SLICES - 1;
         eb_wt_add(s, c->res_pulse_b
                      + (size_t)sb * EB_WT_RES_OVER * EB_WT_RES_LEN, frac,
-                  c->gn_pulse * (c->sat_hi - c->sat_lo)); }
+                  c->gn_pulse * (c->sat_hi - c->sat_lo) * c->lvl_pulse); }
     }
     {   /* the pulse's MOVING edge, where t crosses zero */
         float tprev = c->pw + prev;
@@ -123,7 +138,8 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
             frac = -tprev / c->inc;
             eb_wt_add(s, c->res_pulse_a
                          + ((size_t)sl * EB_WT_RES_OVER * EB_WT_RES_LEN),
-                      frac, c->gn_pulse * (c->sat_hi - c->sat_lo));
+                      frac, c->gn_pulse * (c->sat_hi - c->sat_lo)
+                            * c->lvl_pulse);
         }
     }
     if (cnt != s->subcnt || (u < 0.0f) != (((((s->subcnt + prev) + 1.0f)
@@ -131,7 +147,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
         /* the sub's own crossing; its step is the same height as the pulse's
          * because both are square */
         eb_wt_add(s, c->res_sub, 0.5f,
-                  c->gn_sub * (c->sat_hi - c->sat_lo));
+                  c->gn_sub * (c->sat_hi - c->sat_lo) * c->lvl_sub);
     }
 
 #endif
@@ -140,8 +156,30 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
     out = (sub * c->lvl_sub)
         + ((saw * c->lvl_saw) + (pulse * c->lvl_pulse));
 
-    /* ---- drain one residual sample and clear the slot behind us */
-    out += s->ring[s->rpos];
+    /* ---- THE FLAT VALUE IS DELAYED TO MEET ITS OWN CORRECTION.
+     *
+     * The residual is centred at tap EB_WT_RES_LEN/2, because a band-limited
+     * step has energy on BOTH sides of its edge. Written from the current
+     * position it therefore lands half a window LATE, and the first build did
+     * exactly that: the flat signal was on time, the correction arrived 32
+     * samples afterwards, and the null measured -21 to -37 dB with the
+     * alignment search pinned at its limit.
+     *
+     * That is NOT something an alignment can remove -- a signal whose
+     * correction is displaced from it is not a delayed signal, it is a wrong
+     * one. So the flat value is written into the same ring at +HALF, where its
+     * own residual's centre already lands. The whole oscillator is then
+     * delayed by HALF samples UNIFORMLY, which IS a pure delay and which the
+     * gate can and does remove.
+     *
+     * The alternative is a minimum-phase residual, which is causal and needs
+     * no delay at all. It is the better answer and it is not this one: it
+     * requires a cepstral factorisation in the generator, and the cost here is
+     * one add. */
+    s->ring[(s->rpos + EB_WT_RES_LEN / 2) & (EB_WT_RES_LEN - 1)] += out;
+
+    /* ---- drain, and clear the slot behind us */
+    out = s->ring[s->rpos];
     s->ring[s->rpos] = 0.0f;
     s->rpos = (s->rpos + 1) & (EB_WT_RES_LEN - 1);
     return out;
