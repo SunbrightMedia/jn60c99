@@ -90,6 +90,25 @@ static void eb_wt_add(eb_dco_wt_state *s, const float *tab, float frac,
     }
 }
 
+void eb_dco_wt_advance(eb_dco_wt_state *s, const eb_dco_wt_coef *c, int n)
+{
+    int i;
+    for (i = 0; i < n; ++i) {
+        const float prev = s->phase;
+        float p = prev + c->inc, cnt = s->subcnt;
+        if (p >= 1.0f) p -= 2.0f;
+        s->phase = p;
+        if (!(p < c->subthr || c->subthr <= prev)) cnt += 2.0f;
+        if (cnt >= 4.0f) cnt = 0.0f;
+        s->subcnt = cnt;
+        /* THE RING IS DRAINED TOO. Leaving it would let a residual scheduled
+         * just before the voice fell silent land on the first sample it
+         * sounds again, EB_WT_RES_LEN samples later. */
+        s->ring[s->rpos] = 0.0f;
+        s->rpos = (s->rpos + 1) & (EB_WT_RES_LEN - 1);
+    }
+}
+
 float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
 {
     const float prev = s->phase;

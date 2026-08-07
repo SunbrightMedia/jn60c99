@@ -76,6 +76,16 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
              * see the free-run note in eb_dco.h, which also explains why this
              * cannot be an O(1) closed form. */
             eb_dco_advance(&st->dco[v], &st->dco_live[v], 1);
+#if EB_DCO_WT
+            /* AND THE WAVETABLE'S OWN STATE, which is the one the sounding
+             * path actually runs. Advancing only the trunk's left an at-rest
+             * voice's wavetable phase frozen; see eb_dco_wt_advance. */
+            {   eb_dco_wt_coef *w = &st->wt_live[v];
+                w->inc    = st->dco_live[v].inc;
+                w->subthr = st->dco_live[v].subthr;
+                eb_dco_wt_advance(&st->wt[v], w, 1);
+            }
+#endif
             continue;
         }
 

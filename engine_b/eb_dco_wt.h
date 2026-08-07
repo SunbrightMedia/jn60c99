@@ -258,6 +258,22 @@ typedef struct {
 void  eb_dco_wt_bind_tables(eb_dco_wt_coef *c);
 
 void  eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc, float pw);
+
+/* FREE-RUN, for an AT-REST voice. The port's DCO keeps its phase and its
+ * divide-by-two counter running while a voice is silent, and eb_render.c's
+ * at-rest shortcut calls eb_dco_advance to do exactly that.
+ *
+ * THAT SHORTCUT ADVANCED THE TRUNK'S STATE ONLY. Under EB_DCO_WT the sounding
+ * path runs THIS module's state instead, so a voice that went at rest had its
+ * wavetable phase stop dead while the trunk's kept running -- and when the
+ * voice sounded again the two oscillators were at unrelated points in their
+ * cycle. It is why the idle scenarios were the worst of the 36 and why several
+ * of them measured a worst block ABOVE 0 dB, which is what uncorrelated looks
+ * like.
+ *
+ * No arms, no residual, no output: the same phase and counter arithmetic the
+ * tick does, and nothing else. */
+void  eb_dco_wt_advance(eb_dco_wt_state *s, const eb_dco_wt_coef *c, int n);
 float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c);
 
 #endif
