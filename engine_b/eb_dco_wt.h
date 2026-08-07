@@ -258,7 +258,11 @@ typedef struct {
 
 typedef struct {
     /* per sample, from the CV chain -- the same two numbers eb_dco_set_pitch
-     * takes today */
+     * takes today. inc4 is the SUB-STEP increment and inc is 4*inc4, the
+     * output-rate one; both are kept because the module needs both and
+     * deriving one from the other at the wrong moment is what caused the
+     * drift described below. */
+    float inc4;
     float inc;
     float pw;
     /* per recall */

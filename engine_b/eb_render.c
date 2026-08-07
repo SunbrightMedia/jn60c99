@@ -81,7 +81,11 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
              * path actually runs. Advancing only the trunk's left an at-rest
              * voice's wavetable phase frozen; see eb_dco_wt_advance. */
             {   eb_dco_wt_coef *w = &st->wt_live[v];
-                w->inc    = st->dco_live[v].inc;
+                /* set_pitch, not a field poke: it is the one place that knows
+                 * inc4 and inc are two different numbers. The at-rest voice
+                 * keeps the last live increment, exactly as eb_dco_advance
+                 * does with dco_live. */
+                eb_dco_wt_set_pitch(w, st->dco_live[v].inc * 0.25f, w->pw);
                 w->subthr = st->dco_live[v].subthr;
                 eb_dco_wt_advance(&st->wt[v], w, 1);
             }
@@ -271,13 +275,14 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
             w->lvl_sub = d->lvl_sub;
             w->gn_saw = d->gn_saw;   w->gn_pulse = d->gn_pulse;
             w->gn_sub = d->gn_sub;   w->subthr = d->subthr;
-            /* THE INCREMENT COMES FROM dco_live, which already holds
-             * eb_dco_inc_scale(inc) -- inc*4 under EB_QUARTER_OS, which is
-             * exactly one output sample of phase. Writing "inc * 4" here
-             * instead would be a SECOND copy of that rule, and a second copy
-             * is how this project's octave bug survived twice. There is one
-             * expression and this line reads it. */
-            eb_dco_wt_set_pitch(w, st->dco_live[v].inc, pw_live);
+            /* THE UNSCALED INCREMENT, which is the SUB-STEP one. The module
+             * advances its phase in four sub-steps exactly as the port does,
+             * because adding 4*inc4 once and adding inc4 four times are the
+             * same number only when the arithmetic is exact -- see the drift
+             * note in eb_dco_wt.c. dco_live[v].inc holds the SCALED value and
+             * passing it here made the module's phase drift away from the
+             * port's over seconds. */
+            eb_dco_wt_set_pitch(w, inc, pw_live);
             q[0] = eb_dco_wt_tick(&st->wt[v], w);
             q[1] = q[2] = q[3] = 0.0f;
         }

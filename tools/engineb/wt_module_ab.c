@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     wc.lvl_saw=dc.lvl_saw; wc.lvl_pulse=dc.lvl_pulse; wc.lvl_sub=dc.lvl_sub;
     wc.gn_saw=dc.gn_saw; wc.gn_pulse=dc.gn_pulse; wc.gn_sub=dc.gn_sub;
     wc.subthr=dc.subthr;
-    eb_dco_wt_set_pitch(&wc, inc4*4.0f, dc.pw);
+    eb_dco_wt_set_pitch(&wc, inc4, dc.pw);
     /* THE BIQUAD RUNS ON THIS SIDE TOO, exactly as eb_render.c does it: the
      * wavetable replaces the decimator's FIR, and the biquad tail stays
      * because it is rate-dependent recall data. Comparing an un-biquadded
@@ -112,7 +112,7 @@ int main(int argc, char **argv)
                 float ph = (float)i * (2.0f * 3.14159265f * 3.0f / (float)N);
                 float pwv = pw0 + pwmod * (float)sin(ph);
                 float inv = inc4 * (1.0f + pmod * (float)sin(ph * 1.7f));
-                eb_dco_wt_set_pitch(&wc, inv * 4.0f, pwv);
+                eb_dco_wt_set_pitch(&wc, inv, pwv);
             }
             w = eb_dco_wt_tick(&ws,&wc);
             /* the biquad alone: feed the sample in and zero the other three,

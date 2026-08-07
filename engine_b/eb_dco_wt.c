@@ -32,17 +32,18 @@ void eb_dco_wt_bind_tables(eb_dco_wt_coef *c)
  * pitch-independent (eb_dco_wt.h, finding 5 -- MEASURED at 2.4290 output samples
  * across five octaves), so they need no level. THE SUB'S IS NOT (finding 9), and
  * the exponent extraction below is the whole of what that costs. */
-void eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc, float pw)
+void eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc4, float pw)
 {
-    c->inc = inc;
-    c->pw  = pw;
+    c->inc4 = inc4;
+    c->inc  = inc4 * 4.0f;
+    c->pw   = pw;
     /* THE SUB'S MIP LEVEL, one per octave, taken from the FLOAT EXPONENT so it
      * costs no logarithm. inc/EB_WT_SUB_INC0 in [1,2) is level 0, [2,4) is
      * level 1, and so on; the biased exponent of that ratio minus 127 IS the
      * level. Only the sub needs this -- see eb_dco_wt.h, finding 9. */
     {   union { float f; unsigned u; } z;
         int e2, j, lv;
-        z.f = inc * (1.0f / EB_WT_SUB_OINC0);
+        z.f = c->inc * (1.0f / EB_WT_SUB_OINC0);
         e2 = (int)((z.u >> 23) & 0xFFu) - 127;
         /* the top two mantissa bits split each octave into four */
         j  = (int)((z.u >> 21) & 3u);
@@ -104,8 +105,11 @@ void eb_dco_wt_advance(eb_dco_wt_state *s, const eb_dco_wt_coef *c, int n)
     int i;
     for (i = 0; i < n; ++i) {
         const float prev = s->phase;
-        float p = prev + c->inc, cnt = s->subcnt;
-        if (p >= 1.0f) p -= 2.0f;
+        float p = prev, cnt = s->subcnt;
+        p += c->inc4; if (p >= 1.0f) p -= 2.0f;
+        p += c->inc4; if (p >= 1.0f) p -= 2.0f;
+        p += c->inc4; if (p >= 1.0f) p -= 2.0f;
+        p += c->inc4; if (p >= 1.0f) p -= 2.0f;
         s->phase = p;
         if (!(p < c->subthr || c->subthr <= prev)) cnt += 2.0f;
         if (cnt >= 4.0f) cnt = 0.0f;
@@ -130,8 +134,30 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      * (docs/engineb/data/dco_real_cost.md), so they are not reproduced on a
      * path whose whole purpose is to be cheap. A phase that could reach them
      * would need an increment above 2.0, which is above Nyquist. */
-    p = prev + c->inc;
-    if (p >= 1.0f)  p -= 2.0f;
+    /* FOUR SUB-STEPS, NOT ONE STEP OF FOUR TIMES THE SIZE, and this is the
+     * whole of the module's remaining error.
+     *
+     * The port advances its phase by inc4 four times per output sample and
+     * wraps after each. Adding 4*inc4 once is the same number only when the
+     * arithmetic is exact; in float it is not, and the two phases DRIFT.
+     *
+     * MEASURED, per edge, at inc4 0.00187: the error does not depend on the
+     * crossing fraction at all -- it GROWS MONOTONICALLY with time, 0.0067 at
+     * the first edge, 0.050 by the twenty-fourth, 0.229 worst over 111. That
+     * is a drift and nothing else looks like one.
+     *
+     * It also explains why some pitches measured -65 dB and their neighbours
+     * -37: at a pitch where inc4 is an exact binary fraction, 4*inc4 and four
+     * additions of inc4 agree bit for bit and there is no drift. Those were
+     * the pitches this module was sampled at, which is how the error hid.
+     *
+     * The cost is three adds and three compares -- against a DCO sub-step
+     * that is thirty times that. */
+    p = prev;
+    p += c->inc4; if (p >= 1.0f) p -= 2.0f;
+    p += c->inc4; if (p >= 1.0f) p -= 2.0f;
+    p += c->inc4; if (p >= 1.0f) p -= 2.0f;
+    p += c->inc4; if (p >= 1.0f) p -= 2.0f;
     s->phase = p;
 
     /* ---- the three arms, FLAT. sat_hi/sat_lo are the saturator evaluated at
