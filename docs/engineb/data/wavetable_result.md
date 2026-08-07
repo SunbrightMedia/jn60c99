@@ -896,3 +896,57 @@ written. But the residual is built with the same constant and absorbs the
 offset, so the constant is not independently determinable that way — and the
 sweep says 3.875. Recorded because the measurement was right and the inference
 from it was wrong.
+
+---
+
+# 2026-08-08 — THE FLAT PATH IS 253 INSTRUCTIONS, NOT 72
+
+Re-priced on the real Xtensa compiler
+(`/root/.espressif/tools/xtensa-esp-elf/.../xtensa-esp32s3-elf-gcc`, which IS
+installed — an earlier search of this container looked in the wrong places and
+concluded it was absent).
+
+| | instructions |
+|---|---|
+| `eb_dco_wt_tick`, flat path, executed | **253** |
+| `eb_dco_wt_tick`, static incl. all edge blocks | 514 |
+| `eb_dco_wt_advance` | 406 static |
+| `eb_dco_wt_set_pitch` | 24 |
+
+**Executed, not static.** The static count with the real `eb_dco_wrap` is 474
+and contains four `fmodf` calls in the wrap's slow arms — MEASURED taken 0
+times in 61,000,000 sub-steps, so counting them would price a path the
+oscillator never runs. The 253 figure is with those arms removed, which makes
+static equal executed.
+
+## Why it grew from 72
+
+Every one of these was a correctness fix measured this session:
+
+* **four phase sub-steps instead of one step of 4×inc** — the drift fix, worth
+  up to 38 dB;
+* **the port's own `eb_dco_wrap`** in place of `if (p >= 1) p -= 2`, which has
+  a negative arm, a rounding-preserving form and an exclusive boundary;
+* **the lead and its per-sample correction**, without which the DCO's delay
+  skews the noise mix it feeds;
+* **the stored `tprev`**, without which the pulse's edge fires twice per
+  crossing under PWM.
+
+## The consequence, stated rather than buried
+
+`REAL_TIME.md`'s ladder priced this module at 72 instructions and concluded
+**0.90× of budget on the worst patch**. At 253 the module costs about
+1,206 more instructions per sample at six voices; at the measured voice-chain
+c/i of 1.56 that is roughly **+1,900 cycles against a 10,884-cycle two-core
+budget**, which moves the worst patch to roughly **1.07× — just over.**
+
+That is an ESTIMATE built on `REAL_TIME.md`'s own arithmetic, not a new
+end-to-end pricing run, and it is not a silicon measurement. But the direction
+is not in doubt: **the accuracy work of this session has consumed the speed
+margin**, and the two halves of the goal now have to be reconciled rather than
+assumed compatible.
+
+For scale, what the module replaces: `eb_dco_step4` is 482 static and
+`eb_decim_tick`'s 4× arm 151, and `dco_real_cost.md` measured the real 4× DCO
+at ~1,451 instructions per voice per sample. So the module is still roughly a
+5× saving on that block — just a smaller one than the plan assumed.
