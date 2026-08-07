@@ -493,7 +493,29 @@ static void emit2(const char *name, float pw, int arm, int which,
                  * the phase wrap at p = 1. */
                 double pe = (which == 1) ? -(double)w
                           : (which == 2) ? (double)RC_subthr : 1.0;
-                double target = (double)o / EB_WT_RES_OVER;
+                /* ROW 0 IS BUILT A HAIR ABOVE ZERO, and this is the fault
+                 * that made the saw a lottery in pitch.
+                 *
+                 * At target EXACTLY 0 the crossing sits on the sample
+                 * boundary, and the detection then lands in the sample BEFORE
+                 * the one every other row is detected in. Row 0 came out
+                 * holding row 63's content: the saw's rows form one smooth
+                 * family whose peak runs +0.493 down through zero to -0.501
+                 * across the sub-positions, and row 0 sat at -0.492, which is
+                 * row 63's value, a whole sample out.
+                 *
+                 * Any crossing landing in the first 1/64 of a sample was then
+                 * corrected one sample late. MEASURED, by refusing to use row
+                 * 0 at all: inc 0.0115 goes -29.2 to -59.7 dB and inc 0.0155
+                 * goes -30.0 to -48.3, while every other pitch does not move.
+                 *
+                 * A quarter of a sub-position above zero puts the crossing
+                 * unambiguously inside the sample. The position error is
+                 * 1/256 of a sample, which is far below what the resolution
+                 * itself carries, and it costs nothing at run time -- a
+                 * clamp in the tick would have cost a compare per edge. */
+                double target = (o == 0) ? (0.25 / EB_WT_RES_OVER)
+                                         : ((double)o / EB_WT_RES_OVER);
                 double p0 = pe - dp * (200.0 + target), got = -1.0;
                 int it;
                 p0 = fmod(p0 + 1.0, 2.0); if (p0 < 0.0) p0 += 2.0; p0 -= 1.0;
