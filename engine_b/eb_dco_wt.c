@@ -341,7 +341,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      * no delay at all. It is the better answer and it is not this one: it
      * requires a cepstral factorisation in the generator, and the cost here is
      * one add. */
-    s->ring[(s->rpos + EB_WT_RES_LEN / 2) & (EB_WT_RES_LEN - 1)] += out;
+    s->ring[(s->rpos + EB_WT_DELAY) & (EB_WT_RES_LEN - 1)] += out;
 
     /* ---- drain, and clear the slot behind us */
     out = s->ring[s->rpos];

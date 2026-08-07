@@ -127,6 +127,34 @@
 #define EB_WT_RES_OVER   64
 #endif
 
+/* THE FLAT PATH'S DELAY, AND THE DEFECT ONLY THE WHOLE ENGINE COULD FIND.
+ *
+ * A band-limited step has energy on BOTH sides of its edge, so the residual
+ * must start before the crossing and the flat path must be delayed to meet it.
+ * That delay was EB_WT_RES_LEN/2 -- eight samples -- on the reasoning that a
+ * uniform delay of the whole oscillator "IS a pure delay, which the gate can
+ * and does remove".
+ *
+ * IT IS A PURE DELAY OF THE OSCILLATOR AND NOT OF THE VOICE. The DCO feeds a
+ * filter whose cutoff, resonance and envelope are computed from control
+ * signals that are NOT delayed, and it is mixed with noise that is not delayed
+ * either. Delaying one input of a time-varying system does not delay its
+ * output; it detunes the timing inside it, and no alignment can undo that.
+ *
+ * MEASURED, and the module's own gate could not have seen it. Per arm the
+ * module measures -39 to -72 dB against the port's 4x path. Put in the engine
+ * with an eight-sample delay it took all 36 whole-engine scenarios to -16 to
+ * -51 dB, with the gate's alignment reporting a clean 16-sample lag -- while
+ * the SAME engine without this module passes 27 of 36 at lag +0.000.
+ *
+ * So the delay is matched to the one the module REMOVES: the port's own
+ * decimator FIR, 3.875 samples. Everything downstream then sees the timing it
+ * saw before. The residual keeps EB_WT_DELAY taps before the step instead of
+ * half the window. */
+#ifndef EB_WT_DELAY
+#define EB_WT_DELAY      4
+#endif
+
 /* THE PULSE-WIDTH GRID. Measured range of pw over all 36 scenarios is
  * [-0.015, 0.939]; the grid spans [-0.05, 1.00] at 0.01, the spacing the
  * convergence measurement showed to be at the limit already.

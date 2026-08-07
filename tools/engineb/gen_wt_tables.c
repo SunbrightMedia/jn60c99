@@ -40,7 +40,10 @@
 #endif
 
 #define OS        64          /* fine steps per OUTPUT sample when building */
-#define HALF      (EB_WT_RES_LEN / 2)
+/* HALF IS NOW THE FLAT PATH'S DELAY, NOT HALF THE WINDOW. See eb_dco_wt.h:
+ * an eight-sample delay is a pure delay of the OSCILLATOR and a timing error
+ * inside the VOICE. Both this file and the tick read EB_WT_DELAY. */
+#define HALF      (EB_WT_DELAY)
 /* THE BUILD PITCH must make the period MUCH longer than the residual window,
  * or a second edge falls inside it. At 0.01 the period is 50 output samples
  * and the 64-sample window always contained two edges -- the pulse residuals
