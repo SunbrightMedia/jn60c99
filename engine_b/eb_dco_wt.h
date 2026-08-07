@@ -174,8 +174,26 @@
 #define EB_WT_SAWGD 3.875f
 #endif
 
+/* SIX, RE-SWEPT ONCE THE LEAD MADE IT FREE. This was 2, chosen when the
+ * module's delay was a raw timing error inside the voice and every sample of
+ * it cost accuracy downstream. The lead removed that cost entirely -- the
+ * oscillator runs EB_WT_DELAY samples ahead and the gate's alignment comes
+ * back at +0.000 for every value -- so the constraint that picked 2 no longer
+ * exists, and the constant was never re-measured against it.
+ *
+ * MEASURED, saw arm through the correct filter, lag +0.000 throughout:
+ *
+ *   DELAY   0.0005   0.002    0.004    0.0075
+ *     2     -51.1    -42.6    -45.0    -38.9
+ *     4     -65.7    -56.7    -57.1    -47.5
+ *     6     -69.8    -61.4    -57.7    -47.3
+ *     8     -69.8    -61.4    -57.7    -47.3
+ *
+ * 8 is identical to 6, so 6 is the knee. The sub does not move at all -- it is
+ * square, and only the SAW needs pre-ring, which is the same split DELAY 0/1/2
+ * found before. */
 #ifndef EB_WT_DELAY
-#define EB_WT_DELAY      2
+#define EB_WT_DELAY      6
 #endif
 
 /* THE PULSE-WIDTH GRID. Measured range of pw over all 36 scenarios is
