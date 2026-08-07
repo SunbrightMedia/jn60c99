@@ -12,6 +12,7 @@
 
 #include <math.h>
 #include <string.h>
+#include "eb_dco.h"      /* for eb_dco_wrap -- the PORT'S OWN wrap */
 #include "eb_wt_tables.h"
 
 #ifdef EB_WT_TRACE
@@ -110,10 +111,8 @@ void eb_dco_wt_advance(eb_dco_wt_state *s, const eb_dco_wt_coef *c, int n)
     if (!s->primed) {
         int k;
         s->primed = 1;
-        for (k = 0; k < EB_WT_DELAY * 4; ++k) {
-            s->phase += c->inc4;
-            if (s->phase >= 1.0f) s->phase -= 2.0f;
-        }
+        for (k = 0; k < EB_WT_DELAY * 4; ++k)
+            s->phase = eb_dco_wrap(s->phase + c->inc4);
         s->tprev = c->pw + s->phase;
         s->inc4_prev = c->inc4;
     }
@@ -122,18 +121,17 @@ void eb_dco_wt_advance(eb_dco_wt_state *s, const eb_dco_wt_coef *c, int n)
      * exactly as the tick maintains it, or the voice comes back out of rest
      * with the wrong one. */
     if (c->inc4 != s->inc4_prev) {
-        s->phase += (float)(EB_WT_DELAY * 4) * (c->inc4 - s->inc4_prev);
-        if (s->phase >= 1.0f) s->phase -= 2.0f;
-        if (s->phase < -1.0f) s->phase += 2.0f;
+        s->phase = eb_dco_wrap(s->phase
+                    + (float)(EB_WT_DELAY * 4) * (c->inc4 - s->inc4_prev));
         s->inc4_prev = c->inc4;
     }
     for (i = 0; i < n; ++i) {
         const float prev = s->phase;
-        float p = prev, cnt = s->subcnt;
-        p += c->inc4; if (p >= 1.0f) p -= 2.0f;
-        p += c->inc4; if (p >= 1.0f) p -= 2.0f;
-        p += c->inc4; if (p >= 1.0f) p -= 2.0f;
-        p += c->inc4; if (p >= 1.0f) p -= 2.0f;
+        float cnt = s->subcnt;
+        float p = eb_dco_wrap(prev + c->inc4);
+        p = eb_dco_wrap(p + c->inc4);
+        p = eb_dco_wrap(p + c->inc4);
+        p = eb_dco_wrap(p + c->inc4);
         s->phase = p;
         if (!(p < c->subthr || c->subthr <= prev)) cnt += 2.0f;
         if (cnt >= 4.0f) cnt = 0.0f;
@@ -165,10 +163,8 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
     if (!s->primed) {
         int k;
         s->primed = 1;
-        for (k = 0; k < EB_WT_DELAY * 4; ++k) {
-            s->phase += c->inc4;
-            if (s->phase >= 1.0f) s->phase -= 2.0f;
-        }
+        for (k = 0; k < EB_WT_DELAY * 4; ++k)
+            s->phase = eb_dco_wrap(s->phase + c->inc4);
         s->tprev = c->pw + s->phase;
         /* THE PRIME IS THE FIRST LEAD, so record the increment it used. Left
          * at zero the correction below reads the whole lead as a CHANGE and
@@ -181,9 +177,8 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      * lives in the phase as EB_WT_DELAY*4*inc4; when inc4 moves, the phase
      * offset that represents two samples moves with it. */
     if (c->inc4 != s->inc4_prev) {
-        s->phase += (float)(EB_WT_DELAY * 4) * (c->inc4 - s->inc4_prev);
-        if (s->phase >= 1.0f) s->phase -= 2.0f;
-        if (s->phase < -1.0f) s->phase += 2.0f;
+        s->phase = eb_dco_wrap(s->phase
+                    + (float)(EB_WT_DELAY * 4) * (c->inc4 - s->inc4_prev));
         s->inc4_prev = c->inc4;
     }
 
@@ -208,11 +203,10 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      *
      * The cost is three adds and three compares -- against a DCO sub-step
      * that is thirty times that. */
-    p = prev;
-    p += c->inc4; if (p >= 1.0f) p -= 2.0f;
-    p += c->inc4; if (p >= 1.0f) p -= 2.0f;
-    p += c->inc4; if (p >= 1.0f) p -= 2.0f;
-    p += c->inc4; if (p >= 1.0f) p -= 2.0f;
+    p = eb_dco_wrap(prev  + c->inc4);
+    p = eb_dco_wrap(p     + c->inc4);
+    p = eb_dco_wrap(p     + c->inc4);
+    p = eb_dco_wrap(p     + c->inc4);
     s->phase = p;
 
     /* ---- the three arms, FLAT. sat_hi/sat_lo are the saturator evaluated at
@@ -251,8 +245,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
          * sharp minimum at 3.875 (-37.7 dB) against -28.7 at 3.0 and -27.7 at
          * 5.0, and 3.875 is what the tap map's centroid gives and what feeding
          * a ramp through the FIR measures. */
-        float pd = p - (EB_WT_SAWGD) * c->inc;
-        if (pd < -1.0f) pd += 2.0f;
+        float pd = eb_dco_wrap(p - (EB_WT_SAWGD) * c->inc);
         saw = (pd * c->gn_saw) * c->sat_hi;
     }
 
@@ -374,10 +367,8 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      *
      * pd_prev is the PREVIOUS sample's delayed phase, wrapped the same way, so
      * the test is the same "did it wrap" question the raw phase asks. */
-    {   float pd_prev = prev - (EB_WT_SAWGD) * c->inc;
-        float pd_now  = p    - (EB_WT_SAWGD) * c->inc;
-        if (pd_prev < -1.0f) pd_prev += 2.0f;
-        if (pd_now  < -1.0f) pd_now  += 2.0f;
+    {   float pd_prev = eb_dco_wrap(prev - (EB_WT_SAWGD) * c->inc);
+        float pd_now  = eb_dco_wrap(p    - (EB_WT_SAWGD) * c->inc);
         if (pd_now < pd_prev)
             eb_wt_add(s, c->res_saw, (1.0f - pd_prev) / c->inc, h_saw);
     }
