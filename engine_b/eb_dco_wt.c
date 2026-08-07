@@ -115,6 +115,17 @@ void eb_dco_wt_advance(eb_dco_wt_state *s, const eb_dco_wt_coef *c, int n)
             if (s->phase >= 1.0f) s->phase -= 2.0f;
         }
         s->tprev = c->pw + s->phase;
+        s->inc4_prev = c->inc4;
+    }
+    /* AND HOLD THE LEAD HERE TOO. An at-rest voice's increment still moves --
+     * the glide and the LFO keep running -- so the lead has to be maintained
+     * exactly as the tick maintains it, or the voice comes back out of rest
+     * with the wrong one. */
+    if (c->inc4 != s->inc4_prev) {
+        s->phase += (float)(EB_WT_DELAY * 4) * (c->inc4 - s->inc4_prev);
+        if (s->phase >= 1.0f) s->phase -= 2.0f;
+        if (s->phase < -1.0f) s->phase += 2.0f;
+        s->inc4_prev = c->inc4;
     }
     for (i = 0; i < n; ++i) {
         const float prev = s->phase;
@@ -159,6 +170,21 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
             if (s->phase >= 1.0f) s->phase -= 2.0f;
         }
         s->tprev = c->pw + s->phase;
+        /* THE PRIME IS THE FIRST LEAD, so record the increment it used. Left
+         * at zero the correction below reads the whole lead as a CHANGE and
+         * applies it a second time -- measured as the module running two
+         * samples EARLY instead of on time. */
+        s->inc4_prev = c->inc4;
+    }
+
+    /* HOLD THE LEAD AT EB_WT_DELAY SAMPLES, whatever the pitch does. The lead
+     * lives in the phase as EB_WT_DELAY*4*inc4; when inc4 moves, the phase
+     * offset that represents two samples moves with it. */
+    if (c->inc4 != s->inc4_prev) {
+        s->phase += (float)(EB_WT_DELAY * 4) * (c->inc4 - s->inc4_prev);
+        if (s->phase >= 1.0f) s->phase -= 2.0f;
+        if (s->phase < -1.0f) s->phase += 2.0f;
+        s->inc4_prev = c->inc4;
     }
 
     prev = s->phase;   /* AFTER the prime, or the first sample sees a jump */

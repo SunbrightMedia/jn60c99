@@ -273,6 +273,15 @@ typedef struct {
      * EB_WT_DELAY samples AHEAD and the ring puts it back on time. Primed
      * once, on the first tick, from the increment then in force. */
     int   primed;
+    /* THE INCREMENT THE LEAD WAS BUILT WITH. The lead is a PHASE offset of
+     * EB_WT_DELAY*4*inc4, so a lead that is two samples at one pitch is not two
+     * samples at another. Priming once and leaving it made the lead drift with
+     * every pitch change: MONO glide measured -18.2 dB against -41.1 before the
+     * lead existed, and the gate's alignment came back at +0, -2, -4.031 and
+     * -4.000 on different scenarios -- four different delays in one engine,
+     * which is what a pitch-dependent lead looks like. The correction below
+     * keeps it exact for three operations a sample. */
+    float inc4_prev;
     /* ACTIVE RESIDUALS. An edge crossed at a fractional position schedules a
      * residual that is added over the next EB_WT_RES_LEN samples. Three arms
      * can each cross in one sample, and a very high note can cross twice, so
