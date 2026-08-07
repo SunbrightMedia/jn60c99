@@ -709,3 +709,53 @@ any of the four fixes**, and the sub arm remains the weakest of the three.
   and `-I` never wins.
 * **The modulation probe used the reference loop's leftover `pw`** as the
   candidate's base, and reported +1.8 dB at a modulation depth of 0.001.
+
+## A correction to the per-arm figures above: they were sampled at flattering pitches
+
+Every pitch in the per-arm tables earlier in this document is an exact binary
+fraction of the base increment. Sampling between them:
+
+| inc | saw |
+|---|---|
+| 0.0025 | −65.3 |
+| 0.00187 | **−37.6** |
+| 0.0031 | −45.0 |
+| 0.0043 | −62.4 |
+| 0.005 | −58.0 |
+| 0.0067 | −48.4 |
+| 0.0091 | −49.0 |
+| 0.01 | −46.9 |
+| 0.013 | −45.5 |
+| 0.017 | −49.7 |
+| 0.02 | −49.1 |
+
+**The honest figure is about −45 to −50 dB typical, −37.6 worst**, not the −58
+to −72 the binary-fraction pitches showed. It was first read as a clean
+"binary versus not" split; inc 0.0043 is not binary and measures −62.4, so that
+reading is wrong too. What is true is only that the earlier sample points were
+not representative.
+
+That typical figure is consistent with the whole engine's −26 to −50 dB, which
+the isolated −60s never were.
+
+### What the remaining error is NOT
+
+Four candidates measured and eliminated at inc 0.00187, each by execution:
+
+* **not sub-position resolution** — OVER 64, 128 and 256 are identical to
+  0.1 dB;
+* **not window truncation or pre-ring** — RES_LEN 16/32/64 and DELAY 2/8/16 are
+  identical;
+* **not the build pitch** — tables built at 0.0005, 0.00187 and 0.004 give the
+  same result at every test pitch, so finding 5 does hold for the saw and the
+  pulse;
+* **not a constant offset in the fraction convention** — sweeping ±0.25 and
+  ±0.5 makes it monotonically worse, so 0 is right.
+
+And the tables themselves are correct: measuring the correction the module
+actually needs (`(port − flat)/h`, printed per edge) gives +0.012, +0.273,
+−0.288, −0.016 at frac 0.4603, against the table's own row for frac 0.5 at
++0.014, +0.281, −0.281, −0.014.
+
+So the residual is right and the error is in something about applying it that
+varies edge to edge. That is where the next work goes.
