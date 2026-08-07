@@ -101,6 +101,37 @@ def main():
     ref = null_b.render_side(build(tmp, "ref", []), False, tmp, "ref")
     cand = null_b.render_side(build(tmp, "cand", FORK_FLAGS), False, tmp, "cand")
 
+    # THE TEETH. A gate that has never been seen to fail is not a gate, and
+    # this one PASSED on its first run at 0.40 dB worst band -- which is
+    # exactly when to distrust it. Each case perturbs the CANDIDATE stream by
+    # a defect a listener would hear, and the gate must fail on every one.
+    teeth = os.environ.get("EB_SONIC_TEETH")
+    if teeth:
+        print("TEETH: perturbing the candidate with '%s'" % teeth)
+
+    def perturb(x, fs):
+        if not teeth:
+            return x
+        if teeth.startswith("gain"):
+            return x * float(teeth[4:])
+        if teeth.startswith("lp"):        # low-pass: kills the high bands
+            fc = float(teeth[2:])
+            n = np.arange(127) - 63.0
+            h = 2 * (fc / fs) * np.sinc(2 * (fc / fs) * n) * np.hamming(127)
+            return np.convolve(x, h / h.sum(), mode="same")
+        if teeth.startswith("noise"):     # raise the floor by adding noise
+            db = float(teeth[5:])
+            rms = np.sqrt(np.mean(x * x)) or 1.0
+            rng = np.random.RandomState(1)
+            return x + rng.randn(len(x)) * rms * (10 ** (db / 20.0))
+        if teeth.startswith("tilt"):      # gentle spectral tilt, one pole
+            a = float(teeth[4:])
+            y = np.copy(x)
+            for i in range(1, len(y)):
+                y[i] = x[i] + a * y[i - 1]
+            return y * (np.sqrt(np.mean(x * x)) / (np.sqrt(np.mean(y * y)) or 1.0))
+        raise SystemExit("unknown teeth case " + teeth)
+
     print("=== SONIC GATE @ %.0f Hz — third-octave level match, bound %.1f dB "
           "per band ===" % (rate, BAND_DB))
     worst_all, fails = 0.0, 0
@@ -112,7 +143,7 @@ def main():
         if np.mean(a * a) < 1e-12:
             print("  %-26s silent, skipped" % tag)
             continue
-        pa, pb = spectrum(a, rate), spectrum(b, rate)
+        pa, pb = spectrum(a, rate), spectrum(perturb(b, rate), rate)
         worst, wf = 0.0, 0.0
         for lo_f, hi_f, lo, hi in bands(rate, 8192):
             ea, eb = pa[lo:hi].sum(), pb[lo:hi].sum()
