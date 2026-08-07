@@ -221,7 +221,17 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
                                              * 0.5f) - 1.0f) < 0.0f)) {
         /* the sub's own crossing; its step is the same height as the pulse's
          * because both are square */
-        eb_wt_add(s, c->res_sub, 0.5f, h_sub);
+        /* THE SUB'S OWN FRACTION, not a hardcoded 0.5. Its ramp is
+         * u = ((cnt + p + 1)/2) - 1, which is zero exactly when cnt + p = 1,
+         * and with cnt in {0,2} that means p = +/-1 -- so the sub's crossing
+         * COINCIDES WITH THE PHASE WRAP and shares its fraction.
+         *
+         * With 0.5 hardcoded the sub was the only arm that did not improve
+         * when the tables were rebuilt at exact fractional positions: it stayed
+         * at -25.6 dB while the pulse went from -27.0 to -61.7. A table indexed
+         * by a fraction the caller never supplies is a table indexed by
+         * nothing. */
+        eb_wt_add(s, c->res_sub, (1.0f - prev) / c->inc, h_sub);
     }
     }
 

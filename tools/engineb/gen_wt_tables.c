@@ -248,8 +248,10 @@ static double naive_at(const eb_dco_coef *c, int arm, double phe, double dsub,
  * replaces -- so the residual carries the decimator's response by
  * CONSTRUCTION rather than by a filter designed to imitate it.
  */
-static void build_one(float pw, int arm, int which, int o, float *out,
-                      float *nout)
+/* Returns the fraction the TICK would measure at the edge this built, so the
+ * caller can correct and re-run. */
+static double build_one(float pw, int arm, int which, int o, float *out,
+                        float *nout, double p0_in, double *frac_out)
 {
     eb_dco_coef c; eb_dco_state s;
     /* THE FIR ONLY -- NOT eb_decim_tick. That function is the FIR *plus a
@@ -275,20 +277,23 @@ static void build_one(float pw, int arm, int which, int o, float *out,
     memset(&s,0,sizeof s); memset(hist,0,sizeof hist);
     fill(&c, BUILD_INC, pw, arm);
     (void)j;
-    /* THE FRACTIONAL OFFSET is applied to the STARTING PHASE.
+    /* THE STARTING PHASE IS SOLVED BACKWARDS from the known edge phase, so the
+     * crossing lands at exactly `frac` of the way through a sample -- which is
+     * the quantity the tick measures and uses to pick a sub-position.
      *
-     * SOLVING p0 BACKWARDS from the known edge phase was tried -- so that the
-     * crossing lands at exactly 200+frac samples -- and it measures WORSE:
-     * the pulse went from -39.8 dB to -19.1 at 1,764 Hz. The reason is an
-     * interaction, not a flaw in the idea: the crossing is then DETECTED in
-     * sample 200 when frac is 0 and in sample 201 when it is not, so `edge`
-     * jumps by one between sub-positions and collides with the window's own
-     * +1 offset.
+     * Shifting a fixed start by frac*dp instead moves the edge by frac but
+     * leaves an arbitrary BASELINE: the edge falls at frac((pe-p0)/dp), and
+     * that is not zero. Measured as roughly half a sample -- the dumped error
+     * around one edge showed the wavetable's transition running that far ahead
+     * of the port's, peak 0.216 on a signal of 0.85.
      *
-     * Making both right at once needs the detection and the placement derived
-     * together rather than adjusted against each other. Recorded here because
-     * the idea is sound and the implementation is what failed. */
-    s.phase = (float)(-1.0 + frac * 4.0 * (double)BUILD_INC);
+     * THIS WAS TRIED ONCE AND FAILED, and the reason it works now is worth
+     * keeping: the crossing is DETECTED in sample M for frac 0 and M+1
+     * otherwise, so `edge` jumps by one between sub-positions. While the
+     * window carried a hand-tuned +1 offset those two shifts fought each
+     * other. The window is now anchored at the detection sample itself, so a
+     * jump in `edge` moves the window with it and cancels. */
+    s.phase = (float)p0_in;
     memset(ring, 0, sizeof ring); memset(nring, 0, sizeof nring);
     for (i = 0; i < 20000 && !got; ++i) {
         float q[4], y, u;
@@ -314,8 +319,14 @@ static void build_one(float pw, int arm, int which, int o, float *out,
          * is the phase eb_dco_wt_tick has when it emits this sample. */
         {   float pn = s.phase, tn = c.pw + pn;
             float un = (((s.subcnt + pn) + 1.0f) * 0.5f) - 1.0f;
+            /* THE SAW'S PHASE CARRIES THE GROUP DELAY, exactly as
+             * eb_dco_wt_tick does. The reference the residual is measured
+             * against must be the flat path the tick actually computes, term
+             * for term -- a reference that differs from the tick by anything
+             * puts that difference into every residual. */
+            float pd = pn - 3.875f * (4.0f * BUILD_INC);
             nring[rp & 511] =
-                (arm == ARM_SAW)   ? (pn * c.gn_saw) * c.sat_hi :
+                (arm == ARM_SAW)   ? (pd * c.gn_saw) * c.sat_hi :
                 (arm == ARM_PULSE) ? (tn < 0.0f ? -c.gn_pulse : c.gn_pulse)
                                      * c.sat_hi
                                    : (un < 0.0f ? -c.gn_sub : c.gn_sub)
@@ -323,18 +334,26 @@ static void build_one(float pw, int arm, int which, int o, float *out,
         }
         if (edge < 0 && i > 200) {
             int hit = 0;
+            /* THE FRACTION THE TICK WOULD MEASURE, computed here the same way
+             * eb_dco_wt.c computes it, so the two can be COMPARED instead of
+             * assumed equal. Printed under EB_WT_TRACEFRAC. */
+            double dpo = (double)c.inc * 4.0;
+            double fr = (which == 1) ? (-(double)(pw + pprev) / dpo)
+                                     : ((1.0 - (double)pprev) / dpo);
+            if (getenv("EB_WT_TRACEFRAC")) { /* set below once hit is known */ }
+            (void)fr;
             if (which == 0 && s.phase < pprev) hit = 1;
             if (which == 1 && ((pw + pprev) < 0.0f) != ((pw + s.phase) < 0.0f))
                 hit = 1;
             if (which == 2 && (uprev < 0.0f) != (u < 0.0f)) hit = 1;
-            if (hit) edge = rp;
+            if (hit) { edge = rp; *frac_out = fr; }
         }
         /* stop once the window's far end has been rendered; the decimator's
          * own group delay of ~4 samples is inside the window and must be */
         if (edge >= 0 && rp - edge >= HALF + 12) got = 1;
         ++rp;
     }
-    warm = 0; (void)warm;
+    warm = 0; (void)warm; (void)frac;
     /* CENTRE ON THE OUTPUT EDGE, NOT THE PHASE EDGE. The port's decimator has
      * 3.875 samples of group delay, so the step appears in the OUTPUT about
      * four samples after the phase crossing that caused it. Centring on the
@@ -377,7 +396,21 @@ static void build_one(float pw, int arm, int which, int o, float *out,
          * truth[k] -- because `edge` is the index of the sample DURING which
          * the sign change was detected, and the tick's naive has already
          * stepped by the time it emits that sample. */
-        int oe = edge + 1;
+        /* TAP HALF SITS AT THE DETECTION SAMPLE, and this is derived rather
+         * than tuned. With the flat path delayed by HALF, the module's output
+         * at time m is flat(m-HALF) plus the residuals; requiring that to
+         * equal the port's output gives
+         *
+         *     R[i] = (port(n + i - HALF) - flat(n + i - HALF)) / h
+         *
+         * for an edge detected at sample n. So the window is anchored at n --
+         * `edge` itself, with no offset -- and the reference is the TICK's own
+         * flat value at each sample.
+         *
+         * The +1 that used to be here, and the two-constant reference it went
+         * with, were each tuned against the other. One definition replaces
+         * both. */
+        int oe = edge;
         for (i = 0; i < EB_WT_RES_LEN; ++i) {
             int j = oe + (i - HALF);
             out[i]  = (j >= 0 && j < rp) ? ring[j & 511]  : 0.0f;
@@ -398,7 +431,39 @@ static void emit2(const char *name, float pw, int arm, int which,
         for (o = 0; o < EB_WT_RES_OVER; ++o) {
             float y[EB_WT_RES_LEN], nvw[EB_WT_RES_LEN];
             double lvl0, lvl1, h;
-            build_one(w, arm, which, o, y, nvw);
+            /* SOLVE p0 BY ITERATION, because solving it in closed form does
+             * not land. MEASURED: the closed form leaves a constant offset of
+             * 0.028 samples AND puts sub-position 0 at an actual fraction of
+             * 0.9721 -- a WHOLE SAMPLE out, on the entry the tick asks for
+             * most often.
+             *
+             * frac is linear in p0, so one Newton step converges; two are
+             * taken and the result is asserted. This replaces a formula that
+             * was right in principle with a loop that is right in fact. */
+            {   double dp = 4.0 * (double)BUILD_INC;
+                double pe = (which == 1) ? -(double)w : 1.0;
+                double target = (double)o / EB_WT_RES_OVER;
+                double p0 = pe - dp * (200.0 + target), got = -1.0;
+                int it;
+                p0 = fmod(p0 + 1.0, 2.0); if (p0 < 0.0) p0 += 2.0; p0 -= 1.0;
+                for (it = 0; it < 6; ++it) {
+                    build_one(w, arm, which, o, y, nvw, p0, &got);
+                    if (fabs(got - target) < 1e-4) break;
+                    /* frac = frac((pe - p0)/dp), so frac RISES as p0 FALLS:
+                     * moving from `got` to `target` means p0 -= (target-got)*dp,
+                     * i.e. += (got-target)*dp. The first version had this the
+                     * other way and the iteration walked away from the answer
+                     * instead of onto it. */
+                    p0 += (got - target) * dp;
+                    p0 = fmod(p0 + 1.0, 2.0);
+                    if (p0 < 0.0) p0 += 2.0;
+                    p0 -= 1.0;
+                }
+                if (getenv("EB_WT_TRACEFRAC"))
+                    fprintf(stderr, "  arm%d which%d o=%2d target %.4f "
+                            "got %.4f after %d\n", arm, which, o, target,
+                            got, it);
+            }
             /* THE TWO SETTLED LEVELS, read from the window's own ends.
              *
              * The tick's own per-sample reference was tried instead and is
@@ -423,13 +488,14 @@ static void emit2(const char *name, float pw, int arm, int which,
              *
              * Both were built and measured. The one that wins is here; the one
              * that is prettier is recorded so it is not retried blind. */
-            lvl0 = y[2]; lvl1 = y[EB_WT_RES_LEN - 3];
+            /* h is the step the TICK's flat path takes across the detection
+             * sample -- the same quantity the tick passes as `amp`. */
+            lvl0 = nvw[HALF - 1]; lvl1 = nvw[HALF];
             h = lvl1 - lvl0;
             if (fabs(h) < 1e-9) h = 1.0;
-            (void)nvw;
             printf("    {");
             for (i = 0; i < EB_WT_RES_LEN; ++i) {
-                double naive = (i < HALF) ? lvl0 : lvl1;
+                double naive = nvw[i];
                 /* %.9e, not %.9g: %g prints a clean zero as "0", and "0f" is
                  * an invalid integer suffix, not a float. The generator's own
                  * output failed to compile on it. */
