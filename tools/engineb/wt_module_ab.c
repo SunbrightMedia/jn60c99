@@ -4,6 +4,7 @@
  * decimator does downstream. */
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "eb_fork_config.h"
@@ -24,7 +25,19 @@ int main(int argc, char **argv)
     dc.inc = inc4; dc.g = 0.00390625f/inc4;
     dc.pw = RC_pw; dc.pwm1 = dc.pw-1.0f; dc.pwp1 = dc.pw+1.0f;
     dc.rm1 = 1.0f/dc.pwm1; dc.rp1 = 1.0f/dc.pwp1;
+    /* ARM SELECTOR via argv[2]: 0 = the patch's own mix, 1 = saw, 2 = pulse,
+     * 3 = sub. A whole-mix residual cannot say WHICH arm is wrong, and with
+     * three arms and three residual tables that is the first thing to know. */
     dc.lvl_saw=RC_lvl_saw; dc.lvl_pulse=RC_lvl_pulse; dc.lvl_sub=RC_lvl_sub;
+    if (argc > 2) {
+        int arm = atoi(argv[2]);
+        if (arm == 1) { dc.lvl_pulse = 0.0f; dc.lvl_sub = 0.0f;
+                        if (dc.lvl_saw == 0.0f) dc.lvl_saw = 1.0f; }
+        if (arm == 2) { dc.lvl_saw = 0.0f;   dc.lvl_sub = 0.0f;
+                        if (dc.lvl_pulse == 0.0f) dc.lvl_pulse = 1.0f; }
+        if (arm == 3) { dc.lvl_saw = 0.0f;   dc.lvl_pulse = 0.0f;
+                        if (dc.lvl_sub == 0.0f) dc.lvl_sub = 1.0f; }
+    }
     dc.gn_saw=RC_gn_saw; dc.gn_pulse=RC_gn_pulse; dc.gn_sub=RC_gn_sub;
     dc.amp_saw=RC_amp_saw; dc.amp_pulse=RC_amp_pulse; dc.amp_sub=RC_amp_sub;
     dc.sat_in=RC_sat_in; dc.subthr=RC_subthr;

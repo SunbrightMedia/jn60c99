@@ -397,6 +397,21 @@ static void emit2(const char *name, float pw, int arm, int which,
              * out as the saw's ramp slope rather than its step. Both
              * formulations were measured; this is the one that wins, and the
              * other is recorded so it is not retried blind. */
+            /* TWO SETTLED LEVELS, and this is MEASURED to be the better of
+             * the two forms even though the other is the one that is right in
+             * principle.
+             *
+             * The tick's own per-sample flat path is the correct reference on
+             * paper. Built that way the module measures WORSE at every pitch
+             * and on every arm -- saw -11.4 dB against this form's -16.7,
+             * pulse -15.6 against -27.0. The reason is the build pitch: the
+             * per-sample reference carries the saw's RAMP, whose slope depends
+             * on pitch, so a residual built at 22 Hz and played at 441 carries
+             * the wrong ramp. Two constants leave the ramp entirely to the
+             * tick, where it is exact at every pitch.
+             *
+             * Both were built and measured. The one that wins is here; the one
+             * that is prettier is recorded so it is not retried blind. */
             lvl0 = y[2]; lvl1 = y[EB_WT_RES_LEN - 3];
             h = lvl1 - lvl0;
             if (fabs(h) < 1e-9) h = 1.0;
