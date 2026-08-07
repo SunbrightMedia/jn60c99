@@ -179,29 +179,64 @@ edge shape and its saturator.
 
 ### Where it stands, precisely
 
-**Built, and one bug remains.** `wt_probe.c` mode `id` builds three tables —
-saw, sub, and the recovered `Rb` — and plays the identity.
+**Built. Two bugs found and fixed; one design limit remains.**
 
-* **DC: FIXED and correct.** The identity is structurally DC-free (a difference
-  of two shifted copies of one function has zero mean) while a square of duty
-  ≠ 50 % has a real offset. The pulse arm's mean is measured at the reference
-  width and scales linearly with pw. Measured: identity mean **0.25221**,
-  reference mean **0.24967**.
+**1. DC — FIXED.** The identity is structurally DC-free (a difference of two
+shifted copies has zero mean) while a square of duty ≠ 50 % has a real offset.
+The pulse arm's mean is measured at the reference width and scales linearly
+with pw. Identity mean **0.25221**, reference **0.24967**.
 
-  Found by looking at the WAVEFORM, not the spectrum. The identity matched in
-  RMS (0.765 against 0.768) and sat 0.25 high at every sample; a Hann-windowed
-  spectrum barely shows DC, so the gate reported **140 dB of "harmonic error"
-  for one missing constant**.
+Found by looking at the WAVEFORM, not the spectrum. The identity matched in
+RMS (0.765 against 0.768) and sat 0.25 high at every sample; a Hann-windowed
+spectrum barely shows DC, so the gate reported **140 dB of "harmonic error"
+for one missing constant**.
 
-* **AC: still wrong.** The flat top sits at 1.36 against the reference's 0.86 —
-  the recovered `Rb` has too much swing. The DC is right and the RMS is close,
-  so this is the **phase-factor convention in the recovery**: a shift of Δ in
-  phase multiplies harmonic k by `e^{−jπkΔ/2}` over the table's period of 4,
-  and the sign of that exponent decides `Rb(p+pw)` against `Rb(p−pw)`.
+**2. The complex division — FIXED.** This file's DFT produces
+`f = Σ a_k cos + b_k sin`, which is the coefficient `C_k = a_k − j b_k`. The
+minus sign is the trap: both cross terms of the division were sign-flipped,
+which left the DC and the RMS right and the swing 60 % too large.
 
-  Recorded rather than guessed at: the structure was argued three ways and each
-  argument gave a different sign, which is why the probe now prints the
-  component means instead.
+**3. THE PULSE HAS TWO EDGE SHAPES, NOT ONE — the finding that made it work.**
+
+The identity was written `Rb(p+pw) − Rb(p+1)`: one shape used twice with
+opposite signs. It failed in a way that pointed straight at the cause. At
+pw = 0.30 the model's own factor for table harmonic 40 is
+`e^{j40π·0.15} − e^{j20π} = 1 − 1 = EXACTLY ZERO`, so the model says that
+harmonic cannot exist — **while the reference has it at −53.6 dB.** The model
+was missing something real, not merely imprecise.
+
+`eb_dco.c` already said what: the pulse phase is divided by `pwm1` when
+`t < 0` and by `pwp1` when `t > 0`, so "the two halves of the pulse get
+different edge slopes — that asymmetry IS the pulse width". Two slopes means
+two shapes:
+
+    pulse(p; pw) = Ra(p + pw) − Rb(p + 1)
+
+Two unknowns per harmonic, so two reference widths give two equations. The
+recovery solves them.
+
+**Result: at the reference width the identity is EXACTLY as good as the direct
+table** — 5.59 dB against the direct table's 5.59 at 441 Hz, 3.15 against 3.15
+at 1,764 Hz. Before this change the same points read 136 dB and 3.15.
+
+### THE REMAINING LIMIT, measured
+
+The edge SLOPES are `1/(pw−1)` and `1/(pw+1)`, so the shapes themselves move
+with the pulse width. Error against distance from the reference width, 441 Hz:
+
+| Δpw | 0.00 | 0.02 | 0.05 | 0.10 | 0.20 | 0.40 |
+|---|---|---|---|---|---|---|
+| error | **5.59** | 11.47 | 27.43 | 27.99 | 26.71 | 26.43 |
+
+It degrades fast and then **plateaus near 27 dB**, which is the signature of
+one harmonic being nulled by the model rather than a gradual loss — the same
+class of defect as the single-edge failure, one level down.
+
+**So the identity is proven at its reference width and not yet across the
+range.** What remains is either a set of `Ra`/`Rb` slices — they are one shared
+step function, so slices are cheap — or the scaling law that relates an edge at
+one width to an edge at another. That is bounded, well-characterised work, and
+it is the last thing between row 6 and a shipping module.
 
 **So the mechanism is proven and the shipping module is not.** A band-limited
 table of this oscillator IS indistinguishable from the 4× path (§ above). PWM

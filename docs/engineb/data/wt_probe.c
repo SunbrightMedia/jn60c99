@@ -54,15 +54,20 @@
  * case; different measures how far one pulse-width slice stretches, which is
  * what decides whether PWM needs a table rebuild, a set of slices, or the
  * band-limited-step identity. */
+static float pwref_override = -1e30f;
+
 static float wt_pulse_ref(void)
 {
     const char *e = getenv("EB_WT_PWREF");
+    if (pwref_override > -1e29f) return pwref_override;
     return e ? (float)atof(e) : RC_pw;
 }
 
 static float wt_pw(int building)
 {
-    const char *e = getenv(building ? "EB_WT_PWREF" : "EB_WT_PW");
+    const char *e;
+    if (building && pwref_override > -1e29f) return pwref_override;
+    e = getenv(building ? "EB_WT_PWREF" : "EB_WT_PW");
     if (!e) e = getenv("EB_WT_PW");
     return e ? (float)atof(e) : RC_pw;
 }
@@ -250,6 +255,20 @@ static void wt_bandlimit(float *tab, int n, int hmax, double inc4)
  * They are left at zero and a second reference width would be needed to fill
  * them -- reported by the probe rather than silently interpolated.
  */
+/* TWO REFERENCE WIDTHS, and the reason is measured. With one, the divisor
+ * VANISHES at every harmonic where the two edges land on the same phase --
+ * for pw0 = 0.30 that is k = 40 and k = 80, and harmonic 40 of the table is
+ * 8,820 Hz carrying real energy at -43 dB. Zeroing it left a -240 dB bin
+ * against the reference's -43 and the gate read 131 dB of harmonic error at
+ * 441 Hz while the SAME build was correct at 1,764 Hz, where hmax is 25 and
+ * k = 40 does not exist.
+ *
+ * The vanishing set depends on pw0, so a second width covers the first's
+ * holes. Per harmonic, the reference with the LARGER divisor wins. */
+static int wt_pulse_step2(float *ra_t, float *rb_t, const float *pa,
+                          const float *pb, int n, int hmax, double pwa,
+                          double pwb, double inc4, double *dc0);
+
 static int wt_pulse_step(float *rb, const float *ptab, int n, int hmax,
                          double pw0, double inc4, double *dc0)
 {
@@ -282,9 +301,18 @@ static int wt_pulse_step(float *rb, const float *ptab, int n, int hmax,
         di = sin(M_PI * k * pw0 / 2.0) - sin(M_PI * k / 2.0);
         den = dr * dr + di * di;
         if (den < 1e-9) { ++dead; rr[k] = ri[k] = 0.0; continue; }
-        /* (a + jb) / (dr + j di) */
-        rr[k] = (a * dr + b * di) / den;
-        ri[k] = (b * dr - a * di) / den;
+        /* THE DIVISION, written out. This DFT produces f = SUM a_k cos +
+         * b_k sin, which is the complex coefficient C_k = a_k - j b_k -- the
+         * minus sign is the whole trap. So
+         *
+         *     (a - jb)/(dr + j di) = [(a*dr - b*di) - j(a*di + b*dr)] / den
+         *
+         * and the coefficient that multiplies sin is +(a*di + b*dr)/den.
+         * The first version had a PLUS in the cos term and a MINUS in the sin
+         * term -- both cross terms sign-flipped -- which left the DC and the
+         * RMS right and the swing 60 % too large. */
+        rr[k] = (a * dr - b * di) / den;
+        ri[k] = (b * dr + a * di) / den;
     }
     for (i = 0; i < n; ++i) {
         double v = 0.0, t0 = 2.0 * M_PI * i / (double)n;
@@ -295,6 +323,91 @@ static int wt_pulse_step(float *rb, const float *ptab, int n, int hmax,
     free(rr); free(ri);
     return dead;
 }
+
+/* The two-reference recovery. Identical arithmetic to wt_pulse_step, run for
+ * both widths, choosing per harmonic. */
+static void wt_pulse_one(const float *tab, int n, int k, double inc4,
+                         double *a, double *b)
+{
+    double sa = 0.0, sb = 0.0, th;
+    int i;
+    for (i = 0; i < n; ++i) {
+        th = 2.0 * M_PI * k * i / (double)n;
+        sa += tab[i] * cos(th); sb += tab[i] * sin(th);
+    }
+    *a = 2.0 * sa / n * decim_mag(k * inc4 / 4.0);
+    *b = 2.0 * sb / n * decim_mag(k * inc4 / 4.0);
+}
+
+/* TWO EDGES, not one -- and this is the finding that made the identity work.
+ *
+ * The first version assumed pulse(p;pw) = Rb(p+pw) - Rb(p+1): one edge shape
+ * used twice with opposite signs. MEASURED, it fails in a way that points
+ * straight at the cause. At pw = 0.30 the identity's own factor for table
+ * harmonic 40 is e^{j40*pi*0.15} - e^{j20*pi} = 1 - 1 = EXACTLY ZERO, so the
+ * model says that harmonic cannot exist -- while the reference has it at
+ * -53.6 dB. The model was missing something real, not merely imprecise.
+ *
+ * eb_dco.c says what: the pulse phase is divided by pwm1 when t < 0 and by
+ * pwp1 when t > 0, so "the two halves of the pulse get different edge slopes
+ * -- that asymmetry IS the pulse width". Two slopes means TWO edge shapes.
+ *
+ *     pulse(p; pw) = Ra(p + pw) - Rb(p + 1)
+ *
+ * Two unknowns per harmonic, so two reference widths give two equations:
+ *
+ *     Ca = Ra e^{j k pi pwa/2} - Rb e^{j k pi/2}
+ *     Cb = Ra e^{j k pi pwb/2} - Rb e^{j k pi/2}
+ *
+ * Subtracting eliminates Rb; back-substitution gives it. The second reference
+ * is offset far enough that the two exponentials cannot coincide.
+ */
+static int wt_pulse_step2(float *ra_t, float *rb_t, const float *pa,
+                          const float *pb, int n, int hmax, double pwa,
+                          double pwb, double inc4, double *dc0)
+{
+    double *ar = (double *)calloc((size_t)hmax + 1, sizeof(double));
+    double *ai = (double *)calloc((size_t)hmax + 1, sizeof(double));
+    double *br = (double *)calloc((size_t)hmax + 1, sizeof(double));
+    double *bi = (double *)calloc((size_t)hmax + 1, sizeof(double));
+    int k, i, dead = 0;
+    { double m = 0.0; for (i = 0; i < n; ++i) m += pa[i]; *dc0 = m / n; }
+    for (k = 1; k <= hmax; ++k) {
+        double car, cai, cbr, cbi;
+        double ea_r = cos(M_PI * k * pwa / 2.0), ea_i = sin(M_PI * k * pwa / 2.0);
+        double eb_r = cos(M_PI * k * pwb / 2.0), eb_i = sin(M_PI * k * pwb / 2.0);
+        double e1_r = cos(M_PI * k / 2.0),       e1_i = sin(M_PI * k / 2.0);
+        double dr = ea_r - eb_r, di = ea_i - eb_i, den = dr * dr + di * di;
+        double nr, ni, rar, rai, tr, ti;
+        {   double x, y;
+            wt_pulse_one(pa, n, k, inc4, &x, &y); car = x; cai = -y;
+            wt_pulse_one(pb, n, k, inc4, &x, &y); cbr = x; cbi = -y; }
+        if (den < 1e-9) { ++dead; continue; }
+        /* Ra = (Ca - Cb) / (ea - eb) */
+        nr = car - cbr; ni = cai - cbi;
+        rar = (nr * dr + ni * di) / den;
+        rai = (ni * dr - nr * di) / den;
+        /* Rb = (Ra*ea - Ca) / e1 ; |e1| == 1 so dividing is multiplying by
+         * its conjugate. */
+        tr = rar * ea_r - rai * ea_i - car;
+        ti = rar * ea_i + rai * ea_r - cai;
+        br[k] =  tr * e1_r + ti * e1_i;
+        bi[k] =  ti * e1_r - tr * e1_i;
+        ar[k] = rar; ai[k] = rai;
+    }
+    /* back to the a*cos + b*sin form this file's DFT uses: C = a - j b */
+    for (i = 0; i < n; ++i) {
+        double va = 0.0, vb = 0.0, t0 = 2.0 * M_PI * i / (double)n;
+        for (k = 1; k <= hmax; ++k) {
+            va += ar[k] * cos(k * t0) - ai[k] * sin(k * t0);
+            vb += br[k] * cos(k * t0) - bi[k] * sin(k * t0);
+        }
+        ra_t[i] = (float)va; rb_t[i] = (float)vb;
+    }
+    free(ar); free(ai); free(br); free(bi);
+    return dead;
+}
+
 
 int main(int argc, char **argv)
 {
@@ -321,7 +434,8 @@ int main(int argc, char **argv)
         /* THE TABLE PATH. Phase advances 4*inc per OUTPUT sample -- four
          * sub-sample increments' worth, since one output sample is what four
          * sub-samples used to make. */
-        static float tab[WT_LEN], sawt[WT_LEN], subt[WT_LEN], rb[WT_LEN];
+        static float tab[WT_LEN], sawt[WT_LEN], subt[WT_LEN];
+        static float ra[WT_LEN], rb[WT_LEN];
         static double pdc0 = 0.0, pwref0 = 1.0;
         double ph = 0.0, dph;
         int hmax, ident = !strcmp(mode, "id");
@@ -345,8 +459,16 @@ int main(int argc, char **argv)
             WT_ARM = 1; wt_build(sawt, inc); wt_bandlimit(sawt, WT_LEN, hmax, inc);
             WT_ARM = 3; wt_build(subt, inc); wt_bandlimit(subt, WT_LEN, hmax, inc);
             WT_ARM = 2; wt_build(tab, inc);
-            dead = wt_pulse_step(rb, tab, WT_LEN, hmax, pw0,
-                                 (double)inc, &pdc0);
+            {   /* the second reference width, offset far enough that its
+                 * vanishing set cannot coincide with the first's */
+                static float tab2[WT_LEN];
+                float save = pwref_override;
+                pwref_override = (float)(pw0 + 0.37);
+                wt_build(tab2, inc);
+                pwref_override = save;
+                dead = wt_pulse_step2(ra, rb, tab, tab2, WT_LEN, hmax,
+                                      pw0, pw0 + 0.37, (double)inc, &pdc0);
+            }
             WT_ARM = 0; pwref0 = pw0;
             {   /* MEANS, printed rather than reasoned about. The DC bug was
                  * argued three ways from the structure and each argument gave
@@ -381,7 +503,7 @@ int main(int argc, char **argv)
                 double o1 = ph + pw / 4.0, o2 = ph + 1.0 / 4.0;
                 o1 -= floor(o1); o2 -= floor(o2);
                 out = (float)(RD(sawt, ph) + RD(subt, ph)
-                              + (RD(rb, o1) - RD(rb, o2))
+                              + (RD(ra, o1) - RD(rb, o2))
                               + pdc0 * (pw / pwref0));
             }
 #undef RD
