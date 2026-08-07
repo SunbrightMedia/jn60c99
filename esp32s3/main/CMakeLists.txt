@@ -47,7 +47,7 @@ idf_component_register(
 # inlines, it does not re-associate float arithmetic.
 target_compile_options(${COMPONENT_LIB} PRIVATE
     -O2 -flto -ffp-contract=off -fno-strict-aliasing
-    -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_IDF)
+    -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_IDF ${S3_EXTRA_DEFS})
 set_source_files_properties(${EB_SRCS} PROPERTIES COMPILE_OPTIONS "-std=c99")
 
 if(NOT S3_LISTEN)
