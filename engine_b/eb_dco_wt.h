@@ -285,7 +285,39 @@
  *
  * That the 441 Hz dip survives an 8x finer ladder is the useful part: it is
  * NOT level quantisation, and whatever it is has not been found. */
-#define EB_WT_SUB_PER_OCT 4
+/* GUARDED, AND THE SHIFT DERIVED. This is the THIRD constant in this file to
+ * be added as a plain #define and then "swept" -- each time returning
+ * identical columns, each time costing a cycle before the sameness was
+ * noticed. Any constant a measurement might vary is #ifndef-guarded here, and
+ * any bit position that depends on it is computed from it. */
+#ifndef EB_WT_SUB_PER_OCT
+/* SIXTEEN, MEASURED. Once the constant could actually be swept, the sub arm
+ * over the pitch range the 36 scenarios reach:
+ *
+ *   inc      4/oct   8/oct   16/oct
+ *   0.0005   -62.1   -62.1   -66.5
+ *   0.001    -68.9   -65.2   -80.8
+ *   0.002    -55.0   -54.4   -55.2
+ *   0.004    -72.3   -68.6   -84.4
+ *   0.0075   -55.1   -65.1   -58.0
+ *
+ * 16 wins at four of five points, by up to 12 dB, for 455 KB against 113. The
+ * ladder is NOT monotonic -- 8 is worse than 4 at two points -- which is what
+ * a level grid whose midpoints happen to land well or badly looks like.
+ *
+ * THE inc 0.002 DIP SURVIVES ALL THREE at -55 dB. It is not level
+ * quantisation, and it is not explained. */
+#define EB_WT_SUB_PER_OCT 16
+#endif
+#if   EB_WT_SUB_PER_OCT == 4
+#define EB_WT_SUB_SHIFT 21
+#elif EB_WT_SUB_PER_OCT == 8
+#define EB_WT_SUB_SHIFT 20
+#elif EB_WT_SUB_PER_OCT == 16
+#define EB_WT_SUB_SHIFT 19
+#else
+#error "EB_WT_SUB_PER_OCT must be 4, 8 or 16"
+#endif
 /* THE LADDER RUNS THREE OCTAVES LOWER THAN IT DID. Level 0 used to sit at
  * sub-step 0.00125, about 110 Hz, and everything below that CLAMPED -- the sub
  * measured -42.7 dB at 79 Hz where its neighbours reach -56. Extending
@@ -296,7 +328,9 @@
  * The top is still capped at sub-step 0.01875, the highest the generator
  * builds soundly. Above it a second edge enters the window and the index
  * clamps instead. */
-#define EB_WT_SUB_MIPS  28           /* 7 octaves at 4 levels each            */
+#ifndef EB_WT_SUB_MIPS
+#define EB_WT_SUB_MIPS  (7 * EB_WT_SUB_PER_OCT)   /* seven octaves */
+#endif
 
 typedef struct {
     float phase;      /* [-1,1), the port's own DCO phase   */

@@ -46,8 +46,10 @@ void eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc4, float pw)
         int e2, j, lv;
         z.f = c->inc * (1.0f / EB_WT_SUB_OINC0);
         e2 = (int)((z.u >> 23) & 0xFFu) - 127;
-        /* the top two mantissa bits split each octave into four */
-        j  = (int)((z.u >> 21) & 3u);
+        /* the top mantissa bits split each octave; both the count and the
+         * shift come from EB_WT_SUB_PER_OCT so they cannot disagree */
+        j  = (int)((z.u >> EB_WT_SUB_SHIFT)
+                   & (unsigned)(EB_WT_SUB_PER_OCT - 1));
         lv = e2 * EB_WT_SUB_PER_OCT + j;
         if (lv < 0) lv = 0;
         if (lv >= EB_WT_SUB_MIPS) lv = EB_WT_SUB_MIPS - 1;
