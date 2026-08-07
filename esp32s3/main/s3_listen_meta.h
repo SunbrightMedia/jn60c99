@@ -2,11 +2,11 @@
  * layout of s3_listen.bin. Patch 0, notes [1, 2, 3, 4, 5, 6, 7, 8]. */
 #define S3L_MAGIC 0x4A554E4Fu
 #define S3L_NNOTE 8
-#define S3L_COEF_SZ 10436u
+#define S3L_COEF_SZ 10564u
 #define S3L_MCOEF_SZ 1704u
-#define S3L_RSTATE_SZ 735236u
+#define S3L_RSTATE_SZ 735332u
 #define S3L_MSTATE_SZ 729816u
-#define S3L_VOICE_SZ 6808u
+#define S3L_VOICE_SZ 6904u
 /* the master state's members, HOST sizes, in blob order.
  * The firmware copies min(host, target) bytes of each --
  * every differing member ends in a pointer the engine
