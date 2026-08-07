@@ -62,8 +62,17 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
     saw   = (p * c->gn_saw) * c->sat_hi;
 
     t     = c->pw + p;
-    pulse = (t < 0.0f ? -c->gn_pulse : c->gn_pulse)
-          * (t < 0.0f ? c->sat_lo : c->sat_hi);
+    /* MEASURED, not derived. eb_dco.c computes pulse = eb_sat_c(e) * sgn(t) *
+     * gn_pulse, where e is the CLAMPED EDGE and its sign is set by tri(x), not
+     * by t. Running it: sat_hi = +1, sat_lo = -1, and the flat output is
+     * exactly +/- gn_pulse following the sign of t.
+     *
+     * The first version wrote (t<0 ? -gn : gn) * (t<0 ? sat_lo : sat_hi) --
+     * and since sat_lo is NEGATIVE the two sign flips cancelled, so the
+     * "pulse" was a constant. It showed up as a residual that stepped once and
+     * never came back, because the reference it was measured against never
+     * stepped at all. */
+    pulse = (t < 0.0f ? -c->gn_pulse : c->gn_pulse) * c->sat_hi;
 
     /* ---- the sub counter, verbatim from eb_dco.c: a rising crossing of
      * subthr steps it by two and it wraps at four. It is FREE-RUNNING STATE
