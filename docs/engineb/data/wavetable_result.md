@@ -219,29 +219,71 @@ recovery solves them.
 table** — 5.59 dB against the direct table's 5.59 at 441 Hz, 3.15 against 3.15
 at 1,764 Hz. Before this change the same points read 136 dB and 3.15.
 
-### THE REMAINING LIMIT, measured
+### THE DESIGN IS COMPLETE, and it converges
 
-The edge SLOPES are `1/(pw−1)` and `1/(pw+1)`, so the shapes themselves move
-with the pulse width. Error against distance from the reference width, 441 Hz:
+Six things were tried. Each failure named the next step, so all six are kept.
 
-| Δpw | 0.00 | 0.02 | 0.05 | 0.10 | 0.20 | 0.40 |
-|---|---|---|---|---|---|---|
-| error | **5.59** | 11.47 | 27.43 | 27.99 | 26.71 | 26.43 |
+| # | approach | result |
+|---|---|---|
+| 1 | pw slices, no interpolation | **dead** — 29 dB at Δpw 0.02 |
+| 2 | one step used twice | **structurally wrong** — two slopes |
+| 3 | two steps, one reference pair | exact AT the reference, broad error away |
+| 4 | phase-scaling the edge width | no help |
+| 5 | slices WITH interpolation | **cannot cross-fade a moving edge** |
+| 6 | **identity + step-shape interpolation** | **converges** |
 
-It degrades fast and then **plateaus near 27 dB**, which is the signature of
-one harmonic being nulled by the model rather than a gradual loss — the same
-class of defect as the single-edge failure, one level down.
+**Why 5 fails and 6 works, which is the whole insight.** Interpolating two
+pulse WAVEFORMS blends edges that sit in different places, and the blend of
+two edges is two edges, not one moved edge — measured at 15.6 dB even with a
+half-spacing of 0.0125. The identity MOVES the edge exactly, because a pulse
+width is a phase offset. What the identity gets wrong is the edge's SHAPE,
+which changes because the slopes are `1/(pw−1)` and `1/(pw+1)`.
 
-**So the identity is proven at its reference width and not yet across the
-range.** What remains is either a set of `Ra`/`Rb` slices — they are one shared
-step function, so slices are cheap — or the scaling law that relates an edge at
-one width to an edge at another. That is bounded, well-characterised work, and
-it is the last thing between row 6 and a shipping module.
+So: recover the step PAIR at two pw slices and interpolate **the steps**.
+Their edges are both at argument 0 by construction, so blending them changes
+shape without moving anything — and the identity then places the blended edge
+at the exact width.
 
-**So the mechanism is proven and the shipping module is not.** A band-limited
-table of this oscillator IS indistinguishable from the 4× path (§ above). PWM
-through the identity is the right design, is built, and has one convention bug
-left in its recovery step.
+**Convergence, measured** (harmonic error against the 4× reference):
+
+| half-spacing h | 0.020 | 0.005 | 0.002 | 0.001 |
+|---|---|---|---|---|
+| 441 Hz | 18.19 | **5.41** | 5.56 | 5.58 |
+| 1,764 Hz | 2.94 | **3.14** | 3.15 | 3.15 |
+
+It converges to **5.59 and 3.15** — which are the DIRECT TABLE's own numbers at
+those pitches. The identity is exact in the limit, and **h = 0.005 is already
+at the limit.**
+
+### And pw CRAWLS, which is what makes it affordable
+
+"pw moves on 52 % of samples" does not say whether it crawls or jumps. Measured
+over 17,199,352 per-voice comparisons:
+
+| per-sample \|Δpw\| | share |
+|---|---|
+| exactly 0 | 48.04 % |
+| < 1e-4 | 19.06 % |
+| < 1e-3 | 32.89 % |
+| **≥ 1e-2** | **0.0013 %** — 232 of 17.2 M |
+
+**PWM is a slow LFO sweep, not a jump.** So a FIXED GRID of step pairs at
+spacing 0.01 across the measured range [−0.015, 0.939] — about 97 slices —
+covers every patch with no rebuild, ever.
+
+### Memory, and why it fits
+
+A band-limited step is **flat except near its edge**, so only the transition
+needs storing — the classic MinBLEP residual. At ±32 samples that is 64 floats
+per step:
+
+    97 slices x 2 steps x 64 floats x 4 bytes = 50 KB
+
+against 3 MB for storing whole periods. Plus one saw table and one sub table
+per mip level, shared by all eight voices (§ above).
+
+**The design is complete and every parameter in it is measured.** What remains
+is writing the shipping module.
 
 ## What it is worth
 

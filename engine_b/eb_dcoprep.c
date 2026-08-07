@@ -23,6 +23,10 @@ static float ebpw_prev[8], ebpw_lo = 1e30f, ebpw_hi = -1e30f;
 static float ebpw_dmax = 0.0f;
 static int ebpw_seen[8], ebpw_slot = 0;
 static unsigned long ebpw_n = 0, ebpw_moved = 0;
+/* THE STEP HISTOGRAM. "pw moves on 52 % of samples" does not say whether it
+ * CRAWLS or JUMPS, and a wavetable only cares about the size. Decade buckets
+ * of |dpw| per sample. */
+static unsigned long ebpw_bkt[8];
 static void ebpw_report(void) __attribute__((destructor));
 static void ebpw_report(void)
 {
@@ -30,9 +34,11 @@ static void ebpw_report(void)
     if (!ebpw_n) return;
     f = fopen("/tmp/eb_pw.log", "a");
     if (!f) return;
-    fprintf(f, "calls=%lu moved=%lu span=[%.6f,%.6f] worststep=%.8f\n",
+    fprintf(f, "calls=%lu moved=%lu span=[%.6f,%.6f] worststep=%.8f "
+            "bkt=%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu\n",
             ebpw_n, ebpw_moved, (double)ebpw_lo, (double)ebpw_hi,
-            (double)ebpw_dmax);
+            (double)ebpw_dmax, ebpw_bkt[0], ebpw_bkt[1], ebpw_bkt[2],
+            ebpw_bkt[3], ebpw_bkt[4], ebpw_bkt[5], ebpw_bkt[6], ebpw_bkt[7]);
     fclose(f);
 }
 #endif
@@ -65,6 +71,17 @@ float eb_dcoprep_tick(const eb_dcoprep_coef *c, float pitch, float pwmcv,
             float d = fabsf(pw - ebpw_prev[q]);
             if (d > 0.0f) ++ebpw_moved;
             if (d > ebpw_dmax) ebpw_dmax = d;
+            {   int bk = 0;
+                if      (d == 0.0f)   bk = 0;
+                else if (d < 1e-6f)   bk = 1;
+                else if (d < 1e-5f)   bk = 2;
+                else if (d < 1e-4f)   bk = 3;
+                else if (d < 1e-3f)   bk = 4;
+                else if (d < 1e-2f)   bk = 5;
+                else if (d < 1e-1f)   bk = 6;
+                else                  bk = 7;
+                ++ebpw_bkt[bk];
+            }
         }
         ebpw_seen[q] = 1; ebpw_prev[q] = pw;
     }

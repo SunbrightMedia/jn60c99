@@ -436,15 +436,44 @@ int main(int argc, char **argv)
          * sub-samples used to make. */
         static float tab[WT_LEN], sawt[WT_LEN], subt[WT_LEN];
         static float ra[WT_LEN], rb[WT_LEN];
+        static float ra2[WT_LEN], rb2[WT_LEN];
+        static double pwL = 0.0, pwH = 1.0;
         static double pdc0 = 0.0, pwref0 = 1.0;
         double ph = 0.0, dph;
-        int hmax, ident = !strcmp(mode, "id");
+        static float pa_t[WT_LEN], pb_t[WT_LEN];
+        int hmax, ident = !strcmp(mode, "id"), slice = !strcmp(mode, "sl");
+        int ident2 = !strcmp(mode, "id2");
+        if (ident2) ident = 1;
+        double pwlo = 0.0, pwhi = 0.0;
         hmax = (int)floor(0.5 / inc);
         if (hmax > WT_LEN / 2 - 1) hmax = WT_LEN / 2 - 1;
         if (hmax < 1) hmax = 1;
         dph = (double)inc;               /* table periods per output sample */
 
-        if (!ident) {
+        if (slice) {
+            /* PULSE-WIDTH SLICES WITH INTERPOLATION -- the test the earlier
+             * slice measurement did NOT run. That one built at one width and
+             * played at another with no interpolation, which is what a table
+             * with ONE slice does. A 2-D table interpolates between two, and
+             * interpolation error falls as the SQUARE of the spacing, so the
+             * two questions have different answers and only one of them was
+             * asked.
+             *
+             * EB_WT_SLICE sets the half-spacing; the two slices bracket the
+             * target width. */
+            double h = getenv("EB_WT_SLICE") ? atof(getenv("EB_WT_SLICE")) : 0.05;
+            double pw = (double)wt_pw(0);
+            float save = pwref_override;
+            pwlo = pw - h; pwhi = pw + h;
+            WT_ARM = 1; wt_build(sawt, inc); wt_bandlimit(sawt, WT_LEN, hmax, inc);
+            WT_ARM = 3; wt_build(subt, inc); wt_bandlimit(subt, WT_LEN, hmax, inc);
+            WT_ARM = 2;
+            pwref_override = (float)pwlo; wt_build(pa_t, inc);
+            wt_bandlimit(pa_t, WT_LEN, hmax, inc);
+            pwref_override = (float)pwhi; wt_build(pb_t, inc);
+            wt_bandlimit(pb_t, WT_LEN, hmax, inc);
+            pwref_override = save; WT_ARM = 0;
+        } else if (!ident) {
             {   const char *r = getenv("EB_WT_REF");
                 wt_build(tab, r ? (float)atof(r) : inc);
             }
@@ -459,6 +488,41 @@ int main(int argc, char **argv)
             WT_ARM = 1; wt_build(sawt, inc); wt_bandlimit(sawt, WT_LEN, hmax, inc);
             WT_ARM = 3; wt_build(subt, inc); wt_bandlimit(subt, WT_LEN, hmax, inc);
             WT_ARM = 2; wt_build(tab, inc);
+            if (ident2) {
+                /* THE TWO IDEAS COMBINED, and each fixes what the other
+                 * cannot.
+                 *
+                 * MEASURED: interpolating two pulse WAVEFORMS converges
+                 * badly at low pitch -- 15.6 dB even at a half-spacing of
+                 * 0.0125 -- because the edges sit in DIFFERENT PLACES and
+                 * blending them gives TWO edges, not one moved edge. You
+                 * cannot cross-fade a moving edge.
+                 *
+                 * The identity moves the edge exactly (it is a phase offset)
+                 * but assumes ONE shape, and the shape moves with pw because
+                 * the slopes are 1/(pw-1) and 1/(pw+1).
+                 *
+                 * So: recover the step PAIR at two pw slices and interpolate
+                 * THE STEPS. Their edges are both at argument 0 by
+                 * construction, so interpolating them blends shape without
+                 * moving anything -- and the identity then places the blended
+                 * edge at the exact width. */
+                double h = getenv("EB_WT_SLICE") ? atof(getenv("EB_WT_SLICE")) : 0.05;
+                double pw = (double)wt_pw(0);
+                static float t2[WT_LEN];
+                float save = pwref_override;
+                pwL = pw - h; pwH = pw + h;
+                pwref_override = (float)pwL;        wt_build(tab, inc);
+                pwref_override = (float)(pwL + 0.37); wt_build(t2, inc);
+                wt_pulse_step2(ra, rb, tab, t2, WT_LEN, hmax,
+                               pwL, pwL + 0.37, (double)inc, &pdc0);
+                pwref_override = (float)pwH;        wt_build(tab, inc);
+                pwref_override = (float)(pwH + 0.37); wt_build(t2, inc);
+                dead = wt_pulse_step2(ra2, rb2, tab, t2, WT_LEN, hmax,
+                                      pwH, pwH + 0.37, (double)inc, &pdc0);
+                pwref_override = save;
+                pwref0 = pw;
+            } else
             {   /* the second reference width, offset far enough that its
                  * vanishing set cannot coincide with the first's */
                 static float tab2[WT_LEN];
@@ -493,15 +557,54 @@ int main(int argc, char **argv)
                      int _k = (int)_u; float _f = (float)(_u - _k); \
                      (T)[_k & (WT_LEN-1)] \
                        + ((T)[(_k+1) & (WT_LEN-1)] - (T)[_k & (WT_LEN-1)]) * _f; })
-            if (!ident) {
+            if (slice) {
+                double pw = (double)wt_pw(0);
+                double w = (pw - pwlo) / (pwhi - pwlo);
+                float lo = RD(pa_t, ph), hi = RD(pb_t, ph);
+                out = (float)(RD(sawt, ph) + RD(subt, ph)
+                              + lo + (hi - lo) * (float)w);
+            } else if (!ident) {
                 out = tab[k & (WT_LEN - 1)]
                     + (tab[(k + 1) & (WT_LEN - 1)] - tab[k & (WT_LEN - 1)]) * f;
             } else {
                 /* pw and 1 are offsets in PHASE, and the table spans 4 phase
                  * units, so an offset of x phase is x/4 of a table period. */
+                /* THE EDGE WIDTH SCALES WITH pw, and a STEP IS FLAT EXCEPT
+                 * NEAR ITS EDGE -- so the width change is a PHASE SCALING of
+                 * one shape, not a new shape.
+                 *
+                 * The pulse phase is t/(pw-1) below zero and t/(pw+1) above,
+                 * and the edge spans a fixed range in that argument, so its
+                 * width in PHASE is proportional to |pw-1| and |pw+1|. Reading
+                 * the recovered step at a distance-from-edge scaled by
+                 * |pwref-1|/|pw-1| gives the right width while leaving the
+                 * flat parts flat.
+                 *
+                 * MEASURED FIRST, which is why this exists: with fixed steps
+                 * the error away from the reference width is BROAD -- 13 of 36
+                 * harmonics over the bound at dpw = 0.05 -- so it is the shape
+                 * moving, not one harmonic nulling. */
                 double pw = (double)wt_pw(0);
-                double o1 = ph + pw / 4.0, o2 = ph + 1.0 / 4.0;
+                double sa = ident2 ? 1.0
+                                   : fabs(pwref0 - 1.0) / fabs(pw - 1.0);
+                double sb = ident2 ? 1.0
+                                   : fabs(pwref0 + 1.0) / fabs(pw + 1.0);
+                double d1 = ph + pw / 4.0, d2 = ph + 1.0 / 4.0;
+                double o1, o2;
+                /* distance from the edge, in table periods, folded to
+                 * (-0.5, 0.5] so the scaling is about the NEAREST edge */
+                d1 -= floor(d1 + 0.5); d2 -= floor(d2 + 0.5);
+                o1 = d1 * sa; o2 = d2 * sb;
                 o1 -= floor(o1); o2 -= floor(o2);
+                if (ident2) {
+                    double wgt = (pw - pwL) / (pwH - pwL);
+                    float a1 = RD(ra, o1), a2v = RD(ra2, o1);
+                    float b1 = RD(rb, o2), b2v = RD(rb2, o2);
+                    out = (float)(RD(sawt, ph) + RD(subt, ph)
+                                  + (a1 + (a2v - a1) * (float)wgt)
+                                  - (b1 + (b2v - b1) * (float)wgt)
+                                  + pdc0);
+                } else
                 out = (float)(RD(sawt, ph) + RD(subt, ph)
                               + (RD(ra, o1) - RD(rb, o2))
                               + pdc0 * (pw / pwref0));
