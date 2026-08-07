@@ -290,7 +290,11 @@ void app_main(void)
      * the intercept then come from silicon, and the engine time is timed
      * SEPARATELY from the chunk so the PCM conversion and I2S call cannot be
      * charged to the DSP. */
+#ifndef S3L_SWEEP
+#define S3L_SWEEP 0
+#endif
     static const unsigned SWEEP[3] = { 0x00u, 0x80u, 0xc0u };
+    (void)SWEEP;
     int phase = 0;
     unsigned long eng_us = 0, ph_chunks = 0;
 
@@ -487,7 +491,14 @@ void app_main(void)
         int64_t t0 = esp_timer_get_time();
         int64_t te = 0;
         int i;
+#if S3L_SWEEP
+        /* THE COST SWEEP overrides the chord with 0, 1 and 2 voices to get a
+         * slope and an intercept from silicon. It renders SILENCE for its
+         * first eight seconds by design, so it is not the build to listen to
+         * -- and it was the default, which is why the first listening attempt
+         * heard nothing. */
         WAKE = SWEEP[phase];
+#endif
         for (i = 0; i < CHUNK; ++i) {
             float vb[EB_NUM_VOICES], L = 0.0f, R = 0.0f;
             int k;

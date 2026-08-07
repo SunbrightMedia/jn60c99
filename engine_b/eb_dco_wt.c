@@ -35,6 +35,11 @@ void eb_dco_wt_bind_tables(eb_dco_wt_coef *c)
  * the exponent extraction below is the whole of what that costs. */
 void eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc4, float pw)
 {
+    /* A ZERO INCREMENT IS NOT A PITCH. It occurs on a voice's first tick,
+     * before any coefficient exists, and every fraction this module computes
+     * divides by it. Guarding here as well as at the point of use is
+     * deliberate: the crash it caused was two steps downstream. */
+    if (!(inc4 > 0.0f)) inc4 = 1e-9f;
     c->inc4 = inc4;
     c->inc  = inc4 * 4.0f;
     c->pw   = pw;
@@ -85,10 +90,24 @@ static void eb_wt_add(eb_dco_wt_state *s, const float *tab, float frac,
 #if EB_WT_CONV & 1
     frac = 1.0f - frac;
 #endif
-    if (frac < 0.0f) frac = 0.0f;
+    /* NaN-SAFE, AND THIS CRASHED A BOARD. `frac < 0.0f` and `frac > 0.99999f`
+     * are BOTH FALSE for a NaN, so the old pair of clamps passed a NaN
+     * straight into (int)frac, whose result is undefined and was a huge index.
+     * The module then read past the end of the flash-mapped residual tables
+     * and the S3 took an MMU entry fault -- Guru Meditation, cache error, with
+     * the faulting address 32 KB beyond the mapped data segment.
+     *
+     * A NaN reaches here whenever inc is 0, which happens on a voice's first
+     * tick before any coefficient has been built. Writing the test as
+     * `!(frac > 0.0f)` makes NaN take the clamp instead of escaping it, and
+     * the integer index is clamped as well -- a table index must be provably
+     * in range at the point of use, not merely at the point it was derived. */
+    if (!(frac > 0.0f)) frac = 0.0f;
     if (frac > 0.99999f) frac = 0.99999f;
     frac *= (float)EB_WT_RES_OVER;
     sub = (int)frac;
+    if (sub < 0) sub = 0;
+    if (sub >= EB_WT_RES_OVER) sub = EB_WT_RES_OVER - 1;
     g1 = frac - (float)sub;
     g0 = 1.0f - g1;
     r0 = tab + sub * EB_WT_RES_LEN;
