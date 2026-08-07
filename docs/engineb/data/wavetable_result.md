@@ -759,3 +759,59 @@ actually needs (`(port − flat)/h`, printed per edge) gives +0.012, +0.273,
 
 So the residual is right and the error is in something about applying it that
 varies edge to edge. That is where the next work goes.
+
+## THE DRIFT — the defect that was hiding behind the other four
+
+Measuring **per edge** instead of per run showed it at once. At inc4 0.00187 the
+error does not depend on the crossing fraction: it grows monotonically with
+time — 0.0067 at the first edge, 0.050 by the twenty-fourth, 0.229 worst over
+111. Nothing but a drift looks like that.
+
+The port advances its phase by `inc4` four times per output sample and wraps
+after each. The module added `4*inc4` once. Those are the same number only when
+the arithmetic is exact.
+
+**It also explains the pitch lottery and why the tables above read so well.** At
+a pitch where `inc4` is an exact binary fraction, `4*inc4` and four additions of
+`inc4` agree bit for bit and there is no drift — and every pitch those tables
+sampled was such a pitch.
+
+| inc | saw | pulse | sub |
+|---|---|---|---|
+| 0.00187 | −66.6 (was −37.6) | −77.2 (−39.4) | −56.6 (−39.9) |
+| 0.0025 | −66.5 (−65.3) | −72.8 (−71.9) | −53.9 (−53.3) |
+| 0.0031 | −64.2 (−45.0) | −75.4 (−47.0) | −53.6 (−47.3) |
+| 0.005 | −62.1 (−58.0) | −66.4 (−62.9) | −49.1 (−44.6) |
+| 0.0067 | −59.8 (−48.4) | −71.1 (−50.9) | −60.4 (−50.0) |
+| 0.013 | −54.2 (−45.5) | −63.2 (−47.0) | −61.7 (−53.3) |
+| 0.02 | −50.0 (−49.1) | −65.2 (−58.3) | −65.1 (−62.3) |
+
+Every arm is between −49 and −77 dB and the lottery is gone. Cost: three adds
+and three compares per sample, against a DCO sub-step thirty times that.
+
+## And the engine did NOT follow, which localises what is left
+
+| scenario group | after the drift fix |
+|---|---|
+| most scenarios | −40 to −62 dB |
+| **`UNISON pile-up`, `idle unison 441/4410`** | **−25.8 to −29.5, unmoved** |
+| **`DCO noise`, `idle noise ×5`** | **−27.1 to −29.0, unmoved** |
+
+Those eleven scenarios have **not moved by more than 0.1 dB through any of the
+five fixes**, while the module they contain improved by up to 38 dB. A cause
+that cannot be moved by changing the oscillator is not in the oscillator.
+
+The baseline separates them further. Without `EB_DCO_WT`:
+
+* the unison scenarios ALREADY FAIL at −48 to −56 dB — they are a pitch/exp
+  fork problem that the DCO makes worse, not one this module created;
+* the noise scenarios **PASS at −267 dB**, so their −28.9 is entirely the
+  wavetable's, and it is immovable by every change to the wavetable's own
+  accuracy.
+
+That pair of facts is the next piece of work, and it says the remaining noise
+error is structural — something the fork computes differently in KIND, not in
+precision. The next measurement is the DCO chain's own output (`decimo`) per
+sample, fork against trunk, inside the `DCO noise` scenario: if it agrees to
+−60 dB while the voice output is −28.9, the fault is downstream of the
+oscillator entirely.
