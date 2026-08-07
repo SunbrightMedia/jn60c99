@@ -9,8 +9,11 @@ decimator's extra 1.87 samples of PURE DELAY, which is not a defect either.
 
 So this gate does two things a plain null does not, and states both:
   1. ALIGNS: cross-correlates the two streams over +/-8 samples and removes
-     the integer lag, then reports the lag it removed. A lag other than the
-     designed ~2 samples is itself a finding.
+     the delay INCLUDING ITS FRACTIONAL PART, then reports the lag it removed.
+     A lag other than the designed ~1.87 samples is itself a finding.
+     Integer-only alignment leaves 0.87 of a sample of pure delay, which is
+     -35 dB of phase error on its own -- the first version of this gate
+     measured exactly that and blamed the lever.
   2. BAND-LIMITS: both streams through the same 18 kHz FIR low-pass before
      the residual is computed, so the comparison covers what the relaxation
      did NOT license.
@@ -38,18 +41,37 @@ def lowpass(x, fs, fc=18000.0, ntap=127):
     return np.convolve(x, h, mode="same")
 
 
-def align(a, b, span=8):
-    """Remove the integer lag between the two streams; return (b_shifted, lag)."""
+def align(a, b, span=8, step=1.0 / 32.0):
+    """Remove the delay between the two streams -- INCLUDING ITS FRACTIONAL
+    PART -- and return (b_shifted, lag).
+
+    WHY FRACTIONAL, and it is a measurement not a refinement. F5's design says
+    the 2x decimator is 1.87 output samples longer than the port's. An
+    INTEGER-only alignment therefore leaves 0.87 of a sample of PURE DELAY in
+    the residual, and a pure delay of d samples costs 2*pi*f*d/fs radians of
+    phase -- about 1.8 % at 1 kHz and 18 % at 10 kHz. That is -35 dB, and
+    -35.7 dB is exactly what this gate reported for half-oversampling.
+
+    So the first version of this gate was measuring its own missing 0.87 of a
+    sample and calling it a defect in the lever. A gate that cannot remove the
+    delay it was written to ignore is not a gate.
+
+    The shift is done in the frequency domain, which gives an exact fractional
+    delay rather than an interpolated approximation of one."""
     n = min(len(a), len(b))
     a, b = a[:n], b[:n]
     seg = slice(n // 4, n // 4 + min(200000, n // 2))
-    best, blag = None, 0
-    for lag in range(-span, span + 1):
-        bb = np.roll(b, -lag)
+    F = np.fft.rfft(b)
+    w = 2.0 * np.pi * np.fft.rfftfreq(n)
+    best, blag, bshift = None, 0.0, b
+    lag = -span
+    while lag <= span + 1e-9:
+        bb = np.fft.irfft(F * np.exp(-1j * w * lag), n) if lag else b
         c = float(np.dot(a[seg], bb[seg]))
         if best is None or c > best:
-            best, blag = c, lag
-    return np.roll(b, -blag), blag
+            best, blag, bshift = c, lag, bb
+        lag += step
+    return bshift, blag
 
 
 def main():
@@ -83,20 +105,33 @@ def main():
                 blk = max(blk, 10 * np.log10(max(np.mean(e[sl] * e[sl]), 1e-30) / den))
         ok = g <= GLOBAL_DB and blk <= BLOCK_DB
         fails += 0 if ok else 1
-        print("  %-26s lag %+d  global %7.1f dB  block %7.1f dB  -> %s"
+        print("  %-26s lag %+6.3f  global %7.1f dB  block %7.1f dB  -> %s"
               % (tag, lag, g, blk, "PASS" if ok else "FAIL"))
     print("VERDICT: %s" % ("PASS" if not fails else "FAIL (%d)" % fails))
     return 0 if not fails else 1
 
 
+# THE WHOLE FORK, not one lever. Every fork lever has been gated ALONE, on one
+# module, and the composite has never been measured with a metric that is valid
+# for it -- which is precisely the hole this project has found twice already
+# ("the defect only a composite could find", "a gate that has never been seen
+# to fail"). EB_FORK_FLAGS carries the full shipping flag set so this gate can
+# answer "does the fork sound right" rather than "does one lever".
+FORK_FLAGS = os.environ.get(
+    "EB_FORK_FLAGS",
+    "-DEB_FORK_S3 -DEB_HALF_OS=1").split()
+
+
 def _build(tmp, tag, mods):
     import null_b
     so = os.path.join(tmp, tag + ".so")
+    n = 0
     if "halfos" in mods:
-        null_b.CFLAGS = null_b.CFLAGS + ["-DEB_FORK_S3", "-DEB_HALF_OS=1"]
+        n = len(FORK_FLAGS)
+        null_b.CFLAGS = null_b.CFLAGS + FORK_FLAGS
     null_b.build(so, ["standalone"])
-    if "halfos" in mods:
-        null_b.CFLAGS = null_b.CFLAGS[:-2]
+    if n:
+        null_b.CFLAGS = null_b.CFLAGS[:-n]
     return so
 
 
