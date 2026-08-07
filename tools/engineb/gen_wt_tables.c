@@ -468,7 +468,24 @@ static void emit2(const char *name, float pw, int arm, int which,
     printf("static const float %s[%d][%d][%d] = {\n", name, nsl,
            EB_WT_RES_OVER + 1, EB_WT_RES_LEN);
     for (sl = 0; sl < nsl; ++sl) {
-        float w = (!mips && slices) ? lo + (hi - lo) * (sl + 0.5f) / slices : pw;
+        /* THE PULSE'S MOVING EDGE IS SLICED BY EDGE WIDTH. Slice sl covers
+         * u = 1 - pw in 2^e*[1+j/16, 1+(j+1)/16) with e = EB_WT_PWA_EMIN +
+         * sl/16 and j = sl%16, and is built at that interval's MIDPOINT --
+         * the same split the tick makes from u's exponent and mantissa. */
+        float w = pw;
+        if (!mips && slices) {
+            if (arm == ARM_PULSE && which == 1) {
+                int e2 = EB_WT_PWA_EMIN + sl / EB_WT_PWA_PER_OCT;
+                int j  = sl % EB_WT_PWA_PER_OCT;
+                float u = 1.0f + ((float)j + 0.5f) / EB_WT_PWA_PER_OCT;
+                int k;
+                for (k = 0; k < -e2; ++k) u *= 0.5f;
+                for (k = 0; k < e2; ++k)  u *= 2.0f;
+                w = 1.0f - u;
+            } else {
+                w = lo + (hi - lo) * (sl + 0.5f) / slices;
+            }
+        }
         if (mips) {
             /* Level L = 4*e + j covers inc in INC0*2^e*[1+j/4, 1+(j+1)/4) and
              * is built at that interval's MIDPOINT -- the same split the tick

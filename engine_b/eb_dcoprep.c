@@ -27,6 +27,13 @@ static unsigned long ebpw_n = 0, ebpw_moved = 0;
  * CRAWLS or JUMPS, and a wavetable only cares about the size. Decade buckets
  * of |dpw| per sample. */
 static unsigned long ebpw_bkt[8];
+/* THE INCREMENT'S OWN RANGE. The band-limited DCO's edge detection tests
+ * `p < prev`, which is a wrap only while the phase INCREASES. Whether the port
+ * can ever hand it a negative increment is not a thing to reason about: the
+ * expression is fmaxf(k5568, pitch*k5536), floored by a RECALLED cell, and the
+ * sign of that cell across the bank is a measurement. */
+static float ebpw_ilo = 1e30f, ebpw_ihi = -1e30f;
+static unsigned long ebpw_ineg = 0;
 static void ebpw_report(void) __attribute__((destructor));
 static void ebpw_report(void)
 {
@@ -34,6 +41,8 @@ static void ebpw_report(void)
     if (!ebpw_n) return;
     f = fopen("/tmp/eb_pw.log", "a");
     if (!f) return;
+    fprintf(f, "inc=[%.9f,%.9f] negcalls=%lu\n",
+            (double)ebpw_ilo, (double)ebpw_ihi, ebpw_ineg);
     fprintf(f, "calls=%lu moved=%lu span=[%.6f,%.6f] worststep=%.8f "
             "bkt=%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu\n",
             ebpw_n, ebpw_moved, (double)ebpw_lo, (double)ebpw_hi,
@@ -55,6 +64,11 @@ float eb_dcoprep_tick(const eb_dcoprep_coef *c, float pitch, float pwmcv,
     float v400;
 
     *out4816 = v397 + in3808;
+#if EB_PW_RANGE
+    if (v398 < ebpw_ilo) ebpw_ilo = v398;
+    if (v398 > ebpw_ihi) ebpw_ihi = v398;
+    if (v398 < 0.0f) ++ebpw_ineg;
+#endif
 #if EB_PW_RANGE
     {   float pw = *out4816;
         ++ebpw_n;

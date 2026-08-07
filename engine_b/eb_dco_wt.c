@@ -379,8 +379,18 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
              * pw crawls (48 % of samples do not move it at all, only 232 of
              * 17.2 M move it past 1e-2), and the grid at 0.01 was MEASURED at
              * the convergence limit already. */
-            int sl = (int)((c->pw - EB_WT_PW_LO) * (1.0f / EB_WT_PW_STEP));
+            /* SLICED BY EDGE WIDTH, NOT BY pw. u = 1 - pw IS the width, and
+             * the index is its exponent plus four mantissa bits -- a shift and
+             * a mask, same trick as the sub's mip. See eb_dco_wt.h. */
+            int sl;
             float frac;
+            {   union { float f; unsigned u; } z;
+                int e2, j;
+                z.f = 1.0f - c->pw;
+                e2 = (int)((z.u >> 23) & 0xFFu) - 127;
+                j  = (int)((z.u >> 19) & 15u);
+                sl = (e2 - (EB_WT_PWA_EMIN)) * EB_WT_PWA_PER_OCT + j;
+            }
             if (sl < 0) sl = 0;
             if (sl >= EB_WT_PW_SLICES) sl = EB_WT_PW_SLICES - 1;
             /* -tprev/inc IS RIGHT EVEN UNDER PWM, and interpolating

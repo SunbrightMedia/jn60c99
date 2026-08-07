@@ -180,9 +180,25 @@
  * for the fixed one. Over the measured pw range [-0.015, 0.939] the moving
  * edge's width varies 16x and the fixed edge's only 2x, so they get different
  * slice counts instead of one number covering both badly. */
+/* THE MOVING EDGE'S SLICES ARE UNIFORM IN EDGE WIDTH, WHICH IS WHAT THE
+ * PARAGRAPH ABOVE ALWAYS SAID AND THE CODE NEVER DID. It used a LINEAR pw grid
+ * at 0.01, and the moving edge's width goes as |pw-1|: at pw 0.02 a step of
+ * 0.01 changes the width by 1 %, and at pw 0.85 it changes it by 6.7 %. The
+ * grid was six times too coarse exactly where the edge is narrowest.
+ *
+ * MEASURED, module pulse arm at inc 0.004 across the pw range the 36 scenarios
+ * actually reach: -73.9 dB at pw 0.02 but -49.9 at 0.7 and -46.0 at 0.85. The
+ * saw and the sub do not move with pw at all, so this is the pulse's alone.
+ *
+ * u = 1 - pw is the edge width, and it spans [0.06, 1.05] over that range --
+ * about four octaves. Sixteen slices per octave, indexed from u's own float
+ * exponent and top four mantissa bits, is FEWER slices than the linear grid
+ * and puts them where the width is changing. */
 #define EB_WT_PW_LO     (-0.05f)
 #define EB_WT_PW_STEP    (0.01f)
-#define EB_WT_PW_SLICES  106
+#define EB_WT_PWA_PER_OCT 16
+#define EB_WT_PWA_EMIN   (-5)          /* u down to 1/32 */
+#define EB_WT_PW_SLICES  (6 * EB_WT_PWA_PER_OCT)
 #ifndef EB_WT_PWB_SLICES
 #define EB_WT_PWB_SLICES   8
 #endif
