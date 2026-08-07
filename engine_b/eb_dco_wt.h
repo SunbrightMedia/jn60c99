@@ -193,7 +193,7 @@
  * square, and only the SAW needs pre-ring, which is the same split DELAY 0/1/2
  * found before. */
 #ifndef EB_WT_DELAY
-#define EB_WT_DELAY      6
+#define EB_WT_DELAY      2
 #endif
 
 /* THE PULSE-WIDTH GRID. Measured range of pw over all 36 scenarios is
