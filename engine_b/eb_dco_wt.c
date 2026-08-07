@@ -80,7 +80,7 @@ static void eb_wt_add(eb_dco_wt_state *s, const float *tab, float frac,
 float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
 {
     const float prev = s->phase;
-    float p, t, u, cnt, out;
+    float p, t, u, cnt, cnt_old, out;
     float saw, pulse, sub;
 
     /* ---- phase. The port's wrap is a pair of compares and an add; the
@@ -133,6 +133,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      * subthr steps it by two and it wraps at four. It is FREE-RUNNING STATE
      * and is advanced whatever lvl_sub is, exactly as the port does. */
     cnt = s->subcnt;
+    cnt_old = cnt;          /* BEFORE the toggle -- see the edge test below */
     if (!(p < c->subthr || c->subthr <= prev)) cnt += 2.0f;
     if (cnt >= 4.0f) cnt = 0.0f;
     s->subcnt = cnt;
@@ -160,7 +161,12 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      * cannot disagree with itself. */
     {
         const float tp = c->pw + prev;
-        const float up = (((s->subcnt + prev) + 1.0f) * 0.5f) - 1.0f;
+        /* THE PREVIOUS RAMP USES THE PREVIOUS COUNTER. s->subcnt has already
+         * been updated by the time this runs, so using it here computes the
+         * previous sample's ramp with the NEW counter -- which is wrong on
+         * exactly the sample the counter toggles, i.e. the only sample this
+         * test exists to catch. */
+        const float up = (((cnt_old + prev) + 1.0f) * 0.5f) - 1.0f;
         const float f_saw_prev   = (prev * c->gn_saw) * c->sat_hi;
         const float f_pulse_prev = (tp < 0.0f ? -c->gn_pulse : c->gn_pulse)
                                  * c->sat_hi;
@@ -217,8 +223,17 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
                       frac, h_pulse);
         }
     }
-    if (cnt != s->subcnt || (u < 0.0f) != (((((s->subcnt + prev) + 1.0f)
-                                             * 0.5f) - 1.0f) < 0.0f)) {
+    /* THE SUB'S EDGE. The old test read
+     *     cnt != s->subcnt || (u<0) != (u_from(s->subcnt, prev) < 0)
+     * and BOTH halves were broken: s->subcnt had already been assigned `cnt`
+     * two lines above, so the first comparison was a value against itself and
+     * always false; and the second built the previous ramp from the NEW
+     * counter, which is wrong on precisely the sample the counter toggles.
+     *
+     * The symptom was that the sub was the ONLY arm that did not improve when
+     * the tables were rebuilt at exact fractional positions -- it sat at
+     * -25.6 dB while the pulse went from -27.0 to -61.7. */
+    if ((u < 0.0f) != ((((cnt_old + prev) + 1.0f) * 0.5f - 1.0f) < 0.0f)) {
         /* the sub's own crossing; its step is the same height as the pulse's
          * because both are square */
         /* THE SUB'S OWN FRACTION, not a hardcoded 0.5. Its ramp is
