@@ -225,6 +225,12 @@ def module_cost(src, entry, extra=()):
     return cost(entry)
 
 
+def budget_report(total):
+    print("\nAgainst the two-core instruction budget 6300-9500 "
+          "(9,500 cycles at c/i 1.5..1.0):")
+    print("  %.1fx to %.1fx OVER" % (total / 9500.0, total / 6300.0))
+
+
 def main():
     fast = "--fast-pitch" in sys.argv[1:]
     recip = "--recip" in sys.argv[1:]
@@ -254,6 +260,20 @@ def main():
     # replaces it with a load pair and a lerp. Gated at -108.8 dB over all 36
     # scenarios, which is the TRUNK gate, not merely the fork's.
     res_lut = "--res-lut" in sys.argv[1:]
+    # --dco-wt: the band-limited DCO (row 6). Replaces eb_dco_step4 AND the
+    # whole decimator. Priced the way dco_price.py prices the DCO -- PATHS
+    # times RATES, not a static body count -- because the residual loop only
+    # runs when an edge falls.
+    #
+    #   flat path   72 instructions, MEASURED by compiling with the edge
+    #               blocks removed (-DEB_WT_NO_EDGES=1)
+    #   edge cost   three residual adds of 64 taps, ~4 instructions a tap
+    #   edge rate   2.5 crossings per period (saw wrap, pulse edge, sub at
+    #               half rate), so 2.5*f0/FS per sample
+    #
+    # Priced at 440 Hz, which is where a JUNO is played. The high-pitch cost
+    # is stated in the result document rather than hidden in an average.
+    dco_wt = "--dco-wt" in sys.argv[1:]
     fvoices = 6
     print("=== ENGINE B, WHOLE PER-SAMPLE DSP CHAIN, STATIC Xtensa "
           "instructions ===")
@@ -267,6 +287,8 @@ def main():
     total = 0
     for src, sym, calls, note in CHAIN:
         extra = []
+        if dco_wt and src == "eb_decim.c":
+            continue                    # the wavetable removes it entirely
         if src == "eb_vcf_res.c" and res_lut:
             extra.append("-DEB_VCF_RES_LUT=4096")
         if src == "eb_pitch.c" and fast:
@@ -307,6 +329,20 @@ def main():
                  "replaces expf: %d LFO + %d VCF-res site(s)"
                  % (1 if shared_lfo else fvoices,
                     0 if res_lut else fvoices)))
+    if dco_wt:
+        flat, taps, per_tap, adds = 72, 64, 4, 3
+        rate = 2.5 * 440.0 / 44100.0
+        per_voice = flat + rate * adds * taps * per_tap
+        dco = int(round(per_voice * fvoices))
+        total += dco
+        print("  %-18s %7d %6d %10d   %s"
+              % ("dco (wavetable)", int(round(per_voice)), fvoices, dco,
+                 "flat 72 + edges at 440 Hz; NO decimator"))
+        print("  %-18s %7d %6d %10d   %s"
+              % ("decim", 0, 0, 0, "REMOVED -- the wavetable is band-limited"))
+        print("\n  TOTAL%39d instructions per audio sample" % total)
+        budget_report(total)
+        return 0
     # THE DCO: real-mix figure from dco_price.py, not a static body count.
     dco = 10202 if recip else 11610
     if half_os:

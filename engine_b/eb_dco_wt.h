@@ -1,0 +1,125 @@
+/* eb_dco_wt.h — THE BAND-LIMITED DCO. Row 6 of docs/engineb/S3_PLAN_V2.md.
+ *
+ * WHAT IT REPLACES: eb_dco_step4 running at 2x or 4x plus the whole of
+ * eb_decim.c. Together those are 3,918 of the S3 fork's instructions per
+ * sample at six voices, and this replaces them with arithmetic that is flat
+ * almost everywhere plus a short residual at each edge.
+ *
+ * ------------------------------------------------------------------------
+ * WHY THIS SHAPE, and every clause is a measurement recorded in
+ * docs/engineb/data/wavetable_result.md.
+ *
+ * 1. A BAND-LIMITED TABLE OF THIS OSCILLATOR IS INDISTINGUISHABLE FROM THE 4x
+ *    PATH. Alias floor DROPS 71-92 dB; harmonics agree to 2.88 dB worst
+ *    against the 3.27 dB that half-oversampling -- already shipping --
+ *    measures on the same metric.
+ *
+ *    This is NOT the 1x DCO that was closed negative the same day. That build
+ *    ran the shaping nonlinearity at the OUTPUT rate, which is where the
+ *    harmonics come from, and they came out 13.6 dB wrong. Here the
+ *    nonlinearity runs ONCE, at high phase resolution, at recall time.
+ *
+ * 2. THE OUTPUT IS FLAT ALMOST EVERYWHERE. eb_dco.c's EB_DCO_PULSEFAST
+ *    measured the saturator's shortcut firing on 98.85 % of sub-steps: away
+ *    from an edge every arm is exactly +/- sat_hi. So the per-sample
+ *    arithmetic is a phase accumulate, three signs and a mix -- and the whole
+ *    cost of the oscillator is its EDGES.
+ *
+ * 3. SO THE TABLE IS A RESIDUAL, NOT A WAVEFORM. Store the difference between
+ *    the band-limited edge and the flat step it replaces. It is non-zero only
+ *    within a few samples of a crossing, so it is short, and it is ADDED to
+ *    the cheap arithmetic rather than replacing it.
+ *
+ * 4. ONE TABLE SET SERVES ALL EIGHT VOICES. Over all 51 factory patches the
+ *    per-voice spread of every DCO shape and gain coefficient is EXACTLY 0;
+ *    CONDITION's scatter enters through the PITCH, which at runtime is the
+ *    increment and the mip level. Both are per-voice for free.
+ *
+ * 5. THE RESIDUAL DEPENDS ON PITCH, about one semitone per level. A table
+ *    built an octave away is 44.6 dB wrong. Hence mip levels.
+ *
+ * 6. THE PULSE HAS TWO EDGE SHAPES, NOT ONE. The port divides the pulse phase
+ *    by pwm1 below zero and pwp1 above, so the two halves have different
+ *    slopes -- "that asymmetry IS the pulse width", as eb_dco.c says. Assuming
+ *    one shape put a -53.6 dB harmonic at -166 dB.
+ *
+ * 7. THE PULSE WIDTH IS A PHASE OFFSET, NOT A BLEND. Interpolating two pulse
+ *    waveforms blends edges that sit in different PLACES, and the blend of two
+ *    edges is two edges: 15.6 dB error even at a half-spacing of 0.0125. The
+ *    offset moves the edge exactly; only its SHAPE is interpolated, and the
+ *    shapes' edges are both at argument 0 by construction so blending them
+ *    moves nothing. That converges: 5.41 dB at half-spacing 0.005 against the
+ *    direct table's own 5.59.
+ *
+ * 8. AND pw CRAWLS. Of 17,199,352 per-voice comparisons, 48 % are exactly 0,
+ *    33 % are under 1e-3, and only 232 exceed 1e-2. So a FIXED GRID of step
+ *    pairs at spacing 0.01 covers every patch with no rebuild ever.
+ *
+ * ------------------------------------------------------------------------
+ * WHAT IS NOT CLAIMED. This header describes a module whose GATE is the fork's
+ * (indistinguishability), not the trunk's. The trunk keeps eb_dco.c exactly as
+ * it is; this compiles only under EB_DCO_WT.
+ */
+#ifndef ENGINEB_EB_DCO_WT_H
+#define ENGINEB_EB_DCO_WT_H
+
+#include "eb_fork_config.h"
+
+#ifndef EB_DCO_WT
+#define EB_DCO_WT 0
+#endif
+
+/* THE RESIDUAL'S LENGTH. A band-limited step's departure from a flat step
+ * decays as 1/n, so a window is a compromise between table size and the ripple
+ * left at its ends. 64 taps at 4 sub-sample positions is the size the design
+ * document prices at 50 KB for the whole pw grid. */
+#define EB_WT_RES_LEN    64
+#define EB_WT_RES_OVER    4     /* fractional-crossing resolution */
+
+/* THE PULSE-WIDTH GRID. Measured range of pw over all 36 scenarios is
+ * [-0.015, 0.939]; the grid spans [-0.05, 1.00] at 0.01, which is the spacing
+ * the convergence measurement showed to be at the limit already. */
+#define EB_WT_PW_LO     (-0.05f)
+#define EB_WT_PW_STEP    (0.01f)
+#define EB_WT_PW_SLICES  106
+
+/* Mip levels: one per semitone across the playable range. A level is chosen by
+ * the increment, so vibrato and CONDITION detune move a voice between levels
+ * without any rebuild. */
+#define EB_WT_MIPS       72
+
+typedef struct {
+    float phase;      /* [-1,1), the port's own DCO phase   */
+    float subcnt;     /* 0 or 2, the divide-by-two counter  */
+    /* ACTIVE RESIDUALS. An edge crossed at a fractional position schedules a
+     * residual that is added over the next EB_WT_RES_LEN samples. Three arms
+     * can each cross in one sample, and a very high note can cross twice, so
+     * the ring is sized for the worst case rather than the common one. */
+    float ring[EB_WT_RES_LEN];
+    int   rpos;
+} eb_dco_wt_state;
+
+typedef struct {
+    /* per sample, from the CV chain -- the same two numbers eb_dco_set_pitch
+     * takes today */
+    float inc;
+    float pw;
+    int   mip;        /* derived from inc; see eb_dco_wt_set_pitch */
+    /* per recall */
+    float sat_hi, sat_lo;
+    float lvl_saw, lvl_pulse, lvl_sub;
+    float gn_saw,  gn_pulse,  gn_sub;
+    float subthr;
+    /* THE RESIDUAL TABLES, caller-owned and SHARED BY ALL VOICES (finding 4).
+     * saw and sub are indexed by mip alone; the pulse's two edges are indexed
+     * by mip and by the pw slice. */
+    const float *res_saw;      /* [EB_WT_MIPS][EB_WT_RES_OVER][EB_WT_RES_LEN] */
+    const float *res_sub;
+    const float *res_pulse_a;  /* [...][EB_WT_PW_SLICES][...] -- moving edge  */
+    const float *res_pulse_b;  /* fixed edge at the wrap                      */
+} eb_dco_wt_coef;
+
+void  eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc, float pw);
+float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c);
+
+#endif
