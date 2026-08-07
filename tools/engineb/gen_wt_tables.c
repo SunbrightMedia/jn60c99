@@ -686,8 +686,10 @@ int main(void)
     g_build_inc = BUILD_INC;
     emit2("eb_wt_res_pulse_a", 0.0f,  ARM_PULSE, 1, EB_WT_PW_SLICES,
          EB_WT_PW_LO, EB_WT_PW_LO + EB_WT_PW_STEP * EB_WT_PW_SLICES, 0);
+    /* THE FIXED EDGE'S RANGE IS ITS OWN, not the moving edge's slice count
+     * scaled by a step that no longer exists. See eb_dco_wt.h. */
     emit2("eb_wt_res_pulse_b", 0.0f,  ARM_PULSE, 0, EB_WT_PWB_SLICES,
-         EB_WT_PW_LO, EB_WT_PW_LO + EB_WT_PW_STEP * EB_WT_PW_SLICES, 0);
+         EB_WT_PW_LO, EB_WT_PWB_HI, 0);
     printf("#endif\n");
     return 0;
 }

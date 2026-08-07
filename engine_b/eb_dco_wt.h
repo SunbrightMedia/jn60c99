@@ -219,6 +219,18 @@
 #error "EB_WT_PWA_PER_OCT must be 8, 16, 32 or 64"
 #endif
 #define EB_WT_PW_SLICES  (6 * EB_WT_PWA_PER_OCT)
+/* THE FIXED EDGE'S OWN RANGE, stated rather than inherited. Its build range
+ * used to be LO + EB_WT_PW_STEP * EB_WT_PW_SLICES -- the MOVING edge's slice
+ * count -- which at 106 linear slices came to 1.01 and matched the tick's
+ * implicit range by accident. The moment the moving edge was re-sliced the
+ * coupling showed: at 192 slices the range became 1.87, so most fixed-edge
+ * slices were built at pulse widths that never occur, and the tick read a row
+ * built for pw 1.75 when it wanted pw 0.7.
+ *
+ * MEASURED: that is the whole of why 32 slices per octave collapsed to -16 dB
+ * while 16 gave -59.7. The tables and the moving edge's index were both
+ * correct; the FIXED edge's range was not. */
+#define EB_WT_PWB_HI     (1.00f)
 #ifndef EB_WT_PWB_SLICES
 #define EB_WT_PWB_SLICES   8
 #endif

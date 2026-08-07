@@ -336,7 +336,8 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
          * the module's RMS came out 0.85 against the 4x path's 0.21, which is
          * exactly the missing lvl_pulse of 0.25. */
         {   int sb = (int)((c->pw - EB_WT_PW_LO)
-                           * (float)EB_WT_PWB_SLICES);
+                           * ((float)EB_WT_PWB_SLICES
+                              / (EB_WT_PWB_HI - EB_WT_PW_LO)));
             if (sb < 0) sb = 0;
             if (sb >= EB_WT_PWB_SLICES) sb = EB_WT_PWB_SLICES - 1;
         /* NEGATIVE. The generator divides each residual by its own SIGNED
