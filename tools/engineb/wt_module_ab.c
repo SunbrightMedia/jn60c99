@@ -103,7 +103,22 @@ int main(int argc, char **argv)
     for (i = 2000; i < N; ++i) { ra += A[i]*A[i]; rb += B[i]*B[i]; }
     printf("f0 %.0f Hz   ref rms %.4f   wt rms %.4f\n",
            inc4/2*4*44100.0, sqrt(ra/(N-2000)), sqrt(rb/(N-2000)));
-    for (i = -128; i <= 128; ++i) {
+    /* THE SEARCH SPAN MUST BE SHORTER THAN A PERIOD, and this probe was
+     * caught not being. A saw is nearly periodic, so its correlation has a
+     * peak at EVERY period; over +/-128 samples the search picked whole-period
+     * offsets and the "aligned" residual it then reported was the module
+     * compared against itself one cycle over. That read as a sharp band of
+     * failure at inc 0.010 to 0.014 -- -19.5 dB at 0.012 between -53.3 and
+     * -44.7 either side -- which is the shape of a broken measurement, not of
+     * a broken oscillator.
+     *
+     * The true lag is not a free parameter: it is EB_WT_RES_LEN/2, the half
+     * ring the tick delays its flat path by. So the span defaults to +/-16 and
+     * EB_AB_LAG pins it outright. */
+    {   int span = getenv("EB_AB_SPAN") ? atoi(getenv("EB_AB_SPAN")) : 16;
+        if (getenv("EB_AB_LAG")) { best = atoi(getenv("EB_AB_LAG")); bc = 1; }
+        else
+    for (i = -span; i <= span; ++i) {
         double c = 0; int k;
         for (k = 4000; k < N-200; ++k) {
             int j = k + i; if (j < 0 || j >= N) continue;
@@ -111,11 +126,27 @@ int main(int argc, char **argv)
         }
         if (c > bc) { bc = c; best = i; }
     }
+    }
     printf("best lag %+d samples (B leads A by this)\n", best);
     /* WHERE the error is, not just how big. A single dB figure cannot say
      * whether a residual is wrong at the edge or everywhere. */
     if (getenv("EB_AB_DUMP")) {
         int k, e0 = -1;
+        /* EB_AB_WORST centres the dump on the LARGEST error instead of the
+         * first edge. The first edge is not the worst one when the fault is
+         * fraction-dependent: at inc 0.014 the first edge's error is 0.002,
+         * which alone would read -55 dB, while the arm measures -19.2. A dump
+         * anchored on the first edge cannot see a fault like that at all. */
+        if (getenv("EB_AB_WORST")) {
+            double bw = -1;
+            for (k = 4000; k < N-200; ++k) {
+                int j = k + best; double d;
+                if (j < 0 || j >= N) continue;
+                d = fabs((double)A[k] - B[j]);
+                if (d > bw) { bw = d; e0 = k; }
+            }
+            printf("  worst error %.5f at sample %d\n", bw, e0);
+        } else
         for (k = 6000; k < 6400; ++k) {
             int j = k + best;
             if (fabs((double)A[k] - A[k-1]) > 0.25) { e0 = k; break; }   /* the port's edge spans several samples, so no single step is large */

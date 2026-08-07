@@ -111,8 +111,20 @@
 #ifndef EB_WT_RES_LEN
 #define EB_WT_RES_LEN    16
 #endif
+/* OVER 64, RAISED FROM 16 BY MEASUREMENT AND ONLY PART OF THE WAY. The saw's
+ * error at a fixed pitch is a LOTTERY in the crossing fraction: over inc 0.009
+ * to 0.018 it jumped between -63 and -22 dB on pitch changes of half a percent.
+ * Raising the resolution lifts the worst of those -- 0.0105 goes -28.9 to
+ * -46.0, 0.014 goes -22.6 to -58.1 -- and costs table memory only, since the
+ * per-edge work is unchanged.
+ *
+ * IT DOES NOT CLOSE IT, and 128 proves that: two pitches (0.0115 and 0.0155)
+ * sit at -29 and -30 at OVER 64 and only reach -35 and -38 at 128, while every
+ * other entry does not move at all. A quantisation error would keep halving.
+ * So a structural fault remains in the saw arm, it is NOT the sub-position
+ * resolution, and it is not claimed to be fixed. */
 #ifndef EB_WT_RES_OVER
-#define EB_WT_RES_OVER   16
+#define EB_WT_RES_OVER   64
 #endif
 
 /* THE PULSE-WIDTH GRID. Measured range of pw over all 36 scenarios is

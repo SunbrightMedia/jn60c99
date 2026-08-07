@@ -79,9 +79,11 @@ static void eb_wt_add(eb_dco_wt_state *s, const float *tab, float frac,
     g1 = frac - (float)sub;
     g0 = 1.0f - g1;
     r0 = tab + sub * EB_WT_RES_LEN;
-    /* the last slot's partner is the FIRST slot of the NEXT sample's window,
-     * which is the same shape shifted one tap -- so it is read one tap in */
-    r1 = (sub + 1 < EB_WT_RES_OVER) ? r0 + EB_WT_RES_LEN : r0;
+    /* ALWAYS A PARTNER. The tables carry EB_WT_RES_OVER+1 rows so the top slot
+     * has one; it used to fall back to r0, which is nearest-neighbour, and at
+     * pitches whose crossing fraction lands there the saw measured -19.2 dB
+     * against -50 either side. */
+    r1 = r0 + EB_WT_RES_LEN;
     for (i = 0; i < EB_WT_RES_LEN; ++i) {
         s->ring[p] += (r0[i] * g0 + r1[i] * g1) * amp;
         p = (p + 1) & (EB_WT_RES_LEN - 1);
@@ -224,7 +226,6 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
          * it is scaled by 1/lvl relative to the signal it corrects. Measured:
          * the module's RMS came out 0.85 against the 4x path's 0.21, which is
          * exactly the missing lvl_pulse of 0.25. */
-        eb_wt_add(s, c->res_saw, frac, h_saw);
         {   int sb = (int)((c->pw - EB_WT_PW_LO)
                            * (float)EB_WT_PWB_SLICES);
             if (sb < 0) sb = 0;
@@ -239,8 +240,30 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
          * the edge is +1.694, and passing +1.70 applied -1.694 -- the right
          * magnitude with the wrong sign, which is worse than no correction. */
         eb_wt_add(s, c->res_pulse_b
-                     + (size_t)sb * EB_WT_RES_OVER * EB_WT_RES_LEN, frac,
+                     + (size_t)sb * (EB_WT_RES_OVER + 1) * EB_WT_RES_LEN, frac,
                   h_pulse); }
+    }
+    /* THE SAW'S EDGE IS SCHEDULED ON ITS OWN DELAYED PHASE, not on the raw
+     * wrap. Its flat path is the ramp pd = p - 3.875*inc, so the flat step
+     * happens 3.875 samples AFTER the phase wrap. Scheduling the residual at
+     * the wrap meant the correction and the step it corrects were quantised to
+     * samples INDEPENDENTLY, and when the two rounded apart the edge was
+     * corrected in the wrong sample entirely.
+     *
+     * MEASURED: at inc 0.014 most edges were accurate to 0.002 -- which alone
+     * would read -55 dB -- while ONE edge in a few tens reached an error of
+     * 0.712, wt +1.110 against the port's +0.398, above the flat level itself.
+     * The arm measured -19.2 dB on that handful of edges. Detecting on pd ties
+     * the two together, so they can no longer round apart.
+     *
+     * pd_prev is the PREVIOUS sample's delayed phase, wrapped the same way, so
+     * the test is the same "did it wrap" question the raw phase asks. */
+    {   float pd_prev = prev - (EB_WT_SAWGD) * c->inc;
+        float pd_now  = p    - (EB_WT_SAWGD) * c->inc;
+        if (pd_prev < -1.0f) pd_prev += 2.0f;
+        if (pd_now  < -1.0f) pd_now  += 2.0f;
+        if (pd_now < pd_prev)
+            eb_wt_add(s, c->res_saw, (1.0f - pd_prev) / c->inc, h_saw);
     }
     {   /* the pulse's MOVING edge, where t crosses zero */
         float tprev = c->pw + prev;
@@ -255,7 +278,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
             if (sl >= EB_WT_PW_SLICES) sl = EB_WT_PW_SLICES - 1;
             frac = -tprev / c->inc;
             eb_wt_add(s, c->res_pulse_a
-                         + ((size_t)sl * EB_WT_RES_OVER * EB_WT_RES_LEN),
+                         + ((size_t)sl * (EB_WT_RES_OVER + 1) * EB_WT_RES_LEN),
                       frac, h_pulse);
         }
     }
@@ -287,7 +310,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
          * The toggle test is `prev < subthr <= p`, so subthr - prev lies in
          * (0, inc] and the fraction is in [0,1) by construction. */
         eb_wt_add(s, c->res_sub
-                     + (size_t)c->sub_mip * EB_WT_RES_OVER * EB_WT_RES_LEN,
+                     + (size_t)c->sub_mip * (EB_WT_RES_OVER + 1) * EB_WT_RES_LEN,
                   (c->subthr - prev) / c->inc, h_sub);
     }
     }

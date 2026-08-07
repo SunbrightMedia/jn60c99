@@ -355,13 +355,25 @@ static double build_one(float pw, int arm, int which, int o, float *out,
              * -0.005) -- NOT at the phase wrap. Using the wrap's fraction here
              * indexed every sub residual by a position half a period from the
              * edge it was meant to describe. */
+            /* THE SAW IS ANCHORED ON ITS DELAYED PHASE, exactly as
+             * eb_dco_wt_tick schedules it. Its flat path is the ramp
+             * pd = p - 3.875*inc, so its step happens 3.875 samples after the
+             * phase wrap; anchoring the table on the wrap and the tick on the
+             * step let the two round into different samples, and one edge in a
+             * few tens was then corrected in the wrong sample entirely. */
+            double gd = 3.875 * dpo;
+            double pdp = (double)pprev - gd, pdn = (double)s.phase - gd;
+            if (pdp < -1.0) pdp += 2.0;
+            if (pdn < -1.0) pdn += 2.0;
             double fr = (which == 1) ? (-(double)(pw + pprev) / dpo)
                       : (which == 2) ? (((double)RC_subthr - (double)pprev)
                                         / dpo)
+                      : (arm == ARM_SAW) ? ((1.0 - pdp) / dpo)
                                      : ((1.0 - (double)pprev) / dpo);
             if (getenv("EB_WT_TRACEFRAC")) { /* set below once hit is known */ }
             (void)fr;
-            if (which == 0 && s.phase < pprev) hit = 1;
+            if (which == 0 && (arm == ARM_SAW ? (pdn < pdp)
+                                             : (s.phase < pprev))) hit = 1;
             if (which == 1 && ((pw + pprev) < 0.0f) != ((pw + s.phase) < 0.0f))
                 hit = 1;
             if (which == 2 && (uprev < 0.0f) != (u < 0.0f)) hit = 1;
@@ -445,7 +457,7 @@ static void emit2(const char *name, float pw, int arm, int which,
 {
     int sl, o, i, nsl = mips ? mips : (slices ? slices : 1);
     printf("static const float %s[%d][%d][%d] = {\n", name, nsl,
-           EB_WT_RES_OVER, EB_WT_RES_LEN);
+           EB_WT_RES_OVER + 1, EB_WT_RES_LEN);
     for (sl = 0; sl < nsl; ++sl) {
         float w = (!mips && slices) ? lo + (hi - lo) * (sl + 0.5f) / slices : pw;
         if (mips) {
@@ -455,7 +467,14 @@ static void emit2(const char *name, float pw, int arm, int which,
             printf("  { /* mip %d, inc %.5f */\n", sl, g_build_inc);
         } else
         printf("  { /* pw %.4f */\n", w);
-        for (o = 0; o < EB_WT_RES_OVER; ++o) {
+        /* OVER+1 ROWS, not OVER. The tick blends row `sub` with row `sub+1`,
+         * and the LAST row had no partner: it fell back to itself, which is
+         * the un-interpolated nearest-neighbour case the whole oversampling
+         * exists to remove. Where a pitch makes the crossing fraction sit in
+         * that top slot the saw collapsed -- -19.2 dB at inc 0.014 between
+         * -53.3 and -44.7 either side. The extra row is the SAME edge at
+         * fraction 1.0, which the solver builds like any other. */
+        for (o = 0; o <= EB_WT_RES_OVER; ++o) {
             float y[EB_WT_RES_LEN], nvw[EB_WT_RES_LEN];
             double lvl0, lvl1, h;
             /* SOLVE p0 BY ITERATION, because solving it in closed form does
