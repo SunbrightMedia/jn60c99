@@ -20,10 +20,18 @@ int main(int argc, char **argv)
     eb_dco_coef dc; eb_dco_state ds;
     eb_dco_wt_coef wc; eb_dco_wt_state ws;
     int i, best = 0; double bc = -1e30, ra = 0, rb = 0;
+    float pw0;
+    float pwmod = getenv("EB_AB_PWMOD") ? (float)atof(getenv("EB_AB_PWMOD")) : 0.0f;
+    float pmod  = getenv("EB_AB_PMOD")  ? (float)atof(getenv("EB_AB_PMOD"))  : 0.0f;
     memset(&ds,0,sizeof ds); memset(&ws,0,sizeof ws); memset(&dc,0,sizeof dc);
     memset(&wc,0,sizeof wc);
     dc.inc = inc4; dc.g = 0.00390625f/inc4;
-    dc.pw = RC_pw; dc.pwm1 = dc.pw-1.0f; dc.pwp1 = dc.pw+1.0f;
+    /* pw0 IS THE BASE, HELD SEPARATELY. Reading dc.pw as the base inside the
+     * candidate loop reads whatever the REFERENCE loop left modulated there,
+     * so the two sides ran different pulse widths and the probe reported
+     * +1.8 dB at a modulation depth of 0.001. */
+    pw0 = getenv("EB_AB_PW") ? (float)atof(getenv("EB_AB_PW")) : RC_pw;
+    dc.pw = pw0; dc.pwm1 = dc.pw-1.0f; dc.pwp1 = dc.pw+1.0f;
     dc.rm1 = 1.0f/dc.pwm1; dc.rp1 = 1.0f/dc.pwp1;
     /* ARM SELECTOR via argv[2]: 0 = the patch's own mix, 1 = saw, 2 = pulse,
      * 3 = sub. A whole-mix residual cannot say WHICH arm is wrong, and with
@@ -65,6 +73,20 @@ int main(int argc, char **argv)
         xc.k6256 = RC_k6256; xc.k6272 = RC_k6272; xc.k6336 = RC_k6336;
         for (i = 0; i < N; ++i) {
             float q[4];
+            /* MODULATED pw AND PITCH, because the engine modulates both every
+             * sample and this probe held them fixed. A module gate that runs
+             * only static coefficients cannot answer why the same module is
+             * 25 dB worse inside the engine. Both sides get the SAME
+             * modulation, so any difference is still the oscillator's. */
+            if (pwmod != 0.0f || pmod != 0.0f) {
+                float ph = (float)i * (2.0f * 3.14159265f * 3.0f / (float)N);
+                float pwv = pw0 + pwmod * (float)sin(ph);
+                float inv = inc4 * (1.0f + pmod * (float)sin(ph * 1.7f));
+                dc.pw = pwv; dc.pwm1 = pwv-1.0f; dc.pwp1 = pwv+1.0f;
+                dc.rm1 = 1.0f/dc.pwm1; dc.rp1 = 1.0f/dc.pwp1;
+                dc.inc = inv; dc.g = 0.00390625f/inv;
+                eb_dco_set_edge_thresholds(&dc);
+            }
             q[0] = eb_dco_step(&ds,&dc); q[1] = eb_dco_step(&ds,&dc);
             q[2] = eb_dco_step(&ds,&dc); q[3] = eb_dco_step(&ds,&dc);
             A[i] = eb_decim_tick(&xs,&xc,0.0f,q[0],q[1],q[2],q[3]);
@@ -85,7 +107,14 @@ int main(int argc, char **argv)
         for (j = 0; j < 16; ++j) yc.c[j] = RC_fir[j];
         yc.k6256 = RC_k6256; yc.k6272 = RC_k6272; yc.k6336 = RC_k6336;
         for (i = 0; i < N; ++i) {
-            float w = eb_dco_wt_tick(&ws,&wc);
+            float w;
+            if (pwmod != 0.0f || pmod != 0.0f) {
+                float ph = (float)i * (2.0f * 3.14159265f * 3.0f / (float)N);
+                float pwv = pw0 + pwmod * (float)sin(ph);
+                float inv = inc4 * (1.0f + pmod * (float)sin(ph * 1.7f));
+                eb_dco_wt_set_pitch(&wc, inv * 4.0f, pwv);
+            }
+            w = eb_dco_wt_tick(&ws,&wc);
             /* the biquad alone: feed the sample in and zero the other three,
              * which is what the EB_QUARTER_OS arm does */
             ys.b3 = ys.b1; ys.b1 = ys.b2;

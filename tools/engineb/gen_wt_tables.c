@@ -164,7 +164,12 @@ static float *trace(float pw, int arm, int which, long *n_out, long *edge_out,
          * on both sides whatever the period turns out to be */
         if (edge < 0 && i > want) {
             if (which == 0 && pnow < pprev) edge = i;
-            if (which == 1 && ((pw + pprev) < 0.0f) != ((pw + pnow) < 0.0f))
+            /* THE NO-WRAP GUARD IS THE TICK'S, and it was missing here. The
+             * tick only calls this the pulse's MOVING edge when p >= prev;
+             * on a wrap sample t also changes sign, and without the guard the
+             * generator called that a moving edge too. */
+            if (which == 1 && pnow >= pprev
+                && ((pw + pprev) < 0.0f) != ((pw + pnow) < 0.0f))
                 edge = i;
             /* THE SUB'S EDGE IS WHERE ITS OWN RAMP CROSSES ZERO, not where
              * the counter is non-zero. The first version tested the counter,
@@ -377,7 +382,8 @@ static double build_one(float pw, int arm, int which, int o, float *out,
             (void)fr;
             if (which == 0 && (arm == ARM_SAW ? (pdn < pdp)
                                              : (s.phase < pprev))) hit = 1;
-            if (which == 1 && ((pw + pprev) < 0.0f) != ((pw + s.phase) < 0.0f))
+            if (which == 1 && s.phase >= pprev
+                && ((pw + pprev) < 0.0f) != ((pw + s.phase) < 0.0f))
                 hit = 1;
             if (which == 2 && (uprev < 0.0f) != (u < 0.0f)) hit = 1;
             if (hit) { edge = rp; *frac_out = fr; }

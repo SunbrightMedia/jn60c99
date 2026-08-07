@@ -183,7 +183,9 @@
 #define EB_WT_PW_LO     (-0.05f)
 #define EB_WT_PW_STEP    (0.01f)
 #define EB_WT_PW_SLICES  106
+#ifndef EB_WT_PWB_SLICES
 #define EB_WT_PWB_SLICES   8
+#endif
 
 /* NO MIP LEVELS FOR THE SAW OR THE PULSE. See finding 5: their residuals are
  * pitch-independent, so a dimension that would have cost 72x and forced a
@@ -223,6 +225,18 @@
 typedef struct {
     float phase;      /* [-1,1), the port's own DCO phase   */
     float subcnt;     /* 0 or 2, the divide-by-two counter  */
+    /* THE PREVIOUS SAMPLE'S OWN t = pw + phase, REMEMBERED RATHER THAN
+     * RECOMPUTED. Rebuilding it from the CURRENT pw and the previous phase
+     * makes pw's own motion move it: a pw change of 1e-4 flipped its sign
+     * while the phase had not crossed anything, so the same crossing was
+     * detected in TWO consecutive samples and corrected twice. The module then
+     * output -1.91 where its own flat level is +/-0.85.
+     *
+     * MEASURED: with pw swept +/-0.2 the pulse arm read -32.2 dB against
+     * -62.9 static. That is the whole of the gap between this module's
+     * isolated figures and the engine's, and no static-pw probe could see it,
+     * because with pw still the two forms are identical. */
+    float tprev;
     /* ACTIVE RESIDUALS. An edge crossed at a fractional position schedules a
      * residual that is added over the next EB_WT_RES_LEN samples. Three arms
      * can each cross in one sample, and a very high note can cross twice, so

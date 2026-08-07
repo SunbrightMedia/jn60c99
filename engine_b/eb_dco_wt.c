@@ -14,6 +14,12 @@
 #include <string.h>
 #include "eb_wt_tables.h"
 
+#ifdef EB_WT_TRACE
+#include <stdio.h>
+#include <stdlib.h>
+unsigned long ebwt_n = 0;
+#endif
+
 void eb_dco_wt_bind_tables(eb_dco_wt_coef *c)
 {
     c->res_saw     = &eb_wt_res_saw[0][0][0];
@@ -104,6 +110,7 @@ void eb_dco_wt_advance(eb_dco_wt_state *s, const eb_dco_wt_coef *c, int n)
         /* THE RING IS DRAINED TOO. Leaving it would let a residual scheduled
          * just before the voice fell silent land on the first sample it
          * sounds again, EB_WT_RES_LEN samples later. */
+        s->tprev = c->pw + p;
         s->ring[s->rpos] = 0.0f;
         s->rpos = (s->rpos + 1) & (EB_WT_RES_LEN - 1);
     }
@@ -209,7 +216,8 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      * BEFORE it, in exactly the expressions the flat path above uses. A sign
      * cannot disagree with itself. */
     {
-        const float tp = c->pw + prev;
+        const float tp = s->tprev;   /* STORED, not rebuilt -- see the
+                                      * state struct's own note */
         /* THE PREVIOUS RAMP USES THE PREVIOUS COUNTER. s->subcnt has already
          * been updated by the time this runs, so using it here computes the
          * previous sample's ramp with the NEW counter -- which is wrong on
@@ -239,6 +247,11 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
     if (p < prev) {                      /* the saw's wrap, and the pulse's
                                           * FIXED edge, both at the phase wrap */
         float frac = (1.0f - prev) / c->inc;
+#ifdef EB_WT_TRACE
+        if (getenv("EB_WT_TRACE"))
+            fprintf(stderr, "%lu WRAP  frac %.4f pw %.4f prev %+.4f p %+.4f\n",
+                    ebwt_n, frac, c->pw, prev, p);
+#endif
         /* THE LEVEL BELONGS ON THE RESIDUAL TOO. The generator normalises
          * each residual by its step height measured at LEVEL 1, and the flat
          * path below applies the recalled level -- so a residual added without
@@ -285,7 +298,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
             eb_wt_add(s, c->res_saw, (1.0f - pd_prev) / c->inc, h_saw);
     }
     {   /* the pulse's MOVING edge, where t crosses zero */
-        float tprev = c->pw + prev;
+        float tprev = s->tprev;
         if ((tprev < 0.0f) != (t < 0.0f) && p >= prev) {
             /* THE SLICE, and the two reasons it is an index and not a rebuild:
              * pw crawls (48 % of samples do not move it at all, only 232 of
@@ -295,7 +308,27 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
             float frac;
             if (sl < 0) sl = 0;
             if (sl >= EB_WT_PW_SLICES) sl = EB_WT_PW_SLICES - 1;
-            frac = -tprev / c->inc;
+            /* -tprev/inc IS RIGHT EVEN UNDER PWM, and interpolating
+             * between the two samples' t values is NOT. tprev is built from
+             * the CURRENT pw and the PREVIOUS phase, and the port holds pw
+             * fixed across a sample's four sub-steps -- so within the sample
+             * the edge moves by phase alone, at rate inc. An interpolation
+             * that mixes the previous sample's pw models a motion the
+             * oscillator does not have; it measured -27.7 dB static against
+             * this form's -62.9. Recorded because it looks like the more
+             * general expression and is the wrong one. */
+            /* THE CROSSING RATE, from the signal's OWN two values. With pw
+             * still, t - tprev is exactly inc and this equals -tprev/inc; with
+             * pw moving it is the rate the edge actually travelled. It is only
+             * correct because tprev is the STORED previous t -- the same
+             * expression built from the current pw measured -27.7 dB static,
+             * because it models a motion the oscillator does not have. */
+            frac = tprev / (tprev - t);
+#ifdef EB_WT_TRACE
+            if (getenv("EB_WT_TRACE"))
+                fprintf(stderr, "%lu MOVE  frac %.4f pw %.4f tprev %+.4f "
+                        "t %+.4f\n", ebwt_n, frac, c->pw, tprev, t);
+#endif
             eb_wt_add(s, c->res_pulse_a
                          + ((size_t)sl * (EB_WT_RES_OVER + 1) * EB_WT_RES_LEN),
                       frac, h_pulse);
@@ -363,6 +396,10 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
     s->ring[(s->rpos + EB_WT_DELAY) & (EB_WT_RES_LEN - 1)] += out;
 
     /* ---- drain, and clear the slot behind us */
+#ifdef EB_WT_TRACE
+    ++ebwt_n;
+#endif
+    s->tprev = t;
     out = s->ring[s->rpos];
     s->ring[s->rpos] = 0.0f;
     s->rpos = (s->rpos + 1) & (EB_WT_RES_LEN - 1);
