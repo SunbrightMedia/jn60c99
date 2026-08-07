@@ -103,6 +103,19 @@ static void eb_wt_add(eb_dco_wt_state *s, const float *tab, float frac,
 void eb_dco_wt_advance(eb_dco_wt_state *s, const eb_dco_wt_coef *c, int n)
 {
     int i;
+    /* PRIME HERE TOO. A voice that is at rest from the start free-runs through
+     * this function before it ever ticks, so priming only in the tick would
+     * apply the lead in the middle of the stream -- a two-sample jump in the
+     * phase at the first note. The flag makes it happen once either way. */
+    if (!s->primed) {
+        int k;
+        s->primed = 1;
+        for (k = 0; k < EB_WT_DELAY * 4; ++k) {
+            s->phase += c->inc4;
+            if (s->phase >= 1.0f) s->phase -= 2.0f;
+        }
+        s->tprev = c->pw + s->phase;
+    }
     for (i = 0; i < n; ++i) {
         const float prev = s->phase;
         float p = prev, cnt = s->subcnt;
