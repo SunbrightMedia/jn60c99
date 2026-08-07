@@ -37,6 +37,12 @@ static unsigned long ebpw_bkt[8];
  * span -- so which end it sits at decides whether the variation matters. Ten
  * equal buckets over [-0.05, 1.00], the grid's own range. */
 static unsigned long ebpw_vbkt[10];
+/* CELL 5456's OWN RANGE. It is the decimator's per-sample feedback term, and
+ * the biquad computes (v521 - v525*k5456)*k6336, where v525 depends on the
+ * INPUT. So k5456 scales whatever error the input carries. The bench probe
+ * passes 0 for it on both sides; the engine passes the real value on both
+ * sides -- and a term that cancels in a null still AMPLIFIES an error. */
+static float ebpw_klo = 1e30f, ebpw_khi = -1e30f;
 static float ebpw_ilo = 1e30f, ebpw_ihi = -1e30f;
 static unsigned long ebpw_ineg = 0;
 static void ebpw_report(void) __attribute__((destructor));
@@ -46,6 +52,7 @@ static void ebpw_report(void)
     if (!ebpw_n) return;
     f = fopen("/tmp/eb_pw.log", "a");
     if (!f) return;
+    fprintf(f, "k5456=[%.6f,%.6f]\n", (double)ebpw_klo, (double)ebpw_khi);
     fprintf(f, "inc=[%.9f,%.9f] negcalls=%lu\n",
             (double)ebpw_ilo, (double)ebpw_ihi, ebpw_ineg);
     fprintf(f, "pwhist=%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu\n",
@@ -118,5 +125,9 @@ float eb_dcoprep_tick(const eb_dcoprep_coef *c, float pitch, float pwmcv,
         v400 = v399;
     *out4800 = 0.00390625f / v398;
     *out5456 = v400;
+#if EB_PW_RANGE
+    if (v400 < ebpw_klo) ebpw_klo = v400;
+    if (v400 > ebpw_khi) ebpw_khi = v400;
+#endif
     return v398;
 }

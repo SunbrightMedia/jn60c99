@@ -12,6 +12,20 @@
 #include "eb_dco_wt.h"
 #include "eb_decim.h"
 #include "c6_realcoefs.h"
+/* CELL 5456 IS 2.0, NOT 0. It is the decimator biquad's per-sample feedback
+ * term, MEASURED constant at 2.0 over all 36 scenarios, with k6336 = 1.0. The
+ * biquad is then
+ *
+ *     v526 = (v521 - v525*2)*1 - 1*v524 + v524 = 3*v521 + 2*v520*k6272 - 2*v524
+ *
+ * so the input enters with coefficient -2. Passing 0 for it, as this probe did
+ * on BOTH sides, degenerates the filter to v526 = v521 -- the direct input
+ * path cancels outright. The probe was self-consistent and measuring a filter
+ * the engine does not have, which is why every module figure it produced was
+ * 20 to 25 dB better than the same module measured inside eb_engine_render. */
+#ifndef EB_AB_K5456
+#define EB_AB_K5456 2.0f
+#endif
 #define N 40000
 static float A[N], B[N];
 int main(int argc, char **argv)
@@ -45,6 +59,11 @@ int main(int argc, char **argv)
                         if (dc.lvl_pulse == 0.0f) dc.lvl_pulse = 1.0f; }
         if (arm == 3) { dc.lvl_saw = 0.0f;   dc.lvl_pulse = 0.0f;
                         if (dc.lvl_sub == 0.0f) dc.lvl_sub = 1.0f; }
+        /* ARM 4: ALL THREE AT ONCE, which is what a real patch does and what
+         * this probe had never measured -- arm 0 uses the source patch's own
+         * levels and that patch has two of the three at exactly 0. */
+        if (arm == 4) { dc.lvl_saw = 0.5f; dc.lvl_pulse = 0.5f;
+                        dc.lvl_sub = 0.5f; }
     }
     dc.gn_saw=RC_gn_saw; dc.gn_pulse=RC_gn_pulse; dc.gn_sub=RC_gn_sub;
     dc.amp_saw=RC_amp_saw; dc.amp_pulse=RC_amp_pulse; dc.amp_sub=RC_amp_sub;
@@ -89,7 +108,7 @@ int main(int argc, char **argv)
             }
             q[0] = eb_dco_step(&ds,&dc); q[1] = eb_dco_step(&ds,&dc);
             q[2] = eb_dco_step(&ds,&dc); q[3] = eb_dco_step(&ds,&dc);
-            A[i] = eb_decim_tick(&xs,&xc,0.0f,q[0],q[1],q[2],q[3]);
+            A[i] = eb_decim_tick(&xs,&xc,EB_AB_K5456,q[0],q[1],q[2],q[3]);
         }
     }
     eb_dco_wt_bind_tables(&wc);
@@ -124,8 +143,8 @@ int main(int argc, char **argv)
                 ys.b1 = v521;
                 v525 = v524 - (v520 * yc.k6272 + v521);
                 ys.b2 = v525 * yc.k6256 + v520;
-                B[i] = ((v521 - v525 * 0.0f) * yc.k6336 - yc.k6336 * v524)
-                     + v524;
+                B[i] = ((v521 - v525 * (EB_AB_K5456)) * yc.k6336
+                        - yc.k6336 * v524) + v524;
             }
         }
     }

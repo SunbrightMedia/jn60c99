@@ -1,6 +1,10 @@
 /* eb_coefs.c — see eb_coefs.h. Every cell is copied from the shim that owns
  * the module; nothing is re-derived from the port source. */
 #include "eb_coefs.h"
+#ifdef EB_DUMP_SHAPE
+#include <stdio.h>
+#include <stdlib.h>
+#endif
 #include "eb_chorus_shim.h"
 #include <string.h>
 
@@ -138,6 +142,25 @@ void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
             q->k7        = CF(a1, 5984); q->k9        = CF(a1, 6000);
             q->k11       = CF(a1, 6016); q->subthr    = CF(a1, 5584);
             eb_dco_set_shape(q);
+#ifdef EB_DUMP_SHAPE
+            /* THE SHAPE COEFFICIENTS, PER RECALL. eb_dco_wt.h finding 4 says
+             * the per-VOICE spread of every DCO shape and gain coefficient is
+             * exactly 0 over all 51 factory patches -- per voice WITHIN a
+             * patch. It says nothing about ACROSS patches, and the residual
+             * tables are built from ONE patch's values. The edge width goes as
+             * 1/amp, so if amp moves between patches one table set cannot
+             * serve them all. */
+            {   static FILE *f;
+                const char *p = getenv("EB_DUMP_SHAPE");
+                if (!f && p) f = fopen(p, "a");
+                if (f && v == 0)
+                    fprintf(f, "%.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g\n",
+                            (double)q->amp_saw, (double)q->amp_pulse,
+                            (double)q->amp_sub, (double)q->sat_in,
+                            (double)q->k3, (double)q->k5, (double)q->k7,
+                            (double)q->k9, (double)q->k11);
+            }
+#endif
         }
 
         /* ---- decimator (shim decim) -------------------------------------- */
