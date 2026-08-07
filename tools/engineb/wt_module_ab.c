@@ -36,15 +36,26 @@ int main(int argc, char **argv)
     eb_dco_set_edge_thresholds(&dc);
     /* the 4x reference: eb_dco_step4 (4 sub-steps) with no decimator, so this
      * compares the OSCILLATORS and nothing else */
-    /* FOUR CALLS TO eb_dco_step, NOT eb_dco_step4. EB_DCO_WT implies
-     * EB_QUARTER_OS, which makes eb_dco_step4 emit ONE sub-sample and three
-     * zeros -- so averaging its output gave a quarter of the amplitude and the
-     * probe blamed the module for its own reference being wrong. eb_dco_step
-     * is one sub-step whatever the flag says. */
-    for (i = 0; i < N; ++i) {
-        float a0 = eb_dco_step(&ds,&dc), a1 = eb_dco_step(&ds,&dc);
-        float a2 = eb_dco_step(&ds,&dc), a3 = eb_dco_step(&ds,&dc);
-        A[i] = (a0+a1+a2+a3) * 0.25f;
+    /* THE REFERENCE IS THE PORT'S OWN 4x PATH: four sub-steps through the
+     * REAL 16-coefficient decimator. A box average of four sub-samples is NOT
+     * that filter -- its response rolls off completely differently -- and
+     * using one made this probe measure the box against the FIR and call the
+     * difference a defect in the module.
+     *
+     * Build with -DEB_QUARTER_OS_SET=1 -DEB_QUARTER_OS=0 so that EB_DCO_WT can
+     * be on (for the candidate) while eb_decim_tick still compiles its 4x arm
+     * (for the reference). One binary, both paths, no chance of the two sides
+     * differing in anything but the oscillator. */
+    {   eb_decim_state xs; eb_decim_coef xc; int j;
+        memset(&xs,0,sizeof xs); memset(&xc,0,sizeof xc);
+        for (j = 0; j < 16; ++j) xc.c[j] = RC_fir[j];
+        xc.k6256 = RC_k6256; xc.k6272 = RC_k6272; xc.k6336 = RC_k6336;
+        for (i = 0; i < N; ++i) {
+            float q[4];
+            q[0] = eb_dco_step(&ds,&dc); q[1] = eb_dco_step(&ds,&dc);
+            q[2] = eb_dco_step(&ds,&dc); q[3] = eb_dco_step(&ds,&dc);
+            A[i] = eb_decim_tick(&xs,&xc,0.0f,q[0],q[1],q[2],q[3]);
+        }
     }
     eb_dco_wt_bind_tables(&wc);
     wc.sat_hi=dc.sat_hi; wc.sat_lo=dc.sat_lo;

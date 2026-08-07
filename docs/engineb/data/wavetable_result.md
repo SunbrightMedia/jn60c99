@@ -359,3 +359,58 @@ fractional-crossing indexing or the residual's phase reference is still wrong.
 an answer to "is it accurate".** Everything it depends on now exists: the
 tables, the wiring, the module A/B, and a composite gate that can search a
 wide enough lag.
+
+---
+
+# THE MODULE'S REAL LIMIT, MEASURED — the flat model is pitch-dependent
+
+Module A/B against the PORT'S OWN 4x path (four `eb_dco_step` calls into
+`eb_decim_tick`, not a box average — the first version of this probe used a
+box and was measuring its own reference):
+
+| f0 | reference RMS | wavetable RMS | aligned residual |
+|---|---|---|---|
+| 441 Hz | 0.8076 | 0.8743 | −10.3 dB |
+| 1,764 Hz | 0.6445 | 0.9215 | −2.5 dB |
+| 7,056 Hz | 0.2329 | 1.0655 | **+11.9 dB** |
+
+**The reference's own LEVEL falls with pitch and the wavetable's does not.**
+That is the whole error, and it is not the residual, the alignment or the
+tables.
+
+## Why, and it follows from a number already in this document
+
+The DCO's edge is **2.4290 output samples wide, fixed in TIME** — that
+measurement is what made the tables pitch-independent, and it is now the thing
+that limits them. The PERIOD shrinks with pitch: 100 samples at 441 Hz, 25 at
+1,764, 6.25 at 7,056. So the edge occupies 2 %, 10 % and **39 %** of the
+period.
+
+`EB_DCO_PULSEFAST` measured the saturator's shortcut firing on 98.85 % of
+sub-steps — **averaged over a scenario set that is mostly low notes.** At high
+pitch the edges occupy most of the period, the ramp never reaches saturation,
+and there is no flat value for a residual to correct.
+
+**So "flat almost everywhere" is a property of LOW notes, not of the
+oscillator.** Finding 2 in `eb_dco_wt.h` is true on average and false where it
+matters most.
+
+## What that means for the design
+
+The residual must be the difference from the **ramp the port actually
+produces**, not from a flat step. That is a bigger table — the ramp's shape
+depends on how far the edge got before the next one began, which is a function
+of pitch — and it reintroduces the pitch dimension the time-indexing removed.
+
+**This is a real limit, not a bug list.** The five defects fixed getting here
+were all real and all fixed; the module now does exactly what it was designed
+to do, and the design does not hold above a few hundred Hz.
+
+## Status, plainly
+
+* **Real time: the arithmetic says yes** — 0.90x worst patch, 0.64x typical,
+  built on a flat path measured at 72 Xtensa instructions. That number is
+  unaffected by this finding.
+* **Accurate: no.** −10.3 dB at 441 Hz against a −80 dB requirement, and worse
+  as pitch rises.
+* **The trunk is untouched and still nulls EXACTLY 0.**

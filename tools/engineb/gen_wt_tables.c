@@ -31,6 +31,7 @@
 #include <math.h>
 #include "eb_fork_config.h"
 #include "eb_dco.h"
+#include "eb_decim.h"
 #include "eb_dco_wt.h"
 #include "c6_realcoefs.h"
 
@@ -173,10 +174,17 @@ static float *trace(float pw, int arm, int which, long *n_out, long *edge_out,
     return v;
 }
 
-/* The ideal reconstruction low-pass at the OUTPUT Nyquist, applied in the fine
- * domain. Cutoff 1/(2*OS) of the fine rate; Blackman window, which trades a
- * wider transition for a much lower first sidelobe -- the sidelobe is what
- * would show up as ringing on every edge in the instrument. */
+/* AN IDEAL LOW-PASS IS THE WRONG BAND-LIMIT, and this is the same lesson the
+ * row-6 probe already learned once: the table must carry the PORT'S OWN
+ * decimator, whose passband is not flat and whose stopband is not a brick
+ * wall. Measured against the real 4x+FIR chain, an ideally-band-limited
+ * residual left -11.5 dB at 441 Hz and +10.2 dB at 7 kHz, because the
+ * reference's own level falls with pitch (RMS 0.81 -> 0.64 -> 0.23) while an
+ * ideal reconstruction holds it flat.
+ *
+ * So the residual is now built by RUNNING the shipping chain -- eb_dco_step
+ * four times into eb_decim_tick -- at each fractional crossing position, and
+ * this ideal filter is kept only for the trace-inspection it still does. */
 static double lp(const float *v, long n, double at)
 {
     const int NT = 16 * OS;
@@ -232,6 +240,111 @@ static double naive_at(const eb_dco_coef *c, int arm, double phe, double dsub,
          * (double)c->sat_hi;
 }
 
+/* Build one residual by RUNNING THE PORT'S OWN CHAIN.
+ *
+ * For sub-position `o` the oscillator is started `o/OVER` of an output sample
+ * earlier, so the edge lands at that fraction through a sample. The chain is
+ * eb_dco_step four times into eb_decim_tick -- the exact 4x path this module
+ * replaces -- so the residual carries the decimator's response by
+ * CONSTRUCTION rather than by a filter designed to imitate it.
+ */
+static void build_one(float pw, int arm, int which, int o, float *out)
+{
+    eb_dco_coef c; eb_dco_state s; eb_decim_state xs; eb_decim_coef xc;
+    int j, i;
+    long warm;
+    double frac = (double)o / EB_WT_RES_OVER;
+    float ring[512]; int rp = 0;
+    float pprev, uprev = 0.0f;
+    int edge = -1, got = 0;
+    memset(&s,0,sizeof s); memset(&xs,0,sizeof xs); memset(&xc,0,sizeof xc);
+    for (j = 0; j < 16; ++j) xc.c[j] = RC_fir[j];
+    xc.k6256 = RC_k6256; xc.k6272 = RC_k6272; xc.k6336 = RC_k6336;
+    fill(&c, BUILD_INC, pw, arm);
+    /* THE FRACTIONAL OFFSET is applied to the STARTING PHASE, which is the
+     * only way to move an edge inside a sample without changing the pitch. */
+    s.phase = (float)(-1.0 + frac * 4.0 * (double)BUILD_INC);
+    memset(ring, 0, sizeof ring);
+    for (i = 0; i < 20000 && !got; ++i) {
+        float q[4], y, u;
+        pprev = s.phase;
+        uprev = (((s.subcnt + s.phase) + 1.0f) * 0.5f) - 1.0f;
+        q[0]=eb_dco_step(&s,&c); q[1]=eb_dco_step(&s,&c);
+        q[2]=eb_dco_step(&s,&c); q[3]=eb_dco_step(&s,&c);
+        y = eb_decim_tick(&xs,&xc,0.0f,q[0],q[1],q[2],q[3]);
+        u = (((s.subcnt + s.phase) + 1.0f) * 0.5f) - 1.0f;
+        ring[rp & 511] = y;
+        if (edge < 0 && i > 200) {
+            int hit = 0;
+            if (which == 0 && s.phase < pprev) hit = 1;
+            if (which == 1 && ((pw + pprev) < 0.0f) != ((pw + s.phase) < 0.0f))
+                hit = 1;
+            if (which == 2 && (uprev < 0.0f) != (u < 0.0f)) hit = 1;
+            if (hit) edge = rp;
+        }
+        /* stop once the window's far end has been rendered; the decimator's
+         * own group delay of ~4 samples is inside the window and must be */
+        if (edge >= 0 && rp - edge >= HALF + 8) got = 1;
+        ++rp;
+    }
+    warm = 0; (void)warm;
+    /* CENTRE ON THE OUTPUT EDGE, NOT THE PHASE EDGE. The port's decimator has
+     * 3.875 samples of group delay, so the step appears in the OUTPUT about
+     * four samples after the phase crossing that caused it. Centring on the
+     * phase edge left the residual having to cancel a step at tap 32 and
+     * re-create it at tap 36 -- a correction as large as the signal, peak
+     * 1.03, which is the opposite of what a residual is for.
+     *
+     * Located by scanning for the midpoint crossing rather than by subtracting
+     * a constant, so the delay is measured from the chain each time instead of
+     * being a number that could go stale. */
+    {   int oe = edge, k;
+        double lo2 = ring[(edge - 12) & 511], hi2 = ring[(edge + 12) & 511];
+        double mid = (lo2 + hi2) * 0.5;
+        for (k = edge - 2; k < edge + 12 && k < rp; ++k) {
+            double a = ring[k & 511], b = ring[(k + 1) & 511];
+            if ((a - mid) * (b - mid) <= 0.0 && a != b) { oe = k + 1; break; }
+        }
+        for (i = 0; i < EB_WT_RES_LEN; ++i) {
+            int j = oe + (i - HALF);
+            out[i] = (j >= 0 && j < rp) ? ring[j & 511] : 0.0f;
+        }
+    }
+}
+
+static void emit2(const char *name, float pw, int arm, int which,
+                  int slices, float lo, float hi)
+{
+    int sl, o, i, nsl = slices ? slices : 1;
+    printf("static const float %s[%d][%d][%d] = {\n", name, nsl,
+           EB_WT_RES_OVER, EB_WT_RES_LEN);
+    for (sl = 0; sl < nsl; ++sl) {
+        float w = slices ? lo + (hi - lo) * (sl + 0.5f) / slices : pw;
+        printf("  { /* pw %.4f */\n", w);
+        for (o = 0; o < EB_WT_RES_OVER; ++o) {
+            float y[EB_WT_RES_LEN];
+            double lvl0, lvl1, h;
+            build_one(w, arm, which, o, y);
+            /* the two flat levels the chain settles to, read from the window's
+             * own ends rather than assembled from constants */
+            lvl0 = y[2]; lvl1 = y[EB_WT_RES_LEN - 3];
+            h = lvl1 - lvl0;
+            if (fabs(h) < 1e-9) h = 1.0;
+            printf("    {");
+            for (i = 0; i < EB_WT_RES_LEN; ++i) {
+                double naive = (i < HALF) ? lvl0 : lvl1;
+                /* %.9e, not %.9g: %g prints a clean zero as "0", and "0f" is
+                 * an invalid integer suffix, not a float. The generator's own
+                 * output failed to compile on it. */
+                printf("%s%.9ef", i ? "," : "", (y[i] - naive) / h);
+            }
+            printf("},\n");
+        }
+        printf("  },\n");
+    }
+    printf("};\n\n");
+}
+
 static void emit(const char *name, float pw, int arm, int which,
                  int slices, float lo, float hi)
 {
@@ -275,11 +388,11 @@ int main(void)
            " * dimension: the edge width in samples is |pw-1|/(8*amp) and inc\n"
            " * cancels, MEASURED at 2.4290 samples across five octaves. */\n");
     printf("#ifndef ENGINEB_EB_WT_TABLES_H\n#define ENGINEB_EB_WT_TABLES_H\n\n");
-    emit("eb_wt_res_saw",     RC_pw, ARM_SAW,   0, 0, 0, 0);
-    emit("eb_wt_res_sub",     RC_pw, ARM_SUB,   2, 0, 0, 0);
-    emit("eb_wt_res_pulse_a", 0.0f,  ARM_PULSE, 1, EB_WT_PW_SLICES,
+    emit2("eb_wt_res_saw",     RC_pw, ARM_SAW,   0, 0, 0, 0);
+    emit2("eb_wt_res_sub",     RC_pw, ARM_SUB,   2, 0, 0, 0);
+    emit2("eb_wt_res_pulse_a", 0.0f,  ARM_PULSE, 1, EB_WT_PW_SLICES,
          EB_WT_PW_LO, EB_WT_PW_LO + EB_WT_PW_STEP * EB_WT_PW_SLICES);
-    emit("eb_wt_res_pulse_b", 0.0f,  ARM_PULSE, 0, EB_WT_PWB_SLICES,
+    emit2("eb_wt_res_pulse_b", 0.0f,  ARM_PULSE, 0, EB_WT_PWB_SLICES,
          EB_WT_PW_LO, EB_WT_PW_LO + EB_WT_PW_STEP * EB_WT_PW_SLICES);
     printf("#endif\n");
     return 0;

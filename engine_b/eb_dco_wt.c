@@ -37,12 +37,31 @@ void eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc, float pw)
  * [0,1); `amp` is the height of the step being corrected. The residual is
  * ADDED into a ring that the tick drains, so several arms crossing in one
  * sample cost one add each and nothing more. */
+/* EB_WT_CONV: a TEMPORARY sweep of the fractional-crossing convention.
+ * bit 0 = use (1-frac) instead of frac; bit 1 = write one slot later.
+ * The relationship between "the edge fell at fraction f through this sample"
+ * and "the residual table's sub-position index" has four plausible readings
+ * and reasoning has picked the wrong one twice today, so it is MEASURED. */
+#ifndef EB_WT_CONV
+#define EB_WT_CONV 0
+#endif
+
 static void eb_wt_add(eb_dco_wt_state *s, const float *tab, float frac,
                       float amp)
 {
-    int sub = (int)(frac * (float)EB_WT_RES_OVER);
-    const float *r = tab + sub * EB_WT_RES_LEN;
+    int sub;
+    const float *r;
     int i, p = s->rpos;
+#if (EB_WT_CONV & 1)
+    frac = 1.0f - frac;
+#endif
+    if (frac < 0.0f) frac = 0.0f;
+    if (frac > 0.999f) frac = 0.999f;
+    sub = (int)(frac * (float)EB_WT_RES_OVER);
+    r = tab + sub * EB_WT_RES_LEN;
+#if (EB_WT_CONV & 2)
+    p = (p + 1) & (EB_WT_RES_LEN - 1);
+#endif
     for (i = 0; i < EB_WT_RES_LEN; ++i) {
         s->ring[p] += r[i] * amp;
         p = (p + 1) & (EB_WT_RES_LEN - 1);
