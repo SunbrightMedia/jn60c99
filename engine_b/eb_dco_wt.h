@@ -167,6 +167,13 @@
  * 2 is the smallest delay that keeps the saw within 1.6 dB of its best. Every
  * sample of delay here is a sample of timing error inside the voice, so the
  * choice is the smallest that the saw survives, not the best per-arm number. */
+/* THE SAW'S GROUP-DELAY CONSTANT, moved here so BOTH the tick and the
+ * generator read one number. It was 3.875 in two files and hardcoded in four
+ * more places in the generator. */
+#ifndef EB_WT_SAWGD
+#define EB_WT_SAWGD 3.875f
+#endif
+
 #ifndef EB_WT_DELAY
 #define EB_WT_DELAY      2
 #endif

@@ -343,7 +343,7 @@ static double build_one(float pw, int arm, int which, int o, float *out,
              * against must be the flat path the tick actually computes, term
              * for term -- a reference that differs from the tick by anything
              * puts that difference into every residual. */
-            float pd = pn - 3.875f * (4.0f * g_build_inc);
+            float pd = pn - (EB_WT_SAWGD) * (4.0f * g_build_inc);
             if (pd < -1.0f) pd += 2.0f;   /* wrapped, as the tick wraps it */
             nring[rp & 511] =
                 (arm == ARM_SAW)   ? (pd * c.gn_saw) * c.sat_hi :
@@ -369,7 +369,7 @@ static double build_one(float pw, int arm, int which, int o, float *out,
              * phase wrap; anchoring the table on the wrap and the tick on the
              * step let the two round into different samples, and one edge in a
              * few tens was then corrected in the wrong sample entirely. */
-            double gd = 3.875 * dpo;
+            double gd = (double)(EB_WT_SAWGD) * dpo;
             double pdp = (double)pprev - gd, pdn = (double)s.phase - gd;
             if (pdp < -1.0) pdp += 2.0;
             if (pdn < -1.0) pdn += 2.0;

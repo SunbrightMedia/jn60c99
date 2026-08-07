@@ -233,9 +233,6 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      * 3.875 is the FIR's group delay: 15.5 sub-samples at four to the output
      * sample, derived from the tap map and confirmed by the alignment shift
      * the first diagnostic needed. */
-#ifndef EB_WT_SAWGD
-#define EB_WT_SAWGD 3.875f
-#endif
     {   /* THE DELAYED PHASE MUST BE WRAPPED. p is in [-1,1), so p minus the
          * group delay falls BELOW -1 for the few samples after each wrap --
          * and left unwrapped the saw's flat value is wrong by a full step for

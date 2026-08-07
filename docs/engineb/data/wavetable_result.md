@@ -815,3 +815,84 @@ precision. The next measurement is the DCO chain's own output (`decimo`) per
 sample, fork against trunk, inside the `DCO noise` scenario: if it agrees to
 −60 dB while the voice output is −28.9, the fault is downstream of the
 oscillator entirely.
+
+---
+
+# 2026-08-08 — THE BENCH PROBE HAD THE WRONG FILTER
+
+**Every per-arm figure above is superseded, by 20 to 25 dB.**
+
+`tools/engineb/wt_module_ab.c` passed `0.0f` for the decimator biquad's
+per-sample feedback term, cell 5456 — on BOTH sides, so the comparison was
+self-consistent and looked sound.
+
+**Cell 5456 is a CONSTANT 2.0** over all 36 scenarios, and `k6336` is 1.0. The
+biquad is then
+
+    v526 = (v521 - v525*2)*1 - 1*v524 + v524 = 3*v521 + 2*v520*k6272 - 2*v524
+
+so the input enters with coefficient **−2**. With `k5456 = 0` it degenerates to
+`v526 = v521` — the direct input path cancels outright. The probe was measuring
+a filter the engine does not have, and one that attenuates the error where the
+real one amplifies it.
+
+## How it was found
+
+By dumping the DCO chain's own output *in situ* (`EB_DUMP_DCO` in
+`eb_render.c`): **−34.7 dB**, against the module's −55 to −86 on the bench. That
+said the oscillator is worse inside the engine and the voice downstream
+*attenuates* rather than amplifies — so the filter was not the target and no
+more filter analysis was needed.
+
+Then every other bench-vs-engine difference was eliminated by measurement:
+
+* **The shape coefficients are IDENTICAL across all patches** — one distinct
+  set, spread exactly 0. `sat_in` = π/2 with k3…k11 the Taylor coefficients of
+  sine, so the saturator is `sin` and `sat_hi` is exactly 1. Finding 4 covered
+  per-VOICE spread and had never covered per-PATCH.
+* **All three arms summing lands BETWEEN the individual arms** — no coherent
+  amplification in the mix.
+* **All eight voices are uniformly bad**, −31.5 to −36.9 dB — not one voice's
+  state.
+* **The median block is −42 dB** — not one transient.
+
+A uniform gap across voices, blocks and patches is a *gain*, and the only
+per-sample gain the bench did not reproduce was this one.
+
+## The corrected numbers
+
+Over the pitch range the scenarios actually reach — which is itself narrower
+than anything measured before: the increment is **never negative** (zero
+negative calls in 17,199,360) and **never exceeds 0.007475**, i.e. 662 Hz.
+
+| inc | saw | pulse | sub | all three |
+|---|---|---|---|---|
+| 0.0005 | −51.1 | −70.2 | −46.5 | −51.5 |
+| 0.001 | −46.8 | −65.4 | −59.6 | −55.5 |
+| 0.002 | −42.6 | −63.5 | −37.5 | −42.5 |
+| 0.004 | −45.0 | −61.7 | −71.1 | −54.0 |
+| 0.0075 | −38.9 | −57.6 | −41.4 | −44.4 |
+
+**The SAW and the SUB are the weak arms — not the pulse**, which is where the
+preceding hours of work went.
+
+## What each arm's floor is, and is not
+
+**The sub responds to resolution.** `EB_WT_RES_OVER` 64 → 256 takes inc 0.0075
+from −41.4 to −57.5 and inc 0.002 from −37.5 to −44.1. Not adopted yet: 256
+costs 3.4 MB of tables.
+
+**The saw responds to nothing tried.** Identical at `EB_WT_RES_OVER` 16, 64,
+128 and 256; identical at `EB_WT_RES_LEN` 16 and 32; best at the group-delay
+constant it already has (3.875, re-swept through the correct filter — 3.5, 3.25,
+3.125 and 3.0 are all worse); and pitch-independent (build 0.0005 is best at
+every test pitch). Its error is confined to taps −3…+4 around the edge and the
+flat model is EXACTLY 0 elsewhere, so it is the residual's own content.
+
+**One derivation that looked right and was not.** Feeding a ramp through the
+port's own 32-tap map gives an implied delay of 3.125 output samples, not
+3.875, because the output sample's time base starts at the LAST sub-sample
+written. But the residual is built with the same constant and absorbs the
+offset, so the constant is not independently determinable that way — and the
+sweep says 3.875. Recorded because the measurement was right and the inference
+from it was wrong.
