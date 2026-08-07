@@ -21,6 +21,20 @@
 #include "eb_fork_config.h"
 #include "juno_tables.h"
 #include "eb_master.h"
+#ifdef EB_DUMP_DCO
+/* THE DCO CHAIN'S OWN OUTPUT, dumped per voice per sample. The whole-engine
+ * null is 15 to 25 dB worse than any per-arm module figure, and no amount of
+ * module work explains that. This says whether the oscillator is worse IN SITU
+ * or whether its error is amplified downstream -- two different searches. */
+#include <stdio.h>
+#include <stdlib.h>
+static FILE *ebdd_f;
+static void ebdd_open(void)
+{
+    const char *p = getenv("EB_DUMP_DCO");
+    if (!ebdd_f && p) ebdd_f = fopen(p, "ab");
+}
+#endif
 #ifdef EB_VOICES_DEBUG
 #include <stdio.h>
 unsigned long ebdbg_n;
@@ -312,6 +326,10 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
          * 6336, not PWM cells). The latch therefore happens AFTER the decim
          * call, below. */
         vcfo   = eb_vcf_tick(&st->vcf[v], &c->vcf[v], nmixo, reso, o7536);
+#ifdef EB_DUMP_DCO
+        ebdd_open();
+        if (ebdd_f) fwrite(&decimo, sizeof decimo, 1, ebdd_f);
+#endif
         eb_modcv_latch(&st->mod[v], decimo);
         (void)nsv04;
         /* THE LAST TWO ARGUMENTS ARE CELL 6848 and CELL 560, per the shim
