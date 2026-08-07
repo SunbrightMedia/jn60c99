@@ -573,9 +573,13 @@ void app_main(void)
             }
             {   double n = (double)(ph_chunks * CHUNK);
                 double e = (double)eng_us / n, w = (double)busy_us / n;
-                printf("SWEEP wake=0x%02x  engine %.2f us (%.0f cyc)  "
+                /* PRINT THE MASK THAT IS ACTUALLY IN FORCE. This printed
+                 * SWEEP[phase] even when the sweep was not driving WAKE, so
+                 * it read "wake=0x00" while six voices were rendering -- a
+                 * diagnostic that says the opposite of the truth. */
+                printf("wake=0x%02x  engine %.2f us (%.0f cyc)  "
                        "whole loop %.2f us (%.0f cyc)  overhead %.0f cyc\n",
-                       SWEEP[phase], e, e * 240.0, w, w * 240.0,
+                       WAKE, e, e * 240.0, w, w * 240.0,
                        (w - e) * 240.0);
                 if (chunks / (SR / CHUNK) % 8 == 0) {
                     phase = (phase + 1) % 3;
