@@ -32,11 +32,31 @@
  *
  * 4. ONE TABLE SET SERVES ALL EIGHT VOICES. Over all 51 factory patches the
  *    per-voice spread of every DCO shape and gain coefficient is EXACTLY 0;
- *    CONDITION's scatter enters through the PITCH, which at runtime is the
- *    increment and the mip level. Both are per-voice for free.
+ *    CONDITION's scatter enters through the PITCH, which at runtime is just
+ *    the increment. It is per-voice for free.
  *
- * 5. THE RESIDUAL DEPENDS ON PITCH, about one semitone per level. A table
- *    built an octave away is 44.6 dB wrong. Hence mip levels.
+ * 5. THE RESIDUAL DOES NOT DEPEND ON PITCH, and this is what makes the table
+ *    small enough to exist. The edge half-width in the triangle argument is
+ *    inc4/(2*amp); x = t/(pw-1) puts it at |pw-1|*inc4/(2*amp) in phase; the
+ *    phase advances 4*inc4 per output sample; so the width in SAMPLES is
+ *    |pw-1|/(8*amp) and inc4 CANCELS.
+ *
+ *    MEASURED, because a derivation is a hypothesis until it is executed:
+ *    the pulse edge is 2.4290 output samples wide at 220, 441, 1,764 AND
+ *    7,056 Hz -- identical to four decimals across five octaves
+ *    (tools/engineb/edge_width.c).
+ *
+ *    A PHASE-indexed table DID depend on pitch, about one semitone per level,
+ *    and that measurement stands -- it is why this module indexes the residual
+ *    by TIME instead. Same edge, different coordinate, and the coordinate is
+ *    the whole difference between 7.5 MB of tables and 42 KB.
+ *
+ *    ONE LIMIT FOUND ON THE WAY: above about 10 kHz the edge is wider than the
+ *    period and the pulse never reaches +/-1 at all. The residual model
+ *    assumes a flat step to correct; at those pitches there is no flat part.
+ *    A JUNO's top key is 4 kHz, so no note reaches it, but a patch with the
+ *    DCO RANGE up and the LFO sweeping might -- and this note is the only
+ *    warning that exists.
  *
  * 6. THE PULSE HAS TWO EDGE SHAPES, NOT ONE. The port divides the pulse phase
  *    by pwm1 below zero and pwp1 above, so the two halves have different
@@ -77,16 +97,22 @@
 #define EB_WT_RES_OVER    4     /* fractional-crossing resolution */
 
 /* THE PULSE-WIDTH GRID. Measured range of pw over all 36 scenarios is
- * [-0.015, 0.939]; the grid spans [-0.05, 1.00] at 0.01, which is the spacing
- * the convergence measurement showed to be at the limit already. */
+ * [-0.015, 0.939]; the grid spans [-0.05, 1.00] at 0.01, the spacing the
+ * convergence measurement showed to be at the limit already.
+ *
+ * THE SLICES ARE IN EDGE WIDTH, not in pw, because that is what the residual
+ * actually depends on: |pw-1|/(8*amp) for the moving edge and |pw+1|/(8*amp)
+ * for the fixed one. Over the measured pw range [-0.015, 0.939] the moving
+ * edge's width varies 16x and the fixed edge's only 2x, so they get different
+ * slice counts instead of one number covering both badly. */
 #define EB_WT_PW_LO     (-0.05f)
 #define EB_WT_PW_STEP    (0.01f)
 #define EB_WT_PW_SLICES  106
+#define EB_WT_PWB_SLICES   8
 
-/* Mip levels: one per semitone across the playable range. A level is chosen by
- * the increment, so vibrato and CONDITION detune move a voice between levels
- * without any rebuild. */
-#define EB_WT_MIPS       72
+/* NO MIP LEVELS. See finding 5: the residual is pitch-independent, so a
+ * dimension that would have cost 72x and forced a per-patch rebuild is simply
+ * not there. */
 
 typedef struct {
     float phase;      /* [-1,1), the port's own DCO phase   */
@@ -104,19 +130,19 @@ typedef struct {
      * takes today */
     float inc;
     float pw;
-    int   mip;        /* derived from inc; see eb_dco_wt_set_pitch */
     /* per recall */
     float sat_hi, sat_lo;
     float lvl_saw, lvl_pulse, lvl_sub;
     float gn_saw,  gn_pulse,  gn_sub;
     float subthr;
-    /* THE RESIDUAL TABLES, caller-owned and SHARED BY ALL VOICES (finding 4).
-     * saw and sub are indexed by mip alone; the pulse's two edges are indexed
-     * by mip and by the pw slice. */
-    const float *res_saw;      /* [EB_WT_MIPS][EB_WT_RES_OVER][EB_WT_RES_LEN] */
-    const float *res_sub;
-    const float *res_pulse_a;  /* [...][EB_WT_PW_SLICES][...] -- moving edge  */
-    const float *res_pulse_b;  /* fixed edge at the wrap                      */
+    /* THE RESIDUAL TABLES, caller-owned and SHARED BY ALL VOICES (finding 4)
+     * AND BY EVERY PITCH (finding 5). saw and sub are single tables; the
+     * pulse's two edges are sliced by the pulse width, which is the only thing
+     * their shape depends on. Total 42 KB for the whole instrument. */
+    const float *res_saw;      /* [EB_WT_RES_OVER][EB_WT_RES_LEN]            */
+    const float *res_sub;      /* [EB_WT_RES_OVER][EB_WT_RES_LEN]            */
+    const float *res_pulse_a;  /* [EB_WT_PW_SLICES][OVER][LEN] -- moving edge */
+    const float *res_pulse_b;  /* [EB_WT_PWB_SLICES][OVER][LEN] -- at the wrap*/
 } eb_dco_wt_coef;
 
 void  eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc, float pw);

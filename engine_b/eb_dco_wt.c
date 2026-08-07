@@ -13,29 +13,15 @@
 #include <math.h>
 #include <string.h>
 
-/* THE MIP LEVEL, one per semitone. Chosen by the increment because that is
- * what the note actually plays at: vibrato, portamento and CONDITION's detune
- * all move a voice between levels without any rebuild, which is the property
- * that makes one shared table set legal (eb_dco_wt.h, finding 4). */
+/* THERE IS NOTHING TO DERIVE. The residual is pitch-independent (eb_dco_wt.h,
+ * finding 5 -- MEASURED at 2.4290 output samples across five octaves), so this
+ * carries the two per-sample numbers and nothing else. The mip-index
+ * arithmetic that used to live here, exponent extraction and all, is gone
+ * because the dimension it indexed does not exist. */
 void eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc, float pw)
 {
     c->inc = inc;
     c->pw  = pw;
-    /* log2 by exponent extraction, 12 steps per octave. No logf: this runs
-     * per sample per voice and libm's logf is 150+ instructions on this
-     * target, which is more than the whole rest of the tick. */
-    {
-        unsigned b;
-        int e;
-        memcpy(&b, &inc, 4);
-        e = (int)((b >> 23) & 0xFFu) - 127;          /* floor(log2(inc))     */
-        /* the mantissa's top 4 bits refine it to a quarter-octave, then a
-         * small table finishes the semitone. Cheap and monotone, which is all
-         * a mip index has to be. */
-        c->mip = (e + 20) * 12 + (int)((b >> 19) & 0xFu) * 12 / 16;
-        if (c->mip < 0) c->mip = 0;
-        if (c->mip >= EB_WT_MIPS) c->mip = EB_WT_MIPS - 1;
-    }
 }
 
 /* Schedule a residual. `frac` is where in the sample the crossing fell, in
@@ -104,12 +90,15 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
     if (p < prev) {                      /* the saw's wrap, and the pulse's
                                           * FIXED edge, both at the phase wrap */
         float frac = (1.0f - prev) / c->inc;
-        eb_wt_add(s, c->res_saw + (size_t)c->mip * EB_WT_RES_OVER
-                                * EB_WT_RES_LEN, frac,
+        eb_wt_add(s, c->res_saw, frac,
                   -2.0f * c->gn_saw * c->sat_hi);
-        eb_wt_add(s, c->res_pulse_b + (size_t)c->mip * EB_WT_RES_OVER
-                                    * EB_WT_RES_LEN, frac,
-                  c->gn_pulse * (c->sat_hi - c->sat_lo));
+        {   int sb = (int)((c->pw - EB_WT_PW_LO)
+                           * (float)EB_WT_PWB_SLICES);
+            if (sb < 0) sb = 0;
+            if (sb >= EB_WT_PWB_SLICES) sb = EB_WT_PWB_SLICES - 1;
+        eb_wt_add(s, c->res_pulse_b
+                     + (size_t)sb * EB_WT_RES_OVER * EB_WT_RES_LEN, frac,
+                  c->gn_pulse * (c->sat_hi - c->sat_lo)); }
     }
     {   /* the pulse's MOVING edge, where t crosses zero */
         float tprev = c->pw + prev;
@@ -124,8 +113,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
             if (sl >= EB_WT_PW_SLICES) sl = EB_WT_PW_SLICES - 1;
             frac = -tprev / c->inc;
             eb_wt_add(s, c->res_pulse_a
-                         + (((size_t)c->mip * EB_WT_PW_SLICES + (size_t)sl)
-                            * EB_WT_RES_OVER * EB_WT_RES_LEN),
+                         + ((size_t)sl * EB_WT_RES_OVER * EB_WT_RES_LEN),
                       frac, c->gn_pulse * (c->sat_hi - c->sat_lo));
         }
     }
@@ -133,8 +121,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
                                              * 0.5f) - 1.0f) < 0.0f)) {
         /* the sub's own crossing; its step is the same height as the pulse's
          * because both are square */
-        eb_wt_add(s, c->res_sub + (size_t)c->mip * EB_WT_RES_OVER
-                                * EB_WT_RES_LEN, 0.5f,
+        eb_wt_add(s, c->res_sub, 0.5f,
                   c->gn_sub * (c->sat_hi - c->sat_lo));
     }
 
