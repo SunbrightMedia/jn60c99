@@ -218,8 +218,8 @@
  *    four times larger. Indexing one by the other picked a level two octaves
  *    out and left the sub at -36 dB where a matched level gives -43. Both
  *    constants are spelled out below so the two cannot be confused again. */
-#define EB_WT_SUB_INC0  (0.00125f)   /* level 0, SUB-STEP rate: the generator */
-#define EB_WT_SUB_OINC0 (0.005f)     /* level 0, OUTPUT rate: the tick        */
+#define EB_WT_SUB_INC0  (0.00015625f) /* level 0, SUB-STEP rate: the generator */
+#define EB_WT_SUB_OINC0 (0.000625f)  /* level 0, OUTPUT rate: the tick        */
 /* QUARTER-OCTAVE LEVELS, NOT OCTAVES. At one level per octave a note halfway
  * between two levels uses a table built up to half an octave away, and the sub
  * measured -41 to -48 dB where the saw and the pulse reach -58 to -72. The
@@ -228,10 +228,27 @@
  *
  * Level L = 4*e + j covers inc in INC0*2^e*[1 + j/4, 1 + (j+1)/4) and is built
  * at that interval's midpoint. */
+/* FOUR PER OCTAVE, AND EIGHT WAS MEASURED AND REJECTED. Doubling the levels
+ * helped two pitches (inc 0.00187 -56.6 -> -62.9, inc 0.013 -61.7 -> -64.5),
+ * did NOT touch the dip it was aimed at (inc 0.005, -49.1 -> -50.9), and made
+ * the PITCH-MODULATED case worse -- -56.5 -> -51.9 -- because a moving pitch
+ * then switches level twice as often. The engine never holds a pitch still, so
+ * the modulated row is the one that decides.
+ *
+ * That the 441 Hz dip survives an 8x finer ladder is the useful part: it is
+ * NOT level quantisation, and whatever it is has not been found. */
 #define EB_WT_SUB_PER_OCT 4
-#define EB_WT_SUB_MIPS  16           /* to sub-step inc 0.01875 -- the highest
-                                      * the generator builds soundly; above it
-                                      * a second edge enters the window */
+/* THE LADDER RUNS THREE OCTAVES LOWER THAN IT DID. Level 0 used to sit at
+ * sub-step 0.00125, about 110 Hz, and everything below that CLAMPED -- the sub
+ * measured -42.7 dB at 79 Hz where its neighbours reach -56. Extending
+ * downwards is free: the generator's only limit is at the TOP, where the
+ * period approaches the residual window, and a longer period is never a
+ * problem. Twelve more levels, 12 KB.
+ *
+ * The top is still capped at sub-step 0.01875, the highest the generator
+ * builds soundly. Above it a second edge enters the window and the index
+ * clamps instead. */
+#define EB_WT_SUB_MIPS  28           /* 7 octaves at 4 levels each            */
 
 typedef struct {
     float phase;      /* [-1,1), the port's own DCO phase   */
