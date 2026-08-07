@@ -49,16 +49,44 @@
 #define WT_LEN   4096          /* table entries over the FULL period of 4      */
 #endif
 
-static void fill_coef(eb_dco_coef *c, float inc4, int substeps)
+/* THE PULSE WIDTH, overridable. EB_WT_PW sets the width the OSCILLATOR runs
+ * at; EB_WT_PWREF sets the width the TABLE is built at. Equal is the honest
+ * case; different measures how far one pulse-width slice stretches, which is
+ * what decides whether PWM needs a table rebuild, a set of slices, or the
+ * band-limited-step identity. */
+static float wt_pulse_ref(void)
+{
+    const char *e = getenv("EB_WT_PWREF");
+    return e ? (float)atof(e) : RC_pw;
+}
+
+static float wt_pw(int building)
+{
+    const char *e = getenv(building ? "EB_WT_PWREF" : "EB_WT_PW");
+    if (!e) e = getenv("EB_WT_PW");
+    return e ? (float)atof(e) : RC_pw;
+}
+
+/* ARM SELECTOR. 0 = all three, 1 = saw only, 2 = pulse only, 3 = sub only.
+ * The three arms are summed AFTER their own saturators, so isolating one by
+ * zeroing the other two levels is exact -- eb_dco.c skips a term whose level
+ * is 0.0f and says why (finite*0.0f is +/-0.0f and adding it changes nothing).
+ */
+static int WT_ARM = 0;
+
+static void fill_coef_pw(eb_dco_coef *c, float inc4, int substeps, float pw)
 {
     memset(c, 0, sizeof *c);
     c->inc = inc4 * (float)(4 / substeps);
     c->g = 0.00390625f / inc4;          /* edge width in TIME -- never rescaled */
-    c->pw = RC_pw; c->pwm1 = c->pw - 1.0f; c->pwp1 = c->pw + 1.0f;
+    c->pw = pw; c->pwm1 = c->pw - 1.0f; c->pwp1 = c->pw + 1.0f;
 #if EB_DCO_RECIP
     c->rm1 = 1.0f / c->pwm1; c->rp1 = 1.0f / c->pwp1;
 #endif
     c->lvl_saw = RC_lvl_saw; c->lvl_pulse = RC_lvl_pulse; c->lvl_sub = RC_lvl_sub;
+    if (WT_ARM == 1) { c->lvl_pulse = 0.0f; c->lvl_sub = 0.0f; }
+    if (WT_ARM == 2) { c->lvl_saw = 0.0f;   c->lvl_sub = 0.0f; }
+    if (WT_ARM == 3) { c->lvl_saw = 0.0f;   c->lvl_pulse = 0.0f; }
     c->gn_saw = RC_gn_saw;   c->gn_pulse = RC_gn_pulse;   c->gn_sub = RC_gn_sub;
     c->amp_saw = RC_amp_saw; c->amp_pulse = RC_amp_pulse; c->amp_sub = RC_amp_sub;
     c->sat_in = RC_sat_in;   c->subthr = RC_subthr;
@@ -70,6 +98,11 @@ static void fill_coef(eb_dco_coef *c, float inc4, int substeps)
 #if EB_DCO_PULSEFAST
     eb_dco_set_edge_thresholds(c);
 #endif
+}
+
+static void fill_coef(eb_dco_coef *c, float inc4, int substeps)
+{
+    fill_coef_pw(c, inc4, substeps, wt_pw(0));
 }
 
 /* ---- build the table -------------------------------------------------------
@@ -89,7 +122,7 @@ static void wt_build(float *tab, float inc4)
     double step = 4.0 / (double)n;       /* phase per table entry              */
 
     memset(&s, 0, sizeof s);
-    fill_coef(&c, inc4, 4);
+    fill_coef_pw(&c, inc4, 4, wt_pw(1));
     /* THE INCREMENT IS SET TO ONE TABLE STEP, not to the note's own. The table
      * is a function of PHASE; how fast the note walks it is the runtime's
      * business. Building it at the note's increment would sample the waveform
@@ -186,6 +219,83 @@ static void wt_bandlimit(float *tab, int n, int hmax, double inc4)
     free(re); free(im);
 }
 
+/* ---- THE PULSE IDENTITY -----------------------------------------------------
+ * WHY IT IS REQUIRED and not merely tidier. A pulse-width SLICE was measured
+ * and it does not stretch: at 441 Hz a table built 0.02 away in pw is 29.3 dB
+ * wrong. Slicing pw would need hundreds of tables. And pw moves on 52 % of
+ * samples, so rebuilding is not an option either.
+ *
+ * THE STRUCTURE. The pulse arm is a square with TWO edges: one at p = -pw,
+ * which moves with the pulse width, and one at the phase wrap p = +/-1, which
+ * does not. Both are the SAME edge shape with opposite signs. So
+ *
+ *     pulse(p; pw) = Rb(p + pw) - Rb(p + 1)
+ *
+ * where Rb is ONE band-limited, edge-shaped step. The pulse width becomes a
+ * PHASE OFFSET on one of two reads of a single table, and nothing is rebuilt.
+ *
+ * RECOVERING Rb from the shipping code, rather than modelling it. Build the
+ * pulse arm's own table at any reference width pw0 and take its Fourier
+ * coefficients C_n. The identity in the frequency domain is
+ *
+ *     C_n = Rb_n * (e^{j n pi pw0} - e^{j n pi})
+ *
+ * over the table's period of 4 -- so the phase factors use n*pi/2 per unit of
+ * phase, and pw0 and 1 are in the same phase units. Dividing gives Rb_n, and
+ * an inverse transform gives the table. Rb therefore inherits the port's own
+ * edge shape and its saturator; nothing here models the oscillator.
+ *
+ * The divisor VANISHES whenever the two edges land on the same phase for a
+ * harmonic, and those harmonics carry no information about Rb at this pw0.
+ * They are left at zero and a second reference width would be needed to fill
+ * them -- reported by the probe rather than silently interpolated.
+ */
+static int wt_pulse_step(float *rb, const float *ptab, int n, int hmax,
+                         double pw0, double inc4, double *dc0)
+{
+    double *rr = (double *)calloc((size_t)hmax + 1, sizeof(double));
+    double *ri = (double *)calloc((size_t)hmax + 1, sizeof(double));
+    int k, i, dead = 0;
+    /* THE PULSE ARM'S DC, which the identity CANNOT carry. Rb(a) - Rb(b) is a
+     * difference of two shifted copies of one function, so its mean is
+     * structurally zero -- while a square of duty != 50 % has a real offset.
+     * Found by looking at the waveform rather than the spectrum: the identity
+     * matched in RMS (0.765 against 0.768) and was 0.25 too high at every
+     * sample. A spectrum with a Hann window barely shows DC, so the gate
+     * reported 140 dB of "harmonic error" for what was one missing constant.
+     *
+     * For a square of amplitude A and duty (1+pw)/2 the mean is A*pw, so the
+     * offset scales linearly with the pulse width and one measurement at pw0
+     * gives every other width. */
+    { double m = 0.0; for (i = 0; i < n; ++i) m += ptab[i]; *dc0 = m / n; }
+    for (k = 1; k <= hmax; ++k) {
+        double a = 0.0, b = 0.0, th, dr, di, den;
+        for (i = 0; i < n; ++i) {
+            th = 2.0 * M_PI * k * i / (double)n;
+            a += ptab[i] * cos(th); b += ptab[i] * sin(th);
+        }
+        a = 2.0 * a / n * decim_mag(k * inc4 / 4.0);
+        b = 2.0 * b / n * decim_mag(k * inc4 / 4.0);
+        /* e^{j k pi/2 * pw0} - e^{j k pi/2 * 1}, phase measured in the table's
+         * own units where the period is 4. */
+        dr = cos(M_PI * k * pw0 / 2.0) - cos(M_PI * k / 2.0);
+        di = sin(M_PI * k * pw0 / 2.0) - sin(M_PI * k / 2.0);
+        den = dr * dr + di * di;
+        if (den < 1e-9) { ++dead; rr[k] = ri[k] = 0.0; continue; }
+        /* (a + jb) / (dr + j di) */
+        rr[k] = (a * dr + b * di) / den;
+        ri[k] = (b * dr - a * di) / den;
+    }
+    for (i = 0; i < n; ++i) {
+        double v = 0.0, t0 = 2.0 * M_PI * i / (double)n;
+        for (k = 1; k <= hmax; ++k)
+            v += rr[k] * cos(k * t0) + ri[k] * sin(k * t0);
+        rb[i] = (float)v;
+    }
+    free(rr); free(ri);
+    return dead;
+}
+
 int main(int argc, char **argv)
 {
     float inc = argc > 1 ? (float)atof(argv[1]) : 0.02f;
@@ -211,46 +321,70 @@ int main(int argc, char **argv)
         /* THE TABLE PATH. Phase advances 4*inc per OUTPUT sample -- four
          * sub-sample increments' worth, since one output sample is what four
          * sub-samples used to make. */
-        static float tab[WT_LEN];
+        static float tab[WT_LEN], sawt[WT_LEN], subt[WT_LEN], rb[WT_LEN];
+        static double pdc0 = 0.0, pwref0 = 1.0;
         double ph = 0.0, dph;
-        int hmax;
-        /* THE TABLE'S REFERENCE PITCH. If EB_WT_REF is set, the table is
-         * built at THAT increment and played at the test increment.
-         *
-         * WHY IT SHOULD WORK, and the reason is worth stating before the
-         * measurement contradicts it or not: `g` fixes the edge's width in
-         * TIME at about a quarter of an output sample, and band-limiting to
-         * Nyquist smooths every edge over about one whole sample. The
-         * band-limit therefore DOMINATES the port's own edge almost
-         * everywhere, so the table's shape should not depend on the pitch it
-         * was built at -- only on the mip level it is band-limited to.
-         *
-         * If that holds, one table set serves every note, and the wavetable
-         * costs kilobytes instead of a rebuild per note-on. If it does not,
-         * the lever needs a table per pitch and is unaffordable. */
-        {   const char *r = getenv("EB_WT_REF");
-            wt_build(tab, r ? (float)atof(r) : inc);
-        }
-        /* Harmonics below Nyquist. One table period is 2 DCO cycles, so the
-         * DCO's fundamental is harmonic 2 and the sub is harmonic 1. The
-         * output rate is 4/(4*inc) table periods per sample... expressed
-         * directly: the table period lasts 4/(4*inc) = 1/inc output samples,
-         * so its fundamental is inc cycles/sample and Nyquist admits
-         * floor(0.5/inc) harmonics. */
+        int hmax, ident = !strcmp(mode, "id");
         hmax = (int)floor(0.5 / inc);
         if (hmax > WT_LEN / 2 - 1) hmax = WT_LEN / 2 - 1;
         if (hmax < 1) hmax = 1;
-        wt_bandlimit(tab, WT_LEN, hmax, (double)inc);
-        dph = (double)inc * 4.0 / 4.0;   /* table periods per output sample */
+        dph = (double)inc;               /* table periods per output sample */
+
+        if (!ident) {
+            {   const char *r = getenv("EB_WT_REF");
+                wt_build(tab, r ? (float)atof(r) : inc);
+            }
+            wt_bandlimit(tab, WT_LEN, hmax, (double)inc);
+        } else {
+            /* THREE TABLES: saw and sub are pulse-width independent and are
+             * tabulated directly; the pulse arm becomes two reads of the
+             * recovered step Rb. Built at the REFERENCE width and played at
+             * the target width, which is the whole point. */
+            double pw0 = (double)wt_pulse_ref();
+            int dead;
+            WT_ARM = 1; wt_build(sawt, inc); wt_bandlimit(sawt, WT_LEN, hmax, inc);
+            WT_ARM = 3; wt_build(subt, inc); wt_bandlimit(subt, WT_LEN, hmax, inc);
+            WT_ARM = 2; wt_build(tab, inc);
+            dead = wt_pulse_step(rb, tab, WT_LEN, hmax, pw0,
+                                 (double)inc, &pdc0);
+            WT_ARM = 0; pwref0 = pw0;
+            {   /* MEANS, printed rather than reasoned about. The DC bug was
+                 * argued three ways from the structure and each argument gave
+                 * a different sign; the arithmetic settles it in one run. */
+                double ms = 0, mu = 0, mp = 0, mr = 0;
+                int q;
+                for (q = 0; q < WT_LEN; ++q) {
+                    ms += sawt[q]; mu += subt[q]; mp += tab[q]; mr += rb[q];
+                }
+                fprintf(stderr, "wt: dead=%d/%d pw0=%.4f | mean saw=%.5f "
+                        "sub=%.5f pulse=%.5f rb=%.5f dc0=%.5f\n",
+                        dead, hmax, pw0, ms / WT_LEN, mu / WT_LEN,
+                        mp / WT_LEN, mr / WT_LEN, pdc0);
+            }
+        }
+
         for (i = 0; i < nsamp; ++i) {
             double u = ph * WT_LEN;
             int    k = (int)u;
             float  f = (float)(u - k), out;
-            out = tab[k & (WT_LEN - 1)]
-                + (tab[(k + 1) & (WT_LEN - 1)] - tab[k & (WT_LEN - 1)]) * f;
-            /* THE BIQUAD TAIL STILL RUNS. It is rate-dependent recall data,
-             * not anti-aliasing, and leaving it out would compare a filtered
-             * reference against an unfiltered candidate. */
+#define RD(T, PH) ({ double _u = (PH) * WT_LEN; \
+                     int _k = (int)_u; float _f = (float)(_u - _k); \
+                     (T)[_k & (WT_LEN-1)] \
+                       + ((T)[(_k+1) & (WT_LEN-1)] - (T)[_k & (WT_LEN-1)]) * _f; })
+            if (!ident) {
+                out = tab[k & (WT_LEN - 1)]
+                    + (tab[(k + 1) & (WT_LEN - 1)] - tab[k & (WT_LEN - 1)]) * f;
+            } else {
+                /* pw and 1 are offsets in PHASE, and the table spans 4 phase
+                 * units, so an offset of x phase is x/4 of a table period. */
+                double pw = (double)wt_pw(0);
+                double o1 = ph + pw / 4.0, o2 = ph + 1.0 / 4.0;
+                o1 -= floor(o1); o2 -= floor(o2);
+                out = (float)(RD(sawt, ph) + RD(subt, ph)
+                              + (RD(rb, o1) - RD(rb, o2))
+                              + pdc0 * (pw / pwref0));
+            }
+#undef RD
             out = eb_decim_tick(&xs, &xc, 0.0f, out, 0.0f, 0.0f, 0.0f);
             fwrite(&out, 4, 1, stdout);
             ph += dph;

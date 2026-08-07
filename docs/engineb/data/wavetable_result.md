@@ -146,20 +146,67 @@ different — `juno_driver_seed_voices`, then `juno_apply_condition`, then
 `juno_apply_unison_spread` — were all missing. The control was added
 afterwards and would have caught it.
 
-## What is NOT answered
+## THE PULSE WIDTH — slicing is DEAD, the identity is REQUIRED, and it is
+## HALF BUILT
 
-**The pulse width is fixed in this probe, on purpose.** Measured, per voice
-over all 36 scenarios and 17,199,360 calls: **pw moves on 52 % of samples**. A
-table rebuilt whenever pw moves is not a saving.
+pw moves on **52 % of samples**, measured per voice over 17,199,360 calls. So
+a table rebuilt when pw moves is not a saving. The first question is whether
+a few pw SLICES would do. They would not:
 
-The route is the band-limited-step identity — a pulse of width `w` is
-`saw(p) − saw(p+w)` — which makes PWM a **phase offset** and never a rebuild.
-That is a second question and it is deliberately not mixed into this one:
-combining them would leave a failure unattributable to either.
+| play f0 | Δpw = 0 | +0.02 | +0.05 | +0.10 | +0.20 |
+|---|---|---|---|---|---|
+| 441 Hz | 5.59 | **29.32** | 34.64 | 28.20 | 33.30 |
+| 1,764 Hz | 3.15 | 9.18 | 29.33 | 6.95 | 14.30 |
 
-**So this result proves the mechanism and not the shipping module.** It says a
-band-limited table of this oscillator is indistinguishable from the 4× path. It
-does not yet say the shipping DCO can be one.
+**A pulse-width slice does not stretch at all.** 0.02 away is already 29 dB
+wrong. Slicing would need hundreds of tables.
+
+### The identity, which is the design
+
+The pulse arm is a square with TWO edges: one at `p = −pw`, which moves with
+the width, and one at the phase wrap, which does not. Both are the SAME edge
+shape with opposite signs. So
+
+    pulse(p; pw) = Rb(p + pw) − Rb(p ± 1)
+
+with `Rb` ONE band-limited, edge-shaped step. **The pulse width becomes a
+phase offset on one of two reads of a single table, and nothing is rebuilt.**
+
+`Rb` is RECOVERED from the shipping code rather than modelled: build the pulse
+arm's own table at any reference width, take its Fourier coefficients, and
+divide by the identity's own phase factor. `Rb` therefore inherits the port's
+edge shape and its saturator.
+
+### Where it stands, precisely
+
+**Built, and one bug remains.** `wt_probe.c` mode `id` builds three tables —
+saw, sub, and the recovered `Rb` — and plays the identity.
+
+* **DC: FIXED and correct.** The identity is structurally DC-free (a difference
+  of two shifted copies of one function has zero mean) while a square of duty
+  ≠ 50 % has a real offset. The pulse arm's mean is measured at the reference
+  width and scales linearly with pw. Measured: identity mean **0.25221**,
+  reference mean **0.24967**.
+
+  Found by looking at the WAVEFORM, not the spectrum. The identity matched in
+  RMS (0.765 against 0.768) and sat 0.25 high at every sample; a Hann-windowed
+  spectrum barely shows DC, so the gate reported **140 dB of "harmonic error"
+  for one missing constant**.
+
+* **AC: still wrong.** The flat top sits at 1.36 against the reference's 0.86 —
+  the recovered `Rb` has too much swing. The DC is right and the RMS is close,
+  so this is the **phase-factor convention in the recovery**: a shift of Δ in
+  phase multiplies harmonic k by `e^{−jπkΔ/2}` over the table's period of 4,
+  and the sign of that exponent decides `Rb(p+pw)` against `Rb(p−pw)`.
+
+  Recorded rather than guessed at: the structure was argued three ways and each
+  argument gave a different sign, which is why the probe now prints the
+  component means instead.
+
+**So the mechanism is proven and the shipping module is not.** A band-limited
+table of this oscillator IS indistinguishable from the 4× path (§ above). PWM
+through the identity is the right design, is built, and has one convention bug
+left in its recovery step.
 
 ## What it is worth
 
