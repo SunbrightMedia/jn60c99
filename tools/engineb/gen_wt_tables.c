@@ -325,6 +325,7 @@ static double build_one(float pw, int arm, int which, int o, float *out,
              * for term -- a reference that differs from the tick by anything
              * puts that difference into every residual. */
             float pd = pn - 3.875f * (4.0f * BUILD_INC);
+            if (pd < -1.0f) pd += 2.0f;   /* wrapped, as the tick wraps it */
             nring[rp & 511] =
                 (arm == ARM_SAW)   ? (pd * c.gn_saw) * c.sat_hi :
                 (arm == ARM_PULSE) ? (tn < 0.0f ? -c.gn_pulse : c.gn_pulse)
@@ -488,10 +489,27 @@ static void emit2(const char *name, float pw, int arm, int which,
              *
              * Both were built and measured. The one that wins is here; the one
              * that is prettier is recorded so it is not retried blind. */
-            /* h is the step the TICK's flat path takes across the detection
-             * sample -- the same quantity the tick passes as `amp`. */
-            lvl0 = nvw[HALF - 1]; lvl1 = nvw[HALF];
-            h = lvl1 - lvl0;
+            /* h IS THE LARGEST JUMP IN THE REFERENCE, located by scanning.
+             *
+             * Taking it at tap HALF assumes the flat path steps exactly at the
+             * detection sample. That is true for the pulse and the sub, and
+             * FALSE for the saw: its phase carries the decimator's group
+             * delay, so its ramp wraps 3.875 samples LATER. Taking the
+             * difference at HALF then gives the ramp's SLOPE -- a near-zero
+             * divisor -- and the saw table came out with entries of 441 and
+             * -330 where it should hold numbers near 1.
+             *
+             * Nothing else in the window comes close to the step, so the
+             * largest jump is it, whichever tap it falls on. */
+            {   int q; double bj = 0.0;
+                lvl0 = lvl1 = 0.0;
+                for (q = 1; q < EB_WT_RES_LEN; ++q) {
+                    double d = (double)nvw[q] - (double)nvw[q - 1];
+                    if (fabs(d) > fabs(bj)) { bj = d; lvl0 = nvw[q-1];
+                                              lvl1 = nvw[q]; }
+                }
+                h = bj;
+            }
             if (fabs(h) < 1e-9) h = 1.0;
             printf("    {");
             for (i = 0; i < EB_WT_RES_LEN; ++i) {

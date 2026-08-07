@@ -114,7 +114,24 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      * 3.875 is the FIR's group delay: 15.5 sub-samples at four to the output
      * sample, derived from the tap map and confirmed by the alignment shift
      * the first diagnostic needed. */
-    saw   = ((p - 3.875f * c->inc) * c->gn_saw) * c->sat_hi;
+#ifndef EB_WT_SAWGD
+#define EB_WT_SAWGD 3.875f
+#endif
+    {   /* THE DELAYED PHASE MUST BE WRAPPED. p is in [-1,1), so p minus the
+         * group delay falls BELOW -1 for the few samples after each wrap --
+         * and left unwrapped the saw's flat value is wrong by a full step for
+         * that whole span. The span is 3.875*inc in phase, so its duration
+         * scales with pitch, which is exactly how the saw's error behaved:
+         * -37.7 dB at 441 Hz and -16.0 at 1,764, about 11 dB per octave.
+         *
+         * The delay constant itself was swept and is right: the error has a
+         * sharp minimum at 3.875 (-37.7 dB) against -28.7 at 3.0 and -27.7 at
+         * 5.0, and 3.875 is what the tap map's centroid gives and what feeding
+         * a ramp through the FIR measures. */
+        float pd = p - (EB_WT_SAWGD) * c->inc;
+        if (pd < -1.0f) pd += 2.0f;
+        saw = (pd * c->gn_saw) * c->sat_hi;
+    }
 
     t     = c->pw + p;
     /* MEASURED, not derived. eb_dco.c computes pulse = eb_sat_c(e) * sgn(t) *
@@ -167,12 +184,20 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
          * exactly the sample the counter toggles, i.e. the only sample this
          * test exists to catch. */
         const float up = (((cnt_old + prev) + 1.0f) * 0.5f) - 1.0f;
-        const float f_saw_prev   = (prev * c->gn_saw) * c->sat_hi;
         const float f_pulse_prev = (tp < 0.0f ? -c->gn_pulse : c->gn_pulse)
                                  * c->sat_hi;
         const float f_sub_prev   = (up < 0.0f ? -c->gn_sub : c->gn_sub)
                                  * c->sat_hi;
-        const float h_saw   = (saw   - f_saw_prev)   * c->lvl_saw;
+        /* THE SAW'S STEP IS KNOWN, and must not be taken as a difference at
+         * the detection sample. Its phase carries the group delay, so the ramp
+         * wraps 3.875 samples LATER -- at the detection sample the difference
+         * is the ramp's SLOPE, and passing that as the step height scales the
+         * whole residual by a near-zero number.
+         *
+         * At a wrap the saw goes from +1 to -1, so the step is exactly
+         * -2*gn_saw*sat_hi. The other two arms are square and their step
+         * genuinely is the difference across the sample. */
+        const float h_saw   = -2.0f * c->gn_saw * c->sat_hi * c->lvl_saw;
         const float h_pulse = (pulse - f_pulse_prev) * c->lvl_pulse;
         const float h_sub   = (sub   - f_sub_prev)   * c->lvl_sub;
         (void)h_saw; (void)h_pulse; (void)h_sub;

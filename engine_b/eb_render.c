@@ -249,7 +249,13 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
         {
             eb_dco_wt_coef *w = &st->wt_live[v];
             const eb_dco_coef *d = &st->dco_live[v];
-            if (!w->res_saw) eb_dco_wt_bind_tables(w);
+            /* BOUND UNCONDITIONALLY. The guard `if (!w->res_saw)` assumes
+             * eb_render_state arrives zeroed, and its seeder only clears
+             * named members -- so a non-zero garbage pointer would never be
+             * replaced and the module would read whatever was at that address.
+             * It is a pointer assignment; the guard saved nothing and risked
+             * everything. */
+            eb_dco_wt_bind_tables(w);
             w->sat_hi = d->sat_hi;   w->sat_lo = d->sat_lo;
             w->lvl_saw = d->lvl_saw; w->lvl_pulse = d->lvl_pulse;
             w->lvl_sub = d->lvl_sub;
