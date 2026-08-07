@@ -472,3 +472,130 @@ pitch dimension.
   on a flat path measured at 72 Xtensa instructions. Untouched by any of this.
 * **Accurate to the plugin: NO.** −23.2 dB at best against −80.
 * **The trunk is untouched and still nulls EXACTLY 0.**
+
+---
+
+# 2026-08-07 — the three arms, separated and fixed one at a time
+
+The numbers above are superseded. They were measured on the MIX, and a mix
+cannot say which arm is wrong. `tools/engineb/wt_module_ab.c` takes an arm
+selector, and with the three separated each one turned out to have a different
+defect.
+
+## Where it stands now
+
+Module A/B against the port's own 4x path plus decimator, per arm, in dB:
+
+| inc | f0 (Hz) | saw | pulse | sub |
+|---|---|---|---|---|
+| 0.0025 | 220 | −68.2 | −72.9 | −48.5 |
+| 0.005 | 441 | −58.4 | −61.7 | −46.9 |
+| 0.008 | 706 | −53.3 | −53.7 | −41.9 |
+| 0.01 | 882 | −46.8 | −49.2 | −54.1 |
+| 0.0115 | 1,014 | **−29.2** | **−31.3** | −55.0 |
+| 0.014 | 1,235 | −58.1 | −68.3 | −47.0 |
+| 0.0155 | 1,367 | **−30.0** | −49.5 | −42.0 |
+| 0.02 | 1,764 | −50.6 | −58.3 | −62.3 |
+| 0.04 | 3,528 | −39.1 | −46.0 | −41.6 |
+
+The mix started this phase at −10.3 dB.
+
+## THE SUB'S RESIDUAL IS PITCH-DEPENDENT, and finding 5 said it was not
+
+Finding 5 was PROVEN on the pulse edge and then assumed for all three arms.
+Building the sub's residual at four pitches and testing each at four pitches
+gives a matrix whose diagonal is −41.8, −42.9, −54.1 and −58.9 dB and whose
+off-diagonal entries are 10 to 20 dB worse.
+
+The pulse's edge width carries `g = 0.00390625/inc`, so inc cancels. The sub's
+ramp `(cnt + p + 1)/2` has no `g` in it, so nothing cancels. The sub gets one
+level per octave; its table is 1 KB per level, so the whole dimension costs
+4 KB against the pulse's 106 slices.
+
+**The top level is not built and the index clamps.** Above sub-step inc 0.02
+the sub's period approaches the residual window plus the filter's reach, so a
+second edge enters the window and the generator emits rubbish (−23.2 dB).
+Clamping to the highest sound level measures −42.0 at inc 0.04. That is a limit
+of the GENERATOR, and it is written down so the table does not read as covering
+everything.
+
+## THE SUB'S EDGE IS NOT AT THE PHASE WRAP
+
+`u = ((cnt + p + 1)/2) − 1` is always negative at cnt 0 and never negative at
+cnt 2. So **u's sign is the counter**, and the sub's edge is the counter's
+toggle — the rising crossing of `subthr`, near −0.005 — not the phase wrap half
+a period away. Both the tick and the generator indexed the sub's table by the
+wrap's fraction. Two wrong fractions preceded this one: a hardcoded 0.5, then
+the wrap's.
+
+## THE SAW'S EDGE AND ITS FLAT STEP WERE QUANTISED SEPARATELY
+
+The saw's flat path is the ramp `pd = p − 3.875*inc`, so its step happens 3.875
+samples after the phase wrap. The residual was scheduled at the WRAP. The two
+therefore rounded to samples independently, and when they rounded apart the edge
+was corrected in the wrong sample outright: at inc 0.014 most edges were
+accurate to 0.002 — which alone reads −55 dB — and one edge in a few tens
+reached 0.712, the module at +1.110 against the port's +0.398, above the flat
+level itself.
+
+**The generator had to move with it.** Changing only the tick made the arm worse
+at every pitch, −18.4 dB at inc 0.005 against −58.4, because the table was still
+anchored on the wrap. A residual and its schedule are one decision made in two
+files.
+
+## THE TOP SUB-POSITION HAD NO PARTNER
+
+`eb_wt_add` blends row `sub` with row `sub+1`, and the last row fell back to
+itself — the nearest-neighbour case the oversampling exists to remove. The
+tables now carry `EB_WT_RES_OVER + 1` rows.
+
+## OVER 16 → 64, AND IT DOES NOT CLOSE THE SAW
+
+Raising the fractional resolution costs table memory only; the per-edge work is
+unchanged. It lifts the worst pitches: inc 0.0105 from −28.9 to −46.0, inc 0.014
+from −22.6 to −58.1.
+
+**128 is the measurement that says the rest is structural.** Two pitches
+(0.0115 and 0.0155) sit at −29 and −30 dB at OVER 64 and reach only −35 and −38
+at 128, while every other entry does not move at all. A quantisation error would
+keep halving. So a fault remains in the saw arm, it is not the sub-position
+resolution, and it is not claimed to be fixed.
+
+Table cost at OVER 64: saw 4,160 B, sub 20,800 B, pulse_a 440,960 B, pulse_b
+33,280 B — **499,200 bytes**, of which the pulse's moving edge is 88 %.
+
+## THREE PROBE DEFECTS, and every one flattered or blamed the module wrongly
+
+1. **THE ALIGNMENT SEARCH RAN OVER ±128 SAMPLES** while a saw's period is 25 to
+   60. A near-periodic signal has a correlation peak at every period, so the
+   search picked whole-period offsets and the "aligned" residual it reported was
+   the module compared against itself one cycle over. That printed as a sharp
+   band of failure at inc 0.010 to 0.014 which was not there. The span is now
+   ±16 — shorter than any period the probe sees — and the true lag is not a free
+   parameter anyway: it is `EB_WT_RES_LEN/2`.
+
+2. **THE DUMP WAS ANCHORED ON THE FIRST EDGE.** When the fault is
+   fraction-dependent the first edge is not the worst one: at inc 0.014 the
+   first edge's error was 0.002, which alone reads −55 dB, while the arm
+   measured −19.2. `EB_AB_WORST` centres on the largest error instead.
+
+3. **FOUR TABLE SWEEPS MEASURED NOTHING AT ALL.** `eb_dco_wt.c` includes
+   `"eb_wt_tables.h"` in QUOTES, so the preprocessor searches `engine_b/` first
+   and `-I` never wins. Every sweep run against a generated copy in a scratch
+   directory silently re-measured the committed header. The length sweep, the
+   build-pitch sweep and two others all returned identical numbers to one
+   decimal, which is what gave it away. Generated tables are now written into
+   `engine_b/` itself.
+
+   `EB_WT_RES_LEN` and `EB_WT_RES_OVER` are also `#ifndef`-guarded now, because
+   a plain `#define` cannot be swept and the first attempt measured 16 four
+   times over.
+
+## Status
+
+* **6 voices + full FX: yes, in the design.** Unchanged.
+* **Real time: the arithmetic says yes** — 0.90x worst patch, 0.64x typical, on
+  a flat path measured at 72 Xtensa instructions. Untouched by all of this.
+* **Accurate to the plugin: NOT YET, and the gap is now two named pitches in
+  one arm** rather than every arm at every pitch.
+* **The trunk is untouched and still nulls EXACTLY 0.**
