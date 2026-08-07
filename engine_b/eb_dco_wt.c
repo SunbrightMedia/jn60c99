@@ -49,21 +49,27 @@ void eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc, float pw)
 static void eb_wt_add(eb_dco_wt_state *s, const float *tab, float frac,
                       float amp)
 {
+    /* INTERPOLATED BETWEEN TWO SUB-POSITIONS. Picking the nearest one
+     * quantises the crossing time, and on a correction whose slope reaches
+     * 1.2 per sample that quantisation IS the error -- 18 % at four positions,
+     * which is what the module measured as -20 dB. The blend costs one
+     * multiply and one add per tap and removes it. */
     int sub;
-    const float *r;
+    const float *r0, *r1;
+    float g1, g0;
     int i, p = s->rpos;
-#if (EB_WT_CONV & 1)
-    frac = 1.0f - frac;
-#endif
     if (frac < 0.0f) frac = 0.0f;
-    if (frac > 0.999f) frac = 0.999f;
-    sub = (int)(frac * (float)EB_WT_RES_OVER);
-    r = tab + sub * EB_WT_RES_LEN;
-#if (EB_WT_CONV & 2)
-    p = (p + 1) & (EB_WT_RES_LEN - 1);
-#endif
+    if (frac > 0.99999f) frac = 0.99999f;
+    frac *= (float)EB_WT_RES_OVER;
+    sub = (int)frac;
+    g1 = frac - (float)sub;
+    g0 = 1.0f - g1;
+    r0 = tab + sub * EB_WT_RES_LEN;
+    /* the last slot's partner is the FIRST slot of the NEXT sample's window,
+     * which is the same shape shifted one tap -- so it is read one tap in */
+    r1 = (sub + 1 < EB_WT_RES_OVER) ? r0 + EB_WT_RES_LEN : r0;
     for (i = 0; i < EB_WT_RES_LEN; ++i) {
-        s->ring[p] += r[i] * amp;
+        s->ring[p] += (r0[i] * g0 + r1[i] * g1) * amp;
         p = (p + 1) & (EB_WT_RES_LEN - 1);
     }
 }
@@ -121,6 +127,28 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
 #define EB_WT_NO_EDGES 0
 #endif
 #if !EB_WT_NO_EDGES
+    /* THE STEP HEIGHTS ARE COMPUTED FROM THE FLAT PATH, not assembled from
+     * constants. The generator divides each residual by its own SIGNED step
+     * height, so the tick must supply the same signed number -- and every time
+     * one was written out by hand it was a chance to get the sign wrong. The
+     * pulse's wrap was wrong that way: the right magnitude with the wrong
+     * sign, which is worse than no correction at all, and it cost 8 dB.
+     *
+     * Here each height is the flat value AFTER the edge minus the flat value
+     * BEFORE it, in exactly the expressions the flat path above uses. A sign
+     * cannot disagree with itself. */
+    {
+        const float tp = c->pw + prev;
+        const float up = (((s->subcnt + prev) + 1.0f) * 0.5f) - 1.0f;
+        const float f_saw_prev   = (prev * c->gn_saw) * c->sat_hi;
+        const float f_pulse_prev = (tp < 0.0f ? -c->gn_pulse : c->gn_pulse)
+                                 * c->sat_hi;
+        const float f_sub_prev   = (up < 0.0f ? -c->gn_sub : c->gn_sub)
+                                 * c->sat_hi;
+        const float h_saw   = (saw   - f_saw_prev)   * c->lvl_saw;
+        const float h_pulse = (pulse - f_pulse_prev) * c->lvl_pulse;
+        const float h_sub   = (sub   - f_sub_prev)   * c->lvl_sub;
+        (void)h_saw; (void)h_pulse; (void)h_sub;
     /* ---- the edges. Each arm's edge is a step of known height at a known
      * fractional position, and the residual table carries the difference
      * between the band-limited edge and that flat step. */
@@ -133,15 +161,23 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
          * it is scaled by 1/lvl relative to the signal it corrects. Measured:
          * the module's RMS came out 0.85 against the 4x path's 0.21, which is
          * exactly the missing lvl_pulse of 0.25. */
-        eb_wt_add(s, c->res_saw, frac,
-                  -2.0f * c->gn_saw * c->sat_hi * c->lvl_saw);
+        eb_wt_add(s, c->res_saw, frac, h_saw);
         {   int sb = (int)((c->pw - EB_WT_PW_LO)
                            * (float)EB_WT_PWB_SLICES);
             if (sb < 0) sb = 0;
             if (sb >= EB_WT_PWB_SLICES) sb = EB_WT_PWB_SLICES - 1;
+        /* NEGATIVE. The generator divides each residual by its own SIGNED
+         * step height, so a residual is always for a unit POSITIVE step and
+         * the tick must supply the sign. At the phase wrap t goes from pw+1
+         * (positive) to pw-1 (negative), so the pulse steps DOWN: the height
+         * is -2*gn*sat_hi.
+         *
+         * MEASURED against tools/engineb/wt_decomp.c: the correction needed at
+         * the edge is +1.694, and passing +1.70 applied -1.694 -- the right
+         * magnitude with the wrong sign, which is worse than no correction. */
         eb_wt_add(s, c->res_pulse_b
                      + (size_t)sb * EB_WT_RES_OVER * EB_WT_RES_LEN, frac,
-                  c->gn_pulse * (c->sat_hi - c->sat_lo) * c->lvl_pulse); }
+                  h_pulse); }
     }
     {   /* the pulse's MOVING edge, where t crosses zero */
         float tprev = c->pw + prev;
@@ -157,16 +193,15 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
             frac = -tprev / c->inc;
             eb_wt_add(s, c->res_pulse_a
                          + ((size_t)sl * EB_WT_RES_OVER * EB_WT_RES_LEN),
-                      frac, c->gn_pulse * (c->sat_hi - c->sat_lo)
-                            * c->lvl_pulse);
+                      frac, h_pulse);
         }
     }
     if (cnt != s->subcnt || (u < 0.0f) != (((((s->subcnt + prev) + 1.0f)
                                              * 0.5f) - 1.0f) < 0.0f)) {
         /* the sub's own crossing; its step is the same height as the pulse's
          * because both are square */
-        eb_wt_add(s, c->res_sub, 0.5f,
-                  c->gn_sub * (c->sat_hi - c->sat_lo) * c->lvl_sub);
+        eb_wt_add(s, c->res_sub, 0.5f, h_sub);
+    }
     }
 
 #endif

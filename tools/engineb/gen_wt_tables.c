@@ -320,7 +320,7 @@ static void build_one(float pw, int arm, int which, int o, float *out,
         }
         /* stop once the window's far end has been rendered; the decimator's
          * own group delay of ~4 samples is inside the window and must be */
-        if (edge >= 0 && rp - edge >= HALF + 8) got = 1;
+        if (edge >= 0 && rp - edge >= HALF + 12) got = 1;
         ++rp;
     }
     warm = 0; (void)warm;
@@ -345,13 +345,28 @@ static void build_one(float pw, int arm, int which, int o, float *out,
      * The FIR's 3.875 samples of group delay therefore live INSIDE the
      * residual, which makes it larger. That is the honest shape: the residual
      * has to move the edge as well as band-limit it. */
-    {   int oe = edge, k;
-        double lo2 = ring[(edge - 12) & 511], hi2 = ring[(edge + 12) & 511];
-        double mid = (lo2 + hi2) * 0.5;
-        for (k = edge - 2; k < edge + 12 && k < rp; ++k) {
-            double a = ring[k & 511], b = ring[(k + 1) & 511];
-            if ((a - mid) * (b - mid) <= 0.0 && a != b) { oe = k + 1; break; }
-        }
+    /* THE WINDOW IS PLACED AT THE PHASE-EDGE SAMPLE, THE SAME PLACE FOR EVERY
+     * SUB-POSITION -- and this is the bug that made sixteen sub-positions
+     * behave exactly like four.
+     *
+     * The earlier version RE-DETECTED the output edge per sub-position and
+     * centred on it. Detection has integer resolution, so re-centring removed
+     * the very fractional offset the sub-position exists to encode: all
+     * sixteen tables came out nearly identical, and raising the resolution
+     * changed the measured residual by 0.0 dB.
+     *
+     * The tick writes its residual at the sample where it DETECTS the phase
+     * edge, so the generator must place tap HALF at that same sample. The
+     * FIR's 3.875 samples of group delay then live inside the residual, which
+     * is where they belong: the correction has to move the edge as well as
+     * band-limit it. */
+    {   /* +1: MEASURED, by comparing the generated table against the
+         * decomposition printed by tools/engineb/wt_decomp.c. The generated
+         * row was ground truth shifted one sample later -- generated[k+1] =
+         * truth[k] -- because `edge` is the index of the sample DURING which
+         * the sign change was detected, and the tick's naive has already
+         * stepped by the time it emits that sample. */
+        int oe = edge + 1;
         for (i = 0; i < EB_WT_RES_LEN; ++i) {
             int j = oe + (i - HALF);
             out[i]  = (j >= 0 && j < rp) ? ring[j & 511]  : 0.0f;

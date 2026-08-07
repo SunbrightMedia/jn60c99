@@ -89,12 +89,23 @@
 #define EB_DCO_WT 0
 #endif
 
-/* THE RESIDUAL'S LENGTH. A band-limited step's departure from a flat step
- * decays as 1/n, so a window is a compromise between table size and the ripple
- * left at its ends. 64 taps at 4 sub-sample positions is the size the design
- * document prices at 50 KB for the whole pw grid. */
-#define EB_WT_RES_LEN    64
-#define EB_WT_RES_OVER    4     /* fractional-crossing resolution */
+/* THE RESIDUAL'S LENGTH AND ITS FRACTIONAL RESOLUTION, both MEASURED rather
+ * than chosen.
+ *
+ * LENGTH 16. The correction is `port_1x - naive_1x`, and printing it directly
+ * (tools/engineb/wt_decomp.c) shows it is EXACTLY ZERO outside a span of TEN
+ * samples around the edge -- zero to six decimals, not merely small. 64 was
+ * four times longer than anything it had to hold.
+ *
+ * OVER 16, WITH INTERPOLATION. This is where the error was. At 4 positions the
+ * crossing time is quantised to a quarter of a sample, and the correction's
+ * steepest slope is about 1.2 per sample on an amplitude of 1.7 -- so the
+ * quantisation alone is an 18 % error, which is the -20 dB the module measured.
+ * Sixteen positions with a linear blend between adjacent ones removes it.
+ *
+ * The two changes pay for each other: 16x16 is the same memory as 64x4. */
+#define EB_WT_RES_LEN    16
+#define EB_WT_RES_OVER   16
 
 /* THE PULSE-WIDTH GRID. Measured range of pw over all 36 scenarios is
  * [-0.015, 0.939]; the grid spans [-0.05, 1.00] at 0.01, the spacing the
