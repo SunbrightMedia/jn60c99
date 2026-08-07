@@ -125,7 +125,7 @@ void eb_dco_wt_advance(eb_dco_wt_state *s, const eb_dco_wt_coef *c, int n)
 
 float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
 {
-    const float prev = s->phase;
+    float prev;
     float p, t, u, cnt, cnt_old, out;
     float saw, pulse, sub;
 
@@ -134,6 +134,22 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
      * (docs/engineb/data/dco_real_cost.md), so they are not reproduced on a
      * path whose whole purpose is to be cheap. A phase that could reach them
      * would need an increment above 2.0, which is above Nyquist. */
+    /* THE LEAD, ONCE. See the state struct: the ring delays this module's
+     * output by EB_WT_DELAY, and the noise it is mixed with is not delayed, so
+     * the oscillator has to run that far ahead. Priming costs nothing after
+     * the first sample. */
+    if (!s->primed) {
+        int k;
+        s->primed = 1;
+        for (k = 0; k < EB_WT_DELAY * 4; ++k) {
+            s->phase += c->inc4;
+            if (s->phase >= 1.0f) s->phase -= 2.0f;
+        }
+        s->tprev = c->pw + s->phase;
+    }
+
+    prev = s->phase;   /* AFTER the prime, or the first sample sees a jump */
+
     /* FOUR SUB-STEPS, NOT ONE STEP OF FOUR TIMES THE SIZE, and this is the
      * whole of the module's remaining error.
      *

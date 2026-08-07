@@ -248,6 +248,14 @@ typedef struct {
      * isolated figures and the engine's, and no static-pw probe could see it,
      * because with pw still the two forms are identical. */
     float tprev;
+    /* THE LEAD. The module's output is EB_WT_DELAY samples later than the
+     * port's, because its flat path waits that long to meet its correction.
+     * On its own that is a pure delay -- but the DCO reaches the VCF ONLY
+     * through the noise mix, and the NOISE term is not delayed, so the mix is
+     * skewed internally and no alignment can undo it. So the oscillator runs
+     * EB_WT_DELAY samples AHEAD and the ring puts it back on time. Primed
+     * once, on the first tick, from the increment then in force. */
+    int   primed;
     /* ACTIVE RESIDUALS. An edge crossed at a fractional position schedules a
      * residual that is added over the next EB_WT_RES_LEN samples. Three arms
      * can each cross in one sample, and a very high note can cross twice, so
