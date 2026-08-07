@@ -220,7 +220,18 @@
  *    constants are spelled out below so the two cannot be confused again. */
 #define EB_WT_SUB_INC0  (0.00125f)   /* level 0, SUB-STEP rate: the generator */
 #define EB_WT_SUB_OINC0 (0.005f)     /* level 0, OUTPUT rate: the tick        */
-#define EB_WT_SUB_MIPS  5            /* octaves, to sub-step inc 0.02         */
+/* QUARTER-OCTAVE LEVELS, NOT OCTAVES. At one level per octave a note halfway
+ * between two levels uses a table built up to half an octave away, and the sub
+ * measured -41 to -48 dB where the saw and the pulse reach -58 to -72. The
+ * levels are indexed by the float exponent AND the top two mantissa bits, so
+ * the index is still a shift and a mask; the table costs 1 KB per level.
+ *
+ * Level L = 4*e + j covers inc in INC0*2^e*[1 + j/4, 1 + (j+1)/4) and is built
+ * at that interval's midpoint. */
+#define EB_WT_SUB_PER_OCT 4
+#define EB_WT_SUB_MIPS  16           /* to sub-step inc 0.01875 -- the highest
+                                      * the generator builds soundly; above it
+                                      * a second edge enters the window */
 
 typedef struct {
     float phase;      /* [-1,1), the port's own DCO phase   */

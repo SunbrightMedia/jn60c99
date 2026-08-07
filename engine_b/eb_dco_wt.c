@@ -41,9 +41,12 @@ void eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc, float pw)
      * level 1, and so on; the biased exponent of that ratio minus 127 IS the
      * level. Only the sub needs this -- see eb_dco_wt.h, finding 9. */
     {   union { float f; unsigned u; } z;
-        int lv;
+        int e2, j, lv;
         z.f = inc * (1.0f / EB_WT_SUB_OINC0);
-        lv = (int)((z.u >> 23) & 0xFFu) - 127;
+        e2 = (int)((z.u >> 23) & 0xFFu) - 127;
+        /* the top two mantissa bits split each octave into four */
+        j  = (int)((z.u >> 21) & 3u);
+        lv = e2 * EB_WT_SUB_PER_OCT + j;
         if (lv < 0) lv = 0;
         if (lv >= EB_WT_SUB_MIPS) lv = EB_WT_SUB_MIPS - 1;
         c->sub_mip = lv;

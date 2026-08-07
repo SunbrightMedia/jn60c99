@@ -470,9 +470,13 @@ static void emit2(const char *name, float pw, int arm, int which,
     for (sl = 0; sl < nsl; ++sl) {
         float w = (!mips && slices) ? lo + (hi - lo) * (sl + 0.5f) / slices : pw;
         if (mips) {
-            int e2;
+            /* Level L = 4*e + j covers inc in INC0*2^e*[1+j/4, 1+(j+1)/4) and
+             * is built at that interval's MIDPOINT -- the same split the tick
+             * makes from the exponent and the top two mantissa bits. */
+            int e2 = sl / EB_WT_SUB_PER_OCT, j = sl % EB_WT_SUB_PER_OCT, k;
             g_build_inc = EB_WT_SUB_INC0;
-            for (e2 = 0; e2 < sl; ++e2) g_build_inc *= 2.0f;
+            for (k = 0; k < e2; ++k) g_build_inc *= 2.0f;
+            g_build_inc *= 1.0f + ((float)j + 0.5f) / (float)EB_WT_SUB_PER_OCT;
             printf("  { /* mip %d, inc %.5f */\n", sl, g_build_inc);
         } else
         printf("  { /* pw %.4f */\n", w);
