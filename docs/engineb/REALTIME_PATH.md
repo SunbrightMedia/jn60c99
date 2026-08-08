@@ -46,7 +46,31 @@ resonant loop moves the resonant peak and rotates the loop phase, and no
 scaling of G can compensate it, because G parameterises the cascade and not
 the loop delay.
 
-WHAT TO DO ABOUT IT: re-derive the feedback term for the new sub-step period
+RULED OUT TOO -- CHECKED, and the diagnosis above is WRONG. The half-rate
+sub-steps DO receive Gp/Ap/Rkp, so S is computed at half-rate parameters
+throughout. And S is not a delayed term at all: it is the zero-input response
+ONE SUB-STEP AHEAD, computed at step n and consumed at step n+1, which is
+exactly on time. That is the whole point of the ZDF solve. There is no delay
+error to compensate.
+
+THE SUSPECT THAT SURVIVES: THE DECIMATOR IS A DIFFERENT FILTER.
+
+At 4x the VCF decimates with the PORT'S OWN coefficients, c->fir[j], 32 taps
+folded into 16 -- and those coefficients are part of the instrument's sound,
+not a convenience. The half-rate path instead uses eb_halfos_fir, 24 taps,
+which was DESIGNED FOR THE DCO PATH. Substituting one anti-imaging filter for
+another changes the transfer function of the whole ladder output, and it does
+so most where the two designs differ most -- which would explain a 24.8 dB
+band error far better than aliasing does.
+
+WHAT TO DO ABOUT IT: derive a 2x->1x decimator whose CASCADE with the
+half-rate ladder matches the port's 4x ladder + 32-tap chain, and gate it on
+response before touching the sonic gate. Do NOT reuse the DCO's filter: the
+note in the 4x path says the VCF's sixteen cells and the DCO decimator's hold
+the same MULTISET at 4x, which is a statement about the 4x filters and says
+nothing about a 2x substitute.
+
+SUPERSEDED PLAN (kept so it is not re-tried): re-derive the feedback term
 rather than transporting c9520 unchanged. The cascade's zero-input response
 one sub-step ahead is a function of (G, A) and the four stage states; S is
 already computed from them, so the half-rate S must be computed with the
