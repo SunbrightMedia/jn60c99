@@ -38,3 +38,26 @@ PLAN:
   4. Firmware built per milestone for the user to measure on return.
 
 LOG (appended as work completes):
+
+## CAUTION recorded early (zero-coefficient scan)
+
+A general scanner (/tmp/zeroscan.c) found 60+ float coefficient slots that are
+0.0 in all 128 factory (note,gate,voice) sets, across modcv, vcf_cv, vca, dco,
+lfo, glide and others. THEY MUST NOT BE BLINDLY DELETED. GOAL.md is binding:
+"this byte is 0 in every factory patch is not an excuse to skip it" -- recall
+must be correct for ANY preset. A factory-bank zero is only deletable if it is
+STRUCTURALLY zero (zero for every possible preset by construction, like the
+12/18 dB VCF taps on an always-4-pole filter). Each candidate needs a
+structural proof, not a bank measurement. The audit workflow's verify stage is
+tasked with exactly this distinction. Coincidental zeros are left alone.
+
+## Strategy lock
+
+The safe-for-any-preset levers, in priority:
+  1. Voice interleaving -- BIT-EXACT BY CONSTRUCTION regardless of coefficient
+     values; it only reorders independent voices' identical arithmetic. Safe
+     for any preset. Each 2-wide module carries a bit-exact unit test as its
+     safety net (as eb_vcf_tick2 does), and the composite is gated EXACTLY 0.
+  2. Block processing -- bit-exact, any preset.
+  3. STRUCTURALLY-zero coefficient deletions only, each with a structural proof.
+Everything ships only after the standalone gate is re-proven EXACTLY 0.
