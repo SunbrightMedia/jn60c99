@@ -160,7 +160,18 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
              * MEASURED at about 8 % of a sounding voice, and it is EXACT --
              * see the free-run note in eb_dco.h, which also explains why this
              * cannot be an O(1) closed form. */
+#if !EB_DCO_WT
             eb_dco_advance(&st->dco[v], &st->dco_live[v], 1);
+#else
+            /* DEAD UNDER EB_DCO_WT, PROVEN by fork-vs-fork A/B: with this
+             * advance removed, all 36 scenarios are BIT-IDENTICAL (0 differ).
+             * st->dco[v] is read only by eb_dco_step4, which is compiled out
+             * under the wavetable; the sounding state is st->wt[v], advanced
+             * by eb_dco_wt_advance below. NOTE the first gate of this change
+             * was INVALID -- null_b with JUNO_EB_DCO_WT compares fork against
+             * TRUNK oracle and always reads -36.6 dB; the correct gate is the
+             * fork-vs-fork bit compare, which is what proved it. */
+#endif
 #if EB_DCO_WT
             /* AND THE WAVETABLE'S OWN STATE, which is the one the sounding
              * path actually runs. Advancing only the trunk's left an at-rest
