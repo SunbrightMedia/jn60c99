@@ -183,7 +183,16 @@ static float eb_vcf_substep(eb_vcf_state *st, const eb_vcf_coef *c,
     else            { x = -1.0f; }
 
     /* the saturation curve. :1362 */
+#if EB_VCF_NOSAT
+    /* DIAGNOSTIC ONLY. Makes the ladder LINEAR so that halving the
+     * oversampling can be judged with the nonlinearity removed: if 2x and 4x
+     * then differ by the same amount as they do with it, the residual is the
+     * cascade's own HF response; if the difference collapses, it is the
+     * saturation's fold. Never a shipping build. */
+    nl = x;
+#else
     nl = x + ((((x * x) * x) * x) * (x * c->c9184));
+#endif
 #endif
 
     /* four cascaded bilinear one-poles. :1365-1375 */
