@@ -124,12 +124,56 @@ static float eb_vcf_substep(eb_vcf_state *st, const eb_vcf_coef *c,
      * 0*NaN are not nothing. :1355-1357 */
     x = ins - (((st->s1 * c->c9520) + (st->s2 * c->c9536)) * Rk);
 
+#if EB_VCF_ADAA
+    /* ANTIDERIVATIVE ANTIALIASING on the clamped quintic.
+     *
+     * The 4x oversampling in this filter is NOT there for frequency warping:
+     * the loop is already zero-delay (see the solve above). It is there
+     * because this saturation sits INSIDE the resonant feedback path, so its
+     * harmonics fold AND are then re-circulated by the resonance. Halving the
+     * oversampling instead of fixing that measured 24.8 dB on the sonic gate.
+     *
+     * ADAA attacks the fold at its source. With
+     *     f(x) = x + k*x^5   on |x| <= 1, and constant +/-(1+k) outside,
+     * the antiderivative is elementary:
+     *     F(x) = x^2/2 + k*x^6/6            on |x| <= 1
+     *     F(x) = F(1) + (1+k)*(|x| - 1)     outside   (F is even, f is odd)
+     * and one sample of it is  y = (F(x) - F(xprev)) / (x - xprev), which is
+     * the average of f over the segment the input travelled rather than its
+     * value at one instant. The fold is suppressed instead of moved.
+     *
+     * THE DIVISION IS ILL-CONDITIONED when the input barely moves, which is
+     * most of the time on a slow-moving control signal. Below the threshold
+     * the midpoint value is used, which is the limit of the quotient. */
+    {   float k = c->c9184, xp = st->xprev, ax, axp, Fx, Fxp, d;
+        st->xprev = x;
+        ax  = x  < 0.0f ? -x  : x;
+        axp = xp < 0.0f ? -xp : xp;
+        if (!(ax  <= 1.0f)) Fx  = (0.5f + k * (1.0f / 6.0f))
+                                  + (1.0f + k) * (ax  - 1.0f);
+        else { float x2 = x * x;  Fx  = 0.5f * x2
+                                        + k * (1.0f / 6.0f) * x2 * x2 * x2; }
+        if (!(axp <= 1.0f)) Fxp = (0.5f + k * (1.0f / 6.0f))
+                                  + (1.0f + k) * (axp - 1.0f);
+        else { float p2 = xp * xp; Fxp = 0.5f * p2
+                                        + k * (1.0f / 6.0f) * p2 * p2 * p2; }
+        d = x - xp;
+        if (d > 1e-5f || d < -1e-5f) {
+            nl = (Fx - Fxp) / d;
+        } else {
+            float m = 0.5f * (x + xp), am = m < 0.0f ? -m : m;
+            if (!(am <= 1.0f)) nl = m < 0.0f ? -(1.0f + k) : (1.0f + k);
+            else { float m2 = m * m; nl = m + k * m2 * m2 * m; }
+        }
+    }
+#else
     /* hard clip, NaN -> -1.0 (the >= test fails on NaN). :1358-1361 */
     if (x >= -1.0f) { if (x > 1.0f) x = 1.0f; }
     else            { x = -1.0f; }
 
     /* the saturation curve. :1362 */
     nl = x + ((((x * x) * x) * x) * (x * c->c9184));
+#endif
 
     /* four cascaded bilinear one-poles. :1365-1375 */
     y1 = (G * (nl + xz)) + (y1z * A);

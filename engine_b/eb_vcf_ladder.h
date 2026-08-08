@@ -63,6 +63,7 @@
  */
 #ifndef ENGINEB_EB_VCF_LADDER_H
 #define ENGINEB_EB_VCF_LADDER_H
+#include "eb_fork_config.h"
 
 /* ---------------------------------------------------------------- state
  * Per voice. Hot every sample of a sounding voice; nothing here is
@@ -76,6 +77,11 @@ typedef struct {
     float nl;       /* saturator output            (port cell 8208/8224) */
     float y1, y2, y3, y4;               /* the four stages  (8240..8288) */
     float s1, s2;   /* S of the last / second-to-last sub-step (8304/8320) */
+#if EB_VCF_ADAA
+    /* ADAA needs the PREVIOUS input to the saturation, which nothing else in
+     * this filter keeps: st->nl is the saturation's OUTPUT. */
+    float xprev;
+#endif
 
     float drive_prev;                   /* previous input drive   (8960) */
     float dith;                         /* dither phase           (8976) */

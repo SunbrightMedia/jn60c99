@@ -104,3 +104,31 @@ ladder is ANTIDERIVATIVE ANTIALIASING on the quintic saturation, which
 attacks the aliasing at its source rather than pushing it out of band. Its
 antiderivative is trivial (x^2/2 + k*x^6/6), so it is tractable, but it is
 unbuilt and ungated and no cycle figure may be quoted for it.
+
+## ADAA: measured, and it does not open the ladder (2026-08-08)
+
+Antiderivative antialiasing on the clamped quintic, EB_VCF_ADAA, sonic gate:
+
+  at FULL 4x   FAIL  8 of 36, worst band  2.22 dB   (bound 1.0)
+  at 2x        FAIL 27 of 36, worst band 30.45 dB
+
+Both numbers matter and they say different things.
+
+At 4x, ADAA changes the sound by up to 2.22 dB ON ITS OWN, with the
+oversampling untouched. First-order ADAA replaces the instantaneous
+nonlinearity with its average over the segment the input travelled, and that
+average is a mild low-pass whose corner moves with input slew. Inside a
+resonant loop the filter hears that as a changed saturation curve, not merely
+as less aliasing. So ADAA is not free even where it is not asked to save
+anything.
+
+At 2x it is WORSE than the plain 2x ladder (30.45 vs 24.80 dB), which settles
+the question the 4x run raised: the failure at 2x is not aliasing that ADAA
+could have removed. If it were, ADAA would have improved it.
+
+CONSEQUENCE: the ladder's 4x oversampling is not reducible by half-rate, by
+zero-delay reformulation (already present), or by first-order ADAA. All three
+are closed by measurement. The VCF's ~26 % stands, and the remaining levers
+for the S3 are the ones that do not touch it: EB_NUM_VOICES=6 (exact),
+control-rate CV and envelopes, and core-balance tuning. Those reach ~1.09x,
+not 1.0x.

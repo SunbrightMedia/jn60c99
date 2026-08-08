@@ -87,6 +87,10 @@
  * nothing fixes the shape. See docs/engineb/data/o8_halfos_result.md §7.
  * The code stays in the tree so the negative result is reproducible in one
  * command instead of re-derived. */
+#ifndef EB_VCF_ADAA
+#define EB_VCF_ADAA 0
+#endif
+
 #ifndef EB_HALF_OS_VCF
 #define EB_HALF_OS_VCF 0
 #endif
