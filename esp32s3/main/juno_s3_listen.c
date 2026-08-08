@@ -271,6 +271,61 @@ static int rings_alloc(void)
     return 1;
 }
 
+
+/* ---- THE SECOND CORE -------------------------------------------------------
+ *
+ * S3_CORES=2 renders voices [0,S3L_SPLIT) on core 0 and [S3L_SPLIT,N) on core
+ * 1. Until this existed the S3's second core had never rendered a sample,
+ * while every cycle figure was compared against a two-core budget.
+ *
+ * THE HANDSHAKE IS A SPIN, NOT A SEMAPHORE, and that is deliberate: a
+ * FreeRTOS semaphore round trip is hundreds of cycles and this happens every
+ * sample. Both cores are dedicated to audio here, so a spin wastes nothing
+ * that had another use. The flags are volatile and each is written by exactly
+ * one core, which is what makes them safe without a lock.
+ *
+ * The worker must NOT be starved by the idle task or the watchdog, so it runs
+ * at the highest priority on core 1 and the loop feeds the watchdog itself. */
+#if S3_CORES >= 2
+#ifndef S3L_SPLIT
+#define S3L_SPLIT (EB_NUM_VOICES / 2)
+#endif
+static volatile int      w_go = 0, w_done = 0, w_quit = 0;
+static eb_shared_tick    w_sh;
+static float            *w_vb = 0;
+
+static void worker(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        while (!w_go) { if (w_quit) vTaskDelete(NULL); }
+        eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
+                               S3L_SPLIT, EB_NUM_VOICES, &w_sh, w_vb);
+        w_go = 0;
+        w_done = 1;
+    }
+}
+
+static void render_sample(float *vb)
+{
+    w_vb = vb;
+    w_sh.ready = 0;
+    /* the prologue first: it is what both halves need, and computing it here
+     * rather than inside core 0's range is what lets core 1 start at once */
+    eb_engine_render_shared(&EBE, RS, &RC, &w_sh);
+    w_done = 0;
+    w_go   = 1;                       /* release core 1 */
+    eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
+                           0, S3L_SPLIT, &w_sh, vb);
+    while (!w_done) { }               /* barrier */
+}
+#else
+static void render_sample(float *vb)
+{
+    eb_engine_render_voices(&EBE, RS, &RC, (const eb_render_needs *)0, vb);
+}
+#endif
+
 static i2s_chan_handle_t TX;
 
 static int i2s_start(void)
@@ -406,6 +461,17 @@ void app_main(void)
     EBE.render_ok = 1;
     load_coefs(CH, 0);
 
+#if S3_CORES >= 2
+    /* HIGHEST priority on core 1 so nothing preempts a spin the audio loop is
+     * waiting on. Started AFTER the engine state is seeded, or it would
+     * render from an uninitialised eb_render_state on its first spin. */
+    xTaskCreatePinnedToCore(worker, "eb_core1", 4096, NULL,
+                            configMAX_PRIORITIES - 1, NULL, 1);
+    printf("TWO CORES: voices 0..%d on core 0, %d..%d on core 1\n",
+           S3L_SPLIT - 1, S3L_SPLIT, EB_NUM_VOICES - 1);
+#else
+    printf("ONE CORE: all %d voices on core 0\n", EB_NUM_VOICES);
+#endif
     if (!i2s_start()) { printf("HALT: I2S would not start.\n"); return; }
 #if S3L_TONE
     /* A LOUD SQUARE WAVE, NO ENGINE AT ALL.
@@ -490,8 +556,7 @@ void app_main(void)
                 for (k = 0; k < EB_NUM_VOICES; ++k)
                     EBE.v[k].atrest = !((WAKE >> k) & 1u);
                 for (k = 0; k < EB_NUM_VOICES; ++k) vb[k] = 0.0f;
-                eb_engine_render_voices(&EBE, RS, &RC,
-                                        (const eb_render_needs *)0, vb);
+                render_sample(vb);
                 eb_master_render(MS, &MC, &RG, vb, &L, &R);
                 if (pass == 0) {
                     float a1 = L < 0.0f ? -L : L, a2 = R < 0.0f ? -R : R;
@@ -560,8 +625,7 @@ void app_main(void)
                 EBE.v[k].atrest = !((WAKE >> k) & 1u);
             for (k = 0; k < EB_NUM_VOICES; ++k) vb[k] = 0.0f;
             {   int64_t e0 = esp_timer_get_time();
-                eb_engine_render_voices(&EBE, RS, &RC,
-                                        (const eb_render_needs *)0, vb);
+                render_sample(vb);
                 te += esp_timer_get_time() - e0;
             }
 #if S3L_NOFX
