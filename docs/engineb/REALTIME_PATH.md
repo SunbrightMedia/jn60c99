@@ -11,15 +11,34 @@ core's help is already inside this number, it does not double the budget).
 
 A voice costs 3,775 cycles. To fit with FX it must cost 1,097. **3.44x.**
 
-## The four levers that remain, and nothing else does
+## THE STANDARD IS FIXED AND IS NOT A LEVER
 
-  1. Voice interleaving                    ~1.35x   designed, unbuilt
-  2. 2x ladder                             ~1.20x   FAILS -- diagnosis below
-  3. Per-module block processing           ~1.15x   unbuilt
-  4. Envelopes at control rate             ~1.07x   unbuilt
+6 voices, full FX, ONE ESP32-S3, real time, 1.0 dB per third-octave band.
+The bound is not negotiable and must not be raised to let a lever pass; a
+second board and a different chip are equally out. Only changes that gate at
+EXACTLY 0, or that pass the 1.0 dB bound as it stands, count.
 
-  product 1.99x against a 1.93x gap. Every one must land near its optimistic
-  value. Without lever 2 the product is 1.66x and the goal is NOT reachable.
+CONSEQUENCE: the 2x ladder is OUT at 3.17 dB. Its remaining error is in-band
+harmonic content from waveshaping at half rate -- not aliasing, so no
+antialiasing method reaches it (three ADAA orders measured). The lever is
+dead under the standard, and the standard wins.
+
+## The levers that remain, and nothing else does
+
+  1. Voice interleaving              ~1.35x  EXACTLY 0   designed, unbuilt
+  2. Per-module block processing     ~1.15x  EXACTLY 0   unbuilt
+  3. Chorus ring into internal SRAM  ~1.03x  EXACTLY 0   unbuilt (102 KB fits
+                                                          the 202 KB free)
+  OUT under the standard:
+     2x ladder (3.17 dB) · envelopes at control rate (an approximation) ·
+     ADAA of any order (measured 3.25 / 5.77 / 33.94 dB)
+
+  product of what remains: ~1.60x against a 1.93x gap.
+
+  STATED PLAINLY so no session mistakes it: the EXACTLY-0 levers known today
+  do NOT close the gap. The shortfall is ~1.21x and there is no candidate for
+  it yet. Finding one is the work -- not relaxing the bound, which is
+  forbidden, and not adding hardware, which is forbidden.
 
 ## Lever 2: the diagnosis, because it is the one that decides it
 
