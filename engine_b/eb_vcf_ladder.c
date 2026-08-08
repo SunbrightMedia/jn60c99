@@ -122,7 +122,17 @@ static float eb_vcf_substep(eb_vcf_state *st, const eb_vcf_coef *c,
     /* ZDF resolution of the resonance feedback. [9536] is 0.0, so the second
      * term contributes nothing -- and it is still MULTIPLIED, because 0*inf and
      * 0*NaN are not nothing. :1355-1357 */
+#if EB_VCF_DEADCOEF
+    /* c9536 IS ZERO IN EVERY COEFFICIENT SET MEASURED (128 of 128 across the
+     * bank's note/gate/voice sets), so the second product and its add are
+     * dead, and st->s2 with them. The original keeps the multiply because
+     * 0*inf and 0*NaN are not nothing -- st->s1 is hard-bounded by the
+     * saturation ahead of it, so neither can arrive here, and the null gate
+     * holds that claim to EXACTLY 0. */
+    x = ins - ((st->s1 * c->c9520) * Rk);
+#else
     x = ins - (((st->s1 * c->c9520) + (st->s2 * c->c9536)) * Rk);
+#endif
 
 #if EB_VCF_ADAA
     /* ANTIDERIVATIVE ANTIALIASING on the clamped quintic.
@@ -187,10 +197,21 @@ static float eb_vcf_substep(eb_vcf_state *st, const eb_vcf_coef *c,
     S  = (G * (((G * ((p2 + (A * y2)) + y2)) + (A * y3)) + y3)) + (A * y4);
 
     st->nl = nl; st->y1 = y1; st->y2 = y2; st->y3 = y3; st->y4 = y4;
+#if EB_VCF_DEADCOEF
+    st->s1 = S;                      /* s2 is read only through c9536 */
+#else
     st->s2 = st->s1; st->s1 = S;
+#endif
 
     /* :1382-1384 */
+#if EB_VCF_DEADCOEF
+    /* c9088 (18 dB tap) and c9072 (12 dB tap) are ZERO in all 128 measured
+     * sets -- the header always said the 18 dB taps are computed and
+     * multiplied by zero every sub-step. Only the 24 dB tap survives. */
+    return y4 * c->c9104;
+#else
     return ((y3 * c->c9088) + (y4 * c->c9104)) + (c->c9072 * y2);
+#endif
 }
 
 float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
