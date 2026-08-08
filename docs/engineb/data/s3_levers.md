@@ -72,3 +72,35 @@ Measured: 6 voices, one core, wavetable = 25,499 cyc = 2.34x over 10,884.
 
 The two-core row is arithmetic on a measured single-core number, not a
 measurement. It is the next thing to put on silicon.
+
+## The 2x ladder is CLOSED NEGATIVE (2026-08-08)
+
+EB_HALF_OS_VCF was already written, with its own 2x decimator. Enabling it and
+running the sonic gate:
+
+  VERDICT: FAIL (27 of 36)   worst band overall 24.80 dB, bound 1.0 dB
+  realloc chorus 24.06 dB · DCO neg warm chorus 10.96 dB · DCO neg pitch
+  sweep 5.88 dB · realloc unison 3.58 dB
+
+That is not a marginal miss. It is 24 dB over a 1 dB bound.
+
+WHY, and it corrects the plan this lever was priced under: the ladder is
+ALREADY zero-delay feedback -- its own source says so and solves
+u*(1 + k*G^4) = in - k*S. The 4x oversampling is NOT there to fix frequency
+warping or a delay-free loop. It is there because a SATURATION sits inside
+the feedback loop:
+
+    nl = x + k * x^5
+
+A nonlinearity inside a resonant loop generates harmonics that fold, and the
+folded products are then RE-CIRCULATED by the resonance. Halving the
+oversampling doubles them and the loop compounds them, which is why the worst
+scenarios are the resonant ones.
+
+CONSEQUENCE, stated plainly: "the ladder at 2x" is worth 0 %, not 13 %, and
+"the ladder at 1x via zero-delay feedback" was never a real lever -- the
+zero-delay part was already there. The only remaining route to a cheaper
+ladder is ANTIDERIVATIVE ANTIALIASING on the quintic saturation, which
+attacks the aliasing at its source rather than pushing it out of band. Its
+antiderivative is trivial (x^2/2 + k*x^6/6), so it is tractable, but it is
+unbuilt and ungated and no cycle figure may be quoted for it.
