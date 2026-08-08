@@ -16,6 +16,7 @@
 #include "eb_fork_config.h"
 #if EB_HALF_OS_VCF
 #include "eb_halfos_fir.h"
+#include "eb_vcf_halfos_fir.h"
 #ifndef EB_VCF_CLAMP_COUNT
 #define EB_VCF_CLAMP_COUNT 0
 #endif
@@ -324,10 +325,13 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
 #if defined(__GNUC__)
 #pragma GCC unroll 12
 #endif
-        for (j = 0; j < EB_HALFOS_FIR_TAPS / 2; ++j) {
+        /* THE LADDER'S OWN 2x DECIMATOR, not the DCO's. See
+         * eb_vcf_halfos_fir.h: reusing eb_halfos_fir here measured 24.80 dB
+         * on the sonic gate, because it is a different filter. */
+        for (j = 0; j < EB_VCF_HALFOS_TAPS / 2; ++j) {
             a0 = h[(base - j) & 31];
-            b0 = h[(base - (EB_HALFOS_FIR_TAPS - 1) + j) & 31];
-            acc += (a0 + b0) * eb_halfos_fir[j];
+            b0 = h[(base - (EB_VCF_HALFOS_TAPS - 1) + j) & 31];
+            acc += (a0 + b0) * eb_vcf_halfos_fir[j];
         }
     }
 #else
