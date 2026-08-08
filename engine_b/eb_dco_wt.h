@@ -416,10 +416,17 @@ typedef struct {
      * AND BY EVERY PITCH (finding 5). saw and sub are single tables; the
      * pulse's two edges are sliced by the pulse width, which is the only thing
      * their shape depends on. Total 42 KB for the whole instrument. */
-    const float *res_saw;      /* [EB_WT_RES_OVER][EB_WT_RES_LEN]            */
-    const float *res_sub;      /* [EB_WT_RES_OVER][EB_WT_RES_LEN]            */
-    const float *res_pulse_a;  /* [EB_WT_PW_SLICES][OVER][LEN] -- moving edge */
-    const float *res_pulse_b;  /* [EB_WT_PWB_SLICES][OVER][LEN] -- at the wrap*/
+    /* THE FOUR TABLE POINTERS ARE GONE, and their removal is a correctness
+     * fix rather than a tidy-up. They were always the SAME four base
+     * addresses -- bind_tables set them from the globals and nothing ever
+     * varied them -- but eb_render_state embeds wt_live[EB_NUM_VOICES], so
+     * 32 pointers lived inside the state a HOST writes into a firmware blob.
+     * That made sizeof(eb_render_state) 128 bytes larger on the host than on
+     * the S3, which the blob's layout equality caught, and it would have put
+     * host addresses in front of a target that followed them.
+     *
+     * eb_dco_wt.c now names the tables directly. The struct is word-size
+     * independent, and four pointer loads per voice per sample go with it. */
 } eb_dco_wt_coef;
 
 /* Point a coefficient block at the module's own residual tables. They are

@@ -179,12 +179,17 @@ typedef char s3l_rstate_layout_check
 typedef char s3l_voice_prefix_check
     [(S3L_VOICE_SZ <= S3L_RSTATE_SZ) ? 1 : -1];
 
-/* EB_DCO_WT is refused OUTRIGHT rather than left to the size check, because
- * a future member could be both small and misplaced. Regenerate the blob
- * with a generator built under the same flags first. */
-#if EB_DCO_WT
-#error "s3_listen.bin must be regenerated under EB_DCO_WT (tools/engineb/gen_listen_coefs.py)."
-#endif
+/* EB_DCO_WT no longer needs a blanket refusal: the generator now builds its
+ * mask probe from null_b.CFLAGS, so a blob made under -DEB_DCO_WT=1 is read
+ * by a probe at the SAME layout, and the size equality above catches any
+ * disagreement between blob and firmware directly. The refusal was correct
+ * while the blob could only be trunk-layout; it is not correct now, and
+ * leaving it would block the lever it was written to protect.
+ *
+ * MEASURED on the way here: with the probe built at the wrong layout the
+ * masks came back 0x00 for all eight chords -- "no voice sounds" -- and a
+ * firmware built on them would have rendered SILENCE. gen_listen_coefs.py
+ * now refuses an all-zero mask instead of writing it. */
 
 static int blob_open(void)
 {

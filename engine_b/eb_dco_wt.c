@@ -21,12 +21,11 @@
 unsigned long ebwt_n = 0;
 #endif
 
+/* Kept as an entry point so callers need not change, and deliberately empty:
+ * the tables are named directly below. See the note in eb_dco_wt.h. */
 void eb_dco_wt_bind_tables(eb_dco_wt_coef *c)
 {
-    c->res_saw     = &eb_wt_res_saw[0][0][0];
-    c->res_sub     = &eb_wt_res_sub[0][0][0];
-    c->res_pulse_a = &eb_wt_res_pulse_a[0][0][0];
-    c->res_pulse_b = &eb_wt_res_pulse_b[0][0][0];
+    (void)c;
 }
 
 /* TWO PER-SAMPLE NUMBERS AND ONE INDEX. The saw's and the pulse's residuals are
@@ -367,7 +366,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
          * MEASURED against tools/engineb/wt_decomp.c: the correction needed at
          * the edge is +1.694, and passing +1.70 applied -1.694 -- the right
          * magnitude with the wrong sign, which is worse than no correction. */
-        eb_wt_add(s, c->res_pulse_b
+        eb_wt_add(s, &eb_wt_res_pulse_b[0][0][0]
                      + (size_t)sb * (EB_WT_RES_OVER + 1) * EB_WT_RES_LEN, frac,
                   h_pulse); }
     }
@@ -389,7 +388,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
     {   float pd_prev = eb_dco_wrap(prev - (EB_WT_SAWGD) * c->inc);
         float pd_now  = eb_dco_wrap(p    - (EB_WT_SAWGD) * c->inc);
         if (pd_now < pd_prev)
-            eb_wt_add(s, c->res_saw, (1.0f - pd_prev) / c->inc, h_saw);
+            eb_wt_add(s, &eb_wt_res_saw[0][0][0], (1.0f - pd_prev) / c->inc, h_saw);
     }
     {   /* the pulse's MOVING edge, where t crosses zero */
         float tprev = s->tprev;
@@ -434,7 +433,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
                 fprintf(stderr, "%lu MOVE  frac %.4f pw %.4f tprev %+.4f "
                         "t %+.4f\n", ebwt_n, frac, c->pw, tprev, t);
 #endif
-            eb_wt_add(s, c->res_pulse_a
+            eb_wt_add(s, &eb_wt_res_pulse_a[0][0][0]
                          + ((size_t)sl * (EB_WT_RES_OVER + 1) * EB_WT_RES_LEN),
                       frac, h_pulse);
         }
@@ -466,7 +465,7 @@ float eb_dco_wt_tick(eb_dco_wt_state *s, const eb_dco_wt_coef *c)
          *
          * The toggle test is `prev < subthr <= p`, so subthr - prev lies in
          * (0, inc] and the fraction is in [0,1) by construction. */
-        eb_wt_add(s, c->res_sub
+        eb_wt_add(s, &eb_wt_res_sub[0][0][0]
                      + (size_t)c->sub_mip * (EB_WT_RES_OVER + 1) * EB_WT_RES_LEN,
                   (c->subthr - prev) / c->inc, h_sub);
     }

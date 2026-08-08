@@ -196,8 +196,24 @@ def main():
     # is the opposite of the obvious guess and is why this probe exists.
     import subprocess, tempfile as _tf
     mp = os.path.join(_tf.mkdtemp(), "maskprobe")
+    # THE PROBE MUST BE BUILT AT THE BLOB'S OWN LAYOUT. These flags were
+    # hard-coded, so a blob generated under JUNO_EB_DCO_WT=1 was read by a
+    # probe compiled WITHOUT it: eb_render_state differs by 1,412 bytes,
+    # every voice read shifted bytes, and the probe reported 0x00 for all
+    # eight chords -- "no voice sounds". A firmware built on those masks
+    # would have played SILENCE and blamed the DSP.
+    #
+    # null_b.CFLAGS already carries whatever the env hooks selected, and it
+    # is the SAME list used to build the library the blob came from. Reusing
+    # it is what makes the two sides agree by construction rather than by a
+    # comment asking the next person to keep them in step.
+    _probe_defs = [f for f in null_b.CFLAGS if f.startswith("-D")]
+    if "-DEB_FORK_S3" not in _probe_defs:
+        _probe_defs = _probe_defs + ["-DEB_FORK_S3"]
+    if not any(f.startswith("-DEB_LFO_SHARED") for f in _probe_defs):
+        _probe_defs = _probe_defs + ["-DEB_LFO_SHARED=1"]
     subprocess.run(["cc", "-std=c99", "-O2", "-ffp-contract=off",
-                    "-fno-strict-aliasing", "-DEB_FORK_S3", "-DEB_LFO_SHARED=1",
+                    "-fno-strict-aliasing"] + _probe_defs + [
                     "-I" + os.path.join(REPO, "engine_b"),
                     "-I" + os.path.join(REPO, "src"),
                     "-I" + os.path.dirname(OUT), "-o", mp,
@@ -209,6 +225,22 @@ def main():
     masks = [int(l.split()[1], 16) for l in
              subprocess.run([mp, OUT], capture_output=True, text=True,
                             check=True).stdout.strip().split("\n")]
+    # A MASK OF ZERO MEANS "NO VOICE SOUNDS", which is never a true answer for
+    # a chord that was just captured with the gate ON. It is always a probe
+    # fault -- wrong layout, wrong flags, wrong blob. Writing it produced a
+    # firmware that rendered silence and looked like a DSP defect.
+    if not all(masks):
+        raise SystemExit(
+            "mask probe returned %s -- a chord cannot sound zero voices.\n"
+            "The probe is not seeing the blob it was given: check that its\n"
+            "build flags match null_b.CFLAGS (they are shared above)."
+            % ["0x%02x" % m for m in masks])
+    # Chord k must sound exactly k voices, or the chord/mask pairing is wrong.
+    for k, m in enumerate(masks, start=1):
+        if bin(m).count("1") != k:
+            raise SystemExit("chord of %d sounds %d voices (mask 0x%02x)"
+                             % (k, bin(m).count("1"), m))
+
     with open(OUT.replace(".bin", "_meta.h"), "a") as f:
         f.write("/* MEASURED by tools/engineb/listen_mask_probe.c: which\n"
                 " * voices actually sound in each chord. The allocator fills\n"
