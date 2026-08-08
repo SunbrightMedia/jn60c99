@@ -93,6 +93,19 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
      * 0, because the shared LFO's input is voice 0's own glide output. */
     const int own_shared = (v0 == 0);
     float noise_v;
+#if EB_VCF_ILV
+    /* VCF interleaving buffers. The four sub-steps of one voice are a serial
+     * chain and cannot overlap; two voices are independent. So the ladder is
+     * DEFERRED here and run pairwise below through eb_vcf_tick2, which gives
+     * the in-order FPU two dependency chains to fill each other's stalls.
+     * Everything crossing the VCF boundary is stashed per voice. */
+    float ilv_nmix[EB_NUM_VOICES], ilv_reso[EB_NUM_VOICES], ilv_7536[EB_NUM_VOICES];
+    float ilv_e1[EB_NUM_VOICES], ilv_e2[EB_NUM_VOICES], ilv_6848[EB_NUM_VOICES];
+    float ilv_decimo[EB_NUM_VOICES];
+    unsigned char ilv_live[EB_NUM_VOICES];
+    int ilv_w;
+    for (ilv_w = 0; ilv_w < EB_NUM_VOICES; ++ilv_w) ilv_live[ilv_w] = 0;
+#endif
 #if EB_LFO_SHARED
     float sh_lfo_del = 0.0f, sh_lfo_und = 0.0f, sh_lfo_pul = 0.0f;
 #endif
@@ -403,6 +416,14 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * caught by reading :2170's operands (decimator coefficients 5456 and
          * 6336, not PWM cells). The latch therefore happens AFTER the decim
          * call, below. */
+#if EB_VCF_ILV
+        /* DEFER the ladder: stash its inputs and everything the post-ladder
+         * work needs, and run it pairwise after the loop. */
+        ilv_nmix[v]=nmixo; ilv_reso[v]=reso; ilv_7536[v]=o7536;
+        ilv_e1[v]=e1; ilv_e2[v]=e2; ilv_6848[v]=o6848;
+        ilv_decimo[v]=decimo; ilv_live[v]=1;
+        (void)nsv04;
+#else
         vcfo   = eb_vcf_tick(&st->vcf[v], &c->vcf[v], nmixo, reso, o7536);
 #ifdef EB_DUMP_DCO
         ebdd_open();
@@ -415,7 +436,35 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * inherited guess. */
         vout[v] = eb_vca_tick(&st->vca[v], &c->vca[v], vcfo, e1, e2,
                               o6848, st->glide[v].s560);
+#endif
     }
+#if EB_VCF_ILV
+    /* THE PAIRWISE LADDER PASS. Walk the live voices two at a time; the last
+     * odd one, if any, uses the single-voice tick. modcv_latch stays BEFORE
+     * vca, exactly as the inline path orders it. */
+    {   int p = v0;
+        while (p < v1) {
+            int a = p; while (a < v1 && !ilv_live[a]) ++a;
+            if (a >= v1) break;
+            int b = a + 1; while (b < v1 && !ilv_live[b]) ++b;
+            if (b < v1) {
+                float oa, ob;
+                eb_vcf_tick2(&st->vcf[a], &c->vcf[a], ilv_nmix[a], ilv_reso[a], ilv_7536[a], &oa,
+                             &st->vcf[b], &c->vcf[b], ilv_nmix[b], ilv_reso[b], ilv_7536[b], &ob);
+                eb_modcv_latch(&st->mod[a], ilv_decimo[a]);
+                vout[a] = eb_vca_tick(&st->vca[a], &c->vca[a], oa, ilv_e1[a], ilv_e2[a], ilv_6848[a], st->glide[a].s560);
+                eb_modcv_latch(&st->mod[b], ilv_decimo[b]);
+                vout[b] = eb_vca_tick(&st->vca[b], &c->vca[b], ob, ilv_e1[b], ilv_e2[b], ilv_6848[b], st->glide[b].s560);
+                p = b + 1;
+            } else {
+                float oa = eb_vcf_tick(&st->vcf[a], &c->vcf[a], ilv_nmix[a], ilv_reso[a], ilv_7536[a]);
+                eb_modcv_latch(&st->mod[a], ilv_decimo[a]);
+                vout[a] = eb_vca_tick(&st->vca[a], &c->vca[a], oa, ilv_e1[a], ilv_e2[a], ilv_6848[a], st->glide[a].s560);
+                p = a + 1;
+            }
+        }
+    }
+#endif
 #ifdef EB_VOICES_DEBUG
     { extern unsigned long ebdbg_n; ++ebdbg_n; }
 #endif

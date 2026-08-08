@@ -258,6 +258,9 @@ if os.environ.get("JUNO_EB_DCO_WT"):
 # JUNO_EB_VCF_DEADCOEF=1: drop the ladder's provably-zero coefficient paths --
 # c9072, c9088 and c9536 are 0 in all 128 measured sets. It must null EXACTLY
 # 0; it deletes arithmetic, it does not approximate any.
+if os.environ.get("JUNO_EB_VCF_ILV"):
+    CFLAGS = CFLAGS + ["-DEB_VCF_ILV=1"]
+
 if os.environ.get("JUNO_EB_VCF_DEADCOEF"):
     CFLAGS = CFLAGS + ["-DEB_VCF_DEADCOEF=1"]
 

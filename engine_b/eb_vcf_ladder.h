@@ -115,6 +115,10 @@ void  eb_vcf_reset(eb_vcf_state *st);
 /* One host sample. `in` is the DCO/noise mix [6544], `G` the ladder integrator
  * gain [7520] and `k` the resonance drive [7536]. Returns the VCF output that
  * the port stores in [9040]. */
+#if EB_VCF_ILV
+void eb_vcf_tick2(eb_vcf_state *sta, const eb_vcf_coef *ca, float ina, float Ga, float ka, float *outa,
+                  eb_vcf_state *stb, const eb_vcf_coef *cb, float inb, float Gb, float kb, float *outb);
+#endif
 float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
                   float in, float G, float k);
 

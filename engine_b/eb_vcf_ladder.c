@@ -469,3 +469,84 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
 
     return acc * c->c9152;                                      /* :1513 */
 }
+
+#if EB_VCF_ILV
+#if !EB_VCF_DEADCOEF || EB_VCF_ADAA || EB_HALF_OS_VCF || EB_VCF_NOSAT
+#error "EB_VCF_ILV supports only the shipping ladder config (DEADCOEF on, no ADAA/HALFOS/NOSAT). tick2 falls back to two tick() calls otherwise -- do not combine."
+#endif
+/* eb_vcf_tick2 -- TWO voices' 4x ladders, statements interleaved.
+ *
+ * The four sub-steps of ONE voice are a serial chain: each reads the
+ * previous sub-step's feedback S and cascade state. They cannot overlap. Two
+ * DIFFERENT voices are independent, so their sub-steps are interleaved here,
+ * giving the in-order LX7 FPU two dependency chains to fill each other's
+ * latency bubbles -- the measured c/i 1.56 with a flat slope is exactly that
+ * stall.
+ *
+ * BIT-IDENTICAL to eb_vcf_tick(a) then eb_vcf_tick(b): no operation inside
+ * either voice is reordered, only independent operations of the two voices
+ * are woven together. The null gate holds it to EXACTLY 0.
+ */
+void eb_vcf_tick2(eb_vcf_state *sta, const eb_vcf_coef *ca, float ina, float Ga, float ka, float *outa,
+                  eb_vcf_state *stb, const eb_vcf_coef *cb, float inb, float Gb, float kb, float *outb)
+{
+    float Aa,Ra,Rka,da,drivea,preva,acca; float *ha=sta->h; int hia=sta->hi;
+    float Ab,Rb,Rkb,db,driveb,prevb,accb; float *hb=stb->h; int hib=stb->hi;
+    float xa,nla,y1a,y2a,y3a,y4a,ta,p2a,Sa, xza,y1za,y2za,y3za,y4za;
+    float xb,nlb,y1b,y2b,y3b,y4b,tb,p2b,Sb, xzb,y1zb,y2zb,y3zb,y4zb;
+    float insa, insb; int j, ss;
+
+    da=sta->dith; drivea=(((ka*ca->c9168)+1.0f)*(ina*ca->c9136))+((-da)*ca->c9120); sta->dith=eb_wrap24(-da); preva=sta->drive_prev; sta->drive_prev=drivea;
+    db=stb->dith; driveb=(((kb*cb->c9168)+1.0f)*(inb*cb->c9136))+((-db)*cb->c9120); stb->dith=eb_wrap24(-db); prevb=stb->drive_prev; stb->drive_prev=driveb;
+    Aa=1.0f-(Ga+Ga); Ra=1.0f/((((Ga*Ga)*(Ga*Ga))*ka)+1.0f); Rka=Ra*ka;
+    Ab=1.0f-(Gb+Gb); Rb=1.0f/((((Gb*Gb)*(Gb*Gb))*kb)+1.0f); Rkb=Rb*kb;
+
+    /* the four input weights of the 4x path, both voices */
+    for (ss = 0; ss < 4; ++ss) {
+        switch (ss) {
+        case 0: insa=((preva*ca->c9216)+(drivea*ca->c9232))*Ra; insb=((prevb*cb->c9216)+(driveb*cb->c9232))*Rb; break;
+        case 1: insa=((preva+drivea)*ca->c9248)*Ra;             insb=((prevb+driveb)*cb->c9248)*Rb;             break;
+        case 2: insa=((preva*ca->c9232)+(drivea*ca->c9216))*Ra; insb=((prevb*cb->c9232)+(driveb*cb->c9216))*Rb; break;
+        default:insa=(drivea*ca->c9200)*Ra;                     insb=(driveb*cb->c9200)*Rb;                     break;
+        }
+        xza=sta->nl; y1za=sta->y1; y2za=sta->y2; y3za=sta->y3; y4za=sta->y4;
+        xzb=stb->nl; y1zb=stb->y1; y2zb=stb->y2; y3zb=stb->y3; y4zb=stb->y4;
+        xa = insa - ((sta->s1 * ca->c9520) * Rka);
+        xb = insb - ((stb->s1 * cb->c9520) * Rkb);
+        if (xa >= -1.0f) { if (xa > 1.0f) xa = 1.0f; } else xa = -1.0f;
+        if (xb >= -1.0f) { if (xb > 1.0f) xb = 1.0f; } else xb = -1.0f;
+        nla = xa + ((((xa * xa) * xa) * xa) * (xa * ca->c9184));
+        nlb = xb + ((((xb * xb) * xb) * xb) * (xb * cb->c9184));
+        y1a = (Ga * (nla + xza)) + (y1za * Aa);
+        y1b = (Gb * (nlb + xzb)) + (y1zb * Ab);
+        ta = Ga * (y1a + y1za);
+        tb = Gb * (y1b + y1zb);
+        p2a = Ga * (((Ga * nla) + (Aa * y1a)) + y1a);
+        p2b = Gb * (((Gb * nlb) + (Ab * y1b)) + y1b);
+        y2a = ta + (y2za * Aa);
+        y2b = tb + (y2zb * Ab);
+        y3a = (Ga * (y2a + y2za)) + (y3za * Aa);
+        y3b = (Gb * (y2b + y2zb)) + (y3zb * Ab);
+        y4a = ((y3za + y3a) * Ga) + (Aa * y4za);
+        y4b = ((y3zb + y3b) * Gb) + (Ab * y4zb);
+        Sa = (Ga * (((Ga * ((p2a + (Aa * y2a)) + y2a)) + (Aa * y3a)) + y3a)) + (Aa * y4a);
+        Sb = (Gb * (((Gb * ((p2b + (Ab * y2b)) + y2b)) + (Ab * y3b)) + y3b)) + (Ab * y4b);
+        sta->nl=nla; sta->y1=y1a; sta->y2=y2a; sta->y3=y3a; sta->y4=y4a; sta->s1=Sa;
+        stb->nl=nlb; stb->y1=y1b; stb->y2=y2b; stb->y3=y3b; stb->y4=y4b; stb->s1=Sb;
+        hia=(hia+1)&31; ha[hia]=y4a*ca->c9104;
+        hib=(hib+1)&31; hb[hib]=y4b*cb->c9104;
+    }
+    sta->hi=hia; stb->hi=hib;
+
+    {   int basea=hia+32, baseb=hib+32; float a0,b0,a0b,b0b;
+        acca=(ha[(hia-15)&31]+ha[(hia-16)&31])*ca->fir[0];
+        accb=(hb[(hib-15)&31]+hb[(hib-16)&31])*cb->fir[0];
+        for (j=1;j<16;++j){
+            acca+=(ha[(hia-(15-j))&31]+ha[(hia-(16+j))&31])*ca->fir[j];
+            accb+=(hb[(hib-(15-j))&31]+hb[(hib-(16+j))&31])*cb->fir[j];
+        }
+        (void)basea;(void)baseb;(void)a0;(void)b0;(void)a0b;(void)b0b;
+    }
+    *outa=acca*ca->c9152; *outb=accb*cb->c9152;
+}
+#endif
