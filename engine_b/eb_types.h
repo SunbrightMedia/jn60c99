@@ -40,7 +40,15 @@
 #include "eb_alloc.h"
 #include "eb_freerun.h"
 
+/* THE PORT RENDERS EIGHT. The JUNO-60 itself is a SIX-voice instrument, and a
+ * target that plays six should not carry two more: their free-run advance is
+ * billed every sample, and with an even count the two-core split balances by
+ * construction instead of by an accident of the allocator's mask. Overridable
+ * on the command line for exactly that reason; the trunk and every gate keep
+ * the port's eight. */
+#ifndef EB_NUM_VOICES
 #define EB_NUM_VOICES 8
+#endif
 
 /* ------------------------------------------------------------------ voice
  *

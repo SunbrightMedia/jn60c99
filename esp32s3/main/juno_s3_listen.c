@@ -35,6 +35,7 @@
 #include "driver/i2s_std.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
+#include "esp_task_wdt.h"
 #include "eb_engine.h"
 #include "eb_render.h"
 #include "eb_coefs.h"
@@ -467,6 +468,14 @@ void app_main(void)
      * render from an uninitialised eb_render_state on its first spin. */
     xTaskCreatePinnedToCore(worker, "eb_core1", 4096, NULL,
                             configMAX_PRIORITIES - 1, NULL, 1);
+    /* THE WORKER SPINS AND NEVER YIELDS, so core 1's idle task never runs and
+     * the task watchdog reports IDLE1 every five seconds. Nothing crashes and
+     * no sample is lost -- but a log full of backtraces hides real faults, and
+     * this one is by design. Unsubscribe core 1's idle task rather than make
+     * the audio path yield. */
+    {   TaskHandle_t idle1 = xTaskGetIdleTaskHandleForCore(1);
+        if (idle1) esp_task_wdt_delete(idle1);
+    }
     printf("TWO CORES: voices 0..%d on core 0, %d..%d on core 1\n",
            S3L_SPLIT - 1, S3L_SPLIT, EB_NUM_VOICES - 1);
 #else
