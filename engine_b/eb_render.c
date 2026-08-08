@@ -40,6 +40,50 @@ static void ebdd_open(void)
 unsigned long ebdbg_n;
 #endif
 
+/* See eb_render.h. This duplicates no arithmetic: it runs the same three
+ * calls the range would have run for voice 0, and the range then skips them.
+ * The at-rest test is the loop's own, because if voice 0 is at rest the loop
+ * `continue`s BEFORE the LFO block and every voice sees a zero LFO -- that is
+ * the behaviour the EXACTLY-0 gate certified, and the prologue must
+ * reproduce it rather than improve on it. */
+void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
+                             const eb_render_coefs *c, eb_shared_tick *sh)
+{
+    eb_cvgate_in  gi;
+    eb_cvgate_out go;
+    float lfo_undel = 0.0f, lfo_pulse = 0.0f;
+
+    sh->lfo_del = sh->lfo_und = sh->lfo_pul = 0.0f;
+    sh->v0_pit_in = sh->v0_gate_sign = 0.0f;
+    sh->v0_dly_env = sh->v0_pitch_cv = 0.0f;
+    sh->noise_v = eb_notecv_tick(&st->notecv, &c->notecv);
+
+    sh->v0_atrest = e->v[0].atrest ? 1 : 0;
+    if (sh->v0_atrest) { sh->ready = 1; return; }
+
+    gi.t28 = c->cvg_t28[0];  gi.t29 = c->cvg_t29[0];
+    gi.k   = c->cvg_k[0];    gi.p28 = c->cvg_p28[0];
+    if (st->aux_edge[0]) { gi.p29 = 0.0f; st->aux_edge[0] = 0; }
+    else                 { gi.p29 = st->gate_cell320[0]; }
+    gi.gate_off = c->cvg_gate_off[0];
+    eb_cvgate(&gi, &go);
+    sh->v0_pit_in    = go.c464;
+    sh->v0_gate_sign = go.sign;
+    sh->v0_dly_env   = eb_glide_tick(&st->glide[0], &c->glide[0],
+                                     go.sign, c->kbd[0], c->vel[0], go.c464,
+                                     &sh->v0_pitch_cv);
+#if EB_LFO_SHARED
+    sh->lfo_del = eb_lfo_tick(&st->lfo[0], &c->lfo[0], sh->v0_dly_env,
+                              c->lfo_ext_gate[0], c->lfo_ext0[0],
+                              c->lfo_ext1[0], sh->noise_v,
+                              &lfo_undel, &lfo_pulse);
+    sh->lfo_und = lfo_undel; sh->lfo_pul = lfo_pulse;
+#else
+    (void)lfo_undel; (void)lfo_pulse;
+#endif
+    sh->ready = 1;
+}
+
 int eb_engine_render_range(eb_engine *e, eb_render_state *st,
                            const eb_render_coefs *c, const eb_render_needs *n,
                            int v0, int v1, eb_shared_tick *sh, float *vout)
@@ -75,7 +119,9 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
     /* THE NOISE ADVANCES ONCE PER SAMPLE, not once per core. The consuming
      * range reads the value the owner published; advancing it on both cores
      * would step the LFSR twice per sample. */
-    if (own_shared) {
+    if (sh && sh->ready) {
+        noise_v = sh->noise_v;        /* the prologue already advanced it */
+    } else if (own_shared) {
         noise_v = eb_notecv_tick(&st->notecv, &c->notecv);
         if (sh) sh->noise_v = noise_v;
     } else {
@@ -150,6 +196,14 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
             gi.p29 = st->gate_cell320[v];
         }
         gi.gate_off = c->cvg_gate_off[v];
+        if (sh && sh->ready && v == 0) {
+            /* the prologue ran these and advanced the glide state; running
+             * them again would tick the glide twice in one sample */
+            pit_in    = sh->v0_pit_in;
+            gate_sign = sh->v0_gate_sign;
+            dly_env   = sh->v0_dly_env;
+            pitch_cv  = sh->v0_pitch_cv;
+        } else {
         eb_cvgate(&gi, &go);
         pit_in    = go.c464;
         gate_sign = go.sign;
@@ -157,6 +211,7 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         dly_env = eb_glide_tick(&st->glide[v], &c->glide[v],
                                 gate_sign, c->kbd[v], c->vel[v], pit_in,
                                 &pitch_cv);
+        }
 
 #if EB_LFO_SHARED
         /* THE SHARED LFO (fork lever, gated EXACTLY 0 -- see the flag's note
@@ -170,7 +225,10 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * approximation. The gate that holds it to that claim is the full
          * null at EXACTLY 0: any input this reasoning missed fails loudly.
          * Voices 1..N keep their state untouched; only voice 0's advances. */
-        if (v == 0) {
+        if (sh && sh->ready) {
+            lfo_del = sh->lfo_del; lfo_undel = sh->lfo_und;
+            lfo_pulse = sh->lfo_pul;
+        } else if (v == 0) {
             lfo_del = eb_lfo_tick(&st->lfo[0], &c->lfo[0], dly_env,
                                   c->lfo_ext_gate[0], c->lfo_ext0[0],
                                   c->lfo_ext1[0], noise_v,
@@ -381,8 +439,8 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
      * noise perturbations passing, because that patch's noise level is 0. The
      * noise path was gated by scenario coverage, not by construction. */
     eb_shared_tick sh;
-    sh.noise_v = 0.0f; sh.lfo_del = 0.0f; sh.lfo_und = 0.0f;
-    sh.lfo_pul = 0.0f; sh.ready = 0;
+    sh.ready = 0;
+    eb_engine_render_shared(e, st, c, &sh);
     (void)eb_engine_render_range(e, st, c, n, 0, EB_SPLIT_TEST, &sh, vout);
     return eb_engine_render_range(e, st, c, n, EB_SPLIT_TEST,
                                   EB_NUM_VOICES, &sh, vout);

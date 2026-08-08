@@ -266,8 +266,25 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
 typedef struct {
     float noise_v;
     float lfo_del, lfo_und, lfo_pul;
+    /* voice 0's control-rate outputs, computed by the prologue so its range
+     * does not run them twice. The LFO's input is voice 0's glide, which is
+     * why the prologue must reach this far and no further. */
+    float v0_pit_in, v0_gate_sign, v0_dly_env, v0_pitch_cv;
+    int   v0_atrest;              /* voice 0 took the at-rest branch */
     int   ready;                  /* the publishing core sets this last */
 } eb_shared_tick;
+
+/* THE PROLOGUE. Computes ONLY what both cores need before either can start:
+ * the shared noise, voice 0's cvgate and glide, and the shared LFO. Without
+ * it core 1 must wait for core 0 to finish a whole voice, which serialises
+ * one voice in six and caps the split near 1.5x instead of 2x.
+ *
+ * After this call, eb_engine_render_range() with sh->ready set consumes the
+ * result -- including for voice 0, whose glide state this call has already
+ * advanced. Calling the range without the prologue (sh == NULL) is still the
+ * single-core path and is unchanged. */
+void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
+                             const eb_render_coefs *c, eb_shared_tick *sh);
 
 int eb_engine_render_range(eb_engine *e, eb_render_state *st,
                            const eb_render_coefs *c, const eb_render_needs *n,
