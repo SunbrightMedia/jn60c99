@@ -6,7 +6,37 @@
 #ifndef ENGINEB_EB_WT_TABLES_H
 #define ENGINEB_EB_WT_TABLES_H
 
-static const float eb_wt_res_saw[1][65][16] = {
+/* EB_WT_ATTR / EB_WT_ATTR_BIG -- WHERE THESE TABLES LIVE.
+ *
+ * MEASURED (2026-08-08): .flash.rodata is 2.74 MB and these tables are 903 KB
+ * of it. The linker file places engine CODE in IRAM and its comment says
+ * "constants were never the measured cost" -- but that measurement predates
+ * the wavetable DCO entirely (the trunk DCO has no tables). The wavetable
+ * reads residual rows from FLASH through the shared data cache, from BOTH
+ * cores, at every edge. The board's own sweep shows the price: the per-voice
+ * slope is 3,775 cycles on ONE core and 4,290 on TWO -- +515 cycles/voice
+ * that appears only when a second core competes for that cache.
+ *
+ * saw (4,160 B) and pulse_b (33,280 B) are hit on every period and are small,
+ * so they go to INTERNAL RAM. sub and pulse_a are 466/399 KB and are indexed
+ * by pitch/pulse-width; only one 4,160-byte slice of each is live per voice,
+ * so they stay in flash for now (a per-note slice copy is the next step).
+ *
+ * This changes ADDRESSES, never values: bit-exact by construction, for any
+ * preset. */
+#ifndef EB_WT_ATTR
+#if defined(EB_IDF)
+#include "esp_attr.h"
+#define EB_WT_ATTR      DRAM_ATTR      /* internal RAM */
+#define EB_WT_ATTR_BIG                 /* leave in flash rodata */
+#else
+#define EB_WT_ATTR
+#define EB_WT_ATTR_BIG
+#endif
+#endif
+
+
+static const float EB_WT_ATTR eb_wt_res_saw[1][65][16] = {
   { /* pw 0.0200 */
     {1.130373339e-01f,4.985527961e-01f,-1.152998645e-01f,6.372447590e-03f,-2.125034217e-03f,1.530151125e-03f,1.059041662e-05f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f},
     {1.098726787e-01f,4.930632585e-01f,-1.185402635e-01f,6.532288301e-03f,-2.240932157e-03f,1.559744627e-03f,1.255933915e-05f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f,1.789929570e-07f},
@@ -76,7 +106,7 @@ static const float eb_wt_res_saw[1][65][16] = {
   },
 };
 
-static const float eb_wt_res_sub[112][65][16] = {
+static const float EB_WT_ATTR_BIG eb_wt_res_sub[112][65][16] = {
   { /* mip 0, inc 0.00016 */
     {-0.000000000e+00f,-0.000000000e+00f,-1.006598445e+00f,-9.773335431e-01f,-1.078357046e+00f,-5.000000000e-01f,7.835704617e-02f,-2.266645686e-02f,6.800680363e-03f,1.518691458e-03f,-8.052272859e-03f,1.117408401e-02f,-2.239185823e-01f,-2.010352697e-01f,-3.837298375e-02f,-6.222725613e-04f},
     {-0.000000000e+00f,-0.000000000e+00f,-1.006598445e+00f,-9.773335431e-01f,-1.078357046e+00f,-5.000000000e-01f,7.835704617e-02f,-2.266645686e-02f,6.788478940e-03f,1.549720938e-03f,-8.099570903e-03f,1.213799641e-02f,-2.225981990e-01f,-1.989391143e-01f,-4.154542379e-02f,-7.348902910e-05f},
@@ -7583,7 +7613,7 @@ static const float eb_wt_res_sub[112][65][16] = {
   },
 };
 
-static const float eb_wt_res_pulse_a[96][65][16] = {
+static const float EB_WT_ATTR_BIG eb_wt_res_pulse_a[96][65][16] = {
   { /* pw 0.9678 */
     {0.000000000e+00f,-6.760920554e-04f,-1.001720260e+00f,-9.947826646e-01f,-9.469914096e-01f,-6.331313980e-01f,-1.606462112e-01f,-4.756984122e-02f,3.595212330e-03f,-3.294734764e-04f,5.018711653e-04f,7.362927534e-06f,0.000000000e+00f,0.000000000e+00f,0.000000000e+00f,0.000000000e+00f},
     {0.000000000e+00f,-3.366961576e-04f,-1.003142708e+00f,-9.901019815e-01f,-9.988074161e-01f,-6.415038092e-01f,-1.616927286e-01f,-4.903513393e-02f,3.958835765e-03f,-3.555242152e-04f,5.113027249e-04f,8.204404966e-06f,0.000000000e+00f,0.000000000e+00f,0.000000000e+00f,0.000000000e+00f},
@@ -14018,7 +14048,7 @@ static const float eb_wt_res_pulse_a[96][65][16] = {
   },
 };
 
-static const float eb_wt_res_pulse_b[8][65][16] = {
+static const float EB_WT_ATTR eb_wt_res_pulse_b[8][65][16] = {
   { /* pw 0.0156 */
     {-4.266991814e-05f,-1.802865399e-03f,-9.967624857e-01f,-1.006498029e+00f,-8.501878809e-01f,-4.390776957e-01f,-8.137262079e-02f,3.252380399e-03f,-7.823636428e-04f,1.170284739e-03f,-0.000000000e+00f,-0.000000000e+00f,-0.000000000e+00f,-0.000000000e+00f,-0.000000000e+00f,-0.000000000e+00f},
     {-3.884820813e-05f,-1.779093661e-03f,-9.968638136e-01f,-1.006558896e+00f,-8.536208634e-01f,-4.444522077e-01f,-8.423669442e-02f,3.635813616e-03f,-9.046233014e-04f,1.203908775e-03f,-0.000000000e+00f,-0.000000000e+00f,-0.000000000e+00f,-0.000000000e+00f,-0.000000000e+00f,-0.000000000e+00f},

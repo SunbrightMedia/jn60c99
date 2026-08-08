@@ -332,16 +332,25 @@ static eb_shared_tick    w_shb[CHUNK];
 static float             w_vbb[CHUNK][EB_NUM_VOICES];
 static int               w_n = 0;
 
+/* ROLLING READY INDEX, not a barrier. The first block design computed ALL
+ * 128 prologues before releasing core 1, so the whole prologue pass (notecv +
+ * voice-0 cvgate/glide + the shared LFO) sat on the critical path with core 1
+ * idle. w_ready is published by core 0 as each sample's prologue completes and
+ * consumed by core 1, so the two overlap. One writer per flag; volatile. */
+static volatile int w_ready = 0;
+
 static void worker(void *arg)
 {
     int i;
     (void)arg;
     for (;;) {
         while (!w_go) { if (w_quit) vTaskDelete(NULL); }
-        for (i = 0; i < w_n; ++i)
+        for (i = 0; i < w_n; ++i) {
+            while (w_ready <= i) { }        /* wait for this sample's prologue */
             eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
                                    S3L_SPLIT, EB_NUM_VOICES, &w_shb[i],
                                    w_vbb[i]);
+        }
         w_go = 0;
         w_done = 1;
     }
@@ -350,17 +359,21 @@ static void worker(void *arg)
 static void render_block(int n)
 {
     int i, k;
+    /* Release core 1 FIRST; it blocks on w_ready until sample 0's prologue is
+     * published, then runs one sample behind core 0's prologue rather than a
+     * whole block behind it. */
+    w_n    = n;
+    w_ready = 0;
+    w_done = 0;
+    w_go   = 1;
     for (i = 0; i < n; ++i) {
         for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
         w_shb[i].ready = 0;
         eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i]);
-    }
-    w_n    = n;
-    w_done = 0;
-    w_go   = 1;                                   /* release core 1 */
-    for (i = 0; i < n; ++i)
+        w_ready = i + 1;                          /* publish; core 1 may go */
         eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
                                0, S3L_SPLIT, &w_shb[i], w_vbb[i]);
+    }
     while (!w_done) { }                           /* ONE barrier per block */
 }
 #else
