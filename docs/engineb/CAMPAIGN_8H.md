@@ -61,3 +61,39 @@ The safe-for-any-preset levers, in priority:
   2. Block processing -- bit-exact, any preset.
   3. STRUCTURALLY-zero coefficient deletions only, each with a structural proof.
 Everything ships only after the standalone gate is re-proven EXACTLY 0.
+
+## FINDING 1 (DECISIVE): voice interleaving is defeated by the 16-register file
+
+MEASURED on the Xtensa toolchain (objdump, not silicon timing but exact
+instruction counts):
+  two eb_vcf_tick calls   320 insns, 0 FP spills
+  eb_vcf_tick2 (woven)    432 insns, 27 ssi FP SPILLS + ~40 extra reloads
+  stack frame: 64 B single -> 96 B interleaved
+
+The interleave keeps ~32 FP values live (two voices x ~16) across 16 physical
+registers, so 27 spill to the stack. It was meant to hide arithmetic latency;
+it PAYS that latency back as spill store/reload latency. 35 % more
+instructions.
+
+This is the SAME wall the project already hit twice and recorded:
+  - eb_envgen.c: "two ticks force-inlined 240 insns/105 accesses vs 162/50
+    separate -- inlining made it WORSE... 16 float registers... two live sets
+    spill."
+  - pitch hoist: "1,677 of 3,452 instructions are float SPILLS... left as
+    calls on purpose."
+
+CONSEQUENCE: EB_VCF_ILV is NOT a proven win. It is bit-exact (unit test +
+EXACTLY-0 gate hold) but on THIS silicon it likely costs more than it saves.
+It must be shipped as a MEASURED A/B (with and without), defaulted OFF, not
+assumed. Extending interleave to more modules is ABANDONED -- every module
+would add the same spill penalty.
+
+The two largest levers are now both closed by measurement:
+  - 2x VCF ladder: 3.17 dB sonic (in-band harmonics, not fixable)
+  - voice interleave: register-spill wall (this finding)
+
+REMAINING candidates that do NOT increase register pressure:
+  - block processing ONE voice over N samples: keeps one state set live,
+    amortizes per-call overhead and hoists invariant coefficient loads across
+    the block. To be measured next.
+  - structurally-zero coefficient deletions (audit workflow).
