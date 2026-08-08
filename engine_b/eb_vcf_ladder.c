@@ -114,6 +114,41 @@ void eb_vcf_hist_set(eb_vcf_state *st, int i, float v)
  * `ins` is the interpolated input ALREADY multiplied by R = 1/(1+k*G^4).
  * Returns the 24 dB tap; leaves the pipeline advanced.
  */
+
+#if EB_VCF_ADAA
+/* the clamped quintic and its first two antiderivatives, in one place so the
+ * ADAA orders cannot disagree about the curve they are integrating */
+static float eb_vcf_sat(float x, float k)
+{
+    float ax = x < 0.0f ? -x : x, x2;
+    if (!(ax <= 1.0f)) return x < 0.0f ? -(1.0f + k) : (1.0f + k);
+    x2 = x * x;
+    return x + k * x2 * x2 * x;
+}
+static float eb_vcf_F1(float x, float k)          /* even */
+{
+    float ax = x < 0.0f ? -x : x, x2;
+    if (!(ax <= 1.0f))
+        return (0.5f + k * (1.0f / 6.0f)) + (1.0f + k) * (ax - 1.0f);
+    x2 = x * x;
+    return 0.5f * x2 + k * (1.0f / 6.0f) * x2 * x2 * x2;
+}
+static float eb_vcf_F2(float x, float k)          /* odd */
+{
+    float ax = x < 0.0f ? -x : x, a2, v;
+    if (!(ax <= 1.0f)) {
+        float e = ax - 1.0f;
+        v = (1.0f / 6.0f + k * (1.0f / 42.0f))
+            + (0.5f + k * (1.0f / 6.0f)) * e
+            + 0.5f * (1.0f + k) * e * e;
+    } else {
+        a2 = ax * ax;
+        v = a2 * ax * (1.0f / 6.0f) + k * (1.0f / 42.0f) * a2 * a2 * a2 * ax;
+    }
+    return x < 0.0f ? -v : v;
+}
+#endif
+
 static float eb_vcf_substep(eb_vcf_state *st, const eb_vcf_coef *c,
                             float ins, float G, float A, float Rk)
 {
@@ -135,7 +170,42 @@ static float eb_vcf_substep(eb_vcf_state *st, const eb_vcf_coef *c,
     x = ins - (((st->s1 * c->c9520) + (st->s2 * c->c9536)) * Rk);
 #endif
 
-#if EB_VCF_ADAA
+#if EB_VCF_ADAA >= 2
+    /* SECOND-ORDER ANTIDERIVATIVE ANTIALIASING.
+     *
+     * First order is measured HARMFUL on this filter -- 2.22 dB at 4x and
+     * 5.77 dB at 2x -- because it replaces the instantaneous nonlinearity
+     * with its average over the input's last step, and that average is a
+     * low-pass whose corner moves with slew. Second order takes the average
+     * of THAT average over two steps, so its own artefact falls with the
+     * SQUARE of the step instead of linearly, while suppressing the fold
+     * harder.
+     *
+     * With f(x) = x + k x^5 on |x| <= 1 and constant +/-(1+k) outside,
+     *     F1(x) = x^2/2  + k x^6/6            (even, since f is odd)
+     *     F2(x) = x^3/6  + k x^7/42           (odd)
+     * and outside the clamp both continue as polynomials in (|x| - 1) with
+     * the value and slope matched at the boundary.
+     *
+     * y = 2/(x0-x2) * ( (F2(x0)-F2(x1))/(x0-x1) - (F2(x1)-F2(x2))/(x1-x2) )
+     *
+     * TWO denominators can vanish, not one, and they vanish independently.
+     * Each is guarded separately and falls back to the lower-order form,
+     * which is that quotient's own limit. */
+    {   float k = c->c9184, x1 = st->xprev, x2 = st->xprev2;
+        float d0 = x - x1, d1 = x1 - x2, d2 = x - x2;
+        float F2x = eb_vcf_F2(x, k), F2a = st->F2p, F2b = st->F2pp;
+        float q0, q1;
+        st->xprev2 = x1;  st->xprev  = x;
+        st->F2pp   = F2a; st->F2p    = F2x;
+        q0 = (d0 > 1e-5f || d0 < -1e-5f) ? (F2x - F2a) / d0
+                                         : eb_vcf_F1(0.5f * (x + x1), k);
+        q1 = (d1 > 1e-5f || d1 < -1e-5f) ? (F2a - F2b) / d1
+                                         : eb_vcf_F1(0.5f * (x1 + x2), k);
+        if (d2 > 1e-5f || d2 < -1e-5f) nl = 2.0f * (q0 - q1) / d2;
+        else                           nl = eb_vcf_sat(0.5f * (x + x2), k);
+    }
+#elif EB_VCF_ADAA
     /* ANTIDERIVATIVE ANTIALIASING on the clamped quintic.
      *
      * The 4x oversampling in this filter is NOT there for frequency warping:

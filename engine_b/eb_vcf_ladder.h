@@ -81,6 +81,10 @@ typedef struct {
     /* ADAA needs the PREVIOUS input to the saturation, which nothing else in
      * this filter keeps: st->nl is the saturation's OUTPUT. */
     float xprev;
+#if EB_VCF_ADAA >= 2
+    float xprev2;                /* ADAA2 needs two inputs back */
+    float F2p, F2pp;             /* cached second antiderivatives */
+#endif
 #endif
 
     float drive_prev;                   /* previous input drive   (8960) */
