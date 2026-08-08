@@ -332,7 +332,13 @@ void app_main(void)
 #ifndef S3L_SWEEP
 #define S3L_SWEEP 0
 #endif
-    static const unsigned SWEEP[3] = { 0x00u, 0x80u, 0xc0u };
+    /* THE SWEEP REACHES 6 NOW. Two points give a slope and an intercept, but
+     * they cannot show CURVATURE -- and curvature is the whole question once
+     * the FX move to a second board and the voice state fits internal SRAM.
+     * The masks fill from voice 7 downward, which is the allocator's own
+     * order (S3L_MASK in the generated header, measured not assumed). */
+    static const unsigned SWEEP[6] = { 0x00u, 0x80u, 0xc0u, 0xe0u,
+                                       0xf0u, 0xfcu };
     (void)SWEEP;
     int phase = 0;
     unsigned long eng_us = 0, ph_chunks = 0;
@@ -621,7 +627,7 @@ void app_main(void)
                        WAKE, e, e * 240.0, w, w * 240.0,
                        (w - e) * 240.0);
                 if (chunks / (SR / CHUNK) % 8 == 0) {
-                    phase = (phase + 1) % 3;
+                    phase = (phase + 1) % 6;
                     eng_us = busy_us = ph_chunks = 0;
                 }
             }
