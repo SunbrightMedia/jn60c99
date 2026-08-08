@@ -244,6 +244,35 @@ int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c
  *
  * Obeys the same guard as eb_engine_render: silence and EB_RENDER_INCOMPLETE
  * unless the caller has set e->render_ok. */
+/* THE TWO-CORE SPLIT.
+ *
+ * eb_engine_render_voices() renders every voice on the calling core. Every
+ * measurement this project has taken was therefore SINGLE CORE, while the
+ * budget it was measured against assumed two -- the S3's second core has
+ * never run a sample.
+ *
+ * The voices are independent: voice v touches only slot v of every array in
+ * eb_render_state. Three things are NOT per voice and must be computed once:
+ * the shared noise LFSR (advancing it per voice steps it N times too fast --
+ * a bug an earlier driver shipped), and under EB_LFO_SHARED the one LFO,
+ * whose input is voice 0's glide output. So voice 0's owner computes them and
+ * publishes; the other core consumes them.
+ *
+ * eb_engine_render_range() renders voices [v0,v1). With sh == NULL it does
+ * the shared work itself and stores it for the other core; with sh non-NULL
+ * it uses what it is given. eb_engine_render_voices() is exactly
+ * render_range(0, EB_NUM_VOICES, NULL), which is what keeps the split from
+ * being a second implementation of the chain. */
+typedef struct {
+    float noise_v;
+    float lfo_del, lfo_und, lfo_pul;
+    int   ready;                  /* the publishing core sets this last */
+} eb_shared_tick;
+
+int eb_engine_render_range(eb_engine *e, eb_render_state *st,
+                           const eb_render_coefs *c, const eb_render_needs *n,
+                           int v0, int v1, eb_shared_tick *sh, float *vout);
+
 int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
                             const eb_render_coefs *c, const eb_render_needs *n,
                             float *vout);

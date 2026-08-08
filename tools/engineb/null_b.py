@@ -187,6 +187,17 @@ if _FORK:
     # constants belong; these switches select AMONG them.
     CFLAGS = CFLAGS + ["-DEB_FORK_S3"] + _map[_FORK]
 
+# JUNO_EB_SPLIT_TEST=N: render voices [0,N) and [N,8) as two separate calls,
+# which is exactly what the two-core firmware does. It must null EXACTLY 0 --
+# the split chooses which core runs the arithmetic, it does not change it.
+# Added because a local probe on one patch reported the split bit-exact while
+# BOTH noise perturbations also passed: that patch's noise level is 0, so the
+# shared-noise path was covered by scenario luck. This battery has DCO noise
+# scenarios in it.
+if os.environ.get("JUNO_EB_SPLIT_TEST"):
+    CFLAGS = CFLAGS + ["-DEB_SPLIT_TEST=%d"
+                       % int(os.environ["JUNO_EB_SPLIT_TEST"])]
+
 # JUNO_EB_LFO_SHARED=1: ONE LFO for the whole engine (the fork's global-LFO
 # lever). Independent of JUNO_EB_FORK on purpose, so it can be nulled against
 # the pure trunk: if the shared build is EXACTLY 0, the per-voice LFOs are

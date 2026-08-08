@@ -40,10 +40,14 @@ static void ebdd_open(void)
 unsigned long ebdbg_n;
 #endif
 
-int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
-                            const eb_render_coefs *c, const eb_render_needs *n,
-                            float *vout)
+int eb_engine_render_range(eb_engine *e, eb_render_state *st,
+                           const eb_render_coefs *c, const eb_render_needs *n,
+                           int v0, int v1, eb_shared_tick *sh, float *vout)
 {
+    /* OWN_SHARED: this call computes the shared noise and LFO rather than
+     * consuming another core's. It is true for the range that contains voice
+     * 0, because the shared LFO's input is voice 0's own glide output. */
+    const int own_shared = (v0 == 0);
     float noise_v;
 #if EB_LFO_SHARED
     float sh_lfo_del = 0.0f, sh_lfo_und = 0.0f, sh_lfo_pul = 0.0f;
@@ -58,7 +62,7 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
      * mistake gets silence and a return code, not plausible-sounding audio
      * nobody has compared to anything. */
     if (!e->render_ok) {
-        for (v = 0; v < EB_NUM_VOICES; ++v) vout[v] = 0.0f;
+        for (v = v0; v < v1; ++v) vout[v] = 0.0f;
         return EB_RENDER_INCOMPLETE;
     }
 
@@ -68,9 +72,17 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
      * once. Since the state and the coefficients are both shared, that is
      * identical to computing it once here -- and unlike a per-voice call it
      * cannot drift to eight times too fast. */
-    noise_v = eb_notecv_tick(&st->notecv, &c->notecv);
+    /* THE NOISE ADVANCES ONCE PER SAMPLE, not once per core. The consuming
+     * range reads the value the owner published; advancing it on both cores
+     * would step the LFSR twice per sample. */
+    if (own_shared) {
+        noise_v = eb_notecv_tick(&st->notecv, &c->notecv);
+        if (sh) sh->noise_v = noise_v;
+    } else {
+        noise_v = sh ? sh->noise_v : 0.0f;
+    }
 
-    for (v = 0; v < EB_NUM_VOICES; ++v) {
+    for (v = v0; v < v1; ++v) {
         eb_voice *vc = &e->v[v];
         float e1, e2, pit, pwm, cut, o6704, o6848;
         float dly_env, pitch_cv, lfo_del, lfo_undel, lfo_pulse;
@@ -165,9 +177,17 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
                                   &lfo_undel, &lfo_pulse);
             sh_lfo_del = lfo_del; sh_lfo_und = lfo_undel;
             sh_lfo_pul = lfo_pulse;
-        } else {
+            if (sh) { sh->lfo_del = lfo_del; sh->lfo_und = lfo_undel;
+                      sh->lfo_pul = lfo_pulse; }
+        } else if (own_shared) {
             lfo_del = sh_lfo_del; lfo_undel = sh_lfo_und;
             lfo_pulse = sh_lfo_pul;
+        } else {
+            /* a range that does not contain voice 0 never runs the v==0 arm,
+             * so its only source is what the owner published */
+            lfo_del = sh ? sh->lfo_del : 0.0f;
+            lfo_undel = sh ? sh->lfo_und : 0.0f;
+            lfo_pulse = sh ? sh->lfo_pul : 0.0f;
         }
 #else
         lfo_del = eb_lfo_tick(&st->lfo[v], &c->lfo[v], dly_env,
@@ -342,6 +362,34 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
     { extern unsigned long ebdbg_n; ++ebdbg_n; }
 #endif
     return EB_RENDER_OK;
+}
+
+/* The original entry point, unchanged in meaning: one core, every voice. It
+ * is the SAME code, not a copy, so the split cannot drift from it. */
+int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
+                            const eb_render_coefs *c, const eb_render_needs *n,
+                            float *vout)
+{
+#if EB_SPLIT_TEST
+    /* EB_SPLIT_TEST=N drives the SAME two calls the two-core firmware makes,
+     * on one core and in order, so the whole 36-scenario battery can gate the
+     * split. It must be EXACTLY 0 -- the split moves no arithmetic, it only
+     * chooses which core runs it.
+     *
+     * WHY THIS EXISTS AND A LOCAL HARNESS DID NOT DO: a hand-written probe on
+     * the firmware's own blob showed the split bit-identical AND showed both
+     * noise perturbations passing, because that patch's noise level is 0. The
+     * noise path was gated by scenario coverage, not by construction. */
+    eb_shared_tick sh;
+    sh.noise_v = 0.0f; sh.lfo_del = 0.0f; sh.lfo_und = 0.0f;
+    sh.lfo_pul = 0.0f; sh.ready = 0;
+    (void)eb_engine_render_range(e, st, c, n, 0, EB_SPLIT_TEST, &sh, vout);
+    return eb_engine_render_range(e, st, c, n, EB_SPLIT_TEST,
+                                  EB_NUM_VOICES, &sh, vout);
+#else
+    return eb_engine_render_range(e, st, c, n, 0, EB_NUM_VOICES,
+                                  (eb_shared_tick *)0, vout);
+#endif
 }
 
 int eb_engine_render(eb_engine *e, eb_render_state *st, const eb_render_coefs *c,
