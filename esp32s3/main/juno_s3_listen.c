@@ -86,6 +86,21 @@
 #define S3L_NOFX 0
 #endif
 
+/* S3_OFFLINE and S3_NOFX ARE MUTUALLY EXCLUSIVE, and this #error exists
+ * because they were combined once by accident and the board died. The offline
+ * renderer calls eb_master_render(); under S3L_NOFX the master state and its
+ * rings are never allocated, so that is a null dereference on the first
+ * sample -- LoadProhibited, EXCVADDR 0.
+ *
+ * HOW IT HAPPENED, recorded so it is not repeated: S3_OFFLINE is a CMake
+ * CACHE variable. A build that does not pass it INHERITS the previous
+ * build's value unless the build directory is wiped. The project already has
+ * this exact trap recorded for S3_EXTRA_DEFS. ALWAYS rm -rf build when the
+ * flag set changes. */
+#if S3L_NOFX && S3L_OFFLINE
+#error "S3_NOFX and S3_OFFLINE cannot be combined: offline renders the master chain, NOFX does not allocate it. Wipe the build dir (rm -rf build) -- these are CMake CACHE vars and persist."
+#endif
+
 #ifndef S3L_VOICES
 #define S3L_VOICES 2
 #endif
