@@ -84,6 +84,54 @@ void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
     sh->ready = 1;
 }
 
+
+/* ---- EB_ABLATE: per-module CYCLE attribution by ABLATION ------------------
+ *
+ * WHY ABLATION AND NOT CCOUNT PROBES. The per-voice chain is twelve calls in
+ * one hot loop. Bracketing each with a cycle-counter read changes inlining,
+ * register allocation and scheduling around every one of them -- and this
+ * project has now been misled THREE times by measurements that perturbed or
+ * mis-metered what they measured (interleave judged on instruction count, the
+ * flash-resident wavetables missed entirely, a cache fix that measured zero).
+ * A probe that costs what it measures cannot answer "which module is biggest".
+ *
+ * Instead: build N firmwares, each with ONE module's work replaced by a cheap
+ * constant, and take the delta of the wake=0xfc number the board already
+ * prints. The remaining code, its inlining and its cache layout are untouched.
+ *
+ * THE AUDIO IS WRONG IN AN ABLATED BUILD, DELIBERATELY. These builds measure
+ * COST ONLY. They are never gated and never shipped -- EB_ABLATE is a
+ * measurement flag, and a nonzero value is refused by the sonic/null gates.
+ *
+ * READ THE RESULT WITH THE NOISE FLOOR IN MIND: the sweep's own 4-voice point
+ * came in 273 cycles BELOW its 3-voice point although the critical path is
+ * identical, so anything under ~300 cycles is not a finding.
+ *
+ * Values are one-hot so a build can never ablate two modules at once. */
+#ifndef EB_ABLATE
+#define EB_ABLATE 0
+#endif
+/* An ablated build produces WRONG AUDIO ON PURPOSE. It must never reach a
+ * gate or a listening firmware, so the gates refuse it outright rather than
+ * relying on anyone remembering. EB_ABLATE is a MEASUREMENT flag. */
+#if EB_ABLATE
+#ifdef EB_GATED_BUILD
+#error "EB_ABLATE is a cost-measurement flag and produces deliberately wrong audio: it cannot be combined with a gated build."
+#endif
+#endif
+#define EB_ABL_VCF      1
+#define EB_ABL_VCF_RES  2
+#define EB_ABL_VCA      3
+#define EB_ABL_ENV      4
+#define EB_ABL_DCO      5
+#define EB_ABL_PITCH    6
+#define EB_ABL_VCF_CV   7
+#define EB_ABL_GLIDE    8
+#define EB_ABL_DECIM    9
+#define EB_ABL_NSVF     10
+#define EB_ABL_DCOPREP  11
+#define EB_ABL_MODCV    12
+
 int eb_engine_render_range(eb_engine *e, eb_render_state *st,
                            const eb_render_coefs *c, const eb_render_needs *n,
                            int v0, int v1, eb_shared_tick *sh, float *vout)
@@ -285,10 +333,15 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
             float k1 = k0;
             if (c->env_lfo_trig[v][0] == 0.0f) k0 = 1.0f;
             if (c->env_lfo_trig[v][1] == 0.0f) k1 = 1.0f;
+#if EB_ABLATE == EB_ABL_ENV
+            e1 = st->glide[v].s560 * k0;
+            e2 = st->glide[v].s560 * k1;
+#else
             e1 = eb_env_tick(&st->env[v][0], &c->env[v][0],
                              st->glide[v].s560 * k0);
             e2 = eb_env_tick(&st->env[v][1], &c->env[v][1],
                              st->glide[v].s560 * k1);
+#endif
         }
 
         /* THE TAP COMES BEFORE THE LATCH. Cell 3536 is the ONE-SAMPLE DELAY
@@ -311,7 +364,11 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         /* THE PORT: fmin(fmax(cell4448 + cell3776, -20), 8.9), gained by
          * cell 3792 (a delayed copy of recall cell 3840). `pit` IS cell 3776,
          * modcv's pitch sum. The offset and the gain were both missing. */
+#if EB_ABLATE == EB_ABL_PITCH
+        cv = c->pitch_off[v] + pit;
+#else
         cv = eb_pitch_eval(c->pitch_off[v] + pit, c->pitch_gain[v]);
+#endif
 
         /* SAME two inputs as modcv, per the shim: cells 752 and 880. `pit`
          * here is cell 752 (the glide output), NOT modcv's pitch_sum -- the
@@ -321,8 +378,12 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 
         /* the resonance shaper takes the cutoff CV and the two side outputs,
          * and returns the ladder's feedback term (the port's v241). */
+#if EB_ABLATE == EB_ABL_VCF_RES
+        reso = cut; o7536 = cut; (void)o6704; (void)o6848;
+#else
         reso = eb_vcf_res_tick(&st->res[v], &c->res[v], cut, o6704, o6848,
                                &o7536);
+#endif
 
         /* ---- audio rate --------------------------------------------------- */
         if (!st->dco_live_seeded[v]) {
@@ -399,7 +460,11 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
              * passing it here made the module's phase drift away from the
              * port's over seconds. */
             eb_dco_wt_set_pitch(w, inc, pw_live);
+#if EB_ABLATE == EB_ABL_DCO
+            q[0] = 0.0f; (void)w;
+#else
             q[0] = eb_dco_wt_tick(&st->wt[v], w);
+#endif
             q[1] = q[2] = q[3] = 0.0f;
         }
 #else
@@ -435,7 +500,11 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         ilv_decimo[v]=decimo; ilv_live[v]=1;
         (void)nsv04;
 #else
+#if EB_ABLATE == EB_ABL_VCF
+        vcfo = nmixo;
+#else
         vcfo   = eb_vcf_tick(&st->vcf[v], &c->vcf[v], nmixo, reso, o7536);
+#endif
 #ifdef EB_DUMP_DCO
         ebdd_open();
         if (ebdd_f) fwrite(&decimo, sizeof decimo, 1, ebdd_f);
@@ -445,8 +514,12 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         /* THE LAST TWO ARGUMENTS ARE CELL 6848 and CELL 560, per the shim
          * (JF(a1, 6848), JF(a1, 560)) -- not o6704 and the gate sign. Fifth
          * inherited guess. */
+#if EB_ABLATE == EB_ABL_VCA
+        vout[v] = vcfo * e1; (void)e2; (void)o6848;
+#else
         vout[v] = eb_vca_tick(&st->vca[v], &c->vca[v], vcfo, e1, e2,
                               o6848, st->glide[v].s560);
+#endif
 #endif
     }
 #if EB_VCF_ILV
