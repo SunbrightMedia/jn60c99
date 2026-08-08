@@ -59,3 +59,32 @@ misled twice); redesign the most cycle-expensive module first; gate; repeat.
   3. Six-slot build + ILV silicon A/B          -- EXACTLY 0
   4. Per-module cycle attribution ON SILICON   -- the map for step 5
   5. Module-response redesigns under the gate  -- the only road to 1.0x
+
+## MEASURED VERDICT on this review's own fixes (SRAM build, 2026-08-08)
+
+  phase        BEST2    SRAM+pipeline   delta
+  0x00 floor   1,871    1,927           +56
+  0x80 1v      5,572    5,572           0     (marginal v1: 3,645)
+  0xc0 2v      9,862    10,031          +169  (marginal v2: 4,459)
+  0xe0 3v      14,154   14,493          +339  (marginal v3: 4,462)
+  0xfc 6v      14,497   14,441          -56
+
+BOTH FIXES MEASURED ~ZERO, and the review's own standard applies to itself:
+  - ERROR 2's mechanism was MISDIAGNOSED. saw (4 KB) and pulse_b (33 KB) were
+    small enough to be cache-resident all along -- moving them changed
+    nothing. If the flash-miss theory is right at all, the misses are in the
+    tables NOT moved: sub/pulse_a (866 KB), whose PITCH-DISTINCT 4,160-byte
+    slices differ per voice. The decisive test is a per-note slice copy at
+    load_coefs, which needs the slice base reintroduced as a per-voice
+    pointer. Note the new slope SHAPE is evidence: v1 costs 3,645 but v2/v3
+    cost ~4,460 each -- each additional voice adds a DISTINCT working set,
+    which is a cache-capacity signature, not cross-core contention as this
+    review first claimed.
+  - ERROR 3's fix is a WASH: per-sample w_ready spins cost about what the
+    serialized prologue cost. -56 at 6v, +170..340 in core-1-heavy phases.
+
+STANDING TOTAL: 14,441 cyc at 6v no FX = 2.65x. The cache slice-copy is worth
+at most ~1,600 (if v2/v3 fall back to ~3,650) -> ~12,850 = 2.36x. The
+module-response redesign road (the wavetable's method applied to VCA, env,
+CV chains under the 1.0 dB gate) remains the only lever with the magnitude
+to reach 1.0x, and per-module CYCLE attribution on silicon is its first step.
