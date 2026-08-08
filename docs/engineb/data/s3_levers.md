@@ -164,3 +164,44 @@ just the six-voice harness rebuild, which is bit-exact by construction.
 One board at six voices does not reach real time on measured levers. Two
 boards at three each does, with 3 % of margin, and the split is the one the
 user proposed before any of this was measured.
+
+## Certification of the whole flag set together (2026-08-08)
+
+Every lever above had been gated ALONE. Gated together, which is the only
+combination a target actually runs:
+
+  sonic gate, EB_FORK_S3 + EB_DCO_WT + EB_LFO_SHARED + EB_VCF_DEADCOEF
+    PASS, worst band 0.40 dB over all 36 scenarios (bound 1.0)
+
+  null gate, EB_SPLIT_TEST=3 + EB_LFO_SHARED + EB_VCF_DEADCOEF
+    PASS, EXACTLY 0 everywhere
+
+The 0.40 dB is unchanged from the wavetable DCO alone, which is the evidence
+that the dead-coefficient deletion and the two-core split add nothing: they
+are exact, and the composite says so rather than the per-lever runs.
+
+## The state of the goal
+
+MEASURED on the user's board, 6 voices, no FX, wall clock per sample:
+  trunk one core        ~136.0 us   6.00x     (budget 22.68 us)
+  wavetable one core     106.25 us  4.69x
+  wavetable two cores     62.65 us  2.76x
+Unmeasured on silicon yet: block-level barrier, dead-coefficient deletion,
+the timer-overhead fix. All three are built, gated and shipped.
+
+THE ONE NUMBER THAT DECIDES IT: a voice costs 3,775 cycles and a sample of
+real time is 5,442. Six voices perfectly balanced across two cores is 11,325
+cycles of wall clock -- 2.08x over before any floor, sync or FX. Per-voice
+must reach about 1,700.
+
+REMAINING LEVER WITH 2x IN IT: voice interleaving. c/i is 1.56 and the
+measured slope is FLAT (two voices cost exactly twice one), so nothing
+overlaps: roughly a third of every cycle is the FPU stalling on the ladder's
+serial chain y1->y2->y3->y4->S, which is ~10 dependent ops deep, four
+sub-steps per voice per sample. Running two voices' arithmetic together fills
+those stalls with independent work and changes no arithmetic, so it gates at
+EXACTLY 0 like the split did.
+
+CLOSED, so nobody re-tries them: ladder at 2x (24.80 dB), ADAA (2.22 dB at
+4x, worse at 2x), zero-delay reformulation (already present), control-rate CV
+(7.32 dB -- the wrap24 dither is stochastic and holding it deletes it).
