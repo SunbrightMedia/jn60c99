@@ -170,7 +170,34 @@ static float eb_vcf_substep(eb_vcf_state *st, const eb_vcf_coef *c,
     x = ins - (((st->s1 * c->c9520) + (st->s2 * c->c9536)) * Rk);
 #endif
 
-#if EB_VCF_ADAA >= 2
+#if EB_VCF_ADAA == 3
+    /* CENTRED ADAA -- antialiasing WITHOUT the delay that killed the others.
+     *
+     * Ordinary ADAA averages f over the segment the input just travelled,
+     * [x1, x0], so its result belongs to the MIDPOINT: a half-sample delay at
+     * first order, a full sample at second. This saturation sits inside a
+     * zero-delay resonant loop, and a phase shift there is precisely what the
+     * ZDF solve exists to remove -- which is why first order measured 2.22 dB
+     * and second order 33.94 dB while the linear cascade at the same rate
+     * measured 0.03 dB. The delay was the fault, not the averaging.
+     *
+     * So average over a segment of the SAME WIDTH centred on x instead:
+     *
+     *     y = ( F1(x + d/2) - F1(x - d/2) ) / d ,   d = x - x1
+     *
+     * It is still causal -- d uses only the current and previous input -- it
+     * still suppresses the fold, and its centre of mass is x, so it adds no
+     * delay to the loop. The limit as d -> 0 is f(x) exactly. */
+    {   float k = c->c9184, d = x - st->xprev, hd;
+        st->xprev = x;
+        hd = 0.5f * d;
+        if (d > 1e-5f || d < -1e-5f)
+            nl = (eb_vcf_F1(x + hd, k) - eb_vcf_F1(x - hd, k)) / d;
+        else
+            nl = eb_vcf_sat(x, k);
+    }
+#elif EB_VCF_ADAA >= 2
+
     /* SECOND-ORDER ANTIDERIVATIVE ANTIALIASING.
      *
      * First order is measured HARMFUL on this filter -- 2.22 dB at 4x and
