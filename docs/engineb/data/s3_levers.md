@@ -132,3 +132,35 @@ are closed by measurement. The VCF's ~26 % stands, and the remaining levers
 for the S3 are the ones that do not touch it: EB_NUM_VOICES=6 (exact),
 control-rate CV and envelopes, and core-balance tuning. Those reach ~1.09x,
 not 1.0x.
+
+## Control-rate CV is closed under the SONIC standard too (2026-08-08)
+
+The hypothesis was that C2 died against the trunk's -100 dB gate and might
+live under the fork's, since the wavetable DCO nulls at -36.5 dB and still
+passes the sonic gate at 0.40 dB. MEASURED, EB_VCF_RES_CR:
+
+  N=2  FAIL 13 of 36, worst band  7.32 dB
+  N=4  FAIL 14 of 36, worst band 11.27 dB
+
+The hypothesis was wrong, and the original C2 finding already said why:
+vcf_res carries the wrap24 DITHER, and holding a value between updates does
+not approximate a stochastic term, it REMOVES it. A missing dither is not a
+small error in any band -- it changes what the resonance does. A -39 dB null
+whose residual is BROADBAND NOISE is not the same object as a -36 dB null
+whose residual is repositioned aliases, and the sonic gate is right to
+separate them.
+
+## Where the measured ladder actually ends
+
+                                        cyc     over   +chorus
+  ONE board, 6 voices, today          15,036   1.38x    1.45x
+  ONE board, + EB_NUM_VOICES=6        13,661   1.26x    1.32x
+  TWO boards, 3 voices each            11,343  1.04x    1.10x
+  TWO boards, 3 each + NUM_VOICES=6     9,886  0.91x    0.97x  FITS
+
+Only the last row fits, and it needs NO new deviation and NO unbuilt DSP --
+just the six-voice harness rebuild, which is bit-exact by construction.
+
+One board at six voices does not reach real time on measured levers. Two
+boards at three each does, with 3 % of margin, and the split is the one the
+user proposed before any of this was measured.
