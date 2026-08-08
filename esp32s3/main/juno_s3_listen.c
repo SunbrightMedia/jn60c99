@@ -291,39 +291,73 @@ static int rings_alloc(void)
 #ifndef S3L_SPLIT
 #define S3L_SPLIT (EB_NUM_VOICES / 2)
 #endif
+
+/* ---- BLOCK-LEVEL PARALLELISM ------------------------------------------------
+ *
+ * The first two-core build synchronised EVERY SAMPLE: signal core 1, render,
+ * spin at a barrier. At 44,100 Hz that is 88,200 cross-core handshakes a
+ * second, and the barrier sits on the critical path each time -- MEASURED at
+ * roughly 1,436 cycles per sample, which is 26 % of the entire 5,442-cycle
+ * real-time budget spent on handshaking rather than DSP.
+ *
+ * A whole CHUNK is now handed over at once, so there is ONE barrier per 128
+ * samples instead of 128. The order is what makes it legal:
+ *
+ *   1. core 0 runs the prologue for all CHUNK samples, into an array. The
+ *      prologue advances the shared noise, voice 0's cvgate/glide and the
+ *      LFO, and NOTHING in a voice range writes back into any of them -- so
+ *      the whole block can be computed ahead of any voice.
+ *   2. core 1 renders its voice range for all CHUNK samples.
+ *   3. core 0 renders its range for the same CHUNK, concurrently.
+ *   4. one barrier.
+ *
+ * The per-sample loop afterwards only reads finished voice buffers. */
 static volatile int      w_go = 0, w_done = 0, w_quit = 0;
-static eb_shared_tick    w_sh;
-static float            *w_vb = 0;
+static eb_shared_tick    w_shb[CHUNK];
+static float             w_vbb[CHUNK][EB_NUM_VOICES];
+static int               w_n = 0;
 
 static void worker(void *arg)
 {
+    int i;
     (void)arg;
     for (;;) {
         while (!w_go) { if (w_quit) vTaskDelete(NULL); }
-        eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                               S3L_SPLIT, EB_NUM_VOICES, &w_sh, w_vb);
+        for (i = 0; i < w_n; ++i)
+            eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
+                                   S3L_SPLIT, EB_NUM_VOICES, &w_shb[i],
+                                   w_vbb[i]);
         w_go = 0;
         w_done = 1;
     }
 }
 
-static void render_sample(float *vb)
+static void render_block(int n)
 {
-    w_vb = vb;
-    w_sh.ready = 0;
-    /* the prologue first: it is what both halves need, and computing it here
-     * rather than inside core 0's range is what lets core 1 start at once */
-    eb_engine_render_shared(&EBE, RS, &RC, &w_sh);
+    int i, k;
+    for (i = 0; i < n; ++i) {
+        for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
+        w_shb[i].ready = 0;
+        eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i]);
+    }
+    w_n    = n;
     w_done = 0;
-    w_go   = 1;                       /* release core 1 */
-    eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                           0, S3L_SPLIT, &w_sh, vb);
-    while (!w_done) { }               /* barrier */
+    w_go   = 1;                                   /* release core 1 */
+    for (i = 0; i < n; ++i)
+        eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
+                               0, S3L_SPLIT, &w_shb[i], w_vbb[i]);
+    while (!w_done) { }                           /* ONE barrier per block */
 }
 #else
-static void render_sample(float *vb)
+static float w_vbb[CHUNK][EB_NUM_VOICES];
+static void render_block(int n)
 {
-    eb_engine_render_voices(&EBE, RS, &RC, (const eb_render_needs *)0, vb);
+    int i, k;
+    for (i = 0; i < n; ++i) {
+        for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
+        eb_engine_render_voices(&EBE, RS, &RC, (const eb_render_needs *)0,
+                                w_vbb[i]);
+    }
 }
 #endif
 
@@ -565,7 +599,11 @@ void app_main(void)
                 for (k = 0; k < EB_NUM_VOICES; ++k)
                     EBE.v[k].atrest = !((WAKE >> k) & 1u);
                 for (k = 0; k < EB_NUM_VOICES; ++k) vb[k] = 0.0f;
-                render_sample(vb);
+                /* the OFFLINE path renders one sample at a time on purpose:
+                 * it is not real-time constrained, and a block buffer here
+                 * would only duplicate render_block's storage. */
+                render_block(1);
+                { int q; for (q = 0; q < EB_NUM_VOICES; ++q) vb[q] = w_vbb[0][q]; }
                 eb_master_render(MS, &MC, &RG, vb, &L, &R);
                 if (pass == 0) {
                     float a1 = L < 0.0f ? -L : L, a2 = R < 0.0f ? -R : R;
@@ -623,20 +661,25 @@ void app_main(void)
          * heard nothing. */
         WAKE = SWEEP[phase];
 #endif
-        for (i = 0; i < CHUNK; ++i) {
-            float vb[EB_NUM_VOICES], L = 0.0f, R = 0.0f;
-            int k;
-            /* THE VOICE CAP, applied per sample. A capped voice is `atrest`,
-             * which is NOT "skipped": eb_render.c still advances its free-run
-             * state, because a phase that stops while the engine runs is the
-             * bug null_b plants in its teeth battery. */
+        /* THE VOICE CAP. A capped voice is `atrest`, which is NOT "skipped":
+         * eb_render.c still advances its free-run state. WAKE is constant
+         * across a chunk, so this leaves the per-sample path. */
+        {   int k;
             for (k = 0; k < EB_NUM_VOICES; ++k)
                 EBE.v[k].atrest = !((WAKE >> k) & 1u);
-            for (k = 0; k < EB_NUM_VOICES; ++k) vb[k] = 0.0f;
-            {   int64_t e0 = esp_timer_get_time();
-                render_sample(vb);
-                te += esp_timer_get_time() - e0;
-            }
+        }
+        /* THE WHOLE CHUNK, then ONE barrier. The timer is read TWICE per
+         * BLOCK rather than twice per sample: esp_timer_get_time() reads a
+         * hardware timer and is not free, and at two calls a sample it was
+         * billing its own cost to the engine it was measuring. */
+        {   int64_t e0 = esp_timer_get_time();
+            render_block(CHUNK);
+            te += esp_timer_get_time() - e0;
+        }
+        for (i = 0; i < CHUNK; ++i) {
+            float *vb = w_vbb[i];
+            float L = 0.0f, R = 0.0f;
+            int k; (void)k;
 #if S3L_NOFX
             /* The port's master sums the voices; everything after that is
              * FX. Summing here is NOT a claim to be the master stage -- it
