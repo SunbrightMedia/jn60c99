@@ -295,3 +295,31 @@ and core 1 touches none of the state the prologue advances.
 every existing sweep point: it only appears when the prologue-bearing core
 carries fewer voices. 0xd0 wakes voice 4 (core 0) and voices 6,7 (core 1).
 Any symmetric mask hides the difference entirely.
+
+## LFOCUT ON SILICON (2026-08-10): NO CHANGE -- AND THE REASON REWRITES THE MAP
+  0x80: 4,740 (was 4,736)   0xfc: 10,970 (was 10,965)   -- flat.
+
+**THE SWEEP NEVER RUNS THE LFO.** Every wake mask fills from voice 7 DOWN, so
+voice 0 is AT REST in all seven phases -- and eb_engine_render_shared
+early-returns after notecv when voice 0 rests, BEFORE cvgate/glide/LFO. The
+memo and the 13 deletions are correct (EXACTLY 0) and cost nothing, but their
+cycles only exist when voice 0 SOUNDS (7-8 note play). Both head theories die
+together: Opus's 752-instruction prologue count included an LFO that never
+executes in this sweep (the c/i 1.93 match was coincidence), and the whole
+"LFO is two-thirds of the head" plan attacked code the measurement never ran.
+
+**WHAT THE 1,454 HEAD ACTUALLY IS: the at-rest voices' advance BODIES.** The
+old ablation priced an at-rest voice at 232 cycles; 6-7 of them is ~1,500.
+EB_ATREST_BLOCK hoisted the per-sample CALL (set_pitch, primed test); the
+128-iteration loop body (4 wraps + sub counter + ring write, per voice, per
+sample) still runs in full.
+
+**THE REAL LEVER, named for the next session:** a closed-form block advance.
+Phase after n steps is wrap(phase + 4n*inc4) -- O(1); the sub counter's
+crossings over n steps are floor arithmetic -- O(1); the residual ring is all
+zeros after RES_LEN samples -- one memset. NOT bit-exact (float rounding
+differs from 128 sequential wraps), so it takes the SONIC gate -- and the
+error it introduces is phase-at-wake, which is the charter's already-relaxed
+"which beat" question (the -46 dB null collapse). Worth ~1,400 of the head
+plus most of the 1,904 floor. With it and the asm kernel (~600/voice of the
+measured stall pool), the two-chip core lands ~5,4xx vs 5,442.
