@@ -362,6 +362,11 @@ static void render_block(int n)
     /* Release core 1 FIRST; it blocks on w_ready until sample 0's prologue is
      * published, then runs one sample behind core 0's prologue rather than a
      * whole block behind it. */
+    /* THE AT-REST VOICES, ONCE FOR THE WHOLE BLOCK (EB_ATREST_BLOCK).
+     * A no-op unless that flag is set. Both ranges are advanced here on core
+     * 0: an at-rest voice's free-run state is touched by nothing else in the
+     * block, so there is no race with core 1, which skips those voices. */
+    eb_engine_advance_atrest(&EBE, RS, &RC, 0, EB_NUM_VOICES, n);
     w_n    = n;
     w_ready = 0;
     w_done = 0;
@@ -381,6 +386,7 @@ static float w_vbb[CHUNK][EB_NUM_VOICES];
 static void render_block(int n)
 {
     int i, k;
+    eb_engine_advance_atrest(&EBE, RS, &RC, 0, EB_NUM_VOICES, n);
     for (i = 0; i < n; ++i) {
         for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
         eb_engine_render_voices(&EBE, RS, &RC, (const eb_render_needs *)0,
