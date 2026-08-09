@@ -36,6 +36,11 @@ unsigned long eb_vcf_clamp_hits = 0;
 #if EB_VCF_GRANGE
 #include <stdio.h>
 static float eb_g_lo = 1e30f, eb_g_hi = -1e30f;
+/* AND k, THE RESONANCE. The ZDF refit's fitted saturation is judged almost
+ * entirely by behaviour near self-oscillation, so its reachable range is a
+ * precondition of the fit rather than a curiosity. Tracked here so both
+ * numbers come from ONE run over the real battery. */
+static float eb_k_lo = 1e30f, eb_k_hi = -1e30f;
 static unsigned long eb_g_n = 0, eb_g_over = 0;
 static void eb_g_report(void) __attribute__((destructor));
 static void eb_g_report(void)
@@ -49,9 +54,10 @@ static void eb_g_report(void)
     if (!eb_g_n) return;
     f = fopen("/tmp/eb_grange.log", "a");
     if (!f) return;
-    fprintf(f, "calls=%lu G in [%.6f, %.6f] over-0.41421=%lu (%.4f%%)\n",
+    fprintf(f, "calls=%lu G in [%.6f, %.6f] over-0.41421=%lu (%.4f%%) "
+               "k in [%.6f, %.6f]\n",
             eb_g_n, (double)eb_g_lo, (double)eb_g_hi, eb_g_over,
-            100.0 * eb_g_over / eb_g_n);
+            100.0 * eb_g_over / eb_g_n, (double)eb_k_lo, (double)eb_k_hi);
     fclose(f);
 }
 #endif
@@ -321,6 +327,136 @@ static float eb_vcf_substep(eb_vcf_state *st, const eb_vcf_coef *c,
 #endif
 }
 
+/* ===================================================== EB_VCF_ZDF1X (S3/S4)
+ * THE 1x REFIT. A TEMPORARY, FLAGGED EXPERIMENT -- default OFF, adopted only
+ * by the user's decision. Read docs/engineb/VCF_ZDF1X_PLAN.md.
+ *
+ * THE SEAM, established by reading the port rather than assuming: the port's
+ * ladder is ALREADY zero-delay. `ins` arrives pre-multiplied by
+ * R = 1/(1+k*G^4) and the feedback is `ins - s1*R*k`, which IS the TPT solve
+ * u = (x - k*S)/(1 + k*G^4). So the 4x oversampling buys NOTHING for the
+ * linear filter -- eb_vcf_ladder.c has always said it is there because the
+ * saturator sits inside the resonant loop. Drop the oversampling, keep the
+ * solve, and the linear response should be reproducible EXACTLY by algebra;
+ * only the nonlinearity needs fitting. That is what gate G-A tests, and it is
+ * why the linear skeleton is built and gated BEFORE anything is fitted.
+ *
+ * THE CUTOFF MAP, derived from the port's own one-pole, not assumed.
+ *     H(z) = G(1 + z^-1)/(1 - A z^-1),  A = 1 - 2G
+ * matched against the bilinear lowpass (pole (1-g)/(1+g), gain g/(1+g)) gives
+ *     G = g/(1+g)   i.e.   g = G/(1-G)
+ * -- G is the bilinear GAIN, NOT the prewarped tangent. Assuming G = tan cost
+ * 29 dB once in the half-OS work; it is not repeated here. The port's g is at
+ * 4x, so the same corner at 1x is tan(4*atan(g4)), reached by the tangent
+ * double-angle identity applied TWICE, with no frequency ever appearing:
+ *     t  = 2g4/(1 - g4^2)          tan(2th)
+ *     g1 = 2t /(1 - t^2)           tan(4th)
+ *     G1 = g1/(1 + g1)
+ *
+ * THE GUARD IS REAL, not decoration. g1 runs to infinity as t -> 1, i.e.
+ * g4 -> 0.41421, i.e. G -> 0.29289. MEASURED over the whole battery G lands
+ * in [0.000119, 0.209771], so the clamp never fires on any factory patch --
+ * and "no factory patch reaches it" is not a proof about any preset, which is
+ * exactly why it is kept.
+ */
+#if EB_VCF_ZDF1X
+float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
+                  float in, float G, float k)
+{
+    float d, drive, prev;
+    float g4, t, g1, G1, A1, R1, Rk1;
+    float x, nl, y1, y2, y3, y4, tt, p2, S;
+    float xz, y1z, y2z, y3z, y4z;
+
+    /* the input node, unchanged and at 1x already -- the dither is a
+     * free-running wrap24 oscillator and C2 proved a stochastic carrier
+     * cannot be approximated, so it is stepped every sample exactly as before */
+    d     = st->dith;
+    drive = (((k * c->c9168) + 1.0f) * (in * c->c9136)) + ((-d) * c->c9120);
+    st->dith = eb_wrap24(-d);
+    prev  = st->drive_prev;
+    st->drive_prev = drive;
+    (void)prev;                 /* the 4x upsampler's other tap; see S4 */
+
+#if EB_VCF_ZDF1X == 2
+    /* VARIANT 2 -- POLE-MAPPED, NO NYQUIST ZERO. Gate G-A on variant 1
+     * (bilinear corner match) measured 0.2-1.8 dB at low cutoff and 20 dB
+     * near Nyquist at G >= 0.05, and the cause is structural rather than a
+     * tuning error: the port's one-pole is G(1+z^-1)/(1-Az^-1), so it carries
+     * a ZERO AT NYQUIST. At 4x those four zeros sit at 88.2 kHz and do
+     * nothing in band; at 1x they sit at 22.05 kHz and gut the top octave.
+     * No choice of corner frequency can move them.
+     *
+     * So map what CAN be mapped exactly -- the pole. Four steps of a pole A
+     * at 4x is A^4 at 1x, exactly. Drop the numerator and normalise for unity
+     * DC. The cascade is then a plain 4-pole with the port's own decay per
+     * output sample and no spurious notch.
+     */
+    A1 = 1.0f - (G + G);
+    A1 = (A1 * A1) * (A1 * A1);                 /* A^4, exact 4x -> 1x */
+    G1 = 1.0f - A1;                             /* unity DC             */
+    (void)g4; (void)t; (void)g1;
+#else
+    g4 = G / (1.0f - G);
+    if (!(g4 < 0.40f)) g4 = 0.40f;              /* the documented clamp */
+    t  = (g4 + g4) / (1.0f - (g4 * g4));
+    g1 = (t + t) / (1.0f - (t * t));
+    G1 = g1 / (1.0f + g1);
+    A1 = 1.0f - (G1 + G1);
+#endif
+    R1 = 1.0f / ((((G1 * G1) * (G1 * G1)) * k) + 1.0f);
+    Rk1 = R1 * k;
+
+    xz = st->nl; y1z = st->y1; y2z = st->y2; y3z = st->y3; y4z = st->y4;
+
+    x = (drive * R1) - ((st->s1 * c->c9520) * Rk1);
+#if EB_VCF_NOSAT
+    nl = x;                                     /* the linear skeleton, G-A */
+#else
+    if (x >= -1.0f) { if (x > 1.0f) x = 1.0f; } else { x = -1.0f; }
+    nl = x + ((((x * x) * x) * x) * (x * c->c9184));
+#endif
+
+#if EB_VCF_ZDF1X == 2
+    /* plain one-poles: y = G1*x + A1*y_prev, no numerator, no Nyquist zero.
+     * S is the same object as the port's -- the cascade's output ONE STEP
+     * AHEAD with zero input -- rebuilt for this recurrence rather than
+     * copied, because the port's expression assumes its own numerator. */
+    y1 = (G1 * nl) + (y1z * A1);
+    y2 = (G1 * y1) + (y2z * A1);
+    y3 = (G1 * y2) + (y3z * A1);
+    y4 = (G1 * y3) + (y4z * A1);
+    {   float z1 = A1 * y1, z2, z3;
+        z2 = (G1 * z1) + (A1 * y2);
+        z3 = (G1 * z2) + (A1 * y3);
+        S  = (G1 * z3) + (A1 * y4);
+    }
+    (void)tt; (void)p2; (void)xz;
+#else
+    y1 = (G1 * (nl + xz)) + (y1z * A1);
+    tt = G1 * (y1 + y1z);
+    p2 = G1 * (((G1 * nl) + (A1 * y1)) + y1);
+    y2 = tt + (y2z * A1);
+    y3 = (G1 * (y2 + y2z)) + (y3z * A1);
+    y4 = ((y3z + y3) * G1) + (A1 * y4z);
+    S  = (G1 * (((G1 * ((p2 + (A1 * y2)) + y2)) + (A1 * y3)) + y3)) + (A1 * y4);
+#endif
+
+    st->nl = nl; st->y1 = y1; st->y2 = y2; st->y3 = y3; st->y4 = y4;
+    st->s1 = S;
+
+    /* c9152 IS KEPT, AND GATE G-A IS WHY. The first draft dropped it with the
+     * decimator, reasoning that a 4x output gain belongs to a 4x path. The
+     * gate's DC column then read port 0.97022 against 0.24254 -- a ratio of
+     * EXACTLY 4.0000, which is not a response error at all: c9136 scales the
+     * INPUT by 0.25 and c9152 restores it at the output. The decimator has
+     * unity DC gain and never carried this factor. Measured, not reasoned:
+     * the assumption in the deleted comment was wrong in the direction that
+     * would have been absorbed silently by a fitted makeup gain in S4, and
+     * the fit would then have been hiding a factor of four. */
+    return (y4 * c->c9104) * c->c9152;
+}
+#else
 float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
                   float in, float G, float k)
 {
@@ -343,6 +479,8 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
     if (G < eb_g_lo) eb_g_lo = G;
     if (G > eb_g_hi) eb_g_hi = G;
     if (G > 0.41421354f) ++eb_g_over;
+    if (k < eb_k_lo) eb_k_lo = k;
+    if (k > eb_k_hi) eb_k_hi = k;
 #endif
     A  = 1.0f - (G + G);                                        /* :1344 */
     R  = 1.0f / ((((G * G) * (G * G)) * k) + 1.0f);             /* :1345 */
@@ -477,6 +615,7 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
 
     return acc * c->c9152;                                      /* :1513 */
 }
+#endif  /* EB_VCF_ZDF1X */
 
 #if EB_VCF_ILV
 #if !EB_VCF_DEADCOEF || EB_VCF_ADAA || EB_HALF_OS_VCF || EB_VCF_NOSAT
