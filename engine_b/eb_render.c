@@ -329,9 +329,13 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         pit_in    = go.c464;
         gate_sign = go.sign;
 
+#if EB_ABLATE == EB_ABL_GLIDE
+        dly_env = gate_sign; pitch_cv = pit_in;
+#else
         dly_env = eb_glide_tick(&st->glide[v], &c->glide[v],
                                 gate_sign, c->kbd[v], c->vel[v], pit_in,
                                 &pitch_cv);
+#endif
         }
 
 #if EB_LFO_SHARED
@@ -403,8 +407,12 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * key-follow + velocity SUM it computes -- NOT the raw key-follow cell
          * 368. The shim passes JF(a1, 880); this function passed c->kbd[v].
          * Third inherited guess found by the audit. */
+#if EB_ABLATE == EB_ABL_MODCV
+        pit = pitch_cv; pwm = 0.0f;
+#else
         eb_modcv_tick(&c->mod[v], pitch_cv, st->glide[v].s880,
                       lfo_del, lfo_undel, e1, e2, &pit, &pwm);
+#endif
         /* eb_modcv_tick's `pwm_out` IS cell 3808 (eb_pwm_cv.c:91 "THE PWM SUM,
          * [3808]"), which is eb_dcoprep's per-sample input. The second need
          * was likewise a value already computed and merely not routed. */
@@ -422,8 +430,12 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         /* SAME two inputs as modcv, per the shim: cells 752 and 880. `pit`
          * here is cell 752 (the glide output), NOT modcv's pitch_sum -- the
          * shim reads JF(a1, 752) for both calls. */
+#if EB_ABLATE == EB_ABL_VCF_CV
+        cut = pitch_cv; o6704 = 0.0f; o6848 = 0.0f;
+#else
         cut = eb_vcf_cv_tick(&st->cv[v], &c->cv[v], pitch_cv, st->glide[v].s880,
                              lfo_del, lfo_undel, e1, e2, &o6704, &o6848);
+#endif
 
         /* the resonance shaper takes the cutoff CV and the two side outputs,
          * and returns the ladder's feedback term (the port's v241). */
@@ -446,8 +458,12 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * and the width comes from cell 5520 plus the per-sample 3808. */
         /* THE SECOND ARGUMENT IS CELL 3776 (the port's v392 = modcv's pitch
          * sum), NOT the PWM sum. Fourth inherited guess. */
+#if EB_ABLATE == EB_ABL_DCOPREP
+        inc = cv; g_edge = 0.0f; pw_live = 0.5f; pwm_out = 0.0f;
+#else
         inc = eb_dcoprep_tick(&c->dprep[v], cv, pit, n_3808,
                               &g_edge, &pw_live, &pwm_out);
+#endif
         /* THE HALF-OS INCREMENT COMES FROM eb_dco_inc_scale(), the single
          * expression every path uses -- see the long note on it in eb_dco.h,
          * which records the two opposite octave errors that got it there.
@@ -525,7 +541,11 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * and the second of the same class as the DCO levels. */
         decimo = eb_decim_tick(&st->dec[v], &c->dec[v], pwm_out,
                                q[0], q[1], q[2], q[3]);
+#if EB_ABLATE == EB_ABL_NSVF
+        nsvo = noise_v; nsv04 = noise_v;
+#else
         nsvo   = eb_nsvf_tick(&st->nsv[v], &c->nsv[v], noise_v, &nsv04);
+#endif
         /* the noise mix consumes the SVF's cell-4320 output and the per-sample
          * cell 3536; its result is the ladder's noise input (cell 6544). */
         /* eb_nsvf_tick RETURNS cell 4320 and reports cell 4304 through

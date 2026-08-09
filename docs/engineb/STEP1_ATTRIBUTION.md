@@ -198,3 +198,31 @@ ALSO TRUE AND NOT VISIBLE IN THE FILES: engine B has no arpeggiator
 fork's render comes from the host harness, so the S3 firmware could not play
 that performance today. It is a missing feature, not an inaccuracy, and it is
 not yet on the plan.
+
+## TWO LADDER IDEAS KILLED BY COUNTING, BEFORE ANY BUILD (2026-08-09)
+
+The four VCF sub-steps are 846 cycles/voice, the largest item left. Two
+candidates were checked against the source and both die on arithmetic alone.
+Recorded so they are not proposed again.
+
+1. **TABULATE THE SATURATOR. A LOSS, NOT A WIN.** The curve is
+   `nl = x + ((((x*x)*x)*x) * (x*c9184))` -- FIVE flops after a two-compare
+   clip. A table costs a scale, a truncation, TWO LOADS, a subtract, a
+   multiply and an add. The wavetable DCO and the resonance table both won
+   because they replaced an `expf`, a 13- or 14-term polynomial and divides.
+   A quintic is already cheaper than its own lookup. **The method is not
+   general: it pays only where the thing replaced is expensive.**
+
+2. **`S` IS NOT DEAD ARITHMETIC.** The zero-input response computed one
+   sub-step ahead looked like a candidate, because EB_VCF_DEADCOEF already
+   proved its SECOND tap (c9536) dead in all 128 sets. It is not: `st->s1` is
+   read at the top of the next sub-step as `x = ins - ((st->s1 * c9520) * Rk)`
+   -- it IS the resonance feedback, and c9520 is 1.0, not 0. Deleting it would
+   remove the resonance.
+
+WHAT THIS LEAVES. The sub-step is ~30 flops of live filter arithmetic in a
+serial chain (y1 -> t -> y2 -> y3 -> y4 -> S), running at ~7 cycles per flop
+because an in-order FPU stalls on that chain. The fix for a stall is
+independent work, which is voice interleaving, which is CLOSED by the
+16-register wall. **No cheap lever remains inside the ladder, and saying so is
+more useful than proposing a fifth one.**
