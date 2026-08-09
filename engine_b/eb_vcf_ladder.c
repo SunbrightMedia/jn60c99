@@ -462,9 +462,17 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
      * same sum interleaves four 8-cell lines; the mapping (line, slot) ->
      * 4x delay is  A/B/C/D = delay 0/1/2/3 mod 4, slot = delay/4, which is why
      * this is one ring and not four.                                        */
+#if defined(EB_ABLATE) && EB_ABLATE == 9      /* EB_ABL_DECIM, cost only */
+    /* Splits the ladder's measured 1,083 cycles/voice into FOUR SUB-STEPS and
+     * DECIMATOR. Deliberately wrong audio: it takes the newest 4x sample
+     * instead of filtering the last 32. Never gated, never shipped. */
+    acc = h[hi & 31];
+    (void)j;
+#else
     acc = (h[(hi - 15) & 31] + h[(hi - 16) & 31]) * c->fir[0];
     for (j = 1; j < 16; ++j)
         acc += (h[(hi - (15 - j)) & 31] + h[(hi - (16 + j)) & 31]) * c->fir[j];
+#endif
 #endif  /* EB_HALF_OS_VCF */
 
     return acc * c->c9152;                                      /* :1513 */
