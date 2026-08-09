@@ -281,6 +281,33 @@ static float eb_vcf_substep(eb_vcf_state *st, const eb_vcf_coef *c,
         }
     }
 #else
+    /* EB_VCF_SATFIT -- FITTED SATURATION DRIVE, for the 2x path.
+     *
+     * WHY THIS AND NOT MORE ADAA. EB_HALF_OS_VCF measures 3.17 dB on the
+     * sonic gate, and the record says the residual is IN-BAND HARMONICS from
+     * half-rate waveshaping. All three ADAA orders (2.22 / 5.77 / 33.94 dB,
+     * centred 3.25) attacked ALIASING. Aliasing and level are different
+     * defects: at 2x the saturator is evaluated TWICE per output sample
+     * instead of four times, so the same input traverses the curve half as
+     * often and the harmonic LEVEL it generates is simply different. That is
+     * a gain question, and a gain question is fitted, not antialiased.
+     *
+     * The form keeps small-signal gain EXACTLY 1 at a = m = 1, so the flag is
+     * the identity when unset and the trunk is untouched:
+     *     nl = sat(x * a) * (m / a)
+     * `a` sets how hard the curve is driven (the harmonic level), `m` is the
+     * overall makeup. Two constants, fitted against the TRUNK ORACLE's own
+     * renders -- never against a bounce (diagnostic covenant).
+     */
+#ifndef EB_VCF_SATFIT_A
+#define EB_VCF_SATFIT_A 1.0f
+#endif
+#ifndef EB_VCF_SATFIT_M
+#define EB_VCF_SATFIT_M 1.0f
+#endif
+#if EB_VCF_SATFIT
+    x = x * (EB_VCF_SATFIT_A);
+#endif
     /* hard clip, NaN -> -1.0 (the >= test fails on NaN). :1358-1361 */
     if (x >= -1.0f) { if (x > 1.0f) x = 1.0f; }
     else            { x = -1.0f; }
@@ -295,6 +322,9 @@ static float eb_vcf_substep(eb_vcf_state *st, const eb_vcf_coef *c,
     nl = x;
 #else
     nl = x + ((((x * x) * x) * x) * (x * c->c9184));
+#if EB_VCF_SATFIT
+    nl = nl * ((EB_VCF_SATFIT_M) / (EB_VCF_SATFIT_A));
+#endif
 #endif
 #endif
 

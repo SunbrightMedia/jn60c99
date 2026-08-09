@@ -170,6 +170,13 @@ void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
 #define EB_ABL_DCOPREP  11
 #define EB_ABL_MODCV    12
 #define EB_ABL_ATREST   13
+/* NOT one-hot, and deliberately so. The per-sample wiring is ~648 cycles
+ * spread over five small modules -- roughly 110 each, which is BELOW this
+ * board's ~300-cycle noise floor, so five separate binaries would each
+ * measure noise and cost five flashing rounds to do it. Ablating all five at
+ * once asks the only question the floor can answer: is the 648 concentrated
+ * in one place, or is it genuinely spread? */
+#define EB_ABL_WIRING   14
 
 void eb_engine_advance_atrest(eb_engine *e, eb_render_state *st,
                               const eb_render_coefs *c, int v0, int v1, int n)
@@ -346,7 +353,7 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         pit_in    = go.c464;
         gate_sign = go.sign;
 
-#if EB_ABLATE == EB_ABL_GLIDE
+#if EB_ABLATE == EB_ABL_GLIDE || EB_ABLATE == EB_ABL_WIRING
         dly_env = gate_sign; pitch_cv = pit_in;
 #else
         dly_env = eb_glide_tick(&st->glide[v], &c->glide[v],
@@ -424,7 +431,7 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * key-follow + velocity SUM it computes -- NOT the raw key-follow cell
          * 368. The shim passes JF(a1, 880); this function passed c->kbd[v].
          * Third inherited guess found by the audit. */
-#if EB_ABLATE == EB_ABL_MODCV
+#if EB_ABLATE == EB_ABL_MODCV || EB_ABLATE == EB_ABL_WIRING
         pit = pitch_cv; pwm = 0.0f;
 #else
         eb_modcv_tick(&c->mod[v], pitch_cv, st->glide[v].s880,
@@ -447,7 +454,7 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         /* SAME two inputs as modcv, per the shim: cells 752 and 880. `pit`
          * here is cell 752 (the glide output), NOT modcv's pitch_sum -- the
          * shim reads JF(a1, 752) for both calls. */
-#if EB_ABLATE == EB_ABL_VCF_CV
+#if EB_ABLATE == EB_ABL_VCF_CV || EB_ABLATE == EB_ABL_WIRING
         cut = pitch_cv; o6704 = 0.0f; o6848 = 0.0f;
 #else
         cut = eb_vcf_cv_tick(&st->cv[v], &c->cv[v], pitch_cv, st->glide[v].s880,
@@ -475,7 +482,7 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * and the width comes from cell 5520 plus the per-sample 3808. */
         /* THE SECOND ARGUMENT IS CELL 3776 (the port's v392 = modcv's pitch
          * sum), NOT the PWM sum. Fourth inherited guess. */
-#if EB_ABLATE == EB_ABL_DCOPREP
+#if EB_ABLATE == EB_ABL_DCOPREP || EB_ABLATE == EB_ABL_WIRING
         inc = cv; g_edge = 0.0f; pw_live = 0.5f; pwm_out = 0.0f;
 #else
         inc = eb_dcoprep_tick(&c->dprep[v], cv, pit, n_3808,
@@ -558,7 +565,7 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * and the second of the same class as the DCO levels. */
         decimo = eb_decim_tick(&st->dec[v], &c->dec[v], pwm_out,
                                q[0], q[1], q[2], q[3]);
-#if EB_ABLATE == EB_ABL_NSVF
+#if EB_ABLATE == EB_ABL_NSVF || EB_ABLATE == EB_ABL_WIRING
         nsvo = noise_v; nsv04 = noise_v;
 #else
         nsvo   = eb_nsvf_tick(&st->nsv[v], &c->nsv[v], noise_v, &nsv04);

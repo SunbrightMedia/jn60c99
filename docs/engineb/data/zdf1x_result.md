@@ -74,3 +74,80 @@ cascade is already close and the failure (3.17 dB, EB_HALF_OS_VCF) is entirely
 in the NONLINEARITY. That is the next thing to attack, and it has never been
 attacked by FITTING -- the three ADAA orders addressed aliasing, which is a
 different defect from level.
+
+# PART 2 — THE 2x PATH, AND WHY OVERSAMPLING IS NOW CLOSED
+2026-08-09, same session. Everything below is measured.
+
+## The reframing that made the rest quick
+`EB_HALF_OS_VCF` measures 3.17 dB and the record attributed it to "in-band
+harmonics from half-rate waveshaping". **That attribution is wrong.** Gate G-A
+run on the 2x path with the saturator OFF ON BOTH SIDES measures a band error
+of 2.758 dB. The residual is overwhelmingly LINEAR, which is why three ADAA
+orders (2.22 / 5.77 / 33.94, centred 3.25) never moved it -- they were all
+treating aliasing, and the defect is response.
+
+## Attempt 1 — fit the saturation drive. CLOSED NEGATIVE.
+`EB_VCF_SATFIT`, nl = sat(x*a)*(m/a), identity at a = m = 1.
+MEASURED over the full 36-scenario battery, worst third-octave band:
+
+    a = 0.85   3.43 dB        a = 1.30   (worse)
+    a = 1.00   3.17 dB  <- MINIMUM, and it reproduces the recorded figure
+    a = 1.15   3.52 dB        a = 1.80  12.16 dB
+                              a = 2.20  16.00 dB
+
+a = 1.0 is a local minimum and both directions are worse, so the 2x residual
+is not a saturation LEVEL error. The a = 1 row is also the harness's own
+non-vacuity control: it lands on 3.17 dB exactly, so the flag is the identity
+when unset and the measurement is of the thing it claims.
+
+## Attempt 2 — retune the cutoff map. HALVES IT, NOT ENOUGH.
+The current map matches the corner exactly, which is not the same as
+minimising in-band error. Per-G optimal G' (numerical, 20 Hz - 18 kHz):
+
+    G = 0.001   4.06 -> 2.03 dB      G = 0.12    2.95 -> 1.09 dB
+    G = 0.01    4.05 -> 1.97 dB      G = 0.2097  0.94 -> 0.60 dB
+    G = 0.05    3.87 -> 1.64 dB
+
+Best case ~2.0 dB against a 1.0 dB bound. And the residual after retuning is
+strongly k-DEPENDENT (k = 0 and k = 3.98 differ by ~2 dB at 18 kHz), so no
+FIXED spectral correction folded into the decimator can absorb it: applying
+the best single correction leaves a worst residual of 3.67 dB.
+
+## Why any rate reduction fails — one sentence
+The port's one-pole carries a zero at Nyquist. Lowering the rate moves those
+four zeros down into the audio band: the numerator-only mismatch is
++1.70 dB at 10 kHz, +4.55 at 16 kHz and +7.43 at 20 kHz for 2x, and roughly
+doubles again for 1x. It is G-dependent through the pole interaction and
+k-dependent through the loop, so it is not one fixed curve that one fixed
+filter can undo.
+
+## The exact 1x equivalent EXISTS, and dies on the chip, not the maths
+Hankel singular values of the port's own 1x impulse response give the system
+order directly (a fitter cannot fake it; a bad fitter cannot hide it):
+
+    G = 0.001   order 4        G = 0.12    order 8
+    G = 0.01    order 7        G = 0.2097  order 7
+    G = 0.05    order 8
+
+So a 1x equivalent is an ARMA of 4 poles and ~8 zeros -- around 12 multiplies
+a sample against the ~170 flops the 4x path costs. The poles even have a
+CLOSED FORM: (1 - Az^-1)^4 + kG^4(1 + z^-1)^4 = 0 factors through the fourth
+roots of -1, so z_j = (A + c_j)/(1 - c_j) with c_j = k^(1/4) G w_j, and the
+decimated poles are z_j^4.
+
+**It dies on the ESP32-S3's arithmetic, not on accuracy.** That form needs a
+k^(1/4) and FOUR COMPLEX DIVISIONS every sample. The S3 has NO hardware FP
+divide -- eb_vcf_ladder.c's own header opens by saying the single division in
+R is a soft-float call, measured rather than avoided. Four more per sample
+costs more than the four sub-steps they replace.
+
+The tabulated alternative -- a shared 2D (G,k) table of the 4 poles -- is the
+only route left, and it is a NEW RESEARCH PROJECT rather than a closing move:
+its accuracy near k = 3.98 (99.5 % of self-oscillation, which the battery does
+reach) is exactly where pole-radius interpolation error is most audible, and
+nothing here has measured that.
+
+## STATUS
+Oversampling reduction is CLOSED at 4x for every structure tried or costed:
+1x direct (23.77 dB), 2x + drive fit (3.17 dB, a minimum), 2x + retuned map
++ fixed correction (3.67 dB), exact-1x ARMA (arithmetic, not accuracy).
