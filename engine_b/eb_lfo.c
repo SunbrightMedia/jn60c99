@@ -22,6 +22,9 @@
  * expression amplifies it; that is measured there, not assumed here.
  */
 #include "eb_fork_config.h"
+#ifndef EB_EXP_MEMO
+#define EB_EXP_MEMO 0
+#endif
 
 /* #ifndef so a diagnostic build can define EB_EXPF first and tap this site.
  * That tap produced the finding recorded in F3_S3_FORK_DESIGN: the engine
@@ -80,7 +83,26 @@ float eb_lfo_tick(eb_lfo_state *s, const eb_lfo_coef *c,
     float L1680, L1696, L1712, L1728, L1760;
 
     v74 = c->k1056;
+#if EB_EXP_MEMO
+    /* THE MEMO, cashing a measurement O6 left on the table: across 2,016,000
+     * calls over the whole battery this site saw FOUR distinct arguments (the
+     * delay envelope is a ramp between recall constants and parks at its
+     * ends). A pure function with four live inputs is a cache, not a
+     * computation: one float compare on a hit against ~300 cycles of
+     * exponential. BIT-EXACT BY CONSTRUCTION -- same argument, same result,
+     * the cached value IS the function's own output. A stale entry cannot
+     * exist: the key is compared before every use. The cache is file-static
+     * (NOT engine state) precisely because a value cache needs no re-seed:
+     * unlike the lockstep statics this project was bitten by, a memo entry
+     * is correct for its key in every context or it does not match at all. */
+    {   static float memo_a = -1.0f/0.0f, memo_r;
+        float a75 = (float)dly_env * c->k1200;
+        if (a75 != memo_a) { memo_a = a75; memo_r = EB_EXPF(a75); }
+        v75 = memo_r * c->k1184;
+    }
+#else
     v75 = EB_EXPF((float)dly_env * c->k1200) * c->k1184;
+#endif
     v76 = v74 * c->k1072;
     L1584 = s->s1568;
     v77 = v75 + c->k1216;

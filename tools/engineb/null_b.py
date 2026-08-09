@@ -231,6 +231,9 @@ if os.environ.get("JUNO_EB_ZC_PROBE2"):
 if os.environ.get("JUNO_EB_ZC_PROBE"):
     CFLAGS = CFLAGS + ["-DEB_ZC_PROBE=1"]
 
+if os.environ.get("JUNO_EB_EXP_MEMO"):
+    CFLAGS = CFLAGS + ["-DEB_EXP_MEMO=1"]
+
 if os.environ.get("JUNO_EB_ZEROCOEF"):
     CFLAGS = CFLAGS + ["-DEB_ZEROCOEF=1"]
 

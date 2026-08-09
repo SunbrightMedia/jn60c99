@@ -163,6 +163,12 @@ static void zc2_rep(void){ int i; FILE*f=fopen("/tmp/zc2.log","a"); if(!f)return
     for(i=0;i<ZCN;++i) fprintf(f,"%-16s max|v| %.9g\n",zc2n[i],(double)zc2[i]);
     fclose(f); }
 #define ZC2(i,v) do{ float _a=(v)<0?-(v):(v); if(_a>zc2[i]) zc2[i]=_a; }while(0)
+static float zc2l[14];
+static void zc2l_rep(void) __attribute__((destructor));
+static void zc2l_rep(void){ int i; FILE*f=fopen("/tmp/zc2l.log","a"); if(!f)return;
+    for(i=0;i<14;++i) fprintf(f,"lfo[%d] max|v| %.9g\n",i,(double)zc2l[i]);
+    fclose(f); }
+#define ZC2L(i,v) do{ float _a=(v)<0?-(v):(v); if(_a>zc2l[i]) zc2l[i]=_a; }while(0)
 #endif
 
 #ifndef EB_FUSE_VCA
@@ -655,6 +661,15 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         eb_modcv_latch(&st->mod[v], decimo);
         (void)nsv04;
 #if EB_ZC_PROBE2
+        {   /* the LFO's own candidates, probed IN-RENDER for the same reason
+             * the first probe exists: a preset sweep never plays a note. */
+            const eb_lfo_coef *L = &c->lfo[0];
+            ZC2L(0,L->k1856); ZC2L(1,L->k1904); ZC2L(2,L->k1968);
+            ZC2L(3,L->k1984); ZC2L(4,L->k2000); ZC2L(5,L->k2016);
+            ZC2L(6,L->k2032); ZC2L(7,L->k2048); ZC2L(8,L->k2096);
+            ZC2L(9,L->k2112); ZC2L(10,L->k2304); ZC2L(11,L->k2336);
+            ZC2L(12,L->k2496); ZC2L(13,L->k2512);
+        }
         ZC2(0,c->vca[v].c9552);  ZC2(1,c->vca[v].c9680);
         ZC2(2,c->vca[v].c10224); ZC2(3,c->vca[v].c10368);
         ZC2(4,c->glide[v].k912); ZC2(5,c->glide[v].k1040);
