@@ -94,6 +94,25 @@ static grp G[] = {
 
 static unsigned char alive[NG][MAXSLOT];    /* 1 = still believed always-zero */
 
+/* THE NON-VACUITY WITNESS. "This stage killed 0 slots" has two readings: the
+ * survivors really are structural, or the stage perturbed nothing. They are
+ * indistinguishable from the kill count alone, and this project's standing
+ * rule is that a check which has never been seen to bite is not a check. So
+ * every stage also records how many slots it MOVED -- changed from the value
+ * the previous stage left. A stage that moves thousands of slots and kills
+ * none is evidence; a stage that moves none is a broken stage. */
+static float lastv[NG][MAXSLOT];
+static long  moved;
+static void witness(void)
+{
+    int g, s;
+    for (g = 0; g < NG; ++g)
+        for (s = 0; s < G[g].nf && s < MAXSLOT; ++s) {
+            const float *f = G[g].get(0);
+            if (f[s] != lastv[g][s]) { lastv[g][s] = f[s]; ++moved; }
+        }
+}
+
 /* A cheap deterministic generator. Math.random-style reproducibility matters
  * here: a survivor list nobody can regenerate is not evidence. */
 static unsigned long rs = 12345u;
@@ -123,6 +142,7 @@ static void settle(unsigned char *st, const unsigned char *bank, int p)
     juno_apply_unison_spread(st, juno_bank_assign(bank, p));
     eb_render_coefs_build(st, &RC);
     observe();
+    witness();
 }
 
 int main(int argc, char **argv)
@@ -147,12 +167,15 @@ int main(int argc, char **argv)
         for (s = 0; s < MAXSLOT; ++s) alive[g][s] = 1;
     for (g = 0; g < NG; ++g) total += G[g].nf;
 
-    /* how many parameters the BINDINGS table exposes: probe upward until the
-     * setter refuses. juno_apply_param returns a negative value for an index
-     * it does not own. */
-    memset(st, 0, JUNO_STATE_BYTES);
-    juno_engine_init(st); juno_engine_prepare(st);
-    while (NPARAM < 4096 && juno_apply_param(st, NPARAM, 0, rate) >= -1e29f) ++NPARAM;
+    /* THE PORT EXPORTS THE COUNT. An earlier draft probed for it instead, by
+     * calling the setter with rising indices and watching for a refusal --
+     * but juno_apply_param returns 0.0f for an index it does not own, never a
+     * negative, so the probe never terminated and set this to 4,096. Stage 2
+     * then became 4.2 MILLION iterations, each memsetting a 12 MB state: it
+     * would not have finished this year. Ask, do not probe. */
+    setvbuf(stdout, (char *)0, _IOLBF, 0);
+    NPARAM = juno_param_count();
+    printf("parameters in the BINDINGS table: %d\n", NPARAM);
 
     /* ---- STAGE 1: the 64 factory patches ------------------------------- */
     for (p = 0; p < np; ++p) {
@@ -163,30 +186,35 @@ int main(int argc, char **argv)
         ++stage1;
     }
     { int a = 0; for (g = 0; g < NG; ++g) for (s = 0; s < G[g].nf; ++s) a += alive[g][s];
-      printf("STAGE 1  %d factory patches x %d voices          -> %d of %d slots still zero\n",
-             np, EB_NUM_VOICES, a, total); }
+      printf("STAGE 1  %d factory patches x %d voices     -> %d of %d zero   (moved %ld)\n",
+             np, EB_NUM_VOICES, a, total, moved); moved = 0; }
 
     /* ---- STAGE 2: every parameter x every byte, on 4 base patches ------ */
     for (p = 0; p < np; p += (np / 4 > 0 ? np / 4 : 1)) {
+        /* THE RESET IS PER PARAMETER, NOT PER BYTE, and it is a patch apply
+         * rather than a 12 MB memset plus init plus prepare. Re-applying the
+         * patch restores every parameter this sweep has touched, which is all
+         * that is needed: the sweep changes exactly one. */
+        memset(st, 0, JUNO_STATE_BYTES);
+        juno_engine_init(st); juno_engine_prepare(st);
         for (i = 0; i < NPARAM; ++i) {
+            juno_bank_apply(st, bank, p);
             for (b = 0; b < 256; ++b) {
-                memset(st, 0, JUNO_STATE_BYTES);
-                juno_engine_init(st); juno_engine_prepare(st);
-                juno_bank_apply(st, bank, p);
                 juno_apply_param(st, i, b, rate);
                 settle(st, bank, p);
                 ++stage2;
             }
         }
+        printf("  stage 2: base patch %d done (%ld sweeps)\n", p, stage2);
     }
     { int a = 0; for (g = 0; g < NG; ++g) for (s = 0; s < G[g].nf; ++s) a += alive[g][s];
-      printf("STAGE 2  %ld single-parameter sweeps               -> %d of %d slots still zero\n",
-             stage2, a, total); }
+      printf("STAGE 2  %ld BINDINGS sweeps (%d params)     -> %d of %d zero   (moved %ld)\n",
+             stage2, NPARAM, a, total, moved); moved = 0; }
 
     /* ---- STAGE 3: random presets, every parameter at once --------------- */
+    memset(st, 0, JUNO_STATE_BYTES);
+    juno_engine_init(st); juno_engine_prepare(st);
     for (trial = 0; trial < 4000; ++trial) {
-        memset(st, 0, JUNO_STATE_BYTES);
-        juno_engine_init(st); juno_engine_prepare(st);
         juno_bank_apply(st, bank, (int)(rnd() % (unsigned)np));
         for (i = 0; i < NPARAM; ++i)
             juno_apply_param(st, i, (int)(rnd() & 0xFF), rate);
@@ -195,11 +223,67 @@ int main(int argc, char **argv)
         juno_apply_unison_spread(st, (int)(rnd() % 3u));
         eb_render_coefs_build(st, &RC);
         observe();
+        witness();
         ++stage3;
     }
     { int a = 0; for (g = 0; g < NG; ++g) for (s = 0; s < G[g].nf; ++s) a += alive[g][s];
-      printf("STAGE 3  %ld random presets (all parameters)       -> %d of %d slots still zero\n",
-             stage3, a, total); }
+      printf("STAGE 3  %ld random BINDINGS presets           -> %d of %d zero   (moved %ld)\n",
+             stage3, a, total, moved); moved = 0; }
+
+    /* ---- STAGE 4: the RECORD path -- ~79 host parameters over their whole
+     * semantic range, written into the patch record and driven through the
+     * FULL recall. The BINDINGS table above is 31 parameters; recall applies
+     * 129 leaves. Stages 2 and 3 could therefore only ever reach a quarter of
+     * the space, which is why their kill counts must not be read as strength.
+     * This is the wide sweep, and stage 5 randomises all of them at once. */
+    {   int np_h = juno_host_param_count(), q, val;
+        long stage4 = 0, stage5 = 0;
+        unsigned char *rec;
+        printf("host parameters with record encoders: %d\n", np_h);
+        for (p = 0; p < np; p += (np / 4 > 0 ? np / 4 : 1)) {
+            for (q = 0; q < np_h; ++q) {
+                int lo = juno_host_param_min(q), hi = juno_host_param_max(q);
+                int keep;
+                rec = juno_bank_record(bank, p);
+                if (!rec) continue;
+                keep = juno_host_param_decode(rec, q);
+                for (val = lo; val <= hi; ++val) {
+                    juno_host_param_encode(rec, q, val);
+                    memset(st, 0, JUNO_STATE_BYTES);
+                    juno_engine_init(st); juno_engine_prepare(st);
+                    juno_bank_apply(st, bank, p);
+                    settle(st, bank, p);
+                    ++stage4;
+                }
+                juno_host_param_encode(rec, q, keep);   /* restore */
+            }
+            printf("  stage 4: base patch %d done (%ld applies)\n", p, stage4);
+        }
+        { int a = 0; for (g = 0; g < NG; ++g) for (s = 0; s < G[g].nf; ++s) a += alive[g][s];
+          printf("STAGE 4  %ld record sweeps (%d params)      -> %d of %d zero   (moved %ld)\n",
+                 stage4, np_h, a, total, moved); moved = 0; }
+
+        for (trial = 0; trial < 3000; ++trial) {
+            rec = juno_bank_record(bank, (int)(rnd() % (unsigned)np));
+            if (!rec) continue;
+            for (q = 0; q < np_h; ++q) {
+                int lo = juno_host_param_min(q), hi = juno_host_param_max(q);
+                juno_host_param_encode(rec, q, lo + (int)(rnd() % (unsigned)(hi - lo + 1)));
+            }
+            memset(st, 0, JUNO_STATE_BYTES);
+            juno_engine_init(st); juno_engine_prepare(st);
+            juno_bank_apply(st, bank, 0);
+            juno_driver_seed_voices(st);
+            juno_apply_condition(st, (int)(rnd() & 0xFF));
+            juno_apply_unison_spread(st, (int)(rnd() % 3u));
+            eb_render_coefs_build(st, &RC);
+            observe(); witness();
+            ++stage5;
+        }
+        { int a = 0; for (g = 0; g < NG; ++g) for (s = 0; s < G[g].nf; ++s) a += alive[g][s];
+          printf("STAGE 5  %ld random RECORD presets           -> %d of %d zero   (moved %ld)\n",
+                 stage5, a, total, moved); }
+    }
 
     printf("\nSURVIVORS -- candidates for a structural proof, NOT proofs:\n");
     for (g = 0; g < NG; ++g) {
