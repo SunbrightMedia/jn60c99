@@ -12,6 +12,13 @@
 #ifndef EB_ATREST_O1
 #define EB_ATREST_O1 0
 #endif
+/* The gate build sets MIN=1 so the closed form runs on EVERY advance of all
+ * 36 scenarios -- the host harness advances one sample at a time, and at the
+ * shipping threshold (8) the gate would never execute the code it judges.
+ * A vacuous PASS is the trap this project keeps a catalogue of. */
+#ifndef EB_ATREST_O1_MIN
+#define EB_ATREST_O1_MIN 8
+#endif
 
 #if EB_DCO_WT
 
@@ -162,7 +169,7 @@ void eb_dco_wt_advance(eb_dco_wt_state *s, const eb_dco_wt_coef *c, int n)
      * lever under the SONIC gate: the error is PHASE-AT-WAKE, the same
      * already-relaxed beat-class question as the DCO's alias positions and
      * UNISON's 18.2-cent scatter (the -46 dB null collapse). */
-    if (n >= 8) {
+    if (n >= EB_ATREST_O1_MIN) {
         double p0  = (double)s->phase;
         double D   = (double)n * 4.0 * (double)c->inc4;
         double thr = (double)c->subthr;
