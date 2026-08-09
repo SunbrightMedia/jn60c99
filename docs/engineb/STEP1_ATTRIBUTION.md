@@ -109,3 +109,57 @@ law permits ~1e-5 there), and its cost is one `expf`, a 14-term polynomial
 and two divides -- all tabulatable. The ladder itself (1,083) is NOT reopened
 by this: 2x half-rate measured 3.17 dB and all three ADAA orders failed, both
 recorded closed.
+
+## STEP 2 RESULT (2026-08-09) -- THE RESONANCE TABLE SHIPS
+
+MEASURED on the user's S3, `EB_VCF_RES_LUT=256`:
+
+  floor 1,927 -> 1,867 · 6 voices 14,441 -> 11,353
+  per critical-path voice 4,171 -> 3,162, a saving of **1,009 cycles**
+  6 voices vs the 5,442-cycle budget: **2.65x -> 2.09x over**
+
+The predicted shaper cost was 1,045; the table recovers 1,009 of it, 97 %.
+The remaining ~36 is the load pair, the lerp and the range test.
+
+SONIC GATE, with its non-vacuity control:
+
+  no table (control)   0.40 dB      table 512    0.40 dB
+  table 2,048          0.40 dB      table 256    0.40 dB
+  table 128            0.39 dB      table  64    0.41 dB
+  table  32            0.96 dB   <- the control
+
+All 36 scenarios PASS at every size. The 0.40 dB is the wavetable DCO's own
+residual, unchanged by the table. The 32-entry row is what makes the other
+rows mean anything: six identical numbers are equally consistent with the
+flag never reaching the build, and this project has been caught by exactly
+that. It degrades, so the gate is live.
+
+**256 ENTRIES, NOT 2,048.** The per-sample cost is one load pair and a lerp
+at ANY size, so size buys only accuracy, and accuracy stops improving at 256.
+1 KB per voice instead of 8 KB: DIRAM free 38 KB -> 95 KB. The FX still have
+to fit, so that headroom is not decoration.
+
+## THE LADDER SPLIT (EB_ABLATE=9)
+
+  floor 1,765 · 6 voices 13,568 · decimator = **237 cycles/voice**
+
+So the ladder's 1,083 is **846 in the four sub-steps and 237 in the 32-tap
+decimator**. The decimator is 5.6 % of a voice -- too small to be worth the
+response risk of redesigning it. The sub-steps are the ladder.
+
+## THE MAP AS IT NOW STANDS (voice = 3,162)
+
+  four VCF sub-steps      846   26.8 %
+  the per-sample wiring   648   20.5 %   <- now the SECOND largest item
+  pitch eval              397   12.6 %
+  VCA + HPF               379   12.0 %
+  DCO wavetable           328   10.4 %
+  ENV x2                  291    9.2 %
+  VCF decimator           237    7.5 %
+  res shaper (residual)    36    1.1 %
+
+And the FLOOR is now 1,867 cycles = **34 % of the whole budget with no voice
+sounding**. It is not overhead: ablations move it, so it is the eight AT-REST
+voices ticking their full chains. On the 6-voice case core 0 carries two of
+them, ~740 cycles that produce silence. The at-rest shortcut has been listed
+as unexercised since Phase 1; it is now a named target with a number on it.
