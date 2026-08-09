@@ -22,6 +22,16 @@
  * expression amplifies it; that is measured there, not assumed here.
  */
 #include "eb_fork_config.h"
+
+/* EB_ZEROCOEF here deletes 13 of the 14 candidate coefficients. The 14th,
+ * k1856, IS NOT DELETED: the in-render probe reads it at 1.0 with notes
+ * sounding while all five preset stages held it at zero -- the THIRD member
+ * of the note-path smoother-target species (k6864, c9680, k1856). Every
+ * deletion below was confirmed zero IN-RENDER over the full battery, and the
+ * operands are bounded CVs, so no 0*inf can arrive. */
+#ifndef EB_ZEROCOEF
+#define EB_ZEROCOEF 0
+#endif
 #ifndef EB_EXP_MEMO
 #define EB_EXP_MEMO 0
 #endif
@@ -107,7 +117,11 @@ float eb_lfo_tick(eb_lfo_state *s, const eb_lfo_coef *c,
     L1584 = s->s1568;
     v77 = v75 + c->k1216;
     v78 = s->s1504;
+#if EB_ZEROCOEF
+    v79 = 0.0f;                                   /* k1904 == 0 */
+#else
     v79 = ext_gate * c->k1904;
+#endif
     L1616 = s->s1600;
     v80 = s->s1488;
     v81 = s->s1536;
@@ -176,10 +190,18 @@ float eb_lfo_tick(eb_lfo_state *s, const eb_lfo_coef *c,
      * side effects, and eb_triangle wraps its own argument (PROVEN over all
      * 2^32 inputs), so the discarded call is simply absent. v107 and v108 are
      * DIFFERENT phases -- see src/voice_render.c:899. */
+#if EB_ZEROCOEF
+    v108 = v98;                                   /* k2304 == 0 */
+#else
     v108 = v98 + c->k2304;
+#endif
     v108 = eb_lfo_wrap(v108);
     v109 = eb_triangle(v107);
+#if EB_ZEROCOEF
+    v110 = v108;                                  /* k2496 == 0 */
+#else
     v110 = v108 + c->k2496;
+#endif
     v111 = v109 * c->k2384;
     if (v110 >= 0.0f) {
         if (v110 > 0.0f)
@@ -187,30 +209,59 @@ float eb_lfo_tick(eb_lfo_state *s, const eb_lfo_coef *c,
     } else {
         v110 = -1.0f;
     }
+#if EB_ZEROCOEF
+    v112 = v98;                                   /* k2336 == 0 */
+#else
     v112 = v98 + c->k2336;
+#endif
     L1728 = v111;
     *out1824 = v110;
+#if EB_ZEROCOEF
+    v113 = v110 * c->k2368;                       /* k2512 == 0 */
+#else
     v113 = (float)(v110 * c->k2368) + c->k2512;
+#endif
     v112 = eb_lfo_wrap(v112);
     v114 = fabsf(v112);
     L1712 = v113;
+#if EB_ZEROCOEF
+    /* k1968, k2032, k2000, k2016 all zero: the whole v116 sum and the
+     * v115*L1728 product below vanish. */
+    v115 = 0.0f;
+    v116 = 0.0f;
+#else
     v115 = c->k1968;
     v116 = (float)((float)(c->k2032 * L1760)
                  + (float)(c->k2000 * L1680))
          + (float)(c->k2016 * L1696);
+#endif
     v117 = (float)((float)((float)((float)(v114 * (float)((float)(v114 * v114) * v114)) * c->k2224)
                          + (float)((float)((float)((float)(v114 * v114) * v114) * c->k2208)
                                  + (float)((float)((float)(v114 * c->k2176) + c->k2160)
                                          + (float)((float)(v114 * v114) * c->k2192))))
                  + c->k2240)
          * c->k2400;
+#if EB_ZEROCOEF
+    v118 = 0.0f;                        /* v115 == v116 == 0 above */
+    (void)v115; (void)v116;
+#else
     v118 = (float)(v115 * L1728) + v116;
+#endif
     v119 = c->k2080;
     v120 = (float)((float)(c->k1936 * L1472) - c->k1936) + 1.0f;
+#if EB_ZEROCOEF
+    /* k1984 == 0 and k2048 == 0; with v118 == 0 the sum is one product. */
+    v121 = v117 * c->k1952;
+#else
     v121 = (float)((float)(v118 + (float)(c->k1984 * L1712))
                  + (float)(v117 * c->k1952))
          + (float)(c->k2048 * L1408);
+#endif
     *out1808 = v121;
+#if EB_ZEROCOEF
+    return (v119 * v120) * v121;        /* k2096 == 0, k2112 == 0 */
+#else
     return (float)((float)(c->k2096 * L1440) + (float)(c->k2112 * L1456))
          + (float)((float)(v119 * v120) * v121);
+#endif
 }
