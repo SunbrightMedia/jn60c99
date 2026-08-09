@@ -336,3 +336,23 @@ kernel (~600/voice, ASM_KERNEL_WORKORDER.md) is the last span. If the floor
 is flat, record it as dead end six and the kernel carries the rest.
 State: 10,970 banked bit-exact at 6 voices; sound bit-exact to the plugin;
 all negatives documented in docs/engineb/data/.
+
+## AUDIBLE BUILD ON SILICON (2026-08-10) -- THE HONEST FINAL TABLE OF THE DAY
+  0x00 floor  1,020   (was 1,904 -- EB_ATREST_O1 DELIVERED, head 1,450->675)
+  0x80        3,743   0xc0 6,804   0xe0 9,879
+  0xfc       10,004   (6 voices, one chip; day started at 11,353)
+  0xd0        6,723   <- the two-chip workload, vs 5,442 = 1.24x OVER
+
+Slope: voice = 3,068. HALF_OS delivered ~212/voice, NOT the ~500 projected.
+THE PROJECTION ERROR WAS A MIS-CITATION, and the correction was already in
+the record: engine_price.py's own comment says the half-OS decimator saving
+"measured zero -- the fifth such result", so only the two sub-steps were ever
+real (~160 insns). The 5,560 landing and the "nothing outside 2%" claim were
+wrong; the miss is 24%.
+
+REMAINING GAP: 1,281/chip = ~640/voice. The measured FPU stall pool in
+ladder+VCA is ~735/voice (c/i ~1.9 still). For the first time the LAST span
+is SMALLER than the single remaining lever's measured pool:
+**ASM_KERNEL_WORKORDER.md is now correctly sized to finish this.** No
+standard change remains, none is needed. Sound: gated 3.17 dB worst band,
+user holds the worst-case WAVs.
