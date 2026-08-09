@@ -7,6 +7,11 @@
  * in this file exists to correct the samples where an edge falls.
  */
 #include "eb_dco_wt.h"
+#include <math.h>
+#include <string.h>
+#ifndef EB_ATREST_O1
+#define EB_ATREST_O1 0
+#endif
 
 #if EB_DCO_WT
 
@@ -145,6 +150,43 @@ void eb_dco_wt_advance(eb_dco_wt_state *s, const eb_dco_wt_coef *c, int n)
                     + (float)(EB_WT_DELAY * 4) * (c->inc4 - s->inc4_prev));
         s->inc4_prev = c->inc4;
     }
+#if EB_ATREST_O1
+    /* THE CLOSED FORM, for the at-rest path only (n large). LFOCUT's sweep
+     * exposed the truth about the head: EB_ATREST_BLOCK hoisted the per-call
+     * prologue and left this 128-iteration body running in full for every
+     * silent voice -- ~232 cycles each, 6-7 of them, which IS the 1,454-cycle
+     * intercept. Phase after n samples is one wrap of p0 + 4n*inc4; the sub
+     * counter's upward crossings are floor arithmetic on the unwrapped
+     * travel; the ring is a memset once n covers its length. NOT bit-exact
+     * (one rounding replaces 4n sequential roundings), so this is a FORK
+     * lever under the SONIC gate: the error is PHASE-AT-WAKE, the same
+     * already-relaxed beat-class question as the DCO's alias positions and
+     * UNISON's 18.2-cent scatter (the -46 dB null collapse). */
+    if (n >= 8) {
+        double p0  = (double)s->phase;
+        double D   = (double)n * 4.0 * (double)c->inc4;
+        double thr = (double)c->subthr;
+        double pf  = fmod(p0 + D + 1.0, 2.0) - 1.0;
+        long   cr  = (long)floor((p0 + D - thr) / 2.0)
+                   - (long)floor((p0 - thr) / 2.0);
+        long   sc  = ((long)s->subcnt + 2L * cr) & 3L;
+        s->phase  = (float)pf;
+        s->subcnt = (float)(sc >= 2 ? 2 : 0);
+        s->tprev  = c->pw + s->phase;
+        if (n >= EB_WT_RES_LEN) {
+            memset(s->ring, 0, sizeof s->ring);
+            s->rpos = (s->rpos + n) & (EB_WT_RES_LEN - 1);
+        } else {
+            /* the loop advances rpos itself -- advancing it again after was
+             * the first draft's double-count, caught before the gate ran */
+            for (i = 0; i < n; ++i) {
+                s->ring[s->rpos] = 0.0f;
+                s->rpos = (s->rpos + 1) & (EB_WT_RES_LEN - 1);
+            }
+        }
+        return;
+    }
+#endif
     for (i = 0; i < n; ++i) {
         const float prev = s->phase;
         float cnt = s->subcnt;
