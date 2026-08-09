@@ -2,6 +2,9 @@
  * src/voice_render.c:1230-1297, with the port's variable numbers kept.
  */
 #include "eb_vcf_res.h"
+#ifndef EB_ZEROCOEF
+#define EB_ZEROCOEF 0
+#endif
 #include "eb_fork_config.h"
 /* EB_VCF_RES_CR -- C2, control-rate resonance. CLOSED NEGATIVE 2026-08-05:
  * N=2, the gentlest decimation that exists, FAILS at -39.3 dB on all 36
@@ -205,7 +208,11 @@ float eb_vcf_res_tick(eb_vcf_res_state *s, const eb_vcf_res_coef *c,
     v232 = (float)(v231 * c->k7696) + c->k7600;
     s->s7552 = ebr_wrap24(-v230);
     v233 = (float)(1.0 - v229) * c->k7728;
+#if EB_ZEROCOEF
+    s->s7536 = v229 * c->k7792;                     /* k7616 == 0 */
+#else
     s->s7536 = (float)(v229 * c->k7792) + c->k7616;
+#endif
     v227 = (float)(fmaxf(
                                  fminf(
                                    (float)((float)((float)((float)(v227 * c->k7680)

@@ -142,6 +142,29 @@ void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
 #define EB_SLOTS EB_NUM_VOICES
 #endif
 
+
+/* ---- EB_ZC_PROBE2: which candidate coefficients are nonzero WHILE RENDERING
+ * The lesson from k6864: zero_proof.c sweeps PRESETS and never plays a note,
+ * so a note/gate-written cell reads zero there for the wrong reason. This
+ * reads the remaining candidates from inside the voice loop, with notes
+ * sounding, and is the confirmation every deletion now has to pass. */
+#ifndef EB_ZC_PROBE2
+#define EB_ZC_PROBE2 0
+#endif
+#if EB_ZC_PROBE2
+#include <stdio.h>
+#define ZCN 9
+static float zc2[ZCN];
+static const char *zc2n[ZCN] = {
+    "vca.c9552","vca.c9680","vca.c10224","vca.c10368",
+    "glide.k912","glide.k1040","nsvf.k84","vcf_res.k7616","dcoprep.k6320" };
+static void zc2_rep(void) __attribute__((destructor));
+static void zc2_rep(void){ int i; FILE*f=fopen("/tmp/zc2.log","a"); if(!f)return;
+    for(i=0;i<ZCN;++i) fprintf(f,"%-16s max|v| %.9g\n",zc2n[i],(double)zc2[i]);
+    fclose(f); }
+#define ZC2(i,v) do{ float _a=(v)<0?-(v):(v); if(_a>zc2[i]) zc2[i]=_a; }while(0)
+#endif
+
 #ifndef EB_FUSE_VCA
 #define EB_FUSE_VCA 0
 #endif
@@ -631,6 +654,13 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 #endif
         eb_modcv_latch(&st->mod[v], decimo);
         (void)nsv04;
+#if EB_ZC_PROBE2
+        ZC2(0,c->vca[v].c9552);  ZC2(1,c->vca[v].c9680);
+        ZC2(2,c->vca[v].c10224); ZC2(3,c->vca[v].c10368);
+        ZC2(4,c->glide[v].k912); ZC2(5,c->glide[v].k1040);
+        ZC2(6,c->nsv[v].k84);    ZC2(7,c->res[v].k7616);
+        ZC2(8,c->dprep[v].k6320);
+#endif
         /* THE LAST TWO ARGUMENTS ARE CELL 6848 and CELL 560, per the shim
          * (JF(a1, 6848), JF(a1, 560)) -- not o6704 and the gate sign. Fifth
          * inherited guess. */

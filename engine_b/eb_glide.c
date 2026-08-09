@@ -12,6 +12,9 @@
  * -ffp-contract=off.
  */
 #include "eb_glide.h"
+#ifndef EB_ZEROCOEF
+#define EB_ZEROCOEF 0
+#endif
 #include "juno_tables.h"
 #include <math.h>
 
@@ -112,7 +115,11 @@ LABEL_26:
     v68 = (float)((float)(v59 - v65) * c->k1152) + v65;
     v69 = c->k1088;
     s->s1104 = v68;
+#if EB_ZEROCOEF
+    v70 = v69;                                      /* k1040 (v67) == 0 */
+#else
     v70 = (float)((float)(v68 * v67) - (float)(v67 * v69)) + v69;
+#endif
     if (v70 <= 0.0f)
         v71 = 0.0f;
     else

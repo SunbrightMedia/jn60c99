@@ -1,6 +1,9 @@
 /* eb_dcoprep.c — see eb_dcoprep.h. A transcription of
  * src/voice_render.c:1702-1717 with the port's variable numbers kept. */
 #include "eb_dcoprep.h"
+#ifndef EB_ZEROCOEF
+#define EB_ZEROCOEF 0
+#endif
 #include <math.h>
 
 /* EB_PW_RANGE -- write-only instrumentation, and the one question that
@@ -76,7 +79,11 @@ float eb_dcoprep_tick(const eb_dcoprep_coef *c, float pitch, float pwmcv,
     float v396 = pitch * c->k5536;
     float v397 = c->k5520;
     float v398 = fmaxf(c->k5568, v396);
+#if EB_ZEROCOEF
+    float v399 = c->k6288;                          /* k6320 == 0 */
+#else
     float v399 = (float)(v395 * c->k6320) + c->k6288;
+#endif
     float v400;
 
     *out4816 = v397 + in3808;

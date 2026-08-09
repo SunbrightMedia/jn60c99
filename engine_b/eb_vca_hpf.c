@@ -12,6 +12,9 @@
  * apart, and docs/trackb/CELLMAP.md flags it. They are kept where they are.
  */
 #include "eb_vca_hpf.h"
+#ifndef EB_ZEROCOEF
+#define EB_ZEROCOEF 0
+#endif
 #include <math.h>
 
 void eb_vca_reset(eb_vca_state *st)
@@ -59,7 +62,11 @@ void eb_vca_control(eb_vca_state *st, const eb_vca_coef *c,
 
     env = (env1 * c->c10192) + (c->c10176 * gnext);                 /* :1582 */
     env = env + (c->c10208 * env2);                                 /* :1587 */
+#if EB_ZEROCOEF
+    /* c10224 is zero, so this whole line is env = env. c9552 goes with it. */
+#else
     env = ((c->c10224 * c->c9552) - (c->c10224 * env)) + env;       /* :1586-8 */
+#endif
     lvl = env * c->c10304;                                          /* :1590 */
     if (lvl <= 0.0f) lvl = 0.0f;                                    /* :1592 */
     lvl = lvl * c->c10320;                                          /* :1598 */
@@ -79,7 +86,11 @@ float eb_vca_audio(eb_vca_state *st, const eb_vca_coef *c,
     hp_in   = vcf - lp_prev;                                        /* :1580 */
     lp      = lp_prev + ((vcf - lp_prev) * c->c10240);              /* :1583 */
     st->lp  = lp;
+#if EB_ZEROCOEF
+    boost   = hp_in * c->c10352;                    /* c10368 == 0 :1585 */
+#else
     boost   = (hp_in * c->c10352) + (lp * c->c10368);               /* :1585 */
+#endif
 
     y  = ((c->c10256 * boost) + (vcf * (1.0f - c->c10256)))
        * ((rescomp * c->c10336) + 1.0f);
