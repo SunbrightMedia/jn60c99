@@ -323,3 +323,16 @@ error it introduces is phase-at-wake, which is the charter's already-relaxed
 "which beat" question (the -46 dB null collapse). Worth ~1,400 of the head
 plus most of the 1,904 floor. With it and the asm kernel (~600/voice of the
 measured stall pool), the two-chip core lands ~5,4xx vs 5,442.
+
+## SESSION HANDOFF (2026-08-10, session limit)
+EB_ATREST_O1 (closed-form at-rest advance) PASSED the sonic gate at 0.40 dB
+-- the unchanged fork's own figure -- with the closed form FORCED onto every
+sample (EB_ATREST_O1_MIN=1 in the gate build; shipping threshold 8). Firmware
+juno_s3_O1.bin: full stack (O1 + ATREST_BLOCK + ZEROCOEF + EXP_MEMO +
+RES_LUT + DEADCOEF). Flash it, run the 7-phase sweep (~4 min), read 0x00 and
+0xfc. If the floor (1,904) collapses, the head diagnosis is confirmed and
+~1,400-1,800 comes off every mask -> 6 voices ~9,300, two-chip board ~6,300,
+kernel (~600/voice, ASM_KERNEL_WORKORDER.md) is the last span. If the floor
+is flat, record it as dead end six and the kernel carries the rest.
+State: 10,970 banked bit-exact at 6 voices; sound bit-exact to the plugin;
+all negatives documented in docs/engineb/data/.
