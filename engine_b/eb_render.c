@@ -125,6 +125,23 @@ void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
  * Gated fork-vs-fork BIT-IDENTICAL, the same gate that proved the trunk
  * advance dead under the wavetable. A sonic gate would be the wrong
  * instrument for a change that claims to be exact. */
+/* EB_SLOTS -- render only the first N voice slots; the rest are held AT REST.
+ * A DIAGNOSTIC for the six-voice question, not a shipping configuration.
+ *
+ * WHAT IT ANSWERS AND WHAT IT DOES NOT. UNISON stacks every voice on one
+ * note, so which slots are dropped is arbitrary and this reproduces a
+ * six-voice unison exactly. It does NOT answer the POLY question: the port's
+ * assigner scans 7 downward, so capping the TOP would silence the first notes
+ * played rather than shrink the pool. A real six-slot POLY engine needs the
+ * harness rebuild (regenerate blob and masks), not this flag.
+ *
+ * The low slots are kept deliberately: voice 0 drives the shared-LFO
+ * prologue, and holding it at rest would zero the LFO for every voice --
+ * which would look like a six-voice artefact and be nothing of the kind. */
+#ifndef EB_SLOTS
+#define EB_SLOTS EB_NUM_VOICES
+#endif
+
 #ifndef EB_ATREST_BLOCK
 #define EB_ATREST_BLOCK 0
 #endif
@@ -244,7 +261,7 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         eb_cvgate_out go;
 
         vout[v] = 0.0f;
-        if (vc->atrest) {
+        if (vc->atrest || v >= EB_SLOTS) {
 #if EB_ATREST_BLOCK || (defined(EB_ABLATE) && EB_ABLATE == 13)
             /* The advance is hoisted to eb_engine_advance_atrest(), which the
              * caller runs ONCE PER BLOCK. See that function for why the two
