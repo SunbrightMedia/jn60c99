@@ -156,4 +156,39 @@ float eb_vca_tick(eb_vca_state *st, const eb_vca_coef *c,
                   float vcf, float env1, float env2, float rescomp,
                   float gate);
 
+/* ---------------------------------------------------- EB_FUSE_VCA (kernel)
+ * THE SPLIT AT THE ONLY REAL SEAM IN THIS MODULE.
+ *
+ * The ladder ahead of the VCA is FOUR SERIALLY DEPENDENT sub-steps -- one
+ * chain, ~20 dependent operations each, and on an in-order LX7 with ~4-cycle
+ * FP latency that chain STALLS: 516 instructions measured against 1,083
+ * cycles, c/i 2.1. The compiler cannot fill those bubbles because within a
+ * voice there is nothing legal to move into them.
+ *
+ * But this module divides cleanly in two. `sm`, `vel`, `g1`, `g2`, the gate
+ * ramp and `lvl` DO NOT READ `vcf` -- they are functions of the envelopes,
+ * the gate flag, the coefficients and their own state. They are already
+ * available BEFORE the ladder runs. Everything from the HPF onward does read
+ * `vcf` and cannot move.
+ *
+ * So the control half is hoisted above the ladder and the audio half stays
+ * below it, and the scheduler is handed ~100 instructions of independent work
+ * to lay into the ladder's stalls.
+ *
+ * WHY THIS IS BIT-EXACT AND NOT AN APPROXIMATION. Moving an independent chain
+ * earlier changes no operation's inputs, no parenthesisation and no rounding;
+ * floating-point results depend on the order WITHIN a dependency chain, not
+ * on how two independent chains are interleaved. eb_vca_tick below is kept as
+ * a wrapper that calls both halves in the original order, so the trunk build
+ * is untouched, and the composite null gate holds the claim to EXACTLY 0.
+ */
+typedef struct {
+    float g1, g2, lvl;      /* the three values the audio half consumes */
+} eb_vca_ctl;
+
+void  eb_vca_control(eb_vca_state *st, const eb_vca_coef *c,
+                     float env1, float env2, float gate, eb_vca_ctl *o);
+float eb_vca_audio(eb_vca_state *st, const eb_vca_coef *c,
+                   float vcf, float rescomp, const eb_vca_ctl *o);
+
 #endif /* ENGINEB_EB_VCA_HPF_H */

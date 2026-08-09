@@ -142,6 +142,10 @@ void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
 #define EB_SLOTS EB_NUM_VOICES
 #endif
 
+#ifndef EB_FUSE_VCA
+#define EB_FUSE_VCA 0
+#endif
+
 #ifndef EB_ATREST_BLOCK
 #define EB_ATREST_BLOCK 0
 #endif
@@ -266,6 +270,9 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 
         eb_cvgate_in gi;
         eb_cvgate_out go;
+#if EB_FUSE_VCA
+        eb_vca_ctl vca_ctl;
+#endif
 
         vout[v] = 0.0f;
         if (vc->atrest || v >= EB_SLOTS) {
@@ -593,6 +600,26 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         ilv_decimo[v]=decimo; ilv_live[v]=1;
         (void)nsv04;
 #else
+#if EB_FUSE_VCA
+        /* THE CONTROL HALF OF THE VCA, HOISTED ABOVE THE LADDER.
+         *
+         * The ladder is four serially dependent sub-steps and on this in-order
+         * FPU it stalls: 516 instructions measured against 1,083 cycles, c/i
+         * 2.1. The compiler cannot fill those bubbles because inside one voice
+         * there is nothing legal to move into them -- every neighbouring
+         * module either feeds the ladder or is fed by it.
+         *
+         * The VCA's control strands are the exception: sm, vel, g1, g2, the
+         * gate ramp and lvl never read the ladder's output. Computed here they
+         * become ~100 instructions of INDEPENDENT work sitting next to the
+         * chain, which is exactly what an in-order machine needs.
+         *
+         * BIT-EXACT, not approximate: no operation's inputs, grouping or
+         * rounding changes -- only the interleaving of two chains that do not
+         * touch. The composite null gate holds it to EXACTLY 0. */
+        eb_vca_control(&st->vca[v], &c->vca[v], e1, e2, st->glide[v].s560,
+                       &vca_ctl);
+#endif
 #if EB_ABLATE == EB_ABL_VCF
         vcfo = nmixo;
 #else
@@ -609,6 +636,8 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * inherited guess. */
 #if EB_ABLATE == EB_ABL_VCA
         vout[v] = vcfo * e1; (void)e2; (void)o6848;
+#elif EB_FUSE_VCA
+        vout[v] = eb_vca_audio(&st->vca[v], &c->vca[v], vcfo, o6848, &vca_ctl);
 #else
         vout[v] = eb_vca_tick(&st->vca[v], &c->vca[v], vcfo, e1, e2,
                               o6848, st->glide[v].s560);

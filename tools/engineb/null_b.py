@@ -216,6 +216,14 @@ if os.environ.get("JUNO_EB_VCF_RES_CR"):
 # JUNO_EB_VCF_GRANGE=1: write-only instrumentation that reports the RANGE of
 # the VCF's G over the whole scenario set, so the half-OS cutoff guard's fire
 # rate is measured rather than assumed. It changes no arithmetic.
+# JUNO_EB_FUSE_VCA=1: hoist the VCA's control strands above the ladder so the
+# in-order FPU has independent work for the ladder's stalls. The claim is
+# BIT-EXACT (independent chains interleaved; no operation's inputs, grouping
+# or rounding change), so it is gated HERE at -100 dB rather than by the sonic
+# gate -- an exact change judged by a tolerance gate would prove nothing.
+if os.environ.get("JUNO_EB_FUSE_VCA"):
+    CFLAGS = CFLAGS + ["-DEB_FUSE_VCA=1"]
+
 if os.environ.get("JUNO_EB_VCF_GRANGE"):
     CFLAGS = CFLAGS + ["-DEB_VCF_GRANGE=1"]
 
