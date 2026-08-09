@@ -108,6 +108,27 @@ void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
  * identical, so anything under ~300 cycles is not a finding.
  *
  * Values are one-hot so a build can never ablate two modules at once. */
+/* EB_ATREST_BLOCK -- run the at-rest voices' free-run advance ONCE PER BLOCK
+ * instead of once per sample. EXACT BY CONSTRUCTION, not by approximation:
+ * eb_dco_wt_advance already takes a sample count and its body loop is the
+ * same statements in the same order either way. What disappears is the
+ * per-sample PROLOGUE -- the function call, the primed test, the inc4-change
+ * test and eb_dco_wt_set_pitch, which recomputes the sub's mip level from a
+ * float exponent every sample for a voice that is producing silence.
+ *
+ * THE PRECONDITION, stated because it is what makes the two spellings equal:
+ * an at-rest voice's increment cannot move inside the block. It comes from
+ * st->dco_live[v].inc, which only that voice's own tick writes, and an
+ * at-rest voice does not tick. The caller must also hold `atrest` constant
+ * across the block, which the firmware does -- WAKE is per chunk.
+ *
+ * Gated fork-vs-fork BIT-IDENTICAL, the same gate that proved the trunk
+ * advance dead under the wavetable. A sonic gate would be the wrong
+ * instrument for a change that claims to be exact. */
+#ifndef EB_ATREST_BLOCK
+#define EB_ATREST_BLOCK 0
+#endif
+
 #ifndef EB_ABLATE
 #define EB_ABLATE 0
 #endif
@@ -131,6 +152,27 @@ void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
 #define EB_ABL_NSVF     10
 #define EB_ABL_DCOPREP  11
 #define EB_ABL_MODCV    12
+#define EB_ABL_ATREST   13
+
+void eb_engine_advance_atrest(eb_engine *e, eb_render_state *st,
+                              const eb_render_coefs *c, int v0, int v1, int n)
+{
+#if EB_ATREST_BLOCK && EB_DCO_WT
+    int v;
+    (void)c;
+    if (n <= 0) return;
+    for (v = v0; v < v1; ++v) {
+        if (!e->v[v].atrest) continue;
+        {   eb_dco_wt_coef *w = &st->wt_live[v];
+            eb_dco_wt_set_pitch(w, st->dco_live[v].inc * 0.25f, w->pw);
+            w->subthr = st->dco_live[v].subthr;
+            eb_dco_wt_advance(&st->wt[v], w, n);
+        }
+    }
+#else
+    (void)e; (void)st; (void)c; (void)v0; (void)v1; (void)n;
+#endif
+}
 
 int eb_engine_render_range(eb_engine *e, eb_render_state *st,
                            const eb_render_coefs *c, const eb_render_needs *n,
@@ -203,6 +245,13 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 
         vout[v] = 0.0f;
         if (vc->atrest) {
+#if EB_ATREST_BLOCK || (defined(EB_ABLATE) && EB_ABLATE == 13)
+            /* The advance is hoisted to eb_engine_advance_atrest(), which the
+             * caller runs ONCE PER BLOCK. See that function for why the two
+             * spellings are the same arithmetic. Under EB_ABLATE=13 the caller
+             * runs nothing at all, which bounds the lever. */
+            continue;
+#endif
             /* State advance only. The DCO's phase and its sub counter must keep
              * running; eb_dco_advance does exactly that and no audio work.
              * MEASURED at about 8 % of a sounding voice, and it is EXACT --

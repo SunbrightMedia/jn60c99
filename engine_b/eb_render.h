@@ -286,6 +286,14 @@ typedef struct {
 void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
                              const eb_render_coefs *c, eb_shared_tick *sh);
 
+/* eb_engine_advance_atrest -- the at-rest voices' free-run advance for a WHOLE
+ * BLOCK of n samples. Under EB_ATREST_BLOCK the per-sample loop no longer does
+ * it and the caller MUST call this once per block, with `atrest` unchanged
+ * across that block. A no-op unless EB_ATREST_BLOCK is set, so a caller may
+ * always call it. See eb_render.c for why the two spellings are exact. */
+void eb_engine_advance_atrest(eb_engine *e, eb_render_state *st,
+                              const eb_render_coefs *c, int v0, int v1, int n);
+
 int eb_engine_render_range(eb_engine *e, eb_render_state *st,
                            const eb_render_coefs *c, const eb_render_needs *n,
                            int v0, int v1, eb_shared_tick *sh, float *vout);
