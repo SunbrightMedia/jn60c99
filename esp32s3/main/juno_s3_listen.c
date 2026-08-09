@@ -304,6 +304,9 @@ static int rings_alloc(void)
  * at the highest priority on core 1 and the loop feeds the watchdog itself. */
 #if S3_CORES >= 2
 #ifndef S3L_SPLIT
+#ifndef EB_PROLOGUE_PIPE
+#define EB_PROLOGUE_PIPE 0
+#endif
 #define S3L_SPLIT (EB_NUM_VOICES / 2)
 #endif
 
@@ -371,6 +374,42 @@ static void render_block(int n)
     w_ready = 0;
     w_done = 0;
     w_go   = 1;
+#if EB_PROLOGUE_PIPE
+    /* THE PROLOGUE IS A SERIAL HEAD, AND IT DOES NOT HAVE TO BE.
+     *
+     * MEASURED from the sweep's own slope (which predicts the 3-voice point
+     * to the cycle in two independent builds): a sounding voice costs ~3,280
+     * cycles and the prologue ~1,300. Core 1 waits for that prologue EVERY
+     * SAMPLE before it may start, so the loop is prologue + max(core0, core1)
+     * -- the prologue is charged to the critical path in full while a whole
+     * core sits idle through it.
+     *
+     * Compute sample i+1's prologue AFTER core 0's own voices for sample i,
+     * and publish sample i's at the TOP of the iteration. Core 1 is then
+     * never blocked and the loop becomes
+     *     max(core0_voices + prologue, core1_voices)
+     * which lets an asymmetric split hide the prologue behind the other
+     * core's voices entirely.
+     *
+     * BIT-EXACT BY CONSTRUCTION: the ORDER OF STATE UPDATES IS UNCHANGED --
+     * prologue[i], voices[i], prologue[i+1], voices[i+1] is exactly the
+     * sequence the serial version runs. Only the release point of core 1
+     * moves, and core 1 touches none of the state the prologue advances
+     * (notecv, glide[0], lfo[0]); voice 0's render consumes the published
+     * eb_shared_tick rather than recomputing any of it. */
+    w_shb[0].ready = 0;
+    eb_engine_render_shared(&EBE, RS, &RC, &w_shb[0]);
+    for (i = 0; i < n; ++i) {
+        for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
+        w_ready = i + 1;                    /* prologue[i] is already done */
+        eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
+                               0, S3L_SPLIT, &w_shb[i], w_vbb[i]);
+        if (i + 1 < n) {
+            w_shb[i + 1].ready = 0;
+            eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i + 1]);
+        }
+    }
+#else
     for (i = 0; i < n; ++i) {
         for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
         w_shb[i].ready = 0;
@@ -379,6 +418,7 @@ static void render_block(int n)
         eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
                                0, S3L_SPLIT, &w_shb[i], w_vbb[i]);
     }
+#endif
     while (!w_done) { }                           /* ONE barrier per block */
 }
 #else
@@ -466,8 +506,16 @@ void app_main(void)
      * the FX move to a second board and the voice state fits internal SRAM.
      * The masks fill from voice 7 downward, which is the allocator's own
      * order (S3L_MASK in the generated header, measured not assumed). */
-    static const unsigned SWEEP[6] = { 0x00u, 0x80u, 0xc0u, 0xe0u,
-                                       0xf0u, 0xfcu };
+    /* 0xd0 IS THE PROLOGUE-PIPELINING PROBE, and it is here because the
+     * lever is INVISIBLE at every other point in this sweep. The gain only
+     * appears when the prologue-bearing core carries FEWER voices than the
+     * other: 0xd0 wakes voice 4 (core 0) and voices 6,7 (core 1), a 1-vs-2
+     * split. Serial, the loop is prologue + 2*voice ~= 7,860; pipelined it is
+     * max(prologue + voice, 2*voice) ~= 6,560. Any symmetric mask hides the
+     * difference completely, which is why adding this point comes BEFORE
+     * trusting a pipelining measurement. */
+    static const unsigned SWEEP[7] = { 0x00u, 0x80u, 0xc0u, 0xe0u,
+                                       0xf0u, 0xfcu, 0xd0u };
     (void)SWEEP;
     int phase = 0;
     unsigned long eng_us = 0, ph_chunks = 0;
@@ -782,7 +830,7 @@ void app_main(void)
                        WAKE, e, e * 240.0, w, w * 240.0,
                        (w - e) * 240.0);
                 if (chunks / (SR / CHUNK) % 8 == 0) {
-                    phase = (phase + 1) % 6;
+                    phase = (phase + 1) % 7;
                     eng_us = busy_us = ph_chunks = 0;
                 }
             }

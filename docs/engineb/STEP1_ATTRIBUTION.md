@@ -245,3 +245,53 @@ pays if the values do not have to cross a call boundary; anything that
 lengthens live ranges across the ladder LOSES.
 
 Decomposition binary: juno_s3_STEP13.bin = ATREST + zerocoef, fusion OFF.
+
+## STEP13 ON SILICON + THE SLOPE CORRECTION (2026-08-10)
+
+  wake      baseline   STEP123    STEP13
+  0x00         1,867     1,961     1,856
+  0x80         4,388        --     4,760
+  0xc0         7,634        --     8,058
+  0xe0        10,888    11,286    11,372
+  0xfc        11,353    11,133   *10,965*   <- best of the campaign, -388
+
+The fusion's cost in isolation: STEP123 - STEP13 = **+168 cycles**.
+
+**THE DECOMPOSITION WAS WRONG, AND THE SLOPE FIXES IT.** Consecutive wake
+masks add exactly ONE sounding voice on core 1, so the DIFFERENCE is the
+voice cost with no assumption about what the floor contains:
+
+                 voice      prologue    2-voice core      1-voice core
+  baseline       3,250       1,138      7,638 = 1.40x     4,388 = 0.81x
+  STEP13         3,306       1,454      8,066 = 1.48x     4,760 = 0.87x
+
+Both models predict their own 0xe0 point TO THE CYCLE. The earlier figures
+(voice 3,394, shared 704) came from dividing the 0xfc-minus-floor difference,
+which mixes the at-rest change into the voice cost and understates the
+prologue by ~2x.
+
+CONSEQUENCE: the kernel's target is not 673 cycles/voice but ~1,210 (a 37 %
+cut) against a hand-scheduling ceiling of roughly 18 %. **The asm kernel
+alone cannot reach 6 voices on two chips.**
+
+## THE LEVER THE PLAN NEVER CONSIDERED: the prologue is a SERIAL HEAD
+Core 1 waits for the prologue every sample, so the loop is
+`prologue + max(core0, core1)` -- 1,300 cycles charged in full while a whole
+core idles. The prologue depends on note events and its own state, never on
+the current sample's voice output, so computing sample i+1's prologue AFTER
+core 0's voices for sample i makes the loop
+`max(core0_voices + prologue, core1_voices)`.
+
+BIT-EXACT BY CONSTRUCTION: prologue[i], voices[i], prologue[i+1] is exactly
+the order the serial version already runs. Only core 1's release point moves,
+and core 1 touches none of the state the prologue advances.
+
+  2 chips, 6 voices, 3 per chip:
+    serial, 2/1 split          7,860 = 1.44x
+    pipelined, 1/2 split       6,560 = 1.21x
+    pipelined + kernel ceiling ~5,400 vs 5,442  -- fits, ~1 % margin
+
+**THE PROBE MASK 0xd0 IS PART OF THE MEASUREMENT.** The gain is INVISIBLE at
+every existing sweep point: it only appears when the prologue-bearing core
+carries fewer voices. 0xd0 wakes voice 4 (core 0) and voices 6,7 (core 1).
+Any symmetric mask hides the difference entirely.
