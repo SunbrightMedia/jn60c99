@@ -226,3 +226,22 @@ because an in-order FPU stalls on that chain. The fix for a stall is
 independent work, which is voice interleaving, which is CLOSED by the
 16-register wall. **No cheap lever remains inside the ladder, and saying so is
 more useful than proposing a fifth one.**
+
+## STEP123 ON SILICON (2026-08-10) -- THE FUSION REGRESSED, MEASURED
+
+  wake        RESLUT baseline   STEP123    delta
+  0x00 floor        1,867        1,961      +94
+  0xe0 (3v)        10,888       11,286     +398   -> sounding voice 3,394 -> ~3,527
+  0xfc (6v)        11,353       11,133     -220
+
+ATREST delivered (~450 recovered where at-rest voices sit on the critical
+core). THE VCA FUSION COST ~130 CYCLES PER SOUNDING VOICE: the three control
+values must live across the whole ladder call, so they spill to the stack and
+reload -- the 16-REGISTER WALL, THIRD APPEARANCE (voice interleave, the pitch
+hoist's inlining, now this). The EXACTLY-0 gate was the right correctness
+instrument and structurally could not price it: spills are bit-exact.
+LESSON, stated once: on this chip, "give the scheduler independent work" only
+pays if the values do not have to cross a call boundary; anything that
+lengthens live ranges across the ladder LOSES.
+
+Decomposition binary: juno_s3_STEP13.bin = ATREST + zerocoef, fusion OFF.
