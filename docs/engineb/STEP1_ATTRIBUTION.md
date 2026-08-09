@@ -163,3 +163,38 @@ sounding**. It is not overhead: ablations move it, so it is the eight AT-REST
 voices ticking their full chains. On the 6-voice case core 0 carries two of
 them, ~740 cycles that produce silence. The at-rest shortcut has been listed
 as unexercised since Phase 1; it is now a named target with a number on it.
+
+## THE THREE-WAY AUDIO CHECK (2026-08-09), against the PLUGIN BINARY
+
+Rendered at MIDI note 48 (C3), velocity 100, 2 s held, 44,100 Hz. "VST" is the
+plugin's own machine code executed under Unicorn -- not the port standing in
+for it.
+
+  patch                    VST vs PORT          VST vs S3 FORK (worst band)
+  ---------------------------------------------------------------------------
+   0 SY Poly Synth         0 of 88,200 differ   0.01 dB
+   2 KY Delicate Keys      0 differ             0.07 dB
+   5 LD Classic Lead       0 differ             0.07 dB
+  61 LD Perc Lead          0 differ             0.04 dB
+   1 SQ Dynamic ARPG       0 differ *           0.08 / 0.10 dB
+
+**A TRAP WORTH RECORDING, because it looked exactly like a port defect.** The
+first render of patch 1 read 88,198 of 88,200 samples differing. It is a
+HARNESS limit, not a defect: e2e_emu drives the engine directly and has NO
+TRANSPORT CLOCK, so the plugin's arpeggiator never steps and it holds ONE
+note while the port arpeggiates. MEASURED, rather than argued from the
+docstring: the plugin side's 50 ms envelope decays monotonically to 0.002 and
+never retriggers, while the port's keeps making fresh attacks to 0.297.
+recall_render_ab.py excludes patches 1/9/17/25/33/41/49 for this reason.
+
+* The patch-1 row is rendered THROUGH THE ARP GATE's driving -- the same
+33-event schedule replayed into the plugin at real note offsets -- which is
+what makes it a comparison at all. The schedule is the PORT's, and that is
+sound only because arp_sched_ab.py separately proves it 7/7 against the
+plugin's own arpeggiator. That is a proof CITED here, not re-run.
+
+ALSO TRUE AND NOT VISIBLE IN THE FILES: engine B has no arpeggiator
+(eb_patch.h: with no transport clock it writes none). The arpeggio in the
+fork's render comes from the host harness, so the S3 firmware could not play
+that performance today. It is a missing feature, not an inaccuracy, and it is
+not yet on the plan.
