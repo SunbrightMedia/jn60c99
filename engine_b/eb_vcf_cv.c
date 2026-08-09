@@ -29,6 +29,20 @@
  */
 #include "eb_vcf_cv.h"
 
+#ifndef EB_ZC_PROBE
+#define EB_ZC_PROBE 0
+#endif
+#if EB_ZC_PROBE
+#include <stdio.h>
+static float zc_hi[7];
+static const char *zc_nm[7] = {"k6864","k7008","k7024","k7136","k7216","k7312","k7376"};
+static void zc_rep(void) __attribute__((destructor));
+static void zc_rep(void){ int i; FILE*f=fopen("/tmp/zc_probe.log","a"); if(!f)return;
+  for(i=0;i<7;++i) fprintf(f,"%s max|v| %.9g\n",zc_nm[i],(double)zc_hi[i]); fclose(f); }
+#define ZC(i,v) do{ float _a=(v)<0?-(v):(v); if(_a>zc_hi[i]) zc_hi[i]=_a; }while(0)
+#endif
+
+
 /* ---------------------------------------------------- EB_ZEROCOEF (step 3)
  * DELETING COEFFICIENTS THAT ARE ZERO FOR EVERY PRESET, NOT MERELY EVERY
  * FACTORY PATCH. GOAL.md forbids the second and this is evidenced for the
@@ -117,11 +131,19 @@ float eb_vcf_cv_tick(eb_vcf_cv_state *st, const eb_vcf_cv_derived *c,
     *out6848 = c->f6848;
 
     /* ---- smoother [6896]  (src :1171-1175) ---- */
-#if EB_ZEROCOEF
-    s_env_new = ((-st->s_env) * c->k6928) + st->s_env;      /* k6864 == 0 */
-#else
+    /* k6864 IS NOT DELETABLE, and it is the reason this file carries a
+     * warning. zero_proof.c held it at 0.0 through 64 patches, 81,376
+     * parameter sweeps and 7,000 random presets -- and it reaches 0.787 the
+     * moment a NOTE IS PLAYED. That sweep varied PRESETS and never played a
+     * note, so every note/gate-dependent cell read zero for a reason that had
+     * nothing to do with the preset space. The -100 dB gate caught it at
+     * 2.4 dB on 9 scenarios.
+     *
+     * THE LESSON FOR THE REST OF THE CANDIDATE LIST: preset coverage and
+     * note/gate coverage are DIFFERENT AXES, and the earlier firmware-blob
+     * scan (one patch, 128 note/gate/voice sets) was strong exactly where
+     * zero_proof is blind. Neither alone licenses a deletion. */
     s_env_new = ((c->k6864 - st->s_env) * c->k6928) + st->s_env;
-#endif
     st->s_env = s_env_new;
 
     /* ---- the two-term mixer [6976]  (src :1176-1179) ---- */
@@ -160,6 +182,10 @@ float eb_vcf_cv_tick(eb_vcf_cv_state *st, const eb_vcf_cv_derived *c,
     st->s_b = s_b_new;
 
     /* ---- the final eight-term sum -> v227  (src :1204-1229) ---- */
+#if EB_ZC_PROBE
+    ZC(0,c->k6864); ZC(1,c->k7008); ZC(2,c->k7024); ZC(3,c->k7136);
+    ZC(4,c->k7216); ZC(5,c->k7312); ZC(6,c->k7376);
+#endif
     v225  = c->k7296;
     v226  = c->v226;
 #if EB_ZEROCOEF

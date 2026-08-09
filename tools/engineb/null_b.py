@@ -225,6 +225,9 @@ if os.environ.get("JUNO_EB_VCF_RES_CR"):
 # 64 patches, 81,376 parameter sweeps on two interfaces and 7,000 random
 # presets. The claim is that the deleted terms are EXACTLY zero, so this is
 # gated here at -100 dB and must read EXACTLY 0.
+if os.environ.get("JUNO_EB_ZC_PROBE"):
+    CFLAGS = CFLAGS + ["-DEB_ZC_PROBE=1"]
+
 if os.environ.get("JUNO_EB_ZEROCOEF"):
     CFLAGS = CFLAGS + ["-DEB_ZEROCOEF=1"]
 

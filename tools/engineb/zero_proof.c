@@ -25,6 +25,18 @@
  *            slot that is only nonzero when TWO parameters are both off their
  *            defaults; this can.
  *
+ * *** THE BLIND SPOT THIS PROGRAM HAS, FOUND BY THE -100 dB GATE ***
+ * IT NEVER PLAYS A NOTE. Every stage recalls a preset and reads the
+ * coefficients from a state with no note-on, so any cell the NOTE/GATE path
+ * writes reads zero for a reason that has nothing to do with the preset
+ * space. vcf_cv's k6864 survived all five stages here and reaches 0.787 the
+ * instant a note sounds; deleting it failed the null gate at 2.4 dB on 9
+ * scenarios. The earlier firmware-blob scan -- one patch, but 128
+ * (note,gate,voice) sets -- was strong exactly where this is blind.
+ * PRESET COVERAGE AND NOTE/GATE COVERAGE ARE DIFFERENT AXES. Neither alone
+ * licenses a deletion, and a survivor list from this program must be
+ * confirmed against a rendering probe before anything is removed.
+ *
  * A slot that survives all three is a CANDIDATE, not a proof. The remaining
  * step is to read the port's own writer for that cell and say why it can
  * never be nonzero. This program's job is to shrink the reading list from
