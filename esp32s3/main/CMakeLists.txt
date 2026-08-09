@@ -47,7 +47,15 @@ idf_component_register(
 # inlines, it does not re-associate float arithmetic.
 target_compile_options(${COMPONENT_LIB} PRIVATE
     -O2 -flto -ffp-contract=off -fno-strict-aliasing
-    -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_IDF ${S3_EXTRA_DEFS})
+    -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_VCF_RES_LUT=256 -DEB_IDF
+    ${S3_EXTRA_DEFS})
+# EB_VCF_RES_LUT=256 -- MEASURED on the user's S3: 1,009 cycles per
+# critical-path voice, 6 voices 14,441 -> 11,353. The shaper's tail is a pure
+# function of one scalar, so a table replaces it with a load pair and a lerp.
+# 256 rather than 2,048 because the sonic gate reads 0.40 dB at both -- the
+# no-table control's own number -- while 256 costs 1 KB a voice instead of
+# 8 KB. A 32-entry run degrades to 0.96 dB, which is the control proving the
+# gate responds to this table at all.
 set_source_files_properties(${EB_SRCS} PROPERTIES COMPILE_OPTIONS "-std=c99")
 
 if(NOT S3_LISTEN)
