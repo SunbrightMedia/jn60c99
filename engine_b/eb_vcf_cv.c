@@ -29,6 +29,34 @@
  */
 #include "eb_vcf_cv.h"
 
+/* ---------------------------------------------------- EB_ZEROCOEF (step 3)
+ * DELETING COEFFICIENTS THAT ARE ZERO FOR EVERY PRESET, NOT MERELY EVERY
+ * FACTORY PATCH. GOAL.md forbids the second and this is evidenced for the
+ * first: tools/engineb/zero_proof.c holds each of these at 0.0 through 64
+ * factory patches, 31,744 single-parameter sweeps over the BINDINGS table,
+ * 49,632 sweeps of every host RECORD parameter over its whole semantic range,
+ * and 7,000 randomised presets -- 188,668 slot-values moved in total, and not
+ * one of these ever left zero.
+ *
+ * AND THE METHOD HAS A NON-VACUITY CONTROL, which is what makes the above
+ * mean anything: the identical sweep run against the VCA's c9584 FOUND
+ * negatives (72 of 512 factory sets, reaching +/-1.0 across the preset
+ * space) and thereby killed the tone-filter skip. The sweep bites when there
+ * is something to bite.
+ *
+ * ON 0 * inf AND 0 * NaN, which this project keeps for c9536 deliberately:
+ * every operand deleted below is a bounded control-rate CV -- envelope
+ * outputs, smoother taps and recall constants -- not the ladder's feedback
+ * state, so neither an infinity nor a NaN can arrive at these multiplies.
+ * That is the argument c9536 could not make and these can.
+ *
+ * STILL A FLAG, DEFAULT OFF. The evidence is empirical and wide, not a proof
+ * read out of the port's own writer; the user decides adoption. */
+#ifndef EB_ZEROCOEF
+#define EB_ZEROCOEF 0
+#endif
+
+
 void eb_vcf_cv_reset(eb_vcf_cv_state *st)
 {
     st->s_env = 0.0f;
@@ -89,31 +117,61 @@ float eb_vcf_cv_tick(eb_vcf_cv_state *st, const eb_vcf_cv_derived *c,
     *out6848 = c->f6848;
 
     /* ---- smoother [6896]  (src :1171-1175) ---- */
+#if EB_ZEROCOEF
+    s_env_new = ((-st->s_env) * c->k6928) + st->s_env;      /* k6864 == 0 */
+#else
     s_env_new = ((c->k6864 - st->s_env) * c->k6928) + st->s_env;
+#endif
     st->s_env = s_env_new;
 
     /* ---- the two-term mixer [6976]  (src :1176-1179) ---- */
     mix6976 = (in880 * c->k6960) + (in752 * c->k6944);
 
     /* ---- the lerp pair [7040]/[7072]  (src :1180-1187) ---- */
+#if EB_ZEROCOEF
+    /* k7008 and k7024 are both structurally zero, so v210 collapses to
+     * in2752 and the lerp collapses to v210 (c7024x6640 is k7024 * x6640,
+     * zero with it). Five multiplies and three adds. */
+    v210     = in2752;
+    lerp7072 = v210;
+#else
     v210     = in2752 + ((c->k7008 * in3232) - (c->k7008 * in2752));
     lerp7072 = (c->c7024x6640 - (c->k7024 * v210)) + v210;
+#endif
 
     /* ---- smoother [7088] + its tap [7104]  (src :1188-1195) ---- */
     d_a     = in1792 - st->s_a;
     s_a_new = (d_a * c->k7120) + st->s_a;
+#if EB_ZEROCOEF
+    tap7104 = c->k7152 * s_a_new;                  /* k7136 == 0 */
+#else
     tap7104 = (d_a * c->k7136) + (c->k7152 * s_a_new);
+#endif
     st->s_a = s_a_new;
 
     /* ---- smoother [7168] + its tap [7184]  (src :1196-1203) ---- */
     d_b     = in1808 - st->s_b;
     s_b_new = (d_b * c->k7200) + st->s_b;
+#if EB_ZEROCOEF
+    tap7184 = c->k7232 * s_b_new;                  /* k7216 == 0 */
+#else
     tap7184 = (d_b * c->k7216) + (c->k7232 * s_b_new);
+#endif
     st->s_b = s_b_new;
 
     /* ---- the final eight-term sum -> v227  (src :1204-1229) ---- */
     v225  = c->k7296;
     v226  = c->v226;
+#if EB_ZEROCOEF
+    /* k7312 == 0 makes v226 zero and both (v226 - k7312*T) + T collapse to T.
+     * k7376 == 0 then kills the whole tap7184 leg, which is what makes this
+     * the largest of the deletions. */
+    (void)v226; (void)tap7184;
+    cv = ((c->termA
+           + (((c->k7440 + s_env_new) * c->k7504) * c->k7424))
+        + ((((tap7104 * v225) * c->k7344))
+            + (((mix6976 + c->k7488) * c->k7408) + (lerp7072 * c->k7392))));
+#else
     cv = ((c->termA
            + (((c->k7440 + s_env_new) * c->k7504) * c->k7424))
         + (((((((v226 - (c->k7312 * (tap7184 * v225))) + (tap7184 * v225))
@@ -121,5 +179,6 @@ float eb_vcf_cv_tick(eb_vcf_cv_state *st, const eb_vcf_cv_derived *c,
               + (((v226 - (c->k7312 * (tap7104 * v225))) + (tap7104 * v225))
                  * c->k7344))
             + ((((mix6976 + c->k7488) * c->k7408) + (lerp7072 * c->k7392))))));
+#endif
     return cv;
 }
