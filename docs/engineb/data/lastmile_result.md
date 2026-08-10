@@ -101,3 +101,11 @@ tools/engineb/gen_listen_coefs.py 0`), because the blob is a SNAPSHOT of
 engine B's state and a snapshot taken under different flags is a
 discontinuity. The struct-size assert in `juno_s3_listen.c` catches the
 grosser half of that mistake at compile time.
+
+## POSTSCRIPT — SILICON (2026-08-10, same night)
+The board closed Phase A: **0xd0 = 6,681 vs 5,442, 1.23x over** — the holds
+deliver ~60 cycles/voice, not the priced hundreds, because the voice loop is
+stall-bound and the removed arithmetic was hiding inside stalls. Full table
+and the PSRAM placement defect the first firmware caught are in
+STEP1_ATTRIBUTION.md. The CR flags stay in the tree, gated and documented,
+and ship OFF. The sound standard remains the AUDIBLE build's 3.17 dB.

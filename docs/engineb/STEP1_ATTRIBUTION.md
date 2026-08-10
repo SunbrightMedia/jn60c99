@@ -378,3 +378,35 @@ corrections and neither alone (40.43 / 41.89 / 22.47 / 5.51).
 
 Firmware `juno_s3_LASTMILE.bin` carries the shipped set. NO CYCLE NUMBER IS
 CLAIMED HERE. 0xd0 is the verdict and only the board prints it.
+
+## LASTMILE ON SILICON (2026-08-10) -- PHASE A CLOSED BY THE BOARD
+Two firmwares, one lesson each:
+
+LASTMILE (holds at the struct TAIL): 0xfc 12,182 -- every sounding voice
+~700 cycles WORSE. The listen firmware keeps only the prefix up to
+offsetof(eb_render_state, chorus) in internal RAM; the fourteen hold slots
+were after the FX states, in PSRAM, hit per voice per sample. PLACEMENT IS
+PART OF THE DESIGN. Fixed by moving the slots into the prefix (8,024 ->
+8,488 bytes).
+
+LASTMILE2 (slots in internal RAM):
+  0x00 1,130 · 0x80 3,710 · 0xc0 6,716 · 0xe0 9,744 · 0xf0 9,705
+  0xfc 10,051 · **0xd0 6,681 vs 5,442 = 1.23x OVER**
+Against the AUDIBLE build: 0x80 -33, 0xc0 -88, 0xfc +47, 0xd0 -42.
+
+**THE MEASUREMENT: the control-rate holds save ~60 cycles/voice on this
+chip, not the several hundred the host attribution priced.** The held path
+still loads the slots, runs the lerp and takes the branch -- and the voice
+loop is STALL-BOUND (c/i ~1.9): removing arithmetic from a pipeline that was
+waiting removes almost nothing. The stalls were the cost; the modules were
+partly free. This is the same fact as the interleave and fusion negatives,
+finally measured head-on.
+
+CONSEQUENCES:
+1. THE CR LEVERS SHIP OFF. ~60 cycles for 2.6 dB of sound is a bad trade at
+   any price. The shipping fork build stays the AUDIBLE set (3.17 dB, the
+   user approved its WAVs BY EAR on the four worst gate scenarios).
+2. THE GAP IS ~620/voice AND IT IS MADE OF STALLS -- Phase A just proved
+   that by elimination. The ladder+VCA stall pool is measured ~735/voice.
+   ASM_KERNEL_WORKORDER.md is the only lever that attacks the measured
+   cause, and it is sized to cover the span. It is the head pointer.

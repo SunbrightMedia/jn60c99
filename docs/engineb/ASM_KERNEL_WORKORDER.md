@@ -95,3 +95,27 @@ STEP13 voice ~3,380 -> ~2,720 or less. Two-voice core <= 5,442.
 SIX VOICES, FULL FX (on the 1-voice core), 44.1 kHz, TWO CHIPS, 1.0 dB gate
 untouched (the kernel is bit-exact; it spends NOTHING sonically).
 That is real time. That is the finish line, and this is the whole distance.
+
+## ADDENDUM (2026-08-10, silicon night) — READ THIS FIRST, IT RESIZES THE JOB
+**The gap is 0xd0 = 6,681 vs 5,442 = ~620 cycles on the 2-voice core, and
+Phase A just PROVED it is made of stalls.** The control-rate holds removed
+hundreds of instructions of module arithmetic and the board moved ~60
+cycles/voice (LASTMILE2 sweep, STEP1_ATTRIBUTION.md). Arithmetic removal is
+exhausted as a category: the pipeline was waiting, not working. The measured
+ladder+VCA stall pool is ~735/voice > the 620 gap. This kernel is now the
+ONLY lever matched to the measured cause, and the FIRST one sized to cover
+the remaining span.
+
+EXECUTION NOTES THE BOARD ADDED TONIGHT:
+- The SHIPPING flag set is the AUDIBLE build's (CMakeCache S3_EXTRA_DEFS of
+  LASTMILE2 MINUS every EB_CR_* and EB_ENV_CR flag). Do not carry the CR
+  levers into the kernel build: ~60 cycles for 2.6 dB is a closed trade.
+- Verify bit-exactness under QEMU (tools/engineb/qemu/) against the C
+  ladder BEFORE any firmware goes to the user. The user flashes VERDICTS,
+  not experiments.
+- The 16-register wall killed every COMPILER-side scheduling attempt
+  (interleave, fusion, always_inline). The kernel exists precisely because
+  hand allocation can hold two voices' four live values each where the
+  compiler spills; if a draft spills to the stack inside the sub-step loop,
+  it has already lost -- count stores before counting cycles.
+- Iron rule unchanged: no landing number to the user before 0xd0 prints.
