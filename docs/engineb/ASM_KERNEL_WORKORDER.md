@@ -119,3 +119,17 @@ EXECUTION NOTES THE BOARD ADDED TONIGHT:
   compiler spills; if a draft spills to the stack inside the sub-step loop,
   it has already lost -- count stores before counting cycles.
 - Iron rule unchanged: no landing number to the user before 0xd0 prints.
+
+## RECON RESULT (2026-08-10, Opus 5) — READ docs/engineb/data/asm_kernel_recon.md
+- **c/i is 1.35, not 1.9.** Pool ~790 cycles/voice against a ~620 gap: the
+  kernel is still correctly sized, required capture ~78 %.
+- **c/i = 0.95 was a DIFFERENT PROGRAM** (F4 harness: 4x ladder, no
+  wavetable DCO, never calls eb_render.c's voice loop). Do not quote it here.
+- **DO THE FREE MEASUREMENT FIRST:** esp32s3/flash/juno_s3_ILV.bin and
+  juno_s3_BEST_noILV.bin already exist, gated EXACTLY 0, and were NEVER
+  MEASURED. They decide the interleave hypothesis -- the kernel's own
+  premise -- for the cost of two flashes.
+- **QEMU TRAP:** tools/engineb/qemu/build.sh has none of the shipping fork
+  flags. Without -DEB_HALF_OS_VCF the reference is a DIFFERENT ladder body.
+- asm_diff.py exists and its teeth are proven (control passes; four
+  mutations caught; the fused-multiply-add rule is absolute).

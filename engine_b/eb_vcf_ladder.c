@@ -702,37 +702,37 @@ void eb_vcf_tick2(eb_vcf_state *sta, const eb_vcf_coef *ca, float ina, float Ga,
     /* ------------------------------------------------- the input node */
     da = sta->dith;
     drivea = (((ka * ca->c9168) + 1.0f) * (ina * ca->c9136)) + ((-da) * ca->c9120);
+    sta->dith = eb_wrap24(-da);
+    preva = sta->drive_prev; sta->drive_prev = drivea;
     db = stb->dith;
     driveb = (((kb * cb->c9168) + 1.0f) * (inb * cb->c9136)) + ((-db) * cb->c9120);
-    sta->dith = eb_wrap24(-da);
     stb->dith = eb_wrap24(-db);
-    preva = sta->drive_prev; sta->drive_prev = drivea;
     prevb = stb->drive_prev; stb->drive_prev = driveb;
 
     /* ------------------------------------ the half-rate cutoff transform */
     g4a = Ga / (1.0f - Ga);
-    g4b = Gb / (1.0f - Gb);
     if (g4a > 0.41421354f) {
         g4a = 0.41421354f;
 #if EB_VCF_CLAMP_COUNT
         ++eb_vcf_clamp_hits;
 #endif
     }
+    g2a = (g4a + g4a) / (1.0f - (g4a * g4a));
+    Gpa = g2a / (1.0f + g2a);
+    Apa = 1.0f - (Gpa + Gpa);
+    Rpa = 1.0f / ((((Gpa * Gpa) * (Gpa * Gpa)) * ka) + 1.0f);
+    Rkpa = Rpa * ka;
+    g4b = Gb / (1.0f - Gb);
     if (g4b > 0.41421354f) {
         g4b = 0.41421354f;
 #if EB_VCF_CLAMP_COUNT
         ++eb_vcf_clamp_hits;
 #endif
     }
-    g2a = (g4a + g4a) / (1.0f - (g4a * g4a));
     g2b = (g4b + g4b) / (1.0f - (g4b * g4b));
-    Gpa = g2a / (1.0f + g2a);
     Gpb = g2b / (1.0f + g2b);
-    Apa   = 1.0f - (Gpa + Gpa);
     Apb = 1.0f - (Gpb + Gpb);
-    Rpa = 1.0f / ((((Gpa * Gpa) * (Gpa * Gpa)) * ka) + 1.0f);
     Rpb = 1.0f / ((((Gpb * Gpb) * (Gpb * Gpb)) * kb) + 1.0f);
-    Rkpa = Rpa * ka;
     Rkpb = Rpb * kb;
 
     /* ------------------------------------------------------ sub-step 1
