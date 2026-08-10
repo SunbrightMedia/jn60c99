@@ -269,6 +269,40 @@ static void load_coefs(int n, int g)
  * were built against is a wrong delay time at best and a read past the end at
  * worst -- eb_master.h states that requirement, and guessing at it in the one
  * file that finally makes sound would have been a poor way to honour it. */
+/* S3L_RING_SRAM -- put the SHORTENED rings in INTERNAL SRAM.
+ *
+ * WHY, MEASURED. docs/engineb/data/o8_halfos_result.md section 10 prices the
+ * FX chain at 3,276 instructions and 7,745 cycles -- c/i 2.36 against the
+ * voice chain's 1.56 -- and names the cause itself: the rings are 6.2 MB in
+ * PSRAM. tools/engineb (JUNO_EB_RING_PROBE=1) then measured the DEEPEST READ
+ * behind each write pointer over all 36 scenarios: 31,007 samples on the
+ * largest ring, and since exactly ONE DELAY ARM runs per patch the worst
+ * ACTIVE set is 137 KB against the 163 KB of free internal SRAM this file
+ * prints at boot.
+ *
+ * WHY IT IS NOT JUST A SMALLER calloc, AND THIS IS THE WHOLE DIFFICULTY. The
+ * length is the MODULUS of the circular buffer: a read is (w - lag) mod len.
+ * Shortening the ring is only equivalent while lag < len AT EVERY SAMPLE. It
+ * is therefore NOT a free change -- it is a change with a PRECONDITION, and
+ * the precondition is a property of the DELAY TIME parameter, not of the 36
+ * scenarios that happened to be measured.
+ *
+ * SO THE SHORT RING CARRIES A RUNTIME GUARD rather than a hope. Every read
+ * lag is checked against the allocated length and the deepest one seen is
+ * reported at each sweep phase. If any lag reaches the length the firmware
+ * SAYS SO instead of quietly folding a 2-second delay into a 0.74-second one,
+ * which would be heard as a wrong delay time and diagnosed as a DSP defect.
+ *
+ * DEFAULT 0: the full PSRAM allocation, exactly as before. */
+#ifndef S3L_RING_SRAM
+#define S3L_RING_SRAM 0
+#endif
+#if S3L_RING_SRAM
+/* the deepest read lag observed per ring, published for the report */
+volatile uint32_t s3l_ring_lag[9];
+volatile uint32_t s3l_ring_over;          /* times a lag reached the length */
+#endif
+
 static int rings_alloc(void)
 {
     float **dst[9] = { &RG.t1, &RG.t23, &RG.t5_0, &RG.t5_1, &RG.t5_2,
@@ -279,11 +313,34 @@ static int rings_alloc(void)
     /* the port's own ring lengths, the same nine the standalone shim copies */
     int i;
     for (i = 0; i < 9; ++i) {
-        *dst[i] = heap_caps_calloc((size_t)S3L_RING_LEN[i], sizeof(float),
+        int32_t want = S3L_RING_LEN[i];
+#if S3L_RING_SRAM
+        /* cap at the measured working set rounded to a power of two -- the
+         * modulus must stay a power of two or the wrap arithmetic changes */
+        if (want > S3L_RING_SRAM) want = S3L_RING_SRAM;
+        *dst[i] = heap_caps_calloc((size_t)want, sizeof(float),
+                                   MALLOC_CAP_INTERNAL);
+        if (!*dst[i]) {
+            printf("RINGS: internal alloc failed at %d (%d samples) -- "
+                   "falling back to PSRAM at FULL length\n", i, (int)want);
+            want = S3L_RING_LEN[i];
+            *dst[i] = heap_caps_calloc((size_t)want, sizeof(float),
+                                       MALLOC_CAP_SPIRAM);
+        }
+#else
+        *dst[i] = heap_caps_calloc((size_t)want, sizeof(float),
                                    MALLOC_CAP_SPIRAM);
-        if (!*dst[i]) { printf("RINGS: PSRAM alloc failed at %d\n", i); return 0; }
-        *len[i] = S3L_RING_LEN[i];
+#endif
+        if (!*dst[i]) { printf("RINGS: alloc failed at %d\n", i); return 0; }
+        *len[i] = want;
     }
+#if S3L_RING_SRAM
+    printf("RINGS: capped at %d samples, INTERNAL SRAM. free internal now %u\n",
+           (int)S3L_RING_SRAM,
+           (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    printf("RINGS: THE CAP IS ONLY VALID WHILE EVERY READ LAG IS BELOW IT --\n"
+           "       a longer DELAY TIME than this bank uses would fold.\n");
+#endif
     return 1;
 }
 
