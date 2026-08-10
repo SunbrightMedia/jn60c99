@@ -19,6 +19,29 @@
  */
 #include "eb_render.h"
 #include "eb_fork_config.h"
+#include "eb_costprobe.h"
+#if EB_COSTPROBE
+#include <stdio.h>
+unsigned long ebcp_vsamp, ebcp_lut_hit, ebcp_lut_miss, ebcp_wtadd;
+static void ebcp_report(void) __attribute__((destructor));
+static void ebcp_report(void)
+{
+    FILE *f;
+    unsigned long tot;
+    if (!ebcp_vsamp) return;
+    /* a FILE, not stderr: null_b renders in worker subprocesses whose stderr
+     * is discarded, and a probe that silently reports nothing is the trap
+     * this project keeps a catalogue of. */
+    f = fopen("/tmp/eb_cost.log", "a");
+    if (!f) return;
+    tot = ebcp_lut_hit + ebcp_lut_miss;
+    fprintf(f, "voice_samples=%lu lut_hit=%lu lut_miss=%lu (%.4f%%) wt_add=%lu (%.4f/vs)\n",
+            ebcp_vsamp, ebcp_lut_hit, ebcp_lut_miss,
+            100.0 * ebcp_lut_miss / (double)(tot ? tot : 1),
+            ebcp_wtadd, ebcp_wtadd / (double)ebcp_vsamp);
+    fclose(f);
+}
+#endif
 #include "juno_tables.h"
 #include "eb_master.h"
 #ifdef EB_DUMP_DCO
@@ -375,6 +398,7 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
         }
 
 #if EB_CR_N > 1
+        EBCP(vsamp);          /* one SOUNDING voice-sample */
         /* THE CONTROL-RATE PHASE, advanced once per voice per sample. It is
          * the MASTER period; each group tests its own divisor against it, so
          * the pitch chain can hold for four samples while the cutoff CV holds

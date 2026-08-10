@@ -2,6 +2,7 @@
  * src/voice_render.c:1230-1297, with the port's variable numbers kept.
  */
 #include "eb_vcf_res.h"
+#include "eb_costprobe.h"
 #include "eb_fpdiv.h"
 #include "eb_minmax.h"
 #ifndef EB_ZEROCOEF
@@ -255,8 +256,10 @@ float eb_vcf_res_tick(eb_vcf_res_state *s, const eb_vcf_res_coef *c,
         int   i = (int)u;
         float f = u - (float)i;
         v241 = c->lut[i] + (c->lut[i + 1] - c->lut[i]) * f;
+        EBCP(lut_hit);
     } else {
         v241 = ebr_tail(c, v227);   /* outside the measured span: exact */
+        EBCP(lut_miss);
     }
 #else
     v241 = ebr_tail(c, v227);

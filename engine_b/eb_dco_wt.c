@@ -7,6 +7,7 @@
  * in this file exists to correct the samples where an edge falls.
  */
 #include "eb_dco_wt.h"
+#include "eb_costprobe.h"
 #include <math.h>
 #include <string.h>
 #ifndef EB_ATREST_O1
@@ -89,6 +90,7 @@ void eb_dco_wt_set_pitch(eb_dco_wt_coef *c, float inc4, float pw)
 static void eb_wt_add(eb_dco_wt_state *s, const float *tab, float frac,
                       float amp)
 {
+    EBCP(wtadd);
     /* INTERPOLATED BETWEEN TWO SUB-POSITIONS. Picking the nearest one
      * quantises the crossing time, and on a correction whose slope reaches
      * 1.2 per sample that quantisation IS the error -- 18 % at four positions,
