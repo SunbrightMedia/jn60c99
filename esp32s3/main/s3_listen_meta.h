@@ -6,7 +6,7 @@
 #define S3L_MCOEF_SZ 1704u
 #define S3L_RSTATE_SZ 736916u
 #define S3L_MSTATE_SZ 729816u
-#define S3L_VOICE_SZ 8024u
+#define S3L_VOICE_SZ 8488u
 /* the master state's members, HOST sizes, in blob order.
  * The firmware copies min(host, target) bytes of each --
  * every differing member ends in a pointer the engine

@@ -175,15 +175,6 @@ typedef struct {
      * project once, and one that no COLD scenario can see. Set by a note event,
      * consumed by the first sample after it. */
     unsigned char   aux_edge[EB_NUM_VOICES];
-    eb_chorus_state chorus;
-    eb_delay_state  delay;
-    eb_reverb_state reverb;
-    /* the reverb's pending-tap array and wipe arm: real storage, never NULL */
-    /* EB_REV_NTAP (34), not 33: eb_reverb_process reads EB_REV_NTAP entries.
-     * The [33] here was the same off-by-one found in eb_master_state, where it
-     * cost the reverb's B channel its last bits. Fixed in both. */
-    int32_t         rev_pending[EB_REV_NTAP];
-    int32_t         rev_wipe;
     /* CONTROL-RATE HOLD (fork levers A1/A2/A4, docs/engineb/LAST_MILE.md).
      * Per-voice, NOT per-engine, and that is the point: a voice is rendered
      * exactly once per sample by exactly one core, so a per-voice counter IS
@@ -210,6 +201,22 @@ typedef struct {
     float           cr_gedge[EB_NUM_VOICES];
     float           cr_pw[EB_NUM_VOICES];
     float           cr_pwmout[EB_NUM_VOICES];
+    /* MUST STAY ABOVE `chorus`: the listen firmware places only the prefix
+     * up to offsetof(eb_render_state, chorus) in INTERNAL RAM (see
+     * ebsh_dump_sizes). These fields are read and written per voice per
+     * sample; the first firmware had them after the FX states, i.e. in
+     * PSRAM, and the board measured every sounding voice ~700 cycles MORE
+     * expensive than without the levers at all. Placement is part of the
+     * design, not tidiness. */
+    eb_chorus_state chorus;
+    eb_delay_state  delay;
+    eb_reverb_state reverb;
+    /* the reverb's pending-tap array and wipe arm: real storage, never NULL */
+    /* EB_REV_NTAP (34), not 33: eb_reverb_process reads EB_REV_NTAP entries.
+     * The [33] here was the same off-by-one found in eb_master_state, where it
+     * cost the reverb's B channel its last bits. Fixed in both. */
+    int32_t         rev_pending[EB_REV_NTAP];
+    int32_t         rev_wipe;
 } eb_render_state;
 
 /* EB_RENDER_NEEDS — THE LIST IS EMPTY, and this time nothing is defaulted.
