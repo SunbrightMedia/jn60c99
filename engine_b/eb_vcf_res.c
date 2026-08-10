@@ -2,6 +2,7 @@
  * src/voice_render.c:1230-1297, with the port's variable numbers kept.
  */
 #include "eb_vcf_res.h"
+#include "eb_fpdiv.h"
 #include "eb_minmax.h"
 #ifndef EB_ZEROCOEF
 #define EB_ZEROCOEF 0
@@ -185,7 +186,7 @@ static float ebr_tail(const eb_vcf_res_coef *c, float v227)
                                  * (float)(v239 * v239))
                          + (float)((float)(v238 * v238) * c->k8048))
                  + 1.0);
-    v241 = v240 / (float)(v240 + 1.0);
+    v241 = EB_DIV(v240, (float)(v240 + 1.0));
     return v241;
 }
 

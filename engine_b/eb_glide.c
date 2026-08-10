@@ -12,6 +12,7 @@
  * -ffp-contract=off.
  */
 #include "eb_glide.h"
+#include "eb_fpdiv.h"
 #ifndef EB_ZEROCOEF
 #define EB_ZEROCOEF 0
 #endif
@@ -77,7 +78,7 @@ float eb_glide_tick(eb_glide_state *s, const eb_glide_coef *c,
     v43 = (float)(v36 * v35) - v35;
     v44 = c->k816;
     v45 = (float)(v43 + 1.0f) * c->k592;
-    v46 = (float)(s->s672 / (float)((float)(v37 * v38) + c->k800)) * v37;
+    v46 = (float)EB_DIV(s->s672, (float)((float)(v37 * v38) + c->k800)) * v37;
     v47 = s->s656;
     v48 = v47 - v46;
     v49 = s->s688;
