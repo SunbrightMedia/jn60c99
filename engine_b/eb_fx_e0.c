@@ -1,5 +1,6 @@
 /* eb_fx_e0.c -- GENERATED from src/master_render.c:2504-2626. */
 #include "eb_fx_e0.h"
+#include "eb_minmax.h"
 
 #include "juno_tables.h"
 #include <math.h>
@@ -88,7 +89,7 @@ void eb_fx_e0_tick(eb_fx_e0_state *s, const eb_fx_e0_coef *c,
       v667 = s->s84976;
       v668 = (float)(v664 + v664) * c->k85200;
       v669 = (float)(v665 * c->k85328) + c->k85312;
-      v670 = fminf(c->k85568 + s->s85120, c->k85184);
+      v670 = eb_fminf(c->k85568 + s->s85120, c->k85184);
       v671 = (float)(v665 * v665) * v665;
       v672 = (float)(v665 * v665) * c->k85344;
       s->s84960 = v668;
@@ -116,14 +117,14 @@ void eb_fx_e0_tick(eb_fx_e0_state *s, const eb_fx_e0_coef *c,
       v685 = c->k85792;
       v686 = s->s85600;
       if ( (float)(v684 * v685) >= -1.0 )
-        v687 = fminf(v684 * v685, 1.0);
+        v687 = eb_fminf_c(v684 * v685, 1.0);
       else
         v687 = -1.0;
       v688 = (float)((float)(v684 * c->k85776) + (float)(v686 * c->k85760)) * v685;
       s->s85616 = (float)((float)((float)(v687 * v687) * v687) * c->k85824)
                              + (float)(v687 * c->k85808);
       if ( v688 >= -1.0 )
-        v689 = fminf(v688, 1.0);
+        v689 = eb_fminf_c(v688, 1.0);
       else
         v689 = -1.0;
       v690 = s->s85600;
@@ -131,7 +132,7 @@ void eb_fx_e0_tick(eb_fx_e0_state *s, const eb_fx_e0_coef *c,
       s->s85648 = (float)((float)((float)(v689 * v689) * v689) * c->k85824)
                              + (float)(v689 * c->k85808);
       if ( v691 >= -1.0 )
-        v692 = fminf(v691, 1.0);
+        v692 = eb_fminf_c(v691, 1.0);
       else
         v692 = -1.0;
       v693 = s->s85616;
@@ -140,7 +141,7 @@ void eb_fx_e0_tick(eb_fx_e0_state *s, const eb_fx_e0_coef *c,
       s->s85680 = (float)((float)((float)(v692 * v692) * v692) * c->k85824)
                              + (float)(v692 * c->k85808);
       if ( v694 >= -1.0 )
-        v58 = fminf(v694, 1.0);
+        v58 = eb_fminf_c(v694, 1.0);
       v695 = s->s85696;
       v696 = (float)((float)(v693 + s->s85728) * c->k85840)
            + (float)(c->k85856 * s->s85648);

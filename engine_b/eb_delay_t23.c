@@ -1,5 +1,6 @@
 /* eb_delay_t23.c -- GENERATED SKELETON, see the .c header note */
 #include "eb_delay_t23.h"
+#include "eb_minmax.h"
 #include "eb_ring_probe.h"
 #include "eb_dsp.h"
 #include "juno_tables.h"
@@ -103,7 +104,7 @@ void eb_dly23_tick(eb_dly23_state *s, const eb_dly23_coef *c,
       s->s6395344 = c->k6395312;
       s->s6395360 = v253;
       v254 = eb_pitch_poly((double)(float)( c->k6395312 + c->k6395408 ));
-      v255 = fmaxf(fminf(v254, 512.0), -512.0);
+      v255 = eb_fmaxf_c(eb_fminf_c(v254, 512.0), -512.0);
       s->s6395376 = v255;
       v256 = s->s6395600;
       v257 = s->s6395360;
@@ -186,7 +187,7 @@ void eb_dly23_tick(eb_dly23_state *s, const eb_dly23_coef *c,
       v281 = c->k6396448;
       v282 = c->k6396576 + s->s6396000;
       s->s6429424 = v281 * (float)((float)(v274 * s->s6395840) + (float)(v278 * v280));
-      v283 = fminf(c->k6396592, v282) * v281;
+      v283 = eb_fminf(c->k6396592, v282) * v281;
       s->s6395984 = v283;
       if ( (float)(v283 - s->s6395968) >= 0.0 )
         v284 = c->k6396608;
@@ -204,7 +205,7 @@ void eb_dly23_tick(eb_dly23_state *s, const eb_dly23_coef *c,
       v289 = v288;
       v290 = (float)((float)(c->k6396128 - v287) * c->k6396400) + v287;
       if ( v289 >= -1.0 )
-        v291 = fminf(v289, 1.0);
+        v291 = eb_fminf_c(v289, 1.0);
       else
         v291 = -1.0;
       s->s6396000 = v291 * c->k6396448;

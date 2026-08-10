@@ -18,6 +18,7 @@
  * reproduced exactly. None of it is "fixed".
  */
 #include "eb_delay.h"
+#include "eb_minmax.h"
 #include <math.h>
 
 #define M (EB_DELAY_LEN - 1)
@@ -70,7 +71,7 @@ void eb_delay_process(const eb_delay_cfg *c, eb_delay_state *s,
     fstep = (fadesum - tprev >= 0.0f) ? c->fade_up : c->fade_dn;
     f = fade_z + fstep;
     if (f <= 0.0f) f = 0.0f;
-    f = (f >= -1.0f) ? fminf(f, 1.0f) : -1.0f;
+    f = (f >= -1.0f) ? eb_fminf_c(f, 1.0f) : -1.0f;
     s->fade = f * c->mute;
 
     /* ---- DELAY TIME smoother ------------------------------------------ */
@@ -84,8 +85,8 @@ void eb_delay_process(const eb_delay_cfg *c, eb_delay_state *s,
     s->t_last = tt;
     s->t_step = v369;
     d  = fabsf(v369) * c->slew;
-    sm = fmaxf(tprev - d, tt);
-    if (tt - tprev > 0.0f) sm = fminf(tprev + d, tt);
+    sm = eb_fmaxf(tprev - d, tt);
+    if (tt - tprev > 0.0f) sm = eb_fminf(tprev + d, tt);
     s->t_smooth = sm;
 
     /* ---- tap position: integer part NEGATED, fraction from the positive */

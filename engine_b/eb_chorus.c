@@ -21,6 +21,7 @@
  *     allpass match 74/4,000). It is also the cheap choice.
  */
 #include "eb_chorus.h"
+#include "eb_minmax.h"
 #include <math.h>
 #include <string.h>
 
@@ -152,7 +153,7 @@ void eb_chorus_tick_x(eb_chorus_state *restrict s,
     _line_in = v624 * v626;                       /* :2851 cell 95840 */
 
     /* startup ramp + delay-time smoother ---------------------------- :2852 */
-    v628 = fminf(k->ramp_max, v627) * v622;
+    v628 = eb_fminf(k->ramp_max, v627) * v622;
     s->c720 = v628;
     if ((v628 - s->c704) >= 0.0f) v629 = k->slew_up;
     else                          v629 = k->slew_dn;
@@ -162,7 +163,7 @@ void eb_chorus_tick_x(eb_chorus_state *restrict s,
     if (v630 > 0.0f) v56 = v630;
     v633 = v56;
     v634 = ((k->dtime - v632) * k->smco) + v632;
-    if (v633 >= -1.0f) v58 = fminf(v633, 1.0f);
+    if (v633 >= -1.0f) v58 = eb_fminf_c(v633, 1.0f);
     s->c736 = v58 * k->mute;
     if ((v634 - v632) != 0.0f) v631 = v634;
     s->c688 = v631;

@@ -1,5 +1,6 @@
 /* eb_dly_t4.c -- GENERATED from src/master_render.c:1871-2074. */
 #include "eb_dly_t4.h"
+#include "eb_minmax.h"
 #include "eb_ring_probe.h"
 #include "eb_dsp.h"
 #include "juno_tables.h"
@@ -109,7 +110,7 @@ void eb_dly_t4_tick(eb_dly_t4_state *s, const eb_dly_t4_coef *c,
       s->s6429504 = c->k6429472;
       s->s6429520 = v178;
       v179 = eb_pitch_poly((double)(float)( c->k6429472 + c->k6429568 ));
-      s->s6429536 = fmaxf(fminf(v179, 512.0), -512.0);
+      s->s6429536 = eb_fmaxf_c(eb_fminf_c(v179, 512.0), -512.0);
       v180 = s->s6429520;
       s->s6429776 = s->s6429760;
       { float _inc3 = (float)(s->s6429536 * c->k6429808);
@@ -218,7 +219,7 @@ void eb_dly_t4_tick(eb_dly_t4_state *s, const eb_dly_t4_coef *c,
       v217 = c->k6430784;
       v218 = c->k6430880 + s->s6430336;
       s->s6496544 = v217 * (float)((float)(v212 * s->s6430096) + (float)(v214 * v216));
-      v219 = fminf(c->k6430896, v218) * v217;
+      v219 = eb_fminf(c->k6430896, v218) * v217;
       s->s6430320 = v219;
       v220 = s->s6430352;
       if ( (float)(v219 - s->s6430304) >= 0.0 )
@@ -236,7 +237,7 @@ void eb_dly_t4_tick(eb_dly_t4_state *s, const eb_dly_t4_coef *c,
       v225 = v224;
       v226 = (float)((float)(c->k6430464 - v223) * c->k6430736) + v223;
       if ( v225 >= -1.0 )
-        v227 = fminf(v225, 1.0);
+        v227 = eb_fminf_c(v225, 1.0);
       else
         v227 = -1.0;
       s->s6430336 = v227 * c->k6430784;

@@ -9,6 +9,7 @@
  * plain-local capture would have skipped silently.
  */
 #include "eb_delay_t5.h"
+#include "eb_minmax.h"
 #include "eb_ring_probe.h"
 #include "eb_dsp.h"
 #include "juno_tables.h"
@@ -275,9 +276,9 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           s->s6497040 = v50;
           v53 = fabs(v50) * v52;
           v54 = v49 + v53;
-          v55 = fmaxf(v49 - v53, v47);
+          v55 = eb_fmaxf(v49 - v53, v47);
           if ( v51 > 0.0 )
-            v55 = fminf(v54, v47);
+            v55 = eb_fminf(v54, v47);
           s->s6497056 = v55;
           v56 = 0.0;
           if ( v48 <= 0.0 )
@@ -287,7 +288,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           v58 = -1.0;
           v59 = v57;
           if ( v59 >= -1.0 )
-            v60 = fminf(v59, 1.0);
+            v60 = eb_fminf_c(v59, 1.0);
           else
             v60 = -1.0;
           s->s6497104 = v60 * c->k6497408;
@@ -362,7 +363,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           s->s10692048 = c->k10692016;
           s->s10692064 = v99;
           v100 = eb_pitch_poly((double)(float)( c->k10692016 + c->k10692112 ));
-          s->s10692080 = fmaxf(fminf(v100, 512.0), -512.0);
+          s->s10692080 = eb_fmaxf_c(eb_fminf_c(v100, 512.0), -512.0);
           v101 = s->s10692064;
           s->s10692320 = s->s10692304;
           { float _inc2 = (float)(s->s10692080 * c->k10692352);
@@ -477,7 +478,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           v140 = c->k10693328;
           v141 = c->k10693424 + s->s10692880;
           s->s10759088 = v140 * (float)((float)(v135 * s->s10692640) + (float)(v137 * v139));
-          v142 = fminf(c->k10693440, v141) * v140;
+          v142 = eb_fminf(c->k10693440, v141) * v140;
           s->s10692864 = v142;
           v143 = s->s10692896;
           if ( (float)(v142 - s->s10692848) >= 0.0 )
@@ -493,7 +494,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           v148 = v147;
           v149 = (float)((float)(c->k10693008 - v146) * c->k10693280) + v146;
           if ( v148 >= -1.0 )
-            v150 = fminf(v148, 1.0);
+            v150 = eb_fminf_c(v148, 1.0);
           else
             v150 = -1.0;
           s->s10692880 = v150 * c->k10693328;

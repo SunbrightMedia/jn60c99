@@ -1,5 +1,6 @@
 /* eb_fx_e1.c -- GENERATED from src/master_render.c:2381-2497. */
 #include "eb_fx_e1.h"
+#include "eb_minmax.h"
 
 #include "juno_tables.h"
 #include <math.h>
@@ -95,7 +96,7 @@ void eb_fx_e1_tick(eb_fx_e1_state *s, const eb_fx_e1_coef *c,
     v725 = (float)((float)(v719 * c->k86384) + (float)(v715 * c->k86368))
          + (float)(c->k86400 * s->s86192);
     if ( v724 >= -1.0 )
-      v726 = fminf(v724, 1.0);
+      v726 = eb_fminf_c(v724, 1.0);
     else
       v726 = -1.0;
     v727 = s->s86224;
@@ -115,14 +116,14 @@ void eb_fx_e1_tick(eb_fx_e1_state *s, const eb_fx_e1_coef *c,
     v736 = c->k86864;
     v737 = s->s86672;
     if ( (float)(v734 * v736) >= -1.0 )
-      v738 = fminf(v734 * v736, 1.0);
+      v738 = eb_fminf_c(v734 * v736, 1.0);
     else
       v738 = -1.0;
     v739 = (float)((float)(v737 * c->k86832) + (float)(v734 * c->k86848)) * v736;
     s->s86688 = (float)((float)((float)(v738 * v738) * v738) * c->k86896)
                            + (float)(v738 * c->k86880);
     if ( v739 >= -1.0 )
-      v740 = fminf(v739, 1.0);
+      v740 = eb_fminf_c(v739, 1.0);
     else
       v740 = -1.0;
     v741 = s->s86672;
@@ -130,7 +131,7 @@ void eb_fx_e1_tick(eb_fx_e1_state *s, const eb_fx_e1_coef *c,
     s->s86720 = (float)((float)((float)(v740 * v740) * v740) * c->k86896)
                            + (float)(v740 * c->k86880);
     if ( v742 >= -1.0 )
-      v743 = fminf(v742, 1.0);
+      v743 = eb_fminf_c(v742, 1.0);
     else
       v743 = -1.0;
     v744 = s->s86688;
@@ -139,7 +140,7 @@ void eb_fx_e1_tick(eb_fx_e1_state *s, const eb_fx_e1_coef *c,
     s->s86752 = (float)((float)((float)(v743 * v743) * v743) * c->k86896)
                            + (float)(v743 * c->k86880);
     if ( v745 >= -1.0 )
-      v58 = fminf(v745, 1.0);
+      v58 = eb_fminf_c(v745, 1.0);
     v746 = s->s86768;
     v747 = (float)((float)(v744 + s->s86800) * c->k86912)
          + (float)(c->k86928 * s->s86720);

@@ -16,6 +16,7 @@
  * becomes the specification.
  */
 #include "eb_delay_t1.h"
+#include "eb_minmax.h"
 #include "eb_ring_probe.h"
 
 #include "juno_tables.h"
@@ -142,7 +143,7 @@ void eb_dly1_tick(eb_dly1_state *s, const eb_dly1_coef *c,
                                              * c->k4297824)
                                      + (float)(c->k4297808 * s->s4297328))
                              * c->k4297840;
-    v423 = fminf(c->k4298032, v422) * k5;
+    v423 = eb_fminf(c->k4298032, v422) * k5;
     s->s4297504 = v423;
     if ( (float)(v423 - s->s4297488) >= 0.0 )
       v424 = c->k4298048;
@@ -160,9 +161,9 @@ void eb_dly1_tick(eb_dly1_state *s, const eb_dly1_coef *c,
     s->s4297456 = v428;
     v431 = fabs(v428) * v430;
     v432 = v427 + v431;
-    v433 = fmaxf(v427 - v431, v425);
+    v433 = eb_fmaxf(v427 - v431, v425);
     if ( v429 > 0.0 )
-      v433 = fminf(v432, v425);
+      v433 = eb_fminf(v432, v425);
     s->s4297472 = v433;
     v56 = 0.0;
     if ( v426 <= 0.0 )
@@ -172,7 +173,7 @@ void eb_dly1_tick(eb_dly1_state *s, const eb_dly1_coef *c,
     v58 = -1.0;
     v435 = v434;
     if ( v435 >= -1.0 )
-      v436 = fminf(v435, 1.0);
+      v436 = eb_fminf_c(v435, 1.0);
     else
       v436 = -1.0;
     s->s4297520 = v436 * c->k4297840;

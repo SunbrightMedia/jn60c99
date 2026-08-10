@@ -1,5 +1,6 @@
 /* eb_fx_e5.c -- GENERATED from src/master_render.c:2633-2748. */
 #include "eb_fx_e5.h"
+#include "eb_minmax.h"
 #include "eb_ring_probe.h"
 #include "eb_dsp.h"
 #include "juno_tables.h"
@@ -104,7 +105,7 @@ void eb_fx_e5_tick(eb_fx_e5_state *s, const eb_fx_e5_coef *c,
         s->s95936 = v563;
         v564 = v562 + c->k96832;
         s->s101040 = (float)(v560 * v559) * v563;
-        v565 = fminf(c->k96848, v564) * v559;
+        v565 = eb_fminf(c->k96848, v564) * v559;
         s->s96224 = v565;
         if ( (float)(v565 - s->s96208) >= 0.0 )
           v566 = c->k96864;
@@ -118,7 +119,7 @@ void eb_fx_e5_tick(eb_fx_e5_state *s, const eb_fx_e5_coef *c,
         v570 = v56;
         v571 = (float)((float)(c->k96336 - v569) * c->k96384) + v569;
         if ( v570 >= -1.0 )
-          v58 = fminf(v570, 1.0);
+          v58 = eb_fminf_c(v570, 1.0);
         s->s96240 = v58 * c->k96416;
         if ( (float)(v571 - v569) != 0.0 )
           v568 = v571;
