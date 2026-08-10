@@ -560,6 +560,44 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
      * port's OWN second and fourth inputs, used verbatim. */
     {
         float g4, g2, Gp, Ap, Rp, Rkp;
+#if EB_VCF_MAPFAST
+        /* THE SAME MAP IN ONE DIVISION INSTEAD OF THREE.
+         *
+         * Substituting the three steps into each other:
+         *     g4 = G/(1-G)
+         *     g2 = 2*g4/(1-g4^2) = 2G(1-G)/(1-2G)
+         *     Gp = g2/(1+g2)     = 2G(1-G)/(1-2G^2)
+         * VERIFIED EXACT over 289 rationals G = 0.001..0.289 in exact
+         * arithmetic -- this is an identity, not a fit. What is NOT exact is
+         * the float32 evaluation, because the same real number reached by a
+         * different sequence of roundings is a different float: MEASURED
+         * worst 5 ULP over the whole measured domain G in [0.000119,
+         * 0.209771]. So this is FORK-ONLY and its gate is the sonic gate,
+         * never the null.
+         *
+         * THE CLAMP IS THE SAME CLAMP, MOVED. g4 <= sqrt(2)-1 is exactly
+         * G <= 1 - 1/sqrt(2) = 0.29289322, and at that point both forms give
+         * Gp = 0.5 -- checked, not assumed. It also guards the closed form's
+         * OWN pole at 1-2G^2 = 0, i.e. G = 1/sqrt(2) = 0.7071, which sits far
+         * above it. MEASURED over the whole battery G never exceeds 0.209771,
+         * so the clamp does not fire on any factory patch; it is kept for the
+         * same reason the original is -- an unstable filter is a worse failure
+         * than a wrong cutoff.
+         *
+         * Two divisions and one operation come out. The remaining Rp division
+         * stays: 1/(G^4 k + 1) is not part of this identity, and the file's
+         * own header refuses a reciprocal APPROXIMATION by name. */
+        {   float Gc = G;
+            if (Gc > 0.29289322f) {
+                Gc = 0.29289322f;
+#if EB_VCF_CLAMP_COUNT
+                ++eb_vcf_clamp_hits;
+#endif
+            }
+            Gp = ((Gc + Gc) * (1.0f - Gc)) / (1.0f - ((Gc * Gc) + (Gc * Gc)));
+        }
+        (void)g4; (void)g2;
+#else
         g4 = G / (1.0f - G);
         if (g4 > 0.41421354f) {
             g4 = 0.41421354f;
@@ -569,6 +607,7 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
         }
         g2  = (g4 + g4) / (1.0f - (g4 * g4));
         Gp  = g2 / (1.0f + g2);
+#endif
         Ap  = 1.0f - (Gp + Gp);
         Rp  = 1.0f / ((((Gp * Gp) * (Gp * Gp)) * k) + 1.0f);
         Rkp = Rp * k;

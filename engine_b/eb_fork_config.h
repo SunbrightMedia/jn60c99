@@ -300,6 +300,15 @@
 #error "EB_ENV_CR supports 1 (off) and 2 only: the compensation is the two-step pole square."
 #endif
 
+/* EB_VCF_MAPFAST -- the half-rate ladder's cutoff map in ONE division.
+ * The three-step map collapses to Gp = 2G(1-G)/(1-2G^2) by exact algebra
+ * (verified over 289 exact rationals). The float32 evaluation differs by at
+ * most 5 ULP over the measured domain, so it is FORK-ONLY and faces the
+ * sonic gate, not the null. See eb_vcf_ladder.c for the clamp mapping. */
+#ifndef EB_VCF_MAPFAST
+#define EB_VCF_MAPFAST 0
+#endif
+
 /* EB_DECIM_AVG -- lever A3. Replaces the half-rate ladder's 16-tap folded
  * FIR with a 2-tap average carrying THE SAME DC GAIN (the FIR's taps sum to
  * 1.0001332, so the average's weight is half of that and the output LEVEL is
