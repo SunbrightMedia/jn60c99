@@ -410,3 +410,48 @@ CONSEQUENCES:
    that by elimination. The ladder+VCA stall pool is measured ~735/voice.
    ASM_KERNEL_WORKORDER.md is the only lever that attacks the measured
    cause, and it is sized to cover the span. It is the head pointer.
+
+## FAST3 ON SILICON (2026-08-10) — HALF THE GAP CLOSED, AND MY MODEL CORRECTED
+NOLIBM + VCF_MAPFAST + FPDIV, voices only, user's S3:
+
+  wake     AUDIBLE   FAST3    delta
+  0x00       1,020    1,038      +18
+  0x80       3,743    3,394     -349
+  0xc0       6,804    6,120     -684
+  0xe0       9,879    8,855   -1,024
+  0xf0       9,705    8,796     -909
+  0xfc      10,004    9,100     -904
+  **0xd0     6,723    6,062     -661**
+
+VOICE SLOPE 3,068 -> **2,730** (-338). Two independent slopes agree: 2,726
+and 2,735.
+
+**GAP 1,281 -> 620. Fifty-two percent of it closed in one night, and at ZERO
+sonic cost** -- two of the three levers are bit-exact and the third measures
+the control's own 3.17 dB.
+
+### ★ MY OWN MODEL WAS WRONG AND THE BOARD CORRECTED IT
+I derived "the voice must reach 2,721" from `0xd0 = 2 voices`. The voice
+reached 2,730 -- on target within noise -- and 0xd0 is STILL 620 over,
+because:
+
+    2 voices at the measured slope   5,461
+    measured 0xd0                    6,062
+    UNMODELLED REMAINDER               601   <- head + at-rest + sync
+
+**That 601 is now almost exactly the whole remaining gap (620).** The voice is
+no longer the binding constraint; the SERIAL HEAD and the at-rest floor are.
+Stating the requirement as a per-voice number was an over-simplification of my
+own making, and it is retired here.
+
+### CONSEQUENCE: THE NEXT LEVER IS THE PROLOGUE, NOT THE VOICE
+Core 1 waits for the prologue every sample. `EB_PROLOGUE_PIPE` computes
+sample i+1's prologue AFTER core 0's voices for sample i, making the loop
+`max(core0_voices + prologue, core1_voices)` -- BIT-EXACT BY CONSTRUCTION,
+since it is the same order the serial version already runs.
+
+It measured -54 and was recorded dead. **THAT MEASUREMENT WAS TAKEN ON MASKS
+THAT HIDE IT.** This file already says so: "the gain is INVISIBLE at every
+existing sweep point; it only appears when the prologue-bearing core carries
+fewer voices." 0xd0 is exactly that mask, and PIPE has never been measured
+there. The lever is UNDECIDED, not dead -- the same status the ILV pair had.
