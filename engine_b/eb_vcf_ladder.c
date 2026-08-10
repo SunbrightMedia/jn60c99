@@ -659,9 +659,170 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
 #endif  /* EB_VCF_ZDF1X */
 
 #if EB_VCF_ILV
-#if !EB_VCF_DEADCOEF || EB_VCF_ADAA || EB_HALF_OS_VCF || EB_VCF_NOSAT
-#error "EB_VCF_ILV supports only the shipping ladder config (DEADCOEF on, no ADAA/HALFOS/NOSAT). tick2 falls back to two tick() calls otherwise -- do not combine."
+#if !EB_VCF_DEADCOEF || EB_VCF_ADAA || EB_VCF_NOSAT || EB_VCF_ZDF1X \
+    || EB_VCF_SATFIT || (EB_HALF_OS_VCF && EB_DECIM_AVG)
+#error "EB_VCF_ILV supports the shipping 4x ladder and the HALF-OS ladder (DEADCOEF on, no ADAA/NOSAT/ZDF1X/SATFIT, and no DECIM_AVG under half-OS). tick2 falls back to two tick() calls otherwise -- do not combine."
 #endif
+
+#if EB_HALF_OS_VCF
+/* eb_vcf_tick2 -- TWO voices' HALF-OVERSAMPLED ladders, statements interleaved.
+ *
+ * SAME HYPOTHESIS AS THE 4x TICK2, CHEAPER TO TEST: the LX7 is in-order and
+ * its FPU results are not available to the next instruction, so a single
+ * voice's ladder is a chain of stalls. Two voices are independent, so their
+ * statements are woven together and each fills the other's bubbles.
+ *
+ * WHY IT MAY WORK HERE WHERE THE 4x VERSION IS BOUNDED BY REGISTERS: the
+ * half-OS ladder runs TWO sub-steps, not four, and the per-sub-step live set
+ * is the same size either way -- but the DECIMATOR is 16 taps folded into 8
+ * instead of 32 folded into 16, and the loop trip count halves. The register
+ * question is settled by objdump (stack stores inside the sub-steps), not by
+ * this comment.
+ *
+ * BIT-IDENTICAL to eb_vcf_tick(a) then eb_vcf_tick(b) under the same flags:
+ * within each voice every operation and every association is the one
+ * eb_vcf_tick + eb_vcf_substep already perform, in the same order. Only
+ * INDEPENDENT statements of the two voices are interleaved. Nothing is
+ * simplified, no expression is regrouped, and the two dead values A and R
+ * (computed before the #if in eb_vcf_tick and immediately (void)-cast in its
+ * half-OS arm) are simply not computed, which no float can observe.
+ */
+void eb_vcf_tick2(eb_vcf_state *sta, const eb_vcf_coef *ca, float ina, float Ga, float ka, float *outa,
+                  eb_vcf_state *stb, const eb_vcf_coef *cb, float inb, float Gb, float kb, float *outb)
+{
+    float da, drivea, preva, acca; float *ha = sta->h; int hia = sta->hi;
+    float db, driveb, prevb, accb; float *hb = stb->h; int hib = stb->hi;
+    float g4a, g2a, Gpa, Apa, Rpa, Rkpa;
+    float g4b, g2b, Gpb, Rpb, Apb, Rkpb;
+    float xa, nla, y1a, y2a, y3a, y4a, tta, p2a, Sa, xza, y1za, y2za, y3za, y4za;
+    float xb, nlb, y1b, y2b, y3b, y4b, ttb, p2b, Sb, xzb, y1zb, y2zb, y3zb, y4zb;
+    float insa, insb, a0a, b0a, a0b, b0b;
+    int basea, baseb, j;
+
+    /* ------------------------------------------------- the input node */
+    da = sta->dith;
+    drivea = (((ka * ca->c9168) + 1.0f) * (ina * ca->c9136)) + ((-da) * ca->c9120);
+    db = stb->dith;
+    driveb = (((kb * cb->c9168) + 1.0f) * (inb * cb->c9136)) + ((-db) * cb->c9120);
+    sta->dith = eb_wrap24(-da);
+    stb->dith = eb_wrap24(-db);
+    preva = sta->drive_prev; sta->drive_prev = drivea;
+    prevb = stb->drive_prev; stb->drive_prev = driveb;
+
+    /* ------------------------------------ the half-rate cutoff transform */
+    g4a = Ga / (1.0f - Ga);
+    g4b = Gb / (1.0f - Gb);
+    if (g4a > 0.41421354f) {
+        g4a = 0.41421354f;
+#if EB_VCF_CLAMP_COUNT
+        ++eb_vcf_clamp_hits;
+#endif
+    }
+    if (g4b > 0.41421354f) {
+        g4b = 0.41421354f;
+#if EB_VCF_CLAMP_COUNT
+        ++eb_vcf_clamp_hits;
+#endif
+    }
+    g2a = (g4a + g4a) / (1.0f - (g4a * g4a));
+    g2b = (g4b + g4b) / (1.0f - (g4b * g4b));
+    Gpa = g2a / (1.0f + g2a);
+    Gpb = g2b / (1.0f + g2b);
+    Apa   = 1.0f - (Gpa + Gpa);
+    Apb = 1.0f - (Gpb + Gpb);
+    Rpa = 1.0f / ((((Gpa * Gpa) * (Gpa * Gpa)) * ka) + 1.0f);
+    Rpb = 1.0f / ((((Gpb * Gpb) * (Gpb * Gpb)) * kb) + 1.0f);
+    Rkpa = Rpa * ka;
+    Rkpb = Rpb * kb;
+
+    /* ------------------------------------------------------ sub-step 1
+     * input weight c9248 -- the port's own 1/2 instant. */
+    insa = ((preva + drivea) * ca->c9248) * Rpa;
+    insb = ((prevb + driveb) * cb->c9248) * Rpb;
+    xza = sta->nl; y1za = sta->y1; y2za = sta->y2; y3za = sta->y3; y4za = sta->y4;
+    xzb = stb->nl; y1zb = stb->y1; y2zb = stb->y2; y3zb = stb->y3; y4zb = stb->y4;
+    xa = insa - ((sta->s1 * ca->c9520) * Rkpa);
+    xb = insb - ((stb->s1 * cb->c9520) * Rkpb);
+    if (xa >= -1.0f) { if (xa > 1.0f) xa = 1.0f; } else xa = -1.0f;
+    if (xb >= -1.0f) { if (xb > 1.0f) xb = 1.0f; } else xb = -1.0f;
+    nla = xa + ((((xa * xa) * xa) * xa) * (xa * ca->c9184));
+    nlb = xb + ((((xb * xb) * xb) * xb) * (xb * cb->c9184));
+    y1a = (Gpa * (nla + xza)) + (y1za * Apa);
+    y1b = (Gpb * (nlb + xzb)) + (y1zb * Apb);
+    tta = Gpa * (y1a + y1za);
+    ttb = Gpb * (y1b + y1zb);
+    p2a = Gpa * (((Gpa * nla) + (Apa * y1a)) + y1a);
+    p2b = Gpb * (((Gpb * nlb) + (Apb * y1b)) + y1b);
+    y2a = tta + (y2za * Apa);
+    y2b = ttb + (y2zb * Apb);
+    y3a = (Gpa * (y2a + y2za)) + (y3za * Apa);
+    y3b = (Gpb * (y2b + y2zb)) + (y3zb * Apb);
+    y4a = ((y3za + y3a) * Gpa) + (Apa * y4za);
+    y4b = ((y3zb + y3b) * Gpb) + (Apb * y4zb);
+    Sa = (Gpa * (((Gpa * ((p2a + (Apa * y2a)) + y2a)) + (Apa * y3a)) + y3a)) + (Apa * y4a);
+    Sb = (Gpb * (((Gpb * ((p2b + (Apb * y2b)) + y2b)) + (Apb * y3b)) + y3b)) + (Apb * y4b);
+    sta->nl = nla; sta->y1 = y1a; sta->y2 = y2a; sta->y3 = y3a; sta->y4 = y4a; sta->s1 = Sa;
+    stb->nl = nlb; stb->y1 = y1b; stb->y2 = y2b; stb->y3 = y3b; stb->y4 = y4b; stb->s1 = Sb;
+    hia = (hia + 1) & 31; ha[hia] = y4a * ca->c9104;
+    hib = (hib + 1) & 31; hb[hib] = y4b * cb->c9104;
+
+    /* ------------------------------------------------------ sub-step 2
+     * input weight c9200 -- the port's own instant 1. */
+    insa = (drivea * ca->c9200) * Rpa;
+    insb = (driveb * cb->c9200) * Rpb;
+    xza = nla; y1za = y1a; y2za = y2a; y3za = y3a; y4za = y4a;
+    xzb = nlb; y1zb = y1b; y2zb = y2b; y3zb = y3b; y4zb = y4b;
+    xa = insa - ((Sa * ca->c9520) * Rkpa);
+    xb = insb - ((Sb * cb->c9520) * Rkpb);
+    if (xa >= -1.0f) { if (xa > 1.0f) xa = 1.0f; } else xa = -1.0f;
+    if (xb >= -1.0f) { if (xb > 1.0f) xb = 1.0f; } else xb = -1.0f;
+    nla = xa + ((((xa * xa) * xa) * xa) * (xa * ca->c9184));
+    nlb = xb + ((((xb * xb) * xb) * xb) * (xb * cb->c9184));
+    y1a = (Gpa * (nla + xza)) + (y1za * Apa);
+    y1b = (Gpb * (nlb + xzb)) + (y1zb * Apb);
+    tta = Gpa * (y1a + y1za);
+    ttb = Gpb * (y1b + y1zb);
+    p2a = Gpa * (((Gpa * nla) + (Apa * y1a)) + y1a);
+    p2b = Gpb * (((Gpb * nlb) + (Apb * y1b)) + y1b);
+    y2a = tta + (y2za * Apa);
+    y2b = ttb + (y2zb * Apb);
+    y3a = (Gpa * (y2a + y2za)) + (y3za * Apa);
+    y3b = (Gpb * (y2b + y2zb)) + (y3zb * Apb);
+    y4a = ((y3za + y3a) * Gpa) + (Apa * y4za);
+    y4b = ((y3zb + y3b) * Gpb) + (Apb * y4zb);
+    Sa = (Gpa * (((Gpa * ((p2a + (Apa * y2a)) + y2a)) + (Apa * y3a)) + y3a)) + (Apa * y4a);
+    Sb = (Gpb * (((Gpb * ((p2b + (Apb * y2b)) + y2b)) + (Apb * y3b)) + y3b)) + (Apb * y4b);
+    sta->nl = nla; sta->y1 = y1a; sta->y2 = y2a; sta->y3 = y3a; sta->y4 = y4a; sta->s1 = Sa;
+    stb->nl = nlb; stb->y1 = y1b; stb->y2 = y2b; stb->y3 = y3b; stb->y4 = y4b; stb->s1 = Sb;
+    hia = (hia + 1) & 31; ha[hia] = y4a * ca->c9104;
+    hib = (hib + 1) & 31; hb[hib] = y4b * cb->c9104;
+
+    sta->hi = hia; stb->hi = hib;
+
+    /* --------------------------------------------- the 2x decimator, folded
+     * The accumulator starts at 0.0f and the first tap is ADDED to it, which
+     * is what eb_vcf_tick does; 0.0f + x is not x when x is -0.0f, so the
+     * initialisation is copied rather than folded away. */
+    basea = hia + 32;
+    baseb = hib + 32;
+    acca = 0.0f;
+    accb = 0.0f;
+#if defined(__GNUC__)
+#pragma GCC unroll 12
+#endif
+    for (j = 0; j < EB_VCF_HALFOS_TAPS / 2; ++j) {
+        a0a = ha[(basea - j) & 31];
+        a0b = hb[(baseb - j) & 31];
+        b0a = ha[(basea - (EB_VCF_HALFOS_TAPS - 1) + j) & 31];
+        b0b = hb[(baseb - (EB_VCF_HALFOS_TAPS - 1) + j) & 31];
+        acca += (a0a + b0a) * eb_vcf_halfos_fir[j];
+        accb += (a0b + b0b) * eb_vcf_halfos_fir[j];
+    }
+
+    *outa = acca * ca->c9152;
+    *outb = accb * cb->c9152;
+}
+#else
 /* eb_vcf_tick2 -- TWO voices' 4x ladders, statements interleaved.
  *
  * The four sub-steps of ONE voice are a serial chain: each reads the
@@ -737,4 +898,5 @@ void eb_vcf_tick2(eb_vcf_state *sta, const eb_vcf_coef *ca, float ina, float Ga,
     }
     *outa=acca*ca->c9152; *outb=accb*cb->c9152;
 }
-#endif
+#endif  /* EB_HALF_OS_VCF */
+#endif  /* EB_VCF_ILV */
