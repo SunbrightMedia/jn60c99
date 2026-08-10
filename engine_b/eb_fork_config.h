@@ -161,6 +161,154 @@
 #endif
 #endif
 
+/* ===================================================== CONTROL-RATE LEVERS
+ * docs/engineb/LAST_MILE.md, Phase A. Each holds one module group's OUTPUT
+ * for EB_CR_N samples and skips the module on the held samples.
+ *
+ * WHY THESE ARE OPEN AGAIN AFTER BEING CLOSED. C2 closed control-rate CV at
+ * -39.3 dB and C1 closed control-rate pitch at -89.5 dB. BOTH ARE NULL
+ * NUMBERS, measured against the -100 dB trunk gate. A null answers "is this
+ * the same waveform"; the fork's standard is third-octave BAND ENERGY, which
+ * asks "does this sound the same". Nothing in this repo has ever measured
+ * these levers under the second question. That is the whole reason they are
+ * built here, and the sonic gate -- not this comment -- decides each one.
+ *
+ * DEFAULT 0 EVERYWHERE. Nothing changes in any existing build until a flag
+ * is passed on the command line.
+ *
+ *   EB_CR_N        the hold length in samples (2 = every other sample)
+ *   EB_CR_ENV      hold both envelope outputs        (A2)
+ *   EB_CR_VCFCV    hold the VCF cutoff CV + shaper   (A1)
+ *   EB_CR_MODCV    hold the modulation CV sums       (A1)
+ *   EB_CR_PITCH    hold the pitch evaluator + dcoprep(A4)
+ *   EB_CR_ALL      convenience: sets all four
+ *
+ * WHAT IS DELIBERATELY NOT HELD: the note/gate path (eb_cvgate) and the
+ * glide state. Both carry note EVENTS, and an event that arrives one sample
+ * late is a different note, not a slightly different one. */
+#ifndef EB_CR_ALL
+#define EB_CR_ALL 0
+#endif
+#ifndef EB_CR_N
+#if EB_CR_ALL
+#define EB_CR_N EB_CR_ALL
+#else
+#define EB_CR_N 1
+#endif
+#endif
+#ifndef EB_CR_ENV
+#define EB_CR_ENV (EB_CR_ALL ? 1 : 0)
+#endif
+#ifndef EB_CR_VCFCV
+#define EB_CR_VCFCV (EB_CR_ALL ? 1 : 0)
+#endif
+/* SEPARATE FROM EB_CR_VCFCV, and the separation is a measurement, not tidying:
+ * the resonance shaper is already a 256-entry table costing about 36 cycles,
+ * so holding it saves nothing and only removes accuracy. Running it EVERY
+ * sample from a HELD cutoff is both cheaper to be right about and cheaper to
+ * run. */
+#ifndef EB_CR_VCFRES
+#define EB_CR_VCFRES 0
+#endif
+#ifndef EB_CR_MODCV
+#define EB_CR_MODCV (EB_CR_ALL ? 1 : 0)
+#endif
+#ifndef EB_CR_PITCH
+#define EB_CR_PITCH (EB_CR_ALL ? 1 : 0)
+#endif
+
+/* PER-GROUP HOLD PERIODS. EB_CR_N is the MASTER period and must be a power of
+ * two; each group holds for its own divisor of it. The three are separate
+ * because the gate measured them apart and they do not agree: the pitch chain
+ * is as good at four samples as at two (4.09 dB against 4.18), while the
+ * cutoff CV falls apart there (10.93 dB). One period for all of them would
+ * have to be the worst group's. */
+#ifndef EB_CR_NP
+#define EB_CR_NP EB_CR_N
+#endif
+#ifndef EB_CR_NC
+#define EB_CR_NC EB_CR_N
+#endif
+#ifndef EB_CR_NE
+#define EB_CR_NE EB_CR_N
+#endif
+#if (EB_CR_N & (EB_CR_N - 1)) != 0
+#error "EB_CR_N must be a power of two -- the phase test is a mask"
+#endif
+
+/* EB_CR_LERP -- INTERPOLATE the held value instead of stepping to it.
+ *
+ * THE MEASUREMENT THAT PUT THIS HERE. Every plain hold failed in the SAME
+ * place, the 10,240 Hz band, and by amounts a slow control signal cannot
+ * explain: envelopes 40.43 dB, cutoff CV 6.74 dB. A held control is a
+ * STAIRCASE, the VCA and the filter MULTIPLY by it, and a staircase at half
+ * the sample rate modulates the audio at fs/2 -- which lands exactly there.
+ * The error was never the control's accuracy; it was the shape of its edges.
+ *
+ * So the held samples are filled by linear interpolation between the two
+ * computed points. The output is one sample late and has no steps in it. The
+ * cost is one add and one multiply on the computed samples, which is far less
+ * than the module that is no longer running.
+ *
+ * IT IS PER GROUP, AND THAT IS A MEASUREMENT TOO. Interpolating the PITCH
+ * chain made it far worse -- 3.21 dB stepped, 17.96 dB interpolated -- and the
+ * reason is in the arithmetic rather than in the ear: eb_dcoprep produces the
+ * increment AND the edge gain g = 0.00390625/inc, an exact reciprocal pair.
+ * Interpolating the two INDEPENDENTLY breaks that identity, because the
+ * midpoint of a reciprocal is not the reciprocal of a midpoint, and the DCO's
+ * edge width is then wrong for its own increment. Stepping keeps the pair
+ * consistent, and a stepped increment is inaudible where a stepped GAIN is
+ * not. So: interpolate what MULTIPLIES the audio, step what describes it. */
+#ifndef EB_CR_LERP_ENV
+#define EB_CR_LERP_ENV 1
+#endif
+#ifndef EB_CR_LERP_CV
+#define EB_CR_LERP_CV 1
+#endif
+#ifndef EB_CR_LERP_PITCH
+#define EB_CR_LERP_PITCH 0
+#endif
+
+/* EB_ENV_CR -- the RATE-COMPENSATED envelope, the answer to the plain hold's
+ * 40.43 dB. A plain hold at N=2 does not make the envelope slightly wrong, it
+ * makes every attack and decay TWICE AS LONG, which is a different instrument
+ * and the gate said so at once.
+ *
+ * The composition is exact where the envelope is linear: two steps of
+ * y += a(target - y) equal one step of a' = 2a - a^2, so the state at the even
+ * samples is unchanged. The same squaring applies to the rate smoother, and
+ * the sustain SLEW is a linear ramp, so its step doubles instead. What is
+ * left over is the zero-order hold on the odd samples and the two-sample peak
+ * detector -- both of them errors of one sample, not of a time constant.
+ *
+ * MEASURED, AND IT IS NOT THE FIX: with the compensation on, the envelope
+ * hold reads 41.89 dB against the plain hold's 40.43 dB -- no better, and the
+ * failures stay in the same 10,240 Hz band. That is the result that named the
+ * real defect: the envelope's TIME CONSTANT was never the problem, its EDGES
+ * were, and EB_CR_LERP above is what answers them. The code stays so the
+ * negative is one command away instead of re-derived, and it is DEFAULT OFF.
+ *
+ * When set to 2 it must equal EB_CR_N, because a mismatch is silent and would
+ * read as a bad envelope rather than a bad flag. */
+#ifndef EB_ENV_CR
+#define EB_ENV_CR 1
+#endif
+#if EB_ENV_CR == 2 && (EB_CR_NE != 2)
+#error "EB_ENV_CR=2 needs EB_CR_NE=2 -- see eb_fork_config.h"
+#endif
+#if EB_ENV_CR != 1 && EB_ENV_CR != 2
+#error "EB_ENV_CR supports 1 (off) and 2 only: the compensation is the two-step pole square."
+#endif
+
+/* EB_DECIM_AVG -- lever A3. Replaces the half-rate ladder's 16-tap folded
+ * FIR with a 2-tap average carrying THE SAME DC GAIN (the FIR's taps sum to
+ * 1.0001332, so the average's weight is half of that and the output LEVEL is
+ * unchanged by construction). Only the stopband changes, and how much that
+ * costs is a gate question, not a comment question. */
+#ifndef EB_DECIM_AVG
+#define EB_DECIM_AVG 0
+#endif
+
 /* OUTSIDE the fork guard on purpose: eb_dco.c and eb_decim.c compile in the
  * TRUNK build too, and an undefined EB_DCO_SUBSTEPS there would be a silent
  * 0 in the #if -- a DCO that produces no sub-samples at all. */

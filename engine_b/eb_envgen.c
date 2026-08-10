@@ -26,6 +26,7 @@
  * is the natural misreading and is wrong. Here they are two named fields.
  */
 #include "eb_envgen.h"
+#include "eb_fork_config.h"
 
 /* fminf without <math.h>: the port's fminf(a,b) on two non-NaN operands, which
  * these always are (both are finite by construction -- k_peak is a constant and
@@ -105,14 +106,33 @@ float eb_env_tick(eb_env_state *s, const eb_env_coef *c, float gin)
     rsel = (c->d_q * p) + (c->a_q * atk);
 
     /* upward slew of the sustain target, then the peak clamp; port :1005-1009 */
+#if EB_ENV_CR == 2
+    if ((sus - t_prev) > 0.0f) sus = t_prev + (c->k_slew + c->k_slew);
+#else
     if ((sus - t_prev) > 0.0f) sus = t_prev + c->k_slew;
+#endif
     t = eb_fminf(c->k_peak, sus);
 
     /* error toward the stage target, smoothed rate, integrate; :1011-1017.
      * TRAP 2 is the `(c->r_q*rel - rel*r) + r` factor. */
     err = ((atk * c->k_atktgt) + (p * t)) - y_prev;
+#if EB_ENV_CR == 2
+    {   /* THE TWO-STEP POLE SQUARE. See eb_fork_config.h: this call now
+         * stands for two samples, so each first-order coefficient a becomes
+         * 1-(1-a)^2 = a(2-a), which lands the state exactly where two
+         * uncompensated steps would have -- for as long as the inputs hold,
+         * which between two adjacent samples they nearly do. */
+        float ks = c->k_ratesm * (2.0f - c->k_ratesm);
+        float a;
+        r = ((ks * rsel) - (ks * r_prev)) + r_prev;
+        a = ((c->r_q * rel) - (rel * r)) + r;
+        a = a * (2.0f - a);
+        y = (a * err) + y_prev;
+    }
+#else
     r   = ((c->k_ratesm * rsel) - (c->k_ratesm * r_prev)) + r_prev;
     y   = ((((c->r_q * rel) - (rel * r)) + r) * err) + y_prev;
+#endif
 
     s->y = y; s->h = h; s->p = p; s->t = t; s->r = r;
 

@@ -596,6 +596,16 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
         int base = hi + 32;
         float a0, b0;
         acc = 0.0f;
+#if EB_DECIM_AVG
+        /* LEVER A3. The two newest sub-samples, averaged, carrying the 16-tap
+         * filter's OWN DC gain (1.0001332) so the output LEVEL cannot move --
+         * only the stopband does. j and the fir table stay referenced so the
+         * flag cannot silently drop a symbol it was meant to replace. */
+        (void)b0;
+        a0 = h[base & 31] + h[(base - 1) & 31];
+        acc = a0 * 0.50006661f;
+        (void)j; (void)eb_vcf_halfos_fir;
+#else
 #if defined(__GNUC__)
 #pragma GCC unroll 12
 #endif
@@ -607,6 +617,7 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
             b0 = h[(base - (EB_VCF_HALFOS_TAPS - 1) + j) & 31];
             acc += (a0 + b0) * eb_vcf_halfos_fir[j];
         }
+#endif
     }
 #else
     hi = (hi + 1) & 31;

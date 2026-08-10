@@ -184,6 +184,32 @@ typedef struct {
      * cost the reverb's B channel its last bits. Fixed in both. */
     int32_t         rev_pending[EB_REV_NTAP];
     int32_t         rev_wipe;
+    /* CONTROL-RATE HOLD (fork levers A1/A2/A4, docs/engineb/LAST_MILE.md).
+     * Per-voice, NOT per-engine, and that is the point: a voice is rendered
+     * exactly once per sample by exactly one core, so a per-voice counter IS
+     * a per-sample phase and stays correct under the two-core split with no
+     * cross-core traffic. The fields are present in EVERY build; nothing
+     * reads them unless a CR flag is on, so the trunk's EXACTLY-0 gates are
+     * untouched by their existence.
+     * cr_ph is FORCED TO 0 while a voice is at rest, so the first sample
+     * after a note-on always recomputes instead of using a value that was
+     * last valid seconds ago. */
+    unsigned char   cr_ph[EB_NUM_VOICES];
+    unsigned char   cr_prime[EB_NUM_VOICES];
+    float           cr_e1[EB_NUM_VOICES];
+    float           cr_e2[EB_NUM_VOICES];
+    float           cr_cut[EB_NUM_VOICES];
+    float           cr_o6704[EB_NUM_VOICES];
+    float           cr_o6848[EB_NUM_VOICES];
+    float           cr_reso[EB_NUM_VOICES];
+    float           cr_o7536[EB_NUM_VOICES];
+    float           cr_pit[EB_NUM_VOICES];
+    float           cr_pwm[EB_NUM_VOICES];
+    float           cr_cv[EB_NUM_VOICES];
+    float           cr_inc[EB_NUM_VOICES];
+    float           cr_gedge[EB_NUM_VOICES];
+    float           cr_pw[EB_NUM_VOICES];
+    float           cr_pwmout[EB_NUM_VOICES];
 } eb_render_state;
 
 /* EB_RENDER_NEEDS — THE LIST IS EMPTY, and this time nothing is defaulted.

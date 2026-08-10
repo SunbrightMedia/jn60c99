@@ -231,6 +231,21 @@ void eb_engine_advance_atrest(eb_engine *e, eb_render_state *st,
 #endif
 }
 
+#if EB_CR_N > 1
+/* Publish a freshly computed control value and return the value THIS sample
+ * uses. With EB_CR_LERP the returned value is the midpoint of the previous
+ * and the new computed points, which makes the held samples a line rather
+ * than a step; the whole signal is then one sample late and has no edges in
+ * it at fs/2. On the first sample of a note (prime) there is no previous
+ * point, so the new value is used unaltered. */
+static float eb_cr_out(float *slot, float nv, int prime, int lerp)
+{
+    float o = (lerp && !prime) ? 0.5f * (*slot + nv) : nv;
+    *slot = nv;
+    return o;
+}
+#endif
+
 int eb_engine_render_range(eb_engine *e, eb_render_state *st,
                            const eb_render_coefs *c, const eb_render_needs *n,
                            int v0, int v1, eb_shared_tick *sh, float *vout)
@@ -299,12 +314,25 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 
         eb_cvgate_in gi;
         eb_cvgate_out go;
+#if EB_CR_N > 1
+        int cr_prime;
+        unsigned int cr_ph;
+#endif
 #if EB_FUSE_VCA
         eb_vca_ctl vca_ctl;
 #endif
 
         vout[v] = 0.0f;
         if (vc->atrest || v >= EB_SLOTS) {
+#if EB_CR_N > 1
+            /* re-arm the control-rate phase, so the first sample of the next
+             * note recomputes instead of reading a hold from another note --
+             * and PRIME it, so that sample is emitted straight rather than
+             * interpolated halfway toward a value left over from a note that
+             * ended seconds ago. */
+            st->cr_ph[v] = 0;
+            st->cr_prime[v] = 1;
+#endif
 #if EB_ATREST_BLOCK || (defined(EB_ABLATE) && EB_ABLATE == 13)
             /* The advance is hoisted to eb_engine_advance_atrest(), which the
              * caller runs ONCE PER BLOCK. See that function for why the two
@@ -345,6 +373,32 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 #endif
             continue;
         }
+
+#if EB_CR_N > 1
+        /* THE CONTROL-RATE PHASE, advanced once per voice per sample. It is
+         * the MASTER period; each group tests its own divisor against it, so
+         * the pitch chain can hold for four samples while the cutoff CV holds
+         * for two, from one counter and one increment. */
+        cr_ph = st->cr_ph[v];
+        st->cr_ph[v] = (unsigned char)((cr_ph + 1) & (EB_CR_N - 1));
+        cr_prime = st->cr_prime[v];
+        st->cr_prime[v] = 0;
+#endif
+/* CR_RUN(flag) is 1 whenever the module must actually run: always when its
+ * flag is off, and on the phase-0 sample when it is on. With the flag off
+ * the compiler folds this to a constant and deletes the hold branch.
+ * CR_OUT(slot, v) publishes a freshly computed value into its hold slot and
+ * returns what this sample should USE -- the midpoint between the previous
+ * computed value and this one, so the held samples lie on a line instead of a
+ * step. See EB_CR_LERP in eb_fork_config.h for the measurement that requires
+ * it. */
+#if EB_CR_N > 1
+#define CR_RUN(flag, per) (!(flag) || (cr_ph & ((per) - 1)) == 0)
+#define CR_OUT(en, slot, nv) eb_cr_out((slot), (nv), cr_prime, (en))
+#else
+#define CR_RUN(flag, per) 1
+#define CR_OUT(en, slot, nv) (nv)
+#endif
 
         /* ---- control rate ------------------------------------------------
          * THE ORDER BELOW IS THE PORT'S, and it is not the order this
@@ -450,10 +504,16 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
             e1 = st->glide[v].s560 * k0;
             e2 = st->glide[v].s560 * k1;
 #else
-            e1 = eb_env_tick(&st->env[v][0], &c->env[v][0],
-                             st->glide[v].s560 * k0);
-            e2 = eb_env_tick(&st->env[v][1], &c->env[v][1],
-                             st->glide[v].s560 * k1);
+            if (CR_RUN(EB_CR_ENV, EB_CR_NE)) {
+                e1 = eb_env_tick(&st->env[v][0], &c->env[v][0],
+                                 st->glide[v].s560 * k0);
+                e2 = eb_env_tick(&st->env[v][1], &c->env[v][1],
+                                 st->glide[v].s560 * k1);
+                e1 = CR_OUT((EB_CR_ENV && EB_CR_LERP_ENV), &st->cr_e1[v], e1);
+                e2 = CR_OUT((EB_CR_ENV && EB_CR_LERP_ENV), &st->cr_e2[v], e2);
+            } else {
+                e1 = st->cr_e1[v]; e2 = st->cr_e2[v];
+            }
 #endif
         }
 
@@ -470,8 +530,14 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 #if EB_ABLATE == EB_ABL_MODCV || EB_ABLATE == EB_ABL_WIRING
         pit = pitch_cv; pwm = 0.0f;
 #else
-        eb_modcv_tick(&c->mod[v], pitch_cv, st->glide[v].s880,
-                      lfo_del, lfo_undel, e1, e2, &pit, &pwm);
+        if (CR_RUN(EB_CR_MODCV, EB_CR_NP)) {
+            eb_modcv_tick(&c->mod[v], pitch_cv, st->glide[v].s880,
+                          lfo_del, lfo_undel, e1, e2, &pit, &pwm);
+            pit = CR_OUT((EB_CR_MODCV && EB_CR_LERP_PITCH), &st->cr_pit[v], pit);
+            pwm = CR_OUT((EB_CR_MODCV && EB_CR_LERP_PITCH), &st->cr_pwm[v], pwm);
+        } else {
+            pit = st->cr_pit[v]; pwm = st->cr_pwm[v];
+        }
 #endif
         /* eb_modcv_tick's `pwm_out` IS cell 3808 (eb_pwm_cv.c:91 "THE PWM SUM,
          * [3808]"), which is eb_dcoprep's per-sample input. The second need
@@ -484,7 +550,12 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 #if EB_ABLATE == EB_ABL_PITCH
         cv = c->pitch_off[v] + pit;
 #else
-        cv = eb_pitch_eval(c->pitch_off[v] + pit, c->pitch_gain[v]);
+        if (CR_RUN(EB_CR_PITCH, EB_CR_NP)) {
+            cv = eb_pitch_eval(c->pitch_off[v] + pit, c->pitch_gain[v]);
+            cv = CR_OUT((EB_CR_PITCH && EB_CR_LERP_PITCH), &st->cr_cv[v], cv);
+        } else {
+            cv = st->cr_cv[v];
+        }
 #endif
 
         /* SAME two inputs as modcv, per the shim: cells 752 and 880. `pit`
@@ -493,8 +564,17 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 #if EB_ABLATE == EB_ABL_VCF_CV || EB_ABLATE == EB_ABL_WIRING
         cut = pitch_cv; o6704 = 0.0f; o6848 = 0.0f;
 #else
-        cut = eb_vcf_cv_tick(&st->cv[v], &c->cv[v], pitch_cv, st->glide[v].s880,
-                             lfo_del, lfo_undel, e1, e2, &o6704, &o6848);
+        if (CR_RUN(EB_CR_VCFCV, EB_CR_NC)) {
+            cut = eb_vcf_cv_tick(&st->cv[v], &c->cv[v], pitch_cv,
+                                 st->glide[v].s880, lfo_del, lfo_undel,
+                                 e1, e2, &o6704, &o6848);
+            cut   = CR_OUT((EB_CR_VCFCV && EB_CR_LERP_CV), &st->cr_cut[v], cut);
+            o6704 = CR_OUT((EB_CR_VCFCV && EB_CR_LERP_CV), &st->cr_o6704[v], o6704);
+            o6848 = CR_OUT((EB_CR_VCFCV && EB_CR_LERP_CV), &st->cr_o6848[v], o6848);
+        } else {
+            cut = st->cr_cut[v];
+            o6704 = st->cr_o6704[v]; o6848 = st->cr_o6848[v];
+        }
 #endif
 
         /* the resonance shaper takes the cutoff CV and the two side outputs,
@@ -502,8 +582,14 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 #if EB_ABLATE == EB_ABL_VCF_RES
         reso = cut; o7536 = cut; (void)o6704; (void)o6848;
 #else
-        reso = eb_vcf_res_tick(&st->res[v], &c->res[v], cut, o6704, o6848,
-                               &o7536);
+        if (CR_RUN(EB_CR_VCFRES, EB_CR_NC)) {
+            reso = eb_vcf_res_tick(&st->res[v], &c->res[v], cut, o6704, o6848,
+                                   &o7536);
+            reso   = CR_OUT((EB_CR_VCFRES && EB_CR_LERP_CV), &st->cr_reso[v], reso);
+            o7536  = CR_OUT((EB_CR_VCFRES && EB_CR_LERP_CV), &st->cr_o7536[v], o7536);
+        } else {
+            reso = st->cr_reso[v]; o7536 = st->cr_o7536[v];
+        }
 #endif
 
         /* ---- audio rate --------------------------------------------------- */
@@ -521,8 +607,17 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 #if EB_ABLATE == EB_ABL_DCOPREP || EB_ABLATE == EB_ABL_WIRING
         inc = cv; g_edge = 0.0f; pw_live = 0.5f; pwm_out = 0.0f;
 #else
-        inc = eb_dcoprep_tick(&c->dprep[v], cv, pit, n_3808,
-                              &g_edge, &pw_live, &pwm_out);
+        if (CR_RUN(EB_CR_PITCH, EB_CR_NP)) {
+            inc = eb_dcoprep_tick(&c->dprep[v], cv, pit, n_3808,
+                                  &g_edge, &pw_live, &pwm_out);
+            inc     = CR_OUT((EB_CR_PITCH && EB_CR_LERP_PITCH), &st->cr_inc[v], inc);
+            g_edge  = CR_OUT((EB_CR_PITCH && EB_CR_LERP_PITCH), &st->cr_gedge[v], g_edge);
+            pw_live = CR_OUT((EB_CR_PITCH && EB_CR_LERP_PITCH), &st->cr_pw[v], pw_live);
+            pwm_out = CR_OUT((EB_CR_PITCH && EB_CR_LERP_PITCH), &st->cr_pwmout[v], pwm_out);
+        } else {
+            inc = st->cr_inc[v];     g_edge = st->cr_gedge[v];
+            pw_live = st->cr_pw[v];  pwm_out = st->cr_pwmout[v];
+        }
 #endif
         /* THE HALF-OS INCREMENT COMES FROM eb_dco_inc_scale(), the single
          * expression every path uses -- see the long note on it in eb_dco.h,
