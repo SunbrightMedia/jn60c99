@@ -311,7 +311,7 @@ static int rings_alloc(void)
                         &RG.t5_2_len, &RG.t5_3_len, &RG.e5_len,
                         &RG.t4_0_len, &RG.t4_1_len };
     /* the port's own ring lengths, the same nine the standalone shim copies */
-    int i;
+    int i, n_int = 0, n_psram = 0;
     for (i = 0; i < 9; ++i) {
         int32_t want = S3L_RING_LEN[i];
 #if S3L_RING_SRAM
@@ -326,6 +326,9 @@ static int rings_alloc(void)
             want = S3L_RING_LEN[i];
             *dst[i] = heap_caps_calloc((size_t)want, sizeof(float),
                                        MALLOC_CAP_SPIRAM);
+            ++n_psram;
+        } else {
+            ++n_int;
         }
 #else
         *dst[i] = heap_caps_calloc((size_t)want, sizeof(float),
@@ -335,8 +338,16 @@ static int rings_alloc(void)
         *len[i] = want;
     }
 #if S3L_RING_SRAM
-    printf("RINGS: capped at %d samples, INTERNAL SRAM. free internal now %u\n",
-           (int)S3L_RING_SRAM,
+    /* Report the OUTCOME, not the request. The earlier form printed
+     * "INTERNAL SRAM" unconditionally, so a run in which five of the nine
+     * rings had fallen back to PSRAM still announced itself as an internal
+     * build -- and the FX cycle figure was then read as an internal figure.
+     * A summary line that cannot say it failed is not a summary line. */
+    printf("RINGS: cap %d samples. %d of 9 INTERNAL, %d in PSRAM -- "
+           "PLACEMENT IS %s. free internal now %u\n",
+           (int)S3L_RING_SRAM, n_int, n_psram,
+           (n_psram == 0) ? "ALL-INTERNAL"
+                          : (n_int == 0 ? "ALL-PSRAM" : "MIXED"),
            (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
     printf("RINGS: THE CAP IS ONLY VALID WHILE EVERY READ LAG IS BELOW IT --\n"
            "       a longer DELAY TIME than this bank uses would fold.\n");
