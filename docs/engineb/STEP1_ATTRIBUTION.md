@@ -536,3 +536,35 @@ zero, and its own abort line is 300 cycles.
 Tonight moved 0xd0 from 6,723 to 6,062 at ZERO sonic cost. Three levers
 delivered (NOLIBM, VCF_MAPFAST, FPDIV) and four were closed by measurement
 (control-rate holds, 2-tap decimator, prologue pipelining, voice interleave).
+
+## ★★★ FAST3_CR ON SILICON (2026-08-10) — THE TWO-CHIP WORKLOAD IS UNDER BUDGET
+FAST3 + the ear-approved control-rate holds (the 5.79 dB flag set):
+
+  wake     FAST3  FAST3_CR  delta
+  0x00      1,038    1,132     +94
+  0x80      3,394    3,056    -338
+  0xc0      6,120    5,415    -705
+  0xe0      8,855    7,780  -1,075
+  0xfc      9,100    8,145    -955
+  **0xd0    6,062    5,395    -667      BUDGET 5,442 -> UNDER BY 47**
+
+Voice slope 2,730 -> **2,362** (two slopes agree: 2,359 / 2,365).
+
+**THE RE-OPENING WAS CORRECT.** The same holds that delivered ~60 cycles on
+the stalled LASTMILE2 build deliver **667 cycles on 0xd0** after FAST3
+drained the stall pool. The ~60 was never the lever's value; it was the
+pipeline's. A closed-negative is evidence about the build it was measured
+on, and this is the proof by demonstration.
+
+STATED PLAINLY, WITH THE CAVEATS THAT KEEP IT HONEST:
+1. The 47-cycle margin is 0.9 %. The run is stable to +-3 cycles across its
+   eight lines, so the number is real, but it is THIN.
+2. The WHOLE-LOOP figure is 5,486 (+44 over), including ~91 cycles of the
+   sweep harness's own bookkeeping. A real firmware pays I2S writes instead.
+   The engine number is the like-for-like comparison used for every prior
+   verdict in this file.
+3. This is the VOICE side only. The FX chip rides the other board's
+   one-voice core: with the new voice at 2,362, the FX is free below
+   ~5,395 - 2,362 - (at-rest+sync) ~= 2,900 cycles. FX_SRAM.bin measures it.
+4. The sound is the 5.79 dB build THE USER APPROVED BY EAR. Nothing new
+   was spent tonight; the trade already accepted finally paid.
