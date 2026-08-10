@@ -356,3 +356,25 @@ is SMALLER than the single remaining lever's measured pool:
 **ASM_KERNEL_WORKORDER.md is now correctly sized to finish this.** No
 standard change remains, none is needed. Sound: gated 3.17 dB worst band,
 user holds the worst-case WAVs.
+
+## LAST MILE PHASE A — GATED ON HOST (2026-08-10)
+Full result: `docs/engineb/data/lastmile_result.md`. Four control-rate holds,
+each measured under the AUDIBLE standard for the first time (their old
+rejections were NULL numbers at -100 dB, a different question).
+
+  control (the build on the user's board)                    3.17 dB
+  pitch + modcv held 4, cutoff CV held 2                     4.23 dB
+  + envelopes held 2, rate compensated  <- SHIPPED           5.79 dB
+  2-tap decimator                                    DEAD,  10.07 dB
+
+TWO CORRECTIONS TURNED DEAD LEVERS LIVE. (1) A held control is a STAIRCASE
+and the VCA multiplies by it, so every plain hold failed in the 10,240 Hz band
+-- envelopes at 40.43 dB. Interpolating the held samples removes the edges.
+(2) Interpolation is PER GROUP: on the pitch chain it measured 17.96 against
+the stepped 3.21, because eb_dcoprep's increment and edge gain are an exact
+reciprocal pair that independent interpolation breaks. INTERPOLATE WHAT
+MULTIPLIES THE AUDIO, STEP WHAT DESCRIBES IT. The envelope needed both
+corrections and neither alone (40.43 / 41.89 / 22.47 / 5.51).
+
+Firmware `juno_s3_LASTMILE.bin` carries the shipped set. NO CYCLE NUMBER IS
+CLAIMED HERE. 0xd0 is the verdict and only the board prints it.

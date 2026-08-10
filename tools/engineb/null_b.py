@@ -305,6 +305,17 @@ if os.environ.get("JUNO_EB_VCF_RES_LUT"):
 if os.environ.get("JUNO_EB_HALF_OS"):
     CFLAGS = CFLAGS + ["-DEB_FORK_S3", "-DEB_HALF_OS=1"]
 
+# JUNO_EB_DEFS: extra -D flags, verbatim, space separated. It exists so a
+# HOST tool can be built with the SAME flag set as a firmware without one
+# named hook per flag -- gen_listen_coefs.py snapshots engine B's state, and a
+# snapshot taken under a different flag set than the firmware runs is a
+# mismatched struct or a discontinuous state, which this project has already
+# paid for twice. It is NOT a general escape hatch for gates: every flag a
+# gate turns on still gets its own named hook above, so the gate log says
+# which lever it measured.
+if os.environ.get("JUNO_EB_DEFS"):
+    CFLAGS = CFLAGS + os.environ["JUNO_EB_DEFS"].split()
+
 # ---------------------------------------------------------------- scenarios
 # The nine port-risk scenarios are reused verbatim from the Track B gate: they
 # were not guessed, they were grown by the canary and observability probes

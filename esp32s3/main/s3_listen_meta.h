@@ -2,9 +2,9 @@
  * layout of s3_listen.bin. Patch 0, notes [1, 2, 3, 4, 5, 6, 7, 8]. */
 #define S3L_MAGIC 0x4A554E4Fu
 #define S3L_NNOTE 8
-#define S3L_COEF_SZ 10564u
+#define S3L_COEF_SZ 18788u
 #define S3L_MCOEF_SZ 1704u
-#define S3L_RSTATE_SZ 736452u
+#define S3L_RSTATE_SZ 736916u
 #define S3L_MSTATE_SZ 729816u
 #define S3L_VOICE_SZ 8024u
 /* the master state's members, HOST sizes, in blob order.
