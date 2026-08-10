@@ -9,11 +9,21 @@
  *     x + ((((x*x)*x)*x)*(x*K)) is not      x*(1 + K*(x*x)*(x*x))
  *     1/(((G*G)*(G*G))*k + 1)   is not      a reciprocal approximation
  * The third is called out by docs/trackb/VCF.md §3.8 and is the one that would
- * be tempting on a divider-less FPU: the ESP32-S3 has no FP divide, so this
- * division is a soft-float call, and it is measured rather than avoided.
+ * be tempting on a divider-less FPU. CORRECTED 2026-08-10, because the
+ * sentence that stood here was wrong on both halves: it said the ESP32-S3 has
+ * no FP divide and that this division is therefore a soft-float call. MEASURED,
+ * __XCHAL_HAVE_FP_DIV is 1, every instruction of the divide sequence assembles
+ * for this target, and libgcc's own __divsf3 for esp32s3 IS that sequence --
+ * 30 instructions of which 14 are div0.s / nexp01.s / maddn.s / divn.s. The
+ * FPU was doing the work all along; what the call costs is TRANSPORT (entry,
+ * retw, a wfr pair in and an rfr out, because the windowed ABI passes floats
+ * in INTEGER registers). engine_b/eb_fpdiv.h removes that transport by
+ * inlining the same sequence verbatim. The refusal above still stands: a
+ * reciprocal APPROXIMATION is not admissible here, and none is used.
  */
 #include "eb_vcf_ladder.h"
 #include "eb_fork_config.h"
+#include "eb_fpdiv.h"
 #if EB_HALF_OS_VCF
 #include "eb_halfos_fir.h"
 #include "eb_vcf_halfos_fir.h"
@@ -609,7 +619,7 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
         Gp  = g2 / (1.0f + g2);
 #endif
         Ap  = 1.0f - (Gp + Gp);
-        Rp  = 1.0f / ((((Gp * Gp) * (Gp * Gp)) * k) + 1.0f);
+        Rp  = EB_DIV(1.0f, ((((Gp * Gp) * (Gp * Gp)) * k) + 1.0f));
         Rkp = Rp * k;
 
         hi = (hi + 1) & 31;
