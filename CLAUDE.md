@@ -2,6 +2,50 @@
 
 # JUNO-60 (JU-06A) C99 port — project memory
 
+**⚑⚑⚑⚑ LIVE STATE (2026-08-10 night, Opus 5) — READ THESE FOUR
+CORRECTIONS BEFORE QUOTING ANY OLDER NUMBER IN THIS FILE. Full evidence:
+`docs/engineb/data/gap_decomposition.md`, `asm_kernel_recon.md`,
+`lastmile_result.md`, `STEP1_ATTRIBUTION.md`.**
+
+1. **`c/i = 0.95` MUST NOT BE QUOTED ABOUT THE FORK.** It was measured on the
+   F4 harness only — 4x ladder, no wavetable DCO, no half-OS, and it never
+   calls `eb_render.c`'s voice loop. The SHIPPING FORK voice, priced twice
+   independently from real Xtensa disassembly, is **~2,275 instructions
+   against 3,068 measured cycles → c/i ≈ 1.35**.
+2. **THE GAP IS −347 CYCLES/VOICE, NOT −620.** `0xd0` decomposes as
+   core 0 = head 693 + 1 voice = 3,761 and core 1 = 2 voices = 6,136; the loop
+   is the max, so **the prologue is NOT on the critical core** and the binding
+   constraint is simply TWO SOUNDING VOICES ON ONE CORE. Budget 5,442 → the
+   voice must reach 2,721. The old −620 charged the measurement's own head
+   and sync overhead against the voice.
+3. **THE ESP32-S3 HAS HARDWARE FP DIVIDE.** `__XCHAL_HAVE_FP_DIV` is 1 and
+   `div0.s / divn.s / recip0.s / nexp01.s / maddn.s / mkdadj.s / addexpm.s /
+   sqrt0.s` all assemble for this target. `eb_vcf_ladder.c`'s header says the
+   chip "has no FP divide" — that sentence is WRONG. GCC emits `__divsf3`
+   anyway and no tested flag changes it; inline asm is the open route.
+4. **THE ASM KERNEL IS UNDERSIZED and is NOT the head pointer.** Ladder+VCA
+   hold ~466 cycles of stall against the work order's ~650 requirement, so a
+   perfect kernel cannot close the gap alone. Two levers ahead of it, both
+   free: the never-measured `juno_s3_ILV.bin` / `juno_s3_BEST_noILV.bin` pair
+   in `esp32s3/flash/`, and the hardware divide above.
+
+LANDED 2026-08-10, both gated: **`EB_NOLIBM`** — 14 `fminf`/`fmaxf` CALLS off
+the voice path (`engine_b/eb_minmax.h`; one picolibc `fminf` is 62 executed
+instructions, the ternary is 2). Trunk null EXACTLY 0; fork sonic gate
+3.17 dB. **`EB_VCF_MAPFAST`** — the ladder cutoff map's three divisions
+collapse to one by exact identity (verified over 289 exact rationals, 5 ULP
+in float32); `__divsf3` in `eb_vcf_ladder.o` 8 → 4; sonic gate 3.17 dB.
+Together ~500 instructions/voice off a 2,275 baseline. **NO CYCLE CLAIM —
+the board has not run either.** Firmware `esp32s3/flash/juno_s3_NOLIBM.bin`.
+
+CLOSED BY MEASUREMENT the same night, do not reopen: control-rate holds
+(~60 cycles for 2.6 dB of sound); the at-rest path (indexed addressing, ONE
+at-rest voice on the critical core, ~127 cycles — the "93 instructions of
+spilled induction pointers" claim is refuted by disassembly); the 2-tap
+decimator (10.07 dB). **SHIPPING WARNING:** with `S3L_SPLIT=5` the allocator
+fills from voice 7 downward, so a three-note chord lands ENTIRELY on core 1
+— 9,204 cycles, 70 % over. The voice-to-core map must force a 2/1 split.
+
 **⚑⚑⚑ LIVE WORK ORDER (2026-08-04, USER-BINDING, supersedes all prior engine B
 sequencing): `docs/engineb/PHASE1_ORDERS.md`.** The user has decided the
 strategy: **the TRUNK is the full EXACT engine B — the splitting point for
