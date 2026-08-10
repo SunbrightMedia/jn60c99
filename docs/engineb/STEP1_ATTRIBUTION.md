@@ -499,3 +499,40 @@ stack stores against 9), which by the work order's rule means it has already
 lost on registers -- but the whole point of the interleave is that filling
 stalls may pay for spills, and only the board can weigh those against each
 other. Firmware juno_s3_FAST3_ILV.bin.
+
+## EB_VCF_ILV ON SILICON (2026-08-10) — CLOSED NEGATIVE, AND IT DAMAGES THE KERNEL
+  wake     FAST3    +ILV   delta
+  0x00      1,038     971     -67
+  0x80      3,394   3,554    +160
+  0xc0      6,120   6,273    +153
+  0xe0      8,855   9,200    +345
+  0xfc      9,100   9,376    +276
+  **0xd0    6,062   6,193    +131**
+
+**0xd0 IS ILV'S BEST CASE** -- core 1 carries exactly two voices, i.e. exactly
+one pair, so every voice is interleaved and none falls back to the single
+tick. Even there it is 131 cycles WORSE. At three voices (0xe0) it is +345.
+
+THE SPILLS WON. Predicted before the flash from the static count (40 stack
+stores against 9) and stated as a coin flip; the coin came down on registers.
+**THE 16-REGISTER WALL, FOURTH APPEARANCE** -- voice interleave (twice now),
+the pitch hoist's inlining, EB_FUSE_VCA.
+
+**AND THIS IS EVIDENCE AGAINST THE ASM KERNEL, whose whole premise is the
+same one.** ASM_KERNEL_WORKORDER.md exists to give the in-order FPU two
+independent dependency chains so its stalls fill. That hypothesis now has a
+BIT-EXACT, silicon-MEASURED implementation, in its most favourable
+configuration, and it LOSES by 131. The kernel's remaining argument is that
+HAND allocation would not spill where the compiler did -- which is not
+refuted, but it must now overcome a measured deficit rather than start from
+zero, and its own abort line is 300 cycles.
+
+## WHERE THE PROJECT STANDS, all measured, FAST3 is the best build
+    0xd0 = 2 sounding (5,720) + 1 at-rest (130) + loop/sync (212) = 6,062
+    budget 5,442 -> OVER BY 620 (1.114x)
+    voice must reach 2,550 as things are, or 2,615 if the at-rest slot on the
+    critical core is eliminated. Today 2,860: **-310, or -245**.
+
+Tonight moved 0xd0 from 6,723 to 6,062 at ZERO sonic cost. Three levers
+delivered (NOLIBM, VCF_MAPFAST, FPDIV) and four were closed by measurement
+(control-rate holds, 2-tap decimator, prologue pipelining, voice interleave).
