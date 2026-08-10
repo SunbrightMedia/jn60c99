@@ -1,6 +1,7 @@
 /* eb_pitch.c — see eb_pitch.h. Double precision throughout until the final
  * fminf/fmaxf, exactly as the port. */
 #include "eb_pitch.h"
+#include "eb_minmax.h"
 #include "eb_fork_config.h"
 #include "juno_tables.h"
 #include <math.h>
@@ -24,7 +25,9 @@
 
 float eb_pitch_eval(float cv, float gain)
 {
-    return fmaxf(fminf(eb_pitch_fork_eval(cv), 512.0f), -512.0f) * gain;
+    /* both bounds are non-zero constants in the SECOND operand: no NaN
+     * and no signed-zero case (eb_minmax.h). */
+    return eb_fmaxf_c(eb_fminf_c(eb_pitch_fork_eval(cv), 512.0f), -512.0f) * gain;
 }
 
 int eb_pitch_row(float cv)
@@ -191,7 +194,7 @@ static df df_coef(double v)
 
 static float ebpf_clamp(float cv)
 {
-    return fminf(fmaxf(cv, -20.0f), 8.9f);
+    return eb_fminf_c(eb_fmaxf_c(cv, -20.0f), 8.9f);   /* constants, non-zero */
 }
 
 static int ebpf_row(float cv)
@@ -250,7 +253,7 @@ static float ebpf_eval_row(float cv, int row, float gain)
         df t = two_sum(A.s.lo, A.c);
         df u = two_sum(A.s.hi, t.hi);
         float out = u.hi + (u.lo + t.lo);
-        return fmaxf(fminf(out, 512.0f), -512.0f) * gain;
+        return eb_fmaxf_c(eb_fminf_c(out, 512.0f), -512.0f) * gain;
     }
 }
 
@@ -512,7 +515,7 @@ float eb_pitch_eval(float cv, float gain)
              + x10 * x * tab[22]
              + x10 * x * x * tab[24];
 
-    return fmaxf(fminf((float)s, 512.0f), -512.0f) * gain;
+    return eb_fmaxf_c(eb_fminf_c((float)s, 512.0f), -512.0f) * gain;
 }
 
 #endif /* !EB_PITCH_FAST */

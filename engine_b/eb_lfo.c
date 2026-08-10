@@ -12,6 +12,7 @@
  * -ffp-contract=off: they force a rounding at that point.
  */
 #include "eb_lfo.h"
+#include "eb_minmax.h"
 #include "triangle.h"
 #include <math.h>
 
@@ -135,15 +136,16 @@ float eb_lfo_tick(eb_lfo_state *s, const eb_lfo_coef *c,
     v84 = c->k1856;
     v85 = v79 + v84;
     if (v85 >= -1.0f)
-        v86 = fminf(v85, 1.0f);
+        v86 = eb_fminf_c(v85, 1.0f);      /* non-zero constant second */
     else
         v86 = -1.0f;
     v87 = c->k2128;
     s->s1488 = v86;
-    v88 = fminf(v87, v83 * 0.000015258789f);
+    /* SECOND OPERAND IS COMPUTED -- no bound, so the exact form. */
+    v88 = eb_fminf(v87, v83 * 0.000015258789f);
     v89 = (float)((float)(1.0f - v78) * c->k1920) + v78;
     if (v89 >= -1.0f)
-        v90 = fminf(v89, 1.0f);
+        v90 = eb_fminf_c(v89, 1.0f);      /* non-zero constant second */
     else
         v90 = -1.0f;
     v91 = v88 * c->k2144;

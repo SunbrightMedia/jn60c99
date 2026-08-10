@@ -1,6 +1,7 @@
 /* eb_dcoprep.c — see eb_dcoprep.h. A transcription of
  * src/voice_render.c:1702-1717 with the port's variable numbers kept. */
 #include "eb_dcoprep.h"
+#include "eb_minmax.h"
 #ifndef EB_ZEROCOEF
 #define EB_ZEROCOEF 0
 #endif
@@ -78,7 +79,9 @@ float eb_dcoprep_tick(const eb_dcoprep_coef *c, float pitch, float pwmcv,
     float v395 = pwmcv + c->k6304;
     float v396 = pitch * c->k5536;
     float v397 = c->k5520;
-    float v398 = fmaxf(c->k5568, v396);
+    /* THE COEFFICIENT IS THE FIRST OPERAND, so the second is COMPUTED and
+     * no bound is available for it -- the exact form, not the ternary. */
+    float v398 = eb_fmaxf(c->k5568, v396);
 #if EB_ZEROCOEF
     float v399 = c->k6288;                          /* k6320 == 0 */
 #else

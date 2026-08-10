@@ -2,6 +2,7 @@
  * src/voice_render.c:1230-1297, with the port's variable numbers kept.
  */
 #include "eb_vcf_res.h"
+#include "eb_minmax.h"
 #ifndef EB_ZEROCOEF
 #define EB_ZEROCOEF 0
 #endif
@@ -213,12 +214,16 @@ float eb_vcf_res_tick(eb_vcf_res_state *s, const eb_vcf_res_coef *c,
 #else
     s->s7536 = (float)(v229 * c->k7792) + c->k7616;
 #endif
-    v227 = (float)(fmaxf(
-                                 fminf(
+    /* k7760/k7776 are RECALL coefficients in the second operand -- non-NaN
+     * by construction (they are decoded patch bytes) and never a signed
+     * zero paired with an opposite zero. The INNER fminf's second operand
+     * v233 is COMPUTED, so that one takes the exact form. */
+    v227 = (float)(eb_fmaxf_c(
+                                 eb_fminf_c(
                                    (float)((float)((float)((float)(v227 * c->k7680)
                                                          + (float)(v228 * c->k7648))
                                                  + v232)
-                                         + fminf(c->k7744, v233))
+                                         + eb_fminf(c->k7744, v233))
                                  + c->k7664,
                                    c->k7760),
                                  c->k7776)

@@ -12,6 +12,7 @@
  * apart, and docs/trackb/CELLMAP.md flags it. They are kept where they are.
  */
 #include "eb_vca_hpf.h"
+#include "eb_minmax.h"
 #ifndef EB_ZEROCOEF
 #define EB_ZEROCOEF 0
 #endif
@@ -51,7 +52,10 @@ void eb_vca_control(eb_vca_state *st, const eb_vca_coef *c,
     gy     = st->gate_y;
     galt   = gy + c->c9984;                                         /* :1554 */
     gclamp = gy * c->c10000;                                        /* :1553 */
-    if (gclamp >= -1.0f) gclamp = fminf(gclamp, 1.0f);              /* :1555 */
+    /* the 1.0f second operand is a non-zero constant, so neither the NaN
+     * nor the signed-zero case of eb_minmax.h can arise. The `>= -1.0f`
+     * guard has already excluded a NaN gclamp in any case. */
+    if (gclamp >= -1.0f) gclamp = eb_fminf_c(gclamp, 1.0f);         /* :1555 */
     else                 gclamp = -1.0f;
     if ((gy + c->c9952) >= 0.0f)                                    /* :1559 */
         galt = ((c->c9968 * gate) - (c->c9968 * gy)) + gy;          /* :1560 */
