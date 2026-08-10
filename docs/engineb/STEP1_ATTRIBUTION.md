@@ -455,3 +455,47 @@ THAT HIDE IT.** This file already says so: "the gain is INVISIBLE at every
 existing sweep point; it only appears when the prologue-bearing core carries
 fewer voices." 0xd0 is exactly that mask, and PIPE has never been measured
 there. The lever is UNDECIDED, not dead -- the same status the ILV pair had.
+
+## EB_PROLOGUE_PIPE ON 0xd0 (2026-08-10) — DEAD, ON THE MASK BUILT TO REVEAL IT
+  wake     FAST3   +PIPE   delta
+  0x00      1,038   1,068     +30
+  0x80      3,394   3,382     -12
+  0xc0      6,120   6,104     -16
+  0xe0      8,855   8,825     -30
+  0xfc      9,100   9,116     +16
+  **0xd0    6,062   6,055      -7**
+
+Seven cycles, far inside this board's ~300-cycle noise floor. **CLOSED
+NEGATIVE, and this time on the mask that was supposed to show it** -- the
+file's own note said the gain is invisible everywhere except where the
+prologue-bearing core carries fewer voices, and 0xd0 is that mask. It does
+not.
+
+**AND THAT REFUTES MY OWN DIAGNOSIS OF AN HOUR EARLIER.** I said the 601
+unmodelled cycles on 0xd0 were the serial head. They are not: if the head
+were on the critical path, removing it from the path would have moved the
+number. The head was ALREADY overlapped -- core 1 is simply the longer core.
+
+## THE CORRECTED DECOMPOSITION, from FAST3's own numbers
+    slope (sounding minus at-rest)      2,730
+    at-rest voice        1,038 / 8   =    130
+    ABSOLUTE sounding voice             2,860
+
+    0xd0 core 1 = 2 sounding + 1 at-rest  5,850
+                  measured                6,062
+                  loop + sync remainder     212
+
+**TO FIT: the absolute voice must reach 2,550, from 2,860 -- another -310.**
+That is the honest requirement, and unlike the previous two statements of it
+this one is built from the at-rest cost and the sync remainder rather than
+assuming they are zero.
+
+## THE LEVER THAT DIRECTLY ATTACKS IT
+EB_VCF_ILV on the HALF-OS ladder -- two voices' ladders woven so the in-order
+FPU has two independent dependency chains. PROVEN BIT-EXACT earlier tonight
+over 12,360,000 voice-vectors on host and on Xtensa under QEMU, with three
+planted defects caught including a single moved parenthesis. It SPILLS (40
+stack stores against 9), which by the work order's rule means it has already
+lost on registers -- but the whole point of the interleave is that filling
+stalls may pay for spills, and only the board can weigh those against each
+other. Firmware juno_s3_FAST3_ILV.bin.
