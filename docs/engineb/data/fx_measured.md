@@ -53,9 +53,40 @@ So `juno_s3_FX_SRAM.bin` is NOT an all-internal build. It is a MIXED build.
 The 2,616 figure is therefore a mixed-placement figure, and the all-internal
 number is still unknown and could only be better.
 
-Two consequences. The summary line must be fixed to report what was achieved.
-And `juno_s3_FX_PSRAM.bin` is still worth running: it gives the all-PSRAM end
-of the range, and the SRAM end needs a rebuild with a smaller cap.
+The summary line is fixed: it now names the placement ALL-INTERNAL / MIXED /
+ALL-PSRAM and counts both sides.
+
+## ★ RING PLACEMENT IS NOT A LEVER — CLOSED BY MEASUREMENT
+
+`juno_s3_FX_PSRAM.bin`, all nine rings in PSRAM, ran next:
+
+| wake | mixed-SRAM | all-PSRAM | delta |
+|---|---|---|---|
+| 0x00 | 2,704 | 2,680 | **-24** |
+| 0xfc | 2,705 | 2,679 | **-26** |
+| 0xd0 | 2,707 | 2,684 | **-23** |
+
+**PSRAM is FASTER, by about 24 cycles, on every mask.** Not slower. The whole
+`S3L_RING_SRAM` idea was built on the belief that PSRAM ring access would cost
+the FX chain real time. It costs nothing measurable, and putting the rings
+internal costs a little -- most likely because the 102 KB it takes out of
+internal RAM displaces something the voice chain wanted (the engine column
+also moves, 6,082 -> 6,113).
+
+So the delay rings STAY IN PSRAM. That releases about 102 KB of internal SRAM
+for whatever the two-chip link turns out to need, and it removes the standing
+precondition that the earlier build had to print -- the cap was only valid
+while every read lag stayed below it, so a longer DELAY TIME than this bank
+uses would have folded. **That risk is now gone, and it was bought for -24
+cycles.** Do not reopen this.
+
+The FX figure to quote is therefore the all-PSRAM one: overhead 2,684, and
+**FX proper 2,593 cycles/sample**.
+
+## A benign artefact worth naming
+
+The all-PSRAM run prints `underruns=1` from t=1s and it never grows. It is a
+single start-up event, not a running deficit. A real overrun would climb.
 
 ## The voice numbers in this build are OLD
 
@@ -72,16 +103,16 @@ FX proper of 2,616, and the 5,442-cycle budget:
 **LAYOUT A — 3 voices per chip**
 
     chip A: core0 2v = 4,724 ; core1 1v = 2,362   -> 4,815   margin 627
-    chip B: core0 2v = 4,724 ; core1 1v+FX = 4,978 -> 5,069  margin 373
+    chip B: core0 2v = 4,724 ; core1 1v+FX = 4,955 -> 5,046  margin 396
 
 **LAYOUT B — 4 voices on chip A; 2 voices + FX ALONE on chip B**
 
     chip A: core0 2v ; core1 2v                    -> 4,815  margin 627
-    chip B: core0 2v = 4,724 ; core1 FX = 2,616    -> 4,815  margin 627
+    chip B: core0 2v = 4,724 ; core1 FX = 2,593    -> 4,815  margin 627
 
 **BOTH LAYOUTS FIT ON PAPER.** Layout B is the better one — it balances at
 4,815 on both chips and holds 627 cycles of margin on each, against layout A's
-worst core at 5,069 and 373. Layout B is also the safer one, because the FX
+worst core at 5,046 and 396. Layout B is also the safer one, because the FX
 core has no voice on it at all, so a voice-count change cannot push it over.
 
 **ONE CHIP STILL CANNOT DO IT:** 3 voices plus the FX on one core is 9,793
