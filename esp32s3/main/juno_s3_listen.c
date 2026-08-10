@@ -457,7 +457,15 @@ static void render_block(int n)
     w_shb[0].ready = 0;
     eb_engine_render_shared(&EBE, RS, &RC, &w_shb[0]);
     for (i = 0; i < n; ++i) {
-        for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
+        /* THE PRE-ZERO LOOP IS GONE, AND IT WAS NOT MERELY REDUNDANT -- IT
+         * WAS ON THE CRITICAL PATH. eb_engine_render_range writes
+         * `vout[v] = 0.0f` as the FIRST statement of its own voice loop, for
+         * every v in [v0,v1), before the at-rest test. The two ranges cover
+         * [0,SPLIT) and [SPLIT,EB_NUM_VOICES), so every slot was already
+         * being zeroed by the core that owns it -- and this loop zeroed all
+         * eight AGAIN, on core 0, BEFORE publishing w_ready. Core 1 therefore
+         * waited on eight float stores it did not need, every sample.
+         * Removing it deletes duplicated work AND releases core 1 earlier. */
         w_ready = i + 1;                    /* prologue[i] is already done */
         eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
                                0, S3L_SPLIT, &w_shb[i], w_vbb[i]);
@@ -468,7 +476,8 @@ static void render_block(int n)
     }
 #else
     for (i = 0; i < n; ++i) {
-        for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
+        /* same removal as the pipelined arm above: the ranges zero their own
+         * slots and together they cover every one. */
         w_shb[i].ready = 0;
         eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i]);
         w_ready = i + 1;                          /* publish; core 1 may go */
@@ -829,9 +838,17 @@ void app_main(void)
             eb_master_render(MS, &MC, &RG, vb, &L, &R);
 #endif
             if (L > 1.0f) L = 1.0f; else if (L < -1.0f) L = -1.0f;
+#if S3L_NOFX
+            /* R IS L HERE, so clamping and converting it a second time is
+             * pure duplication -- one clamp, one multiply and one float-to-int
+             * per sample, on the critical core. Convert once, store twice.
+             * Under the FX build L and R genuinely differ and both are done. */
+            pcm[2 * i] = pcm[2 * i + 1] = (int16_t)(L * 30000.0f);
+#else
             if (R > 1.0f) R = 1.0f; else if (R < -1.0f) R = -1.0f;
             pcm[2 * i]     = (int16_t)(L * 30000.0f);
             pcm[2 * i + 1] = (int16_t)(R * 30000.0f);
+#endif
 
             /* One chord, held then released, repeating. `gate` 0 = held.
              *
