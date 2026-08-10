@@ -759,6 +759,24 @@ void eb_vcf_tick2(eb_vcf_state *sta, const eb_vcf_coef *ca, float ina, float Ga,
     prevb = stb->drive_prev; stb->drive_prev = driveb;
 
     /* ------------------------------------ the half-rate cutoff transform */
+#if EB_VCF_MAPFAST
+    /* THE SAME ONE-DIVISION MAP AS eb_vcf_tick's. It MUST be kept identical
+     * to that one: with both EB_VCF_ILV and EB_VCF_MAPFAST on, this function
+     * and eb_vcf_tick render voices of the SAME engine, and two different
+     * cutoff maps in one instrument is a silent divergence of exactly the
+     * class this project keeps a catalogue of. */
+    {   float Gca = Ga;
+        if (Gca > 0.29289322f) {
+            Gca = 0.29289322f;
+#if EB_VCF_CLAMP_COUNT
+            ++eb_vcf_clamp_hits;
+#endif
+        }
+        Gpa = ((Gca + Gca) * (1.0f - Gca))
+             / (1.0f - ((Gca * Gca) + (Gca * Gca)));
+    }
+    (void)g4a; (void)g2a;
+#else
     g4a = Ga / (1.0f - Ga);
     if (g4a > 0.41421354f) {
         g4a = 0.41421354f;
@@ -768,9 +786,28 @@ void eb_vcf_tick2(eb_vcf_state *sta, const eb_vcf_coef *ca, float ina, float Ga,
     }
     g2a = (g4a + g4a) / (1.0f - (g4a * g4a));
     Gpa = g2a / (1.0f + g2a);
+#endif
     Apa = 1.0f - (Gpa + Gpa);
-    Rpa = 1.0f / ((((Gpa * Gpa) * (Gpa * Gpa)) * ka) + 1.0f);
+    Rpa = EB_DIV(1.0f, ((((Gpa * Gpa) * (Gpa * Gpa)) * ka) + 1.0f));
     Rkpa = Rpa * ka;
+#if EB_VCF_MAPFAST
+    /* THE SAME ONE-DIVISION MAP AS eb_vcf_tick's. It MUST be kept identical
+     * to that one: with both EB_VCF_ILV and EB_VCF_MAPFAST on, this function
+     * and eb_vcf_tick render voices of the SAME engine, and two different
+     * cutoff maps in one instrument is a silent divergence of exactly the
+     * class this project keeps a catalogue of. */
+    {   float Gcb = Gb;
+        if (Gcb > 0.29289322f) {
+            Gcb = 0.29289322f;
+#if EB_VCF_CLAMP_COUNT
+            ++eb_vcf_clamp_hits;
+#endif
+        }
+        Gpb = ((Gcb + Gcb) * (1.0f - Gcb))
+             / (1.0f - ((Gcb * Gcb) + (Gcb * Gcb)));
+    }
+    (void)g4b; (void)g2b;
+#else
     g4b = Gb / (1.0f - Gb);
     if (g4b > 0.41421354f) {
         g4b = 0.41421354f;
@@ -780,8 +817,9 @@ void eb_vcf_tick2(eb_vcf_state *sta, const eb_vcf_coef *ca, float ina, float Ga,
     }
     g2b = (g4b + g4b) / (1.0f - (g4b * g4b));
     Gpb = g2b / (1.0f + g2b);
+#endif
     Apb = 1.0f - (Gpb + Gpb);
-    Rpb = 1.0f / ((((Gpb * Gpb) * (Gpb * Gpb)) * kb) + 1.0f);
+    Rpb = EB_DIV(1.0f, ((((Gpb * Gpb) * (Gpb * Gpb)) * kb) + 1.0f));
     Rkpb = Rpb * kb;
 
     /* ------------------------------------------------------ sub-step 1
