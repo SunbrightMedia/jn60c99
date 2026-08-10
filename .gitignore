@@ -79,3 +79,6 @@ tools/verify/finefx_port_dump
 
 # gprof profiling output (tools/verify + /tmp benchmarks)
 gmon.out
+
+# session listening bundles (regenerate with tools/engineb/lastmile_wav.py)
+lastmile_wavs.zip
