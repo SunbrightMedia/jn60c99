@@ -133,3 +133,17 @@ EXECUTION NOTES THE BOARD ADDED TONIGHT:
   flags. Without -DEB_HALF_OS_VCF the reference is a DIFFERENT ladder body.
 - asm_diff.py exists and its teeth are proven (control passes; four
   mutations caught; the fused-multiply-add rule is absolute).
+
+## ★ STOP — THE RECON SAYS THIS IS THE WRONG FIRST LEVER (2026-08-10)
+- **Ladder+VCA stall pool is ~466 cycles/voice, and this order requires
+  ~650** (abort line 300). A PERFECT kernel cannot close the gap alone.
+- The 516-instruction ladder figure this order is sized on **charges the
+  decimator's hardware `loop` body ONCE against a trip count of 15**;
+  executed is ~682, so the 4x ladder's c/i was 1.59, not 2.1.
+- **27 % of a voice is LIBRARY CALLS**: 7 fminf/fmaxf at 62 instructions
+  each (30-instruction body + 2 __issignalingf + 2 __isnanf) plus 6
+  __divsf3 = 620 of 2,275 instructions. eb_envgen.c:37 already defines a
+  static eb_fminf for this exact reason; seven per-voice call sites never
+  took it. A library call OCCUPIES issue slots rather than waiting in them,
+  so Phase A's null result does not predict this one.
+DO THAT FIRST. Then re-measure, then decide about this order.

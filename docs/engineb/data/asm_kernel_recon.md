@@ -122,7 +122,67 @@ CAVEAT, stated: 31,007 is the deepest read THIS BANK produces. A correct
 allocation must be derived from the delay-time parameter's MAXIMUM, not from
 observed lag. That derivation is not done.
 
-## 8. THE HEAD POINTER
+## 8. ★ THE KERNEL IS UNDERSIZED — the refutation's own conclusion
+The pool that matters is not the whole voice's ~790 cycles, it is the pool
+INSIDE THE MODULES THE KERNEL TOUCHES. Ladder + VCA are **784 of the 2,275
+instructions**, and against the board's own ablations (VCA 379 cyc / 220
+instr = c/i 1.72; ladder ~871 cyc / 564 instr = c/i 1.54, inferred from
+1,083 minus the ~212 the half-OS change delivered) the stall pool inside
+those two modules is **~466 cycles/voice**.
+
+**The work order requires ~650. Its own ABORT-TO-DECISION line is 300.**
+So a PERFECT kernel — every stall filled, zero spills — lands between the
+abort line and the requirement, and cannot close the gap alone. Writing it
+first would be spending days to arrive at a measured shortfall.
+
+A further correction from the same pass: the 516-instruction ladder figure
+the work order is sized on **charges the 32-tap decimator's hardware `loop`
+body ONCE** when the trip count is 15 (`eb_vcf_ladder.c:652-653`). ~182
+executed instructions are missing; executed is ~682, so the 4x ladder's c/i
+was **1.59, not 2.1**, and the "~735 measured stalls" was never that large.
+
+## 9. ★★ THE LEVER NOBODY HAS LOOKED AT: 27 % OF A VOICE IS LIBRARY CALLS
+MEASURED on the board's own linked ELF, at the board's own flags
+(`-specs=picolibc.specs`):
+
+    7 libm fminf/fmaxf CALLS per voice   x 62 instr = 434
+    6 __divsf3                                       ~186
+    ---------------------------------------------------------
+    library helpers                       620 / 2,275 = **27 % of a voice**
+
+Each `fminf` is 62 instructions — a 30-instruction body plus TWO
+`__issignalingf` (9 each) and TWO `__isnanf` (7 each) — to compute what
+`(a < b) ? a : b` does in two. **The engine already knows this**:
+`eb_envgen.c:37` defines a static `eb_fminf` for exactly this reason and
+says so. Some modules took that route; seven call sites per voice did not.
+
+This is arithmetic REMOVAL, and tonight's Phase A showed removal returns
+little on a stalled pipeline — BUT a library CALL is not stalled
+arithmetic. It is a windowed ABI call, register-window rotation, argument
+marshalling and branches: work that occupies issue slots rather than
+waiting in them. It is a different category from the control-rate holds and
+must not be judged by their result.
+
+**The refutation's own verdict: "the kernel is the wrong first lever."**
+
+## 10. THE ILV BIT-EXACTNESS IS CONFIRMED BY AN INDEPENDENT REFUTATION
+A second agent tried to break the 750,000-vector claim and could not:
+- **12,360,000 voice-vectors, ZERO output and ZERO state mismatches** — a
+  harness written from scratch, compiling `eb_vcf_ladder.c` TWICE (ILV=0 and
+  ILV=1) and comparing both floats and both complete 168-byte states
+  bit-for-bit after every call, with voice B given a DIFFERENT coefficient
+  set so a shared subexpression cannot hide.
+- Run on host x86 over 6 seeds AND **on ESP32-S3 bare metal under QEMU with
+  the real Xtensa compiler** (360,000 of those vectors). Zero `madd.s` in
+  the objects or the linked ELF.
+- Mechanical lane-split: 45 A-lane and 45 B-lane statements TEXTUALLY
+  IDENTICAL after suffix strip; only integer statements touch both lanes.
+  **No computed float value crosses lanes.**
+- **Three planted defects, all caught**, including P1 — a rounding-only
+  reassociation inside ONE voice's chain in ONE of two sub-steps (a single
+  moved parenthesis): 198,372 mismatches on host, 31,982 on Xtensa.
+
+## 11. THE HEAD POINTER
 1. **Flash the two ILV binaries that already exist** (`juno_s3_ILV.bin` vs
    `juno_s3_BEST_noILV.bin`) — zero build cost, and it decides the interleave
    hypothesis on silicon, which is the hypothesis the whole kernel rests on.
