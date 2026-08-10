@@ -42,7 +42,14 @@ CLOSED BY MEASUREMENT the same night, do not reopen: control-rate holds
 (~60 cycles for 2.6 dB of sound); the at-rest path (indexed addressing, ONE
 at-rest voice on the critical core, ~127 cycles — the "93 instructions of
 spilled induction pointers" claim is refuted by disassembly); the 2-tap
-decimator (10.07 dB). **SHIPPING WARNING:** with `S3L_SPLIT=5` the allocator
+decimator (10.07 dB); **TRIM** — deleting the redundant pre-zero loop and the
+duplicated R-channel convert costs **+35 on 0xd0 and +34 PER VOICE** while
+buying only −33 at the floor (`data/trim_result.md`), the 16-register wall for
+the FIFTH time; reverted, and the standing 0xd0 numbers (engine 5,395, whole
+loop 5,486, budget 5,442) are unchanged. **THE CHIP-LAYOUT LEVER IS FREE AND
+UNEXPLOITED:** 4 voices on chip A, 2 voices + the FX ALONE on chip B's second
+core raises the FX budget 2,362 → 4,724 (`data/chip_layout.md`).
+**SHIPPING WARNING:** with `S3L_SPLIT=5` the allocator
 fills from voice 7 downward, so a three-note chord lands ENTIRELY on core 1
 — 9,204 cycles, 70 % over. The voice-to-core map must force a 2/1 split.
 
