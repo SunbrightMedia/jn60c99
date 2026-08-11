@@ -80,10 +80,26 @@ static void render(int chord, float *out)
     for (v = 0; v < EB_NUM_VOICES; ++v)
         EBE.v[v].atrest = !((wake >> v) & 1u);
 
+    /* ⚠ THE PROLOGUE PATH, BECAUSE THAT IS WHAT THE FIRMWARE RUNS.
+     *
+     * The first version of this called eb_engine_render_voices(), the
+     * SINGLE-CORE entry. The firmware is built S3_CORES=2 and its render_block
+     * calls eb_engine_render_shared() and then eb_engine_render_range() -- a
+     * different path through the same file. EB_LFO_FREERUN lives in the
+     * PROLOGUE, so a probe that never calls the prologue cannot see it, and
+     * reported EXACTLY 0 for a fix that works.
+     *
+     * That was the THIRD time in one session that a measurement here could not
+     * see its own subject. The pattern is always the same: the probe was
+     * configured like something convenient instead of like the device. */
     for (i = 0; i < NSA; ++i) {
+        eb_shared_tick sh;
         float s = 0.0f;
         for (v = 0; v < EB_NUM_VOICES; ++v) vb[v] = 0.0f;
-        eb_engine_render_voices(&EBE, RS, &RC, (const eb_render_needs *)0, vb);
+        sh.ready = 0;
+        eb_engine_render_shared(&EBE, RS, &RC, &sh);
+        eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
+                               0, EB_NUM_VOICES, &sh, vb);
         for (v = 0; v < EB_NUM_VOICES; ++v) s += vb[v];
         out[i] = s;
     }

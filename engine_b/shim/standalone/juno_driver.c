@@ -170,6 +170,7 @@ float *(*juno_master_render_fn)(unsigned char *, float **, float **)
 #include "eb_coefs.h"
 #include "eb_master.h"
 #include "eb_master_coefs.h"
+#include "eb_pwm_cv.h"   /* eb_modcv_tick, for ebsh_lfo_reach below */
 #include <stddef.h>
 
 static eb_engine       EBE;
@@ -217,6 +218,38 @@ void ebsh_dump_sizes(int *out)
         out[i++] = (int)sizeof MS.rev_pending;
         out[i++] = (int)sizeof MS.rev_wipe;
     }
+}
+
+/* ebsh_lfo_reach -- DOES THIS PATCH'S LFO REACH ANYTHING?
+ *
+ * Added 2026-08-11. The listen blob carried a patch whose LFO ran and modulated
+ * nothing, so a proven LFO fix produced EXACTLY 0 audio difference and the fix
+ * could not be demonstrated. Choosing a different patch by its NAME would be a
+ * guess; this answers it by execution.
+ *
+ * It calls the modulation stage twice with the LFO inputs at their extremes and
+ * returns the largest resulting swing in either output. Zero means the patch
+ * routes no LFO -- the coefficients that scale it are zero -- and the patch is
+ * useless for demonstrating modulation however good the engine is.
+ *
+ * It reads the coefficients the shim has ALREADY BUILT from the port's recall,
+ * so it measures the same numbers the firmware would freeze into its blob. */
+float ebsh_lfo_reach(void *ctx)
+{
+    float best = 0.0f;
+    int v;
+    (void)ctx;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+        float p0, w0, p1, w1, d;
+        /* the two LFO inputs at 0 and at full scale; everything else held */
+        eb_modcv_tick(&EBC.mod[v], 0.0f, EBC.kbd[v], 0.0f, 0.0f,
+                      0.0f, 0.0f, &p0, &w0);
+        eb_modcv_tick(&EBC.mod[v], 0.0f, EBC.kbd[v], 1.0f, 1.0f,
+                      0.0f, 0.0f, &p1, &w1);
+        d = p1 - p0; if (d < 0.0f) d = -d; if (d > best) best = d;
+        d = w1 - w0; if (d < 0.0f) d = -d; if (d > best) best = d;
+    }
+    return best;
 }
 
 void ebsh_dump_blob(int which, unsigned char *dst)

@@ -217,3 +217,57 @@ reports all three outputs, and its header says why.
 
 **The rule: when an output reads exactly zero, prove the wire is connected
 before concluding the source is dead.**
+
+# ★★ PROVEN AUDIBLY ON PATCH 50 (2026-08-11)
+
+`tools/engineb/lfo_patch_scan.py` asked, by execution rather than by reading a
+parameter index, which factory patches route the LFO to the modulation outputs.
+
+    patches whose LFO reaches the modulation outputs: 32 of 64
+    strongest: 50, 41, 20 (reach 0.4575), 35, 56, 19, 5, 8 ...
+
+**The listen blob had been built from patch 0, one of the 32 that route NOTHING.**
+That is why a proven LFO fix produced EXACTLY 0 audio: a 50/50 draw, lost.
+
+Blob regenerated from patch 50 and re-measured through the FIRMWARE'S OWN
+render path:
+
+    BEFORE (EB_LFO_FREERUN=0)      moddep   lfo spans        residual
+      chord 1  wake 0x80             0.62   0 / 0 / 0        --
+      chord 2  wake 0xc0             2.26   0 / 0 / 0        --
+      chord 3  wake 0xe0             2.08   0 / 0 / 0        --
+
+    AFTER  (EB_LFO_FREERUN=1)
+      chord 1  wake 0x80             3.00   1.996/1.996/2.0  -3.6 dB (88059/88200)
+      chord 2  wake 0xc0             4.43   1.996/1.996/2.0  -3.4 dB (88107/88200)
+      chord 3  wake 0xe0             4.43   1.996/1.996/2.0  -2.7 dB (88130/88200)
+
+**Modulation depth roughly doubles and the residual is around -3 dB with
+essentially every sample changed.** For scale: the fork's whole audible standard
+is a 3.17 dB worst-band control. This is not a subtle correction; the instrument
+was missing a large part of its sound.
+
+Trunk null re-run after the shim edit: **PASS, EXACTLY 0 everywhere.**
+
+## ⚠ MY PROBE WAS WRONG A SECOND TIME, THE SAME WAY
+
+The first version watched one of three LFO outputs. The second called
+`eb_engine_render_voices()` -- the SINGLE-CORE entry -- while the firmware is
+built `S3_CORES=2` and runs `eb_engine_render_shared()` + `eb_engine_render_range()`.
+`EB_LFO_FREERUN` lives in the prologue, so a probe that never calls the prologue
+cannot see it, and it dutifully reported EXACTLY 0 for a fix that works.
+
+Three times in one session a measurement here could not see its own subject, and
+the shape was identical every time: **the probe was configured like something
+convenient instead of like the device.** That is the same sentence as the
+original defect. The tool now renders through the prologue and says so in its
+header.
+
+## ⚠ THE SINGLE-CORE PATH IS STILL BROKEN
+
+`EB_LFO_FREERUN` fixes the PROLOGUE. The voice loop's own `sh == NULL` path
+still `continue`s on an at-rest voice 0 before its LFO block, so a single-core
+build (`S3_CORES=1`, or any caller of `eb_engine_render_voices`) retains the
+original defect in full. The shipping firmware is two-core and is fixed; nothing
+else is. This is recorded rather than fixed because the fix belongs with a gate
+that exercises it, and no such gate exists yet.
