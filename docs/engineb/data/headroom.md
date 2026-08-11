@@ -67,3 +67,45 @@ The next work is therefore not another cycle hunt. It is:
 3. Test with actual playing rather than a looped chord. The voice-to-core map
    is still unforced, and a three-note chord landing entirely on one core was
    already measured at 9,204 cycles, 70 % over.
+
+# OWN3B MEASURED: the console throttle worked, 0.54 % remains (2026-08-11)
+
+    OWN3   drift +1,581 ms / 136 s = 11.6 ms/s = 1.16 % behind
+    OWN3B  drift   +568 ms / 105 s =  5.4 ms/s = 0.54 % behind
+
+**The verdict now reads `realtime OK` on EVERY line -- the flicker is gone.**
+But the cumulative drift still climbs, so it is still not a pass.
+
+The saving was 0.62 % against a predicted 1.63 %. **Wrong by 2.6x, in the
+flattering direction, for the sixth time.** The console model assumed the UART
+blocks for its full transmission time; evidently the driver buffers part of
+it. The number to trust is the 0.62 %.
+
+## Where the last 29 cycles are
+
+    whole loop says  +4 cycles over
+    wall clock says ~29 cycles over
+    -> about 25 cycles sit OUTSIDE the timed region
+
+The only work there is per-BLOCK: the I2S write and the single barrier,
+amortised over CHUNK samples. At CHUNK=128 a 3,000-cycle write is 23
+cycles/sample -- the right size to be the whole remainder.
+
+`juno_s3_OWN3C.bin` doubles CHUNK to 256, which halves that share.
+
+**THE COST IS LATENCY AND IT IS USER-FACING:** 128 frames is 2.9 ms, 256 is
+5.8 ms, and the FX pipeline adds one more chunk on top of whichever is
+chosen. That is a playability trade, so CHUNK stays a knob rather than a
+silent new default.
+
+## ⚠ AND THIS IS WHERE THE CYCLE HUNT SHOULD STOP
+
+Closing 0.54 % buys a margin of roughly zero. The chip would then be exactly
+at budget with **MIDI, parameter control and preset recall still missing**,
+and recall does not exist on the device at all. Those are BURSTS, and a burst
+needs slack, not parity.
+
+Chasing the last 29 cycles is worth one build because it is nearly free. It is
+NOT worth a campaign. The next real work is the three items already listed
+above: build the missing paths and measure them, win back 5-10 % of genuine
+headroom, and test with real playing instead of a looped chord.

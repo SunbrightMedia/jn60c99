@@ -106,7 +106,21 @@
 #endif
 
 #define SR        44100
-#define CHUNK     128            /* frames per render/write */
+#ifndef CHUNK
+/* frames per render/write.
+ *
+ * 128 -> 256 MEASURED-MOTIVATED (2026-08-11): after the console throttle the
+ * wall clock still ran 0.54 % behind while the timed loop was only 0.07 %
+ * over, so about 25 cycles/sample sit OUTSIDE the timed region. The per-block
+ * work -- the I2S write and the one barrier -- is the only thing there, and it
+ * is amortised over CHUNK samples. Doubling CHUNK halves its per-sample share.
+ *
+ * THE COST IS LATENCY, and it is the user-facing kind: 128 frames is 2.9 ms,
+ * 256 is 5.8 ms, and the FX pipeline adds one more chunk on top. That is a
+ * playability trade, not a free win, so it is a knob and not a new default
+ * baked into the file. */
+#define CHUNK     256
+#endif
 
 /* __asm__, not `asm`: -std=c99 is strict ISO and does not spell it the short
  * way. The project's flags are uniform across host and target on purpose, so
