@@ -54,3 +54,40 @@ being measured. I generalised a measurement past its own conditions.
 internal SRAM. If contention is the cause, the engine figure must fall
 sharply. If it does not move, the hypothesis is dead and the cause is
 something else -- and either answer is worth one flash.
+
+# ⚠ THE DISCRIMINATOR DID NOT RUN: THE KNOB WAS NOT WIRED (2026-08-11)
+
+`juno_s3_FXPIPE_SRAM.bin` returned engine 8,746 / whole loop 8,773 / drift
++636.8 ms at t=1s -- **identical to FXPIPE to the decimal.** It is NOT a
+result. The build never carried the change.
+
+**`S3_RING_SRAM` was not read by `main/CMakeLists.txt` at all.** It was passed
+on the idf.py command line, CMake stored it as
+`S3_RING_SRAM:UNINITIALIZED=32768`, and nothing ever consumed it. CMake does
+not warn about a `-D` it never uses. The firmware compiled clean and was the
+PSRAM build with a different version string.
+
+Two tells, and both were in the log before I sent the binary:
+
+1. **No `RINGS:` lines.** `rings_alloc`'s report is inside `#if
+   S3L_RING_SRAM`. The earlier FX_SRAM build printed them; this one printed
+   nothing, so that code was not compiled.
+2. **Numbers identical to the decimal.** That is the same signature the
+   watchdog fixed point left three hours earlier. An identical number across
+   two binaries means the thing you changed is not in the path.
+
+Proved mechanically rather than argued -- the ring report string is absent
+from the old image and present in the new one:
+
+    strings juno_s3_FXPIPE_SRAM.bin  | grep -c "PLACEMENT IS"   -> 0
+    strings juno_s3_FXPIPE_SRAM2.bin | grep -c "PLACEMENT IS"   -> 1
+
+## The rule this earns
+
+**A knob is not a knob until something reads it, and the check is the
+firmware's own printed banner, not the command line you typed.** The
+CMakeLists now defines `S3L_RING_SRAM` from `S3_RING_SRAM` and carries this
+history in a comment so the next person does not spend a flash on it.
+
+The contention hypothesis is still OPEN. It has not been tested.
+`juno_s3_FXPIPE_SRAM2.bin` is the build that actually tests it.

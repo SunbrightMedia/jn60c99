@@ -82,6 +82,26 @@ if(S3_NOFX)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE S3L_NOFX=1)
 endif()
 
+# -DS3_RING_SRAM=N caps every delay ring at N samples and tries INTERNAL RAM
+# first, falling back to PSRAM at full length per ring.
+#
+# ⚠ THIS BLOCK DID NOT EXIST UNTIL 2026-08-11, AND ITS ABSENCE COST A FLASH.
+# S3_RING_SRAM was passed on the idf.py command line, CMake stored it in the
+# cache as an UNINITIALIZED variable, and nothing ever read it. The build
+# succeeded, the cache showed `S3_RING_SRAM:UNINITIALIZED=32768`, and the
+# firmware was byte-for-byte the PSRAM one. The board then returned numbers
+# IDENTICAL TO THE DECIMAL to the previous run -- which is the same signature
+# a fixed point leaves, and would have been read as "the hypothesis is dead"
+# if the missing `RINGS:` lines had not given it away.
+#
+# CMake does not warn about a -D it never uses. So the rule this earns is:
+# a knob is not a knob until something reads it, and the way to check is the
+# firmware's own printed banner, not the command line you typed.
+if(S3_RING_SRAM)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE
+                               S3L_RING_SRAM=${S3_RING_SRAM})
+endif()
+
 if(S3_LTO)
     target_link_options(${COMPONENT_LIB} INTERFACE -flto)
 endif()
