@@ -156,3 +156,59 @@ log. The engine columns never moved through any of it. When two measurements
 in one log contradict each other, suspect the instrument before the subject --
 and when a fix changes nothing AT ALL, suspect that the thing being fixed is
 holding itself in place.
+
+# ★ REALTIME6: THE VOICE CHAIN HOLDS REAL TIME ON SILICON (2026-08-11)
+
+With the sleep gone and the idle watchdog off, the board reads **`realtime
+OK`** on every line for 64 seconds.
+
+    engine        5,285 cycles
+    whole loop    5,377 cycles
+    budget        5,442 cycles      -> UNDER by 65
+    verdict       realtime OK, every second
+    drift         -3.4 ms at t=1s -> -117.6 ms at t=64s
+
+**This is the first end-to-end real-time PASS in the project.** Three voices,
+1 on core 0 and 2 on core 1 (`S3L_SPLIT=6`, mask `0xe0`), rendering into a
+live I2S clock, holding for over a minute.
+
+## The drift is NEGATIVE, and that is the codec, not the engine
+
+The slope is **-1.81 ms per second**. Negative means the wall clock ran BEHIND
+the audio clock -- the engine produced audio faster than nominal, not slower.
+
+    implied codec rate = 44,100 x 1.00181 = 44,180 Hz
+
+A 0.18 % offset is an I2S PLL divisor rounding, which is ordinary. The
+firmware computes `audio_us` from a nominal 44,100 while the codec consumes at
+its real programmed rate, so the two clocks separate at a constant rate
+forever. It is bounded in RATE, which is the property that matters; it is not
+a leak. **A positive slope would have been the failure. This is the opposite
+sign.**
+
+## ⚠ THE UNDERRUN COUNTER IS NOT ZERO, AND IT IS NOT EXPLAINED
+
+41 underruns in 64 seconds -- 0.64/s, against 345 chunk writes per second, so
+**0.19 % of writes**. It climbs steadily rather than in bursts.
+
+That is small, and it does NOT contradict the wall-clock pass (the wall clock
+is the deciding test, and it passes). But it is not zero and it must not be
+waved through. One hypothesis worth testing and NOT yet tested: the count is
+about **1.4 per chord cycle**, and the chord cycle is 1.50 s held + 0.70 s
+released = 2.20 s, with a `load_coefs()` state copy at each gate change. A
+blocking copy at note-on and note-off would produce roughly two events per
+cycle. That is a HYPOTHESIS from an arithmetic coincidence, not a measurement,
+and it is exactly the sort of coincidence this project has been fooled by
+before. It needs a probe.
+
+Two other candidates, equally untested: a partial write counted as an underrun
+(`wrote != sizeof pcm`), and the 0.18 % clock offset slowly walking the DMA
+fill level across a boundary.
+
+## The honest scope of this result
+
+STILL `S3_NOFX`: three voices, **no master and no FX**, one chip. The FX chain
+is measured separately at 2,593 cycles/sample and has never run in the same
+build as the voices. The two-chip link does not exist. So this proves the
+VOICE CHAIN holds real time on real silicon with a real clock -- which is what
+it was built to prove, and no more than that.
