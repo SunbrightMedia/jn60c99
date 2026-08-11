@@ -17,6 +17,31 @@ chip, 32 kHz, fewer voices, dropping any FX.
 cycles saved. The failure that made the user state this was reporting cycle
 counts as the headline while the thing being timed could not be played.
 
+**⚑ DEVICE RECALL IS DESIGNED, GATED COLD, AND BROKEN IN THREE PLACES
+(2026-08-11) — read `docs/engineb/DEVICE_RECALL.md` before building any of it.**
+HOLDS, measured: the 11 MB cell array reduces to **~29 KB** with a 31-segment
+map; the map is **FREE at a constant offset** (4-instruction Xtensa fold,
+reproduced twice); the burst is ~28,000 instructions and **fits in ONE audio
+block on chip A**; `eb_vcf_res_prepare` (~460,000 instr) leaves the burst
+entirely because the table is **rate-only and identical in every voice**
+(2,688/2,688, 0/123 parameters move it — this CORRECTS `data/res_lut.md:99`);
+no libm on the recall path; no ring churn on a patch change. A **384-case gate
+executes BIT-IDENTICAL** at trunk and fork flags with five measured teeth, one
+of which found a defect nobody planted. BREAKS IT: **(1) warm recall != cold
+recall — 24/64 coefficients and 41/64 master coefficients differ when patch A
+precedes patch B**, and the device recalls warm while the gate recalls cold, so
+the design's own CRC rule would MUTE the instrument on the second patch change;
+**(2) per-voice state is unmapped** (cell 320 is the ADSR gate) so voices 1..5
+cannot sound a note — the per-voice scatter set is **13 cells, not 5**;
+**(3) `eb_render_events_mirror` IS on the recall path and WRITES into the cell
+array**, which unsettles the double-buffer argument, and nothing clears
+`dco_live_seeded`, so the DCO would stay on the OLD patch after a program
+change. ALSO: **`EB_PATCH_BYTES` must go 127 -> 132** — BEND GAIN (506), CHORUS
+PRE DELAY/LOW CUT/HIGH CUT (3286-3288), REVERB DENSITY (3950) are constant in
+all 64 factory patches and therefore invisible to the byte scan; forcing them
+changes 8,807 bytes of coefficients. **CHIP B CANNOT RECALL WHILE IT PLAYS** —
+it is over budget, and recall must not be asked to hide a headroom problem.
+
 # JUNO-60 (JU-06A) C99 port — project memory
 
 **⚑⚑⚑⚑ LIVE STATE (2026-08-10 night, Opus 5) — READ THESE FOUR
