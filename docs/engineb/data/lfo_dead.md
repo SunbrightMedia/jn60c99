@@ -94,3 +94,42 @@ run before any cycle number is quoted.
 2. **A shortcut justified per-voice must be re-justified when something SHARED
    depends on that voice.** The at-rest claim was "a resting voice outputs 0",
    which is true and was never the whole story once one voice owned the LFO.
+
+# THE FIX IS IN AND BOTH GATES ARE NEUTRAL (2026-08-11)
+
+`EB_LFO_FREERUN`, defaulting to `EB_LFO_SHARED`, runs voice 0's
+cvgate/glide/LFO chain whether or not voice 0 sounds.
+
+    trunk null gate (--module standalone)   VERDICT: PASS, residual EXACTLY 0
+    fork sonic gate (lastmile_run.sh)       3.17 dB, the SAME 12 rows as the
+                                            recorded control
+
+**Both are unchanged, and that was the prediction, not a relief.** The gate's
+shim holds every voice awake, so `sh->v0_atrest` is 0 in every gated run and
+the branch removed here never executed under test. Identical code, identical
+order, identical arithmetic, for every input either gate has ever presented.
+
+The gates being unable to move is the same fact as the gates being unable to
+catch the bug. A neutral gate result here CONFIRMS the blind spot rather than
+clearing it.
+
+Verified at the firmware's own flag set rather than assumed:
+
+    AT THE FIRMWARE'S OWN FLAGS: SHARED=1 FREERUN=1
+    trunk build:                 SHARED=0 FREERUN=0
+
+`juno_s3_LFO.bin` is the first firmware in this project that has an LFO.
+
+## What is NOT known
+
+**The cost.** Every cycle figure in this repository was taken with the LFO
+absent, including chip B's 5,440 against 5,442. That number is real for the
+program that produced it, and that program is not the instrument.
+
+An estimate exists and is deliberately not repeated here: it is a static
+instruction count times a cycles-per-instruction ratio borrowed from different
+code, and its own components are wrong in both directions. Six of seven
+estimates in this project flattered themselves.
+
+One flash replaces every cycle figure in the repo with one that describes the
+actual instrument.
