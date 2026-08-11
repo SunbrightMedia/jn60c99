@@ -506,6 +506,114 @@ static volatile int w_ready = 0;
 #error "S3L_VOICE_LO must leave at least one voice."
 #endif
 
+/* ---- S3L_LAYOUT: EVERY CHIP LAYOUT IN ONE FLASH ----------------------------
+ *
+ * WHY THIS IS RUNTIME AND NOT SIX BUILDS. `S3L_VOICE_LO`, `S3L_SPLIT` and the
+ * FX stage are compile-time today, so answering "which two-chip layout fits"
+ * costs one flash per layout, and the user has already flashed this board
+ * fifteen times tonight. None of the three has to be compile-time:
+ * `eb_engine_render_range` TAKES the range as arguments, and the FX stage is
+ * one `if`. So this build sweeps them.
+ *
+ * WHAT IS DIFFERENT FROM A DEDICATED BUILD, stated because it bounds what the
+ * numbers mean:
+ *
+ *   - a real `S3_NOFX=1` build puts the voice state in INTERNAL RAM and skips
+ *     the ring allocation. Here the FX must exist for the FX rows, so the
+ *     placement is a per-ROW field instead (`rsint`) and both are measured.
+ *   - the dry-bus sum for the no-FX rows runs on core 1 in the pipeline slot
+ *     the FX would have used, not in core 0's tail. It is eight adds.
+ *
+ * Everything else -- the same chunk, the same barrier, the same timer, the
+ * same engine -- is shared, so rows are comparable with each other and row 1
+ * is comparable with the builds already measured. THAT IS WHY ROW 1 EXISTS:
+ * it reproduces the shipping configuration, and if it does not read about
+ * 6,040 then this harness is measuring something else and no other row on the
+ * page may be quoted. */
+#ifndef S3L_LAYOUT
+#define S3L_LAYOUT 0
+#endif
+#if S3L_LAYOUT && !S3L_FX_PIPE
+#error "S3L_LAYOUT needs S3L_FX_PIPE=1: the FX rows are measured in the pipeline slot, which is the only place the FX has ever been free."
+#endif
+#if S3L_LAYOUT && S3L_NOFX
+#error "S3L_LAYOUT builds WITH the master chain and switches it per row; S3L_NOFX removes it from the link."
+#endif
+#if S3L_LAYOUT
+static int g_lo = S3L_VOICE_LO, g_split = 4, g_fx = 1;
+#define LO_     g_lo
+#define SPLIT_  g_split
+
+/* THE LAYOUT TABLE.
+ *
+ *   k      how many voices this row sounds. The wake masks fill from voice 7
+ *          DOWNWARD (the allocator's own order), so k voices are [8-k, 8) and
+ *          the row owns exactly those: lo = 8-k.
+ *   split  the first voice index core 1 renders. core 0 gets [lo, split),
+ *          core 1 gets [split, 8).
+ *   fx     run the master chain (chorus, delay, reverb) on core 1's pipeline
+ *          slot, or emit the dry voice bus.
+ *   rsint  voice state in INTERNAL RAM rather than PSRAM. A real S3_NOFX
+ *          build always does this and every FX build so far never has, so the
+ *          two have never been compared at the same FX setting.
+ *
+ * PREDICTIONS ARE IN THE `pred` COLUMN so they cannot be written after the
+ * fact. They come from the measured constants -- prologue+LFO ~717, voice
+ * 2,362, FX 2,622, output 91 -- as max(core0, core1) + 91, and the additive
+ * model is already known to read about 370 cycles LOW against this loop. */
+typedef struct { int k, split, fx, rsint, pred; const char *what; } s3l_row;
+static const s3l_row S3L_ROW[] = {
+ { 3, 7, 1, 0, 5532, "CONTROL: chip B as shipped (3v+FX, 2/1) -- must read ~6040" },
+ { 3, 7, 1, 1, 5532, "  same, voice state INTERNAL RAM" },
+ { 2, 7, 1, 1, 5075, "LAYOUT B chip B: 2 voices + FX, 1/1" },
+ { 2, 7, 1, 0, 5075, "  same, voice state PSRAM" },
+ { 3, 6, 0, 1, 4815, "LAYOUT A chip A: 3 voices no FX, 1/2" },
+ { 4, 6, 0, 1, 6051, "LAYOUT B chip A: 4 voices no FX, 2/2" },
+ { 4, 5, 0, 1, 7177, "  4 voices no FX, 1/3 -- the other partition" },
+ { 3, 6, 1, 1, 7437, "  3 voices + FX, 1/2 -- the other partition" },
+ { 6, 5, 0, 1, 7177, "ONE CHIP, 6 voices, no FX" },
+ { 6, 5, 1, 1, 9799, "ONE CHIP, everything: 6 voices + FX" },
+};
+#define S3L_NROW ((int)(sizeof S3L_ROW / sizeof S3L_ROW[0]))
+static eb_render_state *RS_INT, *RS_PSR;
+
+/* Applying a row touches four of app_main's locals, so it is a macro rather
+ * than a function -- passing four pointers to say `CH = k-1` would be worse.
+ * It is expanded in exactly one place. Every row starts from the SAME seeded
+ * state, or a row would inherit the previous row's warm FX and its number
+ * would not be comparable. */
+#define S3L_APPLY_ROW(ROW) do {                                               \
+    const s3l_row *r_ = &S3L_ROW[ROW];                                        \
+    int q_;                                                                   \
+    g_lo = EB_NUM_VOICES - r_->k;                                             \
+    g_split = r_->split;                                                      \
+    g_fx = r_->fx;                                                            \
+    CH = r_->k - 1;                                                           \
+    WAKE = S3L_MASK[CH];                                                      \
+    RS = r_->rsint ? RS_INT : RS_PSR;                                         \
+    memcpy(RS, B_RSTATE, S3L_VOICE_SZ);                                       \
+    ms_load(B_MSTATE);                                                        \
+    memset(w_vbb, 0, sizeof w_vbb);                                           \
+    memset(w_pcm, 0, sizeof w_pcm);                                           \
+    w_have_prev = 0;                                                          \
+    frame = 0; gate = 0;                                                      \
+    load_coefs(CH, 0);                                                        \
+    for (q_ = 0; q_ < EB_NUM_VOICES; ++q_)                                    \
+        EBE.v[q_].atrest = !((WAKE >> q_) & 1u);                              \
+    printf("\n--- ROW %d/%d  %s\n"                                            \
+           "    voices %d (%d..%d)  core0 [%d,%d)  core1 [%d,%d)  FX %s  "    \
+           "state %s  predicted %d\n",                                        \
+           (ROW) + 1, S3L_NROW, r_->what,                                     \
+           r_->k, EB_NUM_VOICES - r_->k, EB_NUM_VOICES - 1,                   \
+           g_lo, g_split, g_split, EB_NUM_VOICES,                             \
+           r_->fx ? "on" : "off", r_->rsint ? "INTERNAL" : "PSRAM",           \
+           r_->pred);                                                         \
+} while (0)
+#else
+#define LO_     S3L_VOICE_LO
+#define SPLIT_  S3L_SPLIT
+#endif
+
 #ifndef S3L_TIME_PROLOGUE
 #define S3L_TIME_PROLOGUE 0
 #endif
@@ -548,6 +656,16 @@ static void worker(void *arg)
         if (have) {
             for (i = 0; i < w_n; ++i) {
                 float L = 0.0f, R = 0.0f;
+#if S3L_LAYOUT
+                /* A no-FX row still has to produce PCM, or the row measures a
+                 * silent engine and sounds like a fault. The dry voice bus is
+                 * what a real S3_NOFX build emits, and it is eight adds. */
+                if (!g_fx) {
+                    int k;
+                    for (k = 0; k < EB_NUM_VOICES; ++k) L += w_vbb[prev][i][k];
+                    R = L;
+                } else
+#endif
                 eb_master_render(MS, &MC, &RG, w_vbb[prev][i], &L, &R);
                 if (L > 1.0f) L = 1.0f; else if (L < -1.0f) L = -1.0f;
                 if (R > 1.0f) R = 1.0f; else if (R < -1.0f) R = -1.0f;
@@ -558,7 +676,7 @@ static void worker(void *arg)
         for (i = 0; i < w_n; ++i) {
             while (w_ready <= i) { }        /* wait for this sample's prologue */
             eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                                   S3L_SPLIT, EB_NUM_VOICES, &w_shb[i],
+                                   SPLIT_, EB_NUM_VOICES, &w_shb[i],
                                    w_vbb[cur][i]);
         }
         }
@@ -566,7 +684,7 @@ static void worker(void *arg)
         for (i = 0; i < w_n; ++i) {
             while (w_ready <= i) { }        /* wait for this sample's prologue */
             eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                                   S3L_SPLIT, EB_NUM_VOICES, &w_shb[i],
+                                   SPLIT_, EB_NUM_VOICES, &w_shb[i],
                                    w_vbb[i]);
         }
 #endif
@@ -594,7 +712,7 @@ static void render_block(int n)
      * A no-op unless that flag is set. Both ranges are advanced here on core
      * 0: an at-rest voice's free-run state is touched by nothing else in the
      * block, so there is no race with core 1, which skips those voices. */
-    eb_engine_advance_atrest(&EBE, RS, &RC, S3L_VOICE_LO, EB_NUM_VOICES, n);
+    eb_engine_advance_atrest(&EBE, RS, &RC, LO_, EB_NUM_VOICES, n);
     w_n    = n;
     w_ready = 0;
     w_done = 0;
@@ -625,10 +743,10 @@ static void render_block(int n)
     w_shb[0].ready = 0;
     eb_engine_render_shared(&EBE, RS, &RC, &w_shb[0]);
     for (i = 0; i < n; ++i) {
-        for (k = S3L_VOICE_LO; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
+        for (k = LO_; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
         w_ready = i + 1;                    /* prologue[i] is already done */
         eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                               S3L_VOICE_LO, S3L_SPLIT, &w_shb[i], vb[i]);
+                               LO_, SPLIT_, &w_shb[i], vb[i]);
         if (i + 1 < n) {
             w_shb[i + 1].ready = 0;
             eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i + 1]);
@@ -659,18 +777,18 @@ static void render_block(int n)
     }
     w_ready = n;                                  /* release core 1 in full */
     for (i = 0; i < n; ++i) {
-        for (k = S3L_VOICE_LO; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
+        for (k = LO_; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
         eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                               S3L_VOICE_LO, S3L_SPLIT, &w_shb[i], vb[i]);
+                               LO_, SPLIT_, &w_shb[i], vb[i]);
     }
 #else
     for (i = 0; i < n; ++i) {
-        for (k = S3L_VOICE_LO; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
+        for (k = LO_; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
         w_shb[i].ready = 0;
         eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i]);
         w_ready = i + 1;                          /* publish; core 1 may go */
         eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                               S3L_VOICE_LO, S3L_SPLIT, &w_shb[i], vb[i]);
+                               LO_, SPLIT_, &w_shb[i], vb[i]);
     }
 #endif
     while (!w_done) { }                           /* ONE barrier per block */
@@ -681,11 +799,18 @@ static void render_block(int n)
 #endif
 }
 #else
+/* The one-core build never had S3L_VOICE_LO defined -- its #ifndef lives in
+ * the two-core section above -- so this branch referenced an undeclared
+ * identifier and only ever compiled because nothing builds it. Give it the
+ * default explicitly rather than leave the trap in place. */
+#ifndef LO_
+#define LO_ 0
+#endif
 static float w_vbb[CHUNK][EB_NUM_VOICES];
 static void render_block(int n)
 {
     int i, k;
-    eb_engine_advance_atrest(&EBE, RS, &RC, S3L_VOICE_LO, EB_NUM_VOICES, n);
+    eb_engine_advance_atrest(&EBE, RS, &RC, LO_, EB_NUM_VOICES, n);
     for (i = 0; i < n; ++i) {
         for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
         eb_engine_render_voices(&EBE, RS, &RC, (const eb_render_needs *)0,
@@ -740,8 +865,14 @@ void app_main(void)
     unsigned long wrote_blocked_us = 0;
     int step = 0, gate = 0;
     /* the chord index for this build's voice count, clamped to what exists */
+#if S3L_LAYOUT
+    int CH = (S3L_VOICES < 1 ? 1 :
+              S3L_VOICES > S3L_NNOTE ? S3L_NNOTE : S3L_VOICES) - 1;
+    int lrow = 0;
+#else
     const int CH = (S3L_VOICES < 1 ? 1 :
                     S3L_VOICES > S3L_NNOTE ? S3L_NNOTE : S3L_VOICES) - 1;
+#endif
     /* OFFLINE RENDERS EVERY VOICE. The cap exists for the REAL-TIME build,
      * where cycles are the constraint; rendering into memory has no such
      * constraint, and capping there deletes real sound. MEASURED against the
@@ -816,7 +947,17 @@ void app_main(void)
      * So the full struct is allocated in PSRAM (the master chain still wants
      * it when FX are on) and, when FX are OFF, a 6,808-byte INTERNAL copy is
      * used instead. Under S3L_NOFX nothing can reach past the prefix. */
-#if S3L_NOFX
+#if S3L_LAYOUT
+    /* BOTH placements, so `rsint` is a row field and not a rebuild. The voice
+     * chain reads only the first S3L_VOICE_SZ bytes -- eb_render.c contains no
+     * reference to st->chorus / st->delay / st->reverb, checked again rather
+     * than inherited -- and the master keeps its own state in MS. So an
+     * 8,488-byte internal buffer is a complete voice state. */
+    RS_PSR = heap_caps_malloc(sizeof *RS, MALLOC_CAP_SPIRAM);
+    RS_INT = heap_caps_malloc(S3L_VOICE_SZ + 64u, MALLOC_CAP_INTERNAL);
+    RS = RS_PSR;
+    if (!RS_PSR || !RS_INT) { printf("HALT: layout allocs failed.\n"); return; }
+#elif S3L_NOFX
     RS = heap_caps_malloc(S3L_VOICE_SZ + 64u, MALLOC_CAP_INTERNAL);
 #else
     RS = heap_caps_malloc(sizeof *RS, MALLOC_CAP_SPIRAM);
@@ -895,6 +1036,14 @@ void app_main(void)
             i2s_channel_write(TX, t, sizeof t, &wrote, portMAX_DELAY);
         }
     }
+#endif
+#if S3L_LAYOUT
+    printf("\n=== CHIP-LAYOUT SWEEP: %d rows, 8 s each, %d s per pass ===\n"
+           "Row 1 is the CONTROL. It reproduces the shipping configuration\n"
+           "(juno_s3_LFO.bin, whole loop 6,040). If it does not land near\n"
+           "6,040 this harness is measuring something else and NO row on the\n"
+           "page may be quoted.\n", S3L_NROW, S3L_NROW * 8);
+    S3L_APPLY_ROW(0);
 #endif
     t_start = esp_timer_get_time();
     printf("chord of %d voice(s), wake mask 0x%02x, "
@@ -1195,6 +1344,24 @@ void app_main(void)
                        WAKE, e, e * 240.0, w, w * 240.0,
                        (w - e) * 240.0);
                 if (chunks / (SR / CHUNK) % 8 == 0) {
+#if S3L_LAYOUT
+                    /* THE ROW'S RESULT, printed from the window that just
+                     * ended, THEN the next row. The whole-loop figure is the
+                     * one that decides: it contains the barrier, the PCM
+                     * conversion and the I2S call, and the codec charges for
+                     * all three. */
+                    {   double cyc = w * 240.0, d = cyc - 5442.0;
+                        printf("    RESULT  engine %.0f   WHOLE LOOP %.0f   "
+                               "budget 5442   %s by %.0f   (predicted %d, "
+                               "err %+.0f)\n",
+                               e * 240.0, cyc,
+                               d <= 0.0 ? "FITS, under" : "OVER",
+                               d <= 0.0 ? -d : d, S3L_ROW[lrow].pred,
+                               cyc - (double)S3L_ROW[lrow].pred);
+                    }
+                    lrow = (lrow + 1) % S3L_NROW;
+                    S3L_APPLY_ROW(lrow);
+#endif
                     phase = (phase + 1) % 7;
                     eng_us = busy_us = ph_chunks = 0;
                 }

@@ -102,6 +102,13 @@ if(S3_RING_SRAM)
                                S3L_RING_SRAM=${S3_RING_SRAM})
 endif()
 
+# -DS3_LAYOUT=1: the CHIP-LAYOUT SWEEP. Voice range, core split and the FX
+# stage all become RUNTIME values, so every candidate two-chip layout is
+# measured in ONE flash instead of one flash each. Needs S3L_FX_PIPE=1.
+if(S3_LAYOUT)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE S3L_LAYOUT=${S3_LAYOUT})
+endif()
+
 if(S3_LTO)
     target_link_options(${COMPONENT_LIB} INTERFACE -flto)
 endif()
