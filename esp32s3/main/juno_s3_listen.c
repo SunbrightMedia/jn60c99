@@ -459,6 +459,33 @@ static float             w_vbb[CHUNK][EB_NUM_VOICES];
  * consumed by core 1, so the two overlap. One writer per flag; volatile. */
 static volatile int w_ready = 0;
 
+/* S3L_VOICE_LO -- the LOWEST voice index this firmware owns.
+ *
+ * WHY IT EXISTS, and it is not an optimisation. MEASURED 2026-08-11: the
+ * shared prologue costs 117 cycles, not the 1,414 a subtraction had implied.
+ * The other 1,297 is the per-sample cost of the FIVE voices this chord never
+ * sounds -- about 259 cycles each for a zero-write, an at-rest test, two
+ * control-rate state writes and a block advance.
+ *
+ * On a TWO-CHIP build those voices do not exist. Chip B owns three voices;
+ * voices 0..4 are chip A's. Iterating them is not work to be made faster, it
+ * is work the shipping design never does at all. This constant makes the
+ * firmware own only what it owns.
+ *
+ * SAFETY, stated: w_vbb is static and therefore zero, nothing writes the
+ * unowned slots, and the master sums all EB_NUM_VOICES entries -- so the
+ * unowned slots contribute exactly 0.0 forever without being re-zeroed. That
+ * is why the per-sample zeroing may be skipped rather than merely hoisted.
+ *
+ * DEFAULT 0 = own everything, which is the behaviour every previous build
+ * had. */
+#ifndef S3L_VOICE_LO
+#define S3L_VOICE_LO 0
+#endif
+#if S3L_VOICE_LO >= EB_NUM_VOICES
+#error "S3L_VOICE_LO must leave at least one voice."
+#endif
+
 #ifndef S3L_TIME_PROLOGUE
 #define S3L_TIME_PROLOGUE 0
 #endif
@@ -547,7 +574,7 @@ static void render_block(int n)
      * A no-op unless that flag is set. Both ranges are advanced here on core
      * 0: an at-rest voice's free-run state is touched by nothing else in the
      * block, so there is no race with core 1, which skips those voices. */
-    eb_engine_advance_atrest(&EBE, RS, &RC, 0, EB_NUM_VOICES, n);
+    eb_engine_advance_atrest(&EBE, RS, &RC, S3L_VOICE_LO, EB_NUM_VOICES, n);
     w_n    = n;
     w_ready = 0;
     w_done = 0;
@@ -578,10 +605,10 @@ static void render_block(int n)
     w_shb[0].ready = 0;
     eb_engine_render_shared(&EBE, RS, &RC, &w_shb[0]);
     for (i = 0; i < n; ++i) {
-        for (k = 0; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
+        for (k = S3L_VOICE_LO; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
         w_ready = i + 1;                    /* prologue[i] is already done */
         eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                               0, S3L_SPLIT, &w_shb[i], vb[i]);
+                               S3L_VOICE_LO, S3L_SPLIT, &w_shb[i], vb[i]);
         if (i + 1 < n) {
             w_shb[i + 1].ready = 0;
             eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i + 1]);
@@ -612,18 +639,18 @@ static void render_block(int n)
     }
     w_ready = n;                                  /* release core 1 in full */
     for (i = 0; i < n; ++i) {
-        for (k = 0; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
+        for (k = S3L_VOICE_LO; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
         eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                               0, S3L_SPLIT, &w_shb[i], vb[i]);
+                               S3L_VOICE_LO, S3L_SPLIT, &w_shb[i], vb[i]);
     }
 #else
     for (i = 0; i < n; ++i) {
-        for (k = 0; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
+        for (k = S3L_VOICE_LO; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
         w_shb[i].ready = 0;
         eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i]);
         w_ready = i + 1;                          /* publish; core 1 may go */
         eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                               0, S3L_SPLIT, &w_shb[i], vb[i]);
+                               S3L_VOICE_LO, S3L_SPLIT, &w_shb[i], vb[i]);
     }
 #endif
     while (!w_done) { }                           /* ONE barrier per block */
@@ -638,7 +665,7 @@ static float w_vbb[CHUNK][EB_NUM_VOICES];
 static void render_block(int n)
 {
     int i, k;
-    eb_engine_advance_atrest(&EBE, RS, &RC, 0, EB_NUM_VOICES, n);
+    eb_engine_advance_atrest(&EBE, RS, &RC, S3L_VOICE_LO, EB_NUM_VOICES, n);
     for (i = 0; i < n; ++i) {
         for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
         eb_engine_render_voices(&EBE, RS, &RC, (const eb_render_needs *)0,
