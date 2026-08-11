@@ -13,8 +13,16 @@ properties of the METHOD, not of the JUNO.
 | `fork-adversarial-audit.js` | Loop-until-dry hunt for defects in a target fork. Seven lenses, each told to BREAK the build; every finding attacked by two independent skeptics before it survives. **This is the one that found the dead LFO.** |
 | `find-cycles.js` | Find a named number of cycles on a named critical core, without losing audible accuracy. Four lenses (move work, remove work, cheaper arithmetic, build config), each lever refuted twice — once on cycles, once on sonic cost. |
 | `next-phase-design.js` | Read the mechanisms that gate a next step, design against them, then have one agent try to REFUTE the design and another ask what nobody mentioned. |
-| `ssx-portable-harness.js` | Earlier: the portable-harness work. |
-| `trackb-cost-attribution.js` | Earlier: cost attribution across the Track B fork. |
+| `exactly0-audit.js` | Audit of the EXACTLY-0 null claims — what each gate really proves. |
+| `asm-kernel-recon-and-decision.js` | Recon on the hand-written Xtensa kernel, and the decision not to build it. |
+| `cycle-attribution-design.js` | Designing where the cycles actually go, before optimising any of them. |
+| `engineb-s3-assessment.js` | The original ESP32-S3 feasibility assessment. |
+| `engineb-pitch-v3-and-qemu.js` | The pitch evaluator work and the QEMU instruction-count harness. |
+| `ssx-portable-harness.js` | The portable-harness work — the piece most directly reusable for another synth. |
+| `trackb-cost-attribution.js` | Cost attribution across the Track B fork. |
+
+Ten scripts, ~140 KB. Every multi-agent run this project has made, kept whole
+rather than summarised, because a summary of a workflow cannot be re-run.
 
 ## The thing that makes them work, if you write another
 
