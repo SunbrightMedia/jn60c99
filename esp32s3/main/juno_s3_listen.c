@@ -532,6 +532,17 @@ void app_main(void)
     unsigned long busy_us = 0;
     int64_t t_start;
     int behind = 0;
+    /* THE PREVIOUS SECOND'S wall clock and audio clock. The verdict below used
+     * to compare TOTALS since t_start and LATCH `behind` forever on the first
+     * comparison that failed. Two things were wrong with that. A latch cannot
+     * recover, so one slow start-up second condemned a run that then held real
+     * time for two minutes -- which is exactly what happened. And a total
+     * hides the rate: a run 3 ms behind and holding reads the same as a run
+     * losing 3 ms every second, and only the second one is a failure. These
+     * two carry the previous second so the verdict can be PER SECOND, and the
+     * drift is printed in ms so the direction is visible instead of inferred. */
+    int64_t prev_real_us = 0, prev_audio_us = 0;
+    double  drift_ms = 0.0;
     int step = 0, gate = 0;
     /* the chord index for this build's voice count, clamped to what exists */
     const int CH = (S3L_VOICES < 1 ? 1 :
@@ -882,10 +893,20 @@ void app_main(void)
         if (++chunks % (SR / CHUNK) == 0) {
             /* cycles/sample, from the real render loop rather than a model */
             double us_per_sample = (double)busy_us / (double)(chunks * CHUNK);
-            /* THE WALL-CLOCK TEST, which is the one that decides. */
-            {   double real_us = (double)esp_timer_get_time() - (double)t_start;
-                double audio_us = (double)(chunks * CHUNK) * 1e6 / (double)SR;
-                if (real_us > audio_us * 1.02) behind = 1;
+            /* THE WALL-CLOCK TEST, which is the one that decides. Measured
+             * over the LAST SECOND only, so the verdict tracks the engine
+             * instead of remembering the start-up. */
+            {   int64_t real_us  = esp_timer_get_time() - t_start;
+                int64_t audio_us = (int64_t)((double)(chunks * CHUNK)
+                                             * 1e6 / (double)SR);
+                int64_t d_real  = real_us  - prev_real_us;
+                int64_t d_audio = audio_us - prev_audio_us;
+                behind = (d_real > (int64_t)((double)d_audio * 1.02));
+                /* CUMULATIVE drift, signed: positive means the wall clock has
+                 * run ahead of the audio, i.e. the engine owes time. A healthy
+                 * run holds this flat; a failing one climbs without limit. */
+                drift_ms = (double)(real_us - audio_us) / 1000.0;
+                prev_real_us = real_us; prev_audio_us = audio_us;
             }
             {   double n = (double)(ph_chunks * CHUNK);
                 double e = (double)eng_us / n, w = (double)busy_us / n;
@@ -902,10 +923,12 @@ void app_main(void)
                     eng_us = busy_us = ph_chunks = 0;
                 }
             }
-            printf("t=%lus  %s  underruns=%lu  render %.2f us/sample "
+            printf("t=%lus  %s  drift %+.1f ms  underruns=%lu  "
+                   "render %.2f us/sample "
                    "(~%.0f cycles at 240 MHz)  budget %.2f us  %s\n",
                    chunks / (SR / CHUNK),
                    behind ? "BEHIND REAL TIME" : "realtime OK",
+                   drift_ms,
                    underrun, us_per_sample,
                    us_per_sample * 240.0, 1e6 / (double)SR,
                    us_per_sample < 1e6 / (double)SR ? "FITS" : "OVER");
