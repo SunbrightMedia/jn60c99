@@ -173,3 +173,47 @@ buys something: the synth modulates.
 **That it sounds different.** A correctness fix which changes no audible
 behaviour has fixed nothing, and the log cannot show that. The listening check
 is outstanding and it outranks the cycle number.
+
+# THE FIX IS PROVEN AT THE LFO, AND SILENT ON THIS PATCH (2026-08-11)
+
+The user's correction was right: I asked them to listen instead of measuring.
+`tools/engineb/device_sonic.c` now does the measuring, under the DEVICE's own
+wake masks -- the configuration no gate in this repo can adopt.
+
+    EB_LFO_FREERUN=0        lfo_del  lfo_und  lfo_pul   residual
+      chord 1  wake 0x80     0.0000   0.0000   0.0000   --
+      chord 8  wake 0xff     0.0000   1.9962   2.0000   --
+
+    EB_LFO_FREERUN=1
+      chord 1  wake 0x80     0.0000   1.9962   2.0000   EXACTLY 0
+      chord 8  wake 0xff     0.0000   1.9962   2.0000   EXACTLY 0
+
+**THE DEFECT AND THE FIX ARE BOTH PROVEN.** Before: a one-note chord had an
+LFO span of ZERO on every output; the eight-note chord had the full swing. The
+LFO existed only at full polyphony, exactly as claimed. After: every chord has
+the eight-note swing.
+
+**AND THE AUDIO IS EXACTLY 0 ON THIS PATCH, which is also correct.** The blob
+carries ONE patch and that patch routes no LFO to audio. The modulation now
+runs and reaches nothing. Both facts are true and neither weakens the other.
+
+Consequences, stated so nobody has to re-derive them:
+- The 600-cycle cost measured on the board is REAL -- the chain executes.
+- The audible benefit CANNOT be shown on this blob and has not been shown.
+  Demonstrating it needs a blob regenerated from an LFO-routed patch, which is
+  one `gen_listen_coefs.py <patch>` run away and has not been done.
+
+## ⚠ MY FIRST PROBE WAS BLIND, IN THE SAME WAY AS THE BUG
+
+The first version watched only `eb_lfo_tick`'s RETURN value, the DELAYED
+output. It read 0.0000 even with voice 0 awake, which looks exactly like "the
+LFO does nothing" and was actually "you are watching the wrong wire":
+`eb_lfo.c` records `k2096 == 0, k2112 == 0` for this patch, so the delayed path
+carries nothing by construction. The modulation is on the other two outputs.
+
+I built a measurement that could not see its subject, while hunting a bug whose
+whole nature is a measurement that could not see its subject. The tool now
+reports all three outputs, and its header says why.
+
+**The rule: when an output reads exactly zero, prove the wire is connected
+before concluding the source is dead.**
