@@ -459,6 +459,14 @@ static float             w_vbb[CHUNK][EB_NUM_VOICES];
  * consumed by core 1, so the two overlap. One writer per flag; volatile. */
 static volatile int w_ready = 0;
 
+#ifndef S3L_TIME_PROLOGUE
+#define S3L_TIME_PROLOGUE 0
+#endif
+#if S3L_TIME_PROLOGUE
+/* prologue cost, accumulated per block. Write-only from core 0. */
+static unsigned long prologue_us = 0, prologue_n = 0;
+#endif
+
 static void worker(void *arg)
 {
     int i;
@@ -578,6 +586,35 @@ static void render_block(int n)
             w_shb[i + 1].ready = 0;
             eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i + 1]);
         }
+    }
+#elif S3L_TIME_PROLOGUE
+    /* MEASUREMENT BUILD ONLY. Core 0's 6,138 cycles are prologue + 2 voices,
+     * and backing the voices out puts the prologue at 1,414 -- but that number
+     * is a SUBTRACTION of two other numbers, and it silently contains the
+     * at-rest advance and every per-voice loop cost for the five voices this
+     * chord does not sound. Before anyone tries to move the prologue onto the
+     * other core, its real size has to be its own measurement.
+     *
+     * So: run all n prologues in ONE timed batch, then the voices. This
+     * DELIBERATELY SERIALISES the two -- core 1 is blocked until the batch
+     * ends -- so the loop total this build prints is WORSE by construction and
+     * must not be quoted. The only number it exists to produce is `prologue`.
+     * The timer is read twice per BLOCK, not per sample, for the reason the
+     * main loop already records: at two calls a sample it bills its own cost
+     * to the thing it measures. */
+    {   int64_t t0 = esp_timer_get_time();
+        for (i = 0; i < n; ++i) {
+            w_shb[i].ready = 0;
+            eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i]);
+        }
+        prologue_us += (unsigned long)(esp_timer_get_time() - t0);
+        prologue_n  += (unsigned long)n;
+    }
+    w_ready = n;                                  /* release core 1 in full */
+    for (i = 0; i < n; ++i) {
+        for (k = 0; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
+        eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
+                               0, S3L_SPLIT, &w_shb[i], vb[i]);
     }
 #else
     for (i = 0; i < n; ++i) {
@@ -1097,6 +1134,14 @@ void app_main(void)
                     eng_us = busy_us = ph_chunks = 0;
                 }
             }
+#if S3L_TIME_PROLOGUE
+            if (prologue_n)
+                printf("PROLOGUE %.2f us/sample (~%.0f cycles) "
+                       "-- loop total in THIS build is serialised and must not "
+                       "be quoted\n",
+                       (double)prologue_us / (double)prologue_n,
+                       (double)prologue_us / (double)prologue_n * 240.0);
+#endif
             printf("t=%lus  %s  drift %+.1f ms  underruns=%lu  "
                    "render %.2f us/sample "
                    "(~%.0f cycles at 240 MHz)  budget %.2f us  %s\n",
