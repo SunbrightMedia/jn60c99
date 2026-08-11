@@ -543,6 +543,10 @@ void app_main(void)
      * drift is printed in ms so the direction is visible instead of inferred. */
     int64_t prev_real_us = 0, prev_audio_us = 0;
     double  drift_ms = 0.0;
+    /* how long the last I2S write BLOCKED. A blocking write means the engine
+     * is ahead of the codec, which is both the result we want and a yield the
+     * scheduler already got. See the watchdog note in the loop. */
+    unsigned long wrote_blocked_us = 0;
     int step = 0, gate = 0;
     /* the chord index for this build's voice count, clamped to what exists */
     const int CH = (S3L_VOICES < 1 ? 1 :
@@ -883,13 +887,37 @@ void app_main(void)
              * counter stayed at 0 for eight seconds, because when you are
              * permanently behind there is ALWAYS free DMA space and the
              * write never blocks. The real test is the wall clock. */
+            int64_t tw = esp_timer_get_time();
             if (i2s_channel_write(TX, pcm, sizeof pcm, &wrote,
                                   pdMS_TO_TICKS(50)) != ESP_OK
                 || wrote != sizeof pcm)
                 ++underrun;
+            wrote_blocked_us = (unsigned long)(esp_timer_get_time() - tw);
         }
 
-        vTaskDelay(1);          /* feed the watchdog; the loop had starved IDLE0 */
+        /* THE WATCHDOG FEED WAS THE MEASUREMENT (found 2026-08-11).
+         *
+         * This used to be an unconditional `vTaskDelay(1)` every CHUNK. One
+         * FreeRTOS tick is 10 ms at the default 100 Hz, and a CHUNK of 128
+         * frames is 2.90 ms of audio. So the loop spent 10 ms of wall clock
+         * sleeping for every 2.90 ms of audio it produced, and the wall-clock
+         * verdict measured THAT -- the board reported a drift climbing about
+         * 2,450 ms per second while the engine's own counter said 22.40 us
+         * against a 22.68 us budget. The delay, not the engine, was the
+         * deficit. A harness that sleeps 3x the sample period cannot answer
+         * whether the sample period is met.
+         *
+         * The delay exists because when the engine runs BEHIND, i2s_channel_
+         * write never blocks -- there is always free DMA space -- so the loop
+         * spins and starves IDLE0. But when the engine runs AHEAD, which is
+         * the case we are trying to prove, that write DOES block, and a
+         * blocking queue wait yields to IDLE by itself. So the delay is only
+         * needed in the failing case, and it is exactly the failing case that
+         * it was corrupting.
+         *
+         * Feed the watchdog only when the write did NOT block. In a passing
+         * run this never fires and the wall clock is the engine's alone. */
+        if (wrote_blocked_us < 1000) vTaskDelay(1);
         if (++chunks % (SR / CHUNK) == 0) {
             /* cycles/sample, from the real render loop rather than a model */
             double us_per_sample = (double)busy_us / (double)(chunks * CHUNK);
