@@ -55,3 +55,47 @@ be played.** Every fact was on the record; none of it was foregrounded.
 So: **progress is measured against the six items above, in the user's words,
 and a status report says which of them are met.** Not how many cycles were
 saved this session.
+
+## DECIDED: parameter resolution — 8-bit now, 10-bit later, no CPU cost either way
+
+The user asked whether moving to 10-bit parameters later would cost real-time
+headroom. **It does not, and the reason is structural rather than a matter of
+degree.**
+
+    patch bytes  ->  [curve tables]  ->  float coefficients  ->  [audio loop]
+      8 or 10 bit                             identical              identical
+
+The per-sample render path NEVER READS A PARAMETER. Grepping `eb_render.c` for
+`eb_params` / `patch` returns only comments; the loop reads `eb_render_coefs`,
+which is floats. A float coefficient is a float coefficient whether it came
+from a table index or an interpolation between two table entries, so the DSP
+cannot tell and the per-sample cost is bit-for-bit identical.
+
+What 10-bit actually costs:
+  per parameter change   one lerp instead of a bare table index -- a few
+                         instructions, ONCE, inside the recall burst
+  storage                79 bytes -> ~99 in the compact patch
+  PER SAMPLE             ZERO
+
+Label: **READ**, from the code structure. It cannot be MEASURED until device
+recall exists, because today no parameter can change on the device at all. The
+structural argument is strong -- for 10-bit to cost per-sample cycles the audio
+path would have to read parameters, and it demonstrably does not -- but it is
+not yet an executed result and must not be quoted as one.
+
+THE DECISION, so it is not re-litigated:
+  Build the parameter path at 8-BIT first. That is the plugin's own resolution
+  (its front-panel bytes are 0-255, already proven exhaustively over all 256
+  values at three rates) and it is what the whole recall chain is gated on.
+  Add 10-bit LATER as a build flag, once encoders exist and the user can judge
+  by ear whether 256 steps feels coarse -- most likely it will not, except
+  perhaps on filter cutoff.
+
+THE HONEST CAVEAT ON 10-BIT, recorded now rather than discovered later: every
+4th value lands on a plugin-verified point and the three between are values the
+PLUGIN CANNOT PRODUCE. They cannot be proven against the reference. The gates
+would certify the 256 anchors exactly and verify the interpolated points only
+as smooth and monotonic between two proven neighbours. That is a mild,
+deliberate departure from "audibly identical to the plugin" in the direction of
+finer control. **It is the user's call, and it is recorded as a decision rather
+than slipped in.**
