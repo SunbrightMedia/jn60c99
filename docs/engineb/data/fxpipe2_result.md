@@ -58,3 +58,51 @@ Two candidate levers, neither measured in this configuration:
 
 Neither is a promise. The measured position is: **the FX is free, and the
 remaining gap is 696 cycles on one core.**
+
+# EB_PROLOGUE_PIPE CLOSED NEGATIVE AGAIN, and now for a stated reason
+
+    FXPIPE2            engine 6,138
+    FXPIPE3 (+PIPE)    engine 6,136      -> -2 cycles
+
+The retest was justified -- the first closure was measured when core 0 was not
+prologue-bound -- and the answer is the same. This time the reason is known
+rather than assumed:
+
+**`EB_PROLOGUE_PIPE` changes WHEN CORE 1 IS RELEASED. Core 1 is no longer
+waiting.** The FX-first reorder already fills that window. And core 0 is
+WORK-bound, not dependency-bound: its total (prologue + 2 voices) is the same
+whichever order it runs them in. **A lever aimed at a dependency cannot move a
+work bound.**
+
+That is a general rule worth keeping: before adopting a scheduling lever,
+identify whether the critical core is waiting or working. Only the first kind
+is reachable by scheduling.
+
+## THE REMAINING BOUND, and it is much smaller than 696
+
+Chip B's TOTAL work per sample:
+
+    prologue 1,414 + 3 voices 7,086 + FX 2,622 = 11,122
+    perfectly balanced over two cores          =  5,561
+    budget                                     =  5,442
+    -> EVEN PERFECT BALANCE IS 119 OVER
+
+So the position is:
+
+    measured today             6,138   over by 696
+    best conceivable rebalance 5,561   over by 119
+
+**577 of the 696 is bad balance and is reachable by scheduling. The last 119
+is real work and is not.** The obstacle to the balance half is that the
+prologue is 1,414 cycles, indivisible, and must precede the voices -- so any
+core holding it plus two voices lands at 6,138 regardless of order.
+
+Two honest routes for the last 119, neither attempted:
+- Remove ~119 cycles of arithmetic anywhere on the chip. That is 5 % of one
+  voice, or 4.5 % of the FX chain.
+- Pipeline the PROLOGUE itself onto core 1 a chunk ahead, the way the FX now
+  is. Core 1 idles 1,154 and the prologue costs 1,414, so it does not fit in
+  the gap today -- but it would change the shape of the bound rather than
+  chip away at it.
+
+Nothing above is a promise. It is where the measurements leave the problem.
