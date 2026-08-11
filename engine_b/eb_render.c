@@ -82,7 +82,40 @@ void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
     sh->noise_v = eb_notecv_tick(&st->notecv, &c->notecv);
 
     sh->v0_atrest = e->v[0].atrest ? 1 : 0;
+#if !EB_LFO_FREERUN
     if (sh->v0_atrest) { sh->ready = 1; return; }
+#else
+    /* EB_LFO_FREERUN -- voice 0's chain runs WHETHER OR NOT VOICE 0 SOUNDS.
+     *
+     * WHY, and it is a correctness fix rather than a refinement. Under
+     * EB_LFO_SHARED the WHOLE INSTRUMENT'S LFO is voice 0's. The early return
+     * above faithfully reproduced the voice loop, which `continue`s on an
+     * at-rest voice BEFORE its LFO block -- so with voice 0 at rest, every
+     * voice read lfo_del = lfo_und = lfo_pul = 0 and the instrument had NO
+     * modulation at all.
+     *
+     * That is not a corner case on the device. eb_alloc.c scans TOP-DOWN, so
+     * voice 0 is the LAST voice the allocator ever assigns; the firmware's
+     * wake masks (s3_listen_meta.h) contain no mask with bit 0 set except the
+     * eight-voice 0xff; and the shipping build carries S3L_VOICE_LO=5, which
+     * puts voice 0 outside the rendered range entirely. So the board has been
+     * running with no vibrato, no PWM sweep and no filter modulation, on every
+     * measurement taken.
+     *
+     * WHY THIS CANNOT MOVE ANY GATED RESULT: the gate's own shim holds every
+     * voice awake -- engine_b/shim/standalone/juno_driver.c, `for (v = 0; ...)
+     * EBE.v[v].atrest = 0;` -- so `sh->v0_atrest` is 0 in every gated run and
+     * the branch removed here never executed there. Same code, same order,
+     * same arithmetic, for every input the gate has ever presented. The gate
+     * being unable to move is exactly why it could not catch this.
+     *
+     * WHY FREE-RUNNING IS THE CORRECT ANSWER rather than merely a different
+     * one: the PORT runs every voice's LFO every sample regardless of whether
+     * that voice sounds, which is the fact EB_LFO_SHARED was built on -- the
+     * LFO phase is identical in all eight voices, verified across all 64
+     * patches. A shared LFO that stops when its owner stops is not the shared
+     * LFO that was proven; it is a different object. */
+#endif
 
     gi.t28 = c->cvg_t28[0];  gi.t29 = c->cvg_t29[0];
     gi.k   = c->cvg_k[0];    gi.p28 = c->cvg_p28[0];

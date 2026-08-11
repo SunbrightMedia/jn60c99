@@ -159,6 +159,24 @@
 #ifndef EB_LFO_SHARED
 #define EB_LFO_SHARED 0
 #endif
+
+/* EB_LFO_FREERUN -- run voice 0's cvgate/glide/LFO chain even when voice 0 is
+ * AT REST. It DEFAULTS TO EB_LFO_SHARED, because a shared LFO without it is
+ * broken rather than merely slower: the whole instrument's modulation sits
+ * behind one voice's at-rest test, and that voice is the last one the
+ * allocator ever assigns.
+ *
+ * Measured consequence before this existed: the shipping firmware had NO LFO
+ * at any polyphony below eight notes, on every cycle figure taken on the
+ * board. See docs/engineb/data/lfo_dead.md for the full chain and for why no
+ * gate in this repo could see it -- the gate's shim holds every voice awake,
+ * so the branch this flag removes never executed under test.
+ *
+ * It costs the prologue's real work every sample instead of an early return.
+ * That cost is UNMEASURED on silicon; do not quote an estimate for it. */
+#ifndef EB_LFO_FREERUN
+#define EB_LFO_FREERUN EB_LFO_SHARED
+#endif
 #endif
 
 /* ===================================================== CONTROL-RATE LEVERS
@@ -331,4 +349,18 @@
 #define EB_DCO_SUBSTEPS 4
 #endif
 
+#endif
+
+/* SAFE OUTSIDE THE FORK TOO. Everything above is inside the EB_FORK_S3 guard,
+ * so a TRUNK build never sees those defaults -- and `#if !EB_LFO_FREERUN` in
+ * eb_render.c would then be testing an UNDEFINED macro, which the preprocessor
+ * silently reads as 0. It would give the right answer for the wrong reason,
+ * and it would stop giving it the moment someone spelled the flag differently.
+ * This project has already been bitten by a knob nothing read (S3_RING_SRAM,
+ * 2026-08-11, cost one flash). Define it explicitly for the non-fork build. */
+#ifndef EB_LFO_FREERUN
+#define EB_LFO_FREERUN 0
+#endif
+#ifndef EB_LFO_SHARED
+#define EB_LFO_SHARED 0
 #endif
