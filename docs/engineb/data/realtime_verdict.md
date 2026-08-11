@@ -117,3 +117,42 @@ Nothing in the cycle columns. `busy_us` was always measured around the render
 only, so every engine and whole-loop figure in every log stands unaltered. The
 sleep was outside the timed region -- which is precisely why the two halves of
 the log disagreed, and why the disagreement was the clue.
+
+# THE CONDITIONAL FIX FAILED, AND THE FAILURE IS THE INTERESTING PART
+
+REALTIME5 carried `if (wrote_blocked_us < 1000) vTaskDelay(1);` -- feed the
+watchdog only when the I2S write did not block. The board returned a drift of
+**+2,451.5 ms/s, identical to REALTIME4 to the decimal**.
+
+The diagnosis was right and the fix was wrong, for a reason worth keeping:
+
+    behind ---> DMA always empty ---> the write never blocks
+       ^                                        |
+       +--------- so we sleep 10 ms <-----------+
+
+**The behind-state sustains itself.** The sleep is the only reason the loop is
+behind, and being behind is the only reason the sleep keeps firing. The escape
+condition can never become true, so NO CONDITION ON THE LOOP CAN BE THE FIX.
+An identical number, to the decimal, across two different binaries is what a
+fixed point looks like from outside.
+
+## The fix that is not a condition
+
+Stop sleeping at all. A real-time audio loop is SUPPOSED to saturate its core;
+starving IDLE is what it is for, not a fault to be papered over. So the idle
+task watchdog is turned off for this firmware in `sdkconfig.defaults`, and the
+loop now blocks only inside `i2s_channel_write` waiting for DMA space -- a real
+blocking wait, which yields correctly the moment the engine is ahead of the
+codec, which is exactly the state the test exists to detect.
+
+`juno_s3_REALTIME6.bin` carries it. Same engine, same flags, third attempt at
+the harness.
+
+## The lesson, stated plainly
+
+Two harness defects in a row, both in the instrument rather than the subject,
+and both found only because a number disagreed with another number in the same
+log. The engine columns never moved through any of it. When two measurements
+in one log contradict each other, suspect the instrument before the subject --
+and when a fix changes nothing AT ALL, suspect that the thing being fixed is
+holding itself in place.

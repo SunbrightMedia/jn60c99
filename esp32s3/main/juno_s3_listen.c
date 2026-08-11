@@ -915,9 +915,27 @@ void app_main(void)
          * needed in the failing case, and it is exactly the failing case that
          * it was corrupting.
          *
-         * Feed the watchdog only when the write did NOT block. In a passing
-         * run this never fires and the wall clock is the engine's alone. */
-        if (wrote_blocked_us < 1000) vTaskDelay(1);
+         * ⚠ THE CONDITIONAL FORM OF THAT FIX DID NOT WORK, and the board said
+         * so immediately: the drift stayed at +2,451.5 ms/s, identical to the
+         * decimal. The behind-state SUSTAINS ITSELF, so the condition can
+         * never fire:
+         *
+         *     behind ---> DMA always empty ---> the write never blocks
+         *        ^                                        |
+         *        +--------- so we sleep 10 ms <-----------+
+         *
+         * The sleep is the only reason we are behind, and being behind is the
+         * only reason the sleep keeps firing. There is no path out from inside
+         * the loop, so NO CONDITION ON THE LOOP CAN BE THE FIX.
+         *
+         * THE FIX IS TO STOP SLEEPING AT ALL. A real-time audio loop is
+         * SUPPOSED to saturate its core; it is not misbehaving when it starves
+         * IDLE. The idle-task watchdog is therefore off for this firmware
+         * (sdkconfig.defaults), and the loop now blocks only where it should
+         * -- inside i2s_channel_write, waiting for DMA space. That is a proper
+         * blocking wait and yields by itself the moment the engine is ahead,
+         * which is exactly the state we are trying to detect. */
+        (void)wrote_blocked_us;
         if (++chunks % (SR / CHUNK) == 0) {
             /* cycles/sample, from the real render loop rather than a model */
             double us_per_sample = (double)busy_us / (double)(chunks * CHUNK);
