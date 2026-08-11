@@ -133,3 +133,43 @@ estimates in this project flattered themselves.
 
 One flash replaces every cycle figure in the repo with one that describes the
 actual instrument.
+
+# ★ THE LFO COSTS 600 CYCLES, MEASURED (2026-08-11)
+
+    OWN3C (no LFO)   whole loop 5,440
+    LFO              whole loop 6,040
+    the LFO                       600 cycles/sample
+
+    vs budget 5,442 : OVER by 598 = 1.110x
+    drift +113 ms/s = 11.3 % behind; 6,040/5,442 = 11.0 % -- the two agree
+
+**This is the first cycle figure in this project that describes the actual
+instrument.** Every number before it was taken with the modulation absent.
+
+## The estimate was 2.5x HIGH, and that is new
+
+The workflow's static estimate was ~1,480 cycles. The board says 600. **This is
+the FIRST estimate in this project to be pessimistic rather than optimistic** --
+the running record was six of seven flattering themselves.
+
+Worth recording why, because it is the opposite failure and has its own lesson:
+the estimate charged four `expf` calls where `eb_lfo.c` has two and one of them
+is memoised, and it charged two full `fmodf` bodies against a slow arm CLAUDE.md
+records as MEASURED at 9.75 % of calls. Both errors are of the same kind as the
+optimistic ones -- **pricing code that was not read** -- they simply happened to
+point the other way this time. The direction of an estimate's error is not a
+property of the estimator's temperament; it is a property of not measuring.
+
+## Where chip B now stands
+
+    chip B, 3 voices + FX, WITH the LFO   6,040 against 5,442, over by 598
+
+The 696-cycle gap that `S3L_VOICE_LO` closed has been replaced by a 598-cycle
+gap that is real work the instrument must do. The difference is that this one
+buys something: the synth modulates.
+
+## What has NOT been confirmed
+
+**That it sounds different.** A correctness fix which changes no audible
+behaviour has fixed nothing, and the log cannot show that. The listening check
+is outstanding and it outranks the cycle number.
