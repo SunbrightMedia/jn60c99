@@ -60,3 +60,49 @@ move or shrink a shared prologue that was never big enough to matter, and it
 hid a 1,297-cycle cost that the product does not even incur. The FX price was
 settled by measuring it three ways; the prologue should have been measured
 once before anything was designed around it.
+
+# ★★ OWN3 ON SILICON: 6,138 -> 5,446. THE 696 IS RECOVERED. (2026-08-11)
+
+`juno_s3_OWN3.bin`, `S3L_VOICE_LO=5`, 136 s on the user's board.
+
+    FXPIPE2 (owns all 8)   engine 6,138   whole loop 6,164
+    OWN3    (owns 3)       engine 5,420   whole loop 5,446
+    saved                          718                 718
+
+**718 recovered against a 696 target.** Not owning the other chip's voices was
+the whole gap.
+
+    whole loop 5,446   vs budget 5,442   -> over by 4 cycles, 0.07 %
+
+## It is ON the line, and the wall clock is slightly the harsher judge
+
+The verdict FLICKERS between `realtime OK` and `BEHIND REAL TIME` second by
+second, which is exactly what a loop sitting on its budget looks like. The
+drift accumulates **+11.6 ms per second, about 1.16 % behind**, which is more
+than the 0.07 % the loop metric implies.
+
+That difference is real and it is not a contradiction: `busy_us` measures the
+render, while the wall clock also carries the I2S write, the per-sample note
+gate and the once-a-second printf. **The wall clock is the deciding test and
+it says marginally behind.** So: NOT a pass. About 60 cycles of wall-clock
+work sit outside the timed region and are now the whole remaining deficit.
+
+## The prediction was optimistic AGAIN, by 371
+
+I predicted 5,075 and the board returned 5,446 -- the fifth prediction in this
+project and the fifth to flatter itself. The residual is the per-sample loop
+and at-rest advance still running over voices 5..7 plus the three-slot zeroing,
+none of which the estimate charged. **The direction of the error is now a
+pattern rather than a coincidence, and future estimates should be quoted with
+it stated.**
+
+## Where the last ~60 cycles could come from, none measured
+
+- `CHUNK` is 128. A larger chunk amortises the per-block I2S call and barrier
+  over more samples. It also raises latency, which is a user-facing trade.
+- The per-sample note gate runs a counter and a branch for every sample on
+  core 0; it only needs to act at a gate change.
+- The once-a-second printf is inside the timed wall clock.
+
+None of these is engine arithmetic. **The DSP is no longer the problem** --
+which is the first time that has been true in this project.
