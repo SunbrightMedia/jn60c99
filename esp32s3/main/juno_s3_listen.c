@@ -468,14 +468,28 @@ static void worker(void *arg)
 #if S3L_FX_PIPE
         {
         const int cur = w_cur, prev = 1 - w_cur, have = w_have_prev;
-        for (i = 0; i < w_n; ++i) {
-            while (w_ready <= i) { }        /* wait for this sample's prologue */
-            eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                                   S3L_SPLIT, EB_NUM_VOICES, &w_shb[i],
-                                   w_vbb[cur][i]);
-        }
-        /* THE PIPELINE STAGE: the PREVIOUS chunk's voices are complete on both
-         * cores, so its FX may run now, here, beside core 0's current chunk. */
+        /* ⚠ THE FX RUNS FIRST, AND THE ORDER IS THE WHOLE POINT.
+         *
+         * The first version of this worker did its voices and THEN the FX, and
+         * the board measured 8,746 against a predicted 4,984. The reason is
+         * not the FX's cost -- it is that core 1's VOICE pass cannot run any
+         * faster than core 0 publishes prologues. `w_ready` is advanced once
+         * per sample by core 0, which also carries two voices per sample, so
+         * core 1's single voice waits at the top of every iteration and its
+         * pass ENDS WHEN CORE 0'S ENDS. Only then did the FX start -- with
+         * core 0 already spinning at the barrier. So the FX overlapped
+         * nothing, and the loop was core0_pass + FX, which is a sum again.
+         *
+         * The FX depends ONLY on the previous chunk, which is complete before
+         * this one begins. It is therefore the one piece of work on this core
+         * that is never blocked. Running it FIRST fills exactly the window
+         * where core 0 is busy and core 1 would otherwise be waiting on
+         * w_ready; the voices then follow, still throttled by core 0, but now
+         * throttled during time that was already going to be spent.
+         *
+         * MEASURED CAUSE, not a guess: the ring-placement test moved four of
+         * nine rings into internal SRAM and the engine got 94 cycles WORSE,
+         * which kills the memory-contention explanation and leaves this one. */
         if (have) {
             for (i = 0; i < w_n; ++i) {
                 float L = 0.0f, R = 0.0f;
@@ -485,6 +499,12 @@ static void worker(void *arg)
                 w_pcm[prev][2 * i]     = (int16_t)(L * 30000.0f);
                 w_pcm[prev][2 * i + 1] = (int16_t)(R * 30000.0f);
             }
+        }
+        for (i = 0; i < w_n; ++i) {
+            while (w_ready <= i) { }        /* wait for this sample's prologue */
+            eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
+                                   S3L_SPLIT, EB_NUM_VOICES, &w_shb[i],
+                                   w_vbb[cur][i]);
         }
         }
 #else

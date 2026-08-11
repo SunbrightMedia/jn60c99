@@ -91,3 +91,51 @@ history in a comment so the next person does not spend a flash on it.
 
 The contention hypothesis is still OPEN. It has not been tested.
 `juno_s3_FXPIPE_SRAM2.bin` is the build that actually tests it.
+
+# CONTENTION IS DEAD, AND THE REAL CAUSE IS AN ORDERING DEFECT (2026-08-11)
+
+`juno_s3_FXPIPE_SRAM2.bin`, with the knob actually wired -- the banner now
+reads `RINGS: cap 32768 samples. 4 of 9 INTERNAL, 5 in PSRAM -- PLACEMENT IS
+MIXED`, which is the check working:
+
+    PSRAM rings   engine 8,746
+    MIXED rings   engine 8,840      -> +94 cycles WORSE
+
+**Moving four of nine rings into internal SRAM made it slightly worse.** The
+memory-contention hypothesis is not supported and is closed. (The earlier
+serial finding stands: PSRAM is the better placement. It was reopened
+correctly and it has now closed the same way.)
+
+## The real cause, from the code rather than a guess
+
+Core 1's VOICE pass cannot run faster than core 0 publishes prologues.
+`w_ready` advances once per sample from core 0, which in this split also
+carries TWO voices per sample. Core 1's single voice therefore waits at the
+top of every iteration and **its pass ends when core 0's pass ends.** Only
+then did the FX start -- with core 0 already spinning at the barrier.
+
+**So the FX overlapped nothing.** The loop was `core0_pass + FX`, which is a
+sum again, in a build written to stop summing. The pipeline moved the FX off
+the SERIAL TAIL and onto a core that was itself serialised behind core 0.
+
+## The fix, and why it is the right shape
+
+The FX depends only on the PREVIOUS chunk, which is complete before this one
+starts. It is the one piece of work on core 1 that is never blocked. Running
+it FIRST fills exactly the window in which core 0 is busy and core 1 would
+otherwise be waiting on `w_ready`. The voices then follow, still throttled by
+core 0, but throttled during time that was already going to be spent.
+
+`juno_s3_FXPIPE2.bin` carries the reorder. It is a MOVE of one loop above
+another; no arithmetic changed.
+
+## THE BOUND THAT MATTERS MORE THAN EITHER
+
+From measured parts, per sample: 3 voices = 7,086, FX = 2,622, total 9,708.
+Spread over two cores PERFECTLY, that is **4,854 against a 5,442 budget**.
+
+So 3 voices + FX on ONE chip is not impossible -- but it needs a near-perfect
+split, and the prologue is on core 0 and is not divisible. The measured 8,746
+is 1.8x the ideal, so the arrangement, not the arithmetic, is what is being
+paid for. That is the thing to keep working on, and it is also why the
+two-chip plan was never contingent on this build fitting.
