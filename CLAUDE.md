@@ -1,5 +1,22 @@
 **Adhere to and only respond in ASD-STE100 Simplified Technical English.**
 
+# ⚑⚑⚑⚑⚑ READ `END_GOAL.md` BEFORE ANYTHING ELSE IN THIS FILE ⚑⚑⚑⚑⚑
+
+The user stated the FINAL END GOAL once, on 2026-08-11, and said it is the most
+important thing they will ever say on this project. It is in `END_GOAL.md`, it
+is USER-BINDING, and it outranks every work order, plan and pointer below.
+
+In one line: **audibly identical, 6 voices, EXACTLY two ESP32-S3 boards, full
+FX including chorus, seamless real time, complete control over every parameter
+including preset recall, confidently proven.**
+
+Ruled out permanently and never to be re-proposed: a third chip, a different
+chip, 32 kHz, fewer voices, dropping any FX.
+
+**Progress is reported against those six items, in the user's words.** Not in
+cycles saved. The failure that made the user state this was reporting cycle
+counts as the headline while the thing being timed could not be played.
+
 # JUNO-60 (JU-06A) C99 port — project memory
 
 **⚑⚑⚑⚑ LIVE STATE (2026-08-10 night, Opus 5) — READ THESE FOUR
