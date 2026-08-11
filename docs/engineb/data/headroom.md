@@ -109,3 +109,37 @@ Chasing the last 29 cycles is worth one build because it is nearly free. It is
 NOT worth a campaign. The next real work is the three items already listed
 above: build the missing paths and measure them, win back 5-10 % of genuine
 headroom, and test with real playing instead of a looped chord.
+
+# OWN3C MEASURED: 0.29 % behind, and the hunt stops here (2026-08-11)
+
+    OWN3   CHUNK 128, console every 1 s   11.6 ms/s = 1.16 % behind
+    OWN3B  CHUNK 128, console every 5 s    5.4 ms/s = 0.54 % behind
+    OWN3C  CHUNK 256, console every 5 s    2.9 ms/s = 0.29 % behind
+
+Doubling CHUNK halved the deficit exactly as the per-block model predicted --
+the first estimate tonight that was not optimistic.
+
+**The timed loop is now 5,440 against a 5,442 budget: UNDER by 2 cycles.** The
+wall clock is still 0.29 % behind, so about 16 cycles/sample remain outside the
+timed region.
+
+## Why this is the stopping point
+
+Every halving so far has been bought with latency or with reporting. CHUNK 512
+would give roughly 0.15 % and **11.6 ms of latency**, before the FX pipeline
+adds its own chunk. That is not a trade worth making on an instrument.
+
+And the arithmetic that matters has not changed: closing 0.29 % leaves a margin
+of about zero, on a chip that still has no MIDI, no parameter control and no
+device-side recall. Those are bursts. **Parity is not headroom.**
+
+## The measured position, for the record
+
+    chip A : 3 voices, no FX                      4,724   fits, 718 spare
+    chip B : 3 voices + FX, owning only its own   5,440   fits the timed loop
+             wall clock                           0.29 % behind
+
+    voice slope   2,362      measured, linear
+    FX chain      2,622      measured three ways within 1 %
+    prologue        117      measured directly
+    output stage     91      measured
