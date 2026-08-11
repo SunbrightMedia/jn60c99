@@ -479,6 +479,12 @@ static volatile int w_ready = 0;
  *
  * DEFAULT 0 = own everything, which is the behaviour every previous build
  * had. */
+/* How often the per-second report is PRINTED. The measurement is unaffected;
+ * see the console note in the loop for why this matters at all. */
+#ifndef S3L_REPORT_EVERY
+#define S3L_REPORT_EVERY 5
+#endif
+
 #ifndef S3L_VOICE_LO
 #define S3L_VOICE_LO 0
 #endif
@@ -1129,6 +1135,23 @@ void app_main(void)
          * which is exactly the state we are trying to detect. */
         (void)wrote_blocked_us;
         if (++chunks % (SR / CHUNK) == 0) {
+            /* ⚠ THE CONSOLE IS PART OF THE MEASUREMENT, and at 115200 baud it
+             * is not a small part. The two lines below run about 235
+             * characters; at 8N1 that is 2,350 bits, or 20.4 ms of UART time
+             * EVERY SECOND -- 2.0 % of the wall clock, against a measured
+             * remaining deficit of 1.16 %. printf blocks once the driver's
+             * buffer fills, and it sits INSIDE the wall-clock test that
+             * decides pass or fail.
+             *
+             * So the report is throttled to one second in S3L_REPORT_EVERY.
+             * The measurement still accumulates every second; only the
+             * printing is rarer, which divides the UART cost by the same
+             * factor without touching what is measured.
+             *
+             * This is the third time tonight the instrument turned out to be
+             * the thing being measured -- after the latched verdict and the
+             * watchdog sleep. Whenever the last few percent will not close,
+             * price the harness before pricing the engine. */
             /* cycles/sample, from the real render loop rather than a model */
             double us_per_sample = (double)busy_us / (double)(chunks * CHUNK);
             /* THE WALL-CLOCK TEST, which is the one that decides. Measured
@@ -1152,7 +1175,8 @@ void app_main(void)
                  * SWEEP[phase] even when the sweep was not driving WAKE, so
                  * it read "wake=0x00" while six voices were rendering -- a
                  * diagnostic that says the opposite of the truth. */
-                printf("wake=0x%02x  engine %.2f us (%.0f cyc)  "
+                if ((chunks / (SR / CHUNK)) % S3L_REPORT_EVERY == 0)
+            printf("wake=0x%02x  engine %.2f us (%.0f cyc)  "
                        "whole loop %.2f us (%.0f cyc)  overhead %.0f cyc\n",
                        WAKE, e, e * 240.0, w, w * 240.0,
                        (w - e) * 240.0);
@@ -1169,6 +1193,7 @@ void app_main(void)
                        (double)prologue_us / (double)prologue_n,
                        (double)prologue_us / (double)prologue_n * 240.0);
 #endif
+            if ((chunks / (SR / CHUNK)) % S3L_REPORT_EVERY == 0)
             printf("t=%lus  %s  drift %+.1f ms  underruns=%lu  "
                    "render %.2f us/sample "
                    "(~%.0f cycles at 240 MHz)  budget %.2f us  %s\n",
