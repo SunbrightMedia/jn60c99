@@ -400,8 +400,57 @@ static int rings_alloc(void)
  * The per-sample loop afterwards only reads finished voice buffers. */
 static volatile int      w_go = 0, w_done = 0, w_quit = 0;
 static eb_shared_tick    w_shb[CHUNK];
-static float             w_vbb[CHUNK][EB_NUM_VOICES];
 static int               w_n = 0;
+
+#ifndef S3L_FX_PIPE
+#define S3L_FX_PIPE 0
+#endif
+#if S3L_FX_PIPE && S3L_NOFX
+#error "S3L_FX_PIPE pipelines the FX chain; it is meaningless with S3L_NOFX."
+#endif
+
+#if S3L_FX_PIPE
+/* ---- THE FX PIPELINE STAGE -------------------------------------------------
+ *
+ * WHY. FXRT measured 8,014 cycles against a 5,442 budget, and the parts added
+ * EXACTLY: voice phase 5,294 + FX 2,622 + output 91. The FX was serial,
+ * because `eb_master_render` ran in the per-sample loop AFTER the barrier, on
+ * core 0, with core 1 already finished and idle. Nothing was overlapped.
+ *
+ * WHY IT CANNOT SIMPLY MOVE. The FX consumes the SUMMED VOICE OUTPUT, so it
+ * cannot run beside the voices of the same sample -- the thing it needs does
+ * not exist yet. It can only run beside the voices of the NEXT chunk. So this
+ * is a pipeline stage, not a reassignment, and it costs one chunk of latency
+ * (2.9 ms at CHUNK=128) and a second set of buffers. Both are stated here
+ * because both are real.
+ *
+ * THE SHAPE. Two banks. Each chunk, both cores render voices into bank `cur`;
+ * core 1 then runs the FX over bank `1-cur`, which is complete, and writes
+ * finished PCM for it. Core 0's per-sample tail keeps only the note gate.
+ *
+ *   core 0 : prologue + its voice range                    (bank cur)
+ *   core 1 : its voice range (bank cur), THEN FX (bank 1-cur)
+ *
+ * so the loop becomes max(core0_voices, core1_voices + FX) instead of a sum.
+ * With the wake mask putting 2 voices on core 0 and 1 on core 1 that is
+ * max(4,724 , 2,362 + 2,622) = 4,984, which is the point of the exercise.
+ *
+ * THE FIRST CHUNK HAS NO PREDECESSOR and therefore emits one chunk of
+ * SILENCE, 2.9 ms, once at start. That is the pipeline filling, not a defect,
+ * and it is why `w_have_prev` exists rather than being assumed.
+ *
+ * RACE ANALYSIS, stated rather than hoped: core 0 writes bank `cur` at voice
+ * indices [0,SPLIT) while core 1 writes bank `cur` at [SPLIT,NUM) -- disjoint.
+ * Core 1 READS bank `1-cur`, which no one writes this chunk. `w_cur` is
+ * flipped by core 0 only, before `w_go` releases the worker, so the worker
+ * reads a stable value for the whole pass. */
+static float             w_vbb[2][CHUNK][EB_NUM_VOICES];
+static int16_t           w_pcm[2][CHUNK * 2];
+static volatile int      w_cur = 0;
+static volatile int      w_have_prev = 0;
+#else
+static float             w_vbb[CHUNK][EB_NUM_VOICES];
+#endif
 
 /* ROLLING READY INDEX, not a barrier. The first block design computed ALL
  * 128 prologues before releasing core 1, so the whole prologue pass (notecv +
@@ -416,12 +465,36 @@ static void worker(void *arg)
     (void)arg;
     for (;;) {
         while (!w_go) { if (w_quit) vTaskDelete(NULL); }
+#if S3L_FX_PIPE
+        {
+        const int cur = w_cur, prev = 1 - w_cur, have = w_have_prev;
+        for (i = 0; i < w_n; ++i) {
+            while (w_ready <= i) { }        /* wait for this sample's prologue */
+            eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
+                                   S3L_SPLIT, EB_NUM_VOICES, &w_shb[i],
+                                   w_vbb[cur][i]);
+        }
+        /* THE PIPELINE STAGE: the PREVIOUS chunk's voices are complete on both
+         * cores, so its FX may run now, here, beside core 0's current chunk. */
+        if (have) {
+            for (i = 0; i < w_n; ++i) {
+                float L = 0.0f, R = 0.0f;
+                eb_master_render(MS, &MC, &RG, w_vbb[prev][i], &L, &R);
+                if (L > 1.0f) L = 1.0f; else if (L < -1.0f) L = -1.0f;
+                if (R > 1.0f) R = 1.0f; else if (R < -1.0f) R = -1.0f;
+                w_pcm[prev][2 * i]     = (int16_t)(L * 30000.0f);
+                w_pcm[prev][2 * i + 1] = (int16_t)(R * 30000.0f);
+            }
+        }
+        }
+#else
         for (i = 0; i < w_n; ++i) {
             while (w_ready <= i) { }        /* wait for this sample's prologue */
             eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
                                    S3L_SPLIT, EB_NUM_VOICES, &w_shb[i],
                                    w_vbb[i]);
         }
+#endif
         w_go = 0;
         w_done = 1;
     }
@@ -430,6 +503,15 @@ static void worker(void *arg)
 static void render_block(int n)
 {
     int i, k;
+#if S3L_FX_PIPE
+    /* Flip banks BEFORE releasing the worker, so the worker reads one stable
+     * value of w_cur for its whole pass. Core 0 is the only writer. */
+    float (*vb)[EB_NUM_VOICES];
+    w_cur = 1 - w_cur;
+    vb = w_vbb[w_cur];
+#else
+    float (*vb)[EB_NUM_VOICES] = w_vbb;
+#endif
     /* Release core 1 FIRST; it blocks on w_ready until sample 0's prologue is
      * published, then runs one sample behind core 0's prologue rather than a
      * whole block behind it. */
@@ -468,10 +550,10 @@ static void render_block(int n)
     w_shb[0].ready = 0;
     eb_engine_render_shared(&EBE, RS, &RC, &w_shb[0]);
     for (i = 0; i < n; ++i) {
-        for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
+        for (k = 0; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
         w_ready = i + 1;                    /* prologue[i] is already done */
         eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                               0, S3L_SPLIT, &w_shb[i], w_vbb[i]);
+                               0, S3L_SPLIT, &w_shb[i], vb[i]);
         if (i + 1 < n) {
             w_shb[i + 1].ready = 0;
             eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i + 1]);
@@ -479,15 +561,20 @@ static void render_block(int n)
     }
 #else
     for (i = 0; i < n; ++i) {
-        for (k = 0; k < EB_NUM_VOICES; ++k) w_vbb[i][k] = 0.0f;
+        for (k = 0; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
         w_shb[i].ready = 0;
         eb_engine_render_shared(&EBE, RS, &RC, &w_shb[i]);
         w_ready = i + 1;                          /* publish; core 1 may go */
         eb_engine_render_range(&EBE, RS, &RC, (const eb_render_needs *)0,
-                               0, S3L_SPLIT, &w_shb[i], w_vbb[i]);
+                               0, S3L_SPLIT, &w_shb[i], vb[i]);
     }
 #endif
     while (!w_done) { }                           /* ONE barrier per block */
+#if S3L_FX_PIPE
+    /* From here on there IS a previous chunk, so the worker may run its FX
+     * stage. Set only after the first barrier, never cleared. */
+    w_have_prev = 1;
+#endif
 }
 #else
 static float w_vbb[CHUNK][EB_NUM_VOICES];
@@ -841,8 +928,18 @@ void app_main(void)
             render_block(CHUNK);
             te += esp_timer_get_time() - e0;
         }
+#if !S3L_FX_PIPE
+        float (*vb_out)[EB_NUM_VOICES] = w_vbb;
+#endif
         for (i = 0; i < CHUNK; ++i) {
-            float *vb = w_vbb[i];
+#if S3L_FX_PIPE
+            /* THE PCM IS ALREADY MADE. Core 1 produced it this chunk, from the
+             * PREVIOUS chunk's voices. Core 0's tail keeps only the note gate,
+             * which must stay per-sample because the hold and release lengths
+             * are counted in frames. */
+            (void)0;
+#else
+            float *vb = vb_out[i];
             float L = 0.0f, R = 0.0f;
             int k; (void)k;
 #if S3L_NOFX
@@ -858,6 +955,7 @@ void app_main(void)
             if (R > 1.0f) R = 1.0f; else if (R < -1.0f) R = -1.0f;
             pcm[2 * i]     = (int16_t)(L * 30000.0f);
             pcm[2 * i + 1] = (int16_t)(R * 30000.0f);
+#endif
 
             /* One chord, held then released, repeating. `gate` 0 = held.
              *
@@ -888,9 +986,19 @@ void app_main(void)
              * permanently behind there is ALWAYS free DMA space and the
              * write never blocks. The real test is the wall clock. */
             int64_t tw = esp_timer_get_time();
-            if (i2s_channel_write(TX, pcm, sizeof pcm, &wrote,
+#if S3L_FX_PIPE
+            /* Bank 1-w_cur is the chunk core 1 just finished the FX for.
+             * Before the first flip it is all zeros -- one chunk of silence
+             * while the pipeline fills, 2.9 ms, once. */
+            const int16_t *out = w_pcm[1 - w_cur];
+            const size_t   nby = sizeof w_pcm[0];
+#else
+            const int16_t *out = pcm;
+            const size_t   nby = sizeof pcm;
+#endif
+            if (i2s_channel_write(TX, out, nby, &wrote,
                                   pdMS_TO_TICKS(50)) != ESP_OK
-                || wrote != sizeof pcm)
+                || wrote != nby)
                 ++underrun;
             wrote_blocked_us = (unsigned long)(esp_timer_get_time() - tw);
         }
