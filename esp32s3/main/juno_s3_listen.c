@@ -1557,6 +1557,11 @@ static void render_block(int n)
  * `volatile` and single-writer per field, the same discipline every other
  * cross-context datum in this file uses. A torn read costs one wrong digit in
  * a diagnostic; a lock would cost the thing this exists to avoid. */
+#if S3L_USBMIDI
+#include "tusb.h"
+extern unsigned long usbmidi_pkts;
+#endif
+
 static volatile int           rpt_pending = 0;
 static volatile unsigned long rpt_sec = 0, rpt_cyc = 0, rpt_under = 0;
 static volatile unsigned long rpt_gap = 0, rpt_build = 0, rpt_nb = 0;
@@ -1576,9 +1581,18 @@ static void rpt_task(void *arg)
          * tick. Under 100 characters does. The budget constant and the words
          * are what got cut; every number is still here. */
         printf("t=%lu cyc=%lu drift=%+ld un=%lu gap=%lu bst=%lu nb=%lu "
-               "midi=%lu/%lu\n",
+               "midi=%lu/%lu usb=%lu/%d\n",
                rpt_sec, rpt_cyc, rpt_drift, rpt_under, rpt_gap,
-               rpt_build, rpt_nb, rpt_midi, rpt_drop);
+               rpt_build, rpt_nb, rpt_midi, rpt_drop,
+#if S3L_USBMIDI
+               /* usb=<packets>/<mounted>. MOUNTED means the host completed
+                * enumeration. 0 packets with mounted 1 is a DAW routing
+                * problem; mounted 0 is mine. */
+               usbmidi_pkts, (int)tud_mounted()
+#else
+               0ul, 0
+#endif
+               );
     }
 }
 

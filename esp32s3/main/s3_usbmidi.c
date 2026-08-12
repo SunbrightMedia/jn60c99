@@ -164,6 +164,21 @@ int s3_usbmidi_start(void)
     };
     if (usb_new_phy(&pc, &PHY) != ESP_OK) return 0;
     if (!tud_init(0)) return 0;
+
+    /* ⚠ EVIDENCE, NOT A BANNER. The first USB build printed "started" and the
+     * host saw NOTHING AT ALL -- not even a failed enumeration. "started" only
+     * meant two functions returned success, which is the same defect as a gate
+     * that cannot fail: it could not have told us otherwise.
+     *
+     * GSNPSID is the DWC2 core's own ID register at offset 0x40. On a powered,
+     * clocked core it reads 0x4F54xxxx ("OT" in ASCII). If it reads 0x00000000
+     * or 0xFFFFFFFF the core is dark and no descriptor work can matter. That
+     * single word separates "the core is dead" from "the core is alive but
+     * never pulls up D+", which are different bugs with different fixes. */
+    {   volatile uint32_t *gsnpsid = (volatile uint32_t *)(0x60080000UL + 0x40);
+        printf("USB MIDI: DWC2 GSNPSID = 0x%08lX  (0x4F54xxxx = core alive; "
+               "0 or FFFFFFFF = core dark)\n", (unsigned long)*gsnpsid);
+    }
     if (xTaskCreatePinnedToCore(usbmidi_task, "usbmidi", 4096, NULL, 2, NULL, 0)
         != pdPASS) return 0;
     return 1;
