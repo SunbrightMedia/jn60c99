@@ -50,6 +50,6 @@ static const ebdev_seg EBDEV_SEGTAB[EBDEV_NSEG] = {
   { 11022032u, 11022352u, 18860u },
 };
 static const unsigned EBDEV_SCATTAB[EBDEV_NSCAT] = {
-  320u, 592u, 1072u, 1856u, 3968u, 5520u, 6864u, 7600u, 9680u, 9824u, 10320u
+  304u, 320u, 592u, 1072u, 1856u, 3968u, 6864u, 7600u, 9680u, 9824u, 10320u
 };
 #endif
