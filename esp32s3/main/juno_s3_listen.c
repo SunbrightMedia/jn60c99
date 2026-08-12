@@ -1400,6 +1400,38 @@ static void render_block(int n)
 }
 #endif
 
+/* ---- THE REPORTER, AND WHY IT IS A TASK -------------------------------------
+ *
+ * See the comment at the snapshot site: printf from the audio loop stalled the
+ * loop for 66-117 ms, measured, twelve windows out of twelve. The loop now
+ * writes these and nothing else; this task prints them. It runs at priority 1
+ * on core 0, so the audio loop (which never yields except inside
+ * i2s_channel_write) preempts it always and it can never hold the loop up.
+ *
+ * `volatile` and single-writer per field, the same discipline every other
+ * cross-context datum in this file uses. A torn read costs one wrong digit in
+ * a diagnostic; a lock would cost the thing this exists to avoid. */
+static volatile int           rpt_pending = 0;
+static volatile unsigned long rpt_sec = 0, rpt_cyc = 0, rpt_under = 0;
+static volatile unsigned long rpt_gap = 0, rpt_build = 0, rpt_nb = 0;
+static volatile unsigned long rpt_midi = 0, rpt_drop = 0;
+static volatile long          rpt_drift = 0;
+
+static void rpt_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        if (!rpt_pending) { vTaskDelay(1); continue; }
+        rpt_pending = 0;
+        printf("t=%lus  loop %lu cyc / 5442  drift %+ld ms  underruns=%lu  "
+               "worst gap %lu us (budget %lu)  burst %lu  note-burst %lu  "
+               "midi %lu/%lu\n",
+               rpt_sec, rpt_cyc, rpt_drift, rpt_under, rpt_gap,
+               (unsigned long)(1000000ull * CHUNK / SR),
+               rpt_build, rpt_nb, rpt_midi, rpt_drop);
+    }
+}
+
 static i2s_chan_handle_t TX;
 
 static int i2s_start(void)
@@ -1715,6 +1747,9 @@ void app_main(void)
            "270/270 vs the plugin), applied through the port's own note path, "
            "and published at the next block boundary.\n");
 #endif
+    /* Priority 1 on core 0: the audio loop always wins. Started before I2S so
+     * the very first second is reported. */
+    xTaskCreatePinnedToCore(rpt_task, "eb_report", 3072, NULL, 1, NULL, 0);
     if (!i2s_start()) { printf("HALT: I2S would not start.\n"); return; }
 #if S3L_TONE
     /* A LOUD SQUARE WAVE, NO ENGINE AT ALL.
@@ -2142,6 +2177,50 @@ void app_main(void)
          * which is exactly the state we are trying to detect. */
         (void)wrote_blocked_us;
         if (++chunks % (SR / CHUNK) == 0) {
+            /* ⚑⚑ THE AUDIO LOOP MAY NOT CALL printf. NOT THROTTLED -- AT ALL.
+             *
+             * MEASURED 2026-08-12 by this build's own gap meter: the worst
+             * block-to-block gap was 66,000-117,000 us and the tag was
+             * `printf` on TWELVE windows out of twelve, against a 5,804 us
+             * block period. Seven report lines is about 800 characters; at
+             * 115,200 baud that is 69 ms of blocking, and it matches the
+             * measured gap exactly.
+             *
+             * That is playbook defect 30 FOR THE FOURTH TIME. The catalogue
+             * already named the console, and S3L_REPORT_EVERY was already
+             * added to throttle it -- then four more lines were added while
+             * hunting a stall, and re-created the defect at three times the
+             * size. Every hypothesis chased afterwards was chasing this.
+             *
+             * A throttle makes it rarer. Rare is what let it survive. So the
+             * loop now only SNAPSHOTS, and rpt_task() -- a separate task, low
+             * priority, on core 0 -- does the printing. It cannot block the
+             * audio path because it is not on it. */
+            {   unsigned long sec = chunks / (SR / CHUNK);
+                static unsigned long p_busy = 0, p_ch = 0;
+                unsigned long d_busy = busy_us - p_busy;
+                unsigned long d_ch   = (chunks - p_ch) * CHUNK;
+                int64_t real_us  = esp_timer_get_time() - t_start;
+                int64_t audio_us = (int64_t)((double)(chunks * CHUNK)
+                                             * 1e6 / (double)SR);
+                p_busy = busy_us; p_ch = chunks;
+                rpt_sec   = sec;
+                rpt_cyc   = d_ch ? (unsigned long)((double)d_busy
+                                                   / (double)d_ch * 240.0) : 0;
+                rpt_under = underrun;
+                rpt_gap   = gap_max;
+                rpt_drift = (long)((real_us - audio_us) / 1000);
+#if S3L_RECALL
+                rpt_build = b_last;
+                rpt_nb    = nb_last;
+                rpt_midi  = notes_seen;
+                rpt_drop  = notes_dropped;
+#endif
+                gap_max = 0;
+            }
+            rpt_pending = 1;
+        }
+        if (0) {
             /* ⚠ THE CONSOLE IS PART OF THE MEASUREMENT, and at 115200 baud it
              * is not a small part. The two lines below run about 235
              * characters; at 8N1 that is 2,350 bits, or 20.4 ms of UART time
