@@ -10,47 +10,43 @@
 
 /* voice-0 scatter: a constant offset inside the tile that is per-voice */
 #define EBDEV_SCAT0_BODY \
-            if (off < 5520u) { \
-                if (off < 1072u) { \
+            if (off < 3968u) { \
+                if (off < 592u) { \
                     if (off < 320u) { \
                         if (off == 304u) return &EBDEV_S.scat[0][0]; \
                     } else { \
-                        if (off < 592u) { \
-                            if (off == 320u) return &EBDEV_S.scat[0][1]; \
-                        } else { \
-                            if (off == 592u) return &EBDEV_S.scat[0][2]; \
-                        } \
+                        if (off == 320u) return &EBDEV_S.scat[0][1]; \
                     } \
                 } else { \
-                    if (off < 1856u) { \
-                        if (off == 1072u) return &EBDEV_S.scat[0][3]; \
+                    if (off < 1072u) { \
+                        if (off == 592u) return &EBDEV_S.scat[0][2]; \
                     } else { \
-                        if (off < 3968u) { \
-                            if (off == 1856u) return &EBDEV_S.scat[0][4]; \
+                        if (off < 1856u) { \
+                            if (off == 1072u) return &EBDEV_S.scat[0][3]; \
                         } else { \
-                            if (off == 3968u) return &EBDEV_S.scat[0][5]; \
+                            if (off == 1856u) return &EBDEV_S.scat[0][4]; \
                         } \
                     } \
                 } \
             } else { \
                 if (off < 9680u) { \
                     if (off < 6864u) { \
-                        if (off == 5520u) return &EBDEV_S.scat[0][6]; \
+                        if (off == 3968u) return &EBDEV_S.scat[0][5]; \
                     } else { \
                         if (off < 7600u) { \
-                            if (off == 6864u) return &EBDEV_S.scat[0][7]; \
+                            if (off == 6864u) return &EBDEV_S.scat[0][6]; \
                         } else { \
-                            if (off == 7600u) return &EBDEV_S.scat[0][8]; \
+                            if (off == 7600u) return &EBDEV_S.scat[0][7]; \
                         } \
                     } \
                 } else { \
                     if (off < 9824u) { \
-                        if (off == 9680u) return &EBDEV_S.scat[0][9]; \
+                        if (off == 9680u) return &EBDEV_S.scat[0][8]; \
                     } else { \
                         if (off < 10320u) { \
-                            if (off == 9824u) return &EBDEV_S.scat[0][10]; \
+                            if (off == 9824u) return &EBDEV_S.scat[0][9]; \
                         } else { \
-                            if (off == 10320u) return &EBDEV_S.scat[0][11]; \
+                            if (off == 10320u) return &EBDEV_S.scat[0][10]; \
                         } \
                     } \
                 } \

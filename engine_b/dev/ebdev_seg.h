@@ -9,7 +9,7 @@
 #define EBDEV_VHI     84272u
 #define EBDEV_NSEG 32
 #define EBDEV_SEGBYTES 19180u
-#define EBDEV_NSCAT 12
+#define EBDEV_NSCAT 11
 typedef struct { unsigned lo, hi, at; } ebdev_seg;
 /* The TABLE is the reference form. ebdev.c uses the literal chain in
  * ebdev_map.h for the real lookup and, under -DEBDEV_INSTRUMENT, checks
@@ -50,6 +50,6 @@ static const ebdev_seg EBDEV_SEGTAB[EBDEV_NSEG] = {
   { 11022032u, 11022352u, 18860u },
 };
 static const unsigned EBDEV_SCATTAB[EBDEV_NSCAT] = {
-  304u, 320u, 592u, 1072u, 1856u, 3968u, 5520u, 6864u, 7600u, 9680u, 9824u, 10320u
+  304u, 320u, 592u, 1072u, 1856u, 3968u, 6864u, 7600u, 9680u, 9824u, 10320u
 };
 #endif
