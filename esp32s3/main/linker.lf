@@ -40,7 +40,42 @@
 [mapping:main]
 archive: libmain.a
 entries:
-    * (noflash_text)
+    # ⚠ NOT `* (noflash_text)`. THE WILDCARD CANNOT SHIP.
+    #
+    # iram0_0_seg is 341,760 bytes SHARED WITH ALL DRAM, and .bss alone is
+    # already 211,760 of it. Moving every libmain.a object into IRAM asks for
+    # ~180 KB more than exists, so the wildcard either fails the link or, under
+    # -flto, silently does nothing -- which is what it has been doing.
+    #
+    # So the entries below are an EXPLICIT HOT LIST: the modules the voice loop
+    # executes 44,100 times a second. Everything not named here stays in flash
+    # by default, including all of recall, which runs about once a second.
+    #
+    # THIS ONLY WORKS WITHOUT -flto. Under LTO the archive members are IR and
+    # ldgen's `archive:`/object matching selects nothing -- MEASURED, both
+    # ways, zero engine symbols in IRAM. S3_LTO now defaults OFF for exactly
+    # that reason, and the firmware PRINTS which of its own symbols are in IRAM
+    # so this can never again be believed rather than checked.
+    eb_render (noflash_text)
+    eb_dco (noflash_text)
+    eb_dco_wt (noflash_text)
+    eb_decim (noflash_text)
+    eb_vcf_ladder (noflash_text)
+    eb_vcf_res (noflash_text)
+    eb_vcf_cv (noflash_text)
+    eb_envgen (noflash_text)
+    eb_vca (noflash_text)
+    eb_lfo (noflash_text)
+    eb_glide (noflash_text)
+    eb_notecv (noflash_text)
+    eb_pitch (noflash_text)
+    eb_noisemix (noflash_text)
+    eb_dcoprep (noflash_text)
+    eb_pwm_cv (noflash_text)
+    eb_cvgate (noflash_text)
+    eb_modcv (noflash_text)
+    eb_exp_fork (noflash_text)
+    eb_minmax (noflash_text)
     # ---- THE RECALL OBJECTS STAY IN FLASH -----------------------------------
     #
     # `* (noflash_text)` above puts EVERY object of libmain.a into IRAM. With

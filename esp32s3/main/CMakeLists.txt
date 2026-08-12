@@ -84,8 +84,29 @@ idf_component_register(
 #
 # -ffp-contract=off still applies, so no FMA can appear; LTO reorders and
 # inlines, it does not re-associate float arithmetic.
+# ⚠ -flto IS OFF BY DEFAULT AS OF 2026-08-12, AND THAT IS A MEASURED DECISION.
+#
+# It was added to buy instruction-level parallelism across the per-voice calls.
+# It did not: the board measures a FLAT voice slope -- two voices cost exactly
+# twice one -- so nothing overlaps and LTO's own justification never landed.
+#
+# And it COSTS something that was never noticed: under LTO the libmain.a
+# members are IR, so `linker.lf`'s IRAM mapping matches nothing and the whole
+# engine runs XIP from flash through a small instruction cache. That mapping
+# has been inert since the day it was written, MEASURED both ways (zero engine
+# symbols in IRAM). The audio loop executes 44,100 times a second out of
+# flash, which is exactly the thrash the mapping exists to remove.
+#
+# -DS3_LTO=1 puts it back. If it is ever put back, the IRAM mapping stops
+# working again, so the firmware prints its own IRAM symbol count at boot.
+if(S3_LTO)
+    set(S3_LTO_FLAG -flto)
+    message(STATUS "S3_LTO=1: LTO ON -- linker.lf's IRAM mapping will be INERT")
+else()
+    set(S3_LTO_FLAG "")
+endif()
 target_compile_options(${COMPONENT_LIB} PRIVATE
-    -O2 -flto -ffp-contract=off -fno-strict-aliasing
+    -O2 ${S3_LTO_FLAG} -ffp-contract=off -fno-strict-aliasing
     -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_VCF_RES_LUT=256 -DEB_IDF
     ${S3_EXTRA_DEFS})
 # EB_VCF_RES_LUT=256 -- MEASURED on the user's S3: 1,009 cycles per
@@ -95,7 +116,22 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
 # no-table control's own number -- while 256 costs 1 KB a voice instead of
 # 8 KB. A 32-entry run degrades to 0.96 dB, which is the control proving the
 # gate responds to this table at all.
-set_source_files_properties(${EB_SRCS} PROPERTIES COMPILE_OPTIONS "-std=c99")
+# -Wno-array-bounds: WITHOUT -flto GCC can finally see through ebdev_at()'s
+# `static inline` literal chain, and it then reports every cell offset past the
+# first segment as "outside array bounds of ebdev_state" -- e.g. subscript
+# 21068. It is right that the arithmetic leaves the member it started in and
+# wrong that it leaves the OBJECT: ebdev_at returns a pointer into a different
+# member of the same struct, which the analysis cannot follow.
+#
+# Suppressing a bounds warning is not free and this is why it is acceptable
+# here rather than in general: the addressing has its own proof and its own
+# runtime detector. engine_b/dev/ebdev.c carries an EXHAUSTIVE chain-vs-table
+# self-test that the firmware runs at boot and PRINTS ("0 disagreements,
+# 0 REQUIRED"), and every access that falls off the map increments a counter
+# the board reports and mutes on. A real out-of-range access is caught by both;
+# it is not being traded away for a quiet build.
+set_source_files_properties(${EB_SRCS} PROPERTIES COMPILE_OPTIONS
+    "-std=c99;-Wno-array-bounds;-Wno-stringop-overflow")
 
 if(S3_RECALL)
     # EB_DEVCELLS is the rebase. It used to be a PYTHON TEXT REWRITE inside
@@ -130,7 +166,7 @@ if(S3_RECALL)
     # src/ predates the IDF warning set: the BINDINGS table in juno_apply.c
     # uses partial struct initialisers and IDF promotes that to an ERROR.
     set_source_files_properties(${RECALL_SRCS} PROPERTIES COMPILE_OPTIONS
-        "-std=c99;-Wno-missing-field-initializers")
+        "-std=c99;-Wno-missing-field-initializers;-Wno-array-bounds;-Wno-stringop-overflow")
 endif()
 
 if(S3_PATCH_SECS)
