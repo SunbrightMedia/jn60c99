@@ -7,6 +7,7 @@
 #endif
 #include "eb_chorus_shim.h"
 #include <string.h>
+#include <stddef.h>
 
 /* EB_DEVCELLS -- the device rebase. See src/juno_engine.h for why this is a
  * build flag and not a text rewrite.
@@ -222,7 +223,45 @@ void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
             q->k8160 = CF(a1, 8160); q->k8176 = CF(a1, 8176);
             q->k8192 = CF(a1, 8192);
 #if EB_VCF_RES_LUT
-            eb_vcf_res_prepare(q);
+            /* ⚠ THE SINGLE BIGGEST TERM IN THE DEVICE RECALL BURST, and it is
+             * REDUNDANT SEVEN TIMES OUT OF EIGHT.
+             *
+             * eb_vcf_res_prepare fills 257 entries, each an ebr_tail()
+             * evaluation -- 236 static Xtensa instructions plus EB_EXPF plus
+             * libgcc. Eight voices is roughly 460,000 instructions, MEASURED on
+             * the board as about a third of a 1.9 M-cycle patch change.
+             *
+             * ebr_tail reads ONLY k7856..k8192 (eb_vcf_res.c:150-181). Those
+             * come from juno_engine_init/prepare and are a function of SAMPLE
+             * RATE ALONE: identical in every voice (2,688 of 2,688 compared,
+             * 0 different) and moved by NONE of the 123 recall-affecting patch
+             * bytes. docs/engineb/data/res_lut.md:99 says the opposite and is
+             * the wrong document; DEVICE_RECALL.md carries the measurement.
+             *
+             * SO THIS IS A CACHE KEYED ON THE INPUTS THEMSELVES, not on that
+             * claim. It compares every byte the table depends on -- the whole
+             * struct up to `lut`, which is LAST by design -- and only reuses
+             * the table when they are identical. If a future patch, rate or
+             * fork flag ever DOES make a voice's k-fields differ, the compare
+             * fails and that voice rebuilds. The result is bit-identical to
+             * calling prepare every time, by construction rather than by
+             * argument, which is why it needs no new gate.
+             *
+             * Cost when it hits: one 1,028-byte memcpy instead of 57,500
+             * instructions. */
+            {
+                static eb_vcf_res_coef ebc_res_cache;
+                static int             ebc_res_valid = 0;
+                const size_t           kbytes = offsetof(eb_vcf_res_coef, lut);
+                if (ebc_res_valid &&
+                    memcmp(q, &ebc_res_cache, kbytes) == 0) {
+                    memcpy(q->lut, ebc_res_cache.lut, sizeof q->lut);
+                } else {
+                    eb_vcf_res_prepare(q);
+                    memcpy(&ebc_res_cache, q, sizeof ebc_res_cache);
+                    ebc_res_valid = 1;
+                }
+            }
 #endif
         }
 

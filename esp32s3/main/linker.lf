@@ -76,6 +76,22 @@ entries:
     eb_modcv (noflash_text)
     eb_exp_fork (noflash_text)
     eb_minmax (noflash_text)
+    # ---- CORE 1'S FX, AND IT IS NOT A LUXURY -------------------------------
+    #
+    # MEASURED 2026-08-12: with the voice path in IRAM the engine settles at
+    # 5,213-5,280 -- under budget -- and then SPIKES to 6,200, 7,500, 9,000 and
+    # 10,158 in scattered chunks, with the barrier spin reaching 2.7 M cycles.
+    # A 2.7 M-cycle spin is core 0 waiting for core 1, and core 1 does exactly
+    # two things: its voice range (IRAM) and the FX chain (FLASH).
+    #
+    # The burst runs on core 0 and hammers flash -- 30 KB of boot image, the
+    # 126 KB juno_curve tables, and the recall code itself. Both cores share
+    # one flash cache, so while core 0 recalls, core 1's FX stalls on every
+    # instruction fetch. That is the spike, and it is why the FX belongs in
+    # IRAM even though it is not the hottest code by cycles: it is the code
+    # most exposed to what the OTHER core is doing.
+    eb_master (noflash_text)
+    eb_chorus (noflash_text)
     # ---- THE RECALL OBJECTS STAY IN FLASH -----------------------------------
     #
     # `* (noflash_text)` above puts EVERY object of libmain.a into IRAM. With
