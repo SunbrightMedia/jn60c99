@@ -54,6 +54,8 @@ on host; this track is wiring it to the device.
 | C5 MIDI in over UART — **the user plays it** | **BUILT, UNPLAYED** — UART1 31,250 on GPIO 18, `midi=0` so far |
 | C6 encoders + LCD (8 params first, then all) | **NOT DONE** — but cycle-cheap: chip A core 0 has ~1,600 spare cycles/sample (`data/two_board_advantages.md`) |
 | C7 preset storage (save/load without audio dropout) | **NOT DONE** — same spare core; the risk is flash-erase stalls, not cycles |
+| C9 **EVERY parameter adjustable at once, in real time** (USER-BINDING, added 2026-08-12) | **NOT DONE — and it is a REQUIREMENT, not a nicety.** Today a single knob move costs the FULL burst (~2,000,000 cycles), because engine B HOISTS cell reads into a prepared coefficient struct and any change rebuilds the struct. |
+| C10 chunked patch change (build spread over N blocks, one atomic publish) | **NOT DONE** — removes the program-change click without making the burst faster. |
 | C8 the port's warm-recall bug fixed in src/ + warm gate in make verify | **1/2** — cell 91152 FIXED in src/chorus_recall.c with its own tooth, `make test` green, 0 of 384 cold cases changed. The warm gate is NOT yet in `make verify`. |
 
 ### D. LINK — two chips are one instrument (END_GOAL 2)
@@ -91,6 +93,40 @@ any analog mismatch between the two halves of a chord.
 
 ---
 
+## C9 — THE PARAMETER REQUIREMENT, AND WHY THE PLUGIN IS NOT THE MODEL
+
+**The user's requirement (2026-08-12):** as many parameters as you please, at
+the same time, without overloading the CPU. Ideally the way the VST does it.
+
+**How the VST does it, and why we cannot copy it.** The plugin has NO
+coefficient build stage. Its per-parameter setters write a handful of cells and
+its render loop READS THOSE CELLS EVERY SAMPLE. A knob move therefore costs
+almost nothing -- and the per-sample cost is enormous, which is exactly the cost
+this port cannot afford on a 240 MHz chip.
+
+Engine B is fast BECAUSE it hoists those reads into `eb_render_coefs` /
+`eb_master_coef` once. That hoist is the speed advantage and it is the whole
+reason a knob move costs 2 M cycles today. Copying the plugin's structure would
+trade a patch-change stall for a permanent 3-4x per-sample cost. It is the wrong
+trade and must not be proposed again.
+
+**The design that satisfies the requirement:** keep the hoist, make the refresh
+INCREMENTAL. A parameter writes its cells, then refreshes ONLY the coefficient
+fields that depend on those cells. This is the same move that already worked for
+notes (`eb_recall_build_voices`, proven bit-identical with two teeth): a cutoff
+knob is a few fields, not eight voices and the FX chain.
+
+**The map is DERIVED, not written.** For each recall-applied parameter, perturb
+it on the host, diff the resulting coefficient structs, record which fields
+moved. That is a generated table with a gate, and the tooth is obvious: a
+parameter whose map is short by one field must produce a coefficient set that
+differs from the full build.
+
+**⚠ THIS IS AN ITEM-7 TOOL.** The generator is pointed at a parameter list and a
+coefficient struct; nothing about it is JUNO-specific. Hardcoding a JUNO
+constant into it is a defect against END_GOAL item 7 in the same way a wrong
+coefficient is a defect against item 1.
+
 ## THE ORDER (do not reorder without the user)
 
 1. **C2 → C3** — finish recall fixes, put recall on the board, burst off the
@@ -100,10 +136,13 @@ any analog mismatch between the two halves of a chord.
 3. **Re-measure the budget while it is being PLAYED.** This number replaces
    every cycle figure in the repo.
 4. **B3** — the ~700-cycle hunt, against the real instrument.
-5. **C6, C7, C8** — controls, storage, the warm bug.
-6. **D** — the link, second board, 6 voices. **END_GOAL 2/3/4 land here.**
-7. **A4** — the user listens. **END_GOAL 1 lands here.**
-8. **E3, E4** — write the pipeline doc, de-JUNO the tools.
+5. **C10 then C9** — chunked patch change first (it removes the click and is
+   small), then the per-parameter incremental refresh, which is what makes C6's
+   encoders possible at all.
+6. **C6, C7, C8** — controls, storage, the warm bug.
+7. **D** — the link, second board, 6 voices. **END_GOAL 2/3/4 land here.**
+8. **A4** — the user listens. **END_GOAL 1 lands here.**
+9. **E3, E4** — write the pipeline doc, de-JUNO the tools.
 
 ## What the second board buys beyond cycles (`data/two_board_advantages.md`)
 Chip A core 0 has ~1,600 spare cycles/sample MEASURED — the control surface is
