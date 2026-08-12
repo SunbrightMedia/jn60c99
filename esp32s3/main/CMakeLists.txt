@@ -16,9 +16,27 @@ else()
     set(APP_EMBED "")
 endif()
 
+# ---- SCOUT 1 MEASUREMENT ONLY (C3). Reverted after `idf.py size`. ----------
+# THE RECALL PATH. An EXPLICIT LIST, never a glob: a glob over src/ would pull
+# in voice_render.c and master_render.c -- the port's whole render engine, a
+# second copy of the DSP -- and the build would still succeed.
+set(RECALL_SRCS
+    ${CMAKE_CURRENT_LIST_DIR}/gen_recall/juno_apply.c
+    ${CMAKE_CURRENT_LIST_DIR}/gen_recall/juno_curve.c
+    ${CMAKE_CURRENT_LIST_DIR}/gen_recall/delay_recall.c
+    ${CMAKE_CURRENT_LIST_DIR}/gen_recall/reverb_recall.c
+    ${CMAKE_CURRENT_LIST_DIR}/gen_recall/chorus_recall.c
+    ${CMAKE_CURRENT_LIST_DIR}/gen_recall/finefx_recall.c
+    ${CMAKE_CURRENT_LIST_DIR}/gen_recall/effect_modes.c
+    ${CMAKE_CURRENT_LIST_DIR}/gen_recall/hpf_type_lut.c
+    ${CMAKE_CURRENT_LIST_DIR}/gen_recall/juno_note.c
+    ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/dev/ebdev.c
+    ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/dev/eb_recall.c
+    ${CMAKE_CURRENT_LIST_DIR}/c3_recall_probe.c)
+
 idf_component_register(
-    SRCS ${APP_SRC} ${EB_SRCS}
-    INCLUDE_DIRS "." "../../engine_b" "../../src" "../../tools/engineb/qemu"
+    SRCS ${APP_SRC} ${EB_SRCS} ${RECALL_SRCS}
+    INCLUDE_DIRS "." "../../engine_b" "../../engine_b/dev" "gen_recall" "../../tools/engineb/qemu"
     EMBED_FILES ${APP_EMBED}
     LDFRAGMENTS "linker.lf"
     REQUIRES esp_driver_i2s driver esp_timer)
@@ -47,7 +65,7 @@ idf_component_register(
 # inlines, it does not re-associate float arithmetic.
 target_compile_options(${COMPONENT_LIB} PRIVATE
     -O2 -flto -ffp-contract=off -fno-strict-aliasing
-    -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_VCF_RES_LUT=256 -DEB_IDF
+    -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_VCF_RES_LUT=256 -DEB_IDF -DEBDEV_NV=6
     ${S3_EXTRA_DEFS})
 # EB_VCF_RES_LUT=256 -- MEASURED on the user's S3: 1,009 cycles per
 # critical-path voice, 6 voices 14,441 -> 11,353. The shaper's tail is a pure
@@ -57,6 +75,10 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
 # 8 KB. A 32-entry run degrades to 0.96 dB, which is the control proving the
 # gate responds to this table at all.
 set_source_files_properties(${EB_SRCS} PROPERTIES COMPILE_OPTIONS "-std=c99")
+# src/ predates the IDF warning set. The BINDINGS table in juno_apply.c uses
+# partial struct initialisers, which IDF promotes to an ERROR.
+set_source_files_properties(${RECALL_SRCS} PROPERTIES COMPILE_OPTIONS
+    "-std=c99;-Wno-error=missing-field-initializers;-Wno-missing-field-initializers")
 
 if(NOT S3_LISTEN)
     # EB_DELAY_LEN: 32768 here, NOT the shipping 524288. The harness keeps its
@@ -123,3 +145,5 @@ endif()
 if(S3_TONE)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE S3L_TONE=1)
 endif()
+
+target_link_options(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=c3_recall_probe")

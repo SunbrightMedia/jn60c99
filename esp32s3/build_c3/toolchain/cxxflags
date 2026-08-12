@@ -1,0 +1,8 @@
+-mlongcalls
+-fno-builtin-memcpy
+-fno-builtin-memset
+-fno-builtin-bzero
+-mdisable-hardware-atomics
+-specs=picolibc.specs
+-fno-rtti
+-ftrivial-auto-var-init=uninitialized

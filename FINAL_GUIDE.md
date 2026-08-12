@@ -62,10 +62,23 @@ The only subsystem with zero code. Requirements already written
 
 | step | state |
 |---|---|
-| D1 shared sample clock + audio summing between boards | **NOT DONE** |
+| D1 shared sample clock + audio summing between boards | **NOT DONE — architecture DECIDED 2026-08-12** |
 | D2 patch bytes + apply-at-index distribution, CRC handshake | **NOT DONE** |
 | D3 global voice index (chip B builds voices 4..7, not 0..1) | **NOT DONE** |
 | D4 one image flashed twice, role by strap pin | **NOT DONE** |
+
+**D1 DECIDED (user, 2026-08-12): ONE DAC, chip A is the only clock.**
+Chip A runs I2S0 as MASTER TX into the single audio board, and I2S1 as MASTER
+RX from chip B. Chip B runs I2S as SLAVE TX and receives A's BCLK/LRCK, so it
+has no clock and no DAC of its own. Drift between the chips is then impossible
+BY CONSTRUCTION rather than corrected, and chip B gets its sample tick for
+free. Three wires plus ground. **No MCLK is required anywhere**, which is what
+settled it -- the user's board does not expose one and will not be changed.
+Cost: chip B's audio arrives one block late, one pipeline stage, the same
+trade the FX chain already pays. The ESP32-S3 has two I2S peripherals, so
+chip A can run TX and RX at once (READ from the IDF, not yet executed).
+Consequence for hardware: buy ONE audio board, not two -- which also removes
+any analog mismatch between the two halves of a chord.
 
 ### E. REPEAT — the process survives to the JX-3P (END_GOAL 7)
 | step | state |

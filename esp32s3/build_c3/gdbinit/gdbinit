@@ -1,0 +1,2 @@
+source /home/user/jn60c99/esp32s3/build_c3/gdbinit/symbols
+source /home/user/jn60c99/esp32s3/build_c3/gdbinit/connect
