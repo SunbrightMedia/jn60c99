@@ -495,6 +495,87 @@ static int dev_check_rings(void)
     return bad;
 }
 
+
+/* ================= THE MEMORY PROBE, 2026-08-12 ==========================
+ * WHY THIS EXISTS. The reseed measured 426,945 cycles to copy 30,252 bytes =
+ * 14.1 CYCLES PER BYTE. An internal-SRAM copy is well under one. That is not
+ * a memcpy, it is waiting on memory -- and the whole project has been
+ * optimising ARITHMETIC. If the engine is memory-bound anywhere, every cycle
+ * hunt aimed at the DSP was aimed at the wrong thing.
+ *
+ * Three questions, one boot-time probe, no config change and no risk:
+ *   1. how fast is a copy OUT OF FLASH (the reseed's own pattern)?
+ *   2. how fast is the same copy internal -> internal (the floor)?
+ *   3. what does a SCATTERED read cost in PSRAM vs internal?  Question 3 is
+ *      the delay rings: 6.1 MB in PSRAM, and the patches that cost DOUBLE are
+ *      exactly the pitch-shifting delays, which read several MOVING taps. If
+ *      PSRAM scattered reads are dear, the FX cost is latency, not maths.
+ *
+ * The scattered pattern strides 64 bytes -- one D-cache line -- so every read
+ * misses, which is what a moving delay tap does. A sequential loop would
+ * measure the prefetcher instead and flatter PSRAM.
+ *
+ * NOTHING IS CONCLUDED HERE. It prints numbers. */
+static void mem_probe(void)
+{
+    enum { NB = 30252, NSTRIDE = 4096, STRIDE = 64 };
+    unsigned long t0, c_flash = 0, c_int = 0, c_ps = 0, c_isc = 0;
+    unsigned char *dst = (unsigned char *)heap_caps_malloc(NB, MALLOC_CAP_INTERNAL);
+    unsigned char *src = (unsigned char *)heap_caps_malloc(NB, MALLOC_CAP_INTERNAL);
+    volatile float *ps = (volatile float *)heap_caps_malloc(
+        (size_t)NSTRIDE * STRIDE, MALLOC_CAP_SPIRAM);
+    volatile float *isr = (volatile float *)heap_caps_malloc(
+        (size_t)NSTRIDE * STRIDE / 16, MALLOC_CAP_INTERNAL);
+    volatile float sink = 0.0f;
+    int i;
+
+    if (!dst || !src) { printf("MEM: no internal buffer, probe skipped\n"); return; }
+
+    /* 1. OUT OF FLASH. ebdev_boot[0] is memory-mapped flash -- the reseed's
+     *    own source, so this is the reseed's read cost with nothing else in
+     *    it. */
+    t0 = (unsigned long)esp_cpu_get_cycle_count();
+    memcpy(dst, ebdev_boot[0], NB);
+    c_flash = (unsigned long)esp_cpu_get_cycle_count() - t0;
+
+    /* 2. THE FLOOR: internal -> internal, same size. */
+    t0 = (unsigned long)esp_cpu_get_cycle_count();
+    memcpy(dst, src, NB);
+    c_int = (unsigned long)esp_cpu_get_cycle_count() - t0;
+
+    /* 3. SCATTERED reads, PSRAM vs internal, one per cache line. */
+    if (ps) {
+        t0 = (unsigned long)esp_cpu_get_cycle_count();
+        for (i = 0; i < NSTRIDE; ++i) sink += ps[(size_t)i * (STRIDE / 4)];
+        c_ps = (unsigned long)esp_cpu_get_cycle_count() - t0;
+    }
+    if (isr) {
+        t0 = (unsigned long)esp_cpu_get_cycle_count();
+        for (i = 0; i < NSTRIDE / 16; ++i) sink += isr[(size_t)i * (STRIDE / 4)];
+        c_isc = (unsigned long)esp_cpu_get_cycle_count() - t0;
+    }
+
+    printf("\n=== MEMORY PROBE (is this engine memory-bound?) ===\n");
+    printf("MEM: copy %d B out of FLASH   %lu cyc  = %.2f cyc/byte\n",
+           NB, c_flash, (double)c_flash / (double)NB);
+    printf("MEM: copy %d B internal->int %lu cyc  = %.2f cyc/byte  <- the floor\n",
+           NB, c_int, (double)c_int / (double)NB);
+    if (ps)
+        printf("MEM: %d scattered reads PSRAM    %lu cyc = %.1f cyc/read\n",
+               NSTRIDE, c_ps, (double)c_ps / (double)NSTRIDE);
+    if (isr)
+        printf("MEM: %d scattered reads INTERNAL %lu cyc = %.1f cyc/read\n",
+               NSTRIDE / 16, c_isc, (double)c_isc / (double)(NSTRIDE / 16));
+    printf("MEM: flash is configured DIO @ 80 MHz. QIO @ 120 MHz is available\n"
+           "     and is worth its reflash ONLY if the flash row above is dear.\n");
+    printf("MEM: the delay rings are 6.1 MB in PSRAM. If the PSRAM row is many\n"
+           "     times the internal row, DELAY TYPE 2/3/5 is LATENCY, not maths.\n");
+    (void)sink;
+    heap_caps_free(dst); heap_caps_free(src);
+    if (ps) heap_caps_free((void *)ps);
+    if (isr) heap_caps_free((void *)isr);
+}
+
 /* ---- THE OTHER 40 % OF THE BURST, attributed the same way ----------------
  * MEASURED on silicon 2026-08-12: the whole burst is 1,992,935 cycles and the
  * two coefficient builds account for 1,204,025 of them. That leaves 788,910
@@ -1840,6 +1921,7 @@ void app_main(void)
      * Playbook 12: two separate defects on this project were diagnostics that
      * printed the opposite of the truth. Every number below is read from the
      * thing itself. */
+    mem_probe();
     printf("\n=== DEVICE RECALL ===\n");
     printf("RECALL: cell array %u B  (tile %u + segments %u + scatter %dx%d)\n"
            "        NV=%d  segments=%d  scatter cells=%d\n",
