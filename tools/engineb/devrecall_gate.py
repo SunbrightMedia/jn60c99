@@ -626,8 +626,14 @@ MAP_TEETH = [
      {'scat0_in_tile': 1}),
     ('old-1a move ONE HOT segment (84272) by 4 bytes in the port space',
      {'gen': ['--shift-seg', '84272:4']}),
-    ('old-1b move every segment boundary (regenerate at a different gap)',
-     {'gen': ['--gap', '64']}),
+    ('old-1b move every segment boundary (regenerate at gap 64)',
+     {'gen': ['--gap', '64'], 'blind': 1, 'why':
+      'EXPECTED, and it is a finding rather than a miss. --gap only decides\n'
+      '       how much DEAD SPACE between touched cells is carried; the'
+      ' segments\n       are built FROM the cell list, so every touched cell'
+      ' stays covered at\n       any gap. The 2026-08-11 gate called this'
+      ' tooth "move one hot segment"\n       and it was firing on the boot-image'
+      ' packing. old-1a is the real form.'}),
     ('old-2  flip ONE ULP in ONE scatter cell (5520) on voice 3',
      {'define': 'GATE_TOOTH_ULP'}),
     ('old-5a delete a HOT segment (84272, the shared noise block)',
@@ -731,20 +737,21 @@ def teeth():
                   % (name, 'CAUGHT' if caught else 'NOT CAUGHT', n, ncase,
                      ', dev half refused' if rc else ''))
             if how.get('blind'):
-                # THE HONEST TOOTH. 18 of 32 segments are never touched by any
-                # scenario here, so deleting one CANNOT be caught -- and the
-                # 2026-08-11 gate said so too. It is reported rather than
-                # dropped, because a tooth that cannot fire reads as coverage.
-                # If it ever DOES fire, the segment was not cold and the
-                # coverage line above is wrong.
+                # THE HONEST TOOTH. Printed, never dropped: a tooth that cannot
+                # fire reads as coverage, which is how three planted defects in
+                # this project were reported green. If one of these ever DOES
+                # fire, the reason recorded here was wrong and the gate says so.
                 if caught:
-                    print('       ^ a segment reported COLD was in fact reached'
-                          ' -- the coverage line is wrong')
+                    print('       ^ THIS WAS EXPECTED NOT TO FIRE AND IT DID.'
+                          ' The recorded reason is wrong.')
                     bad = 1
                 else:
-                    print('       ^ EXPECTED. This measures the gate\'s blind'
-                          ' spot, not the map: the 18 cold segments cost'
-                          ' 4,272 B and no scenario reaches them.')
+                    print('       ^ ' + how.get('why',
+                          'EXPECTED. This measures the gate\'s blind spot, not'
+                          ' the map: 18 of 32 segments are\n       never'
+                          ' reached by any scenario, they cost 4,272 B, and'
+                          ' deleting one\n       therefore cannot be'
+                          ' detected. The 2026-08-11 gate said so too.'))
             elif not caught:
                 bad = 1
         finally:
