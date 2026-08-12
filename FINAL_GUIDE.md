@@ -34,7 +34,7 @@ own configuration; the user's ear on WAVs is the final judge.
 | B1 chip A: 3 voices no FX | **DONE — FITS** (5,388 of 5,442, measured) |
 | B2 chip B: 2 voices + FX | **DONE — FITS** (M1: 5,410 of 5,442, measured) |
 | B3 chip B: 3 voices + FX | **NOT DONE — over by 691.** THE gap. One number. |
-| B4 real headroom (~5 %+ margin, so bursts don't click) | **NOT DONE** (M1 clicks: 105 underruns from one 29 KB burst) |
+| B4 real headroom (~5 %+ margin, so bursts don't click) | **NOT DONE, AND NOW BINDING.** M1's 105 underruns are GONE (burst off the audio path) but PLAY1 is 3-8 % over budget with two voices. |
 
 B3 has two routes: find ~700 cycles on chip B (cycle hunt AGAINST THE REAL
 INSTRUMENT, not the looped chord), or move one voice to chip A and accept 4+2
@@ -49,9 +49,9 @@ on host; this track is wiring it to the device.
 |---|---|
 | C1 device recall design + cold gate | **DONE** (384 cases, 5 teeth) |
 | C2 the three defects (warm, per-voice, publish) fixed + gated | **DONE** — 1,152 cases bit-identical at both flag sets, issues notes, runs sequences; ONE adversarial round survived (it found 3 more defects, all fixed and toothed). Round 2 did not run: session limit. |
-| C3 recall running ON the board, burst off the audio path | **SCOUTED, not built.** Two real firmware links say recall as designed does NOT fit: `dram0_0_seg overflowed by 7,184 B`. Fits after the 32 KB `EBDEV_MISSLIST` diagnostic shrinks. Flash is a net WIN of 1.72 MB (recall retires the blob). ⚠ `ebdev_at` does NOT fold to 4 instructions in the real recall TUs — 900 out-of-line sites, 667 in `eb_master_coefs.c`. The burst is bigger than planned. |
-| C4 note path + allocator on device (real note events, not snapshots) | **NOT DONE** |
-| C5 MIDI in over UART — **the user plays it** | **NOT DONE** |
+| C3 recall running ON the board, burst off the audio path | **BUILT AND PROVEN ON SILICON** — 13 patches CRC-MATCH the host, 0 unmapped, 22 publishes, **underruns 0** (M1 had 105). ⚠ the burst is **2.1 M cycles, 23x the plan**, and the engine is now OVER budget (`data/c3_silicon.md`). Previously scouted: Two real firmware links say recall as designed does NOT fit: `dram0_0_seg overflowed by 7,184 B`. Fits after the 32 KB `EBDEV_MISSLIST` diagnostic shrinks. Flash is a net WIN of 1.72 MB (recall retires the blob). ⚠ `ebdev_at` does NOT fold to 4 instructions in the real recall TUs — 900 out-of-line sites, 667 in `eb_master_coefs.c`. The burst is bigger than planned. |
+| C4 note path + allocator on device (real note events, not snapshots) | **BUILT, UNPLAYED** — eb_alloc + the port's note path linked and in the image; no key has been pressed yet |
+| C5 MIDI in over UART — **the user plays it** | **BUILT, UNPLAYED** — UART1 31,250 on GPIO 18, `midi=0` so far |
 | C6 encoders + LCD (8 params first, then all) | **NOT DONE** — but cycle-cheap: chip A core 0 has ~1,600 spare cycles/sample (`data/two_board_advantages.md`) |
 | C7 preset storage (save/load without audio dropout) | **NOT DONE** — same spare core; the risk is flash-erase stalls, not cycles |
 | C8 the port's warm-recall bug fixed in src/ + warm gate in make verify | **1/2** — cell 91152 FIXED in src/chorus_recall.c with its own tooth, `make test` green, 0 of 384 cold cases changed. The warm gate is NOT yet in `make verify`. |
