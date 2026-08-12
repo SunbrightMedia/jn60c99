@@ -928,6 +928,25 @@ static void con_poll(void)
         }
         if (c == 'z') { if (con_base >= 24) con_base -= 12; continue; }
         if (c == 'x') { if (con_base <= 96) con_base += 12; continue; }
+        /* b / n -- PROGRAM CHANGE, backward and forward through the 64 factory
+         * patches. This costs the FULL burst (about 2,000,000 cycles), not the
+         * note path's ~135,000: a patch change really does move every voice
+         * coefficient and the whole master chain. It is requested here and
+         * performed in render_block, off the per-sample path, so it lands at a
+         * block boundary rather than inside one.
+         *
+         * ⚠ EXPECT A CLICK. 2 M cycles is 8 ms against a 5.8 ms block, so a
+         * program change is currently audible as a gap. That is the known open
+         * item, it is measured (data/c3_silicon.md), and hearing it here is the
+         * instrument telling the truth rather than a new fault. */
+        if (c == 'b') {
+            dev_request((dev_patch + DEVCRC_NPATCH - 1) % DEVCRC_NPATCH, 0);
+            continue;
+        }
+        if (c == 'n') {
+            dev_request((dev_patch + 1) % DEVCRC_NPATCH, 0);
+            continue;
+        }
         if (c >= 128 || (CON_KEY[c] == 0 && c != 'a')) continue;
         note = con_base + CON_KEY[c];
         if (note < 0 || note > 127) continue;
@@ -1655,7 +1674,7 @@ static void rpt_task(void *arg)
          * tick. Under 100 characters does. The budget constant and the words
          * are what got cut; every number is still here. */
         printf("t=%lu cyc=%lu drift=%+ld un=%lu gap=%lu bst=%lu nb=%lu "
-               "midi=%lu/%lu usb=%lu/%d keys=%lu\n",
+               "midi=%lu/%lu usb=%lu/%d keys=%lu pat=%d\n",
                rpt_sec, rpt_cyc, rpt_drift, rpt_under, rpt_gap,
                rpt_build, rpt_nb, rpt_midi, rpt_drop,
 #if S3L_USBMIDI
@@ -1666,7 +1685,7 @@ static void rpt_task(void *arg)
 #else
                0ul, 0
 #endif
-               , con_keys);
+               , con_keys, dev_patch);
     }
 }
 
@@ -2024,6 +2043,9 @@ void app_main(void)
                "          a s d f g h j k  = C D E F G A B C   (white keys)\n"
                "            w e   t y u    = the black keys\n"
                "          z / x = octave down / up     SPACE = release all\n"
+               "          b / n = previous / next patch  (all 64 factory patches;\n"
+               "                  a program change costs the full burst, so a\n"
+               "                  click there is expected and is measured)\n"
                "          KEYS TOGGLE: a terminal never reports a key going UP,\n"
                "          so press once to sound a note and again to release it.\n"
                "          Hold a chord with a, d, g -- two voices are allowed.\n");
