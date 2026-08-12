@@ -82,3 +82,9 @@ gmon.out
 
 # session listening bundles (regenerate with tools/engineb/lastmile_wav.py)
 lastmile_wavs.zip
+
+# ESP-IDF build trees. An agent committed esp32s3/build_c3 wholesale on
+# 2026-08-12 (3,500 files). Build output is regenerable by definition and a
+# committed build tree makes every later `git status` unreadable.
+esp32s3/build/
+esp32s3/build_*/

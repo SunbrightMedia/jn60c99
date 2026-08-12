@@ -15,7 +15,7 @@ static unsigned char SINK[8];
 
 unsigned long EBDEV_SEGHIT[EBDEV_NSEG];
 unsigned long EBDEV_VHIT, EBDEV_SHIT, EBDEV_GHIT;
-unsigned long EBDEV_MISSLIST[EBDEV_MISSLIST_N];
+unsigned long EBDEV_MISSLIST[8192];
 int           EBDEV_NMISS;
 
 void *ebdev_miss(unsigned long off)
