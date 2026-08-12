@@ -1,6 +1,11 @@
 **Adhere to and only respond in ASD-STE100 Simplified Technical English.**
 
-# ⚑⚑⚑⚑⚑ READ `END_GOAL.md` BEFORE ANYTHING ELSE IN THIS FILE ⚑⚑⚑⚑⚑
+# ⚑⚑⚑⚑⚑ READ `END_GOAL.md` THEN `FINAL_GUIDE.md` BEFORE ANYTHING ELSE ⚑⚑⚑⚑⚑
+
+**`FINAL_GUIDE.md` is the ONLY status page (2026-08-12, user-binding).** Five
+tracks A-E, fixed order, and the reporting rules: status = five lines, one per
+track, ten lines maximum, no cycle counts in the headline, regressions first.
+Report against IT, not against this file's history.
 
 The user stated the FINAL END GOAL once, on 2026-08-11, and said it is the most
 important thing they will ever say on this project. It is in `END_GOAL.md`, it

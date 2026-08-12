@@ -1,18 +1,106 @@
-# DEVICE-SIDE RECALL — the design, and the three defects that broke it
-(2026-08-11, Opus 5 + a 7-agent workflow: 4 readers, 1 designer, 2 refuters)
-
-**READ THIS PAGE BEFORE BUILDING ANY OF IT.** The design below is real work and
-most of it holds. Both refuters returned **BROKEN**, and they are right. Build
-the corrected version, not the design as written.
-
-Evidence lives beside this file in `data/devrecall/`. The workflow ran in a
-scratchpad, and a scratchpad dies with the container, so the load-bearing
-artifacts are copied into the repo: the address map, the two halves of the
-gate, the touched-cell list, and every refutation probe.
+# DEVICE-SIDE RECALL — the design, the three defects, and their fix
+(design 2026-08-11; **all three defects CLOSED 2026-08-12**, and closing them
+found a defect in the SHIPPING port)
 
 ---
 
-## THE ONE SENTENCE
+## ⚑ STATE AS OF 2026-08-12 — READ THIS BEFORE THE 08-11 TEXT BELOW
+
+The three defects listed further down are **FIXED AND GATED**. The 08-11 text
+is kept because its evidence is still the evidence; where it disagrees with
+this block, this block wins.
+
+**What now exists in the repo, not in a scratchpad:**
+
+| file | what it is |
+|---|---|
+| `engine_b/dev/ebdev.{h,c}` | the device cell array and `ebdev_at()`. Fast path is a `static inline` literal chain; the cold paths, the reference TABLE form and an exhaustive chain-vs-table self-test are in the .c |
+| `engine_b/dev/ebdev_seg.h`, `ebdev_map.h` | GENERATED. Still a literal binary-search chain, never a loop |
+| `engine_b/dev/eb_recall.{h,c}` | **the publish contract**, steps 1-8, in the shims' own order |
+| `tools/engineb/gen_devcells.py` | the generator for the two headers |
+| `tools/engineb/devrecall_gate.py` + `devrecall/gate.c` | THE GATE, runnable standalone |
+
+**The gate now runs 1,152 cases per flag set** — 3 sequences (cold, warm A→B,
+warm A→edit→B) × 3 rates × 64 patches × {factory, nibble-randomised synthetic}
+— at trunk defaults AND at the shipping fork flags, and it **ISSUES NOTES**
+across every voice and runs `eb_render_state_seed` and
+`eb_render_events_mirror`. Those were the two holes that hid defects 2 and 3.
+Result: **BIT-IDENTICAL over 1,152 cases at both flag sets, for both the
+instrumented map and the shipping inline-chain map, unmapped accesses 0.**
+
+**D1 — WARM.** The gate's cases are SEQUENCES and its reference for a warm
+case is **the same sequence on the host**, never a cold recall. That is the
+right reference because warm ≠ cold is the plugin's own behaviour: the plugin's
+state differs in **50 of 64** consecutive pairs while its AUDIO differs in
+**0 of 64**. **And chasing it found a defect in the shipping port**: EFFECT
+TYPE 2 (chorus I) writes the chorus LFO rate cell **91152** in the plugin and
+did not in the port (`src/chorus_recall.c`). PROVEN by isolated dispatch of the
+plugin's own index-873 setter under Unicorn at four rates. From a cold engine
+the missing write is the IDENTITY, which is why every gate in this repo passed
+it. Warm, after a chorus II patch, a chorus I patch keeps chorus II's LFO rate
+— **1.71× too fast** — and `src/master_render.c:2783` reads that cell every
+sample. Ten factory pairs are ET3→ET2. Fixed, with its own tooth
+(`-DJUNO_TOOTH_NO_ET2_LFO`), and MEASURED both ways: **0 of 384 cold cases
+change** (the 57/57 seal is untouched) and **72 of 768 warm cases do**.
+
+**D2 — PER-VOICE.** The scatter is **twelve cells, not five**: the five
+recall-time ones plus the seven the note path writes (304 pitch, 320 the ADSR
+gate, 592 porta gate, 1856 held, 6864 / 9680 velocity, 9824 gate twin). The aux
+retrigger latch needs nothing — all eight voices' copies already sit inside a
+non-voice segment. `ebdev_at` routes scatter cells for **every** voice
+including voice 0, whose copies live in `scat[0]` and never in the tile, and
+`ebdev_broadcast_scatter()` is the device's `juno_driver_seed_voices`.
+A dense per-voice tile was measured and rejected: the twelve offsets span
+[304, 10324) to hold 48 bytes, so the smallest covering prefix is the whole
+10,688-byte block — 2.8× the array, not a simplicity trade.
+
+**ARRAY SIZE, compiled not computed:** `ebdev_state` = **30,176 B at 6 voices**
+and **30,272 B at 8**. The twelve-cell scatter costs **+168 B at NV=6** over
+the broken five-cell one. Replicating the whole block per voice would be
+83,324 / 104,700 B.
+
+**D3 — PUBLISH.** `engine_b/dev/eb_recall.c` implements the contract: build
+into the SHADOW bank; assert quiescence; swap the pointer (master coefficients
+deliberately one block late under `EB_RECALL_FX_PIPE`); force all five delay
+route-latch mirrors; refresh `rev_wipe` and `rev_pending[]`; refresh
+`gate_cell320[v]` per voice and CONSUME the aux one-shot; clear
+`dco_live_seeded` for sounding voices and refresh the at-rest voices'
+`dco_live` **field-wise** (a whole-struct copy sets their `inc` to 0 and stops
+them free-running); release barrier. **13 of 13 contract checks pass and every
+step has a tooth that fires.**
+
+**PATCH FORMAT: `EB_PATCH_BYTES` is 133**, not 127 and not the 132 the design
+said — record 506 needs 507 too, so BEND GAIN costs two bytes.
+`eb_patch_record_coverage()` is the net, `eb_patch_selftest()` calls it, and
+the recall-affecting position list was **RE-MEASURED** this run:
+`devrecall_gate.py --patch-scan` perturbs all 4,080 positions in [16,4096) over
+six base patches and finds **112** that move the recalled coefficients;
+`EB_RECALL_POS[]` matches all 112. Dropping a carried byte is CAUGHT.
+
+**WHAT IS STILL NOT PROVEN, and it has not moved:** both halves of the gate are
+the same host compiler on the same sources, so this proves the address map and
+the publish contract and **nothing about Xtensa**. Not one instruction of
+recall has executed on the chip. Nothing here has been listened to. And the
+sentence that still goes first: **chip B cannot recall while it plays, because
+chip B is over budget.**
+
+Two honest NOT-CAUGHT teeth, both reported by the gate rather than dropped:
+deleting a **COLD** segment (18 of 32 are never reached, 4,272 B of fat) and
+regenerating at `--gap 64` (the gap only decides how much dead space is
+carried; every touched cell stays covered at any gap — and at gap 64 the array
+is **28,536 B at NV=6**, 1,640 B smaller, bit-identical, unadopted only because
+fewer segments means a shorter chain).
+
+Also corrected while building this: the 08-11 gate's first tooth ("move one hot
+segment") was **firing for the wrong reason** — the host half gathers its boot
+image THROUGH the generated table, so a tooth that regenerated the map and
+rebuilt only the device half fired on a boot-image packing mismatch. Every
+map-regenerating tooth now rebuilds both halves. That is what turned the
+cold-segment tooth from a false CAUGHT into an honest NOT CAUGHT.
+
+---
+
+## THE ONE SENTENCE (2026-08-11, as written then)
 
 **Device recall is possible, and the hard part is measured: the port's own
 11 MB cell array reduces to about 29 KB with a 31-segment address map, the map
