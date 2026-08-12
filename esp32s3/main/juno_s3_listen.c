@@ -1423,11 +1423,15 @@ static void rpt_task(void *arg)
     for (;;) {
         if (!rpt_pending) { vTaskDelay(1); continue; }
         rpt_pending = 0;
-        printf("t=%lus  loop %lu cyc / 5442  drift %+ld ms  underruns=%lu  "
-               "worst gap %lu us (budget %lu)  burst %lu  note-burst %lu  "
-               "midi %lu/%lu\n",
+        /* SHORT ON PURPOSE. The console is 115200 baud (the kconfig symbol
+         * refused to hold 921600 and was left alone rather than fought). At
+         * 8N1 that is 8.7 us per character, so a 130-character line needs
+         * 11.3 ms of UART time and cannot leave inside ONE donated 10 ms
+         * tick. Under 100 characters does. The budget constant and the words
+         * are what got cut; every number is still here. */
+        printf("t=%lu cyc=%lu drift=%+ld un=%lu gap=%lu bst=%lu nb=%lu "
+               "midi=%lu/%lu\n",
                rpt_sec, rpt_cyc, rpt_drift, rpt_under, rpt_gap,
-               (unsigned long)(1000000ull * CHUNK / SR),
                rpt_build, rpt_nb, rpt_midi, rpt_drop);
     }
 }
@@ -1764,7 +1768,9 @@ void app_main(void)
 #endif
     /* Priority 1 on core 0: the audio loop always wins. Started before I2S so
      * the very first second is reported. */
-    xTaskCreatePinnedToCore(rpt_task, "eb_report", 3072, NULL, 1, NULL, 0);
+    /* Priority 2: above the idle task, BELOW the audio loop's 5, so it can
+     * still never preempt audio -- it runs only in the donated tick. */
+    xTaskCreatePinnedToCore(rpt_task, "eb_report", 3072, NULL, 2, NULL, 0);
     if (!i2s_start()) { printf("HALT: I2S would not start.\n"); return; }
 #if S3L_TONE
     /* A LOUD SQUARE WAVE, NO ENGINE AT ALL.
@@ -2234,6 +2240,22 @@ void app_main(void)
                 gap_max = 0;
             }
             rpt_pending = 1;
+            /* ⚠ A LOWER-PRIORITY TASK ON A SATURATED CORE NEVER RUNS.
+             * MEASURED (PRIO build): with the audio loop raised to priority 5,
+             * rpt_task at priority 1 printed NOTHING -- not one line after the
+             * banner. Moving the printf off the audio path is necessary and is
+             * not sufficient: the loop is over budget, so it never blocks long
+             * enough in i2s_channel_write for a priority-1 task to be picked.
+             *
+             * So the loop DONATES one tick, once per second, at the exact
+             * moment the reporter has something to say. The DMA holds
+             * dma_desc_num(6) x CHUNK(256) = 34.8 ms of audio, so a 10 ms
+             * donation cannot empty it. This is the ONLY place the audio loop
+             * yields on purpose, and it is once per second. */
+            vTaskDelay(1);
+            /* The donation is not a stall. Re-anchor the gap meter so it does
+             * not report its own yield as a 10 ms worst gap once a second. */
+            t_prev_block = esp_timer_get_time();
         }
         if (0) {
             /* ⚠ THE CONSOLE IS PART OF THE MEASUREMENT, and at 115200 baud it
