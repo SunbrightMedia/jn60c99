@@ -103,8 +103,10 @@ void eb_dly23_tick(eb_dly23_state *s, const eb_dly23_coef *c,
       v253 = c->k6395328;
       s->s6395344 = c->k6395312;
       s->s6395360 = v253;
-      v254 = eb_pitch_poly((double)(float)( c->k6395312 + c->k6395408 ));
-      v255 = eb_fmaxf_c(eb_fminf_c(v254, 512.0), -512.0);
+      /* HOISTED to eb_master_coefs_build -- see eb_delay_t23.h. This was a
+       * 13-term DOUBLE polynomial over two CONSTANTS, every sample. */
+      v255 = c->pitchmod_pre;
+      (void)v254;
       s->s6395376 = v255;
       v256 = s->s6395600;
       v257 = s->s6395360;

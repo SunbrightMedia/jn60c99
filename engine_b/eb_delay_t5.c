@@ -362,8 +362,9 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           v99 = c->k10692032;
           s->s10692048 = c->k10692016;
           s->s10692064 = v99;
-          v100 = eb_pitch_poly((double)(float)( c->k10692016 + c->k10692112 ));
-          s->s10692080 = eb_fmaxf_c(eb_fminf_c(v100, 512.0), -512.0);
+          /* HOISTED -- see eb_delay_t5.h. */
+          s->s10692080 = c->pitchmod_pre;
+          (void)v100;
           v101 = s->s10692064;
           s->s10692320 = s->s10692304;
           { float _inc2 = (float)(s->s10692080 * c->k10692352);

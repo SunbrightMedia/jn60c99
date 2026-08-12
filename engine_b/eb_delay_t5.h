@@ -36,6 +36,30 @@ typedef struct {
     float   k10692016;
     float   k10692032;
     float   k10692112;
+    /* ⚑ THE PER-SAMPLE DOUBLE-PRECISION PITCH CALL, HOISTED. EXACTLY 0.
+     *
+     * MEASURED on the user's board 2026-08-12: patches with DELAY TYPE 2, 3 or
+     * 5 cost about DOUBLE -- ~10,000 cycles against ~5,200 -- and 18 of the 64
+     * factory patches use them. The cause is this expression, which ran ONCE
+     * PER SAMPLE:
+     *
+     *     v = eb_pitch_poly((double)(float)(k_a + k_b));
+     *     v = clamp(v, -512, 512);
+     *
+     * eb_pitch_poly is a THIRTEEN-TERM DOUBLE-PRECISION polynomial and the
+     * ESP32-S3 HAS NO DOUBLE FPU, so every term is a libgcc soft-double call.
+     * CLAUDE.md already prices that shape at 18,200-22,300 instructions a
+     * sample where it appears in the DCO.
+     *
+     * BOTH INPUTS ARE COEFFICIENTS. k_a and k_b are set once by
+     * eb_master_coefs_build from CF(base, ...) and never change between
+     * recalls, so the whole expression is LOOP-INVARIANT and was being
+     * recomputed 44,100 times a second for a value that cannot move.
+     *
+     * This is not an approximation and needs no sonic gate: the same
+     * expression, same types, same order, evaluated once at build time. The
+     * null must stay EXACTLY 0 and that is the whole proof. */
+    float   pitchmod_pre;
     float   k10692352;
     float   k10692368;
     float   k10692400;
