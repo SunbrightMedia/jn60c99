@@ -60,7 +60,7 @@ idf_component_register(
                  "../../tools/engineb/devboot" "../../tools/engineb/qemu"
     EMBED_FILES ${APP_EMBED}
     LDFRAGMENTS "linker.lf"
-    REQUIRES esp_driver_i2s driver esp_timer esp_hw_support)
+    REQUIRES esp_driver_i2s esp_driver_uart driver esp_timer esp_hw_support)
 
 # The project's load-bearing flags, verbatim from the host build. FMA does
 # not exist on the LX7, but the flag stays uniform so nobody has to reason

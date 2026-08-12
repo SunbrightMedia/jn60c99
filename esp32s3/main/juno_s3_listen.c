@@ -33,6 +33,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/i2s_std.h"
+#include "driver/uart.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "esp_task_wdt.h"
@@ -92,6 +93,7 @@
 #include "ebdev.h"
 #include "eb_recall.h"
 #include "eb_devseq.h"
+#include "eb_alloc.h"
 #include "eb_patch.h"
 #include "devchord.h"
 #include "esp_cpu.h"
@@ -428,6 +430,12 @@ static void load_coefs(int n, int g)
  * the chip; it does not prove note allocation runs on the chip, and calling it
  * a note path would be the over-claim this file's own header warns about. */
 
+static eb_alloc      ALLOC;
+static eb_alloc_ev   ALLOC_EV[EB_ALLOC_MAX_EV];
+static volatile int  note_pending = 0;   /* events are queued, a burst is owed */
+static int           note_nev = 0;
+static unsigned long notes_seen = 0, notes_dropped = 0, note_bursts = 0;
+static unsigned long nb_min = 0xFFFFFFFFul, nb_max = 0, nb_last = 0;
 static volatile int  dev_pending = 0;   /* a build+publish is owed          */
 static int           dev_patch = 0;     /* which patch the bank is on       */
 static int           dev_gate = 0;      /* 0 = held, 1 = released           */
@@ -506,8 +514,22 @@ static int dev_burst(int patch, int gate)
         return 1;
     }
     eb_devseq_recall(DEVBANK, 128.0f);
+    /* C4: the allocator must learn THIS patch's ASSIGN MODE. Skipping it is
+     * docs/ASSIGNER_MODE_FINDING.md verbatim -- 16 of 64 factory patches
+     * played POLY when they are MONO or UNISON, for months, behind green
+     * gates, because the port and its oracle were wrong together. */
+    eb_alloc_init(&ALLOC);
+    eb_devseq_alloc_config(&ALLOC, DEVBANK);
+#if S3L_MIDI
+    /* MIDI OWNS THE NOTES. The built-in chord is what makes the CRC comparable
+     * to the host oracle, so it still runs at boot; with MIDI on, the keyboard
+     * takes over from the first key. */
+    (void)gate;
+    eb_devseq_notes_on(DEVCHORD_VOICE, DEVCHORD_NOTE, DEVCHORD_VEL, DEVCHORD_N);
+#else
     eb_devseq_notes_on(DEVCHORD_VOICE, DEVCHORD_NOTE, DEVCHORD_VEL, DEVCHORD_N);
     if (gate) eb_devseq_notes_off(DEVCHORD_VOICE, DEVCHORD_N);
+#endif
 
     miss0 = EBDEV_S.miss;
     eb_recall_build(&REC);              /* into the SHADOW bank */
@@ -568,6 +590,159 @@ static void dev_request(int patch, int gate)
     dev_gate = gate;
     dev_pending = 1;
 }
+
+/* ======================================================================
+ *            C4 + C5 -- THE NOTE PATH AND MIDI IN
+ * ======================================================================
+ *
+ * C3 above proves the chip can turn 134 patch bytes into the host's own
+ * coefficients. It still plays a HARD-CODED chord: DEVCHORD_VOICE picks the
+ * voice by hand, on purpose, so "is recall right" and "which voice does a key
+ * land on" stayed separate questions. C4 joins them and C5 lets you press the
+ * key.
+ *
+ * THE ALLOCATOR IS NOT NEW CODE. engine_b/eb_alloc.c is CAssignJu60's own law,
+ * PROVEN 270/270 against the plugin's allocator over all nine assign
+ * configurations with four teeth. It emits the port's cell-writing ACTIONS;
+ * engine_b/dev/eb_devseq.c applies them through the port's own note functions.
+ * Nothing here reimplements either.
+ *
+ * ⚠ A NOTE-ON IS A COEFFICIENT CHANGE, and that is the fact that shapes this.
+ * juno_note.c writes cell 304 (pitch), 320 (the ADSR gate), 6864/9680
+ * (velocity) and more, and eb_coefs.c reads every one of them back per voice.
+ * So a key press needs the same build+publish a patch change does -- it is a
+ * BURST, not a poke. The only differences are that it must NOT reload the cell
+ * array from the boot image (that would discard the patch) and must NOT re-run
+ * juno_bank_apply.
+ *
+ * THE LATENCY THIS COSTS, stated rather than discovered: MIDI is polled once
+ * per CHUNK and the publish lands at the following block boundary, so a key
+ * press is heard between one and two chunks later -- 5.8 to 11.6 ms at
+ * CHUNK=256. That is playable but it is not tight, and the fix when it matters
+ * is a smaller CHUNK or a per-voice rebuild rather than a whole one. Neither is
+ * done here and neither is guessed at: the burst cost is PRINTED.
+ */
+#ifndef S3L_MIDI
+#define S3L_MIDI 0
+#endif
+
+/* THE NOTE BURST. Same shape as dev_burst() minus the cold reseed and the bank
+ * apply: the cell array is already this patch's and must stay that way. */
+static int dev_note_burst(void)
+{
+    unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count(), dt;
+    unsigned long miss0 = EBDEV_S.miss;
+
+    if (eb_devseq_events(ALLOC_EV, note_nev) != note_nev) {
+        dev_mute_why = "the allocator emitted an event the device cannot apply";
+        return 1;
+    }
+    eb_recall_build(&REC);              /* into the SHADOW bank */
+    dt = (unsigned long)esp_cpu_get_cycle_count() - t0;
+    nb_last = dt;
+    if (dt < nb_min) nb_min = dt;
+    if (dt > nb_max) nb_max = dt;
+    ++note_bursts;
+
+    if (EBDEV_S.miss != miss0) {
+        printf("NOTE: *** %lu UNMAPPED CELL ACCESSES applying note events "
+               "(last offset %lu). A note wrote into a SINK -- that is "
+               "DEVICE_RECALL.md defect 2 and the voice is silent. ***\n",
+               EBDEV_S.miss - miss0, EBDEV_S.lastmiss);
+        dev_mute_why = "a note event hit an unmapped cell";
+        return 1;
+    }
+    return 0;
+}
+
+#if S3L_MIDI
+/* ---- MIDI IN, UART1 at 31,250 baud --------------------------------------
+ *
+ * Standard 5-pin MIDI or a USB-MIDI adapter that speaks serial. One wire plus
+ * ground into S3L_MIDI_RX. An opto-isolator is the correct front end for a
+ * real DIN socket; a direct connection works on a bench and is what this
+ * assumes.
+ *
+ * RUNNING STATUS IS HANDLED because keyboards use it: after one 0x9n a
+ * controller may send bare note/velocity pairs forever, and a parser that
+ * ignores that drops most of what you play. NOTE-ON WITH VELOCITY 0 IS A
+ * NOTE-OFF -- also not optional, it is how most keyboards release.
+ *
+ * THE VELOCITY POLICY IS THE PLUGIN'S OWN and it is not a detail: the JU-06A's
+ * wrapper forces every note to velocity 100 unless "Keyboard Velocity SW" is
+ * on, and its default is OFF (CLAUDE.md, the host-lifecycle arc). A port that
+ * passes played velocity raw sounds wrong on every velocity-sensitive patch.
+ * S3L_MIDI_VELSW=1 turns the switch on. */
+#ifndef S3L_MIDI_RX
+#define S3L_MIDI_RX 18
+#endif
+#ifndef S3L_MIDI_VELSW
+#define S3L_MIDI_VELSW 0
+#endif
+#define MIDI_UART   UART_NUM_1
+
+static uint8_t m_status = 0, m_d1 = 0;
+static int     m_have = 0;
+
+static void midi_event(int on, int note, int vel)
+{
+    int n;
+    ++notes_seen;
+    /* The wrapper's own policy, applied HERE and not in the engine, exactly as
+     * the port layers it (juno_gui_midi_note_on vs juno_gui_note_on). */
+    if (on && vel == 0) { on = 0; }
+#if !S3L_MIDI_VELSW
+    vel = on ? 100 : 64;
+#endif
+    /* One burst may be in flight. A second key inside 5.8 ms is queued by the
+     * ALLOCATOR (its state advances) but its EVENTS would overwrite the
+     * pending set -- so it is counted and dropped rather than silently lost.
+     * A real queue is owed; the counter makes the need measurable instead of
+     * theoretical. */
+    if (note_pending) { ++notes_dropped; return; }
+    n = on ? eb_alloc_note_on(&ALLOC, note, vel, ALLOC_EV)
+           : eb_alloc_note_off(&ALLOC, note, ALLOC_EV);
+    if (n <= 0) return;
+    note_nev = n;
+    note_pending = 1;
+}
+
+static void midi_poll(void)
+{
+    uint8_t b[64];
+    int n, i;
+    n = uart_read_bytes(MIDI_UART, b, sizeof b, 0);
+    for (i = 0; i < n; ++i) {
+        uint8_t c = b[i];
+        if (c >= 0xF8) continue;                 /* real-time, ignore */
+        if (c & 0x80) {                          /* status */
+            m_status = c; m_have = 0;
+            continue;
+        }
+        if ((m_status & 0xF0) != 0x90 && (m_status & 0xF0) != 0x80) continue;
+        if (!m_have) { m_d1 = c; m_have = 1; continue; }
+        midi_event((m_status & 0xF0) == 0x90, m_d1, c);
+        m_have = 0;                              /* running status stays armed */
+    }
+}
+
+static int midi_start(void)
+{
+    uart_config_t cfg = {
+        .baud_rate = 31250,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+    if (uart_driver_install(MIDI_UART, 512, 0, 0, NULL, 0) != ESP_OK) return 0;
+    if (uart_param_config(MIDI_UART, &cfg) != ESP_OK) return 0;
+    if (uart_set_pin(MIDI_UART, UART_PIN_NO_CHANGE, S3L_MIDI_RX,
+                     UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) != ESP_OK) return 0;
+    return 1;
+}
+#endif /* S3L_MIDI */
 #endif /* S3L_RECALL */
 
 /* The master's nine delay rings. CALLER-OWNED by design (eb_master.h), and
@@ -1144,6 +1319,18 @@ static void render_block(int n)
                    dev_mute_why);
         }
     }
+    /* C4: a key press is a coefficient change and therefore the same burst,
+     * in the same place, minus the reseed and the bank apply. `else if`
+     * because a patch change already re-issues the chord -- running both in
+     * one block would apply note events to coefficients that are about to be
+     * replaced. */
+    else if (note_pending && !dev_muted) {
+        if (dev_note_burst()) {
+            dev_muted = 1;
+            printf("MUTE: %s.\n", dev_mute_why);
+        }
+        dev_pending = 1;        /* the publish below moves it into the audio */
+    }
 #endif
     {   /* CORE 0'S BARRIER SPIN, TIMED. Two CCOUNT reads per BLOCK, never per
          * sample -- at two a sample the clock bills its own cost to the thing
@@ -1182,6 +1369,7 @@ static void render_block(int n)
             if (qd > p_max) p_max = qd;
         }
         dev_pending = 0;
+        note_pending = 0;       /* released here, so MIDI may queue the next */
     }
 #endif
 #if S3L_FX_PIPE
@@ -1485,6 +1673,20 @@ void app_main(void)
 #else
     printf("ONE CORE: all %d voices on core 0\n", EB_NUM_VOICES);
 #endif
+#if S3L_RECALL && S3L_MIDI
+    if (!midi_start()) {
+        printf("HALT: MIDI UART would not start on GPIO %d.\n", S3L_MIDI_RX);
+        return;
+    }
+    printf("MIDI IN: UART1, 31250 baud, RX on GPIO %d.  velocity switch %s "
+           "(%s)\n", S3L_MIDI_RX,
+           S3L_MIDI_VELSW ? "ON" : "OFF",
+           S3L_MIDI_VELSW ? "played velocity passes through"
+                          : "every note forced to 100 -- the plugin's own default");
+    printf("PLAY IT. Notes are allocated by eb_alloc (CAssignJu60's law, "
+           "270/270 vs the plugin), applied through the port's own note path, "
+           "and published at the next block boundary.\n");
+#endif
     if (!i2s_start()) { printf("HALT: I2S would not start.\n"); return; }
 #if S3L_TONE
     /* A LOUD SQUARE WAVE, NO ENGINE AT ALL.
@@ -1709,6 +1911,13 @@ void app_main(void)
          * hardware timer and is not free, and at two calls a sample it was
          * billing its own cost to the engine it was measuring. */
         {   int64_t e0 = esp_timer_get_time();
+#if S3L_RECALL && S3L_MIDI
+            /* ONCE PER BLOCK, OUTSIDE the timed render. A UART read is a
+             * memcpy out of the driver's ring; polling it per sample would
+             * bill its cost to the engine, which is playbook 12's rule and
+             * this project has broken it three times. */
+            midi_poll();
+#endif
             render_block(CHUNK);
             te += esp_timer_get_time() - e0;
         }
@@ -1969,6 +2178,13 @@ void app_main(void)
                        "be quoted\n",
                        (double)prologue_us / (double)prologue_n,
                        (double)prologue_us / (double)prologue_n * 240.0);
+#endif
+#if S3L_RECALL
+            if ((chunks / (SR / CHUNK)) % S3L_REPORT_EVERY == 0)
+                printf("NOTES: midi=%lu dropped=%lu bursts=%lu  "
+                       "note-burst cyc %lu/%lu/%lu (min/max/last)\n",
+                       notes_seen, notes_dropped, note_bursts,
+                       nb_min == 0xFFFFFFFFul ? 0ul : nb_min, nb_max, nb_last);
 #endif
             if ((chunks / (SR / CHUNK)) % S3L_REPORT_EVERY == 0)
             printf("t=%lus  %s  drift %+.1f ms  underruns=%lu  "

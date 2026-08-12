@@ -29,6 +29,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "eb_alloc.h"
+
 /* A one-record "bank": the 23-byte header the port's reader skips plus one
  * 20,223-byte record. juno_bank_apply() indexes bank + 23 + idx*20223 and
  * bound-checks idx against 64 only, so a bank of one at idx 0 is exact. It is
@@ -80,6 +82,43 @@ void eb_devseq_notes_off(const int *voice, int n);
  * DEFINED HERE rather than taken from the platform: the host oracle and the
  * chip must compute the same function, and "esp_crc32_le's argument convention"
  * is exactly the kind of assumption that turns a mismatch into a mystery. */
+/* ---- C4: THE ALLOCATOR SEAM -------------------------------------------------
+ *
+ * eb_devseq_notes_on/off above take a VOICE INDEX because C3 deliberately kept
+ * "does recall produce the right coefficients" apart from "which voice does a
+ * key land on". C4 joins them, and the join is exactly this: engine_b/eb_alloc.c
+ * emits the port's own cell-writing ACTIONS, and this applies them.
+ *
+ * WHY THE APPLIER LIVES HERE and not in the firmware: eb_alloc is PROVEN
+ * (270/270 note sequences against the plugin's own CAssignJu60, over all nine
+ * assign configurations, four teeth). What has never been proven is the
+ * translation from its events to the port's note calls -- and that translation
+ * must be ONE source, or the firmware and any host oracle of it drift, which is
+ * playbook defect 28 with the roles swapped. Same argument as the file header.
+ *
+ * THE EVENT ORDER IS THE ALLOCATOR'S, NOT THIS FUNCTION'S. It applies them in
+ * the order given and adds nothing. In particular it does NOT broadcast the
+ * held flag itself: EB_EV_HELD is an event the allocator emits, so the "any key
+ * held" cell (1856) is set when the port sets it and not when this file thinks
+ * it should be. Getting that wrong once cost -34.6 dB on an arpeggiated patch
+ * (CLAUDE.md, the arp render fix).
+ *
+ * Returns the number of events it applied, or -1 if it met a kind it does not
+ * know -- which must mute rather than be skipped, because an unapplied event is
+ * a note the instrument did not play. */
+int eb_devseq_events(const eb_alloc_ev *ev, int n);
+
+/* Cell 592 as the RECALL left it -- juno_note_porta_gate's restore value.
+ * Captured by eb_devseq_recall(); see the comment there for why it cannot be
+ * read back at note time. */
+extern float EB_DEVSEQ_PORTA_BASE;
+
+/* Read the patch's ASSIGN MODE / LEGATO / PORTAMENTO out of the bank and load
+ * them into the allocator. Without this every patch plays POLY -- which is the
+ * defect ASSIGNER_MODE_FINDING.md records as having made 16 of 64 factory
+ * patches play in the wrong mode for months, behind green gates. */
+void eb_devseq_alloc_config(eb_alloc *a, const unsigned char *bank);
+
 uint32_t eb_devseq_crc32(const void *p, size_t n);
 
 #endif /* EB_DEVSEQ_H */
