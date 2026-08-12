@@ -6,6 +6,18 @@ what was planned. Every rule here was paid for by a defect; where a rule has a
 number attached, that number was measured on this project and is quoted so the
 next one can recognise the same shape.
 
+**⚑ THIS FILE IS END_GOAL ITEM 7.** The user made the repeatability of the whole
+process — `.vst3` in, two playing boards out — a binding goal on 2026-08-12, so
+that the next synth takes days and not a month. The transcribed arithmetic
+transfers to nothing; THIS transfers to everything. Keep it current: a lesson
+that lives only in a session's memory, or only in a dated result document, has
+not been made repeatable. The companion artifacts are `.claude/workflows/`
+(every multi-agent run, kept whole and re-runnable) and the gate shapes below.
+
+**Read §10's catalogue before writing a gate, and §12-14 before touching a
+target.** Sections 0-11 were learned on the host; 12-14 were learned on
+silicon, and they are a different family of trap.
+
 The task this describes: you have a bit-exact port of a plugin's DSP that runs
 on a host, and you want a portable engine that runs on a microcontroller and
 sounds *identical*. Not similar. Identical, until you deliberately and
@@ -453,9 +465,125 @@ checklist.
 **#18 is the one to internalise.** Before concluding "the original does X", check
 that the original's code for *not*-X could have run in your harness at all.
 
+### The silicon-phase additions (2026-08-05 to 08-12)
+
+Everything above was learned while the engine ran on a host. These were paid for
+on the microcontroller, and they are a different family: on a host the harness is
+free, and on a target the harness is part of the thing you are timing.
+
+| # | defect | how it presented |
+|---|---|---|
+| 28 | **A gate that cannot be configured like the device.** The shim forced every voice awake; the device sets that flag from a wake mask. | The shared LFO was DEAD at every polyphony below full, on the firmware being flashed all night. The gate could not see it BY CONSTRUCTION, and re-running the gate after the fix moved nothing — which CONFIRMS the blind spot rather than clearing it. |
+| 29 | **A subtraction quoted as a measurement.** A shared prologue was priced as `core0_total − 2 voices`. | Wrong by 12× (1,414 against a measured 117). It steered a whole search toward moving a component that was never big enough to matter. |
+| 30 | **The harness was the thing being measured** (×3). A `vTaskDelay(1)` in the audio loop; a latched pass/fail verdict; 235 characters of console per second at 115,200 baud. | The delay slept 10 ms per 2.9 ms of audio and the board reported the SLEEP as the deficit. The latch condemned a run that then held real time for two minutes. The console was 2.0 % of the wall clock against a 1.16 % deficit. **Rule: when the last few percent will not close, price the harness before pricing the engine.** |
+| 31 | **A conditional fix for a self-sustaining failure.** "Only sleep when we are behind" — but the sleep was the only reason we were behind. | The board returned drift IDENTICAL TO THE DECIMAL across two binaries. A fixed point and a dead knob leave the same signature. |
+| 32 | **A build knob nothing read.** `-DS3_RING_SRAM=32768` sat in the CMake cache as UNINITIALIZED; no rule consumed it. | The firmware was byte-for-byte the old one. CMake does not warn. **A knob is not a knob until something reads it, and the way to check is the firmware's own printed banner, not the command line you typed.** |
+| 33 | **A structure described without being read** (×3). | Predicted the FX would overlap; it was serial. Predicted a split's cost from a diagram. Each time the code said otherwise in a comment already in the file. |
+| 34 | **A probe watching one of three outputs.** The modulation detector read only the delayed LFO output, which that patch leaves at zero by construction. | Reported "the LFO is dead" for a working fix. Same shape as the bug being hunted: a measurement that cannot see its subject. |
+| 35 | **A demonstration patch that could not demonstrate.** The coefficient blob carried one patch, and that patch routed no LFO to audio. | A PROVEN fix produced EXACTLY 0 audio difference. Scanning all 64 patches found 32 that route it; the blob had been built from one of the other 32. |
+| 36 | **A scheduling lever aimed at a work bound.** Prologue pipelining moves WHEN the other core is released. | −2 cycles. **Before adopting a scheduling lever, establish whether the critical core is WAITING or WORKING. Only the first kind is reachable by scheduling.** |
+| 37 | **Ordering, not cost, was the whole defect.** Two loops on the second core, in the wrong order. | The FX cost 2,622 cycles and hid 2,608 of them when its loop moved ABOVE the voice loop. Nothing else changed. The first ordering had been justified by a memory-contention theory that a placement test had already killed. |
+| 38 | **Every gate recalls COLD, one patch per scenario.** | Warm ≠ cold was invisible for the life of the project. Measured at last: the plugin's state is order-dependent in 50 of 64 pairs but never reaches its audio; the port's reaches the audio in 19 % of random pairs, from ONE missing recall write. **A shipping, audible defect that no cold gate could ever see.** |
+| 39 | **A count asserted three times without a trace.** A per-voice cell set was called 5, then 13. | Measured: 364 addressed, 12 needing storage. The 5-cell version fails 192/192 the moment a note is issued. Trace it; do not count it by reading. |
+| 40 | **A gate that never issues a note.** The device-recall gate called recall and the builders, and stopped. | It could not see the per-voice hole (#39) or the event mirror. It had already caught one per-voice hazard, which made it look strong — and it stopped one step short of where that same hazard recurs. |
+
 ---
 
-## 11. Order of work
+## 12. Taking it to silicon
+
+**No optimisation before a silicon number.** Host cycle counts are not target
+costs in either direction, and modelled target costs are worse: on this project
+an llvm-mca model calibrated on the host case was still 2.2× off the real board,
+and a QEMU per-call harness was 51 % high on one module because its synthetic
+inputs defeated a saturator shortcut the real signal takes 99.2 % of the time.
+
+**Measure rates on the host, prices on the target.** Branch-taken rates come from
+host counters on the real scenario set; instruction prices come from static
+target disassembly INCLUDING the compiler-support library bodies. Multiply. This
+agreed with an independent method to 8 % where a pure-target harness had been out
+by 51 %.
+
+**Instruction counts are not cycles until the chip says so.** On the M7 they were
+not. On this LX7 they were, within 5 % — and that was worth one measurement to
+learn, because the whole cost model rested on it.
+
+**Timer calls are not free.** Read the clock twice per BLOCK, not twice per
+sample, or the measurement bills its own cost to the thing it measures.
+
+**Print what is in force, not what you configured.** Two separate defects here
+were diagnostics that printed the opposite of the truth: a wake mask the sweep
+was not driving, and a memory placement the build had not applied.
+
+**The per-core budget is `rate ÷ sample rate`, and the loop is the MAX of the
+cores, never the sum — but only the cores that overlap.** Establish which work is
+serial with which before designing a split. On this project the shared prologue
+must precede every voice, so the core carrying it holds strictly fewer voices,
+and no amount of rebalancing changes that.
+
+---
+
+## 13. Writing an estimate
+
+**This project's record: eight estimates, seven wrong. Six flattered
+themselves.** Record yours the same way, because the direction of the error is
+not a property of the estimator's temperament — it is a property of not
+measuring.
+
+Every one of the six optimistic errors was **pricing code that had not been
+read**: a whole master chain omitted; a static helper counted once where it is
+called eleven times; intra-module calls dropped by a regex; a library object
+credited with a symbol it only references. The single PESSIMISTIC one (2.5× high)
+had exactly the same cause — it charged four transcendental calls where the
+source has two, one of them memoised, and charged a slow branch at 100 % that the
+repo already recorded as measured at 9.75 %.
+
+So: **an estimate is a reading exercise, not an arithmetic one.** State what
+would falsify it, and say which of its terms you have not read.
+
+---
+
+## 14. Recall and parameters on the device
+
+Learned from designing this for the S3; every number is this project's, but the
+shape is general.
+
+**The huge state array is an illusion of size.** The original's block was 11 MB;
+recall touches 343 cells. A voice tile plus about thirty segments is ~29 KB, and
+on a register-window machine a literal binary-search address map compiles to the
+SAME four instructions as a flat array at any constant offset. An array loop does
+not fold and costs 27. **Generate the literal chain.**
+
+**Find the map with a randomised bank, never the factory bank.** 321 of the 343
+cells appear under the factory patches; 22 appear only when every record nibble
+is randomised. The same blindness hides parameters from a byte-scan format: five
+of this synth's parameters are constant in all 64 factory patches, so a scan
+built from that bank cannot see them, and a format built from that scan is short
+by five.
+
+**Price the per-parameter table before you put it in the burst.** One resonance
+table here is ~460,000 instructions for six voices and would have dominated
+everything. It is a function of SAMPLE RATE ONLY — identical in every voice, and
+moved by none of the parameters — so it belongs at boot. Check that class of
+thing first; it is the difference between a burst that fits in one audio block
+and one that cannot fit at all.
+
+**Publishing a patch is not a pointer swap.** State that lives in neither
+coefficient struct — a live oscillator copy, an envelope gate mirror, a
+one-shot retrigger latch — must be invalidated in the original's own order, or
+the instrument bisects: filter and envelopes on the new patch, oscillator on the
+old.
+
+**Do not double-buffer an array the engine writes back into.** If an event
+mirror CONSUMES a latch by writing zero into the array, two buffers either lose
+the event or replay one nobody triggered — wrong even single-threaded.
+
+**A render engine is not an instrument.** Recall, note events, MIDI, controls and
+storage are bursts on a budget, and a per-sample average that fits does not
+survive a burst. Build headroom, not parity.
+
+---
+
+## 15. Order of work
 
 1. Build the null harness and its EXACTLY-0 self-test. Nothing before this.
 2. Measure dispatch-arm coverage; add scenarios until every reachable arm runs.
@@ -474,3 +602,15 @@ that the original's code for *not*-X could have run in your harness at all.
 battery was left unfinished in favour of the next piece of work, and both times
 the state of the project was quietly less proven than it was described as being.
 Each task's own battery runs to completion inside that task.
+
+
+8. **Only now the target.** Re-read §12 first. Nothing measured on a host
+   survives the crossing unexamined, and the harness you carry over becomes
+   part of what you are timing.
+9. **Build the instrument, not just the engine.** Recall, notes, MIDI, controls
+   and storage are the product. On this project they were left until after the
+   engine was fast, and that was the wrong order — a render engine cannot be
+   judged by ear, and "audibly identical" is the standard.
+10. **Update THIS FILE as you go.** Every defect you pay for goes in §10 the day
+    it is found, not at the end. That is item 7, and a lesson recorded only in a
+    dated result document has already failed it.
