@@ -52,8 +52,8 @@ on host; this track is wiring it to the device.
 | C3 recall running ON the board, burst off the audio path | **NOT DONE** (publish contract is the mechanism; load_coefs() is its first user — this also fixes B4's clicks) |
 | C4 note path + allocator on device (real note events, not snapshots) | **NOT DONE** |
 | C5 MIDI in over UART — **the user plays it** | **NOT DONE** |
-| C6 encoders + LCD (8 params first, then all) | **NOT DONE** |
-| C7 preset storage (save/load without audio dropout) | **NOT DONE** |
+| C6 encoders + LCD (8 params first, then all) | **NOT DONE** — but cycle-cheap: chip A core 0 has ~1,600 spare cycles/sample (`data/two_board_advantages.md`) |
+| C7 preset storage (save/load without audio dropout) | **NOT DONE** — same spare core; the risk is flash-erase stalls, not cycles |
 | C8 the port's warm-recall bug fixed in src/ + warm gate in make verify | **1/2** — cell 91152 FIXED in src/chorus_recall.c with its own tooth, `make test` green, 0 of 384 cold cases changed. The warm gate is NOT yet in `make verify`. |
 
 ### D. LINK — two chips are one instrument (END_GOAL 2)
@@ -104,6 +104,13 @@ any analog mismatch between the two halves of a chord.
 6. **D** — the link, second board, 6 voices. **END_GOAL 2/3/4 land here.**
 7. **A4** — the user listens. **END_GOAL 1 lands here.**
 8. **E3, E4** — write the pipeline doc, de-JUNO the tools.
+
+## What the second board buys beyond cycles (`data/two_board_advantages.md`)
+Chip A core 0 has ~1,600 spare cycles/sample MEASURED — the control surface is
+nearly free. And 6 voices over 4 cores is **2.7× the compute per voice** of 8
+over 2, so the second board is also how the fork can stop approximating:
+`EB_HALF_OS_VCF`, `EB_DCO_WT` and `EB_CR_N=4` become reconsiderable. That is
+END_GOAL item 1, not item 4.
 
 ## The three facts that must not be re-litigated
 - **One chip cannot do it:** 6v+FX single-chip measured 10,479 = 1.93× over.
