@@ -32,6 +32,14 @@ typedef struct {
      * expression, same types, same order, evaluated once at build time. The
      * null must stay EXACTLY 0 and that is the whole proof. */
     float   pitchmod_pre;
+    /* ⚠ THE SECOND HOIST WAS TRIED AND THE NULL REFUSED IT. The LFO phase
+     * increment (v255 * k6395648, through the wrap ladder and the k6395664
+     * zero-guard) is loop-invariant BY INSPECTION and folding it to a float
+     * constant broke 2 of 36 scenarios at -0.9 dB. The render loop computes
+     * that ladder with DOUBLE literals -- `v258 < 4.0`, `v258 + -2.0` -- so
+     * each step is a float promoted to double, added, and rounded back, and a
+     * float-only fold is NOT the same function. It is worth a few compares and
+     * it is not worth being wrong; the null said so on its first run. */
     float   k6395648;
     float   k6395664;
     float   k6395696;

@@ -1590,6 +1590,21 @@ void app_main(void)
     int phase = 0;
     unsigned long eng_us = 0, ph_chunks = 0;
 
+    /* ⚑ THE AUDIO LOOP MUST OUTRANK EVERY TASK IT SHARES A CORE WITH.
+     *
+     * MEASURED 2026-08-12: with printf moved to rpt_task the worst
+     * block-to-block gap fell from 66-117 ms to a stubborn 16 ms, ONCE A
+     * SECOND -- exactly the reporter's period. IDF starts app_main as
+     * `main_task` at CONFIG_ESP_MAIN_TASK_PRIORITY, which is 1, and rpt_task
+     * was created at 1 as well. FreeRTOS ROUND-ROBINS EQUAL PRIORITIES, so the
+     * reporter's ~69 ms of UART could preempt the audio loop after all.
+     *
+     * Taking printf off the loop was necessary and not sufficient: it also has
+     * to be unable to preempt. This is the same defect as the console one
+     * wearing a different hat, and it is why the fix is a PRIORITY and not
+     * another throttle. */
+    vTaskPrioritySet(NULL, 5);
+
     printf("\n=== JUNO ENGINE B — S3 LISTEN FIRMWARE ===\n");
     printf("voices allowed: %d   sample rate: %d\n", S3L_VOICES, SR);
     printf("free internal %u  free PSRAM %u\n",
