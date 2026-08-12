@@ -48,8 +48,8 @@ on host; this track is wiring it to the device.
 | step | state |
 |---|---|
 | C1 device recall design + cold gate | **DONE** (384 cases, 5 teeth) |
-| C2 the three defects (warm, per-voice, publish) fixed + gated | **IN FLIGHT** (workflow running; per-voice = 12 storage cells measured; port's own warm bug found: cell 91152) |
-| C3 recall running ON the board, burst off the audio path | **NOT DONE** (publish contract is the mechanism; load_coefs() is its first user — this also fixes B4's clicks) |
+| C2 the three defects (warm, per-voice, publish) fixed + gated | **DONE** — 1,152 cases bit-identical at both flag sets, issues notes, runs sequences; ONE adversarial round survived (it found 3 more defects, all fixed and toothed). Round 2 did not run: session limit. |
+| C3 recall running ON the board, burst off the audio path | **SCOUTED, not built.** Two real firmware links say recall as designed does NOT fit: `dram0_0_seg overflowed by 7,184 B`. Fits after the 32 KB `EBDEV_MISSLIST` diagnostic shrinks. Flash is a net WIN of 1.72 MB (recall retires the blob). ⚠ `ebdev_at` does NOT fold to 4 instructions in the real recall TUs — 900 out-of-line sites, 667 in `eb_master_coefs.c`. The burst is bigger than planned. |
 | C4 note path + allocator on device (real note events, not snapshots) | **NOT DONE** |
 | C5 MIDI in over UART — **the user plays it** | **NOT DONE** |
 | C6 encoders + LCD (8 params first, then all) | **NOT DONE** — but cycle-cheap: chip A core 0 has ~1,600 spare cycles/sample (`data/two_board_advantages.md`) |
