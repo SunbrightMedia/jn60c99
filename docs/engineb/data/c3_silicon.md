@@ -127,3 +127,33 @@ Something blocks for seconds at a time. I have no measurement that names it and
 I am not going to guess a fifth time in one session. The instrumentation that
 would settle it: timestamp the LONGEST single i2s_channel_write and the longest
 gap between block starts, and print what the loop was doing when it happened.
+
+## THE BURST, SPLIT AND ATTRIBUTED (2026-08-12, silicon)
+
+The whole-burst figure above is 1,992,935 cycles. Where it goes, MEASURED with
+CCOUNT around each step rather than attributed:
+
+| step | cycles | share |
+|---|---|---|
+| voice coefficients (`eb_render_coefs_build`) | 1,082,812 | 54 % |
+| master coefficients (`eb_master_coefs_build`) | 121,213 | 6 % |
+| reseed + install + port recall + notes | 788,910 | 40 % |
+
+**THE FINDING.** The voice build walks all EIGHT voices every time -- for a
+two-voice chord, and for a key press that changes exactly ONE voice. Seven
+eighths of 54 % was recomputing values that could not have moved.
+
+`eb_recall_build_voices()` rebuilds only the voices named by the allocator,
+after copying the live bank into the shadow so the rest is CARRIED rather than
+stale. That copy is what makes it exact; it is not a shortcut to be trimmed.
+Gated against the full build byte for byte at both flag sets
+(`tools/engineb/devrecall/gate.c`), with two teeth -- a wrong mask and an empty
+mask -- both seen to fail first.
+
+Expected note burst: ~135,000 cycles, ~0.6 ms, against the 8 ms it was.
+
+**A PATCH CHANGE IS NOT FIXED BY THIS AND SHOULD NOT BE SAID TO BE.** A program
+change genuinely moves every voice and the master chain, so it still pays the
+full build. The 40 % outside the coefficient builds is instrumented in the same
+way and is not yet attributed -- the four counters exist and print; the numbers
+do not exist until a board prints them.

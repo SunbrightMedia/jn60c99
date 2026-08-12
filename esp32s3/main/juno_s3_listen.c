@@ -495,6 +495,20 @@ static int dev_check_rings(void)
     return bad;
 }
 
+/* ---- THE OTHER 40 % OF THE BURST, attributed the same way ----------------
+ * MEASURED on silicon 2026-08-12: the whole burst is 1,992,935 cycles and the
+ * two coefficient builds account for 1,204,025 of them. That leaves 788,910
+ * cycles -- 40 % -- in the four steps below, and NOTHING is known about how
+ * they divide. The voice build was cut by measuring it first; this is the same
+ * move on what is left, and it is one flash rather than four guesses.
+ *
+ * These run once per patch change, never per sample. */
+static unsigned long devp_reseed = 0, devp_install = 0;
+static unsigned long devp_recall = 0, devp_notes = 0;
+static unsigned long devp_t0 = 0;
+#define DEVP_T0()      devp_t0 = (unsigned long)esp_cpu_get_cycle_count()
+#define DEVP_T1(dst)   (dst) = (unsigned long)esp_cpu_get_cycle_count() - devp_t0
+
 /* THE BURST. Returns 0 on success. On any failure it says which one and the
  * caller mutes -- a board that plays wrong coefficients teaches nothing. */
 static int dev_burst(int patch, int gate)
@@ -504,22 +518,29 @@ static int dev_burst(int patch, int gate)
 
     chunks_since_burst = 0;
     ebdev_reset_counters();
+    DEVP_T0();
     if (eb_devseq_boot_cells(ebdev_boot[0], (unsigned)EBDEV_NV)) {
         dev_mute_why = "the baked boot image does not match EBDEV_NV";
         return 1;
     }
+    DEVP_T1(devp_reseed);
+    DEVP_T0();
     if (eb_devseq_install(DEVBANK, eb_template, sizeof eb_template,
                           eb_bank64 + (size_t)patch * EB_PATCH_BYTES)) {
         dev_mute_why = "eb_patch_install refused the record";
         return 1;
     }
+    DEVP_T1(devp_install);
+    DEVP_T0();
     eb_devseq_recall(DEVBANK, 128.0f);
+    DEVP_T1(devp_recall);
     /* C4: the allocator must learn THIS patch's ASSIGN MODE. Skipping it is
      * docs/ASSIGNER_MODE_FINDING.md verbatim -- 16 of 64 factory patches
      * played POLY when they are MONO or UNISON, for months, behind green
      * gates, because the port and its oracle were wrong together. */
     eb_alloc_init(&ALLOC);
     eb_devseq_alloc_config(&ALLOC, DEVBANK);
+    DEVP_T0();
 #if S3L_MIDI
     /* MIDI OWNS THE NOTES. The built-in chord is what makes the CRC comparable
      * to the host oracle, so it still runs at boot; with MIDI on, the keyboard
@@ -532,6 +553,7 @@ static int dev_burst(int patch, int gate)
 #endif
 
     miss0 = EBDEV_S.miss;
+    DEVP_T1(devp_notes);
     eb_recall_build(&REC);              /* into the SHADOW bank */
     dt = (unsigned long)esp_cpu_get_cycle_count() - t0;
     b_last = dt;
@@ -1857,6 +1879,9 @@ void app_main(void)
     printf("  (CHOSEN voices, NOT an allocator -- that is C4)\n");
     printf("RECALL: boot build %lu cycles, publish %lu cycles  "
            "(the FIRST Xtensa numbers for recall that exist)\n", b_last, p_last);
+    printf("RECALL: burst rest: reseed %lu, install %lu, port recall %lu, "
+           "notes %lu cyc  (these four are the 40 %% that is NOT coefficients)\n",
+           devp_reseed, devp_install, devp_recall, devp_notes);
     printf("RECALL: burst split: voice coefs %lu cyc, master coefs %lu cyc "
            "(0/0 = profiling off).  MEASURED, not attributed -- the ~90,000 in "
            "eb_recall.h and the res-LUT attribution were both wrong.\n",
