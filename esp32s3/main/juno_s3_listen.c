@@ -576,6 +576,32 @@ static void mem_probe(void)
     if (ps) heap_caps_free((void *)ps);
 }
 
+
+/* ================= THE HEALTH LINE =======================================
+ *
+ * ONE verdict, and it LATCHES. The firmware already had several detectors and
+ * printed twelve numbers beside them, which left a human to notice -- and a
+ * person reading a scrolling log is not a detector.
+ *
+ * `HEALTH: OK` or the name of the FIRST fault, and once a fault is named this
+ * never reads OK again. A latch rather than a level, because an instrument that
+ * broke for one block an hour ago and recovered is still an instrument that
+ * broke, and a self-healing report hides exactly the intermittent fault that is
+ * hardest to find.
+ *
+ * ⚠ A HEALTH LINE THAT HAS NEVER GONE RED IS NOT EVIDENCE OF HEALTH. It is an
+ * untested detector, which is playbook defect 1 and the oldest rule here. Each
+ * fault below owes a tooth that provokes it on purpose; the ones marked OWED in
+ * FINAL_GUIDE do not have one yet and must not be quoted as proof. */
+static const char *health_fault = 0;      /* the FIRST fault, latched */
+static unsigned long health_n = 0;        /* how many times anything fired */
+
+static void health_fail(const char *why)
+{
+    ++health_n;
+    if (!health_fault) health_fault = why;   /* FIRST, not last */
+}
+
 /* ---- THE OTHER 40 % OF THE BURST, attributed the same way ----------------
  * MEASURED on silicon 2026-08-12: the whole burst is 1,992,935 cycles and the
  * two coefficient builds account for 1,204,025 of them. That leaves 788,910
@@ -649,11 +675,13 @@ static int dev_burst(int patch, int gate)
                "missed read or wrote an 8-byte SINK. ***\n",
                EBDEV_S.miss, patch, EBDEV_S.lastmiss, EBDEV_S.miss - miss0);
         dev_mute_why = "unmapped cells -- the address map is incomplete";
+        health_fail("a recall access fell off the address map");
         dev_last_bad_patch = (unsigned long)patch;
         return 1;
     }
     if (dev_check_rings()) { dev_ringlen_bad = 1;
         dev_mute_why = "a delay ring length changed under its coefficients";
+        health_fail("a delay ring length moved");
         return 1; }
 
     /* THE ANSWER KEY. gen/devcrc.h was computed by the SAME source
@@ -793,6 +821,7 @@ static int dev_note_burst(void)
                "DEVICE_RECALL.md defect 2 and the voice is silent. ***\n",
                EBDEV_S.miss - miss0, EBDEV_S.lastmiss);
         dev_mute_why = "a note event hit an unmapped cell";
+        health_fail("a note wrote into an unmapped cell");
         return 1;
     }
     return 0;
@@ -845,7 +874,8 @@ void s3_midi_event(int on, int note, int vel)
      * pending set -- so it is counted and dropped rather than silently lost.
      * A real queue is owed; the counter makes the need measurable instead of
      * theoretical. */
-    if (note_pending) { ++notes_dropped; return; }
+    if (note_pending) { ++notes_dropped;
+        health_fail("a note was DROPPED rather than delayed"); return; }
     n = on ? eb_alloc_note_on(&ALLOC, note, vel, ALLOC_EV)
            : eb_alloc_note_off(&ALLOC, note, ALLOC_EV);
     if (n <= 0) return;
@@ -1673,6 +1703,9 @@ static void rpt_task(void *arg)
          * 11.3 ms of UART time and cannot leave inside ONE donated 10 ms
          * tick. Under 100 characters does. The budget constant and the words
          * are what got cut; every number is still here. */
+        printf("HEALTH: %s%s\n",
+               health_fault ? "*** " : "OK",
+               health_fault ? health_fault : "");
         printf("t=%lu cyc=%lu drift=%+ld un=%lu gap=%lu bst=%lu nb=%lu "
                "midi=%lu/%lu usb=%lu/%d keys=%lu pat=%d\n",
                rpt_sec, rpt_cyc, rpt_drift, rpt_under, rpt_gap,
@@ -1759,6 +1792,7 @@ void app_main(void)
      *    windows leak the cause is in the steady state and the burst is
      *    exonerated. One flash answers a question four hypotheses could not. */
     unsigned long gap_max = 0, gap_tag = 0, gap_at = 0;
+    int64_t       t_prev_ok = 0;
     unsigned long w_underrun0 = 0, w_chunks0 = 0;
     int           w_step_on = !S3L_PLAY;   /* S3L_PLAY: no patch stepping */
     int64_t       t_prev_block = 0;
@@ -2282,6 +2316,16 @@ void app_main(void)
         }
         t_prev_block = t0;
         phase_tag = 5;
+        /* THE DEADLINE. One block must be produced every CHUNK/SR seconds. A
+         * gap longer than TWO block periods means a block was late enough that
+         * the DMA had to be carrying us, which is the definition of the
+         * invariant being broken -- whatever it sounded like. Two rather than
+         * one because the writer blocks on a full queue by design, which makes
+         * a single period of jitter normal and expected. */
+        if (t_prev_ok && (unsigned long)(t0 - t_prev_ok)
+                         > 2ul * (1000000ul * CHUNK / SR))
+            health_fail("a block missed its deadline");
+        t_prev_ok = t0;
 #if S3L_SWEEP
         /* THE COST SWEEP overrides the chord with 0, 1 and 2 voices to get a
          * slope and an intercept from silicon. It renders SILENCE for its
@@ -2336,6 +2380,15 @@ void app_main(void)
 #else
             eb_master_render(MS, &MC, &RG, vb, &L, &R);
 #endif
+            /* NaN and Inf survive the clamps below -- a NaN compares false
+             * against everything, so `if (L > 1.0f)` does NOT catch it and it
+             * reaches the DAC as full-scale noise. It is checked BEFORE the
+             * clamp and only against itself, which is the one test that catches
+             * NaN without a library call. */
+            if (!(L == L) || !(R == R)) {
+                health_fail("a sample was NaN -- the DSP diverged");
+                L = 0.0f; R = 0.0f;
+            }
             if (L > 1.0f) L = 1.0f; else if (L < -1.0f) L = -1.0f;
             if (R > 1.0f) R = 1.0f; else if (R < -1.0f) R = -1.0f;
             pcm[2 * i]     = (int16_t)(L * 30000.0f);
@@ -2466,7 +2519,7 @@ void app_main(void)
              * causes the OPPOSITE state (the queue fills, the write still
              * returns ESP_OK with wrote == nby). So the two are different
              * faults and were being added together. */
-            if (we != ESP_OK) ++i2s_timeout;
+            if (we != ESP_OK) { ++i2s_timeout; health_fail("I2S write timed out -- the DAC ran dry"); }
             if (wrote != nby)  ++i2s_short;
             if (we != ESP_OK || wrote != nby) {
                 ++underrun;

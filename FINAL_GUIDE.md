@@ -47,6 +47,41 @@ and every parameter moving every block.
    is COUNTED and reported. A system that copes quietly cannot be proven to
    cope.
 
+### THE HEALTH LINE -- any issue must be OBVIOUS IMMEDIATELY (user, 2026-08-12)
+
+Verbatim: **"whatever process we use to test the fork should make it VERY clear
+if there is ANY issue RIGHT away."**
+
+The flaw in the firmware as it stands is not that it lacks detectors -- it has
+several -- it is that it prints TWELVE NUMBERS and leaves a human to notice. A
+person reading a scrolling log is not a detector.
+
+**THE RULE: one verdict line. It reads `HEALTH: OK` or it names the FIRST
+fault, and once it has named one it NEVER READS OK AGAIN.**
+
+A latch, not a level. An instrument that broke for one block an hour ago and
+recovered is still an instrument that broke, and a report that heals itself
+hides exactly the intermittent fault that is hardest to find.
+
+What it latches, each with the counter that already exists or is owed:
+
+| fault | detector | state |
+|---|---|---|
+| block overran its deadline | wall-clock per block vs the block period | OWED |
+| audio underrun / DMA starved | `un=` | EXISTS |
+| a cell access fell off the map | `EBDEV_S.miss`, mutes | EXISTS |
+| a publish was refused | `dev_pub_refused` | EXISTS |
+| a note was dropped | `notes_dropped` | EXISTS |
+| a delay ring length moved | `dev_check_rings` | EXISTS |
+| coefficients disagree with the host | CRC vs answer key -- **1 patch checked, 64 owed** | PARTIAL |
+| a sample was NaN, Inf, or ran away in DC | — | OWED |
+| a parameter update was dropped rather than delayed | — | OWED (needs C9) |
+
+**AND EVERY DETECTOR MUST HAVE BEEN SEEN TO FIRE.** A health line that has never
+gone red is not evidence of health; it is an untested detector, which is
+playbook defect 1 and the oldest rule in this project. Each row above needs a
+tooth that provokes it on purpose.
+
 ### How it is proven -- not by listening
 
 An adversarial STRESS GATE, and the standard is that it has been seen to FAIL
