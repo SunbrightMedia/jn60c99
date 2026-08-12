@@ -88,6 +88,11 @@ void eb_recall_build(eb_recall *r);
  * in which case NOTHING is published. */
 int  eb_recall_publish(eb_recall *r);
 
+/* THE BURST SPLIT. Cycles spent in each half of the last eb_recall_build().
+ * Written only when EB_RECALL_PROF is 1; zero otherwise. Read the block above
+ * their definition in eb_recall.c for why they exist. */
+extern unsigned long eb_recall_t_rc, eb_recall_t_mc;
+
 /* The FX-pipe deferral: call once per block boundary, after the block that
  * followed a publish. Applies mc_pending to EB_MC. No-op when nothing pends. */
 void eb_recall_block_boundary(eb_recall *r);

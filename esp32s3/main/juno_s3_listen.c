@@ -1848,6 +1848,10 @@ void app_main(void)
     printf("  (CHOSEN voices, NOT an allocator -- that is C4)\n");
     printf("RECALL: boot build %lu cycles, publish %lu cycles  "
            "(the FIRST Xtensa numbers for recall that exist)\n", b_last, p_last);
+    printf("RECALL: burst split: voice coefs %lu cyc, master coefs %lu cyc "
+           "(0/0 = profiling off).  MEASURED, not attributed -- the ~90,000 in "
+           "eb_recall.h and the res-LUT attribution were both wrong.\n",
+           eb_recall_t_rc, eb_recall_t_mc);
     printf("RECALL: CRC vs host answer key: %lu checked, %lu bad -- %s\n",
            crc_checked, crc_bad,
            crc_bad ? "*** THE CHIP DISAGREES WITH THE HOST. NO CYCLE FIGURE "

@@ -146,6 +146,12 @@ if(S3_RECALL)
     # defect 28, which cost this project a dead LFO through a whole night.
     target_compile_definitions(${COMPONENT_LIB} PRIVATE
                                S3L_RECALL=1 EB_DEVCELLS EBDEV_NV=8
+                               # EB_RECALL_PROF: two cycle counters around the
+                               # two halves of the burst. The burst measured
+                               # 1.95 M cycles against a stated 90,000, so the
+                               # next step is to find out WHERE before anything
+                               # is optimised. Two counter reads per burst.
+                               EB_RECALL_PROF=1
                                EBDEV_MISSLIST_N=64 EBSH_MAX_CTX=1
                                DEVCHORD_N=${S3_VOICES})
     # EB_RECALL_FX_PIPE MUST FOLLOW S3L_FX_PIPE, and it arrives inside the

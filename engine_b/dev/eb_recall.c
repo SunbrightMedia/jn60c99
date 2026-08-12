@@ -44,6 +44,34 @@ void eb_recall_init(eb_recall *r,
     EB_MC = mc0;
 }
 
+/* ---- THE BURST SPLIT, measured rather than attributed ---------------------
+ * MEASURED 2026-08-12 on silicon: the whole burst is ~1.95 M cycles, against
+ * this header's ~90,000. That is 21x, and it is the third time a number about
+ * this burst has been stated without being measured -- the res-LUT
+ * attribution, my own 90,000, and the "fits in ONE audio block" claim in
+ * DEVICE_RECALL.md are all now suspect for the same reason.
+ *
+ * So the burst is split in two and each half is COUNTED. Nothing is optimised
+ * until these two numbers exist. Zero cost when EB_RECALL_PROF is off. */
+unsigned long eb_recall_t_rc = 0, eb_recall_t_mc = 0;
+#if EB_RECALL_PROF
+/* CCOUNT is read INLINE and not through esp_cpu.h on purpose: these sources
+ * build at -std=c99, where the bare `asm` keyword IDF's xt_utils.h uses is not
+ * a keyword. `__asm__` is the standard-clean spelling and needs no header. */
+static inline unsigned long eb__ccount(void)
+{
+    unsigned long c;
+    __asm__ __volatile__("rsr.ccount %0" : "=a"(c));
+    return c;
+}
+static unsigned long eb__t0;
+#define EB_RECALL_T0() eb__t0 = eb__ccount()
+#define EB_RECALL_T1(dst) (dst) = eb__ccount() - eb__t0
+#else
+#define EB_RECALL_T0() do { } while (0)
+#define EB_RECALL_T1(dst) do { } while (0)
+#endif
+
 /* ==================================================== STEPS 1-2: THE BURST */
 void eb_recall_build(eb_recall *r)
 {
@@ -61,7 +89,9 @@ void eb_recall_build(eb_recall *r)
      *    have to be true is that no offset sinks: a SINK-built set puts voice
      *    0's pitch and velocity into every voice. The count is captured at
      *    publish and the firmware mutes on it. */
+    EB_RECALL_T0();
     eb_render_coefs_build((const unsigned char *)0, r->rc[shadow]);
+    EB_RECALL_T1(eb_recall_t_rc);
 
     /* 2. Master coefficients, same reason.
      *    NOT rebuilt here, deliberately:
@@ -73,7 +103,9 @@ void eb_recall_build(eb_recall *r)
      *        (eb_coefs.c:207-209) and a function of SAMPLE RATE alone --
      *        2,688 of 2,688 comparisons identical across voices, 0 of 123
      *        recall-affecting record bytes move it. Build it once at boot. */
+    EB_RECALL_T0();
     eb_master_coefs_build((const unsigned char *)0, r->mc[shadow]);
+    EB_RECALL_T1(eb_recall_t_mc);
 
     (void)v;
 }
