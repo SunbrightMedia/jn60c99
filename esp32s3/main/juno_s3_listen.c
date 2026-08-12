@@ -2283,7 +2283,38 @@ void app_main(void)
 #endif
             ++chunks_since_burst;
 #endif
-            we = i2s_channel_write(TX, out, nby, &wrote, pdMS_TO_TICKS(50));
+            /* ⚠ A SHORT WRITE USED TO DROP THE REST OF THE BLOCK.
+             *
+             * MEASURED 2026-08-12, with the test loop finally out of the way:
+             * every `cyc` is under the 5,442 budget and the block-to-block gap
+             * is a clean 5,700 us, yet underruns climbed about 7 per second and
+             * the drift went NEGATIVE and grew. Negative drift means the loop
+             * counted MORE audio than wall-clock time -- which cannot happen by
+             * computing faster. It happens by counting a block as delivered
+             * when part of it was thrown away.
+             *
+             * The writer produces a block every 5,700 us; the DAC consumes one
+             * every 5,804 us. The writer is ahead, so the DMA queue fills, the
+             * 50 ms write returns SHORT, and the remainder was silently
+             * discarded -- a hole in the audio and a click, once per full
+             * queue.
+             *
+             * The remainder is now WRITTEN, not dropped, and the wait is
+             * unbounded. A blocking write is the correct way to be ahead: it
+             * parks the loop until the DAC has room, which locks the engine to
+             * the DAC's own clock instead of free-running against it. An
+             * underrun is now only a real timeout. */
+            {   const unsigned char *wp = (const unsigned char *)out;
+                size_t left = nby, n = 0;
+                we = ESP_OK;
+                wrote = 0;
+                while (left) {
+                    we = i2s_channel_write(TX, wp, left, &n, portMAX_DELAY);
+                    if (we != ESP_OK) break;
+                    if (n == 0) break;      /* no progress: do not spin */
+                    wp += n; left -= n; wrote += n;
+                }
+            }
             /* DECODE THE COUNTER BEFORE TRYING TO FIX WHAT IT COUNTS.
              * esp-idf components/esp_driver_i2s/i2s_common.c:1630-1633 returns
              * a SHORT write only on ESP_ERR_TIMEOUT -- i.e. the TX message
