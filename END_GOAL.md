@@ -18,6 +18,50 @@ so every future session reads it before anything else.
 **That is the only thing this project works towards. It is the assistant's
 entire responsibility, and the assistant owns it.**
 
+## 7. THE PROCESS MUST BE REPEATABLE (added by the user 2026-08-12, BINDING)
+
+The user's own words:
+
+> the PROCESS that is used, all the way from importing the .vst3 file into
+> claude, to getting the .vst3's DSP engine fully working on two ESP32S3's,
+> should be as REPEATABLE as possible, to prevent further frustration and to
+> make the process extremely quick compared to how long it has taken to make it
+> the first time.
+
+**This is a DELIVERABLE, not a nice-to-have.** The next synth — the JX-3P, and
+whatever follows it — must take days, not a month. The first one took a month
+because every method had to be invented while it was being used. None of that
+may have to be invented twice.
+
+### What it means in practice
+
+**The reusable half is the METHOD, not the DSP.** The JUNO's transcribed
+arithmetic transfers to nothing. These transfer to everything:
+
+- `.claude/workflows/` — every multi-agent run, kept whole. Point
+  `fork-adversarial-audit` at another fork and it hunts the same defect
+  classes, because the classes belong to the method.
+- `docs/engineb/METHOD_PLAYBOOK.md` — the defect catalogue.
+- The gate shapes: null to EXACTLY 0, the third-octave sonic gate, teeth on
+  every gate, `plugin_check`, the two-process rule, PROVEN/READ/INFERRED.
+- The harness: the Unicorn oracle, the shim pattern, the cell-map generator,
+  the compact patch format, the device gate.
+
+**So every tool built from here is built to be pointed at a different synth.**
+Hardcoding a JUNO constant into a tool that did not need it is a defect against
+this item, the same as a wrong coefficient is a defect against item 1.
+
+**And the pipeline must be written down end to end.** From "here is a .vst3" to
+"two boards are playing it": every step, in order, with the gate that closes it
+and the trap that is waiting in it. A method that lives only in one session's
+memory has not been made repeatable.
+
+### How progress on this item is measured
+
+Not by how tidy the tools look. **By how fast the SECOND synth goes.** Until
+another synth has been through the pipeline, every claim about repeatability is
+INFERRED and must say so.
+
 ## What that means in practice, so it cannot be quietly reinterpreted
 
 **"Audibly identical" is the standard, not "close".** The trunk stays

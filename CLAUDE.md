@@ -10,6 +10,15 @@ In one line: **audibly identical, 6 voices, EXACTLY two ESP32-S3 boards, full
 FX including chorus, seamless real time, complete control over every parameter
 including preset recall, confidently proven.**
 
+**A SEVENTH ITEM was added by the user on 2026-08-12 and is equally binding:
+THE WHOLE PROCESS — .vst3 in, two playing ESP32-S3 boards out — MUST BE
+REPEATABLE**, so the next synth (JX-3P and after) takes days rather than a
+month. Every tool built from here is built to be pointed at a different synth;
+hardcoding a JUNO constant where none was needed is a defect against item 7 in
+the same way a wrong coefficient is a defect against item 1. Progress on it is
+measured by how fast the SECOND synth goes, and until one has been through the
+pipeline every repeatability claim is INFERRED.
+
 Ruled out permanently and never to be re-proposed: a third chip, a different
 chip, 32 kHz, fewer voices, dropping any FX.
 
