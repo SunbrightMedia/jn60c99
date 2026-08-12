@@ -485,11 +485,38 @@ free, and on a target the harness is part of the thing you are timing.
 | 37 | **Ordering, not cost, was the whole defect.** Two loops on the second core, in the wrong order. | The FX cost 2,622 cycles and hid 2,608 of them when its loop moved ABOVE the voice loop. Nothing else changed. The first ordering had been justified by a memory-contention theory that a placement test had already killed. |
 | 38 | **Every gate recalls COLD, one patch per scenario.** | Warm ≠ cold was invisible for the life of the project. Measured at last: the plugin's state is order-dependent in 50 of 64 pairs but never reaches its audio; the port's reaches the audio in 19 % of random pairs, from ONE missing recall write. **A shipping, audible defect that no cold gate could ever see.** |
 | 39 | **A count asserted three times without a trace.** A per-voice cell set was called 5, then 13. | Measured: 364 addressed, 12 needing storage. The 5-cell version fails 192/192 the moment a note is issued. Trace it; do not count it by reading. |
+| 41 | **printf in the audio loop, for the FOURTH time.** Entry 30 already named the console and a throttle was already added for it. Four more report lines went in while hunting a stall. | The loop blocked 66-117 ms against a 5,804 us period -- twelve windows out of twelve, tagged `printf` by its own gap meter. Two flashes were then spent chasing hypotheses about the engine. **A throttle makes it rarer, and rare is what lets it survive: the audio loop may not call printf AT ALL. It snapshots; a separate task prints.** |
 | 40 | **A gate that never issues a note.** The device-recall gate called recall and the builders, and stopped. | It could not see the per-voice hole (#39) or the event mirror. It had already caught one per-voice hazard, which made it look strong — and it stopped one step short of where that same hazard recurs. |
 | 41 | **A perturbation scan whose PROBE VALUES cannot reach the value being tested for.** The record-position scan used `{0x00,0x03,0x0C,0x7F}`, i.e. low nibbles `{0,3,12,15}`, against a parameter whose only live value is **1** (`lg == 1 && as == 1`, src/juno_apply.c:652). | LEGATO's record positions 126/127 were absent from the "112 measured recall-affecting positions", so the compact patch format does not carry blob 110. MEASURED both ways: the four probe values move nothing, `0x01` moves the coefficients. **A scan is blind to 11 of the 16 nibble values, and equality-gated discrete parameters live in exactly that blind spot.** Sweeping VALUES is not the same as sweeping POSITIONS, and this scan swept positions only. |
 | 42 | **A single-position scan used as a completeness proof for a COMBINATION.** The same scan also needs a base patch that satisfies the parameter's gate; none of its six did (only patches 5 and 47 have `LEGATO==1 && ASSIGN==1`). | The cheap refutation is a WHOLE-record random template: perturb every non-carried position at once, then bisect. It named the byte in one run. Do that before believing any "these N positions are the ones that matter" list. |
 | 43 | **A LINKER PLACEMENT DIRECTIVE THAT NOTHING APPLIED, for the life of the firmware.** `esp32s3/main/linker.lf` maps all of `libmain.a` to `noflash_text` and its own comment explains the board's 2x-over-model cycles as instruction-cache thrash that the mapping removes. | MEASURED 2026-08-12 on the shipping ELF: `nm juno_s3.elf \| awk '$1 ~ /^403/' \| grep -cE "eb_\|juno_"` returns **0**. `app_main` is at 0x4200a69c and `eb_engine_render_range` at 0x42011a48 -- XIP FLASH, both. Reverting the fragment entirely changes NOTHING: identical addresses, identical section sizes. INFERRED cause: `-flto` destroys the archive-member identity ldgen matches on. So every cycle figure this project has ever quoted for the S3 was measured with the engine running from FLASH, and the recorded explanation for the shortfall was never tested. **Playbook 32 again, one layer down: a knob is not a knob until something reads it, and the artefact -- not the file you wrote -- is what says so.** |
 | 44 | **A concurrent session editing the same tree during a battery** (third occurrence: `eeda697`, `cdabfe9`, and this one). While this task was measuring, another agent modified `src/juno_apply.c`, `src/juno_apply.h`, `gui/juno_bridge.c`, `tools/engineb/gen_devcells.py`, `tools/engineb/devrecall_gate.py` and `engine_b/dev/ebdev.h`. | The gate refused to start -- `ebdev_seg.h` had gone STALE under it because the generator had grown a new `#define` in another session. That refusal is the ONLY reason the collision was noticed at all; the earlier `make test` and the two firmware links had already run across a tree that was moving. **No battery result may be quoted as a certification of a tree unless the tree was frozen for its whole run, and the cheap way to know is `git status` before AND after.** |
+
+---
+
+## 11b. THE FLASH BUDGET — someone else's hands are in this loop
+
+On a target you cannot flash yourself, every build costs a HUMAN two minutes
+and their patience. That makes a flash a scarce resource and it should be
+spent like one. MEASURED on 2026-08-12: eight flashes in one session, of which
+**two were hypothesis-driven guesses chasing a stall that turned out to be the
+session's own `printf`** -- and the measurement that settled it was available
+the whole time and was sent fourth instead of second.
+
+Three rules, in order of how much they save:
+
+1. **MEASURE BEFORE YOU FIX.** If you cannot name the cause, the next build
+   INSTRUMENTS; it does not repair. A repair sent without a cause is a guess
+   with a flash attached, and this project's estimate record says four in five
+   of those are wrong.
+2. **A BUILD MAY CARRY MANY EXPERIMENTS AND NEVER MANY GUESSES.** Make the
+   variable a RUNTIME switch and sweep it: the layout sweep tested ten chip
+   configurations in one flash, and the bisect answered a question four
+   separate builds had failed to. Two fixes in one binary is not that -- it is
+   two guesses that cannot be told apart afterwards.
+3. **STATE THE DECISION RULE BEFORE SENDING.** Which number, which threshold,
+   and what each outcome means. If no result would change what you do next,
+   the build is not worth their two minutes.
 
 ---
 
