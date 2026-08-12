@@ -1,7 +1,7 @@
 {
     "version":            "1.3",
     "project_name":       "juno_s3",
-    "project_version":    "febc400-dirty",
+    "project_version":    "cdabfe9-dirty",
     "project_path":       "/home/user/jn60c99/esp32s3",
     "idf_path":           "/home/user/esp-idf",
     "build_dir":          "/home/user/jn60c99/esp32s3/build_c3",

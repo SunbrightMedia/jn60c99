@@ -65,7 +65,7 @@ idf_component_register(
 # inlines, it does not re-associate float arithmetic.
 target_compile_options(${COMPONENT_LIB} PRIVATE
     -O2 -flto -ffp-contract=off -fno-strict-aliasing
-    -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_VCF_RES_LUT=256 -DEB_IDF -DEBDEV_NV=6
+    -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_VCF_RES_LUT=256 -DEB_IDF -DEBDEV_NV=6 -DEBDEV_MISSLIST_N=64
     ${S3_EXTRA_DEFS})
 # EB_VCF_RES_LUT=256 -- MEASURED on the user's S3: 1,009 cycles per
 # critical-path voice, 6 voices 14,441 -> 11,353. The shaper's tail is a pure

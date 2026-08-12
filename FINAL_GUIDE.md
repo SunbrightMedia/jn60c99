@@ -54,7 +54,7 @@ on host; this track is wiring it to the device.
 | C5 MIDI in over UART — **the user plays it** | **NOT DONE** |
 | C6 encoders + LCD (8 params first, then all) | **NOT DONE** |
 | C7 preset storage (save/load without audio dropout) | **NOT DONE** |
-| C8 the port's warm-recall bug fixed in src/ + warm gate in make verify | **NOT DONE** (affects DAW/WASM today, 19 % of patch changes) |
+| C8 the port's warm-recall bug fixed in src/ + warm gate in make verify | **1/2** — cell 91152 FIXED in src/chorus_recall.c with its own tooth, `make test` green, 0 of 384 cold cases changed. The warm gate is NOT yet in `make verify`. |
 
 ### D. LINK — two chips are one instrument (END_GOAL 2)
 The only subsystem with zero code. Requirements already written

@@ -127,7 +127,10 @@ void  ebdev_reset_counters(void);
 
 extern unsigned long EBDEV_SEGHIT[EBDEV_NSEG];
 extern unsigned long EBDEV_VHIT, EBDEV_SHIT, EBDEV_GHIT;
-extern unsigned long EBDEV_MISSLIST[8192];
+#ifndef EBDEV_MISSLIST_N
+#define EBDEV_MISSLIST_N 8192
+#endif
+extern unsigned long EBDEV_MISSLIST[EBDEV_MISSLIST_N];
 extern int           EBDEV_NMISS;
 
 #endif /* EBDEV_H */
