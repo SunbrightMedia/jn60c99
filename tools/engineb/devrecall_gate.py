@@ -42,6 +42,9 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 BUILD = os.path.join(REPO, 'build', 'devrecall')
+REPO_DEV = os.path.join(REPO, 'engine_b', 'dev')
+TOOTH_HDR = os.path.join(BUILD, 'toothhdr')     # teeth regenerate HERE, never
+                                                # over the checked-in headers
 BANK = os.path.join(REPO, 'truth', 'presetbankog1.bin')
 CC = os.environ.get('CC', 'cc')
 BASE_CFLAGS = ['-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing',
@@ -144,8 +147,16 @@ def sh(cmd, **kw):
     return r
 
 
-def make_tree(dev, flags):
-    """Copy src/ + engine_b/ into a build dir; apply the fork if dev."""
+def make_tree(dev, flags, hdr=None):
+    """Copy src/ + engine_b/ into a build dir; apply the fork if dev.
+
+    `hdr` overrides where the two GENERATED headers come from. The teeth use
+    it to generate a broken map into a scratch directory instead of writing
+    over engine_b/dev/. That is not tidiness: on 2026-08-12 an unrelated
+    process committed this repo while a tooth had the 12-cell scatter header
+    temporarily replaced by an 11-cell one, and the tooth-damaged file went in
+    as `eeda697`. A gate that briefly corrupts checked-in generated files WILL
+    eventually have that corruption snapshotted."""
     root = os.path.join(BUILD, ('dev' if dev else 'host') + '_' + flags)
     if os.path.exists(root):
         shutil.rmtree(root)
@@ -159,8 +170,11 @@ def make_tree(dev, flags):
                     files.append(fn)
     for fn in ('ebdev.h', 'ebdev.c', 'ebdev_seg.h', 'ebdev_map.h',
                'eb_recall.h', 'eb_recall.c'):
-        shutil.copy(os.path.join(REPO, 'engine_b', 'dev', fn),
-                    os.path.join(root, fn))
+        srcdir = REPO_DEV
+        if hdr and fn in ('ebdev_seg.h', 'ebdev_map.h') \
+                and os.path.exists(os.path.join(hdr, fn)):
+            srcdir = hdr
+        shutil.copy(os.path.join(srcdir, fn), os.path.join(root, fn))
     if dev:
         files.append('ebdev.c')
         files.append('eb_recall.c')
@@ -199,8 +213,8 @@ def make_tree(dev, flags):
     return root, files
 
 
-def build(dev, tag, cflags, extra=()):
-    root, files = make_tree(dev, tag)
+def build(dev, tag, cflags, extra=(), hdr=None):
+    root, files = make_tree(dev, tag, hdr)
     out = os.path.join(BUILD, ('gate_dev_' if dev else 'gate_host_') + tag)
     cmd = [CC] + BASE_CFLAGS + list(cflags) + list(extra)
     if dev:
@@ -668,9 +682,10 @@ def teeth():
     rec = int(re.search(r'= (\d+) B/case', out).group(1))
     ncase = int(re.search(r'(\d+) cases', out).group(1))
 
-    seg_p = os.path.join(REPO, 'engine_b/dev/ebdev_seg.h')
-    map_p = os.path.join(REPO, 'engine_b/dev/ebdev_map.h')
-    orig_seg, orig_map = open(seg_p).read(), open(map_p).read()
+    # Broken maps are generated into a SCRATCH directory. See make_tree().
+    if os.path.exists(TOOTH_HDR):
+        shutil.rmtree(TOOTH_HDR)
+    os.makedirs(TOOTH_HDR)
 
     # (c) the SEQUENCE tooth: measured off the host half's own output. If a warm
     # case is not different from the cold reference, the whole sequence
@@ -687,12 +702,16 @@ def teeth():
         bad = 1
 
     for name, how in MAP_TEETH:
-        ref_h, ref_boot = ho, boot
+        ref_h, ref_boot, hdr = ho, boot, None
+        for f in os.listdir(TOOTH_HDR):
+            os.remove(os.path.join(TOOTH_HDR, f))
         try:
             if 'gen' in how:
-                r = sh([sys.executable, os.path.join(HERE, 'gen_devcells.py')] + how['gen'])
+                r = sh([sys.executable, os.path.join(HERE, 'gen_devcells.py'),
+                        '--out', TOOTH_HDR] + how['gen'])
                 if r.returncode:
                     print('%-74s SKIPPED (generator failed)' % name); continue
+                hdr = TOOTH_HDR
             if 'scat_drop' in how:
                 src = open(os.path.join(HERE, 'gen_devcells.py')).read()
                 m = re.search(r'SCATTER = \[(.*?)\]', src, re.S)
@@ -702,10 +721,11 @@ def teeth():
                        + src[m.end():])
                 tmp = os.path.join(BUILD, 'gen_tooth.py')
                 open(tmp, 'w').write(src)
-                r = sh([sys.executable, tmp])
+                r = sh([sys.executable, tmp, '--out', TOOTH_HDR])
                 if r.returncode:
                     print('%-74s SKIPPED (generator failed)' % name); continue
-            if 'gen' in how or 'scat_drop' in how:
+                hdr = TOOTH_HDR
+            if hdr:
                 # REBUILD THE HOST HALF TOO. It gathers the boot image THROUGH
                 # EBDEV_SEGTAB / EBDEV_SCATTAB, so a tooth that regenerates the
                 # headers and rebuilds only the DEVICE half makes the two
@@ -714,7 +734,7 @@ def teeth():
                 # with the host half left stale, deleting a segment the gate
                 # itself reports COLD came back CAUGHT. See the note above
                 # MAP_TEETH.
-                th = build(False, 'tooth_h', [])
+                th = build(False, 'tooth_h', [], hdr=hdr)
                 ref_h = os.path.join(BUILD, 'host_tooth.bin')
                 ref_boot = os.path.join(BUILD, 'boot_tooth.bin')
                 rc, _ = run(th, ref_h, ref_boot)
@@ -725,7 +745,8 @@ def teeth():
                 extra = ['-D' + how['define']]
             if 'scat0_in_tile' in how:
                 extra = ['-DEBDEV_TOOTH_SCAT0_IN_TILE']
-            db = build(True, 'tooth', [], extra=extra + ['-DEBDEV_INSTRUMENT'])
+            db = build(True, 'tooth', [], extra=extra + ['-DEBDEV_INSTRUMENT'],
+                       hdr=hdr)
             do = os.path.join(BUILD, 'tooth.bin')
             rc, out = run(db, do, ref_boot)
             diff, err = compare(ref_h, do, rec, ncase)
@@ -755,8 +776,8 @@ def teeth():
             elif not caught:
                 bad = 1
         finally:
-            open(seg_p, 'w').write(orig_seg)
-            open(map_p, 'w').write(orig_map)
+            for f in os.listdir(TOOTH_HDR):
+                os.remove(os.path.join(TOOTH_HDR, f))
 
     # ------------------------------------------------------- publish teeth
     ds = build(True, 'trunk_ship', [])
