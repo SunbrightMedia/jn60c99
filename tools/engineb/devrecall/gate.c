@@ -55,7 +55,7 @@ static const int RATES[NRATE] = { 44100, 48000, 96000 };
 
 /* the three sequences */
 enum { SEQ_COLD = 0, SEQ_WARM = 1, SEQ_EDIT = 2, NSEQ = 3 };
-static const char *SEQNAME[NSEQ] = { "cold", "warm A->B", "warm A->edit->B" };
+static const char *SEQNAME[NSEQ] = { "cold", "warm A->B", "A->edit->B->edit" };
 
 static uint64_t fnv(const void *p, size_t n)
 {
@@ -70,9 +70,33 @@ static eb_render_coefs RC;
 static eb_master_coef  MC;
 static eb_render_state RS;
 
+/* ============================================ THE BOOT IMAGE EXCHANGE FORMAT
+ *
+ * The device does NOT run the port's boot. src/chorus_init.c is 2,971 raw
+ * `*(_DWORD *)(a1 + N)` stores and pointer WALKS (`*v6++`), which no cell map
+ * can rebase; calling it in a device build segfaults. That is a design fact,
+ * not an oversight -- the post-boot state is a per-rate CONSTANT, so it is
+ * baked (tools/engineb/devboot/bootgen.c) and flashed. The host half of this
+ * gate bakes the same image through the same generated table.
+ *
+ * IT IS SELF-DESCRIBING, and that is not tidiness. The two halves exchange a
+ * packed layout; when a tooth regenerates the map and the two halves disagree
+ * about the packing, the reader used to see only a SHORT READ and refuse -- and
+ * a refusal reads as "the tooth fired". That is the exact disease this file
+ * already warns about above MAP_TEETH, one level down. With a header the
+ * reader can say WHICH field disagrees and exit 3, which devrecall_gate.py
+ * treats as a HARNESS ERROR and never as a tooth verdict.
+ *
+ * The scatter row count is carried too, and the reader accepts an image with
+ * MORE rows than it carries (skipping the rest). That is what lets the
+ * short-rows tooth exercise the MAP instead of the exchange. */
+#define BOOT_MAGIC 0x42544f4fu           /* "OOTB" */
+typedef struct {
+    uint32_t magic, vtile, segbytes, nscat, nrows, nrate;
+} boot_hdr;
+
 #ifdef GATE_DEV
 static unsigned char *const ST = (unsigned char *)0;   /* unused: JF ignores it */
-#define BOOTBYTES (EBDEV_VTILE + EBDEV_SEGBYTES + (unsigned)sizeof(((ebdev_state*)0)->scat))
 static unsigned char BOOT[NRATE][EBDEV_VTILE + EBDEV_SEGBYTES + EBDEV_NV * EBDEV_NSCAT * 4];
 #else
 static unsigned char *ST;
@@ -144,25 +168,57 @@ static void notes(void)
 }
 
 /* -------------------------------------------------------- a live edit
- * The encoder path, gui/juno_bridge.c:331-341: one leaf expands to every
- * BINDINGS row sharing its blob byte, and a per-voice cell is replicated to
- * voices 1..7 by hand. One of those offsets is 592, the portamento gate --
- * i.e. an ordinary knob move writes a SCATTER cell on every voice. */
-static void edit(int idx, int byte)
+ * The encoder path: juno_apply_param_leaf (src/juno_apply.c), which is the
+ * SAME function gui/juno_bridge.c's juno_gui_set_param calls and which carries
+ * the device arm the firmware compiles. One leaf expands to every BINDINGS row
+ * sharing its blob byte, and a per-voice cell takes the identical value in
+ * every voice. One of the offsets reached is 592, the portamento gate -- i.e.
+ * an ordinary knob move writes a SCATTER cell on every voice.
+ *
+ * ⚠ THIS WAS DEAD UNTIL 2026-08-12, TWICE OVER, and it was the first fatal
+ * finding of the adversarial round.
+ *   (1) it was called with BLOB ids 35/54/38 where it takes a BINDINGS INDEX.
+ *       juno_param_count() is 31, so all three returned at the first line.
+ *   (2) the calls sat BEFORE the final recall, which rewrites every cell an
+ *       edit touches -- so even with the indices repaired, 0 of 192 records
+ *       moved.
+ * MEASURED consequence: all 384 SEQ_EDIT records were byte-identical to their
+ * SEQ_WARM counterparts. A third of 1,152 cases was a duplicate of another
+ * third, and it read as coverage.
+ *
+ * Both causes are addressed by construction. The selector is now the BLOB --
+ * which is what the comments always said and what a panel actually has -- and
+ * an unresolvable blob ABORTS instead of returning quietly; and the sequence
+ * edits AFTER the final recall as well as before it. */
+static int param_of_blob(int blob)
 {
-    int blob = juno_param_blob(idx), n = juno_param_count(), i, v;
-    int Hr = (int)JF(ST, 16);
-    if (blob < 0) return;
-    for (i = 0; i < n; ++i) {
-        if (juno_param_blob(i) != blob) continue;
-        {
-            int off = juno_param_offset(i);
-            float w = juno_apply_param(ST, i, byte, Hr);
-            if (off >= 176 && off < 176 + JUNO_VOICE_MAIN_STRIDE)
-                for (v = 1; v < JUNO_NUM_VOICES; ++v)
-                    JF(ST, (unsigned)off + (unsigned)v * JUNO_VOICE_MAIN_STRIDE) = w;
-        }
+    int i, n = juno_param_count();
+    for (i = 0; i < n; ++i)
+        if (juno_param_blob(i) == blob) return i;
+    return -1;
+}
+
+static void edit(int blob, int byte)
+{
+    int i = param_of_blob(blob);
+    if (i < 0) {
+        fprintf(stderr, "EDIT: no BINDINGS row carries blob %d -- the gate's "
+                        "live-edit sequence would be vacuous\n", blob);
+        exit(3);
     }
+    juno_apply_param_leaf(ST, i, byte, (int)JF(ST, 16));
+}
+
+/* the three leaves the sequence moves, chosen for what they reach:
+ *   35 VCF CUTOFF   1 row,  per-voice, NOT in the scatter (the shared tile)
+ *   54 PORTAMENTO   2 rows, one of them cell 592 -- a SCATTER cell
+ *   38 HPF CUTOFF   4 rows, the joint leaf, all per-voice, none in the scatter
+ * Between them: a plain tile cell, a scatter cell, and a multi-row leaf. */
+static void edit_burst(void)
+{
+    edit(35, 200);
+    edit(54, 90);
+    edit(38, 111);
 }
 
 #ifdef GATE_DEV
@@ -250,9 +306,16 @@ static int publish_section(const unsigned char *bank)
     if (eb_recall_publish(&REC) != 0) { printf("  publish refused -- aborting\n"); return 1; }
 
     /* 4: the swap */
+    /* under EB_RECALL_FX_PIPE the master coefficients are DEFERRED by one block
+     * on purpose, so EB_MC is expected NOT to have moved yet -- see the FX PIPE
+     * section at the end, which is the only place that behaviour is exercised */
     pcheck("step 4: EB_RC now points at the newly built bank",
            (const eb_render_coefs *)EB_RC == &RCB[1] &&
+#if EB_RECALL_FX_PIPE
+           REC.mc_pending == &MCB[1]);
+#else
            (const eb_master_coef *)EB_MC == &MCB[1]);
+#endif
     /* and the bank it points at is what the shim would have built */
     {
         static eb_render_coefs REF;
@@ -309,6 +372,69 @@ static int publish_section(const unsigned char *bank)
     pcheck("step 8: the publish generation advanced", REC.gen == 1);
     pcheck("no cell was unmapped during the publish",
            EBDEV_S.miss == REC.unmapped_at_publish);
+
+    /* ============================== A SECOND PUBLISH ==========================
+     * Everything above is ONE publish, and the route latch's whole justification
+     * is a DELAY TYPE change ACROSS publishes -- which the section above fakes by
+     * planting REC.route_last = 3 by hand. So: keep the id the FIRST publish
+     * derived from patch 37's own delay type, recall a third patch, publish
+     * again, and require the mirrors to carry THAT id rather than the plant.
+     * The bank ping-pong (cur back to 0) and gen == 2 come along free. Nothing
+     * had ever run eb_recall_publish twice. */
+    {
+        int latched = REC.route_last;          /* derived, not planted */
+        unsigned s3 = 3u;
+        recall(bank, 51, 0, &s3);
+        notes();
+        eb_recall_build(&REC);
+        if (eb_recall_publish(&REC) != 0) {
+            printf("  second publish refused -- aborting\n"); return 1;
+        }
+        pcheck("2nd publish: the banks ping-pong back",
+               (const eb_render_coefs *)EB_RC == &RCB[0] &&
+#if EB_RECALL_FX_PIPE
+               REC.mc_pending == &MCB[0]);
+#else
+               (const eb_master_coef *)EB_MC == &MCB[0]);
+#endif
+        pcheck("2nd publish: the mirrors carry the id the FIRST publish derived",
+               MS.route_change == latched && MS.d1.s11022348 == latched &&
+               MS.d23.s11022348 == latched && MS.d4.s11022348 == latched &&
+               MS.d5.s11022348 == latched);
+        pcheck("2nd publish: ... and that id was NOT the hand-planted 3",
+               latched != 3);
+        pcheck("2nd publish: the generation advanced again", REC.gen == 2);
+        {   static eb_render_coefs REF2;
+            eb_render_coefs_build(ST, &REF2);
+            pcheck("2nd publish: the published coefficients == the shim's build",
+                   memcmp(&REF2, &RCB[0], sizeof REF2) == 0);
+        }
+    }
+
+    /* ================== THE FX-PIPE DEFERRAL, WHICH NOTHING COMPILED ==========
+     * EB_RECALL_FX_PIPE appears NOWHERE in the repository except its own #if, so
+     * eb_recall.c:100-110 and eb_recall_block_boundary() were dead code that no
+     * build compiled and no gate ran -- while the design describes the deferral
+     * as part of the shipped contract. Either it is exercised or the claim goes.
+     * devrecall_gate.py builds this section a third time with the flag on. */
+#if EB_RECALL_FX_PIPE
+    {
+        const eb_master_coef *live = (const eb_master_coef *)EB_MC;
+        unsigned s4 = 4u;
+        recall(bank, 20, 0, &s4);
+        notes();
+        eb_recall_build(&REC);
+        if (eb_recall_publish(&REC) != 0) { printf("  refused\n"); return 1; }
+        pcheck("FX PIPE: publish leaves EB_MC on the PREVIOUS block's coefficients",
+               (const eb_master_coef *)EB_MC == live && REC.mc_pending != 0);
+        eb_recall_block_boundary(&REC);
+        pcheck("FX PIPE: the block boundary applies it, once",
+               (const eb_master_coef *)EB_MC != live && REC.mc_pending == 0);
+        eb_recall_block_boundary(&REC);
+        pcheck("FX PIPE: a second boundary call is a no-op",
+               REC.mc_pending == 0);
+    }
+#endif
 
     printf("PUBLISH CONTRACT: %d of %d checks ok\n", PUB_RUN - PUB_FAIL, PUB_RUN);
     return PUB_FAIL ? 1 : 0;
@@ -414,13 +540,12 @@ static void run_case(const unsigned char *bank, int p, int r, int seq,
         eb_render_state_seed(ST, &RS);
         eb_render_events_mirror(ST, &RS);
     }
-    if (seq == SEQ_EDIT) {
-        edit(35, 200);      /* VCF CUTOFF FREQ */
-        edit(54, 90);       /* PORTAMENTO  -- writes scatter cell 592        */
-        edit(38, 111);      /* HPF CUTOFF  -- the 4-cell joint leaf           */
-    }
+    if (seq == SEQ_EDIT)
+        edit_burst();             /* before B: recall must overwrite it */
     recall(bank, p, synth, &seed);
     notes();
+    if (seq == SEQ_EDIT)
+        edit_burst();             /* after B: THE KNOB MOVE. END_GOAL item 5 */
 #if defined(GATE_DEV) && defined(GATE_TOOTH_ULP)
     /* THE 2026-08-11 GATE'S SECOND TOOTH, reproduced. Move ONE per-voice cell
      * on ONE voice by ONE ULP. It is the smallest defect the scatter can carry
@@ -475,9 +600,40 @@ int main(int argc, char **argv)
 #ifdef GATE_DEV
     f = fopen(argv[3], "rb");
     if (!f) { perror(argv[3]); return 2; }
-    if (fread(BOOT, 1, sizeof BOOT, f) != sizeof BOOT) {
-        fprintf(stderr, "BOOT: short read (want %u)\n", (unsigned)sizeof BOOT);
-        return 2;
+    {   boot_hdr h;
+        int i;
+        unsigned per_rate;
+        if (fread(&h, 1, sizeof h, f) != sizeof h) {
+            fprintf(stderr, "BOOT LAYOUT MISMATCH: no header\n"); return 3; }
+#define BCHK(field, mine) \
+        if (h.field != (uint32_t)(mine)) { \
+            fprintf(stderr, "BOOT LAYOUT MISMATCH: %s image=%u device=%u\n", \
+                    #field, (unsigned)h.field, (unsigned)(mine)); return 3; }
+        BCHK(magic,    BOOT_MAGIC)
+        BCHK(vtile,    EBDEV_VTILE)
+        BCHK(segbytes, EBDEV_SEGBYTES)
+        BCHK(nscat,    EBDEV_NSCAT)
+        BCHK(nrate,    NRATE)
+#undef BCHK
+        if (h.nrows < (uint32_t)EBDEV_NV) {
+            fprintf(stderr, "BOOT LAYOUT MISMATCH: nrows image=%u device=%u\n",
+                    (unsigned)h.nrows, (unsigned)EBDEV_NV);
+            return 3;
+        }
+        per_rate = EBDEV_VTILE + EBDEV_SEGBYTES + h.nrows * EBDEV_NSCAT * 4u;
+        for (i = 0; i < NRATE; ++i) {
+            unsigned char *dst = BOOT[i];
+            unsigned mine = EBDEV_VTILE + EBDEV_SEGBYTES + EBDEV_NV * EBDEV_NSCAT * 4u;
+            if (fread(dst, 1, mine, f) != mine) {
+                fprintf(stderr, "BOOT LAYOUT MISMATCH: short image at rate %d\n", i);
+                return 3;
+            }
+            /* skip the rows this build does not carry */
+            if (fseek(f, (long)(per_rate - mine), SEEK_CUR)) {
+                fprintf(stderr, "BOOT LAYOUT MISMATCH: cannot skip rows\n");
+                return 3;
+            }
+        }
     }
     fclose(f);
     {   long bad = ebdev_selftest();
@@ -490,17 +646,23 @@ int main(int argc, char **argv)
 #else
     {   /* the boot image, one per rate, in the order the dev half reads it */
         FILE *b = fopen(argv[3], "wb");
-        static float scat[8][EBDEV_NSCAT];
+        static float scat[EBDEV_NVPORT][EBDEV_NSCAT];
         static const unsigned *SC = EBDEV_SCATTAB;
         int i, v, k;
         static unsigned char v0[EBDEV_VTILE], sg[EBDEV_SEGBYTES];
+        {   boot_hdr h;
+            h.magic = BOOT_MAGIC; h.vtile = EBDEV_VTILE;
+            h.segbytes = EBDEV_SEGBYTES; h.nscat = EBDEV_NSCAT;
+            h.nrows = EBDEV_NVPORT; h.nrate = NRATE;
+            fwrite(&h, 1, sizeof h, b);
+        }
         for (r = 0; r < NRATE; ++r) {
             boot(r);
             memcpy(v0, ST, EBDEV_VTILE);
             for (i = 0; i < EBDEV_NSEG; ++i)
                 memcpy(sg + EBDEV_SEGTAB[i].at, ST + EBDEV_SEGTAB[i].lo,
                        EBDEV_SEGTAB[i].hi - EBDEV_SEGTAB[i].lo);
-            for (v = 0; v < 8; ++v)
+            for (v = 0; v < EBDEV_NVPORT; ++v)
                 for (k = 0; k < EBDEV_NSCAT; ++k)
                     scat[v][k] = JF(ST, (unsigned)v * JUNO_VOICE_MAIN_STRIDE + SC[k]);
             fwrite(v0, 1, sizeof v0, b);

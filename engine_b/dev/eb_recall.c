@@ -104,6 +104,13 @@ int eb_recall_publish(eb_recall *r)
      * voices rendered under the old one: one chunk (5.8 ms at CHUNK=256) of
      * the wrong effect on every program change. Deferring by exactly one block
      * restores the alignment the port has by construction. */
+    /* ⚠ KNOWN, MEASURED, UNGUARDED: two publishes with no block boundary
+     * between them overwrite mc_pending and the first patch's master
+     * coefficients are never applied. The firmware calls
+     * eb_recall_block_boundary() every block, so it cannot happen there -- but
+     * nothing here says so, and the gate's own publish section provoked it
+     * while proving the deferral. Recorded rather than "fixed" blind: the right
+     * answer is a caller contract, and the caller does not exist yet. */
     r->mc_pending = r->mc[r->cur];
 #else
     EB_MC = r->mc[r->cur];
@@ -214,10 +221,20 @@ int eb_recall_publish(eb_recall *r)
         }
         {
             eb_dco_coef *L = &r->rs->dco_live[v];
-            const float inc = L->inc, g = L->g, pw = L->pw;
-            const float m1 = L->pwm1, p1 = L->pwp1;
+            /* SAVE THE PER-SAMPLE HALF BY ITS EXTENT, NOT BY NAMING FIELDS.
+             * It used to name five (inc/g/pw/pwm1/pwp1) and that is a list
+             * nothing kept in step with the struct: with -DEB_DCO_RECIP=1
+             * eb_dco.h grows rm1/rp1 in the SAME per-sample group and the
+             * hand list drops them -- PROVEN by compiling the old statement at
+             * that flag, where rm1/rp1 came back 0.000 instead of 0.400/0.220.
+             * It is inert today (eb_dco_advance reads only inc and subthr) and
+             * it is exactly the trap step 7c exists to warn about, so the
+             * boundary is now the struct's own: eb_dco.h declares the split and
+             * EB_DCO_PERSAMPLE_BYTES is where it falls. */
+            unsigned char keep[EB_DCO_PERSAMPLE_BYTES];
+            memcpy(keep, L, EB_DCO_PERSAMPLE_BYTES);
             *L = r->rc[r->cur]->dco[v];              /* the per-recall half */
-            L->inc = inc; L->g = g; L->pw = pw; L->pwm1 = m1; L->pwp1 = p1;
+            memcpy(L, keep, EB_DCO_PERSAMPLE_BYTES);
 #if EB_DCO_PULSEFAST
             eb_dco_set_edge_thresholds(L);           /* eb_render.c:702-706 */
 #endif

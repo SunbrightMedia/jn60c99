@@ -51,20 +51,37 @@ BASE_CFLAGS = ['-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing',
                '-w']
 
 # The two flag sets the gate runs at.
+#
+# ⚠ -DEB_NUM_VOICES=6 IS PART OF THE SHIPPING FORK AND WAS MISSING UNTIL
+# 2026-08-12. The gate printed `EB_NUM_VOICES=8` under the heading "shipping
+# fork" at every run, so the configuration END_GOAL item 2 actually names --
+# six voices -- had never been through the 1,152-case identity comparison. A
+# gate configured differently from the device proves nothing about the device;
+# END_GOAL says so in those words, about a different bug, on the same day.
 FLAGSETS = [
     ('trunk defaults', []),
-    ('shipping fork', ['-DEB_FORK_S3', '-DEB_LFO_SHARED=1', '-DEB_VCF_RES_LUT=256']),
+    ('shipping fork', ['-DEB_FORK_S3', '-DEB_LFO_SHARED=1', '-DEB_VCF_RES_LUT=256',
+                       '-DEB_NUM_VOICES=6']),
 ]
 
 # ---------------------------------------------------------------- the fork
 #
-# The device build is the port's own sources with every state access rebased.
-# The edits are textual and MECHANICAL, and each one is checked to have
-# applied -- a rewrite that silently matched nothing is how a device build
-# ends up half-rebased and crashing on a wild pointer, which is what happened
-# the first time this was attempted. DESIGN_full.md 1.5 names all 17 raw-cast
-# sites; they are the `RAW` entries below.
-FORK = [
+# *** THE FORK IS NOW A COMPILE FLAG, -DEB_DEVCELLS, IN THE CHECKED-IN SOURCES.
+# *** (2026-08-12, C3.) The list below is DEAD and kept only as the record of
+# *** what the flag replaced.
+#
+# Why it had to change: an ESP-IDF build cannot run a regex over its own
+# inputs, so the firmware could not compile the rebased sources at all, and a
+# gate that proves a scratch tree nobody flashes proves the wrong tree. The
+# substitution now lives in src/juno_engine.h (JCELL), src/juno_driver.c,
+# engine_b/eb_coefs.c, engine_b/eb_master_coefs.c and
+# engine_b/eb_chorus_shim.c, behind #ifdef EB_DEVCELLS -- so the gate and the
+# firmware compile THE SAME BYTES.
+#
+# What is NOT lost: the completeness check below (nothing may still reach the
+# flat array through a raw cast) still runs, and it is the check that mattered
+# -- a half-rebased device build crashes on a wild pointer.
+DEAD_FORK = [
     ('src/juno_engine.h', [
         ('#define JF(st, off)  (*(float   *)((unsigned char *)(st) + (off)))   /* float  */\n'
          '#define JI(st, off)  (*(int32_t *)((unsigned char *)(st) + (off)))   /* int32  */',
@@ -179,29 +196,35 @@ def make_tree(dev, flags, hdr=None):
         files.append('ebdev.c')
         files.append('eb_recall.c')
     if dev:
-        for path, edits in FORK:
-            fn = os.path.basename(path)
-            p = os.path.join(root, fn)
-            txt = open(p).read()
-            for old, new in edits:
-                if old.startswith('RE:'):
-                    txt, n = re.subn(old[3:], new, txt)
-                    if n == 0:
-                        sys.exit('FORK PATCH MISSED (regex): %s :: %s' % (fn, old))
-                else:
-                    if old not in txt:
-                        sys.exit('FORK PATCH MISSED: %s :: %r' % (fn, old[:60]))
-                    txt = txt.replace(old, new)
-            open(p, 'w').write(txt)
-        # nothing may still reach the flat array
+        # NO TEXT REWRITE. -DEB_DEVCELLS is added in build(). What remains is
+        # the completeness check: nothing may still reach the flat array.
+        #
+        # IT RUNS ON THE PREPROCESSOR'S OUTPUT, not on the source text, and
+        # that is a STRENGTHENING rather than a convenience. The old check read
+        # the file and could not see through JF/JI/CF at all -- it only ever
+        # caught a raw cast someone had written literally. On the preprocessed
+        # text every macro is already expanded, so a JF() that had NOT been
+        # rebased would show up as `*(float *)((unsigned char *)(state) + ...`
+        # and be caught by the same pattern. It also means the check now tests
+        # the arm that is COMPILED: an #else arm holding the host form is
+        # invisible to it, which is exactly right.
         for fn in ('delay_recall.c', 'effect_modes.c', 'reverb_recall.c',
-                   'juno_driver.c', 'eb_coefs.c', 'eb_master_coefs.c'):
-            txt = open(os.path.join(root, fn)).read()
-            for pat in (r'\*\(\s*(?:const\s+)?(?:float|int32_t|uint32_t)\s*\*\s*\)\s*\(\s*(?:state|st|base)\s*\+',):
-                m = re.search(pat, txt)
-                if m:
-                    sys.exit('FORK INCOMPLETE: %s still has a raw cast at %d'
-                             % (fn, m.start()))
+                   'juno_driver.c', 'eb_coefs.c', 'eb_master_coefs.c',
+                   'eb_chorus_shim.c'):
+            r = sh([CC, '-E', '-std=c99', '-DEB_DEVCELLS', '-w',
+                    '-I' + root, os.path.join(root, fn)])
+            if r.returncode:
+                print(r.stderr[-2000:])
+                sys.exit('FORK CHECK: could not preprocess %s' % fn)
+            pat = (r'\*\s*\(\s*(?:const\s+)?(?:volatile\s+)?'
+                   r'(?:float|int32_t|uint32_t)\s*\*\s*\)\s*\(\s*'
+                   r'\(\s*(?:const\s+)?unsigned char\s*\*\s*\)\s*'
+                   r'\(?\s*(?:state|st|base)\s*\)?\s*\+')
+            m = re.search(pat, r.stdout)
+            if m:
+                sys.exit('FORK INCOMPLETE: %s still forms a FLAT-ARRAY address '
+                         'after preprocessing: %r'
+                         % (fn, r.stdout[m.start():m.start() + 90]))
     # drop the .c files that pull in things the gate does not need and that
     # would drag the whole render path in
     # engine_b/ holds a handful of standalone probe mains beside the engine;
@@ -218,7 +241,7 @@ def build(dev, tag, cflags, extra=(), hdr=None):
     out = os.path.join(BUILD, ('gate_dev_' if dev else 'gate_host_') + tag)
     cmd = [CC] + BASE_CFLAGS + list(cflags) + list(extra)
     if dev:
-        cmd += ['-DGATE_DEV']
+        cmd += ['-DGATE_DEV', '-DEB_DEVCELLS']
     cmd += ['-I' + root, '-o', out,
             os.path.join(HERE, 'devrecall', 'gate.c')] + \
            [os.path.join(root, f) for f in files] + ['-lm']
@@ -258,7 +281,7 @@ def compare(hostbin, devbin, rec, ncase):
     return bad, ''
 
 
-SEQ = ['cold', 'warm A->B', 'warm A->edit->B']
+SEQ = ['cold', 'warm A->B', 'A->edit->B->edit']
 
 
 def case_name(c, nseq, nrate, npatch):
@@ -289,7 +312,7 @@ def sizing():
     open(src, 'w').write(
         '#include <stdio.h>\n#include "ebdev.h"\n'
         'int main(void){\n'
-        '  printf("NV=%d  ebdev_state = %u B  (tile %u + segments %u + '
+        '  printf("rows=%d  ebdev_state = %u B  (tile %u + segments %u + '
         'scatter %dx%d floats = %u + header %u)\\n",\n'
         '     EBDEV_NV, (unsigned)sizeof(ebdev_state), EBDEV_VTILE,\n'
         '     EBDEV_SEGBYTES, EBDEV_NV, EBDEV_NSCAT,\n'
@@ -300,18 +323,57 @@ def sizing():
         'disagreements\\n", ebdev_selftest());\n'
         '  return ebdev_selftest()!=0;}\n')
     bad = 0
-    for nv in (6, 8):
-        exe = os.path.join(BUILD, 'size%d' % nv)
-        r = sh([CC, '-std=c99', '-O2', '-w', '-DEBDEV_NV=%d' % nv,
-                '-I' + os.path.join(REPO, 'engine_b', 'dev'),
-                '-o', exe, src, os.path.join(REPO, 'engine_b/dev/ebdev.c')])
-        if r.returncode:
-            print(r.stderr[-1500:]); bad = 1; continue
-        r = sh([exe])
-        print(r.stdout.strip())
-        bad |= r.returncode
+    exe = os.path.join(BUILD, 'size')
+    r = sh([CC, '-std=c99', '-O2', '-w',
+            '-I' + os.path.join(REPO, 'engine_b', 'dev'),
+            '-o', exe, src, os.path.join(REPO, 'engine_b/dev/ebdev.c')])
+    if r.returncode:
+        print(r.stderr[-1500:]); return 1
+    r = sh([exe])
+    print(r.stdout.strip())
+    bad |= r.returncode
+
+    # THE ROW COUNT IS NOT A KNOB ANY MORE, and this is where that is asserted.
+    # -DEBDEV_NV=6 was a WORKING build until 2026-08-12 and it MISSED on 22
+    # offsets including cell 320. It must now refuse to compile.
+    r = sh([CC, '-std=c99', '-O2', '-w', '-DEBDEV_NV=6', '-fsyntax-only',
+            '-I' + os.path.join(REPO, 'engine_b', 'dev'),
+            os.path.join(REPO, 'engine_b/dev/ebdev.c')])
+    caught = r.returncode != 0 and 'below the port' in (r.stderr or '')
+    print('      -DEBDEV_NV=6 (fewer rows than the port has voices): %s'
+          % ('REFUSED TO BUILD (correct)' if caught else '*** STILL BUILDS ***'))
+    if not caught:
+        bad = 1
+    r = sh([CC, '-std=c99', '-O2', '-w', '-DEB_NUM_VOICES=12', '-fsyntax-only',
+            '-I' + os.path.join(REPO, 'engine_b', 'dev'),
+            os.path.join(REPO, 'engine_b/dev/ebdev.c')])
+    caught = r.returncode != 0 and 'exceeds the scatter row count' in (r.stderr or '')
+    print('      -DEB_NUM_VOICES=12 (more voices than rows):         %s'
+          % ('REFUSED TO BUILD (correct)' if caught else '*** STILL BUILDS ***'))
+    if not caught:
+        bad = 1
+
+    # THE BOOT IMAGE IS PART OF THE DEVICE'S COST AND WAS NOT IN THIS SECTION.
+    # The device cannot run juno_chorus_init through the map (2,971 raw
+    # `*(_DWORD *)(a1 + N)` stores and pointer walks), so the post-boot state is
+    # baked per rate and flashed. Quoting sizeof(ebdev_state) alone understates
+    # what the part carries.
+    src2 = os.path.join(BUILD, 'bootsize.c')
+    open(src2, 'w').write(
+        '#include <stdio.h>\n#include "ebdev_seg.h"\n'
+        'int main(void){unsigned per = EBDEV_VTILE + EBDEV_SEGBYTES + '
+        'EBDEV_NVPORT*EBDEV_NSCAT*4;\n'
+        '  printf("BAKED BOOT IMAGE: %u B per sample rate (flash, not SRAM); '
+        '%u B for the three\\n                  rates this gate runs. The device '
+        'does not execute the port\'s boot.\\n", per, 3u*per + 24u);\n'
+        '  return 0;}\n')
+    exe2 = os.path.join(BUILD, 'bootsize')
+    r = sh([CC, '-std=c99', '-O2', '-w',
+            '-I' + os.path.join(REPO, 'engine_b', 'dev'), '-o', exe2, src2])
+    if not r.returncode:
+        print(sh([exe2]).stdout.strip())
     print('For scale: replicating the whole voice block per voice instead of '
-          'the\nscatter is %u B at NV=6 and %u B at NV=8 -- 2.8x.'
+          'the\nscatter is %u B at 6 voices and %u B at 8 -- 2.8x.'
           % (10688 * 6 + 19180 + 16, 10688 * 8 + 19180 + 16))
     return bad
 
@@ -329,6 +391,29 @@ def main():
     if not os.path.exists(BANK):
         sys.exit('no bank at %s' % BANK)
     os.makedirs(BUILD, exist_ok=True)
+
+    # AN INTERLOCK, because there was none and it cost a false FAIL. Every run
+    # writes the SAME fixed paths under build/devrecall. Two overlapping
+    # invocations exchange each other's binaries and boot images, and the teeth
+    # then report verdicts that have nothing to do with the map: OBSERVED
+    # 2026-08-12 -- one run of this gate, from a clean tree, printed FAIL with
+    # old-1b and old-5b firing as "THIS WAS EXPECTED NOT TO FIRE AND IT DID"
+    # and old-5a coming back NOT CAUGHT, while two serial runs before and after
+    # it PASSED and agreed line for line. A gate that can be made to lie by
+    # something happening elsewhere in the container is not a gate.
+    lock = os.path.join(BUILD, '.lock')
+    try:
+        lockfd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(lockfd, str(os.getpid()).encode())
+        os.close(lockfd)
+    except FileExistsError:
+        sys.exit('ANOTHER devrecall_gate.py IS RUNNING (pid %s, lock %s).\n'
+                 'Overlapping runs share build/devrecall and produce teeth '
+                 'verdicts that are\nnot about the map. Wait for it, or remove '
+                 'the lock if it is stale.'
+                 % (open(lock).read().strip(), lock))
+    import atexit
+    atexit.register(lambda: os.path.exists(lock) and os.remove(lock))
 
     # the generated headers must be current or the gate is proving a stale map
     r = sh([sys.executable, os.path.join(HERE, 'gen_devcells.py'), '--check'])
@@ -359,6 +444,8 @@ def main():
         m = re.search(r'= (\d+) B/case', out)
         rec = int(m.group(1))
         ncase = int(re.search(r'(\d+) cases', out).group(1))
+        sz = re.search(r'record: RC (\d+) \+ MC (\d+)', out)
+        nrc, nmc = int(sz.group(1)), int(sz.group(2))
 
         rc, out = run(db, do, boot)
         print(out.strip())
@@ -397,14 +484,29 @@ def main():
         print(out3.strip())
         if rc3:
             overall = 1
+        # and again with the FX-pipe deferral compiled in. It is dead code in
+        # every other build in the repository -- `#if EB_RECALL_FX_PIPE` is its
+        # only appearance -- so without this the one-block master deferral is
+        # described in the design and executed nowhere.
+        dp = build(True, tag + '_fxpipe', cflags, extra=['-DEB_RECALL_FX_PIPE=1'])
+        rc4, out4 = run(dp, so, boot, case='publish')
+        for ln in out4.strip().splitlines():
+            if 'FX PIPE' in ln or 'PUBLISH CONTRACT:' in ln:
+                print('  [FX PIPE build] ' + ln.strip())
+        if rc4:
+            overall = 1
+
+        # -------------------------------------------- the live edit is not dead
+        overall |= edit_liveness(ho, rec)
 
         # ---------------------------------------------------------- the D1 fact
-        warm_vs_cold(ho, rec)
+        warm_vs_cold(ho, rec, nrc, nmc)
         overall |= et2_check(tag, cflags, ho, boot, rec)
 
         if a.quick:
             break
 
+    overall |= boot_crosscheck(os.path.join(BUILD, 'boot_trunk.bin'))
     overall |= sizing()
     overall |= patch_check(a.patch_scan)
 
@@ -416,20 +518,27 @@ def main():
     return overall
 
 
-def warm_vs_cold(hostbin, rec):
+def warm_vs_cold(hostbin, rec, nrc, nmc):
     """How order-dependent is the PORT itself? Measured off the host half's own
-    output, so it costs nothing and it is the D1 number in the gate."""
+    output, so it costs nothing and it is the D1 number in the gate.
+
+    ⚠ nrc/nmc USED TO BE THE LITERALS 10564 AND 1704, which are the TRUNK's
+    struct sizes. At the shipping fork eb_render_coefs is 18,788 B, so the
+    column headed `render_coefs` compared the first 10,564 bytes of it and the
+    column headed `master_coef` compared bytes 10,564..12,268 -- ALSO inside
+    eb_render_coefs. That is the whole of the "D1 inverts under the fork flags"
+    anomaly: at the fork the table was not measuring the fields it named. The
+    sizes now come from the binary that wrote the file."""
     A = open(hostbin, 'rb').read()
     npatch, nrate, nseq = 64, 3, 3
     per_seq = nrate * npatch
-    nrc, nmc = 10564, 1704
     print('D1  THE PORT IS ORDER-DEPENDENT. Measured here, on the host half\'s own')
     print('    output: patch A then patch B is not patch B alone. The device')
     print('    recalls WARM, so the gate\'s reference for a warm case is the same')
     print('    SEQUENCE on the host -- never a cold recall of the same patch.')
     for trial, tname in ((0, 'factory'), (1, 'synthetic')):
         base = trial * nseq * per_seq
-        for seq, sname in ((1, 'warm A->B', ), (2, 'warm A->edit->B')):
+        for seq, sname in ((1, 'warm A->B', ), (2, 'A->edit->B->edit')):
             d = [0, 0, 0, 0]
             for i in range(per_seq):
                 c0, c1 = base + i, base + seq * per_seq + i
@@ -446,6 +555,108 @@ def warm_vs_cold(hostbin, rec):
             print('    %-10s %-16s any %3d/%d  render_coefs %3d  master_coef %3d'
                   '  render_state %3d' % (tname, sname, d[0], per_seq,
                                           d[1], d[2], d[3]))
+
+
+def seg_consts():
+    """The generated layout constants, read from the generated header."""
+    txt = open(os.path.join(REPO_DEV, 'ebdev_seg.h')).read()
+    out = {}
+    for k in ('EBDEV_VTILE', 'EBDEV_SEGBYTES', 'EBDEV_NSCAT', 'EBDEV_NVPORT'):
+        out[k] = int(re.search(r'#define %s\s+(\d+)' % k, txt).group(1))
+    return out
+
+
+def boot_crosscheck(bootfile):
+    """TWO PRODUCERS OF THE BOOT IMAGE, and nothing had ever compared them.
+
+    The device does not run the port's boot: src/chorus_init.c is 2,971 raw
+    `*(_DWORD *)(a1 + N)` stores plus pointer WALKS, which no cell map can
+    rebase -- calling it in a device build segfaults, MEASURED. The post-boot
+    state is instead baked and flashed. Two things bake it: this gate's own
+    host half, and tools/engineb/devboot/bootgen.c, which is what the FIRMWARE
+    carries. They gather through the same generated table but they are separate
+    code, so they can drift -- and if they drift, the gate certifies an image
+    the chip does not boot from.
+
+    So: build bootgen, run it at each of the gate's rates, and require its
+    bytes to equal the gate's own image. Tooth below."""
+    print('\n' + '=' * 74)
+    print('THE BAKED BOOT IMAGE -- THE GATE\'S vs THE FIRMWARE\'S PRODUCER')
+    print('=' * 74)
+    C = seg_consts()
+    per = C['EBDEV_VTILE'] + C['EBDEV_SEGBYTES'] + C['EBDEV_NVPORT'] * C['EBDEV_NSCAT'] * 4
+    hdr = 24                                     # boot_hdr in devrecall/gate.c
+    gate_img = open(bootfile, 'rb').read()
+    srcs = []
+    for d in ('src', 'engine_b'):
+        for fn in sorted(os.listdir(os.path.join(REPO, d))):
+            if fn.endswith('.c') and not fn.startswith('test_') \
+                    and fn != 'engineb_stub.c':
+                srcs.append(os.path.join(REPO, d, fn))
+    exe = os.path.join(BUILD, 'bootgen')
+    r = sh([CC] + BASE_CFLAGS + ['-I' + os.path.join(REPO, 'src'),
+                                 '-I' + os.path.join(REPO, 'engine_b'),
+                                 '-I' + REPO_DEV, '-o', exe,
+                                 os.path.join(REPO, 'tools/engineb/devboot/bootgen.c')]
+           + srcs + ['-lm'])
+    if r.returncode:
+        print(r.stderr[-2000:]); print('bootgen would not build'); return 1
+    bad = 0
+    for i, rate in enumerate((44100, 48000, 96000)):
+        out = os.path.join(BUILD, 'bootgen_%d.bin' % rate)
+        rr = sh([exe, out], env=dict(os.environ, BOOTGEN_RATES=str(rate),
+                                     BOOTGEN_NV=str(C['EBDEV_NVPORT'])))
+        if rr.returncode:
+            print(rr.stderr[-1500:]); bad = 1; continue
+        mine = open(out, 'rb').read()
+        theirs = gate_img[hdr + i * per: hdr + (i + 1) * per]
+        ok = mine == theirs
+        print('  %6d Hz  bootgen(%d B) vs the gate\'s own gather: %s'
+              % (rate, len(mine), 'BIT-IDENTICAL' if ok else
+                 '*** DIFFER at byte %d ***' % first_diff(mine, theirs)))
+        if not ok:
+            bad = 1
+    # ---- the tooth: a WRONG-RATE image must not compare equal --------------
+    out = os.path.join(BUILD, 'bootgen_tooth.bin')
+    rr = sh([exe, out], env=dict(os.environ, BOOTGEN_RATES='88200',
+                                 BOOTGEN_NV=str(C['EBDEV_NVPORT'])))
+    caught = (rr.returncode == 0 and
+              open(out, 'rb').read() != gate_img[hdr:hdr + per])
+    print('  %-70s %s' % ('tooth: bake at 88,200 Hz and compare against the '
+                          '44,100 image', 'CAUGHT' if caught else 'NOT CAUGHT'))
+    if not caught:
+        bad = 1
+    return bad
+
+
+def edit_liveness(hostbin, rec):
+    """THE CHECK THAT WOULD HAVE CAUGHT FATAL FINDING 1, and it costs nothing.
+
+    A sequence whose records are byte-identical to another sequence's is not a
+    third of the coverage, it is a duplicate reported as coverage. Measured on
+    the host half's own output: every SEQ_EDIT record must differ from its
+    SEQ_WARM counterpart, because the edit lands AFTER the recall and moves
+    cells the coefficient builder reads.
+
+    Before the fix this printed 0 of 384 -- edit() was fed BLOB ids where it
+    wanted BINDINGS indices AND sat before a recall that overwrote it."""
+    A = open(hostbin, 'rb').read()
+    per_seq = 3 * 64
+    moved = 0
+    for trial in (0, 1):
+        base = trial * 3 * per_seq
+        for i in range(per_seq):
+            w = base + per_seq + i
+            e = base + 2 * per_seq + i
+            if A[w * rec:(w + 1) * rec] != A[e * rec:(e + 1) * rec]:
+                moved += 1
+    ok = moved == 2 * per_seq
+    print('-' * 74)
+    print('LIVE EDIT  SEQ_EDIT records differing from their SEQ_WARM twin: '
+          '%d of %d' % (moved, 2 * per_seq))
+    print('           %s' % ('ok -- the live-edit sequence is not a duplicate'
+                             if ok else '*** THE LIVE-EDIT SEQUENCE IS VACUOUS ***'))
+    return 0 if ok else 1
 
 
 def et2_check(tag, cflags, hostbin, boot, rec):
@@ -656,6 +867,18 @@ MAP_TEETH = [
      {'gen': ['--drop-seg', '131072'], 'blind': 1}),
     ('new  skip the scat[0]->scat[v] broadcast at recall',
      {'define': 'GATE_TOOTH_NOBCAST'}),
+    # ---- 2026-08-12, the adversarial round's three fatal findings ----------
+    ('f1  skip the per-cell scatter broadcast on a LIVE EDIT',
+     {'define': 'JUNO_TOOTH_NO_EDIT_BCAST'}),
+    ('f2  replay the PORT\'s per-voice replication on a LIVE EDIT',
+     {'define': 'JUNO_TOOTH_EDIT_PORTLOOP'}),
+    # THE HOST HALF REBUILDS AT EB_NUM_VOICES=6 TOO ('cflags'). Without that the
+    # two halves' eb_render_coefs are different SIZES and the comparison fires on
+    # a size mismatch -- a tooth passing for the wrong reason, which is the
+    # failure this file already carries a warning about.
+    ('f3  give the array FEWER scatter rows than the port has voices',
+     {'define': ['EBDEV_NV=6', 'EBDEV_TOOTH_SHORT_ROWS'],
+      'cflags': ['-DEB_NUM_VOICES=6']}),
 ]
 
 PUBLISH_TEETH = [
@@ -703,6 +926,7 @@ def teeth():
 
     for name, how in MAP_TEETH:
         ref_h, ref_boot, hdr = ho, boot, None
+        trec, tncase = rec, ncase
         for f in os.listdir(TOOTH_HDR):
             os.remove(os.path.join(TOOTH_HDR, f))
         try:
@@ -710,7 +934,17 @@ def teeth():
                 r = sh([sys.executable, os.path.join(HERE, 'gen_devcells.py'),
                         '--out', TOOTH_HDR] + how['gen'])
                 if r.returncode:
-                    print('%-74s SKIPPED (generator failed)' % name); continue
+                    # A SKIPPED TOOTH USED TO LEAVE THE GATE GREEN, and that
+                    # is the disease this whole section exists to refuse: a
+                    # tooth that cannot fire reads as coverage. MEASURED
+                    # 2026-08-12 -- three scatter teeth reported SKIPPED
+                    # (a concurrent session was rewriting gen_devcells.py
+                    # underneath the run) and the gate still printed PASS.
+                    print('%-74s SKIPPED (generator failed) *** COUNTS AS A '
+                          'FAILURE ***' % name)
+                    print(r.stderr[-600:])
+                    bad = 1
+                    continue
                 hdr = TOOTH_HDR
             if 'scat_drop' in how:
                 src = open(os.path.join(HERE, 'gen_devcells.py')).read()
@@ -723,7 +957,17 @@ def teeth():
                 open(tmp, 'w').write(src)
                 r = sh([sys.executable, tmp, '--out', TOOTH_HDR])
                 if r.returncode:
-                    print('%-74s SKIPPED (generator failed)' % name); continue
+                    # A SKIPPED TOOTH USED TO LEAVE THE GATE GREEN, and that
+                    # is the disease this whole section exists to refuse: a
+                    # tooth that cannot fire reads as coverage. MEASURED
+                    # 2026-08-12 -- three scatter teeth reported SKIPPED
+                    # (a concurrent session was rewriting gen_devcells.py
+                    # underneath the run) and the gate still printed PASS.
+                    print('%-74s SKIPPED (generator failed) *** COUNTS AS A '
+                          'FAILURE ***' % name)
+                    print(r.stderr[-600:])
+                    bad = 1
+                    continue
                 hdr = TOOTH_HDR
             if hdr:
                 # REBUILD THE HOST HALF TOO. It gathers the boot image THROUGH
@@ -740,22 +984,46 @@ def teeth():
                 rc, _ = run(th, ref_h, ref_boot)
                 if rc:
                     print('%-74s SKIPPED (host half refused)' % name); continue
+            tcf = list(how.get('cflags', []))
+            if tcf:
+                # this tooth changes the STRUCTS, so the reference must move
+                # with it or the comparison fires on a size mismatch
+                th = build(False, 'tooth_cf', tcf, hdr=hdr)
+                ref_h = os.path.join(BUILD, 'host_toothcf.bin')
+                ref_boot = os.path.join(BUILD, 'boot_toothcf.bin')
+                rc, o2 = run(th, ref_h, ref_boot)
+                if rc:
+                    print('%-74s SKIPPED (host half refused)' % name); continue
+                trec = int(re.search(r'= (\d+) B/case', o2).group(1))
+                tncase = int(re.search(r'(\d+) cases', o2).group(1))
             extra = []
             if 'define' in how:
-                extra = ['-D' + how['define']]
+                d = how['define']
+                extra = ['-D' + x for x in (d if isinstance(d, list) else [d])]
             if 'scat0_in_tile' in how:
                 extra = ['-DEBDEV_TOOTH_SCAT0_IN_TILE']
-            db = build(True, 'tooth', [], extra=extra + ['-DEBDEV_INSTRUMENT'],
+            db = build(True, 'tooth', tcf, extra=extra + ['-DEBDEV_INSTRUMENT'],
                        hdr=hdr)
             do = os.path.join(BUILD, 'tooth.bin')
             rc, out = run(db, do, ref_boot)
-            diff, err = compare(ref_h, do, rec, ncase)
+            # exit 3 is the boot-image reader saying the two halves disagree
+            # about the EXCHANGE FORMAT. That is a harness error, never a tooth
+            # verdict -- reporting it as CAUGHT is how the 2026-08-11 gate's
+            # segment teeth "passed" while proving nothing about the map.
+            if rc == 3:
+                print('%-74s HARNESS ERROR (boot layout)' % name)
+                for ln in out.strip().splitlines():
+                    if 'BOOT LAYOUT' in ln:
+                        print('       ' + ln)
+                bad = 1
+                continue
+            diff, err = compare(ref_h, do, trec, tncase)
             if err:
-                print('%-74s CAUGHT (%s)' % (name, err)); continue
+                print('%-74s HARNESS ERROR (%s)' % (name, err)); bad = 1; continue
             n = len(diff)
             caught = bool(n) or bool(rc)
             print('%-74s %s (%d of %d cases%s)'
-                  % (name, 'CAUGHT' if caught else 'NOT CAUGHT', n, ncase,
+                  % (name, 'CAUGHT' if caught else 'NOT CAUGHT', n, tncase,
                      ', dev half refused' if rc else ''))
             if how.get('blind'):
                 # THE HONEST TOOTH. Printed, never dropped: a tooth that cannot

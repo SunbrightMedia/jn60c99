@@ -47,7 +47,7 @@ static void write_struct(unsigned char *state, const juno_efx_cell *tbl, int n)
 {
     int i;
     for (i = 0; i < n; ++i)
-        *(uint32_t *)(state + tbl[i].off) = tbl[i].bits;
+        *(uint32_t *)JCELL(state, tbl[i].off) = tbl[i].bits;
 }
 
 void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
@@ -61,7 +61,7 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
      * 6/9/255 == the type-5 state, PROVEN by the setter spot sweep under
      * Unicorn, scratchpad/ext_sweeps.py 2026-07-19); the raw write diverged. */
     if (etype > 5) etype = 5;
-    *(int32_t *)(state + JUNO_PROG_EFX) = (int32_t)etype;
+    *(int32_t *)JCELL(state, JUNO_PROG_EFX) = (int32_t)etype;
 
     /* Shared slot-2 wet control (read by master_render for EVERY mode at 84544). */
     JF(state, 84544) = efx_bits(EFFECT_SW_LUT[depth & 0xFF]);

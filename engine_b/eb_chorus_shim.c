@@ -25,10 +25,31 @@
  */
 #include "eb_chorus.h"
 #include "eb_chorus_shim.h"
+#ifdef EB_DEVCELLS
+#include "ebdev.h"
+#define EBSH_CELL(b, off)  ((const unsigned char *)ebdev_at((unsigned long)(off)))
+#else
+#define EBSH_CELL(b, off)  ((const unsigned char *)(b) + (off))
+#endif
 #include <string.h>
 #include <stdlib.h>
 
+/* HOW MANY HOST CONTEXTS THIS TRANSLATION UNIT KEEPS.
+ *
+ * 16 is the HOST harness's number: the null gate renders many contexts in one
+ * process. `ebsh_st` is sizeof(eb_chorus_state) per slot -- MEASURED at 63,720
+ * BYTES of internal .bss on the S3 at 16 slots -- and A DEVICE HAS ONE
+ * CONTEXT. Nothing on the firmware calls ebsh_chorus(); the firmware reaches
+ * this file only through eb_master_coefs_build's coefficient reads.
+ *
+ * So the device sets EBSH_MAX_CTX=1 and gets ~60 KB of internal SRAM back,
+ * which is more than device recall's entire new cost. It is a #ifndef and not
+ * a silent change because the host harness genuinely needs 16, and a host gate
+ * that quietly ran at 1 would abort() -- loudly, see below -- rather than
+ * mis-measure. */
+#ifndef EBSH_MAX_CTX
 #define EBSH_MAX_CTX 16
+#endif
 
 static const unsigned char *ebsh_base[EBSH_MAX_CTX];
 static eb_chorus_state ebsh_st[EBSH_MAX_CTX];
@@ -36,11 +57,11 @@ static int             ebsh_n;
 
 static float ld(const unsigned char *b, int off)
 {
-    float f; memcpy(&f, b + off, 4); return f;
+    float f; memcpy(&f, EBSH_CELL(b, off), 4); return f;
 }
 static int32_t ldi(const unsigned char *b, int off)
 {
-    int32_t i; memcpy(&i, b + off, 4); return i;
+    int32_t i; memcpy(&i, EBSH_CELL(b, off), 4); return i;
 }
 
 /* Copy the port's power-on chorus state into the module's struct. Every line

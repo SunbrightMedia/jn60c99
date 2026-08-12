@@ -197,6 +197,13 @@ def main():
     seg_h.append('#define EBDEV_VSTRIDE %uu' % VOICE_STRIDE)
     seg_h.append('#define EBDEV_VLO     %uu' % VOICE_LO)
     seg_h.append('#define EBDEV_VHI     %uu' % VOICE_HI)
+    seg_h.append('/* THE PORT\'S VOICE COUNT, derived from the block geometry above --')
+    seg_h.append(' * (VHI - VLO) / VSTRIDE -- and NOT typed. The scatter row index is a')
+    seg_h.append(' * PORT voice number (ebdev.c derives it from the port offset), and the')
+    seg_h.append(' * port\'s recall writes every one of them unconditionally')
+    seg_h.append(' * (src/juno_apply.c:478,:500,:814 loop v < JUNO_NUM_VOICES). An array')
+    seg_h.append(' * with fewer rows than this SINKS the top voices\' cells, silently. */')
+    seg_h.append('#define EBDEV_NVPORT %d' % ((VOICE_HI - VOICE_LO) // VOICE_STRIDE))
     seg_h.append('#define EBDEV_NSEG %d' % len(placed))
     seg_h.append('#define EBDEV_SEGBYTES %uu' % segbytes)
     seg_h.append('#define EBDEV_NSCAT %d' % len(SCATTER))
@@ -263,19 +270,20 @@ def main():
         with open(os.path.join(a.out, name), 'w') as f:
             f.write(txt)
 
-    nv = 6
+    nvport = (VOICE_HI - VOICE_LO) // VOICE_STRIDE
     hdr = 16
     print('cells: %d touched + %d static + %d gate-measured + %d legacy -> %d distinct'
           % (len(touched), len(static), len(gatemeas), len(legacy), len(allcells)))
     print('voice cells %d (tile %u B)   non-voice %d -> %d segments, %u B'
           % (len(voice), VTILE, len(nonvoice), len(placed), segbytes))
-    print('scatter: %d cells/voice = %d B at NV=6, %d B at NV=8'
-          % (len(SCATTER), len(SCATTER) * 4 * 6, len(SCATTER) * 4 * 8))
-    for n in (6, 8):
-        print('  ebdev_state at NV=%d: %d B'
-              % (n, VTILE + segbytes + len(SCATTER) * 4 * n + hdr))
+    print('scatter: %d cells x %d PORT voices = %d B  (the row count is the PORT\'s,'
+          % (len(SCATTER), nvport, len(SCATTER) * 4 * nvport))
+    print('         not the DSP\'s: recall writes all %d whatever the fork plays)'
+          % nvport)
+    print('  ebdev_state: %d B'
+          % (VTILE + segbytes + len(SCATTER) * 4 * nvport + hdr))
     print('wrote %s/ebdev_seg.h and ebdev_map.h' % a.out)
-    del nv, hdr
+    del hdr
 
 
 if __name__ == '__main__':

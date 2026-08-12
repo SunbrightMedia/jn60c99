@@ -129,9 +129,11 @@ int main(int argc, char **argv)
 
     /* ---------------------------------------------------- 3a: the format */
     printf("=== THE COMPACT FORMAT ===\n");
+    /* 134 since 2026-08-12: blob 110, LEGATO's high nibble. The sweep below
+     * is what found it, and the tooth below is what keeps it found. */
     printf("EB_PATCH_BYTES        = %d %s\n", EB_PATCH_BYTES,
-           EB_PATCH_BYTES == 133 ? "(133, as claimed)" : "*** NOT 133 ***");
-    if (EB_PATCH_BYTES != 133) bad = 1;
+           EB_PATCH_BYTES == 134 ? "(134, as claimed)" : "*** NOT 134 ***");
+    if (EB_PATCH_BYTES != 134) bad = 1;
     printf("eb_patch_selftest()   = %d %s\n", eb_patch_selftest(),
            eb_patch_selftest() == 0 ? "(pass)" : "*** FAIL ***");
     if (eb_patch_selftest()) bad = 1;
@@ -433,14 +435,18 @@ int main(int argc, char **argv)
         }
     }
 
-    /* ------------------------------- THE FIX, DEMONSTRATED NOT ASSERTED
-     * Carry blob 110 as well -- EB_PATCH_BYTES 133 -> 134 -- and the
-     * randomised template stops mattering. Simulated here by installing the
-     * one extra byte on top of eb_patch_install(); the format itself is NOT
-     * edited by this tool. */
+    /* --------------------------------------------- THE TOOTH FOR THE FIX
+     * The format now carries blob 110 and the randomised-template sweep above
+     * is 64/64. That result is only evidence if the sweep CAN fail, so plant
+     * the defect back: install the patch, then overwrite record 126 with the
+     * randomised template's own byte -- i.e. exactly what a 133-byte format
+     * leaves there. It must DIVERGE, on patches 5 and 47 and nowhere else.
+     *
+     * A gate that has never been seen to fail is not a gate, and this one had
+     * been green for the whole life of the format while the format was short. */
     {
-        int nfail = 0;
-        printf("\n=== THE FIX: carry blob 110 too (EB_PATCH_BYTES 133 -> 134) ===\n");
+        int nfail = 0, which[8], nw = 0;
+        printf("\n=== TOOTH: put blob 110 back the way a 133-byte format leaves it ===\n");
         for (p = 0; p < EB_BANK_COUNT; ++p) {
             boot(RATES[0]);
             recall_build(bank, p, &RC_ref, &MC_ref);
@@ -448,16 +454,22 @@ int main(int argc, char **argv)
             memcpy(fake + BANK_HEADER, TPL[3], TEMPLATE_BYTES);   /* randomised */
             {   eb_patch q; memcpy(q.b, PB[p], EB_PATCH_BYTES);
                 eb_patch_install(fake + BANK_HEADER, &q); }
-            /* the 134th byte: blob 110 = record 126, LEGATO's high nibble */
-            fake[BANK_HEADER + 126] =
-                bank[BANK_HEADER + (long)p * BANK_STRIDE + 126];
+            fake[BANK_HEADER + 126] = TPL[3][126];       /* the dropped byte */
             boot(RATES[0]);
             recall_build(fake, 0, &RC_cand, &MC_cand);
             if (firstdiff(&RC_ref, &RC_cand, sizeof RC_ref) >= 0 ||
-                firstdiff(&MC_ref, &MC_cand, sizeof MC_ref) >= 0) ++nfail;
+                firstdiff(&MC_ref, &MC_cand, sizeof MC_ref) >= 0) {
+                ++nfail;
+                if (nw < 8) which[nw++] = p;
+            }
         }
-        printf("rate  44100  template=randomised    %2d/64 %s\n", 64 - nfail,
-               nfail ? "*** STILL DIVERGES ***" : "BIT-IDENTICAL");
+        printf("   %d of 64 patches diverge with blob 110 dropped: ", nfail);
+        for (p = 0; p < nw; ++p) printf("%d ", which[p]);
+        printf("\n   %s\n", nfail ? "CAUGHT -- the sweep above is not vacuous"
+                                  : "*** NOT CAUGHT: the randomised template "
+                                    "does not reach record 126, so the 64/64 "
+                                    "above proves nothing ***");
+        if (!nfail) bad = 1;
     }
 
     /* the template that ships: patch 0's prefix, real plugin data */
@@ -465,7 +477,7 @@ int main(int argc, char **argv)
     wr(argv[2], "eb_template.bin", TPL[0], TEMPLATE_BYTES);
     wrh(argv[2], "eb_template.h", "eb_template", TPL[0], TEMPLATE_BYTES,
         "the first 4,096 bytes of factory record 0 from\n"
-        " * truth/presetbankog1.bin. Its content outside the 133 carried\n"
+        " * truth/presetbankog1.bin. Its content outside the 134 carried\n"
         " * positions is PROVEN irrelevant to the recalled coefficients (this\n"
         " * generator repeats the whole round trip with an all-zero and a\n"
         " * randomised template and gets bit-identical results); it is real\n"

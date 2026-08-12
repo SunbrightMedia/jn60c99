@@ -13,8 +13,23 @@
 #include "eb_chorus_shim.h"
 #include <string.h>
 
+/* EB_DEVCELLS -- the device rebase; src/juno_engine.h has the reasoning. The
+ * master coefficients are all absolute cells (no per-voice tile), so this is
+ * the plain substitution. */
+#ifdef EB_DEVCELLS
+#include "ebdev.h"
+#define CF(p, off)  (*(const float *)ebdev_at((unsigned long)(off)))
+#define CI(p, off)  (*(const int32_t *)ebdev_at((unsigned long)(off)))
+#else
 #define CF(p, off)  (*(const float *)((const unsigned char *)(p) + (off)))
 #define CI(p, off)  (*(const int32_t *)((const unsigned char *)(p) + (off)))
+#endif
+/* the one raw pointer this file forms (the reverb tap array, read as a block) */
+#ifdef EB_DEVCELLS
+#define EB_MC_CELLPTR(b, off)  ((const int32_t *)ebdev_at((unsigned long)(off)))
+#else
+#define EB_MC_CELLPTR(b, off)  ((const int32_t *)((const unsigned char *)(b) + (off)))
+#endif
 
 void eb_master_coefs_build(const unsigned char *base, eb_master_coef *c)
 {
@@ -745,7 +760,7 @@ void eb_master_state_seed(const unsigned char *base, eb_master_state *s)
      * Finding it needed the port's own intermediates exported and
      * compared stage by stage; no amount of staring at the chain would
      * have said which of five stages was first. */
-    eb_reverb_seed(&s->rev, (const int32_t *)(base + 11022064),
+    eb_reverb_seed(&s->rev, EB_MC_CELLPTR(base, 11022064),
                    CF(base, 11022032), s->rev_wipe);
     ebsh_snapshot(&s->cho, base);
 

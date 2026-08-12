@@ -47,13 +47,13 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
      * from chorus_mode here: an earlier revision did, and every caller passing 0
      * silently parked slot 2 in the Pan arm instead of the plugin's power-on
      * chorus, so the warm (host-idled) state diverged on every chorus patch. */
-    p39  = (int32_t *)(st + JUNO_PROG_DLY);
-    p551 = (int32_t *)(st + JUNO_PROG_EFX);
+    p39  = (int32_t *)JCELL(st, JUNO_PROG_DLY);
+    p551 = (int32_t *)JCELL(st, JUNO_PROG_EFX);
     memcpy(shim->params + 136, &p39,  sizeof(void *));
     memcpy(shim->params + 112, &p551, sizeof(void *));
     /* base = &shim->params, stored at state+136 (the chase's first hop) */
     base = shim->params;
-    memcpy(st + 136, &base, sizeof(void *));
+    memcpy(JCELL(st, 136), &base, sizeof(void *));
 }
 
 /* Replicate voice 0's per-voice state block [176,84272) to voices 1..7 so every
@@ -62,11 +62,21 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
  * the shared/global region (>=84272) and the header (<176) are left untouched. */
 void juno_driver_seed_voices(unsigned char *st)
 {
+#ifdef EB_DEVCELLS
+    /* THE DEVICE HAS NO CONTIGUOUS VOICE BLOCK, so this memcpy would copy
+     * nothing (the tile IS voice 0 and voices 1..7 exist only as the twelve
+     * scatter cells). The rewrite lives here rather than at the call site so a
+     * future caller cannot get a silent no-op. Omitting the broadcast was
+     * MEASURED to fail 24 of 192 gate cases, first at glide[1].k592. */
+    (void)st;
+    ebdev_broadcast_scatter();
+#else
     const unsigned block = 176;                 /* per-voice block start          */
     int v;
     for (v = 1; v < JUNO_NUM_VOICES; ++v)
         memcpy(st + block + (unsigned)v * JUNO_VOICE_MAIN_STRIDE,
                st + block, JUNO_VOICE_MAIN_STRIDE);
+#endif
 }
 
 /* Shared analog-noise/LFSR block: a self-contained noise generator + one-pole
@@ -103,11 +113,11 @@ void juno_driver_render_voices(unsigned char *st, float *vbuf)
     /* snapshot the block, then restore before EACH voice so all 8 step from the
      * same state (nblk) and read the identical one-step advance; after the loop the
      * block is left advanced exactly once (by the last voice) — matching the plugin. */
-    memcpy(nblk, st + JUNO_NOISE_BLOCK_OFF, JUNO_NOISE_BLOCK_LEN);
+    memcpy(nblk, JCELL(st, JUNO_NOISE_BLOCK_OFF), JUNO_NOISE_BLOCK_LEN);
     for (v = 0; v < JUNO_NUM_VOICES; ++v) {
         float vr = 0.0f;
         vbuf[v] = 0.0f;
-        memcpy(st + JUNO_NOISE_BLOCK_OFF, nblk, JUNO_NOISE_BLOCK_LEN);
+        memcpy(JCELL(st, JUNO_NOISE_BLOCK_OFF), nblk, JUNO_NOISE_BLOCK_LEN);
         juno_voice_render_fn(st, v, &vbuf[v], &vr);
     }
 }

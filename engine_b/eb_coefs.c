@@ -8,8 +8,25 @@
 #include "eb_chorus_shim.h"
 #include <string.h>
 
+/* EB_DEVCELLS -- the device rebase. See src/juno_engine.h for why this is a
+ * build flag and not a text rewrite.
+ *
+ * The per-voice read: poke voice v's SCATTER into the shared tile, then read
+ * the tile. The twelve scatter cells are the only ones that differ between
+ * voices; everything else in the block is voice-invariant and one tile is exact
+ * for it (MEASURED: 0 of 8 divergent over 192 cases). CF then has to tell a
+ * TILE-relative read from an absolute one, because the same macro is used with
+ * `base` (absolute) and with a VBASE result (tile). */
+#ifdef EB_DEVCELLS
+#include "ebdev.h"
+#define VBASE(b, v)  (ebdev_voice_select((v)), (const unsigned char *)EBDEV_S.v0)
+#define CF(p, off)   (*(const float *)(((const unsigned char *)(p) == (const unsigned char *)EBDEV_S.v0) \
+                       ? (const void *)((const unsigned char *)(p) + (off))                            \
+                       : (const void *)ebdev_at((unsigned long)(off))))
+#else
 #define VBASE(b, v)  ((const unsigned char *)(b) + (unsigned)(v) * 10512u)
 #define CF(p, off)   (*(const float *)((const unsigned char *)(p) + (off)))
+#endif
 
 void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
 {
@@ -375,7 +392,11 @@ void eb_render_events_mirror(unsigned char *base, eb_render_state *s)
              * at :2178 when its voice function runs; under this gate that
              * function does not run, so an uncleared 1.0 would be re-armed by
              * every later event and the retrigger would fire repeatedly. */
+#ifdef EB_DEVCELLS
+            *(float *)ebdev_at((unsigned long)aux) = 0.0f;
+#else
             *(float *)(base + aux) = 0.0f;
+#endif
         }
     }
     /* the DCO's live coefficient copy is seeded from the recall coefficients,

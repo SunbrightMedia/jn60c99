@@ -15,7 +15,7 @@ static unsigned char SINK[8];
 
 unsigned long EBDEV_SEGHIT[EBDEV_NSEG];
 unsigned long EBDEV_VHIT, EBDEV_SHIT, EBDEV_GHIT;
-unsigned long EBDEV_MISSLIST[8192];
+unsigned long EBDEV_MISSLIST[EBDEV_MISSLIST_N];
 int           EBDEV_NMISS;
 
 void *ebdev_miss(unsigned long off)
@@ -86,6 +86,18 @@ void ebdev_voice_select(int v)
     if (v < 0 || v >= EBDEV_NV) return;
     for (i = 0; i < EBDEV_NSCAT; ++i)
         *(float *)(EBDEV_S.v0 + EBDEV_SCATTAB[i]) = EBDEV_S.scat[v][i];
+}
+
+void ebdev_broadcast_cell(unsigned long voff)
+{
+    int v, i;
+    for (i = 0; i < EBDEV_NSCAT; ++i)
+        if (voff == (unsigned long)EBDEV_SCATTAB[i]) {
+            for (v = 1; v < EBDEV_NV; ++v)
+                EBDEV_S.scat[v][i] = EBDEV_S.scat[0][i];
+            return;
+        }
+    /* not a scatter cell: the shared tile already served every voice */
 }
 
 void ebdev_broadcast_scatter(void)

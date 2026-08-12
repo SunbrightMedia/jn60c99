@@ -285,5 +285,5 @@ void juno_apply_reverb(unsigned char *state, const unsigned char *rec)
      * state-transplant instrument — poking this single cell at the warm-recall
      * point reproduces the plugin's balance exactly on both patches
      * (tools/verify + scratchpad transplant run wf_e1e7df78). */
-    *(int32_t *)(state + 10759872) = 256;
+    *(int32_t *)JCELL(state, 10759872) = 256;
 }

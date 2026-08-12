@@ -334,6 +334,64 @@ float juno_apply_param(unsigned char *state, int i, int byte, int Hr)
     return c;
 }
 
+/* THE LIVE PANEL EDIT -- leaf expansion + per-voice replication, in ONE place.
+ *
+ * It used to live only in gui/juno_bridge.c's juno_gui_set_param, which is a
+ * HOST-side file no target compiles. The consequence was found on 2026-08-12:
+ * the device-recall gate's live-edit sequence carried its own copy of the loop,
+ * that copy was fed BLOB ids where it wanted BINDINGS indices, all three calls
+ * returned at the first line, and 384 of the gate's 1,152 cases were silent
+ * duplicates of another 384. A second copy of a rule is a rule that will drift;
+ * this is the rule, and juno_bridge.c and the gate both call it.
+ *
+ * The semantics are the plugin's, measured (see juno_param_blob above and the
+ * juno_gui_set_param header): the value tree dispatches whole LEAVES, so one
+ * panel move writes every BINDINGS row sharing the blob byte, and a per-voice
+ * cell takes the IDENTICAL value in all voices. It is not a recall: nothing is
+ * re-seeded and CONDITION is not re-applied.
+ *
+ * EB_DEVCELLS -- the device arm. The per-voice replication is REDUNDANT on the
+ * device (one shared voice tile) except for the twelve scatter cells, which
+ * ebdev_broadcast_cell handles per cell. Replaying the port's loop literally
+ * would throw 6x7 writes at offsets the map does not carry, and the firmware
+ * mutes on a non-zero unmapped count. See ebdev.h above ebdev_broadcast_cell.
+ *
+ * Returns the float written for `param_index` itself (0.0 on a bad index). */
+float juno_apply_param_leaf(unsigned char *state, int param_index, int byte, int Hr)
+{
+    int blob = juno_param_blob(param_index), i, n;
+    float w = 0.0f;
+    if (blob < 0) return 0.0f;
+    if (Hr <= 0) Hr = 96000;
+    n = N_BINDINGS;
+    for (i = 0; i < n; ++i) {
+        if (BINDINGS[i].blob_pos != blob) continue;
+        {
+            int off = BINDINGS[i].offset;
+            float wi = juno_apply_param(state, i, byte, Hr);
+            if (off >= 176 && off < 176 + (int)JUNO_VOICE_MAIN_STRIDE) {
+                /* two teeth, both devrecall_gate.py's:
+                 *   JUNO_TOOTH_EDIT_PORTLOOP  replay the PORT's replication
+                 *     literally on the device -- the defect as reported: 42
+                 *     writes to per-voice offsets the map does not carry.
+                 *   JUNO_TOOTH_NO_EDIT_BCAST  drop the broadcast -- the
+                 *     scatter rows then keep the pre-edit value. */
+#if defined(EB_DEVCELLS) && !defined(JUNO_TOOTH_EDIT_PORTLOOP)
+#ifndef JUNO_TOOTH_NO_EDIT_BCAST
+                ebdev_broadcast_cell((unsigned long)off);
+#endif
+#else
+                int v;
+                for (v = 1; v < JUNO_NUM_VOICES; ++v)
+                    JF(state, (unsigned)off + (unsigned)v * JUNO_VOICE_MAIN_STRIDE) = wi;
+#endif
+            }
+            if (i == param_index) w = wi;
+        }
+    }
+    return w;
+}
+
 int juno_bank_num_patches(const unsigned char *bank, unsigned long len)
 {
     unsigned long n;

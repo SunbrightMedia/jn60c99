@@ -385,7 +385,7 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
      * the type-5 value, PROVEN by the setter spot sweep under Unicorn,
      * scratchpad/ext_sweeps.py 2026-07-19); the raw write diverged for >5. */
     if (dtype > 5) dtype = 5;
-    *(int32_t *)(state + JUNO_PROG_DLY) = (int32_t)dtype;  /* per-patch slot-1 mode */
+    *(int32_t *)JCELL(state, (JUNO_PROG_DLY)) = (int32_t)dtype;  /* per-patch slot-1 mode */
 
     /* Ring-buffer geometry ints — the plugin's recall writes these for EVERY
      * patch (PROVEN: identical in the type-0 and type-4 full-state dumps at
@@ -394,18 +394,18 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
      * read them (57/57 was bit-exact before they were added), but the TYPE-4
      * arm reads 6429412 as its ring MASK every sample — with the port's former
      * 0 the mask underflowed to 0xFFFFFFFF and the ring addressing was garbage. */
-    *(int32_t *)(state + 95828)    = 0x400;
-    *(int32_t *)(state + 101028)   = 0x400;
-    *(int32_t *)(state + 2199956)  = 0x80000;
-    *(int32_t *)(state + 4297124)  = 0x80000;
-    *(int32_t *)(state + 6395252)  = 0x80000;
-    *(int32_t *)(state + 6429412)  = 0x2000;
-    *(int32_t *)(state + 6463716)  = 0x2000;
-    *(int32_t *)(state + 6496500)  = 0x2000;
-    *(int32_t *)(state + 8594772)  = 0x80000;
-    *(int32_t *)(state + 10691940) = 0x80000;
-    *(int32_t *)(state + 10726260) = 0x2000;
-    *(int32_t *)(state + 10759044) = 0x2000;
+    *(int32_t *)JCELL(state, (95828))    = 0x400;
+    *(int32_t *)JCELL(state, (101028))   = 0x400;
+    *(int32_t *)JCELL(state, (2199956))  = 0x80000;
+    *(int32_t *)JCELL(state, (4297124))  = 0x80000;
+    *(int32_t *)JCELL(state, (6395252))  = 0x80000;
+    *(int32_t *)JCELL(state, (6429412))  = 0x2000;
+    *(int32_t *)JCELL(state, (6463716))  = 0x2000;
+    *(int32_t *)JCELL(state, (6496500))  = 0x2000;
+    *(int32_t *)JCELL(state, (8594772))  = 0x80000;
+    *(int32_t *)JCELL(state, (10691940)) = 0x80000;
+    *(int32_t *)JCELL(state, (10726260)) = 0x2000;
+    *(int32_t *)JCELL(state, (10759044)) = 0x2000;
 
     /* Delay Time (102352): SYNC-AWARE, written for EVERY DELAY TYPE — the plugin's
      * recall dispatches the time leaf before the type routing, so 102352 carries

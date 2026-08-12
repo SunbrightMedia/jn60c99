@@ -47,9 +47,40 @@
 #include "ebdev_seg.h"
 #include "ebdev_map.h"
 
-/* Voices this build carries. 6 is the fork; 8 is the trunk and the host gate. */
+/* === THE SCATTER ROW COUNT IS THE PORT'S VOICE COUNT, NOT THE FORK'S =======
+ *
+ * This was wrong until 2026-08-12 and it was the third fatal finding of the
+ * adversarial round. EBDEV_NV read as "voices this build plays", so the fork's
+ * six were the obvious value -- and at -DEBDEV_NV=6 the array MISSES, MEASURED,
+ * on 22 distinct offsets, among them cell 320, the ADSR gate. Defect 2, back.
+ *
+ * The reason is structural, not a tuning choice. `ebdev_scatter_slow` derives
+ * the row from the PORT offset (`(off - VLO) / VSTRIDE`), so a row index IS a
+ * port voice number; and the port's recall writes every port voice
+ * unconditionally -- src/juno_apply.c:478 (CONDITION), :500 (UNISON), :814
+ * (LFO tempo) all loop `v < 8` and none of them can know what the fork plays.
+ * Give the array fewer rows than the port has voices and those writes sink.
+ *
+ * So the row count is EBDEV_NVPORT, generated from the block geometry in
+ * ebdev_seg.h. It costs 96 bytes over a six-row array. In exchange the SAME
+ * image is addressable by a board that owns ANY subset of the port's voices,
+ * which is what END_GOAL item 2 (two boards, six voices) will need: a chip
+ * playing global voices 4 and 5 can reach rows 4 and 5.
+ *
+ * EB_NUM_VOICES -- how many voices the DSP renders -- is a different number and
+ * stays free. It is bounded below the row count here, so a fork that raises it
+ * past the array cannot build. */
 #ifndef EBDEV_NV
-#define EBDEV_NV 8
+#define EBDEV_NV EBDEV_NVPORT
+#endif
+#if EBDEV_NV < EBDEV_NVPORT && !defined(EBDEV_TOOTH_SHORT_ROWS)
+#error "EBDEV_NV is below the port's voice count: recall writes voices this \
+array cannot hold and they sink silently. See the comment above. \
+-DEBDEV_TOOTH_SHORT_ROWS builds it anyway, for the gate's tooth."
+#endif
+#if defined(EB_NUM_VOICES) && (EB_NUM_VOICES > EBDEV_NV)
+#error "EB_NUM_VOICES exceeds the scatter row count: the DSP would read voices \
+the cell array does not carry."
 #endif
 
 typedef struct {
@@ -113,6 +144,30 @@ void *ebdev_at_v(int v, unsigned long off);
  * voice v's cells through the tile (that is what eb_coefs.c's VBASE does). */
 void  ebdev_voice_select(int v);
 
+/* ONE cell of scat[0] -> scat[1..NV-1]. `voff` is a VOICE-BLOCK-RELATIVE port
+ * offset; if it is not a scatter cell this does nothing, and that is the whole
+ * point.
+ *
+ * THIS IS THE LIVE PANEL EDIT, and it is the second fatal finding of the
+ * 2026-08-12 adversarial round. The port's live edit (gui/juno_bridge.c, now
+ * juno_apply_param_leaf) writes voice 0's cell and then replicates the
+ * IDENTICAL value to voices 1..7 by hand. Replayed literally on the device
+ * that is 42 writes to per-voice offsets the map does not carry -- MEASURED,
+ * 6 offsets x 7 voices, and eb_recall.c:63's rule mutes the instrument on a
+ * non-zero unmapped count. So a knob turn muted it.
+ *
+ * The fix is not a wider map, it is that the replication is REDUNDANT here:
+ * the tile is shared, so writing voice 0 already served every voice. The only
+ * per-voice offsets that need anything are the twelve in the scatter, and for
+ * those the identical value must reach every row. Hence: broadcast exactly the
+ * cell that moved, nothing else.
+ *
+ * It is deliberately NOT a blanket drop of per-voice writes. A caller that
+ * writes DIFFERENT values to different voices at a non-scatter offset is
+ * defect 2 all over again, and it must still MISS and still be counted --
+ * which it does, because this function never touches the map. */
+void  ebdev_broadcast_cell(unsigned long voff);
+
 /* scat[0] -> scat[1..NV-1]. This is the device's juno_driver_seed_voices:
  * on the host, recall writes voice 0 and a memcpy replicates the block; here
  * the block is not contiguous, so the scatter must be broadcast explicitly.
@@ -127,7 +182,15 @@ void  ebdev_reset_counters(void);
 
 extern unsigned long EBDEV_SEGHIT[EBDEV_NSEG];
 extern unsigned long EBDEV_VHIT, EBDEV_SHIT, EBDEV_GHIT;
-extern unsigned long EBDEV_MISSLIST[8192];
+/* THE MISS LIST IS PURE DIAGNOSTIC, and at 8,192 entries it is 32,768 BYTES
+ * OF INTERNAL SRAM. MEASURED: with it at that size, linking recall into the
+ * shipping firmware fails with `region dram0_0_seg overflowed by 7184 bytes`
+ * -- i.e. this array alone is the deficit, five times over. It names the
+ * distinct unmapped offsets and nobody has ever read past the first dozen. */
+#ifndef EBDEV_MISSLIST_N
+#define EBDEV_MISSLIST_N 8192
+#endif
+extern unsigned long EBDEV_MISSLIST[EBDEV_MISSLIST_N];
 extern int           EBDEV_NMISS;
 
 #endif /* EBDEV_H */

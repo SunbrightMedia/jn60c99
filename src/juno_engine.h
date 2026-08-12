@@ -35,9 +35,36 @@ extern "C" {
 #define JUNO_NUM_VOICES         8
 
 /* Offset accessors into the state block `st` (an unsigned char*). The casts
- * mirror the decompile (float / dword) memory reads exactly. */
-#define JF(st, off)  (*(float   *)((unsigned char *)(st) + (off)))   /* float  */
-#define JI(st, off)  (*(int32_t *)((unsigned char *)(st) + (off)))   /* int32  */
+ * mirror the decompile (float / dword) memory reads exactly.
+ *
+ * === EB_DEVCELLS: THE DEVICE REBASE, AS A BUILD FLAG ===================
+ *
+ * The microcontroller cannot hold an 11 MB array. engine_b/dev/ebdev.h carries
+ * the ~30 KB of it that recall actually touches and `ebdev_at(off)` maps a port
+ * offset to its device address. Until 2026-08-12 that substitution was done by
+ * a PYTHON TEXT REWRITE in tools/engineb/devrecall_gate.py, which copied these
+ * sources into a scratch tree and applied ~20 exact-string edits. That could
+ * not ship: an ESP-IDF build cannot run a regex over its own inputs, and the
+ * gate then proved a tree that was not the tree being flashed.
+ *
+ * So it is a flag, here, in the checked-in source. `JCELL(st, off)` is the ONE
+ * place the address is formed; with EB_DEVCELLS undefined it is textually
+ * different from the old expression and semantically the identity, and that
+ * claim is checked by rebuilding libjuno.so and byte-comparing it.
+ *
+ * The other rebased sites -- the raw pointer casts in delay_recall.c,
+ * effect_modes.c, reverb_recall.c and juno_driver.c, and eb_coefs.c /
+ * eb_master_coefs.c / eb_chorus_shim.c's own cell accessors -- use JCELL or
+ * their own #ifdef with the same name. Nothing may reach a cell any other way;
+ * tools/engineb/devrecall_gate.py refuses a build that does. */
+#ifdef EB_DEVCELLS
+#include "ebdev.h"
+#define JCELL(st, off)  ebdev_at((unsigned long)(off))
+#else
+#define JCELL(st, off)  ((void *)((unsigned char *)(st) + (off)))
+#endif
+#define JF(st, off)  (*(float   *)JCELL((st), (off)))   /* float  */
+#define JI(st, off)  (*(int32_t *)JCELL((st), (off)))   /* int32  */
 
 /* Full engine state size. The initializer (sub_1803990C0) writes up to offset
  * ~10.69 MB (all 8 voices + global blocks); the master reads a counter at

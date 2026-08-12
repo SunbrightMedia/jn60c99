@@ -46,6 +46,7 @@
 #define ENGINEB_EB_DCO_H
 
 #include <math.h>
+#include <stddef.h>            /* offsetof, for EB_DCO_PERSAMPLE_BYTES */
 #include "eb_fork_config.h"
 
 #if defined(__GNUC__)
@@ -119,7 +120,14 @@ typedef struct {
 #if EB_DCO_RECIP
     float rm1, rp1;   /* 1/pwm1, 1/pwp1 -- the RECIPROCAL OPTION, below       */
 #endif
-    /* per recall */
+    /* per recall
+     * ⚠ lvl_saw IS THE BOUNDARY. EB_DCO_PERSAMPLE_BYTES below is
+     * offsetof(eb_dco_coef, lvl_saw), and engine_b/dev/eb_recall.c step 7c
+     * uses it to save the per-sample half across a patch change on an AT-REST
+     * voice. Anything added ABOVE this line is per-sample and is preserved
+     * automatically; anything added below is per-recall and is refreshed.
+     * The previous form named five fields by hand and silently dropped rm1/rp1
+     * under -DEB_DCO_RECIP=1. Keep the two groups contiguous. */
     float lvl_saw, lvl_pulse, lvl_sub;   /* port 4736, 4752, 4768             */
     float gn_saw,  gn_pulse,  gn_sub;    /* port 5648, 5664, 5680             */
     float amp_saw, amp_pulse, amp_sub;   /* port 5600, 5616, 5632             */
@@ -156,6 +164,10 @@ typedef struct {
     float sat_hi;                        /* eb_sat(+sat_in)                   */
     float sat_lo;                        /* eb_sat(-sat_in)                   */
 } eb_dco_coef;
+
+/* The extent of the PER-SAMPLE group above -- the prefix a patch change must
+ * NOT overwrite on an at-rest voice. See the note at lvl_saw. */
+#define EB_DCO_PERSAMPLE_BYTES  ((unsigned)offsetof(eb_dco_coef, lvl_saw))
 
 /* ---------------------------------------------------------------- THE VERDICT
  * THIS MODULE IS ACCURATE AND IT IS NOT AFFORDABLE. Reported here rather than

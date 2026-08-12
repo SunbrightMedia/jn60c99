@@ -13,10 +13,73 @@
 #
 # Placing the whole main archive (which is where the eb_*.c objects land) in
 # IRAM removes the flash fetch entirely.
+#
+# ⚠⚠ THIS MAPPING IS INERT IN THE SHIPPING BUILD, AND HAS BEEN ALL ALONG.
+# MEASURED 2026-08-12 (C3), on the M1 firmware and on the recall firmware,
+# with this file present AND with it reverted -- byte-identical placement both
+# ways:
+#     xtensa-esp32s3-elf-nm build/juno_s3.elf | awk '$1 ~ /^403/' \
+#         | grep -cE "eb_|juno_"      ->  0
+# ZERO engine or app symbols are in IRAM. app_main is at 0x4200a69c and
+# eb_engine_render_range at 0x42011a48 -- both XIP FLASH. DIRAM .text is
+# 52,879 B in both builds and that is IDF's own IRAM code, not ours.
+#
+# THE CAUSE, INFERRED (not yet executed as an A/B): -flto. Under LTO the
+# libmain.a members are IR, and the code the link-time plugin generates does
+# not carry the archive-member identity ldgen matches on, so `archive:
+# libmain.a` selects nothing. Falsify it by building once with -flto removed
+# from esp32s3/main/CMakeLists.txt and re-running the nm above.
+#
+# WHY IT MATTERS BEYOND TIDINESS: the paragraph above this one explains the
+# board's 2x-over-model cycles as instruction-cache thrash and says this
+# mapping removes it. It does not. So either the thrash is still there and
+# unaddressed, or the explanation was wrong -- and 5,410-of-5,442 was measured
+# with the engine in FLASH either way. This is playbook defect 32 exactly: a
+# knob is not a knob until something reads it, and the way to check is the
+# artefact, not the file you wrote.
 [mapping:main]
 archive: libmain.a
 entries:
     * (noflash_text)
+    # ---- THE RECALL OBJECTS STAY IN FLASH -----------------------------------
+    #
+    # `* (noflash_text)` above puts EVERY object of libmain.a into IRAM. With
+    # -DS3_RECALL=1 that would drag ~100 KB of once-per-patch code into
+    # iram0_0_seg, which is 341,760 bytes SHARED WITH ALL DRAM -- so it either
+    # fails the link or starves the heap the coefficient banks live in.
+    #
+    # These objects run once per patch change, not once per sample. The whole
+    # reason the audio path needed IRAM was instruction-cache thrash at 44,100
+    # calls a second; a burst 0.25 times a second is served perfectly well by
+    # XIP from flash, and the burst's own cost is measured on the board (the
+    # BURST: line) rather than assumed either way.
+    #
+    # A per-object entry OVERRIDES the wildcard above (ldgen takes the most
+    # specific match). If one of these ever moves back into IRAM by accident
+    # the symptom is a link failure naming dram0_0_seg or iram0_0_seg, which is
+    # loud -- unlike the reverse mistake.
+    #
+    # THESE LINES CHANGE NOTHING TODAY, and saying so is the point: the whole
+    # mapping is inert under -flto (see above), MEASURED both ways. They are
+    # here so that the day LTO is dropped -- which is the day the wildcard
+    # starts working -- 100 KB of once-per-patch recall code does not silently
+    # move into a 341,760-byte segment shared with every byte of DRAM.
+    juno_apply (default)
+    juno_curve (default)
+    juno_driver (default)
+    juno_note (default)
+    delay_recall (default)
+    reverb_recall (default)
+    chorus_recall (default)
+    finefx_recall (default)
+    effect_modes (default)
+    hpf_type_lut (default)
+    ebdev (default)
+    eb_recall (default)
+    eb_devseq (default)
+    eb_coefs (default)
+    eb_master_coefs (default)
+    eb_chorus_shim (default)
 
 # noflash_TEXT, not noflash. `noflash` moves rodata into DRAM as well, and
 # this component's rodata is the 1.69 MB embedded coefficient blob -- the

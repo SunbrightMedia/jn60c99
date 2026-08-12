@@ -4,6 +4,108 @@ found a defect in the SHIPPING port)
 
 ---
 
+## ⚑⚑ THE ADVERSARIAL ROUND, 2026-08-12 — THREE MORE FATAL DEFECTS, ALL IN THE GATE'S OWN COVERAGE, ALL NOW FIXED AND TOOTHED
+
+Two independent skeptics executed the gate and broke it three ways. All three
+findings were **CONFIRMED BY RE-EXECUTION** here, not accepted on report; the
+numbers below are this session's own runs.
+
+**F1 — THE LIVE-EDIT SEQUENCE WAS DEAD, TWICE OVER, so 384 of 1,152 cases were
+byte-identical duplicates of another 384.** `edit()` was called with BLOB ids
+35/54/38 where it took a BINDINGS INDEX (`juno_param_count()` is 31, so all
+three returned at the first line), and the calls sat BEFORE a recall that
+overwrites every cell an edit touches. MEASURED on the gate's own
+`host_trunk.bin`: 384 of 384 SEQ_EDIT records identical to their SEQ_WARM twin.
+Effective coverage was 768, not 1,152, and **END_GOAL item 5 — live parameter
+control — had ZERO coverage.**
+FIX: the expansion rule now lives ONCE, in `juno_apply_param_leaf`
+(`src/juno_apply.c`), which `gui/juno_bridge.c` and the gate both call — the
+duplicate copy is what drifted. The gate selects by BLOB (what a panel has) and
+**aborts** on an unresolvable one; the sequence is now `A→edit→B→edit`, so the
+second edit is the knob move. MEASURED after: **384 of 384 SEQ_EDIT records
+DIFFER**, and a new `LIVE EDIT` section fails the gate if they ever stop.
+The bridge refactor is PROVEN identity: 3 rates × 10 patches × 31 params × 16
+bytes, hashing all 8 voices' whole per-voice block, `ddbcd95c049c7ba3` both
+sides; toothed (replicate from voice 2 instead of 1 → `780a09b71a7311e3`).
+
+**F2 — A KNOB TURN MADE THE MAP MISS, and `eb_recall.c`'s own rule mutes on
+that.** Replaying the port's per-voice replication literally on the device is
+42 writes to per-voice offsets the map does not carry. REPRODUCED HERE, exactly:
+**84 accesses, 42 distinct offsets — cells 624, 6736, 10240, 10256, 10272,
+10288 × voices 1..7**, only one of the 31 bindings (cell 592) being a scatter
+cell.
+FIX, and it is at the source rather than in the map: the replication is
+**redundant** on a shared tile. `ebdev_broadcast_cell()` broadcasts exactly the
+cell that moved and only if it is a scatter cell; everything else is already
+served by the tile. It deliberately does **not** blanket-drop per-voice writes —
+a caller writing DIFFERENT values per voice at a non-scatter offset is defect 2
+again and must still miss, and it does, because this path never touches the map.
+MEASURED after: **unmapped accesses = 0 with the live edit running**, host vs
+device bit-identical over all 1,152 cases. Two teeth: `JUNO_TOOTH_EDIT_PORTLOOP`
+(the defect as reported → dev half refuses) and `JUNO_TOOTH_NO_EDIT_BCAST`
+(drop the broadcast → 384 cases differ).
+
+**F3 — `EBDEV_NV=6`, THE FORK'S OWN VOICE COUNT, WAS NOT A WORKING
+CONFIGURATION AND NO GATE BUILT IT.** REPRODUCED: **82 accesses, 22 distinct
+offsets — voices 6 and 7's whole scatter, including cell 320, the ADSR gate.**
+Defect 2, reintroduced by a build flag. The 1,152-case comparison could not see
+it: at `EB_NUM_VOICES=6` only six voices are READ, so the coefficients still
+matched **0 of 1,152 differing** — the tooth fires through the unmapped counter
+alone.
+FIX: **the scatter row count is the PORT's voice count, not the fork's.**
+`ebdev_scatter_slow` derives the row from the port offset, so a row index IS a
+port voice number, and `src/juno_apply.c:478/:500/:814` write all eight
+unconditionally. `EBDEV_NV` now defaults to the generated `EBDEV_NVPORT` and
+`-DEBDEV_NV=6` **refuses to compile**; `EB_NUM_VOICES > EBDEV_NV` refuses too.
+It costs 96 bytes and buys the thing END_GOAL item 2 will need: the same image
+is addressable by a board owning ANY subset of the port's voices.
+**And the gate now runs the fork at `-DEB_NUM_VOICES=6`** — it had printed
+`EB_NUM_VOICES=8` under the heading "shipping fork" at every run.
+
+**Also closed in the same round, each with its own measurement:**
+- **The D1 table was not measuring the fields it named at the fork flags.**
+  `warm_vs_cold` sliced at the literals 10564/1704 — the TRUNK's struct sizes —
+  so at the fork both the `render_coefs` and the `master_coef` columns were
+  reading inside `eb_render_coefs`. That, and only that, is the "D1 inverts
+  under the fork flags" anomaly. Sizes now come from the binary that wrote the
+  file, and **the table is identical at both flag sets**: factory 44/119,
+  synthetic 192/15.
+- **The boot image had two producers and nothing compared them.** The device
+  cannot run the port's boot — `src/chorus_init.c` is 2,971 raw
+  `*(_DWORD *)(a1 + N)` stores plus pointer walks, which no cell map can rebase
+  — so it is baked and flashed. The gate now builds
+  `tools/engineb/devboot/bootgen.c` (what the FIRMWARE carries) and requires its
+  bytes to equal the gate's own gather: **BIT-IDENTICAL at 44,100 / 48,000 /
+  96,000**, toothed by baking at 88,200. Its cost is now in the size section:
+  **30,252 B of flash per sample rate**, on top of the 30,272 B array.
+- **The boot exchange is self-describing.** A packing disagreement between the
+  two halves used to surface as a short read and a refusal — which reads as a
+  tooth firing. It is now a named `BOOT LAYOUT MISMATCH` and exit 3, which the
+  gate reports as a HARNESS ERROR and never as a verdict.
+- **A second publish, and the FX-pipe deferral, had never executed.** The route
+  latch's whole justification is a DELAY TYPE change ACROSS publishes and the
+  section planted the previous id by hand. It now publishes twice and requires
+  the mirrors to carry the id the FIRST publish DERIVED. `EB_RECALL_FX_PIPE`
+  appeared nowhere but its own `#if`; the gate now builds the publish section
+  with it on. **21 of 21 checks.**
+- **Step 7c saved the DCO's per-sample half by naming five fields.** With
+  `-DEB_DCO_RECIP=1` the struct grows `rm1`/`rp1` in that same group and the
+  hand list dropped them. It is now the struct's own boundary,
+  `EB_DCO_PERSAMPLE_BYTES = offsetof(eb_dco_coef, lvl_saw)`.
+- **`build/devrecall` had no interlock and it cost a false FAIL.** OBSERVED
+  here: one run from a clean tree printed FAIL with `old-1b`/`old-5b` firing as
+  "EXPECTED NOT TO FIRE AND IT DID" and `old-5a` NOT CAUGHT, while two serial
+  runs on either side PASSED and agreed line for line. There is a lock file now.
+
+**REFUTED, with a measurement rather than an argument:** `tools/engineb/devboot/`
+is **tracked** (`git ls-files` lists all three files; added in `cdabfe9`), and
+the third copy of the recall sources, `esp32s3/main/gen_recall/`, was **deleted**
+in `8c61f67`. The device sources are also no longer a Python text rewrite — the
+rebase is `-DEB_DEVCELLS` in the checked-in files, so the gate and the firmware
+compile the same bytes.
+
+---
+
 ## ⚑ STATE AS OF 2026-08-12 — READ THIS BEFORE THE 08-11 TEXT BELOW
 
 The three defects listed further down are **FIXED AND GATED**. The 08-11 text
@@ -21,7 +123,7 @@ this block, this block wins.
 | `tools/engineb/devrecall_gate.py` + `devrecall/gate.c` | THE GATE, runnable standalone |
 
 **The gate now runs 1,152 cases per flag set** — 3 sequences (cold, warm A→B,
-warm A→edit→B) × 3 rates × 64 patches × {factory, nibble-randomised synthetic}
+A→edit→B→edit) × 3 rates × 64 patches × {factory, nibble-randomised synthetic}
 — at trunk defaults AND at the shipping fork flags, and it **ISSUES NOTES**
 across every voice and runs `eb_render_state_seed` and
 `eb_render_events_mirror`. Those were the two holes that hid defects 2 and 3.

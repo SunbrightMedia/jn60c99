@@ -27,6 +27,11 @@ const char *juno_param_name(int i);
 int         juno_param_offset(int i);
 int         juno_param_blob(int i);   /* front-panel blob position (leaf id); rows sharing it form one plugin leaf */
 float       juno_apply_param(unsigned char *state, int i, int byte, int Hr);
+/* juno_apply_param_leaf(state,i,byte,Hr): the LIVE PANEL EDIT -- expands the
+ * leaf (every binding row sharing i's blob byte) and replicates a per-voice
+ * cell to every voice. The one implementation of that rule; gui/juno_bridge.c
+ * and the device-recall gate both call it. See juno_apply.c for why. */
+float       juno_apply_param_leaf(unsigned char *state, int i, int byte, int Hr);
 
 /* Decode the per-patch ARPEGGIATOR settings (NAME1 leaves 89/90/91 at record bytes
  * 298/306/314 — derived from the same value-tree leaf enumeration that lands the 5

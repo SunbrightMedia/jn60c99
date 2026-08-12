@@ -16,12 +16,51 @@ else()
     set(APP_EMBED "")
 endif()
 
+# -DS3_RECALL=1 : DEVICE RECALL. The coefficients are built ON THE CHIP from
+# 134 compact patch bytes, so the 1.69 MB frozen blob is not embedded at all.
+#
+# ⚠ THE RECALL SOURCES ARE AN EXPLICIT LIST, NEVER A GLOB, and this is the one
+# thing in this file that must not be waved past. A glob over src/ would take
+# 21 objects instead of 10 -- including voice_render.c, master_render.c and
+# juno_dsp.c, a SECOND COPY of the DSP the fork exists to replace -- and the
+# build would still succeed.
+#
+# AND ADDING src/ AT ALL COSTS THIS BUILD A GATE. The comment at the top of
+# this file is not decoration: the engine_b-only glob is what makes a module
+# that quietly grows a dependency on src/ fail HERE, on the firmware, naming
+# the symbol. With src/ objects in the image, an eb_*.c that started calling
+# juno_triangle would link cleanly from tomorrow. The only other enforcement is
+# engine_b/tests/test_standalone_link, which is NOT in the top-level `make
+# test` (playbook defect 23 verbatim). So: that test must go into `make test`
+# in the same commit as this list, or the standalone invariant is unenforced
+# the day recall lands. THAT IS STILL OWED AS OF THIS COMMIT.
+if(S3_RECALL)
+    set(RECALL_SRCS
+        ${CMAKE_CURRENT_LIST_DIR}/../../src/juno_apply.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../src/juno_curve.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../src/juno_driver.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../src/juno_note.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../src/delay_recall.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../src/reverb_recall.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../src/chorus_recall.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../src/finefx_recall.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../src/effect_modes.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../src/hpf_type_lut.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/dev/ebdev.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/dev/eb_recall.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/dev/eb_devseq.c)
+    set(APP_EMBED "")          # the blob is REPLACED, not carried alongside
+else()
+    set(RECALL_SRCS "")
+endif()
+
 idf_component_register(
-    SRCS ${APP_SRC} ${EB_SRCS}
-    INCLUDE_DIRS "." "../../engine_b" "../../src" "../../tools/engineb/qemu"
+    SRCS ${APP_SRC} ${EB_SRCS} ${RECALL_SRCS}
+    INCLUDE_DIRS "." "../../engine_b" "../../engine_b/dev" "../../src"
+                 "../../tools/engineb/devboot" "../../tools/engineb/qemu"
     EMBED_FILES ${APP_EMBED}
     LDFRAGMENTS "linker.lf"
-    REQUIRES esp_driver_i2s driver esp_timer)
+    REQUIRES esp_driver_i2s driver esp_timer esp_hw_support)
 
 # The project's load-bearing flags, verbatim from the host build. FMA does
 # not exist on the LX7, but the flag stays uniform so nobody has to reason
@@ -57,6 +96,50 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
 # 8 KB. A 32-entry run degrades to 0.96 dB, which is the control proving the
 # gate responds to this table at all.
 set_source_files_properties(${EB_SRCS} PROPERTIES COMPILE_OPTIONS "-std=c99")
+
+if(S3_RECALL)
+    # EB_DEVCELLS is the rebase. It used to be a PYTHON TEXT REWRITE inside
+    # tools/engineb/devrecall_gate.py, which could not ship -- an ESP-IDF build
+    # cannot run a regex over its own inputs, and a gate that proves a scratch
+    # tree nobody flashes proves the wrong tree. It is now #ifdef'd into the
+    # checked-in sources (src/juno_engine.h's JCELL and five others), so the
+    # 1,152-case gate and THIS FIRMWARE compile the same bytes.
+    #
+    # EBDEV_NV=8, not 6. The 96 bytes 6 would save are not worth configuring
+    # the device differently from the gate that certifies it -- playbook
+    # defect 28, which cost this project a dead LFO through a whole night.
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE
+                               S3L_RECALL=1 EB_DEVCELLS EBDEV_NV=8
+                               EBDEV_MISSLIST_N=64 EBSH_MAX_CTX=1
+                               DEVCHORD_N=${S3_VOICES})
+    # EB_RECALL_FX_PIPE MUST FOLLOW S3L_FX_PIPE, and it arrives inside the
+    # S3_EXTRA_DEFS string, so it is matched out of it rather than assumed.
+    # WHAT GOES WRONG IF IT DOES NOT: with the FX pipeline, core 1's next pass
+    # runs eb_master_render over the PREVIOUS chunk's voices. Publishing the
+    # master coefficients immediately puts the NEW patch's delay/reverb/chorus
+    # on voices rendered under the OLD one -- one chunk, 5.8 ms, of the wrong
+    # effect on every program change. eb_recall.c defers it by exactly one
+    # block when this is set. juno_s3_listen.c #errors if the two disagree, so
+    # a silent mismatch is not shippable.
+    string(FIND "${S3_EXTRA_DEFS}" "S3L_FX_PIPE=1" _fxpipe_at)
+    if(NOT _fxpipe_at EQUAL -1)
+        target_compile_definitions(${COMPONENT_LIB} PRIVATE EB_RECALL_FX_PIPE=1)
+        message(STATUS "RECALL: EB_RECALL_FX_PIPE=1 (master coefficients "
+                       "deferred one block, matching S3L_FX_PIPE)")
+    endif()
+    # src/ predates the IDF warning set: the BINDINGS table in juno_apply.c
+    # uses partial struct initialisers and IDF promotes that to an ERROR.
+    set_source_files_properties(${RECALL_SRCS} PROPERTIES COMPILE_OPTIONS
+        "-std=c99;-Wno-missing-field-initializers")
+endif()
+
+if(S3_PATCH_SECS)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE
+                               S3L_PATCH_SECS=${S3_PATCH_SECS})
+endif()
+if(S3_RECALL_NOMUTE)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE S3L_RECALL_NOMUTE=1)
+endif()
 
 if(NOT S3_LISTEN)
     # EB_DELAY_LEN: 32768 here, NOT the shipping 524288. The harness keeps its

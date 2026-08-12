@@ -7,6 +7,13 @@
 #define EBDEV_VSTRIDE 10512u
 #define EBDEV_VLO     176u
 #define EBDEV_VHI     84272u
+/* THE PORT'S VOICE COUNT, derived from the block geometry above --
+ * (VHI - VLO) / VSTRIDE -- and NOT typed. The scatter row index is a
+ * PORT voice number (ebdev.c derives it from the port offset), and the
+ * port's recall writes every one of them unconditionally
+ * (src/juno_apply.c:478,:500,:814 loop v < JUNO_NUM_VOICES). An array
+ * with fewer rows than this SINKS the top voices' cells, silently. */
+#define EBDEV_NVPORT 8
 #define EBDEV_NSEG 32
 #define EBDEV_SEGBYTES 19180u
 #define EBDEV_NSCAT 12

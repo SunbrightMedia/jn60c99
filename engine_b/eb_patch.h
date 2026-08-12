@@ -98,11 +98,37 @@
  * nibble-packed parameter needs BOTH its bytes or it is not readable, which is
  * the condition eb_patch_coverage() has always reported. So: 133, not 132.
  *
+ * 134 (2026-08-12, C3). blob 110, LEGATO's HIGH nibble. MEASURED, not argued:
+ * the round trip 134 bytes -> template -> juno_bank_apply -> coefficients is
+ * BIT-IDENTICAL on 64/64 patches at three rates against a REAL template, an
+ * all-zero one AND a RANDOMISED one; at 133 the randomised template DIVERGES
+ * on patches 5 and 47 (tools/engineb/devboot/patchbank.c, executed).
+ * src/juno_apply.c:652 reads LEGATO as ((blob[110]&0xF)<<4)|(blob[111]&0xF)
+ * and tests `lg == 1 && as == 1`; 5 and 47 are the only two patches that
+ * satisfy it, which is exactly what the sweep named.
+ *
+ * WHY EVERY GATE PASSED A FORMAT THAT WAS SHORT -- two blind spots, both
+ * demonstrated by execution, now playbook entries 41 and 42:
+ *   (a) --patch-scan's probe values are {0x00,0x03,0x0C,0x7F}, i.e. low
+ *       nibbles {0,3,12,15}. LEGATO's only live value is 1. A scan that
+ *       cannot EMIT the value an equality tests for is blind to 11 of the 16
+ *       nibble values.
+ *   (b) none of its six base patches satisfies LEGATO==1 && ASSIGN==1, so the
+ *       gate could not have fired even with the right probe value.
+ * The cheap refutation is a WHOLE-RECORD random template -- perturb every
+ * non-carried position at once, then bisect. It named the byte in one run.
+ *
+ * HONEST SEVERITY: from a plugin-authored bank the byte is INERT today.
+ * truth/Script.xml gives LEGATO a two-state stringTableRef (READ), so record
+ * 126's low nibble is 0 in all 64 factory patches (executed). It becomes a
+ * live defect the moment the DEVICE's own 8-bit parameter path writes LEGATO,
+ * which END_GOAL item 5 requires: at 133 bytes, values 16..255 are unstorable.
+ *
  * WHAT KEEPS IT FROM SHIPPING SHORT AGAIN: eb_patch_record_coverage() checks
  * the carried set against EB_RECALL_POS[] -- the measured list of every record
  * position that moves a recalled coefficient, plus the READ-but-inert list --
  * and eb_patch_selftest() fails if anything is uncovered. */
-#define EB_PATCH_BYTES   133
+#define EB_PATCH_BYTES   134
 #define EB_RECORD_BYTES  20223
 #define EB_BANK_HEADER   23
 #define EB_BANK_BLOB_OFF 16
