@@ -75,3 +75,55 @@ pump for exactly this and the firmware does the whole build in one call. At
 
 And B4 -- real headroom -- is now the binding item for the whole track, not a
 later nicety: this build is over budget with two voices.
+
+# PLAY3: THE SPIKES ARE FIXED. THE BURST DID NOT MOVE, AND MY ATTRIBUTION WAS WRONG.
+
+    engine, quiet stretches     PLAY1 5,611-5,861   PLAY2 5,213-5,280   PLAY3 5,229-5,273
+    engine, worst spike         PLAY1  ~6,000       PLAY2 10,158        PLAY3  6,220
+    publish                                         PLAY2 19,143 min    PLAY3  9,850 min
+    build (the burst)                               PLAY2 1,906,608     PLAY3 1,886,815
+
+**THE FX-IN-IRAM FIX WORKED.** PLAY2's 9,002 and 10,158-cycle chunks are gone;
+the worst is now 6,220. Core 1 was stalling on flash instruction fetch while
+core 0's burst hammered the same cache, and moving `eb_master_render` and the
+chorus into IRAM removed it. The publish also halved.
+
+**THE RESONANCE-TABLE CACHE CHANGED NOTHING: 1,906,608 -> 1,886,815, which is
+1 %.** I priced `eb_vcf_res_prepare` at about a third of the burst. It is not.
+The cache is correct -- the 1,152-case gate passes and it is keyed on its own
+inputs -- and it is nearly free, so it stays. But it does not do what I said it
+would.
+
+**THAT IS THE TWELFTH ESTIMATE AND THE TENTH MISS.**
+
+## WHAT THE BURST'S OWN NUMBER SAYS, and it rules out arithmetic
+
+    burst                    ~1,890,000 cycles
+    burst, priced            ~28,000 instructions (the C3 scout, measured)
+    implied                  ~68 CYCLES PER INSTRUCTION
+
+The engine's own c/i is 1.35-1.6. **68 is not code running slowly; it is code
+waiting.** No amount of shaving instructions out of recall will touch it, which
+is exactly why the LUT cache did nothing.
+
+The suspect is named rather than assumed: `juno_curve.c` is **126,444 bytes of
+lookup tables in flash rodata**, and recall's whole job is random lookups into
+them. Every miss is a flash read through a small data cache. Nothing else in
+the burst has that shape.
+
+**IT IS TESTABLE IN ONE BUILD**: copy the curve tables into PSRAM (or internal
+RAM, if 126 KB can be found) at boot and re-measure. If the burst collapses,
+that was it; if it does not, the suspect is wrong and the next one is the 30 KB
+boot-image reseed. **NOT DONE, and not to be quoted until it is.**
+
+## THE UNDERRUNS ARE NOT THE BURST, AND I DO NOT YET KNOW WHAT THEY ARE
+
+They climb at roughly 5 per second while the engine sits UNDER budget, and the
+firmware's own `nearest burst` reads **245 chunks** on most of them -- as far
+from a burst as the counter can report. Twice the drift jumps by 3.6 s and
+3.4 s inside a single 5-second window, which no 5 % overrun can produce.
+
+Something blocks for seconds at a time. I have no measurement that names it and
+I am not going to guess a fifth time in one session. The instrumentation that
+would settle it: timestamp the LONGEST single i2s_channel_write and the longest
+gap between block starts, and print what the loop was doing when it happened.
