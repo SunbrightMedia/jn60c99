@@ -112,6 +112,14 @@ over 2, so the second board is also how the fork can stop approximating:
 `EB_HALF_OS_VCF`, `EB_DCO_WT` and `EB_CR_N=4` become reconsiderable. That is
 END_GOAL item 1, not item 4.
 
+## ⚠ EVERY CYCLE FIGURE IN THIS FILE IS DELAY TYPE 0 (`data/patch_dependent_fx.md`)
+MEASURED 2026-08-12: patches with DELAY TYPE 2, 3 or 5 cost about **DOUBLE** --
+~10,000 cycles against ~5,200 -- because those arms are a pitch-shifting delay
+and the engine's largest FX module. **18 of 64 factory patches** use them. The
+listen blob was built from patch 0, which is TYPE 0, so every number in track B
+is the cheapest of three classes. A real-time budget must be met by the WORST
+patch. This is now B's binding constraint, ahead of the 425-cycle gap.
+
 ## The three facts that must not be re-litigated
 - **One chip cannot do it:** 6v+FX single-chip measured 10,479 = 1.93× over.
 - **The split matters more than any lever:** wrong split costs 1,863 cycles.
