@@ -1446,6 +1446,34 @@ void app_main(void)
     unsigned long wrote_blocked_us = 0;
     int step = 0, gate = 0;
     unsigned long patch_frames = 0;
+    /* ---- THE STALL BISECT AND THE GAP METER (2026-08-12) -----------------
+     *
+     * MEASURED and unexplained: underruns climb about 5/s while the engine's
+     * own timed region sits UNDER budget, `nearest burst` reads 245 chunks on
+     * most of them, and twice the drift jumped 3.5 s inside ONE five-second
+     * window. No 5 % overrun produces that. SOMETHING BLOCKS FOR SECONDS and
+     * four hypotheses in one session were wrong, so this build stops guessing.
+     *
+     * TWO INSTRUMENTS, and between them they leave nowhere for the cause to
+     * hide:
+     *
+     * 1. THE GAP METER. The timed region measures render_block. It cannot see
+     *    time spent ANYWHERE ELSE in the loop -- the PCM tail, the I2S write,
+     *    printf, the burst, an interrupt. So this measures BLOCK START TO
+     *    BLOCK START, which is the whole period by construction, and records
+     *    the worst one with a TAG for what the loop had just done. Whatever
+     *    the missing time is, it is inside this number and outside the other.
+     *
+     * 2. THE BISECT. Patch stepping alternates 30 s ON, 30 s OFF, and the
+     *    underrun count is reported PER WINDOW. If the OFF windows are clean
+     *    the burst is the cause and `nearest burst` is lying about it; if both
+     *    windows leak the cause is in the steady state and the burst is
+     *    exonerated. One flash answers a question four hypotheses could not. */
+    unsigned long gap_max = 0, gap_tag = 0, gap_at = 0;
+    unsigned long w_underrun0 = 0, w_chunks0 = 0;
+    int           w_step_on = 1;
+    int64_t       t_prev_block = 0;
+    unsigned long phase_tag = 0;   /* 1 write 2 report 3 burst 4 publish 5 tail */
     /* the DECODED underrun counters. The old single `underrun`
      * conflated an ESP_ERR_TIMEOUT with a short write, and a
      * counter nobody has decoded is the same class of defect as a
@@ -1891,6 +1919,15 @@ void app_main(void)
         int64_t t0 = esp_timer_get_time();
         int64_t te = 0;
         int i;
+        if (t_prev_block) {
+            unsigned long g = (unsigned long)(t0 - t_prev_block);
+            if (g > gap_max) {
+                gap_max = g; gap_tag = phase_tag;
+                gap_at  = (unsigned long)(t0 - t_start) / 1000ul;
+            }
+        }
+        t_prev_block = t0;
+        phase_tag = 5;
 #if S3L_SWEEP
         /* THE COST SWEEP overrides the chord with 0, 1 and 2 voices to get a
          * slope and an intercept from silicon. It renders SILENCE for its
@@ -1988,7 +2025,8 @@ void app_main(void)
              * the patch changes while the chord is held -- which is where the
              * publish contract's transitions actually bite (a bisected
              * instrument is only audible if something is sounding). */
-            if (++patch_frames >= (unsigned long)(S3L_PATCH_SECS * SR)) {
+            if (w_step_on &&
+                ++patch_frames >= (unsigned long)(S3L_PATCH_SECS * SR)) {
                 patch_frames = 0;
                 dev_request((dev_patch + 1) % DEVCRC_NPATCH, gate);
             }
@@ -2008,6 +2046,7 @@ void app_main(void)
              * permanently behind there is ALWAYS free DMA space and the
              * write never blocks. The real test is the wall clock. */
             int64_t tw = esp_timer_get_time();
+            phase_tag = 1;
 #if S3L_FX_PIPE
             /* Bank 1-w_cur is the chunk core 1 just finished the FX for.
              * Before the first flip it is all zeros -- one chunk of silence
@@ -2186,6 +2225,31 @@ void app_main(void)
                        notes_seen, notes_dropped, note_bursts,
                        nb_min == 0xFFFFFFFFul ? 0ul : nb_min, nb_max, nb_last);
 #endif
+            {   /* THE BISECT WINDOW. 30 s of patch stepping, then 30 s of
+                 * none, forever. The underrun count is per window, so the two
+                 * are directly comparable and neither is a subtraction. */
+                unsigned long sec = chunks / (SR / CHUNK);
+                if (sec && sec % 30 == 0 && chunks % (SR / CHUNK) == 0) {
+                    static const char *TAG[6] = { "?", "i2s write", "printf",
+                                                  "burst", "publish", "tail" };
+                    unsigned long uw = underrun - w_underrun0;
+                    unsigned long cw = chunks - w_chunks0;
+                    printf("\n*** BISECT WINDOW %s: %lu underruns in %lu "
+                           "chunks (%.2f %%)   worst block-to-block gap "
+                           "%lu us at t=%lu ms, right after: %s   "
+                           "[budget %lu us]\n",
+                           w_step_on ? "PATCH STEPPING ON " : "PATCH STEPPING OFF",
+                           uw, cw, cw ? 100.0 * (double)uw / (double)cw : 0.0,
+                           gap_max, gap_at, TAG[gap_tag > 5 ? 0 : gap_tag],
+                           (unsigned long)(1000000ull * CHUNK / SR));
+                    printf("*** next window: PATCH STEPPING %s\n\n",
+                           w_step_on ? "OFF" : "ON");
+                    w_step_on = !w_step_on;
+                    w_underrun0 = underrun; w_chunks0 = chunks;
+                    gap_max = 0; gap_tag = 0; gap_at = 0;
+                }
+            }
+            phase_tag = 2;
             if ((chunks / (SR / CHUNK)) % S3L_REPORT_EVERY == 0)
             printf("t=%lus  %s  drift %+.1f ms  underruns=%lu  "
                    "render %.2f us/sample "
