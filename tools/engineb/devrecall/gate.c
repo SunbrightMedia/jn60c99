@@ -421,6 +421,20 @@ static void run_case(const unsigned char *bank, int p, int r, int seq,
     }
     recall(bank, p, synth, &seed);
     notes();
+#if defined(GATE_DEV) && defined(GATE_TOOTH_ULP)
+    /* THE 2026-08-11 GATE'S SECOND TOOTH, reproduced. Move ONE per-voice cell
+     * on ONE voice by ONE ULP. It is the smallest defect the scatter can carry
+     * and it is the shape a wrong stride or a swapped row would make. Voice 3,
+     * scatter slot 6 = cell 5520 (CONDITION tune, read at eb_coefs.c:213).
+     * If a 1-ULP move on one voice does not reach the compared bytes, the
+     * scatter is not being read and every scatter PASS is decoration. */
+    if (EBDEV_NV > 3) {
+        union { float f; unsigned u; } z;
+        z.f = EBDEV_S.scat[3][6];
+        z.u ^= 1u;
+        EBDEV_S.scat[3][6] = z.f;
+    }
+#endif
     eb_render_coefs_build(ST, &RC);
     eb_master_coefs_build(ST, &MC);
     eb_render_state_seed(ST, &RS);

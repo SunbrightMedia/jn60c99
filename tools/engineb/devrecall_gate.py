@@ -259,6 +259,49 @@ def case_name(c, nseq, nrate, npatch):
         [44100, 48000, 96000][r], p)
 
 
+def sizing():
+    """THE ARRAY SIZE, COMPILED not arithmetic.
+
+    `sizeof(ebdev_state)` is printed by the gate at NV=8 because that is what
+    the host half runs. The device runs SIX voices, so the number that matters
+    is not on the gate's own output path -- it is measured here by compiling
+    ebdev.c at each voice count and printing the compiler's own sizeof. Doing
+    it by hand is exactly the subtraction this project has been told is not a
+    measurement."""
+    print('\n' + '=' * 74)
+    print('THE DEVICE CELL ARRAY')
+    print('=' * 74)
+    src = os.path.join(BUILD, 'size.c')
+    open(src, 'w').write(
+        '#include <stdio.h>\n#include "ebdev.h"\n'
+        'int main(void){\n'
+        '  printf("NV=%d  ebdev_state = %u B  (tile %u + segments %u + '
+        'scatter %dx%d floats = %u + header %u)\\n",\n'
+        '     EBDEV_NV, (unsigned)sizeof(ebdev_state), EBDEV_VTILE,\n'
+        '     EBDEV_SEGBYTES, EBDEV_NV, EBDEV_NSCAT,\n'
+        '     (unsigned)(EBDEV_NV*EBDEV_NSCAT*4),\n'
+        '     (unsigned)(sizeof(ebdev_state)-EBDEV_VTILE-EBDEV_SEGBYTES'
+        '-EBDEV_NV*EBDEV_NSCAT*4));\n'
+        '  printf("      map selftest (chain vs table, exhaustive): %ld '
+        'disagreements\\n", ebdev_selftest());\n'
+        '  return ebdev_selftest()!=0;}\n')
+    bad = 0
+    for nv in (6, 8):
+        exe = os.path.join(BUILD, 'size%d' % nv)
+        r = sh([CC, '-std=c99', '-O2', '-w', '-DEBDEV_NV=%d' % nv,
+                '-I' + os.path.join(REPO, 'engine_b', 'dev'),
+                '-o', exe, src, os.path.join(REPO, 'engine_b/dev/ebdev.c')])
+        if r.returncode:
+            print(r.stderr[-1500:]); bad = 1; continue
+        r = sh([exe])
+        print(r.stdout.strip())
+        bad |= r.returncode
+    print('For scale: replicating the whole voice block per voice instead of '
+          'the\nscatter is %u B at NV=6 and %u B at NV=8 -- 2.8x.'
+          % (10688 * 6 + 19180 + 16, 10688 * 8 + 19180 + 16))
+    return bad
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--quick', action='store_true', help='trunk defaults only')
@@ -348,6 +391,7 @@ def main():
         if a.quick:
             break
 
+    overall |= sizing()
     overall |= patch_check(a.patch_scan)
 
     if not a.no_teeth:
@@ -470,6 +514,62 @@ def patch_check(rescan):
     print(r.stdout.strip())
     bad = r.returncode
 
+    # -------------------------------------------------------------- the tooth
+    # THE 2026-08-11 GATE'S THIRD TOOTH, in its post-fix form. Then it was
+    # "set the five uncarried record bytes to non-factory values" and the
+    # answer was 8,807 differing bytes -- a MEASUREMENT that the format was
+    # short. The format now carries them, so the same defect has to be planted
+    # the other way round: take one of the late bytes back OUT and require the
+    # net to say so. Without this, "NOT carried: 0" is a claim that has never
+    # been seen to be anything else.
+    ebdir = os.path.join(REPO, 'engine_b')
+    tdir = os.path.join(BUILD, 'patch_tooth')
+    os.makedirs(tdir, exist_ok=True)
+    pc = open(os.path.join(ebdir, 'eb_patch.c')).read()
+    ph = open(os.path.join(ebdir, 'eb_patch.h')).read()
+    m = re.search(r'const uint16_t eb_patch_offsets\[EB_PATCH_BYTES\] = \{(.*?)\};',
+                  pc, re.S)
+    nb = re.search(r'#define EB_PATCH_BYTES\s+(\d+)', ph)
+    if not m or not nb:
+        print('old-3 patch-format tooth: SKIPPED (eb_patch source shape changed)')
+        bad = 1
+    else:
+        for drop, what in ((3270, 'CHORUS PRE DELAY, record 3286'),
+                           (490, 'BEND GAIN, record 506')):
+            label = 'old-3  drop blob byte %d (%s)' % (drop, what)
+            keep = [int(x) for x in re.findall(r'\d+', m.group(1))]
+            if drop not in keep:
+                print('%-74s SKIPPED (not in the format)' % label)
+                bad = 1
+                continue
+            keep.remove(drop)
+            body = ',\n  '.join(', '.join('%d' % v for v in keep[i:i + 12])
+                                for i in range(0, len(keep), 12))
+            open(os.path.join(tdir, 'eb_patch.c'), 'w').write(
+                pc[:m.start()]
+                + 'const uint16_t eb_patch_offsets[EB_PATCH_BYTES] = {\n  '
+                + body + '\n};' + pc[m.end():])
+            open(os.path.join(tdir, 'eb_patch.h'), 'w').write(
+                ph[:nb.start()] + '#define EB_PATCH_BYTES   %d' % len(keep)
+                + ph[nb.end():])
+            texe = os.path.join(BUILD, 'patchchk_tooth')
+            rr = sh([CC, '-std=c99', '-O2', '-w', '-I' + tdir, '-I' + ebdir,
+                     '-o', texe, src, os.path.join(tdir, 'eb_patch.c')])
+            if rr.returncode:
+                print('%-74s SKIPPED (build failed)' % label)
+                print(rr.stderr[-800:])
+                bad = 1
+                continue
+            rr = sh([texe])
+            g = re.search(r'NOT carried: (\d+)', rr.stdout)
+            nmiss = int(g.group(1)) if g else 0
+            caught = bool(nmiss) and bool(rr.returncode)
+            print('%-74s %s (%d position%s reported missing)'
+                  % (label, 'CAUGHT' if caught else 'NOT CAUGHT',
+                     nmiss, '' if nmiss == 1 else 's'))
+            if not caught:
+                bad = 1
+
     if rescan:
         hb = build(False, 'scan', [])
         pos = os.path.join(BUILD, 'recall_positions.txt')
@@ -506,6 +606,15 @@ def patch_check(rescan):
 # that cannot fire is worse than no tooth, because it reads as coverage: this
 # project has already been bitten three times by a planted defect that its own
 # harness could not reach.
+#
+# ⚠ A TOOTH THAT FIRES FOR THE WRONG REASON IS THE SAME DISEASE, and this one
+# was caught here. The host half gathers its boot image THROUGH the generated
+# EBDEV_SEGTAB, so a tooth that regenerates the map and rebuilds only the
+# DEVICE half makes the two halves exchange a differently-packed boot image
+# -- and then every 'gen' tooth "passes" on a layout mismatch while proving
+# nothing about the map. Every 'gen' tooth below therefore rebuilds BOTH
+# halves and regenerates the reference. It cost the honest answer on old-5b:
+# with both halves rebuilt, deleting a COLD segment is NOT caught.
 MAP_TEETH = [
     ('a1  route cell 320 (the ADSR gate) through the SHARED TILE -- defect 2',
      {'scat_drop': 320}),
@@ -515,8 +624,16 @@ MAP_TEETH = [
      {'scat_drop': 5520}),
     ('old-4  route voice 0\'s scatter through the tile (the 2026-08-11 tooth)',
      {'scat0_in_tile': 1}),
-    ('old-1  move every segment boundary (regenerate at a different gap)',
+    ('old-1a move ONE HOT segment (84272) by 4 bytes in the port space',
+     {'gen': ['--shift-seg', '84272:4']}),
+    ('old-1b move every segment boundary (regenerate at a different gap)',
      {'gen': ['--gap', '64']}),
+    ('old-2  flip ONE ULP in ONE scatter cell (5520) on voice 3',
+     {'define': 'GATE_TOOTH_ULP'}),
+    ('old-5a delete a HOT segment (84272, the shared noise block)',
+     {'gen': ['--drop-seg', '84272']}),
+    ('old-5b delete a COLD segment (131072) -- EXPECTED BLIND, see below',
+     {'gen': ['--drop-seg', '131072'], 'blind': 1}),
     ('new  skip the scat[0]->scat[v] broadcast at recall',
      {'define': 'GATE_TOOTH_NOBCAST'}),
 ]
@@ -564,6 +681,7 @@ def teeth():
         bad = 1
 
     for name, how in MAP_TEETH:
+        ref_h, ref_boot = ho, boot
         try:
             if 'gen' in how:
                 r = sh([sys.executable, os.path.join(HERE, 'gen_devcells.py')] + how['gen'])
@@ -581,6 +699,21 @@ def teeth():
                 r = sh([sys.executable, tmp])
                 if r.returncode:
                     print('%-74s SKIPPED (generator failed)' % name); continue
+            if 'gen' in how or 'scat_drop' in how:
+                # REBUILD THE HOST HALF TOO. It gathers the boot image THROUGH
+                # EBDEV_SEGTAB / EBDEV_SCATTAB, so a tooth that regenerates the
+                # headers and rebuilds only the DEVICE half makes the two
+                # halves exchange a differently-packed boot image, and then it
+                # "fires" on that and proves nothing about the map. MEASURED:
+                # with the host half left stale, deleting a segment the gate
+                # itself reports COLD came back CAUGHT. See the note above
+                # MAP_TEETH.
+                th = build(False, 'tooth_h', [])
+                ref_h = os.path.join(BUILD, 'host_tooth.bin')
+                ref_boot = os.path.join(BUILD, 'boot_tooth.bin')
+                rc, _ = run(th, ref_h, ref_boot)
+                if rc:
+                    print('%-74s SKIPPED (host half refused)' % name); continue
             extra = []
             if 'define' in how:
                 extra = ['-D' + how['define']]
@@ -588,8 +721,8 @@ def teeth():
                 extra = ['-DEBDEV_TOOTH_SCAT0_IN_TILE']
             db = build(True, 'tooth', [], extra=extra + ['-DEBDEV_INSTRUMENT'])
             do = os.path.join(BUILD, 'tooth.bin')
-            rc, out = run(db, do, boot)
-            diff, err = compare(ho, do, rec, ncase)
+            rc, out = run(db, do, ref_boot)
+            diff, err = compare(ref_h, do, rec, ncase)
             if err:
                 print('%-74s CAUGHT (%s)' % (name, err)); continue
             n = len(diff)
@@ -597,7 +730,22 @@ def teeth():
             print('%-74s %s (%d of %d cases%s)'
                   % (name, 'CAUGHT' if caught else 'NOT CAUGHT', n, ncase,
                      ', dev half refused' if rc else ''))
-            if not caught:
+            if how.get('blind'):
+                # THE HONEST TOOTH. 18 of 32 segments are never touched by any
+                # scenario here, so deleting one CANNOT be caught -- and the
+                # 2026-08-11 gate said so too. It is reported rather than
+                # dropped, because a tooth that cannot fire reads as coverage.
+                # If it ever DOES fire, the segment was not cold and the
+                # coverage line above is wrong.
+                if caught:
+                    print('       ^ a segment reported COLD was in fact reached'
+                          ' -- the coverage line is wrong')
+                    bad = 1
+                else:
+                    print('       ^ EXPECTED. This measures the gate\'s blind'
+                          ' spot, not the map: the 18 cold segments cost'
+                          ' 4,272 B and no scenario reaches them.')
+            elif not caught:
                 bad = 1
         finally:
             open(seg_p, 'w').write(orig_seg)

@@ -63,37 +63,32 @@
                 if (off < 524288u) { \
                     if (off < 131072u) { \
                         if (off < 90400u) { \
-                            if (off < 88200u) { \
-                                if (off >= 84272u && off < 87156u) return EBDEV_S.sg + 0u + (off - 84272u); \
-                                goto miss; \
-                            } else { \
-                                if (off >= 88200u && off < 88204u) return EBDEV_S.sg + 2884u + (off - 88200u); \
-                                goto miss; \
-                            } \
+                            if (off >= 88200u && off < 88204u) return EBDEV_S.sg + 0u + (off - 88200u); \
+                            goto miss; \
                         } else { \
                             if (off < 101024u) { \
-                                if (off >= 90400u && off < 96916u) return EBDEV_S.sg + 2888u + (off - 90400u); \
+                                if (off >= 90400u && off < 96916u) return EBDEV_S.sg + 4u + (off - 90400u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 101024u && off < 102788u) return EBDEV_S.sg + 9404u + (off - 101024u); \
+                                if (off >= 101024u && off < 102788u) return EBDEV_S.sg + 6520u + (off - 101024u); \
                                 goto miss; \
                             } \
                         } \
                     } else { \
                         if (off < 192000u) { \
                             if (off < 154360u) { \
-                                if (off >= 131072u && off < 131076u) return EBDEV_S.sg + 11168u + (off - 131072u); \
+                                if (off >= 131072u && off < 131076u) return EBDEV_S.sg + 8284u + (off - 131072u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 154360u && off < 154364u) return EBDEV_S.sg + 11172u + (off - 154360u); \
+                                if (off >= 154360u && off < 154364u) return EBDEV_S.sg + 8288u + (off - 154360u); \
                                 goto miss; \
                             } \
                         } else { \
                             if (off < 262144u) { \
-                                if (off >= 192000u && off < 192004u) return EBDEV_S.sg + 11176u + (off - 192000u); \
+                                if (off >= 192000u && off < 192004u) return EBDEV_S.sg + 8292u + (off - 192000u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 262144u && off < 262148u) return EBDEV_S.sg + 11180u + (off - 262144u); \
+                                if (off >= 262144u && off < 262148u) return EBDEV_S.sg + 8296u + (off - 262144u); \
                                 goto miss; \
                             } \
                         } \
@@ -102,36 +97,36 @@
                     if (off < 1048576u) { \
                         if (off < 600000u) { \
                             if (off < 588912u) { \
-                                if (off >= 524288u && off < 524292u) return EBDEV_S.sg + 11184u + (off - 524288u); \
+                                if (off >= 524288u && off < 524292u) return EBDEV_S.sg + 8300u + (off - 524288u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 588912u && off < 588916u) return EBDEV_S.sg + 11188u + (off - 588912u); \
+                                if (off >= 588912u && off < 588916u) return EBDEV_S.sg + 8304u + (off - 588912u); \
                                 goto miss; \
                             } \
                         } else { \
                             if (off < 842520u) { \
-                                if (off >= 600000u && off < 600004u) return EBDEV_S.sg + 11192u + (off - 600000u); \
+                                if (off >= 600000u && off < 600004u) return EBDEV_S.sg + 8308u + (off - 600000u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 842520u && off < 842524u) return EBDEV_S.sg + 11196u + (off - 842520u); \
+                                if (off >= 842520u && off < 842524u) return EBDEV_S.sg + 8312u + (off - 842520u); \
                                 goto miss; \
                             } \
                         } \
                     } else { \
                         if (off < 2097152u) { \
                             if (off < 1499996u) { \
-                                if (off >= 1048576u && off < 1048580u) return EBDEV_S.sg + 11200u + (off - 1048576u); \
+                                if (off >= 1048576u && off < 1048580u) return EBDEV_S.sg + 8316u + (off - 1048576u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 1499996u && off < 1500000u) return EBDEV_S.sg + 11204u + (off - 1499996u); \
+                                if (off >= 1499996u && off < 1500000u) return EBDEV_S.sg + 8320u + (off - 1499996u); \
                                 goto miss; \
                             } \
                         } else { \
                             if (off < 2199952u) { \
-                                if (off >= 2097152u && off < 2097156u) return EBDEV_S.sg + 11208u + (off - 2097152u); \
+                                if (off >= 2097152u && off < 2097156u) return EBDEV_S.sg + 8324u + (off - 2097152u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 2199952u && off < 2199960u) return EBDEV_S.sg + 11212u + (off - 2199952u); \
+                                if (off >= 2199952u && off < 2199960u) return EBDEV_S.sg + 8328u + (off - 2199952u); \
                                 goto miss; \
                             } \
                         } \
@@ -142,36 +137,36 @@
                     if (off < 4297120u) { \
                         if (off < 4194304u) { \
                             if (off < 2509804u) { \
-                                if (off >= 2418432u && off < 2418436u) return EBDEV_S.sg + 11220u + (off - 2418432u); \
+                                if (off >= 2418432u && off < 2418436u) return EBDEV_S.sg + 8336u + (off - 2418432u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 2509804u && off < 2509808u) return EBDEV_S.sg + 11224u + (off - 2509804u); \
+                                if (off >= 2509804u && off < 2509808u) return EBDEV_S.sg + 8340u + (off - 2509804u); \
                                 goto miss; \
                             } \
                         } else { \
                             if (off < 4195232u) { \
-                                if (off >= 4194304u && off < 4194308u) return EBDEV_S.sg + 11228u + (off - 4194304u); \
+                                if (off >= 4194304u && off < 4194308u) return EBDEV_S.sg + 8344u + (off - 4194304u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 4195232u && off < 4195300u) return EBDEV_S.sg + 11232u + (off - 4195232u); \
+                                if (off >= 4195232u && off < 4195300u) return EBDEV_S.sg + 8348u + (off - 4195232u); \
                                 goto miss; \
                             } \
                         } \
                     } else { \
                         if (off < 6429408u) { \
                             if (off < 6395248u) { \
-                                if (off >= 4297120u && off < 4298084u) return EBDEV_S.sg + 11300u + (off - 4297120u); \
+                                if (off >= 4297120u && off < 4298084u) return EBDEV_S.sg + 8416u + (off - 4297120u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 6395248u && off < 6396628u) return EBDEV_S.sg + 12264u + (off - 6395248u); \
+                                if (off >= 6395248u && off < 6396628u) return EBDEV_S.sg + 9380u + (off - 6395248u); \
                                 goto miss; \
                             } \
                         } else { \
                             if (off < 6463712u) { \
-                                if (off >= 6429408u && off < 6430932u) return EBDEV_S.sg + 13644u + (off - 6429408u); \
+                                if (off >= 6429408u && off < 6430932u) return EBDEV_S.sg + 10760u + (off - 6429408u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 6463712u && off < 6463720u) return EBDEV_S.sg + 15168u + (off - 6463712u); \
+                                if (off >= 6463712u && off < 6463720u) return EBDEV_S.sg + 12284u + (off - 6463712u); \
                                 goto miss; \
                             } \
                         } \
@@ -180,36 +175,36 @@
                     if (off < 10691936u) { \
                         if (off < 8594768u) { \
                             if (off < 8388608u) { \
-                                if (off >= 6496496u && off < 6497604u) return EBDEV_S.sg + 15176u + (off - 6496496u); \
+                                if (off >= 6496496u && off < 6497604u) return EBDEV_S.sg + 12292u + (off - 6496496u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 8388608u && off < 8388612u) return EBDEV_S.sg + 16284u + (off - 8388608u); \
+                                if (off >= 8388608u && off < 8388612u) return EBDEV_S.sg + 13400u + (off - 8388608u); \
                                 goto miss; \
                             } \
                         } else { \
                             if (off < 8999996u) { \
-                                if (off >= 8594768u && off < 8594776u) return EBDEV_S.sg + 16288u + (off - 8594768u); \
+                                if (off >= 8594768u && off < 8594776u) return EBDEV_S.sg + 13404u + (off - 8594768u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 8999996u && off < 9000000u) return EBDEV_S.sg + 16296u + (off - 8999996u); \
+                                if (off >= 8999996u && off < 9000000u) return EBDEV_S.sg + 13412u + (off - 8999996u); \
                                 goto miss; \
                             } \
                         } \
                     } else { \
                         if (off < 10758864u) { \
                             if (off < 10726256u) { \
-                                if (off >= 10691936u && off < 10693476u) return EBDEV_S.sg + 16300u + (off - 10691936u); \
+                                if (off >= 10691936u && off < 10693476u) return EBDEV_S.sg + 13416u + (off - 10691936u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 10726256u && off < 10726264u) return EBDEV_S.sg + 17840u + (off - 10726256u); \
+                                if (off >= 10726256u && off < 10726264u) return EBDEV_S.sg + 14956u + (off - 10726256u); \
                                 goto miss; \
                             } \
                         } else { \
                             if (off < 11022032u) { \
-                                if (off >= 10758864u && off < 10759876u) return EBDEV_S.sg + 17848u + (off - 10758864u); \
+                                if (off >= 10758864u && off < 10759876u) return EBDEV_S.sg + 14964u + (off - 10758864u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 11022032u && off < 11022352u) return EBDEV_S.sg + 18860u + (off - 11022032u); \
+                                if (off >= 11022032u && off < 11022352u) return EBDEV_S.sg + 15976u + (off - 11022032u); \
                                 goto miss; \
                             } \
                         } \

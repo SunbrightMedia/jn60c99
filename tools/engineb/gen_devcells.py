@@ -142,6 +142,15 @@ def main():
                     help='drop the 14 unprovenanced segments (see cells_legacy.txt)')
     ap.add_argument('--check', action='store_true',
                     help='regenerate into memory and fail if the files differ')
+    ap.add_argument('--drop-seg', type=int, default=-1, metavar='LO',
+                    help='TOOTH: delete the segment starting at byte offset LO. '
+                         'Used by devrecall_gate.py to measure which segments '
+                         'the scenario set can actually reach.')
+    ap.add_argument('--shift-seg', default='', metavar='LO:DELTA',
+                    help='TOOTH: move the segment starting at LO by DELTA bytes '
+                         'in the PORT address space. The 2026-08-11 gate\'s '
+                         'first tooth. Both halves rebuild against it, so what '
+                         'it perturbs is the map and not the exchange format.')
     a = ap.parse_args()
 
     touched = read_offsets(os.path.join(DATA, 'touched.txt'))
@@ -161,6 +170,17 @@ def main():
             sys.exit('cell %d folds to %d, outside the %d-byte tile' % (o, k, VTILE))
 
     segs = segments(nonvoice, a.gap)
+    if a.drop_seg >= 0:
+        before = len(segs)
+        segs = [s for s in segs if s[0] != a.drop_seg]
+        if len(segs) == before:
+            sys.exit('--drop-seg %d: no segment starts there' % a.drop_seg)
+    if a.shift_seg:
+        lo0, d = (int(x) for x in a.shift_seg.split(':'))
+        if not any(s[0] == lo0 for s in segs):
+            sys.exit('--shift-seg: no segment starts at %d' % lo0)
+        segs = [((lo + d, hi + d) if lo == lo0 else (lo, hi)) for lo, hi in segs]
+        segs.sort()
     placed, at = [], 0
     for lo, hi in segs:
         placed.append((lo, hi, at))
