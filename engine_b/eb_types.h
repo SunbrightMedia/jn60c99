@@ -193,6 +193,7 @@ typedef struct {
     uint8_t portamento, assign_mode, bend_range, delay_sync, vca_level;
     uint8_t vca_mode, condition, hpf_type, delay_type, vcf_env_src;
     uint8_t arp_sw, arp_type, arp_step;
+    uint8_t bend_gain;         /* record 506, src/juno_apply.c:447 */
 
     /* --- NOT YET LOCATED. These are real JUNO-60 parameters engine B will
      *     need; their blob positions have not been derived here and are NOT
@@ -201,8 +202,11 @@ typedef struct {
     uint8_t effect_type, effect_depth, delay_fb, reverb_type, reverb_time;
     uint8_t legato, transpose;
     uint8_t dly_hicut, dly_locut, dly_lfdamp, dly_hfdamp;
-    uint8_t cho_hicut, cho_locut, cho_predelay;
-    uint8_t rev_predelay, rev_locut, rev_hicut, rev_density;
+    uint8_t rev_predelay, rev_locut, rev_hicut;
+
+    /* --- LOCATED 2026-08-12 and now carried: single-byte (int1x7) record
+     *     reads in src/finefx_recall.c, not nibble pairs. */
+    uint8_t cho_hicut, cho_locut, cho_predelay, rev_density;
 } eb_params;
 
 /* ------------------------------------------------------------------ FX

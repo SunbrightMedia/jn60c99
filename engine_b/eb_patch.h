@@ -70,10 +70,39 @@
 #include <stddef.h>
 #include "eb_types.h"
 
-/* 127, NOT the 118 of docs/preset/COMPACT_FORMAT.md. MEASURED here, against the
- * oracle, and the difference is a real defect in that format -- see the header
- * comment above and docs/engineb/COMPACT_FORMAT_FINDING.md. */
-#define EB_PATCH_BYTES   127
+/* 133. It was 118, then 127, and now 133, and each step was a MEASUREMENT
+ * finding the previous one short. The last six (2026-08-12):
+ *
+ *   3270 3271 3272   CHORUS PRE DELAY / LOW CUT / HIGH CUT (record 3286-3288)
+ *   3934             REVERB DENSITY                        (record 3950)
+ *        PROVEN by execution: tools/engineb/devrecall_gate.py --patch-scan
+ *        perturbs every record position over six base patches and reports the
+ *        112 that move the recalled coefficients. These four are among them
+ *        and were not carried. All four are CONSTANT in all 64 factory
+ *        patches, which is exactly why the byte scan that produced the
+ *        127-byte set could not see them -- the same blindness this header
+ *        has always warned about, caught by the same method that produced it.
+ *   490 491          BEND GAIN                             (record 506-507)
+ *        NOT a scan result, and that is the point. The scan calls it INERT,
+ *        because src/juno_apply.c:447-453 multiplies it by juno_curve(4,
+ *        BEND RANGE) and juno_curve(22, BEND SENS), and with any of those at
+ *        a zeroing value the whole product is 0 whatever BEND GAIN does. A
+ *        single-byte perturbation scan can NEVER see a parameter that is one
+ *        factor of a product of several. It is carried because the recall
+ *        path READS it, which is the rule that does not depend on a probe
+ *        being clever enough.
+ *
+ * The 2026-08-11 design said 132. It named record 506 and not 507 -- and 506
+ * is the HIGH nibble, which for a parameter whose range is 0..3 can only ever
+ * contribute multiples of 16 and therefore cannot carry the value at all. A
+ * nibble-packed parameter needs BOTH its bytes or it is not readable, which is
+ * the condition eb_patch_coverage() has always reported. So: 133, not 132.
+ *
+ * WHAT KEEPS IT FROM SHIPPING SHORT AGAIN: eb_patch_record_coverage() checks
+ * the carried set against EB_RECALL_POS[] -- the measured list of every record
+ * position that moves a recalled coefficient, plus the READ-but-inert list --
+ * and eb_patch_selftest() fails if anything is uncovered. */
+#define EB_PATCH_BYTES   133
 #define EB_RECORD_BYTES  20223
 #define EB_BANK_HEADER   23
 #define EB_BANK_BLOB_OFF 16
@@ -97,6 +126,10 @@ int eb_patch_install(uint8_t *record, const eb_patch *p);
 
 /* One carried blob byte, or -1 if that offset is not in the 118. */
 int eb_patch_byte(const eb_patch *p, int blob_off);
+
+/* One SINGLE-BYTE (int1x7) parameter at RECORD offset `roff`, 0..127, or -1 if
+ * that byte is not carried. The fine-FX leaves are read this way. */
+int eb_patch_param_raw(const eb_patch *p, int roff);
 
 /* One nibble-packed parameter at RECORD offset `roff`, 0..255,
  * or -1 if either of its two bytes is not carried. */
@@ -126,7 +159,27 @@ int eb_patch_unresolved(const char **names, int n);
 /* Human name for a record offset in the binding table ("?" if unknown). */
 const char *eb_patch_name_of(int roff);
 
-/* Internal consistency of this file's own tables. 0 = ok. */
+/* EVERY RECALL-AFFECTING RECORD POSITION MUST BE CARRIED.
+ *
+ * This is the mechanical net, and it is a different question from
+ * eb_patch_coverage(): that one asks whether the parameters THIS FILE KNOWS
+ * ABOUT are readable, so a parameter nobody thought to put in TAB is invisible
+ * to it. This one asks whether every record byte the port's recall reacts to
+ * is stored, and it does not need anybody to have thought of the parameter.
+ *
+ * EB_RECALL_POS[] is two lists concatenated:
+ *   - MEASURED: the 112 positions that move eb_render_coefs or eb_master_coef,
+ *     from tools/engineb/devrecall_gate.py --patch-scan (four probe values,
+ *     six base patches, three of them with every nibble randomised). PROVEN.
+ *   - READ-BUT-INERT: positions the recall path reads whose effect a
+ *     single-byte scan structurally cannot see, each with its file:line. READ.
+ *
+ * Returns the number of positions not carried; fills `missing` with them.
+ * 0 is the only acceptable answer. */
+int eb_patch_record_coverage(int *missing, int nmiss);
+
+/* Internal consistency of this file's own tables, INCLUDING the record
+ * coverage above. 0 = ok. */
 int eb_patch_selftest(void);
 
 #endif /* ENGINEB_EB_PATCH_H */

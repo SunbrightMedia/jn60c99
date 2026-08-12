@@ -74,6 +74,41 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
             float f; memcpy(&f, &b, 4);
             JF(state, 91152) = f;
         }
+#ifndef JUNO_TOOTH_NO_ET2_LFO
+        /* ★ EFFECT TYPE 2 (chorus I) WRITES 91152 TOO, AND THE PORT DID NOT.
+         *
+         * PROVEN by isolated single-dispatch of the plugin's OWN EFFECT TYPE
+         * setter (value-tree index 873) under Unicorn, fresh engine per trial,
+         * two different base patches so "unchanged" cannot be confused with
+         * "written the same value" (docs/engineb/data/devrecall/probes/
+         * iso873.py, rates873.py):
+         *
+         *      873 <- 0, 1, 5   no write to 91152
+         *      873 <- 2         91152 = f32(0.96f) / f32(H)
+         *      873 <- 3         the chorus II arm above
+         *      873 <- 4         the flanger arm below
+         *
+         * bit-exact at 44100/48000/88200/96000 (0x37b69bf1 / 0x37a7c5ac /
+         * 0x37369bf1 / 0x3727c5ac) -- the SAME expression as juno_prepare.c:111.
+         *
+         * WHY NO GATE EVER SAW IT: from a fresh engine, 91152 already holds
+         * 0.96/H, so the missing write is the identity and every COLD gate in
+         * this repo passes. It only shows WARM: load an EFFECT TYPE 3 patch,
+         * then an EFFECT TYPE 2 patch, and the chorus LFO stays at chorus II's
+         * rate -- 3.7188209e-05 instead of 2.1768707e-05 at 44.1 kHz, 1.71x --
+         * and src/master_render.c:2783 reads 91152 every sample. Ten factory
+         * pairs are ET3 -> ET2 and nine of them render differently. This is a
+         * plain patch change on the shipping engine, so it affects the DAW.
+         *
+         * Cold renders are BIT-IDENTICAL with and without this line (it is the
+         * identity from a fresh engine), so the 57/57 seal is untouched.
+         * MEASURED: tools/engineb/devrecall_gate.py's ET3->ET2 check, and its
+         * tooth is -DJUNO_TOOTH_NO_ET2_LFO. */
+        if (etype == 2) {
+            float Hf = JF(state, 16); if (!(Hf > 0.0f)) Hf = 96000.0f;
+            JF(state, 91152) = 0.96f / Hf;
+        }
+#endif
         /* EFFECT TYPE 4 (FLANGER) re-shapes block A's structural cells to the flanger
          * coefficients — the OLD "2/3/4 write bit-identical block A" reading was wrong
          * for mode 4. Four cells, DEPTH/TONE-independent (verified across base patches

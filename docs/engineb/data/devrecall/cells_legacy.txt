@@ -1,0 +1,42 @@
+# cells_legacy.txt -- the 14 four-byte segments that the 2026-08-11 map carried
+# and that NO source in this repo can account for.
+#
+# PROVENANCE: they are in `ebdev_seg.h` as generated on 2026-08-11 and in NO
+# other list. They are not in `touched.txt` (the executed recall trace) and they
+# are not in `static_extra.txt` (the static constant scan whose output was
+# preserved). Every one of them greps out of the sources as an ORDINARY NUMERIC
+# CONSTANT, not as a cell offset:
+#
+#     131072 262144 524288 1048576 2097152 4194304 8388608   powers of two
+#     524288    src/juno_ftz.c        (a float scale)
+#     588912    src/juno_prepare.c
+#     842520 154360   src/juno_note.c
+#     1048576   src/juno_init.c
+#     2418432 2509804 src/juno_prepare.c
+#     1499996 8999996 192000 600000   sample-rate-shaped constants
+#
+# READ, not PROVEN: I did not execute anything that writes them. My reading is
+# that they are FALSE POSITIVES of a static scan that could not tell a scale
+# factor from an offset. They are kept anyway, because 56 bytes is a cheap
+# insurance premium against a cell that no gate case moves -- and because
+# dropping them would silently change a map whose Xtensa fold was already
+# measured. They are listed HERE, separately, so that the day somebody wants
+# the 56 bytes and the 14 binary-search nodes back, the decision is one file
+# deletion and not an archaeology problem.
+#
+# The gate prints them as COLD every run. If they are still cold when a
+# rendered device null exists, delete this file.
+131072
+154360
+262144
+524288
+588912
+842520
+1048576
+1499996
+2097152
+2418432
+2509804
+4194304
+8388608
+8999996
