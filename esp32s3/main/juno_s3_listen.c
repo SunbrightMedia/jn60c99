@@ -729,6 +729,29 @@ static void dev_request(int patch, int gate)
 #define S3L_MIDI 0
 #endif
 
+/* S3L_PLAY -- THE INSTRUMENT, NOT THE DEMONSTRATION.
+ *
+ * Everything this firmware does by itself is a TEST FEATURE: it steps through
+ * all 64 patches every S3L_PATCH_SECS seconds, and it plays a chord on a
+ * 1.5 s / 0.7 s loop. Both were correct while nothing could play it.
+ *
+ * They are also why the board looks worse than it is. Each patch step and
+ * each gate change asks for a 2-million-cycle burst, which is 8 ms against a
+ * 5.8 ms block. That makes the 16 ms gaps and most of the underruns. A player
+ * does none of this: a player selects ONE patch and presses keys.
+ *
+ * With S3L_PLAY=1 the firmware does nothing until a key arrives. A key press
+ * rebuilds only the voices it touched (about 135,000 cycles, not 2 million).
+ *
+ * MEASURED, and the reason to expect this to hold: DELAY TYPE 0 patches run
+ * 5,150-5,400 cycles against the 5,442 budget. 46 of the 64 factory patches
+ * are TYPE 0. The other 18 use DELAY TYPE 2, 3 or 5, measure 6,600-6,900, and
+ * will NOT hold real time. That is the PSRAM work and it is not done. */
+#ifndef S3L_PLAY
+#define S3L_PLAY 0
+#endif
+
+
 /* THE NOTE BURST. Same shape as dev_burst() minus the cold reseed and the bank
  * apply: the cell array is already this patch's and must stay that way. */
 static int dev_note_burst(void)
@@ -1619,7 +1642,7 @@ void app_main(void)
      *    exonerated. One flash answers a question four hypotheses could not. */
     unsigned long gap_max = 0, gap_tag = 0, gap_at = 0;
     unsigned long w_underrun0 = 0, w_chunks0 = 0;
-    int           w_step_on = 1;
+    int           w_step_on = !S3L_PLAY;   /* S3L_PLAY: no patch stepping */
     int64_t       t_prev_block = 0;
     unsigned long phase_tag = 0;   /* 1 write 2 report 3 burst 4 publish 5 tail */
     /* the DECODED underrun counters. The old single `underrun`
@@ -1835,6 +1858,19 @@ void app_main(void)
         dev_muted = 1;
     }
     printf("RECALL: boot recall done, patch %d, gen %lu\n", dev_patch, REC.gen);
+#if S3L_PLAY
+    /* SILENCE AT POWER-ON. dev_burst() sounds the built-in chord so the CRC
+     * can be compared against the host answer key, and that check is worth
+     * keeping. An instrument must not then drone. So the chord is released
+     * here, after the check, and the coefficients are rebuilt once. */
+    eb_devseq_notes_off(DEVCHORD_VOICE, DEVCHORD_N);
+    eb_recall_build(&REC);
+    if (eb_recall_publish(&REC) != 0)
+        printf("PLAY: the release publish refused -- the boot chord is held.\n");
+    else
+        printf("PLAY: boot chord released. The board is SILENT until you play "
+               "a key. Patch stepping is OFF.\n");
+#endif
 #else
     load_coefs(CH, 0);
 #endif
@@ -2172,7 +2208,10 @@ void app_main(void)
              * captured at or the copy is a jump. It was: 1024 frames captured
              * against 1.5 s held, a 4,716-count step, audible as a pluck at
              * the end of every note. */
-            if (++frame >= (unsigned long)(gate ? S3L_REL_FRAMES : S3L_HOLD_FRAMES)) {
+            /* S3L_PLAY: the keyboard owns the notes. The built-in chord loop
+             * is a test feature and its gate change costs a full burst. */
+            if (!S3L_PLAY &&
+                ++frame >= (unsigned long)(gate ? S3L_REL_FRAMES : S3L_HOLD_FRAMES)) {
                 frame = 0;
                 gate = !gate;
 #if S3L_RECALL
