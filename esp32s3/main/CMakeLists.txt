@@ -10,6 +10,12 @@ file(GLOB EB_SRCS ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/eb_*.c)
 # code reads.
 if(S3_LISTEN)
     set(APP_SRC "juno_s3_listen.c")
+    if(S3_USBMIDI)
+        # USB MIDI is OPT-IN. It pulls in TinyUSB and puts a USB interrupt on a
+        # core that renders audio; a build that does not want a DAW attached
+        # should not carry either.
+        list(APPEND APP_SRC "s3_usbmidi.c")
+    endif()
     set(APP_EMBED "s3_listen.bin")
 else()
     set(APP_SRC "juno_s3_main.c" "../../tools/engineb/qemu/harness.c")
@@ -54,13 +60,25 @@ else()
     set(RECALL_SRCS "")
 endif()
 
+# REQUIRES is resolved at CONFIGURE time, so a generator expression in it is
+# silently wrong -- it fails inside __build_resolve_and_add_req with no useful
+# message. Build the list first.
+# tinyusb is required UNCONDITIONALLY, and that is deliberate. IDF resolves
+# REQUIRES in an early expansion pass where this file's own cache variables are
+# not reliably visible, so `if(S3_USBMIDI) list(APPEND ...)` produced a main
+# component with NO tinyusb requirement and a build that failed on a missing
+# tusb.h -- a conditional that silently does not fire. With S3_USBMIDI off the
+# class code is unreferenced and --gc-sections drops it.
+set(APP_REQ esp_driver_i2s esp_driver_uart driver esp_timer esp_hw_support
+            tinyusb)
+
 idf_component_register(
     SRCS ${APP_SRC} ${EB_SRCS} ${RECALL_SRCS}
     INCLUDE_DIRS "." "../../engine_b" "../../engine_b/dev" "../../src"
                  "../../tools/engineb/devboot" "../../tools/engineb/qemu"
     EMBED_FILES ${APP_EMBED}
     LDFRAGMENTS "linker.lf"
-    REQUIRES esp_driver_i2s esp_driver_uart driver esp_timer esp_hw_support)
+    REQUIRES ${APP_REQ})
 
 # The project's load-bearing flags, verbatim from the host build. FMA does
 # not exist on the LX7, but the flag stays uniform so nobody has to reason

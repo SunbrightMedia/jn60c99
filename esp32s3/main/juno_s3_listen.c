@@ -729,6 +729,14 @@ static void dev_request(int patch, int gate)
 #define S3L_MIDI 0
 #endif
 
+/* S3L_USBMIDI -- be a class-compliant USB MIDI device on the NATIVE USB
+ * socket, so a DAW can play the instrument with no parts and no driver. Read
+ * main/s3_usbmidi.c: the console socket CANNOT do this, and the USB interrupt
+ * is a real-time risk that `un=` and `gap=` will report. */
+#ifndef S3L_USBMIDI
+#define S3L_USBMIDI 0
+#endif
+
 /* S3L_PLAY -- THE INSTRUMENT, NOT THE DEMONSTRATION.
  *
  * Everything this firmware does by itself is a TEST FEATURE: it steps through
@@ -819,7 +827,10 @@ static int dev_note_burst(void)
 static uint8_t m_status = 0, m_d1 = 0;
 static int     m_have = 0;
 
-static void midi_event(int on, int note, int vel)
+/* NON-STATIC on purpose: main/s3_usbmidi.c calls this so that USB MIDI and
+ * UART MIDI share ONE velocity policy and ONE allocator path. Two entry points
+ * that decide separately is how the assigner-mode defect survived for months. */
+void s3_midi_event(int on, int note, int vel)
 {
     int n;
     ++notes_seen;
@@ -856,7 +867,7 @@ static void midi_poll(void)
         }
         if ((m_status & 0xF0) != 0x90 && (m_status & 0xF0) != 0x80) continue;
         if (!m_have) { m_d1 = c; m_have = 1; continue; }
-        midi_event((m_status & 0xF0) == 0x90, m_d1, c);
+        s3_midi_event((m_status & 0xF0) == 0x90, m_d1, c);
         m_have = 0;                              /* running status stays armed */
     }
 }
@@ -1910,6 +1921,16 @@ void app_main(void)
            S3L_MIDI_VELSW ? "ON" : "OFF",
            S3L_MIDI_VELSW ? "played velocity passes through"
                           : "every note forced to 100 -- the plugin's own default");
+#if S3L_USBMIDI
+    {   extern int s3_usbmidi_start(void);
+        if (s3_usbmidi_start())
+            printf("USB MIDI: started. Plug a USB-C cable into the board's OTHER\n"
+                   "          socket -- the NATIVE one, not the console/flash one --\n"
+                   "          and select \"JUNO-60 Engine B\" in your DAW.\n");
+        else
+            printf("USB MIDI: FAILED TO START. UART MIDI on GPIO 18 still works.\n");
+    }
+#endif
     printf("PLAY IT. Notes are allocated by eb_alloc (CAssignJu60's law, "
            "270/270 vs the plugin), applied through the port's own note path, "
            "and published at the next block boundary.\n");
