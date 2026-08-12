@@ -15,6 +15,59 @@ HOW and WHAT ORDER.)
 
 ---
 
+## ⚑ THE INVARIANT (USER-BINDING, 2026-08-12) — READ BEFORE ANY TRACK
+
+The user's words: **the fork must be as IMMUTABLE as possible -- there is NO way
+for the code to break under any circumstance, including stutters caused in any
+way, including changing a bunch of parameters at once.**
+
+This is END_GOAL item 4 made TESTABLE. It is not a sixth track; it is a
+condition every track must satisfy, and a track step is not DONE until it does.
+
+**THE INVARIANT, in one line: the audio block always completes on time, for
+every input.** Not on average. In the WORST CASE.
+
+Worst case means all of these at once: the most expensive patch (DELAY TYPE
+2/3/5), full polyphony, a chord arriving on the same block as a program change,
+and every parameter moving every block.
+
+### The four rules that make it true
+
+1. **NOTHING UNBOUNDED ON THE AUDIO PATH.** No allocation, no flash read, no
+   lock, no blocking call, no loop whose trip count depends on input. Every one
+   of these has already been found on this path at least once.
+2. **ALL OTHER WORK IS INCREMENTAL AND CAPPED.** Recall, parameter refresh and
+   note bursts get a FIXED budget of work per block and take more blocks when
+   there is more to do. This is what C10 and C9 are for.
+3. **THE OVERLOAD POLICY IS STATED, NOT ACCIDENTAL.** When more is asked than
+   fits, the CHANGE ARRIVES LATER. The audio never breaks. **Latency degrades;
+   continuity does not.** A dropped or delayed parameter update is acceptable; a
+   gap in the audio is not, ever, for any reason.
+4. **NO SILENT FAILURE.** Every refusal, every deferral, every queue that fills
+   is COUNTED and reported. A system that copes quietly cannot be proven to
+   cope.
+
+### How it is proven -- not by listening
+
+An adversarial STRESS GATE, and the standard is that it has been seen to FAIL
+before it is believed: all 64 patches x worst-case polyphony x a program change
+on every boundary x every parameter changing every block, with a hard
+block-overrun counter that must read **0**. Anything above 0 is a defect against
+this invariant, whatever it sounds like.
+
+### What this changes about the tracks, stated now rather than discovered
+
+- **B4 is not "about 5 % headroom".** It is worst-case headroom, measured on the
+  most expensive patch, with everything else happening at the same time.
+- **The 18 DELAY TYPE 2/3/5 patches VIOLATE this invariant today** (6,600-6,900
+  cycles against 5,442). They are not a tuning item; they are the invariant's
+  binding constraint on one board.
+- **C9 and C10 are not conveniences.** They are how rules 2 and 3 are
+  implemented.
+- **A "usually fine" measurement is not evidence.** Every cycle figure in this
+  file that came from one patch and one chord has to be re-taken against the
+  worst case before it can support an invariant claim.
+
 ## THE FIVE TRACKS
 
 ### A. SOUND — the engine is audibly identical (END_GOAL 1, 6)
@@ -34,7 +87,7 @@ own configuration; the user's ear on WAVs is the final judge.
 | B1 chip A: 3 voices no FX | **DONE — FITS** (5,388 of 5,442, measured) |
 | B2 chip B: 2 voices + FX | **DONE — FITS** (M1: 5,410 of 5,442, measured) |
 | B3 chip B: 3 voices + FX | **NOT DONE — over by 691.** THE gap. One number. |
-| B4 real headroom (~5 %+ margin, so bursts don't click) | **NOT DONE, AND NOW BINDING.** M1's 105 underruns are GONE (burst off the audio path) but PLAY1 is 3-8 % over budget with two voices. |
+| B4 **WORST-CASE** headroom (see THE INVARIANT: worst patch, full polyphony, program change and parameter storm at once) | **NOT DONE, AND NOW BINDING.** M1's 105 underruns are GONE (burst off the audio path) but PLAY1 is 3-8 % over budget with two voices. |
 
 B3 has two routes: find ~700 cycles on chip B (cycle hunt AGAINST THE REAL
 INSTRUMENT, not the looped chord), or move one voice to chip A and accept 4+2

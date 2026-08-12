@@ -143,3 +143,22 @@ as smooth and monotonic between two proven neighbours. That is a mild,
 deliberate departure from "audibly identical to the plugin" in the direction of
 finer control. **It is the user's call, and it is recorded as a decision rather
 than slipped in.**
+
+
+## THE INVARIANT (user, 2026-08-12) -- a sharpening of item 4, equally binding
+
+Verbatim: **"i want the final fork to be as IMMUTABLE as possible, as in there
+is NO way for the code to break under any circumstance. this includes stutters
+and such in any capacity, caused in any way, including changing a bunch of
+parameters at once."**
+
+What it means in practice, and it is a HARD REAL-TIME requirement rather than a
+performance target: the audio block always completes on time for EVERY input --
+worst patch, full polyphony, a program change and a parameter storm on the same
+block. Bounded worst case, not a good average.
+
+The policy when more is asked than fits: **the change arrives later; the audio
+never breaks.** Latency degrades, continuity does not.
+
+FINAL_GUIDE.md carries the four rules and the stress gate that proves it. A
+track step is not DONE until it satisfies this.
