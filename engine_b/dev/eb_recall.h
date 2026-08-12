@@ -88,6 +88,14 @@ void eb_recall_build(eb_recall *r);
  * in which case NOTHING is published. */
 int  eb_recall_publish(eb_recall *r);
 
+/* THE INCREMENTAL BURST. Rebuilds ONLY the voices in `mask`, after copying the
+ * live bank into the shadow so the rest is carried rather than stale. Read the
+ * block above its definition: the caller must name every voice whose cells
+ * moved, including a voice that was STOLEN. Master coefficients are copied,
+ * not rebuilt -- correct for a note event, WRONG for a patch change, which
+ * must keep calling eb_recall_build(). */
+void eb_recall_build_voices(eb_recall *r, unsigned mask);
+
 /* THE BURST SPLIT. Cycles spent in each half of the last eb_recall_build().
  * Written only when EB_RECALL_PROF is 1; zero otherwise. Read the block above
  * their definition in eb_recall.c for why they exist. */

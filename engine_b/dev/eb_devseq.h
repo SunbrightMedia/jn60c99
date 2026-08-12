@@ -106,6 +106,10 @@ void eb_devseq_notes_off(const int *voice, int n);
  * Returns the number of events it applied, or -1 if it met a kind it does not
  * know -- which must mute rather than be skipped, because an unapplied event is
  * a note the instrument did not play. */
+/* The voices whose cells the LAST eb_devseq_events() call wrote, as a bit per
+ * voice. Pass it straight to eb_recall_build_voices(); do not narrow it. */
+extern unsigned EB_DEVSEQ_TOUCHED;
+
 int eb_devseq_events(const eb_alloc_ev *ev, int n);
 
 /* Cell 592 as the RECALL left it -- juno_note_porta_gate's restore value.

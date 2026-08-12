@@ -436,6 +436,74 @@ static int publish_section(const unsigned char *bank)
     }
 #endif
 
+    /* ============= THE INCREMENTAL BURST, WHICH IS WHAT MAKES IT PLAYABLE ====
+     * MEASURED on silicon 2026-08-12: the voice coefficient build is 1,082,812
+     * cycles of a 1,992,935-cycle burst, and a key press pays all of it. That
+     * is 8 ms of stall on every note. eb_recall_build_voices() rebuilds only
+     * the voices a note touched.
+     *
+     * THE ONLY THING WORTH PROVING is that it is not an approximation: the
+     * incremental result must be BIT-IDENTICAL to the full build. So each
+     * check below does the same work twice and compares the bytes.
+     *
+     * AND IT MUST BE SEEN TO FAIL. The last two checks are teeth: an
+     * UNDER-STATED mask -- the caller's one real obligation, and the failure
+     * that would be silent on the board -- must produce a difference. If a
+     * tooth passes, the comparison is not looking at what it claims to. */
+    {
+        static eb_render_coefs FULL;
+        unsigned s5 = 5u;
+        int vch = 4;
+
+        recall(bank, 12, 0, &s5);
+        notes();
+        eb_recall_build(&REC);
+        if (eb_recall_publish(&REC) != 0) {
+            printf("  incremental setup publish refused -- aborting\n");
+            return 1;
+        }
+
+        /* A key press on ONE voice, applied through the port's own note path. */
+        juno_note_on(ST, vch, 67, 100);
+
+        eb_render_coefs_build(ST, &FULL);            /* the whole truth */
+        eb_recall_build_voices(&REC, 1u << vch);     /* the cheap way */
+        pcheck("incremental: one voice rebuilt == the full build, bit for bit",
+               memcmp(&FULL, REC.rc[1 - REC.cur], sizeof FULL) == 0);
+
+        /* A second note on a DIFFERENT voice, from the same live bank, to show
+         * the carried seven are carried and not merely still correct by luck. */
+        if (eb_recall_publish(&REC) != 0) {
+            printf("  incremental publish refused -- aborting\n"); return 1;
+        }
+        juno_note_on(ST, 1, 55, 90);
+        eb_render_coefs_build(ST, &FULL);
+        eb_recall_build_voices(&REC, 1u << 1);
+        pcheck("incremental: a second note carries the other seven voices",
+               memcmp(&FULL, REC.rc[1 - REC.cur], sizeof FULL) == 0);
+
+        /* TOOTH 1: name the wrong voice. */
+        if (eb_recall_publish(&REC) != 0) {
+            printf("  tooth publish refused -- aborting\n"); return 1;
+        }
+        /* VOICE 3, NOT 6. The fork builds with -DEB_NUM_VOICES=6, so a tooth
+         * on voice 6 pokes a voice that does not exist there, nothing differs,
+         * and the tooth reports itself as broken -- which is exactly what it
+         * did on its first run. Every index here must be inside the SMALLEST
+         * configuration the gate compiles, not the largest. */
+        juno_note_on(ST, 3, 72, 111);
+        eb_render_coefs_build(ST, &FULL);
+        eb_recall_build_voices(&REC, 1u << 0);       /* voice 0, not 3 */
+        pcheck("TOOTH: naming the wrong voice DOES differ (an under-stated "
+               "mask must never be silent)",
+               memcmp(&FULL, REC.rc[1 - REC.cur], sizeof FULL) != 0);
+
+        /* TOOTH 2: name no voice at all. */
+        eb_recall_build_voices(&REC, 0u);
+        pcheck("TOOTH: an empty mask DOES differ",
+               memcmp(&FULL, REC.rc[1 - REC.cur], sizeof FULL) != 0);
+    }
+
     printf("PUBLISH CONTRACT: %d of %d checks ok\n", PUB_RUN - PUB_FAIL, PUB_RUN);
     return PUB_FAIL ? 1 : 0;
 }

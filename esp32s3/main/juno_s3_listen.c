@@ -637,7 +637,16 @@ static int dev_note_burst(void)
         dev_mute_why = "the allocator emitted an event the device cannot apply";
         return 1;
     }
-    eb_recall_build(&REC);              /* into the SHADOW bank */
+    /* THE INCREMENTAL BURST. A patch change moves every voice and the master
+     * chain; a key press moves the voices the allocator just named and nothing
+     * else. MEASURED on silicon: the full burst is 1,992,935 cycles, of which
+     * the voice build is 1,082,812 and the master build 121,213 -- so a note
+     * paying the full price stalls the audio loop for 8 ms and clicks.
+     *
+     * The mask is the applier's, not this file's. Proven bit-identical to the
+     * full build by tools/engineb/devrecall/gate.c, with two teeth: a wrong
+     * mask and an empty mask both have to differ, and both were seen to. */
+    eb_recall_build_voices(&REC, EB_DEVSEQ_TOUCHED);
     dt = (unsigned long)esp_cpu_get_cycle_count() - t0;
     nb_last = dt;
     if (dt < nb_min) nb_min = dt;

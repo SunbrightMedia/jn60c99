@@ -34,6 +34,13 @@
  * takes). Fills every coefficient for all EB_NUM_VOICES voices plus the FX. */
 void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c);
 
+/* ONE voice's coefficients, for callers that know only one voice changed --
+ * a key press being the whole reason this exists. It does NOT memset: the
+ * caller owns the other seven voices' values and must have put them there.
+ * `for (v...) eb_coefs_voice(base, c, v)` after a memset IS
+ * eb_render_coefs_build; that identity is what devrecall_gate.py checks. */
+void eb_coefs_voice(const unsigned char *base, eb_render_coefs *c, int v);
+
 /* Seed engine B's state from the port's, ONCE, at context start. After this
  * the engine owns its state and never re-reads a cell -- re-seeding free-run
  * state per sample is exactly what would mask a lockstep defect. */

@@ -105,11 +105,22 @@ uint32_t eb_devseq_crc32(const void *p, size_t n)
 
 /* ---- C4: THE ALLOCATOR SEAM ---------------------------------------------- */
 
+unsigned EB_DEVSEQ_TOUCHED = 0u;
+
 int eb_devseq_events(const eb_alloc_ev *ev, int n)
 {
     int i;
     if (!ev) return -1;
+    EB_DEVSEQ_TOUCHED = 0u;
     for (i = 0; i < n; ++i) {
+        /* THE VOICE MASK, built HERE and not inferred by the caller. A caller
+         * that under-states it gets seven stale voices and no error -- see
+         * eb_recall_build_voices. Every arm below writes the voice it names;
+         * the one that does NOT is EB_EV_HELD, which is the port's own
+         * engine-wide broadcast of cell 1856 and therefore touches all of
+         * them. Getting that single case wrong is the whole risk. */
+        EB_DEVSEQ_TOUCHED |= (ev[i].kind == EB_EV_HELD)
+                             ? ~0u : (1u << ev[i].voice);
         switch (ev[i].kind) {
         case EB_EV_TRIGGER:
             juno_note_on(DEVST, ev[i].voice, ev[i].a, ev[i].b);

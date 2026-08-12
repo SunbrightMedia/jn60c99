@@ -29,12 +29,21 @@
 #define CF(p, off)   (*(const float *)((const unsigned char *)(p) + (off)))
 #endif
 
-void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
+/* ONE VOICE'S COEFFICIENTS. Split out of eb_render_coefs_build's loop, which
+ * is where the burst's cycles are: MEASURED on silicon 2026-08-12, the voice
+ * coefficient build is 1,082,812 cycles of a 1,992,935-cycle burst, and it
+ * builds ALL EIGHT voices every time -- for a two-voice chord, and for a key
+ * press that changes exactly ONE voice.
+ *
+ * The body below is the loop body VERBATIM, moved and not edited, so that
+ * `for (v...) eb_coefs_voice(base, c, v)` is the same function it replaced.
+ * eb_render_coefs_build's own memset stays where it was: a caller that builds
+ * one voice must NOT clear the seven it is not building. */
+void eb_coefs_voice(const unsigned char *base, eb_render_coefs *c, int v)
 {
-    int v, ei, i;
-    memset(c, 0, sizeof *c);
-
-    for (v = 0; v < EB_NUM_VOICES; ++v) {
+    int ei, i;
+    (void)i;
+    {
         const unsigned char *a1 = VBASE(base, v);
 
         /* ---- envelopes (shim env): ENV2 = ENV1 + 480 ---------------------- */
@@ -330,6 +339,15 @@ void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
         c->env_lfo_trig[v][0] = CF(a1, 2560);
         c->env_lfo_trig[v][1] = CF(a1, 2560 + 480);
     }
+}
+
+void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
+{
+    int v, ei, i;
+    (void)ei; (void)i;
+    memset(c, 0, sizeof *c);
+
+    for (v = 0; v < EB_NUM_VOICES; ++v) eb_coefs_voice(base, c, v);
 
     /* ---- the shared noise generator (base cells) ------------------------- */
     c->notecv.n84272 = CF(base, 84272); c->notecv.n84304 = CF(base, 84304);

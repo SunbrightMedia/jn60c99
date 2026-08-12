@@ -110,6 +110,46 @@ void eb_recall_build(eb_recall *r)
     (void)v;
 }
 
+/* ============================================ THE INCREMENTAL BURST (NOTES)
+ * WHY. A patch change alters every voice's coefficients and every master
+ * coefficient, and eb_recall_build above is the honest price of that. A KEY
+ * PRESS does not: juno_note.c writes cells 304, 320, 6864 and 9680 for ONE
+ * voice, so seven eighths of the voice build and the whole master build are
+ * recomputing values that cannot have moved.
+ *
+ * MEASURED on silicon 2026-08-12, and this is the arithmetic that justifies
+ * the function: the voice build is 1,082,812 cycles and the master build is
+ * 121,213, against a 5,442-cycle sample budget and a 5.8 ms block. A key press
+ * paying the full burst is 8 ms of stall -- a click on every note.
+ *
+ * WHAT MAKES IT EXACT. The shadow bank holds the build from TWO patches ago,
+ * not the live one, so a partial build into it would leave seven voices stale.
+ * The copy below is therefore not an optimisation to be trimmed later: it is
+ * what makes the result equal to a full build. It costs one 18 KB memcpy of
+ * internal SRAM against ~135,000 cycles of arithmetic per voice skipped.
+ *
+ * THE CALLER'S OBLIGATION, stated because getting it wrong is silent: `mask`
+ * must have a bit set for EVERY voice whose cells changed. A note that steals
+ * a voice changes the STOLEN one too. eb_alloc names both, and the note path
+ * passes what it names -- it does not infer. */
+void eb_recall_build_voices(eb_recall *r, unsigned mask)
+{
+    const int shadow = 1 - r->cur;
+    int v;
+
+    if (mask == 0u) return;
+
+    *r->rc[shadow] = *r->rc[r->cur];
+    *r->mc[shadow] = *r->mc[r->cur];
+
+    EB_RECALL_T0();
+    for (v = 0; v < EB_NUM_VOICES; ++v)
+        if (mask & (1u << v))
+            eb_coefs_voice((const unsigned char *)0, r->rc[shadow], v);
+    EB_RECALL_T1(eb_recall_t_rc);
+    eb_recall_t_mc = 0;
+}
+
 /* ================================== STEPS 3-8: THE QUIESCENT WINDOW ONLY */
 int eb_recall_publish(eb_recall *r)
 {
