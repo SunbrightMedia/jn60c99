@@ -872,6 +872,80 @@ static void midi_poll(void)
     }
 }
 
+
+/* ================= THE KEYBOARD YOU ALREADY HAVE =========================
+ *
+ * WHY THIS EXISTS. Every part of the note path is built and PROVEN on the host
+ * -- eb_alloc is CAssignJu60's own law, 270/270 against the plugin -- and none
+ * of it had ever executed on the board, because nothing had ever sent a byte to
+ * GPIO 18. USB MIDI was meant to be that byte source and does not enumerate.
+ *
+ * The console cable is already connected to UART0. So the terminal becomes the
+ * keyboard: no optocoupler, no DIN socket, no USB stack, no parts at all. It is
+ * not a musical instrument interface and is not pretending to be one. It exists
+ * to make the allocator, the note path and the incremental burst RUN, and to
+ * make the board make a sound you asked it for.
+ *
+ * THE LAYOUT is the usual tracker/DAW one, so the middle row is the white keys:
+ *
+ *     w e   t y u          C# D#   F# G# A#
+ *    a s d f g h j k      C  D  E  F  G  A  B  C
+ *
+ * z and x transpose down and up one octave. SPACE releases everything.
+ *
+ * KEYS TOGGLE, and that is a deliberate limitation rather than an oversight: a
+ * terminal reports a key going DOWN and never reports it coming UP. So the
+ * first press sounds a note and the second releases it. You can therefore hold
+ * a chord -- press a, d, g -- which is what makes this useful for two voices.
+ *
+ * ⚠ IT MUST NOT PRINT. This is called from the audio loop, and printf in the
+ * audio loop is playbook defect 30, four recurrences, most recently today. The
+ * counters say what happened; the reporter prints them. */
+#define CON_UART UART_NUM_0
+
+static const signed char CON_KEY[128] = {
+    ['a'] =  0, ['w'] =  1, ['s'] =  2, ['e'] =  3, ['d'] =  4,
+    ['f'] =  5, ['t'] =  6, ['g'] =  7, ['y'] =  8, ['h'] =  9,
+    ['u'] = 10, ['j'] = 11, ['k'] = 12,
+};
+static unsigned char con_held[128];
+static int  con_base = 60;              /* middle C */
+unsigned long con_keys = 0;
+
+static void con_poll(void)
+{
+    unsigned char b[16];
+    int n, i;
+    n = uart_read_bytes(CON_UART, b, sizeof b, 0);
+    for (i = 0; i < n; ++i) {
+        unsigned char c = b[i];
+        int note;
+        if (c == ' ') {                 /* panic: release everything */
+            int k;
+            for (k = 0; k < 128; ++k)
+                if (con_held[k]) { con_held[k] = 0; s3_midi_event(0, k, 64); }
+            continue;
+        }
+        if (c == 'z') { if (con_base >= 24) con_base -= 12; continue; }
+        if (c == 'x') { if (con_base <= 96) con_base += 12; continue; }
+        if (c >= 128 || (CON_KEY[c] == 0 && c != 'a')) continue;
+        note = con_base + CON_KEY[c];
+        if (note < 0 || note > 127) continue;
+        ++con_keys;
+        if (con_held[note]) { con_held[note] = 0; s3_midi_event(0, note, 64); }
+        else                { con_held[note] = 1; s3_midi_event(1, note, 100); }
+    }
+}
+
+static int con_start(void)
+{
+    /* The console's own UART. The driver is installed for READING; printf keeps
+     * writing the way it always has, and the two directions do not share a
+     * FIFO. */
+    if (uart_driver_install(CON_UART, 256, 0, 0, NULL, 0) != ESP_OK) return 0;
+    return 1;
+}
+
 static int midi_start(void)
 {
     uart_config_t cfg = {
@@ -1581,7 +1655,7 @@ static void rpt_task(void *arg)
          * tick. Under 100 characters does. The budget constant and the words
          * are what got cut; every number is still here. */
         printf("t=%lu cyc=%lu drift=%+ld un=%lu gap=%lu bst=%lu nb=%lu "
-               "midi=%lu/%lu usb=%lu/%d\n",
+               "midi=%lu/%lu usb=%lu/%d keys=%lu\n",
                rpt_sec, rpt_cyc, rpt_drift, rpt_under, rpt_gap,
                rpt_build, rpt_nb, rpt_midi, rpt_drop,
 #if S3L_USBMIDI
@@ -1592,7 +1666,7 @@ static void rpt_task(void *arg)
 #else
                0ul, 0
 #endif
-               );
+               , con_keys);
     }
 }
 
@@ -1945,6 +2019,17 @@ void app_main(void)
             printf("USB MIDI: FAILED TO START. UART MIDI on GPIO 18 still works.\n");
     }
 #endif
+    if (con_start())
+        printf("TYPE TO PLAY -- no parts needed, this console IS the keyboard:\n"
+               "          a s d f g h j k  = C D E F G A B C   (white keys)\n"
+               "            w e   t y u    = the black keys\n"
+               "          z / x = octave down / up     SPACE = release all\n"
+               "          KEYS TOGGLE: a terminal never reports a key going UP,\n"
+               "          so press once to sound a note and again to release it.\n"
+               "          Hold a chord with a, d, g -- two voices are allowed.\n");
+    else
+        printf("TYPE TO PLAY: the console UART driver refused; typing does "
+               "nothing.\n");
     printf("PLAY IT. Notes are allocated by eb_alloc (CAssignJu60's law, "
            "270/270 vs the plugin), applied through the port's own note path, "
            "and published at the next block boundary.\n");
@@ -2201,6 +2286,7 @@ void app_main(void)
              * bill its cost to the engine, which is playbook 12's rule and
              * this project has broken it three times. */
             midi_poll();
+            con_poll();
 #endif
             render_block(CHUNK);
             te += esp_timer_get_time() - e0;
