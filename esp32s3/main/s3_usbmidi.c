@@ -125,16 +125,38 @@ const uint16_t *tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 }
 
 /* ------------------------------------------------------------------ the task
- * Priority 2, on core 0, exactly like the reporter: it must never preempt the
- * audio loop, and the audio loop donates a tick once a second, so it gets to
- * run. Notes therefore arrive with up to one tick of latency on top of the
- * block latency. That is stated rather than hidden; if it is too slow to play,
- * the fix is a donated tick per block, not a higher priority. */
+ * ⚠ CORE 1, NOT CORE 0, AND THIS WAS THE BUG.
+ *
+ * The first version copied the reporter: priority 2 on core 0. That is right
+ * for a reporter and fatal for USB. Core 0 runs the audio loop at priority 5
+ * and it never yields except for the one tick it donates each second -- so
+ * tud_task() ran ONCE A SECOND.
+ *
+ * USB enumeration is a conversation with deadlines. The host sends SETUP,
+ * waits milliseconds, and gives up. A device that answers a second later is
+ * not slow, it is ABSENT: Windows showed nothing at all, which is exactly what
+ * "no device" looks like and is why the descriptors were suspected for so
+ * long. The core was alive the whole time (GSNPSID 0x4F54400A) and the
+ * interrupt was enabled; only the class task was starved.
+ *
+ * Core 1 renders 2 voices and the FX and then BLOCKS waiting for the next
+ * chunk, so it has real idle time between blocks. Priority 3 there is above
+ * idle and below the worker.
+ *
+ * This is playbook 45 in its second form: work moved off a hot path only helps
+ * if the destination is ever scheduled. There it starved a reporter and cost a
+ * flash; here it starved a protocol and looked like a hardware fault. */
 static void usbmidi_task(void *arg)
 {
     (void)arg;
     for (;;) {
-        tud_task();
+        /* BLOCKS on TinyUSB's own event queue rather than polling. A tight
+         * tud_task() spin would answer the host promptly and consume every
+         * spare cycle core 1 has between chunks; a vTaskDelay(1) poll would be
+         * cheap and answer 10 ms late, which is what starved enumeration in
+         * the first place. Blocking is both: idle until the ISR posts, then
+         * immediate. */
+        tud_task_ext(UINT32_MAX, false);
 
         /* USB-MIDI carries 4-byte event packets: [cable|CIN, status, d1, d2].
          * The CIN nibble already tells us note-on from note-off, but the
@@ -150,7 +172,6 @@ static void usbmidi_task(void *arg)
                 else if (st == 0x80u) s3_midi_event(0, p[2], p[3]);
             }
         }
-        vTaskDelay(1);
     }
 }
 
@@ -179,7 +200,7 @@ int s3_usbmidi_start(void)
         printf("USB MIDI: DWC2 GSNPSID = 0x%08lX  (0x4F54xxxx = core alive; "
                "0 or FFFFFFFF = core dark)\n", (unsigned long)*gsnpsid);
     }
-    if (xTaskCreatePinnedToCore(usbmidi_task, "usbmidi", 4096, NULL, 2, NULL, 0)
+    if (xTaskCreatePinnedToCore(usbmidi_task, "usbmidi", 4096, NULL, 3, NULL, 1)
         != pdPASS) return 0;
     return 1;
 }
