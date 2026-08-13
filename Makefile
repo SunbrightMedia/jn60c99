@@ -109,6 +109,8 @@ verify: test libjuno.so
 	if [ $$rc -eq 3 ]; then echo "SKIP: ARM cross toolchain absent (apt-get install gcc-arm-linux-gnueabihf qemu-user-static gcc-arm-none-eabi) -- NOT a pass"; \
 	elif [ $$rc -ne 0 ]; then FAIL=1; fi; \
 	echo "=== LEDGER ==="; \
+	echo "=== APPROXIMATION AUDIT (zero approximations in the port) ==="; \
+	python3 tools/verify/approx_audit.py || FAIL=1; \
 	python3 tools/verify/provenance_check.py || FAIL=1; \
 	python3 tools/verify/completeness_scan.py || FAIL=1; \
 	exit $$FAIL

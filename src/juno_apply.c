@@ -70,6 +70,20 @@
  * D,S,R,A because ATTACK has the highest address). Per-panel (curve,offset,transform)
  * come from RUNNING the plugin's real value-tree dispatch under Unicorn and matching
  * juno_curve(curve, transform(value)) bit-for-bit across a dense value grid.
+ * ⚠ THE BLOCK BELOW IS STALE HISTORY, KEPT FOR ITS REASONING AND NOT AS STATUS.
+ * It was written before the fine-FX arc, the tempo-sync derivation and the
+ * assigner finding, and tools/verify/approx_audit.py caught it on 2026-08-13
+ * still claiming work that has since been done. What it says now:
+ *   - the four EFX leaves ARE applied (COVERAGE.tsv: APPLIED 129, GAP 0);
+ *   - Delay Time 102352 IS derived -- delay_recall.c's SYNC_BEATS/SYNC_MS_128,
+ *     bit-exact 48/48 over 16 divisions x 3 rates;
+ *   - LEGATO / ASSIGN MODE write no coefficient, which is still true, but they
+ *     are NOT inert: docs/ASSIGNER_MODE_FINDING.md proved they change which
+ *     VOICE a note lands on, worth up to +17 dB, and they are handled by the
+ *     allocator rather than by recall.
+ * The paragraph is left in place because its ARGUMENT (why a permutation that
+ * lives in an external descriptor file may not be guessed) is still the rule.
+ *
  * NOT applied yet, for a documented reason (never guessed):
  *   - The four EFX leaves (EFFECT DEPTH, REVERB LEVEL, DELAY LEVEL, DELAY TIME):
  *     these occupy blob {40,49,50,51} (proven: the parser transform table gives

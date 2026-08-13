@@ -124,10 +124,24 @@ static const uint32_t FILT[] = {
  * cells below (verified 8/8 incl. a level-0 patch); only TIME (102352 / 4297584),
  * WET (102528 / 4297760) and the level gate (feedback 102560, ON 102576 / 4297824)
  * are per-patch. Bit-for-bit from the captured MASTER states state_pN_master.bin.
- * TIME is tempo-synced for most TYPE-1 patches (the manual byte formula matches only
- * a subset — same open sync item as reverb 6497168 / delay 102352; see
- * docs/FX_COLDLOAD_TODO.md); the manual formula is used until the sync law is
- * derived, which lands the tap close (exact where the patch's division coincides). */
+ * TIME is tempo-synced for most TYPE-1 patches, and THE SYNC LAW IS DERIVED AND
+ * IMPLEMENTED -- see SYNC_BEATS / SYNC_MS_128 / sync_division() at the top of this
+ * file: division = (byte==0)?0:(byte+16)/17, ms = beats*60000/BPM, obtained by
+ * sweeping the plugin's own dispatch (idx 797 + idx 803) under Unicorn and
+ * bit-exact 48/48 over 16 divisions x 3 rates. docs/FX_COLDLOAD_TODO.md is titled
+ * RESOLVED and records the closure.
+ *
+ * APPROX-OK: the three marker words below are in the HISTORY of this comment,
+ * not in the code. The sync law is derived and bit-exact 48/48.
+ *
+ * ⚠ THIS COMMENT PREVIOUSLY SAID THE OPPOSITE -- that the manual formula was used
+ * "until the sync law is derived, which lands the tap close". That sentence
+ * outlived the work that replaced it, and on 2026-08-13 it was read as evidence
+ * of a live approximation and REPORTED TO THE USER AS ONE. A stale comment in a
+ * codebase whose method is "the comments carry the evidence" is a broken gate: it
+ * invents defects that do not exist, and on another day it lets a real one be
+ * dismissed as "that old known thing". tools/verify/approx_audit.py now fails the
+ * build on any unjustified approximation marker in src/. */
 static const uint32_t DLY1_A[] = {   /* first instance 102xxx: always-constant cells */
   102368,0x3e1b31ceu, 102416,0x3fb07de6u, 102432,0xbf07c840u, 102464,0x3e52bdc7u,
   102480,0x3fb50bf3u, 102496,0x3f800000u, 102512,0x3f800000u, 102544,0x3f9bd7cau,
@@ -356,7 +370,9 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
      * bit-exact 768/768), gated to 0 when the delay is off exactly as the captured
      * OFF states show (render-equivalent either way: wet is 0). The old captured
      * constant 0x3ed8d8d9 was the fb=120 special case. DRY (102512) likewise gets
-     * its per-patch law, overwriting the DLY1_A placeholder. */
+     * its per-patch law, overwriting the DLY1_A placeholder.
+     * APPROX-OK: a placeholder OVERWRITTEN in this same call by the per-patch
+     * law two lines below -- it is never the value that reaches the engine. */
     JF(state, 102560)  = on ? ((float)fb / 255.0f) * 0.9f : 0.0f;
     JF(state, 102512)  = (float)direct / 255.0f;
     JF(state, 102576)  = on ? 1.0f : 0.0f;
