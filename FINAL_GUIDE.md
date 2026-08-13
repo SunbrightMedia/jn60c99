@@ -143,6 +143,7 @@ on host; this track is wiring it to the device.
 | C6 encoders + LCD (8 params first, then all) | **NOT DONE** — but cycle-cheap: chip A core 0 has ~1,600 spare cycles/sample (`data/two_board_advantages.md`) |
 | C7 preset storage (save/load without audio dropout) | **NOT DONE** — same spare core; the risk is flash-erase stalls, not cycles |
 | C9 **EVERY parameter adjustable at once, in real time** (USER-BINDING, added 2026-08-12) | **NOT DONE — and it is a REQUIREMENT, not a nicety.** Today a single knob move costs the FULL burst (~2,000,000 cycles), because engine B HOISTS cell reads into a prepared coefficient struct and any change rebuilds the struct. |
+| C11 **ONE INTERNAL EVENT API — the boundary every input crosses** (USER-BINDING, 2026-08-12) | **NOT DONE.** Keybed, panel, DIN, USB all submit events through one small header. Nothing else may reach the engine. |
 | C10 chunked patch change (build spread over N blocks, one atomic publish) | **NOT DONE** — removes the program-change click without making the burst faster. |
 | C8 the port's warm-recall bug fixed in src/ + warm gate in make verify | **1/2** — cell 91152 FIXED in src/chorus_recall.c with its own tooth, `make test` green, 0 of 384 cold cases changed. The warm gate is NOT yet in `make verify`. |
 
@@ -215,6 +216,58 @@ coefficient struct; nothing about it is JUNO-specific. Hardcoding a JUNO
 constant into it is a defect against END_GOAL item 7 in the same way a wrong
 coefficient is a defect against item 1.
 
+## C11 — THE INTERNAL EVENT API (USER-BINDING, 2026-08-12)
+
+**The rule: inside the box, nothing speaks MIDI.** MIDI is a wire protocol for
+other people's equipment. Used internally it only costs: a 7-bit CC cannot reach
+half of an 8-bit parameter's values, a DIN byte stream is 31,250 bits/second
+between two chips on the same board, and a stuck note is far harder to find in a
+byte stream than in a function call.
+
+**Every input source converts into ONE event API:**
+
+    juno_event_note_on (source, note, velocity)
+    juno_event_note_off(source, note)
+    juno_event_param   (source, param_id, value_0_255)
+
+    keybed --+
+    panel ---+--> events --> allocator / incremental recall
+    DIN in --+
+    USB -----+
+
+This already half-exists and has already paid for itself: `s3_midi_event()` is
+the single note entry, so the UART and USB parsers CANNOT disagree about
+velocity policy. Two entry points deciding separately is how the assigner-mode
+defect survived for months (docs/ASSIGNER_MODE_FINDING.md). The PARAMETER side
+needs the same treatment, which is C9.
+
+**EVERY EVENT CARRIES A SOURCE TAG.** One byte: keybed, panel, DIN, USB. It
+costs nothing and it is what lets the health line say WHICH input caused a
+fault instead of only that one occurred.
+
+### Why this is what makes THE INVARIANT hold for hardware nobody has built yet
+
+The API is a BOUNDARY, and the boundary is where the cap lives. Anything behind
+it -- including a board a user solders in later -- may only SUBMIT. It never
+renders, never touches the cell array, never blocks, never allocates. So a
+misbehaving add-on cannot break the audio: it can only fill a bounded queue, and
+a full queue means its events land LATE. Latency degrades, continuity does not.
+That is rule 3, extended to code that does not exist yet.
+
+**A user connection point, in two levels, and only the first is committed:**
+
+  1. **SOFTWARE** -- the public header above. Costs nothing extra: the keybed
+     and the panel need it regardless. **This is the one to build.**
+  2. **HARDWARE** -- a physical header carrying the same events over I2C or
+     UART, so an add-on needs no firmware change. A LATER and SEPARATE
+     decision: a bus other people's boards sit on must tolerate a device that
+     floods it or holds a line low, and that is a new class of work.
+
+**⚠ ITEM-7 TOOL.** A keybed sends notes and an encoder sends parameter values on
+ANY synth. This header carries straight to the JX-3P. Nothing in it may be
+JUNO-specific -- `param_id` is an index into a per-synth table, never a JUNO
+constant.
+
 ## THE ORDER (do not reorder without the user)
 
 1. **C2 → C3** — finish recall fixes, put recall on the board, burst off the
@@ -224,9 +277,10 @@ coefficient is a defect against item 1.
 3. **Re-measure the budget while it is being PLAYED.** This number replaces
    every cycle figure in the repo.
 4. **B3** — the ~700-cycle hunt, against the real instrument.
-5. **C10 then C9** — chunked patch change first (it removes the click and is
-   small), then the per-parameter incremental refresh, which is what makes C6's
-   encoders possible at all.
+5. **C11, then C10, then C9** — the event API first (it is the boundary the
+   other two are implemented behind), then the chunked patch change (removes the
+   click, small), then the per-parameter incremental refresh, which is what
+   makes C6's encoders possible at all.
 6. **C6, C7, C8** — controls, storage, the warm bug.
 7. **D** — the link, second board, 6 voices. **END_GOAL 2/3/4 land here.**
 8. **A4** — the user listens. **END_GOAL 1 lands here.**
