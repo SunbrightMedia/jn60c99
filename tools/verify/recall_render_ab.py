@@ -52,13 +52,58 @@ NOTE, VEL, N = 60, 105, 16000
 # arp patches is meaningless. The 7 arp patches [1,9,17,25,33,41,49] are covered by
 # dedicated gates instead: arp_sched_ab.py (schedule, 7/7 vs the plugin's own arp)
 # and arp_render_ab.py (render of that schedule). See docs + ROADMAP_TO_DONE.md.
-_ARP_PATCHES = {1, 9, 17, 25, 33, 41, 49}
-DEFAULT_PATCHES = [p for p in range(64) if p not in _ARP_PATCHES]
+def _arp_patches(bank_bytes):
+    """WHICH patches have the arpeggiator on, ASKED OF THE BANK rather than
+    remembered.
+
+    ⚠ THIS WAS A HARDCODED SET {1,9,17,25,33,41,49} AND IT WAS WRONG THE MOMENT
+    A SECOND BANK EXISTED. Those are the FACTORY bank's arp patches. Run against
+    any other bank it did two damaging things at once:
+
+      1. It SKIPPED patches 1,9,17,25,33,41,49 whatever they contained -- seven
+         untested patches per bank, silently, reported as "57/57".
+      2. It RENDERED that bank's real arp patches. The reference has no
+         transport clock and CANNOT arpeggiate, so those comparisons were
+         guaranteed to differ for a reason that is not a port defect -- and they
+         were counted as failures.
+
+    Found 2026-08-13 when the port was run against 12 user banks (768 patches):
+    111 render mismatches, cause unattributable until this was fixed. A constant
+    that encodes a property of the DATA is a defect the moment the data changes.
+
+    The port's own accessor answers it: juno_bank_arp() is the same function the
+    engine uses to decide whether to arpeggiate, so the skip set cannot disagree
+    with what is actually rendered."""
+    import ctypes
+    lib = ctypes.CDLL(os.path.join(os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))), 'libjuno.so'))
+    lib.juno_bank_arp.restype = ctypes.c_int
+    lib.juno_bank_arp.argtypes = [ctypes.c_char_p, ctypes.c_int,
+                                  ctypes.POINTER(ctypes.c_int),
+                                  ctypes.POINTER(ctypes.c_int)]
+    m = ctypes.c_int(0); o = ctypes.c_int(0)
+    out = set()
+    for p in range(64):
+        if lib.juno_bank_arp(bank_bytes, p, ctypes.byref(m), ctypes.byref(o)):
+            out.add(p)
+    return out
 
 
-def parse_patches(argv):
+def default_patches(bank_bytes):
+    arp = _arp_patches(bank_bytes)
+    return [p for p in range(64) if p not in arp], arp
+
+
+def parse_patches(argv, bank_bytes=None):
     ps = [int(a) for a in argv if a.lstrip('-').isdigit()]
-    return ps or DEFAULT_PATCHES
+    if ps:
+        return ps
+    if bank_bytes is None:
+        bank_bytes = open(BANK, 'rb').read()
+    keep, arp = default_patches(bank_bytes)
+    print("  arp patches in THIS bank (skipped, the reference cannot "
+          "arpeggiate): %s" % sorted(arp))
+    return keep
 
 
 # Master/FX value-tree leaves whose dispatch index is beyond real_recall.leaf_table's
@@ -201,7 +246,7 @@ _MODE = sys.argv[1] if (__name__ == '__main__' and len(sys.argv) > 1) else None
 if _MODE == '--ref':
     import e2e_emu as E
     import real_recall as R
-    patches = parse_patches(sys.argv[2:])
+    patches = parse_patches(sys.argv[2:], open(BANK, 'rb').read())
     bank = E.bank_bytes(); leaves = R.leaf_table()
     out = {}
     for idx in patches:
