@@ -276,10 +276,12 @@ elif _MODE == '--port':
     print("N=%d note %d vel %d SR %g\n" % (N, NOTE, VEL, SR))
     npass = nfail = 0
     fails = []
-    # Compare only the scoped patches (non-arp); robust against a stale pickle that
-    # may still contain arp entries. The 7 arp patches are covered by arp_sched_ab +
+    # Compare only the non-arp patches; robust against a stale pickle that may
+    # still contain arp entries. Arp patches are covered by arp_sched_ab +
     # arp_render_ab (this oracle cannot arpeggiate).
-    for idx in [p for p in sorted(ref) if p not in _ARP_PATCHES]:
+    # ⚠ DERIVED FROM THIS BANK, never a constant -- see _arp_patches().
+    _arp_here = _arp_patches(bankbytes)
+    for idx in [p for p in sorted(ref) if p not in _arp_here]:
         c = lib.juno_gui_create(ctypes.c_float(SR), 0)
         lib.juno_gui_apply_bank(c, bankbytes, len(bankbytes), idx)
         lib.juno_gui_note_on(c, NOTE, VEL)
