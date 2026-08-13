@@ -162,3 +162,19 @@ never breaks.** Latency degrades, continuity does not.
 
 FINAL_GUIDE.md carries the four rules and the stress gate that proves it. A
 track step is not DONE until it satisfies this.
+
+
+## THE FOUR MANTRAS (user, 2026-08-13, binding)
+
+Everything done on this project advances one of these. If it advances none, it
+is not work:
+
+1. Rewriting bit-exact `.vst3` code.
+2. Confirming in every way possible that the rewritten code is correct —
+   testing under every circumstance.
+3. Optimizing both the code and the work itself, as you go.
+4. Making sure the legacy — what is complete and what was learned — is
+   repeatable for the next plugin, documented in the most efficient way
+   possible.
+
+Item 4 is item 7 of the goal, restated as a daily habit rather than a phase.

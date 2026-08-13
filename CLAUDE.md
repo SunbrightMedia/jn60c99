@@ -3,6 +3,19 @@
 ~150 words unless the user asks for detail. Tables and code do not count.**
 The user says "STE" when you break this. Do not make them say it.
 
+# ⚑ THE FOUR MANTRAS (user-binding, 2026-08-13)
+**Every action must advance one of these. If it advances none, do not do it.**
+1. **REWRITE** the `.vst3` code, bit-exact.
+2. **CONFIRM** that what you rewrote is correct — test it in every
+   circumstance, not the convenient one.
+3. **OPTIMIZE** the code AND your own work as you go.
+4. **LEAVE A LEGACY** — what is done and what is learned must be repeatable for
+   the next plugin, documented in the most efficient way possible.
+
+Order matters. 1 before 2 is wrong (unproven code). 2 before 3 is required
+(never optimize what is not proven). 4 is not last in time — write it as you
+go, or it is not written.
+
 # ⚑ READ FIRST, IN ORDER
 1. `END_GOAL.md` — WHAT we build (user's words, binding). Short form: audibly
    identical, 6 voices, EXACTLY two ESP32-S3s, full FX incl. chorus, seamless
