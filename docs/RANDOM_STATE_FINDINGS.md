@@ -48,3 +48,39 @@ be DERIVED from the plugin's own dispatch — never fitted to these seeds.
 12 seeds were enough to find 40 cells. The single-parameter exhaustive gate had
 run every parameter at every value and found none of them, because each needs
 two or more parameters set together. That is the whole argument for this gate.
+
+## ATTRIBUTED (2026-08-13): DELAY TYPE is 39 of the 42 cells
+
+Hold-out, seed 0. Coarse pass over 16 groups of 7: pinning group 15 to factory
+values took the differing cells from 42 to ZERO; every other group left all 42.
+Refine pass, each of those seven held alone:
+
+| held at factory | cells still differing | so it causes |
+|---|---|---|
+| **DELAY TYPE (875)** | **3** | **39** |
+| EFFECT TYPE (873) | 40 | 2 |
+| REVERB TYPE (876) | 41 | 1 |
+| HPF TYPE, FILTER TYPE, EFFECT TONE, REVERB TIME | 42 | 0 |
+
+**One parameter causes 93 % of the disagreement.** DELAY TYPE selects WHICH
+delay block the recall writes; for TYPE values the factory bank never uses, the
+port writes a different block from the plugin. That is the same class as the
+already-fixed fine-FX defect (fine-FX wrote to different cells depending on
+DELAY TYPE) -- the class was known, one more instance was not.
+
+It also explains the user-bank issue 2 exactly: cell 102592, the TYPE-0 delay
+mute/enable, is set by the port for a patch where the plugin routes elsewhere.
+
+### Confidence
+
+- Holding ONE parameter fixes 39 of 42; holding four others fixes none.
+- The gate returns 0 when 0 is correct (factory-value self-control).
+- Two independent hunts -- the user's 768 patches and random seeds -- land on
+  the same block.
+
+### Owed
+
+1. Derive the DELAY TYPE routing law from the plugin's own dispatch. NOT fitted
+   to these seeds.
+2. Fix `delay_recall.c` routing; re-run the random gate; expect 3 cells left.
+3. Then attribute the residual 3, plus EFFECT TYPE (2) and REVERB TYPE (1).
