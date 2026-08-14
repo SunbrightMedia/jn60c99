@@ -38,6 +38,11 @@ SR = RS.SR
 
 
 def groups_of(leaves, ngroups):
+    # --leaves a,b,c  -> each named leaf is its OWN group, for the refine pass
+    # after a coarse run has narrowed the cause to one group.
+    only = os.environ.get('JUNO_ATTR_LEAVES')
+    if only:
+        return [[int(x)] for x in only.split(',')]
     bbs = sorted(bb for _i, bb in leaves)
     per = (len(bbs) + ngroups - 1) // ngroups
     return [bbs[i:i + per] for i in range(0, len(bbs), per)]
