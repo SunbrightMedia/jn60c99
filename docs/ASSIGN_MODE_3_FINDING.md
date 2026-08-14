@@ -69,3 +69,41 @@ about the parameter space. The user's banks reached mode 3 on the first try.
 ## Still open
 
 32 of the 54 failures are in modes 0/1/2 — a SECOND cause, not yet identified.
+
+---
+
+# ISSUE 2 (2026-08-13): the DELAY is switched ON when the plugin has it MUTED
+
+The 32 failures in ASSIGN MODE 0/1/2 are a different fault, and unlike issue 1
+this one IS a recall difference.
+
+`recall_fullstate_diff.py` on 2_Preset patch 11 (fails):
+
+| cell | plugin | port | what it is (delay_recall.c) |
+|---|---|---|---|
+| 102592 | 0 | **1** | delay mute/enable gate |
+| 102560 | 0 | **0.423529416** | delay FEEDBACK |
+| 102544 | 1.30727255 | 0 | TYPE-0/1 block constant |
+
+The port enables the TYPE-0 delay block and gives it feedback; the plugin leaves
+that block muted. Audible from the first samples, which matches the measured
+divergence at sample 2.
+
+`delay_recall.c` derives these as:
+
+    On/Off (102576)      = 1 if DELAY LEVEL > 0 else 0
+    Mute/enable (102592) = same as On/Off
+
+so the port reaches "on" from DELAY LEVEL alone. The plugin evidently does not,
+for this patch — meaning some OTHER parameter (DELAY TYPE, EFFECT TYPE, or the
+routing that selects which delay instance is live) gates it, and that
+combination does not occur in the 64 factory patches.
+
+⚠ NOT YET ATTRIBUTED to the specific parameter combination. What is proven: the
+cells, the direction, and that it is recall rather than the render.
+
+## Owed
+1. Find which parameter mutes that block in the plugin. Derive it by driving the
+   plugin's own dispatch, never by fitting to these patches.
+2. Fix the law in `delay_recall.c`.
+3. Gate it, seen to fail first.
