@@ -166,3 +166,210 @@ factory). Whether it is a constant or a function of another parameter is
 UNKNOWN. Writing it as a constant now would be fitting to a measurement -- the
 exact defect class this project forbids. The law must be derived by sweeping the
 delay parameters AT type 2, the way the TYPE-0 laws were derived.
+
+---
+
+# 2026-08-14 — four laws derived, one applied, three still open
+
+Four candidate laws were derived from the plugin's own dispatch and each was then
+attacked by an independent agent. **Only one survived.** This section records what
+landed, what did not, and the experiments that decide it. Nothing here is fitted
+to a seed or a capture.
+
+| block | verdict | action |
+|---|---|---|
+| `delay_14` (DELAY TYPE 1 / 4) | **SURVIVES** | APPLIED, see below |
+| `delay_base_235` (DELAY TYPE 2/3/5 base block) | **REFUTED** | not applied, still open |
+| `finefx` (out-of-range TYPE routing) | **REFUTED** | not applied, still open |
+| `chorus` (EFFECT TYPE 1 / 5 wet+noise) | **no verdict returned** | not applied, unadjudicated |
+
+## APPLIED: DELAY TYPE 1 and 4 — the two instances were inverted
+
+The port applied the per-patch FEEDBACK and DRY laws to the **first** delay
+instance, which the plugin never writes at TYPE 1/4, and gave the **second**
+instance the captured constant `0x3ed8d8d9`, which the plugin drives per patch.
+
+| cell | plugin | port before | port now |
+|---|---|---|---|
+| 102512 first DRY | never written — carries the previous patch | `direct/255` | no write |
+| 4297808 second FEEDBACK | `f32(fb/255)*f32(0.9)`, ungated | constant `0x3ed8d8d9` | the law |
+
+`0x3ed8d8d9` is `f32(120/255)*f32(0.9)` — the law evaluated at the engine's own
+default feedback byte. **One capture cannot tell a constant from a law.** Sweeping
+all 256 bytes can: the law is 256/256 bit-exact, the rival op chains score
+180 / 203 / 209, and the divide in `f32(b)/f32(255)` beats the reciprocal
+multiply 256 to 130.
+
+**Gate numbers.** `delaytype_sweep.py`, all other parameters at factory:
+
+| DELAY TYPE | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| before | 0 | **3** | 4 | 4 | **2** | 5 |
+| after  | 0 | **0** | 4 | 4 | **0** | 5 |
+
+TYPE 1 and TYPE 4 are **206 of the 832 real patches**. `make test` green,
+`approx_audit` PASS, factory `recall_gate` PASS, render A/B **57/57 BIT-EXACT**.
+
+## WHY EVERY EXISTING GATE WAS BLIND TO IT — the reusable lesson
+
+Two measurements, both PROVEN(executed), and they matter more than the fix:
+
+**1. The factory bank cannot see an FX law.** Histogram of the 64 factory records:
+
+| DELAY TYPE | patches | DELAY FEEDBACK | DELAY DIRECT |
+|---|---|---|---|
+| 0 | 29 | 9 distinct values | 255 only |
+| 1 | 17 | **120 only** | **255 only** |
+| 2 | 10 | **120 only** | **255 only** |
+| 3 | 4 | **120 only** | **255 only** |
+| 5 | 4 | **120 only** | **255 only** |
+
+Every non-TYPE-0 factory patch sits at fb=120 and direct=255 — *exactly* the two
+bytes at which the wrong port agreed with the plugin. Render A/B was 57/57 before
+the fix and 57/57 after it, and both are true. **A bank whose FX bytes are all at
+the engine default is structurally incapable of separating a constant from a law.**
+
+**2. `random_state_ab.py` cannot see it either, and its "44 cells" headline is
+measuring something else.** `synth_bank` writes only the 112 value-tree leaves —
+bank bytes 51..690. DELAY FEEDBACK (bank 3080/3081) and DELAY DIRECT (bank
+3083/3084) are **never touched: both are 0 in all 60 seeds**. Worse, DELAY TYPE is
+a random byte, so:
+
+    seeds with DELAY TYPE 0..5 :  0
+    seeds with DELAY TYPE >= 6 : 60
+
+**All 60 seeds carry an out-of-range DELAY TYPE.** The 44 cells are therefore the
+*unreachable* class (0 of 832 real patches), not a reachable defect count. The gate
+number is unchanged at **44 -> 44**, and that is the correct, predicted result: the
+edited code is never executed by any seed. It is not evidence the fix did nothing.
+
+**Owed on the gate itself:** randomise the raw record bytes (fine-FX, feedback,
+direct) and constrain switch leaves to their live ranges, or the gate will keep
+ranking an impossible input above a defect that half the patches hit.
+
+## THE GATE THAT DOES SEE IT: a warm patch-change chain
+
+Cold gates cannot test a "the plugin does NOT write this cell" law — the claim is
+about a *stale carry*, and a fresh engine has nothing to carry. So: ONE engine,
+seven recalls, plugin (Unicorn) vs port (ctypes), two processes.
+`scratchpad/wf_warm_{ref,port}.py`, pickle `wf_warm_chain.pkl`.
+
+    step 0  TYPE 0  fb=37  dr=90   lvl=200   seeds the stale carry
+    step 1  TYPE 1  fb=200 dr=10   lvl=200
+    step 2  TYPE 4  fb=17  dr=240  lvl=200
+    step 3  TYPE 1  fb=200 dr=10   lvl=1     below the level gate
+    step 4  TYPE 4  fb=88  dr=3    lvl=0     below the level gate
+    step 5  TYPE 1  fb=200 dr=10   lvl=200   back above the gate
+    step 6  TYPE 0  fb=255 dr=0    lvl=200
+
+Detector seen to fail first: flipping one bit of every expected value is caught
+70/70 by the same comparison code.
+
+| library | differing cell-steps of 70 |
+|---|---|
+| before the fix | **22** |
+| after the fix | **10** |
+| new regressions | **0** (the 10 are a strict subset of the 22) |
+
+The plugin holds `102512 = 0.352941185` and `102560 = 0.130588233` from step 0
+across a TYPE-1 *and* a TYPE-4 recall, then re-carries the next pair at step 6.
+The port now reproduces that exactly.
+
+## STILL OPEN 1 — the level gate at TYPE 1/4 is NOT derived (found by the chain above)
+
+The `delay_14` write-up also claimed `102560 = 0` and `102576 = 0` below the level
+gate (DELAY LEVEL < 2). **My warm chain refutes that half**, and it is the reason
+the 10 residual cell-steps remain:
+
+| step | cell | plugin | port |
+|---|---|---|---|
+| 3 (TYPE 1, lvl 1) | 102560 | **0.130588233** (stale from step 0) | 0 |
+| 3 | 102576 | **1.0** | 0 |
+| 4 (TYPE 4, lvl 0) | 102560 | **0.130588233** (stale) | 0 |
+| 5 (TYPE 1, lvl 200) | 102560 | **0.130588233** (still stale) | 0 (self-poisoned) |
+
+So the plugin does **not** write 102560 or 102576 at TYPE 1/4 in either gate
+direction. The `= 0` seen on a **cold** engine is an ORDER artefact: `prepare_recall`
+dispatches DELAY LEVEL (796) before DELAY TYPE (875), so on a fresh engine the level
+leaf fires while the routing int still holds 0, and the **TYPE-0** arm writes the
+zero. Once the routing is already 1 or 4 from a previous patch, no zero appears.
+
+This zero write is **pre-existing** — it was in the port before this change and all
+10 residual cell-steps are also in the old library's 22. It was NOT introduced here
+and is NOT removed here, because removing it is a new law and no sweep has derived
+it. Status: **NOT DERIVED.** Deriving it needs the dispatch-order question answered,
+not another cold sweep.
+
+**New cell, also not derived:** at step 4 (TYPE 4, LEVEL 0) the plugin writes
+`4297808 = 0` — a second-instance cell that the TYPE-4 arm otherwise never touches.
+One point. Not a law. Recorded so it is not lost.
+
+## STILL OPEN 2 — DELAY TYPE 2/3/5 base block (`delay_base_235`): REFUTED
+
+Claimed: at TYPE 2/3/5 the plugin writes `102528 = LEVEL/255`,
+`102560 = LEVEL>=2 ? 0x3ed8d8d9 : 0`, `102576 = LEVEL>=2`, `102592 = 0`, plus the
+TYPE-1 rate arm at 102544.
+
+**Refuting experiment (PROVEN):** the 530 runs behind the law all used a fresh
+engine and one leaf order, and both are load-bearing. On one engine, TYPE 2,
+LEVEL 255, 44.1 kHz:
+
+| dispatch order | 102528 | 102560 | 102576 |
+|---|---|---|---|
+| post-build, no recall at all | 0 | **0.423529416** | 0 |
+| normal order (= `prepare_recall`) | 1 | 0.423529416 | 1 |
+| FEEDBACK leaf dispatched **first** | 1 | **0.899999976** | 1 |
+| DELAY TYPE leaf dispatched **first** | **0** | 0.423529416 | **0** |
+
+`0x3ed8d8d9` is the engine's pre-recall default, not a gated constant, and a
+patch-change chain leaves it **stale** (T0 fb=76 -> T5 gives 0.268235296). Only
+`102544` (rate arm) and `102592 = 0` were written in every order and history.
+Writing the claimed constant would make the cold gate green while encoding a number
+the plugin produces only from a fresh engine in one leaf order — the CAPTURED
+defect class, one level deeper.
+
+Also refuted: "one law, no difference between the three". TYPE 5 needs
+`6497376 = f32(fb/255)*f32(0.9)` (**not** level-gated) and `6497392 = LEVEL>=2`;
+TYPE 2/3 need `6396432 = min(LEVEL*32,255)/255`, which lies in a hole in
+`recall_fullstate_diff.REGIONS` (6396128..6396620 is skipped) so **no gate can see
+it**. Surviving and reusable: `102528 = f32(v)/f32(255)` (division, 130/256 for the
+reciprocal multiply), and the general rule that **the active slot-1 instance carries
+the feedback law while the base block does not** — the same rule the applied fix
+encodes at TYPE 1.
+
+## STILL OPEN 3 — out-of-range TYPE routing (`finefx`): REFUTED
+
+Claimed: for DELAY TYPE >= 6 the plugin does not dispatch the routing at all, so the
+whole 6497xxx / 10692xxx / 10693xxx block keeps its previous values.
+
+**Refuting experiment (PROVEN):** one engine, identical leaf set, only blob 634
+changes. `634=5 -> 634=5` moves 0 cells (null-step control); `634=5 -> 634=189`
+moves **5**: 101744, **6497360**, **6497408**, **10693280**, **10693328** — four of
+them inside the blocks claimed untouched, three of them read by `master_render.c`.
+The behaviour is state-dependent (cold 189 gives 6497360 = 0; warm-after-5 gives the
+ARM_LFX1 rate arm), so no single-value law covers it. A "skip instead of clamp" fix
+would therefore be wrong. Also missed: `10759840` differs for **every DELAY TYPE
+except 5** (736 of 832 real patches), 16 bytes past the end of the sweep's own
+window; it is render-inert today.
+
+Sub-claims that survived the attack and are cheap to pick up later, each PROVEN:
+`6497376 = f32(fb/255)*f32(0.9)` (CAPTURED constant in the port, real and
+reachable — this is the TYPE-5 cell in the sweep table above); REVERB TYPE >= 6
+**aliases to TYPE 4**, so `reverb_recall.c`'s `type > 5 -> 5` must be `-> 4`;
+EFFECT TYPE >= 6 is not written; `101744 = (DELAY TYPE <= 5)`, not level-gated.
+
+## STILL OPEN 4 — chorus: no refutation verdict was returned
+
+The chorus block (EFFECT TYPE 1 gets no Wet write; EFFECT TYPE 5 must not write
+Noise) was **never adjudicated**. It is not applied. An unrefuted law is not a
+surviving law — the whole point of the two-agent method is that three of the four
+derivations here were wrong in a way their own author could not see.
+
+## Method note worth keeping
+
+Every one of the three refutations turned on the **same** axis: the derivation
+tested a cold engine in one dispatch order, and the plugin's real behaviour depends
+on history and order. A recall law of the form "cell X = f(params)" is not proven
+until it has been driven from a **warm** engine whose previous patch left a
+different value in X. Cold sweeps prove what is written; only a patch-change chain
+proves what is *not*.

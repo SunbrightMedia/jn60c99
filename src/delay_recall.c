@@ -121,9 +121,19 @@ static const uint32_t FILT[] = {
  * (a single tap), TYPE 1 runs TWO delay instances: the first-instance block at
  * 102xxx (a variant of the TYPE-0 block — 102544/102592/102608 differ) AND a full
  * SECOND instance at 4297584.. All 17 factory TYPE-1 patches share the same constant
- * cells below (verified 8/8 incl. a level-0 patch); only TIME (102352 / 4297584),
- * WET (102528 / 4297760) and the level gate (feedback 102560, ON 102576 / 4297824)
- * are per-patch. Bit-for-bit from the captured MASTER states state_pN_master.bin.
+ * cells below (verified 8/8 incl. a level-0 patch). Per-patch, NOT in these tables:
+ * TIME (102352 / 4297584), WET (102528 / 4297760), the level gate (102560 / 102576 /
+ * 4297824) and the SECOND-instance feedback (4297808) and dry (4297744) laws — see
+ * the derivation in apply_slot1_delay1 below.
+ *
+ * ⚠ TWO CELLS WERE REMOVED FROM THESE TABLES ON 2026-08-14, and the reason is the
+ * reusable lesson: they were read out of the captured MASTER states, where the
+ * engine happened to sit at its own default bytes. 102512 (first-instance dry) is
+ * NEVER WRITTEN by a TYPE-1/4 recall — the captured 1.0 was the cold seed, and the
+ * cell really carries the previous patch's value. 4297808 (second-instance feedback)
+ * held 0x3ed8d8d9, which is f32(120/255)*f32(0.9) — the law evaluated at the default
+ * feedback byte 120, so one capture cannot tell a constant from a law. Bytes, not
+ * captures: sweeping all 256 separates them.
  * TIME is tempo-synced for most TYPE-1 patches, and THE SYNC LAW IS DERIVED AND
  * IMPLEMENTED -- see SYNC_BEATS / SYNC_MS_128 / sync_division() at the top of this
  * file: division = (byte==0)?0:(byte+16)/17, ms = beats*60000/BPM, obtained by
@@ -144,7 +154,7 @@ static const uint32_t FILT[] = {
  * build on any unjustified approximation marker in src/. */
 static const uint32_t DLY1_A[] = {   /* first instance 102xxx: always-constant cells */
   102368,0x3e1b31ceu, 102416,0x3fb07de6u, 102432,0xbf07c840u, 102464,0x3e52bdc7u,
-  102480,0x3fb50bf3u, 102496,0x3f800000u, 102512,0x3f800000u, 102544,0x3f9bd7cau,
+  102480,0x3fb50bf3u, 102496,0x3f800000u, 102544,0x3f9bd7cau,
   102592,0x00000000u, 102608,0x3bab929au, 102624,0x3f800000u, 102640,0x3f800000u,
   102656,0x3f4ba5b0u, 102672,0x3f800000u
 };
@@ -152,7 +162,7 @@ static const uint32_t DLY1_B[] = {   /* second instance 4297584..: always-consta
   4297600,0x3e1b31ceu, 4297616,0x00000000u, 4297632,0x00000000u, 4297648,0x3fb07de6u,
   4297664,0xbf07c840u, 4297680,0x00000000u, 4297696,0x3e52bdc7u, 4297712,0x3fb50bf3u,
   4297728,0x3f800000u, 4297744,0x3f800000u, 4297776,0x387fd974u, 4297792,0x3efefeffu,
-  4297808,0x3ed8d8d9u, 4297840,0x3f800000u, 4297856,0x3f800000u, 4297872,0x00000000u,
+  4297840,0x3f800000u, 4297856,0x3f800000u, 4297872,0x00000000u,
   4297888,0x40000000u, 4297904,0x3c2b929au, 4297920,0x3f800000u, 4297936,0x3f800000u,
   4297952,0x3f4ba5b0u, 4297968,0x3f800000u, 4297984,0x3f800000u
 };
@@ -328,8 +338,10 @@ static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, f
 static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, float tc, int second)
 {
     int level = blob_val(rec, 52);            /* DELAY LEVEL */
-    int fb    = rec_byte(rec, 3057);          /* DELAY FEEDBACK (per-patch law, see TYPE-0) */
-    int direct = rec_byte(rec, 3060);         /* DELAY DIRECT LEVEL */
+    int fb    = rec_byte(rec, 3057);          /* DELAY FEEDBACK -> second instance only */
+    /* DELAY DIRECT LEVEL (record 3060) is deliberately NOT read here: at TYPE 1 it
+     * drives 4297744 through juno_apply_delay_finefx_2nd, and at TYPE 4 it is inert
+     * (256-byte sweep at TYPE 4 moves ZERO cells in the full 2.75 M-cell state). */
     int on = (level >= 2);
     int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
     unsigned k; uint32_t bits; float f;
@@ -363,20 +375,58 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
     JF(state, 102528)  = (float)level / 255.0f;
     if (second) JF(state, 4297760) = (float)level / 255.0f;
 
-    /* Level gate: first-instance feedback (102560) + ON (102576) and second-instance
-     * ON (4297824) drop to 0 when the delay is off (LEVEL < 2); the second-instance
-     * feedback (4297808, in DLY1_B) stays constant, matching the captured states. */
-    /* First-instance feedback: the plugin's own per-patch law (delay_fb_sweep.py,
-     * bit-exact 768/768), gated to 0 when the delay is off exactly as the captured
-     * OFF states show (render-equivalent either way: wet is 0). The old captured
-     * constant 0x3ed8d8d9 was the fb=120 special case. DRY (102512) likewise gets
-     * its per-patch law, overwriting the DLY1_A placeholder.
-     * APPROX-OK: a placeholder OVERWRITTEN in this same call by the per-patch
-     * law two lines below -- it is never the value that reaches the engine. */
-    JF(state, 102560)  = on ? ((float)fb / 255.0f) * 0.9f : 0.0f;
-    JF(state, 102512)  = (float)direct / 255.0f;
+    /* --- The per-patch laws for TYPE 1 and TYPE 4. DERIVED FROM THE PLUGIN'S OWN
+     * DISPATCH, never fitted. Sweeps under Unicorn, every other leaf at a factory
+     * value unless stated: all 256 bytes of DELAY FEEDBACK and all 256 of DELAY
+     * DIRECT LEVEL, at TYPE 1 and at TYPE 4, at DELAY LEVEL 20 and repeated at
+     * DELAY LEVEL 0; a 32-point repeat at 48 kHz; the WHOLE 2.75 M-cell state
+     * diffed at 44100/48000/88200/96000; 200 cross-parameter checks (25 other
+     * settings x 2 types) and 88 points with every other leaf RANDOM (8 seeds) —
+     * 0 violations. The detector was seen to fire first: DELAY LEVEL and DELAY
+     * TIME each move cells in the same runs, including inside the TYPE-4 block.
+     *
+     * FIRST INSTANCE (102xxx) — the plugin leaves the per-patch cells ALONE:
+     *   102512 DRY       never written by a TYPE-1/4 recall. It carries the
+     *                    previous patch's value. PROVEN by a 5-recall stale chain
+     *                    on ONE engine: 102512/102560 still hold 0.35294119 /
+     *                    0.13058823 from a preceding TYPE-0 patch after both a
+     *                    TYPE-1 and a TYPE-4 recall, then re-carry the next pair.
+     *                    So the port must NOT write it — there is no line here.
+     *   102560 FEEDBACK  written ONLY as 0, and only below the level gate
+     *                    (DELAY LEVEL < 2). Above the gate: no write. 256/256 at
+     *                    LEVEL 0. This zero arm is load-bearing for TYPE 4 too,
+     *                    not only TYPE 1 (dt=4, level 0/1 -> 0x00000000 against a
+     *                    cold default of 0x3ed8d8d9).
+     *
+     * SECOND INSTANCE (4297xxx, TYPE 1 only) — the ACTIVE tap carries the laws:
+     *   4297808 FEEDBACK f32(fb/255) * f32(0.9), UNGATED (still 0.9 at LEVEL 0).
+     *                    256/256 bit-exact; the rival op chains score
+     *                    f32(b*0.9)/255 = 180, f32(b)*f32(0.9/255) = 203, the f64
+     *                    chain 209. Rate-independent (bit-identical at all four
+     *                    rates while 102544 moves per rate, so the rate did
+     *                    change). The same law was reached independently from the
+     *                    TYPE-5 side, which is why the op order is not in doubt.
+     *   4297744 DRY      f32(byte)/f32(255) — 256/256; the reciprocal multiply
+     *                    f32(b)*f32(1/255) scores only 130/256, so the DIVIDE is
+     *                    proven. Already applied bit-exactly by
+     *                    juno_apply_delay_finefx_2nd (finefx_recall.c) — it is
+     *                    deliberately NOT repeated here.
+     *
+     * WHAT WAS WRONG, and the reusable rule. The old code had the two instances
+     * INVERTED: it applied the feedback and dry laws to the first instance, which
+     * the plugin does not write, and gave the second instance the captured
+     * constant 0x3ed8d8d9, which the plugin drives per patch. Port and plugin
+     * therefore agreed at exactly 1 feedback byte of 256 and 1 direct byte of 256.
+     * At fb=128 the two values were literally swapped. THE RULE: the ACTIVE slot-1
+     * instance carries the feedback law; the base block does not. Because both
+     * first-instance cells are stale-carrying, this fix was re-checked on the
+     * patch-change path (5 sequential recalls on one engine), not only cold. */
+    if (!on) JF(state, 102560) = 0.0f;
     JF(state, 102576)  = on ? 1.0f : 0.0f;
-    if (second) JF(state, 4297824) = on ? 1.0f : 0.0f;
+    if (second) {
+        JF(state, 4297808) = ((float)fb / 255.0f) * 0.9f;
+        JF(state, 4297824) = on ? 1.0f : 0.0f;
+    }
 }
 
 void juno_apply_delay(unsigned char *state, const unsigned char *rec)
