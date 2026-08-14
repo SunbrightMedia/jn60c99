@@ -133,3 +133,36 @@ overwrites it, or from the type-specific arms writing the same cells.
 
 Next probe: find every writer of 102512/102528/102544/102560/102576/102592 in
 the non-zero-type path, in order.
+
+### DELAY TYPE 2/3/5: cause LOCATED (not yet fixed)
+
+`delay_recall.c` returns EARLY for these types:
+
+    if (dtype == 2 || dtype == 3) { apply_slot1_chorus(...); return; }
+    if (dtype == 5)               { apply_slot1_reverb(...); return; }
+
+so the base delay block (102512..102688, the `FILT[]` write) is NEVER reached.
+The port leaves those cells at 0, except 102592, which keeps `FILT[]`'s 1.0 from
+an earlier write.
+
+The plugin DOES write a base block for these types. MEASURED by sweeping DELAY
+TYPE with every other parameter at a factory value:
+
+| cell | plugin (type 2/3/5) | port |
+|---|---|---|
+| 102528 | 0.0784313753 (= level/255) | 0 |
+| 102544 | 1.30727255 | 0 |
+| 102576 | 1 | 0 |
+| 102592 | **0** | **1** |
+
+102592 inverted is the audible one: the port MUTES the block the plugin leaves
+enabled, and vice versa.
+
+This also explains why removing `if (dtype != 0) return;` (fix attempt 1)
+changed nothing: types 2/3/5 return long before that line.
+
+⚠ NOT FIXED. 1.30727255 comes from ONE sweep point (all other parameters at
+factory). Whether it is a constant or a function of another parameter is
+UNKNOWN. Writing it as a constant now would be fitting to a measurement -- the
+exact defect class this project forbids. The law must be derived by sweeping the
+delay parameters AT type 2, the way the TYPE-0 laws were derived.
