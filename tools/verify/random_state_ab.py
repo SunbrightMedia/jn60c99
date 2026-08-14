@@ -72,7 +72,15 @@ BLOB_OFF = 16           # record-relative blob base -- THE VALUE recall_
 BANK_LEN = 23 + 20223
 
 
-def synth_bank(seed, leaves):
+def factory_leaves(leaves):
+    """Leaf values read OUT of factory patch 0, for the self-control below."""
+    b = open(truth.BANK, 'rb').read()
+    base = HEADER + BLOB_OFF
+    return {bb: ((b[base + bb] & 0xF) << 4) | (b[base + bb + 1] & 0xF)
+            for _i, bb in leaves}
+
+
+def synth_bank(seed, leaves, fixed=None):
     """One record, every recall leaf byte randomised. The nibble-pair encoding
     is the port's own (juno_bank_apply reads blob[2*pos] / [2*pos+1])."""
     rnd = random.Random(seed)
@@ -80,7 +88,7 @@ def synth_bank(seed, leaves):
     b[0] = ord('K')
     base = HEADER + BLOB_OFF
     for _idx, bb in leaves:
-        v = rnd.randrange(256)
+        v = fixed[bb] if fixed is not None else rnd.randrange(256)
         b[base + bb] = (v >> 4) & 0xF
         b[base + bb + 1] = v & 0xF
     return bytes(b)
@@ -97,7 +105,8 @@ def ref(n, start):
     leaves = R.leaf_table()
     offs = FS.offsets()
     for s in range(start, start + n):
-        bank = synth_bank(s, leaves)
+        fixed = factory_leaves(leaves) if s < 0 else None
+        bank = synth_bank(s, leaves, fixed)
         e = RR.prepare_recall(0, bank, leaves, E, R, SR)
         st = e.state[0]
         d = {o: struct.unpack('<I', e.uc.mem_read(st + o, 4))[0] for o in offs}
@@ -131,7 +140,8 @@ def port(n, start):
     for s in seeds:
         r = pickle.load(open(pkl(s), 'rb'))
         ctx = lib.juno_gui_create(ctypes.c_float(SR), 0)
-        lib.juno_gui_apply_bank(ctx, synth_bank(s, leaves), BANK_LEN, 0)
+        fixed = factory_leaves(leaves) if s < 0 else None
+        lib.juno_gui_apply_bank(ctx, synth_bank(s, leaves, fixed), BANK_LEN, 0)
         for off in sorted(r):
             if inert(off):
                 continue
