@@ -117,3 +117,19 @@ direction.
 The random gate found the block; the SWEEP separated reachable from
 unreachable. A random-parameter gate must always be followed by a reachability
 check, or it will rank an impossible input above a defect half the patches hit.
+
+### Fix attempt 1: FAILED (recorded, not hidden)
+
+Hypothesis: `delay_recall.c`'s `if (dtype != 0) return;` suppressed the base
+delay block for non-zero types.
+
+Removed it, rebuilt, re-ran the sweep: **the differing-cell counts were
+IDENTICAL** (TYPE 1:3, 2:4, 3:4, 4:2, 5:5). So that line is not the cause, and
+the edit was reverted rather than left in the frozen port.
+
+What this rules out: the base block is already reached for non-zero types by
+another path. The wrong values therefore come from a LATER write that
+overwrites it, or from the type-specific arms writing the same cells.
+
+Next probe: find every writer of 102512/102528/102544/102560/102576/102592 in
+the non-zero-type path, in order.
