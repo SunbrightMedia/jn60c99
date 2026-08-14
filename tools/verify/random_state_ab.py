@@ -80,6 +80,38 @@ def factory_leaves(leaves):
             for _i, bb in leaves}
 
 
+def legal_values(leaves):
+    """For each leaf, the set of values REAL PATCHES use -- the factory bank plus
+    every bank in scratchpad/userbanks/ (832 patches).
+
+    ⚠ WHY THIS EXISTS, and it invalidated a whole night of results. The first
+    version drew a uniform byte 0..255 for every leaf. For a SWITCH with six
+    legal values that is out of range 250 times in 256, so DELAY TYPE was >= 6 in
+    ALL 60 seeds and every "defect" the gate reported lived in the out-of-range
+    class. The gate was measuring a corner no user can reach, 60 times.
+
+    A test must be proven before its results mean anything. Drawing from values
+    real patches use makes every seed REACHABLE by definition.
+    """
+    import glob
+    banks = [truth.BANK] + sorted(glob.glob(os.path.join(
+        ROOT, 'scratchpad', 'userbanks', '*.bin')))
+    base = HEADER + BLOB_OFF
+    out = {bb: set() for _i, bb in leaves}
+    for path in banks:
+        b = open(path, 'rb').read()
+        for p_ in range(64):
+            rec = base + p_ * 20223
+            if rec + 700 > len(b):
+                continue
+            for _i, bb in leaves:
+                out[bb].add(((b[rec + bb] & 0xF) << 4) | (b[rec + bb + 1] & 0xF))
+    return {bb: sorted(v) for bb, v in out.items()}
+
+
+_LEGAL = None
+
+
 def synth_bank(seed, leaves, fixed=None):
     """One record, every recall leaf byte randomised. The nibble-pair encoding
     is the port's own (juno_bank_apply reads blob[2*pos] / [2*pos+1])."""
@@ -88,7 +120,16 @@ def synth_bank(seed, leaves, fixed=None):
     b[0] = ord('K')
     base = HEADER + BLOB_OFF
     for _idx, bb in leaves:
-        v = fixed[bb] if fixed is not None else rnd.randrange(256)
+        if fixed is not None:
+            v = fixed[bb]
+        elif os.environ.get('JUNO_SEED_WILD'):
+            v = rnd.randrange(256)          # out-of-range too; NOT user-reachable
+        else:
+            global _LEGAL
+            if _LEGAL is None:
+                _LEGAL = legal_values(leaves)
+            pool = _LEGAL.get(bb) or [0]
+            v = pool[rnd.randrange(len(pool))]
         b[base + bb] = (v >> 4) & 0xF
         b[base + bb + 1] = v & 0xF
     return bytes(b)
