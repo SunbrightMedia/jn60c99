@@ -84,3 +84,36 @@ mute/enable, is set by the port for a patch where the plugin routes elsewhere.
    to these seeds.
 2. Fix `delay_recall.c` routing; re-run the random gate; expect 3 cells left.
 3. Then attribute the residual 3, plus EFFECT TYPE (2) and REVERB TYPE (1).
+
+## CORRECTION + the reachable defect (2026-08-13)
+
+The DELAY TYPE sweep (`delaytype_sweep.py`, plugin dispatch, every other
+parameter at a factory value) splits the finding in two:
+
+| DELAY TYPE | cells wrong | occurrences in 832 REAL patches |
+|---|---|---|
+| 0 | **0** | 447 |
+| 1 | 3 (102512, 102560, 4297808) | 188 |
+| 2 | 4 (102528, 102544, 102576, 102592) | 45 |
+| 3 | 4 (same) | 38 |
+| 4 | 2 (102512, 102560) | 18 |
+| 5 | 5 (+6497376) | 96 |
+| 6..15 | 39 | **0 -- never occurs** |
+
+**THE "39 OF 42 CELLS" HEADLINE WAS MISLEADING AND IS WITHDRAWN.** Those 39 come
+from DELAY TYPE 6..15. The UI has six positions; 832 real patches (12 user banks
++ factory) contain only 0..5. That is a port/plugin difference on an input no
+patch can carry -- worth recording, not worth prioritising.
+
+**The reachable defect is smaller and worse.** EVERY DELAY TYPE except 0 writes
+wrong cells: **385 of 832 real patches, 46 %**. TYPE 0 is exactly right, which
+is why every earlier gate passed -- the factory bank is 70 % TYPE 0 and the
+render A/B patches skew further that way.
+
+Cell 102592 appears for TYPE 2/3/5, which is user-bank issue 2, from a second
+direction.
+
+### Method note
+The random gate found the block; the SWEEP separated reachable from
+unreachable. A random-parameter gate must always be followed by a reachability
+check, or it will rank an impossible input above a defect half the patches hit.
