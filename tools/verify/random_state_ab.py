@@ -38,11 +38,16 @@ absence of defects; it can only fail fast, reproducibly, and never quietly. Its
 value is that it reaches combinations no bank contains -- not that it is
 exhaustive.
 
-⚠ A RANDOM VALUE IS NOT ALWAYS A LEGAL ONE. Some leaves are switches with 2-4
-live values; a random byte may select a state no UI can produce. That is on
-purpose (the plugin is still the oracle, so whatever it does is correct), but a
-failure must be read as "the port disagrees HERE", not automatically as "a user
-could hit this".
+⚠ TWO MODES, KEPT SEPARATE ON PURPOSE.
+  default          every byte drawn from its PLUGIN-DERIVED legal range
+                   (scratchpad/leaf_ranges.pkl, tools/verify/leaf_ranges.py).
+                   Every seed is a state the plugin itself distinguishes; a
+                   failure is a REACHABLE defect.
+  JUNO_SEED_WILD=1 uniform 0..255 including out-of-range switch values. The
+                   plugin is still the oracle, so a failure is still a port
+                   disagreement -- but it must be LABELLED out-of-range, never
+                   mixed into the reachable count. The first 60 seeds ran
+                   wild-only by accident and every finding was this class.
 
 USAGE
     python3 tools/verify/random_state_ab.py --ref  [N] [--start S]
@@ -77,59 +82,58 @@ def factory_leaves(leaves):
     b = open(truth.BANK, 'rb').read()
     base = HEADER + BLOB_OFF
     return {bb: ((b[base + bb] & 0xF) << 4) | (b[base + bb + 1] & 0xF)
-            for _i, bb in leaves}
+            for bb in all_bytes(leaves)}
 
 
-def legal_values(leaves):
-    """For each leaf, the set of values REAL PATCHES use -- the factory bank plus
-    every bank in scratchpad/userbanks/ (832 patches).
+def leaf_ranges():
+    """{byte: top} -- each recall byte's legal range 0..top, DERIVED FROM THE
+    PLUGIN by tools/verify/leaf_ranges.py (binary-searched clamp point over the
+    full render-visible state, with a seen-to-fail boundary check per byte).
 
-    ⚠ WHY THIS EXISTS, and it invalidated a whole night of results. The first
-    version drew a uniform byte 0..255 for every leaf. For a SWITCH with six
-    legal values that is out of range 250 times in 256, so DELAY TYPE was >= 6 in
-    ALL 60 seeds and every "defect" the gate reported lived in the out-of-range
-    class. The gate was measuring a corner no user can reach, 60 times.
-
-    A test must be proven before its results mean anything. Drawing from values
-    real patches use makes every seed REACHABLE by definition.
+    ⚠ TWO PICKERS BEFORE THIS ONE WERE WRONG, one night of results each.
+      1. Uniform 0..255: a 6-value switch is out of range 250/256, so DELAY
+         TYPE was >= 6 in ALL 60 seeds -- one unreachable corner, 60 times.
+      2. "Values real patches use": right for switches, WRONG for knobs -- a
+         cutoff value no patch uses is still legal, and the entire reason for
+         the seeds is COMPLETE randomness (user, 2026-08-15).
+    The range must come from the plugin, nowhere else. A knob whose 256 values
+    all move the plugin stays 0..255; a clamped switch draws only its classes.
     """
-    import glob
-    banks = [truth.BANK] + sorted(glob.glob(os.path.join(
-        ROOT, 'scratchpad', 'userbanks', '*.bin')))
-    base = HEADER + BLOB_OFF
-    out = {bb: set() for _i, bb in leaves}
-    for path in banks:
-        b = open(path, 'rb').read()
-        for p_ in range(64):
-            rec = base + p_ * 20223
-            if rec + 700 > len(b):
-                continue
-            for _i, bb in leaves:
-                out[bb].add(((b[rec + bb] & 0xF) << 4) | (b[rec + bb + 1] & 0xF))
-    return {bb: sorted(v) for bb, v in out.items()}
+    import leaf_ranges as LR
+    r = pickle.load(open(LR.OUT, 'rb'))
+    return {bb: d['top'] for bb, d in r.items()}
 
 
-_LEGAL = None
+_RANGES = None
+
+
+def all_bytes(leaves):
+    """EVERY recall byte, not just the 112 front-panel leaves: src/ also reads
+    blob 3057 (DELAY FEEDBACK) and 3060 (DELAY DIRECT). The first generator
+    missed them, so the feedback law could never fail under it."""
+    import leaf_ranges as LR
+    return sorted({bb for _i, bb in leaves} | set(LR.EXTRA_BYTES))
 
 
 def synth_bank(seed, leaves, fixed=None):
-    """One record, every recall leaf byte randomised. The nibble-pair encoding
-    is the port's own (juno_bank_apply reads blob[2*pos] / [2*pos+1])."""
+    """One record, every recall byte randomised within its PLUGIN-DERIVED
+    range. The nibble-pair encoding is the port's own (juno_bank_apply reads
+    blob[2*pos] / [2*pos+1])."""
     rnd = random.Random(seed)
     b = bytearray(BANK_LEN)
     b[0] = ord('K')
     base = HEADER + BLOB_OFF
-    for _idx, bb in leaves:
+    wild = bool(os.environ.get('JUNO_SEED_WILD'))
+    global _RANGES
+    if _RANGES is None and fixed is None and not wild:
+        _RANGES = leaf_ranges()
+    for bb in all_bytes(leaves):
         if fixed is not None:
-            v = fixed[bb]
-        elif os.environ.get('JUNO_SEED_WILD'):
-            v = rnd.randrange(256)          # out-of-range too; NOT user-reachable
+            v = fixed.get(bb, 0)
+        elif wild:
+            v = rnd.randrange(256)      # out-of-range too; NOT user-reachable
         else:
-            global _LEGAL
-            if _LEGAL is None:
-                _LEGAL = legal_values(leaves)
-            pool = _LEGAL.get(bb) or [0]
-            v = pool[rnd.randrange(len(pool))]
+            v = rnd.randrange(_RANGES.get(bb, 255) + 1)
         b[base + bb] = (v >> 4) & 0xF
         b[base + bb + 1] = v & 0xF
     return bytes(b)
