@@ -373,3 +373,32 @@ on history and order. A recall law of the form "cell X = f(params)" is not prove
 until it has been driven from a **warm** engine whose previous patch left a
 different value in X. Cold sweeps prove what is written; only a patch-change chain
 proves what is *not*.
+
+# 2026-08-15 — FIRST RUN WITH PROVEN SEEDS (plugin-derived ranges)
+
+The generator was rebuilt (commit 88d4c0f): each recall byte's legal range is
+derived FROM THE PLUGIN by `tools/verify/leaf_ranges.py` (full-state hash,
+binary-searched clamp point, boundary verified per byte), and the two non-leaf
+recall bytes 3057 (DELAY FEEDBACK) / 3060 (DELAY DIRECT) are now randomised too.
+Coverage proven over 100 seeds before running. 30 seeds (100..129), all
+reachable by construction.
+
+RESULT: **42 differing cells**, cleanly attributed by per-seed correlation
+(every failing seed decoded, classes vs FX-type bytes — no hold-out needed):
+
+| class | cells | correlates with | status |
+|---|---|---|---|
+| base block 102528/44/76/92 | 4 | DELAY TYPE ∈ {2,3,5,6}, all 19 such seeds, none other | KNOWN cause: early return in delay_recall.c (~line 435). UNFIXED |
+| fine-FX 6496480.. (18 cells) + chorus 10691936.. (15) + aux 101744 + route | 35 | DELAY TYPE = 6 EXACTLY (4/4 seeds, no others) | **NEW DEFECT: the plugin has SEVEN delay-type classes (0..6). leaf_ranges proved state(6) != state(5). The port clamps >5 to 5.** |
+| finefx single cell 6497376 | 1 | DELAY TYPE = 5 | known CAPTURED-constant cell (fb law at type 5) |
+| BBD ring 91200/91232 | 1–2 | NOT yet attributed (crosses delay types; suspect chorus LFO phase vs a leaf) | OPEN |
+| route 11022040.. | 1 | EFFECT TYPE = 6 and DELAY TYPE = 6 seeds | matches "REVERB/EFFECT TYPE >= 6" class above |
+
+The dtype=6 finding is exactly what the proven seeds were for: the old
+generator hid it inside the unreachable-corner noise; the patch-pool picker
+would NEVER have drawn 6 (no factory or user patch uses it); the plugin's own
+clamp point says 6 is a distinct, reachable class.
+
+Labels: DELAY TYPE 7-classes = PROVEN(executed, leaf_ranges boundary probe +
+4/4 seed correlation). Base-block cause = PROVEN located, law not yet derived.
+BBD = INFERRED, open.
