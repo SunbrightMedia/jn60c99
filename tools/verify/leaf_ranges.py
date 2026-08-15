@@ -52,11 +52,22 @@ HEADER = 23
 BLOB_OFF = 16
 BANK_LEN = 23 + 20223
 
-# Recall bytes the port reads that are NOT front-panel leaves (grep of
-# src/ rec_byte calls): DELAY FEEDBACK and DELAY DIRECT LEVEL. The first
-# generator missed them entirely -- it only wrote leaf_table() bytes -- so
-# the feedback law's fix could never have been found by it.
-EXTRA_BYTES = [3057, 3060]
+# Recall bytes the port reads that are NOT front-panel leaves: DELAY FEEDBACK
+# and DELAY DIRECT LEVEL. The first generator missed them entirely -- it only
+# wrote leaf_table() bytes.
+#
+# ⚠ RECORD-RELATIVE vs BLOB-RELATIVE, and this file got it wrong for a day.
+# src/delay_recall.c:442-443 reads rec_byte(rec, 3057) / (rec, 3060) -- those
+# are RECORD offsets. probe() and random_state_ab.synth_bank() write at
+# HEADER + BLOB_OFF, which is BLOB-relative, and blob = record - 16.
+# recall_render_ab.py:196 has always converted correctly (`recoff - 16`); this
+# file did not, so the gate perturbed record 3073/3076 -- bytes nothing reads --
+# while its comment claimed it had closed the feedback blind spot. The plugin
+# said so itself and was not listened to: the derived range for blob 3057 came
+# back `flat`, i.e. a byte whose value never moves the plugin's state. A `flat`
+# result on a byte you believe is a live parameter is EVIDENCE OF A WRONG
+# ADDRESS, not a boring parameter. Read it that way next time.
+EXTRA_BYTES = [3041, 3044]          # blob-relative = record 3057 / 3060
 
 
 def state_hash(e):

@@ -48,6 +48,14 @@ STATE_SZ = 0xA83010
 # The regions the render actually reads. Dumping all 11 MB through a 4-byte
 # accessor is 2.7 M calls per patch; these cover every cell any render path
 # touches, and a cell outside them cannot reach the audio.
+#
+# ⚠ THIS LIST IS A GATE, AND AN INCOMPLETE ONE IS A BLIND ONE. On 2026-08-15
+# four FX cells were found OUTSIDE it — 6396400/6396448, 6430736/6430784 and
+# 10693328 — each of them an LFX1/ENABLE pair a DELAY TYPE change writes. A
+# derivation ran three warm chains against this list, saw nothing, and would
+# have supported a WRONG law ("the plugin writes nothing"); only a whole-11 MB
+# diff found the writes. When a result says A CELL IS NEVER WRITTEN, prove the
+# window contains it before believing the window.
 #   voices        8 x 10512 from 0
 #   shared noise  84272..84436
 #   aux one-shot  101504 + v*32
@@ -57,13 +65,18 @@ REGIONS = [
     (84272, 84436),
     (101504, 101504 + 8 * 32),
     (102336, 102720),          # delay type 0 block
-    (4297552, 4297856),        # delay second instance
+    (4297552, 4297990),        # delay second instance (was ..4297856: the tail
+                               # 4297856..4297990 was OUTSIDE, and the type-1
+                               # tear-down writes land in it)
     (6395248, 6395440),        # delay t23
+    (6396384, 6396464),        # slot-1 chorus LFX1 + ENABLE -- WAS NOT COVERED
     (6429408, 6429440),
+    (6430720, 6430800),        # delay type-4 LFX1 + ENABLE -- WAS NOT COVERED
     (6463712, 6463744),
     (6496480, 6497500),        # delay t5 + fine-FX
     (8594768, 8594800),
-    (10691936, 10693300),      # chorus
+    (10691936, 10693360),      # chorus (was ..10693300: 10693328, the type-5
+                               # SECOND enable cell, sat 28 bytes outside)
     (10726256, 10726288),
     (10759040, 10759520),      # reverb
     (11022040, 11022360),      # effect routing / prog id
