@@ -190,6 +190,11 @@ static void put_rate(unsigned char *state, int Hr, int off,
 #define ARM_HCSW  0x3f800000u, 0x00000000u, 0x00000000u, 0x00000000u  /* High-Cut Sw   */
 #define ARM_HFDMP 0x3f800000u, 0x3f4ba5b0u, 0x3f4ba5b0u, 0x3f4ba5b0u  /* HF-Damp Fc    */
 #define ARM_LFX1  0x388b3cdfu, 0x387fd974u, 0x37ffd974u, 0x37ffd974u  /* 96k-clamped   */
+/* The value a slot-1 block's LFX1 cell takes when the block is turned OFF. It is
+ * 2*sin(pi*10000/H) — EXACT at 44.1k and 48k by computation — and the 88.2k slot
+ * carries the 96k value, the same 96k clamp ARM_LFX1 documents. Not a new
+ * constant: the type-1/4 arm at :362 already writes these four words. */
+#define ARM_LFX1_OFF 0x3fa754b5u, 0x3f9bd7cau, 0x3f2493b7u, 0x3f2493b7u
 #define ARM_LFX2  0x3c3abeeau, 0x3c2b929au, 0x3bbabeeau, 0x3bab929au  /* 2sin(pi*80/H) */
 #define ARM_CHDEP 0x3cdb8001u, 0x3cef0001u, 0x3d5c0001u, 0x3d6f8001u  /* chorus depth  */
 #define ARM_CHLF  0x3b696eb3u, 0x3b56774fu, 0x3ae96eb3u, 0x3ad6774fu  /* chorus LF     */
@@ -447,9 +452,53 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     float f, tc;
     if (Hr <= 0) Hr = 96000;
 
+    /* THE TYPE-0 BASE BLOCK IS WRITTEN FOR EVERY DELAY TYPE, NOT ONLY TYPE 0.
+     *
+     * The four cells 102528 / 102544 / 102576 / 102592 were the largest single
+     * defect class the random-state gate found: wrong on 19 of 30 legal seeds,
+     * every one of them a patch with DELAY TYPE 2, 3, 5 or 6. The port reached
+     * the type-2/3/5 arms and returned before it ever got here, so it wrote
+     * none of the four.
+     *
+     * MEASURED, warm, through ONE engine, plugin as the oracle (G2:
+     * tools/verify/warm_recall_gate.py with a synthetic bank from
+     * tools/verify/synth_warm_bank.py). Cold at TYPE 3 / LEVEL 150 the plugin
+     * writes 150/255, the OFF arm, 1 and 0; the port wrote 0, 0, 0 and a stale 1.
+     *
+     * THE WET CELL IS GATED ON THE PREVIOUS TYPE, NOT THE NEW ONE. With the
+     * previous DELAY TYPE 3 and a new patch at TYPE 2 / LEVEL 200, the plugin
+     * leaves 102528 at the PREVIOUS patch's 150/255 — it does not write 200/255.
+     * 102592 is the type-0 block's own ENABLE flag and is 1 exactly when the
+     * last recall was TYPE 0, so it IS the predicate; no shadow is needed.
+     *
+     * AND THE LEVEL GATE IS THREE-WAY, WHICH COST A REFUTED FIX TO LEARN. An
+     * earlier derivation read it as (level >= 2), from a chain whose only
+     * level-1 point followed a level-0 step — where "write 0" and "no write"
+     * are the same observation. Proven two-sided here instead: arm the carried
+     * flag to 1 and level 1 leaves 1; arm it to 0 and level 1 leaves 0. The
+     * result equals the incoming value both ways, so AT LEVEL 1 THE PLUGIN
+     * WRITES NOTHING. Writing 0 there would mute a path the plugin leaves open
+     * (src/master_render.c:1127 and :1151 multiply slot-1 by 102576) and the
+     * cell carries, so the split would persist across later patches. */
+    if (JF(state, 102592) != 0.0f) {          /* previous DELAY TYPE was 0 */
+        JF(state, 102528) = (float)level / 255.0f;
+        if (level == 0)       JF(state, 102576) = 0.0f;
+        else if (level >= 2)  JF(state, 102576) = 1.0f;
+        /* level == 1: NO WRITE. Proven two-sided above. Do not "complete" this. */
+    }
+    if (dtype != 0) {                          /* tear the type-0 block down */
+        put_rate(state, Hr, 102544, ARM_LFX1_OFF);
+        JF(state, 102592) = 0.0f;
+    }
+
     /* The plugin CLAMPS out-of-range DELAY TYPE to 5 (routing int at 6/9/255 ==
      * the type-5 value, PROVEN by the setter spot sweep under Unicorn,
-     * scratchpad/ext_sweeps.py 2026-07-19); the raw write diverged for >5. */
+     * scratchpad/ext_sweeps.py 2026-07-19); the raw write diverged for >5.
+     * ⚠ CONTESTED, and NOT resolved here: a 2026-08-15 derivation measured
+     * DELAY TYPE 6/7/15/255 as a SEVENTH class whose whole state differs from
+     * type 5, which would make this clamp wrong. That work is not landed and
+     * no patch in 832 carries 6, so the clamp stays until it is proven and
+     * gated. Do not cite this comment as evidence that 6 == 5. */
     if (dtype > 5) dtype = 5;
     *(int32_t *)JCELL(state, (JUNO_PROG_DLY)) = (int32_t)dtype;  /* per-patch slot-1 mode */
 
