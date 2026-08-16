@@ -554,8 +554,35 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
      * type 5, which would make this clamp wrong. That work is not landed and
      * no patch in 832 carries 6, so the clamp stays until it is proven and
      * gated. Do not cite this comment as evidence that 6 == 5. */
-    if (dtype > 5) dtype = 5;
-    *(int32_t *)JCELL(state, (JUNO_PROG_DLY)) = (int32_t)dtype;  /* per-patch slot-1 mode */
+    /* DELAY TYPE >= 6 IS A SEVENTH CLASS, NOT A CLAMP TO 5. The old
+     * `if (dtype > 5) dtype = 5;` built a reverb here; the plugin builds
+     * NOTHING. Landed 2026-08-16, and the range is the plugin's own:
+     * tools/verify/leaf_ranges.py sweeps each recall byte under Unicorn and
+     * derives blob 634 top = 6 -- state(5) != state(6), and every value >= 6
+     * equals state(255) -- with a tooth checking both edges. So 6..255 is one
+     * class, distinct from 5, and the random gate draws it legitimately.
+     *
+     * MEASURED against the plugin's own post-recall states (the reference
+     * pickles of tools/verify/random_state_ab.py, seeds 214/219/221 -- three
+     * INDEPENDENT random states that happen to draw type 6). All three give
+     * the IDENTICAL 39-cell set, and the plugin's value is ZERO in every one:
+     *   6496480..6497500  (20 cells)  reverb block      -- never built
+     *   10691936..10693360 (17 cells)  reverb 2nd block -- never built
+     *   101744  DLY Mute            -- 0.0f, so slot 1 is SILENT
+     *   11022056 routing int        -- NOT WRITTEN, keeps the previous type
+     *
+     * WHY THIS IS A BRANCH AND NOT AN EARLY RETURN, proven two-sided: the
+     * plugin DOES still write 102352 (delay time) at type 6, and its value
+     * varies per seed (3e215fc1 / 3e93659a / 3ff23ba0 across the three). The
+     * time and level leaves dispatch BEFORE the type leaf, so they land on the
+     * still-live block regardless of type. Returning before the common writes
+     * would trade 39 wrong cells for a different wrong cell. The ring-geometry
+     * ints stay on the common path for the same reason. */
+    if (dtype > 5) {
+        JI(state, 101744) = 0x00000000u;   /* DLY Mute <- 0.0f: slot 1 silent */
+    } else {
+        *(int32_t *)JCELL(state, (JUNO_PROG_DLY)) = (int32_t)dtype;  /* slot-1 mode */
+    }
 
     /* Ring-buffer geometry ints — the plugin's recall writes these for EVERY
      * patch (PROVEN: identical in the type-0 and type-4 full-state dumps at
@@ -585,6 +612,9 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
      * must come after the scale. Hr from state[16], unset => 96 kHz. */
     tc = dly_time_coeff(Hr, dtime, sync);
     JF(state, 102352) = tc;
+
+    if (dtype > 5)                             /* seventh class: build NOTHING */
+        return;                                /* (common writes above already done) */
 
     if (dtype == 2 || dtype == 3) {            /* slot 1 hosts chorus I/II */
         apply_slot1_chorus(state, rec, dtype);

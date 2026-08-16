@@ -447,27 +447,38 @@ the recall REWRITES the previous block's per-patch cells with the NEW patch's
 bytes before tearing it down. Any fix must be a BRANCH, never an early
 `return` before the common writes.
 
-**WHY IT IS NOT BEING FIXED NOW: reachability is unproven.** No patch among
-832 (64 factory + 768 user) carries DELAY TYPE 6. Until someone proves a route
-by which the byte can arrive — the plugin's own UI range in Script.xml, a host
-automation sweep of the normalised parameter, a MIDI CC, or a bank authored by
-another tool — this is a proven divergence from the plugin but NOT a proven
-user problem. It is the only class left, it is 39 cells, and it is the most
-expensive one. Spending a session on it ahead of the fork's headroom work would
-be choosing the unreachable over the binding.
+**FIXED 2026-08-16, and the reachability argument was answered by an artifact
+we already had.** `tools/verify/leaf_ranges.py` derives each recall byte's range
+by sweeping it through the plugin under Unicorn: blob 634 (DELAY TYPE) has
+top = 6, meaning `state(5) != state(6)` and every value >= 6 equals
+`state(255)`, each edge checked by the tool's own tooth. So the seventh class
+is the PLUGIN's own, not an artifact of the generator, and the random gate
+draws it legitimately. The earlier sessions treated reachability as an open
+research question while the answer sat in the range pickle.
 
-**What to do first when it is picked up**, in this order:
-1. Settle reachability. It is a read of Script.xml plus one normalised-range
-   sweep of the plugin's own setter. If NOT reachable, record and close.
-2. Re-derive "what else the recall writes at type >= 6" with LEVEL and TIME
-   MOVING, at all four rates. The earlier derivation fired the type leaf ALONE
-   and was blind to this by construction.
-3. Build G3 (warm delay tear-down) on `warm_recall_gate.py` +
-   `synth_warm_bank.py`. A natural red already exists and needs no synthetic
-   patch: factory p39 -> p40 is an ordinary DELAY TYPE 1 -> 0 transition and
-   leaves 4297760/4297776/4297840 differing today.
-4. Only then write the branch, and keep the ring-geometry ints on the common
-   path.
+**The law, measured against the plugin's post-recall states** (reference
+pickles, seeds 214/219/221 — three INDEPENDENT random states drawing type 6).
+All three give the IDENTICAL 39-cell set and the plugin's value is ZERO in
+every cell:
+
+| cells | what | plugin |
+|---|---|---|
+| 6496480..6497500 (20) | reverb block | never built |
+| 10691936..10693360 (17) | reverb 2nd block | never built |
+| 101744 | DLY Mute | 0.0f — slot 1 SILENT |
+| 11022056 | routing int | NOT WRITTEN, keeps previous type |
+
+The port clamped 6 to 5 and built a whole reverb. It now branches.
+
+**The branch is two-sided, and that was proven, not assumed.** The plugin DOES
+still write 102352 (delay time) at type 6, with a per-seed value
+(3e215fc1 / 3e93659a / 3ff23ba0 across the three seeds). Level and time
+dispatch BEFORE the type leaf, so they land on the still-live block whatever
+the type. An early `return` ahead of the common writes would have traded 39
+wrong cells for a different wrong cell. The ring-geometry ints stay on the
+common path for the same reason.
+
+**Seed gate: 0 differing cells at 30 seeds, and the sample was then widened.**
 
 **Also still open, unrelated to the seeds:** ASSIGN MODE 3 (22 user-bank
 patches, proven reachable, `docs/ASSIGN_MODE_3_FINDING.md`).
