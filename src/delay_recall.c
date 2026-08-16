@@ -271,6 +271,9 @@ static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, i
         int lvl32 = b52 * 32; if (lvl32 > 255) lvl32 = 255;
         JF(state, 6396432) = (float)lvl32 / 255.0f;
     }
+    /* same shared gate as the reverb arm: under level 2 the plugin holds 0 at
+     * the first-instance FEEDBACK cell, not the FILT[] constant. */
+    if (b52 < 2) JF(state, 102560) = 0.0f;
     /* Chorus I (dtype 2) vs II (dtype 3): these four routing/filter cells carry the
      * I/II distinction (constant per mode; exact bits from the master states). */
     {
@@ -298,13 +301,13 @@ static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, i
 static const uint32_t S1REVERB[] = {
   6497184,0x3e1b31ceu, 6497232,0x3fb07de6u, 6497248,0xbf07c840u, 6497280,0x3e52bdc7u,
   6497296,0x3fb50bf3u, 6497312,0x3f800000u, 6497328,0x3f800000u, 6497360,0x387fd974u,
-  6497392,0x3f800000u, 6497408,0x3f800000u, 6497424,0x3c2b929au,
+  6497408,0x3f800000u, 6497424,0x3c2b929au,
   6497440,0x3f800000u, 6497456,0x3f800000u, 6497472,0x3f4ba5b0u, 6497488,0x3f800000u,
   6497504,0x3f800000u, 10692016,0xc0bafafbu, 10692032,0x3f800000u, 10693008,0x3cef0001u,
   10693040,0x3f000000u, 10693056,0x3f008081u, 10693072,0x3f03df74u, 10693088,0x3f83df74u,
   10693104,0x3f03df74u, 10693120,0xbee549c0u, 10693136,0xbf1cd8f1u, 10693168,0x3f4ba5b0u,
   10693184,0x3fb50bf3u, 10693200,0x3f800000u, 10693216,0x3b56774fu, 10693232,0x3f800000u,
-  10693248,0x3f800000u, 10693264,0x3f800000u, 10693280,0x387fd974u, 10693312,0x3f800000u,
+  10693248,0x3f800000u, 10693264,0x3f800000u, 10693280,0x387fd974u,
   10693328,0x3f800000u, 10693344,0xbf800000u, 10693360,0x3f800000u, 10759360,0x446f8000u,
   10759472,0x3d000000u, 10759840,0x3f29d800u
 };
@@ -316,6 +319,33 @@ static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, f
     for (k = 0; k < sizeof(S1REVERB) / sizeof(S1REVERB[0]); k += 2) {
         bits = S1REVERB[k + 1]; memcpy(&f, &bits, sizeof f);
         JF(state, (int)S1REVERB[k]) = f;
+    }
+
+    /* THE SAME DEFECT AS 6497376 BELOW, TWO MORE CELLS. Both sat in S1REVERB[]
+     * as 0x3f800000. They are per-patch and driven by DELAY LEVEL, and they hid
+     * for the same reason: each is flat for level >= 8 or >= 2, and a uniform
+     * random level clears those thresholds in 97% / 99% of draws (playbook 51).
+     * 553 random seeds saw only the flat side. 10,687 seeds found them.
+     *
+     * MEASURED under Unicorn, level swept, BOTH SIDES OF EVERY THRESHOLD
+     * (scratchpad/derive3.py, DELAY TYPE 5):
+     *   6497392   lvl 0,1 -> 0.0        lvl 2..255 -> 1.0
+     *   10693312  lvl 0 -> 0   1 -> 32/255   2 -> 64/255   5 -> 160/255
+     *             lvl 7 -> 224/255 (unclamped)   lvl 8+ -> 1.0 (clamped)
+     * 10693312 is the THIRD site of the plugin's min(LEVEL*32,255)/255 idiom,
+     * after the TYPE-4 block and the slot-1 chorus (6396432). */
+    {
+        int on = (b52 >= 2);
+        int lvl32 = b52 * 32; if (lvl32 > 255) lvl32 = 255;
+        JF(state, 6497392)  = on ? 1.0f : 0.0f;
+        JF(state, 10693312) = (float)lvl32 / 255.0f;
+        /* Shared with the delay block: the first-instance FEEDBACK cell is
+         * zeroed whenever the slot is under level 2, whatever hosts the slot.
+         * TYPE 1 already did this; TYPE 5 and the chorus did not, so 102560
+         * kept the FILT[] constant 0.423529 where the plugin holds 0.
+         * Measured at TYPES 1/2/3/5 alike: lvl 0,1 -> 0.0, lvl 2+ -> 0.423529
+         * (TYPE 0 is a different law, 0.843529, and is untouched here). */
+        if (!on) JF(state, 102560) = 0.0f;
     }
 
     /* 6497376 IS NOT A CONSTANT. IT WAS A CAPTURE, AND IT SAT IN S1REVERB[]
@@ -634,8 +664,17 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     tc = dly_time_coeff(Hr, dtime, sync);
     JF(state, 102352) = tc;
 
-    if (dtype > 5)                             /* seventh class: build NOTHING */
+    if (dtype > 5) {                           /* seventh class: build NOTHING */
+        /* ...but the shared FEEDBACK gate is NOT part of building a block. It
+         * depends only on DELAY LEVEL and applies wherever the slot sits:
+         * measured lvl 0,1 -> 0.0 and lvl 2+ -> 0.423529 at TYPES 1,2,3,4,5
+         * AND 6 alike (TYPE 0 alone has its own law and is untouched).
+         * Found by the 10,687-seed gate: 10 seeds, all type 6 at level < 2.
+         * This is exactly why the seventh class is a BRANCH and not an early
+         * return -- a return here would skip a write the plugin still does. */
+        if (blob_val(rec, 52) < 2) JF(state, 102560) = 0.0f;
         return;                                /* (common writes above already done) */
+    }
 
     if (dtype == 2 || dtype == 3) {            /* slot 1 hosts chorus I/II */
         apply_slot1_chorus(state, rec, dtype);
