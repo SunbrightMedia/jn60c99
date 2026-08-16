@@ -517,6 +517,35 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
         JF(state, 102592) = 0.0f;
     }
 
+    /* THE SAME LAW, ONE INSTANCE OVER: leaving DELAY TYPE 1 tears the SECOND
+     * instance down, and the NEW patch's level lands in it first.
+     *
+     * FACTORY-REACHABLE, and it needs no exotic value: patches 39 -> 40 is an
+     * ordinary adjacent pair (TYPE 1 -> TYPE 0) and three cells diverged.
+     * Cold gates could never see it -- the second instance is only live after a
+     * type-1 patch, so a fresh engine per patch never has one to tear down.
+     *
+     * MEASURED through ONE engine (tools/verify/warm_recall_gate.py with a bank
+     * from tools/verify/synth_warm_bank.py):
+     *   TYPE 1 lvl 115 -> TYPE 0 lvl  68 : 4297760 = 68/255,  OFF arm, ENABLE 0
+     *   TYPE 1 lvl 115 -> TYPE 2 lvl 100 : 4297760 = 100/255, OFF arm, ENABLE 0
+     *   TYPE 2 lvl 100 -> TYPE 0 lvl  68 : the block is NOT TOUCHED
+     * so the write is gated on the PREVIOUS type being 1, exactly as the type-0
+     * base block above is gated on the previous type being 0. The level written
+     * is the NEW patch's, because the LEVEL leaf dispatches BEFORE the TYPE leaf
+     * and therefore lands on the block that is still live.
+     *
+     * prev comes from the port-owned shadow, not from a routing cell: the
+     * second instance's own ENABLE (4297840) is level-gated, so it reads 0 for a
+     * type-1 patch at level 0 or 1 and cannot answer "was the last type 1".
+     * JUNO_PREV_DLY is updated at the END of juno_bank_apply (src/juno_apply.c),
+     * so here it still holds the PREVIOUS patch's type. */
+    if (JI(state, JUNO_PREV_DLY) == 1 && dtype != 1) {
+        JF(state, 4297760) = (float)level / 255.0f;
+        put_rate(state, Hr, 4297776, ARM_LFX1_OFF);
+        JF(state, 4297840) = 0.0f;
+    }
+
     /* The plugin CLAMPS out-of-range DELAY TYPE to 5 (routing int at 6/9/255 ==
      * the type-5 value, PROVEN by the setter spot sweep under Unicorn,
      * scratchpad/ext_sweeps.py 2026-07-19); the raw write diverged for >5.
