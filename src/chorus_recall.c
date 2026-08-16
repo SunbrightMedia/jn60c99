@@ -47,19 +47,66 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
     int depth = cr_blob_val(rec, 50);    /* EFFECT DEPTH 0..255 */
     int tone  = cr_rec_byte(rec, 642);   /* EFFECT TONE  0..255 */
     int etype = cr_rec_byte(rec, 634);   /* EFFECT TYPE  0..5   */
+    /* The EFFECT TYPE in force BEFORE this recall — a PORT-OWNED shadow of the
+     * raw leaf, seeded to the power-on 2 by juno_engine_prepare and updated at
+     * the END of juno_bank_apply (src/juno_engine.h JUNO_PREV_EFX). This
+     * function NEVER writes it. */
+    int prev_etype = JI(state, JUNO_PREV_EFX);
+#ifdef JUNO_TOOTH_NO_PREV_EFX
+    prev_etype = etype;   /* THE TOOTH: kill the shadow. Rebuild with
+                           * -DJUNO_TOOTH_NO_PREV_EFX and
+                           * tools/verify/warm_recall_gate.py --port --seq 39,40
+                           * --cells 91232 MUST go RED again. If it stays green
+                           * the gate is not testing the shadow. */
+#endif
 
-    if (etype == 0) {
-        /* EFFECT TYPE 0 (the slot-2 Pan arm): the plugin's post-recall state
-         * carries block-A Wet = CHORUS_WET_LUT[depth] here too, and ONLY Wet —
-         * Dry/Noise stay at their prepare values (PROVEN: chillwave state diff +
-         * doctored-depth full recalls at 0/128/255, bit-equal; the type-0 render
-         * branch does not read block A, so this is state-faithfulness). */
-        JF(state, 91232) = cr_bits(CHORUS_WET_LUT[depth & 0xFF]);
-    }
-    if (etype >= 2 && etype <= 5) {                 /* block A (91120) — chorus modes 2/3/4/5 */
+    /* ★ THE WET CELL IS GATED ON THE PREVIOUS TYPE AS WELL, AND ON {2,3,4} —
+     * NOT {2,3,4,5}. The port's old gate was one value too wide and looked at
+     * the NEW type only, so warm it OVERWROTE a value the plugin CARRIES.
+     *
+     * The plugin's law, measured under Unicorn on ONE engine with two recalls
+     * (tools/verify/warm_recall_gate.py, factory bank, 44100):
+     *     prev 2, new 5  (p0 -> p40)  plugin WRITES  WET[144] = 0x3eb1bcd3
+     *     prev 5, new 5  (p39 -> p40) plugin CARRIES WET[255] = 0x3f95c28f
+     *     prev 5, new 5  (p40 -> p41) plugin CARRIES WET[144] = 0x3eb1bcd3
+     *     prev 2, new 1  (p1 -> p9)   plugin WRITES  WET[68]  = 0x3de1bb45
+     *     prev 1, new 1  (p9 -> p9)   plugin CARRIES WET[68]  = 0x3de1bb45
+     * i.e. the write happens iff the type in force BEFORE the recall is in
+     * {2,3,4} OR the new type is. Type 5 routes slot 2 to block B (96336), so
+     * a 5 -> 5 change never touches block A's Wet.
+     *
+     * WHY NO GATE EVER SAW IT: every gate in tools/verify/ recalled COLD (a
+     * fresh plugin engine per patch), where prev is always the power-on 2 and
+     * the left arm is always true. The EFFECT TYPE histogram of the SHIPPING
+     * factory bank is {1:1, 2:33, 3:22, 5:8} — 9 patches sit outside {2,3,4}
+     * (7,9,21,28,39,40,41,44,55). Simulating both laws over the bank:
+     * 89 of the 4032 ORDERED factory pairs end with a different Wet, 81 of
+     * them purely warm (the first recall already agrees), SIX of them
+     * ADJACENT — 8->9, 10->9, 39->40, 40->39, 40->41, 41->40 — plus ONE
+     * cold single patch, p9. (An earlier written claim of "42 of 4032" does
+     * NOT reproduce; playbook 46.) The Noise gate below moves 281 ordered
+     * pairs. PROVEN(executed), truth.verify() + a direct bank decode.
+     *
+     * The old `etype == 0` arm is SUBSUMED, not dropped: its evidence (the
+     * chillwave state diff and the doctored-depth full recalls at 0/128/255)
+     * was all COLD, i.e. prev == 2, where this gate writes exactly as that arm
+     * did. Cold behaviour changes at ONE type only: type 1, which the old
+     * gate skipped and this one writes (factory p9 — and p9 COLD was RED at
+     * 91232 on the old tree, plugin 0x3de1bb45 vs port 0x00000000). Type 1
+     * does not take the block-A chorus arm in src/master_render.c:2916, so no
+     * render moves; the cell gates do, in the correct direction. */
+    if ((prev_etype >= 2 && prev_etype <= 4) || (etype >= 2 && etype <= 4))
+        JF(state, 91232) = cr_bits(CHORUS_WET_LUT[depth & 0xFF]);   /* Wet */
+
+    if (etype >= 2 && etype <= 4) {                 /* block A (91120) — chorus modes 2/3/4 */
         JF(state, 91216) = 1.3f;                                    /* Dry (const) */
-        JF(state, 91232) = cr_bits(CHORUS_WET_LUT[depth & 0xFF]);   /* Wet         */
         JF(state, 91200) = cr_bits(CHORUS_NOISE_LUT[tone & 0xFF]);  /* Noise       */
+        /* Noise is gated on the NEW type ALONE — not the Wet law above. Same
+         * two-recall runs: prev 2, new 5 (p0 -> p7 and p0 -> p40) leaves the
+         * plugin holding p0's NOISE[78] = 0x3ac8768b, so neither arm of an OR
+         * fires here. Both rows were RED on the old tree. Dry is a constant
+         * 1.3 and is also the prepare seed, so its gate is unobservable; it
+         * stays with Noise because that is the arm the dispatch shares. */
         /* Mode 3 (chorus II) runs block A's LFO at a DIFFERENT rate than modes 2/4/5
          * (which use the prepare default 91152=1.92e-05). The plugin holds mode 3 at
          * a RATE-DEPENDENT value (continuous C/H family — the 44.1k/88.2k bits are
@@ -129,7 +176,9 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
             JF(state, 91184) = cr_bits(0x399d4952u);
         }
     }
-    /* EFFECT TYPE mode 5 also drives block B (96336..) — structural + On/Off + LFO
-     * Rate + enable gates — via src/effect_modes.c (juno_apply_effect_modes). Block A
-     * above (levels) is written for mode 5 too (the plugin recalls both). */
+    /* EFFECT TYPE mode 5 drives block B (96336..) — structural + On/Off + LFO
+     * Rate + enable gates — via src/effect_modes.c (juno_apply_effect_modes).
+     * It does NOT write block A's Dry/Noise: the old "block A is written for
+     * mode 5 too" reading was a COLD artefact and is corrected above. Mode 5
+     * touches block A's Wet only through the previous-type arm. */
 }

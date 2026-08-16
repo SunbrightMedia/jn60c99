@@ -143,6 +143,17 @@ def pkl(seed):
     return os.path.join(SCRATCH, 'randstate_%d.pkl' % seed)
 
 
+# Cells that differ on EVERY patch, including passing ones: the C++ object
+# header (< 176, vtable/allocator pointers the port has no equivalent for)
+# and the FX-default cells audited inert. Proven inert by control on
+# 2026-08-13: a PASSING patch differs in exactly these.
+# ⚠ MODULE-LEVEL 2026-08-15 (was nested in port()): warm_recall_gate.py must
+# use the SAME rule, and a second copy of it would be a second thing to get
+# wrong. One definition, two callers.
+def inert(off):
+    return off < 176 or off in (10759472, 11022352, 11022356)
+
+
 def ref(n, start):
     import e2e_emu as E
     import real_recall as R
@@ -172,13 +183,6 @@ def port(n, start):
     lib.juno_gui_peek.argtypes = [ctypes.c_void_p, ctypes.c_int]
     lib.juno_gui_destroy.argtypes = [ctypes.c_void_p]
     leaves = R.leaf_table()
-
-    # Cells that differ on EVERY patch, including passing ones: the C++ object
-    # header (< 176, vtable/allocator pointers the port has no equivalent for)
-    # and the FX-default cells audited inert. Proven inert by control on
-    # 2026-08-13: a PASSING patch differs in exactly these.
-    def inert(off):
-        return off < 176 or off in (10759472, 11022352, 11022356)
 
     seeds = [s for s in range(start, start + n) if os.path.exists(pkl(s))]
     bad = {}

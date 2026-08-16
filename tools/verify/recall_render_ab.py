@@ -179,16 +179,22 @@ def _finefx_leaves(blob, R):
     return dly + cho + REVERB_FINEFX_LEAVES
 
 
-def prepare_recall(idx, bank, leaves, E, R, sr):
-    """Build a plugin engine and drive its OWN complete recall for patch idx at rate
-    sr, leaving it noteless/settled (snap+clear_latch+set_ftz done). This is the
-    proven-bit-exact recall (the port's juno_gui_apply_bank reproduces it, 57/57
-    render A/B): the value-tree leaves PLUS the extended cells the enumerator omits
-    (FX feedback/direct, VCF/VCA velocity-sens, DELAY/CHORUS/REVERB fine-FX). Reused
-    by the differential fuzz (fuzz_diff.py) so its oracle starts from the SAME state
-    the port does — otherwise an omitted leaf (e.g. velocity-sens at vel<127) makes
-    every event-sequence diverge for a reason that is NOT the port."""
+def build_engine(E, sr):
+    """ONE plugin engine at rate sr, built and settled. SPLIT OUT OF prepare_recall
+    2026-08-15 so a WARM gate can drive SEVERAL recalls through ONE engine
+    (tools/verify/warm_recall_gate.py). Every gate in this tree used to get a fresh
+    engine per comparison, so no gate could fail on a defect that only shows after a
+    PATCH CHANGE — and the port is stateful across patch changes (juno_bank_apply
+    writes into an existing state and never re-prepares). Playbook 38."""
     e = E.E2E(); e.build(sr); e.snap_all()
+    return e
+
+
+def apply_recall(e, idx, bank, leaves, E, R):
+    """Drive the plugin's OWN complete recall for patch idx into the EXISTING engine
+    e, leaving it noteless/settled. Call it twice on one engine to get a warm recall.
+    Body split verbatim out of prepare_recall (no reordering): the descriptor writes,
+    the 9-unit dispatch loop, the assigner refresh, snap/clear_latch/set_ftz."""
     blob = E.patch_blob(bank, idx)
     for (disp, bb) in leaves:
         R.wr_desc(e, disp, R.dec(blob, bb))
@@ -223,6 +229,22 @@ def prepare_recall(idx, bank, leaves, E, R, sr):
     e.assigner_notify()
     e.snap_all(); e.clear_latch(); e.set_ftz()
     return e
+
+
+def prepare_recall(idx, bank, leaves, E, R, sr):
+    """Build a plugin engine and drive its OWN complete recall for patch idx at rate
+    sr, leaving it noteless/settled (snap+clear_latch+set_ftz done). This is the
+    proven-bit-exact recall (the port's juno_gui_apply_bank reproduces it, 57/57
+    render A/B): the value-tree leaves PLUS the extended cells the enumerator omits
+    (FX feedback/direct, VCF/VCA velocity-sens, DELAY/CHORUS/REVERB fine-FX). Reused
+    by the differential fuzz (fuzz_diff.py) so its oracle starts from the SAME state
+    the port does — otherwise an omitted leaf (e.g. velocity-sens at vel<127) makes
+    every event-sequence diverge for a reason that is NOT the port.
+
+    ⚠ THIS IS THE COLD ENTRY POINT: one fresh engine, one recall. It is build_engine
+    + apply_recall, and nothing else — the two halves exist separately so a warm gate
+    can reuse the second without the first."""
+    return apply_recall(build_engine(E, sr), idx, bank, leaves, E, R)
 
 
 def ref_render(idx, bank, leaves, E, R):

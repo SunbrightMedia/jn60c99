@@ -806,6 +806,20 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
      * all bit-exact from the binary (see src/effect_modes.c). */
     juno_apply_effect_modes(state, blob - BANK_BLOB_OFF);
     ++n;
+
+    /* PORT-OWNED SHADOWS (src/juno_engine.h), updated LAST so that every
+     * applier above read the type IN FORCE BEFORE THIS RECALL. Raw leaf bytes,
+     * never clamped — JUNO_PROG_EFX/JUNO_PROG_DLY are clamped and are not
+     * written at all at type >= 6, so they cannot answer "what was in force".
+     * ONE site, so a new applier cannot forget to maintain it; do not split
+     * this bookkeeping into effect_modes.c / delay_recall.c, both of which
+     * clamp their local copy before they return. Order is already right:
+     * juno_apply_delay :782, juno_apply_chorus :799, juno_apply_effect_modes
+     * :807, this update last. JUNO_PREV_DLY is declared and maintained here
+     * but NOT YET READ by any applier (it is owed to the DELAY TYPE >= 6
+     * work); JUNO_PREV_EFX is read by src/chorus_recall.c. */
+    JI(state, JUNO_PREV_EFX) = record_byte(blob, 634);   /* EFFECT TYPE */
+    JI(state, JUNO_PREV_DLY) = record_byte(blob, 650);   /* DELAY  TYPE */
     return n;
 }
 

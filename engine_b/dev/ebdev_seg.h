@@ -15,7 +15,7 @@
  * with fewer rows than this SINKS the top voices' cells, silently. */
 #define EBDEV_NVPORT 8
 #define EBDEV_NSEG 32
-#define EBDEV_SEGBYTES 19180u
+#define EBDEV_SEGBYTES 19248u
 #define EBDEV_NSCAT 12
 typedef struct { unsigned lo, hi, at; } ebdev_seg;
 /* The TABLE is the reference form. ebdev.c uses the literal chain in
@@ -54,7 +54,7 @@ static const ebdev_seg EBDEV_SEGTAB[EBDEV_NSEG] = {
   { 10691936u, 10693476u, 16300u },
   { 10726256u, 10726264u, 17840u },
   { 10758864u, 10759876u, 17848u },
-  { 11022032u, 11022352u, 18860u },
+  { 11022032u, 11022420u, 18860u },
 };
 static const unsigned EBDEV_SCATTAB[EBDEV_NSCAT] = {
   304u, 320u, 592u, 1072u, 1856u, 3968u, 5520u, 6864u, 7600u, 9680u, 9824u, 10320u

@@ -272,8 +272,24 @@ void juno_gui_recall_factory(juno_ctx *c)
     juno_engine_init(c->st);             /* constructor state                    */
     juno_engine_prepare(c->st);          /* binary prepared baseline (no capture) */
     default_patch(c->st);
-    /* clean slot-1 (v39): no stale DELAY TYPE from a prior patch */
-    *(int32_t *)(c->st + JUNO_PROG_DLY) = 0;
+    /* Clean slot-1 (v39): no stale DELAY TYPE from a prior patch.
+     *
+     * DECIDED, NOT INHERITED. The juno_engine_prepare three lines up already
+     * writes 0 into BOTH of these (src/juno_prepare.c:279,291), so today this
+     * pair is redundant — and that is exactly the trap: it was correct only
+     * because something else had run first. A writer that leaves the routing
+     * cell and its shadow (src/juno_engine.h JUNO_PREV_DLY) out of step is a
+     * defect whatever the preceding lines happen to do, so this site keeps the
+     * PAIR itself and stops depending on the accident. Power-on DELAY TYPE = 0
+     * has the same provenance as the seed: PROVEN under Unicorn from the
+     * plugin's own state cell 11022056 (src/juno_prepare.c:270-279).
+     *
+     * NOTHING READS JUNO_PREV_DLY YET (it is owed to the DELAY TYPE >= 6 work),
+     * so no render or state A/B can catch a desync here — which is why this one
+     * is held statically, by tools/verify/shadow_sync_gate.py check S, which
+     * fails such a site on ORDER rather than on luck. */
+    JI(c->st, JUNO_PROG_DLY) = 0;
+    JI(c->st, JUNO_PREV_DLY) = 0;
     juno_driver_seed_voices(c->st);      /* propagate to all 8 voices */
     juno_apply_condition(c->st, 128);    /* default CONDITION -> per-voice analog scatter */
     c->last_condition = 128;
@@ -429,13 +445,57 @@ float juno_gui_set_mod(juno_ctx *c, int slot, int base_byte, int off)
  * seeds the routing cell (juno_engine_prepare owns the power-on default 2), so
  * this writes the EFFECT TYPE program cell directly — same effect the old
  * attach-time seed had for callers of this API. A subsequent patch apply
- * overrides it with the patch's own EFFECT TYPE, exactly as before. */
+ * overrides it with the patch's own EFFECT TYPE, exactly as before.
+ *
+ * THIS SETTER PUTS AN EFFECT TYPE IN FORCE, so it must move BOTH cells a recall
+ * moves — the routing cell AND its port-owned shadow (src/juno_engine.h
+ * JUNO_PREV_EFX) — by the same law juno_apply_effect_modes + juno_bank_apply use:
+ *     routing cell = the CLAMPED type. The plugin's own EFFECT TYPE setter writes
+ *                    clamp(v, <=5) for every value 0..255, PROVEN under Unicorn by
+ *                    the setter spot sweep (src/effect_modes.h JUNO_PROG_EFX,
+ *                    src/effect_modes.c:63). Writing a raw 9 here parked the port
+ *                    in a routing state the plugin can never hold.
+ *     shadow       = the RAW leaf, never clamped — that is the whole reason the
+ *                    shadow exists, the routing cell cannot answer "what was in
+ *                    force" once it has been clamped.
+ *
+ * IT DID NEITHER, AND THAT WAS A REAL BREAK, NOT A THEORETICAL ONE. The shadow's
+ * first written contract said "any FUTURE setter outside juno_bank_apply must
+ * update these"; this setter already existed on that day — a shipped WASM export
+ * (gui/web/build.sh), wrapped by gui/juno_gui.py + gui/juno_web.py and driven in a
+ * loop by tools/verify/cov_replay.py. src/chorus_recall.c gates the chorus WET cell
+ * 91232 on the type in force BEFORE the next recall and reads it from the shadow,
+ * so a stale shadow made the SAME EFFECT TYPE in force produce two different
+ * engines. MEASURED (ctypes, 44100, factory bank; the path-independence cases in
+ * tools/verify/shadow_sync_gate.py):
+ *     p39 -> p40                  type 5 in force, 91232 = 0x3f95c28f (carried)
+ *     set_chorus_mode(5) -> p40   type 5 in force, 91232 = 0x3eb1bcd3 (written)
+ * and the same split at type 2 (p39,set(2) -> p40 vs p0 -> p40). The desync fired
+ * at EVERY mode except 2 — mode 2 only re-synced because 2 is the power-on seed —
+ * and mode 0 is the Pan arm the shipping web app passes at startup
+ * (gui/web/index.html). Caught by the writer-set audit, not by any A/B: every
+ * whole-state gate recalled COLD, where the shadow is always the power-on 2.
+ * Guarded from now on by tools/verify/shadow_sync_gate.py, wired into `make
+ * verify`; it covers mode 0, the clamped bound and out-of-range values. */
 void juno_gui_set_chorus_mode(juno_ctx *c, int mode)
 {
+    int route = mode > 5 ? 5 : mode;
     ++eb_coef_gen;
     c->chorus_mode = mode;
     juno_driver_attach_host(c->st, &c->shim, mode);
+#ifdef JUNO_TOOTH_STALE_EFX_SHADOW
+    /* THE TOOTH: the pre-repair writer, verbatim — raw into the routing cell,
+     * shadow untouched. Rebuild with -DJUNO_TOOTH_STALE_EFX_SHADOW and
+     * tools/verify/shadow_sync_gate.py check B MUST go RED on every
+     * set_chorus_mode row except mode 2, on the OUT OF RANGE rows, and on the
+     * path-independence cases. If it stays green the gate is not testing this
+     * writer. Same device as src/chorus_recall.c JUNO_TOOTH_NO_PREV_EFX. */
     *(int32_t *)(c->st + JUNO_PROG_EFX) = mode;
+    (void)route;
+#else
+    JI(c->st, JUNO_PROG_EFX) = route;   /* routing: CLAMPED, as the applier writes it   */
+    JI(c->st, JUNO_PREV_EFX) = mode;    /* shadow:  RAW leaf, as juno_bank_apply writes it */
+#endif
 }
 
 /* Poke the voice-0 note-on edge state[101504]. KNOWN LIMITATION: the real

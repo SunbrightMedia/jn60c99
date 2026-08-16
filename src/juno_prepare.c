@@ -279,6 +279,17 @@ void juno_engine_prepare(unsigned char *st)
     JI(st, JUNO_PROG_DLY) = 0;
     JI(st, JUNO_PROG_EFX) = 2;
 
+    /* PORT-OWNED SHADOWS of the two raw type leaves, same provenance as the
+     * two routing cells above: the power-on EFFECT TYPE is 2 and the power-on
+     * DELAY TYPE is 0. Seeding them here is what makes the state-resident form
+     * work — every legitimate caller of juno_bank_apply already runs prepare,
+     * so every caller gets the seed with ZERO plumbing. A harness that skips
+     * prepare reads 0 (= EFFECT TYPE 0), not the plugin's power-on 2; do NOT
+     * paper over that with a fallback in the reader, it would hide a missing
+     * prepare (see src/juno_engine.h JUNO_PREV_EFX). */
+    JI(st, JUNO_PREV_EFX) = 2;
+    JI(st, JUNO_PREV_DLY) = 0;
+
     /* --- Class E: reverb tap-index table (34 ints, 11022208..11022340) ------ */
     /* Generator sub_0x3C1AC0: tap[0]=1; a continuous predelay = floor(T1*H) (T1 in
      * [0.01998958,0.02), ~19.99 ms) plus rate-class integer stage lengths. At

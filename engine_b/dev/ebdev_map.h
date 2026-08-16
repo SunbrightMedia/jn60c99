@@ -209,7 +209,7 @@
                                 if (off >= 10758864u && off < 10759876u) return EBDEV_S.sg + 17848u + (off - 10758864u); \
                                 goto miss; \
                             } else { \
-                                if (off >= 11022032u && off < 11022352u) return EBDEV_S.sg + 18860u + (off - 11022032u); \
+                                if (off >= 11022032u && off < 11022420u) return EBDEV_S.sg + 18860u + (off - 11022032u); \
                                 goto miss; \
                             } \
                         } \

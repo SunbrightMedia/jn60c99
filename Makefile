@@ -84,6 +84,25 @@ verify: test libjuno.so
 	echo "=== ET-MODE A/B: synthetic EFFECT TYPE 0..5 recall (port vs plugin; no factory patch reaches modes 2-5) ==="; \
 	fresh $(SCRATCH)/etmode_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/etmode_ab.py --ref || FAIL=1; \
 	python3 tools/verify/etmode_ab.py --port || FAIL=1; \
+	echo "=== WARM RECALL: N recalls through ONE engine, plugin vs port (every gate above recalls COLD) ==="; \
+	echo "    p39,40 CARRY / p1,9 WRITE -- the two directions of the chorus WET law, judged on the"; \
+	echo "    NAMED cell (--cells-only). p0,0 is the IDENTITY case and is judged on the WHOLE state,"; \
+	echo "    so a gate stuck at green cannot hide here. THE WHOLE-STATE WARM VERDICT IS NOT YET"; \
+	echo "    GREEN and is OWED: p39,40 leaves 4297760/4297776/4297840 (warm DELAY TYPE 1->0"; \
+	echo "    tear-down) and p1,9 leaves 102608/102656 (unattributed, possibly a"; \
+	echo "    recall_render_ab._finefx_leaves artefact) differing. Both PRE-EXIST this gate --"; \
+	echo "    MEASURED identical on libjuno.so built from the pre-shadow gui/juno_bridge.c. Drop"; \
+	echo "    --cells-only the day those close; do NOT widen the claim before then."; \
+	for s in 39,40 1,9; do \
+	  wp=$(SCRATCH)/warm_recall_`echo $$s | tr , -`_44100.pkl; \
+	  fresh $$wp $(ORACLE_DEPS) || python3 tools/verify/warm_recall_gate.py --ref --seq $$s --cells 91232 || FAIL=1; \
+	  python3 tools/verify/warm_recall_gate.py --port --seq $$s --cells 91232 --cells-only || FAIL=1; \
+	done; \
+	fresh $(SCRATCH)/warm_recall_0-0_44100.pkl $(ORACLE_DEPS) || python3 tools/verify/warm_recall_gate.py --ref --seq 0,0 --cells 91232 || FAIL=1; \
+	python3 tools/verify/warm_recall_gate.py --port --seq 0,0 --cells 91232 || FAIL=1; \
+	echo "=== SHADOW CELLS: bounds (cannot false-fail an A/B) + WRITER-SET invariant (prog == clamp(shadow)) ==="; \
+	python3 tools/verify/shadow_bounds_gate.py || FAIL=1; \
+	python3 tools/verify/shadow_sync_gate.py || FAIL=1; \
 	echo "=== DIFFERENTIAL FUZZ (SEAL 4 / Pillar-2b): random polyphonic sequences, port vs plugin, 24 seeds x 3 rates ==="; \
 	fresh $(SCRATCH)/fuzz_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/fuzz_diff.py --ref || FAIL=1; \
 	python3 tools/verify/fuzz_diff.py --port || FAIL=1; \
