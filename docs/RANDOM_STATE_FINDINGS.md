@@ -478,7 +478,48 @@ the type. An early `return` ahead of the common writes would have traded 39
 wrong cells for a different wrong cell. The ring-geometry ints stay on the
 common path for the same reason.
 
-**Seed gate: 0 differing cells at 30 seeds, and the sample was then widened.**
+**THE CAMPAIGN, 2026-08-16. 100,000 seeds, 0 differing cells.**
+
+Sample size was the whole story. Each level tested is a FULL combination:
+every one of the 114 recall bytes randomised at once, then all 23,627 state
+cells compared against the plugin.
+
+| seeds | result |
+|---|---|
+| 30 | green -- and wrong; it could not see the classes below |
+| 100 | found 6396432 (chorus), 1 seed in 25 |
+| 553 | green again |
+| 10,687 | found 102560, 6497392, 10693312 |
+| 100,000 | 0 differing cells, 40/40 blocks green |
+
+**Why the defects needed the bigger samples.** Every one of them was a
+per-patch cell sitting in a "constants" table because its law SATURATES:
+
+| cell | active at | law |
+|---|---|---|
+| 6396432 | types 2,3 | min(LEVEL*32,255)/255 |
+| 10693312 | type 5 | min(LEVEL*32,255)/255 |
+| 6497392 | type 5 | LEVEL >= 2 ? 1 : 0 |
+| 102560 | types 1,2,3,4,5,6 | LEVEL >= 2 ? 0.423529 : 0 |
+
+A uniform random LEVEL clears 8 in 97% of draws and clears 2 in 99%. So the
+captures and the early seeds all landed in the flat region and agreed with
+each other. Agreement across N samples is not evidence of constancy when the
+law saturates (playbook 51).
+
+**What 100,000 seeds does and does not prove.** The space is ~10^259
+combinations, so coverage is ~10^-254 -- effectively zero. What the campaign
+DOES establish is a bound on how rare a surviving defect can be: a law wrong
+in 1 draw in 10,000 would almost certainly have shown. It is a probability
+statement, not exhaustion, and it should be quoted that way.
+
+**Cost.** 3.92s per state made 100,000 seeds a ~4-day proposition. 99.2% of
+that was rebuilding the engine to do 30 ms of work. seedgen_fast.py snapshots
+one built engine and restores per seed (0.11 s/state, proven byte-identical on
+178 seeds); seed_sweep.sh streams generate -> gate -> delete so peak disk is
+one block. The campaign took about two hours.
+
+
 
 **Also still open, unrelated to the seeds:** ASSIGN MODE 3 (22 user-bank
 patches, proven reachable, `docs/ASSIGN_MODE_3_FINDING.md`).
