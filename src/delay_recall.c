@@ -226,7 +226,7 @@ static const uint32_t S1CHORUS[] = {
   6396208,0x3f83df74u, 6396224,0x3f03df74u, 6396240,0xbee549c0u, 6396256,0xbf1cd8f1u,
   6396288,0x3f4ba5b0u, 6396304,0x3fb50bf3u, 6396320,0x3f800000u, 6396336,0x3b56774fu,
   6396352,0x3f800000u, 6396368,0x3f800000u, 6396384,0x3f800000u, 6396400,0x387fd974u,
-  6396432,0x3f800000u, 6396448,0x3f800000u, 6396528,0x3db40000u
+  6396448,0x3f800000u, 6396528,0x3db40000u
 };
 static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, int dtype)
 {
@@ -250,6 +250,27 @@ static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, i
     { uint32_t hb = 0x3f4ba5b0u; memcpy(&f, &hb, sizeof f); JF(state, 102656) = f; }
     JF(state, 6395312) = ((float)b53 / 255.0f) * 11.0f - 8.0f;   /* chorus rate/level */
     JF(state, 6396176) = (float)b52 / 255.0f;                    /* chorus depth      */
+    /* 6396432 -- WAS A LIE IN THE "CONSTANT" TABLE ABOVE. It sat there as
+     * 0x3f800000 because every factory patch and every early random seed drove
+     * it to exactly 1.0, so 18 captured states agreed and it looked constant.
+     * It is per-patch, and it SATURATES, which is why it hid: it clamps at
+     * DELAY LEVEL >= 8, and a uniform random level clears 8 in 97% of draws.
+     * It took 100 seeds to find ONE that did not (seed 315, level 4).
+     *
+     * MEASURED under Unicorn from seed 315's own bank, level swept, BOTH SIDES
+     * OF THE CLAMP (scratchpad/edge6396432.py):
+     *   lvl 0 -> 00000000   lvl 1 -> 3e008081   lvl 4 -> 3f008081
+     *   lvl 7 -> 3f60e0e1   lvl 8 -> 3f800000   lvl 9/200/255 -> 3f800000
+     * The 0x008081 mantissa is the n/255 float32 signature (32/255, 128/255,
+     * 224/255). Unclamped at 7, clamped at 8 -- the edge is proven from both
+     * directions, not inferred from the saturated side alone.
+     *
+     * The level*32-clamped-to-255 idiom is the plugin's own and already
+     * appears in the TYPE-4 block below; this is the same law, second site. */
+    {
+        int lvl32 = b52 * 32; if (lvl32 > 255) lvl32 = 255;
+        JF(state, 6396432) = (float)lvl32 / 255.0f;
+    }
     /* Chorus I (dtype 2) vs II (dtype 3): these four routing/filter cells carry the
      * I/II distinction (constant per mode; exact bits from the master states). */
     {
