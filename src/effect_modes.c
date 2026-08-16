@@ -56,12 +56,26 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
     int tone  = efx_rec_byte(rec, 642);   /* EFFECT TONE  0..255 */
     int etype = efx_rec_byte(rec, 634);   /* EFFECT TYPE  0..5   */
 
-    /* Route slot 2 to the patch's EFFECT TYPE (the driver points params+112 here). */
-    /* The plugin CLAMPS out-of-range types to 5 (routing int + full state at
-     * 6/9/255 == the type-5 state, PROVEN by the setter spot sweep under
-     * Unicorn, scratchpad/ext_sweeps.py 2026-07-19); the raw write diverged. */
+    /* Route slot 2 to the patch's EFFECT TYPE (the driver points params+112 here).
+     *
+     * OUT OF RANGE MEANS NO STORE, NOT A CLAMPED STORE. The old comment here
+     * said the plugin clamps types above 5 to 5, from a COLD spot sweep — and
+     * cold that is unfalsifiable, because the power-on routing value and a
+     * clamped write can be the same number. Warm it is plainly false.
+     *
+     * PROVEN two-sided (tools/verify/warm_recall_gate.py, synthetic bank, one
+     * engine): with EFFECT TYPE 3 in force, a recall at type 6 leaves the cell
+     * at 3; with type 5 in force it leaves 5; type 7 and 255 behave as 6. The
+     * result always equals the incoming value, so the plugin performs NO STORE.
+     * The port clamped and stored 5, which is right only when the previous type
+     * happened to be 5 — 7 of 30 legal random seeds caught it.
+     *
+     * The CLAMP ITSELF STAYS for the mode arms below: only the routing store is
+     * skipped. The arms at a clamped 5 matched the plugin on every one of those
+     * seeds; changing them is the unlanded seventh-class work, not this fix. */
+    if (etype <= 5)
+        *(int32_t *)JCELL(state, JUNO_PROG_EFX) = (int32_t)etype;
     if (etype > 5) etype = 5;
-    *(int32_t *)JCELL(state, JUNO_PROG_EFX) = (int32_t)etype;
 
     /* Shared slot-2 wet control (read by master_render for EVERY mode at 84544). */
     JF(state, 84544) = efx_bits(EFFECT_SW_LUT[depth & 0xFF]);

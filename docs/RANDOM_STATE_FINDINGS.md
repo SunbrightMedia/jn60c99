@@ -402,3 +402,72 @@ clamp point says 6 is a distinct, reachable class.
 Labels: DELAY TYPE 7-classes = PROVEN(executed, leaf_ranges boundary probe +
 4/4 seed correlation). Base-block cause = PROVEN located, law not yet derived.
 BBD = INFERRED, open.
+
+# 2026-08-16 — THE SEED CLASSES ARE CLOSED EXCEPT ONE
+
+Scoreboard, 30 legal seeds (200..229), `random_state_ab.py --port 30 --start 200`:
+
+| class | cells | seeds | state |
+|---|---|---|---|
+| chorus WET 91232 / NOISE 91200 | 2 | — | FIXED (warm, prev effect type) |
+| delay base block 102528/44/76/92 | 4 | 19/30 | FIXED (written for every type) |
+| feedback capture 6497376 | 1 | 11/30 | FIXED (the law, not the capture) |
+| EFFECT TYPE >5 routing 11022052 | 1 | 7/30 | FIXED (no store) |
+| **DELAY TYPE >= 6** | **39** | **3/30** | **OPEN — see below** |
+
+40 -> 39 cells, and every remaining cell now appears on EXACTLY the three seeds
+that carry DELAY TYPE >= 6 (214, 219, 221). One class remains.
+
+## Why the factory bank could never have found two of these
+
+* All FOUR factory DELAY TYPE 5 patches carry DELAY FEEDBACK **120**, and the
+  frozen constant `0x3ed8d8d9` in `S1REVERB[]` IS the law evaluated at 120.
+  Every factory patch agreed with the capture by construction.
+* **No factory patch has EFFECT TYPE above 5** — histogram {1:1, 2:33, 3:22, 5:8}.
+  The clamped store could never diverge there.
+
+Neither is a gap in the render A/B. Both are the same lesson as the warm
+defects: a sample cannot test a law it never varies.
+
+## DELAY TYPE >= 6 — DEFERRED, DELIBERATELY, WITH THE REASON WRITTEN DOWN
+
+**Mechanism (derived 2026-08-15, largely survived refutation).** The plugin
+treats 6/7/15/255 as ONE SEVENTH CLASS whose whole state differs from type 5.
+The slot-1 type setter always turns the LIVE block off (its LFX1 cell <- the
+rate arm 0x3fa754b5/0x3f9bd7ca/0x3f2493b7, its ENABLE <- 0.0f); for type <= 5
+it then builds the new block and writes the routing int; at type >= 6 it
+instead writes 101744 (DLY Mute) <- 0.0f and **does not write the routing int
+at all**, so that cell keeps the previous patch's type. The port clamps 6 to 5
+and builds a reverb.
+
+**The clause that was REFUTED, and must not be re-inherited.** "Nothing else
+happens at type >= 6" is FALSE. DELAY LEVEL (blob 104) and DELAY TIME (106)
+dispatch BEFORE the type leaf (875), so they land on the still-live block and
+the recall REWRITES the previous block's per-patch cells with the NEW patch's
+bytes before tearing it down. Any fix must be a BRANCH, never an early
+`return` before the common writes.
+
+**WHY IT IS NOT BEING FIXED NOW: reachability is unproven.** No patch among
+832 (64 factory + 768 user) carries DELAY TYPE 6. Until someone proves a route
+by which the byte can arrive — the plugin's own UI range in Script.xml, a host
+automation sweep of the normalised parameter, a MIDI CC, or a bank authored by
+another tool — this is a proven divergence from the plugin but NOT a proven
+user problem. It is the only class left, it is 39 cells, and it is the most
+expensive one. Spending a session on it ahead of the fork's headroom work would
+be choosing the unreachable over the binding.
+
+**What to do first when it is picked up**, in this order:
+1. Settle reachability. It is a read of Script.xml plus one normalised-range
+   sweep of the plugin's own setter. If NOT reachable, record and close.
+2. Re-derive "what else the recall writes at type >= 6" with LEVEL and TIME
+   MOVING, at all four rates. The earlier derivation fired the type leaf ALONE
+   and was blind to this by construction.
+3. Build G3 (warm delay tear-down) on `warm_recall_gate.py` +
+   `synth_warm_bank.py`. A natural red already exists and needs no synthetic
+   patch: factory p39 -> p40 is an ordinary DELAY TYPE 1 -> 0 transition and
+   leaves 4297760/4297776/4297840 differing today.
+4. Only then write the branch, and keep the ring-geometry ints on the common
+   path.
+
+**Also still open, unrelated to the seeds:** ASSIGN MODE 3 (22 user-bank
+patches, proven reachable, `docs/ASSIGN_MODE_3_FINDING.md`).

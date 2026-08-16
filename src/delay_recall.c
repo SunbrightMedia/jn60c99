@@ -277,7 +277,7 @@ static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, i
 static const uint32_t S1REVERB[] = {
   6497184,0x3e1b31ceu, 6497232,0x3fb07de6u, 6497248,0xbf07c840u, 6497280,0x3e52bdc7u,
   6497296,0x3fb50bf3u, 6497312,0x3f800000u, 6497328,0x3f800000u, 6497360,0x387fd974u,
-  6497376,0x3ed8d8d9u, 6497392,0x3f800000u, 6497408,0x3f800000u, 6497424,0x3c2b929au,
+  6497392,0x3f800000u, 6497408,0x3f800000u, 6497424,0x3c2b929au,
   6497440,0x3f800000u, 6497456,0x3f800000u, 6497472,0x3f4ba5b0u, 6497488,0x3f800000u,
   6497504,0x3f800000u, 10692016,0xc0bafafbu, 10692032,0x3f800000u, 10693008,0x3cef0001u,
   10693040,0x3f000000u, 10693056,0x3f008081u, 10693072,0x3f03df74u, 10693088,0x3f83df74u,
@@ -296,6 +296,32 @@ static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, f
         bits = S1REVERB[k + 1]; memcpy(&f, &bits, sizeof f);
         JF(state, (int)S1REVERB[k]) = f;
     }
+
+    /* 6497376 IS NOT A CONSTANT. IT WAS A CAPTURE, AND IT SAT IN S1REVERB[]
+     * FOR MONTHS HOLDING 0x3ed8d8d9.
+     *
+     * That word is not an engine constant at all: it is this very law evaluated
+     * at DELAY FEEDBACK = 120, the byte the factory patches happen to carry. The
+     * table around it is honestly labelled "captured bit-for-bit from the v39==5
+     * master states" — and a capture of a per-patch cell freezes one patch's
+     * value and calls it physics. Every factory patch agreed, so every gate was
+     * green.
+     *
+     * THE LAW IS NOT FITTED TO THE SEEDS THAT CAUGHT IT. It was derived from the
+     * plugin's own code for the OTHER delay instance and landed at 4297808
+     * (commit 2336ce4, see :407); this site was then swept independently and
+     * matches it BIT-EXACTLY at feedback 0, 1, 64, 127, 128, 200, 254 and 255 —
+     * both ends included, where a wrong law is likeliest to show.
+     *
+     * fb=0 gives exactly +0.0 and fb=255 exactly +0.9, so it is ungated: there
+     * is no LEVEL term here, the same as the second instance.
+     *
+     * Caught by tools/verify/random_state_ab.py once its DELAY FEEDBACK byte
+     * address was corrected — the gate had been perturbing blob 3057 (a dead
+     * byte) instead of blob 3041, so this axis had never moved. 11 of 30 legal
+     * seeds. Held now by a full-range DELAY TYPE 5 sweep through
+     * tools/verify/warm_recall_gate.py. */
+    JF(state, 6497376) = ((float)rec_byte(rec, 3057) / 255.0f) * 0.9f;
     /* rate-dependent cells (table holds the 48k arm; see put_rate above). The two
      * High-Cut switches (6497264 / 10693152) are 44.1k-only=1.0 and were previously
      * never written; 10759360 is the affine H*0.02-2 predelay (880/958/1762/1918);
