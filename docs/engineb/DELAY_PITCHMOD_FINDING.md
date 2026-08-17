@@ -88,21 +88,40 @@ LATENT, not broken today, recorded so the next hoist does not repeat this:
   NOT yet hoisted (`eb_dly_t4.c:112`). If it is hoisted, it inherits this
   defect unless it uses the shared helper.
 
-## Still red, and NOT engine B's DSP
-`make engineb` remains RED at step 4 on two HARNESS teeth. Both are
-pre-existing, both were unobservable while the battery aborted, and neither is
-an engine B divergence:
+## The two teeth that were red, and are now fixed
+Neither was an engine B divergence. Both were pre-existing and unobservable
+while the battery aborted at step 4.
 
 1. `out:lfo:(1.0f + 1e-7f)` is a PASS-side probe that got CAUGHT, at -93.3 dB
-   in 1 scenario. It is not a module divergence: `--module lfo` is EXACTLY 0
-   everywhere. One ULP of `1.0f` is ~1.19e-7, so `1e-7` already IS one ULP and
-   anything smaller rounds to `1.0f` and perturbs nothing. **A pass-side probe
-   is therefore impossible for this module**, exactly as already recorded for
-   `pitch`, `glide`, `pwm_cv`, `dcoprep` and `cvgate`. The fix is to move `lfo`
-   into that fail-only list WITH the measurement, not to move the gate
+   in 1 scenario. Not a module divergence: `--module lfo` is EXACTLY 0
+   everywhere. One ULP of `1.0f` is 1.1920929e-7, so `1e-7` already IS one ULP;
+   MEASURED (executed), 1e-7/8e-8/6e-8 all give the same float and 5.96e-8 and
+   below give exactly `1.0f`, perturbing nothing. **A pass-side probe is
+   unreachable for this module**, so it joins the fail-only list with
+   `pitch`, `glide`, `pwm_cv`, `dcoprep`, `cvgate`. THE GATE WAS NOT MOVED
    (precedent: the 2026-08-02 reverb re-calibration, `null_b.py:947-960`).
-2. The static coefficient audit does not refuse a planted cell 4736 -- "the
-   audit is blind". Untouched by this work; owed.
+   Recorded with it: the old bracket was measured at 48 kHz while this battery
+   runs at 44100 (`null_ab.SR`, no `--rate` in foundation.sh) -- so brackets
+   carrying "MEASURED at 48 kHz" were calibrated at a rate never exercised.
+   Re-measuring them at 44.1 kHz is OWED.
+2. The static coefficient audit did not refuse a planted cell 4736. Cause:
+   `read_cells()` sliced from `void eb_render_coefs_build` to
+   `void eb_render_state_seed` -- `eb_coefs.c:344-393` -- but the per-voice
+   construction is `eb_coefs_voice` at `:42`, outside it. It reported "0
+   per-voice cells cached" about a file that caches **266**, and the plant at
+   `:161` landed where the scan never looked. The defect was not the
+   allow-list; it was that an allow-list matching NOTHING still returns
+   cleanly. The constructors are now named and each MUST be found and
+   non-empty, or the audit exits non-zero. PROVEN: clean tree PASS (266
+   cells); planted 4736 -> FAIL rc=1, naming `voice_render.c:1702`, the
+   DCO-silence defect it was written for.
+
+   Rejected en route: widening the scan to "everything except the seed". That
+   flagged cell 320 in `eb_render_events_mirror`, which its own site documents
+   as an exact event-boundary re-read. A false positive would have been worse
+   than the blindness.
+
+Result: `TEETH: PASS`, and the battery runs on to step 8.
 
 ## What the repaired teeth then exposed (2026-08-17, later the same day)
 With both teeth fixed, `make engineb` ran past step 4 for the first time in
