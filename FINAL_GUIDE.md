@@ -94,9 +94,13 @@ this invariant, whatever it sounds like.
 
 - **B4 is not "about 5 % headroom".** It is worst-case headroom, measured on the
   most expensive patch, with everything else happening at the same time.
-- **The 18 DELAY TYPE 2/3/5 patches VIOLATE this invariant today** (6,600-6,900
-  cycles against 5,442). They are not a tuning item; they are the invariant's
-  binding constraint on one board.
+- **The 18 DELAY TYPE 2/3/5 patches VIOLATE this invariant today** (~10,700
+  cycles against 5,442, board-measured, data/patch_dependent_fx.md). They are
+  not a tuning item; they are the invariant's binding constraint on one board.
+  CORRECTED 2026-08-17: this line read "6,600-6,900", which is the TWO-VOICE
+  CORE figure (2 x 3,394, the 0xd0 gap) and not the delay-patch cost at all --
+  it understated the gap by 3.6x and a headroom plan was sized off it. See
+  docs/engineb/M2_WORST_CASE.md.
 - **C9 and C10 are not conveniences.** They are how rules 2 and 3 are
   implemented.
 - **A "usually fine" measurement is not evidence.** Every cycle figure in this

@@ -41,16 +41,31 @@ NEVER been measured, and producing that one number is step M2 below.
 | gap | size | what closes it |
 |---|---|---|
 | G1 spike: worst block on the playable build | 6,220 − 5,442 = **778** | transient; acceptable only if the overrun counter still reads 0 — B4 gate decides, not this table |
-| G2 the invariant violation: DELAY 2/3/5 at 2v+FX | 6,900 − 5,442 = **~1,460** | the FX/ring work (L1), because these are exactly the patches whose rings live in PSRAM |
+| G2 the invariant violation: DELAY 2/3/5 at 2v+FX | 10,700 − 5,442 = **~5,258** | L1 can reach at most 2,634 of it — see below |
 | G3 the sixth voice: B3 | **~700** on chip B, or ~850 on chip A | whichever of the two routes the post-L1 measurement favors |
+
+⚑ **G2 WAS WRONG IN THE FIRST VERSION OF THIS FILE, by 3.6x.** It read
+"6,900 − 5,442 = ~1,460", taking the 6,600–6,900 range from FINAL_GUIDE.md:97.
+That range is the TWO-VOICE CORE figure (2 × 3,394 = 6,788, the 0xd0 gap) and
+has nothing to do with the delay patches; four other files use it with that
+meaning. The delay-patch cost is board-measured in
+data/patch_dependent_fx.md: TYPE 0 = 5,159, **TYPE 5 ≈ 10,700**. Corrected
+with its cross-check and its consequences in **M2_WORST_CASE.md**, which is
+the file to read before acting on this table.
 
 The single most useful reframe in the repo (fx_chain_price.md §3): the FX is
 FREE below 3,068 cycles — it hides behind the two-voice core entirely. The FX
 measures 7,745 at c/i 2.36 while the voice chain runs c/i 1.56. **The target
-is not "make the FX faster", it is "get the FX under 3,068".** If the ring
-placement alone moves c/i from 2.36 toward the voice chain's 1.56, the FX
-lands near ~5,100 — better, not sufficient; the structural fallback (L2) is
-already identified for the remainder.
+is not "make the FX faster", it is "get the FX under 3,068".**
+
+**And L1 cannot get there, which M2 settles by arithmetic on measured c/i.**
+A PERFECT L1 — the whole FX chain moved from c/i 2.36 to the voice chain's
+1.56 — is worth 7,745 − 5,111 = **2,634 cycles**, and lands the FX at 5,111,
+still above 3,068. Against a G2 of 5,258 that leaves **~2,624 still to find**.
+Only 34 % of the expensive delay arm is memory at all (1,327 of its 3,915
+cycles); the other two thirds are arithmetic that placement cannot touch.
+**So L2 is not a fallback — on these numbers L1 lands short by construction
+and something of L2's size is required.** See M2_WORST_CASE.md.
 
 ## THE LEVERS, each with its measured basis
 

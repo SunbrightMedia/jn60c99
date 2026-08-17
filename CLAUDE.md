@@ -78,8 +78,9 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
 # LIVE STATE (2026-08-13 — update in place, no dated blocks here, EVER)
 - 12-bank user parity vs src/: recall 768/768 PASS. Render re-running after
   the arp-list fix; prior 111 fails are UNATTRIBUTED until it lands.
-- Fork on silicon: 2v+FX fits (5,442 budget); DELAY TYPE 2/3/5 patches ~6,800
-  = over budget = invariant violation; PSRAM scattered read ~244 cyc (rings
+- Fork on silicon: 2v+FX fits (5,442 budget); DELAY TYPE 2/3/5 patches ~10,700
+  = 2x over = invariant violation (was recorded ~6,800; that is the two-voice
+  CORE figure, not the delay cost -- M2_WORST_CASE.md); PSRAM scattered ~244 cyc (rings
   live there); patch-change burst ~2.0 M cyc (attributed; note path ~135 k via
   eb_recall_build_voices, proven bit-identical + 2 teeth).
 - Next per FINAL_GUIDE: C11 event API → C10 chunked recall → C9 per-param
