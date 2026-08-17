@@ -803,11 +803,12 @@ _BRACKET = {
     # teeth(). Like pwm_cv it is gated finer than one ULP of 1.0f, so no pass
     # case can exist: MEASURED, 1.8e-8 gives EXACTLY 0 because
     # `1.0f + 1.8e-8f == 1.0f`, i.e. that build perturbs nothing at all.
-    # MEASURED 2026-08-03 at 48 kHz over all 30 scenarios: 1e-6 FAILS at
-    # -83.6 dB in 4 scenarios, 1e-7 PASSES at -105.9 dB. The LFO carries a
-    # CONTROL value, so a relative error on it is amplified at the output --
-    # which is why its bracket sits two decades finer than the audio modules'.
-    "lfo":        ("1e-6",    "1e-7"),
+    # 'lfo' HAS NO BRACKET ANY MORE -- it is fail-only; see the reasoning at the
+    # fail-only list in teeth(). Its pass side was 1e-7, which is one ULP of
+    # 1.0f, and at this battery's 44100 Hz that measures -93.3 dB, outside the
+    # gate. The old entry read: "MEASURED 2026-08-03 at 48 kHz over all 30
+    # scenarios: 1e-6 FAILS at -83.6 dB in 4 scenarios, 1e-7 PASSES at
+    # -105.9 dB" -- a 48 kHz calibration that this battery never exercises.
     # MEASURED 2026-08-03 at 48 kHz, perturbing the NOISE output: 1e-4 fails
     # at -92.6 dB in 6 scenarios, 1e-5 passes at -112.0 dB. The bracket is
     # coarse for the same reason the noise SVF's is -- the noise is the most
@@ -1376,7 +1377,7 @@ def teeth(quick):
     # result, so it cannot be perturbed into the output at all. It is
     # un-gateable by this harness by construction -- see _OUT_ANCHOR.
     for _m in sorted(_OUT_ANCHOR):
-        if _m in ("pwm_cv", "pitch", "cvgate", "glide", "dcoprep"):
+        if _m in ("pwm_cv", "pitch", "cvgate", "glide", "dcoprep", "lfo"):
             # Both carry a CONTROL value -- a cutoff and a pitch -- so a
             # relative error on them is amplified enormously at the output, and
             # both are gated finer than one ULP of 1.0f. A pass case is
@@ -1404,6 +1405,36 @@ def teeth(quick):
             # 3.16e-5 and 3.16e-6 give the identical +3.3 dB in the identical 4
             # scenarios. There is no bracket to draw because the response does
             # not vary with the factor.
+            #
+            # 'lfo' JOINED THIS LIST 2026-08-17. Its pass side is not merely
+            # absent AT THE RATE THIS BATTERY RUNS -- it is unreachable. The
+            # pass probe was 1e-7, and one ULP of 1.0f is 1.1920929e-7, so the
+            # smallest non-zero perturbation this shape can express IS one ULP.
+            # MEASURED (executed, -ffp-contract=off): 1e-7, 8e-8 and 6e-8 all
+            # produce the SAME float, 1.00000012 -- one ULP up -- and 5.96e-8
+            # and below produce exactly 1.0f, a build that perturbs nothing and
+            # would null EXACTLY 0 vacuously. MEASURED at one ULP, 44100 Hz:
+            # -93.3 dB rel in 1 scenario, 6.7 dB OUTSIDE the -100 dB gate. No
+            # factor both perturbs and passes, so the case is fail-only.
+            #
+            # ⚑ AND THE REASON IS A RATE MISMATCH, WHICH IS OWED SEPARATELY.
+            # The bracket removed here was recorded "MEASURED 2026-08-03 at
+            # 48 kHz ... 1e-7 PASSES at -105.9 dB". This battery does NOT run
+            # at 48 kHz: SR comes from null_ab.SR = 44100.0 and foundation.sh
+            # passes no --rate. Both lfo probes moved consistently with that
+            # difference -- the 1e-6 fail probe was recorded at -83.6 dB in 4
+            # scenarios and measures -88.1 dB in the same 4 today. So this
+            # module's bracket, and possibly others carrying "MEASURED at
+            # 48 kHz", were calibrated at a rate the battery never uses. The
+            # honest reading is NOT "the probe drifted": it is that a 48 kHz
+            # calibration was being judged at 44.1 kHz. Re-measuring every
+            # bracket at the battery's own rate is owed and is NOT done here.
+            #
+            # THE GATE WAS NOT MOVED, and the module is not at fault: --module
+            # lfo is EXACTLY 0 everywhere, measured the same day. Same
+            # discipline as the 2026-08-02 reverb re-calibration above -- the
+            # probe moves, never the gate; and when the probe CANNOT be moved
+            # off the line, the case is fail-only and says why.
             cases.append(("out:%s:(1.0f + 1e-7f)" % _m,
                           (_ANCHOR_DIR.get(_m, _m),), True))
             continue
