@@ -28,7 +28,7 @@ patch while everything else happens at once.
 | voices only, c/i | 1.56 | fx_chain_price.md §1 |
 | FX-free threshold | 3,068 cyc | fx_chain_price.md §3 |
 | worst active ring set | **1,030 KB** vs 163 KB internal free | M3_RING_DERIVATION.md (parameter-derived). The 137 KB once cited here was factory-bank-derived and does not survive |
-| PSRAM scattered read | ~244 cyc | CLAUDE.md live state |
+| PSRAM scattered read | ~244 cyc — ⚑ **NO SOURCE FOUND**, and contradicted by layout_sweep.md's measured 17–37 cyc for state placement. Do not quote until measured | CLAUDE.md live state only |
 | patch-change burst | ~1.89 M cyc, c/i ~68 = WAITING, not code | c3_silicon.md PLAY3 |
 | ASM stall pool | 735/voice | LAST_MILE.md Phase B |
 

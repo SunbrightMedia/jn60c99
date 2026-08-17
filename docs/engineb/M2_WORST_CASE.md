@@ -152,3 +152,49 @@ recoverable. Four ring buffers in PSRAM is the obvious suspect and M3 already
 showed the rings cannot simply move (1,030 KB vs 163 KB). The live-window
 variant M3 identified is unmeasured and is now the first thing to measure,
 because it attacks exactly this 3,819.
+
+## WHICH STALLS ARE RECOVERABLE — the measured answer is "almost none, by placement"
+The stall pool is real (3,819 cycles, 70 % of the arm). The question is how
+much of it placement can take back. The repo already answered that ON SILICON
+and the answer was not carried forward.
+
+`data/layout_sweep.md` flashed TEN layouts in one image, three passes,
+repeatable to within 1 cycle. Two pairs differ ONLY in where state lives:
+
+| rows | config | PSRAM | internal | RECOVERED |
+|---|---|---|---|---|
+| 1 vs 2 | 3 voices, 2/1 split, FX on | 6,133 | 6,096 | **37** |
+| 3 vs 4 | 2 voices, 1/1 split, FX on | 5,489 | 5,472 | **17** |
+
+**Moving state out of PSRAM bought 17-37 cycles.** Not hundreds, not thousands.
+That is the only time placement has been measured on this board, and it is two
+orders of magnitude below what the ring work is assumed to be worth.
+
+### AND THE FIGURE THAT MOTIVATES THE RING WORK HAS NO SOURCE
+"PSRAM scattered read ~244 cyc" appears in `CLAUDE.md`'s LIVE STATE and in the
+line of `HEADROOM_PLAN.md` that quotes it. A search of `docs/`, the tools and
+the sources finds NO measurement behind it. It is also in direct tension with
+the 37-cycle result: if a scattered PSRAM read really cost 244 cycles, moving
+the voice state out of PSRAM could not have been worth only 37.
+
+One of those two numbers is wrong, and the sourced one is 37.
+
+### WHAT IS AND IS NOT SETTLED
+- SETTLED: state placement is worth ~30 cycles on this board. Any plan that
+  assumes placement returns thousands is arguing against a measurement.
+- NOT SETTLED: the delay RINGS are a different access pattern -- larger, more
+  scattered, and read at a modulated offset rather than swept linearly. The
+  37-cycle result does not transfer to them automatically.
+- THEREFORE: the ring question is open, but the prior should now be LOW, and
+  the 244 figure must not be quoted again until something measures it.
+
+### THE ONE FLASH THAT WOULD SETTLE IT
+`layout_sweep.md`'s method is the answer: voice-state placement is already a
+RUNTIME ROW FIELD, so ten layouts fit in one image. Add a row field for RING
+placement (the active arm's rings internal vs PSRAM, at a size that fits --
+M3 shows the full ring does not, but a factory-sized 62 KB live window does)
+and re-flash once. That measures the recoverable share directly instead of
+inferring it, and it is the same technique the board has already proven.
+
+Until that runs, the honest statement is: the arm is 70 % stall, and NOTHING
+in this repo shows that placement recovers a useful fraction of it.
