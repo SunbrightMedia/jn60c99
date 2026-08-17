@@ -90,7 +90,13 @@ lag, or a patch outside the battery reads past the end. Gate: trunk null
 EXACTLY 0 (placement must change no arithmetic), then cycles re-measured on
 the board.
 
-**L2 — FX arms on the spare core (structural fallback if L1 lands short of
+**L2 — FX arms on the spare core. ⚑ SPENT BY THE ROUTE DECISION (M4).**
+Layout B (4 voices on chip A; chip B = 2 voices on one core, FX ALONE on the
+other) uses all four cores, so there is no spare core left to move arms onto.
+L2 is not a lever on top of Layout B -- Layout B is the structural move.
+See M4_ROUTE_DECISION.md. Original text:
+
+**L2 (as originally scoped) — FX arms on the spare core (structural fallback if L1 lands short of
 3,068).** The port already forms its output BEFORE dispatching the effect
 arms; an arm reaches the audio on the NEXT sample through cells 84672/84704
 (fx_chain_price.md §5). The one-sample delay the split needs already exists
@@ -127,9 +133,15 @@ produces THE number G1–G3 must not be summed to guess. Also attribute the
 
 **M3 — L1** (ring derivation, then placement, then re-measure M2's number).
 
-**M4 — decide the B3 route** with M3's number in hand: ~700 on chip B vs
-~850 on chip A stops being a guess once the FX's real post-L1 cost is known.
-Then L2/L3/L4 as the remaining gap dictates.
+**M4 — decide the B3 route.** ✅ DONE (M4_ROUTE_DECISION.md): **Layout B**,
+decided at the WORST patch class rather than patch 0, where the two layouts
+tie. On TYPE 2/3/5 chip B is 8,100 under B against 11,168 under A -- better by
+exactly one voice, because B is the only arrangement where the expensive FX
+does not share a core with a voice. It needed no L1 number.
+Two gaps remain: the two-voice core (+694, both chips, every patch, covered by
+L3's 735/voice pool) and the worst-patch FX (+2,658, chip B, 18 patches,
+**covered by NOTHING on this list** -- L1 dead, L2 spent, L3 is a voice lever,
+L4 is the wrong arm). A new lever against the delay arms' ARITHMETIC is owed.
 
 **M5 — the sonic frame around all of it** (SONIC_BOUND_SETTLED.md): every
 lever is screened at EB_SONIC_BAND_DB = 1.0 per band at SHIP flags; the
