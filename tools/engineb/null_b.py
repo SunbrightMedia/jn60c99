@@ -1085,11 +1085,19 @@ def _plant(tmp, mutate):
         # sample 0 has nothing to diverge from yet. The idle-prefix scenarios
         # are what make it observable, which is why they exist.
         p = os.path.join(tmp, "engine_b", "eb_render.c"); s = open(p).read()
-        a = "        vout[v] = 0.0f;\n        if (vc->atrest) {"
+        # The guard gained "|| v >= EB_SLOTS" in 61e3a2c (EB_LFO_FREERUN) and this
+        # anchor was not moved with it, so the tooth asserted instead of biting and
+        # `make engineb` has been RED at step 4 ever since. Anchoring on the whole
+        # condition would break again on the next edit to it, so anchor on the two
+        # stable ends and let the condition text vary.
+        a = "        vout[v] = 0.0f;\n        if (vc->atrest"
         assert s.count(a) == 1, "voiceidleskip anchor moved"
+        # Re-emit the anchor VERBATIM: the rest of the condition (and its brace)
+        # stays in the file untouched. Spelling it out here is what dropped
+        # "|| v >= EB_SLOTS" when the guard grew.
         s = s.replace(a, "        vout[v] = 0.0f;\n"
                          "        if (st->glide[v].s560 == 0.0f) continue;\n"
-                         "        if (vc->atrest) {", 1)
+                         "        if (vc->atrest", 1)
     else:
         raise SystemExit("unknown mutation %s" % mutate)
     open(p, "w").write(s)
