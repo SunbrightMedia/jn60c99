@@ -145,12 +145,16 @@ L3's 735/voice pool) and the worst-patch FX (+2,658, chip B, 18 patches,
 **covered by NOTHING on this list** -- L1 dead, L2 spent, L3 is a voice lever,
 L4 is the wrong arm). A new lever against the delay arms' ARITHMETIC is owed.
 
-**M5 — the sonic frame around all of it** (SONIC_BOUND_SETTLED.md): every
-lever is screened at EB_SONIC_BAND_DB = 1.0 per band at SHIP flags; the
-instrument-level acceptance number is the USER's, by ear, on worst-case WAVs
-(A4) — the one listening judgement the project permits. The shipping fork
-measures 5.79 dB worst band today; that reference must be fixed by the user
-before any lever is allowed to move it.
+**M5 — the sonic frame around all of it.** ✅ DONE (M5_SONIC_FRAME.md).
+Every lever is screened by `sonic_gate.py` at the SHIP flags and 44,100 (the
+device's own rate — NOT the gate's default 2-flag subset, and NOT 48 kHz),
+with `EB_SONIC_TEETH=lp8000` proving the gate bites first. The 1.0 dB per-band
+bound is a PER-LEVER screen, not the instrument's acceptance bound.
+The A4 material is rendered: 36 trunk/fork pairs, same gain, 24-bit.
+⚑ OWED, and it is a DECISION not a measurement: the instrument's acceptance
+figure must become a FIXED number the user sets by ear. "Within 2x of the
+audible build's own" is a ratchet — re-pointing it at today's 5.79 makes it
+11.58, and the next re-baseline 23.
 
 ## WHAT DONE LOOKS LIKE
 The B4 counter reads 0 over all 64 patches at 6 voices across both chips,
