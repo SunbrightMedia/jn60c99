@@ -21,13 +21,13 @@ patch while everything else happens at once.
 | B2 chip B, 2v + FX (M1) | 5,410 — FITS | FINAL_GUIDE B2, c3_silicon.md |
 | playable build, quiet (PLAY3) | 5,229–5,273 | c3_silicon.md |
 | playable build, worst spike (PLAY3) | 6,220 | c3_silicon.md |
-| DELAY TYPE 2/3/5 patches, 2v + FX | ~6,600–6,900 — VIOLATES | FINAL_GUIDE, CLAUDE.md live state |
+| DELAY TYPE 2/3/5 patches, 2v + FX | **~10,700 — VIOLATES, 2x over** | data/patch_dependent_fx.md (board). The ~6,600–6,900 once cited here is the two-voice CORE figure — see M2_WORST_CASE.md |
 | B3 chip B, 3v + FX | over by 691 | FINAL_GUIDE B3 |
 | chip A at 4v (route B) | over by 820 | FINAL_GUIDE B3 |
 | FX chain alone | 7,745 cyc, c/i 2.36 | fx_chain_price.md §1 |
 | voices only, c/i | 1.56 | fx_chain_price.md §1 |
 | FX-free threshold | 3,068 cyc | fx_chain_price.md §3 |
-| worst active ring set | 137 KB; 163 KB internal free | fx_chain_price.md §2 |
+| worst active ring set | **1,030 KB** vs 163 KB internal free | M3_RING_DERIVATION.md (parameter-derived). The 137 KB once cited here was factory-bank-derived and does not survive |
 | PSRAM scattered read | ~244 cyc | CLAUDE.md live state |
 | patch-change burst | ~1.89 M cyc, c/i ~68 = WAITING, not code | c3_silicon.md PLAY3 |
 | ASM stall pool | 735/voice | LAST_MILE.md Phase B |
