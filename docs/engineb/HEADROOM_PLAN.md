@@ -41,8 +41,8 @@ NEVER been measured, and producing that one number is step M2 below.
 | gap | size | what closes it |
 |---|---|---|
 | G1 spike: worst block on the playable build | 6,220 − 5,442 = **778** | transient; acceptable only if the overrun counter still reads 0 — B4 gate decides, not this table |
-| G2 the invariant violation: DELAY 2/3/5 at 2v+FX | 10,700 − 5,442 = **~5,258** | L1 can reach at most 2,634 of it — see below |
-| G3 the sixth voice: B3 | **~700** on chip B, or ~850 on chip A | whichever of the two routes the post-L1 measurement favors |
+| G2 the invariant violation: DELAY 2/3/5 at 2v+FX | 10,700 − 5,442 = **~5,258** | Layout B (M4) absorbs the part that came from sharing a core; what is left is **+2,658 of FX on chip B**, and NOTHING on this list covers it — L1 dead, L2 spent |
+| G3 the sixth voice: B3 | **+694** two-voice core, both chips, every patch | **L3** — the 735/voice ASM pool covers it. Route DECIDED (M4): Layout B |
 
 ⚑ **G2 WAS WRONG IN THE FIRST VERSION OF THIS FILE, by 3.6x.** It read
 "6,900 − 5,442 = ~1,460", taking the 6,600–6,900 range from FINAL_GUIDE.md:97.
@@ -64,8 +64,10 @@ A PERFECT L1 — the whole FX chain moved from c/i 2.36 to the voice chain's
 still above 3,068. Against a G2 of 5,258 that leaves **~2,624 still to find**.
 Only 34 % of the expensive delay arm is memory at all (1,327 of its 3,915
 cycles); the other two thirds are arithmetic that placement cannot touch.
-**So L2 is not a fallback — on these numbers L1 lands short by construction
-and something of L2's size is required.** See M2_WORST_CASE.md.
+**So L1 lands short by construction.** M3 then removed L1 entirely and M4
+spent L2, so neither is available: the remaining FX gap on chip B is +2,658
+and is mostly ARITHMETIC in eb_delay_t23/eb_delay_t5. See M2_WORST_CASE.md,
+M3_RING_DERIVATION.md, M4_ROUTE_DECISION.md.
 
 ## THE LEVERS, each with its measured basis
 
