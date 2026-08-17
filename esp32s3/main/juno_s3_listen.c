@@ -207,6 +207,15 @@ typedef char s3l_boot_rate_check[(EBDEV_BOOT_NRATE == 1) ? 1 : -1];
 #error "S3_NOFX and S3_OFFLINE cannot be combined: offline renders the master chain, NOFX does not allocate it. Wipe the build dir (rm -rf build) -- these are CMake CACHE vars and persist."
 #endif
 
+/* S3L_B4_TOOTH -- provoke B4's overrun counter on purpose. N means "stall
+ * one block in every N past two periods". 0 (the default) compiles the tooth
+ * out entirely, so a shipping build carries none of it. Build the tooth,
+ * SEE ovr_miss climb and HEALTH go red, then build with it off: that order is
+ * the whole point. */
+#ifndef S3L_B4_TOOTH
+#define S3L_B4_TOOTH 0
+#endif
+
 #ifndef S3L_VOICES
 #define S3L_VOICES 2
 #endif
@@ -1690,6 +1699,34 @@ static volatile unsigned long rpt_sec = 0, rpt_cyc = 0, rpt_under = 0;
 static volatile unsigned long rpt_gap = 0, rpt_build = 0, rpt_nb = 0;
 static volatile unsigned long rpt_midi = 0, rpt_drop = 0;
 static volatile long          rpt_drift = 0;
+/* ⚑ B4'S COUNTER. THE INVARIANT'S OWN VERDICT, AND IT DID NOT EXIST.
+ *
+ * FINAL_GUIDE requires "a hard block-overrun counter that must read 0".
+ * `underrun` is NOT that counter and cannot be: it counts an I2S write
+ * failure, which esp-idf returns only on ESP_ERR_TIMEOUT -- an EMPTY DMA
+ * queue for 50 ms. A LATE block produces the OPPOSITE state (the queue
+ * fills and the write returns ESP_OK), so the one counter this firmware
+ * published was structurally blind to the thing B4 asks about.
+ *
+ * The DEADLINE PREDICATE already existed and was already correct; it just
+ * had nowhere to put its answer. It called health_fail(), which latches
+ * only the FIRST fault string and increments health_n -- a variable that
+ * was never printed anywhere. So a missed deadline after the first one was
+ * invisible, and the first one was only visible as a string.
+ *
+ * These two are CUMULATIVE and are never reset. A per-second maximum
+ * (gap_max) answers "how bad was the worst block lately"; B4 asks "did a
+ * block EVER miss", and only a counter that cannot be cleared answers it.
+ *   ovr_late -- blocks that took more than ONE period. Expected to be
+ *               non-zero: the writer blocks on a full queue by design, so
+ *               a single period of jitter is normal. It is the early
+ *               warning, not the verdict.
+ *   ovr_miss -- blocks that took more than TWO periods. THIS IS THE B4
+ *               NUMBER. The comment at the predicate explains why two:
+ *               past two periods the DMA had to be carrying us, which is
+ *               the invariant broken whatever it sounded like. */
+static volatile unsigned long rpt_ovr_late = 0, rpt_ovr_miss = 0;
+static volatile unsigned long rpt_health_n = 0;
 
 static void rpt_task(void *arg)
 {
@@ -1706,6 +1743,11 @@ static void rpt_task(void *arg)
         printf("HEALTH: %s%s\n",
                health_fault ? "*** " : "OK",
                health_fault ? health_fault : "");
+        /* ovr=<late>/<miss> is B4's verdict and is CUMULATIVE. miss MUST read
+         * 0; late is expected non-zero (one period of jitter is by design).
+         * hn is health_n, which nothing printed before. */
+        printf("B4: ovr=%lu/%lu hn=%lu\n",
+               rpt_ovr_late, rpt_ovr_miss, rpt_health_n);
         printf("t=%lu cyc=%lu drift=%+ld un=%lu gap=%lu bst=%lu nb=%lu "
                "midi=%lu/%lu usb=%lu/%d keys=%lu pat=%d\n",
                rpt_sec, rpt_cyc, rpt_drift, rpt_under, rpt_gap,
@@ -1792,6 +1834,8 @@ void app_main(void)
      *    windows leak the cause is in the steady state and the burst is
      *    exonerated. One flash answers a question four hypotheses could not. */
     unsigned long gap_max = 0, gap_tag = 0, gap_at = 0;
+    /* CUMULATIVE by design -- never cleared in the per-second snapshot. */
+    unsigned long ovr_late = 0, ovr_miss = 0;
     int64_t       t_prev_ok = 0;
     unsigned long w_underrun0 = 0, w_chunks0 = 0;
     int           w_step_on = !S3L_PLAY;   /* S3L_PLAY: no patch stepping */
@@ -2322,9 +2366,37 @@ void app_main(void)
          * invariant being broken -- whatever it sounded like. Two rather than
          * one because the writer blocks on a full queue by design, which makes
          * a single period of jitter normal and expected. */
-        if (t_prev_ok && (unsigned long)(t0 - t_prev_ok)
-                         > 2ul * (1000000ul * CHUNK / SR))
-            health_fail("a block missed its deadline");
+#if S3L_B4_TOOTH
+        /* ⚑ THE TOOTH. A counter that has never fired is not evidence of
+         * health; it is an untested detector (FINAL_GUIDE: "EVERY DETECTOR
+         * MUST HAVE BEEN SEEN TO FIRE", and END_GOAL: "the gate must be able
+         * to fail"). This burns past two block periods on one block in every
+         * S3L_B4_TOOTH, so ovr_miss MUST become non-zero and HEALTH MUST go
+         * red. A B4 run whose tooth build reads ovr=.../0 has proved nothing
+         * about the build that follows it.
+         *
+         * It BUSY-WAITS rather than vTaskDelay: the point is to occupy the
+         * core the way a real overrun does, not to yield it. */
+        {
+            static unsigned long tooth_n = 0;
+            if (++tooth_n % (unsigned long)S3L_B4_TOOTH == 0) {
+                int64_t until = t0 + (int64_t)(3ul * (1000000ul * CHUNK / SR));
+                while (esp_timer_get_time() < until) { }
+            }
+        }
+#endif
+        if (t_prev_ok) {
+            unsigned long d      = (unsigned long)(t0 - t_prev_ok);
+            unsigned long period = 1000000ul * CHUNK / SR;
+            /* COUNT, do not merely latch. See rpt_ovr_* for why the counter
+             * had to be added: health_fail keeps the FIRST string only, so
+             * every later miss was invisible, and B4 needs the COUNT. */
+            if (d > period)      ++ovr_late;
+            if (d > 2ul * period) {
+                ++ovr_miss;
+                health_fail("a block missed its deadline");
+            }
+        }
         t_prev_ok = t0;
 #if S3L_SWEEP
         /* THE COST SWEEP overrides the chord with 0, 1 and 2 voices to get a
@@ -2617,6 +2689,11 @@ void app_main(void)
                 rpt_under = underrun;
                 rpt_gap   = gap_max;
                 rpt_drift = (long)((real_us - audio_us) / 1000);
+                /* NOT reset below with gap_max: B4's question is "did a block
+                 * EVER miss", so these accumulate for the life of the run. */
+                rpt_ovr_late  = ovr_late;
+                rpt_ovr_miss  = ovr_miss;
+                rpt_health_n  = health_n;
 #if S3L_RECALL
                 rpt_build = b_last;
                 rpt_nb    = nb_last;
