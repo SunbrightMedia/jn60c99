@@ -108,3 +108,47 @@ without one:
 The order the plan already sets stands, and this file only sharpens it: run the
 B4 tooth, see it red, then run the stress and take the worst-case number ONCE.
 Do not re-derive G2 from arithmetic when a board can print it.
+
+## CORRECTION (same day): the arm is STALL-bound, not arithmetic-bound
+The attribution above priced the delay arm by applying the FX CHAIN's c/i
+(2.36) to the arm's instruction delta: 1,659 x 2.36 = 3,915 cycles, of which
+2,588 was called the arithmetic floor and 1,327 (34 %) the memory term. That
+used an average where a direct measurement exists, and it understates the arm.
+
+The arm's OWN cost is the difference between two board measurements of the same
+chain (data/patch_dependent_fx.md): DELAY TYPE 0 = 2,622 cycles, TYPE 2/3/5 =
+~8,100. So the arm costs **5,478 cycles for 1,659 instructions -- c/i 3.30**,
+not 2.36, and not 3,915 cycles.
+
+    voice chain        8,200 instr  12,820 cyc  c/i 1.56  stalls 4,620 (36 %)
+    FX chain           3,276 instr   7,745 cyc  c/i 2.36  stalls 4,469 (58 %)
+    THE EXPENSIVE ARM  1,659 instr   5,478 cyc  c/i 3.30  stalls 3,819 (70 %)
+
+**Seventy per cent of the arm is stall.** The claim in this file that "two
+thirds of the expensive arm is arithmetic" is WRONG: it followed from the
+averaged c/i, and the arm's own figure inverts it. Only 30 % of the arm's time
+is issuing instructions.
+
+WHAT THAT CHANGES. The 2,658-cycle gap M4 left without an owner does NOT have
+to come out of the algorithm:
+
+    the arm today, c/i 3.30                    5,478 cyc
+    the arm at the VOICE chain's c/i 1.56      2,588 cyc
+    difference                                 2,890 cyc   > the 2,658 needed
+
+Bringing the arm's stall rate down to the rest of the engine's would close the
+gap on its own, and stalls are waiting rather than work -- removing them
+changes no arithmetic and therefore no sound. That is a scheduling and
+placement problem, not an algorithm rewrite.
+
+ROBUST TO THE INPUT UNCERTAINTY: "roughly 8,100" is the softest number here.
+Even at 7,745 the arm delta is 5,123 cycles, 3,464 of them stall, and the
+head-room to voice-chain c/i is 2,535 -- within 5 % of the need rather than
+comfortably over it, but the conclusion (stall-bound, not arithmetic-bound)
+does not move.
+
+NOT PROVEN, and it is the next measurement: WHICH stalls, and how many are
+recoverable. Four ring buffers in PSRAM is the obvious suspect and M3 already
+showed the rings cannot simply move (1,030 KB vs 163 KB). The live-window
+variant M3 identified is unmeasured and is now the first thing to measure,
+because it attacks exactly this 3,819.
