@@ -157,3 +157,51 @@ Standing count of pre-existing harness defects this one repair exposed: the
 blind tooth, the vacuous coefficient audit, the unreachable lfo pass probe, the
 48 kHz brackets judged at 44.1 kHz, and this fingerprint. None was an engine B
 audio divergence; all five were the verification failing to verify.
+
+## The fork: gate run, firmware rebuilt (2026-08-17, end of session)
+Both fork-side gaps are closed, and the second closed with a surprise.
+
+**Firmware.** `eb_master_coefs.c` IS in the S3 image (`esp32s3/main/CMakeLists
+.txt:5` globs `engine_b/eb_*.c`; the shims are NOT built -- `grep -c shim` on
+that file is 0). So the S3 never carried the pitchmod defect: its builder is
+the one that always filled the field. The image was still older than the
+change, so it was rebuilt: `idf.py -B build build` -> rc=0, `juno_s3.bin`
+1,479,936 bytes (was 1,479,312, so +624). PROVEN current: the
+`eb_master_coefs.c.obj` in the image is newer than `eb_delay_pitchmod.h`.
+The toolchain is in the container at `/root/.espressif` (NOT `~/.espressif`);
+`source /home/user/esp-idf/export.sh` puts `xtensa-esp32s3-elf-gcc` on PATH.
+NOTHING WAS FLASHED.
+
+**Sonic gate, and the flag trap.** `tools/engineb/sonic_gate.py` is not one
+configuration but a family: `EB_FORK_FLAGS` x rate x `EB_SONIC_BAND_DB`. Its
+DEFAULT `EB_FORK_FLAGS` is `-DEB_FORK_S3 -DEB_DCO_WT=1` -- a two-flag subset
+that **nobody ships**. Run at that default it says PASS, worst band 0.40 dB.
+That PASS is close to meaningless, and taking it would have repeated playbook
+53 exactly: proving on a configuration that does not ship.
+
+Re-run at the SHIPPING set (`ab_wavs.SHIP`, 22 flags):
+
+| build | verdict | worst band |
+|---|---|---|
+| default 2-flag subset | PASS | 0.40 dB |
+| SHIPPING flags, with the fix | **FAIL (28)** | 5.79 dB |
+| SHIPPING flags, fix REVERTED | **FAIL (28)** | 5.79 dB |
+
+The last row is the point. Identical verdict, identical count, identical worst
+band with the change reverted: **the pitchmod refactor moves no band at all.**
+That is the fork-side proof the change is inert, and it is stronger than the
+default-flag PASS.
+
+The FAIL itself is PRE-EXISTING and is NOT this work. It is also not obviously
+a defect: `EB_SONIC_BAND_DB` defaults to 1.0 dB, while docs record the audible
+build's own accepted worst band as **3.17 dB** ("KEEP ... in-band harmonics,
+not fixable", docs/engineb/LAST_MILE.md:26, CAMPAIGN_8H.md:92). So the gate's
+default bound is tighter than the bound this fork is actually held to -- and
+5.79 dB exceeds even 3.17. OWED: reconcile the shipping flag set, the band
+bound, and what FINAL_GUIDE A2/A3 recorded as DONE. Until that is settled, "the
+fork passes its sonic gate" should not be asserted.
+
+Also found: `device_sonic.c`'s header points at `device_sonic.sh`, which does
+not exist in the tree, so A3's invocation is not reproducible as it stands.
+`device_sonic.c` is NOFX and never calls `eb_master_coefs_build`, so it cannot
+see this change either way.
