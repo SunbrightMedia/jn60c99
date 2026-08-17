@@ -27,6 +27,7 @@
  * complete and exact.
  */
 #include "eb_delay_t23.h"
+#include "eb_delay_pitchmod.h"
 #include "juno_engine.h"
 #include "juno_dsp.h"
 #include <math.h>
@@ -1330,6 +1331,11 @@ LABEL_69:
         EBD23C.k6396608 = *(float *)(a1 + 6396608);
         EBD23C.k6396624 = *(float *)(a1 + 6396624);
         EBD23C.k6429412 = *(int32_t *)(a1 + 6429412);
+        /* DERIVED, not a cell: the hoisted pitch-mod pre-value. Filling the
+         * k-cells is not enough -- eb_dly23_tick READS this field, and a
+         * function-level static leaves it 0.0f. See eb_delay_pitchmod.h. */
+        EBD23C.pitchmod_pre = eb_delay_pitchmod_pre(EBD23C.k6395312,
+                                                    EBD23C.k6395408);
         EBD23HAVE = 1; EBD23GEN = eb_coef_gen;
       }
       st23.s6395344 = *(float *)(a1 + 6395344);

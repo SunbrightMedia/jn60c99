@@ -70,7 +70,9 @@
 #include "eb_fx_e1.h"
 #include "eb_fx_e5.h"
 #include "eb_delay_t5.h"
+#include "eb_delay_pitchmod.h"
 #include "eb_delay_t23.h"
+#include "eb_delay_pitchmod.h"
 #include "eb_delay_t1.h"
 #include "eb_dly_t4.h"
 #include "eb_fx_e0.h"
@@ -1280,6 +1282,11 @@ only one of them is proven. The omission was unreachable until an
         EBD23C.k6396608 = *(float *)(a1 + 6396608);
         EBD23C.k6396624 = *(float *)(a1 + 6396624);
         EBD23C.k6429412 = *(int32_t *)(a1 + 6429412);
+        /* DERIVED, not a cell: the hoisted pitch-mod pre-value. Filling the
+         * k-cells is not enough -- eb_dly23_tick READS this field, and a
+         * function-level static leaves it 0.0f. See eb_delay_pitchmod.h. */
+        EBD23C.pitchmod_pre = eb_delay_pitchmod_pre(EBD23C.k6395312,
+                                                    EBD23C.k6395408);
         EBD23HAVE = 1; EBD23GEN = eb_coef_gen;
       }
       st23.s6395344 = *(float *)(a1 + 6395344);
@@ -1476,6 +1483,10 @@ only one of them is proven. The omission was unreachable until an
               EBD5C.k10693472 = *(float *)(a1 + 10693472);
               EBD5C.k10726260 = *(int32_t *)(a1 + 10726260);
               EBD5C.k10759044 = *(int32_t *)(a1 + 10759044);
+              /* DERIVED, not a cell -- see the same note in the TYPE 2/3 shim
+               * and the rationale in eb_delay_pitchmod.h. */
+              EBD5C.pitchmod_pre = eb_delay_pitchmod_pre(EBD5C.k10692016,
+                                                          EBD5C.k10692112);
               EBD5HAVE = 1; EBD5GEN = eb_coef_gen;
             }
             st5.s6496576 = *(float *)(a1 + 6496576);

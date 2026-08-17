@@ -12,6 +12,7 @@
 #include "eb_master_coefs.h"
 #include "eb_minmax.h"
 #include "eb_dsp.h"
+#include "eb_delay_pitchmod.h"
 #include "eb_chorus_shim.h"
 #include <string.h>
 
@@ -111,10 +112,8 @@ void eb_master_coefs_build(const unsigned char *base, eb_master_coef *c)
      * SAMPLE in double precision on a chip with no double FPU. Written here
      * character for character as the render loop had it, so the result is
      * bit-identical and the null stays EXACTLY 0. */
-    c->d23.pitchmod_pre = eb_fmaxf_c(eb_fminf_c(
-        (float)eb_pitch_poly((double)(float)(c->d23.k6395312
-                                             + c->d23.k6395408)),
-        512.0f), -512.0f);
+    c->d23.pitchmod_pre = eb_delay_pitchmod_pre(c->d23.k6395312,
+                                                c->d23.k6395408);
     c->d23.k6395648 = CF(base, 6395648);
     c->d23.k6395664 = CF(base, 6395664);
     c->d23.k6395696 = CF(base, 6395696);
@@ -185,10 +184,8 @@ void eb_master_coefs_build(const unsigned char *base, eb_master_coef *c)
     c->d5.k10692016 = CF(base, 10692016);
     c->d5.k10692032 = CF(base, 10692032);
     c->d5.k10692112 = CF(base, 10692112);
-    c->d5.pitchmod_pre = eb_fmaxf_c(eb_fminf_c(
-        (float)eb_pitch_poly((double)(float)(c->d5.k10692016
-                                             + c->d5.k10692112)),
-        512.0f), -512.0f);
+    c->d5.pitchmod_pre = eb_delay_pitchmod_pre(c->d5.k10692016,
+                                               c->d5.k10692112);
     c->d5.k10692352 = CF(base, 10692352);
     c->d5.k10692368 = CF(base, 10692368);
     c->d5.k10692400 = CF(base, 10692400);
