@@ -103,3 +103,38 @@ an engine B divergence:
    (precedent: the 2026-08-02 reverb re-calibration, `null_b.py:947-960`).
 2. The static coefficient audit does not refuse a planted cell 4736 -- "the
    audit is blind". Untouched by this work; owed.
+
+## What the repaired teeth then exposed (2026-08-17, later the same day)
+With both teeth fixed, `make engineb` ran past step 4 for the first time in
+eight days and reached **step 8**. Steps 4-7 are GREEN: teeth PASS, composite
+regenerated, and ALL 30 per-module nulls EXACTLY 0. It now stops on ledger
+integrity, and what it stopped on is worth more than the stop.
+
+**Two rows re-emitted cleanly** (`noise_lfsr`, `triangle`); their old rows are
+SUPERSEDED. **Two could not** (`chorus`, `env`), both refused with:
+
+    parsed 36 scenario lines but null_ab.SCEN has 30
+
+That is not a counting bug. `ledger.scenario_fingerprint()` hashes
+`null_ab.SCEN` (30 tags), but engine B's null runs `null_b.BASE_SCEN`, which is
+those 30 PLUS six engine-B-only scenarios:
+
+    DELAY type 2 | DELAY type 3 | DELAY type 4 (synthetic)
+    EFFECT type 0 (synthetic) | EFFECT type 1 (arp) | EFFECT type 4 (synthetic)
+
+So every engine B null row's fingerprint describes a scenario set SIX SMALLER
+than the one actually run -- and the six missing ones are the delay and effect
+arms, precisely where today's defect lived. The function's own docstring states
+the standard it is failing: "`26/26 EXACTLY 0` was true when there were 26
+scenarios and is a lie now that there are 30."
+
+OWED, and deliberately NOT done here: point the fingerprint at the scenario set
+actually executed. It is a small edit with a large tail -- it changes the
+fingerprint of EVERY row, marking all 18 stale and requiring a full
+`ledger.py emit --all`, which re-runs every proof. That is a scoped piece of
+work, not a side effect to slip into an unrelated fix.
+
+Standing count of pre-existing harness defects this one repair exposed: the
+blind tooth, the vacuous coefficient audit, the unreachable lfo pass probe, the
+48 kHz brackets judged at 44.1 kHz, and this fingerprint. None was an engine B
+audio divergence; all five were the verification failing to verify.
