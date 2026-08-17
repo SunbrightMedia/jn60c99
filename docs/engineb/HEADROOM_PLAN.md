@@ -69,7 +69,18 @@ and something of L2's size is required.** See M2_WORST_CASE.md.
 
 ## THE LEVERS, each with its measured basis
 
-**L1 — rings out of PSRAM into internal SRAM.** The active arm's worst ring
+**L1 — rings out of PSRAM into internal SRAM. ⚑ DEAD AS SCOPED (M3).**
+The precondition was run (M3_RING_DERIVATION.md) and it removes this lever in
+its stated form: derived from the DELAY TIME parameter instead of the factory
+bank, the worst active arm needs 1,030 KB against 163 KB of internal SRAM --
+6.3x too big, where the factory-derived figure said 137 KB and fit. What
+survives is a DIFFERENT lever: keep the allocation in PSRAM and make the LIVE
+WINDOW internal (the read and write heads are two small moving regions in a
+large array). That is unmeasured and must not inherit the ceiling below.
+The original text follows because its arithmetic is still the bound on any
+ring work:
+
+**L1 (as originally scoped) — rings out of PSRAM into internal SRAM.** The active arm's worst ring
 set is 137 KB against 163 KB free internal (MEASURED, ring probe, all 36
 scenarios). PSRAM scattered read is ~244 cyc. The 6.1 MB PSRAM allocation is
 45x the working set, inherited from the plugin's own length cells.
