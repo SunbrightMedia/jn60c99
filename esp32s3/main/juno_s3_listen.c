@@ -536,7 +536,7 @@ static void mem_probe(void)
      * probe may not take a fifth of it. Cycles-per-byte is scale-free. */
     enum { NB = 2048, NSTRIDE = 2048, STRIDE = 64, NISC = 64 };
     static unsigned char PB_DST[NB], PB_SRC[NB];
-    unsigned long t0, c_flash = 0, c_int = 0, c_ps = 0, c_isc = 0;
+    unsigned long t0, c_flash = 0, c_int = 0, c_ps = 0, c_isc = 0, c_seq = 0;
     volatile float *ps = (volatile float *)heap_caps_malloc(
         (size_t)NSTRIDE * STRIDE, MALLOC_CAP_SPIRAM);
     static float ISR[NISC * (STRIDE / 4)];
@@ -565,6 +565,31 @@ static void mem_probe(void)
     for (i = 0; i < NISC; ++i) sink += ISR[(size_t)i * (STRIDE / 4)];
     c_isc = (unsigned long)esp_cpu_get_cycle_count() - t0;
 
+    /* 4. THE PATTERN THE DELAY ACTUALLY USES, which rows 1-3 do not measure.
+     *
+     * Row 3 strides one cache line so EVERY read misses. A delay tap does not
+     * do that: consecutive samples read consecutive ring positions, so one
+     * 32-byte PSRAM burst serves eight samples. Concluding "the rings are
+     * latency" from row 3 is reading a worst case as if it were the case --
+     * and this file's own FX-ordering note records a ring-placement test that
+     * made the engine 94 cycles WORSE, which row 3 cannot explain.
+     *
+     * So: a MOVING TAP. The read position advances one float per iteration
+     * with a small wobble, and two adjacent floats are interpolated -- which
+     * is what a pitch-modulated delay does. If this row is near the internal
+     * row, the delay's cost is ARITHMETIC and the rings are innocent. */
+    if (ps) {
+        const size_t mask = (size_t)NSTRIDE * (STRIDE / 4) - 1u;
+        size_t w = 0;
+        t0 = (unsigned long)esp_cpu_get_cycle_count();
+        for (i = 0; i < NSTRIDE; ++i) {
+            size_t p = (w - (size_t)(1000 + (i & 7))) & mask;
+            sink += ps[p] * 0.5f + ps[(p + 1u) & mask] * 0.5f;
+            ++w;
+        }
+        c_seq = (unsigned long)esp_cpu_get_cycle_count() - t0;
+    }
+
     printf("\n=== MEMORY PROBE (is this engine memory-bound?) ===\n");
     printf("MEM: copy %d B out of FLASH   %lu cyc  = %.2f cyc/byte\n",
            NB, c_flash, (double)c_flash / (double)NB);
@@ -577,10 +602,14 @@ static void mem_probe(void)
         printf("MEM: PSRAM buffer refused -- the row that matters is MISSING\n");
     printf("MEM: %d scattered reads INTERNAL %lu cyc = %.1f cyc/read\n",
            NISC, c_isc, (double)c_isc / (double)NISC);
+    if (ps)
+        printf("MEM: %d MOVING-TAP reads PSRAM  %lu cyc = %.1f cyc/tap  "
+               "<- the delay's own pattern\n",
+               NSTRIDE, c_seq, (double)c_seq / (double)NSTRIDE);
     printf("MEM: flash is configured DIO @ 80 MHz. QIO @ 120 MHz is available\n"
            "     and is worth its reflash ONLY if the flash row above is dear.\n");
-    printf("MEM: the delay rings are 6.1 MB in PSRAM. If the PSRAM row is many\n"
-           "     times the internal row, DELAY TYPE 2/3/5 is LATENCY, not maths.\n");
+    printf("MEM: rings are 6.1 MB in PSRAM. Read the MOVING-TAP row, NOT the\n"
+           "     scattered row: scattered is a worst case the delay never runs.\n");
     (void)sink;
     if (ps) heap_caps_free((void *)ps);
 }
@@ -1374,6 +1403,41 @@ static eb_render_state *RS_INT, *RS_PSR;
 static unsigned long prologue_us = 0, prologue_n = 0;
 #endif
 
+/* S3L_FXPROF -- SPLIT CORE 1'S PASS INTO ITS TWO HALVES.
+ *
+ * WHY THIS EXISTS AND WHY IT IS NOT OPTIONAL. The second silicon run measured
+ * DELAY TYPE 2/3/5 patches at 6,526-6,772 cyc against 5,069-5,682 for every
+ * other patch, and the delta was ATTRIBUTED to PSRAM ring latency on the
+ * strength of the boot probe's scattered-read row. That attribution is not
+ * measured, and the boot probe cannot support it: it strides one cache line so
+ * every read misses, while a delay tap walks the ring ~sequentially. The probe
+ * measures a pattern the delay does not use.
+ *
+ * There is also standing evidence AGAINST the latency story, in this very
+ * file: moving four of nine rings into internal SRAM made the engine 94 cycles
+ * WORSE. That test asked a different question and predates the FX-first
+ * reordering, so it does not settle this -- but it is the reason the ring work
+ * must not begin until the cost is located.
+ *
+ * WHAT THIS MEASURES. Core 1 does two things per block: the FX pass over the
+ * PREVIOUS chunk (never blocked) and its own voice pass (throttled by core 0's
+ * w_ready). Timing them separately answers the only question that matters
+ * before any ring is touched: does the delay patches' extra cost land in the
+ * FX pass at all, and how much of the FX pass is FREE -- i.e. inside the
+ * window where core 1 would otherwise be waiting on core 0?
+ *
+ * COST: four CCOUNT reads per BLOCK, never per sample. Default ON; it is a
+ * measurement, not a knob the audio path reads. */
+#ifndef S3L_FXPROF
+#define S3L_FXPROF 1
+#endif
+#if S3L_FXPROF
+/* per-sample averages over the last reported second, published for rpt_task */
+static volatile unsigned long rpt_fx_cyc = 0, rpt_v1_cyc = 0, rpt_wait_cyc = 0;
+/* accumulators, written only by core 1 */
+static unsigned long fxp_fx = 0, fxp_v1 = 0, fxp_wait = 0, fxp_n = 0;
+#endif
+
 static void worker(void *arg)
 {
     int i;
@@ -1416,6 +1480,9 @@ static void worker(void *arg)
          * MEASURED CAUSE, not a guess: the ring-placement test moved four of
          * nine rings into internal SRAM and the engine got 94 cycles WORSE,
          * which kills the memory-contention explanation and leaves this one. */
+#if S3L_FXPROF
+        {   unsigned long p0 = (unsigned long)esp_cpu_get_cycle_count(), pd;
+#endif
         if (have) {
             for (i = 0; i < w_n; ++i) {
                 float L = 0.0f, R = 0.0f;
@@ -1430,18 +1497,44 @@ static void worker(void *arg)
                 } else
 #endif
                 eb_master_render(MS, mc, &RG, w_vbb[prev][i], &L, &R);
+#if S3L_FXPROF && defined(S3L_FXPROF_TOOTH)
+                /* THE RESPONSE TEST. A measurement nobody has seen move is a
+                 * number, not a measurement. This burns S3L_FXPROF_TOOTH
+                 * cycles per sample INSIDE the timed FX region and nowhere
+                 * else, so `fx` must rise by exactly that and `v1` must not
+                 * move. Default: not defined at all. */
+                {   unsigned long tt = (unsigned long)esp_cpu_get_cycle_count();
+                    while ((unsigned long)esp_cpu_get_cycle_count() - tt
+                           < (unsigned long)S3L_FXPROF_TOOTH) { }
+                }
+#endif
                 if (L > 1.0f) L = 1.0f; else if (L < -1.0f) L = -1.0f;
                 if (R > 1.0f) R = 1.0f; else if (R < -1.0f) R = -1.0f;
                 w_pcm[prev][2 * i]     = (int16_t)(L * 30000.0f);
                 w_pcm[prev][2 * i + 1] = (int16_t)(R * 30000.0f);
             }
         }
+#if S3L_FXPROF
+        pd = (unsigned long)esp_cpu_get_cycle_count() - p0;
+        if (have && w_n > 0) fxp_fx += pd / (unsigned long)w_n;
+        p0 = (unsigned long)esp_cpu_get_cycle_count();
+#endif
         for (i = 0; i < w_n; ++i) {
             while (w_ready <= i) { }        /* wait for this sample's prologue */
             eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
                                    SPLIT_, EB_NUM_VOICES, &w_shb[i],
                                    w_vbb[cur][i]);
         }
+#if S3L_FXPROF
+        pd = (unsigned long)esp_cpu_get_cycle_count() - p0;
+        if (w_n > 0) { fxp_v1 += pd / (unsigned long)w_n; ++fxp_n; }
+        if (fxp_n >= 64) {          /* publish an average, then start afresh */
+            rpt_fx_cyc = fxp_fx / fxp_n;
+            rpt_v1_cyc = fxp_v1 / fxp_n;
+            fxp_fx = fxp_v1 = fxp_wait = 0; fxp_n = 0;
+        }
+        }
+#endif
         }
 #else
         for (i = 0; i < w_n; ++i) {
@@ -1748,6 +1841,13 @@ static void rpt_task(void *arg)
          * hn is health_n, which nothing printed before. */
         printf("B4: ovr=%lu/%lu hn=%lu\n",
                rpt_ovr_late, rpt_ovr_miss, rpt_health_n);
+#if S3L_FXPROF
+        /* fx = core 1's master/FX pass, v1 = core 1's own voice pass
+         * (INCLUDING the time it waits on core 0). Per sample, averaged over
+         * 64 blocks. Compare fx across patch classes: if the delay patches'
+         * extra cycles are not here, the rings are not the cause. */
+        printf("FXP: fx=%lu v1=%lu per sample\n", rpt_fx_cyc, rpt_v1_cyc);
+#endif
         printf("t=%lu cyc=%lu drift=%+ld un=%lu gap=%lu bst=%lu nb=%lu "
                "midi=%lu/%lu usb=%lu/%d keys=%lu pat=%d\n",
                rpt_sec, rpt_cyc, rpt_drift, rpt_under, rpt_gap,
