@@ -282,7 +282,7 @@ cross-referenced. Done and retired from the old list: recall on the board
 
 | label | was | what | state |
 |---|---|---|---|
-| **O1** | C11 | the internal event API — the boundary O2/O3 live behind | NOT DONE |
+| **O1** | C11 | the internal event API — the boundary O2/O3 live behind | **BUILT AND GATED 2026-08-18, UNPLAYED.** event/juno_event.{h,c}: three submit calls, mandatory source tag, bounded ring, counters. Producers lock, the drain does NOT (rule 1). Notes are now DEFERRED, never dropped — the old path discarded a note when a burst was pending, which broke rule 3. s3_midi_event() retired; every parser submits with its own tag. Gates seen to fail first: event/teeth.sh (6 teeth) and tools/engineb/boundary_teeth.sh (3 structural teeth on boundary_check.py). **NOT DONE until a key is pressed on the board and `EVQ: ref=` reads 0 under a real chord.** The param path is queued and COUNTED as unhandled (`par=`) until O3. |
 | **O2** | C10 | chunked patch change — THE fix for B4's counted misses | NOT DONE |
 | **O3** | C9 | per-parameter incremental refresh (derived field map) | NOT DONE |
 | **O4** | B3/B4 | worst-case headroom CLOSED: measure the prologue, explain the delay arm's +1,45x, then pick the lever (chain split across cores vs arm hunt) | OPEN — b6_split_sweep.md is the evidence base |
