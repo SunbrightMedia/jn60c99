@@ -117,10 +117,11 @@ int eb_devseq_events(const eb_alloc_ev *ev, int n)
          * that under-states it gets seven stale voices and no error -- see
          * eb_recall_build_voices. Every arm below writes the voice it names;
          * the one that does NOT is EB_EV_HELD, which is the port's own
-         * engine-wide broadcast of cell 1856 and therefore touches all of
-         * them. Getting that single case wrong is the whole risk. */
+         * engine-wide broadcast of cell 1856. Its contribution is decided in
+         * its own case below, BEFORE it writes, for the reason stated there.
+         * Getting that single case wrong is the whole risk. */
         EB_DEVSEQ_TOUCHED |= (ev[i].kind == EB_EV_HELD)
-                             ? ~0u : (1u << ev[i].voice);
+                             ? 0u : (1u << ev[i].voice);
         switch (ev[i].kind) {
         case EB_EV_TRIGGER:
             juno_note_on(DEVST, ev[i].voice, ev[i].a, ev[i].b);
@@ -142,7 +143,61 @@ int eb_devseq_events(const eb_alloc_ev *ev, int n)
                                  EB_DEVSEQ_PORTA_BASE);
             break;
         case EB_EV_HELD:
-            /* engine-wide: cell 1856 to ALL voices, the port's own broadcast */
+            /* ⚑ WIDEN TO ALL EIGHT VOICES ONLY WHEN THE BROADCAST ACTUALLY
+             * MOVES A COEFFICIENT. MEASURED consequence of not doing so
+             * (b9_held_broadcast.md): eb_alloc emits this on EVERY note-on
+             * and EVERY note-off, so an unconditional ~0u made every single
+             * note rebuild all eight voices -- the full 1.12 M-cycle voice
+             * build, 7.9x the ~135,000 the plan assumed, and the largest
+             * single-block cost in the firmware.
+             *
+             * WHAT THE BROADCAST MEANS, from the port's own semantics
+             * (src/juno_note.c:204-211, measured under Unicorn): cell 1856 is
+             * (held-note count > 0). Note-on writes 1.0 to every voice -- but
+             * if a key was already held it was ALREADY 1.0. Note-off writes
+             * 0.0 only when no key remains. So it transitions on the FIRST key
+             * down and the LAST key up, and on nothing else. In between, the
+             * other seven voices' cells are untouched and rebuilding them
+             * recomputes identical values.
+             *
+             * ⚠ IT READS THE CELL RATHER THAN REMEMBERING THE STATE, and that
+             * is the whole design. A remembered flag goes STALE the moment a
+             * patch reseed rewrites 1856 -- it would then skip a widen that
+             * was needed, leaving seven voices carrying a wrong k1856 into the
+             * LFO: audible, and invisible to any test that only plays chords.
+             * The cell is self-synchronising: after a reseed it holds whatever
+             * the reseed put there, so the comparison is right by
+             * construction and there is no resync to forget.
+             *
+             * Voice 0's copy is enough: broadcast_held writes all voices
+             * identically, and VBASE(0) is 0, so the cell is at offset 1856.
+             *
+             * Held bit-identical to the unconditional widen by
+             * tools/engineb/held_gate.py over a note sequence, with teeth. */
+            /* ⚠ DEFAULT OFF, AND THE GATE IS WHY. tools/engineb/held_gate.py
+             * runs a note sequence on patches 0, 5 and 21 and compares the
+             * live coefficients against a full rebuild from the current cells.
+             * With the narrowing ON, PATCH 5 FAILS: 14 bytes differ, and a
+             * WIDE build from the same starting point MATCHES the full
+             * rebuild. So the narrowing drops a voice whose coefficients
+             * really did change -- the reasoning in b9_held_broadcast.md §3 is
+             * necessary but NOT sufficient, and cell 1856 is not the only
+             * thing a note moves that reaches another voice.
+             *
+             * Patches 0 and 21 pass, which is exactly why this is behind a
+             * flag rather than deleted: the idea is worth 7.9x and the gate
+             * now says precisely what would have to be true for it to be safe.
+             * Patch 5 is MONO and emits a different event set (glide, retrig,
+             * porta gate) than the POLY patches -- that is where to look next.
+             *
+             * DO NOT ENABLE THIS WITHOUT held_gate.py GREEN. */
+#ifdef EB_DEVSEQ_NARROW_HELD
+            {   const float want = ev[i].a ? 1.0f : 0.0f;
+                if (JF(DEVST, 1856u) != want) EB_DEVSEQ_TOUCHED = ~0u;
+            }
+#else
+            EB_DEVSEQ_TOUCHED = ~0u;   /* the safe, measured-correct behaviour */
+#endif
             juno_note_broadcast_held(DEVST, ev[i].a);
             break;
         default:

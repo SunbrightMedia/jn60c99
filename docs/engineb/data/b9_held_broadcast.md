@@ -78,3 +78,48 @@ feels broken.
      and that is the most audible note there is. Narrowing fixes legato and
      chords, not the first strike. That case needs its own design answer (a
      second publish, or a measured acceptance), stated rather than silent.
+
+## 6. THE NARROWING WAS BUILT, GATED, AND REFUSED BY ITS OWN GATE (2026-08-18)
+IMPLEMENTED as section 3 proposed -- read cell 1856 rather than track state, so
+a patch reseed cannot leave a stale flag (Fable 5's objection b, eliminated by
+construction rather than by a tooth). Then gated. THE GATE SAID NO.
+
+tools/engineb/held_gate.py runs press-A, press-B-while-held, release-B,
+release-A across patches 0, 5 and 21, and after every batch compares the LIVE
+coefficients against a full rebuild from the CURRENT cells:
+
+    patch  0   all four steps PASS, narrows on the two middle steps
+    patch 21   all four steps PASS, narrows on the two middle steps
+    patch  5   THREE STEPS FAIL -- 14 bytes of 18,788 differ, and
+               "a WIDE build from the same start MATCHES the full rebuild"
+
+That last line is the verdict: the mask is the cause. Narrowing drops a voice
+whose coefficients genuinely changed. Section 3's reasoning -- 1856 only moves
+on the first key down and the last key up -- is TRUE (the gate prints all eight
+voices reading 1.0) and NOT SUFFICIENT. Something else a note does reaches
+other voices, and cell 1856 was never the whole story.
+
+WHERE TO LOOK NEXT, from the gate's own evidence: patch 5 is the only one of
+the three that narrows on its FIRST key (the recall left 1856 at 1.0, so no
+widen resyncs it) and the only one whose allocator names voice 0 rather than
+voice 6 -- i.e. it is MONO, and MONO emits GLIDE, RETRIG and PORTA_GATE where
+POLY does not. Those three event kinds are the difference between a passing
+patch and a failing one.
+
+SHIPPED STATE: the unconditional widen, behind #ifdef EB_DEVSEQ_NARROW_HELD
+(default OFF). The idea is worth 7.9x and is not deleted; the gate now states
+exactly what must be true before it can be switched on, and refuses it until
+then. held_gate.py PASSES on the shipped path -- which is itself worth having,
+because it proves the widen is correct rather than merely conservative.
+
+⚠ SO THE 58 ms LATENCY OF §4 STANDS, AND O2b MUST NOT SHIP ALONE.
+The note burst is chunked and correct, but at eight voices a key press is ten
+blocks. The remaining options, none yet chosen:
+  a. fix the narrowing (find what MONO moves, extend the mask honestly);
+  b. derive the mask from WHICH CELLS WERE WRITTEN rather than from event
+     kinds -- ebdev already has the hook to track dirty scatter indices;
+  c. publish the allocated voice after ONE step and the rest later, so the key
+     sounds immediately and the other seven catch up;
+  d. keep the burst whole for notes and accept the deadline miss.
+(c) is the one that matches rule 3 best -- the note arrives on time and the
+change completes late -- but it needs a second publish path and its own gate.
