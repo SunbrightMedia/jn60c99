@@ -58,8 +58,22 @@ def read_cells(path):
     whose subject has moved must fail loudly, never report all-clear."""
     s = open(path).read()
     out = {}
-    for fn in ("eb_coefs_voice", "eb_render_coefs_build"):
-        key = "void " + fn
+    # ⚠ THE PAREN IS LOAD-BEARING. This read `key = "void " + fn` and counted
+    # SUBSTRING occurrences, so when O2 split the constructor into
+    # eb_render_coefs_build + eb_render_coefs_build_shared, the count for
+    # "void eb_render_coefs_build" became 2 and the audit exited BROKEN on a
+    # clean tree. It was right to stop -- its subject had moved -- but it named
+    # the wrong reason. A prefix that swallows a longer name is the same defect
+    # as a \b that cannot reach inside an identifier (playbook 59).
+    #
+    # eb_render_coefs_build is now three functions, and all three are named:
+    # the per-voice constructor, the wrapper, and the shared tail. Only the
+    # per-voice one is REQUIRED to contribute CF(a1, N) reads -- the other two
+    # read base cells, not per-voice cells, so an empty contribution from them
+    # is correct rather than the blindness this guard exists to catch.
+    for fn in ("eb_coefs_voice", "eb_render_coefs_build",
+               "eb_render_coefs_build_shared"):
+        key = "void " + fn + "("
         if s.count(key) != 1:
             raise SystemExit(
                 "COEFFICIENT AUDIT: BROKEN -- expected exactly one 'void %s' in "
