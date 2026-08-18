@@ -735,3 +735,28 @@ THE CURE: when costing a rebalance, price the MOVES YOU CAN ACTUALLY MAKE, not
 the partition function's optimum. State the granularity of the smallest movable
 unit in the same sentence as the pool. An unreachable optimum is a useful
 bound and a misleading plan.
+
+## 59. \b does not bound a C identifier, and the check reports PASS
+MEASURED 2026-08-18, TWICE IN ONE AFTERNOON, both times in a gate this session
+had just written. `_` is a word character, so:
+  * `r"\btud_midi\b"` does NOT match `tud_midi_available()` -- so the USB file
+    was silently exempt from the boundary check's "does every input submit?"
+    pass, and the gate printed PASS while USB still reached the engine through
+    a shim;
+  * `r"\bVCF\b"` does NOT match `JUNO_VCF_CUTOFF_PARAM` -- so a planted JUNO
+    constant walked straight through the "is the header synth-agnostic?" pass.
+
+Both were found ONLY because a tooth was planted and NOT CAUGHT. Neither would
+have been found by reading the regex, and both gates were green.
+
+THE CURE, two halves:
+  * matching a C identifier or any part of one: no `\b`, match the substring,
+    or anchor on something that is genuinely not a word character;
+  * and the half that actually saved it: EVERY GATE GETS TEETH, INCLUDING THE
+    ONES THAT CHECK OTHER GATES. A tooth that is not caught is the only signal
+    that would have arrived here.
+
+RELATED: 55 (a probe that measures a pattern the code never runs). Same family
+-- a selector that selects nothing and reports success -- now seen in a
+measurement, a linker script, a coefficient audit, a ledger fingerprint, a
+teeth anchor, and twice in one regex.

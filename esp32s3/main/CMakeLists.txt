@@ -72,9 +72,15 @@ endif()
 set(APP_REQ esp_driver_i2s esp_driver_uart driver esp_timer esp_hw_support
             tinyusb)
 
+# O1: the internal event boundary. ONE small portable file, compiled into the
+# firmware exactly as the host gate compiles it (event/teeth.sh) -- a boundary
+# proven on a workstation and a different boundary shipped is two boundaries.
+set(EVENT_SRCS ${CMAKE_CURRENT_LIST_DIR}/../../event/juno_event.c)
+
 idf_component_register(
-    SRCS ${APP_SRC} ${EB_SRCS} ${RECALL_SRCS}
+    SRCS ${APP_SRC} ${EB_SRCS} ${RECALL_SRCS} ${EVENT_SRCS}
     INCLUDE_DIRS "." "../../engine_b" "../../engine_b/dev" "../../src"
+                 "../../event"
                  "../../tools/engineb/devboot" "../../tools/engineb/qemu"
     EMBED_FILES ${APP_EMBED}
     LDFRAGMENTS "linker.lf"
@@ -123,8 +129,12 @@ if(S3_LTO)
 else()
     set(S3_LTO_FLAG "")
 endif()
+# JUNO_EVQ_PORT_HEADER supplies the producers' lock. WITHOUT IT the boundary
+# silently compiles with a NO-OP lock -- correct for the single-threaded host
+# gate and a data race here, where USB, DIN and the console all submit.
 target_compile_options(${COMPONENT_LIB} PRIVATE
     -O2 ${S3_LTO_FLAG} -ffp-contract=off -fno-strict-aliasing
+    -DJUNO_EVQ_PORT_HEADER="juno_event_port.h"
     -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_VCF_RES_LUT=256 -DEB_IDF
     ${S3_EXTRA_DEFS})
 # EB_VCF_RES_LUT=256 -- MEASURED on the user's S3: 1,009 cycles per

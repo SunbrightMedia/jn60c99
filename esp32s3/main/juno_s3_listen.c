@@ -94,6 +94,9 @@
 #include "eb_recall.h"
 #include "eb_devseq.h"
 #include "eb_alloc.h"
+/* O1: THE ONE BOUNDARY. Every input reaches the engine through this and
+ * nothing else -- FINAL_GUIDE O1, USER-BINDING. */
+#include "juno_event.h"
 #include "eb_patch.h"
 #include "devchord.h"
 #include "esp_cpu.h"
@@ -444,6 +447,10 @@ static eb_alloc_ev   ALLOC_EV[EB_ALLOC_MAX_EV];
 static volatile int  note_pending = 0;   /* events are queued, a burst is owed */
 static int           note_nev = 0;
 static unsigned long notes_seen = 0, notes_dropped = 0, note_bursts = 0;
+static unsigned long ev_applied_blocks = 0;   /* blocks that applied events */
+/* The producers' mutex. Declared in main/juno_event_port.h, defined ONCE
+ * here, and taken only by submitters -- never by the drain. */
+portMUX_TYPE juno_evq_mux = portMUX_INITIALIZER_UNLOCKED;
 static unsigned long nb_min = 0xFFFFFFFFul, nb_max = 0, nb_last = 0;
 static volatile int  dev_pending = 0;   /* a build+publish is owed          */
 static int           dev_patch = 0;     /* which patch the bank is on       */
@@ -897,29 +904,98 @@ static int     m_have = 0;
 /* NON-STATIC on purpose: main/s3_usbmidi.c calls this so that USB MIDI and
  * UART MIDI share ONE velocity policy and ONE allocator path. Two entry points
  * that decide separately is how the assigner-mode defect survived for months. */
-void s3_midi_event(int on, int note, int vel)
+/* ================= O1: THE CONSUMER SIDE =================================
+ *
+ * The queue is synth-agnostic by rule (END_GOAL item 7). EVERYTHING THAT IS
+ * TRUE ONLY OF A JUNO LIVES HERE, on this side of the boundary, and there is
+ * exactly one of each.
+ *
+ * THE VELOCITY POLICY MOVED HERE, and that is a correction rather than a
+ * relocation. It used to sit in the submit path, which meant the QUEUE carried
+ * an already-cooked velocity. But the JU-06A wrapper forcing every note to 100
+ * unless "Keyboard Velocity SW" is on is a property of THIS INSTRUMENT, not of
+ * a keybed. The boundary now carries what was PLAYED and the instrument
+ * decides what to do with it -- which is also what lets the same header serve
+ * the JX-3P, whose wrapper has different manners.
+ *
+ * It is still decided in ONE place, which was the original reason it was
+ * hoisted out of the two parsers (docs/ASSIGNER_MODE_FINDING.md).
+ *
+ * THE CAP. eb_alloc emits up to EB_ALLOC_MAX_EV (40) events per note into one
+ * shared buffer, and the burst applies the buffer as a unit. So this drains
+ * notes only while the buffer provably has room for another worst case. That
+ * is rule 2 -- a fixed budget of work per block, more blocks when there is
+ * more to do -- and the surplus stays queued IN ORDER for the next block.
+ *
+ * WHY NOT ONE NOTE PER BLOCK, which would also be safe: a chord is several
+ * note-ons in the same millisecond, and one per 5.8 ms block would spread a
+ * six-note chord over 35 ms. That is audible as an arpeggio. */
+#define EV_DRAIN_MAX 8          /* events examined per block; see the cap note */
+
+static unsigned long ev_param_unhandled = 0;
+
+static int ev_apply(void)
 {
-    int n;
-    ++notes_seen;
-    /* The wrapper's own policy, applied HERE and not in the engine, exactly as
-     * the port layers it (juno_gui_midi_note_on vs juno_gui_note_on). */
-    if (on && vel == 0) { on = 0; }
+    juno_event ev[EV_DRAIN_MAX];
+    int got, i, nev = 0;
+
+    /* Room for ONE worst-case note must exist before the first is taken, or
+     * the drain would have to put an event back -- and a queue you can push
+     * back into is not a queue with one consumer. */
+    if (note_pending) return 0;      /* a burst is still in flight */
+    got = juno_event_drain(ev, EV_DRAIN_MAX);
+    if (got <= 0) return 0;
+
+    for (i = 0; i < got; ++i) {
+        int n, vel;
+        if (ev[i].kind == JUNO_EV_PARAM) {
+            /* O3 (was C9) owns this. Until it lands the event is COUNTED and
+             * reported rather than quietly consumed -- a boundary that accepts
+             * a parameter and does nothing is a knob that is not a knob
+             * (playbook 32), and the count is what makes the gap visible. */
+            ++ev_param_unhandled;
+            continue;
+        }
+        /* STOP BEFORE THE BUFFER CAN OVERFLOW, not after. eb_alloc may write
+         * up to EB_ALLOC_MAX_EV for the next note alone. */
+        if (nev + EB_ALLOC_MAX_EV > (int)(sizeof ALLOC_EV / sizeof ALLOC_EV[0]))
+            break;
+
+        ++notes_seen;
+        vel = ev[i].b;
 #if !S3L_MIDI_VELSW
-    vel = on ? 100 : 64;
+        vel = (ev[i].kind == JUNO_EV_NOTE_ON) ? 100 : 64;
 #endif
-    /* One burst may be in flight. A second key inside 5.8 ms is queued by the
-     * ALLOCATOR (its state advances) but its EVENTS would overwrite the
-     * pending set -- so it is counted and dropped rather than silently lost.
-     * A real queue is owed; the counter makes the need measurable instead of
-     * theoretical. */
-    if (note_pending) { ++notes_dropped;
-        health_fail("a note was DROPPED rather than delayed"); return; }
-    n = on ? eb_alloc_note_on(&ALLOC, note, vel, ALLOC_EV)
-           : eb_alloc_note_off(&ALLOC, note, ALLOC_EV);
-    if (n <= 0) return;
-    note_nev = n;
+        n = (ev[i].kind == JUNO_EV_NOTE_ON)
+              ? eb_alloc_note_on(&ALLOC, ev[i].a, vel, ALLOC_EV + nev)
+              : eb_alloc_note_off(&ALLOC, ev[i].a, ALLOC_EV + nev);
+        if (n > 0) nev += n;
+    }
+    if (nev <= 0) return 0;
+    note_nev = nev;
     note_pending = 1;
+    ++ev_applied_blocks;
+    return 1;
 }
+
+/* O1: `s3_midi_event()` IS GONE, and its removal is the point of this step.
+ *
+ * It was the single note entry -- the half of the boundary that already
+ * existed -- and it did two things it should not have. It ALLOCATED VOICES
+ * INLINE from whatever task happened to be parsing, and when a burst was
+ * already pending it DROPPED the note:
+ *
+ *     if (note_pending) { ++notes_dropped;
+ *         health_fail("a note was DROPPED rather than delayed"); return; }
+ *
+ * THE INVARIANT rule 3 says the change ARRIVES LATER. It does not permit
+ * discarding it. Playing two keys inside one 5.8 ms block lost one, on an
+ * instrument whose entire premise is that it never breaks.
+ *
+ * Every parser now calls juno_event_note_on/off directly WITH ITS OWN SOURCE
+ * TAG, so USB and DIN are distinguishable in every counter -- through the shim
+ * they were not. Nothing reaches eb_alloc except ev_apply(), and
+ * tools/engineb/boundary_check.py fails the build if that stops being true. */
 
 static void midi_poll(void)
 {
@@ -935,7 +1011,11 @@ static void midi_poll(void)
         }
         if ((m_status & 0xF0) != 0x90 && (m_status & 0xF0) != 0x80) continue;
         if (!m_have) { m_d1 = c; m_have = 1; continue; }
-        s3_midi_event((m_status & 0xF0) == 0x90, m_d1, c);
+        /* O1: the DIN parser SUBMITS. It no longer decides anything about
+         * velocity -- that is the instrument's business, applied once in
+         * ev_apply -- and it can no longer lose a note to a busy block. */
+        if ((m_status & 0xF0) == 0x90) juno_event_note_on (JUNO_SRC_DIN, m_d1, c);
+        else                           juno_event_note_off(JUNO_SRC_DIN, m_d1);
         m_have = 0;                              /* running status stays armed */
     }
 }
@@ -997,7 +1077,8 @@ static void con_poll(void)
         if (c == ' ') {                 /* panic: release everything */
             int k;
             for (k = 0; k < 128; ++k)
-                if (con_held[k]) { con_held[k] = 0; s3_midi_event(0, k, 64); }
+                if (con_held[k]) { con_held[k] = 0;
+                                   juno_event_note_off(JUNO_SRC_CONSOLE, k); }
             continue;
         }
         if (c == 'z') { if (con_base >= 24) con_base -= 12; continue; }
@@ -1045,8 +1126,10 @@ static void con_poll(void)
         note = con_base + CON_KEY[c];
         if (note < 0 || note > 127) continue;
         ++con_keys;
-        if (con_held[note]) { con_held[note] = 0; s3_midi_event(0, note, 64); }
-        else                { con_held[note] = 1; s3_midi_event(1, note, 100); }
+        if (con_held[note]) { con_held[note] = 0;
+                              juno_event_note_off(JUNO_SRC_CONSOLE, note); }
+        else                { con_held[note] = 1;
+                              juno_event_note_on(JUNO_SRC_CONSOLE, note, 100); }
     }
 }
 
@@ -1769,7 +1852,17 @@ static void render_block(int n)
      * because a patch change already re-issues the chord -- running both in
      * one block would apply note events to coefficients that are about to be
      * replaced. */
-    else if (note_pending && !dev_muted) {
+    /* O1: TAKE EVENTS OFF THE QUEUE, HERE AND NOWHERE ELSE.
+     *
+     * Off the per-sample path and inside the same block-boundary section that
+     * already owns the burst, so the events this drains are applied by the
+     * burst below in the very same block. `else if` on the patch change for
+     * the reason stated there: a program change re-issues the chord, and
+     * applying note events to coefficients about to be replaced is wasted work
+     * at best. Those events stay QUEUED and land next block -- late, not
+     * lost, which is now true of the whole input path and not just this one
+     * branch. */
+    else if (!dev_muted && (ev_apply(), note_pending)) {
         if (dev_note_burst()) {
             dev_muted = 1;
             printf("MUTE: %s.\n", dev_mute_why);
@@ -1915,6 +2008,19 @@ static void rpt_task(void *arg)
          * hn is health_n, which nothing printed before. */
         printf("B4: ovr=%lu/%lu hn=%lu\n",
                rpt_ovr_late, rpt_ovr_miss, rpt_health_n);
+        /* O1: the boundary's own numbers. Rule 4 -- every refusal and every
+         * deferral is COUNTED and reported; a system that copes quietly cannot
+         * be proven to cope. `ref` MUST read 0: it is the only one of these
+         * that is a fault. `dep`/`hi` are the queue's depth now and ever, and
+         * a rising high-water mark is the early warning that the consumer is
+         * falling behind. `par` counts parameter events accepted by the
+         * boundary that O3 does not yet apply. */
+        {   juno_event_stats es;
+            juno_event_get_stats(&es);
+            printf("EVQ: sub=%lu ref=%lu del=%lu dep=%d hi=%lu par=%lu\n",
+                   es.submitted, es.refused, es.delivered,
+                   juno_event_depth(), es.depth_max, ev_param_unhandled);
+        }
 #if S3L_FXPROF
         /* fx = core 1's master/FX pass, v1 = core 1's own voice pass
          * (INCLUDING the time it waits on core 0). Per sample, averaged over

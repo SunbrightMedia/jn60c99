@@ -39,7 +39,10 @@
 /* The instrument's own note entry. Defined in juno_s3_listen.c; the UART MIDI
  * parser calls the same function, so the two inputs cannot diverge in their
  * velocity policy or their allocator handling. */
-void s3_midi_event(int on, int note, int vel);
+/* O1: this parser SUBMITS to the one boundary, with its own source tag.
+ * It used to call a shim in juno_s3_listen.c, which meant the USB source
+ * was indistinguishable from the DIN source in every counter. */
+#include "juno_event.h"
 
 /* Counted so the board can say whether the host ever talked to it. A device
  * that enumerates and sends nothing looks identical to a dead cable. */
@@ -162,14 +165,14 @@ static void usbmidi_task(void *arg)
          * The CIN nibble already tells us note-on from note-off, but the
          * STATUS byte is used instead so that this path and the UART path
          * decide the same way. A note-on with velocity 0 is a note-off, and
-         * s3_midi_event applies that rule for both. */
+         * juno_event_note_on applies that rule for every source at once. */
         while (tud_midi_available()) {
             uint8_t p[4];
             if (tud_midi_packet_read(p) != true) break;
             ++usbmidi_pkts;
             {   uint8_t st = p[1] & 0xF0u;
-                if (st == 0x90u)      s3_midi_event(1, p[2], p[3]);
-                else if (st == 0x80u) s3_midi_event(0, p[2], p[3]);
+                if (st == 0x90u)      juno_event_note_on (JUNO_SRC_USB, p[2], p[3]);
+                else if (st == 0x80u) juno_event_note_off(JUNO_SRC_USB, p[2]);
             }
         }
     }
