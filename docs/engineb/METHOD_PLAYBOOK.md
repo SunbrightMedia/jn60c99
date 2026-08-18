@@ -701,3 +701,37 @@ detail" -- it is the measurement. Print the parts, not the sum. And a comment
 that justifies a design by a runtime relationship (who waits for whom) names a
 condition that can expire: re-measure it whenever the configuration it assumed
 changes.
+
+## 57. The accumulator that was declared and never written
+MEASURED 2026-08-18 (b6_split_sweep.md). `fxp_wait` was declared beside two
+accumulators that WERE written, was zeroed in the same statement as them, and
+was never incremented anywhere. It compiled clean: it is written (to 0) and
+read (into the reset), so no unused-variable warning fires. Had it reached a
+print it would have shown a confident, stable 0 -- and 0 is exactly the value
+the hypothesis wanted, so it would have been believed.
+
+THE SHAPE is 55's cousin and the project's recurring one: a thing that looks
+like a measurement, reports success, and selects nothing. Here the giveaway
+was not the compiler but a REVIEWER ASKING WHAT WROTE IT.
+
+THE CURE: a counter must be read at BOTH ENDS OF ITS RANGE before it is
+quoted. `wait` read 5 at the shipping split and 1,399-3,307 after the split
+moved -- one run, one stimulus, both ends seen. Prefer a live stimulus already
+in the run (patch stepping, a config knob) over a tooth build: it costs no
+flash and it exercises the real path.
+
+## 58. The pool that is real and not reachable
+Same run. The load-balance finding priced the recoverable idle time at
+~1,350/~2,020 cycles by comparing the measured block against a PERFECT split
+of the total work. Both halves of that were true. The conclusion still did not
+follow, because the FX chain is INDIVISIBLE at block granularity: the only
+moves available were whole voices, and the two reachable configurations are
+    split 7: fx + 2,590        split 8: 5,610
+neither of which is the balanced ideal. Split 8 bought 900 cycles on the four
+patches that needed it and lost 600 on the other sixty -- measured, and the
+opposite of the headline.
+
+THE CURE: when costing a rebalance, price the MOVES YOU CAN ACTUALLY MAKE, not
+the partition function's optimum. State the granularity of the smallest movable
+unit in the same sentence as the pool. An unreachable optimum is a useful
+bound and a misleading plan.

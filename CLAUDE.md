@@ -78,16 +78,19 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
 # LIVE STATE (2026-08-13 — update in place, no dated blocks here, EVER)
 - 12-bank user parity vs src/: recall 768/768 PASS. Render re-running after
   the arp-list fix; prior 111 fails are UNATTRIBUTED until it lands.
-- Fork on silicon (2026-08-18, b5_fx_attribution.md): fresh devcrc.h key -->
-  CRC MATCH all patches, mute gone. Non-delay 5,069-5,682 of 5,442; patches
-  5/16/21/49 read 6,526-6,821. LOCATED: cyc = fx + v1 within +-140 -- core 1
-  runs the FX then its voice with ZERO overlap, so core 0 spins ~half of every
-  block. Delta is all in fx (2,4xx-2,9xx vs 3,9xx-4,1xx). RINGS ARE NOT THE
-  LEVER (moving-tap PSRAM 29.9 cyc/tap, not the scattered row's 229.5); the
-  b4_second_run ring attribution is WITHDRAWN. Lever = LOAD BALANCE, worth
-  ~1,350 (non-delay) / ~2,020 (delay) -- more than the overrun. Burst ~2.1 M,
-  misses 1-4 blocks per patch step (C10 binding). ovr_late/drift timer
-  anomaly still open (b4_first_run.md §5).
+- Fork on silicon (2026-08-18, b6_split_sweep.md): CRC MATCH all patches (key
+  regenerated). SPLIT 7 (shipping, KEEP IT): non-delay 5,112-5,389 UNDER 5,442,
+  patches 5/16/21/49 6,526-6,821 OVER. wait=5 cyc PROVEN --> core 1 is the
+  bottleneck, core 0 spins. SPLIT 8 (2 voices core 0, FX alone core 1): delay
+  5,801-5,910, non-delay 5,735-5,881 -- buys 900 on delay, costs 600 elsewhere,
+  compliant on NOTHING. Bound: core 0's 2-voice pass = 5,522-5,706 flat, i.e.
+  ~2,805/voice, so 2 voices alone spend the budget. RINGS ARE NOT THE LEVER
+  (moving-tap 30.0 cyc/tap vs scattered 229; b4_second_run attribution
+  WITHDRAWN). Moving whole voices CANNOT close it; the balanced ideal
+  (5,610+fx)/2 = 4,105/4,830 needs the MASTER CHAIN SPLIT ACROSS CORES, cost
+  one block (5.8 ms) of latency. That is the next design step. Burst ~2.1 M,
+  misses 1-4 blocks per patch step (C10 binding). ovr_late/drift timer anomaly
+  still open (b4_first_run.md §5).
 - Next per FINAL_GUIDE: C11 event API → C10 chunked recall → C9 per-param
   refresh; B3/B4 worst-case; D link (zero code); random full-state gate owed.
 
