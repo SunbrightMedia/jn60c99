@@ -56,9 +56,12 @@ tooth 3 "$SRC" \
 
 # 4. The cursor stops one step early: every symptom of 3, plus a step count
 #    that no longer matches what the firmware budgets blocks against.
+# RETARGETED when chunk_step was rewritten for O2b. The old plant edited a line
+# that no longer exists, and the guard caught that rather than passing a tooth
+# that changed nothing -- which is the whole reason the guard is there.
 tooth 4 "$SRC" \
-  's/if (st > EB_RECALL_CHUNK_STEPS) { r->chunk_step = 0; return 0; }/if (st >= EB_RECALL_CHUNK_STEPS) { r->chunk_step = 0; return 0; }/' \
-  'the cursor terminates one step early'
+  's/    if (r->chunk_tail \&\& st <= EB_RECALL_CHUNK_STEPS) {/    if (r->chunk_tail \&\& st < EB_RECALL_CHUNK_STEPS) {/' \
+  'the cursor terminates one step early (the master set is never built)'
 
 # 5. The extraction itself regresses: the monolith stops calling the tail it
 #    used to inline. Catches a bad merge of the eb_coefs.c split.
@@ -66,7 +69,31 @@ tooth 5 "$COEF" \
   's/^    eb_render_coefs_build_shared(base, c);$/    (void)0;/' \
   'the MONOLITH loses the shared tail (a bad merge of the split)'
 
+# ---- O2b: the NOTE build ------------------------------------------------
+# 6. a note build that also runs the master set: 130,000 cycles nobody
+#    budgeted, and invisible in a byte compare because the values are right.
+tooth 6 "$SRC" \
+  's/    r->chunk_tail = 0;             \/\* a note moves no FX and no master cell \*\//    r->chunk_tail = 1;/' \
+  'a NOTE build also builds the shared tail and master set'
+
+# 7. the shadow copy skipped: every voice the note did NOT name keeps whatever
+#    was in the shadow -- the patch from two changes ago.
+# ⚠ SCOPED TO THE CHUNKED FUNCTION. The unscoped version of this plant deleted
+# the identical line from eb_recall_build_voices TOO -- so both sides of the
+# comparison lost the copy, agreed with each other, and the gate passed. A
+# plant that breaks the reference as well as the subject proves nothing, and it
+# looks exactly like a blind gate. Range-address the function.
+tooth 7 "$SRC" \
+  '/eb_recall_chunk_begin_voices/,/^}/ s/    \*r->rc\[shadow\] = \*r->rc\[r->cur\];//' \
+  'the note build skips the shadow copy'
+
+# 8. the cursor spends an extra block discovering it is finished -- the exact
+#    defect the step count caught on the first draft.
+tooth 8 "$SRC" \
+  's/    if (st <= EB_NUM_VOICES) { r->chunk_step = st; return 1; }/    if (st <= EB_NUM_VOICES + 1) { r->chunk_step = st; return 1; }/' \
+  'the note cursor burns an extra block per build'
+
 restore
 echo
 python3 "$HERE/chunk_gate.py"
-echo "CHUNK TEETH: five caught, clean tree green."
+echo "CHUNK TEETH: eight caught, clean tree green."

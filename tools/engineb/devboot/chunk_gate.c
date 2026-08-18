@@ -204,6 +204,82 @@ int main(int argc, char **argv)
         }
     }
 
+    /* ================= O2b: THE NOTE BUILD, EVERY MASK ==================
+     * eb_recall_build_voices is what a key press used to call in one lump.
+     * The chunked note path must produce the SAME shadow for the SAME mask --
+     * over all 256 masks, not the two or three a chord happens to produce,
+     * because the allocator's mask is its business and this gate must not
+     * assume which bits it sets.
+     *
+     * It also checks the STEP COUNT: popcount(mask) + 0, because a note owes
+     * no shared tail and no master set. A note build that quietly ran the
+     * master build would cost 130,000 cycles nobody budgeted. */
+    {
+        unsigned mask;
+        int nmask_bad = 0;
+        /* one patch is enough here: the question is whether the chunked note
+         * path equals the monolithic one, and that is mask arithmetic, not
+         * patch arithmetic. Patch 5 chosen because it is a DELAY TYPE 5 -- the
+         * class whose blocks have the least slack. */
+        ebdev_reset_counters();
+        if (eb_devseq_boot_cells(boot, nv)) return 2;
+        if (eb_devseq_install(BANKBUF, tpl, (size_t)tpln,
+                              bank64 + (size_t)5 * EB_PATCH_BYTES)) return 2;
+        eb_devseq_recall(BANKBUF, 128.0f);
+        eb_devseq_notes_on(DEVCHORD_VOICE, DEVCHORD_NOTE, DEVCHORD_VEL,
+                           DEVCHORD_N);
+
+        for (mask = 0u; mask < (1u << EB_NUM_VOICES); ++mask) {
+            int nstep = 0, want = 0, v;
+            for (v = 0; v < EB_NUM_VOICES; ++v)
+                if (mask & (1u << v)) ++want;
+
+            /* the live bank must differ from the shadow, or a path that
+             * copies and does nothing would pass. Poison the shadow. */
+            memset(&RC_B, 0x5A, sizeof RC_B);
+            memset(&MC_B, 0x5A, sizeof MC_B);
+            memset(&RC_REF, 0x5A, sizeof RC_REF);
+            memset(&MC_REF, 0x5A, sizeof MC_REF);
+
+            /* A: the monolith. REC.cur is 0 so the shadow is bank 1 = RC_B. */
+            eb_recall_build_voices(&REC, mask);
+            RC_REF = RC_B; MC_REF = MC_B;
+
+            /* B: the chunked path, from the same starting shadow. */
+            memset(&RC_B, 0x5A, sizeof RC_B);
+            memset(&MC_B, 0x5A, sizeof MC_B);
+            eb_recall_chunk_begin_voices(&REC, mask);
+            if (eb_recall_chunk_steps(&REC) != want) {
+                printf("  *** mask %02x: chunk_steps()=%d, expected %d\n",
+                       mask, eb_recall_chunk_steps(&REC), want);
+                ++bad;
+            }
+            while (eb_recall_chunk_step(&REC)) {
+                if (++nstep > EB_NUM_VOICES * 4) {
+                    printf("  *** mask %02x: cursor does not terminate\n", mask);
+                    return 1;
+                }
+            }
+            if (eb_recall_chunk_busy(&REC)) {
+                printf("  *** mask %02x: still busy after the last step\n", mask);
+                ++bad;
+            }
+            /* steps that RETURNED non-zero is want-1 for a non-empty mask
+             * (the last one returns 0), and 0 for an empty mask. */
+            if (nstep != (want ? want - 1 : 0)) {
+                printf("  *** mask %02x: %d steps ran, expected %d\n",
+                       mask, nstep, want ? want - 1 : 0);
+                ++nmask_bad; ++bad;
+            }
+            if (diff(&RC_REF, &RC_B, sizeof RC_REF, "note render coefs",
+                     (int)mask)) ++bad;
+            if (diff(&MC_REF, &MC_B, sizeof MC_REF, "note master coefs",
+                     (int)mask)) ++bad;
+        }
+        printf("256 masks, chunked note build vs eb_recall_build_voices: %s\n",
+               (bad == 0 && nmask_bad == 0) ? "identical" : "DIFFERS");
+    }
+
     printf("64 patches, both paths, %u + %u bytes each\n",
            (unsigned)sizeof(eb_render_coefs), (unsigned)sizeof(eb_master_coef));
     printf("CHUNK GATE: %s\n", bad == 0 ? "PASS -- chunked IS monolithic"

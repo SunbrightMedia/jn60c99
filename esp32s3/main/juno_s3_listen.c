@@ -469,7 +469,8 @@ static unsigned long burst_restarts = 0;/* a new request arrived mid-build   */
 /* Set by dev_burst_step(), read and cleared at the deadline check, so a miss
  * can be attributed to the burst or to the steady state. Written and read by
  * core 0 only, in the same block. */
-static volatile int  burst_ran_this_block = 0;   /* 0 none, else the STEP ID
+static volatile int  burst_ran_this_block = 0;
+static volatile int  note_ran_this_block = 0;   /* 0 none, else the STEP ID
                                   * -- so a miss can name WHICH step overran
                                   * (b7: burst=17 and no attribution). */
 static int           dev_patch = 0;     /* which patch the bank is on       */
@@ -1076,41 +1077,97 @@ static void dev_request(int patch, int gate)
 
 /* THE NOTE BURST. Same shape as dev_burst() minus the cold reseed and the bank
  * apply: the cell array is already this patch's and must stay that way. */
-static int dev_note_burst(void)
+/* ================= O2b: THE NOTE BURST, ALSO ONE STEP PER BLOCK ==========
+ *
+ * MEASURED (b8_robot_attribution.md): this was 1.06-1.27 M cycles in ONE
+ * block -- 4.4-5.3 ms of a 5.8 ms period, 1.6x core 0's entire slack, and
+ * 7.9x the ~135,000 FINAL_GUIDE C4 planned for it. O2 chunked the PATCH burst
+ * and left this whole, which made a key press the largest single-block cost
+ * in the firmware. THE INVARIANT rule 2 names note bursts explicitly, so O2
+ * was half done.
+ *
+ * THREE STATES, and the coefficient one is now popcount(mask) blocks rather
+ * than one:
+ *   NB_EVENTS  apply the allocator's events through the port's note path,
+ *              then open the chunked voice build
+ *   NB_VOICES  one voice per block
+ *   NB_CHECK   the unmapped-cell check, which must see the WHOLE build
+ *
+ * `nb` IS NOW SPLIT the way BURST: already is -- ev= for the event apply,
+ * vb= for the voice build, nv= for how many voices the allocator named. The
+ * 135,000 figure was a PLAN NUMBER that nobody had measured; splitting it is
+ * how the next session learns why it is 7.9x rather than guessing. If nv reads
+ * 8 when a two-note chord is playing, that is a DEFECT to fix and not work to
+ * spread -- which is exactly why the count is printed. */
+enum { NB_IDLE = 0, NB_EVENTS, NB_VOICES, NB_CHECK };
+static int           nbst = NB_IDLE;
+static unsigned long nb_ev = 0, nb_vb = 0, nb_nvoice = 0, nb_steps = 0;
+static unsigned long nb_miss0 = 0;
+
+static int dev_note_step(void)
 {
-    unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count(), dt;
-    unsigned long miss0 = EBDEV_S.miss;
+    unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count();
+    int rc_step = 1;
 
-    if (eb_devseq_events(ALLOC_EV, note_nev) != note_nev) {
-        dev_mute_why = "the allocator emitted an event the device cannot apply";
-        return 1;
-    }
-    /* THE INCREMENTAL BURST. A patch change moves every voice and the master
-     * chain; a key press moves the voices the allocator just named and nothing
-     * else. MEASURED on silicon: the full burst is 1,992,935 cycles, of which
-     * the voice build is 1,082,812 and the master build 121,213 -- so a note
-     * paying the full price stalls the audio loop for 8 ms and clicks.
-     *
-     * The mask is the applier's, not this file's. Proven bit-identical to the
-     * full build by tools/engineb/devrecall/gate.c, with two teeth: a wrong
-     * mask and an empty mask both have to differ, and both were seen to. */
-    eb_recall_build_voices(&REC, EB_DEVSEQ_TOUCHED);
-    dt = (unsigned long)esp_cpu_get_cycle_count() - t0;
-    nb_last = dt;
-    if (dt < nb_min) nb_min = dt;
-    if (dt > nb_max) nb_max = dt;
-    ++note_bursts;
+    /* A NOTE STEP IS BURST WORK TOO. Without this, a miss caused by a note
+     * build was attributed to `quiet` -- i.e. to O4 -- which is how b8 nearly
+     * sent the next session hunting the delay arm for a note-path cost. */
+    note_ran_this_block = 1;
 
-    if (EBDEV_S.miss != miss0) {
-        printf("NOTE: *** %lu UNMAPPED CELL ACCESSES applying note events "
-               "(last offset %lu). A note wrote into a SINK -- that is "
-               "DEVICE_RECALL.md defect 2 and the voice is silent. ***\n",
-               EBDEV_S.miss - miss0, EBDEV_S.lastmiss);
-        dev_mute_why = "a note event hit an unmapped cell";
-        health_fail("a note wrote into an unmapped cell");
-        return 1;
+    switch (nbst) {
+    case NB_IDLE:
+        nb_miss0 = EBDEV_S.miss;
+        nbst = NB_EVENTS;
+        /* fall through: the first call does the event apply */
+        /* FALLTHRU */
+    case NB_EVENTS:
+        if (eb_devseq_events(ALLOC_EV, note_nev) != note_nev) {
+            dev_mute_why = "the allocator emitted an event the device cannot apply";
+            nbst = NB_IDLE;
+            return -1;
+        }
+        nb_ev = (unsigned long)esp_cpu_get_cycle_count() - t0;
+        /* THE MASK IS THE APPLIER'S, not this file's. Proven bit-identical to
+         * the full build by tools/engineb/devrecall/gate.c, and the chunked
+         * path proven identical to eb_recall_build_voices over ALL 256 masks
+         * by tools/engineb/chunk_gate.py, with three teeth. */
+        eb_recall_chunk_begin_voices(&REC, EB_DEVSEQ_TOUCHED);
+        {   unsigned m = (unsigned)EB_DEVSEQ_TOUCHED, n = 0;
+            while (m) { n += m & 1u; m >>= 1; }
+            nb_nvoice = n;
+            nb_steps  = (unsigned long)eb_recall_chunk_steps(&REC);
+        }
+        nb_vb = 0;
+        nbst = eb_recall_chunk_busy(&REC) ? NB_VOICES : NB_CHECK;
+        break;
+
+    case NB_VOICES:
+        if (!eb_recall_chunk_step(&REC)) nbst = NB_CHECK;
+        nb_vb += (unsigned long)esp_cpu_get_cycle_count() - t0;
+        break;
+
+    case NB_CHECK:
+        nbst = NB_IDLE;
+        ++note_bursts;
+        nb_last = nb_ev + nb_vb;
+        if (nb_last < nb_min) nb_min = nb_last;
+        if (nb_last > nb_max) nb_max = nb_last;
+        /* THE CHECK MUST SEE THE WHOLE BUILD, which is why it is its own
+         * state rather than folded into the last voice: a cell that missed
+         * during voice 5 must still be caught after voice 7. */
+        if (EBDEV_S.miss != nb_miss0) {
+            printf("NOTE: *** %lu UNMAPPED CELL ACCESSES applying note events "
+                   "(last offset %lu). A note wrote into a SINK -- that is "
+                   "DEVICE_RECALL.md defect 2 and the voice is silent. ***\n",
+                   EBDEV_S.miss - nb_miss0, EBDEV_S.lastmiss);
+            dev_mute_why = "a note event hit an unmapped cell";
+            health_fail("a note wrote into an unmapped cell");
+            return -1;
+        }
+        rc_step = 0;
+        break;
     }
-    return 0;
+    return rc_step;
 }
 
 #if S3L_MIDI
@@ -2120,13 +2177,21 @@ static void render_block(int n)
      * a time, so notes wait while a patch build is in flight -- and because O1
      * queued them they wait rather than vanish. That composition is why O1 had
      * to come first. */
-    else if (!dev_muted && burst_state == BST_IDLE
-             && (ev_apply(), note_pending)) {
-        if (dev_note_burst()) {
-            dev_muted = 1;
-            printf("MUTE: %s.\n", dev_mute_why);
+    else if (!dev_muted && burst_state == BST_IDLE) {
+        /* O2b: A NOTE IS NOW A SEQUENCE OF BLOCKS TOO. ev_apply only draws
+         * from the queue when no note build is in flight, so the shadow keeps
+         * exactly one owner; the events it does not take stay QUEUED and
+         * arrive next block -- late, not lost. */
+        if (!note_pending) ev_apply();
+        if (note_pending) {
+            int st = dev_note_step();
+            if (st < 0) {
+                dev_muted = 1;
+                printf("MUTE: %s.\n", dev_mute_why);
+            } else if (st == 0) {
+                dev_pending = 1;   /* the publish below moves it into the audio */
+            }
         }
-        dev_pending = 1;        /* the publish below moves it into the audio */
     }
 #endif
     {   /* CORE 0'S BARRIER SPIN, TIMED. Two CCOUNT reads per BLOCK, never per
@@ -2246,6 +2311,7 @@ static volatile long          rpt_drift = 0;
  *               the invariant broken whatever it sounded like. */
 static volatile unsigned long rpt_ovr_late = 0, rpt_ovr_miss = 0;
 static volatile unsigned long rpt_miss_burst = 0, rpt_miss_quiet = 0;
+static volatile unsigned long rpt_miss_note = 0;
 static volatile unsigned long rpt_miss_step[BST_CHECK + 1];
 static volatile unsigned long rpt_health_n = 0;
 
@@ -2273,7 +2339,8 @@ static void rpt_task(void *arg)
          * burst step overran. quiet= belongs to O4 (delay patches over budget)
          * and to the open timer anomaly, and is printed beside it so the two
          * can never be confused for one another. */
-        printf("B4: miss burst=%lu quiet=%lu\n", rpt_miss_burst, rpt_miss_quiet);
+        printf("B4: miss burst=%lu note=%lu quiet=%lu\n",
+               rpt_miss_burst, rpt_miss_note, rpt_miss_quiet);
         /* WHICH STEP overran: reseed/install/recall/notes/coefs/check. b7
          * measured burst=17 with no attribution; this is the attribution. */
         printf("O2m: rs=%lu in=%lu rc=%lu nt=%lu cf=%lu ck=%lu\n",
@@ -2294,6 +2361,13 @@ static void rpt_task(void *arg)
          * only means the knob moved faster than a change settles. */
         printf("O2: blk=%lu mx=%lu rst=%lu cyc=%lu\n",
                burst_blocks, burst_blocks_max, burst_restarts, b_last);
+        /* O2b: the note burst, SPLIT. ev= the event apply, vb= the chunked
+         * voice build, nv= how many voices the allocator named, st= steps
+         * committed. The 1.06 M lump b8 measured is now these parts, so the
+         * next question ("why 7.9x the plan?") is answered by reading rather
+         * than by guessing. nv=8 on a two-note chord would be a DEFECT. */
+        printf("NB: ev=%lu vb=%lu nv=%lu st=%lu tot=%lu\n",
+               nb_ev, nb_vb, nb_nvoice, nb_steps, nb_last);
         {   juno_event_stats es;
             juno_event_get_stats(&es);
             /* torn= is the only runtime witness to the publish barrier being
@@ -2400,7 +2474,7 @@ void app_main(void)
     unsigned long gap_max = 0, gap_tag = 0, gap_at = 0;
     /* CUMULATIVE by design -- never cleared in the per-second snapshot. */
     unsigned long ovr_late = 0, ovr_miss = 0;
-    unsigned long ovr_miss_burst = 0, ovr_miss_quiet = 0;
+    unsigned long ovr_miss_burst = 0, ovr_miss_quiet = 0, ovr_miss_note = 0;
     unsigned long miss_step[BST_CHECK + 1];
     memset((void *)miss_step, 0, sizeof miss_step);
     int64_t       t_prev_ok = 0;
@@ -2986,11 +3060,14 @@ void app_main(void)
                     ++ovr_miss_burst;
                     ++miss_step[burst_ran_this_block <= BST_CHECK
                                 ? burst_ran_this_block : 0];
+                } else if (note_ran_this_block) {
+                    ++ovr_miss_note;
                 } else ++ovr_miss_quiet;
                 health_fail("a block missed its deadline");
             }
         }
         burst_ran_this_block = 0;
+        note_ran_this_block = 0;
         t_prev_ok = t0;
 #if S3L_SWEEP
         /* THE COST SWEEP overrides the chord with 0, 1 and 2 voices to get a
@@ -3291,6 +3368,7 @@ void app_main(void)
                 rpt_ovr_late  = ovr_late;
                 rpt_miss_burst = ovr_miss_burst;
                 rpt_miss_quiet = ovr_miss_quiet;
+                rpt_miss_note  = ovr_miss_note;
                 memcpy((void *)rpt_miss_step, (const void *)miss_step,
                        sizeof miss_step);
                 /* rule 4 latches that should always have existed: a refused

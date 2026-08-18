@@ -41,6 +41,8 @@ void eb_recall_init(eb_recall *r,
     r->cur = 0;
     r->route_last = -1;
     r->chunk_step = 0;
+    r->chunk_mask = 0u;
+    r->chunk_tail = 0;
     EB_RC = rc0;
     EB_MC = mc0;
 }
@@ -127,7 +129,38 @@ void eb_recall_chunk_begin(eb_recall *r)
      * caller that begins a build and is then interrupted must leave a shadow
      * that is definitely stale-and-zeroed rather than half of two patches. */
     memset(r->rc[shadow], 0, sizeof *r->rc[shadow]);
+    r->chunk_mask = (1u << EB_NUM_VOICES) - 1u;   /* a patch moves them all */
+    r->chunk_tail = 1;                            /* ...and the tail+master */
     r->chunk_step = 1;
+}
+
+void eb_recall_chunk_begin_voices(eb_recall *r, unsigned mask)
+{
+    const int shadow = 1 - r->cur;
+    r->chunk_mask = mask & ((1u << EB_NUM_VOICES) - 1u);
+    r->chunk_tail = 0;             /* a note moves no FX and no master cell */
+    /* AN EMPTY MASK TOUCHES NOTHING, INCLUDING THE COPY. eb_recall_build_voices
+     * returns before its copy for mask 0, so a chunked path that copied anyway
+     * would differ from the monolith on that one input -- which the gate saw
+     * and refused. Matching it exactly is also the safer behaviour: no voices
+     * changed, so the shadow has no business being disturbed. */
+    if (r->chunk_mask == 0u) { r->chunk_step = 0; return; }
+    /* THE COPY IS STEP 0 AND MUST BE, for the same reason the memset is: every
+     * later step writes into this shadow, so a build interrupted after the
+     * copy holds the CURRENT patch's coefficients -- correct, merely stale --
+     * rather than a mixture. This is the same copy eb_recall_build_voices
+     * makes; it has simply stopped sharing a block with eight voice builds. */
+    *r->rc[shadow] = *r->rc[r->cur];
+    *r->mc[shadow] = *r->mc[r->cur];
+    r->chunk_step = 1;
+}
+
+int eb_recall_chunk_steps(const eb_recall *r)
+{
+    int n = 0, v;
+    for (v = 0; v < EB_NUM_VOICES; ++v)
+        if (r->chunk_mask & (1u << v)) ++n;
+    return n + (r->chunk_tail ? 2 : 0);        /* + shared tail + master */
 }
 
 int eb_recall_chunk_busy(const eb_recall *r)
@@ -142,6 +175,13 @@ int eb_recall_chunk_step(eb_recall *r)
 
     if (st == 0) return 0;                    /* nothing in progress */
 
+    /* SKIP THE VOICES THIS BUILD DOES NOT OWE, without spending a block on
+     * each. A note names two or three voices; walking the cursor past the
+     * others costs a few compares, while returning 1 for each would spend a
+     * whole 5.8 ms block doing nothing. The skip is bounded by EB_NUM_VOICES,
+     * so the step stays O(1). */
+    while (st <= EB_NUM_VOICES && !(r->chunk_mask & (1u << (st - 1)))) ++st;
+
     if (st <= EB_NUM_VOICES) {
         /* one voice. The most expensive single step, and the reason the step
          * granularity is a voice and not "the voice build": MEASURED at about
@@ -149,7 +189,15 @@ int eb_recall_chunk_step(eb_recall *r)
         EB_RECALL_T0();
         eb_coefs_voice((const unsigned char *)0, r->rc[shadow], st - 1);
         EB_RECALL_T1(eb_recall_t_rc);
+    } else if (!r->chunk_tail) {
+        /* an empty mask: begin_voices already set chunk_step = 0, so this is
+         * only reachable by a caller that hand-set the cursor. Finish. */
+        r->chunk_step = 0;
+        return 0;
     } else if (st == EB_NUM_VOICES + 1) {
+        /* A NOTE BUILD NEVER REACHES HERE. It owes no shared tail and no
+         * master set: a note moves per-voice cells only, and the shadow copy
+         * carries the current FX and master values forward. */
         eb_render_coefs_build_shared((const unsigned char *)0, r->rc[shadow]);
     } else {
         EB_RECALL_T0();
@@ -157,10 +205,21 @@ int eb_recall_chunk_step(eb_recall *r)
         EB_RECALL_T1(eb_recall_t_mc);
     }
 
+    /* ⚑ RETURN 0 ON THE CALL THAT DID THE LAST PIECE OF WORK, not on a later
+     * one that finds nothing to do. The first version returned 1 after the
+     * final voice and 0 from an extra call, which cost a whole 5.8 ms block
+     * per note build to discover it was finished -- a 3-voice note took 4
+     * blocks. The gate caught it by counting steps against popcount(mask),
+     * which is why the count is part of the contract and not a nicety. */
     ++st;
-    if (st > EB_RECALL_CHUNK_STEPS) { r->chunk_step = 0; return 0; }
-    r->chunk_step = st;
-    return 1;
+    while (st <= EB_NUM_VOICES && !(r->chunk_mask & (1u << (st - 1)))) ++st;
+    if (st <= EB_NUM_VOICES) { r->chunk_step = st; return 1; }
+    if (r->chunk_tail && st <= EB_RECALL_CHUNK_STEPS) {
+        r->chunk_step = st;
+        return 1;
+    }
+    r->chunk_step = 0;
+    return 0;
 }
 
 /* ============================================ THE INCREMENTAL BURST (NOTES)

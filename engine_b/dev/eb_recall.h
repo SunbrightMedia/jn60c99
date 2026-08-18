@@ -70,6 +70,11 @@ typedef struct {
      * run. Lives here rather than in a file static so that a second recall
      * context cannot silently share one cursor. */
     int   chunk_step;
+    /* O2b: which voices the chunked build still owes, and whether it owes the
+     * shared tail and the master set. A PATCH build owes all three; a NOTE
+     * build owes only the voices the allocator named. */
+    unsigned chunk_mask;
+    int   chunk_tail;
 } eb_recall;
 
 /* Quiescence. A rule that cannot fail is not a rule: publish ASSERTS this
@@ -115,6 +120,33 @@ void eb_recall_init(eb_recall *r,
 #define EB_RECALL_CHUNK_STEPS (EB_NUM_VOICES + 2)   /* voices + tail + master */
 
 void eb_recall_chunk_begin(eb_recall *r);
+
+/* ===================== O2b: THE NOTE BUILD, ALSO ONE PIECE AT A TIME =====
+ *
+ * WHY THIS EXISTS AND WHY IT IS NOT OPTIONAL. MEASURED on silicon
+ * (b8_robot_attribution.md): a NOTE burst is 1.06-1.27 M cycles -- 4.4-5.3 ms
+ * inside a 5.8 ms block, and 1.6x core 0's entire slack. Every block carrying
+ * one runs late BY CONSTRUCTION, and the FINAL_GUIDE's stated expectation for
+ * it was ~135,000 cycles, so the plan was 7.9x optimistic.
+ *
+ * O2 chunked the PATCH build and left this one whole, which made it the
+ * largest single-block cost in the firmware. THE INVARIANT rule 2 names it
+ * explicitly -- "recall, parameter refresh and NOTE BURSTS get a FIXED budget
+ * of work per block" -- so O2 was only half done.
+ *
+ * A note touches the voices the allocator named, so this is popcount(mask) + 1
+ * steps, not fifteen: the +1 is the shadow copy, which must happen FIRST and
+ * as its own step because every later step writes into what it copied.
+ *
+ * ⚠ IT DOES NOT BUILD THE SHARED TAIL OR THE MASTER SET, and that is not an
+ * omission -- eb_recall_build_voices did not either. A note moves per-voice
+ * cells; the FX configuration and the master chain cannot have changed, and
+ * the shadow copy carries the current ones forward. */
+void eb_recall_chunk_begin_voices(eb_recall *r, unsigned mask);
+
+/* How many steps a begin() just committed to. The firmware budgets blocks
+ * against this rather than counting them afterwards. */
+int  eb_recall_chunk_steps(const eb_recall *r);
 int  eb_recall_chunk_step(eb_recall *r);
 /* Non-zero while a chunked build is part-way through. The caller must not
  * start a note build or a second patch build while this is true -- the shadow
