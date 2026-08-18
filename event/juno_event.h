@@ -131,11 +131,17 @@ typedef struct {
     unsigned long refused;            /* queue was full -- THE fault count */
     unsigned long delivered;          /* handed to the engine by drain     */
     unsigned long depth_max;          /* high-water mark, ever             */
+    unsigned long torn;               /* drained an impossible event -- see
+                                       * JUNO_EVQ_BARRIER. MUST read 0.    */
     unsigned long by_src[JUNO_SRC__N];/* submitted, per source             */
     unsigned long refused_by_src[JUNO_SRC__N];
 } juno_event_stats;
 
 void juno_event_get_stats(juno_event_stats *out);
+#ifdef JUNO_EVQ_TESTABLE
+/* TEST ONLY -- never compiled into a port. See juno_event.c. */
+void juno_event_poke_for_test(int slot, unsigned char kind, unsigned char src);
+#endif
 void juno_event_reset(void);          /* clears the queue AND the counters */
 
 /* ------------------------------------------------------------- the lock -- */
@@ -152,6 +158,39 @@ void juno_event_reset(void);          /* clears the queue AND the counters */
 #ifndef JUNO_EVQ_LOCK
 #define JUNO_EVQ_LOCK()   ((void)0)
 #define JUNO_EVQ_UNLOCK() ((void)0)
+#endif
+
+/* ⚑ THE PUBLISH BARRIER, AND WHY THE LOCK IS NOT ENOUGH.
+ *
+ * A producer writes the four payload bytes and THEN advances the write index.
+ * The index is `volatile`; the payload stores are not. C does not order a
+ * plain store against a volatile one -- a single-threaded observer cannot tell
+ * the difference, so the compiler is free to sink the payload stores past the
+ * index increment. THE CONSUMER TAKES NO LOCK (that is rule 1), so it can see
+ * an index that has moved over bytes that have not been written: a note with
+ * another note's pitch, rarely, and never reproducibly.
+ *
+ * The producer's lock does NOT close this. The index is published INSIDE the
+ * lock, so the unlock barrier comes too late to help a lock-free reader.
+ *
+ * A COMPILER BARRIER IS SUFFICIENT HERE, and the reason is specific to this
+ * chip rather than general: the ESP32-S3 addresses internal SRAM directly with
+ * no data cache in front of it, and its store buffer retires in order, so once
+ * the compiler is forbidden to reorder, the hardware will not either.
+ *
+ * ⚠ THIS ARGUMENT IS INFERRED (READ from the ISA and the memory map), NOT
+ * PROVEN BY EXECUTION. The host gate is single-threaded and CANNOT reach it,
+ * so no tooth in event/teeth.sh covers it. What DOES watch it at runtime is
+ * the drain-side validity check: submit rejects an out-of-range kind or
+ * source, so a drained event carrying one can only be a torn publish, and that
+ * is counted and reported. A port on a chip with a write-back data cache
+ * between the cores needs a REAL barrier here, not this one. */
+#ifndef JUNO_EVQ_BARRIER
+#if defined(__GNUC__) || defined(__clang__)
+#define JUNO_EVQ_BARRIER() __asm__ __volatile__("" ::: "memory")
+#else
+#define JUNO_EVQ_BARRIER() ((void)0)
+#endif
 #endif
 
 /* Queue length. A power of two so the wrap is a mask. 64 events x 4 bytes =

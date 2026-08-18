@@ -64,6 +64,9 @@ static int ev_submit(juno_ev_kind kind, juno_src src, int a, int b)
         Q[wr & QMASK].src  = (unsigned char)src;
         Q[wr & QMASK].a    = (unsigned char)(a & 0xFF);
         Q[wr & QMASK].b    = (unsigned char)(b & 0xFF);
+        /* PAYLOAD FIRST, INDEX SECOND, and the barrier is what makes that
+         * ordering real rather than merely written down. See JUNO_EVQ_BARRIER. */
+        JUNO_EVQ_BARRIER();
         QWR = wr + 1u;
         ++ST.submitted;
         ++ST.by_src[src];
@@ -126,9 +129,24 @@ int juno_event_drain(juno_event *out, int max)
     int n = 0;
     if (!out || max <= 0) return 0;
     wr = QWR;                     /* ONE unlocked read; see the header note */
+    JUNO_EVQ_BARRIER();           /* ...and no payload read may be hoisted
+                                   * above it, which is the same hazard as
+                                   * the producer's, mirrored. */
     rd = QRD;
     while (n < max && rd != wr) {
-        out[n++] = Q[rd & QMASK];
+        juno_event e = Q[rd & QMASK];
+        /* AN IMPOSSIBLE EVENT IS A TORN PUBLISH. ev_submit validates both
+         * fields, so neither can be out of range in a slot that was written
+         * completely. This is the only runtime witness to the barrier being
+         * wrong, and it is why `torn` is in the stats rather than an assert:
+         * the count is the evidence, and 0 is the requirement. */
+        if (e.kind > (unsigned char)JUNO_EV_PARAM ||
+            e.src  >= (unsigned char)JUNO_SRC__N) {
+            ++ST.torn;
+            ++rd;
+            continue;
+        }
+        out[n++] = e;
         ++rd;
     }
     QRD = rd;                     /* single writer, no lock, by construction */
@@ -145,6 +163,18 @@ void juno_event_get_stats(juno_event_stats *out)
 {
     if (out) *out = ST;
 }
+
+#ifdef JUNO_EVQ_TESTABLE
+/* TEST ONLY, and compiled out of the firmware. Writes a slot's kind/src
+ * directly so the torn-publish detector can be shown to work -- a
+ * single-threaded test cannot produce a real race, and a detector nobody has
+ * seen fire is playbook defect 1. */
+void juno_event_poke_for_test(int slot, unsigned char kind, unsigned char src)
+{
+    Q[(unsigned)slot & QMASK].kind = kind;
+    Q[(unsigned)slot & QMASK].src  = src;
+}
+#endif
 
 void juno_event_reset(void)
 {

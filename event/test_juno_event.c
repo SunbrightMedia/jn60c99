@@ -153,6 +153,34 @@ static void t_boundary_rules(void)
         ck(s.by_src[JUNO_SRC_NONE] == 1, "an unknown source folds to NONE"); }
 }
 
+/* ---------------------------------------------------------------------- 7 */
+/* THE TORN-PUBLISH DETECTOR. It cannot be provoked by a race here -- this test
+ * is single-threaded, which is exactly why the barrier argument is labelled
+ * INFERRED in juno_event.h. What CAN be checked is that the detector is not
+ * dead: an impossible event must be counted and dropped rather than handed to
+ * the engine. TOOTH 7 removes the check and this goes red. */
+static void t_torn_detector(void)
+{
+    juno_event ev[8];
+    int n;
+    juno_event_stats s;
+    juno_event_reset();
+    printf("7   the torn-publish detector is alive\n");
+
+    juno_event_note_on(JUNO_SRC_DIN, 60, 100);
+    juno_event_get_stats(&s);
+    ck(s.torn == 0, "a well-formed event is not counted as torn");
+
+    /* Corrupt the queued slot the way a lost publish barrier would: the index
+     * has moved, the payload has not. juno_event_poke_for_test writes directly
+     * into the ring, which is why it exists ONLY under JUNO_EVQ_TESTABLE. */
+    juno_event_poke_for_test(0, 0xEE, 0xEE);
+    n = juno_event_drain(ev, 8);
+    juno_event_get_stats(&s);
+    ck(n == 0, "an impossible event is NOT handed to the engine");
+    ck(s.torn == 1, "an impossible event is COUNTED");
+}
+
 int main(void)
 {
     printf("=== O1: the internal event boundary ===\n");
@@ -163,6 +191,7 @@ int main(void)
     t_cap_is_late_not_lost();
     t_full_refuses_and_counts();
     t_boundary_rules();
+    t_torn_detector();
     printf("%s (%d failure%s)\n", fails ? "FAIL" : "PASS",
            fails, fails == 1 ? "" : "s");
     return fails ? 1 : 0;
@@ -175,4 +204,5 @@ int main(void)
  *   4  velocity 0 stays a note-on                -> check 5 goes red
  *   5  the range clamp is removed                -> check 6 goes red
  *   6  drain does not advance the read index     -> check 3 goes red
+ *   7  the torn-publish check is removed          -> check 7 goes red
  */

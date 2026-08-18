@@ -466,6 +466,10 @@ static unsigned long burst_cyc = 0;     /* cycles across the whole build     */
 static unsigned long burst_blocks = 0;  /* blocks the last change took       */
 static unsigned long burst_blocks_max = 0;
 static unsigned long burst_restarts = 0;/* a new request arrived mid-build   */
+/* Set by dev_burst_step(), read and cleared at the deadline check, so a miss
+ * can be attributed to the burst or to the steady state. Written and read by
+ * core 0 only, in the same block. */
+static volatile int  burst_ran_this_block = 0;
 static int           dev_patch = 0;     /* which patch the bank is on       */
 static int           dev_gate = 0;      /* 0 = held, 1 = released           */
 static unsigned long dev_builds = 0, dev_pubs = 0, dev_pub_refused = 0;
@@ -825,6 +829,8 @@ static int dev_burst_step(void)
 {
     unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count();
     int rc_step = 1;
+
+    burst_ran_this_block = 1;   /* attributes a deadline miss to O2, not O4 */
 
     switch (burst_state) {
     case BST_IDLE:
@@ -2151,6 +2157,7 @@ static volatile long          rpt_drift = 0;
  *               past two periods the DMA had to be carrying us, which is
  *               the invariant broken whatever it sounded like. */
 static volatile unsigned long rpt_ovr_late = 0, rpt_ovr_miss = 0;
+static volatile unsigned long rpt_miss_burst = 0, rpt_miss_quiet = 0;
 static volatile unsigned long rpt_health_n = 0;
 
 static void rpt_task(void *arg)
@@ -2173,6 +2180,11 @@ static void rpt_task(void *arg)
          * hn is health_n, which nothing printed before. */
         printf("B4: ovr=%lu/%lu hn=%lu\n",
                rpt_ovr_late, rpt_ovr_miss, rpt_health_n);
+        /* burst= is O2's ACCEPTANCE NUMBER and must read 0: a block that ran a
+         * burst step overran. quiet= belongs to O4 (delay patches over budget)
+         * and to the open timer anomaly, and is printed beside it so the two
+         * can never be confused for one another. */
+        printf("B4: miss burst=%lu quiet=%lu\n", rpt_miss_burst, rpt_miss_quiet);
         /* O1: the boundary's own numbers. Rule 4 -- every refusal and every
          * deferral is COUNTED and reported; a system that copes quietly cannot
          * be proven to cope. `ref` MUST read 0: it is the only one of these
@@ -2189,9 +2201,13 @@ static void rpt_task(void *arg)
                burst_blocks, burst_blocks_max, burst_restarts, b_last);
         {   juno_event_stats es;
             juno_event_get_stats(&es);
-            printf("EVQ: sub=%lu ref=%lu del=%lu dep=%d hi=%lu par=%lu\n",
+            /* torn= is the only runtime witness to the publish barrier being
+             * right (juno_event.h, JUNO_EVQ_BARRIER). Like ref=, it MUST
+             * read 0; unlike ref= it can only be a concurrency fault. */
+            printf("EVQ: sub=%lu ref=%lu del=%lu dep=%d hi=%lu par=%lu torn=%lu\n",
                    es.submitted, es.refused, es.delivered,
-                   juno_event_depth(), es.depth_max, ev_param_unhandled);
+                   juno_event_depth(), es.depth_max, ev_param_unhandled,
+                   es.torn);
         }
 #if S3L_FXPROF
         /* fx = core 1's master/FX pass, v1 = core 1's own voice pass
@@ -2289,6 +2305,7 @@ void app_main(void)
     unsigned long gap_max = 0, gap_tag = 0, gap_at = 0;
     /* CUMULATIVE by design -- never cleared in the per-second snapshot. */
     unsigned long ovr_late = 0, ovr_miss = 0;
+    unsigned long ovr_miss_burst = 0, ovr_miss_quiet = 0;
     int64_t       t_prev_ok = 0;
     unsigned long w_underrun0 = 0, w_chunks0 = 0;
     int           w_step_on = !S3L_PLAY;   /* S3L_PLAY: no patch stepping */
@@ -2850,9 +2867,30 @@ void app_main(void)
             if (d > period)      ++ovr_late;
             if (d > 2ul * period) {
                 ++ovr_miss;
+                /* ⚑ O2's ACCEPTANCE TEST NEEDS THE CAUSE, NOT THE TOTAL.
+                 *
+                 * `miss` climbs for reasons O2 does not own and cannot fix:
+                 * delay patches 5/16/21/49 overrun in STEADY STATE (6,526-6,821
+                 * against 5,442 -- that is O4), and b4_first_run.md §5 records
+                 * miss incrementing about once a second with the gap under
+                 * threshold, an esp_timer-vs-I2S anomaly that is still open.
+                 *
+                 * So "miss must not increment across a program change" is not a
+                 * test of O2. It would fail for O4's reasons and send the next
+                 * session hunting the wrong cause -- which is exactly what the
+                 * ring attribution cost this project once already today.
+                 *
+                 * THE TEST THAT IS O2's: did a block that RAN A BURST STEP miss
+                 * its deadline? That is the claim -- a step fits in the slack --
+                 * and it is isolated from both other causes. miss_burst MUST
+                 * read 0. miss_quiet is O4's and the anomaly's, reported beside
+                 * it so neither can be mistaken for the other. */
+                if (burst_ran_this_block) ++ovr_miss_burst;
+                else                      ++ovr_miss_quiet;
                 health_fail("a block missed its deadline");
             }
         }
+        burst_ran_this_block = 0;
         t_prev_ok = t0;
 #if S3L_SWEEP
         /* THE COST SWEEP overrides the chord with 0, 1 and 2 voices to get a
@@ -3148,6 +3186,8 @@ void app_main(void)
                 /* NOT reset below with gap_max: B4's question is "did a block
                  * EVER miss", so these accumulate for the life of the run. */
                 rpt_ovr_late  = ovr_late;
+                rpt_miss_burst = ovr_miss_burst;
+                rpt_miss_quiet = ovr_miss_quiet;
                 rpt_ovr_miss  = ovr_miss;
                 rpt_health_n  = health_n;
 #if S3L_RECALL

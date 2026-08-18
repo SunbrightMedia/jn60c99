@@ -11,7 +11,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 CC=${CC:-cc}
-CFLAGS="-std=c99 -Wall -Wextra -O1 -I$HERE"
+CFLAGS="-std=c99 -Wall -Wextra -O1 -I$HERE -DJUNO_EVQ_TESTABLE"
 
 tooth() {                       # tooth <n> <sed script> <what it breaks>
     n=$1; script=$2; what=$3
@@ -42,8 +42,12 @@ tooth 5 's/if (note > 127)     note = 127;//' \
         'the note range clamp is removed'
 tooth 6 's/^    QRD = rd;.*$/    (void)rd;/' \
         'drain does not advance the read index'
+# The WHOLE condition must go: poking both fields means either half alone
+# still catches it, so a plant that removes one half proves nothing.
+tooth 7 's/if (e.kind > (unsigned char)JUNO_EV_PARAM ||/if (0 \&\&/' \
+        'the torn-publish check is removed'
 
 echo
 $CC $CFLAGS "$HERE/juno_event.c" "$HERE/test_juno_event.c" -o "$TMP/clean"
 "$TMP/clean"
-echo "O1 GATE: six teeth caught, clean run green."
+echo "O1 GATE: seven teeth caught, clean run green."
