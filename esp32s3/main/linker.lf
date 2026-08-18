@@ -14,7 +14,17 @@
 # Placing the whole main archive (which is where the eb_*.c objects land) in
 # IRAM removes the flash fetch entirely.
 #
-# ⚠⚠ THIS MAPPING IS INERT IN THE SHIPPING BUILD, AND HAS BEEN ALL ALONG.
+# ⚠ THE PARAGRAPH BELOW IS NO LONGER TRUE, AND THAT IS GOOD NEWS.
+# RE-MEASURED 2026-08-17 on this build, with the same nm command:
+#     xtensa-esp32s3-elf-nm build/juno_s3.elf | awk '$1 ~ /^403/' \
+#         | grep -cE "eb_|juno_"      ->  35
+# eb_engine_render_range is at 0x40386888 and eb_master_render at 0x40385a08 --
+# IRAM, not the 0x42... flash addresses recorded below. S3_LTO now defaults OFF
+# and the mapping IS live. The 2026-08-12 text is kept verbatim because the
+# INFERRED cause (-flto) turned out to be right and that is worth keeping; read
+# it as history, not as the state of the build.
+#
+# HISTORICAL, 2026-08-12: THIS MAPPING IS INERT IN THE SHIPPING BUILD.
 # MEASURED 2026-08-12 (C3), on the M1 firmware and on the recall firmware,
 # with this file present AND with it reverted -- byte-identical placement both
 # ways:
@@ -92,6 +102,61 @@ entries:
     # most exposed to what the OTHER core is doing.
     eb_master (noflash_text)
     eb_chorus (noflash_text)
+    # ---- THE DELAY ARMS, AND THEY WERE THE ONES LEFT BEHIND ----------------
+    #
+    # MEASURED 2026-08-17, on the artefact rather than on this file (which is
+    # the lesson the header records): with the mapping finally live, 35 engine
+    # symbols ARE in IRAM -- eb_master_render at 0x40385a08, eb_chorus_tick_x
+    # at 0x403838a8 -- but EVERY delay arm was still at 0x42..., in flash:
+    #
+    #     eb_delay_process 0x4201490c   eb_dly23_tick 0x42015054
+    #     eb_dly1_tick     0x42014bb4   eb_dly5_tick  0x42015584
+    #                                   eb_dly_t4_tick 0x4201608c
+    #
+    # So the FX-in-IRAM fix moved the master chain and the chorus and stopped
+    # short of the arms -- which are the expensive part. The arm's own cost is
+    # 5,478 cycles for 1,659 instructions, c/i 3.30, i.e. 70 % STALL
+    # (M2_WORST_CASE.md). The paragraph above explains why the FX belongs in
+    # IRAM: it is the code most exposed to what the other core is doing while
+    # it hammers flash. That argument applies to the arms MORE than to the
+    # master chain, because one arm runs on every sample of an expensive patch
+    # and 18 of the 64 factory patches select one.
+    #
+    # THE COST IS SMALL AND WAS MEASURED BEFORE IT WAS SPENT (xtensa-size on
+    # the objects of this build): delay 695, t1 1,248, t23 1,393, t5 2,912,
+    # t4 1,694 -- 7,942 bytes for all five. Not the 20,949 quoted elsewhere for
+    # t5; that figure is not this build's .text.
+    #
+    # ALL FIVE, not just the expensive two: which arm runs is a PER-PATCH
+    # choice, so leaving one in flash reinstates the fetch on whichever patch
+    # selects it. At 8 KB the whole set is cheaper than reasoning about which
+    # patches the user will play.
+    #
+    # THIS CHANGES NO ARITHMETIC. It is a linker placement, so the trunk null
+    # stays EXACTLY 0 by construction and the sonic gate cannot move. What it
+    # can change is cycles, and that is a BOARD measurement -- it is not
+    # claimed here.
+    # ⚠ THE ARMS DO NOT FIT TODAY. MEASURED 2026-08-17 by trying it:
+    # enabling all five entries below links FAILS with
+    #     region `dram0_0_seg' overflowed by 7232 bytes
+    # Adding 7,942 bytes of .text to iram0_0_seg -- which is SHARED WITH ALL
+    # DRAM -- leaves 7,232 too little for .bss. So the free headroom is
+    # 7,942 - 7,232 = about 710 BYTES, and even the smallest single arm
+    # (eb_delay, 695 B) all but exhausts it while buying nothing: the win is
+    # t23 (1,393) and t5 (2,912), and neither fits.
+    #
+    # THE LEVER IS NOT WRONG, IT IS BLOCKED. ~7.2 KB of DRAM must come out
+    # before the arms can go in. That is the next question for this file, and
+    # it is a DRAM audit, not a scheduling one.
+    #
+    # Uncomment ALL FIVE together once the DRAM is found -- which arm runs is a
+    # per-patch choice, so leaving one in flash reinstates the fetch on
+    # whichever patch selects it.
+    #eb_delay (noflash_text)
+    #eb_delay_t1 (noflash_text)
+    #eb_delay_t23 (noflash_text)
+    #eb_delay_t5 (noflash_text)
+    #eb_dly_t4 (noflash_text)
     # ---- THE RECALL OBJECTS STAY IN FLASH -----------------------------------
     #
     # `* (noflash_text)` above puts EVERY object of libmain.a into IRAM. With
