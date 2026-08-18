@@ -272,23 +272,29 @@ ANY synth. This header carries straight to the JX-3P. Nothing in it may be
 JUNO-specific -- `param_id` is an index into a per-synth table, never a JUNO
 constant.
 
-## THE ORDER (do not reorder without the user)
+## THE ORDER — relabeled O1..O6 / F1..F3 (user request, 2026-08-18)
 
-1. **C2 → C3** — finish recall fixes, put recall on the board, burst off the
-   audio path. Fixes B4's clicks as a side effect.
-2. **C4 → C5** — notes + MIDI. **First playable milestone: 2 voices + FX,
-   played from a keyboard.** (User-chosen; explicitly NOT the goal, a step.)
-3. **Re-measure the budget while it is being PLAYED.** This number replaces
-   every cycle figure in the repo.
-4. **B3** — the ~700-cycle hunt, against the real instrument.
-5. **C11, then C10, then C9** — the event API first (it is the boundary the
-   other two are implemented behind), then the chunked patch change (removes the
-   click, small), then the per-parameter incremental refresh, which is what
-   makes C6's encoders possible at all.
-6. **C6, C7, C8** — controls, storage, the warm bug.
-7. **D** — the link, second board, 6 voices. **END_GOAL 2/3/4 land here.**
-8. **A4** — the user listens. **END_GOAL 1 lands here.**
-9. **E3, E4** — write the pipeline doc, de-JUNO the tools.
+O = the remaining BUILD steps. F = the FINAL acceptance steps, which only the
+user or a full-system gate can close. This is a RENAME of the remaining order,
+not a resequence; the old track letters stay valid for status lines and are
+cross-referenced. Done and retired from the old list: recall on the board
+(C2→C3), notes + MIDI built (C4→C5), the played-budget re-measure (b4-b6 data).
+
+| label | was | what | state |
+|---|---|---|---|
+| **O1** | C11 | the internal event API — the boundary O2/O3 live behind | NOT DONE |
+| **O2** | C10 | chunked patch change — THE fix for B4's counted misses | NOT DONE |
+| **O3** | C9 | per-parameter incremental refresh (derived field map) | NOT DONE |
+| **O4** | B3/B4 | worst-case headroom CLOSED: measure the prologue, explain the delay arm's +1,45x, then pick the lever (chain split across cores vs arm hunt) | OPEN — b6_split_sweep.md is the evidence base |
+| **O5** | C6/C7/C8 | encoders + LCD, preset storage, warm gate into make verify | NOT DONE |
+| **O6** | D1-D4 | the two-chip link — 6 voices, one instrument | NOT DONE (D1 architecture decided) |
+| **F1** | B4 verdict | the full stress gate green: worst patch x full polyphony x program change x parameter storm, miss=0, every detector seen to fire | NOT DONE |
+| **F2** | A4 | the user listens to the WAV pairs and gives the FIXED acceptance number, then accepts | NOT DONE — the only remaining judge |
+| **F3** | E3/E4 | pipeline doc ".vst3 in → two boards out" + de-JUNO audit (E5 then unblocks) | NOT DONE |
+
+Rule unchanged: do not reorder without the user. O1 before O2/O3 because it is
+their boundary; O4 needs O2 (the burst misses are half of B4's red); O6 needs
+O4's number; F1 needs O1-O6; F2/F3 close the project.
 
 ## What the second board buys beyond cycles (`data/two_board_advantages.md`)
 Chip A core 0 has ~1,600 spare cycles/sample MEASURED — the control surface is
