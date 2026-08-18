@@ -146,14 +146,42 @@ def toolchain_id():
 
 
 def scenario_fingerprint():
-    """The scenario set is part of the claim. `26/26 EXACTLY 0` was true when
-    there were 26 scenarios and is a lie now that there are 30, so the count and
-    the tags are hashed into every row that depends on them."""
+    """The scenario set is part of the claim, so it is hashed into every row.
+
+    ⚑ IT MUST BE THE SET THAT ACTUALLY RUNS. This used to read null_ab.SCEN --
+    30 tags -- while every proof in this file runs null_b.py, whose BASE_SCEN
+    is those 30 PLUS SIX engine-B-only scenarios: DELAY type 2, DELAY type 3,
+    DELAY type 4 (synthetic), EFFECT type 0/1/4. So each row's fingerprint
+    described a set SIX SMALLER than the one measured, and the six missing ones
+    are the delay and effect arms -- exactly where the 2026-08-17 pitchmod
+    defect lived.
+
+    It also broke emission outright: proof_null compares the scenario lines it
+    parsed against this count, so `chorus` and `env` refused with "parsed 36
+    scenario lines but null_ab.SCEN has 30" and no row could be written for
+    them at all.
+
+    This function's own docstring stated the standard it was failing:
+    "`26/26 EXACTLY 0` was true when there were 26 scenarios and is a lie now
+    that there are 30." The same sentence applies to 30 against 36.
+
+    AND IT REFUSES TO RETURN AN EMPTY SET. A fingerprint over nothing is the
+    defect class this project keeps paying for -- a selector that selects
+    nothing and reports success (playbook 54, the coefficient audit, the
+    linker.lf entries)."""
     sys.path.insert(0, os.path.join(REPO, "tools", "trackb"))
     sys.path.insert(0, os.path.join(REPO, "tools", "verify"))
-    import null_ab
-    tags = [t for _, _, t in null_ab.SCEN]
+    sys.path.insert(0, HERE)
+    import null_b
+    tags = [t for _, _, t in null_b.scenarios(False)]
+    if len(tags) < 2:
+        raise SystemExit(
+            "ledger: scenario_fingerprint got %d scenario(s) from "
+            "null_b.scenarios(False). A fingerprint over an empty or trivial "
+            "set certifies nothing; fix the import rather than emitting rows "
+            "against it." % len(tags))
     return len(tags), sha_text("\n".join(sorted(tags))), tags
+
 
 
 # ==========================================================================
