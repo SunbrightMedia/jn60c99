@@ -74,7 +74,6 @@ entries:
     eb_vcf_res (noflash_text)
     eb_vcf_cv (noflash_text)
     eb_envgen (noflash_text)
-    eb_vca (noflash_text)
     eb_lfo (noflash_text)
     eb_glide (noflash_text)
     eb_notecv (noflash_text)
@@ -83,9 +82,15 @@ entries:
     eb_dcoprep (noflash_text)
     eb_pwm_cv (noflash_text)
     eb_cvgate (noflash_text)
-    eb_modcv (noflash_text)
     eb_exp_fork (noflash_text)
-    eb_minmax (noflash_text)
+    # ---- THREE DEAD ENTRIES REMOVED 2026-08-17 -----------------------------
+    # `eb_vca`, `eb_modcv` and `eb_minmax` named objects that DO NOT EXIST:
+    # there is no eb_vca.c and no eb_modcv.c (modcv's symbols are in
+    # eb_coefs.c and eb_pwm_cv.c), and eb_minmax is a header. ldgen matched
+    # nothing for all three and said nothing -- which is how eb_vca_tick, a
+    # per-sample function, sat in XIP flash while a line in this file appeared
+    # to place it. eb_vca_hpf (the real file) is listed below.
+    # tools/engineb/iram_check.py now FAILS on an entry that places nothing.
     # ---- CORE 1'S FX, AND IT IS NOT A LUXURY -------------------------------
     #
     # MEASURED 2026-08-12: with the voice path in IRAM the engine settles at
@@ -165,6 +170,50 @@ entries:
     eb_delay_t23 (noflash_text)
     eb_delay_t5 (noflash_text)
     eb_dly_t4 (noflash_text)
+    # ---- AND THE REST OF THE PER-SAMPLE CODE, FOUND THE SAME WAY -----------
+    #
+    # Having caught the delay arms by reading the ELF rather than this file, I
+    # read the WHOLE list of eb_* code still at 0x42... and found the same
+    # defect several more times. All of these run per sample and none was in
+    # the hot list:
+    #
+    #   eb_fx_e0/e1/e5   the EFFECT arms -- exactly the delay-arm story again,
+    #                    one runs per patch, every sample
+    #   eb_master_in     the master input stage
+    #   eb_master_out    the master output stage. NOTE: `eb_master` above does
+    #                    NOT cover these -- they are separate translation units
+    #                    and the entry matches an OBJECT, not a prefix. That is
+    #                    how they were missed.
+    #   eb_noise_svf     70 bytes, and it was in flash
+    #   eb_reverb        2,965 bytes, runs whenever reverb is on
+    #   eb_dsp           the shared primitives -- eb_pitch_poly, eb_triangle,
+    #                    eb_wrap_unit/hi. eb_dly_t4 still calls pitch_poly per
+    #                    sample (L4 is not done), so this one is on the audio
+    #                    path even after the t23/t5 hoist.
+    #
+    # SIZES, measured on this build's objects: 917 + 953 + 960 + 174 + 237 + 70
+    # + 2,965 + 7,250 = 13,526 bytes. With EBDEV_S's 30,328 freed and 7,942
+    # spent on the delay arms, that leaves about 8,860 bytes of slack.
+    #
+    # THE GENERAL LESSON, and it is playbook 32 again: an entry here names an
+    # OBJECT. A module split into more files silently loses its mapping, and
+    # nothing warns. The check is the ELF, and the firmware already prints its
+    # own IRAM symbols so this can be seen rather than believed.
+    eb_fx_e0 (noflash_text)
+    eb_fx_e1 (noflash_text)
+    eb_fx_e5 (noflash_text)
+    eb_master_in (noflash_text)
+    eb_master_out (noflash_text)
+    eb_noise_svf (noflash_text)
+    eb_reverb (noflash_text)
+    eb_dsp (noflash_text)
+    # AND TWO MORE OF EXACTLY THE SAME KIND, found by the same ELF read:
+    #   eb_vca_hpf   the list says `eb_vca` and the FILE is eb_vca_hpf.c, so
+    #                the entry never matched and eb_vca_tick sat in flash
+    #   eb_pitch_fork  the list says `eb_pitch`; eb_pitch_fork_eval is a
+    #                separate TU and is called from eb_pitch.c:30, per sample
+    eb_vca_hpf (noflash_text)
+    eb_pitch_fork (noflash_text)
     # ---- THE RECALL OBJECTS STAY IN FLASH -----------------------------------
     #
     # `* (noflash_text)` above puts EVERY object of libmain.a into IRAM. With
