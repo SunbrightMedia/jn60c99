@@ -136,27 +136,35 @@ entries:
     # stays EXACTLY 0 by construction and the sonic gate cannot move. What it
     # can change is cycles, and that is a BOARD measurement -- it is not
     # claimed here.
-    # ⚠ THE ARMS DO NOT FIT TODAY. MEASURED 2026-08-17 by trying it:
-    # enabling all five entries below links FAILS with
+    # ⚠ THEY DID NOT FIT AT FIRST, AND THE FIX WAS DRAM, NOT IRAM.
+    # MEASURED 2026-08-17: enabling the five entries below failed the link with
     #     region `dram0_0_seg' overflowed by 7232 bytes
-    # Adding 7,942 bytes of .text to iram0_0_seg -- which is SHARED WITH ALL
-    # DRAM -- leaves 7,232 too little for .bss. So the free headroom is
-    # 7,942 - 7,232 = about 710 BYTES, and even the smallest single arm
-    # (eb_delay, 695 B) all but exhausts it while buying nothing: the win is
-    # t23 (1,393) and t5 (2,912), and neither fits.
+    # because iram0_0_seg is SHARED WITH ALL DRAM. Free headroom was 7,942 -
+    # 7,232 = about 710 bytes, so not even one useful arm fitted.
     #
-    # THE LEVER IS NOT WRONG, IT IS BLOCKED. ~7.2 KB of DRAM must come out
-    # before the arms can go in. That is the next question for this file, and
-    # it is a DRAM audit, not a scheduling one.
+    # WHAT MADE ROOM: EBDEV_S, the 30,328-byte device cell array, moved to
+    # PSRAM (engine_b/dev/ebdev.c, EXT_RAM_BSS_ATTR). It is the coldest big
+    # object in DRAM -- `ebdev_at` is reached only from recall and coefficient
+    # building, never from eb_render.c, eb_master.c or any arm -- so it is read
+    # about once a second and never per sample. The two bigger objects, EBE
+    # (108,012, live engine state) and RCB (37,576, the coefficients the voice
+    # loop reads every sample), must stay and did.
     #
-    # Uncomment ALL FIVE together once the DRAM is found -- which arm runs is a
-    # per-patch choice, so leaving one in flash reinstates the fetch on
-    # whichever patch selects it.
-    #eb_delay (noflash_text)
-    #eb_delay_t1 (noflash_text)
-    #eb_delay_t23 (noflash_text)
-    #eb_delay_t5 (noflash_text)
-    #eb_dly_t4 (noflash_text)
+    # VERIFIED on the artefact, which is this file's own standard:
+    #     eb_delay_process 0x40385144   eb_dly23_tick  0x4038588c
+    #     eb_dly1_tick     0x403853ec   eb_dly5_tick   0x40385dc0
+    #                                   eb_dly_t4_tick 0x403868d0
+    #     EBDEV_S          0x3c150000  (PSRAM)
+    # All five arms IRAM, link green.
+    #
+    # STILL NOT CLAIMED: any cycle number. This buys the arms a fetch from IRAM
+    # instead of XIP flash, and the arm was 70 % stall at c/i 3.30 -- but what
+    # that is worth is a BOARD measurement and nothing here measures it.
+    eb_delay (noflash_text)
+    eb_delay_t1 (noflash_text)
+    eb_delay_t23 (noflash_text)
+    eb_delay_t5 (noflash_text)
+    eb_dly_t4 (noflash_text)
     # ---- THE RECALL OBJECTS STAY IN FLASH -----------------------------------
     #
     # `* (noflash_text)` above puts EVERY object of libmain.a into IRAM. With

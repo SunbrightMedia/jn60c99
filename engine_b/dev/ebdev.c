@@ -6,7 +6,38 @@
  */
 #include "ebdev.h"
 
+/* ⚑ EBDEV_S LIVES IN PSRAM ON THE DEVICE, AND IT IS THE COLDEST BIG THING WE
+ * HAVE. MEASURED 2026-08-17: it is 30,328 bytes, the third largest object in
+ * DRAM after EBE (108,012, the live engine state) and RCB (37,576, the render
+ * coefficients the voice loop reads EVERY SAMPLE). Both of those must stay.
+ *
+ * This one need not. `ebdev_at` -- the only way anything reaches this array --
+ * appears in eb_chorus_shim.c, eb_coefs.c, eb_master_coefs.c, eb_devseq.c,
+ * eb_recall.c and this file, and in NONE of eb_render.c, eb_master.c or any
+ * delay arm. So it is read while a patch is being recalled, about once a
+ * second, and never on the per-sample path.
+ *
+ * WHY IT IS WORTH MOVING. iram0_0_seg is SHARED WITH ALL DRAM, so DRAM is what
+ * bounds how much CODE can be pulled out of flash. The delay arms are still
+ * XIP-flash (linker.lf) and are 70 % stall at c/i 3.30; putting their 7,942
+ * bytes in IRAM overflowed dram0_0_seg by 7,232. Freeing 30 KB here buys that
+ * and more.
+ *
+ * WHAT IT COSTS, stated rather than hidden: the recall BURST gets slower,
+ * because its 900-odd ebdev_at sites now read PSRAM. The burst is already
+ * ~1.89 M cycles and is OFF the audio path -- underruns 0, MEASURED
+ * (c3_silicon.md PLAY3) -- so this trades patch-change latency, which no gate
+ * bounds today, for per-sample headroom, which the invariant does bound.
+ *
+ * NOT MEASURED: how much slower the burst gets. The board prints it on the
+ * BURST: line, so the next flash answers it. If it becomes unacceptable the
+ * answer is to move something else, not to put the arms back in flash. */
+#if defined(EB_IDF) && defined(EB_DEVCELLS)
+#include "esp_attr.h"
+EXT_RAM_BSS_ATTR ebdev_state EBDEV_S;
+#else
 ebdev_state EBDEV_S;
+#endif
 ebdev_state *const EBDEV = &EBDEV_S;
 
 /* Where an unplaceable offset goes. 8 bytes so a float or an int32 store fits
