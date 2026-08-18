@@ -116,7 +116,7 @@ own configuration; the user's ear on WAVs is the final judge.
 | step | state |
 |---|---|
 | A1 trunk bit-exact vs plugin, all 64 patches | **DONE** (certified, EXACTLY 0) |
-| A2 fork passes sonic gate at trunk flags | **DONE** (3.17 dB control) |
+| A2 fork passes sonic gate at trunk flags | **RE-OPENED 2026-08-17** — the 3.17 dB figure is SHIP minus the control-rate flags, not today's build; at the real SHIP flags the gate reads 5.79 dB worst band. Inside the LAST_MILE acceptance rule (~6.34), outside the 1.0 screening bound. Needs the user's FIXED acceptance number (SONIC_BOUND_SETTLED.md) |
 | A3 fork gated at DEVICE config (wake masks, LFO free-run) | **DONE** (device_sonic.c, LFO fix PROVEN) |
 | A4 user listens to fork WAVs A/B vs plugin renders and accepts | **NOT DONE — the only remaining judge** |
 
@@ -126,7 +126,7 @@ own configuration; the user's ear on WAVs is the final judge.
 | B1 chip A: 3 voices no FX | **DONE — FITS** (5,388 of 5,442, measured) |
 | B2 chip B: 2 voices + FX | **DONE — FITS** (M1: 5,410 of 5,442, measured) |
 | B3 chip B: 3 voices + FX | **NOT DONE — over by 691.** THE gap. One number. |
-| B4 **WORST-CASE** headroom (see THE INVARIANT: worst patch, full polyphony, program change and parameter storm at once) | **NOT DONE, AND NOW BINDING.** M1's 105 underruns are GONE (burst off the audio path) but PLAY1 is 3-8 % over budget with two voices. |
+| B4 **WORST-CASE** headroom (see THE INVARIANT: worst patch, full polyphony, program change and parameter storm at once) | **DETECTOR DONE AND SEEN TO FIRE** (2026-08-18, on-board: `B4: ovr=late/miss`, miss counted real deadline misses). **VERDICT NOT DONE**: the patch-change burst misses 2-3 blocks per step (C10 owed and now COUNTED), and the delay-patch cost re-measure is BLOCKED on a stale answer key (data/b4_first_run.md) — the baked key predates the four-cell delay fix, the chip muted at patch 5, correctly. Per-sample path now ALL in IRAM; worth-on-silicon unquotable until the key is regenerated. |
 
 B3 has two routes: find ~700 cycles on chip B (cycle hunt AGAINST THE REAL
 INSTRUMENT, not the looped chord), or move one voice to chip A and accept 4+2

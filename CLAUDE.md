@@ -78,11 +78,12 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
 # LIVE STATE (2026-08-13 — update in place, no dated blocks here, EVER)
 - 12-bank user parity vs src/: recall 768/768 PASS. Render re-running after
   the arp-list fix; prior 111 fails are UNATTRIBUTED until it lands.
-- Fork on silicon: 2v+FX fits (5,442 budget); DELAY TYPE 2/3/5 patches ~10,700
-  = 2x over = invariant violation (was recorded ~6,800; that is the two-voice
-  CORE figure, not the delay cost -- M2_WORST_CASE.md); PSRAM scattered ~244 cyc (rings
-  live there); patch-change burst ~2.0 M cyc (attributed; note path ~135 k via
-  eb_recall_build_voices, proven bit-identical + 2 teeth).
+- Fork on silicon (2026-08-18, b4_first_run.md): 2v+FX fits (5,104-5,514 of
+  5,442); B4 counter LIVE and seen to fire; burst misses 2-3 blocks per patch
+  change (C10 binding); per-sample code ALL in IRAM (iram_check.py gates it);
+  DELAY 2/3/5 re-measure BLOCKED on stale s3_listen_meta.h (predates the
+  4-cell fix -- chip muted at patch 5, correctly); PSRAM scattered 228.6 cyc
+  (the board's own probe print).
 - Next per FINAL_GUIDE: C11 event API → C10 chunked recall → C9 per-param
   refresh; B3/B4 worst-case; D link (zero code); random full-state gate owed.
 
