@@ -40,6 +40,7 @@ void eb_recall_init(eb_recall *r,
     r->rs = rs; r->ms = ms; r->eng = eng;
     r->cur = 0;
     r->route_last = -1;
+    r->chunk_step = 0;
     EB_RC = rc0;
     EB_MC = mc0;
 }
@@ -108,6 +109,58 @@ void eb_recall_build(eb_recall *r)
     EB_RECALL_T1(eb_recall_t_mc);
 
     (void)v;
+}
+
+/* ==================================== O2: THE CHUNKED PATCH BUILD =========
+ * The pieces of eb_recall_build, callable one at a time. See eb_recall.h for
+ * why this is safe (the shadow is never read by the audio path) and for the
+ * gate that holds it bit-identical to the monolithic build.
+ *
+ * THE ORDER IS THE MONOLITHIC ORDER: memset, then voices 0..7, then the shared
+ * tail, then the master. Preserved deliberately -- these write into one struct
+ * and a reordering would only be provably harmless after someone proved no two
+ * steps touch the same field. Keeping the order means nobody has to. */
+void eb_recall_chunk_begin(eb_recall *r)
+{
+    const int shadow = 1 - r->cur;
+    /* The memset happens HERE, in step 0, and not lazily inside step 1: a
+     * caller that begins a build and is then interrupted must leave a shadow
+     * that is definitely stale-and-zeroed rather than half of two patches. */
+    memset(r->rc[shadow], 0, sizeof *r->rc[shadow]);
+    r->chunk_step = 1;
+}
+
+int eb_recall_chunk_busy(const eb_recall *r)
+{
+    return r->chunk_step != 0;
+}
+
+int eb_recall_chunk_step(eb_recall *r)
+{
+    const int shadow = 1 - r->cur;
+    int st = r->chunk_step;
+
+    if (st == 0) return 0;                    /* nothing in progress */
+
+    if (st <= EB_NUM_VOICES) {
+        /* one voice. The most expensive single step, and the reason the step
+         * granularity is a voice and not "the voice build": MEASURED at about
+         * 140,000 cycles each against a ~1.12 M whole. */
+        EB_RECALL_T0();
+        eb_coefs_voice((const unsigned char *)0, r->rc[shadow], st - 1);
+        EB_RECALL_T1(eb_recall_t_rc);
+    } else if (st == EB_NUM_VOICES + 1) {
+        eb_render_coefs_build_shared((const unsigned char *)0, r->rc[shadow]);
+    } else {
+        EB_RECALL_T0();
+        eb_master_coefs_build((const unsigned char *)0, r->mc[shadow]);
+        EB_RECALL_T1(eb_recall_t_mc);
+    }
+
+    ++st;
+    if (st > EB_RECALL_CHUNK_STEPS) { r->chunk_step = 0; return 0; }
+    r->chunk_step = st;
+    return 1;
 }
 
 /* ============================================ THE INCREMENTAL BURST (NOTES)

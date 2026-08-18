@@ -66,6 +66,10 @@ typedef struct {
     const eb_master_coef *mc_pending;   /* the FX-pipe one-block deferral    */
     unsigned long gen;            /* +1 per publish, for the firmware banner */
     unsigned long unmapped_at_publish;
+    /* O2: the chunked build's cursor. 0 = idle, otherwise the NEXT step to
+     * run. Lives here rather than in a file static so that a second recall
+     * context cannot silently share one cursor. */
+    int   chunk_step;
 } eb_recall;
 
 /* Quiescence. A rule that cannot fail is not a rule: publish ASSERTS this
@@ -79,6 +83,43 @@ void eb_recall_init(eb_recall *r,
                     eb_master_coef *mc0, eb_master_coef *mc1,
                     eb_render_state *rs, eb_master_state *ms,
                     const eb_engine *eng);
+
+/* ===================== O2: THE SAME BUILD, ONE PIECE AT A TIME ===========
+ *
+ * WHY. eb_recall_build() is ~1.25 M cycles and the whole patch-change burst is
+ * ~2.1 M against a 5.8 ms block. MEASURED on silicon: 1-4 missed block
+ * deadlines per program change (data/b4_first_run.md, b6_split_sweep.md).
+ * THE INVARIANT rule 2 requires that work to be INCREMENTAL AND CAPPED, and
+ * rule 3 says the change may ARRIVE LATER -- so the build is spread over
+ * blocks and the audio keeps playing the CURRENT bank until one atomic
+ * publish swaps it.
+ *
+ * THIS IS SAFE BECAUSE THE SHADOW IS NOT READ BY THE AUDIO PATH. Every step
+ * writes only r->rc[shadow] / r->mc[shadow]; the render loop reads
+ * r->rc[cur]. A half-built shadow is therefore inaudible, which is the whole
+ * reason the shadow exists (see eb_recall_build's own note).
+ *
+ * USAGE:
+ *     eb_recall_chunk_begin(r);
+ *     while (eb_recall_chunk_step(r)) { }     // one call per block
+ *     eb_recall_publish(r);                   // in the quiescent window
+ *
+ * eb_recall_chunk_step() returns 1 while more work remains and 0 when the
+ * shadow is complete. Each call does ONE bounded piece: one voice, the shared
+ * tail, or the master build. THE CALLER DECIDES HOW MANY STEPS A BLOCK CAN
+ * AFFORD -- this file does not know the block period and must not guess.
+ *
+ * ⚠ BIT-IDENTICAL TO eb_recall_build BY GATE, not by argument:
+ * tools/engineb/chunk_gate.py builds all 64 patches both ways and compares
+ * the structs byte for byte, with planted teeth. */
+#define EB_RECALL_CHUNK_STEPS (EB_NUM_VOICES + 2)   /* voices + tail + master */
+
+void eb_recall_chunk_begin(eb_recall *r);
+int  eb_recall_chunk_step(eb_recall *r);
+/* Non-zero while a chunked build is part-way through. The caller must not
+ * start a note build or a second patch build while this is true -- the shadow
+ * has one owner at a time. */
+int  eb_recall_chunk_busy(const eb_recall *r);
 
 /* Steps 1-2: build into the SHADOW bank. Outside the window. */
 void eb_recall_build(eb_recall *r);

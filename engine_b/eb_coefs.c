@@ -341,14 +341,37 @@ void eb_coefs_voice(const unsigned char *base, eb_render_coefs *c, int v)
     }
 }
 
+/* O2 SPLIT THIS FUNCTION IN THREE, AND CHANGED NOTHING IT COMPUTES.
+ *
+ * A patch change costs ~2.1 M cycles against a 5.8 ms block, so it misses
+ * deadlines (b4_first_run.md counted 1-4 per program change) -- THE INVARIANT
+ * rule 2 says that work must be INCREMENTAL AND CAPPED. To spread it the
+ * firmware needs the pieces callable one at a time, and the pieces were
+ * already here: eight independent per-voice builds and a tail of shared cell
+ * gathers that depends on none of them.
+ *
+ * So the body below is now `eb_render_coefs_build_shared` and this function is
+ * memset + the eight voices + that call, IN THE SAME ORDER AS BEFORE. The
+ * order matters and is preserved because these write into one struct and a
+ * later write to an overlapping field would win; nothing here overlaps today,
+ * and keeping the order means that fact never has to be re-proven.
+ *
+ * ⚠ THE CHUNKED PATH MUST REMAIN BIT-IDENTICAL TO THIS ONE. That is not a
+ * hope: tools/engineb/chunk_gate.py builds all 64 patches both ways and
+ * compares the coefficient structs byte for byte, with teeth. */
 void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c)
 {
-    int v, ei, i;
-    (void)ei; (void)i;
+    int v;
     memset(c, 0, sizeof *c);
-
     for (v = 0; v < EB_NUM_VOICES; ++v) eb_coefs_voice(base, c, v);
+    eb_render_coefs_build_shared(base, c);
+}
 
+/* The part of a coefficient build that belongs to no single voice: the shared
+ * noise generator and the FX configuration. Pure cell gathers -- no loop whose
+ * trip count depends on input, so it is one bounded step. */
+void eb_render_coefs_build_shared(const unsigned char *base, eb_render_coefs *c)
+{
     /* ---- the shared noise generator (base cells) ------------------------- */
     c->notecv.n84272 = CF(base, 84272); c->notecv.n84304 = CF(base, 84304);
     c->notecv.n84400 = CF(base, 84400); c->notecv.n84416 = CF(base, 84416);

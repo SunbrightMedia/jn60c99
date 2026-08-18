@@ -37,9 +37,27 @@ void eb_render_coefs_build(const unsigned char *base, eb_render_coefs *c);
 /* ONE voice's coefficients, for callers that know only one voice changed --
  * a key press being the whole reason this exists. It does NOT memset: the
  * caller owns the other seven voices' values and must have put them there.
- * `for (v...) eb_coefs_voice(base, c, v)` after a memset IS
- * eb_render_coefs_build; that identity is what devrecall_gate.py checks. */
+ *
+ * ⚠ CORRECTED 2026-08-18. This comment used to read: "`for (v...)
+ * eb_coefs_voice(base, c, v)` after a memset IS eb_render_coefs_build". It is
+ * not, and never was -- the build also gathers a SHARED tail (the noise
+ * generator's base cells and the whole FX configuration) that belongs to no
+ * voice. The overstatement was harmless for the caller it was written for,
+ * eb_recall_build_voices, which copies the CURRENT bank into the shadow first
+ * and therefore already has a correct tail; it would have been a real defect
+ * for any caller that started from a memset. O2 needs exactly such a caller,
+ * so the tail is now its own step and the identity is stated in full:
+ *
+ *     memset + for(v) eb_coefs_voice + eb_render_coefs_build_shared
+ *         ==  eb_render_coefs_build,  byte for byte
+ *
+ * which tools/engineb/chunk_gate.py checks over all 64 patches, with teeth. */
 void eb_coefs_voice(const unsigned char *base, eb_render_coefs *c, int v);
+
+/* The shared tail: everything in a coefficient build that is not one voice's.
+ * Pure cell gathers, bounded, safe to run as one step of a chunked build. */
+void eb_render_coefs_build_shared(const unsigned char *base,
+                                  eb_render_coefs *c);
 
 /* Seed engine B's state from the port's, ONCE, at context start. After this
  * the engine owns its state and never re-reads a cell -- re-seeding free-run
