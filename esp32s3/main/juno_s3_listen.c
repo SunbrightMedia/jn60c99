@@ -452,7 +452,20 @@ static unsigned long ev_applied_blocks = 0;   /* blocks that applied events */
  * here, and taken only by submitters -- never by the drain. */
 portMUX_TYPE juno_evq_mux = portMUX_INITIALIZER_UNLOCKED;
 static unsigned long nb_min = 0xFFFFFFFFul, nb_max = 0, nb_last = 0;
-static volatile int  dev_pending = 0;   /* a build+publish is owed          */
+static volatile int  dev_pending = 0;   /* a FINISHED shadow awaits publish */
+/* ---- O2: the chunked patch change ---------------------------------------
+ * The burst is ~2.1 M cycles against a 5.8 ms block and MEASURED 1-4 missed
+ * deadlines per program change. THE INVARIANT rule 2 says that work is
+ * INCREMENTAL AND CAPPED; rule 3 says the change may ARRIVE LATER. So it runs
+ * ONE bounded step per block and the audio keeps playing the current bank
+ * until one atomic publish swaps it. */
+static volatile int  dev_want = 0;      /* a patch change has been asked for */
+static int           burst_state = 0;   /* 0 idle, else the NEXT step to run */
+static int           burst_patch = 0, burst_gate = 0;
+static unsigned long burst_cyc = 0;     /* cycles across the whole build     */
+static unsigned long burst_blocks = 0;  /* blocks the last change took       */
+static unsigned long burst_blocks_max = 0;
+static unsigned long burst_restarts = 0;/* a new request arrived mid-build   */
 static int           dev_patch = 0;     /* which patch the bank is on       */
 static int           dev_gate = 0;      /* 0 = held, 1 = released           */
 static unsigned long dev_builds = 0, dev_pubs = 0, dev_pub_refused = 0;
@@ -663,6 +676,8 @@ static unsigned long devp_t0 = 0;
 
 /* THE BURST. Returns 0 on success. On any failure it says which one and the
  * caller mutes -- a board that plays wrong coefficients teaches nothing. */
+static int dev_burst_verify(int patch, int gate);
+
 static int dev_burst(int patch, int gate)
 {
     unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count(), dt;
@@ -705,6 +720,7 @@ static int dev_burst(int patch, int gate)
 #endif
 
     miss0 = EBDEV_S.miss;
+    (void)miss0;
     DEVP_T1(devp_notes);
     eb_recall_build(&REC);              /* into the SHADOW bank */
     dt = (unsigned long)esp_cpu_get_cycle_count() - t0;
@@ -712,13 +728,19 @@ static int dev_burst(int patch, int gate)
     if (dt < b_min) b_min = dt;
     if (dt > b_max) b_max = dt;
     ++dev_builds;
+    return dev_burst_verify(patch, gate);
+}
 
+/* THE CHECKS, IN ONE PLACE. Both the monolithic boot burst and O2's stepped
+ * path end here, because two copies of a mute condition is how one of them
+ * stops being updated. Returns non-zero on failure with dev_mute_why set. */
+static int dev_burst_verify(int patch, int gate)
+{
     if (EBDEV_S.miss) {
         printf("RECALL: *** %lu UNMAPPED CELL ACCESSES on patch %d (last "
-               "offset %lu, %lu of them during the coefficient build). The "
-               "address map is INCOMPLETE for this patch and every cell that "
-               "missed read or wrote an 8-byte SINK. ***\n",
-               EBDEV_S.miss, patch, EBDEV_S.lastmiss, EBDEV_S.miss - miss0);
+               "offset %lu). The address map is INCOMPLETE for this patch "
+               "and every cell that missed read or wrote an 8-byte SINK. ***\n",
+               EBDEV_S.miss, patch, EBDEV_S.lastmiss);
         dev_mute_why = "unmapped cells -- the address map is incomplete";
         health_fail("a recall access fell off the address map");
         dev_last_bad_patch = (unsigned long)patch;
@@ -757,6 +779,127 @@ static int dev_burst(int patch, int gate)
     return 0;
 }
 
+/* ================= O2: THE SAME BURST, ONE STEP PER BLOCK ================
+ *
+ * dev_burst() above is the monolith and is KEPT: it is what boot uses, where
+ * there is no audio to protect and no reason to spend fourteen blocks. The
+ * stepped path below runs the SAME calls in the SAME order for a program
+ * change while the instrument is playing.
+ *
+ * THE STEP BUDGET IS ONE PER BLOCK, and that is a measurement rather than a
+ * preference. MEASURED (b6_split_sweep.md): at the shipping split core 0
+ * renders one voice (~2,590 cyc/sample) inside a ~5,250 block, so it spins at
+ * the barrier for roughly half of every block -- about 650,000 cycles. The
+ * largest single step here is the reseed at ~440,000 (BURST: line, silicon),
+ * so even the worst step fits inside the slack that already exists. Fourteen
+ * steps is ~81 ms for a program change: LATENCY DEGRADES, CONTINUITY DOES NOT,
+ * which is rule 3 stated rather than accidental.
+ *
+ * ⚠ IF A STEP EVER GROWS PAST THE SLACK this stops working silently -- the
+ * block simply runs long and B4's miss counter catches it. That counter is
+ * the acceptance test for this whole step and it must read 0 across a program
+ * change on all 64 patches.
+ *
+ * WHY IT IS SAFE: every step writes only the cell array and the SHADOW bank.
+ * ebdev.c records that ebdev_at appears in no delay arm, eb_render.c or
+ * eb_master.c -- so no cell is read per sample -- and the render loop reads
+ * rc[cur], never rc[shadow]. A half-built patch is therefore inaudible.
+ *
+ * Returns  1 more work remains
+ *          0 the shadow is COMPLETE and checked -- publish it
+ *         -1 failed; dev_mute_why says which, and the caller mutes. */
+enum { BST_IDLE = 0, BST_RESEED, BST_INSTALL, BST_RECALL, BST_NOTES,
+       BST_COEFS, BST_CHECK };
+
+static void dev_burst_begin(int patch, int gate)
+{
+    if (burst_state != BST_IDLE) ++burst_restarts;  /* latest wins, counted */
+    burst_patch  = patch;
+    burst_gate   = gate;
+    burst_state  = BST_RESEED;
+    burst_cyc    = 0;
+    burst_blocks = 0;
+}
+
+static int dev_burst_step(void)
+{
+    unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count();
+    int rc_step = 1;
+
+    switch (burst_state) {
+    case BST_IDLE:
+        return 1;
+
+    case BST_RESEED:
+        chunks_since_burst = 0;
+        ebdev_reset_counters();
+        if (eb_devseq_boot_cells(ebdev_boot[0], (unsigned)EBDEV_NV)) {
+            dev_mute_why = "the baked boot image does not match EBDEV_NV";
+            burst_state = BST_IDLE; rc_step = -1; break;
+        }
+        devp_reseed = (unsigned long)esp_cpu_get_cycle_count() - t0;
+        burst_state = BST_INSTALL;
+        break;
+
+    case BST_INSTALL:
+        if (eb_devseq_install(DEVBANK, eb_template, sizeof eb_template,
+                              eb_bank64 + (size_t)burst_patch * EB_PATCH_BYTES)) {
+            dev_mute_why = "eb_patch_install refused the record";
+            burst_state = BST_IDLE; rc_step = -1; break;
+        }
+        devp_install = (unsigned long)esp_cpu_get_cycle_count() - t0;
+        burst_state = BST_RECALL;
+        break;
+
+    case BST_RECALL:
+        eb_devseq_recall(DEVBANK, 128.0f);
+        devp_recall = (unsigned long)esp_cpu_get_cycle_count() - t0;
+        burst_state = BST_NOTES;
+        break;
+
+    case BST_NOTES:
+        /* The allocator must learn THIS patch's ASSIGN MODE. Skipping it is
+         * docs/ASSIGNER_MODE_FINDING.md verbatim. */
+        eb_alloc_init(&ALLOC);
+        eb_devseq_alloc_config(&ALLOC, DEVBANK);
+#if S3L_MIDI
+        eb_devseq_notes_on(DEVCHORD_VOICE, DEVCHORD_NOTE, DEVCHORD_VEL,
+                           DEVCHORD_N);
+#else
+        eb_devseq_notes_on(DEVCHORD_VOICE, DEVCHORD_NOTE, DEVCHORD_VEL,
+                           DEVCHORD_N);
+        if (burst_gate) eb_devseq_notes_off(DEVCHORD_VOICE, DEVCHORD_N);
+#endif
+        devp_notes = (unsigned long)esp_cpu_get_cycle_count() - t0;
+        eb_recall_chunk_begin(&REC);
+        burst_state = BST_COEFS;
+        break;
+
+    case BST_COEFS:
+        /* ONE piece of the coefficient build: a voice, the shared tail, or
+         * the master set. Held bit-identical to the monolith over all 64
+         * patches by tools/engineb/chunk_gate.py, with five teeth. */
+        if (!eb_recall_chunk_step(&REC)) burst_state = BST_CHECK;
+        break;
+
+    case BST_CHECK:
+        burst_state = BST_IDLE;
+        rc_step = dev_burst_verify(burst_patch, burst_gate) ? -1 : 0;
+        break;
+    }
+
+    burst_cyc += (unsigned long)esp_cpu_get_cycle_count() - t0;
+    ++burst_blocks;
+    if (rc_step == 0) {
+        b_last = burst_cyc;
+        if (burst_cyc < b_min) b_min = burst_cyc;
+        if (burst_cyc > b_max) b_max = burst_cyc;
+        ++dev_builds;
+        if (burst_blocks > burst_blocks_max) burst_blocks_max = burst_blocks;
+    }
+    return rc_step;
+}
+
 /* Ask for a patch/gate change. Called from the per-sample tail -- it must be
  * O(1) there, which is the whole point of C3: the 29 KB memcpy that used to
  * live at that call site is now the burst above, on the other side of a flag. */
@@ -764,7 +907,11 @@ static void dev_request(int patch, int gate)
 {
     dev_patch = patch;
     dev_gate = gate;
-    dev_pending = 1;
+    dev_want  = 1;      /* O2: a REQUEST. The build starts at the next block
+                         * boundary and takes several; dev_pending now means
+                         * "a finished shadow awaits publish" and nothing else.
+                         * Conflating the two is what made the burst one
+                         * indivisible lump. */
 }
 
 /* ======================================================================
@@ -1838,13 +1985,26 @@ static void render_block(int n)
      * spin, per chunk, from CCOUNT -- that is the burst's real budget, and it
      * is a measurement rather than the subtraction 5,410 - predicted_core0
      * that this project has already been told is not one. */
-    if (dev_pending && !dev_muted) {
-        if (dev_burst(dev_patch, dev_gate)) {
+    /* O2: A PATCH CHANGE IS NOW A SEQUENCE OF BLOCKS, NOT ONE LUMP.
+     *
+     * A new request while a build is in flight RESTARTS it with the newer
+     * patch -- latest wins, which is what a user spinning the patch knob
+     * means -- and the restart is COUNTED (rule 4), because a knob turned
+     * faster than 81 ms would otherwise silently never settle. */
+    if (dev_want && !dev_muted) {
+        dev_burst_begin(dev_patch, dev_gate);
+        dev_want = 0;
+    }
+    if (burst_state != BST_IDLE && !dev_muted) {
+        int st = dev_burst_step();
+        if (st < 0) {
             dev_muted = 1;
             printf("MUTE: %s. The audio is silenced deliberately -- a board "
                    "playing coefficients it cannot vouch for teaches nothing. "
                    "Rebuild with -DS3_RECALL_NOMUTE=1 to hear it anyway.\n",
                    dev_mute_why);
+        } else if (st == 0) {
+            dev_pending = 1;        /* the shadow is complete and checked */
         }
     }
     /* C4: a key press is a coefficient change and therefore the same burst,
@@ -1862,7 +2022,12 @@ static void render_block(int n)
      * at best. Those events stay QUEUED and land next block -- late, not
      * lost, which is now true of the whole input path and not just this one
      * branch. */
-    else if (!dev_muted && (ev_apply(), note_pending)) {
+    /* A NOTE MAY NOT LAND ON A HALF-BUILT SHADOW. The shadow has one owner at
+     * a time, so notes wait while a patch build is in flight -- and because O1
+     * queued them they wait rather than vanish. That composition is why O1 had
+     * to come first. */
+    else if (!dev_muted && burst_state == BST_IDLE
+             && (ev_apply(), note_pending)) {
         if (dev_note_burst()) {
             dev_muted = 1;
             printf("MUTE: %s.\n", dev_mute_why);
@@ -2015,6 +2180,13 @@ static void rpt_task(void *arg)
          * a rising high-water mark is the early warning that the consumer is
          * falling behind. `par` counts parameter events accepted by the
          * boundary that O3 does not yet apply. */
+        /* O2: the patch change's own numbers. `blk` is how many blocks the
+         * last change took and `mx` the worst ever -- that IS the latency
+         * rule 3 trades for continuity, so it is reported rather than
+         * assumed. `rst` counts a request that arrived mid-build; non-zero
+         * only means the knob moved faster than a change settles. */
+        printf("O2: blk=%lu mx=%lu rst=%lu cyc=%lu\n",
+               burst_blocks, burst_blocks_max, burst_restarts, b_last);
         {   juno_event_stats es;
             juno_event_get_stats(&es);
             printf("EVQ: sub=%lu ref=%lu del=%lu dep=%d hi=%lu par=%lu\n",
