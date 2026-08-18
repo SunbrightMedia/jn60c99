@@ -469,7 +469,9 @@ static unsigned long burst_restarts = 0;/* a new request arrived mid-build   */
 /* Set by dev_burst_step(), read and cleared at the deadline check, so a miss
  * can be attributed to the burst or to the steady state. Written and read by
  * core 0 only, in the same block. */
-static volatile int  burst_ran_this_block = 0;
+static volatile int  burst_ran_this_block = 0;   /* 0 none, else the STEP ID
+                                  * -- so a miss can name WHICH step overran
+                                  * (b7: burst=17 and no attribution). */
 static int           dev_patch = 0;     /* which patch the bank is on       */
 static int           dev_gate = 0;      /* 0 = held, 1 = released           */
 static unsigned long dev_builds = 0, dev_pubs = 0, dev_pub_refused = 0;
@@ -830,7 +832,8 @@ static int dev_burst_step(void)
     unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count();
     int rc_step = 1;
 
-    burst_ran_this_block = 1;   /* attributes a deadline miss to O2, not O4 */
+    if (burst_state != BST_IDLE)
+        burst_ran_this_block = burst_state;  /* the STEP ID, for attribution */
 
     switch (burst_state) {
     case BST_IDLE:
@@ -905,6 +908,91 @@ static int dev_burst_step(void)
     }
     return rc_step;
 }
+
+/* ================= S3L_STRESS: THE ROBOT KEYBED ==========================
+ *
+ * b7's stimulus was a HUMAN mashing a terminal, and the user asked the right
+ * question: a person is a poor stimulus generator. Unrepeatable, unlogged,
+ * and unable to hit a patch boundary on purpose. This driver is the person,
+ * scripted. It submits through THE SAME BOUNDARY as every real input
+ * (juno_event_*, source KEYBED) -- a driver that reached the engine any other
+ * way would stress a path nobody ships.
+ *
+ * FIVE PHASES, ~2 s each, repeating (172 blocks/s, 344 blocks/phase):
+ *   0 BASELINE   silence, so every counter has an uncontaminated control
+ *   1 SINGLES    a note toggles ~4x/s -- the ordinary case
+ *   2 PAIRS      TWO keys in ONE block -- the exact case the old path
+ *                dropped and counted (notes_dropped)
+ *   3 STORM      one event EVERY block, ~172/s -- far beyond human rate
+ *   4 COLLIDE    a note submitted into every block where a patch build is
+ *                LIVE (burst_state != IDLE) -- the O1xO2 composition rule,
+ *                exercised deliberately instead of by luck
+ * All held notes are released at each phase boundary, so a phase cannot leak
+ * ringing voices into the next phase's measurements.
+ *
+ * ACCEPTANCE, same as the human run: sub == del + dep, ref = 0, torn = 0 --
+ * and now HEALTH latches red on either, so nobody has to read the numbers.
+ * Default OFF: this is a test stimulus, not an instrument feature. */
+#ifndef S3L_STRESS
+#define S3L_STRESS 0
+#endif
+#if S3L_STRESS
+static void stress_step(void)
+{
+    static unsigned long blk = 0;
+    static int held[8];
+    static const unsigned char NOTE[8] = {48, 52, 55, 60, 64, 67, 72, 76};
+    unsigned long t = blk++;
+    unsigned long ph = (t / 344u) % 5u;
+    int i;
+
+    if (t % 344u == 343u) {              /* phase boundary: release all */
+        for (i = 0; i < 8; ++i)
+            if (held[i]) { juno_event_note_off(JUNO_SRC_KEYBED, NOTE[i]);
+                           held[i] = 0; }
+        return;
+    }
+    switch (ph) {
+    case 0: break;
+    case 1:
+        if (t % 43u == 0) {
+            i = (int)((t / 43u) & 7u);
+            if (held[i]) { juno_event_note_off(JUNO_SRC_KEYBED, NOTE[i]);
+                           held[i] = 0; }
+            else         { juno_event_note_on(JUNO_SRC_KEYBED, NOTE[i], 100);
+                           held[i] = 1; }
+        }
+        break;
+    case 2:
+        if (t % 86u == 0) {
+            juno_event_note_on(JUNO_SRC_KEYBED, 60, 100);
+            juno_event_note_on(JUNO_SRC_KEYBED, 64, 100);
+        } else if (t % 86u == 43u) {
+            juno_event_note_off(JUNO_SRC_KEYBED, 60);
+            juno_event_note_off(JUNO_SRC_KEYBED, 64);
+        }
+        break;
+    case 3:
+        i = (int)(t & 7u);
+        if (held[i]) { juno_event_note_off(JUNO_SRC_KEYBED, NOTE[i]);
+                       held[i] = 0; }
+        else         { juno_event_note_on(JUNO_SRC_KEYBED, NOTE[i], 100);
+                       held[i] = 1; }
+        break;
+    case 4:
+        if (burst_state != BST_IDLE) {
+            i = (int)(t & 3u);
+            if (!held[i]) { juno_event_note_on(JUNO_SRC_KEYBED, NOTE[i], 100);
+                            held[i] = 1; }
+        } else if (t % 43u == 1u) {
+            for (i = 0; i < 8; ++i)
+                if (held[i]) { juno_event_note_off(JUNO_SRC_KEYBED, NOTE[i]);
+                               held[i] = 0; }
+        }
+        break;
+    }
+}
+#endif
 
 /* Ask for a patch/gate change. Called from the per-sample tail -- it must be
  * O(1) there, which is the whole point of C3: the 29 KB memcpy that used to
@@ -2158,6 +2246,7 @@ static volatile long          rpt_drift = 0;
  *               the invariant broken whatever it sounded like. */
 static volatile unsigned long rpt_ovr_late = 0, rpt_ovr_miss = 0;
 static volatile unsigned long rpt_miss_burst = 0, rpt_miss_quiet = 0;
+static volatile unsigned long rpt_miss_step[BST_CHECK + 1];
 static volatile unsigned long rpt_health_n = 0;
 
 static void rpt_task(void *arg)
@@ -2185,6 +2274,12 @@ static void rpt_task(void *arg)
          * and to the open timer anomaly, and is printed beside it so the two
          * can never be confused for one another. */
         printf("B4: miss burst=%lu quiet=%lu\n", rpt_miss_burst, rpt_miss_quiet);
+        /* WHICH STEP overran: reseed/install/recall/notes/coefs/check. b7
+         * measured burst=17 with no attribution; this is the attribution. */
+        printf("O2m: rs=%lu in=%lu rc=%lu nt=%lu cf=%lu ck=%lu\n",
+               rpt_miss_step[BST_RESEED], rpt_miss_step[BST_INSTALL],
+               rpt_miss_step[BST_RECALL], rpt_miss_step[BST_NOTES],
+               rpt_miss_step[BST_COEFS],  rpt_miss_step[BST_CHECK]);
         /* O1: the boundary's own numbers. Rule 4 -- every refusal and every
          * deferral is COUNTED and reported; a system that copes quietly cannot
          * be proven to cope. `ref` MUST read 0: it is the only one of these
@@ -2306,6 +2401,8 @@ void app_main(void)
     /* CUMULATIVE by design -- never cleared in the per-second snapshot. */
     unsigned long ovr_late = 0, ovr_miss = 0;
     unsigned long ovr_miss_burst = 0, ovr_miss_quiet = 0;
+    unsigned long miss_step[BST_CHECK + 1];
+    memset((void *)miss_step, 0, sizeof miss_step);
     int64_t       t_prev_ok = 0;
     unsigned long w_underrun0 = 0, w_chunks0 = 0;
     int           w_step_on = !S3L_PLAY;   /* S3L_PLAY: no patch stepping */
@@ -2885,8 +2982,11 @@ void app_main(void)
                  * and it is isolated from both other causes. miss_burst MUST
                  * read 0. miss_quiet is O4's and the anomaly's, reported beside
                  * it so neither can be mistaken for the other. */
-                if (burst_ran_this_block) ++ovr_miss_burst;
-                else                      ++ovr_miss_quiet;
+                if (burst_ran_this_block) {
+                    ++ovr_miss_burst;
+                    ++miss_step[burst_ran_this_block <= BST_CHECK
+                                ? burst_ran_this_block : 0];
+                } else ++ovr_miss_quiet;
                 health_fail("a block missed its deadline");
             }
         }
@@ -2919,6 +3019,9 @@ void app_main(void)
              * this project has broken it three times. */
             midi_poll();
             con_poll();
+#if S3L_STRESS
+            stress_step();          /* the robot keybed, same boundary */
+#endif
 #endif
             render_block(CHUNK);
             te += esp_timer_get_time() - e0;
@@ -3188,6 +3291,15 @@ void app_main(void)
                 rpt_ovr_late  = ovr_late;
                 rpt_miss_burst = ovr_miss_burst;
                 rpt_miss_quiet = ovr_miss_quiet;
+                memcpy((void *)rpt_miss_step, (const void *)miss_step,
+                       sizeof miss_step);
+                /* rule 4 latches that should always have existed: a refused
+                 * submit and a torn publish are FAULTS, not statistics. */
+                {   juno_event_stats hs;
+                    juno_event_get_stats(&hs);
+                    if (hs.refused) health_fail("the event queue REFUSED a submit");
+                    if (hs.torn)    health_fail("a TORN publish reached the drain");
+                }
                 rpt_ovr_miss  = ovr_miss;
                 rpt_health_n  = health_n;
 #if S3L_RECALL
