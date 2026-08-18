@@ -978,6 +978,12 @@ static const signed char CON_KEY[128] = {
 };
 static unsigned char con_held[128];
 static int  con_base = 60;              /* middle C */
+/* The console-settable split. Declared here because the console reader below
+ * writes it and is defined before the block that explains it; the reasoning
+ * lives at the SPLIT_ macro. Latched into w_split at a block boundary. */
+#if !S3L_LAYOUT
+volatile int g_split_rt = S3L_SPLIT;
+#endif
 unsigned long con_keys = 0;
 
 static void con_poll(void)
@@ -1015,6 +1021,26 @@ static void con_poll(void)
             dev_request((dev_patch + 1) % DEVCRC_NPATCH, 0);
             continue;
         }
+#if !S3L_LAYOUT
+        /* , / . -- MOVE THE SPLIT. Core 0 renders [lo, split), core 1 renders
+         * [split, 8) plus the whole master chain. split = 8 leaves core 1 with
+         * the FX ALONE, which is the cheap test of the load-balance finding:
+         * no new pipeline stage and no added latency. The value is latched at
+         * a block boundary in render_block, so pressing this mid-block cannot
+         * make the two cores disagree about a voice. */
+        if (c == ',' || c == '.') {
+            g_split_rt += (c == '.') ? 1 : -1;
+            if (g_split_rt < S3L_VOICE_LO)  g_split_rt = S3L_VOICE_LO;
+            if (g_split_rt > EB_NUM_VOICES) g_split_rt = EB_NUM_VOICES;
+            printf("SPLIT: core 0 renders voices %d..%d, core 1 renders %d..%d "
+                   "%s the master chain\n",
+                   S3L_VOICE_LO, g_split_rt - 1, g_split_rt, EB_NUM_VOICES - 1,
+                   "plus");
+            if (g_split_rt >= EB_NUM_VOICES)
+                printf("SPLIT: core 1 now runs the FX ALONE (no voices)\n");
+            continue;
+        }
+#endif
         if (c >= 128 || (CON_KEY[c] == 0 && c != 'a')) continue;
         note = con_base + CON_KEY[c];
         if (note < 0 || note > 127) continue;
@@ -1392,7 +1418,22 @@ static eb_render_state *RS_INT, *RS_PSR;
 } while (0)
 #else
 #define LO_     S3L_VOICE_LO
-#define SPLIT_  S3L_SPLIT
+/* THE SPLIT IS RUNTIME IN THIS BUILD, AND THAT IS THE WHOLE POINT.
+ *
+ * b5_fx_attribution.md located the delay overrun in the load balance: core 0
+ * carries [LO_, split) and core 1 carries [split, 8) PLUS the entire master
+ * chain, and cyc = fx + v1 says core 1's two halves are the whole block.
+ * The cheapest possible test of that -- no new pipeline stage, no added
+ * latency -- is to give core 0 BOTH voices and leave core 1 with only the FX:
+ * split = EB_NUM_VOICES makes core 1's voice range [8,8), which is empty.
+ *
+ * Compile-time it would cost a flash per value, and this board has been
+ * reflashed enough. `eb_engine_render_range` already TAKES the range, so the
+ * only requirement is that BOTH CORES SEE ONE VALUE FOR A WHOLE BLOCK --
+ * which is why it is latched into w_split in render_block before core 1 is
+ * released, and never read from the console variable inside the loops. */
+static int          w_split    = S3L_SPLIT;   /* latched, per block */
+#define SPLIT_  w_split
 #endif
 
 #ifndef S3L_TIME_PROLOGUE
@@ -1436,6 +1477,7 @@ static unsigned long prologue_us = 0, prologue_n = 0;
 static volatile unsigned long rpt_fx_cyc = 0, rpt_v1_cyc = 0, rpt_wait_cyc = 0;
 /* accumulators, written only by core 1 */
 static unsigned long fxp_fx = 0, fxp_v1 = 0, fxp_wait = 0, fxp_n = 0;
+static unsigned long fxp_wn = 0;   /* samples, for the per-sample wait mean */
 #endif
 
 static void worker(void *arg)
@@ -1520,18 +1562,39 @@ static void worker(void *arg)
         p0 = (unsigned long)esp_cpu_get_cycle_count();
 #endif
         for (i = 0; i < w_n; ++i) {
+#if S3L_FXPROF
+            /* ⚑ THE WAIT, MEASURED RATHER THAN ASSUMED. b5_fx_attribution.md
+             * concluded "core 1 never waits" from cyc = fx + v1. That does not
+             * follow: v1 INCLUDES this spin, so a v1 that is mostly waiting
+             * looks identical in the sum. If part of v1 is wait, the load
+             * balance pool is smaller than that document claims -- so the
+             * claim must not be spent until this number exists.
+             * COST: two CCOUNT reads per SAMPLE, not per block. That is the
+             * one place in this file that pays per sample, and it is why
+             * S3L_FXPROF is a measurement build rather than the default
+             * shipping state. The reads land INSIDE v1, so v1 is inflated by
+             * them and wait is not; neither is corrected, because a corrected
+             * number nobody can re-derive is worse than a stated bias. */
+            {   unsigned long ww = (unsigned long)esp_cpu_get_cycle_count();
+                while (w_ready <= i) { }
+                fxp_wait += (unsigned long)esp_cpu_get_cycle_count() - ww;
+            }
+#else
             while (w_ready <= i) { }        /* wait for this sample's prologue */
+#endif
             eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
                                    SPLIT_, EB_NUM_VOICES, &w_shb[i],
                                    w_vbb[cur][i]);
         }
 #if S3L_FXPROF
         pd = (unsigned long)esp_cpu_get_cycle_count() - p0;
-        if (w_n > 0) { fxp_v1 += pd / (unsigned long)w_n; ++fxp_n; }
+        if (w_n > 0) { fxp_v1 += pd / (unsigned long)w_n;
+                       fxp_wn += (unsigned long)w_n; ++fxp_n; }
         if (fxp_n >= 64) {          /* publish an average, then start afresh */
-            rpt_fx_cyc = fxp_fx / fxp_n;
-            rpt_v1_cyc = fxp_v1 / fxp_n;
-            fxp_fx = fxp_v1 = fxp_wait = 0; fxp_n = 0;
+            rpt_fx_cyc   = fxp_fx / fxp_n;
+            rpt_v1_cyc   = fxp_v1 / fxp_n;
+            rpt_wait_cyc = fxp_wn ? fxp_wait / fxp_wn : 0ul;
+            fxp_fx = fxp_v1 = fxp_wait = fxp_wn = 0; fxp_n = 0;
         }
         }
 #endif
@@ -1573,6 +1636,17 @@ static void render_block(int n)
      * A no-op unless that flag is set. Both ranges are advanced here on core
      * 0: an at-rest voice's free-run state is touched by nothing else in the
      * block, so there is no race with core 1, which skips those voices. */
+#if !S3L_LAYOUT
+    /* LATCH THE SPLIT FOR THIS BLOCK. Before this line core 1 is parked, so
+     * this is the one instant at which the value can change without the two
+     * cores disagreeing about who renders which voice -- which would render a
+     * voice twice or not at all. Clamped, because the console writes it. */
+    {   int s_ = g_split_rt;
+        if (s_ < LO_)            s_ = LO_;
+        if (s_ > EB_NUM_VOICES)  s_ = EB_NUM_VOICES;
+        w_split = s_;
+    }
+#endif
     eb_engine_advance_atrest(&EBE, RS, rc, LO_, EB_NUM_VOICES, n);
     w_n    = n;
     w_ready = 0;
@@ -1846,7 +1920,8 @@ static void rpt_task(void *arg)
          * (INCLUDING the time it waits on core 0). Per sample, averaged over
          * 64 blocks. Compare fx across patch classes: if the delay patches'
          * extra cycles are not here, the rings are not the cause. */
-        printf("FXP: fx=%lu v1=%lu per sample\n", rpt_fx_cyc, rpt_v1_cyc);
+        printf("FXP: fx=%lu v1=%lu wait=%lu per sample\n",
+               rpt_fx_cyc, rpt_v1_cyc, rpt_wait_cyc);
 #endif
         printf("t=%lu cyc=%lu drift=%+ld un=%lu gap=%lu bst=%lu nb=%lu "
                "midi=%lu/%lu usb=%lu/%d keys=%lu pat=%d\n",
@@ -2224,6 +2299,9 @@ void app_main(void)
                "          b / n = previous / next patch  (all 64 factory patches;\n"
                "                  a program change costs the full burst, so a\n"
                "                  click there is expected and is measured)\n"
+               "          , / . = move the CORE SPLIT.  '.' until core 1 has\n"
+               "                  the FX alone is the load-balance test; watch\n"
+               "                  FXP wait= and cyc on patches 5/16/21/49.\n"
                "          KEYS TOGGLE: a terminal never reports a key going UP,\n"
                "          so press once to sound a note and again to release it.\n"
                "          Hold a chord with a, d, g -- two voices are allowed.\n");
