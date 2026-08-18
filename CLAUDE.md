@@ -78,13 +78,16 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
 # LIVE STATE (2026-08-13 — update in place, no dated blocks here, EVER)
 - 12-bank user parity vs src/: recall 768/768 PASS. Render re-running after
   the arp-list fix; prior 111 fails are UNATTRIBUTED until it lands.
-- Fork on silicon (2026-08-18, b4_second_run.md): fresh devcrc.h key -- CRC
-  MATCH all patches, mute gone. Non-delay patches 5,069-5,682 of 5,442; DELAY
-  TYPE 2/3/5 patches 6,526-6,772 = ~1,200 OVER budget with ALL per-sample code
-  in IRAM (iram_check.py PASS). G2 NOT closed: the remainder is PSRAM ring
-  latency (probe: 229.4 cyc/scattered read), next lever is the rings, not
-  IRAM. Burst ~2.1 M unchanged, misses 1-4 blocks per patch step (C10
-  binding). ovr_late/drift timer anomaly still open (b4_first_run.md §5).
+- Fork on silicon (2026-08-18, b5_fx_attribution.md): fresh devcrc.h key -->
+  CRC MATCH all patches, mute gone. Non-delay 5,069-5,682 of 5,442; patches
+  5/16/21/49 read 6,526-6,821. LOCATED: cyc = fx + v1 within +-140 -- core 1
+  runs the FX then its voice with ZERO overlap, so core 0 spins ~half of every
+  block. Delta is all in fx (2,4xx-2,9xx vs 3,9xx-4,1xx). RINGS ARE NOT THE
+  LEVER (moving-tap PSRAM 29.9 cyc/tap, not the scattered row's 229.5); the
+  b4_second_run ring attribution is WITHDRAWN. Lever = LOAD BALANCE, worth
+  ~1,350 (non-delay) / ~2,020 (delay) -- more than the overrun. Burst ~2.1 M,
+  misses 1-4 blocks per patch step (C10 binding). ovr_late/drift timer
+  anomaly still open (b4_first_run.md §5).
 - Next per FINAL_GUIDE: C11 event API → C10 chunked recall → C9 per-param
   refresh; B3/B4 worst-case; D link (zero code); random full-state gate owed.
 

@@ -17,12 +17,16 @@ Steady-state cyc per patch class, 2v+FX, un=0 throughout:
     DELAY TYPE 2/3/5 patches (5, 16, 21)            6,526-6,772
 
 Budget is 5,442. The delay patches are ~1,100-1,330 OVER, even with every
-per-sample arm in IRAM (iram_check PASS on this ELF, 57 symbols). So the IRAM
-move helped the instruction side but the remaining cost is the PSRAM ring
-access itself — the boot probe's own line says it: scattered PSRAM read
-229.4 cyc vs internal 19.9. DELAY TYPE 2/3/5 is LATENCY, not maths, exactly
-as the probe predicted. Next lever per M4: ring access batching/prefetch or
-internal-SRAM ring segments — not more IRAM.
+per-sample arm in IRAM (iram_check PASS on this ELF, 57 symbols).
+
+⚠ THE PARAGRAPH THAT STOOD HERE IS WITHDRAWN. It read the remaining cost as
+PSRAM ring latency, citing the boot probe's scattered-read row (229.4 cyc vs
+internal 19.9). That row strides one cache line so every read misses, while a
+delay tap walks the ring roughly in order -- it measured a pattern the delay
+never runs. b5_fx_attribution.md adds the MOVING-TAP row (the delay's own
+pattern): 29.9 cyc/tap, 7.7x cheaper, and locates the whole delta in core 1's
+FX pass, where the real lever is LOAD BALANCE. See that file. Nothing here
+below this line depended on the withdrawn claim.
 
 ## 3. THE B4 COUNTERS — the burst is still guilty, and the timer anomaly stands
 - gap 12,5xx-17,1xx µs on patch-step seconds vs the 11,608 µs two-period
@@ -34,6 +38,8 @@ internal-SRAM ring segments — not more IRAM.
 - burst 2.02-2.26 M cycles, unchanged.
 
 ## 4. WHAT THIS DECIDES
-The IRAM work alone did NOT close G2 for the three delay classes. Non-delay
-patches have 160-370 cyc of margin at 2 voices; delay patches have negative
-margin ~1,200. The headroom track's next target is the PSRAM ring latency.
+The IRAM work alone did NOT close G2 for the delay patches. Non-delay patches
+have 160-370 cyc of margin at 2 voices; delay patches have negative margin
+~1,200. The next target was written here as "the PSRAM ring latency" and that
+was wrong -- b5_fx_attribution.md measured it and the target is the LOAD
+BALANCE between the two cores.

@@ -657,3 +657,47 @@ Each task's own battery runs to completion inside that task.
 10. **Update THIS FILE as you go.** Every defect you pay for goes in §10 the day
     it is found, not at the end. That is item 7, and a lesson recorded only in a
     dated result document has already failed it.
+
+## 55. A worst-case probe read as if it were the case
+MEASURED 2026-08-18 (b5_fx_attribution.md). The boot memory probe strided one
+cache line so EVERY PSRAM read missed, and printed 229.5 cyc/read beside a
+closing line inviting the reader to conclude "DELAY TYPE 2/3/5 is LATENCY, not
+maths". The delay does not read that way: a tap walks the ring roughly in
+order, so one 32-byte burst serves eight samples. The delay's own pattern
+measures 29.9 cyc/tap -- 7.7x cheaper. A whole session's headroom plan was
+aimed at the rings on the strength of a row that measured a pattern the code
+never runs.
+
+THE SHAPE. A probe is honest about what it did and silent about what it did
+NOT do, and then its conclusion line does the arguing. The worst case is the
+right thing to measure for a BOUND and the wrong thing to attribute a COST to.
+
+THE CURE, both halves:
+  * measure the pattern the code actually runs, beside the worst case, never
+    instead of it -- the two rows together are the finding;
+  * a probe may print numbers and MUST NOT print a verdict. The line that said
+    "if the PSRAM row is many times the internal row, this is LATENCY" is the
+    defect, not the number above it.
+
+RELATED: 46 (a number quoted N times is not thereby measured). The difference
+is that 46 is about repetition and this is about a measurement that was taken
+once, correctly, of the wrong thing.
+
+## 56. The load balance nobody measured because both halves were on one line
+Same run. `cyc` was the only per-sample number the firmware printed, so three
+sessions of headroom work attributed its movement to whatever had changed in
+the DSP. Splitting core 1's block into its two halves -- four CCOUNT reads per
+BLOCK -- showed cyc = fx + v1 within +-140 across every patch class: the two
+halves are strictly serial and are the ENTIRE block time. Core 0 carries one
+voice and then spins for half of every block.
+
+The reordering that put the FX first was justified in a comment by "the FX
+fills the window where core 1 waits on core 0". At two voices core 1 never
+waits. The argument was sound when it was written and silently stopped being
+true when the voice count changed; nothing measured it again.
+
+THE CURE: when a total is the only thing printed, the split is not "extra
+detail" -- it is the measurement. Print the parts, not the sum. And a comment
+that justifies a design by a runtime relationship (who waits for whom) names a
+condition that can expire: re-measure it whenever the configuration it assumed
+changes.
