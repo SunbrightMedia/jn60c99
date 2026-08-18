@@ -283,7 +283,7 @@ cross-referenced. Done and retired from the old list: recall on the board
 | label | was | what | state |
 |---|---|---|---|
 | **O1** | C11 | the internal event API — the boundary O2/O3 live behind | **DONE 2026-08-18** — gated (7 queue teeth + 3 structural teeth, all caught) AND FIELD-PROVEN (b7_o1o2_field.md): 313 human key events, sub=del=314, ref=0, torn=0, hi=3 of 63. Refusals and torn publishes now latch HEALTH red. Param events queue and count (`par=`) until O3. |
-| **O2** | C10 | chunked patch change — THE fix for B4's counted misses | **BUILT, GATED, ATTRIBUTED, BLOCKED ON THE NOTE BURST** (b8_robot_attribution.md). Misses nowname their step: `O2m: rs=9 in=0 rc=0 nt=1 cf=8 ck=0` — install, port recall and check NEVER overran in ~190 builds. But the run found a bigger threat: **a NOTE burst is 1.06-1.27 M cycles (4.4-5.3 ms of a 5.8 ms block), 7.9x the ~135,000 C4 planned and 1.6x core 0's whole slack** — and it is UNCHUNKED. Every block carrying one runs late; the cf=8 misses are O2 steps landing on blocks already over. **NEXT: chunk the note burst with the same eb_recall_chunk_* machine (2-4 steps, not 15) BEFORE tuning O2's reseed.** |
+| **O2** | C10 | chunked patch AND note builds — THE fix for B4's counted misses | **BOTH BUILDS CHUNKED AND GATED; ONE ITEM LEFT: KEY LATENCY.** Patch burst: gated bit-identical over all 64 patches (chunk_gate, 8 teeth). Note burst: gated over all 256 voice masks; cause of its 7.9x cost EXPLAINED (EB_EV_HELD widens every note to all 8 voices — b9_held_broadcast.md). Narrowing the mask FAILED its gate (patch 5, 14 bytes; three hypotheses refuted, b9 §7-8) and stays behind `EB_DEVSEQ_NARROW_HELD`, OFF. Remaining: the chunked 8-voice note build costs ~10 blocks = 58 ms key latency (b9 §6, option c preferred: publish the allocated voice after one step, the rest catch up). ACCEPTANCE unchanged: `B4:` miss=0 across a program change AND across a played note, CRC MATCH. |
 | **O3** | C9 | per-parameter incremental refresh (derived field map) | NOT DONE |
 | **O4** | B3/B4 | worst-case headroom CLOSED: measure the prologue, explain the delay arm's +1,45x, then pick the lever (chain split across cores vs arm hunt) | OPEN — b6_split_sweep.md is the evidence base |
 | **O5** | C6/C7/C8 | encoders + LCD, preset storage, warm gate into make verify | NOT DONE |
@@ -309,8 +309,11 @@ on the BURST/RECALL lines: voice coefs ~1.12 M, master coefs ~0.13 M, reseed
 fixed work per block, more blocks when more to do; publish stays ATOMIC
 (the eb_recall.c generation/shadow-bank machinery already provides this — do
 not invent a second publish path). EB_RECALL_FX_PIPE ordering constraint is
-load-bearing (main/CMakeLists.txt comment). ACCEPTANCE: `B4:` miss does not
-increment across a program change, all 64 patches, and CRC still MATCHES.
+load-bearing (main/CMakeLists.txt comment). O2 covers the NOTE build too —
+same cursor (`eb_recall_chunk_begin_voices`), same gate, no separate label.
+Open item and its options: b9_held_broadcast.md §6. ACCEPTANCE: `B4:` miss
+does not increment across a program change OR a played note, all 64 patches,
+and CRC still MATCHES.
 
 **O3 (incremental refresh):** design + derived-field-map rule in the C9
 section below. The proven precedent is `eb_recall_build_voices` (bit-identical,

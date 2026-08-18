@@ -49,13 +49,13 @@ over all 256 masks; this needs the same treatment against a run that always
 broadcasts, plus a tooth that holds a chord and requires the mask to STAY
 narrow, and one that presses the first key and requires it to WIDEN.
 
-## 4. ⚠ WHAT THIS MEANS FOR THE O2b CHUNKING JUST BUILT
+## 4. ⚠ WHAT THIS MEANS FOR THE O2 CHUNKING JUST BUILT
 With the mask always ~0u, a chunked note is 1 (events) + 8 (voices) +
 1 (check) = TEN BLOCKS = 58 ms of key latency. That is not a keyboard.
 Fable 5 flagged the latency risk at 2-4 blocks; the real figure is worse
 because the mask is always full.
 
-So O2b's chunking is correct and INSUFFICIENT ON ITS OWN. The order is:
+So O2's chunking is correct and INSUFFICIENT ON ITS OWN. The order is:
   1. narrow the mask (section 3) -- 8 voices -> 1, gated;
   2. then the chunking costs 1 + 1 + 1 = 3 blocks = 17 ms, and folding the
      check into the last voice step makes it 2 blocks = 12 ms;
@@ -112,7 +112,7 @@ exactly what must be true before it can be switched on, and refuses it until
 then. held_gate.py PASSES on the shipped path -- which is itself worth having,
 because it proves the widen is correct rather than merely conservative.
 
-⚠ SO THE 58 ms LATENCY OF §4 STANDS, AND O2b MUST NOT SHIP ALONE.
+⚠ SO THE 58 ms LATENCY OF §4 STANDS, AND THE NOTE CHUNKING MUST NOT SHIP ALONE.
 The note burst is chunked and correct, but at eight voices a key press is ten
 blocks. The remaining options, none yet chosen:
   a. fix the narrowing (find what MONO moves, extend the mask honestly);

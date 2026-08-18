@@ -204,7 +204,7 @@ int main(int argc, char **argv)
         }
     }
 
-    /* ================= O2b: THE NOTE BUILD, EVERY MASK ==================
+    /* ================= O2: THE NOTE BUILD, EVERY MASK ==================
      * eb_recall_build_voices is what a key press used to call in one lump.
      * The chunked note path must produce the SAME shadow for the SAME mask --
      * over all 256 masks, not the two or three a chord happens to produce,

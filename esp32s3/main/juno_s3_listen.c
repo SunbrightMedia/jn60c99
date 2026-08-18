@@ -1077,7 +1077,7 @@ static void dev_request(int patch, int gate)
 
 /* THE NOTE BURST. Same shape as dev_burst() minus the cold reseed and the bank
  * apply: the cell array is already this patch's and must stay that way. */
-/* ================= O2b: THE NOTE BURST, ALSO ONE STEP PER BLOCK ==========
+/* ================= O2: THE NOTE BURST, ALSO ONE STEP PER BLOCK ==========
  *
  * MEASURED (b8_robot_attribution.md): this was 1.06-1.27 M cycles in ONE
  * block -- 4.4-5.3 ms of a 5.8 ms period, 1.6x core 0's entire slack, and
@@ -2178,7 +2178,7 @@ static void render_block(int n)
      * queued them they wait rather than vanish. That composition is why O1 had
      * to come first. */
     else if (!dev_muted && burst_state == BST_IDLE) {
-        /* O2b: A NOTE IS NOW A SEQUENCE OF BLOCKS TOO. ev_apply only draws
+        /* O2: A NOTE IS NOW A SEQUENCE OF BLOCKS TOO. ev_apply only draws
          * from the queue when no note build is in flight, so the shadow keeps
          * exactly one owner; the events it does not take stay QUEUED and
          * arrive next block -- late, not lost. */
@@ -2361,7 +2361,7 @@ static void rpt_task(void *arg)
          * only means the knob moved faster than a change settles. */
         printf("O2: blk=%lu mx=%lu rst=%lu cyc=%lu\n",
                burst_blocks, burst_blocks_max, burst_restarts, b_last);
-        /* O2b: the note burst, SPLIT. ev= the event apply, vb= the chunked
+        /* O2: the note burst, SPLIT. ev= the event apply, vb= the chunked
          * voice build, nv= how many voices the allocator named, st= steps
          * committed. The 1.06 M lump b8 measured is now these parts, so the
          * next question ("why 7.9x the plan?") is answered by reading rather

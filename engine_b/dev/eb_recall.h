@@ -70,7 +70,7 @@ typedef struct {
      * run. Lives here rather than in a file static so that a second recall
      * context cannot silently share one cursor. */
     int   chunk_step;
-    /* O2b: which voices the chunked build still owes, and whether it owes the
+    /* O2: which voices the chunked build still owes, and whether it owes the
      * shared tail and the master set. A PATCH build owes all three; a NOTE
      * build owes only the voices the allocator named. */
     unsigned chunk_mask;
@@ -121,7 +121,7 @@ void eb_recall_init(eb_recall *r,
 
 void eb_recall_chunk_begin(eb_recall *r);
 
-/* ===================== O2b: THE NOTE BUILD, ALSO ONE PIECE AT A TIME =====
+/* ===================== O2: THE NOTE BUILD, ALSO ONE PIECE AT A TIME =====
  *
  * WHY THIS EXISTS AND WHY IT IS NOT OPTIONAL. MEASURED on silicon
  * (b8_robot_attribution.md): a NOTE burst is 1.06-1.27 M cycles -- 4.4-5.3 ms

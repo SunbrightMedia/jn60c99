@@ -56,7 +56,7 @@ tooth 3 "$SRC" \
 
 # 4. The cursor stops one step early: every symptom of 3, plus a step count
 #    that no longer matches what the firmware budgets blocks against.
-# RETARGETED when chunk_step was rewritten for O2b. The old plant edited a line
+# RETARGETED when chunk_step was rewritten for O2. The old plant edited a line
 # that no longer exists, and the guard caught that rather than passing a tooth
 # that changed nothing -- which is the whole reason the guard is there.
 tooth 4 "$SRC" \
@@ -69,7 +69,7 @@ tooth 5 "$COEF" \
   's/^    eb_render_coefs_build_shared(base, c);$/    (void)0;/' \
   'the MONOLITH loses the shared tail (a bad merge of the split)'
 
-# ---- O2b: the NOTE build ------------------------------------------------
+# ---- O2: the NOTE build ------------------------------------------------
 # 6. a note build that also runs the master set: 130,000 cycles nobody
 #    budgeted, and invisible in a byte compare because the values are right.
 tooth 6 "$SRC" \
