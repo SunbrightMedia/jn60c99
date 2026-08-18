@@ -126,7 +126,7 @@ own configuration; the user's ear on WAVs is the final judge.
 | B1 chip A: 3 voices no FX | **DONE — FITS** (5,388 of 5,442, measured) |
 | B2 chip B: 2 voices + FX | **DONE — FITS** (M1: 5,410 of 5,442, measured) |
 | B3 chip B: 3 voices + FX | **NOT DONE — over by 691.** THE gap. One number. |
-| B4 **WORST-CASE** headroom (see THE INVARIANT: worst patch, full polyphony, program change and parameter storm at once) | **DETECTOR DONE AND SEEN TO FIRE** (2026-08-18, on-board: `B4: ovr=late/miss`, miss counted real deadline misses). **VERDICT NOT DONE**: the patch-change burst misses 2-3 blocks per step (C10 owed and now COUNTED), and the delay-patch cost re-measure is BLOCKED on a stale answer key (data/b4_first_run.md) — the baked key predates the four-cell delay fix, the chip muted at patch 5, correctly. Per-sample path now ALL in IRAM; worth-on-silicon unquotable until the key is regenerated. |
+| B4 **WORST-CASE** headroom (see THE INVARIANT: worst patch, full polyphony, program change and parameter storm at once) | **DETECTOR DONE AND SEEN TO FIRE** (`B4: ovr=late/miss`). **VERDICT NOT DONE**, two named causes: (1) the patch-change burst misses 1-4 blocks per step — O2 is the fix, acceptance test: miss MUST NOT increment across a program change; (2) delay patches 5/16/21/49 read 6,526-6,821 vs budget 5,442 at split 7 — O4 is the fix. Key regenerated 2026-08-18, CRC MATCH all patches, cost quotable. Full evidence: data/b6_split_sweep.md (supersedes b4/b5 where they disagree). |
 
 B3 has two routes: find ~700 cycles on chip B (cycle hunt AGAINST THE REAL
 INSTRUMENT, not the looped chord), or move one voice to chip A and accept 4+2
@@ -296,6 +296,46 @@ Rule unchanged: do not reorder without the user. O1 before O2/O3 because it is
 their boundary; O4 needs O2 (the burst misses are half of B4's red); O6 needs
 O4's number; F1 needs O1-O6; F2/F3 close the project.
 
+### O-step briefings — what the executor must know, with sources
+
+**O1 (event API):** full spec in the C11 section below — three calls, source
+tag mandatory, bounded queue, submit-only boundary. Half exists:
+`s3_midi_event()` in juno_s3_listen.c is the note side. Item-7 rule: no JUNO
+constants in the header.
+
+**O2 (chunked patch change):** the burst is 2.02-2.26 M cycles, split MEASURED
+on the BURST/RECALL lines: voice coefs ~1.12 M, master coefs ~0.13 M, reseed
+~0.44 M, install ~0.17 M, port recall ~0.24 M, notes ~0.02 M. Budget rule 2:
+fixed work per block, more blocks when more to do; publish stays ATOMIC
+(the eb_recall.c generation/shadow-bank machinery already provides this — do
+not invent a second publish path). EB_RECALL_FX_PIPE ordering constraint is
+load-bearing (main/CMakeLists.txt comment). ACCEPTANCE: `B4:` miss does not
+increment across a program change, all 64 patches, and CRC still MATCHES.
+
+**O3 (incremental refresh):** design + derived-field-map rule in the C9
+section below. The proven precedent is `eb_recall_build_voices` (bit-identical,
+two teeth). Item-7: the map generator must be synth-agnostic.
+
+**O4 (worst-case closed):** evidence base data/b6_split_sweep.md. Keep split 7.
+Open questions IN ORDER: (a) measure the prologue — `S3L_TIME_PROLOGUE` exists
+in juno_s3_listen.c, currently 0, so "2,805/voice" is prologue-inflated and no
+6-voice projection may use it until split out; (b) explain the delay arm's
++1,45x (fx 3,9xx-4,2xx vs 2,4xx-2,9xx) — arithmetic vs PSRAM access is NOT
+separated; if fx drops below ~2,850 the delay patches close at split 7 with no
+new latency; (c) 4-vs-18 patch classification mismatch (see the ⚠ section);
+(d) only then choose: master-chain split across cores (costs one block, 5.8 ms,
+invariant permits) vs arm cycle hunt vs a D-layout — with FOUR cores, FX alone
+measures ≤4,276 and fits a core by itself. Board knobs that exist NOW: `,`/`.`
+console keys move the split live; `FXP: fx= v1= wait=` prints per second.
+
+**O5 (controls/storage/warm):** chip A core 0 has ~1,600 spare cycles/sample
+(data/two_board_advantages.md); the C7 risk is flash-erase stalls, not cycles;
+C8's remaining half is putting the warm gate into `make verify`.
+
+**O6 (link):** D1 architecture decided and recorded below (one DAC, chip A
+master, three wires, no MCLK). D2-D4 requirements: DEVICE_RECALL.md §6. Chip
+B's block arrives one stage late by design — the same trade as the FX pipe.
+
 ## What the second board buys beyond cycles (`data/two_board_advantages.md`)
 Chip A core 0 has ~1,600 spare cycles/sample MEASURED — the control surface is
 nearly free. And 6 voices over 4 cores is **2.7× the compute per voice** of 8
@@ -303,13 +343,14 @@ over 2, so the second board is also how the fork can stop approximating:
 `EB_HALF_OS_VCF`, `EB_DCO_WT` and `EB_CR_N=4` become reconsiderable. That is
 END_GOAL item 1, not item 4.
 
-## ⚠ EVERY CYCLE FIGURE IN THIS FILE IS DELAY TYPE 0 (`data/patch_dependent_fx.md`)
-MEASURED 2026-08-12: patches with DELAY TYPE 2, 3 or 5 cost about **DOUBLE** --
-~10,000 cycles against ~5,200 -- because those arms are a pitch-shifting delay
-and the engine's largest FX module. **18 of 64 factory patches** use them. The
-listen blob was built from patch 0, which is TYPE 0, so every number in track B
-is the cheapest of three classes. A real-time budget must be met by the WORST
-patch. This is now B's binding constraint, ahead of the 425-cycle gap.
+## ⚠ THE DELAY-PATCH COST, RE-MEASURED 2026-08-18 (`data/b6_split_sweep.md`)
+The 2026-08-12 "~10,000 vs ~5,200, 18 of 64 patches" figure that stood here is
+SUPERSEDED — it predated the IRAM move and the four-cell recall fix. Current,
+board-measured at 2v+FX, split 7: non-delay 5,112-5,389 (UNDER 5,442), delay
+patches **6,526-6,821 (OVER by ~1,100-1,380)**. Only **4 patches (5/16/21/49)**
+show the high band on the stepped run, while b4_stress.py classifies 18 as
+TYPE 2/3/5 — that mismatch is UNRESOLVED and is O4's first question, because a
+worst-case budget must be met by the worst patch, whichever list is right.
 
 ## The three facts that must not be re-litigated
 - **One chip cannot do it:** 6v+FX single-chip measured 10,479 = 1.93× over.
