@@ -78,12 +78,13 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
 # LIVE STATE (2026-08-13 — update in place, no dated blocks here, EVER)
 - 12-bank user parity vs src/: recall 768/768 PASS. Render re-running after
   the arp-list fix; prior 111 fails are UNATTRIBUTED until it lands.
-- Fork on silicon (2026-08-18, b4_first_run.md): 2v+FX fits (5,104-5,514 of
-  5,442); B4 counter LIVE and seen to fire; burst misses 2-3 blocks per patch
-  change (C10 binding); per-sample code ALL in IRAM (iram_check.py gates it);
-  DELAY 2/3/5 re-measure BLOCKED on stale s3_listen_meta.h (predates the
-  4-cell fix -- chip muted at patch 5, correctly); PSRAM scattered 228.6 cyc
-  (the board's own probe print).
+- Fork on silicon (2026-08-18, b4_second_run.md): fresh devcrc.h key -- CRC
+  MATCH all patches, mute gone. Non-delay patches 5,069-5,682 of 5,442; DELAY
+  TYPE 2/3/5 patches 6,526-6,772 = ~1,200 OVER budget with ALL per-sample code
+  in IRAM (iram_check.py PASS). G2 NOT closed: the remainder is PSRAM ring
+  latency (probe: 229.4 cyc/scattered read), next lever is the rings, not
+  IRAM. Burst ~2.1 M unchanged, misses 1-4 blocks per patch step (C10
+  binding). ovr_late/drift timer anomaly still open (b4_first_run.md §5).
 - Next per FINAL_GUIDE: C11 event API → C10 chunked recall → C9 per-param
   refresh; B3/B4 worst-case; D link (zero code); random full-state gate owed.
 
