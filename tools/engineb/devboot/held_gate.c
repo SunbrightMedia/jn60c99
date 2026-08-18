@@ -138,6 +138,25 @@ static int step(const char *what, int on, int note, int want, int *bad)
             printf("      a WIDE build from the same start %s the full rebuild\n",
                    memcmp(&RC_B, &RC_WIDE, sizeof RC_B) == 0
                      ? "MATCHES" : "ALSO DIFFERS");
+            /* WHICH VOICE IS MISSING? Add one at a time to the mask the
+             * narrowing produced and see which one repairs it. This names the
+             * voice without needing to know the struct layout, and a voice
+             * that repairs it is by definition one the narrowing should have
+             * included. */
+            {   int vv;
+                for (vv = 0; vv < EB_NUM_VOICES; ++vv) {
+                    if (mask & (1u << vv)) continue;
+                    eb_recall_build_voices(&REC, mask | (1u << vv));
+                    if (memcmp(&RC_B, &RC_WIDE, sizeof RC_B) == 0) {
+                        printf("      ADDING VOICE %d TO THE MASK REPAIRS IT "
+                               "-- that voice really changed\n", vv);
+                        break;
+                    }
+                }
+                if (vv == EB_NUM_VOICES)
+                    printf("      no single added voice repairs it -- more "
+                           "than one voice moved\n");
+            }
         }
         ++*bad;
     }
@@ -229,6 +248,28 @@ int main(int argc, char **argv)
             eb_devseq_alloc_config(&AL, BANKBUF);
             eb_render_coefs_build((const unsigned char *)0, &RC_A);
             eb_master_coefs_build((const unsigned char *)0, &MC_A);
+
+            /* ⚑ IS THE REFERENCE REPEATABLE? Asked before anything is compared
+             * against it, because if eb_render_coefs_build has a side effect on
+             * the cell array -- a consumed edge, a left-over voice selection --
+             * then building it twice gives two answers and EVERY comparison in
+             * this file is meaningless. Nothing else in the gate is worth
+             * running until this passes. */
+            {   static eb_render_coefs RC_TWICE;
+                static eb_master_coef  MC_TWICE;
+                eb_render_coefs_build((const unsigned char *)0, &RC_TWICE);
+                eb_master_coefs_build((const unsigned char *)0, &MC_TWICE);
+                if (memcmp(&RC_A, &RC_TWICE, sizeof RC_A) != 0 ||
+                    memcmp(&MC_A, &MC_TWICE, sizeof MC_A) != 0) {
+                    printf("  *** patch %d: THE REFERENCE IS NOT IDEMPOTENT -- "
+                           "two consecutive full builds from unchanged cells "
+                           "disagree. Every comparison in this gate is void "
+                           "until that is explained.\n", p);
+                    ++bad;
+                } else {
+                    printf("      reference build is idempotent\n");
+                }
+            }
 
             /* THE FIRST NOTE AFTER A RECALL IS REPORTED, NOT ASSERTED, and
              * that correction is worth keeping: this gate first demanded a

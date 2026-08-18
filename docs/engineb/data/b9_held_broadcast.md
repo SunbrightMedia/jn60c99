@@ -123,3 +123,54 @@ blocks. The remaining options, none yet chosen:
   d. keep the burst whole for notes and accept the deadline miss.
 (c) is the one that matches rule 3 best -- the note arrives on time and the
 change completes late -- but it needs a second publish path and its own gate.
+
+## 7. THREE HYPOTHESES TESTED AND ELIMINATED (2026-08-18, same day)
+Fable 5 challenged §6's verdict as PLAUSIBLE rather than PROVEN, on the ground
+that the gate might be measuring its own side effects. Each candidate was made
+into a check rather than argued about. All three are now closed.
+
+  a. "THE REFERENCE IS DESTRUCTIVE." Proposed mechanism: eb_coefs_voice
+     consumes the aux-edge cell, so the second build sees different inputs.
+     TESTED -- held_gate.c now builds the reference TWICE from unchanged cells
+     and compares, on every patch, before anything else runs.
+     RESULT: "reference build is idempotent" on patches 0, 5 and 21.
+     The named mechanism is also not in the path: the aux-edge reads are in
+     eb_render_state_seed and eb_render_events_mirror, neither of which this
+     gate calls. HYPOTHESIS REFUTED.
+
+  b. "THE FAILURE IS AN ARTIFACT." TESTED by re-running with the narrowing
+     compiled ON (HELD_NARROW=1) after the idempotency check was in place.
+     RESULT: patch 5 still fails, identically -- first differing byte 6418 of
+     18,788, 14 bytes, on all three narrow steps, every run. Deterministic.
+     HYPOTHESIS REFUTED.
+
+  c. "ONE VOICE IS MISSING FROM THE MASK." TESTED -- the gate now adds each
+     absent voice to the mask one at a time and reports which repairs it.
+     RESULT: "no single added voice repairs it -- more than one voice moved."
+     HYPOTHESIS REFUTED, and this is the most informative of the three: the
+     narrowing is not short by one voice, so no small correction to the event
+     mask will fix it.
+
+## 8. WHAT IS ACTUALLY KNOWN, AND WHAT IS NOT
+KNOWN (executed): the reference is idempotent; the failure is deterministic and
+byte-identical across runs; a WIDE build from the same starting point matches
+ground truth; more than one voice is stale; all eight voices' cell 1856 read
+1.0 at the moment of failure; patches 0 and 21 pass and patch 5 does not;
+patch 5 is the only one of the three whose allocator names voice 0 rather than
+voice 6, i.e. the only non-POLY one.
+
+NOT KNOWN: which cell a note writes that reaches more than one voice. The
+leading candidate is the DEVICE CELL MODEL itself -- ebdev gives every voice
+its own storage for exactly TWELVE scatter cells and SHARES everything else
+through one tile that ebdev_voice_select swaps per build. Any note write that
+lands outside those twelve is therefore seen by every voice. Every write in
+juno_note_on, _glide, _retrig, _porta_gate and _off that this session checked
+IS a scatter cell (304, 320, 592, 1856, 6864, 9680, 9824), so the write that
+escapes has not been found. THAT IS THE NEXT SESSION'S FIRST QUESTION, and the
+gate can now answer it: instrument ebdev_at to log non-scatter writes during
+eb_devseq_events on patch 5.
+
+⚠ THE SHIP DECISION IS UNCHANGED AND DOES NOT DEPEND ON ANY OF THIS. The
+unconditional widen is measured-correct on all three patches; it is what ships;
+the narrowing stays behind EB_DEVSEQ_NARROW_HELD, default off, and may not be
+enabled until held_gate.py is green with HELD_NARROW=1.

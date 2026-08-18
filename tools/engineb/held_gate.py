@@ -38,6 +38,10 @@ def main():
 
     defs = ['-DEB_DEVCELLS', '-DEBDEV_NV=%d' % a.nv,
             '-DDEVCHORD_N=%d' % a.chord] + make_boot.M1_DEFS
+    # HELD_NARROW=1 builds with the narrowing ENABLED, which is the
+    # configuration this gate exists to judge. Default off = the shipped path.
+    if os.environ.get('HELD_NARROW') == '1':
+        defs.append('-DEB_DEVSEQ_NARROW_HELD')
     exe = os.path.join(BUILD, 'held_gate')
     # eb_recall.c is NOT in make_boot.sources(): devcrc does not need it. The
     # chunk cursor lives there, and driving the REAL cursor rather than a
