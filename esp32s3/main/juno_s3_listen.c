@@ -92,6 +92,7 @@
 #if S3L_RECALL
 #include "ebdev.h"
 #include "eb_recall.h"
+#include "eb_sched.h"
 #include "eb_devseq.h"
 #include "eb_alloc.h"
 /* O1: THE ONE BOUNDARY. Every input reaches the engine through this and
@@ -492,31 +493,17 @@ static volatile int  tooth_once = 0;
  * leave a key silent. A forced step is a report of O4's problem, not O2's --
  * which is why the two counters are printed apart. */
 #define SCHED_STARVE 64            /* ~370 ms, then force and count it */
-static unsigned long g_quiet_spin = 0;   /* core 0's idle, burst-free block */
-/* ⚠ ONE WORST-CASE PER MACHINE, NOT ONE FOR BOTH. The patch burst's reseed
- * step is about 440,000 cycles and a note's voice step about 148,000. A single
- * shared maximum would let the reseed's figure gate every note step forever --
- * the note would be refused room it actually had, and the budget would starve
- * the very thing it was added to protect. The two machines are budgeted
- * against their own measured costs. */
+/* ⚠ THE DECISION ITSELF LIVES IN engine_b/dev/eb_sched.h, NOT HERE. It is
+ * gated with teeth by tools/engineb/sched_gate.py, and a gate that proves a
+ * copy the firmware does not run proves nothing (playbook 28). This file
+ * supplies the two MEASUREMENTS and nothing else. */
+static eb_sched SCHED;
+/* ⚠ ONE WORST-CASE PER MACHINE. The patch reseed is ~440,000 cycles and a
+ * note's voice step ~148,000; a shared maximum would let the reseed's figure
+ * gate every note step for ever -- the budget starving the exact work it was
+ * added to protect. */
 static unsigned long g_step_cyc_note = 0, g_step_cyc_burst = 0;
-static unsigned long sched_defer = 0, sched_forced = 0, sched_starve = 0;
-
-/* Non-zero when core 0 has room for one more step of THIS kind this block. */
-static int sched_may_step(unsigned long worst)
-{
-    /* No history yet: allow it. The first steps ARE the measurement, and
-     * refusing until measured would mean never measuring. */
-    if (g_quiet_spin == 0ul || worst == 0ul) return 1;
-    if (worst <= g_quiet_spin) { sched_starve = 0; return 1; }
-    if (++sched_starve >= SCHED_STARVE) {
-        sched_starve = 0;
-        ++sched_forced;         /* it will probably miss. Say so out loud. */
-        return 1;
-    }
-    ++sched_defer;
-    return 0;
-}
+static unsigned long g_quiet_spin = 0;   /* core 0's idle, burst-free block */
 
 /* Fold one step's measured cost into its machine's worst case, in cycles. */
 static void sched_note_cost(unsigned long *slot, unsigned long cyc)
@@ -2426,7 +2413,7 @@ static void render_block(int n)
         }
     }
     if (burst_state != BST_IDLE && !dev_muted
-        && sched_may_step(g_step_cyc_burst)) {
+        && eb_sched_may(&SCHED, g_step_cyc_burst)) {
         unsigned long sc0 = (unsigned long)esp_cpu_get_cycle_count();
         int st = dev_burst_step();
         sched_note_cost(&g_step_cyc_burst,
@@ -2471,7 +2458,7 @@ static void render_block(int n)
          * would hold the key silent to save work that does not exist. Only the
          * states that BUILD are gated. */
         if (note_pending
-            && (!nb_state_heavy() || sched_may_step(g_step_cyc_note))) {
+            && (!nb_state_heavy() || eb_sched_may(&SCHED, g_step_cyc_note))) {
             unsigned long sc0 = (unsigned long)esp_cpu_get_cycle_count();
             int st = dev_note_step();
             sched_note_cost(&g_step_cyc_note,
@@ -2502,7 +2489,9 @@ static void render_block(int n)
          * core it runs on, in the units it is measured in. Taking it from a
          * block that DID run a step would measure the slack after the step ate
          * it, and the scheduler would then starve itself. */
-        if (!burst_ran_this_block && !note_ran_this_block) g_quiet_spin = sd;
+        if (!burst_ran_this_block && !note_ran_this_block) {
+            g_quiet_spin = sd; eb_sched_slack(&SCHED, sd);
+        }
 #endif
     }
 #if S3L_RECALL
@@ -2702,7 +2691,7 @@ static void rpt_task(void *arg)
          * found room, which is O4's steady-state overrun and not O2's. */
         printf("SCHED: slack=%lu note=%lu burst=%lu cyc  defer=%lu forced=%lu\n",
                g_quiet_spin, g_step_cyc_note, g_step_cyc_burst,
-               sched_defer, sched_forced);
+               SCHED.n_defer, SCHED.n_forced);
         {   juno_event_stats es;
             juno_event_get_stats(&es);
             /* torn= is the only runtime witness to the publish barrier being
@@ -3014,6 +3003,7 @@ void app_main(void)
                                              MALLOC_CAP_INTERNAL);
     if (!DEVBANK) { printf("HALT: no room for the 20,246 B record buffer.\n"); return; }
     eb_recall_init(&REC, &RCB[0], &RCB[1], &MCB[0], &MCB[1], RS, MS, &EBE);
+    eb_sched_init(&SCHED, SCHED_STARVE);
     if (dev_burst(dev_patch, 0)) {
         dev_muted = 1;
         printf("MUTE AT BOOT: %s. The engine is started anyway so the counters "
