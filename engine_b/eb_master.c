@@ -27,6 +27,8 @@
 #include <stdio.h>
 int eb_rp_maxlag[EB_RP_N];
 int eb_rp_len[EB_RP_N];
+
+
 /* A FILE, not stderr, for the reason eb_vcf_ladder.c records: the null
  * harness runs its scenarios in worker subprocesses whose stderr is captured
  * and discarded, so a stderr report would print nothing and read as "no ring
@@ -48,6 +50,52 @@ static void eb_rp_report(void)
     fclose(f);
 }
 #endif
+
+/* ================= O4: THE MASTER-CHAIN STAGE PROFILER =================
+ *
+ * WHY. b6 and b15 both put the whole remaining deadline deficit in ONE place:
+ * core 1's FX pass. b15's run measured `FXP: fx` swinging 2,432 -> 4,374
+ * cyc/sample across patches while `v1` sat flat at ~2,600 and `wait=5`. So the
+ * variance -- about 1,900 cyc/sample, against a total deficit of 259 -- is
+ * entirely inside eb_master_render, and closing it would close O4 outright.
+ *
+ * ⚠ AND THE OBVIOUS CULPRIT WAS ALREADY RULED OUT. The delay rings look like
+ * the answer, and b4_second_run attributed it to PSRAM latency -- an
+ * attribution b6 WITHDREW: the moving-tap probe reads 29.8 cyc/tap against the
+ * scattered probe's 228.8, and a delay tap walks the ring nearly sequentially.
+ * A ring-placement test then moved four of nine rings into internal SRAM and
+ * the engine got 94 cycles WORSE. So "it is the rings" has been asserted,
+ * measured, and refuted, and the honest state is that NOBODY KNOWS which stage
+ * costs the 1,900.
+ *
+ * This answers it by construction rather than by argument: five stages, five
+ * counters, one per sample. The next board run names the stage.
+ *
+ * ⚠ OFF BY DEFAULT AND FREE WHEN OFF. Every macro below compiles to nothing
+ * unless EB_MSPROF is 1, so the shipping build is byte-identical and the trunk
+ * stays bit-exact. It reads the cycle counter, which is why it may never be
+ * left on in a build whose block timings are quoted: six reads per sample is
+ * itself a cost, and a profiler that changes what it measures is a defect
+ * (this file's own FXPROF tooth exists for that reason).
+ */
+#ifndef EB_MSPROF
+#define EB_MSPROF 0
+#endif
+#if EB_MSPROF
+#include <xtensa/hal.h>
+unsigned long long eb_msprof[5];      /* in, delay, reverb, out, effect */
+unsigned long      eb_msprof_n;
+#define MSP_T0()   unsigned long _p = (unsigned long)xthal_get_ccount(), _q
+#define MSP_HIT(k) do { _q = (unsigned long)xthal_get_ccount();               \
+                        eb_msprof[k] += (unsigned long long)(_q - _p);        \
+                        _p = _q; } while (0)
+#define MSP_END()  (++eb_msprof_n)
+#else
+#define MSP_T0()   do { } while (0)
+#define MSP_HIT(k) do { } while (0)
+#define MSP_END()  do { } while (0)
+#endif
+
 #include <string.h>
 
 int eb_master_render(eb_master_state *s, const eb_master_coef *c,
@@ -57,6 +105,7 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
     float v36, v38, v32, v176, v177, v56, v58, v529, v530, v593;
     float dL, dR;
 
+    MSP_T0();
     *outL = 0.0f;
     *outR = 0.0f;
 
@@ -67,6 +116,7 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
     eb_master_in_tick(&s->in, &c->in, voices, s->fb84672, s->fb84704,
                       &v36, &v38, &v32);
 
+    MSP_HIT(0);
     /* ---- 2. the DELAY dispatch ------------------------------------------ */
     v56 = 0.0f;
     v58 = -1.0f;
@@ -108,10 +158,12 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
                      &v176, &v177, &v56, &v58);
     }
 
+    MSP_HIT(1);
     /* ---- 3. the reverb. It CROSSES its channels; see eb_reverb.h. ------- */
     eb_reverb_process(&c->rev, &s->rev, s->rev_pending, &s->rev_wipe,
                       v176, v177, &v529, &v530);
 
+    MSP_HIT(2);
     /* ---- 4. the output stage. THE SAMPLE IS FINISHED HERE. -------------- */
     {
         /* cells 101264/101280 are the port's pre-doubling pair; the module
@@ -124,6 +176,7 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
         (void)cell101264; (void)cell101280;
     }
 
+    MSP_HIT(3);
     /* ---- 5. the EFFECT dispatch, which feeds the NEXT sample ------------ */
     if (c->effect_type == 0 || c->effect_type >= 6) {
         /* the LABEL_164 core */
@@ -149,5 +202,7 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
         v593 = chR;
     }
     s->fb84704 = v593;                              /* the port's LABEL_205 */
+    MSP_HIT(4);
+    MSP_END();
     return EB_MASTER_OK;
 }
