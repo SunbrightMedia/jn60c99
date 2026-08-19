@@ -187,3 +187,48 @@ caught, one command** (`sh tools/engineb/o2_gates.sh`).
 
 O2's acceptance is a SILICON test and cannot be closed here:
 `miss note=0`, `SCHED forced=0`, `KEYH` 2 dominant, `pubretry=0`.
+
+## 12. THE SAME DEFECT WAS STILL LIVE IN THE PATCH MACHINE
+Gating the NOTE sequence, then reading the PATCH sequence with that contract
+in mind, found the identical hand-over defect STILL IN THE SHIPPING PATH:
+
+    case BST_CHECK:
+        burst_state = BST_IDLE;                    /* <-- already idle */
+        rc_step = dev_burst_verify(...) ? -1 : 0;  /*     ...then ask   */
+
+If that publish is REFUSED -- and the firmware counts refusals, so it is a
+case that exists -- the machine is already IDLE. The whole ~2.1 M-cycle build
+then sits in the shadow, unpublished and forgotten: the instrument keeps
+playing the OLD patch, so THE PROGRAM CHANGE SILENTLY DID NOTHING. Worse, the
+next key press opens a note build, whose first act is to copy the LIVE bank
+over the shadow -- destroying the built patch outright. The player turns the
+knob, nothing happens, and no counter anywhere says why.
+
+⚠ THE LESSON, and it is the expensive one: THE NOTE MACHINE'S FIX WAS APPLIED
+TO THE CODE THAT HAD JUST BEEN READ, NOT TO THE CLASS OF DEFECT. A defect
+found in one state machine is a QUESTION TO ASK OF EVERY OTHER ONE. Both
+machines now hold the same contract -- ask to publish, advance only when the
+caller says it happened -- and both are gated with the defect planted as
+tooth 1.
+
+`engine_b/dev/eb_burststep.h` + `burst_gate.py` + `burst_teeth.sh`: order
+(every stage once, in order), termination, hand-over, the fatal paths at
+EVERY stage, the interlock, and the budget predicate. Seven teeth, all caught.
+
+## 13. WHERE O2 STANDS
+| gate | teeth |
+|---|---|
+| O1 event queue | 7 |
+| O1 boundary | 3 |
+| O2 chunk + split publish | 11 |
+| O2 note sequence | 9 |
+| O2 patch sequence | 7 |
+| O2 burst budget | 7 |
+| held (narrowing OFF) | - |
+| **total** | **44, all caught** |
+
+One command: `sh tools/engineb/o2_gates.sh`. ALL GREEN.
+
+Everything provable without the board is proved. O2's acceptance is a SILICON
+test and cannot be closed here: `miss note=0`, `SCHED forced=0`, `KEYH` 2
+dominant, `pubretry=0` on BOTH machines, `ref` at or near 0.

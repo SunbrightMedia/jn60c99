@@ -835,3 +835,35 @@ TWO COROLLARIES, both paid for in the same hour:
 And the shape to recognise: a scheduler must not deadlock on its own input. A
 deferred block must still refresh the measurement the deferral was based on,
 or the first deferral is permanent.
+
+## 62. A defect found in one state machine is a question to ask of every other
+PAID 2026-08-19, twice in one hour, in the same file.
+
+The note sequencer had a hand-over defect: it advanced past a publish without
+waiting to hear the publish had happened, so a REFUSED publish let the next
+build copy over the shadow and lose the work. It was found by reading, fixed,
+extracted to a header, and gated with the defect planted as a tooth.
+
+THE PATCH SEQUENCER, TWENTY LINES AWAY IN THE SAME FILE, HAD THE IDENTICAL
+DEFECT AND KEPT IT. `BST_CHECK` set the state to IDLE and asked for the
+publish in one step. Consequence if refused: a ~2.1 M-cycle patch build
+stranded in the shadow, the instrument still playing the old patch -- a
+program change that silently did nothing -- and the build then destroyed by
+the next key press, which copies the live bank over the shadow.
+
+WHY IT SURVIVED THE FIRST FIX: the fix was applied to THE CODE THAT HAD JUST
+BEEN READ, not to the CLASS. Reading a machine, finding a fault, and repairing
+that machine feels complete, and it is exactly half the job.
+
+THE RULE: when a defect is found in one state machine, protocol, or handshake,
+IMMEDIATELY ENUMERATE EVERY OTHER INSTANCE OF THAT SHAPE IN THE TREE and check
+each one before moving on. Write the check as a gate over the shared contract,
+not as a fix to the instance -- the gate is what makes the class stay closed.
+"Are there others?" is one question and it costs a minute; here it was the
+difference between one gated machine and two.
+
+Corollary, and it is what made the second one findable: EXTRACTING THE FIRST
+MACHINE'S CONTRACT INTO A HEADER MADE THE SECOND MACHINE'S BREACH OBVIOUS. A
+written contract is a template to hold against every other candidate. Before
+the extraction, both machines were "some states in a big switch" and the
+similarity was invisible.

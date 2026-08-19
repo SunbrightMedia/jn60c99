@@ -33,6 +33,7 @@ run "O1 boundary   (3 teeth)"    sh   "$HERE/boundary_teeth.sh"
 # O2 proper.
 run "O2 chunk+split (11 teeth)"  sh   "$HERE/chunk_teeth.sh"
 run "O2 note sequence (9 teeth)" sh   "$HERE/note_teeth.sh"
+run "O2 patch sequence (7 teeth)" sh  "$HERE/burst_teeth.sh"
 run "O2 burst budget (7 teeth)"  sh   "$HERE/sched_teeth.sh"
 # The narrowing that is REFUSED and must stay refused: this gate is green only
 # because the narrowing is off. It is here so nobody enables it unnoticed.

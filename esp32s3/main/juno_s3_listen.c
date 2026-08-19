@@ -94,6 +94,7 @@
 #include "eb_recall.h"
 #include "eb_sched.h"
 #include "eb_notestep.h"
+#include "eb_burststep.h"
 #include "eb_devseq.h"
 #include "eb_alloc.h"
 /* O1: THE ONE BOUNDARY. Every input reaches the engine through this and
@@ -882,7 +883,11 @@ static int dev_burst_verify(int patch, int gate)
  *          0 the shadow is COMPLETE and checked -- publish it
  *         -1 failed; dev_mute_why says which, and the caller mutes. */
 enum { BST_IDLE = 0, BST_RESEED, BST_INSTALL, BST_RECALL, BST_NOTES,
-       BST_COEFS, BST_CHECK };
+       BST_COEFS, BST_CHECK, BST_PUB };
+/* rule 4: a publish refused mid-build, counted. Must read 0 -- the publish
+ * happens inside the quiescent window and there is no known way to refuse it,
+ * so non-zero means the precondition is not what this file believes. */
+static unsigned long burst_pub_retry = 0;
 
 static void dev_burst_begin(int patch, int gate)
 {
@@ -959,8 +964,30 @@ static int dev_burst_step(void)
         break;
 
     case BST_CHECK:
-        burst_state = BST_IDLE;
-        rc_step = dev_burst_verify(burst_patch, burst_gate) ? -1 : 0;
+        /* ⚑ IT MUST NOT GO IDLE HERE. This read `burst_state = BST_IDLE`
+         * before asking for the publish, which is the SAME hand-over defect
+         * the note machine had -- found by reading THIS machine after the note
+         * machine was gated, and now tooth 1 of burst_teeth.sh.
+         *
+         * With a refused publish the whole ~2.1 M-cycle build was stranded in
+         * the shadow: the instrument kept playing the OLD patch, so the
+         * program change silently did nothing, and the next key press copied
+         * the live bank over the shadow and destroyed the built patch.
+         * The contract is eb_burststep.h's: ask, and advance only when the
+         * caller says the publish HAPPENED. */
+        if (dev_burst_verify(burst_patch, burst_gate)) {
+            burst_state = BST_IDLE; rc_step = -1;
+        } else {
+            burst_state = BST_PUB; rc_step = 0;
+        }
+        break;
+
+    case BST_PUB:
+        /* Reachable only when the publish was REFUSED. Ask again and touch
+         * nothing -- the shadow still holds the patch that was not handed
+         * over, and opening anything over it loses the build. */
+        ++burst_pub_retry;
+        rc_step = 0;
         break;
     }
 
@@ -2456,7 +2483,11 @@ static void render_block(int n)
          * key's events be drawn on top of a half-owed build, which is the one
          * thing the shadow's single-owner rule forbids. The mid-note publish
          * leaves nbst non-idle, so the flag survives it. */
+        /* ⚑ BOTH MACHINES ARE TOLD THE PUBLISH HAPPENED, AND ONLY HERE, ON
+         * THE SUCCESS PATH. A refused publish leaves each of them asking
+         * again next block while still owning its shadow. */
         eb_nb_published(&NB);
+        if (burst_state == BST_PUB) burst_state = BST_IDLE;
         if (eb_nb_idle(&NB))
             note_pending = 0;   /* released here, so MIDI may queue the next */
     }
@@ -2586,8 +2617,9 @@ static void rpt_task(void *arg)
          * rule 3 trades for continuity, so it is reported rather than
          * assumed. `rst` counts a request that arrived mid-build; non-zero
          * only means the knob moved faster than a change settles. */
-        printf("O2: blk=%lu mx=%lu rst=%lu cyc=%lu\n",
-               burst_blocks, burst_blocks_max, burst_restarts, b_last);
+        printf("O2: blk=%lu mx=%lu rst=%lu cyc=%lu pubretry=%lu\n",
+               burst_blocks, burst_blocks_max, burst_restarts, b_last,
+               burst_pub_retry);
         /* O2: the note burst, SPLIT. ev= the event apply, vb= the chunked
          * voice build, nv= how many voices the allocator named, st= steps
          * committed. The 1.06 M lump b8 measured is now these parts, so the
