@@ -13,6 +13,10 @@ REPO=$(dirname "$(dirname "$HERE")")
 WORK="$REPO/build/chunkteeth"
 SRC="$REPO/engine_b/dev/eb_recall.c"
 COEF="$REPO/engine_b/eb_coefs.c"
+# eb_recall.c is BOTH the chunk cursor and the publish. Tooth 11 plants into
+# the publish half, so it needs its own handle -- but the same file, and the
+# restore below already covers it. Named separately so the tooth reads right.
+REC="$SRC"
 
 rm -rf "$WORK"; mkdir -p "$WORK"
 cp "$SRC" "$WORK/eb_recall.c.orig"
@@ -93,7 +97,39 @@ tooth 8 "$SRC" \
   's/    if (st <= EB_NUM_VOICES) { r->chunk_step = st; return 1; }/    if (st <= EB_NUM_VOICES + 1) { r->chunk_step = st; return 1; }/' \
   'the note cursor burns an extra block per build'
 
+# ---- O2: THE SPLIT PUBLISH (the key sounds in two blocks) ---------------
+# 9. THE SECOND STAGE CLOBBERS THE FIRST. If stage 2 copies from the SHADOW
+#    rather than from the bank stage 1 just published, the priority voice's
+#    build is thrown away at the final publish -- the key sounds, then goes
+#    stale again ~8 blocks later. The nastiest failure this design can have,
+#    because the note is audibly RIGHT at first.
+tooth 9 "$SRC" \
+  '/eb_recall_chunk_begin_voices/,/^}/ s/    \*r->rc\[shadow\] = \*r->rc\[r->cur\];/    *r->rc[shadow] = *r->rc[shadow];/' \
+  'the second stage copies the SHADOW, discarding the first publish'
+
+# 10. THE PRIORITY VOICE IS NOT ACTUALLY BUILT FIRST -- an off-by-one in the
+#     voice the cursor builds. The end state can still come out right once the
+#     other stage covers it, so ONLY the "does the key sound early" check sees
+#     this. That check exists for exactly this plant.
+tooth 10 "$SRC" \
+  's/        eb_coefs_voice((const unsigned char \*)0, r->rc\[shadow\], st - 1);/        eb_coefs_voice((const unsigned char *)0, r->rc[shadow], st % EB_NUM_VOICES);/' \
+  'the cursor builds the wrong voice (the key does not sound early)'
+
+# 11. ⚠ THE ONE ONLY THIS SECTION CAN CATCH: A PUBLISH THAT IS NOT IDEMPOTENT.
+#     The split publishes TWICE for one key press. Everything in
+#     eb_recall_publish must therefore survive being run twice, and step 7b is
+#     the one that genuinely could not -- it CONSUMES the aux retrigger one-shot
+#     out of the cell array. This plant makes the second publish clear the
+#     retrigger the first one armed: the note loses its retrigger, silently, and
+#     no byte of any coefficient moves. Neither the 64-patch section nor the
+#     256-mask section calls publish at all, so nothing else in this gate can
+#     see it. That is why the split section compares RENDER STATE and not only
+#     coefficients.
+tooth 11 "$REC" \
+  's/            if (\*aux == 1.0f) { r->rs->aux_edge\[v\] = 1; \*aux = 0.0f; }/            if (*aux == 1.0f) { r->rs->aux_edge[v] = 1; *aux = 0.0f; }\n            else r->rs->aux_edge[v] = 0;/' \
+  'publish is NOT idempotent -- the second one loses the retrigger'
+
 restore
 echo
 python3 "$HERE/chunk_gate.py"
-echo "CHUNK TEETH: eight caught, clean tree green."
+echo "CHUNK TEETH: eleven caught, clean tree green."

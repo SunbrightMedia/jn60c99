@@ -280,6 +280,218 @@ int main(int argc, char **argv)
                (bad == 0 && nmask_bad == 0) ? "identical" : "DIFFERS");
     }
 
+    /* ============ O2: THE SPLIT PUBLISH -- THE KEY SOUNDS IN TWO BLOCKS =====
+     *
+     * THE PROBLEM IT SOLVES, measured and stated in b9_held_broadcast.md §4:
+     * EB_EV_HELD widens every note's mask to all eight voices, so a chunked
+     * note build is 1 + 8 + 1 = TEN BLOCKS = 58 ms between key and sound. The
+     * chunking fixed the missed deadlines and created a keyboard nobody can
+     * play. Narrowing the mask was tried, gated, and REFUSED (§6-§8).
+     *
+     * THE FIX, which is option (c) of §6: build the voices the allocator NAMED
+     * first, PUBLISH, then build the rest into a SECOND publish. The note
+     * sounds after two blocks (~12 ms); the broadcast's effect on the other
+     * seven voices arrives up to eight blocks later. THE INVARIANT rule 3
+     * exactly -- the change arrives late, the audio never breaks.
+     *
+     * ⚠ IT ADDS NO NEW PUBLISH PATH, and that is the reason to prefer it. A
+     * second chunked build after a publish is the SAME machine on the other
+     * bank: begin_voices copies the now-live bank into the new shadow, so the
+     * priority voice it just published is carried forward rather than lost.
+     *
+     * WHAT THIS SECTION PROVES, and neither half is optional:
+     *   1. THE END STATE IS UNCHANGED -- the live bank after both publishes is
+     *      byte-identical to the live bank after ONE monolithic
+     *      eb_recall_build_voices(mask) + publish. If this fails the split has
+     *      changed what the instrument computes, not merely when.
+     *   2. THE KEY REALLY DOES SOUND EARLY -- the live bank after the FIRST
+     *      publish is byte-identical to a monolithic build of the PRIORITY set
+     *      alone. Without this the split could pass check 1 while publishing
+     *      nothing useful early, which is the whole point defeated silently.
+     *
+     * OVER EVERY (mask, priority) PAIR, not the few a chord happens to make:
+     * for all 256 masks and every SUBSET of each, which is 3^8 = 6,561 pairs.
+     * The allocator names one voice usually and two when it steals, but which
+     * bits it sets is its business and this gate must not assume.
+     *
+     * THE PUBLISH RUNS TWICE PER NOTE and that had to be checked rather than
+     * assumed, because publish is not a pure function -- step 7b CONSUMES the
+     * aux retrigger one-shot out of the cell array. Comparing the RENDER STATE
+     * as well as the coefficients is what makes this section see that: a second
+     * publish that lost a retrigger, re-latched a delay route differently, or
+     * re-seeded a DCO from the wrong bank shows up in RS/MS, not in RC. */
+    {
+        static ebdev_state    SNAP_CELLS;
+        static eb_render_coefs SNAP_A, SNAP_B, LIVE1, LIVEF, REFF;
+        static eb_master_coef  SNAP_MA, SNAP_MB, LIVE1M, LIVEFM, REFFM;
+        static eb_render_state SNAP_RS, REF_RS, SUB_RS;
+        static eb_master_state SNAP_MS, REF_MS, SUB_MS;
+        static eb_recall       SNAP_REC;
+        unsigned mask, pri;
+        long pairs = 0, split_bad = 0, early_bad = 0;
+
+        /* One patch, and patch 5 on purpose: it is the DELAY TYPE 5 whose
+         * blocks have the least slack AND the MONO patch whose event set broke
+         * the narrowing, so it is the least forgiving input this split has. */
+        ebdev_reset_counters();
+        if (eb_devseq_boot_cells(boot, nv)) return 2;
+        if (eb_devseq_install(BANKBUF, tpl, (size_t)tpln,
+                              bank64 + (size_t)5 * EB_PATCH_BYTES)) return 2;
+        eb_devseq_recall(BANKBUF, 128.0f);
+        /* BOTH BANKS MUST BE POPULATED before any of this means anything: a
+         * note build COPIES the live bank, so a trial starting from a zeroed
+         * pair would compare two carries of nothing. Build and publish twice. */
+        eb_recall_build(&REC); eb_recall_publish(&REC);
+        eb_recall_block_boundary(&REC);
+        eb_recall_build(&REC); eb_recall_publish(&REC);
+        eb_recall_block_boundary(&REC);
+        /* ⚠ THE NOTES GO IN AFTER THOSE PUBLISHES, AND THE ORDER IS THE WHOLE
+         * POINT. Publish step 7b CONSUMES the aux retrigger one-shot, so a
+         * trial that starts with the one-shot already spent cannot tell an
+         * idempotent publish from one that destroys what the first publish
+         * armed -- which is the single risk the split publish introduces.
+         *
+         * MEASURED, not reasoned: with the notes applied BEFORE those two
+         * publishes, tooth 11 (a publish that clears the retrigger on its
+         * second run) WAS NOT CAUGHT. Moving them here is what made it bite.
+         * A precondition the gate forgot to set up is a blind gate that reads
+         * PASS, and this one read PASS for a whole run. */
+        eb_devseq_notes_on(DEVCHORD_VOICE, DEVCHORD_NOTE, DEVCHORD_VEL,
+                           DEVCHORD_N);
+        /* AND THE RELEASE IS WHAT ACTUALLY ARMS IT. src/juno_note.c:166 says
+         * note-ON does NOT arm the DCO retrigger latch, and :255 says each
+         * note-OFF arms the released voice's 101504+32v to 1.0. Taking the
+         * port at its word rather than assuming a note-on arms everything is
+         * the second half of what made tooth 11 bite -- moving the notes after
+         * the publishes was not enough on its own. */
+        eb_devseq_notes_off(DEVCHORD_VOICE, DEVCHORD_N);
+
+#define SNAPSHOT() do {                                                      \
+        SNAP_CELLS = EBDEV_S; SNAP_A = RC_A; SNAP_B = RC_B;                  \
+        SNAP_MA = MC_A; SNAP_MB = MC_B;                                      \
+        SNAP_RS = RS; SNAP_MS = MS; SNAP_REC = REC;                          \
+    } while (0)
+#define RESTORE() do {                                                       \
+        EBDEV_S = SNAP_CELLS; RC_A = SNAP_A; RC_B = SNAP_B;                   \
+        MC_A = SNAP_MA; MC_B = SNAP_MB;                                       \
+        RS = SNAP_RS; MS = SNAP_MS; REC = SNAP_REC;                           \
+    } while (0)
+
+        SNAPSHOT();
+
+        /* THE SNAPSHOT ITSELF MUST BE HONEST. If restoring did not really put
+         * the world back, every comparison below would compare two runs from
+         * different starting points and could agree or differ for reasons that
+         * have nothing to do with the split. Check it once, out loud -- this is
+         * the same defect held_gate.c paid for (b9 §7a). */
+        {   static eb_render_coefs T1, T2;
+            RESTORE(); eb_recall_build_voices(&REC, 0x0Fu);
+            T1 = *REC.rc[1 - REC.cur];
+            RESTORE(); eb_recall_build_voices(&REC, 0x0Fu);
+            T2 = *REC.rc[1 - REC.cur];
+            if (memcmp(&T1, &T2, sizeof T1) != 0) {
+                printf("  *** the snapshot does not restore -- two builds from "
+                       "the 'same' state differ. Nothing below is evidence.\n");
+                ++bad;
+            } else {
+                printf("split publish: snapshot restores exactly\n");
+            }
+            RESTORE();
+        }
+
+        for (mask = 1u; mask < (1u << EB_NUM_VOICES) && !split_bad
+                        && !early_bad; ++mask) {
+            /* every non-empty SUBSET of mask, by the standard submask walk */
+            for (pri = mask; pri; pri = (pri - 1u) & mask) {
+                int nstep;
+
+                /* ---- REFERENCE: one build, one publish ------------------- */
+                RESTORE();
+                eb_recall_build_voices(&REC, mask);
+                if (eb_recall_publish(&REC) != 0) {
+                    printf("  *** reference publish refused\n"); ++bad; break;
+                }
+                eb_recall_block_boundary(&REC);
+                REFF = *REC.rc[REC.cur]; REFFM = *REC.mc[REC.cur];
+                REF_RS = RS; REF_MS = MS;
+
+                /* ---- REFERENCE 2: the PRIORITY set alone, one publish ----
+                 * what the player must be hearing after the first publish. */
+                RESTORE();
+                eb_recall_build_voices(&REC, pri);
+                if (eb_recall_publish(&REC) != 0) { ++bad; break; }
+                eb_recall_block_boundary(&REC);
+                LIVE1 = *REC.rc[REC.cur]; LIVE1M = *REC.mc[REC.cur];
+
+                /* ---- SUBJECT: the split, through the REAL cursor --------- */
+                RESTORE();
+                eb_recall_chunk_begin_voices(&REC, pri);
+                nstep = 0;
+                while (eb_recall_chunk_step(&REC))
+                    if (++nstep > EB_NUM_VOICES * 4) {
+                        printf("  *** stage 1 cursor does not terminate\n");
+                        return 1;
+                    }
+                if (eb_recall_publish(&REC) != 0) { ++bad; break; }
+                eb_recall_block_boundary(&REC);
+
+                /* CHECK 2: the key sounds NOW, with its own voice correct. */
+                if (memcmp(&LIVE1, REC.rc[REC.cur], sizeof LIVE1) != 0 ||
+                    memcmp(&LIVE1M, REC.mc[REC.cur], sizeof LIVE1M) != 0) {
+                    printf("  *** mask %02x pri %02x: after the FIRST publish "
+                           "the live bank is NOT the priority build -- the key "
+                           "does not sound early, which is the whole point\n",
+                           mask, pri);
+                    ++early_bad; ++bad; break;
+                }
+
+                /* the rest, catching up */
+                if (mask & ~pri) {
+                    eb_recall_chunk_begin_voices(&REC, mask & ~pri);
+                    nstep = 0;
+                    while (eb_recall_chunk_step(&REC))
+                        if (++nstep > EB_NUM_VOICES * 4) {
+                            printf("  *** stage 2 cursor does not terminate\n");
+                            return 1;
+                        }
+                    if (eb_recall_publish(&REC) != 0) { ++bad; break; }
+                    eb_recall_block_boundary(&REC);
+                }
+                LIVEF = *REC.rc[REC.cur]; LIVEFM = *REC.mc[REC.cur];
+                SUB_RS = RS; SUB_MS = MS;
+
+                /* CHECK 1: the end state is what the monolith would have. */
+                if (memcmp(&REFF, &LIVEF, sizeof REFF) != 0 ||
+                    memcmp(&REFFM, &LIVEFM, sizeof REFFM) != 0) {
+                    printf("  *** mask %02x pri %02x: the split's FINAL live "
+                           "bank differs from the monolithic build -- the "
+                           "split changed WHAT is computed, not only when\n",
+                           mask, pri);
+                    ++split_bad; ++bad; break;
+                }
+                /* ...INCLUDING the state publish writes. Two publishes instead
+                 * of one must not lose a retrigger or re-latch a route. */
+                if (memcmp(&REF_RS, &SUB_RS, sizeof REF_RS) != 0) {
+                    printf("  *** mask %02x pri %02x: RENDER STATE differs "
+                           "after two publishes (gate/aux/dco mirror)\n",
+                           mask, pri);
+                    ++split_bad; ++bad; break;
+                }
+                if (memcmp(&REF_MS, &SUB_MS, sizeof REF_MS) != 0) {
+                    printf("  *** mask %02x pri %02x: MASTER STATE differs "
+                           "after two publishes (delay route / reverb wipe)\n",
+                           mask, pri);
+                    ++split_bad; ++bad; break;
+                }
+                ++pairs;
+            }
+        }
+#undef SNAPSHOT
+#undef RESTORE
+        printf("%ld (mask,priority) pairs, split publish vs monolith: %s\n",
+               pairs, (split_bad || early_bad) ? "DIFFERS" : "identical");
+    }
+
     printf("64 patches, both paths, %u + %u bytes each\n",
            (unsigned)sizeof(eb_render_coefs), (unsigned)sizeof(eb_master_coef));
     printf("CHUNK GATE: %s\n", bad == 0 ? "PASS -- chunked IS monolithic"

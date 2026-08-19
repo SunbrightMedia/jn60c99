@@ -106,12 +106,14 @@ uint32_t eb_devseq_crc32(const void *p, size_t n)
 /* ---- C4: THE ALLOCATOR SEAM ---------------------------------------------- */
 
 unsigned EB_DEVSEQ_TOUCHED = 0u;
+unsigned EB_DEVSEQ_VOICED  = 0u;
 
 int eb_devseq_events(const eb_alloc_ev *ev, int n)
 {
     int i;
     if (!ev) return -1;
     EB_DEVSEQ_TOUCHED = 0u;
+    EB_DEVSEQ_VOICED  = 0u;
     for (i = 0; i < n; ++i) {
         /* THE VOICE MASK, built HERE and not inferred by the caller. A caller
          * that under-states it gets seven stale voices and no error -- see
@@ -121,6 +123,12 @@ int eb_devseq_events(const eb_alloc_ev *ev, int n)
          * its own case below, BEFORE it writes, for the reason stated there.
          * Getting that single case wrong is the whole risk. */
         EB_DEVSEQ_TOUCHED |= (ev[i].kind == EB_EV_HELD)
+                             ? 0u : (1u << ev[i].voice);
+        /* THE PRIORITY SET, built from the SAME expression so it cannot drift
+         * from TOUCHED. EB_EV_HELD names no voice; every other kind names the
+         * one the player is waiting to hear. See the header for why this is a
+         * publish ORDER and never a mask to build alone. */
+        EB_DEVSEQ_VOICED |= (ev[i].kind == EB_EV_HELD)
                              ? 0u : (1u << ev[i].voice);
         switch (ev[i].kind) {
         case EB_EV_TRIGGER:

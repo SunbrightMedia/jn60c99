@@ -174,3 +174,78 @@ eb_devseq_events on patch 5.
 unconditional widen is measured-correct on all three patches; it is what ships;
 the narrowing stays behind EB_DEVSEQ_NARROW_HELD, default off, and may not be
 enabled until held_gate.py is green with HELD_NARROW=1.
+
+## 9. THE 58 ms IS CLOSED — THE SPLIT PUBLISH (2026-08-19, O2's last item)
+§6 listed four options and chose none. (c) is now BUILT AND GATED: build the
+voices the ALLOCATOR NAMED first, publish, then build the rest into a SECOND
+publish.
+
+    block 1    apply the events
+    block 2    the voice the key landed on      --> PUBLISH, IT SOUNDS
+    block 3-9  the other seven, catching up     --> PUBLISH, complete
+
+TWO BLOCKS TO SOUND (~12 ms) instead of ten (58 ms). Nothing is dropped and no
+mask was narrowed: EB_DEVSEQ_TOUCHED is still built and still honoured in full.
+What arrives late is the broadcast's effect on voices the player did NOT press
+-- cell 1856 into their LFO -- for at most eight blocks. THE INVARIANT rule 3
+exactly: the change arrives later, the audio never breaks.
+
+### Why (c) and not (a), (b) or (d)
+(a) fix the narrowing -- §7 refuted all three hypotheses; the mechanism is
+    still unknown, so there is nothing to fix yet.
+(b) derive the mask from written cells -- a new derivation and a new gate for a
+    result the mask already has correctly.
+(d) accept the miss -- forbidden by the invariant, not a trade to make.
+(c) needs NO NEW PUBLISH PATH, which is the reason to prefer it. A second
+    chunked build after a publish is the SAME machine on the other bank:
+    begin_voices copies the now-live bank into the new shadow, so the voice
+    just published is carried forward rather than lost.
+
+### What was built
+  * eb_devseq: EB_DEVSEQ_VOICED, the voices the events NAMED, from the SAME
+    expression as TOUCHED so the two cannot drift. It is a PUBLISH ORDER, never
+    a mask to build alone -- the header says so in those words.
+  * juno_s3_listen: NB_PRI / NB_REST_BEGIN / NB_REST replace NB_VOICES.
+    note_pending is now released only when the machine is IDLE, so the
+    mid-note publish cannot let the next key's events land on a half-owed
+    build. `NB:` prints key= and keymax=, the blocks the player waited.
+
+### The gate, and the tooth that was NOT caught first time
+tools/engineb/chunk_gate.py now walks all 6,305 (mask, priority) pairs -- every
+non-empty subset of every mask, 3^8 - 1 - 255 -- on patch 5, and checks TWO
+things, neither optional:
+  1. the live bank after BOTH publishes is byte-identical to one monolithic
+     eb_recall_build_voices(mask) + publish. The split changed WHEN, not WHAT.
+  2. the live bank after the FIRST publish is byte-identical to a monolithic
+     build of the priority set alone -- i.e. the key really does sound early.
+     Without check 2 the split could pass check 1 while publishing nothing
+     useful early, which is the whole point defeated silently.
+It also compares the RENDER and MASTER STATE, because publish is NOT a pure
+function: step 7b CONSUMES the aux retrigger one-shot out of the cell array,
+and the split runs publish TWICE per key press.
+
+⚠ TOOTH 11 PLANTS EXACTLY THAT -- a publish that clears on its second run the
+retrigger its first run armed -- AND IT WAS NOT CAUGHT ON TWO ATTEMPTS. Both
+failures were the gate's setup, not the tooth:
+  a. the notes were applied BEFORE the two setup publishes, which consumed the
+     one-shot, so no trial had a retrigger pending to lose;
+  b. moving them after was still not enough: src/juno_note.c:166 says note-ON
+     does NOT arm the latch and :255 says note-OFF does. The gate had to
+     release the chord as well.
+A precondition the gate forgot to set up is a blind gate, and this one read
+PASS for two whole runs while a real defect sat in the tree. That is playbook
+defect 1 wearing a new coat: the detector existed, was never seen to fire, and
+was believed. ELEVEN TEETH NOW CAUGHT, clean tree green.
+
+### What is NOT claimed
+key=2 is PROVEN on the host as a step count and READ in the firmware's state
+machine. It has NOT been measured on silicon -- the board has not been flashed
+with this build. The `NB: key= keymax=` line is what will confirm or refute it,
+and keymax is the number to read, because an average latency is not what a
+player feels.
+
+The narrowing is untouched: still behind EB_DEVSEQ_NARROW_HELD, still OFF,
+still refused by held_gate.py with HELD_NARROW=1. §8's open question -- which
+cell a note writes that reaches more than one voice -- is STILL OPEN, and the
+split publish makes it an optimisation rather than a blocker: it would take the
+catch-up from eight blocks to one, and the key latency is already paid.

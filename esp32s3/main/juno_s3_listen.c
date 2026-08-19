@@ -1086,12 +1086,16 @@ static void dev_request(int patch, int gate)
  * in the firmware. THE INVARIANT rule 2 names note bursts explicitly, so O2
  * was half done.
  *
- * THREE STATES, and the coefficient one is now popcount(mask) blocks rather
- * than one:
- *   NB_EVENTS  apply the allocator's events through the port's note path,
- *              then open the chunked voice build
- *   NB_VOICES  one voice per block
- *   NB_CHECK   the unmapped-cell check, which must see the WHOLE build
+ * THE STATES, one block each, and the voice ones are popcount(mask) blocks
+ * rather than one:
+ *   NB_EVENTS      apply the allocator's events through the port's note path,
+ *                  then open the PRIORITY voice build
+ *   NB_PRI         the voices the allocator NAMED, one per block. The publish
+ *                  after the last of these is where the key becomes audible.
+ *   NB_REST_BEGIN  open the catch-up build, over the bank that publish made
+ *                  live
+ *   NB_REST        every other voice the broadcast touched, one per block
+ *   NB_CHECK       the unmapped-cell check, which must see the WHOLE build
  *
  * `nb` IS NOW SPLIT the way BURST: already is -- ev= for the event apply,
  * vb= for the voice build, nv= for how many voices the allocator named. The
@@ -1099,10 +1103,64 @@ static void dev_request(int patch, int gate)
  * how the next session learns why it is 7.9x rather than guessing. If nv reads
  * 8 when a two-note chord is playing, that is a DEFECT to fix and not work to
  * spread -- which is exactly why the count is printed. */
-enum { NB_IDLE = 0, NB_EVENTS, NB_VOICES, NB_CHECK };
+/* ⚑ AND THE SPLIT PUBLISH, WHICH IS WHAT MAKES IT A KEYBOARD.
+ *
+ * The chunking above fixed the missed deadlines and created a new fault:
+ * eb_alloc emits EB_EV_HELD on every note, eb_devseq widens the mask to all
+ * eight voices (correct -- held_gate.py proves narrowing it WRONG on patch 5),
+ * so a chunked note is 1 + 8 + 1 = TEN BLOCKS = 58 ms between key and sound.
+ * That is not an instrument. Full evidence: data/b9_held_broadcast.md §4.
+ *
+ * THE FIX is b9 §6 option (c): build the voices the ALLOCATOR NAMED first,
+ * publish, then build the other seven into a SECOND publish.
+ *
+ *   block 1   apply the events
+ *   block 2   build the voice the key landed on   --> PUBLISH, IT SOUNDS
+ *   block 3-9 the other seven, catching up        --> PUBLISH, complete
+ *
+ * TWO BLOCKS TO SOUND (~12 ms) instead of ten (58 ms). THE INVARIANT rule 3
+ * exactly: the change arrives later, the audio never breaks, and nothing is
+ * dropped. What lands late is the broadcast's effect on voices the player did
+ * NOT just press -- cell 1856 into their LFO -- for at most eight blocks.
+ *
+ * IT ADDS NO NEW PUBLISH PATH. A second chunked build after a publish is the
+ * same machine on the other bank: begin_voices copies the now-live bank into
+ * the new shadow, so the voice just published is carried forward, not lost.
+ *
+ * ⚠ PUBLISHING TWICE FOR ONE KEY PRESS IS ONLY SAFE BECAUSE PUBLISH IS
+ * IDEMPOTENT, and that was CHECKED, not assumed: step 7b consumes the aux
+ * retrigger one-shot out of the cell array, so a second publish could destroy
+ * what the first armed. tools/engineb/chunk_gate.py compares the RENDER STATE
+ * after the split against the monolith over all 6,305 (mask, priority) pairs,
+ * and chunk_teeth.sh tooth 11 plants exactly that defect and requires it to be
+ * caught. Anything added to eb_recall_publish must keep that tooth red. */
+/* ⚠ AND THE PUBLISH MAY BE REFUSED, WHICH IS WHY THERE ARE WAIT STATES.
+ * eb_recall_publish returns non-zero when its quiescence precondition fails
+ * and then NOTHING moves -- the build stays in the shadow. The firmware
+ * already counts that (`dev_pub_refused`) so it is a case that exists.
+ *
+ * WITHOUT A WAIT STATE THE SPLIT LOSES A VOICE, SILENTLY: if the priority
+ * publish is refused and the machine walks on to open the catch-up build,
+ * begin_voices copies the LIVE bank over the shadow that still held the
+ * priority voice -- and that voice is not in the catch-up mask, so nothing
+ * ever rebuilds it. The key sounds with the previous patch's coefficients
+ * until the next note happens to name it. A stale voice and no error is this
+ * project's most expensive defect shape, and the split publish is the first
+ * thing here that could produce one.
+ *
+ * So the machine does not advance past a publish until the publish HAPPENED.
+ * NB_PUB1/NB_PUB2 ask again next block and touch nothing meanwhile; the
+ * publish site advances them on success only. */
+enum { NB_IDLE = 0, NB_EVENTS, NB_PRI, NB_PUB1,
+       NB_REST_BEGIN, NB_REST, NB_CHECK, NB_PUB2 };
 static int           nbst = NB_IDLE;
 static unsigned long nb_ev = 0, nb_vb = 0, nb_nvoice = 0, nb_steps = 0;
 static unsigned long nb_miss0 = 0;
+/* how many blocks the player waited: events opened to the first publish. This
+ * is THE number this whole split exists to move, so the firmware prints it
+ * rather than leaving it to be inferred from a design argument. */
+static unsigned long nb_keyblk = 0, nb_keyblk_max = 0;
+static unsigned      nb_pri = 0, nb_rest = 0;
 
 static int dev_note_step(void)
 {
@@ -1127,27 +1185,75 @@ static int dev_note_step(void)
             return -1;
         }
         nb_ev = (unsigned long)esp_cpu_get_cycle_count() - t0;
-        /* THE MASK IS THE APPLIER'S, not this file's. Proven bit-identical to
-         * the full build by tools/engineb/devrecall/gate.c, and the chunked
-         * path proven identical to eb_recall_build_voices over ALL 256 masks
-         * by tools/engineb/chunk_gate.py, with three teeth. */
-        eb_recall_chunk_begin_voices(&REC, EB_DEVSEQ_TOUCHED);
+        /* BOTH MASKS ARE THE APPLIER'S, not this file's. TOUCHED is the whole
+         * obligation and is passed unnarrowed; VOICED says which of those the
+         * player is waiting to hear. This file must not compute either -- a
+         * consumer that infers the mask is eb_recall_build_voices' stated
+         * failure mode, seven stale voices and no error. */
+        nb_pri  = EB_DEVSEQ_VOICED & EB_DEVSEQ_TOUCHED;
+        nb_rest = EB_DEVSEQ_TOUCHED & ~nb_pri;
         {   unsigned m = (unsigned)EB_DEVSEQ_TOUCHED, n = 0;
             while (m) { n += m & 1u; m >>= 1; }
             nb_nvoice = n;
-            nb_steps  = (unsigned long)eb_recall_chunk_steps(&REC);
         }
         nb_vb = 0;
-        nbst = eb_recall_chunk_busy(&REC) ? NB_VOICES : NB_CHECK;
+        nb_keyblk = 1;                 /* this block, the one that applied */
+        /* THE PRIORITY STAGE. An empty priority set is not an error -- it is
+         * an event batch that named no voice -- so fall straight through to
+         * the rest rather than publishing nothing. */
+        if (nb_pri) {
+            eb_recall_chunk_begin_voices(&REC, nb_pri);
+            nb_steps = (unsigned long)eb_recall_chunk_steps(&REC);
+            nbst = eb_recall_chunk_busy(&REC) ? NB_PRI : NB_REST_BEGIN;
+        } else {
+            nb_steps = 0;
+            nbst = NB_REST_BEGIN;
+        }
         break;
 
-    case NB_VOICES:
+    case NB_PRI:
+        ++nb_keyblk;
+        if (!eb_recall_chunk_step(&REC)) {
+            /* ⚑ THE KEY SOUNDS HERE. Returning 0 makes the caller publish; the
+             * note is NOT finished, and note_pending stays set so no new
+             * events are drawn over a half-owed build. */
+            nbst = NB_PUB1;
+            nb_vb += (unsigned long)esp_cpu_get_cycle_count() - t0;
+            if (nb_keyblk > nb_keyblk_max) nb_keyblk_max = nb_keyblk;
+            return 0;
+        }
+        nb_vb += (unsigned long)esp_cpu_get_cycle_count() - t0;
+        break;
+
+    case NB_PUB1:
+    case NB_PUB2:
+        /* Only reachable when the publish was REFUSED -- the publish site
+         * advances these on success. Ask again and touch NOTHING: the shadow
+         * still holds the build that was not published, and the one thing
+         * that must not happen is opening another build over it. */
+        return 0;
+
+    case NB_REST_BEGIN:
+        /* The catch-up build, opened AFTER the publish above so it copies the
+         * bank that publish just made live -- which is what carries the voice
+         * the player is already hearing into the second half. */
+        if (nb_rest) {
+            eb_recall_chunk_begin_voices(&REC, nb_rest);
+            nb_steps += (unsigned long)eb_recall_chunk_steps(&REC);
+            nbst = eb_recall_chunk_busy(&REC) ? NB_REST : NB_CHECK;
+        } else {
+            nbst = NB_CHECK;
+        }
+        nb_vb += (unsigned long)esp_cpu_get_cycle_count() - t0;
+        break;
+
+    case NB_REST:
         if (!eb_recall_chunk_step(&REC)) nbst = NB_CHECK;
         nb_vb += (unsigned long)esp_cpu_get_cycle_count() - t0;
         break;
 
     case NB_CHECK:
-        nbst = NB_IDLE;
+        nbst = NB_PUB2;
         ++note_bursts;
         nb_last = nb_ev + nb_vb;
         if (nb_last < nb_min) nb_min = nb_last;
@@ -1162,6 +1268,7 @@ static int dev_note_step(void)
                    EBDEV_S.miss - nb_miss0, EBDEV_S.lastmiss);
             dev_mute_why = "a note event hit an unmapped cell";
             health_fail("a note wrote into an unmapped cell");
+            nbst = NB_IDLE;     /* muted; do not leave a publish owed */
             return -1;
         }
         rc_step = 0;
@@ -2142,7 +2249,17 @@ static void render_block(int n)
      * patch -- latest wins, which is what a user spinning the patch knob
      * means -- and the restart is COUNTED (rule 4), because a knob turned
      * faster than 81 ms would otherwise silently never settle. */
-    if (dev_want && !dev_muted) {
+    /* ⚠ AND IT WAITS FOR A NOTE BUILD TO FINISH. THE SHADOW HAS ONE OWNER.
+     * The note branch below already refuses to start while a patch build is in
+     * flight; the reverse was NOT true, so a program change arriving mid-note
+     * opened a patch build over the note's half-finished shadow. It is worse
+     * now that a note publishes twice: the burst's publish would also advance
+     * the note machine past a hand-over that never happened.
+     *
+     * dev_want is NOT cleared here, so nothing is lost -- the patch change
+     * lands a few blocks later, which is rule 3 and the same answer the note
+     * path already gives a patch change. */
+    if (dev_want && !dev_muted && !note_pending && nbst == NB_IDLE) {
         dev_burst_begin(dev_patch, dev_gate);
         dev_want = 0;
     }
@@ -2229,9 +2346,23 @@ static void render_block(int n)
             p_last = qd;
             if (qd < p_min) p_min = qd;
             if (qd > p_max) p_max = qd;
+            /* ⚑ THE NOTE MACHINE ADVANCES PAST A PUBLISH ONLY HERE, on the
+             * success path. A refused publish leaves it in NB_PUB1/NB_PUB2,
+             * where it asks again next block and opens no new build over the
+             * shadow it has not yet handed over. See the enum's comment for
+             * the stale voice this prevents. */
+            if (nbst == NB_PUB1)      nbst = NB_REST_BEGIN;
+            else if (nbst == NB_PUB2) nbst = NB_IDLE;
         }
         dev_pending = 0;
-        note_pending = 0;       /* released here, so MIDI may queue the next */
+        /* ⚠ RELEASED ONLY WHEN THE NOTE MACHINE IS ACTUALLY IDLE. A note now
+         * publishes TWICE -- once so the key sounds, once when the other
+         * voices catch up -- and clearing this on the first would let the next
+         * key's events be drawn on top of a half-owed build, which is the one
+         * thing the shadow's single-owner rule forbids. The mid-note publish
+         * leaves nbst non-idle, so the flag survives it. */
+        if (nbst == NB_IDLE)
+            note_pending = 0;   /* released here, so MIDI may queue the next */
     }
 #endif
 #if S3L_FX_PIPE
@@ -2366,8 +2497,15 @@ static void rpt_task(void *arg)
          * committed. The 1.06 M lump b8 measured is now these parts, so the
          * next question ("why 7.9x the plan?") is answered by reading rather
          * than by guessing. nv=8 on a two-note chord would be a DEFECT. */
-        printf("NB: ev=%lu vb=%lu nv=%lu st=%lu tot=%lu\n",
-               nb_ev, nb_vb, nb_nvoice, nb_steps, nb_last);
+        /* key= IS THE HEADLINE NUMBER OF THE SPLIT PUBLISH: blocks from the
+         * event apply to the publish that makes the key audible. It read TEN
+         * before the split (58 ms) and must read TWO (~12 ms). keymax= is the
+         * worst any key press saw, because an average latency is not what a
+         * player feels. nv= is still the WHOLE obligation, so key= being small
+         * while nv= reads 8 is the design working, not a mask that shrank. */
+        printf("NB: ev=%lu vb=%lu nv=%lu st=%lu tot=%lu key=%lu keymax=%lu\n",
+               nb_ev, nb_vb, nb_nvoice, nb_steps, nb_last,
+               nb_keyblk, nb_keyblk_max);
         {   juno_event_stats es;
             juno_event_get_stats(&es);
             /* torn= is the only runtime witness to the publish barrier being

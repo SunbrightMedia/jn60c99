@@ -760,3 +760,37 @@ RELATED: 55 (a probe that measures a pattern the code never runs). Same family
 -- a selector that selects nothing and reports success -- now seen in a
 measurement, a linker script, a coefficient audit, a ledger fingerprint, a
 teeth anchor, and twice in one regex.
+
+## 60. The gate that never set up the precondition its tooth needed
+PAID 2026-08-19, chunk_gate.py's split-publish section, TWICE in one hour.
+
+The split publish makes eb_recall_publish run twice per key press, and publish
+is not a pure function -- step 7b CONSUMES the aux retrigger one-shot out of
+the cell array. So the gate compares RENDER STATE as well as coefficients, and
+tooth 11 plants the matching defect: a publish whose second run clears the
+retrigger its first run armed. A lost retrigger moves no coefficient byte, so
+nothing else in that gate could see it.
+
+TOOTH 11 WAS NOT CAUGHT. Twice.
+  1. The setup applied the notes BEFORE its two priming publishes, which
+     consumed the one-shot. No trial had a retrigger pending, so the plant had
+     nothing to destroy.
+  2. Moving the notes after the publishes was still not enough, because
+     src/juno_note.c:166 says note-ON does NOT arm the latch and :255 says
+     note-OFF does. The gate had to RELEASE the chord too.
+
+THE DEFECT CLASS: a detector that is correct, wired in, and pointed at a state
+the harness never enters. It reads PASS, and the PASS is worth nothing. This is
+defect 1 -- an untested detector -- reached from the other direction: not "the
+tooth was never planted" but "the tooth was planted, the gate stayed green, and
+that was nearly read as the gate being right about the code".
+
+THE RULE, and it is cheap: WHEN A TOOTH IS NOT CAUGHT, SUSPECT THE GATE'S SETUP
+BEFORE THE TOOTH. Ask what state the plant needs to be observable in, then
+check the harness actually reaches that state -- from the SOURCE that owns the
+state, not from what the state is called. The answer here was two lines of the
+port's own note file, and it was written down years before the gate existed.
+
+Corollary: a gate that exercises a side-effecting function must set up the side
+effect it is testing. Priming a context with the same call being measured is
+how the precondition gets spent before the measurement starts.

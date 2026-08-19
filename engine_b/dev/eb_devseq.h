@@ -110,6 +110,23 @@ void eb_devseq_notes_off(const int *voice, int n);
  * voice. Pass it straight to eb_recall_build_voices(); do not narrow it. */
 extern unsigned EB_DEVSEQ_TOUCHED;
 
+/* THE VOICES THE ALLOCATOR ACTUALLY NAMED, without the EB_EV_HELD widen.
+ * ALWAYS A SUBSET OF EB_DEVSEQ_TOUCHED, and it is NOT a narrowing: rebuilding
+ * only these voices is WRONG and held_gate.py proves it wrong on patch 5.
+ *
+ * WHAT IT IS FOR, and this is the whole of it: it says WHICH VOICE THE PLAYER
+ * IS WAITING TO HEAR. A key press must rebuild every voice in TOUCHED, but the
+ * voice the key landed on is the only one whose lateness a human can hear. The
+ * firmware therefore builds THESE first, publishes, and builds the rest into a
+ * second publish -- so the note sounds in two blocks instead of ten, and the
+ * broadcast completes late. That is THE INVARIANT rule 3 exactly: latency
+ * degrades, continuity does not.
+ *
+ * ⚠ IT IS A PRIORITY ORDER, NEVER A MASK TO BUILD ALONE. A caller that builds
+ * this set and stops leaves the other voices stale forever. The obligation to
+ * build TOUCHED does not go away; it is only deferred. */
+extern unsigned EB_DEVSEQ_VOICED;
+
 int eb_devseq_events(const eb_alloc_ev *ev, int n);
 
 /* Cell 592 as the RECALL left it -- juno_note_porta_gate's restore value.
