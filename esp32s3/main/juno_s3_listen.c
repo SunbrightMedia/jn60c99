@@ -95,6 +95,8 @@
 #include "eb_sched.h"
 #include "eb_notestep.h"
 #include "eb_burststep.h"
+#include "eb_paramstep.h"
+#include "eb_param_class.h"
 #include "eb_devseq.h"
 #include "eb_alloc.h"
 /* O1: THE ONE BOUNDARY. Every input reaches the engine through this and
@@ -889,6 +891,125 @@ enum { BST_IDLE = 0, BST_RESEED, BST_INSTALL, BST_RECALL, BST_NOTES,
  * so non-zero means the precondition is not what this file believes. */
 static unsigned long burst_pub_retry = 0;
 
+/* ======================= O3: THE PARAMETER PATH =========================
+ *
+ * A knob move is NOT a program change. It writes the parameter's two record
+ * bytes, recalls WARM over the live cells -- no reseed, no install -- and
+ * rebuilds only the sub-builders that parameter can reach, from the GENERATED
+ * eb_param_class table. MEASURED (docs/engineb/data/b13_param_map.md): the
+ * median parameter moves 32 of 12,276 coefficient bytes, so the full rebuild a
+ * program change earns is ~380x the work a knob needs.
+ *
+ * ⚠ NO PER-PARAMETER STASH IS NEEDED, and that is a consequence of the design
+ * rather than luck. eb_devseq.c names six values the GUI bridge must keep for
+ * its live-edit path (lfo_rate_byte, dly time/sync/type, hpf_type,
+ * last_condition) because the bridge drives per-parameter SETTERS that cannot
+ * read them back. This path re-runs the WHOLE recall from the record every
+ * edit, so every one of those is re-read from the bytes that hold it. The
+ * stash list stays owed only for a design that narrows the APPLY, which is the
+ * scope decision b13 §5 records and does not take.
+ *
+ * THE WARM RECALL IS THE DECISION eb_devseq.h RESERVED FOR THIS MOMENT, and it
+ * is settled by measurement: 2,036 of 2,040 parameters land byte for byte
+ * where a cold recall would, and the four that do not are transition latches
+ * where WARM is the CORRECT answer for a live edit. paramwarm.c names those
+ * four and fails in both directions.
+ *
+ * EDITS COALESCE. Several knobs moving at once, or one knob moving fast, cost
+ * ONE build: the record bytes are written as they arrive and the class mask is
+ * OR-ed, so the rebuild covers all of them. That is what makes "as many
+ * parameters as you please, at the same time" (C9, user-binding) affordable
+ * rather than N times the price. */
+static eb_pm         PM;
+/* ⚠ TWO SETS, AND THE SECOND ONE IS NOT OPTIONAL. `pend` accumulates the class
+ * of every edit that has arrived; `run` is the snapshot the build in flight is
+ * actually rebuilding. Taking the snapshot and CLEARING `pend` at begin() is
+ * what makes the next batch start empty.
+ *
+ * With one set the masks would only ever grow: the first knob to touch all
+ * eight voices would leave every later build rebuilding all eight forever, so
+ * the map would be derived, gated, shipped -- and then quietly not used. The
+ * saving would vanish with no symptom, because the coefficients would still be
+ * RIGHT. Wrong-but-correct-looking is the failure mode this project has spent
+ * the most time on.
+ *
+ * It is also what makes an edit arriving MID-BUILD safe: it lands in `pend`,
+ * raises pm_want, and is rebuilt by the next build. Late, never lost. */
+static unsigned      pm_vmask   = 0u;    /* pending class, voices */
+static int           pm_tail    = 0;
+static int           pm_master  = 0;
+static unsigned      pm_v_run   = 0u;    /* the build in flight */
+static int           pm_t_run   = 0;
+static int           pm_m_run   = 0;
+static int           pm_want    = 0;     /* edits are queued for a build */
+static unsigned long pm_edits   = 0;     /* parameters accepted */
+static unsigned long pm_builds  = 0;     /* rebuilds run */
+static unsigned long pm_defer   = 0;     /* blocks the interlock held it off */
+static unsigned long pm_unknown = 0;     /* param_id not in the class table */
+static unsigned long pm_cyc_apply = 0, pm_cyc_max = 0;
+
+/* Queue one edit. Called from the event drain, so it must be cheap and must
+ * NOT touch the shadow -- a build may be in flight. */
+static void dev_param_edit(int param_id, int value)
+{
+    const eb_param_class *c = eb_param_class_of(param_id);
+    unsigned char *blob;
+    if (!c) {
+        /* ⚠ REFUSE AND COUNT, never "rebuild nothing". A parameter the map
+         * does not know is a knob whose effect would silently not happen
+         * (playbook 32), and the count is what makes the gap visible. */
+        ++pm_unknown;
+        health_fail("a parameter id outside the class table");
+        return;
+    }
+    /* DEVBANK is a BANK, not a bare record: juno_bank_apply indexes
+     * bank + 23 + idx*20223 and the device holds one record at index 0, whose
+     * nibble-packed blob starts 16 bytes in past the name. Writing at the
+     * wrong base would edit a neighbouring parameter and still look plausible,
+     * so the two constants come from eb_patch.h rather than from arithmetic
+     * spelled out here. */
+    blob = DEVBANK + EB_BANK_HEADER + EB_BANK_BLOB_OFF;
+    blob[c->rec - EB_BANK_BLOB_OFF]     = (unsigned char)((value >> 4) & 0xF);
+    blob[c->rec - EB_BANK_BLOB_OFF + 1] = (unsigned char)(value & 0xF);
+    pm_vmask  |= c->vmask8;
+    pm_tail   |= c->tail;
+    pm_master |= c->master;
+    pm_want    = 1;
+    ++pm_edits;
+}
+
+static int pm_apply(void *u)
+{
+    unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count(), d;
+    (void)u;
+    ebdev_reset_counters();
+    /* WARM: the live cells stay, the edited record is re-applied over them. */
+    eb_devseq_recall(DEVBANK, 128.0f);
+    d = (unsigned long)esp_cpu_get_cycle_count() - t0;
+    pm_cyc_apply = d;
+    if (d > pm_cyc_max) pm_cyc_max = d;
+    return 1;
+}
+static void pm_begin(void *u)
+{ (void)u; eb_recall_chunk_begin_subset(&REC, pm_v_run, pm_t_run, pm_m_run); }
+static int  pm_step(void *u)  { (void)u; return eb_recall_chunk_step(&REC); }
+static int  pm_busy(void *u)  { (void)u; return eb_recall_chunk_busy(&REC); }
+static int  pm_verify(void *u)
+{
+    (void)u;
+    if (EBDEV_S.miss) {
+        printf("PARAM: *** %lu UNMAPPED CELL ACCESSES during a parameter "
+               "refresh (last offset %lu) ***\n",
+               EBDEV_S.miss, EBDEV_S.lastmiss);
+        dev_mute_why = "unmapped cells during a parameter refresh";
+        health_fail("a parameter refresh fell off the address map");
+        return 0;
+    }
+    return 1;
+}
+static const eb_pm_ops PM_OPS = { pm_apply, pm_begin, pm_step, pm_busy,
+                                  pm_verify };
+
 static void dev_burst_begin(int patch, int gate)
 {
     if (burst_state != BST_IDLE) ++burst_restarts;  /* latest wins, counted */
@@ -1432,6 +1553,10 @@ static int     m_have = 0;
  * six-note chord over 35 ms. That is audible as an arpeggio. */
 #define EV_DRAIN_MAX 8          /* events examined per block; see the cap note */
 
+/* Kept, and it must now read 0: O3 handles every parameter event, so a
+ * non-zero count means an event reached the drain that the parameter path
+ * declined -- the gap this counter was added to make visible has moved from
+ * "not implemented yet" to "a real refusal". */
 static unsigned long ev_param_unhandled = 0;
 
 static int ev_apply(void)
@@ -1449,11 +1574,18 @@ static int ev_apply(void)
     for (i = 0; i < got; ++i) {
         int n, vel;
         if (ev[i].kind == JUNO_EV_PARAM) {
-            /* O3 (was C9) owns this. Until it lands the event is COUNTED and
-             * reported rather than quietly consumed -- a boundary that accepts
-             * a parameter and does nothing is a knob that is not a knob
-             * (playbook 32), and the count is what makes the gap visible. */
-            ++ev_param_unhandled;
+            /* O3. The edit is written into the record and its class OR-ed into
+             * the pending mask; the REBUILD happens later, in the parameter
+             * machine, under the budget. Several knobs in one drain therefore
+             * cost ONE build, which is what makes C9's "as many parameters as
+             * you please, at the same time" affordable.
+             *
+             * ⚠ THIS WRITES THE RECORD, NOT THE SHADOW. It is safe with a
+             * build in flight because the record is not the coefficient bank;
+             * the next apply reads whatever the record then holds. An edit
+             * arriving mid-build is therefore picked up by the build after it,
+             * which is rule 3 -- late, never lost. */
+            dev_param_edit((int)ev[i].a, (int)ev[i].b);
             continue;
         }
         /* STOP BEFORE THE BUFFER CAN OVERFLOW, not after. eb_alloc may write
@@ -2446,6 +2578,42 @@ static void render_block(int n)
                 dev_pending = 1;   /* the publish below moves it into the audio */
             }
         }
+
+        /* ================= O3: THE PARAMETER MACHINE =================
+         *
+         * ⚠ THE INTERLOCK IS NOW THREE-WAY. The shadow bank has ONE owner.
+         * This branch already sits inside `burst_state == BST_IDLE`, so the
+         * patch machine is excluded; the note machine must be excluded here.
+         * A two-way check that grew a third machine is exactly how a build
+         * gets opened over a shadow somebody else still owns.
+         *
+         * ⚠ AND THIS ONE IS BUDGET-GATED, where the patch burst is not. The
+         * burst's worst step is 591,526 cycles against ~460,000 of slack and
+         * can NEVER fit, so gating it starved the whole instrument (playbook
+         * 63). This machine's worst step is the warm recall at ~0.24 M, which
+         * FITS. Same rule, opposite answer, and the numbers are why. */
+        if (eb_pm_idle(&PM)) {
+            if (pm_want && !note_pending && eb_nb_idle(&NB)) {
+                /* snapshot, then clear -- see the two-set note above */
+                pm_v_run = pm_vmask; pm_t_run = pm_tail; pm_m_run = pm_master;
+                pm_vmask = 0u;       pm_tail  = 0;       pm_master = 0;
+                eb_pm_begin(&PM);
+                pm_want = 0;
+                ++pm_builds;
+            } else if (pm_want) {
+                ++pm_defer;   /* counted, and pm_want is NOT cleared */
+            }
+        }
+        if (!eb_pm_idle(&PM)
+            && (!eb_pm_heavy(&PM) || eb_sched_may(&SCHED, pm_cyc_max))) {
+            int st = eb_pm_step(&PM, &PM_OPS, (void *)0);
+            if (st < 0) {
+                dev_muted = 1;
+                printf("MUTE: %s.\n", dev_mute_why);
+            } else if (st == 0) {
+                dev_pending = 1;
+            }
+        }
     }
 #endif
     {   /* CORE 0'S BARRIER SPIN, TIMED. Two CCOUNT reads per BLOCK, never per
@@ -2510,6 +2678,12 @@ static void render_block(int n)
          * again next block while still owning its shadow. */
         eb_nb_published(&NB);
         if (burst_state == BST_PUB) burst_state = BST_IDLE;
+        /* ⚑ AND THE PARAMETER MACHINE. eb_pm_published() is guarded on its own
+         * PM_PUB state, so telling all three unconditionally cannot advance
+         * one that did not ask -- which matters now that three machines share
+         * one shadow and one publish per block. The guard is gated: param_gate
+         * test 8 calls published() mid-build and requires nothing to move. */
+        eb_pm_published(&PM);
         if (eb_nb_idle(&NB))
             note_pending = 0;   /* released here, so MIDI may queue the next */
     }
@@ -2713,6 +2887,17 @@ static void rpt_task(void *arg)
                    juno_event_depth(), es.depth_max, ev_param_unhandled,
                    es.torn);
         }
+        /* O3. `edits` is knobs accepted, `builds` is rebuilds run -- the gap
+         * between them IS the coalescing, and it is the number that says C9's
+         * "as many parameters as you please, at the same time" is affordable.
+         * `apply` is the warm recall's cost, the biggest single step this
+         * machine takes and the one the budget is sized against.
+         * `unknown` and `pubretry` MUST read 0: the first is a knob the class
+         * table does not know, the second a build handed over twice. */
+        printf("PARAM: edits=%lu builds=%lu defer=%lu unknown=%lu "
+               "pubretry=%u apply=%lu applymax=%lu blocks=%u\n",
+               pm_edits, pm_builds, pm_defer, pm_unknown, PM.pub_retry,
+               pm_cyc_apply, pm_cyc_max, PM.blocks);
 #if S3L_FXPROF
         /* fx = core 1's master/FX pass, v1 = core 1's own voice pass
          * (INCLUDING the time it waits on core 0). Per sample, averaged over
@@ -3049,6 +3234,11 @@ void app_main(void)
     eb_recall_init(&REC, &RCB[0], &RCB[1], &MCB[0], &MCB[1], RS, MS, &EBE);
     eb_sched_init(&SCHED, SCHED_STARVE);
     eb_nb_init(&NB);
+    /* ⚠ EXPLICIT, NOT BY STATIC ZERO-INIT. PM_IDLE happens to be 0, so a
+     * static eb_pm would start idle by luck. This project does not ship state
+     * that is correct by luck: an enum reordered later would silently boot the
+     * machine mid-build, owning a shadow nobody built. */
+    eb_pm_init(&PM);
     if (dev_burst(dev_patch, 0)) {
         dev_muted = 1;
         printf("MUTE AT BOOT: %s. The engine is started anyway so the counters "
