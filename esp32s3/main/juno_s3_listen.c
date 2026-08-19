@@ -1133,7 +1133,7 @@ static int dev_burst_step(void)
  * (juno_event_*, source KEYBED) -- a driver that reached the engine any other
  * way would stress a path nobody ships.
  *
- * SIX PHASES, ~2 s each, repeating (172 blocks/s, 344 blocks/phase):
+ * SEVEN PHASES, ~2 s each, repeating (172 blocks/s, 344 blocks/phase):
  *   0 BASELINE   silence, so every counter has an uncontaminated control
  *   1 SINGLES    a note toggles ~4x/s -- the ordinary case
  *   2 PAIRS      TWO keys in ONE block -- the exact case the old path
@@ -1146,6 +1146,18 @@ static int dev_burst_step(void)
  *                acceptance case, and the worst case for key latency because
  *                a key must now wait for a patch build to hand back the
  *                shadow. keymax is read from THIS phase, not from phase 1.
+ *   6 KNOBSTORM  O3. A parameter sweep -- one edit EVERY block, cycling the
+ *                whole class table -- UNDER A HELD CHORD, with a program
+ *                change every ~1 s on top. This is the only phase that makes
+ *                the parameter path run at all.
+ *
+ * ⚠ PHASE 6 EXISTS BECAUSE THE FIRST O3 BUILD HAD NO KNOB. The parameter path
+ * was written, gated by 57 teeth and compiled, and NOTHING ON THE DEVICE COULD
+ * SEND IT AN EVENT -- no panel yet, and no stimulus here. That build would have
+ * reported PARAM: edits=0 and been read as "O3 is quiet, so O3 is fine". It is
+ * the SAME defect the note-collide phase already carries a warning about, one
+ * paragraph below, committed again on the next subsystem: a stimulus whose
+ * precondition never occurs measures nothing while reporting normally.
  *
  * ⚠ PHASES 4 AND 5 DRIVE THE PATCH THEMSELVES. Phase 4 was written to submit
  * notes into a LIVE patch build and then nothing in this file ever started
@@ -1173,7 +1185,7 @@ static void stress_step(void)
     static int held[8];
     static const unsigned char NOTE[8] = {48, 52, 55, 60, 64, 67, 72, 76};
     unsigned long t = blk++;
-    unsigned long ph = (t / 344u) % 6u;
+    unsigned long ph = (t / 344u) % 7u;
     int i;
 
     /* THE PATCH DRIVER, phases 4 and 5. dev_request is O(1) and only sets
@@ -1184,6 +1196,17 @@ static void stress_step(void)
         dev_request((int)((t / 43u) % (unsigned long)DEVCRC_NPATCH), 0);
     if (ph == 5u && (t % 86u) == 0u)
         dev_request((int)((t / 86u) % (unsigned long)DEVCRC_NPATCH), 0);
+
+    /* O3's driver. Every block, a different parameter, a sweeping value --
+     * the worst case for the parameter machine and the one that shows the
+     * coalescing: 344 edits per phase against far fewer builds. */
+    if (ph == 6u) {
+        int pid = (int)(t % (unsigned long)EB_PARAM_CLASS_N);
+        int val = (int)((t * 7u) & 0xFFu);
+        juno_event_param(JUNO_SRC_PANEL, pid, val);
+        if ((t % 172u) == 3u)
+            dev_request((int)((t / 172u) % (unsigned long)DEVCRC_NPATCH), 0);
+    }
 
     if (t % 344u == 343u) {              /* phase boundary: release all */
         for (i = 0; i < 8; ++i)
@@ -1228,6 +1251,17 @@ static void stress_step(void)
                 if (held[i]) { juno_event_note_off(JUNO_SRC_KEYBED, NOTE[i]);
                                held[i] = 0; }
         }
+        break;
+    case 6:
+        /* A HELD CHORD under the knob sweep, for the same reason phase 5 holds
+         * one: a parameter refresh that lands on silence proves nothing about
+         * what the player hears. Keys are NOT retriggered here -- the knob is
+         * the variable under test and note traffic would confound it. */
+        if (t % 344u == 5u)
+            for (i = 0; i < 4; ++i) {
+                juno_event_note_on(JUNO_SRC_KEYBED, NOTE[i], 100);
+                held[i] = 1;
+            }
         break;
     case 5:
         /* A HELD CHORD, and keys moving under the program changes above. The
@@ -1698,6 +1732,11 @@ volatile int g_split_rt = S3L_SPLIT;
 #endif
 unsigned long con_keys = 0;
 
+/* O3 console state: which parameter the `;`/`'` keys select and the
+ * value the `[`/`]` keys sweep. */
+static int k_param = 0;
+static int k_pval  = 128;
+
 static void con_poll(void)
 {
     unsigned char b[16];
@@ -1717,6 +1756,28 @@ static void con_poll(void)
          * its use site: this is how a measurement build proves its own
          * detectors are live without contaminating the measurement. */
         if (c == 't') { tooth_once = 1; continue; }
+        /* O3 BY HAND. `[` and `]` sweep the SELECTED parameter down and up;
+         * `;` and `'` choose which parameter. Without these the only knob
+         * source is the robot phase, and a path you cannot drive by hand is a
+         * path you cannot investigate when the robot finds something. */
+        if (c == ';' || c == '\'') {
+            k_param = (c == '\'') ? (k_param + 1) % EB_PARAM_CLASS_N
+                                   : (k_param + EB_PARAM_CLASS_N - 1)
+                                     % EB_PARAM_CLASS_N;
+            printf("PARAM: selected id=%d (record %d, vmask=%02x tail=%d "
+                   "master=%d)\n", k_param, EB_PARAM_CLASS[k_param].rec,
+                   EB_PARAM_CLASS[k_param].vmask8,
+                   EB_PARAM_CLASS[k_param].tail,
+                   EB_PARAM_CLASS[k_param].master);
+            continue;
+        }
+        if (c == '[' || c == ']') {
+            k_pval = (c == ']') ? (k_pval + 8 > 255 ? 255 : k_pval + 8)
+                                : (k_pval < 8 ? 0 : k_pval - 8);
+            juno_event_param(JUNO_SRC_PANEL, k_param, k_pval);
+            printf("PARAM: id=%d value=%d\n", k_param, k_pval);
+            continue;
+        }
         if (c == 'z') { if (con_base >= 24) con_base -= 12; continue; }
         if (c == 'x') { if (con_base <= 96) con_base += 12; continue; }
         /* b / n -- PROGRAM CHANGE, backward and forward through the 64 factory
