@@ -1020,3 +1020,36 @@ mistake was made on the next subsystem anyway.
 So: reading a warning is not the same as applying it. When a file tells you a
 defect class was paid for here, ask whether the thing you are adding RIGHT NOW
 has it -- that is the only moment the warning is worth anything.
+
+## 68. A unit error inside a CORROBORATION is worse than one inside a claim
+PAID 2026-08-19 (b15), and it had already been used to set a step's target.
+
+b12 measured mean block duration and found the instrument ~200-300 us over
+period on every block. That was a big claim, so b14 checked it against an
+independent number from the same run -- the board's drift counter -- and
+reported "implied drift 149.5 s vs the board's own 150.1 s, agreement 0.4 %".
+
+The drift field prints MICROSECONDS. 150,106 us is 0.15 seconds. The two
+numbers disagree by a factor of 1,000, and the check that was supposed to
+catch that instead certified it.
+
+What actually settles it needs no clever measurement at all: the board prints
+the BLOCK COUNT and the elapsed time. 73,443 blocks in 425 s is 5,787 us per
+block, which is the period. The engine keeps up. The mean-duration meter is
+inflated by 3.5 % and everything derived from it -- including a whole track's
+stated target of "287 cycles/sample over budget" -- was wrong.
+
+THE RULE: WHEN A CORROBORATION AGREES, CHECK ITS UNITS BEFORE BELIEVING IT.
+A disagreement invites scrutiny and gets it. An agreement closes the question,
+so an error hidden inside one survives -- and it survives with MORE authority
+than the original claim, because it is now "confirmed".
+
+THE SECOND RULE, cheaper and better: PREFER A COUNT AND A CLOCK OVER A MEAN.
+Block count and elapsed time are two numbers the board already prints, they
+cannot drift apart, and dividing them answers the question directly. The
+elaborate per-class mean was the thing that was wrong; the trivial ratio was
+right the whole time and nobody had computed it.
+
+THE THIRD: a mean that contradicts the count it was derived from is a bug in
+the mean. Do not go looking for a physical explanation for an arithmetic
+disagreement until the arithmetic is ruled out.
