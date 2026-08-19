@@ -284,7 +284,7 @@ cross-referenced. Done and retired from the old list: recall on the board
 |---|---|---|---|
 | **O1** | C11 | the internal event API — the boundary O2/O3 live behind | **DONE 2026-08-18** — gated (7 queue teeth + 3 structural teeth, all caught) AND FIELD-PROVEN (b7_o1o2_field.md): 313 human key events, sub=del=314, ref=0, torn=0, hi=3 of 63. Refusals and torn publishes now latch HEALTH red. Param events queue and count (`par=`) until O3. |
 | **O2** | C10 | chunked patch AND note builds — bounded, measured, field-proven | **DONE 2026-08-19 — GATED AND PROVEN ON SILICON (data/b12_block_duration.md).** Patch burst and note burst both chunked, bit-identical over all 64 patches and all 256 masks; SPLIT PUBLISH (b9 §9) makes the key audible in 2 blocks — board: bucket 2 = 15,356 of 15,462 presses, bucket 9 = 106, all 8-key chords where every voice is priority. 47-minute robot run: `pubretry=0` both machines, `torn=0`, `ref=0`, `un=0`, `defer=0`, `forced=0`, CRC MATCH. Cost of one chunked step MEASURED: `B4dur` note 6,190 µs − quiet 6,001 µs = **189 µs/block**, bounded. 44 teeth across 7 gates (`sh tools/engineb/o2_gates.sh`), all seen to fail. Narrowing (`EB_DEVSEQ_NARROW_HELD`) still refused, still OFF. **⚠ THE OLD ACCEPTANCE RULE ("miss must not increment") WAS UNPASSABLE** — a quiet block already runs 6,001 µs against a 5,804 µs period, so `miss=0` is unreachable for ANY subsystem. See playbook 64; the residual moved to O4, which is where it was caused. |
-| **O3** | C9 | per-parameter incremental refresh (derived field map) | NOT DONE |
+| **O3** | C9 | per-parameter incremental refresh (derived field map) | **STEP 1 DONE 2026-08-19 — decided by measurement, gated (data/b13_param_map.md).** (a) COST: of **59** parameters that move any coefficient the median moves **32 of 12,276 bytes (0.26%)**, worst 471 (3.84%); the rule stated before the run said build the map below 10%, so **BUILD THE MAP**. 58 of 59 are all-voices or no-voices — ASSIGN MODE alone touches a subset (voices 1-7) — so narrow by FIELD, never by voice. (b) LEGALITY, which outranks cost and answers eb_devseq.h's standing warning: **2,036 of 2,040 parameters land exactly where a cold recall would**; the four that diverge (EFFECT TYPE, DELAY TYPE, two related cells) are all LATCHES that settle, so the incremental path is LEGAL. GATED: `paramwarm` asserts the four BY NAME in both directions, 3 teeth all caught (`sh tools/engineb/paramwarm_teeth.sh`). **NOT CLAIMED: the cycle cost** — bytes are not cycles (the gather computes, ~400 cyc/float), so the sub-builder decomposition is owed before any refresh-rate claim. REMAINING: narrow the apply (~0.24 M cyc ≈ 1 ms/block is too much while O4 is open) or rate-limit; then the third state machine, to the same publish contract as the other two (playbook 62). |
 | **O4** | B3/B4 | worst-case headroom CLOSED — now the ONLY holder of the deadline deficit | OPEN. **ITS REAL NUMBER IS NOW MEASURED (b12 §3): an idle block — no note, no patch, nothing but audio — runs 6,001 µs against a 5,804 µs period, +197 µs, 3.4 % over; drift +150,106 µs over 47 minutes.** That supersedes every deficit stated from patch cycle counts, and it proves the `ovr_late`/esp_timer-vs-I2S anomaly (b4_first_run.md §5) is the deficit itself, not a reporting artefact. Evidence base still b6_split_sweep.md; keep split 7. Next: measure the prologue (`S3L_TIME_PROLOGUE`), then the master-chain split across cores. |
 | **O5** | C6/C7/C8 | encoders + LCD, preset storage, warm gate into make verify | NOT DONE |
 | **O6** | D1-D4 | the two-chip link — 6 voices, one instrument | NOT DONE (D1 architecture decided) |
@@ -322,6 +322,21 @@ CRC MATCH all 64 patches, `NB: keymax=` reads 2.
 **O3 (incremental refresh):** design + derived-field-map rule in the C9
 section below. The proven precedent is `eb_recall_build_voices` (bit-identical,
 two teeth). Item-7: the map generator must be synth-agnostic.
+
+STEP 1 IS DONE AND IT SETTLED THREE THINGS (data/b13_param_map.md):
+  * C9's "a cutoff knob is a few fields, not eight voices and the FX chain" is
+    HALF RIGHT. It IS a few fields — median 32 of 12,276 bytes — but those few
+    fields sit ON ALL EIGHT VOICES. 58 of 59 parameters are all-voices or
+    no-voices. Narrow by FIELD; a design that narrows by voice refreshes
+    nothing.
+  * the incremental path is LEGAL, which was not obvious. eb_devseq.h warned
+    that cold recall is wrong for live edits and "has to be REVISITED, NOT
+    INHERITED". Measured: 2,036 of 2,040 parameters are order-INdependent, and
+    the four that are not are latches that settle, with WARM the correct answer
+    for a live knob move. Now gated by name, with teeth.
+  * `--patch-scan` had a FALSE NEGATIVE and its base set is fixed. See playbook
+    65: randomised bases must be ADDITIONAL, never substitutes, and a red gate
+    is a question rather than an instruction.
 
 **O4 (worst-case closed):** evidence base data/b6_split_sweep.md. Keep split 7.
 Open questions IN ORDER: (a) measure the prologue — `S3L_TIME_PROLOGUE` exists

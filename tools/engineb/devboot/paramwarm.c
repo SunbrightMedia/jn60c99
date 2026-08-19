@@ -84,9 +84,42 @@ static void recall_only(unsigned char *bank, int p)
     juno_apply_lfo_tempo(ST, juno_bank_lfo_rate_byte(bank, p), 128.0f);
 }
 
+/* ⚠ THE FOUR PARAMETERS THAT ARE ORDER-DEPENDENT BY DESIGN.
+ *
+ * Each was classified by applying the SAME edit twice and finding zero cells
+ * still moving: a LATCH, not an accumulation. An accumulation would have made
+ * an incremental parameter path impossible; a latch does not.
+ *
+ *   116  chorus-region latch  (cell 91232)
+ *   120  delay-region latch   (cell 102528)
+ *   634  EFFECT TYPE -> JUNO_PREV_EFX, read by src/chorus_recall.c:54
+ *   650  DELAY  TYPE -> JUNO_PREV_DLY, read by src/delay_recall.c:594
+ *
+ * ⚠ THE SET IS THE CLAIM, NOT ITS SIZE. This harness first printed a COUNT and
+ * called any divergence a failure. Both were wrong. A count cannot see the
+ * change that matters: if one parameter became order-dependent while another
+ * stopped being so, the count stays 4 and the gate stays green while the
+ * instrument has gained a new stale-coefficient path. And a divergence is not
+ * a failure -- for a LIVE knob move WARM is the correct answer, because the
+ * plugin does not reseed either.
+ *
+ * So both directions fail, and they are reported apart:
+ *   a parameter that JOINS is a new order-dependent path, unclassified;
+ *   a parameter that LEAVES means an intended transition stopped firing,
+ *   which is a silent loss of behaviour and exactly as serious. */
+static const int EXPECT[4] = { 116, 120, 634, 650 };
+
+static int expected(int roff)
+{
+    int i;
+    for (i = 0; i < 4; ++i) if (EXPECT[i] == roff) return 1;
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     static const unsigned char VAL[4] = { 0x00u, 0x03u, 0x0Cu, 0x7Fu };
+    int joined[64], left[64], njoin = 0, nleft = 0;
     unsigned char *bank, *wb;
     unsigned char *base[6];
     long bl;
@@ -164,12 +197,29 @@ int main(int argc, char **argv)
         }
         if (moved_any) ++nparam;
         if (diverged) ++ndiff;
+        if (diverged && !expected(i) && njoin < 64) joined[njoin++] = i;
+        if (!diverged && expected(i) && nleft < 64) left[nleft++] = i;
     }
     fclose(of);
     printf("WARM-vs-COLD SINGLE-PARAMETER EDIT\n");
-    printf("  parameters probed:            %d\n", nparam);
-    printf("  parameters where WARM != COLD: %d\n", ndiff);
-    printf("  %s\n", ndiff ? "*** the cheap incremental path is NOT free ***"
-                           : "a live edit lands exactly where a cold recall would");
-    return ndiff ? 1 : 0;
+    printf("  parameters probed:              %d\n", nparam);
+    printf("  order-dependent (WARM != COLD): %d\n", ndiff);
+    printf("  expected by name:               4\n");
+
+    for (i = 0; i < njoin; ++i)
+        printf("  *** UNEXPECTEDLY order-dependent: record %d ***"
+               "  (a new stale-coefficient path; classify it before adding it)\n",
+               joined[i]);
+    for (i = 0; i < nleft; ++i)
+        printf("  *** NO LONGER order-dependent: record %d ***"
+               "  (an intended transition stopped firing)\n", left[i]);
+
+    if (!njoin && !nleft) {
+        printf("  PASS -- the order-dependent set is exactly the four named,\n");
+        printf("          so a live edit is identical to a cold recall for\n");
+        printf("          every other parameter. The incremental path is legal.\n");
+        return 0;
+    }
+    printf("  *** FAILED ***\n");
+    return 1;
 }

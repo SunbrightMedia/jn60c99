@@ -10,36 +10,38 @@ F = median (coefficient bytes moved) / (struct bytes). F<10% build the map;
 F>50% reuse O2's chunked rebuild; 10-50% split.
 
     eb_render_coefs 10,564 B + eb_master_coef 1,712 B = 12,276 B
-    parameters that move any coefficient   57
+    parameters that move any coefficient   59
     median moved     32 B    0.261%
-    worst  moved    259 B    2.110%   (record 650, DELAY TYPE)
-    buckets     <1%: 56    1-10%: 1    >10%: 0
+    worst  moved    471 B    3.837%   (record 650, DELAY TYPE)
+    buckets     <1%: 58    1-10%: 1    >10%: 0
 
 **F = 0.26%: BUILD THE MAP**, with 38x margin on the rule's own threshold.
 
-⚠ **THESE COUNTS ARE A FLOOR, NOT THE FINAL MAP.** They come from the first
-`parammap` run, whose base set and value list were later found to under-report
-(§3). The re-run is exhaustive — all 256 pair values, all 256 values of each
-byte alone, 13 bases — and takes its position list from the fixed discovery
-scan. It can only ADD parameters and bytes, never remove them.
+FINAL, from the exhaustive re-run: 13 bases, all 256 pair values and all 256
+values of each byte alone, over the 114 positions the fixed discovery scan
+names. It supersedes the first run (57 parameters, worst 2.11%), which
+under-reported for the three reasons in §3. **The median did not move at all**
+and the worst rose to 3.84% -- still under half the threshold, so the decision
+never depended on the correction.
 
-**The DECISION does not depend on the correction.** The rule's threshold is
-10%; the worst parameter measured is 2.11% and the median 0.26%. The additions
-are ASSIGN MODE and three CHORUS records, whose moved-byte counts are 4-24
-bytes of master coefficients — an order of magnitude below the threshold. No
-plausible correction moves F to 10%, so "build the map" stands on the floor
-alone. The exact per-parameter table is what the re-run settles.
+### The structure -- AND A CLAIM THE RE-RUN OVERTURNED
 
-### The structure is binary, with nothing in between
-
-| class | n | moved bytes min/median/max |
+| voice mask | n | meaning |
 |---|---|---|
-| per-voice | 37 | 16 / 32 / 104 — all eight voices |
-| shared / FX / master | 20 | 4 / 12 / 259 — no per-voice byte |
+| all eight | 36 | per-voice parameters |
+| none | 22 | shared / FX / master only |
+| **voices 1-7** | **1** | **ASSIGN MODE (record 128/129)** |
 
-**No parameter touches a SUBSET of voices.** O2's per-voice lever therefore
-buys a parameter refresh nothing; field narrowing buys it everything. That is
-why O3 is a different mechanism and not a reuse of O2.
+The first run said "**no** parameter touches a SUBSET of voices", and that was
+an artefact of the parameter it had missed. ASSIGN MODE is the exception:
+`juno_apply_unison_spread` writes all eight voices, but `UNISON_3968[0]` is
+zero and so is the non-unison value, so voice 0 never moves. One parameter of
+59, and it is precisely the one the old probe could not see.
+
+The design consequence is unchanged. 58 of 59 parameters are all-voices or
+no-voices, so narrowing by VOICE is still worthless and narrowing by FIELD is
+still everything. But the flat statement was wrong and is corrected here rather
+than quietly dropped.
 
 ### ⚠ BYTES ARE NOT CYCLES — the inference NOT made here
 
