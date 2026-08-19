@@ -250,3 +250,47 @@ What CAN settle it: render the same knob sweep through the PLUGIN and through
 the port at each N and compare. The plugin re-reads its cells every sample, so
 the residual against it IS the zipper — measured, not heard. **That gate does
 not exist yet, and it is what O3 phase 2 needs before any N is chosen.**
+
+## 6. The zipper, measured (zipper_gate.c)
+
+END_GOAL forbids picking N by ear. The gate renders the SAME knob sweep twice
+through the trunk's proven render path (src/ port + standalone shim, the pair
+`make engineb` nulls EXACTLY 0): reference = re-applied every block (N=1, the
+finest update the O1 queue can deliver), candidate = re-applied every N blocks
+with the value HELD between — exactly the rate-limited refresh. The residual
+IS the zipper.
+
+The curve, patch 5, record 92, 2-second full-range sweep over a held chord:
+
+| N | rate | residual vs N=1 |
+|---|---|---|
+| 1 | 172 Hz | EXACTLY 0 (the self-null) |
+| 2 | 86 Hz | −54.4 dB rel |
+| 4 | 43 Hz | −40.6 dB rel |
+| 8 | 22 Hz | −38.0 dB rel |
+| 11 | 16 Hz | −35.8 dB rel |
+| 22 | 8 Hz | −30.0 dB rel |
+
+Monotonic, as the structural check requires. **The gate does not pick N** —
+the acceptable point on this curve is the user's number (F2 is the only
+remaining judge). What the curve already shows: N=2 is 19 dB cleaner than
+N=11, so a rate limit of every-2-blocks (86 Hz) — which the apply can afford
+where every-block cannot — buys most of what per-block would.
+
+### The gate was seen to fail, three times, for real
+
+No planted teeth were needed — the structural checks caught three genuine
+defects during bring-up, which is a stronger demonstration than a plant:
+
+1. **Self-null failed at +2.4 dB**: engine B's static render state carried
+   from one sweep into the next. Fix: `ebsh_new_context()` per sweep.
+2. **Self-null failed at −6.8 dB**: the sweep mutated the bank and never
+   restored it, so each sweep booted from the previous sweep's final knob
+   position — a cold recall at value 255 followed by a block-0 step to 0.
+   Fix: the sweep writes its own starting value before the boot recall.
+3. **Three of four parameters were INAUDIBLE** — zero differing samples at
+   every N, because this driving never renders what they move (an envelope
+   rate after the attack has passed). A −999 dB curve is not "no zipper", it
+   is "the measurement cannot see its subject". The gate now FAILS on it
+   (exit 1) instead of reassuring. Per-parameter drivings are owed before the
+   curve is claimed for any parameter but the ones measured audible.
