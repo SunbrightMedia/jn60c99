@@ -2590,6 +2590,8 @@ static volatile long          rpt_drift = 0;
  *               past two periods the DMA had to be carrying us, which is
  *               the invariant broken whatever it sounded like. */
 static volatile unsigned long rpt_ovr_late = 0, rpt_ovr_miss = 0;
+static volatile unsigned long rpt_blk_burst = 0, rpt_blk_quiet = 0,
+                              rpt_blk_note = 0;
 static volatile unsigned long rpt_miss_burst = 0, rpt_miss_quiet = 0;
 static volatile unsigned long rpt_miss_note = 0;
 static volatile unsigned long rpt_miss_step[BST_CHECK + 1];
@@ -2621,6 +2623,23 @@ static void rpt_task(void *arg)
          * can never be confused for one another. */
         printf("B4: miss burst=%lu note=%lu quiet=%lu\n",
                rpt_miss_burst, rpt_miss_note, rpt_miss_quiet);
+        /* ⚑ THE RATE, WHICH IS THE ACTUAL TEST. Misses per 10,000 blocks of
+         * each class. O2's claim is that a note step fits the slack, so the
+         * NOTE rate must not exceed the QUIET rate -- a note block missing as
+         * often as an idle one means the note did not cause it, and what did
+         * is the steady-state overrun on the delay patches (O4).
+         * A bare count cannot say this: a note build spans ~10 blocks and
+         * overlaps most misses by coincidence. */
+        {   unsigned long bb = rpt_blk_burst ? rpt_blk_burst : 1;
+            unsigned long bq = rpt_blk_quiet ? rpt_blk_quiet : 1;
+            unsigned long bn = rpt_blk_note  ? rpt_blk_note  : 1;
+            printf("B4rate: burst=%lu/10k note=%lu/10k quiet=%lu/10k  "
+                   "(blocks %lu/%lu/%lu)  NOTE MUST NOT EXCEED QUIET\n",
+                   10000ul * rpt_miss_burst / bb,
+                   10000ul * rpt_miss_note  / bn,
+                   10000ul * rpt_miss_quiet / bq,
+                   rpt_blk_burst, rpt_blk_note, rpt_blk_quiet);
+        }
         /* WHICH STEP overran: reseed/install/recall/notes/coefs/check. b7
          * measured burst=17 with no attribution; this is the attribution. */
         printf("O2m: rs=%lu in=%lu rc=%lu nt=%lu cf=%lu ck=%lu\n",
@@ -2779,6 +2798,20 @@ void app_main(void)
     /* CUMULATIVE by design -- never cleared in the per-second snapshot. */
     unsigned long ovr_late = 0, ovr_miss = 0;
     unsigned long ovr_miss_burst = 0, ovr_miss_quiet = 0, ovr_miss_note = 0;
+    /* ⚠ A COUNT OF MISSES IS NOT AN ATTRIBUTION. A note build spans ~10
+     * blocks, so it OVERLAPS most misses by coincidence -- and this board
+     * misses in STEADY STATE on the delay patches (cyc 5,4xx-6,7xx against a
+     * 5,442 budget, which is O4). `miss note=16` therefore cannot distinguish
+     * "the note caused it" from "a miss happened while a note was in flight".
+     *
+     * THE RATE CAN. Count the BLOCKS in each class as well as the misses. If
+     * note blocks miss at the same rate as quiet ones, the note path is not
+     * the cause and O2's acceptance is met; if they miss at a higher rate, it
+     * is, and the step is still too big for the block it landed on.
+     *
+     * The same trap was already written down for `burst` in this file and the
+     * note counter was added without it. */
+    unsigned long blk_burst = 0, blk_quiet = 0, blk_note = 0;
     unsigned long miss_step[BST_CHECK + 1];
     memset((void *)miss_step, 0, sizeof miss_step);
     int64_t       t_prev_ok = 0;
@@ -3356,6 +3389,9 @@ void app_main(void)
                    "zero this run printed was an untested detector.\n");
             while (esp_timer_get_time() < until) { }
         }
+        if (burst_ran_this_block)     ++blk_burst;
+        else if (note_ran_this_block) ++blk_note;
+        else                          ++blk_quiet;
         if (t_prev_ok) {
             unsigned long d      = (unsigned long)(t0 - t_prev_ok);
             unsigned long period = 1000000ul * CHUNK / SR;
@@ -3696,6 +3732,8 @@ void app_main(void)
                 rpt_miss_burst = ovr_miss_burst;
                 rpt_miss_quiet = ovr_miss_quiet;
                 rpt_miss_note  = ovr_miss_note;
+                rpt_blk_burst = blk_burst; rpt_blk_quiet = blk_quiet;
+                rpt_blk_note  = blk_note;
                 memcpy((void *)rpt_miss_step, (const void *)miss_step,
                        sizeof miss_step);
                 /* rule 4 latches that should always have existed: a refused

@@ -66,3 +66,52 @@ candidate build before the build is called a candidate.
   * `un=0` throughout. Even completely starved of note builds, THE AUDIO NEVER
     BROKE -- which is the invariant holding under a defect that made the
     instrument useless. Latency degraded to infinity; continuity did not.
+
+## 7. THE FIX WORKED, AND THE LAST CRITERION IS THE WRONG TEST (run 3)
+Six of seven criteria pass, and both regressions are closed:
+
+| criterion | result |
+|---|---|
+| KEYH 0,1 zero; 2 dominant | **PASS — 2=337 of 337, exclusively** |
+| keymax bounded | **PASS — 2** (run 1 had two 9s; none now) |
+| pubretry=0, both machines | **PASS — 0** |
+| SCHED forced=0 | **PASS — forced=0, defer=0** |
+| ref=0 | **PASS — 0** (9,019 -> 542 -> 0) |
+| detectors seen to fire | PASS — HEALTH red, `t` tooth fired |
+| miss note=0 | **FAIL — note=16** |
+
+The 256-slot queue took refusals to ZERO, the un-gated burst restored the note
+path, and the key now sounds in exactly 2 blocks EVERY TIME -- bucket 2 holds
+every single one of 337 presses, with 0, 1 and every higher bucket empty.
+
+### ⚠ BUT `miss note=16` CANNOT MEAN WHAT THE RULE ASSUMED
+SCHED says the worst note step is **219,493 cycles against 418,050-851,999 of
+slack**. It always fits; `defer=0` confirms no step was ever refused. So the
+note step is NOT overrunning its budget -- yet 16 misses are attributed to
+blocks that ran one.
+
+Look at `cyc`: **5,412-6,734 against a 5,442 budget.** Those blocks were
+ALREADY over before any note work happened. That is the delay-patch
+steady-state overrun, which is O4 and has been measured since b6.
+
+`note_ran_this_block` cannot distinguish "the note caused this miss" from "a
+miss happened while a note was in flight". A note build spans ~10 blocks, so
+it overlaps most misses by coincidence.
+
+⚠ THIS EXACT TRAP IS ALREADY WRITTEN DOWN IN THIS FILE, for `burst`:
+"`miss` climbs for reasons O2 does not own and cannot fix... it would fail for
+O4's reasons and send the next session hunting the wrong cause". The `note`
+counter was added later WITHOUT that reasoning applied to it. A warning is not
+a guard: it protected the counter it was written next to and nothing else.
+
+### The measurement that settles it: a RATE, not a count
+The firmware now counts BLOCKS per class as well as misses, and prints
+`B4rate: burst=/10k note=/10k quiet=/10k`. The claim under test is that a note
+step fits its slack, so:
+
+  **THE NOTE MISS RATE MUST NOT EXCEED THE QUIET MISS RATE.**
+
+Equal rates mean the note path is not the cause and O2's acceptance is met.
+A higher note rate means it IS the cause, and the step is genuinely too big
+for the blocks it lands on. Either way the answer is a number, not a
+judgement -- which a bare count could never give.
