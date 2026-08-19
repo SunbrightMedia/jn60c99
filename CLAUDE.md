@@ -101,8 +101,19 @@ Branch: push -u origin <current claude/* branch>; retry 2s/4s/8s/16s; no PRs
 unless asked. Trailer verbatim:
 `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`
 `Claude-Session: https://claude.ai/code/session_019dkoF3tvNYDygVXy9RBXJb`
-Flash instructions to the user: always BOTH the esptool write-flash line AND
-`python -m serial.tools.miniterm COM5 115200`. Only send builds worth flashing
+FLASHING -- PASTE THE COMMANDS EVERY SINGLE TIME A .bin IS SENT. Never say
+"same command as before" and never make the user scroll back. Verbatim, both
+lines, in this order, with the delete reminder first:
+  1. "Delete the old juno_s3.bin from Downloads first" (Windows renames a
+     duplicate to `juno_s3 (1).bin` and the flash then fails on the old file).
+  2. `python -m esptool --chip esp32s3 -b 460800 --before default-reset
+     --after hard-reset write-flash --flash-mode dio --flash-size 8MB
+     --flash-freq 80m 0x0 bootloader.bin 0x8000 partitiontable.bin
+     0x10000 juno_s3.bin`
+  3. `python -m serial.tools.miniterm COM5 115200`
+The three-bin set lives in `esp32s3/flash/meas/` -- partitiontable.bin has NO
+hyphen. Send builds from THERE, never from `esp32s3/build/`, whose paths and
+names do not match what the user has. Only send builds worth flashing
 (playbook 11b: measure first; state the decision rule before sending).
 
 # WORKING STYLE
