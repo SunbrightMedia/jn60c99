@@ -1062,3 +1062,40 @@ THE TELL: a "time" field and a "count" field that must be consistent are the
 cheapest cross-check on any board -- but only after both definitions are known.
 Here the count field was derived FROM the thing under test, so the check had no
 independent term in it at all.
+
+## 69. "Probably harmless codegen noise" was the bug reporting itself
+PAID 2026-08-19 (b16), while adding a disabled profiler to eb_master.c.
+
+A five-stage profiler was added to the master chain, every macro expanding to
+`do { } while (0)` unless EB_MSPROF is 1. The claim was that a disabled
+profiler costs nothing, so the host assembly was diffed before and after.
+
+IT DIFFERED BY 341 LINES -- register allocation shifted throughout. The
+temptation, and the reasoning that was actually written down first, was:
+"statement-neutral text CAN move GCC's allocator, x86 host codegen is not the
+target, this is probably noise."
+
+IT WAS NOT NOISE. The macro block had been inserted INSIDE an existing
+`#if EB_RING_PROBE` region that is off by default. The definitions vanished;
+the CALL SITES, further down the file and outside that region, did not. So
+`MSP_T0()` compiled as a call to an undefined function -- which is exactly why
+codegen moved, and the trunk gate then failed to LINK:
+
+    undefined reference to `MSP_T0'
+    undefined reference to `MSP_HIT'
+
+After moving the block past the region's `#endif`, the assembly diff is ZERO
+lines and the claim "free when off" is proven rather than asserted.
+
+THE RULE: WHEN A CHEAP CHECK DISAGREES WITH A CLAIM YOU BELIEVE, THE CHECK IS
+THE FINDING. The instinct to explain a small anomaly away is strongest exactly
+when the anomaly is small, and "probably harmless" is a hypothesis with no
+measurement behind it. Here the anomaly WAS the defect, in full, and reading it
+would have found the bug before the gate did.
+
+THE SECOND LESSON, about insertion by script: adding text at a position found
+by searching backwards for a comment or a blank line takes NO ACCOUNT OF
+PREPROCESSOR NESTING. A block landing inside a disabled `#if` is invisible in
+the source diff -- it reads perfectly -- and shows up only as a link error or,
+worse, as silently different behaviour in one build configuration. After any
+scripted insertion into C, CHECK WHICH #if REGION THE NEW TEXT LANDED IN.
