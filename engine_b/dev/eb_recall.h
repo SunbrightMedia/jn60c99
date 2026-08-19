@@ -75,6 +75,7 @@ typedef struct {
      * build owes only the voices the allocator named. */
     unsigned chunk_mask;
     int   chunk_tail;
+    int   chunk_master;
 } eb_recall;
 
 /* Quiescence. A rule that cannot fail is not a rule: publish ASSERTS this
@@ -143,6 +144,23 @@ void eb_recall_chunk_begin(eb_recall *r);
  * cells; the FX configuration and the master chain cannot have changed, and
  * the shadow copy carries the current ones forward. */
 void eb_recall_chunk_begin_voices(eb_recall *r, unsigned mask);
+
+/* ===================== O3: THE PARAMETER BUILD -- AN ARBITRARY SUBSET =====
+ *
+ * A parameter edit re-runs only the sub-builders its class needs
+ * (data/b13_param_map.md §7): the voices in `mask`, the shared tail if
+ * `tail`, the master set if `master`. The classes come from the GENERATED
+ * eb_param_class table, which tools/engineb/devboot/paramclass_gate.c both
+ * derives and holds -- pre-edit coefficients + this subset == full rebuild,
+ * byte for byte, over all 59 parameters, with three teeth.
+ *
+ * Like the note build it copies the live bank into the shadow first, so what
+ * is not rebuilt is carried, never stale. begin(mask=all, tail=1, master=1)
+ * is NOT the same as eb_recall_chunk_begin: a patch build starts from a
+ * memset shadow, this starts from a copy. A patch change must keep calling
+ * eb_recall_chunk_begin. */
+void eb_recall_chunk_begin_subset(eb_recall *r, unsigned mask,
+                                  int tail, int master);
 
 /* How many steps a begin() just committed to. The firmware budgets blocks
  * against this rather than counting them afterwards. */
