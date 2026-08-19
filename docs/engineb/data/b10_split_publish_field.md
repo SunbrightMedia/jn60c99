@@ -145,3 +145,45 @@ counted and latch HEALTH. 256 x 4 B = 1 KB, 1.4 % of free internal RAM.
 scripts written over three sessions is not a plan, and a PARTIAL run is worse
 than none: it reads green while the half that was skipped is the half that
 broke. Each entry runs the TEETH script, never the bare gate.
+
+## 10. THE NOTE SEQUENCE IS NOW GATED TOO — AND IT FOUND A DEFECT AT ONCE
+The state machine that turns a key press into blocks and publishes lived
+inside juno_s3_listen.c, where NOTHING COULD TEST IT. Two defects in it were
+found by READING:
+  1. a refused publish let the catch-up build copy over the shadow still
+     holding the priority voice -- stale for ever, silently;
+  2. a program change arriving mid-note took the shadow from under it.
+Finding those by reading was LUCK, not method. They are now teeth 1 and 2 of
+`tools/engineb/note_teeth.sh`.
+
+`engine_b/dev/eb_notestep.h` holds the sequence -- portable, no IDF, no JUNO
+constant, work supplied through an ops struct -- and THE FIRMWARE RUNS IT.
+`note_gate.py` walks **all 65,536 (touched, voiced) mask pairs** and checks
+termination, key latency, hand-over, coverage, the interlock, refusal
+behaviour and the fatal paths. Nine teeth, all caught.
+
+### It found a real defect on its first run
+Check 8 asks whether `eb_nb_heavy()` -- the predicate the BUDGET defers on --
+matches the work a step actually does. It did not. **NB_EVENTS also calls
+begin_voices, whose shadow copy is ~20 KB of memcpy**, so the FIRST build of
+every note was opened OUTSIDE the budget: the scheduler skipping the work it
+was added to schedule. NB_IDLE too, since it falls through into NB_EVENTS in
+the same call. Both are now heavy.
+
+⚠ It surfaced because `-Werror` said the predicate was UNUSED. An unused
+predicate is an untested one; the compiler was reporting a gate hole.
+
+### And a second, in the gate itself
+Tooth 2 was not caught first time. The interlock check only verified the
+machine LEFT idle at some point -- which a machine reporting idle in the
+MIDDLE of its own build passes trivially. The interlock has to hold
+CONTINUOUSLY: idle is what tells the caller the shadow is free. Third time in
+this track that an uncaught tooth found a hole in the gate rather than the
+code (playbook 60, the scheduler's reset, this).
+
+## 11. WHAT IS LEFT
+Everything provable without the board is proved: **6 gates, 37 teeth, all
+caught, one command** (`sh tools/engineb/o2_gates.sh`).
+
+O2's acceptance is a SILICON test and cannot be closed here:
+`miss note=0`, `SCHED forced=0`, `KEYH` 2 dominant, `pubretry=0`.

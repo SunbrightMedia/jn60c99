@@ -93,6 +93,7 @@
 #include "ebdev.h"
 #include "eb_recall.h"
 #include "eb_sched.h"
+#include "eb_notestep.h"
 #include "eb_devseq.h"
 #include "eb_alloc.h"
 /* O1: THE ONE BOUNDARY. Every input reaches the engine through this and
@@ -1255,167 +1256,93 @@ static void dev_request(int patch, int gate)
  * So the machine does not advance past a publish until the publish HAPPENED.
  * NB_PUB1/NB_PUB2 ask again next block and touch nothing meanwhile; the
  * publish site advances them on success only. */
-enum { NB_IDLE = 0, NB_EVENTS, NB_PRI, NB_PUB1,
-       NB_REST_BEGIN, NB_REST, NB_CHECK, NB_PUB2 };
-static int           nbst = NB_IDLE;
+static eb_nb         NB;
 static unsigned long nb_ev = 0, nb_vb = 0, nb_nvoice = 0, nb_steps = 0;
 static unsigned long nb_miss0 = 0;
-/* how many blocks the player waited: events opened to the first publish. This
- * is THE number this whole split exists to move, so the firmware prints it
- * rather than leaving it to be inferred from a design argument. */
 static unsigned long nb_keyblk = 0, nb_keyblk_max = 0;
-static unsigned      nb_pri = 0, nb_rest = 0;
-/* THE KEY-LATENCY DISTRIBUTION, not just its max. A max says the worst block
- * count happened once; it does not say whether the instrument USUALLY sounds
- * in 2. Index = blocks from event apply to the publish that made the key
- * audible, saturating at the last bucket. Bucket 0 and 1 must stay EMPTY (a
- * key cannot sound before its own build), 2 is the design, anything past 3 is
- * a note that waited on something else. */
 #define NB_KEYH 12
 static unsigned long nb_key_hist[NB_KEYH];
-/* ⚠ RULE 4: EVERY DEFERRAL IS COUNTED. Both of these are new with the split
- * publish and both are silent by nature, which is exactly what rule 4 exists
- * to forbid:
- *   nb_defer     a program change that arrived while a note build owned the
- *                shadow. NOT dropped -- dev_want holds it and it lands a few
- *                blocks later. If this is large the patch knob feels heavy.
- *   nb_pubretry  a publish REFUSED mid-note, so the machine sat in NB_PUB1 /
- *                NB_PUB2 and asked again. MUST read 0: the publish happens in
- *                the quiescent window and there is no known way to refuse it.
- *                Non-zero means the quiescence precondition is not what this
- *                file believes, and the split publish is the first code that
- *                would care. */
-static unsigned long nb_defer = 0, nb_pubretry = 0;
+static unsigned long nb_defer = 0;
 
-/* Which note states actually BUILD, and are therefore worth budgeting. The
- * cheap ones (event apply, publish request, the unmapped check) are not: see
- * the call site. */
-static int nb_state_heavy(void)
+/* ---- the work eb_notestep.h drives. THIS FILE SUPPLIES THE WORK; THE HEADER
+ * SUPPLIES THE ORDER, and the order is what tools/engineb/note_gate.py proves
+ * with nine teeth. Two defects in that order were once found by reading this
+ * file; they are now teeth 1 and 2. */
+static int nb_apply(void *u)
 {
-    return nbst == NB_PRI || nbst == NB_REST || nbst == NB_REST_BEGIN;
+    (void)u;
+    if (eb_devseq_events(ALLOC_EV, note_nev) != note_nev) {
+        dev_mute_why = "the allocator emitted an event the device cannot apply";
+        return 0;
+    }
+    return 1;
 }
+static unsigned nb_touched(void *u)
+{
+    (void)u;
+    return (unsigned)EB_DEVSEQ_TOUCHED & ((1u << EB_NUM_VOICES) - 1u);
+}
+static unsigned nb_voiced(void *u)
+{
+    (void)u;
+    return (unsigned)EB_DEVSEQ_VOICED & ((1u << EB_NUM_VOICES) - 1u);
+}
+static void nb_begin(void *u, unsigned m) { (void)u; eb_recall_chunk_begin_voices(&REC, m); }
+static int  nb_chunk(void *u)  { (void)u; return eb_recall_chunk_step(&REC); }
+static int  nb_busy(void *u)   { (void)u; return eb_recall_chunk_busy(&REC); }
+static int  nb_check(void *u)
+{
+    (void)u;
+    if (EBDEV_S.miss != nb_miss0) {
+        printf("NOTE: *** %lu UNMAPPED CELL ACCESSES applying note events "
+               "(last offset %lu). A note wrote into a SINK -- that is "
+               "DEVICE_RECALL.md defect 2 and the voice is silent. ***\n",
+               EBDEV_S.miss - nb_miss0, EBDEV_S.lastmiss);
+        dev_mute_why = "a note event hit an unmapped cell";
+        health_fail("a note wrote into an unmapped cell");
+        return 0;
+    }
+    return 1;
+}
+static const eb_nb_ops NB_OPS = { nb_apply, nb_touched, nb_voiced,
+                                  nb_begin, nb_chunk, nb_busy, nb_check };
 
 static int dev_note_step(void)
 {
     unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count();
-    int rc_step = 1;
+    int was_idle = eb_nb_idle(&NB);
+    int r;
 
     /* A NOTE STEP IS BURST WORK TOO. Without this, a miss caused by a note
-     * build was attributed to `quiet` -- i.e. to O4 -- which is how b8 nearly
-     * sent the next session hunting the delay arm for a note-path cost. */
+     * build was attributed to `quiet` -- i.e. to O4. */
     note_ran_this_block = 1;
+    if (was_idle) nb_miss0 = EBDEV_S.miss;
 
-    switch (nbst) {
-    case NB_IDLE:
-        nb_miss0 = EBDEV_S.miss;
-        nbst = NB_EVENTS;
-        /* fall through: the first call does the event apply */
-        /* FALLTHRU */
-    case NB_EVENTS:
-        if (eb_devseq_events(ALLOC_EV, note_nev) != note_nev) {
-            dev_mute_why = "the allocator emitted an event the device cannot apply";
-            nbst = NB_IDLE;
-            return -1;
-        }
+    r = eb_nb_step(&NB, &NB_OPS, (void *)0);
+
+    if (was_idle) {
         nb_ev = (unsigned long)esp_cpu_get_cycle_count() - t0;
-        /* BOTH MASKS ARE THE APPLIER'S, not this file's. TOUCHED is the whole
-         * obligation and is passed unnarrowed; VOICED says which of those the
-         * player is waiting to hear. This file must not compute either -- a
-         * consumer that infers the mask is eb_recall_build_voices' stated
-         * failure mode, seven stale voices and no error. */
-        nb_pri  = EB_DEVSEQ_VOICED & EB_DEVSEQ_TOUCHED;
-        nb_rest = EB_DEVSEQ_TOUCHED & ~nb_pri;
-        {   /* ⚠ MASK TO THE VOICES THAT EXIST. EB_DEVSEQ_TOUCHED is ~0u after
-             * the held broadcast, so counting all 32 bits printed `nv=32` on
-             * an eight-voice engine. The BUILD was always right -- the cursor
-             * masks internally -- but the report was not, and a figure that
-             * cannot be true is worse than no figure. */
-            unsigned m = (unsigned)EB_DEVSEQ_TOUCHED
-                       & ((1u << EB_NUM_VOICES) - 1u), n = 0;
-            while (m) { n += m & 1u; m >>= 1; }
-            nb_nvoice = n;
+        nb_nvoice = 0; nb_vb = 0;
+        {   unsigned m = nb_touched((void *)0);
+            while (m) { nb_nvoice += m & 1u; m >>= 1; }
         }
-        nb_vb = 0;
-        nb_keyblk = 1;                 /* this block, the one that applied */
-        /* THE PRIORITY STAGE. An empty priority set is not an error -- it is
-         * an event batch that named no voice -- so fall straight through to
-         * the rest rather than publishing nothing. */
-        if (nb_pri) {
-            eb_recall_chunk_begin_voices(&REC, nb_pri);
-            nb_steps = (unsigned long)eb_recall_chunk_steps(&REC);
-            nbst = eb_recall_chunk_busy(&REC) ? NB_PRI : NB_REST_BEGIN;
-        } else {
-            nb_steps = 0;
-            nbst = NB_REST_BEGIN;
-        }
-        break;
-
-    case NB_PRI:
-        ++nb_keyblk;
-        if (!eb_recall_chunk_step(&REC)) {
-            /* ⚑ THE KEY SOUNDS HERE. Returning 0 makes the caller publish; the
-             * note is NOT finished, and note_pending stays set so no new
-             * events are drawn over a half-owed build. */
-            nbst = NB_PUB1;
-            nb_vb += (unsigned long)esp_cpu_get_cycle_count() - t0;
-            if (nb_keyblk > nb_keyblk_max) nb_keyblk_max = nb_keyblk;
-            nb_key_hist[nb_keyblk < NB_KEYH ? nb_keyblk : NB_KEYH - 1]++;
-            return 0;
-        }
+        nb_steps = (unsigned long)eb_recall_chunk_steps(&REC);
+    } else {
         nb_vb += (unsigned long)esp_cpu_get_cycle_count() - t0;
-        break;
+    }
 
-    case NB_PUB1:
-    case NB_PUB2:
-        /* Only reachable when the publish was REFUSED -- the publish site
-         * advances these on success. Ask again and touch NOTHING: the shadow
-         * still holds the build that was not published, and the one thing
-         * that must not happen is opening another build over it. */
-        ++nb_pubretry;          /* rule 4: a deferral nobody may discover late */
-        return 0;
-
-    case NB_REST_BEGIN:
-        /* The catch-up build, opened AFTER the publish above so it copies the
-         * bank that publish just made live -- which is what carries the voice
-         * the player is already hearing into the second half. */
-        if (nb_rest) {
-            eb_recall_chunk_begin_voices(&REC, nb_rest);
-            nb_steps += (unsigned long)eb_recall_chunk_steps(&REC);
-            nbst = eb_recall_chunk_busy(&REC) ? NB_REST : NB_CHECK;
-        } else {
-            nbst = NB_CHECK;
-        }
-        nb_vb += (unsigned long)esp_cpu_get_cycle_count() - t0;
-        break;
-
-    case NB_REST:
-        if (!eb_recall_chunk_step(&REC)) nbst = NB_CHECK;
-        nb_vb += (unsigned long)esp_cpu_get_cycle_count() - t0;
-        break;
-
-    case NB_CHECK:
-        nbst = NB_PUB2;
+    nb_keyblk = NB.key_blocks;
+    if (r == 0 && NB.st == NB_PUB1) {
+        if (nb_keyblk > nb_keyblk_max) nb_keyblk_max = nb_keyblk;
+        nb_key_hist[nb_keyblk < NB_KEYH ? nb_keyblk : NB_KEYH - 1]++;
+    }
+    if (r == 0 && NB.st == NB_PUB2) {
         ++note_bursts;
         nb_last = nb_ev + nb_vb;
         if (nb_last < nb_min) nb_min = nb_last;
         if (nb_last > nb_max) nb_max = nb_last;
-        /* THE CHECK MUST SEE THE WHOLE BUILD, which is why it is its own
-         * state rather than folded into the last voice: a cell that missed
-         * during voice 5 must still be caught after voice 7. */
-        if (EBDEV_S.miss != nb_miss0) {
-            printf("NOTE: *** %lu UNMAPPED CELL ACCESSES applying note events "
-                   "(last offset %lu). A note wrote into a SINK -- that is "
-                   "DEVICE_RECALL.md defect 2 and the voice is silent. ***\n",
-                   EBDEV_S.miss - nb_miss0, EBDEV_S.lastmiss);
-            dev_mute_why = "a note event hit an unmapped cell";
-            health_fail("a note wrote into an unmapped cell");
-            nbst = NB_IDLE;     /* muted; do not leave a publish owed */
-            return -1;
-        }
-        rc_step = 0;
-        break;
     }
-    return rc_step;
+    return r;
 }
 
 #if S3L_MIDI
@@ -2405,7 +2332,7 @@ static void render_block(int n)
      * lands a few blocks later, which is rule 3 and the same answer the note
      * path already gives a patch change. */
     if (dev_want && !dev_muted) {
-        if (note_pending || nbst != NB_IDLE) {
+        if (note_pending || !eb_nb_idle(&NB)) {
             ++nb_defer;     /* rule 4: counted, and dev_want is NOT cleared */
         } else {
             dev_burst_begin(dev_patch, dev_gate);
@@ -2458,7 +2385,7 @@ static void render_block(int n)
          * would hold the key silent to save work that does not exist. Only the
          * states that BUILD are gated. */
         if (note_pending
-            && (!nb_state_heavy() || eb_sched_may(&SCHED, g_step_cyc_note))) {
+            && (!eb_nb_heavy(&NB) || eb_sched_may(&SCHED, g_step_cyc_note))) {
             unsigned long sc0 = (unsigned long)esp_cpu_get_cycle_count();
             int st = dev_note_step();
             sched_note_cost(&g_step_cyc_note,
@@ -2521,8 +2448,6 @@ static void render_block(int n)
              * where it asks again next block and opens no new build over the
              * shadow it has not yet handed over. See the enum's comment for
              * the stale voice this prevents. */
-            if (nbst == NB_PUB1)      nbst = NB_REST_BEGIN;
-            else if (nbst == NB_PUB2) nbst = NB_IDLE;
         }
         dev_pending = 0;
         /* ⚠ RELEASED ONLY WHEN THE NOTE MACHINE IS ACTUALLY IDLE. A note now
@@ -2531,7 +2456,8 @@ static void render_block(int n)
          * key's events be drawn on top of a half-owed build, which is the one
          * thing the shadow's single-owner rule forbids. The mid-note publish
          * leaves nbst non-idle, so the flag survives it. */
-        if (nbst == NB_IDLE)
+        eb_nb_published(&NB);
+        if (eb_nb_idle(&NB))
             note_pending = 0;   /* released here, so MIDI may queue the next */
     }
 #endif
@@ -2676,7 +2602,7 @@ static void rpt_task(void *arg)
         printf("NB: ev=%lu vb=%lu nv=%lu st=%lu tot=%lu key=%lu keymax=%lu "
                "defer=%lu pubretry=%lu\n",
                nb_ev, nb_vb, nb_nvoice, nb_steps, nb_last,
-               nb_keyblk, nb_keyblk_max, nb_defer, nb_pubretry);
+               nb_keyblk, nb_keyblk_max, nb_defer, (unsigned long)NB.pub_retry);
         /* THE DISTRIBUTION, because a max is one event and a player feels the
          * common case. Buckets 0 and 1 MUST be empty -- a key cannot sound
          * before the block that builds it. */
@@ -3004,6 +2930,7 @@ void app_main(void)
     if (!DEVBANK) { printf("HALT: no room for the 20,246 B record buffer.\n"); return; }
     eb_recall_init(&REC, &RCB[0], &RCB[1], &MCB[0], &MCB[1], RS, MS, &EBE);
     eb_sched_init(&SCHED, SCHED_STARVE);
+    eb_nb_init(&NB);
     if (dev_burst(dev_patch, 0)) {
         dev_muted = 1;
         printf("MUTE AT BOOT: %s. The engine is started anyway so the counters "
