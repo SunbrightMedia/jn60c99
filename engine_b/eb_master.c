@@ -82,11 +82,25 @@ static void eb_rp_report(void)
 #define EB_MSPROF 0
 #endif
 #if EB_MSPROF
-#include <xtensa/hal.h>
+/* ⚠ THE CLOCK IS A PORT DETAIL, AND MAKING IT ONE IS WHAT LETS THE GATE RUN
+ * WITH THE PROFILER ON. The first version called xthal_get_ccount() directly,
+ * which is Xtensa-only -- so `make engineb` could only ever prove the OFF
+ * path, and the build actually flashed would have been the UNGATED one. That
+ * is the wrong way round: the configuration that ships is the configuration
+ * that must be proven.
+ *
+ * The device defines EB_MSPROF_TICK to its cycle counter; the host falls back
+ * to a plain counter, which is useless as a TIME but exercises every line of
+ * the accumulation, so the trunk gate can assert the null is still EXACTLY 0
+ * with the profiler compiled in. */
+#ifndef EB_MSPROF_TICK
+static unsigned long eb_msprof_fake;
+#define EB_MSPROF_TICK() (++eb_msprof_fake)
+#endif
 unsigned long long eb_msprof[5];      /* in, delay, reverb, out, effect */
 unsigned long      eb_msprof_n;
-#define MSP_T0()   unsigned long _p = (unsigned long)xthal_get_ccount(), _q
-#define MSP_HIT(k) do { _q = (unsigned long)xthal_get_ccount();               \
+#define MSP_T0()   unsigned long _p = (unsigned long)EB_MSPROF_TICK(), _q
+#define MSP_HIT(k) do { _q = (unsigned long)EB_MSPROF_TICK();                 \
                         eb_msprof[k] += (unsigned long long)(_q - _p);        \
                         _p = _q; } while (0)
 #define MSP_END()  (++eb_msprof_n)

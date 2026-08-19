@@ -158,4 +158,19 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
                      const eb_master_rings *r, const float *voices,
                      float *outL, float *outR);
 
+/* ---- O4: the master-chain stage profiler (see eb_master.c) --------------
+ * Five accumulators, one per numbered stage, plus the sample count. Present
+ * ONLY when EB_MSPROF is 1; the shipping build declares nothing and the
+ * assembly is byte-identical without them (proven: `make engineb` GREEN and a
+ * zero-line assembly diff).
+ *
+ * ⚠ THE PROFILER CHANGES WHAT IT MEASURES. It reads the cycle counter six
+ * times per sample, so a build with it ON must never have its BLOCK timings
+ * quoted -- only the RATIO between stages, which is what it exists to give.
+ * The same rule the FXPROF tooth was written under. */
+#if EB_MSPROF
+extern unsigned long long eb_msprof[5];   /* in, delay, reverb, out, effect */
+extern unsigned long      eb_msprof_n;    /* samples accumulated */
+#endif
+
 #endif /* ENGINEB_EB_MASTER_H */

@@ -95,6 +95,11 @@
 #include "eb_sched.h"
 #include "eb_notestep.h"
 #include "eb_burststep.h"
+/* the device supplies the profiler's clock; see eb_master.c */
+#if EB_MSPROF
+#include <xtensa/hal.h>
+#define EB_MSPROF_TICK() xthal_get_ccount()
+#endif
 #include "eb_paramstep.h"
 #include "eb_param_class.h"
 #include "eb_devseq.h"
@@ -2955,6 +2960,36 @@ static void rpt_task(void *arg)
          * machine takes and the one the budget is sized against.
          * `unknown` and `pubretry` MUST read 0: the first is a knob the class
          * table does not know, the second a build handed over twice. */
+#if EB_MSPROF
+        /* ================= O4: WHERE THE MASTER PASS SPENDS ITS TIME =======
+         *
+         * b16 predicts, BEFORE this ran: stage 1 (the DELAY dispatch) carries
+         * ~1,500 cyc/sample more on patches 5, 16, 21 and 49 -- the bank's
+         * only DELAY TYPE 5 patches -- than on the other sixty. If the excess
+         * lands in stage 2 (reverb), or is spread across stages, b16 is WRONG
+         * and the master-chain split across cores comes back onto the table.
+         *
+         * Printed beside `pat=` so each line is self-attributing. The counters
+         * RESET every report, so a line describes ITS second and not the run.
+         *
+         * ⚠ DO NOT QUOTE THIS BUILD'S BLOCK TIMINGS. Six cycle-counter reads
+         * per sample are inside the region being measured. The RATIO between
+         * stages is what this build is for; `B4dur`, `cyc=` and `FXP:` from it
+         * mean nothing. */
+        {   unsigned long n = eb_msprof_n ? eb_msprof_n : 1ul;
+            printf("MSP: in=%lu delay=%lu reverb=%lu out=%lu effect=%lu "
+                   "cyc/sample  (n=%lu samples)\n",
+                   (unsigned long)(eb_msprof[0] / n),
+                   (unsigned long)(eb_msprof[1] / n),
+                   (unsigned long)(eb_msprof[2] / n),
+                   (unsigned long)(eb_msprof[3] / n),
+                   (unsigned long)(eb_msprof[4] / n),
+                   eb_msprof_n);
+            eb_msprof[0] = eb_msprof[1] = eb_msprof[2] = 0;
+            eb_msprof[3] = eb_msprof[4] = 0;
+            eb_msprof_n  = 0;
+        }
+#endif
         printf("PARAM: edits=%lu builds=%lu defer=%lu unknown=%lu "
                "pubretry=%u apply=%lu applymax=%lu blocks=%u\n",
                pm_edits, pm_builds, pm_defer, pm_unknown, PM.pub_retry,
