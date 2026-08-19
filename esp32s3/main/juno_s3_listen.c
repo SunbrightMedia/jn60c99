@@ -445,6 +445,9 @@ static void load_coefs(int n, int g)
 static eb_alloc      ALLOC;
 static eb_alloc_ev   ALLOC_EV[EB_ALLOC_MAX_EV];
 static volatile int  note_pending = 0;   /* events are queued, a burst is owed */
+/* set by the console `t` key, consumed once in the block loop: stall one block
+ * on purpose so this build's overrun detector is SEEN TO FIRE. */
+static volatile int  tooth_once = 0;
 static int           note_nev = 0;
 static unsigned long notes_seen = 0, notes_dropped = 0, note_bursts = 0;
 static unsigned long ev_applied_blocks = 0;   /* blocks that applied events */
@@ -919,7 +922,7 @@ static int dev_burst_step(void)
  * (juno_event_*, source KEYBED) -- a driver that reached the engine any other
  * way would stress a path nobody ships.
  *
- * FIVE PHASES, ~2 s each, repeating (172 blocks/s, 344 blocks/phase):
+ * SIX PHASES, ~2 s each, repeating (172 blocks/s, 344 blocks/phase):
  *   0 BASELINE   silence, so every counter has an uncontaminated control
  *   1 SINGLES    a note toggles ~4x/s -- the ordinary case
  *   2 PAIRS      TWO keys in ONE block -- the exact case the old path
@@ -928,6 +931,18 @@ static int dev_burst_step(void)
  *   4 COLLIDE    a note submitted into every block where a patch build is
  *                LIVE (burst_state != IDLE) -- the O1xO2 composition rule,
  *                exercised deliberately instead of by luck
+ *   5 PATCHSTORM a program change every ~0.5 s UNDER A HELD CHORD -- B4's
+ *                acceptance case, and the worst case for key latency because
+ *                a key must now wait for a patch build to hand back the
+ *                shadow. keymax is read from THIS phase, not from phase 1.
+ *
+ * ⚠ PHASES 4 AND 5 DRIVE THE PATCH THEMSELVES. Phase 4 was written to submit
+ * notes into a LIVE patch build and then nothing in this file ever started
+ * one -- the console `b`/`n` keys were the only source, so the phase ran its
+ * condition against burst_state == IDLE forever and measured NOTHING while
+ * reporting normally. A stimulus whose precondition never occurs is the same
+ * blind-gate defect as playbook 60, wearing a stimulus instead of a gate.
+ *
  * All held notes are released at each phase boundary, so a phase cannot leak
  * ringing voices into the next phase's measurements.
  *
@@ -938,14 +953,26 @@ static int dev_burst_step(void)
 #define S3L_STRESS 0
 #endif
 #if S3L_STRESS
+/* defined below -- the robot drives the patch as well as the keys, and this is
+ * the only forward reference in the file. */
+static void dev_request(int patch, int gate);
 static void stress_step(void)
 {
     static unsigned long blk = 0;
     static int held[8];
     static const unsigned char NOTE[8] = {48, 52, 55, 60, 64, 67, 72, 76};
     unsigned long t = blk++;
-    unsigned long ph = (t / 344u) % 5u;
+    unsigned long ph = (t / 344u) % 6u;
     int i;
+
+    /* THE PATCH DRIVER, phases 4 and 5. dev_request is O(1) and only sets
+     * dev_want; the build starts at the next block boundary that the note
+     * machine is not holding, which is precisely the contention this is here
+     * to create. */
+    if (ph == 4u && (t % 43u) == 7u)
+        dev_request((int)((t / 43u) % (unsigned long)DEVCRC_NPATCH), 0);
+    if (ph == 5u && (t % 86u) == 0u)
+        dev_request((int)((t / 86u) % (unsigned long)DEVCRC_NPATCH), 0);
 
     if (t % 344u == 343u) {              /* phase boundary: release all */
         for (i = 0; i < 8; ++i)
@@ -989,6 +1016,21 @@ static void stress_step(void)
             for (i = 0; i < 8; ++i)
                 if (held[i]) { juno_event_note_off(JUNO_SRC_KEYBED, NOTE[i]);
                                held[i] = 0; }
+        }
+        break;
+    case 5:
+        /* A HELD CHORD, and keys moving under the program changes above. The
+         * chord is what makes this B4's worst case rather than a patch sweep
+         * on silence: voices are sounding when the shadow changes hands. */
+        if (t % 86u == 3u) {
+            for (i = 0; i < 4; ++i)
+                if (!held[i]) { juno_event_note_on(JUNO_SRC_KEYBED,
+                                                   NOTE[i], 100);
+                                held[i] = 1; }
+        } else if (t % 86u == 60u) {
+            i = (int)((t / 86u) & 3u);
+            if (held[i]) { juno_event_note_off(JUNO_SRC_KEYBED, NOTE[i]);
+                           held[i] = 0; }
         }
         break;
     }
@@ -1161,6 +1203,27 @@ static unsigned long nb_miss0 = 0;
  * rather than leaving it to be inferred from a design argument. */
 static unsigned long nb_keyblk = 0, nb_keyblk_max = 0;
 static unsigned      nb_pri = 0, nb_rest = 0;
+/* THE KEY-LATENCY DISTRIBUTION, not just its max. A max says the worst block
+ * count happened once; it does not say whether the instrument USUALLY sounds
+ * in 2. Index = blocks from event apply to the publish that made the key
+ * audible, saturating at the last bucket. Bucket 0 and 1 must stay EMPTY (a
+ * key cannot sound before its own build), 2 is the design, anything past 3 is
+ * a note that waited on something else. */
+#define NB_KEYH 12
+static unsigned long nb_key_hist[NB_KEYH];
+/* ⚠ RULE 4: EVERY DEFERRAL IS COUNTED. Both of these are new with the split
+ * publish and both are silent by nature, which is exactly what rule 4 exists
+ * to forbid:
+ *   nb_defer     a program change that arrived while a note build owned the
+ *                shadow. NOT dropped -- dev_want holds it and it lands a few
+ *                blocks later. If this is large the patch knob feels heavy.
+ *   nb_pubretry  a publish REFUSED mid-note, so the machine sat in NB_PUB1 /
+ *                NB_PUB2 and asked again. MUST read 0: the publish happens in
+ *                the quiescent window and there is no known way to refuse it.
+ *                Non-zero means the quiescence precondition is not what this
+ *                file believes, and the split publish is the first code that
+ *                would care. */
+static unsigned long nb_defer = 0, nb_pubretry = 0;
 
 static int dev_note_step(void)
 {
@@ -1220,6 +1283,7 @@ static int dev_note_step(void)
             nbst = NB_PUB1;
             nb_vb += (unsigned long)esp_cpu_get_cycle_count() - t0;
             if (nb_keyblk > nb_keyblk_max) nb_keyblk_max = nb_keyblk;
+            nb_key_hist[nb_keyblk < NB_KEYH ? nb_keyblk : NB_KEYH - 1]++;
             return 0;
         }
         nb_vb += (unsigned long)esp_cpu_get_cycle_count() - t0;
@@ -1231,6 +1295,7 @@ static int dev_note_step(void)
          * advances these on success. Ask again and touch NOTHING: the shadow
          * still holds the build that was not published, and the one thing
          * that must not happen is opening another build over it. */
+        ++nb_pubretry;          /* rule 4: a deferral nobody may discover late */
         return 0;
 
     case NB_REST_BEGIN:
@@ -1486,6 +1551,10 @@ static void con_poll(void)
                                    juno_event_note_off(JUNO_SRC_CONSOLE, k); }
             continue;
         }
+        /* t -- fire the overrun detector ONCE, deliberately. See the block at
+         * its use site: this is how a measurement build proves its own
+         * detectors are live without contaminating the measurement. */
+        if (c == 't') { tooth_once = 1; continue; }
         if (c == 'z') { if (con_base >= 24) con_base -= 12; continue; }
         if (c == 'x') { if (con_base <= 96) con_base += 12; continue; }
         /* b / n -- PROGRAM CHANGE, backward and forward through the 64 factory
@@ -2259,9 +2328,13 @@ static void render_block(int n)
      * dev_want is NOT cleared here, so nothing is lost -- the patch change
      * lands a few blocks later, which is rule 3 and the same answer the note
      * path already gives a patch change. */
-    if (dev_want && !dev_muted && !note_pending && nbst == NB_IDLE) {
-        dev_burst_begin(dev_patch, dev_gate);
-        dev_want = 0;
+    if (dev_want && !dev_muted) {
+        if (note_pending || nbst != NB_IDLE) {
+            ++nb_defer;     /* rule 4: counted, and dev_want is NOT cleared */
+        } else {
+            dev_burst_begin(dev_patch, dev_gate);
+            dev_want = 0;
+        }
     }
     if (burst_state != BST_IDLE && !dev_muted) {
         int st = dev_burst_step();
@@ -2503,9 +2576,17 @@ static void rpt_task(void *arg)
          * worst any key press saw, because an average latency is not what a
          * player feels. nv= is still the WHOLE obligation, so key= being small
          * while nv= reads 8 is the design working, not a mask that shrank. */
-        printf("NB: ev=%lu vb=%lu nv=%lu st=%lu tot=%lu key=%lu keymax=%lu\n",
+        printf("NB: ev=%lu vb=%lu nv=%lu st=%lu tot=%lu key=%lu keymax=%lu "
+               "defer=%lu pubretry=%lu\n",
                nb_ev, nb_vb, nb_nvoice, nb_steps, nb_last,
-               nb_keyblk, nb_keyblk_max);
+               nb_keyblk, nb_keyblk_max, nb_defer, nb_pubretry);
+        /* THE DISTRIBUTION, because a max is one event and a player feels the
+         * common case. Buckets 0 and 1 MUST be empty -- a key cannot sound
+         * before the block that builds it. */
+        {   int h; printf("KEYH:");
+            for (h = 0; h < NB_KEYH; ++h) printf(" %d=%lu", h, nb_key_hist[h]);
+            printf("   (blocks from key to sound; 2 is the design)\n");
+        }
         {   juno_event_stats es;
             juno_event_get_stats(&es);
             /* torn= is the only runtime witness to the publish barrier being
@@ -3167,6 +3248,27 @@ void app_main(void)
             }
         }
 #endif
+        /* ⚑ THE SAME TOOTH, ON DEMAND, ALWAYS COMPILED IN.
+         *
+         * S3L_B4_TOOTH above fires every N blocks, which proves the detector
+         * works and RUINS the measurement it is compiled into -- miss can no
+         * longer be read as "the instrument missed a deadline". So a
+         * MEASUREMENT build has to leave it off, and then that build's own
+         * overrun detector has never been seen to fire.
+         *
+         * That is a false choice. `t` on the console stalls ONE block, once,
+         * when the operator asks. Press it at the END of a run: the numbers
+         * up to that point are uncontaminated, and the red that follows proves
+         * the detector was live the whole time. Every detector seen to fire,
+         * without paying for it in the data. */
+        if (tooth_once) {
+            int64_t until = t0 + (int64_t)(3ul * (1000000ul * CHUNK / SR));
+            tooth_once = 0;
+            printf("TOOTH: stalling ONE block on purpose. B4 ovr= and miss= "
+                   "MUST move and HEALTH MUST go red. If they do not, every "
+                   "zero this run printed was an untested detector.\n");
+            while (esp_timer_get_time() < until) { }
+        }
         if (t_prev_ok) {
             unsigned long d      = (unsigned long)(t0 - t_prev_ok);
             unsigned long period = 1000000ul * CHUNK / SR;

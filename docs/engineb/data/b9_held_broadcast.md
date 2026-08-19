@@ -249,3 +249,41 @@ still refused by held_gate.py with HELD_NARROW=1. §8's open question -- which
 cell a note writes that reaches more than one voice -- is STILL OPEN, and the
 split publish makes it an optimisation rather than a blocker: it would take the
 catch-up from eight blocks to one, and the key latency is already paid.
+
+## 10. THE MEASUREMENT BUILD (2026-08-19) — what it will answer, and the rule
+Built to settle §9's one unproven claim: key=2 is host-proven and READ in the
+firmware, never measured on silicon.
+
+### What was added so no human input is needed
+  * robot keybed PHASE 5 PATCHSTORM: a program change every ~0.5 s under a
+    HELD CHORD. That is B4's acceptance case and the worst case for key
+    latency, because a key must wait for a patch build to hand back the shadow.
+  * ⚠ PHASES 4 AND 5 NOW DRIVE THE PATCH THEMSELVES. Phase 4 was written to
+    submit notes into a LIVE patch build, and NOTHING IN THE FIRMWARE EVER
+    STARTED ONE -- the console b/n keys were the only source. Its condition
+    (burst_state != IDLE) was false forever, so the phase measured nothing and
+    reported normally. Same shape as playbook 60: a precondition the harness
+    never enters, reading green. Found by reading, not by a failure.
+  * KEYH: a histogram of blocks-from-key-to-sound. A max is one event; a player
+    feels the common case. Buckets 0 and 1 MUST be empty.
+  * NB: defer= and pubretry=, the two deferrals the split publish introduced.
+    Rule 4 requires both be counted; neither existed when §9 was written.
+  * console `t`: fire the overrun detector ONCE, on demand. S3L_B4_TOOTH fires
+    every N blocks and RUINS the measurement it proves -- so a measurement
+    build left it off and then had no evidence its own detector was live. `t`
+    removes that false choice: press it at the END of a run.
+
+### THE DECISION RULE, stated before the board is touched (playbook 11b)
+The split publish is CONFIRMED if and only if all of:
+  1. KEYH buckets 0 and 1 are ZERO, and bucket 2 holds the great majority.
+  2. keymax <= 3 in phases 1-3. Phase 5 may be larger -- a key waiting on a
+     program change is rule 3 working, not a fault -- but it must be BOUNDED
+     and it must be explainable by the patch build in flight.
+  3. B4 miss does not increment during phase 5 (the program-change case).
+  4. pubretry = 0. Non-zero means the quiescence precondition is not what the
+     firmware believes, and the split publish is the first code that cares.
+  5. sub = del + dep, ref = 0, torn = 0, notes_dropped = 0 (O1, unchanged).
+  6. `t` at the end makes B4 ovr/miss move and HEALTH go red. If it does not,
+     every zero above was an untested detector and the run proves nothing.
+REFUTED if KEYH bucket 10+ is populated in phases 1-3, or miss increments per
+key press. Either sends the split back, not the measurement.
