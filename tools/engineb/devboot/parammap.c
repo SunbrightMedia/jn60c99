@@ -68,6 +68,7 @@
 
 #define BANK_HEADER  23
 #define BANK_STRIDE  20223
+#define NBASE        13
 
 static unsigned char *ST;
 static eb_render_coefs RC, RC0;
@@ -123,22 +124,21 @@ int main(int argc, char **argv)
      * does. The reported set is the UNION of all of it: under-reporting a
      * dependency yields a stale coefficient and no error, so every doubt is
      * resolved in the direction of reporting more. */
-    static const unsigned char PVAL[12] = {
-        0x00u, 0x01u, 0x03u, 0x07u, 0x0Fu, 0x10u,
-        0x33u, 0x55u, 0x7Fu, 0xA5u, 0xCCu, 0xFFu };
-    static const unsigned char VAL[4] = { 0x00u, 0x03u, 0x0Cu, 0x7Fu };
     const size_t NRC = sizeof(eb_render_coefs);
     const size_t NMC = sizeof(eb_master_coef);
     const size_t NTOT = NRC + NMC;
     unsigned char *bank, *wb, *moved;
-    unsigned char *base[6];
+    unsigned char *base[13];
+    int bpat[13];
     unsigned char *OWN[EB_NUM_VOICES];
     long bl;
     FILE *f, *of;
     int b, i, k, v, nparam = 0;
     unsigned s = 7u;
+    static unsigned char want[4096];
+    int nwant = 0;
 
-    if (argc < 3) { fprintf(stderr, "usage: parammap <bank.bin> <out.tsv>\n");
+    if (argc < 3) { fprintf(stderr, "usage: parammap <bank.bin> <out.tsv> [positions.txt]\n");
                     return 2; }
 
     f = fopen(argv[1], "rb");
@@ -153,9 +153,18 @@ int main(int argc, char **argv)
     moved = (unsigned char *)malloc(NTOT);
     memcpy(wb, bank, (size_t)bl);
 
-    for (b = 0; b < 6; ++b) {
-        base[b] = wb + BANK_HEADER + (long)(b * 7) * BANK_STRIDE;
-        if (b >= 3)
+    /* ⚠ THE BASE SET IS THE FIXED SCAN'S, AND FOR THE SAME REASON (playbook
+     * 65). Six bases -- factory 0/7/14 plus RANDOMISED 21/28/35 -- made this
+     * harness blind to every parameter whose effect needs an effect type only
+     * patches 21/28/35/49/56 select, because it randomised exactly those. Ten
+     * UNTOUCHED factory bases plus three randomised copies of patches nothing
+     * relies on. Randomised bases are ADDITIONAL, never substitutes. */
+    for (b = 0; b < NBASE; ++b) {
+        static const int RPAT[3] = { 3, 10, 17 };
+        int pat = (b < 10) ? (b * 7) : RPAT[b - 10];
+        bpat[b] = pat;
+        base[b] = wb + BANK_HEADER + (long)pat * BANK_STRIDE;
+        if (b >= 10)
             for (i = 16; i < BANK_STRIDE; ++i) {
                 s = s * 1103515245u + 12345u;
                 base[b][i] = (unsigned char)((s >> 16) & 0xFF);
@@ -187,6 +196,19 @@ int main(int argc, char **argv)
         }
     }
 
+    /* the discovery scan's answer, if supplied */
+    if (argc > 3) {
+        FILE *pf = fopen(argv[3], "r");
+        int q;
+        if (!pf) { perror(argv[3]); return 2; }
+        while (fscanf(pf, "%d", &q) == 1)
+            if (q >= 0 && q < 4096) { want[q] = 1u; ++nwant; }
+        fclose(pf);
+        printf("mapping %d record positions named by --patch-scan\n", nwant);
+    } else {
+        printf("no position list given: sweeping ALL pairs (very slow)\n");
+    }
+
     of = fopen(argv[2], "w");
     fprintf(of, "#blob_lo\tblob_hi\tmoved_bytes\ttotal_bytes\trc_bytes\tmc_bytes\tvoice_mask\n");
     printf("PARAMETER MAP: eb_render_coefs=%lu B  eb_master_coef=%lu B"
@@ -197,41 +219,63 @@ int main(int argc, char **argv)
      * record 16+2p, i.e. blob 2p and 2p+1. Both bytes move together because a
      * knob writes a value, not half of one -- perturbing only one nibble would
      * measure a parameter the instrument cannot produce. */
+    /* ⚠ WHICH PAIRS. The exhaustive sweep above is 13 bases x 768 recalls per
+     * pair, so sweeping all 2,040 pairs would take days. DISCOVERY is not this
+     * harness's job: devrecall_gate.py --patch-scan already answers "which
+     * record positions reach the coefficients", it is the proven tool for it,
+     * and its base set was fixed alongside this one. So the caller passes that
+     * answer in and this harness MAPS it.
+     *
+     * The file is one record position per line (build/devrecall/recall_positions.txt).
+     * Reading it is not a shortcut: a map that disagreed with the discovery
+     * scan about WHICH parameters exist would be two answers to one question. */
     for (i = 16; i + 1 < 4096; i += 2) {
         size_t nmv = 0, nrc = 0, nmc = 0;
+        if (nwant && !want[i] && !want[i + 1]) continue;
         unsigned vmask = 0u;
         int any = 0;
 
         memset(moved, 0, NTOT);
-        for (b = 0; b < 6; ++b) {
+        for (b = 0; b < NBASE; ++b) {
             unsigned char o0 = base[b][i], o1 = base[b][i + 1];
-            full_recall(wb, b * 7);
+            full_recall(wb, bpat[b]);
             memcpy(&RC0, &RC, sizeof RC);
             memcpy(&MC0, &MC_, sizeof MC_);
-            /* (a) the parameter's own value range, nibbles independent */
-            for (k = 0; k < 12; ++k) {
-                unsigned char hi = (unsigned char)((PVAL[k] >> 4) & 0xFu);
-                unsigned char lo = (unsigned char)(PVAL[k] & 0xFu);
+            /* ⚠ EXHAUSTIVE, AND THE THIRD PROBE DEFECT THAT FORCED IT.
+             * A 12-value list missed ASSIGN MODE (record 128/129) outright:
+             * juno_apply_unison_spread acts only when assign == 2, so that
+             * parameter is live at ONE value of 256 and no sampled list that
+             * omits it can see it. The first defect was coupling both nibbles
+             * (4 reachable values); the second was the base set (playbook 65);
+             * this is the third of the same family. The answer is to stop
+             * sampling: a nibble-packed parameter has an 8-bit value, so 256
+             * IS the whole space.
+             *
+             * (a) every value the PARAMETER can take, nibbles set from it. */
+            for (k = 0; k < 256; ++k) {
+                unsigned char hi = (unsigned char)((k >> 4) & 0xFu);
+                unsigned char lo = (unsigned char)(k & 0xFu);
                 if (hi == (o0 & 0xFu) && lo == (o1 & 0xFu)) continue;
                 base[b][i] = hi; base[b][i + 1] = lo;
-                full_recall(wb, b * 7);
+                full_recall(wb, bpat[b]);
                 mark(moved, &RC0, &RC, NRC, 0);
                 mark(moved, &MC0, &MC_, NMC, NRC);
             }
             base[b][i] = o0; base[b][i + 1] = o1;
-            /* (b) each byte alone, exactly gate.c's proven probe. A pair sweep
-             * and a single-byte sweep can each see what the other cannot. */
-            for (k = 0; k < 4; ++k) {
-                if (VAL[k] != o0) {
-                    base[b][i] = VAL[k];
-                    full_recall(wb, b * 7);
+            /* (b) each byte alone over its FULL 8-bit range. Not redundant
+             * with (a): (a) writes nibbles, so a DIRECT-COPY byte -- eb_patch.h
+             * names several -- would only ever see values 0..15 there. */
+            for (k = 0; k < 256; ++k) {
+                if ((unsigned char)k != o0) {
+                    base[b][i] = (unsigned char)k;
+                    full_recall(wb, bpat[b]);
                     mark(moved, &RC0, &RC, NRC, 0);
                     mark(moved, &MC0, &MC_, NMC, NRC);
                     base[b][i] = o0;
                 }
-                if (VAL[k] != o1) {
-                    base[b][i + 1] = VAL[k];
-                    full_recall(wb, b * 7);
+                if ((unsigned char)k != o1) {
+                    base[b][i + 1] = (unsigned char)k;
+                    full_recall(wb, bpat[b]);
                     mark(moved, &RC0, &RC, NRC, 0);
                     mark(moved, &MC0, &MC_, NMC, NRC);
                     base[b][i + 1] = o1;

@@ -17,6 +17,19 @@ F>50% reuse O2's chunked rebuild; 10-50% split.
 
 **F = 0.26%: BUILD THE MAP**, with 38x margin on the rule's own threshold.
 
+⚠ **THESE COUNTS ARE A FLOOR, NOT THE FINAL MAP.** They come from the first
+`parammap` run, whose base set and value list were later found to under-report
+(§3). The re-run is exhaustive — all 256 pair values, all 256 values of each
+byte alone, 13 bases — and takes its position list from the fixed discovery
+scan. It can only ADD parameters and bytes, never remove them.
+
+**The DECISION does not depend on the correction.** The rule's threshold is
+10%; the worst parameter measured is 2.11% and the median 0.26%. The additions
+are ASSIGN MODE and three CHORUS records, whose moved-byte counts are 4-24
+bytes of master coefficients — an order of magnitude below the threshold. No
+plausible correction moves F to 10%, so "build the map" stands on the floor
+alone. The exact per-parameter table is what the re-run settles.
+
 ### The structure is binary, with nothing in between
 
 | class | n | moved bytes min/median/max |
@@ -117,10 +130,46 @@ on a factory base the scan relies on. Randomised bases are now ADDITIONAL,
 never substitutes. The patch index is carried in `bpat[]` rather than
 recomputed as `b*7` at the call sites.
 
+### The fixed scan's verdict — AND NO FORMAT DEFECT
+
+    RECORD SCAN: 114 of 4080 positions change the recalled coefficients
+    *** EB_RECALL_POS[] IS STALE: measured 114, listed 112 ***
+        only measured: [128, 129, 134]
+        only listed:   [3092]
+
+3286-3288 are now found, so the fix works. The three NEWLY measured positions
+are records 128, 129 (ASSIGN MODE — `juno_bank_assign` reads blob 112/113) and
+134.
+
+**All three are already CARRIED by the compact format** (`eb_patch_offsets`
+holds blob 112, 113, 118), so the format is NOT short and no parameter is being
+dropped. Only `EB_RECALL_POS[]`, the assertion list, is out of date. That is
+bookkeeping, not a lost parameter — the distinction that decides whether this
+is urgent, and it is not.
+
+### ⚠ A THIRD PROBE DEFECT, in this harness, of the same family
+
+`parammap.c` did NOT find ASSIGN MODE either. `juno_apply_unison_spread` acts
+only when `assign == 2`, so that parameter is live at **one value out of 256**,
+and a 12-value sampled list that omits 2 cannot see it. The three defects in
+order:
+
+1. both nibbles written from one probe value — 4 reachable values of 256.
+2. randomised bases destroying the effect-type condition (playbook 65).
+3. a sampled value list missing the single value a parameter responds to.
+
+All three under-report, which is the dangerous direction, and all three were
+found by CORROBORATION rather than by reading code. The answer to the third is
+to stop sampling: a nibble-packed parameter's value is 8 bits, so 256 is the
+whole space. `parammap.c` now sweeps all 256 pair values AND all 256 values of
+each byte alone (a direct-copy byte would otherwise only ever see 0..15), over
+the same 13 bases, and takes the position list FROM the discovery scan rather
+than rediscovering it — two answers to one question is how they drift apart.
+
 ### Still open: record 3092
 
 3092 moves no coefficient on any of the ten factory patches at any of 256
-values, and the old scan's randomised bases did not move it either. It is
+values, and neither scan's randomised bases moved it either. It is
 NOT yet demonstrated dead — a parameter can be one factor of a product no
 probe has set (the BEND GAIN trap, `eb_patch.h`). It is recorded as
 UNRESOLVED and nothing has been removed from the format on its account.
