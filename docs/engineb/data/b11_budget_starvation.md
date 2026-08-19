@@ -115,3 +115,37 @@ Equal rates mean the note path is not the cause and O2's acceptance is met.
 A higher note rate means it IS the cause, and the step is genuinely too big
 for the blocks it lands on. Either way the answer is a number, not a
 judgement -- which a bare count could never give.
+
+## 8. THE RATE WAS THE WRONG INSTRUMENT TOO — USE THE MEAN
+Two runs of the rate build gave IDENTICAL counters: note=21, quiet=20 misses
+on 6,105 and 6,618 blocks -> 34/10k and 30/10k. (Identical because the robot
+is deterministic, which is a useful fact in itself: the harness is exactly
+repeatable.)
+
+⚠ THAT COMPARISON CANNOT BE SETTLED BY RUNNING LONGER, for two reasons:
+
+  a. **Poisson.** At ~20 events the error is +-4.5 on each count, so 34 and 30
+     overlap. Reaching a 10 % separation needs ~400 events per class, i.e.
+     roughly 30 minutes of stimulus, for a question that does not need it.
+  b. **THE CLASSES ARE NOT EXCHANGEABLE, which is the real defect in the
+     test.** Note blocks cluster in the robot's BUSY phases, where patches are
+     stepping and the delay arms are live. Quiet blocks include the SILENT
+     baseline phase. The note class is drawn from a more expensive population
+     for reasons that have nothing to do with the note build, so a higher note
+     rate is expected even if the note step is free.
+
+### The direct question, with thousands of samples instead of twenty
+**DOES A BLOCK THAT RAN A NOTE STEP TAKE LONGER THAN ONE THAT DID NOT?**
+
+`B4dur: note= quiet= burst= period=` -- mean block duration per class, over
+EVERY block. The prediction is specific: a note step is ~222,000 cycles and
+core 0's measured spin is 420,000-880,000, so the step runs inside time core 0
+already spends WAITING FOR CORE 1 and should add nothing measurable.
+
+  * note ~ quiet  -> the note step is free, O2's claim is confirmed DIRECTLY,
+                     and the residual misses are the background rate (O4).
+  * note >> quiet -> the step really does extend its block, and O2 is not done.
+
+A mean over thousands of samples answers in 90 seconds what a tail count could
+not answer in half an hour. Reaching for a longer run was the wrong instinct:
+the fix was a better instrument, not more data through a blunt one.

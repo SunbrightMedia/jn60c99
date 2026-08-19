@@ -2592,6 +2592,8 @@ static volatile long          rpt_drift = 0;
 static volatile unsigned long rpt_ovr_late = 0, rpt_ovr_miss = 0;
 static volatile unsigned long rpt_blk_burst = 0, rpt_blk_quiet = 0,
                               rpt_blk_note = 0;
+static volatile unsigned long rpt_dur_burst = 0, rpt_dur_quiet = 0,
+                              rpt_dur_note = 0;
 static volatile unsigned long rpt_miss_burst = 0, rpt_miss_quiet = 0;
 static volatile unsigned long rpt_miss_note = 0;
 static volatile unsigned long rpt_miss_step[BST_CHECK + 1];
@@ -2640,6 +2642,16 @@ static void rpt_task(void *arg)
                    10000ul * rpt_miss_quiet / bq,
                    rpt_blk_burst, rpt_blk_note, rpt_blk_quiet);
         }
+        /* ⚑ THE MEASUREMENT THAT ACTUALLY DECIDES O2. Mean block duration by
+         * class, in microseconds, over EVERY block rather than the ~20 that
+         * missed. A note step is ~222,000 cycles and core 0's spin is
+         * 420,000-880,000, so it should run inside time core 0 spends waiting
+         * for core 1 and add NOTHING to the block. note ~ quiet proves that
+         * from data; note > quiet by a visible margin refutes it. */
+        printf("B4dur: note=%luus quiet=%luus burst=%luus  period=%luus  "
+               "NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK\n",
+               rpt_dur_note, rpt_dur_quiet, rpt_dur_burst,
+               (unsigned long)(1000000ul * CHUNK / SR));
         /* WHICH STEP overran: reseed/install/recall/notes/coefs/check. b7
          * measured burst=17 with no attribution; this is the attribution. */
         printf("O2m: rs=%lu in=%lu rc=%lu nt=%lu cf=%lu ck=%lu\n",
@@ -2812,6 +2824,25 @@ void app_main(void)
      * The same trap was already written down for `burst` in this file and the
      * note counter was added without it. */
     unsigned long blk_burst = 0, blk_quiet = 0, blk_note = 0;
+    /* ⚑ AND THE MEAN BLOCK DURATION PER CLASS -- THE SHARP INSTRUMENT.
+     *
+     * Counting rare misses cannot settle this. Two runs gave note=21 and
+     * quiet=20 misses; at ~20 events the Poisson error is +-4.5 on each, so
+     * 34/10k and 30/10k are indistinguishable NO MATTER HOW LONG THE RUN.
+     *
+     * Worse, the comparison is BIASED: note blocks cluster in the robot's
+     * busy phases, where patches are being stepped and the delay arms are
+     * live; quiet blocks include the silent baseline phase. The note class is
+     * therefore drawn from a more expensive population for reasons that have
+     * nothing to do with the note build.
+     *
+     * THE DIRECT QUESTION HAS THOUSANDS OF SAMPLES: does a block that ran a
+     * note step take LONGER than one that did not? The note step is ~222,000
+     * cycles and core 0's measured spin is 420,000-880,000, so the step
+     * should fit inside time core 0 spends WAITING FOR CORE 1 and cost the
+     * block nothing. If mean(note) ~ mean(quiet), that is confirmed directly,
+     * from every block rather than from the tail. */
+    unsigned long long dur_burst = 0, dur_quiet = 0, dur_note = 0;
     unsigned long miss_step[BST_CHECK + 1];
     memset((void *)miss_step, 0, sizeof miss_step);
     int64_t       t_prev_ok = 0;
@@ -3389,11 +3420,11 @@ void app_main(void)
                    "zero this run printed was an untested detector.\n");
             while (esp_timer_get_time() < until) { }
         }
-        if (burst_ran_this_block)     ++blk_burst;
-        else if (note_ran_this_block) ++blk_note;
-        else                          ++blk_quiet;
         if (t_prev_ok) {
             unsigned long d      = (unsigned long)(t0 - t_prev_ok);
+            if (burst_ran_this_block)     { ++blk_burst; dur_burst += d; }
+            else if (note_ran_this_block) { ++blk_note;  dur_note  += d; }
+            else                          { ++blk_quiet; dur_quiet += d; }
             unsigned long period = 1000000ul * CHUNK / SR;
             /* COUNT, do not merely latch. See rpt_ovr_* for why the counter
              * had to be added: health_fail keeps the FIRST string only, so
@@ -3734,6 +3765,9 @@ void app_main(void)
                 rpt_miss_note  = ovr_miss_note;
                 rpt_blk_burst = blk_burst; rpt_blk_quiet = blk_quiet;
                 rpt_blk_note  = blk_note;
+                rpt_dur_burst = blk_burst ? (unsigned long)(dur_burst / blk_burst) : 0;
+                rpt_dur_quiet = blk_quiet ? (unsigned long)(dur_quiet / blk_quiet) : 0;
+                rpt_dur_note  = blk_note  ? (unsigned long)(dur_note  / blk_note)  : 0;
                 memcpy((void *)rpt_miss_step, (const void *)miss_step,
                        sizeof miss_step);
                 /* rule 4 latches that should always have existed: a refused
