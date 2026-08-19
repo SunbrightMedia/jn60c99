@@ -96,14 +96,15 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
   rule was UNPASSABLE (playbook 64): an IDLE block runs 6,001 us against the
   5,804 us period, so miss=0 is unreachable for any subsystem. That +197 us is
   O4's real deficit and the whole remaining one.
-- O3 BUILT AND GATED ON THE HOST, UNCOMPILED FOR THE TARGET (no ESP-IDF here).
+- O3 BUILT, GATED AND COMPILED FOR THE TARGET; UNFLASHED. (ESP-IDF v6.2 IS
+  here: `. /home/user/esp-idf/export.sh` then `idf.py build`. `which idf.py`
+  without sourcing export.sh says nothing -- do not conclude from it.)
   A knob = write 2 record bytes, WARM recall, rebuild only its class. Median
   parameter moves 32 of 12,276 coef bytes; 2,036/2,040 warm==cold, the 4 that
   differ are latches that settle. eb_param_class.h is GENERATED and re-derived
   every run. 57 teeth green: sh tools/engineb/o3_gates.sh. Knob waits up to 48
   blocks behind a note storm -- a POLICY the user may overturn.
-- Next: compile O3 for the target + silicon (PARAM: unknown=/pubretry= must be
-  0); O4 worst-case (prologue first, then master-chain split across cores);
+- Next: O3 on silicon (PARAM: unknown=/pubretry= must be 0); O4 worst-case (prologue first, then master-chain split across cores);
   D link (zero code); full-state gate.
 
 # BUILD & GIT
