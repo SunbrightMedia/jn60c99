@@ -91,8 +91,13 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
   one block (5.8 ms) of latency. That is the next design step. Burst ~2.1 M,
   misses 1-4 blocks per patch step (C10 binding). ovr_late/drift timer anomaly
   still open (b4_first_run.md §5).
-- Next per FINAL_GUIDE: C11 event API → C10 chunked recall → C9 per-param
-  refresh; B3/B4 worst-case; D link (zero code); random full-state gate owed.
+- O1 and O2 DONE and proven on silicon (b12). O2's cost: one chunked step adds
+  189 us to its block, bounded; key audible in 2 blocks. O2's old acceptance
+  rule was UNPASSABLE (playbook 64): an IDLE block runs 6,001 us against the
+  5,804 us period, so miss=0 is unreachable for any subsystem. That +197 us is
+  O4's real deficit and the whole remaining one.
+- Next per FINAL_GUIDE: O3 per-param refresh; O4 worst-case (prologue first,
+  then master-chain split across cores); D link (zero code); full-state gate.
 
 # BUILD & GIT
 `make libjuno.so` | `make test` | `make verify` (finish line) | WASM:

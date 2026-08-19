@@ -900,3 +900,32 @@ found it, in one pass, in under a second of its own runtime.
 
 So: a candidate build is not a candidate until the robot harness has played it.
 Component gates say the parts are right. They never say the instrument works.
+
+## 64. An acceptance rule can be unpassable, and only a baseline class shows it
+PAID 2026-08-19 on silicon (b12), after two builds spent chasing it.
+
+O2's acceptance rule said "miss MUST NOT increment across a program change or
+a played note". Two builds were made to satisfy it. The first counted misses
+per class; a bare count cannot attribute. The second counted a miss RATE per
+class; a rate of a rare event is Poisson-limited and biased by when the classes
+occur. Neither could say whether O2 had worked.
+
+The third build measured the MEAN BLOCK DURATION per class, and added a class
+that does NOTHING -- `quiet`, blocks with no chunk step at all. That class
+answered the question in one line: **an idle block runs 6,001 us against a
+5,804 us period**. The deadline was already missed with no O2 work in the
+frame, so `miss = 0` was unreachable BY CONSTRUCTION, and the rule had been
+asking O2 to remove a miss another track causes.
+
+The same measurement then gave O2 the number it actually needed -- note minus
+quiet = 189 us, what one chunked step costs -- and gave O4 its real deficit,
+which no cycle count of a patch had produced in three attempts.
+
+THE RULE: MEASURE A PER-BLOCK MEAN OF THE QUANTITY THE DEADLINE IS ABOUT, AND
+ALWAYS CARRY A CLASS THAT DOES NOTHING. A count says something happened. A
+rate says how often, badly, when the event is rare. A mean with a baseline
+says HOW MUCH, and WHOSE.
+
+THE SECOND LESSON: AN ACCEPTANCE RULE WRITTEN BEFORE ITS BACKGROUND WAS
+MEASURABLE MUST BE RE-DERIVED ONCE IT IS -- not argued around, and not chased.
+Work that cannot pass its own rule is not failing; the rule is.

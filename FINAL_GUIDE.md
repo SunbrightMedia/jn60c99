@@ -283,9 +283,9 @@ cross-referenced. Done and retired from the old list: recall on the board
 | label | was | what | state |
 |---|---|---|---|
 | **O1** | C11 | the internal event API — the boundary O2/O3 live behind | **DONE 2026-08-18** — gated (7 queue teeth + 3 structural teeth, all caught) AND FIELD-PROVEN (b7_o1o2_field.md): 313 human key events, sub=del=314, ref=0, torn=0, hi=3 of 63. Refusals and torn publishes now latch HEALTH red. Param events queue and count (`par=`) until O3. |
-| **O2** | C10 | chunked patch AND note builds — THE fix for B4's counted misses | **BUILT AND GATED IN FULL; UNFLASHED.** Patch burst chunked, bit-identical over all 64 patches. Note burst chunked, identical over all 256 masks. Key latency CLOSED by the SPLIT PUBLISH (b9 §9): the voices the allocator named build and publish first, the rest catch up into a second publish — 2 blocks to sound (~12 ms), not 10 (58 ms), with no mask narrowed and nothing dropped. Gated over all 6,305 (mask, priority) pairs on both "the end state is unchanged" AND "the key really sounds early", incl. render/master state because publish now runs twice per key. **11 teeth caught; tooth 11 was NOT caught twice first — see playbook 60.** Narrowing still refused, still OFF. **REMAINING: silicon.** `NB: key= keymax=` must read 2 on the board, and `B4:` miss must not increment across a program change or a played note. |
+| **O2** | C10 | chunked patch AND note builds — bounded, measured, field-proven | **DONE 2026-08-19 — GATED AND PROVEN ON SILICON (data/b12_block_duration.md).** Patch burst and note burst both chunked, bit-identical over all 64 patches and all 256 masks; SPLIT PUBLISH (b9 §9) makes the key audible in 2 blocks — board: bucket 2 = 15,356 of 15,462 presses, bucket 9 = 106, all 8-key chords where every voice is priority. 47-minute robot run: `pubretry=0` both machines, `torn=0`, `ref=0`, `un=0`, `defer=0`, `forced=0`, CRC MATCH. Cost of one chunked step MEASURED: `B4dur` note 6,190 µs − quiet 6,001 µs = **189 µs/block**, bounded. 44 teeth across 7 gates (`sh tools/engineb/o2_gates.sh`), all seen to fail. Narrowing (`EB_DEVSEQ_NARROW_HELD`) still refused, still OFF. **⚠ THE OLD ACCEPTANCE RULE ("miss must not increment") WAS UNPASSABLE** — a quiet block already runs 6,001 µs against a 5,804 µs period, so `miss=0` is unreachable for ANY subsystem. See playbook 64; the residual moved to O4, which is where it was caused. |
 | **O3** | C9 | per-parameter incremental refresh (derived field map) | NOT DONE |
-| **O4** | B3/B4 | worst-case headroom CLOSED: measure the prologue, explain the delay arm's +1,45x, then pick the lever (chain split across cores vs arm hunt) | OPEN — b6_split_sweep.md is the evidence base |
+| **O4** | B3/B4 | worst-case headroom CLOSED — now the ONLY holder of the deadline deficit | OPEN. **ITS REAL NUMBER IS NOW MEASURED (b12 §3): an idle block — no note, no patch, nothing but audio — runs 6,001 µs against a 5,804 µs period, +197 µs, 3.4 % over; drift +150,106 µs over 47 minutes.** That supersedes every deficit stated from patch cycle counts, and it proves the `ovr_late`/esp_timer-vs-I2S anomaly (b4_first_run.md §5) is the deficit itself, not a reporting artefact. Evidence base still b6_split_sweep.md; keep split 7. Next: measure the prologue (`S3L_TIME_PROLOGUE`), then the master-chain split across cores. |
 | **O5** | C6/C7/C8 | encoders + LCD, preset storage, warm gate into make verify | NOT DONE |
 | **O6** | D1-D4 | the two-chip link — 6 voices, one instrument | NOT DONE (D1 architecture decided) |
 | **F1** | B4 verdict | the full stress gate green: worst patch x full polyphony x program change x parameter storm, miss=0, every detector seen to fire | NOT DONE |
@@ -293,7 +293,7 @@ cross-referenced. Done and retired from the old list: recall on the board
 | **F3** | E3/E4 | pipeline doc ".vst3 in → two boards out" + de-JUNO audit (E5 then unblocks) | NOT DONE |
 
 Rule unchanged: do not reorder without the user. O1 before O2/O3 because it is
-their boundary; O4 needs O2 (the burst misses are half of B4's red); O6 needs
+their boundary; O4 needs O2 (done 2026-08-19; O4 now owns the whole remaining deficit); O6 needs
 O4's number; F1 needs O1-O6; F2/F3 close the project.
 
 ### O-step briefings — what the executor must know, with sources
@@ -313,9 +313,11 @@ load-bearing (main/CMakeLists.txt comment). O2 covers the NOTE build too —
 same cursor (`eb_recall_chunk_begin_voices`), same gate, no separate label.
 The SPLIT PUBLISH (b9 §9) is how the key stays playable: `EB_DEVSEQ_VOICED`
 is a publish ORDER, never a mask to build alone — a caller that builds it and
-stops leaves the other voices stale forever. ACCEPTANCE: `B4:` miss does not
-increment across a program change OR a played note, all 64 patches, CRC still
-MATCHES, and `NB: keymax=` reads 2.
+stops leaves the other voices stale forever. ACCEPTANCE (RE-DERIVED 2026-08-19, playbook 64 — the old "miss does not
+increment" rule was unpassable, see b12 §3): a chunked step costs the block a
+BOUNDED, MEASURED amount and neither machine owns the shadow indefinitely.
+Met on silicon: 189 µs/step, `defer=0`, `forced=0`, `pubretry=0`, `ref=0`,
+CRC MATCH all 64 patches, `NB: keymax=` reads 2.
 
 **O3 (incremental refresh):** design + derived-field-map rule in the C9
 section below. The proven precedent is `eb_recall_build_voices` (bit-identical,
