@@ -1021,35 +1021,44 @@ So: reading a warning is not the same as applying it. When a file tells you a
 defect class was paid for here, ask whether the thing you are adding RIGHT NOW
 has it -- that is the only moment the warning is worth anything.
 
-## 68. A unit error inside a CORROBORATION is worse than one inside a claim
-PAID 2026-08-19 (b15), and it had already been used to set a step's target.
+## 68. Read the field's DEFINITION before reading its value
+PAID 2026-08-19 (b15), twice in one hour, in opposite directions, while writing
+this entry.
 
-b12 measured mean block duration and found the instrument ~200-300 us over
-period on every block. That was a big claim, so b14 checked it against an
-independent number from the same run -- the board's drift counter -- and
-reported "implied drift 149.5 s vs the board's own 150.1 s, agreement 0.4 %".
+The board prints `drift=+150106` and `t=425`. Two conclusions were drawn from
+them, both confidently, both wrong:
 
-The drift field prints MICROSECONDS. 150,106 us is 0.15 seconds. The two
-numbers disagree by a factor of 1,000, and the check that was supposed to
-catch that instead certified it.
+  b14  read `drift` as MICROSECONDS, called it 150 s by luck, and reported that
+       it "confirmed" the mean-block-duration meter to 0.4 %. Right answer,
+       wrong reason -- the agreement was arithmetic coincidence.
+  b15  "caught" that, read `drift` as MICROSECONDS the other way (0.15 s),
+       declared the meter inflated by 3.5 % and the engine healthy, and
+       RETRACTED a whole track's target. It also used `t=` as wall-clock
+       elapsed to prove it.
 
-What actually settles it needs no clever measurement at all: the board prints
-the BLOCK COUNT and the elapsed time. 73,443 blocks in 425 s is 5,787 us per
-block, which is the period. The engine keeps up. The mean-duration meter is
-inflated by 3.5 % and everything derived from it -- including a whole track's
-stated target of "287 cycles/sample over budget" -- was wrong.
+The source settles both in two lines:
 
-THE RULE: WHEN A CORROBORATION AGREES, CHECK ITS UNITS BEFORE BELIEVING IT.
-A disagreement invites scrutiny and gets it. An agreement closes the question,
-so an error hidden inside one survives -- and it survives with MORE authority
-than the original claim, because it is now "confirmed".
+    rpt_drift = (long)((real_us - audio_us) / 1000);   /* MILLISECONDS */
+    sec       = chunks / (SR / CHUNK);                 /* AUDIO time, from
+                                                          the BLOCK COUNT */
 
-THE SECOND RULE, cheaper and better: PREFER A COUNT AND A CLOCK OVER A MEAN.
-Block count and elapsed time are two numbers the board already prints, they
-cannot drift apart, and dividing them answers the question directly. The
-elaborate per-class mean was the thing that was wrong; the trivial ratio was
-right the whole time and nobody had computed it.
+`drift` is ms: 150,106 is 150 s and the engine really is behind. `t=` is audio
+produced, not real time -- so using it to test whether blocks arrive on time is
+CIRCULAR, assuming exactly what it was cited to prove. With the definitions in
+hand the numbers close to 0.03 %: 73,443 blocks produce 426 s of audio in 446 s
+of real time, and the 20 s difference IS the drift counter.
 
-THE THIRD: a mean that contradicts the count it was derived from is a bug in
-the mean. Do not go looking for a physical explanation for an arithmetic
-disagreement until the arithmetic is ruled out.
+THE RULE: A FIELD'S UNITS AND BASIS ARE PROPERTIES OF THE CODE THAT WRITES IT,
+NOT OF THE CONTEXT IT IS READ IN. Open the line that assigns it. This costs
+thirty seconds and it is the only thing that worked here.
+
+THE TRAP THAT MADE IT SURVIVE: context supplies whichever reading fits the
+conclusion being drawn. b14 wanted confirmation and found it; b15 wanted a
+retraction and found that. Neither an agreement NOR a disagreement is evidence
+about a field whose definition has not been read -- and an agreement is worse,
+because it closes the question.
+
+THE TELL: a "time" field and a "count" field that must be consistent are the
+cheapest cross-check on any board -- but only after both definitions are known.
+Here the count field was derived FROM the thing under test, so the check had no
+independent term in it at all.

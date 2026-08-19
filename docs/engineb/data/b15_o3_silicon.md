@@ -1,4 +1,4 @@
-# b15 — O3 on silicon, and a retraction of b14's O4 target
+# b15 — O3 on silicon; and two unit errors in a row, corrected
 
 Board run, 2026-08-19, 425 s, robot phases 0-6 including KNOBSTORM.
 
@@ -32,56 +32,70 @@ parameter build. That is the priority policy b13 §8 predicted (it modelled up
 to 48 blocks under a heavier storm) now visible on hardware at 78 of ~2,000
 presses. It is a POLICY, and it is the user's to overturn.
 
-## 2. ⚠ RETRACTION: b14's O4 TARGET WAS BUILT ON A UNIT ERROR
+## 2. ⚠ THIS SECTION WAS WRONG, TWICE OVER — the corrected account
 
-b14 claimed b12's block durations were confirmed by the drift counter —
-"implied drift 149.5 s vs the board's own 150.1 s, agreement 0.4 %". 
+**What §2 originally said (2026-08-19, WITHDRAWN): that b14's O4 target was a
+unit error, that `B4dur` was inflated by 3.5 %, and that the engine keeps up.
+All three statements are false.** They are left named here rather than deleted,
+because the sequence is the lesson.
 
-**That is wrong. 150,106 µs is 0.15 SECONDS, not 150 seconds.** The two numbers
-disagree by a factor of 1000, and b14 read a µs field as seconds and called it
-corroboration.
+### The field definitions, read from the source instead of assumed
+
+    juno_s3_listen.c:4010   rpt_drift = (long)((real_us - audio_us) / 1000);
+    juno_s3_listen.c:3997   sec       = chunks / (SR / CHUNK);
+
+* `drift` is **MILLISECONDS**, not microseconds. `+150,106` in b12 is 150.1 s
+  and `+20,114` here is 20.1 s.
+* `t=` is **audio time produced**, derived from the BLOCK COUNT — not wall
+  clock. So "73,443 blocks in 425 s" was circular: it assumed the very thing it
+  was used to prove.
 
 ### What the board actually says
 
-    blocks counted        73,443   (12,499 + 26,721 + 34,223)
-    elapsed                  425 s
-    implied mean interval  5,787 µs
-    period                 5,805 µs
-    B4dur weighted mean    6,081 µs  -> would imply 447 s elapsed
-    drift at t=425        +20,114 µs = 0.02 s  ->  0.274 µs per block
-    B4dur excess per block   276 µs      ->  1,008x the measured drift
+    blocks                 73,443
+    audio produced          426.3 s   (this is the t= field)
+    drift                   +20.1 s   (20,114 ms)
+    REAL elapsed            446.4 s   (audio + drift)
 
-**The block COUNT settles it.** 73,443 blocks in 425 s is 5,787 µs per block,
-which is the period. The instrument is keeping up. Drift accumulates at 0.27 µs
-per block — 0.005 % — not 276 µs.
+    B4dur weighted mean     6,081 µs -> 446.6 s over 73,443 blocks
+    agreement with REAL      100.03 %
 
-### So `B4dur` is the broken instrument, not the engine
+**`B4dur` is correct to 0.03 %.** The engine produces 426 s of audio in 446 s
+of real time. It is **4.8 % behind**, and the drift counter is the accumulated
+proof: 20.1 s lost in one run.
 
-Three independent quantities — block count, elapsed time, and the drift counter
-— agree that blocks arrive at the period. Only `B4dur` disagrees, by ~3.5 %
-consistently across all three of its classes. A mean that contradicts the count
-and the clock it was derived from is a bug in the mean.
+### So O4's target STANDS, restated
 
-**O4's target is therefore NOT 306 µs/block, and not 287 cyc/sample.** Both
-numbers are withdrawn. What remains real and unexplained:
+    mean block          6,081 µs against a 5,805 µs period
+    over per block        276 µs
+    over per sample       259 cycles
+    actual              ~5,701 cyc/sample against the 5,442 budget
 
-* `ovr=39,301` of 73,443 blocks exceed the period — but if the mean interval IS
-  the period, that is jitter crossing a threshold, not a deficit. Roughly half
-  the blocks being over a mean-centred threshold is what jitter looks like.
-* `gap=9,000-12,000 µs` worst block-to-block, tagged to `printf` in earlier
-  work. Those are real stalls and they are the only large excursions here.
-* `miss` totals 23/84/101 over the run — rare, and now unattributed again.
+b12 was right. b14's reconciliation was right. **Only this section was wrong.**
 
-### What O4's first step must be
+### The sequence, because it is worth more than the number
 
-Not a cycle hunt, and not the master-chain split. **Fix or retire `B4dur`
-first.** Every O4 lever would be chosen against a number that is 1,000x wrong.
-The block count and the drift counter are cheap, already printed, and agree
-with each other; `B4dur` must be reconciled against them or removed.
+1. b12 measured a mean and it looked alarming.
+2. b14 checked it against `drift` and reported agreement — reading ms as s by
+   luck, and getting the right answer for the wrong reason.
+3. b15 §2 "caught" b14's unit error, read ms as µs, and used a block-derived
+   `t=` as if it were wall clock. Two errors, both in the direction of the
+   conclusion being drawn, in the act of writing a playbook entry about unit
+   errors.
+4. The only thing that settled it was OPENING THE SOURCE and reading what the
+   two fields are computed from.
 
-## 3. Why this got as far as it did
+**Neither an agreement nor a disagreement is evidence about a field whose
+definition has not been read.** Both times the interpretation came from
+context, and context supplied whichever answer was being looked for.
+## 3. What O4's first step actually is
 
-b12 quoted `B4dur` and it looked plausible. b14 "reconciled" it against the
-drift counter and got agreement — but only by misreading µs as s. A check that
-CONFIRMS a suspect number is exactly where a unit error does the most damage,
-because it converts doubt into false confidence and closes the question.
+Not "fix B4dur" — it is correct. The engine is 259 cyc/sample over budget and
+loses 20 s per 7 minutes. The b6 lever list applies: measure the prologue
+(`S3L_TIME_PROLOGUE`, still 0), explain the delay arm, then choose between the
+master-chain split across cores and an arm hunt.
+
+One number from THIS run narrows it already: `FXP: fx=2,4xx-4,3xx v1=2,57x-2,65x
+wait=5`. Core 1's FX pass swings by ~1,900 cyc/sample across patches while its
+voice pass is flat, and `wait=5` says core 0 is not the constraint. That is the
+same picture b6 recorded, on a build with three machines running.
