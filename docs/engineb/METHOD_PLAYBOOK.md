@@ -867,3 +867,36 @@ MACHINE'S CONTRACT INTO A HEADER MADE THE SECOND MACHINE'S BREACH OBVIOUS. A
 written contract is a template to hold against every other candidate. Before
 the extraction, both machines were "some states in a big switch" and the
 similarity was invisible.
+
+## 63. A budget for work that cannot fit starves everything behind it
+PAID 2026-08-19 on silicon, one build after the budget was added (b11).
+
+b10 measured `miss note=23` and `miss burst=7` and added a budget: a step runs
+only when the measured slack covers it. Correct for the note path, whose steps
+are ~148,000 cycles against ~460,000 of slack. It was applied to the PATCH
+burst too, because "rule 2 covers all incremental work".
+
+The patch burst's worst step is 591,526 cycles. It CANNOT FIT -- the reseed and
+the bank apply are single indivisible operations larger than any block's spare
+time. So every step deferred to the starve limit and was forced: a program
+change went from 15 blocks to ~384. Requests arrived faster than that, the
+build restarted 588 times, `burst_state` was never idle, and the note path --
+which may only run when it is -- NEVER RAN ONCE. 9,019 events refused, not one
+note built, on a build whose host gates were all green.
+
+THE RULE: A BUDGET IS ONLY MEANINGFUL FOR WORK THAT CAN BE MADE TO FIT.
+Deferring work that can never fit does not protect the deadline -- the work
+still runs, later, in one lump -- it only delays everything behind it. Before
+gating anything, compare its worst measured step against the available slack.
+If the step is larger, the answer is to divide it or to accept its overrun,
+never to postpone it.
+
+THE SECOND, HARDER LESSON: the starvation was not caused by the deferrals. It
+was caused by an INTERLOCK the deferrals made permanent. Three individually
+correct components -- a budget, a single-owner rule, and a request rate --
+composed into a system that could not play a note. Per-component gates cannot
+see this by construction; each one passed. Only a WHOLE-INSTRUMENT stress run
+found it, in one pass, in under a second of its own runtime.
+
+So: a candidate build is not a candidate until the robot harness has played it.
+Component gates say the parts are right. They never say the instrument works.

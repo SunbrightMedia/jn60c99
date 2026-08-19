@@ -2366,10 +2366,32 @@ static void render_block(int n)
             dev_want = 0;
         }
     }
-    if (burst_state != BST_IDLE && !dev_muted
-        && eb_sched_may(&SCHED, g_step_cyc_burst)) {
+    /* ⚠ THE PATCH BURST IS NOT BUDGET-GATED, AND THE BOARD IS WHY.
+     *
+     * It was, for one build, on the reasoning that both machines are
+     * incremental work and rule 2 covers both. MEASURED consequence
+     * (b11): NOT ONE NOTE WAS EVER BUILT in a 280-second run, and 9,019
+     * events were refused.
+     *
+     * The arithmetic: the burst's worst step measured 591,526 cycles against
+     * 460,000 of slack, so it can NEVER fit -- the reseed and the bank apply
+     * are single indivisible operations larger than any block's spare time.
+     * Every step therefore deferred to the 64-block starve limit, so one
+     * program change took ~384 blocks instead of 15. The robot requests
+     * patches faster than that, so the build restarted 588 times and
+     * `burst_state` was never IDLE -- and the note branch below only runs
+     * when it is. The budget starved the exact path it was added to protect,
+     * through an interlock rather than through its own deferrals.
+     *
+     * THE RULE THIS ENCODES: A BUDGET IS ONLY MEANINGFUL FOR WORK THAT CAN
+     * BE MADE TO FIT. Deferring work that can never fit does not protect the
+     * deadline -- the work still runs, later, in one lump -- it only delays
+     * everything waiting behind it. The burst's own misses were 7 against the
+     * note path's 23; it was never the problem. */
+    if (burst_state != BST_IDLE && !dev_muted) {
         unsigned long sc0 = (unsigned long)esp_cpu_get_cycle_count();
         int st = dev_burst_step();
+        /* still MEASURED, so the report can show why it is not gated */
         sched_note_cost(&g_step_cyc_burst,
                         (unsigned long)esp_cpu_get_cycle_count() - sc0);
         if (st < 0) {
