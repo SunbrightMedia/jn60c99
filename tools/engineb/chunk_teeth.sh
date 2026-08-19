@@ -60,11 +60,14 @@ tooth 3 "$SRC" \
 
 # 4. The cursor stops one step early: every symptom of 3, plus a step count
 #    that no longer matches what the firmware budgets blocks against.
-# RETARGETED when chunk_step was rewritten for O2. The old plant edited a line
-# that no longer exists, and the guard caught that rather than passing a tooth
-# that changed nothing -- which is the whole reason the guard is there.
+# RETARGETED TWICE, and both times by the guard rather than by a person. First
+# when chunk_step was rewritten for O2, again when it became a slot walk for
+# O3's subset build. Each time the old plant edited a line that no longer
+# existed and the "plant did not apply" check refused to score it. A tooth
+# whose target moves is the normal case in living code; a tooth that silently
+# stops planting is how a gate quietly becomes decorative.
 tooth 4 "$SRC" \
-  's/    if (r->chunk_tail \&\& st <= EB_RECALL_CHUNK_STEPS) {/    if (r->chunk_tail \&\& st < EB_RECALL_CHUNK_STEPS) {/' \
+  's/    if (st <= EB_NUM_VOICES + 2) { r->chunk_step = st; return 1; }/    if (st <= EB_NUM_VOICES + 1) { r->chunk_step = st; return 1; }/' \
   'the cursor terminates one step early (the master set is never built)'
 
 # 5. The extraction itself regresses: the monolith stops calling the tail it
@@ -93,8 +96,10 @@ tooth 7 "$SRC" \
 
 # 8. the cursor spends an extra block discovering it is finished -- the exact
 #    defect the step count caught on the first draft.
+# RETARGETED for the slot walk: make the FIRST skip loop stop one short, so a
+# note build stalls a block on a voice it does not own.
 tooth 8 "$SRC" \
-  's/    if (st <= EB_NUM_VOICES) { r->chunk_step = st; return 1; }/    if (st <= EB_NUM_VOICES + 1) { r->chunk_step = st; return 1; }/' \
+  '/^int eb_recall_chunk_step/,/^}/ s/    while (st <= EB_NUM_VOICES \&\& !(r->chunk_mask \& (1u << (st - 1)))) ++st;/    while (st < EB_NUM_VOICES \&\& !(r->chunk_mask \& (1u << (st - 1)))) ++st;/' \
   'the note cursor burns an extra block per build'
 
 # ---- O2: THE SPLIT PUBLISH (the key sounds in two blocks) ---------------
@@ -129,7 +134,39 @@ tooth 11 "$REC" \
   's/            if (\*aux == 1.0f) { r->rs->aux_edge\[v\] = 1; \*aux = 0.0f; }/            if (*aux == 1.0f) { r->rs->aux_edge[v] = 1; *aux = 0.0f; }\n            else r->rs->aux_edge[v] = 0;/' \
   'publish is NOT idempotent -- the second one loses the retrigger'
 
+# ================= O3: THE SUBSET BUILD (parameter classes) =================
+#
+# 12. A CLASS SHORT BY ITS MASTER BUILDER -- C9's named tooth, in the shape the
+#     parameter path can actually produce it. 22 of the 59 parameters are
+#     master-only or tail+master; dropping the master flag makes every one of
+#     them rebuild NOTHING, so the knob moves and the instrument does not.
+#     The old chunk paths cannot see this: begin() hardcodes master=1 and
+#     begin_voices() hardcodes master=0, so only the subset section is exposed.
+tooth 12 "$REC" \
+  's/    r->chunk_master = master ? 1 : 0;/    r->chunk_master = 0;/' \
+  'subset drops the MASTER builder -- master-only classes rebuild nothing'
+
+# 13. THE SLOT WALK RUNS A SLOT IT DOES NOT OWE. This is the defect the first
+#     draft of the subset extension actually had, found by reading the walk
+#     rather than by a test -- so it is planted here to make sure reading is
+#     never the only line of defence again. Removing the master skip in the
+#     ADVANCE lets a tail-only build stop at the master slot and run it: the
+#     coefficients gain a rebuild nobody asked for AND the step count exceeds
+#     the owed count, which is what the firmware budgets blocks against.
+tooth 13 "$REC" \
+  's/    if (st == EB_NUM_VOICES + 2 \&\& !r->chunk_master) ++st;//' \
+  'the cursor runs the master slot a tail-only build does not owe'
+
+# 14. THE SUBSET SKIPS ITS SHADOW COPY. Everything the class does NOT rebuild
+#     must be CARRIED from the live bank. Without the copy those fields keep
+#     whatever the shadow held -- the previous patch, or the gate's poison.
+#     Tooth 7 plants the same rule for the note path; the parameter path is
+#     separate code and needs its own, or the rule is only half guarded.
+tooth 14 "$REC" \
+  '175s/.*\*r->rc\[shadow\] = \*r->rc\[r->cur\];//' \
+  'subset skips the shadow copy -- unbuilt fields keep stale values'
+
 restore
 echo
 python3 "$HERE/chunk_gate.py"
-echo "CHUNK TEETH: eleven caught, clean tree green."
+echo "CHUNK TEETH: fourteen caught, clean tree green."
