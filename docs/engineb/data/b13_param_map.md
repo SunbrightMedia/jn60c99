@@ -195,3 +195,58 @@ hand-over defect. A third must be built to the same contract from the first
 line: `step()` returns 0 to ASK for a publish and does NOT advance; the caller
 calls `published()` only when the publish really happened. The interlock
 becomes one-shadow-one-owner across THREE machines.
+
+## 5. The cell map — how much of the apply an edit actually needs (cellmap.c)
+
+b13 §1 measured the GATHER half and found it tiny. This measures the APPLY
+half, which dominates it: ~0.24 M cycles on silicon, ~1 ms at 240 MHz, on a
+block b12 measured already 197 µs over period. Narrowing the gather buys
+nothing while the apply costs that.
+
+    FULL RECALL writes            2,807 cells
+    one parameter writes    min 1   median 8   max 113
+    58 of 59 parameters write under 50 cells
+
+    REDUNDANCY  R = full / per-parameter
+      median R = 351x
+      worst  R = 24.8x   (record 650, DELAY TYPE)
+
+**The apply is almost entirely recomputation the edit did not need.** Even the
+worst parameter needs 4% of it; the median needs 0.3%.
+
+### ⚠ THE PRIZE IS LARGE AND SO IS THE PRICE — a cost b13 §4 failed to state
+
+b13 §4 offered "narrow the apply with a second derived map" as one option
+beside rate-limiting, as though the two were comparable in risk. **They are
+not, and that should have been written down when the option was.**
+
+`src/` is the FROZEN bit-exact port. `juno_bank_apply` is transcribed plugin
+code, `make verify` is its finish line, and `approx_audit.py` enforces ZERO
+approximations in it every run. Decomposing it per parameter means rewriting
+the one part of this repo that is proven.
+
+So the measurement says the prize is 351x and the constraint says the price is
+the port's proof. **That is a scope decision for the user, not an engineering
+preference to be settled here.** It is recorded and not acted on.
+
+### What ships without that decision
+
+**Full apply + mapped gather, rate-limited.** Touches nothing in `src/`.
+Refresh rate = 172/N Hz for one refresh every N blocks. The mapped gather is
+already justified by §1 and costs almost nothing; the apply sets N.
+
+The alternative that needs no new machinery at all is to drive the existing
+note machine (`eb_notestep.h`) with `touched` = all voices and `voiced` = the
+SOUNDING voices, so the knob reaches what the player hears in 2 blocks via the
+proven split publish. That is one note build per refresh: ~11 blocks, ~16 Hz.
+
+### ⚠ THE RATE CANNOT BE JUDGED THE USUAL WAY
+
+16 Hz is audibly stepped on a filter sweep; 172 Hz is smooth; 43-86 Hz is the
+interesting middle. **END_GOAL forbids validating by ear and forbids asking the
+user to A/B**, so "is 43 Hz smooth enough" cannot be settled by listening.
+
+What CAN settle it: render the same knob sweep through the PLUGIN and through
+the port at each N and compare. The plugin re-reads its cells every sample, so
+the residual against it IS the zipper — measured, not heard. **That gate does
+not exist yet, and it is what O3 phase 2 needs before any N is chosen.**
