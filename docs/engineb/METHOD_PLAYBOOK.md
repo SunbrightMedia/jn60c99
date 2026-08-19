@@ -794,3 +794,44 @@ port's own note file, and it was written down years before the gate existed.
 Corollary: a gate that exercises a side-effecting function must set up the side
 effect it is testing. Priming a context with the same call being measured is
 how the precondition gets spent before the measurement starts.
+
+## 61. "A fixed budget per block" read as "one fixed lump per block"
+PAID 2026-08-19, O2's note chunking, found on silicon after the design passed
+every host gate it had.
+
+THE INVARIANT rule 2 says incremental work gets "a FIXED budget of work per
+block". O2 implemented that as ONE VOICE PER BLOCK and called it done. A voice
+is not a budget. It is ~148,000 cycles, fixed, and whether it fits depends
+entirely on what the block was already doing -- which varies by PATCH, by a
+factor this project had already measured (delay patches run 6,526-6,821
+against a 5,442 budget before any burst work starts).
+
+The board said so precisely: 23 misses in ~4,160 note-build blocks, 0.55 %.
+The step nearly always fitted. It missed when it LANDED ON A BLOCK WITH NO
+SLACK. The obvious next move -- chunk finer, sub-voice -- would have been
+wasted work, because the fault was WHEN the step ran, not how big it was. The
+0.55 % is what said so; a bare "23 misses" would have sent the next session
+subdividing eb_coefs_voice.
+
+THE RULE: A BUDGET IS A MEASUREMENT, NOT A CONSTANT. If work is "capped per
+block", the cap must be read from the instrument at run time and compared
+against the measured cost of the specific work about to run. A constant chosen
+at design time is a guess that happens to be right on the patches you tested.
+
+TWO COROLLARIES, both paid for in the same hour:
+  a. BUDGET AGAINST THE RIGHT CLOCK. The obvious slack is "period minus the
+     last block's duration" -- but that used esp_timer, whose gap reads
+     9,000-11,000 us against a 5,804 us period for reasons still OPEN
+     (b4_first_run §5). A scheduler on that number concludes there is never
+     slack and forces every step: worse than none. The honest number was
+     already being measured in CCOUNT -- core 0's barrier spin IS its idle
+     time, on the core the work runs on, in the units it is measured in.
+     Never build control logic on a measurement whose value you cannot yet
+     explain (playbook 55, one step further).
+  b. ONE WORST-CASE PER MACHINE. A shared "worst step" let the patch reseed
+     (~440,000 cyc) gate note steps (~148,000 cyc) for ever -- the budget
+     starving the exact work it was added to protect.
+
+And the shape to recognise: a scheduler must not deadlock on its own input. A
+deferred block must still refresh the measurement the deferral was based on,
+or the first deferral is permanent.

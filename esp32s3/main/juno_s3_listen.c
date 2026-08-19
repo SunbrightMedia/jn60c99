@@ -448,6 +448,81 @@ static volatile int  note_pending = 0;   /* events are queued, a burst is owed *
 /* set by the console `t` key, consumed once in the block loop: stall one block
  * on purpose so this build's overrun detector is SEEN TO FIRE. */
 static volatile int  tooth_once = 0;
+
+/* ================= O2: THE BUDGET, MEASURED RATHER THAN ASSUMED =========
+ *
+ * ⚠ WHY THIS EXISTS. The first split-publish run (b10) PROVED the key sounds
+ * in 2 blocks -- 519 of 521 presses -- and still failed its acceptance,
+ * because `miss note=` reached 23. THE INVARIANT rule 2 says the work gets "a
+ * FIXED budget of work per block", and O2 had read that as ONE VOICE PER
+ * BLOCK. A voice is not a budget. It is a fixed lump of about 148,000 cycles,
+ * and whether it fits depends entirely on what the block was already doing:
+ * on a DELAY TYPE 0 patch there is room, on patches 5/16/21/49 the block is
+ * over budget before any burst work starts (6,526-6,821 against 5,442, O4).
+ *
+ * MEASURED consequence: 23 misses in about 4,160 note-build blocks, 0.55 %.
+ * The step nearly always fits. It missed when it landed on a block that had
+ * no slack left -- which no amount of finer chunking fixes, because the
+ * problem is WHEN the step runs, not how big it is.
+ *
+ * SO THE BUDGET IS NOW READ FROM THE INSTRUMENT ITSELF -- AND FROM CCOUNT,
+ * NOT FROM esp_timer. That choice is load-bearing. The obvious budget is
+ * "period minus how long the last block took", but the block gap reads
+ * 9,000-11,000 us against a 5,804 us period in every run on this board, and
+ * WHY IS AN OPEN ITEM (b4_first_run.md §5, ovr_late on ~60 % of blocks). A
+ * scheduler built on that number would conclude there is never any slack,
+ * defer for ever, and force every step -- worse than no scheduler. Building
+ * on an unexplained measurement is how the ring attribution went wrong.
+ *
+ * CORE 0'S BARRIER SPIN IS THE HONEST NUMBER, and it is already measured:
+ * `while (!w_done) { }` is core 0 with nothing to do while core 1 finishes.
+ * That spin IS the slack, in cycles, on the core the burst actually runs on.
+ *   g_quiet_spin   the spin on the last block that ran NO burst work -- the
+ *                  full slack this patch leaves, before the burst eats it
+ *   g_step_cyc_max the worst any single burst step has cost, measured
+ * A step runs only when the measured slack covers the worst measured step.
+ * Otherwise it waits a block and is COUNTED (rule 4). Latency degrades,
+ * continuity does not -- rule 3, applied to the burst instead of the queue.
+ *
+ * ⚠ IT MUST NOT STARVE. "The change arrives later" is the invariant; "the
+ * change never arrives" is not. On a patch whose steady-state cost already
+ * exceeds the period, slack never appears and a pure budget rule would defer
+ * for ever. So after SCHED_STARVE deferrals the step is FORCED and counted
+ * separately: that block may miss, and it is better to miss one block than to
+ * leave a key silent. A forced step is a report of O4's problem, not O2's --
+ * which is why the two counters are printed apart. */
+#define SCHED_STARVE 64            /* ~370 ms, then force and count it */
+static unsigned long g_quiet_spin = 0;   /* core 0's idle, burst-free block */
+/* ⚠ ONE WORST-CASE PER MACHINE, NOT ONE FOR BOTH. The patch burst's reseed
+ * step is about 440,000 cycles and a note's voice step about 148,000. A single
+ * shared maximum would let the reseed's figure gate every note step forever --
+ * the note would be refused room it actually had, and the budget would starve
+ * the very thing it was added to protect. The two machines are budgeted
+ * against their own measured costs. */
+static unsigned long g_step_cyc_note = 0, g_step_cyc_burst = 0;
+static unsigned long sched_defer = 0, sched_forced = 0, sched_starve = 0;
+
+/* Non-zero when core 0 has room for one more step of THIS kind this block. */
+static int sched_may_step(unsigned long worst)
+{
+    /* No history yet: allow it. The first steps ARE the measurement, and
+     * refusing until measured would mean never measuring. */
+    if (g_quiet_spin == 0ul || worst == 0ul) return 1;
+    if (worst <= g_quiet_spin) { sched_starve = 0; return 1; }
+    if (++sched_starve >= SCHED_STARVE) {
+        sched_starve = 0;
+        ++sched_forced;         /* it will probably miss. Say so out loud. */
+        return 1;
+    }
+    ++sched_defer;
+    return 0;
+}
+
+/* Fold one step's measured cost into its machine's worst case, in cycles. */
+static void sched_note_cost(unsigned long *slot, unsigned long cyc)
+{
+    if (cyc > *slot) *slot = cyc;
+}
 static int           note_nev = 0;
 static unsigned long notes_seen = 0, notes_dropped = 0, note_bursts = 0;
 static unsigned long ev_applied_blocks = 0;   /* blocks that applied events */
@@ -1225,6 +1300,14 @@ static unsigned long nb_key_hist[NB_KEYH];
  *                would care. */
 static unsigned long nb_defer = 0, nb_pubretry = 0;
 
+/* Which note states actually BUILD, and are therefore worth budgeting. The
+ * cheap ones (event apply, publish request, the unmapped check) are not: see
+ * the call site. */
+static int nb_state_heavy(void)
+{
+    return nbst == NB_PRI || nbst == NB_REST || nbst == NB_REST_BEGIN;
+}
+
 static int dev_note_step(void)
 {
     unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count();
@@ -1255,7 +1338,13 @@ static int dev_note_step(void)
          * failure mode, seven stale voices and no error. */
         nb_pri  = EB_DEVSEQ_VOICED & EB_DEVSEQ_TOUCHED;
         nb_rest = EB_DEVSEQ_TOUCHED & ~nb_pri;
-        {   unsigned m = (unsigned)EB_DEVSEQ_TOUCHED, n = 0;
+        {   /* ⚠ MASK TO THE VOICES THAT EXIST. EB_DEVSEQ_TOUCHED is ~0u after
+             * the held broadcast, so counting all 32 bits printed `nv=32` on
+             * an eight-voice engine. The BUILD was always right -- the cursor
+             * masks internally -- but the report was not, and a figure that
+             * cannot be true is worse than no figure. */
+            unsigned m = (unsigned)EB_DEVSEQ_TOUCHED
+                       & ((1u << EB_NUM_VOICES) - 1u), n = 0;
             while (m) { n += m & 1u; m >>= 1; }
             nb_nvoice = n;
         }
@@ -2336,8 +2425,12 @@ static void render_block(int n)
             dev_want = 0;
         }
     }
-    if (burst_state != BST_IDLE && !dev_muted) {
+    if (burst_state != BST_IDLE && !dev_muted
+        && sched_may_step(g_step_cyc_burst)) {
+        unsigned long sc0 = (unsigned long)esp_cpu_get_cycle_count();
         int st = dev_burst_step();
+        sched_note_cost(&g_step_cyc_burst,
+                        (unsigned long)esp_cpu_get_cycle_count() - sc0);
         if (st < 0) {
             dev_muted = 1;
             printf("MUTE: %s. The audio is silenced deliberately -- a board "
@@ -2373,8 +2466,16 @@ static void render_block(int n)
          * exactly one owner; the events it does not take stay QUEUED and
          * arrive next block -- late, not lost. */
         if (!note_pending) ev_apply();
-        if (note_pending) {
+        /* THE PUBLISH STATES ARE NEVER BUDGETED. NB_PUB1/NB_PUB2 only ask for
+         * a pointer swap and NB_CHECK only reads a counter; deferring those
+         * would hold the key silent to save work that does not exist. Only the
+         * states that BUILD are gated. */
+        if (note_pending
+            && (!nb_state_heavy() || sched_may_step(g_step_cyc_note))) {
+            unsigned long sc0 = (unsigned long)esp_cpu_get_cycle_count();
             int st = dev_note_step();
+            sched_note_cost(&g_step_cyc_note,
+                            (unsigned long)esp_cpu_get_cycle_count() - sc0);
             if (st < 0) {
                 dev_muted = 1;
                 printf("MUTE: %s.\n", dev_mute_why);
@@ -2395,6 +2496,13 @@ static void render_block(int n)
         sd = (unsigned long)esp_cpu_get_cycle_count() - s0;
         if (sd < spin_min) spin_min = sd;
         if (sd > spin_max) spin_max = sd;
+        /* ⚑ THE BUDGET'S MEASUREMENT. On a block that ran NO burst work this
+         * spin is core 0's whole slack: the cycles it had spare while core 1
+         * finished. That is exactly what a burst step must fit inside, on the
+         * core it runs on, in the units it is measured in. Taking it from a
+         * block that DID run a step would measure the slack after the step ate
+         * it, and the scheduler would then starve itself. */
+        if (!burst_ran_this_block && !note_ran_this_block) g_quiet_spin = sd;
 #endif
     }
 #if S3L_RECALL
@@ -2587,6 +2695,14 @@ static void rpt_task(void *arg)
             for (h = 0; h < NB_KEYH; ++h) printf(" %d=%lu", h, nb_key_hist[h]);
             printf("   (blocks from key to sound; 2 is the design)\n");
         }
+        /* THE BUDGET, SHOWN, so the rule can be read rather than inferred.
+         * slack= is core 0's spare cycles on a burst-free block; step= is the
+         * worst burst step measured. step <= slack is the whole rule.
+         * forced= MUST stay 0: a forced step is the budget admitting it never
+         * found room, which is O4's steady-state overrun and not O2's. */
+        printf("SCHED: slack=%lu note=%lu burst=%lu cyc  defer=%lu forced=%lu\n",
+               g_quiet_spin, g_step_cyc_note, g_step_cyc_burst,
+               sched_defer, sched_forced);
         {   juno_event_stats es;
             juno_event_get_stats(&es);
             /* torn= is the only runtime witness to the publish barrier being
