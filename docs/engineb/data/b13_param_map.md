@@ -342,3 +342,52 @@ carried.
    the zipper curve is then the user's choice (F2).
 3. Per-parameter drivings for the zipper gate (envelope-time parameters are
    inaudible under a held chord).
+
+## 8. Three machines, one shadow — the composition gate (interlock_gate.c)
+
+Playbook 63 cost a silicon build: "three individually correct components — a
+budget, a single-owner rule, and a request rate — composed into a system that
+could not play a note", 9,019 events refused, every component gate green. O3
+adds a THIRD machine to exactly that composition, so the same failure is
+available and no per-machine gate can see it.
+
+This drives the real `eb_nb` / `eb_bs` / `eb_pm` headers through the firmware's
+arbitration rules under a storm of all three request types at once, 20,000
+blocks:
+
+    requests  note=2858 patch=378 param=4000
+    completed note=1210 patch=377 param=575
+    worst wait: note=23 blocks  param=48 blocks   worst stall=0
+    edits in=4000 built=575 coalesced=3425
+
+* **No starvation** — every type completes; worst stall with a request pending
+  is 0 blocks.
+* **No double ownership** — never two machines non-idle in the same block.
+* **Coalescing works**: 4,000 edits cost 575 builds. That is C9's "as many
+  parameters as you please, at the same time" made affordable.
+
+### ⚠ THE NUMBER TO ARGUE WITH: a knob can wait 48 blocks
+
+48 blocks is ~278 ms. Notes take priority over knobs by design — a key press is
+more urgent than a filter tweak — but under a sustained note storm the knob's
+worst-case latency is a quarter of a second. That is a POLICY choice now
+visible as a number rather than buried in an if-condition, and it is the
+user's to accept or overturn.
+
+### Teeth, all three caught
+
+    1  drop the note-machine check from the parameter start  -> two owners
+    2  drop the parameter check from the patch start         -> two owners
+    3  budget the patch burst (the b11 regression, verbatim) -> starvation
+
+Tooth 3 replays the exact defect that cost the silicon build, so the gate is
+proven able to see it before it can happen again with a third machine present.
+
+### A counter defect this gate had first
+
+Its completion counters read `machine is idle at a publish`, which is true of
+every machine that was not running. It reported **3,053 patch changes completed
+out of 378 requested**, and the identical 3,053 for parameters — both were
+really counting publishes. **A completion is a TRANSITION, not a state.** A
+counter that cannot tell "finished" from "was never busy" measures the block
+loop rather than the machine, and it fails in the reassuring direction.

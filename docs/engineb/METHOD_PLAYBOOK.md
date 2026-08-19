@@ -965,3 +965,27 @@ ALARM. Acting on it -- deleting four bytes from the patch format -- would have
 silently dropped three real parameters. A red gate is a question, not an
 instruction. Before deleting anything on a gate's say-so, reproduce the finding
 by a second method that does not share the first one's construction.
+
+## 66. A completion is a transition, not a state
+PAID 2026-08-19 (b13 §8), in the gate written to guard against playbook 63.
+
+The three-machine interlock gate counted a finished build as "the machine is
+idle when a publish happens". Every machine that was NOT running is idle then,
+so the counter really counted publishes. It reported 3,053 patch changes
+completed out of 378 requested, and the identical 3,053 for parameter
+refreshes -- two different subsystems reporting the same number, which was the
+only reason it was questioned at all.
+
+THE RULE: TO COUNT A COMPLETION, LATCH THE STATE BEFORE AND AFTER AND COUNT THE
+EDGE. A predicate that reads "is finished" is almost always also true of
+"never started", and the difference is the entire measurement.
+
+THE TELL, which is worth more than the rule: two independent counters agreeing
+exactly is not corroboration, it is a shared cause. When a number matches
+another number it has no reason to match, suspect the instrument before the
+result -- the same reflex that found the --patch-scan false negative (playbook
+65) one measurement earlier.
+
+AND THE DIRECTION: this defect inflated the completion counts. A gate that
+over-reports success is worse than one that under-reports it, because nobody
+investigates good news.
