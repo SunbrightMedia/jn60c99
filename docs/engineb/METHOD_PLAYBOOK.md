@@ -929,3 +929,39 @@ says HOW MUCH, and WHOSE.
 THE SECOND LESSON: AN ACCEPTANCE RULE WRITTEN BEFORE ITS BACKGROUND WAS
 MEASURABLE MUST BE RE-DERIVED ONCE IT IS -- not argued around, and not chased.
 Work that cannot pass its own rule is not failing; the rule is.
+
+## 65. Randomising a probe's bases can destroy the condition it is probing for
+PAID 2026-08-19 (b13), while deriving O3's parameter map.
+
+`--patch-scan` decides which record positions reach the coefficients, and the
+compact patch format's coverage check asserts against its answer. It used six
+bases: factory patches 0, 7, 14 and RANDOMISED copies of 21, 28, 35. It
+reported EB_RECALL_POS[] stale by four entries, three of them CHORUS PRE DELAY
+/ LOW CUT / HIGH CUT.
+
+The scan was wrong. Those three move 4, 5 and 24 bytes of eb_master_coef when
+perturbed on FACTORY patch 21 -- executed, all 256 values. They reach the
+coefficients only when EFFECT TYPE selects their block, which is true on
+patches 21, 28, 35, 49 and 56. **The scan randomised precisely 21, 28 and 35**,
+so on those three bases the condition was destroyed; the factory bases that
+survived do not select that effect.
+
+THE RULE: RANDOMISED BASES MUST BE ADDITIONAL, NEVER SUBSTITUTES. Randomisation
+is added to reach conditions the real data never sets, and it does -- but it
+also DESTROYS the conditions the real data DID set, on exactly the samples it
+replaces. A probe that randomises over its only examples of a condition cannot
+see anything that depends on it, and it reports that blindness as a negative.
+
+THE SECOND LESSON, which is why this cost so little: the disagreement was found
+by CORROBORATING A NEW MEASUREMENT AGAINST A PROVEN ONE. A fresh harness and a
+checked-in table disagreed by three entries. The reflex is to assume the new
+tool is wrong -- and this time the new tool was right about the discrepancy and
+WRONG ABOUT THE DIRECTION: its own first conclusion ("those records are dead")
+came from copying the old scan's base selection, blind spot included. Both were
+settled only by testing the case neither covered.
+
+THE THIRD, AND THE DANGEROUS ONE: the gate was RED and its verdict was a FALSE
+ALARM. Acting on it -- deleting four bytes from the patch format -- would have
+silently dropped three real parameters. A red gate is a question, not an
+instruction. Before deleting anything on a gate's say-so, reproduce the finding
+by a second method that does not share the first one's construction.

@@ -549,17 +549,52 @@ static void scan_build(unsigned char *rec_bank, int p)
 static int scan_section(const unsigned char *bank, long bl, const char *outpath)
 {
     static const unsigned char VAL[4] = { 0x00u, 0x03u, 0x0Cu, 0x7Fu };
+    /* ⚠ THE BASE SET, AND THE FALSE NEGATIVE THAT SIZED IT (2026-08-19).
+     *
+     * This was SIX bases: factory patches 0, 7, 14 and RANDOMISED copies of
+     * 21, 28, 35. It reported records 3286-3288 -- CHORUS PRE DELAY / LOW CUT
+     * / HIGH CUT -- as moving no coefficient, and therefore declared
+     * EB_RECALL_POS[] stale by exactly those three. IT WAS THE SCAN THAT WAS
+     * WRONG. Perturbing them on FACTORY patch 21 moves 4, 5 and 24 bytes of
+     * eb_master_coef (executed; docs/engineb/data/b13_param_map.md §3).
+     *
+     * The mechanism is the cruel part: those three parameters only reach the
+     * coefficients when EFFECT TYPE selects their block, which is true on
+     * factory patches 21, 28, 35, 49 and 56 -- and the scan RANDOMISED
+     * PRECISELY 21, 28 AND 35, destroying on those three bases the one
+     * condition that would have shown it. The randomisation added to broaden
+     * coverage is what blinded it, and the remaining factory bases (0, 7, 14)
+     * do not select that effect.
+     *
+     * Acting on the stale verdict would have deleted four bytes from the
+     * compact patch format and silently dropped three real parameters -- the
+     * exact failure eb_patch.h was written to prevent ("a byte set derived by
+     * probing is only as complete as the probe").
+     *
+     * SO: the randomised bases are now ADDITIONAL, never substitutes. Ten
+     * factory bases cover the bank's effect and delay types; three randomised
+     * ones still reach conditions no factory patch sets. The cost is linear in
+     * base count and this scan is opt-in (--patch-scan). */
     unsigned char *wb = (unsigned char *)malloc((size_t)bl);
-    unsigned char *base[6];
-    int nbase = 6, b, i, k, n = 0;
+    unsigned char *base[13];
+    int bpat[13];                 /* the PATCH INDEX each base points at --
+                                   * no longer b*7, so it is carried, not
+                                   * recomputed at the two call sites. */
+    int nbase = 13, b, i, k, n = 0;
     unsigned s = 7u;
     FILE *of;
     int lo = 16, hi = 4096;          /* juno_bank_apply reads record 30..3952 */
 
     memcpy(wb, bank, (size_t)bl);
-    for (b = 0; b < 6; ++b) {
-        base[b] = wb + BANK_HEADER + (long)(b * 7) * BANK_STRIDE;
-        if (b >= 3) {
+    for (b = 0; b < nbase; ++b) {
+        /* b < 10: factory patches 0,7,...,63 UNTOUCHED.
+         * b >= 10: randomised copies of patches 3, 10, 17 -- chosen so the
+         * randomisation never lands on a factory base this scan relies on. */
+        static const int RPAT[3] = { 3, 10, 17 };
+        int pat = (b < 10) ? (b * 7) : RPAT[b - 10];
+        bpat[b] = pat;
+        base[b] = wb + BANK_HEADER + (long)pat * BANK_STRIDE;
+        if (b >= 10) {
             for (i = 16; i < BANK_STRIDE; ++i) {
                 s = s * 1103515245u + 12345u;
                 base[b][i] = (unsigned char)((s >> 16) & 0xFF);
@@ -571,13 +606,13 @@ static int scan_section(const unsigned char *bank, long bl, const char *outpath)
         int moved = 0;
         for (b = 0; b < nbase && !moved; ++b) {
             unsigned char orig = base[b][i];
-            scan_build(wb, b * 7);
+            scan_build(wb, bpat[b]);
             memcpy(&SC_RC0, &SC_RC, sizeof SC_RC);
             memcpy(&SC_MC0, &SC_MC, sizeof SC_MC);
             for (k = 0; k < 4 && !moved; ++k) {
                 if (VAL[k] == orig) continue;
                 base[b][i] = VAL[k];
-                scan_build(wb, b * 7);
+                scan_build(wb, bpat[b]);
                 if (memcmp(&SC_RC0, &SC_RC, sizeof SC_RC) ||
                     memcmp(&SC_MC0, &SC_MC, sizeof SC_MC)) moved = 1;
             }
