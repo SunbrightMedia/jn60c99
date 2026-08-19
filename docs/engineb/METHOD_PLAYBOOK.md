@@ -989,3 +989,34 @@ result -- the same reflex that found the --patch-scan false negative (playbook
 AND THE DIRECTION: this defect inflated the completion counts. A gate that
 over-reports success is worse than one that under-reports it, because nobody
 investigates good news.
+
+## 67. Gate the path; then ask what on the DEVICE can drive it
+PAID 2026-08-19, on O3, one command before the user flashed it.
+
+The parameter path was designed from two measurements, built, held by 57 teeth
+across five gates, compiled for the target and staged for flashing. Nothing on
+the device could send it a parameter event. The panel is a later step and no
+test stimulus existed, so the build would have printed `PARAM: edits=0` and
+been read as "the parameter path is quiet, so it is fine".
+
+THE HOST GATES CANNOT SEE THIS BY CONSTRUCTION. Every one of them CALLS the
+path under test directly -- that is what makes them gates. The question they
+cannot ask is "what, on the real device, produces this input at all", and
+nothing asks it automatically.
+
+THE RULE: A SUBSYSTEM IS NOT READY TO FLASH UNTIL SOMETHING ON THE DEVICE CAN
+DRIVE IT, BY ROBOT AND BY HAND. Robot, so it is exercised without a person.
+By hand, so it can be investigated when the robot finds something. Add both
+before the build is sent, not after the log comes back empty.
+
+⚠ THE PART THAT MAKES THIS ENTRY WORTH ITS NUMBER: the same file already
+carried a written warning about the identical defect. Phase 4 of the robot had
+been written to submit notes into a live patch build when nothing in the file
+ever started one, and its comment names it "the same blind-gate defect as
+playbook 60, wearing a stimulus instead of a gate". That comment was READ
+during this session, four paragraphs from where the new fix went, and the same
+mistake was made on the next subsystem anyway.
+
+So: reading a warning is not the same as applying it. When a file tells you a
+defect class was paid for here, ask whether the thing you are adding RIGHT NOW
+has it -- that is the only moment the warning is worth anything.
