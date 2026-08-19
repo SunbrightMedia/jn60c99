@@ -294,3 +294,51 @@ defects during bring-up, which is a stronger demonstration than a plant:
    is "the measurement cannot see its subject". The gate now FAILS on it
    (exit 1) instead of reassuring. Per-parameter drivings are owed before the
    curve is claimed for any parameter but the ones measured audible.
+
+## 7. The narrowed refresh is bit-identical, gated with teeth (paramclass_gate.c)
+
+The shipping O3 refresh is: write the edited record bytes → warm recall →
+re-run ONLY the sub-builders the parameter's class needs → publish. The
+sub-builders are O2's own chunk pieces: `eb_coefs_voice(v)`, the shared tail,
+the master set. This gate holds the claim C9 demanded a tooth for:
+
+    (pre-edit coefficients + only the class's sub-builders re-run)
+        ==  (full rebuild),  BYTE FOR BYTE
+
+    59 parameters x 13 bases x 6 values:  0 narrowed rebuilds differ
+
+The class is DERIVED each run — per-voice regions from `OWN[v]` (what
+`eb_coefs_voice(v)` itself writes under two fills), the tail is the rest of
+`eb_render_coefs`, the master set its own struct — and emitted as a generated
+table (`eb_param_class`) the firmware can include. The gate re-derives it every
+run, so a stale table fails HERE before it ships a stale coefficient THERE.
+
+Teeth, all three CAUGHT:
+    --tooth-tail    every parameter forced voices-only  → tail/master params differ
+    --tooth-voice   every parameter forced tail+master  → per-voice params differ
+    --tooth-one     voice 3 dropped from every mask     → the C9 tooth verbatim
+
+### Record 3092: RESOLVED, and the resolution is an old lesson
+
+§4 left 3092 unresolved: no single-byte probe moved anything. This gate's PAIR
+probe moves it — class tail+master, narrowed rebuild identical. The mechanism
+is `eb_patch.h`'s BEND GAIN precedent verbatim: 3092 is the HIGH NIBBLE of a
+small-range parameter, so a single-byte change steps the value by 16 and lands
+outside the used range every time. A single-byte scan is STRUCTURALLY blind to
+high-nibble bytes of small parameters; the pair probe is not. `EB_RECALL_POS[]`
+was right to carry it, for the same reason both bytes of a pair must always be
+carried.
+
+### What remains of O3
+
+1. FIRMWARE: the param path — event → record bytes → warm burst that starts at
+   BST_RECALL (no reseed, no install; paramwarm proves the warm landing) →
+   narrowed chunk steps per `eb_param_class` → publish. The burst machine, the
+   budget and the publish contract all exist and are gated; this is wiring,
+   not new machinery. The worst param step is the recall (~0.24 M cycles),
+   which FITS the block slack (~0.46 M) — unlike the patch burst's reseed, so
+   the param burst CAN be budget-gated (the b11 rule holds).
+2. The refresh RATE on silicon, measured with b12's `B4dur` method; N against
+   the zipper curve is then the user's choice (F2).
+3. Per-parameter drivings for the zipper gate (envelope-time parameters are
+   inaudible under a held chord).
