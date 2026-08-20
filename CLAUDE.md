@@ -106,21 +106,25 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
   blocks behind a note storm -- a POLICY the user may overturn.
 - O3 PROVEN ON SILICON over 52 min: 76,779 edits, unknown=0, pubretry=0,
   15.0x coalescing, applymax=302,245 cyc (b17).
-- O4 MEASURED AND DECIDED (b19), not done. Per-patch MSPP, 84 reports: the hot
-  set is 5 lines, delay 2,045-2,097 vs 657-1,210 elsewhere, NO OVERLAP. Delay
-  ratio 2.45x, reverb ratio 1.02x, and the DELAY STAGE IS 97 % OF THE EXCESS.
-  5 hot in 84 against 5.25 expected for 4 type-5 patches of 64; status pat= on
-  every one is 5/16/21/49. LEVER = optimise eb_delay_t5.c. The master-chain
-  split is off the table for this deficit (it costs 5.8 ms latency on all 64 to
-  fix 4) and returns only if type 5 cannot come down far enough.
-  b18's lean toward reverb was a one-second-window artefact and is REFUTED.
-  ⚠ MSPP's own pat= field is UNRELIABLE (dev_patch is driven from two places);
-  the attribution rests on the status line and the count. Fix before reuse.
+- O4's LEVER DECIDED (b20): the ARITHMETIC in eb_delay_t5.c. Full-length MSPP
+  windows only (n>=150k, no straddling): hot 4 windows delay 2,073-2,089, all
+  patches 5/21/49; other 37 windows 657-1,012. NO non-type-5 above 1,500, NO
+  type-5 below. Gap 1,012->2,073, ratio 2.53x. (Patch 16 never got a full
+  window this run -- NOT claimed.)
+  THREE RIVALS DEAD BY MEASUREMENT, each rule written before its run:
+  * EB_ZEROCOEF on t5 -- 4 of 65 coefficients always zero vs a >=20 rule (host).
+  * ring placement -- FOUR moving taps read 15.1 cyc/tap vs ONE at 29.8, so
+    12 reads = 181 cyc = 15 % of the 1,231 excess vs a >=70 % rule. Four
+    streams are CHEAPER per tap than one; b6's PSRAM withdrawal survives the
+    four-stream case it was never tested on.
+  * master-chain split -- 5.8 ms latency on all 64 to fix 4 (b19).
+  STRUCTURAL: EB_ZEROCOEF is in 7 VOICE modules and NO delay module. The voice
+  chain got the EXACTLY-0 treatment; the master chain never did.
   ⚠ Nothing absolute from an MSPROF build is a cost: 6 counter reads/sample sit
   inside it. sum is NOT fx. Ratios and the hot-set identity only.
-- Next: fix the MSPP pat= label; optimise eb_delay_t5.c with the trunk null
-  EXACTLY 0; re-measure profiler-free and read FXP: fx on 5/16/21/49 against
-  the 2,842 ceiling. Then D link (zero code); full-state gate.
+- Next: cut t5's arithmetic (175 mul / 91 add vs t23's 101/44) with the trunk
+  null EXACTLY 0; re-measure profiler-free and read FXP: fx on 5/16/21/49
+  against the 2,842 ceiling. Then D link (zero code); full-state gate.
 
 # BUILD & GIT
 `make libjuno.so` | `make test` | `make verify` (finish line) | WASM:
