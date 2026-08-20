@@ -1099,3 +1099,58 @@ PREPROCESSOR NESTING. A block landing inside a disabled `#if` is invisible in
 the source diff -- it reads perfectly -- and shows up only as a link error or,
 worse, as silently different behaviour in one build configuration. After any
 scripted insertion into C, CHECK WHICH #if REGION THE NEW TEXT LANDED IN.
+
+## 70. Gate the configuration that SHIPS, not the one that is convenient
+PAID 2026-08-19 (b16), caught before the build was sent rather than after.
+
+The master-chain stage profiler was written with `xthal_get_ccount()` called
+directly. That is Xtensa-only, so `make engineb` -- which runs on the host --
+could compile it ONLY with the profiler OFF. The OFF path was therefore proven
+byte-identical and green, and the build actually flashed, with the profiler ON,
+had no gate behind it at all.
+
+That is exactly the wrong way round. The disabled configuration was the proven
+one; the shipping configuration was the unproven one.
+
+THE FIX was small: make the clock a PORT DETAIL. `EB_MSPROF_TICK()` defaults to
+a plain counter, which is useless as a time but exercises every line of the
+accumulation, and the device defines it to its cycle counter. Now the trunk
+gate can run with EB_MSPROF=1 and assert the null is still EXACTLY 0 with the
+profiler compiled in.
+
+THE RULE: A PLATFORM CALL INSIDE OTHERWISE-PORTABLE CODE SILENTLY MOVES THAT
+CODE OUT OF EVERY HOST GATE. One `xthal_`, one `esp_`, one `#include <driver/>`
+is enough. Push it behind a macro the port supplies -- not for elegance, but
+because the gate cannot see past it, and what the gate cannot compile it cannot
+prove.
+
+A SECOND ERROR IN THE SAME MINUTE, worth recording because it is so easy: the
+first attempt to run the gate with the profiler on passed
+`make engineb EXTRA_CFLAGS=-DEB_MSPROF=1`. This Makefile has no EXTRA_CFLAGS.
+The run would have gone green having tested NOTHING, and been reported as
+proof. Before trusting a flag-driven run, CONFIRM THE FLAG REACHED THE
+COMPILER -- here, by compiling one file and checking the symbol exists.
+
+## 71. A watcher that matches itself never returns
+PAID 2026-08-20 (O4), ninety minutes of it.
+
+Wait loops were written as `until ! pgrep -f "make engineb"; do sleep 20; done`.
+The WAITER'S OWN command line contains the string "make engineb", so pgrep
+matched the shell running the loop. It reported "[gate running]" for ninety
+minutes after the gate had actually finished, and three separate wait tasks
+spun until they were killed.
+
+THE RULE: A PATTERN MATCHED AGAINST PROCESS COMMAND LINES WILL MATCH THE
+PROCESS DOING THE MATCHING. Use `pgrep -x` on the executable, check the exit of
+the job itself, or watch the artefact -- the log's own last line and mtime said
+"finished at 22:42" the whole time and were never read.
+
+⚠ IT IS THE SESSION'S RECURRING SHAPE, not a shell trivium. A profiler whose
+cycle-counter reads sit inside the region it times. A `B4dur` mean argued
+against a `t=` field derived from the thing under test. A stimulus phase whose
+precondition never occurs. A staleness check that counted its own accessor's
+brace. Every one is the instrument entangled with its subject, and every one
+cost more than the bug it was hunting.
+
+WHEN A MEASUREMENT DISAGREES WITH REALITY, SUSPECT THE MEASUREMENT'S
+INDEPENDENCE FIRST -- before its arithmetic, and long before the system.

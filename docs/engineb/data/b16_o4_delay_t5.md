@@ -89,3 +89,49 @@ comes back.
 
 **The prediction is stated before the measurement, and it is falsifiable: stage
 1, on those four patches, ~1,500 cyc/sample above the other sixty.**
+## 5. THE PREDICTION, WEAKENED BY ITS OWN ARITHMETIC (added before the run)
+
+b16 §4 predicted "stage 1, ~1,500 cyc/sample above the other sixty". Checking
+that against the module's actual size says it is probably TOO STRONG.
+
+Operation counts, `eb_delay_t5.c` against the modules the other 60 patches use:
+
+    t5 / t23 :  mul 1.73x   add 2.07x   ring 1.71x
+    t5 / t1  :  mul 2.06x   add 3.25x   ring 1.71x
+
+So type 5 does roughly **1.8x the work**. For 1.8x to produce a **+1,500
+cyc/sample** increase, the delay stage would have to already cost ~1,900
+cyc/sample on ordinary patches:
+
+    D=  400  ->  +320        D= 1200  ->  +960
+    D=  800  ->  +640        D= 1900  -> +1520
+
+But the whole master pass is ~2,600 cyc/sample on non-delay patches. A delay
+stage of 1,900 would be **73 % of the entire chain**, leaving ~700 cycles for
+input + reverb + output + effect combined — and the reverb alone runs eight
+comb filters and four damping stages. That is not impossible, but it is not the
+way to bet.
+
+### So the profiler now discriminates between hypotheses, not just confirms one
+
+| if the run shows | then |
+|---|---|
+| stage 1 large AND ~1.8x on type-5 | b16 holds; optimise `eb_delay_t5.c` |
+| stage 1 ~1.8x but the absolute gap is well under 1,500 | something ELSE also scales with type 5 — the profiler names which stage |
+| stage 2 (reverb) carries it | b16 is wrong; the "delay arm" framing has been misnamed since b6 |
+| spread across stages | no single module is the lever; the master-chain split across cores returns |
+
+**The refined prediction, and it is the one to judge:** stage 1 is the largest
+single contributor, and its type-5 : other ratio is 1.7-2.0x. The absolute gap
+is NOT predicted, because the arithmetic above says it cannot be 1,500 from the
+op-count ratio alone.
+
+### ⚠ A limitation of the counts above, stated
+
+They are WHOLE-FILE counts. The script that produced them failed to isolate the
+per-sample process function, so init and recall code is included. The ratios
+are therefore indicative of module weight, not of hot-loop weight, and a module
+with a large setup path would be overstated. This is exactly the sort of proxy
+that should not be quoted once the profiler has run — it exists only to say
+whether the original prediction was plausible, and the answer is that its
+absolute number was not.
