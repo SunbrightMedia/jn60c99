@@ -1225,3 +1225,49 @@ Each is an **instrument that did not reach its subject**, and each passed every
 gate aimed at the subject. The gates were pointed at the engine; nothing was
 pointed at the instrument. **Gate the instrument as an artefact in its own
 right, or it will read plausibly and mean nothing.**
+
+## 73. `idf.py` returned EXIT 0 on a FAILED build, and a stale ELF passed the check
+
+**Paid 2026-08-20, minutes after 72.** Two `idf.py build` runs were left going
+in the SAME build directory at once. They clobbered each other's CMake state:
+
+    CMake Error: Cannot find component list file
+    ninja: error: rebuilding 'build.ninja': subcommand failed
+    ERROR: ninja failed with exit code 1
+    [exited with code 0]          <-- idf.py's own exit status
+
+**The build failed and the command succeeded.** `build/juno_s3.elf` was left as
+the PREVIOUS build's artefact, and it was newer than nothing that mattered.
+
+### The check that passed, and why it was worthless
+
+The playbook-72 check was run against that stale ELF:
+
+    ccount reads in eb_master_render : 6      GREEN
+    eb_msprof_fake symbol            : 0      GREEN
+
+Both true — of the OLD image. 72's own lesson had just been filed and the check
+it produced was aimed at a feature the old build ALREADY HAD. A verification
+that the previous artefact also satisfies proves nothing about this one.
+
+What caught it was a check for the string the NEW code adds:
+
+    strings build/juno_s3.bin | grep 'MSPP: pat='   ->  0
+
+### The rules
+
+1. **Never run two builds in one build directory.** Serialize, or give each its
+   own directory. A build system's incremental state is not concurrency-safe.
+2. **Do not judge a build by its exit status.** `idf.py` returns 0 on a ninja
+   failure. Grep the output for the success line AND inspect the artefact.
+3. **A post-build check must test something the PREVIOUS artefact lacked.** Any
+   assertion an older image also satisfies cannot detect a build that did not
+   run. Pick a string, symbol or instruction the new code introduces.
+4. **Check freshness explicitly**: `[ build/x.elf -nt src/changed.c ]`.
+
+### The session's shape, restated
+
+67, 69, 70, 72 were instruments that did not reach their subject. 73 is the
+same failure applied to a VERIFICATION: the check did not reach the artefact it
+was believed to describe. **Verifying the report instead of the thing is the
+defect, whether the report is a log line, a gate, or an exit code.**
