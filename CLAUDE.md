@@ -104,7 +104,16 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
   differ are latches that settle. eb_param_class.h is GENERATED and re-derived
   every run. 57 teeth green: sh tools/engineb/o3_gates.sh. Knob waits up to 48
   blocks behind a note storm -- a POLICY the user may overturn.
-- Next: O3 on silicon (PARAM: unknown=/pubretry= must be 0); O4 worst-case (prologue first, then master-chain split across cores);
+- O3 PROVEN ON SILICON over 52 min: 76,779 edits, unknown=0, pubretry=0,
+  15.0x coalescing, applymax=302,245 cyc (b17).
+- O4 open. Deficit is core 1's MASTER pass alone (fx swings ~1,900 cyc/sample;
+  v1 flat). Hot set = patches 5/16/21/49 = the bank's only DELAY TYPE 5, over
+  two runs (b16, b17). Attribution is still CIRCUMSTANTIAL. The five-stage
+  MSPROF profiler settles it; its first flash measured NOTHING (tick macro in
+  the wrong translation unit, playbook 72) and is fixed and re-gated.
+  Prediction to judge: stage 1 largest, type-5:other ratio 1.7-2.0x.
+- Next: flash the MSPROF build, read the MSP: ratio, then pick O4's lever
+  (optimise eb_delay_t5.c vs master-chain split across cores);
   D link (zero code); full-state gate.
 
 # BUILD & GIT

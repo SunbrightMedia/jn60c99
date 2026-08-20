@@ -11,8 +11,16 @@
 # breaks O2 breaks O3's foundation, and the O2 suite is where that shows.
 #
 # ⚠ WHAT IS NOT HERE, and must not be forgotten because the list looks full:
-#   * the FIRMWARE has not been compiled for the target in this environment
-#     (no ESP-IDF toolchain), let alone run.
+#   * this script proves the HOST build. It does not compile the firmware.
+#     ESP-IDF v6.2 IS in this environment (`. /home/user/esp-idf/export.sh`),
+#     so "no toolchain" is NOT a reason to skip the target build -- that claim
+#     stood here once, from running `which idf.py` without sourcing
+#     export.sh, and it cost two turns of under-delivery.
+#   * A HOST-GREEN GATE CANNOT PROVE A TARGET-SELECTED CODE PATH. Anything
+#     chosen by #if on a target macro compiles to its OTHER arm here. The
+#     MSPROF clock was picked that way and read a stub for a 52-minute board
+#     run (playbook 72). Check such a path in the TARGET ARTEFACT:
+#       objdump -d build/juno_s3.elf --disassemble=<fn> | grep <insn>
 #   * interlock_gate.c is a MODEL of the arbitration, not the firmware's own
 #     lines. It proves the rules cannot deadlock; it cannot prove the firmware
 #     transcribes them faithfully.
