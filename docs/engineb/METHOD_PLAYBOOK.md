@@ -1154,3 +1154,74 @@ cost more than the bug it was hunting.
 
 WHEN A MEASUREMENT DISAGREES WITH REALITY, SUSPECT THE MEASUREMENT'S
 INDEPENDENCE FIRST -- before its arithmetic, and long before the system.
+
+## 72. A macro cannot cross a translation unit — the profiler that measured nothing for 52 minutes
+
+**Paid 2026-08-20.** `eb_master.c` carried a five-stage cycle profiler and left
+its clock as a port detail:
+
+    #ifndef EB_MSPROF_TICK
+    static unsigned long eb_msprof_fake;
+    #define EB_MSPROF_TICK() (++eb_msprof_fake)   /* host fallback */
+    #endif
+
+The firmware supplied the real clock — in `juno_s3_listen.c`:
+
+    #if EB_MSPROF
+    #define EB_MSPROF_TICK() xthal_get_ccount()
+    #endif
+
+`eb_master.c` is a **different translation unit**. It never saw that `#define`.
+It compiled the stub. The user ran the board for 52 minutes and every report
+line read:
+
+    MSP: in=1 delay=1 reverb=1 out=1 effect=1 cyc/sample
+
+Five stages, all exactly 1 — the signature of a counter that steps by one per
+read. O4's prediction was left untested and 52 minutes of the user's time was
+spent on an instrument that was not connected to its subject.
+
+### Why it survived the gates
+
+Playbook 70 was filed in this same session for the *opposite* error: the tick
+was Xtensa-only, so the host gate could only prove the OFF path. The fix made
+the tick a port hook — and put the hook in the caller. That made the host gate
+runnable and made the DEVICE build silently wrong. **The repair introduced the
+defect it was next door to.**
+
+Every gate then passed honestly. The trunk gate proves the null is 0, which it
+was. Nothing anywhere asserted that the number printed was a TIME.
+
+### The rules
+
+1. **Select a platform detail in the file that USES it**, from a predefined
+   target macro (`__XTENSA__`), never from a `#define` in a caller. A caller's
+   macro reaches its own TU and no other. If a hook genuinely must come from
+   outside, it must arrive as a **compile definition** or through a **header
+   both units include** — those cross; a `#define` in a `.c` does not.
+2. **Prove the selection in the artefact that ships.** The check that would
+   have caught this costs one command:
+
+       target-gcc -DEB_MSPROF=1 -S eb_master.c  ->  6 rsr.ccount sites, 0 stub
+       target-gcc              -S eb_master.c  ->  0 rsr.ccount sites
+
+   Compiling for the host proves the host arm. Only target assembly proves the
+   target arm.
+3. **A measurement must be able to say it is broken.** The board now prints
+   `MSP: *** BROKEN` when every stage reads <=1. A stub clock has a signature;
+   detect the signature. Cf. playbook 46 (a number quoted N times is not
+   thereby measured) and the standing rule that every tooth must be SEEN TO
+   FAIL.
+4. **Do not drag a platform's headers into the engine to get one register.**
+   `<xtensa/hal.h>` lives in an ESP-IDF component; including it would have made
+   `engine_b/` depend on the device tree. One `rsr.ccount` in inline asm has no
+   such cost.
+
+### The shape, which is now four deep in one session
+
+67 (a knob with no source), 69 (a probe inside a disabled `#if`), 70 (a gate
+that could only prove the unused path), 72 (a clock wired to the wrong TU).
+Each is an **instrument that did not reach its subject**, and each passed every
+gate aimed at the subject. The gates were pointed at the engine; nothing was
+pointed at the instrument. **Gate the instrument as an artefact in its own
+right, or it will read plausibly and mean nothing.**
