@@ -541,7 +541,27 @@ static const float COND_FINE_SCAL[8] = { 0.0f, 0.00416666688f, 0.00186666672f, -
                                          0.00208333344f, -0.00333333341f, -0.00249999994f, 0.000833333354f };
 static const float COND_GAIN_SCAL[8] = { -0.0f, -0.005f, -0.015f, -0.01f,
                                          -0.02f, -0.0f, -0.02f, -0.008f };
-void juno_apply_condition(unsigned char *state, int cbyte)
+/* ⚑ O6/D3: `base` IS THE GLOBAL INDEX OF THIS STATE'S LOCAL VOICE 0.
+ *
+ * WHY IT EXISTS. CONDITION scatter is PER-VOICE DISTINCT -- three tables of
+ * eight, one entry per voice. On ONE instrument the local slot IS the global
+ * voice and base is 0. On TWO CHIPS it is not: chip B owns global voices 3..5
+ * in its local slots 0..2, and indexing by the local slot would deal it chip
+ * A's detune. Both chips would then carry the SAME three analog identities
+ * and the instrument would be three voices wide instead of six.
+ *
+ * The defect is SILENT -- no crash, no overrun, every coefficient CRC still
+ * matches -- which is why it has a gate of its own:
+ * tools/engineb/d3_voiceindex_gate.c, seen to fail before this was written.
+ *
+ * ⚠ base 0 REPRODUCES THE FROZEN BEHAVIOUR EXACTLY. juno_apply_condition is
+ * now this function with base 0 and nothing else, so `make verify` and every
+ * host gate see the same bytes they always did. The wrapper is kept rather
+ * than the call sites rewritten precisely so that stays true by construction.
+ *
+ * The index is MASKED to the table, not clamped: a global voice is a position
+ * in an eight-entry analog scatter, and 8 voices is the port's own count. */
+void juno_apply_condition_at(unsigned char *state, int cbyte, int base)
 {
     int v, C = cbyte < 0 ? 0 : (cbyte > 255 ? 255 : cbyte);   /* clamp 0..255 */
     float recip = 1.0f / 129.0f;                              /* f32 reciprocal (0x3bfe03f8) */
@@ -549,11 +569,17 @@ void juno_apply_condition(unsigned char *state, int cbyte)
     float cube = (L * L) * L;                                 /* stepwise f32 cube          */
     for (v = 0; v < 8; ++v) {
         unsigned b = (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
-        JF(state, 5520u  + b) = L    * COND_TUNE_SCAL[v];     /* per-voice detune (tune-trim) */
-        JF(state, 7600u  + b) = cube * COND_FINE_SCAL[v];     /* per-voice fine detune        */
-        JF(state, 10320u + b) = cube * COND_GAIN_SCAL[v] + 1.0f; /* per-voice re-level        */
+        int g = (base + v) & 7;                               /* the GLOBAL voice */
+        JF(state, 5520u  + b) = L    * COND_TUNE_SCAL[g];     /* per-voice detune (tune-trim) */
+        JF(state, 7600u  + b) = cube * COND_FINE_SCAL[g];     /* per-voice fine detune        */
+        JF(state, 10320u + b) = cube * COND_GAIN_SCAL[g] + 1.0f; /* per-voice re-level        */
         /* ZERO_A(3968)/ZERO_B(7616) stay 0.0 = engine baseline; no write needed. */
     }
+}
+
+void juno_apply_condition(unsigned char *state, int cbyte)
+{
+    juno_apply_condition_at(state, cbyte, 0);
 }
 
 /* ASSIGN MODE 2 (UNISON) per-voice DCO detune spread at 3968. Measured under the
@@ -566,15 +592,24 @@ static const unsigned int UNISON_3968[8] = {
     0x00000000u, 0xbae33103u, 0x3b6101c6u, 0xbbf3d93au,
     0x3bda740eu, 0xbba3d70au, 0x3b5a740eu, 0xbb23d70au,
 };
-void juno_apply_unison_spread(unsigned char *state, int assign)
+/* O6/D3: `base` as in juno_apply_condition_at above. The UNISON spread is the
+ * other per-voice-distinct table, so it takes the same global index or the two
+ * chips detune their unison identically. base 0 is the frozen behaviour. */
+void juno_apply_unison_spread_at(unsigned char *state, int assign, int base)
 {
     int v;
     for (v = 0; v < 8; ++v) {
         unsigned b = (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
-        unsigned int bits = (assign == 2) ? UNISON_3968[v] : 0x00000000u;
+        int g = (base + v) & 7;                               /* the GLOBAL voice */
+        unsigned int bits = (assign == 2) ? UNISON_3968[g] : 0x00000000u;
         float f; memcpy(&f, &bits, 4);
         JF(state, 3968u + b) = f;
     }
+}
+
+void juno_apply_unison_spread(unsigned char *state, int assign)
+{
+    juno_apply_unison_spread_at(state, assign, 0);
 }
 
 /* Read the ASSIGN MODE nibble-pair (blob row 56) for patch idx, for the bridge to

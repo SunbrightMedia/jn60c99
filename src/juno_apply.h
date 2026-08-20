@@ -76,10 +76,16 @@ int juno_bank_voice_modes(const unsigned char *bank, int idx,
  * juno_bank_condition reads the CONDITION byte (leaf 114, record 498) for patch idx
  * (default 128). See src/juno_apply.c / scratchpad/oracle/condition_scatter_spec.md. */
 void juno_apply_condition(unsigned char *state, int cbyte);
+/* O6/D3: the two-chip form. `base` is the GLOBAL voice index of local slot 0,
+ * so chip B (base 3) gets global voices 3..5 instead of repeating chip A's.
+ * base 0 is juno_apply_condition exactly. Gate: tools/engineb/d3_voiceindex_gate.c */
+void juno_apply_condition_at(unsigned char *state, int cbyte, int base);
 int  juno_bank_condition(const unsigned char *bank, int idx);
 /* ASSIGN==2 (UNISON) per-voice 3968 detune spread (fixed measured table); must run
  * after seed_voices. juno_bank_assign reads the ASSIGN MODE nibbles (blob row 56). */
 void juno_apply_unison_spread(unsigned char *state, int assign);
+/* O6/D3: as juno_apply_condition_at. base 0 is juno_apply_unison_spread exactly. */
+void juno_apply_unison_spread_at(unsigned char *state, int assign, int base);
 int  juno_bank_assign(const unsigned char *bank, int idx);
 int juno_bank_hpf_type(const unsigned char *bank, int idx); /* record 618; joint HPF recompute context */
 
