@@ -105,6 +105,15 @@
 #include "eb_param_class.h"
 #include "eb_devseq.h"
 #include "eb_alloc.h"
+/* O6: the two-chip link. S3L_LINK defaults ON and is HARMLESS when off the
+ * bench: an unstrapped board with no wires reads chip A, finds no peer, and
+ * runs single-board exactly as before. See s3_link_uart.h. */
+#ifndef S3L_LINK
+#define S3L_LINK 1
+#endif
+#if S3L_LINK
+#include "s3_link_uart.h"
+#endif
 /* O1: THE ONE BOUNDARY. Every input reaches the engine through this and
  * nothing else -- FINAL_GUIDE O1, USER-BINDING. */
 #include "juno_event.h"
@@ -3104,6 +3113,9 @@ static void rpt_task(void *arg)
              * patch so far; MSPP: is the number to read. */
         }
 #endif
+#if S3L_LINK
+        s3_link_report();
+#endif
         printf("PARAM: edits=%lu builds=%lu defer=%lu unknown=%lu "
                "pubretry=%u apply=%lu applymax=%lu blocks=%u\n",
                pm_edits, pm_builds, pm_defer, pm_unknown, PM.pub_retry,
@@ -3512,6 +3524,12 @@ void app_main(void)
         printf("HALT: MIDI UART would not start on GPIO %d.\n", S3L_MIDI_RX);
         return;
     }
+#if S3L_LINK
+    if (!s3_link_start())
+        printf("LINK: control UART would NOT start -- running single-board.\n");
+    else
+        s3_link_banner();
+#endif
     printf("MIDI IN: UART1, 31250 baud, RX on GPIO %d.  velocity switch %s "
            "(%s)\n", S3L_MIDI_RX,
            S3L_MIDI_VELSW ? "ON" : "OFF",
@@ -3984,6 +4002,26 @@ void app_main(void)
 #endif
             (void)step;
         }
+#if S3L_LINK
+        /* O6/D2: one frame every ~100 ms and a drain of whatever arrived.
+         * O(1), no allocation, and it runs on the BLOCK tail rather than the
+         * sample tail -- the same rule the burst obeys (C3).
+         *
+         * ⚑ THE CRC SENT IS THE COMPILED-IN ANSWER KEY, NOT A LIVE CHECKSUM,
+         * and that is the useful choice rather than the lazy one. A live CRC
+         * over 18,788 bytes every block is unaffordable; and the chip ALREADY
+         * verifies its live bank against this table on every recall (the
+         * `CRC MISMATCH` path above mutes if they disagree). So sending the
+         * table value transmits a number already proven equal to the
+         * coefficients this chip is actually playing.
+         *
+         * What it then catches across the link is the failure that
+         * one-image-flashed-twice invites and nothing else would see: THE TWO
+         * BOARDS RUNNING DIFFERENT BUILDS. devcrc_rc/mc are generated per
+         * build, so a stale image on one board changes this number and the
+         * handshake says SAME PATCH, DIFFERENT COEFFICIENTS. */
+        s3_link_poll(dev_patch, devcrc_rc[dev_patch] ^ devcrc_mc[dev_patch]);
+#endif
         busy_us += (unsigned long)(esp_timer_get_time() - t0);
         eng_us  += (unsigned long)te;
         ++ph_chunks;

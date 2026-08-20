@@ -69,8 +69,12 @@ endif()
 # component with NO tinyusb requirement and a build that failed on a missing
 # tusb.h -- a conditional that silently does not fire. With S3_USBMIDI off the
 # class code is unreferenced and --gc-sections drops it.
-set(APP_REQ esp_driver_i2s esp_driver_uart driver esp_timer esp_hw_support
-            tinyusb)
+# esp_driver_gpio: O6's role strap reads a pin. In ESP-IDF v6 the GPIO driver
+# is its OWN component -- `driver` no longer carries it -- so without this the
+# build fails on `driver/gpio.h: No such file or directory`, which reads like a
+# missing SDK and is really a missing REQUIRES line.
+set(APP_REQ esp_driver_i2s esp_driver_uart esp_driver_gpio driver esp_timer
+            esp_hw_support tinyusb)
 
 # O1: the internal event boundary. ONE small portable file, compiled into the
 # firmware exactly as the host gate compiles it (event/teeth.sh) -- a boundary
