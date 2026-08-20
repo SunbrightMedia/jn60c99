@@ -639,6 +639,7 @@ static void mem_probe(void)
     enum { NB = 2048, NSTRIDE = 2048, STRIDE = 64, NISC = 64 };
     static unsigned char PB_DST[NB], PB_SRC[NB];
     unsigned long t0, c_flash = 0, c_int = 0, c_ps = 0, c_isc = 0, c_seq = 0;
+    unsigned long c_seq4 = 0;
     volatile float *ps = (volatile float *)heap_caps_malloc(
         (size_t)NSTRIDE * STRIDE, MALLOC_CAP_SPIRAM);
     static float ISR[NISC * (STRIDE / 4)];
@@ -692,6 +693,55 @@ static void mem_probe(void)
         c_seq = (unsigned long)esp_cpu_get_cycle_count() - t0;
     }
 
+    /* 5. ⚠ FOUR MOVING TAPS AT ONCE -- THE PATTERN **DELAY TYPE 5** RUNS, AND
+     *    THE ONE ROW 4 DOES NOT MEASURE.
+     *
+     * b19 proved O4's whole deficit is the delay stage on the four DELAY
+     * TYPE 5 patches: 2.45x the delay cost of the other sixty, 97 % of the
+     * excess. Type 5 is the only delay arm with FOUR rings; t1 and t23 have
+     * one each. It performs 12 ring reads per sample against their ~4.
+     *
+     * Row 4 measures ONE moving tap and reads 30 cyc/tap, and that number has
+     * been quoted ever since -- including in b6's WITHDRAWAL of the PSRAM
+     * attribution. But one stream is the case where a 32-byte burst serves
+     * eight consecutive samples. FOUR streams, far apart, interleaved, may
+     * evict each other between reads and never amortise a burst at all.
+     * Nobody has measured that, and it is exactly the untested assumption
+     * this project keeps paying for (playbook 46).
+     *
+     * THE ARITHMETIC THAT MAKES THIS DECISIVE, written before the run:
+     *   12 reads/sample at row 4's 30 cyc/tap  =   360 cyc  -- 29 % of the
+     *      1,231 cyc/sample excess. Ring placement is then a PARTIAL lever
+     *      and the rest must come from the arithmetic.
+     *   12 reads/sample at about 100 cyc/tap   = 1,200 cyc  -- essentially
+     *      ALL of it. Ring placement is then THE lever, and it is available
+     *      at no sonic cost, because the rings only need to be as long as
+     *      the measured maximum read lag.
+     *
+     * The four taps are spread across the buffer so they cannot share a
+     * cache line or a burst, and each advances independently, as four
+     * separate rings do. */
+    if (ps) {
+        const size_t nfl  = (size_t)NSTRIDE * (STRIDE / 4);
+        const size_t mask = nfl - 1u;
+        const size_t sep  = nfl / 4u;      /* the four rings, far apart */
+        size_t w = 0;
+        t0 = (unsigned long)esp_cpu_get_cycle_count();
+        for (i = 0; i < NSTRIDE / 4; ++i) {
+            size_t d = (size_t)(1000 + (i & 7));
+            size_t p0 = (w - d) & mask;
+            size_t p1 = (w + sep - d) & mask;
+            size_t p2 = (w + 2u * sep - d) & mask;
+            size_t p3 = (w + 3u * sep - d) & mask;
+            sink += ps[p0] * 0.5f + ps[(p0 + 1u) & mask] * 0.5f;
+            sink += ps[p1] * 0.5f + ps[(p1 + 1u) & mask] * 0.5f;
+            sink += ps[p2] * 0.5f + ps[(p2 + 1u) & mask] * 0.5f;
+            sink += ps[p3] * 0.5f + ps[(p3 + 1u) & mask] * 0.5f;
+            ++w;
+        }
+        c_seq4 = (unsigned long)esp_cpu_get_cycle_count() - t0;
+    }
+
     printf("\n=== MEMORY PROBE (is this engine memory-bound?) ===\n");
     printf("MEM: copy %d B out of FLASH   %lu cyc  = %.2f cyc/byte\n",
            NB, c_flash, (double)c_flash / (double)NB);
@@ -708,6 +758,19 @@ static void mem_probe(void)
         printf("MEM: %d MOVING-TAP reads PSRAM  %lu cyc = %.1f cyc/tap  "
                "<- the delay's own pattern\n",
                NSTRIDE, c_seq, (double)c_seq / (double)NSTRIDE);
+    if (ps) {
+        /* 8 reads per iteration over NSTRIDE/4 iterations = 2*NSTRIDE reads */
+        printf("MEM: %d FOUR-TAP reads PSRAM    %lu cyc = %.1f cyc/tap  "
+               "<- DELAY TYPE 5's own pattern\n",
+               NSTRIDE * 2, c_seq4, (double)c_seq4 / (double)(NSTRIDE * 2));
+        printf("MEM:   ONE tap %.1f -> FOUR taps %.1f cyc/tap.  At 12 reads a\n"
+               "MEM:   sample that is %.0f cyc/sample, against the %d cyc/sample\n"
+               "MEM:   excess b19 measured for DELAY TYPE 5.  >=70%% -> ring\n"
+               "MEM:   PLACEMENT is O4's lever; <40%% -> the arithmetic is.\n",
+               (double)c_seq / (double)NSTRIDE,
+               (double)c_seq4 / (double)(NSTRIDE * 2),
+               12.0 * (double)c_seq4 / (double)(NSTRIDE * 2), 1231);
+    }
     printf("MEM: flash is configured DIO @ 80 MHz. QIO @ 120 MHz is available\n"
            "     and is worth its reflash ONLY if the flash row above is dear.\n");
     printf("MEM: rings are 6.1 MB in PSRAM. Read the MOVING-TAP row, NOT the\n"
@@ -1293,6 +1356,43 @@ static void stress_step(void)
  * live at that call site is now the burst above, on the other side of a flag. */
 static void dev_request(int patch, int gate)
 {
+#if EB_MSPROF
+    /* ⚠ O4: THE MSP WINDOW IS THE PATCH, AND THE RESET BELONGS **HERE**.
+     *
+     * b18 reset the counters once a SECOND while the patch stepped every four,
+     * so no line described one patch. The first repair moved the reset to the
+     * periodic patch stepper -- and was STILL WRONG, because the stepper is not
+     * the only source of a program change: S3L_STRESS drives its own, and so do
+     * the console's b/n keys. A window labelled with a DELAY TYPE 0 patch could
+     * therefore contain a stretch of a TYPE 5 one, and b19's first run produced
+     * exactly that -- two hot windows labelled 48 (type 2) and 32 (type 0),
+     * which is incoherent, since one delay type cannot cost 2,090 and 660.
+     *
+     * Every program change in this firmware passes through THIS function. So
+     * the window closes here, for the patch that is ENDING, before dev_patch is
+     * overwritten -- and it closes no matter who asked.
+     *
+     * Guarded on an ACTUAL change: line 3932 re-requests the SAME patch on a
+     * gate change, and closing the window there would cut a patch into pieces
+     * and label every piece the same, which reads like agreement and is not. */
+    if (patch != dev_patch && eb_msprof_n) {
+        unsigned long n = eb_msprof_n;
+        unsigned long dl = (unsigned long)(eb_msprof[1] / n);
+        unsigned long rv = (unsigned long)(eb_msprof[2] / n);
+        printf("MSPP: pat=%d in=%lu delay=%lu reverb=%lu out=%lu effect=%lu"
+               "  sum=%lu  (n=%lu)\n",
+               dev_patch, (unsigned long)(eb_msprof[0] / n), dl, rv,
+               (unsigned long)(eb_msprof[3] / n),
+               (unsigned long)(eb_msprof[4] / n),
+               (unsigned long)((eb_msprof[0] + eb_msprof[1] + eb_msprof[2] +
+                                eb_msprof[3] + eb_msprof[4]) / n), n);
+        if (dl <= 1ul && rv <= 1ul)
+            printf("MSPP: *** BROKEN -- stub tick, IGNORE.\n");
+        eb_msprof[0] = eb_msprof[1] = eb_msprof[2] = 0;
+        eb_msprof[3] = eb_msprof[4] = 0;
+        eb_msprof_n  = 0;
+    }
+#endif
     dev_patch = patch;
     dev_gate = gate;
     dev_want  = 1;      /* O2: a REQUEST. The build starts at the next block
@@ -3879,42 +3979,6 @@ void app_main(void)
             if (w_step_on &&
                 ++patch_frames >= (unsigned long)(S3L_PATCH_SECS * SR)) {
                 patch_frames = 0;
-#if EB_MSPROF
-                /* ⚠ O4: THE MSP WINDOW MUST BE THE PATCH, NOT THE SECOND.
-                 *
-                 * The first working MSPROF run reported per SECOND. The patch
-                 * steps every S3L_PATCH_SECS and the report window drifted
-                 * against it (n swung 3,328..264,192 samples), so NO line
-                 * described one patch and the type-5 attribution could not be
-                 * read off it at all. A profiler whose window does not match
-                 * the thing being attributed answers a question nobody asked.
-                 *
-                 * So the accumulators are printed and reset HERE, at the patch
-                 * boundary, for the patch that is ENDING. One line per patch,
-                 * exactly attributed, 64 lines per sweep.
-                 *
-                 * The line is emitted BEFORE dev_request so `pat` names the
-                 * patch whose samples were counted. */
-                {   unsigned long n = eb_msprof_n ? eb_msprof_n : 1ul;
-                    unsigned long dl = (unsigned long)(eb_msprof[1] / n);
-                    unsigned long rv = (unsigned long)(eb_msprof[2] / n);
-                    printf("MSPP: pat=%d in=%lu delay=%lu reverb=%lu out=%lu "
-                           "effect=%lu  sum=%lu  (n=%lu)\n",
-                           dev_patch,
-                           (unsigned long)(eb_msprof[0] / n), dl, rv,
-                           (unsigned long)(eb_msprof[3] / n),
-                           (unsigned long)(eb_msprof[4] / n),
-                           (unsigned long)((eb_msprof[0] + eb_msprof[1] +
-                                            eb_msprof[2] + eb_msprof[3] +
-                                            eb_msprof[4]) / n),
-                           eb_msprof_n);
-                    if (dl <= 1ul && rv <= 1ul)
-                        printf("MSPP: *** BROKEN -- stub tick, IGNORE.\n");
-                    eb_msprof[0] = eb_msprof[1] = eb_msprof[2] = 0;
-                    eb_msprof[3] = eb_msprof[4] = 0;
-                    eb_msprof_n  = 0;
-                }
-#endif
                 dev_request((dev_patch + 1) % DEVCRC_NPATCH, gate);
             }
 #endif
