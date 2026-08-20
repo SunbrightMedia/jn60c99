@@ -2997,9 +2997,11 @@ static void rpt_task(void *arg)
                            "is the stub counter, not the cycle counter. "
                            "IGNORE THIS RUN.\n");
             }
-            eb_msprof[0] = eb_msprof[1] = eb_msprof[2] = 0;
-            eb_msprof[3] = eb_msprof[4] = 0;
-            eb_msprof_n  = 0;
+            /* ⚠ NO RESET HERE. The counters belong to the MSPP: window at the
+             * patch boundary. Clearing them on the one-second report would
+             * take samples out of the patch's own average and put the
+             * misalignment back. This line is a PARTIAL running average of the
+             * patch so far; MSPP: is the number to read. */
         }
 #endif
         printf("PARAM: edits=%lu builds=%lu defer=%lu unknown=%lu "
@@ -3877,6 +3879,42 @@ void app_main(void)
             if (w_step_on &&
                 ++patch_frames >= (unsigned long)(S3L_PATCH_SECS * SR)) {
                 patch_frames = 0;
+#if EB_MSPROF
+                /* ⚠ O4: THE MSP WINDOW MUST BE THE PATCH, NOT THE SECOND.
+                 *
+                 * The first working MSPROF run reported per SECOND. The patch
+                 * steps every S3L_PATCH_SECS and the report window drifted
+                 * against it (n swung 3,328..264,192 samples), so NO line
+                 * described one patch and the type-5 attribution could not be
+                 * read off it at all. A profiler whose window does not match
+                 * the thing being attributed answers a question nobody asked.
+                 *
+                 * So the accumulators are printed and reset HERE, at the patch
+                 * boundary, for the patch that is ENDING. One line per patch,
+                 * exactly attributed, 64 lines per sweep.
+                 *
+                 * The line is emitted BEFORE dev_request so `pat` names the
+                 * patch whose samples were counted. */
+                {   unsigned long n = eb_msprof_n ? eb_msprof_n : 1ul;
+                    unsigned long dl = (unsigned long)(eb_msprof[1] / n);
+                    unsigned long rv = (unsigned long)(eb_msprof[2] / n);
+                    printf("MSPP: pat=%d in=%lu delay=%lu reverb=%lu out=%lu "
+                           "effect=%lu  sum=%lu  (n=%lu)\n",
+                           dev_patch,
+                           (unsigned long)(eb_msprof[0] / n), dl, rv,
+                           (unsigned long)(eb_msprof[3] / n),
+                           (unsigned long)(eb_msprof[4] / n),
+                           (unsigned long)((eb_msprof[0] + eb_msprof[1] +
+                                            eb_msprof[2] + eb_msprof[3] +
+                                            eb_msprof[4]) / n),
+                           eb_msprof_n);
+                    if (dl <= 1ul && rv <= 1ul)
+                        printf("MSPP: *** BROKEN -- stub tick, IGNORE.\n");
+                    eb_msprof[0] = eb_msprof[1] = eb_msprof[2] = 0;
+                    eb_msprof[3] = eb_msprof[4] = 0;
+                    eb_msprof_n  = 0;
+                }
+#endif
                 dev_request((dev_patch + 1) % DEVCRC_NPATCH, gate);
             }
 #endif
