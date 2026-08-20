@@ -1271,3 +1271,50 @@ What caught it was a check for the string the NEW code adds:
 same failure applied to a VERIFICATION: the check did not reach the artefact it
 was believed to describe. **Verifying the report instead of the thing is the
 defect, whether the report is a log line, a gate, or an exit code.**
+
+## 74. `git add -A` during a gate run committed the gate's own planted defect
+
+**Paid 2026-08-20.** The worst defect of the session, and it reached the branch.
+
+`chunk_teeth.sh` proves its detector by PLANTING faults into the checked-in
+`engine_b/dev/eb_recall.c`, running the gate, and restoring the file. Tooth 2
+replaces the shared FX/noise tail build with `(void)0;` — a full patch recall
+that never builds its FX tail. It is correctly written: it snapshots the file,
+and a `trap ... EXIT INT TERM` restores it.
+
+While that suite was mid-flight, an unrelated documentation commit was made
+with `git add -A`. It swept up the planted line. **`(void)0;` — a deliberate,
+audio-breaking defect — was committed and pushed.**
+
+### And then the recovery made it worse
+
+After the suite finished it restored the real call, which now showed as a diff
+against the poisoned commit. That diff was misread as "the tooth is still in
+the tree", and `git checkout -- engine_b/dev/eb_recall.c` was run to "clean up"
+— **destroying the correct code and reinstating the plant.**
+
+Recovered by taking the file from the last commit that predates the poisoning
+(`git show <good>:<path> > <path>`) and diffing to confirm it is identical.
+
+### The rules
+
+1. **NEVER `git add -A` while any gate is running.** The FREEZE rule already
+   said do not edit the tree during a gate; it did not say the tree is being
+   edited BY the gate. It is. Gates that plant teeth make the working tree
+   theirs for the duration. Check `git status` is clean, or that no gate is
+   running, before staging anything.
+2. **Stage by path, not by sweep**, when any doubt exists. `git add <the files
+   you edited>` cannot pick up a plant in a file you never touched.
+3. **A diff appearing during or after a gate run is not evidence of which side
+   is correct.** Determine the correct content from a commit known to predate
+   the gate, never from the direction of the diff. `git checkout --` resolves
+   toward HEAD, and HEAD is exactly what may be poisoned.
+4. **A file a tooth plants into must be verified against a known-good commit**
+   after any suite run, not merely observed to be clean.
+
+### Why nothing downstream trusted it
+
+The gate suite still read ALL GREEN, because the gates ran against the restored
+file. Green did not mean the tree was sound. That is the session's shape once
+more (67, 69, 70, 72, 73): the report was about something other than the
+artefact in hand.

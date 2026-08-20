@@ -222,7 +222,7 @@ int eb_recall_chunk_step(eb_recall *r)
         /* A NOTE BUILD NEVER REACHES HERE. It owes no shared tail and no
          * master set: a note moves per-voice cells only, and the shadow copy
          * carries the current FX and master values forward. */
-        (void)0;
+        eb_render_coefs_build_shared((const unsigned char *)0, r->rc[shadow]);
     } else {
         EB_RECALL_T0();
         eb_master_coefs_build((const unsigned char *)0, r->mc[shadow]);
