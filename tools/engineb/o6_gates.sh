@@ -4,7 +4,8 @@
 # ⚠ WHAT IS NOT HERE, and must not be forgotten because the list looks full:
 #   * THERE IS NO SECOND BOARD. D1 (shared clock, one DAC) and D2 (patch
 #     distribution + CRC handshake) cannot be gated at all yet, and the
-#     PIN-to-WIRE mapping under D4 is UNPROVEN. What follows is LOGIC.
+#     PIN-to-WIRE mapping is UNPROVEN. What follows is LOGIC ONLY.
+#     Wiring: docs/engineb/TWO_CHIP_WIRING.md
 #   * D3 is proven against the frozen port (`make verify` green with src/
 #     touched); D4 is proven only against itself.
 #
@@ -42,11 +43,23 @@ for t in 1 2 3; do
     fi
 done
 
+printf '\n======== O6/D1+D2 link table + handshake (20 checks, 3 teeth) ========\n'
+cc -std=c99 -O1 -Wall -Wextra -Wno-unused-function -I "$REPO/esp32s3/main" \
+   -o "$REPO/build/d1gate" "$HERE/d1_link_gate.c"
+"$REPO/build/d1gate" | tail -3 || fails=$((fails+1))
+for t in 1 2 3; do
+    if "$REPO/build/d1gate" "$t" >/dev/null 2>&1; then
+        printf '   tooth %s NOT CAUGHT\n' "$t"; fails=$((fails+1))
+    else
+        printf '   tooth %s caught\n' "$t"
+    fi
+done
+
 printf '\n========================================\n'
 if [ "$fails" -eq 0 ]; then
     echo "O6 GATES: ALL GREEN, every tooth caught."
     echo "   D3 proven against the frozen port. D4 proven against itself only."
-    echo "   D1/D2 UNGATED and the pin-to-wire mapping UNPROVEN: no second board."
+    echo "   D1/D2 LOGIC gated. NO WIRE EXISTS: pins, peripherals, UART UNPROVEN."
 else
     echo "O6 GATES: $fails RED."; exit 1
 fi

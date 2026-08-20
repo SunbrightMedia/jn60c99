@@ -1,0 +1,173 @@
+/* s3_link.h -- O6/D1+D2: THE TWO-CHIP LINK, as pin maps and pure functions.
+ *
+ * D1 IS ALREADY DECIDED (user, 2026-08-12): ONE DAC, chip A is the only clock.
+ * Nothing here re-opens that. This file writes it down as something a gate can
+ * execute, because the alternative is that it first executes on two boards
+ * that have never been wired -- and this session has twice paid for logic
+ * whose first run was on silicon (playbook 67, 72).
+ *
+ * ==========================================================================
+ * THE WIRING, and it is the whole design in six lines
+ * ==========================================================================
+ *
+ *   AUDIO OUT   chip A  I2S0 MASTER TX  --> the ONE audio board  (5/6/7)
+ *   LINK        chip A  I2S1 MASTER RX  <-- chip B  I2S1 SLAVE TX
+ *
+ *       A GPIO 15  BCLK  ---------------->  B GPIO 15   (A drives, B listens)
+ *       A GPIO 16  LRCK  ---------------->  B GPIO 16   (A drives, B listens)
+ *       A GPIO 17  DIN   <----------------  B GPIO 17   (B drives, A listens)
+ *       A GND            <--------------->  B GND
+ *
+ *   CONTROL     chip A  UART1 TX/RX     <-> chip B  UART1 RX/TX
+ *
+ *       A GPIO  8  TX    ---------------->  B GPIO  9  RX
+ *       A GPIO  9  RX    <----------------  B GPIO  8  TX
+ *
+ * ⚠ THE CONTROL PAIR IS TWO WIRES THE D1 DECISION DID NOT COVER, and it is
+ * flagged rather than slipped in. D1 settled the AUDIO path at "three wires
+ * plus ground, no MCLK". D2 -- patch bytes, apply-at-index, CRC handshake --
+ * needs a path from A to B, and the audio link carries data only B->A. The
+ * I2S frame could hide control bits in its low bits, but that would put a
+ * silent, unprovable coupling between the audio format and the control
+ * protocol, and this project has spent the whole session paying for silent
+ * couplings. Two more wires and a UART is the honest cost. SIX WIRES PLUS
+ * GROUND in total. If the user refuses the extra pair, the fallback is
+ * spelled out in docs/engineb/TWO_CHIP_WIRING.md and it is worse.
+ *
+ * ==========================================================================
+ * WHY B GETS ITS SAMPLE TICK FOR FREE
+ * ==========================================================================
+ * B's I2S is a SLAVE, clocked by A's BCLK/LRCK. Its render loop is driven by
+ * the DMA those clocks advance, so the two chips cannot drift: there is one
+ * oscillator in the instrument. Chip B's audio arrives one block late, which
+ * is the same trade the FX pipeline already pays and which THE INVARIANT
+ * permits (audio never breaks; changes may land late).
+ */
+#ifndef JUNO_S3_LINK_H
+#define JUNO_S3_LINK_H
+
+#include "s3_role.h"
+
+/* ---- the link pins. IDENTICAL on both chips: one image, and the DIRECTION
+ * is what the role changes, never the number. A pin map that differed by role
+ * would be two boards' worth of wiring to keep in step. -------------------- */
+#ifndef S3_LINK_BCLK
+#define S3_LINK_BCLK 15
+#endif
+#ifndef S3_LINK_LRCK
+#define S3_LINK_LRCK 16
+#endif
+#ifndef S3_LINK_DATA
+#define S3_LINK_DATA 17
+#endif
+#ifndef S3_LINK_UART_TX
+#define S3_LINK_UART_TX 8
+#endif
+#ifndef S3_LINK_UART_RX
+#define S3_LINK_UART_RX 9
+#endif
+
+/* the audio-board pins, chip A only */
+#ifndef S3_DAC_BCLK
+#define S3_DAC_BCLK 5
+#endif
+#ifndef S3_DAC_LRCK
+#define S3_DAC_LRCK 6
+#endif
+#ifndef S3_DAC_DOUT
+#define S3_DAC_DOUT 7
+#endif
+
+enum { S3_DIR_IN = 0, S3_DIR_OUT = 1 };
+
+typedef struct {
+    int link_is_master;   /* 1 = this chip DRIVES the link BCLK/LRCK        */
+    int link_is_tx;       /* 1 = this chip SENDS audio on the link          */
+    int bclk_dir;         /* S3_DIR_OUT on A, S3_DIR_IN on B                */
+    int lrck_dir;
+    int data_dir;         /* S3_DIR_IN on A (it receives), OUT on B         */
+    int uses_dac;         /* only A touches GPIO 5/6/7 at all               */
+} s3_link_cfg;
+
+static s3_link_cfg s3_link_config(int role)
+{
+    s3_link_cfg c;
+    /* ⚑ THE LINK MASTER IS **A**, AND IT IS THE CHIP THAT RECEIVES.
+     *
+     * That inversion is the whole point of D1 and is the line most likely to
+     * be "corrected" by someone who assumes the sender clocks the wire. It
+     * does not: A owns the ONLY oscillator in the instrument, so A must drive
+     * BCLK/LRCK on BOTH its I2S peripherals -- the one feeding the DAC and
+     * the one receiving B. B is a slave that transmits. Reverse this and the
+     * two chips have two clocks, which is precisely what the one-DAC decision
+     * exists to make impossible. */
+    c.link_is_master = (role == S3_ROLE_A);
+    c.link_is_tx     = (role == S3_ROLE_B);
+    c.bclk_dir       = (role == S3_ROLE_A) ? S3_DIR_OUT : S3_DIR_IN;
+    c.lrck_dir       = (role == S3_ROLE_A) ? S3_DIR_OUT : S3_DIR_IN;
+    c.data_dir       = (role == S3_ROLE_A) ? S3_DIR_IN  : S3_DIR_OUT;
+    c.uses_dac       = (role == S3_ROLE_A);
+    return c;
+}
+
+/* ---- D2: the handshake ---------------------------------------------------
+ *
+ * WHAT IT MUST ESTABLISH, before a note is allowed to sound:
+ *   1. the peer exists and is the OPPOSITE role (s3_pair_check)
+ *   2. both chips hold the SAME patch index
+ *   3. both chips built the SAME coefficients from it -- by CRC, because the
+ *      device recall already has an answer-key CRC and reusing it costs
+ *      nothing (RECALL: CRC vs host answer key, 0 bad)
+ *   4. both agree which GLOBAL voices each owns (D3's base)
+ *
+ * ⚠ 3 IS THE ONE THAT MATTERS AND THE ONE MOST EASILY SKIPPED. Chips that
+ * agree on the patch INDEX but built different coefficients are exactly the
+ * D3 species: silent, self-consistent, and audible only as a wrong chord.
+ * The index handshake alone would pass. */
+enum {
+    S3_HS_OK = 0,
+    S3_HS_NO_PEER,        /* nothing answered                              */
+    S3_HS_BAD_PAIR,       /* two masters or two slaves                     */
+    S3_HS_PATCH_DIFFERS,  /* different patch index                         */
+    S3_HS_CRC_DIFFERS,    /* same index, DIFFERENT coefficients            */
+    S3_HS_BASE_OVERLAP    /* the two chips claim the same global voices    */
+};
+
+typedef struct {
+    int  present;         /* did the peer answer at all                    */
+    int  role;
+    int  patch;
+    int  voice_base;
+    int  voices;
+    unsigned long crc;
+} s3_peer;
+
+static int s3_handshake_check(const s3_role_cfg *me, int my_patch,
+                              unsigned long my_crc, const s3_peer *peer)
+{
+    if (!peer->present) return S3_HS_NO_PEER;
+    if (s3_pair_check(me->role, peer->role) != S3_PAIR_OK) return S3_HS_BAD_PAIR;
+    if (peer->patch != my_patch)                           return S3_HS_PATCH_DIFFERS;
+    if (peer->crc   != my_crc)                             return S3_HS_CRC_DIFFERS;
+    /* disjoint global voice ranges (D3). Overlap means one chip's detune is
+     * duplicated and another global voice is never sounded at all. */
+    if (!(me->voice_base + me->voices <= peer->voice_base ||
+          peer->voice_base + peer->voices <= me->voice_base))
+        return S3_HS_BASE_OVERLAP;
+    return S3_HS_OK;
+}
+
+static const char *s3_handshake_name(int hs)
+{
+    switch (hs) {
+    case S3_HS_OK:            return "OK";
+    case S3_HS_NO_PEER:       return "NO PEER ANSWERED -- check the UART pair and ground";
+    case S3_HS_BAD_PAIR:      return "BAD PAIR -- both chips strapped the same way";
+    case S3_HS_PATCH_DIFFERS: return "PATCH INDEX DIFFERS between the chips";
+    case S3_HS_CRC_DIFFERS:   return "SAME PATCH, DIFFERENT COEFFICIENTS -- silent defect";
+    case S3_HS_BASE_OVERLAP:  return "GLOBAL VOICE RANGES OVERLAP -- a voice is duplicated";
+    default:                  return "?";
+    }
+}
+
+#endif /* JUNO_S3_LINK_H */
