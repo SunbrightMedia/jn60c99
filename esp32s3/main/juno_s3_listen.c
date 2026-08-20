@@ -95,11 +95,12 @@
 #include "eb_sched.h"
 #include "eb_notestep.h"
 #include "eb_burststep.h"
-/* the device supplies the profiler's clock; see eb_master.c */
-#if EB_MSPROF
-#include <xtensa/hal.h>
-#define EB_MSPROF_TICK() xthal_get_ccount()
-#endif
+/* ⚠ THE PROFILER'S CLOCK IS **NOT** SUPPLIED FROM HERE, AND MUST NEVER BE.
+ * A `#define EB_MSPROF_TICK() xthal_get_ccount()` stood on these lines and did
+ * NOTHING: eb_master.c is a different translation unit and a macro does not
+ * cross one. It fell back to its host stub and every stage read exactly 1
+ * cyc/sample for a 52-minute board run. eb_master.c now selects the clock from
+ * __XTENSA__, where the choice belongs. See playbook 72. */
 #include "eb_paramstep.h"
 #include "eb_param_class.h"
 #include "eb_devseq.h"
@@ -2985,6 +2986,17 @@ static void rpt_task(void *arg)
                    (unsigned long)(eb_msprof[3] / n),
                    (unsigned long)(eb_msprof[4] / n),
                    eb_msprof_n);
+            /* ⚠ THE TOOTH. A stub clock steps by one per read, so a broken
+             * profiler prints 1 for every stage -- which is what a 52-minute
+             * run printed. A report that cannot tell that from a measurement
+             * is worthless. This line SAYS SO, on the board, in the log. */
+            {   int k, real = 0;
+                for (k = 0; k < 5; k++) if (eb_msprof[k] / n > 1ul) real = 1;
+                if (!real)
+                    printf("MSP: *** BROKEN -- every stage reads <=1. The tick "
+                           "is the stub counter, not the cycle counter. "
+                           "IGNORE THIS RUN.\n");
+            }
             eb_msprof[0] = eb_msprof[1] = eb_msprof[2] = 0;
             eb_msprof[3] = eb_msprof[4] = 0;
             eb_msprof_n  = 0;

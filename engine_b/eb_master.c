@@ -89,13 +89,30 @@ static void eb_rp_report(void)
  * is the wrong way round: the configuration that ships is the configuration
  * that must be proven.
  *
- * The device defines EB_MSPROF_TICK to its cycle counter; the host falls back
- * to a plain counter, which is useless as a TIME but exercises every line of
- * the accumulation, so the trunk gate can assert the null is still EXACTLY 0
- * with the profiler compiled in. */
+ * The device uses its cycle counter; the host falls back to a plain counter,
+ * which is useless as a TIME but exercises every line of the accumulation, so
+ * the trunk gate can assert the null is still EXACTLY 0 with the profiler
+ * compiled in.
+ *
+ * ⚠ THE CHOICE IS MADE HERE, IN THIS TRANSLATION UNIT, AND THAT IS THE WHOLE
+ * POINT. The first device build put `#define EB_MSPROF_TICK() ...` in
+ * juno_s3_listen.c. A macro cannot cross a translation unit. eb_master.c never
+ * saw it, fell back to the counter below, and every stage read EXACTLY 1
+ * cyc/sample for 52 minutes on the board -- the signature of a counter that
+ * steps by one. The instrument did not measure its subject. Select the clock
+ * from the TARGET, never from a caller. */
 #ifndef EB_MSPROF_TICK
+#if defined(__XTENSA__)
+/* CCOUNT read inline, with NO <xtensa/hal.h>. The header lives in an ESP-IDF
+ * component, and pulling IDF into an engine_b file would make the trunk depend
+ * on the device tree. One special register, one instruction. */
+static unsigned long eb_msprof_ccount(void)
+{ unsigned long c; __asm__ __volatile__("rsr.ccount %0" : "=a"(c)); return c; }
+#define EB_MSPROF_TICK() eb_msprof_ccount()
+#else
 static unsigned long eb_msprof_fake;
 #define EB_MSPROF_TICK() (++eb_msprof_fake)
+#endif
 #endif
 unsigned long long eb_msprof[5];      /* in, delay, reverb, out, effect */
 unsigned long      eb_msprof_n;
