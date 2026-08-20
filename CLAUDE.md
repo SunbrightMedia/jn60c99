@@ -122,9 +122,17 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
   chain got the EXACTLY-0 treatment; the master chain never did.
   ⚠ Nothing absolute from an MSPROF build is a cost: 6 counter reads/sample sit
   inside it. sum is NOT fx. Ratios and the hot-set identity only.
-- Next: cut t5's arithmetic (175 mul / 91 add vs t23's 101/44) with the trunk
-  null EXACTLY 0; re-measure profiler-free and read FXP: fx on 5/16/21/49
-  against the 2,842 ceiling. Then D link (zero code); full-state gate.
+- t5 CANNOT COME DOWN (b21). Its cost is the ALGORITHM, not the compilation:
+  it writes 101 distinct persistent state fields per sample vs t23's 41 and
+  t1's 33 -- 2.46x against the MEASURED 2.53x cost ratio. Bit-exactness forbids
+  dropping any of them. restrict/aliasing tried both ways and REFUTED
+  (992->992 struct member, 992->991 local, ld/st slightly worse); reverted.
+- => THE MASTER-CHAIN SPLIT ACROSS CORES IS O4's ONLY REMAINING LEVER, which is
+  the condition b19/b20 stated in advance. Affordable because wait=5 on every
+  run: core 1 is the bottleneck and CORE 0 SPINS. Cost: one block = 5.8 ms of
+  latency on ALL 64 patches to fix 4. THE INVARIANT permits it.
+  ⚠ OWED FIRST: the user has never been asked to accept that 5.8 ms. ASK.
+  ⚠ b6's (5,610+fx)/2 balance point is arithmetic, not a measurement.
 
 # BUILD & GIT
 `make libjuno.so` | `make test` | `make verify` (finish line) | WASM:
