@@ -130,6 +130,20 @@ CFLAGS = ["-std=c99", "-O2", "-ffp-contract=off", "-fno-strict-aliasing"]
 # execution instead of by reading the call graph.
 if os.environ.get("JUNO_EB_VERIFY_GEN"):
     CFLAGS = CFLAGS + ["-DEB_VERIFY_GEN"]
+# EB_MSPROF: build the master chain with its five-stage profiler compiled IN.
+# JUNO_EB_MSPROF=1 turns it on for a run.
+#
+# ⚠ THIS SWITCH EXISTS BECAUSE THE SHIPPING BUILD USES IT AND THE GATE COULD
+# NOT. The profiler is what the O4 measurement build flashes, and without a way
+# to reach it from here the null was only ever proving the DISABLED
+# configuration -- the one that does not ship. `make engineb CFLAGS=...` does
+# NOT solve it: this harness builds with its own CFLAGS list and never sees the
+# make variable, so that run went green having tested nothing (playbook 70).
+#
+# The profiler only reads a counter and accumulates integers, so it MUST leave
+# the audio bit-identical. "Must" is the claim; this is how it gets executed.
+if os.environ.get("JUNO_EB_MSPROF"):
+    CFLAGS = CFLAGS + ["-DEB_MSPROF=1"]
 # EB_PITCH_FAST: build engine B's pitch with the v7 double-float path (the S3
 # build). Default OFF = bit-exact double. JUNO_EB_PITCH_FAST=1 turns it on so
 # the -100 dB gate can be run against the REAL integrated file, not a probe
