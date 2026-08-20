@@ -106,15 +106,21 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
   blocks behind a note storm -- a POLICY the user may overturn.
 - O3 PROVEN ON SILICON over 52 min: 76,779 edits, unknown=0, pubretry=0,
   15.0x coalescing, applymax=302,245 cyc (b17).
-- O4 open. Deficit is core 1's MASTER pass alone (fx swings ~1,900 cyc/sample;
-  v1 flat). Hot set = patches 5/16/21/49 = the bank's only DELAY TYPE 5, over
-  two runs (b16, b17). Attribution is still CIRCUMSTANTIAL. The five-stage
-  MSPROF profiler settles it; its first flash measured NOTHING (tick macro in
-  the wrong translation unit, playbook 72) and is fixed and re-gated.
-  Prediction to judge: stage 1 largest, type-5:other ratio 1.7-2.0x.
-- Next: flash the MSPROF build, read the MSP: ratio, then pick O4's lever
-  (optimise eb_delay_t5.c vs master-chain split across cores);
-  D link (zero code); full-state gate.
+- O4 MEASURED AND DECIDED (b19), not done. Per-patch MSPP, 84 reports: the hot
+  set is 5 lines, delay 2,045-2,097 vs 657-1,210 elsewhere, NO OVERLAP. Delay
+  ratio 2.45x, reverb ratio 1.02x, and the DELAY STAGE IS 97 % OF THE EXCESS.
+  5 hot in 84 against 5.25 expected for 4 type-5 patches of 64; status pat= on
+  every one is 5/16/21/49. LEVER = optimise eb_delay_t5.c. The master-chain
+  split is off the table for this deficit (it costs 5.8 ms latency on all 64 to
+  fix 4) and returns only if type 5 cannot come down far enough.
+  b18's lean toward reverb was a one-second-window artefact and is REFUTED.
+  ⚠ MSPP's own pat= field is UNRELIABLE (dev_patch is driven from two places);
+  the attribution rests on the status line and the count. Fix before reuse.
+  ⚠ Nothing absolute from an MSPROF build is a cost: 6 counter reads/sample sit
+  inside it. sum is NOT fx. Ratios and the hot-set identity only.
+- Next: fix the MSPP pat= label; optimise eb_delay_t5.c with the trunk null
+  EXACTLY 0; re-measure profiler-free and read FXP: fx on 5/16/21/49 against
+  the 2,842 ceiling. Then D link (zero code); full-state gate.
 
 # BUILD & GIT
 `make libjuno.so` | `make test` | `make verify` (finish line) | WASM:
