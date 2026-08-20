@@ -127,12 +127,19 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
   t1's 33 -- 2.46x against the MEASURED 2.53x cost ratio. Bit-exactness forbids
   dropping any of them. restrict/aliasing tried both ways and REFUTED
   (992->992 struct member, 992->991 local, ld/st slightly worse); reverted.
-- => THE MASTER-CHAIN SPLIT ACROSS CORES IS O4's ONLY REMAINING LEVER, which is
-  the condition b19/b20 stated in advance. Affordable because wait=5 on every
-  run: core 1 is the bottleneck and CORE 0 SPINS. Cost: one block = 5.8 ms of
-  latency on ALL 64 patches to fix 4. THE INVARIANT permits it.
-  ⚠ OWED FIRST: the user has never been asked to accept that 5.8 ms. ASK.
-  ⚠ b6's (5,610+fx)/2 balance point is arithmetic, not a measurement.
+- THE SPLIT IS RE-PRICED (b22): eb_master_render is a CLOSED PER-SAMPLE LOOP
+  (effect(n) -> fb84672/fb84704 -> input(n+1), eb_master_in.c:28). A lockstep
+  split parallelises nothing (the chain is serial inside one sample); a
+  chunk-pipelined split delivers the feedback a CHUNK late -- NOT bit-exact,
+  a SONIC change judged by the fork gate, on top of the 5.8 ms. b6 priced the
+  latency and never the feedback. Today's S3L_FX_PIPE is legitimate because it
+  moves the WHOLE chain, keeping the loop sample-deep inside.
+- O4 DECISION PENDING, deliberately: the deficit was measured on the INTERIM
+  1-chip 2-voice build. The shipping layout is 3 voices + FX per chip. Whether
+  the 4 type-5 patches still miss THERE is unmeasured, and the two-chip link
+  (O6) is owed regardless. Re-derive the deficit on the real layout before
+  paying any sonic-deviation lever for it. Fallback stances: leave 4 patches
+  documented-noncompliant, or fork-gate the pipelined split.
 
 # BUILD & GIT
 `make libjuno.so` | `make test` | `make verify` (finish line) | WASM:
