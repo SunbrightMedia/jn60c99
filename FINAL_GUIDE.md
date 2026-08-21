@@ -180,8 +180,8 @@ any analog mismatch between the two halves of a chord.
 |---|---|
 | E1 method playbook current | **DONE** (40 defects, silicon sections, kept current BY RULE) |
 | E2 workflows saved in repo | **DONE** (10 + the recall pair) |
-| E3 end-to-end pipeline doc: ".vst3 in → two boards out", every step + gate | **NOT DONE** |
-| E4 de-JUNO the tools (no needless hardcoded constants) | **NOT DONE — audit owed** |
+| E3 end-to-end pipeline doc: ".vst3 in → two boards out", every step + gate | **WRITTEN** — `docs/PIPELINE.md`, 9 phases + gates, every cited path verified to exist. PROVEN only when a second synth traverses it (E5). |
+| E4 de-JUNO the tools (no needless hardcoded constants) | **AUDIT EXISTS AND IS CLEAN** — `tools/verify/dejuno_audit.py` (tooth: seen to fail). 12 item-7 files: 9 clean outright, 16 carried constants marked `JUNO-BOUND:` and PRINTED as the owed-parameter list. |
 | E5 proven by a second synth | **BLOCKED until A–D done** (until then, all repeatability claims are INFERRED) |
 
 ---
