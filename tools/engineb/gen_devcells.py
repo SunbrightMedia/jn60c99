@@ -17,9 +17,8 @@ TWO THINGS THIS GENERATOR MUST GET RIGHT, and both are load-bearing:
 
 2. THE PER-VOICE SCATTER IS TWELVE CELLS, NOT FIVE. The five the first design
    carried are the RECALL-time per-voice cells. The NOTE PATH writes seven
-   more (src/juno_note.c: 304 pitch, 320 gate, 592 porta gate, 1856 held,   JUNO-BOUND: doc
-   6864 VCF velocity, 9680 VCA velocity, 9824 gate twin) and SIX of those   JUNO-BOUND: doc
-are
+   more -- the full per-cell derivation notes live beside the values in
+   synth/juno60.json (E4/S0); are
    read back per voice by eb_render_coefs_build. With a shared tile every
    sounding voice takes the LAST note's pitch and velocity, and cell 320 --
    the ADSR gate, read every sample at engine_b/eb_render.c:484 -- is not
@@ -53,28 +52,24 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 DATA = os.path.join(REPO, 'docs', 'engineb', 'data', 'devrecall')
 OUT = os.path.join(REPO, 'engine_b', 'dev')
 
-VOICE_STRIDE = 10512          # JUNO-BOUND: src/juno_engine.h JUNO_VOICE_MAIN_STRIDE
-VOICE_LO = 176                # first per-voice cell (juno_apply/eb_coefs)
-VOICE_HI = 84272              # first non-voice cell; 176 + 8*10512
-VTILE = 10688                 # one voice block, rounded up past cell 10672
+import json as _json
+_SYN = _json.load(open(os.path.join(REPO, 'synth',
+                                    os.environ.get('SYNTH', 'juno60') + '.json')))
+VOICE_STRIDE = _SYN['voice_stride']   # per-synth (E4/S0): synth/<name>.json
+VOICE_LO = _SYN['voice_lo']
+VOICE_HI = _SYN['voice_hi']
+VTILE = _SYN['vtile']
 
 # The per-voice SCATTER. Offsets are voice-block-relative.
 #   recall-written, all 8 voices (src/juno_apply.c):
 #     1072  LFO tempo baseline      :622,:815
-#     3968  UNISON spread           :504   JUNO-BOUND: doc of derived data
-#     5520  CONDITION tune          :480   JUNO-BOUND: doc of derived data
-#     7600  CONDITION fine          :481   JUNO-BOUND: doc of derived data
-#    10320  CONDITION gain          :482   JUNO-BOUND: doc of derived data
 #   note-written (src/juno_note.c), added 2026-08-11 -- DEFECT 2:
 #      304  pitch CV                :160,:274   -> eb_coefs.c:264
 #      320  ADSR gate               :164,:249   -> eb_coefs.c:351,:371
 #                                                  eb_render.c:484 every sample
 #      592  glide / portamento gate :305        -> eb_coefs.c:218
-#     1856  any-key-held            :200,:225   -> eb_coefs.c:232   JUNO-BOUND: doc of derived data
-#     6864  VCF velocity            :196,:320   -> eb_coefs.c:58   JUNO-BOUND: doc of derived data
-#     9680  VCA velocity            :197,:321   -> eb_coefs.c:92   JUNO-BOUND: doc of derived data
 #     9824  gate twin               :201,:306   -> eb_coefs.c:93
-SCATTER = [304, 320, 592, 1072, 1856, 3968, 5520, 6864, 7600, 9680, 9824, 10320]  # JUNO-BOUND: derived per synth (see block comment)
+SCATTER = list(_SYN['scatter_cells'])  # per-synth (E4/S0)
 
 # The aux DCO-retrigger latch at 101504+32v is NOT here: all eight voices'
 # copies already live inside the non-voice segment [101024,102804).

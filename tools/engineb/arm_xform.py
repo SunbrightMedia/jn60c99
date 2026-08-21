@@ -53,22 +53,20 @@ RINGS = [(6429408, 6429412, 6396640)]
 # The type-5 arm's FOUR rings. Each ring's control pair sits immediately AFTER
 # the PREVIOUS ring's data, so the index cell of a ring is nowhere near its own
 # base -- read the write expression to pair them, never the addresses.
-RINGS_D4 = [(6463712, 6463716, 6430944),
-            (6496496, 6496500, 6463728)]
-
-RINGS_E5 = [(101024, 101028, 96928)]
-
-RINGS_T1 = [(6395248, 6395252, 4298096)]
-
-# JUNO-BOUND: every RINGS_* triple below is this plugin's ring geometry, read
-# off master_render.c's write expressions. NEXT SYNTH: these tables are the
-# per-synth INPUT to this tool -- move them to a config the port supplies, as
-# E4 requires; the transform logic itself carries no JUNO number.
-RINGS_T5 = [(8594768,  8594772,  6497616),    # JUNO-BOUND: t5 ring geometry
-            (10691936, 10691940, 8594784),    # JUNO-BOUND: t5 ring geometry
-            (10726256, 10726260, 10693488),   # JUNO-BOUND: t5 ring geometry
-            (10759040, 10759044, 10726272)]   # JUNO-BOUND: t5 ring geometry
-
+# THE RING TABLES ARE THE SYNTH'S, NOT THE TOOL'S (E4/S0). They are read from
+# synth/<name>.json -- the per-synth input this tool consumes. The JUNO tables
+# that used to sit here verbatim now live in synth/juno60.json, and the move is
+# verified by the regenerated modules not changing by a byte. A new synth
+# supplies its own file and this tool changes not at all (SYNTH=<name> env).
+import json as _json
+_SYN = _json.load(open(os.path.join(REPO, 'synth',
+                                    os.environ.get('SYNTH', 'juno60') + '.json')))
+def _rings(k):
+    return [tuple(t) for t in _SYN['rings'].get(k, [])]
+RINGS_D4 = _rings('D4')
+RINGS_E5 = _rings('E5')
+RINGS_T1 = _rings('T1')
+RINGS_T5 = _rings('T5')
 
 def classify(lo, hi):
     L = open(SRC).read().split("\n")

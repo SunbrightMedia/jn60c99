@@ -111,10 +111,10 @@ def main():
                          'The firmware carries a compile-time assert on '
                          'DEVCRC_RC_SZ that catches exactly this.')
     ap.add_argument('--no-copy', action='store_true')
-    ap.add_argument('--bank', default=os.path.join(REPO, 'truth',
-                    'presetbankog1.bin'),   # JUNO-BOUND: default only; the
-                    # JX-3P run passes its own bank here (END_GOAL item 7)
-                    help='preset bank to bake from')
+    _syn = __import__('json').load(open(os.path.join(REPO, 'synth',
+                    os.environ.get('SYNTH', 'juno60') + '.json')))
+    ap.add_argument('--bank', default=os.path.join(REPO, _syn['truth_bank']),
+                    help='preset bank (default: from synth/<name>.json)')
     a = ap.parse_args()
     os.makedirs(BUILD, exist_ok=True)
     bank = a.bank

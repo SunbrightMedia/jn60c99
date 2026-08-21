@@ -1,0 +1,29 @@
+{
+  "_comment": "PER-SYNTH CONFIG (E4/E5). Every number an item-7 tool needs about THIS synth lives here, not in the tool. The JX-3P gets synth/jx3p.json with its own values; the tools change not at all. Provenance of each value: derived in this repo, cited beside it.",
+  "name": "juno60",
+  "truth_bank": "truth/presetbankog1.bin",
+  "rates": [44100, 48000, 96000],
+
+  "bank_header": 23,
+  "bank_stride": 20223,
+  "patch_bytes": 134,
+  "npatch": 64,
+
+  "voice_stride": 10512,
+  "voice_lo": 176,
+  "voice_hi": 84272,
+  "vtile": 10688,
+  "scatter_cells": [304, 320, 592, 1072, 1856, 3968, 5520, 6864, 7600, 9680, 9824, 10320],
+
+  "_rings": "triples (write-index cell, length cell, ring base), read off the port's write expressions -- arm_xform.py's per-synth input",
+  "rings": {
+    "T1":  [[6395248, 6395252, 4298096]],
+    "T5":  [[8594768, 8594772, 6497616],
+            [10691936, 10691940, 8594784],
+            [10726256, 10726260, 10693488],
+            [10759040, 10759044, 10726272]],
+    "D4":  [[6463712, 6463716, 6430944],
+            [6496496, 6496500, 6463728]],
+    "E5":  [[101024, 101028, 96928]]
+  }
+}

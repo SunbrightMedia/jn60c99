@@ -44,6 +44,8 @@ MANIFEST = [
     "event/juno_event.h",
     # the generic optimiser
     "tools/opt/regcache.py",
+    # the RTTI seed finder -- travels to any MSVC-built synth
+    "tools/rtti_seeds.py",
     # O6: the role/link decision layer travels whole to the next pair of chips
     "esp32s3/main/s3_role.h",
     "esp32s3/main/s3_link.h",
