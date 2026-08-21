@@ -112,3 +112,23 @@ to you now rather than discovered mid-S2.**
 **PROCEED. Timeline stands (5 sessions nominal, 7 with slack).** Every S1
 criterion passed; the only open item is whether two more `Code8_*` files are
 needed, answerable early in S2 and cheap to supply if so. No re-scope.
+
+## The .Dat question — evidence gathered (still oracle-decided)
+
+Two findings shift the leading hypothesis toward "not needed for render":
+
+1. **Precedent.** The JUNO port passes `make verify` bit-exact with NO .Dat
+   files present at all — `truth/` holds only JUNO60.vst3, Script.xml and the
+   bank. The JUNO DLL references Code1.Dat/Code8 identically to the JX DLL, yet
+   its bit-exact render needs neither. Same vendor, same reference pattern.
+
+2. **Structure.** Code1.Dat and Code8_1.Dat share an identical 20-byte header
+   (3edacaba 6e969ffd 21c3cba2 729a98fd 3bd4defd) and are high-entropy (6.63 /
+   5.25 bits/byte) with values inconsistent with raw f32 coefficient tables
+   (~50% outside [-4,4], magnitudes to 3e38). That is packed/compressed content
+   — factory preset/UI data — not a table a per-sample render would index.
+
+**Still the oracle's call, not concluded here.** If any closure function in the
+IDA dump opens Code1.Dat/Code8_*, they are ground truth and the other two
+Code8 files are needed. The evidence says that is unlikely, so it is now a
+low-probability item rather than an open risk. Recorded, not assumed.
