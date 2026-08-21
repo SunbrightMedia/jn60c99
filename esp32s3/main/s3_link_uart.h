@@ -104,6 +104,23 @@ static int s3_link_read_strap(void)
     return gpio_get_level((gpio_num_t)S3_ROLE_PIN) == 0;   /* low = strapped */
 }
 
+/* ⚑ O6/D3: THE STRAP MUST BE READ BEFORE THE BOOT RECALL, not at link start.
+ *
+ * The boot recall deals the CONDITION/UNISON scatter, and it deals it from
+ * EB_DEVSEQ_VOICE_BASE. Link start happens AFTER boot recall (it needs the
+ * console up), so reading the strap only there would leave chip B playing
+ * chip A's scatter until its first patch change -- four seconds of the exact
+ * defect D3 exists to prevent, invisible to every CRC because the base-0 key
+ * would match the base-0 recall. s3_link_early() is called before the boot
+ * burst; s3_link_start() reuses its answer rather than re-reading. */
+static int s3_link_early_role = -1;
+
+static int s3_link_early(void)
+{
+    s3_link_early_role = s3_role_of(s3_link_read_strap());
+    return s3_link_early_role;
+}
+
 static int s3_link_start(void)
 {
     uart_config_t cfg = {
@@ -115,7 +132,8 @@ static int s3_link_start(void)
         .source_clk = UART_SCLK_DEFAULT,
     };
     memset(&LINK, 0, sizeof LINK);
-    LINK.role = s3_role_of(s3_link_read_strap());
+    LINK.role = (s3_link_early_role >= 0) ? s3_link_early_role
+                                          : s3_role_of(s3_link_read_strap());
     LINK.cfg  = s3_role_config(LINK.role);
     LINK.hs   = S3_HS_NO_PEER;
 

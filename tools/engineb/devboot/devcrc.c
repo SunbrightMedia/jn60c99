@@ -58,9 +58,9 @@ int main(int argc, char **argv)
     unsigned char *tpl;
     long bootn, bankn, tpln;
     unsigned nv = 8;
-    int p, i, bad = 0;
+    int p, i, vb, bad = 0;
     unsigned long miss_total = 0;
-    uint32_t rcc[EB_BANK_COUNT], mcc[EB_BANK_COUNT];
+    uint32_t rcc[2][EB_BANK_COUNT], mcc[2][EB_BANK_COUNT];
     unsigned long missp[EB_BANK_COUNT];
     const char *e = getenv("DEVCRC_NV");
 
@@ -107,6 +107,17 @@ int main(int argc, char **argv)
     printf("        sizeof eb_render_coefs %u  eb_master_coef %u\n",
            (unsigned)sizeof(eb_render_coefs), (unsigned)sizeof(eb_master_coef));
 
+    /* ⚑ O6/D3: THE ANSWER KEY EXISTS PER VOICE BASE, OR CHIP B MUTES ITSELF.
+     *
+     * eb_devseq_recall now deals CONDITION/UNISON scatter from the GLOBAL
+     * voice index (EB_DEVSEQ_VOICE_BASE). Those cells feed the coefficient
+     * build, so the same patch produces DIFFERENT coefficients at base 0 and
+     * base 3 -- correctly. A single base-0 key would therefore read chip B's
+     * CORRECT recall as a CRC MISMATCH and mute it: the protection against
+     * wrong coefficients would fire on right ones. So the key is computed at
+     * BOTH bases by the same sequence, and the board selects by its role. */
+    for (vb = 0; vb < 2; ++vb) {
+    EB_DEVSEQ_VOICE_BASE = vb ? 3 : 0;
     for (p = 0; p < EB_BANK_COUNT; ++p) {
         ebdev_reset_counters();
         if (eb_devseq_boot_cells(boot, nv)) { fprintf(stderr, "boot load\n"); return 2; }
@@ -124,8 +135,8 @@ int main(int argc, char **argv)
         eb_master_state_seed((const unsigned char *)0, &MS);
         eb_render_events_mirror((unsigned char *)0, &RS);
 
-        rcc[p] = eb_devseq_crc32(&RC, sizeof RC);
-        mcc[p] = eb_devseq_crc32(&MC, sizeof MC);
+        rcc[vb][p] = eb_devseq_crc32(&RC, sizeof RC);
+        mcc[vb][p] = eb_devseq_crc32(&MC, sizeof MC);
         missp[p] = EBDEV_S.miss;
         miss_total += EBDEV_S.miss;
         if (EBDEV_S.miss) {
@@ -136,13 +147,28 @@ int main(int argc, char **argv)
             bad = 1;
         }
     }
+    }
+    EB_DEVSEQ_VOICE_BASE = 0;
 
     /* NON-VACUITY. If every patch produced the same CRC the table would be
      * decoration and the board's comparison would pass on a stuck recall. */
     {
-        int distinct = 0;
+        int distinct = 0, moved = 0;
         for (p = 1; p < EB_BANK_COUNT; ++p)
-            if (rcc[p] != rcc[0]) ++distinct;
+            if (rcc[0][p] != rcc[0][0]) ++distinct;
+        /* THE BASE'S OWN TOOTH: if base 3 produced the SAME key as base 0,
+         * EB_DEVSEQ_VOICE_BASE never reached the scatter and the two-chip
+         * fix is decorative. Seen to fail by reverting eb_devseq.c's _at
+         * calls: moved reads 0 and this generator refuses. */
+        for (p = 0; p < EB_BANK_COUNT; ++p)
+            if (rcc[1][p] != rcc[0][p]) ++moved;
+        printf("        base 3 changes the rc key on %d of %d patches\n",
+               moved, EB_BANK_COUNT);
+        if (moved == 0) {
+            printf("*** BASE 3 == BASE 0: the voice base never reached the "
+                   "scatter ***\n");
+            bad = 1;
+        }
         printf("        %d of %d patches differ from patch 0 (voice coefficients)\n",
                distinct, EB_BANK_COUNT - 1);
         if (distinct < EB_BANK_COUNT - 8) {
@@ -169,16 +195,21 @@ int main(int argc, char **argv)
     fprintf(f, "#define DEVCRC_PATCH_B  %d\n", EB_PATCH_BYTES);
     fprintf(f, "#define DEVCRC_RC_SZ    %uu\n", (unsigned)sizeof(eb_render_coefs));
     fprintf(f, "#define DEVCRC_MC_SZ    %uu\n", (unsigned)sizeof(eb_master_coef));
-    fprintf(f, "static const unsigned long devcrc_rc[DEVCRC_NPATCH] = {\n");
-    for (p = 0; p < EB_BANK_COUNT; ++p)
-        fprintf(f, "%s0x%08lxul", (p % 6) ? ", " : (p ? ",\n  " : "  "),
-                (unsigned long)rcc[p]);
-    fprintf(f, "\n};\n");
-    fprintf(f, "static const unsigned long devcrc_mc[DEVCRC_NPATCH] = {\n");
-    for (p = 0; p < EB_BANK_COUNT; ++p)
-        fprintf(f, "%s0x%08lxul", (p % 6) ? ", " : (p ? ",\n  " : "  "),
-                (unsigned long)mcc[p]);
-    fprintf(f, "\n};\n");
+    for (vb = 0; vb < 2; ++vb) {
+        fprintf(f, "static const unsigned long devcrc_rc%s[DEVCRC_NPATCH] = {\n",
+                vb ? "_b3" : "");
+        for (p = 0; p < EB_BANK_COUNT; ++p)
+            fprintf(f, "%s0x%08lxul", (p % 6) ? ", " : (p ? ",\n  " : "  "),
+                    (unsigned long)rcc[vb][p]);
+        fprintf(f, "\n};\n");
+        fprintf(f, "static const unsigned long devcrc_mc%s[DEVCRC_NPATCH] = {\n",
+                vb ? "_b3" : "");
+        for (p = 0; p < EB_BANK_COUNT; ++p)
+            fprintf(f, "%s0x%08lxul", (p % 6) ? ", " : (p ? ",\n  " : "  "),
+                    (unsigned long)mcc[vb][p]);
+        fprintf(f, "\n};\n");
+    }
+    fprintf(f, "/* O6/D3: select by EB_DEVSEQ_VOICE_BASE (0 -> plain, 3 -> _b3) */\n");
     fprintf(f, "static const unsigned long devcrc_miss[DEVCRC_NPATCH] = {\n");
     for (p = 0; p < EB_BANK_COUNT; ++p)
         fprintf(f, "%s%luul", (p % 10) ? ", " : (p ? ",\n  " : "  "), missp[p]);

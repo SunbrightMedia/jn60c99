@@ -70,6 +70,10 @@ int eb_devseq_install(unsigned char *bank, const unsigned char *tpl,
  * LFO tempo, in the gate's own order. `bpm` is the host tempo the arpeggiated
  * patches' LFO sync uses; the gate uses 128.0f. */
 void eb_devseq_recall(unsigned char *bank, float bpm);
+/* O6/D3: the GLOBAL index of this board's local voice 0. Set ONCE at boot from
+ * the strap-pin role (chip A = 0, chip B = 3) before the first recall; default
+ * 0 is the single-chip behaviour, byte-identical. See eb_devseq.c. */
+extern int EB_DEVSEQ_VOICE_BASE;
 
 /* Sound `n` notes. voice[i] is the VOICE INDEX -- this is deliberately not an
  * allocator. C4 owns the allocator; C3 owns proving that recall on the chip

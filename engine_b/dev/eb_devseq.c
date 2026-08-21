@@ -45,6 +45,24 @@ int eb_devseq_install(unsigned char *bank, const unsigned char *tpl,
     return eb_patch_install(bank + 23u, (const eb_patch *)patch_bytes);
 }
 
+/* ⚑ O6/D3: THE GLOBAL VOICE BASE, AND WHY IT IS A GLOBAL SET ONCE AT BOOT.
+ *
+ * CONDITION scatter and UNISON spread are per-voice DISTINCT; on two chips the
+ * table index must be the GLOBAL voice, or chip B repeats chip A's analog
+ * identities (the D3 defect -- silent, CRC-clean, audible only as a narrow
+ * chord; gate: tools/engineb/d3_voiceindex_gate.c).
+ *
+ * A global rather than a parameter because eb_devseq_recall has THREE call
+ * sites in the firmware (boot, burst, robot) plus the host gates, and a
+ * threaded parameter would have to be carried through every one -- each a
+ * chance to pass 0 at one site and 3 at another, which is the same defect one
+ * layer up. The base is a property of the BOARD (its strap pin), not of any
+ * call. It is set once, before the first recall, and never changes.
+ *
+ * Default 0 = the single-chip behaviour, byte-identical to before: the host
+ * answer-key CRCs were generated at base 0 and still gate the base-0 build. */
+int EB_DEVSEQ_VOICE_BASE = 0;
+
 void eb_devseq_recall(unsigned char *bank, float bpm)
 {
     juno_bank_apply(DEVST, bank, 0);
@@ -53,8 +71,10 @@ void eb_devseq_recall(unsigned char *bank, float bpm)
      * rewrite is inside juno_driver_seed_voices under EB_DEVCELLS so a caller
      * cannot get a silent no-op. */
     juno_driver_seed_voices(DEVST);
-    juno_apply_unison_spread(DEVST, juno_bank_assign(bank, 0));
-    juno_apply_condition(DEVST, juno_bank_condition(bank, 0));
+    juno_apply_unison_spread_at(DEVST, juno_bank_assign(bank, 0),
+                                EB_DEVSEQ_VOICE_BASE);
+    juno_apply_condition_at(DEVST, juno_bank_condition(bank, 0),
+                            EB_DEVSEQ_VOICE_BASE);
     juno_apply_lfo_tempo(DEVST, juno_bank_lfo_rate_byte(bank, 0), bpm);
     /* THE RECALL-TIME STASH, and it is one field because that is all the note
      * path needs. gui/juno_bridge.c:361 keeps cell 592 (PORTAMENTO on/off) at

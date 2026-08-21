@@ -919,13 +919,19 @@ static int dev_burst_verify(int patch, int gate)
         unsigned long rc = eb_devseq_crc32(REC.rc[shadow], sizeof(eb_render_coefs));
         unsigned long mc = eb_devseq_crc32(REC.mc[shadow], sizeof(eb_master_coef));
         ++crc_checked;
-        if (rc != devcrc_rc[patch] || mc != devcrc_mc[patch]) {
+        /* O6/D3: the key is PER VOICE BASE. Chip B's recall correctly
+         * differs from chip A's on the scatter cells, so checking it against
+         * the base-0 key would mute a RIGHT recall. devcrc.c generates both
+         * and refuses if base 3 fails to move the key (seen to fail). */
+        const unsigned long *krc = EB_DEVSEQ_VOICE_BASE ? devcrc_rc_b3 : devcrc_rc;
+        const unsigned long *kmc = EB_DEVSEQ_VOICE_BASE ? devcrc_mc_b3 : devcrc_mc;
+        if (rc != krc[patch] || mc != kmc[patch]) {
             ++crc_bad;
             dev_last_bad_patch = (unsigned long)patch;
             printf("RECALL: *** CRC MISMATCH patch %d: chip rc=%08lx mc=%08lx | "
                    "host rc=%08lx mc=%08lx. THE CHIP'S RECALL DISAGREES WITH "
                    "THE HOST'S. No cycle figure from this run may be quoted. ***\n",
-                   patch, rc, mc, devcrc_rc[patch], devcrc_mc[patch]);
+                   patch, rc, mc, krc[patch], kmc[patch]);
             dev_mute_why = "the chip's coefficients disagree with the host's";
             return 1;
         }
@@ -3461,6 +3467,17 @@ void app_main(void)
      * that is correct by luck: an enum reordered later would silently boot the
      * machine mid-build, owning a shadow nobody built. */
     eb_pm_init(&PM);
+#if S3L_LINK
+    /* O6/D3: the strap decides the GLOBAL voice base BEFORE the first recall
+     * deals the scatter. An unstrapped board reads chip A, base 0 -- today's
+     * behaviour, byte-identical. */
+    {   int r = s3_link_early();
+        EB_DEVSEQ_VOICE_BASE = s3_role_config(r).voice_base;
+        printf("LINK: strap read EARLY -> chip %c, GLOBAL voice base %d "
+               "(before the boot recall, so the scatter is dealt right the "
+               "first time)\n", 'A' + r, EB_DEVSEQ_VOICE_BASE);
+    }
+#endif
     if (dev_burst(dev_patch, 0)) {
         dev_muted = 1;
         printf("MUTE AT BOOT: %s. The engine is started anyway so the counters "
@@ -4020,7 +4037,8 @@ void app_main(void)
          * BOARDS RUNNING DIFFERENT BUILDS. devcrc_rc/mc are generated per
          * build, so a stale image on one board changes this number and the
          * handshake says SAME PATCH, DIFFERENT COEFFICIENTS. */
-        s3_link_poll(dev_patch, devcrc_rc[dev_patch] ^ devcrc_mc[dev_patch]);
+        s3_link_poll(dev_patch, (EB_DEVSEQ_VOICE_BASE ? devcrc_rc_b3[dev_patch] ^ devcrc_mc_b3[dev_patch]
+                                              : devcrc_rc[dev_patch] ^ devcrc_mc[dev_patch]));
 #endif
         busy_us += (unsigned long)(esp_timer_get_time() - t0);
         eng_us  += (unsigned long)te;
