@@ -18,7 +18,7 @@
  *       A GPIO 17  DIN   <----------------  B GPIO 17   (B drives, A listens)
  *       A GND            <--------------->  B GND
  *
- *   CONTROL     chip A  UART1 TX/RX     <-> chip B  UART1 RX/TX
+ *   CONTROL     chip A  UART2 TX/RX     <-> chip B  UART2 RX/TX
  *
  *       A GPIO  8  TX    ---------------->  B GPIO  9  RX
  *       A GPIO  9  RX    <----------------  B GPIO  8  TX
@@ -108,6 +108,48 @@ static s3_link_cfg s3_link_config(int role)
     c.data_dir       = (role == S3_ROLE_A) ? S3_DIR_IN  : S3_DIR_OUT;
     c.uses_dac       = (role == S3_ROLE_A);
     return c;
+}
+
+/* ---- D2: the wire frame --------------------------------------------------
+ *
+ * Fixed length, magic-led, checksummed. Not text: a half-connected wire makes
+ * framing garbage, and a text parser will happily read a plausible number out
+ * of noise. FIXED-WIDTH TYPES ONLY: the first draft used `unsigned long`,
+ * which is 4 bytes on the S3 and 8 on the host -- so the host gate would have
+ * gated a DIFFERENT LAYOUT than the wire carries.
+ *
+ * ⚠ THE CHECKSUM COVERS offsetof(sum), NOT sizeof-2. The first draft summed
+ * sizeof-2 bytes; tail padding put the sum field INSIDE that range, so the
+ * sender (sum bytes still zero) and the receiver (sum bytes filled) computed
+ * different values and EVERY frame was rejected. Two perfectly wired boards
+ * would have reported NO PEER forever -- a detector wrong in the direction
+ * that discards good input, on the exact build meant to prove the wire.
+ * Playbook 75. The codec gate corrupts every byte and also round-trips a
+ * clean frame, so both directions of that failure are now toothed. */
+#include <stdint.h>
+#include <stddef.h>
+
+#define S3_LINK_MAGIC0 0x4Au   /* 'J' */
+#define S3_LINK_MAGIC1 0x36u   /* '6' */
+
+typedef struct {
+    uint8_t  m0, m1;
+    uint8_t  role;
+    uint8_t  voice_base;
+    uint8_t  voices;
+    uint8_t  pad;
+    uint16_t patch;
+    uint32_t crc;      /* the coefficient CRC -- the field that matters */
+    uint16_t sum;      /* frame checksum; MUST stay the LAST field      */
+} s3_link_frame;
+
+static uint16_t s3_link_sum(const s3_link_frame *f)
+{
+    const uint8_t *p = (const uint8_t *)f;
+    uint16_t s = 0; size_t i;
+    for (i = 0; i < offsetof(s3_link_frame, sum); ++i)
+        s = (uint16_t)(s + p[i] * 31u + 7u);
+    return s;
 }
 
 /* ---- D2: the handshake ---------------------------------------------------

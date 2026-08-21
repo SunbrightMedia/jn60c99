@@ -43,33 +43,6 @@
 #define LINK_UART   UART_NUM_2
 #define LINK_BAUD   115200
 
-/* ---- the frame ----------------------------------------------------------
- * Fixed length, magic-led, checksummed. Not a text protocol: a half-connected
- * wire produces framing garbage, and a text parser would happily read a
- * plausible number out of noise. */
-#define LINK_MAGIC0 0x4Au   /* 'J' */
-#define LINK_MAGIC1 0x36u   /* '6' */
-
-typedef struct {
-    unsigned char  m0, m1;
-    unsigned char  role;
-    unsigned char  voice_base;
-    unsigned char  voices;
-    unsigned char  pad;
-    unsigned short patch;
-    unsigned long  crc;      /* the coefficient CRC -- the field that matters */
-    unsigned short sum;      /* frame checksum                               */
-} s3_link_frame;
-
-static unsigned short s3_link_sum(const s3_link_frame *f)
-{
-    const unsigned char *p = (const unsigned char *)f;
-    unsigned short s = 0; size_t i;
-    for (i = 0; i < sizeof(s3_link_frame) - sizeof(unsigned short); ++i)
-        s = (unsigned short)(s + p[i] * 31u + 7u);
-    return s;
-}
-
 /* ---- state --------------------------------------------------------------- */
 typedef struct {
     int            started;
@@ -178,7 +151,7 @@ static void s3_link_poll(int my_patch, unsigned long my_crc)
     if (now - LINK.last_tx_us > 100000) {
         s3_link_frame f;
         memset(&f, 0, sizeof f);
-        f.m0 = LINK_MAGIC0; f.m1 = LINK_MAGIC1;
+        f.m0 = S3_LINK_MAGIC0; f.m1 = S3_LINK_MAGIC1;
         f.role       = (unsigned char)LINK.role;
         f.voice_base = (unsigned char)LINK.cfg.voice_base;
         f.voices     = (unsigned char)LINK.cfg.voices;
@@ -197,7 +170,7 @@ static void s3_link_poll(int my_patch, unsigned long my_crc)
     if (n > 0) LINK.rxn += n;
     while (LINK.rxn >= (int)sizeof(s3_link_frame)) {
         s3_link_frame f;
-        if (LINK.rx[0] != LINK_MAGIC0 || LINK.rx[1] != LINK_MAGIC1) {
+        if (LINK.rx[0] != S3_LINK_MAGIC0 || LINK.rx[1] != S3_LINK_MAGIC1) {
             memmove(LINK.rx, LINK.rx + 1, (size_t)(--LINK.rxn));
             ++LINK.bad;
             continue;

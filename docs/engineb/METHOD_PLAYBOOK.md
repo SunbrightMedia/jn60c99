@@ -1318,3 +1318,46 @@ The gate suite still read ALL GREEN, because the gates ran against the restored
 file. Green did not mean the tree was sound. That is the session's shape once
 more (67, 69, 70, 72, 73): the report was about something other than the
 artefact in hand.
+
+## 75. The checksum that covered itself — a detector wrong in the direction that rejects good input
+
+**Caught in review, 2026-08-21, AFTER the build had been sent to the user.**
+The two-chip link frame ended in its checksum:
+
+    typedef struct { ...six bytes... ; uint16 patch; ulong crc; uint16 sum; }
+    for (i = 0; i < sizeof(frame) - sizeof(sum); ++i)  /* <- the defect */
+
+Struct tail padding made `sizeof - 2` LARGER than `offsetof(sum)`, so the
+summed range included the `sum` field itself. The sender computes the checksum
+while the field is still zero; the receiver computes it over the filled field.
+**Every frame is rejected. Two perfectly wired boards report NO PEER forever**
+— on the exact build whose purpose was to prove the wire. The bench diagnosis
+would have read "bad wiring", and the wiring would have been fine.
+
+A second defect in the same struct: `unsigned long` is 4 bytes on the S3 and 8
+on the host, so a host gate would have gated a DIFFERENT LAYOUT than the wire
+carries — a gate aimed beside its subject (the 70/72/73 species again).
+
+### The rules
+
+1. **A trailing checksum covers `offsetof(sum)` bytes, never `sizeof - N`.**
+   Padding makes the two differ, and the difference puts the checksum inside
+   its own coverage.
+2. **Wire structs use fixed-width types only.** `long` across host and target
+   is two layouts with one name.
+3. **A codec's FIRST gate case is the clean round trip.** Corruption tests
+   check rejection; the shipped defect was in ACCEPTANCE, and a suite of
+   corruption tests alone would have stayed green while every good frame died.
+   Both directions are toothed now (d1_link_gate tooth 4 re-computes the old
+   sizeof-2 checksum and requires the round trip to fail).
+4. Protocol code written for hardware that does not exist yet gets its codec
+   executed on the host BEFORE the image ships, not after. The direction
+   table and handshake were gated; the byte-level codec was not — the gap was
+   exactly the ungated layer.
+
+### Why review caught it and no gate did
+
+The frame codec lived in the ESP-only header, out of reach of the host gates,
+and nothing on a desk can run a UART. The fix moved the codec into the
+portable header where d1_link_gate executes it. The lesson is 74's, restated
+for protocols: gate every layer you CAN before touching the layer you cannot.

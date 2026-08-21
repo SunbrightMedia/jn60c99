@@ -9,6 +9,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "s3_link.h"
 
 static int fails;
@@ -86,6 +87,46 @@ int main(int argc, char **argv)
     { s3_peer p = pB; p.voice_base = 0;
       ck(s3_handshake_check(&RA,7,CRC,&p) == S3_HS_BASE_OVERLAP,
          "overlapping global voice ranges is caught (the D3 species)"); }
+
+    /* ---- D2: the wire codec ------------------------------------------- */
+    printf("\n=== O6/D2 WIRE CODEC ===\n");
+    {
+        s3_link_frame f;
+        size_t i;
+        int allrej = 1;
+        memset(&f, 0, sizeof f);
+        f.m0 = S3_LINK_MAGIC0; f.m1 = S3_LINK_MAGIC1;
+        f.role = S3_ROLE_B; f.voice_base = 3; f.voices = 3;
+        f.patch = 7; f.crc = 0xABCD1234u;
+        f.sum = s3_link_sum(&f);
+        /* THE CASE THE FIRST SHIPPED BUILD FAILED: a clean frame, sender and
+         * receiver computing the same checksum. sizeof-2 coverage put the sum
+         * field inside its own range and rejected every frame (playbook 75). */
+        ck(f.sum == s3_link_sum(&f),
+           "a CLEAN frame verifies (the case the first build failed)");
+        ck(offsetof(s3_link_frame, sum) + sizeof(uint16_t)
+               <= sizeof(s3_link_frame) &&
+           offsetof(s3_link_frame, sum) >= sizeof(s3_link_frame) - 4,
+           "sum is the last field and outside its own coverage");
+        /* every COVERED byte, corrupted, must be caught */
+        for (i = 0; i < offsetof(s3_link_frame, sum); ++i) {
+            s3_link_frame g = f;
+            ((uint8_t *)&g)[i] ^= 0x5A;
+            if (g.sum == s3_link_sum(&g)) allrej = 0;
+        }
+        ck(allrej, "every covered byte, corrupted, is rejected");
+        ck(sizeof(f.crc) == 4 && sizeof(f.patch) == 2,
+           "fixed-width fields: the host gates the layout the WIRE carries");
+        if (t == 4) {
+            /* THE TOOTH: recompute the checksum the way the first build did
+             * -- over sizeof-2 bytes -- and require the round trip to FAIL,
+             * proving this gate would have caught that build. */
+            uint16_t bad = 0; const uint8_t *p = (const uint8_t *)&f;
+            for (i = 0; i < sizeof(s3_link_frame) - 2; ++i)
+                bad = (uint16_t)(bad + p[i] * 31u + 7u);
+            ck(f.sum == bad, "TOOTH 4: the sizeof-2 checksum round-trips");
+        }
+    }
 
     printf("\n%s\n", fails ? "D1/D2 LOGIC: RED" : "D1/D2 LOGIC: GREEN");
     printf("⚠ NO WIRE EXISTS. Pins, peripherals and the UART are UNPROVEN.\n");
