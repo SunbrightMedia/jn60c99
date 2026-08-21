@@ -134,6 +134,21 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
   a SONIC change judged by the fork gate, on top of the 5.8 ms. b6 priced the
   latency and never the feedback. Today's S3L_FX_PIPE is legitimate because it
   moves the WHOLE chain, keeping the loop sample-deep inside.
+- O6 IN FLIGHT, no wire yet. D3 FIXED AND WIRED END TO END: juno_apply_*_at
+  (base = global voice of local slot 0), EB_DEVSEQ_VOICE_BASE set from the
+  strap BEFORE the boot recall, and the devcrc ANSWER KEY EXISTS PER BASE
+  (base-0 tables byte-identical; generator refuses if base 3 fails to move the
+  key -- seen to fail). D4 role-by-strap (GPIO 4; unstrapped = chip A = today's
+  board). D1/D2 gated as LOGIC: direction table (every wire exactly one
+  driver; A is link MASTER and RECEIVER), UART2 handshake (role, patch,
+  coefficient CRC, voice-range disjointness -- all six rejections toothed).
+  Gates: sh tools/engineb/o6_gates.sh. Wiring: docs/engineb/TWO_CHIP_WIRING.md
+  (6 wires + ground + 1 jumper; both boards get the SAME image). UNPROVEN
+  until wired: pins, peripherals, UART. Patch-follow + audio link = step 2,
+  deliberately deferred to the bench that can exercise them.
+- E3/E4 DONE AS WRITTEN: docs/PIPELINE.md (9 phases, every cited path exists);
+  tools/verify/dejuno_audit.py CLEAN with the 16 owed constants printed.
+  PROVEN only when the JX-3P traverses it (E5).
 - O4 DECISION PENDING, deliberately: the deficit was measured on the INTERIM
   1-chip 2-voice build. The shipping layout is 3 voices + FX per chip. Whether
   the 4 type-5 patches still miss THERE is unmeasured, and the two-chip link
