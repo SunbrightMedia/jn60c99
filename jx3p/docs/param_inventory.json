@@ -1,0 +1,2032 @@
+[
+ {
+  "section": "name0",
+  "name": "name",
+  "encoding": "int4x4",
+  "range": null,
+  "default": null
+ },
+ {
+  "section": "name0",
+  "name": "name",
+  "encoding": "stringNx4",
+  "range": null,
+  "default": "----------------"
+ },
+ {
+  "section": "ARP",
+  "name": "DUMMY",
+  "encoding": "int1x7",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "SCAT",
+  "name": "DUMMY",
+  "encoding": "int1x7",
+  "range": "0,9",
+  "default": "0"
+ },
+ {
+  "section": "SYS_COM",
+  "name": "Local SW",
+  "encoding": "int1x7",
+  "range": "0,2",
+  "default": "1"
+ },
+ {
+  "section": "SYS_COM",
+  "name": "Master Tune (SYSTEM-1)",
+  "encoding": "int1x7",
+  "range": "0,20",
+  "default": "10"
+ },
+ {
+  "section": "SYS_COM",
+  "name": "MASTER TUNE",
+  "encoding": "int2x4",
+  "range": "0,200",
+  "default": "100"
+ },
+ {
+  "section": "SYN_COM",
+  "name": "VOLUME",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "SYN_COM",
+  "name": "TRANSPOSE",
+  "encoding": "int1x7",
+  "range": "0,11",
+  "default": "0"
+ },
+ {
+  "section": "SYN_COM",
+  "name": "TEMPO",
+  "encoding": "int3x4",
+  "range": "0,2600",
+  "default": "880"
+ },
+ {
+  "section": "LFO",
+  "name": "LFO WAVEFORM",
+  "encoding": "int2x4",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "LFO",
+  "name": "LFO DELAY TIME",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "LFO",
+  "name": "LFO RATE",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "175"
+ },
+ {
+  "section": "LFO",
+  "name": "DCO LFO MOD",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "LFO",
+  "name": "VCF LFO MOD",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "LFO",
+  "name": "(LFO AMP DEPTH)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "LFO",
+  "name": "LFO KEY TRIG",
+  "encoding": "int2x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "OSC1",
+  "name": "DCO1 WAVEFORM",
+  "encoding": "int2x4",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "OSC1",
+  "name": "(OSC1 COLOR)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "OSC1",
+  "name": "DCO1 FREQ MOD",
+  "encoding": "int2x4",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "OSC1",
+  "name": "DCO1 RANGE",
+  "encoding": "int2x4",
+  "range": "0,5",
+  "default": "3"
+ },
+ {
+  "section": "OSC1",
+  "name": "(OSC1 CROSS MOD)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "OSC2",
+  "name": "DCO2 WAVEFORM",
+  "encoding": "int2x4",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "OSC2",
+  "name": "(OSC2 COLOR)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "OSC2",
+  "name": "DCO2 FREQ MOD",
+  "encoding": "int2x4",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "OSC2",
+  "name": "DCO2 RANGE",
+  "encoding": "int2x4",
+  "range": "0,5",
+  "default": "3"
+ },
+ {
+  "section": "OSC2",
+  "name": "DCO2 FINE TUNE",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "OSC2",
+  "name": "(RING)",
+  "encoding": "int2x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "OSC2",
+  "name": "DCO2 CROSS MOD",
+  "encoding": "int2x4",
+  "range": "0,2",
+  "default": "0"
+ },
+ {
+  "section": "OSC2",
+  "name": "DCO2 TUNE",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "MIX",
+  "name": "DCO1 LEVEL",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "MIX",
+  "name": "DCO2 LEVEL",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "MIX",
+  "name": "(MIX OSC3 / SUB OSC)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "MIX",
+  "name": "(MIX NOISE)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "MIX",
+  "name": "(MIX SUB OSC TYPE)",
+  "encoding": "int2x4",
+  "range": "0,3",
+  "default": "0"
+ },
+ {
+  "section": "MIX",
+  "name": "(MIX NOISE TYPE)",
+  "encoding": "int2x4",
+  "range": "0,3",
+  "default": "1"
+ },
+ {
+  "section": "PIT",
+  "name": "DCO ENV1 MOD",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PIT",
+  "name": "(PITCH ATTACK)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PIT",
+  "name": "(PITCH DECAY)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "FLT",
+  "name": "VCF CUTOFF FREQ",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "255"
+ },
+ {
+  "section": "FLT",
+  "name": "(FILTER LPF TYPE)",
+  "encoding": "int2x4",
+  "range": "0,3",
+  "default": "0"
+ },
+ {
+  "section": "FLT",
+  "name": "VCF RESONANCE",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "FLT",
+  "name": "HPF CUTOFF",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "FLT",
+  "name": "VCF ENV1 MOD",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "FLT",
+  "name": "ENV1 ATTACK",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "FLT",
+  "name": "ENV1 DECAY",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "FLT",
+  "name": "ENV1 SUSTAIN",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "255"
+ },
+ {
+  "section": "FLT",
+  "name": "ENV1 RELEASE",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "FLT",
+  "name": "VCF PITCH FOLLOW",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "AMP",
+  "name": "ENV2 ATTACK",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "AMP",
+  "name": "ENV2 DECAY",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "AMP",
+  "name": "ENV2 SUSTAIN",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "255"
+ },
+ {
+  "section": "AMP",
+  "name": "ENV2 RELEASE",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "AMP",
+  "name": "BRILLIANCE",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "EFX",
+  "name": "EFFECT LEVEL",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "EFX",
+  "name": "REVERB LEVEL",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "EFX",
+  "name": "DELAY LEVEL",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "EFX",
+  "name": "DELAY TIME",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "CTRL",
+  "name": "PORTAMENTO",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "CTRL",
+  "name": "LEGATO",
+  "encoding": "int2x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "CTRL",
+  "name": "ASSIGN MODE",
+  "encoding": "int2x4",
+  "range": "0,2",
+  "default": "0"
+ },
+ {
+  "section": "CTRL",
+  "name": "BEND RANGE",
+  "encoding": "int2x4",
+  "range": "0,23",
+  "default": "2"
+ },
+ {
+  "section": "CTRL",
+  "name": "(MOD ASIGN)",
+  "encoding": "int2x4",
+  "range": "0,127",
+  "default": "0"
+ },
+ {
+  "section": "CTRL",
+  "name": "TEMPO SYNC",
+  "encoding": "int2x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "EXTEND",
+  "name": "(MOD ID 1)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "EXTEND",
+  "name": "(MOD ID 2)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "EXTEND",
+  "name": "(MOD ID 3)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "EXTEND",
+  "name": "(MOD PRM 1)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "EXTEND",
+  "name": "(MOD PRM 2)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "EXTEND",
+  "name": "(MOD PRM 3)",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "EXTEND",
+  "name": "VCA LEVEL",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "EXTEND",
+  "name": "VCA LEVEL SW",
+  "encoding": "int2x4",
+  "range": "0,1",
+  "default": "1"
+ },
+ {
+  "section": "EXTEND",
+  "name": "(OSC1 EXTEND)",
+  "encoding": "int2x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "EXTEND",
+  "name": "(OSC2 EXTEND)",
+  "encoding": "int2x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 000-003",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 004-007",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 008-011",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 012-015",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 016-019",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 020-023",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 024-027",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 028-031",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 032-035",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 036-039",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 040-043",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 044-047",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 048-051",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 052-055",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 056-059",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME",
+  "name": "PATCH NAME 060-063",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "INPUT JACK USING",
+  "encoding": "int8x4",
+  "range": "0,65535",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "ARPEGGIO",
+  "encoding": "int8x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "ARPEGGIO TYPE",
+  "encoding": "int8x4",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "ARPEGGIO STEP",
+  "encoding": "int8x4",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "SCATTER TYPE",
+  "encoding": "int8x4",
+  "range": "0,9",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "SCATTER DEPTH",
+  "encoding": "int8x4",
+  "range": "-5,5",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "OCTAVE SHIFT",
+  "encoding": "int8x4",
+  "range": "-3,3",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "KEY HOLD",
+  "encoding": "int8x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "(LFO CV IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "(LFO RING IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "(LFO PITCH IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "(LFO FILTER IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "(LFO AMP IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "(OSC1 X-MOD IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "(OSC2 SYNC IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME1",
+  "name": "(OSC2 RING IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "(OSC3 EXT IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "(P ENV GATE IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "(PITCH ENV IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "(F ENV GATE IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "(FILTER ENV IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "(A ENV GATE IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "(AMP ENV IN)",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "LFO CV GAIN",
+  "encoding": "int8x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "(F ENV VARIATION)",
+  "encoding": "int8x4",
+  "range": "0,2",
+  "default": "1"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "VCA MODE",
+  "encoding": "int8x4",
+  "range": "0,2",
+  "default": "1"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "CONDITION",
+  "encoding": "int8x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "BEND GAIN",
+  "encoding": "int8x4",
+  "range": "0,3",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "BEND SENS DCO",
+  "encoding": "int8x4",
+  "range": "0,255",
+  "default": "255"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "BEND SENS VCF",
+  "encoding": "int8x4",
+  "range": "0,255",
+  "default": "255"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "MOD SENS DCO",
+  "encoding": "int8x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT_NAME2",
+  "name": "MOD SENS VCF",
+  "encoding": "int8x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "(LFO VARIATION)",
+  "encoding": "int8x4",
+  "range": "0,2",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "LFO TRIG ENV",
+  "encoding": "int8x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "(OSC1 VARIATION)",
+  "encoding": "int8x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "(OSC1 COARSE TUNE)",
+  "encoding": "int8x4",
+  "range": "0,22",
+  "default": "11"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "(OSC1 FINE TUNE)",
+  "encoding": "int8x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "(OSC2 VARIATION)",
+  "encoding": "int8x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "(OSC3 WAVEFORM)",
+  "encoding": "int8x4",
+  "range": "0,5",
+  "default": "1"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "(OSC3 COLOR)",
+  "encoding": "int8x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "(OSC3 TUNE)",
+  "encoding": "int8x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "(FILTER VARIATION)",
+  "encoding": "int8x4",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "(FILTER TYPE)",
+  "encoding": "int8x4",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "EFFECT TYPE",
+  "encoding": "int8x4",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "EFFECT TONE",
+  "encoding": "int8x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "DELAY TYPE",
+  "encoding": "int8x4",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "REVERB TYPE",
+  "encoding": "int8x4",
+  "range": "0,5",
+  "default": "2"
+ },
+ {
+  "section": "PAT_NAME3",
+  "name": "REVERB TIME",
+  "encoding": "int8x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT2_LFO",
+  "name": "LFO RATE H",
+  "encoding": "int8x4",
+  "range": "0,1065353216",
+  "default": "1060089776"
+ },
+ {
+  "section": "PAT2_FLT",
+  "name": "VCF VELOCITY SENS",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_FLT",
+  "name": "VCF CUTOFF FREQ H",
+  "encoding": "int8x4",
+  "range": "0,1065353216",
+  "default": "1065353216"
+ },
+ {
+  "section": "PAT2_AMP",
+  "name": "VCA VELOCITY SENS",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CTRL",
+  "name": "Patch Tempo",
+  "encoding": "int8x4",
+  "range": "0,2600",
+  "default": "800"
+ },
+ {
+  "section": "PAT2_DLY",
+  "name": "DELAY TAP TIME",
+  "encoding": "int1x7",
+  "range": "0,100",
+  "default": "50"
+ },
+ {
+  "section": "PAT2_DLY",
+  "name": "DELAY FEEDBACK",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "120"
+ },
+ {
+  "section": "PAT2_DLY",
+  "name": "DELAY HIGH CUT",
+  "encoding": "int1x7",
+  "range": "0,14",
+  "default": "7"
+ },
+ {
+  "section": "PAT2_DLY",
+  "name": "DELAY DIRECT LEVEL",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "255"
+ },
+ {
+  "section": "PAT2_DLY",
+  "name": "DELAY LF DAMP",
+  "encoding": "int8x4",
+  "range": "0,81",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_DLY",
+  "name": "DELAY LF DAMP FREQ",
+  "encoding": "int8x4",
+  "range": "0,10",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_DLY",
+  "name": "DELAY HF DAMP",
+  "encoding": "int8x4",
+  "range": "0,81",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_DLY",
+  "name": "DELAY HF DAMP FREQ",
+  "encoding": "int8x4",
+  "range": "0,13",
+  "default": "13"
+ },
+ {
+  "section": "PAT2_CHO",
+  "name": "CHORUS PRE DELAY",
+  "encoding": "int1x7",
+  "range": "0,80",
+  "default": "20"
+ },
+ {
+  "section": "PAT2_CHO",
+  "name": "CHORUS LOW CUT",
+  "encoding": "int1x7",
+  "range": "0,17",
+  "default": "2"
+ },
+ {
+  "section": "PAT2_CHO",
+  "name": "CHORUS HIGH CUT",
+  "encoding": "int1x7",
+  "range": "0,14",
+  "default": "13"
+ },
+ {
+  "section": "PAT2_CHO",
+  "name": "CHORUS_LFO SOURCE",
+  "encoding": "int1x7",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHO",
+  "name": "CHORUS LFO EXT GAIN",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "64"
+ },
+ {
+  "section": "PAT2_CHO",
+  "name": "CHORUS LFO EXT OFFSET",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT2_FL",
+  "name": "FLANGER MANUAL",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT2_FL",
+  "name": "FLANGER RESONANCE",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "230"
+ },
+ {
+  "section": "PAT2_FL",
+  "name": "FLANGER SEPARATIOIN",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT2_FL",
+  "name": "FLANGER LOW CUT",
+  "encoding": "int1x7",
+  "range": "0,17",
+  "default": "2"
+ },
+ {
+  "section": "PAT2_FL",
+  "name": "FLANGER LFO SOURCE",
+  "encoding": "int1x7",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_FL",
+  "name": "FLANGER LFO EXT GAIN",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "64"
+ },
+ {
+  "section": "PAT2_FL",
+  "name": "FLANGER LFO EXT OFFSET",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX TYPE",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX ASSIGN 1 TARGET",
+  "encoding": "int1x7",
+  "range": "0,15",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX ASSIGN 1 RANGE MIN",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX ASSIGN 1 RANGE MAX",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "255"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX ASSIGN 2 TARGET",
+  "encoding": "int1x7",
+  "range": "0,15",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX ASSIGN 2 RANGE MIN",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX ASSIGN 2 RANGE MAX",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "255"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX LFO SOURCE",
+  "encoding": "int1x7",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX LFO EXT GAIN",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "64"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX LFO EXT OFFSET",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 01",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 02",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 03",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 04",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 05",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 06",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 07",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 08",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 09",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 10",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 11",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 12",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 13",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 14",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 15",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_MFX",
+  "name": "MFX PARAMETER 16",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_REV",
+  "name": "REVERB PRE DELAY",
+  "encoding": "int1x7",
+  "range": "0,100",
+  "default": "20"
+ },
+ {
+  "section": "PAT2_REV",
+  "name": "REVERB LOW CUT",
+  "encoding": "int1x7",
+  "range": "0,17",
+  "default": "2"
+ },
+ {
+  "section": "PAT2_REV",
+  "name": "REVERB HIGH CUT",
+  "encoding": "int1x7",
+  "range": "0,14",
+  "default": "11"
+ },
+ {
+  "section": "PAT2_REV",
+  "name": "REVERB DENSITY",
+  "encoding": "int1x7",
+  "range": "0,10",
+  "default": "10"
+ },
+ {
+  "section": "PAT2_REV",
+  "name": "REVERB DIRECT LEVEL",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "255"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY SW",
+  "encoding": "int1x7",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Form",
+  "encoding": "int1x7",
+  "range": "0,10",
+  "default": "10"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 1)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "61"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 2)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "68"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 3)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "73"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 4)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 5)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 6)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 7)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 8)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 9)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 10)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 11)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 12)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 13)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 14)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 15)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT2_CHORD",
+  "name": "CHORD MEMORY Note (voice 16)",
+  "encoding": "int2x4",
+  "range": "0,128",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_COM",
+  "name": "STEP SEQ LENGTH",
+  "encoding": "int1x7",
+  "range": "0,63",
+  "default": "15"
+ },
+ {
+  "section": "PAT3_SEQ_COM",
+  "name": "STEP SEQ FIRST STEP",
+  "encoding": "int1x7",
+  "range": "0,63",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_COM",
+  "name": "STEP SEQ LAST STEP",
+  "encoding": "int1x7",
+  "range": "0,63",
+  "default": "15"
+ },
+ {
+  "section": "PAT3_SEQ_COM",
+  "name": "STEP SEQ SCALE",
+  "encoding": "int1x7",
+  "range": "0,5",
+  "default": "1"
+ },
+ {
+  "section": "PAT3_SEQ_COM",
+  "name": "STEP SEQ PLAY MODE",
+  "encoding": "int1x7",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_COM",
+  "name": "STEP SEQ GATE RATIO",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT3_SEQ_COM",
+  "name": "STEP SEQ SHUFFLE",
+  "encoding": "int2x4",
+  "range": "0,255",
+  "default": "128"
+ },
+ {
+  "section": "PAT3_SEQ_COM",
+  "name": "STEP SEQ SMOOTH",
+  "encoding": "int1x7",
+  "range": "0,2",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_COM",
+  "name": "DUMMY1",
+  "encoding": "int1x7",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_COM",
+  "name": "DUMMY2",
+  "encoding": "int1x7",
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Note (voice 1)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "36"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Note (voice 2)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "36"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Note (voice 3)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "36"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Note (voice 4)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "36"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Note (voice 5)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "36"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Note (voice 6)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "36"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Note (voice 7)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "36"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Note (voice 8)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "36"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Velo (voice 1)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Velo (voice 2)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Velo (voice 3)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Velo (voice 4)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Velo (voice 5)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Velo (voice 6)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Velo (voice 7)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Velo (voice 8)",
+  "encoding": "int1x7",
+  "range": "0,127",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Gate (voice 1)",
+  "encoding": "int1x7",
+  "range": "0,99",
+  "default": "49"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Gate (voice 2)",
+  "encoding": "int1x7",
+  "range": "0,99",
+  "default": "49"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Gate (voice 3)",
+  "encoding": "int1x7",
+  "range": "0,99",
+  "default": "49"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Gate (voice 4)",
+  "encoding": "int1x7",
+  "range": "0,99",
+  "default": "49"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Gate (voice 5)",
+  "encoding": "int1x7",
+  "range": "0,99",
+  "default": "49"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Gate (voice 6)",
+  "encoding": "int1x7",
+  "range": "0,99",
+  "default": "49"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Gate (voice 7)",
+  "encoding": "int1x7",
+  "range": "0,99",
+  "default": "49"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Gate (voice 8)",
+  "encoding": "int1x7",
+  "range": "0,99",
+  "default": "49"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Note Flag",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Slide Flag",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Mute Flag",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 1 Target",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 2 Target",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 3 Target",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 4 Target",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 1 Value",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 2 Value",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 3 Value",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 4 Value",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 1 Transient",
+  "encoding": "int1x7",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 2 Transient",
+  "encoding": "int1x7",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 3 Transient",
+  "encoding": "int1x7",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign 4 Transient",
+  "encoding": "int1x7",
+  "range": "0,5",
+  "default": "0"
+ },
+ {
+  "section": "PAT3_SEQ_STEP0",
+  "name": "STEP SEQ Assign Flag",
+  "encoding": "int8x4",
+  "range": "0,2147483647",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "mode",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "ccAssign",
+  "encoding": null,
+  "range": "0,1",
+  "default": "1"
+ },
+ {
+  "section": "vs",
+  "name": "panelPatch",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "panelSize",
+  "encoding": null,
+  "range": "0,1",
+  "default": "1"
+ },
+ {
+  "section": "vs",
+  "name": "patchManager",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "patchListMain",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "patchListSub",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "activation",
+  "encoding": null,
+  "range": "0,2",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "mainZoom",
+  "encoding": "int4x4",
+  "range": "25,200",
+  "default": "62"
+ },
+ {
+  "section": "vs",
+  "name": "dm",
+  "encoding": null,
+  "range": "0,127",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "velSense",
+  "encoding": null,
+  "range": "0,1",
+  "default": "1"
+ },
+ {
+  "section": "vs",
+  "name": "voiceCount",
+  "encoding": null,
+  "range": "2,8",
+  "default": "6"
+ },
+ {
+  "section": "vs",
+  "name": "quality",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "bankId",
+  "encoding": "int4x4",
+  "range": "0,65535",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "patchId",
+  "encoding": null,
+  "range": "0,63",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "sampleRate",
+  "encoding": null,
+  "range": "0,3",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "patchZoom",
+  "encoding": "int4x4",
+  "range": "25,200",
+  "default": "62"
+ },
+ {
+  "section": "vs",
+  "name": "setup",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "updateSetup",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "edit",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "writePatch",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "auth",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "updateAuth",
+  "encoding": null,
+  "range": "0,1",
+  "default": "0"
+ },
+ {
+  "section": "vs",
+  "name": "authDummy",
+  "encoding": "stringNx7",
+  "range": null,
+  "default": null
+ },
+ {
+  "section": "ks",
+  "name": "onVel",
+  "encoding": null,
+  "range": "0,127",
+  "default": "0"
+ },
+ {
+  "section": "ks",
+  "name": "offVel",
+  "encoding": null,
+  "range": "1,127",
+  "default": "64"
+ },
+ {
+  "section": "ks",
+  "name": "ch",
+  "encoding": null,
+  "range": "0,15",
+  "default": "0"
+ }
+]

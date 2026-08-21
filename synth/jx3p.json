@@ -1,0 +1,24 @@
+{
+  "_comment": "JX-3P per-synth config (E4/S0 form). KNOWN values are filled; DERIVED-IN-S2 values are null until the oracle + IDA dump land, and must not be guessed. The JUNO's are in synth/juno60.json.",
+  "name": "jx3p",
+  "truth_bank": "jx3p/truth/preset_bank_1.bin",
+  "rates": [44100, 48000, 96000],
+
+  "_bank_geometry": "KNOWN from S1: the JX bank is a byte-compatible container with the JUNO -- exactly 23 + 20223*64 = 1294295 bytes, names decode with juno_bank_patch_name.",
+  "bank_header": 23,
+  "bank_stride": 20223,
+  "patch_bytes": 134,
+  "npatch": 64,
+
+  "_patch_byte_layout": "DERIVED-IN-S2, not assumed. Script.xml gives the PARAMETER ADDRESS SPACE (page:offset SysEx-style), NOT the on-disk bank byte offsets. The JUNO proved these differ; the JX offsets (which byte is DELAY TYPE, etc.) come from perturb-and-diff under the oracle. Placeholders below stay null.",
+  "record_delay_type_offset": null,
+  "blob_condition_offset": null,
+
+  "_state_layout": "DERIVED-IN-S2 from the IDA dump: the flat per-object state stride, voice cells, scatter cells. The JX has TWO DCOs (DCO1+DCO2 with cross-mod) where the JUNO had one, so the voice state is larger -- do not copy the JUNO's stride.",
+  "voice_stride": null,
+  "scatter_cells": null,
+  "rings": null,
+
+  "_param_surface": "KNOWN from Script.xml: 290 parameters, 43 audible. Full inventory in jx3p/docs/param_inventory.json. Encoding is int2x4 nibble-pair dominant, as JUNO. ASSIGN MODE range 0,2 (UNISON at 2). CONDITION range 0,255 default 128.",
+  "param_inventory": "jx3p/docs/param_inventory.json"
+}
