@@ -60,10 +60,14 @@ RINGS_E5 = [(101024, 101028, 96928)]
 
 RINGS_T1 = [(6395248, 6395252, 4298096)]
 
-RINGS_T5 = [(8594768,  8594772,  6497616),
-            (10691936, 10691940, 8594784),
-            (10726256, 10726260, 10693488),
-            (10759040, 10759044, 10726272)]
+# JUNO-BOUND: every RINGS_* triple below is this plugin's ring geometry, read
+# off master_render.c's write expressions. NEXT SYNTH: these tables are the
+# per-synth INPUT to this tool -- move them to a config the port supplies, as
+# E4 requires; the transform logic itself carries no JUNO number.
+RINGS_T5 = [(8594768,  8594772,  6497616),    # JUNO-BOUND: t5 ring geometry
+            (10691936, 10691940, 8594784),    # JUNO-BOUND: t5 ring geometry
+            (10726256, 10726260, 10693488),   # JUNO-BOUND: t5 ring geometry
+            (10759040, 10759044, 10726272)]   # JUNO-BOUND: t5 ring geometry
 
 
 def classify(lo, hi):

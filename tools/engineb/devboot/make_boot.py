@@ -111,9 +111,13 @@ def main():
                          'The firmware carries a compile-time assert on '
                          'DEVCRC_RC_SZ that catches exactly this.')
     ap.add_argument('--no-copy', action='store_true')
+    ap.add_argument('--bank', default=os.path.join(REPO, 'truth',
+                    'presetbankog1.bin'),   # JUNO-BOUND: default only; the
+                    # JX-3P run passes its own bank here (END_GOAL item 7)
+                    help='preset bank to bake from')
     a = ap.parse_args()
     os.makedirs(BUILD, exist_ok=True)
-    bank = os.path.join(REPO, 'truth', 'presetbankog1.bin')
+    bank = a.bank
     if not os.path.exists(bank):
         sys.exit('no bank at ' + bank)
     bad = 0
