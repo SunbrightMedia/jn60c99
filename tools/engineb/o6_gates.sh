@@ -47,7 +47,7 @@ printf '\n======== O6/D1+D2 link table + handshake (20 checks, 3 teeth) ========
 cc -std=c99 -O1 -Wall -Wextra -Wno-unused-function -I "$REPO/esp32s3/main" \
    -o "$REPO/build/d1gate" "$HERE/d1_link_gate.c"
 "$REPO/build/d1gate" | tail -3 || fails=$((fails+1))
-for t in 1 2 3 4 5 6 7; do
+for t in 1 2 3 4 5 6 7 8 9; do
     if "$REPO/build/d1gate" "$t" >/dev/null 2>&1; then
         printf '   tooth %s NOT CAUGHT\n' "$t"; fails=$((fails+1))
     else

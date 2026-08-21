@@ -107,6 +107,48 @@ int main(int argc, char **argv)
     ck(s3_follow_holds_stepper(S3_ROLE_A, 1, S3_ROLE_B) == 0,
        "A's stepper is never held");
 
+    /* ---- step 2: the audio-mix gate (chip A) --------------------------- */
+    printf("\n=== O6 STEP 2: A's MIX GATE + B's PACING ===\n");
+    {
+        s3_amix m = {0, 0};
+        int i, open = 0;
+        /* garbage on a floating wire: chunks arrive, none ever CRC-matches */
+        for (i = 0; i < 100; ++i) open = s3_amix_step(&m, 1, 1, 0, 0);
+        ck(!open, "100 unverified chunks NEVER open the mix (floating wire)");
+        open = s3_amix_step(&m, 1, 1, 1, 0);
+        ck(!open, "one CRC match is not enough (needs a streak)");
+        s3_amix_step(&m, 1, 1, 1, 0);
+        open = s3_amix_step(&m, 1, 1, 1, 0);
+        ck(open == (t == 5 + 3 ? 0 : 1), "three consecutive matches OPEN the mix");
+        open = s3_amix_step(&m, 1, 1, 0, 0);
+        ck(open, "no event between UART frames HOLDS the open mix");
+        open = s3_amix_step(&m, 1, 1, 0, 1);
+        ck(!open, "ONE mismatch closes it (closing late = audible garbage)");
+        for (i = 0; i < 3; ++i) open = s3_amix_step(&m, 1, 1, 1, 0);
+        ck(open, "it re-opens after a fresh streak");
+        open = s3_amix_step(&m, 0, 1, 1, 0);
+        ck(!open, "a dead handshake closes the mix");
+        { s3_amix z = {0,0}; int o2 = 0;
+          for (i = 0; i < 3; ++i) o2 = s3_amix_step(&z, 1, 0, 1, 0);
+          ck(!o2, "matches without received chunks cannot open it (starved)"); }
+    }
+    {
+        int st = S3_BPACE_FREERUN;
+        st = s3_bpace_step(st, S3_ROLE_B, 0, 0);
+        ck(st == S3_BPACE_FREERUN, "B with no handshake stays on its own crystal");
+        st = s3_bpace_step(st, S3_ROLE_B, 1, 0);
+        ck(st == S3_BPACE_LINKED, "a healthy handshake moves B onto A's clock");
+        st = s3_bpace_step(st, S3_ROLE_B, 1, 1);
+        ck(st == (t == 9 ? S3_BPACE_LINKED : S3_BPACE_FREERUN),
+           "a TX timeout (A's clock gone) drops B back to its own crystal\n"
+           "         -- blocking on a clockless slave write would hang the loop");
+        ck(s3_bpace_step(S3_BPACE_FREERUN, S3_ROLE_A, 1, 0) == S3_BPACE_FREERUN,
+           "A NEVER re-paces: it owns the only oscillator");
+        ck(S3_LA_INJ0 != S3_LA_TAP0 && S3_LA_INJ1 != S3_LA_TAP1 &&
+           S3_LA_INJ0 != S3_LA_TAP1 && S3_LA_INJ1 != S3_LA_TAP0,
+           "A's injection slots never collide with its own sounding voices");
+    }
+
     /* ---- D2: the wire codec ------------------------------------------- */
     printf("\n=== O6/D2 WIRE CODEC ===\n");
     {

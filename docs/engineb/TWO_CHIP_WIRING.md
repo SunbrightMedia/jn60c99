@@ -105,6 +105,27 @@ The firmware brings the link up **before** it makes any sound, and reports:
 Any failure is printed by name and the instrument stays silent rather than
 playing half a chord. The failure names are in `s3_link.h`.
 
+## Step 2 is IN this image: the audio link
+
+The same build now carries the audio link. Nothing to re-flash later:
+
+1. The control handshake settles to `hs=OK` (step 1).
+2. Chip B moves onto A's clock: its report line changes to
+   `LKA: pace=LINKED(A's clock)`.
+3. Chip B advertises a CRC of each audio chunk it sends **over the control
+   wire**; chip A CRCs what the audio wire delivered and compares. One channel
+   proves the other.
+4. After three consecutive matches, chip A's report shows `LKA: mix=OPEN` —
+   and only then do B's voices reach the output. Until that moment the mix is
+   closed and chip A sounds exactly like a lone board. A floating or
+   mis-wired audio line can never reach the speaker: unverified bytes are
+   dropped by construction.
+
+So the audio path diagnoses itself the same way the handshake does:
+`mix=closed, crc bad=` counting up means the audio wires (15/16/17) are wrong
+while the control pair (8/9) is fine — the split that tells you which wire to
+reseat.
+
 ## What is proven and what is not
 
 **Proven on a workstation** (`sh tools/engineb/o6_gates.sh`): the role table,

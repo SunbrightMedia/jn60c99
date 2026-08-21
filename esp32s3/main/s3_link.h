@@ -139,8 +139,15 @@ typedef struct {
     uint8_t  voices;
     uint8_t  pad;
     uint16_t patch;
-    uint32_t crc;      /* the coefficient CRC -- the field that matters */
-    uint16_t sum;      /* frame checksum; MUST stay the LAST field      */
+    uint32_t crc;      /* the build fingerprint -- see the handshake note */
+    /* O6 step 2: the AUDIO WIRE'S OWN PROOF. B advertises the CRC32 of the
+     * most recent NON-SILENT audio chunk it queued on the I2S link, plus that
+     * chunk's index. A CRCs what it receives and compares. Chip A's link RX
+     * is a MASTER clock reading a wire that may be floating, so THE INVARIANT
+     * forbids mixing a single byte before this matches -- see s3_amix below. */
+    uint32_t acrc;     /* CRC32 of B's last non-silent queued audio chunk   */
+    uint32_t ablk;     /* that chunk's index on B (informational)           */
+    uint16_t sum;      /* frame checksum; MUST stay the LAST field          */
 } s3_link_frame;
 
 static uint16_t s3_link_sum(const s3_link_frame *f)
@@ -244,6 +251,78 @@ static const char *s3_handshake_name(int hs)
     case S3_HS_BASE_OVERLAP:  return "GLOBAL VOICE RANGES OVERLAP -- a voice is duplicated";
     default:                  return "?";
     }
+}
+
+/* ==========================================================================
+ * O6 STEP 2 -- THE AUDIO LINK'S TWO STATE MACHINES, PURE AND HOST-GATED
+ * ==========================================================================
+ *
+ * THE CONTRACT, from measurement (b: all four master input pair gains read
+ * EXACTLY 1.0 on all 64 patches, so voice placement in the pair mixer is
+ * free): chip B sends its two rendered voices raw -- slot 0 = local voice 6,
+ * slot 1 = local voice 7, f32 bits in 32-bit I2S slots. Chip A injects them
+ * into voice slots 4 and 5 of the chunk it just rendered; its own sounding
+ * voices are 6 and 7, so the pairs stay exact: v18 = (B.v7 + B.v6) * 1.0 and
+ * v24 = (A.v7 + A.v6) * 1.0 -- the port's own association, unchanged. B's
+ * audio is one chunk late by DMA depth, the trade D1 priced and accepted.
+ */
+#define S3_LA_TAP0    6   /* B sends its local voice 6...                  */
+#define S3_LA_TAP1    7   /* ...and 7 (the allocator fills from 7 down)    */
+#define S3_LA_INJ0    4   /* A mixes them in at slots 4 and 5, which are   */
+#define S3_LA_INJ1    5   /* free on a 2-voice chip A build                */
+
+/* ---- chip A: WHEN MAY RECEIVED AUDIO REACH THE MIX? ----------------------
+ *
+ * A's link RX is the MASTER: it clocks the wire itself, so its DMA fills with
+ * SOMETHING even when B is absent, mis-wired, or slot-shifted -- a floating
+ * line, noise, or misaligned frames. Injecting that is broken audio, which
+ * THE INVARIANT forbids for any input. So the mix is CLOSED by default and
+ * opens only after proof: the CRC B advertises over the CONTROL wire matches
+ * a CRC A computed over AUDIO bytes it actually received. One channel proves
+ * the other. Silent chunks prove nothing (a grounded line also reads as
+ * zeros), so only NON-SILENT chunks may verify -- the caller enforces that by
+ * only offering non-silent CRCs to this machine.
+ *
+ * Opens after S3_AMIX_NEED consecutive matches; closes on ONE mismatch or on
+ * starvation or a dead handshake. Asymmetric on purpose: opening late costs
+ * a moment of 4-voice audio; closing late costs audible garbage. */
+enum { S3_AMIX_CLOSED = 0, S3_AMIX_OPEN = 1 };
+#define S3_AMIX_NEED 3
+
+typedef struct { int st; int streak; } s3_amix;
+
+static int s3_amix_step(s3_amix *m, int hs_ok, int got_chunk,
+                        int crc_match, int crc_mismatch)
+{
+    if (!hs_ok || !got_chunk) { m->st = S3_AMIX_CLOSED; m->streak = 0; }
+    else if (crc_mismatch)    { m->st = S3_AMIX_CLOSED; m->streak = 0; }
+    else if (crc_match) {
+        if (m->st == S3_AMIX_CLOSED && ++m->streak >= S3_AMIX_NEED)
+            m->st = S3_AMIX_OPEN;
+    }
+    /* no event: hold state -- an open mix does not close between UART frames */
+    return m->st == S3_AMIX_OPEN;
+}
+
+/* ---- chip B: WHAT PACES THE RENDER LOOP? ---------------------------------
+ *
+ * D1's core: ONE oscillator. Free-running, B paces on its own (unconnected)
+ * DAC write, as today. LINKED, it must pace on the slave TX that A clocks --
+ * otherwise the two crystals drift and the DMA slips a click every few
+ * minutes, which is exactly the failure D1's design makes impossible.
+ *
+ * FREERUN -> LINKED needs a healthy handshake. LINKED -> FREERUN on a TX
+ * timeout: A's clock is gone, and a slave write with no clock never drains,
+ * so blocking on it would hang B's whole loop -- B falls back to its own
+ * crystal and keeps rendering (INVARIANT: its audio path never stalls). */
+enum { S3_BPACE_FREERUN = 0, S3_BPACE_LINKED = 1 };
+
+static int s3_bpace_step(int st, int my_role, int hs_ok, int tx_timeout)
+{
+    if (my_role != S3_ROLE_B) return S3_BPACE_FREERUN;   /* A never re-paces */
+    if (st == S3_BPACE_LINKED)
+        return tx_timeout ? S3_BPACE_FREERUN : S3_BPACE_LINKED;
+    return hs_ok ? S3_BPACE_LINKED : S3_BPACE_FREERUN;
 }
 
 #endif /* JUNO_S3_LINK_H */

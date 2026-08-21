@@ -2955,6 +2955,10 @@ static volatile unsigned long rpt_miss_note = 0;
 static volatile unsigned long rpt_miss_step[BST_CHECK + 1];
 static volatile unsigned long rpt_health_n = 0;
 
+#if S3L_LINK
+static void s3_la_report(void);
+#endif
+
 static void rpt_task(void *arg)
 {
     (void)arg;
@@ -3121,6 +3125,7 @@ static void rpt_task(void *arg)
 #endif
 #if S3L_LINK
         s3_link_report();
+        s3_la_report();
 #endif
         printf("PARAM: edits=%lu builds=%lu defer=%lu unknown=%lu "
                "pubretry=%u apply=%lu applymax=%lu blocks=%u\n",
@@ -3149,6 +3154,12 @@ static void rpt_task(void *arg)
                , con_keys, dev_patch);
     }
 }
+
+#if S3L_LINK
+/* O6 step 2: the audio link. Included HERE, after SR/CHUNK/EB_NUM_VOICES
+ * exist -- it is plumbing over s3_link.h's host-gated decisions. */
+#include "s3_link_audio.h"
+#endif
 
 static i2s_chan_handle_t TX;
 
@@ -3546,6 +3557,13 @@ void app_main(void)
         printf("LINK: control UART would NOT start -- running single-board.\n");
     else
         s3_link_banner();
+    if (!s3_la_start(LINK.role))
+        printf("LINK: audio channel would NOT start -- control link only.\n");
+    else
+        printf("LINK: audio %s ready on BCLK %d LRCK %d DATA %d "
+               "(mix stays CLOSED until the wire is CRC-proven)\n",
+               LINK.role == S3_ROLE_A ? "master RX" : "slave TX",
+               S3_LINK_BCLK, S3_LINK_LRCK, S3_LINK_DATA);
 #endif
     printf("MIDI IN: UART1, 31250 baud, RX on GPIO %d.  velocity switch %s "
            "(%s)\n", S3L_MIDI_RX,
@@ -4062,7 +4080,21 @@ void app_main(void)
          * every correct pair, forever. Each chip's PLAYING bank is proven
          * locally by the per-base RECALL CRC check; the wire only proves
          * same build + same patch. */
-        s3_link_poll(dev_patch, devcrc_rc[dev_patch] ^ devcrc_mc[dev_patch]);
+        s3_link_poll(dev_patch, devcrc_rc[dev_patch] ^ devcrc_mc[dev_patch],
+                     LA.tx_crc, LA.tx_crc_blk);
+        /* O6 step 2, on the same block tail. The chunk in w_vbb[w_cur] is
+         * complete on both cores and untouched until the next flip, so this
+         * is the one window where B may tap it and A may inject into it.
+         * hs_ok gates everything; a lone board does nothing here. */
+        {   int hs_ok = LINK.peer.present && LINK.hs == S3_HS_OK;
+            if (LINK.role == S3_ROLE_A) {
+                s3_la_rx_inject(w_vbb[w_cur], CHUNK, hs_ok,
+                                LINK.peer_acrc, LINK.acrc_fresh);
+                LINK.acrc_fresh = 0;
+            } else {
+                s3_la_tx(w_vbb[w_cur], CHUNK, hs_ok);
+            }
+        }
 #endif
         busy_us += (unsigned long)(esp_timer_get_time() - t0);
         eng_us  += (unsigned long)te;
@@ -4125,7 +4157,17 @@ void app_main(void)
                 we = ESP_OK;
                 wrote = 0;
                 while (left) {
-                    we = i2s_channel_write(TX, wp, left, &n, portMAX_DELAY);
+                    /* O6 step 2: when chip B is LINKED, A's clock paces the
+                     * loop through the slave-TX write, and this DAC write (to
+                     * unconnected pins on B) must NOT also block -- two
+                     * pacemakers on two crystals is the drift D1 forbids. */
+                    we = i2s_channel_write(TX, wp, left, &n,
+#if S3L_LINK
+                                           (LA.up && LA.role == S3_ROLE_B &&
+                                            LA.pace == S3_BPACE_LINKED)
+                                               ? 0 :
+#endif
+                                           portMAX_DELAY);
                     if (we != ESP_OK) break;
                     if (n == 0) break;      /* no progress: do not spin */
                     wp += n; left -= n; wrote += n;

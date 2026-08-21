@@ -50,6 +50,10 @@ typedef struct {
     s3_role_cfg    cfg;
     s3_peer        peer;
     int            hs;            /* last s3_handshake_check result          */
+    uint32_t       peer_acrc;     /* B's advertised audio-chunk CRC          */
+    uint32_t       peer_ablk;
+    int            acrc_fresh;    /* set per received frame, consumed by the
+                                   * audio injection -- one compare per frame */
     int            said;          /* the verdict has been printed once       */
     unsigned long  sent, got, bad;
     int64_t        last_tx_us;
@@ -138,7 +142,8 @@ static void s3_link_banner(void)
 }
 
 /* Called once per block from the audio loop's tail. O(1), no allocation. */
-static void s3_link_poll(int my_patch, unsigned long my_crc)
+static void s3_link_poll(int my_patch, unsigned long my_crc,
+                         uint32_t my_acrc, uint32_t my_ablk)
 {
     int64_t now;
     int n;
@@ -156,7 +161,9 @@ static void s3_link_poll(int my_patch, unsigned long my_crc)
         f.voice_base = (unsigned char)LINK.cfg.voice_base;
         f.voices     = (unsigned char)LINK.cfg.voices;
         f.patch      = (unsigned short)my_patch;
-        f.crc        = my_crc;
+        f.crc        = (uint32_t)my_crc;
+        f.acrc       = my_acrc;
+        f.ablk       = my_ablk;
         f.sum        = s3_link_sum(&f);
         uart_write_bytes(LINK_UART, (const char *)&f, sizeof f);
         LINK.last_tx_us = now;
@@ -186,6 +193,12 @@ static void s3_link_poll(int my_patch, unsigned long my_crc)
         LINK.peer.voice_base = f.voice_base;
         LINK.peer.voices     = f.voices;
         LINK.peer.crc        = f.crc;
+        if (f.acrc != LINK.peer_acrc || f.ablk != LINK.peer_ablk) {
+            /* a NEW advertisement -- stale repeats must not re-verify */
+            LINK.peer_acrc  = f.acrc;
+            LINK.peer_ablk  = f.ablk;
+            LINK.acrc_fresh = 1;
+        }
         LINK.hs = s3_handshake_check(&LINK.cfg, my_patch, my_crc, &LINK.peer);
         if (!LINK.said) {
             LINK.said = 1;
