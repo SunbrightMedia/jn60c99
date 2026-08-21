@@ -90,8 +90,16 @@ The firmware brings the link up **before** it makes any sound, and reports:
 * which role each board decided it is, and from what pin level
 * whether a peer answered at all
 * whether the pair is valid (not two masters or two slaves)
-* whether both chips hold the same patch **and built the same coefficients**
-  (by CRC — matching patch numbers alone is not enough)
+* whether both chips run the **same build** and hold the same patch (by a
+  build fingerprint — matching patch numbers alone is not enough). Each chip
+  separately proves its own playing coefficients against its own answer key
+  and mutes itself on a mismatch, so the pair check plus the local checks
+  cover everything.
+* **chip A is the source of truth for the patch.** Chip B stops its own
+  4-second patch stepper the moment a valid peer appears and follows A's
+  patch instead. Expect `hs=PATCH INDEX DIFFERS` to flicker for a moment at
+  each patch change (B's rebuild takes a few blocks) and settle back to
+  `hs=OK`. A steady `OK` between changes is the pass criterion.
 * whether the two chips claim disjoint global voices
 
 Any failure is printed by name and the instrument stays silent rather than

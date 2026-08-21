@@ -4011,8 +4011,27 @@ void app_main(void)
              * the patch changes while the chord is held -- which is where the
              * publish contract's transitions actually bite (a bisected
              * instrument is only audible if something is sounding). */
+#if S3L_LINK
+            /* O6/D2: CHIP A IS THE SOURCE OF TRUTH FOR THE PATCH. With a
+             * valid peer, chip B never self-steps -- two free-running 4 s
+             * steppers agree only by luck and the handshake would read
+             * PATCH_DIFFERS nearly always, making the bench criterion
+             * unreachable. The decision is a pure function, gated on the
+             * host (d1_link_gate teeth 5-7) before this line existed. */
+            if (w_step_on) {
+                int fp = s3_follow_patch(LINK.role, LINK.peer.present,
+                                         LINK.peer.role, dev_patch,
+                                         LINK.peer.patch);
+                if (fp >= 0) { patch_frames = 0; dev_request(fp, gate); }
+            }
+            if (w_step_on &&
+                !s3_follow_holds_stepper(LINK.role, LINK.peer.present,
+                                         LINK.peer.role) &&
+                ++patch_frames >= (unsigned long)(S3L_PATCH_SECS * SR)) {
+#else
             if (w_step_on &&
                 ++patch_frames >= (unsigned long)(S3L_PATCH_SECS * SR)) {
+#endif
                 patch_frames = 0;
                 dev_request((dev_patch + 1) % DEVCRC_NPATCH, gate);
             }
@@ -4037,8 +4056,13 @@ void app_main(void)
          * BOARDS RUNNING DIFFERENT BUILDS. devcrc_rc/mc are generated per
          * build, so a stale image on one board changes this number and the
          * handshake says SAME PATCH, DIFFERENT COEFFICIENTS. */
-        s3_link_poll(dev_patch, (EB_DEVSEQ_VOICE_BASE ? devcrc_rc_b3[dev_patch] ^ devcrc_mc_b3[dev_patch]
-                                              : devcrc_rc[dev_patch] ^ devcrc_mc[dev_patch]));
+        /* ⚠ THE WIRE FINGERPRINT IS THE BASE-0 KEY ON BOTH CHIPS -- see
+         * s3_link.h. The per-base keys differ BY DESIGN, so advertising each
+         * chip's own key (the previous revision did) reads CRC_DIFFERS on
+         * every correct pair, forever. Each chip's PLAYING bank is proven
+         * locally by the per-base RECALL CRC check; the wire only proves
+         * same build + same patch. */
+        s3_link_poll(dev_patch, devcrc_rc[dev_patch] ^ devcrc_mc[dev_patch]);
 #endif
         busy_us += (unsigned long)(esp_timer_get_time() - t0);
         eng_us  += (unsigned long)te;

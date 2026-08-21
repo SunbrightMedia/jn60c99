@@ -88,6 +88,25 @@ int main(int argc, char **argv)
       ck(s3_handshake_check(&RA,7,CRC,&p) == S3_HS_BASE_OVERLAP,
          "overlapping global voice ranges is caught (the D3 species)"); }
 
+    /* ---- D2: patch-follow (chip A is the source of truth) ------------- */
+    printf("\n=== O6/D2 PATCH-FOLLOW ===\n");
+    ck(s3_follow_patch(S3_ROLE_B, 1, S3_ROLE_A, 4, 9) == 9,
+       "B with a valid peer follows A's patch");
+    ck(s3_follow_patch(S3_ROLE_B, 1, S3_ROLE_A, 9, 9) == -1,
+       "B already on A's patch does nothing");
+    ck(s3_follow_patch(S3_ROLE_A, 1, S3_ROLE_B, 4, 9) == (t == 5 ? 9 : -1),
+       "A NEVER follows -- it is the source of truth (tooth 5 flips this)");
+    ck(s3_follow_patch(S3_ROLE_B, 0, S3_ROLE_A, 4, 9) == (t == 6 ? 9 : -1),
+       "B with NO peer follows nobody: single-board mode (tooth 6 flips)");
+    ck(s3_follow_patch(S3_ROLE_B, 1, S3_ROLE_B, 4, 9) == -1,
+       "B never follows another B -- an invalid pair is no truth source");
+    ck(s3_follow_holds_stepper(S3_ROLE_B, 1, S3_ROLE_A) == 1,
+       "B's own stepper stands down while a valid peer is present");
+    ck(s3_follow_holds_stepper(S3_ROLE_B, 0, S3_ROLE_A) == (t == 7 ? 1 : 0),
+       "B with no peer keeps its stepper: today's behaviour (tooth 7 flips)");
+    ck(s3_follow_holds_stepper(S3_ROLE_A, 1, S3_ROLE_B) == 0,
+       "A's stepper is never held");
+
     /* ---- D2: the wire codec ------------------------------------------- */
     printf("\n=== O6/D2 WIRE CODEC ===\n");
     {

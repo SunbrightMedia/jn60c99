@@ -157,9 +157,17 @@ static uint16_t s3_link_sum(const s3_link_frame *f)
  * WHAT IT MUST ESTABLISH, before a note is allowed to sound:
  *   1. the peer exists and is the OPPOSITE role (s3_pair_check)
  *   2. both chips hold the SAME patch index
- *   3. both chips built the SAME coefficients from it -- by CRC, because the
- *      device recall already has an answer-key CRC and reusing it costs
- *      nothing (RECALL: CRC vs host answer key, 0 bad)
+ *   3. both chips run the SAME BUILD and derived the same patch -- by
+ *      exchanging the BASE-0 answer-key fingerprint for the current patch.
+ *      ⚠ NOT the key each chip plays from. The per-base keys (O6/D3) DIFFER
+ *      BY DESIGN between the chips -- chip A verifies itself against the
+ *      base-0 table and chip B against base-3 -- so comparing "my key" with
+ *      "your key" across the wire would read CRC_DIFFERS on every correctly
+ *      working pair, forever. The first draft did exactly that, caught in
+ *      the bench-path audit before any wire existed. Each chip PROVES its
+ *      own playing bank locally (the RECALL CRC check mutes on mismatch);
+ *      the wire's job is only to prove the two chips share one build and one
+ *      patch, and the base-0 fingerprint answers that on both roles.
  *   4. both agree which GLOBAL voices each owns (D3's base)
  *
  * ⚠ 3 IS THE ONE THAT MATTERS AND THE ONE MOST EASILY SKIPPED. Chips that
@@ -197,6 +205,32 @@ static int s3_handshake_check(const s3_role_cfg *me, int my_patch,
           peer->voice_base + peer->voices <= me->voice_base))
         return S3_HS_BASE_OVERLAP;
     return S3_HS_OK;
+}
+
+/* ---- D2: PATCH-FOLLOW, the decision as a pure function -------------------
+ *
+ * WHY IT EXISTS: both boards run the same image, so both carry the 4-second
+ * patch stepper. Free-running, the two steppers agree only by luck, and the
+ * handshake reads PATCH_DIFFERS nearly always -- the bench criterion "wait
+ * for OK" would be unreachable. So: CHIP A IS THE SOURCE OF TRUTH. When a
+ * valid peer is present, chip B never self-steps; it requests whatever patch
+ * A advertises. Chip A never follows anyone.
+ *
+ * Returns the patch to request, or -1 for "no action". A separate query,
+ * s3_follow_holds_stepper, tells B's own stepper to stand down even while
+ * the patches already agree. Pure functions: gated in d1_link_gate.c. */
+static int s3_follow_patch(int my_role, int peer_present, int peer_role,
+                           int my_patch, int peer_patch)
+{
+    if (my_role != S3_ROLE_B || !peer_present) return -1;
+    if (s3_pair_check(my_role, peer_role) != S3_PAIR_OK) return -1;
+    return (peer_patch != my_patch) ? peer_patch : -1;
+}
+
+static int s3_follow_holds_stepper(int my_role, int peer_present, int peer_role)
+{
+    return my_role == S3_ROLE_B && peer_present &&
+           s3_pair_check(my_role, peer_role) == S3_PAIR_OK;
 }
 
 static const char *s3_handshake_name(int hs)
