@@ -132,3 +132,30 @@ repetitions of proven steps, and make verify is the gate that ties them together
 
 The DSP core (voice + master render) is proven; recall is 95% and scoped; the
 above is the remaining, genuine work.
+
+
+## RECALL FULLY CHARACTERIZED (this session)
+
+Recall is now completely mapped and 94% mechanical:
+- 47 params write coefficients on patch recall. Dispatch is deterministic and
+  idempotent; params are pure at the STATE level.
+- 44 of 47 are CLEAN per-param setters -> exact via captured value->coefficient
+  LUTs (jx3p/gen/recall_luts.json, jx3p/gen/recall_sparse.json).
+- Exactly 3 are PROC-mediated (read other params' values via the proc object):
+    param 796 (3 cells) depends on 875
+    param 797 (1 cell)  depends on 803, 875
+    param 803 (9 cells) depends on 797, 875
+  i.e. ONE small cluster {796,797,803} keyed on param 875 (a mode). This is the
+  only non-LUT piece of recall -- handle by a joint capture over (875,796,797,803)
+  or by transcribing those 3 setters.
+
+So the JX recall = 44 LUT params + one 4-param cluster. No large curve subsystem.
+
+## REMAINING TO FINISH (precise, bounded)
+
+1. Recall cluster {796,797,803}x875: joint-capture or transcribe (3 setters).
+2. Build jx_recall.c (LUT table + cluster) and prove post-recall state == oracle
+   bit-for-bit, all 64 patches, per unit.
+3. Integrate jx_engine.c: recall -> note-on -> per-block 8-voice+master render.
+4. Effects standalone nulls (those not covered inside the already-proven master).
+5. make verify SYNTH=jx3p: null EXACTLY 0, 64 patches x rates x blocks.
