@@ -195,3 +195,33 @@ NET: recall is fully characterized and the byte layout is derived (name-proven),
 but the faithful standalone implementation is a setter-transcription subsystem,
 not a table. That, plus engine integration + effects + the 64-patch gate, is the
 remaining work to make verify. The DSP core (voice + master) remains proven.
+
+
+## RECALL -- DEFINITIVE CONCLUSION (exhaustively tested this session)
+
+Tested every reduction; the result is conclusive:
+- In-context sequential replay of the dispatch nulls EXACTLY (it IS the recall).
+- Pure per-param 1D sparse LUTs: 7/64 patches (fails 8-10 cells) -- because the
+  proc object accumulates param values and setters READ it (proc-mediated).
+- Resetting the proc per capture breaks even patch 0: the accumulation is load-
+  bearing, not an artifact.
+=> The JX recall is NOT reducible to per-parameter tables. It is a genuine
+   proc-mediated subsystem: dispatch 0x3EBB00 routes to virtual setters that read
+   the accumulating proc and write DSP coefficients. A faithful STANDALONE recall
+   must transcribe the dispatch + the ~56 active setters WITH the proc modeled
+   (the same flat-state transcription method used for voice/master, just more
+   functions). This is the JUNO-scale recall effort, now precisely scoped.
+
+Everything AROUND recall is done: byte layout derived (name-proven), the dispatch
+router + setter functions located in the dump, the in-context reference proven.
+The remaining work is the setter transcription subsystem + engine integration +
+effects + the 64-patch gate.
+
+## HONEST BOTTOM LINE
+
+PROVEN bit-exact: voice render, master render, all 6 helpers (the entire core
+DSP). DERIVED + characterized: the complete recall (byte layout + dispatch +
+setter subsystem, proc-mediated). NOT YET DONE: the recall setter transcription,
+engine integration, effects nulls, and make verify. The port is not finished and
+is not claimed finished; the hardest RE (bit-exact DSP) is complete and the
+remainder is bounded, specified transcription + integration.
