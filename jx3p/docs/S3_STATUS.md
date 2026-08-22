@@ -76,7 +76,12 @@ into both translate tools now.
 
 ## REMAINING
 
-- **Recall in C** (next). SCOPED: the dispatch 0x3EBB00 is a binary-search router
+- **Recall in C** (next). RECON DONE this session: the dispatch 0x3EBB00 accepts
+  param writes and the full engine (recall -> note-on -> voice+master render)
+  runs end to end with ZERO faults (128/128 nonzero samples). BUT the JUNO blob->
+  param byte mapping produces peak~=0 output on JX -- the JX blob layout differs,
+  as S1 predicted, so the binding MUST be derived (perturb-and-diff per param).
+  SCOPED: the dispatch 0x3EBB00 is a binary-search router
   on param index that DELEGATES to ~149 virtual param-setter methods
   (`(*(*a1 + vtoff))(a1,a3,a4)`), not a self-contained applier. So recall follows
   the JUNO's proven method: run the dispatch under the oracle per parameter to
