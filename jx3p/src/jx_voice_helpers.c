@@ -6,7 +6,7 @@
  * rvas the code addresses; the dump's 256-byte raw prefixes cross-checked
  * byte-identical (03_constants.txt truncates long raws).
  *
- * STATUS: READ (static transcription; unproven until null).
+ * STATUS: PROVEN (helper null 0/53932 vs Unicorn; render null EXACTLY 0).
  * Compile with -ffp-contract=off (load-bearing: no fused madds exist in the
  * original SSE2 scalar code).
  *
