@@ -47,8 +47,15 @@ import ida_funcs, ida_hexrays, ida_name, ida_bytes, ida_segment, ida_nalt
 import idautils, idc, ida_xref, ida_typeinf
 
 IMAGE_BASE   = idc.get_inf_attr(idc.INF_BASEADDR)
-CLASS_PREFIX = "CDSPJx3p"        # DSP module family
+SYNTH_TOKEN  = "Jx3p"            # the per-synth token: Ju60 / Jx3p
+CLASS_PREFIX = "CDSP" + SYNTH_TOKEN            # DSP module family
 PLUGIN_HINT  = "CPrmDSP"         # the control/parameter class family
+# the other audio-path classes, matched by token so the completeness check
+# covers them too: the voice assigner (CAssign<token>) and the sim/registry
+# class (C<token>Sim -- on the JUNO its methods hold the parameter registry
+# leaf 0x388170 the port consumes). GUI controls (Slider/Latch/Led/Button) are
+# deliberately NOT matched -- their code lives outside the DSP slab.
+AUDIO_PATH   = ["CAssign" + SYNTH_TOKEN, "C" + SYNTH_TOKEN + "Sim"]
 BAND_MARGIN  = 0x10000           # slab padding; PROVEN to catch every JUNO leaf
 CLOSURE_CAP  = 8000              # safety only; the band, not this, bounds the run
 OUT = os.path.join(os.path.dirname(idc.get_idb_path()) or ".", "jx3p_dump")
@@ -64,8 +71,12 @@ def safe(s): return re.sub(r"[^A-Za-z0-9_.-]", "_", s)[:90]
 # Find every class vtable whose RTTI TypeDescriptor name starts with a prefix.
 def find_vtables(prefixes):
     out = {}
+    # non-capturing group around the alternation so \w* applies to EVERY prefix,
+    # not just the last one -- otherwise CDSPJx3pOscVoice fails to match and only
+    # the raw-COL fallback saves it.
+    pat = re.compile(r"\?\?_7((?:" + "|".join(prefixes) + r")\w*)@@6B")
     for ea, name in idautils.Names():
-        m = re.match(r"\?\?_7(" + "|".join(prefixes) + r"\w*)@@6B", name)
+        m = pat.match(name)
         if m:
             out.setdefault(m.group(1), ea)
     if len(out) >= 8:
@@ -217,8 +228,8 @@ def proto(ea):
 def main():
     log("ImageBase 0x%X  out=%s" % (IMAGE_BASE, OUT))
 
-    # 1. RTTI: every DSP + control class vtable, ALL slots
-    vts = find_vtables([CLASS_PREFIX, PLUGIN_HINT])
+    # 1. RTTI: every DSP + control + audio-path class vtable, ALL slots
+    vts = find_vtables([CLASS_PREFIX, PLUGIN_HINT] + AUDIO_PATH)
     log("phase 1: %d class vtables from RTTI" % len(vts))
     methods_by_class = {}     # class -> [method_ea...]
     with open(os.path.join(OUT, "00_vtables.txt"), "w") as fh:

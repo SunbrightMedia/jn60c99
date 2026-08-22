@@ -102,6 +102,20 @@ exact class or address missing and why, so a follow-up is surgical, not another
 blind full run. The design intent, now measured on the JUNO and on the JX class
 inventory, is **one run, complete.**
 
+### "Is this EVERYTHING?" — the re-runnable receipt
+
+`jx3p/tools/coverage_audit.py` answers that as a measurement, not a promise, and
+needs no IDA. It harvests every `.text` code address the FINISHED JUNO port ever
+took out of IDA — across eight separate visits: the oracle harness, PROVENANCE,
+every recall/parse/translate script — and checks each one lands in the band's
+range, is reached by the band's call-graph closure, or is a named non-DSP
+reference (a dump-limit constant; a CRT function the emulator hooks by address
+and never transcribes). It PASSES: of 59 such addresses, 52 are in the band
+range, 5 in the closure, 2 are named non-DSP — zero unexplained. Its tooth
+(`--tooth`) plants a CRT address and is seen to FAIL, so the PASS is trusted.
+That is the whole basis for the claim that one run of this extractor is
+everything the port will ever need from IDA.
+
 ## If IDA's Hex-Rays is unavailable
 
 The script still dumps disassembly (`01_closure.asm`), all constants, vtables,
