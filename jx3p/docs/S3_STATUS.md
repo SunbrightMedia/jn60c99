@@ -176,3 +176,22 @@ Recorded in synth/jx3p.json (blob_pos_formula, dispatch_idx_formula).
 So the recall is now fully specified end to end: blob byte -> (2*pool+8 decode) ->
 param value -> (pool+740 dispatch idx) -> coefficient (44 LUTs + {796,797,803}
 cluster). Remaining is implementation + the cluster + engine integration + gate.
+
+
+## RECALL INTERACTION SCOPE -- CORRECTED (this session)
+
+Earlier "only 3 proc-mediated params" was incomplete. Definitive test: applying
+CLEAN-captured per-param LUTs in dispatch (idx) order leaves 43 cells wrong,
+owned by ~12 params (752,789,790,792,796,797,798,799,800,803,855,875). So the
+sequential dispatch has BROADER cross-param interactions than a single cluster.
+
+What IS proven: an in-context replay -- capturing each param's ACTUAL writes
+during the real dispatch sequence -- reproduces the oracle EXACTLY (0 cells).
+So recall == the sequential dispatch; a standalone C recall must reproduce that
+sequence's interactions, i.e. TRANSCRIBE the dispatch 0x3EBB00 + its ~56 virtual
+setters (the JUNO-scale recall subsystem), not a flat per-param LUT.
+
+NET: recall is fully characterized and the byte layout is derived (name-proven),
+but the faithful standalone implementation is a setter-transcription subsystem,
+not a table. That, plus engine integration + effects + the 64-patch gate, is the
+remaining work to make verify. The DSP core (voice + master) remains proven.
