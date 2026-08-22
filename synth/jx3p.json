@@ -32,12 +32,17 @@
     "master_driver_rva": "0x3F9220",
     "voice_render_variants": ["0x3A22C0","0x3A99B0","0x3B1040","0x3B86D0","0x3BFD60","0x3C73F0","0x3CEA80","0x3D6110"],
     "master_render_rva": "0x39A2B0",
-    "build_rva": null,
+    "build_rva": "0x3F8610",
+    "alloc_stub_rva": "0x6AB63C",
     "noteon_rva": null,
     "noteoff_rva": null,
     "setsr_rva": null,
     "asg_notify_rva": null,
-    "alloc_stub_rva": null,
-    "fatal_stub_rva": null
+    "fatal_stub_rva": null,
+    "_build_proven": "PROVEN by execution under Unicorn (tools/verify/jx_emu.py probe_build): BUILD 0x3F8610 called with rcx=HOST allocates 9 unit-state blocks of STATE_SZ each and stores 9 objects whose vptr==proc_vtable. Zero faults.",
+    "n_units": 9,
+    "state_sz": "0xAAC310",
+    "host_state_ptr": "HOST + 80 + 64*i",
+    "host_proc_ptr": "HOST + 96 + 64*i"
   }
 }
