@@ -2,26 +2,25 @@
   "_comment": "JX-3P per-synth config (E4/S0 form). KNOWN values are filled; DERIVED-IN-S2 values are null until the oracle + IDA dump land, and must not be guessed. The JUNO's are in synth/juno60.json.",
   "name": "jx3p",
   "truth_bank": "jx3p/truth/preset_bank_1.bin",
-  "rates": [44100, 48000, 96000],
-
+  "rates": [
+    44100,
+    48000,
+    96000
+  ],
   "_bank_geometry": "KNOWN from S1: the JX bank is a byte-compatible container with the JUNO -- exactly 23 + 20223*64 = 1294295 bytes, names decode with juno_bank_patch_name.",
   "bank_header": 23,
   "bank_stride": 20223,
   "patch_bytes": 134,
   "npatch": 64,
-
   "_patch_byte_layout": "DERIVED-IN-S2, not assumed. Script.xml gives the PARAMETER ADDRESS SPACE (page:offset SysEx-style), NOT the on-disk bank byte offsets. The JUNO proved these differ; the JX offsets (which byte is DELAY TYPE, etc.) come from perturb-and-diff under the oracle. Placeholders below stay null.",
   "record_delay_type_offset": null,
   "blob_condition_offset": null,
-
   "_state_layout": "DERIVED-IN-S2 from the IDA dump: the flat per-object state stride, voice cells, scatter cells. The JX has TWO DCOs (DCO1+DCO2 with cross-mod) where the JUNO had one, so the voice state is larger -- do not copy the JUNO's stride.",
   "voice_stride": null,
   "scatter_cells": null,
   "rings": null,
-
   "_param_surface": "KNOWN from Script.xml: 290 parameters, 43 audible. Full inventory in jx3p/docs/param_inventory.json. Encoding is int2x4 nibble-pair dominant, as JUNO. ASSIGN MODE range 0,2 (UNISON at 2). CONDITION range 0,255 default 128.",
   "param_inventory": "jx3p/docs/param_inventory.json",
-
   "_entries": "READ from the second IDA dump (RVAs, ImageBase 0x180000000). Render topology mirrors the JUNO. NOT YET PROVEN-executed under Unicorn -- that is the oracle-harness step; these are the addresses it wires. DISPATCH/proc_vtable already cross-checked by S2's vtable-slot transfer.",
   "entries": {
     "proc_vtable_rva": "0x9F9A90",
@@ -30,19 +29,31 @@
     "voice_driver_rva": "0x3F8C60",
     "master_wrap_rva": "0x377010",
     "master_driver_rva": "0x3F9220",
-    "voice_render_variants": ["0x3A22C0","0x3A99B0","0x3B1040","0x3B86D0","0x3BFD60","0x3C73F0","0x3CEA80","0x3D6110"],
+    "voice_render_variants": [
+      "0x3A22C0",
+      "0x3A99B0",
+      "0x3B1040",
+      "0x3B86D0",
+      "0x3BFD60",
+      "0x3C73F0",
+      "0x3CEA80",
+      "0x3D6110"
+    ],
     "master_render_rva": "0x39A2B0",
     "build_rva": "0x3F8610",
     "alloc_stub_rva": "0x6AB63C",
-    "noteon_rva": null,
-    "noteoff_rva": null,
-    "setsr_rva": null,
-    "asg_notify_rva": null,
+    "noteon_rva": "0x3F9150",
+    "noteoff_rva": "0x3F90F0",
+    "setsr_rva": "0x3F9970",
+    "asg_notify_rva": "0x356BF0",
     "fatal_stub_rva": null,
     "_build_proven": "PROVEN by execution under Unicorn (tools/verify/jx_emu.py probe_build): BUILD 0x3F8610 called with rcx=HOST allocates 9 unit-state blocks of STATE_SZ each and stores 9 objects whose vptr==proc_vtable. Zero faults.",
     "n_units": 9,
     "state_sz": "0xAAC310",
     "host_state_ptr": "HOST + 80 + 64*i",
-    "host_proc_ptr": "HOST + 96 + 64*i"
+    "host_proc_ptr": "HOST + 96 + 64*i",
+    "_audio_proven": "PROVEN: build+SETSR(44100)+noteon(60,100)+render produces nonzero audio at block 3, zero faults. NOTEOFF 0x3F90F0 is the remaining unconfirmed candidate (its twin pattern; does not mutate assigner on note-on args).",
+    "voice_stride": 16128,
+    "host_assign_ptr": "HOST + 104 + 64*i"
   }
 }
