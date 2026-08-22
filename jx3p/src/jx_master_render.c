@@ -1,6 +1,8 @@
 /* jx_master_render.c -- exact C99 transcription of the JX-3P master render
  * (sub_18039A2B0). Single unit; offsets are the decompile's own. Helpers shared
- * with the voice render (jx_voice_helpers). STATUS: READ until null 0.
+ * with the voice render (jx_voice_helpers). STATUS: PROVEN on the default note state (output + full state null EXACTLY 0,
+ * 32 samples). The 11 argless helper sites are DCO-mode/effect-gated (v31<=3 via
+ * the note object) and unexercised here -- placeholdered, pending a mode patch.
  * Build with -ffp-contract=off -fno-strict-aliasing. */
 #include <stdint.h>
 #include <stdbool.h>
@@ -11,13 +13,14 @@
 typedef uint32_t _DWORD; typedef uint64_t _QWORD;
 typedef uint16_t _WORD;  typedef uint8_t _BYTE;
 typedef int64_t __int64; typedef int32_t __int32;
+typedef int16_t __int16; typedef int8_t __int8;
 #define LODWORD(x)  (*((uint32_t *)&(x)))
 #define HIDWORD(x)  (*((uint32_t *)&(x)+1))
 #define SLODWORD(x) (*((int32_t *)&(x)))
 static inline float    f32_from_bits(uint32_t b){ float f; memcpy(&f,&b,4); return f; }
 static inline uint32_t bits_from_f32(float f){ uint32_t b; memcpy(&b,&f,4); return b; }
 
-float *jx_master_render(unsigned char *st, void **a2, float **a3)
+float *jx_master_render(unsigned char *st, unsigned char *a2, float **a3)
 {
   float v5; // xmm1_4
   float v6; // xmm7_4
@@ -1184,11 +1187,11 @@ float *jx_master_render(unsigned char *st, void **a2, float **a3)
     else
       v375 = v374;
     v376 = (int)(float)(v370 * -16384.0);
-    *(_DWORD *)(st + 6563984) = *(_DWORD *)(a1
+    *(_DWORD *)(st + 6563984) = *(_DWORD *)(st
                                           + 4
                                           * ((*(int *)(st + 6563956) - 1LL) & (*(_DWORD *)(st + 6563952) - v376 + 1LL))
                                           + 4466800);
-    *(_DWORD *)(st + 6563988) = *(_DWORD *)(a1
+    *(_DWORD *)(st + 6563988) = *(_DWORD *)(st
                                           + 4
                                           * ((*(int *)(st + 6563956) - 1LL) & (*(_DWORD *)(st + 6563952) - v376 + 2LL))
                                           + 4466800);
@@ -1197,11 +1200,11 @@ float *jx_master_render(unsigned char *st, void **a2, float **a3)
     v379 = (int)(float)(v377 * -16384.0);
     *(float *)(st + 6563992) = v378;
     v380 = *(float *)(st + 6563984);
-    *(_DWORD *)(st + 6564000) = *(_DWORD *)(a1
+    *(_DWORD *)(st + 6564000) = *(_DWORD *)(st
                                           + 4
                                           * ((*(int *)(st + 6563956) - 1LL) & (*(_DWORD *)(st + 6563952) - v379 + 1LL))
                                           + 4466800);
-    *(_DWORD *)(st + 6564004) = *(_DWORD *)(a1
+    *(_DWORD *)(st + 6564004) = *(_DWORD *)(st
                                           + 4
                                           * ((*(int *)(st + 6563956) - 1LL) & (*(_DWORD *)(st + 6563952) - v379 + 2LL))
                                           + 4466800);
@@ -1377,22 +1380,22 @@ LABEL_61:
         v316 = -1.0;
       *(float *)(st + 270992) = v316 * *(float *)(st + 271296);
       v317 = (int)(float)(v313 * -16384.0);
-      *(_DWORD *)(st + 4465856) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 4465856) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 2368660) - 1LL) & (*(_DWORD *)(st + 2368656) - v317 + 1LL))
                                             + 271504);
-      *(_DWORD *)(st + 4465860) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 4465860) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 2368660) - 1LL) & (*(_DWORD *)(st + 2368656) - v317 + 2LL))
                                             + 271504);
       v318 = (float)(v313 * 16384.0) - (double)(int)(float)(v313 * 16384.0);
       *(float *)(st + 4465864) = v318;
       v319 = *(float *)(st + 4465856);
-      *(_DWORD *)(st + 4465888) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 4465888) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 4465828) - 1LL) & (*(_DWORD *)(st + 4465824) - v317 + 1LL))
                                             + 2368672);
-      *(_DWORD *)(st + 4465892) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 4465892) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 4465828) - 1LL) & (*(_DWORD *)(st + 4465824) - v317 + 2LL))
                                             + 2368672);
@@ -1471,14 +1474,14 @@ LABEL_61:
       v231 = *(_DWORD *)(st + 6564032);
       *(_DWORD *)(st + 6564048) = *(_DWORD *)(st + 6564016);
       *(_DWORD *)(st + 6564064) = v231;
-      v232 = jx_h_3A2010();
+      v232 = jx_h_3A2010(0.0)/*ARGLESS*/;
       *(float *)(st + 6564080) = fmaxf(fminf(v232, 512.0), -512.0);
       v233 = *(float *)(st + 6564064);
       *(_DWORD *)(st + 6564320) = *(_DWORD *)(st + 6564304);
       v33 = 0;
-      v234 = jx_h_3A21E0();
+      v234 = jx_h_3A21E0(0.0f)/*ARGLESS*/;
       v235 = *(float *)&v234;
-      *(float *)&v234 = jx_h_3A2210();
+      *(float *)&v234 = jx_h_3A2210(0.0f)/*ARGLESS*/;
       *(_DWORD *)(st + 6564336) = LODWORD(v234);
       *(float *)(st + 6564304) = (float)(v235 * v233) + (float)(v233 - 1.0);
       v236 = (float)(*(float *)&v234 * *(float *)(st + 6564400)) + *(float *)(st + 6564416);
@@ -1571,11 +1574,11 @@ LABEL_61:
       *(float *)(st + 6564656) = v258;
       v266 = v258 + *(float *)(st + 6564736);
       v267 = (int)(float)(v266 * -16384.0);
-      *(_DWORD *)(st + 6598144) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 6598144) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 6598116) - 1LL) & (*(_DWORD *)(st + 6598112) - v267 + 1LL))
                                             + 6565344);
-      *(_DWORD *)(st + 6598148) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 6598148) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 6598116) - 1LL) & (*(_DWORD *)(st + 6598112) - v267 + 2LL))
                                             + 6565344);
@@ -1585,11 +1588,11 @@ LABEL_61:
       v270 = *(float *)(st + 6564720);
       v271 = v265 + *(float *)(st + 6564752);
       v272 = (int)(float)(v271 * -16384.0);
-      *(_DWORD *)(st + 6598160) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 6598160) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 6598116) - 1LL) & (*(_DWORD *)(st + 6598112) - v272 + 1LL))
                                             + 6565344);
-      *(_DWORD *)(st + 6598164) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 6598164) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 6598116) - 1LL) & (*(_DWORD *)(st + 6598112) - v272 + 2LL))
                                             + 6565344);
@@ -1759,12 +1762,12 @@ LABEL_61:
           else
             v53 = -1.0;
           *(float *)(st + 6665808) = v53 * *(float *)(st + 6666112);
-          *(_DWORD *)(st + 10860672) = *(_DWORD *)(a1
+          *(_DWORD *)(st + 10860672) = *(_DWORD *)(st
                                                  + 4
                                                  * ((*(int *)(st + 8763476) - 1LL)
                                                   & (*(_DWORD *)(st + 8763472) - (int)(float)(v48 * -16384.0) + 1LL))
                                                  + 6666320);
-          *(_DWORD *)(st + 10860676) = *(_DWORD *)(a1
+          *(_DWORD *)(st + 10860676) = *(_DWORD *)(st
                                                  + 4
                                                  * ((*(int *)(st + 8763476) - 1LL)
                                                   & (*(_DWORD *)(st + 8763472) - (int)(float)(v48 * -16384.0) + 2LL))
@@ -1772,12 +1775,12 @@ LABEL_61:
           v54 = (float)(v48 * 16384.0) - (double)(int)(float)(v48 * 16384.0);
           *(float *)(st + 10860680) = v54;
           v55 = *(float *)(st + 10860672);
-          *(_DWORD *)(st + 10860704) = *(_DWORD *)(a1
+          *(_DWORD *)(st + 10860704) = *(_DWORD *)(st
                                                  + 4
                                                  * ((*(int *)(st + 10860644) - 1LL)
                                                   & (*(_DWORD *)(st + 10860640) - (int)(float)(v48 * -16384.0) + 1LL))
                                                  + 8763488);
-          *(_DWORD *)(st + 10860708) = *(_DWORD *)(a1
+          *(_DWORD *)(st + 10860708) = *(_DWORD *)(st
                                                  + 4
                                                  * ((*(int *)(st + 10860644) - 1LL)
                                                   & (*(_DWORD *)(st + 10860640) - (int)(float)(v48 * -16384.0) + 2LL))
@@ -1843,13 +1846,13 @@ LABEL_61:
           v91 = *(_DWORD *)(st + 10860736);
           *(_DWORD *)(st + 10860752) = *(_DWORD *)(st + 10860720);
           *(_DWORD *)(st + 10860768) = v91;
-          v92 = jx_h_3A2010();
+          v92 = jx_h_3A2010(0.0)/*ARGLESS*/;
           *(float *)(st + 10860784) = fmaxf(fminf(v92, 512.0), -512.0);
           v93 = *(float *)(st + 10860768);
           *(_DWORD *)(st + 10861024) = *(_DWORD *)(st + 10861008);
-          v94 = jx_h_3A21E0();
+          v94 = jx_h_3A21E0(0.0f)/*ARGLESS*/;
           v95 = *(float *)&v94;
-          *(float *)&v94 = jx_h_3A2210();
+          *(float *)&v94 = jx_h_3A2210(0.0f)/*ARGLESS*/;
           *(_DWORD *)(st + 10861040) = LODWORD(v94);
           *(float *)(st + 10861008) = (float)(v95 * v93) + (float)(v93 - 1.0);
           v96 = (float)(*(float *)&v94 * *(float *)(st + 10861104)) + *(float *)(st + 10861120);
@@ -1986,12 +1989,12 @@ LABEL_61:
           v136 = v130;
           v137 = v130 + *(float *)(st + 10861616);
           v138 = (int)(float)(v137 * -16384.0);
-          *(_DWORD *)(st + 10927776) = *(_DWORD *)(a1
+          *(_DWORD *)(st + 10927776) = *(_DWORD *)(st
                                                  + 4
                                                  * ((*(int *)(st + 10894964) - 1LL)
                                                   & (*(_DWORD *)(st + 10894960) - v138 + 1LL))
                                                  + 10862192);
-          *(_DWORD *)(st + 10927780) = *(_DWORD *)(a1
+          *(_DWORD *)(st + 10927780) = *(_DWORD *)(st
                                                  + 4
                                                  * ((*(int *)(st + 10894964) - 1LL)
                                                   & (*(_DWORD *)(st + 10894960) - v138 + 2LL))
@@ -2002,12 +2005,12 @@ LABEL_61:
           v141 = *(float *)(st + 10861600);
           v142 = v136 + *(float *)(st + 10861632);
           v143 = (int)(float)(v142 * -16384.0);
-          *(_DWORD *)(st + 10927808) = *(_DWORD *)(a1
+          *(_DWORD *)(st + 10927808) = *(_DWORD *)(st
                                                  + 4
                                                  * ((*(int *)(st + 10927748) - 1LL)
                                                   & (*(_DWORD *)(st + 10927744) - v143 + 1LL))
                                                  + 10894976);
-          *(_DWORD *)(st + 10927812) = *(_DWORD *)(a1
+          *(_DWORD *)(st + 10927812) = *(_DWORD *)(st
                                                  + 4
                                                  * ((*(int *)(st + 10927748) - 1LL)
                                                   & (*(_DWORD *)(st + 10927744) - v143 + 2LL))
@@ -2060,14 +2063,14 @@ LABEL_61:
       v163 = *(_DWORD *)(st + 6598192);
       *(_DWORD *)(st + 6598208) = *(_DWORD *)(st + 6598176);
       *(_DWORD *)(st + 6598224) = v163;
-      v164 = jx_h_3A2010();
+      v164 = jx_h_3A2010(0.0)/*ARGLESS*/;
       *(float *)(st + 6598240) = fmaxf(fminf(v164, 512.0), -512.0);
       v165 = *(float *)(st + 6598224);
       *(_DWORD *)(st + 6598480) = *(_DWORD *)(st + 6598464);
       v33 = 0;
-      v166 = jx_h_3A21E0();
+      v166 = jx_h_3A21E0(0.0f)/*ARGLESS*/;
       v167 = *(float *)&v166;
-      *(float *)&v166 = jx_h_3A2210();
+      *(float *)&v166 = jx_h_3A2210(0.0f)/*ARGLESS*/;
       *(_DWORD *)(st + 6598496) = LODWORD(v166);
       *(float *)(st + 6598464) = (float)(v167 * v165) + (float)(v165 - 1.0);
       v168 = (float)(*(float *)&v166 * *(float *)(st + 6598560)) + *(float *)(st + 6598576);
@@ -2201,11 +2204,11 @@ LABEL_61:
       *(float *)(st + 6598992) = v200;
       v207 = v200 + *(float *)(st + 6599072);
       v208 = (int)(float)(v207 * -16384.0);
-      *(_DWORD *)(st + 6665232) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 6665232) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 6632420) - 1LL) & (*(_DWORD *)(st + 6632416) - v208 + 1LL))
                                             + 6599648);
-      *(_DWORD *)(st + 6665236) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 6665236) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 6632420) - 1LL) & (*(_DWORD *)(st + 6632416) - v208 + 2LL))
                                             + 6599648);
@@ -2215,11 +2218,11 @@ LABEL_61:
       v211 = *(float *)(st + 6599056);
       v212 = v206 + *(float *)(st + 6599088);
       v213 = (int)(float)(v212 * -16384.0);
-      *(_DWORD *)(st + 6665264) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 6665264) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 6665204) - 1LL) & (*(_DWORD *)(st + 6665200) - v213 + 1LL))
                                             + 6632432);
-      *(_DWORD *)(st + 6665268) = *(_DWORD *)(a1
+      *(_DWORD *)(st + 6665268) = *(_DWORD *)(st
                                             + 4
                                             * ((*(int *)(st + 6665204) - 1LL) & (*(_DWORD *)(st + 6665200) - v213 + 2LL))
                                             + 6632432);
@@ -2260,7 +2263,7 @@ LABEL_61:
     }
   }
 LABEL_96:
-  *(_DWORD *)(st + 10928560) = (unsigned __int16)(*(_DWORD *)(st + 10928560) - 1);
+  *(_DWORD *)(st + 10928560) = (uint16_t)(*(_DWORD *)(st + 10928560) - 1);
   v410 = *(float *)(st + 11190736);
   if ( *(int *)(st + 10928576) <= 0 )
   {
@@ -2396,36 +2399,36 @@ LABEL_96:
     else
       v425 = -2048.0;
     *(float *)(st + 10928048) = v423;
-    *(float *)(st + 4LL * (unsigned __int16)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190768)) + 10928592) = v422;
+    *(float *)(st + 4LL * (uint16_t)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190768)) + 10928592) = v422;
     v426 = *(_DWORD *)(st + 10928560);
-    v427 = *(float *)(st + 4LL * (unsigned __int16)(v426 + *(_DWORD *)(st + 11190780)) + 10928592);
-    v428 = *(float *)(a1
-                    + 4LL * (unsigned __int16)(v426 + *(_DWORD *)(st + 11190772) - (int)(float)(v424 * v425))
+    v427 = *(float *)(st + 4LL * (uint16_t)(v426 + *(_DWORD *)(st + 11190780)) + 10928592);
+    v428 = *(float *)(st
+                    + 4LL * (uint16_t)(v426 + *(_DWORD *)(st + 11190772) - (int)(float)(v424 * v425))
                     + 10928592)
          - (float)(v427 * *(float *)(st + 10928096));
-    *(float *)(st + 4LL * (unsigned __int16)(v426 + *(_DWORD *)(st + 11190776)) + 10928592) = v428;
+    *(float *)(st + 4LL * (uint16_t)(v426 + *(_DWORD *)(st + 11190776)) + 10928592) = v428;
     v429 = *(_DWORD *)(st + 10928560);
-    v430 = *(float *)(st + 4LL * (unsigned __int16)(v429 + *(_DWORD *)(st + 11190788)) + 10928592);
+    v430 = *(float *)(st + 4LL * (uint16_t)(v429 + *(_DWORD *)(st + 11190788)) + 10928592);
     v431 = (float)((float)(*(float *)(st + 10928096) * v428) + v427) - (float)(*(float *)(st + 10928096) * v430);
-    *(float *)(st + 4LL * (unsigned __int16)(v429 + *(_DWORD *)(st + 11190784)) + 10928592) = v431;
+    *(float *)(st + 4LL * (uint16_t)(v429 + *(_DWORD *)(st + 11190784)) + 10928592) = v431;
     v432 = *(_DWORD *)(st + 10928560);
     v433 = (float)(*(float *)(st + 10928096) * v431) + v430;
-    v434 = *(float *)(st + 4LL * (unsigned __int16)(v432 + *(_DWORD *)(st + 11190796)) + 10928592);
+    v434 = *(float *)(st + 4LL * (uint16_t)(v432 + *(_DWORD *)(st + 11190796)) + 10928592);
     v435 = v433 - (float)(*(float *)(st + 10928096) * v434);
-    *(float *)(st + 4LL * (unsigned __int16)(v432 + *(_DWORD *)(st + 11190792)) + 10928592) = v435;
+    *(float *)(st + 4LL * (uint16_t)(v432 + *(_DWORD *)(st + 11190792)) + 10928592) = v435;
     v436 = *(_DWORD *)(st + 10928560);
     v437 = (float)(*(float *)(st + 10928096) * v435) + v434;
-    v438 = *(float *)(st + 4LL * (unsigned __int16)(v436 + *(_DWORD *)(st + 11190804)) + 10928592);
+    v438 = *(float *)(st + 4LL * (uint16_t)(v436 + *(_DWORD *)(st + 11190804)) + 10928592);
     v439 = v437 - (float)(*(float *)(st + 10928096) * v438);
-    *(float *)(st + 4LL * (unsigned __int16)(v436 + *(_DWORD *)(st + 11190800)) + 10928592) = v439;
+    *(float *)(st + 4LL * (uint16_t)(v436 + *(_DWORD *)(st + 11190800)) + 10928592) = v439;
     v440 = *(_DWORD *)(st + 10928560);
     v441 = (float)(*(float *)(st + 10928096) * v439) + v438;
-    v442 = *(float *)(st + 4LL * (unsigned __int16)(v440 + *(_DWORD *)(st + 11190812)) + 10928592);
+    v442 = *(float *)(st + 4LL * (uint16_t)(v440 + *(_DWORD *)(st + 11190812)) + 10928592);
     v443 = v441 * 0.5;
     v444 = (float)(v443 - (float)(*(float *)(st + 10928096) * v442)) + *(float *)(st + 10927920);
-    *(float *)(st + 4LL * (unsigned __int16)(v440 + *(_DWORD *)(st + 11190808)) + 10928592) = v444;
-    *(float *)(st + 4LL * (unsigned __int16)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190840)) + 10928592) = (float)(v444 * *(float *)(st + 10928096)) + v442;
-    v445 = *(float *)(st + 4LL * (unsigned __int16)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190852)) + 10928592)
+    *(float *)(st + 4LL * (uint16_t)(v440 + *(_DWORD *)(st + 11190808)) + 10928592) = v444;
+    *(float *)(st + 4LL * (uint16_t)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190840)) + 10928592) = (float)(v444 * *(float *)(st + 10928096)) + v442;
+    v445 = *(float *)(st + 4LL * (uint16_t)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190852)) + 10928592)
          - *(float *)(st + 10927904);
     *(float *)(st + 10927920) = v445;
     v446 = (float)(v445 * *(float *)(st + 10928352)) + *(float *)(st + 10927904);
@@ -2433,11 +2436,11 @@ LABEL_96:
     *(float *)(st + 10927920) = (float)(v446 * *(float *)(st + 10928384))
                               + (float)(*(float *)(st + 10928368) * *(float *)(st + 10927920));
     v447 = *(_DWORD *)(st + 10928560);
-    v448 = *(float *)(st + 4LL * (unsigned __int16)(v447 + *(_DWORD *)(st + 11190820)) + 10928592);
+    v448 = *(float *)(st + 4LL * (uint16_t)(v447 + *(_DWORD *)(st + 11190820)) + 10928592);
     v449 = (float)(v443 - (float)(v448 * *(float *)(st + 10928096))) + *(float *)(st + 10927952);
-    *(float *)(st + 4LL * (unsigned __int16)(v447 + *(_DWORD *)(st + 11190816)) + 10928592) = v449;
-    *(float *)(st + 4LL * (unsigned __int16)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190856)) + 10928592) = (float)(v449 * *(float *)(st + 10928096)) + v448;
-    v450 = *(float *)(st + 4LL * (unsigned __int16)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190868)) + 10928592)
+    *(float *)(st + 4LL * (uint16_t)(v447 + *(_DWORD *)(st + 11190816)) + 10928592) = v449;
+    *(float *)(st + 4LL * (uint16_t)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190856)) + 10928592) = (float)(v449 * *(float *)(st + 10928096)) + v448;
+    v450 = *(float *)(st + 4LL * (uint16_t)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190868)) + 10928592)
          - *(float *)(st + 10927936);
     *(float *)(st + 10927952) = v450;
     v451 = (float)(v450 * *(float *)(st + 10928400)) + *(float *)(st + 10927936);
@@ -2445,11 +2448,11 @@ LABEL_96:
     *(float *)(st + 10927952) = (float)(v451 * *(float *)(st + 10928432))
                               + (float)(*(float *)(st + 10928416) * *(float *)(st + 10927952));
     v452 = *(_DWORD *)(st + 10928560);
-    v453 = *(float *)(st + 4LL * (unsigned __int16)(v452 + *(_DWORD *)(st + 11190828)) + 10928592);
+    v453 = *(float *)(st + 4LL * (uint16_t)(v452 + *(_DWORD *)(st + 11190828)) + 10928592);
     v454 = (float)(v443 - (float)(v453 * *(float *)(st + 10928096))) + *(float *)(st + 10927984);
-    *(float *)(st + 4LL * (unsigned __int16)(v452 + *(_DWORD *)(st + 11190824)) + 10928592) = v454;
-    *(float *)(st + 4LL * (unsigned __int16)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190872)) + 10928592) = (float)(v454 * *(float *)(st + 10928096)) + v453;
-    v455 = *(float *)(st + 4LL * (unsigned __int16)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190884)) + 10928592)
+    *(float *)(st + 4LL * (uint16_t)(v452 + *(_DWORD *)(st + 11190824)) + 10928592) = v454;
+    *(float *)(st + 4LL * (uint16_t)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190872)) + 10928592) = (float)(v454 * *(float *)(st + 10928096)) + v453;
+    v455 = *(float *)(st + 4LL * (uint16_t)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190884)) + 10928592)
          - *(float *)(st + 10927968);
     *(float *)(st + 10927984) = v455;
     v456 = (float)(v455 * *(float *)(st + 10928448)) + *(float *)(st + 10927968);
@@ -2457,11 +2460,11 @@ LABEL_96:
     *(float *)(st + 10927984) = (float)(v456 * *(float *)(st + 10928480))
                               + (float)(*(float *)(st + 10928464) * *(float *)(st + 10927984));
     v457 = *(_DWORD *)(st + 10928560);
-    v458 = *(float *)(st + 4LL * (unsigned __int16)(v457 + *(_DWORD *)(st + 11190836)) + 10928592);
+    v458 = *(float *)(st + 4LL * (uint16_t)(v457 + *(_DWORD *)(st + 11190836)) + 10928592);
     v459 = (float)(v443 - (float)(v458 * *(float *)(st + 10928096))) + *(float *)(st + 10928016);
-    *(float *)(st + 4LL * (unsigned __int16)(v457 + *(_DWORD *)(st + 11190832)) + 10928592) = v459;
-    *(float *)(st + 4LL * (unsigned __int16)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190888)) + 10928592) = (float)(v459 * *(float *)(st + 10928096)) + v458;
-    v460 = *(float *)(st + 4LL * (unsigned __int16)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190900)) + 10928592)
+    *(float *)(st + 4LL * (uint16_t)(v457 + *(_DWORD *)(st + 11190832)) + 10928592) = v459;
+    *(float *)(st + 4LL * (uint16_t)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190888)) + 10928592) = (float)(v459 * *(float *)(st + 10928096)) + v458;
+    v460 = *(float *)(st + 4LL * (uint16_t)(*(_WORD *)(st + 10928560) + *(_WORD *)(st + 11190900)) + 10928592)
          - *(float *)(st + 10928000);
     *(float *)(st + 10928016) = v460;
     v461 = (float)(v460 * *(float *)(st + 10928496)) + *(float *)(st + 10928000);
@@ -2472,48 +2475,48 @@ LABEL_96:
     v463 = *(float *)(st + 10928144);
     v464 = *(float *)(st + 11190736);
     v465 = *(float *)(st + 10928080);
-    v466 = (float)((float)((float)((float)((float)((float)((float)(*(float *)(a1
+    v466 = (float)((float)((float)((float)((float)((float)((float)(*(float *)(st
                                                                             + 4LL
-                                                                            * (unsigned __int16)(v462
+                                                                            * (uint16_t)(v462
                                                                                                + *(_DWORD *)(st + 11190864))
                                                                             + 10928592)
-                                                                 + *(float *)(a1
+                                                                 + *(float *)(st
                                                                             + 4LL
-                                                                            * (unsigned __int16)(v462
+                                                                            * (uint16_t)(v462
                                                                                                + *(_DWORD *)(st + 11190844))
                                                                             + 10928592))
-                                                         + *(float *)(a1
+                                                         + *(float *)(st
                                                                     + 4LL
-                                                                    * (unsigned __int16)(v462
+                                                                    * (uint16_t)(v462
                                                                                        + *(_DWORD *)(st + 11190876))
                                                                     + 10928592))
-                                                 + *(float *)(a1
+                                                 + *(float *)(st
                                                             + 4LL
-                                                            * (unsigned __int16)(v462 + *(_DWORD *)(st + 11190896))
+                                                            * (uint16_t)(v462 + *(_DWORD *)(st + 11190896))
                                                             + 10928592))
                                          * v463)
                                  * 16.0)
                          * v464)
                  * v465)
          + (float)(*(float *)(st + 10928128) * v162);
-    v467 = (float)((float)((float)((float)((float)((float)((float)(*(float *)(a1
+    v467 = (float)((float)((float)((float)((float)((float)((float)(*(float *)(st
                                                                             + 4LL
-                                                                            * (unsigned __int16)(v462
+                                                                            * (uint16_t)(v462
                                                                                                + *(_DWORD *)(st + 11190848))
                                                                             + 10928592)
-                                                                 + *(float *)(a1
+                                                                 + *(float *)(st
                                                                             + 4LL
-                                                                            * (unsigned __int16)(v462
+                                                                            * (uint16_t)(v462
                                                                                                + *(_DWORD *)(st + 11190860))
                                                                             + 10928592))
-                                                         + *(float *)(a1
+                                                         + *(float *)(st
                                                                     + 4LL
-                                                                    * (unsigned __int16)(v462
+                                                                    * (uint16_t)(v462
                                                                                        + *(_DWORD *)(st + 11190880))
                                                                     + 10928592))
-                                                 + *(float *)(a1
+                                                 + *(float *)(st
                                                             + 4LL
-                                                            * (unsigned __int16)(v462 + *(_DWORD *)(st + 11190892))
+                                                            * (uint16_t)(v462 + *(_DWORD *)(st + 11190892))
                                                             + 10928592))
                                          * v463)
                                  * 16.0)
@@ -2762,7 +2765,7 @@ LABEL_216:
           *(float *)(st + 263936) = v826;
           v827 = (float)((float)(v826 * *(float *)(st + 265136)) + (float)(v825 * *(float *)(st + 265168))) + v822;
           *(float *)(st + 263968) = v827;
-          v828 = jx_h_3A2180(v490, v491);
+          v828 = jx_h_3A2180(0.0f)/*ARGLESS2*/;
           v829 = *(float *)&v828;
           v830 = *(float *)(st + 265376);
           *(float *)(st + 264064) = v829;
@@ -2849,8 +2852,8 @@ LABEL_226:
           v861 = (int)(float)(v856 * 16384.0);
           if ( v861 != 0x80000000 && (float)v861 != v860 )
             v860 = (float)(v861 - (int)((bits_from_f32(v860) >> 31) & 1u));
-          *(_DWORD *)(st + 264400) = v856.m128_i32[0];
-          *(_DWORD *)(st + 264560) = v858.m128_i32[0];
+          *(_DWORD *)(st + 264400) = bits_from_f32(v856);
+          *(_DWORD *)(st + 264560) = bits_from_f32(v858);
           v862 = v860 * 0.000061035156;
           v858 = v858 * 16384.0;
           *(float *)(st + 264256) = v862;
@@ -2966,7 +2969,7 @@ LABEL_266:
           v895 = v891 * 0.000061035156;
           v890 = v890 * 16384.0;
           v896 = (int)v890;
-          *(_DWORD *)(a1
+          *(_DWORD *)(st
                     + 4
                     * ((*(int *)(st + 197860) - 1LL) & (*(_DWORD *)(st + 197856) - (int)(float)(v895 * -16384.0) + 1LL))
                     + 132320) = *(_DWORD *)(st + 264320);
@@ -2976,7 +2979,7 @@ LABEL_266:
           v898 = v890 * 0.000061035156;
           v897 = v897 * 16384.0;
           v899 = (int)v897;
-          *(_DWORD *)(a1
+          *(_DWORD *)(st
                     + 4
                     * ((*(int *)(st + 197860) - 1LL) & (*(_DWORD *)(st + 197856) - (int)(float)(v898 * -16384.0) + 1LL))
                     + 132320) = *(_DWORD *)(st + 264352);
@@ -2986,34 +2989,34 @@ LABEL_266:
           v901 = v897 * 0.000061035156;
           v900 = v900 * 16384.0;
           v902 = (int)v900;
-          *(_DWORD *)(a1
+          *(_DWORD *)(st
                     + 4
                     * ((*(int *)(st + 197860) - 1LL) & (*(_DWORD *)(st + 197856) - (int)(float)(v901 * -16384.0) + 1LL))
                     + 132320) = *(_DWORD *)(st + 264368);
           if ( (int)v900 != 0x80000000 && (float)v902 != v900 )
             v900 = (float)(v902 - (int)((bits_from_f32(v900) >> 31) & 1u));
           v903 = v900 * 0.000061035156;
-          *(_DWORD *)(a1
+          *(_DWORD *)(st
                     + 4
                     * ((*(int *)(st + 197860) - 1LL) & (*(_DWORD *)(st + 197856) - (int)(float)(v903 * -16384.0) + 1LL))
                     + 132320) = *(_DWORD *)(st + 264384);
           if ( (float)(v895 - v893) == 0.0 )
-            *(_DWORD *)(a1
+            *(_DWORD *)(st
                       + 4
                       * ((*(int *)(st + 197860) - 1LL) & (*(_DWORD *)(st + 197856) - (int)(float)(v894 * -16384.0) + 1LL))
                       + 132320) = *(_DWORD *)(st + 264320);
           if ( (float)(v898 - v893) == 0.0 )
-            *(_DWORD *)(a1
+            *(_DWORD *)(st
                       + 4
                       * ((*(int *)(st + 197860) - 1LL) & (*(_DWORD *)(st + 197856) - (int)(float)(v894 * -16384.0) + 1LL))
                       + 132320) = *(_DWORD *)(st + 264352);
           if ( (float)(v901 - v893) == 0.0 )
-            *(_DWORD *)(a1
+            *(_DWORD *)(st
                       + 4
                       * ((*(int *)(st + 197860) - 1LL) & (*(_DWORD *)(st + 197856) - (int)(float)(v894 * -16384.0) + 1LL))
                       + 132320) = *(_DWORD *)(st + 264368);
           if ( (float)(v903 - v893) == 0.0 )
-            *(_DWORD *)(a1
+            *(_DWORD *)(st
                       + 4
                       * ((*(int *)(st + 197860) - 1LL) & (*(_DWORD *)(st + 197856) - (int)(float)(v894 * -16384.0) + 1LL))
                       + 132320) = *(_DWORD *)(st + 264384);
@@ -3109,7 +3112,7 @@ LABEL_312:
               v935 = v931 * 0.000061035156;
               v930 = v930 * 16384.0;
               v936 = (int)v930;
-              *(_DWORD *)(a1
+              *(_DWORD *)(st
                         + 4
                         * ((*(int *)(st + 263428) - 1LL)
                          & (*(_DWORD *)(st + 263424) - (int)(float)(v935 * -16384.0) + 1LL))
@@ -3120,7 +3123,7 @@ LABEL_312:
               v938 = v930 * 0.000061035156;
               v937 = v937 * 16384.0;
               v939 = (int)v937;
-              *(_DWORD *)(a1
+              *(_DWORD *)(st
                         + 4
                         * ((*(int *)(st + 263428) - 1LL)
                          & (*(_DWORD *)(st + 263424) - (int)(float)(v938 * -16384.0) + 1LL))
@@ -3131,7 +3134,7 @@ LABEL_312:
               v941 = v937 * 0.000061035156;
               v940 = v940 * 16384.0;
               v942 = (int)v940;
-              *(_DWORD *)(a1
+              *(_DWORD *)(st
                         + 4
                         * ((*(int *)(st + 263428) - 1LL)
                          & (*(_DWORD *)(st + 263424) - (int)(float)(v941 * -16384.0) + 1LL))
@@ -3139,31 +3142,31 @@ LABEL_312:
               if ( (int)v940 != 0x80000000 && (float)v942 != v940 )
                 v940 = (float)(v942 - (int)((bits_from_f32(v940) >> 31) & 1u));
               v943 = v940 * 0.000061035156;
-              *(_DWORD *)(a1
+              *(_DWORD *)(st
                         + 4
                         * ((*(int *)(st + 263428) - 1LL)
                          & (*(_DWORD *)(st + 263424) - (int)(float)(v943 * -16384.0) + 1LL))
                         + 197888) = *(_DWORD *)(st + 264544);
               if ( (float)(v935 - v933) == 0.0 )
-                *(_DWORD *)(a1
+                *(_DWORD *)(st
                           + 4
                           * ((*(int *)(st + 263428) - 1LL)
                            & (*(_DWORD *)(st + 263424) - (int)(float)(v934 * -16384.0) + 1LL))
                           + 197888) = *(_DWORD *)(st + 264480);
               if ( (float)(v938 - v933) == 0.0 )
-                *(_DWORD *)(a1
+                *(_DWORD *)(st
                           + 4
                           * ((*(int *)(st + 263428) - 1LL)
                            & (*(_DWORD *)(st + 263424) - (int)(float)(v934 * -16384.0) + 1LL))
                           + 197888) = *(_DWORD *)(st + 264512);
               if ( (float)(v941 - v933) == 0.0 )
-                *(_DWORD *)(a1
+                *(_DWORD *)(st
                           + 4
                           * ((*(int *)(st + 263428) - 1LL)
                            & (*(_DWORD *)(st + 263424) - (int)(float)(v934 * -16384.0) + 1LL))
                           + 197888) = *(_DWORD *)(st + 264528);
               if ( (float)(v943 - v933) == 0.0 )
-                *(_DWORD *)(a1
+                *(_DWORD *)(st
                           + 4
                           * ((*(int *)(st + 263428) - 1LL)
                            & (*(_DWORD *)(st + 263424) - (int)(float)(v934 * -16384.0) + 1LL))
@@ -3174,12 +3177,12 @@ LABEL_312:
                    + (float)(*(float *)(st + 263528) * *(float *)(st + 263524));
               v947 = *(float *)(st + 264192) * 16384.0;
               v948 = (int)(float)(*(float *)(st + 264192) * -16384.0);
-              *(_DWORD *)(st + 263520) = *(_DWORD *)(a1
+              *(_DWORD *)(st + 263520) = *(_DWORD *)(st
                                                    + 4
                                                    * ((*(int *)(st + 197860) - 1LL)
                                                     & (*(_DWORD *)(st + 197856) - v948 + 1LL))
                                                    + 132320);
-              *(_DWORD *)(st + 263524) = *(_DWORD *)(a1
+              *(_DWORD *)(st + 263524) = *(_DWORD *)(st
                                                    + 4
                                                    * ((*(int *)(st + 197860) - 1LL)
                                                     & (*(_DWORD *)(st + 197856) - v948 + 2LL))
@@ -3204,12 +3207,12 @@ LABEL_312:
               v957 = (float)((float)(1.0 - *(float *)(st + 263592)) * *(float *)(st + 263584))
                    + (float)(*(float *)(st + 263592) * *(float *)(st + 263588));
               v958 = (int)(float)(v954 * -16384.0);
-              *(_DWORD *)(st + 263584) = *(_DWORD *)(a1
+              *(_DWORD *)(st + 263584) = *(_DWORD *)(st
                                                    + 4
                                                    * ((*(int *)(st + 263428) - 1LL)
                                                     & (*(_DWORD *)(st + 263424) - v958 + 1LL))
                                                    + 197888);
-              *(_DWORD *)(st + 263588) = *(_DWORD *)(a1
+              *(_DWORD *)(st + 263588) = *(_DWORD *)(st
                                                    + 4
                                                    * ((*(int *)(st + 263428) - 1LL)
                                                     & (*(_DWORD *)(st + 263424) - v958 + 2LL))
@@ -3558,7 +3561,7 @@ LABEL_312:
                    * *(float *)(st + 267744))
            - v725;
       *(float *)(st + 267104) = (float)(v727 * *(float *)(st + 267504)) + v725;
-      v730 = jx_h_3A2180(v729, v728);
+      v730 = jx_h_3A2180(0.0f)/*ARGLESS2*/;
       *(_DWORD *)(st + 266880) = LODWORD(v730);
       if ( v726 < 1.0 )
         v727 = *(float *)(st + 267152);
@@ -3737,7 +3740,7 @@ LABEL_355:
   v543 = *(_DWORD *)(st + 268368);
   *(_DWORD *)(st + 268384) = *(_DWORD *)(st + 268352);
   *(_DWORD *)(st + 268400) = v543;
-  v544 = jx_h_3A2010();
+  v544 = jx_h_3A2010(0.0)/*ARGLESS*/;
   *(float *)(st + 268416) = fmaxf(fminf(v544, 512.0), -512.0);
   v545 = *(float *)(st + 268640);
   *(float *)(st + 268656) = v545;
@@ -3759,7 +3762,7 @@ LABEL_355:
   v549 = v547 + v548;
   if ( v549 > 1.0 )
     v549 = fmodf(v549 + 1.0, 2.0) - 1.0;
-  v550 = jx_h_3A2210();
+  v550 = jx_h_3A2210(0.0f)/*ARGLESS*/;
   *(float *)(st + 268704) = v550;
   *(float *)(st + 268672) = (float)(v549 * v545) + (float)(v545 - 1.0);
   *(float *)(st + 268752) = (float)(v550 * *(float *)(st + 268768)) + *(float *)(st + 268784);

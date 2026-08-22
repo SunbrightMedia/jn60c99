@@ -27,10 +27,14 @@ def main():
     # signature
     body = body.replace(
         "float *__fastcall sub_18039A2B0(__int64 a1, __int64 a2, float **a3)",
-        "float *jx_master_render(unsigned char *st, void **a2, float **a3)")
+        "float *jx_master_render(unsigned char *st, unsigned char *a2, float **a3)")
 
-    # offsets: plain single-unit -> st + N  (decimal or hex, keep type verbatim)
-    body = re.sub(r"a1 \+ (0x[0-9A-Fa-f]+|\d+)", r"st + \1", body)
+    # single unit: a1 IS the state base, so every a1 token -> st. This covers
+    # simple (a1 + N) AND computed (a1 + 4LL*idx + base) offsets uniformly.
+    body = re.sub(r"\ba1\b", "st", body)
+    # IDA 'unsigned __intN' -> fixed-width unsigned (C cannot say 'unsigned <typedef>')
+    body = body.replace("unsigned __int64", "uint64_t").replace("unsigned __int32", "uint32_t")
+    body = body.replace("unsigned __int16", "uint16_t").replace("unsigned __int8", "uint8_t")
 
     # helper renames
     for h in ("18039A250","1803A2010","1803A2180","1803A2210","1803A21E0","1803A9950"):
@@ -45,6 +49,7 @@ def main():
                   r"(int)((bits_from_f32(\1) >> 31) & 1u)", body)
     body = re.sub(r"(jx_h_\w+\([^()]*\))\.m128_f32\[0\]", r"\1", body)
     body = re.sub(r"(v\d+)\.m128_f32\[0\]", r"\1", body)
+    body = re.sub(r"(v\d+)\.m128_i32\[0\]", r"bits_from_f32(\1)", body)
 
     # CARRIER-SAFE helper args: 3A2210/3A21E0 are lane-0 (__m128/float) wrappers;
     # a bare double/int64 carrier arg must be reinterpreted, not converted.
@@ -58,6 +63,12 @@ def main():
             return m.group(0)
         body = re.sub(r"jx_h_%s\((v\d+)\)" % h, fix_arg, body)
 
+    # argless placeholders (marked) until the null shows which execute
+    # 2-arg helper calls = Hex-Rays lost xmm0, substituted int regs -> argless
+    body = re.sub(r'jx_h_3A2180\(v\d+, v\d+\)', 'jx_h_3A2180(0.0f)/*ARGLESS2*/', body)
+    body = re.sub(r'jx_h_3A2010\(\)', 'jx_h_3A2010(0.0)/*ARGLESS*/', body)
+    body = re.sub(r'jx_h_3A21E0\(\)', 'jx_h_3A21E0(0.0f)/*ARGLESS*/', body)
+    body = re.sub(r'jx_h_3A2210\(\)', 'jx_h_3A2210(0.0f)/*ARGLESS*/', body)
     # argless fixups
     for old, new in FIX.items():
         n = body.count(old)
@@ -91,6 +102,7 @@ def main():
 typedef uint32_t _DWORD; typedef uint64_t _QWORD;
 typedef uint16_t _WORD;  typedef uint8_t _BYTE;
 typedef int64_t __int64; typedef int32_t __int32;
+typedef int16_t __int16; typedef int8_t __int8;
 #define LODWORD(x)  (*((uint32_t *)&(x)))
 #define HIDWORD(x)  (*((uint32_t *)&(x)+1))
 #define SLODWORD(x) (*((int32_t *)&(x)))
