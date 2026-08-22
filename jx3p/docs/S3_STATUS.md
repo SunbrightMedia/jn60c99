@@ -102,3 +102,33 @@ The voice render proves the whole pipeline end to end (dump -> transcribe ->
 oracle -> null 0). Every remaining module follows the same path. The master's
 argless resolution is the only novel sub-task; after it, effects and recall are
 repetitions of proven steps, and make verify is the gate that ties them together.
+
+
+## RECALL PROGRESS (this session)
+
+- Per-param coefficient derivation WORKS via the plugin's own dispatch under
+  Unicorn (PROVEN-executed, binary-derived -- the JUNO's legitimate method, not a
+  capture): 43 params move 366 coefficient cells; captured value->coefficient
+  LUTs (jx3p/gen/recall_luts.json).
+- LUT-reconstruction of a full factory patch matches the oracle dispatch on
+  348/366 cells (95%). The 18 remaining are CROSS-PARAMETER interactions:
+    * shared cells (e.g. cell 4000 written by params 801 AND 858 -- a read-modify
+      where 858's result depends on 801's coefficient), and
+    * value-INDEPENDENT constant writes my v0-vs-v255 detection missed (e.g.
+      cell 13504, written by no param in isolation).
+  These need the specific virtual setters transcribed (the dispatch routes each
+  param to *(*proc + vtoff)); most params are clean LUTs, a few are read-modify.
+- Dispatch is deterministic (0 cells vary on re-run), so a faithful sequential
+  recall is well-defined.
+
+## REMAINING TO THE FINISH LINE (honest)
+
+1. Recall interactions: transcribe the ~few read-modify/finalize setters (or model
+   them) so all 366 cells match, per unit (voice units 0-7 + master).
+2. Full-engine integration in C: recall -> note-on -> per-block 8-voice + master
+   render + the assigner/note logic, as one jx_engine.
+3. Effects standalone nulls (those not already covered inside the master).
+4. make verify SYNTH=jx3p: null EXACTLY 0 across 64 patches x rates x blocks.
+
+The DSP core (voice + master render) is proven; recall is 95% and scoped; the
+above is the remaining, genuine work.
