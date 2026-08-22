@@ -225,3 +225,26 @@ setter subsystem, proc-mediated). NOT YET DONE: the recall setter transcription,
 engine integration, effects nulls, and make verify. The port is not finished and
 is not claimed finished; the hardest RE (bit-exact DSP) is complete and the
 remainder is bounded, specified transcription + integration.
+
+
+## RECALL -- LUT REDUCTION DEFINITIVELY RULED OUT (triple-confirmed)
+
+Attempted every table reduction with proper heap snapshot/restore:
+- per-param 1D sparse: 7/64
+- 1D + 2D{803,857-guess}: 8/64
+- 1D + 2D{855<-791, 857<-801}: 0/64 (even patch 0 off by 10)
+The interaction structure shifts with capture methodology because the recall is
+a STATEFUL virtual object graph: dispatch -> proc setter -> iterates CHILD DSP
+objects -> each child's setter (vtable +56) -> writes coefficients, with the
+children carrying state. It is not reducible to per-parameter tables.
+
+CONCLUSION (final): a faithful standalone recall must TRANSCRIBE the parameter
+object graph -- the dispatch router 0x3EBB00 + the setter hierarchy (proc setters
+that fan out to child setters). This is the plugin's parameter framework, a
+subsystem on the order of (or larger than) the JUNO's recall effort. The 1D LUTs
+in jx3p/gen/ are correct for the ~44 independent params and are kept as partial
+input, but the interacting setters need transcription.
+
+The recall byte layout (name-proven), the dispatch/setter locations, and the
+in-context reference (which nulls) are all in hand; the implementation is the
+remaining subsystem.
