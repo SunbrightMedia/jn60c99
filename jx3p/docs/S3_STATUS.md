@@ -21,7 +21,18 @@ The reusable win: the null caught the reinterpret trap (helper 3A2210 fed a bare
 `double` carrier -> numeric convert instead of lane-0 bit reinterpret). Baked
 into both translate tools now.
 
-## TRANSCRIBED, NOT YET PROVEN
+## PROVEN — the master render (added this session)
+
+- **The master render** — `jx3p/src/jx_master_render.c`. Nulls EXACTLY 0 against
+  the oracle on the default note state: L/R output 0/32 mismatches AND the full
+  11 MB state 0 bytes differ. Harness: null_master_emu/_c (a2 = 8 voice-main
+  outputs byte-addressed; note-object chain at st+136 relocated; SNAP = full
+  STATE_SZ). The whole core DSP signal path (voice + master) is now bit-exact.
+  Caveat: the 11 argless helper sites are DCO-mode/effect-gated (v31<=3 via the
+  note object) and NOT reached by a sustained note, so they are placeholdered and
+  unproven until a mode-selecting patch (recall) exercises them.
+
+## (superseded note) master render — earlier blocker
 
 - **The master render** — `jx3p/src/jx_master_render.c` from
   `translate_jx_master.py`. Single unit, plain offsets (rsi=a1 confirmed).
@@ -63,15 +74,22 @@ into both translate tools now.
     drive the master's argless branches under the oracle; then the emu arg-capture
     resolves 3A21E0 mechanically instead of by hand, and the master nulls.
 
-## NOT STARTED
+## REMAINING
 
+- **Recall in C** (next). SCOPED: the dispatch 0x3EBB00 is a binary-search router
+  on param index that DELEGATES to ~149 virtual param-setter methods
+  (`(*(*a1 + vtoff))(a1,a3,a4)`), not a self-contained applier. So recall follows
+  the JUNO's proven method: run the dispatch under the oracle per parameter to
+  recover {blob_pos -> (curve/offset)}, port a curve evaluator + binding map in C,
+  prove the post-recall coefficient state matches the oracle's bit-for-bit. This
+  also supplies the mode-selecting patches that exercise the master's 11 argless
+  branches (closing that gap).
 - **Effects** modules (EfxCh chorus, EfxPh phaser, EfxCr, EfxDs/Od/Fz) — each a
-  CDSPJx3p class in the dump; transcribe + null like the voice arm. Some may be
-  invoked inside the master chain; scope confirmed when the master nulls.
-- **Recall in C** — derive patch-byte -> coefficient by perturb-and-diff under
-  the oracle (the JUNO method), implement, prove warm==cold.
+  CDSPJx3p class in the dump; transcribe + null like the voice/master. Some are
+  invoked inside the master chain (the master already nulls, so those paths that
+  run are covered; standalone effect entries still need their own null).
 - **make verify SYNTH=jx3p** — the finish line: null EXACTLY 0 across all 64
-  factory patches x rates x block sizes.
+  factory patches x rates x block sizes, tying recall + render together.
 
 ## The method is proven; the remainder is volume
 
