@@ -39,6 +39,30 @@ into both translate tools now.
   Once resolved: build a null_master harness (MASTER_WRAP, 16 voice-input ptrs +
   L/R out) and null EXACTLY 0.
 
+  DEEPER FINDINGS (this session):
+  * The master render is `sub_18039A2B0(a1, a2, a3)`: a1=state8, a2=array of 16
+    ptrs (8 voices x {main,sub} outputs, read at decompile 1015-1022), a3=L/R
+    out (written at the tail). MASTER_WRAP passes a2/a3 through rdx/r8. Confirmed
+    by direct call (entry executes, returns L/R ptr).
+  * MASTER_WRAP 0x377010 gates on `*(a1+20)` (enable) and a warmup latch
+    `*(a1+11191048)` (>0 => skip render, decrement) -- clear both to run it, or
+    call 0x39A2B0 directly.
+  * The 11 argless sites are NOT reachable from a default single-note state:
+    they sit under DCO-mode guards (`if (v31 <= 3)` + waveform selector
+    `*(a1+11191052)`), i.e. they are the effect/oscillator-mode paths. Exercising
+    them needs a patch that selects those modes -> depends on recall (task 9).
+  * Partial resolution proven from decompile+asm:
+      - 3A2210 arg is CLEAR: the immediately preceding 3A21E0 result (v235 etc.)
+        -> `*(float*)&vN = jx_h_3A2210(v_prev_result);`
+      - 3A2010 arg = (double)(*(float*)(a1+A) + *(float*)(a1+B)), A/B the
+        movss/addss cells before `cvtps2pd` (rsi=a1, so direct).
+      - 3A21E0 arg = phase-accumulator wrap: xmm0=[cell] + a conditional
+        wrap of (clamped-2010-result * [cell]); needs full asm reconstruction of
+        the comiss/addss wrap chain (the one genuinely intricate sub-task).
+  * Recommended order: do RECALL first (task 9) so a mode-selecting patch can
+    drive the master's argless branches under the oracle; then the emu arg-capture
+    resolves 3A21E0 mechanically instead of by hand, and the master nulls.
+
 ## NOT STARTED
 
 - **Effects** modules (EfxCh chorus, EfxPh phaser, EfxCr, EfxDs/Od/Fz) — each a
