@@ -9,10 +9,7 @@ from unicorn.x86_const import *
 
 IB = J.IB
 # sweep of representative inputs (floats seen in the render + edge cases)
-FS = [0.0, -0.0, 1.0, -1.0, 0.5, -0.5, 0.25, 0.7071, -0.7071, 0.9999, -0.9999,
-      1.5, -1.5, 2.0, 3.14159, -3.14159, 0.1, -0.1, 0.001, 1e-8, -1e-8,
-      0.368066, -0.143065, 0.846183, -0.28855, 0.556185, 60.0, -20.0, 8.9,
-      440.0, 0.033, -0.66, 100.0, 0.247314]
+FS = [(-4.0 + 0.013*k) for k in range(700)] + [0.0,-0.0,1.0,-1.0,0.5,-0.5]
 IS = list(range(-34, 35))
 
 def call_ff(jx, fn, xmm0_f, xmm1_or_int=None, is_int=False):
@@ -50,14 +47,14 @@ def main():
             rows.append(struct.pack('<fiI', f, i, o))
     open(os.path.join(outdir, "helper_39A250.bin"), "wb").write(b"".join(rows))
     # 3A2180(float)->float, 3A2210(float)->float, 3A9950(float)->float
-    for rva in (0x3A2180, 0x3A2210, 0x3A9950):
+    for rva in (0x3A2180, 0x3A2210, 0x3A9950, 0x3A21E0):
         rows = []
         for f in FS:
             o = call_ff(jx, IB+rva, f)
             rows.append(struct.pack('<fI', f, o))
         open(os.path.join(outdir, "helper_%X.bin" % rva), "wb").write(b"".join(rows))
     # 3A2010(double)->double
-    DS = [float(x) for x in FS] + [-20.0, -19.5, -10.0, 0.0, 8.9, 8.5, 5.0, 2.5]
+    DS = [(-21.0 + 0.01*k) for k in range(3100)]   # dense over all 29 rows [-20,8.9] + clamp edges
     rows = []
     for d in DS:
         o = call_dd(jx, IB+0x3A2010, d)

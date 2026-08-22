@@ -30,4 +30,6 @@ float  jx_h_3A2210(float a1);
  * 21/23/24, doubling, masks), then (float)result * 2^-24. */
 float  jx_h_3A9950(float a1);
 
+float  jx_h_3A21E0(float result);  /* sub_1803A21E0: positive-side fmodf wrap */
+
 #endif /* JX_VOICE_HELPERS_H */

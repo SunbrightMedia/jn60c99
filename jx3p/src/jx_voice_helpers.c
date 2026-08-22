@@ -675,3 +675,12 @@ LABEL_8:
 #include <xmmintrin.h>
 #include <pmmintrin.h>
 void jx_set_ftz(void){ _mm_setcsr((_mm_getcsr() | 0x8000 | 0x0040)); }
+
+/* sub_1803A21E0: positive-side wrap. Verbatim from the decompile (only the
+ * result>1 branch wraps; no negative branch in the original). STATUS: READ. */
+float jx_h_3A21E0(float result)
+{
+  if ( result > 1.0F )
+    return fmodf(result + 1.0F, 2.0F) - 1.0F;
+  return result;
+}
