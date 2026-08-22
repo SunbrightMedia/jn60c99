@@ -20,5 +20,24 @@
   "rings": null,
 
   "_param_surface": "KNOWN from Script.xml: 290 parameters, 43 audible. Full inventory in jx3p/docs/param_inventory.json. Encoding is int2x4 nibble-pair dominant, as JUNO. ASSIGN MODE range 0,2 (UNISON at 2). CONDITION range 0,255 default 128.",
-  "param_inventory": "jx3p/docs/param_inventory.json"
+  "param_inventory": "jx3p/docs/param_inventory.json",
+
+  "_entries": "READ from the second IDA dump (RVAs, ImageBase 0x180000000). Render topology mirrors the JUNO. NOT YET PROVEN-executed under Unicorn -- that is the oracle-harness step; these are the addresses it wires. DISPATCH/proc_vtable already cross-checked by S2's vtable-slot transfer.",
+  "entries": {
+    "proc_vtable_rva": "0x9F9A90",
+    "dispatch_rva": "0x3EBB00",
+    "voice_wrap_rva": "0x377080",
+    "voice_driver_rva": "0x3F8C60",
+    "master_wrap_rva": "0x377010",
+    "master_driver_rva": "0x3F9220",
+    "voice_render_variants": ["0x3A22C0","0x3A99B0","0x3B1040","0x3B86D0","0x3BFD60","0x3C73F0","0x3CEA80","0x3D6110"],
+    "master_render_rva": "0x39A2B0",
+    "build_rva": null,
+    "noteon_rva": null,
+    "noteoff_rva": null,
+    "setsr_rva": null,
+    "asg_notify_rva": null,
+    "alloc_stub_rva": null,
+    "fatal_stub_rva": null
+  }
 }
