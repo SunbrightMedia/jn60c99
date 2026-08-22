@@ -170,6 +170,7 @@ class JX:
         except: return True
     def call(self,fn,rcx=0,rdx=0,r8=0,r9=0,count=0):
         uc=self.uc
+        uc.reg_write(UC_X86_REG_MXCSR, getattr(self,'_mxcsr',0x1F80))
         rsp=(STACK_BASE+STACK_SIZE-0x10000)&~0xF; rsp-=8
         uc.reg_write(UC_X86_REG_RSP,rsp)
         for reg,v in ((UC_X86_REG_RCX,rcx),(UC_X86_REG_RDX,rdx),(UC_X86_REG_R8,r8),(UC_X86_REG_R9,r9)):
@@ -180,8 +181,17 @@ class JX:
         if rip!=RET: raise RuntimeError("call 0x%x stopped rva 0x%x"%(fn-IB,rip-IB))
         return uc.reg_read(UC_X86_REG_RAX)
 
+    def set_ftz(self):
+        self._mxcsr=0x9FC0
+        """Match the plugin's DSP FP environment: FTZ|DAZ + all exceptions
+        masked (MXCSR 0x9FC0), the same env the JUNO engine runs in and the
+        one the C port compiles against. Without this the emulated render keeps
+        denormals the real plugin would flush, so the reference diverges from a
+        correct transcription on every denormal-producing cell."""
+        self.uc.reg_write(UC_X86_REG_MXCSR, 0x9FC0)
     def _run(self,stub):
         uc=self.uc
+        uc.reg_write(UC_X86_REG_MXCSR, getattr(self,'_mxcsr',0x1F80))
         rsp=(STACK_BASE+STACK_SIZE-0x10000)&~0xF; rsp-=8
         uc.reg_write(UC_X86_REG_RSP,rsp)
         RET=SCRATCH+0x5000; uc.mem_write(rsp,struct.pack("<Q",RET))

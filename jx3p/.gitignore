@@ -1,0 +1,4 @@
+_spec_*.c
+__pycache__/
+*.so
+*.o
