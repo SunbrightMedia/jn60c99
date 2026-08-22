@@ -55,5 +55,8 @@
     "_audio_proven": "PROVEN: build+SETSR(44100)+noteon(60,100)+render produces nonzero audio at block 3, zero faults. NOTEOFF 0x3F90F0 is the remaining unconfirmed candidate (its twin pattern; does not mutate assigner on note-on args).",
     "voice_stride": 16128,
     "host_assign_ptr": "HOST + 104 + 64*i"
-  }
+  },
+  "_recall_mapping": "DERIVED this session (non-circular, name-proven): blob_pos = 2*pool + 8 (the 16-char patch name int2x4-decodes at blob 156 for pool 74-89, exactly spelling the name); dispatch_idx = pool + 740 (active indices map to the real JX DSP params: VCF CUTOFF, ENV ATTACK, DCO WAVEFORM...). Recall coefficient side: 44 clean LUT params + the {796,797,803}/875 cluster.",
+  "blob_pos_formula": "2*pool+8",
+  "dispatch_idx_formula": "pool+740"
 }

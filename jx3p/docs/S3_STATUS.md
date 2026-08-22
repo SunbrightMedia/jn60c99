@@ -159,3 +159,20 @@ So the JX recall = 44 LUT params + one 4-param cluster. No large curve subsystem
 3. Integrate jx_engine.c: recall -> note-on -> per-block 8-voice+master render.
 4. Effects standalone nulls (those not covered inside the already-proven master).
 5. make verify SYNTH=jx3p: null EXACTLY 0, 64 patches x rates x blocks.
+
+
+## RECALL BYTE LAYOUT DERIVED (this session) -- the S1 unknown, solved
+
+Non-circular, name-proven (the JUNO's validation method):
+- The 16-char patch name int2x4-decodes at blob offset 156, stride 2, for value-
+  tree pool 74-89 -- spelling "String 1 [Str1] " EXACTLY. => blob_pos = 2*pool+8.
+- dispatch_idx = pool + 740 (verified: the coefficient-moving indices map to the
+  real JX DSP params -- LFO RATE, DCO1/2 WAVEFORM, VCF CUTOFF FREQ, ENV1/2
+  ATTACK/DECAY/SUSTAIN/RELEASE, VCA LEVEL, etc.).
+- Decoded patch-0 values are musically sensible (VCA LEVEL 116, ENV2 SUSTAIN 255,
+  EFFECT LEVEL 255, BEND RANGE 11...).
+Recorded in synth/jx3p.json (blob_pos_formula, dispatch_idx_formula).
+
+So the recall is now fully specified end to end: blob byte -> (2*pool+8 decode) ->
+param value -> (pool+740 dispatch idx) -> coefficient (44 LUTs + {796,797,803}
+cluster). Remaining is implementation + the cluster + engine integration + gate.
