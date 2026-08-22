@@ -4,33 +4,53 @@
 # family and it dumps EVERYTHING a bit-exact port + oracle needs, in one pass,
 # so IDA never has to be opened again. It replaces the EIGHT separate JUNO
 # scripts (extract_dsp / tables / init / param_setter / param_meta /
-# master_deps / everything_static / host_layer) with their union, and it
-# discovers its own targets from RTTI + call-graph closure rather than a
-# hand-list of addresses -- so completeness does not depend on guessing.
+# master_deps / everything_static / host_layer) with their union.
 #
-# IDA Pro 9.x (Hex-Rays), x86-64. Read-only, no debugger. Safe to run on the
-# freshly auto-analysed database.
+# ============================ THE STRATEGY ============================
+# The render leaves (per-sample voice/master/effect helpers) are reached by
+# INDIRECT dispatch, not direct calls -- a plain call-graph closure CANNOT see
+# them. PROVEN against the JUNO binary: a direct-call closure from every DSP
+# vtable method reaches 154 functions and NONE of the four hand-found leaves
+# (voice render, master/chorus, parameter registry, chorus-coefficient gen).
+#
+# What DOES reach them: an ADDRESS BAND. MSVC lays a class's methods and the
+# non-virtual helpers they dispatch to into one contiguous slab of .text. Every
+# one of the four JUNO leaves falls inside the band spanning the lowest DSP
+# vtable method to the highest parameter-class method, +/-0x10000. Measured:
+#   JUNO band 0x346150..0x3CCD80 = 1282 functions, all 4 leaves + BUILD +
+#             NOTEON/NOTEOFF + the per-sample wrappers IN, 44000 CRT/GUI OUT.
+#   JX   band 0x3486E0..0x3FEB70 = 1291 functions, every DSP method + the
+#             master process (which the old fptr-sweep dump MISSED) IN.
+# So the band is the completeness guarantee. Two call-graph closures are added
+# only as belt-and-suspenders for any straggler outside the band.
+#
+# The old blanket .rdata function-pointer sweep is GONE: it pulled 275+ JUCE/
+# Gdiplus/CRT functions into the set and, with a 6000 cap, crowded the real DSP
+# out (132 of 185 DSP methods were lost). The band replaces it and cannot
+# truncate: it is a bounded address range, not a capped graph walk.
+# =====================================================================
 #
 # ============================ HOW TO RUN ============================
 #   1. IDA Pro -> File -> Open -> JX3P.vst3   (let auto-analysis FINISH;
-#      the bottom-left says "AU: idle". This can take several minutes on a
-#      14 MB DLL -- wait for it, the dump is only complete on a done database.)
+#      the bottom-left says "AU: idle". Several minutes on a 14 MB DLL --
+#      wait for it, the dump is only complete on a done database.)
 #   2. File -> Script file... -> this file.
 #   3. Watch the Output window. It prints a progress line per phase and ends
-#      with "=== DONE. Zip <dir> and send it. ===".
+#      with a COMPLETENESS line "N/M DSP vtable methods decompiled" -- that
+#      number MUST read M/M. If it does not, it lists the missing methods and
+#      the dump is incomplete; do not upload, tell Claude the printed gap.
 #   4. Zip the output directory it names (next to the .i64) and upload it.
 # ===================================================================
-#
-# CPU BUDGET: the closure decompile is the slow part (minutes, not hours).
-# Everything else is instant. One run.
 
 import os, re, struct, json
 import ida_funcs, ida_hexrays, ida_name, ida_bytes, ida_segment, ida_nalt
 import idautils, idc, ida_xref, ida_typeinf
 
 IMAGE_BASE   = idc.get_inf_attr(idc.INF_BASEADDR)
-CLASS_PREFIX = "CDSPJx3p"        # DSP module family; also grabs CPrmDSP* below
+CLASS_PREFIX = "CDSPJx3p"        # DSP module family
 PLUGIN_HINT  = "CPrmDSP"         # the control/parameter class family
+BAND_MARGIN  = 0x10000           # slab padding; PROVEN to catch every JUNO leaf
+CLOSURE_CAP  = 8000              # safety only; the band, not this, bounds the run
 OUT = os.path.join(os.path.dirname(idc.get_idb_path()) or ".", "jx3p_dump")
 if not os.path.isdir(OUT):
     os.makedirs(OUT)
@@ -41,38 +61,30 @@ def fname(ea): return ida_name.get_name(ea) or ("sub_%X" % ea)
 def safe(s): return re.sub(r"[^A-Za-z0-9_.-]", "_", s)[:90]
 
 # ---------------------------------------------------------------- RTTI seeds
-# Find every class vtable whose RTTI TypeDescriptor name starts with a prefix,
-# and return {classname: vtable_ea}. Uses IDA's own name for '??_7Name@@6B@'
-# (the MSVC vftable symbol) when present, else scans for the COL pattern.
+# Find every class vtable whose RTTI TypeDescriptor name starts with a prefix.
 def find_vtables(prefixes):
     out = {}
     for ea, name in idautils.Names():
-        # MSVC vftable mangled symbol: ??_7<Class>@@6B@
         m = re.match(r"\?\?_7(" + "|".join(prefixes) + r"\w*)@@6B", name)
         if m:
             out.setdefault(m.group(1), ea)
     if len(out) >= 8:
         return out
-    # FALLBACK: IDA did not name the vftables -- scan RTTI directly (the same
-    # COL walk rtti_seeds.py uses off-line), so seeds never depend on naming.
-    log("find_vtables: only %d named; falling back to raw RTTI COL scan" % len(out))
+    log("find_vtables: only %d named; raw RTTI COL scan" % len(out))
     for seg in idautils.Segments():
         s = ida_segment.getseg(seg)
-        nm = ida_segment.get_segm_name(s)
-        if nm not in (".data", ".rdata"): continue
+        if ida_segment.get_segm_name(s) not in (".data", ".rdata"): continue
         ea = s.start_ea
         while ea < s.end_ea - 4:
-            # TypeDescriptor name string ".?AV<Class>@@"
-            b = ida_bytes.get_bytes(ea, 4) or b""
-            if b == b".?AV":
+            if ida_bytes.get_bytes(ea, 4) == b".?AV":
                 end = ea
                 while end < ea + 200 and ida_bytes.get_byte(end) != 0: end += 1
                 cls = ida_bytes.get_bytes(ea + 4, end - ea - 4).decode("latin1").rstrip("@")
                 if any(cls.startswith(p) for p in prefixes):
                     td = ea - 16
-                    for xr in idautils.XrefsTo(td, 0):     # COL references the TD
+                    for xr in idautils.XrefsTo(td, 0):
                         col = xr.frm - 12
-                        if ida_bytes.get_dword(col) == 1:   # x64 COL signature
+                        if ida_bytes.get_dword(col) == 1:
                             for vxr in idautils.XrefsTo(col, 0):
                                 vft = vxr.frm + 8
                                 if ida_funcs.get_func(ida_bytes.get_qword(vft)):
@@ -81,18 +93,19 @@ def find_vtables(prefixes):
             ea += 1
     return out
 
-# fallback if IDA didn't name the vftables: scan .rdata for COLs (rare on 9.x)
-def seeds_from_vtables(vts):
-    seeds = set()
-    for cls, vft in vts.items():
-        for i in range(24):                       # first virtual slots
-            p = ida_bytes.get_qword(vft + 8 * i)
-            f = ida_funcs.get_func(p)
-            if f and f.start_ea == p:
-                seeds.add(p)
-            else:
-                break
-    return seeds
+# Read ALL virtual slots of a vtable (up to 64), keeping those that are real
+# function starts; stop after two consecutive non-function slots (vtable end).
+def vtable_methods(vft):
+    ms, gap = [], 0
+    for i in range(64):
+        p = ida_bytes.get_qword(vft + 8 * i)
+        f = ida_funcs.get_func(p)
+        if f and f.start_ea == p:
+            ms.append(p); gap = 0
+        else:
+            gap += 1
+            if gap >= 2: break
+    return ms
 
 # --------------------------------------------------------- call-graph closure
 def callees(ea):
@@ -101,7 +114,7 @@ def callees(ea):
     out = set()
     for h in idautils.Heads(f.start_ea, f.end_ea):
         for xr in idautils.XrefsFrom(h, 0):
-            if xr.type in (ida_xref.fl_CN, ida_xref.fl_CF):   # near/far call
+            if xr.type in (ida_xref.fl_CN, ida_xref.fl_CF):
                 g = ida_funcs.get_func(xr.to)
                 if g: out.add(g.start_ea)
     return out
@@ -119,18 +132,30 @@ def callers(ea, levels):
         frontier = nxt
     return seen
 
-def closure_down(seeds, cap=6000):
-    seen, stack = set(), list(seeds)
-    while stack and len(seen) < cap:
+def closure_down(seeds):
+    seen, stack, hit = set(), list(seeds), False
+    while stack:
+        if len(seen) >= CLOSURE_CAP:
+            hit = True; break
         ea = stack.pop()
         if ea in seen: continue
         seen.add(ea)
         stack.extend(callees(ea))
+    if hit:
+        log("WARNING closure_down hit CLOSURE_CAP=%d -- band still bounds the "
+            "run, but report this to Claude" % CLOSURE_CAP)
     return seen
 
+# ------------------------------------------------------------- band of .text
+def funcs_in_band(lo, hi):
+    out = set()
+    ea = idc.get_next_func(lo - 1)
+    while ea != idc.BADADDR and ea <= hi:
+        out.add(ea)
+        ea = idc.get_next_func(ea)
+    return out
+
 # -------------------------------------------------------------- data globals
-# Every constant a function reads: walk its instructions, collect data xrefs
-# into .rdata/.data, dump the target bytes and interpret as f32/f64/i32 arrays.
 def data_refs(ea):
     f = ida_funcs.get_func(ea)
     if not f: return set()
@@ -144,7 +169,6 @@ def data_refs(ea):
     return refs
 
 def guess_len(ea):
-    # extend to the next named item or defined item boundary, cap 64 KB
     nxt = idc.next_head(ea, ea + 0x10000)
     return max(4, min(0x10000, (nxt - ea) if nxt != idc.BADADDR else 0x400))
 
@@ -193,108 +217,120 @@ def proto(ea):
 def main():
     log("ImageBase 0x%X  out=%s" % (IMAGE_BASE, OUT))
 
-    # 1. RTTI: every DSP + control class vtable
+    # 1. RTTI: every DSP + control class vtable, ALL slots
     vts = find_vtables([CLASS_PREFIX, PLUGIN_HINT])
     log("phase 1: %d class vtables from RTTI" % len(vts))
+    methods_by_class = {}     # class -> [method_ea...]
     with open(os.path.join(OUT, "00_vtables.txt"), "w") as fh:
         for cls in sorted(vts):
             vft = vts[cls]
+            ms = vtable_methods(vft)
+            methods_by_class[cls] = ms
             fh.write("%-32s vft=0x%X (RVA 0x%X)\n" % (cls, vft, rva(vft)))
-            for i in range(24):
-                p = ida_bytes.get_qword(vft + 8 * i)
-                f = ida_funcs.get_func(p)
-                if not (f and f.start_ea == p): break
+            for i, p in enumerate(ms):
                 fh.write("    [%2d] 0x%X (RVA 0x%X) %s\n" % (i, p, rva(p), fname(p)))
 
-    # 2. seeds -> full downward closure of the audio+control code
-    seeds = seeds_from_vtables(vts)
-    log("phase 2: %d vtable-method seeds" % len(seeds))
-    # add a few caller levels so the process/BUILD roots come in too
-    roots = set()
-    for s in list(seeds):
-        roots |= callers(s, 3)
-    clo = closure_down(seeds | roots)
-    log("phase 2: call-closure = %d functions" % len(clo))
+    # concrete methods = the real DSP methods to transcribe and to prove present.
+    # Two things are NOT methods and must not stretch the band:
+    #   (a) _purecall / pure-virtual thunks (dropped by name), and
+    #   (b) any FOREIGN stub a vtable happens to point at, which lands far from
+    #       the DSP slab. The DSP methods form ONE tight cluster (~0.6 MB on both
+    #       the JUNO and JX); a genuine method is never megabytes away. So drop
+    #       by distance from the cluster median -- geometry, not refcount, is the
+    #       clean separator (JUNO/JX _purecall sits ~3.4 MB out; the legitimately
+    #       shared effect methods, ~0.3 MB from the median, are KEPT). This is
+    #       why the old refcount rule was wrong: it conflated the 18-way _purecall
+    #       with a 4-way SHARED-but-real effect method.
+    all_m = sorted({m for ms in methods_by_class.values() for m in ms})
+    named = [m for m in all_m if fname(m) not in ("_purecall", "__purecall")]
+    if not named:
+        log("FATAL: no non-purecall methods -- wrong CLASS_PREFIX?"); return
+    med = named[len(named) // 2]
+    OUTLIER = 0x200000        # 2 MB: far wider than any real DSP cluster
+    concrete = sorted(m for m in named if abs(m - med) <= OUTLIER)
+    dropped = [m for m in all_m if m not in concrete]
+    band_lo, band_hi = min(concrete) - BAND_MARGIN, max(concrete) + BAND_MARGIN
+    log("phase 1: %d concrete methods (%d stub/outlier dropped); "
+        "band 0x%X..0x%X (margin 0x%X)" %
+        (len(concrete), len(dropped), band_lo, band_hi, BAND_MARGIN))
 
-    # 2b. FUNCTION-POINTER-TABLE SWEEP -- the gap a call-graph misses and the
-    # reason the JUNO needed repeat IDA visits. Effect/delay/reverb arms are
-    # often dispatched through .rdata pointer tables, not vtables. Harvest every
-    # qword in .rdata/.data that is the start of a function, add it, re-close.
-    text = None
-    for s in idautils.Segments():
-        seg = ida_segment.getseg(s)
-        if ida_segment.get_segm_name(seg) == ".text":
-            text = (seg.start_ea, seg.end_ea)
-    fptrs = set()
-    for s in idautils.Segments():
-        seg = ida_segment.getseg(s)
-        if ida_segment.get_segm_name(seg) not in (".rdata", ".data"): continue
-        ea = seg.start_ea
-        while ea < seg.end_ea - 8:
-            q = ida_bytes.get_qword(ea)
-            if text and text[0] <= q < text[1]:
-                f = ida_funcs.get_func(q)
-                if f and f.start_ea == q:
-                    fptrs.add(q)
-            ea += 8
-    new = fptrs - clo
-    log("phase 2b: %d function pointers in data; %d new" % (len(fptrs), len(new)))
-    clo = closure_down(clo | fptrs)
-    log("phase 2: closure after fptr sweep = %d functions" % len(clo))
+    # 2. THE BAND -- every function in the DSP slab. This is completeness.
+    band = funcs_in_band(band_lo, band_hi)
+    log("phase 2: %d functions in the DSP band" % len(band))
 
-    # 3. decompile + disasm the whole closure; collect data refs
-    log("phase 3: decompiling %d functions (the slow phase)..." % len(clo))
+    # 2b. belt-and-suspenders closures: direct/resolvable callees DOWN from every
+    #     method (catches a direct-called helper outside the slab, if any), and
+    #     callers UP 2 levels (the engine BUILD, NOTEON/NOTEOFF, per-sample
+    #     wrappers -- plain non-virtual roots the oracle harness needs).
+    down = closure_down(set(concrete))
+    up = set()
+    for m in concrete:
+        up |= callers(m, 2)
+    extra = (down | up) - band
+    log("phase 2b: closure adds %d functions outside the band "
+        "(down=%d up=%d)" % (len(extra), len(down - band), len(up - band)))
+    full = band | extra
+
+    # 3. decompile + disasm the whole set; collect data refs
+    log("phase 3: decompiling %d functions (the slow phase)..." % len(full))
     all_data = set()
     asm = open(os.path.join(OUT, "01_closure.asm"), "w", encoding="utf-8")
     protos = open(os.path.join(OUT, "02_protos.txt"), "w", encoding="utf-8")
     manifest = []
-    for i, ea in enumerate(sorted(clo)):
+    order = sorted(full)
+    for i, ea in enumerate(order):
         dump_c(ea)
         dump_asm(ea, asm)
         protos.write("0x%X (RVA 0x%X)  %-40s  %s\n" % (ea, rva(ea), fname(ea), proto(ea)))
         all_data |= data_refs(ea)
-        manifest.append({"ea": ea, "rva": rva(ea), "name": fname(ea)})
-        if i % 200 == 0: log("   ...%d/%d" % (i, len(clo)))
+        manifest.append({"ea": ea, "rva": rva(ea), "name": fname(ea),
+                         "in_band": ea in band})
+        if i % 200 == 0: log("   ...%d/%d" % (i, len(full)))
     asm.close(); protos.close()
 
-    # 4. every constant table the closure reads, with values
+    # 4. every constant table the set reads, with values
     log("phase 4: %d data globals" % len(all_data))
     with open(os.path.join(OUT, "03_constants.txt"), "w", encoding="utf-8") as fh:
         for ea in sorted(all_data):
             dump_data(ea, fh)
 
-    # 5. the parameter registry: functions that reference the CPrm*Plugin
-    #    vtable are the param-processor constructors / registrars (patch ->
-    #    coefficient appliers). Dump their callers' closure too.
-    log("phase 5: parameter/registry closure")
-    prm = [v for c, v in vts.items() if c.startswith("CPrmDSP")]
-    reg_seeds = set()
-    for vft in prm:
-        for xr in idautils.XrefsTo(vft, 0):
-            g = ida_funcs.get_func(xr.frm)
-            if g: reg_seeds.add(g.start_ea)
-    reg_clo = closure_down(reg_seeds, cap=2000) - clo
-    for ea in sorted(reg_clo):
-        dump_c(ea)
-        manifest.append({"ea": ea, "rva": rva(ea), "name": fname(ea), "kind": "registry"})
-    log("phase 5: +%d registry functions" % len(reg_clo))
-
-    # 6. segment map + state size hints + a machine-readable manifest
-    log("phase 6: layout + manifest")
+    # 5. segment map + machine-readable manifest
+    log("phase 5: layout + manifest")
     with open(os.path.join(OUT, "04_segments.txt"), "w") as fh:
         for s in idautils.Segments():
             seg = ida_segment.getseg(s)
             fh.write("%-10s 0x%X..0x%X (RVA 0x%X, size 0x%X)\n" % (
                 ida_segment.get_segm_name(seg), seg.start_ea, seg.end_ea,
                 rva(seg.start_ea), seg.end_ea - seg.start_ea))
+
+    # 6. THE COMPLETENESS SELF-CHECK -- every concrete method must have a fn_*.c.
+    #    Prints M/M when whole; lists the gap otherwise so truncation is visible
+    #    in the Output window BEFORE the zip leaves the machine.
+    written = set()
+    for f in os.listdir(OUT):
+        m = re.match(r"fn_.*_([0-9A-Fa-f]+)\.c$", f)
+        if m: written.add(int(m.group(1), 16))
+    missing = [m for m in concrete if m not in written]
+    ok = len(concrete) - len(missing)
     json.dump({"image_base": IMAGE_BASE, "class_prefix": CLASS_PREFIX,
+               "band": [band_lo, band_hi], "band_count": len(band),
+               "closure_extra": len(extra), "total": len(full),
                "vtables": {c: rva(v) for c, v in vts.items()},
-               "closure_count": len(clo), "registry_count": len(reg_clo),
+               "concrete_methods": len(concrete),
+               "methods_decompiled": ok, "methods_missing": [rva(m) for m in missing],
                "functions": manifest},
               open(os.path.join(OUT, "manifest.json"), "w"), indent=1)
 
     log("=== DONE. Zip %s and send it. ===" % OUT)
-    log("    %d decompiled functions, %d constant tables, %d classes." % (
-        len(clo) + len(reg_clo), len(all_data), len(vts)))
+    log("    %d functions, %d constant tables, %d classes." %
+        (len(full), len(all_data), len(vts)))
+    log("    COMPLETENESS: %d/%d DSP vtable methods decompiled." %
+        (ok, len(concrete)))
+    if missing:
+        log("    *** INCOMPLETE -- %d methods have no fn_*.c (RVAs): %s" %
+            (len(missing), ", ".join("0x%X" % rva(m) for m in missing[:40])))
+        log("    *** Do NOT upload as complete; send this list to Claude.")
+    else:
+        log("    ALL methods present. One run was enough.")
 
 main()

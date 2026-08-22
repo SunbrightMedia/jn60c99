@@ -1361,3 +1361,54 @@ The frame codec lived in the ESP-only header, out of reach of the host gates,
 and nothing on a desk can run a UART. The fix moved the codec into the
 portable header where d1_link_gate executes it. The lesson is 74's, restated
 for protocols: gate every layer you CAN before touching the layer you cannot.
+
+## 76. The one-run extractor that lost 132 of 185 methods — and the band that got them back
+
+**Caught by the extractor's own completeness check, 2026-08-22, on the JX-3P
+first IDA dump — before any transcription.** `ida_extract_all.py` discovered its
+targets two ways: a call-graph closure DOWN from the DSP vtable methods, and a
+blanket `.rdata` function-pointer sweep, unioned and capped at 6000 functions.
+The dump came back with the entire FltVoice (24/24), LfoVoice (13/13), AmpVoice
+(12/12), EnvVoice (11/11), EfxCh and EfxPh voices **absent** — 132 of 185
+concrete DSP methods had no decompile, and 135 were not even in the disassembly.
+
+Two failures compounded:
+
+1. **The render leaves are reached by INDIRECT dispatch, not direct calls.**
+   Measured on the JUNO: a direct-call closure from every DSP method reaches 154
+   functions and NONE of the four hand-found leaves (voice render, master,
+   parameter registry, chorus-coefficient gen). A call-graph walk was never
+   going to find them; the fptr sweep was the patch for that, and it was the
+   wrong patch.
+2. **The fptr sweep + cap is a truncation machine.** The sweep harvested 275+
+   JUCE/Gdiplus/CRT function pointers; the 6000 cap then evicted real DSP as the
+   graph fanned out through the GUI. A cap on a graph walk cannot be trusted to
+   keep the subset you care about — set membership was decided by traversal
+   order, not by relevance.
+
+### The fix — geometry, not graph-reachability
+
+MSVC lays a class's methods and the non-virtual helpers they dispatch to into
+ONE contiguous slab of `.text`. So the completeness guarantee is an ADDRESS
+BAND, from the lowest DSP method to the highest parameter-class method,
+±0x10000 — a bounded range that physically cannot lose a method. Proven before
+re-running IDA: JUNO band = 1282 functions, all four leaves + BUILD +
+NOTEON/NOTEOFF IN, 44,000 CRT/GUI OUT; JX band = 1291 functions, every method
+plus the master process the bad dump missed IN. Call-graph closures stay only
+as belt-and-suspenders for a straggler outside the slab.
+
+### The rules
+
+1. **A "get everything" extractor states its completeness invariant and checks
+   it in the tool, in the window, before the artifact leaves the machine.** The
+   self-check that printed `53/185` is the only reason this cost one re-run
+   instead of surfacing as wrong coefficients three sessions later.
+2. **Prove a discovery strategy against a binary whose answers you already know
+   BEFORE spending the user's one expensive run on the binary you don't.** The
+   band was validated on the JUNO's four known leaves first; the JX run was
+   never speculative.
+3. **A cap on a graph walk is a silent truncation. Bound coverage by an address
+   range you can measure, not a count you hope is large enough.**
+4. **When the thing you need is reached by indirect dispatch, stop trying to
+   follow the call and enclose the region instead.** Reachability failed;
+   geometry held.
