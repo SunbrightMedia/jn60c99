@@ -304,6 +304,36 @@ static int s3_amix_step(s3_amix *m, int hs_ok, int got_chunk,
     return m->st == S3_AMIX_OPEN;
 }
 
+/* ---- chip A: THE PHASE-LOCK SEARCH (defect paid on the first wire) -------
+ *
+ * I2S is a CONTINUOUS stream: A's DMA chunk boundaries sit at a constant but
+ * arbitrary slot offset from B's chunk boundaries (one shared bit clock, two
+ * independent DMA starts). The as-designed chunk-CRC compare therefore can
+ * NEVER match on silicon -- the host gates fed aligned buffers and could not
+ * see it; the bench did (2026-08-23: rx counted cleanly, short=0, every CRC
+ * bad). Because the offset is CONSTANT, it is found ONCE: scan candidate
+ * windows of the received history for a CRC B advertised; the hit offset is
+ * then discarded from the stream and every later read is B-aligned.
+ *
+ * Pure so the host can gate it. hist is 2 chunks = 2*win slots; a window is
+ * win slots long, candidate offsets 0..win-1. Tests `batch` offsets starting
+ * at *search_off (state advanced in place). Returns the hit offset, or -1. */
+static int s3_lock_search(const int32_t *hist, int win,
+                          const uint32_t *acrc, int nacrc,
+                          uint32_t *search_off, int batch,
+                          uint32_t (*crc)(const void *, size_t))
+{
+    int b, k;
+    for (b = 0; b < batch; ++b) {
+        uint32_t off = *search_off;
+        uint32_t c = crc(hist + off, (size_t)win * sizeof(int32_t));
+        *search_off = (off + 1u) & ((uint32_t)win - 1u);
+        for (k = 0; k < nacrc; ++k)
+            if (acrc[k] == c) return (int)off;
+    }
+    return -1;
+}
+
 /* ---- chip B: WHAT PACES THE RENDER LOOP? ---------------------------------
  *
  * D1's core: ONE oscillator. Free-running, B paces on its own (unconnected)

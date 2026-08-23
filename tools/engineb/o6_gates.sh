@@ -55,6 +55,21 @@ for t in 1 2 3 4 5 6 7 8 9; do
     fi
 done
 
+printf '\n======== O6 audio-link PHASE LOCK (512 offsets, 1 tooth) ========\n'
+# Defect paid on the FIRST real wire (2026-08-23): A's DMA framing is a
+# constant slot offset from B's, so aligned chunk CRCs never matched. The
+# fix (s3_lock_search + one-time discard) is gated over every offset.
+cc -std=c99 -O1 -w -I "$REPO/esp32s3/main" \
+   -o "$REPO/build/lockgate" "$HERE/lock_search_gate.c"
+"$REPO/build/lockgate" | tail -2 || fails=$((fails+1))
+cc -std=c99 -O1 -w -DLOCK_TOOTH_OFFBYONE -I "$REPO/esp32s3/main" \
+   -o "$REPO/build/lockgate_tooth" "$HERE/lock_search_gate.c"
+if "$REPO/build/lockgate_tooth" >/dev/null 2>&1; then
+    printf '   LOCK tooth NOT CAUGHT\n'; fails=$((fails+1))
+else
+    printf '   LOCK tooth caught (off-by-one re-frame goes red)\n'
+fi
+
 printf '\n========================================\n'
 if [ "$fails" -eq 0 ]; then
     echo "O6 GATES: ALL GREEN, every tooth caught."

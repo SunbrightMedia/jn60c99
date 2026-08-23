@@ -40,12 +40,33 @@ typedef struct {
     uint32_t rx_chunks, rx_short, rx_match, rx_mismatch;
     uint32_t rx_crc[8];            /* CRCs of the last 8 received chunks    */
     int      rx_crc_n;
+    /* ---- PHASE LOCK (defect paid on the first real wire, 2026-08-23) ----
+     * I2S is a CONTINUOUS stream: A's DMA chunk boundaries sit at a constant
+     * but arbitrary slot offset from B's chunk boundaries, so the as-designed
+     * chunk-CRC compare can NEVER match on silicon (the host gates fed
+     * aligned buffers and could not see this). The offset is constant
+     * because one bit clock drives both framings, so it is found ONCE:
+     * search the received stream for a 512-slot window whose CRC equals a
+     * CRC B advertised, then discard `off` slots so every later chunk read
+     * is B-aligned. Search cost is bounded to LOCK_BATCH windows per block
+     * and only runs while unlocked (mix is closed then anyway). */
+    int      locked;               /* 1 = A's reads are B-chunk-aligned     */
+    int      lock_off;             /* slot offset the lock found (report)   */
+    uint32_t discard_left;         /* slots still to drop to re-frame       */
+    uint32_t search_off;           /* next candidate slot offset (0..511)   */
+    int      hist_n;               /* chunks in la_hist (need 2)            */
+    uint32_t acrc_hist[8];         /* last 8 advertised CRCs from B         */
+    int      acrc_n;
+    uint32_t relock_miss;          /* post-lock mismatch streak -> re-lock  */
 } s3_la;
 
 static s3_la LA;
 
 /* one chunk of link frames, assembled/disassembled off the DMA */
 static int32_t la_buf[2 /*slots*/ * 256 /*>=CHUNK*/];
+/* chip A only: the last TWO received chunks, for the phase-lock search */
+static int32_t la_hist[2 * 2 * 256];
+#define LOCK_BATCH 8               /* candidate offsets tested per block    */
 
 static int s3_la_start(int role)
 {
@@ -120,6 +141,16 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
     int i, match = 0, mismatch = 0, got_chunk = 0;
     if (!LA.up || LA.role != S3_ROLE_A) return;
     if (n > CHUNK) n = CHUNK;
+    /* phase re-frame: drop the slots between A's DMA framing and B's chunk
+     * framing (found by the lock search below). Must complete before the
+     * next full-chunk read; a partial drop just resumes next block. */
+    if (LA.discard_left) {
+        size_t g = 0;
+        i2s_channel_read(LA.ch, la_buf,
+                         LA.discard_left * sizeof(int32_t), &g, 0);
+        LA.discard_left -= (uint32_t)(g / sizeof(int32_t));
+        if (LA.discard_left) return;         /* not re-framed yet */
+    }
     if (i2s_channel_read(LA.ch, la_buf,
                          (size_t)n * 2u * sizeof(int32_t), &got, 0) == ESP_OK
         && got == (size_t)n * 2u * sizeof(int32_t)) {
@@ -127,16 +158,51 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
         ++LA.rx_chunks;
         LA.rx_crc[LA.rx_crc_n++ & 7] =
             eb_devseq_crc32(la_buf, got);
+        /* keep the last two chunks for the phase-lock search */
+        if (!LA.locked) {
+            memmove(la_hist, la_hist + 2 * CHUNK,
+                    2 * CHUNK * sizeof(int32_t));
+            memcpy(la_hist + 2 * CHUNK, la_buf, 2 * CHUNK * sizeof(int32_t));
+            if (LA.hist_n < 2) ++LA.hist_n;
+        }
     } else if (got) {
         ++LA.rx_short;   /* partial chunks are dropped, never injected      */
     }
+    if (fresh_acrc && peer_acrc)
+        LA.acrc_hist[LA.acrc_n++ & 7] = peer_acrc;
+    /* THE PHASE-LOCK SEARCH: while unlocked, CRC LOCK_BATCH candidate
+     * 512-slot windows of the 2-chunk history against the CRCs B advertised.
+     * A hit gives the constant slot offset; discard it once and every later
+     * read is B-aligned. */
+    if (!LA.locked && LA.hist_n == 2 && LA.acrc_n) {
+        int lim = LA.acrc_n < 8 ? LA.acrc_n : 8;
+        int off = s3_lock_search(la_hist, 2 * CHUNK, LA.acrc_hist, lim,
+                                 &LA.search_off, LOCK_BATCH,
+                                 eb_devseq_crc32);
+        if (off >= 0) {
+            LA.locked = 1;
+            LA.lock_off = off;
+            LA.discard_left = (uint32_t)off;          /* re-frame */
+            LA.hist_n = 0;
+        }
+    }
     /* compare B's advertised CRC against the last 8 chunks A actually
-     * received -- the two counters share no epoch, so the match is windowed */
-    if (fresh_acrc && peer_acrc) {
+     * received -- the two counters share no epoch, so the match is windowed.
+     * Meaningful only once phase-locked; before the lock every window is
+     * shifted and a mismatch says nothing about the wire. */
+    if (fresh_acrc && peer_acrc && LA.locked) {
         int k, hit = 0, lim = LA.rx_crc_n < 8 ? LA.rx_crc_n : 8;
         for (k = 0; k < lim; ++k) if (LA.rx_crc[k] == peer_acrc) hit = 1;
-        if (hit) { match = 1; ++LA.rx_match; }
-        else     { mismatch = 1; ++LA.rx_mismatch; }
+        if (hit) { match = 1; ++LA.rx_match; LA.relock_miss = 0; }
+        else {
+            mismatch = 1; ++LA.rx_mismatch;
+            /* a lock that stops matching is a lock to a stale coincidence
+             * or a re-plugged wire: give it up and search again */
+            if (++LA.relock_miss >= 32) {
+                LA.locked = 0; LA.relock_miss = 0;
+                LA.search_off = 0; LA.rx_crc_n = 0;
+            }
+        }
     }
     if (s3_amix_step(&LA.mix, hs_ok, got_chunk, match, mismatch) && got_chunk) {
         for (i = 0; i < n; ++i) {
@@ -157,10 +223,11 @@ static void s3_la_report(void)
 {
     if (!LA.up) return;
     if (LA.role == S3_ROLE_A)
-        printf("LKA: mix=%s rx=%lu short=%lu crc ok=%lu bad=%lu\n",
+        printf("LKA: mix=%s rx=%lu short=%lu crc ok=%lu bad=%lu lock=%s off=%d\n",
                LA.mix.st == S3_AMIX_OPEN ? "OPEN" : "closed",
                (unsigned long)LA.rx_chunks, (unsigned long)LA.rx_short,
-               (unsigned long)LA.rx_match, (unsigned long)LA.rx_mismatch);
+               (unsigned long)LA.rx_match, (unsigned long)LA.rx_mismatch,
+               LA.locked ? "YES" : "searching", LA.lock_off);
     else
         printf("LKA: pace=%s tx=%lu timeouts=%lu\n",
                LA.pace == S3_BPACE_LINKED ? "LINKED(A's clock)" : "freerun",

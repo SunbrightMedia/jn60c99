@@ -1412,3 +1412,35 @@ as belt-and-suspenders for a straggler outside the slab.
 4. **When the thing you need is reached by indirect dispatch, stop trying to
    follow the call and enclose the region instead.** Reachability failed;
    geometry held.
+
+## 77. The link CRC that could never match — a stream compared by chunk
+
+Paid 2026-08-23, on the FIRST real two-chip wire. The audio-link proof was
+"B advertises the CRC of each chunk it sends; A CRCs the chunk it received;
+match opens the mix." On the bench: handshake OK, rx counting cleanly,
+short=0 — and EVERY CRC bad, forever. Nothing was wrong with the wire.
+
+I2S is a CONTINUOUS stream. A's DMA chunk framing starts when A's channel
+starts; B's when B's does. The two framings sit at a constant, arbitrary slot
+offset — so the two CRCs are computed over SHIFTED windows and can never be
+equal. The host gates fed both sides the same aligned buffer, so this defect
+was structurally invisible to them; only the wire could show it.
+
+The fix exploits the same fact that caused it: ONE bit clock drives both
+framings, so the offset is CONSTANT. `s3_lock_search` (s3_link.h, pure,
+host-gated) scans the received history for a window whose CRC matches an
+advertised one; the hit offset is discarded from the stream ONCE and every
+later chunk is aligned — the original design then works as written.
+Gate: tools/engineb/lock_search_gate.c, all 512 offsets, tooth = off-by-one
+re-frame goes red. In o6_gates.sh.
+
+### The rules
+1. **A chunk is a unit of YOUR bookkeeping, not of the transport.** Any
+   equality check across two independently-framed views of a stream must
+   first prove the framings coincide — or search for the offset.
+2. **A host gate that hands both sides the same buffer has assumed away the
+   transport.** Name the assumption in the gate header, and list what only
+   the physical medium can falsify (framing, polarity, bit order, clocking).
+3. When a wire-proof fails with clean counters everywhere (rx up, short=0,
+   handshake OK), suspect the COMPARISON before the wire: re-seating cannot
+   fix a windowing defect, and one reseat is enough to know.
