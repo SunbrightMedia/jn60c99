@@ -134,6 +134,21 @@ static int run_shift(int s)
     return 0;
 }
 
+static int run_halfswap(void)
+{
+    enum { NW = 1024 };
+    static uint32_t src[NW], sw[NW], back[NW];
+    int i;
+    for (i = 0; i < NW; ++i) src[i] = (uint32_t)prand();
+    s3_halfswap(sw, src, NW);
+    s3_halfswap(back, sw, NW);       /* self-inverse */
+    for (i = 0; i < NW; ++i) {
+        if (back[i] != src[i]) { printf("halfswap not self-inverse @%d\n", i); return 1; }
+        if (sw[i] != ((src[i] << 16) | (src[i] >> 16))) { printf("halfswap wrong @%d\n", i); return 1; }
+    }
+    return 0;
+}
+
 int main(void)
 {
     int off, s, fails = 0;
@@ -141,6 +156,8 @@ int main(void)
     printf("lock_search gate: %d/%d offsets PASS\n", WIN - fails, WIN);
     for (s = 1; s < 32; ++s) fails += run_shift(s);
     printf("bitshift recover: 31 shifts checked\n");
+    fails += run_halfswap();
+    printf("halfswap: self-inverse + exact\n");
     if (fails) { printf("LOCK GATE: RED\n"); return 1; }
     printf("LOCK GATE: GREEN\n");
     return 0;

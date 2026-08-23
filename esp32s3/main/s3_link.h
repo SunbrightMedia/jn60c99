@@ -354,6 +354,17 @@ static void s3_bitshift_recover(uint32_t *dst, const uint32_t *src, int n,
     }
 }
 
+/* Half-word swap: the ESP32 I2S engine can exchange the two 16-bit halves
+ * of each 32-bit slot (a known slave-mode artifact). A permutation, not a
+ * shift -- the shift sweep cannot express it, so it is its own candidate.
+ * Pure; self-inverse. */
+static void s3_halfswap(uint32_t *dst, const uint32_t *src, int n)
+{
+    int i;
+    for (i = 0; i < n; ++i)
+        dst[i] = (uint32_t)(src[i] << 16) | (src[i] >> 16);
+}
+
 /* ---- chip B: WHAT PACES THE RENDER LOOP? ---------------------------------
  *
  * D1's core: ONE oscillator. Free-running, B paces on its own (unconnected)
