@@ -273,3 +273,16 @@ input, but the interacting setters need transcription.
 The recall byte layout (name-proven), the dispatch/setter locations, and the
 in-context reference (which nulls) are all in hand; the implementation is the
 remaining subsystem.
+
+## INTEGRATION SCOPE (next block, exact)
+
+The last untranscribed seam, sized from the dump:
+- NOTEON 0x3F9150 / NOTEOFF 0x3F90F0: 9-unit fan-out over objects at
+  HOST+120+64*i; per-object body sub_1803F5F90 (110 lines) / sub_1803F5EF0
+  (24 lines). Small; the allocator-law twin of the JUNO's eb_alloc step.
+- Then the C driver: template prepared-state snapshot (oracle clean build,
+  the JUNO's method) + jx_bank_apply + note fan-out + per-block 8x voice
+  render + master render.
+- Then the JX verify pipeline (a jx3p verify target; the Makefile has no
+  SYNTH= parameterization -- it must be created): render A/B vs the oracle
+  over 64 patches, null EXACTLY 0.
