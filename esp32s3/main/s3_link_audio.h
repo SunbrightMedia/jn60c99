@@ -91,12 +91,20 @@ typedef struct {
     int      hist_n;               /* chunks in la_hist (need 2)            */
     uint32_t acrc_hist[8];         /* last 8 advertised CRCs from B         */
     int      acrc_n;
+    /* pending adverts: an advert ALWAYS beats its chunk to A (the chunk is
+     * still in B's 6-deep DMA when the UART frame lands), so the compare
+     * runs chunk-against-recent-adverts, and only an advert no chunk
+     * redeems within PEND_MAX chunks counts as a mismatch. */
+    uint32_t pend[8];
+    uint16_t pend_age[8];
+    uint8_t  pend_used[8];
     uint32_t relock_miss;          /* post-lock mismatch streak -> re-lock  */
     uint32_t pat_disc;             /* pattern discontinuities seen (diag)   */
 } s3_la;
 
 static s3_la LA;
 
+#define PEND_MAX 32   /* chunks an advert may wait for its audio */
 /* one chunk of link frames, assembled/disassembled off the DMA */
 static int32_t la_buf[2 /*slots*/ * 256 /*>=CHUNK*/];
 /* chip A only: the last TWO received chunks, for the phase-lock search */
@@ -272,56 +280,51 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
     } else if (got) {
         ++LA.rx_short;   /* partial chunks are dropped, never injected      */
     }
-    if (fresh_acrc && peer_acrc)
+    if (fresh_acrc && peer_acrc) {
+        int k, free_k = -1;
         LA.acrc_hist[LA.acrc_n++ & 7] = peer_acrc;
-    s3_link_alock = LA.locked;    /* B reads this and switches to audio */
-    /* THE PHASE LOCK, audio side: hand a snapshot to the console-task sweep
-     * and collect its verdict. NO CRC runs here -- the block tail spends one
-     * 4 KB copy at most (see the header above for the deadline defect that
-     * forced this shape). */
-    if (!LA.locked) {
-        if (0 && la_snap_state == 0 && LA.hist_n == 2 && LA.acrc_n) {
-            int k, lim = LA.acrc_n < 8 ? LA.acrc_n : 8;
-            memcpy(la_snap, la_hist, sizeof la_snap);
-            for (k = 0; k < lim; ++k) la_snap_acrc[k] = LA.acrc_hist[k];
-            la_snap_nacrc = lim;
-            la_snap_state = 1;                        /* search owns it */
-        } else if (la_snap_state == 2) {
-            int off = la_snap_off;
-            if (off >= 0) {
-                LA.locked = 1;
-                LA.lock_off = off;
-                LA.bit_shift = la_snap_shift;
-                LA.half_swap = la_snap_swap;
-                LA.discard_left = (uint32_t)off;      /* re-frame */
-                LA.hist_n = 0;
-            }
-            la_snap_state = 0;                        /* re-arm (or done) */
+        for (k = 0; k < 8; ++k) if (!LA.pend_used[k]) { free_k = k; break; }
+        if (free_k < 0) {                    /* evict the oldest, count it bad */
+            int old_k = 0;
+            for (k = 1; k < 8; ++k)
+                if (LA.pend_age[k] > LA.pend_age[old_k]) old_k = k;
+            LA.pend_used[old_k] = 0; ++LA.rx_mismatch; free_k = old_k;
         }
+        LA.pend[free_k] = peer_acrc; LA.pend_age[free_k] = 0;
+        LA.pend_used[free_k] = 1;
     }
-    /* compare B's advertised CRC against the last 8 chunks A actually
-     * received -- the two counters share no epoch, so the match is windowed.
-     * Meaningful only once phase-locked; before the lock every window is
-     * shifted and a mismatch says nothing about the wire. */
-    {
-        int is_pat = got_chunk &&
-            ((uint32_t)la_buf[0] & S3_PAT_MASK) == S3_PAT_TAG &&
-            ((uint32_t)la_buf[1] & S3_PAT_MASK) == S3_PAT_TAG;
-        if (is_pat) got_chunk = 0;   /* pattern never feeds the mix gate */
-    }
-    if (fresh_acrc && peer_acrc && LA.locked) {
-        int k, hit = 0, lim = LA.rx_crc_n < 8 ? LA.rx_crc_n : 8;
-        for (k = 0; k < lim; ++k) if (LA.rx_crc[k] == peer_acrc) hit = 1;
-        if (hit) { match = 1; ++LA.rx_match; LA.relock_miss = 0; }
-        else {
-            mismatch = 1; ++LA.rx_mismatch;
-            /* a lock that stops matching is a lock to a stale coincidence
-             * or a re-plugged wire: give it up and search again */
-            if (++LA.relock_miss >= 32) {
-                LA.locked = 0; LA.relock_miss = 0;
-                LA.search_off = 0; LA.rx_crc_n = 0;
+    /* every received AUDIO chunk tries to redeem a pending advert; adverts
+     * that age out unredeemed are the mismatches. Pattern chunks and the
+     * unlocked state leave the pending set untouched. */
+    s3_link_alock = LA.locked;       /* B reads this and switches to audio */
+    /* a PATTERN chunk must never redeem an advert or feed the mix gate --
+     * B also advertises pattern-chunk CRCs, and a pattern match would open
+     * the mix onto the training signal itself. */
+    if (got_chunk &&
+        ((uint32_t)la_buf[0] & S3_PAT_MASK) == S3_PAT_TAG &&
+        ((uint32_t)la_buf[1] & S3_PAT_MASK) == S3_PAT_TAG)
+        got_chunk = 0;
+    if (got_chunk && LA.locked) {
+        uint32_t c = LA.rx_crc[(LA.rx_crc_n - 1) & 7];
+        int k;
+        for (k = 0; k < 8; ++k)
+            if (LA.pend_used[k] && LA.pend[k] == c) {
+                LA.pend_used[k] = 0;
+                match = 1; ++LA.rx_match; LA.relock_miss = 0;
+                break;
             }
-        }
+        for (k = 0; k < 8; ++k)
+            if (LA.pend_used[k] && ++LA.pend_age[k] > PEND_MAX) {
+                LA.pend_used[k] = 0;
+                mismatch = 1; ++LA.rx_mismatch;
+                /* a lock that stops redeeming adverts is stale (a word
+                 * slipped): drop it and retrain -- one pattern chunk. */
+                if (++LA.relock_miss >= 8) {
+                    LA.locked = 0; LA.relock_miss = 0;
+                    LA.rx_crc_n = 0;
+                    memset(LA.pend_used, 0, sizeof LA.pend_used);
+                }
+            }
     }
     if (s3_amix_step(&LA.mix, hs_ok, got_chunk, match, mismatch) && got_chunk) {
         for (i = 0; i < n; ++i) {
