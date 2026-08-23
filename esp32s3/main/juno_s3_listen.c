@@ -4428,11 +4428,17 @@ void app_main(void)
             }
 #if S3L_TIME_PROLOGUE
             if (prologue_n)
-                printf("PROLOGUE %.2f us/sample (~%.0f cycles) "
+                printf("PROLOGUE %.2f us/sample (~%.0f cycles) [LFOTAIL=%d] "
                        "-- loop total in THIS build is serialised and must not "
                        "be quoted\n",
                        (double)prologue_us / (double)prologue_n,
-                       (double)prologue_us / (double)prologue_n * 240.0);
+                       (double)prologue_us / (double)prologue_n * 240.0,
+#if EB_LFO_TAIL_CR
+                       1
+#else
+                       0
+#endif
+                       );
 #endif
 #if S3L_RECALL
             if ((chunks / (SR / CHUNK)) % S3L_REPORT_EVERY == 0)
