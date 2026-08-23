@@ -110,6 +110,13 @@ def main():
     os.makedirs(LOGDIR, exist_ok=True)
     branch = a.branch or sh(["git", "rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
     print("[bench] repo %s  branch %s  ports %s" % (REPO, branch, ports))
+    lock = os.path.join(REPO, ".git", "index.lock")
+    if os.path.exists(lock):
+        try:
+            os.remove(lock)
+            print("[bench] removed stale .git/index.lock")
+        except OSError as e:
+            print("[bench] could not remove index.lock: %r" % e)
 
     mons = [Monitor(p) for p in ports]
     for m in mons:
@@ -185,7 +192,9 @@ def main():
                 if not staged and diag:
                     # THE CHANNEL THAT CANNOT FAIL: no file staging at all --
                     # the diagnosis AND the log tails travel in the message.
-                    msg = "bench-diag: file staging failing\n\n" + "\n".join(diag)
+                    st = sh(["git", "status", "--porcelain"])
+                    msg = ("bench-diag: file staging failing\n\n" + "\n".join(diag)
+                           + "\n\nstatus:\n" + (st.stdout or st.stderr)[-500:])
                     for fn in ("com5.log", "com9.log", "agent_err.log"):
                         p = os.path.join(LOGDIR, fn)
                         if os.path.exists(p):
@@ -204,8 +213,11 @@ def main():
                     print("[bench] logs pushed" if pr.returncode == 0 else
                           "[bench] PUSH FAILED: " + (pr.stderr or pr.stdout)[-300:])
                 else:
-                    print("[bench] nothing new to push" if not diag else
-                          "[bench] diag commit failed")
+                    if diag:
+                        print("[bench] diag commit failed: " +
+                              (c.stderr or c.stdout).strip()[-300:])
+                    else:
+                        print("[bench] nothing new to push")
                 last_push = now
             time.sleep(POLL)
         except KeyboardInterrupt:
