@@ -121,7 +121,7 @@ def main():
     print("[bench] running. current build %s" % (last_sha or "none")[:12])
     while True:
         try:
-            r = sh(["git", "pull", "--ff-only", "origin", branch])
+            r = sh(["git", "pull", "--rebase", "origin", branch])
             if r.returncode != 0:
                 print("[bench] git pull failed:\n" + (r.stderr or r.stdout)[-400:])
             new_me = hashlib.sha256(open(os.path.abspath(__file__), "rb").read()).hexdigest()
