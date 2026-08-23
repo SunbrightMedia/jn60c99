@@ -23,8 +23,38 @@
 #include "driver/i2s_std.h"
 #include "esp_heap_caps.h"
 
-/* the same CRC the recall answer key uses -- one checksum dialect per repo */
+/* the same CRC the recall answer key uses -- one checksum dialect per repo.
+ * The bitwise eb_devseq_crc32 costs ~60 cyc/byte; the sweep needs thousands
+ * of windows, so a TABLE twin (identical dialect, ~8 cyc/byte) is built at
+ * link start and PROVEN equal on a test vector before anything uses it. */
 #include "eb_devseq.h"
+
+static void s3_la_lock_task(void *arg);
+static uint32_t la_crctab[256];
+static int      la_crctab_ok;
+static uint32_t la_crc32(const void *p, size_t n)
+{
+    const unsigned char *q = (const unsigned char *)p;
+    uint32_t c = 0xFFFFFFFFu;
+    size_t i;
+    for (i = 0; i < n; ++i)
+        c = (c >> 8) ^ la_crctab[(c ^ q[i]) & 0xFFu];
+    return c ^ 0xFFFFFFFFu;
+}
+static int la_crc_init(void)
+{
+    uint32_t i, k, c;
+    static const unsigned char tv[] = { 49,50,51,52,53,54,55,56,57 };
+    for (i = 0; i < 256; ++i) {
+        c = i;
+        for (k = 0; k < 8; ++k)
+            c = (c >> 1) ^ (0xEDB88320u & (uint32_t)(-(int32_t)(c & 1u)));
+        la_crctab[i] = c;
+    }
+    /* the twin is not believed until it MATCHES the dialect it mirrors */
+    la_crctab_ok = (la_crc32(tv, 9) == eb_devseq_crc32(tv, 9));
+    return la_crctab_ok;
+}
 
 typedef struct {
     i2s_chan_handle_t ch;          /* A: master RX.  B: slave TX.           */
@@ -120,6 +150,10 @@ static int s3_la_start(int role)
     }
     if (i2s_channel_init_std_mode(LA.ch, &sc) != ESP_OK) return 0;
     if (i2s_channel_enable(LA.ch) != ESP_OK) return 0;
+    if (role == S3_ROLE_A && !la_crc_init()) {
+        printf("LKA: crc table twin DIVERGES from eb_devseq_crc32 -- no link\n");
+        return 0;
+    }
     if (role == S3_ROLE_A && !la_swp) {
         la_swp  = (int32_t *)heap_caps_malloc(2 * 2 * 256 * sizeof(int32_t),
                                               MALLOC_CAP_SPIRAM);
@@ -127,6 +161,8 @@ static int s3_la_start(int role)
                                               MALLOC_CAP_SPIRAM);
         if (!la_swp || !la_swp2) return 0;  /* no scratch = no provable link */
     }
+    if (role == S3_ROLE_A)
+        xTaskCreate(s3_la_lock_task, "lalock", 4096, NULL, 1, NULL);
     LA.up = 1;
     return 1;
 }
@@ -203,7 +239,7 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
             LA.carry = (uint32_t)la_buf[2 * n - 1];
         }
         LA.rx_crc[LA.rx_crc_n++ & 7] =
-            eb_devseq_crc32(la_buf, got);
+            la_crc32(la_buf, got);
         /* keep the last two chunks for the phase-lock search */
         if (!LA.locked) {
             memmove(la_hist, la_hist + 2 * CHUNK,
@@ -277,7 +313,7 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
  * frozen snapshot. ~40 ms of CPU with no deadline anywhere near it. Called
  * wherever s3_la_report is (the status task); a miss just re-arms -- the
  * advertised chunk was not one of the two snapshotted, try the next pair. */
-static void s3_la_lock_bg(void)
+static void s3_la_lock_sweep(void)
 {
     int sw, sh, off = -1, hit_shift = 0, hit_swap = 0;
     if (LA.role != S3_ROLE_A || la_snap_state != 1) return;
@@ -293,13 +329,13 @@ static void s3_la_lock_bg(void)
             if (sh == 0) {
                 off = s3_lock_search(base, 2 * CHUNK,
                                      la_snap_acrc, la_snap_nacrc,
-                                     &search, 2 * CHUNK, eb_devseq_crc32);
+                                     &search, 2 * CHUNK, la_crc32);
             } else {
                 s3_bitshift_recover((uint32_t *)la_swp2, (const uint32_t *)base,
                                     2 * 2 * CHUNK, sh, 0);
                 off = s3_lock_search(la_swp2 + 1, 2 * CHUNK,
                                      la_snap_acrc, la_snap_nacrc,
-                                     &search, 2 * CHUNK, eb_devseq_crc32);
+                                     &search, 2 * CHUNK, la_crc32);
                 if (off >= 0) off = (off + 1) & (2 * CHUNK - 1);
             }
             if (off >= 0) { hit_shift = sh; hit_swap = sw; }
@@ -310,6 +346,25 @@ static void s3_la_lock_bg(void)
     la_snap_shift = hit_shift;
     la_snap_swap  = hit_swap;
     la_snap_state = 2;
+}
+
+/* Sweep task: priority 1, runs whenever a snapshot is armed. The first cut
+ * ran the sweep in the CONSOLE task with the bitwise CRC -- ~14 s per pass,
+ * which STARVED every status print (chip A went mute after boot: third
+ * bench defect of the day). Its own task + the table CRC (~10 ms/pass)
+ * ends both. */
+static void s3_la_lock_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        s3_la_lock_sweep();
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
+
+static void s3_la_lock_bg(void)
+{
+    /* kept for the console call site; the dedicated task does the work */
 }
 
 static void s3_la_report(void)
