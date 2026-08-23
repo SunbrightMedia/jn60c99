@@ -217,6 +217,14 @@ typedef struct {
      * cost the reverb's B channel its last bits. Fixed in both. */
     int32_t         rev_pending[EB_REV_NTAP];
     int32_t         rev_wipe;
+#if EB_LFO_TAIL_CR
+    /* L-B (b24 SS4.1): the last COMPUTED LFO outputs. Each sample's
+     * eb_shared_tick is a fresh struct (the firmware fills a per-sample
+     * array), so a skip sample must publish these held values explicitly --
+     * "leave the previous value" needs a home that survives the sample.
+     * Flag-guarded: the trunk state layout does not move. */
+    float lfo_hold_del, lfo_hold_und, lfo_hold_pul;
+#endif
 } eb_render_state;
 
 /* EB_RENDER_NEEDS — THE LIST IS EMPTY, and this time nothing is defaulted.

@@ -85,6 +85,14 @@ typedef struct {
  * the pre-switch waveform mix (cell 1808) and `out1824` the pulse comparator
  * output (cell 1824); both are read later in the port's voice function, so
  * they are outputs and not internal values. */
+#ifndef EB_LFO_TAIL_CR
+#define EB_LFO_TAIL_CR 0     /* L-B (b24 §4.1): trunk cannot move */
+#endif
+#if EB_LFO_TAIL_CR
+void eb_lfo_advance(eb_lfo_state *s, const eb_lfo_coef *c,
+                    float dly_env, float ext_gate,
+                    float ext0, float ext1, float noise);
+#endif
 float eb_lfo_tick(eb_lfo_state *s, const eb_lfo_coef *c,
                   float dly_env, float ext_gate,
                   float ext0, float ext1, float noise,

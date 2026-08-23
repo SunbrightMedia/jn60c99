@@ -76,13 +76,22 @@ void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
     eb_cvgate_out go;
     float lfo_undel = 0.0f, lfo_pulse = 0.0f;
 
+    /* P3 (b24): the pre-zeros are live ONLY on the !EB_LFO_FREERUN host
+     * early-return path below -- the caller there (eb_render.c:893 area)
+     * declares the tick uninitialised and reads these fields back. Under
+     * EB_LFO_FREERUN every field is overwritten before ready=1, so the
+     * eight stores (incl. v0_atrest, which no FREERUN reader consults) are
+     * dead. GUARDED, not deleted; the trunk object must stay byte-identical
+     * (the .s diff at SHIP flags is the proof, b24 §4.2). */
+#if !EB_LFO_FREERUN
     sh->lfo_del = sh->lfo_und = sh->lfo_pul = 0.0f;
     sh->v0_pit_in = sh->v0_gate_sign = 0.0f;
     sh->v0_dly_env = sh->v0_pitch_cv = 0.0f;
+#endif
     sh->noise_v = eb_notecv_tick(&st->notecv, &c->notecv);
 
-    sh->v0_atrest = e->v[0].atrest ? 1 : 0;
 #if !EB_LFO_FREERUN
+    sh->v0_atrest = e->v[0].atrest ? 1 : 0;
     if (sh->v0_atrest) { sh->ready = 1; return; }
 #else
     /* EB_LFO_FREERUN -- voice 0's chain runs WHETHER OR NOT VOICE 0 SOUNDS.
@@ -129,11 +138,35 @@ void eb_engine_render_shared(eb_engine *e, eb_render_state *st,
                                      go.sign, c->kbd[0], c->vel[0], go.c464,
                                      &sh->v0_pitch_cv);
 #if EB_LFO_SHARED
+#if EB_LFO_TAIL_CR
+    /* L-B (b24 §4.1): the outputs are consumed only on even-cr_ph samples
+     * (every reader is either inside a CR_RUN gate or overwritten by a held
+     * CR value on odd samples -- verified over eb_render.c:560-640). Notes
+     * land at block boundaries and cr_ph is forced 0 while at rest, so all
+     * sounding voices share one parity with voice 0. On an odd sample the
+     * state advances and the PUBLISHED fields keep their previous values --
+     * never zeroed (a future accidental reader gets a one-sample-stale LFO,
+     * not silence). v0-at-rest pins cr_ph[0] to 0, so that configuration
+     * computes every sample: exact by construction, merely unsaved. */
+#if EB_LFO_TAIL_TOOTH
+    /* TOOTH: skip on EVEN phases -- readers then consume stale outputs and
+     * the fork-vs-fork bit compare MUST go red, or it is not a detector. */
+    if ((st->cr_ph[0] & 1u) == 0u) {
+#else
+    if ((st->cr_ph[0] & 1u) != 0u) {
+#endif
+        eb_lfo_advance(&st->lfo[0], &c->lfo[0], sh->v0_dly_env,
+                       c->lfo_ext_gate[0], c->lfo_ext0[0],
+                       c->lfo_ext1[0], sh->noise_v);
+    } else
+#endif
+    {
     sh->lfo_del = eb_lfo_tick(&st->lfo[0], &c->lfo[0], sh->v0_dly_env,
                               c->lfo_ext_gate[0], c->lfo_ext0[0],
                               c->lfo_ext1[0], sh->noise_v,
                               &lfo_undel, &lfo_pulse);
     sh->lfo_und = lfo_undel; sh->lfo_pul = lfo_pulse;
+    }
 #else
     (void)lfo_undel; (void)lfo_pulse;
 #endif

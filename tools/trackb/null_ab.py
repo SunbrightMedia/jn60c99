@@ -260,7 +260,7 @@ def render_script(lib, bank, sr, patch, events):
     """Drive an arbitrary event script; return the interleaved stereo stream.
 
     ('on', note, vel) | ('off', note) | ('param', blob_idx, byte) |
-    ('render', nframes)
+    ('prog', patch_idx) | ('render', nframes)
     """
     c = lib.juno_gui_create(ctypes.c_float(sr), 0)
     lib.juno_gui_apply_bank(c, bank, len(bank), patch)
@@ -269,6 +269,7 @@ def render_script(lib, bank, sr, patch, events):
         if ev[0] == 'on':      lib.juno_gui_note_on(c, ev[1], ev[2])
         elif ev[0] == 'off':   lib.juno_gui_note_off(c, ev[1])
         elif ev[0] == 'param': lib.juno_gui_set_param(c, ev[1], ev[2])
+        elif ev[0] == 'prog':  lib.juno_gui_apply_bank(c, bank, len(bank), ev[1])
         else:
             n = ev[1]
             buf = (ctypes.c_float * (2 * n))()

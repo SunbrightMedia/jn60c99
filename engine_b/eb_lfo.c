@@ -80,10 +80,19 @@ static float eb_lfo_wrap(float p)
     return fmodf(p + 1.0f, 2.0f) - 1.0f;
 }
 
-float eb_lfo_tick(eb_lfo_state *s, const eb_lfo_coef *c,
-                  float dly_env, float ext_gate,
-                  float ext0, float ext1, float noise,
-                  float *out1808, float *out1824)
+/* L-B (b24 §4.1): ONE body, TWO specialisations. The five state stores
+ * (s1488/s1504/s1568/s1536/s1600) all land before the cut; the return value
+ * and both out-pointers are computed after it. want_out is a compile-time
+ * constant at both call sites, so GCC dead-code-eliminates the whole output
+ * tail (including the interleaved output-only locals v96..v100, L1408,
+ * L1680..L1760) from the advance-only specialisation. One source of truth:
+ * the state law cannot drift between the two paths because there is only
+ * one copy of it. */
+static __inline__ __attribute__((always_inline))
+float eb_lfo_tick_impl(eb_lfo_state *s, const eb_lfo_coef *c,
+                       float dly_env, float ext_gate,
+                       float ext0, float ext1, float noise,
+                       float *out1808, float *out1824, int want_out)
 {
     float v74, v75, v76, v77, v78, v79, v80, v81, v83, v84, v85, v86, v87;
     float v88, v89, v90, v91, v92, v93, v94, v95, v96, v97, v98, v99;
@@ -182,6 +191,10 @@ float eb_lfo_tick(eb_lfo_state *s, const eb_lfo_coef *c,
         v103 = v95;
     v104 = eb_lfo_wrap(v104);
     s->s1600 = v103;
+    /* THE CUT (L-B). Every persistent field is written above this line; the
+     * out-pointers are untouched below on the advance path, so a consumer of
+     * the published fields sees the PREVIOUS computed value, never zero. */
+    if (!want_out) return 0.0f;
     v105 = v103 * c->k2416;
     v106 = (float)(v104 * c->k2352) + c->k2480;
     L1680 = v106;
@@ -267,3 +280,25 @@ float eb_lfo_tick(eb_lfo_state *s, const eb_lfo_coef *c,
          + (float)((float)(v119 * v120) * v121);
 #endif
 }
+
+float eb_lfo_tick(eb_lfo_state *s, const eb_lfo_coef *c,
+                  float dly_env, float ext_gate,
+                  float ext0, float ext1, float noise,
+                  float *out1808, float *out1824)
+{
+    return eb_lfo_tick_impl(s, c, dly_env, ext_gate, ext0, ext1, noise,
+                            out1808, out1824, 1);
+}
+
+#if EB_LFO_TAIL_CR
+/* advance the LFO state without computing the outputs -- callable only on
+ * samples the b24 §4.1 alignment argument proves nothing reads them. */
+void eb_lfo_advance(eb_lfo_state *s, const eb_lfo_coef *c,
+                    float dly_env, float ext_gate,
+                    float ext0, float ext1, float noise)
+{
+    float d0, d1;
+    (void)eb_lfo_tick_impl(s, c, dly_env, ext_gate, ext0, ext1, noise,
+                           &d0, &d1, 0);
+}
+#endif
