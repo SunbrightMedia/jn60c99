@@ -2957,6 +2957,7 @@ static volatile unsigned long rpt_health_n = 0;
 
 #if S3L_LINK
 static void s3_la_report(void);
+static void s3_la_lock_bg(void);
 #endif
 
 static void rpt_task(void *arg)
@@ -3124,6 +3125,7 @@ static void rpt_task(void *arg)
         }
 #endif
 #if S3L_LINK
+        s3_la_lock_bg();     /* phase-lock sweep: deadline-free context only */
         s3_link_report();
         s3_la_report();
 #endif

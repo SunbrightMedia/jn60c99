@@ -66,7 +66,19 @@ static s3_la LA;
 static int32_t la_buf[2 /*slots*/ * 256 /*>=CHUNK*/];
 /* chip A only: the last TWO received chunks, for the phase-lock search */
 static int32_t la_hist[2 * 2 * 256];
-#define LOCK_BATCH 8               /* candidate offsets tested per block    */
+/* ---- THE SEARCH RUNS OFF THE AUDIO PATH (second bench defect, same day) --
+ * The first cut CRC'd 8 candidate windows in the block tail: ~800k cyc/block,
+ * quiet blocks 6.2 -> 9.3 ms against the 5.8 ms period -- the INVARIANT
+ * broken by its own diagnostic. Worse, the overruns overflow A's RX DMA,
+ * the stream SLIPS, and the just-found offset is invalid: lock, 32 misses,
+ * unlock, forever. So the audio side only SNAPSHOTS (one 4 KB copy) and the
+ * full 512-window sweep runs in the console task, which has no deadline.
+ * snap_state: 0 = audio may fill, 1 = filled (search owns it), 2 = result. */
+static int32_t  la_snap[2 * 2 * 256];
+static uint32_t la_snap_acrc[8];
+static int      la_snap_nacrc;
+static volatile int la_snap_state;
+static volatile int la_snap_off;
 
 static int s3_la_start(int role)
 {
@@ -170,20 +182,26 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
     }
     if (fresh_acrc && peer_acrc)
         LA.acrc_hist[LA.acrc_n++ & 7] = peer_acrc;
-    /* THE PHASE-LOCK SEARCH: while unlocked, CRC LOCK_BATCH candidate
-     * 512-slot windows of the 2-chunk history against the CRCs B advertised.
-     * A hit gives the constant slot offset; discard it once and every later
-     * read is B-aligned. */
-    if (!LA.locked && LA.hist_n == 2 && LA.acrc_n) {
-        int lim = LA.acrc_n < 8 ? LA.acrc_n : 8;
-        int off = s3_lock_search(la_hist, 2 * CHUNK, LA.acrc_hist, lim,
-                                 &LA.search_off, LOCK_BATCH,
-                                 eb_devseq_crc32);
-        if (off >= 0) {
-            LA.locked = 1;
-            LA.lock_off = off;
-            LA.discard_left = (uint32_t)off;          /* re-frame */
-            LA.hist_n = 0;
+    /* THE PHASE LOCK, audio side: hand a snapshot to the console-task sweep
+     * and collect its verdict. NO CRC runs here -- the block tail spends one
+     * 4 KB copy at most (see the header above for the deadline defect that
+     * forced this shape). */
+    if (!LA.locked) {
+        if (la_snap_state == 0 && LA.hist_n == 2 && LA.acrc_n) {
+            int k, lim = LA.acrc_n < 8 ? LA.acrc_n : 8;
+            memcpy(la_snap, la_hist, sizeof la_snap);
+            for (k = 0; k < lim; ++k) la_snap_acrc[k] = LA.acrc_hist[k];
+            la_snap_nacrc = lim;
+            la_snap_state = 1;                        /* search owns it */
+        } else if (la_snap_state == 2) {
+            int off = la_snap_off;
+            if (off >= 0) {
+                LA.locked = 1;
+                LA.lock_off = off;
+                LA.discard_left = (uint32_t)off;      /* re-frame */
+                LA.hist_n = 0;
+            }
+            la_snap_state = 0;                        /* re-arm (or done) */
         }
     }
     /* compare B's advertised CRC against the last 8 chunks A actually
@@ -217,6 +235,20 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
             vb[i][S3_LA_INJ1] = 0.0f;
         }
     }
+}
+
+/* the console-task half of the phase lock: the full 512-window sweep over the
+ * frozen snapshot. ~40 ms of CPU with no deadline anywhere near it. Called
+ * wherever s3_la_report is (the status task); a miss just re-arms -- the
+ * advertised chunk was not one of the two snapshotted, try the next pair. */
+static void s3_la_lock_bg(void)
+{
+    uint32_t search = 0;
+    if (LA.role != S3_ROLE_A || la_snap_state != 1) return;
+    la_snap_off = s3_lock_search(la_snap, 2 * CHUNK,
+                                 la_snap_acrc, la_snap_nacrc,
+                                 &search, 2 * CHUNK, eb_devseq_crc32);
+    la_snap_state = 2;
 }
 
 static void s3_la_report(void)

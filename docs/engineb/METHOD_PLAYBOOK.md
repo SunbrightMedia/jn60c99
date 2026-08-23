@@ -1444,3 +1444,18 @@ re-frame goes red. In o6_gates.sh.
 3. When a wire-proof fails with clean counters everywhere (rx up, short=0,
    handshake OK), suspect the COMPARISON before the wire: re-seating cannot
    fix a windowing defect, and one reseat is enough to know.
+
+### 77b. The fix that broke the deadline (same day, same wire)
+
+The first cut of the phase-lock ran 8 CRC windows in the BLOCK TAIL: ~800k
+cyc/block, quiet blocks 6.2 -> 9.3 ms against the 5.8 ms period. Two
+consequences, the second worse than the first: (1) the INVARIANT broken by
+its own diagnostic; (2) the overruns overflow A's RX DMA, the stream SLIPS,
+and the "constant" offset the lock just found is no longer where it was --
+lock, 32 misses, unlock, search forever. Observed on the bench: lock=YES
+off=422, then bad=32, then searching for good.
+
+Rule: **a diagnostic that runs on the audio path is part of the audio budget,
+and a lock that assumes a constant offset must not itself cause the slips
+that move the offset.** The sweep now runs in the console task from a frozen
+4 KB snapshot; the block tail pays one memcpy.
