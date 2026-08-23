@@ -2919,6 +2919,7 @@ static volatile unsigned long rpt_sec = 0, rpt_cyc = 0, rpt_under = 0;
 static volatile unsigned long rpt_gap = 0, rpt_build = 0, rpt_nb = 0;
 static volatile unsigned long rpt_midi = 0, rpt_drop = 0;
 static volatile long          rpt_drift = 0;
+static volatile unsigned long rpt_dacsent = 0, rpt_written = 0;
 /* ⚑ B4'S COUNTER. THE INVARIANT'S OWN VERDICT, AND IT DID NOT EXIST.
  *
  * FINAL_GUIDE requires "a hard block-overrun counter that must read 0".
@@ -3141,6 +3142,9 @@ static void rpt_task(void *arg)
         printf("FXP: fx=%lu v1=%lu wait=%lu per sample\n",
                rpt_fx_cyc, rpt_v1_cyc, rpt_wait_cyc);
 #endif
+        printf("B5: dac sent=%lu written=%lu deficit=%ld  (sent>written+6 = TRUE STARVATION; un= cannot see it)\n",
+               rpt_dacsent, rpt_written,
+               (long)rpt_dacsent - (long)rpt_written);
         printf("t=%lu cyc=%lu drift=%+ld un=%lu gap=%lu bst=%lu nb=%lu "
                "midi=%lu/%lu usb=%lu/%d keys=%lu pat=%d\n",
                rpt_sec, rpt_cyc, rpt_drift, rpt_under, rpt_gap,
@@ -3165,13 +3169,22 @@ static void rpt_task(void *arg)
 
 static i2s_chan_handle_t TX;
 
+static volatile uint32_t s3l_dac_sent;   /* descriptors the DAC transmitted */
+static bool IRAM_ATTR s3l_on_sent(i2s_chan_handle_t h,
+                                  i2s_event_data_t *e, void *ctx)
+{
+    (void)h; (void)e; (void)ctx;
+    ++s3l_dac_sent;
+    return false;
+}
+
 static int i2s_start(void)
 {
     i2s_chan_config_t cc = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO,
                                                       I2S_ROLE_MASTER);
     i2s_std_config_t sc = {
         .clk_cfg  = I2S_STD_CLK_DEFAULT_CONFIG(SR),
-        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(
+        .slot_cfg  = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(
                         I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
         .gpio_cfg = { .mclk = I2S_GPIO_UNUSED, .bclk = S3L_BCLK,
                       .ws = S3L_LRCK, .dout = S3L_DOUT,
@@ -3182,6 +3195,19 @@ static int i2s_start(void)
     cc.dma_frame_num = CHUNK;
     if (i2s_new_channel(&cc, &TX, NULL) != ESP_OK) return 0;
     if (i2s_channel_init_std_mode(TX, &sc) != ESP_OK) return 0;
+    /* ⚑ B5: THE STARVATION COUNTER THAT CANNOT BE BLIND (2026-08-23).
+     *
+     * `underrun` counts only a 50 ms write TIMEOUT; a DAC starving for less
+     * repeats/zeros silently and that counter reads 0 forever -- it was
+     * never seen to fail, so it was never a detector (playbook 1/46). The
+     * hardware's own descriptor-completed interrupt is the truth: count
+     * descriptors SENT and compare with chunks WRITTEN. sent > written+q
+     * means the DAC transmitted buffers nobody filled -- true starvation,
+     * per event, no threshold. */
+    {   i2s_event_callbacks_t cb = { 0 };
+        cb.on_sent = s3l_on_sent;
+        i2s_channel_register_event_callback(TX, &cb, NULL);
+    }
     return i2s_channel_enable(TX) == ESP_OK;
 }
 
@@ -4281,6 +4307,8 @@ void app_main(void)
                 rpt_under = underrun;
                 rpt_gap   = gap_max;
                 rpt_drift = (long)((real_us - audio_us) / 1000);
+                rpt_dacsent = s3l_dac_sent;
+                rpt_written = chunks;
                 /* NOT reset below with gap_max: B4's question is "did a block
                  * EVER miss", so these accumulate for the life of the run. */
                 rpt_ovr_late  = ovr_late;
