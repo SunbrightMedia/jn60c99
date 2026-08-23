@@ -50,6 +50,7 @@ typedef struct {
     s3_role_cfg    cfg;
     s3_peer        peer;
     int            hs;            /* last s3_handshake_check result          */
+    int            peer_alock;    /* A's "audio locked" flag, echoed to B    */
     uint32_t       peer_acrc;     /* B's advertised audio-chunk CRC          */
     uint32_t       peer_ablk;
     int            acrc_fresh;    /* set per received frame, consumed by the
@@ -142,6 +143,9 @@ static void s3_link_banner(void)
 }
 
 /* Called once per block from the audio loop's tail. O(1), no allocation. */
+/* set by the audio side on chip A; travels in the frame's pad byte */
+static int s3_link_alock;
+
 static void s3_link_poll(int my_patch, unsigned long my_crc,
                          uint32_t my_acrc, uint32_t my_ablk)
 {
@@ -160,6 +164,7 @@ static void s3_link_poll(int my_patch, unsigned long my_crc,
         f.role       = (unsigned char)LINK.role;
         f.voice_base = (unsigned char)LINK.cfg.voice_base;
         f.voices     = (unsigned char)LINK.cfg.voices;
+        f.pad        = (unsigned char)s3_link_alock;
         f.patch      = (unsigned short)my_patch;
         f.crc        = (uint32_t)my_crc;
         f.acrc       = my_acrc;
@@ -193,6 +198,7 @@ static void s3_link_poll(int my_patch, unsigned long my_crc,
         LINK.peer.voice_base = f.voice_base;
         LINK.peer.voices     = f.voices;
         LINK.peer.crc        = f.crc;
+        LINK.peer_alock      = f.pad;
         if (f.acrc != LINK.peer_acrc || f.ablk != LINK.peer_ablk) {
             /* a NEW advertisement -- stale repeats must not re-verify */
             LINK.peer_acrc  = f.acrc;

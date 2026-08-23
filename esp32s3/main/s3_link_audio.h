@@ -92,6 +92,7 @@ typedef struct {
     uint32_t acrc_hist[8];         /* last 8 advertised CRCs from B         */
     int      acrc_n;
     uint32_t relock_miss;          /* post-lock mismatch streak -> re-lock  */
+    uint32_t pat_disc;             /* pattern discontinuities seen (diag)   */
 } s3_la;
 
 static s3_la LA;
@@ -169,12 +170,24 @@ static int s3_la_start(int role)
 
 /* ---- chip B: queue this chunk's two tapped voices; returns 1 if the
  * slave write TIMED OUT (A's clock is gone) so the caller can re-pace. ---- */
+static uint32_t lb_pat_idx;      /* B's pattern stream counter (words)     */
+
 static int s3_la_tx(float vb[][EB_NUM_VOICES], int n, int hs_ok)
 {
     size_t want, wrote = 0;
     int i, silent = 1, tmo;
     if (!LA.up || LA.role != S3_ROLE_B) return 0;
     if (n > CHUNK) n = CHUNK;
+    if (!LINK.peer_alock) {
+        /* A is unlocked: send the self-describing TRAINING PATTERN instead
+         * of audio (B has no DAC; A's mix is closed -- zero audible cost).
+         * Chunk-aligned counter so A's alignment math is exact. */
+        lb_pat_idx = (lb_pat_idx + 2u * (uint32_t)CHUNK - 1u)
+                     & ~(2u * (uint32_t)CHUNK - 1u);
+        for (i = 0; i < 2 * n; ++i)
+            la_buf[i] = (int32_t)s3_pat_word(lb_pat_idx++);
+        silent = 0;
+    } else
     for (i = 0; i < n; ++i) {
         memcpy(&la_buf[2 * i],     &vb[i][S3_LA_TAP0], 4);
         memcpy(&la_buf[2 * i + 1], &vb[i][S3_LA_TAP1], 4);
@@ -240,24 +253,34 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
         }
         LA.rx_crc[LA.rx_crc_n++ & 7] =
             la_crc32(la_buf, got);
-        /* keep the last two chunks for the phase-lock search */
+        /* THE PATTERN LOCK: while unlocked, B sends tagged counter words.
+         * One clean chunk gives the alignment with no search at all. */
         if (!LA.locked) {
-            memmove(la_hist, la_hist + 2 * CHUNK,
-                    2 * CHUNK * sizeof(int32_t));
-            memcpy(la_hist + 2 * CHUNK, la_buf, 2 * CHUNK * sizeof(int32_t));
-            if (LA.hist_n < 2) ++LA.hist_n;
+            uint32_t idx0; int disc;
+            if (s3_pat_scan((const uint32_t *)la_buf, 2 * n, &idx0, &disc)) {
+                uint32_t m = idx0 & (2u * (uint32_t)CHUNK - 1u);
+                LA.locked = 1;
+                LA.lock_off = (int)m;
+                LA.bit_shift = 0; LA.half_swap = 0;
+                LA.discard_left = (2u * (uint32_t)CHUNK - m)
+                                  & (2u * (uint32_t)CHUNK - 1u);
+                LA.rx_crc_n = 0;      /* pattern CRCs must not seed audio */
+            } else {
+                LA.pat_disc += (uint32_t)disc;
+            }
         }
     } else if (got) {
         ++LA.rx_short;   /* partial chunks are dropped, never injected      */
     }
     if (fresh_acrc && peer_acrc)
         LA.acrc_hist[LA.acrc_n++ & 7] = peer_acrc;
+    s3_link_alock = LA.locked;    /* B reads this and switches to audio */
     /* THE PHASE LOCK, audio side: hand a snapshot to the console-task sweep
      * and collect its verdict. NO CRC runs here -- the block tail spends one
      * 4 KB copy at most (see the header above for the deadline defect that
      * forced this shape). */
     if (!LA.locked) {
-        if (la_snap_state == 0 && LA.hist_n == 2 && LA.acrc_n) {
+        if (0 && la_snap_state == 0 && LA.hist_n == 2 && LA.acrc_n) {
             int k, lim = LA.acrc_n < 8 ? LA.acrc_n : 8;
             memcpy(la_snap, la_hist, sizeof la_snap);
             for (k = 0; k < lim; ++k) la_snap_acrc[k] = LA.acrc_hist[k];
@@ -280,6 +303,12 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
      * received -- the two counters share no epoch, so the match is windowed.
      * Meaningful only once phase-locked; before the lock every window is
      * shifted and a mismatch says nothing about the wire. */
+    {
+        int is_pat = got_chunk &&
+            ((uint32_t)la_buf[0] & S3_PAT_MASK) == S3_PAT_TAG &&
+            ((uint32_t)la_buf[1] & S3_PAT_MASK) == S3_PAT_TAG;
+        if (is_pat) got_chunk = 0;   /* pattern never feeds the mix gate */
+    }
     if (fresh_acrc && peer_acrc && LA.locked) {
         int k, hit = 0, lim = LA.rx_crc_n < 8 ? LA.rx_crc_n : 8;
         for (k = 0; k < lim; ++k) if (LA.rx_crc[k] == peer_acrc) hit = 1;
@@ -379,6 +408,8 @@ static void s3_la_report(void)
     if (LA.role == S3_ROLE_A && LA.locked && (LA.bit_shift || LA.half_swap))
         printf("LKA: corrected in software: bit-shift %d half-swap %d\n",
                LA.bit_shift, LA.half_swap);
+    if (LA.role == S3_ROLE_A && !LA.locked)
+        printf("LKA: pattern discontinuities %lu\n", (unsigned long)LA.pat_disc);
     if (LA.role == S3_ROLE_A && !LA.locked)
         printf("LKAraw: %08lx %08lx %08lx %08lx %08lx %08lx %08lx %08lx\n",
                (unsigned long)la_snap[0], (unsigned long)la_snap[1],

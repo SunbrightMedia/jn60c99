@@ -365,6 +365,49 @@ static void s3_halfswap(uint32_t *dst, const uint32_t *src, int n)
         dst[i] = (uint32_t)(src[i] << 16) | (src[i] >> 16);
 }
 
+/* ---- the TRAINING PATTERN (the lock that needs no search) ----------------
+ *
+ * The CRC sweep assumed the only unknowns were constant transforms. The
+ * bench refuted every one of them (raw words arrive CLEAN, yet no window
+ * ever CRC-matches), so the lock now uses a channel with no unknowns at
+ * all: while A is unlocked, B's tap slots carry a SELF-DESCRIBING word --
+ * 0xA5 tag + 24-bit stream counter -- instead of audio. B has no DAC and
+ * A's mix is closed while unlocked, so this costs nothing audible. ONE
+ * received word tells A the exact stream position; a chunk of consecutive
+ * words proves the wire AND gives the alignment directly. Dropped or
+ * inserted words become countable discontinuities instead of a mystery.
+ * B returns to real audio the moment A's control frames say "locked".
+ * Counter wraps at 2^24 (divisible by the 512-slot chunk, so alignment
+ * survives the wrap). Pure; gated in lock_search_gate.c. */
+#define S3_PAT_TAG   0xA5000000u
+#define S3_PAT_MASK  0xFF000000u
+#define S3_PAT_CTR   0x00FFFFFFu
+
+static uint32_t s3_pat_word(uint32_t idx)
+{
+    return S3_PAT_TAG | (idx & S3_PAT_CTR);
+}
+
+/* Scan n received words. Returns 1 if EVERY word is tagged and consecutive
+ * (mod 2^24); *idx0 = the first word's counter. *disc counts breaks (tag
+ * missing or counter jump) for diagnostics; consecutive-and-tagged means
+ * *disc == 0. */
+static int s3_pat_scan(const uint32_t *w, int n, uint32_t *idx0, int *disc)
+{
+    int i, d = 0;
+    uint32_t expect;
+    if (n <= 0 || (w[0] & S3_PAT_MASK) != S3_PAT_TAG) { *disc = n; return 0; }
+    *idx0 = w[0] & S3_PAT_CTR;
+    expect = (*idx0 + 1u) & S3_PAT_CTR;
+    for (i = 1; i < n; ++i) {
+        if ((w[i] & S3_PAT_MASK) != S3_PAT_TAG || (w[i] & S3_PAT_CTR) != expect)
+            ++d;
+        expect = ((w[i] & S3_PAT_CTR) + 1u) & S3_PAT_CTR;
+    }
+    *disc = d;
+    return d == 0;
+}
+
 /* ---- chip B: WHAT PACES THE RENDER LOOP? ---------------------------------
  *
  * D1's core: ONE oscillator. Free-running, B paces on its own (unconnected)

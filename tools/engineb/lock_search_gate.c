@@ -149,6 +149,32 @@ static int run_halfswap(void)
     return 0;
 }
 
+/* ---- the training pattern: any window of a pattern stream yields the
+ * exact alignment; one corrupted word is seen (tooth inside). */
+static int run_pattern(void)
+{
+    enum { NW = 4096, W = 512 };
+    static uint32_t stream[NW], win[W];
+    uint32_t idx0; int disc, off, i;
+    for (i = 0; i < NW; ++i) stream[i] = s3_pat_word((uint32_t)i + 7u * W);
+    for (off = 0; off < W; ++off) {
+        memcpy(win, stream + off, W * sizeof(uint32_t));
+        if (!s3_pat_scan(win, W, &idx0, &disc) || disc != 0) {
+            printf("pattern off %d: clean scan FAILED\n", off); return 1;
+        }
+        if ((int)(idx0 % W) != (off % W)) {
+            printf("pattern off %d: alignment %u wrong\n", off, idx0 % W); return 1;
+        }
+    }
+    /* tooth: one corrupt word must fail the scan and count a break */
+    memcpy(win, stream + 100, W * sizeof(uint32_t));
+    win[W / 2] ^= 0x00010000u;
+    if (s3_pat_scan(win, W, &idx0, &disc) || disc < 1) {
+        printf("pattern tooth NOT CAUGHT\n"); return 1;
+    }
+    return 0;
+}
+
 int main(void)
 {
     int off, s, fails = 0;
@@ -158,6 +184,8 @@ int main(void)
     printf("bitshift recover: 31 shifts checked\n");
     fails += run_halfswap();
     printf("halfswap: self-inverse + exact\n");
+    fails += run_pattern();
+    printf("pattern: 512 alignments exact, corrupt-word tooth caught\n");
     if (fails) { printf("LOCK GATE: RED\n"); return 1; }
     printf("LOCK GATE: GREEN\n");
     return 0;
