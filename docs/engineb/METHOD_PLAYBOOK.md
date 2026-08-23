@@ -1459,3 +1459,23 @@ Rule: **a diagnostic that runs on the audio path is part of the audio budget,
 and a lock that assumes a constant offset must not itself cause the slips
 that move the offset.** The sweep now runs in the console task from a frozen
 4 KB snapshot; the block tail pays one memcpy.
+
+## 78. The bench that proved a build it never ran
+
+An `rm -rf build` for a flag change silently dropped `-DS3_LISTEN=1` (a
+CMake cache var, the same trap as playbook's S3_EXTRA_DEFS entry, third
+bite). The "3-voice listen" build that shipped to the bench was the F4
+measurement harness; the serial capture had frozen at the flash, so the log
+kept showing the PREVIOUS build's output; and the O4 verdict was recorded
+against a build that never existed. The DEVCHORD compile-time net later
+PROVED the impossibility: a real 3-voice listen build cannot compile until
+the chord-3 answer key is generated, and it had never been.
+
+### The rules
+1. **A measurement without build provenance is attributable to nothing.**
+   Every periodic report line now carries the build tag ([LISTENvN]); a
+   verdict may only cite lines whose tag matches the build under test.
+2. **After ANY build-dir wipe, reconfigure from the recorded canonical
+   line** (esp32s3/LISTEN.md), never from memory of which -D mattered.
+3. A frozen log is indistinguishable from a stable system. The capture
+   channel must carry its own liveness (the agent's data-age stamp).

@@ -3145,9 +3145,9 @@ static void rpt_task(void *arg)
         printf("B5: dac sent=%lu written=%lu deficit=%ld  (sent>written+6 = TRUE STARVATION; un= cannot see it)\n",
                rpt_dacsent, rpt_written,
                (long)rpt_dacsent - (long)rpt_written);
-        printf("t=%lu cyc=%lu drift=%+ld un=%lu gap=%lu bst=%lu nb=%lu "
+        printf("t=%lu [LISTENv%d] cyc=%lu drift=%+ld un=%lu gap=%lu bst=%lu nb=%lu "
                "midi=%lu/%lu usb=%lu/%d keys=%lu pat=%d\n",
-               rpt_sec, rpt_cyc, rpt_drift, rpt_under, rpt_gap,
+               rpt_sec, S3L_VOICES, rpt_cyc, rpt_drift, rpt_under, rpt_gap,
                rpt_build, rpt_nb, rpt_midi, rpt_drop,
 #if S3L_USBMIDI
                /* usb=<packets>/<mounted>. MOUNTED means the host completed

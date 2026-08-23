@@ -154,14 +154,17 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
 - E3/E4 DONE AS WRITTEN: docs/PIPELINE.md (9 phases, every cited path exists);
   tools/verify/dejuno_audit.py CLEAN with the 16 owed constants printed.
   PROVEN only when the JX-3P traverses it (E5).
-- O4 RE-DERIVED ON THE REAL LAYOUT (2026-08-23): 3 voices + FX per chip,
-  S3_VOICES=3 (full recorded S3_EXTRA_DEFS), 9+ min, all 64 patches stepping:
-  un=0 -- AUDIO NEVER BREAKS on chip A. Quiet-miss 44-45/10k (rule was <=60),
-  so 3 voices/chip is KEPT: the 6-voice two-chip instrument RUNS. Hot rows on
-  the real layout: pat21 sum=4259, pat49 sum=3810 cyc/sample -- master-chain
-  cost ~unchanged vs 2-voice, the deficit did not grow with the layout. Open
-  before closing: chip B's own un= (its console capture died at the flash),
-  the mix flap (drain-to-latest fix in flight), drift anomaly (b4 §5).
+- O4 3-VOICE VERDICT RETRACTED AS UNATTRIBUTED (2026-08-23, playbook 78):
+  the "3-voice" build was the F4 harness (rm -rf build dropped S3_LISTEN;
+  the DEVCHORD compile-time net proves a real 3-voice listen build could not
+  even have compiled -- the chord-3 answer key did not exist). Every number
+  recorded for it came from a frozen capture of the 2-VOICE probe build.
+  What IS measured at 2 voices: quiet 6.3-7.07 ms vs the 5.804 ms period
+  with un=0 -- and un= is BLIND (50 ms timeouts only); B5 (DMA on_sent
+  descriptor counter, the non-blind starvation meter) is in the new build.
+  NOW IN FLIGHT: the FIRST real 3-voice listen build (chord-3 key
+  regenerated, [LISTENv3] provenance tag on every report line). The full
+  canonical reconfigure line lives in esp32s3/LISTEN.md.
 
 # BUILD & GIT
 `make libjuno.so` | `make test` | `make verify` (finish line) | WASM:
