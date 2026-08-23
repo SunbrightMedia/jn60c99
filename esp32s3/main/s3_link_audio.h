@@ -100,6 +100,7 @@ typedef struct {
     uint8_t  pend_used[8];
     uint32_t relock_miss;          /* post-lock mismatch streak -> re-lock  */
     uint32_t pat_disc;             /* pattern discontinuities seen (diag)   */
+    uint32_t rx_dropped;           /* whole chunks skipped by the drain     */
     int      probe_lag, probe_delta, probe_have; /* last probe result (diag) */
 } s3_la;
 
@@ -250,9 +251,25 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
         LA.discard_left -= (uint32_t)(g / sizeof(int32_t));
         if (LA.discard_left) return;         /* not re-framed yet */
     }
-    if (i2s_channel_read(LA.ch, la_buf,
-                         (size_t)n * 2u * sizeof(int32_t), &got, 0) == ESP_OK
-        && got == (size_t)n * 2u * sizeof(int32_t)) {
+    /* DRAIN TO LATEST: when A ran late, more than one chunk waits in the
+     * DMA. Reading only one lets the queue overflow and drop WORDS, which
+     * destroys the framing (the slip behind the mix flap). Draining drops
+     * whole CHUNKS instead: framing preserved, one block of B's voices
+     * gracefully skipped, the mix stays open. */
+    {
+        int drained = 0;
+        size_t g;
+        do {
+            g = 0;
+            if (i2s_channel_read(LA.ch, la_buf,
+                                 (size_t)n * 2u * sizeof(int32_t), &g, 0) != ESP_OK
+                || g != (size_t)n * 2u * sizeof(int32_t))
+                break;
+            got = g; ++drained;
+        } while (drained < 4);
+        if (drained > 1) LA.rx_dropped += (uint32_t)(drained - 1);
+    }
+    if (got == (size_t)n * 2u * sizeof(int32_t)) {
         got_chunk = 1;
         ++LA.rx_chunks;
         memmove(la_rawhist, la_rawhist + 2 * CHUNK,
@@ -442,6 +459,7 @@ static void s3_la_report(void)
 {
     if (!LA.up) return;
     if (LA.role == S3_ROLE_A)
+        printf("LKA: drop=%lu\n", (unsigned long)LA.rx_dropped),
         printf("LKA: mix=%s rx=%lu short=%lu crc ok=%lu bad=%lu lock=%s off=%d\n",
                LA.mix.st == S3_AMIX_OPEN ? "OPEN" : "closed",
                (unsigned long)LA.rx_chunks, (unsigned long)LA.rx_short,
