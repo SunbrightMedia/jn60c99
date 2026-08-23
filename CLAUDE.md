@@ -134,7 +134,12 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
   a SONIC change judged by the fork gate, on top of the 5.8 ms. b6 priced the
   latency and never the feedback. Today's S3L_FX_PIPE is legitimate because it
   moves the WHOLE chain, keeping the loop sample-deep inside.
-- O6 IN FLIGHT, no wire yet. D3 FIXED AND WIRED END TO END: juno_apply_*_at
+- O6 STEP 2 PROVEN ON THE WIRE (2026-08-23): two boards linked, hs=OK,
+  pattern lock (lock=YES), CRC-proven audio, mix=OPEN -- B's 3 voices reach
+  the DAC. Five wire defects paid+gated (playbook 77/77b + lock_search_gate).
+  Open: advert age-out flap (bad= counts) to quantify. Bench is REMOTE:
+  tools/bench/bench_agent.py flashes both boards on push and returns logs
+  via commit messages -- no human needed at the bench. D3 FIXED AND WIRED END TO END: juno_apply_*_at
   (base = global voice of local slot 0), EB_DEVSEQ_VOICE_BASE set from the
   strap BEFORE the boot recall, and the devcrc ANSWER KEY EXISTS PER BASE
   (base-0 tables byte-identical; generator refuses if base 3 fails to move the

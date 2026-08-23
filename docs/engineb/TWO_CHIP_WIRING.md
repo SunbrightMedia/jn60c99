@@ -132,5 +132,12 @@ reseat.
 the direction table — every wire has exactly one driver — and all six
 handshake rejections, each seen to fail.
 
-**NOT proven:** that GPIO 15 on A reaches GPIO 15 on B. No wire has existed at
-any point in this design. Nothing here has been on two boards.
+**PROVEN ON THE WIRE (2026-08-23, two boards, six wires + ground + jumper):**
+role-by-strap, the control handshake (`hs=OK`, build fingerprint, disjoint
+voices, patch-follow), the audio link end to end -- `lock=YES`, CRC-proven
+chunks, **`mix=OPEN`**: chip B's three voices reach the DAC. The bench paid
+for and gated five real defects on the way: chunk-framing phase (playbook
+77), the sweep that broke its own deadline (77b), console starvation, the
+advert-beats-its-chunk compare, and the training-pattern lock that ended
+the guessing. Open item: occasional advert age-outs (bad= counts) flap the
+mix; quantify and settle before calling the link production-quiet.
