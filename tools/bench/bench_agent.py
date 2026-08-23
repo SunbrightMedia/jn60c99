@@ -122,7 +122,11 @@ def main():
     for m in mons:
         m.start()
 
-    last_sha = bin_sha()
+    # the last sha actually FLASHED persists across self-restarts -- without
+    # this, a self-update restart re-baselines on a freshly-pulled bin and a
+    # pending flash is silently lost (paid twice on this bench).
+    FLASHED = os.path.join(LOGDIR, "last_flashed.sha")
+    last_sha = open(FLASHED).read().strip() if os.path.exists(FLASHED) else None
     last_push = 0.0
     my_sha = hashlib.sha256(open(os.path.abspath(__file__), "rb").read()).hexdigest()
     print("[bench] running. current build %s" % (last_sha or "none")[:12])
@@ -146,6 +150,7 @@ def main():
                 for m in mons:
                     m.pause.clear()
                 last_sha = sha
+                open(FLASHED, "w").write(sha)
             now = time.time()
             if now - last_push > PUSH_EVERY:
                 # Windows: git cannot index a file the capture thread holds
