@@ -86,14 +86,22 @@ down first and every board just conforms.
   ~2 ¢. Optionally a **series resistor** (100 Ω–1 kΩ) in the wiper line to
   protect the ADC and help mux settling. Tie the two pot ends to HI/LO
   references, wiper to the WIPER pin.
-- **Buttons:** put the **pull resistor on the board** (10 kΩ). Decide pull-up
-  (to VCC, active-low) vs pull-down (to GND, active-high) *once* for the whole
-  system. With a pull-up, `SIG` idles high and the button pulls it to GND — the
-  mux/ADC reads it fine. Optional RC or just firmware debounce.
-- **LEDs:** current-limit resistor **on the breakout** so the cable only carries
-  `LED+`/`LED−` and logic-level drive. Size for your LED + drive voltage
-  (e.g. ~330 Ω @ 5 V for a standard green). RGB = one resistor per color; note
-  common-anode vs common-cathode on the silkscreen.
+- **Buttons — polarity is frozen in copper, so pick one convention.** The pull
+  resistor **must** be on the board (10 kΩ): through a mux, unselected channels
+  would otherwise float, and an MCU internal pull-up only sits on the shared ADC
+  pin, not per channel. Its *direction* is etched in — pull-**up** (to VCC) idles
+  HIGH, press → LOW (active-low); pull-**down** (to GND) is the reverse. You
+  can't flip it in firmware, and it must be **uniform across all button boards**
+  or firmware needs per-channel logic. **Recommend active-low pull-up** (the
+  universal convention). Debounce in firmware.
+- **LEDs — common-anode vs common-cathode is also frozen in copper.** It sets
+  current direction (common-anode → shared pin to VCC, on = pull the color pin
+  LOW/sink; common-cathode → shared pin to GND, on = drive HIGH/source), the
+  driver arrangement, *and* your on/off logic — all dictated by the physical LED
+  you buy. Pick one type, design for it, label it on the silk. Current-limit
+  resistor **on the breakout** so the cable only carries `LED±` + logic-level
+  drive; size for 5 V (e.g. ~330 Ω green) so it's safe at both rails. RGB = one
+  resistor per color.
 - **Encoders:** quadrature needs fast/interrupt reads — **do not** mux these.
   Route straight to GPIO. Include the push-switch pin if the encoder has one.
 - **PB86:** treat button and lamp as two independent 2-pin sub-circuits with two
@@ -101,26 +109,76 @@ down first and every board just conforms.
 
 ---
 
-## 5. The central mux board (Lane A)
+## 5. The central mux board (Lane A) — chainable, ratiometric
 
-- **Chip:** `74HC4067` (16:1 single-ended analog mux). 16 channels = your 16 JST
-  ins, 4 address lines (`S0–S3`) + `EN̄` + one common (`SIG`) out.
+- **Chip:** `74HC4067` (16:1 single-ended analog mux, 2–6 V). 16 channels = your
+  16 JST ins, 4 address lines (`S0–S3`), enable (`EN̄`/`INH`), one common (`SIG`).
 - **16× JST-XH-3 input ports.** Each port = `GND · WIPER/SIG · VCC`. GND and VCC
   rails are shared across all ports (that's what feeds the pot ends / pull-ups).
-- **Out headers:** break out `SIG` (to MCU ADC), `S0–S3`, `EN̄`, `VCC`, `GND` to
-  a 0.1″ header so any dev board (RP2040 / Teensy / STM32 / Arduino) can drive
-  it. Optionally a second 4067 footprint for 32 channels later.
 - **Decoupling:** 100 nF across the 4067's VCC/GND, close to the chip. A bulk
   10 µF on the board is cheap insurance.
-- **Firmware gotcha to design around:** the 4067's on-resistance (~70–200 Ω)
-  plus the ADC sample-and-hold means you must **wait a few µs after switching
-  the address** before sampling. Lower source impedance (the wiper series-R
-  small, the filter cap helping) and a settle delay fix it.
 - **Grounding:** single solid ground pour; keep the analog return clean. Star or
   at least a continuous pour under the input ports.
 
-Outputs/LEDs would be a **separate** small board (e.g. `74HC595` → resistors →
-JST-XH-2 lamp ports) if you want the same connectorized approach for LEDs.
+### Dual-voltage: take VCC from the dev board (works at 3.3 V *and* 5 V)
+
+**Put no regulator on any board.** Feed VCC in from the dev board and the whole
+input system is voltage-agnostic:
+
+- **Analog is ratiometric.** A pot divides its top rail; the ADC measures against
+  that *same* rail. Feed the pot HI reference from dev-board VCC → the reading is
+  a fraction of full-scale whether that rail is 3.3 or 5 V.
+- **Match mux VCC to MCU logic level.** `74HC` thresholds are ratiometric
+  (VIH ≈ 0.7·VCC), so a 3.3 V MCU driving a 5 V-powered mux is marginal. Since
+  VCC comes *from* the dev board, logic level and mux VCC track automatically —
+  no level shifter, no jumper. 3.3 V board → all 3.3; 5 V board → all 5.
+- **Only LED resistors are voltage-sensitive** (brightness ∝ V, not ratiometric).
+  Size them for 5 V; they run a little dimmer at 3.3 V. That's the one exception.
+
+### Dev-board interface & chaining: **8 pins for one mux, +1 per mux**
+
+Every line except the enable is a shared bus, so extra muxes are nearly free:
+
+| Line | Count | Shared across muxes? |
+|------|-------|----------------------|
+| `S0 S1 S2 S3` (address) | 4 | **Yes** — one bus to all muxes |
+| `SIG` (common analog out) | 1 | **Yes** — outputs wire-OR onto **one** ADC pin |
+| `VCC`, `GND` | 2 | **Yes** |
+| `EN̄` (enable) | 1 | **No** — one GPIO per mux |
+
+One mux = 4+1+2+1 = **8 pins**. Add a mux → it shares address/SIG/power and you
+enable one at a time via its own `EN̄` → **+1 GPIO per mux**. A disabled 4067's
+common goes high-Z, so tying all `SIG`s together is safe, and **only one ADC pin
+is ever used** — that's what makes it fit any dev board (ADC pins are the scarce
+resource; many boards have only 1–4).
+
+- Give each board a **chain-in and chain-out** connector carrying the 7 shared
+  lines `{S0..S3, SIG, VCC, GND}` as a pass-through bus, plus its own `EN̄`
+  broken out. Daisy-chain the bus; run one `EN̄` wire from each board to a GPIO.
+- **Settling gotcha:** the 4067's on-resistance (~70–200 Ω) + ADC sample-and-hold
+  means you must **wait a few µs after switching address/enable** before
+  sampling. The wiper series-R (small) + filter cap keep source impedance low.
+
+### How many can you chain? (the "hard limit")
+
+- **Simple mode (one EN̄ GPIO per mux):** limited by **spare GPIO** →
+  realistically **8–16 muxes = 128–256 inputs**. Electrical ceilings sit higher:
+  leakage + capacitance of disabled outputs on the shared `SIG` slowly grow
+  settling time (fine to dozens), and the address bus wants a buffer past
+  ~20–30 loads. There's also a *time* limit — a few µs settle × N channels;
+  256 ch ≈ ~1 ms/scan (~1 kHz update), still plenty; thousands get sluggish.
+- **Scale mode (out of GPIO):** decode the `EN̄`s from *extra address lines* with
+  a `74HC138`/`74HC154` instead of one GPIO each. Muxes then cost address *bits*,
+  not pins — 4 mux-select lines → 16 muxes → **256 inputs on ~11 dev pins**. Run
+  the decode lines through the chain connector so boards stay identical. This is
+  the "as many as you'll ever need" path.
+
+So there's no real chip-count ceiling: the limit is GPIO (simple mode) or your
+required scan rate (scale mode). Design the connector for simple mode now, leave
+footprints/lines for the decoder later.
+
+Outputs/LEDs are a **separate** small board (e.g. `74HC595` → resistors →
+JST-XH-2 lamp ports) — they can't ride an input mux.
 
 ---
 
@@ -183,12 +241,15 @@ pcb/
 
 ## 8. Open decisions (answer these and the design falls out)
 
-1. **System voltage:** 3.3 V or 5 V? (Sets pull/LED resistor values and MCU
-   choice.) The 74HC4067 runs at either.
-2. **MCU / dev board** you'll read this with (RP2040? Teensy? STM32? bare AVR?).
-3. **Button polarity:** pull-up/active-low vs pull-down/active-high (pick once).
-4. **RGB common:** common-anode or common-cathode LEDs?
-5. **How many total inputs** in the finished surface? (>16 → plan the 2nd 4067
-   or a 4067 + 4051 mix now.)
-6. **LED count / brightness control:** simple on/off (GPIO/595) or PWM/dimming
-   (changes the driver choice)?
+Voltage is **solved** — VCC comes from the dev board, so the input system runs
+at 3.3 V *and* 5 V unchanged (§5). Input count is **solved** — the mux board is
+chainable (§5). What's left:
+
+1. **Button polarity** — active-low pull-up (recommended) vs active-high
+   pull-down. Frozen in copper; pick once, apply to every button board.
+2. **RGB common** — common-anode or common-cathode. Frozen in copper; dictated
+   by the LED you buy.
+3. **MCU / dev board** you'll read this with (RP2040 / Teensy / STM32 / AVR) —
+   mainly affects how many EN̄ GPIOs you have, i.e. simple vs scale chaining.
+4. **LED brightness control** — simple on/off (GPIO / `74HC595`) or PWM/dimming
+   (changes the driver choice).
