@@ -217,6 +217,7 @@ def main():
                                 keep = [l for l in txt.splitlines() if KEY.search(l)]
                                 msg += ("\n\n===== %s (key lines) =====\n" % fn) + \
                                        "\n".join(keep[-40:])
+                                msg += ("\n----- %s RAW tail -----\n" % fn) + txt[-1500:]
                             except OSError as e:
                                 msg += "\n(tail %s failed: %r)" % (fn, e)
                 c = sh(["git", "commit", "--allow-empty", "-m", msg])
