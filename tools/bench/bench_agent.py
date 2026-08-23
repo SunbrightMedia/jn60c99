@@ -44,6 +44,7 @@ class Monitor(threading.Thread):
         self.port = port
         self.path = os.path.join(LOGDIR, port.lower() + ".log")
         self.pause = threading.Event()   # set = stop reading (flash time)
+        self.last_data = 0.0             # wall time of last received byte
         self.idle  = threading.Event()   # set by us when actually closed
         self.idle.set()
 
@@ -54,7 +55,13 @@ class Monitor(threading.Thread):
                 self.idle.set(); time.sleep(0.5); continue
             try:
                 with serial.Serial(self.port, BAUD, timeout=1) as s:
+                    # esptool leaves DTR/RTS in whatever state; a reopen that
+                    # asserts them can HOLD THE CHIP IN RESET or wedge the
+                    # capture (seen twice: console froze at flash time).
+                    s.dtr = False
+                    s.rts = False
                     self.idle.clear()
+                    self.last_data = time.time()
                     with open(self.path, "ab") as f:
                         f.write(b"\n=== monitor (re)opened %s ===\n"
                                 % time.strftime("%Y-%m-%d %H:%M:%S").encode())
@@ -62,6 +69,10 @@ class Monitor(threading.Thread):
                             data = s.read(4096)
                             if data:
                                 f.write(data); f.flush()
+                                self.last_data = time.time()
+                            elif time.time() - self.last_data > 60:
+                                f.write(b"\n=== 60s silent: forcing reopen ===\n")
+                                break        # close and reopen the port
                             if f.tell() > ROTATE:
                                 break
                 if os.path.getsize(self.path) > ROTATE:
@@ -185,11 +196,16 @@ def main():
                                     (fn, os.path.exists(dst),
                                      os.path.getsize(dst) if os.path.exists(dst) else -1,
                                      (a.stderr or a.stdout).strip()[-200:]))
-                msg = "bench: serial logs " + time.strftime("%Y-%m-%d %H:%M:%S")
+                live = " ".join("%s:%ds" % (m.port, int(time.time() - m.last_data))
+                                for m in mons if m.last_data)
+                msg = ("bench: serial logs " + time.strftime("%Y-%m-%d %H:%M:%S")
+                       + ("  [data age " + live + "]" if live else "  [no data yet]"))
                 if diag:
                     gv = sh(["git", "--version"]).stdout.strip()
-                    msg = ("bench-diag: some staging failed (%s)\n\n" % gv
-                           + "\n".join(diag))
+                    live = " ".join("%s:%ds" % (m.port, int(time.time() - m.last_data))
+                                    for m in mons if m.last_data)
+                    msg = ("bench-diag: some staging failed (%s) [data age %s]\n\n"
+                           % (gv, live or "none") + "\n".join(diag))
                     import re as _re
                     KEY = _re.compile(r"LKA|LKB|LINK:|B4|HEALTH|RECALL:|bit-shift|lock=|hs=|voices allowed|^t=|B5|MSPP: pat=(5|16|21|49) ")
                     for fn in ("com5.log", "com9.log", "agent_err.log"):
