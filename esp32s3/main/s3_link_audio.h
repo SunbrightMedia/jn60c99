@@ -100,6 +100,7 @@ typedef struct {
     uint8_t  pend_used[8];
     uint32_t relock_miss;          /* post-lock mismatch streak -> re-lock  */
     uint32_t pat_disc;             /* pattern discontinuities seen (diag)   */
+    int      probe_lag, probe_delta, probe_have; /* last probe result (diag) */
 } s3_la;
 
 static s3_la LA;
@@ -124,6 +125,13 @@ static volatile int la_snap_state;
 static volatile int la_snap_off;
 static volatile int la_snap_shift;
 static volatile int la_snap_swap;
+/* the WHY probe: when an advert ages out unredeemed, the lock task searches
+ * the raw received stream (last 4 chunks) at chunk lags 0..3 and word deltas
+ * -32..+32 for a window matching that CRC, and reports where the advertised
+ * chunk ACTUALLY lives. One line that ends the guessing. */
+static int32_t *la_rawhist;            /* 4 chunks, PSRAM                   */
+static volatile uint32_t la_probe_crc; /* aged-out advert awaiting a probe  */
+static volatile int      la_probe_req;
 /* console-task scratch for the bit-shift-recovered candidate stream.
  * PSRAM: it is touched only by the deadline-free sweep, and internal DRAM
  * is 224 bytes from full -- allocated at link start, chip A only. */
@@ -168,7 +176,9 @@ static int s3_la_start(int role)
                                               MALLOC_CAP_SPIRAM);
         la_swp2 = (int32_t *)heap_caps_malloc(2 * 2 * 256 * sizeof(int32_t),
                                               MALLOC_CAP_SPIRAM);
-        if (!la_swp || !la_swp2) return 0;  /* no scratch = no provable link */
+        la_rawhist = (int32_t *)heap_caps_malloc(8 * 2 * 256 * sizeof(int32_t),
+                                                 MALLOC_CAP_SPIRAM);
+        if (!la_swp || !la_swp2 || !la_rawhist) return 0;
     }
     if (role == S3_ROLE_A)
         xTaskCreate(s3_la_lock_task, "lalock", 4096, NULL, 1, NULL);
@@ -245,6 +255,10 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
         && got == (size_t)n * 2u * sizeof(int32_t)) {
         got_chunk = 1;
         ++LA.rx_chunks;
+        memmove(la_rawhist, la_rawhist + 2 * CHUNK,
+                7 * 2 * CHUNK * sizeof(int32_t));
+        memcpy(la_rawhist + 7 * 2 * CHUNK, la_buf,
+               2 * CHUNK * sizeof(int32_t));
         /* bit-shift recovery (locked, shift != 0): rebuild the sender's
          * words in place from the raw stream + the carry word, THEN CRC.
          * The raw last word becomes the next chunk's carry. */
@@ -312,6 +326,10 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
                 LA.pend_used[k] = 0;
                 match = 1; ++LA.rx_match; LA.relock_miss = 0;
                 break;
+            }
+        for (k = 0; k < 8; ++k)
+            if (LA.pend_used[k] && LA.pend_age[k] == 10 && !la_probe_req) {
+                la_probe_crc = LA.pend[k]; la_probe_req = 1;
             }
         for (k = 0; k < 8; ++k)
             if (LA.pend_used[k] && ++LA.pend_age[k] > PEND_MAX) {
@@ -385,11 +403,32 @@ static void s3_la_lock_sweep(void)
  * which STARVED every status print (chip A went mute after boot: third
  * bench defect of the day). Its own task + the table CRC (~10 ms/pass)
  * ends both. */
+static void s3_la_probe(void)
+{
+    int lag, d;
+    uint32_t want;
+    if (!la_probe_req) return;
+    want = la_probe_crc;
+    for (lag = 0; lag < 7; ++lag)
+        for (d = -32; d <= 32; ++d) {
+            int base = (7 - lag) * 2 * CHUNK - 2 * CHUNK + d;
+            if (base < 0 || base + 2 * CHUNK > 8 * 2 * CHUNK) continue;
+            if (la_crc32(la_rawhist + base, 2u * CHUNK * sizeof(int32_t)) == want) {
+                LA.probe_lag = lag; LA.probe_delta = d; LA.probe_have = 1;
+                la_probe_req = 0;
+                return;
+            }
+        }
+    LA.probe_lag = -1; LA.probe_delta = 0; LA.probe_have = 1;
+    la_probe_req = 0;
+}
+
 static void s3_la_lock_task(void *arg)
 {
     (void)arg;
     for (;;) {
         s3_la_lock_sweep();
+        s3_la_probe();
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
@@ -411,6 +450,11 @@ static void s3_la_report(void)
     if (LA.role == S3_ROLE_A && LA.locked && (LA.bit_shift || LA.half_swap))
         printf("LKA: corrected in software: bit-shift %d half-swap %d\n",
                LA.bit_shift, LA.half_swap);
+    if (LA.role == S3_ROLE_A && LA.probe_have)
+        printf(LA.probe_lag >= 0
+               ? "LKAprobe: advert found at lag=%d delta=%+d words\n"
+               : "LKAprobe: advert NOT in stream (lag=%d d=%d) -- content differs\n",
+               LA.probe_lag, LA.probe_delta);
     if (LA.role == S3_ROLE_A && !LA.locked)
         printf("LKA: pattern discontinuities %lu\n", (unsigned long)LA.pat_disc);
     if (LA.role == S3_ROLE_A && !LA.locked)
