@@ -17,7 +17,7 @@ said. Ctrl+C to stop.
 usage:  python tools/bench/bench_agent.py [--ports COM5,COM9] [--branch <br>]
 needs:  git (repo cloned), python, esptool, pyserial  (all already in use)
 """
-import argparse, hashlib, os, subprocess, sys, threading, time
+import argparse, hashlib, os, shutil, subprocess, sys, threading, time
 
 HERE   = os.path.dirname(os.path.abspath(__file__))
 REPO   = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -141,7 +141,18 @@ def main():
                 last_sha = sha
             now = time.time()
             if now - last_push > PUSH_EVERY:
-                a = sh(["git", "add", "bench/logs"])
+                # Windows: git cannot index a file the capture thread holds
+                # open for writing -- push quiescent COPIES, never live logs.
+                snap = os.path.join(LOGDIR, "push")
+                os.makedirs(snap, exist_ok=True)
+                for fn in os.listdir(LOGDIR):
+                    src = os.path.join(LOGDIR, fn)
+                    if os.path.isfile(src) and fn.endswith(".log"):
+                        try:
+                            shutil.copyfile(src, os.path.join(snap, fn))
+                        except OSError:
+                            pass
+                a = sh(["git", "add", "bench/logs/push"])
                 if a.returncode != 0:
                     print("[bench] git add FAILED: " + (a.stderr or a.stdout)[-300:])
                 c = sh(["git", "commit", "-m", "bench: serial logs " +
