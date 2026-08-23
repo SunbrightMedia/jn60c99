@@ -178,7 +178,32 @@ param value -> (pool+740 dispatch idx) -> coefficient (44 LUTs + {796,797,803}
 cluster). Remaining is implementation + the cluster + engine integration + gate.
 
 
-## RECALL INTERACTION SCOPE -- CORRECTED (this session)
+## RECALL -- DONE AND PROVEN (the "irreducible" claim below was WRONG)
+
+The recall IS separable, exactly like the JUNO's juno_apply.c. The earlier
+"proc-mediated, must transcribe 56 setters" conclusion was a HARNESS RESET BUG,
+not a property of the plugin (the user called this correctly: "we did it for the
+JUNO"). Corrected method, mirroring tools/verify/plugin_recall_ref.py:
+- ONE build; per patch dispatch the active pool set (pool+740) in pool order from
+  the SAME clean base; capture voice-0 block. That IS the recall (recall_ref_emu.py).
+- 32 active pools. Capturing each pool's writes from the clean base and composing
+  leaves ONLY 7 interacting cells wrong (recall_separ.py) -- not 43. Those 7 are
+  joint/mode cells (writers: 12/135, 49/115, 50/115, 115, 52/115, 61/117), the
+  JX twin of JUNO's apply_bend_mod_sens / apply_pwm_source. Their law is
+  value-pool-wins: cell = the value-pool's byte-LUT, the mode pool's from-clean
+  write is a default the ordered sequence discards (all factory mode bytes = 0).
+- MODEL (32 LUTs + 7 overrides) == sequential reference, 64/64 EXACT
+  (recall_model_check.py).
+- PORT: src/jx_recall.c + generated src/jx_recall_lut.h (complete single-byte
+  domain enumeration = the exact function, not an approximation). C == oracle
+  reference bit-for-bit, all 64 patches (jx_recall_gate.py). Gate seen to fail.
+- Driver: jx3p/tools/jx_recall_gate.sh regenerates everything from the binary
+  and re-proves. GREEN.
+
+NEXT: engine integration (recall -> note-on -> per-block render), effects nulls,
+and the full make verify SYNTH=jx3p over rates x blocks. Recall itself is closed.
+
+## (superseded, WRONG) RECALL INTERACTION SCOPE
 
 Earlier "only 3 proc-mediated params" was incomplete. Definitive test: applying
 CLEAN-captured per-param LUTs in dispatch (idx) order leaves 43 cells wrong,
