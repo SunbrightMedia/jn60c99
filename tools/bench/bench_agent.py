@@ -191,7 +191,7 @@ def main():
                     msg = ("bench-diag: some staging failed (%s)\n\n" % gv
                            + "\n".join(diag))
                     import re as _re
-                    KEY = _re.compile(r"LKA:|LINK:|B4|HEALTH|RECALL:|bit-shift|lock=|hs=")
+                    KEY = _re.compile(r"LKA|LKB|LINK:|B4|HEALTH|RECALL:|bit-shift|lock=|hs=")
                     for fn in ("com5.log", "com9.log", "agent_err.log"):
                         p = os.path.join(LOGDIR, fn)
                         if os.path.exists(p):
