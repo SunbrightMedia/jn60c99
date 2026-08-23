@@ -153,7 +153,12 @@ def main():
                         continue
                     dst = os.path.join(snap, fn)
                     try:
-                        shutil.copyfile(src, dst)
+                        # read via Python (same process as the writer -- no
+                        # sharing issue) and write a fresh CLOSED file for
+                        # git; shutil.copyfile of the live log was flaky.
+                        data = open(src, "rb").read()[-65536:]
+                        with open(dst, "wb") as df:
+                            df.write(data)
                     except OSError as e:
                         diag.append("copy %s: %r" % (fn, e)); continue
                     ok = False
@@ -170,8 +175,10 @@ def main():
                                      os.path.getsize(dst) if os.path.exists(dst) else -1,
                                      (a.stderr or a.stdout).strip()[-200:]))
                 if staged:
-                    c = sh(["git", "commit", "-m", "bench: serial logs " +
-                            time.strftime("%Y-%m-%d %H:%M:%S")])
+                    msg = "bench: serial logs " + time.strftime("%Y-%m-%d %H:%M:%S")
+                    if diag:
+                        msg += "\n\n" + "\n".join(diag)
+                    c = sh(["git", "commit", "-m", msg])
                     committed = c.returncode == 0
                 else:
                     committed = False
