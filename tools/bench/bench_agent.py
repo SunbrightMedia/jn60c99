@@ -185,13 +185,17 @@ def main():
                     gv = sh(["git", "--version"]).stdout.strip()
                     msg = ("bench-diag: some staging failed (%s)\n\n" % gv
                            + "\n".join(diag))
+                    import re as _re
+                    KEY = _re.compile(r"LKA:|LINK:|B4|HEALTH|RECALL:|bit-shift|lock=|hs=")
                     for fn in ("com5.log", "com9.log", "agent_err.log"):
                         p = os.path.join(LOGDIR, fn)
                         if os.path.exists(p):
                             try:
-                                raw = open(p, "rb").read()[-3000:]
-                                msg += ("\n\n===== tail %s =====\n" % fn) + \
-                                       raw.decode("utf-8", "replace")
+                                raw = open(p, "rb").read()[-131072:]
+                                txt = raw.decode("utf-8", "replace")
+                                keep = [l for l in txt.splitlines() if KEY.search(l)]
+                                msg += ("\n\n===== %s (key lines) =====\n" % fn) + \
+                                       "\n".join(keep[-40:])
                             except OSError as e:
                                 msg += "\n(tail %s failed: %r)" % (fn, e)
                 c = sh(["git", "commit", "--allow-empty", "-m", msg])
