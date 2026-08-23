@@ -71,6 +71,11 @@ class Monitor(threading.Thread):
                     os.replace(self.path, prev)
             except Exception as e:
                 self.idle.set()
+                try:
+                    with open(os.path.join(LOGDIR, "agent_err.log"), "a") as ef:
+                        ef.write("%s %s: %r\n" % (time.strftime("%H:%M:%S"), self.port, e))
+                except OSError:
+                    pass
                 time.sleep(2)   # port busy/unplugged: retry forever
 
 def flash(ports):
@@ -112,12 +117,17 @@ def main():
 
     last_sha = bin_sha()
     last_push = 0.0
+    my_sha = hashlib.sha256(open(os.path.abspath(__file__), "rb").read()).hexdigest()
     print("[bench] running. current build %s" % (last_sha or "none")[:12])
     while True:
         try:
             r = sh(["git", "pull", "--ff-only", "origin", branch])
             if r.returncode != 0:
                 print("[bench] git pull failed:\n" + (r.stderr or r.stdout)[-400:])
+            new_me = hashlib.sha256(open(os.path.abspath(__file__), "rb").read()).hexdigest()
+            if new_me != my_sha:
+                print("[bench] agent updated on the branch -- restarting myself")
+                os.execv(sys.executable, [sys.executable, os.path.abspath(__file__)] + sys.argv[1:])
             sha = bin_sha()
             if sha and sha != last_sha:
                 print("[bench] NEW BUILD %s -- flashing %s" % (sha[:12], ports))
@@ -131,15 +141,26 @@ def main():
                 last_sha = sha
             now = time.time()
             if now - last_push > PUSH_EVERY:
-                sh(["git", "add", "bench/logs"])
+                a = sh(["git", "add", "bench/logs"])
+                if a.returncode != 0:
+                    print("[bench] git add FAILED: " + (a.stderr or a.stdout)[-300:])
                 c = sh(["git", "commit", "-m", "bench: serial logs " +
                         time.strftime("%Y-%m-%d %H:%M:%S")])
                 if c.returncode == 0:         # something actually changed
                     pr = sh(["git", "push", "origin", branch])
                     if pr.returncode != 0:
-                        # remote moved (the agent pushed a build): rebase logs on top
+                        print("[bench] push rejected, rebasing: " +
+                              (pr.stderr or pr.stdout)[-300:])
                         sh(["git", "pull", "--rebase", "origin", branch])
-                        sh(["git", "push", "origin", branch])
+                        pr = sh(["git", "push", "origin", branch])
+                    print("[bench] logs pushed" if pr.returncode == 0 else
+                          "[bench] PUSH FAILED: " + (pr.stderr or pr.stdout)[-300:])
+                else:
+                    out = (c.stderr or c.stdout).strip()
+                    if "nothing to commit" in out or "nothing added" in out:
+                        print("[bench] no new log content this cycle")
+                    else:
+                        print("[bench] COMMIT FAILED: " + out[-300:])
                 last_push = now
             time.sleep(POLL)
         except KeyboardInterrupt:
