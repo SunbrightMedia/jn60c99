@@ -149,7 +149,9 @@ def main():
             now = time.time()
             if now - last_push > PUSH_EVERY:
                 # Windows: git cannot index a file the capture thread holds
-                # open for writing -- push quiescent COPIES, never live logs.
+                # open for writing -- stage quiescent tail-snapshots instead.
+                # WHATEVER fails, the console tails travel in the commit
+                # MESSAGE, so the remote side always sees the boards.
                 snap = os.path.join(LOGDIR, "push")
                 os.makedirs(snap, exist_ok=True)
                 diag = []
@@ -160,16 +162,13 @@ def main():
                         continue
                     dst = os.path.join(snap, fn)
                     try:
-                        # read via Python (same process as the writer -- no
-                        # sharing issue) and write a fresh CLOSED file for
-                        # git; shutil.copyfile of the live log was flaky.
                         data = open(src, "rb").read()[-65536:]
                         with open(dst, "wb") as df:
                             df.write(data)
                     except OSError as e:
                         diag.append("copy %s: %r" % (fn, e)); continue
                     ok = False
-                    for attempt in range(3):   # AV can hold fresh files briefly
+                    for attempt in range(2):
                         a = sh(["git", "add", "--", "bench/logs/push/" + fn])
                         if a.returncode == 0:
                             ok = True; break
@@ -181,43 +180,33 @@ def main():
                                     (fn, os.path.exists(dst),
                                      os.path.getsize(dst) if os.path.exists(dst) else -1,
                                      (a.stderr or a.stdout).strip()[-200:]))
-                if staged:
-                    msg = "bench: serial logs " + time.strftime("%Y-%m-%d %H:%M:%S")
-                    if diag:
-                        msg += "\n\n" + "\n".join(diag)
-                    c = sh(["git", "commit", "-m", msg])
-                    committed = c.returncode == 0
-                else:
-                    committed = False
-                if not staged and diag:
-                    # THE CHANNEL THAT CANNOT FAIL: no file staging at all --
-                    # the diagnosis AND the log tails travel in the message.
-                    st = sh(["git", "status", "--porcelain"])
-                    msg = ("bench-diag: file staging failing\n\n" + "\n".join(diag)
-                           + "\n\nstatus:\n" + (st.stdout or st.stderr)[-500:])
+                msg = "bench: serial logs " + time.strftime("%Y-%m-%d %H:%M:%S")
+                if diag:
+                    gv = sh(["git", "--version"]).stdout.strip()
+                    msg = ("bench-diag: some staging failed (%s)\n\n" % gv
+                           + "\n".join(diag))
                     for fn in ("com5.log", "com9.log", "agent_err.log"):
                         p = os.path.join(LOGDIR, fn)
                         if os.path.exists(p):
                             try:
                                 raw = open(p, "rb").read()[-3000:]
-                                msg += ("\n\n===== tail %s =====\n" % fn) +                                        raw.decode("utf-8", "replace")
+                                msg += ("\n\n===== tail %s =====\n" % fn) + \
+                                       raw.decode("utf-8", "replace")
                             except OSError as e:
                                 msg += "\n(tail %s failed: %r)" % (fn, e)
-                    c = sh(["git", "commit", "--allow-empty", "-m", msg])
-                    committed = c.returncode == 0
-                if committed:
+                c = sh(["git", "commit", "--allow-empty", "-m", msg])
+                committed = c.returncode == 0
+                if not committed:
+                    print("[bench] commit failed: " +
+                          (c.stderr or c.stdout).strip()[-300:])
+                else:
                     pr = sh(["git", "push", "origin", branch])
                     if pr.returncode != 0:
                         sh(["git", "pull", "--rebase", "origin", branch])
                         pr = sh(["git", "push", "origin", branch])
-                    print("[bench] logs pushed" if pr.returncode == 0 else
+                    print("[bench] pushed (staged=%s diag=%d)" % (staged, len(diag))
+                          if pr.returncode == 0 else
                           "[bench] PUSH FAILED: " + (pr.stderr or pr.stdout)[-300:])
-                else:
-                    if diag:
-                        print("[bench] diag commit failed: " +
-                              (c.stderr or c.stdout).strip()[-300:])
-                    else:
-                        print("[bench] nothing new to push")
                 last_push = now
             time.sleep(POLL)
         except KeyboardInterrupt:
