@@ -21,6 +21,7 @@
 
 #include "s3_link.h"
 #include "driver/i2s_std.h"
+#include "esp_heap_caps.h"
 
 /* the same CRC the recall answer key uses -- one checksum dialect per repo */
 #include "eb_devseq.h"
@@ -52,6 +53,8 @@ typedef struct {
      * and only runs while unlocked (mix is closed then anyway). */
     int      locked;               /* 1 = A's reads are B-chunk-aligned     */
     int      lock_off;             /* slot offset the lock found (report)   */
+    int      bit_shift;            /* serial bit-shift the lock found (0-31)*/
+    uint32_t carry;                /* last RAW word read (bit-shift carry)  */
     uint32_t discard_left;         /* slots still to drop to re-frame       */
     uint32_t search_off;           /* next candidate slot offset (0..511)   */
     int      hist_n;               /* chunks in la_hist (need 2)            */
@@ -79,6 +82,11 @@ static uint32_t la_snap_acrc[8];
 static int      la_snap_nacrc;
 static volatile int la_snap_state;
 static volatile int la_snap_off;
+static volatile int la_snap_shift;
+/* console-task scratch for the bit-shift-recovered candidate stream.
+ * PSRAM: it is touched only by the deadline-free sweep, and internal DRAM
+ * is 224 bytes from full -- allocated at link start, chip A only. */
+static int32_t *la_swp;
 
 static int s3_la_start(int role)
 {
@@ -109,6 +117,11 @@ static int s3_la_start(int role)
     }
     if (i2s_channel_init_std_mode(LA.ch, &sc) != ESP_OK) return 0;
     if (i2s_channel_enable(LA.ch) != ESP_OK) return 0;
+    if (role == S3_ROLE_A && !la_swp) {
+        la_swp = (int32_t *)heap_caps_malloc(2 * 2 * 256 * sizeof(int32_t),
+                                             MALLOC_CAP_SPIRAM);
+        if (!la_swp) return 0;     /* no sweep scratch = no provable link */
+    }
     LA.up = 1;
     return 1;
 }
@@ -160,6 +173,8 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
         size_t g = 0;
         i2s_channel_read(LA.ch, la_buf,
                          LA.discard_left * sizeof(int32_t), &g, 0);
+        if (g >= sizeof(int32_t))            /* bit-shift carry follows the */
+            LA.carry = (uint32_t)la_buf[g / sizeof(int32_t) - 1];  /* stream */
         LA.discard_left -= (uint32_t)(g / sizeof(int32_t));
         if (LA.discard_left) return;         /* not re-framed yet */
     }
@@ -168,6 +183,17 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
         && got == (size_t)n * 2u * sizeof(int32_t)) {
         got_chunk = 1;
         ++LA.rx_chunks;
+        /* bit-shift recovery (locked, shift != 0): rebuild the sender's
+         * words in place from the raw stream + the carry word, THEN CRC.
+         * The raw last word becomes the next chunk's carry. */
+        if (LA.locked && LA.bit_shift) {
+            uint32_t rawlast = (uint32_t)la_buf[2 * n - 1];
+            s3_bitshift_recover((uint32_t *)la_buf, (const uint32_t *)la_buf,
+                                2 * n, LA.bit_shift, LA.carry);
+            LA.carry = rawlast;
+        } else {
+            LA.carry = (uint32_t)la_buf[2 * n - 1];
+        }
         LA.rx_crc[LA.rx_crc_n++ & 7] =
             eb_devseq_crc32(la_buf, got);
         /* keep the last two chunks for the phase-lock search */
@@ -198,6 +224,7 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
             if (off >= 0) {
                 LA.locked = 1;
                 LA.lock_off = off;
+                LA.bit_shift = la_snap_shift;
                 LA.discard_left = (uint32_t)off;      /* re-frame */
                 LA.hist_n = 0;
             }
@@ -243,11 +270,32 @@ static void s3_la_rx_inject(float vb[][EB_NUM_VOICES], int n,
  * advertised chunk was not one of the two snapshotted, try the next pair. */
 static void s3_la_lock_bg(void)
 {
-    uint32_t search = 0;
+    int sh, off = -1, hit_shift = 0;
     if (LA.role != S3_ROLE_A || la_snap_state != 1) return;
-    la_snap_off = s3_lock_search(la_snap, 2 * CHUNK,
+    /* shift 0 first (the honest wire), then every serial bit-shift 1..31.
+     * An early-by-s shift equals late-by-(32-s) one word over, and the slot
+     * sweep absorbs whole words, so this covers every constant misalignment.
+     * For a shifted candidate, word 0 lacks its carry: sweep from word 1 --
+     * offsets 1..512 cover all 512 residues just as 0..511 do (512 == 0). */
+    for (sh = 0; sh < 32 && off < 0; ++sh) {
+        uint32_t search = 0;
+        if (sh == 0) {
+            off = s3_lock_search(la_snap, 2 * CHUNK,
                                  la_snap_acrc, la_snap_nacrc,
                                  &search, 2 * CHUNK, eb_devseq_crc32);
+        } else {
+            s3_bitshift_recover((uint32_t *)la_swp, (const uint32_t *)la_snap,
+                                2 * 2 * CHUNK, sh, 0);
+            off = s3_lock_search(la_swp + 1, 2 * CHUNK,
+                                 la_snap_acrc, la_snap_nacrc,
+                                 &search, 2 * CHUNK, eb_devseq_crc32);
+            if (off >= 0) off = (off + 1) & (2 * CHUNK - 1);
+        }
+        if (off >= 0) hit_shift = sh;
+        vTaskDelay(1);            /* console task: stay off any watchdog */
+    }
+    la_snap_off   = off;
+    la_snap_shift = hit_shift;
     la_snap_state = 2;
 }
 
@@ -260,6 +308,8 @@ static void s3_la_report(void)
                (unsigned long)LA.rx_chunks, (unsigned long)LA.rx_short,
                (unsigned long)LA.rx_match, (unsigned long)LA.rx_mismatch,
                LA.locked ? "YES" : "searching", LA.lock_off);
+    if (LA.role == S3_ROLE_A && LA.locked && LA.bit_shift)
+        printf("LKA: serial bit-shift %d corrected in software\n", LA.bit_shift);
     else
         printf("LKA: pace=%s tx=%lu timeouts=%lu\n",
                LA.pace == S3_BPACE_LINKED ? "LINKED(A's clock)" : "freerun",

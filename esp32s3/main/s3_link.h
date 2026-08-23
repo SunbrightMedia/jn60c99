@@ -334,6 +334,26 @@ static int s3_lock_search(const int32_t *hist, int win,
     return -1;
 }
 
+/* A serial bit-shift recovery (the S3 I2S slave-TX artifact). The link
+ * serializes 32-bit words MSB first; if A samples the wire s bits LATE,
+ * A[i] = (S[i] << s) | (S[i+1] >> (32-s)), so the sender's word is
+ * S[i] = (A[i-1] << (32-s)) | (A[i] >> s). An EARLY-by-s sampling is the
+ * same formula with s' = 32-s applied one word over -- and a whole-word
+ * offset is exactly what the slot search absorbs -- so late 1..31 plus the
+ * slot sweep covers every constant bit misalignment there is. Pure, so the
+ * host gate can prove the algebra. carry = the raw word BEFORE src[0]. */
+static void s3_bitshift_recover(uint32_t *dst, const uint32_t *src, int n,
+                                int s, uint32_t carry)
+{
+    int i;
+    uint32_t prev = carry;
+    for (i = 0; i < n; ++i) {
+        uint32_t cur = src[i];
+        dst[i] = (uint32_t)(prev << (32 - s)) | (cur >> s);
+        prev = cur;
+    }
+}
+
 /* ---- chip B: WHAT PACES THE RENDER LOOP? ---------------------------------
  *
  * D1's core: ONE oscillator. Free-running, B paces on its own (unconnected)

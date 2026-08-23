@@ -112,11 +112,35 @@ static int run_offset(int off)
     return 0;
 }
 
+/* ---- bit-shift algebra: serialize MSB-first, sample s bits late, recover
+ * with s3_bitshift_recover, and require the recovered stream to byte-match
+ * the sender's for every s in 1..31 (with the correct one-word carry). */
+static int run_shift(int s)
+{
+    enum { NW = 4096 };
+    static uint32_t src[NW], late[NW], rec[NW];
+    int i;
+    for (i = 0; i < NW; ++i) src[i] = (uint32_t)prand();
+    for (i = 0; i < NW - 1; ++i)                 /* A samples s bits late */
+        late[i] = (src[i] << s) | (src[i + 1] >> (32 - s));
+    late[NW - 1] = src[NW - 1] << s;
+    s3_bitshift_recover(rec + 1, late + 1, NW - 2, s, late[0]);
+    for (i = 1; i < NW - 1; ++i)
+        if (rec[i] != src[i]) {
+            printf("shift %d: word %d recovered 0x%08x want 0x%08x\n",
+                   s, i, rec[i], src[i]);
+            return 1;
+        }
+    return 0;
+}
+
 int main(void)
 {
-    int off, fails = 0;
+    int off, s, fails = 0;
     for (off = 0; off < WIN; ++off) fails += run_offset(off);
     printf("lock_search gate: %d/%d offsets PASS\n", WIN - fails, WIN);
+    for (s = 1; s < 32; ++s) fails += run_shift(s);
+    printf("bitshift recover: 31 shifts checked\n");
     if (fails) { printf("LOCK GATE: RED\n"); return 1; }
     printf("LOCK GATE: GREEN\n");
     return 0;
