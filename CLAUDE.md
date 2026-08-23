@@ -154,12 +154,14 @@ PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
 - E3/E4 DONE AS WRITTEN: docs/PIPELINE.md (9 phases, every cited path exists);
   tools/verify/dejuno_audit.py CLEAN with the 16 owed constants printed.
   PROVEN only when the JX-3P traverses it (E5).
-- O4 DECISION PENDING, deliberately: the deficit was measured on the INTERIM
-  1-chip 2-voice build. The shipping layout is 3 voices + FX per chip. Whether
-  the 4 type-5 patches still miss THERE is unmeasured, and the two-chip link
-  (O6) is owed regardless. Re-derive the deficit on the real layout before
-  paying any sonic-deviation lever for it. Fallback stances: leave 4 patches
-  documented-noncompliant, or fork-gate the pipelined split.
+- O4 RE-DERIVED ON THE REAL LAYOUT (2026-08-23): 3 voices + FX per chip,
+  S3_VOICES=3 (full recorded S3_EXTRA_DEFS), 9+ min, all 64 patches stepping:
+  un=0 -- AUDIO NEVER BREAKS on chip A. Quiet-miss 44-45/10k (rule was <=60),
+  so 3 voices/chip is KEPT: the 6-voice two-chip instrument RUNS. Hot rows on
+  the real layout: pat21 sum=4259, pat49 sum=3810 cyc/sample -- master-chain
+  cost ~unchanged vs 2-voice, the deficit did not grow with the layout. Open
+  before closing: chip B's own un= (its console capture died at the flash),
+  the mix flap (drain-to-latest fix in flight), drift anomaly (b4 §5).
 
 # BUILD & GIT
 `make libjuno.so` | `make test` | `make verify` (finish line) | WASM:
