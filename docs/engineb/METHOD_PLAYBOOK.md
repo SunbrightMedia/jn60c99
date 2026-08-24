@@ -1533,3 +1533,41 @@ the tool's 32. No amount of re-running would have found it.
 4. When a human's count of a plugin's own UI disagrees with a tool's count,
    THE TOOL IS WRONG until proven otherwise. Reconcile against the plugin's
    published surface, not against the tool's own history.
+
+## 80. The green gate that proved less than its headline
+
+The JX-3P integration A/B reported "64/64 patches EXACTLY 0" on two banks, at
+three rates. It was true and it was nearly worthless as a completeness claim.
+The gate recalled 32 parameter pools. The plugin has 57 that move real state,
+and a host shows 63 panel parameters. The user counted them in Ableton and
+asked why the numbers disagreed; that question, not any gate, found the defect.
+
+The 25 unexercised parameters were not idle. Setting them exposed that
+`jx_master_render.c`'s 11 "argless" effect-gated sites -- documented in the
+file's OWN header as "placeholdered, pending a mode patch" -- were live and
+returned NaN. A known TODO had become invisible because no gate could reach it.
+
+### Why no existing rule caught it
+The active-parameter set was DISCOVERED by a probe that watched a 16128-byte
+voice-0 window and used only the values present in the factory bank. Master/FX
+pools were structurally invisible; bank-constant pools never moved off the
+clean base. The gate then took that under-reported set as its own scope. A
+self-scoping gate shrinks silently and still reports green: there is no input
+that makes it fail, so "SEEN TO FAIL" was satisfied for the gate's logic while
+saying nothing about the gate's REACH.
+
+### The rules
+1. **A differential gate cannot detect a dimension neither side exercises.**
+   Port-vs-oracle agreement over a narrow slice is agreement, not correctness.
+2. **Never let a gate define its own scope.** Scope must come from an
+   INDEPENDENT census enumerated from the binary (the JUNO's COVERAGE.tsv +
+   completeness_gate), and a tooth must go red when the gate's reach is
+   smaller than the census. Discovery code is not a census.
+3. **State the space with every claim.** "Bit-exact" is meaningless without:
+   which parameters, which state window, how long, which note events, which
+   rates, which block sizes, which start conditions. See jx3p/docs/SCOPE_AUDIT.md.
+4. **A TODO behind a green gate is worse than a red gate.** If code is
+   placeholdered, a gate must exist that FAILS until it is resolved.
+5. **Prove reach by mutation.** Inject a deliberate fault per dimension; if no
+   gate turns red, that dimension is unproven today. This converts "what else
+   is hiding?" from a worry into a measured number.
