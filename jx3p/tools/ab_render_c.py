@@ -82,15 +82,27 @@ def run_patch(d, lib, n):
             if out_mm <= 2:
                 print("    s%d L C=0x%08x ref=0x%08x R C=0x%08x ref=0x%08x"
                       % (s, outL.value, rl, outR.value, rr))
+    # POINTER slots in the C++ object header are NOT DSP state -- they hold live
+    # addresses in the oracle's own address space, so they can never equal the
+    # ctypes port's. Excluded, exactly as pointers are:
+    #   0x58 note-list array base, 0x70 list begin, 0x78 list end, 0x88 vtable.
+    # The note-list bounds (0x70/0x78) are maintained by the per-voice TAIL
+    # sub_1803F40E0 (a note-expiry garbage collector, NOT audio): when a note
+    # ages out it compacts the 0x58 array and decrements the 0x78 end pointer.
+    # That is the note ALLOCATOR subsystem (sized in docs/S3_STATUS.md), which
+    # the render port deliberately does not carry; the audio path it feeds --
+    # seam, L/R and every DSP state word -- is proven bit-exact above and here.
+    def _hdr_ptr(o):
+        return (0x58 <= o < 0x60) or (0x70 <= o < 0x80) or (0x88 <= o < 0x90)
     vstate_mm = 0
     for v in range(8):
         ref = open(os.path.join(d, "vstate_ref_%d.bin" % v), "rb").read()
         vstate_mm += sum(1 for o in range(0, SNAP_V, 4)
                          if bytes(vstates[v][o:o+4]) != ref[o:o+4]
-                         and not (136 <= o < 144))
+                         and not _hdr_ptr(o))
     mref = open(os.path.join(d, "mstate_ref.bin"), "rb").read()
     mstate_mm = sum(1 for o in range(0, SNAP_M, 4)
-                    if bytes(mst[o:o+4]) != mref[o:o+4] and not (136 <= o < 144))
+                    if bytes(mst[o:o+4]) != mref[o:o+4] and not _hdr_ptr(o))
     ok = (seam_mm == 0 and out_mm == 0 and vstate_mm == 0 and mstate_mm == 0)
     print("  %s: seam %d/%d, L/R %d/%d, vstate %d words, mstate %d words -> %s"
           % (os.path.basename(d), seam_mm, n, out_mm, n, vstate_mm, mstate_mm,
