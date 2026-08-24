@@ -15,7 +15,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import jx_emu as J
 
 BANK = os.path.join(J.REPO, "jx3p", "truth", "preset_bank_1.bin")
-BLOCK = 16128            # voice-0 stride (recall writes voice-0 cells)
+# Voice-unit capture window. Was 16128 (the per-voice ARM stride) -- too narrow:
+# recall also writes voice-unit cells ABOVE that stride, so HPF CUTOFF, EFFECT
+# LEVEL/TONE, DELAY LEVEL/TIME and VCA LEVEL were invisible to both the
+# discovery probe and the reference capture (playbook 80, flaw 3). 0x60000 is
+# the window the render A/B already compares, so the two agree by construction.
+BLOCK = 0x60000
 HEADER = 23; STRIDE = 20223; BLOB_OFF = 16; NPATCH = 64
 POOL_LO, POOL_HI = 2, 140
 
