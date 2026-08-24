@@ -1501,3 +1501,35 @@ Rules:
    what the plugin would do in a DAW: a fresh image has .data defaults.
 3. The 1-ulp signature (few patches, deep state words, LSB-only) means a
    math-kernel divergence, not a logic defect. Check the imports first.
+
+## 80. The self-scoping gate (a green light over unproven ground)
+
+The JX recall pipeline DISCOVERED which parameter pools were active, then
+proved itself bit-exact over exactly that set and printed "64/64 EXACTLY 0".
+Two independent patch banks passed. The headline was true and the scope was
+wrong: the discovery loop probed each pool only with the values that pool
+takes IN THE FACTORY BANK, so any parameter constant across all 64 patches
+never moved off the clean base and was classified inactive. 25 real
+parameters -- DCO1 LEVEL, HPF CUTOFF, ENV2 SUSTAIN, EFFECT/DELAY/REVERB,
+BEND/MOD SENS, DCO cross-mod -- were never exercised by the gate that
+claimed to prove the port. Nothing in the harness could go red, because the
+gate's scope and the gate's evidence came from the same measurement.
+
+Caught only when the USER counted 63 parameters on the host's panel against
+the tool's 32. No amount of re-running would have found it.
+
+### The rules
+1. **A gate that derives its own scope must have an INDEPENDENT check on
+   that scope.** Evidence and extent may not come from one measurement.
+   JUNO has this (completeness_gate: fresh re-enumeration from the binary vs
+   COVERAGE.tsv). JX did not; it does now
+   (jx3p/tools/recall_completeness_gate.py, seen to fail both ways).
+2. **A discovery step must never be driven by the corpus it is discovering
+   FOR.** Probing "which parameters matter" using one bank's values proves
+   only what that bank happens to use. Sweep the full in-range domain.
+3. **Watch every window the subsystem can write.** The same loop watched a
+   voice-0 window only, so every master/FX pool was invisible by
+   construction. Enumerate the units, then watch all of them.
+4. When a human's count of a plugin's own UI disagrees with a tool's count,
+   THE TOOL IS WRONG until proven otherwise. Reconcile against the plugin's
+   published surface, not against the tool's own history.
