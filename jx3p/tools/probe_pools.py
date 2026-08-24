@@ -68,8 +68,8 @@ def main():
     json.dump(res, open(out, "w"), indent=0, sort_keys=True)
     act = sorted(int(k) for k in res)
     print("ACTIVE pools: %d" % len(act))
-    print("  voice-writing : %s" % [p for p in act if res[str(p)]["voice"]])
-    print("  master-writing: %s" % [p for p in act if res[str(p)]["master"]])
+    print("  voice-writing : %s" % [p for p in act if res[p]["voice"]])
+    print("  master-writing: %s" % [p for p in act if res[p]["master"]])
     print("faults=%d" % jx.faults)
 
 
