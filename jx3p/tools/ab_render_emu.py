@@ -36,11 +36,11 @@ def decode(blob, pool):
     p = 2 * pool + 8
     return ((blob[p] & 0xF) << 4) | (blob[p + 1] & 0xF)
 
-def run_patch(outdir, patch, n, warm, bank):
+def run_patch(outdir, patch, n, warm, bank, sr=44100.0):
     jx = J.JX().build(); jx.set_ftz(); uc = jx.uc
     rsp = (J.STACK_BASE+J.STACK_SIZE-0x10000) & ~0xF; rsp -= 8
     uc.reg_write(J.UC_X86_REG_RSP, rsp); uc.reg_write(J.UC_X86_REG_RCX, jx.HOST)
-    uc.reg_write(J.UC_X86_REG_XMM1, struct.unpack('<Q', struct.pack('<f',44100.0)+b'\0\0\0\0')[0])
+    uc.reg_write(J.UC_X86_REG_XMM1, struct.unpack('<Q', struct.pack('<f',float(sr))+b'\0\0\0\0')[0])
     RET = J.SCRATCH+0x5000; uc.mem_write(rsp, struct.pack('<Q',RET)); uc.emu_start(J.IB+SETSR, RET)
     # RECALL: the proven sequence -- active pools in order, dispatched per UNIT
     # (all 9 procs; the plugin's own recall touches every unit's proc).
@@ -113,10 +113,11 @@ def main():
     patches = [int(x) for x in (sys.argv[2] if len(sys.argv) > 2 else "0,5,20,49").split(",")]
     n = int(sys.argv[3]) if len(sys.argv) > 3 else 32
     warm = int(sys.argv[4]) if len(sys.argv) > 4 else 6
+    sr = float(sys.argv[5]) if len(sys.argv) > 5 else 44100.0
     bank = open(BANK, "rb").read()
     os.makedirs(outdir, exist_ok=True)
     for patch in patches:
-        run_patch(outdir, patch, n, warm, bank)
+        run_patch(outdir, patch, n, warm, bank, sr)
     print("AB EMU REFERENCE WRITTEN to %s" % outdir)
 
 if __name__ == "__main__":

@@ -23,8 +23,14 @@ HDR     := $(wildcard src/*.h) $(wildcard gui/*.h)
 OBJ     := $(SRC:.c=.o)
 $(OBJ): $(HDR)
 
-.PHONY: all test clean gui provenance verify completeness engineb engineb-quick
+.PHONY: all test clean gui provenance verify completeness engineb engineb-quick verify-jx3p
 all: $(OBJ)
+
+# JX-3P port finish line: recall (C==oracle) + integration render (voice+master
+# C==plugin) across 3 rates, all EXACTLY 0. Self-proving from the checksummed
+# JX3P.vst3. Override coverage with JX_VERIFY_RATES / JX_VERIFY_N / JX_VERIFY_PATCHES.
+verify-jx3p:
+	sh jx3p/tools/jx_verify.sh
 
 # The honest finish-line gate: functional tests must pass AND the LIVE plugin
 # comparisons must pass AND the provenance ledger must have zero CAPTURED /
