@@ -1,0 +1,39 @@
+# JX-3P — SCOPE AUDIT (what the gates actually prove)
+
+Written 2026-08-24 after playbook 80: a green gate proved less than its
+headline claimed. The user asked the right follow-up — "could the scope be
+wrong in any OTHER way?" — so this enumerates EVERY dimension along which a
+gate's scope can be narrower than its claim, and states the MEASURED status of
+each. No dimension is marked OK unless a measurement says so.
+
+"The port is bit-exact" is meaningless without this table.
+
+| # | Scope dimension | Status | Evidence |
+|---|---|---|---|
+| 1 | Parameter coverage | **WAS WRONG** → fixing | probe found 57 active pools, gate used 32. Now 51 discovered + toothed; 6 master-only pools still uncovered |
+| 2 | Voice compare window | **WRONG** | window 0x60000, but a real f32 DSP cell at **+0xA6BFD0** changes during render (0.9637→1.0) and is NEVER compared |
+| 3 | Master compare window | OK | measured: 0 changing words above 0xAAD000 |
+| 4 | Render duration | **WEAK** | N=64 samples = 1.45 ms @44.1k. Delay/reverb tails are far longer; FX time behaviour is essentially untested |
+| 5 | Note events | **WEAK** | exactly ONE note_on(60,100). No note-off/release, no polyphony, no chords, no velocity spread, no re-trigger, no bend/mod. JUNO has fuzz_diff (24 seeds x 3 rates, random polyphonic); JX has no equivalent |
+| 6 | Block size | **UNTESTED** | the A/B renders SINGLE samples only. JUNO gates block-size invariance at 1/64/128/512/600 |
+| 7 | Sample rates | PARTIAL | 44100/48000/96000. JUNO also gates 88200 + 192000 (non-standard rates catch rate-dependent constants) |
+| 8 | Cold start | **UNTESTED** | every A/B seeds state from the ORACLE then warms 6 blocks. There is no C init/prepare at all, so cold state is not merely untested — it does not exist. JUNO has coldstate_ab at 5 rates |
+| 9 | Warm recall (patch change on a running engine) | **UNTESTED** | JUNO gates it (warm_recall_gate); JX never has |
+| 10 | Voice count | **UNTESTED** | plugin exposes vs.voiceCount = 2..8, default 6. The A/B always drives all 8 arms |
+| 11 | `quality` toggle | **UNTESTED** | vs.quality = 0..1, default 0. Effect unknown; likely an oversampling/CPU trade (would matter for the S3) |
+| 12 | Host-role vs recall-role params | **UNEXAMINED** | JUNO's #112 proved a host reaches parameters a preset load never touches. Never examined for JX. KEY ASSIGN / ARPEGGIO / KEY HOLD / OCTAVE SHIFT / MASTER TUNE reach the engine by some path and are ungated |
+| 13 | Note allocator | **NOT PORTED** | known and sized; the A/B borrows the plugin's note-on |
+| 14 | Master effect branches | **BROKEN** | the 11 argless sites are effect-gated placeholders. Now that FX params are recalled they are live and the C emits NaN. Found only after fixing #1 |
+
+## What IS solidly proven (unchanged by all of the above)
+- The **voice render**: with all 57 pools exercised, N=64, seam 0/64 and voice
+  state 0 words differ, on every patch tested, at 3 rates, on two banks.
+- The **helpers** and the binary's own `expf`/`tanf`: dense full-domain sweeps.
+- **Recall** for the voice unit: 64/64 patches EXACTLY 0 on two banks.
+
+## The rule this audit exists to enforce
+A gate proves a POINT IN A SPACE, not the space. Before calling anything
+"proven", state the space: which parameters, which state, how long, which
+events, which rates, which block sizes, which start conditions. Any dimension
+not enumerated is a dimension where the claim is unverified — and, as #1 and
+#14 showed, that is exactly where the defects live.
