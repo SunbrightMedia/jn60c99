@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"RULE 1: Reply ONLY in ASD-STE100 Simplified Technical English, under ~150 words (tables/code excluded). Short sentences. Direct answer first.\"}}'"
+          }
+        ]
+      }
+    ]
+  }
+}
