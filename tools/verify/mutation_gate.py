@@ -24,7 +24,7 @@ unaffected by any port mutation.
 
 usage: mutation_gate.py [--list] [--only NAME] [--jobs N]
 """
-import argparse, os, re, shutil, subprocess, sys, time
+import argparse, hashlib, os, re, shutil, subprocess, sys, time
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCRATCH = os.path.join(REPO, "scratchpad")
@@ -62,6 +62,10 @@ GATES = [
 ]
 
 
+def _sha(p):
+    return hashlib.sha256(open(p, "rb").read()).hexdigest()
+
+
 def sh(cmd, cwd, timeout=3600):
     try:
         p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
@@ -70,22 +74,74 @@ def sh(cmd, cwd, timeout=3600):
         return 124, "TIMEOUT"
 
 
-def perturb(text, rx, occ):
-    """Change the last hex digit of the occ-th literal matching rx."""
-    ms = list(re.finditer(rx, text))
-    if len(ms) <= occ:
-        return None, None
-    m = ms[occ]
-    lit = m.group(0)
-    last = lit[-1]
-    new_last = "0" if last.lower() in "12345678" and last != "0" else "1"
-    # ensure an actual change
-    if new_last == last:
-        new_last = "2"
-    new = lit[:-1] + new_last
+# Literal forms that actually occur in this port, in priority order. A mutation
+# must land on CODE: comment text is masked out first (a CRC32 noted in a file
+# header once produced a bogus "SURVIVED" -- the build was byte-identical).
+LIT_PATTERNS = [
+    r"0x[0-9a-fA-F]{4,}",                     # packed float bits / masks
+    r"\b\d+\.\d+(?:[eE][-+]?\d+)?f?\b",       # decimal float constants
+    r"\b\d{3,}\b",                            # state offsets / table indices
+]
+
+
+def _mask_comments(text):
+    """Replace comment bodies with spaces, preserving offsets, so literal
+    searches can never land inside a comment."""
+    out = list(text)
+    i, n = 0, len(text)
+    while i < n:
+        if text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            for k in range(i, j):
+                if out[k] != "\n":
+                    out[k] = " "
+            i = j
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            j = n if j < 0 else j
+            for k in range(i, j):
+                out[k] = " "
+            i = j
+        else:
+            i += 1
+    return "".join(out)
+
+
+def candidates(text, limit=6):
+    """Distinct code literals worth mutating, in priority order."""
+    masked = _mask_comments(text)
+    seen, out = set(), []
+    for rx in LIT_PATTERNS:
+        for m in re.finditer(rx, masked):
+            lit = m.group(0)
+            if lit in seen:
+                continue
+            seen.add(lit)
+            out.append((m.start(), m.end(), lit))
+            if len(out) >= limit:
+                return out
+    return out
+
+
+def perturb_at(text, span):
+    """Apply a LARGE, unambiguous change to one literal. Large on purpose: if
+    even this is invisible to every gate, the blind spot is not arguable."""
+    s, e, lit = span
+    if lit.startswith("0x"):
+        new = lit[:-1] + ("1" if lit[-1].lower() != "1" else "2")
+    elif "." in lit:
+        head, _, tail = lit.rpartition(".")
+        suf = "f" if tail.endswith("f") else ""
+        digits = tail[:-1] if suf else tail
+        bumped = str((int(digits or "0") + 5) % (10 ** max(1, len(digits))))
+        bumped = bumped.rjust(len(digits) or 1, "0")
+        new = "%s.%s%s" % (head, bumped, suf)
+    else:
+        new = str(int(lit) + 1)
     if new == lit:
         return None, None
-    return text[:m.start()] + new + text[m.end():], "%s -> %s" % (lit, new)
+    return text[:s] + new + text[e:], "%s -> %s" % (lit, new)
 
 
 def make_worktree(wt):
@@ -118,40 +174,68 @@ def main():
 
     wt = make_worktree(a.worktree)
     print("[mut] worktree %s" % wt)
+
+    # Baseline build: its hash is how we tell a REAL mutation from a no-op.
+    rc, out = sh(["make", "-s", "libjuno.so"], wt, timeout=1800)
+    if rc != 0:
+        raise SystemExit("baseline build failed:\n" + out[-2000:])
+    base_hash = _sha(os.path.join(wt, "libjuno.so"))
+    print("[mut] baseline libjuno.so %s" % base_hash[:12])
+
     results = []
-    for name, dim, rel, rx, occ in muts:
+    for name, dim, rel, _rx, _occ in muts:
         path = os.path.join(wt, rel)
         if not os.path.exists(path):
             print("%-14s SKIP (no %s)" % (name, rel)); continue
         orig = open(path).read()
-        newtext, what = perturb(orig, rx, occ)
-        if newtext is None:
-            print("%-14s SKIP (no literal matched)" % name); continue
-        open(path, "w").write(newtext)
-        t0 = time.time()
-        rc, out = sh(["make", "-s", "libjuno.so"], wt, timeout=1800)
-        if rc != 0:
+        cands = candidates(orig)
+        if not cands:
+            print("%-14s SKIP (no code literal found)" % name); continue
+
+        t0, tried, killers, ineffective = time.time(), [], [], 0
+        for span in cands:
+            newtext, what = perturb_at(orig, span)
+            if newtext is None:
+                continue
+            open(path, "w").write(newtext)
+            rc, _ = sh(["make", "-s", "libjuno.so"], wt, timeout=1800)
+            if rc != 0:
+                open(path, "w").write(orig)
+                continue                      # mutation did not compile; try next
+            if _sha(os.path.join(wt, "libjuno.so")) == base_hash:
+                open(path, "w").write(orig)
+                ineffective += 1              # no-op (dead code / folded away)
+                continue
+            tried.append(what)
+            for gname, cmd in GATES:
+                grc, _ = sh(cmd, wt, timeout=3600)
+                if grc != 0:
+                    killers.append((gname, what)); break
             open(path, "w").write(orig)
-            print("%-14s SKIP (build failed)" % name); continue
-        killers = []
-        for gname, cmd in GATES:
-            grc, gout = sh(cmd, wt, timeout=3600)
-            if grc != 0:
-                killers.append(gname)
-                break          # one red gate is enough to call it KILLED
+            if killers or len(tried) >= 3:
+                break
+
         open(path, "w").write(orig)
-        verdict = "KILLED by %s" % killers[0] if killers else "*** SURVIVED ***"
-        print("%-14s %-28s %-22s %s  (%.0fs)"
-              % (name, dim, what, verdict, time.time() - t0))
-        results.append((name, dim, bool(killers), killers))
+        if not tried:
+            print("%-14s SKIP (no EFFECTIVE mutation; %d no-ops)" % (name, ineffective))
+            continue
+        if killers:
+            verdict = "KILLED by %s" % killers[0][0]
+        else:
+            verdict = "*** SURVIVED %d effective mutation(s) ***" % len(tried)
+        print("%-14s %-28s %-24s %s  (%.0fs)"
+              % (name, dim, tried[-1][:24], verdict, time.time() - t0))
+        results.append((name, dim, bool(killers), tried))
 
     surv = [r for r in results if not r[2]]
     print("\n=== MUTATION REACH: %d/%d killed, %d SURVIVED ==="
           % (len(results) - len(surv), len(results), len(surv)))
-    for n, d, _, _ in surv:
-        print("  BLIND SPOT: %-14s %s" % (n, d))
+    for n, d, _, tried in surv:
+        print("  BLIND SPOT: %-14s %-28s (tried: %s)" % (n, d, "; ".join(tried)))
     if surv:
-        print("\nEach survivor is a fault the port could carry today with every gate green.")
+        print("\nEach survivor is a fault the port could carry TODAY with every gate green.")
+        print("A survivor is only believable because the build hash CHANGED: no-op")
+        print("mutations are reported as SKIP, never as SURVIVED.")
     return 1 if surv else 0
 
 

@@ -39,6 +39,14 @@ Unicorn. Never validate by ear; never ask the user to A/B. "Done" =
 `make verify` green = zero non-PROVEN rows in `PROVENANCE.tsv` (status: 20/20
 PROVEN). USER-BINDING 2026-08-13: ZERO approximations in `src/` —
 `tools/verify/approx_audit.py` enforces it every `make verify`.
+USER-BINDING 2026-08-24: a green gate is NOT completeness. `make verify` green
+means "the port agrees with the plugin WHERE THE GATES LOOK". Completeness is
+governed by `docs/PORT_COMPLETENESS_CHARTER.md` — binding for EVERY .vst3 port:
+census from the binary before gates, a tooth on the gate's own REACH, no TODO
+behind a green gate, mutation reach (`tools/verify/mutation_gate.py`), and the
+scope table stated with every claim. Never report "complete/100%" from a green
+gate alone. If the user's own count disagrees with mine, theirs is evidence and
+mine is a hypothesis (playbook 80).
 
 # HARD RULES (violating any corrupts the project)
 - **Diagnostic-capture covenant**: the user's DAW bounces (scratchpad
