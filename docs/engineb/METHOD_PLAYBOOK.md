@@ -1479,3 +1479,25 @@ the chord-3 answer key is generated, and it had never been.
    line** (esp32s3/LISTEN.md), never from memory of which -D mattered.
 3. A frozen log is indistinguishable from a stable system. The capture
    channel must carry its own liveness (the agent's data-age stamp).
+
+## 79. The libm call that was not the plugin's libm
+
+The JX voice decompile named two calls `expf` and `tanf`, and the
+transcription passed them to SYSTEM libm. But the plugin does not import
+them: both are statically linked INTO the binary (expf @0x722EA0, tanf
+@0x725150), and both begin with a CPU-feature dispatch whose flag lives in
+.data -- zero in a fresh image, so the Unicorn oracle (fresh image, no CRT
+init) executes the NON-FMA path. Host glibc took its own path and differed
+by 1 ulp on tanf for exactly the patches whose filter mode reaches that
+call: 6 of 64 integration A/B patches failed, all voice-state, all 1 ulp.
+Transcribing both functions from their own machine code (tables re-read
+from the checksummed binary) took the sweep to EXACTLY 0.
+
+Rules:
+1. **A named CRT function in a decompile is a transcription work item, not
+   a license to call the host's copy.** If the name is not in the import
+   table, the code is in the binary and the binary's version is the truth.
+2. The ground truth for a dispatch flag is what the ORACLE executes, not
+   what the plugin would do in a DAW: a fresh image has .data defaults.
+3. The 1-ulp signature (few patches, deep state words, LSB-only) means a
+   math-kernel divergence, not a logic defect. Check the imports first.
