@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "control-surface")(type "KiCad")(uri "${KIPRJMOD}/../lib/control-surface.kicad_sym")(options "")(descr "Control-surface interconnect parts"))
+)
