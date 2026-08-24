@@ -3,6 +3,25 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## ★ FINISH LINE REACHED — the DSP port is PROVEN (`make verify-jx3p` GREEN)
+
+One self-proving command over the checksummed JX3P.vst3:
+- **Recall** (patch bytes → coefficient state): C == the plugin's own dispatch,
+  **64/64 patches EXACTLY 0**.
+- **Integration render** (recall → note-on → per-sample 8 voice arms + master):
+  C == the plugin's own render, byte-exact on the seam, L/R, and every DSP
+  state word, **64/64 patches × 3 rates (44100/48000/96000), all EXACTLY 0**.
+
+The whole audio signal path — recall, voice, master, and the binary's own
+`expf`/`tanf` — is bit-exact. Gate: `make verify-jx3p`. Lessons for the next
+port: `jx3p/docs/PORT_LESSONS.md`.
+
+**Not yet carried (bounded, sized, NOT audio):** the note-on / voice ALLOCATOR
+(sub_1803F9150 + sub_1803F5F90 + the expiry GC 0x3F40E0). The gate uses the
+plugin's own note-on as a deterministic control-plane seed; the DSP it feeds is
+proven. A device-standalone C engine still needs this allocator transcribed —
+the last mile, same method. Everything below this line is older working notes.
+
 ## PROVEN (null EXACTLY 0 under Unicorn, FTZ|DAZ)
 
 - **The IDA dump is complete** — 305/305 concrete DSP methods (S3_DUMP_RECEIPT).
