@@ -15,6 +15,8 @@
 #define JUNO_CRT_EXPF_H
 #include <stdint.h>
 #include <string.h>
+#include <math.h>   /* lrint: portable round-to-nearest-even (matches x86 cvtsd2si
+                     * under the default rounding mode; keeps this header ARM-clean) */
 
 static const uint64_t juno_crt_exp_tab_[64] = {
 0x3ff0000000000000ULL,0x3ff02c9a3e778061ULL,0x3ff059b0d3158574ULL,0x3ff0874518759bc8ULL,
@@ -49,8 +51,8 @@ static inline float juno_expf_6EF740(float a1)
   z  = 92.33248261689366 * xd;              /* 64/ln2 */
   if (z >= 8192.0) { ix = 0x7f800000u; memcpy(&out,&ix,4); return out; }
   if (z < -9600.0) return 0.0f;
-  /* cvtpd2dq: round to nearest even (default MXCSR) */
-  __asm__("cvtsd2si %1, %0" : "=r"(n) : "x"(z));
+  /* cvtpd2dq: round to nearest even (default MXCSR) == lrint under default mode */
+  n = (int32_t)lrint(z);
   kd  = (double)n;
   r   = xd - kd * 0.010830424696249145;     /* ln2/64 */
   idx = (uint32_t)n & 63u;

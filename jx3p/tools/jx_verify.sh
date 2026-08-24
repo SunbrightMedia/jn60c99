@@ -26,6 +26,7 @@ set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
 WORK=${JX_VERIFY_WORK:-$(mktemp -d)}
+mkdir -p "$WORK"
 RATES=${JX_VERIFY_RATES:-"44100 48000 96000"}
 N=${JX_VERIFY_N:-64}          # samples per patch (long block: crosses LFO/env edges)
 WARM=${JX_VERIFY_WARM:-6}
