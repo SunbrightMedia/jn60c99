@@ -1280,7 +1280,7 @@ LABEL_16:
   else
     v39 = 1.0;
   v40 = *(float *)(st + 1056 + 16128*(v));
-  v41 = (float)(expf((float)v39 * *(float *)(st + 1200 + 16128*(v))) * *(float *)(st + 1184 + 16128*(v))) + *(float *)(st + 1216 + 16128*(v));
+  v41 = (float)(jx_h_expf_722EA0((float)v39 * *(float *)(st + 1200 + 16128*(v))) * *(float *)(st + 1184 + 16128*(v))) + *(float *)(st + 1216 + 16128*(v));
   v42 = (float)((float)(v40 * *(float *)(st + 1072 + 16128*(v))) - (float)(v40 * v41)) + v41;
   *(float *)(st + 1136 + 16128*(v)) = v42;
   v43 = *(_DWORD *)(st + 992 + 16128*(v));
@@ -1775,7 +1775,7 @@ LABEL_16:
                                    fmaxf((float)(v196 * v195) + v198, *(float *)(st + 13936 + 16128*(v))),
                                    *(float *)(st + 13952 + 16128*(v)))
                                + *(float *)(st + 14128 + 16128*(v))));
-    v201 = 1.0 - 1.0 / (float)(tanf(fminf(v200 * *(float *)(st + 14176 + 16128*(v)), *(float *)(st + 14192 + 16128*(v)))) + 1.0);
+    v201 = 1.0 - 1.0 / (float)(jx_h_tanf_725150(fminf(v200 * *(float *)(st + 14176 + 16128*(v)), *(float *)(st + 14192 + 16128*(v)))) + 1.0);
     if ( v201 < 1.0 )
       v202 = v201;
     else

@@ -32,4 +32,11 @@ float  jx_h_3A9950(float a1);
 
 float  jx_h_3A21E0(float result);  /* sub_1803A21E0: positive-side fmodf wrap */
 
+/* Statically linked CRT math, transcribed from the binary's own machine code
+ * (non-FMA paths; the CPU-feature flag the dispatcher tests is 0 in a fresh
+ * image, which is what the Unicorn oracle executes). System libm differs by
+ * 1 ulp on some inputs (proved by the p30/43/53/54/56/62 A/B failures). */
+float  jx_h_expf_722EA0(float a1);  /* expf  @ rva 0x722EA0 */
+float  jx_h_tanf_725150(float a1);  /* tanf  @ rva 0x725150 */
+
 #endif /* JX_VOICE_HELPERS_H */

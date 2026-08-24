@@ -684,3 +684,172 @@ float jx_h_3A21E0(float result)
     return fmodf(result + 1.0F, 2.0F) - 1.0F;
   return result;
 }
+
+/* ---- statically linked CRT math, transcribed from the binary ----
+ * The plugin does NOT import expf/tanf: both live in the image (expf @
+ * 0x722EA0, tanf @ 0x725150) and both begin with a CPU-feature dispatch
+ * (dword @ 0xCEFC0C). That flag is 0 in a fresh image, and the Unicorn
+ * oracle executes a fresh image, so the ground truth is the NON-FMA path,
+ * transcribed here instruction by instruction. System libm differs by 1 ulp
+ * on some inputs (seen to fail: patches 30/43/53/54/56/62 before this).
+ * STATUS: READ until the A/B gate is EXACTLY 0 again.
+ * Host-only for now: uses unsigned __int128 (the Payne-Hanek path). */
+#include <stdint.h>
+#include <string.h>
+
+static inline double   jxm_asd(uint64_t b){ double d; memcpy(&d,&b,8); return d; }
+static inline uint64_t jxm_asu(double d){ uint64_t b; memcpy(&b,&d,8); return b; }
+static inline float    jxm_asf(uint32_t b){ float f; memcpy(&f,&b,4); return f; }
+static inline uint32_t jxm_asi(float f){ uint32_t b; memcpy(&b,&f,4); return b; }
+
+/* exp2 fraction table @ 0xACC1C0 (64 doubles, biased-exp 0x3FF). */
+static const uint64_t jxm_exp_tab[64] = {
+0x3ff0000000000000ULL,0x3ff02c9a3e778061ULL,0x3ff059b0d3158574ULL,0x3ff0874518759bc8ULL,
+0x3ff0b5586cf9890fULL,0x3ff0e3ec32d3d1a2ULL,0x3ff11301d0125b51ULL,0x3ff1429aaea92de0ULL,
+0x3ff172b83c7d517bULL,0x3ff1a35beb6fcb75ULL,0x3ff1d4873168b9aaULL,0x3ff2063b88628cd6ULL,
+0x3ff2387a6e756238ULL,0x3ff26b4565e27cddULL,0x3ff29e9df51fdee1ULL,0x3ff2d285a6e4030bULL,
+0x3ff306fe0a31b715ULL,0x3ff33c08b26416ffULL,0x3ff371a7373aa9cbULL,0x3ff3a7db34e59ff7ULL,
+0x3ff3dea64c123422ULL,0x3ff4160a21f72e2aULL,0x3ff44e086061892dULL,0x3ff486a2b5c13cd0ULL,
+0x3ff4bfdad5362a27ULL,0x3ff4f9b2769d2ca7ULL,0x3ff5342b569d4f82ULL,0x3ff56f4736b527daULL,
+0x3ff5ab07dd485429ULL,0x3ff5e76f15ad2148ULL,0x3ff6247eb03a5585ULL,0x3ff6623882552225ULL,
+0x3ff6a09e667f3bcdULL,0x3ff6dfb23c651a2fULL,0x3ff71f75e8ec5f74ULL,0x3ff75feb564267c9ULL,
+0x3ff7a11473eb0187ULL,0x3ff7e2f336cf4e62ULL,0x3ff82589994cce13ULL,0x3ff868d99b4492edULL,
+0x3ff8ace5422aa0dbULL,0x3ff8f1ae99157736ULL,0x3ff93737b0cdc5e5ULL,0x3ff97d829fde4e50ULL,
+0x3ff9c49182a3f090ULL,0x3ffa0c667b5de565ULL,0x3ffa5503b23e255dULL,0x3ffa9e6b5579fdbfULL,
+0x3ffae89f995ad3adULL,0x3ffb33a2b84f15fbULL,0x3ffb7f76f2fb5e47ULL,0x3ffbcc1e904bc1d2ULL,
+0x3ffc199bdd85529cULL,0x3ffc67f12e57d14bULL,0x3ffcb720dcef9069ULL,0x3ffd072d4a07897cULL,
+0x3ffd5818dcfba487ULL,0x3ffda9e603db3285ULL,0x3ffdfc97337b9b5fULL,0x3ffe502ee78b3ff6ULL,
+0x3ffea4afa2a490daULL,0x3ffefa1bee615a27ULL,0x3fff50765b6e4540ULL,0x3fffa7c1819e90d8ULL};
+
+float jx_h_expf_722EA0(float a1)
+{
+  uint32_t ix = jxm_asi(a1), ax = ix & 0x7fffffffu;
+  if ((int32_t)ax >= 0x7f800000) {            /* @0x722FE0 special gate */
+    if (ix == 0x7f800000u) return a1;         /* +inf -> +inf */
+    if (ix == 0xff800000u) return 0.0f;       /* -inf -> +0   */
+    return jxm_asf(ix | 0x400000u);           /* nan -> quieted nan */
+  }
+  double xd = (double)a1;
+  double z  = 92.33248261689366 * xd;         /* 64/ln2, @0xAC5DF0 */
+  if (z >= 8192.0)  return jxm_asf(0x7f800000u);  /* overflow  -> +inf */
+  if (z < -9600.0)  return 0.0f;                  /* underflow -> +0   */
+  /* cvtpd2dq: round to nearest even */
+  int32_t n; { double t = z; __asm__("cvtsd2si %1, %0" : "=r"(n) : "x"(t)); }
+  double kd = (double)n;
+  double r  = xd - kd * 0.010830424696249145;     /* ln2/64, @0xAC5E00 */
+  uint32_t idx = (uint32_t)n & 63u;
+  int32_t  top = (n - (int32_t)idx) >> 6;
+  double r2 = r * r;
+  double p  = 0.16666666666666666 * r + 0.5;      /* @0xAC5E10 / @0xAC5E20 */
+  double q  = r2 * p + r;
+  double s  = jxm_asd(jxm_exp_tab[idx]);
+  double s2 = jxm_asd((uint64_t)(uint32_t)(top + 0x3ff) << 52);
+  return (float)((q * s + s) * s2);
+}
+
+/* 2/pi bit string @ 0xACD850 (176 bytes; indexed by byte offset). */
+static const uint8_t jxm_inv_pio4[176] = {
+0xe0,0xf1,0x1b,0xc1,0x0c,0x58,0x21,0x74,0x35,0x7e,0xc4,0x7e,0xed,0xaf,0xa9,0x4b,
+0x4a,0x29,0xde,0xe7,0x1c,0xf4,0xec,0xc5,0x97,0xaf,0x1f,0xeb,0x9e,0xd4,0xb5,0xa8,
+0x7f,0x79,0x9a,0xfd,0x18,0x3d,0xdd,0x26,0x2c,0x9f,0x3c,0xfb,0xd9,0xb4,0x7d,0xb4,
+0x29,0x68,0x2d,0x46,0xbc,0xbc,0x3f,0x60,0x16,0x78,0xff,0x5f,0xe2,0x7f,0xec,0xa0,
+0xe4,0xf7,0x2e,0x7e,0x11,0x72,0xd2,0xe7,0x4c,0x0d,0xe6,0x58,0x47,0xe6,0x04,0xf9,
+0x7d,0xd1,0x9a,0xc0,0x71,0xa6,0x13,0x12,0xed,0xba,0xd4,0xd7,0x08,0xa2,0xfb,0x9c,
+0xa6,0xc4,0x72,0xac,0x77,0xf8,0x73,0x48,0x46,0x27,0xa8,0xbb,0x24,0x19,0x80,0x4b,
+0x37,0x09,0xe9,0xb8,0x91,0xdc,0x86,0x15,0xef,0x7a,0xaf,0x8e,0x45,0xf9,0x07,0x41,
+0x0e,0xf1,0x64,0x56,0x8a,0x6d,0x03,0x77,0xd3,0xd4,0x47,0x5f,0x9d,0xf0,0xa7,0x54,
+0x10,0x39,0xb9,0x0d,0xe6,0x8b,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x18,0x2d,0x44,0x54,0xfb,0x21,0xf9,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+
+static inline uint64_t jxm_ld64(const uint8_t *p){ uint64_t v; memcpy(&v,p,8); return v; }
+
+/* rational tan kernel + odd-quadrant reciprocal, @0x725416..0x72547B */
+static double jxm_tan_poly(double z, uint32_t q)
+{
+  double z2  = z * z;
+  double num = -0.017203248047148168 * z2 + 0.3852960712639954;
+  double den = (0.01844239256901656 * z2 + -0.5139650547885454) * z2
+             + 1.1558882143468838;
+  double t   = num / den;
+  double res = z + (z2 * z) * t;
+  if (q & 1u) res = -1.0 / res;
+  return res;
+}
+
+float jx_h_tanf_725150(float a1)
+{
+  uint32_t ix = jxm_asi(a1);
+  if ((ix & 0x7f800000u) == 0x7f800000u)      /* inf/nan -> errno path @0x74D7D0 */
+    return a1 - a1;                           /* INFERRED edge; DSP-unreachable */
+  double d  = (double)a1;
+  uint64_t ax = jxm_asu(d) & 0x7fffffffffffffffULL;
+  if ((int64_t)ax <= (int64_t)0x3fe921fb54442d18ULL) {   /* |x| <= pi/4 */
+    if ((int64_t)ax >= (int64_t)0x3f20000000000000ULL)   /* >= 2^-13 */
+      return (float)jxm_tan_poly(d, 0);
+    if ((int64_t)ax >= (int64_t)0x3e40000000000000ULL) { /* >= 2^-27: cubic */
+      double z2 = d * d;
+      return (float)(z2 * d * 0.3333333333333333 + d);
+    }
+    /* tiny: raise inexact only, return x (result of the mul/add is dropped) */
+    volatile float sink = a1 * 0.99999994f + 4294967296.0f; (void)sink;
+    return a1;
+  }
+  uint64_t sign = jxm_asu(d) & 0x8000000000000000ULL;
+  double z; uint32_t q;
+  if ((int64_t)ax < (int64_t)0x4160000000000000ULL) {    /* |x| < 2^23 */
+    double xa = jxm_asd(ax);
+    double zn = 0.6366197723675814 * xa + 0.5;           /* 2/pi @0xAC7350 */
+    int32_t n; { double t = zn; __asm__("cvttsd2si %1, %0" : "=r"(n) : "x"(t)); }
+    q = (uint32_t)n & 3u;
+    double kd = (double)n;
+    double r  = xa - kd * 1.5707963267341256;            /* pio2_1  */
+    double w  = kd * 6.077100506506192e-11;              /* pio2_1t */
+    z = r - w;
+  } else {                                               /* Payne-Hanek @0x7252B8 */
+    uint64_t u = ax;
+    int64_t  e = (int64_t)(u >> 52) - 0x3ff;
+    int64_t  off = 0x86 - (e >> 3);
+    uint64_t m0 = jxm_ld64(jxm_inv_pio4 + off);
+    uint64_t frac = ((u << 12) >> 12) | (1ULL << 52);
+    uint64_t m1 = jxm_ld64(jxm_inv_pio4 + off + 8);
+    uint64_t m2 = jxm_ld64(jxm_inv_pio4 + off + 16);
+    uint64_t e7 = (uint64_t)e & 7u;
+    unsigned __int128 p0 = (unsigned __int128)m0 * frac;
+    unsigned __int128 p1 = (unsigned __int128)m1 * frac;
+    unsigned __int128 p2 = (unsigned __int128)m2 * frac;
+    uint64_t lo  = (uint64_t)p0;
+    uint64_t mid = (uint64_t)p1 + (uint64_t)(p0 >> 64);
+    uint64_t hi  = (uint64_t)(p1 >> 64) + (mid < (uint64_t)p1);
+    hi += (uint64_t)p2;
+    unsigned cl = (unsigned)(0x36 - e7);
+    uint64_t sh  = hi >> cl;
+    uint64_t cf  = (hi >> (cl - 1)) & 1u;
+    uint64_t neg = 0;
+    if (cf) { hi = ~hi; mid = ~mid; lo = ~lo; neg = 0x8000000000000000ULL; }
+    q = (uint32_t)((sh + cf) & 3u);
+    unsigned c2 = (unsigned)(e7 + 10);
+    hi = (hi << c2) >> c2;
+    int64_t ebase = (int64_t)c2 - 0x40;
+    unsigned b;
+    if (hi != 0) { b = 63u - (unsigned)__builtin_clzll(hi); }
+    else { hi = mid; mid = lo; lo = 0; b = 63u - (unsigned)__builtin_clzll(hi);
+           ebase -= 0x40; }
+    ebase += b;
+    int64_t sc = (int64_t)b - 0x34;
+    if (sc > 0) {
+      uint64_t t = hi;
+      hi >>= sc; mid >>= sc;
+      mid |= t << (0x40 - sc);
+    } else if (sc < 0) {
+      int64_t c = -sc; uint64_t t9 = mid;
+      hi <<= c; mid <<= c;
+      hi  |= t9 >> (0x40 - c);
+      mid |= lo >> (0x40 - c);
+    }
+    uint64_t bits = (hi & ~(1ULL << 52)) | neg
+                  | ((uint64_t)(ebase + 0x3ff) << 52);
+    z = jxm_asd(bits) * 1.5707963267948966;
+  }
+  double res = jxm_tan_poly(z, q);
+  return (float)jxm_asd(jxm_asu(res) ^ sign);
+}
