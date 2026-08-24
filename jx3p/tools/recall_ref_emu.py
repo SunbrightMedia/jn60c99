@@ -31,16 +31,26 @@ def main():
     st0 = jx.state[0]
 
     # Discover the active recall set: pools whose dispatch (pool+740) MOVES a
-    # voice-0 coefficient on at least one patch. Probe from the clean build.
+    # voice-0 coefficient. Probe from the clean build.
+    #
+    # DEFECT PAID 2026-08-24 (playbook 80): this loop used to probe each pool
+    # ONLY with the values that pool takes in the FACTORY BANK. A parameter that
+    # is constant across all 64 factory patches never moved off the clean base
+    # and was silently classified inactive -- so the gate that consumes this set
+    # shrank its own scope and still reported green. 25 real pools were missing
+    # (DCO1 LEVEL, HPF CUTOFF, ENV2 SUSTAIN, EFFECT/DELAY/REVERB, BEND/MOD SENS,
+    # ...), found only when a human counted the host's 63 panel parameters.
+    # A discovery step must never depend on the corpus it is discovering FOR:
+    # probe the full in-range value spread instead. jx3p/tools/probe_pools.py is
+    # the independent re-derivation (voice AND master windows) and completeness
+    # is now toothed against it.
+    PROBE_VALUES = (0, 255, 1, 64, 128, 192)
     base = bytes(uc.mem_read(st0, BLOCK))
     active = []
     for pool in range(POOL_LO, POOL_HI):
         idx = pool + 740
         moved = False
-        for patch in range(NPATCH):
-            rec = bank[HEADER + patch * STRIDE:]
-            blob = rec[BLOB_OFF:]
-            v = decode(blob, pool)
+        for v in PROBE_VALUES:
             jx.dispatch(0, idx, v)
             if bytes(uc.mem_read(st0, BLOCK)) != base:
                 moved = True
