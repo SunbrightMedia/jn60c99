@@ -1,121 +1,207 @@
 # Dumb 16-channel analog mux board (`mux16`)
 
-The simplest useful board: one `74HC4067`, 16 JST-XH-3 analog inputs, one 8-pin
-header out to the dev board. No microcontroller, no decoder, no firmware.
-Ratiometric — runs at 3.3 V *and* 5 V (VCC comes from the dev board).
+The core board of the control-surface system: one `74HC4067`, 16 JST-XH-3 analog
+inputs, and a shared control bus that chains board-to-board. No microcontroller,
+no decoder, no firmware. Ratiometric — runs at 3.3 V **and** 5 V because VCC
+comes from the dev board.
 
-Each of the 16 input ports is `GND · WIPER · VCC`, so it directly fits a pot or
-fader; a button board with an on-board pull resistor also works (its signal
-rides the same WIPER pin).
+Each input port is `GND · WIPER · VCC`, so a pot/fader plugs straight in; a
+button board (with its own on-board pull resistor) rides the same WIPER pin.
 
-## What's in this folder
+JLCPCB assembles all SMD parts; you hand-solder the through-hole JST-XH headers
+after buying them in bulk.
 
-| File | What it is |
-|------|-----------|
-| `mux16.kicad_pro` | KiCad 9 project — open this |
-| `mux16.kicad_sch` | Blank schematic sheet, ready to populate (see **Schematic capture** below) |
-| `mux16.kicad_pcb` | Blank 1.6 mm 2-layer board |
-| `sym-lib-table` | Maps the `control-surface` symbol library (for the `MUX_74HC4067` symbol) |
-| `../lib/control-surface.kicad_sym` | Custom `74HC4067` symbol with our exact pin/net names |
+---
 
-> The schematic is intentionally blank. Hand-authored auto-wired KiCad files
-> can carry silent connection errors, so instead you get a guaranteed-correct
-> **BOM + netlist** to capture from — it's a ~15-minute paste-in and then ERC
-> proves it. Everything else (project, symbol, footprints, layout spec) is done.
+## Connector map (final)
+
+| Ref | Part | Pins | Purpose | Pinout |
+|-----|------|------|---------|--------|
+| J1–J16 | `S3B-XH-A` | 3 | Analog inputs | `GND · WIPER · VCC` |
+| J_IN_A | `S3B-XH-A` | 3 | Chain **in** — analog/power | `GND · SIG · VCC` |
+| J_IN_D | `S4B-XH-A` | 4 | Chain **in** — digital | `S0 · S1 · S2 · S3` |
+| J_OUT_A | `S3B-XH-A` | 3 | Chain **out** — analog/power | `GND · SIG · VCC` |
+| J_OUT_D | `S4B-XH-A` | 4 | Chain **out** — digital | `S0 · S1 · S2 · S3` |
+| J_EN | `S2B-XH-A` | 2 | Enable (to master) | `GND · EN̄` |
+
+**Why split the 7-line bus into 3-pin + 4-pin:** keeps the analog SIG line (with
+a GND neighbour) physically away from the four fast-switching digital select
+lines, and the different pin counts are **mechanically keyed** so you can't
+misplug analog into digital. IN and OUT are identical, so any chain cable fits
+either end.
+
+**Chain vs enable:** `S0–S3`, `SIG`, `VCC`, `GND` are a **shared bus** — IN and
+OUT carry the *same nets* (straight passthrough), daisy-chaining board to board.
+Only **EN̄ is unique per board**, so it gets its own 2-pin back to the master.
+All muxes' `SIG` wire-OR together; a disabled 4067 goes high-Z, so only the one
+enabled board drives the line.
+
+---
 
 ## BOM
 
-| Ref | Qty | Part | Footprint (KiCad standard lib) | LCSC |
-|-----|-----|------|-------------------------------|------|
-| U1 | 1 | `CD74HC4067` 16-ch analog mux, SOIC-24W | `Package_SO:SOIC-24W_7.5x15.4mm_P1.27mm` | search `CD74HC4067` (SOIC-24, confirm) |
-| J1–J16 | 16 | JST-XH 3-pin, right-angle, `S3B-XH-A` | `Connector_JST:JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal` | **C157928** |
-| J_OUT | 1 | 1×8 pin header, 2.54 mm | `Connector_PinHeader_2.54mm:PinHeader_1x08_P2.54mm_Vertical` | any |
-| C1 | 1 | 100 nF, 0805 | `Capacitor_SMD:C_0805_2012Metric` | any |
-| C2 | 1 | 10 µF, 0805 | `Capacitor_SMD:C_0805_2012Metric` | any |
-| H1–H2 | 2 | M3 mounting hole (Ø3.2 mm) | `MountingHole:MountingHole_3.2mm_M3` | — |
+| Ref | Qty | Part | Footprint (KiCad std lib) | LCSC / note |
+|-----|-----|------|---------------------------|-------------|
+| U1 | 1 | `CD74HC4067` 16-ch analog mux, SOIC-24W | `Package_SO:SOIC-24W_7.5x15.4mm_P1.27mm` | search `CD74HC4067` SOIC-24, confirm |
+| J1–J16 | 16 | JST-XH 3-pin RA `S3B-XH-A` | `Connector_JST:JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal` | **C157928** |
+| J_IN_A, J_OUT_A | 2 | JST-XH 3-pin RA `S3B-XH-A` | same as above | C157928 |
+| J_IN_D, J_OUT_D | 2 | JST-XH 4-pin RA `S4B-XH-A` | `Connector_JST:JST_XH_S4B-XH-A_1x04_P2.50mm_Horizontal` | search `S4B-XH-A` |
+| J_EN | 1 | JST-XH 2-pin RA `S2B-XH-A` | `Connector_JST:JST_XH_S2B-XH-A_1x02_P2.50mm_Horizontal` | search `S2B-XH-A` |
+| C1 | 1 | 100 nF, 0805 | `Capacitor_SMD:C_0805_2012Metric` | fast/local decoupling |
+| C2 | 1 | 10 µF, 0805 | `Capacitor_SMD:C_0805_2012Metric` | bulk reservoir |
+| D1 | 1 | LED, **red**, 0805 | `LED_SMD:LED_0805_2012Metric` | power indicator |
+| R1 | 1 | 2.2 kΩ, 0805 | `Resistor_SMD:R_0805_2012Metric` | LED limit (3.3–5 V) |
+| R2–R17 | 16 | 220 Ω, 0805 — **optional, DNP** | `Resistor_SMD:R_0805_2012Metric` | per-input series R |
+| JP1 | 1 | solder jumper — **optional** | `Jumper:SolderJumper-2_P1.3mm_Open` | ties EN̄→GND for standalone |
+| TP1–TP3 | 3 | test points | `TestPoint:TestPoint_Pad_D1.5mm` | SIG, VCC, GND |
+| H1–H4 | 4 | M3 mounting hole Ø3.2 mm | `MountingHole:MountingHole_3.2mm_M3` | — |
+
+### Component notes
+- **C1 (100 nF)** sits directly across U1 pins 24/12 — handles fast switching
+  noise. **C2 (10 µF)** is the bulk reservoir that keeps VCC from sagging when
+  the mux switches; matters extra because **VCC is also the ADC reference**
+  (ratiometric). Keep both, close to the chip.
+- **LED (D1) + R1:** use a **red** LED (Vf ~1.8 V — blue/white need ~3 V and go
+  marginal at 3.3 V). **2.2 kΩ** gives ~0.7 mA at 3.3 V, ~1.5 mA at 5 V — dim and
+  fine on both rails. Only one resistor; brightness variance doesn't matter.
+- **Series resistors R2–R17 (optional):** 220 Ω in each wiper line for
+  short-protection + light filtering. **Voltage-independent** (ratiometric-
+  neutral). Leave DNP / 0 Ω and only populate if you see trouble.
+- **3.3 V / 5 V compatibility comes from the ratiometric design, NOT resistor
+  values.** The only resistor that even mildly cares about voltage is R1 (LED),
+  and it's fine on both.
+- **JP1:** for single-board use with no master, close JP1 to tie EN̄ to GND
+  (always enabled). Cut/omit it when a master drives EN̄ through J_EN.
+
+---
 
 ## Netlist (capture exactly this)
 
-**Power / shared rails**
-- **VCC** ← U1 pin 24 · every JST pin 3 (J1–J16.3) · C1 + · C2 + · J_OUT pin 7
-- **GND** ← U1 pin 12 · every JST pin 1 (J1–J16.1) · C1 − · C2 − · J_OUT pin 8
+**Shared rails**
+- **VCC** ← U1.24 · J1–J16 pin 3 · J_IN_A.3 · J_OUT_A.3 · C1+ · C2+ · R1 (to D1 anode)
+- **GND** ← U1.12 · J1–J16 pin 1 · J_IN_A.1 · J_OUT_A.1 · J_EN.1 · C1− · C2− · D1 cathode · TP2? · H*(optional)
 
-**Analog channels** (each pot/fader wiper → its own mux channel)
-| Net | From | To (U1 pin) |
-|-----|------|-------------|
-| CH0  | J1.2  | 8  |
-| CH1  | J2.2  | 7  |
-| CH2  | J3.2  | 6  |
-| CH3  | J4.2  | 5  |
-| CH4  | J5.2  | 4  |
-| CH5  | J6.2  | 3  |
-| CH6  | J7.2  | 2  |
-| CH7  | J8.2  | 1  |
-| CH8  | J9.2  | 22 |
-| CH9  | J10.2 | 21 |
-| CH10 | J11.2 | 20 |
-| CH11 | J12.2 | 19 |
-| CH12 | J13.2 | 18 |
-| CH13 | J14.2 | 17 |
-| CH14 | J15.2 | 16 |
-| CH15 | J16.2 | 15 |
+**Analog channels** (each wiper → its mux channel; through R2–R17 if populated)
+| Net | From | To U1 pin |
+|-----|------|-----------|
+| CH0…CH15 | J1.2 … J16.2 | 8,7,6,5,4,3,2,1,22,21,20,19,18,17,16,15 |
 
-**Control / out to dev board** (this is the "8 pins")
-| Net | U1 pin | J_OUT pin | Dev-board pin type |
-|-----|--------|-----------|--------------------|
-| SIG | 23 | 1 | **ADC** |
-| S0  | 11 | 2 | GPIO |
-| S1  | 13 | 3 | GPIO |
-| S2  | 14 | 4 | GPIO |
-| S3  | 10 | 5 | GPIO |
-| EN̄  | 9  | 6 | GPIO (active-LOW; tie to GND if you never disable it) |
-| VCC | 24 | 7 | 3.3 V or 5 V in |
-| GND | 12 | 8 | GND |
+**Shared bus (passthrough IN↔OUT, all same nets)**
+| Net | U1 pin | J_IN | J_OUT | To dev/master |
+|-----|--------|------|-------|---------------|
+| SIG | 23 | J_IN_A.2 | J_OUT_A.2 | ADC |
+| VCC | 24 | J_IN_A.3 | J_OUT_A.3 | 3.3 / 5 V |
+| GND | 12 | J_IN_A.1 | J_OUT_A.1 | GND |
+| S0 | 11 | J_IN_D.1 | J_OUT_D.1 | GPIO |
+| S1 | 13 | J_IN_D.2 | J_OUT_D.2 | GPIO |
+| S2 | 14 | J_IN_D.3 | J_OUT_D.3 | GPIO |
+| S3 | 10 | J_IN_D.4 | J_OUT_D.4 | GPIO |
 
-That's the whole board: 16 analog in → 1 ADC out, plus 4 select + enable + power.
+**Enable (per-board)**
+- **EN̄** ← U1.9 · J_EN.2 · (JP1 to GND for standalone)
 
-## Schematic capture (≈15 min in Eeschema)
+**Test points:** TP1→SIG, TP2→VCC, TP3→GND.
 
-1. Open `mux16.kicad_pro`. If prompted about the `control-surface` library, accept
-   (it's mapped in `sym-lib-table`).
-2. Place **U1** = `control-surface:MUX_74HC4067`.
-3. Place **J1–J16** = `Connector:Conn_01x03_Pin` (or `Connector_Generic:Conn_01x03`).
-4. Place **C1, C2** = `Device:C`; **J_OUT** = `Connector:Conn_01x08_Pin`.
-5. Place `power:VCC`, `power:GND`, and one `power:PWR_FLAG` on both VCC and GND.
-6. Wire per the netlist above. Easiest method: drop a short stub on each pin and
-   use **net labels** (`VCC`, `GND`, `CH0`…`CH15`, `SIG`, `S0`–`S3`, `EN`) rather
-   than long wires — connectivity is by matching label name.
-7. Assign footprints per the BOM table.
-8. Run **ERC** — it should be clean. Fix anything it flags before layout.
+---
+
+## Analog signal integrity — the finicky bits and their fixes
+
+Analog muxing has a bad reputation but the failure modes are known:
+
+1. **Channel bleed (the #1 surprise):** reading channel N right after N−1 shows a
+   ghost of N−1 — the ADC sample cap didn't finish charging through the mux
+   (~100 Ω) + source impedance. **Fix in firmware:** wait ~10–30 µs after
+   switching (or read-discard-read) before sampling.
+2. **Source impedance:** use **10 kΩ linear pots** — high-value pots (100 kΩ)
+   settle slowly and pick up more noise.
+3. **Reference noise:** ratiometric ⇒ VCC noise = reading noise. Decoupling caps
+   earn their keep; keep VCC clean and consistent.
+4. **Cable pickup:** wiper + SIG lines are antennas. Keep cables reasonable,
+   SIG flanked by GND.
+5. **Firmware oversampling:** read each channel 4–16× and average — *the* trick
+   for stable, jitter-free bits. Free.
+6. **Escape hatch:** an op-amp buffer (voltage follower) on SIG before the ADC
+   drops source impedance to ~zero and makes settling/cable issues vanish. Not
+   needed now — just know it exists.
+
+**Precision:** 256–512 steps per pot = 8–9 effective bits. Your MCU's 10–12-bit
+ADC has headroom. With 10 kΩ pots + settle delay + oversampling + good
+decoupling, clean 8–9-bit control is a normal result — even with a full 256
+inputs on one shared SIG line. Precision is set by **noise and ADC bits, not
+input count.**
+
+---
 
 ## PCB layout guidance
 
-- **Size:** aim well under 100 × 100 mm to stay in JLCPCB's cheapest tier.
-- **Place the 16 JST connectors along the board edges** (right-angle housings
-  overhang the edge — see mechanical note below) so cables exit cleanly.
-- **U1 central**, `C1` (100 nF) right across U1 pins 24/12, as close as possible.
-  `C2` (10 µF) nearby.
-- **Ground pour** on both layers, stitched; keep a continuous return under the
-  input area. Short, direct WIPER traces — analog.
-- **M3 holes (H1, H2):** Ø3.2 mm, ≥3 mm from board edges and any future V-cut
-  line. Standardize their spacing so it matches your other breakout boards.
-- **Silk:** label each JST (`CH0`…), pin-1 markers, board name `MUX16 v1`, and
-  the J_OUT pinout.
+- **Size:** keep well under 100 × 100 mm for JLCPCB's cheapest tier.
+- **16 JST inputs along the board edges**, right-angle mouths facing outward so
+  cables clear the board. Label each `CH0…CH15` on silk with pin-1 markers.
+- **U1 central; C1 (100 nF) straight across pins 24/12**, as close as possible;
+  C2 (10 µF) nearby.
+- **Solid ground pour both layers**, stitched; continuous return under the input
+  area. Short, direct WIPER traces. Keep the digital select lines away from SIG.
+- **4× M3 holes (H1–H4):** Ø3.2 mm, ≥3 mm from edges and any future V-cut line;
+  standardize their spacing to match the other breakout boards.
+- **Silk:** board name `MUX16 v1`, J_IN/J_OUT/J_EN pinouts, channel numbers,
+  pin-1 markers.
 
-## JST-XH `S3B-XH-A` mechanical (footprint reference)
+---
 
-- **Pitch:** 2.50 mm, 3 contacts in a line.
-- **Pin-to-pin span (end to end):** 5.0 mm; **housing length:** ~9.9 mm.
-- **Contact posts:** 0.64 mm square; **recommended PCB hole:** ~1.0 mm dia.
-- **Right-angle (side entry):** the housing lies flat and the cable exits
-  *parallel* to the board — leave clearance past the board edge / keep the
-  connector opening facing outward.
-- The KiCad footprint `Connector_JST:JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal`
-  already encodes the exact pads and courtyard — use it and confirm against the
-  JST `S3B-XH-A` datasheet drawing.
+## System architecture — chaining, master board, scaling
 
-## JLCPCB order settings (cheapest)
+### Two 4-bit buses
+- **S0–S3** = *which channel* inside a mux (0–15). Shared by every mux.
+- **M0–M3** = *which mux* is active. Fed to the **master board's `74HC154`**
+  (4→16 decoder, active-low outputs), which generates the 16 enable lines. The
+  dumb mux boards never see M lines — they just receive their one `EN̄`.
+
+### Master board (separate PCB, build later)
+- `74HC154` : inputs `A B C D` ← `M0 M1 M2 M3`; enable inputs `Ē1 Ē2` → GND
+  (or one to a GPIO for a global blank); outputs `Y0–Y15` → 16× `S2B-XH-A`
+  (`EN̄ + GND`), one to each mux board's J_EN. 100 nF decoupling.
+- Connector to the **first mux board's chain-in:** `3-pin (GND/SIG/VCC)` +
+  `4-pin (S0–S3)` — identical to a mux chain connector. **M0–M3 do NOT go to the
+  chain** (the decoder consumes them).
+- Connector to the **dev board:** see pins-to-dev below.
+
+### Pins back to the dev board (fixed, scales by +1 per doubling)
+| Inputs | Muxes | Masters | Pins to dev | Breakdown |
+|--------|-------|---------|-------------|-----------|
+| 16 | 1 | 0 | **7** | S0–3, SIG, VCC, GND |
+| 256 | 16 | 1 | **11** | + M0–3 |
+| 512 | 32 | 2 | **12** | + M4 (or parallel ADC) |
+| 1024 | 64 | 4 | **13** | + M5 |
+| 2048 | 128 | 8 | **14** | + M6 |
+
+8 control lines = an 8-bit address = 1-of-256. Grouped for the dev connector:
+`3-pin (GND/SIG/VCC) + 4-pin (S0–3) + 4-pin (M0–3)`.
+
+### Scaling past one shared SIG (parallel ADC)
+One shared SIG + one ADC is comfortable to **~128–256 inputs**. Beyond that you
+hit: scan speed (one ADC sweeping everything), SIG-line capacitance/leakage from
+many muxes, and VCC IR-drop corrupting the ratiometric reference on far boards.
+
+**Fix — give each master its own SIG → its own ADC pin.** This needs **no board
+change** (each master already has one SIG line); you just don't tie them
+together at the dev end. Bonus: masters no longer arbitrate a shared line, so you
+**drop the master-select bit (M4) and its inverter**, read all masters in
+parallel (≈N× faster), and cut per-line loading. Then distribute power robustly
+(thick VCC / star feeds) to protect the reference. At very large scale
+(~1000+ inputs), local digitization (smart boards) becomes the better path.
+
+---
+
+## JST-XH `S#B-XH-A` mechanical (right-angle)
+
+- Pitch **2.50 mm**; pin-to-pin span = 2.5 × (n−1); contact posts 0.64 mm sq;
+  recommended PCB hole ~1.0 mm.
+- 3-pin span 5.0 mm (housing ~9.9 mm); side-entry, cable exits parallel to board.
+- KiCad footprints `Connector_JST:JST_XH_S#B-XH-A_1x0#_P2.50mm_Horizontal`
+  already encode exact pads/courtyard — confirm against the JST datasheet.
+
+## JLCPCB order (cheapest)
 
 1.6 mm · 2-layer · 1 oz Cu · HASL (leaded) · green mask · no special options.
-Order the 5-pcs minimum. Buy the C157928 connectors on the same order to combine
-shipping. Panelize identical boards with KiKit later (see `../README.md` §6).
+Order the 5-pcs minimum; buy C157928 and the other XH headers on the same order
+to combine shipping. Panelize identical boards with KiKit later (`../README.md`).
