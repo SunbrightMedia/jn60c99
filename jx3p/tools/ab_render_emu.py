@@ -114,7 +114,12 @@ def main():
     n = int(sys.argv[3]) if len(sys.argv) > 3 else 32
     warm = int(sys.argv[4]) if len(sys.argv) > 4 else 6
     sr = float(sys.argv[5]) if len(sys.argv) > 5 else 44100.0
-    bank = open(BANK, "rb").read()
+    # arg 6 or $JX_BANK: any bank file with the same HEADER/STRIDE/BLOB layout
+    # as the factory bank. Other banks are INPUT (never ground truth): the
+    # oracle still recalls them via the plugin's own dispatch, so the A/B stays
+    # a plugin-vs-port comparison, not a bank-derived assertion.
+    bank_path = sys.argv[6] if len(sys.argv) > 6 else os.environ.get("JX_BANK", BANK)
+    bank = open(bank_path, "rb").read()
     os.makedirs(outdir, exist_ok=True)
     for patch in patches:
         run_patch(outdir, patch, n, warm, bank, sr)
