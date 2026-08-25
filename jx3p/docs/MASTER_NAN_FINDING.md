@@ -86,6 +86,34 @@ with these cells, the C must be reading a DIFFERENT cell or taking a DIFFERENT
 branch. That divergence -- not the seed -- is the real remaining question, and
 it is a genuine candidate port defect that must not be closed until explained.
 
+## LOCALISED 2026-08-25 (third pass) -- 6 cells, one expression
+Ran ONE master sample on both sides from the identical snapshot and diffed the
+whole 11 MB master state:
+
+| cell | C | plugin |
+|---|---|---|
+| 32 / 36 | NaN | 0.9902894 |
+| 269968 / 269984 | NaN | 0.9902894 |
+| 136 / 140 | object pointer | object pointer (harness relocation, expected) |
+
+Only SIX cells differ and four of them are the same output value. Everything
+else the master writes -- including the ring index at st+10928560 and the
+chorus-path cells -- matches BIT-EXACTLY. So the divergence is not a branch
+taken differently earlier and not an index computed differently; it is confined
+to the final output expression.
+
+0.9902894 is exactly st+270176, the CLAMP constant, so the plugin took
+`if ((st+270160) - v479 <= 0.0) v482 = st+270176;` -- meaning its v479 >= 0.3032.
+In the C, v479 is NaN, every comparison is therefore false, no clamp fires, and
+the unclamped polynomial yields NaN. All of that expression's state inputs
+(270016/270032/270048/270064/270080/270096/270112/270128/270144/270160/270176)
+were verified FINITE in the seed.
+
+NEXT STEP (bounded): bisect inside jx_master_render.c around lines 2535-2570 by
+printing v466/v472..v482 for this one sample, and compare against the same
+values under the oracle. The defect is in one line of that expression's
+transcription, and it is now cheap to find.
+
 ## The fix, in order
 1. Make the A/B seed a clean state: warm the plugin through its own documented
    entry path rather than by poking two cells, long enough for the chorus line
