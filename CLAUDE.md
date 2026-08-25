@@ -84,6 +84,17 @@ mine is a hypothesis (playbook 80).
 - Costs/levers/history: `docs/` + `docs/engineb/data/` — cite, do not restate.
 
 # LIVE STATE (2026-08-13 — update in place, no dated blocks here, EVER)
+- COMPLETENESS AUDIT: the user counted 63 panel params in a host vs my 32 and
+  was right. Census now 57 pools (probe_pools/juno_scope_probe). THREE REAL
+  DEFECTS found and fixed, each invisible to a green gate: (1) JUNO EFFECT
+  DEPTH 1..63 wrote a ramp where the plugin SATURATES -- no factory patch uses
+  1..63; (2) JX unordered-compare -- the plugin CLAMPS on NaN (comiss;ja), the
+  port did not, so the master emitted NaN; (3) JX cell 1088 -- LFO RATE H
+  shares it with LFO RATE and RESETS it last, derived keep-clean. New binding
+  rules in docs/PORT_COMPLETENESS_CHARTER.md; new gates census_exhaustive,
+  fxsweep, nan_ab, mutation_gate, unordered_audit. NaN is reachable on JX
+  (fixed) and NOT reachable on JUNO (latent, docs/NAN_SEMANTICS_SCOPE.md).
+  Playbook 80 (self-scoping gate) and 81 (unordered compares).
 - 12-bank user parity vs src/: recall 768/768 PASS. Render re-running after
   the arp-list fix; prior 111 fails are UNATTRIBUTED until it lands.
 - Fork on silicon (2026-08-18, b6_split_sweep.md): CRC MATCH all patches (key
