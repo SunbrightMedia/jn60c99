@@ -51,7 +51,7 @@ enabled board drives the line.
 | C2 | 1 | 10 µF, 0805 | `Capacitor_SMD:C_0805_2012Metric` | **C15850** — bulk reservoir |
 | D1 | 1 | LED, **red, 0603**, normal brightness (~90 mcd) | `LED_SMD:LED_0603_1608Metric` | **C2286** — power indicator |
 | R1 | 1 | **10 kΩ**, 0805 | `Resistor_SMD:R_0805_2012Metric` | **C17414** — LED limit, keeps it dim |
-| R2–R17 | 16 | 220 Ω, 0805 — **optional, DNP** | `Resistor_SMD:R_0805_2012Metric` | **C17557** — per-input series R |
+| R2–R17 | 16 | **330 Ω**, 0805 — **populated** | `Resistor_SMD:R_0805_2012Metric` | **C17630** — per-input series R |
 | JP1 | 1 | solder jumper — **optional** | `Jumper:SolderJumper-2_P1.3mm_Open` | ties EN̄→GND for standalone |
 | TP1–TP3 | 3 | test points | `TestPoint:TestPoint_Pad_D1.5mm` | SIG, VCC, GND |
 | H1–H4 | 4 | M3 mounting hole Ø3.2 mm | `MountingHole:MountingHole_3.2mm_M3` | — |
@@ -67,9 +67,11 @@ enabled board drives the line.
   — roughly **1/130 of the LED's 20 mA rating**, so it emits ~0.7 mcd: a faint
   glow. Current is fixed by Ohm's law, so dimness is guaranteed regardless of the
   LED. Want it fainter still → 22 kΩ (C17673), but very weak at 3.3 V.
-- **Series resistors R2–R17 (optional):** 220 Ω in each wiper line for
-  short-protection + light filtering. **Voltage-independent** (ratiometric-
-  neutral). Leave DNP / 0 Ω and only populate if you see trouble.
+- **Series resistors R2–R17 (populated, 330 Ω):** one in each wiper line.
+  Zero steady-state error into the high-Z ADC; limits a fault (input shorted
+  to a rail / miswired cable) to ~15 mA at 5 V — inside the 4067's ±25 mA
+  absolute max, with margin 220 Ω wouldn't leave. **Voltage-independent**
+  (ratiometric-neutral) and swamped by any pot's source impedance.
 - **3.3 V / 5 V compatibility comes from the ratiometric design, NOT resistor
   values.** The only resistor that even mildly cares about voltage is R1 (LED),
   and it's fine on both.
