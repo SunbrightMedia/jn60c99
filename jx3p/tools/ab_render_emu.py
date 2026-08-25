@@ -56,15 +56,21 @@ def run_patch(outdir, patch, n, warm, bank, sr=44100.0):
     for _ in range(warm):
         jx.render(256)
 
-    # ---- SEED VALIDITY TOOTH (2026-08-25) ----
-    # A differential result is only meaningful from a VALID starting state. The
-    # warm-up here (poke st8+11191048=0, st8+20=1, then render x6) was found to
-    # leave the PLUGIN's own chorus delay line partly filled with NaN -- 3497 of
-    # 65536 entries -- which both sides then inherit. The port reached one and
-    # emitted NaN; that looked exactly like a port defect and was not one.
-    # A snapshot containing NaN must FAIL LOUDLY, never be handed to a gate.
-    # (jx3p/docs/MASTER_NAN_FINDING.md)
-    import math as _math
+    # ---- SEED NaN REPORT (2026-08-25, downgraded from a hard tooth) ----
+    # This started as a tooth that FAILED on any NaN in the snapshot, because a
+    # NaN-bearing seed looked like an invalid start state. Investigation proved
+    # otherwise, and the tooth was wrong to fail:
+    #   * the NaN is produced by the PLUGIN's own render, not by the harness
+    #     (state is clean through BUILD/SETSR/RECALL/NOTE-ON; NaN appears in the
+    #     first rendered block and grows ~3 cells per sample);
+    #   * the plugin never computes with those cells -- hooking every read
+    #     showed one site, an INTEGER `mov` shuffling a word along a ring;
+    #   * the plugin CLAMPS them at the output, and the port failed to only
+    #     because of an unordered-compare mistranscription, now fixed
+    #     (docs/NAN_SEMANTICS_SCOPE.md, playbook 81).
+    # So a NaN-bearing seed is a REAL state the plugin produces, and refusing to
+    # gate it would hide the very defect it helped find. The count is reported
+    # for visibility; set JX_FAIL_ON_NAN_SEED=1 to make it fatal again.
     def _nan_count(buf):
         n = 0
         for _o in range(0, len(buf) - 3, 4):
@@ -73,22 +79,11 @@ def run_patch(outdir, patch, n, warm, bank, sr=44100.0):
                (_b[0] or _b[1] or (_b[2] & 0x7F)):
                 n += 1
         return n
-    _bad = []
-    _m = bytes(uc.mem_read(st8, SNAP_M))
-    _n = _nan_count(_m)
-    if _n:
-        _bad.append("master=%d" % _n)
-    for _v in range(8):
-        _n = _nan_count(bytes(uc.mem_read(jx.state[_v], SNAP_V)))
-        if _n:
-            _bad.append("voice%d=%d" % (_v, _n))
-    if _bad and os.environ.get("JX_ALLOW_NAN_SEED") != "1":
-        raise SystemExit(
-            "SEED TOOTH: patch %d -- the ORACLE's own warm state contains NaN "
-            "(%s). The A/B would compare two engines started from a state no "
-            "host can present. Fix the warm-up, do not gate this. "
-            "(JX_ALLOW_NAN_SEED=1 to override for diagnosis only.)"
-            % (patch, ", ".join(_bad)))
+    _nm = _nan_count(bytes(uc.mem_read(st8, SNAP_M)))
+    _nv = sum(_nan_count(bytes(uc.mem_read(jx.state[_v], SNAP_V))) for _v in range(8))
+    if (_nm or _nv) and os.environ.get("JX_FAIL_ON_NAN_SEED") == "1":
+        raise SystemExit("SEED NaN (master=%d voices=%d) and JX_FAIL_ON_NAN_SEED=1"
+                         % (_nm, _nv))
 
     d = os.path.join(outdir, "p%d" % patch); os.makedirs(d, exist_ok=True)
     def rq(a): return int.from_bytes(uc.mem_read(a,8),'little')
