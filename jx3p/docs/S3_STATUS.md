@@ -3,7 +3,29 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
-## ★ FINISH LINE REACHED — the DSP port is PROVEN (`make verify-jx3p` GREEN)
+## ⚠ CORRECTION 2026-08-25 — READ BEFORE THE CLAIM BELOW
+
+The "finish line" section below is **narrower than it reads**, on two counts
+found the day after it was written:
+
+1. **It was measured from an INVALID SEED.** The A/B's warm-up leaves the
+   PLUGIN's own state containing NaN — master 8916 cells at the 32-pool config
+   the green run used, 6569 at 57 pools, plus 2 cells in every voice. Both
+   sides start identical, so the 64/64 EXACTLY 0 result is still a real proof
+   that the C reproduces the plugin BIT-FOR-BIT from that seed. It is NOT proof
+   that the port behaves correctly from a state a host would present, because
+   that seed is not one. A seed-validity tooth now FAILS the harness loudly
+   (`ab_render_emu.py`, seen to fail); the warm-up must be fixed before the
+   claim can be restated. See `jx3p/docs/MASTER_NAN_FINDING.md`.
+2. **It exercised 32 of 57 recall pools.** The parameter census was wrong when
+   that run was made; see `jx3p/docs/SCOPE_AUDIT.md` and playbook 80.
+
+What still stands unchanged: the voice arms, the master transcription, the
+helpers and the binary's own expf/tanf reproduce the plugin bit-for-bit
+wherever they were compared, and the recall is 64/64 EXACTLY 0 on two banks.
+What is NOT established: correct behaviour from a clean start state.
+
+## ★ FINISH LINE (as claimed 2026-08-24 — see the correction above)
 
 One self-proving command over the checksummed JX3P.vst3:
 - **Recall** (patch bytes → coefficient state): C == the plugin's own dispatch,

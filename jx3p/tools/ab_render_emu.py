@@ -56,6 +56,40 @@ def run_patch(outdir, patch, n, warm, bank, sr=44100.0):
     for _ in range(warm):
         jx.render(256)
 
+    # ---- SEED VALIDITY TOOTH (2026-08-25) ----
+    # A differential result is only meaningful from a VALID starting state. The
+    # warm-up here (poke st8+11191048=0, st8+20=1, then render x6) was found to
+    # leave the PLUGIN's own chorus delay line partly filled with NaN -- 3497 of
+    # 65536 entries -- which both sides then inherit. The port reached one and
+    # emitted NaN; that looked exactly like a port defect and was not one.
+    # A snapshot containing NaN must FAIL LOUDLY, never be handed to a gate.
+    # (jx3p/docs/MASTER_NAN_FINDING.md)
+    import math as _math
+    def _nan_count(buf):
+        n = 0
+        for _o in range(0, len(buf) - 3, 4):
+            _b = buf[_o:_o + 4]
+            if (_b[3] & 0x7F) == 0x7F and (_b[2] & 0x80) and \
+               (_b[0] or _b[1] or (_b[2] & 0x7F)):
+                n += 1
+        return n
+    _bad = []
+    _m = bytes(uc.mem_read(st8, SNAP_M))
+    _n = _nan_count(_m)
+    if _n:
+        _bad.append("master=%d" % _n)
+    for _v in range(8):
+        _n = _nan_count(bytes(uc.mem_read(jx.state[_v], SNAP_V)))
+        if _n:
+            _bad.append("voice%d=%d" % (_v, _n))
+    if _bad and os.environ.get("JX_ALLOW_NAN_SEED") != "1":
+        raise SystemExit(
+            "SEED TOOTH: patch %d -- the ORACLE's own warm state contains NaN "
+            "(%s). The A/B would compare two engines started from a state no "
+            "host can present. Fix the warm-up, do not gate this. "
+            "(JX_ALLOW_NAN_SEED=1 to override for diagnosis only.)"
+            % (patch, ", ".join(_bad)))
+
     d = os.path.join(outdir, "p%d" % patch); os.makedirs(d, exist_ok=True)
     def rq(a): return int.from_bytes(uc.mem_read(a,8),'little')
     # voice snapshots + links
