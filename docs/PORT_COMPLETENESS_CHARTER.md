@@ -115,7 +115,38 @@ for a worked example:
 A dimension not listed is a dimension where the claim is unverified — and, as
 the JX-3P showed twice, that is exactly where the defects live.
 
-## 6. REPORTING RULES (binding on me)
+## 6. DRIVE THE PLUGIN THROUGH ITS OWN ENTRY POINT (mandatory)
+
+An INCOMPLETE ORACLE is the mirror of an incomplete gate scope, and it is more
+dangerous: a narrow gate HIDES a defect, a narrow oracle INVENTS one.
+
+On 2026-08-25 a new gate reported the port differing from the plugin on 18 of
+64 factory patches. It was wrong. The gate drove recall with a 112-leaf table,
+while the plugin's real recall ALSO fires extended leaves the enumerator omits
+(DELAY FEEDBACK at index 1179 among them). Without it the plugin's descriptor
+sat at a default and the "constant" the gate saw was the harness's own omission.
+
+Rules:
+* A gate must drive the plugin through its OWN complete entry point. Where one
+  already exists in the repo (`recall_render_ab.prepare_recall`), USE IT.
+* Never re-implement recall, note-on, or warm-up inside a new gate.
+* Single-leaf isolation is legitimate ONLY for laws that depend on that leaf
+  alone. Mode selectors and anything reading extended leaves must be driven
+  through the full path, and the exclusion recorded with its evidence.
+
+## 7. EVERY DIFFERENTIAL GATE RUNS ITS CONTROL FIRST (mandatory)
+
+Before any injected/perturbed comparison, run the SAME comparison with NOTHING
+injected. If the baseline already differs, the harness is wrong and every
+result after it is meaningless -- ABORT rather than report.
+
+Paid for twice on 2026-08-25: the NaN gate's first version packed the oracle's
+uint32 bit patterns as floats and reported 8 of 8 cells "divergent"; with the
+control in place the same run reported 0/32 baseline and 2 genuine findings.
+`nan_ab.py` now aborts on a dirty control, and no differential gate may ship
+without one.
+
+## 8. REPORTING RULES (binding on me)
 
 - Never say "the port is complete/100%" from a green gate. Say it from a census
   plus a mutation-reach number plus a filled-in §5 table.
