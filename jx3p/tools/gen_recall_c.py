@@ -12,7 +12,7 @@ def main():
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "jx_recall_lut.h")
     D = pickle.load(open(os.path.join(refdir, "recall_lut.pkl"), "rb"))
     lut = D["lut"]; active = D["active"]; clean = D["clean"]
-    OVERRIDE = {1072: 12, 3056: 49, 3072: 50, 3088: -1, 3104: 52, 4000: -1, 13440: -1}
+    OVERRIDE = {1072: 12, 1088: -1, 3056: 49, 3072: 50, 3088: -1, 3104: 52, 4000: -1, 13440: -1}  # 1088 keeps clean: see recall_model_check.py
 
     # gather (pool, cell) -> 256 uint32 (clean value where the pool doesn't write)
     entries = []   # (pool, cell, [256 u32])

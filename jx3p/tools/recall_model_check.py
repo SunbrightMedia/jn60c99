@@ -13,7 +13,21 @@ import jx_emu as J
 BANK = os.path.join(J.REPO, "jx3p", "truth", "preset_bank_1.bin")
 BLOCK = 16128; HEADER = 23; STRIDE = 20223; BLOB_OFF = 16; NPATCH = 64
 # interacting cell -> value pool to trust (None = keep clean)
-OVERRIDE = {1072: 12, 3056: 49, 3072: 50, 3088: None, 3104: 52, 4000: None, 13440: None}
+# 1088 added 2026-08-25, when the corrected 57-pool census widened the active
+# set. Cell 1088 is written by pool 12 (LFO RATE) and pool 138 (LFO RATE H) --
+# a high/low resolution pair. DERIVED, not guessed:
+#   * pool 12 at its patch value writes 1088 (e.g. v=2 -> 0x3C008081);
+#   * pool 138 at v=0 writes NOTHING in isolation, because the clean base is
+#     already 0 so the per-pool diff records no change;
+#   * the ORACLE's sequential recall ends with 1088 == 0 on all 64 patches,
+#     i.e. pool 138 runs LAST and RESETS the cell.
+# So the composed value must stay CLEAN, not keep pool 12's write. 'pool 12
+# wins' was tried first and failed on all 64 patches -- the opposite rule to
+# cell 1072, which really is pool-12-wins.
+# BOUND: pool 138 is CONSTANT 0 across the whole factory bank, so this is
+# proven only for LFO RATE H == 0. A bank that varies it needs the true JOINT
+# law derived; the fxsweep/census tooling is the way to get it.
+OVERRIDE = {1072: 12, 1088: None, 3056: 49, 3072: 50, 3088: None, 3104: 52, 4000: None, 13440: None}
 
 def decode(blob, pool):
     p = 2 * pool + 8
