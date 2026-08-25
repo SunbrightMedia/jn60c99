@@ -1,50 +1,45 @@
-# OPEN DEFECT — cell 102560 (delay send) differs on 18/64 factory patches
+# RETRACTED — cell 102560 was NOT a port defect (my oracle was incomplete)
 
-Found 2026-08-25 by `tools/verify/census_exhaustive_gate.py`, the gate written
-to close the reach hole that mutation testing exposed (playbook 80). This is
-the FIRST genuine port defect the mutation-driven work has uncovered, and it
-sat behind a fully green `make verify`.
+Claimed 2026-08-25, **retracted the same day**, by measurement.
 
-## The finding
-Under the plugin's OWN recall path (all 9 units, `real_recall.leaf_table()`
-order, trailing `snap_all()` — i.e. `real_recall.recall`'s exact protocol):
+## The claim (wrong)
+`census_exhaustive_gate.py` reported that the plugin holds cell 102560 at a
+constant 0x3ed8d8d9 while the port writes a varying value, on 18 of 64 factory
+patches. I checked it under "the plugin's own recall path" and called it a real
+defect.
 
-    the plugin writes cell 102560 = 0x3ed8d8d9 on EVERY patch (a constant)
-    the port writes a VALUE THAT VARIES
+## Why it was wrong
+My oracle drove recall with `real_recall.leaf_table()` only — the 112 value-tree
+leaves. The plugin's ACTUAL recall also fires EXTENDED leaves the enumerator
+omits from that table: FX feedback/direct level, VCF/VCA velocity sens, and the
+DELAY/CHORUS/REVERB fine-FX leaves. `recall_render_ab.prepare_recall` exists
+precisely to drive that COMPLETE recall.
 
-18 of the 64 factory patches differ. Examples:
+DELAY FEEDBACK is dispatch index 1179 — outside leaf_table. Without it the
+plugin's descriptor for that cell stayed at its DEFAULT byte 120, and
+0x3ed8d8d9 is exactly f32(120/255)*f32(0.9): the law evaluated at the default.
+So the "constant" I saw was my own omission, and `src/delay_recall.c` line 134
+warns about this exact trap — "one capture cannot tell a constant from a law".
 
-| patch | plugin | port | DELAY LEVEL | DELAY TYPE |
-|---|---|---|---|---|
-| 2  | 0x3ed8d8d9 | 0x3eababac | 44  | 0 |
-| 13 | 0x3ed8d8d9 | 0x3f095623 | 69  | 0 |
-| 30 | 0x3ed8d8d9 | 0x3f095623 | 0   | 0 |
-| 50 | 0x3ed8d8d9 | 0x00000000 | 69  | 0 |
-| 53 | 0x3ed8d8d9 | 0x3f666666 | 85  | 0 |
+## The measurement that settles it
+Re-run through `recall_render_ab.prepare_recall` (complete recall, same rate,
+same patches): cells 102528 / 102560 / 102576 match the plugin BIT-EXACTLY on
+patches 2, 13, 20, 30, 50, 53. No difference. The port is correct here.
 
-All 18 are DELAY TYPE 0. The port's value does not track DELAY LEVEL either
-(patch 30 has LEVEL 0 and patch 13 LEVEL 69, both -> 0x3f095623), so the port
-is writing this cell from some other law while the plugin holds it fixed.
+## The lesson (playbook)
+An INCOMPLETE ORACLE is the mirror image of an incomplete gate scope, and it is
+more dangerous: a narrow gate hides a defect, a narrow oracle INVENTS one. Both
+come from the same root — driving the plugin through a hand-picked subset and
+treating it as "the plugin".
 
-## Why every existing gate missed it
-`recall_exhaustive_gate.py` sweeps every byte 0..255 but reads only the
-VOICE-0 block (10512 bytes). Cell 102560 is in the master/FX region beyond
-VOICE_END (84096), so it was never compared. `recall_render_ab.py` compares
-OUTPUT AUDIO, and this cell is evidently not read on the render path these
-patches take — bit-exact audio therefore proves nothing about it.
-
-## Ruled out (each measured, not argued)
-- **Isolation artifact**: no. Reproduced under the plugin's own full recall
-  protocol, not a single-byte dispatch from defaults.
-- **Dispatch order / ramp settling**: no. Reproduced with all 9 units, true
-  leaf order, and the trailing `snap_all()` that settles ramp records.
-- **A mode selector's cross-byte dependence** (the DELAY TYPE 875 / REVERB
-  TYPE 876 class, which ARE isolation artifacts and are proven so in
-  census_exhaustive_gate.py's MODE_SELECTORS comment): no — this is a plain
-  parameter cell and the whole factory bank agrees on the plugin side.
+**Rule: a gate must drive the plugin through its OWN complete entry point, not
+through a leaf list the harness assembled.** Where such an entry point already
+exists in the repo (`prepare_recall`), use it; never re-implement recall in a
+new gate. `census_exhaustive_ref.py`'s single-leaf isolation is legitimate ONLY
+for cells whose law depends on that leaf alone, which is why mode selectors are
+excluded there — and FX cells that depend on extended leaves belong in the same
+excluded class until driven through the complete recall.
 
 ## Status
-OPEN. Not yet attributed to a specific line in `src/delay_recall.c`. The next
-step is to find which port law writes 102560 and why it is not the constant
-the plugin holds. Audio impact is UNKNOWN and must not be assumed zero just
-because the render A/B is green — that gate never reads this cell.
+CLOSED, no defect. The census gate's FX reach must be rebuilt on
+`prepare_recall` rather than on single-leaf dispatch.
