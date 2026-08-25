@@ -59,6 +59,33 @@ If they are only ever written and never read, (b) holds and the seed tooth
 must ignore inert scratch instead of failing. If they ARE read, (a) holds and
 the driving must be fixed before any master verdict is meaningful.
 
+## Deciding experiment RUN 2026-08-25 -- and its first reading was too crude
+Hooked reads of all 6569 NaN cells across 4 master samples: **4 reads, all from
+ONE site, 0x18039D0E8**. Disassembled, that site is:
+
+    39d0e8: mov  eax, dword ptr [rsi + 0x4424b0]
+    39d0f1: mov  dword ptr [rsi + rcx*4 + 0x42490], eax
+
+an INTEGER 32-bit copy shuffling a word into a ring buffer -- not arithmetic.
+No FP instruction (movss/mulss/addss) read a NaN cell at all.
+
+So the crude "is it read?" test answers the wrong question. The NaN bit
+patterns are DATA being moved around a ring, and the plugin never computes with
+them. That is alternative (b), not (a): the seed's NaN is inert as far as these
+4 samples show, and a tooth that fails on ANY NaN anywhere in 11 MB of state is
+too strict -- it would block a state the plugin itself is content to carry.
+
+REVISED TOOTH CONTRACT (to implement): fail only when a NaN is read INTO FP
+ARITHMETIC, not when one merely exists or is copied. Until that is in place the
+existing tooth stays, but it must be understood as conservative, and
+JX_ALLOW_NAN_SEED=1 is the documented escape for diagnosis.
+
+STILL UNEXPLAINED: with the same seed and the same inputs, the C master emitted
+NaN where the plugin emitted finite audio. Since the plugin does not compute
+with these cells, the C must be reading a DIFFERENT cell or taking a DIFFERENT
+branch. That divergence -- not the seed -- is the real remaining question, and
+it is a genuine candidate port defect that must not be closed until explained.
+
 ## The fix, in order
 1. Make the A/B seed a clean state: warm the plugin through its own documented
    entry path rather than by poking two cells, long enough for the chorus line
