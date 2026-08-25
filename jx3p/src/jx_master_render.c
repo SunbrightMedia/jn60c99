@@ -2547,7 +2547,17 @@ LABEL_96:
                                + (float)(*(float *)(st + 270064) * (float)(v479 * v479)))
                        + (float)(v478 * (float)((float)(v479 * v479) * v479))))
        + (float)((float)((float)((float)((float)(v479 * v479) * v479) * v479) * v479) * *(float *)(st + 270112));
-  if ( (float)(*(float *)(st + 270160) - v479) <= 0.0 )
+  /* UNORDERED-COMPARE FIX (2026-08-25). The plugin's asm here is
+   *     comiss xmm0, xmm12 ; ja <skip>   (rva 0x39E341/0x39E35C)
+   * and `ja` is NOT taken when the compare is UNORDERED, so the plugin CLAMPS
+   * on NaN. C's `x <= 0.0` is FALSE on NaN, so the decompiled form skipped the
+   * clamp and propagated NaN to the output. Written as !(x > 0) to reproduce
+   * the asm exactly. Measured: two of the four chorus taps read NaN from the
+   * delay line in a real recalled state, the plugin clamped to 0.9902894 and
+   * the port emitted NaN. (The SECOND clamp below uses `jb`, which IS taken on
+   * unordered, so its `>= 0.0` transcription is already correct -- do not
+   * "fix" that one.) */
+  if ( !((float)(*(float *)(st + 270160) - v479) > 0.0f) )
     v482 = *(float *)(st + 270176);
   v483 = *(float *)(st + 270064) * v481;
   v484 = v481 * v480;
@@ -2558,7 +2568,7 @@ LABEL_96:
   *(float *)(st + 269968) = v486;
   v487 = (float)((float)((float)(v484 * v480) * *(float *)(st + 270096)) + (float)(v485 + (float)(v478 * v484)))
        + (float)((float)((float)(v484 * v480) * v480) * *(float *)(st + 270112));
-  if ( (float)(*(float *)(st + 270160) - v480) <= 0.0 )
+  if ( !((float)(*(float *)(st + 270160) - v480) > 0.0f) )   /* same asm: ja */
     v487 = *(float *)(st + 270176);
   if ( (float)(*(float *)(st + 270128) - v480) >= 0.0 )
     v487 = *(float *)(st + 270144);
