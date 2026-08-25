@@ -42,16 +42,16 @@ enabled board drives the line.
 
 | Ref | Qty | Part | Footprint (KiCad std lib) | LCSC / note |
 |-----|-----|------|---------------------------|-------------|
-| U1 | 1 | `CD74HC4067` 16-ch analog mux, SOIC-24W | `Package_SO:SOIC-24W_7.5x15.4mm_P1.27mm` | search `CD74HC4067` SOIC-24, confirm |
+| U1 | 1 | `CD74HC4067M96` 16-ch analog mux, SOIC-24W | `Package_SO:SOIC-24W_7.5x15.4mm_P1.27mm` | **C496123** |
 | J1–J16 | 16 | JST-XH 3-pin RA `S3B-XH-A` | `Connector_JST:JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal` | **C157928** |
 | J_IN_A, J_OUT_A | 2 | JST-XH 3-pin RA `S3B-XH-A` | same as above | C157928 |
-| J_IN_D, J_OUT_D | 2 | JST-XH 4-pin RA `S4B-XH-A` | `Connector_JST:JST_XH_S4B-XH-A_1x04_P2.50mm_Horizontal` | search `S4B-XH-A` |
-| J_EN | 1 | JST-XH 2-pin RA `S2B-XH-A` | `Connector_JST:JST_XH_S2B-XH-A_1x02_P2.50mm_Horizontal` | search `S2B-XH-A` |
-| C1 | 1 | 100 nF, 0805 | `Capacitor_SMD:C_0805_2012Metric` | fast/local decoupling |
-| C2 | 1 | 10 µF, 0805 | `Capacitor_SMD:C_0805_2012Metric` | bulk reservoir |
-| D1 | 1 | LED, **red**, 0805 | `LED_SMD:LED_0805_2012Metric` | power indicator |
-| R1 | 1 | 2.2 kΩ, 0805 | `Resistor_SMD:R_0805_2012Metric` | LED limit (3.3–5 V) |
-| R2–R17 | 16 | 220 Ω, 0805 — **optional, DNP** | `Resistor_SMD:R_0805_2012Metric` | per-input series R |
+| J_IN_D, J_OUT_D | 2 | JST-XH 4-pin RA `S4B-XH-A` | `Connector_JST:JST_XH_S4B-XH-A_1x04_P2.50mm_Horizontal` | **C157925** |
+| J_EN | 1 | JST-XH 2-pin RA `S2B-XH-A` | `Connector_JST:JST_XH_S2B-XH-A_1x02_P2.50mm_Horizontal` | **C157931** |
+| C1 | 1 | 100 nF, 0805 | `Capacitor_SMD:C_0805_2012Metric` | **C49678** — fast/local decoupling |
+| C2 | 1 | 10 µF, 0805 | `Capacitor_SMD:C_0805_2012Metric` | **C15850** — bulk reservoir |
+| D1 | 1 | LED, **red, 0603**, normal brightness (~90 mcd) | `LED_SMD:LED_0603_1608Metric` | **C2286** — power indicator |
+| R1 | 1 | **10 kΩ**, 0805 | `Resistor_SMD:R_0805_2012Metric` | **C17414** — LED limit, keeps it dim |
+| R2–R17 | 16 | 220 Ω, 0805 — **optional, DNP** | `Resistor_SMD:R_0805_2012Metric` | **C17557** — per-input series R |
 | JP1 | 1 | solder jumper — **optional** | `Jumper:SolderJumper-2_P1.3mm_Open` | ties EN̄→GND for standalone |
 | TP1–TP3 | 3 | test points | `TestPoint:TestPoint_Pad_D1.5mm` | SIG, VCC, GND |
 | H1–H4 | 4 | M3 mounting hole Ø3.2 mm | `MountingHole:MountingHole_3.2mm_M3` | — |
@@ -61,9 +61,12 @@ enabled board drives the line.
   noise. **C2 (10 µF)** is the bulk reservoir that keeps VCC from sagging when
   the mux switches; matters extra because **VCC is also the ADC reference**
   (ratiometric). Keep both, close to the chip.
-- **LED (D1) + R1:** use a **red** LED (Vf ~1.8 V — blue/white need ~3 V and go
-  marginal at 3.3 V). **2.2 kΩ** gives ~0.7 mA at 3.3 V, ~1.5 mA at 5 V — dim and
-  fine on both rails. Only one resistor; brightness variance doesn't matter.
+- **LED (D1) + R1 — sized for *barely visible*:** use a **red** LED (Vf ~1.8 V —
+  blue/white need ~3 V and go marginal at 3.3 V), normal brightness (~90 mcd),
+  **not** a super-bright part. **10 kΩ** sets ~0.15 mA at 3.3 V / ~0.32 mA at 5 V
+  — roughly **1/130 of the LED's 20 mA rating**, so it emits ~0.7 mcd: a faint
+  glow. Current is fixed by Ohm's law, so dimness is guaranteed regardless of the
+  LED. Want it fainter still → 22 kΩ (C17673), but very weak at 3.3 V.
 - **Series resistors R2–R17 (optional):** 220 Ω in each wiper line for
   short-protection + light filtering. **Voltage-independent** (ratiometric-
   neutral). Leave DNP / 0 Ω and only populate if you see trouble.
