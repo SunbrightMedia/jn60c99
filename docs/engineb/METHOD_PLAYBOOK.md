@@ -1571,3 +1571,44 @@ saying nothing about the gate's REACH.
 5. **Prove reach by mutation.** Inject a deliberate fault per dimension; if no
    gate turns red, that dimension is unproven today. This converts "what else
    is hiding?" from a worry into a measured number.
+
+## 81. The comparison that behaves differently on NaN
+
+The JX master emitted NaN where the plugin emitted audio, with identical input
+state. Not a wrong constant, not a wrong branch earlier, not a bad index: the
+whole 11 MB state matched except the four output cells.
+
+The cause is x86 unordered-compare semantics, lost in decompilation:
+
+    39e326: movss  xmm0, [rsi+0x41f50]
+    39e32e: subss  xmm0, xmm5
+    39e341: comiss xmm0, xmm12          ; compare with 0.0
+    39e35c: ja     skip_clamp
+    39e35e: movss  xmm6, [rsi+0x41f60]  ; the CLAMP
+
+`comiss` on a NaN sets CF=ZF=PF=1 (unordered). `ja` needs CF=0 and ZF=0, so it
+is NOT taken -- the plugin FALLS INTO THE CLAMP on NaN. Hex-Rays renders this
+as `if (x <= 0.0) clamp;`, and in C that is FALSE on NaN, so the port SKIPPED
+the clamp and propagated NaN. The two forms agree on every ordered input and
+disagree only on NaN, which is why 64 patches x 3 rates never caught it.
+
+The mirror case sits ten instructions later and is already correct: that clamp
+uses `jb`, which IS taken on unordered, matching C's `>= 0.0` being false.
+
+### The rules
+1. **Every float comparison is a transcription decision, not a formality.**
+   Map the JUMP, not the decompiler's operator:
+     ja / jae  -> NOT taken on unordered -> C must be `!(x > y)` / `!(x >= y)`
+     jb / jbe  -> IS taken on unordered  -> C's `x < y` / `x <= y` is correct
+     je / jne  -> unordered sets ZF=1, so `je` is taken; `x == y` is not
+   When the decompiler writes `<=` and the asm is `ja`, the decompiler is wrong
+   at exactly one input class: NaN.
+2. **NaN is not necessarily a bug in the plugin.** This one carried thousands
+   of NaN words in a chorus delay line as ordinary data and clamped them at the
+   output. A port that "cleans up" NaN instead of reproducing the clamp is not
+   bit-exact.
+3. **A gate over ordered inputs cannot see this.** It needs a state that
+   actually contains NaN -- which is why the seed-validity work that looked like
+   a harness problem was what exposed a real defect.
+4. **Audit the whole port for this class, do not fix one site.** Any `<=`/`>=`
+   against a value that can be NaN is suspect until its jump is checked.
