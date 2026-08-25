@@ -112,7 +112,10 @@ down first and every board just conforms.
 ## 5. The central mux board (Lane A) — chainable, ratiometric
 
 - **Chip:** `74HC4067` (16:1 single-ended analog mux, 2–6 V). 16 channels = your
-  16 JST ins, 4 address lines (`S0–S3`), enable (`EN̄`/`INH`), one common (`SIG`).
+  16 JST ins, 4 address lines (`S0–S3`), active-low enable `E`, one common `SIG`.
+  Pinout per TI SCHS209C: **SIG = pin 1**, S0=10, S1=11, S2=14, S3=13, **E=15**,
+  GND=12, VCC=24, channels I0–I15 on 9,8,7,6,5,4,3,2,23,22,21,20,19,18,17,16.
+  There is **no VEE pin** — 12 is plain GND.
 - **16× JST-XH-3 input ports.** Each port = `GND · WIPER/SIG · VCC`. GND and VCC
   rails are shared across all ports (that's what feeds the pot ends / pull-ups).
 - **Decoupling:** 100 nF across the 4067's VCC/GND, close to the chip. A bulk

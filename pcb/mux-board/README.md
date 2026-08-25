@@ -84,26 +84,30 @@ enabled board drives the line.
 
 **Shared rails**
 - **VCC** ← U1.24 · J1–J16 pin 3 · J_IN_A.3 · J_OUT_A.3 · C1+ · C2+ · R1 (to D1 anode)
-- **GND** ← U1.12 · J1–J16 pin 1 · J_IN_A.1 · J_OUT_A.1 · J_EN.1 · C1− · C2− · D1 cathode · TP2? · H*(optional)
+- **GND** ← U1.12 · J1–J16 pin 1 · J_IN_A.1 · J_OUT_A.1 · J_EN.1 · C1− · C2− · D1 cathode
+
+> **Pin numbers verified against the TI datasheet (SCHS209C, C496123).** Note the
+> 4067 has **no VEE** — pin 12 is plain GND — and **E (pin 15) is active-LOW**
+> (E high ⇒ all channels off).
 
 **Analog channels** (each wiper → its mux channel; through R2–R17 if populated)
 | Net | From | To U1 pin |
 |-----|------|-----------|
-| CH0…CH15 | J1.2 … J16.2 | 8,7,6,5,4,3,2,1,22,21,20,19,18,17,16,15 |
+| CH0…CH15 | J1.2 … J16.2 | 9,8,7,6,5,4,3,2,23,22,21,20,19,18,17,16 |
 
 **Shared bus (passthrough IN↔OUT, all same nets)**
 | Net | U1 pin | J_IN | J_OUT | To dev/master |
 |-----|--------|------|-------|---------------|
-| SIG | 23 | J_IN_A.2 | J_OUT_A.2 | ADC |
+| SIG | 1 | J_IN_A.2 | J_OUT_A.2 | ADC |
 | VCC | 24 | J_IN_A.3 | J_OUT_A.3 | 3.3 / 5 V |
 | GND | 12 | J_IN_A.1 | J_OUT_A.1 | GND |
-| S0 | 11 | J_IN_D.1 | J_OUT_D.1 | GPIO |
-| S1 | 13 | J_IN_D.2 | J_OUT_D.2 | GPIO |
+| S0 | 10 | J_IN_D.1 | J_OUT_D.1 | GPIO |
+| S1 | 11 | J_IN_D.2 | J_OUT_D.2 | GPIO |
 | S2 | 14 | J_IN_D.3 | J_OUT_D.3 | GPIO |
-| S3 | 10 | J_IN_D.4 | J_OUT_D.4 | GPIO |
+| S3 | 13 | J_IN_D.4 | J_OUT_D.4 | GPIO |
 
 **Enable (per-board)**
-- **EN̄** ← U1.9 · J_EN.2 · (JP1 to GND for standalone)
+- **EN̄** ← U1.15 · J_EN.2 · (JP1 to GND for standalone)
 
 **Test points:** TP1→SIG, TP2→VCC, TP3→GND.
 
