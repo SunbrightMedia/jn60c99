@@ -54,22 +54,54 @@ def main():
                      % (rate, len(idxs), MEANINGFUL, VOICE_END))
 
     e = E.E2E(); e.build(rate); e.snap_all()
-    uc = e.uc; st0 = e.state[0]
-    baseline = bytes(uc.mem_read(st0, MEANINGFUL))
+    uc = e.uc
+
+    # PORT-EQUIVALENT FLAT BUFFER (coldstate_ab.py's mapping, and the only
+    # correct one): voice v occupies [v*BLOCK,(v+1)*BLOCK) and lives in
+    # state[V]+off -- NOT state[0]+off. The shared/master/FX region beyond
+    # VOICE_END lives in state[0]. Reading everything from state[0] made voice
+    # 2..7 offsets alias unrelated memory and produced a wall of false reds.
+    # SCOPE: voice-0 block + the shared/master/FX region, both inside state[0].
+    # We keep recall_exhaustive's PROVEN pairing -- oracle dispatch(unit 0,
+    # flag=recall) vs the port's apply_bank -- and change ONLY the window, from
+    # the voice-0 block to voice-0 PLUS everything beyond VOICE_END. Voices 1..7
+    # are deliberately out of scope here: a unit-0 recall dispatch does not write
+    # them, and comparing them turned a recall-role oracle against a host-role
+    # port (juno_gui_set_param), which is a different contract and a false red.
+    def cell_addr(off):
+        return e.state[0] + off
+
+    def in_scope(off):
+        return off < BLOCK or off >= VOICE_END
+
+    def snapshot():
+        buf = bytearray(MEANINGFUL)
+        buf[0:BLOCK] = uc.mem_read(e.state[0], BLOCK)
+        buf[VOICE_END:MEANINGFUL] = uc.mem_read(e.state[0] + VOICE_END,
+                                                MEANINGFUL - VOICE_END)
+        return bytes(buf)
+
+    def restore(cells, base_vals):
+        for o in cells:
+            uc.mem_write(cell_addr(o), struct.pack('<I', base_vals[o]))
+
+    baseline = snapshot()
     base_np = np.frombuffer(baseline, dtype=np.uint32)
+    unit_base = {0: bytes(uc.mem_read(e.state[0], MEANINGFUL))}
 
     lut, escapes = {}, []
     for n, idx in enumerate(idxs):
         # ---- phase 1: which cells can this index move? ----
         touched = set()
         for v in DISCOVERY_VALUES:
-            uc.mem_write(st0, baseline)
+            uc.mem_write(e.state[0], unit_base[0])
             try:
                 e.dispatch(0, idx, v)
             except RuntimeError:
                 pass
-            cur = np.frombuffer(bytes(uc.mem_read(st0, MEANINGFUL)), dtype=np.uint32)
-            touched.update(int(i) * 4 for i in np.nonzero(cur != base_np)[0])
+            cur = np.frombuffer(snapshot(), dtype=np.uint32)
+            touched.update(int(i) * 4 for i in np.nonzero(cur != base_np)[0]
+                           if in_scope(int(i) * 4))
         if not touched:
             continue
         cells = sorted(touched)
@@ -78,28 +110,27 @@ def main():
         # ---- phase 2: all 256 values, restoring/reading only those cells ----
         table = {o: [base_vals[o]] * 256 for o in cells}
         for v in range(256):
-            for o in cells:                       # cheap targeted reset
-                uc.mem_write(st0 + o, struct.pack('<I', base_vals[o]))
+            restore(cells, base_vals)             # cheap targeted reset
             try:
                 e.dispatch(0, idx, v)
             except RuntimeError:
                 pass
             for o in cells:
-                table[o][v] = struct.unpack('<I', uc.mem_read(st0 + o, 4))[0]
+                table[o][v] = struct.unpack('<I', uc.mem_read(cell_addr(o), 4))[0]
 
         # ---- bound check: did any value escape the discovered set? ----
-        uc.mem_write(st0, baseline)
+        uc.mem_write(e.state[0], unit_base[0])
         try:
             e.dispatch(0, idx, 255 - (idx % 251))
         except RuntimeError:
             pass
-        cur = np.frombuffer(bytes(uc.mem_read(st0, MEANINGFUL)), dtype=np.uint32)
-        moved = {int(i) * 4 for i in np.nonzero(cur != base_np)[0]}
+        cur = np.frombuffer(snapshot(), dtype=np.uint32)
+        moved = {int(i) * 4 for i in np.nonzero(cur != base_np)[0] if in_scope(int(i) * 4)}
         if moved - touched:
             escapes.append((idx, sorted(moved - touched)[:8]))
 
         lut[idx] = {'bb': lt[idx], 'cells': table}
-        uc.mem_write(st0, baseline)
+        uc.mem_write(e.state[0], unit_base[0])
         if n % 10 == 0:
             sys.stderr.write("  %d/%d (idx %d -> %d cells, %d beyond VOICE_END)\n"
                              % (n, len(idxs), idx, len(cells),

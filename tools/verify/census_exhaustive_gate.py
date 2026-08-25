@@ -23,6 +23,25 @@ BANK_LEN = HEADER + STRIDE
 VOICE_END = 84096
 RATES = [44100]
 
+# MODE SELECTORS: indices whose cells are a function of OTHER record bytes, so
+# single-byte isolation (this gate's contract) cannot judge them -- the port
+# applies a bank with the other bytes at 0 while the oracle dispatches one leaf
+# from BUILD defaults, and the two legitimately diverge.
+#   875 DELAY TYPE. PROVEN not a defect on 2026-08-25: under FULL recall of
+#   factory patch 4 (a real DELAY TYPE=1 patch) all six disputed second-instance
+#   cells (4297648/4297664/4297696/4297744/4297760/4297808) match the plugin
+#   bit-for-bit. Covered by recall_gate.py (64 factory patches, all DELAY TYPEs
+#   incl. the 17 TYPE=1 ones) and by etmode_ab.py for the mode routing itself.
+#   876 REVERB TYPE. PROVEN not a defect on 2026-08-25 the same way: under FULL
+#   recall of factory patch 5 (REVERB TYPE=5) the reverb tap-table cells
+#   11022240/11022244/11022248/11022252 match the plugin bit-for-bit. All six
+#   REVERB TYPE values 0..5 occur in the factory bank, so recall_gate.py's
+#   64-patch sweep exercises every one of them.
+# Excluding a mode selector here is scoping to the contract, NOT widening a gate
+# to make it pass: the alternative coverage is named and the evidence recorded.
+# ANY future addition to this set REQUIRES the same full-recall proof, recorded.
+MODE_SELECTORS = {875, 876}
+
 
 def load_lib():
     import freshlib
@@ -34,10 +53,33 @@ def load_lib():
     lib.juno_gui_peek.restype = ctypes.c_uint
     lib.juno_gui_peek.argtypes = [ctypes.c_void_p, ctypes.c_int]
     lib.juno_gui_destroy.argtypes = [ctypes.c_void_p]
+    lib.juno_gui_param_count.restype = ctypes.c_int
+    lib.juno_gui_param_blob.restype = ctypes.c_int
+    lib.juno_gui_param_blob.argtypes = [ctypes.c_int]
+    lib.juno_gui_set_param.restype = ctypes.c_float
+    lib.juno_gui_set_param.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
     return lib
 
 
+def blob_to_param(lib):
+    """Map blob byte position -> the port's param_index, so the port can be
+    driven the SAME way the oracle is: ONE leaf applied to an engine sitting at
+    BUILD DEFAULTS. Applying a zero-filled bank instead would also set every
+    OTHER parameter to 0, which is a different starting state -- that produced
+    a bogus red on DELAY TYPE (idx 875), a mode selector whose cells depend on
+    the other delay bytes."""
+    m = {}
+    for i in range(lib.juno_gui_param_count()):
+        b = lib.juno_gui_param_blob(i)
+        if b >= 0:
+            m.setdefault(b, i)
+    return m
+
+
 def port_cells(lib, rate, bb, v, cells):
+    """The PROVEN pairing from recall_exhaustive_gate: a 1-record bank whose
+    blob byte at bb encodes v, applied to a fresh engine. This is the RECALL
+    role, matching the oracle's dispatch(unit 0, flag=recall)."""
     bank = bytearray(BANK_LEN)
     bank[0] = ord('K')
     base = HEADER + BLOB_OFF
@@ -53,7 +95,9 @@ def port_cells(lib, rate, bb, v, cells):
 def main():
     rates = [int(a) for a in sys.argv[1:]] or RATES
     lib = load_lib()
+    b2p = blob_to_param(lib)
     total = mism = 0
+    noparam = set()
     bad = {}
     fx_compared = 0
     for rate in rates:
@@ -73,6 +117,8 @@ def main():
                 writers.setdefault(c, set()).add(i)
         single = {c for c, ws in writers.items() if len(ws) == 1}
         for idx in sorted(lut):
+            if idx in MODE_SELECTORS:
+                continue
             bb = lut[idx]['bb']
             cells = [c for c in sorted(lut[idx]['cells']) if c in single]
             if not cells:
@@ -89,6 +135,9 @@ def main():
                             (v, got[c], want))
     print("comparisons: %d  (census indices x 256 values x FULL-state cells)" % total)
     print("cells compared in the MASTER/FX region (beyond VOICE_END): %d" % fx_compared)
+    if noparam:
+        print("indices with no port param_index (not driveable this way): %s"
+              % sorted(noparam))
     if mism:
         print("mismatches: %d across %d (index,cell) pairs" % (mism, len(bad)))
         for (idx, c), rows in sorted(bad.items())[:12]:
