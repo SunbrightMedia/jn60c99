@@ -35,6 +35,30 @@ is invalid on the oracle side. Calling it a port defect would repeat the
 2026-08-25 cell-102560 retraction: an incomplete/incorrect oracle INVENTS
 defects.
 
+## Localised 2026-08-25 (second pass)
+The state is CLEAN through BUILD, SETSR, RECALL (57 pools) and NOTE-ON. NaN
+first appears in the FIRST RENDERED BLOCK and then grows by ~768 cells per
+block = 3 cells per sample: the master writes NaN into a delay line every
+sample, from the very first one it renders.
+
+The two harness pokes are NOT the cause. Measured both ways on patch 5:
+  * with pokes (latch forced to 0):    master NaN = 6569
+  * without pokes (latch runs down):   master NaN = 1488
+The latch (st8+11191048) is 960 at note-on and the master stub decrements it
+once per SAMPLE, so without the poke the first ~960 samples are skipped and
+only the remainder render -- fewer rendered samples, proportionally fewer NaN.
+Rendering itself is what produces them, either way.
+
+So the choice is now narrow and testable:
+  (a) the harness drives the master incorrectly (wrong a2 layout, wrong block
+      handling, or a buffer it never initialises), or
+  (b) the plugin genuinely writes NaN into a buffer it does not read while
+      that effect is disabled, and the NaN is inert.
+THE DECIDING EXPERIMENT: hook reads of the NaN cells during a master render.
+If they are only ever written and never read, (b) holds and the seed tooth
+must ignore inert scratch instead of failing. If they ARE read, (a) holds and
+the driving must be fixed before any master verdict is meaningful.
+
 ## The fix, in order
 1. Make the A/B seed a clean state: warm the plugin through its own documented
    entry path rather than by poking two cells, long enough for the chorus line
