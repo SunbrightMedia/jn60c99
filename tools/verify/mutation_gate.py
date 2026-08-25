@@ -10,8 +10,14 @@ For each mutation below we inject ONE deliberate fault into the port, rebuild,
 and run a gate subset:
 
   KILLED   >=1 gate turns red  -> that fault class IS covered. Good.
-  SURVIVED  every gate stays green -> a BLIND SPOT. The port could be wrong in
-            exactly that way today and every gate would still report green.
+  SURVIVED  every gate stays green -> a CANDIDATE blind spot.
+
+⚠ A "SURVIVED" verdict is only ever relative to the GATES list below, which is
+a fast SUBSET. Proven the hard way on 2026-08-25: the reverb-constant mutation
+SURVIVED this subset but a full `make verify` on the same mutated build came
+back RED. A subset survivor is therefore a TRIAGE result, not a blind spot.
+Every survivor MUST be confirmed with the full suite before it is reported as
+one -- that is what --confirm does, and what the summary now demands.
 
 Survivors are the output that matters. Each one is a gate that needs writing.
 
@@ -164,6 +170,9 @@ def main():
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--only", default=None)
     ap.add_argument("--worktree", default=os.path.join("/tmp", "juno_mut"))
+    ap.add_argument("--confirm", action="store_true",
+                    help="re-run each SUBSET survivor under the FULL `make verify`. "
+                         "Slow, and the only way a blind spot may be reported.")
     a = ap.parse_args()
 
     muts = [m for m in MUTATIONS if not a.only or m[0] == a.only]
@@ -228,8 +237,36 @@ def main():
         results.append((name, dim, bool(killers), tried))
 
     surv = [r for r in results if not r[2]]
-    print("\n=== MUTATION REACH: %d/%d killed, %d SURVIVED ==="
-          % (len(results) - len(surv), len(results), len(surv)))
+
+    if a.confirm and surv:
+        print("\n--- confirming %d subset survivor(s) under the FULL make verify ---"
+              % len(surv))
+        confirmed = []
+        for name, dim, _, tried in surv:
+            rel = dict((m[0], m[2]) for m in MUTATIONS)[name]
+            path = os.path.join(wt, rel)
+            orig = open(path).read()
+            for span in candidates(orig):
+                newtext, what = perturb_at(orig, span)
+                if newtext is None:
+                    continue
+                open(path, "w").write(newtext)
+                rc, _ = sh(["make", "-s", "libjuno.so"], wt, timeout=1800)
+                if rc != 0 or _sha(os.path.join(wt, "libjuno.so")) == base_hash:
+                    open(path, "w").write(orig); continue
+                vrc, _out = sh(["make", "verify"], wt, timeout=14400)
+                open(path, "w").write(orig)
+                print("%-14s %-24s full make verify -> %s"
+                      % (name, what, "RED (covered)" if vrc != 0 else "GREEN"))
+                if vrc == 0:
+                    confirmed.append((name, dim))
+                break
+        surv = [(n, d, False, []) for n, d in confirmed]
+        print("--- %d survivor(s) CONFIRMED against the full suite ---" % len(surv))
+
+    print("\n=== MUTATION REACH: %d/%d killed, %d SURVIVED%s ==="
+          % (len(results) - len(surv), len(results), len(surv),
+             " (confirmed vs full suite)" if a.confirm else " (SUBSET ONLY -- rerun with --confirm)"))
     for n, d, _, tried in surv:
         print("  BLIND SPOT: %-14s %-28s (tried: %s)" % (n, d, "; ".join(tried)))
     if surv:
