@@ -68,6 +68,13 @@ mine is a hypothesis (playbook 80).
 - A number quoted N times is not thereby measured (playbook 46). MEASURE.
 - Every detector/gate/tooth must be SEEN TO FAIL before it is believed.
 - No model IDs in commits/code/pushed artifacts.
+- **LONG JOBS ONLY VIA `tools/run_job.sh`** (2026-08-26: two multi-hour gate
+  runs died silently -- shell-tied, then killed by my own `pkill -f`, which
+  MATCHES MY OWN SHELL's command text; progress was then reported from stale
+  logs). run_job = setsid + registry + EXIT verdict; a dead job prints DIED,
+  never looks finished. NEVER `pkill -f` ANYTHING -- kill exact pids from the
+  registry. NEVER report a job's result without its EXIT file. Status:
+  `sh tools/status.sh`.
 
 # STRUCTURE (what lives where)
 - `src/` — the FROZEN bit-exact port. Transcribed DSP + derived recall.

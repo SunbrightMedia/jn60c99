@@ -13,13 +13,12 @@ mins=$(( (now - last) / 60 ))
 echo "  last commit was ${mins} minute(s) ago"
 echo
 echo "=============================================================="
-echo " WHAT IS RUNNING RIGHT NOW"
+echo " JOBS (bench/jobs registry -- every long job MUST run through"
+echo " tools/run_job.sh; a job with no verdict that lost its process"
+echo " prints DIED, never silently disappears)"
 echo "=============================================================="
-found=0
-for p in jx_verify confirm.sh mutation_gate census_exhaustive fxsweep nan_ab "make verify"; do
-  if pgrep -f "$p" >/dev/null 2>&1; then echo "  RUNNING: $p"; found=1; fi
-done
-[ "$found" = 0 ] && echo "  (nothing running -- either idle or between steps)"
+sh tools/run_job.sh --list
+[ -z "$(ls -A bench/jobs 2>/dev/null)" ] && echo "  (no jobs registered)"
 echo
 echo "=============================================================="
 echo " AM I DONE?   done is defined by docs/PORT_COMPLETENESS_CHARTER.md"
