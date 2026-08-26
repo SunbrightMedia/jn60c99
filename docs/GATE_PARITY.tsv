@@ -13,7 +13,7 @@
 #         WAIVED  -- deliberately not needed; the reason column must say why
 #
 # class	juno_gate	jx_gate	status	note
-seeded_random_diff	tools/verify/fuzz_diff.py	jx3p/tools/fuzz_diff.py	MISSING	random polyphonic seeds x rates. THE gap that hid the FTZ defect.
+seeded_random_diff	tools/verify/fuzz_diff.py	jx3p/tools/fuzz_gate.sh	OK	built 2026-08-26; ALREADY FOUND seed 2 diverging (jx3p/docs/FUZZ_SEED2_OPEN.md)
 random_state_ab	tools/verify/random_state_ab.py	jx3p/tools/random_state_ab.py	MISSING	random ENGINE STATE, not random patches
 cold_start	tools/verify/coldstate_ab.py	jx3p/tools/coldstate_ab.py	MISSING	SCOPE_AUDIT row 8; JX has no C init at all yet
 warm_recall	tools/verify/warm_recall_gate.py	jx3p/tools/warm_recall_gate.py	MISSING	patch change on a RUNNING engine; SCOPE_AUDIT row 9
