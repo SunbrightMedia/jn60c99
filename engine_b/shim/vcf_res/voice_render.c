@@ -42,6 +42,7 @@ static unsigned long   EBRGEN_SEEN[8];
 #include "juno_engine.h"
 #include "juno_dsp.h"
 #include "juno_tables.h"
+#include "juno_crt_expf.h"
 #include <math.h>
 #include <string.h>
 
@@ -830,7 +831,7 @@ LABEL_46:
   else
     v73 = 1.0;
   v74 = JF(a1, 1056);
-  v75 = expf((float)v73 * JF(a1, 1200)) * JF(a1, 1184);
+  v75 = juno_expf_6EF740((float)v73 * JF(a1, 1200)) * JF(a1, 1184);
   v76 = v74 * JF(a1, 1072);
   JI(a1, 1584) = JI(a1, 1568);
   v77 = v75 + JF(a1, 1216);

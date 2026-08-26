@@ -513,6 +513,7 @@ static unsigned long   EBRGEN_SEEN[8];
 #include "juno_engine.h"
 #include "juno_dsp.h"
 #include "juno_tables.h"
+#include "juno_crt_expf.h"
 #include <math.h>
 #include <string.h>
 

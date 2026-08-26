@@ -40,6 +40,7 @@ static unsigned long EBLGEN_SEEN[8];
 #include "juno_engine.h"
 #include "juno_dsp.h"
 #include "juno_tables.h"
+#include "juno_crt_expf.h"
 #include <math.h>
 #include <string.h>
 
@@ -1197,7 +1198,7 @@ LABEL_46:
       v234 = (float)(v235 - (int)((bits_from_f32(v227) >> 31) & 1u));
     v236 = v227 - v234;
     v237 = (float)(v236 * v236) * 0.25;
-    v238 = (float)(expf(v234)
+    v238 = (float)(juno_expf_6EF740(v234)
                  * (float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)((float)(v236 * JF(a1, 8032)) + JF(a1, 8016)) * v237) + (float)(v236 * JF(a1, 8000))) + JF(a1, 7984)) * v237) + (float)(v236 * JF(a1, 7968)))
                                                                                                  + JF(a1, 7952))
                                                                                          * v237)
