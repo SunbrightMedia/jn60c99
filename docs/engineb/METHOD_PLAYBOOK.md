@@ -1632,3 +1632,33 @@ writes an exit code; only a signal (OOM, kill -9) leaves nothing.
 3. **Do not run two oracle-heavy gates at the same time.** The oracle maps
    megabytes of plugin state per process. Wall-clock is not the scarce thing;
    memory is.
+
+## 83. The CONTROL layer was never audited -- only the DSP chain was
+Paid 2026-08-26, four defects in one 119-line file.
+
+`docs/NAN_SEMANTICS_SCOPE.md` recorded a considered decision: do NOT mass-
+rewrite the JUNO's 57 at-risk `ja`/`jae` sites, because no measured state
+reaches a NaN there. That decision was correct -- and it was about the RENDER
+path. Nobody noticed it had never been asked about the CONTROL path.
+
+`src/juno_ramp.c` (ramp arm / step / reset -- the path a knob move and a
+note-on gate travel) turned out to hold FOUR transcription defects, and the
+worst of them involves no NaN at all: `juno_ramp_reset` never wrote
+`step_cnt = 0`, so a re-armed ramp fired its first increment up to `subdiv-1`
+control ticks early.
+
+### The rules
+1. **A scope decision names a LAYER, not a codebase.** "Not reachable" was
+   measured over rendered audio state. The control layer has different
+   operands (host values, parameter targets) and different reachability.
+   Re-ask the question per layer, in writing.
+2. **Gate the control path with its own differential A/B.** Render gates drive
+   control code only through the shapes a preset load produces. Random seeded
+   control inputs are a different space -- `tools/verify/ramp_ab_gate.sh` is
+   the reference shape.
+3. **Check for MISSING STORES, not only wrong arithmetic.** Three of the four
+   defects were comparison semantics; the damaging one was a field the plugin
+   writes and the port did not. Diff the plugin's store set against the C's.
+4. **A mutation SURVIVOR is a map of where the defects are.** `ramp_const`
+   survived for months. Writing its gate found four defects immediately.
+   Survivors are not a scoreboard; they are the work list.
