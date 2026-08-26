@@ -1612,3 +1612,23 @@ uses `jb`, which IS taken on unordered, matching C's `>= 0.0` being false.
    a harness problem was what exposed a real defect.
 4. **Audit the whole port for this class, do not fix one site.** Any `<=`/`>=`
    against a value that can be NaN is suspect until its jump is checked.
+
+## 82. A job killed by a signal writes no verdict -- so record TIME, not only state
+Paid 2026-08-26, twice in one day.
+
+Two multi-hour gate runs stopped with no EXIT file. The runner correctly said
+DIED WITHOUT VERDICT, but that row is the same row whether the job ran three
+seconds or three hours, and the two need opposite fixes. A normal failure
+writes an exit code; only a signal (OOM, kill -9) leaves nothing.
+
+### The rules
+1. **A long job must emit a HEARTBEAT.** `run_job.sh` touches `beat` every
+   20 s; `--list` prints the heartbeat age for RUNNING and DIED rows alike.
+   The age is the first fact of any diagnosis.
+2. **State the cause rule BEFORE the re-run.** Here: the only thing the two
+   dead jobs shared was running CONCURRENTLY, two Unicorn oracle fleets on one
+   16 GB machine. So the re-run is SEQUENTIAL, in one job. Completion proves
+   concurrency; a second death at the same point proves the job itself.
+3. **Do not run two oracle-heavy gates at the same time.** The oracle maps
+   megabytes of plugin state per process. Wall-clock is not the scarce thing;
+   memory is.
