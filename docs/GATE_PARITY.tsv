@@ -29,7 +29,7 @@ recall_exhaustive	tools/verify/recall_exhaustive_gate.py	jx3p/tools/recall_compl
 unordered_compare	tools/verify/unordered_audit.py	tools/verify/unordered_audit.py	OK	shared; run over the JX master, 277 compares / 104 RISK
 nan_reachability	tools/verify/nan_ab.py	tools/verify/nan_ab.py	OK	shared; the JX defect it found is fixed
 user_bank_parity	tools/verify/userbank_parity.py	jx3p/tools/userbank_parity.py	MISSING	the user's own banks as INPUT; JX has run two banks by hand only
-ramp_smoothing	-	jx3p/tools/ramp_walk_gate.sh	OK	JX-FIRST: the JUNO owes this one. See note below.
+ramp_smoothing	tools/verify/ramp_ab_gate.sh	jx3p/tools/ramp_walk_gate.sh	OK	JUNO gate written 2026-08-26; found 4 real defects (docs/RAMP_AB_FINDINGS.md)
 fp_mode	src/juno_ftz.c	jx3p/src/jx_ftz.c	OK	FTZ/DAZ; mandatory in ab_render_c.py, refuses if unlinked
 provenance	tools/verify/provenance_check.py	jx3p/tools/provenance_check.py	MISSING	PROVENANCE.tsv equivalent for the JX constants
 pipeline_audit	tools/verify/dejuno_audit.py	tools/verify/dejuno_audit.py	OK	shared; E5 proves it by traversal
