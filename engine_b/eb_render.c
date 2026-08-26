@@ -268,6 +268,69 @@ static void zc2l_rep(void){ int i; FILE*f=fopen("/tmp/zc2l.log","a"); if(!f)retu
 #define EB_ATREST_BLOCK 0
 #endif
 
+/* EB_VPROF -- PER-MODULE PROFILER FOR THE VOICE BACK HALF.
+ *
+ * WHY IT EXISTS. b25 priced the keystone (a chunk-pipelined voice back half on
+ * core 1) from QEMU-executed INSTRUCTION counts: eb_vca_tick measured 0.352 of
+ * eb_vcf_tick, which put a VCA-only cut at ~381 cycles, inside the 306-426
+ * window that buys parity. That number rests on ONE unproven assumption --
+ * that the two modules have comparable cycles-per-instruction. This profiler
+ * exists to test exactly that assumption on silicon, and nothing else.
+ *
+ * ⚠ WHAT MAY BE QUOTED FROM A VPROF BUILD: RATIOS ONLY, NEVER ABSOLUTES.
+ * eb_master.c's EB_MSPROF header records why, and the rule is the same here:
+ * the counter reads are themselves a cost and they sit inside the region being
+ * measured. `vca/vcf` from this build is a measurement. `vca` in cycles from
+ * this build is not a cost.
+ *
+ * THE DECISION RULE, WRITTEN BEFORE THE RUN (playbook 11b):
+ *   silicon vca/vcf within 0.30..0.41  -> the CPI assumption HOLDS, the
+ *                                         VCA-only cut stands, build it.
+ *   silicon vca/vcf below 0.30         -> VCA is SMALLER than modelled; the
+ *                                         cut undershoots parity, and the cut
+ *                                         set must grow (vca+nsvf, then more).
+ *   silicon vca/vcf above 0.41         -> VCA is BIGGER than modelled; a
+ *                                         VCA-only move risks making core 1
+ *                                         critical, and the cut must shrink.
+ * The band is b25's window (306..426) divided by its anchor (1,083).
+ *
+ * THE CLOCK IS SELECTED IN THIS TRANSLATION UNIT, DELIBERATELY. EB_MSPROF was
+ * caught once with its tick macro defined in juno_s3_listen.c; a macro cannot
+ * cross a translation unit, so eb_master.c silently fell back to a plain
+ * counter and every stage read EXACTLY 1 cyc/sample for 52 minutes. Select the
+ * clock from the TARGET, never from a caller.
+ */
+#ifndef EB_VPROF
+#define EB_VPROF 0
+#endif
+#if EB_VPROF
+#if defined(__XTENSA__)
+static unsigned long eb_vprof_ccount(void)
+{ unsigned long c; __asm__ __volatile__("rsr.ccount %0" : "=a"(c)); return c; }
+#define EB_VPROF_TICK() eb_vprof_ccount()
+#else
+/* Host fallback: useless as a TIME, but it exercises every accumulation line,
+ * so the trunk gate can assert the null is still EXACTLY 0 with the profiler
+ * compiled in. The configuration that ships is the configuration proven. */
+static unsigned long eb_vprof_fake;
+#define EB_VPROF_TICK() (++eb_vprof_fake)
+#endif
+/* 0 nsvf, 1 noisemix, 2 vcf, 3 vca, 4 decim */
+unsigned long long eb_vprof[5];
+unsigned long      eb_vprof_n;
+#define VP_T0()    unsigned long _vp = (unsigned long)EB_VPROF_TICK(), _vq
+#define VP_HIT(k)  do { _vq = (unsigned long)EB_VPROF_TICK();                 \
+                        eb_vprof[k] += (unsigned long long)(_vq - _vp);       \
+                        _vp = _vq; } while (0)
+#define VP_MARK()  do { _vp = (unsigned long)EB_VPROF_TICK(); } while (0)
+#define VP_VOICE() (++eb_vprof_n)
+#else
+#define VP_T0()    do { } while (0)
+#define VP_HIT(k)  do { } while (0)
+#define VP_MARK()  do { } while (0)
+#define VP_VOICE() do { } while (0)
+#endif
+
 #ifndef EB_ABLATE
 #define EB_ABLATE 0
 #endif
@@ -784,12 +847,17 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * per-sample feedback term. It was discarded here as `(void)pwm_out`
          * while the decimator read a CACHED 5456 -- the tenth inherited defect,
          * and the second of the same class as the DCO levels. */
+        VP_T0();          /* declares the profiler's span registers, once/voice */
+        VP_MARK();
         decimo = eb_decim_tick(&st->dec[v], &c->dec[v], pwm_out,
                                q[0], q[1], q[2], q[3]);
+        VP_HIT(4);
 #if EB_ABLATE == EB_ABL_NSVF || EB_ABLATE == EB_ABL_WIRING
         nsvo = noise_v; nsv04 = noise_v;
 #else
+        VP_MARK();
         nsvo   = eb_nsvf_tick(&st->nsv[v], &c->nsv[v], noise_v, &nsv04);
+        VP_HIT(0);
 #endif
         /* the noise mix consumes the SVF's cell-4320 output and the per-sample
          * cell 3536; its result is the ladder's noise input (cell 6544). */
@@ -797,7 +865,9 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * `s04_out`; noisemix consumes 4320. Passing nsv04 here would have fed
          * it the wrong one of the two -- sixth inherited guess, found by the
          * same audit. */
+        VP_MARK();
         nmixo  = eb_noisemix_tick(&c->nmix[v], nsvo, n_3536);
+        VP_HIT(1);
         /* REVIEW FIX (Fable): the latch input is NOT the PWM sum. Cell 3520
          * is v526 = eb_decim_tick's RETURN VALUE, written at the port's :2174
          * -- the one-sample-delayed decimator output that noisemix scales into
@@ -837,7 +907,9 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 #if EB_ABLATE == EB_ABL_VCF
         vcfo = nmixo;
 #else
+        VP_MARK();
         vcfo   = eb_vcf_tick(&st->vcf[v], &c->vcf[v], nmixo, reso, o7536);
+        VP_HIT(2);
 #endif
 #ifdef EB_DUMP_DCO
         ebdd_open();
@@ -869,8 +941,11 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 #elif EB_FUSE_VCA
         vout[v] = eb_vca_audio(&st->vca[v], &c->vca[v], vcfo, o6848, &vca_ctl);
 #else
+        VP_MARK();
         vout[v] = eb_vca_tick(&st->vca[v], &c->vca[v], vcfo, e1, e2,
                               o6848, st->glide[v].s560);
+        VP_HIT(3);
+        VP_VOICE();
 #endif
 #endif
     }
