@@ -16,7 +16,12 @@
 set -e
 cd "$(dirname "$0")/../../.."          # repo root
 
-QEMU=/tmp/claude-0/-home-user-jn60c99/851980e2-931d-52da-bb74-16fb8562b242/scratchpad/qemu/bin/qemu-system-xtensa
+# QEMU path: prefer the idf-installed tool (survives scratchpad clearing, which
+# is what broke this rig on 2026-08-26 -- the old hardcoded scratchpad path was
+# gone and the run.log was three weeks stale). Install with:
+#   python3 $IDF_PATH/tools/idf_tools.py install qemu-xtensa
+QEMU=${QEMU:-$(ls /root/.espressif/tools/qemu-xtensa/*/qemu/bin/qemu-system-xtensa 2>/dev/null | head -1)}
+[ -x "$QEMU" ] || { echo "QEMU NOT FOUND -- run: python3 \$IDF_PATH/tools/idf_tools.py install qemu-xtensa"; exit 2; }
 ELF=tools/engineb/qemu/harness.elf
 LOG=tools/engineb/qemu/run.log
 
