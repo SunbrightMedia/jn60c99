@@ -12,3 +12,13 @@ cand6_ratelaw_362D40               rva 0x362D40   288 bytes   96 insns  cand6_ra
 cand6_ratelaw_35D060               rva 0x35D060   288 bytes    2 insns  cand6_ratelaw_35D060.asm
 effect_dispatch_3B9A30             rva 0x3B9A30   512 bytes  141 insns  effect_dispatch_3B9A30.asm
 setsr_container_3BC980             rva 0x3BC980   384 bytes   93 insns  setsr_container_3BC980.asm
+f2_dispatch_3B9A30                 rva 0x3B9A30   512 bytes  141 insns  f2_dispatch_3B9A30.asm
+f2_3C68D0                          rva 0x3C68D0   384 bytes  101 insns  f2_3C68D0.asm
+f2_3B9990                          rva 0x3B9990   384 bytes  124 insns  f2_3B9990.asm
+f2_3B0650                          rva 0x3B0650   512 bytes  255 insns  f2_3B0650.asm
+f2_3C3440                          rva 0x3C3440   384 bytes  169 insns  f2_3C3440.asm
+f2_3BF2A0                          rva 0x3BF2A0   384 bytes  106 insns  f2_3BF2A0.asm
+f2_3BEFC0                          rva 0x3BEFC0   384 bytes  126 insns  f2_3BEFC0.asm
+f2_3BE5C0                          rva 0x3BE5C0   768 bytes  217 insns  f2_3BE5C0.asm
+f2_3C0260                          rva 0x3C0260   384 bytes   91 insns  f2_3C0260.asm
+f2_3C35A0                          rva 0x3C35A0   384 bytes   84 insns  f2_3C35A0.asm

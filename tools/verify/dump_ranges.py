@@ -36,6 +36,17 @@ RANGES = [
     # --- context for the six files the audit never reached ---
     ("effect_dispatch_3B9A30", 0x3B9A30, 0x200),
     ("setsr_container_3BC980", 0x3BC980, 0x180),
+    # --- the seven files the first audit never reached (2026-08-26) ---
+    ("f2_dispatch_3B9A30", 0x3B9A30, 0x200),
+    ("f2_3C68D0", 0x3C68D0, 0x180),
+    ("f2_3B9990", 0x3B9990, 0x180),
+    ("f2_3B0650", 0x3B0650, 0x200),
+    ("f2_3C3440", 0x3C3440, 0x180),
+    ("f2_3BF2A0", 0x3BF2A0, 0x180),
+    ("f2_3BEFC0", 0x3BEFC0, 0x180),
+    ("f2_3BE5C0", 0x3BE5C0, 0x300),
+    ("f2_3C0260", 0x3C0260, 0x180),
+    ("f2_3C35A0", 0x3C35A0, 0x180),
 ]
 
 
