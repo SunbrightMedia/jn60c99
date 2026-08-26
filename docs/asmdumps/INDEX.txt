@@ -1,0 +1,14 @@
+cand1_bend_dco_35C630              rva 0x35C630   320 bytes   91 insns  cand1_bend_dco_35C630.asm
+cand1_bend_vcf_359BE0              rva 0x359BE0   320 bytes  100 insns  cand1_bend_vcf_359BE0.asm
+cand2_mod_dco_35C710               rva 0x35C710   320 bytes  114 insns  cand2_mod_dco_35C710.asm
+cand2_mod_vcf_359D10               rva 0x359D10   320 bytes   96 insns  cand2_mod_vcf_359D10.asm
+cand3_noteon_leaf_3AEC60           rva 0x3AEC60   320 bytes   88 insns  cand3_noteon_leaf_3AEC60.asm
+cand3_gate_setter_35CC30           rva 0x35CC30   192 bytes   70 insns  cand3_gate_setter_35CC30.asm
+cand4_voicecmn_ctor_35C900         rva 0x35C900   320 bytes   47 insns  cand4_voicecmn_ctor_35C900.asm
+cand5_setsr_3C7A00                 rva 0x3C7A00   512 bytes  141 insns  cand5_setsr_3C7A00.asm
+cand5_round_helper_3F2050          rva 0x3F2050   192 bytes   51 insns  cand5_round_helper_3F2050.asm
+cand6_ratelaw_356D00               rva 0x356D00   288 bytes   69 insns  cand6_ratelaw_356D00.asm
+cand6_ratelaw_362D40               rva 0x362D40   288 bytes   96 insns  cand6_ratelaw_362D40.asm
+cand6_ratelaw_35D060               rva 0x35D060   288 bytes    2 insns  cand6_ratelaw_35D060.asm
+effect_dispatch_3B9A30             rva 0x3B9A30   512 bytes  141 insns  effect_dispatch_3B9A30.asm
+setsr_container_3BC980             rva 0x3BC980   384 bytes   93 insns  setsr_container_3BC980.asm
