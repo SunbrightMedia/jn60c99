@@ -1662,3 +1662,30 @@ control ticks early.
 4. **A mutation SURVIVOR is a map of where the defects are.** `ramp_const`
    survived for months. Writing its gate found four defects immediately.
    Survivors are not a scoreboard; they are the work list.
+
+## 82b. CONFIRMED: oracle-heavy jobs die under concurrent agent load
+2026-08-26, the same day 82 was written. The heartbeat paid for itself.
+
+Sequence, measured, not inferred:
+* 06:28 two gate jobs run CONCURRENTLY -> both die, no EXIT, no heartbeat.
+* 08:13 the same work runs with only light editing alongside -> `jx_full_ftz`
+  FINISHES ok (EXIT=0), recall 64/64 + render 64/64 x 3 rates, EXACTLY 0.
+* 08:19/08:27 two JUNO jobs start; at 08:40 a 19-agent Workflow starts.
+* 09:01 the Workflow ends; both JUNO jobs are dead at 66m and 58m, no EXIT.
+  Free memory immediately afterwards: 14.9 GB of 16 GB -- so it is the PEAK
+  during the run, not a leak, and `free` after the fact proves nothing.
+
+82's re-run rule said "sequential proves concurrency". That test was run and
+gave the wrong answer once (a sequential run also died), which is why this
+entry exists: ONE contrary run is not a refutation when the confound -- other
+load on the same box -- was never controlled.
+
+### The rules
+1. **An oracle-heavy job gets the machine to itself.** No second gate job, and
+   no multi-agent Workflow, while one is running. Wall-clock is not the scarce
+   resource; peak memory is.
+2. **The heartbeat age is the first fact of any diagnosis.** "Died at 66m"
+   immediately ruled out a startup fault and pointed at what started at 40m.
+3. **Never pipe a long job through `tail`.** Its log then stays EMPTY until it
+   exits, so a job that dies leaves no progress trace at all. Log raw; read the
+   tail at query time.
