@@ -113,8 +113,24 @@ def main():
     refdir = sys.argv[1]; so = sys.argv[2]
     n = int(sys.argv[3]) if len(sys.argv) > 3 else 32
     lib = ctypes.CDLL(so)
-    if hasattr(lib, "jx_set_ftz"):
-        lib.jx_set_ftz()
+    # FP MODE IS MANDATORY, NOT OPTIONAL (2026-08-26).
+    # This used to read `if hasattr(lib, "jx_set_ftz"): lib.jx_set_ftz()`.
+    # The library never exported that name, so the branch was ALWAYS false and
+    # the whole A/B ran with the port in a different floating-point mode from
+    # the plugin: the oracle flushes denormals (jx_emu.set_ftz), the port did
+    # not. It stayed green because no factory patch drives a denormal into a
+    # compared cell -- the seeded ramp-walker A/B found it at 90/200 cases.
+    # An optional correctness switch is not a switch; it is a comment. Refuse.
+    if not hasattr(lib, "jx_enable_hw_ftz"):
+        raise SystemExit("REFUSE: %s does not export jx_enable_hw_ftz -- link "
+                         "jx3p/src/jx_ftz.c. The port must compute in the "
+                         "plugin's FTZ/DAZ mode or the A/B compares two "
+                         "different functions." % so)
+    lib.jx_hw_ftz_available.restype = ctypes.c_int
+    lib.jx_enable_hw_ftz()
+    if not lib.jx_hw_ftz_available():
+        raise SystemExit("REFUSE: no hardware FTZ/DAZ on this target; a "
+                         "bit-exact claim cannot be made without it.")
     dirs = sorted(dd for dd in os.listdir(refdir) if dd.startswith("p"))
     fails = 0
     for dd in dirs:

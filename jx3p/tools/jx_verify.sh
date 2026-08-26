@@ -40,7 +40,7 @@ echo "=== JX GATE 2/2: INTEGRATION RENDER A/B (voice+master, C == plugin) ==="
 cc -O2 -fno-strict-aliasing -ffp-contract=off -shared -fPIC \
    -o "$WORK/libjxengine.so" \
    "$REPO/jx3p/src/jx_voice_render.c" "$REPO/jx3p/src/jx_voice_helpers.c" \
-   "$REPO/jx3p/src/jx_master_render.c" -lm
+   "$REPO/jx3p/src/jx_master_render.c" "$REPO/jx3p/src/jx_ftz.c" -lm
 fails=0
 for sr in $RATES; do
   spass=0

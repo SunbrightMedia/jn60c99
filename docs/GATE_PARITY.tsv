@@ -1,0 +1,45 @@
+# GATE PARITY LEDGER -- every JUNO gate CLASS must have a JX equivalent or a
+# written waiver. tools/verify/gate_parity.py reads this file and goes RED on
+# any MISSING row and on any JUNO gate not classified here.
+#
+# Written 2026-08-26 after the user asked the question I had no good answer to:
+# "why on EARTH didn't you use the seeds for the JX?" The JUNO had fuzz_diff
+# and random_state_ab for months; the JX was proven against a 64-patch bank.
+# SCOPE_AUDIT row 5 said so in writing and nothing acted on it. A note in a
+# document is not a mechanism. This ledger is the mechanism.
+#
+# status: OK      -- the JX file exists and runs in the JX suite
+#         MISSING -- owed; the tooth is RED until it exists or is waived
+#         WAIVED  -- deliberately not needed; the reason column must say why
+#
+# class	juno_gate	jx_gate	status	note
+seeded_random_diff	tools/verify/fuzz_diff.py	jx3p/tools/fuzz_diff.py	MISSING	random polyphonic seeds x rates. THE gap that hid the FTZ defect.
+random_state_ab	tools/verify/random_state_ab.py	jx3p/tools/random_state_ab.py	MISSING	random ENGINE STATE, not random patches
+cold_start	tools/verify/coldstate_ab.py	jx3p/tools/coldstate_ab.py	MISSING	SCOPE_AUDIT row 8; JX has no C init at all yet
+warm_recall	tools/verify/warm_recall_gate.py	jx3p/tools/warm_recall_gate.py	MISSING	patch change on a RUNNING engine; SCOPE_AUDIT row 9
+note_velocity_exhaust	tools/verify/notevel_exhaust.py	jx3p/tools/notevel_exhaust.py	MISSING	note-off, polyphony, velocity spread; SCOPE_AUDIT row 5
+voice_assigner	tools/verify/assigner_ab.py	jx3p/tools/assigner_ab.py	MISSING	the note allocator; SCOPE_AUDIT row 13
+block_size_invariance	tools/verify/renderstruct_ab.py	jx3p/tools/blocksize_ab.py	MISSING	JUNO gates 1/64/128/512/600; JX renders single samples only
+rate_scan	tools/verify/rate_fullscan.py	jx3p/tools/jx_verify.sh	OK	JX covers 44100/48000/96000; 88200+192000 still owed (row 7)
+host_role_params	tools/verify/hostpath_roles.py	jx3p/tools/hostpath_roles.py	MISSING	params a host reaches that recall never touches; SCOPE_AUDIT row 12
+approx_audit	tools/verify/approx_audit.py	jx3p/tools/approx_audit.py	MISSING	ZERO approximations rule must bind the JX too
+mutation_reach	tools/verify/mutation_gate.py	tools/verify/mutation_gate.py	OK	shared harness; JX dimensions still to be added
+census_parameters	tools/verify/juno_scope_probe.py	jx3p/tools/probe_pools.py	OK	57 pools, cross-checked against the host count
+recall_exhaustive	tools/verify/recall_exhaustive_gate.py	jx3p/tools/recall_completeness_gate.py	OK	64/64 patches EXACTLY 0
+unordered_compare	tools/verify/unordered_audit.py	tools/verify/unordered_audit.py	OK	shared; run over the JX master, 277 compares / 104 RISK
+nan_reachability	tools/verify/nan_ab.py	tools/verify/nan_ab.py	OK	shared; the JX defect it found is fixed
+user_bank_parity	tools/verify/userbank_parity.py	jx3p/tools/userbank_parity.py	MISSING	the user's own banks as INPUT; JX has run two banks by hand only
+ramp_smoothing	-	jx3p/tools/ramp_walk_gate.sh	OK	JX-FIRST: the JUNO owes this one. See note below.
+fp_mode	src/juno_ftz.c	jx3p/src/jx_ftz.c	OK	FTZ/DAZ; mandatory in ab_render_c.py, refuses if unlinked
+provenance	tools/verify/provenance_check.py	jx3p/tools/provenance_check.py	MISSING	PROVENANCE.tsv equivalent for the JX constants
+pipeline_audit	tools/verify/dejuno_audit.py	tools/verify/dejuno_audit.py	OK	shared; E5 proves it by traversal
+census_exhaustive	tools/verify/census_exhaustive_gate.py	jx3p/tools/recall_completeness_gate.py	OK	full-state exhaustive recall sweep; JX equivalent covers its census
+leaf_completeness	tools/verify/completeness_gate.py	jx3p/tools/coverage_audit.py	OK	every leaf enumerated from the binary, not a hand list
+fx_param_sweep	tools/verify/fxsweep_gate.py	jx3p/tools/probe_pools.py	OK	JUNO sweeps 4 FX params x 256 values; JX FX pools are in the 57-pool census
+recall_gate	tools/verify/recall_gate.py	jx3p/tools/jx_recall_gate.sh	OK	patch bytes -> coefficient state, EXACTLY 0
+integration_render_ab	tools/verify/recall_render_ab.py	jx3p/tools/ab_render_c.py	OK	recall + note-on + full chain, plugin vs port
+#
+# PARITY RUNS BOTH WAYS. ramp_smoothing was built for the JX first, so the
+# JUNO now owes an equivalent: does the JUNO port step ITS parameter ramps, or
+# does it only compare settled values? Charter rule 5 lists smoothing/ramps as
+# a required dimension and the JUNO has never gated it.
