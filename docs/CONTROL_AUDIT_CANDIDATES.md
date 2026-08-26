@@ -1,50 +1,63 @@
-# JUNO control-layer audit — UNVERIFIED CANDIDATES (2026-08-26)
+# JUNO control-layer audit — ADJUDICATED (2026-08-26)
 
-**STATUS: NOT FINDINGS. NOT FIXES. DO NOT EDIT `src/` FROM THIS FILE.**
+**VERDICT: no live defect. Six of seven candidates REFUTED. One is LATENT.
+NOTHING in `src/` is to be changed from this file today.**
 
-A 12-file audit workflow ran against the binary. It reached the session limit
-partway: **5 of 19 agents completed, 14 died**, and *every one of the seven
-refutation agents was among the dead*. So the candidates below have been
-claimed once and challenged zero times.
+Two passes ran. The first (12 file agents) produced seven candidates and then
+died at a session limit with every refutation agent unrun. The second put each
+candidate through THREE INDEPENDENT LENSES — machine code, C source,
+reachability — each defaulting to REFUTED. 28 agents, 0 errors. A candidate
+survived only if two lenses failed to refute it AND every lens could read its
+dump.
 
-That distinction is the whole point of playbook 78 and charter rule 4. Twice
-today an audit claim of mine looked solid and was wrong:
-* the "18 of 64 patches differ" claim (retracted — incomplete oracle);
-* my first fix for the `jne` unordered case (wrong — the gate caught it).
+That second pass is why `src/` was not edited on seven claims, five of which
+asserted they were reachable in ordinary operation. **They were not.**
 
-So each row below needs the refutation pass re-run, and then a GATE THAT IS
-SEEN TO FAIL, before one line of `src/` changes.
+## Adjudicated results
 
-## Files audited CLEAN (both agents completed)
+| # | candidate | verdict | why |
+|---|---|---|---|
+| 1 | BEND enable gate (`juno_apply.c:522`) | **SURVIVES — but LATENT, not a defect** | asm and C lenses confirm the plugin gates the curve-4 factor on `obj+0x24` (`cmp dword [rbx+0x24],0 ; je -> xorps`) and the port never reads it. The REACH lens refutes it as unreachable: **the port has no live pitch-bend path at all**, so no input makes audio differ today |
+| 2 | MOD enable factor | **REFUTED** 2 of 3 | |
+| 3 | missing 7th note-on store | **REFUTED** 3 of 3 | |
+| 4 | comment offset 101520 vs 101488 | **REFUTED** 3 of 3, one dump unusable | |
+| 5 | rate rounding vs truncation | **REFUTED** 3 of 3 | |
+| 6 | mul/div order in the rate law | **REFUTED** 2 of 3, two dumps unusable | |
+| 7 | NaN rate early-out | **REFUTED** 2 of 3 | |
+
+## The correction I owe this file
+The earlier version carried a column asserting five candidates were
+"NaN-INDEPENDENT", i.e. reachable in ordinary operation. **That column was
+unsupported and is withdrawn.** It came from single agents with no challenger.
+Playbook 80 in miniature: a claim that defines its own scope cannot be wrong
+until something independent tests it.
+
+## Candidate 1 — what is actually owed, and when
+It is a STATE-CELL mismatch, not an audio defect, and the honest sequence is:
+
+1. **Do not edit `src/` now.** `juno_apply.c` is frozen bit-exact code, and the
+   tree must be frozen while gates run — a speculative edit can invalidate a
+   multi-hour run. Zero audible change is bought.
+2. **The blocking unknown is a MAPPING, not a fix.** `obj+0x24` is not written
+   by any param-dispatch index; only live bend/mod-wheel handlers set it
+   (`tools/oracle/bendmod_setter_findings.md`). Until that is mapped to a
+   record byte or leaf, no correct fix can be written.
+3. **Pay it with the MIDI pitch-bend work**, and write the gate RED first:
+   `bend_enable_gate.py` — ctypes only, no Unicorn, no `make verify`. Drive
+   recall at rest over 64 factory + 12 user banks; assert offsets 4128 and 7472
+   are bit-exact `0x00000000`. It FAILS today (the port writes
+   `curve(22,bsd) * curve(4,brng) * mode`, non-zero for any non-zero sens byte).
+   Add the mandatory seen-to-fail tooth: force the enable to 1 in a test-only
+   path and confirm it goes red again, so it is not vacuously green.
+
+## Files audited CLEAN
 | file | evidence |
 |---|---|
-| `src/finefx_recall.c` | no float comparison and no float clamp exists in it. Store audit PROVEN(executed) by hooking the plugin's dispatch: the port's write set is a strict subset, and every omitted cell is byte-constant and already written with an identical value by `delay_recall.c` |
-| `src/effect_modes.c` | all 16 comparisons are INTEGER. The plugin's own sample-rate path is integer too (`0x3BC980` forwards SR in EDX), so no float compare is being transcribed |
+| `src/finefx_recall.c` | no float comparison, no float clamp. Store audit PROVEN(executed) by hooking the plugin's own dispatch; the port's write set is a strict subset and every omitted cell is byte-constant and already written identically by `delay_recall.c` |
+| `src/effect_modes.c` | all 16 comparisons INTEGER; the plugin's own SR path is integer too (`0x3BC980` forwards SR in EDX) |
 
-## Candidates — each needs REFUTE, then a gate, then a fix
-| # | file | rva | claim | NaN-independent |
-|---|---|---|---|---|
-| 1 | `juno_apply.c:522` | `0x35C659`, `0x359C09` | BEND RANGE curve-4 factor is gated behind an enable field at obj+0x24; the port computes it unconditionally | **yes** |
-| 2 | `juno_apply.c:526` | `0x35C73E`, `0x359D3E` | both MOD depths are multiplied by a 0/1 enable at obj+0x2c; the port omits it. Order matters: `mulss(sens,sw)` THEN `mulss(.,10.0f)` | **yes** |
-| 3 | `juno_note.c:164` | `0x3AEC9A` → `0x35CC30` | note-on makes SEVEN engine writes; the port makes six. Missing: per-voice Gate Notify, param 926+2v, off `101488 + v*32`, set to 1.0f | **yes** |
-| 4 | `juno_note.c:176` | `0x35C94B` | comment says the cell is at `101520 + v*32`; the binary says `101488 + v*32`. No code effect, but it is stated as measured fact in two places | n/a |
-| 5 | `juno_prepare.c:65` | `0x3C7A43` | the plugin does NOT truncate the rate. It widens to double, ROUNDS half-away-from-zero via `0x3F2050`, then saturating-converts. Every rate law then uses `(float)Hr` | **yes** |
-| 6 | `juno_prepare.c:108` | `0x356D4F`, `0x362D82` | the file claims "one divss then one mulss, exactly as the binary". The binary holds BOTH orders, and for the LF-Damp Fc cell it is the other one. `(a*b)/c != a*(b/c)` | **yes** |
-| 7 | `juno_prepare.c:60` | `0x3C7A31` | `ucomiss; je` early-out is taken when unordered, so a NaN rate makes the plugin write NOTHING | no |
-
-Five of seven claim to be NaN-INDEPENDENT. If even one survives refutation it
-is a defect reachable in ordinary operation, like the `juno_ramp_reset`
-`step_cnt` omission found and fixed today.
-
-## Why no gate could see any of these
-`make verify` drives recall and render through the shapes a preset load
-produces. Candidates 1, 2 and 3 are all MISSING STORES or MISSING FACTORS
-whose absent term is 0 or 1 for every factory patch — the same shape as
-`EFFECT_SW_LUT[1..63]`, which no factory patch reached either.
-
-## Re-run
-    Workflow({scriptPath: '<...>/juno-control-layer-audit-wf_0376accd-905.js',
-              resumeFromRunId: 'wf_0376accd-905'})
-Completed agents replay from cache; only the 14 dead ones re-run. Six files
-were never audited at all: `reverb_recall.c`, `delay_recall.c`,
-`chorus_recall.c`, `juno_dsp.c`, `juno_mod.c`, `juno_hostparams.c`, `carp.c`.
+## Never audited — still owed
+`reverb_recall.c`, `delay_recall.c`, `chorus_recall.c`, `juno_dsp.c`,
+`juno_mod.c`, `juno_hostparams.c`, `carp.c`. Six files, no coverage. Run the
+first workflow again with the TEXT-DUMP rule (`docs/asmdumps/`, playbook 82b)
+so it costs no emulator memory.
