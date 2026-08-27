@@ -75,6 +75,20 @@ python3 tools/trackb/verify_labels.py || die "a module label names the wrong src
     "NOTE: 3 of the 9 ranges carry expect=None and are NOT checked at all" \
     "     (audit finding F3). A pass here is weaker than it looks."
 
+# ------------------------------------------------------------ 1b shim drift
+STEP="1b shim drift"
+say "$STEP" "every engine_b fork still tracks src/ (includes + transcribed math)"
+python3 tools/engineb/shim_drift_tooth.py || die "an engine_b shim fork has drifted from src/" \
+    "A shim is a VERBATIM fork of a src/ translation unit with one block" \
+    "replaced. When src/ changed and the fork did not, the fork silently" \
+    "compiled a DIFFERENT function -- the 2026-08-24 juno_crt_expf.h defect," \
+    "which sat for two days INSIDE the measuring apparatus and surfaced only" \
+    "as a confusing 'overlapping shims' error at step 4b." \
+    "FIX: add the missing #include (same position src/ uses) and rewrite any" \
+    "     bare libm call the port transcribed. The tooth names the fork and" \
+    "     the exact divergence. Run it here, before any build, so the class" \
+    "     is caught cheaply instead of as a merge failure downstream."
+
 # ---------------------------------------------------------------- 2 unit tests
 STEP="2 engine_b unit tests"
 say "$STEP" "sizes / free-run contract / 118-byte patch decode"
