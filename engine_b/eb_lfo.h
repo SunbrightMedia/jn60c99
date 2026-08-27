@@ -89,6 +89,26 @@ typedef struct {
 #define EB_LFO_TAIL_CR 0     /* L-B (b24 §4.1): trunk cannot move */
 #endif
 #if EB_LFO_TAIL_CR
+/* ⚠ L-B's EXACTNESS IS BORROWED FROM THE CR FLAGS, so it must not compile
+ * without them (b29 hunt, the lever's one latent defect: it had NO guard).
+ *
+ * The tail publishes lfo_del / lfo_und / lfo_pul. Skipping it on odd cr_ph is
+ * exact ONLY because every consumer reads on even cr_ph:
+ *   env gate k0/k1   inside CR_RUN(EB_CR_ENV,   EB_CR_NE)
+ *   eb_modcv_tick    inside CR_RUN(EB_CR_MODCV, EB_CR_NP)
+ *   eb_vcf_cv_tick   inside CR_RUN(EB_CR_VCFCV, EB_CR_NC)
+ * Turn any of those off, or make its period ODD, and a consumer reads a
+ * one-sample-stale LFO -> the fork null is no longer EXACTLY 0. Measured
+ * silently wrong is exactly what this project refuses to ship, so it is a
+ * hard compile error rather than a comment. */
+#if !EB_CR_VCFCV || !EB_CR_MODCV || !EB_CR_ENV
+#error "EB_LFO_TAIL_CR needs EB_CR_VCFCV, EB_CR_MODCV and EB_CR_ENV all ON: its skip is exact only because every LFO-tail consumer is gated to even cr_ph."
+#endif
+#if (EB_CR_NC % 2) || (EB_CR_NP % 2) || (EB_CR_NE % 2)
+#error "EB_LFO_TAIL_CR needs EB_CR_NC, EB_CR_NP and EB_CR_NE all EVEN: an odd period puts a consumer on an odd cr_ph, where the LFO tail was skipped."
+#endif
+#endif
+#if EB_LFO_TAIL_CR
 void eb_lfo_advance(eb_lfo_state *s, const eb_lfo_coef *c,
                     float dly_env, float ext_gate,
                     float ext0, float ext1, float noise);
