@@ -3148,6 +3148,44 @@ static void rpt_task(void *arg)
                "pubretry=%u apply=%lu applymax=%lu blocks=%u\n",
                pm_edits, pm_builds, pm_defer, pm_unknown, PM.pub_retry,
                pm_cyc_apply, pm_cyc_max, PM.blocks);
+#if EB_VPROF
+        /* THE KEYSTONE MEASUREMENT (b25). Placed HERE, in the same always-run
+         * one-second report as MSP:, because the first VPROF build put it in
+         * the bisect-window report block, which this configuration never
+         * reaches -- so it never printed and cost a flash. The lesson is the
+         * same one EB_MSPROF's header records: put the readout where it fires.
+         *
+         * The decision is the RATIO vca/vcf, never an absolute -- the CCOUNT
+         * reads sit inside the spans they measure. It is a run-long running
+         * average (never reset), which only steadies the ratio.
+         *
+         * DECISION RULE, FIXED BEFORE THE RUN (playbook 11b):
+         *   0.30..0.41 -> CPI assumption HOLDS, VCA-only cut ~381 cyc, BUILD IT
+         *   < 0.30     -> VCA smaller than modelled, the cut must GROW
+         *   > 0.41     -> VCA bigger, VCA-only risks core 1 critical, SHRINK
+         * QEMU-executed instructions predicted 0.352. */
+        if (eb_vprof_n && eb_vprof[2]) {
+            double vcf = (double)eb_vprof[2], vca = (double)eb_vprof[3];
+            double r = vca / vcf;
+            printf("VPROF n=%lu  nsvf=%.1f noisemix=%.1f vcf=%.1f vca=%.1f "
+                   "decim=%.1f  (ticks/voice/sample, RELATIVE ONLY)\n",
+                   eb_vprof_n,
+                   (double)eb_vprof[0] / (double)eb_vprof_n,
+                   (double)eb_vprof[1] / (double)eb_vprof_n,
+                   vcf / (double)eb_vprof_n, vca / (double)eb_vprof_n,
+                   (double)eb_vprof[4] / (double)eb_vprof_n);
+            printf("VPROF vca/vcf = %.4f   (QEMU predicted 0.3520)  VERDICT: %s\n",
+                   r,
+                   (r >= 0.30 && r <= 0.41)
+                       ? "IN BAND -- CPI holds, build the VCA cut"
+                       : (r < 0.30 ? "BELOW BAND -- cut must GROW"
+                                   : "ABOVE BAND -- cut must SHRINK"));
+        } else {
+            printf("VPROF: no samples yet (n=%lu) -- if this persists, the "
+                   "voice loop instrumentation did not compile into eb_render.c\n",
+                   eb_vprof_n);
+        }
+#endif
 #if S3L_FXPROF
         /* fx = core 1's master/FX pass, v1 = core 1's own voice pass
          * (INCLUDING the time it waits on core 0). Per sample, averaged over
@@ -4453,40 +4491,6 @@ void app_main(void)
                        0
 #endif
                        );
-#endif
-#if EB_VPROF
-            /* THE KEYSTONE MEASUREMENT (b25). The decision is the RATIO
-             * vca/vcf, never an absolute: the CCOUNT reads sit inside the
-             * spans they measure, so a cycle figure from this build is not a
-             * cost. Same rule eb_master.c's EB_MSPROF carries.
-             *
-             * DECISION RULE, FIXED BEFORE THE RUN (playbook 11b):
-             *   0.30 <= vca/vcf <= 0.41  -> the CPI assumption HOLDS; the
-             *                               VCA-only cut is ~381 cyc, inside
-             *                               the 306-426 parity window: BUILD IT
-             *   < 0.30                   -> VCA smaller than modelled; the cut
-             *                               undershoots, it must grow
-             *   > 0.41                   -> VCA bigger; a VCA-only move risks
-             *                               making core 1 critical, cut smaller
-             * QEMU-executed instructions predicted 0.352. */
-            if (eb_vprof_n && eb_vprof[2]) {
-                double vcf = (double)eb_vprof[2], vca = (double)eb_vprof[3];
-                double r = vca / vcf;
-                printf("VPROF n=%lu  nsvf=%.1f noisemix=%.1f vcf=%.1f "
-                       "vca=%.1f decim=%.1f  (ticks/voice/sample, RELATIVE ONLY)\n",
-                       eb_vprof_n,
-                       (double)eb_vprof[0] / (double)eb_vprof_n,
-                       (double)eb_vprof[1] / (double)eb_vprof_n,
-                       vcf / (double)eb_vprof_n,
-                       vca / (double)eb_vprof_n,
-                       (double)eb_vprof[4] / (double)eb_vprof_n);
-                printf("VPROF vca/vcf = %.4f   (QEMU predicted 0.3520)  "
-                       "VERDICT: %s\n", r,
-                       (r >= 0.30 && r <= 0.41)
-                           ? "IN BAND -- CPI assumption holds, build the VCA cut"
-                           : (r < 0.30 ? "BELOW BAND -- cut must GROW"
-                                       : "ABOVE BAND -- cut must SHRINK"));
-            }
 #endif
 #if S3L_RECALL
             if ((chunks / (SR / CHUNK)) % S3L_REPORT_EVERY == 0)
