@@ -225,6 +225,22 @@ if(NOT S3_LISTEN)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE EB_DELAY_LEN=32768)
 endif()
 
+# -DS3_VPROF=1 builds the KEYSTONE MEASUREMENT firmware (b25): per-module
+# CCOUNT spans across the voice back half, reported as the RATIO vca/vcf.
+#
+# ⚠ IT MUST REACH BOTH TRANSLATION UNITS. The accumulators live in
+# engine_b/eb_render.c and the report lives in juno_s3_listen.c, so the
+# definition goes on the whole component, not on one file. EB_MSPROF was once
+# defined per-file, could not cross the TU boundary, and read EXACTLY
+# 1 cyc/sample for 52 minutes on the board -- an instrument that did not
+# measure its subject.
+#
+# ⚠ NEVER SHIP IT. The counter reads sit inside the spans they measure, so a
+# block timing from a VPROF build is not a cost. Ratios only.
+if(S3_VPROF)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE EB_VPROF=1)
+endif()
+
 # THE LISTEN FIRMWARE'S VOICE CAP is a build constant with a runtime meaning:
 # raise it, reflash, watch the underrun counter. -DS3_VOICES=N on the idf.py
 # command line.
