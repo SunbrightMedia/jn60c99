@@ -522,9 +522,20 @@ float eb_vcf_tick(eb_vcf_state *st, const eb_vcf_coef *c,
     if (k < eb_k_lo) eb_k_lo = k;
     if (k > eb_k_hi) eb_k_hi = k;
 #endif
+#if !EB_HALF_OS_VCF || EB_HEADROOM_KEEP_DEAD
+    /* HEADROOM (b29, hunt survivor, 2026-08-27): A/R/Rk feed ONLY the 4x
+     * #else arm below. The half-OS arm builds its own Gp/Ap/Rp/Rkp and
+     * (void)-casts these three (line ~632). Under EB_HALF_OS_VCF (the shipping
+     * fork) they are dead -- their compute, including a full non-EB_FPDIV
+     * divide, runs every sample for nothing. -ftrapping-math forbids the
+     * compiler from deleting a divide whose result is unused; the source
+     * guard is what the compiler cannot do for itself. The trunk builds with
+     * HALF_OS off, keeps these three lines, and stays byte-identical
+     * (make verify unaffected). ~30 cyc/voice/sample on the fork. */
     A  = 1.0f - (G + G);                                        /* :1344 */
     R  = 1.0f / ((((G * G) * (G * G)) * k) + 1.0f);             /* :1345 */
     Rk = R * k;                                                 /* :1349 */
+#endif
 
 #if EB_HALF_OS_VCF
     /* ================================================ HALF-OVERSAMPLED PATH
