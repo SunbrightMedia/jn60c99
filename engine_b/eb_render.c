@@ -791,10 +791,21 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
          * sub-sample instead of two, so it is less band-limited -- which is
          * precisely the alias increase gate 2 exists to bound. */
         st->dco_live[v].inc  = eb_dco_inc_scale(inc);
+        /* HEADROOM (b29 lever, 2026-08-27). Under the wavetable fork the
+         * oscillator is driven by wt_live; dco_live's ANALOG pulse/saw fields
+         * .g/.pw/.pwm1/.pwp1 have no reader. The trunk (EB_DCO_WT off) and the
+         * EB_DCO_PULSEFAST path both read them, so both keep them and the
+         * trunk object stays byte-identical. `.inc` stays live -- wt_live's
+         * set_pitch consumes it.
+         * PROVEN by tools/engineb/forkbit.py with EB_HEADROOM_KEEP_DEAD=1 as
+         * the BEFORE side: EXACTLY 0 differing samples on the shipping fork.
+         * ~30 cyc/voice/sample. */
+#if !EB_DCO_WT || EB_DCO_PULSEFAST || EB_HEADROOM_KEEP_DEAD
         st->dco_live[v].g    = g_edge;
         st->dco_live[v].pw   = pw_live;
         st->dco_live[v].pwm1 = pw_live - 1.0f;
         st->dco_live[v].pwp1 = pw_live + 1.0f;
+#endif
 #if EB_DCO_PULSEFAST
         /* g just changed, so the edge thresholds must be re-derived. The
          * shim path gets this through eb_dco_set_pitch; this path assigns
