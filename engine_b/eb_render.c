@@ -843,6 +843,27 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
              * note in eb_dco_wt.c. dco_live[v].inc holds the SCALED value and
              * passing it here made the module's phase drift away from the
              * port's over seconds. */
+            /* HEADROOM (b29 lever, 2026-08-27; b24 §4.3 part 4).
+             * set_pitch derives inc4/inc/pw AND extracts sub_mip from a float
+             * exponent -- the dear part of this block. Its inputs are already
+             * CR-held: on a non-CR-run sample :763-772 read inc and pw_live
+             * back from st->cr_inc[v] / st->cr_pw[v], BYTE-IDENTICAL to the
+             * last CR-run sample. So recomputing them mid-group produces the
+             * same bits into the same persistent w, and skipping it is exact.
+             * w is st->wt_live[v], which persists between samples.
+             *
+             * EXACT ONLY WITH LERP OFF -- see the #error in eb_dco_wt.h.
+             * bind_tables stays UNCONDITIONAL: its own comment above records
+             * why a guard there saved nothing and risked everything, and it is
+             * a pointer assignment.
+             * The 9-field recall copy above is NOT gated here: a recall landing
+             * mid-group would apply up to EB_CR_NP-1 samples late (b24's
+             * `latecopy`). Moving it into the seed block is the remaining part
+             * of L-A and is owed separately.
+             * PROVEN by tools/engineb/forkbit.py with EB_SPLIT_TEST=7. */
+#if EB_DCO_WT_LIVE_CR
+            if (CR_RUN(EB_CR_PITCH, EB_CR_NP))
+#endif
             eb_dco_wt_set_pitch(w, inc, pw_live);
 #if EB_ABLATE == EB_ABL_DCO
             q[0] = 0.0f; (void)w;

@@ -89,6 +89,30 @@
 #define EB_DCO_WT 0
 #endif
 
+/* EB_DCO_WT_LIVE_CR -- L-A part 4 (b24 §4.3, landed 2026-08-27 as a b29
+ * headroom lever). Runs eb_dco_wt_set_pitch once per control-rate group
+ * instead of once per sample. Exact because set_pitch's inputs (inc, pw_live)
+ * are CR-held byte-identical across the group and its output persists in
+ * st->wt_live[v]. */
+#ifndef EB_DCO_WT_LIVE_CR
+#define EB_DCO_WT_LIVE_CR 0     /* trunk cannot move */
+#endif
+#if EB_DCO_WT_LIVE_CR
+/* ⚠ THE EXACTNESS IS BORROWED FROM LERP BEING OFF, so it must not compile
+ * without it. With EB_CR_LERP_PITCH on, CR_OUT INTERPOLATES inc within the
+ * group, so inc differs on every sample; freezing set_pitch's result then
+ * holds a stale increment through the group -- a phase error with a FIXED
+ * SIGN through any glide or pitch sweep, i.e. a silent detune, which is the
+ * worst kind of defect this project can ship. b24 §4.3 requires this to be a
+ * hard error, not a comment. */
+#if EB_CR_LERP_PITCH
+#error "EB_DCO_WT_LIVE_CR is exact only with EB_CR_LERP_PITCH OFF: with LERP on, inc is interpolated within the CR group and freezing set_pitch is a signed phase bias (silent detune)."
+#endif
+#if !EB_CR_PITCH
+#error "EB_DCO_WT_LIVE_CR needs EB_CR_PITCH ON: without it inc and pw_live are recomputed every sample and are not CR-held, so the gated result is not the same value."
+#endif
+#endif
+
 /* THE RESIDUAL'S LENGTH AND ITS FRACTIONAL RESOLUTION, both MEASURED rather
  * than chosen.
  *
