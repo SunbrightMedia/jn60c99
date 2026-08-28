@@ -71,13 +71,23 @@ unsigned long long eb_lfo_ctr[2];
 
 static float eb_lfo_wrap(float p)
 {
+    /* wrap-dco (b38): the fmodf-free form of eb_dco_wrap (eb_dco.h:299-313),
+     * PROVEN bit-identical to this function's fmodf reference over ALL 2^32
+     * float32 inputs incl. NaN payloads (engine_b/test_dco_wrap.c, 0 mismatch).
+     * fmodf survives only on the rare |p|>=~3 tail. EBLC hooks unchanged. */
     EBLC(0);
     if (p <= 1.0f) {
-        if (p < -1.0f) { EBLC(1); return fmodf(p - 1.0f, 2.0f) + 1.0f; }
+        if (p < -1.0f) {
+            float t = p - 1.0f;
+            EBLC(1);
+            return (t > -4.0f) ? (t + 2.0f) + 1.0f : fmodf(t, 2.0f) + 1.0f;
+        }
         return p;
     }
-    EBLC(1);
-    return fmodf(p + 1.0f, 2.0f) - 1.0f;
+    {   float t = p + 1.0f;
+        EBLC(1);
+        return (t < 4.0f) ? (t - 2.0f) - 1.0f : fmodf(t, 2.0f) - 1.0f;
+    }
 }
 
 /* L-B (b24 §4.1): ONE body, TWO specialisations. The five state stores
