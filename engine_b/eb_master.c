@@ -129,10 +129,39 @@ unsigned long      eb_msprof_n;
 
 #include <string.h>
 
+/* EB_FXPROBE_DLY_HALF / EB_FXPROBE_REV_HALF -- HALF-RATE PRICE PROBES ONLY.
+ *
+ * WHAT THEY DO: on every second sample, skip the delay stage (or the reverb
+ * stage) entirely and HOLD the previous output. This deliberately produces
+ * WRONG audio -- echo times double, tails stutter -- and must NEVER ship or
+ * reach a listening test presented as real.
+ *
+ * WHY THEY EXIST (b33): the half-rate FX lever needs its CYCLE price measured
+ * on silicon BEFORE the real version (internal time constants rebuilt for
+ * 22,050 Hz) is designed. Playbook 11b: measure first; the decision rule is
+ * written before the flash. The MSPP per-stage lines price each stage
+ * SEPARATELY: with a probe on, that stage's cyc/sample must drop ~45-50%.
+ * If it does not, the stage's cost is not where the arithmetic says, and the
+ * lever dies cheaply.
+ *
+ * Both default 0; the trunk object is byte-identical with them off. */
+#ifndef EB_FXPROBE_DLY_HALF
+#define EB_FXPROBE_DLY_HALF 0
+#endif
+#ifndef EB_FXPROBE_REV_HALF
+#define EB_FXPROBE_REV_HALF 0
+#endif
+
 int eb_master_render(eb_master_state *s, const eb_master_coef *c,
                      const eb_master_rings *r, const float *voices,
                      float *outL, float *outR)
 {
+#if EB_FXPROBE_DLY_HALF || EB_FXPROBE_REV_HALF
+    static unsigned fxprobe_ph;
+    static float hold_v176, hold_v177, hold_v56, hold_v58;
+    static float hold_v529, hold_v530;
+    fxprobe_ph++;
+#endif
     float v36, v38, v32, v176, v177, v56, v58, v529, v530, v593;
     float dL, dR;
 
@@ -151,6 +180,13 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
     /* ---- 2. the DELAY dispatch ------------------------------------------ */
     v56 = 0.0f;
     v58 = -1.0f;
+#if EB_FXPROBE_DLY_HALF
+    /* PRICE PROBE: odd samples reuse the held delay output. WRONG AUDIO. */
+    if (fxprobe_ph & 1u) {
+        v176 = hold_v176; v177 = hold_v177;
+        v56 = hold_v56;   v58 = hold_v58;
+    } else
+#endif
     if (c->delay_type == 1) {
         s->d1.ring = r->t1;
         eb_dly1_tick(&s->d1, &c->d1, v36, v38, c->in.k84496,
@@ -189,10 +225,22 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
                      &v176, &v177, &v56, &v58);
     }
 
+#if EB_FXPROBE_DLY_HALF
+    hold_v176 = v176; hold_v177 = v177; hold_v56 = v56; hold_v58 = v58;
+#endif
     MSP_HIT(1);
     /* ---- 3. the reverb. It CROSSES its channels; see eb_reverb.h. ------- */
+#if EB_FXPROBE_REV_HALF
+    /* PRICE PROBE: odd samples reuse the held reverb output. WRONG AUDIO. */
+    if (fxprobe_ph & 1u) {
+        v529 = hold_v529; v530 = hold_v530;
+    } else
+#endif
     eb_reverb_process(&c->rev, &s->rev, s->rev_pending, &s->rev_wipe,
                       v176, v177, &v529, &v530);
+#if EB_FXPROBE_REV_HALF
+    hold_v529 = v529; hold_v530 = v530;
+#endif
 
     MSP_HIT(2);
     /* ---- 4. the output stage. THE SAMPLE IS FINISHED HERE. -------------- */
