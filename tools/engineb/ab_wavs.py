@@ -63,8 +63,14 @@ SHIP = [
 
 
 def write24(path, x, rate, gain):
-    """24-bit mono WAV. `gain` is supplied by the caller and is the SAME for
-    both sides on purpose -- see the header."""
+    """24-bit STEREO WAV. `x` is the engine's INTERLEAVED stereo stream
+    (L,R,L,R...), exactly as render_script returns it; this is written as a
+    2-channel file. Writing it as mono (the original bug) played every clip at
+    2x speed, an octave high, with a Nyquist buzz from the alternating channels.
+    `gain` is supplied by the caller and is the SAME for both sides on purpose --
+    see the header."""
+    x = np.asarray(x)
+    nch = 2 if (x.size % 2 == 0) else 1
     y = np.clip(x * gain, -1.0, 1.0)
     q = np.round(y * 8388607.0).astype(np.int32)
     b = bytearray()
@@ -72,7 +78,7 @@ def write24(path, x, rate, gain):
         v = int(v) & 0xFFFFFF
         b += bytes((v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF))
     with wave.open(path, "wb") as w:
-        w.setnchannels(1)
+        w.setnchannels(nch)
         w.setsampwidth(3)
         w.setframerate(int(rate))
         w.writeframes(bytes(b))
