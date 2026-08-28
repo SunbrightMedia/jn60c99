@@ -40,7 +40,14 @@
 #include <stdint.h>
 
 /* EB_REVERB_HALF — the fork's half-rate reverb lever (default OFF, so the trunk
- * and every non-fork build are byte-identical). See eb_reverb_process_half. */
+ * and every non-fork build are byte-identical). See eb_reverb_process_half.
+ *
+ * ⚠ DEFECTIVE — DO NOT ENABLE / DO NOT FLASH (2026-08-28, b35). This lever
+ * ALIASES: its 2-tap-average decimator is too weak an anti-alias filter, so the
+ * reverb send's near-Nyquist energy folds ~30 dB of grit into the wet tail
+ * (MEASURED, difference spectrum; the user's ear caught it). A correct version
+ * needs a real half-band anti-alias FIR in and an anti-image FIR out. Kept in
+ * the tree only as a documented dead end (docs/engineb/data/b35). */
 #ifndef EB_REVERB_HALF
 #define EB_REVERB_HALF 0
 #endif

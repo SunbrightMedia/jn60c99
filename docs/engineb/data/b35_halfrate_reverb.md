@@ -43,7 +43,27 @@ decimator band-limits the send), and the mute-gate crossfade fades at half
 speed. Level, decay time and stereo image are unchanged. A/B WAVs rendered by
 `tools/engineb/halfrate_ab.py --rev` (ref = full-rate fork, half = candidate).
 
-## Next
-Delay half-rate (`EB_DELAY_HALF`), same pattern; then A/B for the delay-heavy
-patches. The two levers together are the b34 headroom that covers idle AND the
-four delay-t5 worst patches.
+## STOPPED — THE LEVER ALIASES (2026-08-28, the user's ear caught it)
+The user listened and said it sounds VERY WRONG. The ear was right and my RMS/
+decay metrics were BLIND to it. The difference SPECTRUM shows why: on
+`long_LFO+tail` the reverb tail's 5–16 kHz band rose from −64/−76 dB (ref) to
+−41/−37 dB (half) — the half-rate path ADDS ~30 dB of aliasing into the tail,
+it does not merely lose HF air. Cause: the 2-tap-average decimator is far too
+weak an anti-alias filter, and the reverb send carries strong near-Nyquist
+energy, which folds down into the audible band. Playbook: a low-RMS, matched-
+decay difference can still be VERY audible — judge FX resampling by the
+difference SPECTRUM (and the ear), never by RMS.
+
+`EB_REVERB_HALF` is LEFT IN THE TREE, default OFF, and MARKED DEFECTIVE in the
+header. It must NOT be flashed. A correct version needs a real half-band anti-
+alias FIR on the decimation and an anti-image FIR on the interpolation (the
+repo already has that machinery for the half-OS VCF); that costs some of the
+saving and still loses the wet tail above 11 kHz by design. Deferred pending the
+user's decision and a silicon measurement of whether it is even needed.
+
+## FOUNDATION RE-PROVEN (no regression without the lever)
+- port (src/) vs .vst3 under emulation: `max|plugin−port| = 0.0`, patches
+  2/5/11/21 (make verify re-running the full 57).
+- fork (EB_REVERB_HALF OFF) vs port/.vst3: `sonic_gate` PASS, worst band 0.40 dB.
+  The reverb module still nulls EXACTLY 0 with the flag off. My half-rate edits
+  are all `#if EB_REVERB_HALF`-guarded, so the shipping fork is unchanged.
