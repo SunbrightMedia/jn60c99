@@ -311,42 +311,67 @@ void eb_reverb_halfrate_cfg(eb_reverb_cfg *c)
     c->lfo_depth = c->lfo_depth * 0.5f;
 }
 
-/* Half-rate reverb: clock the tank once per two master samples. See the header.
+/* Half-rate reverb with a REAL anti-alias / anti-image FIR. See the header and
+ * eb_reverb_halfband.h.
+ *
+ * THE TANK RUNS AT HALF RATE. The mono send (inA+inB) is low-pass filtered by
+ * the 41-tap eb_rev_hb FIR (cutoff 8 kHz, fold band >=53 dB down) and decimated
+ * 2:1; the tank produces the wet pair at half rate; each wet channel is zero-
+ * stuffed 1:2 and reconstructed by the SAME FIR (polyphase, implicit x2) back to
+ * full rate. Without these filters the first version aliased ~30 dB of grit into
+ * the tail (b35); with them the fold is inaudible and the tail is simply band-
+ * limited to ~8 kHz.
  *
  * THE DRY MAIN SIGNAL STAYS FULL RATE. The reverb is an INLINE stage: its output
- * is the wet tank PLUS a dry passthrough (c->dry*inB / c->dry*inA, crossed; and
- * c->dry is 1.0 in every factory patch, so this is the whole main signal). Half-
- * rating the entire stage would band-limit that dry path too — dulling every
- * patch, reverb or not. Instead the tank runs at half rate on the decimated send
- * and the dry pair is stripped from the tank's output and re-added at FULL rate,
- * so only the WET tail carries the trade. When the tank is muted the module
- * returns the unity passthrough (= c->dry*inB while dry==1.0), so the stripped
- * wet is exactly 0 and the output is the bit-exact full-rate dry pair.
- *
- * Even samples decimate the input pair (a 2-tap average, a first-order half-
- * band) and clock the tank; both samples emit a linear interpolation of the two
- * most-recent WET outputs plus the full-rate dry. The odd sample buffers its
- * input for the next pair's average. */
+ * is the wet tank PLUS a dry passthrough (c->dry*inB / c->dry*inA, crossed;
+ * c->dry is 1.0 on every factory patch, so this is the whole main signal). The
+ * tank is driven MONO (inA=decimated send, inB=0), so its A output is pure wet
+ * and its B output carries dry*send, which is stripped; the full-rate dry pair
+ * is added last. When the tank is muted it returns the unity passthrough, which
+ * with the mono drive makes the stripped wet exactly 0, so a no-reverb patch is
+ * the bit-exact full-rate dry pair. */
 void eb_reverb_process_half(const eb_reverb_cfg *c, eb_reverb_state *s,
                             const int32_t *pending, int32_t *wipe_arm,
                             float inA, float inB, float *outA, float *outB)
 {
-    float dryA = c->dry * inB;          /* the cross is the plugin's: A<-inB */
+    const int NT = EB_REV_HB_TAPS;
+    const int NH = (EB_REV_HB_TAPS + 1) / 2;   /* half-rate history depth */
+    float dryA = c->dry * inB;                 /* the plugin's cross: A<-inB */
     float dryB = c->dry * inA;
+    unsigned old_ph = s->hph;
+    int k, p, idx;
+    float yl, yr;
+
+    /* push the full-rate mono send into the anti-alias line */
+    s->hb_in[s->hb_iw] = inA + inB;
+    if (++s->hb_iw == NT) s->hb_iw = 0;
+
     if ((s->hph++ & 1u) == 0u) {
-        float a = 0.5f * (inA + s->hinA);
-        float b = 0.5f * (inB + s->hinB);
-        float yA, yB;
-        s->hyA0 = s->hyA1; s->hyB0 = s->hyB1;
-        eb_reverb_process(c, s, pending, wipe_arm, a, b, &yA, &yB);
-        s->hyA1 = yA - c->dry * b;       /* keep only the WET half-rate part */
-        s->hyB1 = yB - c->dry * a;
-        *outA = 0.5f * (s->hyA0 + s->hyA1) + dryA;
-        *outB = 0.5f * (s->hyB0 + s->hyB1) + dryB;
-    } else {
-        s->hinA = inA; s->hinB = inB;
-        *outA = s->hyA1 + dryA;
-        *outB = s->hyB1 + dryB;
+        /* EVEN sample: decimate, clock the tank once, push the wet pair. */
+        float md = 0.0f, yA, yB;
+        idx = s->hb_iw - 1; if (idx < 0) idx += NT;       /* newest send */
+        for (k = 0; k < NT; ++k) {
+            md += eb_rev_hb[k] * s->hb_in[idx];
+            if (--idx < 0) idx += NT;
+        }
+        eb_reverb_process(c, s, pending, wipe_arm, md, 0.0f, &yA, &yB);
+        s->hb_wl[s->hb_ww] = yA;                 /* outA = wetSL + dry*0    */
+        s->hb_wr[s->hb_ww] = yB - c->dry * md;   /* strip dry*send from B   */
+        if (++s->hb_ww == NH) s->hb_ww = 0;
     }
+    /* ODD sample: the tank does not run; the wipe advances on even samples
+     * only, which lengthens the lazy wipe by 2x -- a bounded, stated trade. */
+
+    /* reconstruct both wet channels to full rate (polyphase, phase = parity) */
+    p = (int)(old_ph & 1u);
+    idx = s->hb_ww - 1; if (idx < 0) idx += NH;            /* newest wet */
+    yl = 0.0f; yr = 0.0f;
+    for (k = p; k < NT; k += 2) {
+        yl += eb_rev_hb[k] * s->hb_wl[idx];
+        yr += eb_rev_hb[k] * s->hb_wr[idx];
+        if (--idx < 0) idx += NH;
+    }
+    *outA = 2.0f * yl + dryA;
+    *outB = 2.0f * yr + dryB;
 }
 #endif

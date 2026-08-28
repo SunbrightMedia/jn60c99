@@ -42,14 +42,17 @@
 /* EB_REVERB_HALF — the fork's half-rate reverb lever (default OFF, so the trunk
  * and every non-fork build are byte-identical). See eb_reverb_process_half.
  *
- * ⚠ DEFECTIVE — DO NOT ENABLE / DO NOT FLASH (2026-08-28, b35). This lever
- * ALIASES: its 2-tap-average decimator is too weak an anti-alias filter, so the
- * reverb send's near-Nyquist energy folds ~30 dB of grit into the wet tail
- * (MEASURED, difference spectrum; the user's ear caught it). A correct version
- * needs a real half-band anti-alias FIR in and an anti-image FIR out. Kept in
- * the tree only as a documented dead end (docs/engineb/data/b35). */
+ * The tank runs at half rate with a REAL 41-tap anti-alias/anti-image FIR
+ * (eb_reverb_halfband.h): the fold band (>=11025 Hz) is >=53 dB down, so the
+ * aliasing of the first cut (b35, -30 dB of grit in the tail) is GONE. The
+ * remaining, deliberate trade is a wet reverb tail band-limited to ~8 kHz; the
+ * dry main signal is kept full-rate and bit-exact. Judged by the user's ear at
+ * F2; the sonic difference is measured in docs/engineb/data/b36. */
 #ifndef EB_REVERB_HALF
 #define EB_REVERB_HALF 0
+#endif
+#if EB_REVERB_HALF
+#include "eb_reverb_halfband.h"   /* EB_REV_HB_TAPS, eb_rev_hb[] */
 #endif
 
 /* Worst case over REVERB TYPE 0..5 at 48,000 Hz (MEASURED, docs/engineb/data/
@@ -101,12 +104,17 @@ typedef struct {
     int32_t seeded;             /* 0 until the first process() call          */
     int32_t overrun;            /* a latched depth exceeded its capacity     */
 #if EB_REVERB_HALF
-    /* half-rate wrapper state (EB_REVERB_HALF only): the 2:1 decimator's held
-     * input pair and the two most-recent half-rate tank outputs, plus the
-     * even/odd phase. Present only in the fork; the trunk never sees them. */
+    /* half-rate wrapper state (EB_REVERB_HALF only): the anti-alias FIR delay
+     * line for the decimated mono send, and the anti-image FIR history of the
+     * two half-rate wet channels, plus the even/odd phase. Present only in the
+     * fork; the trunk never sees them. EB_REV_HB_TAPS comes from the generated
+     * eb_reverb_halfband.h, included above under the same flag. */
     unsigned hph;
-    float hinA, hinB;
-    float hyA0, hyA1, hyB0, hyB1;
+    float hb_in[EB_REV_HB_TAPS];              /* full-rate mono send line     */
+    int32_t hb_iw;
+    float hb_wl[(EB_REV_HB_TAPS + 1) / 2];    /* half-rate wet L history       */
+    float hb_wr[(EB_REV_HB_TAPS + 1) / 2];    /* half-rate wet R history       */
+    int32_t hb_ww;
 #endif
     /* --- rings. read-then-write; index advanced by a compare-and-add --- */
     float pd[EB_REV_CAP_PD];
