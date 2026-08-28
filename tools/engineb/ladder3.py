@@ -87,13 +87,16 @@ def main():
         n = min(len(a), len(f), len(h)); a, f, h = a[:n], f[:n], h[:n]
         pk = max(float(np.max(np.abs(a))), 1e-9); g = 0.891 / pk
         safe = "".join(c if c.isalnum() else "_" for c in nm)
-        stem = "p%02d_%s" % (patch, safe)
+        stem = "patch%02d_%s" % (patch + 1, safe)   # 1-based, the DAW's number
         ab_wavs.write24(os.path.join(outdir, "%s_trunk.wav" % stem), a, rate, g)
         ab_wavs.write24(os.path.join(outdir, "%s_fork.wav" % stem), f, rate, g)
         ab_wavs.write24(os.path.join(outdir, "%s_half.wav" % stem), h, rate, g)
         df = 20*np.log10(np.sqrt(np.mean(f*f))/np.sqrt(np.mean(a*a)+1e-30))
         dh = 20*np.log10(np.sqrt(np.mean(h*h))/np.sqrt(np.mean(a*a)+1e-30))
-        print("patch %d = %r  notes %s  hold %.1f s" % (patch, nm, notes, hold))
+        # user-facing patch number is 1-based (the DAW/hardware convention);
+        # `patch` is the internal 0-based bank index.
+        print("PATCH %d (%r)   [internal index %d]   notes %s  hold %.1f s"
+              % (patch + 1, nm, patch, notes, hold))
         print("   fork %+.3f dB   half %+.3f dB  (rms vs plugin)   -> %s_*.wav" % (df, dh, stem))
     print("\n-> %s" % outdir)
     return 0
