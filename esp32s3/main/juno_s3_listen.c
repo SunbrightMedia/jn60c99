@@ -2121,7 +2121,27 @@ static int rings_alloc(void)
  *
  * The per-sample loop afterwards only reads finished voice buffers. */
 static volatile int      w_go = 0, w_done = 0, w_quit = 0;
+/* PROLOGUE-C1 (S3L_PROLOGUE_C1, default 0 = byte-identical to today): the
+ * shared prologue is computed in a batch on core 1, ONE CHUNK AHEAD (like the
+ * FX pipe), so it leaves core 0's per-sample critical path. Design + adversarial
+ * verification: docs/engineb/data/b38 + the prologue-c1-design-verify workflow.
+ * Correctness: bit-exact for a steady patch; bounded-sonic (one-chunk LFO/pitch/
+ * noise/gate skew, same class as S3L_FX_PIPE) at recall edges ONLY. The double
+ * bank isolates the OUTPUT; the prologue's ENGINE state (glide[0]/lfo[0]/notecv)
+ * stays single-copy and is safe because voice 0 is never rendered (S3L_VOICE_LO
+ * >= 1, compile-asserted below). */
+#ifndef S3L_PROLOGUE_C1
+#define S3L_PROLOGUE_C1 0
+#endif
+#if S3L_PROLOGUE_C1
+static eb_shared_tick    w_shb[2][CHUNK];
+static volatile int      w_shb_valid = 0;          /* read bank pre-computed */
+static const eb_render_coefs *w_shb_rc[2];         /* rc each bank was built at */
+#define S3L_C1_INVALIDATE() do { w_shb_valid = 0; } while (0)
+#else
 static eb_shared_tick    w_shb[CHUNK];
+#define S3L_C1_INVALIDATE() do { } while (0)
+#endif
 static int               w_n = 0;
 
 #ifndef S3L_FX_PIPE
@@ -2129,6 +2149,12 @@ static int               w_n = 0;
 #endif
 #if S3L_FX_PIPE && S3L_NOFX
 #error "S3L_FX_PIPE pipelines the FX chain; it is meaningless with S3L_NOFX."
+#endif
+#if S3L_PROLOGUE_C1 && !S3L_FX_PIPE
+#error "PROLOGUE-C1 reuses the FX-pipe double buffer and w_cur flip; needs S3L_FX_PIPE=1"
+#endif
+#if S3L_PROLOGUE_C1 && (EB_PROLOGUE_PIPE || S3L_TIME_PROLOGUE)
+#error "PROLOGUE-C1: pick ONE prologue scheme (not EB_PROLOGUE_PIPE / S3L_TIME_PROLOGUE)"
 #endif
 
 #if S3L_FX_PIPE
@@ -2304,6 +2330,7 @@ static eb_render_state *RS_INT, *RS_PSR;
     memset(w_vbb, 0, sizeof w_vbb);                                           \
     memset(w_pcm, 0, sizeof w_pcm);                                           \
     w_have_prev = 0;                                                          \
+    S3L_C1_INVALIDATE();  /* a LAYOUT row memcpy'd RS; re-prime, don't reuse */\
     frame = 0; gate = 0;                                                      \
     load_coefs(CH, 0);                                                        \
     for (q_ = 0; q_ < EB_NUM_VOICES; ++q_)                                    \
@@ -2395,6 +2422,17 @@ static unsigned long fxp_fx = 0, fxp_v1 = 0, fxp_wait = 0, fxp_n = 0;
 static unsigned long fxp_wn = 0;   /* samples, for the per-sample wait mean */
 #endif
 
+#if S3L_PROLOGUE_C1
+/* PROLOGUE-C1's whole correctness rests on voice 0 never being a RENDERED
+ * voice: only then is the prologue the sole accessor of glide[0]/lfo[0]/notecv/
+ * aux_edge[0]/gate_cell320[0], so the ahead-batch cannot race a voice render.
+ * S3L_VOICE_LO is the low bound of core 0's rendered range; it MUST be >= 1.
+ * SEEN TO FAIL: build with -DS3L_VOICE_LO=0 -> negative-array -> compile error.
+ * (This governs the compile-time split only; an S3L_LAYOUT runtime g_lo=0 is
+ * caught instead by the sw_by_voice device canary.) */
+typedef char s3l_c1_v0_must_be_at_rest[(S3L_VOICE_LO >= 1) ? 1 : -1];
+#endif
+
 static void worker(void *arg)
 {
     int i;
@@ -2476,6 +2514,30 @@ static void worker(void *arg)
         if (have && w_n > 0) fxp_fx += pd / (unsigned long)w_n;
         p0 = (unsigned long)esp_cpu_get_cycle_count();
 #endif
+#if S3L_PROLOGUE_C1
+        /* PROLOGUE-C1: the read bank w_shb[w_cur] is ALREADY fully formed (the
+         * previous pass's ahead-batch, or render_block's first-block prime), so
+         * core 1 never waits per sample -- the whole per-sample w_ready handshake
+         * is gone from the critical path. */
+        for (i = 0; i < w_n; ++i)
+            eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
+                                   SPLIT_, EB_NUM_VOICES, &w_shb[w_cur][i],
+                                   w_vbb[cur][i]);
+        /* Then compute the NEXT chunk's prologues into the OTHER bank, ONE CHUNK
+         * AHEAD. It runs BEFORE w_done=1, so it finishes inside this pass and can
+         * never overlap the quiescent window's writes to gate_cell320[0]/
+         * aux_edge[0] that the prologue reads. Banks are disjoint: both cores
+         * READ w_shb[w_cur] this chunk; only this batch WRITES w_shb[1-w_cur]. */
+        if (w_n == CHUNK) {
+            int wr = 1 - w_cur, j;
+            for (j = 0; j < w_n; ++j) {
+                w_shb[wr][j].ready = 0;
+                eb_engine_render_shared(&EBE, RS, rc, &w_shb[wr][j]);
+            }
+            w_shb_rc[wr] = rc;
+            w_shb_valid  = 1;
+        }
+#else
         for (i = 0; i < w_n; ++i) {
 #if S3L_FXPROF
             /* ⚑ THE WAIT, MEASURED RATHER THAN ASSUMED. b5_fx_attribution.md
@@ -2501,6 +2563,7 @@ static void worker(void *arg)
                                    SPLIT_, EB_NUM_VOICES, &w_shb[i],
                                    w_vbb[cur][i]);
         }
+#endif
 #if S3L_FXPROF
         pd = (unsigned long)esp_cpu_get_cycle_count() - p0;
         if (w_n > 0) { fxp_v1 += pd / (unsigned long)w_n;
@@ -2565,6 +2628,23 @@ static void render_block(int n)
     eb_engine_advance_atrest(&EBE, RS, rc, LO_, EB_NUM_VOICES, n);
     w_n    = n;
     w_ready = 0;
+#if S3L_PROLOGUE_C1
+    /* PRIME the read bank. In steady state the PREVIOUS worker pass already
+     * filled w_shb[w_cur] one chunk ahead, so this is skipped. It runs only for
+     * the FIRST full chunk (w_shb_valid==0) and for any short/offline block
+     * (n != CHUNK), which stays on the serial prologue and out of the pipeline.
+     * The w_go store below (a MEMW) orders these writes before core 1 reads. */
+    {   const int rd = w_cur;
+        if (n != CHUNK || !w_shb_valid) {
+            int j;
+            for (j = 0; j < n; ++j) {
+                w_shb[rd][j].ready = 0;
+                eb_engine_render_shared(&EBE, RS, rc, &w_shb[rd][j]);
+            }
+            if (n == CHUNK) w_shb_rc[rd] = rc;
+        }
+    }
+#endif
 #if S3L_RECALL
     /* THE WINDOW CLOSES HERE, before the worker is released. One writer. */
     w_parked = 0;
@@ -2646,6 +2726,17 @@ static void render_block(int n)
         for (k = LO_; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
         eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
                                LO_, SPLIT_, &w_shb[i], vb[i]);
+    }
+#elif S3L_PROLOGUE_C1
+    /* PROLOGUE-C1: core 0 does VOICES ONLY. The ~717-cyc prologue is off this
+     * core -- the worker's previous-pass ahead-batch already filled w_shb[w_cur].
+     * The zero range is [LO_,SPLIT_), NARROWED from EB_NUM_VOICES: with the
+     * per-sample w_ready gone, zeroing core 1's slots [SPLIT_,8) here would race
+     * core 1's own writes; core 1 self-zeroes [SPLIT_,8) and [0,LO_) is static. */
+    for (i = 0; i < n; ++i) {
+        for (k = LO_; k < SPLIT_; ++k) vb[i][k] = 0.0f;
+        eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
+                               LO_, SPLIT_, &w_shb[w_cur][i], vb[i]);
     }
 #else
     for (i = 0; i < n; ++i) {
