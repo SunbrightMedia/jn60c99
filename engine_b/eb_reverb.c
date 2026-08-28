@@ -81,6 +81,15 @@ static void eb_rev_derive(eb_reverb_state *s)
         s->ot[k][0] = s->taps[EB_REV_OT[k][1]] - s->taps[EB_REV_OT[k][0]];
         s->ot[k][1] = s->taps[EB_REV_OT[k][2]] - s->taps[EB_REV_OT[k][0]];
     }
+#if EB_REVERB_HALF
+    /* HALF RATE: every read depth halves, so a delay of N samples at the full
+     * rate is N/2 samples at half rate — the SAME real time. The overrun test
+     * above kept the full-rate bound, which the halved depth cannot exceed. The
+     * TYPE-5 modulation reach is halved in the cfg (lfo_depth), so dep[0] stays
+     * consistent with it. */
+    for (k = 0; k < EB_REV_NRING; ++k) s->dep[k] /= 2;
+    for (k = 0; k < 4; ++k) { s->ot[k][0] /= 2; s->ot[k][1] /= 2; }
+#endif
 }
 
 void eb_reverb_init(eb_reverb_state *s)
@@ -272,3 +281,56 @@ void eb_reverb_seed(eb_reverb_state *s, const int32_t *taps, float mute,
     s->wipe = wipe;
     eb_rev_derive(s);
 }
+
+#if EB_REVERB_HALF
+/* Rescale the rate-dependent reverb coefficients from the full gate rate to
+ * half rate, in place. Derived from the filter math, NOT fitted from a capture:
+ *   - damp[i][0] is the loop-damper one-pole gain g in `nlp = dlp + g*e`; its
+ *     pole is (1-g). At half rate a sample spans twice the real time, so the
+ *     pole per sample must be squared to hold the same Hz corner: g' = 1-(1-g)^2.
+ *   - lfo_inc is the pre-delay modulation phase step, advanced once per tank
+ *     sample; double it so the modulation FREQUENCY in Hz is unchanged.
+ *   - lfo_depth scales the modulation's sample reach; halve it so the reach in
+ *     real time is unchanged (dep[0] was halved to match).
+ * LEFT AS-IS, each a bounded and stated trade:
+ *   - ap (structural allpass gain): rate-independent.
+ *   - damp[i][1]/[2] (per-loop-pass decay/HF shelf): the loop's real recircul-
+ *     ation time is preserved by the depth halving, so the per-pass gain must
+ *     NOT change or the tail time would move.
+ *   - f_in[] (input DC block + 2-pole LP): the tank input is already band-
+ *     limited by the 2:1 decimator; the residual mistuning of this one filter
+ *     is the reverb's stated half-rate trade. */
+void eb_reverb_halfrate_cfg(eb_reverb_cfg *c)
+{
+    int i;
+    for (i = 0; i < 4; ++i) {
+        float p = 1.0f - c->damp[i][0];
+        c->damp[i][0] = 1.0f - p * p;
+    }
+    c->lfo_inc = c->lfo_inc * 2.0f;
+    c->lfo_depth = c->lfo_depth * 0.5f;
+}
+
+/* Half-rate reverb: clock the tank once per two master samples. See the header.
+ * Even samples decimate the input pair (a 2-tap average, a first-order half-
+ * band) and run the tank; both samples emit a linear interpolation of the two
+ * most-recent tank outputs. The odd sample buffers its input for the next
+ * pair's average. */
+void eb_reverb_process_half(const eb_reverb_cfg *c, eb_reverb_state *s,
+                            const int32_t *pending, int32_t *wipe_arm,
+                            float inA, float inB, float *outA, float *outB)
+{
+    if ((s->hph++ & 1u) == 0u) {
+        float a = 0.5f * (inA + s->hinA);
+        float b = 0.5f * (inB + s->hinB);
+        s->hyA0 = s->hyA1; s->hyB0 = s->hyB1;
+        eb_reverb_process(c, s, pending, wipe_arm, a, b, &s->hyA1, &s->hyB1);
+        *outA = 0.5f * (s->hyA0 + s->hyA1);
+        *outB = 0.5f * (s->hyB0 + s->hyB1);
+    } else {
+        s->hinA = inA; s->hinB = inB;
+        *outA = s->hyA1;
+        *outB = s->hyB1;
+    }
+}
+#endif

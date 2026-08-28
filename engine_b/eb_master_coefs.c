@@ -416,7 +416,14 @@ void eb_master_coefs_build(const unsigned char *base, eb_master_coef *c)
             k->damp[rk][1] = CF(base, 10759664 + 48*rk);
             k->damp[rk][2] = CF(base, 10759680 + 48*rk); }
         k->lfo_inc = CF(base, 10759504);
-        k->lfo_depth = CF(base, 10759488); }
+        k->lfo_depth = CF(base, 10759488);
+#if EB_REVERB_HALF
+        /* Fork half-rate reverb: rescale the rate-dependent coefficients once,
+         * here, on the full-rate values just read from the plugin's cells. The
+         * ring depths are halved separately, in eb_rev_derive. */
+        eb_reverb_halfrate_cfg(k);
+#endif
+    }
 }
 
 void eb_master_state_seed(const unsigned char *base, eb_master_state *s)

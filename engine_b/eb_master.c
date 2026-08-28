@@ -236,8 +236,17 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
         v529 = hold_v529; v530 = hold_v530;
     } else
 #endif
+#if EB_REVERB_HALF
+    /* THE REAL HALF-RATE REVERB: tank clocked at half rate, depths halved,
+     * coefficients rescaled, input decimated 2:1, output interpolated 1:2. A
+     * SONIC TRADE (not bit-exact); the cfg was passed through
+     * eb_reverb_halfrate_cfg at seed time. */
+    eb_reverb_process_half(&c->rev, &s->rev, s->rev_pending, &s->rev_wipe,
+                           v176, v177, &v529, &v530);
+#else
     eb_reverb_process(&c->rev, &s->rev, s->rev_pending, &s->rev_wipe,
                       v176, v177, &v529, &v530);
+#endif
 #if EB_FXPROBE_REV_HALF
     hold_v529 = v529; hold_v530 = v530;
 #endif
