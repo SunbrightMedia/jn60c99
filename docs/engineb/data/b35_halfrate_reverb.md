@@ -18,6 +18,14 @@ samples:
 
 Every rescale is derived from the filter math, NOT fitted from a capture.
 
+THE DRY MAIN SIGNAL STAYS FULL RATE. The reverb is an INLINE stage — its output
+is the wet tank PLUS `c->dry*inB` (crossed), and c->dry is MEASURED 1.0 on every
+factory patch (gate 1.0 too), so that dry pair is the whole main signal. The
+wrapper strips the dry from the tank output and re-adds it at full rate, so only
+the wet TAIL is half-rated; the dry path is bit-exact. When the tank is muted the
+module returns the unity passthrough (= c->dry*inB while dry==1.0), so the
+stripped wet is exactly 0 — a patch with no reverb is untouched.
+
 ## Proof (mantra 2 before 3)
 | check | result |
 |---|---|

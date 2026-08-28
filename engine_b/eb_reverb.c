@@ -312,25 +312,41 @@ void eb_reverb_halfrate_cfg(eb_reverb_cfg *c)
 }
 
 /* Half-rate reverb: clock the tank once per two master samples. See the header.
+ *
+ * THE DRY MAIN SIGNAL STAYS FULL RATE. The reverb is an INLINE stage: its output
+ * is the wet tank PLUS a dry passthrough (c->dry*inB / c->dry*inA, crossed; and
+ * c->dry is 1.0 in every factory patch, so this is the whole main signal). Half-
+ * rating the entire stage would band-limit that dry path too — dulling every
+ * patch, reverb or not. Instead the tank runs at half rate on the decimated send
+ * and the dry pair is stripped from the tank's output and re-added at FULL rate,
+ * so only the WET tail carries the trade. When the tank is muted the module
+ * returns the unity passthrough (= c->dry*inB while dry==1.0), so the stripped
+ * wet is exactly 0 and the output is the bit-exact full-rate dry pair.
+ *
  * Even samples decimate the input pair (a 2-tap average, a first-order half-
- * band) and run the tank; both samples emit a linear interpolation of the two
- * most-recent tank outputs. The odd sample buffers its input for the next
- * pair's average. */
+ * band) and clock the tank; both samples emit a linear interpolation of the two
+ * most-recent WET outputs plus the full-rate dry. The odd sample buffers its
+ * input for the next pair's average. */
 void eb_reverb_process_half(const eb_reverb_cfg *c, eb_reverb_state *s,
                             const int32_t *pending, int32_t *wipe_arm,
                             float inA, float inB, float *outA, float *outB)
 {
+    float dryA = c->dry * inB;          /* the cross is the plugin's: A<-inB */
+    float dryB = c->dry * inA;
     if ((s->hph++ & 1u) == 0u) {
         float a = 0.5f * (inA + s->hinA);
         float b = 0.5f * (inB + s->hinB);
+        float yA, yB;
         s->hyA0 = s->hyA1; s->hyB0 = s->hyB1;
-        eb_reverb_process(c, s, pending, wipe_arm, a, b, &s->hyA1, &s->hyB1);
-        *outA = 0.5f * (s->hyA0 + s->hyA1);
-        *outB = 0.5f * (s->hyB0 + s->hyB1);
+        eb_reverb_process(c, s, pending, wipe_arm, a, b, &yA, &yB);
+        s->hyA1 = yA - c->dry * b;       /* keep only the WET half-rate part */
+        s->hyB1 = yB - c->dry * a;
+        *outA = 0.5f * (s->hyA0 + s->hyA1) + dryA;
+        *outB = 0.5f * (s->hyB0 + s->hyB1) + dryB;
     } else {
         s->hinA = inA; s->hinB = inB;
-        *outA = s->hyA1;
-        *outB = s->hyB1;
+        *outA = s->hyA1 + dryA;
+        *outB = s->hyB1 + dryB;
     }
 }
 #endif
