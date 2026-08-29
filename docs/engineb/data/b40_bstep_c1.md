@@ -36,3 +36,20 @@ mid-block. bs_mispredict counts violations and MUST read 0.
 - OPEN, not claimed: quiet misses ~2/1,000 blocks remain UNATTRIBUTED
   (suspects: LKA link thrash in BAD-PAIR bench state, reporter prints).
   Attribution owed before Step 4 shrinks the cushion.
+
+## VERDICT ON SILICON (2026-08-29, COM3, 8-min key+patch soak)
+MECHANISM PROVEN, GOAL NOT MET. c1=3,879 steps ran on core 1,
+mispredict=0 the whole run, cycmax=231,342. But B4 miss note stayed
+nonzero (31 over ~500 s of storm; note blocks 6.3-7.0 ms). CAUSE, from the
+same log: the step (231k cyc = 0.96 ms) fits core 1's park only on
+fx-light lines. On delay patches fx rises 1,313 -> 1,800 cyc/sample
+(+125 us of front), the park shrinks below the step, core 1 finishes
+AFTER core 0, and the barrier stretches the block. The margin is razor
+thin everywhere: quiet=5,758 us vs the 5,804 us period leaves 46 us.
+THE INVARIANT HELD: un=0 for the entire run; the 6-deep cushion absorbed
+every bump; deficit grew only during patch storms.
+NEXT LEVER (small, follows from cycmax): split the delegated step in two
+half-voice slices, ~115k each -- under the park on every measured line.
+OWED: b37 latency table REDONE with REV-PIPE's +1 chunk before Step 4
+picks its constants; at CHUNK=128 the naive budget now reads ~12.5 ms
+worst, so Step 4 is not free any more and must be re-derived.
