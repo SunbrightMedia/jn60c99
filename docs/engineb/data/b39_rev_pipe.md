@@ -48,3 +48,13 @@ shipped. Latency budget impact goes in the b37 table before any ship claim.
 - ONE verdict flash: FXP fx= must DROP by ~back= on patches 5/16/21/49 and
   the whole-loop worst case must land under the period. The report prints
   `FXP: back=` (core 0, per sample) for exactly this comparison.
+
+## VERDICT ON SILICON (2026-08-29 flash, COM3, single board, 3 voices)
+GREEN. fx (core 1) 1,316-1,800 cyc/sample (was 2,600-3,600); back (core 0)
+1,179-1,196 -- the moved tail, the size the host predicted. Whole loop
+cyc=5,328-5,473 on EVERY report line including patch 21; quiet blocks
+5,747-5,767 us vs the 5,804 us period. un=0, recall CRC MATCH, audio plays.
+FIRST build in which all 64 patches fit in real time at steady state.
+Residual: quiet misses ~2/1,000 blocks; note step 6.2-6.7 ms, burst
+6.5-6.9 ms (bounded; Step 3's job); B5 deficit creeps only at patch storms
+(119 -> 215 over 32 s of 4 s patch stepping).
