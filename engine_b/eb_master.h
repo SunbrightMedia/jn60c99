@@ -158,6 +158,18 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
                      const eb_master_rings *r, const float *voices,
                      float *outL, float *outR);
 
+/* REV-PIPE halves of the same sample (see the split comment in eb_master.c).
+ * front = in + delay + effect (the per-sample feedback loop); it emits the
+ * delay outputs v176/v177. back = reverb + out (the feed-forward tail); it
+ * consumes them. front-then-back in one call == eb_master_render, bit for
+ * bit; back may instead run one chunk late on buffered v176/v177 (pure
+ * latency, no other change). */
+int eb_master_render_front(eb_master_state *s, const eb_master_coef *c,
+                           const eb_master_rings *r, const float *voices,
+                           float *o176, float *o177);
+int eb_master_render_back(eb_master_state *s, const eb_master_coef *c,
+                          float v176, float v177, float *outL, float *outR);
+
 /* ---- O4: the master-chain stage profiler (see eb_master.c) --------------
  * Five accumulators, one per numbered stage, plus the sample count. Present
  * ONLY when EB_MSPROF is 1; the shipping build declares nothing and the

@@ -2200,6 +2200,55 @@ static volatile int      w_have_prev = 0;
 static float             w_vbb[CHUNK][EB_NUM_VOICES];
 #endif
 
+/* ---- S3L_REV_PIPE: the reverb+out stage moves to CORE 0 ------------------
+ *
+ * WHY. b18: reverb 951-1,228 + out 142 cyc/sample -- together the size of the
+ * whole type-5 overage (6,526-6,821 vs 5,442, b6). b22 priced the master
+ * split as chunk-late FEEDBACK and killed it; but the feedback pair
+ * fb84672/fb84704 is written ONLY by the effect stage, and reverb+out read
+ * NOTHING the effect writes. So the loop is in->delay->effect; reverb+out is
+ * a FEED-FORWARD TAIL and may run a chunk late with NO sonic change at all --
+ * the identical bit stream, one chunk later. PROVEN on the host:
+ * tools/engineb/revpipe_gate.c, 0 differing samples over patches 0/5/16/21 at
+ * chunk 256 and 128, tooth seen to bite on every patch.
+ *
+ * THE SHAPE. eb_master_render splits into _front (in+delay+effect, core 1,
+ * in the FX-pipe slot as before) and _back (reverb+out, CORE 0, one more
+ * chunk behind, right after core 0's voices -- the slot where core 0 was
+ * measured spinning, wait=5). front's v176/v177 go through a two-bank buffer
+ * with the same w_cur discipline as w_vbb; back also consumes the SAME
+ * master-coef pointer front used (rp_mc), so a recall never splits one
+ * chunk's front and back across two patches.
+ *
+ * RACE ANALYSIS. Worker pass K writes rp_f[cur]; core 0's back reads
+ * rp_f[1-cur], written by pass K-1, which finished before block K began
+ * (the w_done barrier). MS fields are disjoint: front touches in, the delay
+ * and effect states, cho and the fb pair; back touches rev only (the host
+ * gate is exactly this claim, executed).
+ * PCM is now written by core 0 into w_pcm[1-w_cur] -- the bank the main loop
+ * reads after this block -- and by nobody else.
+ *
+ * COST. One more chunk of output latency (5.8 ms at CHUNK=256, 2.9 at 128),
+ * and one more chunk of silence while the pipeline fills. */
+#ifndef S3L_REV_PIPE
+#define S3L_REV_PIPE 0
+#endif
+#if S3L_REV_PIPE && !S3L_FX_PIPE
+#error "S3L_REV_PIPE extends the FX pipeline; it needs S3L_FX_PIPE=1"
+#endif
+#if S3L_REV_PIPE && S3L_LAYOUT
+#error "S3L_REV_PIPE: the LAYOUT rows time the whole FX in the worker slot; run one or the other"
+#endif
+#if S3L_REV_PIPE && S3L_OFFLINE
+#error "S3L_REV_PIPE: the OFFLINE path serial-renders the master on the same state; run one or the other"
+#endif
+#if S3L_REV_PIPE
+static float                    rp_f[2][CHUNK][2];  /* front's v176/v177    */
+static const eb_master_coef    *rp_mc[2];
+static int                      rp_n[2];            /* samples in each bank */
+static volatile int             rp_valid[2] = {0, 0};
+#endif
+
 /* ROLLING READY INDEX, not a barrier. The first block design computed ALL
  * 128 prologues before releasing core 1, so the whole prologue pass (notecv +
  * voice-0 cvgate/glide + the shared LFO) sat on the critical path with core 1
@@ -2417,6 +2466,10 @@ static unsigned long prologue_us = 0, prologue_n = 0;
 #if S3L_FXPROF
 /* per-sample averages over the last reported second, published for rpt_task */
 static volatile unsigned long rpt_fx_cyc = 0, rpt_v1_cyc = 0, rpt_wait_cyc = 0;
+#if S3L_REV_PIPE
+static volatile unsigned long rpt_back_cyc = 0;   /* core 0's reverb+out    */
+static unsigned long fxp_back = 0, fxp_back_n = 0;
+#endif
 /* accumulators, written only by core 1 */
 static unsigned long fxp_fx = 0, fxp_v1 = 0, fxp_wait = 0, fxp_n = 0;
 static unsigned long fxp_wn = 0;   /* samples, for the per-sample wait mean */
@@ -2479,6 +2532,16 @@ static void worker(void *arg)
         {   unsigned long p0 = (unsigned long)esp_cpu_get_cycle_count(), pd;
 #endif
         if (have) {
+#if S3L_REV_PIPE
+            /* FRONT ONLY (in+delay+effect). back runs on core 0 next block,
+             * from these buffers, with this same mc. See the rp_f comment. */
+            for (i = 0; i < w_n; ++i)
+                eb_master_render_front(MS, mc, &RG, w_vbb[prev][i],
+                                       &rp_f[cur][i][0], &rp_f[cur][i][1]);
+            rp_mc[cur]   = mc;
+            rp_n[cur]    = w_n;
+            rp_valid[cur] = 1;      /* ordered before core 0's read by w_done */
+#else
             for (i = 0; i < w_n; ++i) {
                 float L = 0.0f, R = 0.0f;
 #if S3L_LAYOUT
@@ -2508,6 +2571,7 @@ static void worker(void *arg)
                 w_pcm[prev][2 * i]     = (int16_t)(L * 30000.0f);
                 w_pcm[prev][2 * i + 1] = (int16_t)(R * 30000.0f);
             }
+#endif /* !S3L_REV_PIPE */
         }
 #if S3L_FXPROF
         pd = (unsigned long)esp_cpu_get_cycle_count() - p0;
@@ -2746,6 +2810,46 @@ static void render_block(int n)
         w_ready = i + 1;                          /* publish; core 1 may go */
         eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
                                LO_, SPLIT_, &w_shb[i], vb[i]);
+    }
+#endif
+#if S3L_REV_PIPE
+    /* THE BACK PASS (reverb + out), on THIS core, over the bank the worker's
+     * PREVIOUS pass front-rendered -- finished before this block began (the
+     * w_done barrier), while the worker is busy writing the OTHER bank. This
+     * fills the slot where core 0 was measured spinning (wait=5, b6). The
+     * pipeline priming bank is silence: w_pcm was zeroed at init/reset and a
+     * bank with rp_valid 0 is simply left as it is. */
+    {   const int rb = 1 - w_cur;
+        if (rp_valid[rb]) {
+            const eb_master_coef *bmc = rp_mc[rb];
+            int bn = rp_n[rb], j;
+#if S3L_FXPROF
+            unsigned long b0 = (unsigned long)esp_cpu_get_cycle_count();
+#endif
+            for (j = 0; j < bn; ++j) {
+                float L = 0.0f, R = 0.0f;
+                eb_master_render_back(MS, bmc, rp_f[rb][j][0], rp_f[rb][j][1],
+                                      &L, &R);
+                if (L > 1.0f) L = 1.0f; else if (L < -1.0f) L = -1.0f;
+                if (R > 1.0f) R = 1.0f; else if (R < -1.0f) R = -1.0f;
+                w_pcm[rb][2 * j]     = (int16_t)(L * 30000.0f);
+                w_pcm[rb][2 * j + 1] = (int16_t)(R * 30000.0f);
+            }
+            for (j = bn; j < CHUNK; ++j) {      /* a short bank: pad silence */
+                w_pcm[rb][2 * j] = 0; w_pcm[rb][2 * j + 1] = 0;
+            }
+#if S3L_FXPROF
+            if (bn > 0) {
+                fxp_back += ((unsigned long)esp_cpu_get_cycle_count() - b0)
+                            / (unsigned long)bn;
+                if (++fxp_back_n >= 64) {
+                    rpt_back_cyc = fxp_back / fxp_back_n;
+                    fxp_back = 0; fxp_back_n = 0;
+                }
+            }
+#endif
+            rp_valid[rb] = 0;       /* consumed; worker refills it next pass */
+        }
     }
 #endif
 #if S3L_RECALL
@@ -3284,6 +3388,11 @@ static void rpt_task(void *arg)
          * extra cycles are not here, the rings are not the cause. */
         printf("FXP: fx=%lu v1=%lu wait=%lu per sample\n",
                rpt_fx_cyc, rpt_v1_cyc, rpt_wait_cyc);
+#if S3L_REV_PIPE
+        /* back = CORE 0's reverb+out pass. THE VERDICT NUMBER: fx (core 1,
+         * now front only) must DROP by ~back vs the pre-REV_PIPE build. */
+        printf("FXP: back=%lu per sample (core 0, reverb+out)\n", rpt_back_cyc);
+#endif
 #endif
         printf("B5: dac sent=%lu written=%lu deficit=%ld  (sent>written+6 = TRUE STARVATION; un= cannot see it)\n",
                rpt_dacsent, rpt_written,

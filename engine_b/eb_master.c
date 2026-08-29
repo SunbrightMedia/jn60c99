@@ -152,22 +152,41 @@ unsigned long      eb_msprof_n;
 #define EB_FXPROBE_REV_HALF 0
 #endif
 
-int eb_master_render(eb_master_state *s, const eb_master_coef *c,
-                     const eb_master_rings *r, const float *voices,
-                     float *outL, float *outR)
+/* ---- THE FRONT/BACK SPLIT (REV-PIPE) --------------------------------------
+ *
+ * The per-sample chain is in -> delay -> reverb -> out -> effect, but the
+ * FEEDBACK pair fb84672/fb84704 is written ONLY by the effect stage and the
+ * reverb+out pair reads NOTHING the effect stage writes (reverb consumes
+ * v176/v177 from the delay; out consumes the reverb). So the loop b22 priced
+ * as unsplittable is in -> delay -> effect; reverb+out is a FEED-FORWARD TAIL.
+ *
+ * eb_master_render_front runs the loop (in, delay, effect); it emits the
+ * delay's v176/v177. eb_master_render_back runs the tail (reverb, out) on
+ * them. Composed front-then-back in one call they compute the SAME floats as
+ * the old monolith -- the effect stage's inputs (v32, v56, v58) and the
+ * reverb's (v176, v177) are all produced before either runs, and their state
+ * is disjoint -- and the trunk null gate re-proves that, it is not assumed.
+ * Composed a CHUNK apart on two cores, the output is the identical bit
+ * stream one chunk later: pure latency, the S3L_FX_PIPE class, no sonic
+ * change. */
+
+#if EB_FXPROBE_DLY_HALF || EB_FXPROBE_REV_HALF
+static unsigned fxprobe_ph;
+static float hold_v176, hold_v177, hold_v56, hold_v58;
+static float hold_v529, hold_v530;
+#endif
+
+int eb_master_render_front(eb_master_state *s, const eb_master_coef *c,
+                           const eb_master_rings *r, const float *voices,
+                           float *o176, float *o177)
 {
 #if EB_FXPROBE_DLY_HALF || EB_FXPROBE_REV_HALF
-    static unsigned fxprobe_ph;
-    static float hold_v176, hold_v177, hold_v56, hold_v58;
-    static float hold_v529, hold_v530;
     fxprobe_ph++;
 #endif
-    float v36, v38, v32, v176, v177, v56, v58, v529, v530, v593;
+    float v36, v38, v32, v176, v177, v56, v58, v593;
     float dL, dR;
 
     MSP_T0();
-    *outL = 0.0f;
-    *outR = 0.0f;
 
     /* No refusals left: task 1b-3 gave DELAY TYPE 4 and the EFFECT LABEL_164
      * core their modules, so every value either dispatch can take is covered. */
@@ -229,6 +248,46 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
     hold_v176 = v176; hold_v177 = v177; hold_v56 = v56; hold_v58 = v58;
 #endif
     MSP_HIT(1);
+    /* ---- 5. the EFFECT dispatch, which feeds the NEXT sample ------------ */
+    if (c->effect_type == 0 || c->effect_type >= 6) {
+        /* the LABEL_164 core */
+        eb_fx_e0_tick(&s->e0, &c->e0, v32, v56, v58, &v56, &v58, &v593);
+        s->fb84672 = s->e0.s84672;
+    } else if (c->effect_type == 1) {
+        eb_fx_e1_tick(&s->e1, &c->e1, v32, v56, v58, &v56, &v58, &v593);
+        s->fb84672 = s->e1.s84672;
+    } else if (c->effect_type == 5) {
+        s->e5.ring = r->e5;
+        eb_fx_e5_tick(&s->e5, &c->e5, v32, v56, v58, &v56, &v58, &v593);
+        s->fb84672 = s->e5.s84672;
+        /* v56/v58 go IN as well as out: the port assigns them only on one
+         * branch of this arm, so on the other branch they keep what the DELAY
+         * stage left. See eb_fx_e1.h. */
+    } else {                                        /* 2, 3, 4 -> chorus */
+        float chL, chR;
+        eb_chorus_tick_x(&s->cho, &c->cho, v32, &chL, &chR, v56, v58);
+        /* the port's :2936-2937: 84672 takes the LEFT output and v593 the
+         * RIGHT one. They are not interchangeable -- 84672 feeds the input
+         * stage's v29 and 84704 its v19, which are different coefficients. */
+        s->fb84672 = chL;
+        v593 = chR;
+    }
+    s->fb84704 = v593;                              /* the port's LABEL_205 */
+    MSP_HIT(4);
+    *o176 = v176;
+    *o177 = v177;
+    return EB_MASTER_OK;
+}
+
+int eb_master_render_back(eb_master_state *s, const eb_master_coef *c,
+                          float v176, float v177, float *outL, float *outR)
+{
+    float v529, v530;
+
+    MSP_T0();
+    *outL = 0.0f;
+    *outR = 0.0f;
+
     /* ---- 3. the reverb. It CROSSES its channels; see eb_reverb.h. ------- */
 #if EB_FXPROBE_REV_HALF
     /* PRICE PROBE: odd samples reuse the held reverb output. WRONG AUDIO. */
@@ -265,32 +324,15 @@ int eb_master_render(eb_master_state *s, const eb_master_coef *c,
     }
 
     MSP_HIT(3);
-    /* ---- 5. the EFFECT dispatch, which feeds the NEXT sample ------------ */
-    if (c->effect_type == 0 || c->effect_type >= 6) {
-        /* the LABEL_164 core */
-        eb_fx_e0_tick(&s->e0, &c->e0, v32, v56, v58, &v56, &v58, &v593);
-        s->fb84672 = s->e0.s84672;
-    } else if (c->effect_type == 1) {
-        eb_fx_e1_tick(&s->e1, &c->e1, v32, v56, v58, &v56, &v58, &v593);
-        s->fb84672 = s->e1.s84672;
-    } else if (c->effect_type == 5) {
-        s->e5.ring = r->e5;
-        eb_fx_e5_tick(&s->e5, &c->e5, v32, v56, v58, &v56, &v58, &v593);
-        s->fb84672 = s->e5.s84672;
-        /* v56/v58 go IN as well as out: the port assigns them only on one
-         * branch of this arm, so on the other branch they keep what the DELAY
-         * stage left. See eb_fx_e1.h. */
-    } else {                                        /* 2, 3, 4 -> chorus */
-        float chL, chR;
-        eb_chorus_tick_x(&s->cho, &c->cho, v32, &chL, &chR, v56, v58);
-        /* the port's :2936-2937: 84672 takes the LEFT output and v593 the
-         * RIGHT one. They are not interchangeable -- 84672 feeds the input
-         * stage's v29 and 84704 its v19, which are different coefficients. */
-        s->fb84672 = chL;
-        v593 = chR;
-    }
-    s->fb84704 = v593;                              /* the port's LABEL_205 */
-    MSP_HIT(4);
     MSP_END();
     return EB_MASTER_OK;
+}
+
+int eb_master_render(eb_master_state *s, const eb_master_coef *c,
+                     const eb_master_rings *r, const float *voices,
+                     float *outL, float *outR)
+{
+    float v176, v177;
+    (void)eb_master_render_front(s, c, r, voices, &v176, &v177);
+    return eb_master_render_back(s, c, v176, v177, outL, outR);
 }
