@@ -553,6 +553,19 @@ static unsigned long burst_restarts = 0;/* a new request arrived mid-build   */
 /* Set by dev_burst_step(), read and cleared at the deadline check, so a miss
  * can be attributed to the burst or to the steady state. Written and read by
  * core 0 only, in the same block. */
+/* S3L_BSTEP_C1 handoff cells -- declared here because nb_chunk() below reads
+ * them; the design comment lives with the S3L_REV_PIPE section they extend. */
+#ifndef S3L_BSTEP_C1
+#define S3L_BSTEP_C1 0
+#endif
+#if S3L_BSTEP_C1
+static volatile int           bs_req = 0;   /* posted before w_go, one block */
+static volatile int           bs_ret = 0;   /* the chunk step's return      */
+static volatile unsigned long bs_cyc = 0;   /* its cost, on core 1          */
+static int                    bs_have = 0;  /* core 0: result stored, unconsumed */
+static unsigned long          bs_c1_steps = 0, bs_cyc_max = 0, bs_mispredict = 0;
+#endif
+
 static volatile int  burst_ran_this_block = 0;
 static volatile int  note_ran_this_block = 0;   /* 0 none, else the STEP ID
                                   * -- so a miss can name WHICH step overran
@@ -1591,7 +1604,12 @@ static unsigned nb_voiced(void *u)
     return (unsigned)EB_DEVSEQ_VOICED & ((1u << EB_NUM_VOICES) - 1u);
 }
 static void nb_begin(void *u, unsigned m) { (void)u; eb_recall_chunk_begin_voices(&REC, m); }
-static int  nb_chunk(void *u)  { (void)u; return eb_recall_chunk_step(&REC); }
+static int  nb_chunk(void *u)  { (void)u;
+#if S3L_BSTEP_C1
+    /* Consume the step core 1 already ran this block -- exactly once. */
+    if (bs_have) { bs_have = 0; return bs_ret; }
+#endif
+    return eb_recall_chunk_step(&REC); }
 static int  nb_busy(void *u)   { (void)u; return eb_recall_chunk_busy(&REC); }
 static int  nb_check(void *u)
 {
@@ -2249,6 +2267,37 @@ static int                      rp_n[2];            /* samples in each bank */
 static volatile int             rp_valid[2] = {0, 0};
 #endif
 
+/* ---- S3L_BSTEP_C1: NOTE-BUILD steps run in core 1's park time -------------
+ *
+ * WHY. Step 3's slice budget was designed to come from core-0 slack -- which
+ * S3L_REV_PIPE spent (SLACK: slack=7 on the b39 verdict flash). The slack
+ * moved: core 1 now parks ~260-390k cycles a block (fx 1,316-1,800 + v1
+ * ~2,600 against the 5,442 budget). A note-build step is 140-200k cycles
+ * (SCHED note=), so it FITS there and fits nowhere else.
+ *
+ * THE SHAPE, and why it stays exact. Exactly one chunk step runs per block,
+ * and in states NB_PRI/NB_REST that step is PURELY eb_recall_chunk_step (a
+ * voice build into the SHADOW bank -- state no renderer reads). So core 0
+ * posts a request BEFORE releasing the worker (the w_go MEMW orders it); the
+ * worker executes the step at its pass tail, inside its park time (the
+ * w_done MEMW orders the result); core 0 then advances the machine AFTER the
+ * barrier, in the quiescent window, with nb_chunk() consuming the stored
+ * result instead of recomputing. The machine code is UNCHANGED -- only where
+ * its one expensive call executes moves cores.
+ *
+ * THE PREDICTION IS EXACT, not hopeful: in NB_PRI/NB_REST the machine always
+ * calls chunk_step, note_pending cannot clear mid-block (quiescent-window
+ * writes only), the burst is interlocked out, and the budget is consulted
+ * once, here. bs_mispredict counts any violation and MUST read 0.
+ *
+ * WHAT IS NOT DELEGATED. NB_EVENTS (allocator + event queue: policy, and
+ * cheap -- ~17k + a bank copy), the publishes, the patch burst (its reseed
+ * is 437k cycles: it fits NO slack and stays under C10's bounded-miss rule),
+ * and the knob machine (worst apply 302k: borderline; measured first). */
+#if S3L_BSTEP_C1 && !(S3L_REV_PIPE && S3L_RECALL)
+#error "S3L_BSTEP_C1 spends core 1's REV-PIPE park time on recall steps; needs S3L_REV_PIPE=1 and S3L_RECALL=1"
+#endif
+
 /* ROLLING READY INDEX, not a barrier. The first block design computed ALL
  * 128 prologues before releasing core 1, so the whole prologue pass (notecv +
  * voice-0 cvgate/glide + the shared LFO) sat on the critical path with core 1
@@ -2649,6 +2698,17 @@ static void worker(void *arg)
                                    w_vbb[i]);
         }
 #endif
+#if S3L_BSTEP_C1
+        /* THE DELEGATED NOTE STEP, in this core's park time. Runs BEFORE
+         * w_done so the w_done MEMW publishes bs_ret; it can never overlap
+         * the quiescent window (that opens only after w_done). It writes the
+         * SHADOW bank only -- state no renderer reads. */
+        if (bs_req) {
+            unsigned long b0 = (unsigned long)esp_cpu_get_cycle_count();
+            bs_ret = eb_recall_chunk_step(&REC);
+            bs_cyc = (unsigned long)esp_cpu_get_cycle_count() - b0;
+        }
+#endif
         w_go = 0;
         w_done = 1;
     }
@@ -2712,6 +2772,19 @@ static void render_block(int n)
 #if S3L_RECALL
     /* THE WINDOW CLOSES HERE, before the worker is released. One writer. */
     w_parked = 0;
+#endif
+#if S3L_BSTEP_C1
+    /* POST THE NOTE STEP for core 1's park time, BEFORE w_go (whose MEMW
+     * orders this store). Only the states whose step is purely
+     * eb_recall_chunk_step; the budget is consulted here and nowhere else
+     * this block. See the S3L_BSTEP_C1 design comment. */
+    bs_req = 0;
+    if (!dev_muted && burst_state == BST_IDLE && note_pending
+        && (NB.st == NB_PRI || NB.st == NB_REST)
+        && eb_sched_may(&SCHED, g_step_cyc_note)) {
+        bs_req = 1;
+        note_ran_this_block = 1;    /* keep the slack sample honest */
+    }
 #endif
     w_done = 0;
     w_go   = 1;
@@ -2957,6 +3030,12 @@ static void render_block(int n)
          * would hold the key silent to save work that does not exist. Only the
          * states that BUILD are gated. */
         if (note_pending
+#if S3L_BSTEP_C1
+            /* This block's step is running on CORE 1; the machine advances
+             * after the barrier, with the result. Everything else (EVENTS,
+             * PUB, CHECK -- the cheap states) still runs here. */
+            && !bs_req
+#endif
             && (!eb_nb_heavy(&NB) || eb_sched_may(&SCHED, g_step_cyc_note))) {
             unsigned long sc0 = (unsigned long)esp_cpu_get_cycle_count();
             int st = dev_note_step();
@@ -3036,6 +3115,32 @@ static void render_block(int n)
      * w_done = 1, and the only code it runs afterwards is that spin. Nothing
      * it can observe changes until core 0 sets w_go. */
     w_parked = 1;
+#if S3L_BSTEP_C1
+    /* COLLECT THE DELEGATED STEP. Core 1 is parked (the window above), so
+     * bs_ret/bs_cyc are stable and ordered by its w_done store. The machine
+     * now advances exactly as it would have pre-barrier; nb_chunk() hands it
+     * the stored result. The publish this may request happens just below, in
+     * this same window, as before. */
+    if (bs_req) {
+        int st;
+        bs_have = 1;
+        ++bs_c1_steps;
+        if (bs_cyc > bs_cyc_max) bs_cyc_max = bs_cyc;
+        sched_note_cost(&g_step_cyc_note, bs_cyc);
+        st = dev_note_step();
+        if (bs_have) {  /* the machine did NOT consume it: prediction defect */
+            ++bs_mispredict;
+            bs_have = 0;
+        }
+        bs_req = 0;
+        if (st < 0) {
+            dev_muted = 1;
+            printf("MUTE: %s.\n", dev_mute_why);
+        } else if (st == 0) {
+            dev_pending = 1;    /* the publish below still runs this block */
+        }
+    }
+#endif
     /* the FX-pipe deferral, applied ONE BLOCK after the publish that set it:
      * the worker's next pass runs the master over the PREVIOUS chunk's voices,
      * so publishing MC immediately would put the new patch's delay/reverb/
@@ -3392,6 +3497,13 @@ static void rpt_task(void *arg)
         /* back = CORE 0's reverb+out pass. THE VERDICT NUMBER: fx (core 1,
          * now front only) must DROP by ~back vs the pre-REV_PIPE build. */
         printf("FXP: back=%lu per sample (core 0, reverb+out)\n", rpt_back_cyc);
+#endif
+#if S3L_BSTEP_C1
+        /* c1= note-build steps run in core 1's park time. mispredict MUST
+         * read 0. cycmax vs core 1's park (~260-390k) is the fit check; the
+         * verdict is B4 `miss note=`, which must now stay 0. */
+        printf("BSTEP: c1=%lu mispredict=%lu cycmax=%lu\n",
+               bs_c1_steps, bs_mispredict, bs_cyc_max);
 #endif
 #endif
         printf("B5: dac sent=%lu written=%lu deficit=%ld  (sent>written+6 = TRUE STARVATION; un= cannot see it)\n",
