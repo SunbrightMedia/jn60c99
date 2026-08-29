@@ -2892,7 +2892,19 @@ static void render_block(int n)
      * fills the slot where core 0 was measured spinning (wait=5, b6). The
      * pipeline priming bank is silence: w_pcm was zeroed at init/reset and a
      * bank with rp_valid 0 is simply left as it is. */
-    {   const int rb = 1 - w_cur;
+    /* b41 PIPE MERGE: consume THIS pass's front, not last block's. The
+     * worker runs its front FIRST and is finished with it ~1.9 ms into the
+     * block (fx 1,313-1,800 cyc/sample); core 0 arrives here after its
+     * voices at ~4.5 ms. So the spin below is expected to be ZERO and the
+     * REV-PIPE chunk of output latency is GONE -- same calls, same cores,
+     * one chunk earlier, identical bits. Ordering: the worker's plain rp_f
+     * stores precede its volatile rp_valid store (MEMW), the same release
+     * pattern w_go uses. The spin cannot hang: the worker always completes
+     * its front before its voice loop, which core 0's w_ready feeds. */
+    {   const int rb = w_cur;
+        if (w_have_prev) {
+            while (!rp_valid[rb]) { }
+        }
         if (rp_valid[rb]) {
             const eb_master_coef *bmc = rp_mc[rb];
             int bn = rp_n[rb], j;
