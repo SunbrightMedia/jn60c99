@@ -3567,7 +3567,14 @@ static int i2s_start(void)
                       .din = I2S_GPIO_UNUSED,
                       .invert_flags = {0, 0, 0} },
     };
-    cc.dma_desc_num = 6;
+    /* S3L_DMA_N: the DMA queue depth IS the output-latency floor
+     * (dma_desc_num x CHUNK frames). 6 x 256 = 34.8 ms was the dropout
+     * armor while blocks ran over; Step 4 shrinks it once every block
+     * fits. A knob, because the b41 latency table prices it per config. */
+#ifndef S3L_DMA_N
+#define S3L_DMA_N 6
+#endif
+    cc.dma_desc_num = S3L_DMA_N;
     cc.dma_frame_num = CHUNK;
     if (i2s_new_channel(&cc, &TX, NULL) != ESP_OK) return 0;
     if (i2s_channel_init_std_mode(TX, &sc) != ESP_OK) return 0;
