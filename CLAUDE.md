@@ -208,7 +208,9 @@ lines, in this order, with the delete reminder first:
      --after hard-reset write-flash --flash-mode dio --flash-size 8MB
      --flash-freq 80m 0x0 bootloader.bin 0x8000 partitiontable.bin
      0x10000 juno_s3.bin`
-  3. `python -m serial.tools.miniterm COM5 115200`
+  3. `python -m serial.tools.miniterm COM3 115200`
+     (COM3 since the 2026-08-29 PC reset -- was COM5; if flashing fails, the
+     user re-checks Device Manager -> Ports and we update this line again.)
 The three-bin set lives in `esp32s3/flash/meas/` -- partitiontable.bin has NO
 hyphen. Send builds from THERE, never from `esp32s3/build/`, whose paths and
 names do not match what the user has. Only send builds worth flashing
