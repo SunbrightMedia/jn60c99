@@ -25,3 +25,13 @@ cutting the 2-block key build, not the buffers.
 - Audio identical; output one chunk earlier (not directly audible --
   proven by the unchanged counters, claimed from the code path).
 - miss counters: no regression vs b40.
+
+## VERDICT ON SILICON (2026-08-29, COM3, correct binary 1,486,128 B)
+GREEN. back=1,044-1,260 and fx/v1 unchanged vs b40; whole loop
+cyc=5,22x-5,48x unchanged; no new spin anywhere (the handoff cost is
+invisible, as predicted). The REV-PIPE chunk of output latency is GONE:
+5.8 ms deleted at CHUNK=256 for zero cycle cost. Miss profile matches
+b40 (note misses from the step-vs-park margin, quiet ~2/1,000, un=0
+throughout, deficit creeps only in patch storms). No regression.
+NEXT: the C=64 probe -- measure core 0's per-block FIXED cost; <15 us
+means CHUNK=64 + dma 2 stands and key->sound ~9 ms is reachable.
