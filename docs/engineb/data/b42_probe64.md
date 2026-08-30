@@ -68,3 +68,20 @@ gated by w_step_on (runtime), NOT S3L_STRESS -- it ran in b42b AND here,
 so the stepper is not the variable. Per the pre-written rule: dma 3 next
 (FINAL64-D3, compile stamp 05:42:19, same 1,472,528 bytes -- verify by the
 boot log stamp, not size). Watch: B5 slope must be FLAT and quiet < 1,451.
+
+## FINAL64-D3 VERDICT: FAIL -- same pops. THE REAL CAUSE FOUND.
+dma 3 changed nothing: quiet 1,454-1,458, B5 deficit +10/s, user heard many
+pops. Attribution error paid twice: (1) b42b was gated on quiet alone; its
+B5 slope was never read (the slope was already there at dma 12 -- b42 showed
+35/s). (2) "S3L_STRESS=0 removes the stimulus" was WRONG: the chord loop
+(1.5s/0.7s gate, a note burst each transition) and the 4 s patch stepper
+(w_step_on, default ON) are gated by S3L_PLAY, not S3L_STRESS. So every
+"musician" probe still ran the bench demo: self-driven bursts every 2.2 s
+and 4 s, each punching through the ~4 ms cushion at C=64. The pops were the
+DEMO, not the keys. LESSON (playbook-class): a stimulus believed OFF must be
+SEEN to be off in the log (pat= froze, nb= froze) -- pat= was climbing in
+every one of these logs and I did not read it as a violation of my own
+build's claim.
+FINAL64-PLAY (compile 05:48:46, 1,472,480 B): S3L_PLAY=1 -- silent until a
+key, no stepper, no chord loop. Gate: B5 slope FLAT at idle AND under keys;
+no pops while playing; KEYH populated <= 7 blocks (10 ms at C=64).
