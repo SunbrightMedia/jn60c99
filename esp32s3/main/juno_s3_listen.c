@@ -1961,6 +1961,19 @@ static void con_poll(void)
         if (c >= 128 || (CON_KEY[c] == 0 && c != 'a')) continue;
         note = con_base + CON_KEY[c];
         if (note < 0 || note > 127) continue;
+        /* TERMINAL AUTO-REPEAT FILTER (2026-08-30, heard on the bench as a
+         * RHYTHMIC CLICK): a held key makes the OS resend the character
+         * every ~30 ms, and each repeat TOGGLED the note -- a retrigger
+         * storm the player never asked for. The same character inside
+         * 300 ms is therefore ONE press. 300 ms is far above any repeat
+         * interval and far below an intentional re-press. */
+        {
+            static int64_t con_last_us[128];
+            int64_t now = esp_timer_get_time();
+            if (now - con_last_us[note] < 300000) { con_last_us[note] = now;
+                                                    continue; }
+            con_last_us[note] = now;
+        }
         ++con_keys;
         if (con_held[note]) { con_held[note] = 0;
                               juno_event_note_off(JUNO_SRC_CONSOLE, note); }
