@@ -11,19 +11,40 @@
 #include "eb_delay_t5.h"
 #include "eb_minmax.h"
 
-/* EB_ZEROCOEF_T5 (2026-08-30) -- delete the six t5 coefficient slots proven
- * structurally zero at 44.1 kHz by tools/engineb/mc_zero_proof.c (64 patches
- * + 31,744 single-parameter sweeps + 4,000 random presets, moved-witness
- * alive each stage) and by the port's own writers: k6497200/k6497216 are
- * DLY_HC table columns 1-2 (zero for every legal byte, finefx_recall.c);
- * k6497264/k10693152 are the ARM_HCSW rate switches' 44.1k arm;
- * k10693024/k10693296 sweep zero over the whole preset space. With
- * k10693152 == 0 the two 5-tap chorus FIRs (v116/v127) feed NOTHING and are
- * deleted whole. 44.1 kHz ONLY -- the other rate arms are nonzero, so this
- * flag must never reach a build with a different rate. Default 0 = trunk
- * verbatim; judged by the foundation gate at EXACTLY 0. */
+/* EB_ZEROCOEF_T5 (2026-08-30) -- delete the t5 coefficient slots proven
+ * structurally zero AND confirmed in render context: k6497200/k6497216
+ * (DLY_HC table columns 1-2, zero for every legal byte, finefx_recall.c),
+ * k10693024 and k10693296 (zero over 64 patches + 31,744 sweeps + 4,000
+ * random presets, mc_zero_proof.c, and over the whole null battery).
+ * TWO CANDIDATES WERE REFUTED BY EXECUTION and are excluded (G2/G4 below):
+ * k6497264 and k10693152 read zero in every no-note recall but are NONZERO
+ * when the battery renders -- mc_zero_proof's documented blind spot caught
+ * by zc_t5_gate.py's first run. Judged by zc_t5_gate.py: EXACTLY 0 on all
+ * 36 streams with a live-coefficient tooth SEEN TO BITE.
+ * Default 0 = trunk verbatim. */
 #ifndef EB_ZEROCOEF_T5
 #define EB_ZEROCOEF_T5 0
+#endif
+/* Per-group sub-flags for zc_t5_gate.py's bisect; each defaults to the main
+ * flag so a plain EB_ZEROCOEF_T5=1 build enables everything. */
+#ifndef EB_ZC_G1
+#define EB_ZC_G1 EB_ZEROCOEF_T5
+#endif
+/* G2 (k6497264) and G4 (k10693152) are REFUTED BY EXECUTION (zc bisect,
+ * 2026-08-30): the null battery shows both NONZERO in render context -- the
+ * mc_zero_proof audit's no-note blind spot, exactly as its header warns.
+ * They stay compiled OUT of EB_ZEROCOEF_T5 permanently. */
+#ifndef EB_ZC_G2
+#define EB_ZC_G2 0
+#endif
+#ifndef EB_ZC_G3
+#define EB_ZC_G3 EB_ZEROCOEF_T5
+#endif
+#ifndef EB_ZC_G4
+#define EB_ZC_G4 0
+#endif
+#ifndef EB_ZC_G5
+#define EB_ZC_G5 EB_ZEROCOEF_T5
 #endif
 #include "eb_ring_probe.h"
 #include "eb_dsp.h"
@@ -227,7 +248,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           s->s6496576 = in36;
           s->s6496592 = in38;
           s->s6496864 = in36;
-#if EB_ZEROCOEF_T5
+#if EB_ZC_G1
 /* EB_ZC_T5_TOOTH: zc_t5_gate.py's non-vacuity probe. Deleting k6497232 -- a
  * LIVE coefficient -- MUST change the battery's audio, or the gate is blind. */
 #if defined(EB_ZC_T5_TOOTH) && EB_ZC_T5_TOOTH
@@ -253,7 +274,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
                                    + s->s6496624;
           v41 = (float)(c->k6497280 * s->s6496624) + s->s6496640;
           s->s6496624 = v41;
-#if EB_ZEROCOEF_T5
+#if EB_ZC_G2
           s->s10691952 = (float)((float)((float)((float)(v41 * c->k6497312)
                                                             + (float)((float)(1.0 - c->k6497312) * in36))
                                                     * c->k6497392)
@@ -273,7 +294,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
 #endif
           v42 = s->s6496592;
           s->s6496944 = v42;
-#if EB_ZEROCOEF_T5
+#if EB_ZC_G1
           v43 = (float)((float)(v42 * c->k6497184)
                       + (float)(s->s6496992 * c->k6497232))
               + (float)(c->k6497248 * s->s6497008);
@@ -292,7 +313,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
                                    + s->s6496752;
           v44 = (float)(s->s6496752 * c->k6497280) + s->s6496768;
           s->s6496752 = v44;
-#if EB_ZEROCOEF_T5
+#if EB_ZC_G2
           s->s10691984 = (float)((float)((float)((float)(v44 * c->k6497312)
                                                             + (float)((float)(1.0 - c->k6497312) * v42))
                                                     * c->k6497392)
@@ -457,7 +478,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           v109 = (float)(v105 * c->k10693344) + c->k10693360;
           s->s10692432 = v107;
           s->s10692448 = v106;
-#if EB_ZEROCOEF_T5
+#if EB_ZC_G3
           v110 = 0.0f;
           v111 = v105;
           v112 = 0.0f;
@@ -480,7 +501,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           s->s10692912 = (float)((float)(c->k10693056 * v111) * v113) + v114;
           s->s10692928 = (float)(v115 * v113) + v114;
           s->s10692672 = v107;
-#if EB_ZEROCOEF_T5
+#if EB_ZC_G4
           /* v116's FIR is DEAD: its only consumer is k10693152 * v116 == 0.
            * The shift chain above still runs (cheap moves, state preserved). */
           v116 = 0.0f;
@@ -501,7 +522,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
                                     + s->s10692496;
           v117 = (float)(s->s10692496 * c->k10693168) + s->s10692512;
           s->s10692496 = v117;
-#if EB_ZEROCOEF_T5
+#if EB_ZC_G4
           v118 = 0.0f; (void)v118;
           v119 = v117;
           v120 = s->s10692528;
@@ -519,7 +540,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           v124 = v121
                + (float)((float)(c->k10693232 * (float)(v121 - v120))
                        - (float)(c->k10693232 * v121));
-#if EB_ZEROCOEF_T5
+#if EB_ZC_G5
           v125 = 0.0f; (void)v125;
           s->s10692512 = v123;
           s->s10759056 = (float)(v122 * v124) * c->k10693328;
@@ -531,7 +552,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
 #endif
           v126 = s->s10692448;
           s->s10692752 = v126;
-#if EB_ZEROCOEF_T5
+#if EB_ZC_G4
           /* v127's FIR is DEAD for the same reason as v116's. */
           v127 = 0.0f;
           (void)v127;
@@ -551,7 +572,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
                                     + s->s10692592;
           v128 = (float)(s->s10692592 * c->k10693168) + s->s10692608;
           s->s10692592 = v128;
-#if EB_ZEROCOEF_T5
+#if EB_ZC_G4
           v129 = 0.0f; (void)v129;
           v130 = c->k10693200;
           v131 = v128;
@@ -578,7 +599,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           s->s10692608 = v138;
           v140 = c->k10693328;
           v141 = c->k10693424 + s->s10692880;
-#if EB_ZEROCOEF_T5
+#if EB_ZC_G5
           s->s10759088 = v140 * (float)(v137 * v139);
 #else
           s->s10759088 = v140 * (float)((float)(v135 * s->s10692640) + (float)(v137 * v139));
