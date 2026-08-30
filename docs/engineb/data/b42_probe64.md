@@ -121,3 +121,17 @@ climbs ~12/s. The flag EARNS its place (it is exact and it pays) but does
 not close the gap alone. NEXT: the reverb (~1,165 cyc/sample in back=)
 has never had a zero-coefficient audit -- extend mc_zero_proof to the
 whole master coef struct.
+
+## ZC+RH VERDICT (2026-08-30): HALF-RATE REVERB WITHDRAWN ON SILICON
+back= rose 1,165 -> ~1,300 with EB_REVERB_HALF=1: the 41-tap FIR pair
+costs MORE than the half-rate tank saves at 44.1 kHz on the S3. b36's
+open question 2 is answered NO by measurement. Flag stays in the tree,
+default 0, never in the ship line. (Run notes: first RH flash MUTED
+itself on the mc CRC tooth -- key not regenerated for the flag: the
+tooth caught a real process fault. Second flash's log was contaminated
+by console keys -- tooth fired, split moved, patch stepped to 7 -- but
+back= is patch-independent enough to settle the verdict.)
+NEXT LEVER (untried on the master chain): per-file -O3 on eb_reverb.c +
+eb_delay_t5.c (S3_O3_FX). linker.lf measured t5 at c/i 3.30 = 70 % stall;
+-O3 scheduling attacks that. Bit-exact (no fast-math, contract off),
+judged by CRC + gates. Probe T5PROBE-O3, ELF da80eedef.

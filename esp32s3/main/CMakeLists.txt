@@ -172,6 +172,21 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
 set_source_files_properties(${EB_SRCS} PROPERTIES COMPILE_OPTIONS
     "-std=c99;-Wno-array-bounds;-Wno-stringop-overflow")
 
+# S3_O3_FX=1: compile the two stall-bound master-chain modules at -O3.
+# linker.lf measured the t5 arm at c/i 3.30 (70 % stall); -O3's extra
+# unrolling and scheduling attacks exactly that. BIT-EXACT: no fast-math is
+# added, -ffp-contract stays off, and GCC does not reorder FP arithmetic
+# without it -- judged anyway by the device CRC and the fork gates, never
+# assumed. Default OFF so every prior build is reproducible verbatim.
+if(S3_O3_FX)
+    set_source_files_properties(
+        ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/eb_reverb.c
+        ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/eb_delay_t5.c
+        PROPERTIES COMPILE_OPTIONS
+        "-std=c99;-Wno-array-bounds;-Wno-stringop-overflow;-O3")
+    message(STATUS "S3_O3_FX=1: eb_reverb.c + eb_delay_t5.c at -O3")
+endif()
+
 if(S3_RECALL)
     # EB_DEVCELLS is the rebase. It used to be a PYTHON TEXT REWRITE inside
     # tools/engineb/devrecall_gate.py, which could not ship -- an ESP-IDF build
