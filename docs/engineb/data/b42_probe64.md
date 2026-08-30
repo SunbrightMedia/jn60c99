@@ -96,3 +96,19 @@ CHUNK (invisible at 256: ~250 cyc/sample; fatal at 64). NEXT: find that
 per-chunk block in eb_delay_t5/master front on the host (QEMU icount at
 chunk 64 vs 256) -- no silicon needed for the hunt. NOT the per-sample
 arithmetic (b21 stands): this is prep/control work per chunk.
+
+## T5PROBE-128 VERDICT (2026-08-30): THE PER-CHUNK MODEL IS DEAD
+fx on patch 5 at CHUNK=128 = 2,711-2,867 -- IDENTICAL to CHUNK=64. There
+is NO per-chunk t5 cost. The "63k/chunk" attribution is RETRACTED: it
+compared patch 5's fx at C=64 against b39's fx=1,800, which was a
+DIFFERENT patch's report window (the stepper was running in b39; t5
+patches were never pinned). Playbook-class defect: a scaling law fitted
+through two points measured on DIFFERENT workloads.
+TRUE STATE: patch 5's fx = 2,700-2,870 cyc/sample AT EVERY CHUNK; core 1
+= fx + v1 = 5,330-5,490 vs the 5,442 budget = 98-101 % everywhere. b39's
+"all 64 fit" stands only as measured -- whole loop under period at 256 by
+a razor margin; the chunk shrink's small fixed overhead tips t5 over.
+GAP TO CLOSE: ~50-150 cyc/sample on core 1, t5 patches only.
+NEXT LEVER (b20's standing structural note): EXACTLY-0 zero-coefficient
+deletion in the master chain -- t5 has 4/65 coefficients always zero and
+NO delay module ever got the EB_ZEROCOEF treatment. Bit-exact, host-gated.
