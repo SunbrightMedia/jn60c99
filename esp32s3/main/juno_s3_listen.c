@@ -570,7 +570,12 @@ static volatile int  burst_ran_this_block = 0;
 static volatile int  note_ran_this_block = 0;   /* 0 none, else the STEP ID
                                   * -- so a miss can name WHICH step overran
                                   * (b7: burst=17 and no attribution). */
-static int           dev_patch = 0;     /* which patch the bank is on       */
+/* S3L_BOOT_PATCH: which patch the boot recall builds. Default 0. A probe
+ * build pins the patch under test here so the bench needs no keys. */
+#ifndef S3L_BOOT_PATCH
+#define S3L_BOOT_PATCH 0
+#endif
+static int           dev_patch = S3L_BOOT_PATCH;
 static int           dev_gate = 0;      /* 0 = held, 1 = released           */
 static unsigned long dev_builds = 0, dev_pubs = 0, dev_pub_refused = 0;
 static unsigned long b_min = 0xFFFFFFFFul, b_max = 0, b_last = 0;
