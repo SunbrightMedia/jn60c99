@@ -56,3 +56,15 @@ written now: un=0 over a 5-minute KEY+PATCH soak WITH LISTENING; KEYH
 key->sound <= 10 ms; no audible click on key or knob (patch-change click
 is C10-bounded and expected). Any un>0 = dma 2 too shallow -> dma 3
 (+1.45 ms, still <10 ms only if KEYH confirms margin).
+
+## FINAL64 dma 2 VERDICT (2026-08-30 flash, user LISTENED): FAIL -- POPS
+The user heard many pops and clicks. The log agrees: B5 deficit climbed
+~10/s the whole run (sent 22,247 vs written 21,359 at t=31) = TRUE
+STARVATION; un=0 stayed blind, as B5 was built to show. quiet=1,453-1,465
+us, OVER the 1,451 period -- but b42b (dma 12, same code) read 1,432-1,443.
+ATTRIBUTION: the +20 us is the I2S write path at queue depth 2 (blocking
+descriptor churn), not the engine. Also learned: the 4 s patch stepper is
+gated by w_step_on (runtime), NOT S3L_STRESS -- it ran in b42b AND here,
+so the stepper is not the variable. Per the pre-written rule: dma 3 next
+(FINAL64-D3, compile stamp 05:42:19, same 1,472,528 bytes -- verify by the
+boot log stamp, not size). Watch: B5 slope must be FLAT and quiet < 1,451.
