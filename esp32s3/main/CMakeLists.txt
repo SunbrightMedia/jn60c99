@@ -136,10 +136,17 @@ endif()
 # JUNO_EVQ_PORT_HEADER supplies the producers' lock. WITHOUT IT the boundary
 # silently compiles with a NO-OP lock -- correct for the single-threaded host
 # gate and a data race here, where USB, DIN and the console all submit.
+# S3_EXACT_ONLY=1: drop the SONIC resonance LUT from the hardwired set, for
+# probe builds that must carry only EXACTLY-0 levers. Default keeps 256.
+if(S3_EXACT_ONLY)
+    set(S3_RES_LUT_FLAG "")
+else()
+    set(S3_RES_LUT_FLAG -DEB_VCF_RES_LUT=256)
+endif()
 target_compile_options(${COMPONENT_LIB} PRIVATE
     -O2 ${S3_LTO_FLAG} -ffp-contract=off -fno-strict-aliasing
     -DJUNO_EVQ_PORT_HEADER="juno_event_port.h"
-    -DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_VCF_RES_LUT=256 -DEB_IDF
+    -DEB_FORK_S3 -DEB_LFO_SHARED=1 ${S3_RES_LUT_FLAG} -DEB_IDF
     ${S3_EXTRA_DEFS})
 # EB_VCF_RES_LUT=256 -- MEASURED on the user's S3: 1,009 cycles per
 # critical-path voice, 6 voices 14,441 -> 11,353. The shaper's tail is a pure

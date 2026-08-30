@@ -43,7 +43,11 @@ CC = os.environ.get('CC', 'cc')
 # THIS LIST IS THE ONE PLACE THE TWO BUILDS COULD DRIFT, and the drift is not
 # silent: the generated devcrc.h carries DEVCRC_RC_SZ / DEVCRC_MC_SZ and the
 # firmware fails to COMPILE if either disagrees with its own sizeof.
-M1_DEFS = [
+# EBOOT_DEFS overrides the list below (space-separated -D... items). It exists
+# for probe builds with a different engine flag set (e.g. the exact-only
+# probe); the DEVCRC_*_SZ compile-time tooth still refuses any drift.
+_env_defs = os.environ.get('EBOOT_DEFS')
+M1_DEFS = _env_defs.split() if _env_defs else [
     '-DEB_FORK_S3', '-DEB_LFO_SHARED=1', '-DEB_VCF_RES_LUT=256',
     '-DEB_DCO_WT=1', '-DEB_VCF_DEADCOEF=1', '-DEB_ATREST_BLOCK=1',
     '-DEB_ATREST_O1=1', '-DEB_ZEROCOEF=1', '-DEB_EXP_MEMO=1',
