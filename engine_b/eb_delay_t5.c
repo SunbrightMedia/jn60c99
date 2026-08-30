@@ -10,6 +10,21 @@
  */
 #include "eb_delay_t5.h"
 #include "eb_minmax.h"
+
+/* EB_ZEROCOEF_T5 (2026-08-30) -- delete the six t5 coefficient slots proven
+ * structurally zero at 44.1 kHz by tools/engineb/mc_zero_proof.c (64 patches
+ * + 31,744 single-parameter sweeps + 4,000 random presets, moved-witness
+ * alive each stage) and by the port's own writers: k6497200/k6497216 are
+ * DLY_HC table columns 1-2 (zero for every legal byte, finefx_recall.c);
+ * k6497264/k10693152 are the ARM_HCSW rate switches' 44.1k arm;
+ * k10693024/k10693296 sweep zero over the whole preset space. With
+ * k10693152 == 0 the two 5-tap chorus FIRs (v116/v127) feed NOTHING and are
+ * deleted whole. 44.1 kHz ONLY -- the other rate arms are nonzero, so this
+ * flag must never reach a build with a different rate. Default 0 = trunk
+ * verbatim; judged by the foundation gate at EXACTLY 0. */
+#ifndef EB_ZEROCOEF_T5
+#define EB_ZEROCOEF_T5 0
+#endif
 #include "eb_ring_probe.h"
 #include "eb_dsp.h"
 #include "juno_tables.h"
@@ -212,11 +227,24 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           s->s6496576 = in36;
           s->s6496592 = in38;
           s->s6496864 = in36;
+#if EB_ZEROCOEF_T5
+/* EB_ZC_T5_TOOTH: zc_t5_gate.py's non-vacuity probe. Deleting k6497232 -- a
+ * LIVE coefficient -- MUST change the battery's audio, or the gate is blind. */
+#if defined(EB_ZC_T5_TOOTH) && EB_ZC_T5_TOOTH
+          v40 = (float)(in36 * c->k6497184)
+              + (float)(c->k6497248 * s->s6496928);
+#else
+          v40 = (float)((float)(in36 * c->k6497184)
+                      + (float)(c->k6497232 * s->s6496912))
+              + (float)(c->k6497248 * s->s6496928);
+#endif
+#else
           v40 = (float)((float)((float)((float)(in36 * c->k6497184)
                                       + (float)(c->k6497200 * s->s6496880))
                               + (float)(s->s6496896 * c->k6497216))
                       + (float)(c->k6497232 * s->s6496912))
               + (float)(c->k6497248 * s->s6496928);
+#endif
           s->s6496896 = v40;
           s->s6496608 = (float)((float)((float)(in36
                                                            - (float)(s->s6496624 * c->k6497296))
@@ -225,6 +253,14 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
                                    + s->s6496624;
           v41 = (float)(c->k6497280 * s->s6496624) + s->s6496640;
           s->s6496624 = v41;
+#if EB_ZEROCOEF_T5
+          s->s10691952 = (float)((float)((float)((float)(v41 * c->k6497312)
+                                                            + (float)((float)(1.0 - c->k6497312) * in36))
+                                                    * c->k6497392)
+                                            + (float)(c->k6497376 * s->s6496704))
+                                    * c->k6497408;
+
+#else
           s->s10691952 = (float)((float)((float)((float)((float)((float)((float)(1.0
                                                                                             - c->k6497264)
                                                                                     * v41)
@@ -234,13 +270,20 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
                                                     * c->k6497392)
                                             + (float)(c->k6497376 * s->s6496704))
                                     * c->k6497408;
+#endif
           v42 = s->s6496592;
           s->s6496944 = v42;
+#if EB_ZEROCOEF_T5
+          v43 = (float)((float)(v42 * c->k6497184)
+                      + (float)(s->s6496992 * c->k6497232))
+              + (float)(c->k6497248 * s->s6497008);
+#else
           v43 = (float)((float)((float)((float)(v42 * c->k6497184)
                                       + (float)(c->k6497200 * s->s6496960))
                               + (float)(c->k6497216 * s->s6496976))
                       + (float)(s->s6496992 * c->k6497232))
               + (float)(c->k6497248 * s->s6497008);
+#endif
           s->s6496976 = v43;
           s->s6496736 = (float)((float)((float)(v42
                                                            - (float)(s->s6496752 * c->k6497296))
@@ -249,6 +292,14 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
                                    + s->s6496752;
           v44 = (float)(s->s6496752 * c->k6497280) + s->s6496768;
           s->s6496752 = v44;
+#if EB_ZEROCOEF_T5
+          s->s10691984 = (float)((float)((float)((float)(v44 * c->k6497312)
+                                                            + (float)((float)(1.0 - c->k6497312) * v42))
+                                                    * c->k6497392)
+                                            + (float)(c->k6497376 * s->s6496832))
+                                    * c->k6497408;
+
+#else
           s->s10691984 = (float)((float)((float)((float)((float)((float)((float)(1.0
                                                                                             - c->k6497264)
                                                                                     * v44)
@@ -258,6 +309,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
                                                     * c->k6497392)
                                             + (float)(c->k6497376 * s->s6496832))
                                     * c->k6497408;
+#endif
           v45 = (float)(c->k6497536 + s->s6497104) * k5;
           s->s6497088 = v45;
           if ( (float)(v45 - s->s6497072) >= 0.0 )
@@ -405,6 +457,15 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           v109 = (float)(v105 * c->k10693344) + c->k10693360;
           s->s10692432 = v107;
           s->s10692448 = v106;
+#if EB_ZEROCOEF_T5
+          v110 = 0.0f;
+          v111 = v105;
+          v112 = 0.0f;
+          v113 = c->k10693376;
+          v114 = c->k10693392;
+          v115 = c->k10693056 * v109;
+          (void)v110; (void)v112;
+#else
           v110 = c->k10693024;
           v111 = v105
                + (float)((float)((float)((float)((float)(v105 * 0.5) + v108) * (float)((float)(v105 * 0.5) + v108))
@@ -415,15 +476,23 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           v113 = c->k10693376;
           v114 = c->k10693392;
           v115 = c->k10693056 * (float)(v109 + v112);
+#endif
           s->s10692912 = (float)((float)(c->k10693056 * v111) * v113) + v114;
           s->s10692928 = (float)(v115 * v113) + v114;
           s->s10692672 = v107;
+#if EB_ZEROCOEF_T5
+          /* v116's FIR is DEAD: its only consumer is k10693152 * v116 == 0.
+           * The shift chain above still runs (cheap moves, state preserved). */
+          v116 = 0.0f;
+          (void)v116;
+#else
           v116 = (float)((float)((float)((float)(v107 * c->k10693072)
                                        + (float)(c->k10693088 * s->s10692688))
                                + (float)(c->k10693104 * s->s10692704))
                        + (float)(c->k10693120 * s->s10692720))
                + (float)(s->s10692736 * c->k10693136);
           s->s10692704 = v116;
+#endif
           s->s10692480 = (float)((float)((float)(v107
                                                             - (float)(s->s10692496
                                                                     * c->k10693184))
@@ -432,28 +501,48 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
                                     + s->s10692496;
           v117 = (float)(s->s10692496 * c->k10693168) + s->s10692512;
           s->s10692496 = v117;
+#if EB_ZEROCOEF_T5
+          v118 = 0.0f; (void)v118;
+          v119 = v117;
+          v120 = s->s10692528;
+          v121 = (float)(v119 * c->k10693200)
+               + (float)((float)(1.0 - c->k10693200) * v107);
+#else
           v118 = c->k10693152;
           v119 = (float)(1.0 - v118) * v117;
           v120 = s->s10692528;
           v121 = (float)((float)(v119 + (float)(v118 * v116)) * c->k10693200)
                + (float)((float)(1.0 - c->k10693200) * v107);
+#endif
           v122 = c->k10693312;
           v123 = (float)((float)(v121 - v120) * c->k10693216) + v120;
           v124 = v121
                + (float)((float)(c->k10693232 * (float)(v121 - v120))
                        - (float)(c->k10693232 * v121));
+#if EB_ZEROCOEF_T5
+          v125 = 0.0f; (void)v125;
+          s->s10692512 = v123;
+          s->s10759056 = (float)(v122 * v124) * c->k10693328;
+#else
           v125 = c->k10693296;
           s->s10692512 = v123;
           s->s10759056 = (float)((float)(v125 * s->s10692544) + (float)(v122 * v124))
                                     * c->k10693328;
+#endif
           v126 = s->s10692448;
           s->s10692752 = v126;
+#if EB_ZEROCOEF_T5
+          /* v127's FIR is DEAD for the same reason as v116's. */
+          v127 = 0.0f;
+          (void)v127;
+#else
           v127 = (float)((float)((float)((float)(v126 * c->k10693072)
                                        + (float)(s->s10692768 * c->k10693088))
                                + (float)(s->s10692784 * c->k10693104))
                        + (float)(c->k10693120 * s->s10692800))
                + (float)(s->s10692816 * c->k10693136);
           s->s10692784 = v127;
+#endif
           s->s10692576 = (float)((float)((float)(v126
                                                             - (float)(s->s10692592
                                                                     * c->k10693184))
@@ -462,6 +551,16 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
                                     + s->s10692592;
           v128 = (float)(s->s10692592 * c->k10693168) + s->s10692608;
           s->s10692592 = v128;
+#if EB_ZEROCOEF_T5
+          v129 = 0.0f; (void)v129;
+          v130 = c->k10693200;
+          v131 = v128;
+          v132 = s->s10692624;
+          v133 = v131;
+          v134 = (float)(1.0 - v130) * v126;
+          v135 = 0.0f; (void)v135;
+          v136 = (float)(v133 * v130) + v134;
+#else
           v129 = c->k10693152;
           v130 = c->k10693200;
           v131 = (float)(1.0 - v129) * v128;
@@ -470,6 +569,7 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           v134 = (float)(1.0 - v130) * v126;
           v135 = c->k10693296;
           v136 = (float)(v133 * v130) + v134;
+#endif
           v137 = c->k10693312;
           v138 = (float)((float)(v136 - v132) * c->k10693216) + v132;
           v139 = v136
@@ -478,7 +578,11 @@ void eb_dly5_tick(eb_dly5_state *s, const eb_dly5_coef *c,
           s->s10692608 = v138;
           v140 = c->k10693328;
           v141 = c->k10693424 + s->s10692880;
+#if EB_ZEROCOEF_T5
+          s->s10759088 = v140 * (float)(v137 * v139);
+#else
           s->s10759088 = v140 * (float)((float)(v135 * s->s10692640) + (float)(v137 * v139));
+#endif
           v142 = eb_fminf(c->k10693440, v141) * v140;
           s->s10692864 = v142;
           v143 = s->s10692896;
