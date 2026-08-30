@@ -32,3 +32,27 @@ instrument does not carry. b42b re-runs the identical probe with
 S3L_LINK=0 and S3L_STRESS=0. If quiet drops under 1,448, the 50 us was
 bench overhead and C=64 lives; if not, the architecture's floor is
 CHUNK=192-256 and the <10 ms target is refused honestly.
+
+## b42b VERDICT (2026-08-30 flash, S3L_LINK=0, S3L_STRESS=0)
+GO. CHUNK=64 STANDS. quiet=1,432-1,443 us -- UNDER the 1,451 us period on
+every report line. The 50 us of b42 was BENCH LOAD (BAD-PAIR link poll +
+patch stepper + reporter), not the architecture: the true per-block FIXED
+cost is ~7-13 us. un=0 the whole run.
+CAVEATS, stated with the claim:
+- Quiet miss tail ~31/10k blocks (spikes; absorbed by the cushion). Above
+  the ~2/1,000 bar; UNATTRIBUTED at 64.
+- b42b ran with NB idle (STRESS off removed the chord loop): notes and keys
+  were NOT exercised. The final verdict flash needs real keys and ears.
+- The two-chip LINK poll (~40 us/block) is COMPILED OUT of this build. It
+  must be re-engineered before the two-chip <10 ms configuration.
+- BSTEP-C1 OFF at 64 (step 215k > park ~90k); note steps run ~2.0 ms
+  blocks against a 2.9 ms cushion at dma 2.
+
+## FINAL64 -- the Step-4 candidate (built 2026-08-30 00:20)
+Identical to b42b with S3L_DMA_N=2. Latency model (b41):
+key->sound worst ~= 1 + 1.45 + 2x1.45 + 1.45 + 2x1.45 = ~9.0 ms.
+juno_s3.bin = 1,472,528 bytes. Decision rule for the verdict flash,
+written now: un=0 over a 5-minute KEY+PATCH soak WITH LISTENING; KEYH
+key->sound <= 10 ms; no audible click on key or knob (patch-change click
+is C10-bounded and expected). Any un>0 = dma 2 too shallow -> dma 3
+(+1.45 ms, still <10 ms only if KEYH confirms margin).
