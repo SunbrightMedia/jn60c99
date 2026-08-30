@@ -2343,6 +2343,12 @@ static volatile int w_ready = 0;
 #ifndef S3L_REPORT_EVERY
 #define S3L_REPORT_EVERY 5
 #endif
+/* Seconds between report PRINTS (the snapshot still runs every second).
+ * 1 = every second, the bench default. A musician build sets this large:
+ * the UART burst is audible on shared-supply DACs and costs one block. */
+#ifndef S3L_REPORT_SECS
+#define S3L_REPORT_SECS 1
+#endif
 
 #ifndef S3L_VOICE_LO
 #define S3L_VOICE_LO 0
@@ -4735,7 +4741,17 @@ void app_main(void)
 #endif
                 gap_max = 0;
             }
-            rpt_pending = 1;
+            /* QUIET INSTRUMENT (2026-08-30): the once-per-second report is
+             * ~2 KB of UART TX. On the bench that burst is AUDIBLE -- a click
+             * in sync with the TX LED, through the shared USB supply into the
+             * DAC -- and it also costs exactly one missed block per print.
+             * A musician build therefore prints RARELY; the measurement
+             * still accumulates every second. */
+            {
+                static unsigned rpt_gate = 0;
+                if (++rpt_gate >= S3L_REPORT_SECS) { rpt_gate = 0;
+                                                     rpt_pending = 1; }
+            }
             /* ⚠ A LOWER-PRIORITY TASK ON A SATURATED CORE NEVER RUNS.
              * MEASURED (PRIO build): with the audio loop raised to priority 5,
              * rpt_task at priority 1 printed NOTHING -- not one line after the
