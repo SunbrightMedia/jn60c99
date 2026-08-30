@@ -112,3 +112,12 @@ GAP TO CLOSE: ~50-150 cyc/sample on core 1, t5 patches only.
 NEXT LEVER (b20's standing structural note): EXACTLY-0 zero-coefficient
 deletion in the master chain -- t5 has 4/65 coefficients always zero and
 NO delay module ever got the EB_ZEROCOEF treatment. Bit-exact, host-gated.
+
+## T5PROBE-ZC VERDICT (2026-08-30): PARTIAL -- real, not enough
+EB_ZEROCOEF_T5 (legal set G1+G3+G5) on silicon, patch 5, C=64:
+fx 2,700-2,867 -> 2,625-2,640 (spikes 2,787); quiet 1,484 -> 1,466 us.
+STILL OVER the 1,451 period by ~15 us (~55 cyc/sample); B5 deficit still
+climbs ~12/s. The flag EARNS its place (it is exact and it pays) but does
+not close the gap alone. NEXT: the reverb (~1,165 cyc/sample in back=)
+has never had a zero-coefficient audit -- extend mc_zero_proof to the
+whole master coef struct.
