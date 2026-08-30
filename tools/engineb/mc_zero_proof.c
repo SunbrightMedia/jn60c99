@@ -29,15 +29,18 @@
 static eb_master_coef MC;
 
 /* d5's floats: everything up to the two trailing int32 ring lengths. */
-#define D5_NF ((int)((sizeof(eb_dly5_coef) - 2 * sizeof(int32_t)) / 4))
+/* 2026-08-30: widened from d5-only to the WHOLE master coef struct.
+ * Int fields self-eliminate when nonzero; any int-typed "survivor" is
+ * filtered at the naming step, never deleted. */
+#define D5_NF ((int)(sizeof(eb_master_coef) / 4))
 
-static unsigned char alive[512];
-static float lastv[512];
+static unsigned char alive[4096];
+static float lastv[4096];
 static long  moved;
 
 static void observe(void)
 {
-    const float *f = (const float *)&MC.d5;
+    const float *f = (const float *)&MC;
     int s;
     for (s = 0; s < D5_NF; ++s) {
         if (alive[s] && f[s] != 0.0f) alive[s] = 0;
@@ -76,7 +79,7 @@ int main(int argc, char **argv)
     for (s = 0; s < D5_NF; ++s) alive[s] = 1;
     setvbuf(stdout, (char *)0, _IOLBF, 0);
     NPARAM = juno_param_count();
-    printf("d5 float slots: %d   params: %d\n", D5_NF, NPARAM);
+    printf("master coef 4-byte slots: %d   params: %d\n", D5_NF, NPARAM);
 
     for (p = 0; p < np; ++p) {
         memset(st, 0, JUNO_STATE_BYTES);
@@ -116,7 +119,7 @@ int main(int argc, char **argv)
     }
     { int a = 0; for (s = 0; s < D5_NF; ++s) a += alive[s];
       printf("STAGE 3  4000 random presets -> %d of %d zero (moved %ld)\n", a, D5_NF, moved);
-      printf("SURVIVORS (float index into eb_dly5_coef):");
+      printf("SURVIVORS (4-byte slot index into eb_master_coef):");
       for (s = 0; s < D5_NF; ++s) if (alive[s]) printf(" %d", s);
       printf("\n"); }
     return 0;
