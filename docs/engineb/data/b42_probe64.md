@@ -85,3 +85,14 @@ build's claim.
 FINAL64-PLAY (compile 05:48:46, 1,472,480 B): S3L_PLAY=1 -- silent until a
 key, no stepper, no chord loop. Gate: B5 slope FLAT at idle AND under keys;
 no pops while playing; KEYH populated <= 7 blocks (10 ms at C=64).
+
+## T5PROBE VERDICT (2026-08-30 flash, patch 5 pinned, C=64, chord loop)
+THE C=64 DELAY COST IS MEASURED AND ATTRIBUTED TO CHUNK GRANULARITY.
+fx=2,699-2,865 cyc/sample on patch 5 at CHUNK=64 vs ~1,800 at 256 (b39).
+Whole loop cyc=5,466-5,644 vs the 5,442 budget: over on EVERY line, B5
+deficit +~20/s, quiet=1,484 us vs 1,451. The extra ~1,000 cyc/sample
+scales as per-chunk work / CHUNK: ~63,000 cyc of t5 work runs ONCE PER
+CHUNK (invisible at 256: ~250 cyc/sample; fatal at 64). NEXT: find that
+per-chunk block in eb_delay_t5/master front on the host (QEMU icount at
+chunk 64 vs 256) -- no silicon needed for the hunt. NOT the per-sample
+arithmetic (b21 stands): this is prep/control work per chunk.
