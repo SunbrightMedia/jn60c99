@@ -3977,8 +3977,13 @@ void app_main(void)
      * the boot publish would have refused it. */
     eb_recall_quiescent = listen_quiescent;
 #endif
-    printf("TWO CORES: voices 0..%d on core 0, %d..%d on core 1\n",
-           S3L_SPLIT - 1, S3L_SPLIT, EB_NUM_VOICES - 1);
+    /* 2026-08-30: this banner printed "voices 0..%d" while the render loops
+     * use [S3L_VOICE_LO, split). The lie hid a REAL defect: with VOICE_LO=6
+     * (the 2-voice era's value) and a 3-voice chord, voice 5 was never
+     * rendered -- its coefficients recalled and CRC-checked, its audio
+     * silently absent. The banner now prints the truth. */
+    printf("TWO CORES: voices %d..%d on core 0, %d..%d on core 1\n",
+           S3L_VOICE_LO, S3L_SPLIT - 1, S3L_SPLIT, EB_NUM_VOICES - 1);
 #else
     printf("ONE CORE: all %d voices on core 0\n", EB_NUM_VOICES);
 #endif

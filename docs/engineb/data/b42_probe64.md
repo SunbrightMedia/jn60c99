@@ -135,3 +135,15 @@ NEXT LEVER (untried on the master chain): per-file -O3 on eb_reverb.c +
 eb_delay_t5.c (S3_O3_FX). linker.lf measured t5 at c/i 3.30 = 70 % stall;
 -O3 scheduling attacks that. Bit-exact (no fast-math, contract off),
 judged by CRC + gates. Probe T5PROBE-O3, ELF da80eedef.
+
+## THE VOICE-5 DEFECT (2026-08-30, found by READING, playbook class)
+The render loops use [S3L_VOICE_LO, split) / [split, 8). The ship line
+carried S3L_VOICE_LO=6 -- the 2-VOICE era's value -- into every
+DEVCHORD_N=3 build. So voice 5's coefficients were recalled and
+CRC-verified, and its AUDIO WAS NEVER RENDERED: every "3-voice" listen
+build sounded 2 voices. The banner printed "voices 0..N" (hardcoded) and
+hid it. Banner fixed to print the real range; -O3 lever recorded DEAD
+(fx/quiet unchanged); ship line corrected to S3L_VOICE_LO=5.
+CONSEQUENCE, stated honestly: every recent budget number was a 2-VOICE
+number. The true 3-voice load is measured by the JUNO-3V build (ELF
+b7aa7b52f); its log re-derives the whole core-0 budget from scratch.
