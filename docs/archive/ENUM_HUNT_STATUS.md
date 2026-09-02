@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-09-02 (phase-3 triage).** RESOLVED 2026-07-27. Successors: docs/RENDER_LOOP_LOG.md, docs/ASSIGNER_MODE_FINDING.md.
+
 # Recall-enumerator completeness hunt — RESOLVED (2026-07-27)
 
 Investigating the BS Solid (Chillwave patch 3) mid-band deficit (user: real

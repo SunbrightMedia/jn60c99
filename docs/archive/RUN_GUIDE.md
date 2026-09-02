@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-09-02 (phase-3 triage).** Extraction-era guide; the cited extraction folders were purged from history (2026-07). Kept for method provenance only.
+
 # How to run `extract_dsp.py` (beginner guide)
 
 

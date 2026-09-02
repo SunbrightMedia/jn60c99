@@ -30,6 +30,8 @@ go, or it is not written.
    a new one is paid for.
 4. `docs/HISTORY.md` — the full dated log (the old CLAUDE.md, verbatim).
    Read it when an old number or claim needs provenance; the docs it cites win.
+5. `docs/INDEX.md` — every doc classified LIVING / REFERENCE / ARCHIVED with
+   the question it answers. Look there BEFORE reading docs at random.
 
 # THE ONE RULE EVERYTHING SERVES
 The original `.vst3` (in `truth/`, checksummed, resolve paths ONLY via

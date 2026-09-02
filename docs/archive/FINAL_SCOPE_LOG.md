@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-09-02 (phase-3 triage).** Execution log of FINAL_SCOPE.md (2026-07). Closed.
+
 # FINAL_SCOPE execution log
 
 ## STEP 0 — Baseline

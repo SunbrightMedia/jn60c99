@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-09-02 (phase-3 triage).** CAPTURE-ERA guide. The capture covenant (CLAUDE.md HARD RULES) forbids this method; every capture-derived constant was replaced. Historical record only.
+
 # How to capture the runtime coefficients (Frida) — `capture_runtime_coeffs.js`
 
 ## Why a runtime capture (not another static dump)

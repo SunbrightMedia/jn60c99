@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-09-02 (phase-3 triage).** Extraction-era guide; folders purged. Method provenance only.
+
 # How to run `extract_all.py` — the one-and-done full extraction
 
 After this, **no more IDA sessions.** It dumps the entire plugin's code so every

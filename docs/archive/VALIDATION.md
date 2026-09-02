@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-09-02 (phase-3 triage).** CAPTURE-ERA validation (live-plugin memory snapshot). Superseded by the Unicorn-oracle gates (make verify); the covenant forbids the method. Historical.
+
 # Validation against the live plugin
 
 The handoff's definition of "correct" is agreement with the actual plugin, not an

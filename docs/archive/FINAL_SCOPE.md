@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-09-02 (phase-3 triage).** Executed to completion (2026-07). Successor for live status: FINAL_GUIDE.md + CLAUDE.md.
+
 # FINAL SCOPE — the last scope. Opus: follow this to the letter, in order.
 
 **User contract (binding):** this is the terminal scope. It does not spawn a new

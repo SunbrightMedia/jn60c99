@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-09-02 (phase-3 triage).** CAPTURE-ERA guide. Forbidden by the covenant; historical record only.
+
 # How to capture the runtime coefficients with IDA's debugger (no Frida)
 
 `tools/extract_runtime_coeffs_dbg.py` reads the 349 runtime-applied coefficients
