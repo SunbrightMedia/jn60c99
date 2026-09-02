@@ -73,3 +73,16 @@ Wire a PCM5102 or MAX98357A: BCK->GPIO5, LRCK/WS->GPIO6, DIN->GPIO7,
 
 Serial monitor at 115200 prints `underruns=` and measured us/sample every
 second. `underruns=0` = it fits. Full guide: ../LISTEN.md.
+
+## Where the old probe images went (2026-09-02 cleanup)
+
+~90 one-session probe builds (juno_s3_*.bin, abl_*.bin, queue/) were removed
+from the tree. Every one was a single measurement whose RESULT is recorded in
+docs/engineb/data/ (b4..b43); the bins themselves are recoverable from git
+history at commit cc1b06c and earlier. What remains here is the living set:
+
+| file | what |
+|---|---|
+| juno_s3_octal_psram.bin / _quad_psram.bin | the canonical playable images (see top of this README) |
+| juno_s3_CLASSIC6.bin | CLASSIC port probe: 6 voices + chorus only, one S3, strict 1982 byte law |
+| meas/ | the three-bin set of the CURRENT staged measurement build (now: JUNO-3V, the first honest 3-voice listen build -- unflashed) |
