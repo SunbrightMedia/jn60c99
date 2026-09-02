@@ -199,6 +199,15 @@ int eb_master_render_front(eb_master_state *s, const eb_master_coef *c,
     /* ---- 2. the DELAY dispatch ------------------------------------------ */
     v56 = 0.0f;
     v58 = -1.0f;
+#if EB_CLASSIC
+    /* CLASSIC: no delay existed on the 1982 panel. The stage is its own OFF
+     * law (eb_delay.c:127, on==0 wet==0 -> out = x), then the type-0 arm's
+     * cross-and-gain. v56/v58 keep the constants above, exactly what the
+     * type-0 core path leaves them. No ring is read, none is allocated. */
+    v176 = c->k101744 * v38;
+    v177 = c->k101744 * v36;
+    (void)r; (void)dL; (void)dR;
+#else
 #if EB_FXPROBE_DLY_HALF
     /* PRICE PROBE: odd samples reuse the held delay output. WRONG AUDIO. */
     if (fxprobe_ph & 1u) {
@@ -247,6 +256,7 @@ int eb_master_render_front(eb_master_state *s, const eb_master_coef *c,
 #if EB_FXPROBE_DLY_HALF
     hold_v176 = v176; hold_v177 = v177; hold_v56 = v56; hold_v58 = v58;
 #endif
+#endif /* !EB_CLASSIC */
     MSP_HIT(1);
     /* ---- 5. the EFFECT dispatch, which feeds the NEXT sample ------------ */
     if (c->effect_type == 0 || c->effect_type >= 6) {
@@ -257,9 +267,17 @@ int eb_master_render_front(eb_master_state *s, const eb_master_coef *c,
         eb_fx_e1_tick(&s->e1, &c->e1, v32, v56, v58, &v56, &v58, &v593);
         s->fb84672 = s->e1.s84672;
     } else if (c->effect_type == 5) {
+#if EB_CLASSIC
+        /* CLASSIC: type 5 needs the e5 ring and this build allocates none.
+         * Fall back to the LABEL_164 core. NOT the plugin's type-5 sound --
+         * deliberate in a classic build, and the header says so. */
+        eb_fx_e0_tick(&s->e0, &c->e0, v32, v56, v58, &v56, &v58, &v593);
+        s->fb84672 = s->e0.s84672;
+#else
         s->e5.ring = r->e5;
         eb_fx_e5_tick(&s->e5, &c->e5, v32, v56, v58, &v56, &v58, &v593);
         s->fb84672 = s->e5.s84672;
+#endif
         /* v56/v58 go IN as well as out: the port assigns them only on one
          * branch of this arm, so on the other branch they keep what the DELAY
          * stage left. See eb_fx_e1.h. */
@@ -289,6 +307,13 @@ int eb_master_render_back(eb_master_state *s, const eb_master_coef *c,
     *outR = 0.0f;
 
     /* ---- 3. the reverb. It CROSSES its channels; see eb_reverb.h. ------- */
+#if EB_CLASSIC
+    /* CLASSIC: no reverb existed on the 1982 panel. The tank-off law of
+     * eb_reverb.c:153 is a CROSSED dry pass: outA = inB, outB = inA. */
+    v529 = v177;
+    v530 = v176;
+    (void)s;
+#else
 #if EB_FXPROBE_REV_HALF
     /* PRICE PROBE: odd samples reuse the held reverb output. WRONG AUDIO. */
     if (fxprobe_ph & 1u) {
@@ -309,6 +334,7 @@ int eb_master_render_back(eb_master_state *s, const eb_master_coef *c,
 #if EB_FXPROBE_REV_HALF
     hold_v529 = v529; hold_v530 = v530;
 #endif
+#endif /* !EB_CLASSIC */
 
     MSP_HIT(2);
     /* ---- 4. the output stage. THE SAMPLE IS FINISHED HERE. -------------- */

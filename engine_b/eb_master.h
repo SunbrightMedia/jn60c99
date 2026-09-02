@@ -55,6 +55,24 @@
 #ifndef ENGINEB_EB_MASTER_H
 #define ENGINEB_EB_MASTER_H
 
+/* EB_CLASSIC -- the 1982 panel. The real JUNO-60 had no delay and no reverb;
+ * this flag removes BOTH TICKS from the chain and replaces each with the law
+ * its own module already uses when the effect is off:
+ *   delay  -> eb_delay.c:127 with on==0, wet==0 is out = x; the type-0 arm's
+ *             cross-and-gain (v176 <- k101744*R, v177 <- k101744*L) is kept.
+ *   reverb -> eb_reverb.c:153 tank-off: outA = inB, outB = inA (crossed).
+ * EFFECT stays: types 2/3/4 are the chorus, which IS the classic sound.
+ * Types 0/1 keep their (ringless) arms; type 5 is re-routed to the type-0
+ * core because its ring is not allocated in a classic build.
+ * RECALL IS UNTOUCHED: every coefficient is still built, so the device
+ * answer-key CRC over the coefficient set stays valid.
+ * NOT BIT-EXACT for patches whose delay/reverb/type-5 effect is audible --
+ * that is the point of the build, and it must be labelled CLASSIC, never
+ * passed off as the full engine. Patches with those effects OFF are exact. */
+#ifndef EB_CLASSIC
+#define EB_CLASSIC 0
+#endif
+
 #include <stdint.h>
 #include "eb_master_in.h"
 #include "eb_master_out.h"

@@ -2063,6 +2063,17 @@ volatile uint32_t s3l_ring_over;          /* times a lag reached the length */
 
 static int rings_alloc(void)
 {
+#if EB_CLASSIC
+    /* CLASSIC build: the delay arms and the e5 effect are never ticked
+     * (eb_master.h EB_CLASSIC), so their rings -- the entire 6.1 MB PSRAM
+     * story -- are simply not allocated. RG stays zeroed; the classic
+     * dispatch reads no ring pointer. */
+    memset(&RG, 0, sizeof RG);
+    printf("RINGS: CLASSIC build -- no delay/e5 rings. 0 bytes of PSRAM "
+           "asked for; free PSRAM %u\n",
+           (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    return 1;
+#else
     float **dst[9] = { &RG.t1, &RG.t23, &RG.t5_0, &RG.t5_1, &RG.t5_2,
                        &RG.t5_3, &RG.e5, &RG.t4_0, &RG.t4_1 };
     int32_t *len[9] = { &RG.t1_len, &RG.t23_len, &RG.t5_0_len, &RG.t5_1_len,
@@ -2111,6 +2122,7 @@ static int rings_alloc(void)
            "       a longer DELAY TIME than this bank uses would fold.\n");
 #endif
     return 1;
+#endif /* !EB_CLASSIC */
 }
 
 
