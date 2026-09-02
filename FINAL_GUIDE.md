@@ -374,6 +374,29 @@ show the high band on the stepped run, while b4_stress.py classifies 18 as
 TYPE 2/3/5 — that mismatch is UNRESOLVED and is O4's first question, because a
 worst-case budget must be met by the worst patch, whichever list is right.
 
+## O4 DELTA (2026-09-02 — supersedes the row's "NEXT" sentence above)
+The b32–b43 arc landed after that row was written: the CHUNK=64 click causes
+were closed one by one, three more levers were refuted on silicon
+(reverb-half, per-file -O3, fuse-VCA), EB_ZEROCOEF_T5 landed (−70 fx), and the
+⚠ VOICE-5 DEFECT was found: VOICE_LO=6 rode into the 3-voice builds, so voice
+5 never rendered and every "3-voice" number was 2-voice. The first honest
+3-voice build (JUNO-3V) is staged in esp32s3/flash/meas/, UNFLASHED. No
+6-voice projection may be made until it is measured. Data: docs/engineb/data/
+b32..b43; live pointers: CLAUDE.md LIVE STATE.
+
+## USER-DIRECTED VARIANTS (2026-09-02 — parallel to the tracks, not in them)
+- **CLASSIC port**: the 1982 panel only. EB_CLASSIC drops delay/reverb/e5 and
+  pins every non-1982 parameter at neutral forever (docs/CLASSIC_PANEL.md).
+  CLASSIC6 image = 6 voices + chorus on ONE S3, staged, unflashed. Judged
+  against the VST limited the same way — NOT against the full engine. If it
+  fits one chip, the fit picture for every track changes.
+- **Hardware**: the MasterAudio 4-slot carrier board (docs/hardware/BOARD.md
+  + PCB_PLACEMENT.md). Supersedes the 2-board jumper-wire bench as the
+  physical target; the D-track link design carries over (chain 4→3→2→1).
+- **JX-3P (E5)**: further along than the E-table above says — recall 64/64
+  EXACTLY 0, transcription nulls green, but the render A/B seed was INVALID
+  (NaN warm-up) and the census was 32/57 pools. jx3p/docs/S3_STATUS.md rules.
+
 ## The three facts that must not be re-litigated
 - **One chip cannot do it:** 6v+FX single-chip measured 10,479 = 1.93× over.
 - **The split matters more than any lever:** wrong split costs 1,863 cycles.
