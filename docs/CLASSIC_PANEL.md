@@ -29,19 +29,33 @@ engine behaves as if they never existed (a 1982 JUNO-60)?
 - There is no single fan-out host param; the plugin stores the two
   envelopes independently (src/juno_hostparams.c).
 
-## The classic rules that follow (binding for any CLASSIC interface)
+## The classic rules — USER OVERRIDE 2026-09-02 (supersedes the first draft)
 
-1. RECALL IS SACRED. Stored ENV2 / VCA TONE / CONDITION values are part of
-   the patch's sound. The classic build recalls them untouched (it already
-   does — recall is not modified by EB_CLASSIC).
-2. The classic PANEL simply does not show them. Removing the knob, not the
-   value.
-3. LIVE EDITS in classic mode: the one ENV section writes THE SAME byte to
-   ENV1 and ENV2 (one knob set feeding both circuits, as the 1982 signal
-   path did). Label: INFERRED from the 1982 architecture, not provable from
-   the plugin binary. A NEW patch initialises VCA TONE = 128 (the proven
-   passthrough) and ENV2 = ENV1.
-4. CONDITION stays a knob (user decision 2026-09-02).
+The user's binding decision: every parameter without a 1982 knob is pinned to
+its neutral value FOREVER, recall included, no matter what the patch stores.
+The classic port is allowed to sound different from the full VST; correctness
+is judged against the VST LIMITED THE SAME WAY.
+
+Implemented as `eb_patch_classicize()` (engine_b/eb_patch.c), a byte-level
+law applied inside eb_patch_install under EB_CLASSIC — the one site the
+firmware and the devcrc answer-key oracle share, so the CRC tooth holds.
+The full pin table is in that function's header comment. Highlights:
+ENV2 := ENV1 (curves pairwise identical 35/38/50/38, so a byte copy is the
+one-ADSR panel), VCA TONE := 128 (proven passthrough), EFFECT TYPE clamped
+to {2,3,4} else 0, delay/reverb/glide/legato/assign/velocity/mod-wheel all
+:= 0, BEND RANGE := 11 (bank-constant), chorus fine-FX := 20/2/13
+(bank-constant). VCA MODE stays (the 1982 ENV/GATE switch — with ENV2==ENV1
+its ENV1-vs-ENV2 split collapses to plain ENV). CONDITION stays a knob
+(user decision).
+
+Verified: classicized all 64 factory patches, every pin conforms
+(scratchpad classic_check.c, 2026-09-02).
+
+Known sound changes vs the full VST, accepted by design: 8 type-5-effect
+patches lose that effect; 1 type-1 patch loses it; delay/reverb tails gone;
+14 MONO + 2 UNISON patches play POLY; glide patches lose glide; 24 patches
+lose their VCA TONE tilt; every patch's amp envelope becomes the panel
+envelope; 10 patches lose HPF TYPE 1; velocity shaping off.
 
 ## Provenance labels
 

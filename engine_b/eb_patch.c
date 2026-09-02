@@ -182,10 +182,79 @@ int eb_patch_extract(const uint8_t *bank, size_t len, int idx, eb_patch *out)
     return 0;
 }
 
+#if EB_CLASSIC
+/* THE 1982 PANEL, ENFORCED AT THE BYTE LEVEL (docs/CLASSIC_PANEL.md).
+ * Every parameter without a knob on the classic JUNO-60 is pinned to its
+ * neutral value BEFORE coefficients are built -- recall included, forever.
+ * This runs inside eb_patch_install, the one site both the firmware and the
+ * devcrc answer-key oracle pass through, so the CRC tooth stays in force.
+ *
+ * Pins (blob offset, nibble-pair value unless RAW):
+ *   ENV2 A/D/S/R  := ENV1 A/D/S/R   (one panel ADSR fed both 1982 circuits;
+ *                                    curves are pairwise identical: 35/38/50/38)
+ *   VCA TONE      98  := 128        (curve24(128) == 0.0 exactly -> passthrough)
+ *   EFFECT DEPTH 100  := 255        (1982 chorus had no depth control; 255 is
+ *                                    the bank's dominant value, 55 of 64)
+ *   REVERB LEVEL 102, DELAY LEVEL 104, DELAY TIME 106 := 0
+ *   PORTAMENTO 108, LEGATO 110, ASSIGN MODE 112 := 0  (no glide/solo in 1982)
+ *   BEND RANGE  114  := 11          (bank-constant, all 64)
+ *   TEMPO SYNC  118, F ENV VAR 466, BEND GAIN 490 := 0
+ *   MOD SENS DCO 514, MOD SENS VCF 522 := 0   (no mod wheel in 1982)
+ *   LFO TRIG ENV 538, HPF TYPE 602 := 0       (bank-dominant values)
+ *   EFFECT TYPE 618  := clamp {2,3,4} else 0  (chorus I/II/I+II or off)
+ *   DELAY TYPE  634  := 0           (keeps DLY-mute cell 101744 at 1.0 --
+ *                                    the LIVE dry-path gain; type>5 zeroes it)
+ *   VCF VEL SENS 1852, VCA VEL SENS 2086 := 0 (1982 keys had no velocity)
+ *   chorus fine-FX RAW 3270/3271/3272 := 20/2/13 (bank-constant, all 64)
+ * VCA MODE (474) and CONDITION (482) are KEPT: the ENV/GATE switch is a 1982
+ * control (with ENV2==ENV1 its ENV1-vs-ENV2 split collapses to plain ENV,
+ * exactly the 1982 switch), and CONDITION stays a knob by user decision.
+ * Delay/reverb fine-FX and REVERB TYPE/TIME are NOT pinned: their coefficient
+ * cells are dead in a classic build (the modules never tick). */
+static void classic_pin(eb_patch *p, int bo, int v)
+{
+    int hi = index_of(bo), lo = index_of(bo + 1);
+    if (hi >= 0) p->b[hi] = (uint8_t)((v >> 4) & 0xF);
+    if (lo >= 0) p->b[lo] = (uint8_t)(v & 0xF);
+}
+void eb_patch_classicize(eb_patch *p)
+{
+    static const int PIN0[] = { 102, 104, 106, 108, 110, 112, 118,
+                                466, 490, 514, 522, 538, 602, 1852, 2086 };
+    int i, et;
+    for (i = 0; i < 8; ++i) {                    /* ENV2 := ENV1, raw bytes */
+        int src = index_of(80 + i), dst = index_of(90 + i);
+        if (src >= 0 && dst >= 0) p->b[dst] = p->b[src];
+    }
+    classic_pin(p, 98, 128);
+    classic_pin(p, 100, 255);
+    classic_pin(p, 114, 11);
+    for (i = 0; i < (int)(sizeof PIN0 / sizeof PIN0[0]); ++i)
+        classic_pin(p, PIN0[i], 0);
+    et = ((p->b[index_of(618)] & 0xF) << 4) | (p->b[index_of(619)] & 0xF);
+    if (et < 2 || et > 4) classic_pin(p, 618, 0);
+    classic_pin(p, 634, 0);
+    p->b[index_of(3270)] = 20;                   /* chorus fine-FX, RAW */
+    p->b[index_of(3271)] = 2;
+    p->b[index_of(3272)] = 13;
+}
+#endif /* EB_CLASSIC */
+
 int eb_patch_install(uint8_t *record, const eb_patch *p)
 {
     int i;
+#if EB_CLASSIC
+    eb_patch cl;
+#endif
     if (!record || !p) return 1;
+#if EB_CLASSIC
+    /* The classic byte law runs HERE, the one site every consumer -- device
+     * recall AND the devcrc oracle -- passes through, so both sides predict
+     * the same coefficients and the CRC tooth keeps its teeth. */
+    cl = *p;
+    eb_patch_classicize(&cl);
+    p = &cl;
+#endif
     for (i = 0; i < EB_PATCH_BYTES; ++i)
         record[EB_BANK_BLOB_OFF + eb_patch_offsets[i]] = p->b[i];
     return 0;

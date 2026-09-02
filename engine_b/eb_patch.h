@@ -150,6 +150,15 @@ int eb_patch_extract(const uint8_t *bank, size_t len, int idx, eb_patch *out);
  * load time if it ever needs a full record. */
 int eb_patch_install(uint8_t *record, const eb_patch *p);
 
+/* EB_CLASSIC (see eb_master.h): the 1982-panel byte law. Applied INSIDE
+ * eb_patch_install, so every consumer gets it; exposed for tests. */
+#ifndef EB_CLASSIC
+#define EB_CLASSIC 0
+#endif
+#if EB_CLASSIC
+void eb_patch_classicize(eb_patch *p);
+#endif
+
 /* One carried blob byte, or -1 if that offset is not in the 118. */
 int eb_patch_byte(const eb_patch *p, int blob_off);
 
