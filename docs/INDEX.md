@@ -185,3 +185,12 @@ MasterAudio_reference.kicad_sch (generated reference netlist).
 jx3p/docs/ — the JX-3P port's own docs; S3_STATUS.md rules its state.
 docs is indexed; AIRTIGHT_PLAN.md, GOAL.md, END_GOAL.md, FINAL_GUIDE.md,
 COVERAGE.tsv, PROVENANCE.tsv live at repo root and outrank this index.
+
+## Fresh-eyes test (phase 6, 2026-09-02) — PASSED
+
+A clean-context agent, given only "start at README.md", answered 10 control
+questions (ground-truth rule, capture covenant, S3 state, CLASSIC standard,
+JX-3P state, src/ freeze rules, doc classification, hardware, claim labels,
+green-gate scope) 10/10 correct with citations, in under a minute. The
+cleanup is measured, not asserted. Re-run the same test after any future
+restructure.
