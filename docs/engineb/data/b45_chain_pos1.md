@@ -32,11 +32,23 @@ future exact-voice layout: BUDGET PER CORE = voice + ~350 overhead, so
 ONE exact voice per core is the maximum, with the prologue and master
 hidden on a core that has fewer voices.
 
-## Open
+## The ~21/10k "misses" -- ATTRIBUTED AND CLOSED (5th build)
 
-- ~21 blocks per 10,000 exceed the period slightly (HEALTH latch prints);
-  the DMA queue absorbs them (deficit flat) so the INVARIANT holds, but
-  the cause is UNATTRIBUTED. Suspects: block-tail UART/ctl jitter, report
-  printf contention. Attribute before quoting any chain budget number.
+Read from the code, not guessed: the miss detector measures block-START
+spacing (d = t0 - t_prev), and fires at d > 2x period. Build 4 runs
+FASTER than the DAC, so the loop PARKS inside the blocking DAC write;
+CHUNK=256 against the driver's 255-frame DMA descriptors makes that park
+occasionally span two descriptor completions -> spacing > 2 periods with
+the queue FULL. That is the writer being AHEAD -- the opposite of
+starvation -- which is why B5 deficit stayed flat and un=0 throughout.
+Fix: the miss test now subtracts the previous block's measured park
+(wrote_blocked_us, already measured); a real stall has park ~0 and still
+fires, and the 't' tooth stalls outside the write and still fires.
+late= stays RAW (documented early warning). Fixed build: app sha
+a65f1b86f. NOTE for the bench: positions 2-4 pace on the slave-TX write
+(20 ms timeout) -- if their park shows the same artifact, the same
+subtraction applies there; measure first.
+
+## Open
 - Note path + event tap not yet exercised (keys=0 in the pass run).
 - Positions 2-4 and every hop remain silicon-unproven.

@@ -4526,11 +4526,25 @@ void app_main(void)
             else if (note_ran_this_block) { ++blk_note;  dur_note  += d; }
             else                          { ++blk_quiet; dur_quiet += d; }
             unsigned long period = 1000000ul * CHUNK / SR;
+            /* THE PARK IS NOT A STALL (b45's open item, attributed and
+             * closed): when the engine runs FASTER than the DAC, the loop
+             * parks inside the blocking DAC write until a descriptor frees.
+             * CHUNK=256 against the driver's 255-frame descriptors makes
+             * that park occasionally span two descriptor completions, so
+             * block-START spacing exceeds 2x period while the DAC is FULL
+             * -- the opposite of starvation (B5 deficit flat, un=0). The
+             * gap d contains the PREVIOUS iteration's park, and
+             * wrote_blocked_us still holds exactly that value here. A real
+             * stall (slow engine) has park ~0 and still fires; the 't'
+             * tooth stalls OUTSIDE the write and still fires. late= stays
+             * RAW on purpose -- it is the documented early warning. */
+            unsigned long d_work = (d > wrote_blocked_us)
+                                       ? d - wrote_blocked_us : 0;
             /* COUNT, do not merely latch. See rpt_ovr_* for why the counter
              * had to be added: health_fail keeps the FIRST string only, so
              * every later miss was invisible, and B4 needs the COUNT. */
             if (d > period)      ++ovr_late;
-            if (d > 2ul * period) {
+            if (d_work > 2ul * period) {
                 ++ovr_miss;
                 /* ⚑ O2's ACCEPTANCE TEST NEEDS THE CAUSE, NOT THE TOTAL.
                  *
