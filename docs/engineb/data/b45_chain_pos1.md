@@ -49,6 +49,20 @@ a65f1b86f. NOTE for the bench: positions 2-4 pace on the slave-TX write
 (20 ms timeout) -- if their park shows the same artifact, the same
 subtraction applies there; measure first.
 
+## The park attribution was REFUTED (6th flash, robot build)
+
+The robot run (app sha 85dad3c51, park fix active) still shows quiet
+misses at ~25/10k, with REAL gaps of 8-22 ms roughly every 4 s -- the
+patch-step period. The park subtraction was correct for the AHEAD case
+but was NOT the miss cause; the earlier "closed" claim is withdrawn.
+Throughout: drift and deficit FROZEN, un=0 -- the 6-deep DMA queue (35 ms)
+absorbs every stall, the INVARIANT holds. The robot run also proved the
+note path and the event tap (CHAINev sent counting, allocator busy).
+Next: the G4 worst-gap probe (7th build, sha 3e79c3662) splits the worst
+block into eng/tail/park/UNSEEN each second -- the attribution is read
+from silicon, not argued.
+
 ## Open
-- Note path + event tap not yet exercised (keys=0 in the pass run).
+- The 8-22 ms loop stalls: UNATTRIBUTED (G4 probe staged).
+- Note path + event tap: PROVEN by the robot run.
 - Positions 2-4 and every hop remain silicon-unproven.

@@ -3398,6 +3398,9 @@ static volatile unsigned long rpt_dacsent = 0, rpt_written = 0;
  *               past two periods the DMA had to be carrying us, which is
  *               the invariant broken whatever it sounded like. */
 static volatile unsigned long rpt_ovr_late = 0, rpt_ovr_miss = 0;
+static volatile unsigned long rpt_g4_worst = 0, rpt_g4_eng = 0,
+                              rpt_g4_tail = 0, rpt_g4_park = 0;
+static volatile int           rpt_g4_tag = 0;
 static volatile unsigned long rpt_blk_burst = 0, rpt_blk_quiet = 0,
                               rpt_blk_note = 0;
 static volatile unsigned long rpt_dur_burst = 0, rpt_dur_quiet = 0,
@@ -3435,6 +3438,13 @@ static void rpt_task(void *arg)
          * hn is health_n, which nothing printed before. */
         printf("B4: ovr=%lu/%lu hn=%lu\n",
                rpt_ovr_late, rpt_ovr_miss, rpt_health_n);
+        /* G4: the worst block gap this second, SPLIT. worst = eng + tail +
+         * park + UNSEEN; a large UNSEEN means the loop was preempted or
+         * parked somewhere this probe does not stamp. tag: 1=burst 2=note. */
+        printf("G4: worst=%luus eng=%lu tail=%lu park=%lu unseen=%ld tag=%d\n",
+               rpt_g4_worst, rpt_g4_eng, rpt_g4_tail, rpt_g4_park,
+               (long)rpt_g4_worst - (long)rpt_g4_eng - (long)rpt_g4_tail
+                   - (long)rpt_g4_park, rpt_g4_tag);
         /* burst= is O2's ACCEPTANCE NUMBER and must read 0: a block that ran a
          * burst step overran. quiet= belongs to O4 (delay patches over budget)
          * and to the open timer anomaly, and is printed beside it so the two
@@ -3767,6 +3777,13 @@ void app_main(void)
      * is ahead of the codec, which is both the result we want and a yield the
      * scheduler already got. See the watchdog note in the loop. */
     unsigned long wrote_blocked_us = 0;
+    /* G4: the WORST-GAP probe (b45 follow-up). The park subtraction did NOT
+     * cut the quiet-miss rate, so the cause is still UNATTRIBUTED. For the
+     * block that ends the worst gap since the last report, keep what the
+     * PREVIOUS iteration spent: engine, tail, DAC park, and what ran. */
+    unsigned long gp_eng = 0, gp_tail = 0;
+    unsigned long gp_worst = 0, gp_w_eng = 0, gp_w_tail = 0, gp_w_park = 0;
+    int gp_w_tag = 0;
     int step = 0, gate = 0;
     unsigned long patch_frames = 0;
     /* ---- THE STALL BISECT AND THE GAP METER (2026-08-12) -----------------
@@ -4540,6 +4557,14 @@ void app_main(void)
              * RAW on purpose -- it is the documented early warning. */
             unsigned long d_work = (d > wrote_blocked_us)
                                        ? d - wrote_blocked_us : 0;
+            if (d > gp_worst) {          /* G4: attribute the worst gap */
+                gp_worst  = d;
+                gp_w_eng  = gp_eng;
+                gp_w_tail = gp_tail;
+                gp_w_park = wrote_blocked_us;
+                gp_w_tag  = (burst_ran_this_block ? 1 : 0)
+                          | (note_ran_this_block ? 2 : 0);
+            }
             /* COUNT, do not merely latch. See rpt_ovr_* for why the counter
              * had to be added: health_fail keeps the FIRST string only, so
              * every later miss was invisible, and B4 needs the COUNT. */
@@ -4617,7 +4642,10 @@ void app_main(void)
 #endif
 #endif
             render_block(CHUNK);
-            te += esp_timer_get_time() - e0;
+            {   int64_t ge = esp_timer_get_time() - e0;
+                te += ge;
+                gp_eng = (unsigned long)ge;   /* G4 probe: this block's engine */
+            }
         }
 #if !S3L_FX_PIPE
         float (*vb_out)[EB_NUM_VOICES] = w_vbb;
@@ -4828,7 +4856,12 @@ void app_main(void)
 #endif
         }
 #endif
-        busy_us += (unsigned long)(esp_timer_get_time() - t0);
+        {   int64_t tb = esp_timer_get_time();
+            busy_us += (unsigned long)(tb - t0);
+            /* G4 probe: everything this iteration did OUTSIDE the engine and
+             * BEFORE the DAC write (miss check, atrest, chain tail, polls). */
+            gp_tail = (unsigned long)(tb - t0) - gp_eng;
+        }
         eng_us  += (unsigned long)te;
         ++ph_chunks;
 
@@ -5025,6 +5058,10 @@ void app_main(void)
                 /* NOT reset below with gap_max: B4's question is "did a block
                  * EVER miss", so these accumulate for the life of the run. */
                 rpt_ovr_late  = ovr_late;
+                rpt_g4_worst = gp_worst;  rpt_g4_eng = gp_w_eng;
+                rpt_g4_tail  = gp_w_tail; rpt_g4_park = gp_w_park;
+                rpt_g4_tag   = gp_w_tag;
+                gp_worst = 0;
                 rpt_miss_burst = ovr_miss_burst;
                 rpt_miss_quiet = ovr_miss_quiet;
                 rpt_miss_note  = ovr_miss_note;
