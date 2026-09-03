@@ -299,6 +299,37 @@ static void s3c_ctl_poll(s3c_ctl *c, int my_patch, unsigned long my_crc,
 #define S3C_SLOTW  (S3_CHAIN_SLOTS)                /* words per sample      */
 #define S3C_CHW    (S3C_SLOTW * 256)               /* words per chunk >= CHUNK*4 */
 
+/* THE TABLE CRC TWIN (the pairwise link's own lesson, re-paid on the first
+ * chain flash 2026-09-03: the bitwise eb_devseq_crc32 is ~60 cyc/byte, and
+ * running it over a 4 KB chunk on the block tail cost ~960 cyc/sample --
+ * cyc read 6,343 against the 5,442 budget and the DAC starved. Same dialect,
+ * ~8 cyc/byte, PROVEN equal on a test vector before anything trusts it. */
+static uint32_t s3c_crctab[256];
+static int      s3c_crctab_ok;
+static uint32_t s3c_crc32(const void *p, size_t n)
+{
+    const unsigned char *q = (const unsigned char *)p;
+    uint32_t c = 0xFFFFFFFFu;
+    size_t i;
+    for (i = 0; i < n; ++i)
+        c = (c >> 8) ^ s3c_crctab[(c ^ q[i]) & 0xFFu];
+    return c ^ 0xFFFFFFFFu;
+}
+static int s3c_crc_init(void)
+{
+    uint32_t i, k, c;
+    static const unsigned char tv[] = { 49,50,51,52,53,54,55,56,57 };
+    if (s3c_crctab_ok) return 1;
+    for (i = 0; i < 256; ++i) {
+        c = i;
+        for (k = 0; k < 8; ++k)
+            c = (c >> 1) ^ (0xEDB88320u & (uint32_t)(-(int32_t)(c & 1u)));
+        s3c_crctab[i] = c;
+    }
+    s3c_crctab_ok = (s3c_crc32(tv, 9) == eb_devseq_crc32(tv, 9));
+    return s3c_crctab_ok;
+}
+
 typedef struct {
     i2s_chan_handle_t ch;
     int up;                      /* channel enabled                          */
@@ -344,6 +375,11 @@ static int s3c_aud_start(s3c_aud *a, int master_rx,
     };
     memset(a, 0, sizeof *a);
     a->pace = S3_BPACE_FREERUN;
+    if (!s3c_crc_init()) {
+        printf("CHAIN: crc table twin DIVERGES from eb_devseq_crc32 -- "
+               "no audio port\n");
+        return 0;
+    }
     if (master_rx) tc.gpio_cfg.din  = data;
     else           tc.gpio_cfg.dout = data;
     cc.dma_desc_num  = 6;
@@ -383,7 +419,7 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
     i2s_channel_write(A_DN.ch, s3c_txbuf, want, &wrote, tmo);
     ++A_DN.tx_blk;
     if (!silent && wrote == want) {
-        A_DN.tx_crc     = eb_devseq_crc32(s3c_txbuf, want);
+        A_DN.tx_crc     = s3c_crc32(s3c_txbuf, want);   /* table twin */
         A_DN.tx_crc_blk = A_DN.tx_blk;
     }
     tmo = (A_DN.pace == S3_BPACE_LINKED && wrote < want);
@@ -397,13 +433,32 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
 /* A-side: drain to latest, pattern-lock, redeem adverts, step the mix gate.
  * Leaves the latest aligned AUDIO chunk in s3c_rxbuf and returns 1 when the
  * mix gate is OPEN for it. */
-static int s3c_rx(int n, int hs_ok, uint32_t peer_acrc, int fresh_acrc)
+static int s3c_rx(int n, int peer_present, int hs_ok,
+                  uint32_t peer_acrc, int fresh_acrc)
 {
     size_t got = 0;
     int match = 0, mismatch = 0, got_chunk = 0, k;
     if (!A_UP.up) return 0;
     if (n > CHUNK) n = CHUNK;
     s3c_rx_fresh = 0;
+    /* NO PEER: the master clock still fills the DMA with garbage, so DRAIN
+     * it (cheap memcpys) -- but pay for nothing else. The first chain flash
+     * scanned and CRC'd a floating wire every block; that work belongs
+     * behind a peer that answered. */
+    if (!peer_present) {
+        size_t g;
+        int d = 0;
+        do {
+            g = 0;
+            if (i2s_channel_read(A_UP.ch, s3c_rxbuf,
+                                 (size_t)n * S3C_SLOTW * sizeof(int32_t),
+                                 &g, 0) != ESP_OK || !g)
+                break;
+        } while (++d < 4);
+        A_UP.locked = 0;
+        (void)s3_amix_step(&A_UP.mix, 0, 0, 0, 0);
+        return 0;
+    }
     if (A_UP.discard_left) {
         size_t g = 0;
         uint32_t w = A_UP.discard_left;
@@ -428,7 +483,10 @@ static int s3c_rx(int n, int hs_ok, uint32_t peer_acrc, int fresh_acrc)
     if (got == (size_t)n * S3C_SLOTW * sizeof(int32_t)) {
         got_chunk = 1;
         ++A_UP.rx_chunks;
-        A_UP.crc_last = eb_devseq_crc32(s3c_rxbuf, got);
+        /* CRC only once LOCKED (it exists to redeem adverts); the pattern
+         * lock itself needs no checksum at all. Table twin, ~8 cyc/byte. */
+        if (A_UP.locked)
+            A_UP.crc_last = s3c_crc32(s3c_rxbuf, got);
         if (!A_UP.locked) {
             uint32_t idx0; int disc;
             if (s3_pat_scan((const uint32_t *)s3c_rxbuf, S3C_SLOTW * n,

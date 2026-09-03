@@ -4776,7 +4776,8 @@ void app_main(void)
             {   int hs_up;
                 s3c_ctl_poll(&C_UP, dev_patch, mycrc, 0, 0, A_UP.locked);
                 hs_up = C_UP.peer.present && C_UP.hs == S3_HS_OK;
-                up_ok = s3c_rx(CHUNK, hs_up, C_UP.peer_acrc, C_UP.acrc_fresh);
+                up_ok = s3c_rx(CHUNK, C_UP.peer.present, hs_up,
+                               C_UP.peer_acrc, C_UP.acrc_fresh);
                 C_UP.acrc_fresh = 0;
             }
 #endif
