@@ -128,6 +128,10 @@ mine is a hypothesis (playbook 80).
   all four chips; hops = the proven pairwise link ×3, TDM4; notes ride a
   checksummed event chain from chip 1. UNFLASHED — no chain silicon fact
   exists yet; first bench criterion is hs=OK + mix=OPEN + CRC MATCH ×4.
+  Pos 1 alone: GREEN on the 4th flash (b45) -- cyc 5,217/5,442, drift and
+  deficit FROZEN. Law: one exact voice per core MAX; prologue+master must
+  ride the light core (S3L_PROLOGUE_C1, no REV_PIPE). Open: ~21/10k long
+  blocks unattributed; note path unexercised.
 - **Hardware (user-directed)**: MasterAudio 4-slot carrier board for N16R8
   DevKitC-1 boards (JLCPCB/LCSC). The user draws the schematic by hand;
   docs/hardware/ holds the connection reference, PCB placement notes, and
