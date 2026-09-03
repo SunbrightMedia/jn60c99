@@ -62,7 +62,26 @@ Next: the G4 worst-gap probe (7th build, sha 3e79c3662) splits the worst
 block into eng/tail/park/UNSEEN each second -- the attribution is read
 from silicon, not argued.
 
+## G4 ATTRIBUTION (8th flash, probe run): THE REPORTER, AGAIN
+
+The probe run shows a ~1 Hz blocker up to 17 ms whose phase slides
+~1.54 ms/s (the linear unseen staircase 911->2452->3994->5531->7077->
+8619, then wrap). The only 1 Hz machinery in the build is the REPORTER's
+serial flood -- and CLAUDE.md ALREADY lists "reporter UART
+(S3L_REPORT_SECS)" among the CLOSED CHUNK=64 stall causes. The stall was
+re-derived instead of grepped (playbook 84 rule 1, violated by its own
+author on the day it was written). Mostly the stall lands outside the
+stamped regions (unseen); every ~5 s it lands inside the e0 region
+(eng 12-17 ms) -- both faces of the same reporter cycle, largest when the
+MSPP per-patch flood prints.
+
+Fix (9th and final build, app sha deb8cea2d): S3L_REPORT_SECS=10 and
+EB_MSPROF off (its collapse numbers are already recorded here and in
+b44). Blocker 10x rarer and ~5x smaller. MSPROF is measurement-only --
+the answer key never included it, so coefficients are unchanged.
+
 ## Open
-- The 8-22 ms loop stalls: UNATTRIBUTED (G4 probe staged).
 - Note path + event tap: PROVEN by the robot run.
+- Residual: a stall may still ride each 10 s report; it is the DOCUMENTED
+  reporter cost, absorbed by the DMA queue (INVARIANT holds).
 - Positions 2-4 and every hop remain silicon-unproven.
