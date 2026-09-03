@@ -1881,6 +1881,8 @@ unsigned long con_keys = 0;
 static int k_param = 0;
 static int k_pval  = 128;
 
+volatile int g_stress_rt = 1;      /* the robot keybed, gated at runtime */
+
 static void con_poll(void)
 {
     unsigned char b[16];
@@ -1900,6 +1902,20 @@ static void con_poll(void)
          * its use site: this is how a measurement build proves its own
          * detectors are live without contaminating the measurement. */
         if (c == 't') { tooth_once = 1; continue; }
+        /* r -- the robot keybed ON/OFF. See the gate at stress_step(). */
+        if (c == 'r') {
+            g_stress_rt = !g_stress_rt;
+            printf("ROBOT: %s -- %s\n", g_stress_rt ? "ON" : "OFF",
+                   g_stress_rt ? "worst-case stress is running"
+                               : "engine is QUIET; play by hand now");
+            if (!g_stress_rt) {
+                int k;
+                for (k = 0; k < 128; ++k)
+                    if (con_held[k]) { con_held[k] = 0;
+                                       juno_event_note_off(JUNO_SRC_CONSOLE, k); }
+            }
+            continue;
+        }
         /* O3 BY HAND. `[` and `]` sweep the SELECTED parameter down and up;
          * `;` and `'` choose which parameter. Without these the only knob
          * source is the robot phase, and a path you cannot drive by hand is a
@@ -3999,6 +4015,41 @@ void app_main(void)
 #else
     printf("ONE CORE: all %d voices on core 0\n", EB_NUM_VOICES);
 #endif
+#if EB_CLASSIC
+    /* THE CLASSIC BUILD MUST PROVE ITSELF IN ITS OWN LOG. Without this the
+     * only evidence that eb_patch_classicize() ran is that I say so. Here the
+     * chip reads back the bytes it actually installed and the memory it did
+     * NOT allocate. A run whose log lacks these lines is not a classic run. */
+    {
+        eb_patch cp;
+        int e1[4], e2[4], tone, dly, efx, i, ok = 1;
+        memcpy(cp.b, eb_bank64 + (size_t)dev_patch * EB_PATCH_BYTES,
+               EB_PATCH_BYTES);
+        eb_patch_classicize(&cp);       /* the SAME law eb_patch_install runs */
+        for (i = 0; i < 4; ++i) {
+            e1[i] = eb_patch_param(&cp, 96 + 2 * i);    /* ENV1 A/D/S/R */
+            e2[i] = eb_patch_param(&cp, 106 + 2 * i);   /* ENV2 A/D/S/R */
+            if (e1[i] != e2[i]) ok = 0;
+        }
+        tone = eb_patch_param(&cp, 114);
+        efx  = eb_patch_param(&cp, 634);
+        dly  = eb_patch_param(&cp, 650);
+        printf("CLASSIC: patch %d ENV1=[%d %d %d %d] ENV2=[%d %d %d %d] %s\n",
+               dev_patch, e1[0], e1[1], e1[2], e1[3],
+               e2[0], e2[1], e2[2], e2[3], ok ? "MATCH" : "*** MISMATCH ***");
+        printf("CLASSIC: VCA TONE=%d (128=passthrough)  EFFECT TYPE=%d "
+               "(0 or 2/3/4=chorus)  DELAY TYPE=%d (0)\n", tone, efx, dly);
+        if (!ok || tone != 128 || dly != 0 || (efx && (efx < 2 || efx > 4)))
+            printf("CLASSIC: *** THE BYTE LAW DID NOT APPLY -- do not trust "
+                   "this run ***\n");
+        printf("CLASSIC: no delay/reverb/e5 ticks, NO FX RINGS. free PSRAM %u B, "
+               "free internal %u B\n",
+               (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+               (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    }
+#endif
+    printf("KEYS: a..k play  z/x octave  b/n patch  ,/. split  r robot on/off  "
+           "space all-notes-off  t fire the tooth\n");
 #if S3L_RECALL && S3L_MIDI
     if (!midi_start()) {
         printf("HALT: MIDI UART would not start on GPIO %d.\n", S3L_MIDI_RX);
@@ -4396,7 +4447,13 @@ void app_main(void)
             midi_poll();
             con_poll();
 #if S3L_STRESS
-            stress_step();          /* the robot keybed, same boundary */
+            /* g_stress_rt: the robot is GATED AT RUNTIME (console 'r').
+             * WHY: one flash must answer two questions that fight each other
+             * -- worst-case headroom (robot hammering) and "does it sound
+             * right" (the user's hands, on a quiet engine). Without this the
+             * two need two flashes. Default ON so a run that is never touched
+             * still measures the worst case. */
+            if (g_stress_rt) stress_step();
 #endif
 #endif
             render_block(CHUNK);
