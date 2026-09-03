@@ -80,8 +80,23 @@ EB_MSPROF off (its collapse numbers are already recorded here and in
 b44). Blocker 10x rarer and ~5x smaller. MSPROF is measurement-only --
 the answer key never included it, so coefficients are unchanged.
 
+## FINAL ATTRIBUTION (9th flash refuted the reporter too): THE DONATED TICK
+
+The 10 s-report build kept the SAME miss rate -> the printing was not the
+cause either. The cause, read from the code and matching every number:
+the audio loop DONATES one 10 ms tick per second (vTaskDelay(1)) so
+rpt_task can run on a saturated core. That donation was deliberately
+re-anchored OUT of the gap meter -- but the B4 miss detector, added
+later on a different anchor, was never taught, so every donation whose
+tick-rounding exceeded ~5.8 ms counted as a missed deadline:
+1/172 blocks x ~half = the observed 21-25/10k, and 10+5.8 ms = the
+observed 13-17 ms "gaps"; the tick-vs-block beat = the 1.54 ms/s
+staircase. THREE wrong attributions preceded this (park, reporter rate,
+reporter volume) -- each was a real cost, none was THE counter's cause.
+Fix (10th build, sha 5a326f29d): the donation adds itself to
+wrote_blocked_us, riding the same subtraction the miss test already does
+for the DAC park. Detector correction only; zero audio-path change.
+
 ## Open
 - Note path + event tap: PROVEN by the robot run.
-- Residual: a stall may still ride each 10 s report; it is the DOCUMENTED
-  reporter cost, absorbed by the DMA queue (INVARIANT holds).
 - Positions 2-4 and every hop remain silicon-unproven.

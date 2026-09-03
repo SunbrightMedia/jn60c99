@@ -5112,9 +5112,19 @@ void app_main(void)
              * dma_desc_num(6) x CHUNK(256) = 34.8 ms of audio, so a 10 ms
              * donation cannot empty it. This is the ONLY place the audio loop
              * yields on purpose, and it is once per second. */
-            vTaskDelay(1);
-            /* The donation is not a stall. Re-anchor the gap meter so it does
-             * not report its own yield as a 10 ms worst gap once a second. */
+            {   int64_t td0 = esp_timer_get_time();
+                vTaskDelay(1);
+                /* The donation is not a stall. Re-anchor the gap meter so it
+                 * does not report its own yield as a 10 ms worst gap once a
+                 * second -- AND teach the MISS detector the same fact: it was
+                 * added later on a different anchor and counted every
+                 * donation as a missed deadline (~21-25/10k, the b45 ghost
+                 * chased through three wrong attributions). The next
+                 * iteration's miss test already subtracts wrote_blocked_us;
+                 * the donation rides the same subtraction. */
+                wrote_blocked_us +=
+                    (unsigned long)(esp_timer_get_time() - td0);
+            }
             t_prev_block = esp_timer_get_time();
         }
         if (0) {
