@@ -1689,3 +1689,29 @@ load on the same box -- was never controlled.
 3. **Never pipe a long job through `tail`.** Its log then stays EMPTY until it
    exits, so a job that dies leaves no progress trace at all. Log raw; read the
    tail at query time.
+
+## 84. Two stall "fixes" shipped from argument; the rate refuted both (paid 2026-09-03, seven pos1 flashes)
+
+The CHAIN4 pos1 bring-up burned SEVEN user flashes. Four were legitimate
+(each bought a measured law: table CRC, no-peer fast path, prologue to
+core 1, master to core 1 -- see b45). Two were NOT: the "DAC-park" miss
+explanation was argued from code reading, shipped as CLOSED, and the next
+run showed the miss rate UNCHANGED (~25/10k, real 8-22 ms gaps). Worse,
+the stall class was ALREADY DOCUMENTED as open (b4_first_run.md §5,
+"about once a second... still open") -- a search of the project's own
+records BEFORE theorizing would have cost zero flashes.
+
+### The rules
+1. **Before attributing any silicon anomaly, grep the data/ records for it
+   first.** An anomaly the project has already seen and left open is not a
+   new defect, and re-deriving it burns the user's flashes.
+2. **A stall cause argued from code reading is a HYPOTHESIS; only a probe
+   that splits the stalled block on silicon is an attribution.** Ship the
+   probe, not the theory. (The G4 worst-gap probe: eng/tail/park/UNSEEN.)
+3. **State the flash budget to the user BEFORE a diagnosis loop starts**
+   ("probe, then fix: two flashes"), and offer the accept-and-move-on
+   option whenever the INVARIANT already holds (deficit frozen, un=0
+   means the DMA queue is absorbing the stall -- audio is NOT breaking).
+4. **A per-core budget law from this arc, MEASURED: one exact voice per
+   core is the maximum** (voice ~5,045 + ~350 overhead vs 5,442);
+   prologue and master must ride the light core.
