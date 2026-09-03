@@ -111,12 +111,55 @@
 #ifndef S3L_LINK
 #define S3L_LINK 1
 #endif
+/* CHAIN4: the 4-board chain (docs/engineb/CHAIN4.md). A different topology
+ * from the pairwise O6 link -- a chain build must say -DS3L_LINK=0. */
+#ifndef S3L_CHAIN
+#define S3L_CHAIN 0
+#endif
+#if S3L_CHAIN && S3L_LINK
+#error "S3L_CHAIN and S3L_LINK are different topologies: build with -DS3L_LINK=0"
+#endif
 #if S3L_LINK
 #include "s3_link_uart.h"
 #endif
 /* O1: THE ONE BOUNDARY. Every input reaches the engine through this and
  * nothing else -- FINAL_GUIDE O1, USER-BINDING. */
 #include "juno_event.h"
+#if S3L_CHAIN
+/* THE EVENT-CHAIN TAP (CHAIN4.md §5). Chip 1 mirrors every note it accepts
+ * up the chain; chips 2..4 take notes ONLY from the chain -- a local key
+ * there would desync the four allocators, so it is refused, not forwarded.
+ * The real bodies live in s3_chain_link.h (included after CHUNK exists);
+ * these wrappers only need the forward declaration. */
+static void s3c_ev_send(int kind, int note, int vel);
+#if S3_CHAIN_POS == 1
+static int s3c_tap_on(juno_src src, int note, int vel)
+{
+    int r = juno_event_note_on(src, note, vel);
+    s3c_ev_send(((int)src << 4) | 1, note, vel);
+    return r;
+}
+static int s3c_tap_off(juno_src src, int note)
+{
+    int r = juno_event_note_off(src, note);
+    s3c_ev_send(((int)src << 4) | 0, note, 0);
+    return r;
+}
+#define juno_event_note_on(s, n, v) s3c_tap_on(s, n, v)
+#define juno_event_note_off(s, n)   s3c_tap_off(s, n)
+#else
+static int s3c_refuse_on(juno_src s, int n, int v)
+{
+    (void)s; (void)n; (void)v;
+    printf("CHAIN: notes come from chip 1 over the event chain -- "
+           "local key refused (determinism)\n");
+    return 0;
+}
+static int s3c_refuse_off(juno_src s, int n) { (void)s; (void)n; return 0; }
+#define juno_event_note_on(s, n, v) s3c_refuse_on(s, n, v)
+#define juno_event_note_off(s, n)   s3c_refuse_off(s, n)
+#endif
+#endif /* S3L_CHAIN */
 #include "eb_patch.h"
 #include "devchord.h"
 #include "esp_cpu.h"
@@ -880,7 +923,7 @@ static int dev_burst(int patch, int gate)
     eb_alloc_init(&ALLOC);
     eb_devseq_alloc_config(&ALLOC, DEVBANK);
     DEVP_T0();
-#if S3L_MIDI
+#if S3L_MIDI || S3L_CHAIN
     /* MIDI OWNS THE NOTES. The built-in chord is what makes the CRC comparable
      * to the host oracle, so it still runs at boot; with MIDI on, the keyboard
      * takes over from the first key. */
@@ -1166,7 +1209,7 @@ static int dev_burst_step(void)
          * docs/ASSIGNER_MODE_FINDING.md verbatim. */
         eb_alloc_init(&ALLOC);
         eb_devseq_alloc_config(&ALLOC, DEVBANK);
-#if S3L_MIDI
+#if S3L_MIDI || S3L_CHAIN
         eb_devseq_notes_on(DEVCHORD_VOICE, DEVCHORD_NOTE, DEVCHORD_VEL,
                            DEVCHORD_N);
 #else
@@ -1671,7 +1714,7 @@ static int dev_note_step(void)
     return r;
 }
 
-#if S3L_MIDI
+#if S3L_MIDI || S3L_CHAIN
 /* ---- MIDI IN, UART1 at 31,250 baud --------------------------------------
  *
  * Standard 5-pin MIDI or a USB-MIDI adapter that speaks serial. One wire plus
@@ -1689,6 +1732,7 @@ static int dev_note_step(void)
  * on, and its default is OFF (CLAUDE.md, the host-lifecycle arc). A port that
  * passes played velocity raw sounds wrong on every velocity-sensitive patch.
  * S3L_MIDI_VELSW=1 turns the switch on. */
+#if S3L_MIDI
 #ifndef S3L_MIDI_RX
 #define S3L_MIDI_RX 18
 #endif
@@ -1699,6 +1743,7 @@ static int dev_note_step(void)
 
 static uint8_t m_status = 0, m_d1 = 0;
 static int     m_have = 0;
+#endif /* S3L_MIDI */
 
 /* NON-STATIC on purpose: main/s3_usbmidi.c calls this so that USB MIDI and
  * UART MIDI share ONE velocity policy and ONE allocator path. Two entry points
@@ -1807,6 +1852,7 @@ static int ev_apply(void)
  * they were not. Nothing reaches eb_alloc except ev_apply(), and
  * tools/engineb/boundary_check.py fails the build if that stops being true. */
 
+#if S3L_MIDI
 static void midi_poll(void)
 {
     uint8_t b[64];
@@ -1829,6 +1875,7 @@ static void midi_poll(void)
         m_have = 0;                              /* running status stays armed */
     }
 }
+#endif /* S3L_MIDI */
 
 
 /* ================= THE KEYBOARD YOU ALREADY HAVE =========================
@@ -1881,7 +1928,11 @@ unsigned long con_keys = 0;
 static int k_param = 0;
 static int k_pval  = 128;
 
+#if S3L_CHAIN && S3_CHAIN_POS != 1
+volatile int g_stress_rt = 0;      /* chain followers take notes from chip 1 */
+#else
 volatile int g_stress_rt = 1;      /* the robot keybed, gated at runtime */
+#endif
 
 static void con_poll(void)
 {
@@ -2012,6 +2063,7 @@ static int con_start(void)
     return 1;
 }
 
+#if S3L_MIDI
 static int midi_start(void)
 {
     uart_config_t cfg = {
@@ -2029,6 +2081,7 @@ static int midi_start(void)
     return 1;
 }
 #endif /* S3L_MIDI */
+#endif /* S3L_MIDI || S3L_CHAIN */
 #endif /* S3L_RECALL */
 
 /* The master's nine delay rings. CALLER-OWNED by design (eb_master.h), and
@@ -2512,6 +2565,17 @@ static eb_render_state *RS_INT, *RS_PSR;
  * released, and never read from the console variable inside the loops. */
 static int          w_split    = S3L_SPLIT;   /* latched, per block */
 #define SPLIT_  w_split
+/* CHAIN4: the HIGH bound of core 1's rendered range. The VOICE-5 defect
+ * proved LO alone cannot express a window; a chain position owns [LO_, HI_)
+ * of the global slots and must render nothing above HI_. Default: all. */
+#ifndef S3L_VOICE_HI
+#define S3L_VOICE_HI EB_NUM_VOICES
+#endif
+#define HI_ S3L_VOICE_HI
+/* CHAIN4, positions 2..4: skip the whole master chain (no DAC listens). */
+#ifndef S3L_NOMASTER
+#define S3L_NOMASTER 0
+#endif
 #endif
 
 /* EB_VPROF accumulators live in engine_b/eb_render.c, which selects its own
@@ -2632,7 +2696,14 @@ static void worker(void *arg)
 #if S3L_FXPROF
         {   unsigned long p0 = (unsigned long)esp_cpu_get_cycle_count(), pd;
 #endif
+#if S3L_NOMASTER
+        /* CHAIN4, positions 2..4: no DAC, no chorus -- the voices leave on
+         * the DOWN hop instead. The whole master chain is skipped and w_pcm
+         * stays the zeros it was initialised to. */
+        if (0) {
+#else
         if (have) {
+#endif
 #if S3L_REV_PIPE
             /* FRONT ONLY (in+delay+effect). back runs on core 0 next block,
              * from these buffers, with this same mc. See the rp_f comment. */
@@ -2686,7 +2757,7 @@ static void worker(void *arg)
          * is gone from the critical path. */
         for (i = 0; i < w_n; ++i)
             eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
-                                   SPLIT_, EB_NUM_VOICES, &w_shb[w_cur][i],
+                                   SPLIT_, HI_, &w_shb[w_cur][i],
                                    w_vbb[cur][i]);
         /* Then compute the NEXT chunk's prologues into the OTHER bank, ONE CHUNK
          * AHEAD. It runs BEFORE w_done=1, so it finishes inside this pass and can
@@ -2725,7 +2796,7 @@ static void worker(void *arg)
             while (w_ready <= i) { }        /* wait for this sample's prologue */
 #endif
             eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
-                                   SPLIT_, EB_NUM_VOICES, &w_shb[i],
+                                   SPLIT_, HI_, &w_shb[i],
                                    w_vbb[cur][i]);
         }
 #endif
@@ -2746,7 +2817,7 @@ static void worker(void *arg)
         for (i = 0; i < w_n; ++i) {
             while (w_ready <= i) { }        /* wait for this sample's prologue */
             eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
-                                   SPLIT_, EB_NUM_VOICES, &w_shb[i],
+                                   SPLIT_, HI_, &w_shb[i],
                                    w_vbb[i]);
         }
 #endif
@@ -2796,8 +2867,8 @@ static void render_block(int n)
      * cores disagreeing about who renders which voice -- which would render a
      * voice twice or not at all. Clamped, because the console writes it. */
     {   int s_ = g_split_rt;
-        if (s_ < LO_)            s_ = LO_;
-        if (s_ > EB_NUM_VOICES)  s_ = EB_NUM_VOICES;
+        if (s_ < LO_)  s_ = LO_;
+        if (s_ > HI_)  s_ = HI_;      /* CHAIN4: core 1 renders [split, HI_) */
         w_split = s_;
     }
 #endif
@@ -2954,9 +3025,11 @@ static void render_block(int n)
      * pattern w_go uses. The spin cannot hang: the worker always completes
      * its front before its voice loop, which core 0's w_ready feeds. */
     {   const int rb = w_cur;
+#if !S3L_NOMASTER
         if (w_have_prev) {
             while (!rp_valid[rb]) { }
         }
+#endif
         if (rp_valid[rb]) {
             const eb_master_coef *bmc = rp_mc[rb];
             int bn = rp_n[rb], j;
@@ -3338,6 +3411,9 @@ static volatile unsigned long rpt_health_n = 0;
 static void s3_la_report(void);
 static void s3_la_lock_bg(void);
 #endif
+#if S3L_CHAIN
+static void s3c_report(void);
+#endif
 
 static void rpt_task(void *arg)
 {
@@ -3508,6 +3584,9 @@ static void rpt_task(void *arg)
         s3_link_report();
         s3_la_report();
 #endif
+#if S3L_CHAIN
+        s3c_report();
+#endif
         printf("PARAM: edits=%lu builds=%lu defer=%lu unknown=%lu "
                "pubretry=%u apply=%lu applymax=%lu blocks=%u\n",
                pm_edits, pm_builds, pm_defer, pm_unknown, PM.pub_retry,
@@ -3593,6 +3672,26 @@ static void rpt_task(void *arg)
 /* O6 step 2: the audio link. Included HERE, after SR/CHUNK/EB_NUM_VOICES
  * exist -- it is plumbing over s3_link.h's host-gated decisions. */
 #include "s3_link_audio.h"
+#endif
+
+#if S3L_CHAIN
+/* CHAIN4 plumbing (control + TDM audio ports). Included HERE for the same
+ * reason as s3_link_audio.h: it needs SR/CHUNK/EB_NUM_VOICES. */
+#include "s3_chain_link.h"
+/* the chain's deferred patch follow: the ctl poll stores, the program-change
+ * site (same context as every other dev_request) consumes. */
+static volatile int s3c_want_patch = -1;
+static void s3c_patch_follow(int peer_patch) { s3c_want_patch = peer_patch; }
+/* apply one chain event through the SAME boundary chip 1's inputs use.
+ * The wrappers at the top of this file rename juno_event_note_on/off;
+ * the parentheses call the REAL functions. */
+static int s3c_apply_event(int kind, int note, int vel)
+{
+    juno_src src = (juno_src)((kind >> 4) & 0xF);
+    if ((kind & 0xF) == S3C_EV_ON)
+        return (juno_event_note_on)(src, note, vel);
+    return (juno_event_note_off)(src, note);
+}
 #endif
 
 static i2s_chan_handle_t TX;
@@ -4050,11 +4149,54 @@ void app_main(void)
 #endif
     printf("KEYS: a..k play  z/x octave  b/n patch  ,/. split  r robot on/off  "
            "space all-notes-off  t fire the tooth\n");
-#if S3L_RECALL && S3L_MIDI
+#if S3L_RECALL && (S3L_MIDI || S3L_CHAIN)
+#if S3L_MIDI
     if (!midi_start()) {
         printf("HALT: MIDI UART would not start on GPIO %d.\n", S3L_MIDI_RX);
         return;
     }
+#endif
+#if S3L_CHAIN
+    /* CHAIN4 bring-up. Ports exist by position; a hop with no peer runs and
+     * says so -- the mix gates stay closed, the chip plays its own window. */
+    printf("\n=== CHAIN4: THIS BOARD IS POSITION %d OF 4 (1 = the DAC end) "
+           "===\n", S3_CHAIN_POS);
+    {   s3_chain_cfg cc_ = s3_chain_config(S3_CHAIN_POS);
+        printf("CHAIN: renders GLOBAL voice slots %d..%d of 2..7; %s%s\n",
+               cc_.v_lo, cc_.v_hi - 1,
+               cc_.has_fx ? "chorus+master+DAC HERE" : "no master (NOMASTER)",
+               S3_CHAIN_POS == 1 ? "; notes enter HERE and ride the chain"
+                                 : "; notes arrive over the event chain");
+#if S3C_HAS_UP
+        {   int lo_, hi_;
+            s3_chain_down_window(S3_CHAIN_POS, &lo_, &hi_);
+            if (!s3c_ctl_start(&C_UP, S3C_UP_UART, S3C_UP_TX, S3C_UP_RX,
+                               1, lo_, hi_))
+                printf("CHAIN: UP control UART would NOT start.\n");
+            else
+                printf("CHAIN: UP ctl TX %d RX %d; UP audio master RX TDM4 "
+                       "BCLK %d LRCK %d DATA %d\n", S3C_UP_TX, S3C_UP_RX,
+                       S3C_UP_BCLK, S3C_UP_LRCK, S3C_UP_DATA);
+            if (!s3c_aud_start(&A_UP, 1, S3C_UP_BCLK, S3C_UP_LRCK,
+                               S3C_UP_DATA))
+                printf("CHAIN: UP audio channel would NOT start.\n");
+        }
+#endif
+#if S3C_HAS_DOWN
+        if (!s3c_ctl_start(&C_DN, S3C_DN_UART, S3C_DN_TX, S3C_DN_RX,
+                           0, cc_.adv_lo, cc_.adv_hi))
+            printf("CHAIN: DOWN control UART would NOT start.\n");
+        else
+            printf("CHAIN: DOWN ctl TX %d RX %d; DOWN audio slave TX TDM4 "
+                   "BCLK %d LRCK %d DATA %d\n", S3C_DN_TX, S3C_DN_RX,
+                   S3C_DN_BCLK, S3C_DN_LRCK, S3C_DN_DATA);
+        if (!s3c_aud_start(&A_DN, 0, S3C_DN_BCLK, S3C_DN_LRCK, S3C_DN_DATA))
+            printf("CHAIN: DOWN audio channel would NOT start.\n");
+#endif
+        printf("CHAIN: every mix gate stays CLOSED until its hop is "
+               "CRC-proven; wiring -> docs/engineb/CHAIN4.md §6\n");
+    }
+#endif
 #if S3L_LINK
     if (!s3_link_start())
         printf("LINK: control UART would NOT start -- running single-board.\n");
@@ -4068,11 +4210,13 @@ void app_main(void)
                LINK.role == S3_ROLE_A ? "master RX" : "slave TX",
                S3_LINK_BCLK, S3_LINK_LRCK, S3_LINK_DATA);
 #endif
+#if S3L_MIDI
     printf("MIDI IN: UART1, 31250 baud, RX on GPIO %d.  velocity switch %s "
            "(%s)\n", S3L_MIDI_RX,
            S3L_MIDI_VELSW ? "ON" : "OFF",
            S3L_MIDI_VELSW ? "played velocity passes through"
                           : "every note forced to 100 -- the plugin's own default");
+#endif
 #if S3L_USBMIDI
     {   extern int s3_usbmidi_start(void);
         if (s3_usbmidi_start())
@@ -4439,12 +4583,14 @@ void app_main(void)
          * hardware timer and is not free, and at two calls a sample it was
          * billing its own cost to the engine it was measuring. */
         {   int64_t e0 = esp_timer_get_time();
-#if S3L_RECALL && S3L_MIDI
+#if S3L_RECALL && (S3L_MIDI || S3L_CHAIN)
             /* ONCE PER BLOCK, OUTSIDE the timed render. A UART read is a
              * memcpy out of the driver's ring; polling it per sample would
              * bill its cost to the engine, which is playbook 12's rule and
              * this project has broken it three times. */
+#if S3L_MIDI
             midi_poll();
+#endif
             con_poll();
 #if S3L_STRESS
             /* g_stress_rt: the robot is GATED AT RUNTIME (console 'r').
@@ -4555,6 +4701,20 @@ void app_main(void)
                 !s3_follow_holds_stepper(LINK.role, LINK.peer.present,
                                          LINK.peer.role) &&
                 ++patch_frames >= (unsigned long)(S3L_PATCH_SECS * SR)) {
+#elif S3L_CHAIN && S3_CHAIN_POS != 1
+            /* CHAIN4: the DOWNSTREAM side is truth (CHAIN4.md §5). The ctl
+             * poll on the block tail stored what the peer holds; consumed
+             * HERE, unconditionally -- a b/n press on chip 1 must propagate
+             * whether or not the stepper is on. Followers never self-step. */
+            if (s3c_want_patch >= 0) {
+                int fp = s3c_want_patch;
+                s3c_want_patch = -1;
+                if (fp != dev_patch && fp >= 0 && fp < DEVCRC_NPATCH) {
+                    patch_frames = 0;
+                    dev_request(fp, gate);
+                }
+            }
+            if (0) {
 #else
             if (w_step_on &&
                 ++patch_frames >= (unsigned long)(S3L_PATCH_SECS * SR)) {
@@ -4603,6 +4763,54 @@ void app_main(void)
             } else {
                 s3_la_tx(w_vbb[w_cur], CHUNK, hs_ok);
             }
+        }
+#elif S3L_CHAIN
+        /* CHAIN4, on the block tail (the same window the O6 link used): the
+         * chunk in w_vbb[w_cur] is complete on both cores and untouched until
+         * the next flip. Order: drain the UP hop first, then inject (pos 1)
+         * or merge+transmit DOWN (pos 2..4). The wire fingerprint is the
+         * plain base-0 answer key on every chip -- the chain runs base 0. */
+        {   unsigned long mycrc = devcrc_rc[dev_patch] ^ devcrc_mc[dev_patch];
+            int up_ok = 0;
+#if S3C_HAS_UP
+            {   int hs_up;
+                s3c_ctl_poll(&C_UP, dev_patch, mycrc, 0, 0, A_UP.locked);
+                hs_up = C_UP.peer.present && C_UP.hs == S3_HS_OK;
+                up_ok = s3c_rx(CHUNK, hs_up, C_UP.peer_acrc, C_UP.acrc_fresh);
+                C_UP.acrc_fresh = 0;
+            }
+#endif
+#if S3_CHAIN_POS == 1
+            {   int ci;
+                float m_[EB_NUM_VOICES];
+                for (ci = 0; ci < CHUNK; ++ci) {
+                    const float *upv = up_ok
+                        ? (const float *)&s3c_rxbuf[S3C_SLOTW * ci]
+                        : (const float *)0;
+                    s3_chain_inject(w_vbb[w_cur][ci], upv, up_ok, m_);
+                    memcpy(w_vbb[w_cur][ci], m_, sizeof m_);
+                }
+            }
+#else
+            {   int ci, hs_dn;
+                s3_chain_cfg cc_ = s3_chain_config(S3_CHAIN_POS);
+                for (ci = 0; ci < CHUNK; ++ci)
+                    s3_chain_merge(&cc_, w_vbb[w_cur][ci],
+#if S3C_HAS_UP
+                                   up_ok
+                                       ? (const float *)&s3c_rxbuf[S3C_SLOTW * ci]
+                                       : (const float *)0,
+#else
+                                   (const float *)0,   /* the chain's far end */
+#endif
+                                   up_ok,
+                                   (float *)&s3c_txbuf[S3C_SLOTW * ci]);
+                s3c_ctl_poll(&C_DN, dev_patch, mycrc,
+                             A_DN.tx_crc, A_DN.tx_crc_blk, 0);
+                hs_dn = C_DN.peer.present && C_DN.hs == S3_HS_OK;
+                s3c_tx(CHUNK, hs_dn, C_DN.peer_alock);
+            }
+#endif
         }
 #endif
         busy_us += (unsigned long)(esp_timer_get_time() - t0);
@@ -4674,6 +4882,15 @@ void app_main(void)
 #if S3L_LINK
                                            (LA.up && LA.role == S3_ROLE_B &&
                                             LA.pace == S3_BPACE_LINKED)
+                                               ? 0 :
+#endif
+#if S3L_CHAIN && S3C_HAS_DOWN
+                                           /* CHAIN4: when the DOWN slave TX
+                                            * paces this loop, the unconnected
+                                            * DAC must not also block -- one
+                                            * pacemaker (D1). */
+                                           (A_DN.up &&
+                                            A_DN.pace == S3_BPACE_LINKED)
                                                ? 0 :
 #endif
                                            portMAX_DELAY);
