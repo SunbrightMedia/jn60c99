@@ -387,9 +387,13 @@ b32..b43; live pointers: CLAUDE.md LIVE STATE.
 ## USER-DIRECTED VARIANTS (2026-09-02 — parallel to the tracks, not in them)
 - **CLASSIC port**: the 1982 panel only. EB_CLASSIC drops delay/reverb/e5 and
   pins every non-1982 parameter at neutral forever (docs/CLASSIC_PANEL.md).
-  CLASSIC6 image = 6 voices + chorus on ONE S3, staged, unflashed. Judged
-  against the VST limited the same way — NOT against the full engine. If it
-  fits one chip, the fit picture for every track changes.
+  Judged against the VST limited the same way — NOT against the full engine.
+  FLASHED AND MEASURED (b44): byte law proven on-chip on BOTH engines;
+  delay=22 reverb=4 (collapsed). Fork classic: 6 voices ≈15.3k → one chip
+  starves, two chips ≈70–77% (INFERRED). ORIGINAL-port classic (trunk +
+  exact levers, the user's binding directive): ≈5,045 cyc/exact voice
+  confirmed → 6 voices + chorus ≈31–35k → the 4-slot board (40k) at 78–88%.
+  Data: docs/engineb/data/b44_classic_silicon.md.
 - **Hardware**: the MasterAudio 4-slot carrier board (docs/hardware/BOARD.md
   + PCB_PLACEMENT.md). Supersedes the 2-board jumper-wire bench as the
   physical target; the D-track link design carries over (chain 4→3→2→1).

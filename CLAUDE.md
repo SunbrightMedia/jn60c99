@@ -112,9 +112,15 @@ mine is a hypothesis (playbook 80).
   law); ZERO FX rings; strict byte law `eb_patch_classicize` pins every
   non-1982 parameter at neutral FOREVER, recall included (ENV2:=ENV1,
   VCA TONE:=128 proven passthrough, EFFECT TYPE clamped {2,3,4}).
-  `esp32s3/flash/juno_s3_CLASSIC6.bin` = 6 voices + chorus on ONE S3,
-  UNFLASHED. Correctness standard: vs the VST limited the same way.
-  Binding doc: docs/CLASSIC_PANEL.md.
+  Correctness standard: vs the VST limited the same way. Binding doc:
+  docs/CLASSIC_PANEL.md. USER-BINDING 2026-09-03: classic must come from the
+  ORIGINAL PORT's sound = trunk + EXACTLY-0 levers only (src/ cannot fit S3).
+  MEASURED on silicon (b44, docs/engineb/data/b44_classic_silicon.md): byte
+  law proven on-chip on both engines; delay=22 reverb=4; exact-classic voice
+  ≈5,045 cyc (v1 minus wait — v1 INCLUDES the spin, never quote it raw) →
+  6 voices + chorus ≈31–35k → the 4-slot board (40k) at 78–88% is the
+  machine. Fork classic: two chips ≈70–77% INFERRED. Owed: silence the
+  single-board LINK BAD-PAIR churn before the next budget number.
 - **Hardware (user-directed)**: MasterAudio 4-slot carrier board for N16R8
   DevKitC-1 boards (JLCPCB/LCSC). The user draws the schematic by hand;
   docs/hardware/ holds the connection reference, PCB placement notes, and
