@@ -126,12 +126,15 @@ mine is a hypothesis (playbook 80).
   docs/engineb/CHAIN4.md. The pair-sum law proven EXACTLY 0 on host
   (tools/engineb/chain_gate.sh, tooth bites); base 0 + one chord-6 key on
   all four chips; hops = the proven pairwise link ×3, TDM4; notes ride a
-  checksummed event chain from chip 1. UNFLASHED — no chain silicon fact
-  exists yet; first bench criterion is hs=OK + mix=OPEN + CRC MATCH ×4.
-  Pos 1 alone: GREEN on the 4th flash (b45) -- cyc 5,217/5,442, drift and
-  deficit FROZEN. Law: one exact voice per core MAX; prologue+master must
-  ride the light core (S3L_PROLOGUE_C1, no REV_PIPE). Open: ~21/10k long
-  blocks unattributed; note path unexercised.
+  checksummed event chain from chip 1. Pos 1 alone: VERIFIED GREEN on
+  silicon (b45, 10th flash sha 5a326f29d) -- cyc 5,217/5,442, miss 0/10k
+  over 160 s, drift/deficit FROZEN, un=0; note path + event tap PROVEN
+  (robot). The miss ghost = the donated tick vs an untaught detector
+  (3 wrong attributions on the way -- b45 records all). EVQ-refused
+  HEALTH line under robot flood is the queue working, not a fault.
+  Law: one exact voice per core MAX; prologue+master must ride the light
+  core (S3L_PROLOGUE_C1, no REV_PIPE). Next: wire hop 1<-2 (CHAIN4.md
+  section 6); criterion hs=OK + mix=OPEN + CRC MATCH.
 - **Hardware (user-directed)**: MasterAudio 4-slot carrier board for N16R8
   DevKitC-1 boards (JLCPCB/LCSC). The user draws the schematic by hand;
   docs/hardware/ holds the connection reference, PCB placement notes, and

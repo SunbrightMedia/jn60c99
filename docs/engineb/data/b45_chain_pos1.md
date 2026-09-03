@@ -97,6 +97,24 @@ Fix (10th build, sha 5a326f29d): the donation adds itself to
 wrote_blocked_us, riding the same subtraction the miss test already does
 for the DAC park. Detector correction only; zero audio-path change.
 
+## VERIFIED GREEN (10th flash, sha 5a326f29d, 160 s robot run)
+
+B4 miss burst=0 note=0 quiet=0 at every report; B4rate 0/10k throughout.
+The donation now rides park (G4 park up to 10,199 -- exactly the
+subtraction design). drift FROZEN -17, deficit FROZEN 139, un=0.
+CHAINev sent counting, byte law + chord-6 CRC MATCH. Position 1 is GREEN.
+
+One red line remains and it is NOT a fault: "HEALTH: *** the event queue
+REFUSED a submit". The ROBOT floods the 255-deep event queue faster than
+the EV_DRAIN_MAX=8/block drain (EVQ dep pinned at 255, ref= climbing).
+A refusal is the queue protecting itself -- correct behavior under a
+deliberate flood. The rule-4 latch treats ANY refusal as a fault, so it
+fires under stress by design. Press 'r' (robot off) and refusals stop.
+No audio effect: the INVARIANT held the whole run. If the latch noise
+bothers the bench, gate it on the robot flag in a future build -- not
+worth a flash on its own.
+
 ## Open
 - Note path + event tap: PROVEN by the robot run.
-- Positions 2-4 and every hop remain silicon-unproven.
+- Positions 2-4 and every hop remain silicon-unproven. Next: wire hop
+  1<-2 (CHAIN4.md section 6); criterion hs=OK, mix=OPEN, CRC MATCH.
