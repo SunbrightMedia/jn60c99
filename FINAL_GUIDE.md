@@ -393,7 +393,9 @@ b32..b43; live pointers: CLAUDE.md LIVE STATE.
   starves, two chips ≈70–77% (INFERRED). ORIGINAL-port classic (trunk +
   exact levers, the user's binding directive): ≈5,045 cyc/exact voice
   confirmed → 6 voices + chorus ≈31–35k → the 4-slot board (40k) at 78–88%.
-  Data: docs/engineb/data/b44_classic_silicon.md.
+  Data: docs/engineb/data/b44_classic_silicon.md. The 4-board build is
+  STAGED (esp32s3/flash/chain4/, design docs/engineb/CHAIN4.md, sum law
+  host-proven EXACTLY 0) and UNFLASHED.
 - **Hardware**: the MasterAudio 4-slot carrier board (docs/hardware/BOARD.md
   + PCB_PLACEMENT.md). Supersedes the 2-board jumper-wire bench as the
   physical target; the D-track link design carries over (chain 4→3→2→1).

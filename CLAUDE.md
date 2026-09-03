@@ -121,6 +121,13 @@ mine is a hypothesis (playbook 80).
   6 voices + chorus ≈31–35k → the 4-slot board (40k) at 78–88% is the
   machine. Fork classic: two chips ≈70–77% INFERRED. Owed: silence the
   single-board LINK BAD-PAIR churn before the next budget number.
+- **CHAIN4 (2026-09-03)**: the 4-board build EXISTS and is STAGED in
+  esp32s3/flash/chain4/pos{1..4} (three-bin sets). Design binding:
+  docs/engineb/CHAIN4.md. The pair-sum law proven EXACTLY 0 on host
+  (tools/engineb/chain_gate.sh, tooth bites); base 0 + one chord-6 key on
+  all four chips; hops = the proven pairwise link ×3, TDM4; notes ride a
+  checksummed event chain from chip 1. UNFLASHED — no chain silicon fact
+  exists yet; first bench criterion is hs=OK + mix=OPEN + CRC MATCH ×4.
 - **Hardware (user-directed)**: MasterAudio 4-slot carrier board for N16R8
   DevKitC-1 boards (JLCPCB/LCSC). The user draws the schematic by hand;
   docs/hardware/ holds the connection reference, PCB placement notes, and
