@@ -342,6 +342,8 @@ typedef struct {
     int locked, lock_off;
     uint32_t discard_left;
     uint32_t rx_chunks, rx_short, rx_match, rx_mismatch, rx_dropped, pat_disc;
+    size_t   rx_off, tx_off;     /* bytes of a PART-moved chunk, carried over */
+    int      tx_silent;          /* the carried chunk is all zeros            */
     uint32_t pend[8]; uint16_t pend_age[8]; uint8_t pend_used[8];
     uint32_t relock_miss;
     uint32_t crc_last;
@@ -382,8 +384,12 @@ static int s3c_aud_start(s3c_aud *a, int master_rx,
     }
     if (master_rx) tc.gpio_cfg.din  = data;
     else           tc.gpio_cfg.dout = data;
-    cc.dma_desc_num  = 6;
-    cc.dma_frame_num = CHUNK;
+    /* The driver caps a descriptor at 4092 B. TDM4 x 32 bit = 16 B a frame,
+     * so CHUNK=256 frames (4096 B) is clamped to 255 and NO single descriptor
+     * can ever hold one chunk. Ask for a frame count that DIVIDES the chunk:
+     * the reads and writes below then land on descriptor boundaries. */
+    cc.dma_desc_num  = 8;
+    cc.dma_frame_num = (CHUNK > 128) ? (CHUNK / 2) : CHUNK;
     if (master_rx) {
         if (i2s_new_channel(&cc, NULL, &a->ch) != ESP_OK) return 0;
     } else {
@@ -404,25 +410,37 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
     int i, silent = 1, tmo;
     if (!A_DN.up) return 0;
     if (n > CHUNK) n = CHUNK;
-    if (!peer_alock) {
-        A_DN.pat_idx = (A_DN.pat_idx + (uint32_t)S3C_SLOTW * CHUNK - 1u)
-                       & ~((uint32_t)S3C_SLOTW * CHUNK - 1u);
-        for (i = 0; i < S3C_SLOTW * n; ++i)
-            s3c_txbuf[i] = (int32_t)s3_pat_word(A_DN.pat_idx++);
-        silent = 0;
-    } else {
-        for (i = 0; i < S3C_SLOTW * n; ++i)
-            if (s3c_txbuf[i]) { silent = 0; break; }
-    }
     want = (size_t)n * S3C_SLOTW * sizeof(int32_t);
-    tmo = (A_DN.pace == S3_BPACE_LINKED) ? pdMS_TO_TICKS(20) : 0;
-    i2s_channel_write(A_DN.ch, s3c_txbuf, want, &wrote, tmo);
-    ++A_DN.tx_blk;
-    if (!silent && wrote == want) {
-        A_DN.tx_crc     = s3c_crc32(s3c_txbuf, want);   /* table twin */
-        A_DN.tx_crc_blk = A_DN.tx_blk;
+    /* A part-written chunk MUST be finished before a new one is built, or the
+     * slot stream loses its alignment. Only fill the buffer when it is free. */
+    if (!A_DN.tx_off) {
+        if (!peer_alock) {
+            A_DN.pat_idx = (A_DN.pat_idx + (uint32_t)S3C_SLOTW * CHUNK - 1u)
+                           & ~((uint32_t)S3C_SLOTW * CHUNK - 1u);
+            for (i = 0; i < S3C_SLOTW * n; ++i)
+                s3c_txbuf[i] = (int32_t)s3_pat_word(A_DN.pat_idx++);
+            silent = 0;
+        } else {
+            for (i = 0; i < S3C_SLOTW * n; ++i)
+                if (s3c_txbuf[i]) { silent = 0; break; }
+        }
+        A_DN.tx_silent = silent;
     }
-    tmo = (A_DN.pace == S3_BPACE_LINKED && wrote < want);
+    tmo = (A_DN.pace == S3_BPACE_LINKED) ? pdMS_TO_TICKS(20) : 0;
+    i2s_channel_write(A_DN.ch, (const char *)s3c_txbuf + A_DN.tx_off,
+                      want - A_DN.tx_off, &wrote, tmo);
+    A_DN.tx_off += wrote;
+    if (A_DN.tx_off >= want) {
+        A_DN.tx_off = 0;
+        ++A_DN.tx_blk;
+        if (!A_DN.tx_silent) {
+            A_DN.tx_crc     = s3c_crc32(s3c_txbuf, want);   /* table twin */
+            A_DN.tx_crc_blk = A_DN.tx_blk;
+        }
+        tmo = 0;
+    } else {
+        tmo = (A_DN.pace == S3_BPACE_LINKED);
+    }
     if (tmo) ++A_DN.tx_timeouts;
     A_DN.pace = s3_bpace_step(A_DN.pace, S3_ROLE_B, hs_ok, tmo);
     return tmo;
@@ -467,17 +485,23 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
         A_UP.discard_left -= (uint32_t)(g / sizeof(int32_t));
         if (A_UP.discard_left) return 0;
     }
+    /* A zero-timeout read returns only what the ready descriptors hold, so a
+     * chunk can arrive in PIECES. Carry the part across blocks (rx_off) --
+     * the first chain flash threw every partial away and locked on nothing. */
     {   int drained = 0;
-        size_t g;
-        do {
+        size_t want = (size_t)n * S3C_SLOTW * sizeof(int32_t), g;
+        char  *base = (char *)s3c_rxbuf;
+        for (;;) {
             g = 0;
-            if (i2s_channel_read(A_UP.ch, s3c_rxbuf,
-                                 (size_t)n * S3C_SLOTW * sizeof(int32_t),
-                                 &g, 0) != ESP_OK
-                || g != (size_t)n * S3C_SLOTW * sizeof(int32_t))
+            if (i2s_channel_read(A_UP.ch, base + A_UP.rx_off,
+                                 want - A_UP.rx_off, &g, 0) != ESP_OK || !g)
                 break;
-            got = g; ++drained;
-        } while (drained < 4);
+            A_UP.rx_off += g;
+            if (A_UP.rx_off < want) { ++A_UP.rx_short; break; }
+            A_UP.rx_off = 0;
+            got = want;
+            if (++drained >= 4) break;
+        }
         if (drained > 1) A_UP.rx_dropped += (uint32_t)(drained - 1);
     }
     if (got == (size_t)n * S3C_SLOTW * sizeof(int32_t)) {
@@ -549,13 +573,14 @@ static void s3c_report(void)
 #if S3C_HAS_UP
     if (C_UP.started)
         printf("CHAINup: %s hs=%s rx=%lu ok=%lu bad=%lu drop=%lu %s%s "
-               "pat_disc=%lu\n",
+               "part=%lu pat_disc=%lu\n",
                A_UP.mix.st == S3_AMIX_OPEN ? "mix=OPEN" : "mix=closed",
                C_UP.peer.present ? s3_handshake_name(C_UP.hs) : "no peer yet",
                (unsigned long)A_UP.rx_chunks, (unsigned long)A_UP.rx_match,
                (unsigned long)A_UP.rx_mismatch, (unsigned long)A_UP.rx_dropped,
                A_UP.locked ? "lock=YES" : "lock=searching",
-               "", (unsigned long)A_UP.pat_disc);
+               "", (unsigned long)A_UP.rx_short,
+               (unsigned long)A_UP.pat_disc);
 #endif
 #if S3C_HAS_DOWN
     if (C_DN.started)

@@ -1715,3 +1715,27 @@ records BEFORE theorizing would have cost zero flashes.
 4. **A per-core budget law from this arc, MEASURED: one exact voice per
    core is the maximum** (voice ~5,045 + ~350 overhead vs 5,442);
    prologue and master must ride the light core.
+
+## 85. A DRIVER WARNING PRINTED ON EVERY BOOT IS A DEFECT REPORT (2026-09-04)
+
+CHAIN4's first four-board run had dead audio on a correctly wired hop. The
+cause was in the console the whole time: `i2s_common: dma frame num is out of
+dma buffer size, limited to 255`, printed by EVERY chain port on EVERY boot
+since the first chain image. TDM4 x 32 bit = 16 B a frame, so a CHUNK=256
+chunk is 4096 B against a 4092 B descriptor cap: no descriptor could ever hold
+one chunk, the zero-timeout read returned partials, and the drain loop threw
+every partial away (`got` assigned only on an exact full read).
+
+### The rules
+1. **A warning the firmware prints on every boot is EVIDENCE, not noise.**
+   Read the driver warnings in the first log of a new subsystem before the
+   first theory. This one named the defect in one line and was scrolled past
+   for eleven builds.
+2. **A partial transfer is the normal case for a zero-timeout DMA read or
+   write.** Any code that requests N bytes and tests `got == N` must carry the
+   remainder across calls, or it silently discards most of the stream. Keep a
+   persistent offset per port; never rebuild a part-written buffer.
+3. **Widening a proven interface RE-OPENS its proofs.** The 2-slot pairwise
+   link was proven on silicon; TDM4 (4 slots) doubled the frame size past the
+   descriptor cap and broke a path the 2-board arc never exercised. Re-check
+   every size assumption when a proven link is widened.

@@ -114,6 +114,35 @@ No audio effect: the INVARIANT held the whole run. If the latch noise
 bothers the bench, gate it on the robot flag in a future build -- not
 worth a flash on its own.
 
+## FIRST FOUR-BOARD RUN (11th flash owed): THE TDM4 CHUNK NEVER FIT A DESCRIPTOR
+
+Wires on, hop 1<-2 per section 6, control proven both ways (hs=OK on board 1
+and board 2). AUDIO dead: board 1 `ok=0 bad=92 lock=searching` with rx_chunks
+crawling (~1.5/s where ~172/s is one per block); board 2 `pace=freerun
+timeouts=5126`. Both boards printed, at every chain port and on every boot,
+`i2s_common: dma frame num is out of dma buffer size, limited to 255`.
+
+READ FROM THE CODE, and it matches every number: s3c_aud_start asked for
+dma_frame_num = CHUNK = 256. TDM4 x 32 bit is 16 B a frame, so a chunk is
+4096 B while the driver's descriptor cap is 4092 -- clamped to 255 frames =
+4080 B. NO SINGLE DESCRIPTOR CAN EVER HOLD ONE CHUNK. The zero-timeout read
+then returned a PART of a chunk and the drain loop's `g != want` test
+DISCARDED it (`got` was only assigned on an exact full read), so ~99 % of the
+received audio was thrown away and the pattern lock never had a whole chunk to
+scan. The transmit side had the same hole: a part-written chunk was rebuilt
+from scratch the next block, which loses slot alignment.
+
+Why pos-1-alone never showed it: with no peer the RX takes the drain-only fast
+path, and the earlier TWO-board link ran 2 slots (2048 B), which fits one
+descriptor. The defect is specific to TDM4 -- i.e. to CHAIN4.
+
+Fix (all four images rebuilt): dma_frame_num = CHUNK/2 (a count that DIVIDES
+the chunk, desc_num 8), plus persistent part-transfer offsets rx_off/tx_off on
+both sides -- a chunk that arrives in pieces is now completed across blocks
+instead of dropped, and a part-written chunk is finished before a new one is
+built. New counter `part=` on the CHAINup line prints partial reads.
+BENCH SIGNAL: the `dma frame num ... limited to 255` warning MUST BE GONE.
+
 ## Open
 - Note path + event tap: PROVEN by the robot run.
 - Positions 2-4 and every hop remain silicon-unproven. Next: wire hop
