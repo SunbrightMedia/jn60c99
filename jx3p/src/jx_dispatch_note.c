@@ -277,6 +277,10 @@ static void jxdn_note_body(const jx_dn_cbs *cb, uint8_t *st, int v,
 void jx_dispatch_note_cb(const jx_dn_cbs *cb, uint8_t *proc_blob,
                          uint8_t *state_blob, int v, int flag, int val)
 {
+#if JX_FULL_TOOTH
+    val += 1;    /* the full-chain tooth: one semitone -- MUST be audible */
+#endif
+
     /* the stub only null-checks [proc+0x110+0x10*v]; the live instance is
      * never null (PROVEN) */
     jxdn_note_body(cb, state_blob, v, flag, val);

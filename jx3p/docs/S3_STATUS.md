@@ -47,9 +47,25 @@ port: `jx3p/docs/PORT_LESSONS.md`.
   9×0x7A8 state bytes EXACTLY 0; the tooth (sustain branch removed) bites.
   Two-process rule respected (emu writes, ctypes reads). Includes the
   plugin's own −1-history-index aliasing quirk, reproduced literally.
-- **Still owed for §7b:** the sink layer below the seam (the +0x518/+0x520
-  objects: the actual voice CHOICE + the expiry GC 0x3F40E0), a clean-boot
-  construct in C, then the bridge + web shell. Same method, next.
+- **NOTE STORE, KEY TRACKER, DISPATCH HANDLERS: PROVEN (2026-09-04).**
+  jx_nstore.c / jx_ktrack.c / jx_dispatch_note.c, each with its own
+  two-process gate and bitten tooth (jx_nstore_gate.sh, jx_ktrack_gate.sh,
+  jx_dn_gate.sh).
+- **§7b FINISH LINE GREEN (2026-09-04): THE PORT PLAYS STANDALONE.**
+  jx_full_gate.sh: the plugin drives ITSELF end-to-end (fresh build, SETSR,
+  order-true recall, NOTEON, render, NO pokes) vs the standalone C engine
+  (jx_bridge.c: clean-boot template + recall aux + the transcribed control
+  plane + wrappers/latch/ramps + the proven renders): L/R bit streams
+  EXACTLY 0 over 1200 samples on patches 0/5/20/49, one-semitone tooth
+  bites. The gate found and paid four real defects on the way: the
+  untranscribed wrapper/latch/ramp layer, missing master recall, missing
+  voice high windows, and a POLLUTED recall reference (playbook 86).
+  Web app: jx3p/gui/web (WASM, browser-verified; mirrored to docs/jx3p).
+- **Still open (logged):** the TRUE host recall protocol (two harness pool
+  models disagree 13 pools each way; factory play uses order-true oracle
+  deltas), the nstore drain seam 0x3EF210 (stubbed in every proof; never
+  fired in the green runs), WASM has no FTZ (denormal caveat, host gates
+  carry real FTZ), and rates 48000/96000 for the full chain.
 Everything below this line is older working notes.
 
 ## PROVEN (null EXACTLY 0 under Unicorn, FTZ|DAZ)

@@ -672,9 +672,15 @@ LABEL_8:
 
 /* FP environment control for the null harness: set FTZ|DAZ to match the
  * plugin's runtime MXCSR. Not part of the DSP; harness-only. */
+#if defined(__SSE__) && !defined(__EMSCRIPTEN__)
 #include <xmmintrin.h>
 #include <pmmintrin.h>
 void jx_set_ftz(void){ _mm_setcsr((_mm_getcsr() | 0x8000 | 0x0040)); }
+#else
+/* WASM has no MXCSR: denormals stay IEEE. The same documented caveat the
+ * JUNO web build carries; the host gates all run with real FTZ. */
+void jx_set_ftz(void){}
+#endif
 
 /* sub_1803A21E0: positive-side wrap. Verbatim from the decompile (only the
  * result>1 branch wraps; no negative branch in the original). STATUS: READ. */
@@ -734,7 +740,15 @@ float jx_h_expf_722EA0(float a1)
   if (z >= 8192.0)  return jxm_asf(0x7f800000u);  /* overflow  -> +inf */
   if (z < -9600.0)  return 0.0f;                  /* underflow -> +0   */
   /* cvtpd2dq: round to nearest even */
+#if defined(__x86_64__)
   int32_t n; { double t = z; __asm__("cvtsd2si %1, %0" : "=r"(n) : "x"(t)); }
+#else
+  /* portable twin of cvtsd2si (round-to-nearest-even; invalid -> INT_MIN).
+   * WASM path only; the x86 asm stays the proven form. */
+  int32_t n; { double t = z;
+    if (t != t || t >= 2147483648.0 || t < -2147483648.5) n = (int32_t)0x80000000;
+    else { double r = __builtin_rint(t); n = (int32_t)r; } }
+#endif
   double kd = (double)n;
   double r  = xd - kd * 0.010830424696249145;     /* ln2/64, @0xAC5E00 */
   uint32_t idx = (uint32_t)n & 63u;
@@ -799,7 +813,15 @@ float jx_h_tanf_725150(float a1)
   if ((int64_t)ax < (int64_t)0x4160000000000000ULL) {    /* |x| < 2^23 */
     double xa = jxm_asd(ax);
     double zn = 0.6366197723675814 * xa + 0.5;           /* 2/pi @0xAC7350 */
+#if defined(__x86_64__)
     int32_t n; { double t = zn; __asm__("cvttsd2si %1, %0" : "=r"(n) : "x"(t)); }
+#else
+    /* portable twin of cvttsd2si (truncate; invalid -> INT_MIN) */
+    int32_t n; { double t = zn;
+      if (t != t || t >= 2147483648.0 || t <= -2147483649.0)
+          n = (int32_t)0x80000000;
+      else n = (int32_t)t; }
+#endif
     q = (uint32_t)n & 3u;
     double kd = (double)n;
     double r  = xa - kd * 1.5707963267341256;            /* pio2_1  */

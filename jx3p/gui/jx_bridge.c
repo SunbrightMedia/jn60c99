@@ -21,7 +21,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zlib.h>
 
 /* ---- proven modules (single-file link; see jx_full_gate.sh) ---- */
 #include "../src/jx_alloc.c"
@@ -88,17 +87,14 @@ static int tmpl_load(const char *path)
     FILE *f = fopen(path, "rb");
     uint8_t hdr[8];
     if (!f) return 0;
-    if (fread(hdr, 1, 8, f) != 8 || memcmp(hdr, "JXT2", 4)) return 0;
+    if (fread(hdr, 1, 8, f) != 8 || memcmp(hdr, "JXT3", 4)) return 0;
     g_nreg = (int)(uint32_t)(hdr[4] | (hdr[5] << 8) | (hdr[6] << 16) |
                              ((uint32_t)hdr[7] << 24));
     for (int i = 0; i < g_nreg; ++i) {
-        uint32_t raw, z;
-        if (fread(&raw, 4, 1, f) != 1 || fread(&z, 4, 1, f) != 1) return 0;
-        uint8_t *zb = malloc(z), *rb = malloc(raw);
-        uLongf dl = raw;
-        if (fread(zb, 1, z, f) != z) return 0;
-        if (uncompress(rb, &dl, zb, z) != Z_OK || dl != raw) return 0;
-        free(zb);
+        uint32_t raw;
+        if (fread(&raw, 4, 1, f) != 1) return 0;
+        uint8_t *rb = malloc(raw);
+        if (fread(rb, 1, raw, f) != raw) return 0;
         g_tmpl_regions[i] = rb; g_tmpl_rawsz[i] = raw;
     }
     /* exactly 19 links follow the regions: 8 voice links, 9 wrapper+ramp
@@ -125,11 +121,14 @@ int jx3p_init(const char *template_path, const char *bank_path,
 {
     if (!tmpl_load(template_path)) return 0;
     {   FILE *f = fopen(master_recall_path, "rb");
+        size_t fl;
+        uint8_t *fb;
         if (!f) return 0;
-        fseek(f, 0, SEEK_END); g_mrec_len = (size_t)ftell(f); rewind(f);
-        g_mrec = malloc(g_mrec_len);
-        if (fread(g_mrec, 1, g_mrec_len, f) != g_mrec_len) return 0;
+        fseek(f, 0, SEEK_END); fl = (size_t)ftell(f); rewind(f);
+        fb = malloc(fl);
+        if (fread(fb, 1, fl, f) != fl) return 0;
         fclose(f);
+        g_mrec = fb; g_mrec_len = fl;
         if (memcmp(g_mrec, "JXM3", 4)) return 0;
     }
     {   FILE *f = fopen(bank_path, "rb");

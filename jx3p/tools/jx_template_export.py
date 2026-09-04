@@ -128,23 +128,21 @@ def main():
     if nn and os.environ.get("JX_TEMPLATE_ALLOW_NAN") != "1":
         raise SystemExit("CLEAN BOOT CONTAINS NaN -- refused")
 
+    # JXT3: regions RAW (the engine parses with no zlib; the WEB fetches the
+    # gzip sidecar and inflates with the browser's own DecompressionStream)
     raw = sum(len(r) for r in regions)
     dst = os.path.join(J.REPO, "jx3p", "gen", "jx_template.bin")
-    with open(dst, "wb") as f:
-        f.write(b"JXT2" + struct.pack("<I", len(regions)))
-        crc = zlib.crc32(b"JXT2")
-        for r in regions:
-            z = zlib.compress(bytes(r), 9)
-            hdr = struct.pack("<II", len(r), len(z))
-            f.write(hdr + z)
-            crc = zlib.crc32(hdr, crc); crc = zlib.crc32(z, crc)
-        for lk in links:
-            hdr = struct.pack("<I", len(lk))
-            f.write(hdr + lk)
-            crc = zlib.crc32(hdr, crc); crc = zlib.crc32(lk, crc)
-        f.write(struct.pack("<I", crc & 0xFFFFFFFF))
-    print("template: %d regions, raw %d B -> %d B compressed, %s"
-          % (len(regions), raw, os.path.getsize(dst), dst))
+    body = b"JXT3" + struct.pack("<I", len(regions))
+    for r in regions:
+        body += struct.pack("<I", len(r)) + bytes(r)
+    for lk in links:
+        body += struct.pack("<I", len(lk)) + lk
+    body += struct.pack("<I", zlib.crc32(body) & 0xFFFFFFFF)
+    open(dst, "wb").write(body)
+    import gzip
+    gzip.open(dst + ".gz", "wb", 9).write(body)
+    print("template: %d regions, %d B raw file (%d B gz), %s"
+          % (len(regions), len(body), os.path.getsize(dst + ".gz"), dst))
 
 
 if __name__ == "__main__":

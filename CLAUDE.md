@@ -139,11 +139,14 @@ mine is a hypothesis (playbook 80).
   DevKitC-1 boards (JLCPCB/LCSC). The user draws the schematic by hand;
   docs/hardware/ holds the connection reference, PCB placement notes, and
   open BOM items (LM2776 C69527 is the -5 V rail; TPA6120 needs it).
-- **JX-3P (E5)**: recall 64/64 EXACTLY 0 on two banks; voice arms + master
-  transcription null vs oracle. ⚠ the green render A/B ran from an INVALID
-  SEED (plugin warm-up leaves NaNs; jx3p/docs/MASTER_NAN_FINDING.md) and 32
-  of 57 pools — correct-seed A/B is the open item. Status:
-  jx3p/docs/S3_STATUS.md; lessons: jx3p/docs/PORT_LESSONS.md.
+- **JX-3P (E5)**: THE PORT PLAYS STANDALONE (charter 7b GREEN 2026-09-04).
+  Full control plane transcribed + proven (alloc/nstore/ktrack/dispatch/
+  wrappers/ramps, each gate EXACTLY 0, teeth bitten); clean-boot template
+  NaN-free; correct-seed render A/B 64/64 at 44100; full-chain gate
+  (jx_full_gate.sh) L/R EXACTLY 0 vs the plugin driving itself, no pokes.
+  Web app: jx3p/gui/web → docs/jx3p (Pages). Open (logged in S3_STATUS):
+  true host recall protocol, drain seam 0x3EF210, WASM-FTZ caveat, other
+  rates. Lessons: jx3p/docs/PORT_LESSONS.md.
 - **Parked tracks**: DAW-parity (HOSTPATH_PARITY_SCOPE steps 2-5) and Track B
   Daisi sonic-identity fork (harness done, zero voice code, blind-gate warning
   stands). Both resumable from HISTORY.md pointers.

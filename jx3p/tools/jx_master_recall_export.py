@@ -111,7 +111,10 @@ def main():
     out += struct.pack("<I", zlib.crc32(out) & 0xFFFFFFFF)
     dst = os.path.join(J.REPO, "jx3p", "gen", "jx_master_recall.bin")
     open(dst, "wb").write(out)
-    print("recall aux: %d B -> %s" % (len(out), dst))
+    import gzip
+    gzip.open(dst + ".gz", "wb", 9).write(out)
+    print("recall aux: %d B (%d B gz) -> %s"
+          % (len(out), os.path.getsize(dst + ".gz"), dst))
 
 
 if __name__ == "__main__":
