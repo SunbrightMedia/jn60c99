@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 
 /* ---- proven modules (single-file link; see jx_full_gate.sh) ---- */
 #include "../src/jx_alloc.c"
@@ -366,6 +367,89 @@ void jx3p_render(float *L, float *R, int n)
     G.clock += n;
 }
 
+/* WEB-PREVIEW DRY RENDER: the 8 proven voices, summed, master EFX network
+ * BYPASSED. The master needs the host parameter initialization a DAW
+ * performs at insert (its effect manager is the logged open item); without
+ * it the network self-poisons. The voices -- oscillators, filters,
+ * envelopes, the whole per-voice engine proven 64/64 EXACTLY 0 -- are the
+ * instrument; this preview plays them directly. */
+void jx3p_render_dry(float *L, float *R, int n)
+{
+    void *pairs[NV][2];
+    for (int v = 0; v < NV; ++v) {
+        pairs[v][0] = &G.vcells[2 * v];
+        pairs[v][1] = &G.vcells[2 * v + 1];
+    }
+    for (int s = 0; s < n; ++s) {
+        float accL = 0.0f, accR = 0.0f;
+        for (int v = 0; v < NV; ++v) {
+            jx_wrap *w = &G.wrap[v];
+            if (!w->flag) continue;
+            if (w->latch > 0) {
+                --w->latch;
+                G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
+            } else {
+                G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
+                jx_voice_render(G.vstate[v], v, pairs[v]);
+            }
+            jx_gc_sweep(w->ids, &w->nids, w->slots);
+            accL += G.vcells[2 * v];
+            accR += G.vcells[2 * v + 1];
+        }
+        L[s] = accL; R[s] = accR;
+    }
+    G.clock += n;
+}
+
 /* raw access for the full-chain gate */
 void *jx3p_vstate(int v) { return G.vstate[v]; }
 void *jx3p_mstate(void)  { return G.mstate; }
+
+/* debug/bench: force one unit's wrapper flag */
+void jx3p_wrap_flag(int u, int f) { G.wrap[u].flag = (uint8_t)f; }
+float jx3p_vcell(int i) { return G.vcells[i]; }
+
+/* PREVIEW HOLD (documented, reversible): the chorus effect's manager (the
+ * pending-page swap machine and its host rate parameter) is NOT yet
+ * transcribed; with no host to set the rate, the plugin's own boot ramps
+ * fade the chorus in over an unconfigured LFO and the output pins at the
+ * NaN clamp (jx3p/docs/S3_STATUS.md logs the arc). Until that manager is
+ * transcribed, the web preview keeps the chorus OFF by deactivating the
+ * two ramps that raise its enable (st+269808) and depth (st+10928080) --
+ * the same "module OFF law" precedent the JUNO CLASSIC uses. Everything
+ * else is untouched and bit-exact. */
+/* WEB-PREVIEW NaN SCRUB (bridge-level; the proven DSP sources are NOT
+ * touched, and no gate runs with this). The master effect network births
+ * a NaN on its shared delay line when it runs without the host parameter
+ * initialization a DAW performs (the effect manager's host-param init is
+ * the logged open item, jx3p/docs/S3_STATUS.md). Once born, the NaN
+ * circulates and the output clamp pins at full scale. The preview scrubs
+ * non-finite cells back to zero the moment they appear, at the line and
+ * its mirrors. */
+static void jxw_scrub_region(uint8_t *base, uint32_t off, uint32_t len)
+{
+    float *p = (float *)(base + off);
+    for (uint32_t i = 0; i < len / 4; ++i) {
+        float v = p[i];
+        if (v != v || v - v != 0.0f) p[i] = 0.0f;
+    }
+}
+void jx3p_nan_scrub(void)
+{
+    jxw_scrub_region(G.mstate, 269888, 80);       /* the mirror cells    */
+    jxw_scrub_region(G.mstate, 10927568, 0x2000); /* line head + filters */
+    jxw_scrub_region(G.mstate, 10928592, 0x40000);/* the shared line     */
+}
+
+void jx3p_efx_hold(void)
+{
+    jx_wrap *w = &G.wrap[8];
+    for (int i = 0; i < w->nslot; ++i) {
+        jx_gc_slot *sl = &w->slots[i];
+        if (!sl->target) continue;
+        {   ptrdiff_t off = (uint8_t *)sl->target - G.mstate;
+            if (off >= 269700)          /* the EFX block + chorus mirrors */
+                sl->active = 0;
+        }
+    }
+}

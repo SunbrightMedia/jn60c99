@@ -33,7 +33,7 @@
 <body>
 <h1>Roland JX-3P <span class="tag">bit-exact C port · clean boot proven</span></h1>
 <div class="sub">The plugin's own recall, note managers, key tracker, dispatch,
-ramps and renders — every layer transcribed from the binary and gated EXACTLY 0.
+ramps and renders — every layer transcribed from the binary and gated EXACTLY 0. Master FX (chorus/echo) are bypassed in this preview until the effect manager's host-parameter init is transcribed.
 Keyboard: A–K white keys, W/E/T/Y/U black, Z/X octave.</div>
 <div class="row">
   <button id="power">Start audio</button>
@@ -43,7 +43,7 @@ Keyboard: A–K white keys, W/E/T/Y/U black, Z/X octave.</div>
 <div id="kbd"></div>
 <div id="status">audio off</div>
 <script type="module">
-const BUILD_VER = "00811b1115f8";
+const BUILD_VER = "0dd5c8d858e3";
 const Jx3pModule = (await import('./jx3p.js?v=' + BUILD_VER)).default;
 
 const mod = await Jx3pModule();
@@ -87,10 +87,10 @@ document.getElementById('power').onclick = async () => {
   ctx = new AudioContext({ sampleRate: 44100 });
   node = ctx.createScriptProcessor(N, 0, 2);
   node.onaudioprocess = (e) => {
-    mod.ccall('jx3p_render', null, ['number','number','number'], [pL, pR, N]);
+    mod.ccall('jx3p_render_dry', null, ['number','number','number'], [pL, pR, N]);
     /* presentation gain only -- the ENGINE stream is bit-exact; WebAudio
      * clips above 1.0 and the plugin's raw floats reach ~2 */
-    const g = 0.45,
+    const g = 8.0,
           l = mod.HEAPF32.subarray(pL >> 2, (pL >> 2) + N),
           r2 = mod.HEAPF32.subarray(pR >> 2, (pR >> 2) + N),
           ol = e.outputBuffer.getChannelData(0),

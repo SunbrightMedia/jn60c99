@@ -17,7 +17,7 @@ emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing \
   jx3p/gui/jx_bridge.c jx3p/src/jx_recall.c \
   jx3p/src/jx_voice_render.c jx3p/src/jx_voice_helpers.c \
   jx3p/src/jx_master_render.c jx3p/src/jx_ftz.c \
-  -s EXPORTED_FUNCTIONS='["_jx3p_init","_jx3p_recall","_jx3p_note_on","_jx3p_note_off","_jx3p_render","_malloc","_free"]' \
+  -s EXPORTED_FUNCTIONS='["_jx3p_init","_jx3p_recall","_jx3p_note_on","_jx3p_note_off","_jx3p_render","_jx3p_render_dry","_malloc","_free"]' \
   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32","FS"]' \
   -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_ES6=1 \
   -s EXPORT_NAME=Jx3pModule -s ENVIRONMENT=web \
@@ -36,4 +36,15 @@ cp jx3p/gui/web/index.html jx3p/gui/web/jx3p.js jx3p/gui/web/jx3p.wasm \
    jx3p/gui/web/jx_template.bin.gz jx3p/gui/web/jx_master_recall.bin.gz \
    jx3p/gui/web/bank.bin.gz docs/jx3p/
 touch docs/.nojekyll
-echo "built jx3p/gui/web/{jx3p.js,jx3p.wasm} + docs/jx3p mirror  BUILD_VER=$VER"
+# single-file build for the claude.ai Artifact (classic script, wasm inlined)
+emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing \
+  -sGROWABLE_ARRAYBUFFERS=0 \
+  jx3p/gui/jx_bridge.c jx3p/src/jx_recall.c \
+  jx3p/src/jx_voice_render.c jx3p/src/jx_voice_helpers.c \
+  jx3p/src/jx_master_render.c jx3p/src/jx_ftz.c \
+  -s EXPORTED_FUNCTIONS='["_jx3p_init","_jx3p_recall","_jx3p_note_on","_jx3p_note_off","_jx3p_render_dry","_malloc","_free"]' \
+  -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32","FS"]' \
+  -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_NAME=Jx3pModule \
+  -s ENVIRONMENT=web \
+  -o jx3p/gui/web/jx3p_artifact.js
+echo "built jx3p/gui/web/{jx3p.js,jx3p.wasm,jx3p_artifact.js} + docs/jx3p mirror  BUILD_VER=$VER"
