@@ -1739,3 +1739,25 @@ every partial away (`got` assigned only on an exact full read).
    link was proven on silicon; TDM4 (4 slots) doubled the frame size past the
    descriptor cap and broke a path the 2-board arc never exercised. Re-check
    every size assumption when a proven link is widened.
+
+## 86. RESTORING STATE BYTES IS NOT RESTORING STATE (2026-09-04, JX-3P)
+
+The JX recall reference was captured on one persistent oracle build,
+restoring the voice state bytes between patches. The dispatch layer keeps
+CHANGE-DETECTION MIRRORS outside that region, so a recalled value equal to
+a leftover mirror was silently not written: the reference missed 205 cells
+a fresh host recall writes, the derived LUT missed them too, and the C
+recall reproduced the polluted reference 64/64 EXACT -- green against a
+state no host ever produces. Found only by the 7b full-chain gate (clean
+boot, plugin end-to-end vs standalone C).
+
+### The rules
+1. **A reference captured after ANY prior dispatch on the same instance is
+   suspect.** Capture references from a fresh build per case, or prove the
+   dispatch layer is history-free first.
+2. **"Restore" must cover every side effect.** Heap mirrors, caches and
+   vectors outside the restored window are state; if you cannot enumerate
+   them, rebuild instead of restoring.
+3. **An end-to-end gate through the SHIPPING entry path is the only gate
+   that catches this class.** Layer gates share the layer's own blind spot:
+   both sides consume the same polluted reference and agree.

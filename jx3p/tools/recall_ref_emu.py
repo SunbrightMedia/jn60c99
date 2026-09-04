@@ -33,6 +33,13 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     bank = open(BANK, "rb").read()
     jx = J.JX().build(); jx.set_ftz(); uc = jx.uc
+    # SETSR FIRST (2026-09-04, found by the 7b full-chain gate): the recall
+    # reference used to be captured WITHOUT the sample-rate call, and SETSR
+    # activates 205 more recall target cells per voice. A LUT derived from
+    # the un-SETSR state reproduces recall for a state no host ever runs.
+    import struct as _s
+    jx.call(J.IB + 0x3F9970, rcx=jx.HOST,
+            rdx=_s.unpack("<Q", _s.pack("<d", 44100.0))[0])
     st0 = jx.state[0]
 
     # Discover the active recall set: pools whose dispatch (pool+740) MOVES a
@@ -66,19 +73,24 @@ def main():
             active.append(pool)
     sys.stderr.write("active recall pools: %d (%s)\n" % (len(active), active))
 
-    # Now the real reference: one persistent build, per patch dispatch the active
-    # set in pool order, capture voice-0 block. Restore clean base per patch so
-    # each patch is a fresh recall (matches the plugin: recall on a prepared engine).
-    uc.mem_write(st0, base)
-    clean = bytes(uc.mem_read(st0, BLOCK))
+    # The real reference: a FRESH BUILD PER PATCH (2026-09-04, found by the
+    # 7b full-chain gate). The old persistent-build capture restored st0
+    # bytes between patches but NOT the dispatch layer's change-detection
+    # mirrors, so a value equal to the probe phase's leftover mirror was
+    # silently NOT written -- the reference then missed 205 cells a fresh
+    # host recall writes, and jx_bank_apply faithfully reproduced the
+    # polluted reference 64/64. State restore is not state: heap mirrors
+    # are state too.
     ref = {}
     for patch in range(NPATCH):
-        uc.mem_write(st0, clean)
+        jxp = J.JX().build(); jxp.set_ftz()
+        jxp.call(J.IB + 0x3F9970, rcx=jxp.HOST,
+                 rdx=_s.unpack("<Q", _s.pack("<d", 44100.0))[0])
         rec = bank[HEADER + patch * STRIDE:]
         blob = rec[BLOB_OFF:]
         for pool in active:
-            jx.dispatch(0, pool + 740, decode(blob, pool))
-        ref[patch] = bytes(uc.mem_read(st0, BLOCK))
+            jxp.dispatch(0, pool + 740, decode(blob, pool))
+        ref[patch] = bytes(jxp.uc.mem_read(jxp.state[0], BLOCK))
     pickle.dump(ref, open(os.path.join(outdir, "recall_ref.pkl"), "wb"))
     json.dump({"active": active, "block": BLOCK, "faults": jx.faults},
               open(os.path.join(outdir, "recall_meta.json"), "w"))
