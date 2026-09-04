@@ -90,6 +90,11 @@
  * "improve" the logic -- bit-exact or nothing (RULE 1 of the project).
  */
 #include <stdint.h>
+#if JX_DN_TOOTH
+#define JXDN_TOOTHVAL 1   /* the tooth skews one gate store by one */
+#else
+#define JXDN_TOOTHVAL 0
+#endif
 #include <string.h>
 
 typedef struct {
@@ -314,7 +319,7 @@ static void jxdn_gate_tail(uint8_t *pb, uint8_t *st, int v, int flag, int val)
         /* o110 slot 0x28, r8d=0 (0x3E3DFF path) */
         jxdn_gate_level(st, v, 0);
     }
-    *(int32_t *)(pb + 0x644 + 4 * v) = val;   /* 0x3E3E18 */
+    *(int32_t *)(pb + 0x644 + 4 * v) = val + JXDN_TOOTHVAL;   /* 0x3E3E18 */
     any = 0;
     lo = *(int32_t *)(pb + 0x63C);
     hi = *(int32_t *)(pb + 0x640);
