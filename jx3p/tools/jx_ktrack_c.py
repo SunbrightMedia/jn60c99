@@ -10,7 +10,7 @@ import sys, os, ctypes
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import jx_ktrack_seq
 
-KT_SZ = 0x100
+KT_SZ = 0xB0
 
 
 def main():
@@ -23,12 +23,16 @@ def main():
     ti = [0]
     events = []
 
-    SET = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_int, ctypes.c_int)
+    SET = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+                           ctypes.c_int)
     GET = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_int,
                            ctypes.c_int, ctypes.POINTER(ctypes.c_int32))
+    G70 = ctypes.CFUNCTYPE(ctypes.c_uint32, ctypes.c_void_p)
+    tape70 = [e for e in ref if e[0] == "get70"]
+    t7 = [0]
 
-    def set48(user, val, pid):
-        events.append(("set48", val & 0xFFFFFFFF, pid & 0xFFFFFFFF, 0))
+    def set48(user, what, pid, val):
+        events.append(("set48", pid & 0xFFFFFFFF, val & 0xFFFFFFFF, 0))
     def get50(user, what, pid, out):
         if ti[0] >= len(tape):
             events.append(("get50", -1, pid, -1)); return 0
@@ -36,11 +40,18 @@ def main():
         events.append(("get50", val, pid & 0xFFFFFFFF, al))
         if al: out[0] = val
         return al
-    keep = [SET(set48), GET(get50)]
+    def get70(user):
+        if t7[0] >= len(tape70):
+            events.append(("get70", -1, 0, -1)); return 0
+        _, val, _z, _z2 = tape70[t7[0]]; t7[0] += 1
+        events.append(("get70", val, 0, 0))
+        return val & 0xFFFFFFFF
+    keep = [SET(set48), GET(get50), G70(get70)]
 
     class Cbs(ctypes.Structure):
-        _fields_ = [("set48", SET), ("get50", GET), ("user", ctypes.c_void_p)]
-    cbs = Cbs(keep[0], keep[1], None)
+        _fields_ = [("set48", SET), ("get50", GET), ("get70", G70),
+                    ("user", ctypes.c_void_p)]
+    cbs = Cbs(keep[0], keep[1], keep[2], None)
 
     blob = ctypes.create_string_buffer(
         open(os.path.join(refdir, "init.bin"), "rb").read(), KT_SZ)
@@ -49,10 +60,10 @@ def main():
         if ev[0] == "on":
             lib.jx_ktrack_on(blob, ctypes.byref(cbs), ev[1], ev[2])
         elif ev[0] == "off":
-            lib.jx_ktrack_off(blob, ctypes.byref(cbs), ev[1])
+            lib.jx_ktrack_off_full(blob, ctypes.byref(cbs), ev[1])
         elif ev[0] == "mode":
-            ctypes.memmove(ctypes.byref(blob, 0x10),
-                           ctypes.c_int32(ev[1]), 4)
+            import struct as _s
+            ctypes.memmove(ctypes.byref(blob, 0x10), _s.pack("<i", ev[1]), 4)
             events.append(("mode", ev[1], 0, 0))
 
     bad = 0
@@ -68,7 +79,7 @@ def main():
     fin = open(os.path.join(refdir, "final.bin"), "rb").read()
     got = blob.raw[:KT_SZ]
     for o in range(KT_SZ):
-        if o < 0x10:   # vtable ptr + header pointers: excluded
+        if o < 8:      # the vtable pointer only: excluded
             continue
         if fin[o] != got[o]:
             print("byte 0x%02X differs: oracle %02x vs C %02x" %

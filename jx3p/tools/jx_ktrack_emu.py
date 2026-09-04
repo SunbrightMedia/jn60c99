@@ -22,7 +22,7 @@ from unicorn.x86_const import (UC_X86_REG_RIP, UC_X86_REG_RSP, UC_X86_REG_RCX,
 from unicorn import UC_HOOK_CODE
 
 ON_W, OFF_W = 0x357BC0, 0x357B20
-KT_SZ = 0x100     # tracker blob extent compared (bitmap+stacks+flags)
+KT_SZ = 0xB0      # JXK_UNIT_SZ: last touched byte +0xA7
 
 
 def main():
@@ -35,15 +35,16 @@ def main():
     vt = struct.unpack("<Q", uc.mem_read(obj, 8))[0]
     t48 = struct.unpack("<Q", uc.mem_read(vt + 0x48, 8))[0]
     t50 = struct.unpack("<Q", uc.mem_read(vt + 0x50, 8))[0]
+    t70 = struct.unpack("<Q", uc.mem_read(vt + 0x70, 8))[0]
 
     open(os.path.join(outdir, "init.bin"), "wb").write(
         bytes(uc.mem_read(obj, KT_SZ)))
     events = []
 
-    def h48(uc_, addr, size, user):     # SET: stub + record
-        val = uc_.reg_read(UC_X86_REG_RDX) & 0xFFFFFFFF
+    def h48(uc_, addr, size, user):     # SET: stub + record (r9d = value)
         pid = uc_.reg_read(UC_X86_REG_R8) & 0xFFFFFFFF
-        events.append(("set48", val, pid, 0))
+        val = uc_.reg_read(UC_X86_REG_R9) & 0xFFFFFFFF
+        events.append(("set48", pid, val, 0))
         rsp = uc_.reg_read(UC_X86_REG_RSP)
         ret = struct.unpack("<Q", uc_.mem_read(rsp, 8))[0]
         uc_.reg_write(UC_X86_REG_RSP, rsp + 8)
@@ -65,7 +66,21 @@ def main():
             val = struct.unpack("<i", uc_.mem_read(out, 4))[0] if al else 0
             events.append(("get50", val, pid, al))
 
+    def h70(uc_, addr, size, user):     # CLOCK GET: run, tape on return
+        rsp = uc_.reg_read(UC_X86_REG_RSP)
+        ret = struct.unpack("<Q", uc_.mem_read(rsp, 8))[0]
+        pend70[ret] = 1
+
+    def h70ret(uc_, addr, size, user):
+        if addr in pend70:
+            pend70.pop(addr)
+            events.append(("get70",
+                           uc_.reg_read(UC_X86_REG_RAX) & 0xFFFFFFFF, 0, 0))
+
+    pend70 = {}
     uc.hook_add(UC_HOOK_CODE, h48, begin=t48, end=t48)
+    uc.hook_add(UC_HOOK_CODE, h70, begin=t70, end=t70)
+    uc.hook_add(UC_HOOK_CODE, h70ret)
     uc.hook_add(UC_HOOK_CODE, h50, begin=t50, end=t50)
     uc.hook_add(UC_HOOK_CODE, h50ret)     # global; filters on return addr
 
