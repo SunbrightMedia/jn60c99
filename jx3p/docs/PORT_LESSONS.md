@@ -62,3 +62,25 @@ the sharp edges inside it.
    short: no allocator, no clean-construct, no shell hookup -- so no
    standalone sound. The stage is now mandatory and comes BEFORE any finish
    line claim. The allocator work below is that stage, not an appendix.
+
+7. **The DAW is part of the instrument: boot through the HOST PARAMETER
+   ENTRY, not bare dispatch** (robustness arc, 2026-09-04). The unhosted
+   clean boot sounds wrong (unstable pitch, master EFX self-poisons) and NO
+   blanket "write every DB default" vector fixes it -- REFUTED on the
+   oracle. What a real host does differently, all READ/PROVEN from the
+   binaries:
+   - Parameter writes go through the host param entry (JX: rva 0x3F9A30;
+     JUNO twin: 0x3C7AE0, byte-for-byte the same idiom), which runs the
+     post-write refresh a bare DISPATCH (0x3EBB00) omits (JUNO proof:
+     assigner stayed POLY without it, probes/assigner/).
+   - After recall, active ramps are SNAPPED to their targets and
+     deactivated, and the warm-up latch cleared (JUNO e2e snap_all /
+     clear_latch -- validated bit-for-bit there).
+   The binary's own parameter tables (name table rva 0x9D6C00; ENGINE DB
+   rva 0x9C2C10, rows {min,max,default,flags}) name every id: 20 MASTER
+   TUNE, 433+ Note (default 36 -- the audit's wrong-pitch red herring),
+   249/619 OCTAVE (default 3), 798 PORTAMENTO. Ids 433-484 are EVENTS
+   (Note/Gate/Mute) -- a host never writes them as parameters.
+   Measurement discipline paid for twice here: zero-crossing f0 lies on
+   complex tones (use autocorrelation), and a knockout sweep that restores
+   state IN PLACE poisons every later trial -- fresh build per trial.
