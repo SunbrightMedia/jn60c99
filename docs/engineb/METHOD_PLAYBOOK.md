@@ -1761,3 +1761,27 @@ boot, plugin end-to-end vs standalone C).
 3. **An end-to-end gate through the SHIPPING entry path is the only gate
    that catches this class.** Layer gates share the layer's own blind spot:
    both sides consume the same polluted reference and agree.
+
+## 87. VERIFY THE ABI OF EVERY ORACLE ENTRY -- A WRONG-ABI CALL IS A
+## SELF-CONSISTENT LIE (2026-09-04, JX-3P)
+
+The JX harness called setSampleRate as `call(SETSR, rcx=HOST, rdx=<double
+bits>)`. The function actually reads the rate as a FLOAT from XMM1
+(`movaps xmm6, xmm1; ucomiss xmm6,[rcx+8]`). XMM1 held garbage, the engine
+never received a sample rate, and EVERY derived artifact -- the clean-boot
+template, the per-patch recall aux, both sides of every render gate --
+carried the same wrong boot. All gates stayed EXACTLY 0 (both sides ran
+the same wrong call) while the port audibly played inharmonic mush. The
+JUNO harness had it right (`call_f`, rate in xmm1); the JX harness was
+written fresh and never checked against the callee's disassembly.
+
+### The rules
+1. Before trusting any oracle entry point, DISASSEMBLE ITS FIRST TEN
+   INSTRUCTIONS and confirm where each argument is read (gpr vs xmm,
+   float vs double, stack args). Record it next to the rva.
+2. A/B gates only prove the two sides agree UNDER THE SAME DRIVE. They
+   prove nothing about the drive itself. Every drive-side call is part
+   of the trusted base and needs its own proof.
+3. When output is qualitatively wrong (inharmonic, unstable) while every
+   gate is green, suspect the DRIVE (ABI, ordering, missing calls)
+   before the DSP.
