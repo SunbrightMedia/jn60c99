@@ -64,6 +64,51 @@ def main():
                      bytes(uc.mem_read(p64, 4)))
         struct.pack_into("<Q", buf, 136, 0)          # pointer zeroed
         regions.append(buf)
+    # control-plane blobs: 9 note managers (+their nstore/ktrack objects)
+    # and the 9 proc headers + the dispatch seam constants
+    for i in range(9):
+        u = rq(jx.HOST + 0x78 + 0x40 * i)
+        mgr = bytearray(uc.mem_read(u, 0x7A8))
+        struct.pack_into("<QQ", mgr, 0x518, 0, 0)     # sink ptrs zeroed
+        ns = bytearray(uc.mem_read(rq(u + 0x518), 0xDB0))
+        struct.pack_into("<Q", ns, 0, 0)              # vtable
+        kt = bytearray(uc.mem_read(rq(u + 0x520), 0xB0))
+        struct.pack_into("<Q", kt, 0, 0)              # vtable
+        regions.append(mgr); regions.append(ns); regions.append(kt)
+    for i in range(9):
+        pr = bytearray(uc.mem_read(jx.proc[i], 0x700))
+        struct.pack_into("<Q", pr, 0, 0)              # vtable
+        regions.append(pr)
+    # WRAPPER + RAMP layer, per unit (charter 7b: a clean boot has 216 LIVE
+    # ramps, latch=960, flag=1 -- measured, not assumed):
+    #   u32 latch, u8 flag, pad3, u32 nids, ids..., u32 nslots,
+    #   slots: {u32 target_off (from the unit state base), 36 bytes rest}
+    for u in range(9):
+        st = jx.state[u]
+        latch = struct.unpack("<i", uc.mem_read(st + 0xAAC308, 4))[0]
+        flag = uc.mem_read(st + 0x14, 1)[0]
+        arr = rq(st + 0x58)
+        b0 = rq(st + 0x70); e0 = rq(st + 0x78)
+        ids = list(struct.unpack("<%di" % ((e0 - b0) // 4),
+                                 uc.mem_read(b0, e0 - b0))) if e0 > b0 else []
+        nslot = (max(ids) + 1) if ids else 0
+        rec = struct.pack("<iBxxxI", latch, flag, len(ids))
+        rec += struct.pack("<%di" % len(ids), *ids) if ids else b""
+        rec += struct.pack("<I", nslot)
+        for i in range(nslot):
+            sl = bytes(uc.mem_read(arr + 40 * i, 40))
+            tgt = struct.unpack("<Q", sl[:8])[0]
+            off = tgt - st if tgt else 0xFFFFFFFF
+            rec += struct.pack("<I", off & 0xFFFFFFFF) + sl[8:]
+        links.append(rec)
+    # voice HIGH windows (ramp targets + wrapper cells live above the DSP
+    # window): sparse via zlib, one region per voice
+    for u in range(8):
+        regions.append(bytearray(uc.mem_read(jx.state[u] + 0xA60000,
+                                             0x4D000)))
+    o110 = rq(jx.proc[0] + 0x110)
+    links.append(bytes(uc.mem_read(o110 + 0x58, 8)) +
+                 bytes(uc.mem_read(J.IB + 0x9BF2F4, 23 * 4)))
     st8 = jx.state[8]
     buf = bytearray(uc.mem_read(st8, SNAP_M))
     obj = rq(st8 + 136)
@@ -74,7 +119,11 @@ def main():
     struct.pack_into("<Q", buf, 136, 0)
     regions.append(buf)
 
-    nn = sum(nan_count(r) for r in regions)
+    # the census is a FLOAT-state rule: DSP regions only (8 voices + the
+    # master, regions 0..7 and the last). The control blobs hold int lists
+    # filled with -1, whose bit pattern is a NaN but is never float data.
+    dsp = regions[:8] + [regions[-1]]
+    nn = sum(nan_count(r) for r in dsp)
     print("template NaN census: %d (0 REQUIRED)" % nn)
     if nn and os.environ.get("JX_TEMPLATE_ALLOW_NAN") != "1":
         raise SystemExit("CLEAN BOOT CONTAINS NaN -- refused")

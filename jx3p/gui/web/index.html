@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JX-3P — bit-exact port</title>
+<style>
+  :root { color-scheme: dark; }
+  body { background:#14161a; color:#dfe3e8; font:14px system-ui,sans-serif;
+         margin:0; padding:24px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .sub { color:#8b93a1; margin-bottom:18px; }
+  .row { display:flex; gap:12px; align-items:center; margin-bottom:14px;
+         flex-wrap:wrap; }
+  select,button { background:#232730; color:#dfe3e8; border:1px solid #3a4150;
+                  border-radius:6px; padding:8px 12px; font-size:14px; }
+  button:active { background:#2f3542; }
+  #kbd { display:flex; user-select:none; height:150px; position:relative;
+         max-width:900px; }
+  .wk { flex:1; background:#e8e6e0; border:1px solid #555; border-radius:0 0 5px 5px;
+        position:relative; }
+  .wk.on { background:#9fd0ff; }
+  .bk { position:absolute; width:56%; height:60%; background:#1a1a1a; left:72%;
+        z-index:2; border-radius:0 0 4px 4px; }
+  .bk.on { background:#3a76c0; }
+  #status { color:#8b93a1; margin-top:14px; white-space:pre-line; }
+  .tag { display:inline-block; background:#1f2a1f; color:#9fd89f;
+         border:1px solid #365936; border-radius:5px; padding:2px 8px;
+         font-size:12px; margin-left:8px; }
+</style>
+</head>
+<body>
+<h1>Roland JX-3P <span class="tag">bit-exact C port · clean boot proven</span></h1>
+<div class="sub">The plugin's own recall, note managers, key tracker, dispatch,
+ramps and renders — every layer transcribed from the binary and gated EXACTLY 0.
+Keyboard: A–K white keys, W/E/T/Y/U black, Z/X octave.</div>
+<div class="row">
+  <button id="power">Start audio</button>
+  <select id="patch"></select>
+  <span id="pname"></span>
+</div>
+<div id="kbd"></div>
+<div id="status">audio off</div>
+<script type="module">
+const BUILD_VER = "dev";
+import Jx3pModule from './jx3p.js?v=' + BUILD_VER;
+
+const mod = await Jx3pModule();
+const ok = mod.ccall('jx3p_init', 'number',
+  ['string','string','string'],
+  ['/jx_template.bin', '/bank.bin', '/jx_master_recall.bin']);
+if (!ok) { document.getElementById('status').textContent =
+  'ENGINE INIT FAILED'; throw new Error('init'); }
+
+const sel = document.getElementById('patch');
+for (let i = 0; i < 64; i++) {
+  const o = document.createElement('option');
+  o.value = i; o.textContent = 'Patch ' + (i + 1);
+  sel.appendChild(o);
+}
+mod.ccall('jx3p_recall', null, ['number'], [0]);
+sel.onchange = () => mod.ccall('jx3p_recall', null, ['number'],
+                               [sel.value | 0]);
+
+let ctx = null, node = null, octave = 4;
+const N = 256;
+const pL = mod._malloc(N * 4), pR = mod._malloc(N * 4);
+document.getElementById('power').onclick = async () => {
+  if (ctx) return;
+  ctx = new AudioContext({ sampleRate: 44100 });
+  node = ctx.createScriptProcessor(N, 0, 2);
+  node.onaudioprocess = (e) => {
+    mod.ccall('jx3p_render', null, ['number','number','number'], [pL, pR, N]);
+    e.outputBuffer.getChannelData(0).set(
+      mod.HEAPF32.subarray(pL >> 2, (pL >> 2) + N));
+    e.outputBuffer.getChannelData(1).set(
+      mod.HEAPF32.subarray(pR >> 2, (pR >> 2) + N));
+  };
+  node.connect(ctx.destination);
+  document.getElementById('status').textContent =
+    'audio running at 44100 Hz — play';
+};
+
+const KEYMAP = { a:0,w:1,s:2,e:3,d:4,f:5,t:6,g:7,y:8,h:9,u:10,j:11,k:12 };
+const held = new Set();
+function noteOn(n)  { mod.ccall('jx3p_note_on', null,
+                                ['number','number'], [n, 100]); }
+function noteOff(n) { mod.ccall('jx3p_note_off', null, ['number'], [n]); }
+window.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z') { octave = Math.max(1, octave - 1); return; }
+  if (k === 'x') { octave = Math.min(7, octave + 1); return; }
+  if (k in KEYMAP) {
+    const n = 12 * octave + KEYMAP[k];
+    if (!held.has(n)) { held.add(n); noteOn(n); paint(); }
+  }
+});
+window.addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase();
+  if (k in KEYMAP) {
+    const n = 12 * octave + KEYMAP[k];
+    if (held.has(n)) { held.delete(n); noteOff(n); paint(); }
+  }
+});
+
+const kbd = document.getElementById('kbd');
+const WHITE = [0,2,4,5,7,9,11], BLACKAFTER = {0:1,2:3,5:6,7:8,9:10};
+const keyEls = {};
+for (let o = 3; o <= 5; o++) for (const w of WHITE) {
+  const n = 12 * o + w;
+  const el = document.createElement('div');
+  el.className = 'wk'; kbd.appendChild(el); keyEls[n] = el;
+  el.onpointerdown = () => { held.add(n); noteOn(n); paint(); };
+  el.onpointerup = () => { held.delete(n); noteOff(n); paint(); };
+  if (w in BLACKAFTER) {
+    const bn = 12 * o + BLACKAFTER[w];
+    const b = document.createElement('div');
+    b.className = 'bk'; el.appendChild(b); keyEls[bn] = b;
+    b.onpointerdown = (e) => { e.stopPropagation(); held.add(bn);
+                              noteOn(bn); paint(); };
+    b.onpointerup = (e) => { e.stopPropagation(); held.delete(bn);
+                             noteOff(bn); paint(); };
+  }
+}
+function paint() {
+  for (const [n, el] of Object.entries(keyEls))
+    el.classList.toggle('on', held.has(+n));
+}
+</script>
+</body>
+</html>
