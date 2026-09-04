@@ -21,9 +21,14 @@ slot lose power independently inherits this.
 
 ## What the carrier board must do
 
-1. **ONE supply for all four slots.** A single 5 V input (wall adapter, not
-   USB) feeds every slot. No slot can be unpowered while another runs, so the
-   asymmetry that causes back-feed never exists in normal use.
+1. **ONE supply for all four slots.** The requirement is ONE SOURCE, not a
+   particular kind of source: a single USB-C receptacle on the carrier
+   (~$0.15 + two 5.1 kΩ CC resistors) feeds every slot and costs nothing the
+   BOM does not already carry. No slot can then be unpowered while another
+   runs, so the asymmetry that causes back-feed never exists in normal use.
+   Current note: four boards + the DAC draw ~1.2 A, so the finished
+   instrument wants a phone charger rather than a 0.5 A laptop port. That is
+   a cable choice, not a purchase.
 2. **Series resistors on EVERY hop line — 330 Ω, 0603.** 15 per hop, 45 in
    total. They cap the clamp current at roughly 8 mA a pin during any
    asymmetry (a slot pulled for service, a board reset by hand) and protect
