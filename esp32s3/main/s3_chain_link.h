@@ -344,6 +344,12 @@ typedef struct {
     uint32_t rx_chunks, rx_short, rx_match, rx_mismatch, rx_dropped, pat_disc;
     size_t   rx_off, tx_off;     /* bytes of a PART-moved chunk, carried over */
     int      tx_silent;          /* the carried chunk is all zeros            */
+    /* the SEQ PROBE: every audio chunk carries a counter in spare slot 3,
+     * frame 0. A gap at the receiver = the wire stream slipped; zero gaps
+     * with zero redemptions = the advert plumbing is the defect. */
+    uint32_t tx_seq;
+    uint32_t rx_seq_last, rx_seq_ok, rx_seq_slips; int rx_seq_have;
+    uint32_t mm_w[4], mm_crc, mm_pend; int mm_have;
     uint32_t pend[8]; uint16_t pend_age[8]; uint8_t pend_used[8];
     uint32_t relock_miss;
     uint32_t crc_last;
@@ -425,6 +431,16 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
                 if (s3c_txbuf[i]) { silent = 0; break; }
         }
         A_DN.tx_silent = silent;
+        /* the seq probe stamps AUDIO chunks only -- the pattern must stay
+         * pure. Stamping also makes every audio chunk non-silent, so an
+         * advert goes out for each one (a silent gap otherwise ages the
+         * receiver's pends past 32 and forces a relock). */
+        if (peer_alock) {
+            s3c_txbuf[3] = (int32_t)++A_DN.tx_seq;
+            A_DN.tx_silent = 0;
+        } else {
+            A_DN.tx_seq = 0;
+        }
     }
     tmo = (A_DN.pace == S3_BPACE_LINKED) ? pdMS_TO_TICKS(20) : 0;
     i2s_channel_write(A_DN.ch, (const char *)s3c_txbuf + A_DN.tx_off,
@@ -546,6 +562,16 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
         got_chunk = 0;
     if (got_chunk && A_UP.locked) {
         uint32_t c = A_UP.crc_last;
+        /* the seq probe: an AUDIO chunk carries a counter in slot 3 frame 0 */
+        {   uint32_t s = (uint32_t)s3c_rxbuf[3];
+            if (s) {
+                if (A_UP.rx_seq_have) {
+                    if (s == A_UP.rx_seq_last + 1) ++A_UP.rx_seq_ok;
+                    else                           ++A_UP.rx_seq_slips;
+                }
+                A_UP.rx_seq_last = s; A_UP.rx_seq_have = 1;
+            }
+        }
         for (k = 0; k < 8; ++k)
             if (A_UP.pend_used[k] && A_UP.pend[k] == c) {
                 A_UP.pend_used[k] = 0;
@@ -554,10 +580,20 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
             }
         for (k = 0; k < 8; ++k)
             if (A_UP.pend_used[k] && ++A_UP.pend_age[k] > 32) {
+                if (!A_UP.mm_have) {
+                    A_UP.mm_have = 1;
+                    A_UP.mm_w[0] = (uint32_t)s3c_rxbuf[0];
+                    A_UP.mm_w[1] = (uint32_t)s3c_rxbuf[1];
+                    A_UP.mm_w[2] = (uint32_t)s3c_rxbuf[2];
+                    A_UP.mm_w[3] = (uint32_t)s3c_rxbuf[3];
+                    A_UP.mm_crc  = c;
+                    A_UP.mm_pend = A_UP.pend[k];
+                }
                 A_UP.pend_used[k] = 0;
                 mismatch = 1; ++A_UP.rx_mismatch;
                 if (++A_UP.relock_miss >= 8) {
                     A_UP.locked = 0; A_UP.relock_miss = 0;
+                    A_UP.rx_seq_have = 0;
                     memset(A_UP.pend_used, 0, sizeof A_UP.pend_used);
                 }
             }
@@ -581,14 +617,28 @@ static void s3c_report(void)
                A_UP.locked ? "lock=YES" : "lock=searching",
                "", (unsigned long)A_UP.rx_short,
                (unsigned long)A_UP.pat_disc);
+    if (C_UP.started) {
+        printf("CHAINseq: ok=%lu slips=%lu last=%lu\n",
+               (unsigned long)A_UP.rx_seq_ok,
+               (unsigned long)A_UP.rx_seq_slips,
+               (unsigned long)A_UP.rx_seq_last);
+        if (A_UP.mm_have) {
+            printf("CHAINmm: w=%08lx %08lx %08lx %08lx crc=%08lx pend=%08lx\n",
+                   (unsigned long)A_UP.mm_w[0], (unsigned long)A_UP.mm_w[1],
+                   (unsigned long)A_UP.mm_w[2], (unsigned long)A_UP.mm_w[3],
+                   (unsigned long)A_UP.mm_crc, (unsigned long)A_UP.mm_pend);
+            A_UP.mm_have = 0;
+        }
+    }
 #endif
 #if S3C_HAS_DOWN
     if (C_DN.started)
-        printf("CHAINdn: pace=%s hs=%s tx=%lu timeouts=%lu ev_gap=%lu\n",
+        printf("CHAINdn: pace=%s hs=%s tx=%lu timeouts=%lu ev_gap=%lu "
+               "txseq=%lu\n",
                A_DN.pace == S3_BPACE_LINKED ? "LINKED" : "freerun",
                C_DN.peer.present ? s3_handshake_name(C_DN.hs) : "no peer yet",
                (unsigned long)A_DN.tx_blk, (unsigned long)A_DN.tx_timeouts,
-               (unsigned long)C_DN.ev_gap);
+               (unsigned long)C_DN.ev_gap, (unsigned long)A_DN.tx_seq);
 #endif
     printf("CHAINev: sent=%lu applied=%lu\n", s3c_ev_sent, s3c_ev_applied);
 }
