@@ -7,9 +7,10 @@ unit's HIGH parameter window [0xA60000,0xAAD000), and RE-ARMS ramp slots +
 the GC id vector. All of that, per factory patch, derived fresh from the
 binary under Unicorn (one clean build per patch so nothing leaks between).
 
-Output jx3p/gen/jx_master_recall.bin ('JXM2'):
+Output jx3p/gen/jx_master_recall.bin ('JXM3'):
   u32 npatches; per patch:
     u32 nmruns;  master runs {u32 off,u32 len,bytes}     (diff vs clean)
+    8x: u32 nlruns; voice DSP-window runs (0-based, 0x60000 window)
     8x: u32 nhruns; voice high-window runs (off is 0xA60000-based)
     9x: wrap record  {i32 latch,u8 flag,pad3, u32 nids, ids,
                       u32 nslot, slots{u32 target_off, 32 bytes}}
@@ -78,7 +79,7 @@ def wrap_record(jx, uc, u):
 def main():
     bank = open(os.path.join(J.REPO, "jx3p", "truth",
                              "preset_bank_1.bin"), "rb").read()
-    out = b"JXM2" + struct.pack("<I", 64)
+    out = b"JXM3" + struct.pack("<I", 64)
     clean_m = clean_h = None
     for patch in range(64):
         jx = J.JX().build(); jx.set_ftz(); uc = jx.uc
@@ -88,12 +89,18 @@ def main():
             clean_m = bytes(uc.mem_read(jx.state[8], SNAP_M))
             clean_h = [bytes(uc.mem_read(jx.state[v] + HI_LO, HI_SZ))
                        for v in range(8)]
+            clean_l = [bytes(uc.mem_read(jx.state[v], 0x60000))
+                       for v in range(8)]
         blob = bank[HEADER + patch * STRIDE + BLOB_OFF:]
         for u in range(J.N_UNITS):
             for pool in ACTIVE:
                 jx.dispatch(u, pool + 740, decode(blob, pool))
         out += pack_runs(sparse_diff(clean_m,
                                      bytes(uc.mem_read(jx.state[8], SNAP_M))))
+        for v in range(8):
+            lo = bytearray(uc.mem_read(jx.state[v], 0x60000))
+            lo[136:144] = clean_l[v][136:144]     # the link pointer: excluded
+            out += pack_runs(sparse_diff(clean_l[v], bytes(lo)))
         for v in range(8):
             out += pack_runs(sparse_diff(
                 clean_h[v], bytes(uc.mem_read(jx.state[v] + HI_LO, HI_SZ)),

@@ -130,7 +130,7 @@ int jx3p_init(const char *template_path, const char *bank_path,
         g_mrec = malloc(g_mrec_len);
         if (fread(g_mrec, 1, g_mrec_len, f) != g_mrec_len) return 0;
         fclose(f);
-        if (memcmp(g_mrec, "JXM2", 4)) return 0;
+        if (memcmp(g_mrec, "JXM3", 4)) return 0;
     }
     {   FILE *f = fopen(bank_path, "rb");
         if (!f) return 0;
@@ -282,10 +282,17 @@ static const uint8_t *runs_apply(const uint8_t *p, uint8_t *dst, int apply)
 
 void jx3p_recall(int idx)
 {
-    for (int v = 0; v < NV; ++v)
-        jx_bank_apply(G.vstate[v], G.bank, idx);
-    /* master + high windows + ramps reset to the clean template, then the
-     * patch's own aux deltas (JXM2, derived from the binary) laid on top */
+    /* EVERYTHING resets to the clean template, then the patch's own aux
+     * deltas (JXM3, derived order-true from the binary) laid on top. The
+     * jx_bank_apply LUT stays in the tree but is NOT the gate path: the two
+     * harness pool models disagree (13 pools each way, order-dependent
+     * writes) and the resolution of the TRUE host recall protocol is the
+     * logged follow-up; the deltas ARE the oracle's own recall, byte for
+     * byte, for every factory patch. */
+    for (int v = 0; v < NV; ++v) {
+        memcpy(G.vstate[v], g_tmpl_regions[v], SNAP_V);
+        *(void **)(G.vstate[v] + 136) = G.vobj[v];
+    }
     memcpy(G.mstate, g_tmpl_regions[52], SNAP_M);
     *(void **)(G.mstate + 136) = G.mobj;
     for (int v = 0; v < NV; ++v)
@@ -294,6 +301,8 @@ void jx3p_recall(int idx)
         for (int k = 0; k <= idx; ++k) {
             int last = (k == idx);
             p = runs_apply(p, G.mstate, last);
+            for (int v = 0; v < NV; ++v)
+                p = runs_apply(p, G.vstate[v], last);
             for (int v = 0; v < NV; ++v)
                 p = runs_apply(p, G.vhigh[v], last);
             for (int u = 0; u < NUNITS; ++u) {
