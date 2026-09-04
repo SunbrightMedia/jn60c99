@@ -349,6 +349,7 @@ typedef struct {
      * with zero redemptions = the advert plumbing is the defect. */
     uint32_t tx_seq;
     uint32_t rx_seq_last, rx_seq_ok, rx_seq_slips; int rx_seq_have;
+    uint32_t rx_realigns;
     uint32_t mm_w[4], mm_crc, mm_pend; int mm_have;
     uint32_t pend[8]; uint16_t pend_age[8]; uint8_t pend_used[8];
     uint32_t relock_miss;
@@ -431,12 +432,17 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
                 if (s3c_txbuf[i]) { silent = 0; break; }
         }
         A_DN.tx_silent = silent;
-        /* the seq probe stamps AUDIO chunks only -- the pattern must stay
-         * pure. Stamping also makes every audio chunk non-silent, so an
-         * advert goes out for each one (a silent gap otherwise ages the
-         * receiver's pends past 32 and forces a relock). */
+        /* Spare slot 3 of EVERY frame carries a tagged marker: the frame's
+         * own index plus a chunk sequence. The receiver reads frame 0's
+         * marker and knows instantly whether the stream is frame-rotated
+         * (a slave-TX underrun inserts whole frames) and by how much -- the
+         * probe proved exactly that rotation. Markers also make every audio
+         * chunk non-silent, so an advert goes out for each one. */
         if (peer_alock) {
-            s3c_txbuf[3] = (int32_t)++A_DN.tx_seq;
+            uint32_t sq = ++A_DN.tx_seq;
+            for (i = 0; i < n; ++i)
+                s3c_txbuf[S3C_SLOTW * i + 3] =
+                    (int32_t)(S3_PAT_TAG | ((sq & 0xFFu) << 9) | (uint32_t)i);
             A_DN.tx_silent = 0;
         } else {
             A_DN.tx_seq = 0;
@@ -461,6 +467,13 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
     A_DN.pace = s3_bpace_step(A_DN.pace, S3_ROLE_B, hs_ok, tmo);
     return tmo;
 }
+#endif
+
+#if S3C_HAS_DOWN
+/* the block-tail merge must NOT refill s3c_txbuf while a part-written chunk
+ * is still leaving -- the splice would carry a CRC no advert ever matches.
+ * The caller skips one merge instead (freerun only; LINKED completes). */
+#define s3c_tx_busy() (A_DN.tx_off != 0)
 #endif
 
 #if S3C_HAS_UP
@@ -523,6 +536,19 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
     if (got == (size_t)n * S3C_SLOTW * sizeof(int32_t)) {
         got_chunk = 1;
         ++A_UP.rx_chunks;
+        /* the marker in frame 0 slot 3 heals frame rotation on the spot: a
+         * slave-TX underrun inserts whole frames, and before this check ONE
+         * slip broke the CRC forever (the probe measured it). */
+        if (A_UP.locked &&
+            ((uint32_t)s3c_rxbuf[3] & S3_PAT_MASK) == S3_PAT_TAG) {
+            uint32_t ci = (uint32_t)s3c_rxbuf[3] & 0x1FFu;
+            if (ci) {
+                A_UP.discard_left = ((uint32_t)n - ci) * (uint32_t)S3C_SLOTW;
+                ++A_UP.rx_realigns;
+                A_UP.rx_seq_have = 0;
+                got_chunk = 0;
+            }
+        }
         /* CRC only once LOCKED (it exists to redeem adverts); the pattern
          * lock itself needs no checksum at all. Table twin, ~8 cyc/byte. */
         if (A_UP.locked)
@@ -562,12 +588,15 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
         got_chunk = 0;
     if (got_chunk && A_UP.locked) {
         uint32_t c = A_UP.crc_last;
-        /* the seq probe: an AUDIO chunk carries a counter in slot 3 frame 0 */
-        {   uint32_t s = (uint32_t)s3c_rxbuf[3];
-            if (s) {
+        /* chunk-sequence continuity, read from the marker (8-bit wrap) */
+        {   uint32_t mk = (uint32_t)s3c_rxbuf[3];
+            if ((mk & S3_PAT_MASK) == S3_PAT_TAG) {
+                uint32_t s = (mk >> 9) & 0xFFu;
                 if (A_UP.rx_seq_have) {
-                    if (s == A_UP.rx_seq_last + 1) ++A_UP.rx_seq_ok;
-                    else                           ++A_UP.rx_seq_slips;
+                    if (s == ((A_UP.rx_seq_last + 1u) & 0xFFu))
+                        ++A_UP.rx_seq_ok;
+                    else
+                        ++A_UP.rx_seq_slips;
                 }
                 A_UP.rx_seq_last = s; A_UP.rx_seq_have = 1;
             }
@@ -618,9 +647,10 @@ static void s3c_report(void)
                "", (unsigned long)A_UP.rx_short,
                (unsigned long)A_UP.pat_disc);
     if (C_UP.started) {
-        printf("CHAINseq: ok=%lu slips=%lu last=%lu\n",
+        printf("CHAINseq: ok=%lu slips=%lu realign=%lu last=%lu\n",
                (unsigned long)A_UP.rx_seq_ok,
                (unsigned long)A_UP.rx_seq_slips,
+               (unsigned long)A_UP.rx_realigns,
                (unsigned long)A_UP.rx_seq_last);
         if (A_UP.mm_have) {
             printf("CHAINmm: w=%08lx %08lx %08lx %08lx crc=%08lx pend=%08lx\n",

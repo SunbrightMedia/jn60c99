@@ -4837,6 +4837,10 @@ void app_main(void)
 #else
             {   int ci, hs_dn;
                 s3_chain_cfg cc_ = s3_chain_config(S3_CHAIN_POS);
+                /* NEVER refill the TX buffer over a part-written chunk (the
+                 * splice's CRC matches no advert). Freerun only; a LINKED
+                 * write completes inside its own block. */
+                if (!s3c_tx_busy())
                 for (ci = 0; ci < CHUNK; ++ci)
                     s3_chain_merge(&cc_, w_vbb[w_cur][ci],
 #if S3C_HAS_UP
