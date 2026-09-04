@@ -146,6 +146,28 @@ control in place the same run reported 0/32 baseline and 2 genuine findings.
 `nan_ab.py` now aborts on a dirty control, and no differential gate may ship
 without one.
 
+## 7b. THE PORT MUST PLAY (mandatory — added 2026-09-04, USER-FOUND)
+
+A port is not finished when its DSP nulls. A port is finished when it makes
+sound STANDALONE: a clean boot state (no emulator snapshot, no plugin seed),
+the note-on/voice-allocator path transcribed and proven, and the whole engine
+mounted in a shell a person can play (the web app, the device, or both).
+
+This stage was done for the JUNO but never written down as required, so the
+JX-3P stopped at "DSP proven" and could not make a note from a clean start --
+found by the USER asking for a JX web app, not by any gate. The gap between
+"bit-exact where seeded" and "an instrument" is exactly the kind of unfinished
+work a green gate hides (§0), so it gets a numbered stage:
+
+- **Census the control plane too**: note-on, note-off, allocator, expiry,
+  clean-construct -- the same census discipline §1 applies to DSP.
+- **A clean-boot tooth**: render from the constructed state and PROVE the
+  output contains no NaN/denormal garbage and matches the oracle driven the
+  same way. A port whose only proven starts are snapshots is not standalone.
+- **The shell hookup is part of the port**, not an extra: the bridge exports
+  (create / recall / note on / note off / render) are the port's deliverable
+  API, and the next port reuses the same shell unchanged.
+
 ## 8. REPORTING RULES (binding on me)
 
 - Never say "the port is complete/100%" from a green gate. Say it from a census

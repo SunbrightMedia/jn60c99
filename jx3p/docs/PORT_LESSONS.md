@@ -56,3 +56,9 @@ the sharp edges inside it.
   the oracle's note-on as a deterministic control-plane seed; the DSP it feeds
   is proven bit-exact. A device-standalone C engine still needs this allocator
   transcribed — the last mile, same method as everything above.
+
+6. **A port that cannot PLAY from a clean boot is not a port** (charter §7b,
+   user-found 2026-09-04). "DSP proven bit-exact" stopped this port one stage
+   short: no allocator, no clean-construct, no shell hookup -- so no
+   standalone sound. The stage is now mandatory and comes BEFORE any finish
+   line claim. The allocator work below is that stage, not an appendix.
