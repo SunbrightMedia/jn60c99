@@ -147,3 +147,19 @@ BENCH SIGNAL: the `dma frame num ... limited to 255` warning MUST BE GONE.
 - Note path + event tap: PROVEN by the robot run.
 - Positions 2-4 and every hop remain silicon-unproven. Next: wire hop
   1<-2 (CHAIN4.md section 6); criterion hs=OK, mix=OPEN, CRC MATCH.
+
+## THE DMA FIX IS PROVEN ON SILICON (12th flash, all four boards)
+
+The `dma frame num ... limited to 255` warning is GONE, and the numbers move
+with it: `rx=1700` per 10 s (one chunk per block, where the broken build got
+~15), `part=0`, and **`lock=YES`** -- the training pattern locks for the first
+time on a chain hop. Board 1 stayed green throughout: miss 0/10k, drift frozen
+-16, un=0, deficit frozen 130.
+
+STILL OPEN on the hop: `ok=0` with `bad=` climbing (~10/s) and `mix=closed` --
+the CRC adverts never redeem, so the mix gate correctly refuses to open.
+`pat_disc` also keeps climbing while locked, which means the lock is being
+LOST and re-taken. The audio now arrives; what fails is agreeing on WHICH
+chunk it is. Next probe target: the advert/redeem path (lock_off alignment
+after a relock, and whether the upstream is still sending pattern words after
+peer_alock is set).
