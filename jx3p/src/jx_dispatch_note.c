@@ -93,12 +93,25 @@
 #include <string.h>
 
 typedef struct {
-    const float *temper12;   /* [o110+0x50] 12-float table; NULL -> zeros */
+    /* [o110+0x50] temper table.  The plugin's index is a SIGNED remainder
+     * mod 12 (range -11..11); for negative indexes its movss reads the
+     * static bytes BEFORE the table at RVA 0x9BF320 (parts of adjacent
+     * vftable pointers, fixed at the preferred/emulated image base
+     * 0x180000000).  To stay bit-exact the port keeps a 23-dword table,
+     * base index 11: temper23[11 + rem].  NULL -> the binary's own bytes
+     * (jxdn_temper_default below, READ from the image, 0x9BF2F4..0x9BF34F).
+     */
+    const float *temper23;
     int32_t      o110_58;    /* [o110+0x58] (0x35FCB0 compares vs 7)      */
     int32_t      o110_5c;    /* [o110+0x5C] (transpose-ish int)           */
 } jx_dn_cbs;                 /* no true callbacks remain -- see header    */
 
-static const float jxdn_zero12[12] = {0};   /* RVA 0x9BF320 build state */
+/* RVA 0x9BF2F4..0x9BF34F: 11 dwords preceding + the 12-zero table itself */
+static const uint32_t jxdn_temper_default[23] = {
+    0x3f800000,0x3f800000,0x00000000,0x80b37340,0x00000001,0x806e555c,
+    0x00000001,0x80b373c8,0x00000001,0x8035f630,0x00000001,
+    0,0,0,0,0,0,0,0,0,0,0,0
+};
 
 /* RVA 0x9B4860, 128 dwords */
 static const uint32_t jxdn_lut13[128] = {
@@ -238,14 +251,15 @@ static int32_t jxdn_rem12(int32_t x) { return x - 12 * jxdn_div12(x); }
 static void jxdn_note_body(const jx_dn_cbs *cb, uint8_t *st, int v,
                            int flag, int note)
 {
-    const float *temper = cb->temper12 ? cb->temper12 : jxdn_zero12;
+    const float *temper = cb->temper23
+        ? cb->temper23 + 11 : (const float *)(const void *)jxdn_temper_default + 11;
     float x0 = JXDN_MAP13(note);              /* 358960 case 0x13 */
     int32_t a  = cb->o110_5c;
     int32_t r9 = 12 - a;                      /* cmovle -> 0 when a<=0 */
     float   x1, x2;
     if (a <= 0) r9 = 0;
     if (cb->o110_58 == 7) x1 = 0.0f;          /* cmp [rbx+0x58],7 */
-    else x1 = temper[jxdn_rem12(0x15 - a)];
+    else x1 = temper[jxdn_rem12(0x15 - a)];   /* signed rem: -11..11 */
     x2 = temper[jxdn_rem12(r9 + note)];
     x2 = x2 - x1;                             /* subss */
     x2 = x2 + x0;                             /* addss */
