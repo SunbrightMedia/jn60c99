@@ -38,11 +38,19 @@ The whole audio signal path — recall, voice, master, and the binary's own
 `expf`/`tanf` — is bit-exact. Gate: `make verify-jx3p`. Lessons for the next
 port: `jx3p/docs/PORT_LESSONS.md`.
 
-**Not yet carried (bounded, sized, NOT audio):** the note-on / voice ALLOCATOR
-(sub_1803F9150 + sub_1803F5F90 + the expiry GC 0x3F40E0). The gate uses the
-plugin's own note-on as a deterministic control-plane seed; the DSP it feeds is
-proven. A device-standalone C engine still needs this allocator transcribed —
-the last mile, same method. Everything below this line is older working notes.
+**Charter §7b (THE PORT MUST PLAY) progress:**
+- **NOTE MANAGERS: TRANSCRIBED AND PROVEN (2026-09-04).** The 9-unit layer
+  behind NOTEON 0x3F9150 / NOTEOFF 0x3F90F0 (bodies 0x3F5F90/0x3F5EF0, the
+  list/map/history machinery, all five setters) is `jx3p/src/jx_alloc.c`,
+  a bit-literal blob transcription. Gate: `jx3p/tools/jx_alloc_gate.sh` —
+  oracle replay vs C twin over 4,000 mixed events: 22,008 seam events and
+  9×0x7A8 state bytes EXACTLY 0; the tooth (sustain branch removed) bites.
+  Two-process rule respected (emu writes, ctypes reads). Includes the
+  plugin's own −1-history-index aliasing quirk, reproduced literally.
+- **Still owed for §7b:** the sink layer below the seam (the +0x518/+0x520
+  objects: the actual voice CHOICE + the expiry GC 0x3F40E0), a clean-boot
+  construct in C, then the bridge + web shell. Same method, next.
+Everything below this line is older working notes.
 
 ## PROVEN (null EXACTLY 0 under Unicorn, FTZ|DAZ)
 
