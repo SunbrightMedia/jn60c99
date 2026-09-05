@@ -412,6 +412,23 @@ The last untranscribed seam, sized from the dump:
   SYNTH= parameterization -- it must be created): render A/B vs the oracle
   over 64 patches, null EXACTLY 0.
 
+## RESUME POINT v2 (2026-09-05, saved on 5-hour limit)
+THE ACTIVE DEFECT: full-chain gate fails from sample 1 (all patches) after the
+snapped-boot change. ROOT CAUSE FOUND by the fix workflow: the aux's sparse
+diffs were computed against a DIFFERENT base than the shipped template
+(template pre-snap, aux post-snap) -- runs splice franken-floats over stale
+cells; the C twin repeats sample 0. FIX LANDED: base-match tooth in
+jx_master_recall_export.py (refuses a baseline split). REMAINING, in order:
+  1. python3 -u jx3p/tools/jx_template_export.py   (regen template)
+  2. python3 -u jx3p/tools/jx_master_recall_export.py  (tooth must pass; ~40 min)
+  3. JX_FULL_SKIP_DERIVE=1 sh jx3p/tools/jx_full_gate.sh  (want 4/4+tooth, then all-64)
+  4. jx_listen_c.py dry + --master; then gui/web/build.sh + jx_artifact_page.py
+     + republish artifact d8679bea (scratchpad path or any path + url=...).
+Fix workflow runId wf_a93fac83-92b, JUNO-audit runId wf_802dbb9d-57e (scripts
+under the session dir; both stopped mid-run; findings in their journal.jsonl).
+An orphaned aux regen (pre-tooth) was killed; jx_master_recall.bin on the
+branch is the OLD-base one -- step 2 replaces it.
+
 ## RESUME POINT (2026-09-05, saved on user stop -- limit at 99%)
 - Harness-audit WORKFLOW stopped mid-run. Resume:
   `Workflow({scriptPath: "/root/.claude/projects/-home-user-jn60c99/851980e2-931d-52da-bb74-16fb8562b242/workflows/scripts/harness-audit-wf_fd470d59-c22.js", resumeFromRunId: "wf_fd470d59-c22"})`
