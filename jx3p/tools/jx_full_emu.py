@@ -11,17 +11,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "..", "..", "tools", "verify"))
 import jx_emu as J
 
-HEADER, STRIDE, BLOB_OFF = 23, 20223, 16
-SETSR, NOTEON, NOTEOFF = 0x3F9970, 0x3F9150, 0x3F90F0
 SNAP_V, SNAP_M = 0x60000, 0xAAD000
-ACTIVE = [10, 11, 12, 13, 14, 16, 17, 19, 20, 22, 24, 25, 26, 28, 29, 30, 31,
-          32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
-          49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65]
-
-
-def decode(blob, pool):
-    p = 2 * pool + 8
-    return ((blob[p] & 0xF) << 4) | (blob[p + 1] & 0xF)
+# The boot is jx_emu.boot(): BUILD -> SETSR(float in xmm1, ABI ledger) ->
+# FTZ. Ramps stay LIVE and the latch runs down as shipped (snap=False): the
+# C twin reproduces both from the template's wrap records. Recall is the
+# plugin's own pool dispatch (jx_emu.recall); notify=False keeps the oracle
+# on the same path the shipping bridge takes today.
 
 
 def main():
@@ -30,17 +25,11 @@ def main():
                (sys.argv[2] if len(sys.argv) > 2 else "0,5,20,49").split(",")]
     n = int(sys.argv[3]) if len(sys.argv) > 3 else 1200
     os.makedirs(outdir, exist_ok=True)
-    bank = open(os.path.join(J.REPO, "jx3p", "truth",
-                             "preset_bank_1.bin"), "rb").read()
+    bank = J.bank_bytes()
     for patch in patches:
-        jx = J.JX().build(); jx.set_ftz(); uc = jx.uc
-        jx.call(J.IB + SETSR, rcx=jx.HOST,
-                rdx=struct.unpack("<Q", struct.pack("<d", 44100.0))[0])
-        blob = bank[HEADER + patch * STRIDE + BLOB_OFF:]
-        for u in range(J.N_UNITS):
-            for pool in ACTIVE:
-                jx.dispatch(u, pool + 740, decode(blob, pool))
-        jx.call(J.IB + NOTEON, rcx=jx.HOST, rdx=60, r8=100)
+        jx = J.JX().boot(44100.0, snap=False); uc = jx.uc
+        jx.recall(patch, bank=bank, notify=False)
+        jx.note_on(60, 100)
         L, R = jx.render(n)
         d = os.path.join(outdir, "p%d" % patch)
         os.makedirs(d, exist_ok=True)

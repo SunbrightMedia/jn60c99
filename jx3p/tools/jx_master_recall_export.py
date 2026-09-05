@@ -82,19 +82,16 @@ def main():
     out = b"JXM3" + struct.pack("<I", 64)
     clean_m = clean_h = None
     for patch in range(64):
-        jx = J.JX().build(); jx.set_ftz(); uc = jx.uc
-        jx.call(J.IB + SETSR, rcx=jx.HOST,
-                rdx=struct.unpack("<Q", struct.pack("<d", 44100.0))[0])
+        # boot per jx_emu.boot(): SETSR takes the rate as a FLOAT in xmm1
+        # (ABI ledger); ramps/latch live, as the C engine replays them
+        jx = J.JX().boot(44100.0, snap=False); uc = jx.uc
         if clean_m is None:
             clean_m = bytes(uc.mem_read(jx.state[8], SNAP_M))
             clean_h = [bytes(uc.mem_read(jx.state[v] + HI_LO, HI_SZ))
                        for v in range(8)]
             clean_l = [bytes(uc.mem_read(jx.state[v], 0x60000))
                        for v in range(8)]
-        blob = bank[HEADER + patch * STRIDE + BLOB_OFF:]
-        for u in range(J.N_UNITS):
-            for pool in ACTIVE:
-                jx.dispatch(u, pool + 740, decode(blob, pool))
+        jx.recall(patch, bank=bank, notify=False)   # the plugin's own pool set
         out += pack_runs(sparse_diff(clean_m,
                                      bytes(uc.mem_read(jx.state[8], SNAP_M))))
         for v in range(8):

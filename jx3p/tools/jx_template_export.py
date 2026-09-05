@@ -45,11 +45,11 @@ def nan_count(buf):
 
 def main():
     sr = float(sys.argv[1]) if len(sys.argv) > 1 else 44100.0
-    jx = J.JX().build()
-    jx.set_ftz()
+    # BUILD -> SETSR (float in xmm1 -- the ABI ledger in jx_emu; the old
+    # rdx call never set a rate, playbook 87) -> FTZ. Ramps + latch stay
+    # live: the template carries them and the C engine replays them.
+    jx = J.JX().boot(sr, snap=False)
     uc = jx.uc
-    jx.call(J.IB + SETSR, rcx=jx.HOST,
-            rdx=struct.unpack("<Q", struct.pack("<d", sr))[0])
 
     regions = []
     links = []
