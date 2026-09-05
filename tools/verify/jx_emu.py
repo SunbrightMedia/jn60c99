@@ -29,6 +29,42 @@ MASTER_WRAP=IB + 0x377010     # (state, a2[16], DWORD** outPair) -- JUNO twin
 STATE_SZ  = 0xAAC310
 N_UNITS   = 9
 
+# ABI LEDGER (tools/verify/abi_check.py, 2026-09-05 -- METHOD_PLAYBOOK 87).
+# Every entry below was disassembled; the register each argument is READ
+# from is recorded here. A call that fills a different register is WRONG
+# whatever the gates say (the SETSR rdx-vs-xmm1 defect hid for the whole port).
+SETSR     = IB + 0x3F9970     # (rcx=HOST, xmm1=float rate)   -- FLOAT IN XMM1
+NOTEON    = IB + 0x3F9150     # (rcx=HOST, dl=note, r8b=vel)  engine vtbl 0x80
+NOTEOFF   = IB + 0x3F90F0     # (rcx=HOST, dl=note, r8b=vel)  engine vtbl 0x78
+ASG_NOTIFY= IB + 0x356BF0     # (rcx=assign obj, edx=what)    JUNO twin 0x3549B0
+HOSTPARAM = IB + 0x3F9A30     # (rcx=HOST, edx=host id, r8d=val) -- needs the
+                              # controller-built id map at .data 0xCE9038
+ENGINE_VTBL = IB + 0xA15B88   # slots: 08 BUILD 18 SETSR 38 RENDER 78 NOTEOFF
+                              #        80 NOTEON 70 HOSTPARAM (pe_recon vtable)
+XC_TABLE  = (0x96C660, 0x96E0C8)   # C++ static initializers (pe_recon crt_init);
+                              # they fill .data's runtime tail [0xCE7800,0xCF2860)
+LATCH_OFF = 0xAAC308          # per-unit warm-up mute latch (960 at clean boot)
+
+# the factory bank geometry + the pool set the plugin's own recall writes
+# (ONE definition; exporters import it -- do not copy this list again)
+BANK_HEADER, BANK_STRIDE, BANK_BLOB_OFF = 23, 20223, 16
+ACTIVE_POOLS = [10, 11, 12, 13, 14, 16, 17, 19, 20, 22, 24, 25, 26, 28, 29, 30,
+                31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46,
+                47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62,
+                63, 64, 65]
+POOL_BASE_ID = 740
+
+def bank_bytes():
+    return open(os.path.join(REPO, "jx3p", "truth", "preset_bank_1.bin"), "rb").read()
+
+def patch_blob(bank, idx):
+    return bank[BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF:
+                BANK_HEADER + (idx + 1) * BANK_STRIDE]
+
+def pool_value(blob, pool):
+    p = 2 * pool + 8
+    return ((blob[p] & 0xF) << 4) | (blob[p + 1] & 0xF)
+
 STACK_BASE=0x200000000; STACK_SIZE=0x2000000
 HEAP_BASE =0x310000000; HEAP_SIZE =0x200000000
 STUB_BASE =0x600000000
@@ -165,10 +201,19 @@ class JX:
         except: pass
         uc.mem_write(address,b"\xC3"); uc.reg_write(UC_X86_REG_RAX,0); self.faults+=1; return True
     def _unmapped(self,uc,access,address,size,value,user):
+        # A silently zero-mapped page HIDES missing data (the JX pulse
+        # wavetable region read as zeros for weeks). Map it so the run can
+        # continue, but SAY SO: the first few faults go to stderr and the
+        # count is always available as .faults. JX_EMU_QUIET=1 silences.
         self.faults+=1
+        if self.faults<=8 and os.environ.get("JX_EMU_QUIET")!="1":
+            rip=uc.reg_read(UC_X86_REG_RIP)
+            sys.stderr.write("jx_emu: UNMAPPED %s 0x%x (size %d) at rva 0x%x -- zero page mapped\n"
+                             %("write" if access in (UC_MEM_WRITE_UNMAPPED,) else "read",
+                               address,size,rip-IB))
         try: uc.mem_map(address&~0xFFF,0x1000,UC_PROT_ALL); return True
         except: return True
-    def call(self,fn,rcx=0,rdx=0,r8=0,r9=0,count=0):
+    def call(self,fn,rcx=0,rdx=0,r8=0,r9=0,count=0,timeout_us=0):
         uc=self.uc
         uc.reg_write(UC_X86_REG_MXCSR, getattr(self,'_mxcsr',0x1F80))
         rsp=(STACK_BASE+STACK_SIZE-0x10000)&~0xF; rsp-=8
@@ -176,7 +221,9 @@ class JX:
         for reg,v in ((UC_X86_REG_RCX,rcx),(UC_X86_REG_RDX,rdx),(UC_X86_REG_R8,r8),(UC_X86_REG_R9,r9)):
             uc.reg_write(reg,v&(2**64-1))
         RET=SCRATCH+0x5000; uc.mem_write(rsp,struct.pack("<Q",RET))
-        uc.emu_start(fn,RET,count=count)
+        # timeout_us bounds WALL CLOCK (a ctor spinning in a shim burns no
+        # instructions); count bounds instructions. Use both for foreign code.
+        uc.emu_start(fn,RET,timeout=timeout_us,count=count)
         rip=uc.reg_read(UC_X86_REG_RIP)
         if rip!=RET: raise RuntimeError("call 0x%x stopped rva 0x%x"%(fn-IB,rip-IB))
         return uc.reg_read(UC_X86_REG_RAX)
@@ -201,10 +248,11 @@ class JX:
     def build(self):
         self.HOST=self.bump(0x8000); self.uc.mem_write(self.HOST,b"\x00"*0x8000)
         self.call(BUILD, rcx=self.HOST)
-        u=self.uc; self.state=[]; self.proc=[]
+        u=self.uc; self.state=[]; self.proc=[]; self.assign=[]
         for i in range(N_UNITS):
             self.state.append(int.from_bytes(u.mem_read(self.HOST+80+64*i,8),'little'))
             self.proc.append(int.from_bytes(u.mem_read(self.HOST+96+64*i,8),'little'))
+            self.assign.append(int.from_bytes(u.mem_read(self.HOST+104+64*i,8),'little'))
         big=[a for a,s in self.allocs if s==STATE_SZ]
         assert len(big)>=N_UNITS, "state allocs %d"%len(big)
         for i in range(N_UNITS):
@@ -236,6 +284,93 @@ class JX:
             Rout+=list(struct.unpack("<%dI"%b, uc.mem_read(offR,4*b)))
             done+=b
         return Lout,Rout
+
+    # ------------------------------------------------------------ host-side
+    # Everything a DAW does to the engine that the raw stubs do not, each
+    # step PROVEN by disassembly (abi_check) or by the JUNO e2e precedent.
+    def call_f(self,fn,rcx,f32):
+        """call with a FLOAT in XMM1 (SETSR reads xmm1 as single -- ledger)"""
+        self.uc.reg_write(UC_X86_REG_XMM1, struct.unpack("<I",struct.pack("<f",float(f32)))[0])
+        return self.call(fn, rcx=rcx)
+    def set_sr(self,sr=44100.0):
+        self.call_f(SETSR, self.HOST, sr)
+        got=struct.unpack("<f",self.uc.mem_read(self.HOST+8,4))[0]
+        assert abs(got-sr)<1e-3, "SETSR did not land: HOST+8=%r"%got
+        return got
+    def note_on(self,note,vel=100):  self.call(NOTEON,  rcx=self.HOST, rdx=note, r8=vel)
+    def note_off(self,note,vel=64):  self.call(NOTEOFF, rcx=self.HOST, rdx=note, r8=vel)
+    def notify(self,what=4):
+        """the assigner refresh the HOST PARAM ENTRY runs after every write
+        (JUNO proof: allocator stayed POLY without it)"""
+        for u in range(N_UNITS): self.call(ASG_NOTIFY, rcx=self.assign[u], rdx=what)
+    def recall(self,patch,bank=None,notify=True):
+        """the plugin's own recall path: every ACTIVE pool of the factory
+        record dispatched to every unit, then the assigner refresh"""
+        blob=patch_blob(bank or bank_bytes(), patch)
+        for u in range(N_UNITS):
+            for pool in ACTIVE_POOLS:
+                self.dispatch(u, POOL_BASE_ID+pool, pool_value(blob,pool))
+        if notify: self.notify()
+    def snap_ramps(self):
+        """settle every ACTIVE ramp to its limit and deactivate it (JUNO e2e
+        snap_all, validated bit-for-bit there); slot layout per jx_gc.c"""
+        uc=self.uc
+        def rq(a): return int.from_bytes(uc.mem_read(a,8),'little')
+        for u in range(N_UNITS):
+            st=self.state[u]
+            arr=rq(st+0x58); b0=rq(st+0x70); e0=rq(st+0x78)
+            ids=struct.unpack("<%di"%((e0-b0)//4), uc.mem_read(b0,e0-b0)) if e0>b0 else ()
+            for i in ids:
+                a=arr+40*i; tgt=rq(a)
+                if tgt: uc.mem_write(tgt, bytes(uc.mem_read(a+0x14,4)))   # *target = limit
+                uc.mem_write(a+0x0C, b"\x00"*4)                            # accum = 0
+                uc.mem_write(a+0x1C, b"\x00")                              # active = 0
+            uc.mem_write(st+0x78, struct.pack("<Q", b0))                   # empty id list
+    def clear_latch(self):
+        for u in range(N_UNITS): self.uc.mem_write(self.state[u]+LATCH_OFF, b"\x00"*4)
+    def run_static_init(self,cap=2_000_000,log=None):
+        """run the DLL's C++ static initializers (the CRT XC table) so the
+        runtime-filled .data tail exists -- the JX pulse wavetable region
+        lives there. Each ctor is isolated; failures are counted, not fatal.
+        Returns (ok, failed)."""
+        a,b=XC_TABLE
+        ptrs=struct.unpack("<%dQ"%((b-a)//8), self.uc.mem_read(IB+a, b-a))
+        ok=fail=0
+        for p in ptrs:
+            if not p: continue
+            try: self.call(p, count=cap, timeout_us=2_000_000); ok+=1
+            except Exception as e:
+                fail+=1
+                if log: log("ctor 0x%x failed: %s"%(p-IB, str(e)[:60]))
+        return ok,fail
+    def bss_fill(self):
+        """bytes of the runtime-filled .data tail that are now nonzero"""
+        buf=bytes(self.uc.mem_read(IB+0xCE7800, 0xCF2860-0xCE7800))
+        return sum(1 for x in buf if x), len(buf)
+    def boot(self,sr=44100.0,patch=None,static_init=False,snap=True):
+        """THE boot recipe: [static init] -> BUILD -> SETSR(float) -> FTZ ->
+        [recall patch + notify] -> [snap ramps + clear latch]. Returns self."""
+        if static_init: self.run_static_init()
+        self.build(); self.set_ftz(); self.set_sr(sr)
+        if patch is not None: self.recall(patch)
+        if snap: self.snap_ramps(); self.clear_latch()
+        return self
+    def render_dry(self,n,block=256):
+        """voice-sum render (master bypassed), floats, NaN dropped -- the
+        listen path for audio_metrics"""
+        uc=self.uc; offs={}; p=BUF_BASE
+        for v in range(8): offs[v]=p; p+=8*block
+        acc=[0.0]*n; done=0
+        while done<n:
+            b=min(block,n-done)
+            for v in range(8):
+                uc.mem_write(PB_VOICE, struct.pack("<QQQQQ",self.state[v],v,offs[v],offs[v]+4*block,b))
+                self._run(self.SVOICE)
+                w=struct.unpack("<%dI"%b, uc.mem_read(offs[v],4*b))
+                for i,x in enumerate(struct.unpack("<%df"%b, struct.pack("<%dI"%b,*w))):
+                    if x==x: acc[done+i]+=x
+            done+=b
+        return acc
 
 def probe_build(candidates):
     """Call each candidate with rcx=fresh HOST; the real BUILD allocates several
