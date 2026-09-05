@@ -3,7 +3,7 @@
 **Status: LIVING. Binding for every port after the JX-3P (mantra 4).**
 One page. Each step names the tool that does it and the artifact it leaves.
 A step with no artifact did not happen. The order is the order the defects
-were paid in (METHOD_PLAYBOOK 85–87, PORT_LESSONS 1–7): skipping a step
+were paid in (METHOD_PLAYBOOK 85–88, PORT_LESSONS 1–9): skipping a step
 re-pays its defect.
 
 | # | Step | Tool (repo path) | Artifact / proof | Defect it prevents |
@@ -12,7 +12,7 @@ re-pays its defect.
 | 1 | **Census** the binary: sections + RUNTIME-FILLED data tails, entry point + CRT initializer tables, parameter name table + ENGINE DB rows, engine vtable | `tools/verify/pe_recon.py <pe> all --json > <port>/gen/recon.json` | `recon.json` (READ) | zero-filled runtime tables mistaken for silence (JX pulse wavetables); id/name guessing |
 | 2 | **ABI ledger**: for every entry the harness will call (BUILD, SETSR, NOTEON/OFF, DISPATCH, RENDER, NOTIFY, HOSTPARAM) prove which register each argument is read from | `tools/verify/abi_check.py <pe> NAME=rva ...` | ledger block at the top of `<port>_emu.py` | playbook 87 (SETSR rate in rdx; callee read xmm1 float) |
 | 3 | **Oracle boot recipe** (`<port>_emu.py`): static initializers → BUILD → SETSR (per ledger) → FTZ → **the controller's default push** (every Script.xml/DB default through the HOST PARAM ENTRY, `host_init()`) → recall + assigner notify → snap ramps + clear latch. Unmapped pages are LOUD, never silent | `jx_emu.JX().boot(sr, patch, host_init=True)` | `boot()` returns; `faults == 0`; master finite over 12000 idle samples | un-booted engine proven "bit-exact" against itself; master EFX self-poisoning (NaN ramps 541/542 at idle sample 3681) |
-| 4 | **Listen proof** (charter §7b): render dry, measure — autocorrelation f0 at ±25 cents of the note, tone fraction ≥ 0.10, idle silent, release decays, no NaN over 10 s | `tools/verify/audio_metrics.py` (`verdict`, `spectral_peaks`, `block_profile`, `sketch`) | a PASS line per test note in `<port>/docs/S3_STATUS.md` | inharmonic mush passing green gates; zero-crossing pitch lies |
+| 4 | **Listen proof** (charter §7b): render dry AND through the master, measure — autocorrelation f0 tracks the keys by one whole number of semitones (±25 cents), harmonicity ≥ 0.80 (detune-tolerant), idle silent, release decays, no NaN over 12000 samples | `tools/verify/audio_metrics.py` (`verdict`, `spectral_peaks`, `block_profile`, `sketch`) | a PASS line per test note in `<port>/docs/S3_STATUS.md` | inharmonic mush passing green gates; zero-crossing pitch lies |
 | 5 | Transcribe DSP + control plane layer by layer, each with its own seq/emu/c/gate quartet and a tooth SEEN TO FAIL | `<port>/tools/<layer>_{seq,emu,c}.py` + `<layer>_gate.sh` | EXACTLY 0 + tooth line in S3_STATUS | untested reach (charter §2) |
 | 6 | Export the clean-boot template + per-patch recall aux FROM THE STEP-3 BOOT (fresh build per patch) | `<port>/tools/<port>_template_export.py`, `<port>_master_recall_export.py` | `<port>/gen/*.bin(.gz)` with NaN census 0 | playbook 86 (state bytes ≠ state; heap mirrors) |
 | 7 | Full-chain gate through the SHIPPING entry path (`<port>_init` → `recall` → `note_on` → `render`) vs the oracle driving itself the same way, plus the step-4 listen verdict on the C twin | `<port>/tools/<port>_full_gate.sh` | GREEN + PASS lines | the app plays something the oracle never did |
@@ -34,7 +34,12 @@ re-pays its defect.
 
 ## What the JX-3P paid to write this page (2026-09-04/05)
 - SETSR ABI (playbook 87): weeks of green gates on an engine with no rate.
-- Runtime-filled `.data` tail read as zeros: pulse/square waveforms streamed
-  a zero table; only saw/triangle synthesized. Found by tracing reads of the
-  sounding voice (pe_recon `sections` → `runtime_filled`).
+- Bank decode 16 bytes off (playbook 88): every pool got its neighbour's
+  value; the recall gate stayed green on the same wrong values. A REFUTED
+  detour on the way: "runtime-filled `.data` read as zeros" — the traced
+  page was a CRT global on its legitimate SSE2 path. Keep the census step
+  (it is cheap) but the decode tooth (`jx_bank_census.py`) is what found it.
+- Link pointers wired to template copies instead of live cells (lesson 8).
+- The controller's default push missing (lesson 9): master EFX NaN at idle
+  sample 3681, outside the 1200-sample gate window.
 - Five confounded "no change" verdicts before the fresh-note rule.
