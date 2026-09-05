@@ -1,6 +1,29 @@
-import sys
-sys.path.insert(0, "/tmp")
-from jx_parts import JS, BT, BA, BB
+#!/usr/bin/env python3
+"""jx_artifact_page.py -- the ONE-LINK playable JX-3P page (charter 7b).
+
+Every input is a COMMITTED file (an earlier revision read /tmp parts that
+died with the container -- PORT_PIPELINE step 8):
+  jx3p/gui/web/jx3p_artifact.js     emcc MODULARIZE build (build.sh)
+  jx3p/gui/web/jx3p_artifact.wasm   inlined as base64, fed through
+                                    instantiateWasm (SINGLE_FILE's binary
+                                    string is charset-fragile: seen to fail)
+  jx3p/gui/web/{jx_template,jx_master_recall,bank}.bin.gz
+                                    inflated in the browser (no zlib)
+The page is pure ASCII. usage: jx_artifact_page.py [out.html]
+"""
+import sys, os, base64
+
+REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+WEB = os.path.join(REPO, "jx3p", "gui", "web")
+
+
+def _b64(name):
+    return base64.b64encode(open(os.path.join(WEB, name), "rb").read()).decode("ascii")
+
+
+JS = open(os.path.join(WEB, "jx3p_artifact.js"), encoding="utf-8").read()
+WASM = _b64("jx3p_artifact.wasm")
+BT, BA, BB = _b64("jx_template.bin.gz"), _b64("jx_master_recall.bin.gz"), _b64("bank.bin.gz")
 
 HTML = """<title>JX-3P Playable Port</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -61,26 +84,29 @@ HTML = """<title>JX-3P Playable Port</title>
 </style>
 <div class="panel">
   <div class="rail">
-    <div class="logo">JX-3P <em>·</em> bit-exact port</div>
-    <div class="badge">voice engine proven · 64/64 exactly 0</div>
+    <div class="logo">JX-3P <em>&middot;</em> bit-exact port</div>
+    <div class="badge">voice engine proven &middot; 64/64 exactly 0</div>
     <div class="led" id="led"></div>
   </div>
   <div class="controls">
     <button id="power" disabled>START AUDIO</button>
     <select id="patch" aria-label="patch"></select>
-    <div class="lcd" id="lcd">BOOTING ENGINE…</div>
+    <button id="octdn" title="octave down">OCT -</button>
+    <button id="octup" title="octave up">OCT +</button>
+    <div class="lcd" id="lcd">BOOTING ENGINE...</div>
   </div>
   <div class="strip" id="strip"></div>
   <div class="kbd-wrap"><div id="kbd"></div></div>
   <div class="foot">
-    <div><b>Play:</b> <kbd>A</kbd>–<kbd>K</kbd> white · <kbd>W E T Y U</kbd> black · <kbd>Z</kbd>/<kbd>X</kbd> octave</div>
-    <div class="mono">clean boot · 8 voices · 44100&nbsp;Hz</div>
-    <div>Master FX (chorus/echo) bypassed in this preview — the effect manager's host-parameter init is the logged next arc.</div>
+    <div><b>Play:</b> <kbd>A</kbd>-<kbd>K</kbd> white &middot; <kbd>W E T Y U</kbd> black &middot; <kbd>Z</kbd>/<kbd>X</kbd> octave</div>
+    <div class="mono">clean boot &middot; 8 voices &middot; 44100 Hz</div>
+    <div>Dry voice sum in this build (master FX bypassed); boot and patch decode corrected 2026-09-05 (playbook 87/88).</div>
   </div>
 </div>
 <script>__ENGINE__</script>
 <script>
 const B64 = { tmpl:"__BT__", aux:"__BA__", bank:"__BB__" };
+const WASM_B64 = "__WASM__";
 function b64bytes(s){ const bin=atob(s); const u=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
 async function gunzip(u8){
@@ -90,7 +116,9 @@ async function gunzip(u8){
 }
 const lcd=t=>document.getElementById('lcd').textContent=t;
 (async()=>{
-  const mod=await Jx3pModule();
+  const mod=await Jx3pModule({ instantiateWasm:(imports,cb)=>{
+    WebAssembly.instantiate(b64bytes(WASM_B64),imports).then(r=>cb(r.instance));
+    return {}; } });
   const [t,a,b]=await Promise.all([gunzip(b64bytes(B64.tmpl)),
     gunzip(b64bytes(B64.aux)), gunzip(b64bytes(B64.bank))]);
   mod.FS.writeFile('/t.bin',t); mod.FS.writeFile('/a.bin',a);
@@ -98,7 +126,7 @@ const lcd=t=>document.getElementById('lcd').textContent=t;
   if(!mod.ccall('jx3p_init','number',['string','string','string'],
                 ['/t.bin','/b.bin','/a.bin'])){ lcd('ENGINE INIT FAILED'); return; }
   const recall=i=>{ mod.ccall('jx3p_recall',null,['number'],[i]);
-    lcd('PATCH '+String(i+1).padStart(2,'0')+'  ·  READY');
+    lcd('PATCH '+String(i+1).padStart(2,'0')+'  -  READY');
     document.querySelectorAll('.patchbtn').forEach((el,k)=>
       el.classList.toggle('sel',k===i));
     document.getElementById('patch').value=i; };
@@ -129,17 +157,22 @@ const lcd=t=>document.getElementById('lcd').textContent=t;
     node.connect(ctx.destination);
     document.getElementById('led').classList.add('on');
     power.textContent='AUDIO RUNNING';
-    lcd('PATCH '+String((sel.value|0)+1).padStart(2,'0')+'  ·  PLAY'); };
-  let octave=4; const held=new Set(), els={};
+    lcd('PATCH '+String((sel.value|0)+1).padStart(2,'0')+'  -  PLAY'); };
+  let octave=4, kbase=3; const held=new Set(), els={};
   const on=n=>mod.ccall('jx3p_note_on',null,['number','number'],[n,100]);
   const off=n=>mod.ccall('jx3p_note_off',null,['number'],[n]);
-  const paint=()=>{ for(const[n,el] of Object.entries(els))
-    el.classList.toggle('on',held.has(+n)); };
+  const paint=()=>{ for(const[rel,el] of Object.entries(els))
+    el.classList.toggle('on',held.has(12*kbase+(+rel))); };
+  const setOct=d=>{ for(const n of [...held]) off(n); held.clear();
+    kbase=Math.max(0,Math.min(6,kbase+d)); octave=kbase+1; paint();
+    lcd('KEYS C'+kbase+' - C'+(kbase+3)+'  -  TYPED OCT '+octave); };
+  document.getElementById('octdn').onclick=()=>setOct(-1);
+  document.getElementById('octup').onclick=()=>setOct(1);
   const KM={a:0,w:1,s:2,e:3,d:4,f:5,t:6,g:7,y:8,h:9,u:10,j:11,k:12};
   addEventListener('keydown',e=>{ if(e.repeat) return;
     const k=e.key.toLowerCase();
-    if(k==='z'){octave=Math.max(1,octave-1);return;}
-    if(k==='x'){octave=Math.min(7,octave+1);return;}
+    if(k==='z'){setOct(-1);return;}
+    if(k==='x'){setOct(1);return;}
     if(k in KM){ const n=12*octave+KM[k];
       if(!held.has(n)){held.add(n);on(n);paint();} } });
   addEventListener('keyup',e=>{ const k=e.key.toLowerCase();
@@ -147,20 +180,22 @@ const lcd=t=>document.getElementById('lcd').textContent=t;
       if(held.has(n)){held.delete(n);off(n);paint();} } });
   const kbd=document.getElementById('kbd');
   const W=[0,2,4,5,7,9,11], BA2={0:1,2:3,5:6,7:8,9:10};
-  for(let o=3;o<=5;o++) for(const w of W){
-    const n=12*o+w, el=document.createElement('div');
-    el.className='wk'; kbd.appendChild(el); els[n]=el;
-    el.onpointerdown=()=>{held.add(n);on(n);paint();};
-    el.onpointerup=el.onpointerleave=()=>{ if(held.has(n)){held.delete(n);off(n);paint();} };
-    if(w in BA2){ const bn=12*o+BA2[w], b2=document.createElement('div');
-      b2.className='bk'; el.appendChild(b2); els[bn]=b2;
-      b2.onpointerdown=ev=>{ev.stopPropagation();held.add(bn);on(bn);paint();};
-      b2.onpointerup=b2.onpointerleave=ev=>{ev.stopPropagation();
-        if(held.has(bn)){held.delete(bn);off(bn);paint();} }; } }
+  const bind=(el,rel)=>{
+    el.onpointerdown=ev=>{ev.stopPropagation(); const n=12*kbase+rel;
+      held.add(n);on(n);paint();};
+    el.onpointerup=el.onpointerleave=ev=>{ev.stopPropagation(); const n=12*kbase+rel;
+      if(held.has(n)){held.delete(n);off(n);paint();} }; };
+  for(let o=0;o<3;o++) for(const w of W){
+    const rel=12*o+w, el=document.createElement('div');
+    el.className='wk'; kbd.appendChild(el); els[rel]=el; bind(el,rel);
+    if(w in BA2){ const brel=12*o+BA2[w], b2=document.createElement('div');
+      b2.className='bk'; el.appendChild(b2); els[brel]=b2; bind(b2,brel); } }
 })();
 </script>
 """
-out = HTML.replace("__ENGINE__", JS).replace("__BT__", BT).replace("__BA__", BA).replace("__BB__", BB)
-dst = "/tmp/claude-0/-home-user-jn60c99/851980e2-931d-52da-bb74-16fb8562b242/scratchpad/jx3p_port.html"
+out = (HTML.replace("__ENGINE__", JS).replace("__WASM__", WASM)
+       .replace("__BT__", BT).replace("__BA__", BA).replace("__BB__", BB))
+assert all(ord(c) < 128 for c in out), "page must be pure ASCII (charset mojibake seen)"
+dst = sys.argv[1] if len(sys.argv) > 1 else os.path.join(REPO, "jx3p", "gen", "jx3p_port.html")
 open(dst, "w").write(out)
 print(dst, len(out))

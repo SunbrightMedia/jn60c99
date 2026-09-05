@@ -37,6 +37,11 @@ def main():
         for u in range(J.N_UNITS):
             jx.dispatch(u, 757, int(wave), flag=0)
         print("forced DCO1 WAVEFORM = %s" % wave)
+    # the patch's own DCO1 RANGE (pool 20; 3 = 8', each step an octave)
+    # sets the expected pitch: patch A11 sits at 16' (RANGE 2) by design
+    rng = J.pool_value(J.patch_blob(J.bank_bytes(), patch), 20)
+    shift = 12 * (rng - 3)
+    print("patch DCO1 RANGE %d -> expected pitch shift %+d semitones" % (rng, shift))
     fails = 0
     idle = np.array(jx.render_dry(4096))
     ok = float(np.abs(idle).max()) < 1e-6
@@ -46,8 +51,9 @@ def main():
         jx.note_on(n, 100)
         jx.render_dry(1024)
         x = np.array(jx.render_dry(16384))
-        ok, msg = M.verdict(x, SR, n)
-        print(msg); fails += not ok
+        ok, msg = M.verdict(x, SR, n + shift)
+        print(msg.replace("note %d:" % (n + shift), "key %d (sounding %d):" % (n, n + shift)))
+        fails += not ok
         jx.note_off(n)
         tail = np.array(jx.render_dry(44100))
         head, last = float(np.abs(tail[:4096]).max()), float(np.abs(tail[-4096:]).max())

@@ -91,22 +91,25 @@ def tone_fraction(x, sr, hz, bw=12.0):
     return float(X[m].sum() / (X.sum() + 1e-12))
 
 
-def harmonicity(x, sr, f0, nharm=None, bins=3):
-    """share of spectral energy sitting on integer multiples of f0 up to
-    Nyquist -- high (>0.8) for any periodic waveform including a narrow
-    pulse, low for noise, clicks or an inharmonic mess. tone_fraction alone
-    punishes thin waveforms whose fundamental is legitimately weak. The
-    band around each harmonic is `bins` FFT bins (Hann main lobe)."""
+def harmonicity(x, sr, f0, nharm=None, bins=3, detune_cents=60.0):
+    """share of spectral energy sitting on (near-)integer multiples of f0
+    up to Nyquist -- high (>0.8) for any periodic waveform including a
+    narrow pulse and for a two-oscillator patch whose second DCO is
+    detuned by up to detune_cents (string/pad patches detune ~30-40
+    cents), low for noise, clicks or an inharmonic mess. tone_fraction
+    alone punishes thin waveforms whose fundamental is legitimately weak.
+    Band per harmonic k: max(`bins` FFT bins, k*f0*(2^(cents/1200)-1))."""
     x = np.asarray(x, dtype=np.float64)
     x = x - x.mean()
     n = len(x)
     X = np.abs(np.fft.rfft(x * np.hanning(n)))
     fr = np.fft.rfftfreq(n, 1.0 / sr)
-    bw = bins * sr / n
+    bw0 = bins * sr / n
+    ratio = 2.0 ** (detune_cents / 1200.0) - 1.0
     nharm = nharm or int((sr / 2.0) / f0)
     m = np.zeros_like(X, dtype=bool)
     for k in range(1, nharm + 1):
-        m |= np.abs(fr - k * f0) < bw
+        m |= np.abs(fr - k * f0) < max(bw0, k * f0 * ratio)
     return float(X[m].sum() / (X.sum() + 1e-12))
 
 
