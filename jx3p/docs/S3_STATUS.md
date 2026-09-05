@@ -43,6 +43,26 @@ no level pool silent bank-wide; GREEN under −8, FAIL (316 violations, 2
 silent pools) under +8. Every derived artifact (template, recall aux, A/B
 references, WASM assets) must be regenerated from the corrected decode.
 
+**THIRD DEFECT, same day (PORT_LESSONS 8): link pointers to template copies.**
+The bridge pointed `obj+40/+64` (voice) and `obj+136/+112` (master) at
+clean-boot VALUE copies; in the plugin they point INTO the unit state at
+`+0xAAC1D8/DC` and `+0xAAC1E8/E4`, cells the recall rewrites (DCO FREQ MOD
+2/3 patches diverged from their first sound sample). Wired to the live cells.
+
+**RESTATED FINISH LINE (2026-09-05, all regenerated from the corrected boot,
+decode and wiring; jobs in bench/jobs/, EXIT 0 each):**
+- Recall gate: 64/64 EXACT, model 64/64 (cell 3088 <- ENV2 SUSTAIN).
+- Full-chain gate (`jx_full_gate.sh`, the shipping entry path, no pokes):
+  **64/64 patches L/R EXACTLY 0** over 1200 samples, tooth bites.
+- Listen proofs (`jx_listen.py` oracle, `jx_listen_c.py` C twin): GREEN on
+  patches 0/20/35/49 -- pitch tracks the keys by a whole number of
+  semitones (-12 for 16' patches, +12 for FREQ MOD 3), harmonic >= 0.88,
+  idle silent, releases decay.
+- Web app rebuilt (BUILD_VER baac9d484d29) and republished at the same
+  artifact link; the page generator reads only committed inputs.
+Open: master FX in the app (the dry voice sum ships), true host recall
+protocol, 48000/96000, WASM-FTZ caveat.
+
 ## ⚠ CORRECTION 2026-08-25 — READ BEFORE THE CLAIM BELOW
 
 The "finish line" section below is **narrower than it reads**, on two counts
