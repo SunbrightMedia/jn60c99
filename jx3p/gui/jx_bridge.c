@@ -162,8 +162,15 @@ int jx3p_init(const char *template_path, const char *bank_path,
         memcpy(G.vobj[v], lk, 256);
         memcpy(G.vd40[v], lk + 256, 4);
         memcpy(G.vd64[v], lk + 260, 4);
-        *(void **)(G.vobj[v] + 40) = G.vd40[v];
-        *(void **)(G.vobj[v] + 64) = G.vd64[v];
+        /* POINTER WIRING ONLY (PORT_LESSONS 8): in the plugin obj+40 and
+         * obj+64 point INTO THE UNIT STATE, at +0xAAC1D8 / +0xAAC1DC (the
+         * DCO mode cells the per-patch recall rewrites -- FM modes 2/3 set
+         * the first to 1). Those offsets live in the captured HIGH window
+         * [0xA60000,0xAAD000), so the recall aux keeps them current. The
+         * template's copied values (vd40/vd64) are the clean-boot mirror
+         * and must NOT be what the DSP reads. */
+        *(void **)(G.vobj[v] + 40) = G.vhigh[v] + (0xAAC1D8 - 0xA60000);
+        *(void **)(G.vobj[v] + 64) = G.vhigh[v] + (0xAAC1DC - 0xA60000);
         *(void **)(G.vstate[v] + 136) = G.vobj[v];
     }
     {   const uint8_t *sm = g_tmpl_links[17];
@@ -176,8 +183,11 @@ int jx3p_init(const char *template_path, const char *bank_path,
         memcpy(G.mobj, lk, 256);
         memcpy(G.mc136, lk + 256, 4);
         memcpy(G.mc112, lk + 260, 256);
-        *(void **)(G.mobj + 136) = G.mc136;
-        *(void **)(G.mobj + 112) = G.mc112;
+        /* same rule for the master (PORT_LESSONS 8): obj+136 -> state+0xAAC1E8,
+         * obj+112 -> state+0xAAC1E4 in the plugin; the master state block is
+         * the whole unit, so the aux's master runs keep them current. */
+        *(void **)(G.mobj + 136) = G.mstate + 0xAAC1E8;
+        *(void **)(G.mobj + 112) = G.mstate + 0xAAC1E4;
         *(void **)(G.mstate + 136) = G.mobj;
     }
     /* wrapper + ramp records (links 8..16), targets rebased per unit */
