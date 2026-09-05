@@ -411,3 +411,18 @@ The last untranscribed seam, sized from the dump:
 - Then the JX verify pipeline (a jx3p verify target; the Makefile has no
   SYNTH= parameterization -- it must be created): render A/B vs the oracle
   over 64 patches, null EXACTLY 0.
+
+## RESUME POINT (2026-09-05, saved on user stop -- limit at 99%)
+- Harness-audit WORKFLOW stopped mid-run. Resume:
+  `Workflow({scriptPath: "/root/.claude/projects/-home-user-jn60c99/851980e2-931d-52da-bb74-16fb8562b242/workflows/scripts/harness-audit-wf_fd470d59-c22.js", resumeFromRunId: "wf_fd470d59-c22"})`
+  (completed auditor agents return cached; journal at .../subagents/workflows/wf_fd470d59-c22/journal.jsonl).
+  NOTE: the script file + journal live in the SESSION dir and die with the
+  container -- the workflow DESIGN (14 auditor lenses + 3-refuter verify) is
+  what to recreate if lost; the lens list mirrors PORT_LESSONS 1-11 and
+  playbook 85-88 classes.
+- `make verify-jx3p` (wired: ABI + census + recall + integration + full chain
+  12000 + listen proofs) runs detached as bench/jobs/jx_verify_full --
+  run_job registry survives; check `sh tools/status.sh`, verdict in its EXIT.
+- gen/ binaries on the branch are CURRENT (snapped host-init boot, pools
+  10..73). Remaining to ship: verify green -> gui/web/build.sh ->
+  jx3p/tools/jx_artifact_page.py -> republish artifact d8679bea.
