@@ -27,7 +27,12 @@ BLOCK = 16128; HEADER = 23; STRIDE = 20223; BLOB_OFF = 16; NPATCH = 64
 # BOUND: pool 138 is CONSTANT 0 across the whole factory bank, so this is
 # proven only for LFO RATE H == 0. A bank that varies it needs the true JOINT
 # law derived; the fxsweep/census tooling is the way to get it.
-OVERRIDE = {1072: 12, 1088: None, 3056: 49, 3072: 50, 3088: None, 3104: 52, 4000: None, 13440: None}
+# 3088 <- pool 51 (ENV2 SUSTAIN), 2026-09-05: under the old +8 decode ENV2
+# SUSTAIN read 0 on all 64 patches (playbook 88), so 3088 never varied and was
+# marked "stays clean". The corrected decode varies it and the model check
+# showed exactly one diff at 3088 on 61/64 patches; the ENV2 neighbours
+# 3056/3072/3104 <- pools 49/50/52 fix the pattern. PROVEN by this check.
+OVERRIDE = {1072: 12, 1088: None, 3056: 49, 3072: 50, 3088: 51, 3104: 52, 4000: None, 13440: None}
 
 def decode(blob, pool):
     p = 2 * pool - 8   # CORRECTED 2026-09-05 (playbook 88, jx_bank_census.py)
