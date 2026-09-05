@@ -333,11 +333,46 @@ class JX:
         """bytes of the runtime-filled .data tail that are now nonzero"""
         buf=bytes(self.uc.mem_read(IB+0xCE7800, 0xCF2860-0xCE7800))
         return sum(1 for x in buf if x), len(buf)
-    def boot(self,sr=44100.0,patch=None,static_init=False,snap=True):
+    def host_init(self,ids=None,log=None):
+        """THE CONTROLLER'S DEFAULT PUSH (2026-09-05): a DAW insert runs the
+        DLL's static initializers (they build the host-id map at .data
+        0xCE9038) and then the controller writes EVERY parameter's default
+        through the HOST PARAM ENTRY (0x3F9A30), which maps host id ->
+        engine id, converts the frame, dispatches with flag 0 and runs the
+        assigner notify. Without this the master's boot ramps 541/542 carry
+        NaN limits and the EFX network self-poisons at idle sample 3681
+        (clamp 1.98 forever); with it the master stays finite and the note
+        rides through the effects. Defaults come from the binary's own
+        ENGINE DB (pe_recon), raw frame = default - min; event ids
+        433..484 (Note/Gate/Mute) are never parameters. Requires
+        run_static_init() BEFORE build() (boot(host_init=True) orders it).
+        Returns (written, failed)."""
+        import pe_recon
+        pe=pe_recon.PE(BIN)
+        rows=pe.params(list(range(1500)))["rows"]
+        ok=fail=0
+        for i,r in rows.items():
+            if ids is not None and i not in ids: continue
+            n=r["name"]
+            if not n or n=="_reserve_" or 433<=i<485: continue
+            if r["min"]==r["max"]==r["default"]==0: continue
+            try:
+                self.call(HOSTPARAM, rcx=self.HOST, rdx=i, r8=r["default"]-r["min"],
+                          count=5_000_000, timeout_us=1_000_000); ok+=1
+            except Exception as e:
+                fail+=1
+                if log: log("host write id %d failed: %s"%(i,str(e)[:60]))
+        return ok,fail
+    def boot(self,sr=44100.0,patch=None,static_init=False,snap=True,host_init=False):
         """THE boot recipe: [static init] -> BUILD -> SETSR(float) -> FTZ ->
-        [recall patch + notify] -> [snap ramps + clear latch]. Returns self."""
-        if static_init: self.run_static_init()
+        [host_init: the controller's default push] -> [recall patch + notify]
+        -> [snap ramps + clear latch]. host_init=True implies static_init.
+        Returns self."""
+        if static_init or host_init: self.run_static_init()
         self.build(); self.set_ftz(); self.set_sr(sr)
+        if host_init:
+            ok,fail=self.host_init()
+            assert fail==0, "host_init: %d writes failed"%fail
         if patch is not None: self.recall(patch)
         if snap: self.snap_ramps(); self.clear_latch()
         return self

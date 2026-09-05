@@ -19,9 +19,12 @@ SR = 44100.0
 REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 
 
+MASTER = "--master" in sys.argv
+
+
 def render(lib, n):
     L = (ctypes.c_float * n)(); R = (ctypes.c_float * n)()
-    lib.jx3p_render_dry(L, R, n)
+    (lib.jx3p_render if MASTER else lib.jx3p_render_dry)(L, R, n)
     return np.nan_to_num(np.array(L[:], dtype=np.float64))
 
 
@@ -44,8 +47,9 @@ def track_verdict(results, harm_min=0.80, tol=25.0):
 
 def main():
     so = sys.argv[1]
-    patches = [int(x) for x in (sys.argv[2] if len(sys.argv) > 2 else "0,20,49").split(",")]
-    notes = [int(x) for x in (sys.argv[3] if len(sys.argv) > 3 else "48,60,72").split(",")]
+    args = [a for a in sys.argv[2:] if not a.startswith("--")]
+    patches = [int(x) for x in (args[0] if len(args) > 0 else "0,20,49").split(",")]
+    notes = [int(x) for x in (args[1] if len(args) > 1 else "48,60,72").split(",")]
     lib = ctypes.CDLL(so)
     lib.jx_enable_hw_ftz()
     bank = B.bank_bytes()

@@ -48,7 +48,7 @@ def main():
     # BUILD -> SETSR (float in xmm1 -- the ABI ledger in jx_emu; the old
     # rdx call never set a rate, playbook 87) -> FTZ. Ramps + latch stay
     # live: the template carries them and the C engine replays them.
-    jx = J.JX().boot(sr, snap=False)
+    jx = J.JX().boot(sr, snap=False, host_init=True)   # the controller's default push (jx_emu.host_init)
     uc = jx.uc
 
     regions = []

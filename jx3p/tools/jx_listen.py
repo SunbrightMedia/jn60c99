@@ -46,9 +46,17 @@ def main():
     notes = [int(x) for x in (args[1] if len(args) > 1 else "48,60,72").split(",")]
     static_init = "--static-init" in sys.argv
     snap = "--no-snap" not in sys.argv
-    jx = J.JX().boot(SR, patch=patch, static_init=static_init, snap=snap)
-    print("boot: patch %d static_init=%s snap=%s faults=%d"
-          % (patch, static_init, snap, jx.faults))
+    host_init = "--no-host-init" not in sys.argv
+    master = "--master" in sys.argv
+    jx = J.JX().boot(SR, patch=patch, static_init=static_init, snap=snap, host_init=host_init)
+    if master:
+        import struct as _s
+        def _render(n):
+            L, _ = jx.render(n)
+            return list(np.nan_to_num(np.frombuffer(_s.pack("<%dI" % len(L), *L), dtype="<f4").astype(np.float64)))
+        jx.render_dry = _render
+    print("boot: patch %d static_init=%s host_init=%s snap=%s master=%s faults=%d"
+          % (patch, static_init, host_init, snap, master, jx.faults))
     wave = os.environ.get("JX_LISTEN_WAVE")
     if wave is not None:
         for u in range(J.N_UNITS):

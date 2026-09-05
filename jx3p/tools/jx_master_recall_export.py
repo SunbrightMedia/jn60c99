@@ -84,7 +84,7 @@ def main():
     for patch in range(64):
         # boot per jx_emu.boot(): SETSR takes the rate as a FLOAT in xmm1
         # (ABI ledger); ramps/latch live, as the C engine replays them
-        jx = J.JX().boot(44100.0, snap=False); uc = jx.uc
+        jx = J.JX().boot(44100.0, snap=False, host_init=True); uc = jx.uc
         if clean_m is None:
             clean_m = bytes(uc.mem_read(jx.state[8], SNAP_M))
             clean_h = [bytes(uc.mem_read(jx.state[v] + HI_LO, HI_SZ))
