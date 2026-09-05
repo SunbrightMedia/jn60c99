@@ -29,7 +29,7 @@ def main():
     if "--offset" in sys.argv:
         off = int(sys.argv[sys.argv.index("--offset") + 1])
     pe = pe_recon.PE(os.path.join(J.REPO, "jx3p", "truth", "JX3P.vst3"))
-    rows = pe.params(list(range(J.POOL_BASE_ID + 10, J.POOL_BASE_ID + 66)))["rows"]
+    rows = pe.params([J.POOL_BASE_ID + p for p in J.ACTIVE_POOLS])["rows"]
     bank = J.bank_bytes()
     bad = 0
     per_pool = {}
