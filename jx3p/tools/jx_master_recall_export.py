@@ -55,6 +55,60 @@ def pack_runs(runs):
     return out
 
 
+def _template_regions(path):
+    """Parse the shipped JXT3 region blocks (links/crc not needed here)."""
+    b = open(path, "rb").read()
+    if b[:4] != b"JXT3":
+        raise SystemExit("BASE-MATCH TOOTH: %s is not JXT3" % path)
+    n = struct.unpack_from("<I", b, 4)[0]
+    off, regs = 8, []
+    for _ in range(n):
+        ln = struct.unpack_from("<I", b, off)[0]; off += 4
+        regs.append(b[off:off + ln]); off += ln
+    return regs
+
+
+def check_template_base(clean_l, clean_h, clean_m, path):
+    """THE BASE-MATCH TOOTH (defect paid 2026-09-05). WHY: sparse byte diffs
+    are valid ONLY over the exact base they were diffed against. At d27c923
+    the aux was diffed against the SNAPPED boot while the committed template
+    was still pre-snap -- untouched cells kept stale values (0.0 where the
+    true clean is 0.686275/1.0) and partial byte runs spliced denormal
+    franken-floats (v0+0x440: run 92 91 11 over stale zeros -> 0x00119192,
+    FTZ to 0.0), which starved the per-sample state advance in the C twin.
+    So: BEFORE any diff is computed, byte-compare this exporter's clean boot
+    windows against the same regions of the JXT3 that ships with the aux and
+    refuse loudly on any mismatch. Region layout mirrors jx_template_export:
+    [0..7]=voice LO (ptr@136 zeroed there), [-9..-2]=voice HI, [-1]=master
+    (ptr@136 zeroed). The pointer cells are masked on our side because the
+    template zeroes them by design (PORT_LESSONS 4) and the aux excludes
+    them from diffs anyway."""
+    regs = _template_regions(path)
+
+    def nbad(mine, ref):
+        return sum(1 for a, b in zip(mine, ref) if a != b) \
+            + abs(len(mine) - len(ref))
+    bad = []
+    for v in range(8):
+        mine = bytearray(clean_l[v]); mine[136:144] = b"\x00" * 8
+        d = nbad(bytes(mine), regs[v])
+        if d: bad.append("voice%d LO: %d B" % (v, d))
+    for v in range(8):
+        d = nbad(clean_h[v], regs[len(regs) - 9 + v])
+        if d: bad.append("voice%d HI: %d B" % (v, d))
+    mm = bytearray(clean_m); mm[136:144] = b"\x00" * 8
+    d = nbad(bytes(mm), regs[-1])
+    if d: bad.append("master: %d B" % d)
+    if bad:
+        raise SystemExit(
+            "BASE-MATCH TOOTH BITES: %s does not match this exporter's "
+            "clean boot (%s). The aux's sparse diffs would be applied over "
+            "the WRONG base and splice garbage. Regenerate the template with "
+            "jx_template_export.py from the SAME jx_emu revision, then rerun "
+            "this exporter." % (path, "; ".join(bad)))
+    print("base-match tooth: template matches the clean boot (17 windows)")
+
+
 def wrap_record(jx, uc, u):
     def rq(a): return int.from_bytes(uc.mem_read(a, 8), "little")
     st = jx.state[u]
@@ -91,6 +145,10 @@ def main():
                        for v in range(8)]
             clean_l = [bytes(uc.mem_read(jx.state[v], 0x60000))
                        for v in range(8)]
+            # WHY: refuse a baseline split BEFORE computing any diff -- the
+            # aux only makes sense over the exact template it ships with.
+            check_template_base(clean_l, clean_h, clean_m, os.path.join(
+                J.REPO, "jx3p", "gen", "jx_template.bin"))
         jx.recall(patch, bank=bank, notify=False)   # the plugin's own pool set
         out += pack_runs(sparse_diff(clean_m,
                                      bytes(uc.mem_read(jx.state[8], SNAP_M))))
