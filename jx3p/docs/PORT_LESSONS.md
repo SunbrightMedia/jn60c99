@@ -84,3 +84,18 @@ the sharp edges inside it.
    Measurement discipline paid for twice here: zero-crossing f0 lies on
    complex tones (use autocorrelation), and a knockout sweep that restores
    state IN PLACE poisons every later trial -- fresh build per trial.
+
+8. **A pointer in a link object points at a LIVE cell, never at a value to
+   copy** (2026-09-05, the FREQ-MOD divergence). The voice objects reach
+   two DWORDs through `obj+40` / `obj+64` (the master: `obj+136` /
+   `obj+112`). The template captured the VALUES those pointers reached at
+   clean boot and the bridge pointed the objects at its own copies. Recall
+   rewrites the real cells, so every patch whose DCO FREQ MOD is 2 or 3
+   (35, 46, 49, 51, 19, ...) diverged from its first sound sample while FM
+   0/1 patches stayed EXACTLY 0. The JUNO paid this once already
+   (`juno_driver_attach_host`: "Pointer wiring ONLY -- point at the ENGINE
+   cell the per-patch recall writes"). Rule: for every pointer-valued slot,
+   resolve WHERE it points (unit state offset / HOST / proc) with the oracle
+   (`where()` in the recon probes) and wire the port's pointer to the SAME
+   live cell of its own state. A copied value is a mirror; mirrors go stale
+   (playbook 86).
