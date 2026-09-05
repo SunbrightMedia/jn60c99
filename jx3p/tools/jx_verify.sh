@@ -33,10 +33,15 @@ WARM=${JX_VERIFY_WARM:-6}
 PATCHES=${JX_VERIFY_PATCHES:-"$(seq 0 63)"}
 echo "[jx verify] work dir $WORK  rates=$RATES  n=$N warm=$WARM"
 
-echo "=== JX GATE 1/2: RECALL (C == oracle, 64/64 EXACTLY 0) ==="
+echo "=== JX GATE 0/4: DRIVE PROOFS (ABI ledger + bank decode census) ==="
+python3 "$REPO/tools/verify/abi_check.py" "$REPO/jx3p/truth/JX3P.vst3" \
+  BUILD=3F8610 SETSR=3F9970 NOTEON=3F9150 NOTEOFF=3F90F0 DISPATCH=3EBB00 \
+  NOTIFY=356BF0 HOSTPARAM=3F9A30 > /dev/null
+python3 "$HERE/jx_bank_census.py"
+echo "=== JX GATE 1/4: RECALL (C == oracle, 64/64 EXACTLY 0) ==="
 sh "$HERE/jx_recall_gate.sh"
 
-echo "=== JX GATE 2/2: INTEGRATION RENDER A/B (voice+master, C == plugin) ==="
+echo "=== JX GATE 2/4: INTEGRATION RENDER A/B (voice+master, C == plugin) ==="
 cc -O2 -fno-strict-aliasing -ffp-contract=off -shared -fPIC \
    -o "$WORK/libjxengine.so" \
    "$REPO/jx3p/src/jx_voice_render.c" "$REPO/jx3p/src/jx_voice_helpers.c" \
@@ -62,4 +67,11 @@ rm -rf "$WORK/ab"
 if [ "$fails" -ne 0 ]; then
   echo "[jx verify] FAIL -- $fails patch/rate cases not EXACTLY 0"; exit 1
 fi
+echo "=== JX GATE 3/4: FULL CHAIN (shipping entry path, reach 12000) ==="
+JX_FULL_SKIP_DERIVE=1 sh "$HERE/jx_full_gate.sh"
+echo "=== JX GATE 4/4: LISTEN PROOFS (oracle + C twin, dry + master) ==="
+python3 "$HERE/jx_listen.py" 0 48,60,72 2>/dev/null
+python3 "$HERE/jx_listen.py" 5 48,60,72 --master 2>/dev/null
+python3 "$HERE/jx_listen_c.py" "$REPO/build/jx_full_ab/libjx3p.so" 0,20,49,35 48,60,72
+python3 "$HERE/jx_listen_c.py" "$REPO/build/jx_full_ab/libjx3p.so" 5,20 48,60,72 --master
 echo "[jx verify] GREEN -- recall 64/64 + render 64/64 x $(echo $RATES | wc -w) rates, all EXACTLY 0"

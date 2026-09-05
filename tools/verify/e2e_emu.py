@@ -27,6 +27,11 @@ IB = pe.OPTIONAL_HEADER.ImageBase
 IMG = pe.get_memory_mapped_image()
 IMGSZ = (len(IMG) + 0xFFF) & ~0xFFF
 
+# ABI LEDGER (tools/verify/abi_check.py, 2026-09-05, playbook 87): every
+# entry disassembly-proven. BUILD(rcx); SETSR(rcx, FLOAT in xmm1 -- call_f);
+# DISPATCH(rcx,edx,r8,r9); NOTEON/NOTEOFF(rcx, dl=note, r8b=vel);
+# ASG_NOTIFY(rcx,edx); HOSTPARAM 0x3C7AE0(rcx,edx,r8d). All match the
+# calls below -- the JUNO harness never carried the JX's SETSR defect.
 BUILD   = IB + 0x3C68D0
 SETSR   = IB + 0x3C7A20
 DISPATCH= IB + 0x3B9A30
