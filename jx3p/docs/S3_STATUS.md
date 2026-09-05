@@ -3,6 +3,33 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## ⚠ CORRECTION 2026-09-05 — THE DRIVE WAS WRONG (playbook 87)
+
+Every oracle run before this date called setSampleRate (0x3F9970) with the
+rate in RDX. The function reads a FLOAT from XMM1 (`tools/verify/abi_check.py`
+proves it in one line). The engine never received a rate; every template,
+recall aux and A/B reference was derived from that boot, and every gate
+stayed EXACTLY 0 because BOTH sides ran the same wrong drive. What still
+stands: the transcription reproduces the plugin bit-for-bit under a given
+drive. What falls: every "plays / rates / bit-exact from a host state" claim
+below, until re-derived through `jx_emu.boot()` (float SETSR) and passed
+through `jx3p/tools/jx_listen.py` (PORT_PIPELINE step 4).
+
+Listen facts on the CORRECTED boot (oracle, patch 0, note 60, all READ/PROVEN
+by execution, `jx_listen.py` numbers):
+- DCO1 WAVEFORM 1 (saw): clean C4, −1 cent, tone fraction 0.28. Pitch and
+  note path are RIGHT.
+- WAVEFORM 2..5 (patch A11 uses 2): only anti-alias spikes (~0.05), no
+  waveform — a zero pulse-width/table source. Refuted as causes, each by
+  measurement: DB-default vectors (raw and engine frame, flag 0 and 1),
+  OCTAVE/TUNE ids, boot ramps, tempo/clock specials, assigner tick, per-sample
+  vtable tick (a `ret`), missing pages (0 faults), C++ static initializers
+  (842/845 run; fill 3.5 KB; id map now live), engine ctor slot 0, CRT FMA
+  flag (legit SSE2 path). OPEN: the cell the pulse path reads for its width,
+  and who writes it in a host.
+- The old audit's "−2 octaves / note 36" reading was the ENGINE DB default
+  for Note ids (36), not a pitch law — a red herring.
+
 ## ⚠ CORRECTION 2026-08-25 — READ BEFORE THE CLAIM BELOW
 
 The "finish line" section below is **narrower than it reads**, on two counts

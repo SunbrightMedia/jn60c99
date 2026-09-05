@@ -87,6 +87,25 @@ def tone_fraction(x, sr, hz, bw=12.0):
     return float(X[m].sum() / (X.sum() + 1e-12))
 
 
+def harmonicity(x, sr, f0, nharm=None, bins=3):
+    """share of spectral energy sitting on integer multiples of f0 up to
+    Nyquist -- high (>0.8) for any periodic waveform including a narrow
+    pulse, low for noise, clicks or an inharmonic mess. tone_fraction alone
+    punishes thin waveforms whose fundamental is legitimately weak. The
+    band around each harmonic is `bins` FFT bins (Hann main lobe)."""
+    x = np.asarray(x, dtype=np.float64)
+    x = x - x.mean()
+    n = len(x)
+    X = np.abs(np.fft.rfft(x * np.hanning(n)))
+    fr = np.fft.rfftfreq(n, 1.0 / sr)
+    bw = bins * sr / n
+    nharm = nharm or int((sr / 2.0) / f0)
+    m = np.zeros_like(X, dtype=bool)
+    for k in range(1, nharm + 1):
+        m |= np.abs(fr - k * f0) < bw
+    return float(X[m].sum() / (X.sum() + 1e-12))
+
+
 def block_profile(x, n=1024):
     x = np.asarray(x, dtype=np.float64)
     rows = []
@@ -109,24 +128,31 @@ def sketch(x, i0, n=64, scale=None):
     return "\n".join(lines)
 
 
-def verdict(x, sr, note, cents_tol=25.0, min_fraction=0.10):
+def verdict(x, sr, note, cents_tol=25.0, min_harmonic=0.80):
     """PASS when the autocorrelation pitch is within cents_tol of the note
-    AND the note's line carries at least min_fraction of the spectrum."""
+    AND at least min_harmonic of the spectrum sits on its harmonics (a
+    periodic waveform of any shape passes; clicks, noise and an inharmonic
+    mess fail). The fundamental's own share is reported, not judged."""
     want = midi_hz(note)
     f0 = f0_autocorr(x, sr)
     frac = tone_fraction(x, sr, want)
+    harm = harmonicity(x, sr, want) if f0 > 0 else 0.0
     cents = 1200.0 * math.log2(f0 / want) if f0 > 0 else float("inf")
-    ok = abs(cents) <= cents_tol and frac >= min_fraction
-    return ok, ("%s note %d: f0 %.2f Hz (%+.0f cents), tone fraction %.3f, "
-                "peak %.4g" % ("PASS" if ok else "FAIL", note, f0, cents,
-                               frac, float(np.abs(x).max())))
+    ok = abs(cents) <= cents_tol and harm >= min_harmonic
+    return ok, ("%s note %d: f0 %.2f Hz (%+.0f cents), harmonic %.3f, "
+                "fundamental %.3f, peak %.4g"
+                % ("PASS" if ok else "FAIL", note, f0, cents, harm, frac,
+                   float(np.abs(x).max())))
 
 
 if __name__ == "__main__":
     # self-test: a synthetic saw at C4 must PASS, white noise must FAIL
     sr = 44100.0
     t = np.arange(16384) / sr
-    saw = 2.0 * ((t * midi_hz(60)) % 1.0) - 1.0
+    f = midi_hz(60)
+    # band-limited saw (a naive saw aliases and is NOT harmonic at 44.1 kHz)
+    saw = sum((-1.0) ** k / k * np.sin(2 * np.pi * k * f * t)
+              for k in range(1, int(sr / 2 / f)))
     ok, msg = verdict(saw, sr, 60)
     print(msg); assert ok
     rng = np.random.default_rng(1)
