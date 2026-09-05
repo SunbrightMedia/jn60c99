@@ -32,7 +32,10 @@ BLOCK = 16128; HEADER = 23; STRIDE = 20223; BLOB_OFF = 16; NPATCH = 64
 # marked "stays clean". The corrected decode varies it and the model check
 # showed exactly one diff at 3088 on 61/64 patches; the ENV2 neighbours
 # 3056/3072/3104 <- pools 49/50/52 fix the pattern. PROVEN by this check.
-OVERRIDE = {1072: 12, 1088: None, 3056: 49, 3072: 50, 3088: 51, 3104: 52, 4000: None, 13440: None}
+# 592 <- pool 58 (PORTAMENTO), 2026-09-05: unmasked by the RATED boot (LUTs and
+# reference both through set_sr); pool 58 matches the reference at 592 on
+# 64/64 patches, pools 59/60 on 3/64. PROVEN by this check.
+OVERRIDE = {592: 58, 1072: 12, 1088: None, 3056: 49, 3072: 50, 3088: 51, 3104: 52, 4000: None, 13440: None}
 
 def decode(blob, pool):
     p = 2 * pool - 8   # CORRECTED 2026-09-05 (playbook 88, jx_bank_census.py)
