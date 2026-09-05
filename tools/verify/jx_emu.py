@@ -333,6 +333,29 @@ class JX:
         """bytes of the runtime-filled .data tail that are now nonzero"""
         buf=bytes(self.uc.mem_read(IB+0xCE7800, 0xCF2860-0xCE7800))
         return sum(1 for x in buf if x), len(buf)
+    def host_map(self):
+        """walk the controller's host-id -> engine-id map (root at .data
+        0xCE9038, built by the static initializers; node key +0x1C, value
+        +0x20). Returns {host_id: engine_id} for every registered id --
+        THE authority on what a host may write (PROVEN: host id 2 maps to
+        engine 20 MASTER TUNE; the DB row of the HOST id is a different
+        parameter and choosing defaults by it detuned the port -39.5 cents)."""
+        uc=self.uc
+        def rq(a): return int.from_bytes(uc.mem_read(a,8),'little')
+        root=rq(IB+0xCE9038)
+        if not root: raise RuntimeError("host map not built -- run_static_init first")
+        out={}; seen=set(); stack=[rq(root+8)]
+        while stack:
+            n=stack.pop()
+            if not n or n in seen or len(seen)>20000: continue
+            seen.add(n)
+            try:
+                k=struct.unpack("<i", uc.mem_read(n+0x1C,4))[0]
+                v=struct.unpack("<i", uc.mem_read(n+0x20,4))[0]
+            except Exception: continue
+            if 0<=k<0x100000 and 0<=v<5223: out[k]=v
+            for off in (0,8,0x10): stack.append(rq(n+off))
+        return out
     def host_init(self,ids=None,log=None):
         """THE CONTROLLER'S DEFAULT PUSH (2026-09-05): a DAW insert runs the
         DLL's static initializers (they build the host-id map at .data
@@ -349,19 +372,20 @@ class JX:
         Returns (written, failed)."""
         import pe_recon
         pe=pe_recon.PE(BIN)
-        rows=pe.params(list(range(1500)))["rows"]
+        rows=pe.params(list(range(5223)))["rows"]
+        mp=self.host_map()
         ok=fail=0
-        for i,r in rows.items():
-            if ids is not None and i not in ids: continue
-            n=r["name"]
-            if not n or n=="_reserve_" or 433<=i<485: continue
+        for hid,eng in sorted(mp.items()):
+            if ids is not None and hid not in ids: continue
+            r=rows.get(eng)
+            if not r or not r["name"] or r["name"]=="_reserve_" or 433<=eng<485: continue
             if r["min"]==r["max"]==r["default"]==0: continue
             try:
-                self.call(HOSTPARAM, rcx=self.HOST, rdx=i, r8=r["default"]-r["min"],
+                self.call(HOSTPARAM, rcx=self.HOST, rdx=hid, r8=r["default"]-r["min"],
                           count=5_000_000, timeout_us=1_000_000); ok+=1
             except Exception as e:
                 fail+=1
-                if log: log("host write id %d failed: %s"%(i,str(e)[:60]))
+                if log: log("host write hid %d (eng %d) failed: %s"%(hid,eng,str(e)[:60]))
         return ok,fail
     def boot(self,sr=44100.0,patch=None,static_init=False,snap=True,host_init=False):
         """THE boot recipe: [static init] -> BUILD -> SETSR(float) -> FTZ ->
