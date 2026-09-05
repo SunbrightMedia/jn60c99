@@ -45,6 +45,7 @@ their old paths so no comment pointer dangles. Live project state:
 | H7_VS_S3_MEASURED.md | REFERENCE | H7 vs ESP32-S3 — measured, not estimated |
 | HISTORY.md | LIVING | PROJECT HISTORY — the full dated log that used to be CLAUDE.md |
 | HOSTPATH_PARITY_SCOPE.md | LIVING | HOSTPATH PARITY SCOPE — close every remaining gap between the port and a REAL host instance. Opus 5: execute t — *PARKED live work order (DAW-parity track)* |
+| PORT_PIPELINE.md | LIVING | THE NEXT-SYNTH ORDER: .vst3 -> playing instrument in 10 steps, each with its tool (pe_recon, abi_check, jx_emu.boot, audio_metrics, listen proofs) and the defect it prevents (playbook 85-88) |
 | JX3P_PLAN.md | LIVING | THE JX-3P PLAN — port-level C99, no hiccups, as fast as the method allows — *jx3p/docs/S3_STATUS.md holds live state* |
 | MASTER_RENDER_MAP.md | REFERENCE | master_render (sub_180363380) — transcription map & dropped-arg resolutions |
 | NAN_SEMANTICS_SCOPE.md | LIVING | NaN semantics: what is a defect, and what is only an inaccuracy |

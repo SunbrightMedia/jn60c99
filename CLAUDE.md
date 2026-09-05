@@ -139,14 +139,17 @@ mine is a hypothesis (playbook 80).
   DevKitC-1 boards (JLCPCB/LCSC). The user draws the schematic by hand;
   docs/hardware/ holds the connection reference, PCB placement notes, and
   open BOM items (LM2776 C69527 is the -5 V rail; TPA6120 needs it).
-- **JX-3P (E5)**: THE PORT PLAYS STANDALONE (charter 7b GREEN 2026-09-04).
-  Full control plane transcribed + proven (alloc/nstore/ktrack/dispatch/
-  wrappers/ramps, each gate EXACTLY 0, teeth bitten); clean-boot template
-  NaN-free; correct-seed render A/B 64/64 at 44100; full-chain gate
-  (jx_full_gate.sh) L/R EXACTLY 0 vs the plugin driving itself, no pokes.
-  Web app: jx3p/gui/web → docs/jx3p (Pages). Open (logged in S3_STATUS):
-  true host recall protocol, drain seam 0x3EF210, WASM-FTZ caveat, other
-  rates. Lessons: jx3p/docs/PORT_LESSONS.md.
+- **JX-3P (E5)**: PLAYS AND SOUNDS RIGHT (2026-09-05). Two harness defects
+  hid for weeks behind green gates (playbook 87 SETSR ABI = float in xmm1;
+  playbook 88 bank decode 16 bytes off) plus one bridge defect (link
+  pointers to template copies, PORT_LESSONS 8). All fixed, all gated:
+  recall 64/64 EXACT, full chain 9/9 EXACTLY 0 incl. FREQ-MOD patches,
+  listen proofs GREEN on oracle AND C twin (jx_listen.py / jx_listen_c.py:
+  pitch tracks keys, harmonic, idle silent, release decays). 64-patch full
+  gate: see S3_STATUS. Web app rebuilt + republished (one link, artifact
+  d8679bea). Pipeline for the next synth: docs/PORT_PIPELINE.md + tools
+  pe_recon / abi_check / audio_metrics / jx_bank_census. Open: master FX
+  in the app (dry voice sum ships), true host recall protocol, other rates.
 - **Parked tracks**: DAW-parity (HOSTPATH_PARITY_SCOPE steps 2-5) and Track B
   Daisi sonic-identity fork (harness done, zero voice code, blind-gate warning
   stands). Both resumable from HISTORY.md pointers.
