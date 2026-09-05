@@ -116,3 +116,21 @@ the sharp edges inside it.
    defaults, is the only faithful host; (c) one NaN the push leaves behind
    (+0xAAC6F4, the STEP SEQ assign sentinel) is hosted state, excluded
    from the census BY OFFSET with its provenance written down.
+
+10. **The host-id space is the CONTROLLER'S, not the engine's** (2026-09-05).
+   The host param entry looks incoming ids up in a map the static
+   initializers build (.data 0xCE9038). Host id 2 maps to engine id 20
+   (MASTER TUNE). A default push that chose values by the HOST id's DB row
+   wrote MASTER TUNE = "KNOB INDICATOR's default" and detuned every note
+   by -39.5 cents -- while 413 of its 416 writes silently did NOTHING
+   (unmapped ids return without writing). Rules: enumerate the map
+   (`jx_emu.host_map()`), write only mapped ids, take each value from the
+   MAPPED engine id's DB row; and count effective writes, not calls.
+
+11. **Snap is the hosted steady state, not a convenience** (2026-09-05).
+   The master's boot ramps 541/542 (limit 0.0, still active) drive NaN into
+   the EFX network at idle sample 3681. Settling every active ramp to its
+   limit and deactivating it (the JUNO's snap_all law) IS the state a host
+   reaches; recall then re-arms the per-patch ramps. Export templates from
+   the SNAPPED boot, and give every render gate reach PAST the latest known
+   birth (12000 samples, not 1200).

@@ -6,7 +6,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 OUT="$REPO/build/jx_full_ab"
 PATCHES="${JX_FULL_PATCHES:-0,5,20,49}"
-N="${JX_FULL_N:-1200}"
+N="${JX_FULL_N:-12000}"   # reach past the master EFX NaN birth at 3681 (lesson 9)
 mkdir -p "$OUT"
 if [ "${JX_FULL_SKIP_DERIVE:-0}" != "1" ]; then
 echo "=== 0. regenerate the derived inputs (template + recall aux) ==="
