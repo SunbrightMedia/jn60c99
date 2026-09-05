@@ -3,7 +3,7 @@
 of tools/verify/plugin_recall_ref.py.
 
 For each patch: ONE build; dispatch the front-panel recall indices (pool+740)
-with the blob-decoded byte (2*pool+8, int2x4 nibble pair) IN POOL ORDER, exactly
+with the blob-decoded byte (2*pool-8, int2x4 nibble pair; +8 was 16 B off, playbook 88) IN POOL ORDER, exactly
 as the plugin's own recall sequence; capture voice-0's coefficient block. Every
 patch overwrites the same cells (no rebuild) -- the plugin's own recall model.
 
@@ -25,7 +25,7 @@ HEADER = 23; STRIDE = 20223; BLOB_OFF = 16; NPATCH = 64
 POOL_LO, POOL_HI = 2, 140
 
 def decode(blob, pool):
-    p = 2 * pool + 8
+    p = 2 * pool - 8   # CORRECTED 2026-09-05 (playbook 88, jx_bank_census.py)
     return ((blob[p] & 0xF) << 4) | (blob[p + 1] & 0xF)
 
 def main():

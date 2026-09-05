@@ -30,6 +30,19 @@ by execution, `jx_listen.py` numbers):
 - The old audit's "−2 octaves / note 36" reading was the ENGINE DB default
   for Note ids (36), not a pitch law — a red herring.
 
+**SECOND DEFECT, same day (playbook 88): the bank decode was 16 bytes off.**
+`blob_pos = 2*pool + 8` put the 16-char name at byte 156; it decodes at
+byte 140. Every pool received its 8th neighbour's value: DCO1 RANGE got DCO2
+CROSS MOD (hence the octave), DCO1 LEVEL read 0 on all 64 patches, DCO2
+WAVEFORM (0..5) read up to 249. The recall gate stayed 64/64 EXACTLY 0
+because it compared the C recall with the plugin dispatching the same wrong
+values. Corrected to `2*pool − 8` in jx_emu.pool_value, jx_recall.c, every
+tool, and synth/jx3p.json. TOOTH: `jx3p/tools/jx_bank_census.py` — every
+decoded value of all 64 patches inside the binary's own ENGINE DB range,
+no level pool silent bank-wide; GREEN under −8, FAIL (316 violations, 2
+silent pools) under +8. Every derived artifact (template, recall aux, A/B
+references, WASM assets) must be regenerated from the corrected decode.
+
 ## ⚠ CORRECTION 2026-08-25 — READ BEFORE THE CLAIM BELOW
 
 The "finish line" section below is **narrower than it reads**, on two counts

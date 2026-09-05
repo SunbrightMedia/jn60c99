@@ -13,7 +13,7 @@ BLOCK = 16128; HEADER = 23; STRIDE = 20223; BLOB_OFF = 16; NPATCH = 64
 CELLS = [1072, 3056, 3072, 3088, 3104, 4000, 13440]
 
 def decode(blob, pool):
-    p = 2 * pool + 8
+    p = 2 * pool - 8   # CORRECTED 2026-09-05 (playbook 88, jx_bank_census.py)
     return ((blob[p] & 0xF) << 4) | (blob[p + 1] & 0xF)
 
 def f(b):  # 4 bytes -> float

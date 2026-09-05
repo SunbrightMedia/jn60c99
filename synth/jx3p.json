@@ -56,7 +56,7 @@
     "voice_stride": 16128,
     "host_assign_ptr": "HOST + 104 + 64*i"
   },
-  "_recall_mapping": "DERIVED this session (non-circular, name-proven): blob_pos = 2*pool + 8 (the 16-char patch name int2x4-decodes at blob 156 for pool 74-89, exactly spelling the name); dispatch_idx = pool + 740 (active indices map to the real JX DSP params: VCF CUTOFF, ENV ATTACK, DCO WAVEFORM...). Recall coefficient side: 44 clean LUT params + the {796,797,803}/875 cluster.",
-  "blob_pos_formula": "2*pool+8",
+  "_recall_mapping": "CORRECTED 2026-09-05 (jx_bank_census.py, binary ranges as the tooth): blob_pos = 2*pool - 8 -- the 16-char name (value-tree pool 74-89) int2x4-decodes at blob 140..171, not 156; the earlier +8 formula fed every pool its 8th neighbour (316 out-of-range values, DCO1 LEVEL 0 on all 64 patches) while the recall gate stayed green on the same wrong values; dispatch_idx = pool + 740 (active indices map to the real JX DSP params: VCF CUTOFF, ENV ATTACK, DCO WAVEFORM...). Recall coefficient side: 44 clean LUT params + the {796,797,803}/875 cluster.",
+  "blob_pos_formula": "2*pool-8",
   "dispatch_idx_formula": "pool+740"
 }

@@ -30,7 +30,7 @@ BLOCK = 16128; HEADER = 23; STRIDE = 20223; BLOB_OFF = 16; NPATCH = 64
 OVERRIDE = {1072: 12, 1088: None, 3056: 49, 3072: 50, 3088: None, 3104: 52, 4000: None, 13440: None}
 
 def decode(blob, pool):
-    p = 2 * pool + 8
+    p = 2 * pool - 8   # CORRECTED 2026-09-05 (playbook 88, jx_bank_census.py)
     return ((blob[p] & 0xF) << 4) | (blob[p + 1] & 0xF)
 
 def main():

@@ -31,7 +31,7 @@ ACTIVE = [10, 11, 12, 13, 14, 16, 17, 19, 20, 22, 24, 25, 26, 28, 29, 30, 31,
 
 
 def decode(blob, pool):
-    p = 2 * pool + 8
+    p = 2 * pool - 8   # CORRECTED 2026-09-05 (playbook 88, jx_bank_census.py)
     return ((blob[p] & 0xF) << 4) | (blob[p + 1] & 0xF)
 
 

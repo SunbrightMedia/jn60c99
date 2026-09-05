@@ -45,6 +45,10 @@ def f0_autocorr(x, sr=44100.0, fmin=15.0, fmax=3000.0):
     X = np.fft.rfft(x, 2 * n)
     ac = np.fft.irfft(X * np.conj(X))[:n]
     lag0, lag1 = int(sr / fmax), min(int(sr / fmin), n - 1)
+    # the zero-lag lobe of a bright waveform stays high for many samples;
+    # search only AFTER the autocorrelation first drops below half of ac[0]
+    dip = int(np.argmax(ac < 0.5 * ac[0])) if (ac < 0.5 * ac[0]).any() else 0
+    lag0 = max(lag0, dip)
     seg = ac[lag0:lag1]
     # octave guard: multiples of the true lag peak almost as high; take the
     # SMALLEST lag within 10% of the maximum (a pure saw ties at 2T)

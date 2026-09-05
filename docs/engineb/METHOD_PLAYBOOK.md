@@ -1785,3 +1785,31 @@ written fresh and never checked against the callee's disassembly.
 3. When output is qualitatively wrong (inharmonic, unstable) while every
    gate is green, suspect the DRIVE (ABI, ordering, missing calls)
    before the DSP.
+
+## 88. A RECALL GATE PROVES THE DECODE ONLY IF THE DECODE HAS ITS OWN TOOTH
+## (2026-09-05, JX-3P)
+
+The JX bank decode was `blob_pos = 2*pool + 8`, "name-proven": the 16-char
+patch name spelled correctly for value-tree pools 74-89. It spelled
+correctly because the name was read at the byte the formula gave for the
+name -- and the formula was 16 bytes off for EVERYTHING ELSE (the name
+actually starts at byte 140, row 66 of the +8 grid). Every pool received
+its 8th neighbour: DCO1 RANGE got DCO2 CROSS MOD, DCO1 LEVEL was 0 on all
+64 patches, DCO2 WAVEFORM (a 0..5 switch) read up to 249. The recall gate
+compared the C recall with the plugin dispatching THE SAME WRONG VALUES:
+64/64 EXACTLY 0, for weeks. The instrument played its patches garbled --
+wrong octave, thin waves, closed filters -- and the wrong-pitch audit
+chased host parameters, ramps, clocks, static initializers and CRT globals
+before the raw record was looked at.
+
+### The rules
+1. A decode needs a tooth of its own, independent of the consumer: every
+   decoded value of every record must fall inside the range the binary's
+   own parameter DB declares (`pe_recon params`), and a level/switch that
+   is constant across a whole bank is a defect. `jx_bank_census.py` does
+   this in one second; it FAILS under the old formula (316 violations).
+2. Anchoring on one field proves that field. State which fields a formula
+   was checked on, and check the ends and the middle.
+3. When a port "plays but sounds wrong", print the DECODED PATCH next to the
+   parameter names before touching the engine. Ten minutes; it ends the
+   argument.

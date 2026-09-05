@@ -14,7 +14,7 @@ BANK = os.path.join(J.REPO, "jx3p", "truth", "preset_bank_1.bin")
 BLOCK = 16128; HEADER = 23; STRIDE = 20223; BLOB_OFF = 16; NPATCH = 64
 
 def decode(blob, pool):
-    p = 2 * pool + 8
+    p = 2 * pool - 8   # CORRECTED 2026-09-05 (playbook 88, jx_bank_census.py)
     return ((blob[p] & 0xF) << 4) | (blob[p + 1] & 0xF)
 
 def main():

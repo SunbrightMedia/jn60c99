@@ -62,7 +62,14 @@ def patch_blob(bank, idx):
                 BANK_HEADER + (idx + 1) * BANK_STRIDE]
 
 def pool_value(blob, pool):
-    p = 2 * pool + 8
+    # blob_pos = 2*pool - 8 (2026-09-05). The earlier formula, 2*pool + 8,
+    # anchored the 16-char name at value-tree pool 74 but put it at byte 156;
+    # the name actually decodes at bytes 140..171 (row 66 of the +8 grid).
+    # Under +8 every pool received its 8th neighbour's value (DCO1 LEVEL "0"
+    # on all 64 patches, DCO2 WAVEFORM up to 249) -- and the recall gate,
+    # comparing C with the plugin fed the SAME wrong values, stayed green.
+    # Under -8 all 64 patches decode in range (see jx_bank_census.py).
+    p = 2 * pool - 8
     return ((blob[p] & 0xF) << 4) | (blob[p + 1] & 0xF)
 
 STACK_BASE=0x200000000; STACK_SIZE=0x2000000

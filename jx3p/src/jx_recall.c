@@ -2,7 +2,8 @@
  *
  * The JX recall is the plugin's dispatch (0x3EBB00) fired over the front-panel
  * pool set in pool order. Proven separable (like the JUNO's juno_apply.c): 32
- * active pools, each a function of ONE input byte (2*pool+8 nibble-pair decode),
+ * active pools, each a function of ONE input byte (2*pool-8 nibble-pair decode;
+ * the earlier +8 was 16 bytes off -- playbook 88, jx_bank_census.py),
  * plus 7 interacting cells resolved by the value-pool-wins rule. The per-pool
  * single-byte tables in jx_recall_lut.h are the COMPLETE domain enumeration of
  * the plugin's own dispatch (captured under Unicorn), i.e. the exact function.
@@ -24,7 +25,7 @@
 
 static int decode_pool(const unsigned char *blob, int pool)
 {
-    int p = 2 * pool + 8;
+    int p = 2 * pool - 8;   /* CORRECTED 2026-09-05: jx_bank_census.py, playbook 88 */
     return ((blob[p] & 0xF) << 4) | (blob[p + 1] & 0xF);
 }
 
