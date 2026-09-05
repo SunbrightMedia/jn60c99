@@ -27,7 +27,14 @@ if grep -q "toResizableBuffer" jx3p/gui/web/jx3p.js; then
   echo "ERROR: resizable-heap path re-enabled (see gui/web/build.sh)" >&2
   exit 1
 fi
-VER=$(cat jx3p/gui/web/jx3p.wasm jx3p/gui/web/jx3p.js | sha256sum | cut -c1-12)
+# WHY the assets are in the hash: the page cache-busts every fetch with
+# ?v=$BUILD_VER, including the .gz engine data. Hashing only code let a
+# data-only regeneration (new template/aux, same source) keep the old
+# stamp -- browsers would then serve STALE engine data against new code,
+# the exact base-split class the aux exporter's tooth guards on the host.
+VER=$(cat jx3p/gui/web/jx3p.wasm jx3p/gui/web/jx3p.js \
+        jx3p/gui/web/jx_template.bin.gz jx3p/gui/web/jx_master_recall.bin.gz \
+        jx3p/gui/web/bank.bin.gz | sha256sum | cut -c1-12)
 sed -i "s/const BUILD_VER = \"[^\"]*\"/const BUILD_VER = \"$VER\"/" \
     jx3p/gui/web/index.html
 # mirror for GitHub Pages (same convention as the JUNO app in docs/)
