@@ -27,7 +27,7 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     bank = J.bank_bytes()
     for patch in patches:
-        jx = J.JX().boot(44100.0, snap=False, host_init=True); uc = jx.uc
+        jx = J.JX().boot(44100.0, snap=True, host_init=True); uc = jx.uc
         jx.recall(patch, bank=bank, notify=False)
         jx.note_on(60, 100)
         L, R = jx.render(n)

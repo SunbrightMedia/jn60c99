@@ -48,7 +48,11 @@ def main():
     # BUILD -> SETSR (float in xmm1 -- the ABI ledger in jx_emu; the old
     # rdx call never set a rate, playbook 87) -> FTZ. Ramps + latch stay
     # live: the template carries them and the C engine replays them.
-    jx = J.JX().boot(sr, snap=False, host_init=True)   # the controller's default push (jx_emu.host_init)
+    # snap=True (2026-09-05): the master's boot ramps 541/542 (limit 0.0,
+    # active) poison the EFX at idle sample 3681 when left live; the hosted
+    # steady state has them settled and dead. Recall re-arms per-patch ramps
+    # AFTER this, so patch machinery stays live in the aux records.
+    jx = J.JX().boot(sr, snap=True, host_init=True)
     uc = jx.uc
 
     regions = []
