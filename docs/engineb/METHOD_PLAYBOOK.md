@@ -1813,3 +1813,36 @@ before the raw record was looked at.
 3. When a port "plays but sounds wrong", print the DECODED PATCH next to the
    parameter names before touching the engine. Ten minutes; it ends the
    argument.
+
+## 89. A SPARSE DIFF IS VALID ONLY OVER THE BASE IT WAS DIFFED AGAINST
+## (2026-09-05, JX-3P -- the "base split")
+
+The JX ships two derived artifacts that must agree: a clean-boot TEMPLATE
+(full bytes) and a per-patch recall AUX (sparse byte RUNS = diff vs the
+exporter's own clean boot). When the boot recipe changed (ramps snapped),
+the AUX was regenerated but the TEMPLATE on disk was still the pre-snap
+one. Nothing complained: both files parsed, the crc matched, the C engine
+loaded both. But every aux run was now spliced over the WRONG base --
+untouched cells kept stale values (0.0 where the true clean is 0.686275),
+and partial runs stitched franken-floats (a 3-byte run over stale zeros
+produced 0x00119192, a denormal that FTZ crushed to 0.0). The engine's
+per-sample state advance starved: the C twin RE-EMITTED SAMPLE 0 forever
+while the oracle advanced. The full-chain gate failed at sample 1 on every
+patch -- a mile from the actual cause, and it took a four-lens workflow to
+name it.
+
+### The rules
+1. Any artifact that stores DIFFS must carry, and CHECK, the identity of
+   its base. Cheapest form: before computing a single diff, byte-compare
+   the exporter's live clean state against the base artifact that will
+   ship with it, and refuse loudly on mismatch
+   (`jx_master_recall_export.check_template_base`, seen to bite).
+2. Regenerate BASE AND DIFF TOGETHER, always, from one script/run. If a
+   recipe change touches the boot, every derived file is stale, not just
+   the obvious one.
+3. The same law applies downstream: the web build's cache-bust stamp must
+   hash the DATA as well as the code, or a browser pairs new code with an
+   old base (fixed the same day in gui/web/build.sh).
+4. Symptom-to-cause hint: "output frozen at the first sample" or "state
+   never advances" points at a POISONED BASE (denormals/zeros where
+   coefficients belong), not at the per-sample logic.
