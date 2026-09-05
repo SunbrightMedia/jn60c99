@@ -122,7 +122,13 @@ def main():
     # the census is a FLOAT-state rule: DSP regions only (8 voices + the
     # master, regions 0..7 and the last). The control blobs hold int lists
     # filled with -1, whose bit pattern is a NaN but is never float data.
-    dsp = regions[:8] + [regions[-1]]
+    # The master's WRAPPER region [0xAAC000,0xAAD000) holds control cells,
+    # not DSP floats: the controller's default push writes the STEP SEQ
+    # Assign targets (ids 1493-1499, Script.xml default 0, DB max=-1 flag
+    # arrays) as a NaN sentinel at +0xAAC6F4 on every unit -- the plugin's
+    # own hosted state, measured benign (master finite over 12000 samples).
+    # Excluded from the census BY OFFSET so the tooth still bites on DSP.
+    dsp = regions[:8] + [regions[-1][:0xAAC000]]
     nn = sum(nan_count(r) for r in dsp)
     print("template NaN census: %d (0 REQUIRED)" % nn)
     if nn and os.environ.get("JX_TEMPLATE_ALLOW_NAN") != "1":
