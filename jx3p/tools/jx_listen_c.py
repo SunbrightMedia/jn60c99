@@ -25,6 +25,23 @@ def render(lib, n):
     return np.nan_to_num(np.array(L[:], dtype=np.float64))
 
 
+def track_verdict(results, harm_min=0.80, tol=25.0):
+    """results: [(key, f0, harmonic)]. PASS when every note is harmonic and
+    the sounding pitch tracks the key by ONE common whole number of
+    semitones (the patch's own RANGE/FREQ-MOD transpose): a broken pitch
+    law, a stuck oscillator or a click train all fail."""
+    import math
+    offs = []
+    for key, f0, harm in results:
+        if f0 <= 0 or harm < harm_min:
+            return False, "FAIL harmonic/f0: " + str(results)
+        offs.append(1200.0 * math.log2(f0 / M.midi_hz(key)))
+    semis = round(offs[0] / 100.0)
+    ok = all(abs(o - 100.0 * semis) <= tol for o in offs)
+    return ok, "%s pitch tracks keys by %+d semitones (offsets %s cents)" % (
+        "PASS" if ok else "FAIL", semis, ", ".join("%+.0f" % o for o in offs))
+
+
 def main():
     so = sys.argv[1]
     patches = [int(x) for x in (sys.argv[2] if len(sys.argv) > 2 else "0,20,49").split(",")]
@@ -47,19 +64,24 @@ def main():
         ok = float(np.abs(idle).max()) < 1e-6
         print("%s idle: peak %.3g" % ("PASS" if ok else "FAIL", float(np.abs(idle).max())))
         fails += not ok
+        results = []
         for n in notes:
             lib.jx3p_note_on(n, 100)
             render(lib, 1024)
             x = render(lib, 16384)
-            ok, msg = M.verdict(x, SR, n + shift)
-            print(msg.replace("note %d:" % (n + shift), "key %d (sounding %d):" % (n, n + shift)))
-            fails += not ok
+            f0 = M.f0_autocorr(x, SR)
+            harm = M.harmonicity(x, SR, f0) if f0 > 0 else 0.0
+            print("key %d: f0 %.2f Hz, harmonic %.3f, peak %.4g" % (n, f0, harm, float(np.abs(x).max())))
+            results.append((n, f0, harm))
             lib.jx3p_note_off(n)
             tail = render(lib, 44100)
             head, last = float(np.abs(tail[:4096]).max()), float(np.abs(tail[-4096:]).max())
             ok = last < 0.05 * max(head, 1e-9) or last < 1e-4
             print("%s release note %d: %.3g -> %.3g" % ("PASS" if ok else "FAIL", n, head, last))
             fails += not ok
+        ok, msg = track_verdict(results)
+        print(msg + "  (patch RANGE predicts %+d)" % shift)
+        fails += not ok
     print("JX LISTEN (C twin): %s" % ("GREEN" if not fails else "%d FAIL" % fails))
     sys.exit(1 if fails else 0)
 

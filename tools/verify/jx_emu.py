@@ -45,32 +45,11 @@ XC_TABLE  = (0x96C660, 0x96E0C8)   # C++ static initializers (pe_recon crt_init)
                               # they fill .data's runtime tail [0xCE7800,0xCF2860)
 LATCH_OFF = 0xAAC308          # per-unit warm-up mute latch (960 at clean boot)
 
-# the factory bank geometry + the pool set the plugin's own recall writes
-# (ONE definition; exporters import it -- do not copy this list again)
-BANK_HEADER, BANK_STRIDE, BANK_BLOB_OFF = 23, 20223, 16
-ACTIVE_POOLS = [10, 11, 12, 13, 14, 16, 17, 19, 20, 22, 24, 25, 26, 28, 29, 30,
-                31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46,
-                47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62,
-                63, 64, 65]
-POOL_BASE_ID = 740
-
-def bank_bytes():
-    return open(os.path.join(REPO, "jx3p", "truth", "preset_bank_1.bin"), "rb").read()
-
-def patch_blob(bank, idx):
-    return bank[BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF:
-                BANK_HEADER + (idx + 1) * BANK_STRIDE]
-
-def pool_value(blob, pool):
-    # blob_pos = 2*pool - 8 (2026-09-05). The earlier formula, 2*pool + 8,
-    # anchored the 16-char name at value-tree pool 74 but put it at byte 156;
-    # the name actually decodes at bytes 140..171 (row 66 of the +8 grid).
-    # Under +8 every pool received its 8th neighbour's value (DCO1 LEVEL "0"
-    # on all 64 patches, DCO2 WAVEFORM up to 249) -- and the recall gate,
-    # comparing C with the plugin fed the SAME wrong values, stayed green.
-    # Under -8 all 64 patches decode in range (see jx_bank_census.py).
-    p = 2 * pool - 8
-    return ((blob[p] & 0xF) << 4) | (blob[p + 1] & 0xF)
+# the factory bank geometry + decode live in jx_bank.py (pure python, so the
+# ctypes half of a two-process gate can import the SAME definition without
+# pulling Unicorn in). blob_pos = 2*pool - 8: playbook 88, jx_bank_census.py.
+from jx_bank import (BANK_HEADER, BANK_STRIDE, BANK_BLOB_OFF, ACTIVE_POOLS,
+                     POOL_BASE_ID, bank_bytes, patch_blob, pool_value)
 
 STACK_BASE=0x200000000; STACK_SIZE=0x2000000
 HEAP_BASE =0x310000000; HEAP_SIZE =0x200000000
