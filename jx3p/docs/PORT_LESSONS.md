@@ -99,3 +99,20 @@ the sharp edges inside it.
    (`where()` in the recon probes) and wire the port's pointer to the SAME
    live cell of its own state. A copied value is a mirror; mirrors go stale
    (playbook 86).
+
+9. **The controller's default push is part of the instrument** (2026-09-05,
+   the master-FX arc). A DAW insert runs the DLL's static initializers
+   (they build the host-id map) and the controller then writes EVERY
+   parameter's default through the host param entry (0x3F9A30: host id ->
+   engine id, frame conversion, dispatch flag 0, assigner notify). Without
+   it the plugin's master carries two boot ramps (slots 541/542) whose
+   values turn NaN and poison the EFX network at idle sample 3681 -- the
+   C twin reproduced that exactly, so the 64/64 gate over 1200 samples was
+   green on a master that dies at sample 3681. With it (`jx_emu.host_init`,
+   416 writes, 0 failures) the master stays finite and the note rides the
+   effects. Rules: (a) the gate window must reach past every known birth
+   (12000 samples, not 1200); (b) "no host writes at insert" was an
+   assumption -- the plugin's own entry point, run with the plugin's own
+   defaults, is the only faithful host; (c) one NaN the push leaves behind
+   (+0xAAC6F4, the STEP SEQ assign sentinel) is hosted state, excluded
+   from the census BY OFFSET with its provenance written down.
