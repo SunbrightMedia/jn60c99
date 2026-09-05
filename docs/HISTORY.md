@@ -1473,3 +1473,20 @@ that delta. So:
 - **Guardrails:** two-process rule; no thread-pool spin (kill any run >5 min in
   the wait loop — call consumers directly); no hand value maps; label
   PROVEN/READ/INFERRED; one reversible commit per closed cell-family.
+
+## 2026-09-05 -- THE JX-3P ROBUSTNESS ARC (the day the drive was proven)
+The user's ears ("sounds terribly wrong") started an audit that found FOUR
+defects behind weeks of green gates, all drive-side, none in the DSP
+transcription: SETSR ABI (playbook 87), bank decode 16 bytes off (playbook
+88), link pointers to template copies (PORT_LESSONS 8), and the missing
+controller boot -- its default push through the controller's OWN id map
+(lessons 9/10) and the snapped steady state (lesson 11). Every artifact was
+regenerated from the corrected boot; the full-chain gate reached 12000
+samples and went 64/64 EXACTLY 0; listen proofs (pitch tracks keys,
+harmonicity, idle silent, release decays) went GREEN on oracle and C twin;
+the web app was rebuilt and republished at the same artifact link. The
+whole method is banked as docs/PORT_PIPELINE.md + tools pe_recon /
+abi_check / audio_metrics / jx_bank_census / jx_listen{,_c}, and
+`make verify-jx3p` now runs drive proofs, census, recall, integration,
+full chain and listen in one command. The JUNO harness was retro-audited
+with abi_check: clean.
