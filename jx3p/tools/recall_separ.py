@@ -24,6 +24,7 @@ def main():
     active = meta["active"]
     bank = open(BANK, "rb").read()
     jx = J.JX().build(); jx.set_ftz(); uc = jx.uc; st0 = jx.state[0]
+    jx.set_sr(44100.0)   # the LUTs must come from a RATED boot (playbook 87)
     clean = bytes(uc.mem_read(st0, BLOCK))
 
     # per-pool LUT: byte -> {cell_off: 4-byte value} captured from clean base

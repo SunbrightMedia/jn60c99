@@ -37,9 +37,7 @@ def main():
     # reference used to be captured WITHOUT the sample-rate call, and SETSR
     # activates 205 more recall target cells per voice. A LUT derived from
     # the un-SETSR state reproduces recall for a state no host ever runs.
-    import struct as _s
-    jx.call(J.IB + 0x3F9970, rcx=jx.HOST,
-            rdx=_s.unpack("<Q", _s.pack("<d", 44100.0))[0])
+    jx.set_sr(44100.0)      # FLOAT in xmm1 (ABI ledger, playbook 87)
     st0 = jx.state[0]
 
     # Discover the active recall set: pools whose dispatch (pool+740) MOVES a
@@ -84,8 +82,7 @@ def main():
     ref = {}
     for patch in range(NPATCH):
         jxp = J.JX().build(); jxp.set_ftz()
-        jxp.call(J.IB + 0x3F9970, rcx=jxp.HOST,
-                 rdx=_s.unpack("<Q", _s.pack("<d", 44100.0))[0])
+        jxp.set_sr(44100.0)
         rec = bank[HEADER + patch * STRIDE:]
         blob = rec[BLOB_OFF:]
         for pool in active:
