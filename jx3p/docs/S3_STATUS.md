@@ -412,6 +412,42 @@ The last untranscribed seam, sized from the dump:
   SYNTH= parameterization -- it must be created): render A/B vs the oracle
   over 64 patches, null EXACTLY 0.
 
+## ★ FINISH LINE RESTATED 2026-09-06 -- THE PORT PLAYS, EFFECTS AND ALL
+
+Every artifact regenerated from a boot that is now DETERMINISTIC, and every
+claim below is a measured job in bench/jobs/ with EXIT 0:
+- **Full-chain gate** (`jx_full_gate.sh`, shipping entry path, no pokes):
+  **64/64 patches L/R EXACTLY 0 over 13,024 samples each** -- 1,024 IDLE
+  samples before note-on plus 12,000 played. The tooth (one-semitone note
+  skew) bites. The idle prefix is new: it proves the -60 dBFS master floor
+  is the PLUGIN'S OWN, so no absolute "silence" threshold is needed.
+- **Recall gate**: 64/64 EXACT (model overrides 592<-58, 3088<-51 derived).
+- **Listen proofs** (`jx_listen_c.py`), dry AND through the master: GREEN --
+  pitch tracks the keys by one whole number of semitones on every patch,
+  harmonicity 0.89-0.98, releases decay.
+- **Web app**: ships the FULL MASTER CHAIN (chorus/delay/reverb) at the
+  plugin's own level (gain 1.0; measured peaks 0.24-0.59). One link,
+  artifact d8679bea. BUILD_VER now hashes the engine DATA as well as the
+  code, so a data-only regeneration cannot serve stale assets.
+
+Harness defects paid on 2026-09-06 (playbook 89, 90):
+- The aux's sparse diffs were computed against a DIFFERENT base than the
+  shipped template ("base split"): franken-floats spliced over stale cells
+  froze the C twin at sample 0. TOOTH: `check_template_base` refuses any
+  aux whose exporter clean boot does not match the shipped template.
+- The boot was NON-DETERMINISTIC: a 2-second wall-clock bound on each
+  static initializer meant machine speed decided which ones half-ran. A
+  half-run ctor wrecked the CRT, BUILD then died with UC_ERR_MAP and a
+  50-second export took 97 minutes. Now: the 3 faulting ctors are skipped
+  BY RVA (proven to cost nothing -- same .data fill, same controller map,
+  same host writes), a stray-page flood guard stops crash-walks by count,
+  and the CRT's EncodePointer/DecodePointer are shimmed as identity.
+  Static init: 6,009 s -> 0.2 s.
+
+Open (logged, none blocking the app): 48000/96000 rates through the full
+chain, the true host recall protocol, the WASM FTZ caveat, and the JUNO
+retro-audit + CHAIN4 firmware review (workflow wf_802dbb9d-57e, stopped).
+
 ## RESUME POINT v2 (2026-09-05, saved on 5-hour limit)
 THE ACTIVE DEFECT: full-chain gate fails from sample 1 (all patches) after the
 snapped-boot change. ROOT CAUSE FOUND by the fix workflow: the aux's sparse
