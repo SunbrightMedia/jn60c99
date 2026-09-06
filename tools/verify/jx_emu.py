@@ -324,7 +324,16 @@ class JX:
         ok=fail=0
         for p in ptrs:
             if not p: continue
-            try: self.call(p, count=cap, timeout_us=2_000_000); ok+=1
+            # DETERMINISM (defect paid 2026-09-06): bound each ctor by
+            # INSTRUCTION COUNT ONLY. A wall-clock bound makes the boot
+            # machine-speed dependent -- on a slower container one more ctor
+            # timed out, the CRT entered its unhandled-exception path
+            # (RtlCaptureContext / UnhandledExceptionFilter, both unshimmed),
+            # which walked memory downward and left ~2300 stray mapped pages
+            # below the heap; BUILD then died with UC_ERR_MAP and the whole
+            # export took 97 min instead of under 1. Instruction counts are
+            # identical on every machine, so the boot is reproducible.
+            try: self.call(p, count=cap); ok+=1
             except Exception as e:
                 fail+=1
                 if log: log("ctor 0x%x failed: %s"%(p-IB, str(e)[:60]))
