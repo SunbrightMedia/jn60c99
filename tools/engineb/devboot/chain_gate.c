@@ -120,6 +120,41 @@ int main(int argc, char **argv)
     }
     printf("CHAIN: topology OK (windows tile, hop check refuses overlap+gap)\n");
 
+    /* ---- the marker law (review 2026-09-06) ------------------------------
+     * CHAIN_TOOTH_MARK substitutes the OLD law (training-pattern tag shared,
+     * index unbounded): every check below must then FAIL, or the gate has no
+     * reach over the defect it exists to hold down. */
+#ifdef CHAIN_TOOTH_MARK
+#define REALIGN_CI(w, n) (((((uint32_t)(w)) & 0xFF000000u) == 0xA5000000u) \
+                              ? (((uint32_t)(w)) & 0x1FFu) : 0u)
+#else
+#define REALIGN_CI(w, n) s3_chain_realign_ci((w), (n))
+#endif
+    /* a true marker heals its exact rotation */
+    if (REALIGN_CI(s3_chain_mark(7, 5), 256) != 5) {
+        printf("CHAIN: *** marker law: a true rotation of 5 not healed ***\n");
+        return 1;
+    }
+    /* frame 0 of an ALIGNED marked chunk asks for nothing */
+    if (REALIGN_CI(s3_chain_mark(7, 0), 256) != 0) {
+        printf("CHAIN: *** marker law: an aligned chunk 'realigned' ***\n");
+        return 1;
+    }
+    /* an aligned TRAINING-PATTERN chunk (slot-3 word = counter 3) must not
+     * realign: the shared tag broke the alignment it had, every lock */
+    if (REALIGN_CI(0xA5000003u, 256) != 0) {
+        printf("CHAIN: *** marker law: a pattern word bought a realign ***\n");
+        return 1;
+    }
+    /* an out-of-range index must not buy a discard: unsigned (n - ci)
+     * once meant HOURS of silence off one corrupted word */
+    if (REALIGN_CI(s3_chain_mark(7, 503), 256) != 0) {
+        printf("CHAIN: *** marker law: index 503 >= n=256 accepted ***\n");
+        return 1;
+    }
+#undef REALIGN_CI
+    printf("CHAIN: marker law OK (tag distinct from pattern, index bounded)\n");
+
     /* ---- the sum law, on the real engine, all %d patches ----------------- */
     for (p = 0; p < EB_BANK_COUNT; ++p) {
         int mism = 0;

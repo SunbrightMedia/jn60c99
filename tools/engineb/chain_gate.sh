@@ -38,4 +38,15 @@ if "$BUILD/chain_gate_tooth" "$BUILD/ebdev_boot.bin" "$BUILD/eb_bank64.bin" \
     exit 1
 fi
 echo "tooth bites: the misrouted slot FAILED the gate, as it must."
+
+echo "=== 4. the marker tooth (the OLD shared-tag/unbounded law MUST fail) ==="
+cc $CFLAGS $DEFS -DEB_DEVCELLS -DEBDEV_NV=8 -DDEVCHORD_N=6 \
+   -DCHAIN_TOOTH_MARK=1 \
+   -o "$BUILD/chain_gate_mark" "$HERE/chain_gate.c" $SRCS $DEVSRC -lm
+if "$BUILD/chain_gate_mark" "$BUILD/ebdev_boot.bin" "$BUILD/eb_bank64.bin" \
+                            "$BUILD/eb_template.bin" > /dev/null 2>&1; then
+    echo "*** THE MARKER TOOTH DID NOT BITE -- the law checks prove nothing ***"
+    exit 1
+fi
+echo "marker tooth bites: the old shared-tag law FAILED the gate, as it must."
 echo "CHAIN GATE GREEN"

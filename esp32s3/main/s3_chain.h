@@ -23,6 +23,8 @@
 #ifndef JUNO_S3_CHAIN_H
 #define JUNO_S3_CHAIN_H
 
+#include <stdint.h>             /* the marker law below */
+
 /* wire format: 4 slots x 32-bit, one TDM frame per sample, every hop */
 #define S3_CHAIN_SLOTS 4
 #define S3_CHAIN_NPOS  4
@@ -82,6 +84,34 @@ static int s3_chain_hop_check(int a_lo, int a_hi, int b_lo, int b_hi)
     if (a_hi != S3_CHAIN_V_HI) return 3;              /* downstream not ..8 */
     if (a_lo <= b_lo || a_lo >= a_hi) return 4;       /* degenerate window  */
     return 0;
+}
+
+/* ---- THE CHUNK MARKER LAW (pure; gated in chain_gate.c) ------------------
+ * Slot 3 of every audio frame carries a tagged marker: the frame's index in
+ * its chunk (9 bits) plus a chunk sequence (8 bits). The tag byte is NOT the
+ * training pattern's 0xA5 (s3_link.h): a pattern chunk's slot-3 word is
+ * counter == 3 (mod 512), and a shared tag made the receiver's realign read
+ * a phantom rotation of 3 on every pattern chunk that arrived in the
+ * <=100 ms after lock -- it then BROKE the alignment it had, and the next
+ * chunk's out-of-range index turned (n - ci) into an unsigned discard of
+ * hours (review 2026-09-06). Distinct tag + bounded index end both. */
+#define S3_CHAIN_MARK_TAG  0xA6000000u
+#define S3_CHAIN_MARK_MASK 0xFF000000u
+
+static uint32_t s3_chain_mark(uint32_t seq, uint32_t frame)
+{
+    return S3_CHAIN_MARK_TAG | ((seq & 0xFFu) << 9) | (frame & 0x1FFu);
+}
+
+/* frame 0's slot-3 word, chunk length n frames -> the rotation to heal:
+ * 1..n-1 frames, or 0 = aligned / not a marker / index out of range (a
+ * corrupted word must NEVER buy a discard; the CRC judges that chunk). */
+static uint32_t s3_chain_realign_ci(uint32_t w, uint32_t n)
+{
+    uint32_t ci;
+    if ((w & S3_CHAIN_MARK_MASK) != S3_CHAIN_MARK_TAG) return 0;
+    ci = w & 0x1FFu;
+    return (ci < n) ? ci : 0;
 }
 
 /* ---- THE MERGE LAW: what this chip writes on its DOWN hop ----------------

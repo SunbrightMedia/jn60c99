@@ -335,6 +335,7 @@ typedef struct {
     int up;                      /* channel enabled                          */
     /* B-side (down TX) */
     int   pace;
+    int   tx_marked;             /* the built chunk carries markers          */
     uint32_t tx_blk, tx_crc, tx_crc_blk, tx_timeouts;
     uint32_t pat_idx;
     /* A-side (up RX) */
@@ -437,15 +438,19 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
          * marker and knows instantly whether the stream is frame-rotated
          * (a slave-TX underrun inserts whole frames) and by how much -- the
          * probe proved exactly that rotation. Markers also make every audio
-         * chunk non-silent, so an advert goes out for each one. */
+         * chunk non-silent, so an advert goes out for each one.
+         * The marker LAW (tag, layout, realign bound) is pure in s3_chain.h
+         * and gated by chain_gate.c -- review 2026-09-06. */
         if (peer_alock) {
             uint32_t sq = ++A_DN.tx_seq;
             for (i = 0; i < n; ++i)
                 s3c_txbuf[S3C_SLOTW * i + 3] =
-                    (int32_t)(S3_PAT_TAG | ((sq & 0xFFu) << 9) | (uint32_t)i);
+                    (int32_t)s3_chain_mark(sq, (uint32_t)i);
             A_DN.tx_silent = 0;
+            A_DN.tx_marked = 1;
         } else {
             A_DN.tx_seq = 0;
+            A_DN.tx_marked = 0;
         }
     }
     tmo = (A_DN.pace == S3_BPACE_LINKED) ? pdMS_TO_TICKS(20) : 0;
@@ -455,7 +460,10 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
     if (A_DN.tx_off >= want) {
         A_DN.tx_off = 0;
         ++A_DN.tx_blk;
-        if (!A_DN.tx_silent) {
+        /* advertise MARKED (audio) chunks only. A pattern chunk's CRC can
+         * never match audio; advertising it banked up to 8 dead pends that
+         * aged out as mismatches right after lock (review 2026-09-06). */
+        if (!A_DN.tx_silent && A_DN.tx_marked) {
             A_DN.tx_crc     = s3c_crc32(s3c_txbuf, want);   /* table twin */
             A_DN.tx_crc_blk = A_DN.tx_blk;
         }
@@ -503,6 +511,7 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                 break;
         } while (++d < 4);
         A_UP.locked = 0;
+        A_UP.rx_seq_have = 0;    /* a returning peer restarts its sequence */
         (void)s3_amix_step(&A_UP.mix, 0, 0, 0, 0);
         return 0;
     }
@@ -538,10 +547,12 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
         ++A_UP.rx_chunks;
         /* the marker in frame 0 slot 3 heals frame rotation on the spot: a
          * slave-TX underrun inserts whole frames, and before this check ONE
-         * slip broke the CRC forever (the probe measured it). */
-        if (A_UP.locked &&
-            ((uint32_t)s3c_rxbuf[3] & S3_PAT_MASK) == S3_PAT_TAG) {
-            uint32_t ci = (uint32_t)s3c_rxbuf[3] & 0x1FFu;
+         * slip broke the CRC forever (the probe measured it). The decision
+         * is s3_chain_realign_ci -- pure, BOUNDED, tag distinct from the
+         * training pattern, gated in chain_gate.c (review 2026-09-06). */
+        if (A_UP.locked) {
+            uint32_t ci = s3_chain_realign_ci((uint32_t)s3c_rxbuf[3],
+                                              (uint32_t)n);
             if (ci) {
                 A_UP.discard_left = ((uint32_t)n - ci) * (uint32_t)S3C_SLOTW;
                 ++A_UP.rx_realigns;
@@ -562,6 +573,12 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                 A_UP.lock_off = (int)m;
                 A_UP.discard_left = ((uint32_t)S3C_SLOTW * CHUNK - m)
                                     & ((uint32_t)S3C_SLOTW * CHUNK - 1u);
+                /* a FRESH lock starts clean: pre-lock pends can never
+                 * match audio, and stale seq state fakes a slip. The
+                 * RE-lock path below already clears these. */
+                memset(A_UP.pend_used, 0, sizeof A_UP.pend_used);
+                A_UP.relock_miss = 0;
+                A_UP.rx_seq_have = 0;
             } else {
                 A_UP.pat_disc += (uint32_t)disc;
             }
@@ -581,16 +598,21 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
         A_UP.pend[free_k] = peer_acrc; A_UP.pend_age[free_k] = 0;
         A_UP.pend_used[free_k] = 1;
     }
-    /* a PATTERN chunk must never redeem an advert or feed the mix gate */
+    /* a PATTERN chunk must never redeem an advert or feed the mix gate.
+     * THREE slots checked (review 2026-09-06): a decaying audio tail passes
+     * floats with top byte 0xA5 (about -1e-16); two coincidences dropped a
+     * good chunk, three make the false positive negligible. A real pattern
+     * chunk tags EVERY word, so this stays a certain hit. */
     if (got_chunk &&
         ((uint32_t)s3c_rxbuf[0] & S3_PAT_MASK) == S3_PAT_TAG &&
-        ((uint32_t)s3c_rxbuf[1] & S3_PAT_MASK) == S3_PAT_TAG)
+        ((uint32_t)s3c_rxbuf[1] & S3_PAT_MASK) == S3_PAT_TAG &&
+        ((uint32_t)s3c_rxbuf[2] & S3_PAT_MASK) == S3_PAT_TAG)
         got_chunk = 0;
     if (got_chunk && A_UP.locked) {
         uint32_t c = A_UP.crc_last;
         /* chunk-sequence continuity, read from the marker (8-bit wrap) */
         {   uint32_t mk = (uint32_t)s3c_rxbuf[3];
-            if ((mk & S3_PAT_MASK) == S3_PAT_TAG) {
+            if ((mk & S3_CHAIN_MARK_MASK) == S3_CHAIN_MARK_TAG) {
                 uint32_t s = (mk >> 9) & 0xFFu;
                 if (A_UP.rx_seq_have) {
                     if (s == ((A_UP.rx_seq_last + 1u) & 0xFFu))
