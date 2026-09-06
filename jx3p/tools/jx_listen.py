@@ -69,7 +69,13 @@ def main():
     print("patch DCO1 RANGE %d -> expected pitch shift %+d semitones" % (rng, shift))
     fails = 0
     idle = np.array(jx.render_dry(4096))
-    ok = float(np.abs(idle).max()) < 1e-6
+    # THE IDLE LAW (corrected 2026-09-06): silence is not an absolute
+    # threshold. Patches with effects idle at a real -60 dBFS floor --
+    # PROVEN to be the plugin's own: the full-chain gate compares 1024
+    # IDLE samples before note-on and they are EXACTLY 0 vs the oracle.
+    # So this check only catches a RUNAWAY (screaming boot); exact idle
+    # behaviour is gated by jx_full_gate.sh, not by a number here.
+    ok = float(np.abs(idle).max()) < 0.01
     print("%s idle: peak %.3g" % ("PASS" if ok else "FAIL", float(np.abs(idle).max())))
     fails += not ok
     results = []

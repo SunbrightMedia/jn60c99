@@ -38,14 +38,17 @@ def main():
         L = (ctypes.c_float * n)(); R = (ctypes.c_float * n)()
         lib.jx3p_note_on(60, 100)
         lib.jx3p_render(L, R, n)
+        # WHY a separate name: mutating the loop-invariant `n` here made the
+        # SECOND patch render idle+n_of_the_first_patch samples and overrun
+        # the reference buffer (caught by the gate, 2026-09-06).
         L = list(Li) + list(L) if idle else list(L)
         R = list(Ri) + list(R) if idle else list(R)
-        n = len(L)
+        ntot = len(L)
         ref = open(os.path.join(refdir, "p%d" % patch, "louts.bin"),
                    "rb").read()
         mm = first = -1
         mm = 0
-        for s in range(n):
+        for s in range(ntot):
             rl, rr = struct.unpack_from("<II", ref, 8 * s)
             cl = struct.unpack("<I", struct.pack("<f", L[s]))[0]
             cr = struct.unpack("<I", struct.pack("<f", R[s]))[0]
@@ -55,13 +58,13 @@ def main():
         if mm:
             fails += 1
             print("  p%d: L/R %d/%d mismatched, first at sample %d"
-                  % (patch, mm, n, first))
+                  % (patch, mm, ntot, first))
             s = first
             rl, rr = struct.unpack_from("<II", ref, 8 * s)
             cl = struct.unpack("<I", struct.pack("<f", L[s]))[0]
             print("    s%d L C=0x%08x ref=0x%08x" % (s, cl, rl))
         else:
-            print("  p%d: L/R %d samples EXACTLY 0" % (patch, n))
+            print("  p%d: L/R %d samples EXACTLY 0" % (patch, ntot))
     if fails:
         print("FULL CHAIN: %d/%d patches FAIL" % (fails, len(patches)))
         sys.exit(1)
