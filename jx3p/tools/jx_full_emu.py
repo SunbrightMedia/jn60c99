@@ -29,8 +29,17 @@ def main():
     for patch in patches:
         jx = J.JX().boot(44100.0, snap=True, host_init=True); uc = jx.uc
         jx.recall(patch, bank=bank, notify=False)
+        # IDLE PREFIX (2026-09-06): the listen proof flagged a -60 dBFS floor
+        # on the master before any note. An absolute threshold cannot say
+        # whether that is a defect or the instrument -- only EQUALITY WITH THE
+        # PLUGIN can. So the gate now renders `idle` samples BEFORE note-on and
+        # compares them too: whatever the plugin's own idle floor is, the port
+        # must reproduce it bit-for-bit.
+        idle = int(os.environ.get("JX_FULL_IDLE", "4096"))
+        Li, Ri = jx.render(idle) if idle else ([], [])
         jx.note_on(60, 100)
         L, R = jx.render(n)
+        L, R = list(Li) + list(L), list(Ri) + list(R)
         d = os.path.join(outdir, "p%d" % patch)
         os.makedirs(d, exist_ok=True)
         open(os.path.join(d, "louts.bin"), "wb").write(

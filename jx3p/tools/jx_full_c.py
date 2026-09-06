@@ -31,9 +31,16 @@ def main():
         if not ok:
             raise SystemExit("jx3p_init failed")
         lib.jx3p_recall(patch)
-        lib.jx3p_note_on(60, 100)
+        idle = int(os.environ.get("JX_FULL_IDLE", "4096"))
+        if idle:                      # idle prefix -- see jx_full_emu.py
+            Li = (ctypes.c_float * idle)(); Ri = (ctypes.c_float * idle)()
+            lib.jx3p_render(Li, Ri, idle)
         L = (ctypes.c_float * n)(); R = (ctypes.c_float * n)()
+        lib.jx3p_note_on(60, 100)
         lib.jx3p_render(L, R, n)
+        L = list(Li) + list(L) if idle else list(L)
+        R = list(Ri) + list(R) if idle else list(R)
+        n = len(L)
         ref = open(os.path.join(refdir, "p%d" % patch, "louts.bin"),
                    "rb").read()
         mm = first = -1
