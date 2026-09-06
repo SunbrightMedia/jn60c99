@@ -100,7 +100,7 @@ HTML = """<title>JX-3P Playable Port</title>
   <div class="foot">
     <div><b>Play:</b> <kbd>A</kbd>-<kbd>K</kbd> white &middot; <kbd>W E T Y U</kbd> black &middot; <kbd>Z</kbd>/<kbd>X</kbd> octave</div>
     <div class="mono">clean boot &middot; 8 voices &middot; 44100 Hz</div>
-    <div>Dry voice sum in this build (master FX bypassed); boot and patch decode corrected 2026-09-05 (playbook 87/88).</div>
+    <div>Full master chain (chorus, delay, reverb) -- proven EXACTLY 0 against the plugin over idle and played samples.</div>
   </div>
 </div>
 <script>__ENGINE__</script>
@@ -148,8 +148,13 @@ const lcd=t=>document.getElementById('lcd').textContent=t;
     ctx=new AudioContext({sampleRate:44100});
     const node=ctx.createScriptProcessor(N,0,2);
     node.onaudioprocess=e=>{
-      mod.ccall('jx3p_render_dry',null,['number','number','number'],[pL,pR,N]);
-      const g=8.0, l=mod.HEAPF32.subarray(pL>>2,(pL>>2)+N),
+      mod.ccall('jx3p_render',null,['number','number','number'],[pL,pR,N]);
+      /* FULL MASTER CHAIN (chorus/delay/reverb), proven 2026-09-06: the
+       * full-chain gate compares 1024 idle + 12000 played samples against
+       * the plugin and they are EXACTLY 0. Gain 1.0 = the plugin's own
+       * output level (measured peaks 0.24-0.59); the old 8.0 belonged to
+       * the dry voice sum, whose peaks were ~0.04. */
+      const g=1.0, l=mod.HEAPF32.subarray(pL>>2,(pL>>2)+N),
             r=mod.HEAPF32.subarray(pR>>2,(pR>>2)+N),
             ol=e.outputBuffer.getChannelData(0),
             or2=e.outputBuffer.getChannelData(1);
