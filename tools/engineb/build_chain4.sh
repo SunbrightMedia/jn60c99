@@ -29,7 +29,9 @@ COMMON="-DS3L_SWEEP=0;-DS3_CORES=2;-DS3L_FX_PIPE=1;-DS3L_PROLOGUE_C1=1;\
 -DS3L_REPORT_SECS=10;-DCHUNK=256;-DS3L_DMA_N=6;-DS3L_LINK=0;-DS3L_CHAIN=1;\
 -DS3L_PLAY=1"
 
-for POS in "${@:-1 2 3 4}"; do
+# "${@:-1 2 3 4}" is ONE word when $# = 0 -- the first no-arg run died on it
+[ $# -eq 0 ] && set -- 1 2 3 4
+for POS in "$@"; do
     case "$POS" in
     1) PER="-DS3L_VOICE_LO=7;-DS3L_SPLIT=8;-DS3L_MIDI=1;-DS3L_STRESS=1" ;;
     2) PER="-DS3L_VOICE_LO=6;-DS3L_SPLIT=7;-DS3L_VOICE_HI=7;-DS3L_NOMASTER=1" ;;

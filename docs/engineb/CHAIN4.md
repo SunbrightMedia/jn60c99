@@ -131,6 +131,25 @@ Render windows: pos4 [2,4), pos3 [4,6), pos2 [6,7), pos1 [7,8) — needs
 S3L_VOICE_HI (new; the VOICE-5 defect showed LO alone cannot express a
 window).
 
+## 8b. The chunk marker (added b45; reviewed 2026-09-06)
+
+Slot 3 of every audio frame carries a tagged marker: frame index (9 bits)
++ chunk sequence (8 bits). The receiver reads frame 0's marker and heals
+frame rotation (a slave-TX underrun inserts whole frames). The law is
+PURE in `s3_chain.h` (`s3_chain_mark`, `s3_chain_realign_ci`) and gated
+in `chain_gate.c` with its own tooth (`CHAIN_TOOTH_MARK`).
+
+Two traps the pre-flash review removed (commit 86a4578):
+- The marker tag must NOT be the training pattern's tag. A pattern
+  chunk's slot-3 word is counter ≡ 3 (mod 512); a shared tag made the
+  realign break a good alignment on every lock, inside the ≤100 ms
+  window before B learns that A locked.
+- The realign index must be BOUNDED (`ci < n`). Unbounded, one corrupted
+  word turned `(n − ci)` into an unsigned discard of hours.
+
+Also: pattern-chunk CRCs are never advertised; a fresh lock clears the
+pend/seq state; the pattern-chunk test reads three slots.
+
 ## 9. What is proven where
 
 - Pre-add law + injection map + ±0 edge: host chain_sum_gate (runs the
