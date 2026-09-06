@@ -1846,3 +1846,39 @@ name it.
 4. Symptom-to-cause hint: "output frozen at the first sample" or "state
    never advances" points at a POISONED BASE (denormals/zeros where
    coefficients belong), not at the per-sample logic.
+
+## 90. A HALF-RUN INITIALIZER IS WORSE THAN NONE, AND EVERY BOUND IN A
+## HARNESS MUST BE DETERMINISTIC (2026-09-06, JX-3P)
+
+The JX oracle runs the plugin's 844 C++ static initializers so the
+controller's host-id map exists. Three of them fault under emulation. I
+bounded each ctor by a 2-SECOND WALL CLOCK to contain them. Consequences,
+all measured:
+  * WHICH ctors got cut short depended on MACHINE SPEED. On a slower
+    container one more ctor half-ran than the day before -- the same repo,
+    the same commit, a different boot. A harness whose result depends on
+    the host clock cannot prove anything.
+  * A half-run ctor left the CRT inconsistent. The damage surfaced FAR
+    AWAY: the next BUILD died with UC_ERR_MAP, and a template export that
+    took 50 s took 97 MINUTES and then failed.
+  * The crash path itself (RtlCaptureContext / UnhandledExceptionFilter,
+    unshimmed) WALKED MEMORY DOWNWARD, faulting a page at a time: 32,698
+    stray pages mapped, wrecking the address space.
+The real cause of one fault was mundane: the CRT stores function pointers
+XORed by EncodePointer; our stub returned 0, so DecodePointer produced
+NULL and the ctor jumped to address 0x60.
+
+### The rules
+1. NEVER bound emulated work by wall clock. Instruction counts, page
+   counts and event counts are identical on every machine; seconds are not.
+2. Contain a faulting routine by SKIPPING IT WHOLE, addressed by RVA, and
+   PROVE the skip costs nothing (same data filled, same tables built, same
+   downstream writes). A ctor that runs half way is a corrupted ctor.
+3. Give the crash path its own guard: cap stray page maps per call
+   (`MAX_STRAY_PAGES`) so a crash-walk aborts in milliseconds instead of
+   mapping tens of thousands of pages.
+4. Shim the CRT's pointer obfuscation as IDENTITY (encode(p)=p,
+   decode(p)=p). It round-trips exactly, which is all the CRT requires.
+5. Symptom-to-cause hint: "it worked yesterday, same commit" plus a
+   far-away memory error means the BOOT is non-deterministic. Count the
+   faults (`jx.faults`) first -- 2 vs 2,347 named this defect in one line.
