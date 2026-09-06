@@ -33,11 +33,13 @@ WARM=${JX_VERIFY_WARM:-6}
 PATCHES=${JX_VERIFY_PATCHES:-"$(seq 0 63)"}
 echo "[jx verify] work dir $WORK  rates=$RATES  n=$N warm=$WARM"
 
-echo "=== JX GATE 0/4: DRIVE PROOFS (ABI ledger + bank decode census) ==="
-python3 "$REPO/tools/verify/abi_check.py" "$REPO/jx3p/truth/JX3P.vst3" \
-  BUILD=3F8610 SETSR=3F9970 NOTEON=3F9150 NOTEOFF=3F90F0 DISPATCH=3EBB00 \
-  NOTIFY=356BF0 HOSTPARAM=3F9A30 > /dev/null
-python3 "$HERE/jx_bank_census.py"
+echo "=== JX GATE 0/4: THE DRIVE GATE (playbook 87/88/89/90) ==="
+# Every defect that cost this port days was a DRIVE defect, invisible to an
+# A/B gate because both sides shared it. These teeth check the drive itself:
+# the ABI ledger against the machine code, the boot fingerprint against its
+# recorded value, the bank decode census (with its tooth), and that the
+# shipped template and aux come from ONE boot.
+python3 "$HERE/jx_drive_gate.py"
 echo "=== JX GATE 1/4: RECALL (C == oracle, 64/64 EXACTLY 0) ==="
 sh "$HERE/jx_recall_gate.sh"
 
