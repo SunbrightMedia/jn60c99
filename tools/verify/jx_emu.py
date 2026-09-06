@@ -151,6 +151,26 @@ class JX:
         dll,name=self.stub2name[address]
         rcx=uc.reg_read(UC_X86_REG_RCX); rdx=uc.reg_read(UC_X86_REG_RDX)
         r8=uc.reg_read(UC_X86_REG_R8)
+        # CRT POINTER OBFUSCATION (defect paid 2026-09-06). WHY identity:
+        # the MSVC CRT stores function pointers XORed with a per-process
+        # cookie (EncodePointer) and unwraps them with DecodePointer. Our
+        # unhandled default returned 0, so a stored pointer decoded to NULL
+        # and static initializer 89 (rva 0xb6f30) CALLED ADDRESS 0x60 --
+        # UC_ERR_INSN_INVALID. Its half-run left the CRT inconsistent and
+        # every later BUILD died with UC_ERR_MAP (a 1-minute export became
+        # 97 minutes). Identity is a valid encoding: encode(p)==p,
+        # decode(p)==p round-trips exactly, which is all the CRT requires.
+        if name in ("EncodePointer","DecodePointer",
+                    "EncodeSystemPointer","DecodeSystemPointer",
+                    "RtlEncodePointer","RtlDecodePointer"):
+            return self._ret(uc,rcx)
+        if name=="IsDebuggerPresent": return self._ret(uc,0)
+        if name=="IsProcessorFeaturePresent": return self._ret(uc,1)
+        if name in ("SetUnhandledExceptionFilter","UnhandledExceptionFilter",
+                    "RtlCaptureContext","RtlLookupFunctionEntry",
+                    "RtlVirtualUnwind","GetSystemInfo","GetSystemTimeAsFileTime",
+                    "QueryPerformanceCounter","GetCurrentProcess"):
+            return self._ret(uc,0)
         if name=="GetProcessHeap": return self._ret(uc,FAKE_HEAP)
         if name in ("HeapAlloc","calloc"):
             p=self.bump(r8 or rdx or 16)
@@ -186,7 +206,42 @@ class JX:
         try: uc.mem_map(address&~0xFFF,0x1000,UC_PROT_ALL)
         except: pass
         uc.mem_write(address,b"\xC3"); uc.reg_write(UC_X86_REG_RAX,0); self.faults+=1; return True
+    # FLOOD GUARD (defect paid 2026-09-06). WHY: three static initializers
+    # fail; the CRT then enters its unhandled-exception path
+    # (RtlCaptureContext / RtlLookupFunctionEntry / UnhandledExceptionFilter,
+    # none of which we shim) and WALKS MEMORY DOWNWARD, faulting a page at a
+    # time. Left alone it mapped 32,698 stray pages below the heap, wrecked
+    # the address space so BUILD died with UC_ERR_MAP, and turned a 1-minute
+    # export into 100 minutes. A crash-walk is never legitimate work, so it
+    # is stopped by COUNT (deterministic on every machine, unlike a clock).
+    MAX_STRAY_PAGES = 64
+
+    # CTORS SKIPPED BY ADDRESS (defect paid 2026-09-06, all three MEASURED).
+    # These three C++ static initializers fault under emulation. Each one's
+    # PARTIAL run leaves the CRT inconsistent, and the damage shows up far
+    # away: BUILD then dies with UC_ERR_MAP and a 1-minute template export
+    # took 97 minutes. Skipping them by ADDRESS is deterministic (an index
+    # or a wall-clock cap is not) and provably costs nothing: with all three
+    # skipped the boot still fills the same .data tail (3442 B), builds the
+    # SAME controller host-id map (0->18, 1->19, 2->20) and host_init writes
+    # the same 3 defaults -- while static init drops from 6009 s to 0.2 s.
+    #   0xB73A4  UC_ERR_EXCEPTION
+    #   0xB6F30  UC_ERR_INSN_INVALID -- releases an object whose vtable is
+    #            NULL, so the CFG thunk at 0x913D00 does `jmp rax` with
+    #            rax = 0 and execution lands at address 0x60
+    #   0x57DEF0 UC_ERR_MAP after a crash-walk (hits the stray-page guard)
+    # If a future port needs what these register, transcribe it explicitly;
+    # do not "let them run and fail" -- a half-run ctor is worse than none.
+    SKIP_CTORS = {0xB73A4, 0xB6F30, 0x57DEF0}
+
     def _unmapped(self,uc,access,address,size,value,user):
+        self._stray = getattr(self, "_stray", 0) + 1
+        if self._stray > self.MAX_STRAY_PAGES:
+            uc.emu_stop()          # abort THIS call; the caller counts a fail
+            return True
+        return self._unmapped_map(uc,access,address,size,value,user)
+
+    def _unmapped_map(self,uc,access,address,size,value,user):
         # A silently zero-mapped page HIDES missing data (the JX pulse
         # wavetable region read as zeros for weeks). Map it so the run can
         # continue, but SAY SO: the first few faults go to stderr and the
@@ -206,6 +261,7 @@ class JX:
         uc.reg_write(UC_X86_REG_RSP,rsp)
         for reg,v in ((UC_X86_REG_RCX,rcx),(UC_X86_REG_RDX,rdx),(UC_X86_REG_R8,r8),(UC_X86_REG_R9,r9)):
             uc.reg_write(reg,v&(2**64-1))
+        self._stray=0            # per-call stray-page budget (flood guard)
         RET=SCRATCH+0x5000; uc.mem_write(rsp,struct.pack("<Q",RET))
         # timeout_us bounds WALL CLOCK (a ctor spinning in a shim burns no
         # instructions); count bounds instructions. Use both for foreign code.
@@ -321,9 +377,10 @@ class JX:
         Returns (ok, failed)."""
         a,b=XC_TABLE
         ptrs=struct.unpack("<%dQ"%((b-a)//8), self.uc.mem_read(IB+a, b-a))
-        ok=fail=0
+        ok=fail=skip=0
         for p in ptrs:
             if not p: continue
+            if (p-IB) in self.SKIP_CTORS: skip+=1; continue
             # DETERMINISM (defect paid 2026-09-06): bound each ctor by
             # INSTRUCTION COUNT ONLY. A wall-clock bound makes the boot
             # machine-speed dependent -- on a slower container one more ctor
@@ -337,6 +394,7 @@ class JX:
             except Exception as e:
                 fail+=1
                 if log: log("ctor 0x%x failed: %s"%(p-IB, str(e)[:60]))
+        self.static_skipped=skip
         return ok,fail
     def bss_fill(self):
         """bytes of the runtime-filled .data tail that are now nonzero"""
