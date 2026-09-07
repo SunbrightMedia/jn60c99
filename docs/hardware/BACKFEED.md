@@ -29,8 +29,11 @@ slot lose power independently inherits this.
    Current note: four boards + the DAC draw ~1.2 A, so the finished
    instrument wants a phone charger rather than a 0.5 A laptop port. That is
    a cable choice, not a purchase.
-2. **Series resistors on EVERY hop line — 330 Ω, 0603.** 15 per hop, 45 in
-   total. They cap the clamp current at roughly 8 mA a pin during any
+2. **Series resistors on EVERY hop line — 330 Ω, 0603 (0603WAF3300T5E,
+   LCSC C25231 — NOT 0603WAF330JT5E, which is 33 Ω).** 5 lines per hop
+   (BCLK, LRCK, DATA, two control), 3 hops, 15 in total; one resistor per
+   line, placed at the TX end. (Corrected 2026-09-07: this line first said
+   "15 per hop, 45 total" — a miscount, never measured.) They cap the clamp current at roughly 8 mA a pin during any
    asymmetry (a slot pulled for service, a board reset by hand) and protect
    the pins themselves. 330 Ω against the ~10 pF of a short trace is ~3 ns —
    negligible against the 2.8 MHz hop bit clock and the 31.25 kbaud control
