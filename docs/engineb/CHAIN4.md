@@ -100,15 +100,17 @@ desynced allocator must resync, not play a wrong chord forever.
 | function | pins | UART/I2S |
 |---|---|---|
 | DOWN port (toward DAC): slave TX audio | BCLK 15, LRCK 16, DATA 17 | I2S |
-| DOWN control | TX 8, RX 9 | UART2 (chips 2–4) |
-| UP port (away from DAC): master RX audio | BCLK 10, LRCK 11, DATA 12 | I2S |
-| UP control | TX 13, RX 14 | UART2 on chip 1, UART1 on chips 2,3 |
+| DOWN control | TX 5, RX 6 | UART2 (chips 2–4) |
+| UP port (away from DAC): master RX audio | BCLK 9, LRCK 10, DATA 11 | I2S |
+| UP control | TX 46, RX 47 | UART2 on chip 1, UART1 on chips 2,3 |
 | MIDI IN | RX 18 | UART1, CHIP 1 ONLY |
 | DAC | 5, 6, 7 | chip 1 only |
 
 Hop wiring (N = 2,3,4; N talks to N−1):
-N.15 ← (N−1).10, N.16 ← (N−1).11, N.17 → (N−1).12,
-N.8 → (N−1).14, N.9 ← (N−1).13, plus common ground.
+N.15 ← (N−1).9, N.16 ← (N−1).10, N.17 → (N−1).11,
+N.5 → (N−1).47, N.6 ← (N−1).46, plus common ground.
+(CARRIER map 2026-09-08: audio RX follows the drawn board's LINK nets;
+control rides the four NC pins, so every EXT breakout pin stays free.)
 
 ## 7. Latency — stated before it is heard
 

@@ -14,14 +14,15 @@
  *    diagnosable, and the fallback can be ported then.
  *  - the aged-advert probe. Same reason: diagnostic, not path.
  *
- * PORTS (identical pin map on all four chips; position decides which exist):
+ * PORTS (identical pin map on all four chips; position decides which exist;
+ * the CARRIER map 2026-09-08 -- see the pin block below for the why):
  *   UP   (away from the DAC; this chip is the hop's A-side, MASTER RX):
- *        TDM4 BCLK 10  LRCK 11  DATA 12; control TX 13 RX 14
+ *        TDM4 BCLK 9  LRCK 10  DATA 11; control TX 46 RX 47
  *        (UART2 on pos 1 -- UART1 there is MIDI; UART1 on pos 2/3)
  *   DOWN (toward the DAC; this chip is the hop's B-side, SLAVE TX):
- *        TDM4 BCLK 15  LRCK 16  DATA 17; control TX 8 RX 9 (UART2)
- *   Hop wiring, N=2,3,4:  N.15<-(N-1).10  N.16<-(N-1).11  N.17->(N-1).12
- *                         N.8->(N-1).14   N.9<-(N-1).13   + ground.
+ *        TDM4 BCLK 15  LRCK 16  DATA 17; control TX 5 RX 6 (UART2)
+ *   Hop wiring, N=2,3,4:  N.15<-(N-1).9   N.16<-(N-1).10  N.17->(N-1).11
+ *                         N.5->(N-1).47   N.6<-(N-1).46   + ground.
  *
  * THE EVENT CHAIN: only pos 1 has inputs. Every note it accepts is mirrored
  * up the chain as a 9-byte 'J','E' frame; pos 2/3 apply AND re-forward.
@@ -49,17 +50,26 @@
 #define S3C_HAS_UP   (S3_CHAIN_POS < 4)
 #define S3C_HAS_DOWN (S3_CHAIN_POS > 1)
 
-/* ---- pins (see the header comment; identical on all chips) -------------- */
-#define S3C_UP_BCLK 10
-#define S3C_UP_LRCK 11
-#define S3C_UP_DATA 12
-#define S3C_UP_TX   13
-#define S3C_UP_RX   14
+/* ---- pins (identical on all chips) --------------------------------------
+ * CARRIER MAP (2026-09-08, net-level audit of the drawn MasterAudio board):
+ * UP audio RX follows the board's LINK nets (IO9/10/11, socket rows
+ * L15-L17), NOT the old bench map's 10/11/12. Control moved to the four
+ * pins the carrier leaves unconnected on every slot: DOWN ctl TX/RX =
+ * IO5/IO6 (rows L5/L6, DAC-only on slot 1, which has no DOWN port) and
+ * UP ctl TX/RX = IO46/IO47 (rows L14/R17, NC everywhere). IO46 is a
+ * strapping pin but only OUR OUTPUT drives it, and the peer's RX is
+ * high-impedance at boot; the RX side (IO47) is not a strapping pin.
+ * The EXT breakout pins (IO4,12,13,14,1,40,39,38) stay untouched. */
+#define S3C_UP_BCLK 9
+#define S3C_UP_LRCK 10
+#define S3C_UP_DATA 11
+#define S3C_UP_TX   46
+#define S3C_UP_RX   47
 #define S3C_DN_BCLK 15
 #define S3C_DN_LRCK 16
 #define S3C_DN_DATA 17
-#define S3C_DN_TX   8
-#define S3C_DN_RX   9
+#define S3C_DN_TX   5
+#define S3C_DN_RX   6
 #define LINK_BAUD_CHAIN 115200
 #if S3_CHAIN_POS == 1
 #define S3C_UP_UART UART_NUM_2      /* UART1 is MIDI on pos 1 */

@@ -23,9 +23,9 @@ wire ONE hop at a time (control pair first, then the three audio wires),
 and watch for hs=OK then mix=OPEN on the downstream console.
 
 Wiring per hop (N = 2,3,4 talks to N-1), plus common ground:
-  N.GPIO15 <- (N-1).GPIO10   hop BCLK   (downstream drives)
-  N.GPIO16 <- (N-1).GPIO11   hop LRCK   (downstream drives)
-  N.GPIO17 -> (N-1).GPIO12   hop DATA   (upstream drives)
-  N.GPIO8  -> (N-1).GPIO14   control    (upstream TX)
-  N.GPIO9  <- (N-1).GPIO13   control    (downstream TX)
+  N.GPIO15 <- (N-1).GPIO9    hop BCLK   (downstream drives)
+  N.GPIO16 <- (N-1).GPIO10   hop LRCK   (downstream drives)
+  N.GPIO17 -> (N-1).GPIO11   hop DATA   (upstream drives)
+  N.GPIO5  -> (N-1).GPIO47   control    (upstream TX)
+  N.GPIO6  <- (N-1).GPIO46   control    (downstream TX)
 DAC stays on chip 1 GPIO 5/6/7; MIDI (optional) chip 1 GPIO 18.
