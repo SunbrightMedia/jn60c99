@@ -18,3 +18,10 @@ label-blind tracer reported wired pins as bare):
 5. The requirement sweep inside the tool is the CURRENT list (hop audio +
    control, resistors at TX, pullup, jumpers, BOOT, EN_ALL, strapping
    rows). New requirements go INTO the tool, not into prose.
+
+6. **A hand probe never overrides the tool.** (Paid 2026-09-08, R58: a
+   probe printed "net: None" for a correct unlabeled TX stub and prose
+   turned it into "dangles" while the tool's own check for that exact
+   line was GREEN.) "No label" is NOT "no connection". Only the tool's
+   sweep, whose teeth have bitten, may declare a FAIL — and only with
+   its raw-geometry dump attached.
