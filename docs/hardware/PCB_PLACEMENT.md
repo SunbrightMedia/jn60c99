@@ -140,17 +140,17 @@ copper area with thermal vias, or the chip overheats. Do not leave it floating.
 
 ---
 
-## OPEN ITEMS TO RESOLVE BEFORE LAYOUT
+## OPEN ITEMS TO RESOLVE BEFORE LAYOUT (refreshed 2026-09-08, from the
+## net audit of the current schematic -- GREEN as of v6)
 
-- [ ] LM2776 placed and wired in the schematic (symbol is in the user's library)
-- [ ] 10 k pullup on CTRL_RSP to 3V3A
-- [ ] Decide: BOOT JSTs for slots 2-4 (optional, ~$0.10 each)
-- [ ] Decide: board 4 listen header (S4_RX_BCK / _WS / _SD)
-- [ ] BOM: JST quantities still blank (S2B, S3B, S4B)
-- [ ] BOM: 1 k quantity 6 -> 8
-- [ ] BOM: 2.2 uF +1 and 10 uF +1 for the LM2776
-- [ ] BOM: PM254-1-11 header 16 -> 20 (breakout headers)
-- [ ] BOM: 10 k +1 (CTRL_RSP pullup)
+Done and verified by tools/hardware/net_audit.py (do not re-litigate):
+LM2776 + caps, CTRL_RSP pullup (R63), BOOT JSTs all four slots, EN_ALL +
+SW2, 5 V jumpers, 15 hop resistors, both mux headers + RC, slot JST
+renames.
+
 - [ ] Verify PJ-603 jack pinout against its datasheet (assumed 2=TIP, 5=RING, 3=SLEEVE)
 - [ ] Verify slide switch pinout against its datasheet (assumed 1=COM, 3=POS2, 4=POS3, 5=POS4)
+- [ ] Slot-4 listen header: drawn? (decided YES 2026-09-08; check the schematic has it)
+- [ ] BOM: order the loose parts with the board (C2337 header strip, C5305 shunts x4+, JST housings + crimps for every JST)
 - [ ] Run ERC to zero errors before opening the PCB editor
+- [ ] Run `python3 tools/hardware/net_audit.py <final .kicad_sch> --tooth` then the audit, GREEN required, immediately before generating fab outputs
