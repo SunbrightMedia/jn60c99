@@ -374,6 +374,50 @@ else:
     if not any(v >= {"LISTEN1", "LISTEN2", "LISTEN3", "GND"} for v in _byref.values()):
         print("FAIL: no connector carries LISTEN1..3 + GND (slot-4 listen JST)"); bad += 1
 
+# THE 595 ENABLE CHAIN (decided 2026-09-08): two SN74HC595DR, 3 GPIOs,
+# 16 EN JSTs. Checked pin by pin; the chain link and every Q->JST->GND.
+_u595 = [r for r, v, *_ in inst if v == "SN74HC595DR"]
+if len(_u595) != 2:
+    print("FAIL: expected two SN74HC595DR, found %s" % _u595); bad += 1
+else:
+    def _net(r, p): return pin_net.get((r, str(p)))
+    def _holder(r, p):
+        for nn, pl in net_pins.items():
+            if (r, str(p)) in pl: return nn
+    # identify chip A (its DS pin 14 reaches EXT_2)
+    A = next((r for r in _u595 if _net(r, 14) == "EXT_2"), None)
+    if A is None:
+        print("FAIL: no 595 has DS(14) on EXT_2 -- chip A missing"); bad += 1
+    else:
+        B = next(r for r in _u595 if r != A)
+        for r in (A, B):
+            for p, want in ((8, "GND"), (13, "GND"), (10, "3V3_ESP1"),
+                            (16, "3V3_ESP1"), (11, "EXT_3"), (12, "EXT_4")):
+                if _net(r, p) != want:
+                    print("FAIL: 595 %s pin %d must be %s, found %s"
+                          % (r, p, want, _net(r, p))); bad += 1
+        if _holder(A, 9) != _holder(B, 14) or _holder(A, 9) is None:
+            print("FAIL: chain link broken: %s pin9 and %s pin14 not one net"
+                  % (A, B)); bad += 1
+        _en = 0
+        for r in (A, B):
+            for p in (15, 1, 2, 3, 4, 5, 6, 7):
+                h = _holder(r, p)
+                ok = False
+                for rr, pp in net_pins.get(h or "", []):
+                    other = "2" if pp == "1" else "1"
+                    if rr.startswith("J") and pin_net.get((rr, other)) == "GND":
+                        ok = True
+                _en += ok
+        if _en != 16:
+            print("FAIL: only %d of 16 Q outputs reach a JST whose other "
+                  "pin is GND" % _en); bad += 1
+    _c595 = sum(1 for r, v, *_ in inst if "BB104" in v
+                and {pin_net.get((r, "1")), pin_net.get((r, "2"))} == {"3V3_ESP1", "GND"})
+    if _c595 < 2:
+        print("WARN: fewer than two spare 100nF on 3V3_ESP1 (595 decoupling "
+              "shares the count with J15's C65)")
+
 # single-pin nets (a label used once = usually a typo)
 for n, pl in sorted(net_pins.items()):
     if n.startswith("?"):
