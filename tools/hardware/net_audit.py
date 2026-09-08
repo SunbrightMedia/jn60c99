@@ -327,8 +327,35 @@ def connector_with(nets):
         if r.startswith("J") and n:
             byref[r].add(n)
     return any(v == want for v in byref.values())
-if not connector_with(("GND", "SDA1", "3V3_ESP1")):
-    print("FAIL: no 3-pin mux header (GND/SDA1/3V3_ESP1) -- J_MUX_A missing"); bad += 1
+# split-aware since the RC went in (2026-09-08): the header's SIG pin sits
+# on the HEADER side of the 1k; SDA1 stays on the slot-1 L12 side.
+def mux_a_ok():
+    byref = collections.defaultdict(dict)
+    for (r, p), n in pin_net.items():
+        byref[r][p] = n
+    for r, v, l, *_ in inst:
+        if not r.startswith("J") or len(libpins.get(l, {})) != 3:
+            continue
+        nets = byref[r]
+        if set(n for n in nets.values() if n) != {"GND", "3V3_ESP1"}:
+            continue
+        sigp = next(p for p, n in nets.items() if not n)
+        h = next((nn for nn, pl in net_pins.items() if (r, sigp) in pl), None)
+        if not h:
+            continue
+        for rr, pp in net_pins.get(h, []):
+            other = "2" if pp == "1" else "1"
+            vv = next(i[1] for i in inst if i[0] == rr)
+            if rr.startswith("R") and "1001" in vv and pin_net.get((rr, other)) == "SDA1":
+                return True
+    return False
+if not mux_a_ok():
+    print("FAIL: mux SIG path broken: need 3-pin header (GND/SIG/3V3_ESP1) "
+          "with SIG through a 1k to SDA1"); bad += 1
+cap_ok = any(v for r, v, l, *_ in inst
+             if "BB103" in v and {pin_net.get((r, "1")), pin_net.get((r, "2"))} == {"SDA1", "GND"})
+if not cap_ok:
+    print("FAIL: no 10nF (BB103) between SDA1 and GND at the ADC end"); bad += 1
 if not connector_with(("SCL1", "SEND1", "SEND2", "SEND3")):
     print("FAIL: no 4-pin mux header (SCL1/SEND1..3) -- J_MUX_D missing"); bad += 1
 
