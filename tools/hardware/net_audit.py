@@ -418,6 +418,17 @@ else:
         print("WARN: fewer than two spare 100nF on 3V3_ESP1 (595 decoupling "
               "shares the count with J15's C65)")
 
+# THE CONNECTOR RULE (adopted 2026-09-08): every JST that carries GND has
+# GND on pin 1. DIN and TRS jacks are exempt (physics owns their pins).
+for _r, _v, _l, *_ in inst:
+    if not _r.startswith("J") or "DIN" in _v or "TRS" in _v:
+        continue
+    _pn = {p: pin_net.get((_r, p)) for p in libpins.get(_l, {})}
+    _g = [p for p, n in _pn.items() if n == "GND"]
+    if _g and "1" not in _g:
+        print("FAIL: %s (%s): GND on pin %s, rule says pin 1"
+              % (_r, _v, ",".join(sorted(_g)))); bad += 1
+
 # single-pin nets (a label used once = usually a typo)
 for n, pl in sorted(net_pins.items()):
     if n.startswith("?"):

@@ -30,3 +30,8 @@ label-blind tracer reported wired pins as bare):
    "open items" list repeated a fixed defect one turn after the tool's
    output had already registered the fix.) Never carry a checklist item
    forward from memory; re-derive it from the current output or drop it.
+
+8. **Connector rule (2026-09-08): pin 1 = GND on every JST that carries
+   GND.** Enforced by the sweep; DIN-5 and TRS jacks exempt (their pins
+   are fixed by their standards). Current J12: GND/3V3_ESP1/SDA1/SCL1;
+   J13: GND/SEND1/SEND2/SEND3 — any doc quoting the old order is stale.
