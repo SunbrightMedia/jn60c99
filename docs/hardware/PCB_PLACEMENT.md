@@ -154,3 +154,13 @@ renames.
 - [ ] BOM: order the loose parts with the board (C2337 header strip, C5305 shunts x4+, JST housings + crimps for every JST)
 - [ ] Run ERC to zero errors before opening the PCB editor
 - [ ] Run `python3 tools/hardware/net_audit.py <final .kicad_sch> --tooth` then the audit, GREEN required, immediately before generating fab outputs
+
+## 19. MOUNTING HOLES — THE GRID RULE (decided 2026-09-08)
+
+Boards are 0.5 mm smaller than their 42 mm grid cells (0.25 mm play per
+side). Hole centers are referenced to the GRID, never to the shrunken
+edge: **8.25 mm from the grid line = 8.00 mm from the board edge**, all
+four corners, typed coordinates (no corner snapping). Hole-to-hole
+spacing is therefore 42·n − 16.5 mm. Every board in the instrument
+(carrier, DAC board, mux plates) uses this same rule, so one standoff
+pattern fits all.
