@@ -359,6 +359,21 @@ if not cap_ok:
 if not connector_with(("SCL1", "SEND1", "SEND2", "SEND3")):
     print("FAIL: no 4-pin mux header (SCL1/SEND1..3) -- J_MUX_D missing"); bad += 1
 
+# slot-4 listen header (decided 2026-09-08): L15-L17 on LISTEN1..3, and a
+# connector must carry all three plus GND
+for i, rw in enumerate(("L15", "L16", "L17")):
+    pass  # rows checked via LINK sweep only on slots 1-3; slot 4 is LISTEN
+_l4 = [row(4, r) for r in ("L15", "L16", "L17")]
+if _l4 != ["LISTEN1", "LISTEN2", "LISTEN3"]:
+    print("FAIL: slot4 L15-L17 must be LISTEN1..3, found %s" % _l4); bad += 1
+else:
+    _byref = collections.defaultdict(set)
+    for (r, p), n in pin_net.items():
+        if r.startswith("J") and n:
+            _byref[r].add(n)
+    if not any(v >= {"LISTEN1", "LISTEN2", "LISTEN3", "GND"} for v in _byref.values()):
+        print("FAIL: no connector carries LISTEN1..3 + GND (slot-4 listen JST)"); bad += 1
+
 # single-pin nets (a label used once = usually a typo)
 for n, pl in sorted(net_pins.items()):
     if n.startswith("?"):
