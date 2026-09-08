@@ -318,6 +318,20 @@ for sl in (2, 3, 4):
     if not any(r.startswith("J") for r in refs):
         print("FAIL: %s has no JST" % netn); bad += 1
 
+# MUX16 chain headers (official mux pinout 2026-09-08): a 3-pin connector
+# carrying exactly GND/SDA1/3V3_ESP1 and a 4-pin carrying SCL1/SEND1/2/3
+def connector_with(nets):
+    want = set(nets)
+    byref = collections.defaultdict(set)
+    for (r, p), n in pin_net.items():
+        if r.startswith("J") and n:
+            byref[r].add(n)
+    return any(v == want for v in byref.values())
+if not connector_with(("GND", "SDA1", "3V3_ESP1")):
+    print("FAIL: no 3-pin mux header (GND/SDA1/3V3_ESP1) -- J_MUX_A missing"); bad += 1
+if not connector_with(("SCL1", "SEND1", "SEND2", "SEND3")):
+    print("FAIL: no 4-pin mux header (SCL1/SEND1..3) -- J_MUX_D missing"); bad += 1
+
 # single-pin nets (a label used once = usually a typo)
 for n, pl in sorted(net_pins.items()):
     if n.startswith("?"):
