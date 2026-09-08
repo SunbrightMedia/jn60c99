@@ -429,6 +429,26 @@ for _r, _v, _l, *_ in inst:
         print("FAIL: %s (%s): GND on pin %s, rule says pin 1"
               % (_r, _v, ",".join(sorted(_g)))); bad += 1
 
+# THE INTERBOARD CONTRACT (2026-09-08): every AUDLINK_A_* connector must
+# read GND/+5V/3V3A/VOL_ADC on pins 1-4; every AUDLINK_D_* must read
+# GND/I2S_BCK_RS/I2S_WS_RS/I2S_SD_RS. Holds for the full board and for
+# each half after the split -- a pinout drift here is two boards that
+# cannot talk.
+_want = {"A": ["GND", "+5V", "3V3A", "VOL_ADC"],
+         "D": ["GND", "I2S_BCK_RS", "I2S_WS_RS", "I2S_SD_RS"]}
+_seen = 0
+for _r, _v, _l, *_ in inst:
+    _m = re.match(r'AUDLINK_([AD])_\d', _v)
+    if not _m:
+        continue
+    _seen += 1
+    _got = [pin_net.get((_r, str(p))) for p in (1, 2, 3, 4)]
+    if _got != _want[_m.group(1)]:
+        print("FAIL: %s (%s) pins 1-4 = %s, contract says %s"
+              % (_r, _v, _got, _want[_m.group(1)])); bad += 1
+if _seen == 0:
+    print("FAIL: no AUDLINK connectors found (interboard contract)"); bad += 1
+
 # single-pin nets (a label used once = usually a typo)
 for n, pl in sorted(net_pins.items()):
     if n.startswith("?"):
