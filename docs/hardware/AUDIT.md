@@ -25,3 +25,8 @@ label-blind tracer reported wired pins as bare):
    line was GREEN.) "No label" is NOT "no connection". Only the tool's
    sweep, whose teeth have bitten, may declare a FAIL — and only with
    its raw-geometry dump attached.
+
+7. **Status lists come from the LATEST run only.** (Paid 2026-09-08: an
+   "open items" list repeated a fixed defect one turn after the tool's
+   output had already registered the fix.) Never carry a checklist item
+   forward from memory; re-derive it from the current output or drop it.
