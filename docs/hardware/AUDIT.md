@@ -35,3 +35,24 @@ label-blind tracer reported wired pins as bare):
    GND.** Enforced by the sweep; DIN-5 and TRS jacks exempt (their pins
    are fixed by their standards). Current J12: GND/3V3_ESP1/SDA1/SCL1;
    J13: GND/SEND1/SEND2/SEND3 — any doc quoting the old order is stale.
+
+9. **One engine, wire-built nets (paid 2026-09-10, midi3, three defects
+   in one audit).** `tools/hardware/schem_audit.py` is now the ONE net
+   engine for ANY .kicad_sch. What it forbids:
+   - Nets read from labels only: on a hand-wired sheet every wire-only
+     net then reads None and 28 correctly wired pins were called
+     "floating". Nets are built from WIRES + pin coincidence +
+     on-segment contact; labels only NAME and MERGE them.
+   - Ad-hoc audit scripts: a one-off fork of the engine dropped
+     `(mirror y)` and reported a correct antiparallel diode as
+     "backwards". If the tool lacks a check, the check goes INTO the
+     tool (law 5), never into a scratch script.
+   - Silent transform guesses: when the calibrated pin transform misses
+     geometry that another convention hits, the tool prints
+     TOOL-AMBIGUOUS and exits 2. Tool doubt is never reported as a
+     drawing defect.
+   Verdict lines: named net / N$n (wired, unlabeled — NORMAL on a
+   hand-wired sheet) / NC (raw scan found nothing, coordinates printed)
+   / STUB (wire that reaches no second pin). Four teeth (cut-wire,
+   unmirror, rotate90, drop-label) all seen to bite 2026-09-10.
+   `net_audit.py` remains the MasterAudio requirement sweep on top.
