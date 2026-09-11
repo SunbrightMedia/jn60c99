@@ -304,9 +304,35 @@ def tooth(s, out=sys.stdout):
     return 0 if ok else 2
 
 # ---------------- main ---------------------------------------------------
-if __name__ == "__main__":
+if __name__ == "__main__" and "--bom" not in sys.argv:
     fn = sys.argv[1]
     s = open(fn).read()
     if "--tooth" in sys.argv:
         sys.exit(tooth(s))
     sys.exit(report(s))
+
+# ---------------- BOM-vs-schematic tooth (added 2026-09-11) --------------
+# Defect it kills: a part in the intended BOM but never PLACED on the sheet
+# survives every net check, because the net checks only test parts that
+# exist. (MasterAudio ferrite bead C46550600: in the BOM, never placed,
+# invisible through many green audits.)
+def bom_check(s, expected):
+    placed = set()
+    for m in re.finditer(r'\(property "LCSC Part" "([^"]+)"', s):
+        placed.add(m.group(1).strip())
+    exp = {e.strip() for e in expected if e.strip()}
+    missing = sorted(exp - placed)   # in BOM, NOT on the sheet
+    extra   = sorted(placed - exp)   # on the sheet, NOT in BOM
+    print("PLACED (%d): %s" % (len(placed), " ".join(sorted(placed))))
+    for c in missing:
+        print("BOM-MISSING %s: in the intended BOM, NOT placed on the sheet" % c)
+    for c in extra:
+        print("SHEET-EXTRA %s: placed on the sheet, NOT in the intended BOM" % c)
+    print("bom-check: %d placed, %d missing, %d extra" %
+          (len(placed), len(missing), len(extra)))
+    return 2 if missing else 0
+
+if __name__ == "__main__" and "--bom" in sys.argv:
+    i = sys.argv.index("--bom")
+    exp = open(sys.argv[i + 1]).read().split()
+    sys.exit(bom_check(open(sys.argv[1]).read(), exp))
