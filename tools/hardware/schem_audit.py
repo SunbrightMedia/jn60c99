@@ -174,6 +174,19 @@ def build(s):
         par[find(a)] = find(b)
     for a, b in wires:
         union(a, b)
+    # T-TAP FIX (2026-09-11): a wire ENDPOINT landing on another wire's
+    # segment interior is a real junction (KiCad marks it with a dot). The
+    # old code only tapped pins/labels onto wires, so a wire-to-wire T-tap
+    # never merged -- C33's VNEG_DAC leg read as floating (false STUB).
+    # Union every wire endpoint that lies on any other wire's segment, and
+    # every explicit junction point onto the wires it sits on.
+    wire_ends = {p for w in wires for p in w}
+    for p in wire_ends:
+        par.setdefault(p, p)
+    for p in wire_ends:
+        for a, b in wires:
+            if p != a and p != b and on_seg(p, a, b):
+                union(p, a)
     contact_pts = list(pin_pts) + [p for p, _ in labels]
     for p in contact_pts:
         par.setdefault(p, p)
@@ -270,11 +283,47 @@ def tooth(s, out=sys.stdout):
         out.write("tooth %-18s %s\n" % (name, "BITES" if good
                                         else "DOES NOT BITE -- FAIL"))
         ok = ok and good
-    # 1. cut the first wire that carries a multi-pin net
-    m = re.search(r'\(wire\s*\(pts\s*\(xy [-\d.]+ [-\d.]+\)\s*'
-                  r'\(xy [-\d.]+ [-\d.]+\)[\s\S]*?\n\t\)', s)
-    if m:
-        bite("cut-wire", s[:m.start()] + s[m.end():])
+    # 1. cut-wire: a schematic MUST have at least one load-bearing wire whose
+    # removal changes the net partition. Cutting the FIRST wire could hit a
+    # redundant one (false FAIL), so scan for any wire that bites. Only if NO
+    # single wire cut changes anything does the tooth fail (dead tool).
+    wm = list(re.finditer(r'\(wire\s*\(pts\s*\(xy [-\d.]+ [-\d.]+\)\s*'
+                          r'\(xy [-\d.]+ [-\d.]+\)[\s\S]*?\n\t\)', s))
+    cut_ok = False
+    for m in wm:
+        try:
+            got, _ = snapshot(s[:m.start()] + s[m.end():])
+            if got != base:
+                cut_ok = True
+                break
+        except Exception:
+            cut_ok = True
+            break
+    out.write("tooth %-18s %s\n" % ("cut-wire", "BITES" if cut_ok
+              else "DOES NOT BITE -- FAIL"))
+    ok = ok and cut_ok
+    # 1b. T-tap tooth: prove wire-endpoint-on-wire-segment merging is live.
+    # Find a wire whose endpoint lands on another wire's interior (a real
+    # T-tap). Nudge that endpoint 1mm off the segment; the nets MUST change.
+    # If they do not, the T-tap merge (the C33/VNEG_DAC fix) is dead.
+    def _tap_case(txt):
+        ws = build(txt)["wires"]
+        for i, (a, b) in enumerate(ws):
+            for e in (a, b):
+                for j, (c, d) in enumerate(ws):
+                    if j != i and e != c and e != d and on_seg(e, c, d):
+                        return e, (a, b)
+        return None
+    tc = _tap_case(s)
+    if tc:
+        e, _w = tc
+        # move the tapping endpoint DIAGONALLY off the segment (moving along
+        # one axis can stay on a horizontal/vertical target segment).
+        s2 = s.replace("(xy %g %g)" % e,
+                       "(xy %g %g)" % (e[0] + 5.08, e[1] + 5.08), 1)
+        bite("t-tap", s2)
+    else:
+        out.write("tooth t-tap             SKIP (no T-tap on this sheet)\n")
     # 2. unmirror the first mirrored part (D2 defect class)
     mm = re.search(r'\n\t\t\(mirror [xy]\)', s)
     if mm:
