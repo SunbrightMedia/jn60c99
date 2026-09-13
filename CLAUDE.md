@@ -203,5 +203,8 @@ with ONE line instead -- paste it verbatim too:
 Simplest fix that holds; reuse proven tables/gates before new machinery. One
 reversible commit per fix; not done until its gate is green. Proceed
 autonomously on reversible work; stop for destructive or scope-changing calls.
+USER-BINDING 2026-09-13: NEVER run multi-agent Workflows (they burn the
+user's usage limits). Do the work directly; a single background agent for a
+bounded search is the ceiling, used sparingly.
 THIS FILE holds rules and pointers ONLY. Findings go in docs/. A dated block
 added here is a defect.
