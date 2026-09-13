@@ -844,8 +844,14 @@ static int s3c_rx_one(int n, int hs_ok)
         }
     }
     s3c_rx_fresh = got_chunk;
-    return s3_amix_step(&A_UP.mix, hs_ok, got_chunk, match, mismatch)
-           && got_chunk;
+    if (match || mismatch)
+        return s3_amix_step(&A_UP.mix, hs_ok, got_chunk, match, mismatch)
+               && got_chunk;
+    /* A HEALED or pattern chunk is not a verdict: under the in-band law a
+     * heal just completes the chunk a moment later, and closing the gate
+     * on it reset the 3-match streak forever (judge-fix log: ok:bad 10:1
+     * yet one transient OPEN). Hold the gate; only judged chunks move it. */
+    return (A_UP.mix.st == S3_AMIX_OPEN) && got_chunk;
 }
 #endif
 
