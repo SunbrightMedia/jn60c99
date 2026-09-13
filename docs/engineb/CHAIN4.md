@@ -1,9 +1,20 @@
-# CHAIN4 — the ORIGINAL-port CLASSIC on FOUR boards (binding design)
+# CHAIN4 — the FULL ORIGINAL PORT on FOUR boards (binding design)
 
-User directive 2026-09-03: flash the classic Juno built from the ORIGINAL
-PORT's sound on 4 boards. b44 measured the exact-classic voice at ≈5,045
-cyc/sample; six voices + chorus need ≈31–35k of the 4-board 43,536 — no
-smaller machine runs it. This document is the design the firmware follows.
+USER DIRECTIVE 2026-09-13, SUPERSEDING SCOPE: the four boards run the FULL
+PANEL of the original port — delay and reverb included, no 1982 byte law.
+"By nailing the ORIGINAL port, the CLASSIC port falls into line": every
+budget win must be won on the full engine; classic is a subset and follows
+for free. Engine flags: the b44 lever set MINUS EB_CLASSIC (trunk +
+EXACTLY-0 levers only; approximations stay forbidden). The full master
+chain (chorus + delay + reverb + e5, PSRAM rings) rides chip 1.
+
+(Superseded scope, kept for provenance: directive 2026-09-03 was the
+classic panel from the ORIGINAL PORT's sound. b44 measured the
+exact-classic voice at ≈5,045 cyc/sample; six voices + chorus need ≈31–35k
+of the 4-board 43,536 — no smaller machine runs it. Voice costs are
+panel-independent, so those numbers stand.)
+
+This document is the design the firmware follows.
 Labels: PROVEN(executed) / READ(static) / INFERRED.
 
 ## 1. Topology — three copies of the PROVEN pairwise link
@@ -129,8 +140,10 @@ latency); it is NOT in the MVP.
 No strap: the four builds already differ (voice window), so S3_CHAIN_POS
 ∈ {1,2,3,4} is a compile flag; each image prints its position, window and
 hop roles at boot and refuses silently mis-flashed positions via the
-per-hop voice-window handshake. Engine flags: the b44 CLASSIC-EXACT set
-(trunk + EXACTLY-0 levers + EB_CLASSIC), S3_EXACT_ONLY=1, chord 6 keys.
+per-hop voice-window handshake. Engine flags (2026-09-13, full-panel
+directive): the b44 lever set MINUS EB_CLASSIC — trunk + EXACTLY-0 levers
+only — S3_EXACT_ONLY=1, chord 6 keys. Chip 1 allocates the nine FX rings
+in PSRAM (pre-classic rings_alloc path); chips 2-4 are NOMASTER as before.
 Render windows: pos4 [2,4), pos3 [4,6), pos2 [6,7), pos1 [7,8) — needs
 S3L_VOICE_HI (new; the VOICE-5 defect showed LO alone cannot express a
 window).

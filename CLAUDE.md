@@ -121,7 +121,10 @@ mine is a hypothesis (playbook 80).
   6 voices + chorus ≈31–35k → the 4-slot board (40k) at 78–88% is the
   machine. Fork classic: two chips ≈70–77% INFERRED. Owed: silence the
   single-board LINK BAD-PAIR churn before the next budget number.
-- **CHAIN4 (2026-09-03)**: the 4-board build EXISTS and is STAGED in
+- **CHAIN4 (2026-09-03; SCOPE 2026-09-13: FULL PANEL)**: user-directed
+  2026-09-13 — the four boards run the FULL ORIGINAL PORT (delay+reverb
+  included, NO EB_CLASSIC; nail the original, classic falls into line).
+  The 4-board build EXISTS and is STAGED in
   esp32s3/flash/chain4/pos{1..4} (three-bin sets). Design binding:
   docs/engineb/CHAIN4.md. The pair-sum law proven EXACTLY 0 on host
   (tools/engineb/chain_gate.sh, tooth bites); base 0 + one chord-6 key on
