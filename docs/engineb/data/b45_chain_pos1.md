@@ -286,3 +286,20 @@ the CRC judged it. Present since the first chain build; every earlier
 "seam" statistic on this hop was this artifact. Fix: judge-on-completion
 -- each completed chunk is verified the moment it completes, before any
 further read; up to 4 judge per block; the last good one feeds the mix.
+
+## HOP 1<-2 GREEN: FIRST SUSTAINED mix=OPEN (2026-09-13, gate-hold flash)
+
+The flagship hop holds: mix=OPEN at every report, ok ~82/s, bad ~6/s,
+pat_disc=0 for the whole run. THE LINK LAW IS PROVEN END TO END ON
+SILICON on the one hop whose sender keeps up. Hop 3<-4 opens and
+re-opens (ok ~154/s, bad ~50/s from pos4's real underruns); hop 2<-3
+still closed (pos3 underruns worst). The blocker is now ONLY capacity,
+and the storm-free numbers are finally honest: pos3 e0=6,132-6,167 us
+and pos4 e0=6,115-6,170 us PER BLOCK, IDLE, PATCH 0, against the
+5,804 us period -- while pos1 (one voice + chorus + master + DAC +
+MIDI) runs ~5,15x cyc. A 2-voice chip with its second voice on core 1
+must not out-cost pos1 on core 0; something specific is wrong and is
+NOT yet attributed. Next session: core-0 attribution on pos4 (the
+lightest failing case: 1 voice + DN port, no UP), then the re-balance
+or the fix the attribution names. Do not guess ahead of it (playbook
+84/46).
