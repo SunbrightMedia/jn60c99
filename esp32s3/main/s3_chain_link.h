@@ -611,14 +611,16 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
 /* A-side: drain to latest, pattern-lock, redeem adverts, step the mix gate.
  * Leaves the latest aligned AUDIO chunk in s3c_rxbuf and returns 1 when the
  * mix gate is OPEN for it. */
+static int s3c_rx_one(int n, int hs_ok);
+
 static int s3c_rx(int n, int peer_present, int hs_ok,
                   uint32_t peer_acrc, int fresh_acrc)
 {
-    size_t got = 0;
-    int match = 0, mismatch = 0, got_chunk = 0, k;
     if (!A_UP.up) return 0;
     if (n > CHUNK) n = CHUNK;
     s3c_rx_fresh = 0;
+    /* Adverts no longer drive redemption (in-band CRC does). */
+    (void)fresh_acrc; (void)peer_acrc;
     /* NO PEER: the master clock still fills the DMA with garbage, so DRAIN
      * it (cheap memcpys) -- but pay for nothing else. The first chain flash
      * scanned and CRC'd a floating wire every block; that work belongs
@@ -659,9 +661,16 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
         if (A_UP.discard_left) return 0;
     }
     /* A zero-timeout read returns only what the ready descriptors hold, so a
-     * chunk can arrive in PIECES. Carry the part across blocks (rx_off) --
-     * the first chain flash threw every partial away and locked on nothing. */
-    {   int drained = 0;
+     * chunk can arrive in PIECES. Carry the part across blocks (rx_off).
+     * ⚑ THE TORN-CHUNK DEFECT (mf forensics 2026-09-13): drain-to-latest
+     * kept READING INTO THE SAME BUFFER after completing a chunk, then the
+     * judge ran on bytes that were [next chunk's head][old chunk's tail],
+     * cut at the boot-constant arrival phase (measured: seam 97/98 frames,
+     * seq S then S-1). THE JUDGE TORE ITS OWN EVIDENCE. Now every completed
+     * chunk is judged IMMEDIATELY, before any further read can touch the
+     * buffer; up to 4 chunks judge per block (catch-up), and the LAST good
+     * one stays in s3c_rxbuf for the mix. */
+    {   int drained = 0, res = 0;
         size_t want = (size_t)n * S3C_SLOTW * sizeof(int32_t), g;
         char  *base = (char *)s3c_rxbuf;
         for (;;) {
@@ -673,13 +682,23 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
             A_UP.rx_off += g;
             if (A_UP.rx_off < want) { ++A_UP.rx_short; break; }
             A_UP.rx_off = 0;
-            got = want;
+            res = s3c_rx_one(n, hs_ok);
             if (++drained >= 4) break;
         }
         if (drained > 1) A_UP.rx_dropped += (uint32_t)(drained - 1);
+        return res;
     }
-    if (got == (size_t)n * S3C_SLOTW * sizeof(int32_t)) {
-        got_chunk = 1;
+}
+
+/* Judge ONE completed chunk in s3c_rxbuf: realign-or-lock, pattern filter,
+ * in-band verify, step the mix gate. Runs the moment a chunk completes and
+ * BEFORE any further read touches the buffer. A realign heal leaves rx_off
+ * set, so the caller's loop completes the healed chunk -- possibly in this
+ * same block. A block that completes no chunk holds the mix state. */
+static int s3c_rx_one(int n, int hs_ok)
+{
+    int match = 0, mismatch = 0, got_chunk = 1;
+    {
         ++A_UP.rx_chunks;
         /* the marker in frame 0 slot 3 heals frame rotation on the spot: a
          * slave-TX underrun inserts whole frames, and before this check ONE
@@ -732,12 +751,7 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                 A_UP.pat_disc += (uint32_t)disc;
             }
         }
-    } else if (got) {
-        ++A_UP.rx_short;
     }
-    /* Adverts no longer drive redemption (in-band CRC does); the pend
-     * machinery is retired with them. */
-    (void)fresh_acrc; (void)peer_acrc; (void)k;
     /* a PATTERN chunk must never redeem an advert or feed the mix gate.
      * THREE slots checked (review 2026-09-06): a decaying audio tail passes
      * floats with top byte 0xA5 (about -1e-16); two coincidences dropped a

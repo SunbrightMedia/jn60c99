@@ -268,3 +268,21 @@ chunk). Change: the lock now survives seams and drops only after 256
 consecutive misses (~1.5 s dead stream = rebooted/unwired peer). With
 relocking near-zero, the unlocked pattern-scan cost leaves the steady
 state and the storm loses its fuel.
+
+## ROOT CAUSE, PROVEN: THE JUDGE TORE ITS OWN EVIDENCE (2026-09-13)
+
+The discriminator flash split the verdict by hop. Hops 2<-3 and 3<-4:
+auto-clear turned the invisible descriptor replays into counted zero
+chunks (z ~25/s) -- their 2-voice senders underrun even idle on patch 0
+(loops 6.4-6.8 ms vs the 5.8 ms wire): the CAPACITY item, now measured
+clean. Hop 1<-2: z=0, a never-underrunning sender, heals verified ok
+(hv 6.7:1) -- and the CHAINmf frame dump convicted the receiver itself:
+every bad chunk read [frames 0..127 of seq S][frames 128..255 of seq
+S-1] -- the NEW chunk's head over the OLD chunk's tail, cut at the
+boot-constant arrival phase (97 one boot, 98 the next). Only one
+mechanism writes that: the drain-to-latest loop kept reading INTO THE
+SAME BUFFER after completing a chunk, partially overwriting it BEFORE
+the CRC judged it. Present since the first chain build; every earlier
+"seam" statistic on this hop was this artifact. Fix: judge-on-completion
+-- each completed chunk is verified the moment it completes, before any
+further read; up to 4 judge per block; the last good one feeds the mix.
