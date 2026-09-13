@@ -1882,3 +1882,34 @@ NULL and the ctor jumped to address 0x60.
 5. Symptom-to-cause hint: "it worked yesterday, same commit" plus a
    far-away memory error means the BOOT is non-deterministic. Count the
    faults (`jx.faults`) first -- 2 vs 2,347 named this defect in one line.
+
+## 91. A PIN-MAP CHANGE MUST BE AUDITED AGAINST THE FIRMWARE'S OWN PIN
+## USERS, NOT ONLY THE WIRES (paid 2026-09-13, CHAIN4 carrier map)
+
+The 2026-09-08 carrier pin map moved the DOWN control UART onto IO5/IO6
+because the drawn board leaves them unconnected on slots 2-4 ("DAC-only on
+slot 1"). The net-level audit was right about the BOARD. It never asked
+what the FIRMWARE does with IO5/IO6: `i2s_start()` opens the DAC pacer
+(STD master, BCLK 5 / LRCK 6 / DOUT 7) UNCONDITIONALLY on every position,
+because positions 2-4 pace on that blocking write until their hop links.
+On the first four-board run of the new map the I2S driver took IO5/IO6
+away from the UART on every upstream chip: every UP port read rx=0,
+`hs=no peer yet`, and the one advert that leaked through contention
+latched `PATCH INDEX DIFFERS`. The defect shipped 5 days before it was
+paid because the images were rebuilt but never run on wires (playbook 11b:
+staged is not proven).
+
+Board 2's console named it on the first read: `i2s_common: GPIO 5 is not
+usable, maybe conflict with others` -- playbook 85 applied, one build
+instead of eleven.
+
+### The rules
+1. A pin map has TWO halves: the wires outside the chip and the claimants
+   inside the firmware. Re-audit BOTH on every remap. `grep` every moved
+   GPIO number through the firmware before rebuilding.
+2. A peripheral kept only as a PACER must not own pins. Route every pin
+   of a pin-less peripheral to I2S_GPIO_UNUSED (etc.); the internal clock
+   and DMA do not need the GPIO matrix.
+3. Two push-pull outputs on one wire (the stolen LRCK vs the peer's UART
+   TX) is electrical contention, not just a data fault. Power down a rig
+   in this state; do not leave it soaking.

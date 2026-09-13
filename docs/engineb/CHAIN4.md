@@ -110,7 +110,9 @@ Hop wiring (N = 2,3,4; N talks to N−1):
 N.15 ← (N−1).9, N.16 ← (N−1).10, N.17 → (N−1).11,
 N.5 → (N−1).47, N.6 ← (N−1).46, plus common ground.
 (CARRIER map 2026-09-08: audio RX follows the drawn board's LINK nets;
-control rides the four NC pins, so every EXT breakout pin stays free.)
+control rides the four NC pins, so every EXT breakout pin stays free.
+2026-09-13: on positions 2-4 the DAC pacer channel keeps NO pins --
+IO5/IO6 belong to the DOWN ctl UART alone; playbook 91.)
 
 ## 7. Latency — stated before it is heard
 

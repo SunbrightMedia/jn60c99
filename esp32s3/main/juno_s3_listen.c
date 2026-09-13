@@ -3723,10 +3723,24 @@ static int i2s_start(void)
         .clk_cfg  = I2S_STD_CLK_DEFAULT_CONFIG(SR),
         .slot_cfg  = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(
                         I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
+#if S3L_CHAIN && S3_CHAIN_POS != 1
+        /* Chain positions 2-4 keep this channel as the boot-time pacer
+         * (pace=freerun blocks on this write until the hop is LINKED) but
+         * must NOT drive its pins: the carrier map puts DOWN ctl UART on
+         * IO5/IO6, and routing BCLK/LRCK here stole the UART's pins -- the
+         * whole up-direction control went silent on the first 4-board run
+         * of the carrier map. The I2S clock is internal; unrouted pins
+         * change nothing about DMA pacing or the B5 counters. */
+        .gpio_cfg = { .mclk = I2S_GPIO_UNUSED, .bclk = I2S_GPIO_UNUSED,
+                      .ws = I2S_GPIO_UNUSED, .dout = I2S_GPIO_UNUSED,
+                      .din = I2S_GPIO_UNUSED,
+                      .invert_flags = {0, 0, 0} },
+#else
         .gpio_cfg = { .mclk = I2S_GPIO_UNUSED, .bclk = S3L_BCLK,
                       .ws = S3L_LRCK, .dout = S3L_DOUT,
                       .din = I2S_GPIO_UNUSED,
                       .invert_flags = {0, 0, 0} },
+#endif
     };
     /* S3L_DMA_N: the DMA queue depth IS the output-latency floor
      * (dma_desc_num x CHUNK frames). 6 x 256 = 34.8 ms was the dropout

@@ -163,3 +163,27 @@ LOST and re-taken. The audio now arrives; what fails is agreeing on WHICH
 chunk it is. Next probe target: the advert/redeem path (lock_off alignment
 after a relock, and whether the upstream is still sending pattern words after
 peer_alock is set).
+
+## FIRST CARRIER-MAP RUN ON WIRES (2026-09-13): THE PACER STOLE THE CONTROL PINS
+
+Bench rewired all three hops old map -> carrier map (audio 10/11/12 -> 9/10/11,
+ctl 8/14+9/13 -> 5/47+6/46). Pos 1 alone stayed GREEN (cyc 4,935-5,279 vs
+5,442; drift -20 and deficit 116, both frozen; un=0; miss 0/10k; CRC MATCH),
+but every UP port on the chain read `rx=0, hs=no peer yet`.
+
+Board 2's console named the cause on first read (playbook 85):
+`i2s_common: GPIO 5 is not usable, maybe conflict with others`.
+`i2s_start()` opens the DAC pacer (BCLK 5 / LRCK 6 / DOUT 7) on EVERY
+position -- positions 2-4 pace on its blocking write while `pace=freerun` --
+and the carrier map moved DOWN ctl UART onto IO5/IO6. The I2S driver took
+the pins; every upstream chip transmitted into nothing. One advert leaked
+through the contention and latched `hs=PATCH INDEX DIFFERS` on board 2's
+down port -- read that state as DOWNSTREAM of the pin theft until proven
+otherwise after the fix. The old bench map (ctl on 8/9/13/14) never
+conflicted, which is why the b45 12th flash had hs=OK both ways.
+
+Fix: chain positions != 1 keep the pacer channel but route every pin to
+I2S_GPIO_UNUSED (internal clock + DMA pacing identical, B5 counters live,
+zero audio-path change on pos 1 -- its build keeps the original gpio_cfg
+verbatim). Full write-up: playbook 91. BENCH SIGNAL for the next flash:
+the `GPIO 5 is not usable` warning MUST BE GONE on boards 2-4.
