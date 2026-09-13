@@ -54,8 +54,47 @@ static unsigned char BANKBUF[EB_DEVSEQ_BANK_BYTES];
 /* the five render states (ref + four positions) and two master states */
 static eb_render_state RSr, RSp[5];
 static eb_master_state MSr, MSc;
-static eb_master_rings RG;           /* EB_CLASSIC: stays zeroed, no rings */
 static eb_engine Er, Ep[5];
+
+/* THE RINGS. Classic build: never ticked, both masters share one zeroed
+ * struct. FULL build (scope directive 2026-09-13): the delay/reverb/e5
+ * arms read AND WRITE their rings, so the REF master and the CHAIN master
+ * must each own a private set or each corrupts the other's tails and the
+ * sum law fails for a reason that is not the chain's. Lengths are the
+ * firmware's own table (esp32s3/main/s3_listen_meta.h S3L_RING_LEN);
+ * content zeroed per patch = the chip's own power-on state (rings_alloc
+ * callocs). */
+static eb_master_rings RGr, RGc;
+#if !EB_CLASSIC
+static const int32_t RING_LEN[9] =
+    { 524288, 8192, 524288, 524288, 8192, 8192, 1024, 8192, 8192 };
+static float *ring_mem[2][9];
+
+static void rings_setup(void)
+{
+    eb_master_rings *rg[2] = { &RGr, &RGc };
+    int s, i;
+    for (s = 0; s < 2; ++s) {
+        float **dst[9] = { &rg[s]->t1, &rg[s]->t23, &rg[s]->t5_0,
+                           &rg[s]->t5_1, &rg[s]->t5_2, &rg[s]->t5_3,
+                           &rg[s]->e5, &rg[s]->t4_0, &rg[s]->t4_1 };
+        int32_t *len[9] = { &rg[s]->t1_len, &rg[s]->t23_len,
+                            &rg[s]->t5_0_len, &rg[s]->t5_1_len,
+                            &rg[s]->t5_2_len, &rg[s]->t5_3_len,
+                            &rg[s]->e5_len, &rg[s]->t4_0_len,
+                            &rg[s]->t4_1_len };
+        for (i = 0; i < 9; ++i) {
+            if (!ring_mem[s][i])
+                ring_mem[s][i] = (float *)malloc((size_t)RING_LEN[i]
+                                                 * sizeof(float));
+            if (!ring_mem[s][i]) { fprintf(stderr, "ring alloc\n"); exit(2); }
+            memset(ring_mem[s][i], 0, (size_t)RING_LEN[i] * sizeof(float));
+            *dst[i] = ring_mem[s][i];
+            *len[i] = RING_LEN[i];
+        }
+    }
+}
+#endif
 
 static void wake(eb_engine *E, int lo, int hi)
 {
@@ -224,7 +263,12 @@ int main(int argc, char **argv)
         eb_master_state_seed((const unsigned char *)0, &MS0);
         eb_render_events_mirror((unsigned char *)0, &RS0);
 
-        memset(&RG, 0, sizeof RG);              /* CLASSIC: no rings */
+#if EB_CLASSIC
+        memset(&RGr, 0, sizeof RGr);            /* CLASSIC: no rings */
+        memset(&RGc, 0, sizeof RGc);
+#else
+        rings_setup();          /* private zeroed rings per master, per patch */
+#endif
         RSr = RS0; MSr = MS0; MSc = MS0;
         eb_engine_init(&Er, 44100.0f); Er.render_ok = 1;
         wake(&Er, S3_CHAIN_V_LO, S3_CHAIN_V_HI);
@@ -242,7 +286,7 @@ int main(int argc, char **argv)
             for (k = 0; k < EB_NUM_VOICES; ++k) vr[k] = 0.0f;
             eb_engine_render_voices(&Er, &RSr, &RC,
                                     (const eb_render_needs *)0, vr);
-            (void)eb_master_render(&MSr, &MC, &RG, vr, &Lr, &Rr);
+            (void)eb_master_render(&MSr, &MC, &RGr, vr, &Lr, &Rr);
             /* CHAIN */
             for (pos = 1; pos <= 4; ++pos) {
                 for (k = 0; k < EB_NUM_VOICES; ++k) vp[pos][k] = 0.0f;
@@ -262,7 +306,7 @@ int main(int argc, char **argv)
                 if (z0 == 0x80000000u) ++negzero;
                 if (z1 == 0x80000000u) ++negzero;
             }
-            (void)eb_master_render(&MSc, &MC, &RG, m, &Lc, &Rc);
+            (void)eb_master_render(&MSc, &MC, &RGc, m, &Lc, &Rc);
             if (memcmp(&Lr, &Lc, 4) || memcmp(&Rr, &Rc, 4)) {
                 if (!mism)
                     printf("  patch %2d: FIRST MISMATCH at sample %d "
