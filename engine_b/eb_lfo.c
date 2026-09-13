@@ -189,45 +189,80 @@ float eb_lfo_tick_impl(eb_lfo_state *s, const eb_lfo_coef *c,
     s->s1568 = v101;
     L1472 = v100;
     v529 = L1552;
+#if !EB_ZEROCOEF
+    /* v102 -> L1408's only consumer is (k2048 * L1408) in the full v121
+     * sum; EB_ZEROCOEF pins k2048 == 0, so both are dead under that flag.
+     * v101 above is NOT dead: s1568 is state. */
     v102 = (float)((float)((float)(v101 * c->k2448) * c->k2064)
                  - (float)(v95 * c->k2064))
          + v95;
+#endif
     v98 = eb_lfo_wrap(v98);
     v103 = L1616;
     s->s1536 = v98;
+#if !EB_ZEROCOEF
+    /* v104's ONLY consumer is v106 -> L1680/L1696 -> the v116 sum, which
+     * EB_ZEROCOEF pins to 0.0 -- so under that flag this add and this WRAP
+     * CALL produce a value nothing reads (deleted below with the tail). */
     v104 = v98 + c->k2288;
     L1408 = v102 * c->k2432;
+#else
+    (void)v102; (void)L1408;
+#endif
     if (v529 < 0.0f && v98 > 0.0f)
         v103 = v95;
+#if !EB_ZEROCOEF
     v104 = eb_lfo_wrap(v104);
+#endif
     s->s1600 = v103;
     /* THE CUT (L-B). Every persistent field is written above this line; the
      * out-pointers are untouched below on the advance path, so a consumer of
      * the published fields sees the PREVIOUS computed value, never zero. */
     if (!want_out) return 0.0f;
+#if EB_ZEROCOEF
+    /* THE DEAD OUTPUT TAIL, HAND-DELETED (2026-09-13). Everything guarded
+     * out below feeds ONLY v116/v118/L1712 -- which this flag already pins
+     * to 0.0 (k1968/k1984/k2000/k2016/k2032/k2048 all structurally zero) --
+     * so their producers compute values nothing reads. GCC cannot delete
+     * them itself: eb_lfo_wrap and eb_triangle contain fmodf, which the
+     * compiler must assume can set errno, so all four calls survive in the
+     * shipped binary (VERIFIED by objdump on the b45 full-panel image).
+     * Deleting the computation of an unread value cannot change a float;
+     * the 64-patch REF-stream CRC null is the executed proof. */
+    (void)v104; (void)v105; (void)v106; (void)v107; (void)v109;
+    (void)L1680; (void)L1696; (void)L1728; (void)L1760;
+#else
     v105 = v103 * c->k2416;
     v106 = (float)(v104 * c->k2352) + c->k2480;
     L1680 = v106;
     L1760 = v105;
     v107 = v98 + c->k2320;
     L1696 = -v106;
+#endif
     /* the port wraps v107 with fmodf and DISCARDS the result; fmodf has no
      * side effects, and eb_triangle wraps its own argument (PROVEN over all
      * 2^32 inputs), so the discarded call is simply absent. v107 and v108 are
      * DIFFERENT phases -- see src/voice_render.c:899. */
 #if EB_ZEROCOEF
-    v108 = v98;                                   /* k2304 == 0 */
+    /* k2304 == 0 makes v108 = v98 -- and v98 is eb_lfo_wrap's OWN OUTPUT.
+     * wrap(wrap(x)) == wrap(x) for EVERY float x, by the wrap law itself:
+     * every arm of eb_lfo_wrap returns a value in [-1, 1] (the two fast
+     * arms by construction, the two fmodf arms because |fmodf(t,2)| < 2
+     * with t's sign, +/-1 lands the result in the band) or NaN, and on
+     * [-1, 1] the first test returns p unchanged while NaN reproduces NaN
+     * through the fmodf arm. So this second wrap is the identity and is
+     * not called. Same argument for v112 below. */
+    v110 = v98;                          /* k2304 == 0, wrap == identity,
+                                          * k2496 == 0                    */
 #else
     v108 = v98 + c->k2304;
-#endif
     v108 = eb_lfo_wrap(v108);
-    v109 = eb_triangle(v107);
-#if EB_ZEROCOEF
-    v110 = v108;                                  /* k2496 == 0 */
-#else
     v110 = v108 + c->k2496;
 #endif
+#if !EB_ZEROCOEF
+    v109 = eb_triangle(v107);
     v111 = v109 * c->k2384;
+#endif
     if (v110 >= 0.0f) {
         if (v110 > 0.0f)
             v110 = 1.0f;
@@ -235,20 +270,18 @@ float eb_lfo_tick_impl(eb_lfo_state *s, const eb_lfo_coef *c,
         v110 = -1.0f;
     }
 #if EB_ZEROCOEF
-    v112 = v98;                                   /* k2336 == 0 */
+    v114 = fabsf(v98);                   /* k2336 == 0, wrap == identity */
+    (void)v108; (void)v111; (void)v112; (void)v113; (void)L1712;
+    *out1824 = v110;
 #else
     v112 = v98 + c->k2336;
-#endif
     L1728 = v111;
     *out1824 = v110;
-#if EB_ZEROCOEF
-    v113 = v110 * c->k2368;                       /* k2512 == 0 */
-#else
     v113 = (float)(v110 * c->k2368) + c->k2512;
-#endif
     v112 = eb_lfo_wrap(v112);
     v114 = fabsf(v112);
     L1712 = v113;
+#endif
 #if EB_ZEROCOEF
     /* k1968, k2032, k2000, k2016 all zero: the whole v116 sum and the
      * v115*L1728 product below vanish. */
