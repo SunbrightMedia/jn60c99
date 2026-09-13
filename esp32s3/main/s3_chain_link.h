@@ -422,6 +422,7 @@ static int s3c_aud_start(s3c_aud *a, int master_rx,
         if (i2s_new_channel(&cc, &a->ch, NULL) != ESP_OK) return 0;
     }
     if (i2s_channel_init_tdm_mode(a->ch, &tc) != ESP_OK) return 0;
+#if S3C_HAS_DOWN   /* s3c_txbuf exists only on chips with a DOWN port */
     if (!master_rx) {
         /* Pre-fill the slave-TX DMA ring BEFORE enable. The rate probe
          * showed the ring running near-EMPTY (write waits 42-677 us): a
@@ -437,6 +438,7 @@ static int s3c_aud_start(s3c_aud *a, int master_rx,
                                          &pl) != ESP_OK)
                 break;
     }
+#endif
     if (i2s_channel_enable(a->ch) != ESP_OK) return 0;
     a->up = 1;
     return 1;
