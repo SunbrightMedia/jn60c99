@@ -1278,7 +1278,7 @@ static int dev_burst_step(void)
  * (juno_event_*, source KEYBED) -- a driver that reached the engine any other
  * way would stress a path nobody ships.
  *
- * SEVEN PHASES, ~2 s each, repeating (172 blocks/s, 344 blocks/phase):
+ * EIGHT PHASES, ~2 s each, repeating (172 blocks/s, 344 blocks/phase):
  *   0 BASELINE   silence, so every counter has an uncontaminated control
  *   1 SINGLES    a note toggles ~4x/s -- the ordinary case
  *   2 PAIRS      TWO keys in ONE block -- the exact case the old path
@@ -1295,6 +1295,9 @@ static int dev_burst_step(void)
  *                whole class table -- UNDER A HELD CHORD, with a program
  *                change every ~1 s on top. This is the only phase that makes
  *                the parameter path run at all.
+ *   7 SEEDED     CHAIN4_SOAK.md layer 2: LCG-driven random keys, velocities,
+ *                patch jumps and silence gaps -- one draw per block, so one
+ *                seed is one exact replay. Counted in the SEED: report line.
  *
  * ⚠ PHASE 6 EXISTS BECAUSE THE FIRST O3 BUILD HAD NO KNOB. The parameter path
  * was written, gated by 57 teeth and compiled, and NOTHING ON THE DEVICE COULD
@@ -1324,13 +1327,29 @@ static int dev_burst_step(void)
 /* defined below -- the robot drives the patch as well as the keys, and this is
  * the only forward reference in the file. */
 static void dev_request(int patch, int gate);
+
+/* ============== PHASE 7: THE SEEDED RANDOM LAYER (CHAIN4_SOAK.md §2) =====
+ * One LCG, stepped EXACTLY ONCE PER BLOCK of its phase whatever it decides,
+ * so the whole event stream is a pure function of (seed, block index):
+ * one seed = one exact replay, which is the soak's replay law. The seed is
+ * compile-forced (-DS3L_SEED=0x...), printed at boot and in every SEED:
+ * report line. Events go through juno_event_* like every real input --
+ * a random layer that bypassed the boundary would stress a path nobody
+ * ships. Every decision is COUNTED so the log can show what ran. */
+#ifndef S3L_SEED
+#define S3L_SEED 0x4A554E4Fu            /* 'JUNO' -- the default replay */
+#endif
+static unsigned long g_seed_lcg = S3L_SEED;
+static unsigned long seed_on, seed_off, seed_patch, seed_gapblk;
+
 static void stress_step(void)
 {
     static unsigned long blk = 0;
     static int held[8];
     static const unsigned char NOTE[8] = {48, 52, 55, 60, 64, 67, 72, 76};
+    static unsigned long gap_until = 0;  /* phase-7 silence gap, in blocks */
     unsigned long t = blk++;
-    unsigned long ph = (t / 344u) % 7u;
+    unsigned long ph = (t / 344u) % 8u;
     int i;
 
     /* THE PATCH DRIVER, phases 4 and 5. dev_request is O(1) and only sets
@@ -1423,6 +1442,37 @@ static void stress_step(void)
                            held[i] = 0; }
         }
         break;
+    case 7: {
+        /* THE SEEDED RANDOM LAYER. One LCG draw per block, consumed whether
+         * or not it fires an event (the replay law). Random slot, random
+         * velocity 1..127, random patch jumps under whatever is held,
+         * random silence gaps of 8..135 blocks. Pitches come from the same
+         * 8-key table as the deterministic phases -- the randomness under
+         * test is timing/velocity/contention; the phase-boundary release
+         * law (NOTE[i]) then stays exact. Broader pitch randomisation
+         * belongs to the soak build with per-slot note tracking. */
+        unsigned long r;
+        g_seed_lcg = g_seed_lcg * 1103515245u + 12345u;
+        r = (g_seed_lcg >> 16) & 0x7FFFu;
+        if (t < gap_until) { ++seed_gapblk; break; }
+        if ((r & 0x1Fu) < 10u) {                 /* ~31%: toggle a key */
+            i = (int)((r >> 5) & 7u);
+            if (held[i]) {
+                juno_event_note_off(JUNO_SRC_KEYBED, NOTE[i]);
+                held[i] = 0; ++seed_off;
+            } else {
+                juno_event_note_on(JUNO_SRC_KEYBED, NOTE[i],
+                                   1 + (int)((r >> 8) & 0x7Fu));
+                held[i] = 1; ++seed_on;
+            }
+        } else if ((r & 0x1Fu) == 29u) {         /* ~3%: patch jump */
+            dev_request((int)((r >> 5) % (unsigned long)DEVCRC_NPATCH), 0);
+            ++seed_patch;
+        } else if ((r & 0x1Fu) == 30u) {         /* ~3%: a silence gap */
+            gap_until = t + 8u + ((r >> 5) & 0x7Fu);
+        }
+        break;
+    }
     }
 }
 #endif
@@ -3693,6 +3743,13 @@ static void rpt_task(void *arg)
                    / (unsigned long)CHUNK);
         spin_min = 0xFFFFFFFFul; spin_max = 0;
 #endif
+#if S3L_STRESS
+        /* the seeded layer's ledger: lcg is the LIVE generator state, so a
+         * replay can be checked mid-run, not only at boot. */
+        printf("SEED: seed=%08lx lcg=%08lx on=%lu off=%lu patch=%lu "
+               "gapblk=%lu\n", (unsigned long)S3L_SEED, g_seed_lcg,
+               seed_on, seed_off, seed_patch, seed_gapblk);
+#endif
 #if S3L_REV_PIPE
         /* back = CORE 0's reverb+out pass. THE VERDICT NUMBER: fx (core 1,
          * now front only) must DROP by ~back vs the pre-REV_PIPE build. */
@@ -4191,6 +4248,11 @@ void app_main(void)
            S3L_VOICE_LO, S3L_SPLIT - 1, S3L_SPLIT, EB_NUM_VOICES - 1);
 #else
     printf("ONE CORE: all %d voices on core 0\n", EB_NUM_VOICES);
+#endif
+#if S3L_STRESS
+    /* CHAIN4_SOAK.md replay law: the seed is on every log's first page. */
+    printf("SEED: %08lx (S3L_SEED; one seed = one exact replay; phase 7 is "
+           "the seeded random layer)\n", (unsigned long)S3L_SEED);
 #endif
 #if EB_CLASSIC
     /* THE CLASSIC BUILD MUST PROVE ITSELF IN ITS OWN LOG. Without this the
