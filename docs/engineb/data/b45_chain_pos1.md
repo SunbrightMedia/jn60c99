@@ -200,3 +200,19 @@ two-board link it was copied from. Second defect, same probe: the RX
 discard path read once per block and starved recovery. Both fixed
 (ms units; bounded full drain). Expected next flash: wmax in the
 milliseconds, timeouts ~0, realign settles, ok= counts, mix=OPEN.
+
+## AFTER THE UNITS FIX: FIRST CRC REDEMPTIONS; THE CUSHION IS THE RESIDUAL
+## (2026-09-13, one-shot log, all four boards)
+
+With the ms-units fix: every sender feeds ~99.5% of the wire (was 90%),
+timeouts 0 everywhere, and hop 3<-4 redeems its FIRST CRCs (ok=43->110
+over 70 s) -- pos 4 is the cleanest sender because it has no UP port.
+Hops 1<-2 and 2<-3 still churned. The probe named the residual: write
+waits of 42-677 us mean the TX ring runs near-EMPTY (just-in-time
+writer, no cushion), so any loop stall still underruns; and the RX
+realign still paid a discard (receivers read ~90% of the wire).
+Fixes: (1) i2s_channel_preload_data fills the slave-TX ring BEFORE
+enable -- the blocking write becomes the true pacer and must be SEEN TO
+BLOCK (wmax ~ms is the next flash's tooth); (2) realign heals by
+memmove of the already-read tail (the next chunk's own start) instead
+of discarding two chunks' worth with extra reads.

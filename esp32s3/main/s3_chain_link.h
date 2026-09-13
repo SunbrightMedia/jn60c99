@@ -422,6 +422,21 @@ static int s3c_aud_start(s3c_aud *a, int master_rx,
         if (i2s_new_channel(&cc, &a->ch, NULL) != ESP_OK) return 0;
     }
     if (i2s_channel_init_tdm_mode(a->ch, &tc) != ESP_OK) return 0;
+    if (!master_rx) {
+        /* Pre-fill the slave-TX DMA ring BEFORE enable. The rate probe
+         * showed the ring running near-EMPTY (write waits 42-677 us): a
+         * just-in-time writer has no cushion, so every loop stall became
+         * an underrun, every underrun a fresh rotation downstream. A ring
+         * that starts FULL makes the blocking write the true pacer (it
+         * must now wait one descriptor per chunk -- SEEN TO BLOCK) and
+         * absorbs a stall up to the whole ring depth. Playbook 92. */
+        size_t pl = 1;
+        memset(s3c_txbuf, 0, sizeof s3c_txbuf);
+        while (pl)
+            if (i2s_channel_preload_data(a->ch, s3c_txbuf, sizeof s3c_txbuf,
+                                         &pl) != ESP_OK)
+                break;
+    }
     if (i2s_channel_enable(a->ch) != ESP_OK) return 0;
     a->up = 1;
     return 1;
@@ -596,7 +611,20 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
             uint32_t ci = s3_chain_realign_ci((uint32_t)s3c_rxbuf[3],
                                               (uint32_t)n);
             if (ci) {
-                A_UP.discard_left = ((uint32_t)n - ci) * (uint32_t)S3C_SLOTW;
+                /* Heal by KEEPING what was read, not by discarding. The
+                 * buffer's tail (ci frames) is the START of the next chunk:
+                 * move it to the front and let rx_off complete that chunk.
+                 * The old path discarded a further (n-ci) frames with extra
+                 * reads -- during churn that starved the port to 90% of the
+                 * wire rate and the RX ring overflowed behind every slip,
+                 * which re-created the rotation it was healing (measured;
+                 * playbook 92). */
+                size_t tail = (size_t)ci * S3C_SLOTW * sizeof(int32_t);
+                memmove(s3c_rxbuf,
+                        (const char *)s3c_rxbuf
+                            + ((size_t)n - ci) * S3C_SLOTW * sizeof(int32_t),
+                        tail);
+                A_UP.rx_off = tail;
                 ++A_UP.rx_realigns;
                 A_UP.rx_seq_have = 0;
                 got_chunk = 0;
