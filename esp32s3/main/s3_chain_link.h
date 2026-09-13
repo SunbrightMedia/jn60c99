@@ -389,6 +389,10 @@ typedef struct {
     uint8_t  ci_i, seam_i;
     /* B-side write-size split: full chunk in one call / partial / zero. */
     uint32_t wr_full, wr_part, wr_zero;
+    /* HEAL VERIFY: the chunk that completes right after a memmove heal
+     * must read ci=0. ok = it did; fail = it rotated AGAIN at once --
+     * the heal itself would then be the suspect. */
+    uint32_t heal_ok, heal_fail; int heal_pending;
     uint32_t pend[8]; uint16_t pend_age[8]; uint8_t pend_used[8];
     uint32_t relock_miss;
     uint32_t crc_last;
@@ -440,6 +444,13 @@ static int s3c_aud_start(s3c_aud *a, int master_rx,
      * per port; the middle chips keep >55 KB internal free. */
     cc.dma_desc_num  = 16;
     cc.dma_frame_num = (CHUNK > 128) ? (CHUNK / 2) : CHUNK;
+    /* AUTO-CLEAR (battery run 2026-09-13): without it, a TX underrun
+     * REPLAYS the last descriptor -- old markers, old seq, invisible to
+     * every counter, and exactly the constant per-hop rotation the seam
+     * histogram measured (128 = one descriptor on hop 3<-4). With it, an
+     * underrun transmits ZEROS: the receiver counts them (z=) and the
+     * realign is not fed forged markers. Truth over comfort. */
+    cc.auto_clear_after_cb = true;
     if (master_rx) {
         if (i2s_new_channel(&cc, NULL, &a->ch) != ESP_OK) return 0;
     } else {
@@ -695,6 +706,8 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                 A_UP.rx_off = tail;
                 A_UP.ci_last[A_UP.ci_i++ & 3u] = ci;
                 ++A_UP.ci_h[(ci % 128u == 0u) ? 0 : (ci < 16u) ? 1 : 2];
+                if (A_UP.heal_pending) ++A_UP.heal_fail;
+                A_UP.heal_pending = 1;
                 ++A_UP.rx_realigns;
                 A_UP.rx_seq_have = 0;
                 got_chunk = 0;
@@ -736,6 +749,7 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
         ((uint32_t)s3c_rxbuf[2] & S3_PAT_MASK) == S3_PAT_TAG)
         got_chunk = 0;
     if (got_chunk && A_UP.locked) {
+        if (A_UP.heal_pending) { ++A_UP.heal_ok; A_UP.heal_pending = 0; }
         /* chunk-sequence continuity, read from the marker (8-bit wrap) */
         {   uint32_t mk = (uint32_t)s3c_rxbuf[3];
             if ((mk & S3_CHAIN_MARK_MASK) == S3_CHAIN_MARK_TAG) {
@@ -867,6 +881,8 @@ static void s3c_report(void)
            (unsigned long)A_UP.seam_h[0], (unsigned long)A_UP.seam_h[1],
            (unsigned long)A_UP.seam_h[2], (unsigned long)A_UP.seam_h[3],
            (unsigned long)A_UP.z_chunks);
+    printf("CHAINhv: ok=%lu fail=%lu\n",
+           (unsigned long)A_UP.heal_ok, (unsigned long)A_UP.heal_fail);
 #endif
 #if S3C_HAS_DOWN
     if (C_DN.started)
