@@ -12,10 +12,13 @@ per run. Stimulus on chip 1 in three layers:
 1. DETERMINISTIC ROBOT (exists: stress_step, block-counter driven,
    replays exactly from boot). Phases cover chords, program changes at
    contention, and parameter sweeps.
-2. SEEDED RANDOM LAYER (to build): an LCG drives random note on/off,
-   random velocities, random patch jumps, random silence gaps. The seed
-   PRINTS AT BOOT and can be forced by a build flag; one seed = one
-   exact replay. New phase in stress_step, no new machinery.
+2. SEEDED RANDOM LAYER (BUILT 2026-09-13, stress_step phase 7): an LCG
+   drives random key toggles (random slot + velocity), random patch
+   jumps, random silence gaps -- one draw per block, so one seed = one
+   exact replay. Seed = -DS3L_SEED (default 'JUNO'), printed at boot;
+   the SEED: report line carries the live lcg state and the counted
+   events. Pitches stay on the robot's 8-key table until the soak build
+   adds per-slot note tracking (recorded limitation).
 3. FAULT INJECTION (to build): at seeded random times, the harness
    injects the faults the repair system exists for -- a forced realign
    ('t'-tooth style), a skipped TX block (simulated stall), a control

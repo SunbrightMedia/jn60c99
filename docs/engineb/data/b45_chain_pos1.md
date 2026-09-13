@@ -443,3 +443,21 @@ core-0 own load; if X <= ~150 the vca/vcf pipe is built next (with a
 revpipe-class host gate); if X > 150 the link path slims first (our
 own code, no bit-exactness bar). The trim's own silicon verdict rides
 the same log: C1AT pro= must drop vs 727.
+
+## SEEDS BUILT; THE PATCH-48 WAR GETS ITS PLAN (2026-09-13, user-directed)
+
+User order: seeds now, and the heavy-patch overage MUST be fixed. Done
+and planned:
+- SEEDS: stress_step phase 7 (CHAIN4_SOAK layer 2) BUILT and committed;
+  compile-proven under S3L_STRESS=1. Rides the fix flash, runtime-gated.
+- PATCH-48 CLASS (~570-970 cyc/voice over patch 0, MEASURED b45 robot
+  freeze): the delta is DATA-DEPENDENT cost -- paths patch 0 never pays.
+  Suspects, in order: flash-cache misses on wavetable mips under moving
+  pitch (host/QEMU CANNOT see these -- the recorded measurement failure
+  class), exp/slow-arm rates, set_pitch exponent recomputes. VERDICT
+  INSTRUMENT: silicon, flash +1 (robot ON steps patches; per-patch cyc
+  lines, b42 idiom). No host number will be quoted for this delta.
+  Honest size at patch 48: a 2-voice chip is ~1,800 cyc/sample over its
+  10,884 total -- the fix class must be memo/cache-shaped (bit-exact by
+  construction) and is UNPROVEN until attributed. "Room somewhere" is
+  a hypothesis, not yet evidence.
