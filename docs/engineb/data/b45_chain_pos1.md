@@ -419,3 +419,27 @@ THREE EXACT-OR-NOT PATHS (a scope/risk decision, owed to the user):
 NONE is a silent per-module tweak. The honest state: the FULL PORT works
 per chip; the 4-chip SUM is blocked by 329 structural cyc with no exact
 micro-shave available.
+
+## THE TRIM LANDS + THE PIPE'S ARITHMETIC + THE DECISION RULE (2026-09-13)
+
+LANDED (f1c3948, EXACTLY-0, teeth bite): the LFO's dead output tail
+hand-deleted under EB_ZEROCOEF -- three wrap calls, eb_triangle, and
+~15 float ops per prologue sample that fed only already-zeroed sums.
+GCC could not remove them (fmodf is errno-opaque; objdump showed all
+four wrap calls in the b45 image). Proof: REFCRC 64/64 identical with
+the LFO ALIVE over 16,384 samples; fabs tooth 25/64 moved, wrap-skip
+tooth 26/64. On the way, playbook 93 was paid: the chain gate had
+rendered every green with a SILENT LFO (fixed, 79e8aaa).
+
+THE PIPE'S ARITHMETIC (why the next flash measures before it builds).
+Under EB_FUSE_VCA the movable one-chunk-late atoms are the VCF (~610)
+and the VCA audio half (~240). Best split on a 2-voice chip:
+  core 1 = voiceB front + vcfB + prologue(trimmed) ~= 5,434
+  core 0 = voiceA full + vcaA + vcaB + LINK(X)     ~= 5,284 + X
+Green at patch 0 REQUIRES X <= ~150 cyc/sample of link work -- and X
+has NEVER been measured (the SLACK print never ran on a chain build;
+fixed, 35c8138). DECISION RULE, stated before the flash: SLACK shows
+core-0 own load; if X <= ~150 the vca/vcf pipe is built next (with a
+revpipe-class host gate); if X > 150 the link path slims first (our
+own code, no bit-exactness bar). The trim's own silicon verdict rides
+the same log: C1AT pro= must drop vs 727.
