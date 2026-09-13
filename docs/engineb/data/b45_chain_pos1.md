@@ -216,3 +216,22 @@ enable -- the blocking write becomes the true pacer and must be SEEN TO
 BLOCK (wmax ~ms is the next flash's tooth); (2) realign heals by
 memmove of the already-read tail (the next chunk's own start) instead
 of discarding two chunks' worth with extra reads.
+
+## CUSHION RUN: RECEIVERS AT FULL RATE; PATCH 48 CONVICTS THE BUDGET
+## (2026-09-13, second one-shot log)
+
+The memmove heal works: every receiver now reads at full chunk rate
+(rx +172/s) with part=0. The preload cushion was consumed during the
+8 s recall boot (the wire drains 23 ms of cushion long before the loop
+starts) -- wmax stayed sub-ms, so the ring self-fills only where the
+loop outruns the wire. The log's real verdict is CAPACITY: the robot
+froze all four chips on patch 48, and on that patch cyc = 5,156 (pos1)
+/ 5,412 (pos2, gap 5,866 us > period) / 6,014 (pos3) / 5,757 (pos4)
+against the 5,442 budget. Positions 3-4 run their loops at 152-161
+blocks/s against the wire's 172.3: they CANNOT feed their hops, locks
+cycle, and no CRC can redeem. Patch follow itself is PROVEN (all four
+chips agree on 48). Hop 3<-4 still redeemed ok=50->110 in the gaps.
+Action: bring-up set holds patch 0 (S3L_STRESS off on pos 1); the
+patch-cost budget question moves to the capacity arc with this first
+real number: AN EXPENSIVE PATCH ON A MIDDLE CHIP IS A CHAIN FAULT, not
+only a local overrun.

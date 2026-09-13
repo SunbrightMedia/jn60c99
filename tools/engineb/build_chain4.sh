@@ -33,7 +33,13 @@ COMMON="-DS3L_SWEEP=0;-DS3_CORES=2;-DS3L_FX_PIPE=1;-DS3L_PROLOGUE_C1=1;\
 [ $# -eq 0 ] && set -- 1 2 3 4
 for POS in "$@"; do
     case "$POS" in
-    1) PER="-DS3L_VOICE_LO=7;-DS3L_SPLIT=8;-DS3L_MIDI=1;-DS3L_STRESS=1" ;;
+    # BRING-UP SET (2026-09-13): no robot/stepper on pos 1 -- the chain holds
+    # patch 0 so the hop gates are judged on ONE variable. The robot run on
+    # silicon froze all four chips on patch 48, whose voice cost busts the
+    # 5,442 budget on pos 2-4 (cyc 5,412/6,014/5,757 measured) -- an over-
+    # budget SENDER cannot feed the wire and no CRC can ever redeem. Restore
+    # -DS3L_STRESS=1 only after mix=OPEN is proven on patch 0.
+    1) PER="-DS3L_VOICE_LO=7;-DS3L_SPLIT=8;-DS3L_MIDI=1" ;;
     2) PER="-DS3L_VOICE_LO=6;-DS3L_SPLIT=7;-DS3L_VOICE_HI=7;-DS3L_NOMASTER=1" ;;
     3) PER="-DS3L_VOICE_LO=4;-DS3L_SPLIT=5;-DS3L_VOICE_HI=6;-DS3L_NOMASTER=1" ;;
     4) PER="-DS3L_VOICE_LO=2;-DS3L_SPLIT=3;-DS3L_VOICE_HI=4;-DS3L_NOMASTER=1" ;;
