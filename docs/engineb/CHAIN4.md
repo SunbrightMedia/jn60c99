@@ -164,3 +164,34 @@ pend/seq state; the pattern-chunk test reads three slots.
 - TDM4, three hops live, event chain on wires: ONLY the 4-board bench can
   prove these. First bench criterion: all three hops report hs=OK,
   mix=OPEN, and the chord-6 CRC MATCH on all four consoles.
+
+## THE LINK SAFETY DOCTRINE (USER-BINDING 2026-09-13)
+
+The link and its repair system are the one major subsystem NOT ported
+from bit-exact external code, so their assurance cannot come from a
+reference binary. It comes from construction plus gates:
+
+1. ONE DOOR. Audio from a hop reaches the mix ONLY when the CRC computed
+   from the received bytes equals the CRC sealed inside the chunk
+   (in-band law, s3_chain.h, gated with teeth in chain_gate.c). There is
+   no second path. Every other failure -- stalls, seams, lost locks,
+   dead peers -- can only REFUSE chunks: missing voices for
+   milliseconds, counted and visible, never silent corruption.
+2. THE ONLY SILENT-FAILURE CLASS is a CRC collision: a DAMAGED chunk
+   whose random fingerprint matches by luck, 2^-32 per damaged chunk.
+   At a (pathological) one damaged chunk per second, expectation is one
+   slip in ~136 years, costing 5.8 ms of wrong sound once. Healthy links
+   damage almost nothing, so the true figure is far larger. Clean
+   chunks never roll this dice.
+3. LOCAL AUDIO IS NEVER HOSTAGE. Chip 1's own DAC stream does not pass
+   through the link at all; total chain failure degrades to fewer
+   voices, never to broken audio (the b45 invariant machinery guards
+   the DAC itself).
+4. THE ACCEPTANCE GATE IS SEEDED, NOT ENUMERATED. The link ships only
+   after a seeded random soak -- random notes, patches, timing and
+   injected faults, seed printed, every failure replayable exactly.
+   Fixed scenarios (the 64 patches) are one axis, never the test.
+5. LEGACY RULE. The laws are pure functions in one header; the gates
+   and their teeth travel WITH the laws to every future synth port. A
+   mistake carried forward must pass the carried teeth. No future port
+   may reimplement a link law without its gate.
