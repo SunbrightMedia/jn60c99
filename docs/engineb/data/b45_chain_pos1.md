@@ -235,3 +235,22 @@ Action: bring-up set holds patch 0 (S3L_STRESS off on pos 1); the
 patch-cost budget question moves to the capacity arc with this first
 real number: AN EXPENSIVE PATCH ON A MIDDLE CHIP IS A CHAIN FAULT, not
 only a local overrun.
+
+## IN-BAND CRC ON SILICON: THE LAW WORKS; THE SEAMS REMAIN (2026-09-13)
+
+Host gate first (sum law EXACTLY 0 x64, in-band law round-trips, three
+teeth bite), then the flash. Verdict: in-band redemption is PROVEN on
+silicon -- hop 3<-4 redeems ~46/s. Hops 1<-2 and 2<-3 stay at ok=0, and
+the new forensics say exactly why: the same sealed chunk (marker seq 3,
+aligned, in-band crc 8deddcfd on the wire) computes a DIFFERENT crc at
+the receiver on different arrivals. One sealed chunk has one crc;
+varying results = COMPOSITE chunks, frames of two chunks around an
+underrun seam. POS3 also caught an ALL-ZERO chunk (no markers): raw
+underrun output. The churn state itself costs cycles (scan + realign +
+relock), keeping loops over period, which makes the seams that sustain
+the churn -- two self-sustaining states, and boot always lands in the
+bad one because the marked stream starts on a near-empty ring. Fix
+aimed at the landing: rings 8->16 descriptors (46 ms armor both
+directions) and a cushion of 4 sealed SILENT marked chunks stuffed at
+the peer_alock 0->1 transition -- silence is free while the mix gate is
+still closed, and those chunks redeem instantly.

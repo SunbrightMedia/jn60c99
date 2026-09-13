@@ -373,6 +373,7 @@ typedef struct {
     uint32_t pend[8]; uint16_t pend_age[8]; uint8_t pend_used[8];
     uint32_t relock_miss;
     uint32_t crc_last;
+    int alock_prev;              /* B-side: last peer_alock, for the cushion */
 } s3c_aud;
 
 #if S3C_HAS_UP
@@ -414,7 +415,11 @@ static int s3c_aud_start(s3c_aud *a, int master_rx,
      * so CHUNK=256 frames (4096 B) is clamped to 255 and NO single descriptor
      * can ever hold one chunk. Ask for a frame count that DIVIDES the chunk:
      * the reads and writes below then land on descriptor boundaries. */
-    cc.dma_desc_num  = 8;
+    /* 16 descriptors = 8 chunks = 46 ms of armor per direction. The mm
+     * forensics showed COMPOSITE chunks (one seq, varying crc): seams cut
+     * by slave-TX underrun and RX overflow during churn. RAM cost 32 KB
+     * per port; the middle chips keep >55 KB internal free. */
+    cc.dma_desc_num  = 16;
     cc.dma_frame_num = (CHUNK > 128) ? (CHUNK / 2) : CHUNK;
     if (master_rx) {
         if (i2s_new_channel(&cc, NULL, &a->ch) != ESP_OK) return 0;
@@ -454,6 +459,34 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
     if (!A_DN.up) return 0;
     if (n > CHUNK) n = CHUNK;
     want = (size_t)n * S3C_SLOTW * sizeof(int32_t);
+    /* CUSHION AT THE MOMENT IT MATTERS: when the downstream peer first
+     * locks (alock 0->1), stuff the ring with sealed SILENT marked chunks
+     * BEFORE the first audio chunk. The boot preload drains away during
+     * the 8 s recall; this one lands exactly when marked streaming starts,
+     * so the first sealed chunks ride a 4-chunk cushion instead of a
+     * near-empty ring. Silence is free here: the mix gate is still closed
+     * (it opens only after these very chunks redeem). */
+    if (peer_alock && !A_DN.alock_prev && !A_DN.tx_off) {
+        int j;
+        for (j = 0; j < 4; ++j) {
+            size_t w2 = 0;
+            uint32_t sq = ++A_DN.tx_seq;
+            memset(s3c_txbuf, 0, want);
+            for (i = 0; i < n; ++i)
+                s3c_txbuf[S3C_SLOTW * i + 3] =
+                    (int32_t)s3_chain_mark(sq, (uint32_t)i);
+            A_DN.tx_crc = s3_chain_crc_seal((uint32_t *)s3c_txbuf,
+                                            (uint32_t)(S3C_SLOTW * n),
+                                            S3C_SLOTW, s3c_crc32);
+            i2s_channel_write(A_DN.ch, s3c_txbuf, want, &w2, 20);
+            A_DN.io_bytes += (uint64_t)w2;
+            if (w2 < want) break;          /* ring holds enough already */
+            ++A_DN.tx_blk;
+        }
+        A_DN.tx_marked = 1;
+        A_DN.tx_silent = 0;
+    }
+    A_DN.alock_prev = peer_alock;
     /* A part-written chunk MUST be finished before a new one is built, or the
      * slot stream loses its alignment. Only fill the buffer when it is free. */
     if (!A_DN.tx_off) {
