@@ -370,6 +370,11 @@ typedef struct {
     uint64_t io_bytes;
     uint32_t io_wait_max_us;
     uint32_t mm_w[4], mm_crc, mm_pend; int mm_have;
+    /* SEAM PROBE: slot-3 markers at fixed frames of the first mismatched
+     * chunk each report. The seq field changing mid-chunk PROVES composite
+     * and shows WHERE the seam falls: always on 128-frame descriptor
+     * boundaries = DMA-quantized inserts; random = byte-time cuts. */
+    uint32_t mm_f[6];
     uint32_t pend[8]; uint16_t pend_age[8]; uint8_t pend_used[8];
     uint32_t relock_miss;
     uint32_t crc_last;
@@ -727,11 +732,17 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                 match = 1; ++A_UP.rx_match; A_UP.relock_miss = 0;
             } else {
                 if (!A_UP.mm_have) {
+                    static const int mf_[6] = { 2, 32, 64, 128, 192, 255 };
+                    int q;
                     A_UP.mm_have = 1;
                     A_UP.mm_w[0] = (uint32_t)s3c_rxbuf[0];
                     A_UP.mm_w[1] = (uint32_t)s3c_rxbuf[1];
                     A_UP.mm_w[2] = (uint32_t)s3c_rxbuf[2];
                     A_UP.mm_w[3] = (uint32_t)s3c_rxbuf[3];
+                    for (q = 0; q < 6; ++q)
+                        A_UP.mm_f[q] = (mf_[q] < n)
+                            ? (uint32_t)s3c_rxbuf[S3C_SLOTW * mf_[q] + 3]
+                            : 0u;
                     A_UP.mm_crc  = s3c_crc32(s3c_rxbuf,
                                              (size_t)n * S3C_SLOTW
                                                  * sizeof(int32_t));
@@ -784,6 +795,11 @@ static void s3c_report(void)
                    (unsigned long)A_UP.mm_w[0], (unsigned long)A_UP.mm_w[1],
                    (unsigned long)A_UP.mm_w[2], (unsigned long)A_UP.mm_w[3],
                    (unsigned long)A_UP.mm_crc, (unsigned long)A_UP.mm_pend);
+            printf("CHAINmf: f2=%08lx f32=%08lx f64=%08lx f128=%08lx "
+                   "f192=%08lx f255=%08lx\n",
+                   (unsigned long)A_UP.mm_f[0], (unsigned long)A_UP.mm_f[1],
+                   (unsigned long)A_UP.mm_f[2], (unsigned long)A_UP.mm_f[3],
+                   (unsigned long)A_UP.mm_f[4], (unsigned long)A_UP.mm_f[5]);
             A_UP.mm_have = 0;
         }
     }
