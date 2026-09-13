@@ -49,4 +49,15 @@ if "$BUILD/chain_gate_mark" "$BUILD/ebdev_boot.bin" "$BUILD/eb_bank64.bin" \
     exit 1
 fi
 echo "marker tooth bites: the old shared-tag law FAILED the gate, as it must."
+
+echo "=== 5. the in-band crc tooth (a check without the zeroing MUST fail) ==="
+cc $CFLAGS $DEFS -DEB_DEVCELLS -DEBDEV_NV=8 -DDEVCHORD_N=6 \
+   -DCHAIN_TOOTH_INBAND=1 \
+   -o "$BUILD/chain_gate_inband" "$HERE/chain_gate.c" $SRCS $DEVSRC -lm
+if "$BUILD/chain_gate_inband" "$BUILD/ebdev_boot.bin" "$BUILD/eb_bank64.bin" \
+                              "$BUILD/eb_template.bin" > /dev/null 2>&1; then
+    echo "*** THE IN-BAND TOOTH DID NOT BITE -- the crc law proves nothing ***"
+    exit 1
+fi
+echo "in-band tooth bites: the zeroing-free check FAILED the gate, as it must."
 echo "CHAIN GATE GREEN"

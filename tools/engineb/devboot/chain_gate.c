@@ -155,6 +155,58 @@ int main(int argc, char **argv)
 #undef REALIGN_CI
     printf("CHAIN: marker law OK (tag distinct from pattern, index bounded)\n");
 
+    /* ---- the in-band CRC law (2026-09-13) --------------------------------
+     * Frame 1's slot-3 word carries the chunk's own CRC (advert/pend
+     * redemption retired after three churn runs). CHAIN_TOOTH_INBAND
+     * substitutes a check that skips the zeroing -- self-referential, it
+     * can never pass -- and every positive check below must then FAIL. */
+    {
+        enum { GW = 4 * 256 };              /* one TDM4 chunk of words */
+        static uint32_t gbuf[GW];
+        uint32_t gi;
+#ifdef CHAIN_TOOTH_INBAND
+#define CRC_CHECK(w, nw, sl) \
+        (eb_devseq_crc32((w), (size_t)(nw) * 4u) == (w)[S3_CHAIN_CRCW(sl)])
+#else
+#define CRC_CHECK(w, nw, sl) s3_chain_crc_check((w), (nw), 4, \
+                                                eb_devseq_crc32)
+#endif
+        for (gi = 0; gi < GW; ++gi)         /* audio-ish filler + markers */
+            gbuf[gi] = 0x3f000000u + gi * 2654435761u;
+        for (gi = 0; gi < 256; ++gi)
+            gbuf[4 * gi + 3] = s3_chain_mark(9, gi);
+        s3_chain_crc_seal(gbuf, GW, 4, eb_devseq_crc32);
+        if (!CRC_CHECK(gbuf, GW, 4)) {
+            printf("CHAIN: *** in-band law: a sealed chunk failed its own "
+                   "check ***\n");
+            return 1;
+        }
+        /* check() zeroed the crc word: a second check must FAIL (proves
+         * the word participates and the check is not a tautology) */
+        if (CRC_CHECK(gbuf, GW, 4)) {
+            printf("CHAIN: *** in-band law: a chunk with a ZEROED crc word "
+                   "passed ***\n");
+            return 1;
+        }
+        s3_chain_crc_seal(gbuf, GW, 4, eb_devseq_crc32);
+        gbuf[777] ^= 0x00000100u;           /* one flipped bit, one word */
+        if (CRC_CHECK(gbuf, GW, 4)) {
+            printf("CHAIN: *** in-band law: a corrupted chunk passed ***\n");
+            return 1;
+        }
+        gbuf[777] ^= 0x00000100u;
+        s3_chain_crc_seal(gbuf, GW, 4, eb_devseq_crc32);
+        gbuf[S3_CHAIN_CRCW(4)] ^= 1u;       /* the crc word itself */
+        if (CRC_CHECK(gbuf, GW, 4)) {
+            printf("CHAIN: *** in-band law: a corrupted CRC WORD passed "
+                   "***\n");
+            return 1;
+        }
+#undef CRC_CHECK
+    }
+    printf("CHAIN: in-band crc law OK (seal round-trips, any corruption "
+           "refused)\n");
+
     /* ---- the sum law, on the real engine, all %d patches ----------------- */
     for (p = 0; p < EB_BANK_COUNT; ++p) {
         int mism = 0;

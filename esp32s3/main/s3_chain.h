@@ -114,6 +114,35 @@ static uint32_t s3_chain_realign_ci(uint32_t w, uint32_t n)
     return (ci < n) ? ci : 0;
 }
 
+/* ---- THE IN-BAND CRC LAW (2026-09-13; pure; gated in chain_gate.c) -------
+ * Frame 1's slot-3 word is redundant (every frame repeats the marker), so it
+ * carries the chunk's OWN CRC instead: computed over the whole chunk with
+ * that word held ZERO, then written into it. The receiver extracts, zeroes,
+ * recomputes and compares IN PLACE. This replaced advert/pend redemption:
+ * a CRC racing down a UART against audio through DMA rings, guarded by pend
+ * ageing and a relock threshold, was an entire failure surface of timing --
+ * three silicon runs churned on it. In-band, redemption is a property of
+ * the chunk alone. check() leaves the word zeroed (slot 3 is spare upward).
+ * The crc comes in as a pointer so the DEVICE (table twin) and the HOST
+ * GATE (eb_devseq_crc32) exercise the SAME sealing code. */
+#define S3_CHAIN_CRCW(slotw) ((slotw) + 3)      /* word index: frame 1, slot 3 */
+static uint32_t s3_chain_crc_seal(uint32_t *w, uint32_t nwords, int slotw,
+                                  uint32_t (*crc)(const void *, size_t))
+{
+    uint32_t c;
+    w[S3_CHAIN_CRCW(slotw)] = 0;
+    c = crc(w, (size_t)nwords * 4u);
+    w[S3_CHAIN_CRCW(slotw)] = c;
+    return c;
+}
+static int s3_chain_crc_check(uint32_t *w, uint32_t nwords, int slotw,
+                              uint32_t (*crc)(const void *, size_t))
+{
+    uint32_t inb = w[S3_CHAIN_CRCW(slotw)];
+    w[S3_CHAIN_CRCW(slotw)] = 0;
+    return crc(w, (size_t)nwords * 4u) == inb;
+}
+
 /* ---- THE MERGE LAW: what this chip writes on its DOWN hop ----------------
  * v[8]     = the chunk of voice samples this chip rendered (its window; the
  *            rest are 0).

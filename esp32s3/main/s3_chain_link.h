@@ -483,6 +483,12 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
                     (int32_t)s3_chain_mark(sq, (uint32_t)i);
             A_DN.tx_silent = 0;
             A_DN.tx_marked = 1;
+            /* IN-BAND CRC (s3_chain.h law): frame 1's redundant marker word
+             * becomes the chunk's own CRC. The advert now carries the same
+             * value (diagnostic only -- redemption is in the chunk). */
+            A_DN.tx_crc = s3_chain_crc_seal((uint32_t *)s3c_txbuf,
+                                            (uint32_t)(S3C_SLOTW * n),
+                                            S3C_SLOTW, s3c_crc32);
         } else {
             A_DN.tx_seq = 0;
             A_DN.tx_marked = 0;
@@ -506,13 +512,11 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
     if (A_DN.tx_off >= want) {
         A_DN.tx_off = 0;
         ++A_DN.tx_blk;
-        /* advertise MARKED (audio) chunks only. A pattern chunk's CRC can
-         * never match audio; advertising it banked up to 8 dead pends that
-         * aged out as mismatches right after lock (review 2026-09-06). */
-        if (!A_DN.tx_silent && A_DN.tx_marked) {
-            A_DN.tx_crc     = s3c_crc32(s3c_txbuf, want);   /* table twin */
+        /* advertise MARKED (audio) chunks only. tx_crc is the in-band seal
+         * computed at fill time (the merge guard keeps txbuf frozen between
+         * fill and completion, so the value still matches the bytes). */
+        if (!A_DN.tx_silent && A_DN.tx_marked)
             A_DN.tx_crc_blk = A_DN.tx_blk;
-        }
         tmo = 0;
     } else {
         tmo = (A_DN.pace == S3_BPACE_LINKED);
@@ -632,10 +636,6 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                 got_chunk = 0;
             }
         }
-        /* CRC only once LOCKED (it exists to redeem adverts); the pattern
-         * lock itself needs no checksum at all. Table twin, ~8 cyc/byte. */
-        if (A_UP.locked)
-            A_UP.crc_last = s3c_crc32(s3c_rxbuf, got);
         if (!A_UP.locked) {
             uint32_t idx0; int disc;
             if (s3_pat_scan((const uint32_t *)s3c_rxbuf, S3C_SLOTW * n,
@@ -658,18 +658,9 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
     } else if (got) {
         ++A_UP.rx_short;
     }
-    if (fresh_acrc && peer_acrc) {
-        int free_k = -1;
-        for (k = 0; k < 8; ++k) if (!A_UP.pend_used[k]) { free_k = k; break; }
-        if (free_k < 0) {
-            int old_k = 0;
-            for (k = 1; k < 8; ++k)
-                if (A_UP.pend_age[k] > A_UP.pend_age[old_k]) old_k = k;
-            A_UP.pend_used[old_k] = 0; ++A_UP.rx_mismatch; free_k = old_k;
-        }
-        A_UP.pend[free_k] = peer_acrc; A_UP.pend_age[free_k] = 0;
-        A_UP.pend_used[free_k] = 1;
-    }
+    /* Adverts no longer drive redemption (in-band CRC does); the pend
+     * machinery is retired with them. */
+    (void)fresh_acrc; (void)peer_acrc; (void)k;
     /* a PATTERN chunk must never redeem an advert or feed the mix gate.
      * THREE slots checked (review 2026-09-06): a decaying audio tail passes
      * floats with top byte 0xA5 (about -1e-16); two coincidences dropped a
@@ -681,7 +672,6 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
         ((uint32_t)s3c_rxbuf[2] & S3_PAT_MASK) == S3_PAT_TAG)
         got_chunk = 0;
     if (got_chunk && A_UP.locked) {
-        uint32_t c = A_UP.crc_last;
         /* chunk-sequence continuity, read from the marker (8-bit wrap) */
         {   uint32_t mk = (uint32_t)s3c_rxbuf[3];
             if ((mk & S3_CHAIN_MARK_MASK) == S3_CHAIN_MARK_TAG) {
@@ -695,31 +685,32 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                 A_UP.rx_seq_last = s; A_UP.rx_seq_have = 1;
             }
         }
-        for (k = 0; k < 8; ++k)
-            if (A_UP.pend_used[k] && A_UP.pend[k] == c) {
-                A_UP.pend_used[k] = 0;
+        /* IN-BAND redemption (s3_chain.h law): the chunk carries its own
+         * CRC in frame 1 slot 3; check leaves that word zeroed (spare). */
+        {   uint32_t inb = (uint32_t)s3c_rxbuf[S3_CHAIN_CRCW(S3C_SLOTW)];
+            if (s3_chain_crc_check((uint32_t *)s3c_rxbuf,
+                                   (uint32_t)(S3C_SLOTW * n), S3C_SLOTW,
+                                   s3c_crc32)) {
                 match = 1; ++A_UP.rx_match; A_UP.relock_miss = 0;
-                break;
-            }
-        for (k = 0; k < 8; ++k)
-            if (A_UP.pend_used[k] && ++A_UP.pend_age[k] > 32) {
+            } else {
                 if (!A_UP.mm_have) {
                     A_UP.mm_have = 1;
                     A_UP.mm_w[0] = (uint32_t)s3c_rxbuf[0];
                     A_UP.mm_w[1] = (uint32_t)s3c_rxbuf[1];
                     A_UP.mm_w[2] = (uint32_t)s3c_rxbuf[2];
                     A_UP.mm_w[3] = (uint32_t)s3c_rxbuf[3];
-                    A_UP.mm_crc  = c;
-                    A_UP.mm_pend = A_UP.pend[k];
+                    A_UP.mm_crc  = s3c_crc32(s3c_rxbuf,
+                                             (size_t)n * S3C_SLOTW
+                                                 * sizeof(int32_t));
+                    A_UP.mm_pend = inb;
                 }
-                A_UP.pend_used[k] = 0;
                 mismatch = 1; ++A_UP.rx_mismatch;
                 if (++A_UP.relock_miss >= 8) {
                     A_UP.locked = 0; A_UP.relock_miss = 0;
                     A_UP.rx_seq_have = 0;
-                    memset(A_UP.pend_used, 0, sizeof A_UP.pend_used);
                 }
             }
+        }
     }
     s3c_rx_fresh = got_chunk;
     return s3_amix_step(&A_UP.mix, hs_ok, got_chunk, match, mismatch)
