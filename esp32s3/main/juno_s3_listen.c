@@ -3680,6 +3680,19 @@ static void rpt_task(void *arg)
         printf("C1AT: v=%lu pro=%lu per sample (core 1: voice pass, "
                "prologue batch)\n", rpt_c1v, rpt_c1p);
 #endif
+#if S3L_RECALL
+        /* SLACK, in the COMPACT reporter (the chain builds never run the
+         * verbose block that owned this print, so core 0's true load was
+         * never on a chain log). spin = core 0 waiting at the w_done
+         * barrier; core 0's OWN load per sample = core 1's total minus
+         * spin/CHUNK. spin_min is the honest figure (a burst-free block). */
+        printf("SLACK: spin=%lu/%lu cyc per chunk (min/max) = %lu cyc/sample "
+               "free on core 0\n",
+               spin_min == 0xFFFFFFFFul ? 0ul : spin_min, spin_max,
+               (spin_min == 0xFFFFFFFFul ? 0ul : spin_min)
+                   / (unsigned long)CHUNK);
+        spin_min = 0xFFFFFFFFul; spin_max = 0;
+#endif
 #if S3L_REV_PIPE
         /* back = CORE 0's reverb+out pass. THE VERDICT NUMBER: fx (core 1,
          * now front only) must DROP by ~back vs the pre-REV_PIPE build. */
