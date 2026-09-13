@@ -254,3 +254,17 @@ aimed at the landing: rings 8->16 descriptors (46 ms armor both
 directions) and a cushion of 4 sealed SILENT marked chunks stuffed at
 the peer_alock 0->1 transition -- silence is free while the mix gate is
 still closed, and those chunks redeem instantly.
+
+## THE LOCK SURVIVES SEAMS (2026-09-13, after the first mix=OPEN)
+
+The rings+cushion flash produced the project's FIRST mix=OPEN (hop 3<-4,
+transient) and redemptions on 2 of 3 hops. The residual is the CASCADE:
+a chip churning on its UP hop (scan + relock load) stalls its DOWN
+sender, seaming the hop below -- the chain heals only top-down. The
+amplifier is the relock trigger: 8 missed chunks threw away a good lock
+and restarted pattern training, though under in-band CRC a miss convicts
+one seamed chunk, never the alignment (the marker realign holds that per
+chunk). Change: the lock now survives seams and drops only after 256
+consecutive misses (~1.5 s dead stream = rebooted/unwired peer). With
+relocking near-zero, the unlocked pattern-scan cost leaves the steady
+state and the storm loses its fuel.

@@ -738,7 +738,16 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                     A_UP.mm_pend = inb;
                 }
                 mismatch = 1; ++A_UP.rx_mismatch;
-                if (++A_UP.relock_miss >= 8) {
+                /* Under IN-BAND CRC a miss convicts ONE chunk (a seam), not
+                 * the lock: alignment is maintained per chunk by the marker
+                 * realign, so re-training buys nothing and costs the storm
+                 * -- the 8-miss trigger fed the churn cascade (unlock ->
+                 * pattern flip -> scan load -> stalls -> more seams on the
+                 * hop below). The lock now survives seams; it drops only
+                 * when the stream is DEAD for ~1.5 s (256 chunks with no
+                 * single clean one), which is a rebooted or unwired peer,
+                 * not a bad moment. */
+                if (++A_UP.relock_miss >= 256) {
                     A_UP.locked = 0; A_UP.relock_miss = 0;
                     A_UP.rx_seq_have = 0;
                 }
