@@ -361,6 +361,14 @@ typedef struct {
     uint32_t tx_seq;
     uint32_t rx_seq_last, rx_seq_ok, rx_seq_slips; int rx_seq_have;
     uint32_t rx_realigns;
+    /* RATE PROBE (2026-09-13, pure counters, zero behavior change): total
+     * BYTES moved through this port since boot, and the longest single
+     * i2s_channel_write/read wait in us. The report prints them; the bench
+     * diffs two reports to get the true wire rate -- board 2's loop ran at
+     * engine speed while every clock read as correct in the code, and that
+     * contradiction is settled by measuring, not arguing (playbook 46). */
+    uint64_t io_bytes;
+    uint32_t io_wait_max_us;
     uint32_t mm_w[4], mm_crc, mm_pend; int mm_have;
     uint32_t pend[8]; uint16_t pend_age[8]; uint8_t pend_used[8];
     uint32_t relock_miss;
@@ -464,8 +472,14 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
         }
     }
     tmo = (A_DN.pace == S3_BPACE_LINKED) ? pdMS_TO_TICKS(20) : 0;
-    i2s_channel_write(A_DN.ch, (const char *)s3c_txbuf + A_DN.tx_off,
-                      want - A_DN.tx_off, &wrote, tmo);
+    {   int64_t tw0 = esp_timer_get_time();
+        i2s_channel_write(A_DN.ch, (const char *)s3c_txbuf + A_DN.tx_off,
+                          want - A_DN.tx_off, &wrote, tmo);
+        {   uint32_t wus = (uint32_t)(esp_timer_get_time() - tw0);
+            if (wus > A_DN.io_wait_max_us) A_DN.io_wait_max_us = wus;
+        }
+        A_DN.io_bytes += (uint64_t)wrote;
+    }
     A_DN.tx_off += wrote;
     if (A_DN.tx_off >= want) {
         A_DN.tx_off = 0;
@@ -519,6 +533,7 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                                  (size_t)n * S3C_SLOTW * sizeof(int32_t),
                                  &g, 0) != ESP_OK || !g)
                 break;
+            A_UP.io_bytes += (uint64_t)g;
         } while (++d < 4);
         A_UP.locked = 0;
         A_UP.rx_seq_have = 0;    /* a returning peer restarts its sequence */
@@ -530,6 +545,7 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
         uint32_t w = A_UP.discard_left;
         if (w > (uint32_t)S3C_CHW) w = (uint32_t)S3C_CHW;
         i2s_channel_read(A_UP.ch, s3c_rxbuf, w * sizeof(int32_t), &g, 0);
+        A_UP.io_bytes += (uint64_t)g;
         A_UP.discard_left -= (uint32_t)(g / sizeof(int32_t));
         if (A_UP.discard_left) return 0;
     }
@@ -544,6 +560,7 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
             if (i2s_channel_read(A_UP.ch, base + A_UP.rx_off,
                                  want - A_UP.rx_off, &g, 0) != ESP_OK || !g)
                 break;
+            A_UP.io_bytes += (uint64_t)g;
             A_UP.rx_off += g;
             if (A_UP.rx_off < want) { ++A_UP.rx_short; break; }
             A_UP.rx_off = 0;
@@ -692,6 +709,9 @@ static void s3c_report(void)
             A_UP.mm_have = 0;
         }
     }
+    /* RATE PROBE: cumulative since boot -- the bench diffs two reports.
+     * 44100 frames/s x 16 B = 705600 B/s is the lawful wire rate. */
+    printf("CHAINrateUP: rxB=%llu\n", (unsigned long long)A_UP.io_bytes);
 #endif
 #if S3C_HAS_DOWN
     if (C_DN.started)
@@ -701,6 +721,9 @@ static void s3c_report(void)
                C_DN.peer.present ? s3_handshake_name(C_DN.hs) : "no peer yet",
                (unsigned long)A_DN.tx_blk, (unsigned long)A_DN.tx_timeouts,
                (unsigned long)C_DN.ev_gap, (unsigned long)A_DN.tx_seq);
+    printf("CHAINrateDN: txB=%llu wmax=%luus\n",
+           (unsigned long long)A_DN.io_bytes,
+           (unsigned long)A_DN.io_wait_max_us);
 #endif
     printf("CHAINev: sent=%lu applied=%lu\n", s3c_ev_sent, s3c_ev_applied);
 }
