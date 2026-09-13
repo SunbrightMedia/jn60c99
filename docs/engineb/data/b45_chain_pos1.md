@@ -334,3 +334,37 @@ window assignment gives two chips exactly that pairing. Required shave:
 in capture.py one run too long and polluted their own follow-up run
 (pos3/4 at 11-12 ms after t=45/60) -- a probe is REMOVED the day its
 answer lands. mix=OPEN reproduced 11 times even so.
+
+## SCOPE DIRECTIVE: THE FULL PANEL (2026-09-13, user-binding)
+
+The user redirected the machine's scope mid-shave: the four boards run
+the FULL ORIGINAL PORT -- delay and reverb included, NO 1982 byte law.
+"By nailing the ORIGINAL port, the CLASSIC port falls into line." Every
+budget number above stands (voice costs are panel-independent); what
+changes is chip 1, which now carries the full master chain with the
+nine PSRAM rings (the pre-classic rings_alloc path).
+
+Done the same hour: EB_CLASSIC dropped from chain_gate.sh +
+build_chain4.sh (kept identical); chain_gate.c gives the REF and CHAIN
+masters PRIVATE zeroed rings (shared rings would corrupt both delay
+tails and fail the sum law for a non-chain reason); boot triple +
+answer key regenerated at full flags -- map complete, SUM LAW EXACTLY 0
+on 64/64 patches WITH delay/reverb/e5 ticking, all three teeth bite.
+
+SHELVED BY THIS DIRECTIVE: the classic-constant shave hunt.
+tools/engineb/classic_scan.c (committed d981fe0) measured 343
+byte-law-constant coefficient words (80 zero) as deletion candidates --
+valid ONLY under EB_CLASSIC, so none of it may be spent on the full
+panel. ⚠ KNOWN DEFECT recorded before shelving: that scan derives
+coefficients WITHOUT PLAYING NOTES, so note-path smoother targets
+(cv.k6864, lfo.k1856 -- the documented species) appear as false
+constants in its report. If the tool is ever revived, the note axis
+(devrecall gate.c notes() battery, silent-vs-noted diff) must be added
+and toothed on those two cells FIRST. Do not consume the d981fe0
+report as it stands.
+
+NEXT LOG MUST ANSWER (one flash, run_test.bat): chip 1's full-master
+cost on silicon (FXP fx= line + rings_alloc PSRAM print + un=), hop 1<-2
+still green under full panel, and fresh pos3/4 numbers (C1AT v=/pro=,
+spin_min/max attribute core 0 for free: spin~0 = core 0 critical,
+spin large = core 1 critical).
