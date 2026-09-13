@@ -375,6 +375,20 @@ typedef struct {
      * and shows WHERE the seam falls: always on 128-frame descriptor
      * boundaries = DMA-quantized inserts; random = byte-time cuts. */
     uint32_t mm_f[6];
+    /* THE FULL BATTERY (one flash, many answers -- the bench's gift):
+     * ci_last = last 4 realign rotations raw; ci_h buckets: [mult of 128 |
+     * <16 | other | =0 never counted]. seam_last = last 4 seam frame
+     * indexes found by scanning a bad chunk's markers; seam_h buckets:
+     * [on 128 | on 64 | other | NO seam found (single-seq bad chunk =
+     * content corruption, a different disease)]. z_chunks = chunks whose
+     * frame-0 slot 3 carries NO tag and are not pattern (raw underrun
+     * output, previously invisible). */
+    uint32_t ci_last[4], ci_h[3];
+    uint32_t seam_last[4], seam_h[4];
+    uint32_t z_chunks;
+    uint8_t  ci_i, seam_i;
+    /* B-side write-size split: full chunk in one call / partial / zero. */
+    uint32_t wr_full, wr_part, wr_zero;
     uint32_t pend[8]; uint16_t pend_age[8]; uint8_t pend_used[8];
     uint32_t relock_miss;
     uint32_t crc_last;
@@ -485,7 +499,14 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
                                             S3C_SLOTW, s3c_crc32);
             i2s_channel_write(A_DN.ch, s3c_txbuf, want, &w2, 20);
             A_DN.io_bytes += (uint64_t)w2;
-            if (w2 < want) break;          /* ring holds enough already */
+            if (w2 < want) {
+                /* FIX: a part-written cushion chunk left UNTRACKED bytes in
+                 * the ring -- a permanent rotation seeded at every lock
+                 * transition. Hand the remainder to the normal completion
+                 * path (tx_off), exactly like any partial chunk. */
+                A_DN.tx_off = w2;
+                break;
+            }
             ++A_DN.tx_blk;
         }
         A_DN.tx_marked = 1;
@@ -545,6 +566,9 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
             if (wus > A_DN.io_wait_max_us) A_DN.io_wait_max_us = wus;
         }
         A_DN.io_bytes += (uint64_t)wrote;
+        if (!wrote)                              ++A_DN.wr_zero;
+        else if (wrote == want - A_DN.tx_off)    ++A_DN.wr_full;
+        else                                     ++A_DN.wr_part;
     }
     A_DN.tx_off += wrote;
     if (A_DN.tx_off >= want) {
@@ -669,6 +693,8 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                             + ((size_t)n - ci) * S3C_SLOTW * sizeof(int32_t),
                         tail);
                 A_UP.rx_off = tail;
+                A_UP.ci_last[A_UP.ci_i++ & 3u] = ci;
+                ++A_UP.ci_h[(ci % 128u == 0u) ? 0 : (ci < 16u) ? 1 : 2];
                 ++A_UP.rx_realigns;
                 A_UP.rx_seq_have = 0;
                 got_chunk = 0;
@@ -721,6 +747,8 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                         ++A_UP.rx_seq_slips;
                 }
                 A_UP.rx_seq_last = s; A_UP.rx_seq_have = 1;
+            } else {
+                ++A_UP.z_chunks;   /* no tag at frame 0: raw underrun output */
             }
         }
         /* IN-BAND redemption (s3_chain.h law): the chunk carries its own
@@ -747,6 +775,28 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
                                              (size_t)n * S3C_SLOTW
                                                  * sizeof(int32_t));
                     A_UP.mm_pend = inb;
+                }
+                /* seam scan: the first frame whose marker disagrees with
+                 * frame 0 (frame 1 is the crc word -- skipped). No seam on
+                 * a bad chunk = single-seq content corruption: a DIFFERENT
+                 * disease, counted apart. ~256 reads, mismatch path only. */
+                {   uint32_t s0_ = ((uint32_t)s3c_rxbuf[3] >> 9) & 0xFFu;
+                    int kk_, seam_ = -1;
+                    for (kk_ = 2; kk_ < n; ++kk_) {
+                        uint32_t wm_ =
+                            (uint32_t)s3c_rxbuf[S3C_SLOTW * kk_ + 3];
+                        if ((wm_ & S3_CHAIN_MARK_MASK) != S3_CHAIN_MARK_TAG
+                            || ((wm_ >> 9) & 0xFFu) != s0_) {
+                            seam_ = kk_;
+                            break;
+                        }
+                    }
+                    if (seam_ < 0) ++A_UP.seam_h[3];
+                    else {
+                        A_UP.seam_last[A_UP.seam_i++ & 3u] = (uint32_t)seam_;
+                        ++A_UP.seam_h[(seam_ % 128 == 0) ? 0
+                                      : (seam_ % 64 == 0) ? 1 : 2];
+                    }
                 }
                 mismatch = 1; ++A_UP.rx_mismatch;
                 /* Under IN-BAND CRC a miss convicts ONE chunk (a seam), not
@@ -806,6 +856,17 @@ static void s3c_report(void)
     /* RATE PROBE: cumulative since boot -- the bench diffs two reports.
      * 44100 frames/s x 16 B = 705600 B/s is the lawful wire rate. */
     printf("CHAINrateUP: rxB=%llu\n", (unsigned long long)A_UP.io_bytes);
+    printf("CHAINdx: ci=[%lu %lu %lu %lu] cih=[%lu %lu %lu] "
+           "seam=[%lu %lu %lu %lu] sh=[%lu %lu %lu %lu] z=%lu\n",
+           (unsigned long)A_UP.ci_last[0], (unsigned long)A_UP.ci_last[1],
+           (unsigned long)A_UP.ci_last[2], (unsigned long)A_UP.ci_last[3],
+           (unsigned long)A_UP.ci_h[0], (unsigned long)A_UP.ci_h[1],
+           (unsigned long)A_UP.ci_h[2],
+           (unsigned long)A_UP.seam_last[0], (unsigned long)A_UP.seam_last[1],
+           (unsigned long)A_UP.seam_last[2], (unsigned long)A_UP.seam_last[3],
+           (unsigned long)A_UP.seam_h[0], (unsigned long)A_UP.seam_h[1],
+           (unsigned long)A_UP.seam_h[2], (unsigned long)A_UP.seam_h[3],
+           (unsigned long)A_UP.z_chunks);
 #endif
 #if S3C_HAS_DOWN
     if (C_DN.started)
@@ -815,9 +876,11 @@ static void s3c_report(void)
                C_DN.peer.present ? s3_handshake_name(C_DN.hs) : "no peer yet",
                (unsigned long)A_DN.tx_blk, (unsigned long)A_DN.tx_timeouts,
                (unsigned long)C_DN.ev_gap, (unsigned long)A_DN.tx_seq);
-    printf("CHAINrateDN: txB=%llu wmax=%luus\n",
+    printf("CHAINrateDN: txB=%llu wmax=%luus wr=[%lu %lu %lu]\n",
            (unsigned long long)A_DN.io_bytes,
-           (unsigned long)A_DN.io_wait_max_us);
+           (unsigned long)A_DN.io_wait_max_us,
+           (unsigned long)A_DN.wr_full, (unsigned long)A_DN.wr_part,
+           (unsigned long)A_DN.wr_zero);
 #endif
     printf("CHAINev: sent=%lu applied=%lu\n", s3c_ev_sent, s3c_ev_applied);
 }
