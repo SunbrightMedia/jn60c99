@@ -187,3 +187,16 @@ I2S_GPIO_UNUSED (internal clock + DMA pacing identical, B5 counters live,
 zero audio-path change on pos 1 -- its build keeps the original gpio_cfg
 verbatim). Full write-up: playbook 91. BENCH SIGNAL for the next flash:
 the `GPIO 5 is not usable` warning MUST BE GONE on boards 2-4.
+
+## THE RATE PROBE CONVICTS THE PACER (2026-09-13, same bench day)
+
+Probe flash (rate counters only): board 2 DN fed 634,880 B/s of the
+lawful 705,600 (90%); board 1 UP read 543,459 B/s (77%); board 2's
+longest DN write wait was 39 us against a nominal 20 ms timeout. A
+"blocking" pacer that never blocks named the defect: the LINKED write
+passed pdMS_TO_TICKS(20) to an API that takes MILLISECONDS (playbook
+92) -- 0 ticks at 100 Hz, non-blocking forever, on the chain AND on the
+two-board link it was copied from. Second defect, same probe: the RX
+discard path read once per block and starved recovery. Both fixed
+(ms units; bounded full drain). Expected next flash: wmax in the
+milliseconds, timeouts ~0, realign settles, ok= counts, mix=OPEN.

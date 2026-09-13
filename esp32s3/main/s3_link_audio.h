@@ -215,7 +215,11 @@ static int s3_la_tx(float vb[][EB_NUM_VOICES], int n, int hs_ok)
     want = (size_t)n * 2u * sizeof(int32_t);
     /* LINKED paces here (A's clock drains it); FREERUN must not block on a
      * wire that may have no clock at all -- 0 ticks, drop what will not fit */
-    tmo = (LA.pace == S3_BPACE_LINKED) ? pdMS_TO_TICKS(20) : 0;
+    /* i2s_channel_write takes MILLISECONDS, not ticks -- pdMS_TO_TICKS(20)
+     * here handed the driver 2 "ms" -> 0 ticks at the 100 Hz tick rate, a
+     * pacer that never blocked. Found on the CHAIN4 twin of this line by
+     * the rate probe (playbook 92); fixed here for the same reason. */
+    tmo = (LA.pace == S3_BPACE_LINKED) ? 20 : 0;
     i2s_channel_write(LA.ch, la_buf, want, &wrote, tmo);
     ++LA.tx_blk;
     if (!silent && wrote == want) {

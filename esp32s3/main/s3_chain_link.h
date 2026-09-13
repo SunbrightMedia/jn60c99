@@ -471,7 +471,12 @@ static int s3c_tx(int n, int hs_ok, int peer_alock)
             A_DN.tx_marked = 0;
         }
     }
-    tmo = (A_DN.pace == S3_BPACE_LINKED) ? pdMS_TO_TICKS(20) : 0;
+    /* i2s_channel_write takes MILLISECONDS and converts internally
+     * (pdMS_TO_TICKS(timeout_ms) in i2s_common.c). Passing pdMS_TO_TICKS(20)
+     * handed it 2 "ms" -> 0 ticks at the 100 Hz tick rate: the LINKED pacer
+     * NEVER BLOCKED on silicon (rate probe: wmax=39us, 634880 of 705600 B/s
+     * fed, perpetual slave underrun = the realign churn). Playbook 92. */
+    tmo = (A_DN.pace == S3_BPACE_LINKED) ? 20 : 0;
     {   int64_t tw0 = esp_timer_get_time();
         i2s_channel_write(A_DN.ch, (const char *)s3c_txbuf + A_DN.tx_off,
                           want - A_DN.tx_off, &wrote, tmo);
@@ -541,12 +546,22 @@ static int s3c_rx(int n, int peer_present, int hs_ok,
         return 0;
     }
     if (A_UP.discard_left) {
-        size_t g = 0;
-        uint32_t w = A_UP.discard_left;
-        if (w > (uint32_t)S3C_CHW) w = (uint32_t)S3C_CHW;
-        i2s_channel_read(A_UP.ch, s3c_rxbuf, w * sizeof(int32_t), &g, 0);
-        A_UP.io_bytes += (uint64_t)g;
-        A_UP.discard_left -= (uint32_t)(g / sizeof(int32_t));
+        /* Drain the WHOLE discard now (bounded like the no-peer drain).
+         * The old single read per block STARVED the port during recovery
+         * -- the rate probe measured 543459 of 705600 lawful B/s read, so
+         * the RX ring overflowed behind every rotation and one slip
+         * snowballed into permanent churn. Playbook 92. */
+        int d_ = 0;
+        while (A_UP.discard_left && d_++ < 4) {
+            size_t g = 0;
+            uint32_t w = A_UP.discard_left;
+            if (w > (uint32_t)S3C_CHW) w = (uint32_t)S3C_CHW;
+            if (i2s_channel_read(A_UP.ch, s3c_rxbuf, w * sizeof(int32_t),
+                                 &g, 0) != ESP_OK || !g)
+                break;
+            A_UP.io_bytes += (uint64_t)g;
+            A_UP.discard_left -= (uint32_t)(g / sizeof(int32_t));
+        }
         if (A_UP.discard_left) return 0;
     }
     /* A zero-timeout read returns only what the ready descriptors hold, so a

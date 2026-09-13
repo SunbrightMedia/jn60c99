@@ -1913,3 +1913,44 @@ instead of eleven.
 3. Two push-pull outputs on one wire (the stolen LRCK vs the peer's UART
    TX) is electrical contention, not just a data fault. Power down a rig
    in this state; do not leave it soaking.
+
+## 92. AN API'S TIMEOUT UNITS ARE PART OF ITS ABI -- AND A PACER MUST BE
+## SEEN TO BLOCK (paid 2026-09-13, CHAIN4 hop 1<-2)
+
+`i2s_channel_write(handle, src, size, written, timeout_ms)` takes
+MILLISECONDS and converts internally (`pdMS_TO_TICKS(timeout_ms)`,
+i2s_common.c). The chain's LINKED pacer passed `pdMS_TO_TICKS(20)` --
+already-converted TICKS. At CONFIG_FREERTOS_HZ=100 that is 2, read as
+2 ms, converted to 0 ticks: a NON-BLOCKING write. The LINKED pacer --
+the mechanism the whole B-side timing rests on -- NEVER BLOCKED ON
+SILICON, ever, including in the "proven" two-board arc (s3_link_audio.h
+carried the same line; the pairwise null gates measured content, not
+pacing). Consequences measured by the rate probe: the slave fed the wire
+634,880 of 705,600 B/s, underran ~10% of the time, every underrun
+rotated the stream, and the marker realign healed each rotation just in
+time for the next. A SECOND defect amplified it: the receiver's discard
+path did ONE read per block and returned, so recovery starved the port
+(543,459 of 705,600 B/s read) and the RX ring overflowed behind every
+rotation.
+
+The three wrong theories on the way (handshake flapping, patch stepping,
+a fast TDM clock) were each killed by one controlled change or one
+measurement -- the robot-off run, the driver-source read, the byte
+counters. The units defect was then found in ONE read of the driver's
+function signature, steered by an impossible measurement: a 20 ms
+timeout that returned in 39 us.
+
+### The rules
+1. NEVER pre-convert a timeout. Read the parameter's UNIT from the
+   callee's signature at the call site; `pdMS_TO_TICKS` belongs only in
+   code that consumes TICKS directly.
+2. A pacer is a detector: it must be SEEN TO BLOCK (wait-time probe)
+   before the pacing claim is believed -- exactly the see-it-fail law
+   applied to timing. wmax=39us on a "20 ms blocking" write convicted it
+   in one line.
+3. Every drain/recovery path must drain AT WIRE RATE, bounded, not one
+   buffer per block. A recovery path slower than arrival turns one slip
+   into permanent churn.
+4. When two theories contradict ("clock fast" vs "clock correct"),
+   STOP ARGUING AND COUNT BYTES. A cheap cumulative byte counter on each
+   port settled in one flash what four analyses could not.
