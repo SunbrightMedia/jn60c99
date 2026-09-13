@@ -1954,3 +1954,26 @@ timeout that returned in 39 us.
 4. When two theories contradict ("clock fast" vs "clock correct"),
    STOP ARGUING AND COUNT BYTES. A cheap cumulative byte counter on each
    port settled in one flash what four analyses could not.
+
+## 93. A NULL INSTRUMENT'S VERDICT IS WORTH NOTHING UNTIL ITS TOOTH HAS
+##     BITTEN -- AND THE CANONICAL CHAIN GATE RENDERED WITH A SILENT LFO
+
+Paid 2026-09-13, twice in one hour, by the same discipline that caught
+both. (1) The new REFCRC cross-build null read "64/64 keys identical"
+for an engine edit -- and its tooth (break the LIVE LFO path) then
+moved 0 of 64 keys. The green verdict had proven nothing: at 2,048
+samples the render sits inside the LFO's delay ramp. (2) Chasing that
+refusal exposed the deeper defect: chain_gate.c rendered through
+eb_engine_render_voices (sh == NULL); voice 0 is at rest in every chain
+window, so its LFO arm never ran and EVERY sum-law green ever printed
+was proven WITH A SILENT LFO, while the firmware free-runs the prologue
+every sample. The gate now runs eb_engine_render_shared per engine per
+sample, and the teeth move 25-26 of 64 keys.
+
+Rules. A green from a new instrument may not be QUOTED until its tooth
+has been SEEN TO FAIL on the exact path the verdict covers. When a
+tooth refuses to bite, the instrument is the suspect -- and so is the
+canonical gate it was built from: the refusal is a REACH probe pointed
+at both. And a harness that "renders the same engine" must be audited
+against the FIRMWARE'S OWN CALL SHAPE (here: sh non-NULL), exactly as
+playbook 91 audits pin maps against the firmware's own pin users.
