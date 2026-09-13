@@ -368,3 +368,54 @@ cost on silicon (FXP fx= line + rings_alloc PSRAM print + un=), hop 1<-2
 still green under full panel, and fresh pos3/4 numbers (C1AT v=/pro=,
 spin_min/max attribute core 0 for free: spin~0 = core 0 critical,
 spin large = core 1 critical).
+
+## FULL-PANEL SILICON VERDICT + THE HUNT'S FIRST HONEST FINDING (2026-09-13)
+
+Log c2415e52 (one bat run, four boards, full panel). MEASURED:
+- pos1 (DAC): FULL FX chain fits. FXP fx=2608 v1=823 wait=0; the whole
+  master (chorus+delay+reverb+e5) = ~2,608 cyc/sample on core 1, ~2,834
+  cyc SPARE on that core. Audio un=0, no NaN. THE FULL ORIGINAL PORT IS
+  PROVEN ON CHIP 1.
+- pos3/pos4 (2-voice chips): C1AT v=5,044 pro=727. core 1 = 5,044+727
+  = 5,771 vs 5,442 budget -> ~329 over, drift +11,970 and climbing.
+  They starve the wire (B5 deficit 1,600), so pos2 then pos1 close the
+  mix gate. The KNOWN gap, nothing new broke.
+- Hop 1<-2 opens (mix=OPEN seen) but closes under the starvation from
+  above -- not a link fault, a feed fault.
+
+HUNT PASS 1 (module read, EXACTLY-0 only): the well is DRY.
+- VCF ladder eb_vcf_tick (610 cyc, the fattest): the default path is the
+  4x-collapsed exact recurrence; every coef (c9520/c9184/c9104/c9152)
+  live, every term load-bearing. NO dead arithmetic. The one lever
+  (EB_VCF_ZDF1X==2) DROPS THE NYQUIST ZERO = approximation, FORBIDDEN.
+- VCA 330, decim 85, nsvf 54, noisemix 38: proven transcriptions, no
+  structural zero.
+- Already-spent exact levers: EB_ZEROCOEF (13 lfo + vcf-cv coefs),
+  EB_VCF_DEADCOEF, EB_ATREST_BLOCK, EB_FUSE_VCA.
+- Prologue 727 = notecv+cvgate+glide+LFO for voice 0; the LFO delay
+  env chains through glide, so it cannot be split; EB_LFO_FREERUN
+  mandates it every sample. IRREDUCIBLE by exact means.
+
+THE ARITHMETIC THAT REMAINS: 6 voices x 5,044 + one 727 prologue PER
+CHIP + one 2,608 master, on 4 chips x 2 cores where the master eats a
+whole core. Any chip that renders 2 voices has BOTH cores at 5,044 and
+the 727 prologue has no home. At least two chips MUST render 2 voices
+(6 voices > 4 chips). So the gap is STRUCTURAL, not a missing micro-opt.
+
+THREE EXACT-OR-NOT PATHS (a scope/risk decision, owed to the user):
+ 1. SHIP THE SHARED LFO DOWN THE WIRE. Chip 1 computes the 3 LFO floats;
+    the 2-voice chips receive them instead of running the 727 prologue
+    -> 5,044 < 5,442, gap CLOSED, bit-exact (shipped value == computed).
+    COST: a per-sample wire dependency on a value that today every chip
+    derives independently; a dropped packet corrupts pitch/PWM/filter mod
+    rather than muting. New link machinery. Touches THE INVARIANT.
+ 2. CONTROL-RATE the CV chain (EB_CR_*): ~330 cyc recoverable, but it is
+    an APPROXIMATION (lerp between computed samples). Forbidden by the
+    ZERO-approximation rule unless the user reopens it.
+ 3. Accept 6 voices need a different split; re-derive whether a
+    5-voice-max panel or a heavier per-chip balance exists. (Does not
+    fit 6 exact voices; needs a scope change.)
+
+NONE is a silent per-module tweak. The honest state: the FULL PORT works
+per chip; the 4-chip SUM is blocked by 329 structural cyc with no exact
+micro-shave available.
