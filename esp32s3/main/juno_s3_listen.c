@@ -2631,6 +2631,11 @@ static unsigned long prologue_us = 0, prologue_n = 0;
 #if S3L_FXPROF
 /* per-sample averages over the last reported second, published for rpt_task */
 static volatile unsigned long rpt_fx_cyc = 0, rpt_v1_cyc = 0, rpt_wait_cyc = 0;
+#if S3L_PROLOGUE_C1
+/* C1AT: core-1 attribution accumulators (worker writes, reporter reads). */
+static unsigned long c1at_v = 0, c1at_p = 0, c1at_n = 0;
+static volatile unsigned long rpt_c1v = 0, rpt_c1p = 0;
+#endif
 #if S3L_REV_PIPE
 static volatile unsigned long rpt_back_cyc = 0;   /* core 0's reverb+out    */
 static unsigned long fxp_back = 0, fxp_back_n = 0;
@@ -2755,10 +2760,25 @@ static void worker(void *arg)
          * previous pass's ahead-batch, or render_block's first-block prime), so
          * core 1 never waits per sample -- the whole per-sample w_ready handshake
          * is gone from the critical path. */
+        /* C1AT -- CORE-1 ATTRIBUTION (2026-09-13). Three CCOUNT reads per
+         * BLOCK (not per sample), so it ships in the default image. It
+         * exists because pos3/pos4's loop = core 1's SUM (voice + prologue
+         * batch, sequential below) and that sum measures ~600-700 cyc/sample
+         * over budget with nothing named. Tooth: -DS3L_C1AT_TOOTH=n burns n
+         * cycles per sample INSIDE the voice region; c1v must rise by
+         * exactly n and c1p must not move. */
+        {   unsigned long a0 = (unsigned long)esp_cpu_get_cycle_count(), a1;
+#ifdef S3L_C1AT_TOOTH
+        {   unsigned long tt = (unsigned long)esp_cpu_get_cycle_count();
+            while ((unsigned long)esp_cpu_get_cycle_count() - tt
+                   < (unsigned long)S3L_C1AT_TOOTH * (unsigned long)w_n) { }
+        }
+#endif
         for (i = 0; i < w_n; ++i)
             eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
                                    SPLIT_, HI_, &w_shb[w_cur][i],
                                    w_vbb[cur][i]);
+        a1 = (unsigned long)esp_cpu_get_cycle_count();
         /* Then compute the NEXT chunk's prologues into the OTHER bank, ONE CHUNK
          * AHEAD. It runs BEFORE w_done=1, so it finishes inside this pass and can
          * never overlap the quiescent window's writes to gate_cell320[0]/
@@ -2772,6 +2792,16 @@ static void worker(void *arg)
             }
             w_shb_rc[wr] = rc;
             w_shb_valid  = 1;
+        }
+        if (w_n > 0) {
+            c1at_v += (a1 - a0) / (unsigned long)w_n;
+            c1at_p += ((unsigned long)esp_cpu_get_cycle_count() - a1)
+                      / (unsigned long)w_n;
+            if (++c1at_n >= 64) {
+                rpt_c1v = c1at_v / c1at_n; rpt_c1p = c1at_p / c1at_n;
+                c1at_v = c1at_p = 0; c1at_n = 0;
+            }
+        }
         }
 #else
         for (i = 0; i < w_n; ++i) {
@@ -3646,6 +3676,10 @@ static void rpt_task(void *arg)
          * extra cycles are not here, the rings are not the cause. */
         printf("FXP: fx=%lu v1=%lu wait=%lu per sample\n",
                rpt_fx_cyc, rpt_v1_cyc, rpt_wait_cyc);
+#if S3L_PROLOGUE_C1
+        printf("C1AT: v=%lu pro=%lu per sample (core 1: voice pass, "
+               "prologue batch)\n", rpt_c1v, rpt_c1p);
+#endif
 #if S3L_REV_PIPE
         /* back = CORE 0's reverb+out pass. THE VERDICT NUMBER: fx (core 1,
          * now front only) must DROP by ~back vs the pre-REV_PIPE build. */
