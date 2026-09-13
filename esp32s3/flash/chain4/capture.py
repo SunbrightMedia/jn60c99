@@ -10,13 +10,11 @@ import serial, sys, threading, time
 PORTS = sys.argv[1:5]
 DUR = 100            # capture seconds; reports come every 10 s
 ROBOT_OFF_AT = 25    # send 'r' to POS1 after boot+recall are done
-# SPLIT PROBE (no-flash experiment): ',' moves the core split DOWN one.
-# At t=45 s POS4 goes split 3->2 (core 0 renders ZERO voices) and at
-# t=60 s POS3 goes 5->4 (same). If core-0 eng stays ~6.1 ms with no
-# voices, the mystery cost is non-voice work; if it collapses, the
-# at-rest voice path itself is the suspect. Reports before/after in
-# one log tell it.
-KEYS = [(0, ROBOT_OFF_AT, b"r"), (3, 45, b","), (2, 60, b",")]
+# The split-probe keys (2026-09-13) are RETIRED: they answered their
+# question (prologue 720 confirmed, core-1 voice 4,832 at patch 0) and
+# then polluted the rest of that run. A probe key must be removed the
+# day its answer lands.
+KEYS = [(0, ROBOT_OFF_AT, b"r")]
 
 lock = threading.Lock()
 f = open("chain4_log.txt", "a", encoding="utf-8", errors="replace")

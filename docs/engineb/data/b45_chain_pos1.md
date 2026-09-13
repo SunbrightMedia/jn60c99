@@ -319,3 +319,18 @@ core 1 = windowed voice + prologue runs ~600-900 cyc/sample over the
 hunt: a CORE-1 voice measures ~5.7k cyc/sample where core 0's measures
 ~5.05-5.3k -- same code. Attribute core 1 (voice vs prologue vs
 overhead) BEFORE shaving anything (playbook 46).
+
+## C1AT ATTRIBUTION LANDS: THE STRUCTURAL LAW IN NUMBERS (2026-09-13)
+
+MEASURED on silicon (C1AT, per-block stamps): prologue = 714-734
+cyc/sample on every chip (b45's 717 CONFIRMED); one core-1 voice at
+patch 0 = ~4,832; empty voice window = 77. A 2-voice chip's core 1 =
+4,832 + 720 + 77 = ~5,630 vs the 5,442 budget on the CHEAPEST patch;
+with b44's average exact voice (5,045) the sum is 5,765. THE LAW:
+VOICE + PROLOGUE NEVER FITS ONE CORE, on any patch, and every possible
+window assignment gives two chips exactly that pairing. Required shave:
+~320-350 cyc/sample from voice+prologue, EXACTLY-0 levers only
+(user-binding). Note for the method log: the split-probe keys stayed
+in capture.py one run too long and polluted their own follow-up run
+(pos3/4 at 11-12 ms after t=45/60) -- a probe is REMOVED the day its
+answer lands. mix=OPEN reproduced 11 times even so.
