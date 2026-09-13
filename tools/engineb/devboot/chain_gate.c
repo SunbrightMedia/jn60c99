@@ -43,13 +43,20 @@
 #error "chain_gate is a 6-voice law -- build with -DDEVCHORD_N=6"
 #endif
 
-#define NSAMP 2048   /* per patch; envelopes + chorus move well inside this */
+#ifndef NSAMP
+#define NSAMP 2048   /* per patch; envelopes + chorus move well inside this.
+                      * Overridable: the REFCRC cross-build null needs a
+                      * window long enough for the LFO to clear its delay
+                      * ramp and reach the audio (its tooth showed 2,048 is
+                      * NOT: a broken live wrap moved 0 of 64 keys). */
+#endif
 
 static eb_render_coefs RC;
 static eb_master_coef  MC;
 static eb_render_state RS0;          /* the seeded state, copied per engine */
 static eb_master_state MS0;
 static unsigned char BANKBUF[EB_DEVSEQ_BANK_BYTES];
+static float REFPCM[2 * NSAMP];      /* the REF stream, for the cross-build key */
 
 /* the five render states (ref + four positions) and two master states */
 static eb_render_state RSr, RSp[5];
@@ -282,16 +289,32 @@ int main(int argc, char **argv)
             float vr[EB_NUM_VOICES], Lr = 0, Rr = 0, Lc = 0, Rc = 0;
             float vp[5][EB_NUM_VOICES];
             float w4[4], w3[4], w2[4], m[EB_NUM_VOICES];
+            eb_shared_tick shr, shp;
+            /* THE PROLOGUE RUNS HERE, AS THE FIRMWARE RUNS IT (2026-09-13).
+             * This gate used to call eb_engine_render_voices (sh == NULL):
+             * voice 0 is at rest in every window, its LFO arm never ran, and
+             * the WHOLE GATE RENDERED WITH A SILENT LFO -- found because the
+             * REFCRC tooth refused to bite on a broken live LFO edit (0 of
+             * 64 keys moved). The firmware free-runs the prologue every
+             * sample (EB_LFO_FREERUN); now the gate does too, one private
+             * shared-tick per engine, exactly the four-chips reality where
+             * every chip derives the identical LFO from identical seeds. */
             /* REF */
             for (k = 0; k < EB_NUM_VOICES; ++k) vr[k] = 0.0f;
-            eb_engine_render_voices(&Er, &RSr, &RC,
-                                    (const eb_render_needs *)0, vr);
+            shr.ready = 0;
+            eb_engine_render_shared(&Er, &RSr, &RC, &shr);
+            eb_engine_render_range(&Er, &RSr, &RC, (const eb_render_needs *)0,
+                                   S3_CHAIN_V_LO, S3_CHAIN_V_HI, &shr, vr);
             (void)eb_master_render(&MSr, &MC, &RGr, vr, &Lr, &Rr);
             /* CHAIN */
             for (pos = 1; pos <= 4; ++pos) {
                 for (k = 0; k < EB_NUM_VOICES; ++k) vp[pos][k] = 0.0f;
-                eb_engine_render_voices(&Ep[pos], &RSp[pos], &RC,
-                                        (const eb_render_needs *)0, vp[pos]);
+                shp.ready = 0;
+                eb_engine_render_shared(&Ep[pos], &RSp[pos], &RC, &shp);
+                eb_engine_render_range(&Ep[pos], &RSp[pos], &RC,
+                                       (const eb_render_needs *)0,
+                                       cfg[pos].v_lo, cfg[pos].v_hi,
+                                       &shp, vp[pos]);
             }
             s3_chain_merge(&cfg[4], vp[4], (const float *)0, 0, w4);
             s3_chain_merge(&cfg[3], vp[3], w4, 1, w3);
@@ -315,8 +338,17 @@ int main(int argc, char **argv)
                            (unsigned long)*(uint32_t *)&Lc);
                 mism = 1;
             }
+            REFPCM[2 * i] = Lr; REFPCM[2 * i + 1] = Rr;
         }
         if (mism) { ++mism_patches; bad = 1; }
+        /* THE REF-STREAM KEY. The sum law above compares fork-vs-fork
+         * WITHIN one build and is blind to an ENGINE edit (both sides
+         * change identically). This line is the cross-build null: an
+         * EXACTLY-0 engine change must leave all 64 keys byte-identical
+         * between the before and after runs, and a tooth edit must move
+         * them. Print-only -- diff two runs, never assert one. */
+        printf("REFCRC: patch %2d %08lx\n", p,
+               (unsigned long)eb_devseq_crc32(REFPCM, sizeof REFPCM));
     }
     printf("CHAIN: %s -- %lu of %d patches mismatched over %d samples each; "
            "-0.0 pre-adds seen %lu\n",
