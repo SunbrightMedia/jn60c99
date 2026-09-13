@@ -303,3 +303,19 @@ NOT yet attributed. Next session: core-0 attribution on pos4 (the
 lightest failing case: 1 voice + DN port, no UP), then the re-balance
 or the fix the attribution names. Do not guess ahead of it (playbook
 84/46).
+
+## THE IDLE-COST "DEFECT" REFUTED BY PROVENANCE (2026-09-13, research pass)
+
+Idle voice cost == active voice cost is THE PLUGIN'S OWN LAW, not a
+defect: the binary renders all 8 voices every sample unconditionally
+(RENDER_LOOP_LOG.md 43-68; numVoices pinned at 8, PROVEN), the port
+reproduces it (juno_driver.c 117-122), and the one state-derived idle
+predicate ever written (eb_env_atrest) was MEASURED unsafe in 153/162
+coefficient sets (BUDGET_STATUS.md 43-60) and is uncalled. atrest is a
+fork lever, legal ONLY as the chain's WINDOW selector. Therefore the
+2-voice chips' shortfall is permanent load, not a sleeping bug:
+core 1 = windowed voice + prologue runs ~600-900 cyc/sample over the
+5,442 budget at all times. One suspicious number remains before any
+hunt: a CORE-1 voice measures ~5.7k cyc/sample where core 0's measures
+~5.05-5.3k -- same code. Attribute core 1 (voice vs prologue vs
+overhead) BEFORE shaving anything (playbook 46).
