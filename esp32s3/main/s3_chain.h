@@ -24,6 +24,8 @@
 #define JUNO_S3_CHAIN_H
 
 #include <stdint.h>             /* the marker law below */
+#include <stddef.h>             /* size_t (the crc laws) */
+#include <string.h>             /* memcpy: the fast crc's aligned load */
 
 /* wire format: 4 slots x 32-bit, one TDM frame per sample, every hop */
 #define S3_CHAIN_SLOTS 4
@@ -141,6 +143,63 @@ static int s3_chain_crc_check(uint32_t *w, uint32_t nwords, int slotw,
     uint32_t inb = w[S3_CHAIN_CRCW(slotw)];
     w[S3_CHAIN_CRCW(slotw)] = 0;
     return crc(w, (size_t)nwords * 4u) == inb;
+}
+
+/* ---- THE FAST CRC (2026-09-14; pure; gated in chain_gate.c) --------------
+ * Slicing-by-4 over the SAME reflected CRC-32 (poly 0xEDB88320, init/xor
+ * 0xFFFFFFFF) the byte-wise twins compute: one 32-bit load + four table
+ * looks per FOUR bytes instead of four loads + four looks. SAME VALUES for
+ * every input -- this is an implementation of the identical function, and
+ * the equivalence is EXECUTED, not assumed: chain_gate.c compares it
+ * against eb_devseq_crc32 over a mixed corpus (and its tooth corrupts one
+ * table entry, which MUST be refused), and the device's s3c_crc_init
+ * repeats the comparison on the chip before anything trusts the tables.
+ * WHY: measured on the b45t log, the two 4 KB chunk passes (seal + check)
+ * cost ~258 cyc/sample of the middle chips' ~415-536 link budget at the
+ * byte-wise table's ~8 cyc/byte. Little-endian word order is Xtensa's and
+ * the host gate's alike; an unaligned head/tail is walked byte-wise so the
+ * function stays total. Tables: 4 KB of DRAM, built once. */
+static uint32_t s3_chain_crc_t4[4][256];
+static int      s3_chain_crc_t4_ok;
+static void s3_chain_crc_fast_init(void)
+{
+    uint32_t i, k, c;
+    for (i = 0; i < 256; ++i) {
+        c = i;
+        for (k = 0; k < 8; ++k)
+            c = (c >> 1) ^ (0xEDB88320u & (uint32_t)(-(int32_t)(c & 1u)));
+        s3_chain_crc_t4[0][i] = c;
+    }
+    for (i = 0; i < 256; ++i) {
+        c = s3_chain_crc_t4[0][i];
+        for (k = 1; k < 4; ++k) {
+            c = (c >> 8) ^ s3_chain_crc_t4[0][c & 0xFFu];
+            s3_chain_crc_t4[k][i] = c;
+        }
+    }
+    s3_chain_crc_t4_ok = 1;
+}
+static uint32_t s3_chain_crc32_fast(const void *p, size_t n)
+{
+    const unsigned char *q = (const unsigned char *)p;
+    uint32_t c = 0xFFFFFFFFu;
+    while (n && ((uintptr_t)q & 3u)) {            /* unaligned head */
+        c = (c >> 8) ^ s3_chain_crc_t4[0][(c ^ *q++) & 0xFFu];
+        --n;
+    }
+    while (n >= 4) {
+        uint32_t w;                               /* strict-alias-safe load */
+        memcpy(&w, q, 4);
+        c ^= w;                                   /* little-endian order    */
+        c = s3_chain_crc_t4[3][c & 0xFFu]
+          ^ s3_chain_crc_t4[2][(c >> 8) & 0xFFu]
+          ^ s3_chain_crc_t4[1][(c >> 16) & 0xFFu]
+          ^ s3_chain_crc_t4[0][c >> 24];
+        q += 4; n -= 4;
+    }
+    while (n--)                                   /* byte tail */
+        c = (c >> 8) ^ s3_chain_crc_t4[0][(c ^ *q++) & 0xFFu];
+    return c ^ 0xFFFFFFFFu;
 }
 
 /* ---- THE MERGE LAW: what this chip writes on its DOWN hop ----------------

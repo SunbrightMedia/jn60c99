@@ -253,6 +253,41 @@ int main(int argc, char **argv)
     printf("CHAIN: in-band crc law OK (seal round-trips, any corruption "
            "refused)\n");
 
+    /* ---- the FAST crc equivalence (2026-09-14) ---------------------------
+     * s3_chain_crc32_fast (slicing-by-4, the device's streaming twin) must
+     * equal eb_devseq_crc32 for EVERY input tried: a marked-chunk-shaped
+     * corpus at every length 0..600 and at the full 4 KB, from aligned and
+     * all three misaligned starts. CHAIN_TOOTH_CRCFAST corrupts one slice
+     * table entry after init; every check below must then FAIL. */
+    {
+        static uint32_t cb[1030];
+        const unsigned char *base = (const unsigned char *)cb;
+        uint32_t gi;
+        int off, ln, neq = 0, ntot = 0;
+        s3_chain_crc_fast_init();
+#ifdef CHAIN_TOOTH_CRCFAST
+        s3_chain_crc_t4[2][0x5A] ^= 0x00010000u;
+#endif
+        for (gi = 0; gi < 1030; ++gi)
+            cb[gi] = 0x3f000000u + gi * 2654435761u;
+        for (gi = 0; gi < 256; ++gi)
+            cb[4 * gi + 3] = s3_chain_mark(9, gi);
+        for (off = 0; off < 4; ++off)
+            for (ln = 0; ln <= 600; ++ln, ++ntot)
+                if (s3_chain_crc32_fast(base + off, (size_t)ln)
+                    != eb_devseq_crc32(base + off, (size_t)ln)) ++neq;
+        for (off = 0; off < 4; ++off, ++ntot)
+            if (s3_chain_crc32_fast(base + off, 4096)
+                != eb_devseq_crc32(base + off, 4096)) ++neq;
+        if (neq) {
+            printf("CHAIN: *** fast crc DIVERGES from eb_devseq_crc32 on "
+                   "%d of %d cases ***\n", neq, ntot);
+            return 1;
+        }
+        printf("CHAIN: fast crc EQUAL to eb_devseq_crc32 on all %d cases "
+               "(lengths 0..600 + 4096, four alignments)\n", ntot);
+    }
+
     /* ---- the sum law, on the real engine, all %d patches ----------------- */
     for (p = 0; p < EB_BANK_COUNT; ++p) {
         int mism = 0;

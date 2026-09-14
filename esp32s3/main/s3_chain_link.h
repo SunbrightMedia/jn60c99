@@ -314,29 +314,35 @@ static void s3c_ctl_poll(s3c_ctl *c, int my_patch, unsigned long my_crc,
  * running it over a 4 KB chunk on the block tail cost ~960 cyc/sample --
  * cyc read 6,343 against the 5,442 budget and the DAC starved. Same dialect,
  * ~8 cyc/byte, PROVEN equal on a test vector before anything trusts it. */
-static uint32_t s3c_crctab[256];
 static int      s3c_crctab_ok;
+/* 2026-09-14: the byte-wise table walk (~8 cyc/B) gave way to the pure
+ * slicing-by-4 law in s3_chain.h -- SAME VALUES, host-gated equivalence
+ * (chain_gate.c step 6 + tooth). The chip still refuses to stream until
+ * it has itself proven the fast twin equal to eb_devseq_crc32, on a test
+ * vector AND a 4 KB marked-chunk-shaped corpus with odd head/tail cuts. */
 static uint32_t s3c_crc32(const void *p, size_t n)
 {
-    const unsigned char *q = (const unsigned char *)p;
-    uint32_t c = 0xFFFFFFFFu;
-    size_t i;
-    for (i = 0; i < n; ++i)
-        c = (c >> 8) ^ s3c_crctab[(c ^ q[i]) & 0xFFu];
-    return c ^ 0xFFFFFFFFu;
+    return s3_chain_crc32_fast(p, n);
 }
 static int s3c_crc_init(void)
 {
-    uint32_t i, k, c;
     static const unsigned char tv[] = { 49,50,51,52,53,54,55,56,57 };
+    static uint32_t corpus[1024];
+    uint32_t i;
+    int ok;
     if (s3c_crctab_ok) return 1;
-    for (i = 0; i < 256; ++i) {
-        c = i;
-        for (k = 0; k < 8; ++k)
-            c = (c >> 1) ^ (0xEDB88320u & (uint32_t)(-(int32_t)(c & 1u)));
-        s3c_crctab[i] = c;
-    }
-    s3c_crctab_ok = (s3c_crc32(tv, 9) == eb_devseq_crc32(tv, 9));
+    s3_chain_crc_fast_init();
+    for (i = 0; i < 1024; ++i)
+        corpus[i] = 0x3f000000u + i * 2654435761u;
+    for (i = 0; i < 256; ++i)
+        corpus[4 * i + 3] = s3_chain_mark(7, i);
+    ok = (s3c_crc32(tv, 9) == eb_devseq_crc32(tv, 9))
+      && (s3c_crc32(corpus, sizeof corpus)
+          == eb_devseq_crc32(corpus, sizeof corpus))
+      && (s3c_crc32((const unsigned char *)corpus + 1, 4093)
+          == eb_devseq_crc32((const unsigned char *)corpus + 1, 4093))
+      && (s3c_crc32(corpus, 7) == eb_devseq_crc32(corpus, 7));
+    s3c_crctab_ok = ok;
     return s3c_crctab_ok;
 }
 
