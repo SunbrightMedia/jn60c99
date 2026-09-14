@@ -1101,3 +1101,25 @@ long before this work; my diff touches it 0 times. Left for a separate,
 focused fix -- regenerating EB_RECALL_POS needs the WHY of the drift
 (a param add/remove?) understood first, and that is a different subsystem
 from the warm-edit path. Flagged to the user.
+
+## SILICON (VERSION 20260914211631, log 20260914_142946): PARAM FIX HOLDS ON 3/4;
+## POS4 BOOT-CRC FLAKE
+
+The plugin-parity warm-edit build, on the wired 4-board bench under the robot
+storm:
+  POS1  un=0  nb=187397 midi=255  mix=OPEN  -> storm off: SIL SILENT, SILV
+        v5/v6/v7 rg=dg=0 (v7 e1/e2 frozen at-rest, pk=0 -> no audio).
+  POS2  un=0  nb=28395  midi=15   mix=OPEN  -> SIL SILENT, rg=dg=0.
+  POS3  un=3  nb=28987  midi=15             -> SIL SILENT, rg=dg=0.
+        (un=3 is FROZEN and PRE-EXISTING: 204047 showed the same 3 on POS3.)
+  STUCK=0 across the whole log. No drone. The param cure holds on silicon with
+  REAL note traffic on three boards.
+  POS4  *** MUTE AT BOOT: coefficients disagree with the host answer key ***,
+        nb=0 -> its SILENT is trivial (muted), NOT a proof.
+
+NOT this change: the mute is a BOOT-time coefficient CRC mismatch. This change
+touches only the WARM param path (pm_apply, on edits), never dev_burst or the
+coefficient builders; POS1/2/3 ran the SAME boot code and matched the key
+(0 bad). 204047 (prev build) had POS4 MATCH. So a 1-of-4 boot mismatch is a
+board/flash/PSRAM flake, not the code. Re-flashed the SAME bins as VERSION
+20260914213344 for one clean 4-board run to confirm POS4.
