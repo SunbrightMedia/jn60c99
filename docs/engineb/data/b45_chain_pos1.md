@@ -491,3 +491,27 @@ post-barrier 452 is the true hoard):
     skew class). Gate: serial-vs-piped bit compare + tooth (b39 idiom).
  Predicted after both, patch 0: core1 ~5,380, core0 ~5,330-5,430. THIN
  but green-able; the seeded robot rides the same flash.
+
+## THE FIX BUILD: WHAT LANDED AND THE HONEST PREDICTION (2026-09-14)
+
+Landed, each gated (commits on the branch):
+ 1. FAST CRC (slicing-by-4, s3_chain.h, pure): equal to eb_devseq_crc32
+    on 2,408 host cases + on-chip re-proof before streaming; tooth
+    (corrupted slice entry) SEEN TO FAIL. Predicted ~-170 cyc/sample on
+    the middle chips' core 0.
+ 2. VCA PIPE (EB_VCA_DEFER engine law + S3L_VCA_PIPE on pos3/4):
+    deferred == serial BIT-IDENTICAL (chain_gate step 7, 2 patches x
+    4096 samples, prologue live; one-ULP tooth bites). Moves ~240
+    cyc/sample off the critical core; the chip ships one chunk later,
+    uniformly (accepted skew class).
+ 3. Already aboard: the -150 LFO trim, the seeded robot (phase 7,
+    runtime-gated), SLACK/C1AT/SEED reporting.
+
+PREDICTION, stated BEFORE the flash (playbook 11b): pos2 ~5,289 GREEN;
+pos1 GREEN (unchanged); pos3/4 core 1 ~5,244-5,330... but the AGGREGATE
+(2 voices + prologue + link) still reads ~11,032 vs 10,884 at patch 0
+-- ~148 over -- so pos3/4 may land JUST over, at ~5,5xx-5,6xx block. If
+red: the same log's SLACK + cyc split names the remaining link segment
+(i2s driver copies are the suspect) and that is the next, last shave.
+This flash is honestly expected to be GREEN-OR-NAME-THE-REST, not
+guaranteed green.
