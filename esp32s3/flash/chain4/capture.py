@@ -8,13 +8,16 @@
 import serial, sys, threading, time
 
 PORTS = sys.argv[1:5]
-DUR = 100            # capture seconds; reports come every 10 s
-ROBOT_OFF_AT = 25    # send 'r' to POS1 after boot+recall are done
+# optional argv[5] = duration seconds (default 100); argv[6] = robot-off
+# second (0 = NEVER send 'r' -- the robot runs the whole capture; that is
+# the SOAK configuration, CHAIN4_SOAK.md layers 1+2).
+DUR = int(sys.argv[5]) if len(sys.argv) > 5 else 100
+ROBOT_OFF_AT = int(sys.argv[6]) if len(sys.argv) > 6 else 25
 # The split-probe keys (2026-09-13) are RETIRED: they answered their
 # question (prologue 720 confirmed, core-1 voice 4,832 at patch 0) and
 # then polluted the rest of that run. A probe key must be removed the
 # day its answer lands.
-KEYS = [(0, ROBOT_OFF_AT, b"r")]
+KEYS = [(0, ROBOT_OFF_AT, b"r")] if ROBOT_OFF_AT > 0 else []
 
 lock = threading.Lock()
 f = open("chain4_log.txt", "a", encoding="utf-8", errors="replace")
