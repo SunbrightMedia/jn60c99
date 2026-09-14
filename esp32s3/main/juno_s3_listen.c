@@ -2027,12 +2027,17 @@ static const signed char CON_KEY[128] = {
 };
 static unsigned char con_held[128];
 static int  con_base = 60;              /* middle C */
-#if S3L_CHAIN && S3_CHAIN_POS == 1
-/* THE PACED PANIC SWEEP (armed by 'r'-off and SPACE): release every note
- * number 0..127 through the REAL entry, a few per block, resuming past a
- * full queue -- see s3c_all_off_local for the held-map hole this closes.
- * -1 = idle. */
-static int g_panic_note = -1;
+#if S3L_CHAIN
+/* THE ENGINE-LEVEL PANIC (2026-09-14, the decisive fix -- bench log
+ * 20260914105005 proved every prior all-off was queue-mediated and so
+ * REFUSABLE by a flooded follower, leaving voices stuck ON with steady
+ * envelopes). g_alloff_want is armed by robot-off, SPACE, and a received
+ * chain ALLOFF; the note-machine site then calls eb_alloc_note_off(&ALLOC,
+ * -1, ...) DIRECTLY into the burst -- the allocator's own proven all-off
+ * (poly_release_key(-1) gates every ASSIGNED voice regardless of the
+ * note->voice binding, and the correct HELD broadcast is recomputed to 0).
+ * No queue, so nothing can refuse it. Runs on EVERY board. */
+static volatile int g_alloff_want = 0;
 #endif
 /* The console-settable split. Declared here because the console reader below
  * writes it and is defined before the block that explains it; the reasoning
@@ -2067,18 +2072,18 @@ static void con_poll(void)
         int note;
         if (c == ' ') {                 /* panic: release everything */
             int k;
-            for (k = 0; k < 128; ++k)
-                if (con_held[k]) { con_held[k] = 0;
-                                   juno_event_note_off(JUNO_SRC_CONSOLE, k); }
+            for (k = 0; k < 128; ++k) con_held[k] = 0;
 #if S3L_STRESS
-            stress_all_off();           /* the robot's held notes too */
+            stress_all_off();           /* the robot's held-note bookkeeping */
 #endif
-#if S3L_CHAIN && S3_CHAIN_POS == 1
-            /* PANIC IS CHAIN-WIDE: same resync law as the robot-off
-             * handler below (see its comment for the paid defect).
-             * The paced local sweep covers chip 1's own refused offs. */
-            g_panic_note = 0;
+#if S3L_CHAIN
+            /* ENGINE-LEVEL PANIC on this board + broadcast it chain-wide.
+             * g_alloff_want -> eb_alloc_note_off(-1) at the note site, which
+             * NO queue can refuse (see the flag's declaration). */
+            g_alloff_want = 1;
+#if S3_CHAIN_POS == 1
             s3c_ev_send(((int)JUNO_SRC_CONSOLE << 4) | 2, 0, 0);
+#endif
 #endif
             continue;
         }
@@ -2094,33 +2099,26 @@ static void con_poll(void)
                                : "engine is QUIET; play by hand now");
             if (!g_stress_rt) {
                 int k;
-                for (k = 0; k < 128; ++k)
-                    if (con_held[k]) { con_held[k] = 0;
-                                       juno_event_note_off(JUNO_SRC_CONSOLE, k); }
+                for (k = 0; k < 128; ++k) con_held[k] = 0;
 #if S3L_STRESS
-                /* AND the robot's own held notes -- without this they
-                 * drone forever after robot-off (the map lives above
-                 * stress_step; see its comment for the paid defect). */
-                stress_all_off();
+                stress_all_off();       /* robot's held-note bookkeeping */
 #endif
-#if S3L_CHAIN && S3_CHAIN_POS == 1
-                /* AND THE WHOLE CHAIN (paid on the bench, 'robot still
-                 * makes noise after off'): under the storm the followers'
-                 * queues REFUSE a large share of the note stream, and a
-                 * refused note-OFF is a voice that rings FOREVER on that
-                 * chip -- worse, the four allocators diverge, so later
-                 * hand-played notes land on voices the chips disagree
-                 * about. The ALLOFF frame is the chain's own resync: on
-                 * every chip it now sweeps ALL 128 notes (see
-                 * s3c_all_off_local for the held-map hole this closes)
-                 * and all four allocators return to the same empty
-                 * state. Chip 1 arms the same full sweep locally, PACED
-                 * at the poll site (its own queue may still hold storm
-                 * backlog; an unpaced sweep would be refused the same
-                 * way the disease was). kind low nibble 2 =
-                 * S3C_EV_ALLOFF. */
-                g_panic_note = 0;
+#if S3L_CHAIN
+                /* THE ENGINE-LEVEL PANIC (bench log 20260914105005): under
+                 * the storm the followers' queues REFUSE most of the note
+                 * stream, so a queue-mediated all-off (every earlier
+                 * attempt) is itself refused and voices ring FOREVER with
+                 * steady envelopes. g_alloff_want drives
+                 * eb_alloc_note_off(&ALLOC, -1) directly into the burst at
+                 * the note site -- the allocator's own proven all-off,
+                 * which gates every ASSIGNED voice by index (no note->voice
+                 * lookup to be wrong) and no queue can drop. Every board
+                 * runs it; chip 1 also broadcasts the chain ALLOFF so 2..4
+                 * arm the same thing. */
+                g_alloff_want = 1;
+#if S3_CHAIN_POS == 1
                 s3c_ev_send(((int)JUNO_SRC_CONSOLE << 4) | 2, 0, 0);
+#endif
 #endif
             }
             continue;
@@ -3656,6 +3654,20 @@ static void render_block(int n)
          * consecutive defers, one drain yields the block: the pm build
          * begins, the queued notes land ONE BLOCK late, nothing is lost. */
 #define PM_STARVE_N 86           /* half a second, then one yielded block */
+#if S3L_CHAIN
+        /* THE ENGINE-LEVEL PANIC, ahead of every other note work: when armed
+         * (robot-off, SPACE, or a received chain ALLOFF) run the allocator's
+         * own all-off DIRECTLY into the burst -- no queue, so a flooded
+         * follower cannot refuse it (bench log 20260914105005). It gates
+         * every ASSIGNED voice by index, so a desynced note->voice binding
+         * cannot hide a stuck voice. eb_nb_idle guards the shadow's one
+         * owner, exactly as ev_apply does. */
+        if (g_alloff_want && !note_pending && eb_nb_idle(&NB)) {
+            int aoff = eb_alloc_note_off(&ALLOC, -1, ALLOC_EV);
+            if (aoff > 0) { note_nev = aoff; note_pending = 1; }
+            g_alloff_want = 0;
+        }
+#endif
         if (!note_pending) {
             if (pm_want && pm_starve >= PM_STARVE_N
                 && eb_pm_idle(&PM) && eb_nb_idle(&NB))
@@ -4247,6 +4259,8 @@ static void rpt_task(void *arg)
  * site (same context as every other dev_request) consumes. */
 static volatile int s3c_want_patch = -1;
 static void s3c_patch_follow(int peer_patch) { s3c_want_patch = peer_patch; }
+/* the header's ALLOFF paths arm this; the note-machine site consumes it. */
+static void s3c_request_alloff(void) { g_alloff_want = 1; }
 /* apply one chain event through the SAME boundary chip 1's inputs use.
  * The wrappers at the top of this file rename juno_event_note_on/off;
  * the parentheses call the REAL functions. */
@@ -5224,18 +5238,6 @@ void app_main(void)
             con_poll();
 #if S3L_PANEL
             pan_poll();
-#endif
-#if S3L_CHAIN && S3_CHAIN_POS == 1
-            if (g_panic_note >= 0) {    /* the paced panic sweep */
-                int pk = 0;
-                while (g_panic_note < 128 && pk < 8) {
-                    if (!(juno_event_note_off)(JUNO_SRC_CONSOLE,
-                                               g_panic_note))
-                        break;          /* queue full: resume next block */
-                    ++g_panic_note; ++pk;
-                }
-                if (g_panic_note >= 128) g_panic_note = -1;
-            }
 #endif
 #if S3L_STRESS
             /* g_stress_rt: the robot is GATED AT RUNTIME (console 'r').
