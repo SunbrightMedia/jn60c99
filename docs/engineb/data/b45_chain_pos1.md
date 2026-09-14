@@ -539,3 +539,25 @@ reservoir is the i2s driver copies + non-crc tail, which this log's
 CRCBENCH + counters will size. The exact-engine arithmetic on a
 2-voice chip (2 voices + prologue + link vs 10,884) remains the wall;
 every remaining lever is in OUR link/driver code, not the engine.
+
+## LOG 17ab5535: POS2 GREEN -- FIRST MIDDLE CHIP EVER -- AND THE ROM
+## CRC IS CROWNED (2026-09-14)
+
+MEASURED:
+- POS2: cyc 5,421 < 5,442, drift -2 (FLAT), un=0. The mirror pipe
+  (VCA_PIPE0) did exactly what its gate said. FIRST middle chip to
+  hold real time.
+- POS1: 5,413, drift +150, and its UP stream went CLEAN: bad 42-56
+  per report (was ~1,500) -- a green sender means an honest wire.
+  mix=OPEN sustained.
+- POS3 5,951 / POS4 5,717: better (-232/-152 vs b45u), still red.
+- CRCBENCH, all four chips agree: rom=10,125-10,126 cyc/KB beats
+  byte (12,821-16,400) and slice4 (16,913-18,210); values IDENTICAL.
+  The bench-first discipline paid: this swap ships MEASURED (326226d),
+  with boot refusal unless rom == byte == eb_devseq_crc32.
+
+ROUND 4 (staged): the ROM streaming CRC. PREDICTION: pos4 ~5,55-5,62x
+(NEAR green), pos3 ~5,80-5,85x (red ~360-410; it pays TWO crc passes
+and the drain). After this log: the remaining pos3/4 reservoir is the
+i2s driver copy path (read+write ~8 KB/block through the driver) --
+the last named exact lever before protocol-level redesign.
