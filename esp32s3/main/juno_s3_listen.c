@@ -2720,6 +2720,17 @@ static volatile unsigned long rpt_c1v = 0, rpt_c1p = 0;
 #error "S3L_VCA_PIPE0 defers exactly ONE core-0 voice: build with S3L_SPLIT == S3L_VOICE_LO + 1"
 #endif
 #endif
+/* TAT -- TAIL ATTRIBUTION (2026-09-14). Two CRC "wins" in a row predicted
+ * cycles the silicon refused to hand over, so the tail's ~440 cyc/sample
+ * gets named by CCOUNT stamps, not models: rx (drain+judge), mg (merge
+ * loop), tx (fill+seal+write), ctl (both polls), adv (at-rest advance,
+ * core 0, pre-barrier). Five stamps per BLOCK; prints with the report. */
+#if S3L_CHAIN
+static unsigned long tat_rx, tat_mg, tat_tx, tat_ctl, tat_adv, tat_n;
+static volatile unsigned long rpt_trx, rpt_tmg, rpt_ttx, rpt_tctl, rpt_tadv;
+#define TAT0(v) { unsigned long v = (unsigned long)esp_cpu_get_cycle_count();
+#define TAT1(v, acc) acc += ((unsigned long)esp_cpu_get_cycle_count() - v)                             / (unsigned long)CHUNK; }
+#endif
 #if S3L_VCA_PIPE || S3L_VCA_PIPE0
 static eb_vca_defer s3v_bank[2][CHUNK];      /* deferring core fills [cur]  */
 static const eb_render_coefs *s3v_rc[2];     /* the rc the fronts used      */
@@ -3020,7 +3031,12 @@ static void render_block(int n)
         w_split = s_;
     }
 #endif
+#if S3L_CHAIN
+    TAT0(ta_) eb_engine_advance_atrest(&EBE, RS, rc, LO_, EB_NUM_VOICES, n);
+    TAT1(ta_, tat_adv)
+#else
     eb_engine_advance_atrest(&EBE, RS, rc, LO_, EB_NUM_VOICES, n);
+#endif
     w_n    = n;
     w_ready = 0;
 #if S3L_PROLOGUE_C1
@@ -3837,6 +3853,11 @@ static void rpt_task(void *arg)
                (spin_min == 0xFFFFFFFFul ? 0ul : spin_min)
                    / (unsigned long)CHUNK);
         spin_min = 0xFFFFFFFFul; spin_max = 0;
+#endif
+#if S3L_CHAIN
+        printf("TAT: rx=%lu mg=%lu tx=%lu ctl=%lu adv=%lu cyc/sample "
+               "(the tail, named)\n",
+               rpt_trx, rpt_tmg, rpt_ttx, rpt_tctl, rpt_tadv);
 #endif
 #if S3L_STRESS
         /* the seeded layer's ledger: lcg is the LIVE generator state, so a
@@ -5046,10 +5067,12 @@ void app_main(void)
             int up_ok = 0;
 #if S3C_HAS_UP
             {   int hs_up;
-                s3c_ctl_poll(&C_UP, dev_patch, mycrc, 0, 0, A_UP.locked);
+                TAT0(tc_) s3c_ctl_poll(&C_UP, dev_patch, mycrc, 0, 0,
+                                       A_UP.locked); TAT1(tc_, tat_ctl)
                 hs_up = C_UP.peer.present && C_UP.hs == S3_HS_OK;
-                up_ok = s3c_rx(CHUNK, C_UP.peer.present, hs_up,
+                TAT0(tr_) up_ok = s3c_rx(CHUNK, C_UP.peer.present, hs_up,
                                C_UP.peer_acrc, C_UP.acrc_fresh);
+                TAT1(tr_, tat_rx)
                 C_UP.acrc_fresh = 0;
             }
 #endif
@@ -5070,6 +5093,7 @@ void app_main(void)
                 /* NEVER refill the TX buffer over a part-written chunk (the
                  * splice's CRC matches no advert). Freerun only; a LINKED
                  * write completes inside its own block. */
+                TAT0(tm_)
                 if (!s3c_tx_busy())
                 for (ci = 0; ci < CHUNK; ++ci)
                     s3_chain_merge(&cc_,
@@ -5092,10 +5116,20 @@ void app_main(void)
 #endif
                                    up_ok,
                                    (float *)&s3c_txbuf[S3C_SLOTW * ci]);
-                s3c_ctl_poll(&C_DN, dev_patch, mycrc,
+                TAT1(tm_, tat_mg)
+                TAT0(tc2_) s3c_ctl_poll(&C_DN, dev_patch, mycrc,
                              A_DN.tx_crc, A_DN.tx_crc_blk, 0);
+                TAT1(tc2_, tat_ctl)
                 hs_dn = C_DN.peer.present && C_DN.hs == S3_HS_OK;
-                s3c_tx(CHUNK, hs_dn, C_DN.peer_alock);
+                TAT0(tt_) s3c_tx(CHUNK, hs_dn, C_DN.peer_alock);
+                TAT1(tt_, tat_tx)
+                if (++tat_n >= 64) {
+                    rpt_trx = tat_rx / tat_n; rpt_tmg = tat_mg / tat_n;
+                    rpt_ttx = tat_tx / tat_n; rpt_tctl = tat_ctl / tat_n;
+                    rpt_tadv = tat_adv / tat_n;
+                    tat_rx = tat_mg = tat_tx = tat_ctl = tat_adv = 0;
+                    tat_n = 0;
+                }
             }
 #endif
         }
