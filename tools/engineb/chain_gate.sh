@@ -13,7 +13,7 @@ HERE="$REPO/tools/engineb/devboot"
 # firmware build (DEVCRC_RC_SZ tooth also enforces).
 DEFS="-DEB_FORK_S3 -DEB_LFO_SHARED=1 -DEB_VCF_DEADCOEF=1 -DEB_ATREST_BLOCK=1 \
 -DEB_ATREST_O1=1 -DEB_ZEROCOEF=1 -DEB_EXP_MEMO=1 -DEB_FUSE_VCA=1 \
--DEB_NOLIBM=1"
+-DEB_NOLIBM=1 -DEB_VCA_DEFER=1"
 
 echo "=== 1. the chord-6 boot triple + answer key (make_boot) ==="
 EBOOT_DEFS="$DEFS" python3 "$HERE/make_boot.py" --chord 6
@@ -72,4 +72,15 @@ if "$BUILD/chain_gate_crcfast" "$BUILD/ebdev_boot.bin" "$BUILD/eb_bank64.bin" \
     exit 1
 fi
 echo "fast-crc tooth bites: the corrupted table FAILED the gate, as it must."
+
+echo "=== 7. the vca-defer tooth (a perturbed banked ctl MUST fail) ==="
+cc $CFLAGS $DEFS -DEB_DEVCELLS -DEBDEV_NV=8 -DDEVCHORD_N=6 \
+   -DCHAIN_TOOTH_VCAPIPE=1 \
+   -o "$BUILD/chain_gate_vcapipe" "$HERE/chain_gate.c" $SRCS $DEVSRC -lm
+if "$BUILD/chain_gate_vcapipe" "$BUILD/ebdev_boot.bin" "$BUILD/eb_bank64.bin" \
+                               "$BUILD/eb_template.bin" > /dev/null 2>&1; then
+    echo "*** THE VCA-DEFER TOOTH DID NOT BITE -- the pipe gate proves nothing ***"
+    exit 1
+fi
+echo "vca-defer tooth bites: the perturbed bank FAILED the gate, as it must."
 echo "CHAIN GATE GREEN"

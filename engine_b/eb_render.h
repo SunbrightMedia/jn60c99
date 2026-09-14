@@ -343,4 +343,38 @@ int eb_engine_render_voices(eb_engine *e, eb_render_state *st,
                             const eb_render_coefs *c, const eb_render_needs *n,
                             float *vout);
 
+/* THE VCA DEFER (2026-09-14; the b45t capacity fix, part 2 of 2).
+ *
+ * Under EB_FUSE_VCA the module already splits into a control half (sm/g1/
+ * g2/gate/lvl -- never reads the ladder) and an audio half (everything that
+ * does). Their STATE FIELDS ARE DISJOINT and neither half reads the other's
+ * (eb_vca_hpf.c). So the audio half of ONE designated voice may be deferred:
+ * the range stores {vcf, rescomp, ctl} into a caller-owned bank instead of
+ * calling eb_vca_audio, and eb_engine_vca_batch() replays the audio half
+ * over the bank later -- on another core, one chunk late. The per-sample
+ * value stream is BIT-IDENTICAL (chain_gate.c step 7 executes the claim and
+ * its tooth perturbs one banked ctl, which must be seen to fail); only
+ * DELIVERY moves by one chunk, the latency-skew class CHAIN4.md §7 already
+ * accepts per hop. The batch must run with the SAME coefficient bank the
+ * fronts used (store the rc pointer beside the bank; recall double-buffers
+ * coefficient banks, so a one-block-old pointer stays valid -- the same
+ * guarantee S3L_FX_PIPE's rp_mc rests on).
+ *
+ * eb_vca_defer_v is the ONE deferring voice (-1 = none): keying by voice,
+ * not by a flag, is what keeps the two cores race-free -- only the core
+ * whose window holds that voice ever reads eb_vca_defer_dst, and the same
+ * core wrote it. One voice only: a second deferring voice would need its
+ * own dst. */
+#ifndef EB_VCA_DEFER
+#define EB_VCA_DEFER 0
+#endif
+#if EB_VCA_DEFER
+typedef struct { float vcf, rescomp; eb_vca_ctl ctl; } eb_vca_defer;
+extern int           eb_vca_defer_v;    /* deferring voice, or -1          */
+extern eb_vca_defer *eb_vca_defer_dst;  /* this sample's record, set by the
+                                         * deferring core before its range */
+void eb_engine_vca_batch(eb_render_state *st, const eb_render_coefs *c,
+                         int v, const eb_vca_defer *bank, int n, float *out);
+#endif
+
 #endif /* ENGINEB_EB_RENDER_H */

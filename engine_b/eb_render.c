@@ -971,6 +971,18 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 #if EB_ABLATE == EB_ABL_VCA
         vout[v] = vcfo * e1; (void)e2; (void)o6848;
 #elif EB_FUSE_VCA
+#if EB_VCA_DEFER
+        if (v == eb_vca_defer_v && eb_vca_defer_dst) {
+            /* the audio half is DEFERRED: bank this sample's inputs; the
+             * batch replays them in the same order later. vout stays 0 --
+             * the caller delivers this voice from the previous chunk's
+             * batch (eb_render.h, THE VCA DEFER). */
+            eb_vca_defer_dst->vcf     = vcfo;
+            eb_vca_defer_dst->rescomp = o6848;
+            eb_vca_defer_dst->ctl     = vca_ctl;
+            vout[v] = 0.0f;
+        } else
+#endif
         vout[v] = eb_vca_audio(&st->vca[v], &c->vca[v], vcfo, o6848, &vca_ctl);
 #else
         VP_MARK();
@@ -1013,6 +1025,23 @@ int eb_engine_render_range(eb_engine *e, eb_render_state *st,
 #endif
     return EB_RENDER_OK;
 }
+
+#if EB_VCA_DEFER
+int           eb_vca_defer_v   = -1;
+eb_vca_defer *eb_vca_defer_dst = 0;
+/* Replay the audio half over a banked chunk, in bank order -- the same
+ * i = 0..n-1 sequence the serial spelling runs, so the audio-half state
+ * (lp/lp2/dcacc/x1/yA/yB) advances through identical values. Gated by
+ * chain_gate.c step 7 (bit compare + tooth). */
+void eb_engine_vca_batch(eb_render_state *st, const eb_render_coefs *c,
+                         int v, const eb_vca_defer *bank, int n, float *out)
+{
+    int i;
+    for (i = 0; i < n; ++i)
+        out[i] = eb_vca_audio(&st->vca[v], &c->vca[v],
+                              bank[i].vcf, bank[i].rescomp, &bank[i].ctl);
+}
+#endif
 
 /* The original entry point, unchanged in meaning: one core, every voice. It
  * is the SAME code, not a copy, so the split cannot drift from it. */

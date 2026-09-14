@@ -288,6 +288,81 @@ int main(int argc, char **argv)
                "(lengths 0..600 + 4096, four alignments)\n", ntot);
     }
 
+#if EB_VCA_DEFER
+    /* ---- the VCA-defer law (2026-09-14) ----------------------------------
+     * The deferred spelling (front banks {vcf,rescomp,ctl}; the batch
+     * replays the audio half a chunk later) must produce the BIT-IDENTICAL
+     * per-sample value stream as the serial spelling, from identical seeded
+     * state, prologue live, over real recalled patches. CHAIN_TOOTH_VCAPIPE
+     * perturbs one banked lvl by one ULP -- the compare must then fail. */
+    {
+        static float sa[4096], sb[4096];
+        static eb_vca_defer bank[256];
+        static const int TP[2] = { 0, 33 };
+        int tp, iv, ci, bad_ = 0;
+        for (tp = 0; tp < 2; ++tp) {
+            int pp = TP[tp];
+            if (eb_devseq_boot_cells(boot, EBDEV_NV)) return 2;
+            if (eb_devseq_install(BANKBUF, tpl, (size_t)tpln,
+                                  bank64 + (size_t)pp * EB_PATCH_BYTES))
+                return 2;
+            eb_devseq_recall(BANKBUF, 128.0f);
+            eb_devseq_notes_on(DEVCHORD_VOICE, DEVCHORD_NOTE, DEVCHORD_VEL,
+                               DEVCHORD_N);
+            eb_render_coefs_build((const unsigned char *)0, &RC);
+            eb_render_state_seed((const unsigned char *)0, &RS0);
+            eb_render_events_mirror((unsigned char *)0, &RS0);
+            /* SERIAL: voice 5 alone, prologue live */
+            RSr = RS0;
+            eb_engine_init(&Er, 44100.0f); Er.render_ok = 1;
+            wake(&Er, 5, 6);
+            eb_vca_defer_v = -1;
+            for (iv = 0; iv < 4096; ++iv) {
+                float vv[EB_NUM_VOICES]; eb_shared_tick sh_;
+                int k2; for (k2 = 0; k2 < EB_NUM_VOICES; ++k2) vv[k2] = 0.0f;
+                sh_.ready = 0;
+                eb_engine_render_shared(&Er, &RSr, &RC, &sh_);
+                eb_engine_render_range(&Er, &RSr, &RC,
+                                       (const eb_render_needs *)0,
+                                       5, 6, &sh_, vv);
+                sa[iv] = vv[5];
+            }
+            /* DEFERRED: fronts bank a 256-chunk, then the batch replays */
+            RSr = RS0;
+            eb_engine_init(&Er, 44100.0f); Er.render_ok = 1;
+            wake(&Er, 5, 6);
+            eb_vca_defer_v = 5;
+            for (ci = 0; ci < 16; ++ci) {
+                for (iv = 0; iv < 256; ++iv) {
+                    float vv[EB_NUM_VOICES]; eb_shared_tick sh_;
+                    int k2; for (k2 = 0; k2 < EB_NUM_VOICES; ++k2) vv[k2] = 0.0f;
+                    sh_.ready = 0;
+                    eb_vca_defer_dst = &bank[iv];
+                    eb_engine_render_shared(&Er, &RSr, &RC, &sh_);
+                    eb_engine_render_range(&Er, &RSr, &RC,
+                                           (const eb_render_needs *)0,
+                                           5, 6, &sh_, vv);
+                }
+                eb_vca_defer_dst = 0;
+#ifdef CHAIN_TOOTH_VCAPIPE
+                {   uint32_t tw; memcpy(&tw, &bank[7].ctl.lvl, 4);
+                    tw ^= 1u; memcpy(&bank[7].ctl.lvl, &tw, 4); }
+#endif
+                eb_engine_vca_batch(&RSr, &RC, 5, bank, 256, sb + 256 * ci);
+            }
+            eb_vca_defer_v = -1;
+            if (memcmp(sa, sb, sizeof sa)) {
+                printf("CHAIN: *** VCA-defer stream DIFFERS from serial on "
+                       "patch %d ***\n", pp);
+                ++bad_;
+            }
+        }
+        if (bad_) return 1;
+        printf("CHAIN: vca-defer law OK (deferred == serial, 2 patches x "
+               "4096 samples, prologue live)\n");
+    }
+#endif
+
     /* ---- the sum law, on the real engine, all %d patches ----------------- */
     for (p = 0; p < EB_BANK_COUNT; ++p) {
         int mism = 0;
