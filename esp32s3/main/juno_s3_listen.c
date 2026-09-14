@@ -1375,11 +1375,29 @@ static void dev_request(int patch, int gate);
 static unsigned long g_seed_lcg = S3L_SEED;
 static unsigned long seed_on, seed_off, seed_patch, seed_gapblk;
 
+/* THE ROBOT'S OWN HELD MAP -- at file scope, NOT function-static, because
+ * of a defect the bench heard (2026-09-14, "it keeps playing long after"):
+ * turning the robot OFF stops stress_step from being CALLED, so the notes
+ * its held[] map was sustaining -- phases 5/6 hold 4-note chords ON
+ * PURPOSE -- were never released and DRONED FOREVER. The 'r' handler
+ * released the console's map only. stress_all_off() is the robot's own
+ * all-notes-off, called at every robot-off. */
+static int                 stress_held[8];
+static const unsigned char STRESS_NOTE[8] = {48, 52, 55, 60, 64, 67, 72, 76};
+static void stress_all_off(void)
+{
+    int i;
+    for (i = 0; i < 8; ++i)
+        if (stress_held[i]) { juno_event_note_off(JUNO_SRC_KEYBED,
+                                                  STRESS_NOTE[i]);
+                              stress_held[i] = 0; }
+}
+
 static void stress_step(void)
 {
     static unsigned long blk = 0;
-    static int held[8];
-    static const unsigned char NOTE[8] = {48, 52, 55, 60, 64, 67, 72, 76};
+    int *held = stress_held;
+    const unsigned char *NOTE = STRESS_NOTE;
     static unsigned long gap_until = 0;  /* phase-7 silence gap, in blocks */
     unsigned long t = blk++;
     unsigned long ph = (t / 344u) % 8u;
@@ -2014,7 +2032,11 @@ static int k_pval  = 128;
 #if S3L_CHAIN && S3_CHAIN_POS != 1
 volatile int g_stress_rt = 0;      /* chain followers take notes from chip 1 */
 #else
-volatile int g_stress_rt = 1;      /* the robot keybed, gated at runtime */
+/* DEFAULT OFF (user-directed after the first hand-play night): the
+ * instrument boots QUIET and playable; the robot is a diagnostic, started
+ * by 'r' -- capture.py sends that 'r' itself, so the bench runs still
+ * storm. Booting INTO the storm made every power-on terrifying. */
+volatile int g_stress_rt = 0;      /* the robot keybed, gated at runtime */
 #endif
 
 static void con_poll(void)
@@ -2047,6 +2069,12 @@ static void con_poll(void)
                 for (k = 0; k < 128; ++k)
                     if (con_held[k]) { con_held[k] = 0;
                                        juno_event_note_off(JUNO_SRC_CONSOLE, k); }
+#if S3L_STRESS
+                /* AND the robot's own held notes -- without this they
+                 * drone forever after robot-off (the map lives above
+                 * stress_step; see its comment for the paid defect). */
+                stress_all_off();
+#endif
             }
             continue;
         }

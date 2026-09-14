@@ -17,7 +17,10 @@ ROBOT_OFF_AT = int(sys.argv[6]) if len(sys.argv) > 6 else 25
 # question (prologue 720 confirmed, core-1 voice 4,832 at patch 0) and
 # then polluted the rest of that run. A probe key must be removed the
 # day its answer lands.
-KEYS = [(0, ROBOT_OFF_AT, b"r")] if ROBOT_OFF_AT > 0 else []
+# The firmware now BOOTS with the robot OFF (the instrument is quiet and
+# playable at power-on), so the capture turns the storm ON itself at t=2
+# and, unless this is a soak (ROBOT_OFF_AT=0), OFF again at ROBOT_OFF_AT.
+KEYS = [(0, 2, b"r")] + ([(0, ROBOT_OFF_AT, b"r")] if ROBOT_OFF_AT > 0 else [])
 
 lock = threading.Lock()
 f = open("chain4_log.txt", "a", encoding="utf-8", errors="replace")
