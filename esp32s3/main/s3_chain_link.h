@@ -38,6 +38,7 @@
 #include "driver/uart.h"
 #include "driver/i2s_tdm.h"
 #include "esp_heap_caps.h"
+#include "esp_rom_crc.h"        /* the CRCBENCH's third candidate */
 #include "esp_timer.h"
 
 #ifndef S3_CHAIN_POS
@@ -314,23 +315,39 @@ static void s3c_ctl_poll(s3c_ctl *c, int my_patch, unsigned long my_crc,
  * running it over a 4 KB chunk on the block tail cost ~960 cyc/sample --
  * cyc read 6,343 against the 5,442 budget and the DAC starved. Same dialect,
  * ~8 cyc/byte, PROVEN equal on a test vector before anything trusts it. */
+static uint32_t s3c_crctab[256];
 static int      s3c_crctab_ok;
-/* 2026-09-14: the byte-wise table walk (~8 cyc/B) gave way to the pure
- * slicing-by-4 law in s3_chain.h -- SAME VALUES, host-gated equivalence
- * (chain_gate.c step 6 + tooth). The chip still refuses to stream until
- * it has itself proven the fast twin equal to eb_devseq_crc32, on a test
- * vector AND a 4 KB marked-chunk-shaped corpus with odd head/tail cuts. */
+/* ⚠ SLICING-BY-4 REFUTED ON SILICON (2026-09-14, one flash after it
+ * landed): the b45u log's POS2 -- whose ONLY change was the CRC swap --
+ * read +177 cyc/sample; the dependency-chained four-table walk stalls
+ * this in-order core worse than the byte loop it replaced, and the
+ * predicted ~3x never existed outside the cycle model. The pure fast
+ * law stays in s3_chain.h with its host equivalence gate as the record;
+ * the DEVICE walks the byte table again. s3c_crc_bench() below prints
+ * all three candidates (byte / slice / ROM) so the next choice is a
+ * MEASUREMENT (playbook 46: a number quoted is not thereby measured). */
 static uint32_t s3c_crc32(const void *p, size_t n)
 {
-    return s3_chain_crc32_fast(p, n);
+    const unsigned char *q = (const unsigned char *)p;
+    uint32_t c = 0xFFFFFFFFu;
+    size_t i;
+    for (i = 0; i < n; ++i)
+        c = (c >> 8) ^ s3c_crctab[(c ^ q[i]) & 0xFFu];
+    return c ^ 0xFFFFFFFFu;
 }
 static int s3c_crc_init(void)
 {
     static const unsigned char tv[] = { 49,50,51,52,53,54,55,56,57 };
     static uint32_t corpus[1024];
-    uint32_t i;
+    uint32_t i, k, c;
     int ok;
     if (s3c_crctab_ok) return 1;
+    for (i = 0; i < 256; ++i) {
+        c = i;
+        for (k = 0; k < 8; ++k)
+            c = (c >> 1) ^ (0xEDB88320u & (uint32_t)(-(int32_t)(c & 1u)));
+        s3c_crctab[i] = c;
+    }
     s3_chain_crc_fast_init();
     for (i = 0; i < 1024; ++i)
         corpus[i] = 0x3f000000u + i * 2654435761u;
@@ -339,11 +356,38 @@ static int s3c_crc_init(void)
     ok = (s3c_crc32(tv, 9) == eb_devseq_crc32(tv, 9))
       && (s3c_crc32(corpus, sizeof corpus)
           == eb_devseq_crc32(corpus, sizeof corpus))
-      && (s3c_crc32((const unsigned char *)corpus + 1, 4093)
-          == eb_devseq_crc32((const unsigned char *)corpus + 1, 4093))
+      && (s3_chain_crc32_fast(corpus, sizeof corpus)
+          == eb_devseq_crc32(corpus, sizeof corpus))
       && (s3c_crc32(corpus, 7) == eb_devseq_crc32(corpus, 7));
     s3c_crctab_ok = ok;
     return s3c_crctab_ok;
+}
+
+/* boot-time CRC bench: cyc/KB for the three same-value candidates over the
+ * marked-chunk corpus. PRINT ONLY -- the streaming path uses the byte
+ * table until a log crowns a faster one AND its value equality is gated. */
+static void s3c_crc_bench(void)
+{
+    static uint32_t corpus[1024];
+    uint32_t i, r;
+    unsigned long t0, tb, ts, tr;
+    volatile uint32_t sink = 0;
+    for (i = 0; i < 1024; ++i)
+        corpus[i] = 0x3f000000u + i * 2654435761u;
+    t0 = (unsigned long)esp_cpu_get_cycle_count();
+    for (r = 0; r < 64; ++r) sink ^= s3c_crc32(corpus, sizeof corpus);
+    tb = ((unsigned long)esp_cpu_get_cycle_count() - t0) / 256u;
+    t0 = (unsigned long)esp_cpu_get_cycle_count();
+    for (r = 0; r < 64; ++r) sink ^= s3_chain_crc32_fast(corpus, sizeof corpus);
+    ts = ((unsigned long)esp_cpu_get_cycle_count() - t0) / 256u;
+    t0 = (unsigned long)esp_cpu_get_cycle_count();
+    for (r = 0; r < 64; ++r) sink ^= esp_rom_crc32_le(0, (const uint8_t *)corpus,
+                                                      sizeof corpus);
+    tr = ((unsigned long)esp_cpu_get_cycle_count() - t0) / 256u;
+    printf("CRCBENCH: byte=%lu slice4=%lu rom=%lu cyc/KB (rom==byte values: "
+           "%s)\n", tb, ts, tr,
+           esp_rom_crc32_le(0, (const uint8_t *)corpus, sizeof corpus)
+               == s3c_crc32(corpus, sizeof corpus) ? "YES" : "NO");
 }
 
 typedef struct {
@@ -437,6 +481,9 @@ static int s3c_aud_start(s3c_aud *a, int master_rx,
         printf("CHAIN: crc table twin DIVERGES from eb_devseq_crc32 -- "
                "no audio port\n");
         return 0;
+    }
+    {   static int benched;
+        if (!benched) { benched = 1; s3c_crc_bench(); }
     }
     if (master_rx) tc.gpio_cfg.din  = data;
     else           tc.gpio_cfg.dout = data;

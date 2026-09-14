@@ -2696,14 +2696,32 @@ static volatile unsigned long rpt_c1v = 0, rpt_c1p = 0;
 #ifndef S3L_VCA_PIPE
 #define S3L_VCA_PIPE 0
 #endif
-#if S3L_VCA_PIPE
-#if !S3L_PROLOGUE_C1 || !S3L_FX_PIPE
-#error "S3L_VCA_PIPE needs S3L_PROLOGUE_C1 + S3L_FX_PIPE (the two-bank vb discipline is the delay line)"
+/* S3L_VCA_PIPE0 (the MIRROR, for a chip whose one voice rides CORE 0 with
+ * core 1 near-idle -- pos2): core 0's voice defers, core 1 batches. Same
+ * engine law, same gate, same previous-bank shipping. */
+#ifndef S3L_VCA_PIPE0
+#define S3L_VCA_PIPE0 0
 #endif
+#if S3L_VCA_PIPE && S3L_VCA_PIPE0
+#error "one deferring voice only: S3L_VCA_PIPE or S3L_VCA_PIPE0, not both"
+#endif
+#if S3L_VCA_PIPE || S3L_VCA_PIPE0
+#if !S3L_PROLOGUE_C1 || !S3L_FX_PIPE
+#error "the vca pipe needs S3L_PROLOGUE_C1 + S3L_FX_PIPE (the two-bank vb discipline is the delay line)"
+#endif
+#endif
+#if S3L_VCA_PIPE
 #if !defined(S3L_VOICE_HI) || (S3L_VOICE_HI - S3L_SPLIT) != 1
 #error "S3L_VCA_PIPE defers exactly ONE core-1 voice: build with S3L_VOICE_HI == S3L_SPLIT + 1"
 #endif
-static eb_vca_defer s3v_bank[2][CHUNK];      /* worker fills [cur]          */
+#endif
+#if S3L_VCA_PIPE0
+#if (S3L_SPLIT - S3L_VOICE_LO) != 1
+#error "S3L_VCA_PIPE0 defers exactly ONE core-0 voice: build with S3L_SPLIT == S3L_VOICE_LO + 1"
+#endif
+#endif
+#if S3L_VCA_PIPE || S3L_VCA_PIPE0
+static eb_vca_defer s3v_bank[2][CHUNK];      /* deferring core fills [cur]  */
 static const eb_render_coefs *s3v_rc[2];     /* the rc the fronts used      */
 static int s3v_n[2];                         /* samples banked              */
 static float s3v_out[CHUNK];                 /* batch output, then scatter  */
@@ -2887,6 +2905,22 @@ static void worker(void *arg)
             }
         }
         }
+#if S3L_VCA_PIPE0
+        /* THE MIRROR BATCH (pos2 shape): core 0's voice deferred; THIS core
+         * replays its audio half over the previous bank into the previous
+         * vb bank's column -- the bank the tail ships. Runs before w_done,
+         * so the barrier orders it ahead of the tail's read. Counts into
+         * v1 (visible in FXP), not into C1AT's voice figure. */
+        {   int pv = 1 - cur;
+            if (s3v_rc[pv]) {
+                int bn = s3v_n[pv], bi;
+                eb_engine_vca_batch(RS, s3v_rc[pv], LO_, s3v_bank[pv], bn,
+                                    s3v_out);
+                for (bi = 0; bi < bn; ++bi)
+                    w_vbb[pv][bi][LO_] = s3v_out[bi];
+            }
+        }
+#endif
 #else
         for (i = 0; i < w_n; ++i) {
 #if S3L_FXPROF
@@ -3109,9 +3143,17 @@ static void render_block(int n)
      * core 1's own writes; core 1 self-zeroes [SPLIT_,8) and [0,LO_) is static. */
     for (i = 0; i < n; ++i) {
         for (k = LO_; k < SPLIT_; ++k) vb[i][k] = 0.0f;
+#if S3L_VCA_PIPE0
+        eb_vca_defer_dst = &s3v_bank[w_cur][i];   /* core 0 defers ITS voice */
+#endif
         eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
                                LO_, SPLIT_, &w_shb[w_cur][i], vb[i]);
     }
+#if S3L_VCA_PIPE0
+    eb_vca_defer_dst = 0;
+    s3v_rc[w_cur] = rc;
+    s3v_n[w_cur]  = n;
+#endif
 #if S3L_VCA_PIPE
     /* THE DEFERRED VCA BATCH: replay the audio half of core 1's voice over
      * the PREVIOUS bank's records, into the PREVIOUS vb bank's column --
@@ -4314,6 +4356,11 @@ void app_main(void)
     printf("VCAPIPE: voice %d audio half runs on core 0, one chunk late "
            "(chip output ships from the previous bank)\n", SPLIT_);
 #endif
+#if S3L_VCA_PIPE0
+    eb_vca_defer_v = LO_;
+    printf("VCAPIPE0: voice %d audio half runs on core 1, one chunk late "
+           "(chip output ships from the previous bank)\n", LO_);
+#endif
 #if EB_CLASSIC
     /* THE CLASSIC BUILD MUST PROVE ITSELF IN ITS OWN LOG. Without this the
      * only evidence that eb_patch_classicize() ran is that I say so. Here the
@@ -5026,7 +5073,7 @@ void app_main(void)
                 if (!s3c_tx_busy())
                 for (ci = 0; ci < CHUNK; ++ci)
                     s3_chain_merge(&cc_,
-#if S3L_VCA_PIPE
+#if S3L_VCA_PIPE || S3L_VCA_PIPE0
                                    /* piped chip: ship the PREVIOUS bank --
                                     * voice A rendered last block, voice B
                                     * batched this block into the same bank.
