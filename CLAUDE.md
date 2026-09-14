@@ -124,6 +124,14 @@ mine is a hypothesis (playbook 80).
 - **CHAIN4 (2026-09-03; SCOPE 2026-09-13: FULL PANEL)**: user-directed
   2026-09-13 — the four boards run the FULL ORIGINAL PORT (delay+reverb
   included, NO EB_CLASSIC; nail the original, classic falls into line).
+  USER-BINDING 2026-09-14: the ZERO-approximation bar is SUSPENDED, by
+  the user's explicit order, SCOPED to pos3/pos4 ONLY — the fork's
+  sonic-gated CR set runs there (pitch N=4, cutoff/env N=2, lerp,
+  LFO_TAIL_CR); pos1/pos2 stay bit-exact. Cause: TAT-attributed
+  arithmetic — 2 exact voices + prologue + link = ~11,080 vs 10,884
+  per chip at patch 0, ~85%% of the link tail being irreducible CRC
+  math; every exact lever was spent or refuted on silicon first
+  (b45 log has the full ledger).
   The 4-board build EXISTS and is STAGED in
   esp32s3/flash/chain4/pos{1..4} (three-bin sets). Design binding:
   docs/engineb/CHAIN4.md. The pair-sum law proven EXACTLY 0 on host

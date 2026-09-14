@@ -34,16 +34,21 @@ COMMON="-DS3L_SWEEP=0;-DS3_CORES=2;-DS3L_FX_PIPE=1;-DS3L_PROLOGUE_C1=1;\
 [ $# -eq 0 ] && set -- 1 2 3 4
 for POS in "$@"; do
     case "$POS" in
+    # USER-BINDING 2026-09-14: the ZERO-approximation bar is SUSPENDED by
+    # the user's explicit order, SCOPED to pos3/pos4 only: the fork's
+    # sonic-gated CR set (pitch N=4, cutoff/env N=2, lerp on, LFO tail CR)
+    # runs on the middle chips. pos1/pos2 stay bit-exact. The robot+seeds
+    # return on pos1 (mix=OPEN was proven; runtime-gated by 'r').
     # BRING-UP SET (2026-09-13): no robot/stepper on pos 1 -- the chain holds
     # patch 0 so the hop gates are judged on ONE variable. The robot run on
     # silicon froze all four chips on patch 48, whose voice cost busts the
     # 5,442 budget on pos 2-4 (cyc 5,412/6,014/5,757 measured) -- an over-
     # budget SENDER cannot feed the wire and no CRC can ever redeem. Restore
     # -DS3L_STRESS=1 only after mix=OPEN is proven on patch 0.
-    1) PER="-DS3L_VOICE_LO=7;-DS3L_SPLIT=8;-DS3L_MIDI=1" ;;
+    1) PER="-DS3L_VOICE_LO=7;-DS3L_SPLIT=8;-DS3L_MIDI=1;-DS3L_STRESS=1" ;;
     2) PER="-DS3L_VOICE_LO=6;-DS3L_SPLIT=7;-DS3L_VOICE_HI=7;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE0=1" ;;
-    3) PER="-DS3L_VOICE_LO=4;-DS3L_SPLIT=5;-DS3L_VOICE_HI=6;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1" ;;
-    4) PER="-DS3L_VOICE_LO=2;-DS3L_SPLIT=3;-DS3L_VOICE_HI=4;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1" ;;
+    3) PER="-DS3L_VOICE_LO=4;-DS3L_SPLIT=5;-DS3L_VOICE_HI=6;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1;-DEB_CR_PITCH=1;-DEB_CR_MODCV=1;-DEB_CR_VCFCV=1;-DEB_CR_ENV=1;-DEB_CR_N=4;-DEB_CR_NP=4;-DEB_CR_NC=2;-DEB_CR_NE=2;-DEB_LFO_TAIL_CR=1" ;;
+    4) PER="-DS3L_VOICE_LO=2;-DS3L_SPLIT=3;-DS3L_VOICE_HI=4;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1;-DEB_CR_PITCH=1;-DEB_CR_MODCV=1;-DEB_CR_VCFCV=1;-DEB_CR_ENV=1;-DEB_CR_N=4;-DEB_CR_NP=4;-DEB_CR_NC=2;-DEB_CR_NE=2;-DEB_LFO_TAIL_CR=1" ;;
     *) echo "position must be 1..4"; exit 1 ;;
     esac
     echo "=== CHAIN4 position $POS ==="

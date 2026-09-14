@@ -579,3 +579,25 @@ measurement flash: its log picks the final lever for pos3/4 by name.
 Suspects, ranked blind: the i2s driver copy inside s3c_tx's write and
 s3c_rx's read; the at-rest advance (6 sleeping voices' wavetable
 phases, core 0); the drain/judge body. After TAT the pick is not blind.
+
+## THE CR ORDER (2026-09-14, USER-BINDING) + THE FUSION RE-PRICE
+
+Log 32f1ce30 (TAT): pos3 tail NAMED -- rx=175 mg=28 tx=190 ctl=16
+adv=0. ~85% of rx/tx is the checksum MATH itself (~10 cyc/B ROM x 16
+B/sample x 2 passes); the fusion idea was RE-PRICED against this and
+found worth ~20, not ~100 (internal SRAM has no cache; the second read
+pass was never the cost). NOT BUILT -- a flash was not spent on it.
+Full pos3 arithmetic at patch 0: 5,046 + 4,932 + 115 + 578 + 409 =
+11,080 vs 10,884. The exact ledger is DRY short of days-class asm/HW
+work, and patch-48 adds ~900 on top that no exact lever reaches.
+
+THE ORDER: "just do the control rate." The ZERO-approximation bar is
+suspended, scoped to pos3/pos4. The set taken is the fork's OWN
+sonic-gated configuration (ab_wavs SHIP subset): CR_PITCH/MODCV/VCFCV/
+ENV, N=4 pitch, N=2 cutoff/env, lerp defaults, EB_LFO_TAIL_CR (its
+guard now satisfied). NOTHING else from the fork (no DCO_WT, no
+HALF_OS, no MAPFAST). pos1/pos2 remain bit-exact; the sum-law gate
+stays exact-modeled and per-chip coefficient CRCs are unchanged (CR
+adds no coefficients). The robot + seeded layer return on pos1
+(runtime-gated): the same flash tests notes, patch storms and the
+heavy-patch question on the CR engine.
