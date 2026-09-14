@@ -461,3 +461,33 @@ and planned:
   10,884 total -- the fix class must be memo/cache-shaped (bit-exact by
   construction) and is UNPROVEN until attributed. "Room somewhere" is
   a hypothesis, not yet evidence.
+
+## LOG 6c1756c1: THE TRIM CONFIRMED, X MEASURED -- THE LINK IS THE ROOM
+## (2026-09-14)
+
+MEASURED on silicon, all four chips:
+- THE TRIM: pro 727 -> 574-582 (-146 to -153 cyc/sample). Better than
+  the 80-150 estimate. POS3 core 1 = 5,046 + 574 = 5,620 (was 5,771).
+  Remaining core-1 gap: ~178.
+- SLACK (first ever on a chain log): POS3/4 core 0 spins ~486-496
+  cyc/sample at the barrier. With block cyc 6,072 (POS3): core 0 =
+  voice 5,046 + ~84 pre-barrier + ~452 POST-barrier link/DAC work =
+  ~5,582. POS2 (one voice, spin~0): cyc 5,459 = 5,044 + ~415 link.
+  SO: THE LINK PATH COSTS ~415-536 CYC/SAMPLE ON CORE 0 -- that is
+  ~110-137k cyc per block to move ~8 KB, ~15-30+ cyc/byte: CRC-AND-COPY
+  BOUND. POS1 = 5,382, under budget, mix=OPEN sustained again.
+- Starvation persists on POS3/4 (deficit 1,790/1,295) -> bad= downstream.
+  Same causal chain, now fully attributed.
+
+THE PLAN THE NUMBERS PICK (X=84 pre-barrier beat the <=150 rule, but the
+post-barrier 452 is the true hoard):
+ 1. LINK SLIM: CRC32 slicing-by-4/8 (same VALUES, ~3 cyc/B vs byte-wise
+    table walk), tables+hot path in IRAM/DRAM, drain/copy tuning.
+    Target: link 536 -> ~150-200. Gate: value-equivalence tooth (fast
+    twin == byte twin over a corpus + all in-band teeth re-bite). Not
+    bit-exactness-bound -- protocol code, same protocol values.
+ 2. VCA PIPE: move the core-1 voice's fused-VCA audio half (~240) to
+    core 0, one chunk late (chip output uniformly late = the accepted
+    skew class). Gate: serial-vs-piped bit compare + tooth (b39 idiom).
+ Predicted after both, patch 0: core1 ~5,380, core0 ~5,330-5,430. THIN
+ but green-able; the seeded robot rides the same flash.
