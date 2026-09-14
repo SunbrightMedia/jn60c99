@@ -1722,6 +1722,14 @@ static void dev_request(int patch, int gate)
 #define S3L_PLAY 0
 #endif
 
+/* S3L_HUSH -- the render-level all-off belt (g_hush_mask). Default ON. The
+ * root cure is the pm_apply note-state preserve; the hush is defence in depth.
+ * Build -DS3L_HUSH=0 to PROVE the cure silences on its own (the verification
+ * that the gate, not the mask, is doing the work). */
+#ifndef S3L_HUSH
+#define S3L_HUSH 1
+#endif
+
 
 /* THE NOTE BURST. Same shape as dev_burst() minus the cold reseed and the bank
  * apply: the cell array is already this patch's and must stay that way. */
@@ -5394,7 +5402,7 @@ void app_main(void)
         {   int k;
             for (k = 0; k < EB_NUM_VOICES; ++k) {
                 EBE.v[k].atrest = !((WAKE >> k) & 1u);
-#if S3L_CHAIN
+#if S3L_CHAIN && S3L_HUSH
                 if ((g_hush_mask >> k) & 1u) EBE.v[k].atrest = 1;
 #endif
             }

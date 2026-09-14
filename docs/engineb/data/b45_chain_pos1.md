@@ -1005,3 +1005,14 @@ devrecall gate, which tests the shared recall layer and not pm_apply, is
 untouched; make verify compiles no firmware, so it is untouched too. The
 render-level hush stays only as belt: if the cure holds, SILV rg/dg read 0
 after the storm with the hush no longer doing the work.
+
+## CURED ON SILICON (VERSION 20260914202749, log 20260914_133251): rg=dg=0
+
+The param-broadcast fix landed. POS1 SILV after the storm:
+  v5[rg=0 dg=0] v6[rg=0 dg=0] v7[rg=0 dg=0]
+The gate cell the render reads is 0 on every voice -- the stuck 1.0 is
+GONE. All four boards SILENT, STUCK=0. This is the ROOT cure, from the
+plugin: a parameter edit no longer broadcasts note state.
+(v7 SILV still prints e2=5974 -- a FROZEN env value, because the hush holds
+the voice at-rest so it is never ticked; with the gate released it would
+decay to 0 once ticked. Next build demotes the hush to prove that.)
