@@ -2038,6 +2038,7 @@ static int  con_base = 60;              /* middle C */
  * note->voice binding, and the correct HELD broadcast is recomputed to 0).
  * No queue, so nothing can refuse it. Runs on EVERY board. */
 static volatile int g_alloff_want = 0;
+static unsigned long g_alloff_fired = 0;   /* DIAG: panic executions */
 #endif
 /* The console-settable split. Declared here because the console reader below
  * writes it and is defined before the block that explains it; the reasoning
@@ -3607,6 +3608,7 @@ static void render_block(int n)
         dev_want = 0;                 /* cancel any pending patch change */
         eb_alloc_init(&ALLOC);        /* bookkeeping matches the silence */
         g_alloff_want = 0;
+        ++g_alloff_fired;             /* DIAG: proves the panic actually ran */
     }
 #endif
     if (dev_want && !dev_muted) {
@@ -4233,6 +4235,18 @@ static void rpt_task(void *arg)
             printf("SIL: pk(1e-6) v0=%u v1=%u v2=%u v3=%u v4=%u v5=%u "
                    "v6=%u v7=%u%s\n", sp[0], sp[1], sp[2], sp[3], sp[4],
                    sp[5], sp[6], sp[7], s_any ? "" : "  -- SILENT");
+            /* DIAG (2026-09-14): pin down POS1's steady stuck v7. fired =
+             * times the panic actually executed; atrest = per-voice cap
+             * mask (bit v set = voice v is at rest, should be silent);
+             * bstate = burst_state, gate = the demo/recall gate flag. */
+            {   unsigned arm = 0; int dv;
+                for (dv = 0; dv < EB_NUM_VOICES; ++dv)
+                    if (EBE.v[dv].atrest) arm |= (1u << dv);
+                printf("SILDIAG: alloff_fired=%lu want=%d atrest=%02x "
+                       "bstate=%d notepend=%d gate=%d\n",
+                       g_alloff_fired, g_alloff_want, arm,
+                       burst_state, note_pending, dev_gate);
+            }
             /* THE VERDICT: quiet input (robot off, no new notes for two
              * whole report periods) plus a non-silent bank = a stuck
              * voice, said by the LOG, not by an ear (SHIP LAW). */
