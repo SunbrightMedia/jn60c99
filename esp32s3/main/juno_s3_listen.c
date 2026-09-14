@@ -1971,6 +1971,19 @@ static int ev_apply(void)
         n = (ev[i].kind == JUNO_EV_NOTE_ON)
               ? eb_alloc_note_on(&ALLOC, ev[i].a, vel, ALLOC_EV + nev)
               : eb_alloc_note_off(&ALLOC, ev[i].a, ALLOC_EV + nev);
+#if S3L_CHAIN
+        /* UN-HUSH the voice a note-on actually triggers, so a hushed board
+         * plays exactly the key that is pressed and nothing that was left
+         * stuck. Scan only this note's freshly emitted events for the gate
+         * edge (EB_EV_TRIGGER names the voice); a note-off never clears a
+         * hush. */
+        if (g_hush_mask && ev[i].kind == JUNO_EV_NOTE_ON) {
+            int j;
+            for (j = nev; j < nev + n; ++j)
+                if (ALLOC_EV[j].kind == EB_EV_TRIGGER && ALLOC_EV[j].voice >= 0)
+                    g_hush_mask &= ~(1u << ALLOC_EV[j].voice);
+        }
+#endif
         if (n > 0) nev += n;
     }
     if (nev <= 0) return 0;
@@ -2074,6 +2087,16 @@ static int  con_base = 60;              /* middle C */
  * No queue, so nothing can refuse it. Runs on EVERY board. */
 static volatile int g_alloff_want = 0;
 static unsigned long g_alloff_fired = 0;   /* DIAG: panic executions */
+/* THE HUSH MASK -- the render-level all-off that CANNOT be out-run by the
+ * device gate. bit v set = force voice v at-rest (the render skips it, so
+ * w_vbb[..][v] is exactly 0). Set for every voice on an all-off; a voice is
+ * un-hushed the instant a note-on TRIGGERS it, so a player hears the note
+ * they press and nothing else. This is the SHIP-LAW guarantee: a released
+ * gate that never reached scat[v] (bench VERSION 20260914135606: rg=dg=1.0
+ * stuck on the rendered voice) still goes SILENT, because at-rest is decided
+ * in RS, downstream of the gate. The persistent-gate defect is still owed
+ * (SILV keeps reporting rg/dg), but no drone survives a hush. */
+static volatile unsigned g_hush_mask = 0u;
 #endif
 /* The console-settable split. Declared here because the console reader below
  * writes it and is defined before the block that explains it; the reasoning
@@ -3644,25 +3667,16 @@ static void render_block(int n)
         eb_alloc_init(&ALLOC);        /* bookkeeping matches the silence */
         g_alloff_want = 0;
         ++g_alloff_fired;             /* DIAG: proves the panic actually ran */
-        /* ⚑ THE GATE CELL THE RENDER ACTUALLY READS, ZEROED DIRECTLY.
-         * The hand-emitted note-offs above go through juno_note_off's own
-         * per-voice base; the bench (silence probe, VERSION 20260914134004)
-         * proved that base does NOT reach the cell the publish syncs the
-         * render gate from for this chip's rendered voice -- rg=dg=1000 stuck
-         * on voice 7 after every all-off, its ENV2 pinned at sustain. The
-         * render's per-sample gate is gate_cell320[v] (eb_render.c:584), and
-         * eb_recall_publish step 7 syncs it from EXACTLY ebdev_at_v(v,320).
-         * Write THAT cell to 0 for every voice, so the panic's own publish
-         * lands a released gate on every voice regardless of the note path's
-         * addressing. Device cells are never read per sample (the O2 note),
-         * so this cannot race core 1; it runs only on a deliberate all-off,
-         * so it cannot touch normal play or bit-exactness. */
-        {   int fz;
-            for (fz = 0; fz < EB_NUM_VOICES; ++fz) {
-                float *gp = (float *)ebdev_at_v(fz, 320u);
-                if (gp) *gp = 0.0f;
-            }
-        }
+        /* ⚑ THE RENDER-LEVEL ALL-OFF. The hand-emitted note-offs above go
+         * through juno_note_off's own per-voice base; the bench proved that
+         * release never reaches the cell the render's gate is synced from for
+         * this chip's rendered voice (rg=dg=1000 stuck, ENV2 pinned). So do
+         * not rely on the gate at all: hush every voice. The render decides
+         * at-rest in RS, downstream of the gate, so a hushed voice is EXACTLY
+         * 0 whatever its stuck gate says. A note-on un-hushes only the voice
+         * it triggers, so this is silence-until-you-play, not a mute. Just a
+         * flag here -- no RS or device write -- so it cannot race core 1. */
+        g_hush_mask = (1u << EB_NUM_VOICES) - 1u;
     }
 #endif
     if (dev_want && !dev_muted) {
@@ -5338,10 +5352,18 @@ void app_main(void)
 #endif
         /* THE VOICE CAP. A capped voice is `atrest`, which is NOT "skipped":
          * eb_render.c still advances its free-run state. WAKE is constant
-         * across a chunk, so this leaves the per-sample path. */
+         * across a chunk, so this leaves the per-sample path.
+         * g_hush_mask (all-off, chain builds) forces a voice at-rest OVER the
+         * WAKE cap: it is how the render-level all-off silences a voice whose
+         * device gate is stuck (rg=dg=1.0). Its bit is cleared the moment a
+         * note-on triggers that voice, so it never mutes a played note. */
         {   int k;
-            for (k = 0; k < EB_NUM_VOICES; ++k)
+            for (k = 0; k < EB_NUM_VOICES; ++k) {
                 EBE.v[k].atrest = !((WAKE >> k) & 1u);
+#if S3L_CHAIN
+                if ((g_hush_mask >> k) & 1u) EBE.v[k].atrest = 1;
+#endif
+            }
         }
         /* THE WHOLE CHUNK, then ONE barrier. The timer is read TWICE per
          * BLOCK rather than twice per sample: esp_timer_get_time() reads a

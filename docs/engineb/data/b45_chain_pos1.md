@@ -905,3 +905,31 @@ Device cells are never read per sample, so this is race-free and runs
 only on a deliberate all-off. SILV kept one cycle to confirm rg->0 and
 ENV2 decays. OWED if the gate still holds with rg=0: cvg_t29 (cell 208,
 the cvgate target) may need the same treatment.
+
+## THE HUSH: A RENDER-LEVEL ALL-OFF THAT THE STUCK GATE CANNOT OUT-RUN
+## (2026-09-14, VERSION next)
+
+The direct device-cell write (ebdev_at_v(v,320)=0 in the panic) did NOT
+stick: VERSION 20260914135606 still read rg=dg=1000 on POS1 voice 7,
+ENV2 pinned at 8749. Cell 320 IS a per-voice scatter cell (EBDEV_SCATTAB
+holds 304 320 592 1072 1856 3968 5520 6864 7600 9680 9824 10320) and the
+strides match (EBDEV_VSTRIDE == JUNO_VOICE_MAIN_STRIDE == 10512), so
+juno_note_off, my direct write, and step 7 all address scat[v] -- yet the
+gate returns to 1.0 after every release. The exact re-writer (a
+scat[0]->scat[v] broadcast in the note-burst rebuild is the leading
+suspect) is NOT yet proven, so the persistent-gate defect stays OWED and
+SILV keeps printing rg/dg to chase it.
+
+But the SHIP LAW does not have to wait on that. The render decides a
+voice's silence in RS, DOWNSTREAM of the gate: an at-rest voice writes
+EXACTLY 0 to w_vbb (eb_render.c:477-478), whatever its gate says. So the
+all-off now sets g_hush_mask = 0xFF (chain builds) -- a render-level
+force-at-rest for every voice, applied over the WAKE cap. A note-on
+un-hushes ONLY the voice its EB_EV_TRIGGER names, so the board plays the
+key pressed and nothing left stuck; a note-off never clears a hush. It is
+a plain flag set in the panic (no RS or device write), so it cannot race
+core 1. Guarantee: after robot-off/SPACE, with no note played, every
+voice is at-rest and the bank is SILENT -- the stuck gate can no longer
+drone. The persistent-gate bug (which also explains the user's early
+"audio continues after I release a key") is the next target, now that the
+board is provably quiet at idle.
