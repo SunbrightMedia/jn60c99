@@ -1038,3 +1038,47 @@ Route dev_param_edit through juno_apply_param_leaf so the param WRITE is the
 plugin's own, then rebuild only the affected coefficients (the device bakes;
 the plugin reads cells per sample). The note path already uses juno_note_*
 + eb_alloc (the plugin's own, gated). Audit both end to end.
+
+## DONE: THE WARM PARAM EDIT NOW GOES THROUGH THE PLUGIN (2026-09-14)
+
+The user's directive, executed. A knob move is not a patch recall, and the
+plugin proves it: juno_apply_param_leaf writes the edited leaf's cell(s) and
+broadcasts only that leaf's scatter cell -- it never re-seeds voices and never
+touches per-voice NOTE state. The device answered EVERY warm edit with
+eb_devseq_recall, whose seed_voices broadcasts voice 0's note cells onto all
+voices (the drone). The preserve-hack neutralised that but was still the wrong
+method wrapped in a bandage.
+
+WHAT LANDED (esp32s3/main/juno_s3_listen.c, engine_b/dev/eb_devparam.h):
+  * eb_devparam.h -- ONE place for the rule. eb_devparam_leaf_index maps the
+    portable param_id (EB_PARAM_CLASS index) to the BINDINGS row
+    juno_apply_param_leaf wants, via blob_pos=(rec-16)/2. PROVEN on host: all
+    59 recs even, every leaf name resolves.
+  * dev_param_edit classifies each edit: 26 of 59 params are value-tree LEAVES
+    (every continuous tonal knob -- VCF, ENV1/2, DCO levels, LFO, PORTAMENTO,
+    TONE, LEVEL, the ones a keybed/panel drives); 33 are non-leaf (discrete
+    switches + FX/master bytes, no per-cell plugin setter).
+  * pm_apply: a leaf-only batch applies each leaf through juno_apply_param_leaf
+    -- the plugin's exact live edit, note cells never touched (no preserve
+    needed; the restore is then a proven no-op). A batch that also touched a
+    non-leaf re-derives from the record via eb_devseq_recall with the note
+    state preserved across it -- the same plugin invariant reached the FX way.
+    The leaf set is double-buffered exactly like the class masks (an edit
+    mid-build lands in _pend, applied next build). Porta stash kept current
+    (cell 592 is itself a leaf; the fast path skips the recall that refreshes
+    it).
+
+THE GATE (tools/engineb/devparam_gate.py + devparam/gate.c), wired into
+o3_gates.sh. HOST build: proves the METHOD (map-independent; devrecall_gate
+proves the device MAP). Puts real notes down, then:
+  - leaf edit via juno_apply_param_leaf: note cells unchanged AND the cutoff
+    coefficient (6736) moved (not vacuous).
+  - non-leaf re-derive + preserve: note cells unchanged.
+  - the leaf_index mapping is itself asserted (VCF CUTOFF->leaf, FX->non-leaf,
+    26 leaves).
+Three teeth, ALL SEEN TO FIRE: leaf-as-recall corrupts note state;
+no-preserve corrupts note state; off-by-one map leaves the target coefficient
+unmoved. Standalone GREEN.
+
+Firmware COMPILES for Xtensa (pos1 build EXIT=0). Matched 4-board set +
+VERSION pending the full build; silicon SILV confirmation owed on flash.

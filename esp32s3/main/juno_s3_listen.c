@@ -105,6 +105,8 @@
 #include "eb_paramstep.h"
 #include "eb_param_class.h"
 #include "eb_devseq.h"
+#include "juno_apply.h"     /* juno_apply_param_leaf -- the plugin's live edit */
+#include "eb_devparam.h"    /* leaf routing + the note-state cells, one place  */
 #include "eb_alloc.h"
 /* O6: the two-chip link. S3L_LINK defaults ON and is HARMLESS when off the
  * bench: an unstrapped board with no wires reads chip A, finds no peer, and
@@ -1135,6 +1137,18 @@ static int           pm_master  = 0;
 static unsigned      pm_v_run   = 0u;    /* the build in flight */
 static int           pm_t_run   = 0;
 static int           pm_m_run   = 0;
+/* THE PLUGIN-EXACT EDIT SET, double-buffered exactly like the class masks above
+ * (an edit arriving mid-build lands in _pend and is applied by the next build).
+ * pm_leaf_* names the value-tree leaves a knob move applies through
+ * juno_apply_param_leaf; pm_nonleaf marks a batch that also touched a switch or
+ * an FX/master byte, which has no per-cell plugin setter and is re-derived from
+ * the record instead. See eb_devparam.h. */
+static uint64_t      pm_leaf_pend = 0u;  /* leaf param_ids queued  (bit = pid) */
+static uint64_t      pm_leaf_run  = 0u;  /* leaf param_ids in flight            */
+static int           pm_nonleaf_pend = 0;
+static int           pm_nonleaf_run  = 0;
+static unsigned char pm_leaf_val[EB_PARAM_CLASS_N];      /* latest byte per pid */
+static unsigned char pm_leaf_val_run[EB_PARAM_CLASS_N];
 static int           pm_want    = 0;     /* edits are queued for a build */
 static unsigned long pm_edits   = 0;     /* parameters accepted */
 static unsigned long pm_builds  = 0;     /* rebuilds run */
@@ -1170,42 +1184,79 @@ static void dev_param_edit(int param_id, int value)
     pm_vmask  |= c->vmask8;
     pm_tail   |= c->tail;
     pm_master |= c->master;
+    /* Classify: a value-tree leaf is applied the plugin's way; anything else
+     * (a switch, an FX/master byte) re-derives from the record. The record is
+     * still written above so a later full recall keeps this edit either way. */
+    {
+        int li = eb_devparam_leaf_index(param_id);
+        if (li >= 0 && param_id < EB_PARAM_CLASS_N) {
+            pm_leaf_val[param_id] = (unsigned char)value;
+            pm_leaf_pend |= (uint64_t)1u << param_id;
+        } else {
+            pm_nonleaf_pend = 1;
+        }
+    }
     pm_want    = 1;
     ++pm_edits;
 }
 
-/* Per-voice NOTE-STATE scatter cells juno_note_* writes: pitch(304), gate(320),
- * VCF vel(6864), VCA vel(9680), 9824. They are NOT patch values, so the plugin's
- * per-parameter edit (juno_apply_param_leaf) NEVER touches them -- it replicates
- * only the EDITED cell. The device's warm param path re-runs the FULL recall,
- * whose seed_voices broadcasts voice 0's scatter cells onto all voices; that
- * copies voice 0's gate/pitch/velocity over every voice's own. PROVEN on host
- * (scratchpad probe3): gate v0+v7, one warm param -> all eight gated and v7's
- * pitch replaced by v0's. THAT is the storm's stuck note, and the divergence
- * from the plugin. Preserve these across the broadcast so a param edit leaves
- * note state exactly as the plugin does. (592 PORTAMENTO and 1856 HELD are the
- * same across voices -- patch/global -- so the broadcast cannot corrupt them.) */
-static const unsigned PM_NOTE_CELLS[] = { 304u, 320u, 6864u, 9680u, 9824u };
-#define PM_NNC ((int)(sizeof PM_NOTE_CELLS / sizeof PM_NOTE_CELLS[0]))
+/* THE WARM PARAMETER EDIT, THE PLUGIN'S OWN WAY (eb_devparam.h).
+ *
+ * A knob move is not a patch recall. juno_apply_param_leaf is the plugin's live
+ * edit: it writes the edited leaf's cell(s) and broadcasts only that leaf's
+ * scatter cell -- it never re-seeds voices and never touches per-voice NOTE
+ * state. The device used to answer every edit with eb_devseq_recall, whose
+ * seed_voices broadcasts voice 0's note-carrying scatter cells onto all voices;
+ * with voice 0 released that gated every voice (the storm's stuck note; PROVEN
+ * on host: a warm seed_voices moves 22 note cells, a leaf edit moves 0).
+ *
+ * So: a batch of leaves goes through juno_apply_param_leaf and the note cells
+ * are never disturbed. A batch that also touched a non-leaf (a switch or an
+ * FX/master byte, which has no per-cell plugin setter) re-derives from the
+ * record via eb_devseq_recall, and the note state is PRESERVED across it --
+ * reaching the same plugin invariant (note state unchanged) a different way.
+ * The coefficient rebuild (pm_begin/pm_step, the class subset) reads the cells
+ * this step writes, so it must run first, as it does (eb_pm_step: apply, then
+ * begin). Hr comes from cell 16, the host rate juno_bank_apply also reads. */
+#define PM_NNC EB_DEVPARAM_NNOTE
 
 static int pm_apply(void *u)
 {
     unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count(), d;
     float pm_save[EB_NUM_VOICES][PM_NNC];
-    int pv, pc;
+    int pv, pc, pid;
+    int hr = (int)(*(const float *)ebdev_at(16u));
     (void)u;
     ebdev_reset_counters();
-    /* Save per-voice note state before the broadcast (see PM_NOTE_CELLS). */
+    /* Save per-voice note state (belt for the non-leaf recall path; a leaf-only
+     * batch never writes these, so the restore is then a proven no-op). */
     for (pv = 0; pv < EB_NUM_VOICES; ++pv)
         for (pc = 0; pc < PM_NNC; ++pc)
-            pm_save[pv][pc] = *(const float *)ebdev_at_v(pv, PM_NOTE_CELLS[pc]);
-    /* WARM: the live cells stay, the edited record is re-applied over them. */
-    eb_devseq_recall(DEVBANK, 128.0f);
-    /* Restore the note state the broadcast clobbered -- a param edit is not a
-     * note event, exactly as the plugin's per-cell edit leaves it. */
+            pm_save[pv][pc] = *(const float *)ebdev_at_v(pv, EB_DEVPARAM_NOTE_CELLS[pc]);
+
+    if (!pm_nonleaf_run) {
+        /* Leaf-only: the plugin's exact live edit, per queued leaf. */
+        for (pid = 0; pid < EB_PARAM_CLASS_N; ++pid)
+            if (pm_leaf_run & ((uint64_t)1u << pid)) {
+                int li = eb_devparam_leaf_index(pid);
+                if (li >= 0)
+                    juno_apply_param_leaf((unsigned char *)0, li,
+                                          pm_leaf_val_run[pid], hr);
+            }
+        /* Keep the note path's porta stash current: eb_devseq_recall refreshes
+         * it (eb_devseq.c), but this fast path skips the recall, and PORTAMENTO
+         * (cell 592) is itself a leaf. Idempotent when no porta edit was in the
+         * batch. */
+        EB_DEVSEQ_PORTA_BASE = *(const float *)ebdev_at(592u);
+    } else {
+        /* A non-leaf was in the batch: re-derive the whole patch from the
+         * (edited) record, then restore the note state seed_voices clobbered. */
+        eb_devseq_recall(DEVBANK, 128.0f);
+    }
+
     for (pv = 0; pv < EB_NUM_VOICES; ++pv)
         for (pc = 0; pc < PM_NNC; ++pc)
-            *(float *)ebdev_at_v(pv, PM_NOTE_CELLS[pc]) = pm_save[pv][pc];
+            *(float *)ebdev_at_v(pv, EB_DEVPARAM_NOTE_CELLS[pc]) = pm_save[pv][pc];
     d = (unsigned long)esp_cpu_get_cycle_count() - t0;
     pm_cyc_apply = d;
     if (d > pm_cyc_max) pm_cyc_max = d;
@@ -3848,6 +3899,10 @@ static void render_block(int n)
                 /* snapshot, then clear -- see the two-set note above */
                 pm_v_run = pm_vmask; pm_t_run = pm_tail; pm_m_run = pm_master;
                 pm_vmask = 0u;       pm_tail  = 0;       pm_master = 0;
+                /* the plugin-exact edit set moves in lockstep with the masks */
+                pm_leaf_run = pm_leaf_pend; pm_leaf_pend = 0u;
+                pm_nonleaf_run = pm_nonleaf_pend; pm_nonleaf_pend = 0;
+                memcpy(pm_leaf_val_run, pm_leaf_val, sizeof pm_leaf_val_run);
                 eb_pm_begin(&PM);
                 pm_want = 0;
                 pm_starve = 0;

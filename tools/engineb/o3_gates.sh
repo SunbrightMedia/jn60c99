@@ -52,6 +52,7 @@ run "O2 suite (44 teeth)"          sh "$HERE/o2_gates.sh"
 run "O3 param map + table (3 teeth)" python3 "$HERE/paramclass_gate.py"
 run "O3 param sequence (4 teeth)"    sh "$HERE/param_teeth.sh"
 run "O3 warm-vs-cold (3 teeth)"      sh "$HERE/paramwarm_teeth.sh"
+run "O3 warm edit = plugin (3 teeth)" python3 "$HERE/devparam_gate.py"
 
 # The composition. Playbook 63's lesson: the parts being right never says the
 # instrument works.
