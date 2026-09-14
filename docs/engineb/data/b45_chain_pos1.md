@@ -680,3 +680,43 @@ against the 5,804 us block) at the once-per-block poll site, off the
 per-sample path. UNPROVEN ON SILICON until the user's next run; the
 1-hour soak is owed ON THIS IMAGE (run_soak.bat), superseding the
 victory image for that purpose.
+
+## LOG 50f40112 -- THE PANEL IMAGE ON SILICON: CHAIN GREEN, TWO PANEL
+DEFECTS PAID (2026-09-14)
+
+The chain itself: GREEN on all four boards through the storm. cyc
+4,496-5,428 vs 5,442; drift frozen (-16/-2/+38/-8); un 0/0/3-frozen/0;
+mix=OPEN, hs=OK, lock=YES, ev_gap=0, timeouts=0; pat=32 changes; the
+seed ledger replays (4a554e4f, on=13 off=10 patch=1 gapblk=281).
+POS2's HEALTH latch = ONE quiet boot-transient miss (B4 quiet=1,
+un=0 forever after) -- the POS3-un=3 class from 4cf17ca4, benign.
+The param chain WORKS AS WIRE: followers received chip 1's stream
+(sub+ref = 1256 = chip 1's submits, exactly), pids valid (unknown=0).
+
+Defect 1 (playbook 94): the unwired CUTOFF pot PARKED at the 4095
+rail, armed at t~33 ("ARMED at 255/255"), then sent 6 phantom edits
+at t~75-90 with the robot off (POS1 edits 354->356->360). INFERRED
+attribution: no console param keys were typed and MIDI carries no
+params; nothing else can move that counter. Fix: never arm inside
+the rail margins (r<64 or r>4031).
+
+Defect 2 (playbook 95): follower knob edits starve. POS2/3/4:
+edits=4, builds=0, defer to 12,596 -- the flood backlog re-arms
+note_pending every block and the drain always wins, so the pm gate
+never fires; the four edits waited the whole capture. Fix: a counted
+yield -- after 86 consecutive defers, one drain yields its block to
+the build; queued notes land one block late, never lost. New counter
+yield= in the PARAM line is the proof either way: yield=0 while
+defer climbs would mean the law did not engage.
+
+Also seen, pre-existing class, NOT fixed here: follower EVQ refusals
+under the robot flood (ref=954 of 1256; frozen after robot-off) --
+the documented queue-refusing-a-flood behavior. With params now on
+the chain this loss window applies to them too DURING A STORM; every
+patch change supersedes the records, and the hand-play condition
+(robot off) accepts everything, so it stays documented rather than
+re-engineered.
+
+Acceptance for the NEXT log (fix build): follower PARAM lines show
+builds>0 during/after phase 6 and yield>0 if defer climbed; POS1
+never prints ARMED while both pots are unwired.

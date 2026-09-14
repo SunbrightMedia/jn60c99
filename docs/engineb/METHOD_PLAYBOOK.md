@@ -1977,3 +1977,39 @@ canonical gate it was built from: the refusal is a REACH probe pointed
 at both. And a harness that "renders the same engine" must be audited
 against the FIRMWARE'S OWN CALL SHAPE (here: sh non-NULL), exactly as
 playbook 91 audits pin maps against the firmware's own pin users.
+
+## 94. "UNWIRED-SAFE" MUST COVER THE QUIET FAILURE, NOT ONLY THE NOISY
+ONE (2026-09-14, the first hand-panel log)
+
+The pot arming law assumed a floating ADC pin JITTERS, so it required
+stillness to arm. The unwired CUTOFF pin did the opposite: leakage
+PARKED it rock-still at the 4095 rail. It armed, and later noise dips
+sent 6 phantom cutoff edits with the robot off -- exactly the patch
+corruption the law existed to prevent. The buttons' pull-ups were
+designed against the QUIET failure (a defined level); the pot law was
+designed only against the NOISY one.
+
+Rules. A guard against "disconnected input" must enumerate BOTH
+floating behaviors: large jitter AND a stable rail park. For an ADC
+pin the rail is the tell -- no hand needs to ARM at the exact end
+stop, so never arm inside the rail margins. And a safety law for
+unwired hardware is only proven by a log FROM the unwired state; this
+one was written, shipped, and refuted by its first such log.
+
+## 95. THE DRAIN THAT ALWAYS WINS THE BLOCK STARVES THE MACHINE BEHIND
+IT -- FAIRNESS IS PART OF "LATE, NEVER LOST" (2026-09-14, same log)
+
+ev_apply ran BEFORE the parameter gate in every block. A robot-flood
+backlog (302 queued events draining ~2/s on a zero-slack follower)
+re-armed note_pending every block, so the pm gate NEVER saw an idle
+note machine: POS2 held four accepted knob edits for the entire
+capture with builds=0 and defer=12,596. "Late, never lost" was true of
+the QUEUE and false of the SYSTEM -- the edit's latency was unbounded.
+
+Rules. Whenever two machines share an owner and one runs first in the
+block, the second's wait must be BOUNDED by construction, not by
+traffic. The fix shape: a counted yield (one block in N) with its own
+counter printed, so the log proves both that starvation happened and
+that the yield released it. A deferral counter that only ever grows
+(defer=) is the smell; a paired yield= that stays 0 while defer climbs
+is the proof of starvation.

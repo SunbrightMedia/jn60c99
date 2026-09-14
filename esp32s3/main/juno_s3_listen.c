@@ -1120,6 +1120,8 @@ static int           pm_want    = 0;     /* edits are queued for a build */
 static unsigned long pm_edits   = 0;     /* parameters accepted */
 static unsigned long pm_builds  = 0;     /* rebuilds run */
 static unsigned long pm_defer   = 0;     /* blocks the interlock held it off */
+static unsigned long pm_starve  = 0;     /* CONSECUTIVE defers; reset at begin */
+static unsigned long pm_yield   = 0;     /* drains yielded to a starved build */
 static unsigned long pm_unknown = 0;     /* param_id not in the class table */
 static unsigned long pm_cyc_apply = 0, pm_cyc_max = 0;
 
@@ -2319,6 +2321,12 @@ static void pan_poll(void)
         if (d <= PAN_STAB) { if (p->stab < 255) ++p->stab; }
         else                 p->stab = 0;
         if (!p->armed) {
+            /* NEVER ARM AT A RAIL (paid in the first panel log): a FLOATING
+             * pin does not always jitter -- leakage PARKS it at a rail, and
+             * the unwired CUTOFF pot sat rock-still at 4095, ARMED, then
+             * noise dips sent 6 phantom edits. No hand needs to arm at the
+             * exact end stop: a real pot arms the moment it moves off it. */
+            if (r < 64 || r > 4031) { p->stab = 0; return; }
             if (p->stab >= PAN_ARM_N) {
                 p->armed = 1;
                 p->sent  = r;        /* PICKUP: arming itself sends NOTHING */
@@ -3556,7 +3564,21 @@ static void render_block(int n)
          * from the queue when no note build is in flight, so the shadow keeps
          * exactly one owner; the events it does not take stay QUEUED and
          * arrive next block -- late, not lost. */
-        if (!note_pending) ev_apply();
+        /* THE STARVATION YIELD (paid in the first panel log): the drain runs
+         * BEFORE the parameter gate in the same block, so a queued flood
+         * re-arms note_pending every block and the gate below NEVER sees an
+         * idle note machine -- POS2 sat at builds=0 with defer=12,596 for a
+         * whole capture while four knob edits waited. Once per PM_STARVE_N
+         * consecutive defers, one drain yields the block: the pm build
+         * begins, the queued notes land ONE BLOCK late, nothing is lost. */
+#define PM_STARVE_N 86           /* half a second, then one yielded block */
+        if (!note_pending) {
+            if (pm_want && pm_starve >= PM_STARVE_N
+                && eb_pm_idle(&PM) && eb_nb_idle(&NB))
+                ++pm_yield;      /* yield: no drain, the gate below fires */
+            else
+                ev_apply();
+        }
         /* THE PUBLISH STATES ARE NEVER BUDGETED. NB_PUB1/NB_PUB2 only ask for
          * a pointer swap and NB_CHECK only reads a counter; deferring those
          * would hold the key silent to save work that does not exist. Only the
@@ -3601,9 +3623,11 @@ static void render_block(int n)
                 pm_vmask = 0u;       pm_tail  = 0;       pm_master = 0;
                 eb_pm_begin(&PM);
                 pm_want = 0;
+                pm_starve = 0;
                 ++pm_builds;
             } else if (pm_want) {
                 ++pm_defer;   /* counted, and pm_want is NOT cleared */
+                ++pm_starve;  /* consecutive; the yield law reads this */
             }
         }
         if (!eb_pm_idle(&PM)
@@ -3992,9 +4016,10 @@ static void rpt_task(void *arg)
 #if S3L_CHAIN
         s3c_report();
 #endif
-        printf("PARAM: edits=%lu builds=%lu defer=%lu unknown=%lu "
+        printf("PARAM: edits=%lu builds=%lu defer=%lu yield=%lu unknown=%lu "
                "pubretry=%u apply=%lu applymax=%lu blocks=%u\n",
-               pm_edits, pm_builds, pm_defer, pm_unknown, PM.pub_retry,
+               pm_edits, pm_builds, pm_defer, pm_yield, pm_unknown,
+               PM.pub_retry,
                pm_cyc_apply, pm_cyc_max, PM.blocks);
 #if EB_VPROF
         /* THE KEYSTONE MEASUREMENT (b25). Placed HERE, in the same always-run
