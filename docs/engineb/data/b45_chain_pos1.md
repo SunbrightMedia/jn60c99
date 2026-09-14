@@ -1082,3 +1082,22 @@ unmoved. Standalone GREEN.
 
 Firmware COMPILES for Xtensa (pos1 build EXIT=0). Matched 4-board set +
 VERSION pending the full build; silicon SILV confirmation owed on flash.
+
+## FOUND, NOT MINE, DEFERRED: EB_RECALL_POS[] IS STALE (2026-09-14)
+
+The first `devrecall_gate.py --patch-scan` in this container (its "expensive
+half", rarely run) re-measured the recall-position set from the binary and
+found engine_b/eb_patch.c's checked-in EB_RECALL_POS[] STALE:
+  measured 114, listed 112
+  recalled but not listed: [128, 129, 134]
+  listed but not recalled: [3092]
+The MAP itself is clean -- devrecall reports BIT-IDENTICAL over 1152 cases on
+both flag sets, and paramclass proves EB_PARAM_CLASS complete + IDENTICAL for
+all 59 params (rec 128/134 among them). So actual recall and the param system
+are correct; only eb_patch.c's checkable position LIST drifted.
+
+NOT this change's: eb_patch.c was last touched by 1227611 (jx_emu host_init),
+long before this work; my diff touches it 0 times. Left for a separate,
+focused fix -- regenerating EB_RECALL_POS needs the WHY of the drift
+(a param add/remove?) understood first, and that is a different subsystem
+from the warm-edit path. Flagged to the user.
