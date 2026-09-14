@@ -1174,13 +1174,38 @@ static void dev_param_edit(int param_id, int value)
     ++pm_edits;
 }
 
+/* Per-voice NOTE-STATE scatter cells juno_note_* writes: pitch(304), gate(320),
+ * VCF vel(6864), VCA vel(9680), 9824. They are NOT patch values, so the plugin's
+ * per-parameter edit (juno_apply_param_leaf) NEVER touches them -- it replicates
+ * only the EDITED cell. The device's warm param path re-runs the FULL recall,
+ * whose seed_voices broadcasts voice 0's scatter cells onto all voices; that
+ * copies voice 0's gate/pitch/velocity over every voice's own. PROVEN on host
+ * (scratchpad probe3): gate v0+v7, one warm param -> all eight gated and v7's
+ * pitch replaced by v0's. THAT is the storm's stuck note, and the divergence
+ * from the plugin. Preserve these across the broadcast so a param edit leaves
+ * note state exactly as the plugin does. (592 PORTAMENTO and 1856 HELD are the
+ * same across voices -- patch/global -- so the broadcast cannot corrupt them.) */
+static const unsigned PM_NOTE_CELLS[] = { 304u, 320u, 6864u, 9680u, 9824u };
+#define PM_NNC ((int)(sizeof PM_NOTE_CELLS / sizeof PM_NOTE_CELLS[0]))
+
 static int pm_apply(void *u)
 {
     unsigned long t0 = (unsigned long)esp_cpu_get_cycle_count(), d;
+    float pm_save[EB_NUM_VOICES][PM_NNC];
+    int pv, pc;
     (void)u;
     ebdev_reset_counters();
+    /* Save per-voice note state before the broadcast (see PM_NOTE_CELLS). */
+    for (pv = 0; pv < EB_NUM_VOICES; ++pv)
+        for (pc = 0; pc < PM_NNC; ++pc)
+            pm_save[pv][pc] = *(const float *)ebdev_at_v(pv, PM_NOTE_CELLS[pc]);
     /* WARM: the live cells stay, the edited record is re-applied over them. */
     eb_devseq_recall(DEVBANK, 128.0f);
+    /* Restore the note state the broadcast clobbered -- a param edit is not a
+     * note event, exactly as the plugin's per-cell edit leaves it. */
+    for (pv = 0; pv < EB_NUM_VOICES; ++pv)
+        for (pc = 0; pc < PM_NNC; ++pc)
+            *(float *)ebdev_at_v(pv, PM_NOTE_CELLS[pc]) = pm_save[pv][pc];
     d = (unsigned long)esp_cpu_get_cycle_count() - t0;
     pm_cyc_apply = d;
     if (d > pm_cyc_max) pm_cyc_max = d;

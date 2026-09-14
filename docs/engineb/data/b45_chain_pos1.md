@@ -964,3 +964,44 @@ in eb_devseq_recall (a patch change), never in the per-note rebuild
 writes scat[v]=0 and it STICKS. The storm's constant recalls are the
 special case. OWED: prove the note-off release on silicon without a storm,
 and root-cause the recall-time re-gate so the hush becomes belt, not load.
+
+## THE ROOT, FROM THE PLUGIN (2026-09-14): A WARM PARAM EDIT BROADCASTS
+## VOICE 0's NOTE STATE OVER EVERY VOICE
+
+User directive: derive the cure from the proven plugin, which handles notes
+perfectly. Method: ask the plugin (READ src/), reproduce on host (a detector
+SEEN TO FAIL), fix to match, prove. No guessing.
+
+WHAT THE PLUGIN DOES (READ src/juno_driver.c, src/juno_note.c):
+ - A patch change calls juno_driver_seed_voices = memcpy of voice 0's whole
+   block to voices 1..7 (device: ebdev_broadcast_scatter, scat[0]->scat[v]).
+ - A PARAMETER edit does NOT do that. The plugin's live edit
+   (juno_apply_param_leaf) writes the EDITED cell on voice 0 and replicates
+   only THAT cell (ebdev_broadcast_cell). It never touches note state
+   (pitch 304, gate 320, VCF vel 6864, VCA vel 9680, 9824).
+
+WHAT THE DEVICE DID (READ juno_s3_listen.c pm_apply): a param edit re-runs
+the FULL eb_devseq_recall -- bank_apply + seed_voices -- so its broadcast
+copies voice 0's gate/pitch/velocity onto EVERY voice. The storm edits a
+parameter EVERY block (phase 6). So the moment voice 0 is gated (the robot
+fills down to it, or a prior broadcast set it), the next param edit gates
+ALL voices; only the rendered awake voice (7) is audible -- the drone.
+
+HOST PROOF (scratchpad/gateprobe, PROVEN executed, both builds off the same
+flat-copied sources the devrecall gate uses, -DEB_DEVCELLS):
+ - probe2: gate voice 0, ebdev_broadcast_scatter() -> ALL eight gated.
+ - probe3, fix=0: gate v0+v7, one warm param -> gate 1 1 1 1 1 1 1 1 and v7
+   pitch 5.0->4.0 (voice 0's). fix=1 (preserve note-state): gate 1 0 0 0 0 0
+   0 1, v7 pitch 5.0. CURED.
+ - probe (firmware recall sequence): reseed->0, recall/bcast->0, chord
+   on->2..7=1, chord off->all 0. So the COLD recall (burst, it reseeds
+   first) is already correct; only the WARM param path was wrong.
+
+FIX (pm_apply, matches the plugin's per-cell edit): save the five per-voice
+note-state scatter cells for all voices, run the recall, restore them. A
+param edit is not a note event. The cold recall keeps broadcasting (it
+reseeds note state to 0 first, so it copies 0 -- harmless) and the
+devrecall gate, which tests the shared recall layer and not pm_apply, is
+untouched; make verify compiles no firmware, so it is untouched too. The
+render-level hush stays only as belt: if the cure holds, SILV rg/dg read 0
+after the storm with the hush no longer doing the work.
