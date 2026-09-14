@@ -326,7 +326,9 @@ static int      s3c_crctab_ok;
  * the DEVICE walks the byte table again. s3c_crc_bench() below prints
  * all three candidates (byte / slice / ROM) so the next choice is a
  * MEASUREMENT (playbook 46: a number quoted is not thereby measured). */
-static uint32_t s3c_crc32(const void *p, size_t n)
+/* the byte-table reference twin, kept as the on-chip oracle the ROM
+ * implementation is proven against at every boot */
+static uint32_t s3c_crc32_byte(const void *p, size_t n)
 {
     const unsigned char *q = (const unsigned char *)p;
     uint32_t c = 0xFFFFFFFFu;
@@ -334,6 +336,16 @@ static uint32_t s3c_crc32(const void *p, size_t n)
     for (i = 0; i < n; ++i)
         c = (c >> 8) ^ s3c_crctab[(c ^ q[i]) & 0xFFu];
     return c ^ 0xFFFFFFFFu;
+}
+/* THE STREAMING CRC IS THE ROM'S (2026-09-14, CROWNED BY CRCBENCH ON ALL
+ * FOUR CHIPS: rom 10,125 cyc/KB vs byte 12,821-16,400 vs slice4
+ * 16,913-18,210, values identical on every chip). The slicing lesson
+ * (refuted +177 one flash earlier) is why this swap arrives MEASURED:
+ * the bench ran on silicon first, and s3c_crc_init refuses to stream
+ * unless rom == byte == eb_devseq_crc32 over the corpus, every boot. */
+static uint32_t s3c_crc32(const void *p, size_t n)
+{
+    return esp_rom_crc32_le(0, (const uint8_t *)p, (uint32_t)n);
 }
 static int s3c_crc_init(void)
 {
@@ -356,8 +368,12 @@ static int s3c_crc_init(void)
     ok = (s3c_crc32(tv, 9) == eb_devseq_crc32(tv, 9))
       && (s3c_crc32(corpus, sizeof corpus)
           == eb_devseq_crc32(corpus, sizeof corpus))
+      && (s3c_crc32_byte(corpus, sizeof corpus)
+          == eb_devseq_crc32(corpus, sizeof corpus))
       && (s3_chain_crc32_fast(corpus, sizeof corpus)
           == eb_devseq_crc32(corpus, sizeof corpus))
+      && (s3c_crc32((const unsigned char *)corpus + 1, 4093)
+          == eb_devseq_crc32((const unsigned char *)corpus + 1, 4093))
       && (s3c_crc32(corpus, 7) == eb_devseq_crc32(corpus, 7));
     s3c_crctab_ok = ok;
     return s3c_crctab_ok;
@@ -375,7 +391,7 @@ static void s3c_crc_bench(void)
     for (i = 0; i < 1024; ++i)
         corpus[i] = 0x3f000000u + i * 2654435761u;
     t0 = (unsigned long)esp_cpu_get_cycle_count();
-    for (r = 0; r < 64; ++r) sink ^= s3c_crc32(corpus, sizeof corpus);
+    for (r = 0; r < 64; ++r) sink ^= s3c_crc32_byte(corpus, sizeof corpus);
     tb = ((unsigned long)esp_cpu_get_cycle_count() - t0) / 256u;
     t0 = (unsigned long)esp_cpu_get_cycle_count();
     for (r = 0; r < 64; ++r) sink ^= s3_chain_crc32_fast(corpus, sizeof corpus);
@@ -387,7 +403,7 @@ static void s3c_crc_bench(void)
     printf("CRCBENCH: byte=%lu slice4=%lu rom=%lu cyc/KB (rom==byte values: "
            "%s)\n", tb, ts, tr,
            esp_rom_crc32_le(0, (const uint8_t *)corpus, sizeof corpus)
-               == s3c_crc32(corpus, sizeof corpus) ? "YES" : "NO");
+               == s3c_crc32_byte(corpus, sizeof corpus) ? "YES" : "NO");
 }
 
 typedef struct {
