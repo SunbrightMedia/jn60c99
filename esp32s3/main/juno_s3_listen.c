@@ -3576,6 +3576,39 @@ static void render_block(int n)
      * dev_want is NOT cleared here, so nothing is lost -- the patch change
      * lands a few blocks later, which is rule 3 and the same answer the note
      * path already gives a patch change. */
+#if S3L_CHAIN
+    /* THE ENGINE-LEVEL PANIC -- HOISTED ABOVE the patch/note branch chain
+     * (bench log 20260914114547): trapped inside the note branch's `else
+     * if`, it never ran on POS1, whose residual dev_want (from 36 robot
+     * patch changes) kept control in the patch branch -- v7 held forever.
+     * Here it fires whenever the shadow is free, whatever else is pending.
+     *
+     * Force EVERY engine voice off DIRECTLY: one EB_EV_NOTE_OFF per voice
+     * index 0..7 plus HELD(0), straight into the burst. juno_note_off is
+     * indexed BY VOICE and needs no allocator record, so it reaches a stuck
+     * voice whatever its origin (desync, recall, a cancelled patch). A
+     * note-off on an idle voice is a no-op, so sweeping all eight is safe.
+     * dev_want is cancelled (we are going silent) and eb_alloc_init realigns
+     * the bookkeeping. burst_state==BST_IDLE keeps it off a half-built
+     * shadow. No queue -- nothing can refuse it. */
+    if (g_alloff_want && !note_pending && eb_nb_idle(&NB)
+        && burst_state == BST_IDLE) {
+        int fv;
+        for (fv = 0; fv < EB_NUM_VOICES; ++fv) {
+            ALLOC_EV[fv].kind  = EB_EV_NOTE_OFF;
+            ALLOC_EV[fv].voice = (int8_t)fv;
+            ALLOC_EV[fv].a = 0; ALLOC_EV[fv].b = 0;
+        }
+        ALLOC_EV[EB_NUM_VOICES].kind  = EB_EV_HELD;   /* clear cell 1856 */
+        ALLOC_EV[EB_NUM_VOICES].voice = -1;
+        ALLOC_EV[EB_NUM_VOICES].a = 0; ALLOC_EV[EB_NUM_VOICES].b = 0;
+        note_nev = EB_NUM_VOICES + 1;
+        note_pending = 1;
+        dev_want = 0;                 /* cancel any pending patch change */
+        eb_alloc_init(&ALLOC);        /* bookkeeping matches the silence */
+        g_alloff_want = 0;
+    }
+#endif
     if (dev_want && !dev_muted) {
         if (note_pending || !eb_nb_idle(&NB)) {
             ++nb_defer;     /* rule 4: counted, and dev_want is NOT cleared */
@@ -3654,39 +3687,6 @@ static void render_block(int n)
          * consecutive defers, one drain yields the block: the pm build
          * begins, the queued notes land ONE BLOCK late, nothing is lost. */
 #define PM_STARVE_N 86           /* half a second, then one yielded block */
-#if S3L_CHAIN
-        /* THE ENGINE-LEVEL PANIC, ahead of every other note work: when armed
-         * (robot-off, SPACE, or a received chain ALLOFF), force EVERY engine
-         * voice off DIRECTLY -- one EB_EV_NOTE_OFF per voice index 0..NV-1,
-         * plus the HELD(0) broadcast, straight into the burst.
-         *
-         * WHY NOT eb_alloc_note_off(-1): bench log 20260914112322 proved that
-         * insufficient. It releases only voices the ALLOCATOR still tracks,
-         * but a storm desync leaves a voice GATED IN THE ENGINE while the
-         * allocator no longer owns it (POS3 v4=note 60, POS4 v2=note 48 held
-         * steady after the allocator-only panic). juno_note_off(DEVST, v) is
-         * indexed by voice and needs no allocator record, so this reaches a
-         * stuck voice whatever its origin (desync, or a recall/demo voice the
-         * allocator never owned). A note-off on an idle voice is a no-op, so
-         * sweeping all eight is safe. eb_alloc_init then resets the
-         * allocator's bookkeeping so its state matches the now-silent engine
-         * and future notes start clean. No queue: nothing can refuse it. */
-        if (g_alloff_want && !note_pending && eb_nb_idle(&NB)) {
-            int fv;
-            for (fv = 0; fv < EB_NUM_VOICES; ++fv) {
-                ALLOC_EV[fv].kind  = EB_EV_NOTE_OFF;
-                ALLOC_EV[fv].voice = (int8_t)fv;
-                ALLOC_EV[fv].a = 0; ALLOC_EV[fv].b = 0;
-            }
-            ALLOC_EV[EB_NUM_VOICES].kind  = EB_EV_HELD;   /* clear cell 1856 */
-            ALLOC_EV[EB_NUM_VOICES].voice = -1;
-            ALLOC_EV[EB_NUM_VOICES].a = 0; ALLOC_EV[EB_NUM_VOICES].b = 0;
-            note_nev = EB_NUM_VOICES + 1;
-            note_pending = 1;
-            eb_alloc_init(&ALLOC);          /* bookkeeping matches the silence */
-            g_alloff_want = 0;
-        }
-#endif
         if (!note_pending) {
             if (pm_want && pm_starve >= PM_STARVE_N
                 && eb_pm_idle(&PM) && eb_nb_idle(&NB))
