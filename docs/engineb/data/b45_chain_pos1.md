@@ -601,3 +601,20 @@ stays exact-modeled and per-chip coefficient CRCs are unchanged (CR
 adds no coefficients). The robot + seeded layer return on pos1
 (runtime-gated): the same flash tests notes, patch storms and the
 heavy-patch question on the CR engine.
+
+## THE PRE-FLIGHT CATCH + THE UNIFORM-CR AMENDMENT (2026-09-14)
+
+Caught BEFORE a flash was spent: the CR-on-pos3/4-only build would have
+died in its own robot storm -- pos1/2's EXACT voices at the patch-48
+class cost ~6,0xx-6,3xx vs 5,442 (the b45 all-four freeze already
+measured this). THE INVARIANT covers every input, so every chip must
+fit the worst patch: CR moved to ALL FOUR positions under the user's
+"add what you need" order (their veto stands until they flash).
+Also aboard: EB_FPDIV (bit-exact inline divide; honest re-price: it
+covers the EB_DIV sites -- glide + vcf_res -- ~40/voice, NOT the
+ladder's raw `/` operators, which stay soft calls; the earlier ~120
+claim was wrong and is corrected here). FLASH #1 = CR uniform + FPDIV
++ robot + seeds + every counter. Acceptance in its log: all four
+cyc<=5,442 with drift flat THROUGH the storm phases, un=0, mix=OPEN
+sustained, no freeze at any patch. If heavy patches still poke over,
+the one prepared knob is deeper CR periods (NC/NE=4) -- flash #2.

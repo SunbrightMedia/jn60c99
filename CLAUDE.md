@@ -125,9 +125,12 @@ mine is a hypothesis (playbook 80).
   2026-09-13 — the four boards run the FULL ORIGINAL PORT (delay+reverb
   included, NO EB_CLASSIC; nail the original, classic falls into line).
   USER-BINDING 2026-09-14: the ZERO-approximation bar is SUSPENDED, by
-  the user's explicit order, SCOPED to pos3/pos4 ONLY — the fork's
-  sonic-gated CR set runs there (pitch N=4, cutoff/env N=2, lerp,
-  LFO_TAIL_CR); pos1/pos2 stay bit-exact. Cause: TAT-attributed
+  the user's explicit order — the fork's sonic-gated CR set (pitch N=4,
+  cutoff/env N=2, lerp, LFO_TAIL_CR) runs on ALL FOUR positions
+  (amended same day under the user's "add what you need for a fully
+  working synth" order: an EXACT voice at the patch-48 class busts ANY
+  chip's budget — b45 freeze, measured — and THE INVARIANT covers every
+  input; uniform CR also keeps all six voices one engine). Cause: TAT-attributed
   arithmetic — 2 exact voices + prologue + link = ~11,080 vs 10,884
   per chip at patch 0, ~85%% of the link tail being irreducible CRC
   math; every exact lever was spent or refuted on silicon first
