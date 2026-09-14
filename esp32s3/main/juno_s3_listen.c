@@ -2052,6 +2052,14 @@ static void con_poll(void)
             for (k = 0; k < 128; ++k)
                 if (con_held[k]) { con_held[k] = 0;
                                    juno_event_note_off(JUNO_SRC_CONSOLE, k); }
+#if S3L_STRESS
+            stress_all_off();           /* the robot's held notes too */
+#endif
+#if S3L_CHAIN && S3_CHAIN_POS == 1
+            /* PANIC IS CHAIN-WIDE: same resync law as the robot-off
+             * handler below (see its comment for the paid defect). */
+            s3c_ev_send(((int)JUNO_SRC_CONSOLE << 4) | 2, 0, 0);
+#endif
             continue;
         }
         /* t -- fire the overrun detector ONCE, deliberately. See the block at
@@ -2074,6 +2082,20 @@ static void con_poll(void)
                  * drone forever after robot-off (the map lives above
                  * stress_step; see its comment for the paid defect). */
                 stress_all_off();
+#endif
+#if S3L_CHAIN && S3_CHAIN_POS == 1
+                /* AND THE WHOLE CHAIN (paid on the bench, 'robot still
+                 * makes noise after off'): under the storm the followers'
+                 * queues REFUSE a large share of the note stream, and a
+                 * refused note-OFF is a voice that rings FOREVER on that
+                 * chip -- worse, the four allocators diverge, so later
+                 * hand-played notes land on voices the chips disagree
+                 * about. The ALLOFF frame is the chain's own resync (the
+                 * seq-gap path already uses it): every chip releases via
+                 * its wire-accurate held map and all four allocators
+                 * return to the same empty state. kind low nibble 2 =
+                 * S3C_EV_ALLOFF. */
+                s3c_ev_send(((int)JUNO_SRC_CONSOLE << 4) | 2, 0, 0);
 #endif
             }
             continue;

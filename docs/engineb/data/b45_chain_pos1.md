@@ -744,3 +744,28 @@ result of that rule against this build's inputs: console RX 43/44
 IO1/IO4 (rail-guarded arming), MIDI 18 (this fix), chain UARTs
 (peer-driven; no-peer boards refuse via handshake). No input remains
 without a defined idle.
+
+## THE HAUNTING'S TRUE ROOT (2026-09-14, after two partial fixes):
+QUEUE REFUSALS DESYNC THE FOUR ALLOCATORS -- ALLOFF IS THE RESYNC
+
+Two fixes (the ghost MIDI pull-up, the robot held-map release) each
+removed a real layer, and the bench still heard "robot makes noise
+after off" and "the button makes no sound". The log pair names the
+rest: under the storm the followers' event queues REFUSE ~73% of the
+chain stream (POS2 067f: sub 296 + ref 790 = chip 1's 1086 exactly).
+A refused note-OFF whose note-ON was accepted = a voice RINGING
+FOREVER on that chip. And the chain's correctness precondition --
+"one ordered stream + the deterministic allocator = identical global
+allocation" -- is BROKEN by refusals: the four allocators diverge, so
+a later hand-played note lands on a voice slot the chips disagree
+about and sounds on some fraction of the six voices only. That is
+both bench symptoms in one mechanism. Follower quiet-path latency is
+NOT the fault: follower KEYH shows every applied key at 2 blocks, the
+design number.
+
+Fix: robot-off and SPACE on chip 1 now broadcast S3C_EV_ALLOFF -- the
+chain's existing resync frame (the seq-gap path already trusted it).
+Every chip releases via its wire-accurate held map and all four
+allocators return to the same empty state. Storm refusals remain the
+queue's documented flood protection; the storm now ENDS with a
+deterministic chain-wide silence + resync instead of a haunting.
