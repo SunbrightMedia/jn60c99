@@ -480,6 +480,14 @@ typedef struct {
     uint32_t seam_last[4], seam_h[4];
     uint32_t z_chunks;
     uint8_t  ci_i, seam_i;
+    /* THE HEAL-LOOP BREAKER (2026-09-14, heard as endless glitch): a boot
+     * can start the TDM RX with a persistent slot/frame offset. The
+     * per-chunk memmove heal then fires FOREVER with the SAME rotation
+     * (bench: ci=[129 129 129 129], realign ~8/s, bad alternating with
+     * good so no consecutive-bad closer ever trips). After 8 identical
+     * consecutive rotations the channel is RESTARTED -- the only act that
+     * truly re-aligns the hardware -- and counted here. */
+    uint32_t heal_ci_prev, heal_ci_run, rx_restarts;
     /* B-side write-size split: full chunk in one call / partial / zero. */
     uint32_t wr_full, wr_part, wr_zero;
     /* HEAL VERIFY: the chunk that completes right after a memmove heal
@@ -826,6 +834,26 @@ static int s3c_rx_one(int n, int hs_ok)
                 ++A_UP.rx_realigns;
                 A_UP.rx_seq_have = 0;
                 got_chunk = 0;
+                /* the heal-loop breaker (struct comment): the SAME rotation
+                 * eight times running is a hardware-phase offset no memmove
+                 * can cure -- restart the RX channel and relock. */
+                if (ci == A_UP.heal_ci_prev) {
+                    if (++A_UP.heal_ci_run >= 8u) {
+                        i2s_channel_disable(A_UP.ch);
+                        i2s_channel_enable(A_UP.ch);
+                        A_UP.locked = 0;
+                        A_UP.rx_off = 0;
+                        A_UP.discard_left = 0;
+                        A_UP.rx_seq_have = 0;
+                        A_UP.heal_pending = 0;
+                        A_UP.heal_ci_run = 0;
+                        ++A_UP.rx_restarts;
+                        return 0;      /* no chunk, mix closed this block */
+                    }
+                } else {
+                    A_UP.heal_ci_prev = ci;
+                    A_UP.heal_ci_run = 1;
+                }
             }
         }
         if (!A_UP.locked) {
@@ -882,6 +910,7 @@ static int s3c_rx_one(int n, int hs_ok)
                                    (uint32_t)(S3C_SLOTW * n), S3C_SLOTW,
                                    s3c_crc32)) {
                 match = 1; ++A_UP.rx_match; A_UP.relock_miss = 0;
+                A_UP.heal_ci_run = 0;   /* a clean chunk ends any heal loop */
             } else {
                 if (!A_UP.mm_have) {
                     static const int mf_[6] = { 2, 32, 64, 128, 192, 255 };
@@ -923,6 +952,16 @@ static int s3c_rx_one(int n, int hs_ok)
                     }
                 }
                 mismatch = 1; ++A_UP.rx_mismatch;
+                /* A JUDGED-BAD CHUNK BECOMES SILENCE (2026-09-14, the
+                 * decisive audible fix): this buffer IS what the injector
+                 * reads, and with the gate open a bad chunk poured its
+                 * GARBAGE straight into the DAC -- the bench's endless
+                 * "distorted popping" was bad chunks alternating with
+                 * good ones at ~86 Hz. Forensics above have already read
+                 * the bytes; from here a bad chunk contributes a 5.8 ms
+                 * dropout, never noise. */
+                memset(s3c_rxbuf, 0,
+                       (size_t)n * S3C_SLOTW * sizeof(int32_t));
                 /* Under IN-BAND CRC a miss convicts ONE chunk (a seam), not
                  * the lock: alignment is maintained per chunk by the marker
                  * realign, so re-training buys nothing and costs the storm
@@ -965,11 +1004,12 @@ static void s3c_report(void)
                "", (unsigned long)A_UP.rx_short,
                (unsigned long)A_UP.pat_disc);
     if (C_UP.started) {
-        printf("CHAINseq: ok=%lu slips=%lu realign=%lu last=%lu\n",
+        printf("CHAINseq: ok=%lu slips=%lu realign=%lu last=%lu rxrst=%lu\n",
                (unsigned long)A_UP.rx_seq_ok,
                (unsigned long)A_UP.rx_seq_slips,
                (unsigned long)A_UP.rx_realigns,
-               (unsigned long)A_UP.rx_seq_last);
+               (unsigned long)A_UP.rx_seq_last,
+               (unsigned long)A_UP.rx_restarts);
         if (A_UP.mm_have) {
             printf("CHAINmm: w=%08lx %08lx %08lx %08lx crc=%08lx pend=%08lx\n",
                    (unsigned long)A_UP.mm_w[0], (unsigned long)A_UP.mm_w[1],
