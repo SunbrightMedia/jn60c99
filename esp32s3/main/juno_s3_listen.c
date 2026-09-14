@@ -2686,6 +2686,28 @@ static volatile unsigned long rpt_fx_cyc = 0, rpt_v1_cyc = 0, rpt_wait_cyc = 0;
 static unsigned long c1at_v = 0, c1at_p = 0, c1at_n = 0;
 static volatile unsigned long rpt_c1v = 0, rpt_c1p = 0;
 #endif
+/* ---- S3L_VCA_PIPE (2026-09-14): core 1's voice defers its fused-VCA audio
+ * half; core 0 replays it ONE CHUNK LATE (eb_render.h, THE VCA DEFER; law
+ * gated by chain_gate.c step 7 + tooth). The chip's whole output then ships
+ * from the PREVIOUS vb bank -- voice A is delayed one bank alongside, so
+ * the pair sum stays time-coherent and the chip is uniformly one chunk
+ * later, the hop-skew class CHAIN4.md par.7 already accepts. ~240
+ * cyc/sample moves off the critical core (b45t plan). */
+#ifndef S3L_VCA_PIPE
+#define S3L_VCA_PIPE 0
+#endif
+#if S3L_VCA_PIPE
+#if !S3L_PROLOGUE_C1 || !S3L_FX_PIPE
+#error "S3L_VCA_PIPE needs S3L_PROLOGUE_C1 + S3L_FX_PIPE (the two-bank vb discipline is the delay line)"
+#endif
+#if !defined(S3L_VOICE_HI) || (S3L_VOICE_HI - S3L_SPLIT) != 1
+#error "S3L_VCA_PIPE defers exactly ONE core-1 voice: build with S3L_VOICE_HI == S3L_SPLIT + 1"
+#endif
+static eb_vca_defer s3v_bank[2][CHUNK];      /* worker fills [cur]          */
+static const eb_render_coefs *s3v_rc[2];     /* the rc the fronts used      */
+static int s3v_n[2];                         /* samples banked              */
+static float s3v_out[CHUNK];                 /* batch output, then scatter  */
+#endif
 #if S3L_REV_PIPE
 static volatile unsigned long rpt_back_cyc = 0;   /* core 0's reverb+out    */
 static unsigned long fxp_back = 0, fxp_back_n = 0;
@@ -2824,10 +2846,22 @@ static void worker(void *arg)
                    < (unsigned long)S3L_C1AT_TOOTH * (unsigned long)w_n) { }
         }
 #endif
-        for (i = 0; i < w_n; ++i)
+        for (i = 0; i < w_n; ++i) {
+#if S3L_VCA_PIPE
+            /* arm this sample's defer record BEFORE the range; only this
+             * core's window contains the deferring voice, so only this
+             * core ever reads the dst it just wrote (race-free by key). */
+            eb_vca_defer_dst = &s3v_bank[cur][i];
+#endif
             eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
                                    SPLIT_, HI_, &w_shb[w_cur][i],
                                    w_vbb[cur][i]);
+        }
+#if S3L_VCA_PIPE
+        eb_vca_defer_dst = 0;
+        s3v_rc[cur] = rc;      /* the batch must replay with THESE coefs */
+        s3v_n[cur]  = w_n;
+#endif
         a1 = (unsigned long)esp_cpu_get_cycle_count();
         /* Then compute the NEXT chunk's prologues into the OTHER bank, ONE CHUNK
          * AHEAD. It runs BEFORE w_done=1, so it finishes inside this pass and can
@@ -3078,6 +3112,25 @@ static void render_block(int n)
         eb_engine_render_range(&EBE, RS, rc, (const eb_render_needs *)0,
                                LO_, SPLIT_, &w_shb[w_cur][i], vb[i]);
     }
+#if S3L_VCA_PIPE
+    /* THE DEFERRED VCA BATCH: replay the audio half of core 1's voice over
+     * the PREVIOUS bank's records, into the PREVIOUS vb bank's column --
+     * which is exactly the bank the block tail ships on a piped chip, so
+     * both of this chip's voices leave one chunk late, together. Nobody
+     * else touches vb[1-w_cur] this block (core 1 writes [w_cur]; the tail
+     * reads after this, same core). s3v_rc pins the coefficient bank the
+     * fronts used (double-buffered by recall -- the FX_PIPE rp_mc
+     * guarantee). First block: no valid bank yet, ship the zeros. */
+    {   int pv = 1 - w_cur;
+        if (s3v_rc[pv]) {
+            int bn = s3v_n[pv], bi;
+            eb_engine_vca_batch(RS, s3v_rc[pv], SPLIT_, s3v_bank[pv], bn,
+                                s3v_out);
+            for (bi = 0; bi < bn; ++bi)
+                w_vbb[pv][bi][SPLIT_] = s3v_out[bi];
+        }
+    }
+#endif
 #else
     for (i = 0; i < n; ++i) {
         for (k = LO_; k < EB_NUM_VOICES; ++k) vb[i][k] = 0.0f;
@@ -4254,6 +4307,13 @@ void app_main(void)
     printf("SEED: %08lx (S3L_SEED; one seed = one exact replay; phase 7 is "
            "the seeded random layer)\n", (unsigned long)S3L_SEED);
 #endif
+#if S3L_VCA_PIPE
+    /* set BEFORE the first render: core 1's one voice defers its VCA audio
+     * half; core 0 replays it a chunk late (the banks above). */
+    eb_vca_defer_v = SPLIT_;
+    printf("VCAPIPE: voice %d audio half runs on core 0, one chunk late "
+           "(chip output ships from the previous bank)\n", SPLIT_);
+#endif
 #if EB_CLASSIC
     /* THE CLASSIC BUILD MUST PROVE ITSELF IN ITS OWN LOG. Without this the
      * only evidence that eb_patch_classicize() ran is that I say so. Here the
@@ -4965,7 +5025,17 @@ void app_main(void)
                  * write completes inside its own block. */
                 if (!s3c_tx_busy())
                 for (ci = 0; ci < CHUNK; ++ci)
-                    s3_chain_merge(&cc_, w_vbb[w_cur][ci],
+                    s3_chain_merge(&cc_,
+#if S3L_VCA_PIPE
+                                   /* piped chip: ship the PREVIOUS bank --
+                                    * voice A rendered last block, voice B
+                                    * batched this block into the same bank.
+                                    * Both one chunk late, together (the
+                                    * accepted hop-skew class). */
+                                   w_vbb[1 - w_cur][ci],
+#else
+                                   w_vbb[w_cur][ci],
+#endif
 #if S3C_HAS_UP
                                    up_ok
                                        ? (const float *)&s3c_rxbuf[S3C_SLOTW * ci]

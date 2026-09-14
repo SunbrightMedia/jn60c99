@@ -23,7 +23,7 @@ cd "$IDF_PATH" && . ./export.sh > /dev/null && cd "$REPO/esp32s3"
 # FULL PANEL (scope directive 2026-09-13): trunk + EXACTLY-0 levers, NO byte
 # law -- delay/reverb/e5 live, rings in PSRAM. No approximation, no MSPROF.
 LEVERS="-DEB_VCF_DEADCOEF=1;-DEB_ATREST_BLOCK=1;-DEB_ATREST_O1=1;\
--DEB_ZEROCOEF=1;-DEB_EXP_MEMO=1;-DEB_FUSE_VCA=1;-DEB_NOLIBM=1"
+-DEB_ZEROCOEF=1;-DEB_EXP_MEMO=1;-DEB_FUSE_VCA=1;-DEB_NOLIBM=1;-DEB_VCA_DEFER=1"
 # prologue and the FULL master ride core 1 -- b45's measured law: one exact
 # voice per core is the maximum, so no REV_PIPE and no second voice anywhere.
 COMMON="-DS3L_SWEEP=0;-DS3_CORES=2;-DS3L_FX_PIPE=1;-DS3L_PROLOGUE_C1=1;\
@@ -42,8 +42,8 @@ for POS in "$@"; do
     # -DS3L_STRESS=1 only after mix=OPEN is proven on patch 0.
     1) PER="-DS3L_VOICE_LO=7;-DS3L_SPLIT=8;-DS3L_MIDI=1" ;;
     2) PER="-DS3L_VOICE_LO=6;-DS3L_SPLIT=7;-DS3L_VOICE_HI=7;-DS3L_NOMASTER=1" ;;
-    3) PER="-DS3L_VOICE_LO=4;-DS3L_SPLIT=5;-DS3L_VOICE_HI=6;-DS3L_NOMASTER=1" ;;
-    4) PER="-DS3L_VOICE_LO=2;-DS3L_SPLIT=3;-DS3L_VOICE_HI=4;-DS3L_NOMASTER=1" ;;
+    3) PER="-DS3L_VOICE_LO=4;-DS3L_SPLIT=5;-DS3L_VOICE_HI=6;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1" ;;
+    4) PER="-DS3L_VOICE_LO=2;-DS3L_SPLIT=3;-DS3L_VOICE_HI=4;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1" ;;
     *) echo "position must be 1..4"; exit 1 ;;
     esac
     echo "=== CHAIN4 position $POS ==="
