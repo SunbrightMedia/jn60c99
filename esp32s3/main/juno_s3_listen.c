@@ -3656,15 +3656,34 @@ static void render_block(int n)
 #define PM_STARVE_N 86           /* half a second, then one yielded block */
 #if S3L_CHAIN
         /* THE ENGINE-LEVEL PANIC, ahead of every other note work: when armed
-         * (robot-off, SPACE, or a received chain ALLOFF) run the allocator's
-         * own all-off DIRECTLY into the burst -- no queue, so a flooded
-         * follower cannot refuse it (bench log 20260914105005). It gates
-         * every ASSIGNED voice by index, so a desynced note->voice binding
-         * cannot hide a stuck voice. eb_nb_idle guards the shadow's one
-         * owner, exactly as ev_apply does. */
+         * (robot-off, SPACE, or a received chain ALLOFF), force EVERY engine
+         * voice off DIRECTLY -- one EB_EV_NOTE_OFF per voice index 0..NV-1,
+         * plus the HELD(0) broadcast, straight into the burst.
+         *
+         * WHY NOT eb_alloc_note_off(-1): bench log 20260914112322 proved that
+         * insufficient. It releases only voices the ALLOCATOR still tracks,
+         * but a storm desync leaves a voice GATED IN THE ENGINE while the
+         * allocator no longer owns it (POS3 v4=note 60, POS4 v2=note 48 held
+         * steady after the allocator-only panic). juno_note_off(DEVST, v) is
+         * indexed by voice and needs no allocator record, so this reaches a
+         * stuck voice whatever its origin (desync, or a recall/demo voice the
+         * allocator never owned). A note-off on an idle voice is a no-op, so
+         * sweeping all eight is safe. eb_alloc_init then resets the
+         * allocator's bookkeeping so its state matches the now-silent engine
+         * and future notes start clean. No queue: nothing can refuse it. */
         if (g_alloff_want && !note_pending && eb_nb_idle(&NB)) {
-            int aoff = eb_alloc_note_off(&ALLOC, -1, ALLOC_EV);
-            if (aoff > 0) { note_nev = aoff; note_pending = 1; }
+            int fv;
+            for (fv = 0; fv < EB_NUM_VOICES; ++fv) {
+                ALLOC_EV[fv].kind  = EB_EV_NOTE_OFF;
+                ALLOC_EV[fv].voice = (int8_t)fv;
+                ALLOC_EV[fv].a = 0; ALLOC_EV[fv].b = 0;
+            }
+            ALLOC_EV[EB_NUM_VOICES].kind  = EB_EV_HELD;   /* clear cell 1856 */
+            ALLOC_EV[EB_NUM_VOICES].voice = -1;
+            ALLOC_EV[EB_NUM_VOICES].a = 0; ALLOC_EV[EB_NUM_VOICES].b = 0;
+            note_nev = EB_NUM_VOICES + 1;
+            note_pending = 1;
+            eb_alloc_init(&ALLOC);          /* bookkeeping matches the silence */
             g_alloff_want = 0;
         }
 #endif
