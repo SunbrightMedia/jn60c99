@@ -23,7 +23,8 @@ cd "$IDF_PATH" && . ./export.sh > /dev/null && cd "$REPO/esp32s3"
 # FULL PANEL (scope directive 2026-09-13): trunk + EXACTLY-0 levers, NO byte
 # law -- delay/reverb/e5 live, rings in PSRAM. No approximation, no MSPROF.
 LEVERS="-DEB_VCF_DEADCOEF=1;-DEB_ATREST_BLOCK=1;-DEB_ATREST_O1=1;\
--DEB_ZEROCOEF=1;-DEB_EXP_MEMO=1;-DEB_FUSE_VCA=1;-DEB_NOLIBM=1;-DEB_VCA_DEFER=1;-DEB_FPDIV=1"
+-DEB_ZEROCOEF=1;-DEB_EXP_MEMO=1;-DEB_FUSE_VCA=1;-DEB_NOLIBM=1;-DEB_VCA_DEFER=1;-DEB_FPDIV=1;\
+-DEB_CR_PITCH=1;-DEB_CR_MODCV=1;-DEB_CR_VCFCV=1;-DEB_CR_ENV=1;-DEB_CR_N=4;-DEB_CR_NP=4;-DEB_CR_NC=2;-DEB_CR_NE=2;-DEB_LFO_TAIL_CR=1"
 # prologue and the FULL master ride core 1 -- b45's measured law: one exact
 # voice per core is the maximum, so no REV_PIPE and no second voice anywhere.
 COMMON="-DS3L_SWEEP=0;-DS3_CORES=2;-DS3L_FX_PIPE=1;-DS3L_PROLOGUE_C1=1;\
@@ -34,11 +35,14 @@ COMMON="-DS3L_SWEEP=0;-DS3_CORES=2;-DS3L_FX_PIPE=1;-DS3L_PROLOGUE_C1=1;\
 [ $# -eq 0 ] && set -- 1 2 3 4
 for POS in "$@"; do
     case "$POS" in
-    # USER-BINDING 2026-09-14: the ZERO-approximation bar is SUSPENDED by
-    # the user's explicit order, SCOPED to pos3/pos4 only: the fork's
-    # sonic-gated CR set (pitch N=4, cutoff/env N=2, lerp on, LFO tail CR)
-    # runs on the middle chips. pos1/pos2 stay bit-exact. The robot+seeds
-    # return on pos1 (mix=OPEN was proven; runtime-gated by 'r').
+    # USER-BINDING 2026-09-14 (amended the same day under the user's
+    # "add what you need for a fully working synth" order): the CR set
+    # runs on ALL FOUR positions. Reason, from the record: the robot's
+    # patch storm reaches every chip, and an EXACT voice at the patch-48
+    # class costs ~6,0xx-6,3xx vs the 5,442 budget on ANY chip (the b45
+    # freeze measured it) -- THE INVARIANT covers every input, so every
+    # chip must fit the worst patch. Uniform CR also makes all six
+    # voices the same engine. The user may veto before flashing.
     # BRING-UP SET (2026-09-13): no robot/stepper on pos 1 -- the chain holds
     # patch 0 so the hop gates are judged on ONE variable. The robot run on
     # silicon froze all four chips on patch 48, whose voice cost busts the
@@ -47,8 +51,8 @@ for POS in "$@"; do
     # -DS3L_STRESS=1 only after mix=OPEN is proven on patch 0.
     1) PER="-DS3L_VOICE_LO=7;-DS3L_SPLIT=8;-DS3L_MIDI=1;-DS3L_STRESS=1" ;;
     2) PER="-DS3L_VOICE_LO=6;-DS3L_SPLIT=7;-DS3L_VOICE_HI=7;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE0=1" ;;
-    3) PER="-DS3L_VOICE_LO=4;-DS3L_SPLIT=5;-DS3L_VOICE_HI=6;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1;-DEB_CR_PITCH=1;-DEB_CR_MODCV=1;-DEB_CR_VCFCV=1;-DEB_CR_ENV=1;-DEB_CR_N=4;-DEB_CR_NP=4;-DEB_CR_NC=2;-DEB_CR_NE=2;-DEB_LFO_TAIL_CR=1" ;;
-    4) PER="-DS3L_VOICE_LO=2;-DS3L_SPLIT=3;-DS3L_VOICE_HI=4;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1;-DEB_CR_PITCH=1;-DEB_CR_MODCV=1;-DEB_CR_VCFCV=1;-DEB_CR_ENV=1;-DEB_CR_N=4;-DEB_CR_NP=4;-DEB_CR_NC=2;-DEB_CR_NE=2;-DEB_LFO_TAIL_CR=1" ;;
+    3) PER="-DS3L_VOICE_LO=4;-DS3L_SPLIT=5;-DS3L_VOICE_HI=6;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1" ;;
+    4) PER="-DS3L_VOICE_LO=2;-DS3L_SPLIT=3;-DS3L_VOICE_HI=4;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1" ;;
     *) echo "position must be 1..4"; exit 1 ;;
     esac
     echo "=== CHAIN4 position $POS ==="
