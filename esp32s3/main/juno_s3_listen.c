@@ -3644,6 +3644,25 @@ static void render_block(int n)
         eb_alloc_init(&ALLOC);        /* bookkeeping matches the silence */
         g_alloff_want = 0;
         ++g_alloff_fired;             /* DIAG: proves the panic actually ran */
+        /* ⚑ THE GATE CELL THE RENDER ACTUALLY READS, ZEROED DIRECTLY.
+         * The hand-emitted note-offs above go through juno_note_off's own
+         * per-voice base; the bench (silence probe, VERSION 20260914134004)
+         * proved that base does NOT reach the cell the publish syncs the
+         * render gate from for this chip's rendered voice -- rg=dg=1000 stuck
+         * on voice 7 after every all-off, its ENV2 pinned at sustain. The
+         * render's per-sample gate is gate_cell320[v] (eb_render.c:584), and
+         * eb_recall_publish step 7 syncs it from EXACTLY ebdev_at_v(v,320).
+         * Write THAT cell to 0 for every voice, so the panic's own publish
+         * lands a released gate on every voice regardless of the note path's
+         * addressing. Device cells are never read per sample (the O2 note),
+         * so this cannot race core 1; it runs only on a deliberate all-off,
+         * so it cannot touch normal play or bit-exactness. */
+        {   int fz;
+            for (fz = 0; fz < EB_NUM_VOICES; ++fz) {
+                float *gp = (float *)ebdev_at_v(fz, 320u);
+                if (gp) *gp = 0.0f;
+            }
+        }
     }
 #endif
     if (dev_want && !dev_muted) {

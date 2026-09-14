@@ -871,3 +871,37 @@ silent; POS1's last patch leaves voice 7 at a floor. A dynamic at-rest
 (respect eb_env_atrest, which is EXACTLY-0 and never cuts a tail) is the
 right long answer but will not silence a voice whose env is NOT at 0 --
 which is why SILV must say first whether the env is at 0 or not.
+
+## RG/DG PINNED IT (VERSION 20260914134004): THE ALL-OFF'S NOTE-OFF DOES
+## NOT REACH THE CELL THE RENDER SYNCS ITS GATE FROM (2026-09-14)
+
+SILV printed, per sticking voice, rg = gate_cell320[v] (the gate the
+render reads every sample, eb_render.c:584) and dg = the device cell 320
+that eb_recall_publish step 7 syncs it from (ebdev_at_v(v,320)). POS1's
+final state, robot off, all counters frozen:
+
+  v5[e1=0 e2=0 rg=1000 dg=1000]  v6[e1=0 e2=0 rg=1000 dg=1000]
+  v7[e1=8057 e2=7704 rg=1000 dg=1000]
+
+Reading: ALL of v5/v6/v7 have rg=dg=1.0 (gate cell HELD), but only v7
+sustains -- because POS1 RENDERS only voice 7 (VOICE_LO=7); v5/v6 are
+injected as follower audio and their local env is never ticked here, so
+their held gate cell is inert. For voice 7 the held gate_cell320 biases
+the cvgate (gi.p29) and pins ENV2 at sustain (7704) -- the drone.
+
+The all-off panic hand-emits juno_note_off(0..7), which writes cell 320
+through juno_note_off's own per-voice base. dg=1.0 proves that write does
+NOT land on ebdev_at_v(v,320) -- the exact cell step 7 reads back into the
+render gate -- for this chip's rendered voice. During the storm frequent
+recalls masked it (a full recall's own path releases), so it only shows
+after robot-off when no recall follows. The three earlier all-off layers
+(alloc note-off(-1), 128-note paced sweep, the engine panic) all release
+through that same juno base, so none could ever reach the render gate.
+
+Fix (VERSION next): the panic now writes ebdev_at_v(v,320)=0 for every
+voice directly -- the cell step 7 reads -- so the panic's own publish
+lands a released gate on every voice regardless of the note path's base.
+Device cells are never read per sample, so this is race-free and runs
+only on a deliberate all-off. SILV kept one cycle to confirm rg->0 and
+ENV2 decays. OWED if the gate still holds with rg=0: cvg_t29 (cell 208,
+the cvgate target) may need the same treatment.
