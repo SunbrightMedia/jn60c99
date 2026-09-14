@@ -515,3 +515,27 @@ red: the same log's SLACK + cyc split names the remaining link segment
 (i2s driver copies are the suspect) and that is the next, last shave.
 This flash is honestly expected to be GREEN-OR-NAME-THE-REST, not
 guaranteed green.
+
+## LOG dd7c3cb0: THE PIPE WORKS, THE FAST CRC DOES NOT (2026-09-14)
+
+MEASURED:
+- VCA PIPE (pos3/4): core 1 v 5,046 -> 4,931 (-115; the fused audio
+  half is ~115 cyc, not b27's 330 -- that number was the UN-fused whole
+  module). pro steady 576-579. Core 1 total 5,507 (was 5,620).
+- FAST CRC: REFUTED ON SILICON. POS2 -- whose ONLY change was the crc
+  swap -- read cyc 5,459 -> 5,636 (+177). The four dependent table
+  looks stall the in-order core worse than the byte walk. All buffers
+  and tables verified INTERNAL (map + nm), so placement is not the
+  story. Reverted on-device (ece9d86); the pure law + host gate stay
+  as the record. CRCBENCH now prints byte/slice4/rom cyc/KB at boot.
+- Net: pos3 6,183 (worse -- crc regression ate the pipe's win), pos1/2
+  up ~100-180 for the same reason. un=0 everywhere throughout.
+
+ROUND 3 (staged): byte crc back + CRCBENCH + the MIRROR pipe
+(S3L_VCA_PIPE0) on pos2 (its voice rides core 0; near-idle core 1
+batches). PREDICTION: pos1 ~5,38x GREEN, pos2 ~5,34x GREEN (first
+time), pos3/4 ~5,95x-6,00x RED by ~300 aggregate -- the remaining
+reservoir is the i2s driver copies + non-crc tail, which this log's
+CRCBENCH + counters will size. The exact-engine arithmetic on a
+2-voice chip (2 voices + prologue + link vs 10,884) remains the wall;
+every remaining lever is in OUR link/driver code, not the engine.
