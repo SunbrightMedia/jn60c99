@@ -769,3 +769,28 @@ Every chip releases via its wire-accurate held map and all four
 allocators return to the same empty state. Storm refusals remain the
 queue's documented flood protection; the storm now ENDS with a
 deterministic chain-wide silence + resync instead of a haunting.
+
+## THE HELD-MAP HOLE (2026-09-14, log e75ce6ac): THE ALLOFF MUST SWEEP
+ALL 128 NOTES, PACED
+
+The resync ALLOFF was necessary and NOT sufficient, and the bench
+proved it in one log: board 1 freshly reset (miniterm's RTS resets
+ONLY the board whose port you open), totally idle -- sub=0, nb=0,
+keys=0 -- while the merge window carried live nonzero samples from
+boards 2..4 THE WHOLE TIME: their voices were still stuck from the
+capture's storm, and the user heard junk "with the robot never on".
+The user then toggled r on/off (CHAINev sent grew); the ALLOFF fired;
+the junk SURVIVED.
+
+Why: s3c_all_off_local released only notes in s3c_held. The map is
+WIRE-accurate; the engine is QUEUE-accurate. A note-off the flooded
+queue refused leaves its voice ringing with the held bit already
+CLEAR -- the map-guided sweep skips exactly the stuck voices. Same
+hole in the seq-gap resync since b45.
+
+Fix: ALLOFF now sweeps ALL 128 note numbers on every chip (a note-off
+for a silent note is a no-op in eb_alloc), and the sweep is PACED --
+8 per block, stopping at the first refusal and resuming next block --
+so a queue still draining storm backlog cannot refuse the cure the
+way it refused the disease. Chip 1 arms the same paced sweep locally
+at robot-off and SPACE (its own queue refused storm events too).

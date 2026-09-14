@@ -182,13 +182,31 @@ static void s3c_ev_send(int kind, int note, int vel)
 #endif
 }
 
+/* EVERY note number, NOT only the held map (paid 2026-09-14, heard as
+ * junk audio from the far boards with chip 1 fully idle): the map is
+ * WIRE-accurate but the engine is QUEUE-accurate. A note-off that the
+ * flooded queue REFUSED leaves its voice ringing with the held bit
+ * already CLEAR, so a map-guided sweep skips exactly the stuck ones.
+ * A note-off for a silent note is a no-op in eb_alloc, so a full sweep
+ * is safe -- and it is PACED (8 per ctl poll, resumed until note 128,
+ * stopping at the first refusal) so a queue still draining storm
+ * backlog cannot refuse the cure the way it refused the disease. */
+static int s3c_sweep_note = -1;    /* -1 idle; else the next note to free */
 static void s3c_all_off_local(void)
 {
-    int n;
-    for (n = 0; n < 128; ++n)
-        if (s3c_held[n >> 5] & (1u << (n & 31)))
-            s3c_apply_event((3 << 4) | S3C_EV_OFF, n, 0);   /* src DIN */
+    s3c_sweep_note = 0;
     memset(s3c_held, 0, sizeof s3c_held);
+}
+static void s3c_sweep_pace(void)
+{
+    int n = 0;
+    if (s3c_sweep_note < 0) return;
+    while (s3c_sweep_note < 128 && n < 8) {
+        if (!s3c_apply_event((3 << 4) | S3C_EV_OFF, s3c_sweep_note, 0))
+            return;                 /* queue full: resume next block */
+        ++s3c_sweep_note; ++n;
+    }
+    if (s3c_sweep_note >= 128) s3c_sweep_note = -1;
 }
 
 static void s3c_ctl_poll(s3c_ctl *c, int my_patch, unsigned long my_crc,
@@ -197,6 +215,7 @@ static void s3c_ctl_poll(s3c_ctl *c, int my_patch, unsigned long my_crc,
     int64_t now;
     int n;
     if (!c->started) return;
+    s3c_sweep_pace();               /* a pending all-off sweep continues */
     now = esp_timer_get_time();
     if (now - c->last_tx_us > 100000) {
         s3_link_frame f;

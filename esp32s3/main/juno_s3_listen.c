@@ -2016,6 +2016,13 @@ static const signed char CON_KEY[128] = {
 };
 static unsigned char con_held[128];
 static int  con_base = 60;              /* middle C */
+#if S3L_CHAIN && S3_CHAIN_POS == 1
+/* THE PACED PANIC SWEEP (armed by 'r'-off and SPACE): release every note
+ * number 0..127 through the REAL entry, a few per block, resuming past a
+ * full queue -- see s3c_all_off_local for the held-map hole this closes.
+ * -1 = idle. */
+static int g_panic_note = -1;
+#endif
 /* The console-settable split. Declared here because the console reader below
  * writes it and is defined before the block that explains it; the reasoning
  * lives at the SPLIT_ macro. Latched into w_split at a block boundary. */
@@ -2057,7 +2064,9 @@ static void con_poll(void)
 #endif
 #if S3L_CHAIN && S3_CHAIN_POS == 1
             /* PANIC IS CHAIN-WIDE: same resync law as the robot-off
-             * handler below (see its comment for the paid defect). */
+             * handler below (see its comment for the paid defect).
+             * The paced local sweep covers chip 1's own refused offs. */
+            g_panic_note = 0;
             s3c_ev_send(((int)JUNO_SRC_CONSOLE << 4) | 2, 0, 0);
 #endif
             continue;
@@ -2090,11 +2099,16 @@ static void con_poll(void)
                  * refused note-OFF is a voice that rings FOREVER on that
                  * chip -- worse, the four allocators diverge, so later
                  * hand-played notes land on voices the chips disagree
-                 * about. The ALLOFF frame is the chain's own resync (the
-                 * seq-gap path already uses it): every chip releases via
-                 * its wire-accurate held map and all four allocators
-                 * return to the same empty state. kind low nibble 2 =
+                 * about. The ALLOFF frame is the chain's own resync: on
+                 * every chip it now sweeps ALL 128 notes (see
+                 * s3c_all_off_local for the held-map hole this closes)
+                 * and all four allocators return to the same empty
+                 * state. Chip 1 arms the same full sweep locally, PACED
+                 * at the poll site (its own queue may still hold storm
+                 * backlog; an unpaced sweep would be refused the same
+                 * way the disease was). kind low nibble 2 =
                  * S3C_EV_ALLOFF. */
+                g_panic_note = 0;
                 s3c_ev_send(((int)JUNO_SRC_CONSOLE << 4) | 2, 0, 0);
 #endif
             }
@@ -5177,6 +5191,18 @@ void app_main(void)
             con_poll();
 #if S3L_PANEL
             pan_poll();
+#endif
+#if S3L_CHAIN && S3_CHAIN_POS == 1
+            if (g_panic_note >= 0) {    /* the paced panic sweep */
+                int pk = 0;
+                while (g_panic_note < 128 && pk < 8) {
+                    if (!(juno_event_note_off)(JUNO_SRC_CONSOLE,
+                                               g_panic_note))
+                        break;          /* queue full: resume next block */
+                    ++g_panic_note; ++pk;
+                }
+                if (g_panic_note >= 128) g_panic_note = -1;
+            }
 #endif
 #if S3L_STRESS
             /* g_stress_rt: the robot is GATED AT RUNTIME (console 'r').
