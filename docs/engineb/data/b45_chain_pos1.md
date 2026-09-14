@@ -933,3 +933,34 @@ voice is at-rest and the bank is SILENT -- the stuck gate can no longer
 drone. The persistent-gate bug (which also explains the user's early
 "audio continues after I release a key") is the next target, now that the
 board is provably quiet at idle.
+
+## SHIP LAW GREEN (VERSION 20260914143219, log 073630): ALL FOUR SILENT
+## AFTER THE STORM (2026-09-14)
+
+The hush + input-ring flush closed it. Final state, robot off, all four
+boards:
+
+  POS1 SIL v0..v7 = 0  -- SILENT   atrest=ff (every voice hushed)
+  POS2 SIL = SILENT   POS3 SIL = SILENT   POS4 SIL = SILENT
+  STUCK count = 0    rxrst = 0 on every board    no reboot loop
+  z: POS2 flat at 42 (ticked once, then still)   POS3 slips settled at
+     300 during the storm, flat after -- neither is climbing post-storm.
+  un = 0 on POS1/2/4, 6 on POS3 (storm-time, not after).
+
+Why the flush was the last piece: the panic hushed all eight, but
+ev_apply cannot drain while the all-off burst is in flight
+(note_pending), so the storm's last note-ONs sat in the ring and, the
+instant the burst finished, un-hushed voices 4..7 -- v7 (the rendered
+voice) drone survived (VERSION ...141801, atrest=0x0f). The panic now
+flushes the ring, so nothing stale clears the hush; atrest reaches 0xff.
+
+Scope of this claim: the SILENCE is proven by the log, per SHIP LAW. The
+DEVICE GATE itself (scat[v][320]) is still not released by the storm's
+rapid recalls -- SILV keeps reporting rg=dg=1.0 -- and the hush MASKS
+that at idle. It is NOT a play-time defect: the scatter broadcast that
+re-gates it (juno_driver_seed_voices = ebdev_broadcast_scatter) lives ONLY
+in eb_devseq_recall (a patch change), never in the per-note rebuild
+(eb_recall_chunk_step / eb_recall_build_voices), so a hand-played note-off
+writes scat[v]=0 and it STICKS. The storm's constant recalls are the
+special case. OWED: prove the note-off release on silicon without a storm,
+and root-cause the recall-time re-gate so the hush becomes belt, not load.

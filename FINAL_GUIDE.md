@@ -393,9 +393,17 @@ b32..b43; live pointers: CLAUDE.md LIVE STATE.
   starves, two chips ≈70–77% (INFERRED). ORIGINAL-port classic (trunk +
   exact levers, the user's binding directive): ≈5,045 cyc/exact voice
   confirmed → 6 voices + chorus ≈31–35k → the 4-slot board (40k) at 78–88%.
-  Data: docs/engineb/data/b44_classic_silicon.md. The 4-board build is
-  STAGED (esp32s3/flash/chain4/, design docs/engineb/CHAIN4.md, sum law
-  host-proven EXACTLY 0) and UNFLASHED.
+  Data: docs/engineb/data/b44_classic_silicon.md. The 4-board build
+  (esp32s3/flash/chain4/, design docs/engineb/CHAIN4.md, sum law host-proven
+  EXACTLY 0) PASSES THE SHIP-LAW STORM: all four boards read SILENT after
+  robot-off, STUCK=0, rxrst=0, z/slips settle, no reboot loop (b45 log
+  20260914_073630, VERSION ...143219). Silence via a render-level all-off
+  (g_hush_mask, force-at-rest downstream of the device gate) plus an
+  input-ring flush so buffered storm notes cannot un-hush. OWED: the device
+  gate (scat[v][320]) is still re-gated by the storm's rapid RECALLS (a
+  scatter broadcast in eb_devseq_recall only, never the per-note rebuild, so
+  a HAND note-off releases cleanly) -- the hush masks that at idle; root-
+  cause it so the hush is belt, not load. Ledger: data/b45_chain_pos1.md.
 - **Hardware**: the MasterAudio 4-slot carrier board (docs/hardware/BOARD.md
   + PCB_PLACEMENT.md). Supersedes the 2-board jumper-wire bench as the
   physical target; the D-track link design carries over (chain 4→3→2→1).
