@@ -23,7 +23,7 @@ cd "$IDF_PATH" && . ./export.sh > /dev/null && cd "$REPO/esp32s3"
 # FULL PANEL (scope directive 2026-09-13): trunk + EXACTLY-0 levers, NO byte
 # law -- delay/reverb/e5 live, rings in PSRAM. No approximation, no MSPROF.
 LEVERS="-DEB_VCF_DEADCOEF=1;-DEB_ATREST_BLOCK=1;-DEB_ATREST_O1=1;\
--DEB_ZEROCOEF=1;-DEB_EXP_MEMO=1;-DEB_FUSE_VCA=1;-DEB_NOLIBM=1;-DEB_VCA_DEFER=1"
+-DEB_ZEROCOEF=1;-DEB_EXP_MEMO=1;-DEB_FUSE_VCA=1;-DEB_NOLIBM=1;-DEB_VCA_DEFER=1;-DEB_FPDIV=1"
 # prologue and the FULL master ride core 1 -- b45's measured law: one exact
 # voice per core is the maximum, so no REV_PIPE and no second voice anywhere.
 COMMON="-DS3L_SWEEP=0;-DS3_CORES=2;-DS3L_FX_PIPE=1;-DS3L_PROLOGUE_C1=1;\
