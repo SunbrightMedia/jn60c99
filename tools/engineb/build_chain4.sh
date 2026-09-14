@@ -49,7 +49,12 @@ for POS in "$@"; do
     # 5,442 budget on pos 2-4 (cyc 5,412/6,014/5,757 measured) -- an over-
     # budget SENDER cannot feed the wire and no CRC can ever redeem. Restore
     # -DS3L_STRESS=1 only after mix=OPEN is proven on patch 0.
-    1) PER="-DS3L_VOICE_LO=7;-DS3L_SPLIT=8;-DS3L_MIDI=1;-DS3L_STRESS=1" ;;
+    # S3L_PANEL (user-directed 2026-09-14): six buttons on IO12..17 + two
+    # pots (IO1 cutoff, IO4 resonance) on chip 1 only -- 15/16/17 are the
+    # DOWN audio port on 2..4. Events (params included, new chain kind 3)
+    # ride the event chain, so the FOUR IMAGES ARE A SET: an old follower
+    # would misread kind 3 as a note-off. Never flash pos 1 alone.
+    1) PER="-DS3L_VOICE_LO=7;-DS3L_SPLIT=8;-DS3L_MIDI=1;-DS3L_STRESS=1;-DS3L_PANEL=1" ;;
     2) PER="-DS3L_VOICE_LO=6;-DS3L_SPLIT=7;-DS3L_VOICE_HI=7;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE0=1" ;;
     3) PER="-DS3L_VOICE_LO=4;-DS3L_SPLIT=5;-DS3L_VOICE_HI=6;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1" ;;
     4) PER="-DS3L_VOICE_LO=2;-DS3L_SPLIT=3;-DS3L_VOICE_HI=4;-DS3L_NOMASTER=1;-DS3L_VCA_PIPE=1" ;;

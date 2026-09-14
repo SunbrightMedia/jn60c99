@@ -119,6 +119,18 @@
 #if S3L_CHAIN && S3L_LINK
 #error "S3L_CHAIN and S3L_LINK are different topologies: build with -DS3L_LINK=0"
 #endif
+/* S3L_PANEL: the hand panel -- six buttons (IO12/13 octave down/up,
+ * IO14..17 = C C# D D#) and two pots (IO1 = VCF CUTOFF, IO4 = VCF
+ * RESONANCE). Buttons are pull-up active-low, so an UNWIRED pin idles HIGH
+ * and plays nothing; a pot must first prove it is a pot (hold still to ARM)
+ * before its moves are sent. Position 1 only: IO15/16/17 are the DOWN audio
+ * port on chips 2..4. */
+#ifndef S3L_PANEL
+#define S3L_PANEL 0
+#endif
+#if S3L_PANEL && S3L_CHAIN && S3_CHAIN_POS != 1
+#error "S3L_PANEL is position 1 only: IO15/16/17 are the DOWN audio port on 2..4"
+#endif
 #if S3L_LINK
 #include "s3_link_uart.h"
 #endif
@@ -145,8 +157,18 @@ static int s3c_tap_off(juno_src src, int note)
     s3c_ev_send(((int)src << 4) | 0, note, 0);
     return r;
 }
+/* PARAMETERS RIDE THE CHAIN TOO (kind 3 = S3C_EV_PARAM, pid/val in the
+ * note/vel bytes). Without this a knob on chip 1 rebuilt chip 1's record
+ * only and five of the six voices kept the old value. */
+static int s3c_tap_param(juno_src src, int pid, int val)
+{
+    int r = juno_event_param(src, pid, val);
+    s3c_ev_send(((int)src << 4) | 3, pid, val);
+    return r;
+}
 #define juno_event_note_on(s, n, v) s3c_tap_on(s, n, v)
 #define juno_event_note_off(s, n)   s3c_tap_off(s, n)
+#define juno_event_param(s, p, v)   s3c_tap_param(s, p, v)
 #else
 static int s3c_refuse_on(juno_src s, int n, int v)
 {
@@ -156,8 +178,16 @@ static int s3c_refuse_on(juno_src s, int n, int v)
     return 0;
 }
 static int s3c_refuse_off(juno_src s, int n) { (void)s; (void)n; return 0; }
+static int s3c_refuse_param(juno_src s, int p, int v)
+{
+    (void)s; (void)p; (void)v;
+    printf("CHAIN: parameters come from chip 1 over the event chain -- "
+           "local edit refused (determinism)\n");
+    return 0;
+}
 #define juno_event_note_on(s, n, v) s3c_refuse_on(s, n, v)
 #define juno_event_note_off(s, n)   s3c_refuse_off(s, n)
+#define juno_event_param(s, p, v)   s3c_refuse_param(s, p, v)
 #endif
 #endif /* S3L_CHAIN */
 #include "eb_patch.h"
@@ -2131,6 +2161,180 @@ static int midi_start(void)
     return 1;
 }
 #endif /* S3L_MIDI */
+
+#if S3L_PANEL
+/* ===================== THE HAND PANEL (user-directed) ====================
+ * Six buttons and two pots, polled ONCE PER BLOCK at the same site as
+ * midi_poll/con_poll (playbook 12). Everything goes through the event
+ * boundary, and on the chain every event is tapped up the wire, so one
+ * button or knob here moves all four chips.
+ *
+ * UNWIRED-SAFE, WHICH IS THE USER'S STATED CONDITION ("i havent wired the
+ * buttons yet, they should only play when wired and pressed"):
+ *   - buttons: internal pull-up, active-low. An unconnected pin reads HIGH
+ *     forever = released. Three consecutive block polls (~17 ms) must agree
+ *     before a state flips, so noise cannot press a key.
+ *   - pots: a floating ADC pin jitters by hundreds of counts. A pot is born
+ *     DISARMED and arms only after ~24 stable reads in a row (~0.6 s of
+ *     holding still, within +/-24 of 4095 counts). Arming sends NOTHING
+ *     (pickup law); only a real move past the hysteresis after that sends,
+ *     and a wild jump no hand can make (>300 counts between reads) both
+ *     never sends and, repeated, DISARMS the pot again. */
+#include "driver/gpio.h"
+#include "esp_adc/adc_oneshot.h"
+
+#define PAN_NBTN   6
+#define PAN_DEB_N  3        /* blocks that must agree to flip a button    */
+#define PAN_STAB   24       /* counts: |r - last| <= this reads "still"   */
+#define PAN_ARM_N  24       /* still reads in a row to ARM (~0.6 s)       */
+#define PAN_HYST   32       /* counts from last SENT value to send again  */
+#define PAN_WILD   300      /* counts in one read no hand produces        */
+#define PAN_WILD_N 6        /* wild reads (net of decay) that DISARM      */
+/* the portable param ids = indexes into EB_PARAM_CLASS. Proven at boot
+ * against the record offsets the ids must mean (86/90, juno_hostparams.c);
+ * a regenerated table that reorders them DISABLES the pots loudly. */
+#define PAN_PID_CUTOFF 12   /* rec 86, VCF CUTOFF FREQ  */
+#define PAN_PID_RES    13   /* rec 90, VCF RESONANCE    */
+
+static const int PAN_BTN[PAN_NBTN] = {12, 13, 14, 15, 16, 17};
+static unsigned char pan_ctr[PAN_NBTN];    /* debounce agreement counter  */
+static unsigned char pan_state[PAN_NBTN];  /* debounced, 1 = pressed      */
+static short         pan_note[PAN_NBTN];   /* note sounding, -1 = none    */
+static int           pan_base = 60;        /* the octave's C (middle C)   */
+
+typedef struct {
+    adc_channel_t ch;
+    int           pid;
+    const char   *name;
+    int  armed, stab, wild;
+    int  last;                /* previous raw read, -1 = never read       */
+    int  sent;                /* raw at the last event sent               */
+} pan_pot;
+static pan_pot pan_pots[2] = {
+    { ADC_CHANNEL_0, PAN_PID_CUTOFF, "CUTOFF",    0, 0, 0, -1, -1 }, /* IO1 */
+    { ADC_CHANNEL_3, PAN_PID_RES,    "RESONANCE", 0, 0, 0, -1, -1 }, /* IO4 */
+};
+static adc_oneshot_unit_handle_t pan_adc;
+static int pan_adc_ok, pan_turn;
+
+static void pan_start(void)
+{
+    gpio_config_t g = {
+        .pin_bit_mask = 0,
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
+    };
+    int i;
+    for (i = 0; i < PAN_NBTN; ++i) {
+        g.pin_bit_mask |= 1ULL << PAN_BTN[i];
+        pan_note[i] = -1;
+    }
+    gpio_config(&g);
+    {
+        adc_oneshot_unit_init_cfg_t u = { .unit_id = ADC_UNIT_1 };
+        adc_oneshot_chan_cfg_t      c = { .atten    = ADC_ATTEN_DB_12,
+                                          .bitwidth = ADC_BITWIDTH_DEFAULT };
+        pan_adc_ok = adc_oneshot_new_unit(&u, &pan_adc) == ESP_OK
+                  && adc_oneshot_config_channel(pan_adc, pan_pots[0].ch,
+                                                &c) == ESP_OK
+                  && adc_oneshot_config_channel(pan_adc, pan_pots[1].ch,
+                                                &c) == ESP_OK;
+    }
+    /* the boot tooth: the pid is an INDEX into a GENERATED table. If a
+     * regeneration reorders it, these ids would edit the WRONG parameter --
+     * so prove the two record offsets and refuse the pots otherwise. */
+    if (EB_PARAM_CLASS[PAN_PID_CUTOFF].rec != 86
+        || EB_PARAM_CLASS[PAN_PID_RES].rec != 90) {
+        pan_adc_ok = 0;
+        printf("PANEL: *** EB_PARAM_CLASS moved (rec %d/%d, want 86/90) -- "
+               "pots DISABLED ***\n",
+               EB_PARAM_CLASS[PAN_PID_CUTOFF].rec,
+               EB_PARAM_CLASS[PAN_PID_RES].rec);
+    }
+    printf("PANEL: hand keys + pots live (safe unwired; wire on BOARD 1):\n"
+           "       buttons, pin to GND:  IO12 = octave down, IO13 = octave "
+           "up,\n"
+           "                             IO14 = C, IO15 = C#, IO16 = D, "
+           "IO17 = D#  (C is %d)\n"
+           "       pots, outer legs to 3V3+GND, wiper to the pin:\n"
+           "                             IO1 = VCF CUTOFF, IO4 = VCF "
+           "RESONANCE\n"
+           "       a pot ARMS after ~0.6 s held still, then its moves are "
+           "sent (%s)\n",
+           pan_base, pan_adc_ok ? "ADC OK" : "ADC REFUSED -- pots dead");
+}
+
+static void pan_poll(void)
+{
+    int i;
+    for (i = 0; i < PAN_NBTN; ++i) {
+        int raw = !gpio_get_level((gpio_num_t)PAN_BTN[i]);  /* press = LOW */
+        if (raw == (int)pan_state[i]) { pan_ctr[i] = 0; continue; }
+        if (++pan_ctr[i] < PAN_DEB_N) continue;
+        pan_ctr[i]   = 0;
+        pan_state[i] = (unsigned char)raw;
+        if (raw) {                                          /* press edge */
+            if (i == 0) {           /* octave down, the console's own clamp */
+                if (pan_base >= 24) pan_base -= 12;
+                printf("PANEL: octave down -- C = %d\n", pan_base);
+            } else if (i == 1) {
+                if (pan_base <= 96) pan_base += 12;
+                printf("PANEL: octave up -- C = %d\n", pan_base);
+            } else if (pan_note[i] < 0) {
+                int n = pan_base + (i - 2);   /* C, C#, D, D# */
+                if (n >= 0 && n <= 127) {
+                    juno_event_note_on(JUNO_SRC_KEYBED, n, 100);
+                    pan_note[i] = (short)n;
+                }
+            }
+        } else if (i >= 2 && pan_note[i] >= 0) {            /* release edge */
+            /* the note STARTED is the note released, so an octave change
+             * under a held key can never strand a voice on. */
+            juno_event_note_off(JUNO_SRC_KEYBED, pan_note[i]);
+            pan_note[i] = -1;
+        }
+    }
+    /* ONE conversion per block, alternating pots: ~30 us against the
+     * 5,804 us block, and it stays off the per-sample path. */
+    if (pan_adc_ok) {
+        pan_pot *p = &pan_pots[pan_turn];
+        int r, d;
+        pan_turn ^= 1;
+        if (adc_oneshot_read(pan_adc, p->ch, &r) != ESP_OK) return;
+        if (p->last < 0) { p->last = r; return; }           /* first read */
+        d = r - p->last; if (d < 0) d = -d;
+        p->last = r;
+        if (d > PAN_WILD) {          /* a jump no hand makes: never send  */
+            p->stab = 0;
+            if (++p->wild >= PAN_WILD_N && p->armed) {
+                p->armed = 0; p->wild = 0;
+                printf("PANEL: %s pot DISARMED (wild input -- unwired?)\n",
+                       p->name);
+            }
+            return;
+        }
+        if (p->wild) --p->wild;
+        if (d <= PAN_STAB) { if (p->stab < 255) ++p->stab; }
+        else                 p->stab = 0;
+        if (!p->armed) {
+            if (p->stab >= PAN_ARM_N) {
+                p->armed = 1;
+                p->sent  = r;        /* PICKUP: arming itself sends NOTHING */
+                printf("PANEL: %s pot ARMED at %d/255 -- move it to take "
+                       "over\n", p->name, r >> 4);
+            }
+            return;
+        }
+        d = r - p->sent; if (d < 0) d = -d;
+        if (d >= PAN_HYST && (r >> 4) != (p->sent >> 4)) {
+            juno_event_param(JUNO_SRC_PANEL, p->pid, r >> 4);
+            p->sent = r;
+        }
+    }
+}
+#endif /* S3L_PANEL */
 #endif /* S3L_MIDI || S3L_CHAIN */
 #endif /* S3L_RECALL */
 
@@ -3918,9 +4122,11 @@ static void s3c_patch_follow(int peer_patch) { s3c_want_patch = peer_patch; }
 static int s3c_apply_event(int kind, int note, int vel)
 {
     juno_src src = (juno_src)((kind >> 4) & 0xF);
-    if ((kind & 0xF) == S3C_EV_ON)
-        return (juno_event_note_on)(src, note, vel);
-    return (juno_event_note_off)(src, note);
+    switch (kind & 0xF) {
+    case S3C_EV_ON:    return (juno_event_note_on)(src, note, vel);
+    case S3C_EV_PARAM: return (juno_event_param)(src, note, vel);
+    default:           return (juno_event_note_off)(src, note);
+    }
 }
 #endif
 
@@ -4515,6 +4721,9 @@ void app_main(void)
     printf("PLAY IT. Notes are allocated by eb_alloc (CAssignJu60's law, "
            "270/270 vs the plugin), applied through the port's own note path, "
            "and published at the next block boundary.\n");
+#if S3L_PANEL
+    pan_start();
+#endif
 #endif
     /* Priority 1 on core 0: the audio loop always wins. Started before I2S so
      * the very first second is reported. */
@@ -4882,6 +5091,9 @@ void app_main(void)
             midi_poll();
 #endif
             con_poll();
+#if S3L_PANEL
+            pan_poll();
+#endif
 #if S3L_STRESS
             /* g_stress_rt: the robot is GATED AT RUNTIME (console 'r').
              * WHY: one flash must answer two questions that fight each other

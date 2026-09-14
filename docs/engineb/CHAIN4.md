@@ -106,6 +106,30 @@ the deterministic allocator = identical global allocation on all chips
 (dropped byte) is COUNTED, printed, and answered with all-notes-off — a
 desynced allocator must resync, not play a wrong chord forever.
 
+PARAMETERS (added 2026-09-14, with the hand panel): kind 3 = S3C_EV_PARAM
+carries the portable EB_PARAM_CLASS index in the note byte and the 0–255
+value in the vel byte. Chip 1 taps every juno_event_param it accepts
+(pots, console `[`/`]`, robot phase 6) up the same stream; chips 2–4
+apply it through the same boundary and re-forward. WHY: a knob must move
+ALL SIX voices — before this kind, a chip-1 edit rebuilt chip 1's record
+only and five voices kept the old value. The held-note map ignores kind 3
+(a pid is not a note). Local param edits on chips 2–4 are REFUSED like
+local notes (determinism). ⚠ CONSEQUENCE: the four images are A SET —
+an older follower misreads kind 3 as a note-off. Never mix builds.
+
+THE HAND PANEL (chip 1 only; user-directed 2026-09-14): S3L_PANEL=1 adds
+six buttons — IO12/13 octave down/up (clamped 12..108, console's own
+clamp), IO14–17 = C/C#/D/D# of the current octave — and two ADC1 pots,
+IO1 = VCF CUTOFF (pid 12, rec 86), IO4 = VCF RESONANCE (pid 13, rec 90).
+Polled ONCE PER BLOCK at the midi_poll/con_poll site (playbook 12).
+Unwired-safe by construction: buttons are pull-up active-low with a
+3-block debounce; a pot is born DISARMED, arms only after ~24 consecutive
+still reads (~0.6 s), arming sends NOTHING (pickup law), a >300-count
+jump between reads never sends and repeated DISARMS it. The pid→record
+binding is proven at boot (rec 86/90 checked against the generated
+table) or the pots refuse loudly. Chip-1-only because IO15/16/17 are the
+DOWN audio port on chips 2–4 (a compile #error enforces it).
+
 ## 6. Pins — IDENTICAL map on all four chips
 
 | function | pins | UART/I2S |

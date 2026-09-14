@@ -73,8 +73,12 @@ endif()
 # is its OWN component -- `driver` no longer carries it -- so without this the
 # build fails on `driver/gpio.h: No such file or directory`, which reads like a
 # missing SDK and is really a missing REQUIRES line.
+# esp_adc: the hand panel's two pots (S3L_PANEL). Unconditional for the same
+# reason tinyusb is -- REQUIRES resolves before this file's flags are
+# reliably visible, and with the panel off the ADC code is unreferenced and
+# --gc-sections drops it.
 set(APP_REQ esp_driver_i2s esp_driver_uart esp_driver_gpio driver esp_timer
-            esp_hw_support tinyusb)
+            esp_hw_support esp_adc tinyusb)
 
 # O1: the internal event boundary. ONE small portable file, compiled into the
 # firmware exactly as the host gate compiles it (event/teeth.sh) -- a boundary

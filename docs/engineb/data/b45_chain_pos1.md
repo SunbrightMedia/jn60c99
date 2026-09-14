@@ -644,3 +644,39 @@ engine on all voices, by the user's binding order -- not bit-exact,
 uniformly so. STILL OWED before "shipped": the 1-hour soak (a RUN of
 this same image, no new flash), soak layer 3 (fault injection), and
 the formal worst-patch sweep numbers into FINAL_GUIDE.
+
+## THE HAND PANEL + PARAMS ON THE CHAIN (2026-09-14, after the victory)
+
+User order: "add support for manual playing on 12 to 17 ... 12 and 13
+for octaves, the others for keys c, c#, d, d#. and a 2 pots wherever,
+you choose, but for res and cutoff" -- buttons unwired today, so the
+build must be SAFE UNWIRED.
+
+What landed (S3L_PANEL=1, chip 1 only; build_chain4.sh pos1 PER):
+- Buttons IO12..17, internal pull-up, active-low, 3-block debounce.
+  12/13 = octave down/up (the console's own clamp, 12..108); 14..17 =
+  C/C#/D/D# of the current octave. The note STARTED is the note
+  RELEASED, so an octave change under a held key cannot strand a voice.
+- Pots on ADC1: IO1 = VCF CUTOFF (pid 12, rec 86), IO4 = VCF RESONANCE
+  (pid 13, rec 90) -- both pins on the carrier's EXT breakout. One
+  conversion per block, alternating. Unwired-safe by an ARMING law:
+  born disarmed; ~24 consecutive still reads (~0.6 s) to arm; arming
+  sends NOTHING (pickup); >300-count jumps never send and repeated
+  DISARM. The pid->rec binding is checked at boot (constant-folded by
+  the compiler -- a regenerated table that moves the ids disables the
+  pots at every boot, loudly).
+- THE MISSING HALF, found by asking what a knob must reach: parameter
+  events did NOT ride the event chain -- phase 6 proved a chip-1 edit
+  is chain-safe, but five of six voices would keep the old cutoff.
+  NEW chain kind 3 = S3C_EV_PARAM (pid/val in the note/vel bytes),
+  tapped on chip 1, applied + re-forwarded on 2..4 through the same
+  juno_event boundary; the held map ignores kind 3; local edits on
+  followers now REFUSED like local notes. CONSEQUENCE: the four
+  images are a SET (an old follower misreads kind 3 as a note-off of
+  note=pid) -- never flash pos1 alone. CHAIN4.md section 5 updated.
+
+Cost honesty: pan_poll adds 6 GPIO reads + one ADC oneshot (~30 us
+against the 5,804 us block) at the once-per-block poll site, off the
+per-sample path. UNPROVEN ON SILICON until the user's next run; the
+1-hour soak is owed ON THIS IMAGE (run_soak.bat), superseding the
+victory image for that purpose.

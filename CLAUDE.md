@@ -158,7 +158,13 @@ mine is a hypothesis (playbook 80).
   under budget THROUGH the robot+seeded storm, 51 patch changes, no
   freeze, un frozen, mix=OPEN, deficits frozen -- one flash. Engine:
   uniform CR per the user's order (+FPDIV, +VCA pipes, +LFO trim, ROM
-  crc). OWED: the 1-hour soak RUN (same image), soak layer 3 (fault
+  crc). HAND PANEL (user-directed, staged after the victory flash):
+  S3L_PANEL on pos1 -- IO12/13 octave down/up, IO14-17 = C/C#/D/D#
+  (pull-up active-low, debounced, unwired-safe), pots IO1=CUTOFF
+  IO4=RESONANCE (arm-by-stillness pickup law, boot-proven pids 12/13);
+  params now RIDE the event chain (kind 3), so THE FOUR IMAGES ARE A
+  SET -- never flash pos1 alone. Design: CHAIN4.md §5/§6. OWED: the
+  1-hour soak RUN (on the PANEL image), soak layer 3 (fault
   injection), worst-patch numbers into FINAL_GUIDE.
 - **Hardware (user-directed)**: MasterAudio 4-slot carrier board for N16R8
   DevKitC-1 boards (JLCPCB/LCSC). The user draws the schematic by hand;

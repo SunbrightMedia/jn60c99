@@ -79,9 +79,15 @@
 #define S3C_DN_UART UART_NUM_2
 #endif
 
-/* ---- the event frame (fixed 9 bytes, NO padding -- the codec lesson) ---- */
+/* ---- the event frame (fixed 9 bytes, NO padding -- the codec lesson) ----
+ * S3C_EV_PARAM reuses the note/vel bytes as pid/val: a knob on chip 1 must
+ * move ALL SIX voices, and before this kind existed a chip-1 parameter edit
+ * rebuilt chip 1's record only -- five voices kept the old cutoff. The pid
+ * is the portable EB_PARAM_CLASS index (0..58, fits the byte) and val is
+ * already 0..255. A mixed-build chain would misread kind 3 as a note-off,
+ * so the four images must always be flashed AS A SET. */
 #define S3C_EV_MAGIC1 0x45u         /* 'J','E' */
-enum { S3C_EV_OFF = 0, S3C_EV_ON = 1, S3C_EV_ALLOFF = 2 };
+enum { S3C_EV_OFF = 0, S3C_EV_ON = 1, S3C_EV_ALLOFF = 2, S3C_EV_PARAM = 3 };
 typedef struct {
     uint8_t m0, m1, kind, note, vel, seq0, seq1, sum0, sum1;
 } s3c_ev;
@@ -235,9 +241,11 @@ static void s3c_ctl_poll(s3c_ctl *c, int my_patch, unsigned long my_crc,
             if ((e.kind & 0xF) == S3C_EV_ALLOFF) s3c_all_off_local();
             else {
                 s3c_apply_event(e.kind, e.note, e.vel);
+                /* the held map tracks NOTES only: a PARAM event's pid rides
+                 * the note byte and must never clear a held bit there. */
                 if ((e.kind & 0xF) == S3C_EV_ON)
                     s3c_held[e.note >> 5] |=  (1u << (e.note & 31));
-                else
+                else if ((e.kind & 0xF) == S3C_EV_OFF)
                     s3c_held[e.note >> 5] &= ~(1u << (e.note & 31));
             }
             ++s3c_ev_applied;
