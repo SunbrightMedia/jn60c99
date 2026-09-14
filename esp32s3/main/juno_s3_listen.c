@@ -38,6 +38,7 @@
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "esp_task_wdt.h"
+#include "esp_attr.h"       /* EXT_RAM_BSS_ATTR -- keep pm_leaf_* out of DRAM */
 #include "eb_engine.h"
 #include "eb_render.h"
 #include "eb_coefs.h"
@@ -1142,13 +1143,33 @@ static int           pm_m_run   = 0;
  * pm_leaf_* names the value-tree leaves a knob move applies through
  * juno_apply_param_leaf; pm_nonleaf marks a batch that also touched a switch or
  * an FX/master byte, which has no per-cell plugin setter and is re-derived from
- * the record instead. See eb_devparam.h. */
-static uint64_t      pm_leaf_pend = 0u;  /* leaf param_ids queued  (bit = pid) */
-static uint64_t      pm_leaf_run  = 0u;  /* leaf param_ids in flight            */
-static int           pm_nonleaf_pend = 0;
-static int           pm_nonleaf_run  = 0;
-static unsigned char pm_leaf_val[EB_PARAM_CLASS_N];      /* latest byte per pid */
-static unsigned char pm_leaf_val_run[EB_PARAM_CLASS_N];
+ * the record instead. See eb_devparam.h.
+ *
+ * The edited BYTE is NOT kept here -- dev_param_edit already writes it into the
+ * DEVBANK record, so pm_apply decodes it back from there.
+ *
+ * ⚠ THESE FOUR LIVE IN PSRAM, ON PURPOSE (b45). In internal .bss they sort
+ * BELOW the coefficient buffer RCB, so every byte of them pushes RCB to a
+ * higher DRAM address. A 142-byte push (the first cut carried two 59-byte value
+ * arrays) muted POS4: its RCB landed on a bad internal-DRAM cell that the boot
+ * CRC then caught (chip rc=ebdfa32b vs host c6c5d9aa; master coefs, which read
+ * the SAME PSRAM cell array, MATCHED -- so the fault is in DRAM, not PSRAM, and
+ * PSRAM is a safe home). EXT_RAM_BSS_ATTR keeps internal DRAM byte-identical to
+ * the pre-change build, so RCB stays where every board's memory is known good.
+ * They are touched only on the cold param path, never per sample. */
+EXT_RAM_BSS_ATTR static uint64_t pm_leaf_pend;  /* leaf param_ids queued (bit=pid) */
+EXT_RAM_BSS_ATTR static uint64_t pm_leaf_run;   /* leaf param_ids in flight         */
+EXT_RAM_BSS_ATTR static int      pm_nonleaf_pend;
+EXT_RAM_BSS_ATTR static int      pm_nonleaf_run;
+
+/* The current record byte for leaf param_id pid (hi/lo nibble pair, exactly as
+ * dev_param_edit wrote it and juno_bank_apply reads it). */
+static int pm_leaf_byte(int pid)
+{
+    const unsigned char *blob = DEVBANK + EB_BANK_HEADER + EB_BANK_BLOB_OFF;
+    int off = (int)EB_PARAM_CLASS[pid].rec - EB_BANK_BLOB_OFF;
+    return ((int)blob[off] << 4) | (int)blob[off + 1];
+}
 static int           pm_want    = 0;     /* edits are queued for a build */
 static unsigned long pm_edits   = 0;     /* parameters accepted */
 static unsigned long pm_builds  = 0;     /* rebuilds run */
@@ -1190,8 +1211,7 @@ static void dev_param_edit(int param_id, int value)
     {
         int li = eb_devparam_leaf_index(param_id);
         if (li >= 0 && param_id < EB_PARAM_CLASS_N) {
-            pm_leaf_val[param_id] = (unsigned char)value;
-            pm_leaf_pend |= (uint64_t)1u << param_id;
+            pm_leaf_pend |= (uint64_t)1u << param_id;  /* value rides the record */
         } else {
             pm_nonleaf_pend = 1;
         }
@@ -1241,7 +1261,7 @@ static int pm_apply(void *u)
                 int li = eb_devparam_leaf_index(pid);
                 if (li >= 0)
                     juno_apply_param_leaf((unsigned char *)0, li,
-                                          pm_leaf_val_run[pid], hr);
+                                          pm_leaf_byte(pid), hr);
             }
         /* Keep the note path's porta stash current: eb_devseq_recall refreshes
          * it (eb_devseq.c), but this fast path skips the recall, and PORTAMENTO
@@ -3899,10 +3919,10 @@ static void render_block(int n)
                 /* snapshot, then clear -- see the two-set note above */
                 pm_v_run = pm_vmask; pm_t_run = pm_tail; pm_m_run = pm_master;
                 pm_vmask = 0u;       pm_tail  = 0;       pm_master = 0;
-                /* the plugin-exact edit set moves in lockstep with the masks */
+                /* the plugin-exact edit set moves in lockstep with the masks
+                 * (the edited bytes stay in the record; pm_apply reads them) */
                 pm_leaf_run = pm_leaf_pend; pm_leaf_pend = 0u;
                 pm_nonleaf_run = pm_nonleaf_pend; pm_nonleaf_pend = 0;
-                memcpy(pm_leaf_val_run, pm_leaf_val, sizeof pm_leaf_val_run);
                 eb_pm_begin(&PM);
                 pm_want = 0;
                 pm_starve = 0;
