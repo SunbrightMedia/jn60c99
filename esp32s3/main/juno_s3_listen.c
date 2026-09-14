@@ -34,6 +34,7 @@
 #include "freertos/task.h"
 #include "driver/i2s_std.h"
 #include "driver/uart.h"
+#include "driver/gpio.h"   /* pin pulls: the unwired-input law (playbook 94) */
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "esp_task_wdt.h"
@@ -2160,6 +2161,14 @@ static int midi_start(void)
     if (uart_param_config(MIDI_UART, &cfg) != ESP_OK) return 0;
     if (uart_set_pin(MIDI_UART, UART_PIN_NO_CHANGE, S3L_MIDI_RX,
                      UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) != ESP_OK) return 0;
+    /* THE UNWIRED LAW (playbook 94): an input pin must hold a DEFINED level
+     * with nothing attached. UART idle is HIGH; this RX floated, noise read
+     * as bytes, and any 0x9x-shaped byte pair became a random full-velocity
+     * note -- MEASURED on the bench: midi= (applied note events) grew ~4/s
+     * with the robot off and nobody playing. The pull-up makes an unwired
+     * MIDI port SILENT; a real MIDI receiver drives the pin and is
+     * unaffected. */
+    gpio_set_pull_mode((gpio_num_t)S3L_MIDI_RX, GPIO_PULLUP_ONLY);
     return 1;
 }
 #endif /* S3L_MIDI */

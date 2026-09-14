@@ -720,3 +720,27 @@ re-engineered.
 Acceptance for the NEXT log (fix build): follower PARAM lines show
 builds>0 during/after phase 6 and yield>0 if defer climbed; POS1
 never prints ARMED while both pots are unwired.
+
+## THE GHOST PLAYER (2026-09-14, the "terrifying" bench session):
+PLAYBOOK 94'S THIRD BITE -- THE UNWIRED MIDI PIN
+
+Sound came alive (the DAC's XSMT solder jumper was the mute) and the
+user heard "random glitches and weirdness" with the robot OFF, and
+typed console keys seemed dead. Evidence from the logs, not the ear:
+midi= prints notes_seen (APPLIED note events), and it grew ~4/s from
+t=25 to t=100 of log 067f195a with the robot off and no player; nb
+kept churning the whole quiet window. Every other input was silent
+(keys=0, panel debounced, followers send nothing down). The one input
+left: GPIO 18, the DIN MIDI RX -- UNWIRED, floating, its noise parsed
+as 0x9x note-ons at velocity 100. The ghosts also held/stole the six
+voices, which is what made hand keys seem dead.
+
+Fix: gpio_set_pull_mode(18, PULLUP) after uart_set_pin -- UART idle
+is HIGH, so an unwired MIDI port now reads silence; a real MIDI
+receiver drives the pin and is unaffected. Playbook 94's rule stands
+verbatim: EVERY input pin must hold a defined level unwired. Audit
+result of that rule against this build's inputs: console RX 43/44
+(driven by the USB bridge, defined), panel 12-17 (pull-ups), pots
+IO1/IO4 (rail-guarded arming), MIDI 18 (this fix), chain UARTs
+(peer-driven; no-peer boards refuse via handshake). No input remains
+without a defined idle.
