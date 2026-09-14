@@ -1253,14 +1253,32 @@ static int dev_burst_step(void)
          * docs/ASSIGNER_MODE_FINDING.md verbatim. */
         eb_alloc_init(&ALLOC);
         eb_devseq_alloc_config(&ALLOC, DEVBANK);
-#if S3L_MIDI || S3L_CHAIN
-        eb_devseq_notes_on(DEVCHORD_VOICE, DEVCHORD_NOTE, DEVCHORD_VEL,
-                           DEVCHORD_N);
-#else
+        /* THE CHORD SEEDS THE VOICE STATE; burst_gate DECIDES ITS FATE.
+         *
+         * The coefficients are built (BST_COEFS) from the voice cells this
+         * leaves behind, and the render reads ONLY published coefficients --
+         * no cell is read per sample (see the O2 note above). So a voice that
+         * is GATED here is baked into the published set and SOUNDS until a
+         * released set is built over it. That is the whole mechanism.
+         *
+         * burst_gate == 0 : hold the chord. The build is comparable to the
+         *                   host answer key, so BST_CHECK CRCs it. USED AT
+         *                   BOOT ONLY (dev_burst() the monolith); the boot
+         *                   chord is then released once, after the check, by
+         *                   the S3L_PLAY block in app_main.
+         * burst_gate == 1 : release the chord before the build, so the
+         *                   published set is already silent. USED FOR EVERY
+         *                   RUNTIME patch change -- dev_request() forces gate=1
+         *                   on PLAY builds (see there). A runtime recall must
+         *                   NEVER publish a held chord or the voice drones
+         *                   until the next release, which is exactly the POS1
+         *                   voice-7 stuck-note defect (bench log 20260914,
+         *                   silence probe): 52 storm recalls each re-published
+         *                   note 72 held on the global voice this chip renders.
+         *                   With gate=1 there is no held publish to get stuck. */
         eb_devseq_notes_on(DEVCHORD_VOICE, DEVCHORD_NOTE, DEVCHORD_VEL,
                            DEVCHORD_N);
         if (burst_gate) eb_devseq_notes_off(DEVCHORD_VOICE, DEVCHORD_N);
-#endif
         devp_notes = (unsigned long)esp_cpu_get_cycle_count() - t0;
         eb_recall_chunk_begin(&REC);
         burst_state = BST_COEFS;
@@ -1582,7 +1600,24 @@ static void dev_request(int patch, int gate)
     }
 #endif
     dev_patch = patch;
+#if S3L_MIDI || S3L_CHAIN
+    /* THE RUNTIME RECALL IS SILENT, BY CONSTRUCTION. This is the ONLY runtime
+     * entry to a recall (boot uses dev_burst() the monolith directly), so
+     * forcing gate=1 HERE makes every runtime patch change on every position
+     * -- robot storm, console b/n, MIDI PC, a chain follower's forwarded step
+     * -- publish RELEASED coefficients. No held chord is ever handed to the
+     * render at runtime, so the POS1 voice-7 drone (a gate=0 recall that
+     * published note 72 held and was re-applied faster than any all-off could
+     * chase it) cannot form. The demo chord's only remaining job is the boot
+     * CRC probe, which runs held on dev_burst() and is released once by the
+     * S3L_PLAY block. The (held-only) per-patch CRC is not run at runtime; the
+     * recall of every patch is already proven bit-exact by the host gates and
+     * on-silicon at boot. */
+    dev_gate = 1;
+    (void)gate;
+#else
     dev_gate = gate;
+#endif
     dev_want  = 1;      /* O2: a REQUEST. The build starts at the next block
                          * boundary and takes several; dev_pending now means
                          * "a finished shadow awaits publish" and nothing else.

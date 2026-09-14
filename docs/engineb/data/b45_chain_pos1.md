@@ -794,3 +794,46 @@ for a silent note is a no-op in eb_alloc), and the sweep is PACED --
 so a queue still draining storm backlog cannot refuse the cure the
 way it refused the disease. Chip 1 arms the same paced sweep locally
 at robot-off and SPACE (its own queue refused storm events too).
+
+## THE PUBLISHED-HELD-CHORD ROOT (2026-09-14, silence probe): A RUNTIME
+## RECALL MUST NOT PUBLISH A HELD CHORD -- gate=1 AT THE dev_request CHOKE
+
+The ALLOFF sweeps (above) were still not sufficient on POS1: the
+silence probe (SIL: line, SHIP LAW) caught voice 7 (note 72) pinned at
+a dead-constant peak after the storm, robot off, everything idle. The
+diagnostic (SILDIAG) read alloff_fired=1 (the panic DID run), gate=0
+(the recall held its chord), atrest=03 (WAKE 0xFC boot chord, voices
+2..7 awake). So the cure ran and the voice survived it -- the same
+shape as the held-map hole, one layer deeper.
+
+Why the sweeps could not win: the render reads ONLY published
+coefficients (the O2 note in juno_s3_listen.c -- no cell is read per
+sample), so a voice that is GATED at build time is BAKED into the
+published set and SOUNDS until a RELEASED set is built over it. Every
+runtime recall on POS1 was requested gate=0 (dev_request(..., 0), from
+the robot storm at ~4 patch/s and the console b/n keys). gate=0 holds
+the demo chord so the build is comparable to the host CRC answer key --
+correct for the BOOT probe, wrong for a runtime recall: each of the 52
+storm recalls re-published note 72 HELD on the global voice this chip
+renders. The ALLOFF/panic release the voice through the NOTE machine
+(rebuild + publish released) -- but the very next storm recall published
+the held chord again, faster than the once-per-robot-off cure could
+chase. A cure that runs once cannot out-run a disease that re-applies
+52 times.
+
+Fix (the ROOT, not another chaser): dev_request() is the ONLY runtime
+entry to a recall -- boot uses dev_burst() the monolith directly -- so
+it now forces gate=1 on PLAY builds (S3L_MIDI || S3L_CHAIN). Every
+runtime patch change on every position (robot, console, MIDI PC, a
+follower's forwarded step) releases the chord BEFORE the coefficient
+build, so the published set is already silent. No held chord is ever
+handed to the render at runtime; the stuck-voice class cannot form.
+The demo chord's only surviving job is the BOOT CRC probe (dev_burst()
+gate=0, released once by the S3L_PLAY block in app_main). Consequence
+for the log: crc_checked drops to ~1 (boot) from ~52 (per storm patch);
+this is expected, NOT a regression -- every patch's recall is already
+proven bit-exact by the host gates and on-silicon at boot; the runtime
+CRC was redundant and incompatible with silence (the oracle sounds the
+chord). OWED, recorded not forgotten: a boot-time on-silicon CRC sweep
+of all 64 patches (held, checked, never published live) would restore
+full on-silicon recall proof without a runtime drone.

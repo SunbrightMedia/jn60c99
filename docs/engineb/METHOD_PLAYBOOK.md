@@ -2034,3 +2034,37 @@ user reads) and prints a STUCK verdict whenever quiet input meets a
 non-silent bank. SHIP LAW: no image is sent unless its own log proves
 the end state. Corollary of 46: a fix believed N times is not thereby
 proven -- the instrument, not the ear, closes the loop.
+
+## 97. A VOICE'S PUBLISHED COEFFICIENTS ARE ITS TRUTH -- CURE THE PUBLISH,
+NOT THE CELLS BEHIND IT (2026-09-14)
+
+POS1 voice 7 (the demo chord's top note, 72) stayed pinned at a
+dead-constant peak after the storm, robot off, board idle. Two cures
+already existed and both ran: the engine-level all-off panic, and the
+paced 128-note ALLOFF sweep. The silence probe still read STUCK; the
+diagnostic showed the panic FIRED (alloff_fired=1) and the voice
+survived it.
+
+The mechanism the cures missed: this engine reads ONLY published
+coefficients per sample -- no voice cell is read in the render loop
+(the design that lets a half-built shadow be inaudible). So a voice is
+silenced ONLY by building and publishing a RELEASED coefficient set
+over it. Both cures poked the gate CELLS and released through the note
+machine -- correct -- but every runtime patch recall was requested
+gate=0, which HOLDS the chord specifically so its build matches the
+host CRC key, and then PUBLISHES that held set. At ~4 storm patches a
+second the held publish re-applied faster than the once-per-robot-off
+cure could chase. The cure ran once; the disease ran fifty-two times.
+
+Rules. When a subsystem's output is a PUBLISHED snapshot and nothing
+downstream reads the source state, the snapshot is the only truth --
+fixing the source after the fact is a race you lose to whatever
+republishes. Cure the publish: make the thing that WRITES the snapshot
+write the state you want, at its single choke point, so the bad state
+is never published at all. Here dev_request() (the ONE runtime entry to
+a recall; boot bypasses it via the monolith) now forces gate=1, so
+every runtime recall publishes a RELEASED set and the stuck-voice class
+cannot form. A held publish belongs only where it is verified and then
+released in the same breath -- the boot CRC probe. Corollary of 46 and
+96: a cure that chases state is weaker than one that never lets the bad
+state exist.
