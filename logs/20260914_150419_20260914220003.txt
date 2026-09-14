@@ -1,0 +1,2257 @@
+==== BENCH version 20260914220003  2026-09-14 15:04:19 ====
+[POS4] ESP-ROM:esp32s3-20210327
+[POS4] Build:Mar 27 2021
+[POS4] rst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)
+[POS4] SPIWP:0xee
+[POS4] mode:DIO, clock div:1
+[POS4] load:0x3fce2820,len:0x14f0
+[POS4] load:0x403c8700,len:0xde4
+[POS4] load:0x403cb700,len:0x2f58
+[POS4] entry 0x403c8904
+[POS4] I (24) boot: ESP-IDF v6.1 2nd stage bootloader
+[POS4] I (25) boot: compile time Sep 14 2026 21:15:32
+[POS4] I (25) boot: Multicore bootloader
+[POS4] I (25) boot: chip revision: v0.2
+[POS4] I (27) boot: efuse block revision: v1.3
+[POS4] I (31) boot.esp32s3: Boot SPI Speed : 80MHz
+[POS4] I (35) boot.esp32s3: SPI Mode       : DIO
+[POS4] I (39) boot.esp32s3: SPI Flash Size : 8MB
+[POS4] I (42) boot: Enabling RNG early entropy source...
+[POS4] I (47) boot: Partition Table:
+[POS4] I (50) boot: ## Label            Usage          Type ST Offset   Length
+[POS4] I (56) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+[POS4] I (62) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+[POS4] I (69) boot:  2 factory          factory app      00 00 00010000 00400000
+[POS4] I (75) boot: End of partition table
+[POS4] I (79) esp_image: segment 0: paddr=00010020 vaddr=3c030020 size=4be20h (310816) map
+[POS4] I (143) esp_image: segment 1: paddr=0005be48 vaddr=3fc98800 size=0362ch ( 13868) load
+[POS4] I (146) esp_image: segment 2: paddr=0005f47c vaddr=40378000 size=00b9ch (  2972) load
+[POS4] I (147) esp_image: segment 3: paddr=00060020 vaddr=42000020 size=2ad7ch (175484) map
+[POS4] I (186) esp_image: segment 4: paddr=0008ada4 vaddr=40378b9c size=0fbc4h ( 64452) load
+[POS4] I (201) esp_image: segment 5: paddr=0009a970 vaddr=50000000 size=00024h (    36) load
+[POS4] I (209) boot: Loaded app from partition at offset 0x10000
+[POS4] I (209) boot: Disabling RNG early entropy source...
+[POS4] I (220) octal_psram: vendor id    : 0x0d (AP)
+[POS4] I (220) octal_psram: dev id       : 0x02 (generation 3)
+[POS4] I (220) octal_psram: density      : 0x03 (64 Mbit)
+[POS4] I (222) octal_psram: good-die     : 0x01 (Pass)
+[POS4] I (226) octal_psram: Latency      : 0x01 (Fixed)
+[POS4] I (231) octal_psram: VCC          : 0x01 (3V)
+[POS4] I (235) octal_psram: SRF          : 0x01 (Fast Refresh)
+[POS4] I (240) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+[POS4] I (245) octal_psram: BurstLen     : 0x01 (32 Byte)
+[POS4] I (249) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+[POS4] I (254) octal_psram: DriveStrength: 0x00 (1/1)
+[POS4] I (259) MSPI Timing: Enter psram timing tuning
+[POS4] I (263) esp_psram: Found 8MB PSRAM device
+[POS4] I (266) esp_psram: Speed: 80MHz
+[POS4] I (269) cpu_start: Multicore app
+[POS4] I (558) esp_psram: SPI SRAM memory test OK
+[POS4] I (566) cpu_start: GPIO 44 and 43 are used as console UART I/O pins
+[POS4] I (567) cpu_start: Pro cpu start user code
+[POS4] I (567) cpu_start: cpu freq: 240000000 Hz
+[POS4] I (569) app_init: Application information:
+[POS4] I (572) app_init: Project name:     juno_s3
+[POS4] I (576) app_init: App version:      8ab1415-dirty
+[POS4] I (581) app_init: Compile time:     Sep 14 2026 21:16:05
+[POS4] I (586) app_init: ELF file SHA256:  36436a320...
+[POS4] I (590) app_init: ESP-IDF:          v6.1
+[POS4] I (594) efuse_init: Min chip rev:     v0.0
+[POS4] I (598) efuse_init: Max chip rev:     v0.99
+[POS4] I (602) efuse_init: Chip rev:         v0.2
+[POS4] I (605) heap_init: Initializing. RAM available for dynamic allocation:
+[POS4] I (612) heap_init: At 3FCCF8F0 len 00019E20 (103 KiB): RAM
+[POS4] I (617) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+[POS4] I (622) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+[POS4] I (627) esp_psram: Adding pool of 8162K of PSRAM memory to heap allocator
+[POS4] I (634) spi_flash: detected chip: generic
+[POS4] I (638) spi_flash: flash io: dio
+[POS4] I (641) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+[POS4] I (647) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+[POS4] I (654) main_task: Started on CPU0
+[POS4] I (654) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+[POS4] I (664) main_task: Calling app_main()
+[POS4] 
+[POS4] === JUNO ENGINE B — S3 LISTEN FIRMWARE ===
+[POS4] voices allowed: 6   sample rate: 44100
+[POS4] free internal 120551  free PSRAM 8355868
+[POS4] BUILD: DEVICE RECALL. The coefficients are built ON THIS CHIP from
+[POS4]        134 compact patch bytes and a 30328 B baked cell array. There is
+[POS4]        no frozen blob in this image.
+[POS3] ESP-ROM:esp32s3-20210327
+[POS3] Build:Mar 27 2021
+[POS3] rst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)
+[POS3] SPIWP:0xee
+[POS3] mode:DIO, clock div:1
+[POS3] load:0x3fce2820,len:0x14f0
+[POS3] load:0x403c8700,len:0xde4
+[POS3] load:0x403cb700,len:0x2f58
+[POS3] entry 0x403c8904
+[POS3] I (24) boot: ESP-IDF v6.1 2nd stage bootloader
+[POS3] I (25) boot: compile time Sep 14 2026 21:14:20
+[POS3] I (25) boot: Multicore bootloader
+[POS3] I (25) boot: chip revision: v0.2
+[POS3] I (27) boot: efuse block revision: v1.4
+[POS3] I (31) boot.esp32s3: Boot SPI Speed : 80MHz
+[POS3] I (35) boot.esp32s3: SPI Mode       : DIO
+[POS3] I (39) boot.esp32s3: SPI Flash Size : 8MB
+[POS3] I (42) boot: Enabling RNG early entropy source...
+[POS3] I (47) boot: Partition Table:
+[POS3] I (50) boot: ## Label            Usage          Type ST Offset   Length
+[POS3] I (56) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+[POS3] I (62) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+[POS3] I (69) boot:  2 factory          factory app      00 00 00010000 00400000
+[POS3] I (75) boot: End of partition table
+[POS3] I (79) esp_image: segment 0: paddr=00010020 vaddr=3c030020 size=4c1a8h (311720) map
+[POS3] I (143) esp_image: segment 1: paddr=0005c1d0 vaddr=3fc98800 size=0362ch ( 13868) load
+[POS3] I (146) esp_image: segment 2: paddr=0005f804 vaddr=40378000 size=00814h (  2068) load
+[POS3] I (147) esp_image: segment 3: paddr=00060020 vaddr=42000020 size=2b7f8h (178168) map
+[POS3] I (187) esp_image: segment 4: paddr=0008b820 vaddr=40378814 size=0ff4ch ( 65356) load
+[POS3] I (202) esp_image: segment 5: paddr=0009b774 vaddr=50000000 size=00024h (    36) load
+[POS3] I (209) boot: Loaded app from partition at offset 0x10000
+[POS3] I (210) boot: Disabling RNG early entropy source...
+[POS3] I (221) octal_psram: vendor id    : 0x0d (AP)
+[POS3] I (221) octal_psram: dev id       : 0x02 (generation 3)
+[POS3] I (221) octal_psram: density      : 0x03 (64 Mbit)
+[POS3] I (223) octal_psram: good-die     : 0x01 (Pass)
+[POS3] I (227) octal_psram: Latency      : 0x01 (Fixed)
+[POS3] I (232) octal_psram: VCC          : 0x01 (3V)
+[POS3] I (236) octal_psram: SRF          : 0x01 (Fast Refresh)
+[POS3] I (241) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+[POS3] I (246) octal_psram: BurstLen     : 0x01 (32 Byte)
+[POS3] I (250) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+[POS3] I (255) octal_psram: DriveStrength: 0x00 (1/1)
+[POS3] I (259) MSPI Timing: Enter psram timing tuning
+[POS3] I (264) esp_psram: Found 8MB PSRAM device
+[POS3] I (267) esp_psram: Speed: 80MHz
+[POS3] I (270) cpu_start: Multicore app
+[POS3] I (555) esp_psram: SPI SRAM memory test OK
+[POS3] I (564) cpu_start: GPIO 44 and 43 are used as console UART I/O pins
+[POS3] I (565) cpu_start: Pro cpu start user code
+[POS3] I (565) cpu_start: cpu freq: 240000000 Hz
+[POS3] I (566) app_init: Application information:
+[POS3] I (570) app_init: Project name:     juno_s3
+[POS3] I (574) app_init: App version:      8ab1415-dirty
+[POS3] I (578) app_init: Compile time:     Sep 14 2026 21:14:47
+[POS3] I (583) app_init: ELF file SHA256:  57d2dedc4...
+[POS3] I (588) app_init: ESP-IDF:          v6.1
+[POS3] I (591) efuse_init: Min chip rev:     v0.0
+[POS3] I (595) efuse_init: Max chip rev:     v0.99
+[POS3] I (599) efuse_init: Chip rev:         v0.2
+[POS3] I (603) heap_init: Initializing. RAM available for dynamic allocation:
+[POS3] I (609) heap_init: At 3FCD0B10 len 00018C00 (99 KiB): RAM
+[POS3] I (614) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+[POS3] I (619) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+[POS3] I (625) esp_psram: Adding pool of 8162K of PSRAM memory to heap allocator
+[POS3] I (632) spi_flash: detected chip: gd
+[POS3] I (635) spi_flash: flash io: dio
+[POS3] I (638) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+[POS3] I (644) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+[POS3] I (651) main_task: Started on CPU0
+[POS3] I (651) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+[POS3] I (661) main_task: Calling app_main()
+[POS3] 
+[POS3] === JUNO ENGINE B — S3 LISTEN FIRMWARE ===
+[POS3] voices allowed: 6   sample rate: 44100
+[POS3] free internal 115911  free PSRAM 8355868
+[POS3] BUILD: DEVICE RECALL. The coefficients are built ON THIS CHIP from
+[POS3]        134 compact patch bytes and a 30328 B baked cell array. There is
+[POS3]        no frozen blob in this image.
+[POS3] RECALL: boot recall done, patch 0, gen 1
+[POS2] ESP-ROM:esp32s3-20210327
+[POS2] Build:Mar 27 2021
+[POS2] rst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)
+[POS2] SPIWP:0xee
+[POS2] mode:DIO, clock div:1
+[POS2] load:0x3fce2820,len:0x14f0
+[POS2] load:0x403c8700,len:0xde4
+[POS2] load:0x403cb700,len:0x2f58
+[POS2] entry 0x403c8904
+[POS2] I (24) boot: ESP-IDF v6.1 2nd stage bootloader
+[POS2] I (25) boot: compile time Sep 14 2026 21:12:57
+[POS2] I (25) boot: Multicore bootloader
+[POS2] I (25) boot: chip revision: v0.2
+[POS2] I (27) boot: efuse block revision: v1.4
+[POS2] I (31) boot.esp32s3: Boot SPI Speed : 80MHz
+[POS2] I (35) boot.esp32s3: SPI Mode       : DIO
+[POS2] I (39) boot.esp32s3: SPI Flash Size : 8MB
+[POS2] I (42) boot: Enabling RNG early entropy source...
+[POS2] I (47) boot: Partition Table:
+[POS2] I (50) boot: ## Label            Usage          Type ST Offset   Length
+[POS2] I (56) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+[POS2] I (62) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+[POS2] I (69) boot:  2 factory          factory app      00 00 00010000 00400000
+[POS2] I (75) boot: End of partition table
+[POS2] I (79) esp_image: segment 0: paddr=00010020 vaddr=3c030020 size=4c1a8h (311720) map
+[POS2] I (143) esp_image: segment 1: paddr=0005c1d0 vaddr=3fc98800 size=0362ch ( 13868) load
+[POS2] I (146) esp_image: segment 2: paddr=0005f804 vaddr=40378000 size=00814h (  2068) load
+[POS2] I (147) esp_image: segment 3: paddr=00060020 vaddr=42000020 size=2b7c4h (178116) map
+[POS2] I (187) esp_image: segment 4: paddr=0008b7ec vaddr=40378814 size=0ff4ch ( 65356) load
+[POS2] I (202) esp_image: segment 5: paddr=0009b740 vaddr=50000000 size=00024h (    36) load
+[POS2] I (209) boot: Loaded app from partition at offset 0x10000
+[POS2] I (210) boot: Disabling RNG early entropy source...
+[POS2] I (221) octal_psram: vendor id    : 0x0d (AP)
+[POS2] I (221) octal_psram: dev id       : 0x02 (generation 3)
+[POS2] I (221) octal_psram: density      : 0x03 (64 Mbit)
+[POS2] I (223) octal_psram: good-die     : 0x01 (Pass)
+[POS2] I (227) octal_psram: Latency      : 0x01 (Fixed)
+[POS2] I (232) octal_psram: VCC          : 0x01 (3V)
+[POS2] I (236) octal_psram: SRF          : 0x01 (Fast Refresh)
+[POS2] I (241) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+[POS2] I (246) octal_psram: BurstLen     : 0x01 (32 Byte)
+[POS2] I (250) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+[POS2] I (255) octal_psram: DriveStrength: 0x00 (1/1)
+[POS2] I (259) MSPI Timing: Enter psram timing tuning
+[POS2] I (264) esp_psram: Found 8MB PSRAM device
+[POS2] I (267) esp_psram: Speed: 80MHz
+[POS2] I (270) cpu_start: Multicore app
+[POS2] I (559) esp_psram: SPI SRAM memory test OK
+[POS2] I (567) cpu_start: GPIO 44 and 43 are used as console UART I/O pins
+[POS2] I (568) cpu_start: Pro cpu start user code
+[POS2] I (568) cpu_start: cpu freq: 240000000 Hz
+[POS2] I (569) app_init: Application information:
+[POS2] I (573) app_init: Project name:     juno_s3
+[POS2] I (577) app_init: App version:      8ab1415-dirty
+[POS2] I (582) app_init: Compile time:     Sep 14 2026 21:13:32
+[POS2] I (587) app_init: ELF file SHA256:  0825f4f8c...
+[POS2] I (591) app_init: ESP-IDF:          v6.1
+[POS2] I (595) efuse_init: Min chip rev:     v0.0
+[POS2] I (598) efuse_init: Max chip rev:     v0.99
+[POS2] I (602) efuse_init: Chip rev:         v0.2
+[POS2] I (606) heap_init: Initializing. RAM available for dynamic allocation:
+[POS2] I (613) heap_init: At 3FCD0B10 len 00018C00 (99 KiB): RAM
+[POS2] I (618) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+[POS2] I (623) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+[POS2] I (628) esp_psram: Adding pool of 8162K of PSRAM memory to heap allocator
+[POS2] I (635) spi_flash: detected chip: gd
+[POS2] I (638) spi_flash: flash io: dio
+[POS2] I (641) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+[POS2] I (647) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+[POS2] I (654) main_task: Started on CPU0
+[POS2] I (654) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+[POS2] I (664) main_task: Calling app_main()
+[POS2] 
+[POS2] === JUNO ENGINE B — S3 LISTEN FIRMWARE ===
+[POS2] voices allowed: 6   sample rate: 44100
+[POS2] free internal 115911  free PSRAM 8355868
+[POS2] BUILD: DEVICE RECALL. The coefficients are built ON THIS CHIP from
+[POS2]        134 compact patch bytes and a 30328 B baked cell array. There is
+[POS2]        no frozen blob in this image.
+[POS2] RECALL: boot recall done, patch 0, gen 1
+[POS1] ESP-ROM:esp32s3-20210327
+[POS1] Build:Mar 27 2021
+[POS1] rst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)
+[POS1] SPIWP:0xee
+[POS1] mode:DIO, clock div:1
+[POS1] load:0x3fce2820,len:0x14f0
+[POS1] load:0x403c8700,len:0xde4
+[POS1] load:0x403cb700,len:0x2f58
+[POS1] entry 0x403c8904
+[POS1] I (24) boot: ESP-IDF v6.1 2nd stage bootloader
+[POS1] I (25) boot: compile time Sep 14 2026 21:11:34
+[POS1] I (25) boot: Multicore bootloader
+[POS1] I (25) boot: chip revision: v0.2
+[POS1] I (27) boot: efuse block revision: v1.3
+[POS1] I (31) boot.esp32s3: Boot SPI Speed : 80MHz
+[POS1] I (35) boot.esp32s3: SPI Mode       : DIO
+[POS1] I (39) boot.esp32s3: SPI Flash Size : 8MB
+[POS1] I (42) boot: Enabling RNG early entropy source...
+[POS1] I (47) boot: Partition Table:
+[POS1] I (50) boot: ## Label            Usage          Type ST Offset   Length
+[POS1] I (56) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+[POS1] I (62) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+[POS1] I (69) boot:  2 factory          factory app      00 00 00010000 00400000
+[POS1] I (75) boot: End of partition table
+[POS1] I (79) esp_image: segment 0: paddr=00010020 vaddr=3c030020 size=4ce94h (315028) map
+[POS1] I (144) esp_image: segment 1: paddr=0005cebc vaddr=3fc9c600 size=0315ch ( 12636) load
+[POS1] I (147) esp_image: segment 2: paddr=00060020 vaddr=42000020 size=2e0a4h (188580) map
+[POS1] I (182) esp_image: segment 3: paddr=0008e0cc vaddr=3fc9f75c size=005b0h (  1456) load
+[POS1] I (183) esp_image: segment 4: paddr=0008e684 vaddr=40378000 size=145d0h ( 83408) load
+[POS1] I (205) esp_image: segment 5: paddr=000a2c5c vaddr=50000000 size=00024h (    36) load
+[POS1] I (213) boot: Loaded app from partition at offset 0x10000
+[POS1] I (214) boot: Disabling RNG early entropy source...
+[POS1] I (225) octal_psram: vendor id    : 0x0d (AP)
+[POS1] I (225) octal_psram: dev id       : 0x02 (generation 3)
+[POS1] I (225) octal_psram: density      : 0x03 (64 Mbit)
+[POS1] I (227) octal_psram: good-die     : 0x01 (Pass)
+[POS1] I (231) octal_psram: Latency      : 0x01 (Fixed)
+[POS1] I (235) octal_psram: VCC          : 0x01 (3V)
+[POS1] I (240) octal_psram: SRF          : 0x01 (Fast Refresh)
+[POS1] I (244) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+[POS1] I (249) octal_psram: BurstLen     : 0x01 (32 Byte)
+[POS1] I (254) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+[POS1] I (259) octal_psram: DriveStrength: 0x00 (1/1)
+[POS1] I (263) MSPI Timing: Enter psram timing tuning
+[POS1] I (268) esp_psram: Found 8MB PSRAM device
+[POS1] I (271) esp_psram: Speed: 80MHz
+[POS1] I (274) cpu_start: Multicore app
+[POS1] I (559) esp_psram: SPI SRAM memory test OK
+[POS1] I (568) cpu_start: GPIO 44 and 43 are used as console UART I/O pins
+[POS1] I (568) cpu_start: Pro cpu start user code
+[POS1] I (568) cpu_start: cpu freq: 240000000 Hz
+[POS1] I (570) app_init: Application information:
+[POS1] I (574) app_init: Project name:     juno_s3
+[POS1] I (578) app_init: App version:      8ab1415-dirty
+[POS1] I (582) app_init: Compile time:     Sep 14 2026 21:12:08
+[POS1] I (587) app_init: ELF file SHA256:  f6666b0a2...
+[POS1] I (591) app_init: ESP-IDF:          v6.1
+[POS1] I (595) efuse_init: Min chip rev:     v0.0
+[POS1] I (599) efuse_init: Max chip rev:     v0.99
+[POS1] I (603) efuse_init: Chip rev:         v0.2
+[POS1] I (607) heap_init: Initializing. RAM available for dynamic allocation:
+[POS1] I (613) heap_init: At 3FCD0C90 len 00018A80 (98 KiB): RAM
+[POS1] I (618) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+[POS1] I (623) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+[POS1] I (629) esp_psram: Adding pool of 8162K of PSRAM memory to heap allocator
+[POS1] I (636) spi_flash: detected chip: generic
+[POS1] I (639) spi_flash: flash io: dio
+[POS1] I (642) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+[POS1] I (648) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+[POS1] I (655) main_task: Started on CPU0
+[POS1] I (655) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+[POS1] I (665) main_task: Calling app_main()
+[POS1] 
+[POS1] === JUNO ENGINE B — S3 LISTEN FIRMWARE ===
+[POS1] voices allowed: 6   sample rate: 44100
+[POS1] free internal 115527  free PSRAM 8355868
+[POS1] BUILD: DEVICE RECALL. The coefficients are built ON THIS CHIP from
+[POS1]        134 compact patch bytes and a 30328 B baked cell array. There is
+[POS1]        no frozen blob in this image.
+[POS1] RECALL: boot recall done, patch 0, gen 1
+[POS3] PLAY: boot chord released. The board is SILENT until you play a key. Patch stepping is OFF.
+[POS3] E (871) task_wdt: delete_entry(240): task not found
+[POS3] TWO CORES: voices 4..4 on core 0, 5..7 on core 1
+[POS3] VCAPIPE: voice 5 audio half runs on core 0, one chunk late (chip output ships from the previous bank)
+[POS3] KEYS: a..k play  z/x octave  b/n patch  ,/. split  r robot on/off  space all-notes-off  t fire the tooth
+[POS3] 
+[POS3] === CHAIN4: THIS BOARD IS POSITION 3 OF 4 (1 = the DAC end) ===
+[POS3] CHAIN: renders GLOBAL voice slots 4..5 of 2..7; no master (NOMASTER); notes arrive over the event chain
+[POS3] CHAIN: UP ctl TX 46 RX 47; UP audio master RX TDM4 BCLK 9 LRCK 10 DATA 11
+[POS3] CRCBENCH: byte=14387 slice4=17739 rom=10129 cyc/KB (rom==byte values: YES)
+[POS3] W (971) i2s_tdm: the current mclk multiple is too small, adjust the mclk multiple to 384
+[POS3] CHAIN: DOWN ctl TX 5 RX 6; DOWN audio slave TX TDM4 BCLK 15 LRCK 16 DATA 17
+[POS3] W (981) i2s_platform: i2s controller 0 has been occupied by i2s_driver
+[POS3] CHAIN: every mix gate stays CLOSED until its hop is CRC-proven; wiring -> docs/engineb/CHAIN4.md §6
+[POS3] TYPE TO PLAY -- no parts needed, this console IS the keyboard:
+[POS3]           a s d f g h j k  = C D E F G A B C   (white keys)
+[POS3]             w e   t y u    = the black keys
+[POS3]           z / x = octave down / up     SPACE = release all
+[POS3]           b / n = previous / next patch  (all 64 factory patches;
+[POS3]                   a program change costs the full burst, so a
+[POS3]                   click there is expected and is measured)
+[POS3]           , / . = move the CORE SPLIT.  '.' until core 1 has
+[POS3]                   the FX alone is the load-balance test; watch
+[POS3]                   FXP wait= and cyc on patches 5/16/21/49.
+[POS3]           KEYS TOGGLE: a terminal never reports a key going UP,
+[POS3]           so press once to sound a note and again to release it.
+[POS3]           Hold a chord with a, d, g -- two voices are allowed.
+[POS3] PLAY IT. Notes are allocated by eb_alloc (CAssignJu60's law, 270/270 vs the plugin), applied through the port's own note path, and published at the next block boundary.
+[POS3] W (1081) i2s_platform: i2s controller 0 has been occupied by i2s_driver
+[POS3] 
+[POS3] === MEMORY PROBE (is this engine memory-bound?) ===
+[POS3] MEM: copy 2048 B out of FLASH   33780 cyc  = 16.49 cyc/byte
+[POS3] MEM: copy 2048 B internal->int  1471 cyc  = 0.72 cyc/byte  <- the floor
+[POS3] MEM: 2048 scattered reads PSRAM    431394 cyc = 210.6 cyc/read
+[POS3] MEM: 64 scattered reads INTERNAL 843 cyc = 13.2 cyc/read
+[POS3] MEM: 2048 MOVING-TAP reads PSRAM  62011 cyc = 30.3 cyc/tap  <- the delay's own pattern
+[POS3] MEM: 4096 FOUR-TAP reads PSRAM    64902 cyc = 15.8 cyc/tap  <- DELAY TYPE 5's own pattern
+[POS3] MEM:   ONE tap 30.3 -> FOUR taps 15.8 cyc/tap.  At 12 reads a
+[POS3] MEM:   sample that is 190 cyc/sample, against the 1231 cyc/sample
+[POS3] MEM:   excess b19 measured for DELAY TYPE 5.  >=70% -> ring
+[POS3] MEM:   PLACEMENT is O4's lever; <40% -> the arithmetic is.
+[POS3] MEM: flash is configured DIO @ 80 MHz. QIO @ 120 MHz is available
+[POS3]      and is worth its reflash ONLY if the flash row above is dear.
+[POS3] MEM: rings are 6.1 MB in PSRAM. Read the MOVING-TAP row, NOT the
+[POS3]      scattered row: scattered is a worst case the delay never runs.
+[POS3] 
+[POS3] === DEVICE RECALL ===
+[POS3] RECALL: cell array 30328 B  (tile 10688 + segments 19248 + scatter 8x12)
+[POS3]         NV=8  segments=32  scatter cells=12
+[POS3] RECALL: boot image 30320 B, baked at 44100 Hz  (THE IMAGE'S rate, not the rate this build configured, which is 44100)
+[POS3] RECALL: banks 2 x 10564 rc + 2 x 1712 mc = 24552 B   patch 134 B x 64 = 8576 B in flash   template 4096 B
+[POS3] RECALL: map chain-vs-table selftest: 0 disagreements (0 REQUIRED)
+[POS3] RECALL: placement rc0=1 rc1=1 mc0=1 mc1=1 cells=0   (1 = INTERNAL. A 0 INVALIDATES THE SWAP ARGUMENT: it assumes the S3 does not serve internal SRAM through L1, so no cache maintenance is done anywhere.)
+[POS3] RECALL: free internal 34947  largest internal block 26624  free PSRAM 393300
+[POS3] RECALL: chord 6 voice(s), wake 0xfc, notes 48->v2 55->v3 60->v4 64->v5 67->v6 72->v7  (CHOSEN voices, NOT an allocator -- that is C4)
+[POS3] RECALL: boot build 1128389 cycles, publish 0 cycles  (the FIRST Xtensa numbers for recall that exist)
+[POS4] RECALL: *** CRC MISMATCH patch 0: chip rc=ebdfa32b mc=9a07774b | host rc=c6c5d9aa mc=9a07774b. THE CHIP'S RECALL DISAGREES WITH THE HOST'S. No cycle figure from this run may be quoted. ***
+[POS4] MUTE AT BOOT: the chip's coefficients disagree with the host's. The engine is started anyway so the counters below still report, but the output is silenced.
+[POS4] RECALL: boot recall done, patch 0, gen 1
+[POS4] PLAY: boot chord released. The board is SILENT until you play a key. Patch stepping is OFF.
+[POS4] E (894) task_wdt: delete_entry(240): task not found
+[POS4] TWO CORES: voices 2..2 on core 0, 3..7 on core 1
+[POS4] VCAPIPE: voice 3 audio half runs on core 0, one chunk late (chip output ships from the previous bank)
+[POS4] KEYS: a..k play  z/x octave  b/n patch  ,/. split  r robot on/off  space all-notes-off  t fire the tooth
+[POS4] 
+[POS4] === CHAIN4: THIS BOARD IS POSITION 4 OF 4 (1 = the DAC end) ===
+[POS4] CHAIN: renders GLOBAL voice slots 2..3 of 2..7; no master (NOMASTER); notes arrive over the event chain
+[POS4] CHAIN: DOWN ctl TX 5 RX 6; DOWN audio slave TX TDM4 BCLK 15 LRCK 16 DATA 17
+[POS4] CRCBENCH: byte=14399 slice4=17175 rom=10124 cyc/KB (rom==byte values: YES)
+[POS4] CHAIN: every mix gate stays CLOSED until its hop is CRC-proven; wiring -> docs/engineb/CHAIN4.md §6
+[POS4] TYPE TO PLAY -- no parts needed, this console IS the keyboard:
+[POS4]           a s d f g h j k  = C D E F G A B C   (white keys)
+[POS4]             w e   t y u    = the black keys
+[POS4]           z / x = octave down / up     SPACE = release all
+[POS4]           b / n = previous / next patch  (all 64 factory patches;
+[POS4]                   a program change costs the full burst, so a
+[POS4]                   click there is expected and is measured)
+[POS4]           , / . = move the CORE SPLIT.  '.' until core 1 has
+[POS4]                   the FX alone is the load-balance test; watch
+[POS4]                   FXP wait= and cyc on patches 5/16/21/49.
+[POS4]           KEYS TOGGLE: a terminal never reports a key going UP,
+[POS4]           so press once to sound a note and again to release it.
+[POS4]           Hold a chord with a, d, g -- two voices are allowed.
+[POS4] PLAY IT. Notes are allocated by eb_alloc (CAssignJu60's law, 270/270 vs the plugin), applied through the port's own note path, and published at the next block boundary.
+[POS4] W (1084) i2s_platform: i2s controller 0 has been occupied by i2s_driver
+[POS4] 
+[POS4] === MEMORY PROBE (is this engine memory-bound?) ===
+[POS4] MEM: copy 2048 B out of FLASH   33965 cyc  = 16.58 cyc/byte
+[POS4] MEM: copy 2048 B internal->int  1729 cyc  = 0.84 cyc/byte  <- the floor
+[POS4] MEM: 2048 scattered reads PSRAM    439467 cyc = 214.6 cyc/read
+[POS4] MEM: 64 scattered reads INTERNAL 935 cyc = 14.6 cyc/read
+[POS4] MEM: 2048 MOVING-TAP reads PSRAM  62103 cyc = 30.3 cyc/tap  <- the delay's own pattern
+[POS4] MEM: 4096 FOUR-TAP reads PSRAM    62363 cyc = 15.2 cyc/tap  <- DELAY TYPE 5's own pattern
+[POS4] MEM:   ONE tap 30.3 -> FOUR taps 15.2 cyc/tap.  At 12 reads a
+[POS4] MEM:   sample that is 183 cyc/sample, against the 1231 cyc/sample
+[POS4] MEM:   excess b19 measured for DELAY TYPE 5.  >=70% -> ring
+[POS4] MEM:   PLACEMENT is O4's lever; <40% -> the arithmetic is.
+[POS4] MEM: flash is configured DIO @ 80 MHz. QIO @ 120 MHz is available
+[POS4]      and is worth its reflash ONLY if the flash row above is dear.
+[POS4] MEM: rings are 6.1 MB in PSRAM. Read the MOVING-TAP row, NOT the
+[POS4]      scattered row: scattered is a worst case the delay never runs.
+[POS4] 
+[POS4] === DEVICE RECALL ===
+[POS4] RECALL: cell array 30328 B  (tile 10688 + segments 19248 + scatter 8x12)
+[POS4]         NV=8  segments=32  scatter cells=12
+[POS4] RECALL: boot image 30320 B, baked at 44100 Hz  (THE IMAGE'S rate, not the rate this build configured, which is 44100)
+[POS4] RECALL: banks 2 x 10564 rc + 2 x 1712 mc = 24552 B   patch 134 B x 64 = 8576 B in flash   template 4096 B
+[POS4] RECALL: map chain-vs-table selftest: 0 disagreements (0 REQUIRED)
+[POS4] RECALL: placement rc0=1 rc1=1 mc0=1 mc1=1 cells=0   (1 = INTERNAL. A 0 INVALIDATES THE SWAP ARGUMENT: it assumes the S3 does not serve internal SRAM through L1, so no cache maintenance is done anywhere.)
+[POS4] RECALL: free internal 73003  largest internal block 32768  free PSRAM 396308
+[POS4] RECALL: chord 6 voice(s), wake 0xfc, notes 48->v2 55->v3 60->v4 64->v5 67->v6 72->v7  (CHOSEN voices, NOT an allocator -- that is C4)
+[POS2] PLAY: boot chord released. The board is SILENT until you play a key. Patch stepping is OFF.
+[POS2] E (874) task_wdt: delete_entry(240): task not found
+[POS2] TWO CORES: voices 6..6 on core 0, 7..7 on core 1
+[POS2] VCAPIPE0: voice 6 audio half runs on core 1, one chunk late (chip output ships from the previous bank)
+[POS2] KEYS: a..k play  z/x octave  b/n patch  ,/. split  r robot on/off  space all-notes-off  t fire the tooth
+[POS2] 
+[POS2] === CHAIN4: THIS BOARD IS POSITION 2 OF 4 (1 = the DAC end) ===
+[POS2] CHAIN: renders GLOBAL voice slots 6..6 of 2..7; no master (NOMASTER); notes arrive over the event chain
+[POS2] CHAIN: UP ctl TX 46 RX 47; UP audio master RX TDM4 BCLK 9 LRCK 10 DATA 11
+[POS2] CRCBENCH: byte=12578 slice4=18207 rom=10123 cyc/KB (rom==byte values: YES)
+[POS2] W (964) i2s_tdm: the current mclk multiple is too small, adjust the mclk multiple to 384
+[POS2] CHAIN: DOWN ctl TX 5 RX 6; DOWN audio slave TX TDM4 BCLK 15 LRCK 16 DATA 17
+[POS2] W (974) i2s_platform: i2s controller 0 has been occupied by i2s_driver
+[POS2] CHAIN: every mix gate stays CLOSED until its hop is CRC-proven; wiring -> docs/engineb/CHAIN4.md §6
+[POS2] TYPE TO PLAY -- no parts needed, this console IS the keyboard:
+[POS2]           a s d f g h j k  = C D E F G A B C   (white keys)
+[POS2]             w e   t y u    = the black keys
+[POS2]           z / x = octave down / up     SPACE = release all
+[POS2]           b / n = previous / next patch  (all 64 factory patches;
+[POS2]                   a program change costs the full burst, so a
+[POS2]                   click there is expected and is measured)
+[POS2]           , / . = move the CORE SPLIT.  '.' until core 1 has
+[POS2]                   the FX alone is the load-balance test; watch
+[POS2]                   FXP wait= and cyc on patches 5/16/21/49.
+[POS2]           KEYS TOGGLE: a terminal never reports a key going UP,
+[POS2]           so press once to sound a note and again to release it.
+[POS2]           Hold a chord with a, d, g -- two voices are allowed.
+[POS2] PLAY IT. Notes are allocated by eb_alloc (CAssignJu60's law, 270/270 vs the plugin), applied through the port's own note path, and published at the next block boundary.
+[POS2] W (1074) i2s_platform: i2s controller 0 has been occupied by i2s_driver
+[POS2] 
+[POS2] === MEMORY PROBE (is this engine memory-bound?) ===
+[POS2] MEM: copy 2048 B out of FLASH   33829 cyc  = 16.52 cyc/byte
+[POS2] MEM: copy 2048 B internal->int  2064 cyc  = 1.01 cyc/byte  <- the floor
+[POS2] MEM: 2048 scattered reads PSRAM    435564 cyc = 212.7 cyc/read
+[POS2] MEM: 64 scattered reads INTERNAL 891 cyc = 13.9 cyc/read
+[POS2] MEM: 2048 MOVING-TAP reads PSRAM  62118 cyc = 30.3 cyc/tap  <- the delay's own pattern
+[POS2] MEM: 4096 FOUR-TAP reads PSRAM    64939 cyc = 15.9 cyc/tap  <- DELAY TYPE 5's own pattern
+[POS2] MEM:   ONE tap 30.3 -> FOUR taps 15.9 cyc/tap.  At 12 reads a
+[POS2] MEM:   sample that is 190 cyc/sample, against the 1231 cyc/sample
+[POS2] MEM:   excess b19 measured for DELAY TYPE 5.  >=70% -> ring
+[POS2] MEM:   PLACEMENT is O4's lever; <40% -> the arithmetic is.
+[POS2] MEM: flash is configured DIO @ 80 MHz. QIO @ 120 MHz is available
+[POS2]      and is worth its reflash ONLY if the flash row above is dear.
+[POS2] MEM: rings are 6.1 MB in PSRAM. Read the MOVING-TAP row, NOT the
+[POS2]      scattered row: scattered is a worst case the delay never runs.
+[POS2] 
+[POS2] === DEVICE RECALL ===
+[POS2] RECALL: cell array 30328 B  (tile 10688 + segments 19248 + scatter 8x12)
+[POS2]         NV=8  segments=32  scatter cells=12
+[POS2] RECALL: boot image 30320 B, baked at 44100 Hz  (THE IMAGE'S rate, not the rate this build configured, which is 44100)
+[POS2] RECALL: banks 2 x 10564 rc + 2 x 1712 mc = 24552 B   patch 134 B x 64 = 8576 B in flash   template 4096 B
+[POS2] RECALL: map chain-vs-table selftest: 0 disagreements (0 REQUIRED)
+[POS2] RECALL: placement rc0=1 rc1=1 mc0=1 mc1=1 cells=0   (1 = INTERNAL. A 0 INVALIDATES THE SWAP ARGUMENT: it assumes the S3 does not serve internal SRAM through L1, so no cache maintenance is done anywhere.)
+[POS2] RECALL: free internal 34947  largest internal block 26624  free PSRAM 393300
+[POS2] RECALL: chord 6 voice(s), wake 0xfc, notes 48->v2 55->v3 60->v4 64->v5 67->v6 72->v7  (CHOSEN voices, NOT an allocator -- that is C4)
+[POS2] RECALL: boot build 1132301 cycles, publish 0 cycles  (the FIRST Xtensa numbers for recall that exist)
+[POS1] PLAY: boot chord released. The board is SILENT until you play a key. Patch stepping is OFF.
+[POS1] E (875) task_wdt: delete_entry(240): task not found
+[POS1] TWO CORES: voices 7..7 on core 0, 8..7 on core 1
+[POS1] SEED: 4a554e4f (S3L_SEED; one seed = one exact replay; phase 7 is the seeded random layer)
+[POS1] KEYS: a..k play  z/x octave  b/n patch  ,/. split  r robot on/off  space all-notes-off  t fire the tooth
+[POS1] 
+[POS1] === CHAIN4: THIS BOARD IS POSITION 1 OF 4 (1 = the DAC end) ===
+[POS1] CHAIN: renders GLOBAL voice slots 7..7 of 2..7; chorus+master+DAC HERE; notes enter HERE and ride the chain
+[POS1] CHAIN: UP ctl TX 46 RX 47; UP audio master RX TDM4 BCLK 9 LRCK 10 DATA 11
+[POS1] CRCBENCH: byte=16399 slice4=18487 rom=10129 cyc/KB (rom==byte values: YES)
+[POS1] W (975) i2s_tdm: the current mclk multiple is too small, adjust the mclk multiple to 384
+[POS1] CHAIN: every mix gate stays CLOSED until its hop is CRC-proven; wiring -> docs/engineb/CHAIN4.md §6
+[POS1] MIDI IN: UART1, 31250 baud, RX on GPIO 18.  velocity switch OFF (every note forced to 100 -- the plugin's own default)
+[POS1] TYPE TO PLAY -- no parts needed, this console IS the keyboard:
+[POS1]           a s d f g h j k  = C D E F G A B C   (white keys)
+[POS1]             w e   t y u    = the black keys
+[POS1]           z / x = octave down / up     SPACE = release all
+[POS1]           b / n = previous / next patch  (all 64 factory patches;
+[POS1]                   a program change costs the full burst, so a
+[POS1]                   click there is expected and is measured)
+[POS1]           , / . = move the CORE SPLIT.  '.' until core 1 has
+[POS1]                   the FX alone is the load-balance test; watch
+[POS1]                   FXP wait= and cyc on patches 5/16/21/49.
+[POS1]           KEYS TOGGLE: a terminal never reports a key going UP,
+[POS1]           so press once to sound a note and again to release it.
+[POS1]           Hold a chord with a, d, g -- two voices are allowed.
+[POS1] PLAY IT. Notes are allocated by eb_alloc (CAssignJu60's law, 270/270 vs the plugin), applied through the port's own note path, and published at the next block boundary.
+[POS1] PANEL: hand keys + pots live (safe unwired; wire on BOARD 1):
+[POS1]        buttons, pin to GND:  IO12 = octave down, IO13 = octave up,
+[POS1]                              IO14 = C, IO15 = C#, IO16 = D, IO17 = D#  (C is 60)
+[POS1]        pots, outer legs to 3V3+GND, wiper to the pin:
+[POS1]                              IO1 = VCF CUTOFF, IO4 = VCF RESONANCE
+[POS1]        a pot ARMS after ~0.6 s held still, then its moves are sent (ADC OK)
+[POS1] W (1115) i2s_platform: i2s controller 0 has been occupied by i2s_driver
+[POS1] 
+[POS1] === MEMORY PROBE (is this engine memory-bound?) ===
+[POS1] MEM: copy 2048 B out of FLASH   34150 cyc  = 16.67 cyc/byte
+[POS1] MEM: copy 2048 B internal->int  1538 cyc  = 0.75 cyc/byte  <- the floor
+[POS1] MEM: 2048 scattered reads PSRAM    427445 cyc = 208.7 cyc/read
+[POS1] MEM: 64 scattered reads INTERNAL 828 cyc = 12.9 cyc/read
+[POS1] MEM: 2048 MOVING-TAP reads PSRAM  62490 cyc = 30.5 cyc/tap  <- the delay's own pattern
+[POS1] MEM: 4096 FOUR-TAP reads PSRAM    62321 cyc = 15.2 cyc/tap  <- DELAY TYPE 5's own pattern
+[POS1] MEM:   ONE tap 30.5 -> FOUR taps 15.2 cyc/tap.  At 12 reads a
+[POS1] MEM:   sample that is 183 cyc/sample, against the 1231 cyc/sample
+[POS1] MEM:   excess b19 measured for DELAY TYPE 5.  >=70% -> ring
+[POS1] MEM:   PLACEMENT is O4's lever; <40% -> the arithmetic is.
+[POS1] MEM: flash is configured DIO @ 80 MHz. QIO @ 120 MHz is available
+[POS1]      and is worth its reflash ONLY if the flash row above is dear.
+[POS1] MEM: rings are 6.1 MB in PSRAM. Read the MOVING-TAP row, NOT the
+[POS1]      scattered row: scattered is a worst case the delay never runs.
+[POS1] 
+[POS1] === DEVICE RECALL ===
+[POS1] RECALL: cell array 30328 B  (tile 10688 + segments 19248 + scatter 8x12)
+[POS1]         NV=8  segments=32  scatter cells=12
+[POS1] RECALL: boot image 30320 B, baked at 44100 Hz  (THE IMAGE'S rate, not the rate this build configured, which is 44100)
+[POS1] RECALL: banks 2 x 10564 rc + 2 x 1712 mc = 24552 B   patch 134 B x 64 = 8576 B in flash   template 4096 B
+[POS1] RECALL: map chain-vs-table selftest: 0 disagreements (0 REQUIRED)
+[POS1] RECALL: placement rc0=1 rc1=1 mc0=1 mc1=1 cells=0   (1 = INTERNAL. A 0 INVALIDATES THE SWAP ARGUMENT: it assumes the S3 does not serve internal SRAM through L1, so no cache maintenance is done anywhere.)
+[POS4] RECALL: boot build 1118912 cycles, publish 0 cycles  (the FIRST Xtensa numbers for recall that exist)
+[POS4] RECALL: burst rest: reseed 440539, install 169657, port recall 245826, notes 18423 cyc  (these four are the 40 % that is NOT coefficients)
+[POS4] RECALL: burst split: voice coefs 61365 cyc, master coefs 65829 cyc (0/0 = profiling off).  MEASURED, not attributed -- the ~90,000 in eb_recall.h and the res-LUT attribution were both wrong.
+[POS4] RECALL: CRC vs host answer key: 1 checked, 1 bad -- *** THE CHIP DISAGREES WITH THE HOST. NO CYCLE FIGURE FROM THIS RUN MAY BE QUOTED. ***
+[POS4] RECALL: patch STEPS every 4 s through all 64 patches, so a program change is exercised in the field and not only at boot
+[POS4] RECALL: *** MUTED: the chip's coefficients disagree with the host's ***
+[POS4] 
+[POS4] chord of 6 voice(s), wake mask 0xfc, 1.50 s held / 0.70 s released, looping
+[POS4] 
+[POS4] 
+[POS4] CHAIN(down-port B): PEER ANSWERED (hop downstream) -- handshake OK
+[POS3] RECALL: burst rest: reseed 437919, install 169633, port recall 246425, notes 18828 cyc  (these four are the 40 % that is NOT coefficients)
+[POS3] RECALL: burst split: voice coefs 65920 cyc, master coefs 57279 cyc (0/0 = profiling off).  MEASURED, not attributed -- the ~90,000 in eb_recall.h and the res-LUT attribution were both wrong.
+[POS3] RECALL: CRC vs host answer key: 1 checked, 0 bad -- MATCH -- device recall reproduces the host build bit for bit
+[POS3] RECALL: patch STEPS every 4 s through all 64 patches, so a program change is exercised in the field and not only at boot
+[POS3] 
+[POS3] chord of 6 voice(s), wake mask 0xfc, 1.50 s held / 0.70 s released, looping
+[POS3] 
+[POS3] 
+[POS3] CHAIN(up-port A): PEER ANSWERED (hop upstream) -- handshake OK
+[POS3] 
+[POS3] CHAIN(down-port B): PEER ANSWERED (hop downstream) -- handshake OK
+[POS1] RECALL: free internal 67779  largest internal block 31744  free PSRAM 394472
+[POS1] RECALL: chord 6 voice(s), wake 0xfc, notes 48->v2 55->v3 60->v4 64->v5 67->v6 72->v7  (CHOSEN voices, NOT an allocator -- that is C4)
+[POS1] RECALL: boot build 1126100 cycles, publish 0 cycles  (the FIRST Xtensa numbers for recall that exist)
+[POS1] RECALL: burst rest: reseed 438133, install 166617, port recall 246599, notes 19597 cyc  (these four are the 40 % that is NOT coefficients)
+[POS1] RECALL: burst split: voice coefs 70491 cyc, master coefs 58159 cyc (0/0 = profiling off).  MEASURED, not attributed -- the ~90,000 in eb_recall.h and the res-LUT attribution were both wrong.
+[POS1] RECALL: CRC vs host answer key: 1 checked, 0 bad -- MATCH -- device recall reproduces the host build bit for bit
+[POS1] RECALL: patch STEPS every 4 s through all 64 patches, so a program change is exercised in the field and not only at boot
+[POS1] 
+[POS1] chord of 6 voice(s), wake mask 0xfc, 1.50 s held / 0.70 s released, looping
+[POS1] 
+[POS1] 
+[POS1] CHAIN(up-port A): PEER ANSWERED (hop upstream) -- handshake OK
+[POS2] RECALL: burst rest: reseed 437791, install 169351, port recall 251214, notes 18867 cyc  (these four are the 40 % that is NOT coefficients)
+[POS2] RECALL: burst split: voice coefs 67944 cyc, master coefs 60315 cyc (0/0 = profiling off).  MEASURED, not attributed -- the ~90,000 in eb_recall.h and the res-LUT attribution were both wrong.
+[POS2] RECALL: CRC vs host answer key: 1 checked, 0 bad -- MATCH -- device recall reproduces the host build bit for bit
+[POS2] RECALL: patch STEPS every 4 s through all 64 patches, so a program change is exercised in the field and not only at boot
+[POS2] 
+[POS2] chord of 6 voice(s), wake mask 0xfc, 1.50 s held / 0.70 s released, looping
+[POS2] 
+[POS2] 
+[POS2] CHAIN(up-port A): PEER ANSWERED (hop upstream) -- handshake OK
+[POS2] 
+[POS2] CHAIN(down-port B): PEER ANSWERED (hop downstream) -- handshake OK
+[POS1] ROBOT: ON -- worst-case stress is running
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=1329/0 hn=2
+[POS4] G4: worst=6957us eng=5370 tail=422 park=1152 unseen=13 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/1719)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5795us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=61687 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=155 del=0 dep=255 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=1749 timeouts=0 ev_gap=0 txseq=1737
+[POS4] CHAINrateDN: txB=7168000 wmax=207us wr=[1746 0 0]
+[POS4] CHAINev: sent=0 applied=410
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=5016 wait=0 per sample
+[POS4] C1AT: v=4442 pro=573 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=51515/96204 cyc per chunk (min/max) = 201 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=328 ctl=9 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=0 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=1844 written=1720 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=10 [LISTENv6] cyc=5424 drift=-8 un=0 gap=5811 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=35
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=1571/1 hn=3
+[POS2] G4: worst=11992us eng=4752 tail=1042 park=6184 unseen=14 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=5/10k  (blocks 0/20/1699)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5805us quiet=5796us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=0 mx=0 rst=0 cyc=1132301 pubretry=0
+[POS2] NB: ev=11302 vb=26623 nv=8 st=1 tot=149890 key=2 keymax=2 defer=148 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=2 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=7 note=84761 burst=0 cyc  defer=1186 forced=18
+[POS2] EVQ: sub=264 ref=150 del=9 dep=255 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=closed hs=PATCH INDEX DIFFERS between the chips rx=1520 ok=719 bad=22 drop=15 lock=YES part=0 pat_disc=6144
+[POS2] CHAINseq: ok=8 slips=0 realign=734 last=163 rxrst=1
+[POS2] CHAINmm: w=00000000 00000000 00000000 a6000400 crc=099a6385 pend=9dcb7263
+[POS2] CHAINmf: f2=a6000402 f32=a60004a0 f64=a60004c0 f128=a6000600 f192=a6000640 f255=a600067f
+[POS2] CHAINrateUP: rxB=5587744
+[POS2] CHAINdx: ci=[61 61 61 61] cih=[0 0 735] seam=[128 61 61 128] sh=[6 0 16 0] z=9
+[POS2] CHAINhv: ok=734 fail=0
+[POS2] CHAINdn: pace=LINKED hs=PATCH INDEX DIFFERS between the chips tx=1754 timeouts=0 ev_gap=0 txseq=1721
+[POS2] CHAINrateDN: txB=7188480 wmax=5617us wr=[1751 0 0]
+[POS2] CHAINev: sent=416 applied=416
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=821 wait=0 per sample
+[POS2] C1AT: v=80 pro=580 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=7/471 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS2] TAT: rx=100 mg=23 tx=737 ctl=21 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=5 notepend=0 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=4389 e2=6647 rg=1000 dg=0 g=22] v7[e1=0 e2=0 rg=1000 dg=0 g=22]
+[POS2] B5: dac sent=1856 written=1720 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=10 [LISTENv6] cyc=5398 drift=-7 un=0 gap=5812 bst=1132301 nb=149890 midi=2/0 usb=0/0 keys=0 pat=36
+[POS1] HEALTH: OK
+[POS1] B4: ovr=1277/0 hn=0
+[POS1] G4: worst=14414us eng=5105 tail=358 park=8927 unseen=24 tag=2
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 60/429/1230)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5793us quiet=5784us burst=5853us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1366502 pubretry=0
+[POS1] NB: ev=11612 vb=196053 nv=8 st=10 tot=239618 key=1 keymax=2 defer=21 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=38 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=321411 note=97443 burst=577258 cyc  defer=629 forced=9
+[POS1] EVQ: sub=418 ref=0 del=265 dep=153 hi=205 par=0 torn=0
+[POS1] CHAINup: mix=closed hs=PATCH INDEX DIFFERS between the chips rx=1697 ok=802 bad=44 drop=614 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=24 slips=0 realign=826 last=186 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 00000000 a6012800 crc=cf14c80d pend=5a6d18cb
+[POS1] CHAINmf: f2=a6012802 f32=a6012820 f64=a6012840 f128=a6012a00 f192=a6012a40 f255=a6012a7f
+[POS1] CHAINrateUP: rxB=4751600
+[POS1] CHAINdx: ci=[67 67 67 195] cih=[0 0 826] seam=[128 128 128 128] sh=[45 0 1 0] z=0
+[POS1] CHAINhv: ok=827 fail=0
+[POS1] CHAINev: sent=418 applied=0
+[POS1] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS1] FXP: fx=2746 v1=652 wait=0 per sample
+[POS1] C1AT: v=81 pro=570 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=7/632580 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=4a554e4f on=0 off=0 patch=0 gapblk=0
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=26543 v7=56479
+[POS1] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=6521 e2=4348 rg=1000 dg=1000 g=22]
+[POS1] B5: dac sent=1858 written=1720 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=10 [LISTENv6] cyc=5185 drift=-20 un=0 gap=7999 bst=1366502 nb=239618 midi=40/0 usb=0/0 keys=0 pat=36
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=789/0 hn=2
+[POS3] G4: worst=7916us eng=7216 tail=689 park=9 unseen=2 tag=1
+[POS3] B4: miss burst=0 note=0 quiet=0
+[POS3] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 12/22/1685)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5778us quiet=5828us burst=6127us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=0 cyc=1175702 pubretry=0
+[POS3] NB: ev=11723 vb=0 nv=8 st=10 tot=39195 key=1 keymax=2 defer=139 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=2 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=58287 note=85746 burst=503373 cyc  defer=1199 forced=19
+[POS3] EVQ: sub=272 ref=146 del=17 dep=255 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=OPEN hs=OK rx=1710 ok=792 bad=107 drop=109 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=101 slips=0 realign=799 last=238 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a6005600 crc=18e4f8c2 pend=659e710e
+[POS3] CHAINmf: f2=a6005602 f32=a60056a0 f64=a60056c0 f128=a6005800 f192=a6005840 f255=a600587f
+[POS3] CHAINrateUP: rxB=6305664
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 445 356] seam=[128 128 128 128] sh=[107 0 0 0] z=0
+[POS3] CHAINhv: ok=801 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=1804 timeouts=0 ev_gap=0 txseq=727
+[POS3] CHAINrateDN: txB=7393280 wmax=495us wr=[1797 0 0]
+[POS3] CHAINev: sent=422 applied=422
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=4698 wait=0 per sample
+[POS3] C1AT: v=4129 pro=568 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=7/94268 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS3] TAT: rx=108 mg=26 tx=258 ctl=21 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS3] B5: dac sent=1848 written=1720 deficit=128  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=10 [LISTENv6] cyc=5438 drift=+49 un=0 gap=7916 bst=1128389 nb=39195 midi=2/0 usb=0/0 keys=0 pat=36
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=3130/1 hn=13
+[POS2] G4: worst=7331us eng=4418 tail=1376 park=1518 unseen=19 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=2/10k  (blocks 45/49/3345)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5768us quiet=5802us burst=5755us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=0 cyc=1157303 pubretry=0
+[POS2] NB: ev=28325 vb=54808 nv=8 st=1 tot=94937 key=2 keymax=2 defer=1392 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=4 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=7 note=84761 burst=502609 cyc  defer=2822 forced=44
+[POS2] EVQ: sub=284 ref=558 del=33 dep=251 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=3002 ok=1437 bad=48 drop=24 lock=YES part=0 pat_disc=6144
+[POS2] CHAINseq: ok=15 slips=0 realign=1471 last=83 rxrst=1
+[POS2] CHAINmm: w=00000000 00000000 00000000 a6017400 crc=7ccd8930 pend=d2c9527c
+[POS2] CHAINmf: f2=a6017402 f32=a6017420 f64=a6017640 f128=a6017680 f192=a60176c0 f255=a60176ff
+[POS2] CHAINrateUP: rxB=10883408
+[POS2] CHAINdx: ci=[61 61 61 61] cih=[0 0 1473] seam=[128 128 61 128] sh=[14 0 34 0] z=9
+[POS2] CHAINhv: ok=1472 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=3463 timeouts=0 ev_gap=0 txseq=3430
+[POS2] CHAINrateDN: txB=14188544 wmax=5617us wr=[3460 0 0]
+[POS2] CHAINev: sent=843 applied=843
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=809 wait=0 per sample
+[POS2] C1AT: v=80 pro=568 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=7/589 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS2] TAT: rx=127 mg=24 tx=1034 ctl=16 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=1000 dg=1000 g=22]
+[POS2] B5: dac sent=3576 written=3440 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=20 [LISTENv6] cyc=5423 drift=-7 un=0 gap=5812 bst=1157303 nb=94937 midi=5/0 usb=0/0 keys=0 pat=51
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=2287/0 hn=12
+[POS3] G4: worst=9889us eng=5018 tail=776 park=4076 unseen=19 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=0
+[POS3] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 45/50/3344)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5773us quiet=5810us burst=5913us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=0 cyc=1152194 pubretry=0
+[POS3] NB: ev=26528 vb=55359 nv=8 st=1 tot=95896 key=2 keymax=2 defer=1273 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=4 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=54792 note=85746 burst=511877 cyc  defer=2818 forced=44
+[POS3] EVQ: sub=284 ref=558 del=33 dep=251 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=OPEN hs=OK rx=3378 ok=1624 bad=110 drop=114 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=103 slips=0 realign=1633 last=122 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a6000200 crc=e78806e2 pend=ada081c1
+[POS3] CHAINmf: f2=a6000202 f32=a60002a0 f64=a60002c0 f128=a6000400 f192=a6000440 f255=a600047f
+[POS3] CHAINrateUP: rxB=13031232
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 1252 382] seam=[128 128 128 128] sh=[110 0 0 0] z=0
+[POS3] CHAINhv: ok=1634 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=3480 timeouts=0 ev_gap=0 txseq=2403
+[POS3] CHAINrateDN: txB=14258176 wmax=688us wr=[3473 0 0]
+[POS3] CHAINev: sent=843 applied=843
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=4696 wait=0 per sample
+[POS3] C1AT: v=4128 pro=567 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=7/61909 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS3] TAT: rx=105 mg=26 tx=466 ctl=15 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=1000 dg=1000 g=22]
+[POS3] B5: dac sent=3565 written=3440 deficit=125  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=20 [LISTENv6] cyc=5410 drift=+30 un=0 gap=5811 bst=1152194 nb=95896 midi=5/0 usb=0/0 keys=0 pat=51
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=2582/0 hn=6
+[POS1] G4: worst=11077us eng=4985 tail=352 park=5724 unseen=16 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 180/789/2470)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5788us quiet=5796us burst=5842us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1430104 pubretry=0
+[POS1] NB: ev=39652 vb=255726 nv=8 st=1 tot=295378 key=2 keymax=2 defer=683 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=63 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=7 note=97443 burst=577258 cyc  defer=2014 forced=30
+[POS1] EVQ: sub=722 ref=121 del=722 dep=0 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=closed hs=OK rx=3387 ok=1625 bad=80 drop=688 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=52 slips=0 realign=1654 last=105 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 bc0e666d a601ae00 crc=443e2098 pend=5f6cb643
+[POS1] CHAINmf: f2=a601ae02 f32=a601ae20 f64=a601ae40 f128=a601b000 f192=a601b040 f255=a601b07f
+[POS1] CHAINrateUP: rxB=9331072
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[0 0 1656] seam=[128 128 128 128] sh=[79 0 1 0] z=0
+[POS1] CHAINhv: ok=1656 fail=0
+[POS1] CHAINev: sent=843 applied=0
+[POS1] PARAM: edits=242 builds=2 defer=34 yield=0 unknown=0 pubretry=0 apply=223756 applymax=249675 blocks=12
+[POS1] FXP: fx=2999 v1=662 wait=0 per sample
+[POS1] C1AT: v=81 pro=580 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=7/934327 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=8cfe7bf6 on=13 off=10 patch=1 gapblk=281
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=20208 v7=148807
+[POS1] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=1000 dg=1000 g=22] v6[e1=0 e2=0 rg=1000 dg=1000 g=22] v7[e1=0 e2=46 rg=0 dg=0 g=22]
+[POS1] B5: dac sent=3578 written=3440 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=20 [LISTENv6] cyc=5060 drift=-19 un=0 gap=7740 bst=1430104 nb=295378 midi=73/0 usb=0/0 keys=0 pat=51
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=2737/0 hn=12
+[POS4] G4: worst=12333us eng=5349 tail=444 park=6526 unseen=14 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/3439)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5800us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=59780 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=588 del=0 dep=255 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=3500 timeouts=0 ev_gap=0 txseq=3488
+[POS4] CHAINrateDN: txB=14340096 wmax=208us wr=[3497 0 0]
+[POS4] CHAINev: sent=0 applied=843
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=5016 wait=0 per sample
+[POS4] C1AT: v=4441 pro=574 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=53253/68836 cyc per chunk (min/max) = 208 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=310 ctl=7 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=0 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=3564 written=3440 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=20 [LISTENv6] cyc=5395 drift=-8 un=0 gap=5812 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=51
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=4119/0 hn=22
+[POS4] G4: worst=7708us eng=5362 tail=431 park=1901 unseen=14 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/5159)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5801us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=63168 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=1218 del=0 dep=255 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=5194 timeouts=0 ev_gap=0 txseq=5182
+[POS4] CHAINrateDN: txB=21278720 wmax=208us wr=[5191 0 0]
+[POS4] CHAINev: sent=0 applied=1476
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=5017 wait=0 per sample
+[POS4] C1AT: v=4442 pro=574 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=52653/69009 cyc per chunk (min/max) = 205 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=292 ctl=13 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=0 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=5284 written=5160 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=30 [LISTENv6] cyc=5420 drift=-8 un=0 gap=5811 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=28
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=3724/1 hn=23
+[POS3] G4: worst=11969us eng=4860 tail=934 park=6114 unseen=61 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=1/10k  (blocks 60/79/5020)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5777us quiet=5813us burst=5886us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=0 cyc=1190077 pubretry=0
+[POS3] NB: ev=32504 vb=47057 nv=8 st=1 tot=41531 key=2 keymax=2 defer=2010 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=7 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=58311 note=85746 burst=511877 cyc  defer=4493 forced=71
+[POS3] EVQ: sub=312 ref=1161 del=57 dep=255 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=OPEN hs=OK rx=5097 ok=2484 bad=113 drop=122 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=110 slips=0 realign=2489 last=54 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a6018800 crc=25332727 pend=51fb456c
+[POS3] CHAINmf: f2=a6018802 f32=a60188a0 f64=a60188c0 f128=a6018a00 f192=a6018a40 f255=a6018a7f
+[POS3] CHAINrateUP: rxB=19962176
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 2081 409] seam=[128 128 128 128] sh=[113 0 0 0] z=0
+[POS3] CHAINhv: ok=2490 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=5204 timeouts=0 ev_gap=0 txseq=739
+[POS3] CHAINrateDN: txB=21319680 wmax=5621us wr=[5193 0 0]
+[POS3] CHAINev: sent=1483 applied=1483
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=4548 wait=0 per sample
+[POS3] C1AT: v=3971 pro=576 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=8/62831 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS3] TAT: rx=104 mg=27 tx=551 ctl=49 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=1000 dg=1000 g=22]
+[POS3] B5: dac sent=5289 written=5160 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=30 [LISTENv6] cyc=5398 drift=+53 un=0 gap=5817 bst=1190077 nb=41531 midi=8/0 usb=0/0 keys=0 pat=28
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=3702/0 hn=16
+[POS1] G4: worst=6497us eng=4966 tail=356 park=1110 unseen=65 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 345/1453/3361)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5794us quiet=5798us burst=5834us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1371958 pubretry=0
+[POS1] NB: ev=4570 vb=87187 nv=8 st=7 tot=262603 key=1 keymax=2 defer=1010 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=116 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=7 note=97443 burst=577258 cyc  defer=2835 forced=42
+[POS1] EVQ: sub=1358 ref=121 del=1172 dep=186 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=5059 ok=2433 bad=134 drop=830 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=103 slips=0 realign=2465 last=25 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 8000028b a601e600 crc=2dec1833 pend=c15993bf
+[POS1] CHAINmf: f2=a601e602 f32=a601e620 f64=a601e640 f128=a601e800 f192=a601e840 f255=a601e87f
+[POS1] CHAINrateUP: rxB=14066080
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[1 0 2466] seam=[128 128 128 128] sh=[130 0 4 0] z=0
+[POS1] CHAINhv: ok=2467 fail=0
+[POS1] CHAINev: sent=1487 applied=0
+[POS1] PARAM: edits=242 builds=2 defer=34 yield=0 unknown=0 pubretry=0 apply=223756 applymax=249675 blocks=12
+[POS1] FXP: fx=2504 v1=663 wait=0 per sample
+[POS1] C1AT: v=81 pro=581 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=7/699568 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=8cfe7bf6 on=13 off=10 patch=1 gapblk=281
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=135245 v7=89907
+[POS1] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=80 e2=0 rg=0 dg=0 g=22]
+[POS1] B5: dac sent=5298 written=5160 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=30 [LISTENv6] cyc=5026 drift=-20 un=0 gap=5806 bst=1371958 nb=262603 midi=134/0 usb=0/0 keys=0 pat=29
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=4690/1 hn=23
+[POS2] G4: worst=12670us eng=4744 tail=1050 park=6862 unseen=14 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=2/10k  (blocks 88/78/4993)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5763us quiet=5803us burst=5780us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1185322 pubretry=0
+[POS2] NB: ev=27787 vb=42829 nv=8 st=1 tot=83354 key=2 keymax=2 defer=2017 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=6 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=7 note=84761 burst=504902 cyc  defer=4480 forced=71
+[POS2] EVQ: sub=312 ref=1168 del=57 dep=255 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=4482 ok=2147 bad=63 drop=34 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=19 slips=0 realign=2193 last=218 rxrst=2
+[POS2] CHAINmm: w=00000000 00000000 00000000 a601e800 crc=a6bc7e4b pend=e1a673ce
+[POS2] CHAINmf: f2=a601e802 f32=a601e820 f64=a601e8c0 f128=a601ea00 f192=a601ea40 f255=a601ea7f
+[POS2] CHAINrateUP: rxB=16175328
+[POS2] CHAINdx: ci=[62 62 62 62] cih=[0 0 2194] seam=[128 128 62 128] sh=[20 0 43 0] z=9
+[POS2] CHAINhv: ok=2193 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=5195 timeouts=0 ev_gap=0 txseq=5162
+[POS2] CHAINrateDN: txB=21282816 wmax=5617us wr=[5192 0 0]
+[POS2] CHAINev: sent=1490 applied=1490
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=810 wait=0 per sample
+[POS2] C1AT: v=80 pro=569 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=7/588 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS2] TAT: rx=102 mg=23 tx=645 ctl=51 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=1000 dg=1000 g=22]
+[POS2] B5: dac sent=5296 written=5160 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=30 [LISTENv6] cyc=5394 drift=-7 un=0 gap=7286 bst=1185322 nb=83354 midi=8/0 usb=0/0 keys=0 pat=29
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=5279/1 hn=33
+[POS3] G4: worst=7312us eng=4836 tail=958 park=1504 unseen=14 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=1/10k  (blocks 75/108/6696)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5775us quiet=5811us burst=5870us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=0 cyc=1192321 pubretry=0
+[POS3] NB: ev=22021 vb=31432 nv=8 st=1 tot=71355 key=2 keymax=2 defer=2441 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=8 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=53724 note=85746 burst=511877 cyc  defer=6161 forced=97
+[POS3] EVQ: sub=328 ref=1581 del=73 dep=255 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=OPEN hs=OK rx=6802 ok=3334 bad=117 drop=127 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=113 slips=0 realign=3339 last=229 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a6004200 crc=579a072a pend=c4e658c2
+[POS3] CHAINmf: f2=a6004202 f32=a6004420 f64=a6004440 f128=a6004480 f192=a60044c0 f255=a60044ff
+[POS3] CHAINrateUP: rxB=26848384
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 2911 430] seam=[128 4 128 128] sh=[116 0 1 0] z=0
+[POS3] CHAINhv: ok=3341 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=6915 timeouts=0 ev_gap=0 txseq=2450
+[POS3] CHAINrateDN: txB=28327936 wmax=5621us wr=[6904 0 0]
+[POS3] CHAINev: sent=1917 applied=1917
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=4524 wait=0 per sample
+[POS3] C1AT: v=3957 pro=566 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=10/63000 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS3] TAT: rx=102 mg=27 tx=692 ctl=48 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=1000 dg=1000 g=22]
+[POS3] B5: dac sent=7009 written=6880 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=40 [LISTENv6] cyc=5424 drift=+53 un=0 gap=5811 bst=1192321 nb=71355 midi=10/0 usb=0/0 keys=0 pat=44
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=6270/1 hn=33
+[POS2] G4: worst=8009us eng=4249 tail=1545 park=2201 unseen=14 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=1/10k  (blocks 103/107/6669)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5757us quiet=5804us burst=5783us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1194645 pubretry=0
+[POS2] NB: ev=21367 vb=30537 nv=8 st=1 tot=76112 key=2 keymax=2 defer=2508 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=7 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=7 note=84761 burst=504902 cyc  defer=6146 forced=97
+[POS2] EVQ: sub=328 ref=1585 del=73 dep=255 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=6022 ok=2914 bad=69 drop=44 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=25 slips=0 realign=2960 last=135 rxrst=2
+[POS2] CHAINmm: w=00000000 00000000 00000000 a6003400 crc=ff3face8 pend=c5e5e932
+[POS2] CHAINmf: f2=a6003402 f32=a6003420 f64=a60034c0 f128=a6003600 f192=a6003640 f255=a600367f
+[POS2] CHAINrateUP: rxB=21689536
+[POS2] CHAINdx: ci=[62 62 62 62] cih=[0 0 2962] seam=[128 128 128 128] sh=[26 0 43 0] z=9
+[POS2] CHAINhv: ok=2960 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=6904 timeouts=0 ev_gap=0 txseq=6871
+[POS2] CHAINrateDN: txB=28282880 wmax=5617us wr=[6901 0 0]
+[POS2] CHAINev: sent=1922 applied=1922
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=811 wait=0 per sample
+[POS2] C1AT: v=80 pro=569 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=7/467 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS2] TAT: rx=123 mg=24 tx=1210 ctl=49 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=1000 dg=1000 g=22]
+[POS2] B5: dac sent=7016 written=6880 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=40 [LISTENv6] cyc=5420 drift=-6 un=0 gap=5811 bst=1194645 nb=76112 midi=10/0 usb=0/0 keys=0 pat=44
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=5490/0 hn=32
+[POS4] G4: worst=13083us eng=5350 tail=443 park=7277 unseen=13 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/6879)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5802us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=59863 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=1696 del=0 dep=255 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=6947 timeouts=0 ev_gap=0 txseq=6935
+[POS4] CHAINrateDN: txB=28459008 wmax=209us wr=[6944 0 0]
+[POS4] CHAINev: sent=0 applied=1954
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=5016 wait=0 per sample
+[POS4] C1AT: v=4441 pro=574 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=52051/68940 cyc per chunk (min/max) = 203 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=266 ctl=13 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=0 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=7004 written=6880 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=40 [LISTENv6] cyc=5391 drift=-8 un=0 gap=5811 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=44
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=5120/0 hn=26
+[POS1] G4: worst=8582us eng=5026 tail=345 park=3189 unseen=22 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 360/1654/4865)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5794us quiet=5801us burst=5836us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1425434 pubretry=0
+[POS1] NB: ev=15579 vb=136850 nv=8 st=1 tot=214323 key=2 keymax=2 defer=1366 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=140 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=448571 note=97443 burst=577258 cyc  defer=4365 forced=65
+[POS1] EVQ: sub=1710 ref=275 del=1546 dep=164 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=6823 ok=3319 bad=149 drop=891 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=141 slips=0 realign=3328 last=13 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 0000028c a6018000 crc=88dac923 pend=0cf73d0c
+[POS1] CHAINmf: f2=a6018002 f32=a6018020 f64=a6018040 f128=a6018200 f192=a6018240 f255=a601827f
+[POS1] CHAINrateUP: rxB=18774992
+[POS1] CHAINdx: ci=[195 67 195 195] cih=[1 0 3328] seam=[128 128 128 128] sh=[145 0 4 0] z=0
+[POS1] CHAINhv: ok=3329 fail=0
+[POS1] CHAINev: sent=1992 applied=0
+[POS1] PARAM: edits=484 builds=4 defer=68 yield=0 unknown=0 pubretry=0 apply=210688 applymax=249675 blocks=11
+[POS1] FXP: fx=3243 v1=662 wait=0 per sample
+[POS1] C1AT: v=81 pro=580 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=7/693374 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=892302f9 on=46 off=38 patch=3 gapblk=445
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=31972
+[POS1] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=1000 dg=1000 g=22] v6[e1=0 e2=0 rg=1000 dg=1000 g=22] v7[e1=4807 e2=6645 rg=1000 dg=1000 g=22]
+[POS1] B5: dac sent=7018 written=6880 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=40 [LISTENv6] cyc=5099 drift=-16 un=0 gap=8060 bst=1425434 nb=186988 midi=153/0 usb=0/0 keys=0 pat=44
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=6890/0 hn=42
+[POS4] G4: worst=8458us eng=5360 tail=432 park=2653 unseen=13 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/8599)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5803us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=64205 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=2341 del=0 dep=255 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=8638 timeouts=0 ev_gap=0 txseq=8626
+[POS4] CHAINrateDN: txB=35385344 wmax=209us wr=[8635 0 0]
+[POS4] CHAINev: sent=0 applied=2596
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=5016 wait=0 per sample
+[POS4] C1AT: v=4442 pro=574 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=52913/69128 cyc per chunk (min/max) = 206 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=288 ctl=8 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=0 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=8724 written=8600 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=50 [LISTENv6] cyc=5416 drift=-8 un=0 gap=5811 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=56
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=7846/1 hn=43
+[POS2] G4: worst=13349us eng=4431 tail=1364 park=7508 unseen=46 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=1/10k  (blocks 133/136/8330)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5762us quiet=5804us burst=5788us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1163466 pubretry=0
+[POS2] NB: ev=9361 vb=42895 nv=8 st=10 tot=95556 key=1 keymax=2 defer=3636 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=9 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=7 note=84761 burst=504902 cyc  defer=7813 forced=124
+[POS2] EVQ: sub=351 ref=2245 del=97 dep=254 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=7733 ok=3765 bad=78 drop=54 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=33 slips=0 realign=3812 last=69 rxrst=2
+[POS2] CHAINmm: w=00000000 00000000 00000000 a6005000 crc=3d96f467 pend=55f582ac
+[POS2] CHAINmf: f2=a6005002 f32=a6005020 f64=a60050c0 f128=a6005200 f192=a6005240 f255=a600527f
+[POS2] CHAINrateUP: rxB=27813696
+[POS2] CHAINdx: ci=[62 62 62 62] cih=[0 0 3814] seam=[128 128 62 128] sh=[33 0 45 0] z=9
+[POS2] CHAINhv: ok=3812 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=8630 timeouts=0 ev_gap=0 txseq=8597
+[POS2] CHAINrateDN: txB=35352576 wmax=5617us wr=[8627 0 0]
+[POS2] CHAINev: sent=2596 applied=2596
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=810 wait=0 per sample
+[POS2] C1AT: v=80 pro=569 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=7/780 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS2] TAT: rx=123 mg=23 tx=1082 ctl=15 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS2] B5: dac sent=8736 written=8600 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=50 [LISTENv6] cyc=5391 drift=-6 un=0 gap=5812 bst=1163466 nb=95556 midi=13/0 usb=0/0 keys=0 pat=56
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=6237/0 hn=36
+[POS1] G4: worst=7336us eng=4636 tail=388 park=2242 unseen=70 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 540/2263/5796)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5792us quiet=5801us burst=5838us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1412015 pubretry=0
+[POS1] NB: ev=11769 vb=157197 nv=8 st=10 tot=227942 key=1 keymax=2 defer=2049 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=181 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=7 note=97443 burst=577258 cyc  defer=5502 forced=82
+[POS1] EVQ: sub=2158 ref=438 del=2152 dep=6 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=8455 ok=4107 bad=193 drop=965 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=174 slips=0 realign=4127 last=137 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 000002c9 a600ea00 crc=545fb765 pend=f3433a4c
+[POS1] CHAINmf: f2=a600ea02 f32=a600ea20 f64=a600ea40 f128=a600ec00 f192=a600ec40 f255=a600ec7f
+[POS1] CHAINrateUP: rxB=23317968
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[1 0 4128] seam=[128 128 128 128] sh=[188 0 5 0] z=0
+[POS1] CHAINhv: ok=4129 fail=0
+[POS1] CHAINev: sent=2596 applied=0
+[POS1] PARAM: edits=726 builds=5 defer=79 yield=0 unknown=0 pubretry=0 apply=247440 applymax=249675 blocks=3
+[POS1] FXP: fx=2904 v1=653 wait=0 per sample
+[POS1] C1AT: v=81 pro=571 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=7/934239 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=1068c3c8 on=80 off=67 patch=8 gapblk=584
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=85531
+[POS1] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=1000 dg=1000 g=22] v7[e1=7467 e2=8749 rg=1000 dg=1000 g=22]
+[POS1] B5: dac sent=8738 written=8600 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=50 [LISTENv6] cyc=4699 drift=-20 un=0 gap=5812 bst=1412015 nb=227942 midi=208/0 usb=0/0 keys=0 pat=56
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=6679/1 hn=43
+[POS3] G4: worst=12657us eng=5154 tail=641 park=6844 unseen=18 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=1/10k  (blocks 109/137/8353)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5778us quiet=5810us burst=5851us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=1 cyc=1046147 pubretry=0
+[POS3] NB: ev=10036 vb=48349 nv=8 st=10 tot=90939 key=1 keymax=2 defer=3859 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=10 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=57237 note=85746 burst=522016 cyc  defer=7849 forced=124
+[POS3] EVQ: sub=352 ref=2244 del=97 dep=255 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=OPEN hs=OK rx=8541 ok=4199 bad=123 drop=133 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=116 slips=0 realign=4207 last=189 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a6010200 crc=5d39f94d pend=d3cae38c
+[POS3] CHAINmf: f2=a6010202 f32=a60102a0 f64=a60102c0 f128=a6010400 f192=a6010440 f255=a601047f
+[POS3] CHAINrateUP: rxB=33819520
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 3732 477] seam=[128 128 128 4] sh=[121 0 2 0] z=0
+[POS3] CHAINhv: ok=4209 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=8667 timeouts=0 ev_gap=0 txseq=4202
+[POS3] CHAINrateDN: txB=35504128 wmax=5621us wr=[8656 0 0]
+[POS3] CHAINev: sent=2596 applied=2596
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=4826 wait=0 per sample
+[POS3] C1AT: v=4259 pro=565 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=7/61939 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS3] TAT: rx=117 mg=27 tx=284 ctl=15 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=0 want=0 atrest=03 bstate=0 notepend=1 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS3] B5: dac sent=8729 written=8600 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=50 [LISTENv6] cyc=5394 drift=+53 un=0 gap=5833 bst=1046147 nb=90939 midi=13/0 usb=0/0 keys=0 pat=56
+[POS1] ROBOT: OFF -- engine is QUIET; play by hand now
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=8303/0 hn=52
+[POS4] G4: worst=13833us eng=843 tail=4950 park=8027 unseen=13 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/10319)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5803us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=93015 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=2763 del=255 dep=0 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=10335 timeouts=0 ev_gap=0 txseq=10323
+[POS4] CHAINrateDN: txB=42336256 wmax=4717us wr=[10332 0 0]
+[POS4] CHAINev: sent=0 applied=3019
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=781 wait=0 per sample
+[POS4] C1AT: v=210 pro=571 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=50864/94893 cyc per chunk (min/max) = 198 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=22 tx=4581 ctl=7 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=1 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=10444 written=10320 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=60 [LISTENv6] cyc=5387 drift=-8 un=0 gap=5814 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=36
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=8147/1 hn=53
+[POS3] G4: worst=7999us eng=5022 tail=772 park=2191 unseen=14 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 124/176/10019)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5778us quiet=5809us burst=5853us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=1 cyc=1187777 pubretry=0
+[POS3] NB: ev=10818 vb=18360 nv=8 st=8 tot=29178 key=9 keymax=9 defer=4394 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=12 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=92340 note=85746 burst=522016 cyc  defer=9326 forced=148
+[POS3] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=OPEN hs=OK rx=10163 ok=5007 bad=127 drop=138 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=117 slips=0 realign=5018 last=76 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a600a600 crc=1c860905 pend=867b815a
+[POS3] CHAINmf: f2=a600a602 f32=a600a6a0 f64=a600a6c0 f128=a600a800 f192=a600a840 f255=a600a87f
+[POS3] CHAINrateUP: rxB=40321280
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 4500 519] seam=[128 128 128 128] sh=[125 0 2 0] z=0
+[POS3] CHAINhv: ok=5019 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=10349 timeouts=0 ev_gap=0 txseq=5884
+[POS3] CHAINrateDN: txB=42393600 wmax=5621us wr=[10338 0 0]
+[POS3] CHAINev: sent=3019 applied=3019
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=773 wait=0 per sample
+[POS3] C1AT: v=209 pro=564 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=8/94078 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS3] TAT: rx=74 mg=26 tx=4503 ctl=16 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS3] B5: dac sent=10449 written=10320 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=60 [LISTENv6] cyc=5420 drift=+53 un=0 gap=5811 bst=1187777 nb=29178 midi=15/0 usb=0/0 keys=0 pat=36
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=9437/1 hn=53
+[POS2] G4: worst=8689us eng=4430 tail=1365 park=2879 unseen=15 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 133/176/10010)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5772us quiet=5804us burst=5788us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1163466 pubretry=0
+[POS2] NB: ev=10468 vb=17501 nv=8 st=8 tot=27969 key=9 keymax=9 defer=4025 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=11 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=137497 note=84761 burst=504902 cyc  defer=9389 forced=149
+[POS2] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=9432 ok=4613 bad=81 drop=61 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=37 slips=0 realign=4660 last=243 rxrst=2
+[POS2] CHAINmm: w=00000000 00000000 00000000 a6011400 crc=f2d28eca pend=629464de
+[POS2] CHAINmf: f2=a6011402 f32=a6011420 f64=a60114c0 f128=a6011600 f192=a6011640 f255=a601167f
+[POS2] CHAINrateUP: rxB=33802560
+[POS2] CHAINdx: ci=[190 190 190 190] cih=[0 0 4661] seam=[128 128 128 128] sh=[36 0 45 0] z=9
+[POS2] CHAINhv: ok=4660 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=10341 timeouts=0 ev_gap=0 txseq=10308
+[POS2] CHAINrateDN: txB=42360832 wmax=5617us wr=[10338 0 0]
+[POS2] CHAINev: sent=3019 applied=3019
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=802 wait=0 per sample
+[POS2] C1AT: v=81 pro=562 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=7/139423 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS2] TAT: rx=171 mg=24 tx=4377 ctl=15 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS2] B5: dac sent=10456 written=10320 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=60 [LISTENv6] cyc=5416 drift=-6 un=0 gap=5812 bst=1163466 nb=27969 midi=15/0 usb=0/0 keys=0 pat=36
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=7439/0 hn=46
+[POS1] G4: worst=12756us eng=3916 tail=351 park=8418 unseen=71 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 615/2793/6911)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5792us quiet=5802us burst=5841us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1387473 pubretry=0
+[POS1] NB: ev=18009 vb=169737 nv=8 st=8 tot=187746 key=9 keymax=9 defer=2068 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=224 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=861507 note=97443 burst=578523 cyc  defer=6433 forced=96
+[POS1] EVQ: sub=2580 ref=438 del=2580 dep=0 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=10162 ok=4945 bad=227 drop=1038 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=210 slips=0 realign=4963 last=65 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 0000028c a6000400 crc=42b67222 pend=805db07b
+[POS1] CHAINmf: f2=a6000402 f32=a6000420 f64=a6000440 f128=a6000600 f192=a6000640 f255=a600067f
+[POS1] CHAINrateUP: rxB=28028224
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[1 0 4964] seam=[128 128 67 128] sh=[221 0 6 0] z=0
+[POS1] CHAINhv: ok=4965 fail=0
+[POS1] CHAINev: sent=3019 applied=0
+[POS1] PARAM: edits=726 builds=6 defer=88 yield=0 unknown=0 pubretry=0 apply=238879 applymax=249675 blocks=7
+[POS1] FXP: fx=2825 v1=646 wait=0 per sample
+[POS1] C1AT: v=86 pro=559 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=7/1706338 cyc per chunk (min/max) = 0 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=1068c3c8 on=80 off=67 patch=8 gapblk=584
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=88562
+[POS1] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=7185 e2=6294 rg=0 dg=0 g=22]
+[POS1] B5: dac sent=10458 written=10320 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=60 [LISTENv6] cyc=3860 drift=-20 un=0 gap=5815 bst=1387473 nb=187746 midi=255/0 usb=0/0 keys=0 pat=36
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=9886/0 hn=62
+[POS4] G4: worst=9208us eng=844 tail=4949 park=3403 unseen=12 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/12039)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5803us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=93030 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=2763 del=255 dep=0 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=12054 timeouts=0 ev_gap=0 txseq=12042
+[POS4] CHAINrateDN: txB=49377280 wmax=4717us wr=[12051 0 0]
+[POS4] CHAINev: sent=0 applied=3019
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=782 wait=0 per sample
+[POS4] C1AT: v=210 pro=570 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=91368/95709 cyc per chunk (min/max) = 356 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=4584 ctl=8 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=1 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=12164 written=12040 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=70 [LISTENv6] cyc=5412 drift=-8 un=0 gap=5813 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=36
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=9809/1 hn=63
+[POS3] G4: worst=13343us eng=833 tail=4961 park=7535 unseen=14 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 124/176/11739)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5778us quiet=5808us burst=5853us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=1 cyc=1187777 pubretry=0
+[POS3] NB: ev=10818 vb=18360 nv=8 st=8 tot=29178 key=9 keymax=9 defer=4394 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=12 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=92340 note=85746 burst=522016 cyc  defer=9326 forced=148
+[POS3] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=OPEN hs=OK rx=11314 ok=5584 bad=129 drop=148 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=124 slips=0 realign=5590 last=6 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a6014000 crc=6d51a376 pend=aaaa9411
+[POS3] CHAINmf: f2=a6014002 f32=a6014220 f64=a6014240 f128=a6014280 f192=a60142c0 f255=a60142ff
+[POS3] CHAINrateUP: rxB=44991040
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 5070 521] seam=[4 128 128 4] sh=[125 0 4 0] z=0
+[POS3] CHAINhv: ok=5591 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=12070 timeouts=0 ev_gap=0 txseq=7605
+[POS3] CHAINrateDN: txB=49442816 wmax=5621us wr=[12059 0 0]
+[POS3] CHAINev: sent=3019 applied=3019
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=773 wait=0 per sample
+[POS3] C1AT: v=209 pro=564 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=89668/94090 cyc per chunk (min/max) = 350 cyc/sample free on core 0
+[POS3] TAT: rx=77 mg=26 tx=4499 ctl=16 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS3] B5: dac sent=12169 written=12040 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=70 [LISTENv6] cyc=5391 drift=+53 un=0 gap=5812 bst=1187777 nb=29178 midi=15/0 usb=0/0 keys=0 pat=36
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=11096/1 hn=63
+[POS2] G4: worst=14028us eng=862 tail=4932 park=8220 unseen=14 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 133/176/11730)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5772us quiet=5804us burst=5788us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1163466 pubretry=0
+[POS2] NB: ev=10468 vb=17501 nv=8 st=8 tot=27969 key=9 keymax=9 defer=4025 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=11 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=137612 note=84761 burst=504902 cyc  defer=9389 forced=149
+[POS2] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=11151 ok=5478 bad=81 drop=75 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=47 slips=0 realign=5514 last=173 rxrst=2
+[POS2] CHAINrateUP: rxB=38242272
+[POS2] CHAINdx: ci=[190 190 190 190] cih=[0 0 5515] seam=[128 128 128 128] sh=[36 0 45 0] z=9
+[POS2] CHAINhv: ok=5513 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=12060 timeouts=0 ev_gap=0 txseq=12027
+[POS2] CHAINrateDN: txB=49401856 wmax=5617us wr=[12057 0 0]
+[POS2] CHAINev: sent=3019 applied=3019
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=802 wait=0 per sample
+[POS2] C1AT: v=81 pro=562 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=133016/139566 cyc per chunk (min/max) = 519 cyc/sample free on core 0
+[POS2] TAT: rx=171 mg=23 tx=4377 ctl=15 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS2] B5: dac sent=12176 written=12040 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=70 [LISTENv6] cyc=5387 drift=-6 un=0 gap=5812 bst=1163466 nb=27969 midi=15/0 usb=0/0 keys=0 pat=36
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=9077/0 hn=56
+[POS1] G4: worst=8174us eng=3705 tail=351 park=4105 unseen=13 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 615/2793/8631)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5792us quiet=5803us burst=5841us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1387473 pubretry=0
+[POS1] NB: ev=18009 vb=169737 nv=8 st=8 tot=187746 key=9 keymax=9 defer=2068 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=224 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=862811 note=97443 burst=578523 cyc  defer=6433 forced=96
+[POS1] EVQ: sub=2580 ref=438 del=2580 dep=0 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=11877 ok=5800 bad=231 drop=1047 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=214 slips=0 realign=5818 last=247 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 0000028c a6012600 crc=e03512aa pend=370a9309
+[POS1] CHAINmf: f2=a6012602 f32=a6012620 f64=a6012640 f128=a6012800 f192=a6012840 f255=a601287f
+[POS1] CHAINrateUP: rxB=32390336
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[1 0 5819] seam=[128 67 128 128] sh=[224 0 7 0] z=0
+[POS1] CHAINhv: ok=5820 fail=0
+[POS1] CHAINev: sent=3019 applied=0
+[POS1] PARAM: edits=726 builds=6 defer=88 yield=0 unknown=0 pubretry=0 apply=238879 applymax=249675 blocks=7
+[POS1] FXP: fx=2949 v1=648 wait=0 per sample
+[POS1] C1AT: v=85 pro=561 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=788856/876863 cyc per chunk (min/max) = 3081 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=1068c3c8 on=80 off=67 patch=8 gapblk=584
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS1] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=7185 e2=6294 rg=0 dg=0 g=22]
+[POS1] B5: dac sent=12178 written=12040 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=70 [LISTENv6] cyc=3885 drift=-20 un=0 gap=5812 bst=1387473 nb=187746 midi=255/0 usb=0/0 keys=0 pat=36
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=11492/0 hn=72
+[POS4] G4: worst=14583us eng=844 tail=4948 park=8778 unseen=13 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/13759)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5803us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=93035 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=2763 del=255 dep=0 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=13773 timeouts=0 ev_gap=0 txseq=13761
+[POS4] CHAINrateDN: txB=56418304 wmax=4717us wr=[13770 0 0]
+[POS4] CHAINev: sent=0 applied=3019
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=781 wait=0 per sample
+[POS4] C1AT: v=210 pro=570 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=91383/94939 cyc per chunk (min/max) = 356 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=4584 ctl=8 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=1 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=13884 written=13760 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=80 [LISTENv6] cyc=5382 drift=-8 un=0 gap=5811 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=36
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=11472/1 hn=73
+[POS3] G4: worst=8688us eng=833 tail=4962 park=2879 unseen=14 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 124/176/13459)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5778us quiet=5808us burst=5853us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=1 cyc=1187777 pubretry=0
+[POS3] NB: ev=10818 vb=18360 nv=8 st=8 tot=29178 key=9 keymax=9 defer=4394 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=12 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=92922 note=85746 burst=522016 cyc  defer=9326 forced=148
+[POS3] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=OPEN hs=OK rx=12460 ok=6155 bad=133 drop=155 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=128 slips=0 realign=6161 last=188 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a6015000 crc=ec64d786 pend=2b9fe0e1
+[POS3] CHAINmf: f2=a6015002 f32=a6015220 f64=a6015240 f128=a6015280 f192=a60152c0 f255=a60152ff
+[POS3] CHAINrateUP: rxB=49650496
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 5640 522] seam=[4 4 4 4] sh=[125 0 8 0] z=0
+[POS3] CHAINhv: ok=6162 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=13789 timeouts=0 ev_gap=0 txseq=9324
+[POS3] CHAINrateDN: txB=56483840 wmax=5621us wr=[13778 0 0]
+[POS3] CHAINev: sent=3019 applied=3019
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=773 wait=0 per sample
+[POS3] C1AT: v=209 pro=564 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=89641/94093 cyc per chunk (min/max) = 350 cyc/sample free on core 0
+[POS3] TAT: rx=74 mg=26 tx=4502 ctl=16 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS3] B5: dac sent=13889 written=13760 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=80 [LISTENv6] cyc=5416 drift=+53 un=0 gap=5811 bst=1187777 nb=29178 midi=15/0 usb=0/0 keys=0 pat=36
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=12753/1 hn=73
+[POS2] G4: worst=9367us eng=862 tail=4932 park=3559 unseen=14 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 133/176/13450)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5772us quiet=5804us burst=5788us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1163466 pubretry=0
+[POS2] NB: ev=10468 vb=17501 nv=8 st=8 tot=27969 key=9 keymax=9 defer=4025 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=11 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=138325 note=84761 burst=504902 cyc  defer=9389 forced=149
+[POS2] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=12869 ok=6339 bad=81 drop=86 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=52 slips=0 realign=6371 last=99 rxrst=2
+[POS2] CHAINrateUP: rxB=42673920
+[POS2] CHAINdx: ci=[190 190 190 190] cih=[0 0 6371] seam=[128 128 128 128] sh=[36 0 45 0] z=9
+[POS2] CHAINhv: ok=6369 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=13779 timeouts=0 ev_gap=0 txseq=13746
+[POS2] CHAINrateDN: txB=56442880 wmax=5617us wr=[13776 0 0]
+[POS2] CHAINev: sent=3019 applied=3019
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=802 wait=0 per sample
+[POS2] C1AT: v=81 pro=562 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=135905/139541 cyc per chunk (min/max) = 530 cyc/sample free on core 0
+[POS2] TAT: rx=171 mg=24 tx=4377 ctl=15 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS2] B5: dac sent=13896 written=13760 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=80 [LISTENv6] cyc=5412 drift=-6 un=0 gap=5806 bst=1163466 nb=27969 midi=15/0 usb=0/0 keys=0 pat=36
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=10711/0 hn=66
+[POS1] G4: worst=13594us eng=3667 tail=356 park=9556 unseen=15 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 615/2793/10351)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5792us quiet=5803us burst=5841us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1387473 pubretry=0
+[POS1] NB: ev=18009 vb=169737 nv=8 st=8 tot=187746 key=9 keymax=9 defer=2068 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=224 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=794896 note=97443 burst=578523 cyc  defer=6433 forced=96
+[POS1] EVQ: sub=2580 ref=438 del=2580 dep=0 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=13595 ok=6656 bad=238 drop=1059 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=221 slips=0 realign=6674 last=177 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 0000028c a6013400 crc=f94dbde6 pend=a6194967
+[POS1] CHAINmf: f2=a6013402 f32=a6013420 f64=a6013440 f128=a6013600 f192=a6013640 f255=a601367f
+[POS1] CHAINrateUP: rxB=36774000
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[1 0 6675] seam=[128 67 128 128] sh=[230 0 8 0] z=0
+[POS1] CHAINhv: ok=6676 fail=0
+[POS1] CHAINev: sent=3019 applied=0
+[POS1] PARAM: edits=726 builds=6 defer=88 yield=0 unknown=0 pubretry=0 apply=238879 applymax=249675 blocks=7
+[POS1] FXP: fx=2885 v1=646 wait=0 per sample
+[POS1] C1AT: v=86 pro=559 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=791311/877567 cyc per chunk (min/max) = 3091 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=1068c3c8 on=80 off=67 patch=8 gapblk=584
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS1] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=7185 e2=6294 rg=0 dg=0 g=22]
+[POS1] B5: dac sent=13898 written=13760 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=80 [LISTENv6] cyc=3909 drift=-20 un=0 gap=5806 bst=1387473 nb=187746 midi=255/0 usb=0/0 keys=0 pat=36
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=13162/0 hn=82
+[POS4] G4: worst=9957us eng=843 tail=4948 park=4152 unseen=14 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/15479)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5804us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=93031 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=2763 del=255 dep=0 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=15494 timeouts=0 ev_gap=0 txseq=15482
+[POS4] CHAINrateDN: txB=63467520 wmax=4717us wr=[15491 0 0]
+[POS4] CHAINev: sent=0 applied=3019
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=781 wait=0 per sample
+[POS4] C1AT: v=210 pro=570 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=89557/94938 cyc per chunk (min/max) = 349 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=4501 ctl=8 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=1 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=15604 written=15480 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=90 [LISTENv6] cyc=5408 drift=-8 un=0 gap=5811 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=36
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=13143/1 hn=83
+[POS3] G4: worst=14032us eng=832 tail=4962 park=8223 unseen=15 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 124/176/15179)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5778us quiet=5807us burst=5853us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=1 cyc=1187777 pubretry=0
+[POS3] NB: ev=10818 vb=18360 nv=8 st=8 tot=29178 key=9 keymax=9 defer=4394 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=12 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=92949 note=85746 burst=522016 cyc  defer=9326 forced=148
+[POS3] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=OPEN hs=OK rx=13611 ok=6732 bad=135 drop=165 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=135 slips=0 realign=6733 last=118 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a600c800 crc=812cc945 pend=46d7fe22
+[POS3] CHAINmf: f2=a600c802 f32=a600ca20 f64=a600ca40 f128=a600ca80 f192=a600cac0 f255=a600caff
+[POS3] CHAINrateUP: rxB=54320256
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 6210 524] seam=[4 4 4 4] sh=[125 0 10 0] z=0
+[POS3] CHAINhv: ok=6734 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=15510 timeouts=0 ev_gap=0 txseq=11045
+[POS3] CHAINrateDN: txB=63533056 wmax=5621us wr=[15499 0 0]
+[POS3] CHAINev: sent=3019 applied=3019
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=773 wait=0 per sample
+[POS3] C1AT: v=209 pro=564 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=90070/94138 cyc per chunk (min/max) = 351 cyc/sample free on core 0
+[POS3] TAT: rx=76 mg=26 tx=4357 ctl=16 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS3] B5: dac sent=15609 written=15480 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=90 [LISTENv6] cyc=5387 drift=+53 un=0 gap=5811 bst=1187777 nb=29178 midi=15/0 usb=0/0 keys=0 pat=36
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=14414/1 hn=83
+[POS2] G4: worst=14706us eng=863 tail=4931 park=8897 unseen=15 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 133/176/15170)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5772us quiet=5804us burst=5788us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1163466 pubretry=0
+[POS2] NB: ev=10468 vb=17501 nv=8 st=8 tot=27969 key=9 keymax=9 defer=4025 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=11 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=139237 note=84761 burst=504902 cyc  defer=9389 forced=149
+[POS2] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=14586 ok=7202 bad=81 drop=100 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=61 slips=0 realign=7225 last=26 rxrst=2
+[POS2] CHAINrateUP: rxB=47110592
+[POS2] CHAINdx: ci=[190 190 190 190] cih=[0 0 7225] seam=[128 128 128 128] sh=[36 0 45 0] z=9
+[POS2] CHAINhv: ok=7223 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=15498 timeouts=0 ev_gap=0 txseq=15465
+[POS2] CHAINrateDN: txB=63483904 wmax=5617us wr=[15495 0 0]
+[POS2] CHAINev: sent=3019 applied=3019
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=802 wait=0 per sample
+[POS2] C1AT: v=81 pro=562 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=135886/139513 cyc per chunk (min/max) = 530 cyc/sample free on core 0
+[POS2] TAT: rx=171 mg=24 tx=4371 ctl=15 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS2] B5: dac sent=15616 written=15480 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=90 [LISTENv6] cyc=5383 drift=-6 un=0 gap=5812 bst=1163466 nb=27969 midi=15/0 usb=0/0 keys=0 pat=36
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=12356/0 hn=76
+[POS1] G4: worst=9013us eng=3742 tail=355 park=4902 unseen=14 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 615/2793/12071)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5792us quiet=5803us burst=5841us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1387473 pubretry=0
+[POS1] NB: ev=18009 vb=169737 nv=8 st=8 tot=187746 key=9 keymax=9 defer=2068 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=224 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=807595 note=97443 burst=578523 cyc  defer=6433 forced=96
+[POS1] EVQ: sub=2580 ref=438 del=2580 dep=0 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=15310 ok=7511 bad=242 drop=1068 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=224 slips=0 realign=7530 last=102 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 0000028c a6015200 crc=a8053107 pend=262f8c67
+[POS1] CHAINmf: f2=a6015202 f32=a6015220 f64=a6015240 f128=a6015400 f192=a6015440 f255=a601547f
+[POS1] CHAINrateUP: rxB=41136112
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[1 0 7531] seam=[128 128 128 128] sh=[234 0 8 0] z=0
+[POS1] CHAINhv: ok=7532 fail=0
+[POS1] CHAINev: sent=3019 applied=0
+[POS1] PARAM: edits=726 builds=6 defer=88 yield=0 unknown=0 pubretry=0 apply=238879 applymax=249675 blocks=7
+[POS1] FXP: fx=2738 v1=648 wait=0 per sample
+[POS1] C1AT: v=85 pro=561 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=787222/875933 cyc per chunk (min/max) = 3075 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=1068c3c8 on=80 off=67 patch=8 gapblk=584
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS1] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=7185 e2=6294 rg=0 dg=0 g=22]
+[POS1] B5: dac sent=15618 written=15480 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=90 [LISTENv6] cyc=3906 drift=-20 un=0 gap=5808 bst=1387473 nb=187746 midi=255/0 usb=0/0 keys=0 pat=36
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=14826/0 hn=92
+[POS4] G4: worst=15334us eng=848 tail=4945 park=9527 unseen=14 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/17199)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5804us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=91598 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=2763 del=255 dep=0 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=17213 timeouts=0 ev_gap=0 txseq=17201
+[POS4] CHAINrateDN: txB=70508544 wmax=4717us wr=[17210 0 0]
+[POS4] CHAINev: sent=0 applied=3019
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=781 wait=0 per sample
+[POS4] C1AT: v=210 pro=570 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=89484/94998 cyc per chunk (min/max) = 349 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=4584 ctl=8 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=1 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=17324 written=17200 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=100 [LISTENv6] cyc=5378 drift=-8 un=0 gap=5812 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=36
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=14813/1 hn=93
+[POS3] G4: worst=9377us eng=835 tail=4960 park=3569 unseen=13 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 124/176/16899)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5778us quiet=5807us burst=5853us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=1 cyc=1187777 pubretry=0
+[POS3] NB: ev=10818 vb=18360 nv=8 st=8 tot=29178 key=9 keymax=9 defer=4394 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=12 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=92947 note=85746 burst=522016 cyc  defer=9326 forced=148
+[POS3] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=OPEN hs=OK rx=14758 ok=7303 bad=139 drop=172 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=138 slips=0 realign=7305 last=45 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a6003000 crc=22538369 pend=e5a8b40e
+[POS3] CHAINmf: f2=a6003002 f32=a6003220 f64=a6003240 f128=a6003280 f192=a60032c0 f255=a60032ff
+[POS3] CHAINrateUP: rxB=58977664
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 6780 526] seam=[4 4 4 4] sh=[125 0 14 0] z=0
+[POS3] CHAINhv: ok=7306 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=17229 timeouts=0 ev_gap=0 txseq=12764
+[POS3] CHAINrateDN: txB=70574080 wmax=5621us wr=[17218 0 0]
+[POS3] CHAINev: sent=3019 applied=3019
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=773 wait=0 per sample
+[POS3] C1AT: v=209 pro=564 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=90705/94332 cyc per chunk (min/max) = 354 cyc/sample free on core 0
+[POS3] TAT: rx=76 mg=26 tx=4426 ctl=16 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS3] B5: dac sent=17329 written=17200 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=100 [LISTENv6] cyc=5412 drift=+53 un=0 gap=5806 bst=1187777 nb=29178 midi=15/0 usb=0/0 keys=0 pat=36
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=16076/1 hn=93
+[POS2] G4: worst=10045us eng=866 tail=4929 park=4237 unseen=13 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 133/176/16890)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5772us quiet=5804us burst=5788us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1163466 pubretry=0
+[POS2] NB: ev=10468 vb=17501 nv=8 st=8 tot=27969 key=9 keymax=9 defer=4025 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=11 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=138287 note=84761 burst=504902 cyc  defer=9389 forced=149
+[POS2] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=16307 ok=8066 bad=81 drop=113 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=68 slips=0 realign=8081 last=212 rxrst=2
+[POS2] CHAINrateUP: rxB=51553472
+[POS2] CHAINdx: ci=[190 190 190 190] cih=[0 0 8082] seam=[128 128 128 128] sh=[36 0 45 0] z=9
+[POS2] CHAINhv: ok=8080 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=17219 timeouts=0 ev_gap=0 txseq=17186
+[POS2] CHAINrateDN: txB=70533120 wmax=5617us wr=[17216 0 0]
+[POS2] CHAINev: sent=3019 applied=3019
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=802 wait=0 per sample
+[POS2] C1AT: v=81 pro=562 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=135890/139504 cyc per chunk (min/max) = 530 cyc/sample free on core 0
+[POS2] TAT: rx=169 mg=23 tx=4295 ctl=15 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS2] B5: dac sent=17336 written=17200 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=100 [LISTENv6] cyc=5409 drift=-6 un=0 gap=5806 bst=1163466 nb=27969 midi=15/0 usb=0/0 keys=0 pat=36
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=13990/0 hn=86
+[POS1] G4: worst=14433us eng=3890 tail=362 park=10166 unseen=15 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 615/2793/13791)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5792us quiet=5803us burst=5841us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1387473 pubretry=0
+[POS1] NB: ev=18009 vb=169737 nv=8 st=8 tot=187746 key=9 keymax=9 defer=2068 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=224 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=807289 note=97443 burst=578523 cyc  defer=6433 forced=96
+[POS1] EVQ: sub=2580 ref=438 del=2580 dep=0 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=17025 ok=8364 bad=250 drop=1079 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=231 slips=0 realign=8384 last=28 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 0000028c a6001400 crc=f4a09fc4 pend=0168c48b
+[POS1] CHAINmf: f2=a6001402 f32=a6001420 f64=a6001440 f128=a6001600 f192=a6001640 f255=a600167f
+[POS1] CHAINrateUP: rxB=45512656
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[1 0 8385] seam=[128 128 128 128] sh=[242 0 8 0] z=0
+[POS1] CHAINhv: ok=8386 fail=0
+[POS1] CHAINev: sent=3019 applied=0
+[POS1] PARAM: edits=726 builds=6 defer=88 yield=0 unknown=0 pubretry=0 apply=238879 applymax=249675 blocks=7
+[POS1] FXP: fx=2756 v1=646 wait=0 per sample
+[POS1] C1AT: v=85 pro=559 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=790717/874117 cyc per chunk (min/max) = 3088 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=1068c3c8 on=80 off=67 patch=8 gapblk=584
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS1] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=7185 e2=6294 rg=0 dg=0 g=22]
+[POS1] B5: dac sent=17338 written=17200 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=100 [LISTENv6] cyc=3885 drift=-20 un=0 gap=5808 bst=1387473 nb=187746 midi=255/0 usb=0/0 keys=0 pat=36
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=16500/0 hn=102
+[POS4] G4: worst=10710us eng=844 tail=4949 park=4904 unseen=13 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/18919)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5804us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=93043 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=2763 del=255 dep=0 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=18934 timeouts=0 ev_gap=0 txseq=18922
+[POS4] CHAINrateDN: txB=77557760 wmax=4717us wr=[18931 0 0]
+[POS4] CHAINev: sent=0 applied=3019
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=781 wait=0 per sample
+[POS4] C1AT: v=210 pro=570 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=89496/94950 cyc per chunk (min/max) = 349 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=4584 ctl=8 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=1 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=19044 written=18920 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=110 [LISTENv6] cyc=5404 drift=-8 un=0 gap=5806 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=36
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=16482/1 hn=103
+[POS3] G4: worst=14721us eng=836 tail=4958 park=8913 unseen=14 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 124/176/18619)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5778us quiet=5807us burst=5853us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=1 cyc=1187777 pubretry=0
+[POS3] NB: ev=10818 vb=18360 nv=8 st=8 tot=29178 key=9 keymax=9 defer=4394 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=12 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=92948 note=85746 burst=522016 cyc  defer=9326 forced=148
+[POS3] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=closed hs=OK rx=15905 ok=7877 bad=142 drop=181 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=145 slips=0 realign=7875 last=230 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a601a800 crc=4f1b9daa pend=88e0aacd
+[POS3] CHAINmf: f2=a601a802 f32=a601aa20 f64=a601aa40 f128=a601aa80 f192=a601aac0 f255=a601aaff
+[POS3] CHAINrateUP: rxB=63641280
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 7349 527] seam=[4 4 4 4] sh=[125 0 17 0] z=0
+[POS3] CHAINhv: ok=7876 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=18948 timeouts=0 ev_gap=0 txseq=14483
+[POS3] CHAINrateDN: txB=77615104 wmax=5621us wr=[18937 0 0]
+[POS3] CHAINev: sent=3019 applied=3019
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=773 wait=0 per sample
+[POS3] C1AT: v=209 pro=564 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=90704/94170 cyc per chunk (min/max) = 354 cyc/sample free on core 0
+[POS3] TAT: rx=77 mg=27 tx=4499 ctl=15 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS3] B5: dac sent=19049 written=18920 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=110 [LISTENv6] cyc=5383 drift=+53 un=0 gap=5811 bst=1187777 nb=29178 midi=15/0 usb=0/0 keys=0 pat=36
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=17736/1 hn=103
+[POS2] G4: worst=15383us eng=871 tail=4923 park=9575 unseen=14 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 133/176/18610)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5772us quiet=5804us burst=5788us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1163466 pubretry=0
+[POS2] NB: ev=10468 vb=17501 nv=8 st=8 tot=27969 key=9 keymax=9 defer=4025 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=11 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=137648 note=84761 burst=504902 cyc  defer=9389 forced=149
+[POS2] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=18026 ok=8931 bad=81 drop=127 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=79 slips=0 realign=8935 last=139 rxrst=2
+[POS2] CHAINrateUP: rxB=55998336
+[POS2] CHAINdx: ci=[190 190 190 190] cih=[0 0 8936] seam=[128 128 128 128] sh=[36 0 45 0] z=9
+[POS2] CHAINhv: ok=8934 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=18938 timeouts=0 ev_gap=0 txseq=18905
+[POS2] CHAINrateDN: txB=77574144 wmax=5617us wr=[18935 0 0]
+[POS2] CHAINev: sent=3019 applied=3019
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=802 wait=0 per sample
+[POS2] C1AT: v=81 pro=562 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=135882/139524 cyc per chunk (min/max) = 530 cyc/sample free on core 0
+[POS2] TAT: rx=171 mg=24 tx=4376 ctl=16 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS2] B5: dac sent=19056 written=18920 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=110 [LISTENv6] cyc=5380 drift=-6 un=0 gap=5812 bst=1163466 nb=27969 midi=15/0 usb=0/0 keys=0 pat=36
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=15638/0 hn=96
+[POS1] G4: worst=9852us eng=3864 tail=358 park=5616 unseen=14 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 615/2793/15511)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5792us quiet=5803us burst=5841us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1387473 pubretry=0
+[POS1] NB: ev=18009 vb=169737 nv=8 st=8 tot=187746 key=9 keymax=9 defer=2068 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=224 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=860340 note=97443 burst=578523 cyc  defer=6433 forced=96
+[POS1] EVQ: sub=2580 ref=438 del=2580 dep=0 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=18745 ok=9220 bad=256 drop=1089 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=236 slips=0 realign=9241 last=216 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 0000028c a6003400 crc=43fc4249 pend=d8732b2a
+[POS1] CHAINmf: f2=a6003402 f32=a6003420 f64=a6003440 f128=a6003600 f192=a6003640 f255=a600367f
+[POS1] CHAINrateUP: rxB=49893104
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[1 0 9242] seam=[128 67 128 128] sh=[247 0 9 0] z=0
+[POS1] CHAINhv: ok=9243 fail=0
+[POS1] CHAINev: sent=3019 applied=0
+[POS1] PARAM: edits=726 builds=6 defer=88 yield=0 unknown=0 pubretry=0 apply=238879 applymax=249675 blocks=7
+[POS1] FXP: fx=2736 v1=646 wait=0 per sample
+[POS1] C1AT: v=86 pro=559 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=787841/875732 cyc per chunk (min/max) = 3077 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=1068c3c8 on=80 off=67 patch=8 gapblk=584
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS1] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=7185 e2=6294 rg=0 dg=0 g=22]
+[POS1] B5: dac sent=19058 written=18920 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=110 [LISTENv6] cyc=3861 drift=-20 un=0 gap=5808 bst=1387473 nb=187746 midi=255/0 usb=0/0 keys=0 pat=36
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=18176/0 hn=112
+[POS4] G4: worst=6085us eng=844 tail=4949 park=278 unseen=14 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=0
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/20639)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5804us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=93656 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=2763 del=255 dep=0 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=20653 timeouts=0 ev_gap=0 txseq=20641
+[POS4] CHAINrateDN: txB=84598784 wmax=4717us wr=[20650 0 0]
+[POS4] CHAINev: sent=0 applied=3019
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=781 wait=0 per sample
+[POS4] C1AT: v=210 pro=570 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=89559/94938 cyc per chunk (min/max) = 349 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=4585 ctl=8 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=1 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=20764 written=20640 deficit=124  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=120 [LISTENv6] cyc=5429 drift=-8 un=0 gap=5812 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=36
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=18162/1 hn=113
+[POS3] G4: worst=10066us eng=837 tail=4957 park=4257 unseen=15 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 124/176/20339)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5778us quiet=5807us burst=5853us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=1 cyc=1187777 pubretry=0
+[POS3] NB: ev=10818 vb=18360 nv=8 st=8 tot=29178 key=9 keymax=9 defer=4394 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=12 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=92353 note=85746 burst=522016 cyc  defer=9326 forced=148
+[POS3] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=OPEN hs=OK rx=17056 ok=8434 bad=162 drop=189 lock=YES part=0 pat_disc=0
+[POS3] CHAINseq: ok=149 slips=0 realign=8448 last=159 rxrst=0
+[POS3] CHAINmm: w=00000000 00000000 00000000 a6011000 crc=85220e85 pend=42d939e2
+[POS3] CHAINmf: f2=a6011002 f32=a6011220 f64=a6011240 f128=a6011280 f192=a60112c0 f255=a60112ff
+[POS3] CHAINrateUP: rxB=68276096
+[POS3] CHAINdx: ci=[4 132 4 4] cih=[0 7903 546] seam=[4 4 4 4] sh=[126 0 36 0] z=0
+[POS3] CHAINhv: ok=8449 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=20669 timeouts=0 ev_gap=0 txseq=16204
+[POS3] CHAINrateDN: txB=84664320 wmax=5621us wr=[20658 0 0]
+[POS3] CHAINev: sent=3019 applied=3019
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=774 wait=0 per sample
+[POS3] C1AT: v=209 pro=564 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=90652/94158 cyc per chunk (min/max) = 354 cyc/sample free on core 0
+[POS3] TAT: rx=74 mg=28 tx=4501 ctl=15 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS3] B5: dac sent=20769 written=20640 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=120 [LISTENv6] cyc=5408 drift=+54 un=0 gap=5806 bst=1187777 nb=29178 midi=15/0 usb=0/0 keys=0 pat=36
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=19394/1 hn=113
+[POS2] G4: worst=10722us eng=865 tail=4929 park=4913 unseen=15 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 133/176/20330)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5772us quiet=5804us burst=5788us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1163466 pubretry=0
+[POS2] NB: ev=10468 vb=17501 nv=8 st=8 tot=27969 key=9 keymax=9 defer=4025 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=11 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=137515 note=84761 burst=504902 cyc  defer=9389 forced=149
+[POS2] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=19746 ok=9794 bad=81 drop=139 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=85 slips=0 realign=9792 last=68 rxrst=2
+[POS2] CHAINrateUP: rxB=60438176
+[POS2] CHAINdx: ci=[190 190 190 190] cih=[0 0 9793] seam=[128 128 128 128] sh=[36 0 45 0] z=9
+[POS2] CHAINhv: ok=9791 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=20659 timeouts=0 ev_gap=0 txseq=20626
+[POS2] CHAINrateDN: txB=84623360 wmax=5617us wr=[20656 0 0]
+[POS2] CHAINev: sent=3019 applied=3019
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=802 wait=0 per sample
+[POS2] C1AT: v=81 pro=562 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=135836/139495 cyc per chunk (min/max) = 530 cyc/sample free on core 0
+[POS2] TAT: rx=171 mg=24 tx=4376 ctl=16 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS2] B5: dac sent=20776 written=20640 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=120 [LISTENv6] cyc=5405 drift=-6 un=0 gap=5810 bst=1163466 nb=27969 midi=15/0 usb=0/0 keys=0 pat=36
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=17270/0 hn=106
+[POS1] G4: worst=15272us eng=3884 tail=356 park=11017 unseen=15 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 615/2793/17231)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5792us quiet=5804us burst=5841us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1387473 pubretry=0
+[POS1] NB: ev=18009 vb=169737 nv=8 st=8 tot=187746 key=9 keymax=9 defer=2068 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=224 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=856582 note=97443 burst=578523 cyc  defer=6433 forced=96
+[POS1] EVQ: sub=2580 ref=438 del=2580 dep=0 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=20458 ok=10075 bad=261 drop=1100 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=243 slips=0 realign=10094 last=141 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 0000028c a600f600 crc=e9bac14f pend=739eeeb1
+[POS1] CHAINmf: f2=a600f602 f32=a600f620 f64=a600f640 f128=a600f800 f192=a600f840 f255=a600f87f
+[POS1] CHAINrateUP: rxB=54258432
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[1 0 10095] seam=[67 128 128 128] sh=[251 0 10 0] z=0
+[POS1] CHAINhv: ok=10097 fail=0
+[POS1] CHAINev: sent=3019 applied=0
+[POS1] PARAM: edits=726 builds=6 defer=88 yield=0 unknown=0 pubretry=0 apply=238879 applymax=249675 blocks=7
+[POS1] FXP: fx=2853 v1=648 wait=0 per sample
+[POS1] C1AT: v=86 pro=562 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=791627/872683 cyc per chunk (min/max) = 3092 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=1068c3c8 on=80 off=67 patch=8 gapblk=584
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS1] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=7185 e2=6294 rg=0 dg=0 g=22]
+[POS1] B5: dac sent=20778 written=20640 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=120 [LISTENv6] cyc=3869 drift=-20 un=0 gap=5806 bst=1387473 nb=187746 midi=255/0 usb=0/0 keys=0 pat=36
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=19842/1 hn=123
+[POS4] G4: worst=8188us eng=843 tail=4950 park=2381 unseen=14 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=1
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/22359)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5805us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=93755 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=2763 del=255 dep=0 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=22377 timeouts=0 ev_gap=0 txseq=807
+[POS4] CHAINrateDN: txB=91660288 wmax=5623us wr=[22370 0 0]
+[POS4] CHAINev: sent=0 applied=3019
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=781 wait=0 per sample
+[POS4] C1AT: v=210 pro=570 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=89909/94947 cyc per chunk (min/max) = 351 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=4585 ctl=7 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=1 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=22488 written=22360 deficit=128  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=130 [LISTENv6] cyc=5417 drift=+15 un=0 gap=5811 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=36
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=19828/1 hn=123
+[POS3] G4: worst=15411us eng=838 tail=4956 park=9603 unseen=14 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 124/176/22059)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5778us quiet=5807us burst=5853us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=1 cyc=1187777 pubretry=0
+[POS3] NB: ev=10818 vb=18360 nv=8 st=8 tot=29178 key=9 keymax=9 defer=4394 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=12 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=92345 note=85746 burst=522016 cyc  defer=9326 forced=148
+[POS3] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=closed hs=OK rx=18162 ok=8868 bad=265 drop=198 lock=YES part=0 pat_disc=22528
+[POS3] CHAINseq: ok=156 slips=0 realign=8979 last=32 rxrst=1
+[POS3] CHAINmm: w=00000000 00000000 00000000 a6015600 crc=21869db5 pend=1bf41343
+[POS3] CHAINmf: f2=a6015602 f32=a6015820 f64=a6015840 f128=a6015880 f192=a60158c0 f255=a60158ff
+[POS3] CHAINrateUP: rxB=72737472
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 8415 565] seam=[4 4 4 4] sh=[129 0 136 0] z=0
+[POS3] CHAINhv: ok=8979 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=22388 timeouts=0 ev_gap=0 txseq=17923
+[POS3] CHAINrateDN: txB=91705344 wmax=5621us wr=[22377 0 0]
+[POS3] CHAINev: sent=3019 applied=3019
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=773 wait=0 per sample
+[POS3] C1AT: v=209 pro=564 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=90661/94169 cyc per chunk (min/max) = 354 cyc/sample free on core 0
+[POS3] TAT: rx=74 mg=26 tx=4503 ctl=15 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS3] B5: dac sent=22489 written=22360 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=130 [LISTENv6] cyc=5379 drift=+54 un=0 gap=5811 bst=1187777 nb=29178 midi=15/0 usb=0/0 keys=0 pat=36
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=21054/1 hn=123
+[POS2] G4: worst=6061us eng=863 tail=4932 park=252 unseen=14 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 133/176/22050)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5772us quiet=5804us burst=5788us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1163466 pubretry=0
+[POS2] NB: ev=10468 vb=17501 nv=8 st=8 tot=27969 key=9 keymax=9 defer=4025 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=11 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=138632 note=84761 burst=504902 cyc  defer=9389 forced=149
+[POS2] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=21464 ok=10658 bad=81 drop=152 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=95 slips=0 realign=10646 last=251 rxrst=2
+[POS2] CHAINrateUP: rxB=64878944
+[POS2] CHAINdx: ci=[190 190 190 190] cih=[0 0 10647] seam=[128 128 128 128] sh=[36 0 45 0] z=9
+[POS2] CHAINhv: ok=10645 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=22378 timeouts=0 ev_gap=0 txseq=22345
+[POS2] CHAINrateDN: txB=91664384 wmax=5617us wr=[22375 0 0]
+[POS2] CHAINev: sent=3019 applied=3019
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=802 wait=0 per sample
+[POS2] C1AT: v=81 pro=562 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=135834/139522 cyc per chunk (min/max) = 530 cyc/sample free on core 0
+[POS2] TAT: rx=171 mg=24 tx=4376 ctl=16 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS2] B5: dac sent=22496 written=22360 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=130 [LISTENv6] cyc=5430 drift=-6 un=0 gap=5812 bst=1163466 nb=27969 midi=15/0 usb=0/0 keys=0 pat=36
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=18907/0 hn=116
+[POS1] G4: worst=10691us eng=3685 tail=354 park=6639 unseen=13 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 615/2793/18951)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5792us quiet=5804us burst=5841us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1387473 pubretry=0
+[POS1] NB: ev=18009 vb=169737 nv=8 st=8 tot=187746 key=9 keymax=9 defer=2068 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=224 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=815125 note=97443 burst=578523 cyc  defer=6433 forced=96
+[POS1] EVQ: sub=2580 ref=438 del=2580 dep=0 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=22180 ok=10935 bad=264 drop=1110 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=247 slips=0 realign=10953 last=73 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 0000028c a601ba00 crc=417a5bd5 pend=0465b2bb
+[POS1] CHAINmf: f2=a601ba02 f32=a601ba20 f64=a601ba40 f128=a601bc00 f192=a601bc40 f255=a601bc7f
+[POS1] CHAINrateUP: rxB=58637808
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[1 0 10954] seam=[67 128 128 128] sh=[254 0 10 0] z=0
+[POS1] CHAINhv: ok=10955 fail=0
+[POS1] CHAINev: sent=3019 applied=0
+[POS1] PARAM: edits=726 builds=6 defer=88 yield=0 unknown=0 pubretry=0 apply=238879 applymax=249675 blocks=7
+[POS1] FXP: fx=2953 v1=646 wait=0 per sample
+[POS1] C1AT: v=86 pro=559 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=789639/875262 cyc per chunk (min/max) = 3084 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=1068c3c8 on=80 off=67 patch=8 gapblk=584
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS1] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=7185 e2=6294 rg=0 dg=0 g=22]
+[POS1] B5: dac sent=22498 written=22360 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=130 [LISTENv6] cyc=3913 drift=-20 un=0 gap=5806 bst=1387473 nb=187746 midi=255/0 usb=0/0 keys=0 pat=36
+[POS4] HEALTH: *** the event queue REFUSED a submit
+[POS4] B4: ovr=21514/1 hn=133
+[POS4] G4: worst=13563us eng=841 tail=4952 park=7758 unseen=12 tag=0
+[POS4] B4: miss burst=0 note=0 quiet=1
+[POS4] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 0/0/24079)  NOTE MUST NOT EXCEED QUIET
+[POS4] B4dur: note=0us quiet=5805us burst=0us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS4] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS4] O2: blk=0 mx=0 rst=0 cyc=1118912 pubretry=0
+[POS4] NB: ev=0 vb=0 nv=0 st=0 tot=0 key=0 keymax=0 defer=0 pubretry=0
+[POS4] KEYH: 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS4] SCHED: slack=93762 note=0 burst=0 cyc  defer=0 forced=0
+[POS4] EVQ: sub=255 ref=2763 del=255 dep=0 hi=255 par=0 torn=0
+[POS4] CHAINdn: pace=LINKED hs=OK tx=24098 timeouts=0 ev_gap=0 txseq=2528
+[POS4] CHAINrateDN: txB=98713600 wmax=5623us wr=[24092 0 0]
+[POS4] CHAINev: sent=0 applied=3019
+[POS4] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS4] FXP: fx=0 v1=781 wait=0 per sample
+[POS4] C1AT: v=210 pro=570 per sample (core 1: voice pass, prologue batch)
+[POS4] SLACK: spin=89369/94959 cyc per chunk (min/max) = 349 cyc/sample free on core 0
+[POS4] TAT: rx=0 mg=20 tx=4585 ctl=7 adv=0 cyc/sample (the tail, named)
+[POS4] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS4] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=1 gate=1
+[POS4] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS4] B5: dac sent=24208 written=24080 deficit=128  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS4] t=140 [LISTENv6] cyc=5388 drift=+15 un=0 gap=5806 bst=1118912 nb=0 midi=0/0 usb=0/0 keys=0 pat=36
+[POS3] HEALTH: *** the event queue REFUSED a submit
+[POS3] B4: ovr=21502/1 hn=133
+[POS3] G4: worst=10756us eng=833 tail=4961 park=4948 unseen=14 tag=0
+[POS3] B4: miss burst=0 note=0 quiet=1
+[POS3] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 124/176/23779)  NOTE MUST NOT EXCEED QUIET
+[POS3] B4dur: note=5778us quiet=5806us burst=5853us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS3] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS3] O2: blk=15 mx=15 rst=1 cyc=1187777 pubretry=0
+[POS3] NB: ev=10818 vb=18360 nv=8 st=8 tot=29178 key=9 keymax=9 defer=4394 pubretry=0
+[POS3] KEYH: 0=0 1=0 2=12 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS3] SCHED: slack=92695 note=85746 burst=522016 cyc  defer=9326 forced=148
+[POS3] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS3] CHAINup: mix=closed hs=OK rx=19311 ok=9440 bad=270 drop=206 lock=YES part=0 pat_disc=22528
+[POS3] CHAINseq: ok=160 slips=0 realign=9551 last=216 rxrst=1
+[POS3] CHAINmm: w=00000000 00000000 00000000 a6018400 crc=f6d7954f pend=312ca228
+[POS3] CHAINmf: f2=a6018402 f32=a6018620 f64=a6018640 f128=a6018680 f192=a60186c0 f255=a60186ff
+[POS3] CHAINrateUP: rxB=77398976
+[POS3] CHAINdx: ci=[4 4 4 4] cih=[0 8986 567] seam=[4 4 4 4] sh=[129 0 141 0] z=0
+[POS3] CHAINhv: ok=9552 fail=0
+[POS3] CHAINdn: pace=LINKED hs=OK tx=24109 timeouts=0 ev_gap=0 txseq=19644
+[POS3] CHAINrateDN: txB=98754560 wmax=5621us wr=[24098 0 0]
+[POS3] CHAINev: sent=3019 applied=3019
+[POS3] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS3] FXP: fx=0 v1=774 wait=0 per sample
+[POS3] C1AT: v=209 pro=564 per sample (core 1: voice pass, prologue batch)
+[POS3] SLACK: spin=90667/94141 cyc per chunk (min/max) = 354 cyc/sample free on core 0
+[POS3] TAT: rx=74 mg=27 tx=4500 ctl=16 adv=0 cyc/sample (the tail, named)
+[POS3] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS3] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS3] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS3] B5: dac sent=24209 written=24080 deficit=129  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS3] t=140 [LISTENv6] cyc=5405 drift=+54 un=0 gap=5812 bst=1187777 nb=29178 midi=15/0 usb=0/0 keys=0 pat=36
+[POS2] HEALTH: *** a block missed its deadline
+[POS2] B4: ovr=22709/1 hn=133
+[POS2] G4: worst=11399us eng=862 tail=4932 park=5591 unseen=14 tag=0
+[POS2] B4: miss burst=0 note=0 quiet=1
+[POS2] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 133/176/23770)  NOTE MUST NOT EXCEED QUIET
+[POS2] B4dur: note=5772us quiet=5804us burst=5788us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS2] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS2] O2: blk=15 mx=15 rst=1 cyc=1163466 pubretry=0
+[POS2] NB: ev=10468 vb=17501 nv=8 st=8 tot=27969 key=9 keymax=9 defer=4025 pubretry=0
+[POS2] KEYH: 0=0 1=0 2=11 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS2] SCHED: slack=138280 note=84761 burst=504902 cyc  defer=9389 forced=149
+[POS2] EVQ: sub=368 ref=2650 del=368 dep=0 hi=255 par=0 torn=0
+[POS2] CHAINup: mix=OPEN hs=OK rx=23184 ok=11522 bad=81 drop=166 lock=YES part=0 pat_disc=22528
+[POS2] CHAINseq: ok=103 slips=0 realign=11502 last=180 rxrst=2
+[POS2] CHAINrateUP: rxB=69321824
+[POS2] CHAINdx: ci=[190 190 190 190] cih=[0 0 11503] seam=[128 128 128 128] sh=[36 0 45 0] z=9
+[POS2] CHAINhv: ok=11501 fail=0
+[POS2] CHAINdn: pace=LINKED hs=OK tx=24099 timeouts=0 ev_gap=0 txseq=24066
+[POS2] CHAINrateDN: txB=98713600 wmax=5617us wr=[24096 0 0]
+[POS2] CHAINev: sent=3019 applied=3019
+[POS2] PARAM: edits=0 builds=0 defer=0 yield=0 unknown=0 pubretry=0 apply=0 applymax=0 blocks=0
+[POS2] FXP: fx=0 v1=802 wait=0 per sample
+[POS2] C1AT: v=81 pro=562 per sample (core 1: voice pass, prologue batch)
+[POS2] SLACK: spin=135849/139554 cyc per chunk (min/max) = 530 cyc/sample free on core 0
+[POS2] TAT: rx=171 mg=23 tx=4376 ctl=16 adv=0 cyc/sample (the tail, named)
+[POS2] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS2] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS2] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=0 e2=0 rg=0 dg=0 g=22]
+[POS2] B5: dac sent=24216 written=24080 deficit=136  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS2] t=140 [LISTENv6] cyc=5401 drift=-6 un=0 gap=5812 bst=1163466 nb=27969 midi=15/0 usb=0/0 keys=0 pat=36
+[POS1] HEALTH: *** the event queue REFUSED a submit
+[POS1] B4: ovr=20543/0 hn=126
+[POS1] G4: worst=6111us eng=3685 tail=383 park=2029 unseen=14 tag=0
+[POS1] B4: miss burst=0 note=0 quiet=0
+[POS1] B4rate: burst=0/10k note=0/10k quiet=0/10k  (blocks 615/2793/20671)  NOTE MUST NOT EXCEED QUIET
+[POS1] B4dur: note=5792us quiet=5804us burst=5841us  period=5804us  NOTE MINUS QUIET IS WHAT A NOTE STEP COSTS THE BLOCK
+[POS1] O2m: rs=0 in=0 rc=0 nt=0 cf=0 ck=0
+[POS1] O2: blk=15 mx=15 rst=0 cyc=1387473 pubretry=0
+[POS1] NB: ev=18009 vb=169737 nv=8 st=8 tot=187746 key=9 keymax=9 defer=2068 pubretry=0
+[POS1] KEYH: 0=0 1=0 2=224 3=0 4=0 5=0 6=0 7=0 8=0 9=1 10=0 11=0   (blocks from key to sound; 2 is the design)
+[POS1] SCHED: slack=797981 note=97443 burst=578523 cyc  defer=6433 forced=96
+[POS1] EVQ: sub=2580 ref=438 del=2580 dep=0 hi=255 par=0 torn=0
+[POS1] CHAINup: mix=OPEN hs=OK rx=23895 ok=11789 bad=270 drop=1120 lock=YES part=0 pat_disc=0
+[POS1] CHAINseq: ok=252 slips=0 realign=11808 last=254 rxrst=0
+[POS1] CHAINmm: w=00000000 00000000 0000028c a601d800 crc=d00fef6d pend=a41e2a87
+[POS1] CHAINmf: f2=a601d802 f32=a601d820 f64=a601d840 f128=a601da00 f192=a601da40 f255=a601da7f
+[POS1] CHAINrateUP: rxB=63007136
+[POS1] CHAINdx: ci=[195 195 195 195] cih=[1 0 11809] seam=[128 128 128 128] sh=[260 0 10 0] z=0
+[POS1] CHAINhv: ok=11810 fail=0
+[POS1] CHAINev: sent=3019 applied=0
+[POS1] PARAM: edits=726 builds=6 defer=88 yield=0 unknown=0 pubretry=0 apply=238879 applymax=249675 blocks=7
+[POS1] FXP: fx=2894 v1=648 wait=0 per sample
+[POS1] C1AT: v=86 pro=561 per sample (core 1: voice pass, prologue batch)
+[POS1] SLACK: spin=790739/873415 cyc per chunk (min/max) = 3088 cyc/sample free on core 0
+[POS1] TAT: rx=0 mg=0 tx=0 ctl=0 adv=0 cyc/sample (the tail, named)
+[POS1] SEED: seed=4a554e4f lcg=1068c3c8 on=80 off=67 patch=8 gapblk=584
+[POS1] SIL: pk(1e-6) v0=0 v1=0 v2=0 v3=0 v4=0 v5=0 v6=0 v7=0  -- SILENT
+[POS1] SILDIAG: alloff_fired=1 want=0 atrest=ff bstate=0 notepend=0 gate=1
+[POS1] SILV: v5[e1=0 e2=0 rg=0 dg=0 g=22] v6[e1=0 e2=0 rg=0 dg=0 g=22] v7[e1=7185 e2=6294 rg=0 dg=0 g=22]
+[POS1] B5: dac sent=24218 written=24080 deficit=138  (sent>written+6 = TRUE STARVATION; un= cannot see it)
+[POS1] t=140 [LISTENv6] cyc=3915 drift=-20 un=0 gap=5812 bst=1387473 nb=187746 midi=255/0 usb=0/0 keys=0 pat=36
+==== BENCH END ====
