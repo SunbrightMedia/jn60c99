@@ -2013,3 +2013,24 @@ counter printed, so the log proves both that starvation happened and
 that the yield released it. A deferral counter that only ever grows
 (defer=) is the smell; a paired yield= that stays 0 while defer climbs
 is the proof of starvation.
+
+## 96. "NEVER VALIDATE BY EAR" BINDS THE LIVE LAYER TOO -- THE USER'S
+EARS WERE THE ONLY DETECTOR, FIVE NIGHTS RUNNING (2026-09-14)
+
+The DSP never regressed all day -- it is gated to the bit. Every
+failure the bench suffered (ghost MIDI pin, robot held-map leak,
+refusal-desynced allocators, the held-map hole in the ALLOFF) lived in
+the LIVE layer -- pins, queues, resync -- which had NO instrument. So
+each defect was found by the user listening, one flash at a time, and
+each fix uncovered the next because they all present as the same
+symptom: wrong sound.
+
+Rules. The project's founding rule applies to everything that reaches
+the user, not only the DSP: every layer needs an instrument before it
+needs a fix. The firmware now carries the SILENCE PROBE (decimated
+per-voice peaks of the bank the DAC/wire carries; on chain position 1
+the post-inject bank shows ALL global voices on the one console the
+user reads) and prints a STUCK verdict whenever quiet input meets a
+non-silent bank. SHIP LAW: no image is sent unless its own log proves
+the end state. Corollary of 46: a fix believed N times is not thereby
+proven -- the instrument, not the ear, closes the loop.

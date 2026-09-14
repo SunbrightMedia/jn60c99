@@ -605,6 +605,17 @@ static void sched_note_cost(unsigned long *slot, unsigned long cyc)
 }
 static int           note_nev = 0;
 static unsigned long notes_seen = 0, notes_dropped = 0, note_bursts = 0;
+
+/* ===== THE SILENCE PROBE (SHIP LAW, 2026-09-14) =========================
+ * "Never validate by ear" finally applied to the LIVE layer: the board
+ * measures the bank the DAC/wire actually carries (decimated per-voice
+ * peaks) and the REPORT judges silence -- on position 1 the bank is
+ * POST-INJECT, so all six global voices are visible on the one console
+ * the user reads. A quiet instrument that is not silent prints STUCK,
+ * and no image ships on a log that does not end SILENT. */
+static float         sil_pk[EB_NUM_VOICES]; /* peak |sample| since report */
+static unsigned long sil_prev_notes;
+static int           sil_quiet;
 static unsigned long ev_applied_blocks = 0;   /* blocks that applied events */
 /* The producers' mutex. Declared in main/juno_event_port.h, defined ONCE
  * here, and taken only by submitters -- never by the drain. */
@@ -4181,6 +4192,28 @@ static void rpt_task(void *arg)
                bs_c1_steps, bs_mispredict, bs_cyc_max);
 #endif
 #endif
+#if S3L_CHAIN
+        {   unsigned sp[EB_NUM_VOICES]; int sv2, s_any = 0;
+            for (sv2 = 0; sv2 < EB_NUM_VOICES; ++sv2) {
+                sp[sv2] = (unsigned)(sil_pk[sv2] * 1e6f);
+                if (sp[sv2] > 100u) s_any = 1;      /* > 1e-4 full scale */
+                sil_pk[sv2] = 0.f;
+            }
+            printf("SIL: pk(1e-6) v0=%u v1=%u v2=%u v3=%u v4=%u v5=%u "
+                   "v6=%u v7=%u%s\n", sp[0], sp[1], sp[2], sp[3], sp[4],
+                   sp[5], sp[6], sp[7], s_any ? "" : "  -- SILENT");
+            /* THE VERDICT: quiet input (robot off, no new notes for two
+             * whole report periods) plus a non-silent bank = a stuck
+             * voice, said by the LOG, not by an ear (SHIP LAW). */
+            if (!g_stress_rt && notes_seen == sil_prev_notes) {
+                if (++sil_quiet >= 2 && s_any)
+                    printf("SIL: *** STUCK -- no input for %d s and the "
+                           "bank is NOT silent ***\n",
+                           sil_quiet * S3L_REPORT_SECS);
+            } else sil_quiet = 0;
+            sil_prev_notes = notes_seen;
+        }
+#endif
         printf("B5: dac sent=%lu written=%lu deficit=%ld  (sent>written+6 = TRUE STARVATION; un= cannot see it)\n",
                rpt_dacsent, rpt_written,
                (long)rpt_dacsent - (long)rpt_written);
@@ -5454,6 +5487,20 @@ void app_main(void)
                 }
             }
 #endif
+        }
+#endif
+#if S3L_CHAIN
+        {   int si, sv;
+            /* THE SILENCE PROBE: decimated per-voice peaks of w_vbb[w_cur]
+             * -- on pos 1 that bank is POST-INJECT (all six global voices),
+             * on 2..4 it is the chip's own voices. 16 of 256 samples, 8
+             * voices: ~700 cycles per block, off the per-sample path. */
+            for (si = 0; si < CHUNK; si += 16)
+                for (sv = 0; sv < EB_NUM_VOICES; ++sv) {
+                    float sa = w_vbb[w_cur][si][sv];
+                    if (sa < 0) sa = -sa;
+                    if (sa > sil_pk[sv]) sil_pk[sv] = sa;
+                }
         }
 #endif
         {   int64_t tb = esp_timer_get_time();

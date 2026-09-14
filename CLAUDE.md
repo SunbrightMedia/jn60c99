@@ -221,6 +221,12 @@ with ONE line instead -- paste it verbatim too:
   `python -m esptool --chip esp32s3 -p <PORT> write-flash 0x0 <image>.bin`
 
 # WORKING STYLE
+SHIP LAW (USER-BINDING 2026-09-14, paid in five bench nights): "never
+validate by ear" applies to the LIVE layer too. The firmware carries a
+SILENCE PROBE (SIL: line, per-voice peaks of the shipped bank; STUCK
+verdict when quiet input meets a non-silent bank). No image is sent to
+the user unless its own log proves the end state (storm off -> SILENT).
+The user's ears are never the detector again.
 Simplest fix that holds; reuse proven tables/gates before new machinery. One
 reversible commit per fix; not done until its gate is green. Proceed
 autonomously on reversible work; stop for destructive or scope-changing calls.
