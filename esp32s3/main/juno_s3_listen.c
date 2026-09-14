@@ -4298,11 +4298,22 @@ static void rpt_task(void *arg)
             {   const eb_render_coefs *rcp = REC.rc[REC.cur];
                 int dv2;
                 printf("SILV:");
-                for (dv2 = 5; dv2 < EB_NUM_VOICES; ++dv2)
-                    printf(" v%d[e1=%d e2=%d g=%d]", dv2,
+                for (dv2 = 5; dv2 < EB_NUM_VOICES; ++dv2) {
+                    /* rg = the gate the render actually reads each sample
+                     * (render-state gate_cell320[v], x1000); dg = the DEVICE
+                     * cell 320 it is synced from at publish (x1000). A stuck
+                     * voice with rg!=0 means the all-off's release never
+                     * reached the render gate; dg==0 while rg!=0 pins it to
+                     * the publish-time sync; dg!=0 pins it to the note-off's
+                     * own cell write (index/base). */
+                    const float *dgp = (const float *)ebdev_at_v(dv2, 320u);
+                    printf(" v%d[e1=%d e2=%d rg=%d dg=%d g=%d]", dv2,
                            (int)(RS->env[dv2][0].y * 1000.f),
                            (int)(RS->env[dv2][1].y * 1000.f),
+                           (int)(RS->gate_cell320[dv2] * 1000.f),
+                           dgp ? (int)(*dgp * 1000.f) : -1,
                            rcp ? (int)(rcp->cvg_gate_off[dv2] * 1000.f) : -1);
+                }
                 printf("\n");
             }
             /* THE VERDICT: quiet input (robot off, no new notes for two
