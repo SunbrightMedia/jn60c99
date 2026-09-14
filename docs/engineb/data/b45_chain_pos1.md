@@ -561,3 +561,21 @@ ROUND 4 (staged): the ROM streaming CRC. PREDICTION: pos4 ~5,55-5,62x
 and the drain). After this log: the remaining pos3/4 reservoir is the
 i2s driver copy path (read+write ~8 KB/block through the driver) --
 the last named exact lever before protocol-level redesign.
+
+## LOG 639df2a8: ROM CRC MOVED NOTHING -- THE TAIL IS NOT CRC-BOUND
+## (2026-09-14)
+
+MEASURED: pos1 5,441 GREEN, pos2 5,408 drift -6 GREEN AND HOLDING;
+pos3 5,950 (unchanged to the cycle), pos4 5,743 (unchanged). The ROM
+swap -- bench-predicted -100..200 -- delivered ZERO on the boards that
+needed it. Two crc predictions have now died on silicon (slicing +177,
+rom +-0). CONCLUSION, and it is a lesson as much as a number: the
+~440-cyc tail is NOT crc-bound, and no further lever will be picked by
+a model. ROM crc stays (not slower, boot-proven equal).
+
+ROUND 5 (staged): TAT -- the tail named by CCOUNT stamps (rx / merge /
+tx / ctl / at-rest advance), printed per sample with each report. A
+measurement flash: its log picks the final lever for pos3/4 by name.
+Suspects, ranked blind: the i2s driver copy inside s3c_tx's write and
+s3c_rx's read; the at-rest advance (6 sleeping voices' wavetable
+phases, core 0); the drain/judge body. After TAT the pick is not blind.
