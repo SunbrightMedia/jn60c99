@@ -3676,6 +3676,16 @@ static void render_block(int n)
          * it triggers, so this is silence-until-you-play, not a mute. Just a
          * flag here -- no RS or device write -- so it cannot race core 1. */
         g_hush_mask = (1u << EB_NUM_VOICES) - 1u;
+        /* DISCARD BUFFERED INPUT. ev_apply cannot drain while this all-off
+         * burst is in flight (note_pending), so the storm's last note-ONs sit
+         * in the ring and, the moment the burst finishes, un-hush the very
+         * voices just hushed -- the bench proved it (VERSION 20260914141801:
+         * atrest settled at 0x0f, voices 4..7 un-hushed, v7 drone survived).
+         * An all-off means silence NOW; a note queued before it is not a new
+         * key press. Flush the ring so nothing stale clears the hush. */
+        {   juno_event evd[EV_DRAIN_MAX];
+            while (juno_event_drain(evd, EV_DRAIN_MAX) > 0) { }
+        }
     }
 #endif
     if (dev_want && !dev_muted) {
