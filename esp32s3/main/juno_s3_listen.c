@@ -4282,6 +4282,29 @@ static void rpt_task(void *arg)
                        g_alloff_fired, g_alloff_want, arm,
                        burst_state, note_pending, dev_gate);
             }
+            /* SILV (2026-09-14): resolve the residual POS1 v5..v7 floor.
+             * Prints, per sticking voice, its two envelope integrators
+             * (e1=ENV1.y, e2=ENV2.y, the VCA env -- x1000) and the PUBLISHED
+             * gate-off coefficient (g, cell 544, x1000) the render actually
+             * reads. This separates the three hypotheses without an ear:
+             *   e2 steady non-zero + g gated  -> the all-off never released
+             *                                    this voice (cell write missed
+             *                                    or rebuild used stale cells);
+             *   g released but e2 non-zero    -> the release envelope does not
+             *                                    decay to 0 (a coef/rate bug);
+             *   e2 ~0 but SIL non-zero        -> the floor is post-VCA (merge,
+             *                                    self-osc, or a stale inject).
+             * env[v][0]=ENV1, [1]=ENV2 (eb_engine.c). Read-only; no state. */
+            {   const eb_render_coefs *rcp = REC.rc[REC.cur];
+                int dv2;
+                printf("SILV:");
+                for (dv2 = 5; dv2 < EB_NUM_VOICES; ++dv2)
+                    printf(" v%d[e1=%d e2=%d g=%d]", dv2,
+                           (int)(RS->env[dv2][0].y * 1000.f),
+                           (int)(RS->env[dv2][1].y * 1000.f),
+                           rcp ? (int)(rcp->cvg_gate_off[dv2] * 1000.f) : -1);
+                printf("\n");
+            }
             /* THE VERDICT: quiet input (robot off, no new notes for two
              * whole report periods) plus a non-silent bank = a stuck
              * voice, said by the LOG, not by an ear (SHIP LAW). */

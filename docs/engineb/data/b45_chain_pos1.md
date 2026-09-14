@@ -837,3 +837,37 @@ CRC was redundant and incompatible with silence (the oracle sounds the
 chord). OWED, recorded not forgotten: a boot-time on-silicon CRC sweep
 of all 64 patches (held, checked, never published live) would restore
 full on-silicon recall proof without a runtime drone.
+
+## GATE=1 SHIPPED (VERSION 20260914125923): 3 OF 4 SILENT; POS1 v7 FLOOR
+## REMAINS -- A SECOND, DIFFERENT STUCK SOURCE (2026-09-14)
+
+The gate=1 choke fix WORKED for what it targeted: POS2/POS3/POS4 read
+SILENT the whole run (SIL all-zero), and POS1's SILDIAG now shows gate=1
+(the recall no longer holds its chord). The recall-chord drone is gone.
+
+POS1 still fails SHIP LAW: after robot-off its own voice 7 decays
+(90492 -> 41032 -> 14631) then FLOORS at ~14585 (1e-6 units, ~-37 dB)
+and stays there for 70+ s. All input counters FREEZE at robot-off
+(midi=273, nb, bst all constant from t=60), so this is NOT spurious
+re-gating -- it is a ONE-TIME stuck that the all-off does not clear.
+alloff_fired=1 (the panic ran), notepend=0 (the note burst finished),
+yet v7 sustains. The engine reads only PUBLISHED coefficients, so a
+steady non-zero v7 means either the all-off never published a RELEASED
+set for POS1's own rendered voice, or the release envelope does not
+reach 0. Distinguishing the two needs the state the SIL line cannot
+show, so VERSION 20260914131913 adds SILV: per sticking voice it prints
+ENV1.y, ENV2.y (the VCA env) and the published cvg_gate_off (cell 544).
+
+Also seen: POS1 SLACK spin=7/7 (0 free cyc), G4 worst=14375us, B5
+deficit=120 -- POS1 is at/over budget under the storm. That is the known
+"18 patches do not hold real time" budget wall, a SEPARATE problem from
+the stuck voice; a hand player does not storm. The stuck voice after
+IDLE is the dealbreaker and is what SILV chases next.
+
+Note: the WAKE mask (0xFC) forces voices 2..7 awake EVERY block
+(line ~5290), so a released voice never sleeps -- it renders its residual
+forever. Followers reach exactly 0 so their forced-awake voices are
+silent; POS1's last patch leaves voice 7 at a floor. A dynamic at-rest
+(respect eb_env_atrest, which is EXACTLY-0 and never cuts a tail) is the
+right long answer but will not silence a voice whose env is NOT at 0 --
+which is why SILV must say first whether the env is at 0 or not.
