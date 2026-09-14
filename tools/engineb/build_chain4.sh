@@ -73,3 +73,8 @@ for POS in "$@"; do
     ( cd "$OUT" && sha256sum *.bin > SHA256SUMS )
     echo "staged -> $OUT"
 done
+# THE UNATTENDED BENCH watches this file (tools/bench/bench.py): a new
+# value = the PC flashes and tests by itself. Written ONLY after every
+# requested position staged, so a partial build never triggers a flash.
+date -u +%Y%m%d%H%M%S > "$REPO/esp32s3/flash/chain4/VERSION.txt"
+echo "VERSION -> $(cat "$REPO/esp32s3/flash/chain4/VERSION.txt")"
