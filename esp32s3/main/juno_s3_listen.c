@@ -539,6 +539,13 @@ static void load_coefs(int n, int g)
 static eb_alloc      ALLOC;
 static eb_alloc_ev   ALLOC_EV[EB_ALLOC_MAX_EV];
 static volatile int  note_pending = 0;   /* events are queued, a burst is owed */
+#if S3L_CHAIN
+/* THE HUSH MASK -- the render-level all-off (see the panic that sets it and
+ * the voice-cap that applies it). Declared early because the note-on drain
+ * un-hushes a voice the instant it is triggered. bit v set = force voice v
+ * at-rest, so w_vbb[..][v] is EXACTLY 0 whatever its device gate says. */
+static volatile unsigned g_hush_mask = 0u;
+#endif
 /* set by the console `t` key, consumed once in the block loop: stall one block
  * on purpose so this build's overrun detector is SEEN TO FIRE. */
 static volatile int  tooth_once = 0;
@@ -2087,16 +2094,8 @@ static int  con_base = 60;              /* middle C */
  * No queue, so nothing can refuse it. Runs on EVERY board. */
 static volatile int g_alloff_want = 0;
 static unsigned long g_alloff_fired = 0;   /* DIAG: panic executions */
-/* THE HUSH MASK -- the render-level all-off that CANNOT be out-run by the
- * device gate. bit v set = force voice v at-rest (the render skips it, so
- * w_vbb[..][v] is exactly 0). Set for every voice on an all-off; a voice is
- * un-hushed the instant a note-on TRIGGERS it, so a player hears the note
- * they press and nothing else. This is the SHIP-LAW guarantee: a released
- * gate that never reached scat[v] (bench VERSION 20260914135606: rg=dg=1.0
- * stuck on the rendered voice) still goes SILENT, because at-rest is decided
- * in RS, downstream of the gate. The persistent-gate defect is still owed
- * (SILV keeps reporting rg/dg), but no drone survives a hush. */
-static volatile unsigned g_hush_mask = 0u;
+/* g_hush_mask (the render-level all-off) is declared up by note_pending,
+ * because the note-on drain un-hushes a voice as it is triggered. */
 #endif
 /* The console-settable split. Declared here because the console reader below
  * writes it and is defined before the block that explains it; the reasoning
