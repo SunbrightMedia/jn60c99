@@ -1016,3 +1016,25 @@ plugin: a parameter edit no longer broadcasts note state.
 (v7 SILV still prints e2=5974 -- a FROZEN env value, because the hush holds
 the voice at-rest so it is never ticked; with the gate released it would
 decay to 0 once ticked. Next build demotes the hush to prove that.)
+
+## PROVEN STANDALONE (VERSION 20260914204047, log 20260914_134545): HUSH
+## OFF, STILL SILENT
+
+Built -DS3L_HUSH=0 (render-level all-off disabled) so ONLY the pm_apply
+note-state preserve keeps the storm quiet. POS1 SILV after the storm:
+  v5[e1=0 e2=0 rg=0 dg=0]  v6[..0..]  v7[e1=0 e2=0 rg=0 dg=0]
+gate released AND envelope decayed to 0 -- the voice is genuinely silent,
+not masked. SILDIAG atrest=03 (NOT ff) confirms the hush did nothing.
+All four boards SILENT, STUCK=0. The root cure stands ALONE. The mask is a
+pure belt (S3L_HUSH=1 default), and SILV rg/dg see the gate THROUGH it, so
+a future regression is still caught even with the belt on.
+
+NEXT (user directive 2026-09-14 "make it bit-exact against the plugin,
+route controls through it"): the plugin's live param edit is
+juno_apply_param_leaf (src/juno_apply.c) -- per-cell write + broadcast_cell
+of ONLY the edited cell, already with a gated EB_DEVCELLS arm in
+devrecall_gate.py. The device's pm_apply re-runs the whole recall instead.
+Route dev_param_edit through juno_apply_param_leaf so the param WRITE is the
+plugin's own, then rebuild only the affected coefficients (the device bakes;
+the plugin reads cells per sample). The note path already uses juno_note_*
++ eb_alloc (the plugin's own, gated). Audit both end to end.
