@@ -154,11 +154,12 @@ mine is a hypothesis (playbook 80).
   playbook 91-92 + the b45 log (pin theft, ms-vs-ticks pacer, discard
   starvation, torn-judge, gate-on-heal, cushion partial). Bench runs are
   ONE bat file (esp32s3/flash/chain4/run_test.bat -> chain4_log.txt).
-  OPEN: hops 2<-3 / 3<-4 limited ONLY by capacity -- pos3/pos4 core-0 e0
-  measures 6,115-6,170 us per block IDLE on patch 0 vs the 5,804 budget
-  while pos1 (voice+chorus+master) runs less; NOT attributed. Next:
-  attribute pos4 core 0 (lightest failing case), then re-balance or fix;
-  then notes-on chord-6 gate; then the seeded soak.
+  THE CHAIN PLAYS (b45 log, 2026-09-14, log 4cf17ca4): ALL FOUR boards
+  under budget THROUGH the robot+seeded storm, 51 patch changes, no
+  freeze, un frozen, mix=OPEN, deficits frozen -- one flash. Engine:
+  uniform CR per the user's order (+FPDIV, +VCA pipes, +LFO trim, ROM
+  crc). OWED: the 1-hour soak RUN (same image), soak layer 3 (fault
+  injection), worst-patch numbers into FINAL_GUIDE.
 - **Hardware (user-directed)**: MasterAudio 4-slot carrier board for N16R8
   DevKitC-1 boards (JLCPCB/LCSC). The user draws the schematic by hand;
   docs/hardware/ holds the connection reference, PCB placement notes, and

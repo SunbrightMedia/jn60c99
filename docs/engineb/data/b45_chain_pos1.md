@@ -618,3 +618,29 @@ claim was wrong and is corrected here). FLASH #1 = CR uniform + FPDIV
 cyc<=5,442 with drift flat THROUGH the storm phases, un=0, mix=OPEN
 sustained, no freeze at any patch. If heavy patches still poke over,
 the one prepared knob is deeper CR periods (NC/NE=4) -- flash #2.
+
+## LOG 4cf17ca4 -- FLASH #1 VERDICT: THE SYNTH WORKS (2026-09-14)
+
+The acceptance criteria written before the flash, against the log:
+- cyc under 5,442 on ALL FOUR boards THROUGH the storm: POS1
+  4,941-5,140 / POS2 5,380-5,420 / POS3 5,255-5,404 / POS4 5,388-5,427.
+- drift FLAT the whole run: -16 / -8 / +52-frozen / -9. gap = block
+  period on every chip (the healthy signature).
+- un=0 on 1/2/4; POS3 un=3 at t=10 and FROZEN there (boot transient;
+  its HEALTH latch records the same instant).
+- B5 deficits FROZEN at their boot values (122/123/145/118).
+- mix=OPEN sustained on every hop; bad 65-129 of ~15,400 (organic
+  seams); pat_disc frozen after lock.
+- THE STORM RAN: 51 patch changes, robot phases + the SEEDED layer
+  (seed 4a554e4f, ledger on=13 off=10 patch=1 gapblk=281 -- replayable),
+  MIDI in on POS1, nb=211,150 note blocks. NO freeze at any patch --
+  the patch-48 class is INSIDE budget on the uniform CR engine.
+- EVQ-refused latches on 2/4 = the queue refusing a flood, documented
+  benign.
+
+SIX VOICES, FULL PANEL (delay+reverb+chorus live on chip 1), FOUR
+CHIPS, ONE FLASH TONIGHT. Sound standard: the fork's sonic-gated CR
+engine on all voices, by the user's binding order -- not bit-exact,
+uniformly so. STILL OWED before "shipped": the 1-hour soak (a RUN of
+this same image, no new flash), soak layer 3 (fault injection), and
+the formal worst-patch sweep numbers into FINAL_GUIDE.
