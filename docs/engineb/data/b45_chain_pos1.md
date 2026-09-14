@@ -1157,3 +1157,34 @@ the board is at fault, independent of this change; if it matches, the board is
 marginal and the binary exposes it. Not re-flashing further from here; flagged
 to the user. The param fix itself is proven on host AND on 3/4 boards with real
 note traffic.
+
+## ROOT CAUSE FOUND: POS4 MUTE WAS A .bss LAYOUT SHIFT, NOT THE PARAM CODE
+## (2026-09-14, fix dafac3b + VERSION 20260914224417)
+
+NOT a board fault, NOT the coefficient logic. From the pos4 link map:
+ - The plugin-leaf edit set added ~142 B of globals (two 59-B value arrays +
+   two masks + two flags). In internal .bss they sort BELOW the voice-coef
+   buffer RCB, so they pushed RCB UP ~142 B: 0x3fcaf854 -> 0x3fcaf8e8.
+ - On POS4 the new RCB address covered a bad INTERNAL-DRAM cell. The boot
+   voice-coef CRC read back wrong (chip rc=ebdfa32b vs host c6c5d9aa) and the
+   board muted. Deterministic (same value 3 runs, survived a power-cycle),
+   POS4-only, and the master coefs MATCHED -- they read the PSRAM cell array,
+   so the fault is DRAM, not PSRAM, and not the inputs.
+ - 204047 (RCB 142 B lower) matched on the SAME POS4 board; the other three
+   boards' DRAM is good at the higher address.
+
+THE TELL: master coefs match + voice coefs wrong = an OUTPUT-buffer (RCB)
+corruption, not an input or logic error. The map then shows what moved RCB.
+
+FIX (zero internal-DRAM growth, so RCB stays where every board is known good):
+ - drop the two pm_leaf_val[] byte arrays; pm_apply decodes the edited byte
+   from the DEVBANK record (dev_param_edit already wrote it -- pm_leaf_byte()).
+ - move pm_leaf_pend/run + pm_nonleaf_pend/run to PSRAM (EXT_RAM_BSS_ATTR);
+   cold param path only, never per sample.
+Verified on host: no pm_leaf_* in internal DRAM; RCB back at 0x3fcaf854;
+devparam gate green. The plugin-leaf param path is UNCHANGED in behaviour.
+
+PLAYBOOK LESSON: adding a global near large audio buffers can push one onto a
+marginal cell on ONE board and mute it deterministically. Keep cold new state
+in PSRAM; watch the map when .bss grows. A per-board deterministic CRC miss
+whose sibling (master) matches is a moved-buffer smell, not "flaky silicon".
