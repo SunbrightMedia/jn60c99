@@ -144,7 +144,16 @@ Two images from one source (`make` = GATE, `make JUNO_PLAY=1` = PLAY):
   builds clean, and the gates prove the samples it will emit are the plugin's.
 
 Every scenario was first re-proven ARM-bit-exact under qemu-user (64 patches +
-5 storms, identical header), then on the metal.
+5 storms, identical header), then ON THE METAL:
+```
+PATCHES: 64/64 identical to the plugin
+STORMS:  5/5 identical to the plugin   (each chunk-invariant)
+BIT-EXACT RESULT: 69/69 scenarios
+FULL SYNTH BIT-EXACT ON BARE METAL — ALL SCENARIOS — EXACT WAVEFORM MATCH
+```
+Note: run the gate on `-M raspi3b` (1 GB). The 64x engine create/destroy
+thrashes QEMU's 512 MB `raspi3ap` under TCG — an EMULATION limit only (each
+create frees before the next, so real 512 MB hardware is fine). Same BCM2837.
 
 ## NEXT (open, in order)
 1. ~~Circle build; boot to metal.~~ **DONE.**

@@ -54,6 +54,8 @@ void run_juno_bitexact (void)
 		else log->Write ("juno", LogNotice,
 			"patch %2d  hash %016llx  !! DIFF (want %016llx)",
 			PATCH_REF[i].patch, h, PATCH_REF[i].hash);
+		if ((i & 7) == 7) log->Write ("juno", LogNotice,
+			"  ..patches %d/%d done", i + 1, NPATCH);
 	}
 	log->Write ("juno", LogNotice, "PATCHES: %d/%d identical to the plugin",
 		    pass, NPATCH);

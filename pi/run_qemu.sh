@@ -16,7 +16,11 @@ set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CIRCLE="$HERE/circle"
 PREFIX=aarch64-linux-gnu-
-MACH="${1:-raspi3ap}"          # raspi3ap = Pi 3A+ (prototype); raspi3b also works
+# Default raspi3b (1 GB): the all-scenarios gate creates/destroys the engine's
+# 12 MB state 64x, which thrashes QEMU's 512 MB raspi3ap under TCG (an emulation
+# limit, not a real-hardware one — each create frees before the next). Both are
+# the same BCM2837. Pass raspi3ap for the lighter boot/PLAY identity check.
+MACH="${1:-raspi3b}"
 OUT="${TMPDIR:-/tmp}/juno_boot_${MACH}.txt"
 
 echo ">> build the engine archive (proven bit-exact flags) + embed bank"
@@ -28,8 +32,8 @@ make -C "$CIRCLE/lib" -j"$(nproc)" >/dev/null
 make -C "$CIRCLE/lib/sound" -j"$(nproc)" >/dev/null
 make -C "$HERE/kernel" clean >/dev/null 2>&1 || true
 make -C "$HERE/kernel" >/dev/null          # GATE image (bit-exact probe)
-echo ">> boot on -M $MACH (rendering the engine under TCG; up to 90 s)"
-timeout 90 qemu-system-aarch64 -M "$MACH" -kernel "$HERE/kernel/kernel8.img" \
+echo ">> boot on -M $MACH (rendering all scenarios under TCG; up to 240 s)"
+timeout 240 qemu-system-aarch64 -M "$MACH" -kernel "$HERE/kernel/kernel8.img" \
     -serial "file:$OUT" -serial null -display none < /dev/null > /dev/null 2>&1 || true
 
 echo "---------------- UART ----------------"
