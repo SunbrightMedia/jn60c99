@@ -627,6 +627,53 @@ static float         sil_pk[EB_NUM_VOICES]; /* peak |sample| since report */
 static unsigned long sil_prev_notes;
 static int           sil_quiet;
 static unsigned long ev_applied_blocks = 0;   /* blocks that applied events */
+
+/* ===== S3L_KEYLAT: THE KEY-TO-DAC LATENCY PROBE (2026-09-15) =============
+ * "Never validate by ear" for the LATENCY the player feels. The bench and
+ * the KEYH counter only measure note EVENT -> engine PUBLISH; they do not
+ * see the chain transit for a voice that lives on a remote board, nor the
+ * attack envelope's own rise. This probe times a HAND-PLAYED note (console
+ * or keybed, storm OFF) from SUBMIT to the moment its audio actually reaches
+ * POS1's post-inject bank -- at TWO thresholds:
+ *   lo = first non-zero sample: the voice is SOUNDING (transport + event
+ *        path measured; an attack rising from 0 crosses this at once).
+ *   hi = first AUDIBLE sample: the perceived onset (a slow attack pushes
+ *        this out even when lo is immediate).
+ * lo small + hi large  => the PATCH's attack envelope (not a defect).
+ * lo AND hi large       => the chain/event transport (the defect).
+ * POS1 only: only the DAC board sees all six global voices post-inject. The
+ * slot map matches s3_chain_inject: v2,3 -> slot 3; v4,5 -> slot 5;
+ * v6 -> slot 6; v7 -> slot 7 (POS1-local). Idle cost is ~0: peaks are
+ * scanned only for slots with a note in flight. */
+#ifndef S3L_KEYLAT
+#define S3L_KEYLAT 0
+#endif
+#if S3L_KEYLAT && S3L_CHAIN && (S3_CHAIN_POS == 1)
+#define KLAT_LO 1e-6f          /* "sounding": above the render's own floor  */
+#define KLAT_HI 1e-2f          /* "audible": a level a player would hear     */
+static int64_t  klat_t0[EB_NUM_VOICES];   /* submit time per slot, -1 idle   */
+static unsigned char klat_st[EB_NUM_VOICES]; /* 0 idle,1 wait-lo,2 wait-hi   */
+static int      klat_note[EB_NUM_VOICES];    /* diag: the midi note          */
+static int klat_slot_of_voice(int v)
+{
+    if (v == 2 || v == 3) return 3;
+    if (v == 4 || v == 5) return 5;
+    if (v == 6)           return 6;
+    if (v == 7)           return 7;
+    return -1;
+}
+/* Called from the note drain when a HAND-PLAYED note-on gets a voice. */
+static void klat_arm(int voice, int note)
+{
+    int s = klat_slot_of_voice(voice);
+    if (s < 0) return;
+    klat_t0[s]   = esp_timer_get_time();
+    klat_st[s]   = 1;
+    klat_note[s] = note;
+    printf("KEYLAT: arm note=%d voice=%d slot=%d\n", note, voice, s);
+}
+#endif
+
 /* The producers' mutex. Declared in main/juno_event_port.h, defined ONCE
  * here, and taken only by submitters -- never by the drain. */
 portMUX_TYPE juno_evq_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -2101,6 +2148,19 @@ static int ev_apply(void)
             for (j = nev; j < nev + n; ++j)
                 if (ALLOC_EV[j].kind == EB_EV_TRIGGER && ALLOC_EV[j].voice >= 0)
                     g_hush_mask &= ~(1u << ALLOC_EV[j].voice);
+        }
+#endif
+#if S3L_KEYLAT && S3L_CHAIN && (S3_CHAIN_POS == 1)
+        /* Arm the latency probe for a HAND-PLAYED note-on only (console or
+         * keybed), and only when the robot storm is OFF so its own notes are
+         * never timed. The TRIGGER event names the voice the allocator chose;
+         * its board decides how far the sound must travel. */
+        if (ev[i].kind == JUNO_EV_NOTE_ON && !g_stress_rt
+            && (ev[i].src == JUNO_SRC_CONSOLE || ev[i].src == JUNO_SRC_KEYBED)) {
+            int j;
+            for (j = nev; j < nev + n; ++j)
+                if (ALLOC_EV[j].kind == EB_EV_TRIGGER && ALLOC_EV[j].voice >= 0)
+                    klat_arm(ALLOC_EV[j].voice, ev[i].a);
         }
 #endif
         if (n > 0) nev += n;
@@ -5782,6 +5842,34 @@ void app_main(void)
                     if (sa < 0) sa = -sa;
                     if (sa > sil_pk[sv]) sil_pk[sv] = sa;
                 }
+#if S3L_KEYLAT && (S3_CHAIN_POS == 1)
+            /* KEY-TO-DAC LATENCY: for each slot with a note in flight, this
+             * chunk's peak (same decimated scan) crossing lo/hi prints the
+             * milliseconds since submit. Costs nothing while nothing is armed. */
+            for (sv = 0; sv < EB_NUM_VOICES; ++sv) {
+                float pk; int j;
+                if (klat_st[sv] == 0) continue;
+                pk = 0.0f;
+                for (j = 0; j < CHUNK; j += 16) {
+                    float sa = w_vbb[w_cur][j][sv];
+                    if (sa < 0) sa = -sa;
+                    if (sa > pk) pk = sa;
+                }
+                if (klat_st[sv] == 1 && pk > KLAT_LO) {
+                    long ms = (long)((esp_timer_get_time() - klat_t0[sv]) / 1000);
+                    printf("KEYLAT: note=%d slot=%d SOUNDING lo=%ld ms\n",
+                           klat_note[sv], sv, ms);
+                    klat_st[sv] = 2;
+                }
+                if (klat_st[sv] == 2 && pk > KLAT_HI) {
+                    long ms = (long)((esp_timer_get_time() - klat_t0[sv]) / 1000);
+                    printf("KEYLAT: note=%d slot=%d AUDIBLE hi=%ld ms  "
+                           "(lo=transport+event, hi-lo=attack envelope)\n",
+                           klat_note[sv], sv, ms);
+                    klat_st[sv] = 0;
+                }
+            }
+#endif
         }
 #endif
         {   int64_t tb = esp_timer_get_time();
