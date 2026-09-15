@@ -65,10 +65,40 @@ caught by the gate before silicon.
 4× 1.4 GHz Cortex-A53. Budget is comfortable; the S3's problem was never the
 DSP cost, it was the invented transport.
 
+## BOOT STEP — DONE (2026-09-15)
+Circle Step51 is a pinned submodule at `pi/circle`. The platform glue is
+`pi/kernel/` (~150 lines total): `kernel.{h,cpp}` boot to metal, init UART +
+timer, print a banner; `main.cpp` is the Circle entry; `bare_stubs.c` is the
+one shim the `aarch64-linux-gnu-` toolchain needs (`__getauxval` → 0, selects
+the portable atomic path; Circle upstream uses `aarch64-none-elf-` and has no
+such call). `build.sh` makes the hardware image; `run_qemu.sh` is the gate.
+
+RUN-PROOF (not "it built" — it BOOTS AND RUNS): the `--qemu` variant booted on
+the emulated **Pi 3A+** (`qemu-system-aarch64 -M raspi3ap`, the exact prototype
+board, BCM2837), captured UART:
+
+```
+logger: Circle 51 started on Raspberry Pi 3 Model A+ 512MB (AArch64)
+00:00:00.56 juno: JUNO bare-metal bring-up — BOOT OK
+00:00:00.56 juno: Circle on Raspberry Pi 3 Model A+
+00:00:00.56 juno: SoC BCM2837, 512 MB RAM, 4 cores
+00:00:01.00 juno: alive t=1 ... t=5
+00:00:05.00 juno: BOOT PROOF COMPLETE — halting.
+```
+
+The kernel reaches our code, reads the SoC/RAM/cores correctly, runs a 5-beat
+heartbeat, and halts clean. Same source also builds the hardware `kernel8.img`
+(one image serves Zero 2 W / 3A+ / 3B). Repeat: `sh pi/run_qemu.sh raspi3ap`.
+
+Container deps (ephemeral): `apt-get install -y gcc-aarch64-linux-gnu
+g++-aarch64-linux-gnu qemu-system-arm`.
+
 ## NEXT (open, in order)
-1. Circle build system for BCM2837; boot to metal, blink, UART.
+1. ~~Circle build system for BCM2837; boot to metal, UART.~~ **DONE (above).**
 2. I2S DAC output driver (48/44.1 kHz) → the render callback pulls
-   `juno_gui_render` into the DMA ring.
+   `juno_gui_render` into the DMA ring. NOTE: the engine is C99 + libm
+   (expf/fabsf). On bare metal, link it against Circle's math (`addon/`) or
+   newlib; prove the same bit-exact hash on-metal as the qemu-user run.
 3. Input: GPIO keys/octave/pots (same panel law as S3 `S3L_PANEL`), MIDI-in.
 4. SIGNAL-level gate: device output CRC + a DISCONTINUITY/tick metric vs the
    host render. The S3 tick passed every state gate because NO gate watched the
