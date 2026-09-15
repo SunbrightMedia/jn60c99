@@ -1488,6 +1488,14 @@ static int dev_burst_step(void)
 #ifndef S3L_STRESS
 #define S3L_STRESS 0
 #endif
+/* SOAK IMAGE ONLY (default OFF). With S3L_SOAK_AUTOSTORM=1 the robot storm is
+ * PINNED ON from boot on the chain leader -- no console 'r' needed -- so a
+ * single remote flash gives an unbroken sustained-load run. The 'r' handler
+ * ignores toggles under this flag. This is a soak build; a shipped instrument
+ * must boot quiet, so it is never set on a shipping image. */
+#ifndef S3L_SOAK_AUTOSTORM
+#define S3L_SOAK_AUTOSTORM 0
+#endif
 #if S3L_STRESS
 /* defined below -- the robot drives the patch as well as the keys, and this is
  * the only forward reference in the file. */
@@ -2255,6 +2263,9 @@ static void con_poll(void)
         if (c == 't') { tooth_once = 1; continue; }
         /* r -- the robot keybed ON/OFF. See the gate at stress_step(). */
         if (c == 'r') {
+#if S3L_STRESS && S3L_SOAK_AUTOSTORM
+            continue;   /* soak image: storm pinned ON, ignore 'r' toggles */
+#endif
             g_stress_rt = !g_stress_rt;
             printf("ROBOT: %s -- %s\n", g_stress_rt ? "ON" : "OFF",
                    g_stress_rt ? "worst-case stress is running"
@@ -4933,6 +4944,14 @@ void app_main(void)
     else
         printf("PLAY: boot chord released. The board is SILENT until you play "
                "a key. Patch stepping is OFF.\n");
+#endif
+#if S3L_STRESS && S3L_SOAK_AUTOSTORM
+    /* SOAK: pin the storm ON from boot (continuous worst-case stress), so a
+     * remote flash alone runs a sustained-load soak with no console keypress.
+     * Only the chain leader (S3L_STRESS) drives it; the followers take their
+     * notes from the chain as always. */
+    g_stress_rt = 1;
+    printf("SOAK: auto-storm ON at boot -- continuous worst-case stress.\n");
 #endif
 #else
     load_coefs(CH, 0);
