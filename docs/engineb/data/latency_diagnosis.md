@@ -63,3 +63,29 @@ stays bit-exact; only the fork transport is tuned.
 So when the user steps to a pad (e.g. 36/48/56), the note ramps to full over
 ~1 s and FEELS like input lag, though it starts sounding at ~10 ms. This is
 authentic JUNO behaviour, not a defect. The boot patch (0) is punchy.
+
+## FIX (2026-09-15) -- validated on silicon, VERSION 20260915074035
+Root cause: POS1 (DAC board) renders 1 voice + full FX + master with ~0 burst
+budget (SCHED slack=7). A note's rebuild is 2 heavy steps (events + the voice);
+eb_sched deferred each up to SCHED_STARVE=64 blocks before forcing -- 2x64=128
+blocks = 743 ms. The KEYLAT wait trace proved it: voice 7 awake (atrest=0),
+un-hushed (hush=0), silent (pk=0) for exactly 128 blocks. Note 60 = the C key
+maps to voice 7, so every C press lagged 743 ms.
+
+Two POS1-only changes (juno_s3_listen.c):
+ 1. nb_begin scopes the note rebuild to POS1's local voice window
+    [S3L_VOICE_LO, EB_NUM_VOICES); the injected voices are never rendered here,
+    so building their coefficients was pure waste. A note is now <= 2 steps.
+ 2. The note-step runs even with no burst budget; the ~0.65 ms overrun is
+    absorbed by the 35 ms DAC DMA buffer.
+
+RESULT on silicon: voice 7 (C key) 743 ms -> **12 ms**. un=0 (no underrun),
+drift=-3 stable, B4 note-misses frozen at 2 (one-time, not per-note), CRC
+0 bad -- MATCH (recall still bit-exact). Boot CRC uses the full rebuild, so it
+is unaffected.
+
+OPEN (secondary): remote voices (POS2-4) are mostly 0-6 ms but show rare
+multi-second outliers under the self-timer -- followers have ample slack
+(SCHED slack ~60000), so this is NOT rebuild starvation; it points at the
+event-chain / transport (a dropped note-on resyncs only on the next event).
+Tracked separately from the (now fixed) local-voice latency.
