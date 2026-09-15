@@ -662,6 +662,7 @@ extern volatile int g_stress_rt;
 EXT_RAM_BSS_ATTR static int64_t  klat_t0[EB_NUM_VOICES];   /* submit time/slot */
 EXT_RAM_BSS_ATTR static unsigned char klat_st[EB_NUM_VOICES]; /* 0,1 lo,2 hi   */
 EXT_RAM_BSS_ATTR static int      klat_note[EB_NUM_VOICES];    /* diag midi note */
+EXT_RAM_BSS_ATTR static unsigned long klat_wait[EB_NUM_VOICES]; /* blocks armed */
 static int klat_slot_of_voice(int v)
 {
     if (v == 2 || v == 3) return 3;
@@ -678,6 +679,7 @@ static void klat_arm(int voice, int note)
     klat_t0[s]   = esp_timer_get_time();
     klat_st[s]   = 1;
     klat_note[s] = note;
+    klat_wait[s] = 0;
     printf("KEYLAT: arm note=%d voice=%d slot=%d\n", note, voice, s);
 }
 
@@ -5913,10 +5915,24 @@ void app_main(void)
                     if (sa < 0) sa = -sa;
                     if (sa > pk) pk = sa;
                 }
+                if (klat_st[sv] == 1 && pk <= KLAT_LO) {
+                    /* TRACE the wait: why is an ARMED, allocated voice still
+                     * silent? Print its render gate every 32 blocks so a long
+                     * wait shows whether the voice is at-rest (hush/wake) or
+                     * awake-but-gate-off (envelope). EBE.v holds the live
+                     * render state; g_hush_mask is the render-level all-off. */
+                    if ((klat_wait[sv]++ & 31u) == 0u)
+                        printf("KEYLAT: wait slot=%d blk=%lu pk=%.6f atrest=%d "
+                               "hush=%d\n", sv, klat_wait[sv] - 1, (double)pk,
+                               (int)EBE.v[sv].atrest,
+                               (int)((g_hush_mask >> sv) & 1u));
+                }
                 if (klat_st[sv] == 1 && pk > KLAT_LO) {
                     long ms = (long)((esp_timer_get_time() - klat_t0[sv]) / 1000);
-                    printf("KEYLAT: note=%d slot=%d patch=%d SOUNDING lo=%ld ms\n",
-                           klat_note[sv], sv, dev_patch, ms);
+                    printf("KEYLAT: note=%d slot=%d patch=%d SOUNDING lo=%ld ms "
+                           "(waited %lu blk)\n",
+                           klat_note[sv], sv, dev_patch, ms, klat_wait[sv]);
+                    klat_wait[sv] = 0;
                     klat_st[sv] = 2;
                 }
                 if (klat_st[sv] == 2 && pk > KLAT_HI) {
