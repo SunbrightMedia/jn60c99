@@ -50,14 +50,28 @@ void juno_enable_hw_ftz(void)
 }
 int juno_hw_ftz_available(void) { return 1; }
 #elif defined(__ARM_FP) && !defined(__EMSCRIPTEN__)
-/* ARM VFP/Cortex-M (the Teensy 4.x target): set FPSCR bit 24 (FZ) for flush-to-zero.
- * ARM's FZ covers both denormal inputs and outputs, so it is the DAZ+FTZ equivalent. */
+/* ARM VFP: set the FZ bit for flush-to-zero -- denormal inputs AND outputs -> 0,
+ * which is the DAZ+FTZ equivalent of x86, so the whole engine computes in the
+ * plugin's floating-point mode and denormals never form. The control register
+ * and the instruction to reach it differ by ISA:
+ *   AArch64 (Raspberry Pi 3 family in 64-bit): FPCR via mrs/msr.
+ *   AArch32 (ARMv7 / Cortex-M, the Teensy 4.x target): FPSCR via vmrs/vmsr.
+ * Getting this wrong is not a crash but a SILENT bit-exactness break -- the
+ * denormal tails of the reverb/delay would diverge from x86 -- so both ISAs
+ * set the same FZ bit (24). tools/pi/arm_bitexact.c is the gate that proves it. */
 void juno_enable_hw_ftz(void)
 {
+#if defined(__aarch64__)
+    unsigned long fpcr;
+    __asm__ __volatile__("mrs %0, fpcr" : "=r"(fpcr));
+    fpcr |= (1ul << 24);                                 /* FZ */
+    __asm__ __volatile__("msr fpcr, %0" : : "r"(fpcr));
+#else
     unsigned int fpscr;
     __asm__ __volatile__("vmrs %0, fpscr" : "=r"(fpscr));
     fpscr |= (1u << 24);                                 /* FZ */
     __asm__ __volatile__("vmsr fpscr, %0" : : "r"(fpscr));
+#endif
 }
 int juno_hw_ftz_available(void) { return 1; }
 #else

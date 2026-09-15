@@ -176,6 +176,11 @@ rewrite behind a blind gate) is in CLAUDE.md HISTORY pointers.
 COMPACT_FORMAT.md: REFERENCE — ⚠ its 118-byte set was measured INSUFFICIENT;
 engine_b/eb_patch.h (134 bytes) is the corrected authority.
 
+## docs/pi/ — LIVING (bare-metal Raspberry Pi bring-up, the live edge)
+
+PORT_PI.md — WHY the S3 chain is retired, the ARM bit-exactness proof
+(64/64 identical x86 == aarch64), the one ARM bug found, and the open steps.
+
 ## docs/hardware/ — LIVING (the MasterAudio carrier board)
 
 BOARD.md (design reference), PCB_PLACEMENT.md (layout notes + open items),
