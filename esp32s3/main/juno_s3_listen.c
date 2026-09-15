@@ -2015,7 +2015,22 @@ static unsigned nb_voiced(void *u)
     (void)u;
     return (unsigned)EB_DEVSEQ_VOICED & ((1u << EB_NUM_VOICES) - 1u);
 }
-static void nb_begin(void *u, unsigned m) { (void)u; eb_recall_chunk_begin_voices(&REC, m); }
+static void nb_begin(void *u, unsigned m) {
+    (void)u;
+#if S3L_CHAIN && (S3_CHAIN_POS == 1)
+    /* POS1 (the DAC board) renders ONLY its local voice window
+     * [S3L_VOICE_LO, EB_NUM_VOICES); voices below it are injected from the
+     * chain, so building their coefficients is pure waste that starves POS1's
+     * ~0 burst budget and DEFERS the note publish (playbook: the 743 ms C-key
+     * latency was 2 heavy steps x SCHED_STARVE=64 = 128 blocks). Scoping the
+     * rebuild to the local window makes a note <= 2 heavy steps (events + the
+     * one local voice), which the forced-step change below can publish
+     * promptly. The skipped voices are never rendered here, so their stale
+     * coefficients are unused; the boot CRC (full rebuild) is unaffected. */
+    m &= (unsigned)(((1u << EB_NUM_VOICES) - 1u) & ~((1u << S3L_VOICE_LO) - 1u));
+#endif
+    eb_recall_chunk_begin_voices(&REC, m);
+}
 static int  nb_chunk(void *u)  { (void)u;
 #if S3L_BSTEP_C1
     /* Consume the step core 1 already ran this block -- exactly once. */
@@ -4016,7 +4031,22 @@ static void render_block(int n)
              * PUB, CHECK -- the cheap states) still runs here. */
             && !bs_req
 #endif
-            && (!eb_nb_heavy(&NB) || eb_sched_may(&SCHED, g_step_cyc_note))) {
+            && (!eb_nb_heavy(&NB) || eb_sched_may(&SCHED, g_step_cyc_note)
+#if S3L_CHAIN && (S3_CHAIN_POS == 1)
+                /* POS1: run the note-step even with no burst budget. A note is
+                 * the primary real-time interaction; deferring its build to a
+                 * block with slack means NEVER, because POS1's per-sample load
+                 * (1 voice + full FX + master) leaves ~0 burst budget, so the
+                 * step only ran when SCHED forced it (every 64 blocks) -> the
+                 * 743 ms latency. With the rebuild scoped to the local voice
+                 * (nb_begin), a note is <= 2 heavy steps costing ~0.65 ms each;
+                 * the 35 ms DAC DMA buffer absorbs that overrun, so the note
+                 * sounds in ~2-3 blocks with NO underrun (the INVARIANT holds
+                 * -- audio does not break, the change just costs a little
+                 * buffer depth at onset). The `un`/drift counters gate this. */
+                || 1
+#endif
+               )) {
             unsigned long sc0 = (unsigned long)esp_cpu_get_cycle_count();
             int st = dev_note_step();
             sched_note_cost(&g_step_cyc_note,
