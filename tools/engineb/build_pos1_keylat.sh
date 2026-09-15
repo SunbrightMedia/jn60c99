@@ -18,10 +18,12 @@ LEVERS="-DEB_VCF_DEADCOEF=1;-DEB_ATREST_BLOCK=1;-DEB_ATREST_O1=1;\
 COMMON="-DS3L_SWEEP=0;-DS3_CORES=2;-DS3L_FX_PIPE=1;-DS3L_PROLOGUE_C1=1;\
 -DS3L_REPORT_SECS=10;-DCHUNK=256;-DS3L_DMA_N=6;-DS3L_LINK=0;-DS3L_CHAIN=1;\
 -DS3L_PLAY=1"
-# pos1 committed set + the probe flag.
-PER="-DS3L_VOICE_LO=7;-DS3L_SPLIT=8;-DS3L_MIDI=1;-DS3L_STRESS=1;-DS3L_PANEL=1;-DS3L_KEYLAT=1"
+# pos1 committed set + the probe flags. S3L_LATSELF makes the probe run with
+# NO operator (self-plays one note/s to a cycling voice, storm off), so the
+# bench's own capture prints KEYLAT overnight without a hand at the keys.
+PER="-DS3L_VOICE_LO=7;-DS3L_SPLIT=8;-DS3L_MIDI=1;-DS3L_STRESS=1;-DS3L_PANEL=1;-DS3L_KEYLAT=1;-DS3L_LATSELF=1"
 
-echo "=== CHAIN4 position 1  +KEYLAT (measurement) ==="
+echo "=== CHAIN4 position 1  +KEYLAT +LATSELF (measurement) ==="
 rm -rf build sdkconfig
 idf.py -DS3_LISTEN=1 -DS3_RECALL=1 -DS3_VOICES=6 -DS3_EXACT_ONLY=1 \
        -DS3_EXTRA_DEFS="$COMMON;$LEVERS;$PER;-DS3_CHAIN_POS=1" \
@@ -32,4 +34,8 @@ cp build/bootloader/bootloader.bin            "$OUT/bootloader.bin"
 cp build/partition_table/partition-table.bin  "$OUT/partitiontable.bin"
 cp build/juno_s3.bin                          "$OUT/juno_s3.bin"
 ( cd "$OUT" && sha256sum *.bin > SHA256SUMS )
-echo "staged -> $OUT (VERSION.txt deliberately NOT written)"
+echo "staged -> $OUT"
+# Bump VERSION so the unattended bench (tools/bench/bench.py) flashes the set
+# and captures -- the self-timer then prints KEYLAT with no operator.
+date -u +%Y%m%d%H%M%S > "$REPO/esp32s3/flash/chain4/VERSION.txt"
+echo "VERSION -> $(cat "$REPO/esp32s3/flash/chain4/VERSION.txt")"

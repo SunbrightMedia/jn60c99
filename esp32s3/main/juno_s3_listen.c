@@ -654,9 +654,14 @@ static unsigned long ev_applied_blocks = 0;   /* blocks that applied events */
 extern volatile int g_stress_rt;
 #define KLAT_LO 1e-6f          /* "sounding": above the render's own floor  */
 #define KLAT_HI 1e-2f          /* "audible": a level a player would hear     */
-static int64_t  klat_t0[EB_NUM_VOICES];   /* submit time per slot, -1 idle   */
-static unsigned char klat_st[EB_NUM_VOICES]; /* 0 idle,1 wait-lo,2 wait-hi   */
-static int      klat_note[EB_NUM_VOICES];    /* diag: the midi note          */
+/* PSRAM, not DRAM: new internal .bss re-sorts the small globals and pushes the
+ * big audio buffers (RCB/EBE) up onto whatever DRAM cell sits next -- exactly
+ * the moved-buffer boot-CRC mute of playbook 98 (POS4). Keeping the probe's
+ * cold state in PSRAM leaves internal DRAM byte-identical, so a measurement
+ * image cannot mute a board it was only meant to observe. */
+EXT_RAM_BSS_ATTR static int64_t  klat_t0[EB_NUM_VOICES];   /* submit time/slot */
+EXT_RAM_BSS_ATTR static unsigned char klat_st[EB_NUM_VOICES]; /* 0,1 lo,2 hi   */
+EXT_RAM_BSS_ATTR static int      klat_note[EB_NUM_VOICES];    /* diag midi note */
 static int klat_slot_of_voice(int v)
 {
     if (v == 2 || v == 3) return 3;
@@ -675,6 +680,39 @@ static void klat_arm(int voice, int note)
     klat_note[s] = note;
     printf("KEYLAT: arm note=%d voice=%d slot=%d\n", note, voice, s);
 }
+
+/* SELF-TIMING DRIVER (S3L_LATSELF): the latency probe with NO OPERATOR. Every
+ * ~1 s, with the storm OFF, it plays one note (cycling C..A across the six
+ * global voices) so KEYLAT times a full key->DAC round trip on the bench with
+ * no hand at the keys. Note on 1 s, off, next -- ~45 notes fit a 90 s
+ * storm-off capture window, several per voice. It submits CONSOLE events, so
+ * klat_arm times them exactly as it times a real key. Default off. */
+#ifndef S3L_LATSELF
+#define S3L_LATSELF 0
+#endif
+#if S3L_LATSELF
+static const int KLAT_SELF_NOTES[6] = { 60, 62, 64, 65, 67, 69 };
+/* PSRAM, same reason as the arrays above: no internal .bss growth. */
+EXT_RAM_BSS_ATTR static int klat_self_idx;
+EXT_RAM_BSS_ATTR static int klat_self_held;
+EXT_RAM_BSS_ATTR static unsigned long klat_self_blk;
+static void klat_self_tick(void)
+{
+    const unsigned long STEP = (unsigned long)(SR / CHUNK);   /* ~1 s of blocks */
+    if (g_stress_rt) { klat_self_held = 0; klat_self_blk = 0; return; }
+    if (note_pending) return;               /* never fight a burst in flight */
+    if (++klat_self_blk < STEP) return;
+    klat_self_blk = 0;
+    if (!klat_self_held) {
+        juno_event_note_on(JUNO_SRC_CONSOLE, KLAT_SELF_NOTES[klat_self_idx], 100);
+        klat_self_held = 1;
+    } else {
+        juno_event_note_off(JUNO_SRC_CONSOLE, KLAT_SELF_NOTES[klat_self_idx]);
+        klat_self_held = 0;
+        klat_self_idx = (klat_self_idx + 1) % 6;
+    }
+}
+#endif
 #endif
 
 /* The producers' mutex. Declared in main/juno_event_port.h, defined ONCE
@@ -5580,6 +5618,9 @@ void app_main(void)
             con_poll();
 #if S3L_PANEL
             pan_poll();
+#endif
+#if S3L_KEYLAT && S3L_LATSELF && (S3_CHAIN_POS == 1)
+            klat_self_tick();      /* operator-free latency driver, storm off */
 #endif
 #if S3L_STRESS
             /* g_stress_rt: the robot is GATED AT RUNTIME (console 'r').
