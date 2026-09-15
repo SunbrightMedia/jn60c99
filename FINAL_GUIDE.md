@@ -399,11 +399,18 @@ b32..b43; live pointers: CLAUDE.md LIVE STATE.
   robot-off, STUCK=0, rxrst=0, z/slips settle, no reboot loop (b45 log
   20260914_073630, VERSION ...143219). Silence via a render-level all-off
   (g_hush_mask, force-at-rest downstream of the device gate) plus an
-  input-ring flush so buffered storm notes cannot un-hush. OWED: the device
-  gate (scat[v][320]) is still re-gated by the storm's rapid RECALLS (a
-  scatter broadcast in eb_devseq_recall only, never the per-note rebuild, so
-  a HAND note-off releases cleanly) -- the hush masks that at idle; root-
-  cause it so the hush is belt, not load. Ledger: data/b45_chain_pos1.md.
+  input-ring flush so buffered storm notes cannot un-hush. The re-gate was
+  then ROOT-CAUSED AND CURED (user-directed plugin parity): a warm param
+  edit now goes through the plugin's own juno_apply_param_leaf (26 leaves;
+  33 non-leaf re-derive with note state preserved, eb_devparam.h +
+  devparam_gate 3 teeth) — note cells are never broadcast, the hush is
+  belt not load (proven with hush OFF). POS4's boot-CRC mute on that build
+  was a .bss shift landing RCB on one bad DRAM cell (playbook 98), cured
+  by zero-DRAM-growth (values ride the record; masks in PSRAM). SOAKED:
+  boot sweep 4/4 clean + ~1 hr continuous four-board storm (S3L_SOAK_
+  AUTOSTORM image) + clean post-soak boot, all four SILENT (b45 ledger).
+  OWED: soak layer 3 (fault injection), worst-patch numbers here.
+  Ledger: data/b45_chain_pos1.md.
 - **Hardware**: the MasterAudio 4-slot carrier board (docs/hardware/BOARD.md
   + PCB_PLACEMENT.md). Supersedes the 2-board jumper-wire bench as the
   physical target; the D-track link design carries over (chain 4→3→2→1).

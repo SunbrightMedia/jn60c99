@@ -163,9 +163,15 @@ mine is a hypothesis (playbook 80).
   (pull-up active-low, debounced, unwired-safe), pots IO1=CUTOFF
   IO4=RESONANCE (arm-by-stillness pickup law, boot-proven pids 12/13);
   params now RIDE the event chain (kind 3), so THE FOUR IMAGES ARE A
-  SET -- never flash pos1 alone. Design: CHAIN4.md §5/§6. OWED: the
-  1-hour soak RUN (on the PANEL image), soak layer 3 (fault
-  injection), worst-patch numbers into FINAL_GUIDE.
+  SET -- never flash pos1 alone. Design: CHAIN4.md §5/§6. PLUGIN
+  PARITY (user-directed): warm param edits go through the plugin's own
+  juno_apply_param_leaf (eb_devparam.h; devparam_gate 3 teeth in
+  o3_gates) -- note cells never broadcast, drone cured 4/4 on silicon.
+  POS4's boot-CRC mute was a .bss shift onto one bad DRAM cell
+  (playbook 98) -- keep new cold state in PSRAM, watch the map. SOAK
+  DONE on the panel image: boot sweep 4/4 + ~1 hr continuous storm
+  (S3L_SOAK_AUTOSTORM, soak-only flag) + clean post-soak boot. OWED:
+  soak layer 3 (fault injection), worst-patch numbers into FINAL_GUIDE.
 - **Hardware (user-directed)**: MasterAudio 4-slot carrier board for N16R8
   DevKitC-1 boards (JLCPCB/LCSC). The user draws the schematic by hand;
   docs/hardware/ holds the connection reference, PCB placement notes, and

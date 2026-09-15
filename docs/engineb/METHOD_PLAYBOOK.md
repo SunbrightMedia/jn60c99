@@ -2068,3 +2068,35 @@ cannot form. A held publish belongs only where it is verified and then
 released in the same breath -- the boot CRC probe. Corollary of 46 and
 96: a cure that chases state is weaker than one that never lets the bad
 state exist.
+
+## 98. A NEW GLOBAL CAN MUTE ONE BOARD -- .bss SORTS SMALL-FIRST, SO EVERY
+BYTE OF NEW STATE PUSHES THE BIG AUDIO BUFFERS ONTO NEW ADDRESSES (2026-09-15)
+
+The plugin-parity edit set added ~142 B of ordinary globals. On POS4 -- and
+only POS4 -- the boot voice-coef CRC then read chip rc=ebdfa32b vs host
+c6c5d9aa, deterministically, across three runs and a power-cycle. It looked
+like a dead board; the user has no spares.
+
+The chain of tells that solved it without touching the bench:
+  1. DETERMINISTIC + survives reset = not read noise. Same wrong value every
+     boot means a fixed cell, not a flaky one.
+  2. MASTER coefs MATCHED while VOICE coefs did not. Both read the same PSRAM
+     cell array, so the inputs and the logic were fine -- the fault had to be
+     in the DRAM OUTPUT buffer (RCB), which only the voice build writes.
+  3. THE MAP: the new globals sorted BELOW RCB in internal .bss, pushing RCB
+     up 0x94 bytes (0x3fcaf854 -> 0x3fcaf8e8) -- onto one weak DRAM cell that
+     exists only on that physical board. The pre-change build, 148 B lower,
+     had matched on the same board for days.
+
+Cure = ZERO net internal-DRAM growth: the edited byte rides the record the
+edit already writes (no value arrays), and the two masks moved to PSRAM
+(EXT_RAM_BSS_ATTR; cold path only). RCB returned to its proven address; POS4
+matched on the next flash and through a 4/4 boot sweep + a 1-hour soak.
+
+Rules. (a) A per-board deterministic CRC miss whose sibling subsystem matches
+is a MOVED-BUFFER smell, not "flaky silicon" and not a dead board -- read the
+link map before blaming hardware. (b) New cold state near large audio buffers
+belongs in PSRAM; every internal .bss byte relocates everything above it onto
+memory no gate has ever exercised on that specific board. (c) The decisive
+evidence order is value-determinism, then which SIBLING passes, then the map
+diff -- all three are free and none needs the bench.
