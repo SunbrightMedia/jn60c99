@@ -50,3 +50,16 @@ I2S RX DMA depth, and the POS1 DAC `S3L_DMA_N` are the priced knobs; the
 realign churn (which lets buffers back up) is the deeper target. Measure the
 per-voice KEYLAT first, then cut the dominant contributor. The `.vst3` DSP
 stays bit-exact; only the fork transport is tuned.
+
+## Attack classification of all 64 factory patches (host)
+28 are PUNCHY (attack to 90% <= 60 ms): 0, 2, 6, 7, 10, 14, 15, 18, 23, 24,
+26, 30, 31, 32, 34, 37, 38, 39, 41, 42, 46, 47, 50, 54, 58, 59, 61, 62.
+
+36 are SLOW-ATTACK PADS (>60 ms, up to 1590 ms): 1, 3, 4, 5, 8, 9, 11, 12, 13,
+16, 17, 19, 20, 21, 22, 25, 27, 28, 29, 33, 35, 36, 40, 43, 44, 45, 48, 49, 51,
+52, 53, 55, 56, 57, 60, 63. The slowest: 63 (1590 ms), 48 (1480 ms),
+43/45 (~1450 ms), 35/60 (1440 ms), 36 (930 ms).
+
+So when the user steps to a pad (e.g. 36/48/56), the note ramps to full over
+~1 s and FEELS like input lag, though it starts sounding at ~10 ms. This is
+authentic JUNO behaviour, not a defect. The boot patch (0) is punchy.
