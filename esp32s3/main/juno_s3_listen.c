@@ -649,6 +649,9 @@ static unsigned long ev_applied_blocks = 0;   /* blocks that applied events */
 #define S3L_KEYLAT 0
 #endif
 #if S3L_KEYLAT && S3L_CHAIN && (S3_CHAIN_POS == 1)
+/* g_stress_rt is defined further down (with the console reader); forward it so
+ * the note drain can gate the probe to storm-OFF (hand-play only). */
+extern volatile int g_stress_rt;
 #define KLAT_LO 1e-6f          /* "sounding": above the render's own floor  */
 #define KLAT_HI 1e-2f          /* "audible": a level a player would hear     */
 static int64_t  klat_t0[EB_NUM_VOICES];   /* submit time per slot, -1 idle   */
