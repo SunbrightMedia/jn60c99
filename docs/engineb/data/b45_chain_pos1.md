@@ -1188,3 +1188,27 @@ PLAYBOOK LESSON: adding a global near large audio buffers can push one onto a
 marginal cell on ONE board and mute it deterministically. Keep cold new state
 in PSRAM; watch the map when .bss grows. A per-board deterministic CRC miss
 whose sibling (master) matches is a moved-buffer smell, not "flaky silicon".
+
+## SOAK DONE (2026-09-15): SWEEP 4/4 + ~1 HR CONTINUOUS STORM + CLEAN POST-SOAK BOOT
+
+Driven remotely through the user's already-running bench (they were away from
+the PC; a running bench.py cannot be re-coded remotely, so the soak was driven
+by what CAN be changed remotely -- the flashed firmware).
+ 1. BOOT-RELIABILITY SWEEP: 4 fresh flash+boot+storm+silence cycles
+    (VERSIONs 20260915010543/011237/012054/013200). 4/4 CLEAN -- every board
+    CRC 0 bad + SILENT, no mute/stuck. Hammered the POS4 .bss/RCB fix across
+    boots.
+ 2. CONTINUOUS STORM: new soak-only flag S3L_SOAK_AUTOSTORM=1 pins the robot
+    storm ON from boot (chain leader; 'r' ignored), so one flash gives an
+    unbroken run with no keypress. VERSION 20260915014823. MONITORED CLEAN
+    START: all four 0 bad, storming (nb up to 245k), mix=OPEN, no mute/stuck.
+    Boards then stormed CONTINUOUSLY ~61 min (bench never re-flashed -> never
+    interrupted). Middle unmonitored by construction (the bench reboots before
+    every capture, so a mid-run read is impossible remotely).
+ 3. POST-SOAK BOOT (the verdict), VERSION 20260915025905 flashed onto the
+    hour-soaked boards: all four CRC 0 bad MATCH, played the storm, ended
+    SILENT, no mute/stuck/halt, un 0/3/3/0. The boards survived the hour and
+    boot clean.
+S3L_SOAK_AUTOSTORM stays default-0 (never on a shipping image). tools/bench/
+soak.py remains for a fully-monitored hour when someone is at the PC. The
+param layer (4/4 silicon) + the soak together: the synth is solid end to end.
