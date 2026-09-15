@@ -691,25 +691,33 @@ static void klat_arm(int voice, int note)
 #define S3L_LATSELF 0
 #endif
 #if S3L_LATSELF
-static const int KLAT_SELF_NOTES[6] = { 60, 62, 64, 65, 67, 69 };
+/* FOUR notes, one per DISTINCT post-inject slot, so each reads a clean per-hop
+ * number with no slot aliasing: 60->voice7=slot7 (POS1 local), 62->voice6=slot6
+ * (POS2, 1 hop), 64->voice5=slot5 (POS3, 2 hops), 67->voice3=slot3 (POS4,
+ * 3 hops). Cadence 2.5 s: 0.5 s held (long enough for the onset), then ~2 s
+ * released so the slot fully silences (patch-0 release is 1.3 s) before the
+ * next note -- no residual ring to fake a 0 ms onset. The storm is forced OFF
+ * (see the 'r' handler) so the patch stays 0 (attack 0 ms), and any lo is
+ * therefore PURE transport, not the envelope. */
+static const int KLAT_SELF_NOTES[4] = { 60, 62, 64, 67 };
 /* PSRAM, same reason as the arrays above: no internal .bss growth. */
 EXT_RAM_BSS_ATTR static int klat_self_idx;
-EXT_RAM_BSS_ATTR static int klat_self_held;
 EXT_RAM_BSS_ATTR static unsigned long klat_self_blk;
 static void klat_self_tick(void)
 {
-    const unsigned long STEP = (unsigned long)(SR / CHUNK);   /* ~1 s of blocks */
-    if (g_stress_rt) { klat_self_held = 0; klat_self_blk = 0; return; }
+    const unsigned long ON     = (unsigned long)(SR / CHUNK) / 2;      /* 0.5 s */
+    const unsigned long PERIOD = (unsigned long)(SR / CHUNK) * 5u / 2u;/* 2.5 s */
+    unsigned long b;
+    if (g_stress_rt) { klat_self_blk = 0; return; }  /* never during the storm */
     if (note_pending) return;               /* never fight a burst in flight */
-    if (++klat_self_blk < STEP) return;
-    klat_self_blk = 0;
-    if (!klat_self_held) {
+    b = klat_self_blk++;
+    if (b == 0)
         juno_event_note_on(JUNO_SRC_CONSOLE, KLAT_SELF_NOTES[klat_self_idx], 100);
-        klat_self_held = 1;
-    } else {
+    else if (b == ON)
         juno_event_note_off(JUNO_SRC_CONSOLE, KLAT_SELF_NOTES[klat_self_idx]);
-        klat_self_held = 0;
-        klat_self_idx = (klat_self_idx + 1) % 6;
+    else if (b >= PERIOD) {
+        klat_self_blk = 0;
+        klat_self_idx = (klat_self_idx + 1) % 4;
     }
 }
 #endif
@@ -2366,6 +2374,12 @@ static void con_poll(void)
         if (c == 'r') {
 #if S3L_STRESS && S3L_SOAK_AUTOSTORM
             continue;   /* soak image: storm pinned ON, ignore 'r' toggles */
+#endif
+#if S3L_KEYLAT && S3L_LATSELF
+            /* latency-measurement image: keep the storm OFF so the patch stays
+             * 0 (attack 0) and the self-timer measures pure transport. The
+             * bench sends 'r'; ignore it. */
+            continue;
 #endif
             g_stress_rt = !g_stress_rt;
             printf("ROBOT: %s -- %s\n", g_stress_rt ? "ON" : "OFF",
@@ -5901,8 +5915,8 @@ void app_main(void)
                 }
                 if (klat_st[sv] == 1 && pk > KLAT_LO) {
                     long ms = (long)((esp_timer_get_time() - klat_t0[sv]) / 1000);
-                    printf("KEYLAT: note=%d slot=%d SOUNDING lo=%ld ms\n",
-                           klat_note[sv], sv, ms);
+                    printf("KEYLAT: note=%d slot=%d patch=%d SOUNDING lo=%ld ms\n",
+                           klat_note[sv], sv, dev_patch, ms);
                     klat_st[sv] = 2;
                 }
                 if (klat_st[sv] == 2 && pk > KLAT_HI) {
