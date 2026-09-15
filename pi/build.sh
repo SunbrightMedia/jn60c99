@@ -19,6 +19,9 @@ command -v ${PREFIX}g++ >/dev/null 2>&1 || {
 # Circle is a pinned submodule; make sure it is checked out.
 [ -f "$CIRCLE/Rules.mk" ] || { echo "circle submodule empty — git submodule update --init pi/circle"; exit 1; }
 
+echo ">> build the engine archive (proven bit-exact flags) + embed bank"
+sh "$HERE/build_engine.sh"
+
 echo ">> configure Circle: Pi 3, AArch64 (hardware)"
 ( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" -f )
 

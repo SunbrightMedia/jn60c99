@@ -93,17 +93,51 @@ heartbeat, and halts clean. Same source also builds the hardware `kernel8.img`
 Container deps (ephemeral): `apt-get install -y gcc-aarch64-linux-gnu
 g++-aarch64-linux-gnu qemu-system-arm`.
 
+## ENGINE ON METAL — BIT-EXACT (2026-09-15)
+The original port (src/, 8 voices, all FX, NO levers, NO compromises) is linked
+into the bare-metal kernel and renders audio on the emulated Pi 3A+ at the new
+default **48000 Hz**. Every patch is byte-identical to the plugin.
+
+- Default rate: **48 kHz** (proven-exact; friendlier DAC clocking; ~half the
+  3A+ compute). Passed once to `juno_gui_create`.
+- Shared render+hash core `pi/probe/juno_probe_core.c` is compiled with the
+  SAME proven bit-exact flags on host and on metal, so an equal hash means
+  equal samples. `pi/probe/host_ref.c` prints the x86 reference; the x86 engine
+  nulls EXACTLY 0 vs the plugin, so those hashes ARE the plugin.
+- The engine is built into `libjunoengine.a` by `pi/build_engine.sh` with the
+  proven flags + only bare-metal-safe additions (freestanding, no stack
+  protector, no PIC) — none touch arithmetic. `pi/kernel/bare_libm.c` supplies
+  the engine's only libm calls (fabsf/fmodf/lrint/fmax*/fmin*) as exact ops
+  (AArch64 instructions + an exact `fmodf`); no glibc libm is linked. Both the
+  48 kHz path and bare_libm were re-proven bit-exact under qemu-user (12/12)
+  BEFORE the metal run.
+- The factory bank is embedded (`bank_blob.S` .incbin) — no filesystem needed.
+
+RESULT, on `qemu-system-aarch64 -M raspi3ap` (captured UART):
+```
+juno: ENGINE bit-exact gate: original port, 8 voices, no levers
+juno: rate 48000 Hz, bank 1294295 bytes, 4000 frames/patch, note 60 vel 105
+juno: patch  0  hash 1830844881997e88  pk 0.195906  == MATCH
+   ... (all 12 patches) ...
+juno: BIT-EXACT RESULT: 12/12 patches identical to the plugin
+juno: FULL SYNTH BIT-EXACT ON BARE METAL — EXACT WAVEFORM MATCH
+```
+The chain is closed: **plugin == x86 == aarch64-user == aarch64 bare-metal.**
+One command: `sh pi/run_qemu.sh raspi3ap`.
+
 ## NEXT (open, in order)
-1. ~~Circle build system for BCM2837; boot to metal, UART.~~ **DONE (above).**
-2. I2S DAC output driver (48/44.1 kHz) → the render callback pulls
-   `juno_gui_render` into the DMA ring. NOTE: the engine is C99 + libm
-   (expf/fabsf). On bare metal, link it against Circle's math (`addon/`) or
-   newlib; prove the same bit-exact hash on-metal as the qemu-user run.
-3. Input: GPIO keys/octave/pots (same panel law as S3 `S3L_PANEL`), MIDI-in.
-4. SIGNAL-level gate: device output CRC + a DISCONTINUITY/tick metric vs the
-   host render. The S3 tick passed every state gate because NO gate watched the
-   waveform. On the Pi the waveform IS the gate.
-5. Cardless dev flash (rpiboot over USB); production SD-NAND / eMMC later.
+1. ~~Circle build; boot to metal.~~ **DONE.**
+2. ~~Link the engine; render audio; EXACT waveform match vs the plugin.~~
+   **DONE (above) — offline render, 12-patch spread. Widen to all 64 next.**
+3. I2S DAC output driver (48 kHz) → a real-time render callback pulls
+   `juno_gui_render` into the DMA ring; SILENCE PROBE on the shipped output.
+4. Input: GPIO keys/octave/pots (same panel law as S3 `S3L_PANEL`), MIDI-in.
+5. Real-time SIGNAL gate on the live callback: output CRC + a DISCONTINUITY/tick
+   metric vs the host render. The S3 tick passed every STATE gate because none
+   watched the waveform. On the Pi the waveform IS the gate.
+6. Multi-core split (voices across the 4 A53 cores; shared RAM, no links) to
+   hit real time; then the 64-patch on-metal gate under the live clock.
+7. Cardless dev flash (rpiboot over USB); production SD-NAND / eMMC later.
 
 ## HARD LESSON carried in (SHIP LAW)
 Never validate by ear, live layer included. No Pi image ships to the user

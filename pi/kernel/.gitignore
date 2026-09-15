@@ -5,3 +5,5 @@
 *.img
 *.lst
 *.map
+build/
+bank.bin

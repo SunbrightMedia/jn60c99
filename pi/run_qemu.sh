@@ -19,16 +19,25 @@ PREFIX=aarch64-linux-gnu-
 MACH="${1:-raspi3ap}"          # raspi3ap = Pi 3A+ (prototype); raspi3b also works
 OUT="${TMPDIR:-/tmp}/juno_boot_${MACH}.txt"
 
+echo ">> build the engine archive (proven bit-exact flags) + embed bank"
+sh "$HERE/build_engine.sh"
+
 echo ">> configure Circle: Pi 3, AArch64, --qemu"
 ( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" --qemu -f )
 make -C "$CIRCLE/lib" -j"$(nproc)" >/dev/null
 make -C "$HERE/kernel" clean >/dev/null 2>&1 || true
 make -C "$HERE/kernel" >/dev/null
-echo ">> boot on -M $MACH (12 s capture)"
-timeout 12 qemu-system-aarch64 -M "$MACH" -kernel "$HERE/kernel/kernel8.img" \
+echo ">> boot on -M $MACH (rendering the engine under TCG; up to 90 s)"
+timeout 90 qemu-system-aarch64 -M "$MACH" -kernel "$HERE/kernel/kernel8.img" \
     -serial "file:$OUT" -serial null -display none < /dev/null > /dev/null 2>&1 || true
 
 echo "---------------- UART ----------------"
 cat "$OUT"
 echo "--------------------------------------"
-grep -q "BOOT PROOF COMPLETE" "$OUT" && echo "RESULT: BOOT OK ($MACH)" || { echo "RESULT: NO BOOT"; exit 1; }
+if grep -q "FULL SYNTH BIT-EXACT ON BARE METAL" "$OUT"; then
+    echo "RESULT: BIT-EXACT ON METAL ($MACH)"
+elif grep -q "PROBE COMPLETE" "$OUT"; then
+    echo "RESULT: DIVERGENCE — probe ran but not bit-exact ($MACH)"; exit 1
+else
+    echo "RESULT: NO BOOT / probe did not finish ($MACH)"; exit 1
+fi

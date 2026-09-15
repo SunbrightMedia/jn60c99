@@ -8,9 +8,15 @@
 #
 CIRCLEHOME = ../circle
 
-OBJS	= main.o kernel.o bare_stubs.o
+# Kernel glue objects (built with Circle's flags — no DSP math here).
+OBJS	= main.o kernel.o juno_probe.o bank_blob.o bare_stubs.o
 
 LIBS	= $(CIRCLEHOME)/lib/libcircle.a
+
+# The engine (built separately with the PROVEN bit-exact flags by
+# ../build_engine.sh). Its own bare_libm.o supplies the exact math, so no glibc
+# libm is linked. Placed in Circle's --start-group so cross-refs resolve.
+EXTRALIBS = build/libjunoengine.a
 
 include $(CIRCLEHOME)/Rules.mk
 

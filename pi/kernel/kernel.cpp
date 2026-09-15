@@ -5,6 +5,10 @@
 #include <circle/string.h>
 #include <circle/machineinfo.h>
 
+// The bit-exact engine gate (juno_probe.cpp): render the original port on the
+// metal and compare every patch's sample hash to the plugin reference.
+void run_juno_bitexact (void);
+
 static const char FromJuno[] = "juno";
 
 CKernel::CKernel (void)
@@ -59,23 +63,11 @@ TShutdownMode CKernel::Run (void)
 			nRAM, CMachineInfo::Get ()->GetModelMajor () >= 2 ? 4 : 1);
 
 	m_Logger.Write (FromJuno, LogNotice, "Compiled: " __DATE__ " " __TIME__);
-	m_Logger.Write (FromJuno, LogNotice,
-			"Next: I2S DAC out + the bit-exact render callback.");
 
-	// Heartbeat so a live board / QEMU run visibly keeps running (not hung).
-	unsigned nBeat = 0;
-	unsigned nTime = m_Timer.GetTime ();
-	while (nBeat < 5)
-	{
-		while (nTime == m_Timer.GetTime ())
-		{
-			// wait one second
-		}
-		nTime = m_Timer.GetTime ();
-		m_Logger.Write (FromJuno, LogNotice, "alive t=%u", nTime);
-		nBeat++;
-	}
+	// The point of the whole board: run the original JUNO port on the metal and
+	// prove the rendered audio is bit-identical to the plugin.
+	run_juno_bitexact ();
 
-	m_Logger.Write (FromJuno, LogNotice, "BOOT PROOF COMPLETE — halting.");
+	m_Logger.Write (FromJuno, LogNotice, "PROBE COMPLETE — halting.");
 	return ShutdownHalt;
 }
