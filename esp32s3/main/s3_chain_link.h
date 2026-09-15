@@ -491,6 +491,18 @@ typedef struct {
 static s3c_aud A_UP;
 static int32_t s3c_rxbuf[S3C_CHW];      /* the drained, aligned chunk       */
 static int     s3c_rx_fresh;            /* a full audio chunk this block    */
+/* PACKET-LOSS CONCEALMENT (2026-09-15). A CRC-bad chunk was memset to SILENCE
+ * -- a 5.8 ms gap that clicks. Repeating the last GOOD chunk instead holds the
+ * waveform, which is far less audible for a short dropout (the pairs are voice
+ * sums, so a held chunk is a held note, not noise). Capped: after
+ * S3C_CONCEAL_MAX repeats the stream is genuinely gone, so fade to silence
+ * rather than drone the last chunk forever. PSRAM: this 4 KB buffer must not
+ * grow internal DRAM (playbook 98, the moved-buffer boot mute). */
+EXT_RAM_BSS_ATTR static int32_t s3c_lastgood[S3C_CHW];
+static unsigned s3c_conceal_run;        /* consecutive concealed (repeated)  */
+#ifndef S3C_CONCEAL_MAX
+#define S3C_CONCEAL_MAX 8u              /* ~46 ms of repeat, then fade         */
+#endif
 #endif
 #if S3C_HAS_DOWN
 static s3c_aud A_DN;
@@ -898,6 +910,10 @@ static int s3c_rx_one(int n, int hs_ok)
                                    s3c_crc32)) {
                 match = 1; ++A_UP.rx_match; A_UP.relock_miss = 0;
                 A_UP.heal_ci_run = 0;   /* a clean chunk ends any heal loop */
+                /* remember this good chunk to conceal the next bad one */
+                memcpy(s3c_lastgood, s3c_rxbuf,
+                       (size_t)n * S3C_SLOTW * sizeof(int32_t));
+                s3c_conceal_run = 0u;
             } else {
                 if (!A_UP.mm_have) {
                     static const int mf_[6] = { 2, 32, 64, 128, 192, 255 };
@@ -945,10 +961,21 @@ static int s3c_rx_one(int n, int hs_ok)
                  * GARBAGE straight into the DAC -- the bench's endless
                  * "distorted popping" was bad chunks alternating with
                  * good ones at ~86 Hz. Forensics above have already read
-                 * the bytes; from here a bad chunk contributes a 5.8 ms
-                 * dropout, never noise. */
-                memset(s3c_rxbuf, 0,
-                       (size_t)n * S3C_SLOTW * sizeof(int32_t));
+                 * the bytes; from here a bad chunk NEVER pours noise into the
+                 * DAC. CONCEALMENT (2026-09-15): for a SHORT dropout, repeat
+                 * the last good chunk (hold the waveform) instead of a silence
+                 * gap -- far less audible, and the alternating-good/bad case
+                 * the old mute still clicked on is now a held note. After
+                 * S3C_CONCEAL_MAX repeats the stream is really gone, so fall
+                 * back to silence rather than drone forever. */
+                if (s3c_conceal_run < S3C_CONCEAL_MAX) {
+                    memcpy(s3c_rxbuf, s3c_lastgood,
+                           (size_t)n * S3C_SLOTW * sizeof(int32_t));
+                    ++s3c_conceal_run;
+                } else {
+                    memset(s3c_rxbuf, 0,
+                           (size_t)n * S3C_SLOTW * sizeof(int32_t));
+                }
                 /* Under IN-BAND CRC a miss convicts ONE chunk (a seam), not
                  * the lock: alignment is maintained per chunk by the marker
                  * realign, so re-training buys nothing and costs the storm
