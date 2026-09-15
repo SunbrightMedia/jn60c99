@@ -8,10 +8,18 @@
 #
 CIRCLEHOME = ../circle
 
-# Kernel glue objects (built with Circle's flags — no DSP math here).
-OBJS	= main.o kernel.o juno_probe.o bank_blob.o bare_stubs.o
+# PLAY mode (real-time I2S audio) is selected with `make JUNO_PLAY=1`; the
+# default is the GATE image (bit-exact probe) that runs under QEMU.
+ifdef JUNO_PLAY
+DEFINE += -DJUNO_PLAY
+endif
 
-LIBS	= $(CIRCLEHOME)/lib/libcircle.a
+# Kernel glue objects (built with Circle's flags — no DSP math here).
+OBJS	= main.o kernel.o juno_probe.o juno_sound.o bank_blob.o bare_stubs.o
+
+# Circle's own I2S sound driver (libsound) + core. --start-group resolves refs.
+LIBS	= $(CIRCLEHOME)/lib/sound/libsound.a \
+	  $(CIRCLEHOME)/lib/libcircle.a
 
 # The engine (built separately with the PROVEN bit-exact flags by
 # ../build_engine.sh). Its own bare_libm.o supplies the exact math, so no glibc

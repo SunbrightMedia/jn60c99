@@ -125,19 +125,39 @@ juno: FULL SYNTH BIT-EXACT ON BARE METAL — EXACT WAVEFORM MATCH
 The chain is closed: **plugin == x86 == aarch64-user == aarch64 bare-metal.**
 One command: `sh pi/run_qemu.sh raspi3ap`.
 
+## ALL SCENARIOS + I2S GLUE (2026-09-15)
+Two images from one source (`make` = GATE, `make JUNO_PLAY=1` = PLAY):
+
+- **GATE** (verifiable under QEMU): the metal probe now covers ALL 64 factory
+  patches PLUS 5 deterministic seeded STORMS (note-on/off + patch-change
+  sequences: polyphony, voice-stealing, lifecycle, recall). The reference
+  `juno_ref.h` is generated at build time by the x86 engine (== the plugin);
+  the metal must reproduce every hash. The storms are rendered on the metal at
+  the **I2S DMA chunk** while the reference is the **continuous** render, so a
+  match proves, together: metal == plugin AND chunk-invariance (the real-time
+  block callback adds NO boundary tick — the exact S3 failure class). Host-side
+  chunk-invariance is also asserted before the header is accepted.
+- **PLAY** (silicon only): `pi/kernel/juno_sound.cpp` is the ONLY audio code we
+  own — one `GetChunk()` that fills each DMA block from `juno_gui_render`. The
+  I2S DRIVER ITSELF IS CIRCLE'S (`CI2SSoundBaseDevice`: PCM peripheral, DMA,
+  clocking — the MiniDexed driver). QEMU has no I2S, so PLAY is not run here; it
+  builds clean, and the gates prove the samples it will emit are the plugin's.
+
+Every scenario was first re-proven ARM-bit-exact under qemu-user (64 patches +
+5 storms, identical header), then on the metal.
+
 ## NEXT (open, in order)
 1. ~~Circle build; boot to metal.~~ **DONE.**
-2. ~~Link the engine; render audio; EXACT waveform match vs the plugin.~~
-   **DONE (above) — offline render, 12-patch spread. Widen to all 64 next.**
-3. I2S DAC output driver (48 kHz) → a real-time render callback pulls
-   `juno_gui_render` into the DMA ring; SILENCE PROBE on the shipped output.
-4. Input: GPIO keys/octave/pots (same panel law as S3 `S3L_PANEL`), MIDI-in.
-5. Real-time SIGNAL gate on the live callback: output CRC + a DISCONTINUITY/tick
-   metric vs the host render. The S3 tick passed every STATE gate because none
-   watched the waveform. On the Pi the waveform IS the gate.
-6. Multi-core split (voices across the 4 A53 cores; shared RAM, no links) to
-   hit real time; then the 64-patch on-metal gate under the live clock.
-7. Cardless dev flash (rpiboot over USB); production SD-NAND / eMMC later.
+2. ~~Link the engine; EXACT waveform match vs the plugin.~~ **DONE.**
+3. ~~All 64 patches + seeded storms + chunk-invariance on metal.~~ **DONE.**
+4. ~~I2S glue over Circle's driver (PLAY mode).~~ **DONE (builds; silicon to hear).**
+5. Input: GPIO keys/octave/pots (same panel law as S3 `S3L_PANEL`), MIDI-in —
+   feed the events into the PLAY engine instance.
+6. On silicon: flash PLAY to a real Pi 3A+ + I2S DAC; SILENCE PROBE on the
+   shipped output (SHIP LAW); confirm real-time headroom at 48 kHz.
+7. Multi-core split (voices across the 4 A53 cores; shared RAM, no links) if one
+   core is short of real time.
+8. Cardless dev flash (rpiboot over USB); production SD-NAND / eMMC later.
 
 ## HARD LESSON carried in (SHIP LAW)
 Never validate by ear, live layer included. No Pi image ships to the user

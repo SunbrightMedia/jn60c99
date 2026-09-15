@@ -25,8 +25,9 @@ sh "$HERE/build_engine.sh"
 echo ">> configure Circle: Pi 3, AArch64, --qemu"
 ( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" --qemu -f )
 make -C "$CIRCLE/lib" -j"$(nproc)" >/dev/null
+make -C "$CIRCLE/lib/sound" -j"$(nproc)" >/dev/null
 make -C "$HERE/kernel" clean >/dev/null 2>&1 || true
-make -C "$HERE/kernel" >/dev/null
+make -C "$HERE/kernel" >/dev/null          # GATE image (bit-exact probe)
 echo ">> boot on -M $MACH (rendering the engine under TCG; up to 90 s)"
 timeout 90 qemu-system-aarch64 -M "$MACH" -kernel "$HERE/kernel/kernel8.img" \
     -serial "file:$OUT" -serial null -display none < /dev/null > /dev/null 2>&1 || true

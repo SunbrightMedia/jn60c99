@@ -7,3 +7,4 @@
 *.map
 build/
 bank.bin
+juno_ref.h

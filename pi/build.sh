@@ -25,12 +25,13 @@ sh "$HERE/build_engine.sh"
 echo ">> configure Circle: Pi 3, AArch64 (hardware)"
 ( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" -f )
 
-echo ">> build libcircle.a"
+echo ">> build libcircle.a + Circle's I2S sound driver"
 make -C "$CIRCLE/lib" -j"$(nproc)"
+make -C "$CIRCLE/lib/sound" -j"$(nproc)"
 
-echo ">> build kernel8.img"
+echo ">> build kernel8.img (PLAY mode: real-time I2S)"
 make -C "$HERE/kernel" clean >/dev/null 2>&1 || true
-make -C "$HERE/kernel"
+make -C "$HERE/kernel" JUNO_PLAY=1
 
 echo ">> DONE: $HERE/kernel/kernel8.img"
 ls -la "$HERE/kernel/kernel8.img"

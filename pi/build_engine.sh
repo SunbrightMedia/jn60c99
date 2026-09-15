@@ -42,4 +42,16 @@ rm -f "$OUT"; ${PREFIX}ar rcs "$OUT" "$OBJ"/*.o
 echo ">> embed bank -> kernel/bank.bin ($(wc -c < "$BANK") bytes)"
 cp "$BANK" "$HERE/kernel/bank.bin"
 
-echo ">> engine archive done: $(${PREFIX}ar t "$OUT" | wc -l) objects"
+# Generate the plugin reference header on x86 (the x86 engine == the plugin),
+# so the metal probe self-checks against fresh, un-transcribed hashes. Its
+# host-side chunk-invariance check must pass, or we stop here.
+echo ">> generate juno_ref.h (x86 reference == plugin)"
+HREF="$HERE/kernel/build/host_ref"
+cc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing -w $INC \
+	$(ls "$ROOT"/src/*.c) "$ROOT/gui/juno_bridge.c" \
+	"$HERE/probe/juno_probe_core.c" "$HERE/probe/host_ref.c" -o "$HREF" -lm
+"$HREF" "$BANK" > "$HERE/kernel/juno_ref.h" 2> "$HERE/kernel/build/host_ref.log"
+grep -q "OK (all seeds)" "$HERE/kernel/build/host_ref.log" || {
+	echo "!! host chunk-invariance FAILED — see build/host_ref.log"; exit 1; }
+
+echo ">> engine archive done: $(${PREFIX}ar t "$OUT" | wc -l) objects; juno_ref.h ready"

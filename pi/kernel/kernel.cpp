@@ -5,9 +5,14 @@
 #include <circle/string.h>
 #include <circle/machineinfo.h>
 
-// The bit-exact engine gate (juno_probe.cpp): render the original port on the
-// metal and compare every patch's sample hash to the plugin reference.
+// Two modes, one image family:
+//  GATE (default): render the original port on the metal and compare every
+//    scenario's sample hash to the plugin reference (juno_probe.cpp). This is
+//    the verifiable path (runs under QEMU).
+//  PLAY (-DJUNO_PLAY): feed Circle's I2S driver from the same render for real
+//    audio on silicon (juno_sound.cpp). QEMU has no I2S, so it is not run here.
 void run_juno_bitexact (void);
+void run_juno_play (CInterruptSystem *pInterrupt);
 
 static const char FromJuno[] = "juno";
 
@@ -64,10 +69,14 @@ TShutdownMode CKernel::Run (void)
 
 	m_Logger.Write (FromJuno, LogNotice, "Compiled: " __DATE__ " " __TIME__);
 
-	// The point of the whole board: run the original JUNO port on the metal and
-	// prove the rendered audio is bit-identical to the plugin.
+#ifdef JUNO_PLAY
+	// Real-time audio on silicon (does not return).
+	run_juno_play (&m_Interrupt);
+	return ShutdownHalt;
+#else
+	// Prove the rendered audio is bit-identical to the plugin, all scenarios.
 	run_juno_bitexact ();
-
 	m_Logger.Write (FromJuno, LogNotice, "PROBE COMPLETE — halting.");
 	return ShutdownHalt;
+#endif
 }

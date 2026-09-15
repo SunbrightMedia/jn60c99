@@ -21,6 +21,19 @@ uint64_t juno_probe_render_hash(const unsigned char *bank, int banklen,
                                 int patch, float sr, int note, int vel,
                                 int nframes, float *buf, float *peak_out);
 
+/* A deterministic seeded SCENARIO: note-on / note-off / patch-change events on
+ * an absolute SAMPLE grid (from `seed`), rendered across `total_frames`. The
+ * event times do not depend on `chunk`; only how the render is sliced does. So
+ * the same seed rendered at chunk = total_frames (one continuous call, what the
+ * plugin does) and at chunk = a small DMA block (what the I2S callback does)
+ * MUST return the same hash. That equality is the proof that the real-time
+ * block callback adds no boundary tick — the exact defect the S3 chain had.
+ *
+ * buf must hold 2*total_frames floats. Returns the FNV-1a-64 of the whole run. */
+uint64_t juno_probe_timeline_hash(const unsigned char *bank, int banklen,
+                                  float sr, uint32_t seed, int total_frames,
+                                  int chunk, float *buf, float *peak_out);
+
 #ifdef __cplusplus
 }
 #endif
