@@ -13,6 +13,7 @@
 //    audio on silicon (juno_sound.cpp). QEMU has no I2S, so it is not run here.
 void run_juno_bitexact (void);
 void run_juno_play (CInterruptSystem *pInterrupt);
+void run_juno_split (void);      // multi-core split gate (JUNO_SPLIT, needs --multicore)
 
 static const char FromJuno[] = "juno";
 
@@ -69,7 +70,12 @@ TShutdownMode CKernel::Run (void)
 
 	m_Logger.Write (FromJuno, LogNotice, "Compiled: " __DATE__ " " __TIME__);
 
-#ifdef JUNO_PLAY
+#if defined(JUNO_SPLIT)
+	// Multi-core split gate: prove the 4-core fork-join is bit-exact vs single
+	// core on real (emulated) cores.
+	run_juno_split ();
+	return ShutdownHalt;
+#elif defined(JUNO_PLAY)
 	// Real-time audio on silicon (does not return).
 	run_juno_play (&m_Interrupt);
 	return ShutdownHalt;

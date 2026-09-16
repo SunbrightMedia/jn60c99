@@ -249,6 +249,27 @@ sample. Requires `juno_gui_tick` (per-sample control step) + `juno_gui_state`
 accessors (test-only). NO DSP change. Only after this gate is green is the
 Circle multicore firmware written.
 
+### MULTI-CORE KERNEL — RUNS BIT-EXACT ON 4 EMULATED CORES (2026-09-16)
+`pi/kernel/juno_split.cpp` is the real firmware: `CJunoSplit : CMultiCoreSupport`
+(Circle's proven primitive), MiniDexed-style per-block fork-join with `volatile`
+status flags — NO atomics/IPIs — plus ARM `DataSyncBarrier`/`DataMemBarrier`
+around the barrier. 4 private engine copies; core 0 (voices 0-1 + master) kicks
+the 3 worker cores (voices 2-3|4-5|6-7), waits, then interleaves its render +
+master. Per-core FTZ. Built with `--multicore` (`ARM_ALLOW_MULTI_CORE`).
+
+It self-checks: core 0 also renders a single-core reference and compares the
+split output block for block. On `qemu-system-aarch64 -M raspi3b` (4 cores; do
+NOT pass `-smp` — it breaks boot):
+```
+CPU core 1/2/3 started
+MULTI-CORE RESULT: 8/8 patches identical to single-core
+SPLIT BIT-EXACT ON 4 EMULATED CORES — barrier + per-core copies proven
+```
+So the REAL concurrency — the barrier, memory ordering and per-core copies — is
+proven, not only the numerics. One command: `sh pi/run_split.sh`. Owed: the
+64-patch + storm sweep through the multicore path, and wiring it to the I2S PLAY
+callback (core 0's GetChunk drives the fork-join) on silicon.
+
 ## NEXT (open, in order)
 1. ~~Circle build; boot to metal.~~ **DONE.**
 2. ~~Link the engine; EXACT waveform match vs the plugin.~~ **DONE.**
