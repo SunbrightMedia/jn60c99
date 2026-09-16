@@ -3,7 +3,7 @@
 ~150 words unless the user asks for detail. Tables and code do not count.**
 The user says "STE" when you break this. Do not make them say it.
 
-# ⚑ THE FOUR MANTRAS (user-binding, 2026-08-13)
+# ⚑ THE FIVE MANTRAS (user-binding, 2026-08-13; mantra 5 added 2026-09-16)
 **Every action must advance one of these. If it advances none, do not do it.**
 1. **REWRITE** the `.vst3` code, bit-exact.
 2. **CONFIRM** that what you rewrote is correct — test it in every
@@ -11,10 +11,19 @@ The user says "STE" when you break this. Do not make them say it.
 3. **OPTIMIZE** the code AND your own work as you go.
 4. **LEAVE A LEGACY** — what is done and what is learned must be repeatable for
    the next plugin, documented in the most efficient way possible.
+5. **MY CODE IS NEVER ITS OWN JUDGE.** Every line I write is graded against
+   PROVEN code that cannot lie — a differential oracle — and NO gate is believed
+   until it is SEEN TO FAIL on a real defect. The harness is the prime suspect:
+   it never reimplements plugin logic, and it carries an isolation control that
+   MUST equal a known-proven path. (Every bringup defect so far was MY code —
+   glue, harness, config, a threshold — never the proven engine. So trust the
+   oracle, never my own word.)
 
 Order matters. 1 before 2 is wrong (unproven code). 2 before 3 is required
 (never optimize what is not proven). 4 is not last in time — write it as you
-go, or it is not written.
+go, or it is not written. 5 underwrites 2: a CONFIRM that only my own harness
+graded is NOT a confirmation — the oracle grades, and I must have watched it
+fail.
 
 # ⚑ READ FIRST, IN ORDER
 1. `END_GOAL.md` — WHAT we build (user's words, binding). Short form: audibly
