@@ -1252,6 +1252,20 @@ int juno_gui_render(juno_ctx *c, float *out, int nframes)
     return full;
 }
 
+/* One sample of the per-sample CONTROL step (arp + note tick) that juno_gui_render
+ * runs before each driver render — WITHOUT rendering. The multi-core split calls
+ * this on every core's private copy each sample, so every copy advances its arp
+ * and note/gate state identically (they all hold the same replicated control), and
+ * each core then renders only its own voices. Deterministic and side-effect-free
+ * across copies. Not used by the single-core path. */
+void juno_gui_tick(juno_ctx *c)
+{
+    if (!c) return;
+    if (c->arp_on) arp_tick(c);
+    juno_note_tick(c->st);
+    if (c->arp_trace_cap) c->arp_trace_smp++;
+}
+
 /* Warm the engine to its steady idle state, exactly as a DAW does by rendering
  * silence continuously from the moment the plugin is activated. A freshly
  * prepared engine holds ~190 smoothed control cells at 0 that only converge
