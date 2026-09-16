@@ -225,6 +225,30 @@ RIGIDITY CHECKLIST (the full set the split must honour):
 Items 1–2 are code-proven here; 3–6 are implementation disciplines the split
 firmware must follow (and the split gate re-checks 1–2 on every engine change).
 
+### BLOCK fork-join — modelled and proven, two more rules found by gating
+`pi/probe/block_split_gate.c` models the real firmware execution (shared-nothing
+private state per core, per-sample control tick replicated, one audio core sums
++ masters) and runs 60 CONSECUTIVE blocks vs `juno_gui_render` with the arp on/off
+and LIVE note events. Building it caught TWO defects that would have been vicious
+live bugs — both now design rules:
+
+8. **The master must stay interleaved per sample.** The master reads per-sample
+   control smoothers (the ~190 smoothed cells). A block-then-master ordering
+   reads them at end-of-block → last-bit drift. So the audio core does, per
+   sample: tick, render its voices, master, flush; workers only PRECOMPUTE their
+   voices for the block.
+9. **Every core's ctx gets the identical event stream from boot.** The voice
+   allocation state lives in the `juno_ctx`, NOT in the 12 MB `st`. A copy driven
+   by cloned `st` (but not the ctx) assigns a new note to a different voice →
+   divergence at the note-on. So control is BROADCAST to every copy from boot;
+   never clone mid-stream.
+
+RESULT with both rules: **BLOCK SHARED-NOTHING SPLIT IS BIT-EXACT** vs
+`juno_gui_render` — every 2/3/4-core partition, arp on/off, live notes, every
+sample. Requires `juno_gui_tick` (per-sample control step) + `juno_gui_state`
+accessors (test-only). NO DSP change. Only after this gate is green is the
+Circle multicore firmware written.
+
 ## NEXT (open, in order)
 1. ~~Circle build; boot to metal.~~ **DONE.**
 2. ~~Link the engine; EXACT waveform match vs the plugin.~~ **DONE.**

@@ -90,14 +90,20 @@ int main(int argc, char **argv)
             bound[ncore] = 8;
             uint32_t s = 0x1234u ^ (uint32_t)(p*131 + pt*7 + arp);
 
-            /* fresh engine on this patch, arp optionally on; clone to all copies */
-            juno_gui_reinit(cref, SR, 0);
-            juno_gui_apply_bank(cref, (const char *)bank, (int)len, p);
-            if (arp) juno_gui_arp_config(cref, 1, 0, 1, 120.0f, 0.75f);
-            juno_gui_note_on(cref, 60, 100);
-            memcpy(snap, juno_gui_state(cref), SB);
-            for (int cc = 0; cc < ncore; ++cc)
-                memcpy(juno_gui_state(ccore[cc]), snap, SB);
+            /* Set up the reference AND every core's copy with the IDENTICAL call
+             * sequence from a fresh engine — NOT an st clone. The voice allocator
+             * state lives in the juno_ctx, not in the 12 MB st, so a copy must be
+             * driven by the same events from boot to keep allocation in lockstep.
+             * This is the firmware rule: broadcast every event to every copy. */
+            void *all[5]; int nall = 0; all[nall++] = cref;
+            for (int cc = 0; cc < ncore; ++cc) all[nall++] = ccore[cc];
+            for (int a = 0; a < nall; ++a) {
+                juno_gui_reinit(all[a], SR, 0);
+                juno_gui_apply_bank(all[a], (const char *)bank, (int)len, p);
+                if (arp) juno_gui_arp_config(all[a], 1, 0, 1, 120.0f, 0.75f);
+                juno_gui_note_on(all[a], 60, 100);
+            }
+            (void)snap;
             nheld = 1; held[0] = 60;
 
             int diverged = 0;
