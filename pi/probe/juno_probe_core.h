@@ -42,6 +42,29 @@ int juno_probe_fuzz(const unsigned char *bank, int banklen, float sr,
                     uint32_t seed, int total_frames, float bound, float *buf,
                     float *worst_peak, long *nbad_finite, long *nbad_bound);
 
+/* ---- the storm event stream, exposed for reuse -------------------------- *
+ * ONE deterministic full-surface event generator, used by BOTH the single-core
+ * timeline/invariant gates above AND the multi-core split gate. A storm is the
+ * same list of events on host and metal, so the split gate can broadcast the
+ * identical stream to every core copy and to a single-core reference and prove
+ * they never diverge. */
+enum { JEV_ON = 0, JEV_OFF = 1, JEV_PATCH = 2, JEV_HOST = 3, JEV_TEMPO = 4 };
+struct juno_ev { int time; int kind; int a; int b; };   /* time is in frames */
+#define JUNO_MAXEV 1024
+
+/* Build the deterministic event list from `seed` across `total_frames`. wide=0
+ * = the musical range used by the bit-exact gate; wide=1 opens every control to
+ * its full VALID extreme (all 128 MIDI notes/velocities, every host param at its
+ * min..max edge) for the invariant fuzz. Writes at most `max` events; returns
+ * the count. Same output on x86 host and bare-metal ARM. */
+int  juno_storm_build(uint32_t seed, int total_frames, float sr, int wide,
+                      struct juno_ev *out, int max);
+
+/* Apply ONE event to ONE engine context (note on/off, patch change, host param,
+ * or tempo). The split gate calls this per core copy + reference to broadcast. */
+void juno_storm_fire(void *ctx, const unsigned char *bank, int banklen,
+                     const struct juno_ev *e);
+
 #ifdef __cplusplus
 }
 #endif

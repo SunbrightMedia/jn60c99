@@ -22,6 +22,7 @@
 #include <circle/timer.h>
 
 extern "C" {
+#include "../probe/juno_probe_core.h"   // the ONE proven full-surface storm generator
 void *juno_gui_create(float,int);
 void  juno_gui_reinit(void*,float,int);
 int   juno_gui_apply_bank(void*,const char*,int,int);
@@ -138,6 +139,29 @@ private:
 		juno_gui_reinit(m_ref, JS_SR, 0);
 		juno_gui_apply_bank(m_ref, (const char*)juno_bank_blob, m_banklen, p);
 	}
+	// Broadcast ONE storm event (note/patch/host/tempo) to every core copy AND
+	// the reference — the firmware rule that keeps voice allocation in lockstep.
+	void BroadcastEvent(const struct juno_ev *e)
+	{
+		const unsigned char *bk = juno_bank_blob;
+		for (int i = 0; i < JS_CORES; ++i) juno_storm_fire(m_ctx[i], bk, m_banklen, e);
+		juno_storm_fire(m_ref, bk, m_banklen, e);
+	}
+
+	// Render ONE block on both paths; accumulate max|diff|; return 1 if identical.
+	int CompareOneBlock(float *md)
+	{
+		float refblk[2*JS_NF];
+		juno_gui_render(m_ref, refblk, JS_NF);   // single-core reference
+		RenderSplitBlock(m_splblk);              // the real 4-core split
+		int ok = 1;
+		for (int n = 0; n < 2*JS_NF; ++n) {
+			float d = refblk[n] - m_splblk[n]; if (d < 0) d = -d;
+			if (d > *md) *md = d;
+			if (d != 0.0f) ok = 0;
+		}
+		return ok;
+	}
 
 	void RunGate(void)
 	{
@@ -145,40 +169,71 @@ private:
 		log->Write("split", LogNotice,
 			"MULTI-CORE split gate: 4 cores, voices 0-1|2-3|4-5|6-7, barrier fork-join");
 
-		const int patches[] = { 0, 5, 11, 27, 42, 48, 60, 7 };
-		const int NPAT = sizeof(patches)/sizeof(patches[0]);
+		// ---- Phase 1: ALL 64 factory patches, sustained 8-note chord --------
+		// A patch's whole voice/FX/master path, block for block. Continuity over
+		// PBLK blocks would expose any per-voice, FX or noise drift.
 		const int chord[8] = { 45, 48, 52, 55, 60, 64, 67, 72 };
-		const int NBLK = 24;
-		float refblk[2*JS_NF];
-
-		for (int p = 0; p < NPAT; ++p) {
-			Broadcast_patch(patches[p]);
+		const int PBLK = 16;
+		int ppass = 0, ptot = 0; float pworst = 0;
+		for (int p = 0; p < 64; ++p) {
+			Broadcast_patch(p);
 			for (int k = 0; k < 8; ++k) Broadcast_note_on(chord[k], 100);
-
 			int ok = 1; float md = 0;
-			for (int b = 0; b < NBLK && ok; ++b) {
-				juno_gui_render(m_ref, refblk, JS_NF);   // single-core reference
-				RenderSplitBlock(m_splblk);              // the real 4-core split
-				for (int n = 0; n < 2*JS_NF; ++n) {
-					float d = refblk[n] - m_splblk[n]; if (d < 0) d = -d;
-					if (d > md) md = d;
-					if (d != 0.0f) ok = 0;
-				}
-			}
-			if (md > m_worstdiff) m_worstdiff = md;
-			++m_total; if (ok) ++m_pass;
-			// CLogger has no %g; report max|diff| as parts-per-billion (0 = exact).
-			log->Write("split", LogNotice, "patch %2d: %s (max|diff| = %u ppb)",
-				   patches[p], ok ? "== MATCH" : "!! DIFF",
-				   (unsigned)(md * 1000000000.0f));
+			for (int b = 0; b < PBLK && ok; ++b) ok &= CompareOneBlock(&md);
+			if (md > pworst) pworst = md;
+			++ptot; if (ok) ++ppass;
+			if (!ok)
+				log->Write("split", LogNotice,
+					"patch %2d: !! DIFF (max|diff| = %u ppb)",
+					p, (unsigned)(md * 1000000000.0f));
+			else if ((p & 7) == 7)
+				log->Write("split", LogNotice,
+					"  ..patches %d/64 done, all MATCH (worst %u ppb)",
+					p + 1, (unsigned)(pworst * 1000000000.0f));
 		}
+		log->Write("split", LogNotice, "PATCHES: %d/64 identical to single-core", ppass);
+
+		// ---- Phase 2: seeded STORMS across the WHOLE surface ----------------
+		// The SAME 5 seeds the single-core bit-exact storm gate uses. The proven
+		// full-surface generator (notes, patch changes, all 79 host params,
+		// tempo) is broadcast to every core copy + the reference at block
+		// boundaries; the split must track the reference block for block.
+		static const unsigned seeds[] =
+			{ 0x0badc0deu, 0x00005eedu, 0x00c0ffeeu, 0x0a11ce99u, 0xdeadbeefu };
+		const int NSEED = (int)(sizeof(seeds)/sizeof(seeds[0]));
+		const int SBLK = 188;                      // 188 * 128 = 24064 frames/storm
+		                                           // (matches the single-core storm gate's ~24000)
+		static struct juno_ev evs[JUNO_MAXEV];
+		int spass = 0, stot = 0; float sworst = 0;
+		for (int si = 0; si < NSEED; ++si) {
+			int total = SBLK * JS_NF;
+			int nev = juno_storm_build(seeds[si], total, JS_SR, 0, evs, JUNO_MAXEV);
+			Broadcast_patch(0);                    // identical cold start everywhere
+			int ei = 0, ok = 1; float md = 0;
+			for (int b = 0; b < SBLK && ok; ++b) {
+				int bend = (b + 1) * JS_NF;
+				while (ei < nev && evs[ei].time < bend) BroadcastEvent(&evs[ei++]);
+				ok &= CompareOneBlock(&md);
+			}
+			if (md > sworst) sworst = md;
+			++stot; if (ok) ++spass;
+			log->Write("split", LogNotice,
+				"storm %08x: %s over %d blocks, %d events (max|diff| = %u ppb)",
+				seeds[si], ok ? "== MATCH" : "!! DIFF", SBLK, nev,
+				(unsigned)(md * 1000000000.0f));
+		}
+		log->Write("split", LogNotice, "STORMS: %d/%d identical to single-core", spass, stot);
 
 		// stop the workers
 		for (int c = 1; c < JS_CORES; ++c) m_status[c] = ST_EXIT;
 		DataSyncBarrier();
 
-		log->Write("split", LogNotice, "MULTI-CORE RESULT: %d/%d patches identical to single-core",
-			   m_pass, m_total);
+		m_pass = ppass + spass; m_total = ptot + stot;
+		m_worstdiff = pworst > sworst ? pworst : sworst;
+		log->Write("split", LogNotice,
+			"MULTI-CORE RESULT: %d/%d scenarios identical to single-core "
+			"(64 patches + %d storms; worst %u ppb)",
+			m_pass, m_total, NSEED, (unsigned)(m_worstdiff * 1000000000.0f));
 		if (m_pass == m_total)
 			log->Write("split", LogNotice,
 			  "SPLIT BIT-EXACT ON 4 EMULATED CORES — barrier + per-core copies proven");

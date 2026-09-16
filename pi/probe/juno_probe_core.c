@@ -79,17 +79,16 @@ static uint32_t xorshift32(uint32_t *s)
     return (*s = x);
 }
 
-enum { EV_ON = 0, EV_OFF = 1, EV_PATCH = 2, EV_HOST = 3, EV_TEMPO = 4 };
-struct ev { int time; int kind; int a; int b; };
-#define MAXEV 1024
-
 /* Build the deterministic event list from the seed. Same on host and metal.
  * `wide`=0 is the musical range used by the bit-exact gate; `wide`=1 opens
  * EVERY control to its full VALID extreme — all 128 MIDI notes/velocities and
  * every host param across its true min..max — for the invariant fuzz. Values
  * stay in-range on purpose: out-of-range enum bytes the plugin UI can never
- * emit would test our clamping, not the audio engine's stability. */
-static int build_events(uint32_t seed, int total, float sr, int wide, struct ev *out)
+ * emit would test our clamping, not the audio engine's stability.
+ * Public (declared in the header) so the multi-core split gate reuses the exact
+ * same generator, guaranteeing an identical stream to every core copy. */
+int juno_storm_build(uint32_t seed, int total, float sr, int wide,
+                     struct juno_ev *out, int max)
 {
     uint32_t s = seed ? seed : 1u;
     int held[8]; int nheld = 0;             /* recent note-on pool for note-off */
@@ -97,23 +96,23 @@ static int build_events(uint32_t seed, int total, float sr, int wide, struct ev 
     int t = 0, n = 0;
     int step_lo = (int)(sr * 0.008f);       /* ~8 ms .. ~60 ms between events    */
     int step_span = (int)(sr * 0.052f);
-    while (n < MAXEV) {
+    while (n < max) {
         t += step_lo + (int)(xorshift32(&s) % (uint32_t)step_span);
         if (t >= total) break;
         uint32_t roll = xorshift32(&s) % 100u;
-        struct ev e; e.time = t; e.a = 0; e.b = 0;
+        struct juno_ev e; e.time = t; e.a = 0; e.b = 0;
         if (roll < 34u) {                    /* NOTE ON */
             int note = wide ? (int)(xorshift32(&s) % 128u)     /* full MIDI */
                             : 36 + (int)(xorshift32(&s) % 48u);
             int vel  = wide ? (int)(xorshift32(&s) % 128u)
                             : 40 + (int)(xorshift32(&s) % 88u);
-            e.kind = EV_ON; e.a = note; e.b = vel;
+            e.kind = JEV_ON; e.a = note; e.b = vel;
             if (nheld < 8) held[nheld++] = note; else held[xorshift32(&s) & 7u] = note;
         } else if (roll < 52u && nheld > 0) {/* NOTE OFF a held note */
             int idx = (int)(xorshift32(&s) % (uint32_t)nheld);
-            e.kind = EV_OFF; e.a = held[idx];
+            e.kind = JEV_OFF; e.a = held[idx];
         } else if (roll < 62u) {             /* PATCH change */
-            e.kind = EV_PATCH; e.a = (int)(xorshift32(&s) % 64u);
+            e.kind = JEV_PATCH; e.a = (int)(xorshift32(&s) % 64u);
         } else if (roll < 95u) {             /* HOST PARAM — the whole surface */
             int i = (int)(xorshift32(&s) % (uint32_t)nhost);
             int lo = juno_host_param_min(i), hi = juno_host_param_max(i);
@@ -121,23 +120,24 @@ static int build_events(uint32_t seed, int total, float sr, int wide, struct ev 
             /* both modes stay in-range; wide favours the extremes (edges) */
             int v = lo + (int)(xorshift32(&s) % (uint32_t)span);
             if (wide && (xorshift32(&s) & 1u)) v = (xorshift32(&s) & 1u) ? lo : hi;
-            e.kind = EV_HOST; e.a = i; e.b = v;
+            e.kind = JEV_HOST; e.a = i; e.b = v;
         } else {                             /* TEMPO */
-            e.kind = EV_TEMPO; e.a = 20 + (int)(xorshift32(&s) % 280u);
+            e.kind = JEV_TEMPO; e.a = 20 + (int)(xorshift32(&s) % 280u);
         }
         out[n++] = e;
     }
     return n;
 }
 
-static void fire(void *c, const unsigned char *bank, int banklen, const struct ev *e)
+void juno_storm_fire(void *c, const unsigned char *bank, int banklen,
+                     const struct juno_ev *e)
 {
     switch (e->kind) {
-    case EV_ON:    juno_gui_note_on(c, e->a, e->b);   break;
-    case EV_OFF:   juno_gui_note_off(c, e->a);        break;
-    case EV_PATCH: juno_gui_apply_bank(c, (const char *)bank, banklen, e->a); break;
-    case EV_HOST:  juno_gui_host_set(c, e->a, e->b);  break;
-    case EV_TEMPO: juno_gui_set_tempo(c, (float)e->a); break;
+    case JEV_ON:    juno_gui_note_on(c, e->a, e->b);   break;
+    case JEV_OFF:   juno_gui_note_off(c, e->a);        break;
+    case JEV_PATCH: juno_gui_apply_bank(c, (const char *)bank, banklen, e->a); break;
+    case JEV_HOST:  juno_gui_host_set(c, e->a, e->b);  break;
+    case JEV_TEMPO: juno_gui_set_tempo(c, (float)e->a); break;
     }
 }
 
@@ -145,15 +145,15 @@ uint64_t juno_probe_timeline_hash(const unsigned char *bank, int banklen,
                                   float sr, uint32_t seed, int total_frames,
                                   int chunk, float *buf, float *peak_out)
 {
-    static struct ev evs[MAXEV];
-    int nev = build_events(seed, total_frames, sr, 0, evs);  /* valid, in-range */
+    static struct juno_ev evs[JUNO_MAXEV];
+    int nev = juno_storm_build(seed, total_frames, sr, 0, evs, JUNO_MAXEV); /* in-range */
 
     void *c = probe_ctx(sr, 0);
     if (!c) { if (peak_out) *peak_out = 0.0f; return 0; }
 
     int pos = 0, ei = 0;
     while (pos < total_frames) {
-        while (ei < nev && evs[ei].time <= pos) fire(c, bank, banklen, &evs[ei++]);
+        while (ei < nev && evs[ei].time <= pos) juno_storm_fire(c, bank, banklen, &evs[ei++]);
 
         int chunk_bound = ((pos / chunk) + 1) * chunk;     /* next DMA boundary */
         int seg_end = chunk_bound < total_frames ? chunk_bound : total_frames;
@@ -185,15 +185,15 @@ int juno_probe_fuzz(const unsigned char *bank, int banklen, float sr,
                     uint32_t seed, int total_frames, float bound, float *buf,
                     float *worst_peak, long *nbad_finite, long *nbad_bound)
 {
-    static struct ev evs[MAXEV];
-    int nev = build_events(seed, total_frames, sr, 1, evs);   /* wide: any input */
+    static struct juno_ev evs[JUNO_MAXEV];
+    int nev = juno_storm_build(seed, total_frames, sr, 1, evs, JUNO_MAXEV); /* wide */
 
     void *c = probe_ctx(sr, 0);
     if (!c) return -1;
 
     int pos = 0, ei = 0, chunk = 256;
     while (pos < total_frames) {
-        while (ei < nev && evs[ei].time <= pos) fire(c, bank, banklen, &evs[ei++]);
+        while (ei < nev && evs[ei].time <= pos) juno_storm_fire(c, bank, banklen, &evs[ei++]);
         int cb = ((pos / chunk) + 1) * chunk;
         int seg_end = cb < total_frames ? cb : total_frames;
         if (ei < nev && evs[ei].time < seg_end) seg_end = evs[ei].time;

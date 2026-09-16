@@ -21,8 +21,10 @@ make -C "$CIRCLE/lib/sound" -j"$(nproc)" >/dev/null
 make -C "$HERE/kernel" clean >/dev/null 2>&1 || true
 make -C "$HERE/kernel" JUNO_SPLIT=1 >/dev/null
 
-echo ">> boot on 4 emulated cores (-M raspi3b, no -smp; up to 60 s)"
-timeout 60 qemu-system-aarch64 -M raspi3b -kernel "$HERE/kernel/kernel8.img" \
+echo ">> boot on 4 emulated cores (-M raspi3b, no -smp; up to 300 s)"
+# The widened gate renders ~1500 blocks (64 patches + 5 storms) twice each
+# (reference + split) under QEMU, so allow generous wall time.
+timeout 300 qemu-system-aarch64 -M raspi3b -kernel "$HERE/kernel/kernel8.img" \
     -serial "file:$OUT" -serial null -display none < /dev/null > /dev/null 2>&1 || true
 
 echo "---------------- UART ----------------"

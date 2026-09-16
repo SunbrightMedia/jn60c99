@@ -258,17 +258,26 @@ the 3 worker cores (voices 2-3|4-5|6-7), waits, then interleaves its render +
 master. Per-core FTZ. Built with `--multicore` (`ARM_ALLOW_MULTI_CORE`).
 
 It self-checks: core 0 also renders a single-core reference and compares the
-split output block for block. On `qemu-system-aarch64 -M raspi3b` (4 cores; do
-NOT pass `-smp` — it breaks boot):
+split output block for block. The gate is WIDE (2026-09-16): all 64 factory
+patches (sustained 8-note chord) AND the 5 seeded STORMS the single-core
+bit-exact gate uses. A storm drives the WHOLE surface — notes, patch changes,
+all 79 host params, tempo — from the ONE proven generator (`juno_storm_build`
+/`juno_storm_fire`, now public in `pi/probe/juno_probe_core.c`, so host and
+metal fire the identical stream). Each event is BROADCAST to every core copy
+AND the reference at the block boundary, so voice allocation stays in lockstep
+(the firmware rule). On `qemu-system-aarch64 -M raspi3b` (4 cores; do NOT pass
+`-smp` — it breaks boot):
 ```
 CPU core 1/2/3 started
-MULTI-CORE RESULT: 8/8 patches identical to single-core
+PATCHES: 64/64 identical to single-core
+storm 0badc0de..deadbeef: == MATCH over 188 blocks (max|diff| = 0 ppb)
+MULTI-CORE RESULT: 69/69 scenarios identical to single-core (64 patches + 5 storms; worst 0 ppb)
 SPLIT BIT-EXACT ON 4 EMULATED CORES — barrier + per-core copies proven
 ```
-So the REAL concurrency — the barrier, memory ordering and per-core copies — is
-proven, not only the numerics. One command: `sh pi/run_split.sh`. Owed: the
-64-patch + storm sweep through the multicore path, and wiring it to the I2S PLAY
-callback (core 0's GetChunk drives the fork-join) on silicon.
+So the REAL concurrency — the barrier, memory ordering and per-core copies —
+holds across every patch and a full-surface storm, not only the numerics. One
+command: `sh pi/run_split.sh`. Owed: wiring it to the I2S PLAY callback (core 0's
+GetChunk drives the fork-join) on silicon.
 
 ## NEXT (open, in order)
 1. ~~Circle build; boot to metal.~~ **DONE.**
