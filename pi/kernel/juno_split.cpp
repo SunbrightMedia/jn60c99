@@ -141,14 +141,35 @@ public:
 		log->Write ("split", LogNotice,
 			"VOICE-STEAL (13 notes): %d/%d identical to single-core", stpass, NSP);
 
+		// ---- Phase 5: IDLE ---------------------------------------------------
+		// No notes held: the voices sum to zero and the output is the master's
+		// own idle floor (the JUNO chorus/BBD, ~ -66 dBFS — the plugin's genuine
+		// output, what the silence probe measures). The split must reproduce that
+		// floor bit-exactly too, not just note audio. (The earlier phases always
+		// played notes, so idle was untested until now.)
+		const int ipatch[] = { 0, 5, 27, 48, 63 };
+		const int NIP = (int) (sizeof (ipatch) / sizeof (ipatch[0]));
+		int ipass = 0;
+		for (int i = 0; i < NIP; ++i) {
+			GPatch (ipatch[i]);                          // no notes at all
+			int ok = 1; float md = 0;
+			for (int b = 0; b < 8 && ok; ++b) ok &= CompareBlock (JS_DMA, &md);
+			if (md > worst) worst = md;
+			if (ok) ++ipass;
+			else log->Write ("split", LogNotice,
+				"idle patch %2d: !! DIFF (max|diff| = %u ppb)", ipatch[i], ppb (md));
+		}
+		log->Write ("split", LogNotice,
+			"IDLE (no notes): %d/%d identical to single-core", ipass, NIP);
+
 		m_fork->Stop ();
 
-		int pass  = ppass + spass + dpass + stpass;
-		int total = 64 + NSEED + dtot + NSP;
+		int pass  = ppass + spass + dpass + stpass + ipass;
+		int total = 64 + NSEED + dtot + NSP + NIP;
 		log->Write ("split", LogNotice,
 			"MULTI-CORE RESULT: %d/%d scenarios identical to single-core "
-			"(64 patches + %d storms + %d block-size + %d voice-steal; worst %u ppb)",
-			pass, total, NSEED, dtot, NSP, ppb (worst));
+			"(64 patches + %d storms + %d block-size + %d steal + %d idle; worst %u ppb)",
+			pass, total, NSEED, dtot, NSP, NIP, ppb (worst));
 		if (pass == total)
 			log->Write ("split", LogNotice,
 			  "SPLIT BIT-EXACT ON 4 EMULATED CORES — barrier + per-core copies proven");

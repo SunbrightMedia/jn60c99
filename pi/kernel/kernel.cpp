@@ -14,6 +14,7 @@
 void run_juno_bitexact (void);
 void run_juno_play (CInterruptSystem *pInterrupt);
 void run_juno_split (void);      // multi-core split gate (JUNO_SPLIT, needs --multicore)
+void run_juno_silence (void);    // SHIP-LAW silence probe (JUNO_SILENCE, QEMU-runnable)
 
 static const char FromJuno[] = "juno";
 
@@ -70,7 +71,12 @@ TShutdownMode CKernel::Run (void)
 
 	m_Logger.Write (FromJuno, LogNotice, "Compiled: " __DATE__ " " __TIME__);
 
-#if defined(JUNO_SPLIT)
+#if defined(JUNO_SILENCE)
+	// SHIP-LAW silence probe: render the boot bank with no notes on 4 cores and
+	// prove the idle output is SILENT (runs under QEMU — no I2S needed).
+	run_juno_silence ();
+	return ShutdownHalt;
+#elif defined(JUNO_SPLIT)
 	// Multi-core split gate: prove the 4-core fork-join is bit-exact vs single
 	// core on real (emulated) cores.
 	run_juno_split ();

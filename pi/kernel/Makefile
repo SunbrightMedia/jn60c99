@@ -16,14 +16,21 @@ endif
 ifdef JUNO_SPLIT
 DEFINE += -DJUNO_SPLIT
 endif
+ifdef JUNO_SILENCE
+DEFINE += -DJUNO_SILENCE
+endif
 # Detector-reach: inject one split fault (see juno_forkjoin.cpp). Default 0.
 ifdef JS_MUT
 DEFINE += -DJS_MUT=$(JS_MUT)
 endif
+# Silence-probe seen-to-fail: force a held note so the probe must verdict STUCK.
+ifdef JUNO_SIL_STUCK
+DEFINE += -DJUNO_SIL_STUCK
+endif
 
 # Kernel glue objects (built with Circle's flags — no DSP math here).
 OBJS	= main.o kernel.o juno_probe.o juno_sound.o juno_split.o juno_forkjoin.o \
-	  bank_blob.o bare_stubs.o
+	  juno_silence.o juno_panel.o bank_blob.o bare_stubs.o
 
 # Circle's own I2S sound driver (libsound) + core. --start-group resolves refs.
 LIBS	= $(CIRCLEHOME)/lib/sound/libsound.a \

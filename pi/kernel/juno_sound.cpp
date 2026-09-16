@@ -26,6 +26,9 @@
 extern "C" {
 void juno_enable_hw_ftz (void);
 }
+int   juno_silence_check (CJunoForkJoin *fork);        // juno_silence.cpp
+void *juno_panel_create (void);                        // juno_panel.cpp
+void  juno_panel_poll (void *panel, CJunoForkJoin *fork);
 
 #define JS_RATE   48000
 #define JS_CHUNK  2048           // I2S DMA chunk, in words (frames*channels)
@@ -33,23 +36,25 @@ void juno_enable_hw_ftz (void);
 class CJunoSound : public CI2SSoundBaseDevice
 {
 public:
-	CJunoSound (CInterruptSystem *pInterrupt, CJunoForkJoin *fork)
+	CJunoSound (CInterruptSystem *pInterrupt, CJunoForkJoin *fork, void *panel)
 	:	CI2SSoundBaseDevice (pInterrupt, JS_RATE, JS_CHUNK),
-		m_fork (fork), m_scale (0.0f), m_scratch (0) {}
+		m_fork (fork), m_panel (panel), m_scale (0.0f), m_scratch (0) {}
 
 	boolean Setup (void)
 	{
-		m_fork->BroadcastPatch (0);        // boot patch on every core copy
 		m_scale   = (float) GetRangeMax ();
 		m_scratch = (float *) malloc (sizeof (float) * JS_CHUNK);   // >= 2*frames
 		return m_scratch != 0;
 	}
 
 	// Circle calls this on core 0 (I2S IRQ) to fill one DMA block. nChunkSize is
-	// a WORD count (one word per channel). We render frames = nChunkSize/channels
-	// through the 4-core fork-join and scale each float sample into the hw range.
+	// a WORD count (one word per channel). We poll the panel at the block boundary
+	// (no re-entrancy vs the render), render frames = nChunkSize/channels through
+	// the 4-core fork-join, and scale each float sample into the hw range.
 	unsigned GetChunk (u32 *pBuffer, unsigned nChunkSize) override
 	{
+		juno_panel_poll (m_panel, m_fork);             // keys/octave between blocks
+
 		unsigned nCh    = GetHWTXChannels ();          // 2 (stereo)
 		unsigned frames = nChunkSize / nCh;
 		int lo = GetRangeMin (), hi = GetRangeMax ();
@@ -68,6 +73,7 @@ public:
 
 private:
 	CJunoForkJoin *m_fork;
+	void  *m_panel;
 	float  m_scale;
 	float *m_scratch;
 };
@@ -91,8 +97,20 @@ void run_juno_play (CInterruptSystem *pInterrupt)
 		log->Write ("juno", LogPanic, "PLAY: CMultiCoreSupport init failed");
 		return;
 	}
+	fork->BroadcastPatch (0);                // boot patch on every core copy
 
-	CJunoSound *snd = new CJunoSound (pInterrupt, fork);
+	// SHIP LAW: the image proves its own end state BEFORE the DAC can make a
+	// sound. Quiet input on the boot bank must be SILENT, or we refuse to open
+	// I2S (a stuck/self-oscillating idle would otherwise reach the speaker).
+	if (!juno_silence_check (fork)) {
+		log->Write ("juno", LogPanic,
+			    "PLAY: SILENCE PROBE STUCK — refusing to start I2S");
+		return;
+	}
+
+	void *panel = juno_panel_create ();      // GPIO keys + octave (unwired-safe)
+
+	CJunoSound *snd = new CJunoSound (pInterrupt, fork, panel);
 	if (snd == 0 || !snd->Setup ()) {
 		log->Write ("juno", LogPanic, "PLAY: sound setup failed");
 		return;
@@ -102,11 +120,12 @@ void run_juno_play (CInterruptSystem *pInterrupt)
 		return;
 	}
 	log->Write ("juno", LogNotice,
-		    "PLAY: I2S running — boot patch 0 sounding, voices 0-1|2-3|4-5|6-7");
+		    "PLAY: I2S running — silence proven, panel live, voices 0-1|2-3|4-5|6-7");
 
-	// The DMA pulls chunks via IRQ on core 0; each pull drives the fork-join.
+	// The DMA pulls chunks via IRQ on core 0; each pull polls the panel then
+	// drives the fork-join.
 	for (;;) {
-		snd->IsActive ();               // touch the device; panel/MIDI input lands next
+		snd->IsActive ();               // keep the device alive; MIDI-in lands next
 		CTimer::SimpleMsDelay (100);
 	}
 }

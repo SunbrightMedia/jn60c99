@@ -42,8 +42,10 @@ public:
 	// The fork-join: render `frames` interleaved stereo frames into out[2*frames]
 	// across all 4 cores. Bit-identical to the single-core juno_gui_render over
 	// the same frames (proven by the gate). Safe for any frames >= 0; rendered in
-	// <= MAXBLK sub-blocks so the per-voice buffer stays bounded.
-	void RenderBlock (float *out, int frames);
+	// <= MAXBLK sub-blocks so the per-voice buffer stays bounded. If vpk != 0 it
+	// must point at 8 floats; each is raised to that voice's peak |sample| over
+	// the block (used by the silence probe), never lowered.
+	void RenderBlock (float *out, int frames, float *vpk = 0);
 
 	void Stop (void);               // release the workers (they leave Run())
 
@@ -51,6 +53,7 @@ public:
 	// lockstep (the firmware rule). The gate mirrors each to its reference.
 	void BroadcastPatch (int idx);  // reinit + apply_bank (cold patch select)
 	void NoteOn (int note, int vel);
+	void NoteOff (int note);
 	void FireEvent (const struct juno_ev *e);   // note/patch/host/tempo
 
 private:

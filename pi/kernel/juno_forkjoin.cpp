@@ -17,6 +17,7 @@ void *juno_gui_create (float, int);
 void  juno_gui_reinit (void *, float, int);
 int   juno_gui_apply_bank (void *, const char *, int, int);
 void  juno_gui_note_on (void *, int, int);
+void  juno_gui_note_off (void *, int);
 void  juno_gui_tick (void *);
 unsigned char *juno_gui_state (void *);
 void  juno_enable_hw_ftz (void);
@@ -99,7 +100,7 @@ void CJunoForkJoin::RenderVoices (int core)
 	}
 }
 
-void CJunoForkJoin::RenderBlock (float *out, int frames)
+void CJunoForkJoin::RenderBlock (float *out, int frames, float *vpk)
 {
 	int done = 0;
 	while (done < frames) {
@@ -131,6 +132,11 @@ void CJunoForkJoin::RenderBlock (float *out, int frames)
 			float L = 0, R = 0, *a3[2] = { &L, &R };
 			juno_master_render (sa, a2, a3); juno_flush_denormals (sa);
 			o[2 * s] = L; o[2 * s + 1] = R;
+			if (vpk)                                     // per-voice peak (probe)
+				for (int v = 0; v < 8; ++v) {
+					float a = m_vbuf[v][s]; if (a < 0) a = -a;
+					if (a > vpk[v]) vpk[v] = a;
+				}
 		}
 		done += n;
 	}
@@ -153,6 +159,11 @@ void CJunoForkJoin::BroadcastPatch (int idx)
 void CJunoForkJoin::NoteOn (int note, int vel)
 {
 	for (int i = 0; i < NCORES; ++i) juno_gui_note_on (m_ctx[i], note, vel);
+}
+
+void CJunoForkJoin::NoteOff (int note)
+{
+	for (int i = 0; i < NCORES; ++i) juno_gui_note_off (m_ctx[i], note);
 }
 
 void CJunoForkJoin::FireEvent (const struct juno_ev *e)

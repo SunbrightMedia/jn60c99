@@ -276,26 +276,55 @@ PATCHES: 64/64 identical to single-core
 storm 0badc0de..deadbeef: == MATCH over 188 blocks (max|diff| = 0 ppb)
 BLOCK-SIZE {1024,1536,100}: 9/9 identical to single-core
 VOICE-STEAL (13 notes): 3/3 identical to single-core
-MULTI-CORE RESULT: 81/81 scenarios identical to single-core (worst 0 ppb)
+IDLE (no notes): 5/5 identical to single-core
+MULTI-CORE RESULT: 86/86 scenarios identical to single-core (worst 0 ppb)
 SPLIT BIT-EXACT ON 4 EMULATED CORES — barrier + per-core copies proven
 ```
 Coverage: 64 patches; 5 full-surface storms; block sizes 1024 (the I2S chunk),
-1536 (> MAXBLK, so the sub-block loop must stitch two fork-joins) and 100; and
-voice stealing (13 notes onto 8 physical voices, the class where a harness bug
-once hid). All 0 ppb.
+1536 (> MAXBLK, so the sub-block loop must stitch two fork-joins) and 100; voice
+stealing (13 notes onto 8 physical voices, the class where a harness bug once
+hid); AND idle (no notes — the earlier phases all played notes, so the master's
+own idle floor was untested until now). All 0 ppb.
 
-**PLAY** (`juno_sound.cpp`): core 0's I2S `GetChunk` calls the same
-`fork.RenderBlock(frames)` — the DMA pull IS the fork-join kick — then scales to
-the hardware range. The workers (cores 1-3) are started by `fork.Initialize()`
-at boot and spin ready. So the 4-core real-time audio is bit-identical to the
-plugin by the gate's proof. `sh pi/build.sh` builds it (links clean); QEMU has
-no I2S, so only silicon can hear it. Owed: panel/MIDI input into the PLAY
-instance; flash + SILENCE PROBE on a real Pi 3A+ + I2S DAC.
+**PLAY** (`juno_sound.cpp`): core 0's I2S `GetChunk` polls the panel then calls
+the same `fork.RenderBlock(frames)` — the DMA pull IS the fork-join kick — then
+scales to the hardware range. The workers (cores 1-3) are started by
+`fork.Initialize()` at boot and spin ready. So the 4-core real-time audio is
+bit-identical to the plugin by the gate's proof. `sh pi/build.sh` builds it
+(links clean, with the silence probe + panel); QEMU has no I2S, so only silicon
+can hear it. Owed: MIDI-in; the pot ADC; flash on a real Pi 3A+ + I2S DAC.
+
+### SILENCE PROBE (SHIP LAW) + PANEL (2026-09-16)
+**Silence probe** (`juno_silence.cpp`): before the DAC opens, PLAY renders the
+boot bank with NO notes through the fork-join and proves the idle output is
+SILENT; a STUCK verdict refuses to start I2S. `sh pi/run_silence.sh` proves it
+under QEMU AND its seen-to-fail (`JUNO_SIL_STUCK` holds a note -> STUCK, out_peak
+0.197). KEY FINDING: silence is NOT digital zero. The plugin's own idle output
+carries a small steady floor (the JUNO chorus/BBD): measured on the x86 engine
+(== the plugin) the no-note floor is 0..0.00081 across all 64 patches (~ -62
+dBFS), boot patch 0 = 0.00049 — CORRECT output, not a fault. The threshold is
+0.01 (-40 dBFS): >12x the floor, far below any audible stuck voice. The split
+gate's new IDLE phase proves that floor is bit-exact across cores too.
+
+**Panel** (`juno_panel.cpp`): GPIO keys + octave, Circle `CGPIOPin`, pull-up
+ACTIVE-LOW, debounced, UNWIRED-SAFE (an unconnected pin reads high = not pressed,
+so a bare board makes no phantom notes). Polled at the TOP of `GetChunk` (the
+block boundary), so note events never race the render on core 0 — the same
+"control between blocks" rule the fork-join follows. BCM pin map: keys C/C#/D/D#
+= GPIO 17/27/22/23; octave down/up = GPIO 5/6. POTS (cutoff/resonance): the Pi
+has NO on-chip ADC; analog pots need an external SPI ADC (e.g. MCP3008 on
+`CSPIMaster`) — that read + the arm-by-stillness pickup law land when the ADC is
+wired. GetChunk polls the panel only on silicon (QEMU never fires I2S), so the
+panel is compile/link-proven here; its logic (debounce, octave, note map) is
+silicon-tested.
 
 ### GATE REACH — what this gate catches, and what it CANNOT (2026-09-16)
 "Every gate must be SEEN TO FAIL." The mutation switch `JS_MUT` in
 `juno_forkjoin.cpp` injects one fault; `make JUNO_SPLIT=1 JS_MUT=n` then shows
 whether the gate goes RED. Battery result on QEMU `raspi3b`:
+
+Battery ran on the 81-scenario gate (before the IDLE phase; idle adds 5
+all-GREEN scenarios and changes no verdict below, control now 86/86):
 
 | JS_MUT | injected fault | gate verdict | meaning |
 |---|---|---|---|
@@ -322,9 +351,12 @@ Reading it straight:
 RESIDUAL RISK, silicon-only (QEMU cannot test): weak-memory reordering; the
 real-time deadline / underrun; the `GetChunk` IRQ+DMA path (no I2S in QEMU); the
 hardware (non-`--qemu`) multicore boot; the DAC format; a worker fault hanging
-core 0 (no watchdog yet). Mitigation before any flash: a SILENCE PROBE in the
-PLAY image (SHIP LAW) + a soak under load. None of these is a numeric defect the
-gate could have caught.
+core 0 (no watchdog yet); the GPIO panel reads + debounce. The SILENCE PROBE
+(SHIP LAW) is now BUILT into the PLAY image and proven under QEMU (accepts the
+floor, catches STUCK), so the first flash proves its own end state. Still owed
+before/at the flash: a soak under load (memory ordering + deadline), MIDI-in, and
+the pot ADC. None of the residual items is a numeric defect the gate could have
+caught.
 
 ## NEXT (open, in order)
 1. ~~Circle build; boot to metal.~~ **DONE.**
