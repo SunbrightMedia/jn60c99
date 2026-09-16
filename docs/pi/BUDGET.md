@@ -66,3 +66,42 @@ A53 is in-order, dual-issue; this code is dependency-bound scalar FP, so
 The full, uncompromised 8-voice engine at 48 kHz fits a single Pi 3A+ / Zero 2 W
 board with real margin **when voices are spread across its 4 cores**. Confirmed
 by a MEASURED per-sample instruction count, not a model.
+
+## PER-CORE SPLIT BUDGET — replication-aware (MEASURED 2026-09-16)
+The sections above divide the whole-sample cost as if the split shared it evenly.
+It does NOT. The shared-nothing fork-join gives each core its OWN engine copy, so
+two costs are **not divided**:
+- the per-sample **control tick** (~190 smoothers + arp/note) runs on EVERY core;
+- the **master + FX** runs only on core 0 (it owns the mix).
+Only the **voice** render is actually divided. MEASURED per-sample (callgrind,
+one patch, 8000 samples; ÷8 for one voice):
+
+| item | x86 Ir/sample | divided by the split? |
+|---|---:|---|
+| one voice | 2,877 | YES (2 voices/core in 2·2·2·2) |
+| control tick + glue | 6,178 | NO — replicated on all 4 cores |
+| FTZ flush | 1,400 | NO — per core |
+| master + FX | 1,196–2,400 | NO — core 0 only (patch-varying) |
+
+So the busiest core (core 0) per sample =
+tick 6,178 + 2 voices 5,754 + master ~2,400 + flush 1,400 = **~15,700 x86 Ir**
+→ ×0.671 = **~10,600 aarch64 instr**. A worker (no master) ≈ **~8,900 instr**.
+
+Per-core headroom at 48 kHz (IPC band 0.7–1.2; ×1.25 worst-patch on core 0):
+
+| split | busiest core, 3A+ @1.4 GHz | busiest core, Zero 2 W @1.0 GHz |
+|---|---:|---:|
+| **4-core (2·2·2·2, shipped)** | ~30–52% (worst-patch to ~65%) | ~42–72% (worst-patch to ~90%) |
+| 2-core (4·4) | ~41–71% | ~58–**99%** (worst corner) |
+
+**Read-out (answers "doesn't it fit in 2 cores?"):**
+- YES, 2 cores fit — but on the Zero 2 W the worst-patch/low-IPC corner touches
+  ~99%, i.e. no margin. That is why the shipped split uses all **4 cores**:
+  each core sits ~40–70%, so a heavy patch or a low IPC still leaves headroom.
+- **core 0 is the bottleneck** (it carries the master). Rebalancing it to 1 voice
+  would only shift the load to a 3-voice worker; 2·2·2·2 is near-optimal.
+- The **tick replication (~6,178 Ir/core)** is why more cores help sub-linearly:
+  you cannot divide the whole sample by 4. Real, but affordable.
+- Still an ESTIMATE in one place — **IPC** — resolved only by the on-silicon PMU
+  cycle counter. The deadline itself (one 1024-frame block = 21.3 ms) is met with
+  wide margin at every point in the band.
