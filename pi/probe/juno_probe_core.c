@@ -6,6 +6,7 @@
 
 /* engine host API — exactly the symbols gui/juno_bridge.c exports */
 void *juno_gui_create (float sample_rate, int chorus_mode);
+void  juno_gui_reinit (void *ctx, float sample_rate, int chorus_mode);
 void  juno_gui_destroy(void *ctx);
 int   juno_gui_apply_bank(void *ctx, const char *bank, int len, int idx);
 void  juno_gui_note_on(void *ctx, int note, int vel);
@@ -20,11 +21,24 @@ int   juno_host_param_max(int i);
 void  juno_gui_host_set(void *ctx, int i, int v);
 void  juno_gui_set_tempo(void *ctx, float bpm);
 
+/* One engine, reused for every scenario. juno_gui_reinit resets it to the exact
+ * COLD state of a fresh create without churning the heap (a 64-patch sweep that
+ * created/destroyed the 12 MB state 64x fragmented Circle's low heap to OOM).
+ * The output is bit-identical to per-scenario create/destroy — proven by the
+ * gate. Not thread-safe; the probe is single-threaded. */
+static void *g_ctx = 0;
+static void *probe_ctx(float sr, int chorus)
+{
+    if (g_ctx) juno_gui_reinit(g_ctx, sr, chorus);
+    else       g_ctx = juno_gui_create(sr, chorus);
+    return g_ctx;
+}
+
 uint64_t juno_probe_render_hash(const unsigned char *bank, int banklen,
                                 int patch, float sr, int note, int vel,
                                 int nframes, float *buf, float *peak_out)
 {
-    void *c = juno_gui_create(sr, 0);   /* chorus_mode 0 = engine default */
+    void *c = probe_ctx(sr, 0);         /* chorus_mode 0 = engine default */
     if (!c) { if (peak_out) *peak_out = 0.0f; return 0; }
 
     juno_gui_apply_bank(c, (const char *)bank, banklen, patch);
@@ -46,7 +60,6 @@ uint64_t juno_probe_render_hash(const unsigned char *bank, int banklen,
         *peak_out = peak;
     }
 
-    juno_gui_destroy(c);
     return h;
 }
 
@@ -135,7 +148,7 @@ uint64_t juno_probe_timeline_hash(const unsigned char *bank, int banklen,
     static struct ev evs[MAXEV];
     int nev = build_events(seed, total_frames, sr, 0, evs);  /* valid, in-range */
 
-    void *c = juno_gui_create(sr, 0);
+    void *c = probe_ctx(sr, 0);
     if (!c) { if (peak_out) *peak_out = 0.0f; return 0; }
 
     int pos = 0, ei = 0;
@@ -161,7 +174,6 @@ uint64_t juno_probe_timeline_hash(const unsigned char *bank, int banklen,
         *peak_out = peak;
     }
 
-    juno_gui_destroy(c);
     return h;
 }
 
@@ -176,7 +188,7 @@ int juno_probe_fuzz(const unsigned char *bank, int banklen, float sr,
     static struct ev evs[MAXEV];
     int nev = build_events(seed, total_frames, sr, 1, evs);   /* wide: any input */
 
-    void *c = juno_gui_create(sr, 0);
+    void *c = probe_ctx(sr, 0);
     if (!c) return -1;
 
     int pos = 0, ei = 0, chunk = 256;
@@ -188,7 +200,6 @@ int juno_probe_fuzz(const unsigned char *bank, int banklen, float sr,
         juno_gui_render(c, buf + 2 * pos, seg_end - pos);
         pos = seg_end;
     }
-    juno_gui_destroy(c);
 
     long bf = 0, bb = 0; float peak = 0.0f;
     int i, m = 2 * total_frames;

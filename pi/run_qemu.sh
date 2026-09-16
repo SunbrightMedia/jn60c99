@@ -16,11 +16,10 @@ set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CIRCLE="$HERE/circle"
 PREFIX=aarch64-linux-gnu-
-# Default raspi3b (1 GB): the all-scenarios gate creates/destroys the engine's
-# 12 MB state 64x, which thrashes QEMU's 512 MB raspi3ap under TCG (an emulation
-# limit, not a real-hardware one — each create frees before the next). Both are
-# the same BCM2837. Pass raspi3ap for the lighter boot/PLAY identity check.
-MACH="${1:-raspi3b}"
+# Default raspi3ap = the Pi 3A+ prototype (512 MB, BCM2837). The gate reuses ONE
+# engine instance (juno_gui_reinit), so there is no 12 MB create/destroy churn
+# and 512 MB is plenty. Pass raspi3b to run on the 1 GB model instead.
+MACH="${1:-raspi3ap}"
 OUT="${TMPDIR:-/tmp}/juno_boot_${MACH}.txt"
 
 echo ">> build the engine archive (proven bit-exact flags) + embed bank"

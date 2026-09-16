@@ -194,6 +194,44 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     return c;
 }
 
+/* Reset an existing context to the exact COLD state of a fresh juno_gui_create,
+ * WITHOUT freeing/reallocating the 12 MB state. Equivalent to destroy+create
+ * (calloc zeros everything, then the same init runs), but reuses the buffers so
+ * a test that sweeps thousands of patches does not churn the heap. The output is
+ * bit-identical to a fresh create: the only thing that differs is the shim base
+ * POINTER stored at st+136, which lives in the excluded header region [0,176)
+ * and never enters the audio (juno_ftz excludes it; the render reads it only as
+ * an address). Tools that create one engine and sweep with this get identical
+ * hashes to per-patch create/destroy — proven by the bit-exact gate. */
+void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
+{
+    int v;
+    unsigned char *st;
+    if (!c) return;
+    ++eb_coef_gen;
+    st = c->st;
+    memset(c, 0, sizeof *c);            /* match calloc's zero of the whole ctx */
+    c->st = st;
+    memset(st, 0, JUNO_STATE_BYTES);    /* match calloc's zero of the state     */
+
+    juno_enable_hw_ftz();
+    JF(c->st, 16) = sample_rate;
+    juno_chorus_init(c->st);
+    juno_engine_init(c->st);
+    juno_engine_prepare(c->st);
+    default_patch(c->st);
+    juno_driver_seed_voices(c->st);
+    juno_apply_condition(c->st, 128);
+    c->last_condition = 128;
+    c->chorus_mode = chorus_mode;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
+    carp_init(&c->arp);
+    c->arp_on = 0;
+    c->arp_cur = -1;
+    c->host_bpm = 128.0f;
+    juno_driver_attach_host(c->st, &c->shim, chorus_mode);
+}
+
 /* Diagnostic: copy the current per-voice allocation into caller arrays (each of
  * length JUNO_NUM_VOICES). notes[v] = MIDI note or -1 (free); gated[v] = 1 if the
  * gate is on. Returns the number of currently-gated voices. For tests/UI only. */

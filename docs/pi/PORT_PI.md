@@ -151,9 +151,27 @@ STORMS:  5/5 identical to the plugin   (each chunk-invariant)
 BIT-EXACT RESULT: 69/69 scenarios
 FULL SYNTH BIT-EXACT ON BARE METAL — ALL SCENARIOS — EXACT WAVEFORM MATCH
 ```
-Note: run the gate on `-M raspi3b` (1 GB). The 64x engine create/destroy
-thrashes QEMU's 512 MB `raspi3ap` under TCG — an EMULATION limit only (each
-create frees before the next, so real 512 MB hardware is fine). Same BCM2837.
+The gate reuses ONE engine instance (`juno_gui_reinit` resets it to cold state
+without reallocating the 12 MB), so it runs on the real `-M raspi3ap` (512 MB)
+prototype with no heap churn. `reinit` is proven bit-identical to a fresh
+create (the only difference is the shim base pointer, which is excluded from the
+audio), and the reused-engine core is ARM bit-exact (x86 == aarch64 header).
+
+## THE INVARIANT + full-surface swarm (2026-09-16)
+END_GOAL's INVARIANT — audio never breaks for ANY input — now has a gate. The
+seed swarm drives the WHOLE control surface (all 128 MIDI notes/velocities, all
+79 host params across their true min..max — DCO/VCF/VCA/ENV/LFO/BEND/MOD/GLOBAL/
+ARP/EFFECT/DELAY/CHORUS/REVERB — plus patches and tempo), and `juno_probe_fuzz`
+scans every sample for non-finite (NaN/inf) and out-of-bound.
+- x86: 2000 seeds x 16000 frames = **64,000,000 samples, ZERO bad**, worst
+  |peak| 1.98. aarch64 (qemu-user) 80 seeds: identically clean.
+- The SAME widened generator now feeds the bit-exact storms, so they cover the
+  whole surface too (still chunk-invariant).
+- On metal (`raspi3ap`): 64 patches + 5 storms + 6 invariant swarms →
+  **69/69 bit-exact + invariant HELD**.
+
+Real-time budget is MEASURED in `docs/pi/BUDGET.md` (30,565 x86 instr/sample;
+the 8-voice engine fits one Pi 3A+/Zero 2 W across its 4 cores at 48 kHz).
 
 ## NEXT (open, in order)
 1. ~~Circle build; boot to metal.~~ **DONE.**
