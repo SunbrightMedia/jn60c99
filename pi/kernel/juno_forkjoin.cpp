@@ -18,6 +18,7 @@ void  juno_gui_reinit (void *, float, int);
 int   juno_gui_apply_bank (void *, const char *, int, int);
 void  juno_gui_note_on (void *, int, int);
 void  juno_gui_note_off (void *, int);
+void  juno_gui_host_set (void *, int, int);
 void  juno_gui_tick (void *);
 unsigned char *juno_gui_state (void *);
 void  juno_enable_hw_ftz (void);
@@ -45,8 +46,14 @@ extern const unsigned char juno_bank_blob_end[];
 
 enum { ST_IDLE = 0, ST_BUSY = 1, ST_EXIT = 2 };
 
+// Worker-wait bound. Normal completion takes a few hundred spins at most; this
+// is ~100x beyond any real block, so it never trips unless a worker is truly
+// dead. Then core 0 proceeds (a one-block glitch) instead of hanging forever.
+#define JS_WD_MAX 50000000UL
+
 CJunoForkJoin::CJunoForkJoin (CMemorySystem *pMem)
-:	CMultiCoreSupport (pMem), m_banklen (0), m_sr (48000.0f), m_frames (0)
+:	CMultiCoreSupport (pMem), m_banklen (0), m_sr (48000.0f), m_frames (0),
+	m_wd_stalls (0)
 {
 	for (int i = 0; i < NCORES; ++i) { m_ctx[i] = 0; m_status[i] = ST_IDLE; }
 	m_bound[0] = 0; m_bound[1] = 2; m_bound[2] = 4; m_bound[3] = 6; m_bound[4] = 8;
@@ -111,7 +118,14 @@ void CJunoForkJoin::RenderBlock (float *out, int frames, float *vpk)
 #if JS_MUT != 1
 		DataSyncBarrier ();
 #endif
-		for (int c = 1; c < NCORES; ++c) while (m_status[c] != ST_IDLE) { }
+		// wait for each worker, but BOUNDED: a dead worker must not hang core 0
+		// forever (no watchdog was the "worker fault = permanent hang" risk).
+		for (int c = 1; c < NCORES; ++c) {
+			unsigned long spins = 0;
+			while (m_status[c] != ST_IDLE) {
+				if (++spins > JS_WD_MAX) { ++m_wd_stalls; break; }  // glitch, not hang
+			}
+		}
 #if JS_MUT != 2
 		DataMemBarrier ();                                        // see their vbuf
 #endif
@@ -156,6 +170,14 @@ void CJunoForkJoin::BroadcastPatch (int idx)
 	}
 }
 
+void CJunoForkJoin::ApplyPatch (int idx)
+{
+	// WARM patch change: apply_bank only (no reinit), so held notes keep ringing
+	// with the new coefficients — the plugin's own warm-recall behaviour.
+	for (int i = 0; i < NCORES; ++i)
+		juno_gui_apply_bank (m_ctx[i], (const char *) juno_bank_blob, m_banklen, idx);
+}
+
 void CJunoForkJoin::NoteOn (int note, int vel)
 {
 	for (int i = 0; i < NCORES; ++i) juno_gui_note_on (m_ctx[i], note, vel);
@@ -164,6 +186,11 @@ void CJunoForkJoin::NoteOn (int note, int vel)
 void CJunoForkJoin::NoteOff (int note)
 {
 	for (int i = 0; i < NCORES; ++i) juno_gui_note_off (m_ctx[i], note);
+}
+
+void CJunoForkJoin::HostSet (int i, int v)
+{
+	for (int j = 0; j < NCORES; ++j) juno_gui_host_set (m_ctx[j], i, v);
 }
 
 void CJunoForkJoin::FireEvent (const struct juno_ev *e)

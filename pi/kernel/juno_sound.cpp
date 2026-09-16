@@ -29,6 +29,8 @@ void juno_enable_hw_ftz (void);
 int   juno_silence_check (CJunoForkJoin *fork);        // juno_silence.cpp
 void *juno_panel_create (void);                        // juno_panel.cpp
 void  juno_panel_poll (void *panel, CJunoForkJoin *fork);
+void *juno_midi_create (CJunoForkJoin *fork);          // juno_midi.cpp (parser + sink)
+void  juno_midi_feed (void *parser, const unsigned char *bytes, unsigned n);
 
 #define JS_RATE   48000
 #define JS_CHUNK  2048           // I2S DMA chunk, in words (frames*channels)
@@ -110,6 +112,14 @@ void run_juno_play (CInterruptSystem *pInterrupt)
 
 	void *panel = juno_panel_create ();      // GPIO keys + octave (unwired-safe)
 
+	// MIDI parser is ready and wired to the fork's proven seams. The physical
+	// TRANSPORT is the one silicon-only choice, fed via juno_midi_feed():
+	//   - USB-MIDI: init CUSBHCIDevice, register the packet handler, feed its bytes;
+	//   - or a 31250-baud UART (MIDI DIN) on a second serial device.
+	// Left unfed here (no transport under QEMU); host-proven parser (midi_test).
+	void *midi = juno_midi_create (fork);
+	(void) midi;
+
 	CJunoSound *snd = new CJunoSound (pInterrupt, fork, panel);
 	if (snd == 0 || !snd->Setup ()) {
 		log->Write ("juno", LogPanic, "PLAY: sound setup failed");
@@ -123,9 +133,17 @@ void run_juno_play (CInterruptSystem *pInterrupt)
 		    "PLAY: I2S running — silence proven, panel live, voices 0-1|2-3|4-5|6-7");
 
 	// The DMA pulls chunks via IRQ on core 0; each pull polls the panel then
-	// drives the fork-join.
+	// drives the fork-join. This loop only keeps the device alive and surfaces
+	// the watchdog count (logging must stay OUT of the IRQ).
+	unsigned seen = 0;
 	for (;;) {
-		snd->IsActive ();               // keep the device alive; MIDI-in lands next
+		snd->IsActive ();
+		unsigned st = fork->StallCount ();
+		if (st != seen) {
+			log->Write ("juno", LogError,
+				    "fork watchdog: %u worker stall(s) — glitch, core 0 did not hang", st);
+			seen = st;
+		}
 		CTimer::SimpleMsDelay (100);
 	}
 }

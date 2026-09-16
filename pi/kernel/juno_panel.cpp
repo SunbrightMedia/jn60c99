@@ -15,6 +15,7 @@
 // PIN MAP (BCM GPIO — wire the panel to these; all inputs, internal pull-up):
 //   keys  C  C#  D  D#   -> GPIO 17, 27, 22, 23
 //   octave down / up     -> GPIO 5, 6
+//   patch  down / up     -> GPIO 24, 25
 // POTS (CUTOFF, RESONANCE): the Pi has NO on-chip ADC. Analog pots need an
 // external SPI ADC (e.g. MCP3008 on Circle's CSPIMaster); that read + the
 // arm-by-stillness pickup law land when the ADC part is wired. Not built here.
@@ -62,7 +63,7 @@ class CJunoPanel
 {
 public:
 	CJunoPanel (void)
-	: m_octdn (5), m_octup (6), m_oct (0)
+	: m_octdn (5), m_octup (6), m_patchdn (24), m_patchup (25), m_oct (0), m_patch (0)
 	{
 		for (int i = 0; i < P_KEYS; ++i) { m_key[i] = new CDebounced (KEY_GPIO[i]); m_note[i] = -1; }
 	}
@@ -73,6 +74,10 @@ public:
 		// octave buttons: one shift per press edge, clamped
 		if (m_octdn.Update () > 0 && m_oct > OCT_MIN) --m_oct;
 		if (m_octup.Update () > 0 && m_oct < OCT_MAX) ++m_oct;
+
+		// patch buttons: step the current patch, WARM (held notes keep ringing)
+		if (m_patchdn.Update () > 0 && m_patch > 0)  { --m_patch; fork->ApplyPatch (m_patch); }
+		if (m_patchup.Update () > 0 && m_patch < 63) { ++m_patch; fork->ApplyPatch (m_patch); }
 
 		// keys: press -> note-on at base + octave + semitone; release -> note-off
 		for (int i = 0; i < P_KEYS; ++i) {
@@ -90,8 +95,8 @@ public:
 
 private:
 	CDebounced *m_key[P_KEYS]; int m_note[P_KEYS];
-	CDebounced  m_octdn, m_octup;
-	int m_oct;
+	CDebounced  m_octdn, m_octup, m_patchdn, m_patchup;
+	int m_oct, m_patch;
 };
 
 // Entry points used by the PLAY driver (juno_sound.cpp): one opaque panel + poll.

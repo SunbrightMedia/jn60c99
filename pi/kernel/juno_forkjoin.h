@@ -52,9 +52,16 @@ public:
 	// Broadcast control to EVERY private copy so voice allocation stays in
 	// lockstep (the firmware rule). The gate mirrors each to its reference.
 	void BroadcastPatch (int idx);  // reinit + apply_bank (cold patch select)
+	void ApplyPatch (int idx);      // apply_bank only (WARM: held notes keep ringing)
 	void NoteOn (int note, int vel);
 	void NoteOff (int note);
 	void FireEvent (const struct juno_ev *e);   // note/patch/host/tempo
+	void HostSet (int i, int v);    // one host param on every copy (e.g. MIDI CC)
+
+	// Watchdog: how many blocks a worker failed to finish in time (a real fault,
+	// never in normal operation). Non-zero => a glitch happened, but core 0 did
+	// NOT hang. Read from the main loop (not the IRQ) to log it.
+	unsigned StallCount (void) const { return m_wd_stalls; }
 
 private:
 	void RenderVoices (int core);   // worker: its voices, m_frames samples
@@ -65,6 +72,7 @@ private:
 	int   m_bound[NCORES + 1];
 	volatile int m_status[NCORES];
 	volatile int m_frames;
+	volatile unsigned m_wd_stalls;  // worker-stall count (watchdog)
 	float m_vbuf[8][MAXBLK];
 };
 
