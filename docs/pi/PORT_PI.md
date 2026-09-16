@@ -197,6 +197,34 @@ It PROVES the numerics and REQUIRES of the implementation: each core renders its
 voices from a PRIVATE copy of the shared noise block (no concurrent clobber), and
 the master sums `vbuf` on ONE core after a barrier. Given that, the split is exact.
 
+### What else could break it — enumerated by census, not argued
+`pi/probe/split_census.c` diffs the whole 12 MB after each `juno_voice_render`
+and classifies every written byte. Across all 64 patches × 5 points × 8 voices:
+`own-main 1,000,837 · own-aux 0 · noise(shared) 35,328 · **HAZARD 0**`. So a
+voice writes ONLY its own private block plus the shared noise block — no
+cross-voice write, no shared-global write. Static scan of the render path
+(`voice_render`, `juno_dsp`, `master_render`, `juno_curve`, `juno_ramp`) found
+NO function-scope statics; the only mutable engine global is `eb_coef_gen`, which
+the control layer bumps and the render only READS.
+
+RIGIDITY CHECKLIST (the full set the split must honour):
+1. **Noise block `[84272,84436)`** — the ONE shared cell voices write; give each
+   core a PRIVATE copy (census-proven sole in-state hazard).
+2. **Sum on one core, canonical `vbuf[0..7]` order** — proven by the split gate.
+3. **Barrier** — all voice cores finish before the master reads `vbuf`; then
+   master → `flush_denormals` run single-core.
+4. **Per-core FTZ/DAZ (FPCR)** — every core must `juno_enable_hw_ftz()` or
+   denormals diverge from x86.
+5. **Memory ordering** — the barrier needs ARM DMB/DSB so `vbuf` writes are
+   visible to the master core (Circle's multicore support provides this).
+6. **Control layer single-core** — note allocation, arp, patch recall run
+   between blocks on one core, never concurrent with voice render.
+7. Read-only shared data (params, coefficients, `eb_coef_gen`, the render
+   function pointers) is safe — every core reads the same values, none writes.
+
+Items 1–2 are code-proven here; 3–6 are implementation disciplines the split
+firmware must follow (and the split gate re-checks 1–2 on every engine change).
+
 ## NEXT (open, in order)
 1. ~~Circle build; boot to metal.~~ **DONE.**
 2. ~~Link the engine; EXACT waveform match vs the plugin.~~ **DONE.**
