@@ -255,6 +255,13 @@ void juno_gui_destroy(juno_ctx *c)
     free(c);
 }
 
+/* Raw state pointer + size — for the split-vs-single-core bit-exact gate only,
+ * which drives the driver-level render (juno_driver_render_sample) directly and
+ * snapshots the whole state to prove a per-core voice split leaves it
+ * byte-identical. Not for audio use. Returns NULL/0 on a null context. */
+unsigned char *juno_gui_state(juno_ctx *c) { return c ? c->st : 0; }
+unsigned juno_gui_state_bytes(void) { return JUNO_STATE_BYTES; }
+
 /* Raw parameter store/load — native units, exactly the plugin's raw-store
  * setter (sub_1803C1090 semantics). Offset bounds-checked against the block. */
 void juno_gui_set(juno_ctx *c, int off, float v)

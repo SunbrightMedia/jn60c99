@@ -173,6 +173,29 @@ scans every sample for non-finite (NaN/inf) and out-of-bound.
 Real-time budget is MEASURED in `docs/pi/BUDGET.md` (30,565 x86 instr/sample;
 the 8-voice engine fits one Pi 3A+/Zero 2 W across its 4 cores at 48 kHz).
 
+## MULTI-CORE SPLIT — bit-exact gate (2026-09-16)
+Spreading the 8 voices across the A53's cores is only safe if the split output
+is byte-identical to single-core. Float add is not associative, so the sum order
+is the trap. The engine makes an exact split possible (`src/juno_driver.c`):
+- voices are INDEPENDENT — each reads its own block + the SHARED noise snapshot,
+  writes only its own `vbuf[v]` slot;
+- the sum is NOT in the voice loop — `juno_master_render` reads `vbuf[0..7]` in a
+  FIXED canonical order, so which core fills which slot cannot change the result;
+- the shared noise/LFSR block is snapshot-restored before each voice.
+
+`pi/probe/split_gate.c` renders the voices in many core→voice PARTITIONS
+(reversed, 2-core swapped/round-robin, 4×2, arbitrary scatter) and checks the
+stereo sample AND the whole 12 MB post-state (noise, voice states, FX, flushed
+denormals) are byte-identical to single-core, across all 64 patches × evolution
+points (attack→sustain→decay) × diverse seeded voice states (mixed activity,
+voice-stealing, live param edits). Needs a tiny `juno_gui_state` accessor.
+RESULT: **SPLIT IS BIT-EXACT — every partition == single-core, sample and state**
+(1920 checks in the chord pass; the seeded diverse-state pass confirms).
+
+It PROVES the numerics and REQUIRES of the implementation: each core renders its
+voices from a PRIVATE copy of the shared noise block (no concurrent clobber), and
+the master sums `vbuf` on ONE core after a barrier. Given that, the split is exact.
+
 ## NEXT (open, in order)
 1. ~~Circle build; boot to metal.~~ **DONE.**
 2. ~~Link the engine; EXACT waveform match vs the plugin.~~ **DONE.**
