@@ -34,6 +34,14 @@ uint64_t juno_probe_timeline_hash(const unsigned char *bank, int banklen,
                                   float sr, uint32_t seed, int total_frames,
                                   int chunk, float *buf, float *peak_out);
 
+/* THE INVARIANT gate (robustness, not bit-exact): drive the WHOLE control
+ * surface with out-of-range values too, and verify every rendered sample is
+ * finite and within |bound|. Returns 0 if clean, 1 if any bad sample, -1 on
+ * alloc failure. buf must hold 2*total_frames floats. */
+int juno_probe_fuzz(const unsigned char *bank, int banklen, float sr,
+                    uint32_t seed, int total_frames, float bound, float *buf,
+                    float *worst_peak, long *nbad_finite, long *nbad_bound);
+
 #ifdef __cplusplus
 }
 #endif

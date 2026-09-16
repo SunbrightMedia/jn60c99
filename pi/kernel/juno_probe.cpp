@@ -76,15 +76,34 @@ void run_juno_bitexact (void)
 	}
 	log->Write ("juno", LogNotice, "STORMS: %d/%d identical to the plugin", spass, NSTORM);
 
+	// 3) THE INVARIANT on metal: whole-surface swarm at valid extremes must
+	// never produce a non-finite or unbounded sample (robustness, not bit-exact).
+	long tot_bad = 0; float worst = 0.0f; int fclean = 0;
+	const int NFUZZ = 6, FFR = 8000;
+	for (int i = 0; i < NFUZZ; ++i) {
+		unsigned seed = 0x9E3779B1u * (unsigned) (i + 1);
+		float pk = 0.0f; long bf = 0, bb = 0;
+		int r = juno_probe_fuzz (juno_bank_blob, banklen, JUNO_SR, seed,
+					 FFR, 16.0f, buf, &pk, &bf, &bb);
+		if (r == 0) ++fclean;
+		if (pk > worst) worst = pk;
+		tot_bad += bf + bb;
+	}
+	log->Write ("juno", LogNotice,
+		    "INVARIANT: %d/%d swarms clean, worst |peak| %.3f, bad samples %ld",
+		    fclean, NFUZZ, worst, tot_bad);
+
 	free (buf);
 
-	bool all = (pass == NPATCH) && (spass == NSTORM);
-	log->Write ("juno", LogNotice, "BIT-EXACT RESULT: %d/%d scenarios",
-		    pass + spass, NPATCH + NSTORM);
+	bool all = (pass == NPATCH) && (spass == NSTORM)
+		 && (fclean == NFUZZ) && (tot_bad == 0);
+	log->Write ("juno", LogNotice, "BIT-EXACT RESULT: %d/%d scenarios; invariant %s",
+		    pass + spass, NPATCH + NSTORM,
+		    (fclean == NFUZZ && tot_bad == 0) ? "HELD" : "VIOLATED");
 	if (all)
 		log->Write ("juno", LogNotice,
-			"FULL SYNTH BIT-EXACT ON BARE METAL — ALL SCENARIOS — EXACT WAVEFORM MATCH");
+			"FULL SYNTH BIT-EXACT ON BARE METAL — ALL SCENARIOS + INVARIANT — EXACT WAVEFORM MATCH");
 	else
 		log->Write ("juno", LogNotice,
-			"DIVERGENCE — the metal render is NOT bit-exact (see DIFF rows)");
+			"FAILURE — divergence or invariant break (see rows above)");
 }
