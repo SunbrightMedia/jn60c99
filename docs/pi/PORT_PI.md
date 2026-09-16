@@ -190,7 +190,8 @@ denormals) are byte-identical to single-core, across all 64 patches × evolution
 points (attack→sustain→decay) × diverse seeded voice states (mixed activity,
 voice-stealing, live param edits). Needs a tiny `juno_gui_state` accessor.
 RESULT: **SPLIT IS BIT-EXACT — every partition == single-core, sample and state**
-(1920 checks in the chord pass; the seeded diverse-state pass confirms).
+(7680 checks: 64 patches × 4 seeds × 5 points × 6 partitions, x86; the same
+voice/master path is already ARM-bit-exact, and a qemu-user subset confirms).
 
 It PROVES the numerics and REQUIRES of the implementation: each core renders its
 voices from a PRIVATE copy of the shared noise block (no concurrent clobber), and
