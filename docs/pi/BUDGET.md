@@ -18,6 +18,21 @@ setup and gives exact retired instructions per stereo sample.
 So the A53 executes roughly **20,500–30,600 instructions/sample** (0.671× as a
 proxy … up to parity — the dynamic ratio is not the static ratio).
 
+## Where the instructions go (MEASURED, callgrind per function ÷ 8000 samples)
+| module | instr/sample | share | note |
+|---|---:|---:|---|
+| voice render (8 voices: DCO+sub+noise, HPF, VCF ladder, VCA, ENV1/2, LFO) | 23,078 | 76% | ~2,885 / voice |
+| triangle (LFO / wave shaping) | 1,969 | 6% | mostly per-voice |
+| FTZ denormal flush (`juno_flush_denormals`) | 1,400 | 5% | the bit-exact FTZ shim |
+| master + ALL FX (chorus, delay, reverb) | 1,337 | 4% | FX is nearly free |
+| wrap24 + voice driver | 651 | 2% | phase wrap, mixing |
+| note lifecycle + misc | ~2,130 | 7% | allocation, gates |
+| **total** | **30,565** | 100% | |
+
+Key fact: cost scales with **VOICES** (~84% of the sample is the 8 voices);
+the full FX stack is ~4%. Fewer voices scale it down almost linearly; adding FX
+barely moves it.
+
 ## A53 cycles and the 48 kHz budget
 A53 is in-order, dual-issue; this code is dependency-bound scalar FP, so
 **IPC ≈ 0.7–1.2** (ESTIMATE; only silicon settles it).
