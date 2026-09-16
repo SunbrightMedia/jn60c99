@@ -274,10 +274,16 @@ NOT pass `-smp` — it breaks boot):
 CPU core 1/2/3 started
 PATCHES: 64/64 identical to single-core
 storm 0badc0de..deadbeef: == MATCH over 188 blocks (max|diff| = 0 ppb)
-DMA-BLOCK (1024 frames): 6/6 patches identical to single-core
-MULTI-CORE RESULT: 75/75 scenarios identical to single-core (worst 0 ppb)
+BLOCK-SIZE {1024,1536,100}: 9/9 identical to single-core
+VOICE-STEAL (13 notes): 3/3 identical to single-core
+MULTI-CORE RESULT: 81/81 scenarios identical to single-core (worst 0 ppb)
 SPLIT BIT-EXACT ON 4 EMULATED CORES — barrier + per-core copies proven
 ```
+Coverage: 64 patches; 5 full-surface storms; block sizes 1024 (the I2S chunk),
+1536 (> MAXBLK, so the sub-block loop must stitch two fork-joins) and 100; and
+voice stealing (13 notes onto 8 physical voices, the class where a harness bug
+once hid). All 0 ppb.
+
 **PLAY** (`juno_sound.cpp`): core 0's I2S `GetChunk` calls the same
 `fork.RenderBlock(frames)` — the DMA pull IS the fork-join kick — then scales to
 the hardware range. The workers (cores 1-3) are started by `fork.Initialize()`
@@ -285,6 +291,40 @@ at boot and spin ready. So the 4-core real-time audio is bit-identical to the
 plugin by the gate's proof. `sh pi/build.sh` builds it (links clean); QEMU has
 no I2S, so only silicon can hear it. Owed: panel/MIDI input into the PLAY
 instance; flash + SILENCE PROBE on a real Pi 3A+ + I2S DAC.
+
+### GATE REACH — what this gate catches, and what it CANNOT (2026-09-16)
+"Every gate must be SEEN TO FAIL." The mutation switch `JS_MUT` in
+`juno_forkjoin.cpp` injects one fault; `make JUNO_SPLIT=1 JS_MUT=n` then shows
+whether the gate goes RED. Battery result on QEMU `raspi3b`:
+
+| JS_MUT | injected fault | gate verdict | meaning |
+|---|---|---|---|
+| 0 | none (control) | GREEN 81/81 | baseline |
+| 1 | drop the kick `DataSyncBarrier` | **GREEN** | QEMU TCG cannot catch it |
+| 2 | drop the vbuf-visibility `DataMemBarrier` | **GREEN** | QEMU TCG cannot catch it |
+| 3 | drop the worker's publish `DataSyncBarrier` | **GREEN** | QEMU TCG cannot catch it |
+| 4 | voice 5 never rendered (the S3 defect class) | **RED 22/81** | caught, loudly (0.26 diff) |
+| 5 | worker hardware FTZ (FPCR) not enabled | **GREEN** | correct: FTZ is a SPEED guard |
+
+Reading it straight:
+- The gate BITES for a STRUCTURAL split defect — a voice not rendered, a
+  mis-partition. That is the exact failure the S3 chain had, and MUT 4 proves
+  the gate catches it hard. This is the risk the split most needs guarded.
+- The three memory-ordering barriers are INVISIBLE to QEMU: its near-lockstep
+  TCG does not reorder, so a wrong/absent barrier still passes. They are
+  correct-by-construction (the MiniDexed producer/consumer pattern) and stay
+  load-bearing on silicon; only a real A53 (soak under load) can exercise them.
+- MUT 5 GREEN is CORRECT, not a hole: hardware FTZ (`juno_enable_hw_ftz`) is a
+  SPEED guard against ~100x-slower denormal ops (crackle); the per-sample
+  SOFTWARE flush `juno_flush_denormals` (called in both split paths) does the
+  bit-exact correctness. So FTZ belongs in the silicon DEADLINE test, not here.
+
+RESIDUAL RISK, silicon-only (QEMU cannot test): weak-memory reordering; the
+real-time deadline / underrun; the `GetChunk` IRQ+DMA path (no I2S in QEMU); the
+hardware (non-`--qemu`) multicore boot; the DAC format; a worker fault hanging
+core 0 (no watchdog yet). Mitigation before any flash: a SILENCE PROBE in the
+PLAY image (SHIP LAW) + a soak under load. None of these is a numeric defect the
+gate could have caught.
 
 ## NEXT (open, in order)
 1. ~~Circle build; boot to metal.~~ **DONE.**

@@ -16,6 +16,10 @@ endif
 ifdef JUNO_SPLIT
 DEFINE += -DJUNO_SPLIT
 endif
+# Detector-reach: inject one split fault (see juno_forkjoin.cpp). Default 0.
+ifdef JS_MUT
+DEFINE += -DJS_MUT=$(JS_MUT)
+endif
 
 # Kernel glue objects (built with Circle's flags — no DSP math here).
 OBJS	= main.o kernel.o juno_probe.o juno_sound.o juno_split.o juno_forkjoin.o \

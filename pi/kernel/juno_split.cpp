@@ -26,9 +26,10 @@ extern const unsigned char juno_bank_blob[];
 extern const unsigned char juno_bank_blob_end[];
 }
 
-#define JS_SR   48000.0f
-#define JS_NF   128                          // gate block (fine event granularity)
-#define JS_DMA  1024                         // == PLAY I2S chunk frames
+#define JS_SR      48000.0f
+#define JS_NF      128                       // gate block (fine event granularity)
+#define JS_DMA     1024                      // == PLAY I2S chunk frames
+#define JS_MAXTEST 2048                      // largest block the gate compares
 
 class CJunoSplitGate
 {
@@ -93,33 +94,61 @@ public:
 		}
 		log->Write ("split", LogNotice, "STORMS: %d/%d identical to single-core", spass, NSEED);
 
-		// ---- Phase 3: the DMA block length PLAY renders ---------------------
-		// PLAY's GetChunk asks the fork-join for JS_DMA frames per call. Prove
-		// RenderBlock at that exact size still equals single-core, so the proof
-		// covers the deployed block, not only the 128-frame gate block.
-		const int patches[] = { 0, 11, 27, 42, 48, 63 };
-		const int NDMA = (int) (sizeof (patches) / sizeof (patches[0]));
-		for (int i = 0; i < NDMA; ++i) {
-			GPatch (patches[i]);
-			for (int k = 0; k < 8; ++k) GNoteOn (chord[k], 100);
+		// ---- Phase 3: the block SIZES PLAY may hand us ----------------------
+		// PLAY's GetChunk asks for a DMA block; Circle may hand any size. Prove
+		// RenderBlock equals single-core at the deployed 1024, at 1536 (> MAXBLK,
+		// so the internal sub-block loop must stitch two fork-joins seamlessly),
+		// and at a small 100. Covers the sub-block stitching, not only 128/1024.
+		const int sizes[]  = { JS_DMA, 1536, 100 };
+		const int NSZ = (int) (sizeof (sizes) / sizeof (sizes[0]));
+		const int dpatch[] = { 0, 27, 48 };
+		const int NDP = (int) (sizeof (dpatch) / sizeof (dpatch[0]));
+		int dtot = 0;
+		for (int i = 0; i < NDP; ++i)
+			for (int z = 0; z < NSZ; ++z) {
+				GPatch (dpatch[i]);
+				for (int k = 0; k < 8; ++k) GNoteOn (chord[k], 100);
+				int ok = 1; float md = 0;
+				for (int b = 0; b < 3 && ok; ++b) ok &= CompareBlock (sizes[z], &md);
+				if (md > worst) worst = md;
+				++dtot; if (ok) ++dpass;
+				else log->Write ("split", LogNotice,
+					"block patch %2d size %d: !! DIFF (max|diff| = %u ppb)",
+					dpatch[i], sizes[z], ppb (md));
+			}
+		log->Write ("split", LogNotice,
+			"BLOCK-SIZE {1024,1536,100}: %d/%d identical to single-core", dpass, dtot);
+
+		// ---- Phase 4: voice STEALING ---------------------------------------
+		// 13 distinct notes onto 8 physical voices forces the allocator to steal.
+		// Every copy + the reference get the identical note stream, so stealing
+		// must land on the same voices in lockstep — the class where a harness
+		// bug once hid (split_battery). Held long, many blocks, to expose drift.
+		const int steal[13] = { 40,44,47,50,53,55,58,60,62,64,67,69,72 };
+		const int spatch[] = { 0, 40, 63 };
+		const int NSP = (int) (sizeof (spatch) / sizeof (spatch[0]));
+		int stpass = 0;
+		for (int i = 0; i < NSP; ++i) {
+			GPatch (spatch[i]);
+			for (int k = 0; k < 13; ++k) GNoteOn (steal[k], 100);   // > 8 → steal
 			int ok = 1; float md = 0;
-			for (int b = 0; b < 3 && ok; ++b) ok &= CompareBlock (JS_DMA, &md);
+			for (int b = 0; b < 24 && ok; ++b) ok &= CompareBlock (JS_NF, &md);
 			if (md > worst) worst = md;
-			if (ok) ++dpass;
+			if (ok) ++stpass;
 			else log->Write ("split", LogNotice,
-				"dma patch %2d: !! DIFF (max|diff| = %u ppb)", patches[i], ppb (md));
+				"steal patch %2d: !! DIFF (max|diff| = %u ppb)", spatch[i], ppb (md));
 		}
 		log->Write ("split", LogNotice,
-			"DMA-BLOCK (%d frames): %d/%d patches identical to single-core",
-			JS_DMA, dpass, NDMA);
+			"VOICE-STEAL (13 notes): %d/%d identical to single-core", stpass, NSP);
 
 		m_fork->Stop ();
 
-		int pass = ppass + spass + dpass, total = 64 + NSEED + NDMA;
+		int pass  = ppass + spass + dpass + stpass;
+		int total = 64 + NSEED + dtot + NSP;
 		log->Write ("split", LogNotice,
 			"MULTI-CORE RESULT: %d/%d scenarios identical to single-core "
-			"(64 patches + %d storms + %d dma-block; worst %u ppb)",
-			pass, total, NSEED, NDMA, ppb (worst));
+			"(64 patches + %d storms + %d block-size + %d voice-steal; worst %u ppb)",
+			pass, total, NSEED, dtot, NSP, ppb (worst));
 		if (pass == total)
 			log->Write ("split", LogNotice,
 			  "SPLIT BIT-EXACT ON 4 EMULATED CORES — barrier + per-core copies proven");
@@ -148,8 +177,8 @@ private:
 	// render one `frames`-frame block both ways; accumulate max|diff|; 1 if equal
 	int CompareBlock (int frames, float *md)
 	{
-		static float refblk[2 * CJunoForkJoin::MAXBLK];
-		static float splblk[2 * CJunoForkJoin::MAXBLK];
+		static float refblk[2 * JS_MAXTEST];
+		static float splblk[2 * JS_MAXTEST];
 		juno_gui_render (m_ref, refblk, frames);     // single-core reference
 		m_fork->RenderBlock (splblk, frames);        // the real 4-core split
 		int ok = 1;

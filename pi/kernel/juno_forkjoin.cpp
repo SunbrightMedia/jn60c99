@@ -30,6 +30,18 @@ extern const unsigned char juno_bank_blob_end[];
 #define NOISE_OFF 84272u        // SHARED noise/LFSR block — copied per voice so
 #define NOISE_LEN 164u          // each render sees the same pre-voice noise state
 
+// DETECTOR-REACH MUTATION SWITCH (default 0 = production). The rule "every gate
+// must be SEEN TO FAIL" (CLAUDE.md) needs the split gate to go RED on a real
+// concurrency/split defect. Build the gate with `make JUNO_SPLIT=1 JS_MUT=n` to
+// inject one fault and confirm the gate catches it (or, for the memory-ordering
+// barriers, honestly map what QEMU's near-lockstep TCG cannot catch):
+//   1 = drop the kick DataSyncBarrier      2 = drop the vbuf-visibility DataMemBarrier
+//   3 = drop the worker's publish barrier  4 = voice-5 not rendered (the S3 defect)
+//   5 = worker FPCR/FTZ not enabled
+#ifndef JS_MUT
+#define JS_MUT 0
+#endif
+
 enum { ST_IDLE = 0, ST_BUSY = 1, ST_EXIT = 2 };
 
 CJunoForkJoin::CJunoForkJoin (CMemorySystem *pMem)
@@ -52,14 +64,18 @@ boolean CJunoForkJoin::Setup (float sr)
 
 void CJunoForkJoin::Run (unsigned nCore)
 {
+#if JS_MUT != 5
 	juno_enable_hw_ftz ();                       // per-core FTZ (rigidity rule 4)
+#endif
 	if (nCore == 0) return;                       // caller drives core 0
 	for (;;) {
 		while (m_status[nCore] == ST_IDLE) { }   // wait to be kicked
 		DataMemBarrier ();
 		if (m_status[nCore] == ST_EXIT) break;
 		RenderVoices ((int) nCore);
+#if JS_MUT != 3
 		DataSyncBarrier ();                       // publish vbuf before IDLE
+#endif
 		m_status[nCore] = ST_IDLE;
 	}
 }
@@ -69,6 +85,9 @@ void CJunoForkJoin::RenderVoices (int core)
 {
 	unsigned char *st = juno_gui_state (m_ctx[core]), nblk[NOISE_LEN];
 	int lo = m_bound[core], hi = m_bound[core + 1], n = m_frames;
+#if JS_MUT == 4
+	if (core == 2) hi = m_bound[core + 1] - 1;    // voice 5 never rendered (S3 defect)
+#endif
 	for (int s = 0; s < n; ++s) {
 		juno_gui_tick (m_ctx[core]);
 		memcpy (nblk, st + NOISE_OFF, NOISE_LEN);
@@ -88,9 +107,13 @@ void CJunoForkJoin::RenderBlock (float *out, int frames)
 		m_frames = n;
 
 		for (int c = 1; c < NCORES; ++c) m_status[c] = ST_BUSY;   // kick workers
+#if JS_MUT != 1
 		DataSyncBarrier ();
+#endif
 		for (int c = 1; c < NCORES; ++c) while (m_status[c] != ST_IDLE) { }
+#if JS_MUT != 2
 		DataMemBarrier ();                                        // see their vbuf
+#endif
 
 		// audio core: its own voices + master interleaved per sample, so the
 		// master reads the control smoothers at THIS sample (== single-core)
