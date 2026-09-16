@@ -25,8 +25,13 @@ OUT="${TMPDIR:-/tmp}/juno_boot_${MACH}.txt"
 echo ">> build the engine archive (proven bit-exact flags) + embed bank"
 sh "$HERE/build_engine.sh"
 
-echo ">> configure Circle: Pi 3, AArch64, --qemu"
-( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" --qemu -f )
+echo ">> configure Circle: Pi 3, AArch64, --qemu --multicore"
+# --multicore so the probe image links the shared fork-join units (juno_split.o
+# / juno_sound.o reference CMultiCoreSupport). The bit-exact probe itself runs
+# single-core on core 0; the workers simply stay parked, so its hashes are
+# unchanged (bit-exactness is a property of the engine archive, not Circle's
+# config). One configure serves the probe and the split gate.
+( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" --qemu --multicore -f )
 make -C "$CIRCLE/lib" -j"$(nproc)" >/dev/null
 make -C "$CIRCLE/lib/sound" -j"$(nproc)" >/dev/null
 make -C "$HERE/kernel" clean >/dev/null 2>&1 || true

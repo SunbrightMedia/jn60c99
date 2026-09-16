@@ -249,35 +249,42 @@ sample. Requires `juno_gui_tick` (per-sample control step) + `juno_gui_state`
 accessors (test-only). NO DSP change. Only after this gate is green is the
 Circle multicore firmware written.
 
-### MULTI-CORE KERNEL — RUNS BIT-EXACT ON 4 EMULATED CORES (2026-09-16)
-`pi/kernel/juno_split.cpp` is the real firmware: `CJunoSplit : CMultiCoreSupport`
-(Circle's proven primitive), MiniDexed-style per-block fork-join with `volatile`
+### MULTI-CORE KERNEL — ONE FORK-JOIN, GATE-PROVEN, DRIVES PLAY (2026-09-16)
+The fork-join is ONE shared unit — `CJunoForkJoin : CMultiCoreSupport`
+(`pi/kernel/juno_forkjoin.{h,cpp}`) — used by BOTH the self-checking gate and
+the real-time I2S path, so the gate proves the EXACT code PLAY runs, not a copy.
+Circle's proven primitive; MiniDexed-style per-block fork-join with `volatile`
 status flags — NO atomics/IPIs — plus ARM `DataSyncBarrier`/`DataMemBarrier`
 around the barrier. 4 private engine copies; core 0 (voices 0-1 + master) kicks
 the 3 worker cores (voices 2-3|4-5|6-7), waits, then interleaves its render +
-master. Per-core FTZ. Built with `--multicore` (`ARM_ALLOW_MULTI_CORE`).
+master. `RenderBlock(out, frames)` renders any block length in <= 1024-frame
+sub-blocks. Per-core FTZ (core 0 via `juno_gui_create`; workers in `Run`). Built
+with `--multicore` (`ARM_ALLOW_MULTI_CORE`) on ALL pi images now (build.sh,
+run_qemu.sh, run_split.sh) — the probe still runs single-core, workers parked.
 
-It self-checks: core 0 also renders a single-core reference and compares the
-split output block for block. The gate is WIDE (2026-09-16): all 64 factory
-patches (sustained 8-note chord) AND the 5 seeded STORMS the single-core
-bit-exact gate uses. A storm drives the WHOLE surface — notes, patch changes,
-all 79 host params, tempo — from the ONE proven generator (`juno_storm_build`
-/`juno_storm_fire`, now public in `pi/probe/juno_probe_core.c`, so host and
-metal fire the identical stream). Each event is BROADCAST to every core copy
-AND the reference at the block boundary, so voice allocation stays in lockstep
-(the firmware rule). On `qemu-system-aarch64 -M raspi3b` (4 cores; do NOT pass
-`-smp` — it breaks boot):
+**GATE** (`juno_split.cpp`): core 0 drives the fork-join and compares its output,
+block for block, to a single-core reference. WIDE coverage: all 64 factory
+patches; the 5 seeded STORMS the single-core gate uses (whole surface — notes,
+patch changes, all 79 host params, tempo — from the ONE public generator
+`juno_storm_build`/`juno_storm_fire`, broadcast to every copy + the reference so
+voice allocation stays in lockstep); AND a DMA-block pass at 1024 frames = the
+I2S chunk PLAY actually renders. On `qemu-system-aarch64 -M raspi3b` (4 cores; do
+NOT pass `-smp` — it breaks boot):
 ```
 CPU core 1/2/3 started
 PATCHES: 64/64 identical to single-core
 storm 0badc0de..deadbeef: == MATCH over 188 blocks (max|diff| = 0 ppb)
-MULTI-CORE RESULT: 69/69 scenarios identical to single-core (64 patches + 5 storms; worst 0 ppb)
+DMA-BLOCK (1024 frames): 6/6 patches identical to single-core
+MULTI-CORE RESULT: 75/75 scenarios identical to single-core (worst 0 ppb)
 SPLIT BIT-EXACT ON 4 EMULATED CORES — barrier + per-core copies proven
 ```
-So the REAL concurrency — the barrier, memory ordering and per-core copies —
-holds across every patch and a full-surface storm, not only the numerics. One
-command: `sh pi/run_split.sh`. Owed: wiring it to the I2S PLAY callback (core 0's
-GetChunk drives the fork-join) on silicon.
+**PLAY** (`juno_sound.cpp`): core 0's I2S `GetChunk` calls the same
+`fork.RenderBlock(frames)` — the DMA pull IS the fork-join kick — then scales to
+the hardware range. The workers (cores 1-3) are started by `fork.Initialize()`
+at boot and spin ready. So the 4-core real-time audio is bit-identical to the
+plugin by the gate's proof. `sh pi/build.sh` builds it (links clean); QEMU has
+no I2S, so only silicon can hear it. Owed: panel/MIDI input into the PLAY
+instance; flash + SILENCE PROBE on a real Pi 3A+ + I2S DAC.
 
 ## NEXT (open, in order)
 1. ~~Circle build; boot to metal.~~ **DONE.**

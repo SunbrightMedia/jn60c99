@@ -18,7 +18,8 @@ DEFINE += -DJUNO_SPLIT
 endif
 
 # Kernel glue objects (built with Circle's flags — no DSP math here).
-OBJS	= main.o kernel.o juno_probe.o juno_sound.o juno_split.o bank_blob.o bare_stubs.o
+OBJS	= main.o kernel.o juno_probe.o juno_sound.o juno_split.o juno_forkjoin.o \
+	  bank_blob.o bare_stubs.o
 
 # Circle's own I2S sound driver (libsound) + core. --start-group resolves refs.
 LIBS	= $(CIRCLEHOME)/lib/sound/libsound.a \

@@ -22,8 +22,10 @@ command -v ${PREFIX}g++ >/dev/null 2>&1 || {
 echo ">> build the engine archive (proven bit-exact flags) + embed bank"
 sh "$HERE/build_engine.sh"
 
-echo ">> configure Circle: Pi 3, AArch64 (hardware)"
-( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" -f )
+echo ">> configure Circle: Pi 3, AArch64 (hardware), --multicore"
+# --multicore (ARM_ALLOW_MULTI_CORE) is required: the PLAY path drives the
+# 4-core fork-join (CJunoForkJoin) from core 0's I2S GetChunk callback.
+( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" --multicore -f )
 
 echo ">> build libcircle.a + Circle's I2S sound driver"
 make -C "$CIRCLE/lib" -j"$(nproc)"
