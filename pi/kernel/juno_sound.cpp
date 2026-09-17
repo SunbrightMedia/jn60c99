@@ -40,7 +40,7 @@ class CJunoSound : public CI2SSoundBaseDevice
 public:
 	CJunoSound (CInterruptSystem *pInterrupt, CJunoForkJoin *fork, void *panel)
 	:	CI2SSoundBaseDevice (pInterrupt, JS_RATE, JS_CHUNK),
-		m_fork (fork), m_panel (panel), m_scale (0.0f), m_scratch (0) {}
+		m_fork (fork), m_panel (panel), m_scale (0.0f), m_scratch (0), m_demoBlk (0) {}
 
 	boolean Setup (void)
 	{
@@ -53,8 +53,36 @@ public:
 	// a WORD count (one word per channel). We poll the panel at the block boundary
 	// (no re-entrancy vs the render), render frames = nChunkSize/channels through
 	// the 4-core fork-join, and scale each float sample into the hw range.
+#ifndef JUNO_NO_DEMO
+	// Boot demo: prove first-power-on makes sound with NO input. On the boot
+	// patch, strum an A-major chord up (A4 C#5 E5 A5), then a fast re-strum
+	// (trill), then release — all through the proven fork-join. One shot; the
+	// panel takes over after. Disable in production with -DJUNO_NO_DEMO.
+	// Blocks are ~21.3 ms (1024 frames @ 48 kHz).
+	void RunDemo (void)
+	{
+		if (m_demoBlk == 0xFFFFFFFFu) return;          // finished
+		static const struct { unsigned blk; int note; int on; } D[] = {
+			{  2, 69, 1}, {  5, 73, 1}, {  8, 76, 1}, { 11, 81, 1}, // strum up
+			{ 34, 69, 0}, { 34, 73, 0}, { 34, 76, 0}, { 34, 81, 0}, // release
+			{ 36, 69, 1}, { 37, 73, 1}, { 38, 76, 1}, { 39, 81, 1}, // trill re-strum
+			{ 80, 69, 0}, { 80, 73, 0}, { 80, 76, 0}, { 80, 81, 0}, // final release
+		};
+		unsigned b = m_demoBlk++;
+		for (unsigned i = 0; i < sizeof (D) / sizeof (D[0]); ++i)
+			if (D[i].blk == b) {
+				if (D[i].on) m_fork->NoteOn (D[i].note, 100);
+				else         m_fork->NoteOff (D[i].note);
+			}
+		if (b >= 82) m_demoBlk = 0xFFFFFFFFu;          // done — hand over to the panel
+	}
+#endif
+
 	unsigned GetChunk (u32 *pBuffer, unsigned nChunkSize) override
 	{
+#ifndef JUNO_NO_DEMO
+		RunDemo ();                                    // one-shot A-major boot flourish
+#endif
 		juno_panel_poll (m_panel, m_fork);             // keys/octave between blocks
 
 		unsigned nCh    = GetHWTXChannels ();          // 2 (stereo)
@@ -78,6 +106,7 @@ private:
 	void  *m_panel;
 	float  m_scale;
 	float *m_scratch;
+	unsigned m_demoBlk;            // boot-demo block counter (0xFFFFFFFF = done)
 };
 
 void run_juno_play (CInterruptSystem *pInterrupt)
@@ -130,7 +159,7 @@ void run_juno_play (CInterruptSystem *pInterrupt)
 		return;
 	}
 	log->Write ("juno", LogNotice,
-		    "PLAY: I2S running — silence proven, panel live, voices 0-1|2-3|4-5|6-7");
+		    "PLAY: I2S running — silence proven, boot demo + panel live, voices 0-1|2-3|4-5|6-7");
 
 	// The DMA pulls chunks via IRQ on core 0; each pull polls the panel then
 	// drives the fork-join. This loop only keeps the device alive and surfaces

@@ -286,6 +286,16 @@ stealing (13 notes onto 8 physical voices, the class where a harness bug once
 hid); AND idle (no notes — the earlier phases all played notes, so the master's
 own idle floor was untested until now). All 0 ppb.
 
+**BOOT DEMO** (`juno_sound.cpp`, on by default; `-DJUNO_NO_DEMO` disables): after
+the silence probe passes and I2S opens, PLAY strums an A-major chord up
+(A4 C#5 E5 A5 = MIDI 69/73/76/81) on the boot patch, does a fast re-strum
+(trill), then releases — ~1.7 s, one shot, through the fork-join. Proves
+first-power-on makes sound with no input; the panel takes over after.
+
+**PANEL PINS** (BCM GPIO, `juno_panel.cpp`): keys C/C#/D/D# = 17/27/22/23;
+octave down/up = 5/6; patch down/up = 24/25. Pull-up, active-low, debounced,
+unwired-safe.
+
 **PLAY** (`juno_sound.cpp`): core 0's I2S `GetChunk` polls the panel then calls
 the same `fork.RenderBlock(frames)` — the DMA pull IS the fork-join kick — then
 scales to the hardware range. The workers (cores 1-3) are started by
