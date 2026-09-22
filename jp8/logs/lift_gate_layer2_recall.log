@@ -1,13 +1,14 @@
 === 0. dynamic reach (indirect targets) ===
 === 1. lift + build ===
-lifted 270 functions, 79535 instructions -> /home/user/jn60c99/jp8/src/jp8_lift.c (91192 lines); unsupported (trap) 228: vmovdqa:39, vmovd:31, vmulsd:18, vfmadd213sd:12, int3:11, vmovq:10, vmovsd:9, vpshufd:7, vsubsd:7, vmovapd:6, vldmxcsr:6, vaddsd:5, vdivsd:4, vandpd:4, vpxor:3, vcvtdq2pd:3, vmulpd:3, vcvtsd2ss:3, vorps:3, vstmxcsr:3, vcvtss2si:3, vcvtsi2ss:3, vucomiss:3, int:2, vucomisd:2, vfnmadd231sd:2, vfmadd231sd:2, punpcklbw:1, vpunpckldq:1, vcvtps2pd:1, vpand:1, vpor:1, vpsrlq:1, vpsubq:1, vcvtpd2dq:1, vpsrad:1, vpsllq:1, vpaddq:1, vmovss:1, vaddpd:1
+lifted 762 functions, 156488 instructions -> /home/user/jn60c99/build/snapL12/jp8/src/jp8_lift.c (175670 lines); unsupported (trap) 280: int3:60, vmovdqa:39, vmovd:31, vmulsd:18, vfmadd213sd:12, vmovq:10, vmovsd:9, vpshufd:7, vsubsd:7, vmovapd:6, vldmxcsr:6, vaddsd:5, vdivsd:4, vandpd:4, lock cmpxchg:3, vpxor:3, vcvtdq2pd:3, vmulpd:3, vcvtsd2ss:3, vorps:3, vstmxcsr:3, vcvtss2si:3, vcvtsi2ss:3, vucomiss:3, int:2, vucomisd:2, vfnmadd231sd:2, vfmadd231sd:2, punpcklbw:1, vpunpckldq:1, vcvtps2pd:1, vpand:1, vpor:1, vpsrlq:1, vpsubq:1, vcvtpd2dq:1, vpsrad:1, vpsllq:1, vpaddq:1, vmovss:1
 === 2. oracle replay (Unicorn) ===
+[  51.9s] layer recall patch 2: 640 judged samples, 11520 output words (2814 nonzero), heap 102.8 MB, faults 1
+[ 122.0s] layer recall patch 63: 640 judged samples, 11520 output words (2814 nonzero), heap 102.8 MB, faults 1
 === 3. C twin ===
-[   4.3s] patch 2: 46080 output words (0 differ), heap EXACT -> PASS
-[   8.7s] patch 63: 46080 output words (0 differ), heap EXACT -> PASS
+[   6.5s] patch 2: 46080 output words (0 differ), heap EXACT -> PASS
+[  14.5s] patch 63: 46080 output words (0 differ), heap EXACT -> PASS
 JP8 LIFT A/B (layer recall): EXACTLY 0 -- every output word and every heap byte match on patches [2, 63]
 === 4. the tooth ===
-tooth bites: [   4.2s] patch 2: word 1652 (sample 91, voice 7 main) oracle bc872708 C bc872707
+tooth bites: [   5.3s] patch 2: word 1652 (sample 91, voice 7 main) oracle bc872708 C bc872707
 JP8 LIFT A/B (layer recall): 9292 differences -- NOT bit-exact
 JP8 LIFT GATE (recall) GREEN
-gate exit 0
