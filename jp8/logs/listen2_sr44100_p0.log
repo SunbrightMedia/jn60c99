@@ -1,0 +1,16 @@
+[  18.0s] boot sr 44100 patch 0 'PD Jupiter Glide': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 -> predicted shift -12 semis; VCO2 SUB RANGE engine 0
+[  20.5s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  21.1s] idle cost: 30546 instr/sample (code hook, 32 samples)
+[  30.8s] key 48: DRY f0 53.02 Hz (-1564 c) harmonic 0.902 peak 0.3077 | MASTER f0 53.02 Hz (-1564 c) harmonic 0.902 peak 1.591 | NaN 0
+[  31.3s] sustain cost: 30528 instr/sample (code hook, 32 samples)
+[  44.8s] PASS release dry 48: 0.0371 -> 0 | FAIL release master: 0.197 -> 0.638 (24000 samples)
+[  53.8s] key 60: DRY f0 106.12 Hz (-1562 c) harmonic 0.865 peak 0.3052 | MASTER f0 106.12 Hz (-1562 c) harmonic 0.842 peak 1.674 | NaN 0
+[  66.8s] PASS release dry 60: 0.0588 -> 0 | FAIL release master: 0.38 -> 0.637 (24000 samples)
+[  76.3s] key 72: DRY f0 212.13 Hz (-1563 c) harmonic 0.835 peak 0.305 | MASTER f0 212.13 Hz (-1563 c) harmonic 0.800 peak 1.577 | NaN 0
+[  90.1s] PASS release dry 72: 0.0478 -> 0 | FAIL release master: 0.343 -> 0.625 (24000 samples)
+[  90.1s] DRY    FAIL pitch tracks keys by -16 semitones (offsets -1564, -1562, -1563 cents) (patch VCO1 RANGE predicts -12)
+[  90.1s] MASTER FAIL pitch tracks keys by -16 semitones (offsets -1564, -1562, -1563 cents)
+[  90.1s] PASS NaN census 0; faults after static init 0
+[  90.1s] S3 estimate (idle): 30546 x86 instr/sample x 1.75 = 53456 cyc/sample = 535% of 10,000 cyc/sample @48k (count PROVEN on this oracle; 1.75 calibration INFERRED)
+[  90.1s] S3 estimate (sustain): 30528 x86 instr/sample x 1.75 = 53424 cyc/sample = 534% of 10,000 cyc/sample @48k (count PROVEN on this oracle; 1.75 calibration INFERRED)
+[  90.1s] JP8 LISTEN sr 44100 patch 0: 5 FAIL

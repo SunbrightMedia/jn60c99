@@ -1,0 +1,5 @@
+[  17.1s] booted patch 2 'BR JP PWM Brass ' sr 44100 faults 1
+[  33.5s] note  48: DRY f0  1045.82 Hz ( +3599 c) harm 0.81 peak 0.0853 | MASTER f0  1045.86 Hz ( +3599 c) harm 0.80 peak 0.456 nan 0 | release master rms ['0.0485', '0.0462', '0.0287', '0.019'] dry rms ['0.00459', '9.43e-34', '0', '0']
+[  50.1s] note  60: DRY f0  2094.33 Hz ( +3601 c) harm 0.77 peak 0.0886 | MASTER f0  2094.74 Hz ( +3601 c) harm 0.76 peak 0.495 nan 0 | release master rms ['0.0428', '0.0348', '0.0393', '0.0275'] dry rms ['0.0038', '7.79e-34', '0', '0']
+[  65.4s] note  72: DRY f0  2092.76 Hz ( +2400 c) harm 0.78 peak 0.0784 | MASTER f0  2092.96 Hz ( +2400 c) harm 0.76 peak 0.433 nan 0 | release master rms ['0.0417', '0.0429', '0.0449', '0.0267'] dry rms ['0.00351', '6.42e-34', '0', '0']
+EXIT 0

@@ -1,0 +1,6 @@
+[  17.7s] booted patch 0 'PD Jupiter Glide' sr 44100 faults 1
+[  18.5s] idle 16 samples: block-hook 491586 instr, code-hook 494015 instr (ratio 0.995)
+[  19.1s] idle2 16 samples: block-hook 492073 instr, code-hook 494502 instr (ratio 0.995)
+[  68.6s] note 16 samples: block-hook 482967 instr, code-hook 485396 instr -> 30185 / 30337 instr per sample
+[  68.6s] one sample, instr per unit (v0..v7, master): [3632, 3631, 3632, 3632, 3632, 3632, 3632, 3638, 1288]
+EXIT 0

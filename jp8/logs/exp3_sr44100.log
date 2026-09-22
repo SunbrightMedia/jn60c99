@@ -1,0 +1,3 @@
+[  27.0s] sr 44100 patch 2 key 48: DRY f0 1045.54 Hz (+3598 cents = +35.98 semis) harm 0.80 peaks ['1040.8', '2088.7', '3129.5', '4170.3']
+[  37.6s] sr 44100 patch 2 key 60: DRY f0 2092.32 Hz (+3599 cents = +35.99 semis) harm 0.75 peaks ['2088.7', '4170.3', '6259.0', '8347.7']
+EXIT 0

@@ -1,0 +1,32 @@
+[   0.3s] static init ok=841 fail=0 skipped=3 faults=1 (template condition: ctor #1 cookie-decoded null ptr, JX identical)
+[   0.3s] host map 3 ids: {0: 18, 1: 19, 2: 20}
+[   3.3s] BUILD: 9 units of 0xa9c0c0, proc vptr == PROC_VPTR asserted
+[   4.5s] SETSR 44100.0 (float in xmm1) landed at HOST+8
+[  10.0s] host_init: 3 effective writes, 0 failed
+[  10.0s] latch per unit [960, 960, 960, 960, 960, 960, 960, 960, 960], active ramps [353, 353, 353, 353, 353, 353, 353, 353, 353]
+[  10.0s] recall patch 0 'PD Jupiter Glide': 64 pools x 9 units + assigner notify; ramps [353, 353, 353, 353, 353, 353, 353, 353, 353]
+[  10.0s] snap ramps + clear latch: ramps [0, 0, 0, 0, 0, 0, 0, 0, 0] latch [0, 0, 0, 0, 0, 0, 0, 0, 0]
+[  10.0s] boot-phase faults (BUILD..latch) = 0
+[  17.5s] IDLE 12000: master NaN L=0 R=0 peak 1.57e-13 | dry NaN 0 peak 0 | faults since static 0
+[  17.5s] STEP 3 PASS: faults==0 True, master finite True, idle silent True
+[  17.6s] NOTE 60 vel 100: attack 256 samples = 87889 instr = 343 instr/sample
+[  27.8s] DRY    : FAIL note 60: f0 848.24 Hz (+2036 cents), harmonic 0.667, fundamental 0.003, peak 0.3423
+[  27.8s] MASTER : FAIL note 60: f0 848.24 Hz (+2036 cents), harmonic 0.665, fundamental 0.003, peak 1.734  (NaN L 0 R 0, dry NaN 0)
+[  27.8s] dry spectral peaks: [('847.0 Hz', '146'), ('1697.5 Hz', '105'), ('2544.5 Hz', '94.1'), ('3391.5 Hz', '72.5'), ('4242.0 Hz', '70.8')]
+[  27.8s]   master block 0 rms 0.3414 max 1.562 zc 41
+[  27.8s]   master block 1 rms 0.3454 max 1.5 zc 40
+[  27.8s]   master block 2 rms 0.3506 max 1.734 zc 41
+[  27.8s]   master block 3 rms 0.3412 max 1.517 zc 41
+[  27.8s]   master block 4 rms 0.3504 max 1.525 zc 39
+[  27.8s]   master block 5 rms 0.3458 max 1.519 zc 40
+[  27.8s]   master block 6 rms 0.3429 max 1.518 zc 41
+[  27.8s]   master block 7 rms 0.3475 max 1.501 zc 40
+[  28.0s] sustained: 256 samples = 84312 instr = 329 instr/sample
+[  42.7s] RELEASE master rms per 4000: ['0.0199', '0.156', '0.211', '0.21', '0.209', '0.161'] (NaN 0)
+[  42.7s] RELEASE dry    rms per 4000: ['0.00374', '0', '0', '0', '0', '0']
+[  42.9s] post-release idle: 256 samples = 66560 instr = 260 instr/sample
+[  42.9s] STEP 4 FAIL: dry False master False, no NaN True, release decays False, faults since static 0
+[  42.9s] S3 estimate (attack): 343 x86 instr/sample x 1.75 = 601 cyc/sample = 6% of 10,000 cyc/sample @48k (calibration INFERRED; count PROVEN on this oracle)
+[  42.9s] S3 estimate (sustain): 329 x86 instr/sample x 1.75 = 576 cyc/sample = 6% of 10,000 cyc/sample @48k (calibration INFERRED; count PROVEN on this oracle)
+[  42.9s] S3 estimate (idle): 260 x86 instr/sample x 1.75 = 455 cyc/sample = 5% of 10,000 cyc/sample @48k (calibration INFERRED; count PROVEN on this oracle)
+EXIT 0

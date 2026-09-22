@@ -1,0 +1,3 @@
+[  26.2s] sr 22050 patch 2 key 48: DRY f0 239.93 Hz (+1050 cents = +10.50 semis) harm 0.83 peaks ['240.5', '480.9', '721.4', '958.2']
+[  37.7s] sr 22050 patch 2 key 60: DRY f0 481.92 Hz (+1058 cents = +10.58 semis) harm 0.79 peaks ['480.9', '965.4', '1446.3', '1927.2']
+EXIT 0

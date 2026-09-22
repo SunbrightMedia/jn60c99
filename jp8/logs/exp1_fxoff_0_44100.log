@@ -1,0 +1,4 @@
+[  19.5s] booted patch 0 'PD Jupiter Glide' sr 44100 faults 1
+[  19.5s] FX levels 794/795/796 := 0 on all units (control arm)
+[  37.7s] note  60: DRY f0   848.23 Hz ( +2036 c) harm 0.77 peak 0.291 | MASTER f0   848.23 Hz ( +2036 c) harm 0.76 peak 1.52 nan 0 | release master rms ['0.0512', '1.57e-13', '1.57e-13', '1.57e-13'] dry rms ['0.00958', '0', '0', '0']
+EXIT 0

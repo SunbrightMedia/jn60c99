@@ -1,0 +1,16 @@
+[  17.0s] boot sr 44100 patch 52 '1981 Hi Brass   ': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 -> predicted shift +0 semis; VCO2 SUB RANGE engine 0
+[  19.4s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  20.0s] idle cost: 31622 instr/sample (code hook, 32 samples)
+[  29.5s] key 48: DRY f0 130.74 Hz (-1 c) harmonic 0.992 peak 0.08137 | MASTER f0 130.74 Hz (-1 c) harmonic 0.992 peak 0.4331 | NaN 0
+[  30.1s] sustain cost: 31556 instr/sample (code hook, 32 samples)
+[  43.0s] PASS release dry 48: 0.0196 -> 0 | PASS release master: 0.109 -> 1.57e-13 (24000 samples)
+[  52.2s] key 60: DRY f0 261.63 Hz (+0 c) harmonic 0.986 peak 0.06336 | MASTER f0 261.63 Hz (+0 c) harmonic 0.986 peak 0.3371 | NaN 0
+[  65.5s] PASS release dry 60: 0.0226 -> 0 | PASS release master: 0.128 -> 1.57e-13 (24000 samples)
+[  80.0s] key 72: DRY f0 523.14 Hz (-0 c) harmonic 0.981 peak 0.07121 | MASTER f0 523.14 Hz (-0 c) harmonic 0.981 peak 0.3789 | NaN 0
+[ 101.5s] PASS release dry 72: 0.0435 -> 0 | PASS release master: 0.232 -> 1.57e-13 (24000 samples)
+[ 101.5s] DRY    PASS pitch tracks keys by +0 semitones (offsets -1, +0, -0 cents) (patch VCO1 RANGE predicts +0)
+[ 101.5s] MASTER PASS pitch tracks keys by +0 semitones (offsets -1, +0, -0 cents)
+[ 101.5s] PASS NaN census 0; faults after static init 0
+[ 101.5s] S3 estimate (idle): 31622 x86 instr/sample x 1.75 = 55339 cyc/sample = 553% of 10,000 cyc/sample @48k (count PROVEN on this oracle; 1.75 calibration INFERRED)
+[ 101.5s] S3 estimate (sustain): 31556 x86 instr/sample x 1.75 = 55224 cyc/sample = 552% of 10,000 cyc/sample @48k (count PROVEN on this oracle; 1.75 calibration INFERRED)
+[ 101.5s] JP8 LISTEN sr 44100 patch 52: GREEN

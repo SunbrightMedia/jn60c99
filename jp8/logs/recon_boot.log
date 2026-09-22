@@ -1,0 +1,30 @@
+[   0.1s] XC table 845 entries, skip set ['0x5c83c0', '0xb6dd0', '0xb7244']
+[   0.1s] ctor #1 rva 0xb720c mapped 1 stray page(s)
+[   0.5s] static init: ok=841 fail=0 faults=1 unhandled imports=[('HeapSize', 6), ('GetCurrentThread', 1), ('GetThreadTimes', 1), ('SetSecurityDescriptorDacl', 1), ('CoCreateGuid', 1), ('timeBeginPeriod', 1), ('QueryPerformanceFrequency', 1)]
+[   0.5s] .data tail nonzero 3441/45536
+[   0.5s] host map: 3 ids; 0..5 -> {0: 18, 1: 19, 2: 20}; hid 2 -> eng 20
+[   4.2s] BUILD returned
+[   4.2s] BUILD allocs=1210 big=[('0xa9c0c0', 9)] faults=1
+[   4.2s] unit 0 state 0x3100384a0 vptr rva 0xa1b678 | proc 0x310ad4570 vptr rva 0xa54158 ==PROC_VPTR | assign 0x310af8420 vptr rva 0x9f31f0
+[   4.2s] unit 1 state 0x310b10ba0 vptr rva 0xa1b678 | proc 0x3115acc70 vptr rva 0xa54158 ==PROC_VPTR | assign 0x3115d0b20 vptr rva 0x9f31f0
+[   4.2s] unit 2 state 0x3115e92a0 vptr rva 0xa1b678 | proc 0x312085370 vptr rva 0xa54158 ==PROC_VPTR | assign 0x3120a9220 vptr rva 0x9f31f0
+[   4.2s] unit 3 state 0x3120c19a0 vptr rva 0xa1b678 | proc 0x312b5da70 vptr rva 0xa54158 ==PROC_VPTR | assign 0x312b81920 vptr rva 0x9f31f0
+[   4.2s] unit 4 state 0x312b9a0a0 vptr rva 0xa1b678 | proc 0x313636170 vptr rva 0xa54158 ==PROC_VPTR | assign 0x31365a020 vptr rva 0x9f31f0
+[   4.2s] unit 5 state 0x3136727a0 vptr rva 0xa1b678 | proc 0x31410e870 vptr rva 0xa54158 ==PROC_VPTR | assign 0x314132720 vptr rva 0x9f31f0
+[   4.2s] unit 6 state 0x31414aea0 vptr rva 0xa1b678 | proc 0x314be6f70 vptr rva 0xa54158 ==PROC_VPTR | assign 0x314c0ae20 vptr rva 0x9f31f0
+[   4.2s] unit 7 state 0x314c235a0 vptr rva 0xa1b678 | proc 0x3156bf670 vptr rva 0xa54158 ==PROC_VPTR | assign 0x3156e3520 vptr rva 0x9f31f0
+[   4.2s] unit 8 state 0x3156fbca0 vptr rva 0xa1b678 | proc 0x316197d70 vptr rva 0xa54158 ==PROC_VPTR | assign 0x3161bbc20 vptr rva 0x9f31f0
+[   4.2s] HOST+8 float = 0.0
+[   5.3s] SETSR landed HOST+8=44100.0
+[   5.3s] unit 0 latch(st+0xa9c0b8)=960  ramp arr 0x310b07200 list [0x310b0fd20,0x310b102a4) n=353
+[   5.3s]    ramp id 860: target 0x310a94220 (in-state) limit 1.0 active 1
+[   5.3s]    ramp id 877: target 0x310a94330 (in-state) limit 0.2828426957130432 active 1
+[   5.3s]    ramp id 880: target 0x310a94360 (in-state) limit 0.2828426957130432 active 1
+[   5.3s]    ramp id 883: target 0x310a94390 (in-state) limit 0.2828426957130432 active 1
+[   5.3s] unit 8 latch(st+0xa9c0b8)=960  ramp arr 0x3161caa00 list [0x3161d3520,0x3161d3aa4) n=353
+[   5.3s]    ramp id 860: target 0x316157a20 (in-state) limit 1.0 active 1
+[   5.3s]    ramp id 877: target 0x316157b30 (in-state) limit 0.2828426957130432 active 1
+[   5.3s]    ramp id 880: target 0x316157b60 (in-state) limit 0.2828426957130432 active 1
+[   5.3s]    ramp id 883: target 0x316157b90 (in-state) limit 0.2828426957130432 active 1
+[   5.3s] unit 0 state tail (last 64 B as i32): [9728, 9783, 9785, 11599, 13174, 13283, 13285, 14870, 17056, 17766, 17768, 19463, 21648, 22358, 960, 0]
+[   5.3s] faults total 1

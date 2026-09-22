@@ -1,0 +1,3 @@
+[  27.5s] sr 48000 patch 2 key 48: DRY f0 522.30 Hz (+2397 cents = +23.97 semis) harm 0.83 peaks ['523.4', '1046.9', '1570.3', '2085.9']
+[  38.5s] sr 48000 patch 2 key 60: DRY f0 1049.07 Hz (+2404 cents = +24.04 semis) harm 0.79 peaks ['1046.9', '2101.6', '3148.4', '4195.3']
+EXIT 0

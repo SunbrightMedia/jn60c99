@@ -1,0 +1,5 @@
+[  15.1s] booted patch 63 '1981 Chime      ' sr 44100 faults 1
+[  36.2s] note  48: DRY f0  2094.21 Hz ( +4801 c) harm 0.83 peak 0.0316 | MASTER f0  2094.15 Hz ( +4801 c) harm 0.83 peak 0.168 nan 0 | release master rms ['0.00728', '1.57e-13', '1.57e-13', '1.57e-13'] dry rms ['0.00135', '0', '0', '0']
+[  52.1s] note  60: DRY f0  2092.98 Hz ( +3600 c) harm 0.81 peak 0.0286 | MASTER f0  2093.00 Hz ( +3600 c) harm 0.81 peak 0.152 nan 0 | release master rms ['0.00634', '1.57e-13', '1.57e-13', '1.57e-13'] dry rms ['0.00113', '0', '0', '0']
+[  67.5s] note  72: DRY f0  2782.93 Hz ( +2893 c) harm 0.76 peak 0.0217 | MASTER f0  2782.92 Hz ( +2893 c) harm 0.76 peak 0.116 nan 0 | release master rms ['0.00598', '1.57e-13', '1.57e-13', '1.57e-13'] dry rms ['0.00112', '0', '0', '0']
+EXIT 0

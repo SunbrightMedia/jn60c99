@@ -1,0 +1,159 @@
+{
+ "BUILD": {
+  "rva": "0x445020",
+  "reads": {
+   "rcx": [
+    "0x445059",
+    "mov"
+   ]
+  },
+  "stack_args": []
+ },
+ "SETSR": {
+  "rva": "0x4464f0",
+  "reads": {
+   "rcx": [
+    "0x4464fb",
+    "mov"
+   ],
+   "xmm1": [
+    "0x4464fe",
+    "movaps",
+    "float"
+   ]
+  },
+  "stack_args": []
+ },
+ "HOSTPARAM": {
+  "rva": "0x4465b0",
+  "reads": {
+   "r8": [
+    "0x4465d7",
+    "mov"
+   ],
+   "rcx": [
+    "0x4465da",
+    "mov"
+   ],
+   "rdx": [
+    "0x4465dd",
+    "cmp"
+   ]
+  },
+  "stack_args": []
+ },
+ "NOTEOFF": {
+  "rva": "0x445c90",
+  "reads": {
+   "r8": [
+    "0x445ca4",
+    "movzx"
+   ],
+   "rcx": [
+    "0x445ca8",
+    "lea"
+   ],
+   "rdx": [
+    "0x445caf",
+    "movzx"
+   ]
+  },
+  "stack_args": []
+ },
+ "NOTEON": {
+  "rva": "0x445cf0",
+  "reads": {
+   "r8": [
+    "0x445d04",
+    "movzx"
+   ],
+   "rcx": [
+    "0x445d08",
+    "lea"
+   ],
+   "rdx": [
+    "0x445d0f",
+    "movzx"
+   ]
+  },
+  "stack_args": []
+ },
+ "RENDER": {
+  "rva": "0x445dc0",
+  "reads": {
+   "r9": [
+    "0x445dfc",
+    "mov"
+   ],
+   "rcx": [
+    "0x445e01",
+    "mov"
+   ]
+  },
+  "stack_args": []
+ },
+ "DISPATCH": {
+  "rva": "0x437630",
+  "reads": {
+   "r9": [
+    "0x43763a",
+    "mov"
+   ],
+   "r8": [
+    "0x43763d",
+    "mov"
+   ],
+   "rcx": [
+    "0x437640",
+    "mov"
+   ],
+   "rdx": [
+    "0x437643",
+    "cmp"
+   ]
+  },
+  "stack_args": []
+ },
+ "ASG_NOTIFY": {
+  "rva": "0x37cd80",
+  "reads": {
+   "rdx": [
+    "0x37cd80",
+    "cmp"
+   ],
+   "rcx": [
+    "0x37cd8b",
+    "mov"
+   ]
+  },
+  "stack_args": []
+ },
+ "VOICE_WRAP": {
+  "rva": "0x3f80b0",
+  "reads": {
+   "rcx": [
+    "0x3f80b6",
+    "cmp"
+   ],
+   "r8": [
+    "0x3f80d7",
+    "mov"
+   ]
+  },
+  "stack_args": []
+ },
+ "MASTER_WRAP": {
+  "rva": "0x3f8040",
+  "reads": {
+   "rcx": [
+    "0x3f8046",
+    "cmp"
+   ],
+   "r8": [
+    "0x3f8063",
+    "mov"
+   ]
+  },
+  "stack_args": []
+ }
+}

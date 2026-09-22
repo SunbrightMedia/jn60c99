@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="utf-8"?>
+<script>
+	<!-- patch -->
+	<panelType>
+		<type>manage</type>
+		<name>Patch Manager</name>
+		<position>0,0</position>
+		<windowPosition>40,40</windowPosition>
+		<size>2300,1364</size>
+		<modal>1</modal>
+		<openCondition>vm.vs.manage,1,==</openCondition>
+		<zoomValueRef>vm.vs.manageZoom</zoomValueRef>
+		<zoomCorner>40</zoomCorner>
+		<textWriterRef>zoom</textWriterRef>
+		<panel>
+			<type>manageList</type>
+		</panel>
+		<panel>
+			<type>manageMatrix</type>
+		</panel>
+		<panel>
+			<type>bankTsv</type>
+		</panel>
+		<control>
+			<type>patchBank</type>
+			<position>60,153</position>
+			<size>425,622</size>
+			<valueRef>vm.vs.bankId</valueRef>
+			<valueRef>vm.vs.patchId</valueRef>
+			<valueRef>vm.vs.mainMode</valueRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<valueRef>vm.vs.manage</valueRef>
+			<textWriterRef>listNCmn</textWriterRef>
+			<textWriterRef>listCCmn</textWriterRef>
+			<cellWidth>397</cellWidth>
+			<heightT>14</heightT>
+			<scrollColor>0x80,0x80,0x80</scrollColor>
+			<scrollBackColor>0x40,0x40,0x40</scrollBackColor>
+			<feedbackColor>0xFF,0xFF,0xFF,0x1F</feedbackColor>
+		</control>
+		<control>
+			<type>writeButton</type>
+			<position>507,26</position>
+			<bitmapRef>btManagerWriteCmn.png</bitmapRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<textWriterRef>btnCmn</textWriterRef>
+			<action>1</action>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+		</control>
+		<control>
+			<type>label</type>
+			<position>2240,1304</position>
+			<size>40,40</size>
+			<bitmapRef>lbZoomGripCmn.png</bitmapRef>
+		</control>
+		<control>
+			<type>latchButton</type>
+			<position>1807,26</position>
+			<bitmapRef>btManagerListCmn.png</bitmapRef>
+			<onValue>0</onValue>
+			<offValue>0</offValue>
+			<valueRef>vm.vs.manageMode</valueRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+		</control>
+		<control>
+			<type>latchButton</type>
+			<position>2025,26</position>
+			<bitmapRef>btManagerMatrixCmn.png</bitmapRef>
+			<onValue>1</onValue>
+			<offValue>1</offValue>
+			<valueRef>vm.vs.manageMode</valueRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+		</control>
+		<control>
+			<type>label</type>
+			<position>60,790</position>
+			<size>180,28</size>
+			<textWriterRef>labelCmn</textWriterRef>
+			<text>BANK</text>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>55,820</position>
+			<bitmapRef>btManagerCmn.png</bitmapRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<label>NEW</label>
+			<textWriterRef>btnCmn</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>0</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>274,820</position>
+			<bitmapRef>btManagerCmn.png</bitmapRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<label>DELETE</label>
+			<textWriterRef>btnCmn</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>1</role>
+		</control>
+
+		<control>
+			<type>patchButton</type>
+			<position>55,924</position>
+			<bitmapRef>btManagerCmn.png</bitmapRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<label>IMPORT</label>
+			<textWriterRef>btnCmn</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>2</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>274,924</position>
+			<bitmapRef>btManagerCmn.png</bitmapRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<label>EXPORT</label>
+			<textWriterRef>btnCmn</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>3</role>
+		</control>
+
+		<control>
+			<type>label</type>
+			<position>60,1058</position>
+			<size>278,28</size>
+			<textWriterRef>labelCmn</textWriterRef>
+			<text>PLUG-OUT</text>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>55,1088</position>
+			<bitmapRef>btManagerCmn.png</bitmapRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<label>SEND ALL</label>
+			<textWriterRef>btnCmn</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>6</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>274,1088</position>
+			<bitmapRef>btManagerCmn.png</bitmapRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<label>GET ALL</label>
+			<textWriterRef>btnCmn</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>7</role>
+		</control>
+		<control>
+			<type>label</type>
+			<position>46,1223</position>
+			<size>104,104</size>
+			<bitmapRef>lbManagerInfoCmn.png</bitmapRef>
+		</control>
+		<control>
+			<type>label</type>
+			<position>58,240</position>
+			<size>840,1000</size>
+			<textWriterRef>managerHelpCmn</textWriterRef>
+			<visiblePosition>0,1000</visiblePosition>
+			<visibleSize>78,78</visibleSize>
+			<text-win>
+				- ctrl+R: new bank
+				- ctrl+T: delete bank
+				- ctrl+I: import bank from file
+				- ctrl+E: export bank to file
+				- ctrl+U: send all patches
+				- ctrl+G: get all patches
+				- ctrl+N: new patch
+				- Delete: delete patch
+				- ctrl+O: read patch
+				- ctrl+S: write patch
+				- Space: rename patch
+				- ctrl+C: copy patch to clipboard
+				- ctrl+X: cut patch to clipboard
+				- ctrl+V: replace patch from clipboard
+				- ctrl+Y: insert patch from clipboard
+				- ctrl+Z: undo
+				- ctrl+shift+Z: redo
+				- ctrl+J: change number format
+				- Up/Down/Left/Right: select patch
+				- Esc: close
+			</text-win>
+			<text-mac>
+				- command+R: new bank
+				- command+T: delete bank
+				- command+I: import bank from file
+				- command+E: export bank to file
+				- command+U: send all patches
+				- command+G: get all patches
+				- command+N: new patch
+				- Delete(forward): delete patch
+				- command+O: read patch
+				- command+S: write patch
+				- Space: rename patch
+				- command+C: copy patch to clipboard
+				- command+X: cut patch to clipboard
+				- command+V: replace patch from clipboard
+				- command+Y: insert patch from clipboard
+				- command+Z: undo
+				- command+shift+Z: redo
+				- command+J: change number format
+				- Up/Down/Left/Right: select patch
+				- Esc: close
+			</text-mac>
+		</control>
+	</panelType>
+		
+	<panelType>
+		<type>manageList</type>
+		<position>0,0</position>
+		<size>2300,1364</size>
+		<bitmapRef>pnManagerListCmn.png</bitmapRef>
+		<openCondition>vm.vs.manageMode,0,==</openCondition>
+		<control>
+			<type>patchList</type>
+			<position>514,151</position>
+			<size>1724,1140</size>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<textWriterRef>listNCmn</textWriterRef>
+			<textWriterRef>listCCmn</textWriterRef>
+			<textWriterRef>listHeaderCmn</textWriterRef>
+			<bitmapRef>brBrowseStarCmn.png</bitmapRef>
+			<cellWidth>500,250,946</cellWidth>
+			<label>NAME,RATING,NOTES</label>
+			<heightT>23</heightT>
+			<scrollColor>0x80,0x80,0x80</scrollColor>
+			<scrollBackColor>0x40,0x40,0x40</scrollBackColor>
+			<feedbackColor>0xFF,0xFF,0xFF,0x1F</feedbackColor>
+		</control>
+	</panelType>
+	<panelType>
+		<type>manageMatrix</type>
+		<position>0,0</position>
+		<size>2300,1364</size>
+		<bitmapRef>pnManagerMatrixCmn.png</bitmapRef>
+		<openCondition>vm.vs.manageMode,1,==</openCondition>
+		<control>
+			<type>patchInfo</type>
+			<position>746,1050</position>
+			<size>1300,62</size>
+			<role>0</role>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<textWriterRef>managerEditCmn</textWriterRef>
+		</control>
+		<control>
+			<type>patchInfo</type>
+			<position>746,1145</position>
+			<size>1494,62</size>
+			<role>1</role>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<textWriterRef>managerEditCmn</textWriterRef>
+		</control>
+		<control>
+			<type>patchInfo</type>
+			<position>2060,1062</position>
+			<size>140,40</size>
+			<role>2</role>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<bitmapRef>brBrowseStarCmn.png</bitmapRef>
+		</control>
+		<control>
+			<type>patchMatrix</type>
+			<position>516,154</position>
+			<size>1726,800</size>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<textWriterRef>listNCmn</textWriterRef>
+			<textWriterRef>listCCmn</textWriterRef>
+			<textWriterRef>listNCmn</textWriterRef>
+			<gridColor>0x40,0x40,0x40</gridColor>
+		</control>
+		<control>
+			<type>label</type>
+			<position>530,1066</position>
+			<size>210,28</size>
+			<textWriterRef>labelCmn</textWriterRef>
+			<text>NAME/RATING</text>
+		</control>
+		<control>
+			<type>label</type>
+			<position>626,1167</position>
+			<size>210,28</size>
+			<textWriterRef>labelCmn</textWriterRef>
+			<text>NOTES</text>
+		</control>
+	</panelType>
+	<panelType>
+		<type>bankTsv</type>
+		<name>bankTsv</name>
+		<position>0,25</position>
+		<size>480,96</size>
+		<openCondition>vm.vs.bankTsv,1,==</openCondition>
+		<control>
+			<type>patchButton</type>
+			<position>50,0</position>
+			<bitmapRef>btManagerCmn.png</bitmapRef>
+			<label>LOAD(TSV)</label>
+			<textWriterRef>btnCmn</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>4</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>270,0</position>
+			<bitmapRef>btManagerCmn.png</bitmapRef>
+			<label>SAVE(TSV)</label>
+			<textWriterRef>btnCmn</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>5</role>
+		</control>
+	</panelType>
+</script>

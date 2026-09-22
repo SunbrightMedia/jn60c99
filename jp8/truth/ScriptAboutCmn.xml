@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<script>
+	<!-- about -->
+	<panelType>
+		<type>about</type>
+		<position>0,0</position>
+		<size>$backSize</size>
+		<backColor>0x00,0x00,0x00,0xC0</backColor>
+		<openCondition>vm.vs.about,1,==</openCondition>
+		<modal>1</modal>
+		<modalCloseIcon>30,60</modalCloseIcon>
+		<panel>
+			<type>aboutA</type>
+			<editPosition>$editPosition</editPosition>
+			<browsePosition>479,300</browsePosition>
+			<appName>$appName</appName>
+			<textMacArm64>$textMacArm64</textMacArm64>
+			<textMacX86_64>$textMacX86_64</textMacX86_64>
+			<textWin>$textWin</textWin>
+			<copyright>$copyright</copyright>
+		</panel>
+	</panelType>
+	<panelType>
+		<type>aboutA</type>
+		<position>$editPosition</position>
+		<position>$browsePosition</position>
+		<positionIndex>vm.vs.mainMode</positionIndex>
+		<size>1346,639</size>
+		<backColor>0x20,0x20,0x20</backColor>
+		<control>
+			<type>label</type>
+			<position>30,30</position>
+			<size>96,96</size>
+			<bitmapRef>lbApp96Cmn.png</bitmapRef>
+		</control>
+		<control>
+			<type>label</type>
+			<position>150,32</position>
+			<size>500,40</size>
+			<textWriterRef>listNCmn</textWriterRef>
+			<text>$appName</text>
+		</control>
+		<control>
+			<type>label</type>
+			<position>150,60</position>
+			<size>500,120</size>
+			<textWriterRef>listNCmn</textWriterRef>
+			<text-mac-arm64>$textMacArm64</text-mac-arm64>
+			<text-mac-x86_64>$textMacX86_64</text-mac-x86_64>
+			<text-win>$textWin</text-win>
+		</control>
+		<control>
+			<type>label</type>
+			<position>150,142</position>
+			<size>800,98</size>
+			<textWriterRef>listNCmn</textWriterRef>
+			<text>$copyright</text>
+		</control>
+		<control>
+			<type>label</type>
+			<position>150,190</position>
+			<size>1140,380</size>
+			<textWriterRef>listNCmn</textWriterRef>
+			<text>
+				Patent: roland.cm/patents
+				SOFTWARE LICENSE:
+				&quot;Roboto&quot; is a trademark for Google.Inc.
+				&quot;Roboto&quot; is licensed under the Apache License, version 2.0
+				Apache Licenses, Version 2.0
+				http://www.apache.org/licenses/LICENSE-2.0
+				Google Attribution
+				https://www.google.com/fonts/attribution
+			</text>
+		</control>
+		<control>
+			<type>label</type>
+			<position>150,530</position>
+			<size>1190,98</size>
+			<textWriterRef>listNCmn</textWriterRef>
+			<text-vst>
+				VST is a registered trademark of Steinberg Media Technologies GmbH.
+			</text-vst>
+			<text-win-sa>
+				VST is a registered trademark of Steinberg Media Technologies GmbH.
+			</text-win-sa>
+		</control>
+	</panelType>
+</script>

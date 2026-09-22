@@ -1,0 +1,5 @@
+[  12.2s] JX engine-DB pool mins != 0: {769: -128} (the raw+min law is a no-op on the JX when this is empty)
+[  32.6s] JX patch 1 DCO1 RANGE 3 (3 = 8'; jx_listen law: pitch tracks keys by 12*(RANGE-3) = +0 semis)
+[  58.0s] JX sr 44100 patch 1 key 48: DRY f0 130.15 Hz (-9 cents) harm 0.98 peak 0.0288
+[  76.4s] JX sr 44100 patch 1 key 60: DRY f0 260.30 Hz (-9 cents) harm 0.97 peak 0.0277
+[  76.4s] JX CONTROL sr 44100 patch 1: PASS (offsets ['-9', '-9'] vs RANGE law +0 semis)

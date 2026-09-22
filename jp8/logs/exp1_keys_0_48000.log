@@ -1,0 +1,5 @@
+[  15.9s] booted patch 0 'PD Jupiter Glide' sr 48000 faults 1
+[  38.9s] note  48: DRY f0   212.07 Hz (  +836 c) harm 0.87 peak 0.284 | MASTER f0   212.07 Hz (  +836 c) harm 0.87 peak 1.49 nan 0 | release master rms ['0.0283', '0.00163', '0.00196', '0.00236'] dry rms ['0.00531', '0', '0', '0']
+[  56.7s] note  60: DRY f0   424.60 Hz (  +838 c) harm 0.81 peak 0.272 | MASTER f0   212.29 Hz (  -362 c) harm 0.86 peak 1.46 nan 0 | release master rms ['0.196', '0.191', '0.0441', '0.00221'] dry rms ['0.00952', '0', '0', '0']
+[  71.9s] note  72: DRY f0   848.43 Hz (  +837 c) harm 0.73 peak 0.293 | MASTER f0   424.30 Hz (  -363 c) harm 0.78 peak 1.91 nan 0 | release master rms ['0.248', '0.233', '0.0858', '0.0794'] dry rms ['0.00962', '0', '0', '0']
+EXIT 0

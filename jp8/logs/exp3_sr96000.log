@@ -1,0 +1,3 @@
+[  27.2s] sr 96000 patch 2 key 48: DRY f0 1044.60 Hz (+3597 cents = +35.97 semis) harm 0.83 peaks ['1046.9', '2093.8', '3140.6', '4171.9']
+[  38.3s] sr 96000 patch 2 key 60: DRY f0 2098.15 Hz (+3604 cents = +36.04 semis) harm 0.79 peaks ['2093.8', '4203.1', '6296.9', '8390.6']
+EXIT 0
