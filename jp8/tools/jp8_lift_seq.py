@@ -14,7 +14,9 @@ IDLE_N = 8
 WARM = 256
 N = 64
 RECALL_TO = 5          # layer 2: the patch recalled during the judged list (from each boot patch of PATCHES)
-if LAYER == "recall":
+if os.environ.get("JP8_LIFT_PATCHES"):                       # a reach run overrides the patch list (jp8_lift_reach.sh)
+    PATCHES = [int(x) for x in os.environ["JP8_LIFT_PATCHES"].split(",")]
+elif LAYER == "recall":
     PATCHES = [2, 63]
 else:
     PATCHES = [2, 63, 10, 0]
@@ -25,6 +27,10 @@ NOTEOFF = 0x445C90     # (rcx=HOST, dl=note, r8b=vel)
 DISPATCH = 0x437630    # (rcx=proc, edx=id, r8=flag, r9=value)
 ASG_NOTIFY = 0x37CD80  # (rcx=assign obj, edx=what)
 ROOTS = "0x3F80B0,0x3F8040,0x445CF0,0x445C90,0x437630,0x37CD80"
+# the tooth per layer: ONE addss turned into subss by jp8_lift.py --tooth; the gate must FAIL with it
+#   render: 0x3965cb = the VCO1 RANGE add in the per-sample pitch block (fn 0x395000)
+#   recall: 0x38633e = the FINE TUNE child setter's "+ 0.0003" (0x386310), reached only through DISPATCH
+TOOTH = {"render": "0x3965cb", "recall": "0x38633e"}[LAYER]
 # oracle regions (jp8_emu constants; the C side maps the same ones)
 IMG_BASE = 0x180000000
 HEAP_BASE = 0x310000000
