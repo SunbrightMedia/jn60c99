@@ -1,6 +1,12 @@
-[  20.1s] boot sr 44100 patch 45 '1981 Honky Tonk': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 196 SUB 0; confound candidates: ENV REL 188/100
-[  23.0s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
-[  37.3s] PASS key 48 EARLY: DRY f0 132.04 Hz (+16 c vs key) harmonic 0.978 peak 0.1183 master peak 0.2169 | engine u0 130.9/133.1 | dev 14 c vs engine, 16 c vs semitone | NaN 0
-[  55.1s] PASS release dry 48: 0.0394 -> 0 | PASS release master: 0.0722 -> 1.57e-13 (24000 samples)
-[  68.5s] PASS key 60 EARLY: DRY f0 263.84 Hz (+15 c vs key) harmonic 0.982 peak 0.1023 master peak 0.1876 | engine u0 262.0/266.4 | dev 12 c vs engine, 15 c vs semitone | NaN 0
-[  84.8s] PASS release dry 60: 0.0408 -> 0 | PASS release master: 0.0748 -> 1.57e-13 (24000 samples)
+[  12.6s] boot sr 44100 patch 45 '1981 Honky Tonk': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 196 SUB 0; confound candidates: ENV REL 188/100
+[  14.4s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  22.9s] PASS key 48 EARLY: DRY f0 132.04 Hz (+16 c vs key) harmonic 0.978 peak 0.1183 master peak 0.2169 | engine u0 130.9/133.1 | dev 14 c vs engine, 16 c vs semitone | NaN 0
+[  33.8s] PASS release dry 48: 0.0394 -> 0 | PASS release master: 0.0722 -> 1.57e-13 (24000 samples)
+[  41.3s] PASS key 60 EARLY: DRY f0 263.84 Hz (+15 c vs key) harmonic 0.982 peak 0.1023 master peak 0.1876 | engine u0 262.0/266.4 | dev 12 c vs engine, 15 c vs semitone | NaN 0
+[  51.4s] PASS release dry 60: 0.0408 -> 0 | PASS release master: 0.0748 -> 1.57e-13 (24000 samples)
+[  58.8s] PASS key 72 EARLY: DRY f0 527.60 Hz (+14 c vs key) harmonic 0.975 peak 0.1161 master peak 0.2129 | engine u0 522.5/531.1 | dev 12 c vs engine, 14 c vs semitone | NaN 0
+[  69.2s] PASS release dry 72: 0.0416 -> 0 | PASS release master: 0.0762 -> 1.57e-13 (24000 samples)
+[  69.2s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +16, +15, +14 cents) | every key on its engine cell: True
+[  69.2s] PASS NaN census 0; faults after static init 0; instr/sample idle 29998 sustain 29507
+[  69.2s] ROW | 45 | 1981 Honky Tonk | PASS | 48:+16c(E) 60:+15c(E) 72:+14c(E) | 0.98 0.98 0.97 | 1.57e-13 | 0 | 0 | 29998/29507 | ENV REL 188/100 |
+[  69.2s] JP8 SWEEP patch 45: PASS
