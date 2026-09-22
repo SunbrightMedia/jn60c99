@@ -1,0 +1,12 @@
+[  10.7s] boot sr 44100 patch 58 '1981 Fat Fifth': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 3 FINE 128 SUB -5; confound candidates: none
+[  12.4s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  20.5s] PASS key 48 EARLY: DRY f0 32.59 Hz (-2406 c vs key) harmonic 0.983 peak 0.1052 master peak 0.3122 | engine u0 65.5/98.0 | dev 1208 c vs engine, 6 c vs semitone | NaN 0
+[  30.5s] PASS release dry 48: 0.049 -> 0 | PASS release master: 0.151 -> 1.57e-13 (24000 samples)
+[  37.8s] PASS key 60 EARLY: DRY f0 65.37 Hz (-2401 c vs key) harmonic 0.986 peak 0.1079 master peak 0.3202 | engine u0 131.0/196.1 | dev 1204 c vs engine, 1 c vs semitone | NaN 0
+[  47.6s] PASS release dry 60: 0.0206 -> 0 | PASS release master: 0.061 -> 1.57e-13 (24000 samples)
+[  54.9s] PASS key 72 EARLY: DRY f0 130.69 Hz (-2402 c vs key) harmonic 0.986 peak 0.1305 master peak 0.3873 | engine u0 261.3/391.0 | dev 1199 c vs engine, 2 c vs semitone | NaN 0
+[  64.6s] PASS release dry 72: 0.0471 -> 0 | PASS release master: 0.14 -> 1.57e-13 (24000 samples)
+[  64.6s] PASS JX law (dry): PASS pitch tracks keys by -24 semitones (offsets -2406, -2401, -2402 cents) | every key on its engine cell: False
+[  64.6s] PASS NaN census 0; faults after static init 0; instr/sample idle 29453 sustain 29482
+[  64.6s] ROW | 58 | 1981 Fat Fifth | PASS | 48:-2406c(E) 60:-2401c(E) 72:-2402c(E) | 0.98 0.99 0.99 | 1.57e-13 | 0 | 0 | 29453/29482 | - |
+[  64.6s] JP8 SWEEP patch 58: PASS

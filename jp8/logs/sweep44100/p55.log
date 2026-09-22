@@ -1,0 +1,12 @@
+[  10.6s] boot sr 44100 patch 55 '1981 Drawbar Org': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 4 FINE 122 SUB -5; confound candidates: none
+[  12.3s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  20.8s] PASS key 48 EARLY: DRY f0 65.24 Hz (-1204 c vs key) harmonic 0.981 peak 0.1221 master peak 0.289 | engine u0 65.5/195.9 | dev 6 c vs engine, 4 c vs semitone | NaN 0
+[  31.2s] PASS release dry 48: 0.0277 -> 0 | PASS release master: 0.0655 -> 1.57e-13 (24000 samples)
+[  38.7s] PASS key 60 EARLY: DRY f0 130.68 Hz (-1202 c vs key) harmonic 0.986 peak 0.07205 master peak 0.1705 | engine u0 131.0/392.1 | dev 4 c vs engine, 2 c vs semitone | NaN 0
+[  49.1s] PASS release dry 60: 0.0254 -> 0 | PASS release master: 0.0601 -> 1.57e-13 (24000 samples)
+[  56.7s] PASS key 72 EARLY: DRY f0 261.33 Hz (-1202 c vs key) harmonic 0.979 peak 0.1053 master peak 0.2492 | engine u0 261.3/781.9 | dev 1 c vs engine, 2 c vs semitone | NaN 0
+[  67.3s] PASS release dry 72: 0.0447 -> 0 | PASS release master: 0.109 -> 1.57e-13 (24000 samples)
+[  67.3s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1204, -1202, -1202 cents) | every key on its engine cell: True
+[  67.3s] PASS NaN census 0; faults after static init 0; instr/sample idle 30538 sustain 30514
+[  67.3s] ROW | 55 | 1981 Drawbar Org | PASS | 48:-1204c(E) 60:-1202c(E) 72:-1202c(E) | 0.98 0.99 0.98 | 1.57e-13 | 0 | 0 | 30538/30514 | - |
+[  67.3s] JP8 SWEEP patch 55: PASS

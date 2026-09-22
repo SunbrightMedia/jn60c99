@@ -1,0 +1,12 @@
+[  12.9s] boot sr 44100 patch 61 '1981 Flute': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 4 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: none
+[  14.2s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  20.8s] PASS key 48 EARLY: DRY f0 262.18 Hz (+1204 c vs key) harmonic 0.888 peak 0.06763 master peak 0.1876 | engine u0 261.9/65.4 | dev 2 c vs engine, 4 c vs semitone | NaN 0
+[  29.0s] PASS release dry 48: 0.0611 -> 0 | PASS release master: 0.169 -> 1.57e-13 (24000 samples)
+[  35.0s] PASS key 60 EARLY: DRY f0 522.93 Hz (+1199 c vs key) harmonic 0.837 peak 0.0626 master peak 0.1736 | engine u0 524.0/130.8 | dev 4 c vs engine, 1 c vs semitone | NaN 0
+[  43.1s] PASS release dry 60: 0.0587 -> 0 | PASS release master: 0.163 -> 1.57e-13 (24000 samples)
+[  65.0s] PASS key 72 LATE: DRY f0 1045.69 Hz (+1199 c vs key) harmonic 0.803 peak 0.05983 master peak 0.1659 | engine u0 1045.1/261.0 | dev 1 c vs engine, 1 c vs semitone | NaN 0
+[  73.0s] PASS release dry 72: 0.0359 -> 0 | PASS release master: 0.0995 -> 1.57e-13 (24000 samples)
+[  73.0s] PASS JX law (dry): PASS pitch tracks keys by +12 semitones (offsets +1204, +1199, +1199 cents) | every key on its engine cell: True
+[  73.0s] PASS NaN census 0; faults after static init 0; instr/sample idle 24527 sustain 24551
+[  73.0s] ROW | 61 | 1981 Flute | PASS | 48:+1204c(E) 60:+1199c(E) 72:+1199c(L) | 0.89 0.84 0.80 | 1.57e-13 | 0 | 0 | 24527/24551 | - |
+[  73.0s] JP8 SWEEP patch 61: PASS

@@ -1,0 +1,12 @@
+[  10.9s] boot sr 44100 patch 62 '1981 Whistle': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 5 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: none
+[  12.4s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  19.0s] PASS key 48 EARLY: DRY f0 523.83 Hz (+2402 c vs key) harmonic 0.958 peak 0.05124 master peak 0.255 | engine u0 532.6/66.5 | dev 29 c vs engine, 2 c vs semitone | NaN 0
+[  27.2s] PASS release dry 48: 0.0503 -> 0.00179 | PASS release master: 0.25 -> 0.00892 (24000 samples)
+[  32.9s] PASS key 60 EARLY: DRY f0 1044.52 Hz (+2397 c vs key) harmonic 0.964 peak 0.03668 master peak 0.1825 | engine u0 1055.7/131.8 | dev 18 c vs engine, 3 c vs semitone | NaN 0
+[  41.1s] PASS release dry 60: 0.0353 -> 0.000695 | PASS release master: 0.176 -> 0.00346 (24000 samples)
+[  46.9s] PASS key 72 EARLY: DRY f0 2091.40 Hz (+2399 c vs key) harmonic 0.955 peak 0.02077 master peak 0.1033 | engine u0 2065.1/257.8 | dev 22 c vs engine, 1 c vs semitone | NaN 0
+[  54.8s] PASS release dry 72: 0.0204 -> 0.000251 | PASS release master: 0.102 -> 0.00125 (24000 samples)
+[  54.8s] PASS JX law (dry): PASS pitch tracks keys by +24 semitones (offsets +2402, +2397, +2399 cents) | every key on its engine cell: False
+[  54.8s] PASS NaN census 0; faults after static init 0; instr/sample idle 24701 sustain 24574
+[  54.8s] ROW | 62 | 1981 Whistle | PASS | 48:+2402c(E) 60:+2397c(E) 72:+2399c(E) | 0.96 0.96 0.95 | 1.57e-13 | 0 | 0 | 24701/24574 | - |
+[  54.8s] JP8 SWEEP patch 62: PASS

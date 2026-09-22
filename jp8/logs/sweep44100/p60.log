@@ -1,0 +1,12 @@
+[  13.0s] boot sr 44100 patch 60 '1981 Hard Blip': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 110 SUB 0; confound candidates: VCO ENV MOD 156
+[  14.9s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  23.5s] PASS key 48 EARLY: DRY f0 65.45 Hz (-1199 c vs key) harmonic 0.978 peak 0.08017 master peak 0.2745 | engine u0 65.5/65.2 | dev 0 c vs engine, 1 c vs semitone | NaN 0
+[  33.8s] PASS release dry 48: 0.0473 -> 0 | PASS release master: 0.164 -> 1.57e-13 (24000 samples)
+[  41.3s] PASS key 60 EARLY: DRY f0 131.00 Hz (-1198 c vs key) harmonic 0.981 peak 0.07954 master peak 0.2723 | engine u0 131.0/130.5 | dev 0 c vs engine, 2 c vs semitone | NaN 0
+[  52.2s] PASS release dry 60: 0.0284 -> 0 | PASS release master: 0.0972 -> 1.57e-13 (24000 samples)
+[  59.9s] PASS key 72 EARLY: DRY f0 262.00 Hz (-1198 c vs key) harmonic 0.979 peak 0.06012 master peak 0.2058 | engine u0 261.3/260.2 | dev 5 c vs engine, 2 c vs semitone | NaN 0
+[  70.2s] PASS release dry 72: 0.0293 -> 0 | PASS release master: 0.102 -> 1.57e-13 (24000 samples)
+[  70.2s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1199, -1198, -1198 cents) | every key on its engine cell: True
+[  70.2s] PASS NaN census 0; faults after static init 0; instr/sample idle 31618 sustain 31553
+[  70.2s] ROW | 60 | 1981 Hard Blip | PASS | 48:-1199c(E) 60:-1198c(E) 72:-1198c(E) | 0.98 0.98 0.98 | 1.57e-13 | 0 | 0 | 31618/31553 | VCO ENV MOD 156 |
+[  70.2s] JP8 SWEEP patch 60: PASS
