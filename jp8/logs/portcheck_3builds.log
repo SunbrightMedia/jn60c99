@@ -1,0 +1,10 @@
+lifted 762 functions, 156488 instructions -> /home/user/jn60c99/build/port_check/jp8_lift.c (175670 lines); unsupported (trap) 280: int3:60, vmovdqa:39, vmovd:3
+id render: JP8 LIFT A/B (layer render): EXACTLY 0 -- every output word and every heap byte match on patches [2, 63, 10, 0]
+id recall: JP8 LIFT A/B (layer recall): EXACTLY 0 -- every output word and every heap byte match on patches [2, 63]
+id boot: JP8 LIFT A/B (layer boot): EXACTLY 0 -- every output word and every heap byte match on patches [2, 63]
+reloc render: JP8 LIFT A/B (layer render): EXACTLY 0 -- every output word and every heap byte match on patches [2, 63, 10, 0]
+reloc recall: JP8 LIFT A/B (layer recall): EXACTLY 0 -- every output word and every heap byte match on patches [2, 63]
+reloc boot: JP8 LIFT A/B (layer boot): EXACTLY 0 -- every output word and every heap byte match on patches [2, 63]
+soft1 render: JP8 LIFT A/B (layer render): EXACTLY 0 -- every output word and every heap byte match on patches [2, 63, 10, 0]
+soft1 recall: JP8 LIFT A/B (layer recall): EXACTLY 0 -- every output word and every heap byte match on patches [2, 63]
+soft1 boot: JP8 LIFT A/B (layer boot): EXACTLY 0 -- every output word and every heap byte match on patches [2, 63]
