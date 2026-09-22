@@ -41,3 +41,24 @@ lessons 1-11 all still apply; these are the ones the JP8 added.
    id to its engine cells and value law in a minute: RANGE = table[.rdata 0xcbc2b8]
    (octaves), SUB RANGE = v/12, FINE TUNE = curve 0x40 of .data 0xd22428 + 0.0003.
    Do it before any pitch/timbre debate, and before step 5's recall layer.
+
+6. **Without an IDA dump, LIFT the machine code mechanically and let the oracle grade it** (2026-09-22,
+   step 5 layer 1). `jp8_lift.py` turns the static reach of an entry (recursive descent, MSVC jump tables read
+   from the image, indirect targets from a TB-flushed dynamic reach) into one C statement per instruction over a
+   register-file struct, with the oracle's regions mapped at the SAME virtual addresses on the C side
+   (MAP_FIXED_NOREPLACE) so pointer-valued cells need no relocation. 71k instructions lifted in seconds, 17 s to
+   compile, EXACTLY 0 on the first four patches after three lifter defects (below). Everything the lifter cannot
+   express is a `jp8_trap` (219 AVX/CRT-dispatch sites, none reached): reaching one turns the gate red.
+
+7. **A lifted function must START at its entry, not at its lowest address** (paid 2026-09-22): MSVC shares
+   tail blocks, so a function's descent reaches blocks at LOWER addresses than its entry; emitting in address
+   order ran f_441f90 from 0x4418a0 and the note-off did nothing. One `goto L_entry;` first.
+
+8. **Every NEW Unicorn hook re-pays D5 unless the TB cache is flushed first** (paid three times on 2026-09-22:
+   the instruction counter, the trace hook, the dynamic reach). Blocks translated before `hook_add` never call
+   the hook; the reach missed the note-off's vtable target 0x37df10 (shared with the assigner notify run at boot)
+   and the trace "showed" the oracle skipping a callee. `uc.ctl_flush_tb()` before every hook_add, always.
+
+9. **The judged drive must carry the control-plane events on BOTH sides.** A note-off applied by the oracle
+   between two judged phases left the C twin holding the note (gate cells 1.0 vs 0): NOTEON/NOTEOFF are lifted
+   and replayed on the C side, which also makes the note path part of the proven reach.

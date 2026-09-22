@@ -1,4 +1,4 @@
-# JP8 S3_STATUS.md -- JUPITER-8 PLUG-OUT .vst3 -> C99 port (PORT_PIPELINE steps 0-4 DONE, 5+ open)
+# JP8 S3_STATUS.md -- JUPITER-8 PLUG-OUT .vst3 -> C99 port (PORT_PIPELINE steps 0-4 DONE, step 5 layer 1 GREEN, layers 2+ open)
 Repo layout (moved from the ephemeral scratchpad 2026-09-22): `jp8/truth/` (checksummed, clean names,
 SHA256SUMS), `jp8/tools/` (oracle `jp8_emu.py` + probes; every `gen/*.py` named below now lives here),
 `jp8/logs/` (every log named below), `jp8/docs/` (this file, `abi_ledger.md/.json`), `jp8/gen/params.tsv`,
@@ -15,6 +15,7 @@ Labels: PROVEN = executed under Unicorn on the plugin's own code; READ = static 
 | 2 | ABI ledger | DONE: gen/abi_ledger.md + abi_ledger.json. BUILD 0x445020 (rcx); SETSR 0x4464F0 (rcx, rate = FLOAT in xmm1, playbook 87 holds); RENDER 0x445DC0 (rcx, r9, stack arg6 nframes -- the HOST process, not the oracle drive); HOSTPARAM 0x4465B0 (rcx, edx host id, r8d value; host map root .data 0xD22478 = {0:18,1:19,2:20}); NOTEON 0x445CF0 / NOTEOFF 0x445C90 (rcx, dl note, r8b vel); DISPATCH 0x437630 (rcx proc, edx id, r8 flag, r9 value); ASG_NOTIFY 0x37CD80; VOICE_WRAP 0x3F80B0 / MASTER_WRAP 0x3F8040 (the JX idiom byte for byte). CJp8Sim vtable 0xA1B678 = the per-unit STATE class, not the entry set. Addendum 2026-09-22: DISPATCH flag 1 = engine frame applied at once (PROVEN); SETSR chain and the 44100-vs-generic table branch (READ) | READ (abi_check) + PROVEN where marked |
 | 3 | Boot | PASS: static init 841/845 -> BUILD -> SETSR(float) -> FTZ -> host_init 3 writes via host_map() -> recall in the ENGINE frame WITH DISPATCH FLAG 0 (the HOSTPARAM path; D6, 2026-09-22) -> SNAP 379 ramps/unit + clear latch 960. Faults: 1 in static init (ctor #1 rva 0xB720C, the JX template condition: cookie-decoded null pointer, one stray page), 0 from BUILD on. IDLE 12000: master NaN 0, peak 1.6e-13, dry 0 (listen_p0_n60.log; listen2_*.log idle PASS x7) | PROVEN |
 | 4 | Listen proof | Before D6 (flag-1 recall, half-defaulted patches): GREEN on patches 2, 10, 52, 63 at 44100 (listen2_sr44100_p*.log), patch 2 at 96000; 48000 = -12 semis = D3. AFTER D6 (flag-0 recall): the RANGE / FINE TUNE / SUB RANGE law PROVEN to the cent on keys 48/60/72 (d4_probe_p2_*.log, D4) and patch 0 settles on its law (d4_windows_p0_k60.log); the 64-patch sweep on the corrected drive is the step-4 reach: SWEEP_44100.md (jp8_sweep.py, one log per patch in logs/sweep44100/) | PROVEN at 44100 |
+| 5 | Transcribe (layer 1: render + note path) | GREEN 2026-09-22: no IDA dump exists for the JP8, so `jp8_lift.py` LIFTS the machine code mechanically (x86-64 -> C99, one statement per instruction, jp8/src/jp8_lift.c: 270 functions / 79535 instructions from VOICE_WRAP 0x3F80B0, MASTER_WRAP 0x3F8040, NOTEON 0x445CF0, NOTEOFF 0x445C90, DISPATCH 0x437630, ASG_NOTIFY 0x37CD80 + every indirect target the TB-flushed dynamic reach saw; 228 trap sites = AVX/CRT-dispatch paths never reached, a trap turns the gate red). Gate `jp8_lift_gate.sh` (JP8_LIFT_LAYER=render): the C twin maps the oracle's regions at the SAME addresses, loads the post-warm-up dumps and replays the judged event list -- 64 samples held, NOTEON 67, 64 more, NOTEOFF 60+67, 64 release -- on patches 2, 63, 10, 0: 13,824 output words (8 voices main/sub + master L/R x 192 samples) and the whole 102.8 MB heap EXACTLY 0 on every patch (logs/lift_gate_layer1.log). TOOTH: `--tooth 0x3965cb` (the VCO1 RANGE addss -> subss) FAILS: "patch 63: state differs at state[0]+0x1170: oracle 913db6bc C b1ddf03d", 122 differences. Reach stated: key 60 (+67), 44100, 256 warm samples, 192 judged, 4 patches, every heap byte. Layer 2 (recall path: DISPATCH x 64 pools x 9 units + ASG_NOTIFY + the walker settling 512 samples, then a note): logs/lift_gate_layer2_recall.log | PROVEN (EXACTLY 0) |
 
 ## Cost (instructions per host sample, UC_HOOK_CODE after ctl_flush_tb, 32-sample windows; PROVEN on this oracle)
 | patch @ rate | idle | sustain | log |
@@ -91,6 +92,15 @@ a bit-exact 8-voice JP8 is ~1 voice per S3. Same class as the JUNO exact engine 
   the DCO2 pitch reads -12 cents (raw) vs -9 cents (engine 0) (jxtune_p1_*.log); a value of 64 read -2780 cents, so the
   DCO2 TUNE mapping is not understood and the autocorrelation may be reading beats. Worth a look by the JX port.
 
+## Step 5 method (the lifter; PORT_LESSONS 6-9)
+jp8_lift.py (static reach + emission; --dyn indirect targets, --tooth rva, --trace), jp8_dynreach.py (executed set + indirect
+targets on the oracle, TB cache flushed before the hook), jp8_reach.py (static census), jp8/src/jp8_cpu.h (register file,
+eager flags, exact SSE helpers), jp8/src/jp8_rt.c (trap, MAP_FIXED_NOREPLACE loader, FTZ, jp8_call), the quartet
+jp8_lift_seq.py (the shared event drive per layer) / jp8_lift_emu.py (oracle dumps + words) / jp8_lift_c.py (same addresses,
+same drive, EXACTLY 0) / jp8_lift_gate.sh. Two-process rule kept: Unicorn in process A, ctypes in process B, files between.
+Not the port's final shape: the C twin runs on the oracle's 103 MB address-space image (pointer cells verbatim); a device
+template needs the state blocks compacted and pointer cells relocated (the JX's lesson 8) -- a later layer.
+
 ## Files (jp8/tools/)
 jp8_emu.py (oracle; recall flag 0 in the engine frame), jp8_listen2.py (step-4 proof, JX law), jp8_sweep.py + jp8_sweep_collect.py
 (64-patch sweep worker + SWEEP_44100.md builder), jp8_d4_law.py (RANGE/FINE/SUB law tables from the cells), jp8_d4_probe.py
@@ -102,5 +112,7 @@ gen/params.tsv, work/fn_3f8240.asm, work/dis_full.py, work/dis_func.py.
 ## Next
 1. Sweep verdict into this page when the job (bench/jobs/jp8_sweep44100, EXIT file) ends; every FAIL triaged against the confound
    list in its log before it is called an engine defect.
-2. Step 5 per PORT_PIPELINE: layer quartets with a tooth SEEN TO FAIL, EXACTLY 0 against the oracle over a stated reach.
+2. Step 5 layers after the render+note path and the recall path: SETSR/BUILD (construction -> a compact template instead of the
+   103 MB image), the host RENDER 0x445DC0 (D3, other rates), longer reach (more patches, keys, thousands of samples, both idle
+   and note), then step 6-8 (template export, full-chain gate, web shell).
 3. 48 kHz: the host resampler path (RENDER 0x445DC0, D3) is a later layer; the target rate law is the 44100 NATIVE constant set.

@@ -1,0 +1,19 @@
+=== 0. dynamic reach (indirect targets) ===
+=== 1. lift + build ===
+lifted 270 functions, 79535 instructions -> /home/user/jn60c99/jp8/src/jp8_lift.c (91192 lines); unsupported (trap) 228: vmovdqa:39, vmovd:31, vmulsd:18, vfmadd213sd:12, int3:11, vmovq:10, vmovsd:9, vpshufd:7, vsubsd:7, vmovapd:6, vldmxcsr:6, vaddsd:5, vdivsd:4, vandpd:4, vpxor:3, vcvtdq2pd:3, vmulpd:3, vcvtsd2ss:3, vorps:3, vstmxcsr:3, vcvtss2si:3, vcvtsi2ss:3, vucomiss:3, int:2, vucomisd:2, vfnmadd231sd:2, vfmadd231sd:2, punpcklbw:1, vpunpckldq:1, vcvtps2pd:1, vpand:1, vpor:1, vpsrlq:1, vpsubq:1, vcvtpd2dq:1, vpsrad:1, vpsllq:1, vpaddq:1, vmovss:1, vaddpd:1
+=== 2. oracle replay (Unicorn) ===
+[  14.1s] layer render patch 2: 192 judged samples, 3456 output words (1024 nonzero), heap 102.8 MB, faults 1
+[  24.8s] layer render patch 63: 192 judged samples, 3456 output words (1024 nonzero), heap 102.8 MB, faults 1
+[  35.4s] layer render patch 10: 192 judged samples, 3456 output words (384 nonzero), heap 102.8 MB, faults 1
+[  45.9s] layer render patch 0: 192 judged samples, 3456 output words (1024 nonzero), heap 102.8 MB, faults 1
+=== 3. C twin ===
+[   0.3s] patch 2: 13824 output words (0 differ), heap EXACT -> PASS
+[   0.5s] patch 63: 13824 output words (0 differ), heap EXACT -> PASS
+[   0.7s] patch 10: 13824 output words (0 differ), heap EXACT -> PASS
+[   0.9s] patch 0: 13824 output words (0 differ), heap EXACT -> PASS
+JP8 LIFT A/B (layer render): EXACTLY 0 -- every output word and every heap byte match on patches [2, 63, 10, 0]
+=== 4. the tooth ===
+tooth bites: [   0.4s] patch 63: state differs at state[0]+0x1170: oracle 913db6bc C b1ddf03d
+JP8 LIFT A/B (layer render): 122 differences -- NOT bit-exact
+JP8 LIFT GATE (render) GREEN
+gate exit 0
