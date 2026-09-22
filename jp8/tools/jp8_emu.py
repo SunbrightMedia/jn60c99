@@ -47,6 +47,31 @@ XC_TABLE  = (0x9B8658, 0x9BA0C0)   # C++ static initializers (pe_recon crt_init)
                               # they fill .data's runtime tail [0xD20A00,0xD2BBE0)
 LATCH_OFF = 0xA9C0B8          # the wrappers decrement [rcx+0xa9c0b8] (READ); reads 960 at clean boot (PROVEN, recon boot)
 
+# D7 (2026-09-22): THE HOST IS CONSTRUCTED THE WAY THE PLUGIN'S PROCESSOR DOES IT (READ, processor init fn
+# 0x33a590): `call 0x444fe0` at 0x33a8db = the CWaveGen FACTORY -- no arguments; ALLOC(0x8D0) through the CRT
+# allocator 0x6F5B04, ctor 0x444000 on the block, returns the HOST in rax (0 if ALLOC failed) -- then at once
+# BUILD through vtbl+8 (0x33a8ed), then vtbl+0x20 (0x36cad0 = movss xmm0,[HOST+8]) and SETSR vtbl+0x18
+# (0x33a9cf) with float(rate), rate = table .rdata 0x9CEBA8 {96000,88200,48000,44100,32000}[mode] or
+# round([HOST+8]) (vtbl+0x28 0x36cdf0) when mode == 5. The ctor: base ctor 0x36c890 stores xmm1 = .rdata
+# 0xA18A44 = 96000.0 into [HOST+8]; vtable 0xA704B0; [HOST+0x38] = 8 (voice count; HOSTPARAM id 0xFFFC00E
+# rewrites it); two deques grown to 0x493E0 ints (ALLOC(0x10) per 4 ints -> ~150k allocations).
+# BUILD copies [HOST+8] into every state+0x10 (0x44508a / 0x445267 -> 0x4400f0): the old zero-filled HOST
+# armed every boot ramp with rate 0 (inf/NaN steps) and the snap + latch clear hid it (S3_STATUS D7).
+# The old zero HOST is kept ONLY behind the explicit legacy flag (JP8(legacy=True) or env
+# JP8_EMU_LEGACY_HOST=1) so logs dated before drive2 stay reproducible; it is never the default.
+FACTORY   = IB + 0x444FE0     # CWaveGen factory (no args) -> rax = HOST (READ)
+HOST_CTOR = IB + 0x444000     # CWaveGen ctor (rcx = block) (READ)
+HOST_SZ   = 0x8D0             # ALLOC size in the factory (`mov ecx,0x8d0`, READ)
+HOST_RATE0= 96000.0           # [HOST+8] after the ctor (.rdata 0xA18A44, READ)
+HOST_NVOICE=8                 # [HOST+0x38] after the ctor (READ)
+FACTORY_CAP=400_000_000       # instruction bound for the factory call (deterministic, never wall clock)
+HP_CAP    = 5_000_000         # instruction bound for one HOSTPARAM call (9 units x setter + dispatch + notify)
+LEGACY_ENV= os.environ.get("JP8_EMU_LEGACY_HOST") == "1"
+# host_init writes the controller default of these HOST ids only (the set the pre-drive2 harness wrote: its
+# map walker dropped every key >= 0x100000, see host_map). The full-map push is an OPEN question (frame law
+# of generic ids with a nonzero DB min, e.g. TEMPO 400..3000) -- measured, not adopted (jp8_drive2_probe.py).
+HOSTINIT_IDS = (0, 1, 2)
+
 # the factory bank geometry + decode live in jx_bank.py (pure python, so the
 # ctypes half of a two-process gate can import the SAME definition without
 # pulling Unicorn in). blob_pos = 2*pool - 8: playbook 88, jx_bank_census.py.
@@ -116,7 +141,12 @@ def _master_stub(pb, fn):
     a.raw(0x48,0x83,0xC4,0x30); a.raw(0x5D); a.raw(0xC3); return a.done()
 
 class JX:
-    def __init__(self):
+    def __init__(self, legacy=None):
+        # legacy=True: the pre-drive2 zero HOST + DISPATCH recall (+ snap/latch allowed). Explicit only.
+        self.legacy = LEGACY_ENV if legacy is None else bool(legacy)
+        if self.legacy and os.environ.get("JP8_EMU_QUIET")!="1":
+            sys.stderr.write("jp8_emu: LEGACY drive (zero HOST, DISPATCH recall) -- reproduces pre-drive2 logs only\n")
+        self._sr_set=False; self._recalled=False; self._hmap=None
         self.heap=HEAP_BASE; self.allocs=[]; self.tls={}; self.tls_ctr=1
         self.unhandled=collections.Counter(); self.newsizes=collections.Counter()
         self.uc=uc=Uc(UC_ARCH_X86,UC_MODE_64)
@@ -292,8 +322,26 @@ class JX:
         uc.emu_start(stub,RET,count=0)
         rip=uc.reg_read(UC_X86_REG_RIP)
         if rip!=RET: raise RuntimeError("stub stopped rva 0x%x"%(rip-IB))
-    def build(self):
-        self.HOST=self.bump(0x8000); self.uc.mem_write(self.HOST,b"\x00"*0x8000)
+    def make_host(self):
+        """the processor's own construction (0x33a8db): FACTORY 0x444FE0 = ALLOC(0x8D0) + ctor 0x444000.
+        Checks the READ facts on the result (first allocation = HOST of 0x8D0, vtable 0xA704B0,
+        [HOST+8] = 96000.0, [HOST+0x38] = 8) and records the allocation count in self.host_allocs."""
+        u=self.uc; n0=len(self.allocs)
+        h=self.call(FACTORY, count=FACTORY_CAP)
+        assert h and self.allocs[n0]==(h,HOST_SZ), "factory: first alloc %r, rax 0x%x"%(self.allocs[n0:n0+1],h)
+        vp=int.from_bytes(u.mem_read(h,8),'little')
+        rate=struct.unpack("<f",u.mem_read(h+8,4))[0]; nv=struct.unpack("<i",u.mem_read(h+0x38,4))[0]
+        assert vp==ENGINE_VTBL and rate==HOST_RATE0 and nv==HOST_NVOICE, \
+            "factory HOST: vptr rva 0x%x rate %r voices %d"%(vp-IB,rate,nv)
+        self.host_allocs=len(self.allocs)-n0
+        return h
+    def build(self, legacy=None):
+        """HOST (the factory, or the legacy zero block) then BUILD 0x445020(rcx=HOST)"""
+        if legacy is None: legacy=self.legacy
+        if legacy:
+            self.HOST=self.bump(0x8000); self.uc.mem_write(self.HOST,b"\x00"*0x8000); self.host_allocs=0
+        else:
+            self.HOST=self.make_host()
         self.call(BUILD, rcx=self.HOST)
         u=self.uc; self.state=[]; self.proc=[]; self.assign=[]
         for i in range(N_UNITS):
@@ -340,7 +388,12 @@ class JX:
         self.uc.reg_write(UC_X86_REG_XMM1, struct.unpack("<I",struct.pack("<f",float(f32)))[0])
         return self.call(fn, rcx=rcx)
     def set_sr(self,sr=44100.0):
-        self.call_f(SETSR, self.HOST, sr)
+        """SETSR 0x4464F0 (float in xmm1). ORDER LAW (drive2): refused after a recall -- the order changes
+        the sound (SHIPPING_DESIGN skeptic item 4, orderprobe.py). SETSR returns at once when the rate
+        equals [HOST+8] (0x446501 je), so on the constructed HOST SETSR(96000) is a no-op (READ)."""
+        if self._recalled and not self.legacy:
+            raise RuntimeError("set_sr after recall refused (order law: ctor -> BUILD -> SETSR -> host_init -> recall)")
+        self.call_f(SETSR, self.HOST, sr); self._sr_set=True
         got=struct.unpack("<f",self.uc.mem_read(self.HOST+8,4))[0]
         assert abs(got-sr)<1e-3, "SETSR did not land: HOST+8=%r"%got
         return got
@@ -358,9 +411,16 @@ class JX:
             for pool in ACTIVE_POOLS:
                 self.dispatch(u, POOL_BASE_ID+pool, pool_value(blob,pool))
         if notify: self.notify()
-    def snap_ramps(self):
+    def _no_poke(self,what,force):
+        if not (self.legacy or force):
+            raise RuntimeError("%s refused on the drive2 oracle (D7: the snap/latch hid the zero HOST; the plugin's "
+                               "own walker settles every ramp). Use JP8(legacy=True) to reproduce old logs, or "
+                               "force=True for a labelled probe."%what)
+    def snap_ramps(self,force=False):
         """settle every ACTIVE ramp to its limit and deactivate it (JUNO e2e
-        snap_all, validated bit-for-bit there); slot layout per jx_gc.c"""
+        snap_all, validated bit-for-bit there); slot layout per jx_gc.c.
+        A HARNESS POKE, not plugin behaviour: legacy drive only (or force=True)."""
+        self._no_poke("snap_ramps",force)
         uc=self.uc
         def rq(a): return int.from_bytes(uc.mem_read(a,8),'little')
         for u in range(N_UNITS):
@@ -373,8 +433,34 @@ class JX:
                 uc.mem_write(a+0x0C, b"\x00"*4)                            # accum = 0
                 uc.mem_write(a+0x1C, b"\x00")                              # active = 0
             uc.mem_write(st+0x78, struct.pack("<Q", b0))                   # empty id list
-    def clear_latch(self):
+    def clear_latch(self,force=False):
+        self._no_poke("clear_latch",force)
         for u in range(N_UNITS): self.uc.mem_write(self.state[u]+LATCH_OFF, b"\x00"*4)
+    def ramp_census(self):
+        """every ramp record of every unit (40-byte slots, array [st+0x58, st+0x60); live = the id list
+        [st+0x70, st+0x78)): counts of NaN/inf in step (+8) and accumulator (+0xC), live and all records,
+        plus active flags (+0x1C) and the latch. Pure read (plumbing)."""
+        uc=self.uc; c=collections.Counter()
+        def rq(a): return int.from_bytes(uc.mem_read(a,8),'little')
+        import math
+        for u in range(N_UNITS):
+            st=self.state[u]; arr=rq(st+0x58); end=rq(st+0x60); b0=rq(st+0x70); e0=rq(st+0x78)
+            n=(end-arr)//40 if end>arr else 0
+            blob=bytes(uc.mem_read(arr,40*n)) if n else b""
+            live=set(struct.unpack("<%di"%((e0-b0)//4), uc.mem_read(b0,e0-b0))) if e0>b0 else set()
+            c["records"]+=n; c["live"]+=len(live)
+            for i in range(n):
+                step,acc=struct.unpack_from("<ff",blob,40*i+8)
+                bad_s_nan=math.isnan(step); bad_s_inf=math.isinf(step); bad_a=not math.isfinite(acc)
+                c["all_step_nan"]+=bad_s_nan; c["all_step_inf"]+=bad_s_inf; c["all_acc_bad"]+=bad_a
+                c["active"]+=blob[40*i+0x1C]!=0
+                if i in live:
+                    c["live_step_nan"]+=bad_s_nan; c["live_step_inf"]+=bad_s_inf; c["live_acc_bad"]+=bad_a
+            c["latch_sum"]+=struct.unpack("<i",uc.mem_read(st+LATCH_OFF,4))[0]
+        c["live_bad"]=c["live_step_nan"]+c["live_step_inf"]+c["live_acc_bad"]
+        c["all_bad"]=c["all_step_nan"]+c["all_step_inf"]+c["all_acc_bad"]
+        c["rate0"]=struct.unpack("<f",uc.mem_read(self.state[0]+0x10,4))[0]
+        return c
     def run_static_init(self,cap=2_000_000,log=None):
         """run the DLL's C++ static initializers (the CRT XC table) so the
         runtime-filled .data tail exists -- the JX pulse wavetable region
@@ -416,6 +502,25 @@ class JX:
         def rq(a): return int.from_bytes(uc.mem_read(a,8),'little')
         root=rq(IB+0xD22478)
         if not root: raise RuntimeError("host map not built -- run_static_init first")
+        if not self.legacy:
+            # drive2 walker (defect paid 2026-09-22): the map is an MSVC std::map<int,int> (node: left +0,
+            # parent +8, right +0x10, isnil +0x19, key +0x1C, value +0x20; head = [.data 0xD22478], root =
+            # [head+8], size = [0xD22480]). Static init 0xAD320 inserts 744 pairs (READ: initializer list
+            # [rbp+0x1670, rbp+0x2db0) -> 0x443dd0); host ids are like 0x600026 (VCO2 SUB RANGE). The old
+            # walker below kept only keys < 0x100000 and so returned 3 of 744 (PROVEN: executed map = 744).
+            if self._hmap is None:
+                out={}; stack=[rq(root+8)]; seen=set()
+                while stack:
+                    n=stack.pop()
+                    if not n or n==root or n in seen: continue
+                    seen.add(n)
+                    if uc.mem_read(n+0x19,1)[0]: continue
+                    k,v=struct.unpack("<ii", uc.mem_read(n+0x1C,8)); out[k]=v
+                    stack.append(rq(n)); stack.append(rq(n+0x10))
+                size=rq(IB+0xD22480)
+                assert len(out)==size, "host map walk %d != size field %d"%(len(out),size)
+                self._hmap=out
+            return dict(self._hmap)
         out={}; seen=set(); stack=[rq(root+8)]
         while stack:
             n=stack.pop()
@@ -443,9 +548,15 @@ class JX:
         run_static_init() BEFORE build() (boot(host_init=True) orders it).
         Returns (written, failed)."""
         import pe_recon
+        if self._recalled and not self.legacy:
+            raise RuntimeError("host_init after recall refused (order law)")
         pe=pe_recon.PE(BIN)
         rows=pe.params(list(range(5223)))["rows"]
         mp=self.host_map()
+        # drive2: the written set is pinned to HOSTINIT_IDS (= what the pre-drive2 walker let through),
+        # ids="all" pushes every mapped id under the old law (a probe; NOT the drive -- see HOSTINIT_IDS)
+        if ids is None and not self.legacy: ids=HOSTINIT_IDS
+        if ids=="all": ids=None
         ok=fail=0
         for hid,eng in sorted(mp.items()):
             if ids is not None and hid not in ids: continue
@@ -453,24 +564,39 @@ class JX:
             if not r or not r["name"] or r["name"]=="_reserve_" or 433<=eng<485: continue
             if r["min"]==r["max"]==r["default"]==0: continue
             try:
+                # bound by INSTRUCTION COUNT only (skeptic item 6: a wall-clock bound is machine dependent);
+                # the legacy drive keeps its old bound so its logs reproduce
                 self.call(HOSTPARAM, rcx=self.HOST, rdx=hid, r8=r["default"]-r["min"],
-                          count=5_000_000, timeout_us=1_000_000); ok+=1
+                          count=HP_CAP, timeout_us=1_000_000 if self.legacy else 0); ok+=1
             except Exception as e:
                 fail+=1
                 if log: log("host write hid %d (eng %d) failed: %s"%(hid,eng,str(e)[:60]))
         return ok,fail
-    def boot(self,sr=44100.0,patch=None,static_init=False,snap=True,host_init=False):
-        """THE boot recipe: [static init] -> BUILD -> SETSR(float) -> FTZ ->
-        [host_init: the controller's default push] -> [recall patch + notify]
-        -> [snap ramps + clear latch]. host_init=True implies static_init.
-        Returns self."""
-        if static_init or host_init: self.run_static_init()
-        self.build(); self.set_ftz(); self.set_sr(sr)
-        if host_init:
-            ok,fail=self.host_init()
-            assert fail==0, "host_init: %d writes failed"%fail
-        if patch is not None: self.recall(patch)
-        if snap: self.snap_ramps(); self.clear_latch()
+    def boot(self,sr=44100.0,patch=None,static_init=False,snap=True,host_init=False,census=None):
+        """DRIVE2 (default): static init -> HOST via the FACTORY (ALLOC 0x8D0 + ctor 0x444000) -> BUILD(HOST)
+        -> FTZ -> SETSR(sr, float xmm1) -> host_init (HOSTINIT_IDS through HOSTPARAM) -> recall(patch)
+        through HOSTPARAM (host id, raw bank value) per pool. NO snap, NO latch clear: the plugin's own
+        walker settles the ramps. census(tag, dict) (optional) is called after every stage with the ramp
+        census (ramp_census) and the host_map() size. static_init/snap/host_init are IGNORED on drive2.
+        LEGACY (self.legacy): the old recipe, unchanged: [static init] -> zero HOST -> BUILD -> FTZ -> SETSR
+        -> [host_init] -> [DISPATCH-flag-0 recall] -> [snap + latch]. Returns self."""
+        if self.legacy:
+            if static_init or host_init: self.run_static_init()
+            self.build(); self.set_ftz(); self.set_sr(sr)
+            if host_init:
+                ok,fail=self.host_init()
+                assert fail==0, "host_init: %d writes failed"%fail
+            if patch is not None: self.recall(patch)
+            if snap: self.snap_ramps(); self.clear_latch()
+            return self
+        def cen(tag, ramps=True):
+            if census: census(tag, dict(self.ramp_census()) if ramps else {}, len(self.host_map()))
+        ok,fail=self.run_static_init(); self.static_ok=(ok,fail); cen("static init", ramps=False)
+        self.build(); cen("HOST+BUILD")
+        self.set_ftz(); self.set_sr(sr); cen("SETSR %g"%sr)
+        ok,fail=self.host_init(); assert fail==0, "host_init: %d writes failed"%fail
+        self.hostinit_writes=ok; cen("host_init")
+        if patch is not None: self.recall(patch); cen("recall %d"%patch)
         return self
     def render_dry(self,n,block=256):
         """voice-sum render (master bypassed), floats, NaN dropped -- the
@@ -524,8 +650,8 @@ def probe_build(candidates):
 class JP8(JX):
     """the JP8 oracle: JX machinery + the shipping RENDER entry (no per-unit
     wrappers located yet) + an instruction counter for the S3 cost estimate"""
-    def __init__(self):
-        super().__init__()
+    def __init__(self, legacy=None):
+        super().__init__(legacy=legacy)
         self._count_on=False; self._bcache={}; self._icount=0; self._md=None
     def _blk(self,uc,address,size,user):
         if not self._count_on: return
@@ -579,18 +705,50 @@ class JP8(JX):
     # recall lost ENV1 SUSTAIN (0 -> 0.995), MIXER VCO1 (2.51 -> 0.5), HPF, PORTAMENTO and
     # FINE TUNE to the boot limits on patch 0. Recall therefore dispatches with flag 0.
     RECALL_FLAG=0
-    def recall(self,patch,bank=None,notify=True,flag=None):
-        """the plugin's own recall path in the ENGINE frame: raw pool byte + engine-DB
-        min, dispatched (flag 0 = arm the ramp, the hosted path; see RECALL_FLAG) to
-        every unit, then the assigner refresh. The caller snaps the ramps afterwards."""
+    # RECALL LAW, DRIVE2 (2026-09-22): the processor's event loop (0x33ac90) hands every parameter change to
+    # HOSTPARAM = CWaveGen vtbl+0x60 (0x33b370: int event, edx = host id, r8d = int value; 0x33b3bb: float
+    # event converted by 0x326560 first) -- READ. HOSTPARAM 0x4465B0 looks the host id up in the static map,
+    # then per unit (9): a per-engine-id switch (tables 0x4467e4/0x4467b8; 756 LFO KEY TRIG -> direct setter
+    # 0x442c30, 769 -> v-36, ...), the DB range check (0x4274f0), DISPATCH flag 0 (proc vtbl+0x58) and the
+    # assigner notify(4). The bank stores the RAW frame; HOSTPARAM takes it (769's v-36 is the proof), so the
+    # harness passes the raw bank value and converts NOTHING (plumbing only).
+    def host_id(self,eid):
+        """engine id -> host id, from the EXECUTED host map (never hardcoded)"""
+        inv=getattr(self,"_hinv",None)
+        if inv is None:
+            inv={}
+            for k,v in self.host_map().items():
+                assert v not in inv, "engine id %d mapped twice"%v
+                inv[v]=k
+            self._hinv=inv
+        return inv[eid]
+    def param(self,eid,raw):
+        """ONE host parameter write through HOSTPARAM (engine id -> host id via the map; raw frame value)"""
+        return self.call(HOSTPARAM, rcx=self.HOST, rdx=self.host_id(eid), r8=raw&0xFFFFFFFF, count=HP_CAP)
+    def recall(self,patch,bank=None,notify=True,flag=None,path=None):
+        """path "hostparam" (drive2 default): every active pool, ascending pool id (= ascending host id;
+        the host's own order is INFERRED), HOSTPARAM(HOST, host id, raw bank value) -- the notify runs inside
+        HOSTPARAM per unit, `notify` is ignored. path "dispatch" (legacy default, or any explicit `flag`):
+        the pre-drive2 law -- raw + engine-DB min through DISPATCH(flag) on every unit, units outer, then
+        one assigner refresh."""
+        if path is None: path="dispatch" if (self.legacy or flag is not None) else "hostparam"
+        blob=patch_blob(bank or bank_bytes(), patch)
+        if path=="hostparam":
+            if not self.legacy and not self._sr_set:
+                raise RuntimeError("recall before SETSR refused (order law: ctor -> BUILD -> SETSR -> host_init -> recall)")
+            for pool in ACTIVE_POOLS:
+                self.param(POOL_BASE_ID+pool, pool_value(blob,pool))
+            self._recalled=True
+            return
+        assert path=="dispatch", path
         mins=self.pool_mins()
         if flag is None: flag=self.RECALL_FLAG
-        blob=patch_blob(bank or bank_bytes(), patch)
         for u in range(N_UNITS):
             for pool in ACTIVE_POOLS:
                 pid=POOL_BASE_ID+pool
                 self.dispatch(u, pid, pool_value(blob,pool)+mins[pid], flag=flag)
         if notify: self.notify()
+        self._recalled=True
     def render_host(self,n,block=256,count=False):
         """the SHIPPING render entry (CWaveGen slot 0x38): rcx=HOST,
         r9=&{L*,R*}, stack arg6=nframes (READ: movsxd rdi,[rbp+0x168];
