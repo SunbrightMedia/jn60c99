@@ -38,6 +38,8 @@ def trace_diff(oracle_path, c_path):
             return
     log("TRACE: identical over %d steps (oracle %d, C %d)"%(min(no,nm),no,nm))
 CPU_SZ=512; R_OFF=0; RSP_OFF=4*8
+# rsp = the CALLER's stack pointer meta["rsp"]; jp8_call_x pushes the dummy return slot, so the callee enters at meta["rsp"]-8,
+# the oracle's entry rsp (jp8_emu.call). Until 2026-09-22 this was meta["rsp"]-8: every C frame sat 8 bytes low (PORT_LESSONS 12).
 def rd(addr,n): return ctypes.string_at(addr,n)
 def wr(addr,b): ctypes.memmove(addr,b,len(b))
 mapped=False; bad_total=0
@@ -61,13 +63,13 @@ for patch in Q.PATCHES:
     ref=open(os.path.join(d,"words.bin"),"rb").read(); got=bytearray(); state=meta["state"]
     trap=None; first=[]
     def call(rva,rcx,rdx,r8,r9=0):
-        ctypes.memmove(cp+RSP_OFF,struct.pack("<Q",meta["rsp"]-8),8)
+        ctypes.memmove(cp+RSP_OFF,struct.pack("<Q",meta["rsp"]),8)
         return lib.jp8_call(cp,rva,rcx,rdx,r8,r9)
     for ev,arg in Q.events():
         if trap: break
         if ev=="build":
             # jp8_emu.build(): HOST = bump(0x8000) zeroed, then BUILD(HOST); state/proc/assign read from the HOST record
-            host=lib.jp8_heap_get(); ctypes.memmove(cp+RSP_OFF,struct.pack("<Q",meta["rsp"]-8),8)
+            host=lib.jp8_heap_get(); ctypes.memmove(cp+RSP_OFF,struct.pack("<Q",meta["rsp"]),8)
             lib.jp8_alloc  # (the runtime bumps through jp8_alloc; here the harness bumps the HOST block the same way)
             class _C(ctypes.Structure): _fields_=[("r",ctypes.c_uint64*16)]
             cc=_C.from_address(cp); cc.r[1]=0x8000; lib.jp8_alloc(cp); host=cc.r[0]
@@ -76,7 +78,7 @@ for patch in Q.PATCHES:
             state=[struct.unpack("<Q",rd(host+0xA0+64*i,8))[0] for i in range(9)]
             if state!=meta["state"]: log("state pointers differ: oracle %s C %s"%(["%x"%x for x in meta["state"]],["%x"%x for x in state]))
         elif ev=="setsr":
-            ctypes.memmove(cp+RSP_OFF,struct.pack("<Q",meta["rsp"]-8),8)
+            ctypes.memmove(cp+RSP_OFF,struct.pack("<Q",meta["rsp"]),8)
             if lib.jp8_call_f(cp,Q.SETSR,meta["host"],arg): trap=lib.jp8_last_trap().decode()
         elif ev=="hostinit":
             for hid,val in Q.hostinit_values({int(k):v for k,v in meta["host_map"].items()}):
