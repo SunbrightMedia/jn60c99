@@ -1,2 +1,12 @@
-[  16.0s] boot sr 44100 patch 46 '1981 Xylo': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 5 FINE 128 SUB 0; confound candidates: VCO ENV MOD 130, SYNC, ENV REL 180/120
-[  18.2s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  11.7s] boot sr 44100 patch 46 '1981 Xylo': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 5 FINE 128 SUB 0; confound candidates: VCO ENV MOD 130, SYNC, ENV REL 180/120
+[  13.7s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  22.6s] PASS key 48 EARLY: DRY f0 131.56 Hz (+10 c vs key) harmonic 0.965 peak 0.09865 master peak 0.2554 | engine u0 130.9/523.1 | dev 8 c vs engine, 10 c vs semitone | NaN 0
+[  81.3s] PASS release dry 48: 0.021 -> 0.00436 | PASS release master: 0.0544 -> 0.0113 (24000 samples) | 3 s tail rule: dry 0 master 1.57e-13 at 3.0 s -> PASS/PASS
+[  88.3s] PASS key 60 EARLY: DRY f0 262.83 Hz (+8 c vs key) harmonic 0.950 peak 0.1018 master peak 0.2636 | engine u0 261.4/1044.3 | dev 10 c vs engine, 8 c vs semitone | NaN 0
+[ 144.2s] PASS release dry 60: 0.0229 -> 0.00462 | PASS release master: 0.0593 -> 0.012 (24000 samples) | 3 s tail rule: dry 0 master 1.57e-13 at 3.0 s -> PASS/PASS
+[ 151.6s] PASS key 72 EARLY: DRY f0 525.95 Hz (+9 c vs key) harmonic 0.894 peak 0.1011 master peak 0.2616 | engine u0 523.6/2091.9 | dev 8 c vs engine, 9 c vs semitone | NaN 0
+[ 207.3s] PASS release dry 72: 0.0215 -> 0.00432 | PASS release master: 0.0557 -> 0.0112 (24000 samples) | 3 s tail rule: dry 0 master 1.57e-13 at 3.0 s -> PASS/PASS
+[ 207.3s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +10, +8, +9 cents) | every key on its engine cell: True
+[ 207.3s] PASS NaN census 0; faults after static init 0; instr/sample idle 29560 sustain 29643
+[ 207.3s] ROW | 46 | 1981 Xylo | PASS | 48:+10c(E) 60:+8c(E) 72:+9c(E) | 0.96 0.95 0.89 | 1.57e-13 | 0 | 0 | 29560/29643 | VCO ENV MOD 130; SYNC; ENV REL 180/120 |
+[ 207.3s] JP8 SWEEP patch 46: PASS

@@ -24,6 +24,8 @@ for patch in Q.PATCHES:
     heap_ptr0=jp.heap; hc0=getattr(jp,"_hc",0x9000)
     open(os.path.join(d,"img.bin"),"wb").write(bytes(uc.mem_read(J.IB,J.IMGSZ)))
     open(os.path.join(d,"heap_pre.bin"),"wb").write(bytes(uc.mem_read(Q.HEAP_BASE,heap_end-Q.HEAP_BASE)))
+    # the STACK is state too (PORT_LESSONS 12): BUILD copies a 16-byte record whose last dword is residue of static init
+    open(os.path.join(d,"stack.bin"),"wb").write(bytes(uc.mem_read(Q.STACK_BASE,Q.STACK_SIZE)))
     uc.mem_write(Q.PAIR_V,struct.pack("<QQ",Q.OUT_M,Q.OUT_S)); uc.mem_write(Q.PAIR_M,struct.pack("<QQ",Q.OUT_L,Q.OUT_R))
     uc.mem_write(Q.A2,b"".join(struct.pack("<QQ",Q.VOUT+8*v,Q.VOUT+8*v+4) for v in range(8)))
     words=bytearray(); nsamp=0

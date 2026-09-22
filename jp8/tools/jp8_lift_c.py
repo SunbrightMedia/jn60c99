@@ -50,6 +50,7 @@ for patch in Q.PATCHES:
         mapped=True
     assert heap_len<=0x8000000, "heap larger than the mapped 128 MB"
     lib.jp8_load(Q.IMG_BASE,os.path.join(d,"img.bin").encode()); lib.jp8_load(Q.HEAP_BASE,os.path.join(d,"heap_pre.bin").encode())
+    if os.path.exists(os.path.join(d,"stack.bin")): lib.jp8_load(Q.STACK_BASE,os.path.join(d,"stack.bin").encode())   # PORT_LESSONS 12
     ctypes.memset(Q.BUF_BASE,0,Q.BUF_SIZE)
     if os.path.exists(os.path.join(d,"page0.bin")): wr(Q.GS_BASE,open(os.path.join(d,"page0.bin"),"rb").read())
     lib.jp8_heap_set(meta.get("heap_ptr0",meta["heap_end"]),Q.HEAP_BASE+0x8000000)

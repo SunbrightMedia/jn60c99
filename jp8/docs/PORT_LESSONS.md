@@ -75,3 +75,12 @@ lessons 1-11 all still apply; these are the ones the JP8 added.
     changed under it): patches 22-25 "FAILED" with a Traceback that was mine, not the port's. CLAUDE.md's
     FREEZE rule covers every file a gate loads, generated ones included; a reach job gets its own copy of the
     library (or the gate waits). The reach was rerun on a quiet tree (logs/lift_reach64.log).
+
+12. **The stack is state: a boot copies stale stack bytes into the heap** (paid 2026-09-22, layer 3). The boot-layer
+    gate matched all 167,616 output words but 8 heap dwords per patch differed (oracle 2, C 0). A write hook on the
+    oracle traced them to BUILD: `mov dword [rsp+0x40], r15d` fills 4 bytes of a 16-byte record, then `movups` copies all
+    16 (0x4453a7..0x4453bc); the last dword is residue that static init left on the stack. The C twin started with a
+    zero stack. Fix: the oracle dumps the stack region with the heap and the C side loads it (jp8_lift_emu/jp8_lift_c,
+    `stack.bin`); a shipping template must carry the stack residue too. Rule: when a heap diff shows a value the lifted
+    code "never computes", hook the oracle's writes to the cell and follow the source operand back to its last writer
+    (scratchpad probe: 2 runs, 3 minutes).
