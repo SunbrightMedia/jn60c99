@@ -1,0 +1,12 @@
+[  12.7s] boot sr 44100 patch 18 'PD Lush City': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 150 SUB 0; confound candidates: REVERB 255 DELAY 255
+[  15.0s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  25.5s] PASS key 48 EARLY: DRY f0 132.10 Hz (+17 c vs key) harmonic 0.992 peak 0.006475 master peak 0.02418 | engine u0 131.9/132.3 | dev 3 c vs engine, 17 c vs semitone | NaN 0
+[  94.6s] PASS release dry 48: 0.00644 -> 0.000764 | PASS release master: 0.027 -> 0.00657 (24000 samples) | 3 s tail rule: dry 0 master 9.1e-09 at 3.0 s -> PASS/PASS
+[ 104.0s] PASS key 60 EARLY: DRY f0 263.93 Hz (+15 c vs key) harmonic 0.986 peak 0.006225 master peak 0.01984 | engine u0 263.3/264.1 | dev 1 c vs engine, 15 c vs semitone | NaN 0
+[ 172.4s] PASS release dry 60: 0.00642 -> 0.000624 | PASS release master: 0.0255 -> 0.0035 (24000 samples) | 3 s tail rule: dry 0 master 9.31e-09 at 3.0 s -> PASS/PASS
+[ 181.7s] PASS key 72 EARLY: DRY f0 527.75 Hz (+15 c vs key) harmonic 0.984 peak 0.006522 master peak 0.01646 | engine u0 527.4/529.1 | dev 1 c vs engine, 15 c vs semitone | NaN 0
+[ 250.9s] PASS release dry 72: 0.00744 -> 0.000911 | PASS release master: 0.0163 -> 0.0026 (24000 samples) | 3 s tail rule: dry 0 master 5.9e-09 at 3.0 s -> PASS/PASS
+[ 250.9s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +17, +15, +15 cents) | every key on its engine cell: True
+[ 250.9s] PASS NaN census 0; faults after static init 0; instr/sample idle 31622 sustain 31652
+[ 250.9s] ROW | 18 | PD Lush City | PASS | 48:+17c(E) 60:+15c(E) 72:+15c(E) | 0.99 0.99 0.98 | 1.57e-13 | 0 | 0 | 31622/31652 | REVERB 255 DELAY 255 |
+[ 250.9s] JP8 SWEEP patch 18: PASS

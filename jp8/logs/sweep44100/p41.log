@@ -1,0 +1,12 @@
+[  19.3s] boot sr 44100 patch 41 '1981 Cars Sync': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 3 FINE 128 SUB -1; confound candidates: VCO ENV MOD 204, SYNC
+[  22.4s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  72.9s] FAIL key 48 EARLY: DRY f0 2594.12 Hz (+5172 c vs key) harmonic 0.053 peak 0.07679 master peak 0.1378 | engine u0 65.5/123.4 | dev 5272 c vs engine, 28 c vs semitone | NaN 0
+[  90.7s] PASS release dry 48: 0.0431 -> 0 | PASS release master: 0.0808 -> 1.57e-13 (24000 samples)
+[ 125.4s] FAIL key 60 LATE: DRY f0 311.24 Hz (+301 c vs key) harmonic 0.545 peak 0.07682 master peak 0.1379 | engine u0 130.9/246.8 | dev 402 c vs engine, 1 c vs semitone | NaN 0
+[ 143.5s] PASS release dry 60: 0.0616 -> 0 | PASS release master: 0.111 -> 1.57e-13 (24000 samples)
+[ 193.5s] FAIL key 72 LATE: DRY f0 609.49 Hz (+264 c vs key) harmonic 0.573 peak 0.07561 master peak 0.1357 | engine u0 261.2/492.6 | dev 369 c vs engine, 36 c vs semitone | NaN 0
+[ 211.5s] PASS release dry 72: 0.0575 -> 0 | PASS release master: 0.103 -> 1.57e-13 (24000 samples)
+[ 211.5s] FAIL JX law (dry): FAIL harmonic/f0: [(48, 2594.1176470588234, 0.05284565321274947), (60, np.float64(311.23980945076727), 0.5445660395757861), (72, np.float64(609.4938138903563), 0.573492525020005)] | every key on its engine cell: False
+[ 211.5s] PASS NaN census 0; faults after static init 0; instr/sample idle 29514 sustain 29973
+[ 211.5s] ROW | 41 | 1981 Cars Sync | FAIL(pitch48,pitch60,pitch72,track) | 48:+5172c(E) 60:+301c(L) 72:+264c(L) | 0.05 0.54 0.57 | 1.57e-13 | 0 | 0 | 29514/29973 | VCO ENV MOD 204; SYNC |
+[ 211.5s] JP8 SWEEP patch 41: FAIL(pitch48,pitch60,pitch72,track)

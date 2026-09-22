@@ -28,6 +28,7 @@ typedef struct {
     long ninstr;
 } CPU;
 
+#define JP8_GS_BASE 0x700020000ULL   /* the oracle's page 0 (gs base 0) mirrored here: BUF_BASE + 0x20000 */
 #define R(n)      (c->r[n])
 #define XF(n,l)   (c->x[n].f[l])
 #define XD(n,l)   (c->x[n].d[l])
@@ -51,6 +52,8 @@ static inline void jp8_stx(uint64_t a, const X *s) { memcpy((void *)(uintptr_t)a
 extern void jp8_trap(CPU *c, uint64_t rva, const char *what);
 extern void jp8_tr(CPU *c, uint64_t rva);        /* per-instruction trace record (lift --trace builds only) */
 extern void jp8_icall(CPU *c, uint64_t target);   /* indirect call/jump through the lifted-function table */
+extern void jp8_alloc(CPU *c);                   /* the CRT allocator hook point: ecx = size -> rax = bump pointer (zeroed) */
+extern void jp8_import(CPU *c, int idx);         /* an import stub reached: shimmed exactly as jp8_emu._imp does */
 
 static inline uint64_t jp8_mask(int sz) { return sz == 64 ? ~0ULL : ((1ULL << sz) - 1); }
 static inline int jp8_parity(uint64_t v) { v &= 0xFF; v ^= v >> 4; v ^= v >> 2; v ^= v >> 1; return !(v & 1); }

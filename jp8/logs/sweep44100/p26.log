@@ -1,0 +1,12 @@
+[  12.6s] boot sr 44100 patch 26 'LD ELK Sitar': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 1 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: VCO ENV MOD 255, PORTAMENTO 43, ENV REL 194/215, REVERB 38 DELAY 86, LFO->VCO 200
+[  14.7s] PASS idle 4096: dry peak 0 master peak 0.000504 NaN 0
+[  49.0s] FAIL key 48 EARLY: DRY f0 217.75 Hz (+882 c vs key) harmonic 0.436 peak 0.2245 master peak 0.4375 | engine u0 436.4/871.8 | dev 1204 c vs engine, 18 c vs semitone | NaN 0
+[ 117.3s] FAIL release dry 48: 0.298 -> 0.227 | FAIL release master: 0.527 -> 0.426 (24000 samples) | 3 s tail rule: dry 0.13 master 0.306 at 3.0 s -> FAIL/FAIL
+[ 151.3s] FAIL key 60 LATE: DRY f0 1791.31 Hz (+3331 c vs key) harmonic 0.387 peak 0.3921 master peak 0.4971 | engine u0 1086.7/2170.7 | dev 333 c vs engine, 31 c vs semitone | NaN 0
+[ 217.7s] FAIL release dry 60: 0.304 -> 0.306 | FAIL release master: 0.401 -> 0.359 (24000 samples) | 3 s tail rule: dry 0.214 master 0.249 at 3.0 s -> FAIL/FAIL
+[ 251.1s] FAIL key 72 EARLY: DRY f0 2663.43 Hz (+2817 c vs key) harmonic 0.433 peak 0.6683 master peak 0.5489 | engine u0 6779.4/13542.4 | dev 1617 c vs engine, 17 c vs semitone | NaN 0
+[ 316.6s] FAIL release dry 72: 0.541 -> 0.555 | FAIL release master: 0.378 -> 0.362 (24000 samples) | 3 s tail rule: dry 0.231 master 0.159 at 3.0 s -> FAIL/FAIL
+[ 316.6s] FAIL JX law (dry): FAIL harmonic/f0: [(48, np.float64(217.74783427172622), 0.43556902377797496), (60, np.float64(1791.3082428119303), 0.3865000801408779), (72, np.float64(2663.430004134769), 0.4326456465937196)] | every key on its engine cell: False
+[ 316.6s] PASS NaN census 0; faults after static init 0; instr/sample idle 29591 sustain 30210
+[ 316.6s] ROW | 26 | LD ELK Sitar | FAIL(pitch48,reldry48,relmaster48,pitch60,reldry60,relmaster60,pitch72,reldry72,relmaster72,track) | 48:+882c(E) 60:+3331c(L) 72:+2817c(E) | 0.44 0.39 0.43 | 0.000504 | 0 | 0 | 29591/30210 | VCO ENV MOD 255; PORTAMENTO 43; ENV REL 194/215; REVERB 38 DELAY 86; LFO->VCO 200 |
+[ 316.6s] JP8 SWEEP patch 26: FAIL(pitch48,reldry48,relmaster48,pitch60,reldry60,relmaster60,pitch72,reldry72,relmaster72,track)

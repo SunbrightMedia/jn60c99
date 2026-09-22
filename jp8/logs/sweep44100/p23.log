@@ -1,0 +1,12 @@
+[  13.0s] boot sr 44100 patch 23 'PD Jupiter Str2': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 4 FINE 166 SUB 0; confound candidates: REVERB 128 DELAY 14
+[  15.2s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  25.3s] PASS key 48 EARLY: DRY f0 131.24 Hz (+6 c vs key) harmonic 0.867 peak 0.1107 master peak 0.1134 | engine u0 130.4/262.9 | dev 11 c vs engine, 6 c vs semitone | NaN 0
+[  91.7s] PASS release dry 48: 0.107 -> 0.0189 | PASS release master: 0.109 -> 0.0155 (24000 samples) | 3 s tail rule: dry 0 master 4.09e-08 at 3.0 s -> PASS/PASS
+[ 100.6s] PASS key 60 EARLY: DRY f0 261.96 Hz (+2 c vs key) harmonic 0.874 peak 0.06524 master peak 0.07023 | engine u0 262.4/528.8 | dev 3 c vs engine, 2 c vs semitone | NaN 0
+[ 185.9s] PASS release dry 60: 0.0818 -> 0.013 | PASS release master: 0.0884 -> 0.0162 (24000 samples) | 3 s tail rule: dry 0 master 3.19e-08 at 3.0 s -> PASS/PASS
+[ 219.1s] PASS key 72 LATE: DRY f0 523.77 Hz (+2 c vs key) harmonic 0.840 peak 0.06434 master peak 0.06979 | engine u0 525.4/1058.9 | dev 5 c vs engine, 2 c vs semitone | NaN 0
+[ 296.2s] PASS release dry 72: 0.0558 -> 0.0124 | PASS release master: 0.0604 -> 0.0127 (24000 samples) | 3 s tail rule: dry 0 master 1.02e-08 at 3.0 s -> PASS/PASS
+[ 296.2s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +6, +2, +2 cents) | every key on its engine cell: True
+[ 296.2s] PASS NaN census 0; faults after static init 0; instr/sample idle 31030 sustain 31010
+[ 296.2s] ROW | 23 | PD Jupiter Str2 | PASS | 48:+6c(E) 60:+2c(E) 72:+2c(L) | 0.87 0.87 0.84 | 1.57e-13 | 0 | 0 | 31030/31010 | REVERB 128 DELAY 14 |
+[ 296.2s] JP8 SWEEP patch 23: PASS

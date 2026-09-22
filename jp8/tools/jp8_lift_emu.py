@@ -12,17 +12,27 @@ def log(m): print("[%6.1fs] %s"%(time.time()-t0,m),flush=True)
 outdir=sys.argv[1]
 for patch in Q.PATCHES:
     d=os.path.join(outdir,"p%02d"%patch); os.makedirs(d,exist_ok=True)
-    jp=J.JP8(); jp.run_static_init(); jp.build(); jp.set_ftz(); jp.set_sr(44100.0); w,f=jp.host_init(); assert f==0
-    jp.recall(patch); jp.snap_ramps(); jp.clear_latch(); uc=jp.uc
-    jp.render_both(Q.IDLE_N); jp.note_on(Q.KEY,100); jp.render_both(Q.WARM)
-    heap_end=jp.heap
+    jp=J.JP8(); jp.run_static_init(); uc=jp.uc
+    if Q.LAYER=="boot":
+        jp.set_ftz(); heap_end=jp.heap+0x7800000        # the C side maps 128 MB of heap; BUILD's 9 x 11 MB land inside
+        hmap=jp.host_map()
+    else:
+        jp.build(); jp.set_ftz(); jp.set_sr(44100.0); w,f=jp.host_init(); assert f==0
+        jp.recall(patch); jp.snap_ramps(); jp.clear_latch()
+        jp.render_both(Q.IDLE_N); jp.note_on(Q.KEY,100); jp.render_both(Q.WARM)
+        heap_end=jp.heap; hmap=None
+    heap_ptr0=jp.heap; hc0=getattr(jp,"_hc",0x9000)
     open(os.path.join(d,"img.bin"),"wb").write(bytes(uc.mem_read(J.IB,J.IMGSZ)))
     open(os.path.join(d,"heap_pre.bin"),"wb").write(bytes(uc.mem_read(Q.HEAP_BASE,heap_end-Q.HEAP_BASE)))
     uc.mem_write(Q.PAIR_V,struct.pack("<QQ",Q.OUT_M,Q.OUT_S)); uc.mem_write(Q.PAIR_M,struct.pack("<QQ",Q.OUT_L,Q.OUT_R))
     uc.mem_write(Q.A2,b"".join(struct.pack("<QQ",Q.VOUT+8*v,Q.VOUT+8*v+4) for v in range(8)))
     words=bytearray(); nsamp=0
     for ev,arg in Q.events():
-        if ev=="noteon": jp.call(J.NOTEON,rcx=jp.HOST,rdx=arg,r8=100)
+        if ev=="build": jp.build(); assert jp.heap<=heap_end
+        elif ev=="setsr": jp.call_f(J.SETSR,jp.HOST,arg)
+        elif ev=="hostinit":
+            for hid,val in Q.hostinit_values(hmap): jp.call(J.HOSTPARAM,rcx=jp.HOST,rdx=hid,r8=val)
+        elif ev=="noteon": jp.call(J.NOTEON,rcx=jp.HOST,rdx=arg,r8=100)
         elif ev=="noteoff":
             if os.environ.get("JP8_LIFT_DEBUG"):
                 from unicorn import UC_HOOK_CODE
@@ -48,7 +58,8 @@ for patch in Q.PATCHES:
                 words+=uc.mem_read(Q.OUT_L,8); nsamp+=1
     open(os.path.join(d,"words.bin"),"wb").write(bytes(words))
     open(os.path.join(d,"heap_post.bin"),"wb").write(bytes(uc.mem_read(Q.HEAP_BASE,heap_end-Q.HEAP_BASE)))
-    meta=dict(patch=patch,layer=Q.LAYER,heap_end=heap_end,state=jp.state,proc=jp.proc,assign=jp.assign,host=jp.HOST,nsamp=nsamp,
+    open(os.path.join(d,"page0.bin"),"wb").write(bytes(uc.mem_read(0,0x1000)))
+    meta=dict(patch=patch,layer=Q.LAYER,heap_end=heap_end,heap_ptr0=heap_ptr0,hc0=hc0,host_map=hmap,state=jp.state,proc=jp.proc,assign=jp.assign,host=jp.HOST,nsamp=nsamp,
               img_size=J.IMGSZ,faults=jp.faults,rsp=(Q.STACK_BASE+Q.STACK_SIZE-0x10000)&~0xF)
     json.dump(meta,open(os.path.join(d,"meta.json"),"w"))
     nz=sum(1 for i in range(0,len(words),4) if words[i:i+4]!=b"\0\0\0\0")

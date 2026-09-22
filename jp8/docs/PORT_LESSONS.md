@@ -62,3 +62,16 @@ lessons 1-11 all still apply; these are the ones the JP8 added.
 9. **The judged drive must carry the control-plane events on BOTH sides.** A note-off applied by the oracle
    between two judged phases left the C twin holding the note (gate cells 1.0 vs 0): NOTEON/NOTEOFF are lifted
    and replayed on the C side, which also makes the note path part of the proven reach.
+
+10. **A tooth that is a no-op on the drive's data is not a tooth** (paid 2026-09-22, layer 2). The render
+    layer's tooth flips the VCO1 RANGE addss (0x3965cb); on a RANGE-3 patch that cell is 0.0 and + and - agree,
+    so the recall-layer gate stayed green WITH the tooth. Each layer now names its own tooth in
+    `jp8_lift_seq.TOOTH` (recall: the FINE TUNE setter's + 0.0003 at 0x38633e, reachable only through DISPATCH,
+    9,292 differences) and the gate prints the first differing word. Rule: pick the tooth on a path the drive
+    exercises with a NON-neutral value, and read the tooth's failing line, never only its exit code.
+
+11. **A running job's build artifacts are part of the frozen tree** (paid 2026-09-22). The 64-patch reach job
+    was reading build/jp8_lift/libjp8lift.so while the boot-layer gate rebuilt it (and the C-side script
+    changed under it): patches 22-25 "FAILED" with a Traceback that was mine, not the port's. CLAUDE.md's
+    FREEZE rule covers every file a gate loads, generated ones included; a reach job gets its own copy of the
+    library (or the gate waits). The reach was rerun on a quiet tree (logs/lift_reach64.log).

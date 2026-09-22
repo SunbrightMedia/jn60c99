@@ -1,0 +1,12 @@
+[  14.8s] boot sr 44100 patch 25 'SY Silk Fives': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 150 SUB 7; confound candidates: REVERB 217 DELAY 255
+[  17.9s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  33.2s] PASS key 48 EARLY: DRY f0 66.02 Hz (-1184 c vs key) harmonic 0.994 peak 0.07306 master peak 0.1211 | engine u0 131.9/198.2 | dev 1198 c vs engine, 16 c vs semitone | NaN 0
+[ 103.8s] PASS release dry 48: 0.0698 -> 0.0288 | PASS release master: 0.123 -> 0.0606 (24000 samples) | 3 s tail rule: dry 0 master 4.25e-05 at 3.0 s -> PASS/PASS
+[ 113.2s] PASS key 60 EARLY: DRY f0 131.98 Hz (-1185 c vs key) harmonic 0.996 peak 0.07196 master peak 0.1017 | engine u0 263.3/395.7 | dev 1196 c vs engine, 15 c vs semitone | NaN 0
+[ 184.4s] PASS release dry 60: 0.0926 -> 0.0235 | PASS release master: 0.116 -> 0.0474 (24000 samples) | 3 s tail rule: dry 0 master 3.81e-05 at 3.0 s -> PASS/PASS
+[ 193.7s] PASS key 72 EARLY: DRY f0 263.89 Hz (-1185 c vs key) harmonic 0.988 peak 0.09622 master peak 0.09313 | engine u0 527.4/792.7 | dev 1199 c vs engine, 15 c vs semitone | NaN 0
+[ 263.1s] PASS release dry 72: 0.0686 -> 0.0292 | PASS release master: 0.0743 -> 0.0397 (24000 samples) | 3 s tail rule: dry 0 master 3.77e-05 at 3.0 s -> PASS/PASS
+[ 263.1s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1184, -1185, -1185 cents) | every key on its engine cell: False
+[ 263.1s] PASS NaN census 0; faults after static init 0; instr/sample idle 31630 sustain 31634
+[ 263.1s] ROW | 25 | SY Silk Fives | PASS | 48:-1184c(E) 60:-1185c(E) 72:-1185c(E) | 0.99 1.00 0.99 | 1.57e-13 | 0 | 0 | 31630/31634 | REVERB 217 DELAY 255 |
+[ 263.1s] JP8 SWEEP patch 25: PASS

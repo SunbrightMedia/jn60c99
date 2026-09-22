@@ -1,0 +1,12 @@
+[  14.1s] boot sr 44100 patch 27 'BS Waver Bass': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: CROSS MOD 73
+[  16.3s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  52.6s] FAIL key 48 EARLY: DRY f0 64.35 Hz (-1228 c vs key) harmonic 0.974 peak 0.5982 master peak 0.6369 | engine u0 188.0/134.1 | dev 1271 c vs engine, 28 c vs semitone | NaN 0
+[ 122.6s] PASS release dry 48: 0.294 -> 0.135 | PASS release master: 0.312 -> 0.143 (24000 samples) | 3 s tail rule: dry 0.000474 master 0.000504 at 3.0 s -> PASS/PASS
+[ 158.9s] FAIL key 60 EARLY: DRY f0 127.87 Hz (-1239 c vs key) harmonic 0.974 peak 0.2199 master peak 0.2337 | engine u0 705.5/523.0 | dev 2439 c vs engine, 39 c vs semitone | NaN 0
+[ 228.3s] PASS release dry 60: 0.161 -> 0.0873 | PASS release master: 0.172 -> 0.0927 (24000 samples) | 3 s tail rule: dry 0.000441 master 0.000469 at 3.0 s -> PASS/PASS
+[ 237.8s] PASS key 72 EARLY: DRY f0 262.23 Hz (-1196 c vs key) harmonic 0.960 peak 0.245 master peak 0.2605 | engine u0 5928.1/2043.9 | dev 3555 c vs engine, 4 c vs semitone | NaN 0
+[ 307.0s] PASS release dry 72: 0.164 -> 0.0985 | PASS release master: 0.175 -> 0.105 (24000 samples) | 3 s tail rule: dry 0.000533 master 0.000566 at 3.0 s -> PASS/PASS
+[ 307.0s] FAIL JX law (dry): FAIL pitch tracks keys by -12 semitones (offsets -1228, -1239, -1196 cents) | every key on its engine cell: False
+[ 307.0s] PASS NaN census 0; faults after static init 0; instr/sample idle 31630 sustain 31645
+[ 307.0s] ROW | 27 | BS Waver Bass | FAIL(pitch48,pitch60,track) | 48:-1228c(E) 60:-1239c(E) 72:-1196c(E) | 0.97 0.97 0.96 | 1.57e-13 | 0 | 0 | 31630/31645 | CROSS MOD 73 |
+[ 307.0s] JP8 SWEEP patch 27: FAIL(pitch48,pitch60,track)

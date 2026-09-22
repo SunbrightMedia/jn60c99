@@ -1,0 +1,12 @@
+[  18.8s] boot sr 44100 patch 38 'SY Jupiter PWM': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 166 SUB 0; confound candidates: REVERB 112 DELAY 43
+[  21.9s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  35.7s] PASS key 48 EARLY: DRY f0 65.77 Hz (-1190 c vs key) harmonic 0.942 peak 0.1269 master peak 0.1349 | engine u0 65.7/66.2 | dev 1 c vs engine, 10 c vs semitone | NaN 0
+[  53.4s] PASS release dry 48: 0.0647 -> 0 | PASS release master: 0.0748 -> 0.00114 (24000 samples)
+[  66.7s] PASS key 60 EARLY: DRY f0 131.08 Hz (-1196 c vs key) harmonic 0.922 peak 0.1162 master peak 0.1366 | engine u0 130.9/132.0 | dev 2 c vs engine, 4 c vs semitone | NaN 0
+[  84.3s] PASS release dry 60: 0.0796 -> 0 | PASS release master: 0.101 -> 0.0016 (24000 samples)
+[  97.2s] PASS key 72 EARLY: DRY f0 262.84 Hz (-1192 c vs key) harmonic 0.930 peak 0.1323 master peak 0.1506 | engine u0 260.1/262.2 | dev 4 c vs engine, 8 c vs semitone | NaN 0
+[ 114.1s] PASS release dry 72: 0.0109 -> 0 | PASS release master: 0.0289 -> 0.000953 (24000 samples)
+[ 114.1s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1190, -1196, -1192 cents) | every key on its engine cell: True
+[ 114.1s] PASS NaN census 0; faults after static init 0; instr/sample idle 29454 sustain 29490
+[ 114.1s] ROW | 38 | SY Jupiter PWM | PASS | 48:-1190c(E) 60:-1196c(E) 72:-1192c(E) | 0.94 0.92 0.93 | 1.57e-13 | 0 | 0 | 29454/29490 | REVERB 112 DELAY 43 |
+[ 114.1s] JP8 SWEEP patch 38: PASS

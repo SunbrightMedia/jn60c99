@@ -1,0 +1,12 @@
+[  18.1s] boot sr 44100 patch 40 '1981 NEG Pluck': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: none
+[  21.1s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  35.3s] PASS key 48 EARLY: DRY f0 65.60 Hz (-1195 c vs key) harmonic 0.985 peak 0.07261 master peak 0.2764 | engine u0 65.5/65.4 | dev 4 c vs engine, 5 c vs semitone | NaN 0
+[  52.7s] PASS release dry 48: 0.049 -> 0 | PASS release master: 0.186 -> 1.57e-13 (24000 samples)
+[  66.1s] PASS key 60 EARLY: DRY f0 130.84 Hz (-1200 c vs key) harmonic 0.986 peak 0.06709 master peak 0.2554 | engine u0 131.0/130.8 | dev 0 c vs engine, 0 c vs semitone | NaN 0
+[  84.1s] PASS release dry 60: 0.055 -> 0 | PASS release master: 0.209 -> 1.57e-13 (24000 samples)
+[  97.1s] PASS key 72 EARLY: DRY f0 261.74 Hz (-1199 c vs key) harmonic 0.970 peak 0.06903 master peak 0.2628 | engine u0 261.3/260.9 | dev 3 c vs engine, 1 c vs semitone | NaN 0
+[ 114.8s] PASS release dry 72: 0.0529 -> 0 | PASS release master: 0.201 -> 1.57e-13 (24000 samples)
+[ 114.8s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1195, -1200, -1199 cents) | every key on its engine cell: True
+[ 114.8s] PASS NaN census 0; faults after static init 0; instr/sample idle 29199 sustain 29142
+[ 114.8s] ROW | 40 | 1981 NEG Pluck | PASS | 48:-1195c(E) 60:-1200c(E) 72:-1199c(E) | 0.98 0.99 0.97 | 1.57e-13 | 0 | 0 | 29199/29142 | - |
+[ 114.8s] JP8 SWEEP patch 40: PASS

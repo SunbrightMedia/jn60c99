@@ -116,3 +116,10 @@ gen/params.tsv, work/fn_3f8240.asm, work/dis_full.py, work/dis_func.py.
    103 MB image), the host RENDER 0x445DC0 (D3, other rates), longer reach (more patches, keys, thousands of samples, both idle
    and note), then step 6-8 (template export, full-chain gate, web shell).
 3. 48 kHz: the host resampler path (RENDER 0x445DC0, D3) is a later layer; the target rate law is the 44100 NATIVE constant set.
+
+## STOP RECORD (2026-09-22, user order "STOP AND SAVE ALL WORK, usage 95%")
+Committed AS-IS, mid-gate. Layers 1 and 2 are GREEN (commits 6759ae8, 1128339). In flight when stopped, NOT green, NOT believed:
+- step 5 layer 3 (boot path): jp8_lift_gate.sh was running (logs/lift_gate_layer3_boot.log, unfinished); jp8_rt.c / jp8_lift_emu.py / jp8_lift_c.py carry the handle-counter plumbing (jp8_hc_set) that was being added.
+- 64-patch listen sweep at 44100: 46 of 64 patch logs in logs/sweep44100/ (EXIT 130 = killed, not a verdict). Resume: rerun jp8_sweep_job.sh for the missing patches.
+- 64-patch lift reach gate (logs/lift_reach64.log, EXIT 130 = killed).
+Resume order: finish the layer-3 gate (must be EXACTLY 0 + tooth), then the sweep + reach, then update the table above. Nothing in this record is PROVEN.

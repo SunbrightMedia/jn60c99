@@ -1,0 +1,12 @@
+[  12.5s] boot sr 44100 patch 34 'SQ Arpg Terra': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 1 VCO2 RANGE 2 FINE 154 SUB 0; confound candidates: CROSS MOD 252, REVERB 80 DELAY 44
+[  14.5s] PASS idle 4096: dry peak 0 master peak 0.000827 NaN 0
+[  62.1s] PASS key 48 LATE: DRY f0 64.84 Hz (-1215 c vs key) harmonic 0.862 peak 0.03646 master peak 0.4736 | engine u0 19.3/131.6 | dev 1225 c vs engine, 15 c vs semitone | NaN 0
+[ 162.4s] PASS release dry 48: 0.0117 -> 0 | PASS release master: 0.0913 -> 0.0252 (24000 samples) | 3 s tail rule: dry 0 master 0.00014 at 3.0 s -> PASS/PASS
+[ 213.3s] FAIL key 60 EARLY: DRY f0 130.07 Hz (-1210 c vs key) harmonic 0.701 peak 0.1092 master peak 0.4984 | engine u0 213.5/525.0 | dev 858 c vs engine, 10 c vs semitone | NaN 0
+[ 309.8s] PASS release dry 60: 0.006 -> 0 | PASS release master: 0.235 -> 0.0258 (24000 samples) | 3 s tail rule: dry 0 master 0.000196 at 3.0 s -> PASS/PASS
+[ 343.1s] FAIL key 72 EARLY: DRY f0 259.81 Hz (-1212 c vs key) harmonic 0.737 peak 0.1117 master peak 0.4852 | engine u0 165.2/2106.2 | dev 784 c vs engine, 12 c vs semitone | NaN 0
+[ 409.3s] PASS release dry 72: 0.0199 -> 0 | PASS release master: 0.225 -> 0.0317 (24000 samples) | 3 s tail rule: dry 0 master 0.000217 at 3.0 s -> PASS/PASS
+[ 409.3s] FAIL JX law (dry): FAIL harmonic/f0: [(48, np.float64(64.84458736616517), 0.861514882393354), (60, np.float64(130.0673849780768), 0.7006018136748474), (72, np.float64(259.8084008670992), 0.7373625058025967)] | every key on its engine cell: False
+[ 409.3s] PASS NaN census 0; faults after static init 0; instr/sample idle 29588 sustain 30057
+[ 409.3s] ROW | 34 | SQ Arpg Terra | FAIL(pitch60,pitch72,track) | 48:-1215c(L) 60:-1210c(E) 72:-1212c(E) | 0.86 0.70 0.74 | 0.000827 | 0 | 0 | 29588/30057 | CROSS MOD 252; REVERB 80 DELAY 44 |
+[ 409.3s] JP8 SWEEP patch 34: FAIL(pitch60,pitch72,track)

@@ -1,0 +1,12 @@
+[  12.8s] boot sr 44100 patch 4 'PL Poly Stack': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 3 FINE 133 SUB 0; confound candidates: ENV REL 174/120, REVERB 144 DELAY 83
+[  14.9s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  24.8s] PASS key 48 EARLY: DRY f0 65.42 Hz (-1200 c vs key) harmonic 0.926 peak 0.03332 master peak 0.1004 | engine u0 65.5/130.8 | dev 2 c vs engine, 0 c vs semitone | NaN 0
+[  89.6s] PASS release dry 48: 0.0143 -> 0.00298 | PASS release master: 0.047 -> 0.00936 (24000 samples) | 3 s tail rule: dry 0 master 4.19e-08 at 3.0 s -> PASS/PASS
+[  98.4s] PASS key 60 EARLY: DRY f0 130.83 Hz (-1200 c vs key) harmonic 0.957 peak 0.0359 master peak 0.1082 | engine u0 130.5/260.7 | dev 4 c vs engine, 0 c vs semitone | NaN 0
+[ 165.6s] PASS release dry 60: 0.0152 -> 0.00305 | PASS release master: 0.0496 -> 0.011 (24000 samples) | 3 s tail rule: dry 0 master 2.43e-08 at 3.0 s -> PASS/PASS
+[ 174.8s] PASS key 72 EARLY: DRY f0 261.14 Hz (-1203 c vs key) harmonic 0.941 peak 0.03652 master peak 0.1101 | engine u0 261.7/522.9 | dev 4 c vs engine, 3 c vs semitone | NaN 0
+[ 241.7s] PASS release dry 72: 0.0139 -> 0.00279 | PASS release master: 0.0472 -> 0.00945 (24000 samples) | 3 s tail rule: dry 0 master 2.03e-08 at 3.0 s -> PASS/PASS
+[ 241.7s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1200, -1200, -1203 cents) | every key on its engine cell: True
+[ 241.7s] PASS NaN census 0; faults after static init 0; instr/sample idle 29966 sustain 29961
+[ 241.7s] ROW | 4 | PL Poly Stack | PASS | 48:-1200c(E) 60:-1200c(E) 72:-1203c(E) | 0.93 0.96 0.94 | 1.57e-13 | 0 | 0 | 29966/29961 | ENV REL 174/120; REVERB 144 DELAY 83 |
+[ 241.7s] JP8 SWEEP patch 4: PASS

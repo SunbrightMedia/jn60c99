@@ -1,0 +1,12 @@
+[  12.9s] boot sr 44100 patch 15 'BR Grind Tpt': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 0 FINE 128 SUB 0; confound candidates: REVERB 54 DELAY 124
+[  15.1s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  26.0s] PASS key 48 EARLY: DRY f0 131.05 Hz (+3 c vs key) harmonic 0.985 peak 0.06621 master peak 0.2292 | engine u0 130.9/16.3 | dev 2 c vs engine, 3 c vs semitone | NaN 0
+[  39.8s] PASS release dry 48: 0.016 -> 0 | PASS release master: 0.045 -> 0.00027 (24000 samples)
+[  48.9s] PASS key 60 EARLY: DRY f0 261.46 Hz (-1 c vs key) harmonic 0.979 peak 0.06971 master peak 0.2189 | engine u0 262.0/32.7 | dev 4 c vs engine, 1 c vs semitone | NaN 0
+[  61.7s] PASS release dry 60: 0.0257 -> 0 | PASS release master: 0.0878 -> 0.000197 (24000 samples)
+[  71.2s] PASS key 72 EARLY: DRY f0 523.03 Hz (-1 c vs key) harmonic 0.975 peak 0.07001 master peak 0.2215 | engine u0 522.5/65.2 | dev 2 c vs engine, 1 c vs semitone | NaN 0
+[  84.0s] PASS release dry 72: 0.0285 -> 0 | PASS release master: 0.131 -> 0.000277 (24000 samples)
+[  84.0s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +3, -1, -1 cents) | every key on its engine cell: True
+[  84.0s] PASS NaN census 0; faults after static init 0; instr/sample idle 32046 sustain 32030
+[  84.0s] ROW | 15 | BR Grind Tpt | PASS | 48:+3c(E) 60:-1c(E) 72:-1c(E) | 0.98 0.98 0.97 | 1.57e-13 | 0 | 0 | 32046/32030 | REVERB 54 DELAY 124 |
+[  84.0s] JP8 SWEEP patch 15: PASS

@@ -1,0 +1,12 @@
+[  13.0s] boot sr 44100 patch 17 'BS So Smooth': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 3 FINE 176 SUB 0; confound candidates: REVERB 120 DELAY 5
+[  15.0s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  24.4s] PASS key 48 EARLY: DRY f0 65.57 Hz (-1196 c vs key) harmonic 0.979 peak 0.05809 master peak 0.439 | engine u0 130.9/264.7 | dev 1197 c vs engine, 4 c vs semitone | NaN 0
+[  36.2s] PASS release dry 48: 0.0292 -> 0 | PASS release master: 0.233 -> 0.0032 (24000 samples)
+[  44.8s] PASS key 60 EARLY: DRY f0 131.08 Hz (-1196 c vs key) harmonic 0.975 peak 0.05539 master peak 0.4189 | engine u0 524.0/1059.3 | dev 2399 c vs engine, 4 c vs semitone | NaN 0
+[  56.4s] PASS release dry 60: 0.0306 -> 0 | PASS release master: 0.218 -> 0.00483 (24000 samples)
+[  64.8s] PASS key 72 EARLY: DRY f0 262.14 Hz (-1197 c vs key) harmonic 0.982 peak 0.05034 master peak 0.3822 | engine u0 2090.0/4224.7 | dev 3594 c vs engine, 3 c vs semitone | NaN 0
+[  76.7s] PASS release dry 72: 0.0374 -> 0 | PASS release master: 0.315 -> 0.00452 (24000 samples)
+[  76.7s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1196, -1196, -1197 cents) | every key on its engine cell: False
+[  76.7s] PASS NaN census 0; faults after static init 0; instr/sample idle 29298 sustain 29364
+[  76.7s] ROW | 17 | BS So Smooth | PASS | 48:-1196c(E) 60:-1196c(E) 72:-1197c(E) | 0.98 0.98 0.98 | 1.57e-13 | 0 | 0 | 29298/29364 | REVERB 120 DELAY 5 |
+[  76.7s] JP8 SWEEP patch 17: PASS

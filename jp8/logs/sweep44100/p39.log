@@ -1,0 +1,12 @@
+[  18.1s] boot sr 44100 patch 39 'SQ Peppercorn': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 5 FINE 142 SUB 0; confound candidates: REVERB 80 DELAY 87, LFO->VCO 255
+[  20.9s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  63.3s] FAIL key 48 EARLY: DRY f0 260.33 Hz (+1191 c vs key) harmonic 0.649 peak 0.06534 master peak 0.1148 | engine u0 65.5/262.1 | dev 12 c vs engine, 9 c vs semitone | NaN 0
+[  75.6s] PASS release dry 48: 0 -> 0 | PASS release master: 1.69e-06 -> 1.23e-07 (24000 samples)
+[ 118.9s] FAIL key 60 EARLY: DRY f0 523.55 Hz (+1201 c vs key) harmonic 0.702 peak 0.04529 master peak 0.07955 | engine u0 131.0/524.2 | dev 2 c vs engine, 1 c vs semitone | NaN 0
+[ 138.4s] PASS release dry 60: 0 -> 0 | PASS release master: 1.39e-06 -> 1e-07 (24000 samples)
+[ 189.4s] FAIL key 72 EARLY: DRY f0 1048.06 Hz (+1203 c vs key) harmonic 0.582 peak 0.02304 master peak 0.04048 | engine u0 261.3/1045.9 | dev 4 c vs engine, 3 c vs semitone | NaN 0
+[ 208.7s] PASS release dry 72: 0 -> 0 | PASS release master: 1.34e-06 -> 5.21e-08 (24000 samples)
+[ 208.7s] PASS JX law (dry): FAIL harmonic/f0: [(48, np.float64(260.32959054754167), 0.6488735821168956), (60, np.float64(523.5538914262632), 0.7016521224295079), (72, np.float64(1048.060780776049), 0.5822847292203194)] | every key on its engine cell: True
+[ 208.7s] PASS NaN census 0; faults after static init 0; instr/sample idle 29573 sustain 29574
+[ 208.7s] ROW | 39 | SQ Peppercorn | FAIL(pitch48,pitch60,pitch72) | 48:+1191c(E) 60:+1201c(E) 72:+1203c(E) | 0.65 0.70 0.58 | 1.57e-13 | 0 | 0 | 29573/29574 | REVERB 80 DELAY 87; LFO->VCO 255 |
+[ 208.7s] JP8 SWEEP patch 39: FAIL(pitch48,pitch60,pitch72)

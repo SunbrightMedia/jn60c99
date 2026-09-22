@@ -1,0 +1,12 @@
+[  14.2s] boot sr 44100 patch 13 'LD Hawk Lead': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 128 SUB 20; confound candidates: SYNC, PORTAMENTO 26, REVERB 56 DELAY 20
+[  16.3s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  52.1s] FAIL key 48 LATE: DRY f0 249.05 Hz (+1115 c vs key) harmonic 0.574 peak 0.08053 master peak 0.1685 | engine u0 142.1/450.7 | dev 971 c vs engine, 15 c vs semitone | NaN 0
+[ 120.2s] PASS release dry 48: 0.0467 -> 0 | PASS release master: 0.101 -> 0.0134 (24000 samples) | 3 s tail rule: dry 0 master 0.000216 at 3.0 s -> PASS/PASS
+[ 153.7s] FAIL key 60 EARLY: DRY f0 749.21 Hz (+1821 c vs key) harmonic 0.379 peak 0.08049 master peak 0.159 | engine u0 792.4/2512.7 | dev 97 c vs engine, 21 c vs semitone | NaN 0
+[ 220.9s] PASS release dry 60: 0.0418 -> 0 | PASS release master: 0.0892 -> 0.0124 (24000 samples) | 3 s tail rule: dry 0 master 0.000227 at 3.0 s -> PASS/PASS
+[ 254.4s] FAIL key 72 EARLY: DRY f0 842.12 Hz (+824 c vs key) harmonic 0.434 peak 0.08062 master peak 0.1594 | engine u0 2085.3/6612.4 | dev 1570 c vs engine, 24 c vs semitone | NaN 0
+[ 320.6s] PASS release dry 72: 0.0715 -> 0 | PASS release master: 0.144 -> 0.0127 (24000 samples) | 3 s tail rule: dry 0 master 0.000199 at 3.0 s -> PASS/PASS
+[ 320.6s] FAIL JX law (dry): FAIL harmonic/f0: [(48, np.float64(249.05145660372955), 0.5744921415903763), (60, np.float64(749.2077155594637), 0.3793024169830251), (72, np.float64(842.1220079172499), 0.4338050448165812)] | every key on its engine cell: False
+[ 320.6s] PASS NaN census 0; faults after static init 0; instr/sample idle 30231 sustain 30747
+[ 320.6s] ROW | 13 | LD Hawk Lead | FAIL(pitch48,pitch60,pitch72,track) | 48:+1115c(L) 60:+1821c(E) 72:+824c(E) | 0.57 0.38 0.43 | 1.57e-13 | 0 | 0 | 30231/30747 | SYNC; PORTAMENTO 26; REVERB 56 DELAY 20 |
+[ 320.6s] JP8 SWEEP patch 13: FAIL(pitch48,pitch60,pitch72,track)

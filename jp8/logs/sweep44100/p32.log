@@ -1,0 +1,12 @@
+[  12.5s] boot sr 44100 patch 32 'SQ Arpg Hardball': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 155 SUB 0; confound candidates: REVERB 65 DELAY 14
+[  14.6s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  23.9s] PASS key 48 EARLY: DRY f0 65.29 Hz (-1203 c vs key) harmonic 0.991 peak 0.5848 master peak 0.8991 | engine u0 130.9/131.5 | dev 1205 c vs engine, 3 c vs semitone | NaN 0
+[  35.6s] PASS release dry 48: 0.263 -> 0 | PASS release master: 0.389 -> 0.00698 (24000 samples)
+[  44.1s] PASS key 60 EARLY: DRY f0 130.85 Hz (-1200 c vs key) harmonic 0.990 peak 0.6054 master peak 0.9279 | engine u0 524.0/526.4 | dev 2402 c vs engine, 0 c vs semitone | NaN 0
+[  55.6s] PASS release dry 60: 0.406 -> 0 | PASS release master: 0.609 -> 0.00893 (24000 samples)
+[  66.6s] PASS key 72 EARLY: DRY f0 261.53 Hz (-1201 c vs key) harmonic 0.983 peak 0.2583 master peak 0.3996 | engine u0 2090.0/2099.6 | dev 3598 c vs engine, 1 c vs semitone | NaN 0
+[  84.0s] PASS release dry 72: 0.2 -> 0 | PASS release master: 0.296 -> 0.00377 (24000 samples)
+[  84.0s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1203, -1200, -1201 cents) | every key on its engine cell: False
+[  84.0s] PASS NaN census 0; faults after static init 0; instr/sample idle 29194 sustain 29313
+[  84.0s] ROW | 32 | SQ Arpg Hardball | PASS | 48:-1203c(E) 60:-1200c(E) 72:-1201c(E) | 0.99 0.99 0.98 | 1.57e-13 | 0 | 0 | 29194/29313 | REVERB 65 DELAY 14 |
+[  84.0s] JP8 SWEEP patch 32: PASS

@@ -1,0 +1,6 @@
+[  20.1s] boot sr 44100 patch 45 '1981 Honky Tonk': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 196 SUB 0; confound candidates: ENV REL 188/100
+[  23.0s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  37.3s] PASS key 48 EARLY: DRY f0 132.04 Hz (+16 c vs key) harmonic 0.978 peak 0.1183 master peak 0.2169 | engine u0 130.9/133.1 | dev 14 c vs engine, 16 c vs semitone | NaN 0
+[  55.1s] PASS release dry 48: 0.0394 -> 0 | PASS release master: 0.0722 -> 1.57e-13 (24000 samples)
+[  68.5s] PASS key 60 EARLY: DRY f0 263.84 Hz (+15 c vs key) harmonic 0.982 peak 0.1023 master peak 0.1876 | engine u0 262.0/266.4 | dev 12 c vs engine, 15 c vs semitone | NaN 0
+[  84.8s] PASS release dry 60: 0.0408 -> 0 | PASS release master: 0.0748 -> 1.57e-13 (24000 samples)

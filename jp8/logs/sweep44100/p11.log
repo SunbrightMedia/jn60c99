@@ -1,0 +1,12 @@
+[  13.7s] boot sr 44100 patch 11 'KY Warship': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 3 FINE 128 SUB 7; confound candidates: REVERB 185 DELAY 40
+[  15.7s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  24.8s] PASS key 48 EARLY: DRY f0 65.23 Hz (-1205 c vs key) harmonic 0.951 peak 0.03119 master peak 0.2072 | engine u0 65.7/196.7 | dev 13 c vs engine, 5 c vs semitone | NaN 0
+[  85.6s] PASS release dry 48: 0.0128 -> 0 | PASS release master: 0.0981 -> 0.00555 (24000 samples) | 3 s tail rule: dry 0 master 1.56e-08 at 3.0 s -> PASS/PASS
+[  93.8s] PASS key 60 EARLY: DRY f0 130.54 Hz (-1204 c vs key) harmonic 0.972 peak 0.02663 master peak 0.2005 | engine u0 130.2/389.7 | dev 4 c vs engine, 4 c vs semitone | NaN 0
+[ 155.5s] PASS release dry 60: 0.0208 -> 0 | PASS release master: 0.158 -> 0.00893 (24000 samples) | 3 s tail rule: dry 0 master 1.49e-07 at 3.0 s -> PASS/PASS
+[ 163.7s] PASS key 72 EARLY: DRY f0 261.30 Hz (-1202 c vs key) harmonic 0.980 peak 0.04476 master peak 0.4036 | engine u0 262.0/784.3 | dev 5 c vs engine, 2 c vs semitone | NaN 0
+[ 174.8s] PASS release dry 72: 0.034 -> 0 | PASS release master: 0.307 -> 0.00394 (24000 samples)
+[ 174.8s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1205, -1204, -1202 cents) | every key on its engine cell: True
+[ 174.8s] PASS NaN census 0; faults after static init 0; instr/sample idle 28942 sustain 29358
+[ 174.8s] ROW | 11 | KY Warship | PASS | 48:-1205c(E) 60:-1204c(E) 72:-1202c(E) | 0.95 0.97 0.98 | 1.57e-13 | 0 | 0 | 28942/29358 | REVERB 185 DELAY 40 |
+[ 174.8s] JP8 SWEEP patch 11: PASS

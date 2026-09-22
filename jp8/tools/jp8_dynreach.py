@@ -6,7 +6,10 @@ Writes <out>.json: executed (sorted hex rvas), indirect {site: [targets]}, per-s
 With --recall <patch B>, the judged window ALSO covers the recall path: after the note phases, recall(B) through
 DISPATCH (flag 0) + notify on every unit, then N*8 samples so the plugin's own ramp walker settles the new cells
 (layer 2's reach: DISPATCH 0x437630, the proc/child setters, ASG_NOTIFY 0x37CD80, the walker).
-usage: jp8_dynreach.py <out.json> <patches e.g. 2,63,10> [samples=64] [--recall B]"""
+With --boot, the hook is installed BEFORE BUILD (right after the static initializers) so the construction path
+(BUILD, SETSR, HOSTPARAM x host_map, recall, notify) is in the reach too, and every IMPORT STUB reached is recorded
+by name (imports: {stub index: [name, hits]}) so the C runtime can shim exactly those (layer 3).
+usage: jp8_dynreach.py <out.json> <patches e.g. 2,63,10> [samples=64] [--recall B] [--boot]"""
 import sys, os, json, struct, collections, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, "/home/user/jn60c99/tools/verify")
 import jp8_emu as J, capstone
@@ -15,6 +18,8 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_RIP
 out=sys.argv[1]; patches=[int(x) for x in sys.argv[2].split(",")]; N=int(sys.argv[3]) if len(sys.argv)>3 and not sys.argv[3].startswith("--") else 64
 recall_b=int(sys.argv[sys.argv.index("--recall")+1]) if "--recall" in sys.argv else None
+boot="--boot" in sys.argv
+imports=collections.Counter()
 md=capstone.Cs(capstone.CS_ARCH_X86,capstone.CS_MODE_64); md.detail=True
 executed=set(); indirect=collections.defaultdict(set); ind_sites={}; t0=time.time()
 def is_indirect(rva):
@@ -32,12 +37,20 @@ def hook(uc,address,size,user):
     if 0<=rva<J.IMGSZ:
         executed.add(rva)
         if is_indirect(rva): pending[0]=rva
+    elif J.STUB_BASE<=address<J.STUB_BASE+8*len(J.IMPORTS)+8:
+        imports[(address-J.STUB_BASE)//8]+=1
 counts={}
 for patch in patches:
-    jp=J.JP8(); jp.run_static_init(); jp.build(); jp.set_ftz(); jp.set_sr(44100.0); w,f=jp.host_init(); assert f==0
-    jp.recall(patch); jp.snap_ramps(); jp.clear_latch()
-    jp.uc.ctl_flush_tb()                      # D5: a code hook added after a block was JIT-cached never fires for it
-    h=jp.uc.hook_add(UC_HOOK_CODE,hook)
+    jp=J.JP8(); jp.run_static_init()
+    if boot:
+        jp.uc.ctl_flush_tb(); h=jp.uc.hook_add(UC_HOOK_CODE,hook)
+    jp.build(); jp.set_ftz(); jp.set_sr(44100.0); w,f=jp.host_init(); assert f==0
+    jp.recall(patch)
+    if boot: jp.render_both(2200)             # the walker settles the recalled ramps (no snap on this drive)
+    else: jp.snap_ramps(); jp.clear_latch()
+    if not boot:
+        jp.uc.ctl_flush_tb()                      # D5: a code hook added after a block was JIT-cached never fires for it
+        h=jp.uc.hook_add(UC_HOOK_CODE,hook)
     n0=len(executed); jp.render_both(8)            # idle: all 8 voices + master
     jp.note_on(60,100); jp.render_both(N)          # note: all 8 voices + master
     jp.note_on(67,100); jp.render_both(N)          # a second key while the first is held (a second voice allocation)
@@ -48,6 +61,9 @@ for patch in patches:
     jp.uc.hook_del(h); jp.uc.ctl_flush_tb()
     counts[patch]=len(executed)-n0
     print("[%5.1fs] patch %d: executed set now %d addresses (+%d), %d indirect sites"%(time.time()-t0,patch,len(executed),len(executed)-n0,len(indirect)),flush=True)
+stubnames={i:(name) for i,(rva,(dll,name)) in enumerate(sorted(J.IMPORTS.items()))}
 json.dump(dict(patches=patches,samples=N,executed=sorted("%x"%a for a in executed),
-               indirect={"%x"%s:sorted("%x"%t for t in ts) for s,ts in indirect.items()}),open(out,"w"))
+               indirect={"%x"%s:sorted("%x"%t for t in ts) for s,ts in indirect.items()},
+               imports={str(i):[stubnames.get(i,"?"),n] for i,n in sorted(imports.items())}),open(out,"w"))
+if imports: print("imports reached: "+", ".join("%s x%d"%(stubnames.get(i,"?"),n) for i,n in sorted(imports.items())))
 print("wrote %s"%out)

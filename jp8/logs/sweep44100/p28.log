@@ -1,0 +1,12 @@
+[  12.6s] boot sr 44100 patch 28 'PD Warm Pad': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 1 VCO2 RANGE 2 FINE 104 SUB 0; confound candidates: CROSS MOD 199, REVERB 0 DELAY 130
+[  14.7s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  25.0s] PASS key 48 EARLY: DRY f0 65.38 Hz (-1201 c vs key) harmonic 0.955 peak 0.1213 master peak 0.05586 | engine u0 129.7/65.1 | dev 8 c vs engine, 1 c vs semitone | NaN 0
+[  93.5s] PASS release dry 48: 0.14 -> 0.0695 | PASS release master: 0.0648 -> 0.0469 (24000 samples) | 3 s tail rule: dry 0 master 0.000527 at 3.0 s -> PASS/PASS
+[ 102.5s] PASS key 60 EARLY: DRY f0 130.45 Hz (-1205 c vs key) harmonic 0.986 peak 0.1139 master peak 0.0568 | engine u0 317.3/129.9 | dev 7 c vs engine, 5 c vs semitone | NaN 0
+[ 169.6s] PASS release dry 60: 0.137 -> 0.0723 | PASS release master: 0.0663 -> 0.0501 (24000 samples) | 3 s tail rule: dry 0 master 0.000813 at 3.0 s -> PASS/PASS
+[ 178.4s] PASS key 72 EARLY: DRY f0 260.46 Hz (-1208 c vs key) harmonic 0.948 peak 0.1202 master peak 0.06362 | engine u0 725.9/260.3 | dev 1 c vs engine, 8 c vs semitone | NaN 0
+[ 244.0s] PASS release dry 72: 0.148 -> 0.091 | PASS release master: 0.0663 -> 0.0433 (24000 samples) | 3 s tail rule: dry 0 master 0.000583 at 3.0 s -> PASS/PASS
+[ 244.0s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1201, -1205, -1208 cents) | every key on its engine cell: True
+[ 244.0s] PASS NaN census 0; faults after static init 0; instr/sample idle 30574 sustain 30532
+[ 244.0s] ROW | 28 | PD Warm Pad | PASS | 48:-1201c(E) 60:-1205c(E) 72:-1208c(E) | 0.95 0.99 0.95 | 1.57e-13 | 0 | 0 | 30574/30532 | CROSS MOD 199; REVERB 0 DELAY 130 |
+[ 244.0s] JP8 SWEEP patch 28: PASS

@@ -1,0 +1,12 @@
+[  12.7s] boot sr 44100 patch 31 'DR Percussion': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 5 FINE 128 SUB 0; confound candidates: VCO ENV MOD 0, ENV REL 98/157, REVERB 154 DELAY 0
+[  14.6s] PASS idle 4096: dry peak 0 master peak 0.00167 NaN 0
+[  42.7s] PASS key 48 LATE: DRY f0 131.04 Hz (+3 c vs key) harmonic 0.980 peak 8.095e-05 master peak 0.001889 | engine u0 131.0/523.5 | dev 0 c vs engine, 3 c vs semitone | NaN 0
+[  52.9s] PASS release dry 48: 8.04e-05 -> 0 | PASS release master: 0.00126 -> 4.66e-05 (24000 samples)
+[  80.6s] PASS key 60 LATE: DRY f0 261.39 Hz (-2 c vs key) harmonic 0.984 peak 0.0001399 master peak 0.005042 | engine u0 261.8/1045.9 | dev 3 c vs engine, 2 c vs semitone | NaN 0
+[  90.4s] PASS release dry 60: 0.000135 -> 0 | PASS release master: 0.00458 -> 0.000103 (24000 samples)
+[ 117.7s] PASS key 72 LATE: DRY f0 523.06 Hz (-1 c vs key) harmonic 0.990 peak 0.0003733 master peak 0.02243 | engine u0 522.5/2087.4 | dev 2 c vs engine, 1 c vs semitone | NaN 0
+[ 127.7s] PASS release dry 72: 0.000369 -> 0 | PASS release master: 0.0213 -> 0.000382 (24000 samples)
+[ 127.7s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +3, -2, -1 cents) | every key on its engine cell: True
+[ 127.7s] PASS NaN census 0; faults after static init 0; instr/sample idle 25510 sustain 26002
+[ 127.7s] ROW | 31 | DR Percussion | PASS | 48:+3c(L) 60:-2c(L) 72:-1c(L) | 0.98 0.98 0.99 | 0.00167 | 0 | 0 | 25510/26002 | VCO ENV MOD 0; ENV REL 98/157; REVERB 154 DELAY 0 |
+[ 127.7s] JP8 SWEEP patch 31: PASS

@@ -13,7 +13,10 @@ lib=ctypes.CDLL(so)
 lib.jp8_map.argtypes=[ctypes.c_uint64,ctypes.c_uint64]; lib.jp8_map.restype=ctypes.c_int
 lib.jp8_load.argtypes=[ctypes.c_uint64,ctypes.c_char_p]; lib.jp8_load.restype=ctypes.c_int
 lib.jp8_call.argtypes=[ctypes.c_void_p,ctypes.c_uint64,ctypes.c_uint64,ctypes.c_uint64,ctypes.c_uint64,ctypes.c_uint64]; lib.jp8_call.restype=ctypes.c_int
+lib.jp8_alloc.argtypes=[ctypes.c_void_p]
 lib.jp8_last_trap.restype=ctypes.c_char_p
+lib.jp8_call_f.argtypes=[ctypes.c_void_p,ctypes.c_uint64,ctypes.c_uint64,ctypes.c_float]; lib.jp8_call_f.restype=ctypes.c_int
+lib.jp8_heap_set.argtypes=[ctypes.c_uint64,ctypes.c_uint64]; lib.jp8_heap_get.restype=ctypes.c_uint64
 DEBUG=os.environ.get("JP8_LIFT_DEBUG")
 if DEBUG and hasattr(lib,"jp8_trace_open"): lib.jp8_trace_open.argtypes=[ctypes.c_char_p]
 def trace_diff(oracle_path, c_path):
@@ -48,6 +51,9 @@ for patch in Q.PATCHES:
     assert heap_len<=0x8000000, "heap larger than the mapped 128 MB"
     lib.jp8_load(Q.IMG_BASE,os.path.join(d,"img.bin").encode()); lib.jp8_load(Q.HEAP_BASE,os.path.join(d,"heap_pre.bin").encode())
     ctypes.memset(Q.BUF_BASE,0,Q.BUF_SIZE)
+    if os.path.exists(os.path.join(d,"page0.bin")): wr(Q.GS_BASE,open(os.path.join(d,"page0.bin"),"rb").read())
+    lib.jp8_heap_set(meta.get("heap_ptr0",meta["heap_end"]),Q.HEAP_BASE+0x8000000)
+    if hasattr(lib,"jp8_hc_set"): lib.jp8_hc_set.argtypes=[ctypes.c_uint64]; lib.jp8_hc_set(meta.get("hc0",0x9000))
     wr(Q.PAIR_V,struct.pack("<QQ",Q.OUT_M,Q.OUT_S)); wr(Q.PAIR_M,struct.pack("<QQ",Q.OUT_L,Q.OUT_R))
     wr(Q.A2,b"".join(struct.pack("<QQ",Q.VOUT+8*v,Q.VOUT+8*v+4) for v in range(8)))
     cpu=ctypes.create_string_buffer(CPU_SZ); cp=ctypes.addressof(cpu)
@@ -58,7 +64,23 @@ for patch in Q.PATCHES:
         return lib.jp8_call(cp,rva,rcx,rdx,r8,r9)
     for ev,arg in Q.events():
         if trap: break
-        if ev=="noteon":
+        if ev=="build":
+            # jp8_emu.build(): HOST = bump(0x8000) zeroed, then BUILD(HOST); state/proc/assign read from the HOST record
+            host=lib.jp8_heap_get(); ctypes.memmove(cp+RSP_OFF,struct.pack("<Q",meta["rsp"]-8),8)
+            lib.jp8_alloc  # (the runtime bumps through jp8_alloc; here the harness bumps the HOST block the same way)
+            class _C(ctypes.Structure): _fields_=[("r",ctypes.c_uint64*16)]
+            cc=_C.from_address(cp); cc.r[1]=0x8000; lib.jp8_alloc(cp); host=cc.r[0]
+            if host!=meta["host"]: log("HOST differs: oracle 0x%x C 0x%x"%(meta["host"],host)); bad_total+=1
+            if call(Q.BUILD,host,0,0): trap=lib.jp8_last_trap().decode(); continue
+            state=[struct.unpack("<Q",rd(host+0xA0+64*i,8))[0] for i in range(9)]
+            if state!=meta["state"]: log("state pointers differ: oracle %s C %s"%(["%x"%x for x in meta["state"]],["%x"%x for x in state]))
+        elif ev=="setsr":
+            ctypes.memmove(cp+RSP_OFF,struct.pack("<Q",meta["rsp"]-8),8)
+            if lib.jp8_call_f(cp,Q.SETSR,meta["host"],arg): trap=lib.jp8_last_trap().decode()
+        elif ev=="hostinit":
+            for hid,val in Q.hostinit_values({int(k):v for k,v in meta["host_map"].items()}):
+                if call(Q.HOSTPARAM,meta["host"],hid,val): trap=lib.jp8_last_trap().decode(); break
+        elif ev=="noteon":
             if call(Q.NOTEON,meta["host"],arg,100): trap=lib.jp8_last_trap().decode()
         elif ev=="noteoff":
             if DEBUG and hasattr(lib,"jp8_trace_open"): lib.jp8_trace_open(os.path.join(d,"trace_noteoff_c.bin").encode())

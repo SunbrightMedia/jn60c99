@@ -1,0 +1,12 @@
+[  12.7s] boot sr 44100 patch 21 "BS Thrillin' Bs": static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 1 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: REVERB 146 DELAY 2
+[  14.8s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  24.9s] PASS key 48 EARLY: DRY f0 32.59 Hz (-2406 c vs key) harmonic 0.985 peak 0.09456 master peak 0.5236 | engine u0 32.7/65.4 | dev 8 c vs engine, 6 c vs semitone | NaN 0
+[  36.8s] PASS release dry 48: 0.0176 -> 0 | PASS release master: 0.087 -> 0.00241 (24000 samples)
+[  45.2s] PASS key 60 EARLY: DRY f0 65.30 Hz (-2403 c vs key) harmonic 0.984 peak 0.1048 master peak 0.5804 | engine u0 65.5/130.8 | dev 5 c vs engine, 3 c vs semitone | NaN 0
+[  57.0s] PASS release dry 60: 0.0182 -> 0 | PASS release master: 0.0958 -> 0.00334 (24000 samples)
+[  66.0s] PASS key 72 EARLY: DRY f0 130.56 Hz (-2403 c vs key) harmonic 0.981 peak 0.1127 master peak 0.6247 | engine u0 130.6/260.9 | dev 1 c vs engine, 3 c vs semitone | NaN 0
+[ 131.6s] PASS release dry 72: 0.0122 -> 0 | PASS release master: 0.0547 -> 0.00396 (24000 samples) | 3 s tail rule: dry 0 master 1.61e-08 at 3.0 s -> PASS/PASS
+[ 131.6s] PASS JX law (dry): PASS pitch tracks keys by -24 semitones (offsets -2406, -2403, -2403 cents) | every key on its engine cell: True
+[ 131.6s] PASS NaN census 0; faults after static init 0; instr/sample idle 29571 sustain 29621
+[ 131.6s] ROW | 21 | BS Thrillin' Bs | PASS | 48:-2406c(E) 60:-2403c(E) 72:-2403c(E) | 0.98 0.98 0.98 | 1.57e-13 | 0 | 0 | 29571/29621 | REVERB 146 DELAY 2 |
+[ 131.6s] JP8 SWEEP patch 21: PASS

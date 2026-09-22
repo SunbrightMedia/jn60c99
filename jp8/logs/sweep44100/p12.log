@@ -1,0 +1,12 @@
+[  12.5s] boot sr 44100 patch 12 'SQ 8th Peaks': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 1 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: SYNC, REVERB 56 DELAY 3
+[  14.7s] PASS idle 4096: dry peak 0 master peak 0.000419 NaN 0
+[  25.2s] PASS key 48 EARLY: DRY f0 32.59 Hz (-2406 c vs key) harmonic 0.862 peak 0.1461 master peak 0.3502 | engine u0 65.5/130.8 | dev 1207 c vs engine, 6 c vs semitone | NaN 0
+[  37.7s] PASS release dry 48: 0.0956 -> 0 | PASS release master: 0.143 -> 0.000853 (24000 samples)
+[  73.0s] PASS key 60 LATE: DRY f0 65.29 Hz (-2403 c vs key) harmonic 0.840 peak 0.1364 master peak 0.3122 | engine u0 261.9/523.2 | dev 2405 c vs engine, 3 c vs semitone | NaN 0
+[  86.0s] PASS release dry 60: 0.0972 -> 0 | PASS release master: 0.178 -> 0.000711 (24000 samples)
+[ 120.0s] FAIL key 72 LATE: DRY f0 130.53 Hz (-2404 c vs key) harmonic 0.785 peak 0.1264 master peak 0.3612 | engine u0 1045.1/2087.6 | dev 3601 c vs engine, 4 c vs semitone | NaN 0
+[ 132.6s] PASS release dry 72: 0.0835 -> 0 | PASS release master: 0.24 -> 0.000865 (24000 samples)
+[ 132.6s] FAIL JX law (dry): FAIL harmonic/f0: [(48, np.float64(32.59496426451836), 0.8623443561049986), (60, np.float64(65.29027503504551), 0.8399914116798677), (72, np.float64(130.53318512850885), 0.7851690498660533)] | every key on its engine cell: False
+[ 132.6s] PASS NaN census 0; faults after static init 0; instr/sample idle 32027 sustain 31602
+[ 132.6s] ROW | 12 | SQ 8th Peaks | FAIL(pitch72,track) | 48:-2406c(E) 60:-2403c(L) 72:-2404c(L) | 0.86 0.84 0.79 | 0.000419 | 0 | 0 | 32027/31602 | SYNC; REVERB 56 DELAY 3 |
+[ 132.6s] JP8 SWEEP patch 12: FAIL(pitch72,track)

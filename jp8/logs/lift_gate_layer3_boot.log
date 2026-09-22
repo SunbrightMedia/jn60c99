@@ -1,0 +1,5 @@
+=== 0. dynamic reach (indirect targets) ===
+=== 1. lift + build ===
+lifted 762 functions, 156488 instructions -> /home/user/jn60c99/jp8/src/jp8_lift.c (175670 lines); unsupported (trap) 280: int3:60, vmovdqa:39, vmovd:31, vmulsd:18, vfmadd213sd:12, vmovq:10, vmovsd:9, vpshufd:7, vsubsd:7, vmovapd:6, vldmxcsr:6, vaddsd:5, vdivsd:4, vandpd:4, lock cmpxchg:3, vpxor:3, vcvtdq2pd:3, vmulpd:3, vcvtsd2ss:3, vorps:3, vstmxcsr:3, vcvtss2si:3, vcvtsi2ss:3, vucomiss:3, int:2, vucomisd:2, vfnmadd231sd:2, vfmadd231sd:2, punpcklbw:1, vpunpckldq:1, vcvtps2pd:1, vpand:1, vpor:1, vpsrlq:1, vpsubq:1, vcvtpd2dq:1, vpsrad:1, vpsllq:1, vpaddq:1, vmovss:1
+=== 2. oracle replay (Unicorn) ===
+[  50.4s] layer boot patch 2: 2328 judged samples, 41904 output words (24624 nonzero), heap 126.0 MB, faults 1

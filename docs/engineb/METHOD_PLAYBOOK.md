@@ -2139,3 +2139,19 @@ peaks at 528 AND 261 Hz). One probe "refuted" the RANGE law that way.
 4. A pitch cell that reads the same number on keys 48, 60 and 72 is an
    OFFSET, not a pitch. Find where the key enters (here the oscillator adds
    [0x35b0] to the cell, 0x39b21a) before turning cells into Hz.
+
+## 100. A TOOTH MUST BITE ON THE DRIVE'S OWN DATA, AND EVERY NEW EMULATOR HOOK
+RE-PAYS THE CACHED-BLOCK DEFECT (paid 2026-09-22, JP8 step 5)
+
+Two bites in one day while lifting the JP8's machine code to C (jp8/tools/jp8_lift.py):
+1. The render gate's tooth (one addss -> subss on the VCO1 RANGE add) was reused for the
+   recall gate; the recalled patch has RANGE 3, the cell is 0.0, + and - agree, and the
+   "gate with the tooth" stayed green. The gate was believed for twenty minutes on an exit
+   code. Rule: a tooth is chosen per gate on a path the drive exercises with a NON-neutral
+   value, and its FAILING LINE is read and quoted (jp8_lift_seq.TOOTH per layer).
+2. Three separate Unicorn hooks (an instruction counter, a per-instruction trace, the dynamic
+   reach that feeds the lifter its indirect targets) were each added after blocks had been
+   JIT-cached and each silently missed those blocks: the reach lacked the note-off's vtable
+   target (shared with the assigner notify run at boot) and the trace "showed" the oracle
+   skipping a callee. Rule: `uc.ctl_flush_tb()` before EVERY hook_add and after hook_del,
+   as jp8_listen2.count() already did (D5); a hook is not "on" until the cache is gone.

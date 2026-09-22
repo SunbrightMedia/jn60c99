@@ -1,0 +1,12 @@
+[  16.6s] boot sr 44100 patch 2 'BR JP PWM Brass': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 163 SUB 0; confound candidates: REVERB 161 DELAY 37
+[  18.8s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  29.2s] PASS key 48 EARLY: DRY f0 131.32 Hz (+7 c vs key) harmonic 0.961 peak 0.1298 master peak 0.1497 | engine u0 131.0/131.9 | dev 4 c vs engine, 7 c vs semitone | NaN 0
+[  41.7s] PASS release dry 48: 0.125 -> 0.00261 | PASS release master: 0.137 -> 0.0053 (24000 samples)
+[  50.7s] PASS key 60 EARLY: DRY f0 262.44 Hz (+5 c vs key) harmonic 0.957 peak 0.1516 master peak 0.1649 | engine u0 262.8/264.6 | dev 2 c vs engine, 5 c vs semitone | NaN 0
+[  63.2s] PASS release dry 60: 0.149 -> 0.00162 | PASS release master: 0.149 -> 0.00566 (24000 samples)
+[  77.1s] PASS key 72 EARLY: DRY f0 524.72 Hz (+5 c vs key) harmonic 0.952 peak 0.1542 master peak 0.1732 | engine u0 520.3/523.9 | dev 3 c vs engine, 5 c vs semitone | NaN 0
+[  90.7s] PASS release dry 72: 0.154 -> 0.000685 | PASS release master: 0.148 -> 0.00352 (24000 samples)
+[  90.7s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +7, +5, +5 cents) | every key on its engine cell: True
+[  90.7s] PASS NaN census 0; faults after static init 0; instr/sample idle 30558 sustain 30538
+[  90.7s] ROW | 2 | BR JP PWM Brass | PASS | 48:+7c(E) 60:+5c(E) 72:+5c(E) | 0.96 0.96 0.95 | 1.57e-13 | 0 | 0 | 30558/30538 | REVERB 161 DELAY 37 |
+[  90.7s] JP8 SWEEP patch 2: PASS

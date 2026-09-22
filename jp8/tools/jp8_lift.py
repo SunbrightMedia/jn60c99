@@ -119,7 +119,10 @@ def ea(ins, op):
     if m.base == x86.X86_REG_RIP:
         return "0x%xULL" % ((ins.address + ins.size + m.disp) & 0xFFFFFFFFFFFFFFFF)
     if m.segment != 0:
-        return None
+        if ins.reg_name(m.segment) != "gs": return None
+        # gs:[disp] -- the TEB under Windows; under Unicorn the GS base is 0 and page 0 is mapped, so the plugin reads
+        # page-0 bytes there (__chkstk's stack limit). The C side keeps the oracle's page 0 at JP8_GS_BASE (jp8_cpu.h).
+        parts.append("JP8_GS_BASE")
     if m.base != 0: parts.append("R(%d)" % reg(ins, m.base)[0])
     if m.index != 0: parts.append("R(%d)*%d" % (reg(ins, m.index)[0], m.scale))
     parts.append("0x%xULL" % (m.disp & 0xFFFFFFFFFFFFFFFF))
@@ -193,13 +196,23 @@ class Lifter:
         e("  uint64_t rva = target - 0x%xULL; int lo = 0, hi = %d;" % (IB, len(self.funcs) - 1))
         e("  while (lo <= hi) { int mid = (lo + hi) / 2; if (jp8_fns_%s[mid].rva == rva) { jp8_fns_%s[mid].fn(c); return; }" % (self.name, self.name))
         e("    if (jp8_fns_%s[mid].rva < rva) lo = mid + 1; else hi = mid - 1; }" % self.name)
+        e("  if (target >= 0x600000000ULL && target < 0x600100000ULL) { jp8_import(c, (int)((target - 0x600000000ULL) / 8)); return; }")
         e("  { static char msg[64]; snprintf(msg, sizeof msg, \"indirect target 0x%llx not lifted\", (unsigned long long)rva); jp8_trap(c, rva, msg); }")
         e("}")
         e("void jp8_run(CPU *c, uint64_t rva) { jp8_icall(c, rva + 0x%xULL); }" % IB)
+        # the import stubs: index i (sorted by IAT rva, as jp8_emu enumerates them) -> name, for jp8_import()
+        imps = sorted((e_.address - IB, imp.name.decode() if imp.name else "ord%d" % imp.ordinal) for e in pe.DIRECTORY_ENTRY_IMPORT for imp in e.imports for e_ in [imp])
+        e("const char *jp8_import_names[] = {")
+        for rva, nm in imps: e('  "%s",' % nm)
+        e("};")
+        e("const int jp8_nimports = %d;" % len(imps))
         return "\n".join(e.lines) + "\n"
 
     def lift_func(self, e, f):
         F = self.funcs[f]; insns = F["insns"]; targets = F["targets"]
+        if F.get("alloc"):
+            e("static void f_%x(CPU *c) { jp8_alloc(c); }   /* the CRT allocator: the oracle hooks this rva (jp8_emu ALLOC) and bumps; so does the runtime */" % f)
+            return
         e("static void f_%x(CPU *c) {" % f)
         e("  X t0, t1; uint64_t a0, a1; (void)t0; (void)t1; (void)a0; (void)a1;")
         e("  goto L_%x;   /* the entry: blocks reached by backward jumps sort BEFORE it (paid 2026-09-22, note-off) */" % f)
@@ -497,7 +510,11 @@ def main():
     args = sys.argv[1:]
     out = args[0]; roots = [int(x, 16) for x in args[1].split(",")]
     dyn = {}; name = "voice"
-    if "--dyn" in args: dyn = json.load(open(args[args.index("--dyn") + 1])).get("indirect", {})
+    for k, a in enumerate(args):                       # every --dyn file is merged (a union of reaches)
+        if a == "--dyn":
+            for site, ts in json.load(open(args[k + 1])).get("indirect", {}).items():
+                dyn[site] = sorted(set(dyn.get(site, [])) | set(ts))
+    alloc = int(args[args.index("--alloc") + 1], 16) if "--alloc" in args else None
     if "--name" in args: name = args[args.index("--name") + 1]
     tooth = int(args[args.index("--tooth") + 1], 16) if "--tooth" in args else None
     trace = "--trace" in args
@@ -505,6 +522,7 @@ def main():
     extra = sorted(set(int(t, 16) for site, ts in dyn.items() for t in ts
                        if (dis(int(site, 16)) is not None and dis(int(site, 16)).mnemonic.replace("bnd ", "") == "call")))
     funcs = discover(roots + extra, dyn)
+    if alloc is not None and alloc in funcs: funcs[alloc]["alloc"] = True
     L = Lifter(funcs, name, tooth, trace); src = L.lift()
     if tooth is not None and not L.tooth_done: raise SystemExit("--tooth rva 0x%x was not lifted" % tooth)
     open(out, "w").write(src)

@@ -1,0 +1,12 @@
+[  12.5s] boot sr 44100 patch 5 'SY 1964 SciWiFi': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 128 SUB -5; confound candidates: SYNC, PORTAMENTO 21, REVERB 139 DELAY 38
+[  14.6s] PASS idle 4096: dry peak 0 master peak 0.00115 NaN 0
+[  24.3s] PASS key 48 EARLY: DRY f0 131.59 Hz (+10 c vs key) harmonic 0.885 peak 0.06123 master peak 0.5872 | engine u0 261.9/195.9 | dev 689 c vs engine, 10 c vs semitone | NaN 0
+[  91.1s] PASS release dry 48: 0.0162 -> 0 | PASS release master: 0.196 -> 0.0305 (24000 samples) | 3 s tail rule: dry 0 master 7.08e-06 at 3.0 s -> PASS/PASS
+[ 100.6s] PASS key 60 EARLY: DRY f0 261.61 Hz (-0 c vs key) harmonic 0.929 peak 0.03839 master peak 0.6596 | engine u0 1045.5/782.3 | dev 1896 c vs engine, 0 c vs semitone | NaN 0
+[ 168.6s] PASS release dry 60: 0.0116 -> 0 | PASS release master: 0.284 -> 0.0304 (24000 samples) | 3 s tail rule: dry 0 master 3.61e-06 at 3.0 s -> PASS/PASS
+[ 177.8s] PASS key 72 EARLY: DRY f0 522.69 Hz (-2 c vs key) harmonic 0.903 peak 0.03971 master peak 0.5426 | engine u0 4188.5/3134.0 | dev 3101 c vs engine, 2 c vs semitone | NaN 0
+[ 245.8s] PASS release dry 72: 0.0111 -> 0 | PASS release master: 0.287 -> 0.0192 (24000 samples) | 3 s tail rule: dry 0 master 3.45e-06 at 3.0 s -> PASS/PASS
+[ 245.8s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +10, -0, -2 cents) | every key on its engine cell: False
+[ 245.8s] PASS NaN census 0; faults after static init 0; instr/sample idle 30086 sustain 29624
+[ 245.8s] ROW | 5 | SY 1964 SciWiFi | PASS | 48:+10c(E) 60:-0c(E) 72:-2c(E) | 0.89 0.93 0.90 | 0.00115 | 0 | 0 | 30086/29624 | SYNC; PORTAMENTO 21; REVERB 139 DELAY 38 |
+[ 245.8s] JP8 SWEEP patch 5: PASS

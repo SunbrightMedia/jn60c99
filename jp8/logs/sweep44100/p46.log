@@ -1,0 +1,2 @@
+[  16.0s] boot sr 44100 patch 46 '1981 Xylo': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 5 FINE 128 SUB 0; confound candidates: VCO ENV MOD 130, SYNC, ENV REL 180/120
+[  18.2s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0

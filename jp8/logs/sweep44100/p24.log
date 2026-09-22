@@ -1,0 +1,12 @@
+[  12.5s] boot sr 44100 patch 24 'SQ Deep Ocean': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 5 FINE 142 SUB -5; confound candidates: REVERB 144 DELAY 45, LFO->VCO 255
+[  14.5s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  48.0s] FAIL key 48 EARLY: DRY f0 65.38 Hz (-1201 c vs key) harmonic 0.599 peak 0.0839 master peak 0.1482 | engine u0 65.5/196.3 | dev 2 c vs engine, 1 c vs semitone | NaN 0
+[ 113.4s] PASS release dry 48: 0 -> 0 | PASS release master: 0.0111 -> 0.00157 (24000 samples) | 3 s tail rule: dry 0 master 0.000232 at 3.0 s -> PASS/PASS
+[ 157.9s] FAIL key 60 LATE: DRY f0 130.82 Hz (-1200 c vs key) harmonic 0.585 peak 0.002137 master peak 0.02097 | engine u0 130.7/392.0 | dev 1 c vs engine, 0 c vs semitone | NaN 0
+[ 226.2s] PASS release dry 60: 0 -> 0 | PASS release master: 0.0111 -> 0.00256 (24000 samples) | 3 s tail rule: dry 0 master 0.000353 at 3.0 s -> PASS/PASS
+[ 269.9s] FAIL key 72 LATE: DRY f0 261.55 Hz (-1201 c vs key) harmonic 0.614 peak 0.001543 master peak 0.02047 | engine u0 262.4/786.8 | dev 5 c vs engine, 1 c vs semitone | NaN 0
+[ 335.3s] PASS release dry 72: 0 -> 0 | PASS release master: 0.0139 -> 0.0022 (24000 samples) | 3 s tail rule: dry 0 master 0.000455 at 3.0 s -> PASS/PASS
+[ 335.3s] PASS JX law (dry): FAIL harmonic/f0: [(48, np.float64(65.38205793181042), 0.5989121852719786), (60, np.float64(130.81679254814344), 0.5852294558620296), (72, np.float64(261.546382182623), 0.6139814108541918)] | every key on its engine cell: True
+[ 335.3s] PASS NaN census 0; faults after static init 0; instr/sample idle 29578 sustain 29591
+[ 335.3s] ROW | 24 | SQ Deep Ocean | FAIL(pitch48,pitch60,pitch72) | 48:-1201c(E) 60:-1200c(L) 72:-1201c(L) | 0.60 0.59 0.61 | 1.57e-13 | 0 | 0 | 29578/29591 | REVERB 144 DELAY 45; LFO->VCO 255 |
+[ 335.3s] JP8 SWEEP patch 24: FAIL(pitch48,pitch60,pitch72)

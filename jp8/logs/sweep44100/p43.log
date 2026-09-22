@@ -1,0 +1,12 @@
+[  18.2s] boot sr 44100 patch 43 '1981 Clav': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 138 SUB 0; confound candidates: none
+[  21.5s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  35.9s] PASS key 48 EARLY: DRY f0 65.43 Hz (-1199 c vs key) harmonic 0.967 peak 0.1428 master peak 0.4522 | engine u0 65.5/65.4 | dev 0 c vs engine, 1 c vs semitone | NaN 0
+[  54.3s] PASS release dry 48: 0.0134 -> 0 | PASS release master: 0.0429 -> 1.57e-13 (24000 samples)
+[  64.0s] PASS key 60 EARLY: DRY f0 130.77 Hz (-1201 c vs key) harmonic 0.988 peak 0.1626 master peak 0.515 | engine u0 131.0/131.0 | dev 3 c vs engine, 1 c vs semitone | NaN 0
+[  75.8s] PASS release dry 60: 0.0323 -> 0 | PASS release master: 0.102 -> 1.57e-13 (24000 samples)
+[  85.0s] PASS key 72 EARLY: DRY f0 261.58 Hz (-1200 c vs key) harmonic 0.980 peak 0.1739 master peak 0.551 | engine u0 261.3/261.2 | dev 2 c vs engine, 0 c vs semitone | NaN 0
+[ 104.1s] PASS release dry 72: 0.0126 -> 0 | PASS release master: 0.0397 -> 1.57e-13 (24000 samples)
+[ 104.1s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1199, -1201, -1200 cents) | every key on its engine cell: True
+[ 104.1s] PASS NaN census 0; faults after static init 0; instr/sample idle 29470 sustain 29466
+[ 104.1s] ROW | 43 | 1981 Clav | PASS | 48:-1199c(E) 60:-1201c(E) 72:-1200c(E) | 0.97 0.99 0.98 | 1.57e-13 | 0 | 0 | 29470/29466 | - |
+[ 104.1s] JP8 SWEEP patch 43: PASS

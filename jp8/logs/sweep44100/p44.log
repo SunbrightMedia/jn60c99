@@ -1,0 +1,3 @@
+[  20.5s] boot sr 44100 patch 44 '1981 Echo Piano': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 4 FINE 142 SUB 0; confound candidates: VCO ENV MOD 248, ENV REL 0/160
+[  23.8s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  80.1s] FAIL key 48 EARLY: DRY f0 766.15 Hz (+3060 c vs key) harmonic 0.968 peak 0.02767 master peak 0.09178 | engine u0 130.9/262.1 | dev 1857 c vs engine, 40 c vs semitone | NaN 0
