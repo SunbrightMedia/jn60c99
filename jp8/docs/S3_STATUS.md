@@ -1,4 +1,4 @@
-# JP8 S3_STATUS.md -- JUPITER-8 PLUG-OUT .vst3 -> C99 port (PORT_PIPELINE steps 0-4 DONE, step 5 layers 1-2 GREEN, later layers open)
+# JP8 S3_STATUS.md -- JUPITER-8 PLUG-OUT .vst3 -> C99 port (step 5 layers 1-3 GREEN on the OLD drive; D7: the drive never built the HOST -- being replaced)
 Repo layout (moved from the ephemeral scratchpad 2026-09-22): `jp8/truth/` (checksummed, clean names,
 SHA256SUMS), `jp8/tools/` (oracle `jp8_emu.py` + probes; every `gen/*.py` named below now lives here),
 `jp8/logs/` (every log named below), `jp8/docs/` (this file, `abi_ledger.md/.json`), `jp8/gen/params.tsv`,
@@ -34,6 +34,18 @@ S3 verdict (1 x86 instr ~ 1.75 S3 cycles, calibration INFERRED; budget 10,000 cy
 a bit-exact 8-voice JP8 is ~1 voice per S3. Same class as the JUNO exact engine (CLAUDE.md: two chips cannot run it).
 
 ## Defects, each with its resolution
+- D7 (OPEN 2026-09-22, CRITICAL, found by the design workflow's skeptic; jp8/docs/SHIPPING_DESIGN.md item 1, probes in
+  jp8/work/design/hostctor.py): THE ORACLE NEVER CONSTRUCTS THE HOST. jp8_emu.build() hands BUILD a zero-filled 0x8000 bump
+  block; the plugin's processor (0x33a8db) calls factory 0x444fe0 = ALLOC(0x8D0) + ctor 0x444000, which writes [HOST+8] =
+  96000.0 (base ctor 0x36c890), [HOST+0x38] = 8 and the vtable, and only then BUILD. BUILD copies [HOST+8] into every
+  state+0x10, so on the zero HOST the rate is 0 and 353 ramps/unit get inf/NaN steps (READ + PROVEN): the "snap" and the
+  latch clear of the boot recipe were a band-aid over this; without them the zero-HOST boot is not silent at idle (master
+  pinned at 1.98, dry 65; PROVEN). With the real ctor (or HOST+8 := 96000.0): 0 NaN/inf steps, every ramp settles with NO
+  snap, idle 1.57e-13 (PROVEN, patch 2). Consequence: EVERY reference so far (layers 1-3, the 64-patch reach, SWEEP_44100,
+  listen2) was measured on the zero-HOST drive. The lifted code's EXACTLY 0 still stands (it reproduces the plugin under that
+  drive); the DRIVE is wrong and must be replaced, then every reference regenerated. Also open from the same review: the
+  recall must take HOSTPARAM's per-id path (id 756 LFO KEY TRIG has a direct setter; 12 patches), the boot order changes the
+  sound (ctor -> BUILD -> SETSR -> host_init -> recall is the host's), and host RENDER 0x445DC0 does three things the stubs do not.
 - D1 (RESOLVED, previous agent): RENDER 0x445DC0 on a zero-filled HOST faulted (it needs the constructed CWaveGen channel
   vectors). The oracle drives VOICE_WRAP x8 + MASTER_WRAP per sample on the states BUILD constructed (jp8_emu.render_both),
   the JX/JUNO idiom. faults == 0 over 12000 idle samples (listen_p0_n60.log). Host RENDER stays READ-only.

@@ -1,0 +1,281 @@
+--- src/jp8_cpu.h	2026-09-22 22:16:58.070493330 +0000
++++ proto/jp8_cpu.h	2026-09-22 23:06:17.203219842 +0000
+@@ -16,7 +16,22 @@
+ #include <math.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++/* ---- build flavours (every flag OFF = the identity path layers 1-3 were proven on, byte for byte) ----
++ * JP8_RELOC        guest addresses stay the oracle's 64-bit values; every access is translated to a host arena through
++ *                  a 256 MB band table (no MAP_FIXED, no fixed host address; wasm32 / AArch64 / any 64-bit host).
++ * JP8_RELOC_CHECK  + bounds check on every access: an access outside every mapped region traps (gate RED).
++ * JP8_SOFTFP=1     FTZ/DAZ in software, the ORACLE's semantics (Unicorn 2.1.4): DAZ on inputs, a denormal IEEE result
++ *                  becomes a signed zero, min/max compare the flushed values but return the ORIGINAL bits, MXCSR flags
++ *                  never set. For hosts without x86 FTZ/DAZ (WASM, ARM) and for the oracle-judged gates.
++ * JP8_SOFTFP=2     FTZ/DAZ in software, x86 HARDWARE semantics: tininess AFTER rounding (a product/quotient/narrowing
++ *                  that rounds to FLT_MIN/DBL_MIN only through gradual underflow is flushed), min/max return the
++ *                  flushed operand. (Flags are not modelled in either mode.) */
++#if !defined(JP8_SOFTFP) && !(defined(__x86_64__) || defined(_M_X64))
++#error "non-x86-64 host: define JP8_SOFTFP (the plugin runs at MXCSR 0x9FC0 = FTZ|DAZ|RNE; plain C floats give other bits on denormals)"
++#endif
++#ifndef JP8_SOFTFP
+ #include <xmmintrin.h>
++#endif
+ 
+ typedef union { float f[4]; double d[2]; uint32_t u[4]; uint64_t q[2]; int32_t i[4]; int64_t l[2]; uint8_t b[16]; uint16_t w[8]; } X;
+ typedef struct {
+@@ -28,7 +43,32 @@
+     long ninstr;
+ } CPU;
+ 
++#ifdef JP8_RELOC
++#define JP8_NBANDS 128u                          /* 256 MB bands: guest addresses below 0x800000000 */
++extern uintptr_t jp8_bdelta[JP8_NBANDS];         /* host = (uintptr_t)guest + delta (mod the host pointer width) */
++extern uint32_t jp8_blo[JP8_NBANDS], jp8_bhi[JP8_NBANDS];  /* mapped band offsets [lo, hi); 0,0 = unmapped */
++extern void jp8_fault(uint64_t a, unsigned n);   /* longjmps to the caller of jp8_call (gate RED); never returns */
++extern uint32_t jp8_badacc;                      /* CHECK=2: sticky "an access missed every region", tested after each call */
++extern unsigned char jp8_sink[64];               /* CHECK=2: where such an access lands instead */
++static inline void *jp8_h(uint64_t a, unsigned n) {
++    uint64_t i = a >> 28; uint32_t k = (uint32_t)(i & (JP8_NBANDS - 1));
++#if JP8_RELOC_CHECK == 1                         /* gates: trap at the access (branchy: ~3.7x slower, measured) */
++    uint32_t off = (uint32_t)(a & 0x0FFFFFFFu);
++    if (i >= JP8_NBANDS || off < jp8_blo[k] || off + n > jp8_bhi[k]) jp8_fault(a, n);
++#elif JP8_RELOC_CHECK == 2                       /* ship: branchless, the bad access is diverted and reported after the call */
++    uint32_t off = (uint32_t)(a & 0x0FFFFFFFu);
++    uint32_t bad = (uint32_t)(i >= JP8_NBANDS) | (uint32_t)(off < jp8_blo[k]) | (uint32_t)(off + n > jp8_bhi[k]);
++    jp8_badacc |= bad;
++    return bad ? (void *)jp8_sink : (void *)((uintptr_t)a + jp8_bdelta[k]);
++#endif
++    return (void *)((uintptr_t)a + jp8_bdelta[k]);
++}
++#define JP8_H(a, n) jp8_h((uint64_t)(a), (n))
++#define JP8_GS_BASE 0x0ULL       /* the oracle's gs base is 0: gs:[x] = guest page 0 = band 0, exactly as under Unicorn */
++#else
++#define JP8_H(a, n) ((void *)(uintptr_t)(a))
+ #define JP8_GS_BASE 0x700020000ULL   /* the oracle's page 0 (gs base 0) mirrored here: BUF_BASE + 0x20000 */
++#endif
+ #define R(n)      (c->r[n])
+ #define XF(n,l)   (c->x[n].f[l])
+ #define XD(n,l)   (c->x[n].d[l])
+@@ -36,18 +76,29 @@
+ #define XQ(n,l)   (c->x[n].q[l])
+ #define XI(n,l)   (c->x[n].i[l])
+ #define XL(n,l)   (c->x[n].l[l])
+-#define M8(a)     (*(volatile uint8_t  *)(uintptr_t)(a))
+-#define M16(a)    (*(volatile uint16_t *)(uintptr_t)(a))
+-#define M32(a)    (*(volatile uint32_t *)(uintptr_t)(a))
+-#define M64(a)    (*(volatile uint64_t *)(uintptr_t)(a))
+-#define MF(a)     (*(volatile float    *)(uintptr_t)(a))
+-#define MD(a)     (*(volatile double   *)(uintptr_t)(a))
++#ifndef JP8_MQ
++#define JP8_MQ volatile          /* the proven qualifier; -DJP8_MQ= drops it (speed; must be re-gated) */
++#endif
++#define M8(a)     (*(JP8_MQ uint8_t  *)JP8_H(a, 1))
++#define M16(a)    (*(JP8_MQ uint16_t *)JP8_H(a, 2))
++#define M32(a)    (*(JP8_MQ uint32_t *)JP8_H(a, 4))
++#define M64(a)    (*(JP8_MQ uint64_t *)JP8_H(a, 8))
++#define MF(a)     (*(JP8_MQ float    *)JP8_H(a, 4))
++#define MD(a)     (*(JP8_MQ double   *)JP8_H(a, 8))
++#define JP8_MX(a) (*(X *)JP8_H(a, 16))  /* a 128-bit memory source (was the inline (*(X*)(uintptr_t)a)) */
+ #define MS8(a)    ((int64_t)(int8_t)M8(a))
+ #define MS16(a)   ((int64_t)(int16_t)M16(a))
+ #define MS32(a)   ((int64_t)(int32_t)M32(a))
+ 
+-static inline void jp8_ldx(X *d, uint64_t a) { memcpy(d, (const void *)(uintptr_t)a, 16); }
+-static inline void jp8_stx(uint64_t a, const X *s) { memcpy((void *)(uintptr_t)a, s, 16); }
++static inline void jp8_ldx(X *d, uint64_t a) { memcpy(d, (const void *)JP8_H(a, 16), 16); }
++static inline void jp8_stx(uint64_t a, const X *s) { memcpy(JP8_H(a, 16), s, 16); }
++/* rep movsb: the proven default is memcpy (NOT x86's forward byte copy when dst overlaps src ahead of it; site 0x72e4be
++ * never reached); the relocated build uses the exact forward loop through M8 */
++#ifdef JP8_RELOC
++#define JP8_MOVSB() do { while (R(1)) { M8(R(7)) = M8(R(6)); R(7)++; R(6)++; R(1)--; } } while (0)
++#else
++#define JP8_MOVSB() do { memcpy((void*)(uintptr_t)R(7),(const void*)(uintptr_t)R(6),(size_t)R(1)); R(7)+=R(1); R(6)+=R(1); R(1)=0; } while (0)
++#endif
+ 
+ extern void jp8_trap(CPU *c, uint64_t rva, const char *what);
+ extern void jp8_tr(CPU *c, uint64_t rva);        /* per-instruction trace record (lift --trace builds only) */
+@@ -117,6 +168,138 @@
+ static inline int op_bt(CPU *c, int sz, uint64_t a, uint64_t bit) { bit &= (sz - 1); c->cf = (a >> bit) & 1; return c->cf; }
+ static inline uint64_t sext(int sz, uint64_t v) { return sz == 64 ? v : sz == 32 ? (uint64_t)(int64_t)(int32_t)v : sz == 16 ? (uint64_t)(int64_t)(int16_t)v : (uint64_t)(int64_t)(int8_t)v; }
+ 
++/* ---- SSE arithmetic entry points (the lifter emits these; default = the proven plain C expression) ---- */
++#ifndef JP8_SOFTFP
++#define JP8_ADDSS(a,b) ((a)+(b))
++#define JP8_SUBSS(a,b) ((a)-(b))
++#define JP8_MULSS(a,b) ((a)*(b))
++#define JP8_DIVSS(a,b) ((a)/(b))
++#define JP8_ADDSD(a,b) ((a)+(b))
++#define JP8_SUBSD(a,b) ((a)-(b))
++#define JP8_MULSD(a,b) ((a)*(b))
++#define JP8_DIVSD(a,b) ((a)/(b))
++#define JP8_CVTSS2SD(a) ((double)(a))
++#define JP8_CVTSD2SS(a) ((float)(a))
++#define JP8_SQRTSS(a) sqrtf(a)
++#define JP8_SQRTSD(a) sqrt(a)
++#define JP8_DAZF(a) (a)
++#define JP8_DAZD(a) (a)
++#define JP8_LDMXCSR(c,v) do { (c)->mxcsr=(v); _mm_setcsr((c)->mxcsr); } while (0)
++#define JP8_STMXCSR(c) _mm_getcsr()
++#else
++static inline uint32_t jp8_fb(float x) { uint32_t u; memcpy(&u, &x, 4); return u; }
++static inline float jp8_bf(uint32_t u) { float x; memcpy(&x, &u, 4); return x; }
++static inline uint64_t jp8_db(double x) { uint64_t u; memcpy(&u, &x, 8); return u; }
++static inline double jp8_bd(uint64_t u) { double x; memcpy(&x, &u, 8); return x; }
++/* DAZ (and FTZ of an already-rounded result): exponent field 0 -> zero of the same sign. Hardware == oracle here. */
++/* branchless on purpose: a branch per operand costs ~20 cycles in code this large (BTB misses; measured 5x) */
++static inline float jp8_dazf(float x) { uint32_t u = jp8_fb(x); return jp8_bf(u & (0x80000000u | (0u - (uint32_t)((u & 0x7F800000u) != 0)))); }
++static inline double jp8_dazd(double x) { uint64_t u = jp8_db(x); return jp8_bd(u & (0x8000000000000000ULL | (0ULL - (uint64_t)((u & 0x7FF0000000000000ULL) != 0)))); }
++#if defined(__GNUC__)
++#define JP8_RARE(x) __builtin_expect(!!(x), 0)
++#else
++#define JP8_RARE(x) (x)
++#endif
++#define JP8_DAZF(a) jp8_dazf(a)
++#define JP8_DAZD(a) jp8_dazd(a)
++/* |r| == FLT_MIN / DBL_MIN after gradual-underflow rounding: x86 hardware flushes iff the value rounded with an
++ * UNBOUNDED exponent is below MIN; the same operation on operands scaled by 2^64 (2^600) cannot underflow, so its
++ * rounding IS the unbounded one (threshold scaled alike). add/sub never need it: a tiny sum is exact. */
++static inline int jp8_isminf(float r) { return (jp8_fb(r) & 0x7FFFFFFFu) == 0x00800000u; }
++static inline int jp8_ismind(double r) { return (jp8_db(r) & 0x7FFFFFFFFFFFFFFFULL) == 0x0010000000000000ULL; }
++static inline float jp8_sz_f(float r) { return jp8_bf(jp8_fb(r) & 0x80000000u); }
++static inline double jp8_sz_d(double r) { return jp8_bd(jp8_db(r) & 0x8000000000000000ULL); }
++/* the x86 SSE NaN rules, enforced (ARM makes 0x7FC00000 for an invalid op, WASM leaves sign/payload open; PROVEN on
++ * AArch64: the boot writes 3,851 x86 default NaNs 0xFFC00000 into the state): an operand NaN wins, first source
++ * first, quieted; an invalid operation gives 0xFFC00000 / 0xFFF8000000000000. Then FTZ. */
++static inline float jp8_fixf(float r, float a, float b) {
++    uint32_t u = jp8_fb(r);
++    if (JP8_RARE((u & 0x7F800000u) == 0x7F800000u) && (u & 0x007FFFFFu)) {
++        uint32_t ua = jp8_fb(a), ub = jp8_fb(b);
++        if ((ua & 0x7FFFFFFFu) > 0x7F800000u) return jp8_bf(ua | 0x00400000u);
++        if ((ub & 0x7FFFFFFFu) > 0x7F800000u) return jp8_bf(ub | 0x00400000u);
++        return jp8_bf(0xFFC00000u);
++    }
++    return jp8_dazf(r);
++}
++static inline double jp8_fixd(double r, double a, double b) {
++    uint64_t u = jp8_db(r);
++    if (JP8_RARE((u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL) && (u & 0x000FFFFFFFFFFFFFULL)) {
++        uint64_t ua = jp8_db(a), ub = jp8_db(b);
++        if ((ua & 0x7FFFFFFFFFFFFFFFULL) > 0x7FF0000000000000ULL) return jp8_bd(ua | 0x0008000000000000ULL);
++        if ((ub & 0x7FFFFFFFFFFFFFFFULL) > 0x7FF0000000000000ULL) return jp8_bd(ub | 0x0008000000000000ULL);
++        return jp8_bd(0xFFF8000000000000ULL);
++    }
++    return jp8_dazd(r);
++}
++static inline float jp8_addss(float a, float b) { a = jp8_dazf(a); b = jp8_dazf(b); return jp8_fixf(a + b, a, b); }
++static inline float jp8_subss(float a, float b) { a = jp8_dazf(a); b = jp8_dazf(b); return jp8_fixf(a - b, a, b); }
++static inline double jp8_addsd(double a, double b) { a = jp8_dazd(a); b = jp8_dazd(b); return jp8_fixd(a + b, a, b); }
++static inline double jp8_subsd(double a, double b) { a = jp8_dazd(a); b = jp8_dazd(b); return jp8_fixd(a - b, a, b); }
++static inline float jp8_mulss(float a, float b) {
++    float r; a = jp8_dazf(a); b = jp8_dazf(b); r = a * b;
++#if JP8_SOFTFP == 2
++    if (JP8_RARE(jp8_isminf(r)) && fabsf((a * 0x1p64f) * b) < 0x1p-62f) return jp8_sz_f(r);
++#endif
++    return jp8_fixf(r, a, b);
++}
++static inline float jp8_divss(float a, float b) {
++    float r; a = jp8_dazf(a); b = jp8_dazf(b); r = a / b;
++#if JP8_SOFTFP == 2
++    if (JP8_RARE(jp8_isminf(r)) && fabsf((a * 0x1p64f) / b) < 0x1p-62f) return jp8_sz_f(r);
++#endif
++    return jp8_fixf(r, a, b);
++}
++static inline double jp8_mulsd(double a, double b) {
++    double r; a = jp8_dazd(a); b = jp8_dazd(b); r = a * b;
++#if JP8_SOFTFP == 2
++    if (JP8_RARE(jp8_ismind(r)) && fabs((a * 0x1p600) * b) < 0x1p-422) return jp8_sz_d(r);
++#endif
++    return jp8_fixd(r, a, b);
++}
++static inline double jp8_divsd(double a, double b) {
++    double r; a = jp8_dazd(a); b = jp8_dazd(b); r = a / b;
++#if JP8_SOFTFP == 2
++    if (JP8_RARE(jp8_ismind(r)) && fabs((a * 0x1p600) / b) < 0x1p-422) return jp8_sz_d(r);
++#endif
++    return jp8_fixd(r, a, b);
++}
++static inline float jp8_cvtsd2ss(double x) {
++    float r; uint64_t ux = jp8_db(x);
++    if (JP8_RARE((ux & 0x7FFFFFFFFFFFFFFFULL) > 0x7FF0000000000000ULL))      /* NaN: quiet, keep the top 22 payload bits */
++        return jp8_bf((uint32_t)(ux >> 32 & 0x80000000u) | 0x7FC00000u | (uint32_t)((ux >> 29) & 0x003FFFFFu));
++    x = jp8_dazd(x); r = (float)x;
++#if JP8_SOFTFP == 2
++    if (JP8_RARE(jp8_isminf(r)) && fabs(x) < 0x1.ffffffp-127) return jp8_sz_f(r);   /* 2^-126 - 2^-151, exact in double */
++#endif
++    return jp8_dazf(r);
++}
++#define JP8_ADDSS(a,b) jp8_addss((a),(b))
++#define JP8_SUBSS(a,b) jp8_subss((a),(b))
++#define JP8_MULSS(a,b) jp8_mulss((a),(b))
++#define JP8_DIVSS(a,b) jp8_divss((a),(b))
++#define JP8_ADDSD(a,b) jp8_addsd((a),(b))
++#define JP8_SUBSD(a,b) jp8_subsd((a),(b))
++#define JP8_MULSD(a,b) jp8_mulsd((a),(b))
++#define JP8_DIVSD(a,b) jp8_divsd((a),(b))
++static inline double jp8_cvtss2sd(float x) {
++    uint32_t u = jp8_fb(x);
++    if (JP8_RARE((u & 0x7FFFFFFFu) > 0x7F800000u))                          /* NaN: quiet, payload widened */
++        return jp8_bd((uint64_t)(u & 0x80000000u) << 32 | 0x7FF8000000000000ULL | (uint64_t)(u & 0x003FFFFFu) << 29);
++    return (double)jp8_dazf(x);
++}
++static inline float jp8_sqrtss(float x) { x = jp8_dazf(x); return jp8_fixf(sqrtf(x), x, x); }
++static inline double jp8_sqrtsd(double x) { x = jp8_dazd(x); return jp8_fixd(sqrt(x), x, x); }
++#define JP8_CVTSS2SD(a) jp8_cvtss2sd(a)
++#define JP8_CVTSD2SS(a) jp8_cvtsd2ss(a)
++#define JP8_SQRTSS(a) jp8_sqrtss(a)
++#define JP8_SQRTSD(a) jp8_sqrtsd(a)
++/* MXCSR is a software register: the engine is only defined at FTZ|DAZ|RNE (0x9FC0 class); any other mode traps. The
++ * oracle never sets exception flags (PROVEN: stmxcsr after an inexact mulss reads 0x9FC0 under Unicorn 2.1.4). */
++#define JP8_LDMXCSR(c,v) do { (c)->mxcsr=(v); if (((c)->mxcsr & 0xE040u) != 0x8040u) jp8_trap((c), 0, "ldmxcsr: mode other than FTZ|DAZ|RNE"); } while (0)
++#define JP8_STMXCSR(c) ((c)->mxcsr)
++#endif
++
+ /* conditions */
+ #define CC_E   (c->zf)
+ #define CC_NE  (!c->zf)
+@@ -137,16 +320,30 @@
+ 
+ /* SSE compares: (u)comiss/(u)comisd -> ZF PF CF, OF=SF=0 */
+ static inline void cmp_f(CPU *c, float a, float b) {
++    a = JP8_DAZF(a); b = JP8_DAZF(b);
+     if (a != a || b != b) { c->zf = c->pf = c->cf = 1; } else { c->zf = (a == b); c->cf = (a < b); c->pf = 0; } c->of = c->sf = 0;
+ }
+ static inline void cmp_d(CPU *c, double a, double b) {
++    a = JP8_DAZD(a); b = JP8_DAZD(b);
+     if (a != a || b != b) { c->zf = c->pf = c->cf = 1; } else { c->zf = (a == b); c->cf = (a < b); c->pf = 0; } c->of = c->sf = 0;
+ }
+ /* hardware min/max: return the SECOND operand when the compare is false (NaN, equal, signed zeros) */
++#if !defined(JP8_SOFTFP)       /* NOTE: gcc -O1 turns these into minss/maxss (hardware DAZ result), -O0 into comiss+select */
+ static inline float  fmin_ss(float a, float b)   { return (a < b) ? a : b; }
+ static inline float  fmax_ss(float a, float b)   { return (a > b) ? a : b; }
+ static inline double fmin_sd(double a, double b) { return (a < b) ? a : b; }
+ static inline double fmax_sd(double a, double b) { return (a > b) ? a : b; }
++#elif JP8_SOFTFP == 2          /* hardware: the flushed operand is returned (PROVEN T5 T6 T11) */
++static inline float  fmin_ss(float a, float b)   { a = jp8_dazf(a); b = jp8_dazf(b); return (a < b) ? a : b; }
++static inline float  fmax_ss(float a, float b)   { a = jp8_dazf(a); b = jp8_dazf(b); return (a > b) ? a : b; }
++static inline double fmin_sd(double a, double b) { a = jp8_dazd(a); b = jp8_dazd(b); return (a < b) ? a : b; }
++static inline double fmax_sd(double a, double b) { a = jp8_dazd(a); b = jp8_dazd(b); return (a > b) ? a : b; }
++#else                          /* oracle: compares flushed, returns the ORIGINAL bits (PROVEN T5 T6 T11) */
++static inline float  fmin_ss(float a, float b)   { return (jp8_dazf(a) < jp8_dazf(b)) ? a : b; }
++static inline float  fmax_ss(float a, float b)   { return (jp8_dazf(a) > jp8_dazf(b)) ? a : b; }
++static inline double fmin_sd(double a, double b) { return (jp8_dazd(a) < jp8_dazd(b)) ? a : b; }
++static inline double fmax_sd(double a, double b) { return (jp8_dazd(a) > jp8_dazd(b)) ? a : b; }
++#endif
+ /* conversions with the x86 "integer indefinite" on NaN / overflow */
+ static inline int32_t cvtt_f2i(float f)  { if (!(f > -2147483904.0f && f < 2147483648.0f)) return INT32_MIN; return (int32_t)f; }
+ static inline int64_t cvtt_f2l(float f)  { if (!(f > -9223373136366403584.0f && f < 9223372036854775808.0f)) return INT64_MIN; return (int64_t)f; }
+@@ -157,12 +354,14 @@
+ static inline int64_t cvtr_f2l(float f)  { if (f != f) return INT64_MIN; float r = nearbyintf(f); if (!(r > -9223373136366403584.0f && r < 9223372036854775808.0f)) return INT64_MIN; return (int64_t)r; }
+ static inline int64_t cvtr_d2l(double d) { if (d != d) return INT64_MIN; double r = nearbyint(d); if (!(r > -9223372036854777856.0 && r < 9223372036854775808.0)) return INT64_MIN; return (int64_t)r; }
+ static inline uint32_t cmp_pred_f(int p, float a, float b) {
++    a = JP8_DAZF(a); b = JP8_DAZF(b);
+     int r;
+     switch (p & 7) { case 0: r = (a == b); break; case 1: r = (a < b); break; case 2: r = (a <= b); break; case 3: r = (a != a || b != b); break;
+                      case 4: r = !(a == b); break; case 5: r = !(a < b); break; case 6: r = !(a <= b); break; default: r = !(a != a || b != b); }
+     return r ? 0xFFFFFFFFu : 0;
+ }
+ static inline uint64_t cmp_pred_d(int p, double a, double b) {
++    a = JP8_DAZD(a); b = JP8_DAZD(b);
+     int r;
+     switch (p & 7) { case 0: r = (a == b); break; case 1: r = (a < b); break; case 2: r = (a <= b); break; case 3: r = (a != a || b != b); break;
+                      case 4: r = !(a == b); break; case 5: r = !(a < b); break; case 6: r = !(a <= b); break; default: r = !(a != a || b != b); }

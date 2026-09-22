@@ -1,0 +1,22 @@
+HW  mx=9fc0 T1 mul tie below min             out=00000000 mxcsr_after=9ff0 zf=0
+HW  mx=9fc0 T2 mul (1-2^-46)min              out=00800000 mxcsr_after=9fe0 zf=0
+HW  mx=9fc0 T3 div exact min-2^-150          out=00000000 mxcsr_after=9ff0 zf=0
+HW  mx=9fc0 T4 cvtsd2ss min-2^-150+2^-170    out=00000000 mxcsr_after=9ff0 zf=0
+HW  mx=9fc0 T5 minss(0, denorm)              out=00000000 mxcsr_after=9fc0 zf=0
+HW  mx=9fc0 T6 maxss(-0, denorm)             out=00000000 mxcsr_after=9fc0 zf=0
+HW  mx=9fc0 T7 addss denorm+denorm           out=00000000 mxcsr_after=9fc0 zf=0
+HW  mx=9fc0 T8 mulss 1/3*1/3 flags           out=3de38e3a mxcsr_after=9fe0 zf=0
+HW  mx=9fc0 T9 comiss denorm vs 0 (ZF)       out=00000001 mxcsr_after=9fc0 zf=1
+HW  mx=9fc0 T10 mul denorm*2^100             out=00000000 mxcsr_after=9fc0 zf=0
+HW  mx=9fc0 T11 minss(denorm, 1.0)           out=00000000 mxcsr_after=9fc0 zf=0
+HW  mx=1f80 T1 mul tie below min             out=00800000 mxcsr_after=1fb0 zf=0
+HW  mx=1f80 T2 mul (1-2^-46)min              out=00800000 mxcsr_after=1fa0 zf=0
+HW  mx=1f80 T3 div exact min-2^-150          out=00800000 mxcsr_after=1fb0 zf=0
+HW  mx=1f80 T4 cvtsd2ss min-2^-150+2^-170    out=00800000 mxcsr_after=1fb0 zf=0
+HW  mx=1f80 T5 minss(0, denorm)              out=00000000 mxcsr_after=1f82 zf=0
+HW  mx=1f80 T6 maxss(-0, denorm)             out=00400000 mxcsr_after=1f82 zf=0
+HW  mx=1f80 T7 addss denorm+denorm           out=00800000 mxcsr_after=1f82 zf=0
+HW  mx=1f80 T8 mulss 1/3*1/3 flags           out=3de38e3a mxcsr_after=1fa0 zf=0
+HW  mx=1f80 T9 comiss denorm vs 0 (ZF)       out=00000001 mxcsr_after=1f82 zf=0
+HW  mx=1f80 T10 mul denorm*2^100             out=27000000 mxcsr_after=1f82 zf=0
+HW  mx=1f80 T11 minss(denorm, 1.0)           out=00000001 mxcsr_after=1f82 zf=0
