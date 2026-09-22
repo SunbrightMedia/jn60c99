@@ -40,21 +40,26 @@ def trace_diff(oracle_path, c_path):
 CPU_SZ=512; R_OFF=0; RSP_OFF=4*8
 # rsp = the CALLER's stack pointer meta["rsp"]; jp8_call_x pushes the dummy return slot, so the callee enters at meta["rsp"]-8,
 # the oracle's entry rsp (jp8_emu.call). Until 2026-09-22 this was meta["rsp"]-8: every C frame sat 8 bytes low (PORT_LESSONS 12).
-def rd(addr,n): return ctypes.string_at(addr,n)
-def wr(addr,b): ctypes.memmove(addr,b,len(b))
+RELOC=hasattr(lib,"jp8_host")            # a JP8_RELOC build: guest addresses are translated to host arenas (jp8_cpu.h JP8_H)
+if RELOC: lib.jp8_host.argtypes=[ctypes.c_uint64]; lib.jp8_host.restype=ctypes.c_void_p
+def H(addr): return lib.jp8_host(addr) if RELOC else addr
+def rd(addr,n): return ctypes.string_at(H(addr),n)
+def wr(addr,b): ctypes.memmove(H(addr),b,len(b))
 mapped=False; bad_total=0
 for patch in Q.PATCHES:
     d=os.path.join(refdir,"p%02d"%patch); meta=json.load(open(os.path.join(d,"meta.json")))
     heap_len=meta["heap_end"]-Q.HEAP_BASE
     if not mapped:
-        for base,size in ((Q.IMG_BASE,meta["img_size"]),(Q.HEAP_BASE,0x8000000),(Q.STACK_BASE,Q.STACK_SIZE),(Q.BUF_BASE,Q.BUF_SIZE)):
+        regions=((Q.IMG_BASE,meta["img_size"]),(Q.HEAP_BASE,0x8000000),(Q.STACK_BASE,Q.STACK_SIZE),(Q.BUF_BASE,Q.BUF_SIZE))
+        if RELOC: regions=((0,0x100000),)+regions      # band 0 = the oracle's page 0 (gs base 0); the identity path mirrors it at BUF+0x20000
+        for base,size in regions:
             if lib.jp8_map(base,size): sys.exit("cannot map 0x%x"%base)
         mapped=True
     assert heap_len<=0x8000000, "heap larger than the mapped 128 MB"
     lib.jp8_load(Q.IMG_BASE,os.path.join(d,"img.bin").encode()); lib.jp8_load(Q.HEAP_BASE,os.path.join(d,"heap_pre.bin").encode())
     if os.path.exists(os.path.join(d,"stack.bin")): lib.jp8_load(Q.STACK_BASE,os.path.join(d,"stack.bin").encode())   # PORT_LESSONS 12
-    ctypes.memset(Q.BUF_BASE,0,Q.BUF_SIZE)
-    if os.path.exists(os.path.join(d,"page0.bin")): wr(Q.GS_BASE,open(os.path.join(d,"page0.bin"),"rb").read())
+    ctypes.memset(H(Q.BUF_BASE),0,Q.BUF_SIZE)
+    if os.path.exists(os.path.join(d,"page0.bin")): wr(0 if RELOC else Q.GS_BASE,open(os.path.join(d,"page0.bin"),"rb").read())
     lib.jp8_heap_set(meta.get("heap_ptr0",meta["heap_end"]),Q.HEAP_BASE+0x8000000)
     if hasattr(lib,"jp8_hc_set"): lib.jp8_hc_set.argtypes=[ctypes.c_uint64]; lib.jp8_hc_set(meta.get("hc0",0x9000))
     wr(Q.PAIR_V,struct.pack("<QQ",Q.OUT_M,Q.OUT_S)); wr(Q.PAIR_M,struct.pack("<QQ",Q.OUT_L,Q.OUT_R))

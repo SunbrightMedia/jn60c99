@@ -84,3 +84,16 @@ lessons 1-11 all still apply; these are the ones the JP8 added.
     `stack.bin`); a shipping template must carry the stack residue too. Rule: when a heap diff shows a value the lifted
     code "never computes", hook the oracle's writes to the cell and follow the source operand back to its last writer
     (scratchpad probe: 2 runs, 3 minutes).
+
+13. **A lifted `call` must write its return address** (found by the design skeptic 2026-09-22, SHIPPING_DESIGN item 7).
+    The lift did `R(4)-=8; f(c); R(4)+=8;` and never stored the return address, so every return slot on the C stack
+    kept stale bytes where the oracle had a code address. With lesson 12 (the stack is state), any later frame that
+    reads residue there diverges. The lifter now emits `M64(R(4)) = <next rva>` on every direct and indirect call.
+
+14. **EXACTLY 0 on a drive that fails step 4 is not a boot** (D7, 2026-09-22). The layer-3 gate was EXACTLY 0 while
+    the oracle's own words showed the boot was broken (master pinned at 1.98 from sample 960, NaN ramps): both sides
+    ran the same wrong drive. The cause was the harness: the HOST was a zero-filled block instead of the object the
+    plugin's factory 0x444fe0 constructs (ALLOC 0x8D0 + ctor 0x444000, [HOST+8] = 96000.0), so BUILD armed every ramp
+    at rate 0. The old recipe's snap + latch clear hid it. Rule: before any layer gate, run the step-4 listen proof on
+    the SAME drive the gate uses, and build every object the plugin's own entry path builds (read the call site that
+    creates it; never hand an entry a zero-filled block because "it did not crash").

@@ -161,7 +161,7 @@ def xsrc(ins, op, kind):
         return {"f": "XF(%d,0)", "d": "XD(%d,0)", "u": "XU(%d,0)", "q": "XQ(%d,0)", "X": "c->x[%d]"}[kind] % i
     a = ea(ins, op)
     if a is None: raise ValueError("segment")
-    if kind == "X": return "(*(X*)(uintptr_t)%s)" % a
+    if kind == "X": return "JP8_MX(%s)" % a
     return {"f": "MF", "d": "MD", "u": "M32", "q": "M64"}[kind] + "(%s)" % a
 
 CC = {"e": "CC_E", "z": "CC_E", "ne": "CC_NE", "nz": "CC_NE", "b": "CC_B", "c": "CC_B", "nae": "CC_B", "ae": "CC_AE", "nb": "CC_AE", "nc": "CC_AE",
@@ -172,6 +172,7 @@ ALU = {"add": "op_add", "sub": "op_sub", "and": "op_and", "or": "op_or", "xor": 
 SHIFT = {"shl": "op_shl", "sal": "op_shl", "shr": "op_shr", "sar": "op_sar", "rol": "op_rol", "ror": "op_ror", "rcr": "op_rcr", "rcl": "op_rcl"}
 FOPS = {"addss": ("f", "+"), "subss": ("f", "-"), "mulss": ("f", "*"), "divss": ("f", "/"),
         "addsd": ("d", "+"), "subsd": ("d", "-"), "mulsd": ("d", "*"), "divsd": ("d", "/")}
+OPM = {"+": "ADD", "-": "SUB", "*": "MUL", "/": "DIV"}          # JP8_<OP><SS|SD>(a,b): jp8_cpu.h picks plain C or soft FTZ/DAZ
 POPS = {"addps": ("f", "+", 4), "subps": ("f", "-", 4), "mulps": ("f", "*", 4), "divps": ("f", "/", 4),
         "addpd": ("d", "+", 2), "subpd": ("d", "-", 2), "mulpd": ("d", "*", 2), "divpd": ("d", "/", 2)}
 BITOPS = {"xorps": "^", "xorpd": "^", "pxor": "^", "andps": "&", "andpd": "&", "pand": "&", "orps": "|", "orpd": "|", "por": "|"}
@@ -232,7 +233,9 @@ class Lifter:
             if self.tooth is not None and rva == self.tooth:
                 if ins.mnemonic in FOPS:
                     k, o = FOPS[ins.mnemonic]; wrong = {"+": "-", "-": "+", "*": "/", "/": "*"}[o]
-                    stmt = "/* TOOTH: %s replaced by %s */ " % (o, wrong) + stmt.replace(o, wrong, 1) if stmt.count(o) else stmt
+                    a_, b_ = "JP8_" + OPM[o], "JP8_" + OPM[wrong]
+                    if not stmt.count(a_): raise SystemExit("tooth: %s not found in %s" % (a_, stmt))
+                    stmt = "/* TOOTH: %s replaced by %s */ " % (o, wrong) + stmt.replace(a_, b_, 1)
                     self.tooth_done = True
                 else: raise SystemExit("--tooth must name an addss/subss/mulss/divss instruction (got %s at 0x%x)" % (ins.mnemonic, rva))
             e("  %s/*%x %s %s*/ %s" % ("jp8_tr(c,0x%x); " % rva if self.trace else "", rva, ins.mnemonic, ins.op_str.replace("*/", "* /"), stmt))
@@ -246,7 +249,7 @@ class Lifter:
         if m.startswith("bnd "): m = m[4:]
         if m.startswith("lock "): m = m[5:]
         if m.startswith("rep "):
-            if m == "rep movsb": return "memcpy((void*)(uintptr_t)R(7),(const void*)(uintptr_t)R(6),(size_t)R(1)); R(7)+=R(1); R(6)+=R(1); R(1)=0;"
+            if m == "rep movsb": return "JP8_MOVSB();"
             if m in ("rep stosb", "rep stosd", "rep stosq", "rep stosw"):
                 w = {"rep stosb": 1, "rep stosw": 2, "rep stosd": 4, "rep stosq": 8}[m]
                 return "while (R(1)) { %s(R(7))=(uint%d_t)R(0); R(7)+=%d; R(1)--; }" % ({1: "M8", 2: "M16", 4: "M32", 8: "M64"}[w], w * 8, w)
@@ -270,9 +273,11 @@ class Lifter:
         if m == "call":
             if op[0].type == x86.X86_OP_IMM:
                 t = op[0].imm - IB
-                if t in self.funcs: return "R(4)-=8; f_%x(c); R(4)+=8;" % t
+                # the return address is WRITTEN like a real call: the stack is state (PORT_LESSONS 12/13) and later frames
+                # read residue; before 2026-09-22 the lift only moved rsp, so C stack slots differed from the oracle's
+                if t in self.funcs: return "R(4)-=8; M64(R(4))=0x%xULL; f_%x(c); R(4)+=8;" % (ins.address + ins.size, t)
                 return None
-            return "a0=%s; R(4)-=8; jp8_icall(c, a0); R(4)+=8;" % rd_int(ins, op[0], 64)
+            return "a0=%s; R(4)-=8; M64(R(4))=0x%xULL; jp8_icall(c, a0); R(4)+=8;" % (rd_int(ins, op[0], 64), ins.address + ins.size)
         if m[0] == "j" and m[1:] in CC:
             t = op[0].imm - IB
             return "if (%s) goto L_%x;" % (CC[m[1:]], t)
@@ -407,10 +412,10 @@ class Lifter:
         # ---- SSE arithmetic
         if m in FOPS:
             k, o = FOPS[m]; d = reg(ins, op[0].reg)[0]; A = "XF" if k == "f" else "XD"
-            return "%s(%d,0)=%s(%d,0)%s%s;" % (A, d, A, d, o, xsrc(ins, op[1], k))
+            return "%s(%d,0)=JP8_%s%s(%s(%d,0),%s);" % (A, d, OPM[o], "SS" if k == "f" else "SD", A, d, xsrc(ins, op[1], k))
         if m in POPS:
             k, o, n = POPS[m]; d = reg(ins, op[0].reg)[0]; A = "XF" if k == "f" else "XD"
-            return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("%s(%d,%d)=%s(%d,%d)%st1.%s[%d];" % (A, d, l, A, d, l, o, k, l) for l in range(n))
+            return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("%s(%d,%d)=JP8_%s%s(%s(%d,%d),t1.%s[%d]);" % (A, d, l, OPM[o], "SS" if k == "f" else "SD", A, d, l, k, l) for l in range(n))
         if m in BITOPS:
             d = reg(ins, op[0].reg)[0]; return "t1=%s; XQ(%d,0)%s=t1.q[0]; XQ(%d,1)%s=t1.q[1];" % (xsrc(ins, op[1], "X"), d, BITOPS[m], d, BITOPS[m])
         if m in ("andnps", "andnpd", "pandn"):
@@ -424,10 +429,10 @@ class Lifter:
         if m in ("minpd", "maxpd"):
             d = reg(ins, op[0].reg)[0]; fn = "fmin_sd" if m == "minpd" else "fmax_sd"
             return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("XD(%d,%d)=%s(XD(%d,%d),t1.d[%d]);" % (d, l, fn, d, l, l) for l in range(2))
-        if m == "sqrtss": return "XF(%d,0)=sqrtf(%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "f"))
-        if m == "sqrtsd": return "XD(%d,0)=sqrt(%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "d"))
+        if m == "sqrtss": return "XF(%d,0)=JP8_SQRTSS(%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "f"))
+        if m == "sqrtsd": return "XD(%d,0)=JP8_SQRTSD(%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "d"))
         if m == "sqrtps":
-            d = reg(ins, op[0].reg)[0]; return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("XF(%d,%d)=sqrtf(t1.f[%d]);" % (d, l, l) for l in range(4))
+            d = reg(ins, op[0].reg)[0]; return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("XF(%d,%d)=JP8_SQRTSS(t1.f[%d]);" % (d, l, l) for l in range(4))
         if m in ("comiss", "ucomiss"): return "cmp_f(c,XF(%d,0),%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "f"))
         if m in ("comisd", "ucomisd"): return "cmp_d(c,XD(%d,0),%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "d"))
         if m in ("cmpss", "cmpsd") and len(op) == 3:
@@ -439,15 +444,15 @@ class Lifter:
             if m == "cmpps": return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("XU(%d,%d)=cmp_pred_f(%d,XF(%d,%d),t1.f[%d]);" % (d, l, p, d, l, l) for l in range(4))
             return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("XQ(%d,%d)=cmp_pred_d(%d,XD(%d,%d),t1.d[%d]);" % (d, l, p, d, l, l) for l in range(2))
         # ---- conversions
-        if m == "cvtss2sd": return "XD(%d,0)=(double)%s;" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "f"))
-        if m == "cvtsd2ss": return "XF(%d,0)=(float)%s;" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "d"))
+        if m == "cvtss2sd": return "XD(%d,0)=JP8_CVTSS2SD(%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "f"))
+        if m == "cvtsd2ss": return "XF(%d,0)=JP8_CVTSD2SS(%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "d"))
         if m == "cvtps2pd":
             d = reg(ins, op[0].reg)[0]
             src = "t1=c->x[%d];" % reg(ins, op[1].reg)[0] if op[1].type == x86.X86_OP_REG else "t1.q[0]=M64(%s);" % ea(ins, op[1])
-            return "%s XD(%d,0)=(double)t1.f[0]; XD(%d,1)=(double)t1.f[1];" % (src, d, d)
+            return "%s XD(%d,0)=JP8_CVTSS2SD(t1.f[0]); XD(%d,1)=JP8_CVTSS2SD(t1.f[1]);" % (src, d, d)
         if m == "cvtpd2ps":
             d = reg(ins, op[0].reg)[0]
-            return "t1=%s; XF(%d,0)=(float)t1.d[0]; XF(%d,1)=(float)t1.d[1]; XQ(%d,1)=0;" % (xsrc(ins, op[1], "X"), d, d, d)
+            return "t1=%s; XF(%d,0)=JP8_CVTSD2SS(t1.d[0]); XF(%d,1)=JP8_CVTSD2SS(t1.d[1]); XQ(%d,1)=0;" % (xsrc(ins, op[1], "X"), d, d, d)
         if m == "cvtsi2ss":
             d = reg(ins, op[0].reg)[0]; sz = op[1].size * 8
             return "XF(%d,0)=(float)(int%d_t)(%s);" % (d, sz, rd_int(ins, op[1], sz))
@@ -495,14 +500,14 @@ class Lifter:
         if m == "pmovmskb":
             s = reg(ins, op[1].reg)[0]; return wr_int(ins, op[0], "(" + "|".join("((XU(%d,%d)>>%d&1)<<%d)" % (s, b // 4, (b % 4) * 8 + 7, b) for b in range(16)) + ")", 32)
         # ---- MXCSR
-        if m == "ldmxcsr": return "c->mxcsr=M32(%s); _mm_setcsr(c->mxcsr);" % ea(ins, op[0])
-        if m == "stmxcsr": return "M32(%s)=_mm_getcsr();" % ea(ins, op[0])
+        if m == "ldmxcsr": return "JP8_LDMXCSR(c,M32(%s));" % ea(ins, op[0])
+        if m == "stmxcsr": return "M32(%s)=JP8_STMXCSR(c);" % ea(ins, op[0])
         if m in ("roundss", "roundsd", "roundps", "roundpd"):
             d = reg(ins, op[0].reg)[0]; mode = op[2].imm & 7
             fn = {0: "nearbyint", 1: "floor", 2: "ceil", 3: "trunc"}.get(mode if not (mode & 4) else -1)
             if fn is None: return None
-            if m == "roundss": return "XF(%d,0)=%sf(%s);" % (d, fn, xsrc(ins, op[1], "f"))
-            if m == "roundsd": return "XD(%d,0)=%s(%s);" % (d, fn, xsrc(ins, op[1], "d"))
+            if m == "roundss": return "XF(%d,0)=%sf(JP8_DAZF(%s));" % (d, fn, xsrc(ins, op[1], "f"))
+            if m == "roundsd": return "XD(%d,0)=%s(JP8_DAZD(%s));" % (d, fn, xsrc(ins, op[1], "d"))
             return None
         return None
 
