@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "SwitchBoard")(type "KiCad")(uri "${KIPRJMOD}/SwitchBoard.pretty")(options "")(descr "universal Daier slide switch slot"))
+)
