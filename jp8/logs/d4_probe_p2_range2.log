@@ -1,0 +1,7 @@
+[ 22.9s] patch 2 770:=0 765:=2 key 48 EARLY: DRY f0 65.89 Hz (-1187 c vs key) harm 0.99 peak 0.0763 | engine VCO1/VCO2 u0 131.04/65.97 Hz -> PASS
+[ 47.7s] patch 2 770:=0 765:=2 key 48 LATE: DRY f0 65.89 Hz (-1187 c vs key) harm 0.98 peak 0.0609 | engine VCO1/VCO2 u0 130.40/65.65 Hz -> PASS
+[ 58.1s] patch 2 770:=0 765:=2 key 60 EARLY: DRY f0 131.91 Hz (-1186 c vs key) harm 0.97 peak 0.0911 | engine VCO1/VCO2 u0 262.96/132.39 Hz -> PASS
+[ 82.6s] patch 2 770:=0 765:=2 key 60 LATE: DRY f0 131.86 Hz (-1186 c vs key) harm 0.99 peak 0.0552 | engine VCO1/VCO2 u0 262.23/132.02 Hz -> PASS
+[ 93.2s] patch 2 770:=0 765:=2 key 72 EARLY: DRY f0 263.67 Hz (-1187 c vs key) harm 0.97 peak 0.0719 | engine VCO1/VCO2 u0 523.26/263.43 Hz -> PASS
+[125.4s] patch 2 770:=0 765:=2 key 72 LATE: DRY f0 263.59 Hz (-1187 c vs key) harm 0.98 peak 0.0407 | engine VCO1/VCO2 u0 525.06/264.34 Hz -> PASS
+D4 PROBE patch 2 770:=0 765:=2: PASS

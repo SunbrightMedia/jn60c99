@@ -1,0 +1,5 @@
+after host_init: cell 0x1480 = 0 ; slots -> ['id 30 listed True accum 0 limit 0.0003 rate 44100 active 1'] ; active list len 353
+after recall(0): cell 0x1480 = 0 ; slots -> ['id 30 listed True accum 0 limit 0.00405 rate 44100 active 1'] ; active list len 379
+after 64 samples rendered (no snap): cell 0x1480 = 0.00137755 ; slots -> ['id 30 listed True accum 0.00137755 limit 0.00405 rate 44100 active 1'] ; active list len 164
+after 2112 samples rendered (no snap): cell 0x1480 = 0.00405 ; slots -> ['id 30 listed False accum 0 limit 0.00405 rate 44100 active 0'] ; active list len 28
+after note_on(60)+1024: cell 0x1480 = 0.00405 ; slots -> ['id 30 listed False accum 0 limit 0.00405 rate 44100 active 0'] ; active list len 28

@@ -1,0 +1,1 @@
+flag census: 0 (pool,value) cases where flag 0 + snap != flag 1 + snap

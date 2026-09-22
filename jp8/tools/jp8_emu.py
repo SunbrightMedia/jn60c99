@@ -570,15 +570,26 @@ class JP8(JX):
             rows=pe_recon.PE(BIN).params([POOL_BASE_ID+p for p in ACTIVE_POOLS])["rows"]
             JP8._pool_min={POOL_BASE_ID+p: rows[POOL_BASE_ID+p]["min"] for p in ACTIVE_POOLS}
         return JP8._pool_min
-    def recall(self,patch,bank=None,notify=True):
+    # RECALL FLAG (PROVEN 2026-09-22, d4_flag / d4_ramp1480 logs): DISPATCH flag 1 writes the
+    # engine cell directly (0x440430: [[state+0x38]+idx*40+0x20] = value) but leaves the BOOT
+    # RAMP that targets the same cell active with its OLD limit; the plugin's own walker then
+    # moves the cell back to that limit within 64 samples (FINE TUNE 0.00405 -> 0.0003), and a
+    # snap does the same at once. Flag 0 is the hosted path: the child setter ARMS the ramp
+    # (limit = new value, +0x14; active +0x1C) and the walker/snap settles it. Under flag 1 the
+    # recall lost ENV1 SUSTAIN (0 -> 0.995), MIXER VCO1 (2.51 -> 0.5), HPF, PORTAMENTO and
+    # FINE TUNE to the boot limits on patch 0. Recall therefore dispatches with flag 0.
+    RECALL_FLAG=0
+    def recall(self,patch,bank=None,notify=True,flag=None):
         """the plugin's own recall path in the ENGINE frame: raw pool byte + engine-DB
-        min, dispatched (flag 1) to every unit, then the assigner refresh"""
+        min, dispatched (flag 0 = arm the ramp, the hosted path; see RECALL_FLAG) to
+        every unit, then the assigner refresh. The caller snaps the ramps afterwards."""
         mins=self.pool_mins()
+        if flag is None: flag=self.RECALL_FLAG
         blob=patch_blob(bank or bank_bytes(), patch)
         for u in range(N_UNITS):
             for pool in ACTIVE_POOLS:
                 pid=POOL_BASE_ID+pool
-                self.dispatch(u, pid, pool_value(blob,pool)+mins[pid])
+                self.dispatch(u, pid, pool_value(blob,pool)+mins[pid], flag=flag)
         if notify: self.notify()
     def render_host(self,n,block=256,count=False):
         """the SHIPPING render entry (CWaveGen slot 0x38): rcx=HOST,

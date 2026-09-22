@@ -1,0 +1,4 @@
+[ 27.5s] base 2 + donor 0 pools 10-25 + 770:=0 765:=4 key 60: DRY f0 130.73 Hz (-1201 cents) harm 0.95 peak 0.092
+[ 26.7s] base 2 + donor 0 pools 26-41 + 770:=0 765:=4 key 60: DRY f0 523.00 Hz (+1199 cents) harm 0.90 peak 0.0846
+[ 28.3s] base 2 + donor 0 pools 42-57 + 770:=0 765:=4 key 60: DRY f0 523.04 Hz (+1199 cents) harm 0.92 peak 0.297
+[ 27.5s] base 2 + donor 0 pools 58-73 + 770:=0 765:=4 key 60: DRY f0 522.77 Hz (+1198 cents) harm 0.90 peak 0.0852

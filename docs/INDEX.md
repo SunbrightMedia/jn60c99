@@ -189,7 +189,7 @@ MasterAudio_reference.kicad_sch (generated reference netlist).
 ## Elsewhere (not docs/, listed for completeness)
 
 jx3p/docs/ — the JX-3P port's own docs; S3_STATUS.md rules its state.
-jp8/docs/ — the JUPITER-8 port's own docs; S3_STATUS.md rules its state (steps 0-4 PROVEN at 44100, step 5 open); abi_ledger.md is its entry-point ledger.
+jp8/docs/ — the JUPITER-8 port's own docs; S3_STATUS.md rules its state (steps 0-4 PROVEN at 44100 on the corrected flag-0 recall, D4 resolved, step 5 open); abi_ledger.md is its entry-point ledger; PORT_LESSONS.md the traps the JP8 added (LIVING); SWEEP_44100.md the 64-patch listen sweep record (REFERENCE, one row per patch, log per row).
 docs is indexed; AIRTIGHT_PLAN.md, GOAL.md, END_GOAL.md, FINAL_GUIDE.md,
 COVERAGE.tsv, PROVENANCE.tsv live at repo root and outrank this index.
 

@@ -1,0 +1,2 @@
+[ 25.7s] patch 2 770:=0 765:=2 key 48: DRY f0 65.38 Hz (-1201 cents) harm 0.99 peak 0.0823 | pitch cells: u0 VCO1 +1203c VCO2 +1c
+[ 36.3s] patch 2 770:=0 765:=2 key 60: DRY f0 130.83 Hz (-1200 cents) harm 0.99 peak 0.0856 | pitch cells: u0 VCO1 +3c VCO2 -1200c

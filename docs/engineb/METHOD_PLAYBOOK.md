@@ -2100,3 +2100,42 @@ belongs in PSRAM; every internal .bss byte relocates everything above it onto
 memory no gate has ever exercised on that specific board. (c) The decisive
 evidence order is value-determinism, then which SIBLING passes, then the map
 diff -- all three are free and none needs the bench.
+
+## 99. A "SET NOW" DISPATCH LEAVES THE BOOT RAMP ARMED WITH ITS OLD LIMIT --
+THE PLUGIN'S OWN WALKER THEN UNDOES THE RECALL (paid 2026-09-22, JP8)
+
+The JP8 oracle recalled every pool with DISPATCH flag 1 (inherited from the
+JX oracle). Flag 1 writes the engine cell directly (0x440430:
+[[state+0x38]+idx*40+0x20] = value) but the BOOT RAMP that targets the same
+cell stays active with its old limit; the plugin's own ramp walker then moves
+the cell back to that limit within 64 samples, and a snap does it at once.
+On patch 0 the recall silently lost ENV1 SUSTAIN (0 -> 0.995), MIXER VCO1
+(2.51 -> 0.5), HPF, PORTAMENTO and VCO2 FINE TUNE (jp8/logs/d4_flag1_p0.log).
+Every listen proof before that day ran on a half-defaulted patch, and the
+"patch 0 tracks keys by -15.64 semis" defect (D4) was this: ENV1 SUSTAIN
+stuck at 0.995 held the pitch envelope (VCO ENV MOD -2.7 oct) down forever.
+Under flag 0 -- the path HOSTPARAM 0x4465B0 itself takes (r8d = 0 into
+DISPATCH slot 0x58, READ) -- the child setter ARMS the ramp (limit = new
+value at +0x14, active +0x1C) and the walker/snap settles it: every cell
+holds after 4160 samples (d4_flag0_p0.log), and patch 0 dives then settles
+at -1197 cents = its VCO1 RANGE 2 (d4_windows_p0_k60.log).
+
+The second bite, same day: overrides written with flag 1 AFTER a flag-0
+recall are undone by the snap too (the recall's ramp is still armed with the
+patch value): "MIXER VCO1 := 0" never muted VCO1, and the f0 detector then
+read VCO1 while the pitch cells said VCO2 (d4_spec_p2_rflag0_range4.log:
+peaks at 528 AND 261 Hz). One probe "refuted" the RANGE law that way.
+
+### The rules
+1. Recall through the SAME flag the host param entry uses. Read it off the
+   host entry (one `xor r8d,r8d` before the dispatch call), never inherit
+   it from the previous port.
+2. After any write, check the ramp slot behind the cell (target pointer,
+   limit, active) and then let the PLUGIN'S OWN walker run without a snap:
+   a value that moves on its own was never set.
+3. Overrides in probes take the recall's path (flag 0 + snap), or come
+   after the snap. Print the spectral peaks with every f0: an autocorrelation
+   f0 alone cannot tell "the other oscillator" from "the pitch law is wrong".
+4. A pitch cell that reads the same number on keys 48, 60 and 72 is an
+   OFFSET, not a pitch. Find where the key enters (here the oscillator adds
+   [0x35b0] to the cell, 0x39b21a) before turning cells into Hz.

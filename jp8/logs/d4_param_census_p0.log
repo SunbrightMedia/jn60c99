@@ -1,0 +1,64 @@
+id 750 LFO WAVE               [0..5] def 0: st+0x820=[1,0] st+0x830=[0,0] st+0x860=[0,0] st+0x850=[0,0] st+0x840=[0,0] st+0x870=[0,0] st+0x880=[0,1] proc+0x30d8=[0,7.006e-45] proc+0x4e4=[0,7.006e-45]
+id 751 LFO DELAY TIME         [0..255] def 0: proc+0x30d0=[0,3.573e-43] st+0x7d0=[0.73555,0.99985] proc+0x4e8=[0,3.573e-43]
+id 752 LFO RATE               [0..255] def 175: st+0x4a0=[0,1] st+0x890=[0,1] proc+0x30c8=[0,3.573e-43] st+0x490=[0.36397,93.177] proc+0x4ec=[0,3.573e-43]
+id 753 VCO LFO MOD            [0..255] def 128: st+0x14d0=[-1,1] proc+0x4f0=[0,3.573e-43]
+id 754 VCF LFO MOD            [0..255] def 128: st+0x5540=[-2.188,2.188] proc+0x4f4=[0,3.573e-43]
+id 755 VCA LFO MOD            [0..255] def 128: st+0x5d40=[1,1] st+0x5ce0=[-1,1] proc+0x4f8=[0,3.573e-43]
+id 756 LFO KEY TRIG           [0..1] def 0: st+0x7b0=[1,0] proc+0x4fc=[0,1.401e-45]
+id 757 VCO1 WAVE              [0..5] def 0: st+0x78=[13164936484, 13164936488, 13164936492, 13164936496, 13164936500, 13164936504, 13164936508, 13164936512] st+0x1560=[0,0] proc+0x500=[0,7.006e-45]
+id 758 VCO PWM DEPTH          [0..255] def 0: st+0x1560=[0,0] st+0x1570=[0,0] proc+0x504=[0,3.573e-43]
+id 759 VCO PWM SOURCE         [0..5] def 0: st+0x1420=[1,0] st+0x1430=[0,0] st+0x1440=[0,0] st+0x1450=[0,-1] proc+0x508=[0,7.006e-45]
+id 760 VCO1 RANGE             [0..5] def 3: st+0x1390=[-3,2] proc+0x50c=[0,7.006e-45]
+id 761 VCO1 CROSS MOD         [0..255] def 0: st+0x1500=[0,6.16] proc+0x510=[0,3.573e-43]
+id 762 VCO2 WAVE              [0..5] def 0: st+0x78=[13164936516, 13164936520, 13164936524, 13164936528, 13164936532, 13164936536, 13164936540, 13164936544] st+0x1510=[0.47,0] st+0x1570=[0,0] proc+0x514=[0,7.006e-45]
+id 763 (OSC2 COLOR)           [0..255] def 0: (no writes)
+id 764 (OSC2 MOD)             [0..5] def 0: (no writes)
+id 765 VCO2 RANGE             [0..5] def 3: st+0x13a0=[-3,2] proc+0x518=[0,7.006e-45]
+id 766 VCO2 FINE TUNE         [0..255] def 128: st+0x1480=[-0.0497,0.0503] proc+0x51c=[0,3.573e-43]
+id 767 VCO2 LOW FREQ          [0..1] def 0: st+0x1580=[0,1] st+0x1940=[0,1] proc+0x520=[0,1.401e-45]
+id 768 VCO2 SYNC              [0..1] def 0: st+0x12e0=[0,1] proc+0x524=[0,1.401e-45]
+id 769 VCO2 SUB RANGE         [-36..36] def 0: st+0x1470=[-3,3] proc+0x528=[nan,5.045e-44]
+id 770 MIXER VCO1             [0..255] def 128: st+0x5200=[0,2.5119] proc+0x52c=[0,3.573e-43]
+id 771 MIXER VCO2             [0..255] def 0: st+0x5210=[0,2.5119] proc+0x530=[0,3.573e-43]
+id 772 (MIXER OSC3 / SUB OSC) [0..255] def 0: (no writes)
+id 773 (MIXER NOISE)          [0..255] def 0: (no writes)
+id 774 (MIXER SUB OSC TYPE)   [0..3] def 0: (no writes)
+id 775 (MIXER NOISE TYPE)     [0..3] def 1: (no writes)
+id 776 VCO ENV MOD            [0..255] def 128: st+0x14e0=[-3.45,3.45] proc+0x534=[0,3.573e-43]
+id 777 (PITCH ATTACK)         [0..255] def 0: (no writes)
+id 778 (PITCH DECAY)          [0..255] def 0: (no writes)
+id 779 VCF CUTOFF             [0..255] def 255: st+0x52d0=[0,1] proc+0x538=[0,3.573e-43]
+id 780 (FILTER LPF TYPE)      [0..3] def 0: (no writes)
+id 781 VCF RESONANCE          [0..255] def 0: st+0x5350=[0,1] proc+0x53c=[0,3.573e-43]
+id 782 HPF CUTOFF             [0..255] def 0: st+0x5340=[0.00021769,0.39184] proc+0x540=[0,3.573e-43]
+id 783 VCF ENV MOD            [0..255] def 128: st+0x5550=[-6.5491,6.5491] proc+0x544=[0,3.573e-43]
+id 784 ENV1 ATTACK            [0..255] def 0: proc+0x318c=[0,3.573e-43] st+0xc00=[0.021769,3.9184e-06] proc+0x548=[0,3.573e-43]
+id 785 ENV1 DECAY             [0..255] def 0: proc+0x3190=[0,3.573e-43] st+0xc10=[1,0.00012624] proc+0x54c=[0,3.573e-43]
+id 786 ENV1 SUSTAIN           [0..255] def 255: proc+0x3194=[0,3.573e-43] st+0xc20=[0,0.99524] proc+0x550=[0,3.573e-43]
+id 787 ENV1 RELEASE           [0..255] def 0: proc+0x3198=[0,3.573e-43] st+0xc30=[1,0.00014156] proc+0x554=[0,3.573e-43]
+id 788 VCF KEY FOLLOW         [0..255] def 128: st+0x5560=[-1.2,1.2] proc+0x558=[0,3.573e-43]
+id 789 ENV2 ATTACK            [0..255] def 0: proc+0x31a0=[0,3.573e-43] st+0xf40=[0.021769,3.9184e-06] proc+0x55c=[0,3.573e-43]
+id 790 ENV2 DECAY             [0..255] def 0: proc+0x31a4=[0,3.573e-43] st+0xf50=[1,0.00012624] proc+0x560=[0,3.573e-43]
+id 791 ENV2 SUSTAIN           [0..255] def 255: proc+0x31a8=[0,3.573e-43] st+0xf60=[0,0.99524] proc+0x564=[0,3.573e-43]
+id 792 ENV2 RELEASE           [0..255] def 0: proc+0x31ac=[0,3.573e-43] st+0xf70=[0.99952,0.00013727] proc+0x568=[0,3.573e-43]
+id 793 VCA TONE               [0..255] def 128: st+0x5ba0=[-1,1] proc+0x56c=[0,3.573e-43]
+id 794 EFFECT LEVEL           [0..255] def 0: proc+0x570=[0,3.573e-43]
+id 795 REVERB LEVEL           [0..255] def 0: st+0x78=[13164936548, 13164936552] proc+0x3070=[0,1.401e-43] proc+0x574=[0,3.573e-43]
+id 796 DELAY LEVEL            [0..255] def 0: proc+0x2ad8=[0,1.401e-45] proc+0x2af0=[0,1.401e-45] proc+0x2afc=[0,3.573e-43] proc+0x2b1c=[0,1.682e-43] proc+0x578=[0,3.573e-43]
+id 797 DELAY TIME             [0..255] def 128: proc+0x2b30=[1.401e-44,1.121e-42] proc+0x2b38=[0, 0] proc+0x2b18=[1.794e-43,1.794e-43] proc+0x57c=[0,3.573e-43]
+id 798 PORTAMENTO             [0..255] def 0: proc+0x3a88=[0,3.573e-43] st+0x320=[0.068711,1.462e-05] st+0x330=[0.11338,8.198e-06] st+0x2f0=[0,1] proc+0x580=[0,3.573e-43]
+id 799 LEGATO                 [0..1] def 0: proc+0x584=[0,0,1.401e-45,1.401e-45] st+0x310=[0,0] st+0x2f0=[1,1]
+id 800 ASSIGN MODE            [0..3] def 0: proc+0x588=[0,0,4.204e-45,4.204e-45] st+0x1370=[0,0] st+0x1380=[-0.00205,-0.00205] st+0x78=[13164936556, 13164936560, 13164936564, 13164936568, 13164936572, 13164936576, 13164936580, 13164936584] st+0x310=[0,0] st+0x2f0=[1,1]
+id 801 BEND RANGE             [0..23] def 2: st+0x14a0=[0.083333,2] st+0x5510=[0.083333,2] proc+0x58c=[0,3.223e-44]
+id 802 PORTA TYPE             [0..1] def 0: st+0x300=[0,1] proc+0x590=[0,1.401e-45]
+id 803 TEMPO SYNC             [0..1] def 0: st+0x480=[0,1] proc+0x594=[0,0,1.401e-45,1.401e-45] proc+0x2b30=[1.121e-42] proc+0x2b38=[0, 1] proc+0x2b18=[1.794e-43,1.794e-43] proc+0x2b34=[0]
+id 804 (MOD ID 1)             [0..255] def 0: (no writes)
+id 805 (MOD ID 2)             [0..255] def 0: (no writes)
+id 806 (MOD ID 3)             [0..255] def 0: (no writes)
+id 807 (MOD PRM 1)            [0..255] def 0: (no writes)
+id 808 (MOD PRM 2)            [0..255] def 0: (no writes)
+id 809 (MOD PRM 3)            [0..255] def 0: (no writes)
+id 810 VCA LEVEL              [0..255] def 128: proc+0x598=[0,3.573e-43]
+id 811 VCA LEVEL SW           [0..1] def 1: (no writes)
+id 812 BEND SW VCO1           [0..1] def 1: st+0x13f0=[0,1] proc+0x59c=[0,1.401e-45]
+id 813 BEND SW VCO2           [0..1] def 1: st+0x1400=[0,1] proc+0x5a0=[0,1.401e-45]
