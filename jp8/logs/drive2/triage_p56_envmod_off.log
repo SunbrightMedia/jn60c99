@@ -1,0 +1,10 @@
+[  14.7s] override eng 776 VCO ENV MOD: bank raw 71 -> 128 through HOSTPARAM (host id 0x600034)
+[  16.3s] patch 56 '1981 Solo Voice' [envmod_off]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
+[  47.0s] FAIL key 48 EARLY: DRY f0 263.78 Hz (+1214 c vs key) harmonic 0.708 | engine start u0 131.00/261.68 end u0 135.64/270.95 | dev 13.9 c | spectral peaks [(261.090087890625, 171.23952190397256), (274.54833984375, 22.159188946503892), (131.890869140625, 19.74880564801426)] | NaN 0
+[  58.1s] PASS release 48: dry 0.0495 -> 0, master 0.18 -> 1.57e-13
+[  88.2s] FAIL key 60 EARLY: DRY f0 527.82 Hz (+1215 c vs key) harmonic 0.715 | engine start u0 261.19/521.74 end u0 261.19/521.76 | dev 20.0 c | spectral peaks [(527.5634765625, 131.80173556987233), (514.105224609375, 62.357451822994115), (261.090087890625, 17.53220701752853)] | NaN 0
+[  99.6s] PASS release 60: dry 0.0494 -> 0, master 0.18 -> 1.57e-13
+[ 129.9s] FAIL key 72 EARLY: DRY f0 1049.43 Hz (+1205 c vs key) harmonic 0.777 | engine start u0 523.88/1046.50 end u0 503.06/1004.90 | dev 4.8 c | spectral peaks [(1047.052001953125, 111.62766811295165), (1030.902099609375, 58.59894880604389), (1065.8935546875, 24.475474346298657)] | NaN 0
+[ 141.0s] PASS release 72: dry 0.0426 -> 0, master 0.155 -> 1.57e-13
+[ 141.0s] JX law (dry): FAIL harmonic/f0: [(48, np.float64(263.78290166598913), 0.7078851634031265), (60, np.float64(527.8151980740047), 0.7149422971241944), (72, np.float64(1049.4296205392159), 0.7771766280271339)]
+[ 141.0s] TRIAGE patch 56 [envmod_off] overrides 776=128: 3 FAIL

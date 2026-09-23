@@ -1,0 +1,11 @@
+[  14.9s] override eng 776 VCO ENV MOD: bank raw 204 -> 128 through HOSTPARAM (host id 0x600034)
+[  14.9s] override eng 768 VCO2 SYNC: bank raw 1 -> 0 through HOSTPARAM (host id 0x600024)
+[  16.7s] patch 41 '1981 Cars Sync' [envmod_sync_off]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
+[  25.0s] PASS key 48 EARLY: DRY f0 123.36 Hz (-102 c vs key) harmonic 0.994 | engine start u0 65.50/123.50 end u0 65.31/123.14 | dev 1.9 c | spectral peaks [(123.81591796875, 234.73648496907728), (371.44775390625, 68.32271955528628), (616.387939453125, 48.117732224151)] | NaN 0
+[  36.5s] PASS release 48: dry 0.0436 -> 0, master 0.0792 -> 1.57e-13
+[  44.8s] PASS key 60 EARLY: DRY f0 246.95 Hz (-100 c vs key) harmonic 0.982 | engine start u0 130.61/246.25 end u0 130.88/246.78 | dev 1.2 c | spectral peaks [(247.6318359375, 230.03247754937638), (740.203857421875, 77.54776754590904), (1235.467529296875, 49.016866773491515)] | NaN 0
+[  56.3s] PASS release 60: dry 0.0454 -> 0, master 0.0837 -> 1.57e-13
+[  64.6s] PASS key 72 EARLY: DRY f0 493.71 Hz (-101 c vs key) harmonic 0.983 | engine start u0 261.53/493.10 end u0 261.85/493.71 | dev 0.0 c | spectral peaks [(492.572021484375, 214.5403612014692), (1480.40771484375, 80.05628340385616), (2468.243408203125, 52.70672933872505)] | NaN 0
+[  76.1s] PASS release 72: dry 0.043 -> 0, master 0.091 -> 1.57e-13
+[  76.1s] JX law (dry): PASS pitch tracks keys by -1 semitones (offsets -102, -100, -101 cents)
+[  76.1s] TRIAGE patch 41 [envmod_sync_off] overrides 776=128,768=0: PASS

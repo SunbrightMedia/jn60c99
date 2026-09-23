@@ -1,0 +1,10 @@
+[  15.2s] override eng 753 VCO LFO MOD: bank raw 255 -> 128 through HOSTPARAM (host id 0x600006)
+[  17.1s] patch 39 'SQ Peppercorn' [lfovco128]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
+[  25.5s] PASS key 48 EARLY: DRY f0 130.57 Hz (-3 c vs key) harmonic 0.956 | engine start u0 131.00/524.42 end u0 130.62/522.91 | dev 0.6 c | spectral peaks [(524.871826171875, 0.66191598526527), (2616.2841796875, 0.6565733450831394), (131.890869140625, 0.6203001964188493)] | NaN 0
+[  36.9s] PASS release 48: dry 0 -> 0, master 0.00315 -> 0.00015
+[  45.4s] PASS key 60 EARLY: DRY f0 261.60 Hz (-0 c vs key) harmonic 0.964 | engine start u0 261.21/1045.69 end u0 261.77/1047.91 | dev 1.1 c | spectral peaks [(5243.3349609375, 0.9845193138194915), (1049.74365234375, 0.8557239084288526), (261.090087890625, 0.8123621689959144)] | NaN 0
+[  57.1s] PASS release 60: dry 0 -> 0, master 0.00284 -> 9.15e-05
+[  65.6s] PASS key 72 EARLY: DRY f0 524.05 Hz (+3 c vs key) harmonic 0.957 | engine start u0 523.06/2093.91 end u0 523.70/2096.50 | dev 1.2 c | spectral peaks [(2096.795654296875, 0.6279181581353828), (522.18017578125, 0.626412701698835), (6287.6953125, 0.2350770261904885)] | NaN 0
+[  77.3s] PASS release 72: dry 0 -> 0, master 0.00295 -> 9e-05
+[  77.3s] JX law (dry): PASS pitch tracks keys by +0 semitones (offsets -3, -0, +3 cents)
+[  77.3s] TRIAGE patch 39 [lfovco128] overrides 753=128: PASS

@@ -1,0 +1,11 @@
+[  15.4s] override eng 776 VCO ENV MOD: bank raw 248 -> 128 through HOSTPARAM (host id 0x600034)
+[  15.4s] override eng 792 ENV2 RELEASE: bank raw 160 -> 0 through HOSTPARAM (host id 0x600054)
+[  17.2s] patch 44 '1981 Echo Piano' [envmod_env2rel_off]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
+[  26.0s] PASS key 48 EARLY: DRY f0 130.99 Hz (+2 c vs key) harmonic 0.990 | engine start u0 131.00/262.21 end u0 130.62/261.45 | dev 0.1 c | spectral peaks [(524.871826171875, 171.7350623701947), (131.890869140625, 63.14887823777404), (261.090087890625, 61.65494579697402)] | NaN 0
+[  38.2s] PASS release 48: dry 0.0489 -> 0, master 0.17 -> 1.57e-13
+[  46.7s] PASS key 60 EARLY: DRY f0 261.94 Hz (+2 c vs key) harmonic 0.982 | engine start u0 261.21/522.85 end u0 261.77/523.96 | dev 1.2 c | spectral peaks [(524.871826171875, 158.17816344636745), (261.090087890625, 73.92562363383283), (783.270263671875, 64.75490732110775)] | NaN 0
+[  58.4s] PASS release 60: dry 0.03 -> 0, master 0.103 -> 1.57e-13
+[  67.2s] PASS key 72 EARLY: DRY f0 523.99 Hz (+2 c vs key) harmonic 0.978 | engine start u0 523.06/1046.96 end u0 523.70/1048.25 | dev 0.9 c | spectral peaks [(1049.74365234375, 191.86558271174377), (522.18017578125, 84.01787144260152), (1569.232177734375, 30.799276701188816)] | NaN 0
+[  79.5s] PASS release 72: dry 0.0576 -> 0, master 0.239 -> 1.57e-13
+[  79.5s] JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +2, +2, +2 cents)
+[  79.5s] TRIAGE patch 44 [envmod_env2rel_off] overrides 776=128,792=0: PASS

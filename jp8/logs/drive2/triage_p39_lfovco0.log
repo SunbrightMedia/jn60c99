@@ -1,0 +1,10 @@
+[  15.1s] override eng 753 VCO LFO MOD: bank raw 255 -> 0 through HOSTPARAM (host id 0x600006)
+[  16.8s] patch 39 'SQ Peppercorn' [lfovco0]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
+[  48.2s] FAIL key 48 EARLY: DRY f0 3150.00 Hz (+5508 c vs key) harmonic 0.072 | engine start u0 65.50/262.21 end u0 261.24/1045.80 | dev 1908.9 c | spectral peaks [(261.090087890625, 0.6150122215891555), (1049.74365234375, 0.42484994981044244), (2363.26904296875, 0.4098871944120392)] | NaN 0
+[  59.6s] PASS release 48: dry 0 -> 0, master 1.51e-06 -> 1.42e-07
+[  68.0s] PASS key 60 EARLY: DRY f0 130.87 Hz (-1199 c vs key) harmonic 0.853 | engine start u0 130.59/522.80 end u0 524.05/2097.88 | dev 3.6 c | spectral peaks [(6293.07861328125, 0.6682897858674188), (530.255126953125, 0.6390903187566276), (2096.795654296875, 0.541618487793002)] | NaN 0
+[  79.5s] PASS release 60: dry 0 -> 0, master 0.00312 -> 0.000123
+[  88.0s] PASS key 72 EARLY: DRY f0 261.92 Hz (-1198 c vs key) harmonic 0.802 | engine start u0 261.72/1047.71 end u0 1046.69/4190.13 | dev 1.4 c | spectral peaks [(1052.435302734375, 0.5143620213995282), (4193.59130859375, 0.32696606570733033), (1036.285400390625, 0.29956746382080957)] | NaN 0
+[  99.5s] PASS release 72: dry 0 -> 0, master 0.00301 -> 6.89e-05
+[  99.5s] JX law (dry): FAIL harmonic/f0: [(48, 3150.0, 0.07179372228511122), (60, np.float64(130.86628560005167), 0.8534187948438523), (72, np.float64(261.9229210123807), 0.8018076251410837)]
+[  99.5s] TRIAGE patch 39 [lfovco0] overrides 753=0: 1 FAIL

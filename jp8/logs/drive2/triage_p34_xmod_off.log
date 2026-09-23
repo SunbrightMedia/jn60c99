@@ -5,3 +5,6 @@
 [ 130.6s] FAIL key 60 EARLY: DRY f0 65.41 Hz (-2400 c vs key) harmonic 0.784 | engine start u0 261.42/525.08 end u0 261.92/526.09 | dev 2398.6 c | spectral peaks [(64.599609375, 84.15861773517827), (131.890869140625, 40.36654242481178), (8.074951171875, 21.69454527609189)] | NaN 0
 [ 193.9s] PASS release 60: dry 0.0113 -> 0, master 0.17 -> 0.0394 | 3 s tail rule: dry 0 master 0.000192
 [ 224.9s] FAIL key 72 EARLY: DRY f0 131.01 Hz (-2397 c vs key) harmonic 0.755 | engine start u0 1046.29/2101.55 end u0 1044.87/2098.69 | dev 3594.7 c | spectral peaks [(261.090087890625, 90.66455792877096), (131.890869140625, 81.76354535793043), (8.074951171875, 21.36204163397194)] | NaN 0
+[ 287.8s] PASS release 72: dry 0.00754 -> 0, master 0.183 -> 0.04 | 3 s tail rule: dry 0 master 0.000154
+[ 287.8s] JX law (dry): FAIL harmonic/f0: [(48, np.float64(32.698454831095354), 0.8585270052484841), (60, np.float64(65.40562588209369), 0.7843480966578904), (72, np.float64(131.0111701474165), 0.7554730144931485)]
+[ 287.8s] TRIAGE patch 34 [xmod_off] overrides 761=0: 3 FAIL
