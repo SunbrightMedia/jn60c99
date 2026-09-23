@@ -1,3 +1,10 @@
 [  12.7s] override eng 761 VCO1 CROSS MOD: bank raw 73 -> 0 through HOSTPARAM (host id 0x600016)
 [  14.3s] patch 27 'BS Waver Bass' [xmod_off]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
 [  41.8s] FAIL key 48 EARLY: DRY f0 64.75 Hz (-1217 c vs key) harmonic 0.984 | engine start u0 132.26/132.10 end u0 133.61/133.44 | dev 1234.3 c | spectral peaks [(64.599609375, 2024.9420457779645), (129.19921875, 891.2718616122445), (191.107177734375, 494.9010398290596)] | NaN 0
+[  97.4s] PASS release 48: dry 0.564 -> 0.213, master 0.6 -> 0.227 | 3 s tail rule: dry 0.000346 master 0.000368
+[ 130.3s] FAIL key 60 EARLY: DRY f0 129.00 Hz (-1224 c vs key) harmonic 0.984 | engine start u0 536.45/535.80 end u0 520.92/520.28 | dev 2414.3 c | spectral peaks [(129.19921875, 321.797255935395), (511.41357421875, 81.27417234683281), (384.906005859375, 61.254867451945856)] | NaN 0
+[ 195.8s] PASS release 60: dry 0.202 -> 0.0689, master 0.215 -> 0.0732 | 3 s tail rule: dry 0.000391 master 0.000415
+[ 229.0s] FAIL key 72 EARLY: DRY f0 265.08 Hz (-1177 c vs key) harmonic 0.975 | engine start u0 2100.24/2097.70 end u0 2035.88/2033.41 | dev 3527.3 c | spectral peaks [(266.473388671875, 222.3741586813708), (1068.585205078125, 49.59360382706968), (535.638427734375, 36.45482945558501)] | NaN 0
+[ 295.1s] PASS release 72: dry 0.202 -> 0.125, master 0.215 -> 0.133 | 3 s tail rule: dry 0.000456 master 0.000485
+[ 295.1s] JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1217, -1224, -1177 cents)
+[ 295.1s] TRIAGE patch 27 [xmod_off] overrides 761=0: 3 FAIL

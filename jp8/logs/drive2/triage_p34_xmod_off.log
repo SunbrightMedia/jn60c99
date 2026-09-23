@@ -1,3 +1,7 @@
 [  12.8s] override eng 761 VCO1 CROSS MOD: bank raw 252 -> 0 through HOSTPARAM (host id 0x600016)
 [  14.2s] patch 34 'SQ Arpg Terra' [xmod_off]: walker settle 4096: dry peak 0 master peak 0.000827 NaN 0; live ramps 0 (NaN/inf 0)
 [  40.5s] FAIL key 48 EARLY: DRY f0 32.70 Hz (-2400 c vs key) harmonic 0.859 | engine start u0 65.50/131.56 end u0 65.31/131.18 | dev 1197.7 c | spectral peaks [(64.599609375, 89.81603940679355), (32.2998046875, 88.51761662855226), (8.074951171875, 19.984087818537116)] | NaN 0
+[  99.1s] PASS release 48: dry 0.0106 -> 0, master 0.0775 -> 0.034 | 3 s tail rule: dry 0 master 0.000148
+[ 130.6s] FAIL key 60 EARLY: DRY f0 65.41 Hz (-2400 c vs key) harmonic 0.784 | engine start u0 261.42/525.08 end u0 261.92/526.09 | dev 2398.6 c | spectral peaks [(64.599609375, 84.15861773517827), (131.890869140625, 40.36654242481178), (8.074951171875, 21.69454527609189)] | NaN 0
+[ 193.9s] PASS release 60: dry 0.0113 -> 0, master 0.17 -> 0.0394 | 3 s tail rule: dry 0 master 0.000192
+[ 224.9s] FAIL key 72 EARLY: DRY f0 131.01 Hz (-2397 c vs key) harmonic 0.755 | engine start u0 1046.29/2101.55 end u0 1044.87/2098.69 | dev 3594.7 c | spectral peaks [(261.090087890625, 90.66455792877096), (131.890869140625, 81.76354535793043), (8.074951171875, 21.36204163397194)] | NaN 0
