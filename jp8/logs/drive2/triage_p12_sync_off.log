@@ -1,2 +1,10 @@
 [  12.5s] override eng 768 VCO2 SYNC: bank raw 1 -> 0 through HOSTPARAM (host id 0x600024)
 [  14.1s] patch 12 'SQ 8th Peaks' [sync_off]: walker settle 4096: dry peak 0 master peak 0.000419 NaN 0; live ramps 0 (NaN/inf 0)
+[  42.2s] FAIL key 48 LATE: DRY f0 32.63 Hz (-2404 c vs key) harmonic 0.918 | engine start u0 65.42/130.69 end u0 65.31/130.47 | dev 1201.7 c | spectral peaks [(32.2998046875, 190.41119702298317), (64.599609375, 96.40714419553781), (129.19921875, 80.49476427907877)] | NaN 0
+[  52.3s] PASS release 48: dry 0.0079 -> 0, master 0.098 -> 0.000491
+[  80.1s] FAIL key 60 LATE: DRY f0 65.27 Hz (-2403 c vs key) harmonic 0.839 | engine start u0 261.24/521.85 end u0 262.52/524.40 | dev 2400.9 c | spectral peaks [(129.19921875, 182.92148627144653), (64.599609375, 177.64391794997005), (261.090087890625, 53.874752833642496)] | NaN 0
+[  90.4s] PASS release 60: dry 0.0326 -> 0, master 0.0873 -> 0.000693
+[ 119.1s] FAIL key 72 LATE: DRY f0 130.46 Hz (-2405 c vs key) harmonic 0.790 | engine start u0 1048.19/2093.83 end u0 1046.15/2089.76 | dev 3604.1 c | spectral peaks [(129.19921875, 146.32623631768945), (261.090087890625, 67.88087066666479), (522.18017578125, 39.757071468159324)] | NaN 0
+[ 129.5s] PASS release 72: dry 0.0358 -> 0, master 0.175 -> 0.000746
+[ 129.5s] JX law (dry): FAIL harmonic/f0: [(48, np.float64(32.62503084070126), 0.9175400588136492), (60, np.float64(65.2749267681743), 0.8389314202855158), (72, np.float64(130.45689212855876), 0.7895623646155604)]
+[ 129.5s] TRIAGE patch 12 [sync_off] overrides 768=0: 3 FAIL

@@ -1,0 +1,5 @@
+[  13.1s] override eng 768 VCO2 SYNC: bank raw 1 -> 0 through HOSTPARAM (host id 0x600024)
+[  13.1s] override eng 798 PORTAMENTO: bank raw 26 -> 0 through HOSTPARAM (host id 0x600060)
+[  14.7s] patch 13 'LD Hawk Lead' [sync_porta_off]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
+[  42.1s] FAIL key 48 LATE: DRY f0 266.39 Hz (+1231 c vs key) harmonic 0.637 | engine start u0 198.23/628.58 end u0 143.63/455.45 | dev 511.6 c | spectral peaks [(263.78173828125, 73.43502601126087), (250.323486328125, 64.75726237653382), (277.239990234375, 50.72327163865769)] | NaN 0
+[  97.5s] PASS release 48: dry 0.0406 -> 0, master 0.0804 -> 0.0158 | 3 s tail rule: dry 0 master 0.000239
