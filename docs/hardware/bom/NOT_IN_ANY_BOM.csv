@@ -1,0 +1,76 @@
+Board,Designator,Pins (netlist),Nets,What it probably is
+ESP32-S3_Motherboard,AUDIO_PWR1,?,,"JST-XH connector, ? pins"
+ESP32-S3_Motherboard,AUDIO_SIG1,?,,"JST-XH connector, ? pins"
+ESP32-S3_Motherboard,I2C1,4,+3V3 GND SCL SDA,"JST-XH connector, 4 pins"
+ESP32-S3_Motherboard,I2C2,4,+3V3 GND SCL SDA,"JST-XH connector, 4 pins"
+ESP32-S3_Motherboard,I2C3,4,+3V3 GND SCL SDA,"JST-XH connector, 4 pins"
+ESP32-S3_Motherboard,INT_MIDI_SIG1,3,GND INT_MIDI_RX INT_MIDI_TX,"JST-XH connector, 3 pins"
+ESP32-S3_Motherboard,MIDI_PWR1,3,+3V3 +5V GND,"JST-XH connector, 3 pins"
+ESP32-S3_Motherboard,MIDI_SIG1,3,GND MIDI_RX MIDI_TX,"JST-XH connector, 3 pins"
+ESP32-S3_Motherboard,PEDAL1,3,GND RING_1 TIP_1,"JST-XH connector, 3 pins"
+ESP32-S3_Motherboard,VOL_POT1,3,+3V3 GND VOL_POT,"JST-XH connector, 3 pins"
+FaderBoard,CONN1,3,+3V3 GND SIG,"JST-XH connector, 3 pins"
+Headphone_Dac,J11,3,+5V 3V3A GND,"JST-XH connector, 3 pins"
+Headphone_Dac,J16,4,GND I2S_BCK_RS I2S_SD_RS I2S_WS_RS,"JST-XH connector, 4 pins"
+Headphone_Dac,J8,4,CTED-(J8-PAD4) GND HP_RING HP_TIP,headphone jack
+KeyswitchBoard,J49,2,GND KEY2,"JST-XH connector, 2 pins"
+KeyswitchKeybed,J16,4,GND KEY1 KEY2 KEY3,"JST-XH connector, 4 pins"
+KeyswitchKeybed,J17,4,GND KEY4 KEY5 KEY6,"JST-XH connector, 4 pins"
+KeyswitchKeybed,J18,4,GND KEY7 KEY8 KEY9,"JST-XH connector, 4 pins"
+KeyswitchKeybed,J19,4,GND KEY10 KEY11 KEY12,"JST-XH connector, 4 pins"
+KeyswitchKeybed,SW1,2,GND KEY1,keyswitch/button (user-supplied?)
+KeyswitchKeybed,SW10,2,GND KEY10,keyswitch/button (user-supplied?)
+KeyswitchKeybed,SW11,2,GND KEY11,keyswitch/button (user-supplied?)
+KeyswitchKeybed,SW12,2,GND KEY12,keyswitch/button (user-supplied?)
+KeyswitchKeybed,SW2,2,GND KEY2,keyswitch/button (user-supplied?)
+KeyswitchKeybed,SW3,2,GND KEY3,keyswitch/button (user-supplied?)
+KeyswitchKeybed,SW4,2,GND KEY4,keyswitch/button (user-supplied?)
+KeyswitchKeybed,SW5,2,GND KEY5,keyswitch/button (user-supplied?)
+KeyswitchKeybed,SW6,2,GND KEY6,keyswitch/button (user-supplied?)
+KeyswitchKeybed,SW7,2,GND KEY7,keyswitch/button (user-supplied?)
+KeyswitchKeybed,SW8,2,GND KEY8,keyswitch/button (user-supplied?)
+KeyswitchKeybed,SW9,2,GND KEY9,keyswitch/button (user-supplied?)
+MIDICON3,CN1,3,+3V3 +5V GND,"JST-XH connector, 3 pins"
+MIDICON3,CN2,3,GND MIDI_RX MIDI_TX,"JST-XH connector, 3 pins"
+MIDICON3,U1,7,CTED-(U1-PAD1) CTED-(U1-PAD2) CTED-(U1-PAD3) GND NET-(D1-A) NET-(R1-PAD2),5-pin DIN jack?
+MIDICON3,U2,7,CTED-(U2-PAD1) CTED-(U2-PAD3) GND NET-(R2-PAD2) NET-(R3-PAD2),5-pin DIN jack?
+MIDICON3,U3,7,CTED-(U3-PAD1) CTED-(U3-PAD3) GND NET-(R4-PAD2) NET-(R5-PAD2),5-pin DIN jack?
+PB86-A1_3-Pack,J1,4,GND SIG1 SIG2 SIG3,"JST-XH connector, 4 pins"
+PB86-A1_3-Pack,J2,4,LED1 LED2 LED3 VCC,"JST-XH connector, 4 pins"
+PB86-A1_3-Pack,SW1,5,GND NET-(SW1-LED+) SIG1 VCC,keyswitch/button (user-supplied?)
+PB86-A1_3-Pack,SW2,5,GND NET-(SW2-LED+) SIG2 VCC,keyswitch/button (user-supplied?)
+PB86-A1_3-Pack,SW3,5,GND NET-(SW3-LED+) SIG3 VCC,keyswitch/button (user-supplied?)
+PB86-A1_4-Pack,LED 1-3,0,,"JST-XH connector, 0 pins"
+PB86-A1_4-Pack,SW 1-3,0,,keyswitch/button (user-supplied?)
+PB86-A1_4-Pack,SW1,5,GND NET-(SW1-LED+) SIG1 VCC,keyswitch/button (user-supplied?)
+PB86-A1_4-Pack,SW2,5,GND NET-(SW2-LED+) SIG2 VCC,keyswitch/button (user-supplied?)
+PB86-A1_4-Pack,SW3,5,GND NET-(SW3-LED+) SIG3 VCC,keyswitch/button (user-supplied?)
+PB86-A1_4-Pack,SW4,5,GND NET-(SW4-LED+) SIG4 VCC,keyswitch/button (user-supplied?)
+PB86-A1_4-Pack,SWLED 4,0,,keyswitch/button (user-supplied?)
+PB86-A1_8-Pack,I2C PORT A,?,,"JST-XH connector, ? pins"
+PB86-A1_8-Pack,I2C PORT B,?,,"JST-XH connector, ? pins"
+PB86-A1_8-Pack,JP1,3,A0 GND VCC,solder jumper (no part)
+PB86-A1_8-Pack,JP2,3,A1 GND VCC,solder jumper (no part)
+PB86-A1_8-Pack,JP3,3,A2 GND VCC,solder jumper (no part)
+PB86-A1_8-Pack,SW1,5,GND NET-(SW1-LED+) SIG1 VCC,keyswitch/button (user-supplied?)
+PB86-A1_8-Pack,SW2,5,GND NET-(SW2-LED+) SIG2 VCC,keyswitch/button (user-supplied?)
+PB86-A1_8-Pack,SW3,5,GND NET-(SW3-LED+) SIG3 VCC,keyswitch/button (user-supplied?)
+PB86-A1_8-Pack,SW4,5,GND NET-(SW4-LED+) SIG4 VCC,keyswitch/button (user-supplied?)
+PB86-A1_8-Pack,SW5,5,GND NET-(SW5-LED+) SIG5 VCC,keyswitch/button (user-supplied?)
+PB86-A1_8-Pack,SW6,5,GND NET-(SW6-LED+) SIG6 VCC,keyswitch/button (user-supplied?)
+PB86-A1_8-Pack,SW7,5,GND NET-(SW7-LED+) SIG7 VCC,keyswitch/button (user-supplied?)
+PB86-A1_8-Pack,SW8,5,GND NET-(SW8-LED+) SIG8 VCC,keyswitch/button (user-supplied?)
+PotentiometerBoard,CONN1,3,+3V3 GND SIG,"JST-XH connector, 3 pins"
+PotentiometerBoard,RV1,5,+3V3 GND SIG,potentiometer (user-supplied)
+Potentiometer_3-Pack,CONN1,3,+3V3 GND SIG1,"JST-XH connector, 3 pins"
+Potentiometer_3-Pack,CONN2,3,+3V3 GND SIG2,"JST-XH connector, 3 pins"
+Potentiometer_3-Pack,CONN3,3,+3V3 GND SIG3,"JST-XH connector, 3 pins"
+Potentiometer_3-Pack,RV1,5,+3V3 GND SIG1,potentiometer (user-supplied)
+Potentiometer_3-Pack,RV2,5,+3V3 GND SIG2,potentiometer (user-supplied)
+Potentiometer_3-Pack,RV3,5,+3V3 GND SIG3,potentiometer (user-supplied)
+FaderBoard,RV1,,,in the BOM without an LCSC #: Fader_Dual_75mm [Fader_Slide_Dual_75mm_60mmTravel_B103] -- not ordered
+Multiplex16,"TP1, TP2, TP3",,,in the BOM without an LCSC #: TestPoint [TestPoint_Pad_D1.5mm] -- not ordered
+PB86-A1_3-Pack,"H1, H2, H3, H4",,,in the BOM without an LCSC #: HOLE_M3 [MountingHole_3.2mm_M3_Pad] -- not ordered
+PB86-A1_4-Pack,"H1, H2, H3, H4",,,in the BOM without an LCSC #: HOLE_M3 [MountingHole_3.2mm_M3_Pad] -- not ordered
+PB86-A1_8-Pack,"H1, H2, H3, H4",,,in the BOM without an LCSC #: HOLE_M3 [MountingHole_3.2mm_M3_Pad] -- not ordered
+SwitchBoard,SW1,,,in the BOM without an LCSC #: SW_TS_Universal [SW_Slide_Daier_TS-22E01_TS-23E01_Universal_v4] -- not ordered
