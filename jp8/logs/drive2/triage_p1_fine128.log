@@ -1,0 +1,5 @@
+[  13.0s] override eng 766 VCO2 FINE TUNE: bank raw 171 -> 128 through HOSTPARAM (host id 0x600020)
+[  14.4s] patch 1 'PD Jupiter Str' [fine128]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
+[  41.6s] FAIL key 48 LATE: DRY f0 65.38 Hz (-1201 c vs key) harmonic 0.752 | engine start u0 65.63/65.56 end u0 65.28/65.20 | dev 2.6 c | spectral peaks [(64.599609375, 97.20378443422725), (131.890869140625, 92.29664599515664), (196.490478515625, 65.2581523833919)] | NaN 0
+[  95.8s] PASS release 48: dry 0.0573 -> 0.017, master 0.075 -> 0.0349 | 3 s tail rule: dry 0 master 1.27e-06
+[ 103.5s] PASS key 60 EARLY: DRY f0 130.70 Hz (-1201 c vs key) harmonic 0.834 | engine start u0 130.16/130.00 end u0 130.54/130.38 | dev 2.2 c | spectral peaks [(131.890869140625, 77.34336262058598), (261.090087890625, 39.17852810435183), (392.98095703125, 26.024225240432934)] | NaN 0

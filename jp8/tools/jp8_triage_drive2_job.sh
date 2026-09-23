@@ -7,6 +7,6 @@ cd "$(dirname "$0")/../.." || exit 1
 export JP8_EMU_QUIET=1
 unset JP8_EMU_LEGACY_HOST
 SPEC=$1
-grep -v '^#' "$SPEC" | grep -v '^ *$' | xargs -P 2 -L 1 sh -c 'p=$0; t=$1; shift 2; python3 jp8/tools/jp8_drive2_triage.py $p "$@" tag=$t > jp8/logs/drive2/triage_p${p}_$t.log 2>&1; echo "patch $p $t exit $?"'
+grep -v '^#' "$SPEC" | grep -v '^ *$' | xargs -P 2 -L 1 sh -c 'p=$0; t=$1; shift 1; python3 jp8/tools/jp8_drive2_triage.py $p "$@" tag=$t > jp8/logs/drive2/triage_p${p}_$t.log 2>&1; echo "patch $p $t exit $?"'
 echo "TRIAGE verdicts:"
 grep -v '^#' "$SPEC" | grep -v '^ *$' | while read p t rest; do grep -h "TRIAGE patch" jp8/logs/drive2/triage_p${p}_$t.log || echo "patch $p $t: NO VERDICT"; done

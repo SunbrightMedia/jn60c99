@@ -1,0 +1,16 @@
+# drive2 sweep FAIL triage (step 6): <patch> <tag> <ENG=RAW overrides through HOSTPARAM> -- each override = the ENGINE DB
+# default of a confound named in the sweep row (or found in the log), never a value tuned to pass
+1 fine128 766=128
+7 xmod_lowfreq_porta_off 761=0 767=0 798=0
+12 sync_off 768=0
+13 sync_porta_off 768=0 798=0
+24 lfovco128 753=128
+24 lfovco0 753=0
+26 envmod_porta_lfo_res_off 776=128 798=0 753=128 781=0
+27 xmod_off 761=0
+34 xmod_off 761=0
+39 lfovco128 753=128
+39 lfovco0 753=0
+41 envmod_sync_off 776=128 768=0
+44 envmod_env2rel_off 776=128 792=0
+56 envmod_off 776=128
