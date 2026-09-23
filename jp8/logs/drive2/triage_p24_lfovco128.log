@@ -1,0 +1,3 @@
+[  12.6s] override eng 753 VCO LFO MOD: bank raw 255 -> 128 through HOSTPARAM (host id 0x600006)
+[  14.0s] patch 24 'SQ Deep Ocean' [lfovco128]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
+[  21.3s] PASS key 48 EARLY: DRY f0 130.75 Hz (-1 c vs key) harmonic 0.976 | engine start u0 131.00/392.87 end u0 130.62/391.74 | dev 1.7 c | spectral peaks [(131.890869140625, 117.56078697043657), (392.98095703125, 50.686768245601804), (654.071044921875, 3.1871925221749695)] | NaN 0

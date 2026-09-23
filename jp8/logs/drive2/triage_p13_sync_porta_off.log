@@ -3,3 +3,4 @@
 [  14.7s] patch 13 'LD Hawk Lead' [sync_porta_off]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
 [  42.1s] FAIL key 48 LATE: DRY f0 266.39 Hz (+1231 c vs key) harmonic 0.637 | engine start u0 198.23/628.58 end u0 143.63/455.45 | dev 511.6 c | spectral peaks [(263.78173828125, 73.43502601126087), (250.323486328125, 64.75726237653382), (277.239990234375, 50.72327163865769)] | NaN 0
 [  97.5s] PASS release 48: dry 0.0406 -> 0, master 0.0804 -> 0.0158 | 3 s tail rule: dry 0 master 0.000239
+[ 124.7s] FAIL key 60 EARLY: DRY f0 814.05 Hz (+1965 c vs key) harmonic 0.416 | engine start u0 1226.42/3888.92 end u0 813.64/2580.03 | dev 0.9 c | spectral peaks [(777.886962890625, 39.79691878742887), (796.728515625, 39.21139189144358), (759.04541015625, 37.33108018208464)] | NaN 0
