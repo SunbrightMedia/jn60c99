@@ -12,3 +12,8 @@
 [ 119.9s] FAIL key 60 EARLY: DRY f0 1530.26 Hz (+3058 c vs key) harmonic 0.857 peak 0.02099 master peak 0.06962 | engine u0 262.4/525.3 | dev 1851 c vs engine, 42 c vs semitone | NaN 0
 [ 174.2s] FAIL release dry 60: 0.0223 -> 0.0107 | FAIL release master: 0.0739 -> 0.0354 (24000 samples) | 3 s tail rule: dry 0.0012 master 0.00398 at 3.0 s -> FAIL/FAIL
 [ 181.7s] PASS key 72 EARLY: DRY f0 3150.00 Hz (+3108 c vs key) harmonic 0.851 peak 0.01083 master peak 0.03592 | engine u0 522.2/1045.2 | dev 1910 c vs engine, 8 c vs semitone | NaN 0
+[ 237.2s] FAIL release dry 72: 0.01 -> 0.0058 | FAIL release master: 0.0333 -> 0.0192 (24000 samples) | 3 s tail rule: dry 0.000715 master 0.00237 at 3.0 s -> FAIL/FAIL
+[ 237.2s] FAIL JX law (dry): FAIL pitch tracks keys by +31 semitones (offsets +3060, +3058, +3108 cents) | every key on its engine cell: False
+[ 237.2s] PASS NaN census 0; faults after static init 0; instr/sample idle 32073 sustain 31605
+[ 237.2s] ROW | 44 | 1981 Echo Piano | FAIL(pitch48,reldry48,relmaster48,pitch60,reldry60,relmaster60,reldry72,relmaster72,track) | 48:+3060c(E) 60:+3058c(E) 72:+3108c(E) | 0.97 0.86 0.85 | 1.57e-13 | 0 | 0 | 32073/31605 | VCO ENV MOD 248; ENV REL 0/160 |
+[ 237.2s] JP8 SWEEP patch 44: FAIL(pitch48,reldry48,relmaster48,pitch60,reldry60,relmaster60,reldry72,relmaster72,track)
