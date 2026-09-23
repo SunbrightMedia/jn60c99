@@ -9,7 +9,7 @@ Quantity,LCSC Part Number,Manufacture Part Number,Comment,Footprint,Boards (qty 
 23,C14663,,CC0603KRX7R9BB104 (+15% spare),C0603,Headphone_Dac x5; Multiplex16_Satellite x2
 21,C15850,,CL21A106KAYNNNE (+15% spare),C0805,Headphone_Dac x4; Multiplex16 x1
 3,C46550600,,600R (+15% spare),0805,Headphone_Dac x1
-12,C84262,,FC-2012YOXK,LED0805-RD_ORANGE,Headphone_Dac x1; Multiplex16 x1
+12,C84256,,"FC-2012YOXK -- NCD0805R1 red, same NATIONSTAR NCD0805 series; replaces backordered NCD0805O1 orange (v2)",LED0805-RD_ORANGE,Headphone_Dac x1; Multiplex16 x1
 28,C17414,,0805W8F1002T5E (+15% spare),R0805,Headphone_Dac x2; Multiplex16 x2
 10,C21190,,0603WAF1001T5E (+15% spare),R0603,Headphone_Dac x4
 7,C23140,,0603WAF330JT5E (+15% spare),R0603,Headphone_Dac x3

@@ -9,7 +9,7 @@ Quantity,LCSC Part Number,Manufacture Part Number,Comment,Footprint,Boards (qty 
 23,C14663,,CC0603KRX7R9BB104,C0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
 21,C15850,,CL21A106KAYNNNE,C0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
 3,C46550600,,600R,0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-12,C84262,,FC-2012YOXK,LED0805-RD_ORANGE,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+12,C84256,,FC-2012YOXK,LED0805-RD_ORANGE,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
 28,C17414,,0805W8F1002T5E,R0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
 10,C21190,,0603WAF1001T5E,R0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
 7,C23140,,0603WAF330JT5E,R0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv

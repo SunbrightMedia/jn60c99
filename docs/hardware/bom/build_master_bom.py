@@ -15,6 +15,8 @@ import csv, glob, os, re, collections
 HERE = os.path.dirname(os.path.abspath(__file__)); IN = os.path.join(HERE, "inputs")
 # parts that have no LCSC # in the board BOM: an MPN the LCSC BOM tool can match instead (INFERRED names, see notes)
 MPN_FOR = {("4.7k", "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"): ("MFR0W4F4701A50", "UNI-ROYAL 1/4W 1% metal film 4.7k, axial, fits DIN0207")}
+# LCSC substitutions for parts that are out of stock (the board BOM stays as designed; the order uses the substitute)
+SUBSTITUTE = {"C84262": ("C84256", "NCD0805R1 red, same NATIONSTAR NCD0805 series; replaces backordered NCD0805O1 orange (v2)")}
 USER_SUPPLIED = {"HOLE_M3", "TestPoint", "Fader_Dual_75mm", "SW_TS_Universal"}   # in a BOM but not bought from LCSC
 import math
 SPARE_PCT = 15   # extra on SMALL PASSIVES (every designator R*, C* or FB*), rounded up; everything else exact
@@ -33,6 +35,7 @@ for board in counts:
         if not lcsc:
             if (val, fp) in MPN_FOR: mpn, note = MPN_FOR[(val, fp)]
             else: skipped.append((board, val, fp, q, ds)); continue
+        if lcsc in SUBSTITUTE: lcsc, note = SUBSTITUTE[lcsc]
         key = lcsc or "MPN:" + mpn
         p = parts.setdefault(key, dict(lcsc=lcsc, mpn=mpn, values=[], footprint=fp, note=note, per_board=collections.OrderedDict()))
         if val not in p["values"]: p["values"].append(val)
