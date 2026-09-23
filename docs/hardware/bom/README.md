@@ -1,5 +1,7 @@
 # MASTER BOM (LCSC) -- all 14 boards, v1.0 (2026-09-23)
 
+Version v2 (2026-09-23): board counts per board_counts.csv, +15% on small passives (R, C, FB designators, rounded up), user_added.csv rows.
+
 Inputs: `inputs/` = each board's JLC export (bom.csv, designators.csv, netlist.ipc) from the user's EVERY_PCB_FILES.zip.
 Three boards have no bom.csv (KeyswitchKeybed, PotentiometerBoard, Potentiometer_3-Pack): every part on them is user-supplied
 or a connector with no LCSC field. `board_counts.csv` = how many of each board to build (all 1 today).

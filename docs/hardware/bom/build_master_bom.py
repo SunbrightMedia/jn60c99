@@ -16,6 +16,10 @@ HERE = os.path.dirname(os.path.abspath(__file__)); IN = os.path.join(HERE, "inpu
 # parts that have no LCSC # in the board BOM: an MPN the LCSC BOM tool can match instead (INFERRED names, see notes)
 MPN_FOR = {("4.7k", "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"): ("MFR0W4F4701A50", "UNI-ROYAL 1/4W 1% metal film 4.7k, axial, fits DIN0207")}
 USER_SUPPLIED = {"HOLE_M3", "TestPoint", "Fader_Dual_75mm", "SW_TS_Universal"}   # in a BOM but not bought from LCSC
+import math
+SPARE_PCT = 15   # extra on SMALL PASSIVES (every designator R*, C* or FB*), rounded up; everything else exact
+def is_passive(p): return all(re.match(r"(R|C|FB)\d", d) for q, ds in p["per_board"].values() for d in ds)
+def with_spare(n, p): return int(math.ceil(n * (1 + SPARE_PCT / 100.0) - 1e-9)) if is_passive(p) else n
 counts = {r["board"]: int(r["count"]) for r in csv.DictReader(open(os.path.join(HERE, "board_counts.csv")))}
 parts = collections.OrderedDict()   # key -> dict(lcsc, mpn, value, footprint, per_board{board: (qty, designators)})
 skipped = []
@@ -37,8 +41,8 @@ for board in counts:
 with open(os.path.join(HERE, "MASTER_BOM_LCSC.csv"), "w", newline="") as o:
     w = csv.writer(o); w.writerow(["Quantity", "LCSC Part Number", "Manufacture Part Number", "Comment", "Footprint", "Boards (qty per board)"])
     for key, p in parts.items():
-        tot = sum(q * counts[b] for b, (q, _) in p["per_board"].items())
-        if tot: w.writerow([tot, p["lcsc"], p["mpn"], " / ".join(p["values"]) + (" -- " + p["note"] if p["note"] else ""), p["footprint"],
+        tot = with_spare(sum(q * counts[b] for b, (q, _) in p["per_board"].items()), p)
+        if tot: w.writerow([tot, p["lcsc"], p["mpn"], " / ".join(p["values"]) + (" -- " + p["note"] if p["note"] else "") + (" (+%d%% spare)" % SPARE_PCT if is_passive(p) else ""), p["footprint"],
                             "; ".join("%s x%d" % (b.replace("_v1.0", ""), q) for b, (q, _) in p["per_board"].items())])
 extra = collections.Counter()
 for r in csv.DictReader(open(os.path.join(HERE, "missing_jst_proposed.csv"))):
@@ -46,15 +50,19 @@ for r in csv.DictReader(open(os.path.join(HERE, "missing_jst_proposed.csv"))):
 with open(os.path.join(HERE, "MASTER_BOM_LCSC_WITH_MISSING_JST.csv"), "w", newline="") as o:
     w = csv.writer(o); w.writerow(["Quantity", "LCSC Part Number", "Manufacture Part Number", "Comment", "Footprint", "Boards (qty per board)"])
     for key, p in parts.items():
-        tot = sum(q * counts[b] for b, (q, _) in p["per_board"].items()) + extra.pop(p["lcsc"], 0) if p["lcsc"] else sum(q * counts[b] for b, (q, _) in p["per_board"].items())
+        tot = with_spare(sum(q * counts[b] for b, (q, _) in p["per_board"].items()), p) + (extra.pop(p["lcsc"], 0) if p["lcsc"] else 0)
         if tot: w.writerow([tot, p["lcsc"], p["mpn"], " / ".join(p["values"])[:60], p["footprint"], "see BOM_BY_BOARD.csv + missing_jst_proposed.csv"])
     for lcsc, n in extra.items(): w.writerow([n, lcsc, "", "JST-XH (proposed)", "", "missing_jst_proposed.csv"])
+USER = list(csv.DictReader(open(os.path.join(HERE, "user_added.csv")))) if os.path.exists(os.path.join(HERE, "user_added.csv")) else []
+for fn in ("MASTER_BOM_LCSC.csv", "MASTER_BOM_LCSC_WITH_MISSING_JST.csv"):
+    with open(os.path.join(HERE, fn), "a", newline="") as o:
+        for r in USER: csv.writer(o).writerow([r["quantity"], r["lcsc"], "", r["note"], "", "user_added.csv"])
 boards = list(counts)
 with open(os.path.join(HERE, "BOM_BY_BOARD.csv"), "w", newline="") as o:
-    w = csv.writer(o); w.writerow(["LCSC Part Number", "Manufacture Part Number", "Comment"] + [b.replace("_v1.0", "") + " (x%d)" % counts[b] for b in boards] + ["TOTAL"])
+    w = csv.writer(o); w.writerow(["LCSC Part Number", "Manufacture Part Number", "Comment"] + [b.replace("_v1.0", "") + " (x%d)" % counts[b] for b in boards] + ["TOTAL (boards x count)", "ORDER (with spare)"])
     for key, p in parts.items():
         row = [p["per_board"].get(b, (0, []))[0] for b in boards]
-        w.writerow([p["lcsc"], p["mpn"], " / ".join(p["values"])] + row + [sum(q * counts[b] for q, b in zip(row, boards))])
+        t = sum(q * counts[b] for q, b in zip(row, boards)); w.writerow([p["lcsc"], p["mpn"], " / ".join(p["values"])] + row + [t, with_spare(t, p)])
     w.writerow([]); w.writerow(["BOARD COUNT", "", ""] + [counts[b] for b in boards])
 # placed parts that are in NO BOM, identified from the netlist (IPC-356 truncates reference designators to 6 characters)
 def netpins(board):

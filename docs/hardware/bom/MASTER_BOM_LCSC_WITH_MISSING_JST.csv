@@ -1,30 +1,31 @@
 Quantity,LCSC Part Number,Manufacture Part Number,Comment,Footprint,Boards (qty per board)
-22,C157925,,CLOCK_SYNC / SAT_SIG / BACKUP_MUX_SEL / GROUP1 / JST-XH CONT,CONN-TH_S4B-XH-A-LF-SN,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-22,C157931,,BACKUP_MUX_EN / SAT_PWR / USB_PWR / JST-XH MUX EN1 / JST-XH ,CONN-TH_S2B-XH-A-LF-SN,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-4,C5159940,,ESP32-S3 CONN,HDR-TH_11P-P2.54-V-F-1,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-38,C157928,,MUX_SIG / S3B-XH-A / TOGGLE,CONN-TH_S3B-XH-A-LF-SN,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-2,,MFR0W4F4701A50,4.7k,R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-4,C23630,,2.2uF CAP / CL10A225KO8NNNC,C0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-4,C45783,,CL21A226MAQNNNE,C0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-7,C14663,,CC0603KRX7R9BB104,C0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-5,C15850,,CL21A106KAYNNNE,C0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-1,C46550600,,600R,0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-2,C84262,,FC-2012YOXK,LED0805-RD_ORANGE,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-4,C17414,,0805W8F1002T5E,R0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-4,C21190,,0603WAF1001T5E,R0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-3,C23140,,0603WAF330JT5E,R0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-2,C22859,,0603WAF100JT5E,R0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-1,C107671,,PCM5102APWR,TSSOP-20_L6.5-W4.4-P0.65-LS6.4-BL,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-1,C69527,,VNEG GENERATOR,SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-1,C70439,,PHONESAMP,HSOP-20_L12.9-W7.5-P1.27-BL-EP,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-3,C400226,,KEYSWITCH,KEY-TH_CPG1511_15.75,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-5,C49678,,CC0805KRX7R9BB104,C0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-1,C81598,,1N4148W_C81598,SOD-123F_L2.7-W1.6-LS3.8-RD,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-20,C17557,,0805W8F2200T5E / 220,R0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-1,C17513,,0805W8F1001T5E,R0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-1,C78589,,OPTOCOUPLER,SMD-6_L7.3-W6.5-P2.54-LS10.2-BL,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-2,C163712,,MIDI-OUT BUFFER / MIDI-THRU BUFFER,SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-2,C10092,,SN74HC595DR,SOIC-16_3.9x9.9mm_P1.27mm,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-1,C496123,,CD74HC4067M96,SOIC-24_L15.4-W7.5-P1.27-LS10.3-BL,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-16,C17630,,0805W8F3300T5E,R0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
-1,C609791,,XL9555,TSSOP-24_L7.8-W4.4-P0.65-LS6.4-BL,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+103,C157925,,CLOCK_SYNC / SAT_SIG / BACKUP_MUX_SEL / GROUP1 / JST-XH CONT,CONN-TH_S4B-XH-A-LF-SN,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+109,C157931,,BACKUP_MUX_EN / SAT_PWR / USB_PWR / JST-XH MUX EN1 / JST-XH ,CONN-TH_S2B-XH-A-LF-SN,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+12,C5159940,,ESP32-S3 CONN,HDR-TH_11P-P2.54-V-F-1,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+268,C157928,,MUX_SIG / S3B-XH-A / TOGGLE,CONN-TH_S3B-XH-A-LF-SN,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+7,,MFR0W4F4701A50,4.7k,R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+10,C23630,,2.2uF CAP / CL10A225KO8NNNC,C0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+10,C45783,,CL21A226MAQNNNE,C0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+23,C14663,,CC0603KRX7R9BB104,C0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+21,C15850,,CL21A106KAYNNNE,C0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+3,C46550600,,600R,0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+12,C84262,,FC-2012YOXK,LED0805-RD_ORANGE,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+28,C17414,,0805W8F1002T5E,R0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+10,C21190,,0603WAF1001T5E,R0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+7,C23140,,0603WAF330JT5E,R0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+5,C22859,,0603WAF100JT5E,R0603,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+2,C107671,,PCM5102APWR,TSSOP-20_L6.5-W4.4-P0.65-LS6.4-BL,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+2,C69527,,VNEG GENERATOR,SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+2,C70439,,PHONESAMP,HSOP-20_L12.9-W7.5-P1.27-BL-EP,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+15,C400226,,KEYSWITCH,KEY-TH_CPG1511_15.75,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+35,C49678,,CC0805KRX7R9BB104,C0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+5,C81598,,1N4148W_C81598,SOD-123F_L2.7-W1.6-LS3.8-RD,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+115,C17557,,0805W8F2200T5E / 220,R0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+6,C17513,,0805W8F1001T5E,R0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+5,C78589,,OPTOCOUPLER,SMD-6_L7.3-W6.5-P2.54-LS10.2-BL,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+10,C163712,,MIDI-OUT BUFFER / MIDI-THRU BUFFER,SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+10,C10092,,SN74HC595DR,SOIC-16_3.9x9.9mm_P1.27mm,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+10,C496123,,CD74HC4067M96,SOIC-24_L15.4-W7.5-P1.27-LS10.3-BL,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+184,C17630,,0805W8F3300T5E,R0805,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+5,C609791,,XL9555,TSSOP-24_L7.8-W4.4-P0.65-LS6.4-BL,see BOM_BY_BOARD.csv + missing_jst_proposed.csv
+5,C41409498,,PJ-603 headphone jack (Headphone_Dac J8) - added by the user (v2),,user_added.csv
