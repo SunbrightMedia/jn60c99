@@ -1,0 +1,19 @@
+[  10.6s] boot sr 44100 patch 20 'SY Spit Sinker': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 128 SUB 0; confound candidates: REVERB 172 DELAY 111
+[  10.6s] CENSUS static init  host_map 744
+[  10.6s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.6s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.6s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.6s] CENSUS recall 20    live ramps 3627, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.6s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.2s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.2s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  20.2s] PASS key 48 EARLY: DRY f0 132.05 Hz (+16 c vs key) harmonic 0.981 peak 0.06083 master peak 0.1547 | engine u0 131.6/131.4 | dev 6 c vs engine, 16 c vs semitone | NaN 0
+[  30.0s] PASS release dry 48: 0.0217 -> 0 | PASS release master: 0.0649 -> 0.00165 (24000 samples)
+[  36.9s] PASS key 60 EARLY: DRY f0 263.51 Hz (+12 c vs key) harmonic 0.960 peak 0.0605 master peak 0.1532 | engine u0 263.1/262.8 | dev 3 c vs engine, 12 c vs semitone | NaN 0
+[  46.1s] PASS release dry 60: 0.0267 -> 0 | PASS release master: 0.07 -> 0.00193 (24000 samples)
+[  52.9s] PASS key 72 EARLY: DRY f0 527.13 Hz (+13 c vs key) harmonic 0.912 peak 0.05922 master peak 0.1476 | engine u0 528.5/527.8 | dev 2 c vs engine, 13 c vs semitone | NaN 0
+[  62.1s] PASS release dry 72: 0.0253 -> 0 | PASS release master: 0.0522 -> 0.0014 (24000 samples)
+[  62.1s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +16, +12, +13 cents) | every key on its engine cell: True
+[  62.1s] PASS NaN census 0; faults after static init 0; instr/sample idle 25473 sustain 25487
+[  62.1s] ROW | 20 | SY Spit Sinker | PASS | 48:+16c(E) 60:+12c(E) 72:+13c(E) | 0.98 0.96 0.91 | 1.57e-13 | 0 | 0 | 25473/25487 | REVERB 172 DELAY 111 |
+[  62.1s] JP8 SWEEP patch 20: PASS

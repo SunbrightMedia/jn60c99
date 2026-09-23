@@ -8,3 +8,5 @@
 [  12.8s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
 [  12.8s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
 [  22.0s] PASS key 48 EARLY: DRY f0 65.69 Hz (-1193 c vs key) harmonic 0.973 peak 0.06842 master peak 0.1561 | engine u0 130.6/65.5 | dev 4 c vs engine, 7 c vs semitone | NaN 0
+[  83.5s] PASS release dry 48: 0.028 -> 0.00191 | PASS release master: 0.0611 -> 0.00783 (24000 samples) | 3 s tail rule: dry 0 master 6e-09 at 3.0 s -> PASS/PASS
+[  91.8s] PASS key 60 EARLY: DRY f0 131.81 Hz (-1187 c vs key) harmonic 0.989 peak 0.0845 master peak 0.2239 | engine u0 264.0/132.5 | dev 9 c vs engine, 13 c vs semitone | NaN 0
