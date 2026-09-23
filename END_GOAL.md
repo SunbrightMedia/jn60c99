@@ -4,6 +4,18 @@ The user said this once and said it is the most important thing they will ever
 say on this project. It is written here so it never has to be said again, and
 so every future session reads it before anything else.
 
+## ⚑ AMENDED BY THE USER 2026-09-23 (BINDING, overrides item 2 below and every multi-board plan)
+
+The user's own words:
+
+> We will NOT be doing ANY MULTI-ESP32-S3 RUNS! THEY ARE NOT STABLE ENOUGH BECAUSE YOU CANNOT MAKE A
+> GOOD ENOUGH LINKAGE SYSTEM. WE WILL ONLY EVER USE ONE BOARD OF EQUIVALENT POWER FOR A SYNTH.
+
+So: **one board per synth, of ESP32-S3-class power. No chip-to-chip audio or voice links, ever.** Item 2's
+"exactly two boards", CHAIN4 (four boards) and the 4-slot carrier as a multi-chip engine are retired. A
+synth whose exact engine does not fit one such board needs a cheaper engine (optimized or sonic-gated)
+that does; the bit-exact port stays the reference it is graded against.
+
 ## The goal, verbatim in substance
 
 1. **Sonically accurate** — to a degree that is AUDIBLY IDENTICAL.

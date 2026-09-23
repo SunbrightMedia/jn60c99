@@ -25,9 +25,14 @@ go, or it is not written. 5 underwrites 2: a CONFIRM that only my own harness
 graded is NOT a confirmation — the oracle grades, and I must have watched it
 fail.
 
+# ⚑ ONE BOARD PER SYNTH (USER-BINDING 2026-09-23, overrides every multi-board line below)
+NO multi-ESP32-S3 runs, ever: the user judged chip-to-chip linkage not stable enough. Every synth runs on ONE
+board of ESP32-S3-class power. Two-chip / CHAIN4 / 4-slot multi-chip plans below are RETIRED (history only).
+An engine that does not fit one board gets a cheaper engine graded against the bit-exact port. END_GOAL.md top.
+
 # ⚑ READ FIRST, IN ORDER
 1. `END_GOAL.md` — WHAT we build (user's words, binding). Short form: audibly
-   identical, 6 voices, EXACTLY two ESP32-S3s, full FX incl. chorus, seamless
+   identical, 6 voices, ONE ESP32-S3-class board (amended 2026-09-23; was two), full FX incl. chorus, seamless
    real time, complete control of every parameter incl. recall, confidently
    proven, and THE WHOLE PROCESS REPEATABLE for the next synth (item 7). Plus
    THE INVARIANT: audio never breaks, for any input; changes may land late.
