@@ -1,0 +1,19 @@
+[  11.4s] boot sr 44100 patch 34 'SQ Arpg Terra': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 1 VCO2 RANGE 2 FINE 154 SUB 0; confound candidates: CROSS MOD 252, REVERB 80 DELAY 44
+[  11.4s] CENSUS static init  host_map 744
+[  11.4s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  11.4s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.4s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.4s] CENSUS recall 34    live ramps 3789, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.4s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  13.2s] PASS idle 4096: dry peak 0 master peak 0.000827 NaN 0
+[  13.2s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  46.5s] PASS key 48 LATE: DRY f0 64.81 Hz (-1216 c vs key) harmonic 0.873 peak 0.03636 master peak 0.4414 | engine u0 64.9/131.2 | dev 1 c vs engine, 16 c vs semitone | NaN 0
+[ 109.7s] PASS release dry 48: 0.00121 -> 0 | PASS release master: 0.0789 -> 0.0253 (24000 samples) | 3 s tail rule: dry 0 master 0.000131 at 3.0 s -> PASS/PASS
+[ 143.3s] FAIL key 60 EARLY: DRY f0 130.27 Hz (-1207 c vs key) harmonic 0.717 peak 0.106 master peak 0.5038 | engine u0 1483.1/527.1 | dev 2420 c vs engine, 7 c vs semitone | NaN 0
+[ 206.1s] PASS release dry 60: 0.00917 -> 0 | PASS release master: 0.123 -> 0.0257 (24000 samples) | 3 s tail rule: dry 0 master 0.000192 at 3.0 s -> PASS/PASS
+[ 237.6s] FAIL key 72 EARLY: DRY f0 259.96 Hz (-1211 c vs key) harmonic 0.734 peak 0.1114 master peak 0.5249 | engine u0 1781.3/2097.7 | dev 3332 c vs engine, 11 c vs semitone | NaN 0
+[ 303.8s] PASS release dry 72: 0.0162 -> 0 | PASS release master: 0.173 -> 0.0315 (24000 samples) | 3 s tail rule: dry 0 master 0.000164 at 3.0 s -> PASS/PASS
+[ 303.8s] FAIL JX law (dry): FAIL harmonic/f0: [(48, np.float64(64.81410670077709), 0.8726472222688239), (60, np.float64(130.26809774731922), 0.7166876978343039), (72, np.float64(259.9625577010983), 0.7338729495737265)] | every key on its engine cell: False
+[ 303.8s] PASS NaN census 0; faults after static init 0; instr/sample idle 29753 sustain 30169
+[ 303.8s] ROW | 34 | SQ Arpg Terra | FAIL(pitch60,pitch72,track) | 48:-1216c(L) 60:-1207c(E) 72:-1211c(E) | 0.87 0.72 0.73 | 0.000827 | 0 | 0 | 29753/30169 | CROSS MOD 252; REVERB 80 DELAY 44 |
+[ 303.8s] JP8 SWEEP patch 34: FAIL(pitch60,pitch72,track)

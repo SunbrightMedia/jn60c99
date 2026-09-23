@@ -1,0 +1,19 @@
+[   8.9s] boot sr 44100 patch 41 '1981 Cars Sync': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 3 FINE 128 SUB -1; confound candidates: VCO ENV MOD 204, SYNC
+[   8.9s] CENSUS static init  host_map 744
+[   8.9s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   8.9s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   8.9s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   8.9s] CENSUS recall 41    live ramps 3465, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   8.9s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.3s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.3s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  36.6s] FAIL key 48 EARLY: DRY f0 2594.12 Hz (+5172 c vs key) harmonic 0.053 peak 0.07681 master peak 0.1379 | engine u0 65.3/123.2 | dev 5276 c vs engine, 28 c vs semitone | NaN 0
+[  45.8s] PASS release dry 48: 0.0403 -> 0 | PASS release master: 0.0742 -> 1.57e-13 (24000 samples)
+[  71.0s] FAIL key 60 LATE: DRY f0 311.35 Hz (+301 c vs key) harmonic 0.544 peak 0.07682 master peak 0.1379 | engine u0 130.8/246.7 | dev 403 c vs engine, 1 c vs semitone | NaN 0
+[  80.6s] PASS release dry 60: 0.052 -> 0 | PASS release master: 0.0991 -> 1.57e-13 (24000 samples)
+[ 105.9s] FAIL key 72 LATE: DRY f0 609.54 Hz (+264 c vs key) harmonic 0.574 peak 0.07562 master peak 0.1357 | engine u0 261.9/493.9 | dev 364 c vs engine, 36 c vs semitone | NaN 0
+[ 115.4s] PASS release dry 72: 0.0605 -> 0 | PASS release master: 0.109 -> 1.57e-13 (24000 samples)
+[ 115.4s] FAIL JX law (dry): FAIL harmonic/f0: [(48, 2594.1176470588234, 0.05340125692568271), (60, np.float64(311.3498289465968), 0.5437568849878871), (72, np.float64(609.5441379909672), 0.5743752769487814)] | every key on its engine cell: False
+[ 115.4s] PASS NaN census 0; faults after static init 0; instr/sample idle 30023 sustain 29497
+[ 115.4s] ROW | 41 | 1981 Cars Sync | FAIL(pitch48,pitch60,pitch72,track) | 48:+5172c(E) 60:+301c(L) 72:+264c(L) | 0.05 0.54 0.57 | 1.57e-13 | 0 | 0 | 30023/29497 | VCO ENV MOD 204; SYNC |
+[ 115.4s] JP8 SWEEP patch 41: FAIL(pitch48,pitch60,pitch72,track)

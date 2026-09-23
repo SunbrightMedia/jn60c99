@@ -1,0 +1,19 @@
+[   9.2s] boot sr 44100 patch 45 '1981 Honky Tonk': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 196 SUB 0; confound candidates: ENV REL 188/100
+[   9.2s] CENSUS static init  host_map 744
+[   9.2s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.2s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] CENSUS recall 45    live ramps 3465, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.5s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.5s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  18.6s] PASS key 48 EARLY: DRY f0 132.00 Hz (+16 c vs key) harmonic 0.970 peak 0.1141 master peak 0.2091 | engine u0 130.6/132.8 | dev 10 c vs engine, 16 c vs semitone | NaN 0
+[  28.0s] PASS release dry 48: 0.0406 -> 0 | PASS release master: 0.0745 -> 1.57e-13 (24000 samples)
+[  35.0s] PASS key 60 EARLY: DRY f0 263.83 Hz (+15 c vs key) harmonic 0.982 peak 0.1008 master peak 0.1848 | engine u0 261.2/265.5 | dev 11 c vs engine, 15 c vs semitone | NaN 0
+[  44.2s] PASS release dry 60: 0.0437 -> 0 | PASS release master: 0.0801 -> 1.57e-13 (24000 samples)
+[  51.2s] PASS key 72 EARLY: DRY f0 527.61 Hz (+14 c vs key) harmonic 0.975 peak 0.1155 master peak 0.2118 | engine u0 524.6/533.3 | dev 10 c vs engine, 14 c vs semitone | NaN 0
+[  60.5s] PASS release dry 72: 0.0413 -> 0 | PASS release master: 0.0757 -> 1.57e-13 (24000 samples)
+[  60.5s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +16, +15, +14 cents) | every key on its engine cell: True
+[  60.5s] PASS NaN census 0; faults after static init 0; instr/sample idle 29905 sustain 29522
+[  60.5s] ROW | 45 | 1981 Honky Tonk | PASS | 48:+16c(E) 60:+15c(E) 72:+14c(E) | 0.97 0.98 0.97 | 1.57e-13 | 0 | 0 | 29905/29522 | ENV REL 188/100 |
+[  60.5s] JP8 SWEEP patch 45: PASS

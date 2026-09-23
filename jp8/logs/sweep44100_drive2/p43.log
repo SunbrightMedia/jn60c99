@@ -1,0 +1,19 @@
+[   9.2s] boot sr 44100 patch 43 '1981 Clav': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 138 SUB 0; confound candidates: none
+[   9.2s] CENSUS static init  host_map 744
+[   9.2s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.2s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] CENSUS recall 43    live ramps 3465, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.7s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.7s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  18.5s] PASS key 48 EARLY: DRY f0 65.41 Hz (-1200 c vs key) harmonic 0.960 peak 0.1392 master peak 0.441 | engine u0 65.3/65.3 | dev 2 c vs engine, 0 c vs semitone | NaN 0
+[  27.5s] PASS release dry 48: 0.0129 -> 0 | PASS release master: 0.0415 -> 1.57e-13 (24000 samples)
+[  34.3s] PASS key 60 EARLY: DRY f0 130.77 Hz (-1201 c vs key) harmonic 0.990 peak 0.1643 master peak 0.5206 | engine u0 130.6/130.5 | dev 2 c vs engine, 1 c vs semitone | NaN 0
+[  43.8s] PASS release dry 60: 0.0393 -> 0 | PASS release master: 0.126 -> 1.57e-13 (24000 samples)
+[  50.7s] PASS key 72 EARLY: DRY f0 261.57 Hz (-1200 c vs key) harmonic 0.981 peak 0.1697 master peak 0.5378 | engine u0 262.3/262.2 | dev 4 c vs engine, 0 c vs semitone | NaN 0
+[  60.0s] PASS release dry 72: 0.0168 -> 0 | PASS release master: 0.053 -> 1.57e-13 (24000 samples)
+[  60.0s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1200, -1201, -1200 cents) | every key on its engine cell: True
+[  60.0s] PASS NaN census 0; faults after static init 0; instr/sample idle 30007 sustain 29524
+[  60.0s] ROW | 43 | 1981 Clav | PASS | 48:-1200c(E) 60:-1201c(E) 72:-1200c(E) | 0.96 0.99 0.98 | 1.57e-13 | 0 | 0 | 30007/29524 | - |
+[  60.0s] JP8 SWEEP patch 43: PASS

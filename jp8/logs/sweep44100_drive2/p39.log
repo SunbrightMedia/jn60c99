@@ -1,0 +1,19 @@
+[  69.0s] boot sr 44100 patch 39 'SQ Peppercorn': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 5 FINE 142 SUB 0; confound candidates: REVERB 80 DELAY 87, LFO->VCO 255
+[  69.0s] CENSUS static init  host_map 744
+[  69.0s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  69.0s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  69.0s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  69.0s] CENSUS recall 39    live ramps 3555, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  69.0s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  72.5s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  72.5s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[ 140.3s] FAIL key 48 EARLY: DRY f0 260.36 Hz (+1192 c vs key) harmonic 0.649 peak 0.06785 master peak 0.1192 | engine u0 65.3/261.5 | dev 8 c vs engine, 8 c vs semitone | NaN 0
+[ 155.8s] PASS release dry 48: 0 -> 0 | PASS release master: 1.55e-06 -> 1.17e-07 (24000 samples)
+[ 181.4s] FAIL key 60 EARLY: DRY f0 523.38 Hz (+1200 c vs key) harmonic 0.707 peak 0.04494 master peak 0.07894 | engine u0 130.7/523.0 | dev 1 c vs engine, 0 c vs semitone | NaN 0
+[ 190.5s] PASS release dry 60: 0 -> 0 | PASS release master: 1.32e-06 -> 9.52e-08 (24000 samples)
+[ 215.6s] FAIL key 72 EARLY: DRY f0 1048.17 Hz (+1203 c vs key) harmonic 0.599 peak 0.02288 master peak 0.04019 | engine u0 262.0/1048.7 | dev 1 c vs engine, 3 c vs semitone | NaN 0
+[ 224.6s] PASS release dry 72: 0 -> 0 | PASS release master: 1.31e-06 -> 4.95e-08 (24000 samples)
+[ 224.6s] PASS JX law (dry): FAIL harmonic/f0: [(48, np.float64(260.35570211265053), 0.6494248386800506), (60, np.float64(523.3805058358035), 0.7072697124689273), (72, np.float64(1048.1749564840957), 0.5994054740013866)] | every key on its engine cell: True
+[ 224.6s] PASS NaN census 0; faults after static init 0; instr/sample idle 30024 sustain 29572
+[ 224.6s] ROW | 39 | SQ Peppercorn | FAIL(pitch48,pitch60,pitch72) | 48:+1192c(E) 60:+1200c(E) 72:+1203c(E) | 0.65 0.71 0.60 | 1.57e-13 | 0 | 0 | 30024/29572 | REVERB 80 DELAY 87; LFO->VCO 255 |
+[ 224.6s] JP8 SWEEP patch 39: FAIL(pitch48,pitch60,pitch72)

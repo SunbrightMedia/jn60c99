@@ -1,0 +1,19 @@
+[   8.8s] boot sr 44100 patch 42 '1981 Hammer Lead': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 148 SUB 0; confound candidates: none
+[   8.8s] CENSUS static init  host_map 744
+[   8.8s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   8.8s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   8.8s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   8.8s] CENSUS recall 42    live ramps 3393, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   8.8s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.2s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.2s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  17.7s] PASS key 48 EARLY: DRY f0 65.48 Hz (-1198 c vs key) harmonic 0.985 peak 0.1193 master peak 0.5327 | engine u0 65.3/65.5 | dev 0 c vs engine, 2 c vs semitone | NaN 0
+[  27.1s] PASS release dry 48: 0.0656 -> 0 | PASS release master: 0.298 -> 1.57e-13 (24000 samples)
+[  34.1s] PASS key 60 EARLY: DRY f0 130.97 Hz (-1198 c vs key) harmonic 0.986 peak 0.07668 master peak 0.342 | engine u0 130.6/130.9 | dev 1 c vs engine, 2 c vs semitone | NaN 0
+[  43.5s] PASS release dry 60: 0.0402 -> 0 | PASS release master: 0.184 -> 1.57e-13 (24000 samples)
+[  50.1s] PASS key 72 EARLY: DRY f0 261.83 Hz (-1199 c vs key) harmonic 0.977 peak 0.08924 master peak 0.3982 | engine u0 262.3/263.0 | dev 3 c vs engine, 1 c vs semitone | NaN 0
+[  59.4s] PASS release dry 72: 0.0718 -> 0 | PASS release master: 0.32 -> 1.57e-13 (24000 samples)
+[  59.4s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1198, -1198, -1199 cents) | every key on its engine cell: True
+[  59.4s] PASS NaN census 0; faults after static init 0; instr/sample idle 30055 sustain 29561
+[  59.4s] ROW | 42 | 1981 Hammer Lead | PASS | 48:-1198c(E) 60:-1198c(E) 72:-1199c(E) | 0.98 0.99 0.98 | 1.57e-13 | 0 | 0 | 30055/29561 | - |
+[  59.4s] JP8 SWEEP patch 42: PASS

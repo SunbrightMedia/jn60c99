@@ -1,0 +1,19 @@
+[  11.3s] boot sr 44100 patch 33 'PD JP Pad Mach': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 1 FINE 171 SUB 0; confound candidates: REVERB 40 DELAY 152
+[  11.3s] CENSUS static init  host_map 744
+[  11.3s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  11.3s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.3s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.3s] CENSUS recall 33    live ramps 3627, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.3s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  13.1s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  13.1s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  22.5s] PASS key 48 EARLY: DRY f0 33.00 Hz (-2384 c vs key) harmonic 0.824 peak 0.1333 master peak 0.1594 | engine u0 65.6/33.1 | dev 6 c vs engine, 16 c vs semitone | NaN 0
+[  85.9s] PASS release dry 48: 0.0866 -> 0.00922 | PASS release master: 0.119 -> 0.0149 (24000 samples) | 3 s tail rule: dry 0 master 5.93e-09 at 3.0 s -> PASS/PASS
+[  94.2s] PASS key 60 EARLY: DRY f0 65.66 Hz (-2393 c vs key) harmonic 0.822 peak 0.152 master peak 0.1946 | engine u0 130.5/65.9 | dev 5 c vs engine, 7 c vs semitone | NaN 0
+[ 158.8s] PASS release dry 60: 0.111 -> 0.00858 | PASS release master: 0.186 -> 0.0211 (24000 samples) | 3 s tail rule: dry 0 master 7.74e-09 at 3.0 s -> PASS/PASS
+[ 167.7s] PASS key 72 EARLY: DRY f0 131.47 Hz (-2391 c vs key) harmonic 0.872 peak 0.1475 master peak 0.1614 | engine u0 262.3/132.3 | dev 11 c vs engine, 9 c vs semitone | NaN 0
+[ 230.3s] PASS release dry 72: 0.127 -> 0.00792 | PASS release master: 0.152 -> 0.0204 (24000 samples) | 3 s tail rule: dry 0 master 4.24e-09 at 3.0 s -> PASS/PASS
+[ 230.3s] PASS JX law (dry): PASS pitch tracks keys by -24 semitones (offsets -2384, -2393, -2391 cents) | every key on its engine cell: True
+[ 230.3s] PASS NaN census 0; faults after static init 0; instr/sample idle 30011 sustain 29524
+[ 230.3s] ROW | 33 | PD JP Pad Mach | PASS | 48:-2384c(E) 60:-2393c(E) 72:-2391c(E) | 0.82 0.82 0.87 | 1.57e-13 | 0 | 0 | 30011/29524 | REVERB 40 DELAY 152 |
+[ 230.3s] JP8 SWEEP patch 33: PASS

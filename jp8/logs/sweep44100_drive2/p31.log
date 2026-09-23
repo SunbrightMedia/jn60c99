@@ -1,0 +1,19 @@
+[  11.0s] boot sr 44100 patch 31 'DR Percussion': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 5 FINE 128 SUB 0; confound candidates: VCO ENV MOD 0, ENV REL 98/157, REVERB 154 DELAY 0
+[  11.0s] CENSUS static init  host_map 744
+[  11.0s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  11.0s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.0s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.0s] CENSUS recall 31    live ramps 3411, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.0s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.4s] PASS idle 4096: dry peak 0 master peak 0.00167 NaN 0
+[  12.4s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  42.1s] PASS key 48 LATE: DRY f0 131.01 Hz (+3 c vs key) harmonic 0.980 peak 8.097e-05 master peak 0.0016 | engine u0 130.6/521.9 | dev 5 c vs engine, 3 c vs semitone | NaN 0
+[  51.5s] PASS release dry 48: 7.86e-05 -> 0 | PASS release master: 0.00136 -> 4.33e-05 (24000 samples)
+[  76.9s] PASS key 60 LATE: DRY f0 261.42 Hz (-1 c vs key) harmonic 0.983 peak 0.0001399 master peak 0.004931 | engine u0 261.6/1045.3 | dev 2 c vs engine, 1 c vs semitone | NaN 0
+[  86.7s] PASS release dry 60: 0.000139 -> 0 | PASS release master: 0.00455 -> 9.99e-05 (24000 samples)
+[ 114.0s] PASS key 72 LATE: DRY f0 523.04 Hz (-1 c vs key) harmonic 0.989 peak 0.0003733 master peak 0.02236 | engine u0 523.9/2092.9 | dev 3 c vs engine, 1 c vs semitone | NaN 0
+[ 124.1s] PASS release dry 72: 0.000372 -> 0 | PASS release master: 0.0215 -> 0.000385 (24000 samples)
+[ 124.1s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +3, -1, -1 cents) | every key on its engine cell: True
+[ 124.1s] PASS NaN census 0; faults after static init 0; instr/sample idle 25481 sustain 25971
+[ 124.1s] ROW | 31 | DR Percussion | PASS | 48:+3c(L) 60:-1c(L) 72:-1c(L) | 0.98 0.98 0.99 | 0.00167 | 0 | 0 | 25481/25971 | VCO ENV MOD 0; ENV REL 98/157; REVERB 154 DELAY 0 |
+[ 124.1s] JP8 SWEEP patch 31: PASS

@@ -1,0 +1,19 @@
+[  11.2s] boot sr 44100 patch 32 'SQ Arpg Hardball': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 155 SUB 0; confound candidates: REVERB 65 DELAY 14
+[  11.2s] CENSUS static init  host_map 744
+[  11.2s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  11.2s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.2s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.2s] CENSUS recall 32    live ramps 3555, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.2s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.8s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.8s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  21.5s] PASS key 48 EARLY: DRY f0 65.28 Hz (-1203 c vs key) harmonic 0.989 peak 0.5844 master peak 0.8986 | engine u0 130.6/131.2 | dev 1201 c vs engine, 3 c vs semitone | NaN 0
+[  33.0s] PASS release dry 48: 0.323 -> 0 | PASS release master: 0.484 -> 0.00709 (24000 samples)
+[  42.5s] PASS key 60 EARLY: DRY f0 130.84 Hz (-1200 c vs key) harmonic 0.987 peak 0.6093 master peak 0.9299 | engine u0 522.4/524.8 | dev 2397 c vs engine, 0 c vs semitone | NaN 0
+[  55.1s] PASS release dry 60: 0.458 -> 0 | PASS release master: 0.688 -> 0.0089 (24000 samples)
+[  63.3s] PASS key 72 EARLY: DRY f0 261.52 Hz (-1201 c vs key) harmonic 0.982 peak 0.2585 master peak 0.4006 | engine u0 2098.6/2108.2 | dev 3605 c vs engine, 1 c vs semitone | NaN 0
+[  74.6s] PASS release dry 72: 0.174 -> 0 | PASS release master: 0.257 -> 0.00391 (24000 samples)
+[  74.6s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1203, -1200, -1201 cents) | every key on its engine cell: False
+[  74.6s] PASS NaN census 0; faults after static init 0; instr/sample idle 29263 sustain 29374
+[  74.6s] ROW | 32 | SQ Arpg Hardball | PASS | 48:-1203c(E) 60:-1200c(E) 72:-1201c(E) | 0.99 0.99 0.98 | 1.57e-13 | 0 | 0 | 29263/29374 | REVERB 65 DELAY 14 |
+[  74.6s] JP8 SWEEP patch 32: PASS

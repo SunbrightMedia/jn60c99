@@ -1,0 +1,19 @@
+[   9.3s] boot sr 44100 patch 40 '1981 NEG Pluck': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: none
+[   9.3s] CENSUS static init  host_map 744
+[   9.3s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.3s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.3s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.3s] CENSUS recall 40    live ramps 3465, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.3s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.7s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.7s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  18.1s] PASS key 48 EARLY: DRY f0 65.60 Hz (-1195 c vs key) harmonic 0.986 peak 0.07223 master peak 0.275 | engine u0 65.3/65.2 | dev 7 c vs engine, 5 c vs semitone | NaN 0
+[  27.1s] PASS release dry 48: 0.0594 -> 0 | PASS release master: 0.226 -> 1.57e-13 (24000 samples)
+[  33.4s] PASS key 60 EARLY: DRY f0 130.85 Hz (-1200 c vs key) harmonic 0.986 peak 0.06727 master peak 0.256 | engine u0 130.6/130.4 | dev 3 c vs engine, 0 c vs semitone | NaN 0
+[  42.8s] PASS release dry 60: 0.0613 -> 0 | PASS release master: 0.233 -> 1.57e-13 (24000 samples)
+[  49.4s] PASS key 72 EARLY: DRY f0 261.75 Hz (-1199 c vs key) harmonic 0.971 peak 0.06924 master peak 0.2636 | engine u0 262.3/262.0 | dev 2 c vs engine, 1 c vs semitone | NaN 0
+[  58.3s] PASS release dry 72: 0.0555 -> 0 | PASS release master: 0.211 -> 1.57e-13 (24000 samples)
+[  58.3s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1195, -1200, -1199 cents) | every key on its engine cell: True
+[  58.3s] PASS NaN census 0; faults after static init 0; instr/sample idle 29741 sustain 29223
+[  58.3s] ROW | 40 | 1981 NEG Pluck | PASS | 48:-1195c(E) 60:-1200c(E) 72:-1199c(E) | 0.99 0.99 0.97 | 1.57e-13 | 0 | 0 | 29741/29223 | - |
+[  58.3s] JP8 SWEEP patch 40: PASS

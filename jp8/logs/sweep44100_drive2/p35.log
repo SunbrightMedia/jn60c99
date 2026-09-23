@@ -1,0 +1,19 @@
+[  11.5s] boot sr 44100 patch 35 'PD Lunar Breeze': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 148 SUB 0; confound candidates: REVERB 216 DELAY 108
+[  11.5s] CENSUS static init  host_map 744
+[  11.5s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  11.5s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.5s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.5s] CENSUS recall 35    live ramps 3627, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.5s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  13.2s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  13.2s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  22.4s] PASS key 48 EARLY: DRY f0 131.75 Hz (+12 c vs key) harmonic 0.993 peak 0.01861 master peak 0.09088 | engine u0 131.1/131.4 | dev 4 c vs engine, 12 c vs semitone | NaN 0
+[  88.9s] PASS release dry 48: 0.0185 -> 0.00689 | PASS release master: 0.0897 -> 0.0261 (24000 samples) | 3 s tail rule: dry 0 master 6.34e-06 at 3.0 s -> PASS/PASS
+[  97.6s] PASS key 60 EARLY: DRY f0 262.07 Hz (+3 c vs key) harmonic 0.977 peak 0.0124 master peak 0.0629 | engine u0 261.2/261.9 | dev 1 c vs engine, 3 c vs semitone | NaN 0
+[ 161.3s] PASS release dry 60: 0.0124 -> 0.00366 | PASS release master: 0.0611 -> 0.0334 (24000 samples) | 3 s tail rule: dry 0 master 7.57e-06 at 3.0 s -> PASS/PASS
+[ 169.7s] PASS key 72 EARLY: DRY f0 526.40 Hz (+10 c vs key) harmonic 0.978 peak 0.05218 master peak 0.1816 | engine u0 523.7/525.1 | dev 4 c vs engine, 10 c vs semitone | NaN 0
+[ 234.8s] PASS release dry 72: 0.0531 -> 0.0137 | PASS release master: 0.18 -> 0.071 (24000 samples) | 3 s tail rule: dry 0 master 6.24e-06 at 3.0 s -> PASS/PASS
+[ 234.8s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +12, +3, +10 cents) | every key on its engine cell: True
+[ 234.8s] PASS NaN census 0; faults after static init 0; instr/sample idle 29545 sustain 29591
+[ 234.8s] ROW | 35 | PD Lunar Breeze | PASS | 48:+12c(E) 60:+3c(E) 72:+10c(E) | 0.99 0.98 0.98 | 1.57e-13 | 0 | 0 | 29545/29591 | REVERB 216 DELAY 108 |
+[ 234.8s] JP8 SWEEP patch 35: PASS

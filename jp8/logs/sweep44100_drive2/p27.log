@@ -1,0 +1,19 @@
+[  10.8s] boot sr 44100 patch 27 'BS Waver Bass': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: CROSS MOD 73
+[  10.8s] CENSUS static init  host_map 744
+[  10.8s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.8s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS recall 27    live ramps 3609, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.5s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.5s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  45.9s] FAIL key 48 EARLY: DRY f0 64.34 Hz (-1228 c vs key) harmonic 0.976 peak 0.5935 master peak 0.6319 | engine u0 258.7/133.5 | dev 1263 c vs engine, 28 c vs semitone | NaN 0
+[ 110.0s] PASS release dry 48: 0.292 -> 0.143 | PASS release master: 0.311 -> 0.152 (24000 samples) | 3 s tail rule: dry 0.000486 master 0.000517 at 3.0 s -> PASS/PASS
+[ 142.8s] FAIL key 60 LATE: DRY f0 128.00 Hz (-1238 c vs key) harmonic 0.966 peak 0.2154 master peak 0.2289 | engine u0 717.4/533.7 | dev 2472 c vs engine, 38 c vs semitone | NaN 0
+[ 206.3s] PASS release dry 60: 0.16 -> 0.0834 | PASS release master: 0.17 -> 0.0886 (24000 samples) | 3 s tail rule: dry 0.000418 master 0.000445 at 3.0 s -> PASS/PASS
+[ 214.9s] PASS key 72 EARLY: DRY f0 262.55 Hz (-1194 c vs key) harmonic 0.959 peak 0.2503 master peak 0.2661 | engine u0 3396.1/2032.5 | dev 3543 c vs engine, 6 c vs semitone | NaN 0
+[ 280.1s] PASS release dry 72: 0.153 -> 0.0998 | PASS release master: 0.162 -> 0.106 (24000 samples) | 3 s tail rule: dry 0.00053 master 0.000563 at 3.0 s -> PASS/PASS
+[ 280.1s] FAIL JX law (dry): FAIL pitch tracks keys by -12 semitones (offsets -1228, -1238, -1194 cents) | every key on its engine cell: False
+[ 280.1s] PASS NaN census 0; faults after static init 0; instr/sample idle 31601 sustain 31628
+[ 280.1s] ROW | 27 | BS Waver Bass | FAIL(pitch48,pitch60,track) | 48:-1228c(E) 60:-1238c(L) 72:-1194c(E) | 0.98 0.97 0.96 | 1.57e-13 | 0 | 0 | 31601/31628 | CROSS MOD 73 |
+[ 280.1s] JP8 SWEEP patch 27: FAIL(pitch48,pitch60,track)

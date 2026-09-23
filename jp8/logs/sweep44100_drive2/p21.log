@@ -12,3 +12,8 @@
 [  41.3s] PASS key 60 EARLY: DRY f0 65.29 Hz (-2403 c vs key) harmonic 0.982 peak 0.1061 master peak 0.5879 | engine u0 65.3/130.4 | dev 0 c vs engine, 3 c vs semitone | NaN 0
 [  52.9s] PASS release dry 60: 0.02 -> 0 | PASS release master: 0.093 -> 0.00313 (24000 samples)
 [  61.4s] PASS key 72 EARLY: DRY f0 130.58 Hz (-2403 c vs key) harmonic 0.984 peak 0.1102 master peak 0.61 | engine u0 131.2/262.0 | dev 8 c vs engine, 3 c vs semitone | NaN 0
+[ 124.5s] PASS release dry 72: 0.0161 -> 0 | PASS release master: 0.0593 -> 0.00384 (24000 samples) | 3 s tail rule: dry 0 master 1.6e-08 at 3.0 s -> PASS/PASS
+[ 124.5s] PASS JX law (dry): PASS pitch tracks keys by -24 semitones (offsets -2406, -2403, -2403 cents) | every key on its engine cell: True
+[ 124.5s] PASS NaN census 0; faults after static init 0; instr/sample idle 30079 sustain 29603
+[ 124.5s] ROW | 21 | BS Thrillin' Bs | PASS | 48:-2406c(E) 60:-2403c(E) 72:-2403c(E) | 0.99 0.98 0.98 | 1.57e-13 | 0 | 0 | 30079/29603 | REVERB 146 DELAY 2 |
+[ 124.5s] JP8 SWEEP patch 21: PASS

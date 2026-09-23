@@ -1,0 +1,19 @@
+[  10.8s] boot sr 44100 patch 26 'LD ELK Sitar': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 1 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: VCO ENV MOD 255, PORTAMENTO 43, ENV REL 194/215, REVERB 38 DELAY 86, LFO->VCO 200
+[  10.8s] CENSUS static init  host_map 744
+[  10.8s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.8s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS recall 26    live ramps 3717, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.5s] PASS idle 4096: dry peak 0 master peak 0.000504 NaN 0
+[  12.5s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  44.3s] FAIL key 48 EARLY: DRY f0 217.50 Hz (+880 c vs key) harmonic 0.442 peak 0.219 master peak 0.4528 | engine u0 437.7/874.4 | dev 1211 c vs engine, 20 c vs semitone | NaN 0
+[ 105.6s] FAIL release dry 48: 0.297 -> 0.24 | FAIL release master: 0.531 -> 0.423 (24000 samples) | 3 s tail rule: dry 0.131 master 0.296 at 3.0 s -> FAIL/FAIL
+[ 136.6s] FAIL key 60 EARLY: DRY f0 1370.85 Hz (+2867 c vs key) harmonic 0.407 peak 0.4582 master peak 0.6236 | engine u0 1702.1/3400.0 | dev 375 c vs engine, 33 c vs semitone | NaN 0
+[ 197.4s] FAIL release dry 60: 0.286 -> 0.297 | FAIL release master: 0.368 -> 0.41 (24000 samples) | 3 s tail rule: dry 0.219 master 0.257 at 3.0 s -> FAIL/FAIL
+[ 228.2s] FAIL key 72 EARLY: DRY f0 2663.52 Hz (+2817 c vs key) harmonic 0.460 peak 0.6797 master peak 0.5332 | engine u0 6765.8/13515.3 | dev 1614 c vs engine, 17 c vs semitone | NaN 0
+[ 289.8s] FAIL release dry 72: 0.554 -> 0.558 | FAIL release master: 0.365 -> 0.343 (24000 samples) | 3 s tail rule: dry 0.204 master 0.193 at 3.0 s -> FAIL/FAIL
+[ 289.8s] FAIL JX law (dry): FAIL harmonic/f0: [(48, np.float64(217.5047589934349), 0.44176192383234125), (60, np.float64(1370.8537531817294), 0.40738753397099714), (72, np.float64(2663.523423500095), 0.4602602533530737)] | every key on its engine cell: False
+[ 289.8s] PASS NaN census 0; faults after static init 0; instr/sample idle 29753 sustain 30101
+[ 289.8s] ROW | 26 | LD ELK Sitar | FAIL(pitch48,reldry48,relmaster48,pitch60,reldry60,relmaster60,pitch72,reldry72,relmaster72,track) | 48:+880c(E) 60:+2867c(E) 72:+2817c(E) | 0.44 0.41 0.46 | 0.000504 | 0 | 0 | 29753/30101 | VCO ENV MOD 255; PORTAMENTO 43; ENV REL 194/215; REVERB 38 DELAY 86; LFO->VCO 200 |
+[ 289.8s] JP8 SWEEP patch 26: FAIL(pitch48,reldry48,relmaster48,pitch60,reldry60,relmaster60,pitch72,reldry72,relmaster72,track)

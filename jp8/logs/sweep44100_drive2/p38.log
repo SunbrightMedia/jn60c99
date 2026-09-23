@@ -1,0 +1,19 @@
+[  16.2s] boot sr 44100 patch 38 'SY Jupiter PWM': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 166 SUB 0; confound candidates: REVERB 112 DELAY 43
+[  16.2s] CENSUS static init  host_map 744
+[  16.2s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  16.2s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  16.2s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  16.2s] CENSUS recall 38    live ramps 3555, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  16.2s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  18.9s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  18.9s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  31.8s] PASS key 48 EARLY: DRY f0 65.68 Hz (-1193 c vs key) harmonic 0.931 peak 0.1281 master peak 0.1361 | engine u0 65.5/66.0 | dev 4 c vs engine, 7 c vs semitone | NaN 0
+[  49.0s] PASS release dry 48: 0.0665 -> 0 | PASS release master: 0.0499 -> 0.00114 (24000 samples)
+[  60.7s] PASS key 60 EARLY: DRY f0 131.07 Hz (-1197 c vs key) harmonic 0.924 peak 0.118 master peak 0.1386 | engine u0 130.4/131.4 | dev 4 c vs engine, 3 c vs semitone | NaN 0
+[  77.6s] PASS release dry 60: 0.0335 -> 0 | PASS release master: 0.0549 -> 0.0015 (24000 samples)
+[  90.5s] PASS key 72 EARLY: DRY f0 263.02 Hz (-1191 c vs key) harmonic 0.930 peak 0.13 master peak 0.1507 | engine u0 261.2/263.2 | dev 1 c vs engine, 9 c vs semitone | NaN 0
+[ 106.9s] PASS release dry 72: 0.0268 -> 0 | PASS release master: 0.0352 -> 0.000966 (24000 samples)
+[ 106.9s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1193, -1197, -1191 cents) | every key on its engine cell: True
+[ 106.9s] PASS NaN census 0; faults after static init 0; instr/sample idle 29521 sustain 29539
+[ 106.9s] ROW | 38 | SY Jupiter PWM | PASS | 48:-1193c(E) 60:-1197c(E) 72:-1191c(E) | 0.93 0.92 0.93 | 1.57e-13 | 0 | 0 | 29521/29539 | REVERB 112 DELAY 43 |
+[ 106.9s] JP8 SWEEP patch 38: PASS

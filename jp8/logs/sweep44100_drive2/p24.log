@@ -1,0 +1,19 @@
+[  11.1s] boot sr 44100 patch 24 'SQ Deep Ocean': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 5 FINE 142 SUB -5; confound candidates: REVERB 144 DELAY 45, LFO->VCO 255
+[  11.1s] CENSUS static init  host_map 744
+[  11.1s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  11.1s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.1s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.1s] CENSUS recall 24    live ramps 3555, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.1s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.9s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.9s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  45.3s] FAIL key 48 EARLY: DRY f0 65.39 Hz (-1200 c vs key) harmonic 0.589 peak 0.08552 master peak 0.1565 | engine u0 65.3/195.9 | dev 2 c vs engine, 0 c vs semitone | NaN 0
+[ 107.7s] PASS release dry 48: 0 -> 0 | PASS release master: 0.0115 -> 0.00134 (24000 samples) | 3 s tail rule: dry 0 master 0.00023 at 3.0 s -> PASS/PASS
+[ 139.3s] FAIL key 60 LATE: DRY f0 130.83 Hz (-1200 c vs key) harmonic 0.579 peak 0.002123 master peak 0.0234 | engine u0 131.2/393.4 | dev 5 c vs engine, 0 c vs semitone | NaN 0
+[ 201.2s] PASS release dry 60: 0 -> 0 | PASS release master: 0.0109 -> 0.0026 (24000 samples) | 3 s tail rule: dry 0 master 0.000362 at 3.0 s -> PASS/PASS
+[ 231.8s] FAIL key 72 LATE: DRY f0 261.53 Hz (-1201 c vs key) harmonic 0.614 peak 0.001565 master peak 0.02083 | engine u0 261.2/783.4 | dev 2 c vs engine, 1 c vs semitone | NaN 0
+[ 294.1s] PASS release dry 72: 0 -> 0 | PASS release master: 0.0137 -> 0.00223 (24000 samples) | 3 s tail rule: dry 0 master 0.000447 at 3.0 s -> PASS/PASS
+[ 294.1s] PASS JX law (dry): FAIL harmonic/f0: [(48, np.float64(65.38909389856848), 0.5892385604543515), (60, np.float64(130.8299034210478), 0.5791470284533358), (72, np.float64(261.5310843491783), 0.6144726588681219)] | every key on its engine cell: True
+[ 294.1s] PASS NaN census 0; faults after static init 0; instr/sample idle 30085 sustain 29593
+[ 294.1s] ROW | 24 | SQ Deep Ocean | FAIL(pitch48,pitch60,pitch72) | 48:-1200c(E) 60:-1200c(L) 72:-1201c(L) | 0.59 0.58 0.61 | 1.57e-13 | 0 | 0 | 30085/29593 | REVERB 144 DELAY 45; LFO->VCO 255 |
+[ 294.1s] JP8 SWEEP patch 24: FAIL(pitch48,pitch60,pitch72)

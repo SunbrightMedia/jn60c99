@@ -1,0 +1,19 @@
+[  10.9s] boot sr 44100 patch 25 'SY Silk Fives': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 150 SUB 7; confound candidates: REVERB 217 DELAY 255
+[  10.9s] CENSUS static init  host_map 744
+[  10.9s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.9s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.9s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.9s] CENSUS recall 25    live ramps 3699, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.9s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.8s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.8s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  22.7s] PASS key 48 EARLY: DRY f0 66.02 Hz (-1184 c vs key) harmonic 0.995 peak 0.07216 master peak 0.118 | engine u0 131.6/197.8 | dev 1194 c vs engine, 16 c vs semitone | NaN 0
+[  88.2s] PASS release dry 48: 0.0725 -> 0.0292 | PASS release master: 0.123 -> 0.0618 (24000 samples) | 3 s tail rule: dry 0 master 4.4e-05 at 3.0 s -> PASS/PASS
+[  96.6s] PASS key 60 EARLY: DRY f0 131.99 Hz (-1185 c vs key) harmonic 0.996 peak 0.07179 master peak 0.1003 | engine u0 264.1/396.9 | dev 1201 c vs engine, 15 c vs semitone | NaN 0
+[ 162.4s] PASS release dry 60: 0.0912 -> 0.0237 | PASS release master: 0.115 -> 0.0498 (24000 samples) | 3 s tail rule: dry 0 master 3.99e-05 at 3.0 s -> PASS/PASS
+[ 171.1s] PASS key 72 EARLY: DRY f0 263.89 Hz (-1185 c vs key) harmonic 0.987 peak 0.09911 master peak 0.09665 | engine u0 526.4/791.2 | dev 1196 c vs engine, 15 c vs semitone | NaN 0
+[ 236.5s] PASS release dry 72: 0.0681 -> 0.028 | PASS release master: 0.0764 -> 0.0389 (24000 samples) | 3 s tail rule: dry 0 master 3.69e-05 at 3.0 s -> PASS/PASS
+[ 236.5s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1184, -1185, -1185 cents) | every key on its engine cell: False
+[ 236.5s] PASS NaN census 0; faults after static init 0; instr/sample idle 31601 sustain 31604
+[ 236.5s] ROW | 25 | SY Silk Fives | PASS | 48:-1184c(E) 60:-1185c(E) 72:-1185c(E) | 0.99 1.00 0.99 | 1.57e-13 | 0 | 0 | 31601/31604 | REVERB 217 DELAY 255 |
+[ 236.5s] JP8 SWEEP patch 25: PASS
