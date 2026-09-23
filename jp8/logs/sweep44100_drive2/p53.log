@@ -1,0 +1,19 @@
+[   9.2s] boot sr 44100 patch 53 '1981 S/H Brass': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 156 SUB 0; confound candidates: none
+[   9.2s] CENSUS static init  host_map 744
+[   9.2s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.2s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] CENSUS recall 53    live ramps 3537, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.6s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.6s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  18.6s] PASS key 48 EARLY: DRY f0 65.63 Hz (-1194 c vs key) harmonic 0.993 peak 0.05295 master peak 0.2328 | engine u0 65.3/65.6 | dev 0 c vs engine, 6 c vs semitone | NaN 0
+[  71.6s] PASS release dry 48: 0.042 -> 0.0107 | PASS release master: 0.185 -> 0.047 (24000 samples) | 3 s tail rule: dry 0 master 1.57e-13 at 3.0 s -> PASS/PASS
+[  78.7s] PASS key 60 EARLY: DRY f0 131.23 Hz (-1195 c vs key) harmonic 0.994 peak 0.05318 master peak 0.2338 | engine u0 131.1/131.7 | dev 2 c vs engine, 5 c vs semitone | NaN 0
+[ 133.1s] PASS release dry 60: 0.0389 -> 0.00939 | PASS release master: 0.171 -> 0.0413 (24000 samples) | 3 s tail rule: dry 0 master 1.57e-13 at 3.0 s -> PASS/PASS
+[ 140.3s] PASS key 72 EARLY: DRY f0 262.46 Hz (-1194 c vs key) harmonic 0.988 peak 0.05374 master peak 0.2363 | engine u0 261.3/262.6 | dev 1 c vs engine, 6 c vs semitone | NaN 0
+[ 195.3s] PASS release dry 72: 0.0456 -> 0.0109 | PASS release master: 0.2 -> 0.0478 (24000 samples) | 3 s tail rule: dry 0 master 1.57e-13 at 3.0 s -> PASS/PASS
+[ 195.3s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1194, -1195, -1194 cents) | every key on its engine cell: True
+[ 195.3s] PASS NaN census 0; faults after static init 0; instr/sample idle 31631 sustain 31637
+[ 195.3s] ROW | 53 | 1981 S/H Brass | PASS | 48:-1194c(E) 60:-1195c(E) 72:-1194c(E) | 0.99 0.99 0.99 | 1.57e-13 | 0 | 0 | 31631/31637 | - |
+[ 195.3s] JP8 SWEEP patch 53: PASS

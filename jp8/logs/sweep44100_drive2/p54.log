@@ -1,0 +1,14 @@
+[   9.3s] boot sr 44100 patch 54 '1981 Pipe Organ': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 5 FINE 128 SUB 0; confound candidates: ENV REL 167/110
+[   9.3s] CENSUS static init  host_map 744
+[   9.3s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.3s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.3s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.3s] CENSUS recall 54    live ramps 3393, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.3s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.7s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.7s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  18.8s] PASS key 48 EARLY: DRY f0 65.37 Hz (-1201 c vs key) harmonic 0.985 peak 0.09514 master peak 0.2049 | engine u0 65.3/521.9 | dev 1 c vs engine, 1 c vs semitone | NaN 0
+[  72.1s] PASS release dry 48: 0.089 -> 0.0064 | PASS release master: 0.192 -> 0.0138 (24000 samples) | 3 s tail rule: dry 0 master 1.57e-13 at 3.0 s -> PASS/PASS
+[  79.5s] PASS key 60 EARLY: DRY f0 130.80 Hz (-1200 c vs key) harmonic 0.988 peak 0.09201 master peak 0.1982 | engine u0 131.1/1047.5 | dev 4 c vs engine, 0 c vs semitone | NaN 0
+[ 132.9s] PASS release dry 60: 0.086 -> 0.0055 | PASS release master: 0.185 -> 0.0118 (24000 samples) | 3 s tail rule: dry 0 master 1.57e-13 at 3.0 s -> PASS/PASS
+[ 140.2s] PASS key 72 EARLY: DRY f0 261.47 Hz (-1201 c vs key) harmonic 0.981 peak 0.08644 master peak 0.1862 | engine u0 261.3/2087.9 | dev 1 c vs engine, 1 c vs semitone | NaN 0

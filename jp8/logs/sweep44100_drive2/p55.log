@@ -1,0 +1,19 @@
+[   9.4s] boot sr 44100 patch 55 '1981 Drawbar Org': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 4 FINE 122 SUB -5; confound candidates: none
+[   9.4s] CENSUS static init  host_map 744
+[   9.4s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.4s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.4s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.4s] CENSUS recall 55    live ramps 3465, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.4s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.9s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.9s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  19.3s] PASS key 48 EARLY: DRY f0 65.24 Hz (-1204 c vs key) harmonic 0.977 peak 0.1188 master peak 0.2811 | engine u0 65.3/195.5 | dev 2 c vs engine, 4 c vs semitone | NaN 0
+[  29.3s] PASS release dry 48: 0.0548 -> 0 | PASS release master: 0.135 -> 1.57e-13 (24000 samples)
+[  36.3s] PASS key 60 EARLY: DRY f0 130.69 Hz (-1202 c vs key) harmonic 0.989 peak 0.07192 master peak 0.1702 | engine u0 130.6/390.9 | dev 1 c vs engine, 2 c vs semitone | NaN 0
+[  46.3s] PASS release dry 60: 0.0378 -> 0 | PASS release master: 0.0895 -> 1.57e-13 (24000 samples)
+[  53.5s] PASS key 72 EARLY: DRY f0 261.32 Hz (-1202 c vs key) harmonic 0.980 peak 0.1047 master peak 0.2479 | engine u0 262.3/785.1 | dev 7 c vs engine, 2 c vs semitone | NaN 0
+[  63.6s] PASS release dry 72: 0.0476 -> 0 | PASS release master: 0.118 -> 1.57e-13 (24000 samples)
+[  63.6s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1204, -1202, -1202 cents) | every key on its engine cell: True
+[  63.6s] PASS NaN census 0; faults after static init 0; instr/sample idle 31034 sustain 30544
+[  63.6s] ROW | 55 | 1981 Drawbar Org | PASS | 48:-1204c(E) 60:-1202c(E) 72:-1202c(E) | 0.98 0.99 0.98 | 1.57e-13 | 0 | 0 | 31034/30544 | - |
+[  63.6s] JP8 SWEEP patch 55: PASS

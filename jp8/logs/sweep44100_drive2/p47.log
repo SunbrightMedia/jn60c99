@@ -10,3 +10,10 @@
 [  18.2s] PASS key 48 EARLY: DRY f0 130.47 Hz (-5 c vs key) harmonic 0.937 peak 0.05379 master peak 0.1785 | engine u0 130.6/130.5 | dev 0 c vs engine, 5 c vs semitone | NaN 0
 [  71.0s] PASS release dry 48: 0.0123 -> 0.00658 | PASS release master: 0.0408 -> 0.0218 (24000 samples) | 3 s tail rule: dry 7.85e-05 master 0.00026 at 3.0 s -> PASS/PASS
 [  78.1s] PASS key 60 EARLY: DRY f0 261.28 Hz (-2 c vs key) harmonic 0.982 peak 0.09458 master peak 0.314 | engine u0 262.2/261.9 | dev 4 c vs engine, 2 c vs semitone | NaN 0
+[ 130.4s] PASS release dry 60: 0.04 -> 0.00924 | PASS release master: 0.133 -> 0.0307 (24000 samples) | 3 s tail rule: dry 8.22e-05 master 0.000273 at 3.0 s -> PASS/PASS
+[ 137.2s] PASS key 72 EARLY: DRY f0 522.56 Hz (-2 c vs key) harmonic 0.971 peak 0.05854 master peak 0.1943 | engine u0 522.6/522.0 | dev 0 c vs engine, 2 c vs semitone | NaN 0
+[ 190.4s] PASS release dry 72: 0.0223 -> 0.00493 | PASS release master: 0.0741 -> 0.0163 (24000 samples) | 3 s tail rule: dry 6.82e-05 master 0.000226 at 3.0 s -> PASS/PASS
+[ 190.4s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets -5, -2, -2 cents) | every key on its engine cell: True
+[ 190.4s] PASS NaN census 0; faults after static init 0; instr/sample idle 30033 sustain 29631
+[ 190.4s] ROW | 47 | 1981 Harp | PASS | 48:-5c(E) 60:-2c(E) 72:-2c(E) | 0.94 0.98 0.97 | 1.57e-13 | 0 | 0 | 30033/29631 | ENV REL 148/168 |
+[ 190.4s] JP8 SWEEP patch 47: PASS
