@@ -1,0 +1,19 @@
+[  10.9s] boot sr 44100 patch 15 'BR Grind Tpt': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 0 FINE 128 SUB 0; confound candidates: REVERB 54 DELAY 124
+[  10.9s] CENSUS static init  host_map 744
+[  10.9s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.9s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.9s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.9s] CENSUS recall 15    live ramps 3411, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.9s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.8s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.8s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  22.6s] PASS key 48 EARLY: DRY f0 131.03 Hz (+3 c vs key) harmonic 0.983 peak 0.0661 master peak 0.2447 | engine u0 130.6/16.3 | dev 5 c vs engine, 3 c vs semitone | NaN 0
+[  34.5s] PASS release dry 48: 0.0248 -> 0 | PASS release master: 0.0705 -> 0.000273 (24000 samples)
+[  43.1s] PASS key 60 EARLY: DRY f0 261.41 Hz (-1 c vs key) harmonic 0.981 peak 0.06902 master peak 0.2113 | engine u0 261.2/32.6 | dev 2 c vs engine, 1 c vs semitone | NaN 0
+[  55.0s] PASS release dry 60: 0.0262 -> 0 | PASS release master: 0.0927 -> 0.000198 (24000 samples)
+[  63.7s] PASS key 72 EARLY: DRY f0 523.10 Hz (-1 c vs key) harmonic 0.974 peak 0.07098 master peak 0.2259 | engine u0 524.6/65.5 | dev 5 c vs engine, 1 c vs semitone | NaN 0
+[  75.7s] PASS release dry 72: 0.0262 -> 0 | PASS release master: 0.127 -> 0.000271 (24000 samples)
+[  75.7s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +3, -1, -1 cents) | every key on its engine cell: True
+[  75.7s] PASS NaN census 0; faults after static init 0; instr/sample idle 32017 sustain 32040
+[  75.7s] ROW | 15 | BR Grind Tpt | PASS | 48:+3c(E) 60:-1c(E) 72:-1c(E) | 0.98 0.98 0.97 | 1.57e-13 | 0 | 0 | 32017/32040 | REVERB 54 DELAY 124 |
+[  75.7s] JP8 SWEEP patch 15: PASS

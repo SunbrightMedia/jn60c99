@@ -1,0 +1,12 @@
+[  10.8s] boot sr 44100 patch 18 'PD Lush City': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 150 SUB 0; confound candidates: REVERB 255 DELAY 255
+[  10.8s] CENSUS static init  host_map 744
+[  10.8s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.8s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS recall 18    live ramps 3627, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.5s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.6s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  22.0s] PASS key 48 EARLY: DRY f0 132.10 Hz (+17 c vs key) harmonic 0.991 peak 0.006696 master peak 0.02468 | engine u0 131.6/132.0 | dev 1 c vs engine, 17 c vs semitone | NaN 0
+[  86.8s] PASS release dry 48: 0.00646 -> 0.000736 | PASS release master: 0.0273 -> 0.00662 (24000 samples) | 3 s tail rule: dry 0 master 9.05e-09 at 3.0 s -> PASS/PASS
+[  95.4s] PASS key 60 EARLY: DRY f0 263.95 Hz (+15 c vs key) harmonic 0.986 peak 0.006183 master peak 0.01958 | engine u0 264.1/264.9 | dev 1 c vs engine, 15 c vs semitone | NaN 0

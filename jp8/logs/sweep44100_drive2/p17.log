@@ -1,0 +1,19 @@
+[  11.3s] boot sr 44100 patch 17 'BS So Smooth': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 3 FINE 176 SUB 0; confound candidates: REVERB 120 DELAY 5
+[  11.3s] CENSUS static init  host_map 744
+[  11.3s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  11.3s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.3s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.3s] CENSUS recall 17    live ramps 3339, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.3s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  13.1s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  13.1s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  22.2s] PASS key 48 EARLY: DRY f0 65.64 Hz (-1194 c vs key) harmonic 0.986 peak 0.05787 master peak 0.4373 | engine u0 130.6/264.1 | dev 1192 c vs engine, 6 c vs semitone | NaN 0
+[  33.3s] PASS release dry 48: 0.0384 -> 0 | PASS release master: 0.303 -> 0.00307 (24000 samples)
+[  41.6s] PASS key 60 EARLY: DRY f0 131.18 Hz (-1195 c vs key) harmonic 0.977 peak 0.05417 master peak 0.408 | engine u0 522.4/1055.9 | dev 2392 c vs engine, 5 c vs semitone | NaN 0
+[  52.6s] PASS release dry 60: 0.0347 -> 0 | PASS release master: 0.259 -> 0.00454 (24000 samples)
+[  60.5s] PASS key 72 EARLY: DRY f0 262.17 Hz (-1196 c vs key) harmonic 0.981 peak 0.0501 master peak 0.3813 | engine u0 2098.6/4242.0 | dev 3601 c vs engine, 4 c vs semitone | NaN 0
+[  71.5s] PASS release dry 72: 0.0352 -> 0 | PASS release master: 0.298 -> 0.00419 (24000 samples)
+[  71.5s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1194, -1195, -1196 cents) | every key on its engine cell: False
+[  71.5s] PASS NaN census 0; faults after static init 0; instr/sample idle 29871 sustain 29395
+[  71.5s] ROW | 17 | BS So Smooth | PASS | 48:-1194c(E) 60:-1195c(E) 72:-1196c(E) | 0.99 0.98 0.98 | 1.57e-13 | 0 | 0 | 29871/29395 | REVERB 120 DELAY 5 |
+[  71.5s] JP8 SWEEP patch 17: PASS

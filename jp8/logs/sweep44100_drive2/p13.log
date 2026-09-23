@@ -1,0 +1,19 @@
+[  10.8s] boot sr 44100 patch 13 'LD Hawk Lead': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 128 SUB 20; confound candidates: SYNC, PORTAMENTO 26, REVERB 56 DELAY 20
+[  10.8s] CENSUS static init  host_map 744
+[  10.8s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.8s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS recall 13    live ramps 3483, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.5s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.5s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  44.8s] FAIL key 48 EARLY: DRY f0 739.29 Hz (+2998 c vs key) harmonic 0.447 peak 0.08138 master peak 0.1594 | engine u0 422.4/1339.5 | dev 969 c vs engine, 2 c vs semitone | NaN 0
+[ 107.9s] PASS release dry 48: 0.0607 -> 0 | PASS release master: 0.121 -> 0.0113 (24000 samples) | 3 s tail rule: dry 0 master 0.000213 at 3.0 s -> PASS/PASS
+[ 139.6s] FAIL key 60 LATE: DRY f0 419.49 Hz (+817 c vs key) harmonic 0.566 peak 0.08037 master peak 0.1693 | engine u0 601.8/1908.1 | dev 625 c vs engine, 17 c vs semitone | NaN 0
+[ 203.2s] PASS release dry 60: 0.0492 -> 0 | PASS release master: 0.0848 -> 0.0135 (24000 samples) | 3 s tail rule: dry 0 master 0.000235 at 3.0 s -> PASS/PASS
+[ 235.2s] FAIL key 72 EARLY: DRY f0 845.59 Hz (+831 c vs key) harmonic 0.427 peak 0.08063 master peak 0.1593 | engine u0 2076.8/6585.5 | dev 1556 c vs engine, 31 c vs semitone | NaN 0
+[ 298.0s] PASS release dry 72: 0.0506 -> 0 | PASS release master: 0.0967 -> 0.0133 (24000 samples) | 3 s tail rule: dry 0 master 0.000189 at 3.0 s -> PASS/PASS
+[ 298.0s] FAIL JX law (dry): FAIL harmonic/f0: [(48, np.float64(739.2897234289616), 0.4472563990356322), (60, np.float64(419.48876387639814), 0.565796858216788), (72, np.float64(845.5918395395348), 0.4272023075699644)] | every key on its engine cell: False
+[ 298.0s] PASS NaN census 0; faults after static init 0; instr/sample idle 30299 sustain 30740
+[ 298.0s] ROW | 13 | LD Hawk Lead | FAIL(pitch48,pitch60,pitch72,track) | 48:+2998c(E) 60:+817c(L) 72:+831c(E) | 0.45 0.57 0.43 | 1.57e-13 | 0 | 0 | 30299/30740 | SYNC; PORTAMENTO 26; REVERB 56 DELAY 20 |
+[ 298.0s] JP8 SWEEP patch 13: FAIL(pitch48,pitch60,pitch72,track)
