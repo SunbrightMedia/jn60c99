@@ -10,3 +10,10 @@
 [  22.0s] PASS key 48 EARLY: DRY f0 65.69 Hz (-1193 c vs key) harmonic 0.973 peak 0.06842 master peak 0.1561 | engine u0 130.6/65.5 | dev 4 c vs engine, 7 c vs semitone | NaN 0
 [  83.5s] PASS release dry 48: 0.028 -> 0.00191 | PASS release master: 0.0611 -> 0.00783 (24000 samples) | 3 s tail rule: dry 0 master 6e-09 at 3.0 s -> PASS/PASS
 [  91.8s] PASS key 60 EARLY: DRY f0 131.81 Hz (-1187 c vs key) harmonic 0.989 peak 0.0845 master peak 0.2239 | engine u0 264.0/132.5 | dev 9 c vs engine, 13 c vs semitone | NaN 0
+[ 153.1s] PASS release dry 60: 0.0449 -> 0.00155 | PASS release master: 0.113 -> 0.00676 (24000 samples) | 3 s tail rule: dry 0 master 1.26e-08 at 3.0 s -> PASS/PASS
+[ 161.5s] PASS key 72 EARLY: DRY f0 262.28 Hz (-1196 c vs key) harmonic 0.977 peak 0.08123 master peak 0.1927 | engine u0 524.3/263.0 | dev 5 c vs engine, 4 c vs semitone | NaN 0
+[ 223.8s] PASS release dry 72: 0.0565 -> 0.00117 | PASS release master: 0.144 -> 0.0159 (24000 samples) | 3 s tail rule: dry 0 master 2.17e-08 at 3.0 s -> PASS/PASS
+[ 223.8s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1193, -1187, -1196 cents) | every key on its engine cell: True
+[ 223.8s] PASS NaN census 0; faults after static init 0; instr/sample idle 29528 sustain 29507
+[ 223.8s] ROW | 19 | SQ Jumpin' Arpg | PASS | 48:-1193c(E) 60:-1187c(E) 72:-1196c(E) | 0.97 0.99 0.98 | 1.57e-13 | 0 | 0 | 29528/29507 | VCO ENV MOD 255; PORTAMENTO 14; REVERB 115 DELAY 123 |
+[ 223.8s] JP8 SWEEP patch 19: PASS
