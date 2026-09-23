@@ -1,0 +1,19 @@
+[   9.7s] boot sr 44100 patch 61 '1981 Flute': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 4 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: none
+[   9.7s] CENSUS static init  host_map 744
+[   9.7s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.7s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.7s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.7s] CENSUS recall 61    live ramps 3393, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.7s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.9s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.9s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  17.5s] PASS key 48 EARLY: DRY f0 262.22 Hz (+1204 c vs key) harmonic 0.887 peak 0.06767 master peak 0.1877 | engine u0 261.3/65.2 | dev 6 c vs engine, 4 c vs semitone | NaN 0
+[  25.4s] PASS release dry 48: 0.0623 -> 0 | PASS release master: 0.173 -> 1.57e-13 (24000 samples)
+[  31.2s] PASS key 60 EARLY: DRY f0 522.91 Hz (+1199 c vs key) harmonic 0.838 peak 0.06254 master peak 0.1734 | engine u0 522.4/130.4 | dev 2 c vs engine, 1 c vs semitone | NaN 0
+[  39.2s] PASS release dry 60: 0.0592 -> 0 | PASS release master: 0.164 -> 1.57e-13 (24000 samples)
+[  61.0s] PASS key 72 LATE: DRY f0 1045.72 Hz (+1199 c vs key) harmonic 0.806 peak 0.06 master peak 0.1664 | engine u0 1048.5/261.8 | dev 5 c vs engine, 1 c vs semitone | NaN 0
+[  69.1s] PASS release dry 72: 0.0451 -> 0 | PASS release master: 0.125 -> 1.57e-13 (24000 samples)
+[  69.1s] PASS JX law (dry): PASS pitch tracks keys by +12 semitones (offsets +1204, +1199, +1199 cents) | every key on its engine cell: True
+[  69.1s] PASS NaN census 0; faults after static init 0; instr/sample idle 25159 sustain 24541
+[  69.1s] ROW | 61 | 1981 Flute | PASS | 48:+1204c(E) 60:+1199c(E) 72:+1199c(L) | 0.89 0.84 0.81 | 1.57e-13 | 0 | 0 | 25159/24541 | - |
+[  69.1s] JP8 SWEEP patch 61: PASS

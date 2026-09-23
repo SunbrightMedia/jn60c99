@@ -1,0 +1,19 @@
+[   9.7s] boot sr 44100 patch 60 '1981 Hard Blip': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 110 SUB 0; confound candidates: VCO ENV MOD 156
+[   9.7s] CENSUS static init  host_map 744
+[   9.7s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.7s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.7s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.7s] CENSUS recall 60    live ramps 3393, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.7s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  11.3s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  11.3s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  19.9s] PASS key 48 EARLY: DRY f0 65.51 Hz (-1197 c vs key) harmonic 0.978 peak 0.08352 master peak 0.286 | engine u0 65.3/65.1 | dev 5 c vs engine, 3 c vs semitone | NaN 0
+[  30.1s] PASS release dry 48: 0.0406 -> 0 | PASS release master: 0.139 -> 1.57e-13 (24000 samples)
+[  37.8s] PASS key 60 EARLY: DRY f0 130.98 Hz (-1198 c vs key) harmonic 0.979 peak 0.07638 master peak 0.2615 | engine u0 130.6/130.1 | dev 5 c vs engine, 2 c vs semitone | NaN 0
+[  48.2s] PASS release dry 60: 0.0214 -> 0 | PASS release master: 0.0731 -> 1.57e-13 (24000 samples)
+[  55.4s] PASS key 72 EARLY: DRY f0 262.08 Hz (-1197 c vs key) harmonic 0.980 peak 0.06136 master peak 0.21 | engine u0 262.3/261.3 | dev 2 c vs engine, 3 c vs semitone | NaN 0
+[  65.7s] PASS release dry 72: 0.0143 -> 0 | PASS release master: 0.0488 -> 1.57e-13 (24000 samples)
+[  65.7s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1197, -1198, -1197 cents) | every key on its engine cell: True
+[  65.7s] PASS NaN census 0; faults after static init 0; instr/sample idle 32095 sustain 31597
+[  65.7s] ROW | 60 | 1981 Hard Blip | PASS | 48:-1197c(E) 60:-1198c(E) 72:-1197c(E) | 0.98 0.98 0.98 | 1.57e-13 | 0 | 0 | 32095/31597 | VCO ENV MOD 156 |
+[  65.7s] JP8 SWEEP patch 60: PASS

@@ -1,0 +1,10 @@
+[   9.2s] boot sr 44100 patch 63 '1981 Chime': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 4 VCO2 RANGE 4 FINE 97 SUB 0; confound candidates: CROSS MOD 97, ENV REL 223/157
+[   9.2s] CENSUS static init  host_map 744
+[   9.2s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.2s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] CENSUS recall 63    live ramps 3465, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.7s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.7s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  18.9s] PASS key 48 EARLY: DRY f0 132.26 Hz (+19 c vs key) harmonic 0.898 peak 0.07422 master peak 0.3084 | engine u0 282.7/259.2 | dev 1165 c vs engine, 19 c vs semitone | NaN 0

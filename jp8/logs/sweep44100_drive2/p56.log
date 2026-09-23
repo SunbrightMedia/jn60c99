@@ -11,3 +11,9 @@
 [  46.3s] PASS release dry 48: 0.0536 -> 0 | PASS release master: 0.195 -> 1.57e-13 (24000 samples)
 [  72.1s] FAIL key 60 EARLY: DRY f0 522.26 Hz (+1197 c vs key) harmonic 0.758 peak 0.09167 master peak 0.3337 | engine u0 259.9/519.2 | dev 10 c vs engine, 3 c vs semitone | NaN 0
 [  81.8s] PASS release dry 60: 0.0523 -> 0 | PASS release master: 0.19 -> 1.57e-13 (24000 samples)
+[ 107.5s] FAIL key 72 EARLY: DRY f0 1038.37 Hz (+1186 c vs key) harmonic 0.735 peak 0.08267 master peak 0.3009 | engine u0 503.9/1006.5 | dev 54 c vs engine, 14 c vs semitone | NaN 0
+[ 116.8s] PASS release dry 72: 0.0481 -> 0 | PASS release master: 0.175 -> 1.57e-13 (24000 samples)
+[ 116.8s] FAIL JX law (dry): FAIL harmonic/f0: [(48, np.float64(261.78958131027525), 0.7276336504313505), (60, np.float64(522.2599063530613), 0.7579608822380958), (72, np.float64(1038.3718642408062), 0.7352494831493553)] | every key on its engine cell: False
+[ 116.8s] PASS NaN census 0; faults after static init 0; instr/sample idle 29809 sustain 29312
+[ 116.8s] ROW | 56 | 1981 Solo Voice | FAIL(pitch48,pitch60,pitch72,track) | 48:+1201c(E) 60:+1197c(E) 72:+1186c(E) | 0.73 0.76 0.74 | 1.57e-13 | 0 | 0 | 29809/29312 | VCO ENV MOD 71; ENV REL 162/57 |
+[ 116.8s] JP8 SWEEP patch 56: FAIL(pitch48,pitch60,pitch72,track)

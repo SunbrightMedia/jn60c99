@@ -8,3 +8,12 @@
 [  10.8s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
 [  10.8s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
 [  18.9s] PASS key 48 EARLY: DRY f0 264.07 Hz (+1216 c vs key) harmonic 0.933 peak 0.02272 master peak 0.04987 | engine u0 262.6/265.0 | dev 6 c vs engine, 16 c vs semitone | NaN 0
+[  71.6s] PASS release dry 48: 0.0321 -> 0.00382 | PASS release master: 0.0704 -> 0.00839 (24000 samples) | 3 s tail rule: dry 0 master 1.57e-13 at 3.0 s -> PASS/PASS
+[  78.5s] PASS key 60 EARLY: DRY f0 527.35 Hz (+1214 c vs key) harmonic 0.935 peak 0.03768 master peak 0.08272 | engine u0 527.2/531.9 | dev 0 c vs engine, 14 c vs semitone | NaN 0
+[ 132.1s] PASS release dry 60: 0.0343 -> 0.0049 | PASS release master: 0.0753 -> 0.0108 (24000 samples) | 3 s tail rule: dry 0 master 1.57e-13 at 3.0 s -> PASS/PASS
+[ 139.0s] PASS key 72 EARLY: DRY f0 1051.05 Hz (+1208 c vs key) harmonic 0.929 peak 0.03386 master peak 0.07433 | engine u0 1047.6/1056.9 | dev 6 c vs engine, 8 c vs semitone | NaN 0
+[ 192.6s] PASS release dry 72: 0.0229 -> 0.00342 | PASS release master: 0.0502 -> 0.00751 (24000 samples) | 3 s tail rule: dry 0 master 1.57e-13 at 3.0 s -> PASS/PASS
+[ 192.6s] PASS JX law (dry): PASS pitch tracks keys by +12 semitones (offsets +1216, +1214, +1208 cents) | every key on its engine cell: True
+[ 192.6s] PASS NaN census 0; faults after static init 0; instr/sample idle 30043 sustain 29509
+[ 192.6s] ROW | 57 | 1981 Choir Voice | PASS | 48:+1216c(E) 60:+1214c(E) 72:+1208c(E) | 0.93 0.94 0.93 | 1.57e-13 | 0 | 0 | 30043/29509 | ENV REL 226/115 |
+[ 192.6s] JP8 SWEEP patch 57: PASS

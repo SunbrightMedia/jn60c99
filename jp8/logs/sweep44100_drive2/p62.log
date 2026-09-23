@@ -1,0 +1,19 @@
+[   9.4s] boot sr 44100 patch 62 '1981 Whistle': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 5 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: none
+[   9.4s] CENSUS static init  host_map 744
+[   9.4s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.4s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.4s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.4s] CENSUS recall 62    live ramps 3321, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.4s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.6s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.7s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  17.3s] PASS key 48 EARLY: DRY f0 523.66 Hz (+2401 c vs key) harmonic 0.956 peak 0.05122 master peak 0.2549 | engine u0 529.0/66.0 | dev 18 c vs engine, 1 c vs semitone | NaN 0
+[  25.2s] PASS release dry 48: 0.0506 -> 0.00184 | PASS release master: 0.252 -> 0.00917 (24000 samples)
+[  30.7s] PASS key 60 EARLY: DRY f0 1045.04 Hz (+2398 c vs key) harmonic 0.965 peak 0.03649 master peak 0.1816 | engine u0 1038.1/129.6 | dev 12 c vs engine, 2 c vs semitone | NaN 0
+[  38.4s] PASS release dry 60: 0.0362 -> 0.000697 | PASS release master: 0.18 -> 0.00347 (24000 samples)
+[  44.3s] PASS key 72 EARLY: DRY f0 2092.91 Hz (+2400 c vs key) harmonic 0.955 peak 0.02073 master peak 0.1031 | engine u0 2063.0/257.6 | dev 25 c vs engine, 0 c vs semitone | NaN 0
+[  52.1s] PASS release dry 72: 0.0205 -> 0.000244 | PASS release master: 0.102 -> 0.00121 (24000 samples)
+[  52.1s] PASS JX law (dry): PASS pitch tracks keys by +24 semitones (offsets +2401, +2398, +2400 cents) | every key on its engine cell: True
+[  52.1s] PASS NaN census 0; faults after static init 0; instr/sample idle 25031 sustain 24579
+[  52.1s] ROW | 62 | 1981 Whistle | PASS | 48:+2401c(E) 60:+2398c(E) 72:+2400c(E) | 0.96 0.96 0.95 | 1.57e-13 | 0 | 0 | 25031/24579 | - |
+[  52.1s] JP8 SWEEP patch 62: PASS

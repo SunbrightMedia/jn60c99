@@ -1,0 +1,19 @@
+[   9.2s] boot sr 44100 patch 58 '1981 Fat Fifth': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 3 FINE 128 SUB -5; confound candidates: none
+[   9.2s] CENSUS static init  host_map 744
+[   9.2s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.2s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] CENSUS recall 58    live ramps 3609, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.2s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.7s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.7s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  18.6s] PASS key 48 EARLY: DRY f0 32.57 Hz (-2407 c vs key) harmonic 0.983 peak 0.1044 master peak 0.3097 | engine u0 65.3/97.8 | dev 1205 c vs engine, 7 c vs semitone | NaN 0
+[  28.6s] PASS release dry 48: 0.0492 -> 0 | PASS release master: 0.154 -> 1.57e-13 (24000 samples)
+[  35.6s] PASS key 60 EARLY: DRY f0 65.35 Hz (-2401 c vs key) harmonic 0.987 peak 0.1101 master peak 0.3267 | engine u0 130.6/195.4 | dev 1199 c vs engine, 1 c vs semitone | NaN 0
+[  45.5s] PASS release dry 60: 0.0286 -> 0 | PASS release master: 0.0848 -> 1.57e-13 (24000 samples)
+[  52.7s] PASS key 72 EARLY: DRY f0 130.72 Hz (-2401 c vs key) harmonic 0.987 peak 0.1302 master peak 0.3862 | engine u0 262.3/392.6 | dev 1206 c vs engine, 1 c vs semitone | NaN 0
+[  62.6s] PASS release dry 72: 0.017 -> 0 | PASS release master: 0.0505 -> 1.57e-13 (24000 samples)
+[  62.6s] PASS JX law (dry): PASS pitch tracks keys by -24 semitones (offsets -2407, -2401, -2401 cents) | every key on its engine cell: False
+[  62.6s] PASS NaN census 0; faults after static init 0; instr/sample idle 29522 sustain 29482
+[  62.6s] ROW | 58 | 1981 Fat Fifth | PASS | 48:-2407c(E) 60:-2401c(E) 72:-2401c(E) | 0.98 0.99 0.99 | 1.57e-13 | 0 | 0 | 29522/29482 | - |
+[  62.6s] JP8 SWEEP patch 58: PASS
