@@ -1,0 +1,3 @@
+[  12.8s] override eng 761 VCO1 CROSS MOD: bank raw 252 -> 0 through HOSTPARAM (host id 0x600016)
+[  14.2s] patch 34 'SQ Arpg Terra' [xmod_off]: walker settle 4096: dry peak 0 master peak 0.000827 NaN 0; live ramps 0 (NaN/inf 0)
+[  40.5s] FAIL key 48 EARLY: DRY f0 32.70 Hz (-2400 c vs key) harmonic 0.859 | engine start u0 65.50/131.56 end u0 65.31/131.18 | dev 1197.7 c | spectral peaks [(64.599609375, 89.81603940679355), (32.2998046875, 88.51761662855226), (8.074951171875, 19.984087818537116)] | NaN 0

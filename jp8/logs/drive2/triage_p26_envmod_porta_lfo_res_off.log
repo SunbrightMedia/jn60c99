@@ -1,0 +1,13 @@
+[  12.6s] override eng 776 VCO ENV MOD: bank raw 255 -> 128 through HOSTPARAM (host id 0x600034)
+[  12.6s] override eng 798 PORTAMENTO: bank raw 43 -> 0 through HOSTPARAM (host id 0x600060)
+[  12.6s] override eng 753 VCO LFO MOD: bank raw 200 -> 128 through HOSTPARAM (host id 0x600006)
+[  12.6s] override eng 781 VCF RESONANCE: bank raw 255 -> 0 through HOSTPARAM (host id 0x60003e)
+[  14.1s] patch 26 'LD ELK Sitar' [envmod_porta_lfo_res_off]: walker settle 4096: dry peak 0 master peak 0.000504 NaN 0; live ramps 0 (NaN/inf 0)
+[  40.8s] FAIL key 48 EARLY: DRY f0 32.70 Hz (-2400 c vs key) harmonic 0.991 | engine start u0 65.50/130.84 end u0 65.31/130.46 | dev 1197.5 c | spectral peaks [(32.2998046875, 371.1719639269717), (64.599609375, 221.48945893248523), (96.8994140625, 107.38667654974083)] | NaN 0
+[  93.3s] FAIL release 48: dry 0.134 -> 0.119, master 0.323 -> 0.329 | 3 s tail rule: dry 0.073 master 0.298
+[ 119.7s] FAIL key 60 EARLY: DRY f0 65.40 Hz (-2400 c vs key) harmonic 0.987 | engine start u0 261.42/522.20 end u0 261.92/523.21 | dev 2398.7 c | spectral peaks [(64.599609375, 356.13176175609436), (131.890869140625, 208.68665006696966), (196.490478515625, 123.72101641815206)] | NaN 0
+[ 172.6s] FAIL release 60: dry 0.14 -> 0.125, master 0.345 -> 0.276 | 3 s tail rule: dry 0.0717 master 0.363
+[ 198.9s] FAIL key 72 EARLY: DRY f0 130.80 Hz (-2400 c vs key) harmonic 0.989 | engine start u0 1046.29/2090.05 end u0 1044.87/2087.20 | dev 3597.5 c | spectral peaks [(131.890869140625, 342.23205410208607), (261.090087890625, 246.17300047747952), (392.98095703125, 127.85328609305397)] | NaN 0
+[ 251.9s] FAIL release 72: dry 0.144 -> 0.161, master 0.396 -> 0.325 | 3 s tail rule: dry 0.0984 master 0.293
+[ 251.9s] JX law (dry): PASS pitch tracks keys by -24 semitones (offsets -2400, -2400, -2400 cents)
+[ 251.9s] TRIAGE patch 26 [envmod_porta_lfo_res_off] overrides 776=128,798=0,753=128,781=0: 9 FAIL

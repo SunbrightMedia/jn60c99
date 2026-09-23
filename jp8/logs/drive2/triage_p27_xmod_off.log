@@ -1,0 +1,3 @@
+[  12.7s] override eng 761 VCO1 CROSS MOD: bank raw 73 -> 0 through HOSTPARAM (host id 0x600016)
+[  14.3s] patch 27 'BS Waver Bass' [xmod_off]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
+[  41.8s] FAIL key 48 EARLY: DRY f0 64.75 Hz (-1217 c vs key) harmonic 0.984 | engine start u0 132.26/132.10 end u0 133.61/133.44 | dev 1234.3 c | spectral peaks [(64.599609375, 2024.9420457779645), (129.19921875, 891.2718616122445), (191.107177734375, 494.9010398290596)] | NaN 0

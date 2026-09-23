@@ -1,0 +1,10 @@
+[  12.9s] override eng 753 VCO LFO MOD: bank raw 255 -> 0 through HOSTPARAM (host id 0x600006)
+[  14.3s] patch 24 'SQ Deep Ocean' [lfovco0]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
+[  40.7s] FAIL key 48 EARLY: DRY f0 65.29 Hz (-1203 c vs key) harmonic 0.614 | engine start u0 65.50/196.44 end u0 261.24/783.47 | dev 5.7 c | spectral peaks [(67.291259765625, 71.85894190080336), (196.490478515625, 55.474517507320144), (258.3984375, 31.673435463198746)] | NaN 0
+[  94.1s] PASS release 48: dry 0 -> 0, master 0.00816 -> 0.0015 | 3 s tail rule: dry 0 master 0.000312
+[ 120.4s] FAIL key 60 EARLY: DRY f0 130.64 Hz (-1202 c vs key) harmonic 0.585 | engine start u0 130.71/392.00 end u0 523.84/1571.01 | dev 1.0 c | spectral peaks [(129.19921875, 73.68009427117174), (524.871826171875, 42.76902769838458), (392.98095703125, 41.44258422986939)] | NaN 0
+[ 172.7s] PASS release 60: dry 0 -> 0, master 0.0102 -> 0.0031 | 3 s tail rule: dry 0 master 0.000465
+[ 199.4s] FAIL key 72 EARLY: DRY f0 261.50 Hz (-1201 c vs key) harmonic 0.607 | engine start u0 261.57/784.47 end u0 1044.86/3133.58 | dev 0.5 c | spectral peaks [(263.78173828125, 75.80530326662983), (1044.3603515625, 46.355425114786975), (785.9619140625, 45.20490315424503)] | NaN 0
+[ 252.1s] PASS release 72: dry 0 -> 0, master 0.0109 -> 0.00307 | 3 s tail rule: dry 0 master 0.000519
+[ 252.1s] JX law (dry): FAIL harmonic/f0: [(48, np.float64(65.28570165248865), 0.6139800648534784), (60, np.float64(130.6381398766042), 0.5846516132594932), (72, np.float64(261.4953546043942), 0.6068908205746673)]
+[ 252.1s] TRIAGE patch 24 [lfovco0] overrides 753=0: 3 FAIL

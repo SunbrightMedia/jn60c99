@@ -4,3 +4,8 @@
 [  42.1s] FAIL key 48 LATE: DRY f0 266.39 Hz (+1231 c vs key) harmonic 0.637 | engine start u0 198.23/628.58 end u0 143.63/455.45 | dev 511.6 c | spectral peaks [(263.78173828125, 73.43502601126087), (250.323486328125, 64.75726237653382), (277.239990234375, 50.72327163865769)] | NaN 0
 [  97.5s] PASS release 48: dry 0.0406 -> 0, master 0.0804 -> 0.0158 | 3 s tail rule: dry 0 master 0.000239
 [ 124.7s] FAIL key 60 EARLY: DRY f0 814.05 Hz (+1965 c vs key) harmonic 0.416 | engine start u0 1226.42/3888.92 end u0 813.64/2580.03 | dev 0.9 c | spectral peaks [(777.886962890625, 39.79691878742887), (796.728515625, 39.21139189144358), (759.04541015625, 37.33108018208464)] | NaN 0
+[ 179.1s] PASS release 60: dry 0.0434 -> 0, master 0.0821 -> 0.0132 | 3 s tail rule: dry 0 master 0.000257
+[ 206.0s] FAIL key 72 EARLY: DRY f0 861.51 Hz (+863 c vs key) harmonic 0.701 | engine start u0 2413.33/7652.56 end u0 2077.83/6588.72 | dev 1524.2 c | spectral peaks [(855.94482421875, 63.00796990293114), (842.486572265625, 55.49972633931058), (869.403076171875, 53.01714273440332)] | NaN 0
+[ 261.0s] PASS release 72: dry 0.0769 -> 0, master 0.154 -> 0.0141 | 3 s tail rule: dry 0 master 0.000211
+[ 261.0s] JX law (dry): FAIL harmonic/f0: [(48, np.float64(266.38668571065966), 0.6365007720462144), (60, np.float64(814.0533502580333), 0.41649173847349014), (72, np.float64(861.5139588570318), 0.7006970431258802)]
+[ 261.0s] TRIAGE patch 13 [sync_porta_off] overrides 768=0,798=0: 3 FAIL
