@@ -1,0 +1,6 @@
+patch 2 exit 0
+patch 10 exit 0
+patch 52 exit 0
+patch 63 exit 1
+patch 0 exit 1
+GREEN: 4 / 5

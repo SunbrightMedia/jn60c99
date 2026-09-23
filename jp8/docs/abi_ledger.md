@@ -51,3 +51,37 @@ JX trio's twins), 1 stray page at ctor #1 (0xB720C, the JX template condition). 
   the host layer (RENDER 0x445DC0) must be what serves other rates. = defect D3 in JP8_STATUS.md.
 - Instruction counting: a UC_HOOK_BLOCK added AFTER the render blocks were translated is not called for
   cached TBs (listen_p0_n60.log: 343 instr/sample, 90x low). Flush (uc.ctl_flush_tb) + UC_HOOK_CODE.
+
+## Addendum 2026-09-23 (D7, DRIVE2) -- the HOST is built by the plugin's FACTORY; the host parameter path
+Logs: jp8/logs/drive2/. Tool: jp8/tools/jp8_drive2_probe.py (process A only). jp8_emu default = DRIVE2 since this date;
+the pre-drive2 zero HOST survives only behind `JP8(legacy=True)` / env `JP8_EMU_LEGACY_HOST=1`.
+| Entry | rva | args | allocations | facts | label |
+|---|---|---|---|---|---|
+| FACTORY | 0x444FE0 | none (called at 0x33A8DB by processor init fn 0x33A590) | 150,033 per call: 1 x ALLOC(0x8D0) = the HOST + 150,032 inside the ctor | `mov ecx,0x8d0; call 0x6F5B04; test rax,rax; je ->ret 0; mov rcx,rax; call 0x444000`; returns rax = HOST | READ; count PROVEN (boot_p2_44100.log) |
+| HOST CTOR | 0x444000 | rcx = block | the 150,032 (two deques grown to 0x493E0 ints, ALLOC(0x10) per 4 ints, + map growth 0x446AC0) | base ctor 0x36C890 with xmm1 = .rdata 0xA18A44 = 96000.0 -> [HOST+8]; vtable 0xA704B0; [HOST+0x38] = 8; [HOST+0x40] = 0; eh-vector ctors at +0x50 (2 x 0x28), +0xA0 (9 x 0x40 unit records), +0x2E0 (16 x 0x18), +0x4D0 (8 x 0x80) | READ; vptr / 96000.0 / 8 PROVEN |
+| BUILD | 0x445020 | rcx = HOST (processor: vtbl+8 at 0x33A8ED, right after the factory) | 9 x 0xA9C0C0 states (+ the rest, report A) | copies [HOST+8] into every state+0x10: 96000.0 on the real HOST; 0 NaN / 0 inf ramp steps over all 8,010 ramp records (3,177 live) | PROVEN (boot_p2_44100.log); zero HOST = 378 NaN + 2,799 inf live steps (tooth_census.log) |
+| SETSR | 0x4464F0 | rcx, xmm1 float | 0 | `ucomiss xmm1,[HOST+8]; je` (0x446501): SETSR(96000) on the real HOST runs 11 instructions of its body and returns; 44100 / 48000 run 163 | READ + PROVEN (sr_p2_k60.log) |
+
+- Processor rate choice (READ, fn 0x33A590 after BUILD): vtbl+0x20 (0x36CAD0 `movss xmm0,[HOST+8]`) rounded = the default;
+  mode = [obj vtbl+0x80] (obj from the processor's vtbl+0x50); mode 5 -> vtbl+0x28 (0x36CDF0, round([HOST+8])) else the table
+  .rdata 0x9CEBA8 = {96000, 88200, 48000, 44100, 32000}[mode]; 0x365B70(proc+0x60, rate); SETSR vtbl+0x18 at 0x33A9CF with
+  xmm1 = float(rate). process() 0x33AC90 calls SETSR again (0x33AD33) when [proc+0x68] != [proc+0x24C]; setter 0x33C030 the same.
+  INFERRED: the engine rate is a plugin setting and the object at proc+0x60 bridges it to the host rate (D3's resampler).
+- HOSTPARAM 0x4465B0 callers (READ): the processor event loop 0x33AC90 -- int event: vtbl+0x60 at 0x33B370 (edx = host id
+  [ev+0xC], r8d = int [ev+0x14]; the loop keeps r14 = ev+9); float event: 0x3256D0 (index) + 0x326560 (normalized -> int) then vtbl+0x60 at 0x33B3BB.
+  HOSTPARAM body: id 0xFFFC00E -> [HOST+0x38] = v (voice count); else std::map lookup (.data 0xD22478, missing id = no-op);
+  then per unit (9; r14 = HOST+0xD8+64u, proc = [r14-0x28], assign = [r14-0x20]): 665 and 20 -> v-100, 22 -> v-12; engine ids
+  707..871 by the byte table 0x4467E4 -> dword table 0x4467B8: 831 -> 0x442750(v!=0), 832 -> 0x442BB0, 833 -> 0x442710,
+  834 -> 0x442C70, 835 -> 0x442C40 (these five skip the dispatch), 756 -> 0x442C30 THEN the generic tail, 769 -> v-36,
+  864/867 -> min(v,1), 871 -> clamp to 1; generic tail: range check 0x4274F0(id) -> DISPATCH(proc, id, flag 0, v) via proc
+  vtbl+0x58 -> ASG_NOTIFY(assign, 4) via vtbl+8. The value frame is the RAW (Script) frame for 769/20/22/665 and the engine
+  frame otherwise (they coincide for every pool but 769).
+- HOST MAP (.data 0xD22478, MSVC std::map<int,int>, size at 0xD22480): built by static init 0xAD320 from an initializer list
+  at [rbp+0x1670, rbp+0x2DB0) passed to 0x443DD0 = 744 (host id, engine id) pairs (READ); the executed walk after static init =
+  744 entries, identical to the READ list (PROVEN, boot_p2_44100.log). Host ids are Script addresses: PATCH pools 750..813 ->
+  0x600000 + 2*(eid-750); 814..877 -> stride 8 from 0x600080. The "map of 3 = {0:18,1:19,2:20}" in this ledger and S3_STATUS
+  was a HARNESS defect: the old walker kept keys < 0x100000 only (the JX walker has the same filter -- INFERRED same defect).
+- LFO KEY TRIG (756): 0x442C30 -> [[HOST+0xD8+64u]+0x18] -> 0x442260: mode byte +0xC := v and dirty +0xB := 1 (when mode <= 2
+  and changed). NOTEON's unit fn 0x442030 reads dirty (0x44203B), then mode (0x44204A), sets flag +8 := (mode in {1,2}),
+  clears dirty. PROVEN (read hooks after a TB flush, recall_compare_p0/p24.log, ktflag_p24.log): on the stub drive nothing
+  else reads +8 -- the flag's consumer is outside VOICE_WRAP/MASTER_WRAP/NOTEON/NOTEOFF (INFERRED: host RENDER / worker).

@@ -1,0 +1,12 @@
+[  10.7s] boot sr 44100 patch 1 'PD Jupiter Str': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 2 FINE 171 SUB 0; confound candidates: REVERB 146 DELAY 45
+[  10.7s] CENSUS static init  host_map 744
+[  10.7s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.7s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.7s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.7s] CENSUS recall 1     live ramps 3483, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.7s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.5s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.5s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  45.4s] FAIL key 48 EARLY: DRY f0 65.85 Hz (-1188 c vs key) harmonic 0.741 peak 0.06297 master peak 0.08944 | engine u0 65.2/65.8 | dev 1 c vs engine, 12 c vs semitone | NaN 0
+[ 108.5s] PASS release dry 48: 0.0573 -> 0.0237 | PASS release master: 0.0884 -> 0.0376 (24000 samples) | 3 s tail rule: dry 0 master 1.17e-06 at 3.0 s -> PASS/PASS
+[ 117.0s] PASS key 60 EARLY: DRY f0 131.47 Hz (-1191 c vs key) harmonic 0.813 peak 0.06404 master peak 0.09198 | engine u0 130.8/132.0 | dev 7 c vs engine, 9 c vs semitone | NaN 0

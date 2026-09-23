@@ -1,0 +1,26 @@
+[  16.9s] boot sr 44100 patch 63 '1981 Chime      ': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 4 -> predicted shift +12 semis; VCO2 SUB RANGE engine 0
+[  16.9s] CENSUS static init  host_map 744
+[  16.9s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  16.9s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  16.9s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  16.9s] CENSUS recall 63    live ramps 3465, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  16.9s] PASS boot census: live NaN/inf ramps over all stages 0; HOST via factory 150033 allocations; host_init writes 3
+[  18.9s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  18.9s] PASS census after idle: live ramps 0 (NaN/inf 0), latch sum 0
+[  19.4s] idle cost: 31164 instr/sample (code hook, 32 samples)
+[  52.1s] key 48 EARLY: DRY f0 132.26 Hz (+19 c) harmonic 0.898 peak 0.07422 | MASTER f0 132.26 Hz (+19 c) harmonic 0.898 peak 0.3084 | NaN 0
+[  52.1s] FAIL key 48 engine pitch (EARLY): cells at window start u0 984.47/260.19, end u0 282.74/259.24 | DRY f0 1165.1 c from the nearest VCO cell, harmonic 0.898 (law: <= 25 c, >= 0.80)
+[  52.7s] sustain cost: 30691 instr/sample (code hook, 32 samples)
+[ 117.3s] PASS release dry 48: 0.014 -> 0.00642 | PASS release master: 0.0581 -> 0.0267 (24000 samples) | 3 s tail rule: dry 0.000126 master 0.000523 at 3.0 s -> PASS/PASS
+[ 149.0s] key 60 EARLY: DRY f0 263.41 Hz (+12 c) harmonic 0.909 peak 0.0706 | MASTER f0 263.41 Hz (+12 c) harmonic 0.909 peak 0.2933 | NaN 0
+[ 149.0s] FAIL key 60 engine pitch (EARLY): cells at window start u0 1988.56/518.47, end u0 575.18/520.77 | DRY f0 1172.3 c from the nearest VCO cell, harmonic 0.909 (law: <= 25 c, >= 0.80)
+[ 212.5s] PASS release dry 60: 0.0211 -> 0.00933 | PASS release master: 0.0876 -> 0.0387 (24000 samples) | 3 s tail rule: dry 0.000192 master 0.000796 at 3.0 s -> PASS/PASS
+[ 244.5s] key 72 EARLY: DRY f0 525.16 Hz (+6 c) harmonic 0.911 peak 0.07338 | MASTER f0 525.16 Hz (+6 c) harmonic 0.911 peak 0.3049 | NaN 0
+[ 244.5s] FAIL key 72 engine pitch (EARLY): cells at window start u0 3650.79/1039.72, end u0 4727.72/1036.20 | DRY f0 1176.6 c from the nearest VCO cell, harmonic 0.911 (law: <= 25 c, >= 0.80)
+[ 307.7s] PASS release dry 72: 0.0217 -> 0.0132 | PASS release master: 0.0901 -> 0.0547 (24000 samples) | 3 s tail rule: dry 0.00028 master 0.00116 at 3.0 s -> PASS/PASS
+[ 307.7s] DRY    PASS pitch tracks keys by +0 semitones (offsets +19, +12, +6 cents) (patch VCO1 RANGE predicts +12) | every key on its engine cell: False
+[ 307.7s] MASTER PASS pitch tracks keys by +0 semitones (offsets +19, +12, +6 cents)
+[ 307.7s] PASS NaN census 0; faults after static init 0
+[ 307.7s] S3 estimate (idle): 31164 x86 instr/sample x 1.75 = 54537 cyc/sample = 545% of 10,000 cyc/sample @48k (count PROVEN on this oracle; 1.75 calibration INFERRED)
+[ 307.7s] S3 estimate (sustain): 30691 x86 instr/sample x 1.75 = 53709 cyc/sample = 537% of 10,000 cyc/sample @48k (count PROVEN on this oracle; 1.75 calibration INFERRED)
+[ 307.7s] JP8 LISTEN sr 44100 patch 63: 3 FAIL

@@ -1,0 +1,23 @@
+[  14.8s] boot sr 44100 patch 0 'PD Jupiter Glide': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 -> predicted shift -12 semis; VCO2 SUB RANGE engine 0
+[  14.8s] CENSUS static init  host_map 744
+[  14.8s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  14.8s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  14.8s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  14.8s] CENSUS recall 0     live ramps 3411, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  14.8s] PASS boot census: live NaN/inf ramps over all stages 0; HOST via factory 150033 allocations; host_init writes 3
+[  16.6s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  16.6s] PASS census after idle: live ramps 0 (NaN/inf 0), latch sum 0
+[  17.1s] idle cost: 30583 instr/sample (code hook, 32 samples)
+[  25.7s] key 48: DRY f0 370.59 Hz (+1803 c) harmonic 0.473 peak 0.3652 | MASTER f0 370.59 Hz (+1803 c) harmonic 0.473 peak 0.12 | NaN 0
+[  26.2s] sustain cost: 31055 instr/sample (code hook, 32 samples)
+[  38.2s] PASS release dry 48: 0.292 -> 0 | FAIL release master: 0.0965 -> 0.0471 (24000 samples)
+[  46.7s] key 60: DRY f0 918.75 Hz (+2175 c) harmonic 0.294 peak 0.4578 | MASTER f0 918.75 Hz (+2175 c) harmonic 0.290 peak 0.1491 | NaN 0
+[  58.4s] PASS release dry 60: 0.301 -> 0 | FAIL release master: 0.0946 -> 0.0662 (24000 samples)
+[  66.6s] key 72: DRY f0 2321.05 Hz (+2579 c) harmonic 0.125 peak 0.5375 | MASTER f0 2205.00 Hz (+2490 c) harmonic 0.128 peak 0.1896 | NaN 0
+[  78.3s] PASS release dry 72: 0.312 -> 0 | FAIL release master: 0.11 -> 0.0507 (24000 samples)
+[  78.3s] DRY    FAIL harmonic/f0: [(48, 370.5882352941176, 0.4726425335100466), (60, 918.75, 0.29374604499186013), (72, 2321.0526315789475, 0.12484803749328988)] (patch VCO1 RANGE predicts -12)
+[  78.3s] MASTER FAIL harmonic/f0: [(48, 370.5882352941176, 0.47264332227048184), (60, 918.75, 0.2897391391451812), (72, 2205.0, 0.1283423203963004)]
+[  78.3s] PASS NaN census 0; faults after static init 0
+[  78.3s] S3 estimate (idle): 30583 x86 instr/sample x 1.75 = 53520 cyc/sample = 535% of 10,000 cyc/sample @48k (count PROVEN on this oracle; 1.75 calibration INFERRED)
+[  78.3s] S3 estimate (sustain): 31055 x86 instr/sample x 1.75 = 54347 cyc/sample = 543% of 10,000 cyc/sample @48k (count PROVEN on this oracle; 1.75 calibration INFERRED)
+[  78.3s] JP8 LISTEN sr 44100 patch 0: 5 FAIL

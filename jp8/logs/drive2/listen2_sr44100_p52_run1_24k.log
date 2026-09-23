@@ -1,0 +1,23 @@
+[  15.2s] boot sr 44100 patch 52 '1981 Hi Brass   ': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 -> predicted shift +0 semis; VCO2 SUB RANGE engine 0
+[  15.2s] CENSUS static init  host_map 744
+[  15.2s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  15.2s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  15.2s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  15.2s] CENSUS recall 52    live ramps 3321, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  15.2s] PASS boot census: live NaN/inf ramps over all stages 0; HOST via factory 150033 allocations; host_init writes 3
+[  17.0s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  17.0s] PASS census after idle: live ramps 0 (NaN/inf 0), latch sum 0
+[  17.5s] idle cost: 32033 instr/sample (code hook, 32 samples)
+[  26.4s] key 48: DRY f0 131.27 Hz (+6 c) harmonic 0.992 peak 0.0697 | MASTER f0 131.28 Hz (+6 c) harmonic 0.992 peak 0.1966 | NaN 0
+[  27.0s] sustain cost: 31564 instr/sample (code hook, 32 samples)
+[  39.2s] FAIL release dry 48: 0.0548 -> 0.00353 | FAIL release master: 0.155 -> 0.00995 (24000 samples)
+[  47.9s] key 60: DRY f0 262.34 Hz (+5 c) harmonic 0.982 peak 0.08586 | MASTER f0 262.34 Hz (+5 c) harmonic 0.982 peak 0.2422 | NaN 0
+[  60.0s] FAIL release dry 60: 0.0533 -> 0.00633 | FAIL release master: 0.15 -> 0.0179 (24000 samples)
+[  68.6s] key 72: DRY f0 524.67 Hz (+5 c) harmonic 0.977 peak 0.08409 | MASTER f0 524.67 Hz (+5 c) harmonic 0.977 peak 0.2372 | NaN 0
+[  80.9s] FAIL release dry 72: 0.0704 -> 0.00352 | PASS release master: 0.198 -> 0.00992 (24000 samples)
+[  80.9s] DRY    PASS pitch tracks keys by +0 semitones (offsets +6, +5, +5 cents) (patch VCO1 RANGE predicts +0)
+[  80.9s] MASTER PASS pitch tracks keys by +0 semitones (offsets +6, +5, +5 cents)
+[  80.9s] PASS NaN census 0; faults after static init 0
+[  80.9s] S3 estimate (idle): 32033 x86 instr/sample x 1.75 = 56057 cyc/sample = 561% of 10,000 cyc/sample @48k (count PROVEN on this oracle; 1.75 calibration INFERRED)
+[  80.9s] S3 estimate (sustain): 31564 x86 instr/sample x 1.75 = 55238 cyc/sample = 552% of 10,000 cyc/sample @48k (count PROVEN on this oracle; 1.75 calibration INFERRED)
+[  80.9s] JP8 LISTEN sr 44100 patch 52: 5 FAIL

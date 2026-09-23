@@ -100,8 +100,9 @@ def cmd_recall(patch):
     res = {}
     for path in ("hostparam", "dispatch"):
         jp = J.JP8(); jp.boot(sr=44100.0, patch=None); uc = jp.uc
-        kt = lfokt(jp); reads = {"recall": 0, "drive": 0}; phase = ["recall"]
-        def hk(uc_, acc, addr, size, val, user): reads[phase[0]] += 1
+        kt = lfokt(jp); reads = {"recall": 0, "drive": 0}; phase = ["recall"]; pcs = {"recall": {}, "drive": {}}
+        def hk(uc_, acc, addr, size, val, user):
+            reads[phase[0]] += 1; k = (uc_.reg_read(J.UC_X86_REG_RIP) - J.IB, (addr & 0xF)); pcs[phase[0]][k] = pcs[phase[0]].get(k, 0) + 1
         uc.ctl_flush_tb(); hh = [uc.hook_add(UC_HOOK_MEM_READ, hk, begin=s + 0xB, end=s + 0xC) for s, _, _ in kt]
         jp.recall(patch, path=path)
         kt1 = lfokt(jp); h1 = heap(jp).copy()
@@ -112,6 +113,8 @@ def cmd_recall(patch):
         h2 = heap(jp).copy()
         log("%-9s patch %d: LFO KEY TRIG (mode,dirty) unit0 %s after recall; reads of those bytes: recall %d, drive %d; drive NaN %d; master sha %s" % (
             path, patch, kt1[0][1:], reads["recall"], reads["drive"], nan, hashlib.sha256(struct.pack("<%dI" % (2 * len(L)), *(L + R))).hexdigest()[:16]))
+        log("  reader pcs (rva, byte +0xB/+0xC) -> count: recall %s | drive %s; (mode,dirty) unit0 after drive %s" % (
+            {"0x%x/+0x%X" % k: n for k, n in sorted(pcs["recall"].items())}, {"0x%x/+0x%X" % k: n for k, n in sorted(pcs["drive"].items())}, lfokt(jp)[0][1:]))
         res[path] = (h1, h2, np.array(L + R, dtype=np.uint32), np.array(D, dtype=np.float32), kt1)
         del jp, uc; gc.collect()
     a, b = res["hostparam"], res["dispatch"]
@@ -127,6 +130,62 @@ def cmd_recall(patch):
     mx = max((abs(fw(int(a[2][i])) - fw(int(b[2][i]))) for i in dw), default=0.0)
     log("OUTPUT master words differ %d of %d (first at sample %d, max |diff| %.3g); dry samples differ %d of %d" % (len(dw), len(a[2]), first, mx, len(dd), len(a[3])))
     log("RECALL COMPARE patch %d done" % patch)
+    return 0
+
+def cmd_ktflag(patch):
+    """who reads the key-trigger FLAG byte [s+8] the note-on (0x44205d) sets from the mode byte, on the stub drive"""
+    jp = J.JP8(); jp.boot(sr=44100.0, patch=patch); uc = jp.uc; kt = lfokt(jp); pcs = {}
+    def hk(uc_, acc, addr, size, val, user):
+        k = uc_.reg_read(J.UC_X86_REG_RIP) - J.IB; pcs[k] = pcs.get(k, 0) + 1
+    uc.ctl_flush_tb(); hh = [uc.hook_add(UC_HOOK_MEM_READ, hk, begin=s + 8, end=s + 8) for s, _, _ in kt]
+    L, R, D, nan = drive_multi(jp)
+    for x in hh: uc.hook_del(x)
+    uc.ctl_flush_tb()
+    log("KT FLAG patch %d: (mode,dirty) unit0 before drive %s, flag byte [s+8] unit0 after drive %d; readers of [s+8] during the drive (rva -> count): %s" % (
+        patch, kt[0][1:], uc.mem_read(kt[0][0] + 8, 1)[0], {"0x%x" % k: n for k, n in sorted(pcs.items())}))
+    return 0
+
+def cmd_hwrites(patch):
+    """drive2 boot + recall P, then every OTHER mapped id's old-law default pushed through HOSTPARAM one at a time:
+    heap bytes each write CHANGES (write hook, old value != new value) -- which non-drive params move the engine"""
+    import pe_recon
+    from unicorn import UC_HOOK_MEM_WRITE
+    jp = J.JP8(); jp.boot(sr=44100.0, patch=patch); uc = jp.uc
+    rows = pe_recon.PE(J.BIN).params(list(range(5223)))["rows"]; hm = jp.host_map()
+    ch = [0]; lo = J.HEAP_BASE; hi = jp.heap
+    def hk(uc_, acc, addr, size, val, user):
+        if lo <= addr < hi and int.from_bytes(uc_.mem_read(addr, size), 'little') != (val & ((1 << (8 * size)) - 1)): ch[0] += size
+    uc.ctl_flush_tb(); h = uc.hook_add(UC_HOOK_MEM_WRITE, hk)
+    out = []
+    for hid, eng in sorted(hm.items()):
+        if hid in J.HOSTINIT_IDS or 750 <= eng <= 813: continue
+        r = rows.get(eng)
+        if not r or not r["name"] or r["name"] == "_reserve_" or 433 <= eng < 485 or r["min"] == r["max"] == r["default"] == 0: continue
+        ch[0] = 0; jp.call(J.HOSTPARAM, rcx=jp.HOST, rdx=hid, r8=r["default"] - r["min"], count=J.HP_CAP)
+        if ch[0]: out.append((eng, r["name"], r["default"], r["min"], ch[0]))
+    uc.hook_del(h); uc.ctl_flush_tb()
+    log("HWRITES patch %d: %d of the old-law default writes change heap bytes:" % (patch, len(out)))
+    for e in out: log("  eng %d %-28s default %d (min %d) -> %d heap bytes changed" % e)
+    return 0
+
+def cmd_ab(patch):
+    """END-TO-END A/B of the two oracle drives on the multi-note drive: LEGACY (zero HOST, DISPATCH-flag-0 recall, snap +
+    latch clear) vs DRIVE2 (factory HOST, HOSTPARAM recall, no snap); master words + dry samples that differ"""
+    out = {}
+    for lab in ("legacy", "drive2"):
+        jp = J.JP8(legacy=(lab == "legacy"))
+        if lab == "legacy":
+            jp.run_static_init(); jp.build(); jp.set_ftz(); jp.set_sr(44100.0); jp.host_init(); jp.recall(patch); jp.snap_ramps(); jp.clear_latch()
+        else:
+            jp.boot(sr=44100.0, patch=patch)
+        L, R, D, nan = drive_multi(jp)
+        out[lab] = (np.array(L + R, dtype=np.uint32), np.array(D, dtype=np.float32))
+        log("%-7s patch %d: master sha %s, dry NaN %d, faults %d" % (lab, patch, hashlib.sha256(out[lab][0].tobytes()).hexdigest()[:16], nan, jp.faults))
+        del jp; gc.collect()
+    a, b = out["legacy"], out["drive2"]; dw = np.nonzero(a[0] != b[0])[0]; dd = np.nonzero(a[1] != b[1])[0]; n = len(a[0]) // 2
+    mx = max((abs(fw(int(a[0][i])) - fw(int(b[0][i]))) for i in dw), default=0.0)
+    log("AB patch %d: master words differ %d of %d (first at sample %s, max |diff| %.3g); dry samples differ %d of %d (first at %s)" % (
+        patch, len(dw), len(a[0]), int(dw[0]) % n if len(dw) else "-", mx, len(dd), len(a[1]), int(dd[0]) if len(dd) else "-"))
     return 0
 
 def cmd_sr(patch):
@@ -172,5 +231,8 @@ if __name__ == "__main__":
     if c == "tooth": sys.exit(cmd_tooth())
     if c == "recall": sys.exit(cmd_recall(int(sys.argv[2])))
     if c == "sr": sys.exit(cmd_sr(int(sys.argv[2])))
+    if c == "hwrites": sys.exit(cmd_hwrites(int(sys.argv[2])))
+    if c == "ab": sys.exit(cmd_ab(int(sys.argv[2])))
+    if c == "ktflag": sys.exit(cmd_ktflag(int(sys.argv[2])))
     if c == "hinit": sys.exit(cmd_hinit(int(sys.argv[2])))
     sys.exit(__doc__)

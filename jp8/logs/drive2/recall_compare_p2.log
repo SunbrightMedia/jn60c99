@@ -1,1 +1,6 @@
 [  29.3s] hostparam patch 2: LFO KEY TRIG (mode,dirty) unit0 (0, 0) after recall; reads of those bytes: recall 9, drive 36; drive NaN 0; master sha 02d28ca1c6103a89
+[  63.4s] dispatch  patch 2: LFO KEY TRIG (mode,dirty) unit0 (0, 0) after recall; reads of those bytes: recall 0, drive 36; drive NaN 0; master sha 02d28ca1c6103a89
+[  64.0s] HEAP after recall: 0 dwords differ (of 27352668)
+[  64.0s] HEAP after drive: 0 dwords differ (of 27352668)
+[  64.0s] OUTPUT master words differ 0 of 37096 (first at sample -1, max |diff| 0); dry samples differ 0 of 18548
+[  64.0s] RECALL COMPARE patch 2 done

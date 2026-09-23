@@ -1,0 +1,4 @@
+[  20.2s] SETSR(96000): SETSR ran 11 instructions in its own body (EARLY RETURN); state+0x10 96000.0, ratio +0x8B0 1.0; set_sr after recall REFUSED; key 60 DRY f0 263.47 Hz (+12 c vs key) harmonic 0.961 | engine cells VCO1 261.62 VCO2 263.42 Hz | NaN 0
+[  41.3s] SETSR(44100): SETSR ran 163 instructions in its own body (full); state+0x10 44100.0, ratio +0x8B0 2.176870822906494; set_sr after recall REFUSED; key 60 DRY f0 262.64 Hz (+7 c vs key) harmonic 0.958 | engine cells VCO1 260.89 VCO2 262.69 Hz | NaN 0
+[  63.0s] SETSR(48000): SETSR ran 163 instructions in its own body (full); state+0x10 48000.0, ratio +0x8B0 1.0; set_sr after recall REFUSED; key 60 DRY f0 131.38 Hz (-1193 c vs key) harmonic 0.948 | engine cells VCO1 261.62 VCO2 263.42 Hz | NaN 0
+[  63.6s] SR SUMMARY patch 2 key 60: 96000 -> 263.47 Hz, 44100 -> 262.64 Hz, 48000 -> 131.38 Hz

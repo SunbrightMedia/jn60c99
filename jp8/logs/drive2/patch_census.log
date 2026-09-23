@@ -1,0 +1,52 @@
+PATCH-struct ids in the executed host map: 128 (pools 64, others 64); shift 0
+TOOTH patch names decoded from eng 814..829: 64/64 match the record name
+values outside [0, max-min]: 1 of 7168
+  eng 830 host 0x600100 (INPUT JACK USING)       DB 0..65535 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 831 host 0x600108 ARPEGGIO SW              DB 0..1 def 0 | bank raw: p0 0 p2 0, 2 distinct over 64
+  eng 832 host 0x600110 ARPEGGIO MODE            DB 0..5 def 0 | bank raw: p0 0 p2 0, 4 distinct over 64
+  eng 833 host 0x600118 ARPEGGIO RANGE           DB 0..5 def 0 | bank raw: p0 0 p2 0, 3 distinct over 64
+  eng 834 host 0x600120 SCATTER TYPE             DB 0..9 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 835 host 0x600128 SCATTER DEPTH            DB -5..5 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 836 host 0x600130 OCTAVE SHIFT             DB -3..3 def 0 | bank raw: p0 0 p2 0, 3 distinct over 64
+  eng 837 host 0x600138 KEY HOLD                 DB 0..1 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 838 host 0x600140 (LFO CV IN)              DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 839 host 0x600148 (LFO RING IN)            DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 840 host 0x600150 (LFO PITCH IN)           DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 841 host 0x600158 (LFO FILTER IN)          DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 842 host 0x600160 (LFO AMP IN)             DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 843 host 0x600168 (OSC1 X-MOD IN)          DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 844 host 0x600170 (OSC2 SYNC IN)           DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 845 host 0x600178 (OSC2 RING IN)           DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 846 host 0x600180 (OSC3 EXT IN)            DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 847 host 0x600188 (P ENV GATE IN)          DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 848 host 0x600190 (PITCH ENV IN)           DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 849 host 0x600198 (F ENV GATE IN)          DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 850 host 0x6001a0 (FILTER ENV IN)          DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 851 host 0x6001a8 (A ENV GATE IN)          DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 852 host 0x6001b0 (AMP ENV IN)             DB 0..13 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 853 host 0x6001b8 LFO CV GAIN              DB 0..255 def 128 | bank raw: p0 128 p2 128, 1 distinct over 64
+  eng 854 host 0x6001c0 ENV1 KEY FOLLOW          DB 0..1 def 0 | bank raw: p0 0 p2 0, 2 distinct over 64
+  eng 855 host 0x6001c8 ENV2 KEY FOLLOW          DB 0..1 def 0 | bank raw: p0 0 p2 0, 2 distinct over 64
+  eng 856 host 0x6001d0 CONDITION                DB 0..255 def 128 | bank raw: p0 255 p2 128, 4 distinct over 64
+  eng 857 host 0x6001d8 BEND GAIN                DB 0..3 def 0 | bank raw: p0 0 p2 0, 2 distinct over 64
+  eng 858 host 0x6001e0 BEND SENS VCO            DB 0..255 def 255 | bank raw: p0 255 p2 43, 4 distinct over 64
+  eng 859 host 0x6001e8 BEND SENS VCF            DB 0..255 def 255 | bank raw: p0 0 p2 43, 6 distinct over 64
+  eng 860 host 0x6001f0 MOD SENS VCO             DB 0..255 def 128 | bank raw: p0 0 p2 0, 23 distinct over 64
+  eng 861 host 0x6001f8 MOD SENS VCF             DB 0..255 def 128 | bank raw: p0 127 p2 78, 28 distinct over 64
+  eng 862 host 0x600200 (LFO VARIATION)          DB 0..2 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 863 host 0x600208 LFO TRIG ENV             DB 0..1 def 0 | bank raw: p0 0 p2 0, 2 distinct over 64
+  eng 864 host 0x600210 VCO1 MOD                 DB 0..1 def 0 | bank raw: p0 1 p2 0, 2 distinct over 64
+  eng 865 host 0x600218 (OSC1 COARSE TUNE)       DB 0..22 def 11 | bank raw: p0 11 p2 11, 1 distinct over 64
+  eng 866 host 0x600220 (OSC1 FINE TUNE)         DB 0..255 def 128 | bank raw: p0 128 p2 128, 1 distinct over 64
+  eng 867 host 0x600228 VCO2 MOD                 DB 0..1 def 0 | bank raw: p0 0 p2 0, 2 distinct over 64
+  eng 868 host 0x600230 (OSC3 WAVEFORM)          DB 0..5 def 1 | bank raw: p0 1 p2 1, 1 distinct over 64
+  eng 869 host 0x600238 CIRCUIT MOD              DB 0..255 def 0 | bank raw: p0 0 p2 0, 1 distinct over 64
+  eng 870 host 0x600240 (OSC3 TUNE)              DB 0..255 def 128 | bank raw: p0 128 p2 128, 1 distinct over 64
+  eng 871 host 0x600248 VCF ENV MOD SOURCE       DB 0..1 def 0 | bank raw: p0 1 p2 0, 2 distinct over 64
+  eng 872 host 0x600250 VCF SLOPE                DB 0..5 def 2 | bank raw: p0 0 p2 1, 4 distinct over 64
+  eng 873 host 0x600258 EFFECT TYPE              DB 0..5 def 0 | bank raw: p0 0 p2 5, 4 distinct over 64
+  eng 874 host 0x600260 EFFECT CTRL              DB 0..255 def 128 | bank raw: p0 0 p2 100, 14 distinct over 64
+  eng 875 host 0x600268 DELAY TYPE               DB 0..5 def 0 | bank raw: p0 5 p2 2, 5 distinct over 64
+  eng 876 host 0x600270 REVERB TYPE              DB 0..5 def 2 | bank raw: p0 0 p2 2, 6 distinct over 64
+  eng 877 host 0x600278 REVERB TIME              DB 0..255 def 128 | bank raw: p0 255 p2 124, 24 distinct over 64
+PATCH CENSUS: FAIL

@@ -1,0 +1,9 @@
+[  15.1s] HWRITES patch 2: 8 of the old-law default writes change heap bytes:
+[  15.1s]   eng 375 TEMPO                        default 1280 (min 400) -> 684 heap bytes changed
+[  15.1s]   eng 835 SCATTER DEPTH                default 0 (min -5) -> 72 heap bytes changed
+[  15.1s]   eng 873 EFFECT TYPE                  default 0 (min 0) -> 144 heap bytes changed
+[  15.1s]   eng 875 DELAY TYPE                   default 0 (min 0) -> 3429 heap bytes changed
+[  15.1s]   eng 876 REVERB TYPE                  default 2 (min 0) -> 144 heap bytes changed
+[  15.1s]   eng 878 LFO RATE H                   default 1060089776 (min 0) -> 1152 heap bytes changed
+[  15.1s]   eng 1029 VCF CUTOFF H                 default 1065353216 (min 0) -> 864 heap bytes changed
+[  15.1s]   eng 1323 REVERB PRE DELAY             default 20 (min 0) -> 144 heap bytes changed

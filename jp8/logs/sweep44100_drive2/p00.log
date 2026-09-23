@@ -1,0 +1,11 @@
+[  10.8s] boot sr 44100 patch 0 'PD Jupiter Glide': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 4 FINE 144 SUB 0; confound candidates: VCO ENV MOD 18, REVERB 30 DELAY 191
+[  10.8s] CENSUS static init  host_map 744
+[  10.8s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.8s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS recall 0     live ramps 3411, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.5s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.5s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  46.0s] FAIL key 48 EARLY: DRY f0 370.59 Hz (+1803 c vs key) harmonic 0.473 peak 0.3652 master peak 0.12 | engine u0 65.3/261.6 | dev 603 c vs engine, 3 c vs semitone | NaN 0
+[ 109.5s] PASS release dry 48: 0.252 -> 0 | PASS release master: 0.0871 -> 0.0629 (24000 samples) | 3 s tail rule: dry 0 master 0.000566 at 3.0 s -> PASS/PASS

@@ -1,1 +1,9 @@
-[  29.6s] hostparam patch 0: LFO KEY TRIG (mode,dirty) unit0 (1, 1) after recall; reads of those bytes: recall 9, drive 45; drive NaN 0; master sha da3d8e1e728b97e0
+[  29.3s] hostparam patch 0: LFO KEY TRIG (mode,dirty) unit0 (1, 1) after recall; reads of those bytes: recall 9, drive 45; drive NaN 0; master sha da3d8e1e728b97e0
+[  29.3s]   reader pcs (rva, byte +0xB/+0xC) -> count: recall {'0x442260/+0xC': 9} | drive {'0x44203b/+0xB': 36, '0x44204a/+0xC': 9}; (mode,dirty) unit0 after drive (1, 0)
+[  63.3s] dispatch  patch 0: LFO KEY TRIG (mode,dirty) unit0 (0, 0) after recall; reads of those bytes: recall 0, drive 36; drive NaN 0; master sha da3d8e1e728b97e0
+[  63.3s]   reader pcs (rva, byte +0xB/+0xC) -> count: recall {} | drive {'0x44203b/+0xB': 36}; (mode,dirty) unit0 after drive (0, 0)
+[  63.9s] HEAP after recall: 18 dwords differ (of 27352668); first at heap+0x113bfa8
+[  63.9s]   of which in the LFO KEY TRIG dwords: 18; others: []
+[  63.9s] HEAP after drive: 18 dwords differ (of 27352668); first at heap+0x113bfa8
+[  63.9s] OUTPUT master words differ 0 of 37096 (first at sample -1, max |diff| 0); dry samples differ 0 of 18548
+[  63.9s] RECALL COMPARE patch 0 done

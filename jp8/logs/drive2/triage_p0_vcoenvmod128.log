@@ -1,0 +1,10 @@
+[  14.4s] override eng 776 VCO ENV MOD: bank raw 18 -> 128 through HOSTPARAM (host id 0x600034)
+[  16.2s] patch 0 'PD Jupiter Glide' [vcoenvmod_off]: walker settle 4096: dry peak 0 master peak 1.57e-13 NaN 0; live ramps 0 (NaN/inf 0)
+[  24.8s] PASS key 48 EARLY: DRY f0 65.52 Hz (-1197 c vs key) harmonic 0.989 | engine start u0 65.50/262.36 end u0 65.31/261.60 | dev 0.5 c | spectral peaks [(64.599609375, 249.14228993721343), (261.090087890625, 195.09156998706956), (129.19921875, 151.10722067160543)] | NaN 0
+[  88.2s] PASS release 48: dry 0.297 -> 0, master 0.0977 -> 0.0483 | 3 s tail rule: dry 0 master 0.00112
+[  96.7s] PASS key 60 EARLY: DRY f0 131.05 Hz (-1197 c vs key) harmonic 0.992 | engine start u0 130.64/523.30 end u0 131.02/524.82 | dev 0.4 c | spectral peaks [(129.19921875, 242.13438633494732), (524.871826171875, 206.32143429130176), (261.090087890625, 141.65668899621073)] | NaN 0
+[ 160.3s] PASS release 60: dry 0.349 -> 0, master 0.115 -> 0.0571 | 3 s tail rule: dry 0 master 0.00114
+[ 168.7s] PASS key 72 EARLY: DRY f0 261.75 Hz (-1199 c vs key) harmonic 0.984 | engine start u0 261.72/1048.35 end u0 261.30/1046.67 | dev 0.2 c | spectral peaks [(261.090087890625, 257.7628460863939), (1047.052001953125, 229.61991886910735), (522.18017578125, 163.10589068625342)] | NaN 0
+[ 233.0s] PASS release 72: dry 0.534 -> 0, master 0.176 -> 0.0633 | 3 s tail rule: dry 0 master 0.00119
+[ 233.0s] JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1197, -1197, -1199 cents)
+[ 233.0s] TRIAGE patch 0 [vcoenvmod_off] overrides 776=128: PASS

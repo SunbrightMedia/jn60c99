@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """jp8_sweep.py -- ONE patch of the 64-patch listen sweep at 44100 (PORT_COMPLETENESS_CHARTER reach before step 5).
-Fresh boot per patch on the CORRECTED drive (recall dispatch flag 0 = the HOSTPARAM path, then snap + latch).
+Fresh boot per patch on DRIVE2 (jp8_emu default since 2026-09-22, S3_STATUS D7): static init -> HOST via the plugin's
+FACTORY 0x444FE0 (ALLOC 0x8D0 + ctor 0x444000) -> BUILD -> FTZ -> SETSR(44100) -> host_init -> recall through HOSTPARAM
+0x4465B0 (host id, raw bank value) per pool. NO snap, NO latch clear: the idle 4096 below lets the plugin's own walker
+settle the ramps. Ramp census (live NaN/inf steps/accumulators) after every boot stage: any bad ramp FAILS the patch.
 Per key 48/60/72, a FRESH note:
   EARLY window (samples 1024..17408 after note-on): DRY f0 by autocorrelation, harmonicity, and the engine's OWN
   pitch cells [0x16e0]/[0x16f0] read at the window start (key-independent OFFSETS in octaves: expected f =
@@ -14,7 +17,8 @@ Per key 48/60/72, a FRESH note:
 Also: idle 4096 silent (peaks < 0.01), NaN census, faults after static init, instr/sample (idle + sustain), and the
 JX whole-semitone law on the dry f0s (info). Never tuned to pass: every FAIL names its confound candidates
 (VCO ENV MOD != 128, CROSS MOD, SYNC, LOW FREQ, long ENV releases, delay/reverb levels) for the reader to check.
-usage: jp8_sweep.py <patch> [outdir]   -> writes <outdir>/p<NN>.log (default jp8/logs/sweep44100/)"""
+usage: jp8_sweep.py <patch> [outdir]   -> writes <outdir>/p<NN>.log (default jp8/logs/sweep44100_drive2/;
+the pre-drive2 logs in jp8/logs/sweep44100/ came from the old recipe: this file's git history + JP8_EMU_LEGACY_HOST=1)"""
 import sys, os, time, math, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, "/home/user/jn60c99/tools/verify")
 sys.path.insert(0, "/home/user/jn60c99/jx3p/tools")
@@ -22,14 +26,14 @@ import jp8_emu as J, audio_metrics as AM, numpy as np
 from jx_listen import track_verdict
 from unicorn import UC_HOOK_CODE
 SR=44100.0; KEYS=(48,60,72)
-patch=int(sys.argv[1]); outdir=sys.argv[2] if len(sys.argv)>2 else os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","logs","sweep44100")
+patch=int(sys.argv[1]); outdir=sys.argv[2] if len(sys.argv)>2 else os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","logs","sweep44100_drive2")
 os.makedirs(outdir,exist_ok=True); out=open(os.path.join(outdir,"p%02d.log"%patch),"w")
 t0=time.time()
 def log(m):
     s="[%6.1fs] %s"%(time.time()-t0,m); print(s,flush=True); out.write(s+"\n"); out.flush()
-jp=J.JP8(); ok,fail=jp.run_static_init(); f_static=jp.faults
-jp.build(); jp.set_ftz(); jp.set_sr(SR); w,f=jp.host_init(); assert f==0
-jp.recall(patch); jp.snap_ramps(); jp.clear_latch(); uc=jp.uc
+cen=[]
+jp=J.JP8(); assert not jp.legacy, "drive2 sweep: unset JP8_EMU_LEGACY_HOST"
+jp.boot(sr=SR, patch=patch, census=lambda t,c,h: cen.append((t,c,h))); ok,fail=jp.static_ok; f_static=jp.faults_static; uc=jp.uc
 bank=J.bank_bytes(); name=J.patch_name(bank,patch).strip(); blob=J.patch_blob(bank,patch)
 P=lambda pool: J.pool_value(blob,pool)
 conf=[]
@@ -57,10 +61,17 @@ def cells(key):
         if c1!=0 or c2!=0: o.append((u,AM.midi_hz(key)*2**(c1-2.0),AM.midi_hz(key)*2**(c2-2.0)))
     return o
 fails=[]; nan_total=0
+for t,c,h in cen:
+    if c: log("CENSUS %-12s live ramps %d, live NaN/inf %d (all records %d, bad %d), latch sum %d, state+0x10 %r, host_map %d"%(t,c["live"],c["live_bad"],c["records"],c["all_bad"],c["latch_sum"],c["rate0"],h))
+    else: log("CENSUS %-12s host_map %d"%(t,h))
+if any(c and c["live_bad"] for t,c,h in cen): fails.append("census")
+log("HOST via factory: %d allocations; host_init writes %d; recall = HOSTPARAM x %d pools"%(jp.host_allocs,jp.hostinit_writes,len(J.ACTIVE_POOLS)))
 dry,Lw,Rw=jp.render_both(4096); L,nanL=AM.words_to_floats(Lw); pk=float(np.abs(L).max()); dpk=max(abs(x) for x in dry); nan_total+=nanL+jp.dry_nan
 idle_ok=pk<0.01 and dpk<0.01
 if not idle_ok: fails.append("idle")
 log("%s idle 4096: dry peak %.3g master peak %.3g NaN %d"%("PASS" if idle_ok else "FAIL",dpk,pk,nanL))
+c4=jp.ramp_census(); log("CENSUS after idle live ramps %d (NaN/inf %d), latch sum %d"%(c4["live"],c4["live_bad"],c4["latch_sum"]))
+if c4["live_bad"]: fails.append("census")
 ipn_idle=count(32); ipn_note=None
 res=[]; keyrows=[]
 def measure(key):
