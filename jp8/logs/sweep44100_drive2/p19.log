@@ -1,0 +1,10 @@
+[  11.1s] boot sr 44100 patch 19 "SQ Jumpin' Arpg": static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 151 SUB -12; confound candidates: VCO ENV MOD 255, PORTAMENTO 14, REVERB 115 DELAY 123
+[  11.1s] CENSUS static init  host_map 744
+[  11.1s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  11.1s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.1s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.1s] CENSUS recall 19    live ramps 3771, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  11.1s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.8s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.8s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  22.0s] PASS key 48 EARLY: DRY f0 65.69 Hz (-1193 c vs key) harmonic 0.973 peak 0.06842 master peak 0.1561 | engine u0 130.6/65.5 | dev 4 c vs engine, 7 c vs semitone | NaN 0

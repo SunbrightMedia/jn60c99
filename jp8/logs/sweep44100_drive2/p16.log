@@ -12,3 +12,8 @@
 [ 120.3s] PASS key 60 EARLY: DRY f0 131.01 Hz (-1197 c vs key) harmonic 0.998 peak 0.05011 master peak 0.2714 | engine u0 524.9/527.1 | dev 2403 c vs engine, 3 c vs semitone | NaN 0
 [ 185.3s] PASS release dry 60: 0.00567 -> 0 | PASS release master: 0.0311 -> 0.00655 (24000 samples) | 3 s tail rule: dry 0 master 7.47e-07 at 3.0 s -> PASS/PASS
 [ 193.9s] PASS key 72 EARLY: DRY f0 262.08 Hz (-1197 c vs key) harmonic 0.991 peak 0.04947 master peak 0.2781 | engine u0 2089.6/2098.5 | dev 3594 c vs engine, 3 c vs semitone | NaN 0
+[ 259.5s] PASS release dry 72: 0.00923 -> 0 | PASS release master: 0.059 -> 0.00701 (24000 samples) | 3 s tail rule: dry 0 master 1.04e-06 at 3.0 s -> PASS/PASS
+[ 259.5s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1197, -1197, -1197 cents) | every key on its engine cell: False
+[ 259.5s] PASS NaN census 0; faults after static init 0; instr/sample idle 32103 sustain 31614
+[ 259.5s] ROW | 16 | LD Jupiter Lead | PASS | 48:-1197c(L) 60:-1197c(E) 72:-1197c(E) | 1.00 1.00 0.99 | 1.57e-13 | 0 | 0 | 32103/31614 | PORTAMENTO 39; REVERB 145 DELAY 15 |
+[ 259.5s] JP8 SWEEP patch 16: PASS
