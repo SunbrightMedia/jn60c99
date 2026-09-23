@@ -1,0 +1,5 @@
+[   2.7s] CENSUS LEGACY BUILD   live 3177 (step NaN 378 inf 2799, acc bad 0) | all 8010 records (step NaN 378 inf 2799, acc bad 0) | latch sum 8640 | state+0x10 0.0 | host_map 3
+[   2.7s] TOOTH (a) legacy zero HOST: live bad 3177 -> BITES
+[   8.4s] CENSUS POKED BUILD    live 3177 (step NaN 378 inf 2799, acc bad 0) | all 8010 records (step NaN 378 inf 2799, acc bad 0) | latch sum 8640 | state+0x10 0.0 | host_map 744
+[   8.4s] TOOTH (b) factory HOST, [HOST+8] := 0 before BUILD: live bad 3177 -> BITES
+[   8.4s] CENSUS TEETH: 2/2 bite

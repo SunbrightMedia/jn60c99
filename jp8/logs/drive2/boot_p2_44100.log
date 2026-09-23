@@ -1,0 +1,13 @@
+[   0.2s] CENSUS static init    host_map 744
+[   5.5s] CENSUS HOST+BUILD     live 3177 (step NaN 0 inf 0, acc bad 0) | all 8010 records (step NaN 0 inf 0, acc bad 0) | latch sum 8640 | state+0x10 96000.0 | host_map 744
+[   6.7s] CENSUS SETSR 44100    live 3177 (step NaN 0 inf 0, acc bad 0) | all 8010 records (step NaN 0 inf 0, acc bad 0) | latch sum 8640 | state+0x10 44100.0 | host_map 744
+[  10.7s] CENSUS host_init      live 3177 (step NaN 0 inf 0, acc bad 0) | all 8010 records (step NaN 0 inf 0, acc bad 0) | latch sum 8640 | state+0x10 44100.0 | host_map 744
+[  10.7s] CENSUS recall 2       live 3555 (step NaN 0 inf 0, acc bad 0) | all 8010 records (step NaN 0 inf 0, acc bad 0) | latch sum 8640 | state+0x10 44100.0 | host_map 744
+[  10.7s] HOST 0x3100304a0 via FACTORY 0x444FE0: 150033 allocations (1 x 0x8D0 HOST + 150032 ctor), vptr rva 0xa704b0, [HOST+8] 44100.0, [HOST+0x38] 8; static init ok 841 fail 0; host_init writes 3
+[  10.8s] HOST MAP executed 744 entries, READ from 0xAD320 744 pairs, identical True; pools covered 64/64 (host ids 0x600000..0x60007e)
+[  12.5s] idle    0.. 960: dry peak 0 master peak 0
+[  12.5s] idle  960..2048: dry peak 0 master peak 1.57e-13
+[  12.5s] idle 2048..4096: dry peak 0 master peak 1.57e-13
+[  12.5s] idle NaN: dry 0 master 0; faults after static init 1
+[  12.5s] CENSUS after 4096     live 0 (step NaN 0 inf 0, acc bad 0) | all 8010 records (step NaN 0 inf 0, acc bad 0) | latch sum 0 | state+0x10 44100.0 | host_map 744
+[  12.5s] DRIVE2 BOOT patch 2 sr 44100: GREEN

@@ -591,7 +591,7 @@ class JX:
             return self
         def cen(tag, ramps=True):
             if census: census(tag, dict(self.ramp_census()) if ramps else {}, len(self.host_map()))
-        ok,fail=self.run_static_init(); self.static_ok=(ok,fail); cen("static init", ramps=False)
+        ok,fail=self.run_static_init(); self.static_ok=(ok,fail); self.faults_static=self.faults; cen("static init", ramps=False)
         self.build(); cen("HOST+BUILD")
         self.set_ftz(); self.set_sr(sr); cen("SETSR %g"%sr)
         ok,fail=self.host_init(); assert fail==0, "host_init: %d writes failed"%fail
