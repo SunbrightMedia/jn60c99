@@ -1,0 +1,19 @@
+[  10.9s] boot sr 44100 patch 12 'SQ 8th Peaks': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 1 VCO2 RANGE 2 FINE 128 SUB 0; confound candidates: SYNC, REVERB 56 DELAY 3
+[  10.9s] CENSUS static init  host_map 744
+[  10.9s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.9s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.9s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.9s] CENSUS recall 12    live ramps 3501, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.9s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.7s] PASS idle 4096: dry peak 0 master peak 0.000419 NaN 0
+[  12.7s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  22.4s] PASS key 48 EARLY: DRY f0 32.58 Hz (-2406 c vs key) harmonic 0.852 peak 0.1424 master peak 0.3434 | engine u0 65.3/130.5 | dev 1204 c vs engine, 6 c vs semitone | NaN 0
+[  34.5s] PASS release dry 48: 0.0301 -> 0 | PASS release master: 0.107 -> 0.000726 (24000 samples)
+[  66.6s] PASS key 60 LATE: DRY f0 65.31 Hz (-2403 c vs key) harmonic 0.842 peak 0.1356 master peak 0.3116 | engine u0 261.3/522.0 | dev 2400 c vs engine, 3 c vs semitone | NaN 0
+[  78.1s] PASS release dry 60: 0.0324 -> 0 | PASS release master: 0.134 -> 0.000706 (24000 samples)
+[ 110.7s] FAIL key 72 LATE: DRY f0 130.50 Hz (-2404 c vs key) harmonic 0.788 peak 0.1258 master peak 0.3611 | engine u0 1047.9/2093.2 | dev 3606 c vs engine, 4 c vs semitone | NaN 0
+[ 122.2s] PASS release dry 72: 0.0245 -> 0 | PASS release master: 0.239 -> 0.000798 (24000 samples)
+[ 122.2s] FAIL JX law (dry): FAIL harmonic/f0: [(48, np.float64(32.584497360912465), 0.852402167930202), (60, np.float64(65.30751573416501), 0.8421768807417823), (72, np.float64(130.50461253270245), 0.7875954752031429)] | every key on its engine cell: False
+[ 122.2s] PASS NaN census 0; faults after static init 0; instr/sample idle 32063 sustain 31561
+[ 122.2s] ROW | 12 | SQ 8th Peaks | FAIL(pitch72,track) | 48:-2406c(E) 60:-2403c(L) 72:-2404c(L) | 0.85 0.84 0.79 | 0.000419 | 0 | 0 | 32063/31561 | SYNC; REVERB 56 DELAY 3 |
+[ 122.2s] JP8 SWEEP patch 12: FAIL(pitch72,track)

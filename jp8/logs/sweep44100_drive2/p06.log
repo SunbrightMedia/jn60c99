@@ -1,0 +1,19 @@
+[  10.7s] boot sr 44100 patch 6 'BS Ba-Bass': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 3 FINE 128 SUB 0; confound candidates: SYNC, PORTAMENTO 15, REVERB 56 DELAY 35
+[  10.7s] CENSUS static init  host_map 744
+[  10.7s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.7s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.7s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.7s] CENSUS recall 6     live ramps 3357, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.7s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.6s] PASS idle 4096: dry peak 0 master peak 0.000617 NaN 0
+[  12.6s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  22.1s] PASS key 48 EARLY: DRY f0 65.16 Hz (-1207 c vs key) harmonic 0.957 peak 0.06854 master peak 0.2886 | engine u0 130.6/261.0 | dev 1204 c vs engine, 7 c vs semitone | NaN 0
+[  34.0s] PASS release dry 48: 0.0345 -> 0 | PASS release master: 0.159 -> 0.00474 (24000 samples)
+[  42.5s] PASS key 60 EARLY: DRY f0 130.56 Hz (-1203 c vs key) harmonic 0.947 peak 0.06352 master peak 0.3206 | engine u0 522.4/1043.5 | dev 2400 c vs engine, 3 c vs semitone | NaN 0
+[  54.1s] PASS release dry 60: 0.0329 -> 0 | PASS release master: 0.164 -> 0.00338 (24000 samples)
+[  62.4s] PASS key 72 EARLY: DRY f0 261.35 Hz (-1202 c vs key) harmonic 0.937 peak 0.05402 master peak 0.3724 | engine u0 2098.6/4192.1 | dev 3606 c vs engine, 2 c vs semitone | NaN 0
+[  74.0s] PASS release dry 72: 0.0322 -> 0 | PASS release master: 0.268 -> 0.00768 (24000 samples)
+[  74.0s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1207, -1203, -1202 cents) | every key on its engine cell: False
+[  74.0s] PASS NaN census 0; faults after static init 0; instr/sample idle 31047 sustain 30574
+[  74.0s] ROW | 6 | BS Ba-Bass | PASS | 48:-1207c(E) 60:-1203c(E) 72:-1202c(E) | 0.96 0.95 0.94 | 0.000617 | 0 | 0 | 31047/30574 | SYNC; PORTAMENTO 15; REVERB 56 DELAY 35 |
+[  74.0s] JP8 SWEEP patch 6: PASS

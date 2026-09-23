@@ -1,0 +1,19 @@
+[  10.8s] boot sr 44100 patch 2 'BR JP PWM Brass': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 3 FINE 163 SUB 0; confound candidates: REVERB 161 DELAY 37
+[  10.8s] CENSUS static init  host_map 744
+[  10.8s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.8s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS recall 2     live ramps 3555, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.6s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.6s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  22.0s] PASS key 48 EARLY: DRY f0 131.35 Hz (+7 c vs key) harmonic 0.966 peak 0.1277 master peak 0.1491 | engine u0 130.3/131.2 | dev 2 c vs engine, 7 c vs semitone | NaN 0
+[  33.6s] PASS release dry 48: 0.127 -> 0.00277 | PASS release master: 0.137 -> 0.00535 (24000 samples)
+[  42.1s] PASS key 60 EARLY: DRY f0 262.40 Hz (+5 c vs key) harmonic 0.956 peak 0.1518 master peak 0.1673 | engine u0 262.3/264.1 | dev 1 c vs engine, 5 c vs semitone | NaN 0
+[  53.7s] PASS release dry 60: 0.146 -> 0.00162 | PASS release master: 0.148 -> 0.00598 (24000 samples)
+[  62.1s] PASS key 72 EARLY: DRY f0 524.72 Hz (+5 c vs key) harmonic 0.953 peak 0.1535 master peak 0.168 | engine u0 523.5/527.1 | dev 4 c vs engine, 5 c vs semitone | NaN 0
+[  73.8s] PASS release dry 72: 0.152 -> 0.000726 | PASS release master: 0.156 -> 0.00368 (24000 samples)
+[  73.8s] PASS JX law (dry): PASS pitch tracks keys by +0 semitones (offsets +7, +5, +5 cents) | every key on its engine cell: True
+[  73.8s] PASS NaN census 0; faults after static init 0; instr/sample idle 31001 sustain 30549
+[  73.8s] ROW | 2 | BR JP PWM Brass | PASS | 48:+7c(E) 60:+5c(E) 72:+5c(E) | 0.97 0.96 0.95 | 1.57e-13 | 0 | 0 | 31001/30549 | REVERB 161 DELAY 37 |
+[  73.8s] JP8 SWEEP patch 2: PASS

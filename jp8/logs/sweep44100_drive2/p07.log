@@ -1,0 +1,19 @@
+[  10.8s] boot sr 44100 patch 7 "LD Siren's Chant": static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 4 VCO2 RANGE 2 FINE 128 SUB 10; confound candidates: CROSS MOD 8, LOW FREQ, PORTAMENTO 57, ENV REL 157/96, REVERB 152 DELAY 42
+[  10.8s] CENSUS static init  host_map 744
+[  10.8s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.8s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] CENSUS recall 7     live ramps 3771, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.8s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.4s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.4s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  44.7s] FAIL key 48 LATE: DRY f0 260.16 Hz (+1190 c vs key) harmonic 0.624 peak 0.01372 master peak 0.2655 | engine u0 541.1/14.5 | dev 1268 c vs engine, 10 c vs semitone | NaN 0
+[ 106.8s] PASS release dry 48: 0.0105 -> 3.66e-05 | PASS release master: 0.209 -> 0.0452 (24000 samples) | 3 s tail rule: dry 0 master 0.000656 at 3.0 s -> PASS/PASS
+[ 137.8s] FAIL key 60 LATE: DRY f0 523.66 Hz (+1201 c vs key) harmonic 0.602 peak 0.01324 master peak 0.3013 | engine u0 2007.7/29.2 | dev 2327 c vs engine, 1 c vs semitone | NaN 0
+[ 200.4s] PASS release dry 60: 0.0107 -> 3.7e-05 | PASS release master: 0.206 -> 0.0505 (24000 samples) | 3 s tail rule: dry 0 master 0.000775 at 3.0 s -> PASS/PASS
+[ 231.5s] FAIL key 72 EARLY: DRY f0 1020.71 Hz (+1157 c vs key) harmonic 0.595 peak 0.01488 master peak 0.2955 | engine u0 8502.9/58.1 | dev 3670 c vs engine, 43 c vs semitone | NaN 0
+[ 293.8s] PASS release dry 72: 0.0112 -> 3.92e-05 | PASS release master: 0.247 -> 0.0663 (24000 samples) | 3 s tail rule: dry 0 master 0.00102 at 3.0 s -> PASS/PASS
+[ 293.8s] FAIL JX law (dry): FAIL harmonic/f0: [(48, np.float64(260.16167314791164), 0.6235879742486728), (60, np.float64(523.656471555857), 0.602086329683837), (72, np.float64(1020.7065940957168), 0.5948888331291068)] | every key on its engine cell: False
+[ 293.8s] PASS NaN census 0; faults after static init 0; instr/sample idle 30201 sustain 30346
+[ 293.8s] ROW | 7 | LD Siren's Chant | FAIL(pitch48,pitch60,pitch72,track) | 48:+1190c(L) 60:+1201c(L) 72:+1157c(E) | 0.62 0.60 0.59 | 1.57e-13 | 0 | 0 | 30201/30346 | CROSS MOD 8; LOW FREQ; PORTAMENTO 57; ENV REL 157/96; REVERB 152 DELAY 42 |
+[ 293.8s] JP8 SWEEP patch 7: FAIL(pitch48,pitch60,pitch72,track)

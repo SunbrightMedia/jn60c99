@@ -10,3 +10,10 @@
 [  45.4s] FAIL key 48 EARLY: DRY f0 65.85 Hz (-1188 c vs key) harmonic 0.741 peak 0.06297 master peak 0.08944 | engine u0 65.2/65.8 | dev 1 c vs engine, 12 c vs semitone | NaN 0
 [ 108.5s] PASS release dry 48: 0.0573 -> 0.0237 | PASS release master: 0.0884 -> 0.0376 (24000 samples) | 3 s tail rule: dry 0 master 1.17e-06 at 3.0 s -> PASS/PASS
 [ 117.0s] PASS key 60 EARLY: DRY f0 131.47 Hz (-1191 c vs key) harmonic 0.813 peak 0.06404 master peak 0.09198 | engine u0 130.8/132.0 | dev 7 c vs engine, 9 c vs semitone | NaN 0
+[ 180.1s] PASS release dry 60: 0.0634 -> 0.0167 | PASS release master: 0.0889 -> 0.029 (24000 samples) | 3 s tail rule: dry 0 master 1.42e-06 at 3.0 s -> PASS/PASS
+[ 188.5s] PASS key 72 EARLY: DRY f0 263.57 Hz (-1187 c vs key) harmonic 0.922 peak 0.04527 master peak 0.06365 | engine u0 262.3/264.7 | dev 7 c vs engine, 13 c vs semitone | NaN 0
+[ 251.4s] PASS release dry 72: 0.0398 -> 0.0172 | PASS release master: 0.0541 -> 0.0274 (24000 samples) | 3 s tail rule: dry 0 master 6.2e-07 at 3.0 s -> PASS/PASS
+[ 251.4s] PASS JX law (dry): FAIL harmonic/f0: [(48, np.float64(65.8524737144504), 0.7410138574174886), (60, np.float64(131.46978338080828), 0.812657021985772), (72, np.float64(263.5678269518818), 0.9215325214603767)] | every key on its engine cell: True
+[ 251.4s] PASS NaN census 0; faults after static init 0; instr/sample idle 31065 sustain 30555
+[ 251.4s] ROW | 1 | PD Jupiter Str | FAIL(pitch48) | 48:-1188c(E) 60:-1191c(E) 72:-1187c(E) | 0.74 0.81 0.92 | 1.57e-13 | 0 | 0 | 31065/30555 | REVERB 146 DELAY 45 |
+[ 251.4s] JP8 SWEEP patch 1: FAIL(pitch48)

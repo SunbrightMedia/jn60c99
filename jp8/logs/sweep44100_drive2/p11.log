@@ -1,0 +1,19 @@
+[  10.6s] boot sr 44100 patch 11 'KY Warship': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 2 VCO2 RANGE 3 FINE 128 SUB 7; confound candidates: REVERB 185 DELAY 40
+[  10.6s] CENSUS static init  host_map 744
+[  10.6s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[  10.6s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.6s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.6s] CENSUS recall 11    live ramps 3555, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[  10.6s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  12.2s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  12.2s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  21.1s] PASS key 48 EARLY: DRY f0 65.24 Hz (-1205 c vs key) harmonic 0.952 peak 0.03128 master peak 0.2085 | engine u0 65.4/195.7 | dev 4 c vs engine, 5 c vs semitone | NaN 0
+[  79.7s] PASS release dry 48: 0.0113 -> 0 | PASS release master: 0.0767 -> 0.0065 (24000 samples) | 3 s tail rule: dry 0 master 1.83e-08 at 3.0 s -> PASS/PASS
+[  87.6s] PASS key 60 EARLY: DRY f0 130.61 Hz (-1203 c vs key) harmonic 0.969 peak 0.02659 master peak 0.1956 | engine u0 130.6/390.9 | dev 0 c vs engine, 3 c vs semitone | NaN 0
+[ 144.9s] PASS release dry 60: 0.0217 -> 0 | PASS release master: 0.156 -> 0.00927 (24000 samples) | 3 s tail rule: dry 0 master 1.54e-07 at 3.0 s -> PASS/PASS
+[ 152.6s] PASS key 72 EARLY: DRY f0 261.18 Hz (-1203 c vs key) harmonic 0.979 peak 0.04718 master peak 0.4054 | engine u0 262.3/785.2 | dev 8 c vs engine, 3 c vs semitone | NaN 0
+[ 163.0s] PASS release dry 72: 0.0337 -> 0 | PASS release master: 0.275 -> 0.00512 (24000 samples)
+[ 163.0s] PASS JX law (dry): PASS pitch tracks keys by -12 semitones (offsets -1205, -1203, -1203 cents) | every key on its engine cell: True
+[ 163.0s] PASS NaN census 0; faults after static init 0; instr/sample idle 28964 sustain 29378
+[ 163.0s] ROW | 11 | KY Warship | PASS | 48:-1205c(E) 60:-1203c(E) 72:-1203c(E) | 0.95 0.97 0.98 | 1.57e-13 | 0 | 0 | 28964/29378 | REVERB 185 DELAY 40 |
+[ 163.0s] JP8 SWEEP patch 11: PASS
