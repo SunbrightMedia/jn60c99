@@ -1,0 +1,13 @@
+[   9.1s] boot sr 44100 patch 56 '1981 Solo Voice': static ok=841 fail=0 faults(static)=1 faults(after)=0; VCO1 RANGE 3 VCO2 RANGE 4 FINE 128 SUB 0; confound candidates: VCO ENV MOD 71, ENV REL 162/57
+[   9.1s] CENSUS static init  host_map 744
+[   9.1s] CENSUS HOST+BUILD   live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 96000.0, host_map 744
+[   9.1s] CENSUS SETSR 44100  live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.1s] CENSUS host_init    live ramps 3177, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.1s] CENSUS recall 56    live ramps 3465, live NaN/inf 0 (all records 8010, bad 0), latch sum 8640, state+0x10 44100.0, host_map 744
+[   9.1s] HOST via factory: 150033 allocations; host_init writes 3; recall = HOSTPARAM x 64 pools
+[  10.6s] PASS idle 4096: dry peak 0 master peak 1.57e-13 NaN 0
+[  10.6s] CENSUS after idle live ramps 0 (NaN/inf 0), latch sum 0
+[  36.9s] FAIL key 48 EARLY: DRY f0 261.79 Hz (+1201 c vs key) harmonic 0.728 peak 0.08249 master peak 0.3003 | engine u0 135.6/270.9 | dev 59 c vs engine, 1 c vs semitone | NaN 0
+[  46.3s] PASS release dry 48: 0.0536 -> 0 | PASS release master: 0.195 -> 1.57e-13 (24000 samples)
+[  72.1s] FAIL key 60 EARLY: DRY f0 522.26 Hz (+1197 c vs key) harmonic 0.758 peak 0.09167 master peak 0.3337 | engine u0 259.9/519.2 | dev 10 c vs engine, 3 c vs semitone | NaN 0
+[  81.8s] PASS release dry 60: 0.0523 -> 0 | PASS release master: 0.19 -> 1.57e-13 (24000 samples)
