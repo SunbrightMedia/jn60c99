@@ -1,0 +1,2 @@
+[  12.5s] override eng 768 VCO2 SYNC: bank raw 1 -> 0 through HOSTPARAM (host id 0x600024)
+[  14.1s] patch 12 'SQ 8th Peaks' [sync_off]: walker settle 4096: dry peak 0 master peak 0.000419 NaN 0; live ramps 0 (NaN/inf 0)

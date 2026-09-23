@@ -6,3 +6,4 @@
 [  93.9s] PASS release 48: dry 0.0105 -> 3.74e-05, master 0.208 -> 0.0311 | 3 s tail rule: dry 0 master 0.000391
 [ 120.5s] FAIL key 60 EARLY: DRY f0 523.29 Hz (+1200 c vs key) harmonic 0.979 | engine start u0 2091.34/930.46 end u0 2095.37/932.25 | dev 996.4 c | spectral peaks [(522.18017578125, 31.1075016829322), (1047.052001953125, 15.534586740522023), (1569.232177734375, 6.2335755191792455)] | NaN 0
 [ 173.6s] PASS release 60: dry 0.0104 -> 3.74e-05, master 0.175 -> 0.0283 | 3 s tail rule: dry 0 master 0.000364
+[ 200.1s] FAIL key 72 EARLY: DRY f0 1046.48 Hz (+1200 c vs key) harmonic 0.972 | engine start u0 8370.33/3724.04 end u0 8358.95/3718.97 | dev 2195.2 c | spectral peaks [(1047.052001953125, 39.20744861162991), (2094.10400390625, 12.839263454109162), (3138.46435546875, 5.129029335019154)] | NaN 0
