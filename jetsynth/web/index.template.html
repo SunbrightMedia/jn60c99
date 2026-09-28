@@ -92,7 +92,7 @@ footer code{font-family:var(--mono);font-size:12px}
       <h2>Engine</h2>
       <div class="f"><label for="throttle">Throttle</label><input id="throttle" type="range" min="0" max="1" step="0.001" value="0.35"><output id="o-throttle"></output>
         <div class="hint">Power lever. The spool follows it, not the sound.</div></div>
-      <div class="f"><label for="spool">Spool</label><input id="spool" type="range" min="0" max="1" step="0.001" value="0.35"><output id="o-spool"></output>
+      <div class="f"><label for="spool">Spool</label><input id="spool" type="range" min="0" max="1" step="0.001" value="0.2"><output id="o-spool"></output>
         <div class="hint">Rotor response time. Bigger engines are slower.</div></div>
       <div class="f"><label for="speed">Speed</label><input id="speed" type="range" min="0" max="1" step="0.001" value="0"><output id="o-speed"></output>
         <div class="hint">Flight Mach. Doppler on every tone, less jet roar.</div></div>
@@ -100,7 +100,7 @@ footer code{font-family:var(--mono);font-size:12px}
         <div class="hint">Engine scale. Pitch goes down, level goes up.</div></div>
       <div class="f"><label for="space">Space</label><input id="space" type="range" min="0" max="1" step="0.001" value="0.35"><output id="o-space"></output>
         <div class="hint">JUNO chorus, delay and reverb. Distance adds more.</div></div>
-      <div class="f"><label for="character">Character</label><input id="character" type="range" min="0" max="1" step="0.001" value="0.6"><output id="o-character"></output>
+      <div class="f"><label for="character">Character</label><input id="character" type="range" min="0" max="1" step="0.001" value="0.5"><output id="o-character"></output>
         <div class="hint">Real engine to movie engine: whine, buzz-saw, crackle, rumble.</div></div>
     </div>
   </section>
@@ -117,11 +117,11 @@ footer code{font-family:var(--mono);font-size:12px}
 <script>
 const WASM_B64 = "__WASM_B64__";
 const IDX = {throttle:0, spool:1, speed:2, angle:3, distance:4, size:5, space:6, boost:7, character:8};
-const state = {throttle:.35, spool:.35, speed:0, angle:.35, distance:.25, size:.5, space:.35, boost:0, character:.6};
+const state = {throttle:.35, spool:.2, speed:0, angle:.35, distance:.25, size:.5, space:.35, boost:0, character:.5};
 const expmap = (v,lo,hi)=>lo*Math.pow(hi/lo,v);
 const fmt = {
   throttle:v=>`TS ${(0.30+0.75*v).toFixed(2)}`,
-  spool:v=>`${expmap(v,.25,12).toFixed(v<.4?2:1)} s`,
+  spool:v=>`${expmap(v,.05,8).toFixed(v<.5?2:1)} s`,
   speed:v=>`M ${(0.4*v).toFixed(2)} · ${Math.round(0.4*v*340.294*1.94384)} kt`,
   size:v=>`${expmap(v,.5,2).toFixed(2)}×`,
   space:v=>`${Math.round(v*100)} %`,
