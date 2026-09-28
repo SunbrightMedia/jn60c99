@@ -1,2 +1,4 @@
 build/
 web/jet.wasm
+tools/*_out/
+tools/__pycache__/
