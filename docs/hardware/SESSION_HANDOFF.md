@@ -36,6 +36,7 @@ Potentiometer_3-Pack, SwitchBoard (x5 each unless named), plus the SegmentBackpa
 | 7-segment backpack (HT16K33A, BSS138 shifter, address jumpers, placement, OPEN diode direction) | `SegmentBackpack/README.md` |
 | Universal Daier TS-22E01/TS-23E01 switch footprint v4 + 75 mm fader footprint, ready KiCad projects | `footprints/README.md`, `SwitchBoard/`, `FaderBoard/` |
 | Snapshots of the user's board files (motherboard, headphone, audio, buttonpack3, muxboardv1, all-boards JLC zip) | `user_boards/README.md` |
+| The purple 15-pin GY-PCM5102 DAC module -> one S3 (sourced pinout, jumpers, GPIO 5/6/7) | `PCM5102_MODULE.md` |
 | What fits ONE S3 (JUNO, JP8, TB-303, a wavetable synth) | `../ONE_BOARD_BUDGET.md` |
 
 **Decisions and answers from 2026-09-13..09-28 (each was asked and answered once; do not re-derive):**
