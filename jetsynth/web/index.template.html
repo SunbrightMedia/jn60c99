@@ -1,0 +1,270 @@
+<title>Jetsynth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --panel:#3d4247; --panel-2:#33383c; --face:#14171a; --line:#5b6167;
+  --ink:#ece9e1; --ink-dim:#a9aca8; --amber:#e7a63c; --cyan:#7cc4d6; --red:#d9574a;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --body:"Barlow",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+html,body{height:100%}
+body{background:var(--panel);color:var(--ink);font:15px/1.45 var(--body);padding-inline:16px;padding-block:18px 28px}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+h1{font:700 44px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;margin:0}
+h1 small{display:block;font:500 13px/1.3 var(--display);letter-spacing:.14em;color:var(--ink-dim);margin-top:6px}
+.start{font:700 18px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--face);background:var(--amber);
+  border:0;border-radius:4px;padding:14px 22px;cursor:pointer;box-shadow:0 0 0 3px var(--face),0 0 0 4px var(--line)}
+.start[aria-pressed="true"]{background:var(--face);color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
+.start:focus-visible,.boost:focus-visible,input:focus-visible,canvas:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+
+.readouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.ro{background:var(--face);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.ro b{display:block;font:600 12px/1 var(--display);letter-spacing:.14em;color:var(--ink-dim);text-transform:uppercase}
+.ro span{display:block;font:500 26px/1.2 var(--mono);font-variant-numeric:tabular-nums;margin-top:6px;white-space:nowrap}
+.ro i{font:400 12px var(--mono);color:var(--ink-dim);font-style:normal}
+.ro.warn span{color:var(--amber)}
+
+.deck{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px}
+.pad{background:var(--face);border:1px solid var(--line);border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.pad h2,.faders h2{font:600 13px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);margin:0}
+#polar{width:100%;aspect-ratio:2/1.2;max-width:100%;touch-action:none;cursor:crosshair;display:block}
+.pad p{margin:0;font-size:13px;color:var(--ink-dim)}
+
+.faders{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:14px}
+.f{display:grid;grid-template-columns:92px minmax(0,1fr) 128px;align-items:center;gap:10px}
+.f label{font:700 17px/1 var(--display);letter-spacing:.1em;text-transform:uppercase}
+.f output{font:500 13px/1.2 var(--mono);text-align:right;font-variant-numeric:tabular-nums;color:var(--cyan)}
+.f .hint{grid-column:2/4;font-size:12.5px;color:var(--ink-dim);margin-top:-8px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:6px;background:var(--face);border-radius:3px;border:1px solid var(--line)}
+input[type=range]::-moz-range-track{height:6px;background:var(--face);border-radius:3px;border:1px solid var(--line)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:26px;margin-top:-11px;border-radius:3px;background:var(--ink);border:2px solid var(--face)}
+input[type=range]::-moz-range-thumb{width:14px;height:24px;border-radius:3px;background:var(--ink);border:2px solid var(--face)}
+#throttle::-webkit-slider-thumb{background:var(--amber)}
+#throttle::-moz-range-thumb{background:var(--amber)}
+
+.boost{font:700 22px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);
+  background:repeating-linear-gradient(135deg,var(--face) 0 14px,#23272b 14px 28px);border:2px solid var(--amber);
+  border-radius:6px;padding:22px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+.boost.on{background:var(--amber);color:var(--face)}
+.boost small{display:block;font:500 12px/1.4 var(--body);letter-spacing:.02em;text-transform:none;color:var(--ink-dim);margin-top:6px}
+.boost.on small{color:var(--face)}
+footer{font-size:12.5px;color:var(--ink-dim);max-width:70ch}
+footer code{font-family:var(--mono);font-size:12px}
+.err{color:var(--red);font-family:var(--mono);font-size:13px}
+@media (max-width:760px){
+  .readouts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .deck{grid-template-columns:minmax(0,1fr)}
+  .f{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}
+  .f input{grid-column:1/3;grid-row:2}
+  .f .hint{grid-column:1/3;margin-top:0}
+  h1{font-size:36px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Jetsynth<small>Turbofan engine · NASA STCA noise data · JUNO-60 effects</small></h1>
+    <button class="start" id="start" aria-pressed="false">Start engine</button>
+  </header>
+
+  <section class="readouts" aria-label="Engine instruments">
+    <div class="ro"><b>N1 fan</b><span id="r-n1">—</span><i id="r-rpm">rpm</i></div>
+    <div class="ro"><b>Power setting</b><span id="r-ts">—</span><i>TS, spool state</i></div>
+    <div class="ro" id="ro-mach"><b>Fan tip Mach</b><span id="r-mt">—</span><i id="r-mt2">buzz-saw above 1.0</i></div>
+    <div class="ro"><b>Blade pass heard</b><span id="r-bpf">—</span><i>Hz, with Doppler</i></div>
+  </section>
+
+  <section class="deck">
+    <div class="pad">
+      <h2>Listener position</h2>
+      <canvas id="polar" tabindex="0" aria-label="Drag to set listener angle and distance. Arrow keys also work."></canvas>
+      <p>Drag the dot. Around the arc sets the angle from the inlet (0°) to the exhaust (180°). Out from the engine sets the distance.</p>
+    </div>
+    <div class="faders">
+      <h2>Engine</h2>
+      <div class="f"><label for="throttle">Throttle</label><input id="throttle" type="range" min="0" max="1" step="0.001" value="0.35"><output id="o-throttle"></output>
+        <div class="hint">Power lever. The spool follows it, not the sound.</div></div>
+      <div class="f"><label for="spool">Spool</label><input id="spool" type="range" min="0" max="1" step="0.001" value="0.35"><output id="o-spool"></output>
+        <div class="hint">Rotor response time. Bigger engines are slower.</div></div>
+      <div class="f"><label for="speed">Speed</label><input id="speed" type="range" min="0" max="1" step="0.001" value="0"><output id="o-speed"></output>
+        <div class="hint">Flight Mach. Doppler on every tone, less jet roar.</div></div>
+      <div class="f"><label for="size">Size</label><input id="size" type="range" min="0" max="1" step="0.001" value="0.5"><output id="o-size"></output>
+        <div class="hint">Engine scale. Pitch goes down, level goes up.</div></div>
+      <div class="f"><label for="space">Space</label><input id="space" type="range" min="0" max="1" step="0.001" value="0.35"><output id="o-space"></output>
+        <div class="hint">JUNO chorus, delay and reverb. Distance adds more.</div></div>
+    </div>
+  </section>
+
+  <button class="boost" id="boost">Hold for full power<small>Or hold the space bar. Spool sets how hard it hits.</small></button>
+
+  <footer>
+    Source levels: pyNA (MIT) jet, core and fan models, checked against NASA's ANOPP data for the STCA take-off, baked into the engine for 16 power settings × 5 flight speeds × 19 angles.
+    Chorus, delay and reverb: the bit-exact JUNO-60 port, with coefficients from its own recall. Engine code: C99, compiled to WebAssembly.
+    <span class="err" id="err"></span>
+  </footer>
+</div>
+
+<script>
+const WASM_B64 = "__WASM_B64__";
+const IDX = {throttle:0, spool:1, speed:2, angle:3, distance:4, size:5, space:6, boost:7};
+const state = {throttle:.35, spool:.35, speed:0, angle:.35, distance:.25, size:.5, space:.35, boost:0};
+const expmap = (v,lo,hi)=>lo*Math.pow(hi/lo,v);
+const fmt = {
+  throttle:v=>`TS ${(0.30+0.75*v).toFixed(2)}`,
+  spool:v=>`${expmap(v,.25,12).toFixed(v<.4?2:1)} s`,
+  speed:v=>`M ${(0.4*v).toFixed(2)} · ${Math.round(0.4*v*340.294*1.94384)} kt`,
+  size:v=>`${expmap(v,.5,2).toFixed(2)}×`,
+  space:v=>`${Math.round(v*100)} %`,
+};
+let node=null, ctx=null, running=false, sendParam=()=>{};
+
+function setParam(k,v){ state[k]=v; sendParam(IDX[k],v); }
+
+for (const k of ["throttle","spool","speed","size","space"]) {
+  const el=document.getElementById(k), out=document.getElementById("o-"+k);
+  const upd=()=>{ const v=+el.value; out.textContent=fmt[k](v); setParam(k,v); };
+  el.addEventListener("input",upd); upd();
+}
+
+/* ---------- polar pad: angle (arc) + distance (radius) ---------- */
+const cv=document.getElementById("polar"), g=cv.getContext("2d");
+function sizeCanvas(){ const r=cv.getBoundingClientRect(), d=window.devicePixelRatio||1;
+  cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d); drawPolar(); }
+function geom(){ const w=cv.width,h=cv.height,d=window.devicePixelRatio||1;
+  const cx=w/2, cy=h-32*d, R=Math.min(w/2-14*d, h-52*d), r0=R*0.16; return {w,h,d,cx,cy,R,r0}; }
+function drawPolar(){
+  const {w,h,d,cx,cy,R,r0}=geom();
+  g.clearRect(0,0,w,h);
+  g.lineWidth=1*d; g.strokeStyle="#2d3237"; g.fillStyle="#a9aca8";
+  g.font=`${11*d}px "IBM Plex Mono", monospace`; g.textAlign="center";
+  for (const m of [15,30,60,120,240,480,800]) {           /* range rings, log scale */
+    const rr=r0+(R-r0)*Math.log(m/15)/Math.log(800/15);
+    g.beginPath(); g.arc(cx,cy,rr,Math.PI,2*Math.PI); g.stroke();
+    if (m>=60){ g.textAlign="center"; g.fillText(`${m}`, cx+rr, cy+14*d); }
+  }
+  for (let a=0;a<=180;a+=30){                              /* angle spokes */
+    const t=Math.PI-a*Math.PI/180, x=Math.cos(t), y=-Math.sin(t);
+    g.beginPath(); g.moveTo(cx+x*r0,cy+y*r0); g.lineTo(cx+x*R,cy+y*R); g.stroke();
+    if (a>0 && a<180){ g.textAlign="center"; g.fillText(`${a}°`, cx+x*(R+2*d), cy+y*(R+2*d)-4*d); }
+  }
+  /* engine, inlet on the left: nacelle + exhaust plume */
+  g.save(); g.translate(cx,cy);
+  g.fillStyle="#5b6167"; g.beginPath(); g.roundRect(-r0*1.1,-7*d,r0*2.0,14*d,4*d); g.fill();
+  g.fillStyle="rgba(231,166,60,.35)"; g.beginPath(); g.moveTo(r0*0.9,-5*d); g.lineTo(r0*2.2,-10*d); g.lineTo(r0*2.2,0); g.closePath(); g.fill();
+  g.restore();
+  g.fillStyle="#ece9e1"; g.font=`600 ${12*d}px "Barlow Condensed", sans-serif`;
+  g.textAlign="left"; g.fillText("0° INLET", cx-R, cy+14*d);
+  g.textAlign="right"; g.fillText("EXHAUST 180°", cx+R, cy-6*d);
+  g.fillStyle="#a9aca8"; g.font=`${10*d}px "IBM Plex Mono", monospace`; g.textAlign="center";
+  g.fillText("metres", cx+R*0.62, cy+26*d);
+  /* listener */
+  const rr=r0+(R-r0)*state.distance, t=Math.PI-state.angle*Math.PI;
+  const x=cx+Math.cos(t)*rr, y=cy-Math.sin(t)*rr;
+  g.strokeStyle="#7cc4d6"; g.setLineDash([4*d,4*d]); g.beginPath(); g.moveTo(cx,cy); g.lineTo(x,y); g.stroke(); g.setLineDash([]);
+  g.fillStyle="#7cc4d6"; g.beginPath(); g.arc(x,y,8*d,0,2*Math.PI); g.fill();
+  g.fillStyle="#ece9e1"; g.textAlign= state.angle>0.5 ? "right":"left"; g.font=`${12*d}px "IBM Plex Mono", monospace`;
+  const lab=`${Math.round(state.angle*180)}° · ${Math.round(expmap(state.distance,15,800))} m`;
+  g.fillText(lab, x+(state.angle>0.5?-14:14)*d, Math.max(14*d,y-10*d));
+}
+function polarFromEvent(e){
+  const r=cv.getBoundingClientRect(), {d,cx,cy,R,r0}=geom();
+  const x=(e.clientX-r.left)*d-cx, y=cy-(e.clientY-r.top)*d;
+  let a=Math.atan2(Math.max(y,0),x);                        /* 0 right .. pi left */
+  const ang=Math.min(1,Math.max(0,1-a/Math.PI));
+  const dist=Math.min(1,Math.max(0,(Math.hypot(x,Math.max(y,0))-r0)/(R-r0)));
+  setParam("angle",ang); setParam("distance",dist); drawPolar();
+}
+cv.addEventListener("pointerdown",e=>{cv.setPointerCapture(e.pointerId); polarFromEvent(e);});
+cv.addEventListener("pointermove",e=>{ if (cv.hasPointerCapture(e.pointerId)) polarFromEvent(e); });
+cv.addEventListener("keydown",e=>{
+  const s=e.shiftKey?.05:.01; let hit=true;
+  if (e.key==="ArrowLeft") setParam("angle",Math.max(0,state.angle-s));
+  else if (e.key==="ArrowRight") setParam("angle",Math.min(1,state.angle+s));
+  else if (e.key==="ArrowUp") setParam("distance",Math.min(1,state.distance+s));
+  else if (e.key==="ArrowDown") setParam("distance",Math.max(0,state.distance-s));
+  else hit=false;
+  if (hit){ e.preventDefault(); drawPolar(); }
+});
+new ResizeObserver(sizeCanvas).observe(cv);
+document.fonts && document.fonts.ready.then(drawPolar);
+
+/* ---------- boost ---------- */
+const boost=document.getElementById("boost");
+const setBoost=on=>{ boost.classList.toggle("on",on); setParam("boost",on?1:0); };
+boost.addEventListener("pointerdown",e=>{boost.setPointerCapture(e.pointerId); setBoost(true);});
+for (const ev of ["pointerup","pointercancel","lostpointercapture"]) boost.addEventListener(ev,()=>setBoost(false));
+window.addEventListener("keydown",e=>{ if (e.code==="Space" && !e.repeat && e.target.tagName!=="INPUT"){ e.preventDefault(); setBoost(true);} });
+window.addEventListener("keyup",e=>{ if (e.code==="Space"){ e.preventDefault(); setBoost(false);} });
+
+/* ---------- readouts ---------- */
+const $=id=>document.getElementById(id);
+function showMeters(m){
+  const [ts,rpm,bpf,mt]=m;
+  $("r-n1").textContent=`${(rpm/9549*100).toFixed(1)}%`;
+  $("r-rpm").textContent=`${Math.round(rpm).toLocaleString()} rpm`;
+  $("r-ts").textContent=ts.toFixed(3);
+  $("r-mt").textContent=mt.toFixed(2);
+  $("ro-mach").classList.toggle("warn",mt>=1);
+  $("r-bpf").textContent=Math.round(bpf).toLocaleString();
+}
+
+/* ---------- audio ---------- */
+const WORKLET = `
+class JetProc extends AudioWorkletProcessor {
+  constructor(){ super(); this.ready=false; this.q=[]; this.t=0;
+    this.port.onmessage=e=>{ const d=e.data;
+      if (d.wasm){ WebAssembly.instantiate(d.wasm,{}).then(r=>{ const x=r.instance.exports; this.x=x;
+          x.init(sampleRate); this.L=x.bufL(); this.R=x.bufR(); this.mem=x.memory;
+          for (const [p,v] of this.q) x.set(p,v); this.ready=true; this.port.postMessage({ok:1}); })
+        .catch(err=>this.port.postMessage({err:String(err)})); }
+      else if (d.p!==undefined){ if (this.ready) this.x.set(d.p,d.v); else this.q.push([d.p,d.v]); } }; }
+  process(inp,out){ const o=out[0]; if(!this.ready||!o) return true; const n=o[0].length;
+    this.x.render(n); const b=this.mem.buffer;
+    o[0].set(new Float32Array(b,this.L,n)); if (o[1]) o[1].set(new Float32Array(b,this.R,n));
+    if ((this.t+=n)>=4096){ this.t=0; const x=this.x; this.port.postMessage({m:[x.meter(0),x.meter(1),x.meter(2),x.meter(3)]}); }
+    return true; } }
+registerProcessor("jet-proc", JetProc);`;
+
+function wasmBytes(){ const s=atob(WASM_B64), a=new Uint8Array(s.length); for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i); return a.buffer; }
+
+async function startWorklet(){
+  const url=URL.createObjectURL(new Blob([WORKLET],{type:"application/javascript"}));
+  await ctx.audioWorklet.addModule(url);
+  node=new AudioWorkletNode(ctx,"jet-proc",{numberOfInputs:0,outputChannelCount:[2]});
+  await new Promise((res,rej)=>{ node.port.onmessage=e=>{ const d=e.data;
+      if (d.ok) res(); else if (d.err) rej(new Error(d.err)); else if (d.m) showMeters(d.m); };
+    node.port.postMessage({wasm:wasmBytes()}); });
+  sendParam=(p,v)=>node.port.postMessage({p,v});
+  node.connect(ctx.destination);
+}
+async function startScript(){               /* fallback: main-thread renderer */
+  const {instance}=await WebAssembly.instantiate(wasmBytes(),{}); const x=instance.exports;
+  x.init(ctx.sampleRate); const L=x.bufL(), R=x.bufR(); let t=0;
+  node=ctx.createScriptProcessor(1024,0,2);
+  node.onaudioprocess=e=>{ const n=e.outputBuffer.length, b=x.memory.buffer; x.render(n);
+    e.outputBuffer.getChannelData(0).set(new Float32Array(b,L,n)); e.outputBuffer.getChannelData(1).set(new Float32Array(b,R,n));
+    if ((t+=n)>=4096){ t=0; showMeters([x.meter(0),x.meter(1),x.meter(2),x.meter(3)]); } };
+  sendParam=(p,v)=>x.set(p,v);
+  node.connect(ctx.destination);
+}
+$("start").addEventListener("click", async ()=>{
+  const b=$("start");
+  if (!ctx){
+    try {
+      ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000});
+      try { await startWorklet(); } catch(e){ console.warn("worklet failed, using fallback",e); await startScript(); }
+      for (const k in IDX) sendParam(IDX[k],state[k]);
+      running=true;
+    } catch(e){ $("err").textContent=" Audio could not start: "+e.message; return; }
+  } else if (running){ await ctx.suspend(); running=false; }
+  else { await ctx.resume(); running=true; }
+  b.setAttribute("aria-pressed",running?"true":"false");
+  b.textContent=running?"Shut down":"Start engine";
+});
+</script>
