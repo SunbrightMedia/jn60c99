@@ -12,6 +12,7 @@ the recall's own float, printed as a hex float by fx_emit.c.
 
   gen_fx_coefs.py scan            one summary line per factory patch
   gen_fx_coefs.py emit P1 P2 ...  write the header for those patches
+  env FX_RATE (default 48000) and FX_OUT (default jetsynth/gen/jet_fx_coefs.h)
 """
 import ctypes, os, subprocess, sys, tempfile
 
@@ -21,8 +22,8 @@ sys.path[:0] = [os.path.join(REPO, "tools", "verify"),
                 os.path.join(REPO, "tools", "engineb")]
 import truth, null_ab, null_b  # noqa: E402
 
-RATE = 48000.0
-OUT = os.path.join(REPO, "jetsynth", "gen", "jet_fx_coefs.h")
+RATE = float(os.environ.get("FX_RATE", "48000"))
+OUT = os.environ.get("FX_OUT", os.path.join(REPO, "jetsynth", "gen", "jet_fx_coefs.h"))
 
 
 def build(tmp):

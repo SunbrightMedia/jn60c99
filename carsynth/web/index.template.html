@@ -1,0 +1,292 @@
+<title>Carsynth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Barlow:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#1f2124; --panel:#2a2d31; --face:#131416; --line:#44484e;
+  --ink:#eeebe4; --dim:#a4a6a6; --red:#e2553c; --amber:#e8a93d; --ivory:#efe9dc; --ebony:#1a1b1d;
+  --display:"Saira Condensed","Arial Narrow",sans-serif;
+  --body:"Barlow",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);padding-inline:16px;padding-block:18px 28px}
+.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+h1{font:700 46px/1 var(--display);letter-spacing:.03em;text-transform:uppercase;margin:0}
+h1 small{display:block;font:500 13px/1.3 var(--display);letter-spacing:.14em;color:var(--dim);margin-top:6px}
+.start{font:700 18px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--face);background:var(--red);
+  border:0;border-radius:4px;padding:14px 22px;cursor:pointer}
+.start[aria-pressed="true"]{background:var(--face);color:var(--red);box-shadow:inset 0 0 0 1px var(--red)}
+button:focus-visible,input:focus-visible,select:focus-visible,.kb:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+
+.dash{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(3,minmax(0,1fr));gap:10px}
+.g{background:var(--face);border:1px solid var(--line);border-radius:6px;padding:10px 12px;min-width:0}
+.g b{display:block;font:600 12px/1 var(--display);letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+.g span{display:block;font:500 26px/1.25 var(--mono);font-variant-numeric:tabular-nums;margin-top:6px;white-space:nowrap}
+.g i{font:400 12px var(--mono);color:var(--dim);font-style:normal}
+.tach{height:6px;background:#26282b;border-radius:3px;margin-top:8px;overflow:hidden}
+.tach div{height:100%;width:0;background:linear-gradient(90deg,var(--amber) 0 75%,var(--red) 75%)}
+
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:16px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.box h2{font:600 13px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin:0}
+.engines{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.eng{font:600 16px/1.1 var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--ink);background:var(--face);
+  border:1px solid var(--line);border-radius:4px;padding:10px 8px;cursor:pointer;text-align:left}
+.eng small{display:block;font:400 11px/1.3 var(--mono);color:var(--dim);text-transform:none;letter-spacing:0;margin-top:4px}
+.eng[aria-pressed="true"]{border-color:var(--red);box-shadow:inset 0 0 0 1px var(--red)}
+label.sel{display:flex;flex-direction:column;gap:6px;font:600 13px/1 var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+select{font:500 14px var(--mono);color:var(--ink);background:var(--face);border:1px solid var(--line);border-radius:4px;padding:8px}
+
+.f{display:grid;grid-template-columns:84px minmax(0,1fr) 92px;align-items:center;gap:10px}
+.f label{font:700 17px/1 var(--display);letter-spacing:.08em;text-transform:uppercase}
+.f output{font:500 13px/1.2 var(--mono);text-align:right;font-variant-numeric:tabular-nums;color:var(--amber)}
+.f .hint{grid-column:2/4;font-size:12.5px;color:var(--dim);margin-top:-8px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:6px;background:var(--face);border-radius:3px;border:1px solid var(--line)}
+input[type=range]::-moz-range-track{height:6px;background:var(--face);border-radius:3px;border:1px solid var(--line)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:26px;margin-top:-11px;border-radius:3px;background:var(--ink);border:2px solid var(--face)}
+input[type=range]::-moz-range-thumb{width:14px;height:24px;border-radius:3px;background:var(--ink);border:2px solid var(--face)}
+
+.kbwrap{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.kbhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.kbhead h2{font:600 13px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin:0}
+.oct{display:flex;gap:6px;align-items:center;font:500 13px var(--mono);color:var(--dim)}
+.oct button{font:600 14px var(--display);background:var(--face);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:6px 10px;cursor:pointer}
+.kb{position:relative;height:150px;touch-action:none;user-select:none;-webkit-user-select:none;overflow:hidden;border-radius:4px}
+.key{position:absolute;top:0;box-sizing:border-box;border-radius:0 0 4px 4px}
+.key.w{height:100%;background:var(--ivory);border:1px solid #b9b3a6}
+.key.b{height:60%;background:var(--ebony);border:1px solid #000;z-index:2}
+.key.on.w{background:#f3c48a}
+.key.on.b{background:#8a3a28}
+.key span{position:absolute;bottom:6px;left:0;right:0;text-align:center;font:500 11px var(--mono);color:#6d685e}
+.key.b span{color:#8d8f92;bottom:4px}
+footer{font-size:12.5px;color:var(--dim);max-width:75ch}
+.err{color:var(--red);font-family:var(--mono);font-size:13px}
+@media (max-width:760px){
+  .dash{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .row{grid-template-columns:minmax(0,1fr)}
+  .f{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}
+  .f input{grid-column:1/3;grid-row:2}
+  .f .hint{grid-column:1/3;margin-top:0}
+  h1{font-size:38px}
+  .kb{height:120px}
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Carsynth<small>engine-sim physics · C99 · JUNO-60 effects</small></h1>
+    <button class="start" id="start" aria-pressed="false">Start engine</button>
+  </header>
+
+  <section class="dash" aria-label="Instruments">
+    <div class="g"><b>Tachometer</b><span id="m-rpm">—</span><div class="tach"><div id="m-tach"></div></div></div>
+    <div class="g"><b>Throttle</b><span id="m-thr">—</span><i>pedal position</i></div>
+    <div class="g"><b>Firing</b><span id="m-hz">—</span><i id="m-note">Hz</i></div>
+    <div class="g"><b>Cylinders</b><span id="m-cyl">—</span><i id="m-name">&nbsp;</i></div>
+  </section>
+
+  <section class="row">
+    <div class="box">
+      <h2>Engine</h2>
+      <div class="engines" id="engines"></div>
+      <label class="sel" for="exhaust">Exhaust
+        <select id="exhaust"></select>
+      </label>
+    </div>
+    <div class="box">
+      <h2>Controls</h2>
+      <div class="f"><label for="load">Load</label><input id="load" type="range" min="0" max="1" step="0.001" value="0.7"><output id="o-load"></output>
+        <div class="hint">How far the throttle opens while a key is held.</div></div>
+      <div class="f"><label for="rev">Rev</label><input id="rev" type="range" min="0" max="1" step="0.001" value="0.35"><output id="o-rev"></output>
+        <div class="hint">How fast the revs follow the key. Also the glide between notes.</div></div>
+      <div class="f"><label for="tone">Tone</label><input id="tone" type="range" min="0" max="1" step="0.001" value="0.32"><output id="o-tone"></output>
+        <div class="hint">engine-sim high-frequency gain: bark and rasp.</div></div>
+      <div class="f"><label for="noise">Noise</label><input id="noise" type="range" min="0" max="1" step="0.001" value="1"><output id="o-noise"></output>
+        <div class="hint">Air noise and pulse jitter: roughness.</div></div>
+      <div class="f"><label for="space">Space</label><input id="space" type="range" min="0" max="1" step="0.001" value="0.3"><output id="o-space"></output>
+        <div class="hint">JUNO-60 chorus, delay and reverb.</div></div>
+    </div>
+  </section>
+
+  <section class="kbwrap">
+    <div class="kbhead">
+      <h2>Keyboard · the key sets the firing pitch</h2>
+      <div class="oct"><button id="octdn" aria-label="Octave down">−</button><span id="octv">Octave 3</span><button id="octup" aria-label="Octave up">+</button><span>Keys A–K, W E T Y U · Z / X octave</span></div>
+    </div>
+    <div class="kb" id="kb" tabindex="0" aria-label="Piano keyboard. Press to rev the engine to that pitch."></div>
+  </section>
+
+  <footer>
+    Sound engine: a C99 port of <a href="https://github.com/ange-yaghi/engine-sim" style="color:var(--amber)">engine-sim</a> (MIT, Ange Yaghi): cylinder gas dynamics, valves, combustion, exhaust pulses, and its own exhaust impulse responses. Engines are transcribed from its scripts. The key you play holds the crank speed, as engine-sim's dyno does. Effects: the JUNO-60 port's chorus, delay and reverb.
+    <span class="err" id="err"></span>
+  </footer>
+</div>
+
+<script>
+const WASM_B64 = "__WASM_B64__";
+const P = {engine:0, exhaust:1, load:2, rev:3, tone:4, noise:5, space:6};
+const state = {engine:0, exhaust:0, load:.7, rev:.35, tone:.32, noise:1, space:.3};
+const $ = id => document.getElementById(id);
+const NOTE = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
+let send = () => {}, running = false, ctx = null, octave = 3;
+
+function wasmBytes(){ const s=atob(WASM_B64), a=new Uint8Array(s.length); for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i); return a.buffer; }
+function cstr(mem, p){ const b=new Uint8Array(mem.buffer); let s=""; while(b[p]) s+=String.fromCharCode(b[p++]); return s; }
+
+/* names come from the engine itself */
+let names = {engines:[], exhausts:[]};
+WebAssembly.instantiate(wasmBytes(),{}).then(({instance})=>{
+  const x=instance.exports; x.init();
+  const ne=x.meter(5)|0, nx=x.meter(6)|0;
+  for (let i=0;i<ne;i++) names.engines.push(cstr(x.memory,x.ename(i)));
+  for (let i=0;i<nx;i++) names.exhausts.push(cstr(x.memory,x.xname(i)));
+  buildEngineUI();
+}).catch(e=>{ $("err").textContent=" This browser cannot run WebAssembly: "+e.message; });
+
+const ENGINE_NOTES = {"GM LS V8":"cross-plane V8 · 5.7 L", "Toyota 2JZ I6":"inline six · 3.0 L", "Subaru EJ25 H4":"flat four · 2.5 L"};
+function buildEngineUI(){
+  const box=$("engines"); box.innerHTML="";
+  names.engines.forEach((n,i)=>{
+    const b=document.createElement("button"); b.className="eng"; b.setAttribute("aria-pressed", i===0?"true":"false");
+    b.innerHTML=`${n}<small>${ENGINE_NOTES[n]||""}</small>`;
+    b.addEventListener("click",()=>{
+      [...box.children].forEach(c=>c.setAttribute("aria-pressed","false")); b.setAttribute("aria-pressed","true");
+      setParam("engine", (i+0.5)/names.engines.length);
+    });
+    box.appendChild(b);
+  });
+  const sel=$("exhaust"); sel.innerHTML="";
+  names.exhausts.forEach((n,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=n; sel.appendChild(o); });
+  sel.addEventListener("change",()=>setParam("exhaust",(+sel.value+0.5)/names.exhausts.length));
+}
+function setParam(k,v){ state[k]=v; send({p:P[k], v}); }
+
+const fmt = {
+  load:v=>`${Math.round(v*100)} %`,
+  rev:v=>{ const t=0.02*Math.pow(100,v); return t<1?`${Math.round(t*1000)} ms`:`${t.toFixed(1)} s`; },
+  tone:v=>(0.1*v*v).toFixed(3),
+  noise:v=>`${Math.round(v*100)} %`,
+  space:v=>`${Math.round(v*100)} %`,
+};
+for (const k of ["load","rev","tone","noise","space"]) {
+  const el=$(k), out=$("o-"+k);
+  const upd=()=>{ const v=+el.value; out.textContent=fmt[k](v); setParam(k,v); };
+  el.addEventListener("input",upd); upd();
+}
+
+/* ---------- keyboard ---------- */
+const kb=$("kb"); const WHITE=[0,2,4,5,7,9,11], KEYS="awsedftgyhujkolp;'";
+const keyEls=new Map();
+function drawKeys(){
+  kb.innerHTML=""; keyEls.clear();
+  const nW=15, w=100/nW;                    /* two octaves + top C */
+  let wi=0;
+  for (let n=0;n<25;n++){
+    const pc=n%12, isW=WHITE.includes(pc), midi=12*(octave+1)+n;
+    const el=document.createElement("div"); el.className="key "+(isW?"w":"b");
+    if (isW){ el.style.left=(wi*w)+"%"; el.style.width=w+"%"; wi++; }
+    else { el.style.left=(wi*w - w*0.3)+"%"; el.style.width=(w*0.6)+"%"; }
+    if (pc===0) el.innerHTML=`<span>C${octave+Math.floor(n/12)}</span>`;
+    el.dataset.midi=midi; kb.appendChild(el); keyEls.set(midi,el);
+  }
+}
+drawKeys();
+const down=new Set();
+function noteOn(m,v){ if(down.has(m))return; down.add(m); keyEls.get(m)?.classList.add("on"); send({on:m,v}); if(!running) $("start").click(); }
+function noteOff(m){ if(!down.has(m))return; down.delete(m); keyEls.get(m)?.classList.remove("on"); send({off:m}); }
+const pointers=new Map();
+kb.addEventListener("pointerdown",e=>{
+  const el=e.target.closest(".key"); if(!el) return; kb.setPointerCapture(e.pointerId);
+  const r=el.getBoundingClientRect(), v=Math.min(1,0.35+0.65*(e.clientY-r.top)/r.height);
+  const m=+el.dataset.midi; pointers.set(e.pointerId,m); noteOn(m,v);
+});
+kb.addEventListener("pointermove",e=>{
+  if(!pointers.has(e.pointerId)) return;
+  const el=document.elementFromPoint(e.clientX,e.clientY)?.closest(".key"); if(!el) return;
+  const m=+el.dataset.midi, old=pointers.get(e.pointerId);
+  if (m!==old){ pointers.set(e.pointerId,m); noteOn(m,0.9); noteOff(old); }
+});
+for (const ev of ["pointerup","pointercancel"]) kb.addEventListener(ev,e=>{ const m=pointers.get(e.pointerId); if(m!==undefined){ noteOff(m); pointers.delete(e.pointerId);} });
+function setOct(o){ octave=Math.max(1,Math.min(5,o)); $("octv").textContent="Octave "+octave; [...down].forEach(noteOff); drawKeys(); }
+$("octdn").onclick=()=>setOct(octave-1); $("octup").onclick=()=>setOct(octave+1);
+window.addEventListener("keydown",e=>{
+  if (e.target.tagName==="INPUT"||e.target.tagName==="SELECT"||e.repeat||e.metaKey||e.ctrlKey) return;
+  const k=e.key.toLowerCase();
+  if (k==="z"){ setOct(octave-1); return; } if (k==="x"){ setOct(octave+1); return; }
+  const i=KEYS.indexOf(k); if(i<0) return; e.preventDefault(); noteOn(12*(octave+1)+i,1);
+});
+window.addEventListener("keyup",e=>{ const i=KEYS.indexOf(e.key.toLowerCase()); if(i>=0) noteOff(12*(octave+1)+i); });
+/* Web MIDI, when the browser allows it */
+if (navigator.requestMIDIAccess) navigator.requestMIDIAccess().then(a=>{
+  const hook=inp=>inp.onmidimessage=m=>{ const [s,n,v]=m.data, c=s&0xf0;
+    if (c===0x90&&v>0) noteOn(n,v/127); else if (c===0x80||(c===0x90&&v===0)) noteOff(n); };
+  a.inputs.forEach(hook); a.onstatechange=()=>a.inputs.forEach(hook);
+}).catch(()=>{});
+
+/* ---------- meters ---------- */
+function showMeters([rpm,thr,hz,cyl,ei]){
+  $("m-rpm").textContent=Math.round(rpm).toLocaleString()+" rpm";
+  $("m-tach").style.width=Math.min(100,rpm/7000*100)+"%";
+  $("m-thr").textContent=Math.round(thr*100)+" %";
+  $("m-hz").textContent=hz.toFixed(1);
+  const n=Math.round(12*Math.log2(hz/440)+69); $("m-note").textContent="Hz · "+NOTE[((n%12)+12)%12]+(Math.floor(n/12)-1);
+  $("m-cyl").textContent=cyl; $("m-name").textContent=names.engines[ei]||"";
+}
+
+/* ---------- audio ---------- */
+const WORKLET = `
+class CarProc extends AudioWorkletProcessor {
+  constructor(){ super(); this.ready=false; this.q=[]; this.t=0;
+    this.port.onmessage=e=>{ const d=e.data;
+      if (d.wasm){ WebAssembly.instantiate(d.wasm,{}).then(r=>{ const x=r.instance.exports; this.x=x; x.init();
+          this.L=x.bufL(); this.R=x.bufR(); for (const m of this.q) this.cmd(m); this.ready=true; this.port.postMessage({ok:1}); })
+        .catch(err=>this.port.postMessage({err:String(err)})); }
+      else if (this.ready) this.cmd(d); else this.q.push(d); }; }
+  cmd(d){ const x=this.x; if (d.p!==undefined) x.set(d.p,d.v); else if (d.on!==undefined) x.on(d.on,d.v); else if (d.off!==undefined) x.off(d.off); }
+  process(inp,out){ const o=out[0]; if(!this.ready||!o) return true; const n=o[0].length;
+    this.x.render(n); const b=this.x.memory.buffer;
+    o[0].set(new Float32Array(b,this.L,n)); if (o[1]) o[1].set(new Float32Array(b,this.R,n));
+    if ((this.t+=n)>=2048){ this.t=0; const x=this.x; this.port.postMessage({m:[x.meter(0),x.meter(2),x.meter(3),x.meter(4),x.meter(7)]}); }
+    return true; } }
+registerProcessor("car-proc", CarProc);`;
+
+async function startWorklet(){
+  const url=URL.createObjectURL(new Blob([WORKLET],{type:"application/javascript"}));
+  await ctx.audioWorklet.addModule(url);
+  const node=new AudioWorkletNode(ctx,"car-proc",{numberOfInputs:0,outputChannelCount:[2]});
+  await new Promise((res,rej)=>{ node.port.onmessage=e=>{ const d=e.data;
+      if (d.ok) res(); else if (d.err) rej(new Error(d.err)); else if (d.m) showMeters(d.m); };
+    node.port.postMessage({wasm:wasmBytes()}); });
+  send=m=>node.port.postMessage(m);
+  node.connect(ctx.destination);
+}
+async function startScript(){               /* fallback: main-thread renderer */
+  const {instance}=await WebAssembly.instantiate(wasmBytes(),{}); const x=instance.exports; x.init();
+  const L=x.bufL(), R=x.bufR(); let t=0;
+  const node=ctx.createScriptProcessor(2048,0,2);
+  node.onaudioprocess=e=>{ const n=e.outputBuffer.length; for (let off=0; off<n; off+=1024){ const k=Math.min(1024,n-off); x.render(k); const b=x.memory.buffer;
+      e.outputBuffer.getChannelData(0).set(new Float32Array(b,L,k),off); e.outputBuffer.getChannelData(1).set(new Float32Array(b,R,k),off); }
+    if ((t+=n)>=2048){ t=0; showMeters([x.meter(0),x.meter(2),x.meter(3),x.meter(4),x.meter(7)]); } };
+  send=d=>{ if (d.p!==undefined) x.set(d.p,d.v); else if (d.on!==undefined) x.on(d.on,d.v); else if (d.off!==undefined) x.off(d.off); };
+  node.connect(ctx.destination);
+}
+$("start").addEventListener("click", async ()=>{
+  const b=$("start");
+  if (!ctx){
+    try {
+      ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:44100});
+      try { await startWorklet(); } catch(e){ console.warn("worklet failed, using fallback",e); await startScript(); }
+      for (const k in P) send({p:P[k], v:k==="engine"||k==="exhaust" ? stateStep(k) : state[k]});
+      running=true;
+    } catch(e){ $("err").textContent=" Audio could not start: "+e.message; return; }
+  } else if (running){ await ctx.suspend(); running=false; }
+  else { await ctx.resume(); running=true; }
+  b.setAttribute("aria-pressed",running?"true":"false");
+  b.textContent=running?"Stop engine":"Start engine";
+});
+function stateStep(k){ return state[k]; }
+</script>
