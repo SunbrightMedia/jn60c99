@@ -1,0 +1,272 @@
+/* MIDI SQUARE -- bench test image: DIN MIDI in -> one square-wave voice ->
+ * PCM5102 over I2S. Not a synth port. Pins match esp32s3/main/juno_s3_listen.c
+ * (proven on the bench): BCK 5, LCK/WS 6, DIN 7, MIDI RX 18.
+ *
+ * The log is the detector (CLAUDE.md SHIP LAW), not the ear:
+ *   SELFTEST  at boot: starvation tooth, then an internal A4 through the SAME
+ *             parser + renderer + I2S path: frequency, peak, and SILENT after
+ *             release. PASS/FAIL.
+ *   NOTE      one line per MIDI note event.
+ *   STAT      once a second when anything moved (and every 10 s regardless):
+ *             MIDI byte/event/frame-error counters, audio peak, SIL verdict,
+ *             HEALTH latch (never reads OK again after a fault). */
+#include <stdio.h>
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "driver/i2s_std.h"
+#include "driver/uart.h"
+#include "driver/gpio.h"
+#include "esp_timer.h"
+#include "msq_core.h"
+
+#define PIN_BCK   GPIO_NUM_5
+#define PIN_WS    GPIO_NUM_6
+#define PIN_DOUT  GPIO_NUM_7
+#define PIN_MIDI  18
+#define SR        48000
+#define CHUNK     240          /* 5 ms */
+#define DMA_N     4
+#define MIDI_UART UART_NUM_1
+
+static msq_t M;
+static i2s_chan_handle_t TX;
+
+/* audio-side counters, written by the audio task / ISR */
+static volatile uint32_t a_sent, a_written;
+static volatile int      a_peak;          /* max |sample| since last take */
+static volatile int      a_rises;         /* rising zero crossings since last take */
+static volatile int      a_frames;        /* frames rendered since last take */
+static volatile int      a_take;          /* 1 = reset accumulators */
+static volatile int      a_stall_ms;      /* tooth: stall the audio task once */
+
+/* health latch */
+static const char *health = NULL;
+static void fault(const char *why) { if (!health) health = why; }
+
+#ifdef MSQ_QEMU
+/* QEMU has no I2S. A 5 ms esp_timer plays the DMA: it "sends" one buffer per
+ * period and frees one slot; a starved queue still counts as sent. Only the
+ * I2S driver is replaced -- parser, renderer, self-test and detectors are the
+ * shipped code. Built only by test/qemu.sh; never shipped. */
+#include "freertos/semphr.h"
+static SemaphoreHandle_t fake_space;
+static void fake_dma(void *u) { a_sent++; xSemaphoreGive(fake_space); }
+#endif
+
+static IRAM_ATTR bool on_sent(i2s_chan_handle_t h, i2s_event_data_t *e, void *u)
+{
+    a_sent++;
+    return false;
+}
+
+static void audio_task(void *arg)
+{
+    static int16_t buf[2 * CHUNK];
+    int prev = 0;
+    for (;;) {
+        msq_render(&M, buf, CHUNK);
+        if (a_take) { a_peak = 0; a_rises = 0; a_frames = 0; a_take = 0; }
+        int pk = a_peak, r = a_rises;
+        for (int i = 0; i < CHUNK; ++i) {
+            int v = buf[2 * i];
+            int av = v < 0 ? -v : v;
+            if (av > pk) pk = av;
+            if (prev <= 0 && v > 0) r++;
+            prev = v;
+        }
+        a_peak = pk; a_rises = r; a_frames += CHUNK;
+        if (a_stall_ms) { vTaskDelay(pdMS_TO_TICKS(a_stall_ms)); a_stall_ms = 0; }
+#ifdef MSQ_QEMU
+        xSemaphoreTake(fake_space, portMAX_DELAY);
+#else
+        size_t w;
+        i2s_channel_write(TX, buf, sizeof buf, &w, portMAX_DELAY);
+#endif
+        a_written++;
+    }
+}
+
+static int audio_start(void)
+{
+#ifdef MSQ_QEMU
+    fake_space = xSemaphoreCreateCounting(DMA_N, DMA_N);
+    esp_timer_handle_t t;
+    esp_timer_create_args_t ta = { .callback = fake_dma, .name = "fakedma" };
+    esp_timer_create(&ta, &t);
+    esp_timer_start_periodic(t, 1000000 / (SR / CHUNK));
+    xTaskCreatePinnedToCore(audio_task, "audio", 4096, NULL, 20, NULL, 1);
+    return 1;
+#endif
+    i2s_chan_config_t cc = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
+    cc.dma_desc_num  = DMA_N;
+    cc.dma_frame_num = CHUNK;
+    cc.auto_clear    = true;              /* a starved DMA sends zeros, not old audio */
+    i2s_std_config_t sc = {
+        .clk_cfg  = I2S_STD_CLK_DEFAULT_CONFIG(SR),
+        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
+                                                        I2S_SLOT_MODE_STEREO),
+        .gpio_cfg = { .mclk = I2S_GPIO_UNUSED, .bclk = PIN_BCK, .ws = PIN_WS,
+                      .dout = PIN_DOUT, .din = I2S_GPIO_UNUSED,
+                      .invert_flags = {0, 0, 0} },
+    };
+    if (i2s_new_channel(&cc, &TX, NULL) != ESP_OK) return 0;
+    if (i2s_channel_init_std_mode(TX, &sc) != ESP_OK) return 0;
+    i2s_event_callbacks_t cb = { .on_sent = on_sent };
+    if (i2s_channel_register_event_callback(TX, &cb, NULL) != ESP_OK) return 0;
+    if (i2s_channel_enable(TX) != ESP_OK) return 0;
+    xTaskCreatePinnedToCore(audio_task, "audio", 4096, NULL, 20, NULL, 1);
+    return 1;
+}
+
+static QueueHandle_t midi_q;
+static uint32_t n_frame_err, n_fifo_ovf;
+
+static int midi_start(void)
+{
+    uart_config_t cfg = {
+        .baud_rate = 31250, .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE, .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, .source_clk = UART_SCLK_DEFAULT,
+    };
+    if (uart_driver_install(MIDI_UART, 1024, 0, 16, &midi_q, 0) != ESP_OK) return 0;
+    if (uart_param_config(MIDI_UART, &cfg) != ESP_OK) return 0;
+    if (uart_set_pin(MIDI_UART, UART_PIN_NO_CHANGE, PIN_MIDI,
+                     UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) != ESP_OK) return 0;
+    gpio_set_pull_mode((gpio_num_t)PIN_MIDI, GPIO_PULLUP_ONLY); /* unwired = silent (playbook 94) */
+    return 1;
+}
+
+static const char *NAMES[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+
+static void print_event(void)
+{
+    int n = M.last_note;
+    if (M.last_event == 1)
+        printf("NOTE ON  %3d %-2s%d vel %3d  %8.2f Hz\n", n, NAMES[n % 12], n / 12 - 1,
+               M.last_vel, msq_note_hz(n));
+    else if (M.last_event == 2)
+        printf("NOTE OFF %3d %-2s%d  held=%d\n", n, NAMES[n % 12], n / 12 - 1, M.nheld);
+    else if (M.last_event == 3)
+        printf("ALL NOTES OFF (CC 120/123)\n");
+}
+
+static int64_t last_off_us;
+
+static void sil_and_stat(int force)
+{
+    static uint32_t p_bytes, p_on, p_off, p_fe;
+    static int64_t p_print;
+    int64_t now = esp_timer_get_time();
+    int pk = a_peak;
+    a_take = 1;
+    const char *sil;
+    if (M.gate)                               sil = pk > 0 ? "SOUNDING" : "MUTE?";
+    else if (now - last_off_us < 100000)      sil = "RELEASING";
+    else                                      sil = pk == 0 ? "SILENT" : "STUCK";
+    if (!strcmp(sil, "STUCK")) fault("STUCK (no key held, output not silent)");
+    if (!strcmp(sil, "MUTE?")) fault("MUTE (key held, output exactly 0)");
+    int32_t deficit = (int32_t)(a_sent - a_written);
+    static int32_t base = 0x7fffffff;
+    if (base == 0x7fffffff) base = deficit;
+    if (deficit > base + 1) fault("AUDIO STARVED (DMA sent a buffer nobody filled)");
+    static uint32_t p_written;
+    if (a_written == p_written) fault("AUDIO TASK STALLED (no block written in 1 s)");
+    p_written = a_written;
+    int moved = M.n_bytes != p_bytes || M.n_on != p_on || M.n_off != p_off || n_frame_err != p_fe;
+    if (force || moved || now - p_print > 10000000) {
+        printf("STAT midi bytes=%lu on=%lu off=%lu cc=%lu rt=%lu ferr=%lu ovf=%lu held=%d | "
+               "peak=%d deficit=%ld | SIL: %s | HEALTH: %s\n",
+               (unsigned long)M.n_bytes, (unsigned long)M.n_on, (unsigned long)M.n_off,
+               (unsigned long)M.n_cc, (unsigned long)M.n_rt, (unsigned long)n_frame_err,
+               (unsigned long)n_fifo_ovf, M.nheld, pk, (long)(deficit - base), sil,
+               health ? health : "OK");
+        p_print = now;
+    }
+    p_bytes = M.n_bytes; p_on = M.n_on; p_off = M.n_off; p_fe = n_frame_err;
+}
+
+/* measure over `ms`: returns Hz, peak via *pk */
+static float window(int ms, int *pk)
+{
+    a_take = 1;
+    vTaskDelay(pdMS_TO_TICKS(20));
+    a_take = 1;
+    vTaskDelay(pdMS_TO_TICKS(ms));
+    *pk = a_peak;
+    int f = a_frames;
+    return f ? a_rises * (float)SR / f : 0.0f;  /* crossings per rendered second */
+}
+
+static int selftest(void)
+{
+    int ok = 1, pk;
+    /* 1. starvation tooth: stall the audio task 100 ms (5x the 20 ms queue);
+     *    the counter MUST move by far more than its +1 threshold */
+    vTaskDelay(pdMS_TO_TICKS(300));
+    int32_t d0 = (int32_t)(a_sent - a_written);
+    a_stall_ms = 100;
+    vTaskDelay(pdMS_TO_TICKS(200));
+    int32_t d1 = (int32_t)(a_sent - a_written);
+    printf("SELFTEST starvation tooth: deficit %ld -> %ld  %s\n", (long)d0, (long)d1,
+           d1 > d0 + 1 ? "FIRES (detector live)" : "DID NOT FIRE -- detector dead");
+    if (!(d1 > d0 + 1)) ok = 0;
+
+    /* 2. internal A4 through the same parser: 0x90 69 100 ... 0x80 69 0 */
+    msq_byte(&M, 0x90); msq_byte(&M, 69); msq_byte(&M, 100);
+    float hz = window(500, &pk);
+    int pk_on = pk;
+    msq_byte(&M, 0x80); msq_byte(&M, 69); msq_byte(&M, 0);
+    vTaskDelay(pdMS_TO_TICKS(60));
+    window(200, &pk);
+    int pk_off = pk;
+    int f_ok = hz > 437.0f && hz < 443.0f, on_ok = pk_on > 8000, off_ok = pk_off == 0;
+    printf("SELFTEST A4: %.1f Hz (want 440 +-3) %s, peak %d (want ~8192) %s, "
+           "after release peak %d %s\n", hz, f_ok ? "ok" : "BAD", pk_on, on_ok ? "ok" : "BAD",
+           pk_off, off_ok ? "SILENT" : "NOT SILENT");
+    ok &= f_ok && on_ok && off_ok;
+    /* the self-test's own events must not count as played notes */
+    M.n_bytes = M.n_on = M.n_off = 0; M.last_event = 0;
+    return ok;
+}
+
+void app_main(void)
+{
+    printf("\n=== MIDI SQUARE TEST (BCK %d, LCK %d, DIN %d, MIDI RX %d, %d Hz) ===\n",
+           PIN_BCK, PIN_WS, PIN_DOUT, PIN_MIDI, SR);
+    msq_init(&M, SR);
+    if (!audio_start()) { printf("FATAL: I2S start failed\n"); return; }
+    int st = selftest();
+    printf("SELFTEST: %s\n", st ? "PASS" : "FAIL");
+    if (!st) fault("SELFTEST FAIL");
+    if (!midi_start()) { printf("FATAL: MIDI UART start failed\n"); return; }
+    printf("READY -- play notes. Any MIDI channel. Expect one NOTE line per key.\n");
+    sil_and_stat(1);
+
+    uint8_t b[128];
+    int64_t next_stat = esp_timer_get_time() + 1000000;
+    for (;;) {
+        uart_event_t ev;
+        if (xQueueReceive(midi_q, &ev, pdMS_TO_TICKS(50))) {
+            if (ev.type == UART_DATA) {
+                int n = uart_read_bytes(MIDI_UART, b, sizeof b, 0);
+                for (int i = 0; i < n; ++i)
+                    if (msq_byte(&M, b[i])) {
+                        if (!M.gate) last_off_us = esp_timer_get_time();
+                        print_event();
+                    }
+            } else if (ev.type == UART_FRAME_ERR) {
+                n_frame_err++;
+            } else if (ev.type == UART_FIFO_OVF || ev.type == UART_BUFFER_FULL) {
+                n_fifo_ovf++;
+                uart_flush_input(MIDI_UART);
+                xQueueReset(midi_q);
+            }
+        }
+        if (esp_timer_get_time() >= next_stat) {
+            sil_and_stat(0);
+            next_stat += 1000000;
+        }
+    }
+}
