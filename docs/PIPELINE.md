@@ -1,5 +1,7 @@
 # THE PIPELINE — .vst3 in → two ESP32-S3 boards out (E3, END_GOAL item 7)
 
+> ⚑ PARTLY SUPERSEDED 2026-09-28: the target is now ONE board per synth (END_GOAL top, 2026-09-23). The .vst3 -> C99 method here and in PORT_PIPELINE.md stands; every "two boards" step does not.
+
 This is the document the next synth starts from. Every phase names its tools,
 its gate, and the defect class the gate exists to catch. The JUNO-60 port is
 the worked example; the METHOD is the deliverable. Where a tool still carries

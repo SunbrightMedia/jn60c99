@@ -3,6 +3,21 @@
 sequencing. END_GOAL.md still outranks everything for WHAT; this file rules
 HOW and WHAT ORDER.)
 
+## ⚑ AMENDED 2026-09-23 — ONE BOARD PER SYNTH (END_GOAL top; overrides every two-chip line below)
+Tracks B and D below were written for two chips. Read them this way from now on:
+- **B. FIT** = the synth's engine holds real time on ONE ESP32-S3-class board. A faithful 6-voice JUNO does not
+  (docs/ONE_BOARD_BUDGET.md); a cheaper engine graded against the bit-exact port is the path. The Pi track
+  (docs/pi/PORT_PI.md) runs the bit-exact JUNO on one BCM2837 — whether it counts is the user's call.
+- **D. LINK** = RETIRED. No chip-to-chip audio or voice links, ever. D1 (one DAC) survives as a board fact.
+- The "three facts" at the end stay true as measurements; "one chip cannot do it" is exactly why B needs a cheaper engine.
+
+## STATUS (2026-09-28, the rules below: one line per track, regressions first)
+- D: RETIRED by the one-board rule (2026-09-23).
+- B: REOPENED for ONE board — no one-board JUNO engine chosen yet (budget facts in docs/ONE_BOARD_BUDGET.md).
+- A: DONE for the port (make verify green, 20/20 PROVEN); the one-board engine will need its own sonic gate.
+- C: esp32s3/ playable (console, patch step, MIDI UART); the Pi PLAY image is built, not yet on silicon.
+- E: JX-3P done and published; JUPITER-8 at step 5-6 (lift gates on drive2, template exported); TB-303 intake only.
+
 ## How to report status (rules for every future session)
 
 1. **Report ONLY the five tracks below, by letter, one line each.** Format:

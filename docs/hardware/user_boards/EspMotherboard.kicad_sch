@@ -1,0 +1,6555 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "921b18f1-3824-4f9d-a344-b1fd5e9e35c8")
+	(paper "A2")
+	(title_block
+		(title "ESP32-S3 Master Audio Motherboard")
+		(date "2026-09-02")
+		(rev "1.0")
+		(company "Sunbright Electronics")
+	)
+	(lib_symbols
+		(symbol "*Global LCSC:S3B-XH-A"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "CN"
+				(at 0 7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "S3B-XH-A"
+				(at 0 -7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" "Global_LCSC:CONN-TH_S3B-XH-A-LF-SN"
+				(at 0 -10.16 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S3B-XH-A-LF-SN_XHsocket-1-3P-Curved-needle-pitch2-5mm_C157928.html"
+				(at 0 -12.7 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Manufacturer" "JST"
+				(at 0 -15.24 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "MPN" "S3B-XH-A(LF)(SN)"
+				(at 0 -17.78 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "LCSC Part" "C157928"
+				(at 0 -20.32 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "Wire To Board / Wire To Wire Connector"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "S3B-XH-A_0_1"
+				(rectangle
+					(start -3.81 5.08)
+					(end 6.35 -5.08)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(circle
+					(center -2.54 3.81)
+					(radius 0.38)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin unspecified line
+					(at -6.35 2.54 0)
+					(length 2.54)
+					(name "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -6.35 0 0)
+					(length 2.54)
+					(name "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -6.35 -2.54 0)
+					(length 2.54)
+					(name "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "Connector_Generic:Conn_01x04"
+			(pin_names
+				(offset 1.016)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "J"
+				(at 0 5.08 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "Conn_01x04"
+				(at 0 -7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "Generic connector, single row, 01x04, script generated (kicad-library-utils/schlib/autogen/connector/)"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "connector"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_fp_filters" "Connector*:*_1x??_*"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "Conn_01x04_1_1"
+				(rectangle
+					(start -1.27 3.81)
+					(end 1.27 -6.35)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(rectangle
+					(start -1.27 2.667)
+					(end 0 2.413)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start -1.27 0.127)
+					(end 0 -0.127)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start -1.27 -2.413)
+					(end 0 -2.667)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start -1.27 -4.953)
+					(end 0 -5.207)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin passive line
+					(at -5.08 2.54 0)
+					(length 3.81)
+					(name "Pin_1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 0 0)
+					(length 3.81)
+					(name "Pin_2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 -2.54 0)
+					(length 3.81)
+					(name "Pin_3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 -5.08 0)
+					(length 3.81)
+					(name "Pin_4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "Global_LCSC:PM254-1-11-Z-3.0-C"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "U"
+				(at 0 17.78 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "PM254-1-11-Z-3.0-C"
+				(at 0 -17.78 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" "Global_LCSC:HDR-TH_11P-P2.54-V-F-1"
+				(at 0 -20.32 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" "https://www.lcsc.com/datasheet/C5159940.pdf"
+				(at 0 -22.86 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Manufacturer" "HCTL(华灿天禄)"
+				(at 0 -25.4 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "MPN" "PM254-1-11-Z-3.0-C"
+				(at 0 -27.94 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "LCSC Part" "C5159940"
+				(at 0 -30.48 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "Pin Headers"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "PM254-1-11-Z-3.0-C_0_1"
+				(rectangle
+					(start -1.27 15.24)
+					(end 3.81 -15.24)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(circle
+					(center 0 13.97)
+					(radius 0.38)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 12.7 0)
+					(length 2.54)
+					(name "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 10.16 0)
+					(length 2.54)
+					(name "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 7.62 0)
+					(length 2.54)
+					(name "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 5.08 0)
+					(length 2.54)
+					(name "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 2.54 0)
+					(length 2.54)
+					(name "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 0 0)
+					(length 2.54)
+					(name "6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 -2.54 0)
+					(length 2.54)
+					(name "7"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "7"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 -5.08 0)
+					(length 2.54)
+					(name "8"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "8"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 -7.62 0)
+					(length 2.54)
+					(name "9"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "9"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 -10.16 0)
+					(length 2.54)
+					(name "10"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "10"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 -12.7 0)
+					(length 2.54)
+					(name "11"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "11"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "Global_LCSC:S2B-XH-A-"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "U"
+				(at 0 6.35 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "S2B-XH-A-"
+				(at 0 -6.35 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" "Global_LCSC:CONN-TH_S2B-XH-A-LF-SN"
+				(at 0 -8.89 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S2B-XH-A-LF-SN_XHsocket-1-2P-Curved-needle-pitch2-5mm_C157931.html"
+				(at 0 -11.43 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Manufacturer" "JST"
+				(at 0 -13.97 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "MPN" "S2B-XH-A(LF)(SN)"
+				(at 0 -16.51 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "LCSC Part" "C157931"
+				(at 0 -19.05 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "Wire To Board / Wire To Wire Connector"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "S2B-XH-A-_0_1"
+				(rectangle
+					(start -2.54 3.81)
+					(end 5.08 -3.81)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(circle
+					(center -1.91 3.17)
+					(radius 0.38)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin unspecified line
+					(at -5.08 1.27 0)
+					(length 2.54)
+					(name "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -5.08 -1.27 0)
+					(length 2.54)
+					(name "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "Global_LCSC:S3B-XH-A"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "CN"
+				(at 0 7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "S3B-XH-A"
+				(at 0 -7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" "Global_LCSC:CONN-TH_S3B-XH-A-LF-SN"
+				(at 0 -10.16 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S3B-XH-A-LF-SN_XHsocket-1-3P-Curved-needle-pitch2-5mm_C157928.html"
+				(at 0 -12.7 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Manufacturer" "JST"
+				(at 0 -15.24 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "MPN" "S3B-XH-A(LF)(SN)"
+				(at 0 -17.78 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "LCSC Part" "C157928"
+				(at 0 -20.32 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "Wire To Board / Wire To Wire Connector"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "S3B-XH-A_0_1"
+				(rectangle
+					(start -3.81 5.08)
+					(end 6.35 -5.08)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(circle
+					(center -2.54 3.81)
+					(radius 0.38)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin unspecified line
+					(at -6.35 2.54 0)
+					(length 2.54)
+					(name "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -6.35 0 0)
+					(length 2.54)
+					(name "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -6.35 -2.54 0)
+					(length 2.54)
+					(name "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "Global_LCSC:S4B-XH-A"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "CN"
+				(at 0 8.89 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "S4B-XH-A"
+				(at 0 -8.89 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" "Global_LCSC:CONN-TH_S4B-XH-A-LF-SN"
+				(at 0 -11.43 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S4B-XH-A-LF-SN_XHsocket-1-4P-Curved-needle-pitch2-5mm_C157925.html"
+				(at 0 -13.97 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Manufacturer" "JST"
+				(at 0 -16.51 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "MPN" "S4B-XH-A(LF)(SN)"
+				(at 0 -19.05 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "LCSC Part" "C157925"
+				(at 0 -21.59 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "Wire To Board / Wire To Wire Connector"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "S4B-XH-A_0_1"
+				(rectangle
+					(start -3.81 6.35)
+					(end 6.35 -6.35)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(circle
+					(center -2.54 5.08)
+					(radius 0.38)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin unspecified line
+					(at -6.35 3.81 0)
+					(length 2.54)
+					(name "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -6.35 1.27 0)
+					(length 2.54)
+					(name "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -6.35 -1.27 0)
+					(length 2.54)
+					(name "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -6.35 -3.81 0)
+					(length 2.54)
+					(name "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+	)
+	(no_connect
+		(at 344.17 194.31)
+		(uuid "18f6c91a-3a4c-4ebd-bec9-03aaa40a7444")
+	)
+	(no_connect
+		(at 344.17 223.52)
+		(uuid "21048d9a-5357-46c8-959d-69bb234cfdb1")
+	)
+	(no_connect
+		(at 360.68 220.98)
+		(uuid "2208956e-ed92-4cae-a015-7cb4a4e4097e")
+	)
+	(no_connect
+		(at 360.68 228.6)
+		(uuid "2ee5860f-589b-488b-aa76-5876e7e19698")
+	)
+	(no_connect
+		(at 344.17 226.06)
+		(uuid "8b3f7283-9ee3-4256-9232-513440a6a6bb")
+	)
+	(no_connect
+		(at 360.68 191.77)
+		(uuid "95a16d78-32de-4c71-bca9-36546b9d7e18")
+	)
+	(no_connect
+		(at 360.68 214.63)
+		(uuid "e8eaeac2-9088-4cdd-b7f2-9dfd40267bfe")
+	)
+	(no_connect
+		(at 360.68 231.14)
+		(uuid "f0f97660-9954-43c0-843d-7d778ebcccbe")
+	)
+	(no_connect
+		(at 360.68 194.31)
+		(uuid "f165d54a-ce76-4de5-badf-ccbf6fca97e5")
+	)
+	(no_connect
+		(at 360.68 226.06)
+		(uuid "f811b176-39cf-4cb5-881d-eb8e8d6629cc")
+	)
+	(no_connect
+		(at 360.68 223.52)
+		(uuid "fe00a1fd-6c0a-4524-afb1-bdd76894fb21")
+	)
+	(global_label "I2S_WS_RS"
+		(shape input)
+		(at 344.17 201.93 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 192 0 151 1)
+			)
+			(justify right)
+		)
+		(uuid "0307fcbe-7ca8-47d1-afbd-81a443c47eb6")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 331.0854 201.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "TIP_2"
+		(shape input)
+		(at 273.05 320.04 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "07a8efe2-e2f3-42f6-afaf-2bc2f1611c28")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 265.0453 320.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SCK"
+		(shape input)
+		(at 165.1 322.58 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "0a9b817c-c69b-4610-94c2-7e64716b9ae8")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 158.3653 322.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "I2S_WS_RS"
+		(shape input)
+		(at 228.6 245.11 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 192 0 151 1)
+			)
+			(justify right)
+		)
+		(uuid "0e88e6f5-43a0-4df3-a464-76fed9486ec7")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 215.5154 245.11 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SCL"
+		(shape input)
+		(at 344.17 228.6 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "12e1fda2-536b-4e27-a613-3d8adbea7d26")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 337.6772 228.6 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SCL"
+		(shape input)
+		(at 226.06 217.17 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "148be279-06e3-4078-af06-8e7b88a34930")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 219.5672 217.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+3V3"
+		(shape input)
+		(at 254 294.64 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 13 1)
+			)
+			(justify right)
+		)
+		(uuid "14f59cbe-f866-454b-9e2f-d183bea511ce")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 245.9348 294.64 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 271.78 209.55 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "168b82ac-7e18-4017-87ba-76154acef49e")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 271.78 209.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "EXT_1"
+		(shape input)
+		(at 344.17 196.85 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify right)
+		)
+		(uuid "18093276-a222-4a33-8028-3a2cdb151615")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 335.6816 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "TIP_1"
+		(shape input)
+		(at 247.65 320.04 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "1c45157a-e480-4fcf-9fc2-981e9a828969")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 239.6453 320.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "MISO"
+		(shape input)
+		(at 165.1 320.04 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "1d4ba723-0bde-43cb-b8db-1a948921492d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 157.5186 320.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 228.6 287.02 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "1d4d2f70-31e9-4493-8334-f3bcd8b3d17d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 221.7443 287.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SAT3"
+		(shape input)
+		(at 228.6 294.64 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "1ed286f7-33a2-4e0e-82a0-b7ff0c6bccab")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 221.1396 294.64 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 165.1 314.96 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "241067e7-e230-422c-9b9d-67d156eef74b")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 158.2443 314.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "I2S_BCK_RS"
+		(shape input)
+		(at 344.17 199.39 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 192 0 151 1)
+			)
+			(justify right)
+		)
+		(uuid "2a277e78-48dc-446c-abc1-77d287999bb5")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 329.9363 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 219.71 314.96 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "2bb40c31-8563-420e-926d-17fef57f787d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 212.8543 314.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "MIDI_RX"
+		(shape input)
+		(at 228.6 269.24 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "2ca5039c-49dd-4e39-b040-705df3692e85")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 218.2367 269.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SAT1"
+		(shape input)
+		(at 228.6 289.56 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "2cad2fc3-62cd-4128-8cf5-c7a978d9d08d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 221.1396 289.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 226.06 209.55 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "2d24b22b-aa44-4c61-9102-0e4a47d2e11a")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 226.06 209.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "MIDI_TX"
+		(shape input)
+		(at 228.6 271.78 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "2d8140c2-1b92-491f-85cf-f8f6412c4739")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 218.5391 271.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 191.77 314.96 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "2db42341-72eb-4e0f-8096-c92e5e740994")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 184.9143 314.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SCL"
+		(shape input)
+		(at 271.78 217.17 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "2dd54d6a-f6df-42b3-8457-72f2d1493d69")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 265.2872 217.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 273.05 317.5 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "2f3655d0-55e1-4783-9518-8010d91e32d6")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 266.1943 317.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "CLK_OUT"
+		(shape input)
+		(at 191.77 320.04 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "33612523-4815-4fe9-b7b4-b1b6e7d43606")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 180.6205 320.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "EXT_7"
+		(shape input)
+		(at 275.59 172.72 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify left)
+		)
+		(uuid "346e817f-7032-402b-a6dd-d46088a0d431")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 284.0784 172.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "SPARE_EN"
+		(shape input)
+		(at 339.09 294.64 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "37c5200b-4625-4e75-892a-45eeeaef3fca")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 326.6706 294.64 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "EXT_5"
+		(shape input)
+		(at 275.59 167.64 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify left)
+		)
+		(uuid "381bacf5-0431-4d91-b531-362e7dee3720")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 284.0784 167.64 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "EXT_6"
+		(shape input)
+		(at 275.59 170.18 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify left)
+		)
+		(uuid "3afb96ba-f3a8-43d8-82ad-ecb37abdaf5c")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 284.0784 170.18 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "I2S_BCK_RS"
+		(shape input)
+		(at 228.6 242.57 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 192 0 151 1)
+			)
+			(justify right)
+		)
+		(uuid "3c5f329f-2c6e-4876-9fe7-5c7af92ed338")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 214.3663 242.57 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SDA"
+		(shape input)
+		(at 248.92 214.63 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "449f1518-e7c7-4f49-9f2b-6a00247e0ce9")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 242.3667 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SAT2"
+		(shape input)
+		(at 228.6 292.1 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "498f2026-74c1-44ca-8be9-9a7d0ba6a1a3")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 221.1396 292.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SEL1"
+		(shape input)
+		(at 308.61 289.56 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "4ebaebec-20fa-4a39-8e59-9d95c4d30d5f")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 301.0287 289.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SDA"
+		(shape input)
+		(at 344.17 220.98 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "51ecd599-b631-4a84-a4ef-7b8a8562820d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 337.6167 220.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 201.93 266.7 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "5335c9fc-93d2-4061-81ad-ec925ea54792")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 195.0743 266.7 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 254 241.3 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "5cb3a65d-a240-4944-a9c2-107d296ad566")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 247.1443 241.3 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "RING_2"
+		(shape input)
+		(at 273.05 322.58 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "5f437e9b-0b77-4dbb-9716-0907c81fd7c3")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 263.4124 322.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "EXT_2"
+		(shape input)
+		(at 344.17 231.14 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify right)
+		)
+		(uuid "63ef95d5-ca8a-479c-8e9e-a52cdde99ec8")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 335.6816 231.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SCL"
+		(shape input)
+		(at 248.92 217.17 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "6773fe3f-9b9d-43cd-aa47-3793d66ddef3")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 242.4272 217.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 360.68 189.23 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify left)
+		)
+		(uuid "6804a919-f467-4cc1-bdea-08201c4fa9af")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 360.68 189.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SEL0"
+		(shape input)
+		(at 308.61 287.02 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "6a5444ca-7df9-4e70-8b35-7930f93bd5c7")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 301.0287 287.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "EXT_1"
+		(shape input)
+		(at 275.59 157.48 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify left)
+		)
+		(uuid "6a607c52-d505-4dc8-a353-dc00aaaacf26")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 284.0784 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "EXT_5"
+		(shape input)
+		(at 344.17 238.76 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify right)
+		)
+		(uuid "6ab276b8-3f46-45f5-8b10-07a56663ff1e")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 335.6816 238.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "EXT_2"
+		(shape input)
+		(at 275.59 160.02 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify left)
+		)
+		(uuid "6b04294f-809f-4160-89d5-cad7e932bc38")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 284.0784 160.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "EXT_6"
+		(shape input)
+		(at 344.17 241.3 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify right)
+		)
+		(uuid "6d7796e2-cf75-4683-a742-4f64a1954c64")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 335.6816 241.3 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 247.65 317.5 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "6ebd0e47-7c8f-4480-b027-c118740fb924")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 240.7943 317.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "INT_MIDI_TX"
+		(shape input)
+		(at 201.93 271.78 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "6f2ccd9f-0ad0-4810-819a-062dd68871b0")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 187.9986 271.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SEL3"
+		(shape input)
+		(at 308.61 294.64 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "766affb0-b822-424d-8a97-a3e041c736bf")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 301.0287 294.64 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+3V3"
+		(shape input)
+		(at 276.86 294.64 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "7dd3c2f6-3be3-42da-ad39-463147401d26")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 268.7948 294.64 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+5V"
+		(shape input)
+		(at 344.17 243.84 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 13 1)
+			)
+			(justify right)
+		)
+		(uuid "7df02256-cb06-45f6-96d5-a0a14a5ea0c7")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 337.3143 243.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "MIDI_RX"
+		(shape input)
+		(at 344.17 214.63 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "7e982b2b-fd94-4ecf-b0ae-7a413dcb4a83")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 333.8067 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 339.09 292.1 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "818322b1-2db3-4c42-90e3-916b64deda33")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 332.2343 292.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "EXT_8"
+		(shape input)
+		(at 360.68 199.39 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify left)
+		)
+		(uuid "830ae6aa-eb7f-4f6e-a1df-9bdcfdaea087")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 369.1684 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "INT_MIDI_RX"
+		(shape input)
+		(at 344.17 209.55 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "844cd8ba-76f9-4e15-93cc-6482a170e3c3")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 329.9362 209.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 275.59 154.94 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify left)
+		)
+		(uuid "8ed27741-3d92-4742-bd30-87397b5de38c")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 282.4457 154.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "+3V3"
+		(shape input)
+		(at 248.92 212.09 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "8ed8e7cc-3351-48a7-9c47-2e29c1327e43")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 240.8548 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "EXT_7"
+		(shape input)
+		(at 360.68 196.85 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify left)
+		)
+		(uuid "9576c648-b609-4695-bcea-328ab7654949")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 369.1684 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "MUX_IN"
+		(shape input)
+		(at 276.86 292.1 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "98db45ef-0449-4918-b6fb-4a3416c2ab95")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 266.9805 292.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 198.12 242.57 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "99780a12-23e4-4220-b101-2a8bac5fcd70")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 191.2643 242.57 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 254 292.1 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "9f405ebe-e515-4a36-8239-30423430d93c")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 247.1443 292.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+3V3"
+		(shape input)
+		(at 344.17 191.77 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "a0b55bde-b51a-4b43-bc7b-e5ea50350718")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 336.1048 191.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+3V3"
+		(shape input)
+		(at 254 271.78 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "a3115e91-6d27-4deb-86cb-117027db1e37")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 245.9348 271.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+3V3"
+		(shape input)
+		(at 271.78 212.09 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "a3c68f75-9ddf-460c-b183-b6039b6e9947")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 263.7148 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "EXT_3"
+		(shape input)
+		(at 344.17 233.68 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify right)
+		)
+		(uuid "a53198c2-e59f-4b22-9ad5-28e6aec70dd3")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 335.6816 233.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+3V3"
+		(shape input)
+		(at 226.06 212.09 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "a6a34faf-82d6-403a-a4d7-0caa11f63e96")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 217.9948 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 276.86 289.56 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "adcf2582-e773-4b1e-a4a9-dd69632c6e3e")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 270.0043 289.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "EXT_3"
+		(shape input)
+		(at 275.59 162.56 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify left)
+		)
+		(uuid "afa191b0-04bd-438a-a516-b09a61f1b045")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 284.0784 162.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "TWAI_RX"
+		(shape input)
+		(at 219.71 322.58 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "b327a92a-2a95-4970-ae6b-d1b7559d8772")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 209.1653 322.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+3V3"
+		(shape input)
+		(at 254 246.38 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "b678eb77-d818-4700-a6ee-9d8de9216f09")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 245.9348 246.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SDA"
+		(shape input)
+		(at 271.78 214.63 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "b6b0fdbc-e938-4ddf-a5bc-9c9357fd16d6")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 265.2267 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "I2S_SD_RS"
+		(shape input)
+		(at 228.6 247.65 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 192 0 151 1)
+			)
+			(justify right)
+		)
+		(uuid "b6c18c61-8f62-4c00-be9f-25973ce653b9")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 215.6968 247.65 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "MOSI"
+		(shape input)
+		(at 165.1 317.5 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "b83fe83c-7bf5-490d-a801-97f93a66de6b")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 157.5186 317.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "I2S_SD_RS"
+		(shape input)
+		(at 344.17 204.47 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 192 0 151 1)
+			)
+			(justify right)
+		)
+		(uuid "bba418da-7dd4-4d3c-ba20-89d90f755598")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 331.2668 204.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 228.6 266.7 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "be0be0ab-5def-409e-85a9-a7011407876b")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 221.7443 266.7 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+3V3"
+		(shape input)
+		(at 275.59 180.34 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify left)
+		)
+		(uuid "bf9401e5-7d1f-4a55-b587-ac68fe0b25e5")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 283.6552 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 344.17 246.38 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "c2fab72b-fc7c-4a72-b085-e5e7491cac41")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 344.17 246.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 228.6 240.03 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "c709dbed-28fd-4bbf-a303-3517101d7221")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 221.7443 240.03 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "EXT_8"
+		(shape input)
+		(at 275.59 175.26 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify left)
+		)
+		(uuid "c854d257-e4f4-47a6-a97b-c4cf40a2d4f8")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 284.0784 175.26 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "INT_MIDI_TX"
+		(shape input)
+		(at 344.17 207.01 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "cb8a3e5a-f43a-4f70-810e-d557bb33006b")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 330.2386 207.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "INT_MIDI_RX"
+		(shape input)
+		(at 201.93 269.24 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "cc36fa1d-6115-42c7-91b0-f8c5e019469a")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 187.6962 269.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "EXT_4"
+		(shape input)
+		(at 344.17 236.22 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify right)
+		)
+		(uuid "d3f073e8-3af3-4bc8-95fb-81321bca8cf8")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 335.6816 236.22 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+5V"
+		(shape input)
+		(at 219.71 317.5 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "d8816df1-e2a9-4aa7-82eb-5538efd21350")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 212.8543 317.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "CLK_IN"
+		(shape input)
+		(at 191.77 317.5 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "db191532-3dc4-4dd0-bb13-7fb9531036b2")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 182.3138 317.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "MIDI_TX"
+		(shape input)
+		(at 344.17 212.09 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "ddd7879b-5a1a-4c7e-a035-591745fb7eac")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 334.1091 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 275.59 177.8 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify left)
+		)
+		(uuid "df770812-124d-40ed-ba7b-1f4580c7813f")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 282.4457 177.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "EXT_4"
+		(shape input)
+		(at 275.59 165.1 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 4 147 0 1)
+			)
+			(justify left)
+		)
+		(uuid "e0590342-bfa5-417c-874a-9cb622d15746")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 284.0784 165.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "+3V3"
+		(shape input)
+		(at 344.17 189.23 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "e32dd0ff-3e0b-455f-9756-f55e26447440")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 336.1048 189.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "RING_1"
+		(shape input)
+		(at 247.65 322.58 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "e3b215da-782e-4c10-83bf-e11d9098c805")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 238.0124 322.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 254 266.7 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "e41efcfc-ab79-4129-9a15-9aea08a98a16")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 247.1443 266.7 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "RUN"
+		(shape input)
+		(at 191.77 322.58 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "e47a9902-2fc2-4148-937c-a097976c493d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 184.8538 322.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "GND"
+		(shape input)
+		(at 248.92 209.55 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "e6d0481c-2b2e-4e99-beea-d7ce2317ca61")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 248.92 209.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "TWAI_TX"
+		(shape input)
+		(at 219.71 320.04 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "ef62ad08-0aaf-4a34-beb4-d5b3d316c20b")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 209.4677 320.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+5V"
+		(shape input)
+		(at 254 243.84 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 13 1)
+			)
+			(justify right)
+		)
+		(uuid "f5ba32ac-adff-48f9-a726-4aea6152da08")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 247.1443 243.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+5V"
+		(shape input)
+		(at 254 269.24 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "f739428c-95a1-436b-84e6-cc621f6aaa6d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 247.1443 269.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "+3V3"
+		(shape input)
+		(at 198.12 247.65 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 255 0 0 1)
+			)
+			(justify right)
+		)
+		(uuid "f91482d4-ac47-4c08-83fb-150af33e0e82")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 190.0548 247.65 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SDA"
+		(shape input)
+		(at 226.06 214.63 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 169 0 169 1)
+			)
+			(justify right)
+		)
+		(uuid "fb5c9e0d-5c09-455a-9b4e-b6d27f1bc154")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 219.5067 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "SEL2"
+		(shape input)
+		(at 308.61 292.1 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "fdfcdcbc-f5bc-4bde-8685-979a15f43966")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 301.0287 292.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:PM254-1-11-Z-3.0-C")
+		(at 347.98 233.68 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "1577b26e-2ba0-41cb-b774-5f962bf9f507")
+		(property "Reference" "H1B1"
+			(at 337.82 251.46 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "ESP32-S3 CONN"
+			(at 331.724 253.746 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Global_LCSC:HDR-TH_11P-P2.54-V-F-1"
+			(at 347.98 259.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/C5159940.pdf"
+			(at 347.98 262.3 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 347.98 264.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "HCTL(华灿天禄)"
+			(at 347.98 267.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "PM254-1-11-Z-3.0-C"
+			(at 347.98 269.92 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C5159940"
+			(at 347.98 272.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "2d92a21d-e5a7-4c9f-9fa8-ef667437bab3")
+		)
+		(pin "2"
+			(uuid "d57dd12c-cfcd-4fb6-a840-f80b0b766971")
+		)
+		(pin "3"
+			(uuid "ac04bced-7cea-40a7-8035-c9fd077dc4eb")
+		)
+		(pin "4"
+			(uuid "dd45c512-cc44-48c2-acd3-83a7104d241f")
+		)
+		(pin "5"
+			(uuid "5e5aac82-13e2-45af-b688-931f0bd047e4")
+		)
+		(pin "6"
+			(uuid "79fea4a5-c7cd-4532-bd47-b4c75877dd01")
+		)
+		(pin "7"
+			(uuid "a6557792-02f5-41f3-bf81-8e65180231bf")
+		)
+		(pin "8"
+			(uuid "eb356cbe-6750-496a-bb4f-f552d6bc8310")
+		)
+		(pin "9"
+			(uuid "e744e34f-e645-45aa-8ff0-3852cf78d24d")
+		)
+		(pin "10"
+			(uuid "48466df3-d6ea-41cb-b900-1995c2a55e6a")
+		)
+		(pin "11"
+			(uuid "bd571321-6c79-464e-b90d-fc8454c07008")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "H1B1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S3B-XH-A")
+		(at 254 320.04 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "2bc2eb81-1bca-47f9-b267-dd1073b77fe9")
+		(property "Reference" "J15"
+			(at 254 310.134 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "FOOTPEDAL_1"
+			(at 254 312.674 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S3B-XH-A-LF-SN"
+			(at 254 346.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S3B-XH-A-LF-SN_XHsocket-1-3P-Curved-needle-pitch2-5mm_C157928.html"
+			(at 254 348.66 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 254 351.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 254 353.74 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S3B-XH-A(LF)(SN)"
+			(at 254 356.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157928"
+			(at 254 358.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "621a5fe2-eda7-4766-9994-7b1116a08a54")
+		)
+		(pin "2"
+			(uuid "ec457d06-f8fa-48d3-85c4-d0b186549470")
+		)
+		(pin "3"
+			(uuid "94b3e7b7-a217-4cc4-969e-3a4da4a78ba0")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "J15")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:PM254-1-11-Z-3.0-C")
+		(at 271.78 167.64 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "2de1fab7-254b-41e0-a8cb-faebb0f33423")
+		(property "Reference" "EXT1"
+			(at 272.796 148.082 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "EXT ESP1"
+			(at 275.336 150.368 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Global_LCSC:HDR-TH_11P-P2.54-V-F-1"
+			(at 271.78 193.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/C5159940.pdf"
+			(at 271.78 196.26 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 271.78 198.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "HCTL(华灿天禄)"
+			(at 271.78 201.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "PM254-1-11-Z-3.0-C"
+			(at 271.78 203.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C5159940"
+			(at 271.78 206.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "25d64837-d02e-4467-96c8-087b945f2986")
+		)
+		(pin "2"
+			(uuid "3cfa6d4a-18ce-4e9f-814f-6ccf964e0a14")
+		)
+		(pin "3"
+			(uuid "4a04fb92-2548-4b66-85ed-51389a80c58b")
+		)
+		(pin "4"
+			(uuid "16ca6c29-6595-4470-b24e-28cf1152519f")
+		)
+		(pin "5"
+			(uuid "26bfb120-8b41-4fb4-a602-d519437df3cb")
+		)
+		(pin "6"
+			(uuid "d63bdd94-6985-4fae-8413-5e148a9f6487")
+		)
+		(pin "7"
+			(uuid "8af27d06-61b9-4248-b60b-7deec72cc981")
+		)
+		(pin "8"
+			(uuid "c67bec46-c430-421b-9d04-608f439e6582")
+		)
+		(pin "9"
+			(uuid "b07bd15d-8852-4125-a585-35f66bac52c1")
+		)
+		(pin "10"
+			(uuid "fa73ee2b-e2eb-4459-9fb6-66ff3c2fc9d1")
+		)
+		(pin "11"
+			(uuid "2cfdbdb1-77e3-469a-b9e8-127b9ba689b6")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "EXT1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S3B-XH-A")
+		(at 279.4 320.04 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "3241949e-bc43-4a6b-87f9-4d44c6518acb")
+		(property "Reference" "J16"
+			(at 279.4 310.134 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "FOOTPEDAL_1"
+			(at 279.4 312.674 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S3B-XH-A-LF-SN"
+			(at 279.4 346.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S3B-XH-A-LF-SN_XHsocket-1-3P-Curved-needle-pitch2-5mm_C157928.html"
+			(at 279.4 348.66 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 279.4 351.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 279.4 353.74 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S3B-XH-A(LF)(SN)"
+			(at 279.4 356.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157928"
+			(at 279.4 358.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "7c927eee-3ce9-43db-b296-ecec80efa823")
+		)
+		(pin "2"
+			(uuid "6946b620-2bfd-4de5-8f08-0d84aa7d31ff")
+		)
+		(pin "3"
+			(uuid "c10b23b9-29f2-4b3a-bd5a-85867a9c0c7b")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "J16")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S3B-XH-A")
+		(at 260.35 243.84 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "3a80f824-c679-49d3-99b9-64313dd19327")
+		(property "Reference" "J13"
+			(at 260.35 233.934 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "AUDIO_PWR"
+			(at 260.35 236.474 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S3B-XH-A-LF-SN"
+			(at 260.35 269.92 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S3B-XH-A-LF-SN_XHsocket-1-3P-Curved-needle-pitch2-5mm_C157928.html"
+			(at 260.35 272.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 260.35 275 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 260.35 277.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S3B-XH-A(LF)(SN)"
+			(at 260.35 280.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157928"
+			(at 260.35 282.62 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0acc4558-7e65-4b6c-aae2-915b70cd718e")
+		)
+		(pin "2"
+			(uuid "d7550816-f74f-44a0-b397-53105e78aae2")
+		)
+		(pin "3"
+			(uuid "9032c6aa-47d8-4172-a80b-772c1932be59")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "J13")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "*Global LCSC:S3B-XH-A")
+		(at 208.28 269.24 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "4857a015-c8c2-480c-b67a-990843f9d0d2")
+		(property "Reference" "CN3"
+			(at 205.74 259.334 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "INT_MIDI_SIG"
+			(at 205.74 261.874 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S3B-XH-A-LF-SN"
+			(at 208.28 279.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S3B-XH-A-LF-SN_XHsocket-1-3P-Curved-needle-pitch2-5mm_C157928.html"
+			(at 208.28 281.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 208.28 269.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 208.28 284.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S3B-XH-A(LF)(SN)"
+			(at 208.28 287.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157928"
+			(at 208.28 289.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "f38e85ec-b448-4fe6-8e1a-2fee6c9baec2")
+		)
+		(pin "3"
+			(uuid "8f21e1c6-59b4-4c80-bb1c-58d92f9211ed")
+		)
+		(pin "2"
+			(uuid "cd355dfc-022e-43cb-9fb1-c64aa35ec037")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "CN3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:PM254-1-11-Z-3.0-C")
+		(at 347.98 201.93 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "4f342bc0-8c26-4e9f-a4f8-c431e9ca0d7b")
+		(property "Reference" "H1A1"
+			(at 338.582 180.594 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "ESP32-S3 CONN"
+			(at 338.582 183.134 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Global_LCSC:HDR-TH_11P-P2.54-V-F-1"
+			(at 347.98 228.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/C5159940.pdf"
+			(at 347.98 230.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 347.98 233.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "HCTL(华灿天禄)"
+			(at 347.98 235.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "PM254-1-11-Z-3.0-C"
+			(at 347.98 238.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C5159940"
+			(at 347.98 240.71 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0b469659-709c-4796-87dd-ec17e4bbf06c")
+		)
+		(pin "2"
+			(uuid "10ef896b-d33d-4d99-a8c2-6e3e85d7f1bd")
+		)
+		(pin "3"
+			(uuid "0eea78c0-1b38-4024-b6a7-a8c80f113681")
+		)
+		(pin "4"
+			(uuid "299c9ea2-7e8c-4dfe-97de-5c368d7ff81a")
+		)
+		(pin "5"
+			(uuid "566b88de-54e0-4cc6-86b7-a0694130e1ca")
+		)
+		(pin "6"
+			(uuid "98623090-f370-4508-b0c4-740bc6f06a14")
+		)
+		(pin "7"
+			(uuid "4661c2e1-642e-4a91-b2ec-85055e2bc4bf")
+		)
+		(pin "8"
+			(uuid "18b59888-c60f-4b14-849d-fe05e7470c14")
+		)
+		(pin "9"
+			(uuid "1e8f6dba-2215-43ff-9549-449acf1751f0")
+		)
+		(pin "10"
+			(uuid "177c7c29-1726-439c-9a4b-9d09c21bf847")
+		)
+		(pin "11"
+			(uuid "2db6cbf5-5660-4afb-b5e8-4cef6faa5000")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "H1A1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S2B-XH-A-")
+		(at 344.17 293.37 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files no)
+		(dnp yes)
+		(uuid "51d23e5b-e8c4-4f02-8df1-037f13e497fc")
+		(property "Reference" "J53"
+			(at 344.17 283.972 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "BACKUP_MUX_EN"
+			(at 344.17 286.512 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S2B-XH-A-LF-SN"
+			(at 344.17 319.45 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S2B-XH-A-LF-SN_XHsocket-1-2P-Curved-needle-pitch2-5mm_C157931.html"
+			(at 344.17 321.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "JST-XH BOOT S4"
+			(at 344.17 324.53 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 344.17 327.07 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S2B-XH-A(LF)(SN)"
+			(at 344.17 329.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157931"
+			(at 344.17 332.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "66196a9e-73ff-49bf-b791-d9116e192714")
+		)
+		(pin "2"
+			(uuid "41de2172-98fe-4800-bd7b-6c5a56440d31")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "J53")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S3B-XH-A")
+		(at 204.47 245.11 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "547b3752-2be9-4c5c-845a-6c1bf45a29fd")
+		(property "Reference" "J14"
+			(at 204.47 235.204 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "VOL_POT"
+			(at 204.47 237.744 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S3B-XH-A-LF-SN"
+			(at 204.47 271.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S3B-XH-A-LF-SN_XHsocket-1-3P-Curved-needle-pitch2-5mm_C157928.html"
+			(at 204.47 273.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 204.47 276.27 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 204.47 278.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S3B-XH-A(LF)(SN)"
+			(at 204.47 281.35 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157928"
+			(at 204.47 283.89 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "7ad29a1f-cc54-456b-a4d8-cbbdfb1933f1")
+		)
+		(pin "2"
+			(uuid "477cb9d7-ebbf-4ff9-b03a-9e0887b60f38")
+		)
+		(pin "3"
+			(uuid "70a4b014-fe2e-450b-9ba5-008dfc8b260d")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "J14")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "*Global LCSC:S3B-XH-A")
+		(at 260.35 269.24 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "5b5a0701-f03b-4b57-89ff-b7cb70f3a949")
+		(property "Reference" "CN1"
+			(at 257.048 258.826 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MIDI_PWR"
+			(at 257.048 261.366 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S3B-XH-A-LF-SN"
+			(at 260.35 279.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S3B-XH-A-LF-SN_XHsocket-1-3P-Curved-needle-pitch2-5mm_C157928.html"
+			(at 260.35 281.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 260.35 269.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 260.35 284.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S3B-XH-A(LF)(SN)"
+			(at 260.35 287.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157928"
+			(at 260.35 289.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "735f00ea-74bf-452e-884d-fa0a50d78956")
+		)
+		(pin "1"
+			(uuid "cf26f780-1573-4f65-9888-ba62ba4fbe08")
+		)
+		(pin "3"
+			(uuid "4a6fee0d-f12d-49bc-8880-835253545c13")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "CN1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S2B-XH-A-")
+		(at 259.08 293.37 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files no)
+		(dnp yes)
+		(uuid "654292c5-33bf-49e4-9904-6e6fe8e9bc97")
+		(property "Reference" "J52"
+			(at 259.08 283.972 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SAT_PWR"
+			(at 259.08 286.512 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S2B-XH-A-LF-SN"
+			(at 259.08 319.45 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S2B-XH-A-LF-SN_XHsocket-1-2P-Curved-needle-pitch2-5mm_C157931.html"
+			(at 259.08 321.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "JST-XH BOOT S4"
+			(at 259.08 324.53 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 259.08 327.07 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S2B-XH-A(LF)(SN)"
+			(at 259.08 329.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157931"
+			(at 259.08 332.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e31b8638-8269-4d2b-89fd-960d9bf82722")
+		)
+		(pin "2"
+			(uuid "f5d4fd34-15f5-4e43-ae29-921d6a08e695")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "J52")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S4B-XH-A")
+		(at 234.95 290.83 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "66ac2dea-99dd-464a-958e-a09568d7dcfd")
+		(property "Reference" "SELIN2"
+			(at 231.902 280.162 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "SAT_SIG"
+			(at 231.902 282.702 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S4B-XH-A-LF-SN"
+			(at 234.95 302.26 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S4B-XH-A-LF-SN_XHsocket-1-4P-Curved-needle-pitch2-5mm_C157925.html"
+			(at 234.95 304.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 234.95 290.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 234.95 307.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S4B-XH-A(LF)(SN)"
+			(at 234.95 309.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157925"
+			(at 234.95 312.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "3"
+			(uuid "79cfbf3c-8616-4ce1-878e-8cd01f6f6842")
+		)
+		(pin "1"
+			(uuid "14056fb1-5f28-41db-9c93-8eedcf7d67f3")
+		)
+		(pin "2"
+			(uuid "22c1e2d5-d789-4a61-ad6f-fbffb6ea3ab4")
+		)
+		(pin "4"
+			(uuid "c5fabdeb-d304-4628-94f4-546be3750ec7")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "SELIN2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S4B-XH-A")
+		(at 171.45 318.77 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "69953035-4263-4467-bb6e-322763d474b6")
+		(property "Reference" "CONN1"
+			(at 168.402 308.102 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "SPI_BUS"
+			(at 168.402 310.642 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S4B-XH-A-LF-SN"
+			(at 171.45 330.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S4B-XH-A-LF-SN_XHsocket-1-4P-Curved-needle-pitch2-5mm_C157925.html"
+			(at 171.45 332.74 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 171.45 318.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 171.45 335.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S4B-XH-A(LF)(SN)"
+			(at 171.45 337.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157925"
+			(at 171.45 340.36 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "3"
+			(uuid "e35262ba-46ef-4eee-87e3-d53e4335143c")
+		)
+		(pin "1"
+			(uuid "70c17edd-5e4c-4987-a7cd-6289310b0af3")
+		)
+		(pin "2"
+			(uuid "6f298e42-22fa-46ab-a371-f619a13e90f5")
+		)
+		(pin "4"
+			(uuid "ba8cca09-e27c-4ffc-8741-51853cbaed50")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "CONN1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S4B-XH-A")
+		(at 226.06 318.77 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "702cfc1d-34b4-4fdd-b2f5-988ef6838f14")
+		(property "Reference" "CANBUS"
+			(at 223.012 308.102 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "CAN_BUS"
+			(at 223.012 310.642 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S4B-XH-A-LF-SN"
+			(at 226.06 330.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S4B-XH-A-LF-SN_XHsocket-1-4P-Curved-needle-pitch2-5mm_C157925.html"
+			(at 226.06 332.74 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 226.06 318.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 226.06 335.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S4B-XH-A(LF)(SN)"
+			(at 226.06 337.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157925"
+			(at 226.06 340.36 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "3"
+			(uuid "1038c582-d377-4991-b436-0838ec9eefb0")
+		)
+		(pin "1"
+			(uuid "5fc455b4-bc48-4fb6-857c-020b9556140a")
+		)
+		(pin "2"
+			(uuid "a10ceab1-54b7-4318-acbf-37b490fcd5f2")
+		)
+		(pin "4"
+			(uuid "890d1d1a-ca02-46d0-b585-628c4c7f9e21")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "CANBUS")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S3B-XH-A")
+		(at 283.21 292.1 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "797360b2-8636-4eba-b6c0-16ab7f1cc3ee")
+		(property "Reference" "SIGIN1"
+			(at 279.908 282.448 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MUX_SIG"
+			(at 279.908 284.988 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S3B-XH-A-LF-SN"
+			(at 283.21 302.26 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S3B-XH-A-LF-SN_XHsocket-1-3P-Curved-needle-pitch2-5mm_C157928.html"
+			(at 283.21 304.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 283.21 292.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 283.21 307.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S3B-XH-A(LF)(SN)"
+			(at 283.21 309.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157928"
+			(at 283.21 312.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "cb37ae09-5a39-4f0c-a4fb-eb0759d3ddb0")
+		)
+		(pin "2"
+			(uuid "d245a482-d7f3-41ce-a54e-b56bda8ac903")
+		)
+		(pin "3"
+			(uuid "ec65705e-f108-4bd0-8383-19a2f06215c9")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "SIGIN1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Generic:Conn_01x04")
+		(at 254 212.09 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(fields_autoplaced yes)
+		(uuid "82af2fa5-ebd7-41b8-8ee8-98ed16f96060")
+		(property "Reference" "J2"
+			(at 256.54 212.0899 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "I2C_2"
+			(at 256.54 214.6299 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_JST:JST_XH_S4B-XH-A_1x04_P2.50mm_Horizontal"
+			(at 254 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 254 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x04, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 254 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "74ca01f2-44dc-424b-a7ba-1c71b9a4b343")
+		)
+		(pin "3"
+			(uuid "06869574-21bb-4ebd-9617-795b6a39149a")
+		)
+		(pin "2"
+			(uuid "579600ae-6c7c-4e94-b3cf-888965f9dd50")
+		)
+		(pin "4"
+			(uuid "b7a77622-8f80-4b92-bc3c-e26a3ab5165d")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "J2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Generic:Conn_01x04")
+		(at 276.86 212.09 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(fields_autoplaced yes)
+		(uuid "871beb97-ac0d-4586-91ae-83d88ec2d814")
+		(property "Reference" "J3"
+			(at 279.4 212.0899 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "I2C_3_STEMMA"
+			(at 279.4 214.6299 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_JST:JST_XH_S4B-XH-A_1x04_P2.50mm_Horizontal"
+			(at 276.86 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 276.86 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x04, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 276.86 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "c841ce5f-6ba4-4fea-bc7e-0b8fe2bf5c89")
+		)
+		(pin "3"
+			(uuid "4de8f272-6e87-4e6f-bb9d-37c0184e8058")
+		)
+		(pin "2"
+			(uuid "798fed1d-b45e-4d25-850e-cb65544820e5")
+		)
+		(pin "4"
+			(uuid "7b6fd04f-feb4-4766-a333-eb22842985a1")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "J3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S4B-XH-A")
+		(at 234.95 243.84 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "aa47d7c3-596d-436e-a0b1-3c24df072621")
+		(property "Reference" "J18"
+			(at 235.204 231.648 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "AUDIO_SIG"
+			(at 235.204 234.188 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S4B-XH-A-LF-SN"
+			(at 234.95 269.92 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S4B-XH-A-LF-SN_XHsocket-1-4P-Curved-needle-pitch2-5mm_C157925.html"
+			(at 234.95 272.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 234.95 275 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 234.95 277.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S4B-XH-A(LF)(SN)"
+			(at 234.95 280.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157925"
+			(at 234.95 282.62 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "2a2c95a3-21e8-461d-8575-04732a6c9587")
+		)
+		(pin "2"
+			(uuid "87f3bab0-5e9d-4471-9fcc-85972117ca3a")
+		)
+		(pin "3"
+			(uuid "ff04e686-ffd6-438f-a00c-adaba076b355")
+		)
+		(pin "4"
+			(uuid "e9f33651-c897-4edd-97fb-a6ab815f90b2")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "J18")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:PM254-1-11-Z-3.0-C")
+		(at 356.87 233.68 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "c2b60882-f294-46bd-b3e3-edc51894ec95")
+		(property "Reference" "H1D1"
+			(at 365.76 251.206 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "ESP32-S3 CONN"
+			(at 365.76 253.746 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Global_LCSC:HDR-TH_11P-P2.54-V-F-1"
+			(at 356.87 259.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/C5159940.pdf"
+			(at 356.87 262.3 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 356.87 264.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "HCTL(华灿天禄)"
+			(at 356.87 267.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "PM254-1-11-Z-3.0-C"
+			(at 356.87 269.92 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C5159940"
+			(at 356.87 272.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "dfa11fc5-28da-4179-958a-7db973698f15")
+		)
+		(pin "2"
+			(uuid "945dd8cb-9c9b-46c6-ba1f-a9a67f0eade0")
+		)
+		(pin "3"
+			(uuid "3ca7dc09-263e-40ae-b770-b6c644d1884a")
+		)
+		(pin "4"
+			(uuid "7d8ea010-d7ae-4fed-b5ec-4e6f6850dace")
+		)
+		(pin "5"
+			(uuid "4dc1101c-f473-4565-94e1-40e2dcd40d6f")
+		)
+		(pin "6"
+			(uuid "a43f4ce4-208f-4b4c-b403-8190677284b2")
+		)
+		(pin "7"
+			(uuid "360cdbe9-2ca6-4bf6-acdd-0432ac6cd6eb")
+		)
+		(pin "8"
+			(uuid "5debec17-47d5-44d2-a425-fdae37f96ba2")
+		)
+		(pin "9"
+			(uuid "40c92fae-3dcd-4dae-bf49-cfb859df9499")
+		)
+		(pin "10"
+			(uuid "8feb871b-749a-4414-ba6e-1ecbb5cc0f0e")
+		)
+		(pin "11"
+			(uuid "4aa1ade0-30a5-4f8e-97bb-2bc974fd4746")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "H1D1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Generic:Conn_01x04")
+		(at 231.14 212.09 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(fields_autoplaced yes)
+		(uuid "c765e955-d2c5-4e56-9630-1775c71a5a7e")
+		(property "Reference" "J1"
+			(at 233.68 212.0899 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "I2C_1"
+			(at 233.68 214.6299 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_JST:JST_XH_S4B-XH-A_1x04_P2.50mm_Horizontal"
+			(at 231.14 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 231.14 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x04, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 231.14 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "337a9f8d-b2e8-4894-baf1-e01a46af2687")
+		)
+		(pin "3"
+			(uuid "d2836a3c-78e9-423f-80a8-7deeff905dcf")
+		)
+		(pin "2"
+			(uuid "3baae9d8-e35e-4d70-8114-2c729c5f75bc")
+		)
+		(pin "4"
+			(uuid "837171e3-7817-4bef-8baf-601b44acb2e4")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "J1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "*Global LCSC:S3B-XH-A")
+		(at 234.95 269.24 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "da694ec2-02e4-4257-a9ce-34236c8ebf66")
+		(property "Reference" "CN2"
+			(at 232.41 259.334 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MIDI_SIG"
+			(at 232.41 261.874 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S3B-XH-A-LF-SN"
+			(at 234.95 279.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S3B-XH-A-LF-SN_XHsocket-1-3P-Curved-needle-pitch2-5mm_C157928.html"
+			(at 234.95 281.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 234.95 269.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 234.95 284.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S3B-XH-A(LF)(SN)"
+			(at 234.95 287.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157928"
+			(at 234.95 289.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "def2970b-ef7c-4297-a450-6628e5c72c8d")
+		)
+		(pin "3"
+			(uuid "551e1273-3406-42d4-8643-5ca2ad87fdf9")
+		)
+		(pin "2"
+			(uuid "c5645e35-ac49-429c-93d8-28c9ddf43f5e")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "CN2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S4B-XH-A")
+		(at 314.96 290.83 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "f07119c4-45d3-4ad6-92be-01dd2b194d71")
+		(property "Reference" "SELIN1"
+			(at 311.912 279.908 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "BACKUP_MUX_SEL"
+			(at 311.912 282.448 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S4B-XH-A-LF-SN"
+			(at 314.96 302.26 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S4B-XH-A-LF-SN_XHsocket-1-4P-Curved-needle-pitch2-5mm_C157925.html"
+			(at 314.96 304.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 314.96 290.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 314.96 307.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S4B-XH-A(LF)(SN)"
+			(at 314.96 309.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157925"
+			(at 314.96 312.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "3"
+			(uuid "66554b52-2824-4a94-ab81-2f0ac062d70b")
+		)
+		(pin "1"
+			(uuid "f9244869-6373-4897-8d30-b8d555a33a71")
+		)
+		(pin "2"
+			(uuid "eb0fb51f-1165-4dcd-8c60-7902e182bfc7")
+		)
+		(pin "4"
+			(uuid "2fd4298c-7425-47bc-90e8-312228f877b6")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "SELIN1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:S4B-XH-A")
+		(at 198.12 318.77 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp yes)
+		(uuid "f9fd31fb-5c73-4173-b28f-7314dc260dd5")
+		(property "Reference" "CONN"
+			(at 195.072 308.102 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "CLOCK_SYNC"
+			(at 195.072 310.642 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Global_LCSC:CONN-TH_S4B-XH-A-LF-SN"
+			(at 198.12 330.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://lcsc.com/product-detail/XH-Connectors_JST_S4B-XH-A-LF-SN_XHsocket-1-4P-Curved-needle-pitch2-5mm_C157925.html"
+			(at 198.12 332.74 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 198.12 318.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 198.12 335.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "S4B-XH-A(LF)(SN)"
+			(at 198.12 337.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C157925"
+			(at 198.12 340.36 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "3"
+			(uuid "3db17aed-77ce-415c-bab9-e825b4ac561c")
+		)
+		(pin "1"
+			(uuid "69969c0d-1a7f-4d3b-9f23-79f40fe2dab0")
+		)
+		(pin "2"
+			(uuid "a2122bb5-9dfe-4e9f-a865-47bb026790f4")
+		)
+		(pin "4"
+			(uuid "1f6d305b-5925-4ccc-bbd7-e09724dd15cd")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "CONN")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Global_LCSC:PM254-1-11-Z-3.0-C")
+		(at 356.87 201.93 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "fe4673dd-5547-4b5c-a8b4-5af9c4739eca")
+		(property "Reference" "H1C1"
+			(at 365.76 180.594 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "ESP32-S3 CONN"
+			(at 365.76 183.134 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Global_LCSC:HDR-TH_11P-P2.54-V-F-1"
+			(at 356.87 228.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/C5159940.pdf"
+			(at 356.87 230.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 356.87 233.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "HCTL(华灿天禄)"
+			(at 356.87 235.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "PM254-1-11-Z-3.0-C"
+			(at 356.87 238.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C5159940"
+			(at 356.87 240.71 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e8d204d7-7ecd-42a3-8794-c3eb9a0bfa97")
+		)
+		(pin "2"
+			(uuid "26139e1c-53d6-4010-a8f8-837a158d45eb")
+		)
+		(pin "3"
+			(uuid "1e9d746f-fb22-4244-9077-aae463eaded7")
+		)
+		(pin "4"
+			(uuid "c77c237b-4d4b-4058-8e9f-1a41566b6aa6")
+		)
+		(pin "5"
+			(uuid "4467b054-ce3e-4fc9-bf3d-49a2549c9a3d")
+		)
+		(pin "6"
+			(uuid "d4682ddc-052d-4c68-b01e-575d99069a9e")
+		)
+		(pin "7"
+			(uuid "605310c2-784e-4f6b-91b8-2dea1e3db7a4")
+		)
+		(pin "8"
+			(uuid "fe1f57ae-452b-4782-b57b-f5aab511f81c")
+		)
+		(pin "9"
+			(uuid "1c9192cf-06f0-447d-b585-023678621ed2")
+		)
+		(pin "10"
+			(uuid "5a8bd99f-9679-460d-84fc-869bca0765bf")
+		)
+		(pin "11"
+			(uuid "35bef552-fcb8-4adf-80fb-43f6ab5d6f8b")
+		)
+		(instances
+			(project "EspMotherboard"
+				(path "/921b18f1-3824-4f9d-a344-b1fd5e9e35c8"
+					(reference "H1C1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

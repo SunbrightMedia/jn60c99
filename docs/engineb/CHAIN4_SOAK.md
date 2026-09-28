@@ -1,5 +1,7 @@
 # CHAIN4 SOAK GATE — the link's acceptance test (spec, 2026-09-13)
 
+> ⚑ ARCHIVED 2026-09-28: CHAIN4 is retired by the one-board rule (END_GOAL top, 2026-09-23). History only.
+
 Binding context: the LINK SAFETY DOCTRINE (CHAIN4.md). The link ships
 only when this gate is green. Fixed scenarios are one axis, never the
 test.

@@ -1,5 +1,7 @@
 # CHAIN4 — the FULL ORIGINAL PORT on FOUR boards (binding design)
 
+> ⚑ ARCHIVED 2026-09-28: CHAIN4 (four boards) is retired by the one-board rule (END_GOAL top, 2026-09-23). History only; it played on 2026-09-14.
+
 USER DIRECTIVE 2026-09-13, SUPERSEDING SCOPE: the four boards run the FULL
 PANEL of the original port — delay and reverb included, no 1982 byte law.
 "By nailing the ORIGINAL port, the CLASSIC port falls into line": every

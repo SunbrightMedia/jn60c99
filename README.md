@@ -26,11 +26,14 @@ in [`PROVENANCE.tsv`](PROVENANCE.tsv) (status: 20/20 PROVEN).
 |---|---|---|
 | Desktop bit-exact port | `src/` + `tools/verify/` | SEALED — `make verify` green |
 | Browser (WASM) | `gui/web/` | Shipped; `wasm_golden` proves WASM == native |
-| Engine B (fast fork for hardware) | `engine_b/` | Trunk bit-exact; S3 fork under budget work |
-| ESP32-S3 firmware | `esp32s3/` | Playable; honest 3-voice budget pending (JUNO-3V staged) |
-| CLASSIC port (1982 panel only) | `EB_CLASSIC` flag + [`docs/CLASSIC_PANEL.md`](docs/CLASSIC_PANEL.md) | 6 voices + chorus on ONE chip — image staged, unflashed |
-| Carrier board (4 × DevKitC-1) | [`docs/hardware/`](docs/hardware/) | Schematic in progress (user's hands) |
-| JX-3P (the repeat) | `jx3p/` | Recall proven; render A/B seed fix open |
+| Engine B (fast fork for hardware) | `engine_b/` | Trunk bit-exact; fork = the sonic-gated S3 engine |
+| ONE BOARD per synth (user rule 2026-09-23) | [`END_GOAL.md`](END_GOAL.md) top, [`docs/ONE_BOARD_BUDGET.md`](docs/ONE_BOARD_BUDGET.md) | Every multi-chip plan (two chips, CHAIN4 four boards) is retired history |
+| ESP32-S3 firmware | `esp32s3/` | Playable (console, patch step, MIDI UART) |
+| Bare-metal Pi (one BCM2837) | `pi/` + [`docs/pi/PORT_PI.md`](docs/pi/PORT_PI.md) | Bit-exact JUNO on metal under QEMU; paused — ask the user |
+| Hardware (mix-and-match boards) | [`docs/hardware/`](docs/hardware/) | User draws the boards; BOM v2 + ordering steps ready |
+| JX-3P (the repeat) | `jx3p/` | Done: recall + full chain EXACTLY 0, listen proofs, web app |
+| JUPITER-8 | `jp8/` | Lifted x86 -> C99, layer gates on the corrected drive; engine + full-chain gate next |
+| TB-303 | `tb303/` | Intake + cost recon only |
 
 ## Quick start (desktop)
 

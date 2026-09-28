@@ -2155,3 +2155,30 @@ Two bites in one day while lifting the JP8's machine code to C (jp8/tools/jp8_li
    target (shared with the assigner notify run at boot) and the trace "showed" the oracle
    skipping a callee. Rule: `uc.ctl_flush_tb()` before EVERY hook_add and after hook_del,
    as jp8_listen2.count() already did (D5); a hook is not "on" until the cache is gone.
+
+## 101. EXACTLY 0 ON A DRIVE THAT FAILS STEP 4 IS NOT A BOOT -- HAND EVERY ENTRY
+THE OBJECT THE PLUGIN'S OWN FACTORY BUILDS (paid 2026-09-22/23, JP8 D7)
+
+The JP8 lift gates (layers 1-3) were EXACTLY 0 for a day while the oracle's own words showed
+the boot was broken: master pinned at 1.98 from sample 960, 378 NaN / 2,799 inf ramp steps. Both
+sides ran the same WRONG drive. The oracle handed BUILD a zero-filled 0x8000 "HOST"; the plugin's
+processor (0x33a8db) calls its factory 0x444FE0 = ALLOC(0x8D0) + ctor 0x444000, which writes
+[HOST+8] = 96000.0, and BUILD copies that rate into every unit (rate 0 -> every boot ramp armed
+with an inf/NaN step). The "snap + latch clear" of the boot recipe had been a band-aid over it.
+Found by an adversarial reviewer, not by any gate (jp8/docs/SHIPPING_DESIGN.md, skeptic item 1).
+Fix (drive2, jp8_emu default): the factory builds the HOST, recall goes through HOSTPARAM per pool,
+no snap, no latch clear; every reference regenerated. Result: idle master 1.57e-13, 0 bad ramps,
+and the lift gates re-green on the corrected drive (jp8/logs/lift_gate_layer*_drive2.log).
+
+### The rules
+1. Before ANY layer gate, run the step-4 listen proof (idle silent + finite, pitch tracks keys,
+   release decays) on the SAME drive the gate uses. The gate proves "C == oracle", never "the
+   oracle is the plugin".
+2. Read the call site that creates an object before handing an entry a buffer. "It did not crash
+   on zeros" proves nothing; build every object the plugin's own entry path builds.
+3. A harness poke that makes a symptom go away (snap, latch clear) is a defect report, not a fix:
+   find what the plugin does instead, then delete the poke.
+4. The control plane is RECORDED, not re-derived: process A logs every top-level call the oracle
+   makes (entry, args, MXCSR, xmm1) and process B replays that list verbatim
+   (jp8/tools/jp8_lift_emu.py / jp8_lift_c.py). A law the harness computes twice is a law the gate
+   cannot see.

@@ -57,7 +57,8 @@ their old paths so no comment pointer dangles. Live project state:
 | PHASE3_COVERAGE_CERTIFICATE.md | REFERENCE | Phase 3 — Coverage Certificate (Gate G3, port + plugin sides) |
 | PHASE4_ALLOCATOR.md | REFERENCE | Phase 4 — Allocator sub-modes (finding + disposition) |
 | PHASE4_ARP_AUDIO_CERT.md | REFERENCE | Phase 4 — Arp audio certification |
-| PIPELINE.md | LIVING | THE PIPELINE — .vst3 in → two ESP32-S3 boards out (E3, END_GOAL item 7) |
+| PIPELINE.md | LIVING (method) | THE PIPELINE — .vst3 in → boards out (E3) — *banner 2026-09-28: the method stands, the two-board steps are superseded by the one-board rule* |
+| ONE_BOARD_BUDGET.md | REFERENCE | What fits ONE ESP32-S3 (JUNO exact/fork/PWM-off/wavetable, JP8, TB-303, a wavetable synth's modules, oscillator aliasing) — written 2026-09-28 |
 | PLAN_5_STEPS.md | REFERENCE | THE 5-STEP PLAN TO THE END GOAL (written 2026-08-26, user-approved scope) — *PARKED scope of 2026-08-26; FINAL_GUIDE rules sequencing* |
 | PLAN_FINAL_STRETCH.md | REFERENCE | THE FINAL STRETCH — EXECUTION PLAN (binding, 2026-08-28) — *PARKED; its cycle budgets predate the voice-5 defect and are 2-voice numbers* |
 | POLYPHONY.md | REFERENCE | Polyphony — deriving the per-voice state layout from the binary |
@@ -96,7 +97,7 @@ their old paths so no comment pointer dangles. Live project state:
 ## docs/engineb/ — the engine-B era (fork + S3 fit)
 
 `METHOD_PLAYBOOK.md` is LIVING BY RULE (defects added the day they are paid).
-Also LIVING: DEVICE_RECALL.md, TWO_CHIP_WIRING.md, SCOPE.md,
+Also LIVING: DEVICE_RECALL.md, SCOPE.md,
 AUDIBLE_STANDARD.md, M5_SONIC_FRAME.md. Everything else is REFERENCE — module
 results (M-*, F-*), superseded plans (each names what replaced it), audits.
 `docs/engineb/data/` (92 files, b4..b43 + module data): REFERENCE wholesale —
@@ -158,7 +159,8 @@ every file is one dated measurement; the filename is the claim's address.
 | SONIC_BOUND_SETTLED.md | REFERENCE | The fork's sonic bound, settled by measurement |
 | STANDALONE.md | REFERENCE | The standalone engine — scope, and why the measurements force it |
 | STEP1_ATTRIBUTION.md | REFERENCE | Step 1: per-module CYCLE attribution on silicon (ablation method) |
-| TWO_CHIP_WIRING.md | LIVING | TWO-CHIP WIRING — O6/D1, what to connect and why |
+| TWO_CHIP_WIRING.md | ARCHIVED | TWO-CHIP WIRING — O6/D1 — *retired by the one-board rule 2026-09-23 (banner in file)* |
+| CHAIN4.md, CHAIN4_SOAK.md | ARCHIVED | the four-board chain design + soak spec — *retired by the one-board rule; it played 2026-09-14 (banner in file)* |
 | VCF_ZDF1X_PLAN.md | REFERENCE | WORK ORDER — the 1x ladder refit (EB_VCF_ZDF1X), written for Opus 5 |
 | VERDICT_ONE_CORE.md | REFERENCE | IT DOES NOT FIT ONE CORE — and the fix costs nothing sonically |
 | VOICE_BUDGET.md | REFERENCE | Engine B — VOICE PATH BUDGET |
@@ -176,20 +178,26 @@ rewrite behind a blind gate) is in CLAUDE.md HISTORY pointers.
 COMPACT_FORMAT.md: REFERENCE — ⚠ its 118-byte set was measured INSUFFICIENT;
 engine_b/eb_patch.h (134 bytes) is the corrected authority.
 
-## docs/pi/ — LIVING (bare-metal Raspberry Pi bring-up, the live edge)
+## docs/pi/ — PAUSED (bare-metal Raspberry Pi bring-up; whether it fits the 2026-09-23 one-board rule is the user's call)
 
 PORT_PI.md — WHY the S3 chain is retired, the ARM bit-exactness proof
 (64/64 identical x86 == aarch64), the one ARM bug found, and the open steps.
 
-## docs/hardware/ — LIVING (the MasterAudio carrier board)
+## docs/hardware/ — LIVING (mix-and-match boards for any synth)
 
-BOARD.md (design reference), PCB_PLACEMENT.md (layout notes + open items),
-MasterAudio_reference.kicad_sch (generated reference netlist).
+SESSION_HANDOFF.md (READ FIRST: its 2026-09-28 section links everything), ORDERING.md (JLCPCB + LCSC in one shipment,
+official steps), bom/ (master LCSC BOM v2 + builder + open checks), footprints/ (switch v4, 75 mm fader, ee2kicad.py, the
+EasyEDA ground-truth JSONs), SwitchBoard/ + FaderBoard/ (ready KiCad projects), SegmentBackpack/ (7-seg HT16K33A backpack,
+address network, OPEN diode direction), user_boards/ (snapshots of the user's board files — the user's PC holds the current
+ones), AUDIT.md + tools/hardware/schem_audit.py (net-level audit law), BOARD.md / PCB_PLACEMENT.md / MOTHERBOARD_PINOUT.md /
+BACKFEED.md / MasterAudio_reference.kicad_sch (the 2026-09 MasterAudio carrier era: REFERENCE, partly superseded by the
+board split).
 
 ## Elsewhere (not docs/, listed for completeness)
 
 jx3p/docs/ — the JX-3P port's own docs; S3_STATUS.md rules its state.
-jp8/docs/ — the JUPITER-8 port's own docs; S3_STATUS.md rules its state (steps 0-4 PROVEN at 44100 on the corrected flag-0 recall, D4 resolved, step 5 open); abi_ledger.md is its entry-point ledger; PORT_LESSONS.md the traps the JP8 added (LIVING); SWEEP_44100.md the 64-patch listen sweep record (REFERENCE, one row per patch, log per row).
+tb303/docs/S3_STATUS.md — TB-303 intake + executed cost recon (not a port yet; the harness must be rebuilt).
+jp8/docs/ — the JUPITER-8 port's own docs; S3_STATUS.md rules its state (read its RESUME HERE block; drive2 = the plugin's own construction; lift gates on drive2; SHIPPING_DESIGN.md = the engine design + the skeptic's 12 items; SWEEP_44100_DRIVE2.md the drive2 listen sweep); abi_ledger.md is its entry-point ledger; PORT_LESSONS.md the traps the JP8 added (LIVING); SWEEP_44100.md the 64-patch listen sweep record (REFERENCE, one row per patch, log per row).
 docs is indexed; AIRTIGHT_PLAN.md, GOAL.md, END_GOAL.md, FINAL_GUIDE.md,
 COVERAGE.tsv, PROVENANCE.tsv live at repo root and outrank this index.
 

@@ -104,103 +104,48 @@ mine is a hypothesis (playbook 80).
   recall. `truth.py`, `e2e_emu.py` (oracle), `recall_gate.py`,
   `recall_render_ab.py` (arp set now DERIVED per bank via `juno_bank_arp` —
   never hardcode data properties), `userbank_parity.py`, `approx_audit.py`.
+- `jx3p/`, `jp8/`, `tb303/` — the next-synth ports, each with `truth/`
+  (checksummed), `tools/`, `docs/S3_STATUS.md` (its only status page).
+  `pi/` — the bare-metal Raspberry Pi track (Circle). `docs/hardware/` —
+  boards, BOM, ordering, the user's board snapshots.
 - Costs/levers/history: `docs/` + `docs/engineb/data/` — cite, do not restate.
 
 # LIVE STATE (update in place, no dated blocks here, EVER; detail lives in
 # FINAL_GUIDE.md / docs/ — this section is one line-group per arc)
 - **src/ + trunk**: SEALED. `make verify` green, PROVENANCE 20/20 PROVEN,
   WASM republished. Do not touch src/ except through a gate.
-- **Fork on S3 (O4 arc, through b43)**: ⚠ VOICE-5 DEFECT (fixed e611f7d-era,
-  see HISTORY): S3L_VOICE_LO=6 carried into "3-voice" builds — voice 5's audio
-  NEVER RENDERED, so every earlier 3-voice timing number was 2-voice. The
-  first honest 3-voice build (JUNO-3V, [LISTENv3] tags) is STAGED in
-  esp32s3/flash/meas/ and UNFLASHED — no honest 3-voice budget exists yet.
-  Levers refuted ON SILICON (do not re-litigate): reverb-half (+135 net),
-  per-file -O3 on FX (0), fuse-VCA (+168). Landed: EB_ZEROCOEF_T5 (−70 fx,
-  legal set G1/G3/G5 only). CHUNK=64 click causes closed one by one: bench
-  demo bursts, console key auto-repeat, reporter UART (S3L_REPORT_SECS),
-  DMA depth. Exact-only cost MEASURED (b43): the bit-exact engine is ~2x the
-  fork; two chips CANNOT run it, four could at ~88-90% on paper.
-- **CLASSIC port (user-directed 2026-09-02)**: EB_CLASSIC = the 1982 panel.
-  Master chain drops delay/reverb/e5 (each replaced by its module's own OFF
-  law); ZERO FX rings; strict byte law `eb_patch_classicize` pins every
-  non-1982 parameter at neutral FOREVER, recall included (ENV2:=ENV1,
-  VCA TONE:=128 proven passthrough, EFFECT TYPE clamped {2,3,4}).
-  Correctness standard: vs the VST limited the same way. Binding doc:
-  docs/CLASSIC_PANEL.md. USER-BINDING 2026-09-03: classic must come from the
-  ORIGINAL PORT's sound = trunk + EXACTLY-0 levers only (src/ cannot fit S3).
-  MEASURED on silicon (b44, docs/engineb/data/b44_classic_silicon.md): byte
-  law proven on-chip on both engines; delay=22 reverb=4; exact-classic voice
-  ≈5,045 cyc (v1 minus wait — v1 INCLUDES the spin, never quote it raw) →
-  6 voices + chorus ≈31–35k → the 4-slot board (40k) at 78–88% is the
-  machine. Fork classic: two chips ≈70–77% INFERRED. Owed: silence the
-  single-board LINK BAD-PAIR churn before the next budget number.
-- **CHAIN4 (2026-09-03; SCOPE 2026-09-13: FULL PANEL)**: user-directed
-  2026-09-13 — the four boards run the FULL ORIGINAL PORT (delay+reverb
-  included, NO EB_CLASSIC; nail the original, classic falls into line).
-  USER-BINDING 2026-09-14: the ZERO-approximation bar is SUSPENDED, by
-  the user's explicit order — the fork's sonic-gated CR set (pitch N=4,
-  cutoff/env N=2, lerp, LFO_TAIL_CR) runs on ALL FOUR positions
-  (amended same day under the user's "add what you need for a fully
-  working synth" order: an EXACT voice at the patch-48 class busts ANY
-  chip's budget — b45 freeze, measured — and THE INVARIANT covers every
-  input; uniform CR also keeps all six voices one engine). Cause: TAT-attributed
-  arithmetic — 2 exact voices + prologue + link = ~11,080 vs 10,884
-  per chip at patch 0, ~85%% of the link tail being irreducible CRC
-  math; every exact lever was spent or refuted on silicon first
-  (b45 log has the full ledger).
-  The 4-board build EXISTS and is STAGED in
-  esp32s3/flash/chain4/pos{1..4} (three-bin sets). Design binding:
-  docs/engineb/CHAIN4.md. The pair-sum law proven EXACTLY 0 on host
-  (tools/engineb/chain_gate.sh, tooth bites); base 0 + one chord-6 key on
-  all four chips; hops = the proven pairwise link ×3, TDM4; notes ride a
-  checksummed event chain from chip 1. Pos 1 alone: VERIFIED GREEN on
-  silicon (b45, 10th flash sha 5a326f29d) -- cyc 5,217/5,442, miss 0/10k
-  over 160 s, drift/deficit FROZEN, un=0; note path + event tap PROVEN
-  (robot). The miss ghost = the donated tick vs an untaught detector
-  (3 wrong attributions on the way -- b45 records all). EVQ-refused
-  HEALTH line under robot flood is the queue working, not a fault.
-  Law: one exact voice per core MAX; prologue+master must ride the light
-  core (S3L_PROLOGUE_C1, no REV_PIPE). HOP 1<-2 GREEN on the wired
-  4-board bench: sustained mix=OPEN, in-band chunk CRC (advert/pend
-  redemption retired; LINK SAFETY DOCTRINE + soak spec are binding in
-  CHAIN4.md / CHAIN4_SOAK.md). Six paid defects on the way live in
-  playbook 91-92 + the b45 log (pin theft, ms-vs-ticks pacer, discard
-  starvation, torn-judge, gate-on-heal, cushion partial). Bench runs are
-  ONE bat file (esp32s3/flash/chain4/run_test.bat -> chain4_log.txt).
-  THE CHAIN PLAYS (b45 log, 2026-09-14, log 4cf17ca4): ALL FOUR boards
-  under budget THROUGH the robot+seeded storm, 51 patch changes, no
-  freeze, un frozen, mix=OPEN, deficits frozen -- one flash. Engine:
-  uniform CR per the user's order (+FPDIV, +VCA pipes, +LFO trim, ROM
-  crc). HAND PANEL (user-directed, staged after the victory flash):
-  S3L_PANEL on pos1 -- IO12/13 octave down/up, IO14-17 = C/C#/D/D#
-  (pull-up active-low, debounced, unwired-safe), pots IO1=CUTOFF
-  IO4=RESONANCE (arm-by-stillness pickup law, boot-proven pids 12/13);
-  params now RIDE the event chain (kind 3), so THE FOUR IMAGES ARE A
-  SET -- never flash pos1 alone. Design: CHAIN4.md §5/§6. PLUGIN
-  PARITY (user-directed): warm param edits go through the plugin's own
-  juno_apply_param_leaf (eb_devparam.h; devparam_gate 3 teeth in
-  o3_gates) -- note cells never broadcast, drone cured 4/4 on silicon.
-  POS4's boot-CRC mute was a .bss shift onto one bad DRAM cell
-  (playbook 98) -- keep new cold state in PSRAM, watch the map. SOAK
-  DONE on the panel image: boot sweep 4/4 + ~1 hr continuous storm
-  (S3L_SOAK_AUTOSTORM, soak-only flag) + clean post-soak boot. OWED:
-  soak layer 3 (fault injection), worst-patch numbers into FINAL_GUIDE.
-- **Hardware (user-directed)**: MasterAudio 4-slot carrier board for N16R8
-  DevKitC-1 boards (JLCPCB/LCSC). The user draws the schematic by hand;
-  docs/hardware/ holds the connection reference, PCB placement notes, and
-  open BOM items (LM2776 C69527 is the -5 V rail; TPA6120 needs it).
-- **JX-3P (E5)**: PLAYS AND SOUNDS RIGHT (2026-09-05). Two harness defects
-  hid for weeks behind green gates (playbook 87 SETSR ABI = float in xmm1;
-  playbook 88 bank decode 16 bytes off) plus one bridge defect (link
-  pointers to template copies, PORT_LESSONS 8). All fixed, all gated:
-  recall 64/64 EXACT, full chain 9/9 EXACTLY 0 incl. FREQ-MOD patches,
-  listen proofs GREEN on oracle AND C twin (jx_listen.py / jx_listen_c.py:
-  pitch tracks keys, harmonic, idle silent, release decays). 64-patch full
-  gate: see S3_STATUS. Web app rebuilt + republished (one link, artifact
-  d8679bea). Pipeline for the next synth: docs/PORT_PIPELINE.md + tools
-  pe_recon / abi_check / audio_metrics / jx_bank_census. Open: master FX
-  in the app (dry voice sum ships), true host recall protocol, other rates.
+- **ONE-BOARD RULE**: every multi-chip arc is HISTORY — the S3 fork O4 arc
+  (two chips), the CLASSIC 4-slot plan, CHAIN4 (four boards played through
+  the storm on 2026-09-14). Their full live-state text, facts and owed items
+  are archived verbatim in docs/HISTORY.md ("LIVE STATE archive"). What fits
+  ONE S3: docs/ONE_BOARD_BUDGET.md — a faithful 6-voice JUNO does NOT (fork
+  ~2,600 cyc/voice; one S3 holds ~3-4 voices + FX); a wavetable synth and the
+  TB-303 do. EB_CLASSIC byte law + docs/CLASSIC_PANEL.md stay valid.
+- **Pi track** (docs/pi/PORT_PI.md): the bit-exact JUNO (8 voices, all FX)
+  runs on ONE bare-metal BCM2837 (Pi 3A+/Zero 2 W) under QEMU: 69/69
+  scenarios bit-exact, invariant swarm clean, multi-core split exact, PLAY
+  image built (pi/). Whether this track is "one board of equivalent power"
+  under the 2026-09-23 rule is the USER's call — ask before resuming it.
+- **Hardware**: modular boards for any synth (motherboard, headphone DAC,
+  faders, muxes, keys, MIDI, button packs, switches, 7-seg backpack).
+  docs/hardware/SESSION_HANDOFF.md (read its 2026-09-28 section first),
+  BOM v2 in docs/hardware/bom/, ordering in docs/hardware/ORDERING.md.
+  The user draws every board; Claude answers at pin/net level.
+- **JX-3P (E5)**: PLAYS AND SOUNDS RIGHT. Recall 64/64 EXACT, full chain
+  EXACTLY 0, listen proofs green on oracle and C twin, web app published.
+  jx3p/docs/S3_STATUS.md rules. Open: master FX in the app, host recall
+  protocol, other rates. INFERRED defect for the JX owners: jx_emu.build()
+  also hands BUILD a zero HOST (JP8 D7 / playbook 101) — check it.
+- **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
+  Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
+  builds the HOST, recall through HOSTPARAM, no snap). The machine-code
+  lifter's three layer gates are EXACTLY 0 on drive2 with teeth; the PSI
+  template + the oracle-recorded recall table are exported (jp8/gen/).
+  NEXT: jp8.h + jp8_engine.c (self-booting engine) + the full-chain gate
+  64/64. The bit-exact JP8 is ~5.3x one S3.
+- **TB-303**: intake + cost recon only (tb303/docs/S3_STATUS.md): voice + FX
+  ~66 % of one S3, NOT listen-certified; the harness was lost — rebuild it
+  from jp8/tools/jp8_emu.py.
 - **Parked tracks**: DAW-parity (HOSTPATH_PARITY_SCOPE steps 2-5) and Track B
   Daisi sonic-identity fork (harness done, zero voice code, blind-gate warning
   stands). Both resumable from HISTORY.md pointers.

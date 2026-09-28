@@ -47,3 +47,18 @@ re-pays its defect.
   choosing values by the host id's DB row detuned the port -39.5 cents
   (host id 2 = engine MASTER TUNE). Gate reach is 12000 samples now.
 - Five confounded "no change" verdicts before the fresh-note rule.
+
+## What the JUPITER-8 paid (2026-09-21..28) — AMENDS steps 3, 5 and 6
+- **Step 3, amended:** build the HOST with the plugin's OWN factory (read the processor's call site; JP8: 0x444FE0 =
+  ALLOC + ctor, [HOST+8] = 96000.0). A zero-filled HOST armed every ramp with a NaN step and the "snap" hid it for a day
+  (D7, playbook 101). Recall through the host param entry (HOSTPARAM, its own flag 0 and per-id switch), NOT a
+  hand-picked DISPATCH flag (playbook 99). No snap, no latch clear: let the plugin's walker settle.
+- **Step 5 without an IDA dump:** lift the machine code mechanically (`jp8/tools/jp8_lift.py`: one C statement per
+  instruction, the oracle's regions at the same addresses or relocated, indirect targets from a block-hook dynamic
+  reach) and let the oracle grade it; each layer its own tooth on a non-neutral path (playbook 100). Record the control
+  plane in process A and replay it verbatim in process B (PORT_LESSONS 15).
+- **Step 6:** the template is POST-STATIC-INIT (image as oracle memory, heap, stack residue, page 0 + runtime scalars,
+  self-check + tooth: `jp8/tools/jp8_template_export.py`); the recall table is the oracle's own recorded HOSTPARAM calls.
+- Rates: the ZenCore engines carry a 44100-specialised constant set and a 96000-referenced generic set; 48000 plays an
+  octave low without the host resampler (JP8 D3, the JX obeys the same law). Grade at 44100 (and 96000) until the host
+  render layer is lifted.

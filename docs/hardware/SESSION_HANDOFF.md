@@ -1,8 +1,8 @@
-# HARDWARE SESSION HANDOFF (written 2026-09-12)
+# HARDWARE SESSION HANDOFF (written 2026-09-12, updated 2026-09-28)
 
 Everything a fresh session needs to continue the MasterAudio / satellite-board
 hardware work. Written as if this chat is deleted. Pairs with PCB_PLACEMENT.md
-(placement rules), AUDIT.md (audit laws), CHAIN4.md (breadboard firmware).
+(placement rules), AUDIT.md (audit laws). CHAIN4.md (breadboard firmware) is RETIRED.
 
 The user hand-builds every KiCad schematic and PCB. Claude is a LEARNING TOOL,
 not a board generator: give methods, part numbers, and pin-level answers — NEVER
@@ -20,6 +20,48 @@ auto-generate KiCad projects or edit the user's files unless explicitly asked.
 7. Verify EVERY LCSC part before quoting — never from memory. LCSC pages are
    blocked from Claude's network; use web search or ask the user to open the page.
 
+## ⚑ STATE 2026-09-28 — READ THIS FIRST (the 2026-09-12 sections below are older; retired parts are marked)
+The chat that did 2026-09-13..09-28 hardware work is retired. Everything it decided is here or linked.
+
+**One-board rule (USER-BINDING 2026-09-23, END_GOAL.md top):** one ESP32-S3-class board per synth. The 4-slot
+MasterAudio carrier as a multi-chip engine and the CHAIN4 breadboard are RETIRED. The hardware is now a set of
+mix-and-match boards for ANY synth: ESP32-S3_Motherboard (x3), Headphone_Dac (x2), FaderBoard (x10), Multiplex16 (x10),
+Multiplex16_Satellite, KeyswitchBoard, KeyswitchKeybed, MIDICON3, PB86-A1 3/4/8-Packs, PotentiometerBoard,
+Potentiometer_3-Pack, SwitchBoard (x5 each unless named), plus the SegmentBackpack (7-seg display).
+
+| topic | where |
+|---|---|
+| Master LCSC BOM v2 (905 pcs; 1,039 with proposed JSTs) + open checks | `bom/README.md` |
+| Ordering boards + parts in ONE shipment (official LCSC steps; corrects the chat's from-memory answer) | `ORDERING.md` |
+| 7-segment backpack (HT16K33A, BSS138 shifter, address jumpers, placement, OPEN diode direction) | `SegmentBackpack/README.md` |
+| Universal Daier TS-22E01/TS-23E01 switch footprint v4 + 75 mm fader footprint, ready KiCad projects | `footprints/README.md`, `SwitchBoard/`, `FaderBoard/` |
+| Snapshots of the user's board files (motherboard, headphone, audio, buttonpack3, muxboardv1, all-boards JLC zip) | `user_boards/README.md` |
+| What fits ONE S3 (JUNO, JP8, TB-303, a wavetable synth) | `../ONE_BOARD_BUDGET.md` |
+
+**Decisions and answers from 2026-09-13..09-28 (each was asked and answered once; do not re-derive):**
+- I2C expanders: button/LED packs use XL9555 C609791 (0x20-0x27, address by 3-pad jumpers to GND/VCC). A PCA9539 (0x74-0x77,
+  pin 3 = RESET, tie high) was also discussed; it collides with HT16K33 0x74-0x77 on one bus. Mux selects S0-S3 + EN ride an
+  expander on the mux board, not S3 GPIOs (keeps the S3 inside its ~24 usable GPIOs).
+- S3 pins never to use on a header: IO19/20 (USB), IO26-32 (flash), IO35-37 (PSRAM), IO43/44 (console), IO0/3/45/46
+  (strapping: let them float safe at boot, pulls on the breakout), IO48 (LED). I2C pull-ups on exactly ONE board per bus.
+- Extra ADC for pots: ADS1015IDGSR C193969 (12-bit, 4-ch, I2C, ~$0.59 in 2026-09, verify live). Avoid PCF8591 (8-bit, ~$4.42).
+- Headphone-only build of the audio board (net-traced): the TPA6120 is fed straight from the DAC, parallel to the line stage,
+  so U3/U4 (OPA1656), J6/J7 (line jacks), R1-R4, R40/R41/R46/R47 can be deleted; LED1 + R22 optional. KEEP U1 DAC + its charge
+  pump caps, U5 LDO (3V3A), U12 LM2776 (VNEG, the HP amp needs it), U2 + R42-R45, R8/R9, J8. XSMT pulled high (R26) = unmuted.
+- Volume: line out FIXED; headphone and speaker each get their own attenuator on the amp INPUT (analog pot, or I2C digital
+  pot such as MCP4661 so levels recall with the patch).
+- I2S board link: 4-pin JST (GND, BCK, WS, SD) + separate 2-pin power (GND, +5V). No MCLK (PCM5102A SCK -> GND, internal PLL).
+- Analog layout: aggressors = I2S clocks, class-D output, DC-DC switch nodes (LM2776 flying cap, boost inductor); victims =
+  DAC outputs, op-amp inputs, 3V3A, VNEG_DAC, CAP_P/CAP_M. A solid ground plane does most of the work; digital-to-analog
+  ~1-3 mm (3W rule) + a stitched guard trace; switchers in their own corner >= ~10 mm with tiny loops; AGND-DGND joined at
+  ONE point at the DAC; never route a fast/critical trace across a plane gap (small voids are fine).
+- Battery (a portable build, not yet designed): NiMH AA, fire-safe. 4S (4.8 V, 4.0-5.8 V) needs a buck-boost to 5 V; 2S2P
+  (2.4 V) a simple boost but twice the current. 4 x 2,400 mAh ~ 11.5 Wh ~ one Li-ion 18650. Any mAh works (only runtime
+  changes) but every cell in a pack must match. In-unit charging: a real NiMH charger IC with -dV + temperature termination
+  (e.g. LTC4060 / MAX712) + a pack thermistor + fuse + a power path (play from the adapter, charge the pack separately).
+  C/3 (~0.9 A for 2,800 mAh) ~ 4-5 h is the safe rate.
+- Every LCSC number must be verified before it is quoted (the LTP-587HR display was quoted from JLCPCB while out of stock).
+
 ## THE AUDIT TOOL — tools/hardware/schem_audit.py
 THE single net-level auditor for any .kicad_sch. Committed this session.
 - `python3 schem_audit.py FILE.kicad_sch` — net dump + STUB/NC/ambiguity checks.
@@ -35,7 +77,7 @@ Three tool bugs were found and fixed this session (each now guarded by a tooth):
   D1 label-only nets (wire-only nets read as floating), D2 dropped mirror,
   D3 wire-to-wire T-tap merge (junction dots). Never audit with an ad-hoc script.
 
-## MASTERAUDIO BOARD — current state
+## MASTERAUDIO BOARD — state of 2026-09-12 (⚠ since then the design split into ESP32-S3_Motherboard + Headphone_Dac + satellites; ask the user which items still apply)
 Latest good file (user's PC): the 09d916c4 / f08694c4 generation. Net audit
 GREEN, all teeth bite, 0 STUBs. Board keeps the analog AND digital sections
 together (user chose NOT to split DAC/digital boards — the JLC per-unique-board
@@ -178,8 +220,9 @@ Passives: 100nF 0805 C49678 / 0603 C14663 · 220R 0805 C17557 / 0603 C22962 ·
   switch layer, then B to refill.
 - Mounting-hole grid rule: 8.25mm from grid line = 8.00mm from board edge;
   hole spacing 42n - 16.5mm (see PCB_PLACEMENT.md item 19).
-- Solder jumper (3-way, address select): symbol Jumper:SolderJumper_3_Open,
-  footprint Jumper:SolderJumper-3_P2.0mm_Open_TrianglePad1.0x1.5mm (largest stock).
+- Solder jumper (3-way, address select, XL9555/PCA955x style): symbol Jumper:SolderJumper_3_Open,
+  footprint Jumper:SolderJumper-3_P2.0mm_Open_TrianglePad1.0x1.5mm (largest stock). The HT16K33 is DIFFERENT: 2-pad
+  jumpers in a diode + 39k chain (SegmentBackpack/README.md).
 - Fab output: KiCad File->Plot (Gerbers) + drill, or install the "Fabrication
   Toolkit" plugin via Plugin and Content Manager for one-click JLCPCB output.
 
@@ -190,7 +233,7 @@ L3 inner: power pours as separate zones +5V / 3V3A / VNEG + slow routing.
 L4 Bottom: signal routing, analog kept apart (local GND fill).
 Wide +5V/GND (>1A). No digital over the analog cluster. D+/D- matched pair.
 
-## SMART BUTTON/FADER BACKPACKS (design decided, not yet built)
+## SMART BUTTON/FADER BACKPACKS (built since: PB86-A1 packs with XL9555; see the 2026-09-28 section above)
 Digital button/LED boards use ONE PCA9555/XL9555 I2C expander (16 IO) —
 LCSC XL9555 **C609791** (~$0.25, cheaper clone of PCA9555, TSSOP-24). 8 buttons +
 8 LEDs per board, 4 wires out (GND/VCC/SDA/SCL), address by 3 solder jumpers
@@ -206,7 +249,7 @@ or add a TCA9548A switch (8 segments x 8 = 64 boards). A per-board MCU
 (CH32V003 ~$0.15) gives arbitrary addresses but adds a firmware project — the
 user chose the expander for zero firmware.
 
-## BREADBOARD 4x ESP32-S3 BUILD (CHAIN4 firmware) — unaffected by PCB changes
+## BREADBOARD 4x ESP32-S3 BUILD (CHAIN4 firmware) — ⚑ RETIRED 2026-09-23 (one-board rule); history only
 This runs the CHAIN4 firmware, separate from the MasterAudio PCB work above.
 Wiring follows CHAIN4.md section 6 (CARRIER pin map, 2026-09-08):
 hop N talks to N-1 (N=2,3,4):
@@ -219,7 +262,7 @@ to the carrier map. Firmware review this session fixed the chunk-marker law
 esp32s3/flash/chain4/pos{1..4}. Criterion: hs=OK + mix=OPEN + chord-6 CRC MATCH
 on all four consoles.
 
-## OPEN ITEMS BEFORE FAB (MasterAudio)
+## OPEN ITEMS BEFORE FAB (MasterAudio, 2026-09-12 — ⚠ may be stale after the board split; confirm with the user)
 - [ ] Delete MIDI parts (list above); add the 3-pin power JST to CN1.
 - [ ] R63 -> 3V3_ESP1.
 - [ ] Import C69527 (LM2776 footprint) and C111609 (reset button).

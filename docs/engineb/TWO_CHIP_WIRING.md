@@ -1,5 +1,7 @@
 # TWO-CHIP WIRING — O6/D1, what to connect and why
 
+> ⚑ ARCHIVED 2026-09-28: the one-board rule (END_GOAL top, 2026-09-23) retired every chip-to-chip design. History only.
+
 Both boards get **the same firmware image**. The only difference is one jumper.
 
 ## The jumper decides the role
