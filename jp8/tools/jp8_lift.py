@@ -392,6 +392,12 @@ class Lifter:
             return "M64(%s)=XQ(%d,1);" % (ea(ins, op[0]), reg(ins, op[1].reg)[0])
         if m == "movlhps": return "XQ(%d,1)=XQ(%d,0);" % (reg(ins, op[0].reg)[0], reg(ins, op[1].reg)[0])
         if m == "movhlps": return "XQ(%d,0)=XQ(%d,1);" % (reg(ins, op[0].reg)[0], reg(ins, op[1].reg)[0])
+        if m in ("punpcklbw", "punpckhbw", "punpcklwd", "punpckhwd"):   # byte/word interleave (the CRT fill path of the factory, 2026-09-28)
+            d = reg(ins, op[0].reg)[0]; s = xsrc(ins, op[1], "X")
+            lane, n, hi = ("b", 8, m.endswith("hbw")) if m.endswith("bw") else ("w", 4, m.endswith("hwd"))
+            o = n if hi else 0
+            return "t0=%s; t1=c->x[%d]; for (int k = 0; k < %d; k++) { c->x[%d].%s[2*k] = t1.%s[k+%d]; c->x[%d].%s[2*k+1] = t0.%s[k+%d]; }" % (
+                s, d, n, d, lane, lane, o, d, lane, lane, o)
         if m in ("unpcklps", "unpckhps", "unpcklpd", "unpckhpd", "punpckldq", "punpckhdq", "punpcklqdq", "punpckhqdq"):
             d = reg(ins, op[0].reg)[0]; s = xsrc(ins, op[1], "X")
             if m in ("unpcklps", "punpckldq"): return "t0=%s; t1=c->x[%d]; XU(%d,0)=t1.u[0]; XU(%d,1)=t0.u[0]; XU(%d,2)=t1.u[1]; XU(%d,3)=t0.u[1];" % (s, d, d, d, d, d)

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""jp8_lift_c.py -- C side (process B) of the lifted-render gate: ctypes-loads libjp8lift.so, maps the oracle's regions
-at the SAME addresses, loads the dumps, replays the judged drive of jp8_lift_seq through the LIFTED VOICE_WRAP /
-MASTER_WRAP, and compares every output word and the whole post-run heap with the oracle's. exit 0 = EXACTLY 0.
-No unicorn here (two-process rule). usage: jp8_lift_c.py <refdir> <libjp8lift.so>"""
+"""jp8_lift_c.py -- C side (process B) of the lifted-code gates, on DRIVE2: ctypes-loads libjp8lift.so, maps the
+oracle's regions at the SAME guest addresses (identity mmap, or host arenas in a JP8_RELOC build), loads the dumps,
+then replays the judged drive of jp8_lift_seq: every control-plane event is the list of top-level calls process A
+RECORDED from the oracle (entry, rcx, rdx, r8, r9, MXCSR, xmm1 float for SETSR), replayed verbatim through the LIFTED
+code -- nothing is re-derived here (plumbing only); renders call the lifted VOICE_WRAP x8 + MASTER_WRAP. Compares
+every output word, every recorded return value, the bump pointer, the whole post-run heap (and reports the stack).
+exit 0 = EXACTLY 0. No unicorn here (two-process rule). usage: jp8_lift_c.py <refdir> <libjp8lift.so>"""
 import sys, os, json, struct, ctypes, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import jp8_lift_seq as Q
@@ -13,100 +16,52 @@ lib=ctypes.CDLL(so)
 lib.jp8_map.argtypes=[ctypes.c_uint64,ctypes.c_uint64]; lib.jp8_map.restype=ctypes.c_int
 lib.jp8_load.argtypes=[ctypes.c_uint64,ctypes.c_char_p]; lib.jp8_load.restype=ctypes.c_int
 lib.jp8_call.argtypes=[ctypes.c_void_p,ctypes.c_uint64,ctypes.c_uint64,ctypes.c_uint64,ctypes.c_uint64,ctypes.c_uint64]; lib.jp8_call.restype=ctypes.c_int
-lib.jp8_alloc.argtypes=[ctypes.c_void_p]
 lib.jp8_last_trap.restype=ctypes.c_char_p
 lib.jp8_call_f.argtypes=[ctypes.c_void_p,ctypes.c_uint64,ctypes.c_uint64,ctypes.c_float]; lib.jp8_call_f.restype=ctypes.c_int
 lib.jp8_heap_set.argtypes=[ctypes.c_uint64,ctypes.c_uint64]; lib.jp8_heap_get.restype=ctypes.c_uint64
-DEBUG=os.environ.get("JP8_LIFT_DEBUG")
-if DEBUG and hasattr(lib,"jp8_trace_open"): lib.jp8_trace_open.argtypes=[ctypes.c_char_p]
-def trace_diff(oracle_path, c_path):
-    """compare the two per-instruction traces (rva + rax rcx rdx rbx xmm0.lo); print the first divergence"""
-    import capstone, pefile
-    o=open(oracle_path,"rb").read(); m=open(c_path,"rb").read(); REC=4+32+4
-    no,nm=len(o)//REC,len(m)//REC
-    pe=pefile.PE("/home/user/jn60c99/jp8/truth/JUPITER-8VST3_64bit.vst3"); IMG=pe.get_memory_mapped_image(); IB=pe.OPTIONAL_HEADER.ImageBase
-    md=capstone.Cs(capstone.CS_ARCH_X86,capstone.CS_MODE_64)
-    def ins(rva):
-        i=next(md.disasm(bytes(IMG[rva:rva+16]),IB+rva),None); return "%s %s"%(i.mnemonic,i.op_str) if i else "?"
-    for k in range(min(no,nm)):
-        ro=struct.unpack("<IQQQQI",o[REC*k:REC*k+REC]); rm=struct.unpack("<IQQQQI",m[REC*k:REC*k+REC])
-        if ro!=rm:
-            log("TRACE: %d instructions agree; divergence at step %d: oracle rva %x (%s) rax %x rcx %x rdx %x rbx %x xmm0 %08x | C rva %x (%s) rax %x rcx %x rdx %x rbx %x xmm0 %08x"%(
-                k,k,ro[0],ins(ro[0]),ro[1],ro[2],ro[3],ro[4],ro[5],rm[0],ins(rm[0]),rm[1],rm[2],rm[3],rm[4],rm[5]))
-            for j in range(max(0,k-6),k):
-                r=struct.unpack("<IQQQQI",o[REC*j:REC*j+REC]); log("   step %d: %x %s  rax %x rcx %x rdx %x rbx %x"%(j,r[0],ins(r[0]),r[1],r[2],r[3],r[4]))
-            return
-    log("TRACE: identical over %d steps (oracle %d, C %d)"%(min(no,nm),no,nm))
-CPU_SZ=512; R_OFF=0; RSP_OFF=4*8
-# rsp = the CALLER's stack pointer meta["rsp"]; jp8_call_x pushes the dummy return slot, so the callee enters at meta["rsp"]-8,
-# the oracle's entry rsp (jp8_emu.call). Until 2026-09-22 this was meta["rsp"]-8: every C frame sat 8 bytes low (PORT_LESSONS 12).
+if hasattr(lib,"jp8_hc_set"): lib.jp8_hc_set.argtypes=[ctypes.c_uint64]
+CPU_SZ=512; RSP_OFF=4*8; RAX_OFF=0; MX_OFF=16*8+16*16+5*4      # jp8_cpu.h CPU: r[16], x[16], zf sf cf of pf, mxcsr
 RELOC=hasattr(lib,"jp8_host")            # a JP8_RELOC build: guest addresses are translated to host arenas (jp8_cpu.h JP8_H)
 if RELOC: lib.jp8_host.argtypes=[ctypes.c_uint64]; lib.jp8_host.restype=ctypes.c_void_p
 def H(addr): return lib.jp8_host(addr) if RELOC else addr
 def rd(addr,n): return ctypes.string_at(H(addr),n)
 def wr(addr,b): ctypes.memmove(H(addr),b,len(b))
+def rq(addr): return struct.unpack("<Q",rd(addr,8))[0]
 mapped=False; bad_total=0
 for patch in Q.PATCHES:
     d=os.path.join(refdir,"p%02d"%patch); meta=json.load(open(os.path.join(d,"meta.json")))
+    assert meta.get("drive")=="drive2", "reference %s is not a drive2 reference"%d
     heap_len=meta["heap_end"]-Q.HEAP_BASE
     if not mapped:
-        regions=((Q.IMG_BASE,meta["img_size"]),(Q.HEAP_BASE,0x8000000),(Q.STACK_BASE,Q.STACK_SIZE),(Q.BUF_BASE,Q.BUF_SIZE))
+        regions=((Q.IMG_BASE,meta["img_size"]),(Q.HEAP_BASE,Q.HEAP_MAP),(Q.STACK_BASE,Q.STACK_SIZE),(Q.BUF_BASE,Q.BUF_SIZE))
         if RELOC: regions=((0,0x100000),)+regions      # band 0 = the oracle's page 0 (gs base 0); the identity path mirrors it at BUF+0x20000
         for base,size in regions:
             if lib.jp8_map(base,size): sys.exit("cannot map 0x%x"%base)
         mapped=True
-    assert heap_len<=0x8000000, "heap larger than the mapped 128 MB"
+    assert heap_len<=Q.HEAP_MAP, "heap larger than the mapped region"
+    ctypes.memset(H(Q.HEAP_BASE),0,Q.HEAP_MAP)
     lib.jp8_load(Q.IMG_BASE,os.path.join(d,"img.bin").encode()); lib.jp8_load(Q.HEAP_BASE,os.path.join(d,"heap_pre.bin").encode())
-    if os.path.exists(os.path.join(d,"stack.bin")): lib.jp8_load(Q.STACK_BASE,os.path.join(d,"stack.bin").encode())   # PORT_LESSONS 12
+    lib.jp8_load(Q.STACK_BASE,os.path.join(d,"stack.bin").encode())            # PORT_LESSONS 12
     ctypes.memset(H(Q.BUF_BASE),0,Q.BUF_SIZE)
-    if os.path.exists(os.path.join(d,"page0.bin")): wr(0 if RELOC else Q.GS_BASE,open(os.path.join(d,"page0.bin"),"rb").read())
-    lib.jp8_heap_set(meta.get("heap_ptr0",meta["heap_end"]),Q.HEAP_BASE+0x8000000)
-    if hasattr(lib,"jp8_hc_set"): lib.jp8_hc_set.argtypes=[ctypes.c_uint64]; lib.jp8_hc_set(meta.get("hc0",0x9000))
+    wr(0 if RELOC else Q.GS_BASE,open(os.path.join(d,"page0.bin"),"rb").read())
+    lib.jp8_heap_set(meta["heap_ptr0"],Q.HEAP_BASE+Q.HEAP_MAP)
+    if hasattr(lib,"jp8_hc_set"): lib.jp8_hc_set(meta["hc0"])
     wr(Q.PAIR_V,struct.pack("<QQ",Q.OUT_M,Q.OUT_S)); wr(Q.PAIR_M,struct.pack("<QQ",Q.OUT_L,Q.OUT_R))
     wr(Q.A2,b"".join(struct.pack("<QQ",Q.VOUT+8*v,Q.VOUT+8*v+4) for v in range(8)))
     cpu=ctypes.create_string_buffer(CPU_SZ); cp=ctypes.addressof(cpu)
     ref=open(os.path.join(d,"words.bin"),"rb").read(); got=bytearray(); state=meta["state"]
-    trap=None; first=[]
-    def call(rva,rcx,rdx,r8,r9=0):
+    trap=None; bad=0; mx=[meta.get("mx0",0x9FC0)]
+    def enter(mxcsr):
+        """the oracle's call(): MXCSR written, rsp = the fixed caller rsp, the RET sentinel at [rsp-8]"""
         ctypes.memmove(cp+RSP_OFF,struct.pack("<Q",meta["rsp"]),8)
+        ctypes.memmove(cp+MX_OFF,struct.pack("<I",mxcsr),4)
+        wr(meta["rsp"]-8,struct.pack("<Q",Q.RET))
+    def call(rva,rcx,rdx,r8,r9=0,mxcsr=None):
+        enter(mx[0] if mxcsr is None else mxcsr)
         return lib.jp8_call(cp,rva,rcx,rdx,r8,r9)
-    for ev,arg in Q.events():
+    for k,((ev,arg),rec) in enumerate(zip(Q.events(),meta["calls"])):
         if trap: break
-        if ev=="build":
-            # jp8_emu.build(): HOST = bump(0x8000) zeroed, then BUILD(HOST); state/proc/assign read from the HOST record
-            host=lib.jp8_heap_get(); ctypes.memmove(cp+RSP_OFF,struct.pack("<Q",meta["rsp"]),8)
-            lib.jp8_alloc  # (the runtime bumps through jp8_alloc; here the harness bumps the HOST block the same way)
-            class _C(ctypes.Structure): _fields_=[("r",ctypes.c_uint64*16)]
-            cc=_C.from_address(cp); cc.r[1]=0x8000; lib.jp8_alloc(cp); host=cc.r[0]
-            if host!=meta["host"]: log("HOST differs: oracle 0x%x C 0x%x"%(meta["host"],host)); bad_total+=1
-            if call(Q.BUILD,host,0,0): trap=lib.jp8_last_trap().decode(); continue
-            state=[struct.unpack("<Q",rd(host+0xA0+64*i,8))[0] for i in range(9)]
-            if state!=meta["state"]: log("state pointers differ: oracle %s C %s"%(["%x"%x for x in meta["state"]],["%x"%x for x in state]))
-        elif ev=="setsr":
-            ctypes.memmove(cp+RSP_OFF,struct.pack("<Q",meta["rsp"]),8)
-            if lib.jp8_call_f(cp,Q.SETSR,meta["host"],arg): trap=lib.jp8_last_trap().decode()
-        elif ev=="hostinit":
-            for hid,val in Q.hostinit_values({int(k):v for k,v in meta["host_map"].items()}):
-                if call(Q.HOSTPARAM,meta["host"],hid,val): trap=lib.jp8_last_trap().decode(); break
-        elif ev=="noteon":
-            if call(Q.NOTEON,meta["host"],arg,100): trap=lib.jp8_last_trap().decode()
-        elif ev=="noteoff":
-            if DEBUG and hasattr(lib,"jp8_trace_open"): lib.jp8_trace_open(os.path.join(d,"trace_noteoff_c.bin").encode())
-            rc=call(Q.NOTEOFF,meta["host"],arg,64)
-            if DEBUG and hasattr(lib,"jp8_trace_open"):
-                lib.jp8_trace_close()
-                if os.path.exists(os.path.join(d,"trace_noteoff.bin")): trace_diff(os.path.join(d,"trace_noteoff.bin"),os.path.join(d,"trace_noteoff_c.bin"))
-            if rc: trap=lib.jp8_last_trap().decode()
-        elif ev=="recall":
-            vals=Q.recall_values(arg)
-            for u in range(9):
-                for pid,val in vals:
-                    if call(Q.DISPATCH,meta["proc"][u],pid,0,val): trap=lib.jp8_last_trap().decode(); break
-                if trap: break
-            for u in range(9):
-                if trap: break
-                if call(Q.ASG_NOTIFY,meta["assign"][u],4,0): trap=lib.jp8_last_trap().decode()
-        elif ev=="render":
+        if ev=="render":
             for s in range(arg):
                 for v in range(8):
                     wr(Q.OUT_M,b"\0"*8); wr(Q.PAIR_V,struct.pack("<QQ",Q.OUT_M,Q.OUT_S))
@@ -116,16 +71,34 @@ for patch in Q.PATCHES:
                 wr(Q.OUT_L,b"\0"*8); wr(Q.PAIR_M,struct.pack("<QQ",Q.OUT_L,Q.OUT_R))
                 if call(Q.MASTER_WRAP,state[8],Q.A2,Q.PAIR_M): trap=lib.jp8_last_trap().decode(); break
                 got+=rd(Q.OUT_L,8)
-    bad=0
+            mx[0]=meta["mx_after"][k]; continue
+        for c in rec:                                   # the oracle's own top-level calls for this event, verbatim
+            mx[0]=c["mx"]
+            if "xmm1" in c:
+                enter(c["mx"]); rc=lib.jp8_call_f(cp,c["fn"],c["rcx"],struct.unpack("<f",struct.pack("<I",c["xmm1"]))[0])
+            else:
+                rc=call(c["fn"],c["rcx"],c["rdx"],c["r8"],c["r9"],c["mx"])
+            if rc: trap="%s (event %s, call rva 0x%x)"%(lib.jp8_last_trap().decode(),ev,c["fn"]); break
+            rax=struct.unpack("<Q",ctypes.string_at(cp+RAX_OFF,8))[0]
+            if rax!=c["rax"]:
+                log("patch %d: event %s call rva 0x%x returned 0x%x, oracle 0x%x"%(patch,ev,c["fn"],rax,c["rax"])); bad+=1
+        if ev=="build" and not trap:
+            host=meta["host"]
+            st=[rq(host+0xA0+64*i) for i in range(9)]
+            if st!=meta["state"]: log("patch %d: state pointers differ"%patch); bad+=1
+            state=st
+        mx[0]=meta["mx_after"][k]                       # the MXCSR the oracle's next call runs at (set_ftz inside 'build')
     if trap: log("patch %d: %s after %d words"%(patch,trap,len(got)//4)); bad+=1
     nw=min(len(ref),len(got))
     diffs=[i//4 for i in range(0,nw,4) if ref[i:i+4]!=got[i:i+4]]
-    if len(ref)!=len(got): bad+=1
+    if len(ref)!=len(got): bad+=1; log("patch %d: %d words, oracle %d"%(patch,len(got)//4,len(ref)//4))
     if diffs:
         bad+=len(diffs)
         for i in diffs[:6]:
             per=18; smp=i//per; k=i%per; who="voice %d %s"%(k//2,"main" if k%2==0 else "sub") if k<16 else ("L" if k==16 else "R")
             log("patch %d: word %d (sample %d, %s) oracle %08x C %08x"%(patch,i,smp,who,struct.unpack("<I",ref[4*i:4*i+4])[0],struct.unpack("<I",got[4*i:4*i+4])[0]))
+    hp=lib.jp8_heap_get()
+    if hp!=meta["heap_final"]: log("patch %d: bump pointer C 0x%x oracle 0x%x"%(patch,hp,meta["heap_final"])); bad+=1
     post=open(os.path.join(d,"heap_post.bin"),"rb").read(); mine=rd(Q.HEAP_BASE,heap_len)
     if post!=mine:
         nd=0; shown=0
@@ -138,7 +111,11 @@ for patch in Q.PATCHES:
                         if st<=a<st+0xA9C0C0: where="state[%d]+0x%x"%(u,a-st)
                     log("patch %d: state differs at %s: oracle %s C %s"%(patch,where,post[off:off+4].hex(),mine[off:off+4].hex())); shown+=1
         bad+=nd; log("patch %d: %d heap dwords differ"%(patch,nd))
-    log("patch %d: %d output words (%d differ), heap %s -> %s"%(patch,nw,len(diffs),"EXACT" if post==mine else "DIFFERS","PASS" if not bad else "FAIL"))
+    spost=open(os.path.join(d,"stack_post.bin"),"rb").read(); smine=rd(Q.STACK_BASE,Q.STACK_SIZE)
+    sd=0 if spost==smine else sum(1 for off in range(0,Q.STACK_SIZE,4) if spost[off:off+4]!=smine[off:off+4])
+    log("patch %d: %d output words (%d differ), %d recorded calls replayed, heap %s, stack %s -> %s"%(
+        patch,nw,len(diffs),sum(len(c) for c in meta["calls"]),"EXACT" if post==mine else "DIFFERS",
+        "EXACT" if not sd else "%d dwords differ (reported, not graded)"%sd,"PASS" if not bad else "FAIL"))
     bad_total+=bad
-print("JP8 LIFT A/B (layer %s): %s"%(Q.LAYER,"EXACTLY 0 -- every output word and every heap byte match on patches %s"%Q.PATCHES if not bad_total else "%d differences -- NOT bit-exact"%bad_total))
+print("JP8 LIFT A/B (layer %s, drive2): %s"%(Q.LAYER,"EXACTLY 0 -- every output word, return value and heap byte match on patches %s"%Q.PATCHES if not bad_total else "%d differences -- NOT bit-exact"%bad_total))
 sys.exit(0 if not bad_total else 1)

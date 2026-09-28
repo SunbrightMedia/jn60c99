@@ -1,4 +1,4 @@
-# JP8 S3_STATUS.md -- JUPITER-8 PLUG-OUT .vst3 -> C99 port (step 5 layers 1-3 GREEN on the OLD drive; D7: the drive never built the HOST -- being replaced)
+# JP8 S3_STATUS.md -- JUPITER-8 PLUG-OUT .vst3 -> C99 port (drive2 = the plugin's own construction; lift gates on drive2; template exported; engine + full-chain gate next)
 Repo layout (moved from the ephemeral scratchpad 2026-09-22): `jp8/truth/` (checksummed, clean names,
 SHA256SUMS), `jp8/tools/` (oracle `jp8_emu.py` + probes; every `gen/*.py` named below now lives here),
 `jp8/logs/` (every log named below), `jp8/docs/` (this file, `abi_ledger.md/.json`), `jp8/gen/params.tsv`,
@@ -18,6 +18,47 @@ Labels: PROVEN = executed under Unicorn on the plugin's own code; READ = static 
 | 5 | Transcribe (layers 1-2: render + note path; recall path) | GREEN 2026-09-22: no IDA dump exists for the JP8, so `jp8_lift.py` LIFTS the machine code mechanically (x86-64 -> C99, one statement per instruction, jp8/src/jp8_lift.c: 270 functions / 79535 instructions from VOICE_WRAP 0x3F80B0, MASTER_WRAP 0x3F8040, NOTEON 0x445CF0, NOTEOFF 0x445C90, DISPATCH 0x437630, ASG_NOTIFY 0x37CD80 + every indirect target the TB-flushed dynamic reach saw; 228 trap sites = AVX/CRT-dispatch paths never reached, a trap turns the gate red). Gate `jp8_lift_gate.sh` (JP8_LIFT_LAYER=render): the C twin maps the oracle's regions at the SAME addresses, loads the post-warm-up dumps and replays the judged event list -- 64 samples held, NOTEON 67, 64 more, NOTEOFF 60+67, 64 release -- on patches 2, 63, 10, 0: 13,824 output words (8 voices main/sub + master L/R x 192 samples) and the whole 102.8 MB heap EXACTLY 0 on every patch (logs/lift_gate_layer1.log). TOOTH: `--tooth 0x3965cb` (the VCO1 RANGE addss -> subss) FAILS: "patch 63: state differs at state[0]+0x1170: oracle 913db6bc C b1ddf03d", 122 differences. Reach stated: key 60 (+67), 44100, 256 warm samples, 192 judged, 4 patches, every heap byte. LAYER 2 GREEN (JP8_LIFT_LAYER=recall, logs/lift_gate_layer2_recall.log): from the booted patches 2 and 63 the C twin recalls patch 5 through the LIFTED DISPATCH (64 pools x 9 units, flag 0, engine frame) + ASG_NOTIFY x 9, renders 512 samples so the plugin's own walker settles the ramps, then NOTEON 60 / 64 samples / NOTEOFF / 64: 46,080 output words and the whole heap EXACTLY 0 on both; its own TOOTH (--tooth 0x38633e, the FINE TUNE setter's + 0.0003, reachable only through DISPATCH) FAILS with 9,292 differences -- the render tooth is a no-op on a RANGE-3 patch, so each layer carries its own tooth (jp8_lift_seq.TOOTH). | PROVEN (EXACTLY 0) |
 | 5 | Transcribe (layer 3: the hosted boot) | GREEN 2026-09-22 (logs/lift_gate_layer3_boot.log, job jp8_L3gate3): from the POST-STATIC-INIT image the C twin runs the lifted BUILD 0x445020 -> SETSR 0x4464F0 (float xmm1, 44100) -> host_init through HOSTPARAM 0x4465B0 -> recall of patch 5 through DISPATCH (flag 0) + ASG_NOTIFY -> 2200 samples (no snap: the plugin's own walker settles) -> NOTEON 60 / 64 / NOTEOFF / 64, on boot patches 2 and 63: 167,616 output words and the whole heap EXACTLY 0. Lift: 762 functions, 156,488 instructions, 280 trap sites (none reached). TOOTH (FINE TUNE setter + 0.0003 at 0x38633e): FAILS with 432 differences, first at state[0]+0x1480. Two harness defects paid on the way (PORT_LESSONS 12): the stack is state (BUILD copies static-init stack residue into 8 voice records) and the C side entered every call 8 bytes below the oracle's rsp. | PROVEN (EXACTLY 0) |
 
+## ⚑ RESUME HERE (written 2026-09-28 when the chat was retired; everything below this block is the dated record)
+**Where it stands (each line has its log):**
+- ORACLE = DRIVE2 (`jp8_emu.JP8()` default; `legacy=True` only reproduces old logs): HOST from the FACTORY 0x444FE0
+  (ALLOC 0x8D0 + ctor 0x444000), BUILD, FTZ, SETSR(float xmm1), host_init (host ids 0,1,2 through HOSTPARAM), recall through
+  HOSTPARAM per pool (host id from the executed std::map, RAW bank value), NO snap, NO latch clear. Step-4 control on it:
+  idle master 1.57e-13, dry 0, NaN 0, 0 live and 0 total bad ramps (bench logs of jp8_ref_d2_*; `CONTROL` lines in the refs).
+- 64-patch listen sweep on drive2: 51/64 PASS (SWEEP_44100_DRIVE2.md); triage PARTIAL — 6 FAIL rows explained by their own
+  confound, 8 OPEN, patch 26's release not decaying is the one to check first (its "## Triage" section).
+- LIFT GATES ON DRIVE2 (control plane RECORDED in process A and replayed verbatim in process B, PORT_LESSONS 15):
+  layer 1 render: EXACTLY 0 on patches 2,63,10,0 (13,824 words each), heap + stack EXACT; tooth 0x3965cb bites (96 diffs)
+  -> logs/lift_gate_layer1_drive2.log. Layer 2 recall (recall of patch 0, LFO KEY TRIG = 1, through HOSTPARAM, 66 recorded
+  calls): EXACTLY 0 on 2,63 (46,080 words each), heap + stack EXACT; tooth 0x38633e bites (10,699 diffs)
+  -> logs/lift_gate_layer2_recall_drive2.log. Layer 3 boot (factory -> BUILD -> SETSR -> host_init -> recall 5 -> 2200
+  samples -> note): EXACTLY 0 on 2,63 (167,616 words each; 72 recorded calls = FACTORY, BUILD, SETSR, 3 host_init, 64 recall,
+  note on/off), heap + stack EXACT; tooth 0x38633e bites (3,304 diffs) -> logs/lift_gate_layer3_boot_drive2.log (job
+  jp8_gates_d2b, EXIT 0, 2026-09-28; the first run trapped at 0x72fd53 punpcklbw in the factory path, PORT_LESSONS 17).
+  NOT YET: a HOST tooth (corrupt the constructed [HOST+8] on the C side; must fail) and the 64-patch reach on drive2.
+  Lift: 769 functions, 156,870 instructions, 282 trap sites; roots in jp8_lift_seq.ROOTS (now incl. the factory 0x444FE0);
+  dyn reach = build/jp8_lift/dynreach_d2.json (2,63,10,0,24 --recall 0) + dynreach_boot_d2.json (2,63 --recall 5 --boot),
+  (build/ is not in git: jp8_lift_gate.sh regenerates both with jp8_dynreach.py, block hook, ~90-170 s each). Run all three: `sh tools/run_job.sh jp8_gates sh jp8/tools/jp8_lift_gates_all.sh`.
+- TEMPLATE (step 6): `jp8/tools/jp8_template_export.py` -> jp8/gen/jp8_template.bin.gz (5.76 MB; raw 14.8 MB, sha256 in
+  jp8_template.sha256): post-static-init image (whole mapping as oracle memory), heap [base, 0x3100304a0), stack residue
+  (60 KB), page 0, scalars (heap_ptr0 0x3100304a0, hc0 0x9020, rsp, RET 0x105000, static 841 ok / 0 fail / 3 skipped /
+  1 fault). Self-check byte-identical; tooth bites (crc, and the region compare with the crc re-sealed). The one oracle
+  page outside the template (0x2b992ddfa000, a static-init stray) is NOT carried. jp8/gen/jp8_recall_tab.h/.json = the
+  ORACLE's own recorded HOSTPARAM calls: host_init {0:1, 1:10, 2:100} and 64 pools x 64 patches in call order.
+
+**Next, in order (tasks carried over from the retired chat):**
+1. Add the HOST tooth to the boot layer (seen to fail). Then the 64-patch reach on drive2:
+   `sh tools/run_job.sh jp8_reach64 sh jp8/tools/jp8_lift_reach.sh` -> logs/lift_reach64_drive2.log (~80 min).
+2. The self-booting engine: jp8/src/jp8.h + jp8_engine.c (SHIPPING_DESIGN.md report C section 2, CORRECTED for drive2:
+   no snap; build = replay FACTORY then BUILD at MXCSR 0x1F80, then 0x9FC0; host_init + recall from jp8_recall_tab.h;
+   render = the per-sample wrap calls with the stub's pointer layout; JP8_RELOC lane; setjmp -> JP8_E_TRAP, never abort).
+3. Full-chain gate (step 7): jp8_full_seq/emu/c + jp8_full_gate.sh — Control 1 (post-init hash == oracle), Run A (oracle
+   chunking, words + end hash EXACT), Run B (random chunks), teeth T1 note skew, T2 lift tooth 0x38633e, T3 a HOST tooth
+   (corrupt the constructed [HOST+8] on the C side), T4 template without the stack. 4 patches, then 64 via run_job.
+4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
+5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
+   done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),
+   10-12 (imports, static-init faults, reach: velocity lane, pitch bend, param changes). Then web shell (offline first).
+
 ## Cost (instructions per host sample, UC_HOOK_CODE after ctl_flush_tb, 32-sample windows; PROVEN on this oracle)
 | patch @ rate | idle | sustain | log |
 |---|---|---|---|
@@ -34,7 +75,7 @@ S3 verdict (1 x86 instr ~ 1.75 S3 cycles, calibration INFERRED; budget 10,000 cy
 a bit-exact 8-voice JP8 is ~1 voice per S3. Same class as the JUNO exact engine (CLAUDE.md: two chips cannot run it).
 
 ## Defects, each with its resolution
-- D7 (OPEN 2026-09-22, CRITICAL, found by the design workflow's skeptic; jp8/docs/SHIPPING_DESIGN.md item 1, probes in
+- D7 (RESOLVED in the oracle 2026-09-22/23 = DRIVE2; the lift gates moved onto it 2026-09-23/28 -- see RESUME HERE. Found by the design workflow's skeptic; jp8/docs/SHIPPING_DESIGN.md item 1, probes in
   jp8/work/design/hostctor.py): THE ORACLE NEVER CONSTRUCTS THE HOST. jp8_emu.build() hands BUILD a zero-filled 0x8000 bump
   block; the plugin's processor (0x33a8db) calls factory 0x444fe0 = ALLOC(0x8D0) + ctor 0x444000, which writes [HOST+8] =
   96000.0 (base ctor 0x36c890), [HOST+0x38] = 8 and the vtable, and only then BUILD. BUILD copies [HOST+8] into every
@@ -115,14 +156,16 @@ Not the port's final shape: the C twin runs on the oracle's 103 MB address-space
 template needs the state blocks compacted and pointer cells relocated (the JX's lesson 8) -- a later layer.
 
 ## Files (jp8/tools/)
-jp8_emu.py (oracle; recall flag 0 in the engine frame), jp8_listen2.py (step-4 proof, JX law), jp8_sweep.py + jp8_sweep_collect.py
+DRIVE2 lift quartet: jp8_lift_seq.py (shared drive), jp8_lift_emu.py (oracle + call recorder), jp8_lift_c.py (replay +
+compare), jp8_lift_gate.sh / jp8_lift_gates_all.sh / jp8_lift_reach.sh, jp8_dynreach.py (block-hook reach), jp8_lift.py (the
+lifter), jp8_template_export.py (template + recorded recall table). Older: jp8_emu.py (oracle; drive2 default), jp8_listen2.py (step-4 proof, JX law), jp8_sweep.py + jp8_sweep_collect.py
 (64-patch sweep worker + SWEEP_44100.md builder), jp8_d4_law.py (RANGE/FINE/SUB law tables from the cells), jp8_d4_probe.py
 (execution proof vs the engine's own pitch cells, early + late windows), jp8_d4_trace.py / jp8_param_census.py (dispatch write
 hooks: parameter -> cell), jp8_d4_flag.py / jp8_d4_ramp.py / jp8_d4_spec.py / jp8_d4_bisect.py (D6 evidence), jp8_probe.py
 (set / windows / tail / tailfx), jp8_d2.py, jp8_srtrace.py, jx_ctrl.py, jp8_bank.py + jp8_bank_census.py, abi_ledger.md/.json,
 gen/params.tsv, work/fn_3f8240.asm, work/dis_full.py, work/dis_func.py.
 
-## Next
+## Next (2026-09-22, SUPERSEDED by RESUME HERE)
 1. Sweep verdict into this page when the job (bench/jobs/jp8_sweep44100, EXIT file) ends; every FAIL triaged against the confound
    list in its log before it is called an engine defect.
 2. Step 5 layers after the render+note path and the recall path: SETSR/BUILD (construction -> a compact template instead of the
@@ -130,9 +173,6 @@ gen/params.tsv, work/fn_3f8240.asm, work/dis_full.py, work/dis_func.py.
    and note), then step 6-8 (template export, full-chain gate, web shell).
 3. 48 kHz: the host resampler path (RENDER 0x445DC0, D3) is a later layer; the target rate law is the 44100 NATIVE constant set.
 
-## STOP RECORD (2026-09-22, user order "STOP AND SAVE ALL WORK, usage 95%")
-Committed AS-IS, mid-gate. Layers 1 and 2 are GREEN (commits 6759ae8, 1128339). In flight when stopped, NOT green, NOT believed:
-- step 5 layer 3 (boot path): jp8_lift_gate.sh was running (logs/lift_gate_layer3_boot.log, unfinished); jp8_rt.c / jp8_lift_emu.py / jp8_lift_c.py carry the handle-counter plumbing (jp8_hc_set) that was being added.
-- 64-patch listen sweep at 44100: 46 of 64 patch logs in logs/sweep44100/ (EXIT 130 = killed, not a verdict). Resume: rerun jp8_sweep_job.sh for the missing patches.
-- 64-patch lift reach gate (logs/lift_reach64.log, EXIT 130 = killed).
-Resume order: finish the layer-3 gate (must be EXACTLY 0 + tooth), then the sweep + reach, then update the table above. Nothing in this record is PROVEN.
+## STOP RECORD (2026-09-22) -- SUPERSEDED
+Everything it listed was finished or replaced: layer 3 went GREEN on the old drive (logs/lift_gate_layer3_boot.log), the
+old-drive sweep and reach completed (SWEEP_44100.md, logs/lift_reach64.log), and then D7 retired that drive. See RESUME HERE.

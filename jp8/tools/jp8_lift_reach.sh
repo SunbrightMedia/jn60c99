@@ -1,10 +1,10 @@
 #!/bin/sh
 # jp8_lift_reach.sh -- the REACH of the lifted code (charter section 5): every factory patch through the layer-1 drive
 # (render + note path), one patch at a time through the SAME oracle/C pair as jp8_lift_gate.sh (the library must already be
-# built by the gate). One verdict line per patch into jp8/logs/lift_reach64.log; exit 0 only when all 64 are EXACTLY 0.
+# built by the gate). One verdict line per patch into jp8/logs/lift_reach64_drive2.log (drive2); exit 0 only when all 64 are EXACTLY 0.
 #   sh tools/run_job.sh jp8_lift_reach64 sh jp8/tools/jp8_lift_reach.sh
 set -u
-HERE="$(cd "$(dirname "$0")" && pwd)"; REPO="$(cd "$HERE/../.." && pwd)"; OUT="$REPO/build/jp8_lift"; LOG="$REPO/jp8/logs/lift_reach64.log"
+HERE="$(cd "$(dirname "$0")" && pwd)"; REPO="$(cd "$HERE/../.." && pwd)"; OUT="$REPO/build/jp8_lift"; LOG="$REPO/jp8/logs/lift_reach64_drive2.log"
 export JP8_LIFT_LAYER=render JP8_EMU_QUIET=1
 : > "$LOG"; ok=0
 for p in $(seq 0 63); do

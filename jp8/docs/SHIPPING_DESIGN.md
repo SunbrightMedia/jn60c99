@@ -1,5 +1,9 @@
 # JP8 SHIPPING DESIGN -- workflow reports (2026-09-22)
 
+> ⚑ 2026-09-28: the skeptic's item 1 was adopted (DRIVE2). Every "snap" / "zero HOST" / "DISPATCH recall" step in reports A-C is
+> SUPERSEDED: build the HOST with the factory, recall through HOSTPARAM, no snap. The engine plan to follow is report C section 2
+> with those corrections — see S3_STATUS.md "RESUME HERE".
+
 Four agents (boot memory census, lifter relocation/WASM/C99 audit, JX shipping mirror, adversarial skeptic), read-only on the repo;
 their scratch probes are preserved in `jp8/work/design/`. The SKEPTIC's item 1 (the HOST is never constructed) supersedes the
 snap-based plans in reports A and C. Labels as written by the agents.

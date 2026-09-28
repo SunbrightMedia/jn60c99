@@ -97,3 +97,21 @@ lessons 1-11 all still apply; these are the ones the JP8 added.
     at rate 0. The old recipe's snap + latch clear hid it. Rule: before any layer gate, run the step-4 listen proof on
     the SAME drive the gate uses, and build every object the plugin's own entry path builds (read the call site that
     creates it; never hand an entry a zero-filled block because "it did not crash").
+
+15. **Record the control plane, never re-derive it** (2026-09-23, drive2 lift gates). The first lift gates computed the
+    host_init list and the recall list in Python on BOTH sides (`jp8_lift_seq.hostinit_values/recall_values`) — a law the
+    harness computes twice is a law the gate cannot see (playbook 101 rule 4). Now process A wraps `jp.call` and records
+    every top-level call the oracle makes for each control event (entry, rcx, rdx, r8, r9, MXCSR, the xmm1 float of SETSR,
+    rax) plus the MXCSR after each event; process B replays that list verbatim and also compares every return value, the
+    bump pointer, the heap and the stack. Result on drive2: layers 1-2 EXACTLY 0 with the stack EXACT too.
+
+16. **A dynamic reach needs a BLOCK hook, not a code hook** (2026-09-23). BUILD alone runs 49 M translation blocks; a
+    Python per-instruction hook over the factory + BUILD is hours. A TB ends at every branch, so the previous block's
+    last instruction is the indirect site and the current block start its target; the executed set is every instruction
+    of every executed block (disassembly cached per (address, size)). Same facts, 90-170 s per run
+    (jp8_dynreach.py; TB flush before hook_add still applies, lesson 8).
+
+17. **The factory reaches CRT code the render never does** (2026-09-28). The first drive2 boot gate trapped at 0x72fd53
+    `punpcklbw` (a byte-fill path under the factory's 150,033 allocations): the trap did its job (RED, named the site).
+    The lifter now emits punpckl/hbw and punpckl/hwd. Rule: a new entry root brings new instruction classes; run the gate,
+    read the trap, add the instruction, re-run all layers.

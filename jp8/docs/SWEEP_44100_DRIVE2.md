@@ -74,3 +74,28 @@ E = early window (1024..17408 after note-on), L = late window (49152..65536); re
 | 61 | 1981 Flute | PASS | 48:+1204c(E) 60:+1199c(E) 72:+1199c(L) | 0.89 0.84 0.81 | 1.57e-13 | 0 | 0 | 25159/24541 | - |
 | 62 | 1981 Whistle | PASS | 48:+2401c(E) 60:+2398c(E) 72:+2400c(E) | 0.96 0.96 0.95 | 1.57e-13 | 0 | 0 | 25031/24579 | - |
 | 63 | 1981 Chime | PASS | 48:+19c(E) 60:+12c(E) 72:+6c(E) | 0.90 0.91 0.91 | 1.57e-13 | 0 | 0 | 31164/30663 | CROSS MOD 97; ENV REL 223/157 |
+
+## Triage (drive2) — PARTIAL, recorded 2026-09-28 (the chat that ran it was retired; nothing below was re-run)
+Method: `jp8/logs/drive2/triage_spec.txt` — each override = the ENGINE DB default of a confound named in the row, written
+through HOSTPARAM (the recall's own path), never a value tuned to pass. One log per line in `jp8/logs/drive2/triage_*.log`.
+
+| patch | override (engine id = raw) | result | reading |
+|---|---|---|---|
+| 0 | VCO ENV MOD 776=128 | PASS | confound explained: the pitch envelope (D4) |
+| 24 | LFO->VCO 753=128 | PASS (753=0: 3 FAIL) | confound explained: LFO pitch modulation (128 = neutral) |
+| 39 | LFO->VCO 753=128 | PASS (753=0: 1 FAIL) | confound explained: LFO pitch modulation |
+| 41 | VCO ENV MOD + SYNC off 776=128, 768=0 | PASS | confound explained: envelope + sync |
+| 44 | VCO ENV MOD + ENV2 REL 776=128, 792=0 | PASS | confound explained: envelope; release PASS with ENV2 REL 0 |
+| 63 | CROSS MOD 761=0 (was a PASS row) | PASS | control |
+| 1 | FINE TUNE 766=128 | 1 FAIL (key 48, harmonic 0.75) | OPEN — pitch within cents; the law's harmonicity bar at key 48 |
+| 7 | CROSS MOD, LOW FREQ, PORTA off | 3 FAIL (f0 +1200 c, engine cell dev 2195 c) | OPEN — detector vs engine cell disagree |
+| 12 | SYNC off 768=0 | 3 FAIL (-2405 c vs cell dev 3604 c) | OPEN |
+| 13 | SYNC + PORTA off | 3 FAIL | OPEN |
+| 26 | ENV MOD, PORTA, LFO->VCO, RES off | 9 FAIL, RELEASE DOES NOT DECAY (dry 0.144 -> 0.161; 3 s tail dry 0.098) | OPEN — the one row that may not be a listen-law confound; check first |
+| 27 | CROSS MOD 761=0 | 3 FAIL (-1177..-1224 c, a slow drift) | OPEN |
+| 34 | CROSS MOD 761=0 | 3 FAIL (-2397 c, harmonic 0.76) | OPEN |
+| 56 | VCO ENV MOD 776=128 | 3 FAIL (+1205 c, harmonic 0.78) | OPEN |
+
+Rule for the next session (PORT_LESSONS 14): the lift gates grade C == oracle; they do not grade oracle == plugin. Resolve
+patch 26's release first (read which unit/cell keeps sounding, by cells, not by ear), then the pitch rows against the
+engine's own pitch cells over the same window (PORT_LESSONS 2-3).
