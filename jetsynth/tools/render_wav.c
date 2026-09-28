@@ -8,7 +8,7 @@
 #include "../src/jet.h"
 
 static const char *NAMES[JET_NPARAM] = {"throttle", "spool", "speed", "angle",
-                                        "distance", "size", "space", "boost"};
+                                        "distance", "size", "space", "boost", "character"};
 typedef struct { double t; int p; float v; } ev_t;
 
 static int parse(const char *s, ev_t *e)

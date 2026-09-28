@@ -19,6 +19,10 @@
  *   SIZE      engine scale 0.5x .. 2x. Rotor and jet frequencies scale 1/size
  *             (geometric similarity), level +20 log size, core does not move.
  *   SPACE     amount of JUNO chorus (air turbulence), delay (echo) and reverb.
+ *   CHARACTER real engine (0) .. movie engine (1). Raises the fan whine and
+ *             buzz-saw above the roar (at the source they sit 15-40 dB under
+ *             it), and adds jet crackle (power- and aft-angle-dependent),
+ *             sub rumble, large-eddy pulsing and a compressor whine.
  * Plus one performance input, BOOST (0/1): while held, the throttle target is
  * full power -- a drum-like hit whose attack is set by SPOOL.
  */
@@ -27,7 +31,7 @@
 
 enum {
     JET_THROTTLE, JET_SPOOL, JET_SPEED, JET_ANGLE, JET_DISTANCE, JET_SIZE,
-    JET_SPACE, JET_BOOST, JET_NPARAM
+    JET_SPACE, JET_BOOST, JET_CHARACTER, JET_NPARAM
 };
 
 void  jet_init(float sample_rate);

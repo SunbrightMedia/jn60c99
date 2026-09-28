@@ -19,11 +19,11 @@
 #define JET_NBUZZ   48            /* shaft orders 1..48, BPF multiples skipped */
 #define FAN_D       1.1948f       /* fan diameter, m (deck)                  */
 #define C0          340.294f      /* pyNA sea-level speed of sound           */
-#define REF_DB      132.0f        /* SPL that maps to digital rms 1.0        */
+#define REF_DB      140.0f        /* SPL that maps to digital rms 1.0        */
 #define PI_F        3.14159265f
 
 static float SR = 48000.0f;
-static float P[JET_NPARAM] = {0.35f, 0.35f, 0.0f, 0.35f, 0.25f, 0.5f, 0.35f, 0.0f};
+static float P[JET_NPARAM] = {0.35f, 0.35f, 0.0f, 0.35f, 0.25f, 0.5f, 0.35f, 0.0f, 0.6f};
 
 /* ---------------------------------------------------------------- state */
 typedef struct { float b0, a1, a2, x1, x2, y1, y2, g, gstep; } band_t;
@@ -35,6 +35,11 @@ static float   buzz_w[JET_NBUZZ];            /* per-order blade irregularity */
 static float   spool = 0.30f;                /* TS the engine is actually at */
 static unsigned rng = 0x9E3779B9u;
 static float   lf1, lf2;                     /* slow turbulence processes    */
+/* CHARACTER layer */
+static float   flut, flut_g, flut_step;      /* large-eddy pulsing (AM)      */
+static float   rum1, rum2, rum_g, rum_step;  /* sub rumble, 2-pole lowpass   */
+static float   crk_env, crk_x1, crk_y, crk_rate, crk_amp;
+static osc_t   whine[2];                     /* compressor (N2) stage tones  */
 static float   meters[5];
 
 static eb_chorus_state cho;
@@ -112,6 +117,8 @@ static void control(void)
     float r = dist_m(), spread, cth, dop, rpm, fshaft, shift, lvl_s;
     float jet[JT_NB], core[JT_NB], fan[JT_NB], bz[JT_NB];
     lerp_t a, b, c;
+    float ch = P[JET_CHARACTER];
+    float bbpow = 0.0f, lowdb;
     int k;
 
     /* spool: slower at low power, slower up than down, slower when bigger */
@@ -136,19 +143,21 @@ static void control(void)
     /* slow turbulence: two one-pole random walks */
     lf1 += 0.02f * (white() - lf1);
     lf2 += 0.005f * (white() - lf2);
+    flut += 0.12f * (white() - flut);             /* ~30 Hz-ish random, per block */
 
     for (k = 0; k < JT_NB; k++) {
         float f = JT_F[k];
         float pw = db_to_pow(band_db(jet, (float)k + shift) + lvl_s)
                  + db_to_pow(core[k] + lvl_s)
                  + db_to_pow(band_db(fan, (float)k + shift) + lvl_s);
-        float db = 10.0f * 0.30103f * jlog2(pw) - spread - JT_ABS[k] * r - REF_DB;
+        float db = 10.0f * 0.30103f * jlog2(pw) - spread - JT_ABS[k] * r - REF_DB - 4.0f * ch;
         /* gain so the filtered white noise carries this band power:
          * noise var 1/3, 2nd-order BPF ENBW = (pi/2) * f/Q, Q = 4.318 */
         float enbw = 1.5708f * f / 4.318f;
         float g = jsqrt(db_to_pow(db) / ((1.0f / 3.0f) * enbw / (0.5f * SR)));
         if (f > 0.45f * SR) g = 0.0f;
         bands[k].gstep = (g - bands[k].g) * (1.0f / JET_BLOCK);
+        if (f < 0.45f * SR) bbpow += db_to_pow(db);
     }
 
     /* rotor */
@@ -168,7 +177,7 @@ static void control(void)
     for (k = 0; k < JET_NTONE; k++) {             /* BPF harmonics           */
         float f = fshaft * JT_B_FAN * (float)(k + 1);
         float db = tri(JT_TONE, JT_NH, k, a, b, c) + lvl_s - spread
-                 - absorb_db_per_m(f) * r - REF_DB + 1.5f * lf2;
+                 - absorb_db_per_m(f) * r - REF_DB + 1.5f * lf2 + 24.0f * ch;
         float amp = (f < 0.45f * SR) ? jsqrt(2.0f * db_to_pow(db)) : 0.0f;
         float inc = f / SR;
         tone[k].astep = (amp - tone[k].a) * (1.0f / JET_BLOCK);
@@ -191,11 +200,42 @@ static void control(void)
             float amp = 0.0f;
             if ((o + 1) % JT_B_FAN && bi < JT_NB + 8 && f < 0.45f * SR && wsum[bi] > 0.0f) {
                 float db = band_db(bz, x + shift) + lvl_s - spread
-                         - absorb_db_per_m(f) * r - REF_DB;
+                         - absorb_db_per_m(f) * r - REF_DB + 18.0f * ch;
                 amp = jsqrt(2.0f * db_to_pow(db) * buzz_w[o] / wsum[bi]);
             }
             buzz[o].astep = (amp - buzz[o].a) * (1.0f / JET_BLOCK);
             buzz[o].incstep = (f / SR - buzz[o].inc) * (1.0f / JET_BLOCK);
+        }
+    }
+
+    /* ---- CHARACTER layer ---------------------------------------------- */
+    {
+        float pw = (spool - 0.55f) * 2.0f;            /* 0 below TS .55, 1 at 1.05 */
+        float dth = (th - 140.0f) * (1.0f / 35.0f);   /* crackle beams aft ~140 deg */
+        float dir = 0.15f + 0.85f * jexp2(-1.442695f * dth * dth);
+        float rms = jsqrt(bbpow);
+        if (pw < 0.0f) pw = 0.0f;
+        if (pw > 1.0f) pw = 1.0f;
+        crk_rate = ch * dir * (pw * pw * 900.0f + (P[JET_BOOST] > 0.5f ? 250.0f : 0.0f)) / SR;
+        crk_amp = ch * rms * 5.0f;
+        /* rumble rides the jet's lowest bands, +12 dB of character */
+        lowdb = band_db(jet, shift) + lvl_s - spread - REF_DB + 12.0f * ch - 6.0f;
+        {
+            float g = ch * jsqrt(db_to_pow(lowdb)) * 120.0f;
+            rum_step = (g - rum_g) * (1.0f / JET_BLOCK);
+        }
+        {   /* pulsing depth grows with power */
+            float g = 1.0f + ch * (0.25f + 0.35f * pw) * flut * 3.0f;
+            flut_step = (g - flut_g) * (1.0f / JET_BLOCK);
+        }
+        for (k = 0; k < 2; k++) {                     /* compressor whine        */
+            float f = fshaft * JT_B_FAN * (k ? 5.31f : 2.73f);
+            float db = tri(JT_TONE, JT_NH, 0, a, b, c) + lvl_s - spread
+                     - absorb_db_per_m(f) * r - REF_DB + ch * 20.0f - 30.0f - 6.0f * (float)k
+                     + 8.0f * (1.0f - pw);               /* most audible spooling up */
+            float amp = (ch > 0.0f && f < 0.45f * SR) ? jsqrt(2.0f * db_to_pow(db)) : 0.0f;
+            whine[k].astep = (amp - whine[k].a) * (1.0f / JET_BLOCK);
+            whine[k].incstep = (f / SR - whine[k].inc) * (1.0f / JET_BLOCK);
         }
     }
 }
@@ -222,6 +262,10 @@ void jet_init(float sample_rate)
     }
     for (k = 0; k < JET_NTONE; k++) { tone[k].ph = 0; tone[k].a = tone[k].inc = 0; }
     spool = 0.30f;
+    flut = flut_step = 0.0f; flut_g = 1.0f;
+    rum1 = rum2 = rum_g = rum_step = 0.0f;
+    crk_env = crk_x1 = crk_y = crk_rate = crk_amp = 0.0f;
+    for (k = 0; k < 2; k++) { whine[k].ph = 0; whine[k].a = whine[k].inc = 0; }
     eb_chorus_reset(&cho);
     jmemset(&dly, 0, sizeof dly);
     eb_reverb_init(&rev);
@@ -253,12 +297,37 @@ void jet_render(float *L, float *R, int n)
         blk = (blk + 1) % JET_BLOCK;
 
         nz = white();
+        flut_g += flut_step;
         for (k = 0; k < JT_NB; k++) {
             band_t *b = &bands[k];
             float y = b->b0 * (nz - b->x2) - b->a1 * b->y1 - b->a2 * b->y2;
             b->x2 = b->x1; b->x1 = nz; b->y2 = b->y1; b->y1 = y;
             b->g += b->gstep;
             x += b->g * y;
+        }
+        x *= flut_g;
+        {   /* sub rumble */
+            rum_g += rum_step;
+            rum1 += 0.004f * (white() - rum1);
+            rum2 += 0.004f * (rum1 - rum2);
+            x += rum_g * rum2;
+        }
+        {   /* crackle: Poisson-triggered noise bursts, differentiated */
+            float u = 0.5f * (white() + 1.0f), y;
+            if (u < crk_rate) {
+                float m = 0.5f * (white() + 1.0f);
+                crk_env = crk_amp * (0.25f + 2.5f * m * m * m);
+            }
+            y = crk_env * white();
+            crk_env *= 0.9f;
+            x += y - crk_x1;
+            crk_x1 = y;
+        }
+        for (k = 0; k < 2; k++) {
+            osc_t *o = &whine[k];
+            o->inc += o->incstep; o->a += o->astep;
+            o->ph += o->inc; o->ph -= (float)(int)o->ph;
+            x += o->a * jsin_turn(o->ph);
         }
         for (k = 0; k < JET_NTONE; k++) {
             osc_t *o = &tone[k];

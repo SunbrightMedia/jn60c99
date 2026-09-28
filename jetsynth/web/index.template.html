@@ -46,6 +46,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 input[type=range]::-moz-range-thumb{width:14px;height:24px;border-radius:3px;background:var(--ink);border:2px solid var(--face)}
 #throttle::-webkit-slider-thumb{background:var(--amber)}
 #throttle::-moz-range-thumb{background:var(--amber)}
+#character::-webkit-slider-thumb{background:var(--cyan)}
+#character::-moz-range-thumb{background:var(--cyan)}
 
 .boost{font:700 22px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);
   background:repeating-linear-gradient(135deg,var(--face) 0 14px,#23272b 14px 28px);border:2px solid var(--amber);
@@ -98,6 +100,8 @@ footer code{font-family:var(--mono);font-size:12px}
         <div class="hint">Engine scale. Pitch goes down, level goes up.</div></div>
       <div class="f"><label for="space">Space</label><input id="space" type="range" min="0" max="1" step="0.001" value="0.35"><output id="o-space"></output>
         <div class="hint">JUNO chorus, delay and reverb. Distance adds more.</div></div>
+      <div class="f"><label for="character">Character</label><input id="character" type="range" min="0" max="1" step="0.001" value="0.6"><output id="o-character"></output>
+        <div class="hint">Real engine to movie engine: whine, buzz-saw, crackle, rumble.</div></div>
     </div>
   </section>
 
@@ -112,8 +116,8 @@ footer code{font-family:var(--mono);font-size:12px}
 
 <script>
 const WASM_B64 = "__WASM_B64__";
-const IDX = {throttle:0, spool:1, speed:2, angle:3, distance:4, size:5, space:6, boost:7};
-const state = {throttle:.35, spool:.35, speed:0, angle:.35, distance:.25, size:.5, space:.35, boost:0};
+const IDX = {throttle:0, spool:1, speed:2, angle:3, distance:4, size:5, space:6, boost:7, character:8};
+const state = {throttle:.35, spool:.35, speed:0, angle:.35, distance:.25, size:.5, space:.35, boost:0, character:.6};
 const expmap = (v,lo,hi)=>lo*Math.pow(hi/lo,v);
 const fmt = {
   throttle:v=>`TS ${(0.30+0.75*v).toFixed(2)}`,
@@ -121,12 +125,13 @@ const fmt = {
   speed:v=>`M ${(0.4*v).toFixed(2)} · ${Math.round(0.4*v*340.294*1.94384)} kt`,
   size:v=>`${expmap(v,.5,2).toFixed(2)}×`,
   space:v=>`${Math.round(v*100)} %`,
+  character:v=>v<.05?'real':v>.95?'movie':`${Math.round(v*100)} %`,
 };
 let node=null, ctx=null, running=false, sendParam=()=>{};
 
 function setParam(k,v){ state[k]=v; sendParam(IDX[k],v); }
 
-for (const k of ["throttle","spool","speed","size","space"]) {
+for (const k of ["throttle","spool","speed","size","space","character"]) {
   const el=document.getElementById(k), out=document.getElementById("o-"+k);
   const upd=()=>{ const v=+el.value; out.textContent=fmt[k](v); setParam(k,v); };
   el.addEventListener("input",upd); upd();
