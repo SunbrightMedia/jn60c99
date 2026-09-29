@@ -170,13 +170,16 @@ FLASHING -- PASTE THE COMMANDS EVERY SINGLE TIME A .bin IS SENT. Never say
 lines, in this order, with the delete reminder first:
   1. "Delete the old juno_s3.bin from Downloads first" (Windows renames a
      duplicate to `juno_s3 (1).bin` and the flash then fails on the old file).
-  2. `python -m esptool --chip esp32s3 -b 460800 --before default-reset
+  2. `cd %USERPROFILE%\Downloads` (the prompt opens in the home folder; the
+     flash line fails with "No such file" without it -- paid 2026-09-29).
+  3. `python -m esptool --chip esp32s3 -b 460800 --before default-reset
      --after hard-reset write-flash --flash-mode dio --flash-size 8MB
      --flash-freq 80m 0x0 bootloader.bin 0x8000 partitiontable.bin
      0x10000 juno_s3.bin`
-  3. `python -m serial.tools.miniterm COM3 115200`
-     (COM3 since the 2026-08-29 PC reset -- was COM5; if flashing fails, the
-     user re-checks Device Manager -> Ports and we update this line again.)
+  4. `python -m serial.tools.miniterm COM4 115200`
+     (COM4 since 2026-09-29 -- esptool's own "Connected ... on COM4" line;
+     was COM3, before that COM5. The flash line auto-finds the port; the
+     monitor line does not. If it fails, the port esptool printed wins.)
 The three-bin set lives in `esp32s3/flash/meas/` -- partitiontable.bin has NO
 hyphen. Send builds from THERE, never from `esp32s3/build/`, whose paths and
 names do not match what the user has. Only send builds worth flashing
