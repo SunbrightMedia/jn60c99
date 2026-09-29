@@ -20,6 +20,10 @@ juno_s3.bin — the name matches the CLAUDE.md flash line).
 - `SELFTEST A4: 440.0 Hz ok, peak 8192 ok, after release ... SILENT` — an
   internal A4 through the same parser, renderer and I2S path (a 0.5 s beep).
 - `NOTE ON/OFF` — one line per MIDI note event.
+- `PIN TOOTH ... FIRES` — GPIO 18 pulls itself low 4 times (open-drain); the
+  raw edge counter must see them. `PIN rx18=H/L edges=N` then counts every
+  edge from outside, independent of the UART: edges=0 while playing = no
+  signal reaches GPIO 18.
 - `STAT ... ferr=` — UART frame errors: non-zero while playing = wrong
   polarity/wiring on the MIDI input. `SIL:` SOUNDING / RELEASING / SILENT /
   STUCK. `HEALTH:` OK, or the FIRST fault, latched.

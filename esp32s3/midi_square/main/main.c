@@ -19,6 +19,7 @@
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
+#include "esp_rom_sys.h"
 #include "msq_core.h"
 
 #define PIN_BCK   GPIO_NUM_5
@@ -121,7 +122,13 @@ static int audio_start(void)
 }
 
 static QueueHandle_t midi_q;
-static uint32_t n_frame_err, n_fifo_ovf;
+static uint32_t n_frame_err, n_fifo_ovf, n_break;
+
+/* RAW PIN PROBE on the MIDI RX pin, independent of the UART: every edge is
+ * counted. edges=0 with rx=H = nothing ever pulls the pin low (no signal
+ * reaches GPIO 18); rx=L held = the line idles LOW (inverted or shorted). */
+static volatile uint32_t rx_edges;
+static void IRAM_ATTR rx_edge_isr(void *u) { rx_edges++; }
 
 static int midi_start(void)
 {
@@ -135,6 +142,33 @@ static int midi_start(void)
     if (uart_set_pin(MIDI_UART, UART_PIN_NO_CHANGE, PIN_MIDI,
                      UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) != ESP_OK) return 0;
     gpio_set_pull_mode((gpio_num_t)PIN_MIDI, GPIO_PULLUP_ONLY); /* unwired = silent (playbook 94) */
+    gpio_set_intr_type((gpio_num_t)PIN_MIDI, GPIO_INTR_ANYEDGE);
+    if (gpio_install_isr_service(0) != ESP_OK) return 0;
+    if (gpio_isr_handler_add((gpio_num_t)PIN_MIDI, rx_edge_isr, NULL) != ESP_OK) return 0;
+    gpio_intr_enable((gpio_num_t)PIN_MIDI);
+
+    /* PROBE TOOTH: the pin pulls ITSELF low 4 times (open-drain, 2 us each:
+     * safe against an opto/open-collector and any pull-up), so the edge
+     * counter MUST read +8 in its final configuration. Level before the
+     * pulses is printed: L = something outside holds the line low. */
+    int lvl0 = gpio_get_level((gpio_num_t)PIN_MIDI);
+    uint32_t e0 = rx_edges;
+    gpio_set_level((gpio_num_t)PIN_MIDI, 1);
+    gpio_set_direction((gpio_num_t)PIN_MIDI, GPIO_MODE_INPUT_OUTPUT_OD);
+    for (int i = 0; i < 4; ++i) {
+        gpio_set_level((gpio_num_t)PIN_MIDI, 0); esp_rom_delay_us(2);
+        gpio_set_level((gpio_num_t)PIN_MIDI, 1); esp_rom_delay_us(40);
+    }
+    gpio_set_direction((gpio_num_t)PIN_MIDI, GPIO_MODE_INPUT);
+    vTaskDelay(pdMS_TO_TICKS(5));
+    uint32_t de = rx_edges - e0;
+    printf("PIN TOOTH rx%d idle=%c, self-pulses -> edges +%lu  %s\n", PIN_MIDI, lvl0 ? 'H' : 'L',
+           (unsigned long)de, de >= 8 ? "FIRES (probe live)" :
+           lvl0 ? "DID NOT FIRE -- probe dead" : "NO EDGES -- line held LOW from outside");
+    if (de < 8) fault(lvl0 ? "PIN PROBE DEAD" : "MIDI RX HELD LOW");
+    uart_flush_input(MIDI_UART);
+    xQueueReset(midi_q);
+    rx_edges = 0;
     return 1;
 }
 
@@ -156,7 +190,7 @@ static int64_t last_off_us;
 
 static void sil_and_stat(int force)
 {
-    static uint32_t p_bytes, p_on, p_off, p_fe;
+    static uint32_t p_bytes, p_on, p_off, p_fe, p_edges;
     static int64_t p_print;
     int64_t now = esp_timer_get_time();
     int pk = a_peak;
@@ -174,8 +208,11 @@ static void sil_and_stat(int force)
     static uint32_t p_written;
     if (a_written == p_written) fault("AUDIO TASK STALLED (no block written in 1 s)");
     p_written = a_written;
-    int moved = M.n_bytes != p_bytes || M.n_on != p_on || M.n_off != p_off || n_frame_err != p_fe;
+    int moved = M.n_bytes != p_bytes || M.n_on != p_on || M.n_off != p_off || n_frame_err != p_fe || rx_edges != p_edges;
     if (force || moved || now - p_print > 10000000) {
+        printf("PIN rx%d=%c edges=%lu brk=%lu | ", PIN_MIDI,
+               gpio_get_level((gpio_num_t)PIN_MIDI) ? 'H' : 'L',
+               (unsigned long)rx_edges, (unsigned long)n_break);
         printf("STAT midi bytes=%lu on=%lu off=%lu cc=%lu rt=%lu ferr=%lu ovf=%lu held=%d | "
                "peak=%d deficit=%ld | SIL: %s | HEALTH: %s\n",
                (unsigned long)M.n_bytes, (unsigned long)M.n_on, (unsigned long)M.n_off,
@@ -184,7 +221,7 @@ static void sil_and_stat(int force)
                health ? health : "OK");
         p_print = now;
     }
-    p_bytes = M.n_bytes; p_on = M.n_on; p_off = M.n_off; p_fe = n_frame_err;
+    p_bytes = M.n_bytes; p_on = M.n_on; p_off = M.n_off; p_fe = n_frame_err; p_edges = rx_edges;
 }
 
 /* measure over `ms`: returns Hz, peak via *pk */
@@ -256,6 +293,8 @@ void app_main(void)
                         if (!M.gate) last_off_us = esp_timer_get_time();
                         print_event();
                     }
+            } else if (ev.type == UART_BREAK) {
+                n_break++;
             } else if (ev.type == UART_FRAME_ERR) {
                 n_frame_err++;
             } else if (ev.type == UART_FIFO_OVF || ev.type == UART_BUFFER_FULL) {
