@@ -1,7 +1,8 @@
 #!/bin/sh
 # Boot the image in QEMU (esp32s3) and print its log. Two builds:
-#   real : the shipped image. QEMU has no I2S, so the self-test MUST read FAIL
-#          and HEALTH must name the fault -- the detectors seen to fire.
+#   real : the shipped image. Since the release knob (esp_adc) it HANGS before
+#          app_main in QEMU (blank eFuses -> ADC self-calibration on a SAR ADC
+#          QEMU does not have). Printed only as a build/boot smoke check.
 #   fake : -DMSQ_QEMU (timer plays the DMA). The self-test MUST read PASS.
 # Needs: . $IDF_PATH/export.sh ; qemu-xtensa installed (idf_tools.py install qemu-xtensa).
 cd "$(dirname "$0")/.." || exit 1
@@ -14,6 +15,6 @@ run() {  # $1 build dir
   grep -E "SELFTEST|STAT" "$O/msq_q.log" | head -6
 }
 idf.py -B build build >/dev/null || exit 1
-echo "== real image (expect FAIL: no I2S in QEMU)"; run build
+echo "== real image (expect: boot stops at the eFuse calibration warning)"; run build
 idf.py -B build_qemu -DSDKCONFIG=build_qemu/sdkconfig -DMSQ_QEMU=1 build >/dev/null || exit 1
 echo "== fake-DMA image (expect PASS)"; run build_qemu

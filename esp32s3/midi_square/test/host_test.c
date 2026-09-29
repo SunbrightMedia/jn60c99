@@ -92,6 +92,24 @@ int main(void)
     for (int k = 0; k < 17; ++k) feed(&m, (uint8_t[]){0x80, (uint8_t)(50 + k), 0}, 3);
     expect_silent(&m, "17 released");
 
+    /* 8. release knob: law endpoints, and a 0.5 s release really takes 0.5 s */
+    CHECK(fabsf(msq_knob_to_release(0.0f) - 0.010f) < 1e-4f, "knob 0 -> %.4f s, want 0.010", msq_knob_to_release(0.0f));
+    CHECK(fabsf(msq_knob_to_release(1.0f) - 2.0f) < 1e-3f, "knob 1 -> %.4f s, want 2.0", msq_knob_to_release(1.0f));
+    CHECK(fabsf(msq_knob_to_release(0.5f) - 0.1414f) < 1e-3f, "knob 0.5 -> %.4f s, want 0.1414", msq_knob_to_release(0.5f));
+    {
+        int pk;
+        msq_set_release(&m, 0.5f);
+        feed(&m, (uint8_t[]){0x90, 57, 100}, 3); expect_note(&m, 57, "A3 before long release");
+        feed(&m, (uint8_t[]){0x80, 57, 0}, 3);
+        measure(&m, 0.200, &pk);                 /* 0.00-0.20 s after off */
+        measure(&m, 0.050, &pk);                 /* 0.20-0.25 s: level 0.6 -> 0.5 */
+        CHECK(pk >= 4000 && pk <= 5000, "0.5 s release: peak %d at 0.20-0.25 s, want ~4100-4900", pk);
+        measure(&m, 0.260, &pk);                 /* to 0.51 s */
+        measure(&m, 0.100, &pk);
+        CHECK(pk == 0, "0.5 s release: peak %d after 0.51 s, want exactly 0", pk);
+        msq_set_release(&m, 0.010f);
+    }
+
     printf("%s: %d failure(s); on=%u off=%u bytes=%u\n",
            fails ? "HOST TEST FAIL" : "HOST TEST PASS", fails, m.n_on, m.n_off, m.n_bytes);
     return fails ? 1 : 0;

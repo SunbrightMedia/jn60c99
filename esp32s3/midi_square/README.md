@@ -9,6 +9,7 @@ attack / 10 ms release, -12 dBFS) -> PCM5102 module over I2S, 48 kHz.
 | LCK (WS) | GPIO 6 |
 | DIN | GPIO 7 |
 | MIDI RX (UART1, 31,250 baud, pull-up on) | GPIO 18 |
+| Release knob wiper (pot ends to 3.3 V / GND) | GPIO 4 (ADC1) |
 
 No PSRAM is used, so the image boots on R8 and R2 modules. Console 115200.
 Flash set: `esp32s3/flash/midi_square/` (bootloader.bin, partitiontable.bin,
@@ -20,6 +21,8 @@ juno_s3.bin — the name matches the CLAUDE.md flash line).
 - `SELFTEST A4: 440.0 Hz ok, peak 8192 ok, after release ... SILENT` — an
   internal A4 through the same parser, renderer and I2S path (a 0.5 s beep).
 - `NOTE ON/OFF` — one line per MIDI note event.
+- `KNOB release X s (raw N)` — the release knob moved (10 ms .. 2 s, exponential).
+  `SIL: RELEASING` lasts the release time + 100 ms, then must read SILENT.
 - `LOOPBACK rx18 idle=H: ... UART got 6, NOTE ON 1, NOTE OFF 1, edges +N, tone
   261.6 Hz ... PASS` — GPIO 18 sends itself a real note (open-drain bit-bang,
   31,250 baud) through the same pin, UART, parser and synth (a short C4 beep).

@@ -34,7 +34,8 @@ Never use DIN standard numbers with this user. DIN order along the arc is 1-4-2-
 the view side: wire one way, swap if the log shows edges=0 while playing (reverse = LED off, no damage).
 6N137 (from memory; check the datasheet): 2 = LED anode, 3 = LED cathode, 5 = GND, 6 = open-collector output,
 7 = enable (HIGH = on), 8 = VCC 4.5-5.5 V (NOT 3.3 V).
-- position 2 -> 220 R -> pin 2; position 4 -> pin 3; 1N4148 across pins 2/3, stripe on pin 2.
+- BENCH-PROVEN 2026-09-29 (Arturia KeyStep, midi_square v3): position 4 -> 220 R -> pin 2; position 2 -> pin 3
+  (positions counted on the jack FRONT). 1N4148 across pins 2/3, stripe on pin 2 (optional; left out on the bench).
 - pin 8 -> 5 V; pin 7 -> 5 V; pin 5 -> GND; 100 nF pin 8 to pin 5 at the chip.
 - pin 6 -> GPIO 18, 1 k pull-up to 3.3 V (never 5 V).
 - Bench 2026-09-29: midi_square v3 LOOPBACK FAILed with the MIDI circuit on GPIO 18 and PASSed with the wire

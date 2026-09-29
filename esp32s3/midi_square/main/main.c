@@ -12,6 +12,7 @@
  *             HEALTH latch (never reads OK again after a fault). */
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -22,6 +23,9 @@
 #include "esp_rom_sys.h"
 #include "esp_rom_gpio.h"
 #include "esp_cpu.h"
+#ifndef MSQ_QEMU
+#include "esp_adc/adc_oneshot.h"
+#endif
 #include "soc/gpio_sig_map.h"   /* U1RXD_IN_IDX: UART1 RX matrix input */
 #include "msq_core.h"
 
@@ -33,6 +37,7 @@
 #define CHUNK     240          /* 5 ms */
 #define DMA_N     4
 #define MIDI_UART UART_NUM_1
+#define PIN_KNOB  4          /* release knob wiper, ADC1 */
 
 static msq_t M;
 static i2s_chan_handle_t TX;
@@ -182,6 +187,48 @@ static void bitbang_byte(uint8_t v)
     gpio_set_level((gpio_num_t)PIN_MIDI, 1);
 }
 
+/* RELEASE KNOB on GPIO 4 (ADC1). Pot ends to 3.3 V and GND, wiper to GPIO 4.
+ * Read every 20 ms, smoothed, applied only on a real move (hysteresis), so a
+ * noisy wiper does not spam the log. Law: msq_knob_to_release (10 ms .. 2 s).
+ * Started AFTER the self-test and loopback, which need the fixed 10 ms. */
+#ifndef MSQ_QEMU
+static adc_oneshot_unit_handle_t knob_adc;
+static adc_channel_t knob_ch;
+static int knob_ok, knob_raw = -1;
+static float knob_avg = -1.0f;
+
+static void knob_start(void)
+{
+    adc_unit_t unit;
+    if (adc_oneshot_io_to_channel(PIN_KNOB, &unit, &knob_ch) != ESP_OK || unit != ADC_UNIT_1) {
+        printf("KNOB: GPIO %d is not an ADC1 pin\n", PIN_KNOB); return;
+    }
+    adc_oneshot_unit_init_cfg_t uc = { .unit_id = ADC_UNIT_1 };
+    adc_oneshot_chan_cfg_t cc = { .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
+    if (adc_oneshot_new_unit(&uc, &knob_adc) != ESP_OK ||
+        adc_oneshot_config_channel(knob_adc, knob_ch, &cc) != ESP_OK) {
+        printf("KNOB: ADC init failed -- release stays %.3f s\n", M.release_s); return;
+    }
+    knob_ok = 1;
+    printf("KNOB: release on GPIO %d (ADC1 ch %d), 10 ms .. 2 s\n", PIN_KNOB, (int)knob_ch);
+}
+
+static void knob_poll(void)
+{
+    int raw;
+    if (!knob_ok || adc_oneshot_read(knob_adc, knob_ch, &raw) != ESP_OK) return;
+    knob_avg = knob_avg < 0 ? raw : knob_avg + (raw - knob_avg) * 0.25f;
+    int r = (int)(knob_avg + 0.5f);
+    if (knob_raw >= 0 && abs(r - knob_raw) < 24) return;     /* hysteresis ~0.6 % */
+    knob_raw = r;
+    msq_set_release(&M, msq_knob_to_release(r / 4095.0f));
+    printf("KNOB release %.3f s (raw %d)\n", M.release_s, r);
+}
+#else
+static void knob_start(void) { printf("KNOB: not in the QEMU build\n"); }
+static void knob_poll(void) { }
+#endif
+
 static const char *NAMES[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 
 static void print_event(void)
@@ -207,7 +254,7 @@ static void sil_and_stat(int force)
     a_take = 1;
     const char *sil;
     if (M.gate)                               sil = pk > 0 ? "SOUNDING" : "MUTE?";
-    else if (now - last_off_us < 100000)      sil = "RELEASING";
+    else if (now - last_off_us < (int64_t)(M.release_s * 1e6f) + 100000) sil = "RELEASING";
     else                                      sil = pk == 0 ? "SILENT" : "STUCK";
     if (!strcmp(sil, "STUCK")) fault("STUCK (no key held, output not silent)");
     if (!strcmp(sil, "MUTE?")) fault("MUTE (key held, output exactly 0)");
@@ -328,14 +375,15 @@ void app_main(void)
     if (!st) fault("SELFTEST FAIL");
     if (!midi_start()) { printf("FATAL: MIDI UART start failed\n"); return; }
     midi_loopback();
+    knob_start();
     printf("READY -- play notes. Any MIDI channel. Expect one NOTE line per key.\n");
     sil_and_stat(1);
 
     uint8_t b[128];
-    int64_t next_stat = esp_timer_get_time() + 1000000;
+    int64_t next_stat = esp_timer_get_time() + 1000000, next_knob = 0;
     for (;;) {
         uart_event_t ev;
-        if (xQueueReceive(midi_q, &ev, pdMS_TO_TICKS(50))) {
+        if (xQueueReceive(midi_q, &ev, pdMS_TO_TICKS(20))) {
             if (ev.type == UART_DATA) {
                 int n = uart_read_bytes(MIDI_UART, b, sizeof b, 0);
                 for (int i = 0; i < n; ++i)
@@ -352,6 +400,10 @@ void app_main(void)
                 uart_flush_input(MIDI_UART);
                 xQueueReset(midi_q);
             }
+        }
+        if (esp_timer_get_time() >= next_knob) {
+            knob_poll();
+            next_knob = esp_timer_get_time() + 20000;
         }
         if (esp_timer_get_time() >= next_stat) {
             sil_and_stat(0);

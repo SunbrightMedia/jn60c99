@@ -19,7 +19,9 @@ typedef struct {
     volatile int      gate;
     /* renderer */
     uint32_t phase;
-    float    level, att_step, rel_step, amp;
+    float    level, att_step, amp;
+    volatile float rel_step;   /* written by the knob task, read once per block */
+    float    release_s;
     float    sr;
     /* counters */
     uint32_t n_bytes, n_on, n_off, n_cc, n_rt, n_other;
@@ -32,4 +34,8 @@ int   msq_byte  (msq_t *m, uint8_t b);
 /* Interleaved stereo 16-bit, n frames. */
 void  msq_render(msq_t *m, int16_t *lr, int n);
 float msq_note_hz(int note);
+/* Release time, seconds (linear fade from the current level; 0 -> clamped 1 ms). */
+void  msq_set_release(msq_t *m, float seconds);
+/* Knob law: x in 0..1 -> 10 ms .. 2 s, exponential (equal feel per turn). */
+float msq_knob_to_release(float x);
 #endif

@@ -7,12 +7,32 @@ float msq_note_hz(int note)
     return 440.0f * powf(2.0f, (float)(note - 69) / 12.0f);
 }
 
+void msq_set_release(msq_t *m, float seconds)
+{
+#ifndef MSQ_TOOTH_FIXED_RELEASE
+    if (seconds < 0.001f) seconds = 0.001f;
+    m->release_s = seconds;
+    m->rel_step  = 1.0f / (seconds * m->sr);
+#else
+    (void)seconds;                        /* TOOTH: the knob does nothing */
+    m->release_s = 0.010f;
+    m->rel_step  = 1.0f / (0.010f * m->sr);
+#endif
+}
+
+float msq_knob_to_release(float x)
+{
+    if (x < 0.0f) x = 0.0f;
+    if (x > 1.0f) x = 1.0f;
+    return 0.010f * powf(200.0f, x);
+}
+
 void msq_init(msq_t *m, float sr)
 {
     memset(m, 0, sizeof *m);
     m->sr       = sr;
     m->att_step = 1.0f / (0.002f * sr);   /* 2 ms attack  */
-    m->rel_step = 1.0f / (0.010f * sr);   /* 10 ms release */
+    msq_set_release(m, 0.010f);           /* 10 ms release until the knob speaks */
     m->amp      = 8192.0f;                /* -12 dBFS */
     m->last_note = -1;
 }
@@ -91,9 +111,10 @@ void msq_render(msq_t *m, int16_t *lr, int n)
 {
     uint32_t inc = m->inc;
     int gate = m->gate;
+    float rel = m->rel_step;
     for (int i = 0; i < n; ++i) {
         if (gate) { m->level += m->att_step; if (m->level > 1.0f) m->level = 1.0f; }
-        else      { m->level -= m->rel_step; if (m->level < 0.0f) m->level = 0.0f; }
+        else      { m->level -= rel; if (m->level < 0.0f) m->level = 0.0f; }
         m->phase += inc;
         float s = (m->phase & 0x80000000u) ? -m->amp : m->amp;
         int16_t v = (int16_t)(s * m->level);          /* level 0 -> exactly 0 */
