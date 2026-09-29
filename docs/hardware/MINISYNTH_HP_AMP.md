@@ -37,3 +37,6 @@ the view side: wire one way, swap if the log shows edges=0 while playing (revers
 - position 2 -> 220 R -> pin 2; position 4 -> pin 3; 1N4148 across pins 2/3, stripe on pin 2.
 - pin 8 -> 5 V; pin 7 -> 5 V; pin 5 -> GND; 100 nF pin 8 to pin 5 at the chip.
 - pin 6 -> GPIO 18, 1 k pull-up to 3.3 V (never 5 V).
+- Bench 2026-09-29: midi_square v3 LOOPBACK FAILed with the MIDI circuit on GPIO 18 and PASSed with the wire
+  off; the loose wire read 5 V. Cause: the pin-6 pull-up (or the wire) was on 5 V. The loopback tooth is the
+  fastest way to split "firmware" from "circuit" -- run it with the GPIO wire off first.
