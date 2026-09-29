@@ -16,13 +16,13 @@ sample scaling in firmware, 32-bit I2S, -6 dB fixed headroom so the 5 V amp cann
 | qty | part | value | manufacturer PN |
 |---|---|---|---|
 | 1 | op-amp DIP-8 | dual high-current | Nisshinbo NJM4556AD (NJM4556AD-ND) |
-| 1 | DIP-8 socket | 0.3" | CNC Tech 245-08-1-03 (TE 1-2199298-2 is discontinued) |
-| 2 | electrolytic | 220 uF 16 V | Panasonic ECA-1CM221 |
+| (1) | DIP-8 socket, optional | 0.3" | CNC Tech 245-08-1-03 (TE 1-2199298-2 is discontinued) |
+| 2 | electrolytic | 220 uF 16 V | Nichicon UVR1C221MED1TA (Panasonic ECA-1CM221 = P5139-ND out of stock 2026-09-29) |
 | 1 | electrolytic | 47 uF 16 V | Panasonic ECA-1CM470 |
-| 1 | electrolytic | 10 uF 25 V | Panasonic ECA-1EM100 |
+| 1 | electrolytic | 10 uF >=10 V | any in-stock radial (ECA-1EM100 = P5148-ND out of stock 2026-09-29); optional with a short 5 V wire |
 | 2 | film | 1 uF 63 V | WIMA MKS2C041001F00KSSD |
 | 1 | ceramic | 100 nF 50 V | KEMET C320C104K5R5TA |
 | 2 | resistor 1/4 W | 33 R | Stackpole CF14JT33R0 |
 | 2 | resistor 1/4 W | 10 k | Stackpole CF14JT10K0 |
 | 2 | resistor 1/4 W | 100 k | Stackpole CF14JT100K |
-| 1 | 3.5 mm stereo jack | TRS, PCB | Same Sky SJ1-3523N (CP1-3523N-ND) |
+| 1 | stereo jack (TRS) | 3.5 mm or 1/4" | Same Sky SJ1-3523N (CP1-3523N-ND), or the user's own 1/4" TRS jack |
