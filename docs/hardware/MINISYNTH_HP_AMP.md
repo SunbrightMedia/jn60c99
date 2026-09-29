@@ -26,3 +26,14 @@ sample scaling in firmware, 32-bit I2S, -6 dB fixed headroom so the 5 V amp cann
 | 2 | resistor 1/4 W | 10 k | Stackpole CF14JT10K0 |
 | 2 | resistor 1/4 W | 100 k | Stackpole CF14JT100K |
 | 1 | stereo jack (TRS) | 3.5 mm or 1/4" | Same Sky SJ1-3523N (CP1-3523N-ND), or the user's own 1/4" TRS jack |
+
+## MIDI IN with a 6N137 (user's wiring convention, 2026-09-29)
+USER-BINDING: the DIN jack's 5 pins form an arc ("smiley"); call them **position 1 (leftmost) .. 5 (rightmost)**.
+Never use DIN standard numbers with this user. DIN order along the arc is 1-4-2-5-3, so position 3 = shield
+(unused), positions 2 and 4 = the MIDI current loop, positions 1 and 5 = unused. Which of 2/4 is "+" depends on
+the view side: wire one way, swap if the log shows edges=0 while playing (reverse = LED off, no damage).
+6N137 (from memory; check the datasheet): 2 = LED anode, 3 = LED cathode, 5 = GND, 6 = open-collector output,
+7 = enable (HIGH = on), 8 = VCC 4.5-5.5 V (NOT 3.3 V).
+- position 2 -> 220 R -> pin 2; position 4 -> pin 3; 1N4148 across pins 2/3, stripe on pin 2.
+- pin 8 -> 5 V; pin 7 -> 5 V; pin 5 -> GND; 100 nF pin 8 to pin 5 at the chip.
+- pin 6 -> GPIO 18, 1 k pull-up to 3.3 V (never 5 V).
