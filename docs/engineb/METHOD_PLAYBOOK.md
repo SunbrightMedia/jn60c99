@@ -2182,3 +2182,20 @@ and the lift gates re-green on the corrected drive (jp8/logs/lift_gate_layer*_dr
    makes (entry, args, MXCSR, xmm1) and process B replays that list verbatim
    (jp8/tools/jp8_lift_emu.py / jp8_lift_c.py). A law the harness computes twice is a law the gate
    cannot see.
+
+## 102. A PIN THAT IS A PERIPHERAL'S OWN IO_MUX PIN IS NOT A GPIO ANY MORE -- A TOOTH THAT DRIVES IT MUST KEEP THE PAD IN GPIO FUNCTION
+Paid 2026-09-29 (esp32s3/midi_square v2, board run). The raw-pin probe on MIDI RX GPIO 18 pulsed the
+pad from the GPIO block to prove its edge counter; the board printed `edges +0 DID NOT FIRE`. Cause
+(READ, soc/esp32s3/include/soc/uart_pins.h: `U1RXD_GPIO_NUM 18`, `U1RXD_MUX_FUNC 2`): GPIO 18 is
+UART1's own IO_MUX RX pin, so `uart_set_pin()` switched the pad to the UART function and GPIO
+writes never reached it. The tooth did its job -- it failed, so the probe's `edges=0` was not
+believed and was not reported to the user as "no MIDI reaches the pin".
+Fix: keep the pad in GPIO function (open-drain, released high, pull-up), route its input to the
+UART through the GPIO matrix (`esp_rom_gpio_connect_in_signal(18, U1RXD_IN_IDX)`), and make the
+tooth END-TO-END: the pad bit-bangs a real note (0x90 60 100 / 0x80 60 0, cycle-counter timed) that
+must come back as 6 UART bytes, NOTE ON + OFF and a 261.6 Hz tone. QEMU has no GPIO pads, so the
+loopback FAILs there (seen to fail) and only silicon can pass it.
+### The rule
+Before a firmware tooth drives or reads a pin, check whether that pin is the IO_MUX pin of a
+peripheral the firmware also uses on it. If it is, route the peripheral through the matrix, or the
+tooth tests a pad nobody is looking at.

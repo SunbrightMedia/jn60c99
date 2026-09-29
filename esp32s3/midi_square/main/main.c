@@ -20,6 +20,9 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_rom_sys.h"
+#include "esp_rom_gpio.h"
+#include "esp_cpu.h"
+#include "soc/gpio_sig_map.h"   /* U1RXD_IN_IDX: UART1 RX matrix input */
 #include "msq_core.h"
 
 #define PIN_BCK   GPIO_NUM_5
@@ -139,37 +142,44 @@ static int midi_start(void)
     };
     if (uart_driver_install(MIDI_UART, 1024, 0, 16, &midi_q, 0) != ESP_OK) return 0;
     if (uart_param_config(MIDI_UART, &cfg) != ESP_OK) return 0;
-    if (uart_set_pin(MIDI_UART, UART_PIN_NO_CHANGE, PIN_MIDI,
-                     UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) != ESP_OK) return 0;
-    gpio_set_pull_mode((gpio_num_t)PIN_MIDI, GPIO_PULLUP_ONLY); /* unwired = silent (playbook 94) */
-    gpio_set_intr_type((gpio_num_t)PIN_MIDI, GPIO_INTR_ANYEDGE);
+    /* THE PAD STAYS A GPIO. GPIO 18 is UART1's own IO_MUX RX pin
+     * (U1RXD_GPIO_NUM 18), so uart_set_pin() would hand the pad to the UART
+     * function and the GPIO block could no longer drive it -- that is why the
+     * v2 self-pulse tooth read +0 on the board. Here the pad keeps the GPIO
+     * function (open-drain, released = high, pull-up on: an unwired port is
+     * silent, playbook 94) and its input reaches UART1 through the GPIO
+     * matrix. So the edge counter, the loopback sender and the UART all see
+     * the same pad. */
+    gpio_set_level((gpio_num_t)PIN_MIDI, 1);           /* released before OE: no glitch */
+    gpio_config_t io = {
+        .pin_bit_mask = 1ULL << PIN_MIDI, .mode = GPIO_MODE_INPUT_OUTPUT_OD,
+        .pull_up_en = GPIO_PULLUP_ENABLE, .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_ANYEDGE,
+    };
+    if (gpio_config(&io) != ESP_OK) return 0;
+    esp_rom_gpio_connect_in_signal(PIN_MIDI, U1RXD_IN_IDX, false);
     if (gpio_install_isr_service(0) != ESP_OK) return 0;
     if (gpio_isr_handler_add((gpio_num_t)PIN_MIDI, rx_edge_isr, NULL) != ESP_OK) return 0;
-    gpio_intr_enable((gpio_num_t)PIN_MIDI);
-
-    /* PROBE TOOTH: the pin pulls ITSELF low 4 times (open-drain, 2 us each:
-     * safe against an opto/open-collector and any pull-up), so the edge
-     * counter MUST read +8 in its final configuration. Level before the
-     * pulses is printed: L = something outside holds the line low. */
-    int lvl0 = gpio_get_level((gpio_num_t)PIN_MIDI);
-    uint32_t e0 = rx_edges;
-    gpio_set_level((gpio_num_t)PIN_MIDI, 1);
-    gpio_set_direction((gpio_num_t)PIN_MIDI, GPIO_MODE_INPUT_OUTPUT_OD);
-    for (int i = 0; i < 4; ++i) {
-        gpio_set_level((gpio_num_t)PIN_MIDI, 0); esp_rom_delay_us(2);
-        gpio_set_level((gpio_num_t)PIN_MIDI, 1); esp_rom_delay_us(40);
-    }
-    gpio_set_direction((gpio_num_t)PIN_MIDI, GPIO_MODE_INPUT);
-    vTaskDelay(pdMS_TO_TICKS(5));
-    uint32_t de = rx_edges - e0;
-    printf("PIN TOOTH rx%d idle=%c, self-pulses -> edges +%lu  %s\n", PIN_MIDI, lvl0 ? 'H' : 'L',
-           (unsigned long)de, de >= 8 ? "FIRES (probe live)" :
-           lvl0 ? "DID NOT FIRE -- probe dead" : "NO EDGES -- line held LOW from outside");
-    if (de < 8) fault(lvl0 ? "PIN PROBE DEAD" : "MIDI RX HELD LOW");
-    uart_flush_input(MIDI_UART);
-    xQueueReset(midi_q);
-    rx_edges = 0;
     return 1;
+}
+
+/* Send one MIDI byte by pulling the pad low (open-drain) at 31,250 baud.
+ * Bit edges are timed against the cycle counter (absolute targets), so an
+ * interrupt only adds jitter and never accumulates drift. */
+static void bitbang_byte(uint8_t v)
+{
+    const uint32_t BIT = 240000000u / 31250u;           /* 7680 cycles */
+    int bits[10];
+    bits[0] = 0;
+    for (int i = 0; i < 8; ++i) bits[1 + i] = (v >> i) & 1;
+    bits[9] = 1;
+    uint32_t t0 = esp_cpu_get_cycle_count();
+    for (int i = 0; i < 10; ++i) {
+        while ((uint32_t)(esp_cpu_get_cycle_count() - t0) < i * BIT) { }
+        gpio_set_level((gpio_num_t)PIN_MIDI, bits[i]);
+    }
+    while ((uint32_t)(esp_cpu_get_cycle_count() - t0) < 10 * BIT) { }
+    gpio_set_level((gpio_num_t)PIN_MIDI, 1);
 }
 
 static const char *NAMES[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
@@ -268,6 +278,45 @@ static int selftest(void)
     return ok;
 }
 
+/* LOOPBACK TOOTH: the pad sends itself a real note (0x90 60 100 ... 0x80 60 0)
+ * through the same pin, UART, parser and synth the keybed uses. It must give
+ * 6 bytes, a NOTE ON and a NOTE OFF, edges > 0 and a C4 (261.6 Hz) tone.
+ * Idle level first: L = something outside holds the line low. */
+static int midi_loopback(void)
+{
+    static const uint8_t on[3] = {0x90, 60, 100}, off[3] = {0x80, 60, 0};
+    uint8_t rx[16];
+    int lvl0 = gpio_get_level((gpio_num_t)PIN_MIDI), pk, n_on, n_off;
+    uint32_t e0 = rx_edges, on0 = M.n_on, off0 = M.n_off;
+    int got = 0;
+    uart_flush_input(MIDI_UART);
+    for (int i = 0; i < 3; ++i) bitbang_byte(on[i]);
+    int n = uart_read_bytes(MIDI_UART, rx, sizeof rx, pdMS_TO_TICKS(30));
+    for (int i = 0; i < n; ++i) msq_byte(&M, rx[i]);
+    got += n;
+    float hz = window(300, &pk);
+    for (int i = 0; i < 3; ++i) bitbang_byte(off[i]);
+    n = uart_read_bytes(MIDI_UART, rx, sizeof rx, pdMS_TO_TICKS(30));
+    for (int i = 0; i < n; ++i) msq_byte(&M, rx[i]);
+    got += n;
+    n_on = M.n_on - on0; n_off = M.n_off - off0;
+    uint32_t de = rx_edges - e0;
+    int ok = lvl0 && got == 6 && n_on == 1 && n_off == 1 && de > 0 && !M.gate &&
+             hz > 258.0f && hz < 265.0f && pk > 8000;
+    printf("LOOPBACK rx%d idle=%c: sent 6 bytes, UART got %d, NOTE ON %d, NOTE OFF %d, edges +%lu, "
+           "tone %.1f Hz (want 261.6) peak %d  %s\n", PIN_MIDI, lvl0 ? 'H' : 'L', got, n_on, n_off,
+           (unsigned long)de, hz, pk, ok ? "PASS (pin->UART->parser->synth live)" :
+           !lvl0 ? "FAIL -- line held LOW from outside" : "FAIL");
+    if (!ok) fault(lvl0 ? "MIDI LOOPBACK FAIL" : "MIDI RX HELD LOW");
+    vTaskDelay(pdMS_TO_TICKS(50));
+    uart_flush_input(MIDI_UART);
+    xQueueReset(midi_q);
+    M.n_bytes = M.n_on = M.n_off = 0; M.last_event = 0;
+    rx_edges = 0;
+    last_off_us = esp_timer_get_time();
+    return ok;
+}
+
 void app_main(void)
 {
     printf("\n=== MIDI SQUARE TEST (BCK %d, LCK %d, DIN %d, MIDI RX %d, %d Hz) ===\n",
@@ -278,6 +327,7 @@ void app_main(void)
     printf("SELFTEST: %s\n", st ? "PASS" : "FAIL");
     if (!st) fault("SELFTEST FAIL");
     if (!midi_start()) { printf("FATAL: MIDI UART start failed\n"); return; }
+    midi_loopback();
     printf("READY -- play notes. Any MIDI channel. Expect one NOTE line per key.\n");
     sil_and_stat(1);
 
