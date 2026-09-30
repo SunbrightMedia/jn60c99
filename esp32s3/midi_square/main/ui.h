@@ -12,6 +12,7 @@
 typedef struct {
     int   note;        /* sounding MIDI note, -1 none */
     float meter;       /* 0..1 output level */
+    uint8_t vstate[6]; /* per voice: 0 idle, 1 releasing, 2 held */
 } ui_live;
 
 typedef struct {

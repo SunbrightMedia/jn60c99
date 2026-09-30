@@ -26,6 +26,7 @@ void panel_init(panel_t *pn, const float knob[PANEL_KNOBS], uint32_t now_ms)
 {
     memset(pn, 0, sizeof *pn);
     memcpy(pn->knob, knob, sizeof pn->knob);
+    memcpy(pn->anchor, knob, sizeof pn->anchor);
     /* shift-bank defaults: no unison, 0.3 s release, a little reverb */
     pn->val[P_UNISON] = 0.0f;
     pn->val[P_RELEASE] = 0.642f;                     /* msq_knob_to_release -> ~0.30 s */
@@ -52,13 +53,25 @@ void panel_knob(panel_t *pn, int k, float pos, uint32_t now_ms)
         int b = pn->bank;
         if (!b && pos > 0.55f) b = 1;
         if (b && pos < 0.45f) b = 0;
-        if (b != pn->bank) { pn->bank = b; pn->bank_ms = now_ms; rearm(pn); }
+        if (b != pn->bank) {
+            pn->bank = b; pn->bank_ms = now_ms; rearm(pn);
+            pn->last_knob = -1;                       /* a new bank starts on its overview */
+            memcpy(pn->anchor, pn->knob, sizeof pn->anchor);
+        }
         return;
     }
     int p = MAP[pn->bank][k];
-    pn->last_ms = now_ms;
-    pn->last_knob = k;                                /* knob 5 has no parameter: shown as unassigned */
-    if (p < 0) return;
+    if (p < 0) return;                                /* knob 5: no parameter, never the screen */
+#ifdef MSQ_TOOTH_NO_FOCUS_DEADBAND
+    const float fm = 0.0f;                            /* TOOTH: any wiggle steals the screen */
+#else
+    const float fm = PANEL_FOCUS_MOVE;
+#endif
+    if (k == pn->last_knob || fabsf(pos - pn->anchor[k]) > fm) {
+        pn->anchor[k] = pos;
+        pn->last_ms = now_ms;
+        pn->last_knob = k;
+    }
     if (!pn->caught[p]) {
         float v = pn->val[p];
         if (fabsf(pos - v) < CATCH || (prev - v) * (pos - v) <= 0.0f) pn->caught[p] = 1;

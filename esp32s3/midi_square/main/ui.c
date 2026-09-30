@@ -129,6 +129,12 @@ static void header(gfx_fb *f, const panel_t *pn, const ui_live *lv, int bank, fl
         char s[16]; snprintf(s, sizeof s, "%s%d", N[lv->note % 12], lv->note / 12 - 1);
         gfx_text(f, 112 - gfx_text_w(s), 1, s, 1);
     }
+    if (lv) for (int k = 0; k < 6; ++k) {                 /* six voice lamps */
+        int x = 66 + k * 4;
+        if (lv->vstate[k] == 2) gfx_fill(f, x, 2, 3, 5, 1);
+        else if (lv->vstate[k] == 1) gfx_rect(f, x, 2, 3, 5, 1);
+        else gfx_pixel(f, x + 1, 6, 1);
+    }
     int m = lv ? (int)lroundf(clampf(lv->meter, 0, 1) * 7) : 0;
     gfx_rect(f, 116, 0, 12, 9, 1);
     for (int i = 0; i < m; ++i) gfx_vline(f, 118 + i, 7 - i, 7, 1);

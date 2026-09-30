@@ -18,6 +18,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "driver/i2s_std.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
@@ -59,7 +60,10 @@ static volatile int      a_frames;        /* frames rendered since last take */
 static volatile int      a_take;          /* 1 = reset accumulators */
 static volatile int      a_stall_ms;      /* tooth: stall the audio task once */
 static volatile int      a_opeak;         /* max |output sample| since last take (post-FX) */
-static volatile uint32_t a_cyc, a_cyc_max; /* render cycles per block: last, max since take */
+static volatile uint32_t a_cyc, a_cyc_max; /* core 1 work per block (voices 0-2 + FX): last, max */
+static volatile uint32_t w_cyc, w_cyc_max; /* core 0 worker per block (voices 3-5): last, max */
+static volatile int      a_mute;          /* 1: render + FX run, the DAC gets zeros (stress test) */
+static volatile int      a_hold;          /* 1: no render, no FX, zeros out (FX re-init)          */
 
 /* health latch */
 static const char *health = NULL;
@@ -81,21 +85,48 @@ static IRAM_ATTR bool on_sent(i2s_chan_handle_t h, i2s_event_data_t *e, void *u)
     return false;
 }
 
+/* THE RENDER IS SPLIT OVER BOTH CORES: voices 3-5 on a core-0 worker, voices
+ * 0-2 + the FX stage on core 1. One handshake per 5 ms block. */
+static SemaphoreHandle_t w_go, w_done;
+static float vbufB[CHUNK];
+
+static void worker_task(void *arg)
+{
+    for (;;) {
+        xSemaphoreTake(w_go, portMAX_DELAY);
+        uint32_t c0 = esp_cpu_get_cycle_count();
+        msq_render_voices(&M, MSQ_VOICES / 2, MSQ_VOICES, vbufB, CHUNK);
+        uint32_t c = esp_cpu_get_cycle_count() - c0;
+        w_cyc = c; if (c > w_cyc_max) w_cyc_max = c;
+        xSemaphoreGive(w_done);
+    }
+}
+
 static void audio_task(void *arg)
 {
     static int16_t buf[2 * CHUNK];
     static float vbuf[CHUNK];
     float prev = 0;
     for (;;) {
-        uint32_t c0 = esp_cpu_get_cycle_count();
-        msq_render_f(&M, vbuf, CHUNK);
-        fx_process(vbuf, buf, CHUNK);
-        uint32_t cyc = esp_cpu_get_cycle_count() - c0;
-        if (a_take) { a_peak = 0; a_rises = 0; a_frames = 0; a_opeak = 0; a_cyc_max = 0; a_take = 0; }
-        /* SIL / pitch probes on the VOICE (pre-FX): a stuck note is a voice
+        if (a_hold) {
+            memset(buf, 0, sizeof buf);
+        } else {
+            xSemaphoreGive(w_go);
+            uint32_t c0 = esp_cpu_get_cycle_count();
+            msq_render_voices(&M, 0, MSQ_VOICES / 2, vbuf, CHUNK);
+            uint32_t c1 = esp_cpu_get_cycle_count() - c0;
+            xSemaphoreTake(w_done, portMAX_DELAY);
+            for (int i = 0; i < CHUNK; ++i) vbuf[i] += vbufB[i];
+            c0 = esp_cpu_get_cycle_count();
+            fx_process(vbuf, buf, CHUNK);
+            uint32_t cyc = c1 + (esp_cpu_get_cycle_count() - c0);
+            a_cyc = cyc; if (cyc > a_cyc_max) a_cyc_max = cyc;
+        }
+        if (a_take) { a_peak = 0; a_rises = 0; a_frames = 0; a_opeak = 0; a_cyc_max = 0; w_cyc_max = 0; a_take = 0; }
+        /* SIL / pitch probes on the VOICE SUM (pre-FX): a stuck note is a voice
          * fault; a reverb tail is not. The output peak feeds the meter. */
         int pk = a_peak, r = a_rises, op = a_opeak;
-        for (int i = 0; i < CHUNK; ++i) {
+        for (int i = 0; i < CHUNK && !a_hold; ++i) {
             float v = vbuf[i];
             int av = (int)(v < 0 ? -v : v);
             if (v != 0.0f && av == 0) av = 1;             /* any nonzero voice sample counts */
@@ -108,7 +139,7 @@ static void audio_task(void *arg)
             if (o > op) op = o;
         }
         a_peak = pk; a_rises = r; a_frames += CHUNK; a_opeak = op;
-        a_cyc = cyc; if (cyc > a_cyc_max) a_cyc_max = cyc;
+        if (a_mute) memset(buf, 0, sizeof buf);
         if (a_stall_ms) { vTaskDelay(pdMS_TO_TICKS(a_stall_ms)); a_stall_ms = 0; }
 #ifdef MSQ_QEMU
         xSemaphoreTake(fake_space, portMAX_DELAY);
@@ -120,8 +151,16 @@ static void audio_task(void *arg)
     }
 }
 
+static void render_start(void)
+{
+    w_go = xSemaphoreCreateBinary();
+    w_done = xSemaphoreCreateBinary();
+    xTaskCreatePinnedToCore(worker_task, "voices35", 4096, NULL, 22, NULL, 0);
+}
+
 static int audio_start(void)
 {
+    render_start();
 #ifdef MSQ_QEMU
     fake_space = xSemaphoreCreateCounting(DMA_N, DMA_N);
     esp_timer_handle_t t;
@@ -277,9 +316,9 @@ static void knob_poll(void)
     for (int k = 0; k < PANEL_KNOBS; ++k) {
         float x;
         if (!knob_read(k, &x)) continue;
-        knob_avg[k] += (x - knob_avg[k]) * 0.3f;
+        knob_avg[k] += (x - knob_avg[k]) * 0.15f;
         float d = knob_avg[k] - knob_sent[k];
-        if (d > 0.004f || d < -0.004f || (knob_avg[k] < 0.002f && knob_sent[k] != 0.0f) ||
+        if (d > 0.006f || d < -0.006f || (knob_avg[k] < 0.002f && knob_sent[k] != 0.0f) ||
             (knob_avg[k] > 0.998f && knob_sent[k] != 1.0f)) {
             float v = knob_avg[k] < 0.002f ? 0.0f : (knob_avg[k] > 0.998f ? 1.0f : knob_avg[k]);
             knob_sent[k] = v;
@@ -326,7 +365,9 @@ static void ui_task(void *arg)
             ui_intro(&fb, now - t0 < UI_INTRO_MS ? now - t0 : UI_INTRO_MS);
             if (panel_ready) ui_anim_init(&an, &PANEL);
         } else {
-            ui_live lv = { M.gate ? M.last_note : -1, a_opeak / 16384.0f };
+            ui_live lv = { M.gate ? M.last_note : -1, a_opeak / 16384.0f, {0} };
+            for (int k = 0; k < MSQ_VOICES && k < 6; ++k)
+                lv.vstate[k] = M.v[k].gate ? 2 : (M.v[k].level > 0.0f ? 1 : 0);
             ui_render(&fb, &PANEL, &lv, &an, now);
         }
         if (oled_flush(&fb)) ui_frames++;
@@ -364,10 +405,10 @@ static void sil_and_stat(int force)
     static int64_t p_print;
     int64_t now = esp_timer_get_time();
     int pk = a_peak, op = a_opeak;
-    uint32_t cyc = a_cyc, cycx = a_cyc_max;
+    uint32_t cyc = a_cyc, cycx = a_cyc_max, wcx = w_cyc_max;
     a_take = 1;
     if (fx_overrun()) fault("REVERB TAP OVERRUN");
-    if (cycx > 240000000u / (SR / CHUNK)) fault("AUDIO BLOCK OVER BUDGET (render > 5 ms)");
+    if (cycx > 240000000u / (SR / CHUNK) || wcx > 240000000u / (SR / CHUNK)) fault("AUDIO BLOCK OVER BUDGET (render > 5 ms)");
     const char *sil;
     if (M.gate)                               sil = pk > 0 ? "SOUNDING" : "MUTE?";
     else if (now - last_off_us < (int64_t)(M.release_s * 1e6f) + 100000) sil = "RELEASING";
@@ -387,12 +428,13 @@ static void sil_and_stat(int force)
                gpio_get_level((gpio_num_t)PIN_MIDI) ? 'H' : 'L',
                (unsigned long)rx_edges, (unsigned long)n_break);
         printf("STAT midi bytes=%lu on=%lu off=%lu cc=%lu rt=%lu ferr=%lu ovf=%lu held=%d | "
-               "peak=%d out=%d deficit=%ld cpu=%lu%%/%lu%% oled=%lu/%lu | SIL: %s | HEALTH: %s\n",
+               "peak=%d out=%d deficit=%ld cpu1=%lu%%/%lu%% cpu0=%lu%% voices=%d oled=%lu/%lu | SIL: %s | HEALTH: %s\n",
                (unsigned long)M.n_bytes, (unsigned long)M.n_on, (unsigned long)M.n_off,
                (unsigned long)M.n_cc, (unsigned long)M.n_rt, (unsigned long)n_frame_err,
                (unsigned long)n_fifo_ovf, M.nheld, pk, op, (long)(deficit - base),
                (unsigned long)(cyc * 100u / (240000000u / (SR / CHUNK))),
                (unsigned long)(cycx * 100u / (240000000u / (SR / CHUNK))),
+               (unsigned long)(wcx * 100u / (240000000u / (SR / CHUNK))), msq_voices_sounding(&M),
                (unsigned long)ui_frames, (unsigned long)oled_errors(), sil,
                health ? health : "OK");
         p_print = now;
@@ -434,15 +476,16 @@ static int selftest(void)
     vTaskDelay(pdMS_TO_TICKS(60));
     window(200, &pk);
     int pk_off = pk, op_off = a_opeak;
-    int f_ok = hz > 437.0f && hz < 443.0f, on_ok = pk_on > 8000, off_ok = pk_off == 0;
-    printf("SELFTEST A4: %.1f Hz (want 440 +-3) %s, peak %d (want ~8192) %s, "
+    int f_ok = hz > 437.0f && hz < 443.0f, on_ok = pk_on > 0.97f * M.amp, off_ok = pk_off == 0;
+    printf("SELFTEST A4: %.1f Hz (want 440 +-3) %s, peak %d (want ~4096) %s, "
            "after release peak %d %s\n", hz, f_ok ? "ok" : "BAD", pk_on, on_ok ? "ok" : "BAD",
            pk_off, off_ok ? "SILENT" : "NOT SILENT");
     ok &= f_ok && on_ok && off_ok;
     /* 3. the JUNO FX stage (chorus 0, reverb 0: its dry path) carried the A4:
-     *    MEASURED on the host, a +-8192 square comes out at ~0.18 FS = ~6000 */
-    int fx_on = op_on > 3000 && op_on < 12000, fx_off = op_off <= 1;
-    printf("SELFTEST FX: out peak %d with the note (want ~6000) %s, %d after release %s, overrun %d\n",
+     *    MEASURED (QEMU v6): a +-4096 square came out at 3005 at FX_IN_GAIN
+     *    1/196608; at 1/294912 that is ~2000 */
+    int fx_on = op_on > 1000 && op_on < 4000, fx_off = op_off <= 1;
+    printf("SELFTEST FX: out peak %d with the note (want ~2000) %s, %d after release %s, overrun %d\n",
            op_on, fx_on ? "ok" : "BAD", op_off, fx_off ? "ok" : "BAD", fx_overrun());
     ok &= fx_on && fx_off && !fx_overrun();
     /* the self-test's own events must not count as played notes */
@@ -474,7 +517,7 @@ static int midi_loopback(void)
     n_on = M.n_on - on0; n_off = M.n_off - off0;
     uint32_t de = rx_edges - e0;
     int ok = lvl0 && got == 6 && n_on == 1 && n_off == 1 && de > 0 && !M.gate &&
-             hz > 258.0f && hz < 265.0f && pk > 8000;
+             hz > 258.0f && hz < 265.0f && pk > 0.97f * M.amp;
     printf("LOOPBACK rx%d idle=%c: sent 6 bytes, UART got %d, NOTE ON %d, NOTE OFF %d, edges +%lu, "
            "tone %.1f Hz (want 261.6) peak %d  %s\n", PIN_MIDI, lvl0 ? 'H' : 'L', got, n_on, n_off,
            (unsigned long)de, hz, pk, ok ? "PASS (pin->UART->parser->synth live)" :
@@ -486,6 +529,40 @@ static int midi_loopback(void)
     M.n_bytes = M.n_on = M.n_off = 0; M.last_event = 0;
     rx_edges = 0;
     last_off_us = esp_timer_get_time();
+    return ok;
+}
+
+/* WORST-CASE STRESS (the INVARIANT: bounded worst case, not a good average).
+ * Output MUTED. 6 voices x 7 unison oscillators, a waveform morph (two shapes
+ * per oscillator), full chorus and reverb, 400 ms. Budget per 5 ms block =
+ * 1,200,000 cycles per core. FAIL (latched) above 90 %. Then the FX state is
+ * re-initialised so no stress tail is ever heard. */
+static int stress(void)
+{
+    const uint32_t budget = 240000000u / (SR / CHUNK);
+    a_mute = 1;
+    msq_set_unison(&M, 1.0f); msq_set_wave(&M, 2.5f);
+    fx_set_chorus(255); fx_set_reverb(255);
+    for (int k = 0; k < MSQ_VOICES; ++k) { msq_byte(&M, 0x90); msq_byte(&M, (uint8_t)(48 + 4 * k)); msq_byte(&M, 100); }
+    vTaskDelay(pdMS_TO_TICKS(60));
+    a_take = 1;
+    vTaskDelay(pdMS_TO_TICKS(400));
+    uint32_t c1 = a_cyc_max, c0 = w_cyc_max;
+    int nv = msq_voices_sounding(&M), opk = a_opeak;
+    for (int k = 0; k < MSQ_VOICES; ++k) { msq_byte(&M, 0x80); msq_byte(&M, (uint8_t)(48 + 4 * k)); msq_byte(&M, 0); }
+    vTaskDelay(pdMS_TO_TICKS(60));
+    a_hold = 1; vTaskDelay(pdMS_TO_TICKS(20));
+    fx_init(NULL);
+    msq_set_unison(&M, 0.0f); msq_set_wave(&M, 3.0f);
+    a_hold = 0; vTaskDelay(pdMS_TO_TICKS(20));
+    a_take = 1; vTaskDelay(pdMS_TO_TICKS(20));        /* the stress peaks must not reach STAT */
+    a_mute = 0;
+    unsigned p1 = (unsigned)(c1 * 100ull / budget), p0 = (unsigned)(c0 * 100ull / budget);
+    int ok = nv == MSQ_VOICES && p1 <= 90 && p0 <= 90 && c1 > 0 && c0 > 0;
+    printf("STRESS (muted) %d voices x %d osc, morph, chorus 255, reverb 255: core1 %u%%  core0 %u%% of the 5 ms block, "
+           "out peak %d/32767  %s\n", nv, MSQ_UNI, p1, p0, opk, ok ? "PASS" : "FAIL");
+    if (!ok) fault("STRESS OVER BUDGET");
+    M.n_bytes = M.n_on = M.n_off = 0; M.last_event = 0;
     return ok;
 }
 
@@ -511,6 +588,7 @@ void app_main(void)
     if (!st) fault("SELFTEST FAIL");
     if (!midi_start()) { printf("FATAL: MIDI UART start failed\n"); return; }
     midi_loopback();
+    stress();
     knob_start();
     printf("READY -- play notes. Any MIDI channel. Expect one NOTE line per key.\n");
     sil_and_stat(1);

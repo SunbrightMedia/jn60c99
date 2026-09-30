@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     float k[5] = { 0.1f, 0.40f, 0.30f, 0.55f, 0.5f };
     panel_t pn; panel_init(&pn, k, 0);
     ui_anim a; ui_anim_init(&a, &pn);
-    ui_live lv = { 60, 0.6f };
+    ui_live lv = { 60, 0.6f, {2, 2, 1, 0, 0, 0} };
     uint32_t now = 5000;
     ui_render(&f, &pn, &lv, &a, now); dump(&f, "overview bank A (WAVE 0.40, ATTACK, CHORUS)");
     CHECK(lit(&f, 0, 127, 10, 31) > 60, "overview empty");
@@ -66,6 +66,30 @@ int main(int argc, char **argv)
     /* unison: catch it (default 0) by passing 0 */
     panel_knob(&pn, 1, 0.0f, now); panel_knob(&pn, 1, 0.7f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus UNISON 0.70");
     panel_knob(&pn, 3, 0.25f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus REVERB");
+    /* KNOB NOISE: WAVE has the screen; every other knob jitters +-0.6 % for
+     * 300 polls and knob 5 floats full-range. The screen must not move. Then a
+     * real 10 % turn of knob 4 must take it. */
+    {
+        panel_t q; float kk[5] = { 0.1f, 0.40f, 0.30f, 0.55f, 0.5f };
+        panel_init(&q, kk, 0);
+        uint32_t t = 100;
+        panel_knob(&q, 1, 0.45f, t);
+        unsigned r = 12345u; int moved = 0;
+        for (int i = 0; i < 300; ++i) {
+            t += 10;
+            for (int k = 2; k <= 3; ++k) {
+                r = r * 1103515245u + 12345u;
+                float j = ((int)((r >> 16) % 13) - 6) * 0.001f;
+                panel_knob(&q, k, kk[k] + j, t);
+            }
+            r = r * 1103515245u + 12345u;
+            panel_knob(&q, 4, (r >> 16) % 1000 / 1000.0f, t);
+            if (q.last_knob != 1) moved++;
+        }
+        CHECK(moved == 0, "knob noise stole the screen on %d of 300 polls", moved);
+        panel_knob(&q, 3, kk[3] + 0.10f, t + 10);
+        CHECK(q.last_knob == 3, "a real 10%% turn of knob 4 did not take the screen (last_knob %d)", q.last_knob);
+    }
     fclose(out);
     printf("%s: %d frames, %d failure(s)\n", fails ? "UI FRAMES FAIL" : "UI FRAMES PASS", nframes, fails);
     return fails != 0;

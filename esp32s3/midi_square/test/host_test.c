@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 /* Host gate for msq_core (the SAME file the firmware compiles).
  * Oracle: the MIDI 1.0 spec (running status, vel-0 = off, real-time bytes may
  * land inside a message) and the equal-tempered pitch law, measured on the
@@ -11,6 +12,7 @@
 
 #define SR 48000
 static int fails;
+static float AMP;                          /* per-voice peak, from msq_init */
 #define CHECK(c, ...) do { if (!(c)) { printf("FAIL: " __VA_ARGS__); printf("\n"); fails++; } } while (0)
 
 static void feed(msq_t *m, const uint8_t *b, int n) { for (int i = 0; i < n; ++i) msq_byte(m, b[i]); }
@@ -33,13 +35,25 @@ static double measure(msq_t *m, double sec, int *peak)
     return rises / sec;
 }
 
+/* Goertzel over 0.5 s of rendered audio: amplitude of `hz` relative to AMP */
+static double tone(msq_t *m, double hz)
+{
+    int n = SR / 2; double w = 2.0 * M_PI * hz / SR, c = 2.0 * cos(w), s0, s1 = 0, s2 = 0;
+    int16_t *buf = malloc(sizeof(int16_t) * 2 * n);
+    msq_render(m, buf, n);
+    for (int i = 0; i < n; ++i) { s0 = buf[2 * i] + c * s1 - s2; s2 = s1; s1 = s0; }
+    free(buf);
+    double re = s1 - s2 * cos(w), im = s2 * sin(w);
+    return 2.0 * sqrt(re * re + im * im) / n / AMP;
+}
+
 static void expect_note(msq_t *m, int note, const char *what)
 {
     int pk;
     measure(m, 0.02, &pk);                           /* past the attack */
     double hz = measure(m, 1.0, &pk), want = 440.0 * pow(2.0, (note - 69) / 12.0);
     CHECK(fabs(hz - want) <= 1.5, "%s: note %d measured %.1f Hz, want %.2f", what, note, hz, want);
-    CHECK(pk > 8000, "%s: peak %d, want ~8192", what, pk);
+    CHECK(pk > 0.97f * AMP, "%s: peak %d, want ~%.0f", what, pk, AMP);
 }
 
 static void expect_silent(msq_t *m, const char *what)
@@ -54,6 +68,7 @@ int main(void)
 {
     msq_t m;
     msq_init(&m, SR);
+    AMP = m.amp;
     expect_silent(&m, "boot");
 
     /* 1. plain note on / note off */
@@ -70,10 +85,23 @@ int main(void)
     feed(&m, (uint8_t[]){0x91, 0xF8, 64, 0xFE, 100}, 5); expect_note(&m, 64, "E4 with RT inside");
     feed(&m, (uint8_t[]){0x81, 64, 0xF8, 0}, 4);          expect_silent(&m, "E4 off with RT");
 
-    /* 4. last-note priority, legato fall-back */
-    feed(&m, (uint8_t[]){0x90, 48, 100, 55, 100}, 5); expect_note(&m, 55, "G3 over C3");
-    feed(&m, (uint8_t[]){0x80, 55, 0}, 3);             expect_note(&m, 48, "back to C3");
-    feed(&m, (uint8_t[]){0x80, 48, 0}, 3);             expect_silent(&m, "C3 off");
+    /* 4. POLYPHONY: a C3-E3-G3 chord sounds all three pitches (Goertzel on the
+     *    rendered samples, sine wave), a note not played does not; releasing
+     *    one key leaves the other two; release all -> exactly silent */
+    msq_set_wave(&m, 0.0f);
+    feed(&m, (uint8_t[]){0x90, 48, 100, 52, 100, 55, 100}, 7);
+    {
+        double c3 = tone(&m, 130.81), e3 = tone(&m, 164.81), g3 = tone(&m, 196.00), d3 = tone(&m, 146.83);
+        CHECK(c3 > 0.3 && e3 > 0.3 && g3 > 0.3 && d3 < 0.02, "chord C3/E3/G3 = %.3f %.3f %.3f, D3 (not played) %.3f", c3, e3, g3, d3);
+        CHECK(m.nheld == 3, "chord: %d voices gated, want 3", m.nheld);
+        feed(&m, (uint8_t[]){0x80, 52, 0}, 3);
+        int pk; measure(&m, 0.05, &pk);
+        c3 = tone(&m, 130.81); e3 = tone(&m, 164.81); g3 = tone(&m, 196.00);
+        CHECK(c3 > 0.3 && e3 < 0.02 && g3 > 0.3, "E3 released: C3 %.3f E3 %.3f G3 %.3f", c3, e3, g3);
+        CHECK(m.nheld == 2, "after E3 off: %d gated, want 2", m.nheld);
+    }
+    feed(&m, (uint8_t[]){0x80, 48, 0, 0x80, 55, 0}, 6); expect_silent(&m, "chord off");
+    msq_set_wave(&m, 3.0f);
 
     /* 5. sysex in the stream does not create notes; CC 123 clears held keys */
     feed(&m, (uint8_t[]){0xF0, 0x7E, 0x10, 0x60, 0xF7}, 5); expect_silent(&m, "sysex");
@@ -86,9 +114,19 @@ int main(void)
     feed(&m, (uint8_t[]){0x90, 96, 100}, 3); expect_note(&m, 96, "C7");
     feed(&m, (uint8_t[]){0x90, 96, 0}, 3);   expect_silent(&m, "C7 off");
 
-    /* 7. key-stack overflow (17 keys held) then release all: silent */
+    /* 7. voice stealing: 8 keys on 6 voices -> the two OLDEST are stolen; the
+     *    same key again reuses its own voice; 17 keys, release all -> silent */
+    for (int k = 0; k < 8; ++k) feed(&m, (uint8_t[]){0x90, (uint8_t)(50 + k), 100}, 3);
+    {
+        int have[128] = {0}, n = 0;
+        for (int k = 0; k < MSQ_VOICES; ++k) if (m.v[k].gate) { have[m.v[k].note]++; n++; }
+        CHECK(n == 6 && !have[50] && !have[51] && have[52] && have[57], "steal: %d gated, 50:%d 51:%d 52:%d 57:%d (want 6, 0,0,1,1)",
+              n, have[50], have[51], have[52], have[57]);
+        feed(&m, (uint8_t[]){0x90, 55, 100}, 3);
+        int same = 0; for (int k = 0; k < MSQ_VOICES; ++k) same += m.v[k].note == 55;
+        CHECK(same == 1 && m.nheld == 6, "retrigger 55: %d voices carry it, %d gated (want 1, 6)", same, m.nheld);
+    }
     for (int k = 0; k < 17; ++k) feed(&m, (uint8_t[]){0x90, (uint8_t)(50 + k), 100}, 3);
-    expect_note(&m, 66, "17 held -> newest");
     for (int k = 0; k < 17; ++k) feed(&m, (uint8_t[]){0x80, (uint8_t)(50 + k), 0}, 3);
     expect_silent(&m, "17 released");
 
@@ -103,7 +141,7 @@ int main(void)
         feed(&m, (uint8_t[]){0x80, 57, 0}, 3);
         measure(&m, 0.200, &pk);                 /* 0.00-0.20 s after off */
         measure(&m, 0.050, &pk);                 /* 0.20-0.25 s: level 0.6 -> 0.5 */
-        CHECK(pk >= 4000 && pk <= 5000, "0.5 s release: peak %d at 0.20-0.25 s, want ~4100-4900", pk);
+        CHECK(pk >= 0.49f * AMP && pk <= 0.61f * AMP, "0.5 s release: peak %d at 0.20-0.25 s, want 0.5..0.6 x %.0f", pk, AMP);
         measure(&m, 0.260, &pk);                 /* to 0.51 s */
         measure(&m, 0.100, &pk);
         CHECK(pk == 0, "0.5 s release: peak %d after 0.51 s, want exactly 0", pk);
@@ -122,7 +160,7 @@ int main(void)
             measure(&m, 0.02, &pk);
             double hz = measure(&m, 1.0, &pk), want = 440.0 * pow(2.0, (64 - 69) / 12.0);
             CHECK(fabs(hz - want) <= 1.5, "%s: %.1f Hz, want %.2f", what, hz, want);
-            CHECK(pk > 0.6 * 8192 && pk < 1.15 * 8192, "%s: peak %d, want 0.6..1.15 x 8192", what, pk);
+            CHECK(pk > 0.6 * AMP && pk < 1.15 * AMP, "%s: peak %d, want 0.6..1.15 x %.0f", what, pk, AMP);
             feed(&m, (uint8_t[]){0x80, 64, 0}, 3); expect_silent(&m, what);
         }
         msq_set_wave(&m, 3.0f);
@@ -149,9 +187,9 @@ int main(void)
         feed(&m, (uint8_t[]){0x90, 57, 100}, 3);
         measure(&m, 0.200, &pk);
         measure(&m, 0.050, &pk);                 /* 0.20-0.25 s: level 0.4 -> 0.5 */
-        CHECK(pk >= 3200 && pk <= 4300, "0.5 s attack: peak %d at 0.20-0.25 s, want ~3300-4100", pk);
+        CHECK(pk >= 0.39f * AMP && pk <= 0.53f * AMP, "0.5 s attack: peak %d at 0.20-0.25 s, want 0.4..0.5 x %.0f", pk, AMP);
         measure(&m, 0.300, &pk); measure(&m, 0.100, &pk);
-        CHECK(pk > 8000, "0.5 s attack: peak %d after 0.55 s, want full", pk);
+        CHECK(pk > 0.97f * AMP, "0.5 s attack: peak %d after 0.55 s, want full", pk);
         feed(&m, (uint8_t[]){0x80, 57, 0}, 3); expect_silent(&m, "after attack test");
         msq_set_attack(&m, 0.002f);
     }

@@ -26,8 +26,9 @@ int      fx_selfcheck(uint32_t *coef_crc, uint32_t *state_crc);
 uint32_t fx_render_crc(void);             /* fixed-signal render CRC (re-inits the state) */
 int      fx_overrun(void);                /* reverb tap overrun (must stay 0) */
 /* synth scale -> engine voice scale. MEASURED (host, fx.c): the master stage
- * gains x4.4 dry and x10.8 at full chorus; 1/196608 puts a single square
- * (+-8192) at ~0.18 FS dry, ~0.45 FS with full chorus, clear of the output
- * soft-clip for unison and reverb. */
-#define  FX_IN_GAIN  (1.0f / 196608.0f)
+ * gains x4.4 dry and x10.8 at full chorus. With 6 voices (+-4096 each) the
+ * QEMU stress chord (7-osc unison, full chorus + reverb) hit full scale at
+ * 1/196608, so 1.5x lower: one square ~0.06 FS dry (~2000), the worst-case
+ * chord at about full scale. */
+#define  FX_IN_GAIN  (1.0f / 294912.0f)
 #endif

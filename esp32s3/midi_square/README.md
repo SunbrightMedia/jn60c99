@@ -1,7 +1,9 @@
 # MINISYNTH -- the ESP32-S3 bench synth (grew from the MIDI square test)
 
-DIN MIDI -> one mono voice (7-oscillator unison, waveform morph sine > triangle >
-saw > square with band-limited saw/square, linear attack/release) -> the **JUNO
+DIN MIDI -> 6 voices (each a 7-oscillator unison stack, waveform morph sine >
+triangle > saw > square with band-limited saw/square, its own attack/release;
+same key reuses its voice, else free, else quietest releasing, else the oldest
+held note is stolen; voices 1-3 render on core 1, 4-6 on a core-0 worker) -> the **JUNO
 FX stage only** (the proven engine_b master chain: JUNO CHORUS 2 + HALL 1, delay
 off) -> PCM5102 over I2S, 48 kHz. Five knobs, two banks, 128x32 SSD1306 OLED.
 Not a JUNO voice port.
@@ -23,7 +25,8 @@ Wiring pictures: docs/hardware/midi_in_6n137.png, docs/hardware/PCM5102_MODULE.m
 | 3 | ATTACK 1 ms .. 2 s | RELEASE 10 ms .. 2 s |
 | 4 | CHORUS = EFFECT DEPTH byte 0..255 (0 = bypass) | REVERB = REVERB LEVEL byte 0..255 |
 | 5 | free | free |
-After a bank change a knob PICKS UP (no jump): the bar is dotted and the screen
+A knob takes the SCREEN only after a 2 % move (ADC noise cannot flip it);
+knob 5 (no parameter) never takes it. After a bank change a knob PICKS UP (no jump): the bar is dotted and the screen
 says TURN > / < TURN until the knob crosses the stored value.
 
 ## The JUNO FX (bit-exact, and how that is proven)
@@ -44,13 +47,16 @@ says TURN > / < TURN until the knob crosses the stored value.
 - `FX: ... coef crc .. state crc .. MATCH`, `FX: render check ... MATCH`
 - `SELFTEST ... PASS` (starvation tooth, A4 pitch/peak/silence, FX dry path ~6000)
 - `LOOPBACK ... PASS` (pin -> UART -> parser -> synth)
+- `STRESS (muted) 6 voices x 7 osc, morph, chorus 255, reverb 255: core1 X% core0 Y%`
+  -- the measured WORST CASE per 5 ms block; FAIL (latched) above 90 %.
 - `OLED: SSD1306 128x32 at 0x3C`, `KNOBS: 1..5 ...`, `PARAM <name> <value>` per move
 - `STAT ... out=.. cpu=avg%/max% oled=frames/errors | SIL | HEALTH`. SIL is measured
   on the VOICE (pre-FX): a reverb tail is not a stuck note.
 
 ## Gates
-- `sh test/run.sh` -- voice DSP (pitch, running status, morph, unison, attack,
-  release; 3 teeth) + UI frames (intro, focus, pick-up; PNG contact sheet).
+- `sh test/run.sh` -- voice DSP (pitch, running status, chord pitches by
+  Goertzel, stealing, morph, unison, attack, release) + UI frames (intro, focus,
+  pick-up, knob-noise immunity; PNG contact sheet). 5 teeth.
 - `bash tools/fx_build.sh` -- the FX chain above.
 - `sh test/qemu.sh` -- boots the fake-DMA image in QEMU (quad PSRAM override:
   sdkconfig.qemu): FX CRCs + render CRC MATCH, SELFTEST PASS. QEMU has no ADC, so

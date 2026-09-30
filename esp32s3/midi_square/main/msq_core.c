@@ -74,56 +74,78 @@ void msq_init(msq_t *m, float sr)
     m->sr       = sr;
     msq_set_attack(m, 0.002f);            /* 2 ms attack  */
     msq_set_release(m, 0.010f);           /* 10 ms release until the knob speaks */
-    m->amp      = 8192.0f;                /* -12 dBFS */
+    m->amp      = 4096.0f;                /* per voice: -18 dBFS, 6 voices fit the FX headroom */
     m->wave     = 3.0f;                   /* square, the v1-v4 sound */
     m->unison   = 0.0f;
-    m->ugain[0] = 1.0f;
-    for (int i = 0; i < MSQ_UNI; ++i) m->uph[i] = (uint32_t)i * 0x2545F491u;
-    m->uph[0] = 0;
+    for (int k = 0; k < MSQ_VOICES; ++k) {
+        msq_voice *v = &m->v[k];
+        v->note = -1;
+        v->ugain[0] = 1.0f;
+        for (int i = 1; i < MSQ_UNI; ++i) v->uph[i] = (uint32_t)(i + 7 * k) * 0x2545F491u;
+    }
     m->last_note = -1;
     if (sine_tab[SINE_N / 4] == 0.0f)
         for (int i = 0; i <= SINE_N; ++i) sine_tab[i] = sinf(6.28318530718f * i / SINE_N);
 }
 
-static void publish(msq_t *m)
+static void count(msq_t *m)
 {
-    if (m->nheld > 0) {
-        double hz = (double)msq_note_hz(m->held[m->nheld - 1]);
-        m->inc  = (uint32_t)(hz / (double)m->sr * 4294967296.0);
-        m->gate = 1;
-    } else {
-        m->gate = 0;                     /* inc kept: the release keeps its pitch */
-    }
-}
-
-static void key_remove(msq_t *m, uint8_t note)
-{
-    int i, j;
-    for (i = 0; i < m->nheld; ++i)
-        if (m->held[i] == note) {
-            for (j = i; j < m->nheld - 1; ++j) m->held[j] = m->held[j + 1];
-            --m->nheld;
-            return;
-        }
+    int n = 0;
+    for (int k = 0; k < MSQ_VOICES; ++k) n += m->v[k].gate != 0;
+    m->nheld = n;
+    m->gate = n > 0;
 }
 
 static void note_on(msq_t *m, uint8_t note, uint8_t vel)
 {
-    key_remove(m, note);
-    if (m->nheld == MSQ_MAX_HELD) {      /* full: drop the oldest */
-        memmove(m->held, m->held + 1, MSQ_MAX_HELD - 1);
-        --m->nheld;
+    int pick = -1;
+    for (int k = 0; k < MSQ_VOICES && pick < 0; ++k)            /* 1. same key */
+        if (m->v[k].note == note) pick = k;
+    for (int k = 0; k < MSQ_VOICES && pick < 0; ++k)            /* 2. idle */
+        if (!m->v[k].gate && m->v[k].level == 0.0f) pick = k;
+    if (pick < 0) {                                              /* 3. quietest releasing */
+        float best = 2.0f;
+        for (int k = 0; k < MSQ_VOICES; ++k)
+            if (!m->v[k].gate && m->v[k].level < best) { best = m->v[k].level; pick = k; }
     }
-    m->held[m->nheld++] = note;
+    if (pick < 0) {                                              /* 4. steal the oldest held */
+        uint32_t oldest = 0xFFFFFFFFu;
+        for (int k = 0; k < MSQ_VOICES; ++k)
+            if (m->v[k].age < oldest) { oldest = m->v[k].age; pick = k; }
+    }
+#ifdef MSQ_TOOTH_MONO
+    pick = 0;                                                    /* TOOTH: one voice only */
+#endif
+    msq_voice *v = &m->v[pick];
+    double hz = (double)msq_note_hz(note);
+    v->inc  = (uint32_t)(hz / (double)m->sr * 4294967296.0);
+    v->note = note;
+    v->age  = ++m->clock;
+    v->gate = 1;
+    count(m);
     m->n_on++; m->last_note = note; m->last_vel = vel; m->last_event = 1;
-    publish(m);
 }
 
 static void note_off(msq_t *m, uint8_t note)
 {
-    key_remove(m, note);
+    for (int k = 0; k < MSQ_VOICES; ++k)
+        if (m->v[k].note == note && m->v[k].gate) m->v[k].gate = 0;   /* inc kept: the release keeps its pitch */
+    count(m);
     m->n_off++; m->last_note = note; m->last_vel = 0; m->last_event = 2;
-    publish(m);
+}
+
+static void all_off(msq_t *m)
+{
+    for (int k = 0; k < MSQ_VOICES; ++k) m->v[k].gate = 0;
+    count(m);
+    m->last_event = 3;
+}
+
+int msq_voices_sounding(const msq_t *m)
+{
+    int n = 0;
+    for (int k = 0; k < MSQ_VOICES; ++k) n += m->v[k].gate || m->v[k].level > 0.0f;
+    return n;
 }
 
 int msq_byte(msq_t *m, uint8_t b)
@@ -146,7 +168,7 @@ int msq_byte(msq_t *m, uint8_t b)
     if (hi == 0xB0) {
         m->n_cc++;
         if (m->d1 == 120 || m->d1 == 123) {          /* all sound / all notes off */
-            m->nheld = 0; m->last_event = 3; publish(m);
+            all_off(m);
             return 1;
         }
         return 0;
@@ -188,46 +210,64 @@ static inline float wave_at(int k, float t, float dt)
 /* Unison layout, centre-out: offsets in units of (outer detune / 3). */
 static const float uni_off[MSQ_UNI] = { 0.0f, -1.0f, 1.0f, -2.0f, 2.0f, -3.0f, 3.0f };
 
-void msq_render_f(msq_t *m, float *out, int n)
+void msq_render_voices(msq_t *m, int v0, int v1, float *out, int n)
 {
-    uint32_t inc = m->inc;
-    int gate = m->gate;
     float att = m->att_step, rel = m->rel_step;
     float w = m->wave, u = m->unison;
     int   k0 = (int)w; if (k0 > 2) k0 = 2;
     float fw = w - (float)k0;                             /* morph k0 -> k0+1 */
     int   nv = msq_unison_voices(u);
     float cents = msq_unison_cents(u);
-    uint32_t vinc[MSQ_UNI];
-    float gt[MSQ_UNI], gstep = 1.0f / (0.010f * m->sr);   /* 10 ms gain ramps */
+    float ratio[MSQ_UNI], gt[MSQ_UNI], gstep = 1.0f / (0.010f * m->sr);   /* 10 ms gain ramps */
     float norm = 1.0f / sqrtf((float)nv);
-    for (int v = 0; v < MSQ_UNI; ++v) {
-        float c = uni_off[v] * cents / 3.0f;
-        vinc[v] = (v == 0 || c == 0.0f) ? inc
-                : (uint32_t)((double)inc * (double)powf(2.0f, c / 1200.0f));
-        gt[v] = v < nv ? norm : 0.0f;
+    for (int o = 0; o < MSQ_UNI; ++o) {
+        float c = uni_off[o] * cents / 3.0f;
+        ratio[o] = (o == 0 || c == 0.0f) ? 1.0f : powf(2.0f, c / 1200.0f);
+        gt[o] = o < nv ? norm : 0.0f;
     }
-    for (int i = 0; i < n; ++i) {
-        if (gate) { m->level += att; if (m->level > 1.0f) m->level = 1.0f; }
-        else      { m->level -= rel; if (m->level < 0.0f) m->level = 0.0f; }
-        float acc = 0.0f;
-        for (int v = 0; v < MSQ_UNI; ++v) {
-            float g = m->ugain[v];
-            if (g != gt[v]) {
-                g += (gt[v] > g) ? gstep : -gstep;
-                if ((gstep > 0) && fabsf(g - gt[v]) < gstep) g = gt[v];
-                m->ugain[v] = g;
+    for (int i = 0; i < n; ++i) out[i] = 0.0f;
+    float acc[64];
+    for (int k = v0; k < v1; ++k) {
+        msq_voice *v = &m->v[k];
+        int gate = v->gate;
+        if (!gate && v->level == 0.0f) continue;          /* idle voice: no cost */
+        uint32_t inc = v->inc;
+        for (int base = 0; base < n; base += 64) {
+            int len = n - base > 64 ? 64 : n - base;
+            for (int i = 0; i < len; ++i) acc[i] = 0.0f;
+            for (int o = 0; o < MSQ_UNI; ++o) {           /* oscillator-major: one shape pair per block */
+                float g = v->ugain[o];
+                uint32_t oinc = ratio[o] == 1.0f ? inc : (uint32_t)((double)inc * (double)ratio[o]);
+                if (g == 0.0f && gt[o] == 0.0f) { v->uph[o] += oinc * (uint32_t)len; continue; }
+                float dt = (float)(oinc >> 8) * (1.0f / 16777216.0f);
+                uint32_t ph = v->uph[o];
+                for (int i = 0; i < len; ++i) {
+                    if (g != gt[o]) {
+                        g += (gt[o] > g) ? gstep : -gstep;
+                        if (fabsf(g - gt[o]) < gstep) g = gt[o];
+                    }
+                    ph += oinc;
+                    float t = (float)(ph >> 8) * (1.0f / 16777216.0f);
+                    float s = wave_at(k0, t, dt);
+                    if (fw > 0.0f) s += (wave_at(k0 + 1, t, dt) - s) * fw;
+                    acc[i] += g * s;
+                }
+                v->uph[o] = ph; v->ugain[o] = g;
             }
-            m->uph[v] += vinc[v];
-            if (g == 0.0f) continue;
-            float t  = (float)(m->uph[v] >> 8) * (1.0f / 16777216.0f);
-            float dt = (float)(vinc[v] >> 8) * (1.0f / 16777216.0f);
-            float s  = wave_at(k0, t, dt);
-            if (fw > 0.0f) s += (wave_at(k0 + 1, t, dt) - s) * fw;
-            acc += g * s;
+            float lv = v->level;
+            for (int i = 0; i < len; ++i) {
+                if (gate) { lv += att; if (lv > 1.0f) lv = 1.0f; }
+                else      { lv -= rel; if (lv < 0.0f) lv = 0.0f; }
+                out[base + i] += acc[i] * m->amp * lv;    /* level 0 -> exactly 0 */
+            }
+            v->level = lv;
         }
-        out[i] = acc * m->amp * m->level;                 /* level 0 -> exactly 0 */
     }
+}
+
+void msq_render_f(msq_t *m, float *out, int n)
+{
+    msq_render_voices(m, 0, MSQ_VOICES, out, n);
 }
 
 void msq_render(msq_t *m, int16_t *lr, int n)

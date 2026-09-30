@@ -1,6 +1,8 @@
-/* msq_core -- MIDI parser + one mono voice: a 7-oscillator unison stack whose
- * waveform morphs sine -> triangle -> saw -> square (band-limited saw/square),
- * with a linear attack/release envelope. Portable C: the firmware
+/* msq_core -- MIDI parser + a 6-voice polyphonic synth. Each voice is a
+ * 7-oscillator unison stack whose waveform morphs sine -> triangle -> saw ->
+ * square (band-limited saw/square), with its own linear attack/release.
+ * Allocation: the same key reuses its voice; else a free voice; else the
+ * quietest releasing voice; else the OLDEST held voice is stolen. Portable C: the firmware
  * and the host test (test/host_test.c) compile THIS file, so the host test
  * grades the code that ships. Test firmware only -- not a synth port. */
 #ifndef MSQ_CORE_H
@@ -8,22 +10,28 @@
 #include <stdint.h>
 
 #define MSQ_MAX_HELD 16
-#define MSQ_UNI      7        /* unison oscillators (always running, gains ramp) */
+#define MSQ_UNI      7        /* unison oscillators per voice (gains ramp) */
+#define MSQ_VOICES   6
+
+typedef struct {
+    volatile uint32_t inc;     /* published by the MIDI side (atomic 32-bit)   */
+    volatile int      gate;
+    volatile int      note;    /* -1 = never used                              */
+    uint32_t age;              /* allocation clock, for stealing               */
+    float    level;
+    uint32_t uph[MSQ_UNI];
+    float    ugain[MSQ_UNI];
+} msq_voice;
 
 typedef struct {
     /* parser */
     uint8_t status, d1;
     int     have;
-    /* key stack, last-note priority */
-    uint8_t held[MSQ_MAX_HELD];
-    int     nheld;
-    /* published to the renderer (32-bit, aligned: atomic on Xtensa) */
-    volatile uint32_t inc;
-    volatile int      gate;
-    /* renderer */
-    uint32_t uph[MSQ_UNI];     /* oscillator phases                         */
-    float    ugain[MSQ_UNI];   /* oscillator gains, ramped toward targets   */
-    float    level, amp;
+    msq_voice v[MSQ_VOICES];
+    uint32_t clock;
+    volatile int nheld;        /* voices with the gate on                      */
+    volatile int gate;         /* 1 while any voice is gated                   */
+    float    amp;              /* per-voice peak, synth scale                  */
     /* sound parameters: written by the knob task, read once per block */
     volatile float att_step, rel_step;
     volatile float wave;       /* 0 sine, 1 triangle, 2 saw, 3 square, morph between */
@@ -40,8 +48,11 @@ void  msq_init  (msq_t *m, float sr);
 int   msq_byte  (msq_t *m, uint8_t b);
 /* Interleaved stereo 16-bit, n frames (the voice only, no effects). */
 void  msq_render(msq_t *m, int16_t *lr, int n);
-/* The voice as float, same scale as msq_render (+-amp), n frames, mono. */
+/* All voices summed as float, mono, same scale as msq_render. */
 void  msq_render_f(msq_t *m, float *out, int n);
+/* Voices [v0, v1) summed into out (overwrites). Two cores each take a range. */
+void  msq_render_voices(msq_t *m, int v0, int v1, float *out, int n);
+int   msq_voices_sounding(const msq_t *m);   /* gated or still releasing */
 float msq_note_hz(int note);
 /* Release time, seconds (linear fade from the current level; 0 -> clamped 1 ms). */
 void  msq_set_release(msq_t *m, float seconds);
