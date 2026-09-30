@@ -10,7 +10,7 @@ O=${TMPDIR:-/tmp}
 run() {  # $1 build dir
   (cd "$1" && python -m esptool --chip esp32s3 merge-bin --fill-flash-size 8MB \
       -o "$O/msq_q.bin" @flash_args >/dev/null) || exit 1
-  timeout 20 qemu-system-xtensa -nographic -machine esp32s3 -m 32M \
+  timeout ${QEMU_S:-20} qemu-system-xtensa -nographic -machine esp32s3 -m 32M \
       -drive file="$O/msq_q.bin",if=mtd,format=raw -serial file:"$O/msq_q.log" -monitor none >/dev/null 2>&1
   grep -E "SELFTEST|STAT" "$O/msq_q.log" | head -6
 }

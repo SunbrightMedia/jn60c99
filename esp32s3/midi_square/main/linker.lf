@@ -1,0 +1,19 @@
+# THE AUDIO PATH RUNS FROM IRAM, NOT FROM FLASH (same lesson as
+# esp32s3/main/linker.lf, playbook 32): the voice loop and the FX stage run
+# 48,000 times a second, and flash and PSRAM share one bus -- an instruction
+# miss waits behind the reverb's PSRAM traffic. An entry names an OBJECT, not
+# a prefix; the firmware prints where its hot symbols landed (IRAM: line).
+[mapping:main]
+archive: libmain.a
+entries:
+    msq_core (noflash_text)
+    fx (noflash_text)
+    eb_master (noflash_text)
+    eb_master_in (noflash_text)
+    eb_master_out (noflash_text)
+    eb_reverb (noflash_text)
+    eb_chorus (noflash_text)
+    eb_fx_e0 (noflash_text)
+    eb_fx_e1 (noflash_text)
+    eb_fx_e5 (noflash_text)
+    eb_dsp (noflash_text)

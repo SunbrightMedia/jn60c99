@@ -199,7 +199,19 @@ int eb_master_render_front(eb_master_state *s, const eb_master_coef *c,
     /* ---- 2. the DELAY dispatch ------------------------------------------ */
     v56 = 0.0f;
     v58 = -1.0f;
-#if EB_CLASSIC
+#if EB_CLASSIC || EB_NODELAY
+#if EB_NODELAY && !EB_CLASSIC
+    /* EB_NODELAY: the SAME off law as CLASSIC, for a build whose recalled
+     * patch has the delay OFF (DELAY TYPE 0, on == 0, wet == 0) and keeps the
+     * reverb. FAIL-CLOSED: any other delay setting renders silence and says
+     * so, rather than playing a delay that is not there. Equivalence with the
+     * running core is not assumed: esp32s3/midi_square/tools/fx_gate.c
+     * compares this build against the full recall path, bit for bit. */
+    if (c->delay_type != 0 || c->dcore.on != 0.0f || c->dcore.wet != 0.0f) {
+        *o176 = 0.0f; *o177 = 0.0f;
+        return EB_MASTER_UNSUPPORTED_ARM;
+    }
+#endif
     /* CLASSIC: no delay existed on the 1982 panel. The stage is its own OFF
      * law (eb_delay.c:127, on==0 wet==0 -> out = x), then the type-0 arm's
      * cross-and-gain. v56/v58 keep the constants above, exactly what the

@@ -72,6 +72,13 @@
 #ifndef EB_CLASSIC
 #define EB_CLASSIC 0
 #endif
+/* EB_NODELAY -- CLASSIC's delay law ONLY (reverb and effect untouched), for a
+ * build whose one recalled patch has the delay OFF. Saves the delay core's
+ * ring traffic (its 524 KB ring sat in PSRAM on the minisynth). Fail-closed on
+ * any other delay setting. Default OFF: every other build is byte-identical. */
+#ifndef EB_NODELAY
+#define EB_NODELAY 0
+#endif
 
 #include <stdint.h>
 #include "eb_master_in.h"

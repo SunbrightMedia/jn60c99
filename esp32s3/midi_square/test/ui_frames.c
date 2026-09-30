@@ -66,7 +66,7 @@ int main(int argc, char **argv)
     /* unison: catch it (default 0) by passing 0 */
     panel_knob(&pn, 1, 0.0f, now); panel_knob(&pn, 1, 0.7f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus UNISON 0.70");
     panel_knob(&pn, 3, 0.25f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus REVERB");
-    /* KNOB NOISE: WAVE has the screen; every other knob jitters +-0.6 % for
+    /* KNOB NOISE: WAVE has the screen; every other knob jitters +-3 % (the v6 board log) for
      * 300 polls and knob 5 floats full-range. The screen must not move. Then a
      * real 10 % turn of knob 4 must take it. */
     {
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
             t += 10;
             for (int k = 2; k <= 3; ++k) {
                 r = r * 1103515245u + 12345u;
-                float j = ((int)((r >> 16) % 13) - 6) * 0.001f;
+                float j = ((int)((r >> 16) % 61) - 30) * 0.001f;
                 panel_knob(&q, k, kk[k] + j, t);
             }
             r = r * 1103515245u + 12345u;
@@ -89,6 +89,23 @@ int main(int argc, char **argv)
         CHECK(moved == 0, "knob noise stole the screen on %d of 300 polls", moved);
         panel_knob(&q, 3, kk[3] + 0.10f, t + 10);
         CHECK(q.last_knob == 3, "a real 10%% turn of knob 4 did not take the screen (last_knob %d)", q.last_knob);
+    }
+    /* DIMMING: full for 10 s idle, then a smooth fade to 10 %, no jumps. */
+    {
+        int prev = ui_contrast(0), worst = 0, mono = 1;
+        CHECK(prev == UI_CONTRAST_FULL && ui_contrast(UI_DIM_AFTER_MS) == UI_CONTRAST_FULL,
+              "screen dims before %d ms idle", UI_DIM_AFTER_MS);
+        for (uint32_t t = 0; t < 20000; t += 30) {
+            int c = ui_contrast(t);
+            if (c > prev) mono = 0;
+            if (prev - c > worst) worst = prev - c;
+            prev = c;
+        }
+        int want = (int)(UI_CONTRAST_FULL * 0.10f + 0.5f);
+        CHECK(prev == want, "dimmed contrast %d, want %d (10 %%)", prev, want);
+        CHECK(mono && worst <= 8, "dim fade not smooth: monotonic %d, worst step %d per 30 ms frame", mono, worst);
+        printf("DIM: %d -> %d over %d ms after %d ms idle, worst step %d per frame\n",
+               UI_CONTRAST_FULL, prev, UI_DIM_FADE_MS, UI_DIM_AFTER_MS, worst);
     }
     fclose(out);
     printf("%s: %d frames, %d failure(s)\n", fails ? "UI FRAMES FAIL" : "UI FRAMES PASS", nframes, fails);

@@ -14,12 +14,17 @@ set(EB_FX_SRCS
     ${EB}/eb_dsp.c)
 idf_component_register(SRCS "main.c" "msq_core.c" "fx.c" "panel.c" "ui.c" "gfx.c" "oled.c" ${EB_FX_SRCS}
                        INCLUDE_DIRS "." ${EB} ${CMAKE_CURRENT_LIST_DIR}/../../../src
-                       REQUIRES ${msq_req})
+                       REQUIRES ${msq_req}
+                       LDFRAGMENTS "linker.lf")
 # -ffp-contract=off is load-bearing (no FMA may appear, or the FX stage stops
 # matching the proven recall path bit for bit); same flags as the host gate.
 target_compile_options(${COMPONENT_LIB} PRIVATE -ffp-contract=off -fno-strict-aliasing)
 set_source_files_properties(${EB_FX_SRCS} PROPERTIES COMPILE_OPTIONS
     "-std=c99;-w")
+# The recalled patch has the delay OFF: run the delay stage's own off law, not
+# the core over its 524 KB PSRAM ring (EB_NODELAY, fail-closed; proven equal to
+# the full path by tools/fx_gate.c).
+set_source_files_properties(${EB}/eb_master.c PROPERTIES COMPILE_DEFINITIONS "EB_NODELAY=1")
 # TOOTH (test only): -DMSQ_TOOTH_FMA=1 lets GCC fuse multiply-adds in the FX
 # stage; the boot render-CRC check MUST then report MISMATCH.
 if(MSQ_TOOTH_FMA)

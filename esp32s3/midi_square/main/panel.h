@@ -4,10 +4,11 @@
  * a knob does not jump the parameter: it PICKS UP when it crosses (or comes
  * within 1.5 % of) the stored value. All values are normalised 0..1.
  * SCREEN FOCUS is separate from value: a knob takes the screen only when it
- * moves PANEL_FOCUS_MOVE (2 %) away from where it last had focus, so ADC noise
+ * moves PANEL_FOCUS_MOVE (4 %) away from where it last had focus, so ADC noise
  * on the other knobs cannot flip the display. The focused knob tracks every
  * move. Knob 5 (no parameter) never takes the screen: unwired, it floats. */
-#define PANEL_FOCUS_MOVE 0.02f
+/* 4 %: the v6 board log showed +-3 % raw jitter on an idle pot (RELEASE). */
+#define PANEL_FOCUS_MOVE 0.04f
 #ifndef MSQ_PANEL_H
 #define MSQ_PANEL_H
 #include <stdint.h>

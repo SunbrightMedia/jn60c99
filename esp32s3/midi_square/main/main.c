@@ -32,10 +32,13 @@
 #include "soc/gpio_sig_map.h"   /* U1RXD_IN_IDX: UART1 RX matrix input */
 #include "msq_core.h"
 #include "fx.h"
+#include "eb_master.h"
 #include "panel.h"
 #include "ui.h"
 #include "oled.h"
 #include "gen/msq_fx_check.h"
+#include "gen/msq_wave_check.h"
+#include "esp_memory_utils.h"
 
 #define PIN_BCK   GPIO_NUM_5
 #define PIN_WS    GPIO_NUM_6
@@ -64,6 +67,10 @@ static volatile uint32_t a_cyc, a_cyc_max; /* core 1 work per block (voices 0-2 
 static volatile uint32_t w_cyc, w_cyc_max; /* core 0 worker per block (voices 3-5): last, max */
 static volatile int      a_mute;          /* 1: render + FX run, the DAC gets zeros (stress test) */
 static volatile int      a_hold;          /* 1: no render, no FX, zeros out (FX re-init)          */
+static volatile uint32_t f_cyc, f_cyc_max; /* the FX stage alone per block (core 1): last, max */
+static volatile int      a_n1, a_nact;    /* last split: active voices on core 1, active in total */
+static volatile uint32_t a_blocks_off;    /* blocks where any voice started gated-off-and-silent */
+static volatile int      a_allidle;       /* 1 while every block since take began with all voices idle */
 
 /* health latch */
 static const char *health = NULL;
@@ -85,17 +92,22 @@ static IRAM_ATTR bool on_sent(i2s_chan_handle_t h, i2s_event_data_t *e, void *u)
     return false;
 }
 
-/* THE RENDER IS SPLIT OVER BOTH CORES: voices 3-5 on a core-0 worker, voices
- * 0-2 + the FX stage on core 1. One handshake per 5 ms block. */
+/* THE RENDER IS SPLIT OVER BOTH CORES, ADAPTIVELY. Core 1 carries the FX
+ * stage, so it takes fewer voices: each block the SOUNDING voices are divided
+ * so that (FX + core-1 voices) and (core-0 voices) are as equal as the running
+ * cost averages say. Idle voices go to the worker (a key pressed mid-block is
+ * rendered by whichever core holds its bit; every voice is in exactly one
+ * mask). One handshake per 5 ms block. */
 static SemaphoreHandle_t w_go, w_done;
 static float vbufB[CHUNK];
+static volatile uint32_t w_mask;
 
 static void worker_task(void *arg)
 {
     for (;;) {
         xSemaphoreTake(w_go, portMAX_DELAY);
         uint32_t c0 = esp_cpu_get_cycle_count();
-        msq_render_voices(&M, MSQ_VOICES / 2, MSQ_VOICES, vbufB, CHUNK);
+        msq_render_mask(&M, w_mask, vbufB, CHUNK);
         uint32_t c = esp_cpu_get_cycle_count() - c0;
         w_cyc = c; if (c > w_cyc_max) w_cyc_max = c;
         xSemaphoreGive(w_done);
@@ -107,22 +119,44 @@ static void audio_task(void *arg)
     static int16_t buf[2 * CHUNK];
     static float vbuf[CHUNK];
     float prev = 0;
+    float fx_avg = 0, v_avg = 0;                         /* cycles: FX per block, one voice per block */
+    uint32_t on_at_start = 0;
     for (;;) {
+        int allidle = 1;
         if (a_hold) {
             memset(buf, 0, sizeof buf);
         } else {
+            on_at_start = M.n_on;
+            uint32_t act = 0; int nact = 0;
+            for (int k = 0; k < MSQ_VOICES; ++k)
+                if (M.v[k].gate || M.v[k].level > 0.0f) { act |= 1u << k; nact++; }
+            allidle = nact == 0;
+            int n1 = nact / 2;
+            if (v_avg > 0.0f) {
+                float x = (nact * v_avg - fx_avg) / (2.0f * v_avg);
+                n1 = (int)(x + 0.5f); if (n1 < 0) n1 = 0; if (n1 > nact) n1 = nact;
+            }
+            uint32_t m1 = 0; int c = 0;
+            for (int k = 0; k < MSQ_VOICES && c < n1; ++k) if (act & (1u << k)) { m1 |= 1u << k; c++; }
+            w_mask = ((1u << MSQ_VOICES) - 1) & ~m1;
+            a_n1 = n1; a_nact = nact;
             xSemaphoreGive(w_go);
             uint32_t c0 = esp_cpu_get_cycle_count();
-            msq_render_voices(&M, 0, MSQ_VOICES / 2, vbuf, CHUNK);
+            msq_render_mask(&M, m1, vbuf, CHUNK);
             uint32_t c1 = esp_cpu_get_cycle_count() - c0;
             xSemaphoreTake(w_done, portMAX_DELAY);
             for (int i = 0; i < CHUNK; ++i) vbuf[i] += vbufB[i];
             c0 = esp_cpu_get_cycle_count();
             fx_process(vbuf, buf, CHUNK);
-            uint32_t cyc = c1 + (esp_cpu_get_cycle_count() - c0);
+            uint32_t cf = esp_cpu_get_cycle_count() - c0;
+            uint32_t cyc = c1 + cf;
             a_cyc = cyc; if (cyc > a_cyc_max) a_cyc_max = cyc;
+            f_cyc = cf; if (cf > f_cyc_max) f_cyc_max = cf;
+            fx_avg += ((float)cf - fx_avg) * 0.1f;
+            if (nact) v_avg += ((float)(c1 + w_cyc) / nact - v_avg) * 0.1f;
         }
-        if (a_take) { a_peak = 0; a_rises = 0; a_frames = 0; a_opeak = 0; a_cyc_max = 0; w_cyc_max = 0; a_take = 0; }
+        if (a_take) { a_peak = 0; a_rises = 0; a_frames = 0; a_opeak = 0; a_cyc_max = 0; w_cyc_max = 0; f_cyc_max = 0; a_allidle = 1; a_take = 0; }
+        if (!allidle) a_allidle = 0;
         /* SIL / pitch probes on the VOICE SUM (pre-FX): a stuck note is a voice
          * fault; a reverb tail is not. The output peak feeds the meter. */
         int pk = a_peak, r = a_rises, op = a_opeak;
@@ -138,6 +172,9 @@ static void audio_task(void *arg)
             if (o2 > o) o = o2;
             if (o > op) op = o;
         }
+        /* STUCK is judged only on blocks that began with every voice idle:
+         * such a block must render exactly 0 (unless a key arrived during it). */
+        if (allidle && !a_hold && M.n_on == on_at_start) for (int i = 0; i < CHUNK; ++i) if (vbuf[i] != 0.0f) { a_blocks_off++; break; }
         a_peak = pk; a_rises = r; a_frames += CHUNK; a_opeak = op;
         if (a_mute) memset(buf, 0, sizeof buf);
         if (a_stall_ms) { vTaskDelay(pdMS_TO_TICKS(a_stall_ms)); a_stall_ms = 0; }
@@ -240,6 +277,11 @@ static void bitbang_byte(uint8_t v)
     bits[0] = 0;
     for (int i = 0; i < 8; ++i) bits[1 + i] = (v >> i) & 1;
     bits[9] = 1;
+    /* ONE BYTE IS ONE CRITICAL SECTION (320 us). v6 LOOPBACK FAILED 5 of 6
+     * bytes on the board: the core-0 voice worker (priority 22) preempted
+     * this task mid-byte, and a stretched bit is a wrong byte. */
+    static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+    taskENTER_CRITICAL(&mux);
     uint32_t t0 = esp_cpu_get_cycle_count();
     for (int i = 0; i < 10; ++i) {
         while ((uint32_t)(esp_cpu_get_cycle_count() - t0) < i * BIT) { }
@@ -247,6 +289,7 @@ static void bitbang_byte(uint8_t v)
     }
     while ((uint32_t)(esp_cpu_get_cycle_count() - t0) < 10 * BIT) { }
     gpio_set_level((gpio_num_t)PIN_MIDI, 1);
+    taskEXIT_CRITICAL(&mux);
 }
 
 /* ----------------------------------------------------------------- PANEL
@@ -256,6 +299,17 @@ static void bitbang_byte(uint8_t v)
  * Started AFTER the self-test and loopback, which need the fixed defaults. */
 static panel_t PANEL;
 static volatile int panel_ready;
+static volatile uint32_t touch_ms;        /* last knob move (knobs 1-4) or key: the screen dim clock */
+
+/* No knobs (ADC failed, or the QEMU build): the panel still starts, at its
+ * defaults, so the screen leaves the intro and the synth plays. */
+static void panel_fallback(void)
+{
+    float pos[PANEL_KNOBS] = { 0.0f, 0.5f, 0.5f, 0.5f, 0.5f };
+    panel_init(&PANEL, pos, (uint32_t)(esp_timer_get_time() / 1000));
+    PANEL.changed = 0;
+    panel_ready = 1;
+}
 
 static void apply_param(int p, float v)
 {
@@ -275,11 +329,19 @@ static adc_channel_t knob_ch[PANEL_KNOBS];
 static int knob_ok;
 static float knob_avg[PANEL_KNOBS], knob_sent[PANEL_KNOBS];
 
+/* 8 conversions averaged per read: the v6 board log showed +-3 % raw jitter
+ * on an idle pot (a 100 nF cap from each wiper to GND removes most of it). */
+#define KNOB_OVERSAMPLE 8
+#define KNOB_IIR        0.10f
+#define KNOB_DEADBAND   0.010f
 static int knob_read(int k, float *x)
 {
-    int raw;
-    if (adc_oneshot_read(knob_adc, knob_ch[k], &raw) != ESP_OK) return 0;
-    *x = raw / 4095.0f;
+    int raw, acc = 0;
+    for (int i = 0; i < KNOB_OVERSAMPLE; ++i) {
+        if (adc_oneshot_read(knob_adc, knob_ch[k], &raw) != ESP_OK) return 0;
+        acc += raw;
+    }
+    *x = acc / (4095.0f * KNOB_OVERSAMPLE);
     return 1;
 }
 
@@ -287,13 +349,13 @@ static void knob_start(void)
 {
     adc_oneshot_unit_init_cfg_t uc = { .unit_id = ADC_UNIT_1 };
     adc_oneshot_chan_cfg_t cc = { .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
-    if (adc_oneshot_new_unit(&uc, &knob_adc) != ESP_OK) { printf("KNOBS: ADC init failed\n"); return; }
+    if (adc_oneshot_new_unit(&uc, &knob_adc) != ESP_OK) { printf("KNOBS: ADC init failed\n"); panel_fallback(); return; }
     float pos[PANEL_KNOBS] = {0};
     for (int k = 0; k < PANEL_KNOBS; ++k) {
         adc_unit_t unit;
         if (adc_oneshot_io_to_channel(PIN_KNOBS[k], &unit, &knob_ch[k]) != ESP_OK || unit != ADC_UNIT_1 ||
             adc_oneshot_config_channel(knob_adc, knob_ch[k], &cc) != ESP_OK) {
-            printf("KNOBS: GPIO %d is not usable on ADC1\n", PIN_KNOBS[k]); return;
+            printf("KNOBS: GPIO %d is not usable on ADC1\n", PIN_KNOBS[k]); panel_fallback(); return;
         }
         float x = 0, acc = 0;
         for (int i = 0; i < 8; ++i) { knob_read(k, &x); acc += x; }
@@ -316,12 +378,13 @@ static void knob_poll(void)
     for (int k = 0; k < PANEL_KNOBS; ++k) {
         float x;
         if (!knob_read(k, &x)) continue;
-        knob_avg[k] += (x - knob_avg[k]) * 0.15f;
+        knob_avg[k] += (x - knob_avg[k]) * KNOB_IIR;
         float d = knob_avg[k] - knob_sent[k];
-        if (d > 0.006f || d < -0.006f || (knob_avg[k] < 0.002f && knob_sent[k] != 0.0f) ||
+        if (d > KNOB_DEADBAND || d < -KNOB_DEADBAND || (knob_avg[k] < 0.002f && knob_sent[k] != 0.0f) ||
             (knob_avg[k] > 0.998f && knob_sent[k] != 1.0f)) {
             float v = knob_avg[k] < 0.002f ? 0.0f : (knob_avg[k] > 0.998f ? 1.0f : knob_avg[k]);
             knob_sent[k] = v;
+            if (k < 4) touch_ms = now;                 /* knob 5 is unwired: it floats */
             int bank0 = PANEL.bank;
             panel_knob(&PANEL, k, v, now);
             if (PANEL.bank != bank0) printf("BANK %c (%s)\n", PANEL.bank ? 'B' : 'A', PANEL.bank ? "SHIFT" : "MAIN");
@@ -344,13 +407,16 @@ static void knob_poll(void)
     }
 }
 #else
-static void knob_start(void) { printf("KNOBS: not in the QEMU build\n"); }
+static void knob_start(void) { printf("KNOBS: not in the QEMU build\n"); panel_fallback(); }
 static void knob_poll(void) { }
 #endif
 
 /* ------------------------------------------------------------------ OLED
- * Its own task on core 0 (the audio owns core 1). ~30 fps; the intro runs
- * first, then the live screens. A missing display is logged, never fatal. */
+ * Its own task on core 0 (the audio owns core 1). ~30 fps. The intro starts
+ * AFTER the boot tests: v6's intro stuttered at the same point every boot,
+ * which was the muted STRESS test loading core 0 (INFERRED from the timing;
+ * the INTRO: line now measures the worst frame gap). The screen dims to 10 %
+ * after 10 s without a knob move or a key (ui_contrast, host-tested). */
 static int oled_addr;
 static volatile uint32_t ui_frames;
 
@@ -358,28 +424,57 @@ static void ui_task(void *arg)
 {
     static gfx_fb fb;
     static ui_anim an;
-    uint32_t t0 = (uint32_t)(esp_timer_get_time() / 1000);
+    uint32_t t0 = (uint32_t)(esp_timer_get_time() / 1000), prev = t0, gap = 0, heal_at = t0 + 2000;
+    int intro_frames = 0, intro_done = 0;
+    uint8_t con = UI_CONTRAST_FULL;
+    TickType_t wake = xTaskGetTickCount();
+    touch_ms = t0;
     for (;;) {
         uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
         if (now - t0 < UI_INTRO_MS || !panel_ready) {
+            if (now - prev > gap) gap = now - prev;
+            intro_frames++;
             ui_intro(&fb, now - t0 < UI_INTRO_MS ? now - t0 : UI_INTRO_MS);
             if (panel_ready) ui_anim_init(&an, &PANEL);
         } else {
+            if (!intro_done) {
+                intro_done = 1;
+                printf("INTRO: %d frames in %lu ms, worst frame gap %lu ms %s\n", intro_frames,
+                       (unsigned long)(now - t0), (unsigned long)gap, gap < 60 ? "(smooth)" : "(STUTTER)");
+                touch_ms = now;
+            }
             ui_live lv = { M.gate ? M.last_note : -1, a_opeak / 16384.0f, {0} };
             for (int k = 0; k < MSQ_VOICES && k < 6; ++k)
                 lv.vstate[k] = M.v[k].gate ? 2 : (M.v[k].level > 0.0f ? 1 : 0);
             ui_render(&fb, &PANEL, &lv, &an, now);
         }
+        prev = now;
+        /* dim: the target follows idle time down smoothly; a touch brings it
+         * back up in ~150 ms */
+        uint8_t tgt = intro_done ? ui_contrast(now - touch_ms) : UI_CONTRAST_FULL;
+        if (tgt > con) con = (uint8_t)(tgt - con > 30 ? con + 30 : tgt); else con = tgt;
+        oled_contrast(con);
         if (oled_flush(&fb)) ui_frames++;
-        vTaskDelay(pdMS_TO_TICKS(30));
+        if (intro_done && (int32_t)(now - heal_at) >= 0) {   /* self-heal: re-init every 2 s */
+            heal_at = now + 2000;
+            if (oled_heal() == 2) printf("OLED: display found late -- now on\n");
+        }
+        xTaskDelayUntil(&wake, pdMS_TO_TICKS(33));      /* a fixed frame clock, not "30 ms after the flush" */
     }
 }
 
 static void oled_start(void)
 {
+    static gfx_fb blank;
     oled_addr = oled_init(PIN_SDA, PIN_SCL);
-    if (!oled_addr) { printf("OLED: no SSD1306 at 0x3C/0x3D on SDA %d SCL %d\n", PIN_SDA, PIN_SCL); return; }
-    printf("OLED: SSD1306 128x32 at 0x%02X (SDA %d, SCL %d)\n", oled_addr, PIN_SDA, PIN_SCL);
+    if (!oled_addr) { printf("OLED: no SSD1306 at 0x3C/0x3D on SDA %d SCL %d after %d tries (will keep looking)\n", PIN_SDA, PIN_SCL, oled_tries()); return; }
+    gfx_clear(&blank);
+    oled_flush(&blank);                                /* power-up RAM is noise: clear it now */
+    printf("OLED: SSD1306 128x32 at 0x%02X (SDA %d, SCL %d), try %d\n", oled_addr, PIN_SDA, PIN_SCL, oled_tries());
+}
+
+static void ui_begin(void)
+{
     xTaskCreatePinnedToCore(ui_task, "ui", 6144, NULL, 2, NULL, 0);
 }
 
@@ -409,10 +504,22 @@ static void sil_and_stat(int force)
     a_take = 1;
     if (fx_overrun()) fault("REVERB TAP OVERRUN");
     if (cycx > 240000000u / (SR / CHUNK) || wcx > 240000000u / (SR / CHUNK)) fault("AUDIO BLOCK OVER BUDGET (render > 5 ms)");
+    /* v6 raised false STUCK / MUTE? alarms: the 1 s window mixed audio from
+     * before a key change with the state after it. Now STUCK = a block that
+     * BEGAN with every voice idle rendered a nonzero sample (counted in the
+     * audio task, never a window guess); MUTE? = a key held through the whole
+     * window and not one nonzero sample. */
+    static uint32_t p_off_bad;
+    static int p_gate;
+    uint32_t off_bad = a_blocks_off;
+    int allidle = a_allidle, gated = M.gate && p_gate;
+    p_gate = M.gate;
     const char *sil;
-    if (M.gate)                               sil = pk > 0 ? "SOUNDING" : "MUTE?";
-    else if (now - last_off_us < (int64_t)(M.release_s * 1e6f) + 100000) sil = "RELEASING";
-    else                                      sil = pk == 0 ? "SILENT" : "STUCK";
+    if (off_bad != p_off_bad)                 sil = "STUCK";
+    else if (gated)                           sil = pk > 0 ? "SOUNDING" : "MUTE?";
+    else if (M.gate || !allidle)              sil = pk > 0 ? "SOUNDING" : "RELEASING";
+    else                                      sil = "SILENT";
+    p_off_bad = off_bad;
     if (!strcmp(sil, "STUCK")) fault("STUCK (no key held, output not silent)");
     if (!strcmp(sil, "MUTE?")) fault("MUTE (key held, output exactly 0)");
     int32_t deficit = (int32_t)(a_sent - a_written);
@@ -428,13 +535,15 @@ static void sil_and_stat(int force)
                gpio_get_level((gpio_num_t)PIN_MIDI) ? 'H' : 'L',
                (unsigned long)rx_edges, (unsigned long)n_break);
         printf("STAT midi bytes=%lu on=%lu off=%lu cc=%lu rt=%lu ferr=%lu ovf=%lu held=%d | "
-               "peak=%d out=%d deficit=%ld cpu1=%lu%%/%lu%% cpu0=%lu%% voices=%d oled=%lu/%lu | SIL: %s | HEALTH: %s\n",
+               "peak=%d out=%d deficit=%ld cpu1=%lu%%/%lu%% (fx %lu%%) cpu0=%lu%% voices=%d split=%d/%d oled=%lu/%lu | SIL: %s | HEALTH: %s\n",
                (unsigned long)M.n_bytes, (unsigned long)M.n_on, (unsigned long)M.n_off,
                (unsigned long)M.n_cc, (unsigned long)M.n_rt, (unsigned long)n_frame_err,
                (unsigned long)n_fifo_ovf, M.nheld, pk, op, (long)(deficit - base),
                (unsigned long)(cyc * 100u / (240000000u / (SR / CHUNK))),
                (unsigned long)(cycx * 100u / (240000000u / (SR / CHUNK))),
+               (unsigned long)(f_cyc_max * 100u / (240000000u / (SR / CHUNK))),
                (unsigned long)(wcx * 100u / (240000000u / (SR / CHUNK))), msq_voices_sounding(&M),
+               a_n1, a_nact - a_n1,
                (unsigned long)ui_frames, (unsigned long)oled_errors(), sil,
                health ? health : "OK");
         p_print = now;
@@ -547,7 +656,8 @@ static int stress(void)
     vTaskDelay(pdMS_TO_TICKS(60));
     a_take = 1;
     vTaskDelay(pdMS_TO_TICKS(400));
-    uint32_t c1 = a_cyc_max, c0 = w_cyc_max;
+    uint32_t c1 = a_cyc_max, c0 = w_cyc_max, cf = f_cyc_max;
+    int s1 = a_n1, s0 = a_nact - a_n1;
     int nv = msq_voices_sounding(&M), opk = a_opeak;
     for (int k = 0; k < MSQ_VOICES; ++k) { msq_byte(&M, 0x80); msq_byte(&M, (uint8_t)(48 + 4 * k)); msq_byte(&M, 0); }
     vTaskDelay(pdMS_TO_TICKS(60));
@@ -559,8 +669,9 @@ static int stress(void)
     a_mute = 0;
     unsigned p1 = (unsigned)(c1 * 100ull / budget), p0 = (unsigned)(c0 * 100ull / budget);
     int ok = nv == MSQ_VOICES && p1 <= 90 && p0 <= 90 && c1 > 0 && c0 > 0;
-    printf("STRESS (muted) %d voices x %d osc, morph, chorus 255, reverb 255: core1 %u%%  core0 %u%% of the 5 ms block, "
-           "out peak %d/32767  %s\n", nv, MSQ_UNI, p1, p0, opk, ok ? "PASS" : "FAIL");
+    printf("STRESS (muted) %d voices x %d osc, morph, chorus 255, reverb 255: core1 %u%% (FX alone %u%%)  core0 %u%% of the 5 ms block, "
+           "split %d/%d voices, out peak %d/32767  %s\n", nv, MSQ_UNI, p1, (unsigned)(cf * 100ull / budget), p0,
+           s1, s0, opk, ok ? "PASS" : "FAIL");
     if (!ok) fault("STRESS OVER BUDGET");
     M.n_bytes = M.n_on = M.n_off = 0; M.last_event = 0;
     return ok;
@@ -581,6 +692,16 @@ void app_main(void)
     printf("FX: render check crc %08lx vs host %08lx: %s\n", (unsigned long)rc,
            (unsigned long)MSQ_FX_RENDER_CRC, rc == MSQ_FX_RENDER_CRC ? "MATCH (S3 arithmetic == host == recall path)" : "MISMATCH");
     if (rc != MSQ_FX_RENDER_CRC) fault("FX RENDER CRC MISMATCH");
+    uint32_t wc = msq_wave_crc();
+    printf("WAVES: voice render check crc %08lx vs host %08lx: %s\n", (unsigned long)wc, (unsigned long)MSQ_WAVE_CRC,
+           wc == MSQ_WAVE_CRC ? "MATCH (tri/saw/square/morphs == host samples)" : "MISMATCH");
+    if (wc != MSQ_WAVE_CRC) fault("WAVE RENDER CRC MISMATCH");
+    const void *hot[3] = { (const void *)msq_render_mask, (const void *)eb_master_render, (const void *)fx_process };
+    int in_iram = 1;
+    for (int i = 0; i < 3; ++i) in_iram &= esp_ptr_in_iram(hot[i]);
+    printf("IRAM: msq_render_mask %p, eb_master_render %p, fx_process %p: %s\n", hot[0], hot[1], hot[2],
+           in_iram ? "all in IRAM" : "NOT ALL IN IRAM (flash fetch on the audio path)");
+    if (!in_iram) fault("AUDIO CODE NOT IN IRAM");
     oled_start();
     if (!audio_start()) { printf("FATAL: I2S start failed\n"); return; }
     int st = selftest();
@@ -590,6 +711,7 @@ void app_main(void)
     midi_loopback();
     stress();
     knob_start();
+    ui_begin();
     printf("READY -- play notes. Any MIDI channel. Expect one NOTE line per key.\n");
     sil_and_stat(1);
 
@@ -602,6 +724,7 @@ void app_main(void)
                 int n = uart_read_bytes(MIDI_UART, b, sizeof b, 0);
                 for (int i = 0; i < n; ++i)
                     if (msq_byte(&M, b[i])) {
+                        touch_ms = (uint32_t)(esp_timer_get_time() / 1000);
                         if (!M.gate) last_off_us = esp_timer_get_time();
                         print_event();
                     }

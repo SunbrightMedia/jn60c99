@@ -28,4 +28,16 @@ cc $CF -DMSQ_TOOTH_NO_FOCUS_DEADBAND test/ui_frames.c main/ui.c main/gfx.c main/
 "$O/ui_tooth" "$O/frames_tooth.txt" > "$O/ui_tooth.log"; t5=$?
 grep FAIL "$O/ui_tooth.log" | head -2
 [ $t5 -ne 0 ] && echo "TOOTH 5 (no focus deadband) BITES" || echo "TOOTH 5 DOES NOT BITE -- gate untrusted"
-[ $r -eq 0 ] && [ $t -ne 0 ] && [ $t2 -ne 0 ] && [ $t3 -ne 0 ] && [ $u -eq 0 ] && [ $t4 -ne 0 ] && [ $t5 -ne 0 ]
+cc $CF test/wave_crc.c main/msq_core.c -lm -o "$O/wave_crc" || exit 1
+"$O/wave_crc" main/gen/msq_wave_check.h || exit 1
+cc $CF test/render_equiv.c test/ref_render.c main/msq_core.c -lm -o "$O/req" || exit 1
+"$O/req"; q=$?
+cc $CF -DMSQ_TOOTH_RENDER test/render_equiv.c test/ref_render.c main/msq_core.c -lm -o "$O/req_tooth" || exit 1
+"$O/req_tooth" > "$O/req_tooth.log"; t6=$?
+tail -1 "$O/req_tooth.log"
+[ $t6 -ne 0 ] && echo "TOOTH 6 (renderer drift) BITES" || echo "TOOTH 6 DOES NOT BITE -- gate untrusted"
+cc $CF -DMSQ_TOOTH_NO_DIM test/ui_frames.c main/ui.c main/gfx.c main/panel.c main/msq_core.c -lm -o "$O/ui_tooth7" || exit 1
+"$O/ui_tooth7" "$O/frames_tooth7.txt" > "$O/ui_tooth7.log"; t7=$?
+grep FAIL "$O/ui_tooth7.log" | head -2
+[ $t7 -ne 0 ] && echo "TOOTH 7 (screen never dims) BITES" || echo "TOOTH 7 DOES NOT BITE -- gate untrusted"
+[ $t7 -ne 0 ] && [ $q -eq 0 ] && [ $t6 -ne 0 ] && [ $r -eq 0 ] && [ $t -ne 0 ] && [ $t2 -ne 0 ] && [ $t3 -ne 0 ] && [ $u -eq 0 ] && [ $t4 -ne 0 ] && [ $t5 -ne 0 ]

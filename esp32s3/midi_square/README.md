@@ -47,16 +47,38 @@ says TURN > / < TURN until the knob crosses the stored value.
 - `FX: ... coef crc .. state crc .. MATCH`, `FX: render check ... MATCH`
 - `SELFTEST ... PASS` (starvation tooth, A4 pitch/peak/silence, FX dry path ~6000)
 - `LOOPBACK ... PASS` (pin -> UART -> parser -> synth)
-- `STRESS (muted) 6 voices x 7 osc, morph, chorus 255, reverb 255: core1 X% core0 Y%`
-  -- the measured WORST CASE per 5 ms block; FAIL (latched) above 90 %.
-- `OLED: SSD1306 128x32 at 0x3C`, `KNOBS: 1..5 ...`, `PARAM <name> <value>` per move
-- `STAT ... out=.. cpu=avg%/max% oled=frames/errors | SIL | HEALTH`. SIL is measured
-  on the VOICE (pre-FX): a reverb tail is not a stuck note.
+- `WAVES: voice render check ... MATCH` -- a libm-free render CRC vs the host
+  (test/wave_crc.c): the board plays the samples the host measured.
+- `IRAM: ... all in IRAM` -- the voice loop and the FX stage run from IRAM
+  (main/linker.lf), read from the linked symbols, not from the .lf file.
+- `STRESS (muted) 6 voices x 7 osc, morph, chorus 255, reverb 255: core1 X% (FX alone F%)
+  core0 Y%, split a/b` -- the measured WORST CASE per 5 ms block; FAIL (latched)
+  above 90 %. The split is ADAPTIVE: core 1 carries the FX, so it takes fewer voices.
+- `OLED: SSD1306 128x32 at 0x3C, try N` (cold start: up to 10 tries with bus
+  reset; re-init every 2 s heals a display that reset later), `INTRO: .. worst
+  frame gap .. (smooth)`, `KNOBS: 1..5 ...`, `PARAM <name> <value>` per move.
+- `STAT ... cpu1=avg%/max% (fx F%) cpu0=.. split=a/b oled=frames/errors | SIL | HEALTH`.
+  SIL is measured on the VOICE (pre-FX): a reverb tail is not a stuck note.
+  STUCK = a block that BEGAN with all voices idle (and no key during it) was not 0.
+
+## v7 costs and fixes (2026-09-30, from the v6 board log)
+- v6 STRESS FAIL (core1 146 %): the FX stage alone was ~60 % idle. Fixes: the
+  delay stage runs its own OFF law (EB_NODELAY, fail-closed, gated EXACTLY 0 vs
+  the full recall path) instead of the 524 KB PSRAM ring; audio code in IRAM;
+  64 KB / 64 B-line data cache; voice loop with the shape switch hoisted
+  (test/render_equiv.c: BIT-EXACT vs the frozen v6 loop, test/ref_render.c).
+- v6 LOOPBACK 5/6 bytes: the core-0 voice worker preempted the bit-banged byte;
+  each byte is now one critical section.
+- Knobs: 8x oversample, IIR 0.10, 1 % deadband, 4 % focus move (the test now uses
+  the board's +-3 % noise). A 100 nF cap from each wiper to GND helps most.
+- Screen: dims to 10 % after 10 s with no knob or key (geometric fade, 1.5 s);
+  the intro starts after the boot tests (v6 stutter = STRESS loading core 0).
 
 ## Gates
 - `sh test/run.sh` -- voice DSP (pitch, running status, chord pitches by
   Goertzel, stealing, morph, unison, attack, release) + UI frames (intro, focus,
-  pick-up, knob-noise immunity; PNG contact sheet). 5 teeth.
+  pick-up, knob-noise immunity, dimming; PNG contact sheet) + render equivalence
+  vs the frozen v6 loop + the WAVES host CRC. 7 teeth.
 - `bash tools/fx_build.sh` -- the FX chain above.
 - `sh test/qemu.sh` -- boots the fake-DMA image in QEMU (quad PSRAM override:
   sdkconfig.qemu): FX CRCs + render CRC MATCH, SELFTEST PASS. QEMU has no ADC, so

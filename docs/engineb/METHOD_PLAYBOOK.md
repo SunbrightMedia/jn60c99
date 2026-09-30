@@ -2199,3 +2199,16 @@ loopback FAILs there (seen to fail) and only silicon can pass it.
 Before a firmware tooth drives or reads a pin, check whether that pin is the IO_MUX pin of a
 peripheral the firmware also uses on it. If it is, route the peripheral through the matrix, or the
 tooth tests a pad nobody is looking at.
+
+## 103. A TOOTH AT A BOUNDARY THE DATA NEVER HITS IS NOT A TOOTH -- PICK THE DEFECT A REFACTOR ACTUALLY MAKES
+Paid 2026-09-30 (esp32s3/midi_square v7). The optimised voice loop is graded BIT FOR BIT against a
+frozen copy of the v6 loop (test/render_equiv.c). The first tooth changed the gain-ramp landing
+test from `<` to `<=`: it DID NOT BITE -- 1.3 M samples x 6 voices, zero differences, because
+|g - gt| == gstep exactly almost never happens. A green gate with that tooth would have been
+believed. The second tooth is the defect the refactor could really make: the ramp gain not written
+back after the sub-block (27,668 blocks differ, BITES).
+### The rule
+A tooth models a mistake the change under test could plausibly make (a lost write-back, a wrong
+specialisation, a dropped term), not a measure-zero boundary. If a tooth does not bite, first ask
+whether it could ever change the data -- and never ship the gate on it.
+

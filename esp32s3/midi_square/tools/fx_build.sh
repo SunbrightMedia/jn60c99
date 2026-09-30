@@ -19,11 +19,21 @@ cc $M32 $FL -o "$O/fxgen32" esp32s3/midi_square/tools/fxgen.c $SRCS -lm
 if diff <(grep -v "STATE\|SEED\|{[0-9]*,0x" "$O/msq_fx64.h") <(grep -v "STATE\|SEED\|{[0-9]*,0x" esp32s3/midi_square/main/gen/msq_fx.h) >/dev/null
 then echo "64-bit vs 32-bit recall: coefficient image and tables IDENTICAL"
 else echo "FAIL: 64-bit and 32-bit recall disagree"; exit 1; fi
-cc $M32 $FL -o "$O/fx_gate" esp32s3/midi_square/tools/fx_gate.c esp32s3/midi_square/main/fx.c esp32s3/midi_square/main/msq_core.c $SRCS -lm
-cc $M32 $FL -DMSQ_FX_TOOTH -o "$O/fx_gate_tooth" esp32s3/midi_square/tools/fx_gate.c esp32s3/midi_square/main/fx.c esp32s3/midi_square/main/msq_core.c $SRCS -lm
+# The firmware runs eb_master.c built with -DEB_NODELAY=1 (the delay-off law,
+# no delay-core traffic). The REFERENCE stays the full default build. Both live
+# in one binary: the NODELAY object's symbols are renamed *_nd, and fx.c (the
+# candidate) is compiled to call them.
+cc $M32 $FL -DEB_NODELAY=1 -c engine_b/eb_master.c -o "$O/eb_master_nd.o"
+for sym in $(nm "$O/eb_master_nd.o" | awk '$2 ~ /[TDBR]/ {print $3}'); do RENAME="$RENAME --redefine-sym $sym=${sym}_nd"; done
+objcopy $RENAME "$O/eb_master_nd.o"
+ND="-Deb_master_render=eb_master_render_nd"
+cc $M32 $FL $ND -c esp32s3/midi_square/main/fx.c -o "$O/fx_nd.o"
+cc $M32 $FL $ND -DMSQ_FX_TOOTH -c esp32s3/midi_square/main/fx.c -o "$O/fx_nd_tooth.o"
+cc $M32 $FL -o "$O/fx_gate" esp32s3/midi_square/tools/fx_gate.c "$O/fx_nd.o" "$O/eb_master_nd.o" esp32s3/midi_square/main/msq_core.c $SRCS -lm
+cc $M32 $FL -o "$O/fx_gate_tooth" esp32s3/midi_square/tools/fx_gate.c "$O/fx_nd_tooth.o" "$O/eb_master_nd.o" esp32s3/midi_square/main/msq_core.c $SRCS -lm
 "$O/fx_gate" "$BANK"
 EB="engine_b/eb_master.c engine_b/eb_master_in.c engine_b/eb_master_out.c engine_b/eb_delay.c engine_b/eb_delay_t1.c engine_b/eb_delay_t23.c engine_b/eb_delay_t5.c engine_b/eb_dly_t4.c engine_b/eb_fx_e0.c engine_b/eb_fx_e1.c engine_b/eb_fx_e5.c engine_b/eb_reverb.c engine_b/eb_chorus.c engine_b/eb_dsp.c"
-cc $M32 $FL -o "$O/fx_crc" esp32s3/midi_square/tools/fx_crc.c esp32s3/midi_square/main/fx.c $EB -lm
+cc $M32 $FL -DEB_NODELAY=1 -o "$O/fx_crc" esp32s3/midi_square/tools/fx_crc.c esp32s3/midi_square/main/fx.c $EB -lm
 "$O/fx_crc" esp32s3/midi_square/main/gen/msq_fx_check.h
 if "$O/fx_gate_tooth" "$BANK" > "$O/fx_tooth.log"; then echo "FX TOOTH DOES NOT BITE -- gate untrusted"; exit 1; fi
 grep DIFF "$O/fx_tooth.log" | head -1; echo "FX TOOTH BITES"

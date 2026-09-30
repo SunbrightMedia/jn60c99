@@ -52,6 +52,10 @@ void  msq_render(msq_t *m, int16_t *lr, int n);
 void  msq_render_f(msq_t *m, float *out, int n);
 /* Voices [v0, v1) summed into out (overwrites). Two cores each take a range. */
 void  msq_render_voices(msq_t *m, int v0, int v1, float *out, int n);
+/* The voices whose bit is set in mask, summed into out (overwrites). */
+void  msq_render_mask(msq_t *m, uint32_t mask, float *out, int n);
+/* Boot proof: CRC of a fixed libm-free render (host value in gen/msq_wave_check.h). */
+uint32_t msq_wave_crc(void);
 int   msq_voices_sounding(const msq_t *m);   /* gated or still releasing */
 float msq_note_hz(int note);
 /* Release time, seconds (linear fade from the current level; 0 -> clamped 1 ms). */

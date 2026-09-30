@@ -68,7 +68,7 @@ void ui_value_text(int p, float v, char *buf, int n)
 /* ---------------------------------------------------------------- intro */
 int ui_intro(gfx_fb *f, uint32_t t)
 {
-    static const char *TITLE = "MINISYNTH";
+    static const char *TITLE = "Sunbright.";
     gfx_clear(f);
     float amp = 1.0f;
     if (t > 900) amp = 1.0f - ease_io((t - 900) / 450.0f);            /* wave flattens */
@@ -97,7 +97,7 @@ int ui_intro(gfx_fb *f, uint32_t t)
         float ul = ease_out((t - 1500) / 400.0f);                      /* underline grows */
         if (t > 1500) { int half = (int)(ul * 50); gfx_hline(f, 64 - half, 63 + half, 19, 1); }
         if (t > 1750) {
-            const char *sub = "S3 JUNO FX";
+            const char *sub = "Minisynth";
             int sw = gfx_text_w(sub), n = (int)clampf((t - 1750) / 45.0f, 0, (float)strlen(sub));
             char b[16]; memcpy(b, sub, n); b[n] = 0;
             gfx_text(f, (GFX_W - sw) / 2, 23, b, 1);
@@ -109,6 +109,22 @@ int ui_intro(gfx_fb *f, uint32_t t)
             if (abs(x - 64) < r) gfx_vline(f, x, 0, GFX_H - 1, 0);
     }
     return t < UI_INTRO_MS;
+}
+
+/* ------------------------------------------------------------ dimming
+ * Full contrast while anything is touched; after UI_DIM_AFTER_MS of no knob
+ * or key, a smooth fade to 10 %. The fade is geometric (equal steps to the
+ * eye), a pure function of idle time, so every frame is a small step. */
+uint8_t ui_contrast(uint32_t idle_ms)
+{
+#ifdef MSQ_TOOTH_NO_DIM
+    return UI_CONTRAST_FULL;                                           /* TOOTH: never dims */
+#endif
+    if (idle_ms <= UI_DIM_AFTER_MS) return UI_CONTRAST_FULL;
+    float e = ease_io((idle_ms - UI_DIM_AFTER_MS) / (float)UI_DIM_FADE_MS);
+    float c = UI_CONTRAST_FULL * powf(0.10f, e);
+    int ci = (int)lroundf(c);
+    return (uint8_t)(ci < 1 ? 1 : ci);
 }
 
 /* ---------------------------------------------------------------- pieces */
