@@ -27,14 +27,62 @@ float msq_knob_to_release(float x)
     return 0.010f * powf(200.0f, x);
 }
 
+void msq_set_attack(msq_t *m, float seconds)
+{
+#ifdef MSQ_TOOTH_FIXED_ATTACK
+    seconds = 0.002f;                     /* TOOTH: the attack knob does nothing */
+#endif
+    if (seconds < 0.001f) seconds = 0.001f;
+    m->attack_s = seconds;
+    m->att_step = 1.0f / (seconds * m->sr);
+}
+
+float msq_knob_to_attack(float x)
+{
+    if (x < 0.0f) x = 0.0f;
+    if (x > 1.0f) x = 1.0f;
+    return 0.001f * powf(2000.0f, x);
+}
+
+void msq_set_wave(msq_t *m, float w)
+{
+    m->wave = w < 0.0f ? 0.0f : (w > 3.0f ? 3.0f : w);
+}
+
+void msq_set_unison(msq_t *m, float u)
+{
+    m->unison = u < 0.0f ? 0.0f : (u > 1.0f ? 1.0f : u);
+}
+
+int msq_unison_voices(float u)
+{
+    int n = 1 + (int)(u * 6.999f);
+    return n < 1 ? 1 : (n > MSQ_UNI ? MSQ_UNI : n);
+}
+
+float msq_unison_cents(float u)
+{
+    return 25.0f * u;                     /* outermost pair at +-25 cents */
+}
+
+#define SINE_N 1024
+static float sine_tab[SINE_N + 1];
+
 void msq_init(msq_t *m, float sr)
 {
     memset(m, 0, sizeof *m);
     m->sr       = sr;
-    m->att_step = 1.0f / (0.002f * sr);   /* 2 ms attack  */
+    msq_set_attack(m, 0.002f);            /* 2 ms attack  */
     msq_set_release(m, 0.010f);           /* 10 ms release until the knob speaks */
     m->amp      = 8192.0f;                /* -12 dBFS */
+    m->wave     = 3.0f;                   /* square, the v1-v4 sound */
+    m->unison   = 0.0f;
+    m->ugain[0] = 1.0f;
+    for (int i = 0; i < MSQ_UNI; ++i) m->uph[i] = (uint32_t)i * 0x2545F491u;
+    m->uph[0] = 0;
     m->last_note = -1;
+    if (sine_tab[SINE_N / 4] == 0.0f)
+        for (int i = 0; i <= SINE_N; ++i) sine_tab[i] = sinf(6.28318530718f * i / SINE_N);
 }
 
 static void publish(msq_t *m)
@@ -107,17 +155,94 @@ int msq_byte(msq_t *m, uint8_t b)
     return 0;
 }
 
-void msq_render(msq_t *m, int16_t *lr, int n)
+/* polyBLEP residual for a unit step at phase 0, t in [0,1), dt = phase increment */
+static inline float blep(float t, float dt)
+{
+    if (t < dt)       { t /= dt;               return t + t - t * t - 1.0f; }
+    if (t > 1.0f - dt){ t = (t - 1.0f) / dt;  return t * t + t + t + 1.0f; }
+    return 0.0f;
+}
+
+/* All four shapes share the phase of their fundamental (+sin(2 pi t)), so a
+ * morph never cancels the fundamental: triangle peaks at t=0.25, the saw falls
+ * (its fundamental is +sin), the square is +1 on the first half. */
+static inline float wave_at(int k, float t, float dt)
+{
+    switch (k) {
+    case 0: {                                             /* sine */
+        float x = t * SINE_N; int i = (int)x; float f = x - i;
+        return sine_tab[i] + (sine_tab[i + 1] - sine_tab[i]) * f;
+    }
+    case 1: {                                             /* triangle */
+        float u = t + 0.25f; if (u >= 1.0f) u -= 1.0f;
+        return 1.0f - 4.0f * fabsf(u - 0.5f);
+    }
+    case 2: return 1.0f - 2.0f * t + blep(t, dt);         /* falling saw */
+    default: {                                            /* square */
+        float t2 = t + 0.5f; if (t2 >= 1.0f) t2 -= 1.0f;
+        return (t < 0.5f ? 1.0f : -1.0f) + blep(t, dt) - blep(t2, dt);
+    }
+    }
+}
+
+/* Unison layout, centre-out: offsets in units of (outer detune / 3). */
+static const float uni_off[MSQ_UNI] = { 0.0f, -1.0f, 1.0f, -2.0f, 2.0f, -3.0f, 3.0f };
+
+void msq_render_f(msq_t *m, float *out, int n)
 {
     uint32_t inc = m->inc;
     int gate = m->gate;
-    float rel = m->rel_step;
+    float att = m->att_step, rel = m->rel_step;
+    float w = m->wave, u = m->unison;
+    int   k0 = (int)w; if (k0 > 2) k0 = 2;
+    float fw = w - (float)k0;                             /* morph k0 -> k0+1 */
+    int   nv = msq_unison_voices(u);
+    float cents = msq_unison_cents(u);
+    uint32_t vinc[MSQ_UNI];
+    float gt[MSQ_UNI], gstep = 1.0f / (0.010f * m->sr);   /* 10 ms gain ramps */
+    float norm = 1.0f / sqrtf((float)nv);
+    for (int v = 0; v < MSQ_UNI; ++v) {
+        float c = uni_off[v] * cents / 3.0f;
+        vinc[v] = (v == 0 || c == 0.0f) ? inc
+                : (uint32_t)((double)inc * (double)powf(2.0f, c / 1200.0f));
+        gt[v] = v < nv ? norm : 0.0f;
+    }
     for (int i = 0; i < n; ++i) {
-        if (gate) { m->level += m->att_step; if (m->level > 1.0f) m->level = 1.0f; }
+        if (gate) { m->level += att; if (m->level > 1.0f) m->level = 1.0f; }
         else      { m->level -= rel; if (m->level < 0.0f) m->level = 0.0f; }
-        m->phase += inc;
-        float s = (m->phase & 0x80000000u) ? -m->amp : m->amp;
-        int16_t v = (int16_t)(s * m->level);          /* level 0 -> exactly 0 */
-        lr[2 * i] = v; lr[2 * i + 1] = v;
+        float acc = 0.0f;
+        for (int v = 0; v < MSQ_UNI; ++v) {
+            float g = m->ugain[v];
+            if (g != gt[v]) {
+                g += (gt[v] > g) ? gstep : -gstep;
+                if ((gstep > 0) && fabsf(g - gt[v]) < gstep) g = gt[v];
+                m->ugain[v] = g;
+            }
+            m->uph[v] += vinc[v];
+            if (g == 0.0f) continue;
+            float t  = (float)(m->uph[v] >> 8) * (1.0f / 16777216.0f);
+            float dt = (float)(vinc[v] >> 8) * (1.0f / 16777216.0f);
+            float s  = wave_at(k0, t, dt);
+            if (fw > 0.0f) s += (wave_at(k0 + 1, t, dt) - s) * fw;
+            acc += g * s;
+        }
+        out[i] = acc * m->amp * m->level;                 /* level 0 -> exactly 0 */
+    }
+}
+
+void msq_render(msq_t *m, int16_t *lr, int n)
+{
+    float buf[64];
+    while (n > 0) {
+        int k = n > 64 ? 64 : n;
+        msq_render_f(m, buf, k);
+        for (int i = 0; i < k; ++i) {
+            float x = buf[i];
+            int v = (int)(x >= 0.0f ? x + 0.5f : x - 0.5f);
+            if (v > 32767) v = 32767;
+            if (v < -32768) v = -32768;
+            lr[0] = (int16_t)v; lr[1] = (int16_t)v; lr += 2;
+        }
+        n -= k;
     }
 }

@@ -110,6 +110,52 @@ int main(void)
         msq_set_release(&m, 0.010f);
     }
 
+    /* 9. waveform morph: every shape and every midpoint keeps the pitch and
+     *    the fundamental (phase-aligned shapes never cancel in a crossfade) */
+    {
+        static const float ws[] = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f};
+        for (unsigned k = 0; k < sizeof ws / sizeof ws[0]; ++k) {
+            char what[40]; int pk;
+            msq_set_wave(&m, ws[k]);
+            snprintf(what, sizeof what, "wave %.1f", ws[k]);
+            feed(&m, (uint8_t[]){0x90, 64, 100}, 3);
+            measure(&m, 0.02, &pk);
+            double hz = measure(&m, 1.0, &pk), want = 440.0 * pow(2.0, (64 - 69) / 12.0);
+            CHECK(fabs(hz - want) <= 1.5, "%s: %.1f Hz, want %.2f", what, hz, want);
+            CHECK(pk > 0.6 * 8192 && pk < 1.15 * 8192, "%s: peak %d, want 0.6..1.15 x 8192", what, pk);
+            feed(&m, (uint8_t[]){0x80, 64, 0}, 3); expect_silent(&m, what);
+        }
+        msq_set_wave(&m, 3.0f);
+    }
+    /* 10. unison: law endpoints, loudness held, silence exact */
+    CHECK(msq_unison_voices(0.0f) == 1 && msq_unison_voices(1.0f) == 7, "unison voices %d..%d, want 1..7",
+          msq_unison_voices(0.0f), msq_unison_voices(1.0f));
+    {
+        int pk1, pk7;
+        msq_set_wave(&m, 2.0f);
+        feed(&m, (uint8_t[]){0x90, 57, 100}, 3); measure(&m, 0.05, &pk1); measure(&m, 0.5, &pk1);
+        msq_set_unison(&m, 1.0f);                measure(&m, 0.05, &pk7); measure(&m, 0.5, &pk7);
+        CHECK(pk7 > pk1 / 2 && pk7 < pk1 * 3, "unison 7: peak %d vs single %d (want within 0.5..3x)", pk7, pk1);
+        feed(&m, (uint8_t[]){0x80, 57, 0}, 3); expect_silent(&m, "unison off");
+        msq_set_unison(&m, 0.0f); msq_set_wave(&m, 3.0f);
+        expect_silent(&m, "unison ramps down");
+    }
+    /* 11. attack knob: law endpoints and a timed 0.5 s attack */
+    CHECK(fabsf(msq_knob_to_attack(0.0f) - 0.001f) < 1e-5f && fabsf(msq_knob_to_attack(1.0f) - 2.0f) < 1e-3f,
+          "attack law %.4f..%.3f, want 0.001..2", msq_knob_to_attack(0.0f), msq_knob_to_attack(1.0f));
+    {
+        int pk;
+        msq_set_attack(&m, 0.5f);
+        feed(&m, (uint8_t[]){0x90, 57, 100}, 3);
+        measure(&m, 0.200, &pk);
+        measure(&m, 0.050, &pk);                 /* 0.20-0.25 s: level 0.4 -> 0.5 */
+        CHECK(pk >= 3200 && pk <= 4300, "0.5 s attack: peak %d at 0.20-0.25 s, want ~3300-4100", pk);
+        measure(&m, 0.300, &pk); measure(&m, 0.100, &pk);
+        CHECK(pk > 8000, "0.5 s attack: peak %d after 0.55 s, want full", pk);
+        feed(&m, (uint8_t[]){0x80, 57, 0}, 3); expect_silent(&m, "after attack test");
+        msq_set_attack(&m, 0.002f);
+    }
+
     printf("%s: %d failure(s); on=%u off=%u bytes=%u\n",
            fails ? "HOST TEST FAIL" : "HOST TEST PASS", fails, m.n_on, m.n_off, m.n_bytes);
     return fails ? 1 : 0;

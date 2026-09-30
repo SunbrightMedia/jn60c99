@@ -13,4 +13,11 @@ tail -1 "$O/msq_tooth.log"
 "$O/msq_tooth2" > "$O/msq_tooth2.log"; t2=$?
 grep FAIL "$O/msq_tooth2.log" | head -2
 [ $t2 -ne 0 ] && echo "TOOTH 2 (release knob dead) BITES" || echo "TOOTH 2 DOES NOT BITE -- gate untrusted"
-[ $r -eq 0 ] && [ $t -ne 0 ] && [ $t2 -ne 0 ]
+cc $CF -DMSQ_TOOTH_FIXED_ATTACK test/host_test.c main/msq_core.c -lm -o "$O/msq_tooth3" || exit 1
+"$O/msq_tooth3" > "$O/msq_tooth3.log"; t3=$?
+grep FAIL "$O/msq_tooth3.log" | head -2
+[ $t3 -ne 0 ] && echo "TOOTH 3 (attack knob dead) BITES" || echo "TOOTH 3 DOES NOT BITE -- gate untrusted"
+cc $CF test/ui_frames.c main/ui.c main/gfx.c main/panel.c main/msq_core.c -lm -o "$O/ui_frames" || exit 1
+"$O/ui_frames" "$O/frames.txt"; u=$?
+python3 test/frames_png.py "$O/frames.txt" "$O/frames.png" | head -1
+[ $r -eq 0 ] && [ $t -ne 0 ] && [ $t2 -ne 0 ] && [ $t3 -ne 0 ] && [ $u -eq 0 ]

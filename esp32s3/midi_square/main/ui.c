@@ -1,0 +1,282 @@
+#include "ui.h"
+#include "msq_core.h"
+#include <math.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define MAIN_Y   10               /* rows 10..31 are the main area */
+#define MAIN_H   (GFX_H - MAIN_Y)
+#define FOCUS_HOLD_MS 1600
+#define SLIDE_MS 180
+
+static float clampf(float x, float a, float b) { return x < a ? a : (x > b ? b : x); }
+static float ease_out(float t) { t = clampf(t, 0, 1); return 1.0f - (1.0f - t) * (1.0f - t) * (1.0f - t); }
+static float ease_io(float t)  { t = clampf(t, 0, 1); return t < 0.5f ? 4*t*t*t : 1.0f - powf(-2*t + 2, 3) / 2; }
+
+/* one sample of the morphing oscillator picture, t in 0..1, w in 0..3 */
+static float shape(float t, float w)
+{
+    float s[4];
+    s[0] = sinf(6.2831853f * t);
+    float u = t + 0.25f; if (u >= 1.0f) u -= 1.0f;
+    s[1] = 1.0f - 4.0f * fabsf(u - 0.5f);
+    s[2] = 1.0f - 2.0f * t;
+    s[3] = t < 0.5f ? 1.0f : -1.0f;
+    int k = (int)w; if (k > 2) k = 2;
+    float f = w - k;
+    return s[k] + (s[k + 1] - s[k]) * f;
+}
+
+static void draw_wave(gfx_fb *f, int x, int y, int w, int h, float wv, float cycles, float amp)
+{
+    int py = 0;
+    for (int i = 0; i < w; ++i) {
+        float t = fmodf(i * cycles / (float)w, 1.0f);
+        int yy = y + h / 2 - (int)lroundf(shape(t, wv) * amp * (h / 2 - 1));
+        if (i) gfx_line(f, x + i - 1, py, x + i, yy, 1); else gfx_pixel(f, x, yy, 1);
+        py = yy;
+    }
+}
+
+void ui_value_text(int p, float v, char *buf, int n)
+{
+    static const char *W[4] = { "SIN", "TRI", "SAW", "SQR" };
+    switch (p) {
+    case P_WAVE: {
+        float w = v * 3.0f; int k = (int)lroundf(w);
+        if (fabsf(w - k) < 0.12f) snprintf(buf, n, "%s", W[k]);
+        else { int a = (int)w; snprintf(buf, n, "%s>%s", W[a], W[a + 1 > 3 ? 3 : a + 1]); }
+        break;
+    }
+    case P_ATTACK: case P_RELEASE: {
+        float s = p == P_ATTACK ? msq_knob_to_attack(v) : msq_knob_to_release(v);
+        if (s < 1.0f) snprintf(buf, n, "%dMS", (int)lroundf(s * 1000.0f));
+        else snprintf(buf, n, "%.2fS", s);
+        break;
+    }
+    case P_UNISON: {
+        int nv = msq_unison_voices(v);
+        if (nv == 1) snprintf(buf, n, "OFF");
+        else snprintf(buf, n, "%dX", nv);
+        break;
+    }
+    default: snprintf(buf, n, "%d%%", (int)lroundf(v * 100.0f)); break;
+    }
+}
+
+/* ---------------------------------------------------------------- intro */
+int ui_intro(gfx_fb *f, uint32_t t)
+{
+    static const char *TITLE = "MINISYNTH";
+    gfx_clear(f);
+    float amp = 1.0f;
+    if (t > 900) amp = 1.0f - ease_io((t - 900) / 450.0f);            /* wave flattens */
+    if (t < 1500) {                                                    /* the morph trace */
+        int reveal = (int)(ease_out(t / 1000.0f) * GFX_W);
+        int py = 16;
+        for (int x = 0; x < reveal; ++x) {
+            float w = 3.0f * x / (GFX_W - 1);
+            float ph = fmodf(x / 32.0f + t / 2000.0f, 1.0f);
+            int yy = 16 - (int)lroundf(shape(ph, w) * 12.0f * amp);
+            if (x) gfx_line(f, x - 1, py, x, yy, 1); else gfx_pixel(f, 0, yy, 1);
+            py = yy;
+        }
+    }
+    if (t >= 1100) {                                                   /* title drops in */
+        int tw = gfx_text2_w(TITLE), x0 = (GFX_W - tw) / 2;
+        for (int i = 0; TITLE[i]; ++i) {
+            float lt = (t - 1100 - i * 55) / 320.0f;
+            if (lt <= 0) continue;
+            float e = ease_out(lt);
+            float bounce = lt > 1 ? 0 : sinf(clampf(lt, 0, 1) * 3.14159f) * 2.0f;
+            int y = (int)lroundf(-16 + e * (2 + 16) - bounce);
+            char c[2] = { TITLE[i], 0 };
+            gfx_text2(f, x0 + i * 12, y, c, 1);
+        }
+        float ul = ease_out((t - 1500) / 400.0f);                      /* underline grows */
+        if (t > 1500) { int half = (int)(ul * 50); gfx_hline(f, 64 - half, 63 + half, 19, 1); }
+        if (t > 1750) {
+            const char *sub = "S3 JUNO FX";
+            int sw = gfx_text_w(sub), n = (int)clampf((t - 1750) / 45.0f, 0, (float)strlen(sub));
+            char b[16]; memcpy(b, sub, n); b[n] = 0;
+            gfx_text(f, (GFX_W - sw) / 2, 23, b, 1);
+        }
+    }
+    if (t > 2250) {                                                    /* iris-out wipe */
+        int r = (int)(ease_io((t - 2250) / 350.0f) * 70);
+        for (int x = 0; x < GFX_W; ++x)
+            if (abs(x - 64) < r) gfx_vline(f, x, 0, GFX_H - 1, 0);
+    }
+    return t < UI_INTRO_MS;
+}
+
+/* ---------------------------------------------------------------- pieces */
+static void header(gfx_fb *f, const panel_t *pn, const ui_live *lv, int bank, float slide, const char *title)
+{
+    /* bank pill: the letter slides vertically on a change */
+    gfx_rfill(f, 0, 0, 13, 9, 1);
+    int dy = (int)lroundf(slide * 9);
+    char a[2] = { bank ? 'B' : 'A', 0 }, b[2] = { bank ? 'A' : 'B', 0 };
+    gfx_fb tmp; gfx_clear(&tmp);
+    gfx_text(&tmp, 4, 1 + dy, a, 1);
+    if (dy) gfx_text(&tmp, 4, 1 + dy - 9, b, 1);
+    for (int x = 1; x < 12; ++x) for (int y = 1; y < 8; ++y) if (gfx_get(&tmp, x, y)) gfx_pixel(f, x, y, 0);
+    gfx_text(f, 17, 1, title ? title : (bank ? "SHIFT" : "MAIN"), 1);
+    /* note + meter on the right */
+    if (lv && lv->note >= 0) {
+        static const char *N[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+        char s[16]; snprintf(s, sizeof s, "%s%d", N[lv->note % 12], lv->note / 12 - 1);
+        gfx_text(f, 112 - gfx_text_w(s), 1, s, 1);
+    }
+    int m = lv ? (int)lroundf(clampf(lv->meter, 0, 1) * 7) : 0;
+    gfx_rect(f, 116, 0, 12, 9, 1);
+    for (int i = 0; i < m; ++i) gfx_vline(f, 118 + i, 7 - i, 7, 1);
+    (void)pn;
+    gfx_hline(f, 0, GFX_W - 1, 9, 2);                     /* dotted separator */
+    for (int x = 0; x < GFX_W; x += 2) gfx_pixel(f, x, 9, 0);
+}
+
+static void bar(gfx_fb *f, int x, int y, int w, int h, float v, int caught, float knob)
+{
+    if (caught) gfx_rect(f, x, y, w, h, 1);
+    else for (int i = 0; i < w; i += 2) { gfx_pixel(f, x + i, y, 1); gfx_pixel(f, x + i, y + h - 1, 1); }
+    int fw = (int)lroundf(clampf(v, 0, 1) * (w - 4));
+    gfx_fill(f, x + 2, y + 2, fw, h - 4, 1);
+    if (!caught) {                                        /* where the knob is now */
+        int kx = x + 2 + (int)lroundf(clampf(knob, 0, 1) * (w - 5));
+        gfx_vline(f, kx, y - 1, y + h, 2);
+    }
+}
+
+static void overview(gfx_fb *f, const panel_t *pn, int bank)
+{
+    for (int k = 1; k < PANEL_KNOBS; ++k) {
+        int x = (k - 1) * 32, p = panel_param_of(bank, k);
+        static const char *SHORT[P_NPARAM] = { "WAVE", "ATK", "CHOR", "UNI", "REL", "VERB" };
+        const char *lab = p >= 0 ? SHORT[p] : "----";
+        gfx_text(f, x + (31 - gfx_text_w(lab)) / 2, MAIN_Y + 2, lab, 1);
+        if (p >= 0) bar(f, x + 2, MAIN_Y + 12, 28, 8, pn->val[p], pn->caught[p], pn->knob[k]);
+        else for (int i = 0; i < 28; i += 3) gfx_pixel(f, x + 2 + i, MAIN_Y + 16, 1);
+    }
+}
+
+static void envelope_pic(gfx_fb *f, int x, int y, int w, int h, float v, int rel)
+{
+    int k = 4 + (int)lroundf(clampf(v, 0, 1) * (w / 2 - 4));
+    int top = y + 1, bot = y + h - 1;
+    if (!rel) { gfx_line(f, x, bot, x + k, top, 1); gfx_hline(f, x + k, x + w - 1, top, 1); }
+    else      { gfx_hline(f, x, x + w - 1 - k, top, 1); gfx_line(f, x + w - 1 - k, top, x + w - 1, bot, 1); }
+    gfx_hline(f, x, x + w - 1, bot, 1);
+}
+
+static void focus(gfx_fb *f, const panel_t *pn, int bank, int knob, uint32_t now)
+{
+    int p = panel_param_of(bank, knob);
+    char val[16];
+    if (p < 0) {
+        char s[24]; snprintf(s, sizeof s, "KNOB %d", knob + 1);
+        (void)s;
+        gfx_text2(f, 2, MAIN_Y + 4, "FREE", 1);
+        return;
+    }
+    ui_value_text(p, pn->val[p], val, sizeof val);        /* the name is in the header */
+    if (gfx_text2_w(val) <= 64) gfx_text2(f, 2, MAIN_Y + 4, val, 1);   /* rows 14..27 */
+    else gfx_text(f, 2, MAIN_Y + 8, val, 1);
+    int gx = 68, gy = MAIN_Y + 1, gw = 58, gh = MAIN_H - 2;
+    if (!pn->caught[p]) {                                 /* pick-up hint */
+        int right = pn->knob[knob] < pn->val[p];
+        gfx_text(f, gx + 4, gy + 1, right ? "TURN >" : "< TURN", (now / 300) & 1 ? 1 : 1);
+        bar(f, gx, gy + 11, gw, 8, pn->val[p], 0, pn->knob[knob]);
+        return;
+    }
+    switch (p) {
+    case P_WAVE: gfx_rect(f, gx, gy, gw, gh, 1); draw_wave(f, gx + 2, gy + 2, gw - 4, gh - 4, pn->val[p] * 3.0f, 2.0f, 1.0f); break;
+    case P_ATTACK: envelope_pic(f, gx, gy + 2, gw, gh - 3, pn->val[p], 0); break;
+    case P_RELEASE: envelope_pic(f, gx, gy + 2, gw, gh - 3, pn->val[p], 1); break;
+    case P_UNISON: {
+        int nv = msq_unison_voices(pn->val[p]);
+        float c = msq_unison_cents(pn->val[p]);
+        for (int i = 0; i < nv; ++i) {
+            float off = nv > 1 ? (i - (nv - 1) / 2.0f) / ((nv - 1) / 2.0f) : 0.0f;
+            int cx = gx + gw / 2 + (int)lroundf(off * c / 25.0f * (gw / 2 - 3));
+            gfx_vline(f, cx, gy + 3, gy + gh - 3, 1);
+        }
+        gfx_hline(f, gx, gx + gw - 1, gy + gh - 1, 1);
+        break;
+    }
+    default: {                                            /* chorus / reverb: amount bars */
+        int nb = 9;
+        for (int i = 0; i < nb; ++i) {
+            float lvl = p == P_REVERB ? expf(-i * 0.35f) : 0.6f + 0.4f * sinf(i * 1.3f + now / 180.0f);
+            int hh = (int)lroundf(lvl * pn->val[p] * (gh - 2));
+            gfx_fill(f, gx + i * 6, gy + gh - 1 - hh, 4, hh, 1);
+        }
+        gfx_hline(f, gx, gx + gw - 1, gy + gh - 1, 1);
+        break;
+    }
+    }
+}
+
+void ui_anim_init(ui_anim *a, const panel_t *pn)
+{
+    memset(a, 0, sizeof *a);
+    a->prev_bank = pn->bank;
+    a->seen_bank_ms = pn->bank_ms;
+    a->focus_knob = -1;
+    a->seen_last_ms = pn->last_ms;
+}
+
+/* compose the main area of `b` into `f`, shifted: dx > 0 moves it right */
+static void blit_main(gfx_fb *f, const gfx_fb *b, int dx, int dy)
+{
+    for (int y = MAIN_Y; y < GFX_H; ++y) for (int x = 0; x < GFX_W; ++x) {
+        int sx = x - dx, sy = y - dy;
+        if (sx < 0 || sx >= GFX_W || sy < MAIN_Y || sy >= GFX_H) continue;
+        if (gfx_get(b, sx, sy)) gfx_pixel(f, x, y, 1);
+    }
+}
+
+void ui_render(gfx_fb *f, const panel_t *pn, const ui_live *lv, ui_anim *a, uint32_t now)
+{
+    /* bookkeeping: new touches, bank changes, focus timeout */
+    if (pn->bank_ms != a->seen_bank_ms) { a->seen_bank_ms = pn->bank_ms; a->focus_knob = -1; a->focus_out_ms = 0; }
+    if (pn->last_ms != a->seen_last_ms && pn->last_knob >= 0) {
+        a->seen_last_ms = pn->last_ms;
+        if (a->focus_knob < 0 || a->focus_out_ms) a->focus_in_ms = now;
+        a->focus_knob = pn->last_knob;
+        a->focus_out_ms = 0;
+    }
+    if (a->focus_knob >= 0 && !a->focus_out_ms && now - pn->last_ms > FOCUS_HOLD_MS) a->focus_out_ms = now;
+    if (a->focus_out_ms && now - a->focus_out_ms > SLIDE_MS) { a->focus_knob = -1; a->focus_out_ms = 0; }
+
+    float bs = 1.0f - ease_out((now - pn->bank_ms) / (float)SLIDE_MS);   /* 1 -> 0 */
+    if (now - pn->bank_ms > SLIDE_MS) { bs = 0; a->prev_bank = pn->bank; }
+
+    gfx_clear(f);
+    const char *title = NULL;
+    if (a->focus_knob >= 0 && !(bs > 0 && a->prev_bank != pn->bank)) {
+        int fp = panel_param_of(pn->bank, a->focus_knob);
+        static char kn[24];
+        if (fp >= 0) title = panel_name(fp); else { snprintf(kn, sizeof kn, "KNOB %d", a->focus_knob + 1); title = kn; }
+    }
+    header(f, pn, lv, pn->bank, bs, title);
+
+    gfx_fb ov, fo;
+    gfx_clear(&ov); overview(&ov, pn, pn->bank);
+    if (bs > 0 && a->prev_bank != pn->bank) {                          /* bank change: vertical slide */
+        gfx_fb old; gfx_clear(&old); overview(&old, pn, a->prev_bank);
+        int d = (int)lroundf(bs * MAIN_H), dir = pn->bank ? 1 : -1;
+        blit_main(f, &old, 0, -dir * (MAIN_H - d));
+        blit_main(f, &ov, 0, dir * d);
+        return;
+    }
+    if (a->focus_knob < 0) { blit_main(f, &ov, 0, 0); return; }
+    gfx_clear(&fo); focus(&fo, pn, pn->bank, a->focus_knob, now);
+    float s;                                                            /* 0 = overview, 1 = focus */
+    if (a->focus_out_ms) s = 1.0f - ease_out((now - a->focus_out_ms) / (float)SLIDE_MS);
+    else s = ease_out((now - a->focus_in_ms) / (float)SLIDE_MS);
+    int off = (int)lroundf(s * GFX_W);
+    blit_main(f, &ov, -off, 0);
+    blit_main(f, &fo, GFX_W - off, 0);
+}

@@ -1,6 +1,8 @@
-/* MIDI SQUARE -- bench test image: DIN MIDI in -> one square-wave voice ->
- * PCM5102 over I2S. Not a synth port. Pins match esp32s3/main/juno_s3_listen.c
- * (proven on the bench): BCK 5, LCK/WS 6, DIN 7, MIDI RX 18.
+/* MINISYNTH (grew from the MIDI square test): DIN MIDI -> one mono voice (7-osc
+ * unison, sine/tri/saw/square morph, attack/release) -> the JUNO FX stage ONLY
+ * (proven engine_b master chain: JUNO CHORUS 2 + HALL 1, recalled tables) ->
+ * PCM5102 over I2S. Five knobs (1 = SHIFT bank switch), 128x32 SSD1306 OLED.
+ * Pins: BCK 5, LCK/WS 6, DIN 7, MIDI RX 18, knobs 1/2/4/8/9, OLED SDA 11 SCL 12.
  *
  * The log is the detector (CLAUDE.md SHIP LAW), not the ear:
  *   SELFTEST  at boot: starvation tooth, then an internal A4 through the SAME
@@ -28,6 +30,11 @@
 #endif
 #include "soc/gpio_sig_map.h"   /* U1RXD_IN_IDX: UART1 RX matrix input */
 #include "msq_core.h"
+#include "fx.h"
+#include "panel.h"
+#include "ui.h"
+#include "oled.h"
+#include "gen/msq_fx_check.h"
 
 #define PIN_BCK   GPIO_NUM_5
 #define PIN_WS    GPIO_NUM_6
@@ -37,7 +44,9 @@
 #define CHUNK     240          /* 5 ms */
 #define DMA_N     4
 #define MIDI_UART UART_NUM_1
-#define PIN_KNOB  4          /* release knob wiper, ADC1 */
+static const int PIN_KNOBS[PANEL_KNOBS] __attribute__((unused)) = { 1, 2, 4, 8, 9 };   /* ADC1 wipers */
+#define PIN_SDA   11
+#define PIN_SCL   12
 
 static msq_t M;
 static i2s_chan_handle_t TX;
@@ -49,6 +58,8 @@ static volatile int      a_rises;         /* rising zero crossings since last ta
 static volatile int      a_frames;        /* frames rendered since last take */
 static volatile int      a_take;          /* 1 = reset accumulators */
 static volatile int      a_stall_ms;      /* tooth: stall the audio task once */
+static volatile int      a_opeak;         /* max |output sample| since last take (post-FX) */
+static volatile uint32_t a_cyc, a_cyc_max; /* render cycles per block: last, max since take */
 
 /* health latch */
 static const char *health = NULL;
@@ -73,19 +84,31 @@ static IRAM_ATTR bool on_sent(i2s_chan_handle_t h, i2s_event_data_t *e, void *u)
 static void audio_task(void *arg)
 {
     static int16_t buf[2 * CHUNK];
-    int prev = 0;
+    static float vbuf[CHUNK];
+    float prev = 0;
     for (;;) {
-        msq_render(&M, buf, CHUNK);
-        if (a_take) { a_peak = 0; a_rises = 0; a_frames = 0; a_take = 0; }
-        int pk = a_peak, r = a_rises;
+        uint32_t c0 = esp_cpu_get_cycle_count();
+        msq_render_f(&M, vbuf, CHUNK);
+        fx_process(vbuf, buf, CHUNK);
+        uint32_t cyc = esp_cpu_get_cycle_count() - c0;
+        if (a_take) { a_peak = 0; a_rises = 0; a_frames = 0; a_opeak = 0; a_cyc_max = 0; a_take = 0; }
+        /* SIL / pitch probes on the VOICE (pre-FX): a stuck note is a voice
+         * fault; a reverb tail is not. The output peak feeds the meter. */
+        int pk = a_peak, r = a_rises, op = a_opeak;
         for (int i = 0; i < CHUNK; ++i) {
-            int v = buf[2 * i];
-            int av = v < 0 ? -v : v;
+            float v = vbuf[i];
+            int av = (int)(v < 0 ? -v : v);
+            if (v != 0.0f && av == 0) av = 1;             /* any nonzero voice sample counts */
             if (av > pk) pk = av;
             if (prev <= 0 && v > 0) r++;
             prev = v;
+            int o = buf[2 * i] < 0 ? -buf[2 * i] : buf[2 * i];
+            int o2 = buf[2 * i + 1] < 0 ? -buf[2 * i + 1] : buf[2 * i + 1];
+            if (o2 > o) o = o2;
+            if (o > op) op = o;
         }
-        a_peak = pk; a_rises = r; a_frames += CHUNK;
+        a_peak = pk; a_rises = r; a_frames += CHUNK; a_opeak = op;
+        a_cyc = cyc; if (cyc > a_cyc_max) a_cyc_max = cyc;
         if (a_stall_ms) { vTaskDelay(pdMS_TO_TICKS(a_stall_ms)); a_stall_ms = 0; }
 #ifdef MSQ_QEMU
         xSemaphoreTake(fake_space, portMAX_DELAY);
@@ -105,7 +128,7 @@ static int audio_start(void)
     esp_timer_create_args_t ta = { .callback = fake_dma, .name = "fakedma" };
     esp_timer_create(&ta, &t);
     esp_timer_start_periodic(t, 1000000 / (SR / CHUNK));
-    xTaskCreatePinnedToCore(audio_task, "audio", 4096, NULL, 20, NULL, 1);
+    xTaskCreatePinnedToCore(audio_task, "audio", 6144, NULL, 20, NULL, 1);
     return 1;
 #endif
     i2s_chan_config_t cc = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
@@ -125,7 +148,7 @@ static int audio_start(void)
     i2s_event_callbacks_t cb = { .on_sent = on_sent };
     if (i2s_channel_register_event_callback(TX, &cb, NULL) != ESP_OK) return 0;
     if (i2s_channel_enable(TX) != ESP_OK) return 0;
-    xTaskCreatePinnedToCore(audio_task, "audio", 4096, NULL, 20, NULL, 1);
+    xTaskCreatePinnedToCore(audio_task, "audio", 6144, NULL, 20, NULL, 1);
     return 1;
 }
 
@@ -187,47 +210,137 @@ static void bitbang_byte(uint8_t v)
     gpio_set_level((gpio_num_t)PIN_MIDI, 1);
 }
 
-/* RELEASE KNOB on GPIO 4 (ADC1). Pot ends to 3.3 V and GND, wiper to GPIO 4.
- * Read every 20 ms, smoothed, applied only on a real move (hysteresis), so a
- * noisy wiper does not spam the log. Law: msq_knob_to_release (10 ms .. 2 s).
- * Started AFTER the self-test and loopback, which need the fixed 10 ms. */
+/* ----------------------------------------------------------------- PANEL
+ * Five pots on ADC1 (ends to 3.3 V / GND, wiper to the pin). Read every 10 ms,
+ * smoothed, and handed to panel.c only on a real move (0.4 % deadband), which
+ * owns SHIFT (knob 1 as a two-position switch), the two banks and pick-up.
+ * Started AFTER the self-test and loopback, which need the fixed defaults. */
+static panel_t PANEL;
+static volatile int panel_ready;
+
+static void apply_param(int p, float v)
+{
+    switch (p) {
+    case P_WAVE:    msq_set_wave(&M, v * 3.0f); break;
+    case P_ATTACK:  msq_set_attack(&M, msq_knob_to_attack(v)); break;
+    case P_CHORUS:  fx_set_chorus((int)(v * 255.0f + 0.5f)); break;
+    case P_UNISON:  msq_set_unison(&M, v); break;
+    case P_RELEASE: msq_set_release(&M, msq_knob_to_release(v)); break;
+    case P_REVERB:  fx_set_reverb((int)(v * 255.0f + 0.5f)); break;
+    }
+}
+
 #ifndef MSQ_QEMU
 static adc_oneshot_unit_handle_t knob_adc;
-static adc_channel_t knob_ch;
-static int knob_ok, knob_raw = -1;
-static float knob_avg = -1.0f;
+static adc_channel_t knob_ch[PANEL_KNOBS];
+static int knob_ok;
+static float knob_avg[PANEL_KNOBS], knob_sent[PANEL_KNOBS];
+
+static int knob_read(int k, float *x)
+{
+    int raw;
+    if (adc_oneshot_read(knob_adc, knob_ch[k], &raw) != ESP_OK) return 0;
+    *x = raw / 4095.0f;
+    return 1;
+}
 
 static void knob_start(void)
 {
-    adc_unit_t unit;
-    if (adc_oneshot_io_to_channel(PIN_KNOB, &unit, &knob_ch) != ESP_OK || unit != ADC_UNIT_1) {
-        printf("KNOB: GPIO %d is not an ADC1 pin\n", PIN_KNOB); return;
-    }
     adc_oneshot_unit_init_cfg_t uc = { .unit_id = ADC_UNIT_1 };
     adc_oneshot_chan_cfg_t cc = { .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
-    if (adc_oneshot_new_unit(&uc, &knob_adc) != ESP_OK ||
-        adc_oneshot_config_channel(knob_adc, knob_ch, &cc) != ESP_OK) {
-        printf("KNOB: ADC init failed -- release stays %.3f s\n", M.release_s); return;
+    if (adc_oneshot_new_unit(&uc, &knob_adc) != ESP_OK) { printf("KNOBS: ADC init failed\n"); return; }
+    float pos[PANEL_KNOBS] = {0};
+    for (int k = 0; k < PANEL_KNOBS; ++k) {
+        adc_unit_t unit;
+        if (adc_oneshot_io_to_channel(PIN_KNOBS[k], &unit, &knob_ch[k]) != ESP_OK || unit != ADC_UNIT_1 ||
+            adc_oneshot_config_channel(knob_adc, knob_ch[k], &cc) != ESP_OK) {
+            printf("KNOBS: GPIO %d is not usable on ADC1\n", PIN_KNOBS[k]); return;
+        }
+        float x = 0, acc = 0;
+        for (int i = 0; i < 8; ++i) { knob_read(k, &x); acc += x; }
+        pos[k] = knob_avg[k] = knob_sent[k] = acc / 8;
     }
     knob_ok = 1;
-    printf("KNOB: release on GPIO %d (ADC1 ch %d), 10 ms .. 2 s\n", PIN_KNOB, (int)knob_ch);
+    panel_init(&PANEL, pos, (uint32_t)(esp_timer_get_time() / 1000));
+    for (int p = 0; p < P_NPARAM; ++p) apply_param(p, PANEL.val[p]);
+    PANEL.changed = 0;
+    panel_ready = 1;
+    printf("KNOBS: 1..5 on GPIO %d %d %d %d %d = %.2f %.2f %.2f %.2f %.2f, bank %c\n",
+           PIN_KNOBS[0], PIN_KNOBS[1], PIN_KNOBS[2], PIN_KNOBS[3], PIN_KNOBS[4],
+           pos[0], pos[1], pos[2], pos[3], pos[4], PANEL.bank ? 'B' : 'A');
 }
 
 static void knob_poll(void)
 {
-    int raw;
-    if (!knob_ok || adc_oneshot_read(knob_adc, knob_ch, &raw) != ESP_OK) return;
-    knob_avg = knob_avg < 0 ? raw : knob_avg + (raw - knob_avg) * 0.25f;
-    int r = (int)(knob_avg + 0.5f);
-    if (knob_raw >= 0 && abs(r - knob_raw) < 24) return;     /* hysteresis ~0.6 % */
-    knob_raw = r;
-    msq_set_release(&M, msq_knob_to_release(r / 4095.0f));
-    printf("KNOB release %.3f s (raw %d)\n", M.release_s, r);
+    if (!knob_ok) return;
+    uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
+    for (int k = 0; k < PANEL_KNOBS; ++k) {
+        float x;
+        if (!knob_read(k, &x)) continue;
+        knob_avg[k] += (x - knob_avg[k]) * 0.3f;
+        float d = knob_avg[k] - knob_sent[k];
+        if (d > 0.004f || d < -0.004f || (knob_avg[k] < 0.002f && knob_sent[k] != 0.0f) ||
+            (knob_avg[k] > 0.998f && knob_sent[k] != 1.0f)) {
+            float v = knob_avg[k] < 0.002f ? 0.0f : (knob_avg[k] > 0.998f ? 1.0f : knob_avg[k]);
+            knob_sent[k] = v;
+            int bank0 = PANEL.bank;
+            panel_knob(&PANEL, k, v, now);
+            if (PANEL.bank != bank0) printf("BANK %c (%s)\n", PANEL.bank ? 'B' : 'A', PANEL.bank ? "SHIFT" : "MAIN");
+        }
+    }
+    static uint32_t last_print;
+    uint32_t ch = PANEL.changed;
+    if (ch) {
+        for (int p = 0; p < P_NPARAM; ++p) if (ch & (1u << p)) apply_param(p, PANEL.val[p]);
+        PANEL.changed = 0;
+        static uint32_t pending;
+        pending |= ch;
+        if (now - last_print > 120) {                  /* the log follows, rate-limited */
+            for (int p = 0; p < P_NPARAM; ++p) if (pending & (1u << p)) {
+                char v[16]; ui_value_text(p, PANEL.val[p], v, sizeof v);
+                printf("PARAM %-7s %.3f  %s\n", panel_name(p), PANEL.val[p], v);
+            }
+            pending = 0; last_print = now;
+        }
+    }
 }
 #else
-static void knob_start(void) { printf("KNOB: not in the QEMU build\n"); }
+static void knob_start(void) { printf("KNOBS: not in the QEMU build\n"); }
 static void knob_poll(void) { }
 #endif
+
+/* ------------------------------------------------------------------ OLED
+ * Its own task on core 0 (the audio owns core 1). ~30 fps; the intro runs
+ * first, then the live screens. A missing display is logged, never fatal. */
+static int oled_addr;
+static volatile uint32_t ui_frames;
+
+static void ui_task(void *arg)
+{
+    static gfx_fb fb;
+    static ui_anim an;
+    uint32_t t0 = (uint32_t)(esp_timer_get_time() / 1000);
+    for (;;) {
+        uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
+        if (now - t0 < UI_INTRO_MS || !panel_ready) {
+            ui_intro(&fb, now - t0 < UI_INTRO_MS ? now - t0 : UI_INTRO_MS);
+            if (panel_ready) ui_anim_init(&an, &PANEL);
+        } else {
+            ui_live lv = { M.gate ? M.last_note : -1, a_opeak / 16384.0f };
+            ui_render(&fb, &PANEL, &lv, &an, now);
+        }
+        if (oled_flush(&fb)) ui_frames++;
+        vTaskDelay(pdMS_TO_TICKS(30));
+    }
+}
+
+static void oled_start(void)
+{
+    oled_addr = oled_init(PIN_SDA, PIN_SCL);
+    if (!oled_addr) { printf("OLED: no SSD1306 at 0x3C/0x3D on SDA %d SCL %d\n", PIN_SDA, PIN_SCL); return; }
+    printf("OLED: SSD1306 128x32 at 0x%02X (SDA %d, SCL %d)\n", oled_addr, PIN_SDA, PIN_SCL);
+    xTaskCreatePinnedToCore(ui_task, "ui", 6144, NULL, 2, NULL, 0);
+}
 
 static const char *NAMES[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 
@@ -250,8 +363,11 @@ static void sil_and_stat(int force)
     static uint32_t p_bytes, p_on, p_off, p_fe, p_edges;
     static int64_t p_print;
     int64_t now = esp_timer_get_time();
-    int pk = a_peak;
+    int pk = a_peak, op = a_opeak;
+    uint32_t cyc = a_cyc, cycx = a_cyc_max;
     a_take = 1;
+    if (fx_overrun()) fault("REVERB TAP OVERRUN");
+    if (cycx > 240000000u / (SR / CHUNK)) fault("AUDIO BLOCK OVER BUDGET (render > 5 ms)");
     const char *sil;
     if (M.gate)                               sil = pk > 0 ? "SOUNDING" : "MUTE?";
     else if (now - last_off_us < (int64_t)(M.release_s * 1e6f) + 100000) sil = "RELEASING";
@@ -271,10 +387,13 @@ static void sil_and_stat(int force)
                gpio_get_level((gpio_num_t)PIN_MIDI) ? 'H' : 'L',
                (unsigned long)rx_edges, (unsigned long)n_break);
         printf("STAT midi bytes=%lu on=%lu off=%lu cc=%lu rt=%lu ferr=%lu ovf=%lu held=%d | "
-               "peak=%d deficit=%ld | SIL: %s | HEALTH: %s\n",
+               "peak=%d out=%d deficit=%ld cpu=%lu%%/%lu%% oled=%lu/%lu | SIL: %s | HEALTH: %s\n",
                (unsigned long)M.n_bytes, (unsigned long)M.n_on, (unsigned long)M.n_off,
                (unsigned long)M.n_cc, (unsigned long)M.n_rt, (unsigned long)n_frame_err,
-               (unsigned long)n_fifo_ovf, M.nheld, pk, (long)(deficit - base), sil,
+               (unsigned long)n_fifo_ovf, M.nheld, pk, op, (long)(deficit - base),
+               (unsigned long)(cyc * 100u / (240000000u / (SR / CHUNK))),
+               (unsigned long)(cycx * 100u / (240000000u / (SR / CHUNK))),
+               (unsigned long)ui_frames, (unsigned long)oled_errors(), sil,
                health ? health : "OK");
         p_print = now;
     }
@@ -310,16 +429,22 @@ static int selftest(void)
     /* 2. internal A4 through the same parser: 0x90 69 100 ... 0x80 69 0 */
     msq_byte(&M, 0x90); msq_byte(&M, 69); msq_byte(&M, 100);
     float hz = window(500, &pk);
-    int pk_on = pk;
+    int pk_on = pk, op_on = a_opeak;
     msq_byte(&M, 0x80); msq_byte(&M, 69); msq_byte(&M, 0);
     vTaskDelay(pdMS_TO_TICKS(60));
     window(200, &pk);
-    int pk_off = pk;
+    int pk_off = pk, op_off = a_opeak;
     int f_ok = hz > 437.0f && hz < 443.0f, on_ok = pk_on > 8000, off_ok = pk_off == 0;
     printf("SELFTEST A4: %.1f Hz (want 440 +-3) %s, peak %d (want ~8192) %s, "
            "after release peak %d %s\n", hz, f_ok ? "ok" : "BAD", pk_on, on_ok ? "ok" : "BAD",
            pk_off, off_ok ? "SILENT" : "NOT SILENT");
     ok &= f_ok && on_ok && off_ok;
+    /* 3. the JUNO FX stage (chorus 0, reverb 0: its dry path) carried the A4:
+     *    MEASURED on the host, a +-8192 square comes out at ~0.18 FS = ~6000 */
+    int fx_on = op_on > 3000 && op_on < 12000, fx_off = op_off <= 1;
+    printf("SELFTEST FX: out peak %d with the note (want ~6000) %s, %d after release %s, overrun %d\n",
+           op_on, fx_on ? "ok" : "BAD", op_off, fx_off ? "ok" : "BAD", fx_overrun());
+    ok &= fx_on && fx_off && !fx_overrun();
     /* the self-test's own events must not count as played notes */
     M.n_bytes = M.n_on = M.n_off = 0; M.last_event = 0;
     return ok;
@@ -366,9 +491,20 @@ static int midi_loopback(void)
 
 void app_main(void)
 {
-    printf("\n=== MIDI SQUARE TEST (BCK %d, LCK %d, DIN %d, MIDI RX %d, %d Hz) ===\n",
+    printf("\n=== MINISYNTH (BCK %d, LCK %d, DIN %d, MIDI RX %d, %d Hz) ===\n",
            PIN_BCK, PIN_WS, PIN_DOUT, PIN_MIDI, SR);
     msq_init(&M, SR);
+    fx_init(NULL);
+    uint32_t cc, sc;
+    int fxok = fx_selfcheck(&cc, &sc);
+    printf("FX: JUNO master stage (CHORUS 2 + HALL 1, delay off), coef crc %08lx state crc %08lx vs host: %s\n",
+           (unsigned long)cc, (unsigned long)sc, fxok ? "MATCH" : "MISMATCH");
+    if (!fxok) fault("FX COEF/STATE CRC MISMATCH");
+    uint32_t rc = fx_render_crc();
+    printf("FX: render check crc %08lx vs host %08lx: %s\n", (unsigned long)rc,
+           (unsigned long)MSQ_FX_RENDER_CRC, rc == MSQ_FX_RENDER_CRC ? "MATCH (S3 arithmetic == host == recall path)" : "MISMATCH");
+    if (rc != MSQ_FX_RENDER_CRC) fault("FX RENDER CRC MISMATCH");
+    oled_start();
     if (!audio_start()) { printf("FATAL: I2S start failed\n"); return; }
     int st = selftest();
     printf("SELFTEST: %s\n", st ? "PASS" : "FAIL");
@@ -383,7 +519,7 @@ void app_main(void)
     int64_t next_stat = esp_timer_get_time() + 1000000, next_knob = 0;
     for (;;) {
         uart_event_t ev;
-        if (xQueueReceive(midi_q, &ev, pdMS_TO_TICKS(20))) {
+        if (xQueueReceive(midi_q, &ev, pdMS_TO_TICKS(10))) {
             if (ev.type == UART_DATA) {
                 int n = uart_read_bytes(MIDI_UART, b, sizeof b, 0);
                 for (int i = 0; i < n; ++i)
@@ -403,7 +539,7 @@ void app_main(void)
         }
         if (esp_timer_get_time() >= next_knob) {
             knob_poll();
-            next_knob = esp_timer_get_time() + 20000;
+            next_knob = esp_timer_get_time() + 10000;
         }
         if (esp_timer_get_time() >= next_stat) {
             sil_and_stat(0);

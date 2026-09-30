@@ -16,5 +16,5 @@ run() {  # $1 build dir
 }
 idf.py -B build build >/dev/null || exit 1
 echo "== real image (expect: boot stops at the eFuse calibration warning)"; run build
-idf.py -B build_qemu -DSDKCONFIG=build_qemu/sdkconfig -DMSQ_QEMU=1 build >/dev/null || exit 1
+idf.py -B build_qemu -DSDKCONFIG=build_qemu/sdkconfig -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu" -DMSQ_QEMU=1 build >/dev/null || exit 1
 echo "== fake-DMA image (expect PASS)"; run build_qemu
