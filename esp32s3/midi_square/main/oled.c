@@ -32,7 +32,7 @@ static const uint8_t INIT[] = {
     0xA1, 0xC8, 0xDA, 0x02, 0x81, 0x8F, 0xD9, 0xF1, 0xDB, 0x40, 0x2E, 0xA4, 0xA6, 0xAF,
 };
 static int bus_ok, addr_found, tries;
-static uint8_t contrast = OLED_CONTRAST_FULL;
+static uint8_t contrast = OLED_CONTRAST_FULL, precharge = 0xF1, vcomh = 0x40;
 
 static int try_attach(void)
 {
@@ -43,8 +43,8 @@ static int try_attach(void)
     i2c_device_config_t dc = { .dev_addr_length = I2C_ADDR_BIT_LEN_7, .device_address = addr, .scl_speed_hz = 400000 };
     if (i2c_master_bus_add_device(bus, &dc, &dev) != ESP_OK) { dev = NULL; return 0; }
     if (!cmds(INIT, sizeof INIT)) { i2c_master_bus_rm_device(dev); dev = NULL; return 0; }
-    uint8_t c[2] = { 0x81, contrast };
-    cmds(c, 2);
+    uint8_t c[6] = { 0x81, contrast, 0xD9, precharge, 0xDB, vcomh };
+    cmds(c, 6);
     addr_found = addr;
     return addr;
 }
@@ -80,11 +80,18 @@ int oled_heal(void)
         i2c_master_bus_reset(bus);
         return 0;
     }
-    /* all but DISPLAY OFF, and the CURRENT contrast in place of the full one:
-     * no flicker, no flash while dimmed */
+    /* all but DISPLAY OFF, and the CURRENT dim registers in place of the full
+     * ones: no flicker, no flash while dimmed. Command bytes only (the scan
+     * steps over each command's argument). */
     uint8_t seq[sizeof INIT - 1];
     memcpy(seq, INIT + 1, sizeof seq);
-    for (unsigned i = 0; i + 1 < sizeof seq; ++i) if (seq[i] == 0x81) { seq[i + 1] = contrast; break; }
+    for (unsigned i = 0; i + 1 < sizeof seq; ++i) {
+        if (seq[i] == 0x81) seq[i + 1] = contrast;
+        else if (seq[i] == 0xD9) seq[i + 1] = precharge;
+        else if (seq[i] == 0xDB) seq[i + 1] = vcomh;
+        else continue;
+        ++i;
+    }
     if (!cmds(seq, sizeof seq)) {
         i2c_master_bus_reset(bus);
         return 0;
@@ -92,12 +99,14 @@ int oled_heal(void)
     return 1;
 }
 
-void oled_contrast(uint8_t c)
+void oled_dim_regs(uint8_t c, uint8_t pre, uint8_t vc)
 {
-    if (c == contrast) return;
-    contrast = c;
-    uint8_t b[2] = { 0x81, c };
-    if (dev) cmds(b, 2);
+    uint8_t b[6]; int n = 0;
+    if (c != contrast)  { b[n++] = 0x81; b[n++] = c; }
+    if (pre != precharge) { b[n++] = 0xD9; b[n++] = pre; }
+    if (vc != vcomh)    { b[n++] = 0xDB; b[n++] = vc; }
+    contrast = c; precharge = pre; vcomh = vc;
+    if (n && dev) cmds(b, n);
 }
 
 int oled_flush(const gfx_fb *f)

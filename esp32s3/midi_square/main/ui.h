@@ -8,10 +8,11 @@
 #include "panel.h"
 
 #define UI_INTRO_MS 2600
-/* Screen dimming: full while in use, then a smooth fade to 10 %. */
+/* Screen dimming: full while in use, then a smooth fade to the dimmest the
+ * SSD1306 gives (contrast 0, pre-charge 0x11, VCOMH 0x00). */
 #define UI_CONTRAST_FULL 0x8F         /* = OLED_CONTRAST_FULL, the v1-v6 brightness */
 #define UI_DIM_AFTER_MS  10000
-#define UI_DIM_FADE_MS   1500
+#define UI_DIM_FADE_MS   2000
 
 typedef struct {
     int   note;        /* sounding MIDI note, -1 none */
@@ -31,8 +32,10 @@ typedef struct {
 int  ui_intro(gfx_fb *f, uint32_t t_ms);
 void ui_anim_init(ui_anim *a, const panel_t *pn);
 void ui_render(gfx_fb *f, const panel_t *pn, const ui_live *lv, ui_anim *a, uint32_t now_ms);
-/* Contrast for the time since the last knob move or key (see ui.c). */
-uint8_t ui_contrast(uint32_t idle_ms);
+/* Dim level 0 (full) .. 255 (dimmest) for the time since the last knob move
+ * or key, and the three SSD1306 registers for a level (see ui.c). */
+uint8_t ui_dim(uint32_t idle_ms);
+void    ui_dim_regs(uint8_t level, uint8_t *contrast, uint8_t *precharge, uint8_t *vcomh);
 /* Value text for a parameter, e.g. "0.25S", "SAW", "5X 18C", "40%". */
 void ui_value_text(int p, float v, char *buf, int n);
 #endif

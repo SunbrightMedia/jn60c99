@@ -112,19 +112,35 @@ int ui_intro(gfx_fb *f, uint32_t t)
 }
 
 /* ------------------------------------------------------------ dimming
- * Full contrast while anything is touched; after UI_DIM_AFTER_MS of no knob
- * or key, a smooth fade to 10 %. The fade is geometric (equal steps to the
- * eye), a pure function of idle time, so every frame is a small step. */
-uint8_t ui_contrast(uint32_t idle_ms)
+ * Full brightness while anything is touched; after UI_DIM_AFTER_MS of no knob
+ * or key, a smooth fade over UI_DIM_FADE_MS. v7 used CONTRAST alone (143 ->
+ * 14) and the board showed it "only very slightly" dimmer: on the SSD1306 the
+ * contrast register is a weak lever. v8 walks three registers in one fade:
+ *   d 0.00-0.50  contrast 143 -> 14 (geometric: the v7 range)
+ *   d 0.50-0.75  contrast 14 -> 0
+ *   d 0.50-1.00  pre-charge phase 2: 15 -> 1 clocks (0xF1 -> 0x11)
+ *   d 0.75-1.00  VCOMH 0x40 -> 0x30 -> 0x20 -> 0x00
+ * Every register only moves one way and in small steps (host-tested). */
+uint8_t ui_dim(uint32_t idle_ms)
 {
 #ifdef MSQ_TOOTH_NO_DIM
-    return UI_CONTRAST_FULL;                                           /* TOOTH: never dims */
+    return 0;                                                          /* TOOTH: never dims */
 #endif
-    if (idle_ms <= UI_DIM_AFTER_MS) return UI_CONTRAST_FULL;
-    float e = ease_io((idle_ms - UI_DIM_AFTER_MS) / (float)UI_DIM_FADE_MS);
-    float c = UI_CONTRAST_FULL * powf(0.10f, e);
-    int ci = (int)lroundf(c);
-    return (uint8_t)(ci < 1 ? 1 : ci);
+    if (idle_ms <= UI_DIM_AFTER_MS) return 0;
+    float t = clampf((idle_ms - UI_DIM_AFTER_MS) / (float)UI_DIM_FADE_MS, 0, 1);
+    float e = t * t * (3.0f - 2.0f * t);          /* smoothstep: max slope 1.5, gentler than ease_io's 3 */
+    return (uint8_t)lroundf(e * 255.0f);
+}
+
+void ui_dim_regs(uint8_t level, uint8_t *contrast, uint8_t *precharge, uint8_t *vcomh)
+{
+    float d = level / 255.0f;
+    float c = d <= 0.5f ? UI_CONTRAST_FULL * powf(0.10f, d / 0.5f)
+                        : (d < 0.75f ? UI_CONTRAST_FULL * 0.10f * (0.75f - d) / 0.25f : 0.0f);
+    *contrast = (uint8_t)lroundf(c);
+    int p2 = d <= 0.5f ? 15 : 15 - (int)lroundf(14.0f * (d - 0.5f) / 0.5f);
+    *precharge = (uint8_t)((p2 << 4) | 1);
+    *vcomh = d < 0.75f ? 0x40 : (d < 0.85f ? 0x30 : (d < 0.95f ? 0x20 : 0x00));
 }
 
 /* ---------------------------------------------------------------- pieces */

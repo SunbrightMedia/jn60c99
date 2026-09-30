@@ -30,7 +30,10 @@ void panel_init(panel_t *pn, const float knob[PANEL_KNOBS], uint32_t now_ms)
     /* shift-bank defaults: no unison, 0.3 s release, a little reverb */
     pn->val[P_UNISON] = 0.0f;
     pn->val[P_RELEASE] = 0.642f;                     /* msq_knob_to_release -> ~0.30 s */
-    pn->val[P_REVERB] = 0.25f;
+    /* 0 since v8: the HALL tail is dark (85 % of its energy at the
+     * fundamental, measured on the host), and at 25 % the user heard it as "a
+     * sine in the background of each note". The knob adds it. */
+    pn->val[P_REVERB] = 0.0f;
     pn->val[P_WAVE] = 1.0f; pn->val[P_ATTACK] = 0.1f; pn->val[P_CHORUS] = 0.0f;
     pn->bank = knob[0] > 0.5f;
     for (int k = 0; k < PANEL_KNOBS; ++k) {           /* the live bank follows the knobs now */

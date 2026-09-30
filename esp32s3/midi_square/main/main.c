@@ -416,7 +416,8 @@ static void knob_poll(void) { }
  * AFTER the boot tests: v6's intro stuttered at the same point every boot,
  * which was the muted STRESS test loading core 0 (INFERRED from the timing;
  * the INTRO: line now measures the worst frame gap). The screen dims to 10 %
- * after 10 s without a knob move or a key (ui_contrast, host-tested). */
+ * after 10 s without a knob move or a key: contrast, pre-charge and VCOMH in
+ * one smooth fade (ui_dim / ui_dim_regs, host-tested). */
 static int oled_addr;
 static volatile uint32_t ui_frames;
 
@@ -426,7 +427,7 @@ static void ui_task(void *arg)
     static ui_anim an;
     uint32_t t0 = (uint32_t)(esp_timer_get_time() / 1000), prev = t0, gap = 0, heal_at = t0 + 2000;
     int intro_frames = 0, intro_done = 0;
-    uint8_t con = UI_CONTRAST_FULL;
+    int dim = 0;                                         /* 0 full .. 255 dimmest */
     TickType_t wake = xTaskGetTickCount();
     touch_ms = t0;
     for (;;) {
@@ -449,11 +450,13 @@ static void ui_task(void *arg)
             ui_render(&fb, &PANEL, &lv, &an, now);
         }
         prev = now;
-        /* dim: the target follows idle time down smoothly; a touch brings it
-         * back up in ~150 ms */
-        uint8_t tgt = intro_done ? ui_contrast(now - touch_ms) : UI_CONTRAST_FULL;
-        if (tgt > con) con = (uint8_t)(tgt - con > 30 ? con + 30 : tgt); else con = tgt;
-        oled_contrast(con);
+        /* dim: the level follows idle time down smoothly; a touch brings it
+         * back to full in ~150 ms */
+        int tgt = intro_done ? ui_dim(now - touch_ms) : 0;
+        if (tgt < dim) dim = dim - tgt > 50 ? dim - 50 : tgt; else dim = tgt;
+        uint8_t rc, rp, rv;
+        ui_dim_regs((uint8_t)dim, &rc, &rp, &rv);
+        oled_dim_regs(rc, rp, rv);
         if (oled_flush(&fb)) ui_frames++;
         if (intro_done && (int32_t)(now - heal_at) >= 0) {   /* self-heal: re-init every 2 s */
             heal_at = now + 2000;

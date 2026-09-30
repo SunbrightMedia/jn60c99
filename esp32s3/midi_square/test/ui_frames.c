@@ -90,22 +90,29 @@ int main(int argc, char **argv)
         panel_knob(&q, 3, kk[3] + 0.10f, t + 10);
         CHECK(q.last_knob == 3, "a real 10%% turn of knob 4 did not take the screen (last_knob %d)", q.last_knob);
     }
-    /* DIMMING: full for 10 s idle, then a smooth fade to 10 %, no jumps. */
+    /* DIMMING: full for 10 s idle, then a smooth fade to the deepest dim
+     * (contrast 0, pre-charge 0x11, VCOMH 0x00); every register moves one way
+     * in small steps per 30 ms frame. */
     {
-        int prev = ui_contrast(0), worst = 0, mono = 1;
-        CHECK(prev == UI_CONTRAST_FULL && ui_contrast(UI_DIM_AFTER_MS) == UI_CONTRAST_FULL,
-              "screen dims before %d ms idle", UI_DIM_AFTER_MS);
+        uint8_t c, p, v, pc, pp, pv;
+        ui_dim_regs(ui_dim(0), &pc, &pp, &pv);
+        CHECK(pc == UI_CONTRAST_FULL && pp == 0xF1 && pv == 0x40, "not full at 0 idle: %d %02x %02x", pc, pp, pv);
+        CHECK(ui_dim(UI_DIM_AFTER_MS) == 0, "screen dims before %d ms idle", UI_DIM_AFTER_MS);
+        int mono = 1, wc = 0, wp = 0, wv = 0;
         for (uint32_t t = 0; t < 20000; t += 30) {
-            int c = ui_contrast(t);
-            if (c > prev) mono = 0;
-            if (prev - c > worst) worst = prev - c;
-            prev = c;
+            ui_dim_regs(ui_dim(t), &c, &p, &v);
+            if (c > pc || p > pp || v > pv) mono = 0;
+            if (pc - c > wc) wc = pc - c;
+            if ((pp >> 4) - (p >> 4) > wp) wp = (pp >> 4) - (p >> 4);
+            if (pv != v) wv++;
+            pc = c; pp = p; pv = v;
         }
-        int want = (int)(UI_CONTRAST_FULL * 0.10f + 0.5f);
-        CHECK(prev == want, "dimmed contrast %d, want %d (10 %%)", prev, want);
-        CHECK(mono && worst <= 8, "dim fade not smooth: monotonic %d, worst step %d per 30 ms frame", mono, worst);
-        printf("DIM: %d -> %d over %d ms after %d ms idle, worst step %d per frame\n",
-               UI_CONTRAST_FULL, prev, UI_DIM_FADE_MS, UI_DIM_AFTER_MS, worst);
+        CHECK(pc == 0 && pp == 0x11 && pv == 0x00, "deepest dim is %d %02x %02x, want 0 11 00", pc, pp, pv);
+        CHECK(mono && wc <= 8 && wp <= 1 && wv == 3, "dim fade not smooth: monotonic %d, worst contrast step %d, "
+              "pre-charge step %d, VCOMH changes %d (want 3)", mono, wc, wp, wv);
+        printf("DIM: contrast %d->0, pre-charge F1->11, VCOMH 40->00 over %d ms after %d ms idle; "
+               "worst step per frame: contrast %d, pre-charge %d\n", UI_CONTRAST_FULL, UI_DIM_FADE_MS,
+               UI_DIM_AFTER_MS, wc, wp);
     }
     fclose(out);
     printf("%s: %d frames, %d failure(s)\n", fails ? "UI FRAMES FAIL" : "UI FRAMES PASS", nframes, fails);

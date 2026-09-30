@@ -71,8 +71,18 @@ says TURN > / < TURN until the knob crosses the stored value.
   each byte is now one critical section.
 - Knobs: 8x oversample, IIR 0.10, 1 % deadband, 4 % focus move (the test now uses
   the board's +-3 % noise). A 100 nF cap from each wiper to GND helps most.
-- Screen: dims to 10 % after 10 s with no knob or key (geometric fade, 1.5 s);
-  the intro starts after the boot tests (v6 stutter = STRESS loading core 0).
+- Screen: the intro starts after the boot tests (v6 stutter = STRESS loading
+  core 0). BOARD v7: `INTRO: 87 frames in 2601 ms, worst frame gap 30 ms (smooth)`.
+- BOARD v7 (measured): `STRESS ... core1 65% (FX alone 41%) core0 66%, split 2/4 PASS`
+  (v6: core1 146 %, core0 74 %). Idle FX 41-43 % of core 1. LOOPBACK PASS.
+
+## v8 (2026-09-30)
+- Dimming: v7 faded CONTRAST alone (143 -> 14) and the board showed it "only very
+  slightly" dimmer. v8 fades contrast to 0, pre-charge 0xF1 -> 0x11 and VCOMH
+  0x40 -> 0x00 in one 2 s smoothstep after 10 s idle (host test: each register
+  one-way, contrast <= 8 and pre-charge <= 1 step per frame; tooth bites).
+- REVERB default 0 (was 25 %). Host measurement: the HALL part is 85 % fundamental
+  (-33 dB at 25 %, under the note and after it) -- the "sine in the background".
 
 ## Gates
 - `sh test/run.sh` -- voice DSP (pitch, running status, chord pitches by
