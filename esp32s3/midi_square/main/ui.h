@@ -7,12 +7,20 @@
 #include "gfx.h"
 #include "panel.h"
 
-/* Intro timeline (ms): wave 0-1350 (flat on the underline row by 1350), title
- * letters 1100-1915, subtitle typed 1750-2155, the whole logo HELD still
- * until UI_INTRO_WIPE (>= 0.5 s, user 2026-10-01), iris wipe to UI_INTRO_MS. */
-#define UI_INTRO_LOGO_MS 2155
-#define UI_INTRO_WIPE    2750
-#define UI_INTRO_MS      3100
+/* Intro timeline (ms), user 2026-10-01 (v2): wave 0-1350 (flat on the
+ * underline row at 1350); the title swoops in RIGHT AFTER, almost at once
+ * (letter i starts at UI_TITLE_T0 + i*UI_TITLE_STEP, each drop UI_TITLE_DROP
+ * long) with the subtitle typed alongside; the complete logo is HELD still
+ * 750 ms; then the iris wipe. */
+#define UI_TITLE_T0      1350
+#define UI_TITLE_STEP    12
+#define UI_TITLE_DROP    100
+#define UI_SUB_T0        1400
+#define UI_SUB_STEP      15
+#define UI_INTRO_LOGO_MS 1560     /* last letter lands 1350+9*12+100 = 1558; subtitle done 1535 */
+#define UI_INTRO_HOLD_MS 750
+#define UI_INTRO_WIPE    (UI_INTRO_LOGO_MS + UI_INTRO_HOLD_MS)
+#define UI_INTRO_MS      (UI_INTRO_WIPE + 350)
 /* Screen dimming: full while in use, then a smooth fade to the dimmest the
  * SSD1306 gives (contrast 0, pre-charge 0x11, VCOMH 0x00). */
 #define UI_CONTRAST_FULL 0x8F         /* = OLED_CONTRAST_FULL, the v1-v6 brightness */

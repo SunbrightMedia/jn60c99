@@ -88,12 +88,12 @@ int ui_intro(gfx_fb *f, uint32_t t)
             py = yy;
         }
     }
-    if (t >= 1100) {                                                   /* title drops in */
+    if (ti >= UI_TITLE_T0) {                                           /* title swoops in */
         int tw = gfx_text2_w(TITLE), xc = (GFX_W - tw) / 2;
         for (int i = 0; TITLE[i]; ++i) {
             char c[2] = { TITLE[i], 0 };
             int x = xc; xc += gfx_text2_w(c) + 2;        /* proportional font: per-letter advance */
-            float lt = (ti - 1100 - i * 55) / 320.0f;
+            float lt = (ti - UI_TITLE_T0 - i * UI_TITLE_STEP) / (float)UI_TITLE_DROP;
             if (lt <= 0) continue;
             float e = ease_out(lt);
             float bounce = lt > 1 ? 0 : sinf(clampf(lt, 0, 1) * 3.14159f) * 2.0f;
@@ -106,10 +106,10 @@ int ui_intro(gfx_fb *f, uint32_t t)
      * underline, full width (user 2026-10-01). v9 removed the flat wave and
      * grew a second line; the first fix slid it down and inwards. */
     if (ti >= 1350) gfx_hline(f, 0, GFX_W - 1, UL_Y, 1);
-    if (ti >= 1100) {
-        if (t > 1750) {
+    {
+        if (ti > UI_SUB_T0) {
             const char *sub = "Minisynth";
-            int sw = gfx_text_w(sub), n = (int)clampf((t - 1750) / 45.0f, 0, (float)strlen(sub));
+            int sw = gfx_text_w(sub), n = (int)clampf((ti - UI_SUB_T0) / (float)UI_SUB_STEP, 0, (float)strlen(sub));
             char b[16]; memcpy(b, sub, n); b[n] = 0;
             gfx_text(f, (GFX_W - sw) / 2, 23, b, 1);
         }

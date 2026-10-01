@@ -101,29 +101,32 @@ int main(int argc, char **argv)
      * still >= 500 ms (user 2026-10-01). */
     {
         gfx_fb g;
-        static const char *TITLE = "Sunbright.";        /* = ui.c; letter i starts at 1100 + 55 i ms */
+        static const char *TITLE = "Sunbright.";        /* = ui.c; letter i starts at UI_TITLE_T0 + i UI_TITLE_STEP */
         int lx[16], lw[16], nl = (int)strlen(TITLE), xc = (128 - gfx_text2_w(TITLE)) / 2;
         for (int i = 0; i < nl; ++i) { char c[2] = { TITLE[i], 0 }; lx[i] = xc; lw[i] = gfx_text2_w(c); xc += lw[i] + 2; }
         int early = 0, gaps = 0;
-        for (uint32_t t = 1100; t <= UI_INTRO_WIPE; t += 10) {
+        for (uint32_t t = 1100; t <= UI_INTRO_WIPE; t += 2) {
             ui_intro(&g, t);
             for (int i = 0; i < nl; ++i)                   /* rows 0..7: the wave is below row 8 after 1100 ms */
-                if (t <= 1100u + 55u * i && lit(&g, lx[i], lx[i] + lw[i] - 1, 0, 7)) early++;
+                if (t <= (uint32_t)(UI_TITLE_T0 + UI_TITLE_STEP * i) && lit(&g, lx[i], lx[i] + lw[i] - 1, 0, 7)) early++;
             if (t >= 1350) {                                /* the underline: row 19, every column */
                 int run = 0;
                 for (int x = 0; x < 128; ++x) run += gfx_get(&g, x, 19) != 0;
                 if (run < 128) gaps++;
             }
         }
-        /* THE HOLD: the complete logo stays still for >= 500 ms before the wipe */
+        /* THE HOLD: the complete logo stays still for >= 750 ms before the wipe,
+         * and it is complete within 250 ms of the wave going flat ("almost
+         * instantly", user 2026-10-01 v2) */
         gfx_fb h0; ui_intro(&h0, UI_INTRO_LOGO_MS);
         int moved = 0;
-        for (uint32_t t = UI_INTRO_LOGO_MS; t <= UI_INTRO_LOGO_MS + 500; t += 10) {
+        CHECK(UI_INTRO_LOGO_MS - 1350 <= 250, "intro: the logo takes %d ms after the wave is flat (want <= 250)", UI_INTRO_LOGO_MS - 1350);
+        for (uint32_t t = UI_INTRO_LOGO_MS; t <= UI_INTRO_LOGO_MS + 750; t += 10) {
             ui_intro(&g, t); if (memcmp(&g, &h0, sizeof g)) moved++;
         }
         ui_intro(&g, UI_INTRO_LOGO_MS - 50);
         CHECK(moved == 0 && memcmp(&g, &h0, sizeof g),
-              "intro: the full logo is not held still for 500 ms (%d changed frames), or UI_INTRO_LOGO_MS is not when it completes", moved);
+              "intro: the full logo is not held still for 750 ms (%d changed frames), or UI_INTRO_LOGO_MS is not when it completes", moved);
         CHECK(early == 0, "intro: %d letter-frames drawn before the letter's own start (it shows, then restarts)", early);
         CHECK(gaps == 0, "intro: the underline (row 19, full width) was not complete in %d of the 10 ms steps after the wave went flat", gaps);
     }
