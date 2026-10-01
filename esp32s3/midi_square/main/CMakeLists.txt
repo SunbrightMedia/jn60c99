@@ -15,7 +15,8 @@ set(EB_FX_SRCS
 idf_component_register(SRCS "main.c" "msq_core.c" "fx.c" "panel.c" "ui.c" "gfx.c" "oled.c" ${EB_FX_SRCS}
                        INCLUDE_DIRS "." ${EB} ${CMAKE_CURRENT_LIST_DIR}/../../../src
                        REQUIRES ${msq_req}
-                       LDFRAGMENTS "linker.lf")
+                       LDFRAGMENTS "linker.lf"
+                       EMBED_FILES "snd/startup_48k_s16le.raw")
 # -ffp-contract=off is load-bearing (no FMA may appear, or the FX stage stops
 # matching the proven recall path bit for bit); same flags as the host gate.
 target_compile_options(${COMPONENT_LIB} PRIVATE -ffp-contract=off -fno-strict-aliasing)

@@ -77,6 +77,14 @@ static volatile int      a_n1, a_nact;    /* last split: active voices on core 1
 static volatile uint32_t a_blocks_off;    /* blocks where any voice started gated-off-and-silent */
 static volatile int      a_allidle;       /* 1 while every block since take began with all voices idle */
 
+/* STARTUP SOUND (user's clip, 2.01 s, 48 kHz stereo 16-bit, embedded raw):
+ * mixed into the OUTPUT after the FX (dry, as delivered), started by the
+ * display task on the intro's first frame. */
+extern const int16_t snd_start[] asm("_binary_startup_48k_s16le_raw_start");
+extern const int16_t snd_end[]   asm("_binary_startup_48k_s16le_raw_end");
+static volatile int snd_pos = -1;          /* frame index, -1 = idle */
+static volatile int64_t snd_t0_us;         /* when the intro asked for it */
+
 /* health latch */
 static const char *health = NULL;
 static void fault(const char *why) { if (!health) health = why; }
@@ -182,6 +190,16 @@ static void audio_task(void *arg)
         if (allidle && !a_hold && M.n_on == on_at_start) for (int i = 0; i < CHUNK; ++i) if (vbuf[i] != 0.0f) { a_blocks_off++; break; }
         a_peak = pk; a_rises = r; a_frames += CHUNK; a_opeak = op;
         if (a_mute) memset(buf, 0, sizeof buf);
+        int sp = snd_pos;
+        if (sp >= 0) {                                 /* the startup sound, after the FX and the mute */
+            int nfr = (int)((snd_end - snd_start) / 2);
+            for (int i = 0; i < CHUNK && sp < nfr; ++i, ++sp)
+                for (int c = 0; c < 2; ++c) {
+                    int v = buf[2 * i + c] + snd_start[2 * sp + c];
+                    buf[2 * i + c] = (int16_t)(v > 32767 ? 32767 : (v < -32768 ? -32768 : v));
+                }
+            snd_pos = sp < nfr ? sp : -1;
+        }
         if (a_stall_ms) { vTaskDelay(pdMS_TO_TICKS(a_stall_ms)); a_stall_ms = 0; }
 #ifdef MSQ_QEMU
         xSemaphoreTake(fake_space, portMAX_DELAY);
@@ -518,8 +536,9 @@ static void ui_task(void *arg)
         } else {
             if (!intro_done) {
                 intro_done = 1;
-                printf("INTRO: %d frames in %lu ms, worst frame gap %lu ms %s\n", intro_frames,
-                       (unsigned long)(now - t0), (unsigned long)gap, gap < 60 ? "(smooth)" : "(STUTTER)");
+                printf("INTRO: %d frames in %lu ms, worst frame gap %lu ms %s; startup sound %s\n", intro_frames,
+                       (unsigned long)(now - t0), (unsigned long)gap, gap < 60 ? "(smooth)" : "(STUTTER)",
+                       snd_pos < 0 && snd_t0_us ? "played to its end" : "STILL PLAYING OR NEVER STARTED");
                 touch_ms = now;
             }
             ui_live lv = { M.gate ? M.last_note : -1, a_opeak / 16384.0f, {0},
@@ -529,6 +548,7 @@ static void ui_task(void *arg)
             ui_render(&fb, &PANEL, &lv, &an, now);
         }
         prev = now;
+        if (intro_frames == 1) { snd_t0_us = esp_timer_get_time(); snd_pos = 0; }   /* sound starts WITH frame 0 */
         /* dim: the level follows idle time down smoothly; a touch brings it
          * back to full in ~150 ms */
         int tgt = intro_done ? ui_dim(now - touch_ms) : 0;
@@ -788,12 +808,16 @@ void app_main(void)
     if (!in_iram) fault("AUDIO CODE NOT IN IRAM");
     oled_start();
     if (!audio_start()) { printf("FATAL: I2S start failed\n"); return; }
+    /* The boot test tones are MUTED since the startup sound (the probes read the
+     * signal before the mute, so every test is unchanged); the startup sound
+     * is the first thing heard. */
+    a_mute = 1;
     int st = selftest();
     printf("SELFTEST: %s\n", st ? "PASS" : "FAIL");
     if (!st) fault("SELFTEST FAIL");
     if (!midi_start()) { printf("FATAL: MIDI UART start failed\n"); return; }
     midi_loopback();
-    stress();
+    stress();                                          /* ends with a_mute = 0 */
     knob_start();
     bat_start();
     ui_begin();
