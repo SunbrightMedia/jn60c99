@@ -40,4 +40,8 @@ cc $CF -DMSQ_TOOTH_NO_DIM test/ui_frames.c main/ui.c main/gfx.c main/panel.c mai
 "$O/ui_tooth7" "$O/frames_tooth7.txt" > "$O/ui_tooth7.log"; t7=$?
 grep FAIL "$O/ui_tooth7.log" | head -2
 [ $t7 -ne 0 ] && echo "TOOTH 7 (screen never dims) BITES" || echo "TOOTH 7 DOES NOT BITE -- gate untrusted"
-[ $t7 -ne 0 ] && [ $q -eq 0 ] && [ $t6 -ne 0 ] && [ $r -eq 0 ] && [ $t -ne 0 ] && [ $t2 -ne 0 ] && [ $t3 -ne 0 ] && [ $u -eq 0 ] && [ $t4 -ne 0 ] && [ $t5 -ne 0 ]
+cc $CF -DMSQ_TOOTH_BAT_FLAT test/ui_frames.c main/ui.c main/gfx.c main/panel.c main/msq_core.c -lm -o "$O/ui_tooth8" || exit 1
+"$O/ui_tooth8" "$O/frames_tooth8.txt" > "$O/ui_tooth8.log"; t8=$?
+grep FAIL "$O/ui_tooth8.log" | head -2
+[ $t8 -ne 0 ] && echo "TOOTH 8 (battery gauge frozen) BITES" || echo "TOOTH 8 DOES NOT BITE -- gate untrusted"
+[ $t8 -ne 0 ] && [ $t7 -ne 0 ] && [ $q -eq 0 ] && [ $t6 -ne 0 ] && [ $r -eq 0 ] && [ $t -ne 0 ] && [ $t2 -ne 0 ] && [ $t3 -ne 0 ] && [ $u -eq 0 ] && [ $t4 -ne 0 ] && [ $t5 -ne 0 ]

@@ -15,6 +15,8 @@ Not a JUNO voice port.
 | MIDI RX (6N137 pin 6, 1 k to 3.3 V) | 18 |
 | Knob 1 SHIFT / 2 / 3 / 4 / 5 (wipers; ends to 3.3 V and GND) | 1 / 2 / 4 / 8 / 9 |
 | OLED SDA / SCL (3.3 V, GND) | 11 / 12 |
+| Battery sense: 10k from charger OUT+ to the pin, 10k from the pin to GND | 10 |
+| Charger CHRG / STDBY (LED pins, each via 10k; optional) | 13 / 14 |
 Wiring pictures: docs/hardware/midi_in_6n137.png, docs/hardware/PCM5102_MODULE.md.
 
 ## Controls
@@ -93,3 +95,13 @@ says TURN > / < TURN until the knob crosses the stored value.
 - `sh test/qemu.sh` -- boots the fake-DMA image in QEMU (quad PSRAM override:
   sdkconfig.qemu): FX CRCs + render CRC MATCH, SELFTEST PASS. QEMU has no ADC, so
   the real image stops at boot there, and no GPIO pads, so LOOPBACK fails there.
+
+## v9 (2026-10-01): battery gauge
+- The overview's empty 5th column shows the battery: percent and volts (alternating),
+  CHG, FULL, or USB (no sense wire). Below 15 % the icon blinks; at 5 % a LOW BATT
+  screen shows for 2.5 s of every 20 s. Gauge = resting LiPo table (ui_bat_pct,
+  host-tested, tooth 8); under load it reads a few % low.
+- Wired-or-not is measured at boot (pull-down probe on GPIO 10): `BATT: ... divider
+  found` or `nothing wired`. STAT carries `bat=`. CHRG and STDBY both LOW reads as
+  "on battery" (not a real charger state).
+

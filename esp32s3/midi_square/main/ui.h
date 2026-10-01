@@ -14,10 +14,15 @@
 #define UI_DIM_AFTER_MS  10000
 #define UI_DIM_FADE_MS   2000
 
+enum { UI_BAT_NONE, UI_BAT_ON, UI_BAT_CHG, UI_BAT_FULL };   /* no sense wire / on battery / charging / full */
+
 typedef struct {
     int   note;        /* sounding MIDI note, -1 none */
     float meter;       /* 0..1 output level */
     uint8_t vstate[6]; /* per voice: 0 idle, 1 releasing, 2 held */
+    int   bat_state;   /* UI_BAT_* */
+    float bat_v;       /* battery volts (smoothed) */
+    int   bat_pct;     /* 0..100 */
 } ui_live;
 
 typedef struct {
@@ -36,6 +41,9 @@ void ui_render(gfx_fb *f, const panel_t *pn, const ui_live *lv, ui_anim *a, uint
  * or key, and the three SSD1306 registers for a level (see ui.c). */
 uint8_t ui_dim(uint32_t idle_ms);
 void    ui_dim_regs(uint8_t level, uint8_t *contrast, uint8_t *precharge, uint8_t *vcomh);
+/* LiPo state of charge from its voltage, 0..100 (a resting-voltage table;
+ * under load it reads a few % low). */
+int ui_bat_pct(float volts);
 /* Value text for a parameter, e.g. "0.25S", "SAW", "5X 18C", "40%". */
 void ui_value_text(int p, float v, char *buf, int n);
 #endif

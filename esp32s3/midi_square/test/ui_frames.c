@@ -90,6 +90,32 @@ int main(int argc, char **argv)
         panel_knob(&q, 3, kk[3] + 0.10f, t + 10);
         CHECK(q.last_knob == 3, "a real 10%% turn of knob 4 did not take the screen (last_knob %d)", q.last_knob);
     }
+    /* BATTERY: the gauge, the four states in the 5th column, the low warning. */
+    {
+        int mono = 1, prev = -1;
+        for (float v = 3.0f; v <= 4.3f; v += 0.005f) { int q = ui_bat_pct(v); if (q < prev) mono = 0; prev = q; }
+        CHECK(mono && ui_bat_pct(4.20f) == 100 && ui_bat_pct(3.27f) == 0 && ui_bat_pct(3.84f) == 50 &&
+              ui_bat_pct(3.70f) > 5 && ui_bat_pct(3.70f) < 20,
+              "battery gauge: mono %d, 4.20 V %d%%, 3.27 V %d%%, 3.84 V %d%%, 3.70 V %d%%", mono,
+              ui_bat_pct(4.20f), ui_bat_pct(3.27f), ui_bat_pct(3.84f), ui_bat_pct(3.70f));
+        panel_t q; float kk[5] = { 0.1f, 0.5f, 0.5f, 0.5f, 0.5f };
+        panel_init(&q, kk, 0);
+        ui_anim b; ui_anim_init(&b, &q);
+        static const struct { int st; float v; uint32_t t; const char *lab; } B[] = {
+            { UI_BAT_NONE, 0, 20000, "battery: no sense wire (USB)" },
+            { UI_BAT_ON, 3.92f, 21000, "battery: on battery, percent" },
+            { UI_BAT_ON, 3.92f, 24000, "battery: on battery, volts" },
+            { UI_BAT_CHG, 4.10f, 25000, "battery: charging" },
+            { UI_BAT_FULL, 4.20f, 26000, "battery: full" },
+            { UI_BAT_ON, 3.40f, 40500, "battery: LOW warning" },
+        };
+        for (unsigned i = 0; i < sizeof B / sizeof B[0]; ++i) {
+            ui_live L = { -1, 0, {0}, B[i].st, B[i].v, ui_bat_pct(B[i].v) };
+            ui_render(&f, &q, &L, &b, B[i].t); dump(&f, B[i].lab);
+            if (i < 5) CHECK(lit(&f, 96, 127, 10, 31) > 20, "battery slot empty in '%s'", B[i].lab);
+        }
+        CHECK(lit(&f, 0, 127, 10, 31) > 60, "LOW BATT warning not drawn");
+    }
     /* DIMMING: full for 10 s idle, then a smooth fade to the deepest dim
      * (contrast 0, pre-charge 0x11, VCOMH 0x00); every register moves one way
      * in small steps per 30 ms frame. */

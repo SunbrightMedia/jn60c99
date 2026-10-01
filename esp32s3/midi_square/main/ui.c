@@ -187,11 +187,53 @@ static void bar(gfx_fb *f, int x, int y, int w, int h, float v, int caught, floa
     }
 }
 
-static void overview(gfx_fb *f, const panel_t *pn, int bank)
+/* ------------------------------------------------------------ battery */
+int ui_bat_pct(float v)
+{
+#ifdef MSQ_TOOTH_BAT_FLAT
+    (void)v; return 50;                                                /* TOOTH: the gauge never moves */
+#endif
+    static const float V[] = { 3.27f, 3.61f, 3.69f, 3.71f, 3.73f, 3.75f, 3.77f, 3.79f, 3.80f, 3.82f, 3.84f,
+                               3.85f, 3.87f, 3.91f, 3.95f, 3.98f, 4.02f, 4.08f, 4.11f, 4.15f, 4.20f };
+    if (v <= V[0]) return 0;
+    if (v >= V[20]) return 100;
+    int i = 0;
+    while (v > V[i + 1]) i++;
+    return (int)lroundf(5.0f * i + 5.0f * (v - V[i]) / (V[i + 1] - V[i]));
+}
+
+/* The empty 5th column of the overview: percent / volts (alternating every
+ * 3 s), CHG, FULL or USB, over a battery icon. Below 15 % the outline blinks. */
+static void battery_slot(gfx_fb *f, int x, const ui_live *lv, uint32_t now)
+{
+    int st = lv ? lv->bat_state : UI_BAT_NONE, pct = lv ? lv->bat_pct : 0;
+    char s[12];
+    if (st == UI_BAT_NONE)      snprintf(s, sizeof s, "USB");
+    else if (st == UI_BAT_CHG)  snprintf(s, sizeof s, "CHG");
+    else if (st == UI_BAT_FULL) snprintf(s, sizeof s, "FULL");
+    else if ((now / 3000) & 1)  snprintf(s, sizeof s, "%.2fV", lv->bat_v);
+    else                        snprintf(s, sizeof s, "%d%%", pct);
+    gfx_text(f, x + (31 - gfx_text_w(s)) / 2, MAIN_Y + 2, s, 1);
+    int bx = x + 2, by = MAIN_Y + 12, bw = 25, bh = 8;
+    int low = st == UI_BAT_ON && pct <= 15, show = !low || ((now / 400) & 1);
+    if (st == UI_BAT_NONE) {
+        for (int i = 0; i < bw; i += 2) { gfx_pixel(f, bx + i, by, 1); gfx_pixel(f, bx + i, by + bh - 1, 1); }
+        gfx_vline(f, bx, by, by + bh - 1, 1); gfx_vline(f, bx + bw - 1, by, by + bh - 1, 1);
+    } else if (show) gfx_rect(f, bx, by, bw, bh, 1);
+    gfx_fill(f, bx + bw, by + 2, 2, bh - 4, 1);                        /* the nub */
+    int full = bw - 4, fw = 0;
+    if (st == UI_BAT_ON) fw = (pct * full + 50) / 100;
+    else if (st == UI_BAT_FULL) fw = full;
+    else if (st == UI_BAT_CHG) fw = (int)((now / 120) % (full + 1));   /* filling sweep */
+    gfx_fill(f, bx + 2, by + 2, fw, bh - 4, 1);
+}
+
+static void overview(gfx_fb *f, const panel_t *pn, int bank, const ui_live *lv, uint32_t now)
 {
     for (int k = 1; k < PANEL_KNOBS; ++k) {
         int x = (k - 1) * 32, p = panel_param_of(bank, k);
         static const char *SHORT[P_NPARAM] = { "WAVE", "ATK", "CHOR", "UNI", "REL", "VERB" };
+        if (p < 0 && k == PANEL_KNOBS - 1) { battery_slot(f, x, lv, now); continue; }
         const char *lab = p >= 0 ? SHORT[p] : "----";
         gfx_text(f, x + (31 - gfx_text_w(lab)) / 2, MAIN_Y + 2, lab, 1);
         if (p >= 0) bar(f, x + 2, MAIN_Y + 12, 28, 8, pn->val[p], pn->caught[p], pn->knob[k]);
@@ -301,12 +343,19 @@ void ui_render(gfx_fb *f, const panel_t *pn, const ui_live *lv, ui_anim *a, uint
     header(f, pn, lv, pn->bank, bs, title);
 
     gfx_fb ov, fo;
-    gfx_clear(&ov); overview(&ov, pn, pn->bank);
+    gfx_clear(&ov); overview(&ov, pn, pn->bank, lv, now);
     if (bs > 0 && a->prev_bank != pn->bank) {                          /* bank change: vertical slide */
-        gfx_fb old; gfx_clear(&old); overview(&old, pn, a->prev_bank);
+        gfx_fb old; gfx_clear(&old); overview(&old, pn, a->prev_bank, lv, now);
         int d = (int)lroundf(bs * MAIN_H), dir = pn->bank ? 1 : -1;
         blit_main(f, &old, 0, -dir * (MAIN_H - d));
         blit_main(f, &ov, 0, dir * d);
+        return;
+    }
+    /* LOW BATTERY: at 5 % or less (on battery), 2.5 s of every 20 s */
+    if (lv && lv->bat_state == UI_BAT_ON && lv->bat_pct <= 5 && now % 20000 < 2500) {
+        const char *t = "LOW BATT", *u = "CHARGE NOW";
+        gfx_text2(f, (GFX_W - gfx_text2_w(t)) / 2, MAIN_Y, t, 1);
+        gfx_text(f, (GFX_W - gfx_text_w(u)) / 2, MAIN_Y + 15, u, 1);
         return;
     }
     if (a->focus_knob < 0) { blit_main(f, &ov, 0, 0); return; }

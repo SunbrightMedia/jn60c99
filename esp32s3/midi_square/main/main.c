@@ -28,6 +28,8 @@
 #include "esp_cpu.h"
 #ifndef MSQ_QEMU
 #include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 #endif
 #include "soc/gpio_sig_map.h"   /* U1RXD_IN_IDX: UART1 RX matrix input */
 #include "msq_core.h"
@@ -51,6 +53,9 @@
 static const int PIN_KNOBS[PANEL_KNOBS] __attribute__((unused)) = { 1, 2, 4, 8, 9 };   /* ADC1 wipers */
 #define PIN_SDA   11
 #define PIN_SCL   12
+#define PIN_BAT   10           /* ADC1: battery via 10k/10k divider from the charger OUT+ */
+#define PIN_CHRG  13           /* charger CHRG LED pin via 10k: LOW = charging   */
+#define PIN_STDBY 14           /* charger STDBY LED pin via 10k: LOW = full      */
 
 static msq_t M;
 static i2s_chan_handle_t TX;
@@ -406,9 +411,82 @@ static void knob_poll(void)
         }
     }
 }
+
+/* ---------------------------------------------------------------- BATTERY
+ * GPIO 10 reads the battery through a 10k/10k divider (half the voltage),
+ * calibrated in mV by the chip's own eFuse curve. WIRED OR NOT is measured,
+ * not assumed: at boot the pin's pull-down is switched on -- a floating pin
+ * falls to ~0 V, a divider holds it at ~1.6-2.1 V. CHRG and STDBY are the
+ * charger's LED pins (open drain): LOW = charging / full. Both LOW is not a
+ * real state (a clamped pin with the charger unplugged) and reads as "on
+ * battery". */
+static adc_channel_t bat_ch;
+static adc_cali_handle_t bat_cali;
+static int bat_ok;
+static volatile int bat_state;
+static volatile float bat_v;
+static volatile int bat_pct;
+
+static float bat_read_v(void)
+{
+    int raw, mv, acc = 0;
+    for (int i = 0; i < 16; ++i) {
+        if (adc_oneshot_read(knob_adc, bat_ch, &raw) != ESP_OK) return -1;
+        if (adc_cali_raw_to_voltage(bat_cali, raw, &mv) != ESP_OK) return -1;
+        acc += mv;
+    }
+    return acc / 16.0f * 2.0f / 1000.0f;               /* divider: x2 */
+}
+
+static void bat_start(void)
+{
+    adc_unit_t unit;
+    gpio_config_t st = { .pin_bit_mask = (1ULL << PIN_CHRG) | (1ULL << PIN_STDBY), .mode = GPIO_MODE_INPUT,
+                         .pull_up_en = GPIO_PULLUP_ENABLE };
+    gpio_config(&st);
+    adc_oneshot_chan_cfg_t cc = { .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
+    adc_cali_curve_fitting_config_t cf = { .unit_id = ADC_UNIT_1, .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
+    if (!knob_ok || adc_oneshot_io_to_channel(PIN_BAT, &unit, &bat_ch) != ESP_OK || unit != ADC_UNIT_1 ||
+        adc_oneshot_config_channel(knob_adc, bat_ch, &cc) != ESP_OK ||
+        adc_cali_create_scheme_curve_fitting(&cf, &bat_cali) != ESP_OK) {
+        printf("BATT: ADC on GPIO %d unavailable -- no battery gauge\n", PIN_BAT); return;
+    }
+    gpio_pulldown_en((gpio_num_t)PIN_BAT);             /* the wired-or-not probe */
+    vTaskDelay(pdMS_TO_TICKS(5));
+    float probe = bat_read_v();
+    gpio_pulldown_dis((gpio_num_t)PIN_BAT);
+    vTaskDelay(pdMS_TO_TICKS(5));
+    float v = bat_read_v();
+    bat_ok = probe > 1.0f;
+    if (bat_ok) { bat_v = v; bat_pct = ui_bat_pct(v); bat_state = UI_BAT_ON; }
+    printf("BATT: GPIO %d %s (probe %.2f V, now %.2f V), CHRG %d STDBY %d\n", PIN_BAT,
+           bat_ok ? "divider found" : "nothing wired -- gauge shows USB", probe, v,
+           gpio_get_level((gpio_num_t)PIN_CHRG), gpio_get_level((gpio_num_t)PIN_STDBY));
+}
+
+/* every 500 ms: smooth the voltage (tau ~5 s); the percent shown moves only on
+ * a 2-point change, so a note's load sag does not make it flicker */
+static void bat_poll(void)
+{
+    if (!bat_ok) return;
+    float v = bat_read_v();
+    if (v < 0) return;
+    bat_v += (v - bat_v) * 0.1f;
+    int chg = !gpio_get_level((gpio_num_t)PIN_CHRG), full = !gpio_get_level((gpio_num_t)PIN_STDBY);
+    int st = (chg && !full) ? UI_BAT_CHG : (full && !chg) ? UI_BAT_FULL : UI_BAT_ON;
+    int p = ui_bat_pct(bat_v);
+    if (st != bat_state || abs(p - bat_pct) >= 2) bat_pct = p;
+    if (st != bat_state) printf("BATT: %s\n", st == UI_BAT_CHG ? "CHARGING" : st == UI_BAT_FULL ? "FULL" : "ON BATTERY");
+    bat_state = st;
+}
 #else
 static void knob_start(void) { printf("KNOBS: not in the QEMU build\n"); panel_fallback(); }
 static void knob_poll(void) { }
+static int bat_ok;
+static volatile int bat_state, bat_pct;
+static volatile float bat_v;
+static void bat_start(void) { printf("BATT: not in the QEMU build\n"); }
+static void bat_poll(void) { }
 #endif
 
 /* ------------------------------------------------------------------ OLED
@@ -444,7 +522,8 @@ static void ui_task(void *arg)
                        (unsigned long)(now - t0), (unsigned long)gap, gap < 60 ? "(smooth)" : "(STUTTER)");
                 touch_ms = now;
             }
-            ui_live lv = { M.gate ? M.last_note : -1, a_opeak / 16384.0f, {0} };
+            ui_live lv = { M.gate ? M.last_note : -1, a_opeak / 16384.0f, {0},
+                           bat_ok ? bat_state : UI_BAT_NONE, bat_v, bat_pct };
             for (int k = 0; k < MSQ_VOICES && k < 6; ++k)
                 lv.vstate[k] = M.v[k].gate ? 2 : (M.v[k].level > 0.0f ? 1 : 0);
             ui_render(&fb, &PANEL, &lv, &an, now);
@@ -538,7 +617,7 @@ static void sil_and_stat(int force)
                gpio_get_level((gpio_num_t)PIN_MIDI) ? 'H' : 'L',
                (unsigned long)rx_edges, (unsigned long)n_break);
         printf("STAT midi bytes=%lu on=%lu off=%lu cc=%lu rt=%lu ferr=%lu ovf=%lu held=%d | "
-               "peak=%d out=%d deficit=%ld cpu1=%lu%%/%lu%% (fx %lu%%) cpu0=%lu%% voices=%d split=%d/%d oled=%lu/%lu | SIL: %s | HEALTH: %s\n",
+               "peak=%d out=%d deficit=%ld cpu1=%lu%%/%lu%% (fx %lu%%) cpu0=%lu%% voices=%d split=%d/%d oled=%lu/%lu bat=%s%.2fV/%d%% | SIL: %s | HEALTH: %s\n",
                (unsigned long)M.n_bytes, (unsigned long)M.n_on, (unsigned long)M.n_off,
                (unsigned long)M.n_cc, (unsigned long)M.n_rt, (unsigned long)n_frame_err,
                (unsigned long)n_fifo_ovf, M.nheld, pk, op, (long)(deficit - base),
@@ -547,7 +626,9 @@ static void sil_and_stat(int force)
                (unsigned long)(f_cyc_max * 100u / (240000000u / (SR / CHUNK))),
                (unsigned long)(wcx * 100u / (240000000u / (SR / CHUNK))), msq_voices_sounding(&M),
                a_n1, a_nact - a_n1,
-               (unsigned long)ui_frames, (unsigned long)oled_errors(), sil,
+               (unsigned long)ui_frames, (unsigned long)oled_errors(),
+               !bat_ok ? "none " : bat_state == UI_BAT_CHG ? "CHG " : bat_state == UI_BAT_FULL ? "FULL " : "",
+               bat_ok ? bat_v : 0.0f, bat_ok ? bat_pct : 0, sil,
                health ? health : "OK");
         p_print = now;
     }
@@ -714,12 +795,13 @@ void app_main(void)
     midi_loopback();
     stress();
     knob_start();
+    bat_start();
     ui_begin();
     printf("READY -- play notes. Any MIDI channel. Expect one NOTE line per key.\n");
     sil_and_stat(1);
 
     uint8_t b[128];
-    int64_t next_stat = esp_timer_get_time() + 1000000, next_knob = 0;
+    int64_t next_stat = esp_timer_get_time() + 1000000, next_knob = 0, next_bat = 0;
     for (;;) {
         uart_event_t ev;
         if (xQueueReceive(midi_q, &ev, pdMS_TO_TICKS(10))) {
@@ -744,6 +826,10 @@ void app_main(void)
         if (esp_timer_get_time() >= next_knob) {
             knob_poll();
             next_knob = esp_timer_get_time() + 10000;
+        }
+        if (esp_timer_get_time() >= next_bat) {
+            bat_poll();
+            next_bat = esp_timer_get_time() + 500000;
         }
         if (esp_timer_get_time() >= next_stat) {
             sil_and_stat(0);
