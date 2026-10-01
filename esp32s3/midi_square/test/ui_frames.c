@@ -90,6 +90,35 @@ int main(int argc, char **argv)
         panel_knob(&q, 3, kk[3] + 0.10f, t + 10);
         CHECK(q.last_knob == 3, "a real 10%% turn of knob 4 did not take the screen (last_knob %d)", q.last_knob);
     }
+    /* INTRO TIMING (user, 2026-10-01: "the title comes in too early, then its
+     * animation restarts; the line under it plays twice"). Causes: unsigned
+     * time arithmetic (before a letter's start, t - start wrapped and drew the
+     * letter finished), and the flat wave line was removed at 1500 ms and a
+     * second line grown from the centre. Rules: no letter shows before its own
+     * start time (checked every 10 ms, per letter); from the moment the
+     * wave is flat (1350 ms) to the wipe, ONE line of >= 90 px is always on
+     * rows 16..19 -- it never vanishes and regrows. */
+    {
+        gfx_fb g;
+        static const char *TITLE = "Sunbright.";        /* = ui.c; letter i starts at 1100 + 55 i ms */
+        int lx[16], lw[16], nl = (int)strlen(TITLE), xc = (128 - gfx_text2_w(TITLE)) / 2;
+        for (int i = 0; i < nl; ++i) { char c[2] = { TITLE[i], 0 }; lx[i] = xc; lw[i] = gfx_text2_w(c); xc += lw[i] + 2; }
+        int early = 0, gaps = 0;
+        for (uint32_t t = 1100; t <= 2200; t += 10) {
+            ui_intro(&g, t);
+            for (int i = 0; i < nl; ++i)                   /* rows 0..7: the wave is below row 8 after 1100 ms */
+                if (t <= 1100u + 55u * i && lit(&g, lx[i], lx[i] + lw[i] - 1, 0, 7)) early++;
+            if (t >= 1350) {                                /* longest horizontal run on rows 16..19 */
+                int best = 0;
+                for (int y = 16; y <= 19; ++y) for (int x = 0, run = 0; x < 128; ++x) {
+                    run = gfx_get(&g, x, y) ? run + 1 : 0; if (run > best) best = run;
+                }
+                if (best < 90) gaps++;
+            }
+        }
+        CHECK(early == 0, "intro: %d letter-frames drawn before the letter's own start (it shows, then restarts)", early);
+        CHECK(gaps == 0, "intro: the line under the title was missing or short in %d of the 10 ms steps (it plays twice)", gaps);
+    }
     /* BATTERY: the gauge, the four states in the 5th column, the low warning. */
     {
         int mono = 1, prev = -1;

@@ -72,7 +72,11 @@ int ui_intro(gfx_fb *f, uint32_t t)
     gfx_clear(f);
     float amp = 1.0f;
     if (t > 900) amp = 1.0f - ease_io((t - 900) / 450.0f);            /* wave flattens */
-    if (t < 1500) {                                                    /* the morph trace */
+    /* ALL INTRO TIMES ARE SIGNED. t is unsigned: "t - start" before a start
+     * wrapped to ~4e9 and drew a letter FINISHED before its drop began (user
+     * 2026-10-01: "the title comes in too early, then restarts"). */
+    const int ti = (int)t;
+    if (ti < 1350) {                                                   /* the morph trace */
         int reveal = (int)(ease_out(t / 1000.0f) * GFX_W);
         int py = 16;
         for (int x = 0; x < reveal; ++x) {
@@ -88,15 +92,24 @@ int ui_intro(gfx_fb *f, uint32_t t)
         for (int i = 0; TITLE[i]; ++i) {
             char c[2] = { TITLE[i], 0 };
             int x = xc; xc += gfx_text2_w(c) + 2;        /* proportional font: per-letter advance */
-            float lt = (t - 1100 - i * 55) / 320.0f;
+            float lt = (ti - 1100 - i * 55) / 320.0f;
             if (lt <= 0) continue;
             float e = ease_out(lt);
             float bounce = lt > 1 ? 0 : sinf(clampf(lt, 0, 1) * 3.14159f) * 2.0f;
             int y = (int)lroundf(-16 + e * (2 + 16) - bounce);
             gfx_text2(f, x, y, c, 1);
         }
-        float ul = ease_out((t - 1500) / 400.0f);                      /* underline grows */
-        if (t > 1500) { int half = (int)(ul * 50); gfx_hline(f, 64 - half, 63 + half, 19, 1); }
+    }
+    /* ONE LINE, NOT TWO: the flattened wave (a full-width line on row 16 at
+     * 1350 ms) slides down to row 19 and narrows into the underline. v9 drew
+     * the flat wave, removed it at 1500 ms and grew a second line from the
+     * centre (user: "the line under it plays twice"). */
+    if (ti >= 1350) {
+        float k = ease_io((ti - 1350) / 350.0f);
+        int y = 16 + (int)lroundf(3.0f * k), half = 64 - (int)lroundf(14.0f * k);
+        gfx_hline(f, 64 - half, 63 + half, y, 1);
+    }
+    if (ti >= 1100) {
         if (t > 1750) {
             const char *sub = "Minisynth";
             int sw = gfx_text_w(sub), n = (int)clampf((t - 1750) / 45.0f, 0, (float)strlen(sub));
