@@ -54,6 +54,7 @@ void gfx_rfill(gfx_fb *f, int x, int y, int w, int h, int on)
     }
 }
 
+#ifndef MSQ_FONT_MC
 /* 5x7 (+1 descender row), column bytes, bit 0 = top. */
 static const struct { char c; uint8_t col[5]; } FONT[] = {
     {' ',{0x00,0x00,0x00,0x00,0x00}}, {'.',{0x00,0x60,0x60,0x00,0x00}},
@@ -95,6 +96,51 @@ static const struct { char c; uint8_t col[5]; } FONT[] = {
     {'y',{0x1C,0xA0,0xA0,0xA0,0x7C}}, {'z',{0x44,0x64,0x54,0x4C,0x44}},
 };
 
+#endif
+
+#ifdef MSQ_FONT_MC
+/* THE MINECRAFT FONT (PROPOSED, opt-in until the user approves: -DMSQ_FONT_MC): proportional, 7 rows + 1 descender
+ * row, generated exactly from the font's outlines (gen/font_mc.h). Big text is
+ * plain 2x pixel doubling -- blocky on purpose, which is the look. */
+#include "gen/font_mc.h"
+static const uint8_t *glyph_w(char c, int *w)
+{
+    if (c < MC_FONT_FIRST || c > MC_FONT_LAST) c = '?';
+    *w = MC_FONT[c - MC_FONT_FIRST].w;
+    return MC_FONT[c - MC_FONT_FIRST].col;
+}
+static int gbit(const uint8_t *g, int w, int x, int y)
+{ return (x < 0 || x >= w || y < 0 || y > 7) ? 0 : (g[x] >> y) & 1; }
+
+int gfx_text(gfx_fb *f, int x, int y, const char *s, int on)
+{
+    for (; *s; ++s) {
+        int w; const uint8_t *g = glyph_w(*s, &w);
+        for (int i = 0; i < w; ++i) for (int j = 0; j < 8; ++j) if (gbit(g, w, i, j)) gfx_pixel(f, x + i, y + j, on);
+        x += w + 1;
+    }
+    return x;
+}
+int gfx_text_w(const char *s)
+{
+    int n = 0, w;
+    for (; *s; ++s) { glyph_w(*s, &w); n += w + 1; }
+    return n ? n - 1 : 0;
+}
+int gfx_text2(gfx_fb *f, int x, int y, const char *s, int on)
+{
+    for (; *s; ++s) {
+        int w; const uint8_t *g = glyph_w(*s, &w);
+        for (int i = 0; i < w; ++i) for (int j = 0; j < 8; ++j) if (gbit(g, w, i, j)) {
+            gfx_pixel(f, x + 2 * i, y + 2 * j, on);     gfx_pixel(f, x + 2 * i + 1, y + 2 * j, on);
+            gfx_pixel(f, x + 2 * i, y + 2 * j + 1, on); gfx_pixel(f, x + 2 * i + 1, y + 2 * j + 1, on);
+        }
+        x += 2 * (w + 1);
+    }
+    return x;
+}
+int gfx_text2_w(const char *s) { int n = gfx_text_w(s); return n ? 2 * n : 0; }
+#else
 static const uint8_t *glyph(char c)
 {
     for (unsigned i = 0; i < sizeof FONT / sizeof FONT[0]; ++i) if (FONT[i].c == c) return FONT[i].col;
@@ -140,3 +186,4 @@ int gfx_text2(gfx_fb *f, int x, int y, const char *s, int on)
     return x;
 }
 int gfx_text2_w(const char *s) { int n = (int)strlen(s); return n ? n * 12 - 2 : 0; }
+#endif

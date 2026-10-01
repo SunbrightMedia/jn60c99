@@ -84,15 +84,16 @@ int ui_intro(gfx_fb *f, uint32_t t)
         }
     }
     if (t >= 1100) {                                                   /* title drops in */
-        int tw = gfx_text2_w(TITLE), x0 = (GFX_W - tw) / 2;
+        int tw = gfx_text2_w(TITLE), xc = (GFX_W - tw) / 2;
         for (int i = 0; TITLE[i]; ++i) {
+            char c[2] = { TITLE[i], 0 };
+            int x = xc; xc += gfx_text2_w(c) + 2;        /* proportional font: per-letter advance */
             float lt = (t - 1100 - i * 55) / 320.0f;
             if (lt <= 0) continue;
             float e = ease_out(lt);
             float bounce = lt > 1 ? 0 : sinf(clampf(lt, 0, 1) * 3.14159f) * 2.0f;
             int y = (int)lroundf(-16 + e * (2 + 16) - bounce);
-            char c[2] = { TITLE[i], 0 };
-            gfx_text2(f, x0 + i * 12, y, c, 1);
+            gfx_text2(f, x, y, c, 1);
         }
         float ul = ease_out((t - 1500) / 400.0f);                      /* underline grows */
         if (t > 1500) { int half = (int)(ul * 50); gfx_hline(f, 64 - half, 63 + half, 19, 1); }
