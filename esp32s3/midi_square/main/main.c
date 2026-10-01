@@ -83,14 +83,25 @@ static volatile int      a_allidle;       /* 1 while every block since take bega
  * display task on the intro's first frame. */
 extern const int16_t snd_start[] asm("_binary_startup_48k_s16le_raw_start");
 extern const int16_t snd_end[]   asm("_binary_startup_48k_s16le_raw_end");
-static volatile int snd_pos = -1;          /* frame index, -1 = idle */
+/* The sound starts EXACTLY SND_DELAY_MS after the intro's first frame (user
+ * 2026-10-01): the trigger on frame 0 sets the position to -delay, and the
+ * audio task counts through the delay sample by sample (48 kHz exact, not the
+ * 30 ms frame clock). */
+#define SND_DELAY_MS 150
+static volatile int snd_on;                /* 1 from the trigger to the clip's end */
+static volatile int snd_pos;               /* frame index; negative = still in the delay */
+static volatile int snd_lead, snd_dpeak;   /* proof: samples from the trigger to clip sample 0; DAC peak during the clip */
 
 /* MASTER VOLUME (knob 5, user 2026-10-01): the LAST stage, after the FX and the
  * startup sound -- the bit-exact FX path is untouched. Knob law: 0 = silent,
  * else -48 dB .. 0 dB (top = the level before the knob existed). Ramped
  * linearly across each 5 ms block: no zipper noise. */
-static volatile float a_vol = 1.0f;
-static float vol_law(float v) { return v <= 0.01f ? 0.0f : powf(10.0f, -48.0f * (1.0f - v) / 20.0f); }
+/* MASTER_MAX: the knob's top is 30 % of the v10 level (x 0.30 amplitude,
+ * -10.5 dB; user 2026-10-01) -- the startup sound and everything else. */
+#define MASTER_MAX 0.30f
+static volatile float a_vol = MASTER_MAX;
+static volatile int a_dpeak;              /* max |sample| sent to the DAC since take (after the volume) */
+static float vol_law(float v) { return v <= 0.01f ? 0.0f : MASTER_MAX * powf(10.0f, -48.0f * (1.0f - v) / 20.0f); }
 static volatile int64_t snd_t0_us;         /* when the intro asked for it */
 
 /* health latch */
@@ -176,7 +187,7 @@ static void audio_task(void *arg)
             fx_avg += ((float)cf - fx_avg) * 0.1f;
             if (nact) v_avg += ((float)(c1 + w_cyc) / nact - v_avg) * 0.1f;
         }
-        if (a_take) { a_peak = 0; a_rises = 0; a_frames = 0; a_opeak = 0; a_cyc_max = 0; w_cyc_max = 0; f_cyc_max = 0; a_allidle = 1; a_take = 0; }
+        if (a_take) { a_dpeak = 0; a_peak = 0; a_rises = 0; a_frames = 0; a_opeak = 0; a_cyc_max = 0; w_cyc_max = 0; f_cyc_max = 0; a_allidle = 1; a_take = 0; }
         if (!allidle) a_allidle = 0;
         /* SIL / pitch probes on the VOICE SUM (pre-FX): a stuck note is a voice
          * fault; a reverb tail is not. The output peak feeds the meter. */
@@ -198,19 +209,21 @@ static void audio_task(void *arg)
         if (allidle && !a_hold && M.n_on == on_at_start) for (int i = 0; i < CHUNK; ++i) if (vbuf[i] != 0.0f) { a_blocks_off++; break; }
         a_peak = pk; a_rises = r; a_frames += CHUNK; a_opeak = op;
         if (a_mute) memset(buf, 0, sizeof buf);
-        int sp = snd_pos;
-        if (sp >= 0) {                                 /* the startup sound, after the FX and the mute */
-            int nfr = (int)((snd_end - snd_start) / 2);
+        if (snd_on) {                                  /* the startup sound, after the FX and the mute */
+            int sp = snd_pos, nfr = (int)((snd_end - snd_start) / 2);
             for (int i = 0; i < CHUNK && sp < nfr; ++i, ++sp)
-                for (int c = 0; c < 2; ++c) {
+                if (sp >= 0) for (int c = 0; c < 2; ++c) {
+                    if (sp == 0 && c == 0) snd_lead = snd_lead + i;   /* + the offset inside this block */
                     int v = buf[2 * i + c] + snd_start[2 * sp + c];
                     buf[2 * i + c] = (int16_t)(v > 32767 ? 32767 : (v < -32768 ? -32768 : v));
                 }
-            snd_pos = sp < nfr ? sp : -1;
+            if (snd_pos < 0 && sp <= 0) snd_lead += CHUNK;  /* whole blocks of the delay */
+            snd_pos = sp;
+            if (sp >= nfr) snd_on = 0;
         }
-        static float vol_now = 1.0f;
+        static float vol_now = MASTER_MAX;
         float vol_to = a_vol;
-        if (vol_to != 1.0f || vol_now != 1.0f) {
+        {                                              /* the master volume: always applied (top = 0.30) */
             float dv = (vol_to - vol_now) / CHUNK;
             for (int i = 0; i < CHUNK; ++i) {
                 float g = vol_now + dv * (i + 1);
@@ -220,6 +233,14 @@ static void audio_task(void *arg)
                 }
             }
             vol_now = vol_to;
+        }
+        int dp = a_dpeak;
+        for (int i = 0; i < 2 * CHUNK; ++i) { int o = buf[i] < 0 ? -buf[i] : buf[i]; if (o > dp) dp = o; }
+        a_dpeak = dp;
+        if (snd_on || snd_pos > 0) {                   /* DAC peak while the clip plays */
+            int sdp = snd_dpeak;
+            for (int i = 0; i < 2 * CHUNK; ++i) { int o = buf[i] < 0 ? -buf[i] : buf[i]; if (o > sdp) sdp = o; }
+            snd_dpeak = sdp;
         }
         if (a_stall_ms) { vTaskDelay(pdMS_TO_TICKS(a_stall_ms)); a_stall_ms = 0; }
 #ifdef MSQ_QEMU
@@ -560,7 +581,10 @@ static void ui_task(void *arg)
                 intro_done = 1;
                 printf("INTRO: %d frames in %lu ms, worst frame gap %lu ms %s; startup sound %s\n", intro_frames,
                        (unsigned long)(now - t0), (unsigned long)gap, gap < 60 ? "(smooth)" : "(STUTTER)",
-                       snd_pos < 0 && snd_t0_us ? "played to its end" : "STILL PLAYING OR NEVER STARTED");
+                       !snd_on && snd_t0_us ? "played to its end" : "STILL PLAYING OR NEVER STARTED");
+                printf("SND: clip sample 0 came %d samples = %.1f ms after the frame-0 trigger (want %d ms); DAC peak in the clip %d "
+                       "(clip peak 32767 x volume; the knob's top = x%.2f = %d)\n", snd_lead, snd_lead * 1000.0f / SR,
+                       SND_DELAY_MS, snd_dpeak, MASTER_MAX, (int)(32767 * MASTER_MAX));
                 touch_ms = now;
             }
             ui_live lv = { M.gate ? M.last_note : -1, a_opeak / 16384.0f, {0},
@@ -570,7 +594,12 @@ static void ui_task(void *arg)
             ui_render(&fb, &PANEL, &lv, &an, now);
         }
         prev = now;
-        if (intro_frames == 1) { snd_t0_us = esp_timer_get_time(); snd_pos = 0; }   /* sound starts WITH frame 0 */
+        if (intro_frames == 1) {                       /* frame 0: arm the sound, SND_DELAY_MS ahead */
+            snd_t0_us = esp_timer_get_time();
+            snd_pos = -(SR / 1000) * SND_DELAY_MS;
+            snd_lead = 0; snd_dpeak = 0;
+            snd_on = 1;
+        }
         /* dim: the level follows idle time down smoothly; a touch brings it
          * back to full in ~150 ms */
         int tgt = intro_done ? ui_dim(now - touch_ms) : 0;
@@ -623,7 +652,7 @@ static void sil_and_stat(int force)
     static uint32_t p_bytes, p_on, p_off, p_fe, p_edges;
     static int64_t p_print;
     int64_t now = esp_timer_get_time();
-    int pk = a_peak, op = a_opeak;
+    int pk = a_peak, op = a_opeak, dpk = a_dpeak;
     uint32_t cyc = a_cyc, cycx = a_cyc_max, wcx = w_cyc_max;
     a_take = 1;
     if (fx_overrun()) fault("REVERB TAP OVERRUN");
@@ -659,10 +688,10 @@ static void sil_and_stat(int force)
                gpio_get_level((gpio_num_t)PIN_MIDI) ? 'H' : 'L',
                (unsigned long)rx_edges, (unsigned long)n_break);
         printf("STAT midi bytes=%lu on=%lu off=%lu cc=%lu rt=%lu ferr=%lu ovf=%lu held=%d | "
-               "peak=%d out=%d deficit=%ld cpu1=%lu%%/%lu%% (fx %lu%%) cpu0=%lu%% voices=%d split=%d/%d oled=%lu/%lu bat=%s%.2fV/%d%% | SIL: %s | HEALTH: %s\n",
+               "peak=%d out=%d dac=%d deficit=%ld cpu1=%lu%%/%lu%% (fx %lu%%) cpu0=%lu%% voices=%d split=%d/%d oled=%lu/%lu bat=%s%.2fV/%d%% | SIL: %s | HEALTH: %s\n",
                (unsigned long)M.n_bytes, (unsigned long)M.n_on, (unsigned long)M.n_off,
                (unsigned long)M.n_cc, (unsigned long)M.n_rt, (unsigned long)n_frame_err,
-               (unsigned long)n_fifo_ovf, M.nheld, pk, op, (long)(deficit - base),
+               (unsigned long)n_fifo_ovf, M.nheld, pk, op, dpk, (long)(deficit - base),
                (unsigned long)(cyc * 100u / (240000000u / (SR / CHUNK))),
                (unsigned long)(cycx * 100u / (240000000u / (SR / CHUNK))),
                (unsigned long)(f_cyc_max * 100u / (240000000u / (SR / CHUNK))),
