@@ -54,7 +54,7 @@ void gfx_rfill(gfx_fb *f, int x, int y, int w, int h, int on)
     }
 }
 
-#ifndef MSQ_FONT_MC
+#ifdef MSQ_FONT_5X7
 /* 5x7 (+1 descender row), column bytes, bit 0 = top. */
 static const struct { char c; uint8_t col[5]; } FONT[] = {
     {' ',{0x00,0x00,0x00,0x00,0x00}}, {'.',{0x00,0x60,0x60,0x00,0x00}},
@@ -98,8 +98,8 @@ static const struct { char c; uint8_t col[5]; } FONT[] = {
 
 #endif
 
-#ifdef MSQ_FONT_MC
-/* THE MINECRAFT FONT (PROPOSED, opt-in until the user approves: -DMSQ_FONT_MC): proportional, 7 rows + 1 descender
+#ifndef MSQ_FONT_5X7
+/* THE MINECRAFT FONT (default since v10, approved by the user 2026-10-01; -DMSQ_FONT_5X7 = the old font): proportional, 7 rows + 1 descender
  * row, generated exactly from the font's outlines (gen/font_mc.h). Big text is
  * plain 2x pixel doubling -- blocky on purpose, which is the look. */
 #include "gen/font_mc.h"
