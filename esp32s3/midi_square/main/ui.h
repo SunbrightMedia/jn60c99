@@ -7,7 +7,12 @@
 #include "gfx.h"
 #include "panel.h"
 
-#define UI_INTRO_MS 2600
+/* Intro timeline (ms): wave 0-1350 (flat on the underline row by 1350), title
+ * letters 1100-1915, subtitle typed 1750-2155, the whole logo HELD still
+ * until UI_INTRO_WIPE (>= 0.5 s, user 2026-10-01), iris wipe to UI_INTRO_MS. */
+#define UI_INTRO_LOGO_MS 2155
+#define UI_INTRO_WIPE    2750
+#define UI_INTRO_MS      3100
 /* Screen dimming: full while in use, then a smooth fade to the dimmest the
  * SSD1306 gives (contrast 0, pre-charge 0x11, VCOMH 0x00). */
 #define UI_CONTRAST_FULL 0x8F         /* = OLED_CONTRAST_FULL, the v1-v6 brightness */

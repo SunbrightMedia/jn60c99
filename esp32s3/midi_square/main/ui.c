@@ -66,6 +66,7 @@ void ui_value_text(int p, float v, char *buf, int n)
 }
 
 /* ---------------------------------------------------------------- intro */
+#define UL_Y 19                   /* the underline row = the wave's centre */
 int ui_intro(gfx_fb *f, uint32_t t)
 {
     static const char *TITLE = "Sunbright.";
@@ -78,11 +79,11 @@ int ui_intro(gfx_fb *f, uint32_t t)
     const int ti = (int)t;
     if (ti < 1350) {                                                   /* the morph trace */
         int reveal = (int)(ease_out(t / 1000.0f) * GFX_W);
-        int py = 16;
+        int py = UL_Y;
         for (int x = 0; x < reveal; ++x) {
             float w = 3.0f * x / (GFX_W - 1);
             float ph = fmodf(x / 32.0f + t / 2000.0f, 1.0f);
-            int yy = 16 - (int)lroundf(shape(ph, w) * 12.0f * amp);
+            int yy = UL_Y - (int)lroundf(shape(ph, w) * 12.0f * amp);
             if (x) gfx_line(f, x - 1, py, x, yy, 1); else gfx_pixel(f, 0, yy, 1);
             py = yy;
         }
@@ -100,15 +101,11 @@ int ui_intro(gfx_fb *f, uint32_t t)
             gfx_text2(f, x, y, c, 1);
         }
     }
-    /* ONE LINE, NOT TWO: the flattened wave (a full-width line on row 16 at
-     * 1350 ms) slides down to row 19 and narrows into the underline. v9 drew
-     * the flat wave, removed it at 1500 ms and grew a second line from the
-     * centre (user: "the line under it plays twice"). */
-    if (ti >= 1350) {
-        float k = ease_io((ti - 1350) / 350.0f);
-        int y = 16 + (int)lroundf(3.0f * k), half = 64 - (int)lroundf(14.0f * k);
-        gfx_hline(f, 64 - half, 63 + half, y, 1);
-    }
+    /* ONE LINE, NOT TWO, AND IT NEVER MOVES: the wave is centred on the
+     * underline row, so when it flattens (1350 ms) it already IS the
+     * underline, full width (user 2026-10-01). v9 removed the flat wave and
+     * grew a second line; the first fix slid it down and inwards. */
+    if (ti >= 1350) gfx_hline(f, 0, GFX_W - 1, UL_Y, 1);
     if (ti >= 1100) {
         if (t > 1750) {
             const char *sub = "Minisynth";
@@ -117,8 +114,8 @@ int ui_intro(gfx_fb *f, uint32_t t)
             gfx_text(f, (GFX_W - sw) / 2, 23, b, 1);
         }
     }
-    if (t > 2250) {                                                    /* iris-out wipe */
-        int r = (int)(ease_io((t - 2250) / 350.0f) * 70);
+    if (ti > UI_INTRO_WIPE) {                                          /* iris-out wipe */
+        int r = (int)(ease_io((ti - UI_INTRO_WIPE) / (float)(UI_INTRO_MS - UI_INTRO_WIPE - 50)) * 70);
         for (int x = 0; x < GFX_W; ++x)
             if (abs(x - 64) < r) gfx_vline(f, x, 0, GFX_H - 1, 0);
     }

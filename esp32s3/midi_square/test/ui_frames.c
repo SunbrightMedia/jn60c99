@@ -23,10 +23,10 @@ int main(int argc, char **argv)
 {
     out = fopen(argc > 1 ? argv[1] : "frames.txt", "w");
     gfx_fb f; char lab[64];
-    for (uint32_t t = 0; t <= 2700; t += 150) {
+    for (uint32_t t = 0; t <= UI_INTRO_MS + 100; t += 150) {
         int running = ui_intro(&f, t);
         snprintf(lab, sizeof lab, "intro t=%u ms", t); dump(&f, lab);
-        if (t >= 2700) CHECK(!running, "intro still running at %u ms", t);
+        if (t >= UI_INTRO_MS) CHECK(!running, "intro still running at %u ms", t);
     }
     msq_t m; msq_init(&m, 48000);     /* laws only */
     float k[5] = { 0.1f, 0.40f, 0.30f, 0.55f, 0.5f };
@@ -95,29 +95,37 @@ int main(int argc, char **argv)
      * time arithmetic (before a letter's start, t - start wrapped and drew the
      * letter finished), and the flat wave line was removed at 1500 ms and a
      * second line grown from the centre. Rules: no letter shows before its own
-     * start time (checked every 10 ms, per letter); from the moment the
-     * wave is flat (1350 ms) to the wipe, ONE line of >= 90 px is always on
-     * rows 16..19 -- it never vanishes and regrows. */
+     * start time (checked every 10 ms, per letter); from the moment the wave
+     * is flat (1350 ms) to the wipe, the underline is row 19 across all 128
+     * columns -- it never moves, shrinks or regrows; the complete logo is held
+     * still >= 500 ms (user 2026-10-01). */
     {
         gfx_fb g;
         static const char *TITLE = "Sunbright.";        /* = ui.c; letter i starts at 1100 + 55 i ms */
         int lx[16], lw[16], nl = (int)strlen(TITLE), xc = (128 - gfx_text2_w(TITLE)) / 2;
         for (int i = 0; i < nl; ++i) { char c[2] = { TITLE[i], 0 }; lx[i] = xc; lw[i] = gfx_text2_w(c); xc += lw[i] + 2; }
         int early = 0, gaps = 0;
-        for (uint32_t t = 1100; t <= 2200; t += 10) {
+        for (uint32_t t = 1100; t <= UI_INTRO_WIPE; t += 10) {
             ui_intro(&g, t);
             for (int i = 0; i < nl; ++i)                   /* rows 0..7: the wave is below row 8 after 1100 ms */
                 if (t <= 1100u + 55u * i && lit(&g, lx[i], lx[i] + lw[i] - 1, 0, 7)) early++;
-            if (t >= 1350) {                                /* longest horizontal run on rows 16..19 */
-                int best = 0;
-                for (int y = 16; y <= 19; ++y) for (int x = 0, run = 0; x < 128; ++x) {
-                    run = gfx_get(&g, x, y) ? run + 1 : 0; if (run > best) best = run;
-                }
-                if (best < 90) gaps++;
+            if (t >= 1350) {                                /* the underline: row 19, every column */
+                int run = 0;
+                for (int x = 0; x < 128; ++x) run += gfx_get(&g, x, 19) != 0;
+                if (run < 128) gaps++;
             }
         }
+        /* THE HOLD: the complete logo stays still for >= 500 ms before the wipe */
+        gfx_fb h0; ui_intro(&h0, UI_INTRO_LOGO_MS);
+        int moved = 0;
+        for (uint32_t t = UI_INTRO_LOGO_MS; t <= UI_INTRO_LOGO_MS + 500; t += 10) {
+            ui_intro(&g, t); if (memcmp(&g, &h0, sizeof g)) moved++;
+        }
+        ui_intro(&g, UI_INTRO_LOGO_MS - 50);
+        CHECK(moved == 0 && memcmp(&g, &h0, sizeof g),
+              "intro: the full logo is not held still for 500 ms (%d changed frames), or UI_INTRO_LOGO_MS is not when it completes", moved);
         CHECK(early == 0, "intro: %d letter-frames drawn before the letter's own start (it shows, then restarts)", early);
-        CHECK(gaps == 0, "intro: the line under the title was missing or short in %d of the 10 ms steps (it plays twice)", gaps);
+        CHECK(gaps == 0, "intro: the underline (row 19, full width) was not complete in %d of the 10 ms steps after the wave went flat", gaps);
     }
     /* BATTERY: the gauge, the four states in the 5th column, the low warning. */
     {
