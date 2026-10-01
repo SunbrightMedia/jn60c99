@@ -3,10 +3,10 @@
 #include <string.h>
 
 static const int8_t MAP[2][PANEL_KNOBS] = {
-    { -1, P_WAVE,   P_ATTACK,  P_CHORUS, -1 },
-    { -1, P_UNISON, P_RELEASE, P_REVERB, -1 },
+    { -1, P_WAVE,   P_ATTACK,  P_CHORUS, P_VOLUME },
+    { -1, P_UNISON, P_RELEASE, P_REVERB, P_VOLUME },
 };
-static const char *NAME[P_NPARAM] = { "WAVE", "ATTACK", "CHORUS", "UNISON", "RELEASE", "REVERB" };
+static const char *NAME[P_NPARAM] = { "WAVE", "ATTACK", "CHORUS", "UNISON", "RELEASE", "REVERB", "VOLUME" };
 
 int panel_param_of(int bank, int k)
 { return (bank < 0 || bank > 1 || k < 0 || k >= PANEL_KNOBS) ? -1 : MAP[bank][k]; }
@@ -64,7 +64,7 @@ void panel_knob(panel_t *pn, int k, float pos, uint32_t now_ms)
         return;
     }
     int p = MAP[pn->bank][k];
-    if (p < 0) return;                                /* knob 5: no parameter, never the screen */
+    if (p < 0) return;
 #ifdef MSQ_TOOTH_NO_FOCUS_DEADBAND
     const float fm = 0.0f;                            /* TOOTH: any wiggle steals the screen */
 #else

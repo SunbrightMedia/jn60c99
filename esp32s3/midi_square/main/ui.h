@@ -7,17 +7,16 @@
 #include "gfx.h"
 #include "panel.h"
 
-/* Intro timeline (ms), user 2026-10-01 (v2): wave 0-1350 (flat on the
- * underline row at 1350); the title swoops in RIGHT AFTER, almost at once
- * (letter i starts at UI_TITLE_T0 + i*UI_TITLE_STEP, each drop UI_TITLE_DROP
- * long) with the subtitle typed alongside; the complete logo is HELD still
- * 750 ms; then the iris wipe. */
+/* Intro timeline (ms), user 2026-10-01 (v3): the wave draws in over
+ * UI_WAVE_REVEAL_MS (its last crest at 454 ms, exactly 150 ms earlier than
+ * v2's 604 ms -- measured by test/ui_frames.c), flattens onto the underline
+ * row by 1350; the whole text appears INSTANTLY at UI_TITLE_T0 (no slide, no
+ * typing); the complete logo is HELD still 750 ms; then the iris wipe. */
+#ifndef UI_WAVE_REVEAL_MS
+#define UI_WAVE_REVEAL_MS 709
+#endif
 #define UI_TITLE_T0      1350
-#define UI_TITLE_STEP    12
-#define UI_TITLE_DROP    100
-#define UI_SUB_T0        1400
-#define UI_SUB_STEP      15
-#define UI_INTRO_LOGO_MS 1560     /* last letter lands 1350+9*12+100 = 1558; subtitle done 1535 */
+#define UI_INTRO_LOGO_MS UI_TITLE_T0
 #define UI_INTRO_HOLD_MS 750
 #define UI_INTRO_WIPE    (UI_INTRO_LOGO_MS + UI_INTRO_HOLD_MS)
 #define UI_INTRO_MS      (UI_INTRO_WIPE + 350)

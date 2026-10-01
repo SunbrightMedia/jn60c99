@@ -78,7 +78,7 @@ int ui_intro(gfx_fb *f, uint32_t t)
      * 2026-10-01: "the title comes in too early, then restarts"). */
     const int ti = (int)t;
     if (ti < 1350) {                                                   /* the morph trace */
-        int reveal = (int)(ease_out(t / 1000.0f) * GFX_W);
+        int reveal = (int)(ease_out(t / (float)UI_WAVE_REVEAL_MS) * GFX_W);
         int py = UL_Y;
         for (int x = 0; x < reveal; ++x) {
             float w = 3.0f * x / (GFX_W - 1);
@@ -88,32 +88,15 @@ int ui_intro(gfx_fb *f, uint32_t t)
             py = yy;
         }
     }
-    if (ti >= UI_TITLE_T0) {                                           /* title swoops in */
-        int tw = gfx_text2_w(TITLE), xc = (GFX_W - tw) / 2;
-        for (int i = 0; TITLE[i]; ++i) {
-            char c[2] = { TITLE[i], 0 };
-            int x = xc; xc += gfx_text2_w(c) + 2;        /* proportional font: per-letter advance */
-            float lt = (ti - UI_TITLE_T0 - i * UI_TITLE_STEP) / (float)UI_TITLE_DROP;
-            if (lt <= 0) continue;
-            float e = ease_out(lt);
-            float bounce = lt > 1 ? 0 : sinf(clampf(lt, 0, 1) * 3.14159f) * 2.0f;
-            int y = (int)lroundf(-16 + e * (2 + 16) - bounce);
-            gfx_text2(f, x, y, c, 1);
-        }
+    if (ti >= UI_TITLE_T0) {                                           /* the text: instantly, no slide */
+        gfx_text2(f, (GFX_W - gfx_text2_w(TITLE)) / 2, 2, TITLE, 1);
+        gfx_text(f, (GFX_W - gfx_text_w("Minisynth")) / 2, 23, "Minisynth", 1);
     }
     /* ONE LINE, NOT TWO, AND IT NEVER MOVES: the wave is centred on the
      * underline row, so when it flattens (1350 ms) it already IS the
      * underline, full width (user 2026-10-01). v9 removed the flat wave and
      * grew a second line; the first fix slid it down and inwards. */
     if (ti >= 1350) gfx_hline(f, 0, GFX_W - 1, UL_Y, 1);
-    {
-        if (ti > UI_SUB_T0) {
-            const char *sub = "Minisynth";
-            int sw = gfx_text_w(sub), n = (int)clampf((ti - UI_SUB_T0) / (float)UI_SUB_STEP, 0, (float)strlen(sub));
-            char b[16]; memcpy(b, sub, n); b[n] = 0;
-            gfx_text(f, (GFX_W - sw) / 2, 23, b, 1);
-        }
-    }
     if (ti > UI_INTRO_WIPE) {                                          /* iris-out wipe */
         int r = (int)(ease_io((ti - UI_INTRO_WIPE) / (float)(UI_INTRO_MS - UI_INTRO_WIPE - 50)) * 70);
         for (int x = 0; x < GFX_W; ++x)
@@ -243,8 +226,8 @@ static void overview(gfx_fb *f, const panel_t *pn, int bank, const ui_live *lv, 
 {
     for (int k = 1; k < PANEL_KNOBS; ++k) {
         int x = (k - 1) * 32, p = panel_param_of(bank, k);
-        static const char *SHORT[P_NPARAM] = { "WAVE", "ATK", "CHOR", "UNI", "REL", "VERB" };
-        if (p < 0 && k == PANEL_KNOBS - 1) { battery_slot(f, x, lv, now); continue; }
+        static const char *SHORT[P_NPARAM] = { "WAVE", "ATK", "CHOR", "UNI", "REL", "VERB", "VOL" };
+        if (k == PANEL_KNOBS - 1) { battery_slot(f, x, lv, now); continue; }   /* knob 5 = VOLUME: its column shows the battery */
         const char *lab = p >= 0 ? SHORT[p] : "----";
         gfx_text(f, x + (31 - gfx_text_w(lab)) / 2, MAIN_Y + 2, lab, 1);
         if (p >= 0) bar(f, x + 2, MAIN_Y + 12, 28, 8, pn->val[p], pn->caught[p], pn->knob[k]);
@@ -294,6 +277,19 @@ static void focus(gfx_fb *f, const panel_t *pn, int bank, int knob, uint32_t now
             gfx_vline(f, cx, gy + 3, gy + gh - 3, 1);
         }
         gfx_hline(f, gx, gx + gw - 1, gy + gh - 1, 1);
+        break;
+    }
+    case P_VOLUME: {                                      /* a speaker and a wedge filled to the level */
+        int cx = gx + 2, cy = gy + gh / 2;
+        gfx_fill(f, cx, cy - 2, 3, 5, 1);
+        for (int i = 0; i < 4; ++i) gfx_vline(f, cx + 3 + i, cy - 2 - i, cy + 2 + i, 1);
+        int wx = gx + 12, ww = gw - 14, fillw = (int)lroundf(clampf(pn->val[p], 0, 1) * ww);
+        for (int i = 0; i < ww; ++i) {
+            int h = 1 + i * (gh - 3) / ww;
+            if (i < fillw) gfx_vline(f, wx + i, gy + gh - 1 - h, gy + gh - 1, 1);
+            else gfx_pixel(f, wx + i, gy + gh - 1 - h, 1);
+        }
+        gfx_hline(f, wx, wx + ww - 1, gy + gh - 1, 1);
         break;
     }
     default: {                                            /* chorus / reverb: amount bars */

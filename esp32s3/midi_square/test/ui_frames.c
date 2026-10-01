@@ -47,7 +47,8 @@ int main(int argc, char **argv)
     (void)tt;
     panel_knob(&pn, 2, 0.6f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus ATTACK");
     panel_knob(&pn, 3, 0.7f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus CHORUS");
-    panel_knob(&pn, 4, 0.2f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus knob 5 (free)");
+    panel_knob(&pn, 4, 0.2f, now); panel_knob(&pn, 4, 0.75f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus VOLUME 75%");
+    CHECK(pn.val[P_VOLUME] == 0.75f && a.focus_knob == 4, "knob 5 did not drive VOLUME (%.2f, focus %d)", pn.val[P_VOLUME], a.focus_knob);
     now += 1700; ui_render(&f, &pn, &lv, &a, now); now += 90; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus leaving (90 ms)");
     now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "back to overview");
     CHECK(a.focus_knob < 0, "focus did not leave after the hold");
@@ -67,7 +68,7 @@ int main(int argc, char **argv)
     panel_knob(&pn, 1, 0.0f, now); panel_knob(&pn, 1, 0.7f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus UNISON 0.70");
     panel_knob(&pn, 3, 0.25f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus REVERB");
     /* KNOB NOISE: WAVE has the screen; every other knob jitters +-3 % (the v6 board log) for
-     * 300 polls and knob 5 floats full-range. The screen must not move. Then a
+     * 300 polls (knob 5, VOLUME, too). The screen must not move. Then a
      * real 10 % turn of knob 4 must take it. */
     {
         panel_t q; float kk[5] = { 0.1f, 0.40f, 0.30f, 0.55f, 0.5f };
@@ -77,13 +78,11 @@ int main(int argc, char **argv)
         unsigned r = 12345u; int moved = 0;
         for (int i = 0; i < 300; ++i) {
             t += 10;
-            for (int k = 2; k <= 3; ++k) {
+            for (int k = 2; k <= 4; ++k) {
                 r = r * 1103515245u + 12345u;
                 float j = ((int)((r >> 16) % 61) - 30) * 0.001f;
                 panel_knob(&q, k, kk[k] + j, t);
             }
-            r = r * 1103515245u + 12345u;
-            panel_knob(&q, 4, (r >> 16) % 1000 / 1000.0f, t);
             if (q.last_knob != 1) moved++;
         }
         CHECK(moved == 0, "knob noise stole the screen on %d of 300 polls", moved);
@@ -101,14 +100,14 @@ int main(int argc, char **argv)
      * still >= 500 ms (user 2026-10-01). */
     {
         gfx_fb g;
-        static const char *TITLE = "Sunbright.";        /* = ui.c; letter i starts at UI_TITLE_T0 + i UI_TITLE_STEP */
+        static const char *TITLE = "Sunbright.";        /* = ui.c; the whole text appears at UI_TITLE_T0 */
         int lx[16], lw[16], nl = (int)strlen(TITLE), xc = (128 - gfx_text2_w(TITLE)) / 2;
         for (int i = 0; i < nl; ++i) { char c[2] = { TITLE[i], 0 }; lx[i] = xc; lw[i] = gfx_text2_w(c); xc += lw[i] + 2; }
         int early = 0, gaps = 0;
         for (uint32_t t = 1100; t <= UI_INTRO_WIPE; t += 2) {
             ui_intro(&g, t);
             for (int i = 0; i < nl; ++i)                   /* rows 0..7: the wave is below row 8 after 1100 ms */
-                if (t <= (uint32_t)(UI_TITLE_T0 + UI_TITLE_STEP * i) && lit(&g, lx[i], lx[i] + lw[i] - 1, 0, 7)) early++;
+                if (t < (uint32_t)UI_TITLE_T0 && lit(&g, lx[i], lx[i] + lw[i] - 1, 0, 7)) early++;
             if (t >= 1350) {                                /* the underline: row 19, every column */
                 int run = 0;
                 for (int x = 0; x < 128; ++x) run += gfx_get(&g, x, 19) != 0;
@@ -120,7 +119,24 @@ int main(int argc, char **argv)
          * instantly", user 2026-10-01 v2) */
         gfx_fb h0; ui_intro(&h0, UI_INTRO_LOGO_MS);
         int moved = 0;
-        CHECK(UI_INTRO_LOGO_MS - 1350 <= 250, "intro: the logo takes %d ms after the wave is flat (want <= 250)", UI_INTRO_LOGO_MS - 1350);
+        CHECK(UI_INTRO_LOGO_MS == 1350, "intro: the text must appear instantly when the wave is flat (1350), not at %d", UI_INTRO_LOGO_MS);
+        /* THE LAST CREST: the rightmost wave crest appears at 454 ms -- exactly
+         * 150 ms earlier than v2 (604 ms with the 1000 ms reveal; user v3).
+         * Measured as the last rightward jump of the rightmost lit pixel in
+         * the crest rows (0..8) before the wave starts to flatten. */
+        {
+            int prevx = -1, last_t = -1;
+            for (uint32_t t = 0; t < 900; ++t) {
+                ui_intro(&g, t);
+                int rx = -1;
+                for (int x = 0; x < 128; ++x) for (int y = 0; y <= 8; ++y) if (gfx_get(&g, x, y)) rx = x;
+                if (rx > prevx + 3) last_t = (int)t;
+                prevx = rx;
+            }
+            CHECK(last_t == 454, "intro: the last wave crest appears at %d ms, want 454 (v2 604 - 150)", last_t);
+            printf("INTRO: last crest at %d ms, text at %d ms, held %d ms, wipe ends %d ms\n",
+                   last_t, UI_INTRO_LOGO_MS, UI_INTRO_HOLD_MS, UI_INTRO_MS);
+        }
         for (uint32_t t = UI_INTRO_LOGO_MS; t <= UI_INTRO_LOGO_MS + 750; t += 10) {
             ui_intro(&g, t); if (memcmp(&g, &h0, sizeof g)) moved++;
         }

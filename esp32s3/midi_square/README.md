@@ -13,7 +13,7 @@ Not a JUNO voice port.
 |---|---|
 | I2S BCK / LCK / DIN | 5 / 6 / 7 |
 | MIDI RX (6N137 pin 6, 1 k to 3.3 V) | 18 |
-| Knob 1 SHIFT / 2 / 3 / 4 / 5 (wipers; ends to 3.3 V and GND) | 1 / 2 / 4 / 8 / 9 |
+| Knob 1 SHIFT / 2 / 3 / 4 / 5 VOLUME (wipers; ends to 3.3 V and GND) | 1 / 2 / 4 / 8 / 9 |
 | OLED SDA / SCL (3.3 V, GND) | 11 / 12 |
 | Battery sense: 10k from charger OUT+ to the pin, 10k from the pin to GND | 10 |
 | Charger CHRG / STDBY (LED pins, each via 10k; optional) | 13 / 14 |
@@ -104,4 +104,15 @@ says TURN > / < TURN until the knob crosses the stored value.
 - Wired-or-not is measured at boot (pull-down probe on GPIO 10): `BATT: ... divider
   found` or `nothing wired`. STAT carries `bat=`. CHRG and STDBY both LOW reads as
   "on battery" (not a real charger state).
+
+## v10 (2026-10-01)
+- Minecraft font ("Minecraft" by Idrees Hassan, SIL OFL; docs/fonts/), user approved.
+- Intro v3: wave reveal 709 ms (last crest at 454 ms, 150 ms earlier than v2),
+  flattens onto the underline row; the text appears instantly at 1350 ms; the logo
+  holds 750 ms; iris wipe to 2450 ms. All timings host-checked (tests seen to fail).
+- Startup sound (user's clip startupv2, 48 kHz stereo, embedded) starts on the intro's
+  first frame, mixed after the FX. Boot test tones are muted (probes read pre-mute).
+- Knob 5 = master VOLUME in both banks: 0 = silent, else -48..0 dB, the last stage
+  (after the FX and the startup sound), ramped per block. Its overview column keeps
+  the battery; turning it shows VOLUME in the focus view.
 

@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -83,6 +84,13 @@ static volatile int      a_allidle;       /* 1 while every block since take bega
 extern const int16_t snd_start[] asm("_binary_startup_48k_s16le_raw_start");
 extern const int16_t snd_end[]   asm("_binary_startup_48k_s16le_raw_end");
 static volatile int snd_pos = -1;          /* frame index, -1 = idle */
+
+/* MASTER VOLUME (knob 5, user 2026-10-01): the LAST stage, after the FX and the
+ * startup sound -- the bit-exact FX path is untouched. Knob law: 0 = silent,
+ * else -48 dB .. 0 dB (top = the level before the knob existed). Ramped
+ * linearly across each 5 ms block: no zipper noise. */
+static volatile float a_vol = 1.0f;
+static float vol_law(float v) { return v <= 0.01f ? 0.0f : powf(10.0f, -48.0f * (1.0f - v) / 20.0f); }
 static volatile int64_t snd_t0_us;         /* when the intro asked for it */
 
 /* health latch */
@@ -199,6 +207,19 @@ static void audio_task(void *arg)
                     buf[2 * i + c] = (int16_t)(v > 32767 ? 32767 : (v < -32768 ? -32768 : v));
                 }
             snd_pos = sp < nfr ? sp : -1;
+        }
+        static float vol_now = 1.0f;
+        float vol_to = a_vol;
+        if (vol_to != 1.0f || vol_now != 1.0f) {
+            float dv = (vol_to - vol_now) / CHUNK;
+            for (int i = 0; i < CHUNK; ++i) {
+                float g = vol_now + dv * (i + 1);
+                for (int c = 0; c < 2; ++c) {
+                    float x = buf[2 * i + c] * g;
+                    buf[2 * i + c] = (int16_t)(x >= 0 ? x + 0.5f : x - 0.5f);
+                }
+            }
+            vol_now = vol_to;
         }
         if (a_stall_ms) { vTaskDelay(pdMS_TO_TICKS(a_stall_ms)); a_stall_ms = 0; }
 #ifdef MSQ_QEMU
@@ -343,6 +364,7 @@ static void apply_param(int p, float v)
     case P_UNISON:  msq_set_unison(&M, v); break;
     case P_RELEASE: msq_set_release(&M, msq_knob_to_release(v)); break;
     case P_REVERB:  fx_set_reverb((int)(v * 255.0f + 0.5f)); break;
+    case P_VOLUME:  a_vol = vol_law(v); break;
     }
 }
 
@@ -407,7 +429,7 @@ static void knob_poll(void)
             (knob_avg[k] > 0.998f && knob_sent[k] != 1.0f)) {
             float v = knob_avg[k] < 0.002f ? 0.0f : (knob_avg[k] > 0.998f ? 1.0f : knob_avg[k]);
             knob_sent[k] = v;
-            if (k < 4) touch_ms = now;                 /* knob 5 is unwired: it floats */
+            touch_ms = now;
             int bank0 = PANEL.bank;
             panel_knob(&PANEL, k, v, now);
             if (PANEL.bank != bank0) printf("BANK %c (%s)\n", PANEL.bank ? 'B' : 'A', PANEL.bank ? "SHIFT" : "MAIN");
