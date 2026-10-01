@@ -44,4 +44,13 @@ cc $CF -DMSQ_TOOTH_BAT_FLAT test/ui_frames.c main/ui.c main/gfx.c main/panel.c m
 "$O/ui_tooth8" "$O/frames_tooth8.txt" > "$O/ui_tooth8.log"; t8=$?
 grep FAIL "$O/ui_tooth8.log" | head -2
 [ $t8 -ne 0 ] && echo "TOOTH 8 (battery gauge frozen) BITES" || echo "TOOTH 8 DOES NOT BITE -- gate untrusted"
-[ $t8 -ne 0 ] && [ $t7 -ne 0 ] && [ $q -eq 0 ] && [ $t6 -ne 0 ] && [ $r -eq 0 ] && [ $t -ne 0 ] && [ $t2 -ne 0 ] && [ $t3 -ne 0 ] && [ $u -eq 0 ] && [ $t4 -ne 0 ] && [ $t5 -ne 0 ]
+[ $t8 -ne 0 ] && [ $t7 -ne 0 ] && [ $q -eq 0 ] && [ $t6 -ne 0 ] && EB=../../engine_b
+EBS="$EB/eb_master.c $EB/eb_master_in.c $EB/eb_master_out.c $EB/eb_delay.c $EB/eb_delay_t1.c $EB/eb_delay_t23.c $EB/eb_delay_t5.c $EB/eb_dly_t4.c $EB/eb_fx_e0.c $EB/eb_fx_e1.c $EB/eb_fx_e5.c $EB/eb_reverb.c $EB/eb_chorus.c $EB/eb_dsp.c"
+OF="-m32 -msse2 -mfpmath=sse -std=gnu99 -O2 -ffp-contract=off -fno-strict-aliasing -w -Imain -I../../src -I$EB -DEB_NODELAY=1"
+cc $OF test/out_test.c main/outstage.c main/fx.c main/msq_core.c $EBS -lm -o "$O/out_test" || exit 1
+"$O/out_test"; og=$?
+cc $OF -DMSQ_TOOTH_NO_LIMIT test/out_test.c main/outstage.c main/fx.c main/msq_core.c $EBS -lm -o "$O/out_tooth" || exit 1
+"$O/out_tooth" > "$O/out_tooth.log"; t9=$?
+grep FAIL "$O/out_tooth.log" | head -2
+[ $t9 -ne 0 ] && echo "TOOTH 9 (no limiter) BITES" || echo "TOOTH 9 DOES NOT BITE -- gate untrusted"
+[ $og -eq 0 ] && [ $t9 -ne 0 ] && [ $r -eq 0 ] && [ $t -ne 0 ] && [ $t2 -ne 0 ] && [ $t3 -ne 0 ] && [ $u -eq 0 ] && [ $t4 -ne 0 ] && [ $t5 -ne 0 ]

@@ -8,6 +8,7 @@ archive: libmain.a
 entries:
     msq_core (noflash_text)
     fx (noflash_text)
+    outstage (noflash_text)
     eb_master (noflash_text)
     eb_master_in (noflash_text)
     eb_master_out (noflash_text)

@@ -116,3 +116,36 @@ says TURN > / < TURN until the knob crosses the stored value.
   (after the FX and the startup sound), ramped per block. Its overview column keeps
   the battery; turning it shows VOLUME in the focus view.
 
+## Speaker-safe output (2026-10-01, main/outstage.c, gate test/out_test.c)
+The user's speaker (PAM8403 + 8 ohm) distorted, on the v10 image, at: C4, no FX,
+sine 75 %, triangle 79 %, saw 88 %, square 89 % (knob 5, v10 law -48..0 dB).
+The v10 chain replayed on the host (out_test.c measures it, nothing typed in):
+
+| wave | knob | DAC peak | RMS | fundamental |
+|---|---|---|---|---|
+| sine | 75 % | 503 | 356 | 444 |
+| triangle | 79 % | 628 | 362 | 449 |
+| saw | 88 % | 1021 | 592 | 580 |
+| square | 89 % | 1091 | 1085 | 1225 |
+
+Sine and triangle agree within 0.2 dB in fundamental and RMS: that is the
+speaker's limit. Saw and square hide their own distortion behind their
+harmonics. The SINE is the worst case in every measure, so it sets the limit:
+- OUT_CEIL 448 (= sine point - 1 dB): no sample ever leaves above it.
+- OUT_KNEE 399 (- 2 dB): one note at full volume peaks here; the limiter never
+  touches a single note (margins: sine 2.0, tri 3.9, saw 8.2, square 8.7 dB).
+- Soft limiter above the knee: instant-attack peak envelope, 100 ms release,
+  tanh into KNEE..CEIL-0.5, stereo-linked. Worst case (6 notes C2-A4, 7-osc
+  unison, morph, chorus+reverb 255, startup clip): peak 448, up to -22 dB of
+  limiting, safety clip 0. Tooth: no limiter -> peak 5684, gate FAILS.
+- Startup clip scaled to peak 2 x CEIL: its loudest 50 ms is near one note's
+  level; the limiter takes up to 6 dB off its rare peaks.
+- Volume 0 sends exact zeros (the idle hiss is analog, not the firmware).
+- Board proof lines: STAT `dac=` (peak sent) `lim=` (deepest limiting) and a
+  latched fault if the ceiling or the safety clip is ever hit; `SND:` line.
+NOT YET PROVEN: notes far from C4 (the speaker's resonance is unknown) -- test
+low notes (C2, C3) at full volume on the board.
+CONSEQUENCE: the DAC now runs 33 dB under full scale, so the headphones are 14 dB
+quieter than v10 too. Fix = gain staging: an attenuator on the PAM8403 input
+only, then re-measure and raise the ceiling (also lowers DAC-side hiss).
+

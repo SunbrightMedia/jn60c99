@@ -12,7 +12,7 @@ set(EB_FX_SRCS
     ${EB}/eb_delay_t1.c ${EB}/eb_delay_t23.c ${EB}/eb_delay_t5.c ${EB}/eb_dly_t4.c
     ${EB}/eb_fx_e0.c ${EB}/eb_fx_e1.c ${EB}/eb_fx_e5.c ${EB}/eb_reverb.c ${EB}/eb_chorus.c
     ${EB}/eb_dsp.c)
-idf_component_register(SRCS "main.c" "msq_core.c" "fx.c" "panel.c" "ui.c" "gfx.c" "oled.c" ${EB_FX_SRCS}
+idf_component_register(SRCS "main.c" "msq_core.c" "fx.c" "outstage.c" "panel.c" "ui.c" "gfx.c" "oled.c" ${EB_FX_SRCS}
                        INCLUDE_DIRS "." ${EB} ${CMAKE_CURRENT_LIST_DIR}/../../../src
                        REQUIRES ${msq_req}
                        LDFRAGMENTS "linker.lf"
