@@ -661,8 +661,15 @@ static void poly_note_on(juno_ctx *c, int midi_note, int velocity, int variant)
                 if (!c->voice_gated[w] && (pick < 0 || c->voice_age[w] < oldest))
                     { oldest = c->voice_age[w]; pick = w; }
         }
-    } else {                                            /* MODE 3: first free/release, top-down */
-        for (v = JUNO_NUM_VOICES - 1; v >= 0; --v)
+    } else {
+        /* MODE 3 (sub_7FF91DFB35C0, READ): scan voices UPWARD from 0 and take
+         * the first one that is not gated (or released under hold, a flag the
+         * port does not model: without hold it is never set). The port scanned
+         * top-down, so from silence it played voice 7 where the plugin plays
+         * voice 0, and per-voice CONDITION scatter changed the sound from
+         * sample 2 (docs/ASSIGN_MODE_3_FINDING.md; 22 of 22 user mode-3
+         * patches; tools/verify/seed_recall_gate.py legal seeds). */
+        for (v = 0; v < JUNO_NUM_VOICES; ++v)
             if (c->voice_note[v] < 0 || !c->voice_gated[v]) { pick = v; break; }
     }
     if (pick < 0)                                       /* steal: newest if porta, else oldest */

@@ -2349,3 +2349,14 @@ had stayed green only because it was never regenerated.
 ### The rule
 Regenerate every ledger from the truth files in a fresh clone before trusting it. A "written" test
 must catch writes of the value already there.
+
+## 115. A FINDING THAT NEVER REACHES THE LEDGER IS LOST -- THE SEEDS FOUND IT AGAIN SEVEN WEEKS LATER
+Paid 2026-10-05 (JUNO ASSIGN MODE 3). On 2026-08-13 the user's banks showed that every ASSIGN MODE 3
+patch (22 of 22) diverged at sample 2; docs/ASSIGN_MODE_3_FINDING.md diagnosed it as a voice-choice
+defect and listed what was owed. It never got a row in docs/CLAIMS.md, so no status page carried it
+and nothing was fixed. The first seeded run that drew ASSIGN MODE from its declared range 0..3
+(tools/verify/seed_recall_gate.py) failed 13 seeds on it. The plugin's mode-3 allocator scans voices
+upward from 0; the port scanned down from 7. Fixed in one loop.
+### The rule
+A finding gets a CLAIMS row the day it is made, OPEN if not fixed. A seeded gate must draw every
+leaf from its full declared range -- the values no factory patch uses are where the open defects are.

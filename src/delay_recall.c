@@ -464,6 +464,15 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
     /* WET = DELAY LEVEL / 255 (both taps for TYPE 1). */
     JF(state, 102528)  = (float)level / 255.0f;
     if (second) JF(state, 4297760) = (float)level / 255.0f;
+    /* DELAY TAP TIME (1178, record 3056, int1x7): the plugin's setter (rva
+     * 0x3B91E0, READ) acts only at DELAY TYPE 1, passing 255*v/100 (integer
+     * division) to the second instance's block method, which stores curve 22
+     * of it in 4297792 (traced: 33 -> 84/255). The port wrote the default-50
+     * value as a constant from the DLY1_B table; found by
+     * tools/verify/seed_recall_gate.py (6 legal seeds), which randomizes 1178
+     * now that the oracle fires the plugin's whole FX recall list. */
+    if (second)
+        JF(state, 4297792) = juno_curve(22, 255 * (rec[3056] & 0x7F) / 100);
 
     /* --- The per-patch laws for TYPE 1 and TYPE 4. DERIVED FROM THE PLUGIN'S OWN
      * DISPATCH, never fitted. Sweeps under Unicorn, every other leaf at a factory

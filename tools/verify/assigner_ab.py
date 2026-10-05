@@ -72,6 +72,13 @@ RATES = [44100.0, 48000.0]
 # Arp patches {1,9,17,25,33,41,49} are excluded (no transport clock in this
 # oracle, exactly as recall_render_ab documents).
 PATCHES = [0, 5, 6, 13, 15, 55, 61, 63]
+# ASSIGN MODE 3 (the POLY variant sub_7FF91DFB35C0) is in no factory patch, so
+# it is driven as one-record banks: a factory base with ASSIGN MODE (blob 56)
+# forced to 3. It went untested until 2026-10-05 and was wrong (the voice scan
+# ran top-down; docs/ASSIGN_MODE_3_FINDING.md, seed_recall_gate.py).
+SYNTH = {'p0A3': (0, {56: 3}),          # mode 3, portamento engaged
+         'p55A3': (55, {56: 3})}        # mode 3 with LEGATO 1 + PORTA 33
+PATCHES += sorted(SYNTH)
 
 # Event scripts. A single note cannot distinguish the modes, so both scripts
 # overlap notes and release them out of order -- the exact surface where POLY,
@@ -105,12 +112,30 @@ SCRIPTS = {
 # Applied to patch 15 only: running it on all eight patches would triple the
 # Unicorn reference cost for coverage the scripts above already give.
 EXTRA = {
+    # 9 notes on 8 voices with a release in the middle: the scan order on
+    # reuse, the steal, and a re-strike of a sounding note.
+    'p0A3': {'cycle9': [('on', 60, 100), ('on', 62, 90), ('on', 64, 80), ('r', 1000),
+                        ('off', 62), ('on', 65, 70), ('on', 67, 100), ('on', 69, 60),
+                        ('on', 71, 100), ('on', 72, 110), ('r', 1000),
+                        ('on', 74, 100), ('on', 60, 120), ('r', 3000)]},
     15: {'warmmono': [('r', 747),
                       ('on', 69, 36), ('on', 57, 45), ('on', 64, 29),
                       ('on', 89, 54), ('on', 86, 11), ('on', 96, 103),
                       ('off', 96),    ('on', 75, 100),
                       ('r', 3000)]},
 }
+
+
+def patch_bank(bank, p):
+    """(bank, index) for a factory patch or a SYNTH key."""
+    if p not in SYNTH:
+        return bank, p
+    base, sets = SYNTH[p]
+    rec = bytearray(bank[23 + base * 20223: 23 + (base + 1) * 20223])
+    for bp, v in sets.items():
+        rec[16 + 2 * bp] = (v >> 4) & 0xF
+        rec[16 + 2 * bp + 1] = v & 0xF
+    return bytes(bank[:23]) + bytes(rec), 0
 
 
 def runs():
@@ -135,14 +160,16 @@ def _ref():
     for sr in RATES:
         modes = {}
         for p in PATCHES:
-            e = RA.prepare_recall(p, bank, leaves, E, R, sr)
+            bk, ix = patch_bank(bank, p)
+            e = RA.prepare_recall(ix, bk, leaves, E, R, sr)
             # Record what the plugin's OWN allocator believes, so a --port run
             # can report the mode alongside a divergence.
             modes[p] = (e.rd_i32(e.assign[0] + 16), e.rd_i32(e.assign[0] + 20))
             del e
         for p, name, script in runs():
             mode, leg = modes[p]
-            e = RA.prepare_recall(p, bank, leaves, E, R, sr)
+            bk, ix = patch_bank(bank, p)
+            e = RA.prepare_recall(ix, bk, leaves, E, R, sr)
             L, Rr = [], []
             for ev in script:
                 if ev[0] == 'on':    e.note_on(ev[1], ev[2])
@@ -152,7 +179,7 @@ def _ref():
                     L += a; Rr += b
             del e
             out['runs'][(sr, p, name)] = (mode, leg, L, Rr)
-            print("  ref: sr %g patch %2d %-9s mode=%d legato=%d  %d samples"
+            print("  ref: sr %g patch %5s %-9s mode=%d legato=%d  %d samples"
                   % (sr, p, name, mode, leg, len(L)), flush=True)
     pickle.dump(out, open(PKL, 'wb'))
     print("assigner_ab ref -> %s" % PKL)
@@ -184,9 +211,10 @@ def _port():
               % (len({(p, n) for _, p, n in d['runs']}), len(script_of)))
         return 1
     for (sr, p, name), (mode, leg, rl, rr) in sorted(
-            d['runs'].items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2])):
+            d['runs'].items(), key=lambda kv: (kv[0][0], str(kv[0][1]), kv[0][2])):
         c = lib.juno_gui_create(ctypes.c_float(sr), 0)
-        lib.juno_gui_apply_bank(c, bank, len(bank), p)
+        bk, ix = patch_bank(bank, p)
+        lib.juno_gui_apply_bank(c, bk, len(bk), ix)
         L, Rr = [], []
         for ev in script_of[(p, name)]:
             if ev[0] == 'on':    lib.juno_gui_note_on(c, ev[1], ev[2])
@@ -207,7 +235,7 @@ def _port():
         checks += 1
         ok = (dl == 0 and dr == 0 and len(L) == len(rl))
         if not ok: fails += 1
-        print("  sr %6g patch %2d %-9s ASSIGN=%d LEGATO=%d : %s (L %d, R %d of %d%s)"
+        print("  sr %6g patch %5s %-9s ASSIGN=%d LEGATO=%d : %s (L %d, R %d of %d%s)"
               % (sr, p, name, mode, leg,
                  "BIT-EXACT" if ok else "*** DIVERGES ***", dl, dr, len(rl),
                  "" if first is None else ", first @ %d" % first))
