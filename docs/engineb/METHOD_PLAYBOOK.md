@@ -2241,3 +2241,16 @@ own stores (rva 0x3c2763) settled both in one run. The fix is one store.
 ### The rule
 "Inert" is a statement about what the gates can see. Before ledgering a difference, build the gate
 that sees the cell; before trusting a probe's cell address, trace the writer's own store.
+
+## 106. A LEDGERED "LIMIT OF THE ORACLE" MUST BE RE-TESTED WHEN THE ORACLE GROWS
+Paid 2026-10-05 (JUNO CLAIMS B2). "A steal with >= 9 sounding voices differs by ~1-2 ULP: the plugin's
+steal path splices a worker-thread render the oracle cannot emulate" was written when the oracle drove
+notes through the leaf bus. The oracle later learned to drive the plugin's OWN allocator, but no gate
+ever forced a steal (fuzz_diff caps held notes at 6), so the ledger line was never re-tested. The first
+gate that forced steals (tools/verify/steal_gate.py) failed 12/16 seeds on ONE cell: the plugin gates
+a still-gated chosen voice OFF before the new gate-on, arming the DCO retrigger latch; the port did
+not. Not a thread-pool limit -- a one-line port defect, audible as a missing phase reset on every
+stolen voice.
+### The rule
+Every "the oracle cannot reach X" line names the oracle version it was true for. When the oracle
+gains a capability, re-run every such line as a gate the same day.

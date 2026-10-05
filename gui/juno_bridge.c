@@ -705,6 +705,17 @@ static void poly_note_on(juno_ctx *c, int midi_note, int velocity, int variant)
             }
     }
 
+    /* A chosen voice that is STILL GATED is gated OFF first. The plugin's POLY
+     * allocator tail (sub_7FF91DFB3150, after the legato arm; MODE 3
+     * sub_7FF91DFB35C0 the same) does `if (gated[v]) setparam(450+v, 0)` and only
+     * then the pitch leaf and the gate leaf with the velocity. That happens on a
+     * STEAL (every voice held) and on a same-note re-strike. The gate-off arms the
+     * DCO retrigger latch (Array A, juno_note_off), so a stolen voice re-phases
+     * its DCO on the next sample -- the port did not, and 12 of 16 seeds of
+     * tools/verify/steal_gate.py failed on exactly that cell (CLAIMS B2).
+     * PROVEN by tracing the plugin's dispatches on a 9th held note: (456,0),
+     * (439,66), (456,113). */
+    if (c->voice_gated[pick]) juno_note_off(c->st, pick);
     voice_trigger(c, pick, midi_note, velocity);        /* chosen voice always retriggers */
     c->legato_mask &= ~(1u << pick);
 }

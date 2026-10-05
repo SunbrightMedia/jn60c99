@@ -115,6 +115,9 @@ verify: test libjuno.so
 	echo "=== ALL-VOICE NOTE STATE (CLAIMS A11/B3): every voice's whole state after every note event, plugin vs port ==="; \
 	fresh $(SCRATCH)/note_bcast_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/note_bcast_gate.py --ref || FAIL=1; \
 	python3 tools/verify/note_bcast_gate.py --port || FAIL=1; \
+	echo "=== VOICE STEAL (CLAIMS A12/B2): more held notes than voices, audio + every voice's state, plugin vs port ==="; \
+	fresh $(SCRATCH)/steal_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/steal_gate.py --ref || FAIL=1; \
+	python3 tools/verify/steal_gate.py --port || FAIL=1; \
 	echo "=== COLD/WARM UNISON: the app must not present the phase-aligned cold engine (docs/COLDSTART_UNISON_FINDING.md) ==="; \
 	python3 tools/verify/coldwarm_unison.py || FAIL=1; \
 	echo "=== VOICE ASSIGN (KEY ASSIGN/LEGATO/PORTAMENTO): note SEQUENCES through the plugin's own allocator vs the port's ==="; \
