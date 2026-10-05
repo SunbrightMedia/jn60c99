@@ -28,6 +28,8 @@
 #include "effect_luts.h"
 #include <stdint.h>
 #include <string.h>
+#include "rate_laws.h"
+#include "juno_curve.h"
 
 static float efx_bits(uint32_t u) { float f; memcpy(&f, &u, sizeof f); return f; }
 
@@ -77,8 +79,19 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
         *(int32_t *)JCELL(state, JUNO_PROG_EFX) = (int32_t)etype;
     if (etype > 5) etype = 5;
 
-    /* Shared slot-2 wet control (read by master_render for EVERY mode at 84544). */
-    JF(state, 84544) = efx_bits(EFFECT_SW_LUT[depth & 0xFF]);
+    /* Shared slot-2 wet control (read by master_render for EVERY mode at 84544).
+     * The plugin's EFFECT DEPTH setter (rva 0x3AE560) SWITCHES ON THE TYPE:
+     *   types 0/1: column 0 of a 256-row table the processor constructor fills
+     *     with min(4*depth, 255) (rva 0x3AC670) goes to the block method at
+     *     rva 0x357D60, which stores curve 25 of it;
+     *   types 2..5: an on/off switch (EFFECT_SW_LUT, depth 0 -> 0, else 1.0).
+     * READ from both functions; PROVEN 256/256 bytes x types 0..5 x 3 rates by
+     * tools/verify/effect_param_gate.py. EFFECT_SW_LUT's 2026-08-25 correction
+     * was measured in types 2..5 only and was applied to every type. */
+    if (etype <= 1)
+        JF(state, 84544) = juno_curve(25, depth * 4 > 255 ? 255 : depth * 4);
+    else
+        JF(state, 84544) = efx_bits(EFFECT_SW_LUT[depth & 0xFF]);
 
     /* EFFECT TYPE 0 — the slot-2 "Pan" arm (the render's v551<=1 branch, block
      * 84960..85968): a clean level+pan stage sharing mode-1's laws (the DlyPan
@@ -134,22 +147,29 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
         JF(state, 96400) = (float)depth / 255.0f;                      /* On/Off           */
         {
             int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
-            /* LFO Rate (96352): the CHORUS5_LFORATE_LUT is the 96 kHz reference; the
-             * host-rate value is LUT * (96000/SR) computed in DOUBLE precision then
-             * rounded to float — a float32 multiply is +1 ULP off for some LUT
-             * entries (e.g. tone 128, LUT 0x37e6c674: plugin 0x387b2f14 @44.1k, the
-             * float op gives ..15). Proven against the plugin's own recall at
-             * 44100/88200 (2.0x @48k is exact either way). */
-            JF(state, 96352) = (float)((double)efx_bits(CHORUS5_LFORATE_LUT[tone & 0xFF])
-                               * (96000.0 / (double)Hr));
+            /* LFO Rate (96352), READ from the mode-5 method (rva 0x3573ab): curve 22 of
+             * the tone byte, r = c * 1.9667f (f32 0x3ffbbcd3, rva 0x988120) + 0.3333f
+             * (f32 0x3eaaa64c, rva 0x988110), then (r + r) / H -- all float.
+             * PROVEN 256/256 tone bytes at 44100, 32000 and 96001 by sweeping the
+             * plugin's own EFFECT TONE setter (dispatch 874) under Unicorn,
+             * 2026-10-05. It replaces "the 96 kHz LUT times 96000/H in double",
+             * an inferred form that matched the factory patches' tone values but
+             * was wrong for 65..72 of the 256 tone bytes at EVERY rate, 44.1k
+             * included (no gate swept EFFECT TONE at EFFECT TYPE 5). */
+            {
+                float r = juno_curve(22, tone & 0xFF) * efx_bits(0x3ffbbcd3u)
+                          + efx_bits(0x3eaaa64cu);
+                JF(state, 96352) = (r + r) / (float)Hr;
+            }
             /* Ip Fc gate (96384) — SR-dependent 3-class (mode5_gates_spec.md). */
             JF(state, 96384) = efx_bits(Hr == 44100 ? 0x388b3cdfu :
                                         Hr == 48000 ? 0x387fd974u : 0x37ffd974u);
-            /* Structural cell 96336 is rate-dependent with FOUR distinct arms (all
-             * measured from the plugin's own recall; MODE5_STRUCT holds the 96k arm). */
-            JF(state, 96336) = efx_bits(Hr == 44100 ? 0x3b8c0000u :
-                                        Hr == 48000 ? 0x3b98bc15u :
-                                        Hr == 88200 ? 0x3c0e0000u : 0x3c1abc15u);
+            /* Structural cell 96336: (H * C3) - C2, C3 = f32 0x33d5febf (rva
+             * 0x9880f0), C2 = f32 0x39000000 (rva 0x988104), read from the
+             * mode-5 method at rva 0x357310. CONTINUOUS in H (CLAIMS B4); it was
+             * four measured arms (this law at 44100/48000/88200/96000, the 96k
+             * word at every other rate -- wrong at 32000, rate_sweep_gate.py). */
+            JF(state, 96336) = rl_mode5_time(Hr);
             /* 17 further block-B cells are RATE-DEPENDENT, 2-class {44100 / else}
              * (48000 == 88200 == 96000 hold the MODE5_STRUCT values). The single-arm
              * struct capture broke every v551==5 patch cold at 44.1 kHz (divergence

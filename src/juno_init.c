@@ -3220,9 +3220,20 @@ uint32_t juno_engine_init(unsigned char *a1)
    * Array B (101520 + v*32) instead, never Array A — so a note that arrives after
    * any rendering does NOT re-phase the DCO (free-running JUNO DCO). This restores
    * the behaviour the old per-note re-arm in juno_note_on broke (phase-2 matrix
-   * Scenario C: 4th note after render diverged at the first post-note sample). */
+   * Scenario C: 4th note after render diverged at the first post-note sample).
+   * (Array B is 101488 + v*32, sixteen bytes below Array A -- see juno_note.c.) */
   for (unsigned av = 0; av < (unsigned)JUNO_NUM_VOICES; av++)
     JF(a1, JUNO_VOICE_AUX_BASE0 + av * JUNO_VOICE_AUX_STRIDE) = 1.0f;
+
+  /* Two reverb smoother outputs the BUILD ramp-output initializer
+   * (sub_7FF91E0066B0, rva 0x3A66B0; ramp records 774 and 797) seeds and nothing
+   * at recall rewrites: 10759472 = 0.03125 (store at rva 0x3ab24e) and
+   * 10759840 = 0.663452 (rva 0x3ab45a). PROVEN by hooking the plugin's BUILD
+   * under Unicorn (same values at every rate). The port left them 0; the gates
+   * excluded them as "inert FX defaults". They are plugin state, so they are
+   * written (tools/verify/rate_sweep_gate.py compares the whole object). */
+  JI(a1, 10759472) = 0x3d000000;
+  JI(a1, 10759840) = 0x3f29d800;
 
   return result;
 }

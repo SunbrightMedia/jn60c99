@@ -88,3 +88,6 @@ lastmile_wavs.zip
 # committed build tree makes every later `git status` unreadable.
 esp32s3/build/
 esp32s3/build_*/
+
+# rate-law self test binary
+tests/test_rate_laws

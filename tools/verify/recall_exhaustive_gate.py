@@ -32,7 +32,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LIB = _JREPO + '/libjuno.so'
 HEADER, STRIDE, BLOB_OFF = 23, 20223, 16
 BANK_LEN = HEADER + STRIDE
-RATES = [44100, 48000, 96000]
+RATES = [8000, 11025, 16000, 22050, 32000, 37800, 44100, 47999, 48000, 50000, 64000, 88200, 96000, 96001, 176400, 192000, 352800, 384000]   # CLAIMS B4: every host rate the sweeps cover
 
 
 def load_lib():
@@ -137,7 +137,7 @@ def main():
         print("\nGATE: FAIL")
         return 1
     print("\nGATE: PASS -- the port's recall reproduces the plugin's setter for EVERY")
-    print("single-input front-panel cell at EVERY byte 0..255, at 44100/48000/96000.")
+    print("single-input front-panel cell at EVERY byte 0..255, at 18 host rates.")
     return 0
 
 

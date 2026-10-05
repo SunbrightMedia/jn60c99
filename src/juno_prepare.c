@@ -51,6 +51,7 @@
 #include "juno_engine.h"
 #include "delay_recall.h"    /* JUNO_PROG_DLY/EFX (power-on slot routing)   */
 #include "reverb_recall.h"   /* juno_write_reverb_taps (Class E tap tables) */
+#include "rate_laws.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -116,8 +117,13 @@ void juno_engine_prepare(unsigned char *st)
     {
         const float K2 = 1.0f / 16384.0f;        /* 0x38800000, exact */
         JF(st,  91120) = (Hf * f32(0x3ac49ba6) - 2.0f) * K2;  /* T=0.0015    (1.5 ms) */
-        JF(st,  96336) = (Hf * f32(0x3ad5febf) - 2.0f) * K2;  /* T=0.00163265        */
-        JF(st, 102352) = (Hf * f32(0x3e4dd2f2) - 2.0f) * K2;  /* T=0.201     (201 ms)*/
+        /* 96336 and 102352 are NOT this form in the plugin (traced under
+         * Unicorn at 32000, 2026-10-05): 96336 is (H * T/16384) - 2/16384 and
+         * 102352 is ((H * 201 ms) * 1/16384000) - 2/16384. The old lines used
+         * ((H*T) - 2)/16384 for both -- equal in exact arithmetic, equal in
+         * float at the five rates the cold gate ran, 1 ULP off at 32000. */
+        JF(st,  96336) = rl_mode5_time(Hr);
+        JF(st, 102352) = rl_ms_time((float)201, Hr);    /* 201 ms < the 4778 clamp */
     }
 
     /* --- Class C: 3-class rate-selected voice coeffs (44100 / 48000 / else) - */
@@ -165,6 +171,17 @@ void juno_engine_prepare(unsigned char *st)
     /* reverb-ECF rate — rate-INDEPENDENT (identical across the 4 rates) */
     JI(st,  10759504) = 0x37ae2650;  /*  2.07603e-05  Rev Ecf Rate            */
     JI(st,  10759872) = 0x00000100;  /*  int 256      reverb algo const        */
+    /* REVERB PRE DELAY at its default byte, in samples as a float: setSampleRate
+     * writes it (rva 0x3c2763 store, traced under Unicorn at 32000/44100/96000:
+     * 638 / 880 / 1918). Recall rewrites it per patch; a cold engine holds this. */
+    JF(st,  10759360) = (float)juno_reverb_predelay(20, Hr);
+    /* The slot-1 delay's LFX1 cell: setSampleRate arms a smoother on it whose
+     * target is delay_recall.c's ARM_LFX1 family (44100 / 48000 / the 96k word
+     * at every other rate; coldstate_ab.py at 18 rates). The port models settled
+     * smoothers, as every gate's drive does (e2e_emu.snap_all); this is that
+     * settled value. (A first guess, the delay-OFF family ARM_LFX1_OFF, was
+     * refused by the cold gate at all 9 rates it ran.) */
+    JI(st, 102544) = (Hr == 44100) ? 0x388b3cdf : (Hr == 48000) ? 0x387fd974 : 0x37ffd974;
     /* effect ENABLE / output-stage constants — the per-mode effect setActive step
      * (container setSampleRate sub_7FF91E01C980 @0x3BC980 + snap-all) writes these;
      * without them the master output stage stays muted. All binary-derived (see

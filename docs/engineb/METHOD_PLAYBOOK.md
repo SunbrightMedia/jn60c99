@@ -2254,3 +2254,53 @@ stolen voice.
 ### The rule
 Every "the oracle cannot reach X" line names the oracle version it was true for. When the oracle
 gains a capability, re-run every such line as a gate the same day.
+
+## 107. A LAW THAT MATCHES EVERY MEASURED RATE IS STILL A FIT -- READ THE ARITHMETIC
+Paid 2026-10-05 (JUNO CLAIMS B4). The FX recall carried 4-arm tables (44100/48000/88200/96000) and
+used the 96000 arm at every other rate; the reverb tap shift was a fitted `0.019995*H - 1919`; the
+EFFECT TONE -> 96352 law was inferred as "96 kHz LUT x 96000/H in double". Each matched every point it
+was measured at. At 32000 and 192000 the arms were wrong (4/9 renders differed within 400 samples);
+the fitted shift diverged at 11025; the double law was wrong for 65..72 of 256 tone bytes at EVERY
+rate, 44100 included -- found by sweeping all 256 bytes, not by adding rates. The plugin's own
+arithmetic, read from the machine code (operation order, float precision, the `cmp eax,0x17700` skip
+at exactly 96000), matched everywhere (src/rate_laws.h).
+### The rule
+Measure to find a law; never ship the measurement as the law. Transcribe the arithmetic, keep the
+measured points as anchors in a self-test (tests/test_rate_laws.c), and grade the law at inputs no
+anchor names (47999, 96001, every byte).
+
+## 108. A CORRECTION MEASURED IN SOME CONTEXTS IS A LAW ONLY THERE -- READ THE SETTER'S SWITCH FIRST
+Paid 2026-10-05 (JUNO cell 84544). On 2026-08-25 a gate showed EFFECT DEPTH -> 84544 is an on/off
+switch, and the port's smooth ramp was replaced by it in EVERY EFFECT TYPE. The measurement used three
+context patches, all EFFECT TYPE 2..5. The plugin's DEPTH setter (rva 0x3AE560) switches on the type
+in force: types 0/1 store curve 25 of min(4*depth, 255), from a table the processor constructor fills
+(rva 0x3AC670). The "correction" broke types 0/1 for depth 1..63, where the old ramp had been right.
+No factory patch is type 0, so no factory gate saw it; tools/verify/effect_param_gate.py (every byte x
+every type) failed on it at once.
+### The rule
+Before generalizing a law, read its setter: every branch on another parameter is a context the law
+must be measured in. A sweep's context list comes from the setter's branches, not from the factory
+bank.
+
+## 109. AN INCOMPLETE COMPARE WINDOW IS A BLIND GATE -- COMPARE THE WHOLE OBJECT, NAME THE EXCLUSIONS
+Paid 2026-10-05 (JUNO B4). The first rate sweep compared recall_fullstate_diff.REGIONS, a hand-made
+list of engine ranges. It skipped part of the slot-1 chorus block (6396128..6396352), so a DELAY TYPE
+2/3 rate defect was invisible to it. Now the gate compares all 0xA83010 bytes (zlib, ~14 KB a patch)
+and names its exclusions as CONTROL with the reason (C++ header pointers [0,176); the heap neighbour
+at and after the object end).
+### The rule
+A gate compares everything and lists what it excludes, with the reason -- never a list of what it
+includes.
+
+## 110. A REFERENCE TOOL MUST SURVIVE A FRESH CLONE, ITS OWN SIZE, AND THE FREEZE
+Paid 2026-10-05 (JUNO B4: four job deaths in one day). (a) A fresh worktree has no scratchpad/, so
+`make verify` died (EXIT=2) on its first pickle write; the Makefile now creates it. (b) Unicorn's
+native memory is invisible to Python's GC: a sweep that kept 64 live engines, or 256 full 11 MB
+snapshots per leaf, was OOM-killed (exit 137). (c) A long job froze the tree for hours. (d) The rate
+sweep's first tooth mutated EFFECT TYPE 4, which no factory patch uses: it did not bite, and that
+exposed the sweep's reach gap (playbook 103); synthetic records now cover types 0 and 4.
+### The rule
+Run every new reference tool once in a fresh clone. Free each emulator (`del e; gc.collect()`) and
+keep only the words that change. Run long jobs from a snapshot worktree (tools/snap_tree.sh: the
+current working state, scratchpad and job registry shared), so the main tree stays editable. When a
+tooth does not bite, look for a reach gap before anything else.

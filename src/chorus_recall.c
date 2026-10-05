@@ -26,6 +26,7 @@
 #include "chorus_recall.h"
 #include <stdint.h>
 #include <string.h>
+#include "rate_laws.h"
 
 #include "chorus_luts.h"   /* CHORUS_WET_LUT / CHORUS_NOISE_LUT / CHORUS5_LFORATE_LUT */
 
@@ -115,11 +116,12 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
          * rate_fullscan.py + the 88.2 probe); the old single 48k capture was one
          * seed of the 44.1 kHz cold-render drift. */
         if (etype == 3) {
+            /* CONTINUOUS since 2026-10-05 (CLAIMS B4): the chorus mode method
+             * (rva 0x357b80) computes (a + a) / H with chorus II's a = 0.82
+             * (src/rate_laws.h). The 4 arms it replaced were this law at
+             * 44100/48000/88200/96000; any other rate got the 96k word. */
             int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
-            unsigned int b = (Hr == 44100) ? 0x381bfa89u : (Hr == 48000) ? 0x380f4e2eu
-                           : (Hr == 88200) ? 0x379bfa89u : 0x378f4e2eu;
-            float f; memcpy(&f, &b, 4);
-            JF(state, 91152) = f;
+            JF(state, 91152) = rl_chorus_mode_rate(1, Hr);
         }
 #ifndef JUNO_TOOTH_NO_ET2_LFO
         /* ★ EFFECT TYPE 2 (chorus I) WRITES 91152 TOO, AND THE PORT DID NOT.
@@ -152,8 +154,10 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
          * MEASURED: tools/engineb/devrecall_gate.py's ET3->ET2 check, and its
          * tooth is -DJUNO_TOOTH_NO_ET2_LFO. */
         if (etype == 2) {
-            float Hf = JF(state, 16); if (!(Hf > 0.0f)) Hf = 96000.0f;
-            JF(state, 91152) = 0.96f / Hf;
+            /* (0.48 + 0.48) / H, the same mode method's chorus I row: the
+             * f32 0.96f / Hf this replaced, bit for bit at every integer rate. */
+            int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+            JF(state, 91152) = rl_chorus_mode_rate(0, Hr);
         }
 #endif
         /* EFFECT TYPE 4 (FLANGER) re-shapes block A's structural cells to the flanger
@@ -167,11 +171,11 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
          * write NO engine cell via dispatch 0x3B9A30 (controller-path, engine dispatch
          * is a no-op) and remain GAP pending the #112 controller lifecycle. */
         if (etype == 4) {
+            /* 91120 / 91152: the mode method's flanger row (T = 3.3 ms, a = 9.2),
+             * continuous in H (src/rate_laws.h); was 4 measured arms. */
             int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
-            JF(state, 91120) = cr_bits(Hr == 44100 ? 0x3c0f87aeu : Hr == 48000 ? 0x3c1c6666u :
-                                       Hr == 88200 ? 0x3c9087aeu : 0x3c9d6666u);
-            JF(state, 91152) = cr_bits(Hr == 44100 ? 0x39dac024u : Hr == 48000 ? 0x39c8fa21u :
-                                       Hr == 88200 ? 0x395ac024u : 0x3948fa21u);
+            JF(state, 91120) = rl_chorus_mode_time(2, Hr);
+            JF(state, 91152) = rl_chorus_mode_rate(2, Hr);
             JF(state, 91168) = cr_bits(0x00000000u);
             JF(state, 91184) = cr_bits(0x399d4952u);
         }

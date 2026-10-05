@@ -33,12 +33,21 @@
 #include "juno_engine.h"
 #include "finefx_recall.h"
 #include "finefx_tables.h"
+#include "rate_laws.h"
 #include <string.h>
 
 static void wr_bits(unsigned char *state, int off, uint32_t bits)
 {
     float f; memcpy(&f, &bits, sizeof f); JF(state, off) = f;
 }
+
+/* LF DAMP FREQ / CHORUS LOW CUT / CHORUS PRE DELAY follow the plugin's continuous
+ * rate laws (src/rate_laws.h); their 4-arm tables in finefx_tables.h are kept as
+ * the measured anchors tests/test_rate_laws.c checks the laws against. HF DAMP
+ * FREQ and the reverb LOW/HIGH CUT are 2-class {44100 / else} in the plugin: the
+ * 48000 and 88200 rows equal the 96000 row, so the 4-arm index is exact at
+ * every rate. */
+static int arm4(int Hr) { return (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3; }
 static int nib(const unsigned char *rec, int roff)   /* int2x4 / int8x4 low byte */
 {
     return ((rec[roff] & 0xF) << 4) | (rec[roff + 1] & 0xF);
@@ -50,7 +59,7 @@ static int clampi(int v, int lo, int hi)
 
 void juno_apply_delay_finefx(unsigned char *state, const unsigned char *rec, int Hr)
 {
-    int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
+    int arm = arm4(Hr);
     int hc  = clampi(rec[3059] & 0x7F, 0, 14);   /* HIGH CUT     (int1x7, raw)  */
     int lfd = clampi(nib(rec, 3068),   0, 81);   /* LF DAMP      (int8x4)       */
     int lff = clampi(nib(rec, 3076),   0, 10);   /* LF DAMP FREQ (int8x4, rate) */
@@ -61,7 +70,7 @@ void juno_apply_delay_finefx(unsigned char *state, const unsigned char *rec, int
         wr_bits(state, DLY_HC_CELLS[k], DLY_HC[hc][k]);
     wr_bits(state, 102640, DLY_LFDMP[lfd]);
     wr_bits(state, 102672, DLY_HFDMP[hfd]);
-    wr_bits(state, 102608, DLY_LFDF[arm][lff]);
+    JF(state, 102608) = rl_scale96(DLY_LFDF[3][lff], Hr);
     wr_bits(state, 102656, DLY_HFDF[arm][hff]);
 }
 
@@ -80,7 +89,7 @@ static const int DLY_HC_CELLS2[7] = {4297600, 4297616, 4297632, 4297648,
                                      4297664, 4297696, 4297728};
 void juno_apply_delay_finefx_2nd(unsigned char *state, const unsigned char *rec, int Hr)
 {
-    int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
+    int arm = arm4(Hr);
     int hc  = clampi(rec[3059] & 0x7F, 0, 14);   /* HIGH CUT      (int1x7, raw)  */
     int dl  = clampi(nib(rec, 3060),   0, 255);  /* DIRECT LEVEL  (int2x4)       */
     int lfd = clampi(nib(rec, 3068),   0, 81);   /* LF DAMP       (int8x4)       */
@@ -93,7 +102,7 @@ void juno_apply_delay_finefx_2nd(unsigned char *state, const unsigned char *rec,
     JF(state, 4297744) = (float)dl / 255.0f;     /* DIRECT LEVEL = byte/255      */
     wr_bits(state, 4297936, DLY_LFDMP[lfd]);
     wr_bits(state, 4297968, DLY_HFDMP[hfd]);
-    wr_bits(state, 4297904, DLY_LFDF[arm][lff]);
+    JF(state, 4297904) = rl_scale96(DLY_LFDF[3][lff], Hr);
     wr_bits(state, 4297952, DLY_HFDF[arm][hff]);
 }
 
@@ -108,7 +117,7 @@ static const int DLY_HC_CELLS5[7] = {6497184, 6497200, 6497216, 6497232,
                                      6497248, 6497280, 6497312};
 void juno_apply_delay_finefx_slot1rev(unsigned char *state, const unsigned char *rec, int Hr)
 {
-    int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
+    int arm = arm4(Hr);
     int hc  = clampi(rec[3059] & 0x7F, 0, 14);
     int dl  = clampi(nib(rec, 3060),   0, 255);
     int lfd = clampi(nib(rec, 3068),   0, 81);
@@ -121,7 +130,7 @@ void juno_apply_delay_finefx_slot1rev(unsigned char *state, const unsigned char 
     JF(state, 6497328) = (float)dl / 255.0f;
     wr_bits(state, 6497456, DLY_LFDMP[lfd]);
     wr_bits(state, 6497488, DLY_HFDMP[hfd]);
-    wr_bits(state, 6497424, DLY_LFDF[arm][lff]);
+    JF(state, 6497424) = rl_scale96(DLY_LFDF[3][lff], Hr);
     wr_bits(state, 6497472, DLY_HFDF[arm][hff]);
 }
 
@@ -138,7 +147,7 @@ void juno_apply_delay_finefx_slot1rev(unsigned char *state, const unsigned char 
  * juno_write_reverb_taps) and is handled separately (follow-up). */
 void juno_apply_reverb_finefx(unsigned char *state, const unsigned char *rec, int Hr)
 {
-    int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
+    int arm = arm4(Hr);
     /* Clamp to the plugin's OWN param range (real host maps normalized->[0,1]->
      * plain in [min,max], so out-of-range record bytes are unreachable). The
      * reverb setter does NOT saturate internally past its range (it reads
@@ -166,7 +175,6 @@ void juno_apply_reverb_finefx(unsigned char *state, const unsigned char *rec, in
  * int1x7 record bytes (HIGH 3288 / LOW 3287 / PRE 3286). */
 void juno_apply_chorus_finefx(unsigned char *state, const unsigned char *rec, int Hr)
 {
-    int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
     /* Clamp to the plugin's own param range (see reverb note above). The chorus
      * setter DOES saturate internally, so the port matched bit-exact over 0..127
      * before this too; clamping to range is kept for uniformity + robustness. */
@@ -175,8 +183,9 @@ void juno_apply_chorus_finefx(unsigned char *state, const unsigned char *rec, in
     int pd = clampi(rec[3286] & 0x7F, 0, 80);    /* CHORUS PRE DELAY(int1x7)      */
     int k;
     for (k = 0; k < 7; k++) wr_bits(state, CHO1_HC_CELLS[k], CHO1_HC[hc][k]);
-    for (k = 0; k < 2; k++) wr_bits(state, CHO1_LC_CELLS[k], CHO1_LC[arm][lc][k]);
-    wr_bits(state, CHO1_PD_CELL, CHO1_PD[arm][pd]);
+    JF(state, CHO1_LC_CELLS[0]) = rl_scale96(CHO1_LC[3][lc][0], Hr);
+    wr_bits(state, CHO1_LC_CELLS[1], CHO1_LC[3][lc][1]);     /* switch: no rate law */
+    JF(state, CHO1_PD_CELL) = rl_chorus_predelay(pd, Hr);
 }
 
 /* DELAY TYPE 5 (slot-1 reverb) SLOT-1-REVERB chorus-filter fine-FX. In TYPE 5 the
@@ -190,12 +199,12 @@ static const int CHO_HC_CELLS5[7] = {10693072, 10693088, 10693104, 10693120,
 static const int CHO_LC_CELLS5[2] = {10693216, 10693232};
 void juno_apply_chorus_finefx_slot1rev(unsigned char *state, const unsigned char *rec, int Hr)
 {
-    int arm = (Hr == 44100) ? 0 : (Hr == 48000) ? 1 : (Hr == 88200) ? 2 : 3;
     int hc = clampi(rec[3288] & 0x7F, 0, 14);
     int lc = clampi(rec[3287] & 0x7F, 0, 17);
     int pd = clampi(rec[3286] & 0x7F, 0, 80);
     int k;
     for (k = 0; k < 7; k++) wr_bits(state, CHO_HC_CELLS5[k], CHO1_HC[hc][k]);
-    for (k = 0; k < 2; k++) wr_bits(state, CHO_LC_CELLS5[k], CHO1_LC[arm][lc][k]);
-    wr_bits(state, 10693008, CHO1_PD[arm][pd]);
+    JF(state, CHO_LC_CELLS5[0]) = rl_scale96(CHO1_LC[3][lc][0], Hr);
+    wr_bits(state, CHO_LC_CELLS5[1], CHO1_LC[3][lc][1]);    /* switch: no rate law */
+    JF(state, 10693008) = rl_chorus_predelay(pd, Hr);
 }

@@ -55,17 +55,21 @@ ORACLE_DEPS := $(wildcard tools/verify/*.py)
 # gate against an out-of-date library. Caught by etmode_ab.py, 2026-07-22.
 verify: test libjuno.so
 	@FAIL=0; \
+	mkdir -p $(SCRATCH); \
 	python3 tools/verify/pathcheck.py || FAIL=1; \
 	fresh() { p="$$1"; shift; [ -f "$$p" ] || return 1; for d in "$$@"; do [ "$$p" -nt "$$d" ] || return 1; done; }; \
 	fresh $(SCRATCH)/index_cell_map.pkl $(ORACLE_DEPS)    || python3 tools/verify/index_cell_map.py    || FAIL=1; \
 	fresh $(SCRATCH)/plugin_recall_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/plugin_recall_ref.py || FAIL=1; \
 	fresh $(SCRATCH)/recall_render_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
-	for r in 44100 48000 96000; do fresh $(SCRATCH)/recall_exhaustive_$$r.pkl $(ORACLE_DEPS) || python3 tools/verify/recall_exhaustive_ref.py $$r || FAIL=1; done; \
+	for r in 8000 11025 16000 22050 32000 37800 44100 47999 48000 50000 64000 88200 96000 96001 176400 192000 352800 384000; do fresh $(SCRATCH)/recall_exhaustive_$$r.pkl $(ORACLE_DEPS) || python3 tools/verify/recall_exhaustive_ref.py $$r || FAIL=1; done; \
 	python3 tools/verify/port_state_dump.py >/dev/null 2>&1 || FAIL=1; \
 	echo "=== LIVE GATE 1/7: recall_gate (port vs plugin's own recall, 64 patches) ==="; \
 	python3 tools/verify/recall_gate.py || FAIL=1; \
-	echo "=== LIVE GATE 2/7: exhaustive recall (every byte 0..255 x 3 rates) ==="; \
+	echo "=== LIVE GATE 2/7: exhaustive recall (every byte 0..255 x 18 rates) ==="; \
 	python3 tools/verify/recall_exhaustive_gate.py || FAIL=1; \
+	echo "=== RATE SWEEP (CLAIMS A13/B4): whole object after recall + renders, 64 patches x 18 host rates ==="; \
+	fresh $(SCRATCH)/rate_sweep_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/rate_sweep_gate.py --ref || FAIL=1; \
+	python3 tools/verify/rate_sweep_gate.py --port || FAIL=1; \
 	echo "=== LIVE GATE 3/7: render A/B (port render vs plugin's own render, 57 non-arp) ==="; \
 	python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
 	echo "=== LIVE GATE 4/7: arp SCHEDULE (plugin's own arp vs carp.c, 7 arp patches) ==="; \
@@ -74,8 +78,8 @@ verify: test libjuno.so
 	echo "=== LIVE GATE 5/7: arp RENDER (schedule replay into plugin, 7 arp patches) ==="; \
 	python3 tools/verify/arp_render_ab.py --port || FAIL=1; \
 	python3 tools/verify/arp_render_ab.py --ref || FAIL=1; \
-	echo "=== LIVE GATE 6/7: cold-state A/B (port init/prepare vs plugin build+setSR, 5 rates) ==="; \
-	for r in 44100 48000 96000 88200 192000; do \
+	echo "=== LIVE GATE 6/7: cold-state A/B (port init/prepare vs plugin build+setSR, 18 rates) ==="; \
+	for r in 8000 11025 16000 22050 32000 37800 44100 47999 48000 50000 64000 88200 96000 96001 176400 192000 352800 384000; do \
 	  python3 tools/verify/coldstate_ab.py --port $$r >/dev/null || FAIL=1; \
 	  python3 tools/verify/coldstate_ab.py --ref  $$r || FAIL=1; \
 	done; \
@@ -84,12 +88,15 @@ verify: test libjuno.so
 	  fresh $(SCRATCH)/recall_render_ref_$$sr.pkl $(ORACLE_DEPS) || JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
 	  JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
 	done; \
-	echo "=== PILLAR-3: exhaustive fine-FX (port applier vs plugin's own setter, every byte x 4 rates) ==="; \
+	echo "=== PILLAR-3: exhaustive fine-FX (port applier vs plugin's own setter, every byte x 18 rates x 9 contexts) ==="; \
 	fresh $(SCRATCH)/finefx_cellsweep_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/finefx_cellsweep.py || FAIL=1; \
 	$(MAKE) -s tools/verify/finefx_port_dump && python3 tools/verify/finefx_pillar3_gate.py || FAIL=1; \
 	echo "=== ET-MODE A/B: synthetic EFFECT TYPE 0..5 recall (port vs plugin; no factory patch reaches modes 2-5) ==="; \
 	fresh $(SCRATCH)/etmode_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/etmode_ab.py --ref || FAIL=1; \
 	python3 tools/verify/etmode_ab.py --port || FAIL=1; \
+	echo "=== EFFECT PARAMS: DEPTH + TONE, every byte x EFFECT TYPE 0..5/6/255 x 3 rates, dispatched AND fresh recall (whole object + render) ==="; \
+	fresh $(SCRATCH)/effect_param_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/effect_param_gate.py --ref || FAIL=1; \
+	python3 tools/verify/effect_param_gate.py --port || FAIL=1; \
 	echo "=== WARM RECALL: N recalls through ONE engine, plugin vs port (every gate above recalls COLD) ==="; \
 	echo "    p39,40 CARRY / p1,9 WRITE -- the two directions of the chorus WET law, judged on the"; \
 	echo "    NAMED cell (--cells-only). p0,0 is the IDENTITY case and is judged on the WHOLE state,"; \
@@ -187,8 +194,9 @@ dll: juno.dll
 juno.dll: gui/juno_bridge.c $(SRC) $(HDR)
 	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $(filter %.c,$^) $(LDLIBS)
 
-test: tests/test_fma_canary tests/test_teensy_golden tests/test_voice_alloc tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter tests/test_arp_pattern tests/test_param_setter
+test: tests/test_fma_canary tests/test_rate_laws tests/test_teensy_golden tests/test_voice_alloc tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter tests/test_arp_pattern tests/test_param_setter
 	./tests/test_fma_canary
+	./tests/test_rate_laws
 	./tests/test_teensy_golden
 	./tests/test_helpers
 	./tests/test_voice_smoke
@@ -281,6 +289,9 @@ tests/test_prepare_rate: tests/test_prepare_rate.c $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
 tests/test_arp_onset: tests/test_arp_onset.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
+
+tests/test_rate_laws: tests/test_rate_laws.c src/rate_laws.h src/finefx_tables.h
 	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
 tests/test_recall_rate: tests/test_recall_rate.c $(SRC) $(HDR)

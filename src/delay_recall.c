@@ -27,6 +27,8 @@
 #include "juno_engine.h"
 #include "delay_recall.h"
 #include "finefx_recall.h"
+#include "reverb_recall.h"   /* juno_reverb_predelay */
+#include "rate_laws.h"
 #include <string.h>
 
 /* DELAY TIME byte -> per-byte delay time in INTEGER MILLISECONDS (10..800 ms),
@@ -195,9 +197,14 @@ static void put_rate(unsigned char *state, int Hr, int off,
  * carries the 96k value, the same 96k clamp ARM_LFX1 documents. Not a new
  * constant: the type-1/4 arm at :362 already writes these four words. */
 #define ARM_LFX1_OFF 0x3fa754b5u, 0x3f9bd7cau, 0x3f2493b7u, 0x3f2493b7u
-#define ARM_LFX2  0x3c3abeeau, 0x3c2b929au, 0x3bbabeeau, 0x3bab929au  /* 2sin(pi*80/H) */
-#define ARM_CHDEP 0x3cdb8001u, 0x3cef0001u, 0x3d5c0001u, 0x3d6f8001u  /* chorus depth  */
-#define ARM_CHLF  0x3b696eb3u, 0x3b56774fu, 0x3ae96eb3u, 0x3ad6774fu  /* chorus LF     */
+/* LF-damp Fc, chorus pre-delay and chorus low-cut are CONTINUOUS in the rate
+ * (src/rate_laws.h). A block's activation writes them at the default bytes
+ * (LF DAMP FREQ 0, CHORUS PRE DELAY 20, CHORUS LOW CUT 2); the old 4-arm words
+ * were these laws at 44100/48000/88200/96000 and the 96000 word everywhere
+ * else (CLAIMS B4). */
+#define LAW_LFX2(Hr)  rl_scale96(0x3bab929au, (Hr))      /* DLY_LFDF[3][0]     */
+#define LAW_CHDEP(Hr) rl_chorus_predelay(20, (Hr))         /* CHO1_PD at byte 20 */
+#define LAW_CHLF(Hr)  rl_scale96(0x3ad6774fu, (Hr))      /* CHO1_LC[3][2][0]   */
 
 /* logical byte from a nibble pair at record offset `off` (record is nibble-packed
  * past the 16-char name; see juno_apply.c record_byte). */
@@ -242,9 +249,9 @@ static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, i
      * 2-class {44100-arm, else}. The slot-1 delay's HF-Damp 102656 is written to the
      * rate-CONSTANT 0x3f4ba5b0 by this config on every rate (plugin@44.1k holds
      * 0.795 here, NOT prepare's 44.1 class-D default 1.0 — measured, rate_fullscan). */
-    put_rate(state, Hr, 6396128, ARM_CHDEP);
+    JF(state, 6396128) = LAW_CHDEP(Hr);
     put_rate(state, Hr, 6396272, ARM_HCSW);
-    put_rate(state, Hr, 6396336, ARM_CHLF);
+    JF(state, 6396336) = LAW_CHLF(Hr);
     put_rate(state, Hr, 6396400, ARM_LFX1);
     put_rate(state, Hr, 6396528, 0x3d256000u, 0x3db40000u, 0x3db40000u, 0x3db40000u);
     { uint32_t hb = 0x3f4ba5b0u; memcpy(&f, &hb, sizeof f); JF(state, 102656) = f; }
@@ -380,13 +387,13 @@ static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, f
      * (same as the chorus config — measured, rate_fullscan/rate88_dump). */
     put_rate(state, Hr, 6497264,  ARM_HCSW);
     put_rate(state, Hr, 6497360,  ARM_LFX1);
-    put_rate(state, Hr, 6497424,  ARM_LFX2);
+    JF(state, 6497424) = LAW_LFX2(Hr);
     put_rate(state, Hr, 6497472,  ARM_HFDMP);
-    put_rate(state, Hr, 10693008, ARM_CHDEP);
+    JF(state, 10693008) = LAW_CHDEP(Hr);
     put_rate(state, Hr, 10693152, ARM_HCSW);
-    put_rate(state, Hr, 10693216, ARM_CHLF);
+    JF(state, 10693216) = LAW_CHLF(Hr);
     put_rate(state, Hr, 10693280, ARM_LFX1);
-    put_rate(state, Hr, 10759360, 0x445c0000u, 0x446f8000u, 0x44dc4000u, 0x44efc000u);
+    JF(state, 10759360) = (float)juno_reverb_predelay(20, Hr);   /* 880/958/1762/1918 at the 4 old arms */
     { uint32_t hb = 0x3f4ba5b0u; memcpy(&f, &hb, sizeof f); JF(state, 102656) = f; }
     JF(state, 6497344) = (float)b52 / 255.0f;   /* reverb depth              */
     JF(state, 6497168) = tc;                    /* delay time (sync-aware)   */
@@ -445,7 +452,7 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
     if (second) {
         put_rate(state, Hr, 4297680, ARM_HCSW);
         put_rate(state, Hr, 4297776, ARM_LFX1);
-        put_rate(state, Hr, 4297904, ARM_LFX2);
+        JF(state, 4297904) = LAW_LFX2(Hr);
         put_rate(state, Hr, 4297952, ARM_HFDMP);
 
         /* DELAY TIME (sync-aware, same value on both taps — matches every captured
@@ -769,7 +776,7 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     /* rate-dependent FILT cells (table holds the 48k arm; see put_rate above) */
     put_rate(state, Hr, 102448, ARM_HCSW);
     put_rate(state, Hr, 102544, ARM_LFX1);
-    put_rate(state, Hr, 102608, ARM_LFX2);
+    JF(state, 102608) = LAW_LFX2(Hr);
     put_rate(state, Hr, 102656, ARM_HFDMP);
     JF(state, 102528) = (float)level  / 255.0f;             /* Wet (per-patch = LEVEL/255) */
     JF(state, 102576) = level >= 2 ? 1.0f : 0.0f;           /* On/Off (curve: v0,v1->0, v2->1) */
