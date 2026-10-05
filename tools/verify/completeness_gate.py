@@ -72,7 +72,7 @@ deferred = {d: s for d, s in have.items() if s == 'DEFERRED-CONTROLLER'}
 # by relabelling it -> RED. (A row here that becomes APPLIED later, via #112, is fine
 # — this is a ceiling, not a floor.) Changing this set requires editing gate code in
 # the open, not a silent ledger relabel.
-DEFERRED_CONTROLLER_ALLOWED = frozenset({1118, 1242, 1243, 1244, 1245, 1246, 1247, 1248})
+DEFERRED_CONTROLLER_ALLOWED = frozenset({1118})   # 1242-1248 left 2026-10-05: engine-reachable at DELAY TYPE 4 (playbook 113)
 illegal_deferred = sorted(set(deferred) - DEFERRED_CONTROLLER_ALLOWED)
 if illegal_deferred:
     red.append("ILLEGAL DEFERRED-CONTROLLER (a GAP cannot be hidden by relabelling): "

@@ -143,7 +143,7 @@ disp	family	struct	name	status	detail
 870	NAME	PAT_NAME3	(OSC3 TUNE)	APPLIED	in_recall
 871	NAME	PAT_NAME3	HPF TYPE	APPLIED	in_recall
 872	NAME	PAT_NAME3	(FILTER TYPE)	APPLIED	in_recall
-873	NAME	PAT_NAME3	EFFECT TYPE	APPLIED	flanger (mode 4) structural cells 91120/91152/91168/91184 wired in chorus_recall.c; LIVE-gated by etmode_ab.py (synthetic EFFECT TYPE 0..5 port-vs-plugin state A/B, 864 cells 0 mismatch) + test_delay_recall case 11; modes 2/3 proven no-gap. NB flanger PARAM leaves 1242-1248 stay GAP (controller-path)
+873	NAME	PAT_NAME3	EFFECT TYPE	APPLIED	in_recall
 874	NAME	PAT_NAME3	EFFECT TONE	APPLIED	in_recall
 875	NAME	PAT_NAME3	DELAY TYPE	APPLIED	in_recall
 876	NAME	PAT_NAME3	REVERB TYPE	APPLIED	in_recall
@@ -152,7 +152,7 @@ disp	family	struct	name	status	detail
 1028	PATCH2	PAT2_FLT	VCF VELOCITY SENS	APPLIED	port_cells=8
 1029	PATCH2	PAT2_FLT	VCF CUTOFF FREQ H	APPLIED	port_cells=8
 1058	PATCH2	PAT2_AMP	VCA VELOCITY SENS	APPLIED	port_cells=8
-1118	PATCH2	PAT2_CTRL	Patch Tempo	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); host-tempo controller param, record pos in extended PATCH2 region; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch uses non-default
+1118	PATCH2	PAT2_CTRL	Patch Tempo	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); needs the VST3 controller/process lifecycle #112 the charter forbids fighting; named+bounded, no factory-patch use
 1178	PATCH2	PAT2_DLY	DELAY TAP TIME	APPLIED	port_cells=1
 1179	PATCH2	PAT2_DLY	DELAY FEEDBACK	APPLIED	port_cells=3
 1180	PATCH2	PAT2_DLY	DELAY HIGH CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
@@ -164,16 +164,16 @@ disp	family	struct	name	status	detail
 1210	PATCH2	PAT2_CHO	CHORUS PRE DELAY	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
 1211	PATCH2	PAT2_CHO	CHORUS LOW CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
 1212	PATCH2	PAT2_CHO	CHORUS HIGH CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
-1213	PATCH2	PAT2_CHO	CHORUS_LFO SOURCE	INERT-PROVEN	no_engine_cell (authoritative full-byte sweep, activating context)
-1214	PATCH2	PAT2_CHO	CHORUS LFO EXT GAIN	INERT-PROVEN	no_engine_cell (authoritative full-byte sweep, activating context)
-1215	PATCH2	PAT2_CHO	CHORUS LFO EXT OFFSET	INERT-PROVEN	no_engine_cell (authoritative full-byte sweep, activating context)
-1242	PATCH2	PAT2_FL	FLANGER MANUAL	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
-1243	PATCH2	PAT2_FL	FLANGER RESONANCE	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
-1244	PATCH2	PAT2_FL	FLANGER SEPARATIOIN	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
-1245	PATCH2	PAT2_FL	FLANGER LOW CUT	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
-1246	PATCH2	PAT2_FL	FLANGER LFO SOURCE	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
-1247	PATCH2	PAT2_FL	FLANGER LFO EXT GAIN	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
-1248	PATCH2	PAT2_FL	FLANGER LFO EXT OFFSET	DEFERRED-CONTROLLER	not engine-reachable (value-tree dispatch is a no-op); EFFECT TYPE 4 flanger param, param LAW derived (scratchpad/flanger_validate.py) but port has no flanger DSP render; needs the VST3 controller/process lifecycle #112 (charter: do not fight process()); named+bounded, no factory patch is EFFECT TYPE 4
+1213	PATCH2	PAT2_CHO	CHORUS_LFO SOURCE	INERT-PROVEN	nullsub setter (READ: processor vtable +2704); no engine cell (executed)
+1214	PATCH2	PAT2_CHO	CHORUS LFO EXT GAIN	INERT-PROVEN	nullsub setter (READ: processor vtable +2712); no engine cell (executed)
+1215	PATCH2	PAT2_CHO	CHORUS LFO EXT OFFSET	INERT-PROVEN	nullsub setter (READ: processor vtable +2720); no engine cell (executed)
+1242	PATCH2	PAT2_FL	FLANGER MANUAL	APPLIED	port_cells=1
+1243	PATCH2	PAT2_FL	FLANGER RESONANCE	APPLIED	port_cells=1
+1244	PATCH2	PAT2_FL	FLANGER SEPARATIOIN	INERT-PROVEN	nullsub setter (READ: processor vtable +2744); no engine cell (executed)
+1245	PATCH2	PAT2_FL	FLANGER LOW CUT	APPLIED	port_cells=2
+1246	PATCH2	PAT2_FL	FLANGER LFO SOURCE	INERT-PROVEN	nullsub setter (READ: processor vtable +2760); no engine cell (executed)
+1247	PATCH2	PAT2_FL	FLANGER LFO EXT GAIN	INERT-PROVEN	nullsub setter (READ: processor vtable +2768); no engine cell (executed)
+1248	PATCH2	PAT2_FL	FLANGER LFO EXT OFFSET	INERT-PROVEN	nullsub setter (READ: processor vtable +2776); no engine cell (executed)
 1274	PATCH2	PAT2_MFX	MFX TYPE	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
 1275	PATCH2	PAT2_MFX	MFX ASSIGN 1 TARGET	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
 1276	PATCH2	PAT2_MFX	MFX ASSIGN 1 RANGE MIN	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
@@ -200,7 +200,7 @@ disp	family	struct	name	status	detail
 1297	PATCH2	PAT2_MFX	MFX PARAMETER 14	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
 1298	PATCH2	PAT2_MFX	MFX PARAMETER 15	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
 1299	PATCH2	PAT2_MFX	MFX PARAMETER 16	INERT-PROVEN	SYSTEM-8-mode param (out of JUNO-60 scope); no cell in JUNO-60 recall
-1323	PATCH2	PAT2_REV	REVERB PRE DELAY	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates x 3 TYPE classes (taps 11022208-340 + predelay 10759360)
+1323	PATCH2	PAT2_REV	REVERB PRE DELAY	APPLIED	port_cells=36
 1324	PATCH2	PAT2_REV	REVERB LOW CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
 1325	PATCH2	PAT2_REV	REVERB HIGH CUT	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates
 1326	PATCH2	PAT2_REV	REVERB DENSITY	APPLIED	finefx_pillar3_gate: port==plugin setter bit-exact, every byte x 4 rates

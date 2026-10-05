@@ -2,8 +2,8 @@
 """PILLAR 1 / Stage A — execute every real value-tree leaf under Unicorn and
 record which unit-0 engine cells it writes (memory-write instrumentation, not
 state-diff — exact and cheap). Swept across several FX-mode contexts so
-subsystem-gated setters (reverb cuts need reverb active, flanger needs EFFECT
-TYPE 4, mfx needs TYPE 5) are all reached; the per-leaf cell set is the UNION
+subsystem-gated setters (reverb cuts need reverb active, the flanger needs DELAY
+TYPE 4 -- not EFFECT TYPE 4, playbook 113 --, mfx needs EFFECT TYPE 5) are all reached; the per-leaf cell set is the UNION
 over contexts. Output: scratchpad/leaf_cellmap.pkl { disp -> {'name','struct',
 'cells':sorted[int], 'ctxhits':{ctx:ncells}} }.
 
@@ -61,10 +61,11 @@ def build_ctx(tag):
     base_patch = {'cold': None, 'chorus': 13, 'flanger': 13, 'mfx': 7, 'reverb': 13}[tag]
     if base_patch is not None:
         E.recall_patch(e, base_patch, leaves, bank); e.snap_all()
-    et = {'cold': None, 'chorus': 2, 'flanger': 4, 'mfx': 5, 'reverb': 2}[tag]
+    et = {'cold': None, 'chorus': 2, 'flanger': None, 'mfx': 5, 'reverb': 2}[tag]
+    dt = 4 if tag == 'flanger' else None   # the flanger block is DELAY TYPE 4 (setters test proc +1480)
     rt = 2 if tag == 'reverb' else None
-    if et is not None or rt is not None:
-        force_type(e, et=et, rt=rt); e.snap_all()
+    if et is not None or dt is not None or rt is not None:
+        force_type(e, et=et, dt=dt, rt=rt); e.snap_all()
     return e
 
 CONTEXTS = ['cold', 'chorus', 'flanger', 'mfx', 'reverb']

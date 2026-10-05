@@ -75,18 +75,19 @@ def main():
         print("  disp %4d %-22s -> %s" % (disp, name, tag))
         if d:
             reachable.append((disp, name, d))
-    # Thoroughness: any flanger (PAT2_FL) leaf must stay no-op even with EFFECT TYPE
-    # routing forced to 4 (the mode that would host it) — proving it needs the
-    # effect-object mode-4 ACTIVATION that dispatch does not perform.
+    # Thoroughness: any flanger (PAT2_FL) leaf must stay no-op even with DELAY TYPE
+    # forced to 4 -- the selector its setters actually test (processor +1480).
+    # Until 2026-10-05 this block forced EFFECT TYPE (873) and so proved nothing:
+    # at DELAY TYPE 4, 1242/1243/1245 DO write engine cells (playbook 113).
     for u in range(9):
-        try: e.dispatch(u, 873, 4)
+        try: e.dispatch(u, 875, 4)
         except RuntimeError: pass
     e.snap_all()
     for disp, name in rows:
         if 1242 <= disp <= 1248:
             d = valdep(disp)
             if d:
-                print("  disp %4d %-22s -> REACHABLE after ET=4 routing (%d cells)" % (disp, name, len(d)))
+                print("  disp %4d %-22s -> REACHABLE with DELAY TYPE 4 (%d cells)" % (disp, name, len(d)))
                 reachable.append((disp, name, d))
 
     if reachable:
@@ -94,7 +95,7 @@ def main():
               " APPLIED, not deferred: %s" % (len(reachable), [r[0] for r in reachable]))
         return 1
     print("\nGATE: GREEN — every DEFERRED-CONTROLLER row proven NOT engine-reachable "
-          "(value-tree dispatch is a no-op; flanger stays no-op even with ET routing=4).")
+          "(value-tree dispatch is a no-op).")
     return 0
 
 

@@ -96,23 +96,14 @@ def _ref():
         e = E.E2E(); e.build(SR); e.snap_all(); e.clear_latch(); e.set_ftz()
         e.render(WARM_IDLE, block=WARM_BLK)          # engine runs before any preset
         blob = E.patch_blob(bank, p)
-        fx = RA._finefx_leaves(blob, R)
+        late = RA.late_leaves(blob, R)    # the oracle's own recall order
         for (d, bb) in leaves:            R.wr_desc(e, d, R.dec(blob, bb))
-        for (d, rec) in RA.FX_LEAVES:     R.wr_desc(e, d, R.dec(blob, rec - 16))
-        for (d, bb) in RA.EXTRA_LEAVES:   R.wr_desc(e, d, R.dec(blob, bb))
-        for (d, rec, raw) in fx:
-            R.wr_desc(e, d, (blob[rec - 16] & 0x7F) if raw else R.dec(blob, rec - 16))
+        for (d, v) in late:               R.wr_desc(e, d, v)
         for u in range(9):
             for (d, _) in leaves:
                 try: e.dispatch(u, d, R.rd_desc(e, d))
                 except RuntimeError: pass
-            for (d, _) in RA.FX_LEAVES:
-                try: e.dispatch(u, d, R.rd_desc(e, d))
-                except RuntimeError: pass
-            for (d, _) in RA.EXTRA_LEAVES:
-                try: e.dispatch(u, d, R.rd_desc(e, d))
-                except RuntimeError: pass
-            for (d, _, _) in fx:
+            for (d, _) in late:
                 try: e.dispatch(u, d, R.rd_desc(e, d))
                 except RuntimeError: pass
         e.render(WARM_GAP, block=WARM_BLK)

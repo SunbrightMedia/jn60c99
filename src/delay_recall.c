@@ -29,6 +29,7 @@
 #include "finefx_recall.h"
 #include "reverb_recall.h"   /* juno_reverb_predelay */
 #include "rate_laws.h"
+#include "juno_curve.h"
 #include <string.h>
 
 /* DELAY TIME byte -> per-byte delay time in INTEGER MILLISECONDS (10..800 ms),
@@ -708,14 +709,16 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
              * doctored-record full recalls of a type-4 user patch under Unicorn
              * (scratchpad/dtype4_block_derive.py, 17 recalls: per-param 3-point
              * sweeps + 44.1/88.2 rate runs + type-0 control):
-             *   6429472 = -(12 - (time*(1/255))*12)  (bit-exact op chain over
-             *             {0,136,255}; -0 at time 255 from the final negate)
+             *   6429472 = (1 - curve22(DELAY TIME)) * -12.0f -- READ from the
+             *             block method at rva 0x35F720 (traced); the earlier
+             *             fit -(12 - (time*(1/255))*12) matched 3 sampled bytes
+             *             and was 1 ULP off for 132 of 256
+             *             (tools/verify/fx_leaf_gate.py flanger). -0 at 255.
              *   6430512 = DELAY LEVEL / 255 (wet)
              *   6429488 = 6430480 = 1.0 (enable gates)
              *   6430496/6430528/6430544 = constants (invariant across level/
              *             time/fb/hc/direct/tap sweeps and 44.1/88.2 rates)
              * fb/hc/direct/tap do NOT touch this block (swept, zero cells). */
-            float t = (float)dtime * (1.0f / 255.0f);
             int lvl32 = level * 32; if (lvl32 > 255) lvl32 = 255;
             /* tail constants + the DPF stage [6430544..6430800], from the same
              * derivation (invariant across level/time/fb/hc/direct + reverb
@@ -723,34 +726,61 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
              * 2-class {44100, else} — 88200 confirmed on the else arm for the
              * head block; tail follows the same family, noted in the comment). */
             static const uint32_t T4_TAIL[] = {
-                6430496,0x3df465fcu, 6430528,0x3f03df74u, 6430544,0x3f83df74u,
+                6430528,0x3f03df74u, 6430544,0x3f83df74u,
                 6430560,0x3f03df74u, 6430576,0xbee549c0u, 6430592,0xbf1cd8f1u,
-                6430624,0x3f4ba5b0u, 6430640,0x3fb50bf3u, 6430672,0x3b56774fu,
-                6430688,0x3f800000u, 6430704,0x3f800000u, 6430720,0x3f800000u,
-                6430736,0x387fd974u, 6430752,0x3f4fcfd0u, 6430784,0x3f800000u,
-                6430800,0x3f800000u
+                6430624,0x3f4ba5b0u, 6430640,0x3fb50bf3u,
+                6430704,0x3f800000u, 6430720,0x3f800000u,
+                6430784,0x3f800000u, 6430800,0x3f800000u
             };
             unsigned k4;
             for (k4 = 0; k4 < sizeof(T4_TAIL)/sizeof(T4_TAIL[0]); k4 += 2) {
                 uint32_t b4 = T4_TAIL[k4 + 1]; float f4; memcpy(&f4, &b4, 4);
                 JF(state, (int)T4_TAIL[k4]) = f4;
             }
-            if (Hr == 44100) {          /* measured 44.1k arms (plugin recall) */
-                static const uint32_t T4_44[] = {
-                    6430608,0x3f800000u, 6430672,0x3b696eb3u, 6430736,0x388b3cdfu };
-                for (k4 = 0; k4 < sizeof(T4_44)/sizeof(T4_44[0]); k4 += 2) {
-                    uint32_t b4 = T4_44[k4 + 1]; float f4; memcpy(&f4, &b4, 4);
-                    JF(state, (int)T4_44[k4]) = f4;
-                }
+            /* 6430608 is 1.0 at 44100 only (0 at every other rate): PROVEN at
+             * 18 host rates by tools/verify/rate_sweep_gate.py (records DT4/DT4x). */
+            if (Hr == 44100)
+                JF(state, 6430608) = 1.0f;
+            /* 6430736: the plugin's rate-class value -- its tables exist for
+             * 44100 and 48000, every other rate takes the 96 kHz one (the same
+             * three classes as 96384 and the cold 102544; the plugin selects
+             * per-class curve tables this way, e.g. rva 0x35A570). PROVEN at 18
+             * rates by rate_sweep_gate.py; the old "else" arm held the 48000
+             * value and was wrong at 16 of the 18. */
+            JI(state, 6430736) = (Hr == 44100) ? 0x388b3cdf : (Hr == 48000) ? 0x387fd974 : 0x37ffd974;
+            {
+                /* The FLANGER leaves (CLAIMS B5). Their setters act only with
+                 * DELAY TYPE 4 in force (processor +1480; the DELAY TYPE setter
+                 * replays them into the block), so the "engine no-op" proof that
+                 * forced EFFECT TYPE 4 never ran them (playbook 113). Traced under
+                 * Unicorn, the block methods at rva 0x35F690 / 0x35EE60 /
+                 * 0x35F320 + 0x35F3C0 store:
+                 *   6430496 = curve 19 of (255 - MANUAL) x 0.5f
+                 *   6430752 = curve 22 of RESONANCE x 0.9f (f32 0x3f666666)
+                 *   6430672 = curve 65 of max(LOW CUT - 1, 0) x 96000 / H
+                 *             (skipped at exactly 96000, src/rate_laws.h)
+                 *   6430688 = LOW CUT > 0 ? 1.0 : 0.0
+                 * SEPARATION (1244) and LFO SOURCE / EXT GAIN / EXT OFFSET
+                 * (1246-1248) reach empty functions (READ: processor vtable
+                 * +2744/+2760/+2768/+2776 are nullsubs). The factory defaults
+                 * (128 / 230 / 2) give the constants this arm used to write. */
+                int manual = rec_byte(rec, 3502);       /* FLANGER MANUAL    (1242), int2x4 */
+                int reso   = rec_byte(rec, 3504);       /* FLANGER RESONANCE (1243), int2x4 */
+                int lowcut = rec[3508] & 0x7F;          /* FLANGER LOW CUT   (1245), int1x7 */
+                JF(state, 6430496) = juno_curve(19, 255 - manual) * 0.5f;
+                JF(state, 6430752) = juno_curve(22, reso) * rl_f32(0x3f666666u);
+                JF(state, 6430672) = rl_scale96f(juno_curve(65, lowcut > 0 ? lowcut - 1 : 0), Hr);
+                JF(state, 6430688) = (lowcut > 0) ? 1.0f : 0.0f;
             }
-            JF(state, 6429472) = -(12.0f - t * 12.0f);
+            JF(state, 6429472) = (1.0f - juno_curve(22, dtime)) * -12.0f;
             JF(state, 6429488) = 1.0f;
             JF(state, 6430480) = 1.0f;
             JF(state, 6430512) = (float)level / 255.0f;
-            /* 6430768 = min(level*32,255)/255 (candidate law: exact at the
-             * measured 0/3/255 points; 7/8/100 probe pending — the 7-patch A/B
-             * is the final arbiter) */
-            JF(state, 6430768) = (float)lvl32 / 255.0f;
+            /* 6430768 = curve 22 of min(32*level, 255): the DELAY LEVEL
+             * setter (rva 0x3B8E50, case 4) passes min(32*level, 255) to the
+             * block method at +56, which takes curve 22 (= k/255 bit for bit).
+             * PROVEN at all 256 levels x 3 rates (fx_leaf_gate.py flanger). */
+            JF(state, 6430768) = juno_curve(22, lvl32);
         }
         return;
     }

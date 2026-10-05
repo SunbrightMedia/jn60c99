@@ -96,6 +96,16 @@ import json, os
 _authp = _JREPO + '/scratchpad/authoritative_cells.json'
 AUTH_CELLS = {int(k): v for k, v in json.load(open(_authp)).items()} if os.path.exists(_authp) else {}
 
+# Processor setters that are EMPTY functions (READ: the processor vtable slot,
+# 8 bytes per index from 1210 at +2680, holds a nullsub thunk).
+NULLSUB_SETTERS = {1213: '+2704', 1214: '+2712', 1215: '+2720',
+                   1244: '+2744', 1246: '+2760', 1247: '+2768', 1248: '+2776'}
+# Cells a type setter writes, but only ever with the value the cold state
+# already holds, so the port's cold state covers them (PROVEN by executing
+# EFFECT TYPE / DELAY TYPE sequences through every class:
+# probes/coverage/cold_value_writes.py -- the cells never leave their cold value).
+COLD_WRITES = {85152, 10693024, 10693296}
+
 rows = []
 for disp in sorted(cellmap):
     info = cellmap[disp]
@@ -124,7 +134,7 @@ for disp in sorted(cellmap):
     # render-read (is_audio) is used only to CATCH a gap the port misses. This
     # keeps APPLIED robust to any incompleteness in the render-read grep.
     port_cells = [c for c in cells if c in port]
-    missing_render = [c for c in cells if c not in port and is_audio(c)]
+    missing_render = [c for c in cells if c not in port and is_audio(c) and c not in COLD_WRITES]
     # A mode ROUTER's missing cells that a fine-FX leaf owns are not the router's
     # gap (the router IS applied; the port routes + sets the active mode). Only a
     # missing cell NO other leaf owns would be a router-specific gap.
@@ -155,6 +165,12 @@ for disp in sorted(cellmap):
             status, detail = 'APPLIED', src
     elif missing_render:
         status, detail = 'GAP', 'missing_audio_cells=' + ','.join(map(str, missing_render[:8]))
+    elif disp in NULLSUB_SETTERS:
+        # The processor setter is an empty function (READ from the vtable), and
+        # no sweep context wrote a cell (executed). The flanger leaves among them
+        # were DEFERRED-CONTROLLER until 2026-10-05, because the sweep forced
+        # EFFECT TYPE 4 instead of DELAY TYPE 4 (playbook 113).
+        status, detail = 'INERT-PROVEN', 'nullsub setter (READ: processor vtable %s); no engine cell (executed)' % NULLSUB_SETTERS[disp]
     elif struct_ in FX_CONTROLLER:
         # NOT engine-reachable: the value-tree dispatch (0x3B9A30) is a proven no-op
         # for these; they reach the engine ONLY through the VST3 controller/process

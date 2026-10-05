@@ -165,19 +165,47 @@ CHORUS_FINEFX_LEAVES = [(1210, 3286, True),   # CHORUS PRE DELAY -> 6396128
                         (1212, 3288, True)]   # CHORUS HIGH CUT  -> 6396192..320
 
 
+# Leaves the plugin's OWN recall list (enumerator 0x3B48A0, executed:
+# tools/verify/plugin_recall_set.py) contains and the harness never fired
+# (2026-10-05, CLAIMS B5/B6). Record positions from the validated Script.xml
+# cumulative offset map (it reproduces all nine known FX anchors; every
+# factory patch holds the Script.xml default at each). 1244 and 1246-1248
+# reach empty functions (READ: proc vtable +2744/+2760/+2768/+2776 are
+# nullsubs); 1242/1243/1245 write the flanger block when DELAY TYPE 4 is in
+# force. Firing them changes 0 cells on the 64 factory patches (measured).
+# 878 LFO RATE H / 1029 VCF CUTOFF FREQ H are NOT here: they do change 16
+# factory patches, and whether a DAW preset load applies them is CLAIMS B6.
+ENUM_FX_LEAVES = [(1178, 3056, True),    # DELAY TAP TIME
+                  (1213, 3289, True),    # CHORUS LFO SOURCE
+                  (1214, 3290, False),   # CHORUS LFO EXT GAIN
+                  (1215, 3292, False),   # CHORUS LFO EXT OFFSET
+                  (1242, 3502, False),   # FLANGER MANUAL
+                  (1243, 3504, False),   # FLANGER RESONANCE
+                  (1244, 3506, False),   # FLANGER SEPARATION
+                  (1245, 3508, True),    # FLANGER LOW CUT
+                  (1246, 3509, True),    # FLANGER LFO SOURCE
+                  (1247, 3510, False),   # FLANGER LFO EXT GAIN
+                  (1248, 3512, False)]   # FLANGER LFO EXT OFFSET
+
+
 def _finefx_leaves(blob, R):
-    """The extra FX fine-FX leaves to fire for this patch (beyond the recall
-    enumerator): DELAY filter leaves when DELAY TYPE in {0,1} (TYPE 0 -> first
-    instance 102xxx, TYPE 1 -> second instance 4297xxx -- context-dependent, both
-    applied by the port; finefx_multictx_probe.py); SLOT-1 CHORUS filter leaves when
-    DELAY TYPE in {2,3}; REVERB filter/gain leaves unconditionally (reverb tank
-    always runs). DELAY TYPE = rec 650 (blob index 650-16=634)."""
-    dtype = R.dec(blob, 634)
-    # DELAY TYPE 5 (slot-1 reverb) hosts BOTH a delay-filter block (6497xxx, delay
-    # leaves) and a chorus-filter block (10693xxx, chorus leaves) -- dispatch both.
-    dly = DELAY_FILT_LEAVES if dtype in (0, 1, 5) else []
-    cho = CHORUS_FINEFX_LEAVES if dtype in (2, 3, 5) else []
-    return dly + cho + REVERB_FINEFX_LEAVES
+    """The FX fine leaves to fire for every patch, in ascending index order.
+    UNCONDITIONAL since 2026-10-05: the plugin's recall list fires them for
+    every patch whatever the DELAY TYPE; the old DELAY-TYPE gating was a harness
+    model of plugin logic (CLAIMS B6). On the 64 factory patches the two forms
+    agree in every cell (measured, whole object)."""
+    return sorted(DELAY_FILT_LEAVES + CHORUS_FINEFX_LEAVES + REVERB_FINEFX_LEAVES
+                  + ENUM_FX_LEAVES)
+
+
+def late_leaves(blob, R):
+    """(dispatch index, value) for every leaf above the value-tree range, in the
+    plugin's recall order (ascending index): EXTRA, FX and the fine leaves."""
+    out = [(d, R.dec(blob, rec - 16)) for d, rec in FX_LEAVES]
+    out += [(d, R.dec(blob, bb)) for d, bb in EXTRA_LEAVES]
+    out += [(d, (blob[rec - 16] & 0x7F) if raw else R.dec(blob, rec - 16))
+            for d, rec, raw in _finefx_leaves(blob, R)]
+    return sorted(out)
 
 
 def build_engine(E, sr):
@@ -194,30 +222,20 @@ def build_engine(E, sr):
 def apply_recall(e, idx, bank, leaves, E, R):
     """Drive the plugin's OWN complete recall for patch idx into the EXISTING engine
     e, leaving it noteless/settled. Call it twice on one engine to get a warm recall.
-    Body split verbatim out of prepare_recall (no reordering): the descriptor writes,
-    the 9-unit dispatch loop, the assigner refresh, snap/clear_latch/set_ftz."""
+    The descriptor writes, the 9-unit dispatch loop (value-tree leaves, then the
+    late leaves in ascending index order, as the plugin's recall list runs), the
+    assigner refresh, snap/clear_latch/set_ftz."""
     blob = E.patch_blob(bank, idx)
+    late = late_leaves(blob, R)
     for (disp, bb) in leaves:
         R.wr_desc(e, disp, R.dec(blob, bb))
-    for (disp, recoff) in FX_LEAVES:                  # record byte -> blob-relative
-        R.wr_desc(e, disp, R.dec(blob, recoff - 16))
-    for (disp, bb) in EXTRA_LEAVES:
-        R.wr_desc(e, disp, R.dec(blob, bb))
-    finefx = _finefx_leaves(blob, R)
-    for (disp, recoff, raw) in finefx:                # int1x7 raw byte vs nibble pair
-        v = (blob[recoff - 16] & 0x7F) if raw else R.dec(blob, recoff - 16)
+    for (disp, v) in late:
         R.wr_desc(e, disp, v)
     for u in range(9):
         for (disp, bb) in leaves:
             try: e.dispatch(u, disp, R.rd_desc(e, disp))
             except RuntimeError: pass
-        for (disp, recoff) in FX_LEAVES:
-            try: e.dispatch(u, disp, R.rd_desc(e, disp))
-            except RuntimeError: pass
-        for (disp, bb) in EXTRA_LEAVES:
-            try: e.dispatch(u, disp, R.rd_desc(e, disp))
-            except RuntimeError: pass
-        for (disp, recoff, raw) in finefx:
+        for (disp, _v) in late:
             try: e.dispatch(u, disp, R.rd_desc(e, disp))
             except RuntimeError: pass
     # What the HOST does that a bare dispatch does not: the engine's parameter

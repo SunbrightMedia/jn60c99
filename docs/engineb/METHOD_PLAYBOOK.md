@@ -2335,3 +2335,17 @@ MANUAL, RESONANCE and LOW CUT each write engine cells. The gate was green for th
 ### The rule
 Before a gate proves "X does nothing in context C", read X's setter and confirm that C is the value
 its branch reads. A no-op proof in the wrong context is the blind gate of entry 108.
+
+## 114. A LEDGER THAT CANNOT REGENERATE FROM THE TRUTH FILES IS NOT A LEDGER
+Paid 2026-10-05 (JUNO COVERAGE.tsv). Regenerating the completeness ledger by its documented chain
+failed three ways. (1) Two steps read a USER bank (scratchpad/chillwave.bin) to reach EFFECT TYPE
+0/4 and DELAY TYPE 4: absent in a fresh container, and user data must never be load-bearing. Now
+synthetic one-record banks (factory patches with every type pair forced) do it. (2) The port's write
+set was "cells whose value changed": a cell written with its cold value (91216 = the prepare seed
+1.3; the reverb tap array) looked unwritten and became a false GAP. Now the recall runs on the cold
+state and on a copy with every word XORed (outside the few cells the recall reads); a written cell
+ends equal in both. (3) The flanger context forced the wrong selector (playbook 113). The ledger
+had stayed green only because it was never regenerated.
+### The rule
+Regenerate every ledger from the truth files in a fresh clone before trusting it. A "written" test
+must catch writes of the value already there.

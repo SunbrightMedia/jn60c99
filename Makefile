@@ -97,6 +97,9 @@ verify: test libjuno.so
 	echo "=== EFFECT PARAMS: DEPTH + TONE, every byte x EFFECT TYPE 0..5/6/255 x 3 rates, dispatched AND fresh recall (whole object + render) ==="; \
 	fresh $(SCRATCH)/effect_param_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/effect_param_gate.py --ref || FAIL=1; \
 	python3 tools/verify/effect_param_gate.py --port || FAIL=1; \
+	echo "=== FLANGER (DELAY TYPE 4) LEAVES: every byte of 18 leaves x 2 contexts x 3 rates, fresh recall (whole object + render) ==="; \
+	fresh $(SCRATCH)/fx_leaf_flanger_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/fx_leaf_gate.py --ref flanger || FAIL=1; \
+	python3 tools/verify/fx_leaf_gate.py --port flanger --recall-only || FAIL=1; \
 	echo "=== WARM RECALL: N recalls through ONE engine, plugin vs port (every gate above recalls COLD) ==="; \
 	echo "    p39,40 CARRY / p1,9 WRITE -- the two directions of the chorus WET law, judged on the"; \
 	echo "    NAMED cell (--cells-only). p0,0 is the IDENTITY case and is judged on the WHOLE state,"; \

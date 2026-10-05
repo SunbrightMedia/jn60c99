@@ -13,9 +13,8 @@ REACH. The factory bank carries no EFFECT TYPE 0 or 4 and no DELAY TYPE 4
 patch, so a factory-only sweep never runs those blocks' rate laws (the first
 tooth of this gate, on EFFECT TYPE 4's 91120, did not bite for exactly that
 reason -- playbook 103). SYNTH adds one-record banks for them: factory patch 0
-with the type nibble pair replaced. DELAY TYPE 4 (the flanger block) is NOT in
-SYNTH yet: the port's block is incomplete (CLAIMS B5); it joins SYNTH the day
-B5 closes, and this gate then grades it at every rate.
+with the type replaced, and DELAY TYPE 4 (the flanger block, CLAIMS B5) with
+default and with non-default flanger leaves.
 
 WHAT IT COMPARES, per rate R in RATES, per patch P in PATCHES + SYNTH:
   1. the WHOLE engine object (all 0xA83010 bytes of unit 0, zlib-compressed,
@@ -67,9 +66,12 @@ RATES = [8000.0, 11025.0, 16000.0, 22050.0, 32000.0, 37800.0, 44100.0,
 PATCHES = list(range(64))
 RENDER_PATCHES = [0, 2, 5, 10, 14, 21, 36, 44, 61]   # every DELAY TYPE class + UNISON
 BANK_HEADER, STRIDE = 23, 20223
-# name -> (factory base patch, {record offset of a nibble pair: value})
+# name -> (factory base patch, {record offset: value}); a plain value is a
+# nibble pair (int2x4), ('r', v) an int1x7 raw byte.
 SYNTH = {'ET0': (0, {634: 0}),               # EFFECT TYPE 0 (Pan): no factory patch
-         'ET4': (0, {634: 4})}               # EFFECT TYPE 4 (flanger chorus row): none
+         'ET4': (0, {634: 4}),               # EFFECT TYPE 4 (flanger chorus row): none
+         'DT4': (0, {650: 4}),               # DELAY TYPE 4 (the flanger block): none
+         'DT4x': (0, {650: 4, 3502: 77, 3504: 40, 3508: ('r', 9)})}  # + MANUAL/RESONANCE/LOW CUT
 
 
 def synth_bank(bank, name):
@@ -77,8 +79,11 @@ def synth_bank(bank, name):
     base, sets = SYNTH[name]
     rec = bytearray(bank[BANK_HEADER + base * STRIDE: BANK_HEADER + (base + 1) * STRIDE])
     for off, v in sets.items():
-        rec[off] = (v >> 4) & 0xF
-        rec[off + 1] = v & 0xF
+        if isinstance(v, tuple):
+            rec[off] = v[1] & 0x7F
+        else:
+            rec[off] = (v >> 4) & 0xF
+            rec[off + 1] = v & 0xF
     return bytes(bank[:BANK_HEADER]) + bytes(rec)
 
 

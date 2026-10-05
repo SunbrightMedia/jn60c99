@@ -23,13 +23,16 @@ static inline float rl_f32(uint32_t b) { float f; memcpy(&f, &b, sizeof f); retu
 
 /* t96 * 96000 / H (multiply first). Identity at exactly 96000: the plugin skips
  * the scale there (`cmp eax,0x17700 / je`). DELAY LF DAMP FREQ (rva 0x3603b0,
- * table value x f32 96000 at rva 0x98802c, then divss by the rate) and CHORUS
- * LOW CUT (rva 0x361108). */
-static inline float rl_scale96(uint32_t t96_bits, int Hr)
+ * table value x f32 96000 at rva 0x98802c, then divss by the rate), CHORUS
+ * LOW CUT (rva 0x361108) and FLANGER LOW CUT (rva 0x35f348, traced). */
+static inline float rl_scale96f(float t, int Hr)
 {
-    float t = rl_f32(t96_bits);
     if (Hr != 96000) t = (t * 96000.0f) / (float)Hr;
     return t;
+}
+static inline float rl_scale96(uint32_t t96_bits, int Hr)
+{
+    return rl_scale96f(rl_f32(t96_bits), Hr);
 }
 
 /* A delay time of x milliseconds as the engine's coefficient:
