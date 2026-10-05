@@ -2229,3 +2229,15 @@ Every path a tool uses is derived from `__file__` (or an explicit environment ov
 trusting any isolated run, grep the tree for the checkout's own absolute path: if it appears, the run
 is not isolated.
 
+## 105. A LEDGERED "AUDIO-INERT" DIFFERENCE NEEDS A GATE THAT CAN SEE THE CELL -- THEN IT IS USUALLY ONE STORE
+Paid 2026-10-05 (JUNO CLAIMS B3). The ledger said "broadcast flags 1856/1488/1840: plugin writes all 8
+voices, port writes the gated voice; audio-inert". No gate compared the voices a note did NOT land on.
+A new all-voice state gate (tools/verify/note_bcast_gate.py: every voice's whole block, from the
+plugin unit that renders it, after every note event) showed the ledger was STALE -- 1856/1840/1488 had
+been fixed -- and found the difference nobody had listed: aux Array B (101488+32v), written to 1.0 by
+the gate setter on every gate-on, never written by the port (9/13 scenarios failed). An earlier probe
+had read Array B one voice off (101520+32v) and concluded MONO never writes it; tracing the setter's
+own stores (rva 0x3c2763) settled both in one run. The fix is one store.
+### The rule
+"Inert" is a statement about what the gates can see. Before ledgering a difference, build the gate
+that sees the cell; before trusting a probe's cell address, trace the writer's own store.

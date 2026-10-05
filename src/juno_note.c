@@ -15,9 +15,10 @@
  *   param   1  M.CV     off 304   note pitch   (immediate)
  *   param   2  M.Gate   off 320   ADSR gate    (immediate)
  *   param 927  Voice0 Note Off Notify off 101504 (+voice*32)  DCO retrigger latch
+ *   (gate leaf 450+v, velocity > 0)   off 101488 (+voice*32)  note-on flag, Array B
  *
  * (Per-voice: voice v adds v*JUNO_VOICE_MAIN_STRIDE to the M.CV/M.Gate offsets and
- *  v*JUNO_VOICE_AUX_STRIDE to the aux latch.)
+ *  v*JUNO_VOICE_AUX_STRIDE to the aux cells.)
  *
  * ---------------------------------------------------------------------------
  * PITCH  ->  M.CV (offset 304), immediate
@@ -63,7 +64,9 @@
  * (juno_init.c), NOT by note-on. Each voice's first rendered sample consumes its
  * own slot, so a cold first note resets DCO phase; thereafter the DCO free-runs.
  * The plugin's note-on writes a DIFFERENT, DSP-inert cell — aux Array B at
- * 101520+voice*32 — never Array A. An earlier port armed Array A on every note-on;
+ * 101488+voice*32 (16 bytes BELOW the same voice's Array A; an earlier reading
+ * put it at 101520+voice*32, one voice off) — never Array A. An earlier port armed
+ * Array A on every note-on;
  * that re-phased the DCO on notes played after rendering had begun (wrong; only
  * masked in the cold single-note A/B because there note-on precedes any render).
  * See scratchpad/oracle/latch_{probe,reads,arm_when}.py.
@@ -98,6 +101,7 @@
 #define GATE_OFF    320    /* M.Gate — per-voice binary gate conditioner       */
 #define TUNE_OFF    4448   /* fixed DCO tune (-4.75), set by init; DO NOT write */
 #define AUX_EDGE(v) (JUNO_VOICE_AUX_BASE0 + (unsigned int)(v) * JUNO_VOICE_AUX_STRIDE)
+#define AUX_NOTEON(v) (AUX_EDGE(v) - 16u)   /* aux Array B, 101488 + v*32 */
 
 /* Gate is binary in the DSP; any positive magnitude opens it identically. */
 #define GATE_OPEN   1.0f
@@ -173,9 +177,13 @@ void juno_note_on(unsigned char *st, int voice, int midi_note, int velocity)
      *   patch 0  ASSIGN=0 POLY : on 64/29 -> v4[g1 A0 B1]   Array B, A untouched
      *   patch 15 ASSIGN=1 MONO : on 69/36 -> v0[g1 A1 B0]   Array A armed
      *
-     * So POLY note-on writes only the DSP-inert Array B (101520 + v*32) — the old
-     * comment here was right about POLY — while a MONO retrigger arms Array A,
-     * which voice_render consumes to reset DCO phase. Arming unconditionally is
+     * So POLY note-on writes only the DSP-inert Array B — the old comment here
+     * was right about POLY — while a MONO retrigger arms Array A, which
+     * voice_render consumes to reset DCO phase. (CORRECTED 2026-10-05 by tracing
+     * the gate setter's own stores: Array B is 101488 + v*32, not 101520 + v*32 --
+     * the "B0" above was the NEXT voice's cell -- and a MONO retrigger writes
+     * BOTH: gate leaf 0 -> Array A, then gate leaf vel -> Array B. The Array B
+     * store is the last line of this function.) Arming Array A unconditionally is
      * measurably wrong: it takes fuzz_diff from 1 diverged seed to 18 and
      * assigner_ab from 28/28 to 20/28, because it re-phases every POLY note.
      *
@@ -199,6 +207,17 @@ void juno_note_on(unsigned char *st, int voice, int midi_note, int velocity)
      * ALSO maintained globally across all voices — see juno_note_broadcast_held. */
     JF(st, base + 1856) = 1.0f;
     JF(st, base + 9824) = 1.0f;
+
+    /* ...and the aux note-on flag, Array B. The gate leaf's setter (rva 0x3c2763,
+     * dispatch 450+v) writes 101488+32v := 1.0 when the value (velocity) is > 0
+     * and 101504+32v (Array A) := 1.0 when it is 0 -- the same store in POLY,
+     * MONO (retrigger = gate 0 then gate vel) and UNISON (all 8 voices). Nothing
+     * reads or clears Array B (voice_render consumes only Array A), so it is
+     * audio-inert, but it IS plugin state: the port did not write it and the
+     * all-voice state gate (tools/verify/note_bcast_gate.py) failed on it in 9
+     * of 13 scenarios. PROVEN by tracing the plugin's own writes under Unicorn,
+     * patches 0 (POLY), 15 (MONO), 61 (UNISON), 2026-10-05. */
+    JF(st, AUX_NOTEON(voice)) = 1.0f;
 }
 
 /* Global "any key held" flag — cell 1856 on EVERY voice, not just the allocated

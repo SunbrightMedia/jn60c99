@@ -21,6 +21,7 @@ Reproduce any row: run the script named in it. Rebuild first: `make libjuno.so`.
 | A8 | **FX per-patch** (chorus I/II, delay, reverb) at 44.1/48/96 kHz | tools/verify/rate_audio_final.py; cold_regress.py | bit-exact; rate arms measured at 44100/48000/88200/96000 (see B4) |
 | A9 | **State-transplant step-equivalence** — plugin warm state → port, both step identically | Phase-2/3 transplant (docs/PHASE2_MATRIX_PROGRESS.md) | proven "equal state + equal steps ⇒ equal forever"; adversarially confirmed |
 | A10 | **Voice allocation** (POLY LRU: reuse/free/release/steal, persistent binding) | tools/verify/fuzz_diff.py; tests/test_voice_alloc.c | bit-exact within corpus; allocator matches CAssignJu60 |
+| A11 | **Every voice's whole state after every note event** — 8 voices x (main block 2628 cells + aux pair + shared noise block), read from the plugin unit that renders each voice, checkpointed after each note-on/off and render (zero-render checkpoints included), hand chord/release script + 12 seeds, 3 rates | tools/verify/note_bcast_gate.py (--ref/--port; --tooth removes the 1856 broadcast and must FAIL: 13/13 fail on cell +1856) | **13/13 scenarios, 9,187,464 cells, 0 differ** (2026-10-05). Closed B3. Found and fixed on the way: aux Array B (101488+32v, the gate setter's note-on flag, rva 0x3c2763) was never written by the port — 9/13 scenarios failed on it |
 
 ## B. LEDGERED — accepted differences with a measured bound (user-approved)
 
@@ -28,7 +29,7 @@ Reproduce any row: run the script named in it. Rebuild first: `make libjuno.so`.
 |---|------|---------------------|
 | B1 | **Warm re-recall not bit-exact-able** | Free-running oscillator/LFO phase makes a warm re-recall unmatchable in absolute phase. Measured envelope 1.6–3.7% diff-RMS across 64 patches, all within the plugin's own warm-vs-warm envelope. Cold recall IS bit-exact (A1/A2). The correctness basis for warm is A9 (step-equivalence), not phase-matching. |
 | B2 | **≥9-SOUNDING-voice steal ~1–2 ULP** | The plugin's arp/steal path splices a worker-thread render; only reachable with ≥9 simultaneously-sounding voices. Bound: 1–2 ULP. Audio-inert in the corpus. |
-| B3 | **Broadcast flags 1856/1488/1840** | Plugin writes all 8 voices; port writes the gated voice. Audio-inert in every test. |
+| B3 | ~~Broadcast flags 1856/1488/1840~~ **CLOSED 2026-10-05 -> A11.** The ledger text was stale: juno_note_broadcast_held() had already made 1856 all-voice and 1840/1488 follow it in voice_render. The new all-voice gate proved those cells identical and found the one real all-voice difference (aux Array B), now fixed. | — |
 | B4 | **Rate arms cover 4 rates** | FX config cells measured at 44100/48000/88200/96000. Other host rates out of contract. Teensy target is 44100 (measured ✓). |
 
 ## C. VERIFICATION INFRASTRUCTURE (proves the above are trustworthy)
