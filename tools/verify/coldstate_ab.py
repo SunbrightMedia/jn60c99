@@ -27,13 +27,14 @@ under Unicorn. They meet only through the pickle.
   python3 coldstate_ab.py --ref  <rate>   # plugin build+setSR, diff, verdict
 NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle
 
 BLOCK = 10512
 NVOICE = 8
 VOICE_END = NVOICE * BLOCK            # 84096
 MEANINGFUL = 11022352                 # plugin per-unit object size (9x operator new(0xA83010))
-PKL = '/home/user/jn60c99/scratchpad/coldstate_ab.pkl'
+PKL = _JREPO + '/scratchpad/coldstate_ab.pkl'
 
 # CONDITION analog-scatter cells the port applies at create (per voice), excluded.
 COND_LOCAL = (5520, 7600, 10320)

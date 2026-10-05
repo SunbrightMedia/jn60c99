@@ -17,19 +17,20 @@ GAP remains. Value-law correctness of APPLIED rows is Pillar 3's job, not this
 gate's. Regenerate the ledger with build_coverage.py (needs the Unicorn
 cell-map). This gate is static + fast (no Unicorn) so it runs in make verify.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, re
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import truth
 
-COV = '/home/user/jn60c99/COVERAGE.tsv'
+COV = _JREPO + '/COVERAGE.tsv'
 
 # 1) regenerate the enumeration from the binary's own Script.xml, then read the
 # canonical 'dispatchable' column (single source of truth — enumerate_leaves.py).
 import subprocess
-subprocess.run([sys.executable, '/home/user/jn60c99/tools/verify/enumerate_leaves.py'],
+subprocess.run([sys.executable, _JREPO + '/tools/verify/enumerate_leaves.py'],
                check=True, capture_output=True)
 want = set()
-for ln in open('/home/user/jn60c99/tools/verify/coverage_leaves.tsv').read().splitlines()[1:]:
+for ln in open(_JREPO + '/tools/verify/coverage_leaves.tsv').read().splitlines()[1:]:
     f = ln.split('\t')
     if f[8] == '1':
         want.add(int(f[1]))

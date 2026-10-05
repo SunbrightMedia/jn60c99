@@ -65,8 +65,7 @@ BASE_CFLAGS = ["-std=c99", "-O2", "-ffp-contract=off", "-fno-strict-aliasing",
 
 
 def find_s3_gcc():
-    for pat in ("/root/.espressif/tools/xtensa-esp-elf/*/xtensa-esp-elf/bin",
-                os.path.expanduser("~/.espressif/tools/xtensa-esp-elf/*/xtensa-esp-elf/bin")):
+    for pat in (os.path.expanduser("~/.espressif/tools/xtensa-esp-elf/*/xtensa-esp-elf/bin")):
         for d in sorted(glob.glob(pat)):
             gcc = os.path.join(d, "xtensa-esp32s3-elf-gcc")
             if os.path.exists(gcc):

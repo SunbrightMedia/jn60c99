@@ -37,7 +37,7 @@ import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-XT = sorted(glob.glob("/root/.espressif/tools/xtensa-esp-elf/*/xtensa-esp-elf/bin"))
+XT = sorted(glob.glob(os.path.expanduser("~/.espressif/tools/xtensa-esp-elf/*/xtensa-esp-elf/bin")))
 if not XT:
     raise SystemExit("no Xtensa toolchain found -- this prices the TARGET.")
 GCC = os.path.join(XT[0], "xtensa-esp32s3-elf-gcc")

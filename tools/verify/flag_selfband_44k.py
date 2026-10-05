@@ -4,8 +4,9 @@ The plugin rendered against ITSELF at different idle lengths at 44100: if its ow
 corr/RMS varies as much as the port's deviation, the flag is the plugin's own
 free-running-phase variation, not a port defect (same test that cleared patches
 5/22 at 48 kHz)."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, ctypes
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import e2e_emu as E
 import numpy as np
 IDLE0, NOTE = 44100, 12000

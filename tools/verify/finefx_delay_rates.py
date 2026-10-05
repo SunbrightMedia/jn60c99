@@ -3,10 +3,11 @@ Plugin's own setter under Unicorn (covenant-clean). Cross-checks dly_t0 vs dly_t
 context for patch-independence. Output: finefx_delay_rates.pkl
   { param -> { rate -> { cell -> [256 uint32] } } }  (dly_t0 context)
 Plus prints which cells vary across rate."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
-sys.path.insert(0,'/home/user/jn60c99/tools/verify')
+sys.path.insert(0,_JREPO + '/tools/verify')
 import e2e_emu as E
-SP='/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
+SP=_JREPO + '/scratchpad'
 SZ=0xA83010
 EFFECT_TYPE,DELAY_TYPE,REVERB_TYPE=873,875,876
 PARAMS={'DELAY HIGH CUT':1180,'DELAY DIRECT LEVEL':1181,'DELAY LF DAMP':1182,

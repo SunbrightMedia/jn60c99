@@ -14,8 +14,9 @@ Ground truth = the plugin's machine code under Unicorn (e2e_emu.py). Each side
 recalls the SAME synthetic blob (oracle: recall_patch(bank=synth); port:
 juno_gui_apply_bank(synth)).
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, ctypes
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 
 HEADER, STRIDE, BLOB_OFF = E.HEADER, E.STRIDE, E.BLOB_OFF
@@ -41,7 +42,7 @@ DISCRETE = [
     ("LFO AMP IN",      370, (0,1,2)),
 ]
 
-lib = ctypes.CDLL('/home/user/jn60c99/libjuno.so')
+lib = ctypes.CDLL(_JREPO + '/libjuno.so')
 lib.juno_gui_create.restype = ctypes.c_void_p
 lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
 lib.juno_gui_apply_bank.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]

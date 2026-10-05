@@ -29,13 +29,14 @@ TWO-PROCESS (mandatory): never build E2E + load libjuno in one process.
   python3 recall_render_ab.py --ref  [patches...]   # plugin -> pickle
   python3 recall_render_ab.py --port [patches...]   # port, compare, verdict
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
 
-HERE = '/home/user/jn60c99/tools/verify'
+HERE = _JREPO + '/tools/verify'
 sys.path.insert(0, HERE)
 import os
 PKL  = os.environ.get('JUNO_RENDER_REF_PKL',
-                     '/home/user/jn60c99/scratchpad/recall_render_ref.pkl')
+                     _JREPO + '/scratchpad/recall_render_ref.pkl')
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
 import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
 # Host rate (default 48 kHz). JUNO_RENDER_SR overrides it so the SAME render A/B can

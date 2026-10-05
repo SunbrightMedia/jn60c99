@@ -25,10 +25,11 @@ Two-process rule: libjuno/ctypes only; the oracle pickles were made in a separat
 Unicorn process. Usage: recall_exhaustive_gate.py [rate ...]  (default all 3)
 NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle, ctypes
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LIB = '/home/user/jn60c99/libjuno.so'
+LIB = _JREPO + '/libjuno.so'
 HEADER, STRIDE, BLOB_OFF = 23, 20223, 16
 BANK_LEN = HEADER + STRIDE
 RATES = [44100, 48000, 96000]

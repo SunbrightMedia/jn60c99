@@ -7,6 +7,7 @@ bit-for-bit.
 Ground truth is the binary executed under Unicorn — NOT a capture of the running
 commercial plugin. These are the values the plugin's own prepare code writes.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import emu2, struct, re
 from emu2 import IB, f32, STACK_BASE, STACK_SIZE, SCRATCH
 from unicorn import UcError
@@ -35,14 +36,14 @@ for ln in open("/tmp/c_init.txt"):
 
 # ---- DSP-read offset set (voice_render + master_render) -------------------
 r = set()
-for f in ("/home/user/jn60c99/src/voice_render.c", "/home/user/jn60c99/src/master_render.c"):
+for f in (_JREPO + "/src/voice_render.c", _JREPO + "/src/master_render.c"):
     s = open(f).read()
     r.update(int(m) for m in re.findall(r'a1, ?(\d+)\)', s))
     r.update(int(m) for m in re.findall(r'a1 \+ (\d+)\b', s))
 readset = set(o for o in r if 0 < o <= 12058620)
 
 # ---- recall-written offsets (juno_apply.c coefficient table) --------------
-rt = open("/home/user/jn60c99/src/juno_apply.c").read()
+rt = open(_JREPO + "/src/juno_apply.c").read()
 recall = set(int(m) for m in re.findall(r'\{\s*\d+,\s*-?\d+,\s*\w+,\s*(\d+),', rt))
 
 # ---- voice-0 main block window: [176, 176+10512) --------------------------

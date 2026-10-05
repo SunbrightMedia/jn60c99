@@ -2,8 +2,9 @@
 COVERAGE leaf writes, from the plugin's OWN dispatch+snap full-byte sweep in the
 leaf's activating context (supersedes the isolated leaf_cellmap over-attribution).
 Covenant-clean (plugin setter under Unicorn). Consumed by build_coverage.py."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, json
-sys.path.insert(0,'/home/user/jn60c99/tools/verify')
+sys.path.insert(0,_JREPO + '/tools/verify')
 import numpy as np, e2e_emu as E
 SZ=0xA83010; NW=SZ//4; ET,DT=873,875
 fac=E.bank_bytes(); std=E.load_leaves()
@@ -34,5 +35,5 @@ out={}
 for disp,et,dt,base,hi in CASES:
     e=ctx(48000.0,et,dt,base); out[str(disp)]=sweep(e,disp,hi)
     print(disp,'->',len(out[str(disp)]),'cells')
-json.dump(out, open('/home/user/jn60c99/scratchpad/authoritative_cells.json','w'), indent=0)
+json.dump(out, open(_JREPO + '/scratchpad/authoritative_cells.json','w'), indent=0)
 print('wrote authoritative_cells.json')

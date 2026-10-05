@@ -2,11 +2,12 @@
 """Scenario C plugin side: cold chord + voice steal on patch 0, Unicorn oracle.
 Canonical cold sequence: build -> snap_all -> recall -> snap_all -> clear_latch
 -> set_ftz -> events. Caches (L,R) bit streams + segment map to pickle."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle, time
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import e2e_emu as E
 
-OUT = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad/scenC_plugin.pkl'
+OUT = _JREPO + '/scratchpad/scenC_plugin.pkl'
 
 t0 = time.time()
 e = E.E2E(); e.build(48000)

@@ -7,13 +7,14 @@ the map-prepare-chain workflow), then reads the 11MB DSP state block at the
 captured offsets and reports match / mismatch / still-zero, and can emit a new
 binary-derived runtime_coeffs_data.c.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import re, struct, sys
 import emu2
 from emu2 import IB, f32
 from unicorn import UcError
 from unicorn.x86_const import *
 
-RC = "/home/user/jn60c99/src/runtime_coeffs_data.c"
+RC = _JREPO + "/src/runtime_coeffs_data.c"
 
 def parse_captured():
     txt = open(RC).read()

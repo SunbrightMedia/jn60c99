@@ -2212,3 +2212,20 @@ A tooth models a mistake the change under test could plausibly make (a lost writ
 specialisation, a dropped term), not a measure-zero boundary. If a tooth does not bite, first ask
 whether it could ever change the data -- and never ship the gate on it.
 
+
+## 104. A GATE THAT HARDCODES ITS CHECKOUT PATH IS NOT ISOLATED -- A WORKTREE RUN TESTS THE OTHER TREE
+Paid 2026-10-05 (JUNO, closing the B ledger). A "frozen" `make verify` baseline was started in a git
+worktree so the main tree could be edited meanwhile. ~90 tools under tools/ (82 Python files, 152
+literals) named `/home/user/jn60c99/...` or a dead `/tmp/claude-0/<old session>/scratchpad`: the
+worktree run imported the MAIN tree's tools, loaded the MAIN tree's libjuno.so (already rebuilt with
+an edit) and wrote the MAIN tree's scratchpad. Its verdict would have described neither tree. The same
+defect silently weakens tools/verify/mutation_gate.py, whose worktree mutant is never the library those
+gates load, and makes the suite unusable at any other path (mantra 4: another machine, another AI).
+tools/verify/pathcheck.py had checked only scratch paths, only in scripts the Makefile names; it now
+scans EVERY tools/ Python file for ANY absolute /home, /root or /tmp/claude literal (seen to fail: 152
+hits; after the rewrite to `__file__`-relative roots: 0).
+### The rule
+Every path a tool uses is derived from `__file__` (or an explicit environment override). Before
+trusting any isolated run, grep the tree for the checkout's own absolute path: if it appears, the run
+is not isolated.
+

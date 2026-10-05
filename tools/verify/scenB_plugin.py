@@ -4,8 +4,9 @@ Canonical cold sequence: build -> snap_all -> recall -> snap_all -> clear_latch
 -> set_ftz, then the lifecycle event script. Dumps L then R uint32 streams.
 Usage: scenB_plugin.py <patch> <outfile>
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, time
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import e2e_emu as E
 
 patch = int(sys.argv[1]); out = sys.argv[2]

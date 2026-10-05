@@ -8,13 +8,14 @@ dispatch to the verified juno_apply record slot by matching (offset, juno_curve 
 against the verified BINDINGS — no positional formulas. Output:
   dispatch_census.json: {disp: {"offsets": {off: {val: bits}}, "paired": name/slot}}
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import importlib.util, sys, struct, json, ctypes
 
-UNIT2 = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad/unit2'
+UNIT2 = _JREPO + '/scratchpad/unit2'
 spec = importlib.util.spec_from_file_location('evt', UNIT2 + '/emu_valuetree.py')
 m = importlib.util.module_from_spec(spec); sys.modules['evt'] = m; spec.loader.exec_module(m)
 
-jc = ctypes.CDLL('/home/user/jn60c99/scratchpad/oracle/libjunocurve.so')
+jc = ctypes.CDLL(_JREPO + '/scratchpad/oracle/libjunocurve.so')
 jc.juno_curve.restype = ctypes.c_float; jc.juno_curve.argtypes = [ctypes.c_int, ctypes.c_int]
 def cbits(c, v): return struct.unpack('<I', struct.pack('<f', jc.juno_curve(c, v)))[0]
 
@@ -76,7 +77,7 @@ def main():
                                for o, lut in offs.items()}
                       for k, offs in census.items()},
            'paired': {str(k): v for k, v in paired.items()}}
-    json.dump(out, open('/home/user/jn60c99/scratchpad/oracle/dispatch_census.json', 'w'))
+    json.dump(out, open(_JREPO + '/scratchpad/oracle/dispatch_census.json', 'w'))
     print("dispatches that write engine cells:", len(census))
     print("paired to verified record slots:", len(paired))
     unpaired = [d for d in census if d not in paired and '_err' not in census[d]]

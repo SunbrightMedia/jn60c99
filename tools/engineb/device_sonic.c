@@ -180,7 +180,10 @@ int main(int argc, char **argv)
     int chord;
     float *store = NULL;
 
-    f = fopen("/home/user/jn60c99/esp32s3/main/s3_listen.bin", "rb");
+    /* run from the repo root, or point S3_LISTEN_BIN at the blob; never a
+     * hardcoded checkout path (tools/verify/pathcheck.py). */
+    f = fopen(getenv("S3_LISTEN_BIN") ? getenv("S3_LISTEN_BIN")
+                                      : "esp32s3/main/s3_listen.bin", "rb");
     if (!f) { fprintf(stderr, "no blob\n"); return 2; }
     fseek(f, 0, SEEK_END); n = ftell(f); fseek(f, 0, SEEK_SET);
     BLOB = malloc((size_t)n);

@@ -14,11 +14,12 @@ Two-process rule: E2E/Unicorn only.
 
 NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 
-OUT = '/home/user/jn60c99/scratchpad/dropped_luts.pkl'
+OUT = _JREPO + '/scratchpad/dropped_luts.pkl'
 
 # voice-0 cells each dropped index writes (from index_cell_map, cells < 10512)
 IDX_CELLS = {

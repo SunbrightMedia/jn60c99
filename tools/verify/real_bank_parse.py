@@ -43,8 +43,9 @@ Usage:
   python3 tools/verify/real_bank_parse.py --verify        # the executed proof
   python3 tools/verify/real_bank_parse.py --dump 5        # one patch's record
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import *

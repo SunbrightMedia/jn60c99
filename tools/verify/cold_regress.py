@@ -4,8 +4,9 @@ Usage:
   python3 cold_regress.py plugin      # compute + pickle plugin cold streams
   python3 cold_regress.py port <tag>  # compare current libjuno.so vs cached plugin
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle, ctypes
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 # THE DEFAULT MUST BE A PATH THAT EXISTS IN EVERY SESSION.
 # It used to be a hardcoded /tmp/claude-.../<session-uuid>/scratchpad -- the
 # scratch directory of the session that WROTE this gate. That session is gone,
@@ -63,7 +64,7 @@ else:
     tag = sys.argv[2] if len(sys.argv) > 2 else '?'
     ref = pickle.load(open(PKL, 'rb'))
     bank = open(BANK, 'rb').read()
-    lib = ctypes.CDLL("/home/user/jn60c99/libjuno.so")
+    lib = ctypes.CDLL(_JREPO + "/libjuno.so")
     lib.juno_gui_create.restype = ctypes.c_void_p
     lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
     lib.juno_gui_apply_bank.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]

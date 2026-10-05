@@ -16,15 +16,16 @@ plugin writes that the port does not => an uncovered context (RED for the audit)
 
 Covenant-clean (plugin setter under Unicorn). One rate (48000) decides cell coverage.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import numpy as np, e2e_emu as E
 
 SZ = 0xA83010; NW = SZ // 4
 ET, DT, RT = 873, 875, 877
 SR = 48000.0
 fac = E.bank_bytes(); std = E.load_leaves()
-PORTWS = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad/port_writeset.pkl'
+PORTWS = _JREPO + '/scratchpad/port_writeset.pkl'
 try:
     port = set(pickle.load(open(PORTWS, 'rb')))
 except Exception:

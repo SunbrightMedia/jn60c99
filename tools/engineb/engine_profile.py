@@ -12,12 +12,13 @@ module granularity, and the two facts that fell out of doing it are that the
 pulse block costs 5x the saw block and that eb_triangle_wrap -- a fixed
 one-variable nonlinearity, tabulatable -- is 53 instructions inside it.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import os, re, subprocess, sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if not os.path.isdir(os.path.join(REPO, "engine_b")):
-    REPO = "/home/user/jn60c99"
-GCC = ("/root/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/"
+    REPO = _JREPO + ""
+GCC = (os.path.expanduser("~/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/") +
        "xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc")
 OD = GCC[:-3] + "objdump"
 CF = ["-std=c99", "-O2", "-ffp-contract=off", "-fno-strict-aliasing",

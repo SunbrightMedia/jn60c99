@@ -11,12 +11,13 @@ reverb=factory20(reverb-active). Merges cells into leaf_cellmap.pkl for the
 PAT2_*/EFX/CTRL leaves; the rest keep their first-pass result.
 Oracle-only (Unicorn). Output: updates scratchpad/leaf_cellmap.pkl in place.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 from unicorn import UC_HOOK_MEM_WRITE
 
-SP  = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
+SP  = _JREPO + '/scratchpad'
 PKL = SP + '/leaf_cellmap.pkl'
 CW  = SP + '/chillwave.bin'
 SZ  = 0xA83010

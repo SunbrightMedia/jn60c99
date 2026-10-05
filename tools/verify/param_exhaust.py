@@ -8,11 +8,12 @@ instance (Unicorn), snap, read the engine cell at the binding's offset from
 unit 0; compare bitwise against the port's juno_apply_param(state, i, byte, Hr).
 Domain: 256 bytes x 3 rates (44100/48000/96000) x 25 rows = 19200 comparisons.
 For finite domains, exhaustive testing IS proof (MASTER_PLAN Phase 2)."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, ctypes, json
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import e2e_emu as E
 
-lib = ctypes.CDLL("/home/user/jn60c99/libjuno.so")
+lib = ctypes.CDLL(_JREPO + "/libjuno.so")
 lib.juno_gui_param_count.restype = ctypes.c_int
 lib.juno_gui_param_name.restype = ctypes.c_char_p
 lib.juno_gui_param_name.argtypes = [ctypes.c_int]
@@ -27,7 +28,7 @@ lib.juno_gui_peek.argtypes = [ctypes.c_void_p, ctypes.c_int]
 
 # blob position per binding row, parsed from src/juno_apply.c BINDINGS
 import re
-src = open('/home/user/jn60c99/src/juno_apply.c').read()
+src = open(_JREPO + '/src/juno_apply.c').read()
 m = re.search(r'BINDINGS\[\]\s*=\s*\{(.*?)\n\};', src, re.S)
 rows = re.findall(r'\{\s*(\d+)\s*,\s*\d+\s*,\s*[A-Z_]+\s*,\s*(\d+)\s*,\s*"([^"]*)"', m.group(1))
 BIND = [(int(bp), int(off), nm) for (bp, off, nm) in rows]

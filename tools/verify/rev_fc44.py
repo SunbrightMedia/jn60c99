@@ -2,8 +2,9 @@
 """rev_fc44.py — REVERB TYPE (idx 876) dispatch at 44100 + 88200: read the 4 DPF
 Fc cells (10759648/96/744/92) and the type-5 stage 10759488 for TYPE 0..5.
 Gives the 44.1k arm of REV_FC[] / REV_R488[] (88.2k expected = 48k/96k arm)."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import e2e_emu as E
 def f(u): return struct.unpack('<f', struct.pack('<I', u & 0xffffffff))[0]
 

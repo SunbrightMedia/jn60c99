@@ -19,9 +19,10 @@ separate processes (two-process rule):
 Usage:
   python3 tools/verify/recall_ref_diff.py <ref.pkl> [port.pkl]
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
 
-PORT_DEFAULT = '/home/user/jn60c99/scratchpad/port_state.pkl'
+PORT_DEFAULT = _JREPO + '/scratchpad/port_state.pkl'
 BLOCK  = 10512
 STRIDE = 16
 

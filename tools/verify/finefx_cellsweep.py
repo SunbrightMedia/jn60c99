@@ -13,11 +13,12 @@ are context-independent. This reference pins every (leaf, context) the port appl
 Covenant-clean: the plugin's OWN setter + smoother under Unicorn. Two-process.
 Output: scratchpad/finefx_cellsweep_ref.pkl { (leaf, ctx, rate) -> {cell: [256]} }.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import numpy as np, e2e_emu as E
 
-SP = '/home/user/jn60c99/scratchpad'
+SP = _JREPO + '/scratchpad'
 SZ = 0xA83010; NW = SZ // 4
 # ET/DT/RT = the FX TYPE selectors (EFFECT/DELAY/REVERB TYPE). RT = 876 = REVERB TYPE
 # (moves the reverb tap array -> the PRE DELAY baseline; verified idx 876 not 877,

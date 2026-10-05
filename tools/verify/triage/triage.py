@@ -12,13 +12,14 @@ event stream). Adds:
 
 Usage: triage.py repro | drop41 | drop42 | dropboth | minimal | minimal_ctl
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__)))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, ctypes, os, time
-HERE = "/home/user/jn60c99/tools/verify"
+HERE = _JREPO + "/tools/verify"
 sys.path.insert(0, HERE)
 import e2e_emu as E
 import fuzz_diff as F
 
-REPO = "/home/user/jn60c99"
+REPO = _JREPO + ""
 lib = F.lib          # same CDLL + signatures as fuzz_diff
 BLOBS = F.BLOBS
 BANK = E.BANK

@@ -6,11 +6,12 @@ M.CV(304) / VCF-vel(6864) / VCA-vel(9680) bits against the port's
 juno_note_pitch(note) / juno_curve(56,vel) / juno_curve(57,vel). Also asserts no
 note x velocity cross-term exists (the exhaustion IS the proof of separability).
 vel 1..127 (vel 0 is note-off semantics on both sides), notes 0..127: 16256 events."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, ctypes
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import e2e_emu as E
 
-lib = ctypes.CDLL("/home/user/jn60c99/libjuno.so")
+lib = ctypes.CDLL(_JREPO + "/libjuno.so")
 lib.juno_note_pitch.restype = ctypes.c_float
 lib.juno_note_pitch.argtypes = [ctypes.c_int]
 lib.juno_curve.restype = ctypes.c_float

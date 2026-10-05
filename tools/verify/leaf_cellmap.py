@@ -10,19 +10,20 @@ over contexts. Output: scratchpad/leaf_cellmap.pkl { disp -> {'name','struct',
 This is the plugin's OWN setters executed on the plugin's OWN state — PROVEN
 provenance. Covenant-clean. Oracle-only (Unicorn); no ctypes in this process.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 from unicorn import UC_HOOK_MEM_WRITE
 
-SP  = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
+SP  = _JREPO + '/scratchpad'
 OUT = SP + '/leaf_cellmap.pkl'
 SZ  = 0xA83010
 
 # real dispatchable leaves from the enumeration (skip _reserve_ / NAME)
 def real_leaves():
     rows = []
-    for ln in open('/home/user/jn60c99/tools/verify/coverage_leaves.tsv').read().splitlines()[1:]:
+    for ln in open(_JREPO + '/tools/verify/coverage_leaves.tsv').read().splitlines()[1:]:
         f = ln.split('\t')
         pos, disp, fam, struct_, name, ty, rng, dflt, disp_ok = f
         if disp_ok != '1':            # canonical dispatchable column

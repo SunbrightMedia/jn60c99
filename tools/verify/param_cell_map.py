@@ -14,8 +14,9 @@ Two-process rule: E2E/Unicorn only; no libjuno.
 
 Usage: python3 tools/verify/param_cell_map.py [--dump]
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 from unicorn import UC_HOOK_MEM_WRITE
 from unicorn.x86_const import UC_X86_REG_RIP
@@ -25,7 +26,7 @@ APPLY    = IB + 0x3C7AE0
 POPULATE = IB + 0xAD5A0
 MAP_G    = IB + 0xCB0E18
 STATE_SZ = E.STATE_SZ
-PKL      = '/home/user/jn60c99/scratchpad/param_cell_map.pkl'
+PKL      = _JREPO + '/scratchpad/param_cell_map.pkl'
 
 
 def u64(uc, a): return int.from_bytes(uc.mem_read(a, 8), 'little')

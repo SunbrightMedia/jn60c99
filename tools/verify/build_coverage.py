@@ -14,16 +14,17 @@ A leaf is:
   SILENT   — wrote no audio cell in any tested FX context (needs its activating
              context OR an inert proof — the bucket Pillar 1 must still resolve)
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, re, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
-SP = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
-OUT = '/home/user/jn60c99/COVERAGE.tsv'
+sys.path.insert(0, _JREPO + '/tools/verify')
+SP = _JREPO + '/scratchpad'
+OUT = _JREPO + '/COVERAGE.tsv'
 
 # audio-cell universe: cells read by any render source
 audio = set()
 for fn in ('src/voice_render.c', 'src/master_render.c', 'src/juno_note.c',
            'src/juno_dsp.c', 'src/juno_ramp.c'):
-    txt = open('/home/user/jn60c99/' + fn).read()
+    txt = open(_JREPO + '/' + fn).read()
     for m in re.finditer(r'a1 \+ (\d+)\)', txt):
         audio.add(int(m.group(1)))
 # per-voice cells repeat at +v*10512; fold voice-1..7 copies into voice-0 base
@@ -54,7 +55,7 @@ import e2e_emu as _E
 LOAD_LEAVES = set(disp for (p, nm, disp, bb) in _E.load_leaves())
 
 leaves = {}
-for ln in open('/home/user/jn60c99/tools/verify/coverage_leaves.tsv').read().splitlines()[1:]:
+for ln in open(_JREPO + '/tools/verify/coverage_leaves.tsv').read().splitlines()[1:]:
     f = ln.split('\t')
     if f[8] != '1':            # canonical dispatchable column
         continue
@@ -92,7 +93,7 @@ FINEFX_PROVEN = {1180, 1181, 1182, 1183, 1184, 1185,   # DELAY fine filters + di
 # leaf's activating context (tools/verify/finefx_authcells.py). Supersedes cellmap
 # for these leaves so the GAP test uses the TRUE cells, not phantom ones.
 import json, os
-_authp = '/home/user/jn60c99/scratchpad/authoritative_cells.json'
+_authp = _JREPO + '/scratchpad/authoritative_cells.json'
 AUTH_CELLS = {int(k): v for k, v in json.load(open(_authp)).items()} if os.path.exists(_authp) else {}
 
 rows = []

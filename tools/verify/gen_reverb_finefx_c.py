@@ -1,5 +1,6 @@
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import pickle
-SP='/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
+SP=_JREPO + '/scratchpad'
 L=pickle.load(open(SP+'/reverb_finefx_laws.pkl','rb'))
 RATES=[44100,48000,88200,96000]
 def hx(v): return "0x%08xu"%v
@@ -43,7 +44,7 @@ out.append("static const uint32_t REV_DIRECT[256] = {")
 for i in range(0,256,8):
     out.append("  "+", ".join(hx(DL[44100]['tbl'][dl_cell][b]) for b in range(i,i+8))+",")
 out.append("};")
-open('/home/user/jn60c99/src/finefx_tables.h','a').write("\n".join(out)+"\n")
+open(_JREPO + '/src/finefx_tables.h','a').write("\n".join(out)+"\n")
 print("appended reverb tables. LC cells",lc_cells,"HC",hc_cells,"DENS",dn_cell,"DIRECT",dl_cell)
 # sanity: rate-indep check for DENSITY/DIRECT (should match across rates)
 di=all(DN[44100]['tbl'][dn_cell]==DN[r]['tbl'][dn_cell] for r in RATES)

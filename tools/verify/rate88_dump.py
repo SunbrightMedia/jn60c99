@@ -2,8 +2,9 @@
 """rate88_dump.py — plugin post-recall values for ALL suspect FX cells at 88200,
 plus the reverb per-patch cells at every rate. If a cell@88200 == its 96k bits,
 it's a rate-CLASS arm constant (encode 3 arms); if not, it's continuous."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import e2e_emu as E
 
 CELLS = [102448, 102544, 102608, 102656,

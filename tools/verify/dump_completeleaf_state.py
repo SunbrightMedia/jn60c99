@@ -5,14 +5,15 @@ traced to the diverging engine cell. E2E/Unicorn only (process 1).
 
 NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 import real_recall as R
 
 SR = 48000.0
 FX_LEAVES = [(1179, 3057), (1181, 3060)]
-OUT = '/home/user/jn60c99/scratchpad/completeleaf_state.pkl'
+OUT = _JREPO + '/scratchpad/completeleaf_state.pkl'
 BLOCK = 10512
 
 

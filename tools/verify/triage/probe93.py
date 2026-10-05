@@ -3,10 +3,11 @@
 Full dual-side state diff after the 5 pre-render events, then a per-sample
 microscope over frames 0..12. Prints every differing uint32 cell (voice blocks,
 aux latch rows, master region)."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__)))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import struct, ctypes, sys
 import numpy as np
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
-sys.path.insert(0, '/home/user/jn60c99/tools/verify/triage')
+sys.path.insert(0, _JREPO + '/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify/triage')
 from ft3 import PluginRun, PortRun, gen_script, STRIDE, f32
 
 def diff_all(P, Q, tag, limit=40):

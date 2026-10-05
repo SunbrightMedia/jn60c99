@@ -9,13 +9,14 @@ Plugin recall path (validated): snap_all -> recall_patch -> snap_all -> clear_la
 
 Usage: scenA_switch.py P1 P2 [outprefix]
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, ctypes, math, os
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import numpy as np
 import e2e_emu as E
 
 P1 = int(sys.argv[1]); P2 = int(sys.argv[2])
-PREFIX = sys.argv[3] if len(sys.argv) > 3 else f"/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad/scenA_{P1}_{P2}"
+PREFIX = sys.argv[3] if len(sys.argv) > 3 else _JREPO + f"/scratchpad/scenA_{P1}_{P2}"
 SR = 48000
 SEG = [6000, 6000, 12000]   # after note_on P1 / after note_off / after P2+note_on
 NTOT = sum(SEG)
@@ -43,7 +44,7 @@ def run_plugin():
 
 # ---------------- port side (native) ----------------
 def run_port():
-    lib = ctypes.CDLL("/home/user/jn60c99/libjuno.so")
+    lib = ctypes.CDLL(_JREPO + "/libjuno.so")
     lib.juno_gui_create.restype = ctypes.c_void_p
     lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
     lib.juno_gui_apply_bank.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]

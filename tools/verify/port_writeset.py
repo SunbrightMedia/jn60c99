@@ -6,19 +6,20 @@ mode-5) are all exercised. Cross-referenced against leaf_cellmap.pkl (the
 plugin's setter cell-map) to produce the GAP: cells the plugin's parameter
 setters write that the port never touches. Port-only process (ctypes libjuno);
 NO Unicorn here (two-process rule)."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, ctypes, struct, pickle
-SP = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
+SP = _JREPO + '/scratchpad'
 OUT = SP + '/port_writeset.pkl'
 CW = SP + '/chillwave.bin'
 SZ = 0xA83010
 
-lib = ctypes.CDLL('/home/user/jn60c99/libjuno.so')
+lib = ctypes.CDLL(_JREPO + '/libjuno.so')
 lib.juno_gui_create.restype = ctypes.c_void_p
 lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
 lib.juno_gui_apply_bank.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
 lib.juno_gui_dump.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_int]
 
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import truth
 FAC = str(truth.BANK)
 
