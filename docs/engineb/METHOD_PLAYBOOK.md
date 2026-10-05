@@ -2304,3 +2304,34 @@ Run every new reference tool once in a fresh clone. Free each emulator (`del e; 
 keep only the words that change. Run long jobs from a snapshot worktree (tools/snap_tree.sh: the
 current working state, scratchpad and job registry shared), so the main tree stays editable. When a
 tooth does not bite, look for a reach gap before anything else.
+
+## 111. THE RECALL ORDER IS PART OF THE LAW -- A SETTER THAT SWITCHES ON ANOTHER PARAMETER SEES WHATEVER VALUE IT HOLDS AT THAT MOMENT
+Paid 2026-10-05 (JUNO A14). The plugin recalls in ascending index order: EFFECT DEPTH (794) before
+EFFECT TYPE (873), EFFECT TONE (874) after it. So DEPTH acts under the PREVIOUS type and TONE under
+the new raw type. At an out-of-range type the plugin stores the raw value (its field holds 6), routes
+nothing and replays nothing, and TONE's switch writes nothing; the port had clamped to 5 and run the
+type-5 arms. Only a whole-object compare of a fresh recall with an out-of-range type saw it
+(tools/verify/effect_param_gate.py part 2).
+### The rule
+For every setter that branches on another parameter, write down which value of that parameter it
+sees in the plugin's recall order, then test the transitions: cold (the power-on value) and warm
+(every previous class, out-of-range included).
+
+## 112. A PREMISE MARKED "GIVEN" IS A HYPOTHESIS -- READ THE INPUT FROM THE ARTIFACT
+Paid 2026-10-05 (JUNO B6). An earlier hunt concluded LFO RATE H (878) and VCF CUTOFF FREQ H (1029)
+were "redundant float twins" of the 8-bit leaves, "verified (given)". Its probe POPULATED the H leaves
+as byte/255 instead of reading them from the record, so it could not see a difference. The record
+carries them, and in 16 of the 64 factory patches they differ (patch 47's cutoff: 53/255 against
+0x3e11cbc0, about 36.3/255). The plugin's recall enumerator applies them after the 8-bit leaves.
+### The rule
+A probe that derives one input from another cannot test whether the two agree. Read every input
+from the artifact, and grep old findings for "given" before building on them.
+
+## 113. A NO-OP PROOF MUST FORCE THE PARAMETER THE SETTER ACTUALLY READS
+Paid 2026-10-05 (JUNO B5). tools/verify/deferred_noop_gate.py "proved" the seven flanger leaves
+(1242-1248) engine-unreachable, "even with EFFECT TYPE routing forced to 4". Their setters test the
+DELAY TYPE field (processor +1480, index 875), not EFFECT TYPE (873). With DELAY TYPE 4 in force,
+MANUAL, RESONANCE and LOW CUT each write engine cells. The gate was green for the wrong reason.
+### The rule
+Before a gate proves "X does nothing in context C", read X's setter and confirm that C is the value
+its branch reads. A no-op proof in the wrong context is the blind gate of entry 108.

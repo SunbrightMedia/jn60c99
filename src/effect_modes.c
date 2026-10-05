@@ -52,46 +52,65 @@ static void write_struct(unsigned char *state, const juno_efx_cell *tbl, int n)
         *(uint32_t *)JCELL(state, tbl[i].off) = tbl[i].bits;
 }
 
+/* EFFECT DEPTH under the EFFECT TYPE field t in force when DEPTH is dispatched.
+ * The plugin's DEPTH setter (rva 0x3AE560) switches on that field; for types
+ * 0/1 it sends column 0 of a 256-row table the processor constructor fills with
+ * min(4*depth, 255) (rva 0x3AC670) to the block method at rva 0x357D60, which
+ * stores curve 25 of it. PROVEN cell by cell under Unicorn (DEPTH dispatched
+ * with each type 0..6 in force; tools/verify/effect_param_gate.py sweeps all
+ * 256 bytes in types 0..5 at 3 rates):
+ *   t 0/1  : 84544 = curve 25 of min(4*depth, 255);
+ *            85136 (t 0) or 86288 (t 1) = MODE1_DS_DRIVE_LUT[depth]
+ *   t 2..4 : 84544 = EFFECT_SW_LUT[depth] (0 -> 0, else 1.0); block-A wet
+ *            91232 too, which src/chorus_recall.c writes with the same law
+ *   t 5    : 84544 = EFFECT_SW_LUT[depth]; 96400 = depth / 255
+ *   t >= 6 : nothing -- the switch has no such case.
+ * EFFECT_SW_LUT's 2026-08-25 correction was measured in types 2..5 only and
+ * had been applied to every type. */
+static void depth_under(unsigned char *state, int t, int depth)
+{
+    if (t <= 1) {
+        JF(state, 84544) = juno_curve(25, depth * 4 > 255 ? 255 : depth * 4);
+        JF(state, t == 0 ? 85136 : 86288) = efx_bits(MODE1_DS_DRIVE_LUT[depth & 0xFF]);
+    } else if (t <= 5) {
+        JF(state, 84544) = efx_bits(EFFECT_SW_LUT[depth & 0xFF]);
+        if (t == 5)
+            JF(state, 96400) = (float)depth / 255.0f;
+    }
+}
+
 void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
 {
     int depth = efx_blob_val(rec, 50);    /* EFFECT DEPTH 0..255 */
     int tone  = efx_rec_byte(rec, 642);   /* EFFECT TONE  0..255 */
     int etype = efx_rec_byte(rec, 634);   /* EFFECT TYPE  0..5   */
 
-    /* Route slot 2 to the patch's EFFECT TYPE (the driver points params+112 here).
-     *
-     * OUT OF RANGE MEANS NO STORE, NOT A CLAMPED STORE. The old comment here
-     * said the plugin clamps types above 5 to 5, from a COLD spot sweep — and
-     * cold that is unfalsifiable, because the power-on routing value and a
-     * clamped write can be the same number. Warm it is plainly false.
-     *
-     * PROVEN two-sided (tools/verify/warm_recall_gate.py, synthetic bank, one
-     * engine): with EFFECT TYPE 3 in force, a recall at type 6 leaves the cell
-     * at 3; with type 5 in force it leaves 5; type 7 and 255 behave as 6. The
-     * result always equals the incoming value, so the plugin performs NO STORE.
-     * The port clamped and stored 5, which is right only when the previous type
-     * happened to be 5 — 7 of 30 legal random seeds caught it.
-     *
-     * The CLAMP ITSELF STAYS for the mode arms below: only the routing store is
-     * skipped. The arms at a clamped 5 matched the plugin on every one of those
-     * seeds; changing them is the unlanded seventh-class work, not this fix. */
-    if (etype <= 5)
-        *(int32_t *)JCELL(state, JUNO_PROG_EFX) = (int32_t)etype;
-    if (etype > 5) etype = 5;
+    /* THE RECALL ORDER DECIDES WHICH TYPE EACH LEAF SEES. The plugin recalls in
+     * ascending index order (its enumerator, rva 0x3B48A0, executed:
+     * probes in tools/verify/plugin_recall_set.py): EFFECT DEPTH (794) runs
+     * BEFORE EFFECT TYPE (873), EFFECT TONE (874) after it. So DEPTH first acts
+     * under the type field in force BEFORE this recall -- the raw previous leaf,
+     * JUNO_PREV_EFX, which can be >= 6 (the plugin's field at processor +1472
+     * stores the raw value, PROVEN: 6 after a type-6 recall). */
+    depth_under(state, JI(state, JUNO_PREV_EFX), depth);
 
-    /* Shared slot-2 wet control (read by master_render for EVERY mode at 84544).
-     * The plugin's EFFECT DEPTH setter (rva 0x3AE560) SWITCHES ON THE TYPE:
-     *   types 0/1: column 0 of a 256-row table the processor constructor fills
-     *     with min(4*depth, 255) (rva 0x3AC670) goes to the block method at
-     *     rva 0x357D60, which stores curve 25 of it;
-     *   types 2..5: an on/off switch (EFFECT_SW_LUT, depth 0 -> 0, else 1.0).
-     * READ from both functions; PROVEN 256/256 bytes x types 0..5 x 3 rates by
-     * tools/verify/effect_param_gate.py. EFFECT_SW_LUT's 2026-08-25 correction
-     * was measured in types 2..5 only and was applied to every type. */
-    if (etype <= 1)
-        JF(state, 84544) = juno_curve(25, depth * 4 > 255 ? 255 : depth * 4);
-    else
-        JF(state, 84544) = efx_bits(EFFECT_SW_LUT[depth & 0xFF]);
+    /* OUT OF RANGE (type >= 6): the TYPE setter stores the raw value in its
+     * field but routes nothing, selects no mode and replays nothing; TONE then
+     * sees the raw value and its switch writes nothing. So no arm below runs.
+     * PROVEN two ways: the routing cell keeps the type in force (with 3 in
+     * force a type-6 recall leaves 3; tools/verify/warm_recall_gate.py), and a
+     * cold type-6/255 recall leaves block B (96352/96384/96400/96416) at 0
+     * where the old port ran the type-5 arm (a clamp to 5 that no gate had
+     * compared on the whole object; tools/verify/effect_param_gate.py). */
+    if (etype > 5)
+        return;
+    *(int32_t *)JCELL(state, JUNO_PROG_EFX) = (int32_t)etype;
+
+    /* A valid TYPE re-routes slot 2 and replays DEPTH under the NEW type:
+     * a cold type-0 recall ends at curve 25 of min(4*depth, 255) although
+     * DEPTH first ran under the power-on type 2 (effect_param_gate.py, fresh
+     * recalls). The arms below then write their own cells. */
+    depth_under(state, etype, depth);
 
     /* EFFECT TYPE 0 — the slot-2 "Pan" arm (the render's v551<=1 branch, block
      * 84960..85968): a clean level+pan stage sharing mode-1's laws (the DlyPan

@@ -35,9 +35,10 @@ TWO-PROCESS RULE: --ref (Unicorn only) -> scratchpad/effect_param_ref.pkl;
 --port (libjuno only) reads it. --ref rebuilds from nothing (the Makefile's
 staleness rule depends on that); --ref --resume keeps the keys already there.
 
-TOOTH (--tooth): two named defects through tools/verify/tooth_tree.py, each
+TOOTH (--tooth): three named defects through tools/verify/tooth_tree.py, each
 must FAIL --port: (a) the DEPTH law of types 0/1 replaced by the 2..5
-switch (the 2026-08-25 state); (b) the EFFECT TONE -> 96352 slope one ULP off.
+switch (the 2026-08-25 state); (b) the EFFECT TONE -> 96352 slope one ULP off;
+(c) an out-of-range type running the type-5 arms (the old clamp to 5).
 
 USAGE
     python3 tools/verify/effect_param_gate.py --ref [--resume] | --port | --tooth
@@ -281,12 +282,18 @@ def tooth():
     sys.path.insert(0, HERE)
     from tooth_tree import run_tooth
     gate = ['tools/verify/effect_param_gate.py', '--port']
+    # (a) types 0/1 take the 2..5 switch (the 2026-08-25 state of 84544)
     a = run_tooth('effect_depth_switch',
-                  [('src/effect_modes.c', '    if (etype <= 1)\n        JF(state, 84544)',
-                    '    if (0)\n        JF(state, 84544)')], gate)
+                  [('src/effect_modes.c', '    if (t <= 1) {\n        JF(state, 84544)',
+                    '    if (t < 0) {\n        JF(state, 84544)')], gate)
+    # (b) the EFFECT TONE -> 96352 slope one ULP off
     b = run_tooth('effect_tone_ulp',
                   [('src/effect_modes.c', 'efx_bits(0x3ffbbcd3u)', 'efx_bits(0x3ffbbcd4u)')], gate)
-    return 0 if (a, b) == (0, 0) else 1
+    # (c) an out-of-range type runs the type-5 arms (the old clamp)
+    c = run_tooth('effect_type_clamp',
+                  [('src/effect_modes.c', '    if (etype > 5)\n        return;',
+                    '    if (etype > 5)\n        etype = 5;')], gate)
+    return 0 if (a, b, c) == (0, 0, 0) else 1
 
 
 def main():
