@@ -2628,3 +2628,13 @@ When a value comes through an indirect call, EXECUTE the call, then print the na
 carries (its descriptor) before binding it to a table row. A plausible range is not an identity.
 Grade the layer between the host and the engine (here the MIDI push) byte for byte, not only the
 engine below it.
+
+## 140. A LONG JOB OUTLIVES THE SHELL, NOT THE CONTAINER -- KEEP A WATCHER RUNNING
+Paid 2026-10-06 (JUNO). Two full `make verify` runs died without a verdict: one after 186 minutes,
+one after 5. Each died a few minutes after a turn ended with no task of the session still running;
+the cloud container is reclaimed when the session is idle, and run_job's setsid does not survive
+that. run_job reported both as DIED (it worked as designed); the disk, refs and snapshot survived.
+### The rule
+While a long job runs, keep a session task alive that ends with the job: a Monitor on the job's
+EXIT file (re-armed at each 30-minute expiry), not a scheduled check-in, which wakes a fresh
+container after the job is gone. A restarted `make verify` keeps every ref that finished.

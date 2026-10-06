@@ -90,7 +90,9 @@ mine is a hypothesis (playbook 80).
   logs). run_job = setsid + registry + EXIT verdict; a dead job prints DIED,
   never looks finished. NEVER `pkill -f` ANYTHING -- kill exact pids from the
   registry. NEVER report a job's result without its EXIT file. Status:
-  `sh tools/status.sh`.
+  `sh tools/status.sh`. While a long job runs, keep a Monitor on its EXIT
+  file (re-arm at each expiry): an idle session's container is reclaimed and
+  the job dies with it (playbook 140).
 
 # STRUCTURE (what lives where)
 - `src/` — the FROZEN bit-exact port. Transcribed DSP + derived recall.
@@ -114,7 +116,8 @@ mine is a hypothesis (playbook 80).
 # FINAL_GUIDE.md / docs/ — this section is one line-group per arc)
 - **src/ + trunk**: PROVENANCE 27/27 PROVEN; full verify of 9009d62 green; of
   0e8f853 died without a verdict (container restart); of c45428f is job
-  verify_c45428f (read its EXIT before any claim). CLAIMS B1-B12
+  verify_c45428f, restarted after the container was reclaimed (read its EXIT
+  before any claim). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
   mute), juno_gui_state_load (DAW preset), juno_gui_load_patch (its patch
   browser) -- host edits, gated by state_load_gate.py against queues the booted
