@@ -2501,3 +2501,13 @@ transposes, it does so in the wrapper's MIDI path, which the engine-level oracle
 ### The rule
 Give every A/B run its own fresh engine (or prove the starting states equal). When an engine-level
 probe shows no effect, write "no ENGINE effect" and name the layer it did not execute.
+
+## 129. A PID IS NOT A LIVE JOB AFTER A RESTART -- CHECK THE HEARTBEAT
+Paid 2026-10-06 (registry). A worker restart killed every job; the kernel then gave the dead
+job's pgid (860) to a process of the next job, and `tools/run_job.sh --list` printed the dead
+job as "RUNNING ... alive 110m". The runner's own law (a dead job never looks alive) was broken
+by `kill -0` alone. Now a job is alive only if its pgid answers AND its 20 s heartbeat is under
+90 s old. Seen to fail: the same entry now prints DIED; the running jobs still print RUNNING.
+### The rule
+Liveness needs two facts that a restart cannot both fake: the process answers, and the job's
+own heartbeat is fresh. A pid alone is a number the kernel reuses.

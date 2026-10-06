@@ -35,6 +35,19 @@ _age() {
   echo "$(( (t1 - t0) / 60 ))m"
 }
 
+# _alive <dir> -- the job's process group is alive AND its heartbeat is fresh.
+# A pid alone lies after a container restart: the kernel hands the old number
+# to a new process, and a job that died in the restart looked RUNNING (paid
+# 2026-10-06: verify_5efc6d5_r2 "alive" on a pid that was another job's make).
+# The wrapper touches beat every 20 s, so a beat older than 90 s is a dead job.
+_alive() {
+  p=$(cat "$1/pid" 2>/dev/null)
+  [ -n "$p" ] && kill -0 "$p" 2>/dev/null || return 1
+  if [ -f "$1/beat" ]; then t=$(date -r "$1/beat" +%s 2>/dev/null) || return 1
+  else t=$(date -d "$(cat "$1/started" 2>/dev/null)" +%s 2>/dev/null) || return 1; fi
+  [ $(( $(date +%s) - t )) -le 90 ]
+}
+
 if [ "${1:-}" = "--list" ]; then
   for d in "$JOBS"/*/; do
     [ -d "$d" ] || continue
@@ -43,7 +56,7 @@ if [ "${1:-}" = "--list" ]; then
     if [ -f "$d/EXIT" ]; then
       code=$(cat "$d/EXIT")
       [ "$code" = 0 ] && st="FINISHED ok" || st="FINISHED EXIT=$code"
-    elif [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    elif _alive "$d"; then
       st="RUNNING (pgid $pid, alive $(_age "$d/beat"))"
     else
       # A killed job (OOM, SIGKILL) writes no EXIT. The heartbeat says WHEN it
@@ -59,7 +72,7 @@ NAME=$1; shift
 D="$JOBS/$NAME"
 if [ -d "$D" ] && [ ! -f "$D/EXIT" ]; then
   pid=$(cat "$D/pid" 2>/dev/null)
-  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+  if _alive "$D"; then
     echo "job '$NAME' is already RUNNING (pgid $pid); refuse to double-start"
     exit 1
   fi
