@@ -101,7 +101,8 @@ int         juno_host_param_count(void);
 const char *juno_host_param_name(int i);
 const char *juno_host_param_section(int i);
 int         juno_host_param_roff(int i);
-int         juno_host_param_type(int i);    /* 0=int1x7 (1 byte), 1=int2x4, 2=int8x4 (nibble-pair low byte) */
+int         juno_host_param_type(int i);    /* 0=int1x7 (1 byte), 1=int2x4, 2=int8x4 (nibble-pair low byte),
+                                                 3=host-only float, 4=host-only int (context-held) */
 int         juno_host_param_min(int i);     /* semantic Script.xml range; min<0 = two's-complement byte */
 int         juno_host_param_max(int i);
 int         juno_host_param_default(int i);

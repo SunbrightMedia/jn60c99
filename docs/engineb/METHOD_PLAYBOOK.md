@@ -2542,3 +2542,26 @@ No gate saw it, because every gate starts from BUILD. The wrapper boot found it 
 ### The rule
 The reference starting point is what the product does before the first audio block, executed:
 construction, initialize, the first block's queued events. BUILD is a model of that start.
+
+## 133. AN ABSENCE CLAIM NEEDS A PROBE THAT COULD HAVE FOUND PRESENCE
+Paid 2026-10-06 (JUNO, CLAIMS A20). A20 said "MASTER TUNE is not in the engine's parameter map",
+and the port's MASTER TUNE changed nothing. The census that "found" this built its parameter list by
+joining host parameters to the RECORD slots the recall reads; MASTER TUNE is a SYSTEM parameter
+(Script.xml SYS_COM, no patch slot), fell out of the join, and was never sent to the engine. One
+host-entry call shows the truth: dispatch 20, all 8 voices' tune cells ramped over 4 ms, value =
+curve 55 of the host value, audible from sample 11 (probes/host/host_census_mt.py, 273 edits).
+### The rule
+"X does not reach the engine" is a measurement only when X itself was sent through the real entry
+and the probe could see every place it might land (ramp records and active lists included, not only
+the gated cells). A row that a join or a filter dropped is UNMEASURED, never "absent".
+
+## 134. A CENSUS KEY IS ONLY AS WIDE AS THE STATES THE CENSUS VARIED
+Paid 2026-10-06 (JUNO, CLAIMS A20). The DELAY TYPE host programs were keyed by EFFECT TYPE x FROM x
+TO and graded green for weeks. The setter also re-sends DELAY LEVEL, whose on-flag decides the
+feedback cell's first set (0 when the delay is off); the census ran DELAY TYPE only on records whose
+delay was on, so the generator saw one value and called it "the recall's". A regrouped gate chain
+(patch 38, DELAY LEVEL 0) showed it: one ramp record armed in the plugin and not in the port.
+### The rule
+Before a key is believed, list the processor state every setter in the list READS (here: the
+on-flag of a re-sent parameter) and vary each one in the census. A source that was constant over
+the census contexts is a hypothesis about the contexts the census never ran.

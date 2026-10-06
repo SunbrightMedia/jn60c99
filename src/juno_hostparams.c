@@ -25,7 +25,9 @@
  * reads the low byte as a nibble pair at roff/roff+1), 3=host-only float (LFO
  * RATE H / VCF CUTOFF FREQ H: the plugin's database range is the float bits
  * [0, 1.0f], EXECUTED; the value lives in the context, not the record, whose
- * encoding of these leaves is not the harness's -- CLAIMS B6).
+ * encoding of these leaves is not the harness's -- CLAIMS B6), 4=host-only
+ * int: MASTER TUNE is a SYSTEM parameter (Script.xml SYS_COM, not in a patch
+ * record; its roff is unused), held by the context like type 3 (CLAIMS A20).
  */
 typedef struct { const char *name; const char *section; int roff; int type; int min; int max; int def; } juno_hostparam;
 
@@ -70,7 +72,7 @@ static const juno_hostparam HOSTPARAMS[] = {
     {"BEND SENS VCF"      ,"BEND"    ,  522, 2,   0, 255,  43},
     {"MOD SENS DCO"       ,"MOD"     ,  530, 2,   0, 255,  22},
     {"MOD SENS VCF"       ,"MOD"     ,  538, 2,   0, 255,  22},
-    {"MASTER TUNE"        ,"GLOBAL"  ,   20, 1,   0, 200, 100},
+    {"MASTER TUNE"        ,"GLOBAL"  ,   20, 4,   0, 200, 100},   /* SYSTEM parameter, context-held (type 4) */
     {"PORTAMENTO"         ,"GLOBAL"  ,  124, 1,   0, 255,   0},
     {"LEGATO"             ,"GLOBAL"  ,  126, 1,   0,   1,   0},
     {"ASSIGN MODE"        ,"GLOBAL"  ,  128, 1,   0,   3,   0},
@@ -129,7 +131,7 @@ int juno_host_param_decode(const unsigned char *rec, int i)
 {
     int r = juno_host_param_roff(i), v;
     if (r < 0 || !rec) return -1;
-    if (juno_host_param_type(i) == 3) return juno_host_param_default(i);   /* context-held */
+    if (juno_host_param_type(i) >= 3) return juno_host_param_default(i);   /* context-held */
     if (juno_host_param_type(i) == 0) v = rec[r] & 0x7F;
     else v = ((rec[r] & 0xF) << 4) | (rec[r+1] & 0xF);
     if (juno_host_param_min(i) < 0 && v >= 128) v -= 256;   /* two's complement */
@@ -142,7 +144,7 @@ int juno_host_param_decode(const unsigned char *rec, int i)
 void juno_host_param_encode(unsigned char *rec, int i, int v)
 {
     int r = juno_host_param_roff(i);
-    if (r < 0 || !rec || juno_host_param_type(i) == 3) return;
+    if (r < 0 || !rec || juno_host_param_type(i) >= 3) return;
     if (v < juno_host_param_min(i)) v = juno_host_param_min(i);
     if (v > juno_host_param_max(i)) v = juno_host_param_max(i);
     if (v < 0) v += 256;                                    /* two's complement */

@@ -12,6 +12,9 @@ INPUTS (regenerate them from the .vst3 first; both are Unicorn-only):
   scratchpad/host_census_v2.pkl      python3 probes/host/host_census_v2.py
       the HOST entry's (rva 0x3C7AE0, flag 0) set list for every host
       parameter over 11282 edits (contexts, values, seeded records).
+  (and _v3, _flags, _h, _mt, _dtype: the same entry over more contexts, the
+   DELAY LEVEL on-flag, the host-only H floats, MASTER TUNE, the DELAY TYPE
+   switch under both on-flag states)
 
 OUTPUTS
   src/ramp_cells.h        JUNO_RAMP_CELL[798] (ascending) + JUNO_RAMP_BUILD0[]
@@ -33,12 +36,16 @@ CEN_PKL = os.path.join(SCRATCH, 'host_census_v2.pkl')
 CEN3_PKL = os.path.join(SCRATCH, 'host_census_v3.pkl')
 CENH_PKL = os.path.join(SCRATCH, 'host_census_h.pkl')
 FLG_PKL = os.path.join(SCRATCH, 'host_census_flags.pkl')
+CENMT_PKL = os.path.join(SCRATCH, 'host_census_mt.pkl')
+CENDT_PKL = os.path.join(SCRATCH, 'host_census_dtype.pkl')
+CURVE_C = os.path.join(REPO, 'src', 'juno_curve.c')
 CELLS_H = os.path.join(REPO, 'src', 'ramp_cells.h')
 TABLE_H = os.path.join(REPO, 'src', 'host_ramp_table.h')
 
 # value sources (src/host_edit.c)
-S_REC, S_ZERO, S_ONE, S_OFF, S_TAP2, S_HOSTV = 0, 1, 2, 3, 4, 5
-SRC_NAME = {S_REC: 'JH_REC', S_ZERO: 'JH_ZERO', S_ONE: 'JH_ONE', S_OFF: 'JH_OFF', S_TAP2: 'JH_TAP2', S_HOSTV: 'JH_HOSTV'}
+S_REC, S_ZERO, S_ONE, S_OFF, S_TAP2, S_HOSTV, S_CURVE = 0, 1, 2, 3, 4, 5, 6
+SRC_NAME = {S_REC: 'JH_REC', S_ZERO: 'JH_ZERO', S_ONE: 'JH_ONE', S_OFF: 'JH_OFF', S_TAP2: 'JH_TAP2', S_HOSTV: 'JH_HOSTV',
+            S_CURVE: 'JH_CURVE'}
 CONST = {0x00000000: S_ZERO, 0x3f800000: S_ONE, 0x3fa754b5: S_OFF}   # OFF: juno_lfx1_value(44100, 0)
 OFF_CELLS = {91248, 96384, 102544, 4297776, 6396400, 6430736, 6497360, 10693280}
 TAP2_CELL = 4297792
@@ -49,7 +56,8 @@ FBIT = {f: 1 << k for k, f in enumerate(FEATS)}
 CANDIDATES = [(), ('ET',), ('DT',), ('ETC',), ('TO',), ('PL',), ('ET', 'DT'), ('DT', 'TO'), ('ET', 'TO'),
               ('FROM', 'TO'), ('DT', 'DON1'), ('RON0', 'RON1'), ('PL', 'ETC'), ('TO', 'PL', 'ETC'),
               ('TO', 'PL', 'ARPON', 'ETC'), ('FROM', 'TO', 'PL', 'ARPON', 'ETC'),
-              ('DT', 'FROM', 'TO'), ('ET', 'FROM', 'TO'), ('ET', 'DT', 'TO'), ('ET', 'DT', 'FROM', 'TO')]
+              ('DT', 'FROM', 'TO'), ('ET', 'FROM', 'TO'), ('ET', 'DT', 'TO'), ('ET', 'DT', 'FROM', 'TO'),
+              ('ET', 'FROM', 'TO', 'DON1')]
 ETC_OF = {0: 0, 1: 1, 2: 2, 3: 2, 4: 2, 5: 3}
 CUTOFF_CELLS = set(6736 + 10512 * v for v in range(8))
 HEADER, STRIDE = 23, 20223
@@ -123,7 +131,8 @@ def job_ops(r, name=None):
             t = 0
         if name == 'VCF CUTOFF FREQ' and a == 'R' and c in CUTOFF_CELLS and t == cutoff_time(r['frm'], r['to']):
             t = 0x80
-        out.append((KIND[a], c, t or 0, val & 0xFFFFFFFF, r['rec'].get(c) if r.get('rec') else None, r['to']))
+        out.append((KIND[a], c, t or 0, val & 0xFFFFFFFF, r['rec'].get(c) if r.get('rec') else None, r['to'],
+                    tuple(r.get('curve') or ())))
     return dedupe(out) if name in DEDUPE else out
 
 
@@ -160,6 +169,10 @@ def feats_of(r, name, lo, hi):
          'ETC': ETC_OF.get(r['ctx'][0]), 'PL': r.get('pl'), 'ARPON': r.get('arpon')}
     if name == 'DELAY LEVEL':
         f['DON1'] = r.get('f1', 1 if r['to'] >= 2 else (0 if r['to'] == 0 else None))
+    elif name == 'DELAY TYPE':
+        # the on-flag the DELAY LEVEL re-send leaves (census _dtype records it;
+        # the v2/v3 jobs did not, so a DON1 key is built from _dtype alone)
+        f['DON1'] = r.get('f1')
     return f
 
 
@@ -167,14 +180,42 @@ def card(f, lo, hi):
     return {'ET': 6, 'DT': 6, 'FROM': hi - lo + 1, 'TO': hi - lo + 1, 'ETC': 4}.get(f, 2)
 
 
+_LUTS = {}
+
+
+def curve_lut(cid):
+    """the port's curve table cid (src/juno_curve.c, PROVEN: juno_curve), as
+    float bits; read as text (two-process rule: no libjuno here)"""
+    if cid not in _LUTS:
+        import re
+        txt = open(CURVE_C).read()
+        m = re.search(r'JUNO_LUT%d\s*\[\s*(\d+)\s*\]\s*=\s*\{([^}]*)\}' % cid, txt)
+        c = re.search(r'case %d: \{ int i = \(value < 0\) \? 0 : value; if \(i > (\d+)\) i = \1; '
+                      r'return juno__bits2f\(JUNO_LUT%d\[i\]\); \}' % (cid, cid), txt)
+        vals = [int(x, 0) for x in re.findall(r'0x[0-9A-Fa-f]+', m.group(2))] if m else []
+        if not m or not c or len(vals) != int(m.group(1)) or int(c.group(1)) != len(vals) - 1:
+            raise SystemExit('curve %d: not a plain clamped table in %s' % (cid, CURVE_C))
+        _LUTS[cid] = vals
+    return _LUTS[cid]
+
+
 def merge_src(rows):
-    """one op position over every job of a key: [(val, rec, host value)] -> a source"""
-    vals = set(v for v, rc, to in rows)
-    rec_ok = all(rc is not None and v == rc for v, rc, to in rows)
+    """one op position over every job of a key: [(val, rec, host value, curve
+    lookups)] -> a source (S_CURVE carries its curve id in bits 8..15)"""
+    vals = set(r[0] for r in rows)
+    rec_ok = all(rc is not None and v == rc for v, rc, to, cl in rows)
     if rec_ok:
         return S_REC
-    if all(v == (to & 0xFFFFFFFF) for v, rc, to in rows) and len(vals) > 1:
+    if all(v == (to & 0xFFFFFFFF) for v, rc, to, cl in rows) and len(vals) > 1:
         return S_HOSTV
+    # the setter looked the host value up in ONE curve (census MT logs every
+    # lookup, rva 0x356380) and the set's value is that curve's entry
+    cids = set(cl[0][0] for v, rc, to, cl in rows if len(cl) == 1)
+    if len(cids) == 1 and len(vals) > 1:
+        cid = cids.pop()
+        lut = curve_lut(cid)
+        if all(cl == ((cid, to),) and 0 <= to < len(lut) and v == lut[to] for v, rc, to, cl in rows):
+            return S_CURVE | (cid << 8)
     if len(vals) == 1:
         v = vals.pop()
         if v in CONST:
@@ -193,7 +234,7 @@ def programs():
     p0 = bank[HEADER:HEADER + STRIDE]
     jobs = {}
     srcs = [cen]
-    for extra in (CEN3_PKL, CENH_PKL):
+    for extra in (CEN3_PKL, CENH_PKL, CENMT_PKL, CENDT_PKL):
         if os.path.exists(extra):
             srcs.append(pickle.load(open(extra, 'rb')))
     for cs in srcs[1:]:
@@ -203,6 +244,14 @@ def programs():
         for j, r in cs['res'].items():
             if r['ok'] is not True:
                 raise SystemExit('census job %d failed: %s' % (j, r['ok']))
+            lo, hi = P[r['i']][4:6]
+            if not lo <= r['to'] <= hi:
+                # outside the database range the host entry calls no setter
+                # (juno_gui_host_set drops the value first): no program, but
+                # the census must show the empty set list
+                if r['ev']:
+                    raise SystemExit('census job %d: value %d outside [%d,%d] made sets' % (j, r['to'], lo, hi))
+                continue
             rec = r.get('base') or p0       # families A-D: patch 0 (types forced only)
             r = dict(r, pl=int(nib(rec, 128) == 0 and nib(rec, 126) == 1), arpon=int(nib(rec, 298) != 0))
             jobs.setdefault(r['i'], []).append(r)
@@ -229,7 +278,7 @@ def programs():
                     continue
                 key = tuple(f[x] for x in cand)
                 ops = job_ops(r, name)
-                shp = tuple((k, c, t) for k, c, t, v, rc, to in ops)
+                shp = tuple(op[:3] for op in ops)
                 g = groups.setdefault(key, [shp, []])
                 if g[0] != shp:
                     ok = False
@@ -242,7 +291,7 @@ def programs():
             for key, (shp, opsl) in groups.items():
                 srcs = []
                 for pos, (k, c, t) in enumerate(shp):
-                    rows = [(ops[pos][3], ops[pos][4], ops[pos][5]) for ops in opsl]
+                    rows = [ops[pos][3:7] for ops in opsl]
                     src = merge_src(rows) if rows else None
                     if src is None and c == TAP2_CELL and name == 'DELAY TYPE':
                         src = S_TAP2
@@ -251,7 +300,7 @@ def programs():
                     if src is None:
                         why = 'key %s op %d (cell %d): no one source for %s' % (
                             key, pos, c, sorted(set('%08x/%s' % (v, '%08x' % rc if rc is not None else '-')
-                                                    for v, rc, to in rows))[:4] if rows else 'no recall values')
+                                                    for v, rc, to, cl in rows))[:4] if rows else 'no recall values')
                         break
                     srcs.append(src)
                 if why:
@@ -316,8 +365,10 @@ def table_h(host, params):
            ' * -- ramped sets (cell, time index), immediate sets, direct writes -- in',
            ' * the plugin\'s order, per key (the context the list depends on), and where',
            ' * each set\'s value comes from. EXECUTED: probes/host/host_census_v2.py',
-           ' * (11282 edits), host_census_v3.py (2632), host_census_flags.py (1800)',
-           ' * and host_census_h.py (72); %d ops, %d programs.' % (len(ops), len(prog_rows)),
+           ' * (11282 edits), host_census_v3.py (2632), host_census_flags.py (1800),',
+           ' * host_census_h.py (72), host_census_mt.py (273) and host_census_dtype.py',
+           ' * (1080); %d ops, %d programs.' % (len(ops), len(prog_rows)),
+           ' * JH_CURVE: the value is juno_curve(pad, host value) (MASTER TUNE: curve 55).',
            ' */',
            '#ifndef JUNO_HOST_RAMP_TABLE_H',
            '#define JUNO_HOST_RAMP_TABLE_H',
@@ -327,12 +378,12 @@ def table_h(host, params):
            'typedef struct { uint32_t feat, nprog, prog0; int32_t lo, hi; uint32_t gate; } jh_param;',
            'enum { JH_G_NONE = 0, JH_G_ARP_ON = 1, JH_G_ARP_TURN_ON = 2 };',
            'enum { JH_RAMP = 0, JH_IMM = 1, JH_WRITE = 2 };',
-           'enum { JH_REC = 0, JH_ZERO = 1, JH_ONE = 2, JH_OFF = 3, JH_TAP2 = 4, JH_HOSTV = 5 };',
+           'enum { JH_REC = 0, JH_ZERO = 1, JH_ONE = 2, JH_OFF = 3, JH_TAP2 = 4, JH_HOSTV = 5, JH_CURVE = 6 };',
            'enum { %s };' % ', '.join('JH_F_%s = 0x%02X' % (f, FBIT[f]) for f in FEATS),
            '#define JH_NONE 0xFFFFFFFFu',
            'static const jh_op JH_OPS[%d] = {' % max(len(ops), 1)]
     for k in range(0, len(ops), 4):
-        out.append('    ' + ' '.join('{%uu,%d,%d,%d,0},' % (c, kd, t, sr) for kd, c, t, sr in ops[k:k + 4]))
+        out.append('    ' + ' '.join('{%uu,%d,%d,%d,%d},' % (c, kd, t, sr & 0xFF, sr >> 8) for kd, c, t, sr in ops[k:k + 4]))
     out.append('};')
     out.append('static const jh_prog JH_PROGS[%d] = {' % max(len(prog_rows), 1))
     for k in range(0, len(prog_rows), 6):

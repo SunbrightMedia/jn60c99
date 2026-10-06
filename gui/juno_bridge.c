@@ -127,10 +127,11 @@ typedef struct {
                               * (the wrapper's rule, see juno_gui_midi_note_on) */
     int   live_recall;       /* 1 while juno_gui_apply_bank_live runs: the recall
                               * leaves the plugin's recall ramps armed (CLAIMS B1) */
-    int   host_only[2];      /* LFO RATE H, VCF CUTOFF FREQ H: the host-only float
+    int   host_only[3];      /* LFO RATE H, VCF CUTOFF FREQ H: the host-only float
                               * parameters' values (bits), not in the record (CLAIMS B6);
+                              * MASTER TUNE: a SYSTEM parameter, not in a patch (A20);
                               * 0 = not set since create (the getter then reports the default) */
-    int   host_only_set[2];
+    int   host_only_set[3];
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -1361,6 +1362,7 @@ int         juno_gui_host_max(int i)         { return juno_host_param_max(i); }
 static int host_only_slot(int i)
 {
     const char *n = juno_host_param_name(i);
+    if (juno_host_param_type(i) == 4) return 2;          /* MASTER TUNE */
     if (juno_host_param_type(i) != 3) return -1;
     return strcmp(n, "LFO RATE H") ? 1 : 0;
 }
@@ -1461,10 +1463,11 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
 /* A host parameter change as the plugin's host entry (rva 0x3C7AE0) takes it.
  * A value outside the parameter's database range reaches no setter and is
  * dropped (EXECUTED: EFFECT/DELAY/REVERB TYPE 6..255, VCF CUTOFF 256, DELAY TAP
- * TIME 101 -> no setter call); HPF TYPE is mapped to (v != 0) first. OCTAVE
- * SHIFT reaches its setter but writes no engine cell (EXECUTED, fresh engines:
- * identical state and audio), and MASTER TUNE is not in the engine's parameter
- * map: both change the record only. CLAIMS A20 / B8. */
+ * TIME 101, MASTER TUNE 201 -> no setter call); HPF TYPE is mapped to (v != 0)
+ * first. OCTAVE SHIFT reaches its setter but writes no engine cell (EXECUTED,
+ * fresh engines: identical state and audio): it changes the record only.
+ * MASTER TUNE ramps every voice's tune cell (its own program, host-only value).
+ * CLAIMS A20 / B8. */
 void juno_gui_host_set(juno_ctx *c, int i, int v)
 {
     unsigned char *rec;
@@ -1475,7 +1478,7 @@ void juno_gui_host_set(juno_ctx *c, int i, int v)
     if (v < juno_host_param_min(i) || v > juno_host_param_max(i)) return;
 #ifndef EB_DEVCELLS
     if (juno_host_edit_known(i) && host_edit_live(c, rec, i, v)) return;
-    if (!strcmp(juno_host_param_name(i), "OCTAVE SHIFT") || !strcmp(juno_host_param_name(i), "MASTER TUNE")) {
+    if (!strcmp(juno_host_param_name(i), "OCTAVE SHIFT")) {
         juno_host_param_encode(rec, i, v);
         return;
     }

@@ -7,6 +7,7 @@
 #include "recall_ramp.h"
 #include "delay_recall.h"      /* juno_lfx1_value */
 #include "host_ramp_table.h"
+#include "juno_curve.h"
 #include <string.h>
 
 #define NPARAMS ((int)(sizeof(JH_PARAMS) / sizeof(JH_PARAMS[0])))
@@ -93,6 +94,7 @@ int juno_host_edit(unsigned char *st, const unsigned char *settled, int hp, cons
         case JH_OFF:  v = juno_lfx1_value(Hr, 0); memcpy(&bits, &v, 4); break;
         case JH_TAP2: bits = juno_rr_tap2_bits(st); break;
         case JH_HOSTV: bits = (uint32_t)f->to; break;   /* the host's value itself (H leaves) */
+        case JH_CURVE: v = juno_curve(o->pad, f->to); memcpy(&bits, &v, 4); break;   /* MASTER TUNE: curve 55 */
         default:      memcpy(&bits, settled + o->cell, 4); break;   /* JH_REC */
         }
         if (t & 0x80) t = cutoff_time(f);

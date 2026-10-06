@@ -35,23 +35,28 @@ FAMILIES (--ref builds the scripts and stores them; --port replays them)
   law     one chain per rule the census alone could not key: VCF CUTOFF's
           step-dependent ramp time, PORTAMENTO under POLY + LEGATO and the porta
           gate, the arp refresh gated on the processor's arp state, the DELAY
-          TYPE 1 instance's kept tap time
+          TYPE 1 instance's kept tap time, DELAY TYPE switches under the DELAY
+          LEVEL on-flag off / on / held by hysteresis
+  tune    MASTER TUNE (a SYSTEM parameter, no patch slot): edits inside and
+          after its 4 ms ramps, across live patch changes, out of range
 ARPEGGIO SW is edited only with no note held, and switched off before the next
 note: the oracle has no transport clock and cannot arpeggiate (as
 seed_recall_gate.py HOLD).
 
-LIMITS, stated: 78 of the 79 panel parameters (MASTER TUNE is not in the
-engine's parameter map: the host cannot send it to the engine); out-of-range
-host values included (the law family); host rates 44100 / 48000 / 96001.
+LIMITS, stated: all 79 panel parameters; out-of-range host values included
+(the law family); host rates 44100 / 48000 / 96001.
 
-TOOTH (--tooth): thirteen named defects must each turn --port red: the
+TOOTH (--tooth): seventeen named defects must each turn --port red: the
 settled re-recall (the old port), the scratch recall meeting live ramps, the
 cutoff time law, the porta gate's restore value, the recall's re-send of the
 kept tap, the reverb fade in double, the arp gate, the POLY+LEGATO skip, an
 out-of-range value clamped instead of dropped, the H leaves from the recall,
 the cutoff step from the record, OCTAVE SHIFT re-running the recall, the 86
-build-stale ramp targets. One reach probe is printed, not graded (the kept vs
-current tap on a switch to type 1): no path observes it.
+build-stale ramp targets, MASTER TUNE reaching no engine cell (the old A20
+claim), MASTER TUNE from the recall, MASTER TUNE's ramp time, DELAY TYPE
+assuming the DELAY LEVEL on-flag set. One reach probe
+is printed, not graded (the kept vs current tap on a switch to type 1): no
+path observes it.
 
 TWO-PROCESS RULE: --ref (Unicorn only) -> scratchpad/host_edit_ref.pkl;
 --port (libjuno only) reads it.
@@ -76,7 +81,9 @@ import struct
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 SCRATCH = os.path.join(REPO, 'scratchpad')
-REF_PKL = os.path.join(SCRATCH, 'host_edit_ref.pkl')
+# HOST_EDIT_REF: another reference file, so a run cannot meet the one a full
+# `make verify` in a snapshot tree is using (the snapshot shares scratchpad/)
+REF_PKL = os.environ.get('HOST_EDIT_REF') or os.path.join(SCRATCH, 'host_edit_ref.pkl')
 TRACE_PKL = os.path.join(SCRATCH, 'host_edit_trace_%d.pkl')
 
 HEADER, STRIDE, BLOB_OFF = 23, 20223, 16
@@ -127,15 +134,21 @@ def oracle_params(e, E, S):
     walk(q(q(E.IB + MAP_RVA) + 8))
     roff_to = {off: d for d, off, kind in S.leaf_slots()}
     # leaves the harness recall does not carry, by their dispatch index
-    # (coverage_leaves.tsv): the host-only fine leaves and the signed OCTAVE SHIFT
-    by_name = {'LFO RATE H': 878, 'VCF CUTOFF FREQ H': 1029, 'OCTAVE SHIFT': 836}
+    # (coverage_leaves.tsv): the host-only fine leaves, the signed OCTAVE SHIFT
+    # and the SYSTEM parameter MASTER TUNE (dispatch 20: host_census_mt.py)
+    by_name = {'LFO RATE H': 878, 'VCF CUTOFF FREQ H': 1029, 'OCTAVE SHIFT': 836, 'MASTER TUNE': 20}
+    # the host entry subtracts these before the database range check (rva
+    # 0x3C7AE0, READ: dispatch 20/665/707 -> value - 100, 22 -> - 12, 769 -> - 11):
+    # the HOST value range is the database range shifted back
+    host_offset = {20: 100, 665: 100, 707: 100, 22: 12, 769: 11}
     out = {}
     for k, name, roff in host_table():
         d = by_name.get(name, roff_to.get(roff))
         if d is None or d not in pid_of:
             continue
         lo, hi = struct.unpack('<ii', uc.mem_read(E.IB + DB_RANGE_RVA + 16 * d, 8))
-        out[k] = (name, d, pid_of[d], lo, hi)
+        o = host_offset.get(d, 0)
+        out[k] = (name, d, pid_of[d], lo + o, hi + o)
     return out
 
 
@@ -291,8 +304,40 @@ def scripts(bank, params):
                  (name_to['VCF CUTOFF FREQ'], 90), (name_to['LFO RATE H'], 0)):
         sc += [('host', k, v), ('render', 150), ('check',)]
     law.append(sc + [('off', 64), ('render', 800), ('check',)])
+    #   DELAY TYPE re-sends DELAY LEVEL, whose on-flag (hysteresis) decides the
+    #   feedback cell's first set (0 when off): switches with the flag off, on,
+    #   and held by hysteresis at DELAY LEVEL 1, under three EFFECT TYPEs
+    DL = name_to['DELAY LEVEL']
+    for c, et in enumerate((0, 2, 5)):
+        rnd = random.Random(1900 + c)
+        sc = [('recall', 'lw_dt%d' % c, noarp(record_bank(bank, (17 * c + 38) % 64, {REC_ETYPE: et, REC_DTYPE: 5, 120: 0}))),
+              ('render', 64), ('on', 57), ('render', 200)]
+        for dl in (0, 1, 2, 1, 0):
+            sc += [('host', DL, dl), ('render', 60)]
+            for to in rnd.sample(range(6), 6):
+                sc += [('host', DT, to), ('render', rnd.choice((20, 150, 500))), ('check',)]
+        law.append(sc + [('off', 57), ('render', 800), ('check',)])
     for c, sc in enumerate(law):
         out.append(('law', RATES[c % 3], sc))
+    # tune: MASTER TUNE ramps every voice's tune cell over 4 ms (curve 55 of the
+    # host value); a patch change leaves it (a SYSTEM parameter); 201 is dropped
+    MT = name_to['MASTER TUNE']
+    P = W.pool()
+    for c in range(3):
+        rnd = random.Random(1700 + c)
+        n0, b0, s0 = P[rnd.randrange(len(P))]
+        sc = [('recall', n0, noarp(record_bank(bank, b0, s0))), ('render', 64), ('on', 60), ('render', 200),
+              ('host', MT, 37), ('render', 100), ('check',), ('host', MT, 163), ('render', 40),
+              ('host', MT, 100), ('render', 300), ('check',), ('host', MT, (0, 200, 1)[c]), ('render', 250)]
+        for step in range(4):
+            n, b, s = P[rnd.randrange(len(P))]
+            sc += [('lrecall', n, noarp(record_bank(bank, b, s))), ('render', rnd.choice((30, 200))), ('check',),
+                   ('host', MT, rnd.randint(0, 200)), ('render', rnd.choice((15, 90, 600))), ('check',)]
+            if step == 1:
+                sc += [('off', 60), ('on', 67), ('render', 300), ('check',)]
+        sc += [('host', MT, 201), ('render', 100), ('check',), ('host', MT, -1), ('render', 100), ('check',),
+               ('host', MT, 55), ('render', 500), ('off', 67), ('render', 800), ('check',)]
+        out.append(('tune', RATES[c % 3], sc))
     # mix: host edits and live patch changes
     P = W.pool()
     for c in range(4):
@@ -636,8 +681,20 @@ def tooth():
         ('he_cutoff_last_from_record', 'the cutoff step is taken from the record, not the object\'s last value',
          [('gui/juno_bridge.c', '    if (i == host_index("VCF CUTOFF FREQ")) f.from = juno_rr_cut_last(c->st);   /* the object\'s last value */\n', '')]),
         ('he_octave_rerecall', 'OCTAVE SHIFT re-runs the settled recall instead of touching nothing',
-         [('gui/juno_bridge.c', '    if (!strcmp(juno_host_param_name(i), "OCTAVE SHIFT") || !strcmp(juno_host_param_name(i), "MASTER TUNE")) {',
-           '    if (!strcmp(juno_host_param_name(i), "MASTER TUNE")) {')]),
+         [('gui/juno_bridge.c', '    if (!strcmp(juno_host_param_name(i), "OCTAVE SHIFT")) {',
+           '    if (0) {')]),
+        ('he_dtype_flag_on', 'DELAY TYPE assumes the DELAY LEVEL on-flag set (the v2 census\'s only context)',
+         [('gui/juno_bridge.c', '            f.don1 = JI(tmp, JUNO_DLY_ON) != 0;',
+           '            f.don1 = (i == host_index("DELAY TYPE")) ? 1 : (JI(tmp, JUNO_DLY_ON) != 0);')]),
+        ('he_tune_unported', 'MASTER TUNE reaches no engine cell (the old A20 claim, the old table)',
+         [('src/host_ramp_table.h', '    { 0x00u, 1u, 40u, 0, 200, 0u },   /* 40 MASTER TUNE: key none */',
+           '    { 0xFFFFu, 0u, 0u, 0, 0, 0u },   /* 40 MASTER TUNE: no host program */')]),
+        ('he_tune_from_recall', 'MASTER TUNE sets the recall\'s cell value, not curve 55 of the host value',
+         [('src/host_edit.c', 'case JH_CURVE: v = juno_curve(o->pad, f->to); memcpy(&bits, &v, 4); break;',
+           'case JH_CURVE: memcpy(&bits, settled + o->cell, 4); break;')]),
+        ('he_tune_time', 'MASTER TUNE glides over 96 ms, not the setter\'s 4 ms',
+         [('src/host_edit.c', 'case JH_CURVE: v = juno_curve(o->pad, f->to); memcpy(&bits, &v, 4); break;',
+           'case JH_CURVE: v = juno_curve(o->pad, f->to); memcpy(&bits, &v, 4); t = 15; break;')]),
         ('he_build_targets', 'every record seeded with its cell value (the build leaves 86 at 0)',
          [('src/recall_ramp.c', 'r->target = JUNO_RAMP_BUILD0[i] ? 0.0f : JF(st, JUNO_RAMP_CELL[i]);',
            'r->target = JF(st, JUNO_RAMP_CELL[i]);')]),
