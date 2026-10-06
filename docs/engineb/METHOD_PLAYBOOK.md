@@ -2650,3 +2650,14 @@ Re-justify every exclusion when the port changes the cells it reads; prefer no e
 same state on both sides). Never send a gate step's output to /dev/null: a red must be readable in
 the log. A commit is verified only by a COMPLETED make verify with EXIT 0; a green per-gate run on
 the day is not that. Keep the Monitor alive (playbook 140) so the verify completes.
+
+## 142. A REFERENCE SAVED MID-BUILD TO ITS FINAL NAME LOOKS FINISHED TO A STALENESS TEST
+Paid 2026-10-06 (JUNO, audit). effect_param_gate --ref saves its pickle after every rate so a long
+build can resume. A container restart stopped it halfway; on the re-run the Makefile's `fresh`
+test (file newer than the gate scripts) skipped the rebuild, and --port failed "REF INCOMPLETE".
+The port check made it loud, so no false green -- but a 4-hour verify was lost to a red that was
+not the port's.
+### The rule
+Save progress to <ref>.partial and rename to the final name only when the build is complete;
+--resume reads the .partial. A staleness test may trust a file only if a complete build wrote it.
+
