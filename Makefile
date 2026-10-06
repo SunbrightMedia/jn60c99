@@ -142,6 +142,9 @@ verify: test libjuno.so
 	echo "=== PLUGIN PRESET PATHS (CLAIMS A22): initialize / setState / patch-browser load, the plugin's own queues through the host entry ==="; \
 	fresh $(SCRATCH)/state_load_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/state_load_gate.py --ref || FAIL=1; \
 	python3 tools/verify/state_load_gate.py --port || FAIL=1; \
+	echo "=== WRAPPER VELOCITY (CLAIMS A23): the MIDI note intake and its velocity switch, the plugin's own push, byte for byte ==="; \
+	fresh $(SCRATCH)/wrapper_velocity_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/wrapper_velocity_gate.py --ref || FAIL=1; \
+	python3 tools/verify/wrapper_velocity_gate.py --port || FAIL=1; \
 	echo "=== SHADOW CELLS: bounds (cannot false-fail an A/B) + WRITER-SET invariant (prog == clamp(shadow)) ==="; \
 	python3 tools/verify/shadow_bounds_gate.py || FAIL=1; \
 	python3 tools/verify/shadow_sync_gate.py || FAIL=1; \

@@ -11,9 +11,14 @@ against the plugin (docs/CLAIMS.md):
   host edits in payload order, with storage masks (A22, state_load_gate.py).
 - STEP 2's live-edit audit: DAW automation through 0x3C7AE0, all 79 parameters, bit-exact
   with the plugin's ramps (A20, host_edit_gate.py).
-Still open: STEP 1 (SYSTEM defaults by execution; Keyboard Velocity SW is READ, default
-0), STEP 2's wrapper note/CC event matrix (0x34A380 -> 0x31F4E0 -> 0x320B20), STEP 4
-(the two gates above are in make verify; the event matrix is not), STEP 5.
+- STEP 1's velocity part, and STEP 2's note half: the wrapper's switch is vm.vs.velSense,
+  default 1 (EXECUTED), not the SYSTEM 'Keyboard Velocity SW' (default 0) the port had
+  assumed -- a fresh plugin plays the key's own velocity; the port forced 100 (A23,
+  wrapper_velocity_gate.py: the plugin's own push, every note message byte-equal).
+  INFERRED: a likely part of S3 on VCF VELOCITY SENS patches.
+Still open: the other SYSTEM values by execution (Fixed Velocity, Curve, Offset are not
+read by the note push), STEP 2's CC / bend half (0x34A380 -> 0x31F4E0 -> 0x320B20), STEP 4
+(the three gates above are in make verify; CC is not), STEP 5.
 
 **Why this scope exists.** The engine is proven bit-exact against the plugin's own
 machine code on every gated surface (recall, render, sequences, fuzz, voice-assign

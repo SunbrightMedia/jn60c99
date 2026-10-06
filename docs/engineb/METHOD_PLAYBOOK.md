@@ -2616,3 +2616,15 @@ Every call the product makes must sit, in the product's order, on a chain graded
 plugin (here: the app family, warm-up then load then keys). A differential gate between two builds
 of one source needs a REACH guard on its inputs (audible renders, the first key) and a tooth that
 both builds share. Run the product's end-to-end check on every change to a product path.
+
+## 139. A GETTER MATCHED TO A NAME BY READING IS A HYPOTHESIS -- EXECUTE IT AND READ ITS NAME
+Paid 2026-10-06 (JUNO, CLAIMS A23). For ten weeks the port forced every note to velocity 100: the
+wrapper's switch byte was READ as "refreshed from the settings object", and that object was matched
+to the SYSTEM table's 'Keyboard Velocity SW' (default 0) because its range looked right. Executed,
+the getter is vm.vs.velSense (default 1), a value of the plugin's own view state: a fresh plugin
+plays the key's own velocity. Every engine gate drove notes below the wrapper, so none could see it.
+### The rule
+When a value comes through an indirect call, EXECUTE the call, then print the name the object
+carries (its descriptor) before binding it to a table row. A plausible range is not an identity.
+Grade the layer between the host and the engine (here the MIDI push) byte for byte, not only the
+engine below it.

@@ -135,7 +135,7 @@ typedef struct {
      * slider move otherwise). calloc zero-init == carp_init's (0,0) default. */
     int   last_scatter_type;
     int   last_scatter_depth;
-    int   kbd_velocity_sw;   /* SYSTEM "Keyboard Velocity SW": 0 = force vel 100
+    int   kbd_velocity_sw;   /* the wrapper velocity switch (vm.vs.velSense): 0 = force vel 100
                               * (the wrapper's rule, see juno_gui_midi_note_on) */
     int   live_recall;       /* 1 while juno_gui_apply_bank_live runs: the recall
                               * leaves the plugin's recall ramps armed (CLAIMS B1) */
@@ -1051,38 +1051,31 @@ void juno_gui_note_off(juno_ctx *c, int midi_note)
 /* --- Wrapper-level MIDI note path (what a DAW's events actually go through) ---
  *
  * The real plugin's VST3 wrapper converts host note events to 3-byte MIDI and
- * applies the SYSTEM setting "fm.SYSTEM.COM.Keyboard Velocity SW" BEFORE the
- * engine ever sees the note. READ (static decomp, three independent sites all
- * implementing the identical rule: the event->MIDI queue push rva 0x31F4E0,
- * the all-sound-off injector rva 0x3208E0, and the connect-path forwarder rva
- * 0x320A30; the flag byte lives at wrapperqueue+572 and is refreshed from the
- * settings object at rva 0x320420):
+ * applies its velocity switch BEFORE the engine ever sees the note. READ
+ * (three sites with the identical rule: the event->MIDI queue push rva
+ * 0x31F4E0, the all-sound-off injector rva 0x3208E0, the connect-path
+ * forwarder rva 0x320A30); the push is graded byte for byte against the plugin
+ * (juno_gui_wrapper_midi, tools/verify/wrapper_velocity_gate.py):
  *   - note-on with velocity 0  -> converted to note-off, off-velocity 64
- *   - Keyboard Velocity SW OFF -> every note-on velocity is REPLACED with 100
- *                                 and every note-off velocity with 64
- *   - Keyboard Velocity SW ON  -> velocities pass through unchanged
- * So by default the real instrument IGNORES how hard you play — faithful to
- * the velocity-insensitive JUNO-60 keyboard — while the port used to pass raw
- * velocities through, making every patch's brightness/level vary per keystroke
- * where the plugin is rock-steady (the user's "always sounded wrong" report;
- * velocity-sens cells scale both VCF and VCA). Every A/B gate was blind to
- * this: both gate sides drive the engine BELOW the wrapper.
+ *   - switch OFF -> every note-on velocity is REPLACED with 100 (the converted
+ *                   note-off's too) and every note-off velocity with 64
+ *   - switch ON  -> velocities pass through unchanged
+ * A fresh instance has the switch ON (below). Every engine A/B gate drives the
+ * engine BELOW the wrapper, so none of them sees this layer.
  *
- * Default kbd_velocity_sw = 0 (forcing ON). Label: READ (upgraded from INFERRED
- * 2026-07-28, probes/hostpath/system_velocity_defaults.py). The plugin's own
- * descriptor table (rva 0x98c040 + 16*idx) read against its own name table
- * (rva 0x9a0030) gives, for the fm.SYSTEM.COM keyboard family:
- *     idx 12 'Keyboard Velocity SW'      min 0  max 1    default 0   <- OFF
- *     idx 13 'Keyboard Fixed Velocity'   min 0  max 126  default 126
- *     idx 14 'Keyboard Velocity Curve'   min 0  max 2    default 1
- *     idx 15 'Keyboard Velocity Offset'  min -10 max 10  default 0
- * so a fresh instance really does default to SW OFF, i.e. every note forced to
- * the constant 100 that the three decompiled wrapper sites hardcode. (Each range
- * matches its own name — a 0..1 "SW", a +-10 "Offset" — which self-validates that
- * this is the right table.) Velocity Curve and Velocity Offset are separate
- * SYSTEM settings the port does not model; both sit at an identity default
- * (curve 1 = the middle of 0..2, offset 0), so a default instance is unaffected.
- * Deriving their laws is only needed if those settings are ever exposed.
+ * The switch (wrapper core +572) is vm.vs.velSense, a value of the plugin's
+ * own view state (processor +184, bound by name in rva 0x34E3E0),
+ * Script.xml default 1. EXECUTED (probes/b6/kbd_vel_default.py): the core's
+ * setup inside IComponent::initialize (rva 0x320420, instruction 0x32079F)
+ * writes 1; no setState payload moves it (velSense is not one of the 95 state
+ * entries), nor setupProcessing / setActive; the plugin's own switch does,
+ * through the model listener (rva 0x321B30, READ: flag = value != 0).
+ * juno_gui_create leaves 0 (the core after createInstance, EXECUTED);
+ * juno_gui_plugin_init sets 1. The old default (0, forcing 100) came from a
+ * READ match of the getter to the SYSTEM table's 'Keyboard Velocity SW'
+ * (idx 12, default 0): a different setting the wrapper never reads
+ * (playbook 139). Velocity Curve / Offset / Fixed Velocity (SYSTEM idx 13-15)
+ * are not read by this path either.
  * The policy itself is READ from the binary. The engine below is untouched. */
 void juno_gui_set_kbd_velocity(juno_ctx *c, int on)
 {
@@ -1097,12 +1090,31 @@ void juno_gui_midi_note_off(juno_ctx *c, int midi_note)
     juno_gui_note_off(c, midi_note);
 }
 
+/* The wrapper's MIDI intake for one 3-byte message, in place (rva 0x31F4E0,
+ * graded byte for byte against the plugin's own push by
+ * tools/verify/wrapper_velocity_gate.py): a note-on at velocity 0 becomes a
+ * note-off at 64; with the velocity switch off, a note-on's velocity -- the
+ * converted note-off's too -- becomes 100 and a note-off's 64. Other
+ * messages are not touched here. */
+void juno_gui_wrapper_midi(const juno_ctx *c, unsigned char m[3])
+{
+    int sw = c && c->kbd_velocity_sw;
+    if ((m[0] & 0xF0) == 0x90) {
+        if (!m[2]) { m[0] = (unsigned char)((m[0] & 0x0F) | 0x80); m[2] = 64; }
+        if (!sw) m[2] = 100;
+    } else if ((m[0] & 0xF0) == 0x80) {
+        if (!sw) m[2] = 64;
+    }
+}
+
 void juno_gui_midi_note_on(juno_ctx *c, int midi_note, int velocity)
 {
+    unsigned char m[3];
     if (!c) return;
-    if (velocity == 0) { juno_gui_midi_note_off(c, midi_note); return; }
-    if (!c->kbd_velocity_sw) velocity = 100;
-    juno_gui_note_on(c, midi_note, velocity);
+    m[0] = 0x90; m[1] = (unsigned char)(midi_note & 0x7F); m[2] = (unsigned char)(velocity & 0x7F);
+    juno_gui_wrapper_midi(c, m);
+    if ((m[0] & 0xF0) == 0x80) juno_gui_midi_note_off(c, midi_note);
+    else juno_gui_note_on(c, midi_note, m[2]);
 }
 
 /* Configure the arpeggiator. on: 0/1. mode: 0=up,1=down,2=up&down (the UI/patch
@@ -1607,6 +1619,12 @@ int juno_gui_plugin_init(juno_ctx *c)
     juno_driver_arm_latch(c->st);
     for (k = 0; k < JUNO_STATE_N; ++k)
         apply_event(c, JUNO_STATE_ENT[k].host, JUNO_STATE_ENT[k].dflt);
+    /* initialize's core setup (rva 0x320420) sets the wrapper's velocity switch
+     * from vm.vs.velSense, whose default is 1 (Script.xml; EXECUTED:
+     * probes/b6/kbd_vel_default.py): a fresh instance plays the key's own
+     * velocity. velSense is not in the state list, so no preset changes it;
+     * only the plugin's own switch does (juno_gui_set_kbd_velocity). */
+    c->kbd_velocity_sw = 1;
     return JUNO_STATE_N;
 }
 

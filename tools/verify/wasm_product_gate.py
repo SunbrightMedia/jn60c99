@@ -72,7 +72,9 @@ def chains(H):
     idx = {n: i for i, (n, lo, hi) in enumerate(H)}
 
     def boot(rate):
-        return [['create', rate], ['vel_sw', 0], ['plugin_init'], ['warmup', rate * 4]]
+        # as the app: plugin_init (the switch ON, as the plugin's start-up), then
+        # the page's velocity switch (default ON), then the warm-up
+        return [['create', rate], ['plugin_init'], ['vel_sw', 1], ['warmup', rate * 4]]
 
     def chord(root, n, vel=100):
         # the app's keys enter through the wrapper's MIDI path (juno_gui_midi_note_on)
@@ -99,7 +101,8 @@ def chains(H):
                 ops += release(root) + [['render', rate // 10]]
         if held is not None:
             ops += release(held)
-        ops += [['vel_sw', 1]] + chord(55, rate // 10, 37) + [['render', rate // 10]] + release(55) + [['render', rate]]
+        ops += chord(55, rate // 10, 37) + [['render', rate // 10]] + release(55) + [['render', rate // 10]]
+        ops += [['vel_sw', 0]] + chord(55, rate // 10, 37) + [['render', rate // 10]] + release(55) + [['render', rate]]
         out.append({'name': name, 'ops': ops})
     # the panel: every host parameter to its min, max and middle with a chord held
     for name, rate, patch in (('panel_48000', 48000, 12), ('panel_44100', 44100, 40)):

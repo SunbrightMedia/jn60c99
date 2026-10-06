@@ -75,9 +75,9 @@
       <input type="range" id="arpGate" min="0" max="1" step="0.05" value="0.6" oninput="arpApply()" style="vertical-align:middle">
       <span id="arpGateV">60%</span></label>
     <span style="width:12px"></span>
-    <label title="SYSTEM 'Keyboard Velocity SW'. OFF (default here, matching a fresh plugin instance): every note plays at fixed velocity 100 — the plugin's own wrapper rule, READ from three decompiled sites, and what a JUNO-60 does. ON: keys/MIDI use their real velocity, so patches with VCF/VCA VELOCITY SENS (e.g. BS Solid) open up when you play hard. Turn it ON only if your DAW instance has it on too — otherwise the port and the plugin get different velocities and will not sound the same.">Kbd&nbsp;Vel
-      <input type="checkbox" id="velSw" onchange="velSwApply()"></label>
-    <label id="velLbl" title="Note-on velocity for the on-screen keys (MIDI keys use their own; VCF/VCA VELOCITY SENS respond to it). Only honoured when Kbd Vel SW is ON.">Vel
+    <label title="The plugin's velocity switch (vm.vs.velSense). ON — the default, as in a fresh plugin instance (executed: its start-up sets the switch from velSense = 1): keys and MIDI play their own velocity, so patches with VCF/VCA VELOCITY SENS respond to how hard you play. OFF: every note plays at a fixed velocity 100 — the plugin's own wrapper rule, graded byte for byte against the plugin (wrapper_velocity_gate.py). A DAW preset does not change this switch; only the plugin's own switch does.">Kbd&nbsp;Vel
+      <input type="checkbox" id="velSw" checked onchange="velSwApply()"></label>
+    <label id="velLbl" title="Note-on velocity for the on-screen keys (MIDI keys use their own; VCF/VCA VELOCITY SENS respond to it). Only honoured when the velocity switch is ON.">Vel
       <input type="range" id="vel" min="1" max="127" step="1" value="100" oninput="document.getElementById('velV').textContent=this.value" style="vertical-align:middle">
       <span id="velV">100</span></label>
     <label id="outLbl" title="MONITOR FADER — the fader a DAW track gives you. It is NOT part of the synth: it is applied after the bit-exact engine, and the engine, its state and every A/B gate are upstream of it. Why it is needed: the engine's master stage ends with out = 2 x (x * cell101312), and cell 101312 has exactly ONE writer in the whole plugin binary — the constructor, storing 1.0 — so there is no master attenuation anywhere, and Boost Mode / Output Gain are executed no-ops. The plugin really is this hot. Measured across all 128 patches in both banks, warmed (the state a real instance is always in): worst single-note peak 1.110 (Chillwave 30), worst 4-note-chord peak 1.937 (factory 38). A DAW carries that in floating point and you pull the fader; a browser hard-clamps at 0 dBFS and it becomes harsh digital clipping. The default 0.50 is 1/1.937 rounded down, i.e. the measured value that keeps the hottest four-note chord in either bank just under full scale. Set it to 1.00 for the raw engine signal.">Out
@@ -129,7 +129,7 @@ import { decodeBank } from "./bank.js";
 
 /* Cache-buster: build.sh rewrites this to the WASM content hash each build, so a new
  * engine is always fetched fresh instead of served from the browser/CDN cache. */
-const BUILD_VER = "d68006d9afc1";
+const BUILD_VER = "f1d8c00153e9";
 
 // The plugin runs its DSP natively at the host sample rate (no oversampling, no
 // decimator). SR is replaced at boot with the AudioContext's ACTUAL rate so the
@@ -229,8 +229,6 @@ async function boot() {
     if (audioCtx.sampleRate > 0) SR = audioCtx.sampleRate | 0;
   } catch (e) { console.warn("JUNO: AudioContext unavailable at boot; defaulting engine to", SR, "Hz", e); }
   ctx = M.cwrap("juno_gui_create","number",["number","number"])(SR, 0);  // engine at host rate.
-  velSwFn(ctx, document.getElementById("velSw").checked ? 1 : 0);  // sync switch set before engine was ready
-  velSwApply();                                  // reflect the default (SW OFF) in the Vel slider's enabled state
   // chorus_mode MUST be 0: any nonzero mode writes a LEGACY hand-rolled chorus
   // block (state 90624..90832) that the real plugin NEVER populates (proven by
   // executing the plugin cold/warm/recalled/rendered — the block stays zero).
@@ -243,6 +241,9 @@ async function boot() {
   // through the host entry. Without this the app would play the engine after BUILD
   // (eight voices), which no DAW instance ever is. Gated: state_load_gate.py (boot).
   if (!M.cwrap("juno_gui_plugin_init","number",["number"])(ctx)) { status("engine init failed"); return; }
+  // plugin_init sets the velocity switch as the plugin's start-up does (ON);
+  // then the page's own switch (default ON) is pushed, and the Vel slider shown
+  velSwApply();
   // Warm the engine to its steady idle state, exactly as a DAW does by rendering
   // silence from the moment the plugin is activated. ~190 smoothed control cells
   // start at 0 and only converge toward their targets WHILE rendering; a freshly
@@ -586,17 +587,15 @@ function mkKey(midi, cls, left) {
 function note(midi, on) {
   ensureAudio();
   // Notes enter through the WRAPPER-level MIDI path (juno_gui_midi_note_on),
-  // exactly like a DAW's events enter the real plugin. The SYSTEM "Keyboard
-  // Velocity SW" ships ON here so VELOCITY SENS patches are playable (with it
-  // OFF — the plugin's factory SYSTEM default, one click away — the engine
-  // receives fixed velocity 100 no matter what: the plugin's own wrapper rule,
-  // see juno_bridge.c).
-  const vel = +$("#vel").value;   // 1..127; only honored when Kbd Vel SW is ON
+  // exactly like a DAW's events enter the real plugin. The plugin's velocity
+  // switch is ON in a fresh instance (vm.vs.velSense = 1), so a key plays its
+  // own velocity; with it OFF the wrapper forces 100 (juno_bridge.c).
+  const vel = +$("#vel").value;   // 1..127; only honored when the switch is ON
   if (on) midiNoteOnFn(ctx, midi, vel); else midiNoteOffFn(ctx, midi);
-  if (on) status(`note ${midi} · vel ${$("#velSw").checked ? vel : "100 (fixed — Kbd Vel SW off, plugin default)"} — live master path, six voices`);
+  if (on) status(`note ${midi} · vel ${$("#velSw").checked ? vel : "100 (fixed — velocity switch off)"} — live master path, six voices`);
 }
 
-// SYSTEM "Keyboard Velocity SW" toggle: mirrors the plugin's wrapper flag.
+// The plugin's velocity switch (vm.vs.velSense): mirrors the wrapper flag.
 // Monitor fader state (slider 0..127 -> gain 0..1, default 57 -> 0.45).
 let OUT_GAIN = 0.50;   /* = 1/1.937 rounded down: the measured worst 4-note-chord WARM peak */
 function outVolApply() {
@@ -610,7 +609,7 @@ function velSwApply() {
   $("#vel").disabled = !on;                    // UI first — engine call below must not block it
   $("#velLbl").style.opacity = on ? "1" : ".45";
   if (typeof velSwFn === "function" && ctx) velSwFn(ctx, on ? 1 : 0);
-  status(`Keyboard Velocity SW ${on ? "ON — real velocities" : "OFF — every note fixed at velocity 100 (the plugin's default behavior)"}`);
+  status(`velocity switch ${on ? "ON — real velocities (the plugin's default)" : "OFF — every note fixed at velocity 100"}`);
 }
 
 // --- Web MIDI: play the engine from a hardware keyboard. Uses ONLY the proven
