@@ -107,13 +107,67 @@ uint32_t (*juno_voice_render_fn)(unsigned char *, int, float *, float *)
 float *(*juno_master_render_fn)(unsigned char *, float **, float **)
     = juno_master_render;
 
+#ifndef EB_DEVCELLS
+#define UNIT_MAGIC 0x54494E55              /* "UNIT": per-voice noise copies live */
+typedef char unit_fits[(JUNO_UNIT_END <= JUNO_STATE_BYTES && JUNO_NOISE_BLOCK_LEN <= 176u) ? 1 : -1];
+static int unit_split(const unsigned char *st)
+{
+    int32_t m;
+    memcpy(&m, st + JUNO_UNIT_BASE, 4);
+    return m == UNIT_MAGIC;
+}
+static unsigned char *unit_noise(unsigned char *st, int v)
+{
+    return st + JUNO_UNIT_BASE + 16u + 176u * (unsigned)v;
+}
+#endif
+
+/* Voice v's own copy of the noise block (for gates): the per-voice copy once
+ * a count below 8 has been rendered, else the one shared block. */
+const unsigned char *juno_driver_unit_noise(const unsigned char *st, int v)
+{
+#ifndef EB_DEVCELLS
+    if (unit_split(st) && v >= 0 && v < JUNO_NUM_VOICES) return unit_noise((unsigned char *)st, v);
+#endif
+    (void)v;
+    return st + JUNO_NOISE_BLOCK_OFF;
+}
+
 void juno_driver_render_voices(unsigned char *st, float *vbuf)
 {
     unsigned char nblk[JUNO_NOISE_BLOCK_LEN];
-    int v;
+    int v, nv = juno_voice_count(st);
+#ifndef EB_DEVCELLS
+    /* A VOICE COUNT BELOW 8 (CLAIMS B10): each voice steps ITS OWN noise copy,
+     * as each plugin unit does, so a stopped unit's copy freezes and stays its
+     * own when the unit runs again. Entered the first time a count below 8 is
+     * rendered (every copy = the shared block: the units ran in lockstep until
+     * then) and kept from then on. With all eight voices in lockstep the result
+     * is the path below, bit for bit. */
+    if (nv < JUNO_NUM_VOICES || unit_split(st)) {
+        if (!unit_split(st)) {
+            int32_t m = UNIT_MAGIC;
+            for (v = 0; v < JUNO_NUM_VOICES; ++v)
+                memcpy(unit_noise(st, v), JCELL(st, JUNO_NOISE_BLOCK_OFF), JUNO_NOISE_BLOCK_LEN);
+            memcpy(st + JUNO_UNIT_BASE, &m, 4);
+        }
+        for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+            float vr = 0.0f;
+            vbuf[v] = 0.0f;
+            if (v >= nv) continue;
+            memcpy(JCELL(st, JUNO_NOISE_BLOCK_OFF), unit_noise(st, v), JUNO_NOISE_BLOCK_LEN);
+            juno_voice_render_fn(st, v, &vbuf[v], &vr);
+            memcpy(unit_noise(st, v), JCELL(st, JUNO_NOISE_BLOCK_OFF), JUNO_NOISE_BLOCK_LEN);
+        }
+        return;
+    }
+#endif
     /* snapshot the block, then restore before EACH voice so all 8 step from the
      * same state (nblk) and read the identical one-step advance; after the loop the
-     * block is left advanced exactly once (by the last voice) — matching the plugin. */
+     * block is left advanced exactly once (by the last voice) — matching the plugin.
+     * A voice at or above the engine's voice count is not rendered at all: its
+     * output is zero and its state does not move (rva 0x3C7400, CLAIMS B10). */
+    (void)nv;                              /* here every voice runs (count >= 8) */
     memcpy(nblk, JCELL(st, JUNO_NOISE_BLOCK_OFF), JUNO_NOISE_BLOCK_LEN);
     for (v = 0; v < JUNO_NUM_VOICES; ++v) {
         float vr = 0.0f;
@@ -145,8 +199,17 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
      * captured baseline — so the master always produces the faithful signal. */
     {
         float *a3[2] = { outL, outR };
+        float keep[JUNO_NUM_VOICES];
+        int nv = juno_voice_count(st), v0 = nv < 0 ? 0 : nv;
         *outL = 0.0f; *outR = 0.0f;
+        /* the master writes every voice's input sample into the voice output
+         * cell (10672 + v*10512) of ITS OWN unit; a voice the count stops keeps
+         * the last output its unit rendered (CLAIMS B10) */
+        for (i = v0; i < JUNO_NUM_VOICES; ++i)
+            keep[i] = JF(st, 10672u + (unsigned)i * JUNO_VOICE_MAIN_STRIDE);
         juno_master_render_fn(st, a2, a3);
+        for (i = v0; i < JUNO_NUM_VOICES; ++i)
+            JF(st, 10672u + (unsigned)i * JUNO_VOICE_MAIN_STRIDE) = keep[i];
 #ifndef EB_DEVCELLS
         /* The plugin steps every unit's ramp records AFTER that unit's DSP of the
          * sample (its render wrappers tail-jump to the pump, rva 0x3C24A0), so

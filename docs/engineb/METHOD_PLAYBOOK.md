@@ -2511,3 +2511,34 @@ by `kill -0` alone. Now a job is alive only if its pgid answers AND its 20 s hea
 ### The rule
 Liveness needs two facts that a restart cannot both fake: the process answers, and the job's
 own heartbeat is fresh. A pid alone is a number the kernel reuses.
+
+## 130. A HARNESS WITHOUT A TEB TURNS EVERY MAGIC STATIC INTO A GHOST
+Paid 2026-10-06 (JUNO, CLAIMS B6). For ten weeks the plugin's IComponent::initialize "could not run
+under emulation" (P112 §7: a CRT abort in a magic-static string parse). Root cause: the emulator gave
+the plugin no TEB, so `gs:[0x58]` read zero, the thread's init epoch read 0, and every MSVC
+function-local static (`guard > epoch` -> initialise) looked already built: empty strings and
+vectors were used. A TEB with the PE's TLS template (epoch INT_MIN) fixed it; the rest was operating-
+system plumbing (OS version, InitOnceExecuteOnce, GetProcAddress, a read-only file system holding the
+plugin's own Script.xml, a few Shell and COM objects), each found by the next failure.
+### The rule
+Before calling a wall "not constructible", give the binary the process it was written for: TEB/TLS,
+the DLL entry point (not a hand-run initializer table), then the host's own call sequence
+(InitDll, factory, initialize). Run the CRT; do not imitate it.
+
+## 131. AN ORACLE THAT SKIPS PART OF THE PLUGIN'S BLOCK IS A MODEL OF THAT PART
+Paid 2026-10-06 (JUNO, CLAIMS A21/B10). The e2e harness replaced the engine render (rva 0x3C7400) by
+direct per-unit calls and kept only the assigner block counter. The render's preamble also syncs
+every assigner to the engine's voice count and skips the units above it; with the harness's zero
+HOST the count was never set, so every gate ran eight voices while the shipped plugin runs six.
+Port and oracle agreed -- with each other.
+### The rule
+When a harness replaces a plugin function by its "essential" calls, list EVERY call and branch of
+the replaced function and state which ones the harness keeps. A dropped branch is an open claim.
+
+## 132. THE PLUGIN AS SHIPPED IS NOT THE ENGINE AFTER BUILD -- RUN ITS OWN DEFAULTS
+Paid 2026-10-06 (JUNO, CLAIMS B6/A21). The plugin's initialize queues its whole default state (95
+values) for the first process() call; one of them (voiceCount 6) changes how every note is played.
+No gate saw it, because every gate starts from BUILD. The wrapper boot found it in one census.
+### The rule
+The reference starting point is what the product does before the first audio block, executed:
+construction, initialize, the first block's queued events. BUILD is a model of that start.

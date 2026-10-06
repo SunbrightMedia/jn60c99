@@ -47,6 +47,17 @@ NOTEOFF = IB + 0x3C72D0   # sub_7FF91E0272D0 -> noteobj 024230 -> assigner noteO
 # (1 = MONO, 2 = UNISON, else POLY). Recall that only DISPATCHes leaves the
 # assigner permanently in POLY; see docs/ASSIGNER_MODE_FINDING.md.
 ASG_NOTIFY = IB + 0x3549B0
+# THE VOICE COUNT (CLAIMS B10, docs/B6_WRAPPER_BOOT.md). The engine keeps it at
+# HOST+0x38: the CWaveGen ctor (rva 0x3C5A50) sets 8, the host entry's special id
+# 0x0FFFC00E (vm.vs.voiceCount, default 6, pushed by the plugin's initialize) sets
+# it. The engine render (rva 0x3C7400) then, per voice unit u = 0..7 and EVERY
+# block: if assigner[u]'s count (getter rva 0x355A60) differs, calls its
+# setVoiceCount (rva 0x355940, which resets the assigner); and renders only units
+# u < count (the others' outputs are zero, their DSP does not run).
+HOST_NVOICE = 0x38
+ASG_GET_COUNT = IB + 0x355A60
+ASG_SET_COUNT = IB + 0x355940
+VOICECOUNT_ID = 0x0FFFC00E
 VOICE_WRAP  = IB + 0x398F30   # (state, voiceIdx, DWORD** outPair)
 MASTER_WRAP = IB + 0x398EC0   # (state, float** a2x16, ptr-> {outL*, outR*})
 ALLOC   = IB + 0x67522C
@@ -276,6 +287,8 @@ class E2E:
     # ------------------------------------------------------------ instance ops
     def build(self, sr):
         self.HOST=self.bump(0x8000); self.uc.mem_write(self.HOST,b"\x00"*0x8000)
+        # the one ctor field the render reads (rva 0x3C5A50: [HOST+0x38] = 8)
+        self.uc.mem_write(self.HOST+HOST_NVOICE, struct.pack("<i", 8))
         self.call(BUILD, rcx=self.HOST)
         self.call_f(SETSR, self.HOST, sr)
         u=self.uc
@@ -362,12 +375,22 @@ class E2E:
         done=0
         while done<n:
             b=min(block,n-done)
-            # per-block per-voice: assigner counter += b (sub_7FF91DFB5AB0)
+            # per-block per-voice, as the engine render (rva 0x3C7400) does:
+            # sync the assigner's voice count to HOST+0x38, then assigner
+            # counter += b (sub_7FF91DFB5AB0)
+            nv=self.rd_i32(self.HOST+HOST_NVOICE)
             for v in range(8):
+                if self.call(ASG_GET_COUNT, rcx=self.assign[v]) & 0xFFFFFFFF != nv & 0xFFFFFFFF:
+                    self.call(ASG_SET_COUNT, rcx=self.assign[v], rdx=nv & 0xFFFFFFFF)
                 c=int.from_bytes(uc.mem_read(self.assign[v]+168,8),'little')
                 uc.mem_write(self.assign[v]+168, struct.pack("<Q",(c+b)&(2**64-1)))
-            # voices (whole block each, in order — units are isolated)
+            # voices (whole block each, in order — units are isolated); a unit at
+            # or above the voice count is not rendered and outputs zeros
             for v in range(8):
+                if v >= nv:
+                    uc.mem_write(offs[('m',v)], b"\x00"*(4*b))
+                    uc.mem_write(offs[('s',v)], b"\x00"*(4*b))
+                    continue
                 uc.mem_write(PB_VOICE, struct.pack("<QQQQQ",
                     self.state[v], v, offs[('m',v)], offs[('s',v)], b))
                 self._run(self.SVOICE)

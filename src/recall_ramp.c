@@ -53,7 +53,7 @@ static const uint32_t RR_CELLS[] = {
 #define RR_N ((int)(sizeof(RR_CELLS) / sizeof(RR_CELLS[0])))
 typedef char rr_n_is_73[(RR_N == 73) ? 1 : -1];
 typedef char rr_stride_is_10512[(JUNO_VOICE_MAIN_STRIDE == 10512) ? 1 : -1];
-typedef char rr_table_fits[(JUNO_RR_BASE + 32u + 34u * JUNO_RAMP_N <= JUNO_RR_END) ? 1 : -1];
+typedef char rr_table_fits[(JUNO_RR_BASE + 32u + 34u * JUNO_RAMP_N <= JUNO_VOICE_COUNT_CELL) ? 1 : -1];
 
 /* The record table, port-owned memory at JUNO_RR_BASE (src/juno_engine.h): a
  * 32-byte header {magic, n_active, revtime, rev_on, tap2, arp_on, cut_last, 1 spare}, one record
@@ -364,15 +364,27 @@ void juno_rr_settle(unsigned char *st)
 }
 
 /* one sample: the plugin's pump (rva 0x3C24A0) after the DSP of the sample */
+/* The engine unit a ramped cell belongs to, as the gates compare it: voice v's
+ * main block and aux pair are unit v, everything else the master (unit 8). */
+static int rr_unit(uint32_t cell)
+{
+    if (cell >= 176u && cell < 176u + 8u * JUNO_VOICE_MAIN_STRIDE) return (int)((cell - 176u) / JUNO_VOICE_MAIN_STRIDE);
+    if (cell >= 101488u && cell < 101488u + 8u * 32u) return (int)((cell - 101488u) / 32u);
+    return 8;
+}
+
 void juno_rr_pump(unsigned char *st)
 {
-    int k;
+    int k, nv;
     int16_t *L;
     if (HDR(st, H_MAGIC) != RR_MAGIC || HDR(st, H_NACT) <= 0) return;
     L = act_list(st);
+    nv = juno_voice_count(st);
     for (k = 0; k < HDR(st, H_NACT); ) {
         rr_rec *r = rec_at(st, L[k]);
         juno_ramp x;
+        int u = rr_unit(JUNO_RAMP_CELL[L[k]]);
+        if (u < 8 && u >= nv) { ++k; continue; }   /* a unit the render does not run steps nothing (rva 0x3C7400) */
         x.out = (float *)JCELL(st, JUNO_RAMP_CELL[L[k]]);
         x.incr = r->incr; x.accum = r->accum; x.start = r->start; x.target = r->target;
         x.rate = JF(st, 16);

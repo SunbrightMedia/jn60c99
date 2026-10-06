@@ -73,6 +73,15 @@ WIN_HI = max(SHADOW.values()) + 16                # one cell grid past the highe
 # EB_DEVCELLS, so the device map need not carry it (checks 4/5 do not apply).
 RR_BASE = 11022464
 RR_END = 11049632                                 # 32-byte header + 798 records of 32 bytes + active list
+                                                  # (+ the voice count, its last 4 bytes: CLAIMS B10)
+# The per-voice units the voice count stops (src/juno_driver.c, CLAIMS B10):
+# noise copies, port-owned, past the ramp table; compiled out under EB_DEVCELLS.
+UNIT_BASE = 11049632
+UNIT_END = UNIT_BASE + 16 + 8 * 176
+
+
+def in_port_owned(o):
+    return WIN_LO <= o < WIN_HI or RR_BASE <= o < RR_END or UNIT_BASE <= o < UNIT_END
 TOOTH = os.environ.get('JUNO_SHADOW_TOOTH', '')
 
 
@@ -86,7 +95,9 @@ def check_defines():
     hdr(0, 'the #defines still say what this gate assumes')
     txt = open(os.path.join(ROOT, 'src', 'juno_engine.h')).read()
     ok = True
-    for name, want in sorted(list(SHADOW.items()) + [('JUNO_RR_BASE', RR_BASE), ('JUNO_RR_END', RR_END)]):
+    for name, want in sorted(list(SHADOW.items()) + [('JUNO_RR_BASE', RR_BASE), ('JUNO_RR_END', RR_END),
+                                                      ('JUNO_VOICE_COUNT_CELL', RR_END - 4),
+                                                      ('JUNO_UNIT_BASE', UNIT_BASE)]):
         m = re.search(r'#define\s+%s\s+(\d+)u?' % name, txt)
         got = int(m.group(1)) if m else None
         print('    %-14s src says %-12s gate assumes %d' % (name, got, want))
@@ -109,7 +120,7 @@ def check_regions():
     offs = set()
     for a, b in regions:
         offs.update(range(a & ~3, b, 4))
-    bad = sorted(o for o in offs if WIN_LO <= o < WIN_HI or RR_BASE <= o < RR_END)
+    bad = sorted(o for o in offs if in_port_owned(o))
     print('    %d compared cells, highest %d' % (len(offs), max(offs)))
     print('    shadow window [%d, %d) + ramp table [%d, %d): %d compared cells inside'
           % (WIN_LO, WIN_HI, RR_BASE, RR_END, len(bad)))
@@ -160,7 +171,7 @@ def check_literals():
             p = os.path.join(d, name)
             for ln, line in enumerate(open(p, errors='replace'), 1):
                 for lit in re.findall(r'\b\d{8,9}\b', line):
-                    if WIN_LO <= int(lit) < WIN_HI or RR_BASE <= int(lit) < RR_END:
+                    if in_port_owned(int(lit)):
                         hits.append((sub + '/' + name, ln, lit))
     print('    scanned tools/verify + tools/engineb; %d hit(s)' % len(hits))
     for h in hits:

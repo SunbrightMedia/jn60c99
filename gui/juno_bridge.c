@@ -30,6 +30,13 @@ typedef struct {
     unsigned char voice_gated[JUNO_NUM_VOICES];/* 1 = note held (gate on), 0 = released */
     unsigned voice_age[JUNO_NUM_VOICES];/* allocation order (LRU; higher = newer)    */
     unsigned age_counter;
+    /* THE ASSIGNER'S VOICE COUNT (CLAIMS B10): CAssignJu60 +8 (getter rva
+     * 0x355A60), 8 after construction. Every allocator scan runs over voices
+     * [0, asg_count) as the plugin's do (a1[2], mask a1[3], list length a1[38]).
+     * The render syncs it to the engine's count (juno_voice_count) before each
+     * block, as the engine render does per voice unit (rva 0x3C7400 ->
+     * setVoiceCount rva 0x355940): see asg_set_count. */
+    int asg_count;
 
     /* Voice-assign modes (CAssignJu60, transcribed from the binary — see
      * docs/VOICE_MODES.md / scratchpad/oracle/assign_modes_findings.md). Recalled
@@ -190,6 +197,7 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     juno_apply_condition(c->st, 128);    /* default CONDITION -> per-voice analog scatter  */
     c->last_condition = 128;
     c->chorus_mode = chorus_mode;
+    c->asg_count = JUNO_NUM_VOICES;
     for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
     /* arp: bit-exact CArpeggio, off by default. carp_init seeds the plugin's
      * power-on arp state exactly: UP, 1 octave, 120 BPM, and — the binary defaults —
@@ -233,6 +241,7 @@ void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
     juno_apply_condition(c->st, 128);
     c->last_condition = 128;
     c->chorus_mode = chorus_mode;
+    c->asg_count = JUNO_NUM_VOICES;
     for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
     carp_init(&c->arp);
     c->arp_on = 0;
@@ -593,7 +602,7 @@ void juno_gui_gate(juno_ctx *c, float v)
 static int pick_oldest(juno_ctx *c, int want_assigned, int want_gated)
 {
     int v, pick = -1; unsigned oldest = 0;
-    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+    for (v = 0; v < c->asg_count && v < JUNO_NUM_VOICES; ++v) {
         int assigned = c->voice_note[v] >= 0;
         if (assigned != want_assigned) continue;
         if (assigned && (int)c->voice_gated[v] != want_gated) continue;
@@ -606,7 +615,7 @@ static int pick_oldest(juno_ctx *c, int want_assigned, int want_gated)
 static int pick_newest(juno_ctx *c, int want_assigned, int want_gated)
 {
     int v, pick = -1; unsigned newest = 0;
-    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+    for (v = 0; v < c->asg_count && v < JUNO_NUM_VOICES; ++v) {
         int assigned = c->voice_note[v] >= 0;
         if (assigned != want_assigned) continue;
         if (assigned && (int)c->voice_gated[v] != want_gated) continue;
@@ -649,7 +658,7 @@ static void poly_note_on(juno_ctx *c, int midi_note, int velocity, int variant)
         if (pick >= 0 && c->voice_note[pick] != midi_note) pick = -1;
         if (pick < 0) {                                 /* same-note among any assigned */
             int best = -1; unsigned age = 0, w;
-            for (w = 0; w < JUNO_NUM_VOICES; ++w)
+            for (w = 0; (int)w < c->asg_count && w < JUNO_NUM_VOICES; ++w)
                 if (c->voice_note[w] == midi_note && (best < 0 || c->voice_age[w] > age))
                     { age = c->voice_age[w]; best = w; }
             pick = best;
@@ -668,7 +677,7 @@ static void poly_note_on(juno_ctx *c, int midi_note, int velocity, int variant)
                                                            the tie-break differs — highest slot
                                                            index wins, so we scan 7->0. */
             int w; unsigned oldest = 0;
-            for (w = JUNO_NUM_VOICES - 1; w >= 0; --w)
+            for (w = (c->asg_count < JUNO_NUM_VOICES ? c->asg_count : JUNO_NUM_VOICES) - 1; w >= 0; --w)
                 if (!c->voice_gated[w] && (pick < 0 || c->voice_age[w] < oldest))
                     { oldest = c->voice_age[w]; pick = w; }
         }
@@ -680,7 +689,7 @@ static void poly_note_on(juno_ctx *c, int midi_note, int velocity, int variant)
          * voice 0, and per-voice CONDITION scatter changed the sound from
          * sample 2 (docs/ASSIGN_MODE_3_FINDING.md; 22 of 22 user mode-3
          * patches; tools/verify/seed_recall_gate.py legal seeds). */
-        for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        for (v = 0; v < c->asg_count && v < JUNO_NUM_VOICES; ++v)
             if (c->voice_note[v] < 0 || !c->voice_gated[v]) { pick = v; break; }
     }
     if (pick < 0)                                       /* steal: newest if porta, else oldest */
@@ -711,12 +720,13 @@ static void poly_note_on(juno_ctx *c, int midi_note, int velocity, int variant)
      * differing sample at index 2). */
     if (!variant && c->legato && c->portamento_on) {
         int silent = 1, i;
-        for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        int nv = c->asg_count < JUNO_NUM_VOICES ? c->asg_count : JUNO_NUM_VOICES;
+        for (v = 0; v < nv; ++v)
             if (c->voice_gated[v]) { silent = 0; break; }
-        for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        for (v = 0; v < nv; ++v)
             juno_note_porta_gate(c->st, v, silent, c->porta_base);
-        if (silent) c->legato_mask = (1u << JUNO_NUM_VOICES) - 1u;
-        for (i = 0; i < JUNO_NUM_VOICES; ++i)
+        if (silent) c->legato_mask = nv > 0 ? (1u << nv) - 1u : 0u;   /* the assigner's mask a1[3] */
+        for (i = 0; i < nv; ++i)
             if (i != pick && ((c->legato_mask >> i) & 1u)) {
                 if (c->voice_note[i] != midi_note) juno_note_glide(c->st, i, midi_note);
                 c->voice_note[i] = midi_note;
@@ -758,7 +768,7 @@ static void mono_note_on(juno_ctx *c, int midi_note, int velocity)
         juno_note_velocity(c->st, 0, velocity);          /* refresh VCF/VCA vel, no gate edge */
         c->voice_note[0] = midi_note;
     }
-    for (v = 1; v < JUNO_NUM_VOICES; ++v)               /* force mono: release the rest */
+    for (v = 1; v < c->asg_count && v < JUNO_NUM_VOICES; ++v)   /* force mono: release the rest */
         if (c->voice_note[v] >= 0) { juno_note_off(c->st, v); c->voice_gated[v] = 0; }
 }
 
@@ -776,7 +786,7 @@ static void mono_note_on(juno_ctx *c, int midi_note, int velocity)
 static void unison_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     int v, was_idle = !c->voice_gated[0];
-    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+    for (v = 0; v < c->asg_count && v < JUNO_NUM_VOICES; ++v) {
         unsigned keep_age = c->voice_age[v];
         if (was_idle) {
             /* UNISON retrigger arms the DCO phase-reset latch on ALL EIGHT
@@ -807,6 +817,56 @@ static void unison_note_on(juno_ctx *c, int midi_note, int velocity)
     }
 }
 
+/* THE ASSIGNER'S setVoiceCount (rva 0x355940, CLAIMS B10), which the engine
+ * render calls on every voice unit's assigner whose count differs from the
+ * engine's (rva 0x3C7400). READ, transcribed in order:
+ *   hold-off (0x354C70, a2 = 0) and all-notes-off (0x3530B0 -> 0x355270): a
+ *     gate-off for every voice of the OLD count whose slot is GATED -- a voice
+ *     already released gets nothing (its DCO latch is not armed);
+ *   the count body (0x354D30): count = min(n, 8) (no lower clamp), every note
+ *     slot "no note" (0xFF), the voice-priority list rebuilt as [0..count-1]
+ *     (fresh ages: the top-down LRU scan then starts at count-1), the legato
+ *     mask and the held-note mask cleared;
+ *   the mode reader (0x3549F0) and LEGATO re-read: the patch's cached mode and
+ *     legato, unchanged here.
+ * The engine's held flag (1856) follows as in the ASSIGN MODE change flush
+ * below, which runs the same two plugin functions. */
+static void asg_set_count(juno_ctx *c, int n)
+{
+    int v, old = c->asg_count < JUNO_NUM_VOICES ? c->asg_count : JUNO_NUM_VOICES;
+    for (v = 0; v < old; ++v)
+        if (c->voice_gated[v]) juno_note_off(c->st, v);
+    c->asg_count = n > JUNO_NUM_VOICES ? JUNO_NUM_VOICES : n;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+        c->voice_note[v] = -1;
+        c->voice_gated[v] = 0;
+        c->voice_age[v] = 0;
+    }
+    c->legato_mask = 0;
+    c->held_notes[0] = c->held_notes[1] = c->held_notes[2] = c->held_notes[3] = 0;
+    juno_note_broadcast_held(c->st, 0);
+}
+
+/* The engine render's per-block preamble (rva 0x3C7400): the assigners follow
+ * the engine's voice count before anything renders. The comparison is with the
+ * RAW engine count, as the plugin's is (a count above 8 resets every block). */
+static void asg_sync(juno_ctx *c)
+{
+    int nv = juno_voice_count(c->st);
+    if (c->asg_count != nv) asg_set_count(c, nv);
+}
+
+/* The host's vm.vs.voiceCount (id 0x0FFFC00E): the plugin's host entry stores
+ * the raw value at engine +0x38 and nothing else (rva 0x3C7AE0); the next render
+ * applies it. The plugin's default state sends 6 (Script.xml range 2..8). */
+void juno_gui_set_voice_count(juno_ctx *c, int n)
+{
+    if (c) juno_set_voice_count(c->st, n);
+}
+int juno_gui_voice_count(juno_ctx *c) { return c ? juno_voice_count(c->st) : 0; }
+/* voice v's own noise block (gates): see juno_driver_unit_noise */
+const void *juno_gui_unit_noise(juno_ctx *c, int v) { return c ? (const void *)juno_driver_unit_noise(c->st, v) : 0; }
+
 static void synth_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     held_set(c, midi_note);
@@ -825,7 +885,7 @@ static void synth_note_on(juno_ctx *c, int midi_note, int velocity)
 static void poly_release_key(juno_ctx *c, int key)
 {
     int v;
-    for (v = 0; v < JUNO_NUM_VOICES; ++v)
+    for (v = 0; v < c->asg_count && v < JUNO_NUM_VOICES; ++v)
         if ((c->voice_note[v] == key && c->voice_gated[v]) ||
             (key < 0 && c->voice_note[v] >= 0)) {
             juno_note_off(c->st, v);
@@ -838,7 +898,7 @@ static void poly_release_key(juno_ctx *c, int key)
  * re-gate); else release. `all` = apply to the whole stack (unison) vs voice 0 (mono). */
 static void mono_note_off(juno_ctx *c, int key, int all)
 {
-    int lo, v, last = all ? JUNO_NUM_VOICES : 1;
+    int lo, v, last = all ? (c->asg_count < JUNO_NUM_VOICES ? c->asg_count : JUNO_NUM_VOICES) : 1;
     if (key >= 0 && c->voice_note[0] != key) return;        /* stale key */
     lo = held_lowest(c);
     if (lo >= 0) {                                          /* fall back to lowest held */
@@ -1444,6 +1504,7 @@ int juno_gui_get_arp(juno_ctx *c)
 int juno_gui_render(juno_ctx *c, float *out, int nframes)
 {
     int i, full = 0;
+    asg_sync(c);                           /* the engine render's preamble (B10) */
     for (i = 0; i < nframes; ++i) {
         if (c->arp_on) arp_tick(c);        /* step the arp pattern in real time */
         juno_note_tick(c->st);
@@ -1502,6 +1563,7 @@ int juno_gui_render_dry(juno_ctx *c, float *out, int nframes)
 {
     int i, v;
     if (!c) return 0;
+    asg_sync(c);
     for (i = 0; i < nframes; ++i) {
         float mix = 0.0f, vbuf[JUNO_NUM_VOICES];
         if (c->arp_on) arp_tick(c);        /* keep the arp advancing in the dry path too */

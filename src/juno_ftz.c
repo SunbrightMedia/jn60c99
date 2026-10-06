@@ -118,9 +118,9 @@ static inline void ftz(unsigned char *st, unsigned off)
  * FTZ/DAZ would. Cheap: 13*8 slot checks per sample. */
 void juno_flush_denormals(unsigned char *st)
 {
-    int v, i;
+    int v, i, nv = juno_voice_count(st);
     if (!juno_flush_enabled) return;          /* the oracle's mode: see above */
-    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+    for (v = 0; v < JUNO_NUM_VOICES && v < nv; ++v) {   /* a voice not rendered keeps its state (B10) */
         unsigned base = (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
         for (i = 0; i < N_VOICE; ++i) ftz(st, base + (unsigned)VOICE_OFF[i]);
     }

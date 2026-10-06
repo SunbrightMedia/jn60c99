@@ -51,7 +51,7 @@ voice unit u = 0..7, sets assigner[u]'s voice count to it when it differs (vt[16
 rva 0x355940) and renders only units u < count (the others' outputs are zeroed,
 their workers not signalled). So the plugin as shipped plays SIX voices. The
 `e2e_emu` harness builds on a zero HOST (engine+0x38 = 0, assigners at 8) and
-renders all eight units: it omits this preamble. Tracked as CLAIMS B10.
+renders all eight units: it omitted this preamble. Now run by the harness and the port, gated: CLAIMS A21, tools/verify/voice_count_gate.py (25/25).
 
 ## Census (probes/b6/state_load_census.py, EXECUTED 2026-10-06)
 

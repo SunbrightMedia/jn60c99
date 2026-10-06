@@ -184,6 +184,25 @@ extern "C" {
  * map does not carry it. tools/verify/shadow_bounds_gate.py checks it. */
 #define JUNO_RR_BASE    11022464u
 #define JUNO_RR_END     11049632u
+/* THE VOICE COUNT (CLAIMS B10): the engine's own count (CWaveGen +0x38: the
+ * ctor writes 8, rva 0x3C5A50; the host entry's id 0x0FFFC00E, vm.vs.voiceCount,
+ * writes the raw value, rva 0x3C7AE0). The engine render (rva 0x3C7400) renders
+ * only voice units below it and syncs every voice unit's assigner to it. Kept in
+ * the last 4 bytes of the ramp-record region (the table ends at 11049628), stored
+ * XOR 8 so a zeroed state reads the ctor's 8; compiled out under EB_DEVCELLS
+ * (the device renders 8). Read/write only through juno_voice_count /
+ * juno_set_voice_count (src/juno_driver.c). */
+#define JUNO_VOICE_COUNT_CELL 11049628u
+/* THE UNITS THE COUNT STOPS (CLAIMS B10, src/juno_driver.c): the plugin's
+ * voice units each own a copy of the shared noise block [84272, 84436) and
+ * step it in lockstep; a unit the count stops keeps its copy frozen, and the
+ * master (unit 8) writes the voice output cells (10672 + v*10512) into its OWN
+ * copy. The port has one state, so once a count below 8 has been rendered it
+ * keeps one noise copy per voice here (magic at +0, copies at +16, 176 bytes
+ * each) and restores a stopped voice's output cell after the master. Port-owned,
+ * past every compared region; compiled out under EB_DEVCELLS. */
+#define JUNO_UNIT_BASE  11049632u
+#define JUNO_UNIT_END   (JUNO_UNIT_BASE + 16u + 8u * 176u)
 
 /* juno_engine_init — exact transcription of sub_1803990C0. Fills the engine
  * state `st` with the real coefficients. Set JF(st,16) to the sample rate first
@@ -219,6 +238,34 @@ void *juno_chorus_init(unsigned char *st);
  * prevents decayed tails from settling into the denormal range (whose ~100x
  * slower ops cause the intermittent audio crackle). See src/juno_ftz.c. */
 void juno_flush_denormals(unsigned char *st);
+
+/* The engine's voice count (CLAIMS B10, JUNO_VOICE_COUNT_CELL): 8 after
+ * construction; juno_set_voice_count stores the host's raw value, as the
+ * plugin's host entry does (no clamp). The render runs voices v < count
+ * (src/juno_driver.c), the ramp pump and the denormal flush skip the others;
+ * the allocator follows it at the next render (gui/juno_bridge.c). Always 8
+ * under EB_DEVCELLS. Header-inline so every driver variant links. */
+static inline int juno_voice_count(const unsigned char *st)
+{
+#ifdef EB_DEVCELLS
+    (void)st;
+    return JUNO_NUM_VOICES;
+#else
+    const unsigned char *p = st + JUNO_VOICE_COUNT_CELL;
+    int32_t x = (int32_t)((uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24));
+    return (int)(x ^ JUNO_NUM_VOICES);
+#endif
+}
+static inline void juno_set_voice_count(unsigned char *st, int n)
+{
+#ifdef EB_DEVCELLS
+    (void)st; (void)n;
+#else
+    uint32_t x = (uint32_t)(n ^ JUNO_NUM_VOICES);
+    unsigned char *p = st + JUNO_VOICE_COUNT_CELL;
+    p[0] = (unsigned char)x; p[1] = (unsigned char)(x >> 8); p[2] = (unsigned char)(x >> 16); p[3] = (unsigned char)(x >> 24);
+#endif
+}
 
 /* juno_enable_hw_ftz — put the CPU into the plugin's SSE flush-to-zero /
  * denormals-are-zero mode (x86 only). On WebAssembly / non-SSE targets this is a

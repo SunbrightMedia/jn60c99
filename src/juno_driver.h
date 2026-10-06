@@ -49,6 +49,10 @@ void juno_driver_render_voices(unsigned char *st, float *vbuf);
  * 1. See juno_driver.c. */
 int juno_driver_render_sample(unsigned char *st, float *outL, float *outR);
 
+/* Voice v's own copy of the shared noise block (CLAIMS B10): per voice once a
+ * voice count below 8 has been rendered, else the one shared block. Gates only. */
+const unsigned char *juno_driver_unit_noise(const unsigned char *st, int v);
+
 #ifdef __cplusplus
 }
 #endif
