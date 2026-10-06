@@ -112,8 +112,9 @@ mine is a hypothesis (playbook 80).
 
 # LIVE STATE (update in place, no dated blocks here, EVER; detail lives in
 # FINAL_GUIDE.md / docs/ — this section is one line-group per arc)
-- **src/ + trunk**: PROVENANCE 27/27 PROVEN; full verify of 9009d62 green, of
-  0e8f853 is job verify_0e8f853 (read its EXIT before any claim). CLAIMS B1-B12
+- **src/ + trunk**: PROVENANCE 27/27 PROVEN; full verify of 9009d62 green; of
+  0e8f853 died without a verdict (container restart); of c45428f is job
+  verify_c45428f (read its EXIT before any claim). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
   mute), juno_gui_state_load (DAW preset), juno_gui_load_patch (its patch
   browser) -- host edits, gated by state_load_gate.py against queues the booted
