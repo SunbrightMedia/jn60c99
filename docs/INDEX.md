@@ -20,6 +20,7 @@ their old paths so no comment pointer dangles. Live project state:
 | ASSIGN_MODE_3_FINDING.md | REFERENCE | ASSIGN MODE 3 — found by the user's banks, never reachable from the factory bank |
 | ATTACK_TRANSIENT_FINDING.md | REFERENCE | BS Solid — the divergence is an ATTACK-TRANSIENT difference (2026-07-27) |
 | AUDIBLE_RECALL_PLAN.md | ARCHIVED | Audible patch recall — feasibility, plan, and progress — *superseded banner in-file; stays (cited by src comments)* |
+| AUDIT_2026-10-06.md | REFERENCE | Audit of the two days 2026-10-05/06 (27 commits): what was re-run or re-read, what was wrong (July reports presented as current; unverified later commits), and HEAD's full-verify verdict |
 | BANK_FORMAT.md | REFERENCE | JUNO-60 preset bank format (KoaBankFile00003 / PG-JU60) |
 | BEND_MOD_SENS.md | REFERENCE | BEND SENS / MOD SENS (DCO + VCF) — derived bit-exact, deferred to the wheel path |
 | BITEXACT_AUDIT.md | REFERENCE | Bit-exact audit: the timbre + arp bugs, and how they were fixed |
