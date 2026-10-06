@@ -114,9 +114,9 @@ mine is a hypothesis (playbook 80).
 
 # LIVE STATE (update in place, no dated blocks here, EVER; detail lives in
 # FINAL_GUIDE.md / docs/ — this section is one line-group per arc)
-- **src/ + trunk**: PROVENANCE 27/27 PROVEN; full verify of 9009d62 green; of
-  9f6b092 RED (job verify_head: coldstate_ab's exclusion, fixed -- playbook
-  141); the re-run on HEAD is job verify_fix (read its EXIT before any claim). The two days 2026-10-05/06
+- **src/ + trunk**: PROVENANCE 27/27 PROVEN; full verify of cd63fc1 GREEN (job
+  verify_fix3, EXIT 0, every section ran; ARM step skipped: no cross
+  toolchain). Later commits are docs only. The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
   mute), juno_gui_state_load (DAW preset), juno_gui_load_patch (its patch
