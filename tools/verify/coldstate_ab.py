@@ -39,23 +39,24 @@ PKL = _JREPO + '/scratchpad/coldstate_ab.pkl'
 # CONDITION analog-scatter cells the port applies at create (per voice), excluded.
 COND_LOCAL = (5520, 7600, 10320)
 
-# EXCLUDED: ONE cell, and it is a known, OWED port gap, not a "default".
-# 11022344 is the warm-up mute counter BUILD sets to 960 (rva 0x398ea0). The
-# plugin's render wrapper mutes its output while it counts down; the port has
-# no warm-up mute, and every oracle drive zeroes the counter
-# (e2e_emu.clear_latch) so the two can be compared at all. OWED: transcribe the
-# wrapper's mute and drive the oracle without clear_latch (DAW-parity work).
-# The other four cells this set used to hold (102544, 10759360, 10759472,
-# 10759840) were written into the port's init/prepare on 2026-10-05 and are
-# now GATED: the old note said "the port writes them at recall", which was
-# true for 4 of 64 patches (tools/verify/rate_sweep_gate.py compares the whole
-# object after recall).
-# (11022052 — the plugin's slot-2 EFFECT-routing int, power-on 2 — was excluded
-# here until 2026-07-19. That exclusion hid a REAL divergence: the port seeded its
-# routing 0, idling in the Pan arm while the plugin free-runs the chorus arm from
-# power-on, which broke warm/DAW-parity on every chorus patch (BS Solid report).
-# juno_engine_prepare now writes the proven power-on value, so the cell is GATED.)
-FX_RECALL_DEFAULT = {11022344}
+# EXCLUDED: NOTHING (since 2026-10-06). The last excluded cell, 11022344, is
+# the start-up mute counter the plugin's BUILD sets to 960 (rva 0x398ea0; the
+# render mutes a unit while it counts down). The port implements it
+# (src/juno_driver.c, CLAIMS A22): juno_gui_plugin_init arms it, the product
+# path; juno_gui_create leaves it 0 because every older gate drives the
+# oracle with e2e_emu.clear_latch and compares that engine. Here the port side
+# arms it explicitly (juno_driver_arm_latch) -- the constructor's state is
+# what this gate compares -- so the whole object is compared, nothing excluded.
+# History: until 2026-10-06 this cell was excluded as "audio-inert", guarded by
+# the self-check below; the day the port gained the mute, the check went red
+# (correctly) and the three full verifies that would have shown it died with
+# their container (docs/AUDIT_2026-10-06.md). The four cells excluded before
+# 2026-10-05 (102544, 10759360, 10759472, 10759840) are written by the port's
+# init/prepare since then and gated. (11022052 -- the slot-2 EFFECT-routing
+# int, power-on 2 -- was excluded until 2026-07-19 and hid a REAL divergence:
+# the port seeded its routing 0; juno_engine_prepare now writes the proven
+# power-on value.) An exclusion added here MUST pass the self-check.
+FX_RECALL_DEFAULT = set()
 
 def rate_arg():
     return float(sys.argv[2]) if len(sys.argv) > 2 else 48000.0
@@ -70,7 +71,11 @@ if sys.argv[1:2] == ['--port']:
     lib.juno_gui_dump.restype = ctypes.c_int
     lib.juno_gui_dump.argtypes = [ctypes.c_void_p, ctypes.c_int,
                                   ctypes.POINTER(ctypes.c_ubyte), ctypes.c_int]
+    lib.juno_gui_state.restype = ctypes.c_void_p
+    lib.juno_gui_state.argtypes = [ctypes.c_void_p]
+    lib.juno_driver_arm_latch.argtypes = [ctypes.c_void_p]
     c = lib.juno_gui_create(ctypes.c_float(rate), 0)
+    lib.juno_driver_arm_latch(lib.juno_gui_state(c))   # the constructor's start-up mute (960), see the header
     buf = (ctypes.c_ubyte * MEANINGFUL)()
     n = lib.juno_gui_dump(c, 0, buf, MEANINGFUL)
     assert n == MEANINGFUL, n
@@ -92,11 +97,14 @@ if sys.argv[1:2] == ['--port']:
         lib.juno_gui_note_on(cc, 60, 105)
         b = (ctypes.c_float * (2 * 24000))(); lib.juno_gui_render(cc, b, 24000)
         return bytes(b)
-    inert = dflt_render(False) == dflt_render(True)
-    print("  FX-recall-default cells audio-inert at unapplied default:", inert)
-    if not inert:
-        print("  *** FX_RECALL_DEFAULT exclusion is UNSAFE — a cell reaches the output ***")
-        sys.exit(1)
+    if FX_RECALL_DEFAULT:
+        inert = dflt_render(False) == dflt_render(True)
+        print("  FX-recall-default cells audio-inert at unapplied default:", inert)
+        if not inert:
+            print("  *** FX_RECALL_DEFAULT exclusion is UNSAFE — a cell reaches the output ***")
+            sys.exit(1)
+    else:
+        print("  excluded cells: none (the whole object is compared)")
 
 elif sys.argv[1:2] == ['--ref']:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

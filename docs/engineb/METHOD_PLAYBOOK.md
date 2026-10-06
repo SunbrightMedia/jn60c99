@@ -2638,3 +2638,15 @@ that. run_job reported both as DIED (it worked as designed); the disk, refs and 
 While a long job runs, keep a session task alive that ends with the job: a Monitor on the job's
 EXIT file (re-armed at each 30-minute expiry), not a scheduled check-in, which wakes a fresh
 container after the job is gone. A restarted `make verify` keeps every ref that finished.
+
+## 141. AN EXCLUSION IS A CLAIM ABOUT THE PORT -- WHEN THE PORT GAINS THE CELL, THE EXCLUSION DIES; AND A HIDDEN STEP CANNOT BE SEEN DYING
+Paid 2026-10-06 (JUNO, audit). coldstate_ab excluded one cell as "audio-inert" and guarded it with a
+self-check that renders with the cell poked. The port then gained the start-up mute that READS the
+cell (A22). The self-check went red -- correctly -- but the Makefile sent that step's output to
+/dev/null, and the three full verifies that followed died with the idle container. Ten hours of
+commits were unverified while every gate's own run was green and LIVE STATE said "read its EXIT".
+### The rule
+Re-justify every exclusion when the port changes the cells it reads; prefer no exclusion (arm the
+same state on both sides). Never send a gate step's output to /dev/null: a red must be readable in
+the log. A commit is verified only by a COMPLETED make verify with EXIT 0; a green per-gate run on
+the day is not that. Keep the Monitor alive (playbook 140) so the verify completes.
