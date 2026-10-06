@@ -115,6 +115,8 @@ typedef struct {
     int   last_scatter_depth;
     int   kbd_velocity_sw;   /* SYSTEM "Keyboard Velocity SW": 0 = force vel 100
                               * (the wrapper's rule, see juno_gui_midi_note_on) */
+    int   live_recall;       /* 1 while juno_gui_apply_bank_live runs: the recall
+                              * leaves the plugin's recall ramps armed (CLAIMS B1) */
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -1099,11 +1101,13 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
         unsigned i;
         if (!pre) {
             if (!flush) return 0;
-            n = juno_bank_apply(c->st, bank, idx);
+            n = c->live_recall ? juno_bank_apply_live(c->st, bank, idx)
+                               : juno_bank_apply(c->st, bank, idx);
             juno_driver_seed_voices(c->st);  /* degraded fallback: full seed */
         } else {
             memcpy(pre, c->st + 176, JUNO_VOICE_MAIN_STRIDE);
-            n = juno_bank_apply(c->st, bank, idx);
+            n = c->live_recall ? juno_bank_apply_live(c->st, bank, idx)
+                               : juno_bank_apply(c->st, bank, idx);
             for (v = 1; v < JUNO_NUM_VOICES; ++v) {
                 unsigned char *dst = c->st + 176 + (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
                 for (i = 0; i < JUNO_VOICE_MAIN_STRIDE; ++i)
@@ -1234,6 +1238,21 @@ int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx
     /* Recall from the retained copy when we have it (so later edits persist); fall
      * back to the caller's buffer if the copy failed to allocate. */
     return ctx_recall(c, c->bank ? c->bank : bank, idx, 1);
+}
+
+/* A patch change on a RUNNING engine as the plugin does it (CLAIMS B1): the
+ * recall's ramped cells (slot switches, voice mutes, reverb send and decay
+ * coefficients) glide over 4 ms instead of jumping; juno_gui_apply_bank is the
+ * same recall settled, which is what every gate compares against the harness
+ * snap. Graded by tools/verify/warm_render_gate.py live. */
+int juno_gui_apply_bank_live(juno_ctx *c, const unsigned char *bank, int len, int idx)
+{
+    int n;
+    if (!c) return 0;
+    c->live_recall = 1;
+    n = juno_gui_apply_bank(c, bank, len, idx);
+    c->live_recall = 0;
+    return n;
 }
 
 /* --- Host-parameter panel bridge (the 79 Ableton-visible parameters) ----------

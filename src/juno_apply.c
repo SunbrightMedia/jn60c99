@@ -121,6 +121,7 @@
 #include "reverb_recall.h"
 #include "chorus_recall.h"
 #include "effect_modes.h"
+#include "recall_ramp.h"
 
 #define BANK_HEADER   23
 #define BANK_STRIDE   20223
@@ -679,12 +680,38 @@ int juno_bank_hpf_type(const unsigned char *bank, int idx)
  * the coarse binding {35,22,T_ID,6736} alone drives the cutoff (engine-exact). */
 
 /* Apply patch `idx` from `bank` into the engine `state`. Returns #params set. */
+static int bank_apply(unsigned char *state, const unsigned char *bank, int idx, int live);
+
+/* The SETTLED recall every gate compares: the plugin's recall followed by the
+ * harness snap (tools/verify/e2e_emu.py snap_all) -- every recall ramp at its
+ * target. */
 int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
+{
+    return bank_apply(state, bank, idx, 0);
+}
+
+/* The LIVE recall (CLAIMS B1): the plugin's recall with its ramps armed and
+ * NOT settled; the render steps them (src/recall_ramp.c). A patch change on a
+ * running engine. */
+int juno_bank_apply_live(unsigned char *state, const unsigned char *bank, int idx)
+{
+    return bank_apply(state, bank, idx, 1);
+}
+
+static int bank_apply(unsigned char *state, const unsigned char *bank, int idx, int live)
 {
     int i, n = 0;
     const unsigned char *blob;
     int Hr;
+#ifndef EB_DEVCELLS
+    juno_rr_ctx rr;
+#endif
     if (idx < 0 || idx >= BANK_COUNT) return 0;
+#ifndef EB_DEVCELLS
+    juno_rr_begin(state, &rr);   /* before any applier writes (src/recall_ramp.c) */
+#else
+    (void)live;
+#endif
     /* Host rate, exactly as juno_prepare reads it — drives the SR-variant curve
      * selection so recall matches the plugin at 44100/48000/else-96k. An unset
      * rate field (0) defaults to 96 kHz (the engine's historical rate). */
@@ -849,14 +876,26 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
      * ONE site, so a new applier cannot forget to maintain it; do not split
      * this bookkeeping into effect_modes.c / delay_recall.c, both of which
      * clamp their local copy before they return. Order is already right:
-     * juno_apply_delay :782, juno_apply_chorus :799, juno_apply_effect_modes
-     * :807, this update last. JUNO_PREV_DLY is declared and maintained here
-     * but NOT YET READ by any applier (it is owed to the DELAY TYPE >= 6
-     * work); JUNO_PREV_EFX is read by src/chorus_recall.c. */
+     * juno_apply_delay, juno_apply_chorus, juno_apply_effect_modes, this
+     * update last. JUNO_PREV_DLY is read by src/delay_recall.c (the block in
+     * force, CLAIMS A17); JUNO_PREV_EFX by src/chorus_recall.c and
+     * src/effect_modes.c. */
     JI(state, JUNO_PREV_EFX) = record_byte(blob, 634);   /* EFFECT TYPE */
     JI(state, JUNO_PREV_DLY) = record_byte(blob, 650);   /* DELAY  TYPE */
     JI(state, JUNO_PREV_FB)   = record_byte(blob, 3057);  /* DELAY FEEDBACK (1179) */
     JI(state, JUNO_PREV_RESO) = record_byte(blob, 3504);  /* FLANGER RESONANCE (1243) */
+
+#ifndef EB_DEVCELLS
+    /* THE RECALL RAMPS (CLAIMS B1): put the 73 ramped cells back and arm their
+     * records as the plugin does; settle them unless this is a live recall. */
+    rr.new_etype = record_byte(blob, 634);
+    rr.new_dtype = record_byte(blob, 650);
+    rr.new_revtype = record_byte(blob, 658);
+    rr.new_revtime = record_byte(blob, 666);
+    rr.new_revlevel = ((blob[2 * 51] & 0xF) << 4) | (blob[2 * 51 + 1] & 0xF);
+    juno_rr_end(state, &rr);
+    if (!live) juno_rr_settle(state);
+#endif
     return n;
 }
 

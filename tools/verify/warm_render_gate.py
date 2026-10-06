@@ -25,6 +25,8 @@ FAMILIES (records built by --ref and stored in the pickle; --port replays them)
   seed   4 x 8  legal seeded records (every recalled leaf random)
   revl   2 x 8  REVERB LEVEL 0/1/2/3/200 and DELAY LEVEL 0/1/2 across steps:
                 the reverb on/off threshold and its tank-clear counter
+  revtime 2 x 5 the one REVERB TYPE/TIME pair whose TYPE arm (computed with
+                the previous TIME) changes a ramp already in flight
   rapid  2 x 12 recalls 100 samples apart, notes held across them (live mode:
                 a recall lands while the previous recall's ramps are in flight)
 
@@ -37,6 +39,10 @@ TWO-PROCESS RULE: --ref (Unicorn only) writes scratchpad/warm_render_<mode>.pkl;
 TOOTH (--tooth): three assigner defects this gate found, each restored in a
 copy of the tree, must turn --port settled red: unison ageing all 8 voices,
 the voice flush on every load, and the note slots kept after that flush.
+TOOTH (--tooth-live): four defects in the recall ramps must turn --port live
+red: no ramps (the settled recall), the pump before the DSP, the REVERB TYPE
+arm without the previous TIME (only the revtime family can see it), and the
+24 ms time as 4 ms; plus a reach probe that removes the no-op mute pairs.
 
 FP MODE: the oracle (Unicorn) honours DAZ but not FTZ, so --port runs the port
 in that mode (juno_set_fp_oracle_mode, src/juno_ftz.c; playbook 120).
@@ -44,7 +50,7 @@ in that mode (juno_set_fp_oracle_mode, src/juno_ftz.c; playbook 120).
 USAGE
     python3 tools/verify/warm_render_gate.py --ref settled|live
     python3 tools/verify/warm_render_gate.py --port settled|live [-v] [--chain N]
-    python3 tools/verify/warm_render_gate.py --tooth
+    python3 tools/verify/warm_render_gate.py --tooth | --tooth-live
 """
 import gc
 import os
@@ -132,6 +138,21 @@ def chains(bank):
             sets = {rlev: RL[(k + c) % 8], dlev: DL[(k + 3 * c) % 8]}
             sc += step('r%d_R%dD%d' % (base, sets[rlev], sets[dlev]), record_bank(bank, base, sets), k)
         out.append(('revl', RATES[c % 3], sc))
+    # revtime: the REVERB TYPE setter's arm uses the TIME the processor still
+    # holds. That intermediate value changes the outcome only when the final
+    # value equals the stored target while a ramp is in flight; the LP01 table
+    # has exactly one such pair, (TYPE 0, TIME 116) <-> (TYPE 1, TIME 200),
+    # found by search. Alternate them 100 samples apart (< 4 ms).
+    for c, rate in enumerate((44100.0, 96001.0)):
+        base = 0
+        sets = lambda ty, tm: {658: ty, 666: tm, rlev: 200}
+        sc = [('recall', 'rt_T2t128', noarp(record_bank(bank, base, sets(2, 128)))), ('render', 64),
+              ('on', 60), ('render', 256)]
+        for k, (ty, tm) in enumerate(((0, 116), (1, 200), (0, 116), (1, 200))):
+            sc += [('recall', 'rt_T%dt%d' % (ty, tm), noarp(record_bank(bank, base, sets(ty, tm)))),
+                   ('render', 100 if k < 3 else 300), ('check',)]
+        sc += [('off', 60), ('render', 512), ('check',)]
+        out.append(('revtime', rate, sc))
     for c in range(2):
         rnd = random.Random(3000 + c)
         n, b, s = P[rnd.randrange(len(P))]
@@ -364,11 +385,52 @@ def tooth():
     return 0 if (a, b, c) == (0, 0, 0) else 1
 
 
+def tooth_live():
+    """Named defects in the live recall ramps (src/recall_ramp.c); each must turn
+    the LIVE gate red. A tooth that does not bite names an arm rule this gate's
+    chains cannot reach (printed, and the run fails)."""
+    sys.path.insert(0, HERE)
+    from tooth_tree import run_tooth
+    gate = ['tools/verify/warm_render_gate.py', '--port', 'live']
+    res = {}
+    res['live_no_ramps'] = run_tooth('wl_no_ramps',
+        [('src/juno_apply.c', '    return bank_apply(state, bank, idx, 1);', '    return bank_apply(state, bank, idx, 0);')],
+        gate, tail=600)
+    res['live_pump_before_dsp'] = run_tooth('wl_pump_before',
+        [('src/juno_driver.c', '        juno_master_render_fn(st, a2, a3);\n#ifndef EB_DEVCELLS',
+          '        juno_rr_pump(st);\n        juno_master_render_fn(st, a2, a3);\n#ifdef JUNO_NEVER')],
+        gate, tail=600)
+    res['live_type_arm_new_time'] = run_tooth('wl_type_new_time',
+        [('src/recall_ramp.c', 'juno_reverb_hplp(c->new_revtype, c->prev_revtime, hplp);',
+          'juno_reverb_hplp(c->new_revtype, c->new_revtime, hplp);')],
+        gate, tail=600)
+    res['live_24ms_as_4ms'] = run_tooth('wl_t24',
+        [('src/recall_ramp.c', 'arm(st, 85168u, 1.0f, T24); arm(st, 85184u, 1.0f, T24);',
+          'arm(st, 85168u, 1.0f, T4); arm(st, 85184u, 1.0f, T4);')],
+        gate, tail=600)
+    # REACH PROBE, not a tooth: the voice / slot-2 / reverb mute-unmute pairs
+    # are no-op ramps (1 -> 1) in every scenario here; this prints whether any
+    # chain can see them, so the claim can say so.
+    probe = run_tooth('wl_no_mute_pairs',
+        [('src/recall_ramp.c', '        arm(st, 2848u + o, 0.0f, T4); arm(st, 2848u + o, 1.0f, T4);\n',
+          '        (void)o;\n'),
+         ('src/recall_ramp.c', '        arm(st, 84560u, 0.0f, T4); arm(st, 84560u, 1.0f, T4);\n', ''),
+         ('src/recall_ramp.c', '    for (k = 0; k < 3; ++k) { arm(st, 10759376u, 0.0f, T36); arm(st, 10759376u, 1.0f, T36); }\n', '')],
+        gate, tail=300)
+    for k, v in res.items():
+        print('%-26s %s' % (k, {0: 'BITES', 1: 'DID NOT BITE', 2: 'NO VERDICT'}[v]))
+    print('%-26s %s (reach probe: %s)' % ('live_no_mute_pairs', {0: 'BITES', 1: 'DID NOT BITE', 2: 'NO VERDICT'}[probe],
+          'the gate sees the no-op pairs' if probe == 0 else 'no chain can see the no-op pairs'))
+    return 0 if all(v == 0 for v in res.values()) else 1
+
+
 def main():
     global ONLY
     a = [x for x in sys.argv[1:] if x != '-v']
     if a[:1] == ['--tooth']:
         return tooth()
+    if a[:1] == ['--tooth-live']:
+        return tooth_live()
     if '--chain' in a:
         i = a.index('--chain')
         ONLY = int(a[i + 1])

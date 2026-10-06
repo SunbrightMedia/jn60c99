@@ -68,6 +68,11 @@ SHADOW = {'JUNO_PREV_EFX': 11022400, 'JUNO_PREV_DLY': 11022416,
           'JUNO_DLY_ON': 11022368, 'JUNO_PREV_FB': 11022376, 'JUNO_PREV_RESO': 11022384}
 WIN_LO = min(SHADOW.values())
 WIN_HI = max(SHADOW.values()) + 16                # one cell grid past the highest
+# The recall-ramp table (src/recall_ramp.c, CLAIMS B1): port-owned like the
+# shadows and checked like them (checks 0, 1, 3), but compiled out under
+# EB_DEVCELLS, so the device map need not carry it (checks 4/5 do not apply).
+RR_BASE = 11022464
+RR_END = RR_BASE + 16 + 73 * 32                   # header + 73 records of 32 bytes
 TOOTH = os.environ.get('JUNO_SHADOW_TOOTH', '')
 
 
@@ -81,12 +86,15 @@ def check_defines():
     hdr(0, 'the #defines still say what this gate assumes')
     txt = open(os.path.join(ROOT, 'src', 'juno_engine.h')).read()
     ok = True
-    for name, want in sorted(SHADOW.items()):
+    for name, want in sorted(list(SHADOW.items()) + [('JUNO_RR_BASE', RR_BASE)]):
         m = re.search(r'#define\s+%s\s+(\d+)u?' % name, txt)
         got = int(m.group(1)) if m else None
         print('    %-14s src says %-12s gate assumes %d' % (name, got, want))
         if got != want:
             ok = False
+    if not (WIN_HI <= RR_BASE):
+        print('    RED: the recall-ramp table overlaps the shadow window')
+        ok = False
     if not ok:
         print('    RED: src/juno_engine.h and this gate disagree.')
     return ok
@@ -101,10 +109,10 @@ def check_regions():
     offs = set()
     for a, b in regions:
         offs.update(range(a & ~3, b, 4))
-    bad = sorted(o for o in offs if WIN_LO <= o < WIN_HI)
+    bad = sorted(o for o in offs if WIN_LO <= o < WIN_HI or RR_BASE <= o < RR_END)
     print('    %d compared cells, highest %d' % (len(offs), max(offs)))
-    print('    shadow window [%d, %d): %d compared cells inside'
-          % (WIN_LO, WIN_HI, len(bad)))
+    print('    shadow window [%d, %d) + ramp table [%d, %d): %d compared cells inside'
+          % (WIN_LO, WIN_HI, RR_BASE, RR_END, len(bad)))
     if bad:
         print('    RED: %s' % bad[:8])
     return not bad
@@ -152,7 +160,7 @@ def check_literals():
             p = os.path.join(d, name)
             for ln, line in enumerate(open(p, errors='replace'), 1):
                 for lit in re.findall(r'\b\d{8,9}\b', line):
-                    if WIN_LO <= int(lit) < WIN_HI:
+                    if WIN_LO <= int(lit) < WIN_HI or RR_BASE <= int(lit) < RR_END:
                         hits.append((sub + '/' + name, ln, lit))
     print('    scanned tools/verify + tools/engineb; %d hit(s)' % len(hits))
     for h in hits:

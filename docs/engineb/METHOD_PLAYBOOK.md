@@ -2427,3 +2427,16 @@ of on a mode change, note slots kept after that flush) plus the oracle FP mode (
 ### The rule
 For every stateful subsystem, a warm gate must exercise the events that USE its state between
 recalls (notes for the allocator, renders for tanks and fades), not only the recall itself.
+
+## 122. A TOOTH THAT DOES NOT BITE NAMES A RULE OUTSIDE THE GATE'S REACH -- SEARCH THE DATA FOR THE CASE
+Paid 2026-10-06 (JUNO, CLAIMS A19). The REVERB TYPE setter recomputes the decay coefficients with
+the TIME the processor still holds; the port reproduced that, and a tooth that used the new TIME
+did NOT bite on 12 chains. The intermediate value changes the outcome only when the final value
+equals the stored target while a ramp is in flight. A search of the coefficient tables found
+exactly one pair that does that, (TYPE 0, TIME 116) <-> (TYPE 1, TIME 200); a chain that
+alternates them 100 samples apart made the tooth bite (2/2). The same day a "no-op" reach probe
+(dropping the mute pairs) bit too: the reverb on/off cell's final target then came from another arm.
+### The rule
+When a tooth does not bite, do not drop the rule and do not believe it either: work out the exact
+condition under which it changes the outcome, search the tables for inputs that meet it, and add
+that case to the gate.

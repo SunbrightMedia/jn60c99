@@ -29,4 +29,9 @@ void juno_write_reverb_taps(unsigned char *state, int type, int Hr);
  * (float)predelay, written by juno_apply_reverb. */
 int  juno_reverb_predelay(int pd_byte, int Hr);
 void juno_write_reverb_taps_pd(unsigned char *state, int type, int Hr, int pd_byte);
+/* For the recall ramps (src/recall_ramp.c): the joint (TYPE, TIME) decay
+ * coefficients {HP01, LP01, HP23, LP23}, and REVERB LEVEL on/off. */
+void juno_reverb_hplp(int type, int time, float out[4]);
+int  juno_reverb_level_on(int byte);
+
 #endif

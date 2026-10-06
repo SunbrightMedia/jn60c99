@@ -21,6 +21,7 @@
  * coeffs (e.g. VCA level at 101072) stay single.
  */
 #include "juno_engine.h"
+#include "recall_ramp.h"
 #include "juno_driver.h"
 #include "delay_recall.h"
 #include "effect_modes.h"
@@ -146,6 +147,12 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
         float *a3[2] = { outL, outR };
         *outL = 0.0f; *outR = 0.0f;
         juno_master_render_fn(st, a2, a3);
+#ifndef EB_DEVCELLS
+        /* The plugin steps every unit's ramp records AFTER that unit's DSP of the
+         * sample (its render wrappers tail-jump to the pump, rva 0x3C24A0), so
+         * the recall ramps step here (CLAIMS B1, src/recall_ramp.c). */
+        juno_rr_pump(st);
+#endif
         /* Reproduce the x86 plugin's FTZ/DAZ: flush decayed recursive state out
          * of the denormal range so the next sample reads zeros (as it would on
          * the real CPU). Removes the denormal-op load behind the crackle. */

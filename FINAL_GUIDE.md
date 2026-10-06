@@ -12,7 +12,7 @@ Tracks B and D below were written for two chips. Read them this way from now on:
 - The "three facts" at the end stay true as measurements; "one chip cannot do it" is exactly why B needs a cheaper engine.
 
 ## STATUS (2026-10-05, the rules below: one line per track, regressions first)
-- A: REGRESSED 2026-10-05, then repaired: four static gates were red since cae0767 (playbook 119); green again, now run by `make static`. Port: PROVENANCE 22/22 PROVEN; CLAIMS B2-B5 closed, warm recall settled-state exact (A17); open: B1 (4 ms recall ramps), B6, B7, B8. The one-board engine will need its own sonic gate.
+- A: REGRESSED 2026-10-05, then repaired: four static gates were red since cae0767 (playbook 119); green again, run by `make static`. Port: PROVENANCE 23/23 PROVEN; CLAIMS B1-B5 closed (warm recall A17-A19: settled, running engine, live ramps); open: B6, B7 (incl. DAW automation ramps), B8. The one-board engine will need its own sonic gate.
 - D: RETIRED by the one-board rule (2026-09-23).
 - B: REOPENED for ONE board — no one-board JUNO engine chosen yet (budget facts in docs/ONE_BOARD_BUDGET.md).
 - C: esp32s3/ playable (console, patch step, MIDI UART); the Pi PLAY image is built, not yet on silicon.
@@ -164,7 +164,7 @@ on host; this track is wiring it to the device.
 | C9 **EVERY parameter adjustable at once, in real time** (USER-BINDING, added 2026-08-12) | **NOT DONE — and it is a REQUIREMENT, not a nicety.** Today a single knob move costs the FULL burst (~2,000,000 cycles), because engine B HOISTS cell reads into a prepared coefficient struct and any change rebuilds the struct. |
 | C11 **ONE INTERNAL EVENT API — the boundary every input crosses** (USER-BINDING, 2026-08-12) | **NOT DONE.** Keybed, panel, DIN, USB all submit events through one small header. Nothing else may reach the engine. |
 | C10 chunked patch change (build spread over N blocks, one atomic publish) | **NOT DONE** — removes the program-change click without making the burst faster. |
-| C8 the port's warm-recall bug fixed in src/ + warm gate in make verify | **DONE 2026-10-05** — warm_recall_gate.py (whole state) and warm_chain_gate.py (234 recalls through one engine, 3 teeth) are in `make verify` (CLAIMS A17). Open: the plugin's 4 ms recall ramps (CLAIMS B1). |
+| C8 the port's warm-recall bug fixed in src/ + warm gate in make verify | **DONE 2026-10-06** — warm_recall_gate.py (whole state), warm_chain_gate.py (234 recalls through one engine) and warm_render_gate.py (patch changes on a running engine, settled and live with the plugin's recall ramps) are in `make verify` (CLAIMS A17-A19). |
 
 ### D. LINK — two chips are one instrument (END_GOAL 2)
 The only subsystem with zero code. Requirements already written

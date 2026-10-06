@@ -49,6 +49,7 @@
  * block [176,10688) is replicated to voices 1..7 by juno_driver_seed_voices.
  */
 #include "juno_engine.h"
+#include "recall_ramp.h"
 #include "delay_recall.h"    /* JUNO_PROG_DLY/EFX (power-on slot routing)   */
 #include "reverb_recall.h"   /* juno_write_reverb_taps (Class E tap tables) */
 #include "rate_laws.h"
@@ -310,6 +311,11 @@ void juno_engine_prepare(unsigned char *st)
     JI(st, JUNO_DLY_ON) = 0;          /* processor +6776 at BUILD */
     JI(st, JUNO_PREV_FB) = 120;       /* processor +1512 at BUILD (FEEDBACK default) */
     JI(st, JUNO_PREV_RESO) = 230;     /* processor +1568 at BUILD (RESONANCE default) */
+#ifndef EB_DEVCELLS
+    /* the recall-ramp records re-seed from the cold cells at the next recall,
+     * as a freshly built plugin's are (src/recall_ramp.c) */
+    juno_rr_reset(st);
+#endif
 
     /* --- Class E: reverb tap-index table (34 ints, 11022208..11022340) ------ */
     /* Generator sub_0x3C1AC0: tap[0]=1; a continuous predelay = floor(T1*H) (T1 in

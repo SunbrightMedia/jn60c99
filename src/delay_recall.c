@@ -198,6 +198,19 @@ static void put_rate(unsigned char *state, int Hr, int off,
  * carries the 96k value, the same 96k clamp ARM_LFX1 documents. Not a new
  * constant: the type-1/4 arm at :362 already writes these four words. */
 #define ARM_LFX1_OFF 0x3fa754b5u, 0x3f9bd7cau, 0x3f2493b7u, 0x3f2493b7u
+
+/* The block switch values the recall ramps arm (src/recall_ramp.c): ON is the
+ * ARM_LFX1 class, OFF the ARM_LFX1_OFF class, by the same 4-class selection as
+ * put_rate (PROVEN at 18 host rates by tools/verify/rate_sweep_gate.py). */
+float juno_lfx1_value(int Hr, int on)
+{
+    static const uint32_t ONV[4]  = { ARM_LFX1 };
+    static const uint32_t OFFV[4] = { ARM_LFX1_OFF };
+    const uint32_t *t = on ? ONV : OFFV;
+    uint32_t bits = (Hr == 44100) ? t[0] : (Hr == 48000) ? t[1] : (Hr == 88200) ? t[2] : t[3];
+    float f; memcpy(&f, &bits, sizeof f);
+    return f;
+}
 /* LF-damp Fc, chorus pre-delay and chorus low-cut are CONTINUOUS in the rate
  * (src/rate_laws.h). A block's activation writes them at the default bytes
  * (LF DAMP FREQ 0, CHORUS PRE DELAY 20, CHORUS LOW CUT 2); the old 4-arm words

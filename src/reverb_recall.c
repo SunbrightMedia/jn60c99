@@ -223,6 +223,28 @@ static int blob_val(const unsigned char *rec, int bp)
     return ((b[2 * bp] & 0xF) << 4) | (b[2 * bp + 1] & 0xF);
 }
 
+/* The joint (TYPE, TIME) decay coefficients as floats: out[0] HP01 (10759664 /
+ * 10759712), out[1] LP01 (10759680 / 10759728), out[2] HP23 (10759760 / 10759808),
+ * out[3] LP23 (10759776 / 10759824). The recall ramps (src/recall_ramp.c) need
+ * the value the REVERB TYPE setter computes with the PREVIOUS recall's TIME. */
+void juno_reverb_hplp(int type, int time, float out[4])
+{
+    if (type < 0) type = 0; else if (type > 5) type = 5;
+    time &= 0xFF;
+    memcpy(&out[0], &HP01[type][time], 4);
+    memcpy(&out[1], &LP01[type][time], 4);
+    memcpy(&out[2], &HP23[type][time], 4);
+    memcpy(&out[3], &LP23[type][time], 4);
+}
+
+/* REVERB LEVEL on/off as the plugin's level setter (rva 0x3C1460) tests it: its
+ * scaled level > 0, i.e. the level table entry is not 0 (bytes 0..2 -> off;
+ * EXECUTED: 2 -> off, 3 -> on, 1 -> off). */
+int juno_reverb_level_on(int byte)
+{
+    return REVLVL_LUT[byte & 0xFF] != 0u;
+}
+
 static void put_bits(unsigned char *state, int off, uint32_t bits)
 {
     float f; memcpy(&f, &bits, 4); JF(state, off) = f;

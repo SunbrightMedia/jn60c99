@@ -130,6 +130,9 @@ verify: test libjuno.so
 	echo "=== WARM RENDER (CLAIMS A18/B1): patch changes on a RUNNING engine, notes + renders between recalls, audio + rendered state, settled recall model ==="; \
 	fresh $(SCRATCH)/warm_render_settled.pkl $(ORACLE_DEPS) || python3 tools/verify/warm_render_gate.py --ref settled || FAIL=1; \
 	python3 tools/verify/warm_render_gate.py --port settled || FAIL=1; \
+	echo "=== WARM RENDER LIVE (CLAIMS A19): the same chains with the plugin's recall ramps NOT settled (4/24/36 ms), port juno_gui_apply_bank_live ==="; \
+	fresh $(SCRATCH)/warm_render_live.pkl $(ORACLE_DEPS) || python3 tools/verify/warm_render_gate.py --ref live || FAIL=1; \
+	python3 tools/verify/warm_render_gate.py --port live || FAIL=1; \
 	echo "=== SHADOW CELLS: bounds (cannot false-fail an A/B) + WRITER-SET invariant (prog == clamp(shadow)) ==="; \
 	python3 tools/verify/shadow_bounds_gate.py || FAIL=1; \
 	python3 tools/verify/shadow_sync_gate.py || FAIL=1; \

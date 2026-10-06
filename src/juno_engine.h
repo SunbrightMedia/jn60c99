@@ -177,6 +177,11 @@ extern "C" {
 #define JUNO_DLY_ON     11022368u
 #define JUNO_PREV_FB    11022376u
 #define JUNO_PREV_RESO  11022384u
+/* THE RECALL-RAMP TABLE (CLAIMS B1, src/recall_ramp.c): a 16-byte header and
+ * 73 records of 32 bytes, [11022464, 11024816), port-owned like the shadows,
+ * past every compared region; compiled out under EB_DEVCELLS, so the device
+ * map does not carry it. tools/verify/shadow_bounds_gate.py checks it. */
+#define JUNO_RR_BASE    11022464u
 
 /* juno_engine_init — exact transcription of sub_1803990C0. Fills the engine
  * state `st` with the real coefficients. Set JF(st,16) to the sample rate first
