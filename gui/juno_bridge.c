@@ -19,6 +19,7 @@
 #include "../src/host_edit.h"
 #include "../src/recall_ramp.h"
 #include "../src/reverb_recall.h"
+#include "../src/juno_state_tables.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -129,7 +130,7 @@ typedef struct {
                               * leaves the plugin's recall ramps armed (CLAIMS B1) */
     int   host_only[3];      /* LFO RATE H, VCF CUTOFF FREQ H: the host-only float
                               * parameters' values (bits), not in the record (CLAIMS B6);
-                              * MASTER TUNE: a SYSTEM parameter, not in a patch (A20);
+                              * MASTER TUNE: a SYSTEM parameter the recall never sets (A20);
                               * 0 = not set since create (the getter then reports the default) */
     int   host_only_set[3];
 } juno_ctx;
@@ -228,6 +229,7 @@ void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
     if (!c) return;
     ++eb_coef_gen;
     st = c->st;
+    free(c->bank);                      /* the model record (a fresh create has none) */
     memset(c, 0, sizeof *c);            /* match calloc's zero of the whole ctx */
     c->st = st;
     memset(st, 0, JUNO_STATE_BYTES);    /* match calloc's zero of the state     */
@@ -1307,28 +1309,45 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
     return n;
 }
 
+/* The MODEL record: what the plugin's model holds for the patch, as a one-record
+ * bank (the bank header + one record) in c->bank, c->patch_idx 0. Every host
+ * edit (juno_gui_host_set) changes it and runs its recall; the plugin's own
+ * preset paths (juno_gui_plugin_init / _state_load / _load_patch) change it only
+ * through host edits, starting from the model at boot (JUNO_DEFAULT_REC, the
+ * plugin's own serialization of its defaults). NULL until the first use. */
+#define MODEL_BANK_BYTES (23 + JUNO_REC_BYTES)
+static int ctx_model(juno_ctx *c, const unsigned char *hdr)
+{
+    static const unsigned char HDR[23] = { 'K','o','a','B','a','n','k','F','i','l','e',
+                                           '0','0','0','0','3','P','G','-','J','U','6','0' };
+    if (!c->bank) {
+        c->bank = malloc(MODEL_BANK_BYTES);
+        if (!c->bank) return 0;
+        c->bank_len = MODEL_BANK_BYTES;
+        memcpy(c->bank + 23, JUNO_DEFAULT_REC, JUNO_REC_BYTES);
+    }
+    memcpy(c->bank, hdr ? hdr : HDR, 23);
+    c->patch_idx = 0;
+    return 1;
+}
+
 /* Apply bank patch `idx` (raw KoaBankFile00003 bytes in `bank`, `len` bytes) into
- * this engine's coefficient slots. Retains a mutable copy of the bank so the
- * host-parameter panel can edit a record byte and re-run the EXACT same recall.
- * Returns # coefficients set. Rejects any idx whose full record does not fit in
- * len (juno_bank_num_patches): recall READS and the host-param panel WRITES
- * record bytes, so applying a truncated bank would be an out-of-bounds access
- * (native: segfault; WASM: silent heap corruption). */
+ * this engine's coefficient slots by the RECALL the gates model (the engine's
+ * own recall enumerator, flag 1: CLAIMS A17-A19); the plugin's own patch load is
+ * juno_gui_load_patch. The record becomes the model record, so the host-parameter
+ * panel can edit a byte and re-run the EXACT same recall. Returns # coefficients
+ * set. Rejects any idx whose full record does not fit in len
+ * (juno_bank_num_patches): recall READS record bytes, so applying a truncated
+ * bank would be an out-of-bounds access (native: segfault; WASM: silent heap
+ * corruption). */
 int juno_gui_apply_bank(juno_ctx *c, const unsigned char *bank, int len, int idx)
 {
     ++eb_coef_gen;
     if (!c || !bank || len <= 0) return 0;
     if (idx < 0 || idx >= juno_bank_num_patches(bank, (unsigned long)len)) return 0;
-    if (c->bank_len != len) {
-        free(c->bank);
-        c->bank = malloc((size_t)len);
-        c->bank_len = c->bank ? len : 0;
-    }
-    if (c->bank) memcpy(c->bank, bank, (size_t)len);
-    c->patch_idx = idx;
-    /* Recall from the retained copy when we have it (so later edits persist); fall
-     * back to the caller's buffer if the copy failed to allocate. */
-    return ctx_recall(c, c->bank ? c->bank : bank, idx, 1);
+    if (!ctx_model(c, bank)) return ctx_recall(c, bank, idx, 1);   /* no model copy: recall the caller's */
+    memcpy(c->bank + 23, bank + 23 + (size_t)idx * JUNO_REC_BYTES, JUNO_REC_BYTES);
+    return ctx_recall(c, c->bank, 0, 1);
 }
 
 /* A patch change on a RUNNING engine as the plugin does it (CLAIMS B1): the
@@ -1413,6 +1432,7 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
     f.dt = host_val(rec, "DELAY TYPE");
     f.pl = host_val(rec, "ASSIGN MODE") == 0 && host_val(rec, "LEGATO") == 1;
     f.arpon = juno_rr_arp_on(c->st);
+    f.cutbyte = host_val(rec, "VCF CUTOFF FREQ");
     f.ron0 = juno_reverb_level_on(host_val(rec, "REVERB LEVEL"));
     keep[0] = rec[roff]; keep[1] = rec[roff + 1];
     juno_host_param_encode(rec, i, v);
@@ -1444,8 +1464,15 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
                     c->host_only[host_only_slot(i)] = v;
                     c->host_only_set[host_only_slot(i)] = 1;
                 }
-                if (i == host_index("VCF CUTOFF FREQ") || i == host_index("VCF CUTOFF FREQ H"))
-                    juno_rr_set_cut_last(c->st, v);
+                /* the cutoff object's last value (rva 0x3597F0's step law reads it):
+                 * the byte, or the H float as (int)(H * 255.0f) (rva 0x359890:
+                 * mulss, cvttss2si) */
+                if (i == host_index("VCF CUTOFF FREQ")) juno_rr_set_cut_last(c->st, v);
+                if (i == host_index("VCF CUTOFF FREQ H")) {
+                    float h;
+                    memcpy(&h, &v, 4);
+                    juno_rr_set_cut_last(c->st, (int)(h * 255.0f));
+                }
                 c->last_condition = t.last_condition;
                 c->hpf_type = t.hpf_type;
                 ctx_alloc_recall(c, c->bank, c->patch_idx, 0, tmp);
@@ -1474,7 +1501,10 @@ void juno_gui_host_set(juno_ctx *c, int i, int v)
     if (!c || !c->bank) return;
     rec = juno_bank_record(c->bank, c->patch_idx);
     if (!rec) return;
-    if (i >= 0 && i < juno_host_param_count() && !strcmp(juno_host_param_name(i), "HPF TYPE")) v = (v != 0);
+    /* mapped before the range check (rva 0x3C7AE0: dispatch 871 HPF TYPE, and
+     * 831 ARPEGGIO SW, whose switch the entry calls with (v != 0) directly) */
+    if (i >= 0 && i < juno_host_param_count() &&
+        (!strcmp(juno_host_param_name(i), "HPF TYPE") || !strcmp(juno_host_param_name(i), "ARPEGGIO SW"))) v = (v != 0);
     if (v < juno_host_param_min(i) || v > juno_host_param_max(i)) return;
 #ifndef EB_DEVCELLS
     if (juno_host_edit_known(i) && host_edit_live(c, rec, i, v)) return;
@@ -1485,6 +1515,105 @@ void juno_gui_host_set(juno_ctx *c, int i, int v)
 #endif
     juno_host_param_encode(rec, i, v);
     ctx_recall(c, c->bank, c->patch_idx, 0);
+}
+
+/* --- The plugin's own preset paths (CLAIMS B6, src/juno_state_tables.h) -------
+ * EXECUTED in the booted plugin (probes/b6/): IComponent::initialize, setState
+ * and the patch browser's load all set model values, and the core queues one
+ * engine event (id, value) per value; the render driver applies the queue at the
+ * start of the next block through the host entry, in order. So each is a list
+ * of host edits: a panel parameter through juno_gui_host_set (which drops a
+ * value outside the database range), vm.vs.voiceCount stored for the render
+ * (A21), everything else (patch name, view state) reaches no engine cell. */
+static void apply_event(juno_ctx *c, int host, int32_t v)
+{
+    if (host >= 0) juno_gui_host_set(c, host, v);
+    else if (host == JUNO_SE_VOICES) juno_gui_set_voice_count(c, v);
+}
+
+/* The plugin as shipped: the engine's construction mutes every unit for its
+ * first 960 samples (juno_driver_arm_latch), and the first process() applies
+ * the 95 defaults IComponent::initialize queues (e.g. six voices). Call once,
+ * right after create. */
+int juno_gui_plugin_init(juno_ctx *c)
+{
+    int k;
+    if (!c || !ctx_model(c, 0)) return 0;
+    juno_driver_arm_latch(c->st);
+    for (k = 0; k < JUNO_STATE_N; ++k)
+        apply_event(c, JUNO_STATE_ENT[k].host, JUNO_STATE_ENT[k].dflt);
+    return JUNO_STATE_N;
+}
+
+static uint32_t be(const unsigned char *p, int n)
+{
+    uint32_t v = 0;
+    while (n--) v = (v << 8) | *p++;      /* the deserializer keeps the low 32 bits */
+    return v;
+}
+
+/* IComponent::setState: `data` is the stream the plugin's getState writes -- a
+ * big-endian byte count, then (id, value) entries, 4-byte big-endian fields (8
+ * when the count exceeds (95 + 128) * 64 / 5: rva 0x321F20). Each entry whose
+ * id is in the parameter list takes value & its storage mask (EXECUTED: 8, 7 or
+ * 16 bits, or the value as given) and is applied in PAYLOAD order; other ids
+ * (the 128 MIDI-assign entries, unknown ids) reach no engine cell. Returns the
+ * number of parameter entries applied, -1 for an empty or short stream (the
+ * plugin returns kResultFalse and sets nothing). */
+int juno_gui_state_load(juno_ctx *c, const unsigned char *data, int len)
+{
+    uint32_t n, off, w;
+    int k, applied = 0;
+    if (!c || !data || len < 4 || !ctx_model(c, 0)) return -1;
+    n = be(data, 4);
+    if (n == 0 || n > (uint32_t)len - 4) return -1;
+    w = ((JUNO_STATE_N + 128) << 6) / 5 < (int)n ? 8 : 4;
+    for (off = 0; off + 2 * w <= n; off += 2 * w) {
+        uint32_t id = be(data + 4 + off, (int)w);
+        int32_t v = (int32_t)be(data + 4 + off + w, (int)w);
+        for (k = 0; k < JUNO_STATE_N && JUNO_STATE_ENT[k].id != id; ++k) ;
+        if (k == JUNO_STATE_N) continue;
+        if (JUNO_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask);
+        apply_event(c, JUNO_STATE_ENT[k].host, v);
+        ++applied;
+    }
+    return applied;
+}
+
+/* the model's set-from-bytes (EXECUTED, probes/b6/patch_load_census.py --craft):
+ * nibble fields are the bytes OR-ed in place, nothing masked */
+static int32_t rec_value(const unsigned char *r, const juno_patch_ev *e)
+{
+    uint32_t v = 0;
+    int i, n;
+    switch (e->dec) {
+    case JUNO_DEC_INT1X7: return r[e->roff];
+    case JUNO_DEC_INT2X4: return (r[e->roff] << 4) | r[e->roff + 1];
+    case JUNO_DEC_INT8X4: n = 8; break;
+    default:              n = 4; break;
+    }
+    for (i = 0; i < n; ++i) v |= (uint32_t)r[e->roff + i] << (4 * (n - 1 - i));
+    return (int32_t)v;
+}
+
+/* The plugin's own patch load (its patch browser, rva 0x335850): every value
+ * of record `idx` in the patch tree's order -- MASTER TUNE first, then the
+ * panel parameters, the name, the extended leaves -- as host edits. Leaves
+ * outside the parameter list (e.g. the LFO / OSC waves) never reach the engine:
+ * the model record keeps the defaults there. Returns the events applied, 0 for
+ * an idx whose record is not in `bank`. */
+int juno_gui_load_patch(juno_ctx *c, const unsigned char *bank, int len, int idx)
+{
+    const unsigned char *r;
+    int k;
+    if (!c || !bank || len <= 0) return 0;
+    if (idx < 0 || idx >= juno_bank_num_patches(bank, (unsigned long)len)) return 0;
+    if (!ctx_model(c, bank)) return 0;
+    r = bank + 23 + (size_t)idx * JUNO_REC_BYTES;
+    memcpy(c->bank + 23, r, 16);          /* the patch's name: display only */
+    for (k = 0; k < JUNO_PATCH_EV_N; ++k)
+        apply_event(c, JUNO_PATCH_EV[k].host, rec_value(r, &JUNO_PATCH_EV[k]));
+    return JUNO_PATCH_EV_N;
 }
 
 /* Packed arp state for the UI to read back after apply: bit0 = on, bits1-2 = mode

@@ -2565,3 +2565,28 @@ delay was on, so the generator saw one value and called it "the recall's". A reg
 Before a key is believed, list the processor state every setter in the list READS (here: the
 on-flag of a re-sent parameter) and vary each one in the census. A source that was constant over
 the census contexts is a hypothesis about the contexts the census never ran.
+
+## 135. THE PRODUCT'S OWN PATH IS THE REFERENCE -- NOT THE ENGINE'S QUICKEST WAY IN
+Paid 2026-10-06 (JUNO, CLAIMS A22/B6). Four gates (A17-A19, warm recall) proved the port's patch
+change against the engine's own recall enumerator. Executed in the booted plugin, its patch browser
+does not use that recall at all: it sets the model, and every value reaches the engine as a host
+edit (ramped, host-role programs) in the patch tree's order -- MASTER TUNE first, leaves outside
+the parameter list never. The same execution found what only that path shows: the engine's 960-
+sample start-up mute (the harness cleared it "to match our C engine"), the fine cutoff's last
+value, the arp refresh's glide law. Both models were exact; one of them was not the product.
+### The rule
+For every user-facing action, execute the product's own entry (GUI command, DAW call) once and
+record what reaches the engine. Gate the port against THAT queue. An engine entry the product
+never calls is a model, however exact; a harness step that "aligns the oracle to the port"
+(clear_latch) is a model too, and must be named as one.
+
+## 136. TWO VALUES THAT WERE EQUAL IN EVERY CENSUS CONTEXT ARE TWO SOURCES
+Paid 2026-10-06 (JUNO, CLAIMS A20/A22). The cutoff object's last value was the byte in every census
+context, because every factory H equals byte/255 and the recall leaves the last value at the
+stored byte -- so "H's bits" and "H * 255" and "the stored byte" were indistinguishable, and the
+arp refresh's glide (always step 0) looked like a constant 96 ms. A patch load (byte, then H)
+followed by a near cutoff split them.
+### The rule
+When a generated source is chosen because two quantities coincide over the census, READ the code
+for which one it is, then add a context where they differ (H != byte/255, a refresh after a
+change) before the key is believed.

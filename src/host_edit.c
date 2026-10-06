@@ -75,11 +75,23 @@ static int gated_off(int hp, const juno_host_feat *f)
     }
 }
 
+/* The arp refresh's cutoff re-send (leaf 312, rva 0x3B9990): the VCF CUTOFF
+ * setter in the host role, so the step law runs from the object's last value
+ * to the stored byte, which becomes the last value (rva 0x3597F0). */
+static int cutoff_resend_time(unsigned char *st, int byte)
+{
+    int d = byte - juno_rr_cut_last(st), t;
+    if (d < 0) d = -d;
+    if (d > 5) d = 5;
+    t = 3 * (5 - d);
+    return t < 5 ? 5 : t;
+}
+
 int juno_host_edit(unsigned char *st, const unsigned char *settled, int hp, const juno_host_feat *f)
 {
     const jh_prog *pg = prog_of(hp, f);
     uint32_t k;
-    int Hr = (int)JF(st, 16);
+    int Hr = (int)JF(st, 16), resend_t = -1;
     if (!pg) return -1;
     if (gated_off(hp, f)) return 0;
     if (Hr <= 0) Hr = 96000;
@@ -98,6 +110,10 @@ int juno_host_edit(unsigned char *st, const unsigned char *settled, int hp, cons
         default:      memcpy(&bits, settled + o->cell, 4); break;   /* JH_REC */
         }
         if (t & 0x80) t = cutoff_time(f);
+        if (t & 0x40) {                     /* every voice's object: one law, one last value */
+            if (resend_t < 0) resend_t = cutoff_resend_time(st, f->cutbyte);
+            t = resend_t;
+        }
         if (o->kind == JH_RAMP) {
             memcpy(&v, &bits, 4);
             juno_rr_arm(st, o->cell, v, t);
@@ -105,6 +121,7 @@ int juno_host_edit(unsigned char *st, const unsigned char *settled, int hp, cons
             memcpy(st + o->cell, &bits, 4);   /* immediate set / direct write */
         }
     }
+    if (resend_t >= 0) juno_rr_set_cut_last(st, f->cutbyte);
     return (int)pg->count;
 }
 

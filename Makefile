@@ -139,6 +139,9 @@ verify: test libjuno.so
 	echo "=== VOICE COUNT (CLAIMS B10): the shipped 6 voices, counts 1..9 changed while notes sound, audio + rendered state incl. stopped units ==="; \
 	fresh $(SCRATCH)/voice_count_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/voice_count_gate.py --ref || FAIL=1; \
 	python3 tools/verify/voice_count_gate.py --port || FAIL=1; \
+	echo "=== PLUGIN PRESET PATHS (CLAIMS A22): initialize / setState / patch-browser load, the plugin's own queues through the host entry ==="; \
+	fresh $(SCRATCH)/state_load_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/state_load_gate.py --ref || FAIL=1; \
+	python3 tools/verify/state_load_gate.py --port || FAIL=1; \
 	echo "=== SHADOW CELLS: bounds (cannot false-fail an A/B) + WRITER-SET invariant (prog == clamp(shadow)) ==="; \
 	python3 tools/verify/shadow_bounds_gate.py || FAIL=1; \
 	python3 tools/verify/shadow_sync_gate.py || FAIL=1; \

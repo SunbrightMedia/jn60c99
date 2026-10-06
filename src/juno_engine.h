@@ -202,7 +202,20 @@ extern "C" {
  * each) and restores a stopped voice's output cell after the master. Port-owned,
  * past every compared region; compiled out under EB_DEVCELLS. */
 #define JUNO_UNIT_BASE  11049632u
-#define JUNO_UNIT_END   (JUNO_UNIT_BASE + 16u + 8u * 176u)
+/* THE START-UP MUTE (CLAIMS B6): the engine's construction (rva 0x398EA0, the
+ * unit state's vtable slot 4) sets every unit's skip counter (state+11022344)
+ * to 960; while it is above 0 the unit's render (rva 0x398F30 voice, 0x398EC0
+ * master) decrements it, outputs zero and runs no DSP -- only its ramp pump.
+ * A unit the voice count stops keeps its counter. The master's counter is the
+ * plugin's own cell (JUNO_LATCH_MASTER, unit 8's, compared by the gates); the
+ * eight voice units' are port-owned (JUNO_LATCH_BASE); 0 = none.
+ * juno_gui_create leaves them 0 (the start of the recall model every recall
+ * gate uses: the harness clears the counter, e2e_emu clear_latch);
+ * juno_gui_plugin_init sets them, as the plugin's own start does. */
+#define JUNO_LATCH_MASTER 11022344u
+#define JUNO_LATCH_BASE (JUNO_UNIT_BASE + 16u + 8u * 176u)
+#define JUNO_LATCH_N    960
+#define JUNO_UNIT_END   (JUNO_LATCH_BASE + 8u * 4u)
 
 /* juno_engine_init — exact transcription of sub_1803990C0. Fills the engine
  * state `st` with the real coefficients. Set JF(st,16) to the sample rate first

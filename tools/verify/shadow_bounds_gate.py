@@ -77,7 +77,7 @@ RR_END = 11049632                                 # 32-byte header + 798 records
 # The per-voice units the voice count stops (src/juno_driver.c, CLAIMS B10):
 # noise copies, port-owned, past the ramp table; compiled out under EB_DEVCELLS.
 UNIT_BASE = 11049632
-UNIT_END = UNIT_BASE + 16 + 8 * 176
+UNIT_END = UNIT_BASE + 16 + 8 * 176 + 8 * 4      # + the eight voice units' start-up mute counters
 
 
 def in_port_owned(o):

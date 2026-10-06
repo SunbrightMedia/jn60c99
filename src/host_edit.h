@@ -30,6 +30,7 @@ typedef struct {
     int ron0, ron1;  /* REVERB LEVEL on before / after (level >= 3)             */
     int pl;          /* ASSIGN MODE 0 with LEGATO 1 (processor +0x548 / +0x544) */
     int arpon;       /* the processor's arp on (juno_rr_arp_on), before the edit */
+    int cutbyte;     /* the stored VCF CUTOFF FREQ (the arp refresh re-sends it)  */
 } juno_host_feat;
 
 /* 1 when host parameter hp (src/juno_hostparams.c index) has a set list */

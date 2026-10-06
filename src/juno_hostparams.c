@@ -26,8 +26,10 @@
  * RATE H / VCF CUTOFF FREQ H: the plugin's database range is the float bits
  * [0, 1.0f], EXECUTED; the value lives in the context, not the record, whose
  * encoding of these leaves is not the harness's -- CLAIMS B6), 4=host-only
- * int: MASTER TUNE is a SYSTEM parameter (Script.xml SYS_COM, not in a patch
- * record; its roff is unused), held by the context like type 3 (CLAIMS A20).
+ * int: MASTER TUNE is a SYSTEM parameter (Script.xml SYS_COM), held by the
+ * context like type 3 (CLAIMS A20); the record carries it at 18 (after the
+ * name, SYS_COM: Local SW, Master Tune (SYSTEM-1), MASTER TUNE), which the
+ * plugin's own patch load reads (src/juno_state_tables.h) and its recall does not.
  */
 typedef struct { const char *name; const char *section; int roff; int type; int min; int max; int def; } juno_hostparam;
 
@@ -72,7 +74,7 @@ static const juno_hostparam HOSTPARAMS[] = {
     {"BEND SENS VCF"      ,"BEND"    ,  522, 2,   0, 255,  43},
     {"MOD SENS DCO"       ,"MOD"     ,  530, 2,   0, 255,  22},
     {"MOD SENS VCF"       ,"MOD"     ,  538, 2,   0, 255,  22},
-    {"MASTER TUNE"        ,"GLOBAL"  ,   20, 4,   0, 200, 100},   /* SYSTEM parameter, context-held (type 4) */
+    {"MASTER TUNE"        ,"GLOBAL"  ,   18, 4,   0, 200, 100},   /* SYSTEM parameter, context-held (type 4) */
     {"PORTAMENTO"         ,"GLOBAL"  ,  124, 1,   0, 255,   0},
     {"LEGATO"             ,"GLOBAL"  ,  126, 1,   0,   1,   0},
     {"ASSIGN MODE"        ,"GLOBAL"  ,  128, 1,   0,   3,   0},

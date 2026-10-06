@@ -120,7 +120,34 @@ static unsigned char *unit_noise(unsigned char *st, int v)
 {
     return st + JUNO_UNIT_BASE + 16u + 176u * (unsigned)v;
 }
+/* unit u's start-up mute (JUNO_LATCH_BASE): 1 = this sample is muted (and the
+ * counter taken), 0 = render */
+static unsigned char *latch_cell(unsigned char *st, int u)
+{
+    return u < 8 ? st + JUNO_LATCH_BASE + 4u * (unsigned)u : st + JUNO_LATCH_MASTER;
+}
+static int latch_take(unsigned char *st, int u)
+{
+    int32_t n;
+    memcpy(&n, latch_cell(st, u), 4);
+    if (n <= 0) return 0;
+    --n;
+    memcpy(latch_cell(st, u), &n, 4);
+    return 1;
+}
 #endif
+
+/* Arm every unit's start-up mute (the engine's construction: 960 samples). */
+void juno_driver_arm_latch(unsigned char *st)
+{
+#ifndef EB_DEVCELLS
+    int32_t n = JUNO_LATCH_N;
+    int u;
+    for (u = 0; u < 9; ++u) memcpy(latch_cell(st, u), &n, 4);
+#else
+    (void)st;
+#endif
+}
 
 /* Voice v's own copy of the noise block (for gates): the per-voice copy once
  * a count below 8 has been rendered, else the one shared block. */
@@ -154,7 +181,7 @@ void juno_driver_render_voices(unsigned char *st, float *vbuf)
         for (v = 0; v < JUNO_NUM_VOICES; ++v) {
             float vr = 0.0f;
             vbuf[v] = 0.0f;
-            if (v >= nv) continue;
+            if (v >= nv || latch_take(st, v)) continue;
             memcpy(JCELL(st, JUNO_NOISE_BLOCK_OFF), unit_noise(st, v), JUNO_NOISE_BLOCK_LEN);
             juno_voice_render_fn(st, v, &vbuf[v], &vr);
             memcpy(unit_noise(st, v), JCELL(st, JUNO_NOISE_BLOCK_OFF), JUNO_NOISE_BLOCK_LEN);
@@ -172,6 +199,11 @@ void juno_driver_render_voices(unsigned char *st, float *vbuf)
     for (v = 0; v < JUNO_NUM_VOICES; ++v) {
         float vr = 0.0f;
         vbuf[v] = 0.0f;
+#ifndef EB_DEVCELLS
+        /* a muted unit runs no DSP; all eight carry the same counter here (they
+         * were armed together and have all rendered every sample since) */
+        if (latch_take(st, v)) continue;
+#endif
         memcpy(JCELL(st, JUNO_NOISE_BLOCK_OFF), nblk, JUNO_NOISE_BLOCK_LEN);
         juno_voice_render_fn(st, v, &vbuf[v], &vr);
     }
@@ -207,6 +239,9 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
          * the last output its unit rendered (CLAIMS B10) */
         for (i = v0; i < JUNO_NUM_VOICES; ++i)
             keep[i] = JF(st, 10672u + (unsigned)i * JUNO_VOICE_MAIN_STRIDE);
+#ifndef EB_DEVCELLS
+        if (!latch_take(st, 8))            /* the master's start-up mute: no DSP, zero out */
+#endif
         juno_master_render_fn(st, a2, a3);
         for (i = v0; i < JUNO_NUM_VOICES; ++i)
             JF(st, 10672u + (unsigned)i * JUNO_VOICE_MAIN_STRIDE) = keep[i];

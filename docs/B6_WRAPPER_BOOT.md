@@ -2,7 +2,8 @@
 
 LIVING. Answers: what does the plugin's OWN preset load hand the engine, and how
 is it executed? Tool: `probes/b6/wrapper_emu.py` (plumbing over `e2e_emu`),
-census `probes/b6/state_load_census.py`.
+censuses `probes/b6/state_load_census.py`, `state_mask_census.py`,
+`patch_load_census.py`; gate `tools/verify/state_load_gate.py` (CLAIMS A22).
 
 ## The wall that fell (P112 section 7)
 
@@ -67,3 +68,43 @@ which writes the list order; so a DAW preset recall reaches the engine as 95 hos
 edits in list order at one sample (plus whatever the host does with the 79
 performEdits: VST3 hosts forward them as parameter changes, host-dependent).
 performEdit values are normalized (LFO RATE 145 -> 145/255).
+
+## The plugin's own patch load (EXECUTED, probes/b6/patch_load_census.py)
+
+The patch browser's "load" (ManagePatch handler rva 0x322E60 -> patch manager
+rva 0x338090 -> rva 0x335850) sets every leaf of the patch tree from the record
+bytes, depth first, each value at its running offset; the core queues one engine
+event per value of the parameter list, exactly as setState does (the markers
+2*slot / 2*slot+1 raise the same loading flag). All 64 factory records:
+
+* 87 kind-2 events at offset 0, ONE order for every record (the tree order):
+  MASTER TUNE first (the record carries SYS_COM after its 16-byte name: Local
+  SW, Master Tune (SYSTEM-1), MASTER TUNE = 01 0a 06 04), the panel values, the
+  8 name words, NAME1..3, then PATCH2 (the H floats as 8 nibbles, the DLY leaves
+  in Script.xml order, not list order).
+* Leaves outside the parameter list (the LFO / OSC waves, the scatter leaves,
+  TEMPO, ...) are set in the model and never reach the engine.
+* The model's own serialization (rva 0x335990) reproduces every record after
+  its name, 64/64: a record IS the serialized patch tree.
+* The decode is the model's set-from-bytes: int1x7 = the byte, int2x4 =
+  (b0 << 4) | b1, int8x4 / int4x4 = the bytes OR-ed shifted -- nothing masked
+  (crafted records). setState instead stores value & mask (8, 7 or 16 bits, or
+  the value: state_mask_census.py).
+* Each event is a host edit, so a patch change in the plugin is NOT the recall
+  the gates A17-A19 model (flag 1): it ramps through the host-role programs (A20).
+
+Generated for the port: src/juno_state_tables.h (tools/verify/gen_state_tables.py:
+every record offset and decode derived from 72 records, the one candidate that
+fits); port: juno_gui_plugin_init / juno_gui_state_load / juno_gui_load_patch;
+gate: tools/verify/state_load_gate.py.
+
+## Found on the way (each a port defect, fixed)
+
+| defect | the plugin (READ + EXECUTED) |
+|---|---|
+| no start-up mute | the engine's construction sets every unit's skip counter to 960 (rva 0x398EA0); a unit under it outputs zero and runs no DSP, only its ramp pump (rva 0x398F30 / 0x398EC0); a unit the voice count stops keeps it |
+| fine cutoff "last value" | VCF CUTOFF FREQ H stores (int)(H * 255.0f) as the cutoff object's last value (rva 0x359890), from which the next step's glide time is measured; the port kept the float's bits |
+| arp refresh glide time | the arp switch re-sends the stored cutoff through the cutoff setter (leaf 312, rva 0x3B9990 -> 0x3597F0): its time follows the step from the last value and the byte becomes the last value; the census only saw step 0 |
+| ARPEGGIO SW out of range | the host entry calls the arp switch with (v != 0) directly (rva 0x3C7AE0, dispatch 831), no range check |
+| MASTER TUNE record offset | 18, not 20 (juno_hostparams.c) |
+| oracle FP mode | a chain that never recalls must still set the plugin's FTZ|DAZ (e2e_emu set_ftz): playbook 120 |

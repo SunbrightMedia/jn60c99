@@ -549,6 +549,43 @@ class Wrapper(E.E2E):
         assert r == 0, 'initialize failed'
         return self.base
 
+    def boot_host(self, log=print):
+        """boot() + what a VST3 host does next: the edit controller created from the
+        factory, initialized, connected both ways to the component, a component
+        handler set, and the component's state handed to it (setComponentState).
+        Returns the controller. The core's edit path (core+600) needs all of it."""
+        q = lambda a: struct.unpack('<Q', self.uc.mem_read(a, 8))[0]
+        self.boot(log=log)
+        fac = self.call(FACTORY, count=100_000_000)
+        buf = self.alloc_com(0x40)
+        self.uc.mem_write(buf, bytes.fromhex('c74480f256663d4c9cfcecce62993ffd') + IID_IEDITCONTROLLER)
+        assert self.vcall(fac, 6, buf, buf + 16, buf + 0x30) & 0xFFFFFFFF == 0
+        ctrl = q(buf + 0x30)
+        assert self.vcall(ctrl, 3, self.new_obj('hostctx'), count=4_000_000_000) & 0xFFFFFFFF == 0
+
+        def qi(obj, iid):
+            self.uc.mem_write(buf, iid)
+            assert self.vcall(obj, 0, buf, buf + 0x30) & 0xFFFFFFFF == 0
+            return q(buf + 0x30)
+        cp_p, cp_c = qi(self.comp, IID_ICONNECTIONPOINT), qi(ctrl, IID_ICONNECTIONPOINT)
+        assert self.vcall(cp_p, 3, cp_c) & 0xFFFFFFFF == 0 and self.vcall(cp_c, 3, cp_p) & 0xFFFFFFFF == 0
+        assert self.vcall(ctrl, 16, self.new_obj('handler')) & 0xFFFFFFFF == 0
+        assert self.vcall(ctrl, 5, self.stream(self.get_state()), count=4_000_000_000) & 0xFFFFFFFF == 0
+        self.ctrl = ctrl
+        return ctrl
+
+    def load_patch(self, rec_tail):
+        """the plugin's own patch load (its patch browser's "load": rva 0x335850)
+        of a record's bytes after the 16-byte name; returns the new queue records"""
+        q = lambda a: struct.unpack('<Q', self.uc.mem_read(a, 8))[0]
+        data = self.alloc_com(len(rec_tail) + 16)
+        self.uc.mem_write(data, rec_tail)
+        vec = self.alloc_com(24)
+        self.uc.mem_write(vec, struct.pack('<QQQ', data, data + len(rec_tail), data + len(rec_tail)))
+        n0 = len(self.queue())
+        self.call(IB + 0x335850, rcx=vec, rdx=q(self.comp + 280 + 8), r8=0, r9=0, count=4_000_000_000)
+        return self.queue()[n0:]
+
     def vcall(self, obj, slot, *args, count=2_000_000_000):
         vt = struct.unpack('<Q', self.uc.mem_read(obj, 8))[0]
         fn = struct.unpack('<Q', self.uc.mem_read(vt + 8 * slot, 8))[0]

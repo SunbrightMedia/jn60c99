@@ -131,6 +131,14 @@ def job_ops(r, name=None):
             t = 0
         if name == 'VCF CUTOFF FREQ' and a == 'R' and c in CUTOFF_CELLS and t == cutoff_time(r['frm'], r['to']):
             t = 0x80
+        # the arp refresh re-sends the stored cutoff through the same setter
+        # (leaf 312, rva 0x3B9990 -> 0x3597F0): its time follows the step from
+        # the object's last value (0 in every census context: the recall leaves
+        # the last value at the stored byte, so the census saw time 15 only)
+        if name in DEDUPE and a == 'R' and c in CUTOFF_CELLS:
+            if t != cutoff_time(0, 0):
+                raise SystemExit('%s: a cutoff re-send at time %d, not the step law of 0' % (name, t))
+            t = 0x40
         out.append((KIND[a], c, t or 0, val & 0xFFFFFFFF, r['rec'].get(c) if r.get('rec') else None, r['to'],
                     tuple(r.get('curve') or ())))
     return dedupe(out) if name in DEDUPE else out
