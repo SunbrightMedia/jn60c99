@@ -127,6 +127,9 @@ verify: test libjuno.so
 	echo "=== WARM CHAINS (CLAIMS A17/B1): 22 chains of recalls through ONE engine (type variants, legal seeds, DELAY LEVEL edges), whole object after every step, 3 rates ==="; \
 	fresh $(SCRATCH)/warm_chain_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/warm_chain_gate.py --ref || FAIL=1; \
 	python3 tools/verify/warm_chain_gate.py --port || FAIL=1; \
+	echo "=== WARM RENDER (CLAIMS A18/B1): patch changes on a RUNNING engine, notes + renders between recalls, audio + rendered state, settled recall model ==="; \
+	fresh $(SCRATCH)/warm_render_settled.pkl $(ORACLE_DEPS) || python3 tools/verify/warm_render_gate.py --ref settled || FAIL=1; \
+	python3 tools/verify/warm_render_gate.py --port settled || FAIL=1; \
 	echo "=== SHADOW CELLS: bounds (cannot false-fail an A/B) + WRITER-SET invariant (prog == clamp(shadow)) ==="; \
 	python3 tools/verify/shadow_bounds_gate.py || FAIL=1; \
 	python3 tools/verify/shadow_sync_gate.py || FAIL=1; \

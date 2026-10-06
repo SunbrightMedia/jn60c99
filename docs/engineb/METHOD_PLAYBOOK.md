@@ -2404,3 +2404,26 @@ adding new shadow cells. `make verify` was red from that commit on.
 `make test static` before every commit (the static target runs every seconds-long gate of
 `make verify`). A gate that parses source text must parse CODE, comments stripped: the old
 sync-gate parser was reading its bound from a comment that quoted removed code.
+
+## 120. THE EMULATOR'S FLOATING POINT IS PART OF THE ORACLE -- MEASURE IT
+Paid 2026-10-06 (JUNO). Unicorn honours DAZ (a denormal operand is read as 0) but NOT FTZ: with
+MXCSR 0x9FC0, 1e-20f * 1e-20f stores the denormal 0x000116c2 where an x86 CPU stores 0. The oracle
+therefore keeps denormal results the real plugin would flush; the port, in true FTZ/DAZ, stored
+signed zeros, and a long-tail render gate went red on cells like the voice filter state 10160.
+Mapping "denormal == 0" in the compare is wrong: integer cells (counters, ring indices) look
+denormal too, and the reverb clear counter 256 vs 0 would have passed. Under DAZ the two modes
+differ only in the denormal results that get stored, so the gate runs the PORT in the oracle's mode
+(src/juno_ftz.c juno_set_fp_oracle_mode: DAZ on, FTZ off, no explicit flush) and compares bit for bit.
+### The rule
+Test the emulator's FP mode with a two-instruction snippet before trusting any gate on long tails.
+Match the port to the oracle's mode in the gate; never canonicalize values in the compare.
+
+## 121. A GATE THAT NEVER RENDERS BETWEEN RECALLS CANNOT SEE THE ALLOCATOR
+Paid 2026-10-06 (JUNO, CLAIMS A18). warm_chain_gate.py (A17) compares the whole object after every
+recall but plays no note, so the voice allocator's state across patch changes was never compared.
+A chain with notes and renders between recalls (tools/verify/warm_render_gate.py) was red on 9 of
+12 chains: three allocator defects (unison ageing all voices, a voice flush on every load instead
+of on a mode change, note slots kept after that flush) plus the oracle FP mode (playbook 120).
+### The rule
+For every stateful subsystem, a warm gate must exercise the events that USE its state between
+recalls (notes for the allocator, renders for tanks and fades), not only the recall itself.

@@ -19,7 +19,8 @@ from unicorn.x86_const import (UC_X86_REG_RCX, UC_X86_REG_RSP, UC_X86_REG_R9,
                                UC_X86_REG_RIP, UC_X86_REG_XMM3, UC_X86_REG_XMM5)
 
 RAMP_STEP, ARM_STORE = 0x3C2E00, 0x3C2EAD
-a = [x for x in sys.argv[1:] if x != '-v']
+a = [x for x in sys.argv[1:] if x not in ('-v', '--flag0')]
+FLAG = 0 if '--flag0' in sys.argv else 1
 P_FROM, P_TO = (int(a[0]), int(a[1])) if len(a) >= 2 else (0, 7)
 SR = float(a[2]) if len(a) >= 3 else 44100.0
 NREC = 1024
@@ -39,10 +40,10 @@ def dispatch_only(e, idx):
     for (d, v) in late: R.wr_desc(e, d, v)
     for u in range(9):
         for (d, _) in lt:
-            try: e.dispatch(u, d, R.rd_desc(e, d))
+            try: e.dispatch(u, d, R.rd_desc(e, d), FLAG)
             except RuntimeError: pass
         for (d, _) in late:
-            try: e.dispatch(u, d, R.rd_desc(e, d))
+            try: e.dispatch(u, d, R.rd_desc(e, d), FLAG)
             except RuntimeError: pass
     e.assigner_notify()
 
@@ -92,7 +93,7 @@ for u in range(9):
     uc.hook_add(UC_HOOK_MEM_WRITE, on_write, begin=bases[u], end=bases[u] + 40 * NREC)
 uc.hook_add(UC_HOOK_CODE, on_step, begin=E.IB + RAMP_STEP, end=E.IB + RAMP_STEP)
 dispatch_only(e, P_TO)
-print('== p%d -> p%d @%g: %d arms (units 0..8)' % (P_FROM, P_TO, SR, len(arms)))
+print('== p%d -> p%d @%g, dispatch flag %d: %d arms (units 0..8)' % (P_FROM, P_TO, SR, FLAG, len(arms)))
 by_site = defaultdict(list)
 for x in arms:
     by_site[x[0]].append(x)

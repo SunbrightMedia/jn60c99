@@ -743,21 +743,32 @@ static void mono_note_on(juno_ctx *c, int midi_note, int velocity)
         juno_note_retrig(c->st, 0);
         voice_trigger(c, 0, midi_note, velocity);
     } else {                                             /* legato: pitch move, keep envelope */
+        /* No voice_age update: a legato key does not move voice 0 in the
+         * plugin's voice-priority list (MEASURED, see unison_note_on). */
         juno_note_glide(c->st, 0, midi_note);
         juno_note_velocity(c->st, 0, velocity);          /* refresh VCF/VCA vel, no gate edge */
         c->voice_note[0] = midi_note;
-        c->voice_age[0]  = ++c->age_counter;
     }
     for (v = 1; v < JUNO_NUM_VOICES; ++v)               /* force mono: release the rest */
         if (c->voice_note[v] >= 0) { juno_note_off(c->st, v); c->voice_gated[v] = 0; }
 }
 
 /* MODE 2 UNISON (sub_7FF91DFB3B60): all 8 voices on the same note. Whole stack
- * retriggers only when idle; overlapping notes glide the stack. */
+ * retriggers only when idle; overlapping notes glide the stack.
+ *
+ * THE VOICE-PRIORITY LIST (CAssignJu60, the 8 ints at assigner +0x78) moves ONLY
+ * voice 0 to the front on a UNISON or MONO retrigger, and nothing at all on a
+ * legato/glide key; a POLY or mode-3 allocation moves the chosen voice. MEASURED
+ * by dumping the list across unison/mono/mode-3 notes and back to POLY
+ * (tools/verify/warm_render_gate.py found it: after a unison patch the plugin's
+ * next POLY note took voice 7, the port's voice 0, because the port aged all 8
+ * unison voices). voice_age is the port's image of that list, so here only
+ * voice 0 is aged. */
 static void unison_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     int v, was_idle = !c->voice_gated[0];
     for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+        unsigned keep_age = c->voice_age[v];
         if (was_idle) {
             /* UNISON retrigger arms the DCO phase-reset latch on ALL EIGHT
              * voices, exactly as MONO arms it on voice 0. Its absence made the
@@ -780,9 +791,10 @@ static void unison_note_on(juno_ctx *c, int midi_note, int velocity)
              * same defect class as the MONO latch above (e611f7d). */
             juno_note_retrig(c->st, v);
             voice_trigger(c, v, midi_note, velocity);
+            if (v) c->voice_age[v] = keep_age;           /* only voice 0 moves */
         }
         else { juno_note_glide(c->st, v, midi_note); juno_note_velocity(c->st, v, velocity);
-               c->voice_note[v] = midi_note; c->voice_age[v] = ++c->age_counter; }
+               c->voice_note[v] = midi_note; }         /* a glide moves nothing */
     }
 }
 
@@ -1079,7 +1091,7 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, floa
  * EDIT path returns 0 unapplied. */
 static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush)
 {
-    int n, mode = 0, oct = 1, on, porta = 0;
+    int n, mode = 0, oct = 1, on, porta = 0, old_mode;
     {
         unsigned char *pre = malloc(JUNO_VOICE_MAIN_STRIDE);
         const unsigned char *v0 = c->st + 176;
@@ -1111,6 +1123,7 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
     juno_apply_condition(c->st, c->last_condition);
     /* Per-patch VOICE-ASSIGN recall (CAssignJu60): ASSIGN MODE (poly/mono/unison/
      * poly-variant), LEGATO, and PORTAMENTO-engaged drive the note allocator above. */
+    old_mode = c->assign_mode;
     juno_bank_voice_modes(bank, idx, &c->legato, &c->assign_mode, &porta);
     c->portamento_on = (porta != 0);
     /* The value leaf 467+v restores into cell 592 is the PORTAMENTO on/off the
@@ -1134,14 +1147,23 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
      * The patch's real values are therefore used, and the allocator modes below
      * (mono_note_on / unison_note_on, transcribed from sub_7FF91DFB38F0 /
      * sub_7FF91DFB3B60) are live. Gated by tools/verify/assigner_ab.py. */
-    /* Switching assign mode flushes sounding voices so the new allocator starts
-     * clean (the plugin's mode-change reader flushes hold + all-notes-off). Release
-     * ALL voices directly (mode-agnostic) and clear the held-note mask. Skipped for
-     * a live host-parameter edit (flush=0) so a held note keeps ringing. */
-    if (flush) {
+    /* A CHANGE of ASSIGN MODE flushes the sounding voices so the new allocator
+     * starts clean: the plugin's mode reader (rva 0x3549F0, called by the assigner
+     * refresh after every parameter write) compares the new mode with its cached
+     * one (assigner +0x10) and ONLY when they differ calls hold-off (0x354C70) and
+     * all-notes-off (0x3530B0: release every gated voice, clear the note slots and
+     * the legato mask). READ. The port flushed on EVERY patch load, so a key held
+     * across a same-mode patch change was released here and kept sounding in the
+     * plugin (tools/verify/warm_render_gate.py, rapid family). The same rule holds
+     * for a live edit of ASSIGN MODE. */
+    if (c->assign_mode != old_mode) {
         int v;
+        /* all-notes-off also clears the assigner's note slots (+0x60..+0x74 :=
+         * 0xff "no note", rva 0x3530C7), so no voice keeps its old note: a MONO
+         * note-on after the change must not gate voices 1..7 off again (it did,
+         * arming their DCO latches; warm_render_gate rapid family). */
         for (v = 0; v < JUNO_NUM_VOICES; ++v)
-            if (c->voice_note[v] >= 0) { juno_note_off(c->st, v); c->voice_gated[v] = 0; }
+            if (c->voice_note[v] >= 0) { juno_note_off(c->st, v); c->voice_gated[v] = 0; c->voice_note[v] = -1; }
         c->held_notes[0] = c->held_notes[1] = c->held_notes[2] = c->held_notes[3] = 0;
         juno_note_broadcast_held(c->st, 0);   /* nothing held after the flush */
         c->legato_mask = 0;                   /* assigner+68, zeroed by the mode-change

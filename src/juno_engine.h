@@ -219,6 +219,10 @@ void juno_flush_denormals(unsigned char *st);
  * init. juno_hw_ftz_available() returns 1 when the hardware mode was applied. */
 void juno_enable_hw_ftz(void);
 int  juno_hw_ftz_available(void);
+/* juno_set_fp_oracle_mode — GATES ONLY: 1 = the Unicorn oracle's floating-point
+ * mode (DAZ on, FTZ off, no explicit flush), so denormal results match it bit
+ * for bit; 0 = back to the plugin's FTZ/DAZ. See src/juno_ftz.c. */
+void juno_set_fp_oracle_mode(int on);
 
 /* voice_render — exact transcription of sub_180369070, parameterised by voice.
  * Produces one mono sample for voice `voice` (0..7) from engine state `base`;
