@@ -129,7 +129,7 @@ import { decodeBank } from "./bank.js";
 
 /* Cache-buster: build.sh rewrites this to the WASM content hash each build, so a new
  * engine is always fetched fresh instead of served from the browser/CDN cache. */
-const BUILD_VER = "c51bf28fbc98";
+const BUILD_VER = "d68006d9afc1";
 
 // The plugin runs its DSP natively at the host sample rate (no oversampling, no
 // decimator). SR is replaced at boot with the AudioContext's ACTUAL rate so the
@@ -186,7 +186,7 @@ function prettify(name, sec) {
 }
 
 let M, ctx, get, set, chorusFn, gateFn, renderFn, malloc, free;
-let noteOnFn, noteOffFn, midiNoteOnFn, midiNoteOffFn, velSwFn, applyBankFn, renderDryFn, arpFn, getArpFn, warmupFn, tempoFn;
+let noteOnFn, noteOffFn, midiNoteOnFn, midiNoteOffFn, velSwFn, loadPatchFn, renderDryFn, arpFn, getArpFn, warmupFn, tempoFn;
 let hostCountFn, hostNameFn, hostSectionFn, hostMinFn, hostMaxFn, hostGetFn, hostSetFn;
 let arpOn = false;
 let PARAMS = [];
@@ -216,7 +216,7 @@ async function boot() {
   arpFn = M.cwrap("juno_gui_arp_config",null,["number","number","number","number","number","number"]);
   tempoFn = M.cwrap("juno_gui_set_tempo",null,["number","number"]);
   getArpFn = M.cwrap("juno_gui_get_arp","number",["number"]);
-  applyBankFn = M.cwrap("juno_gui_apply_bank","number",["number","number","number","number"]);
+  loadPatchFn = M.cwrap("juno_gui_load_patch","number",["number","number","number","number"]);
   warmupFn = M.cwrap("juno_gui_warmup",null,["number","number"]);
   malloc = M._malloc; free = M._free;
   // Create the AudioContext at the device's native rate (usually 48 kHz) and build
@@ -237,6 +237,12 @@ async function boot() {
   // Every proven gate runs mode 0; the webapp passing 2 was the one caller of an
   // unproven path, smearing a non-plugin chorus over every chorus-engaged patch.
   if (!ctx) { status("engine alloc failed"); return; }
+  // THE PLUGIN AS SHIPPED (CLAIMS A21/A22): its construction mutes every unit for
+  // the first 960 samples, and IComponent::initialize queues the 95 defaults of its
+  // parameter list (six voices, the init patch) that the first process() applies
+  // through the host entry. Without this the app would play the engine after BUILD
+  // (eight voices), which no DAW instance ever is. Gated: state_load_gate.py (boot).
+  if (!M.cwrap("juno_gui_plugin_init","number",["number"])(ctx)) { status("engine init failed"); return; }
   // Warm the engine to its steady idle state, exactly as a DAW does by rendering
   // silence from the moment the plugin is activated. ~190 smoothed control cells
   // start at 0 and only converge toward their targets WHILE rendering; a freshly
@@ -270,11 +276,13 @@ async function boot() {
   warmupFn(ctx, (SR * 4) | 0);
 
   PARAMS = buildParams();
+  for (const p of PARAMS) p.val = hostGetFn(ctx, p.idx);   // the init patch's values
+  syncArpUI();
 
   $("#meta").textContent = `· ${PARAMS.length} host parameters @ ${SR} Hz · build ${BUILD_VER} · runs entirely in your browser`;
   $("#warn").innerHTML =
-    `<div class="info">✓ Ready — <b>Load bank → Apply → press a key</b>, then tweak the sliders below. The panel exposes <b>all ${PARAMS.length} host-visible parameters</b> (the same set a VST3 host such as Ableton exposes), grouped by section — DCO, HPF, VCF, VCA, both envelopes, LFO, bender/mod, global, arp and the chorus/flanger/delay/reverb effects — enumerated straight from the plugin's <b>Script.xml value tree</b>. Moving a slider writes that parameter's byte into the loaded patch's record with the plugin's own serialization and re-runs the <b>exact bit-exact recall</b>, so you hear the plugin's own value-tree recall for that value across the full 8-voice + chorus + output path.</div>` +
-    `<div class="caveat">Each slider shows the <b>value the engine recalled</b> for the loaded patch (read back through the engine's own per-leaf decode). Editing re-runs the full recall (a held note keeps ringing, reseeded with the new coefficients — so it behaves like a patch edit, not a smooth mid-note knob). Sliders tagged <span class="tag">recall-only</span> load into the patch but produce <b>no audible change on a plain held note in this port</b>: they are either redundant high-res mirrors the port derives from the coarse control, modulation depths that need a bend/mod wheel this page has no control for, or fine delay/chorus/reverb voicing the port recalls as an aggregate coefficient. The <b>arpeggiator</b> (row above) auto-recalls per preset; Tempo/Gate stay local because the plugin's arp is host-tempo-synced.</div>`;
+    `<div class="info">✓ Ready — the engine starts as the plugin does (its init patch, six voices). <b>Press a key</b>, move any slider, or <b>Load bank → Apply</b>. The panel exposes <b>all ${PARAMS.length} host-visible parameters</b> (the set a VST3 host such as Ableton automates), grouped by section — DCO, HPF, VCF, VCA, both envelopes, LFO, bender/mod, global, arp and the chorus/flanger/delay/reverb effects — enumerated from the plugin's <b>Script.xml value tree</b>. A slider move is a DAW automation event through the plugin's own <b>host parameter entry</b> (its ramps and setters, CLAIMS A20); a patch load is the plugin's own <b>patch-browser load</b> (CLAIMS A22).</div>` +
+    `<div class="caveat">Each slider shows the value the patch record holds. Sliders tagged <span class="tag">recall-only</span> produce <b>no audible change on a plain held note in this port</b>: redundant high-res mirrors, modulation depths that need a bend/mod wheel this page has no control for, or fine delay/chorus/reverb voicing. The <b>arpeggiator</b> switch, mode and range (row above) are the plugin's ARPEGGIO SW / TYPE / STEP parameters; Tempo/Gate stay local because the webapp is the host (the plugin's arp follows the host tempo).</div>`;
   buildPiano();
   refreshPresets();
   renderList();
@@ -295,6 +303,9 @@ function buildParams() {
     const sord = SECTION_ORDER.indexOf(sec);  // is signed -3..3, knobs stay 0..255
     list.push({ idx: i, name, section: sec, secLabel: SECTION_LABEL[sec] || sec,
                 label: prettify(name, sec), min, max, val: 0,
+                // the host-only floats (VCF CUTOFF FREQ H, LFO RATE H): the host
+                // value is the float's bits, 0.0f..1.0f (the plugin's database)
+                isFloat: max === 0x3F800000,
                 inert: INERT.has(name), sord: sord < 0 ? 99 : sord });
   }
   list.sort((a, b) => a.sord - b.sord || a.idx - b.idx);
@@ -311,6 +322,11 @@ function renderList() {
   }
 }
 
+// float <-> its bits, for the host-only float parameters
+const F32 = new Float32Array(1), I32 = new Int32Array(F32.buffer);
+const bitsToF = (b) => { I32[0] = b; return F32[0]; };
+const fToBits = (f) => { F32[0] = f; return I32[0]; };
+
 function rowFor(p) {
   const d = document.createElement("div"); d.className = "p" + (p.inert ? " inert" : "");
   const lab = document.createElement("label");
@@ -319,23 +335,33 @@ function rowFor(p) {
   if (p.inert) { const t = document.createElement("span"); t.className = "tag"; t.textContent = "recall-only"; lab.appendChild(t); }
   const mid = document.createElement("div");
   const num = document.createElement("input");
-  num.type="number"; num.min=p.min; num.max=p.max; num.step=1; num.value=p.val;
   const r = document.createElement("input"); r.type="range";
-  r.min=p.min; r.max=p.max; r.step=1; r.value=p.val;
-  r.oninput  = () => num.value = r.value;
-  r.onchange = () => { commit(p, +r.value); num.value=p.val; r.value=p.val; };
-  num.onchange = () => { commit(p, +num.value); r.value=p.val; num.value=p.val; };
+  num.type="number";
+  if (p.isFloat) {                  // shown as the float 0..1, slider in 1/1000 steps
+    const show = () => { const f = bitsToF(p.val); num.value = f.toFixed(4); r.value = Math.round(f * 1000); };
+    num.min=0; num.max=1; num.step=0.001; r.min=0; r.max=1000; r.step=1; show();
+    r.oninput  = () => num.value = (r.value / 1000).toFixed(4);
+    r.onchange = () => { commit(p, fToBits(r.value / 1000)); show(); };
+    num.onchange = () => { commit(p, fToBits(Math.max(0, Math.min(1, +num.value || 0)))); show(); };
+    p._show = show;
+  } else {
+    num.min=p.min; num.max=p.max; num.step=1; num.value=p.val;
+    r.min=p.min; r.max=p.max; r.step=1; r.value=p.val;
+    r.oninput  = () => num.value = r.value;
+    r.onchange = () => { commit(p, +r.value); num.value=p.val; r.value=p.val; };
+    num.onchange = () => { commit(p, +num.value); r.value=p.val; num.value=p.val; };
+  }
   mid.appendChild(r); p._range = r; p._num = num;
   d.append(lab, mid, num); return d;
 }
 
-// Write value v into the loaded patch's record for this param and re-run the exact
-// plugin recall (juno_gui_host_set; flush=0 so a held note keeps ringing). Reads the
-// value back so the model reflects the byte the engine actually stored.
+// A panel move is a DAW automation event: juno_gui_host_set runs the plugin's host
+// parameter entry (CLAIMS A20: its ramps and setters, a held note keeps ringing)
+// and stores the value in the model record. Reads the value back so the panel
+// shows what the record holds.
 function commit(p, v) {
   if (!ctx) return;
   v = Math.max(p.min, Math.min(p.max, Math.round(v) || 0));
-  if (!BANK_RAW) { status(`${p.label}: load a bank first — edits apply to the loaded patch`); return; }
   hostSetFn(ctx, p.idx, v);
   // The edit's re-recall re-bakes tempo-synced delay cells at the plugin's
   // 128-BPM default — re-push the host tempo so echoes stay on the arp grid.
@@ -344,14 +370,32 @@ function commit(p, v) {
   // return negatives, so a negative readback is a VALUE here, not an error —
   // with a bank loaded the decode cannot fail).
   p.val = hostGetFn(ctx, p.idx);
-  status(`${p.label} (${p.section}) = ${p.val}${p.inert ? " · recall-only (no audible change here)" : ""}`);
+  status(`${p.label} (${p.section}) = ${p.isFloat ? bitsToF(p.val).toFixed(4) : p.val}${p.inert ? " · recall-only (no audible change here)" : ""}`);
 }
 
 // --- controls (exposed for inline handlers) ---
 window.renderList = renderList;
+// The arp row's switch, mode and octave range are the plugin's ARPEGGIO SW / TYPE /
+// STEP host parameters (CLAIMS A20/A22: the switch hands held keys to the arp and
+// back, as the plugin does). Tempo and gate stay host-side: the webapp is the host.
+const hostParam = (name) => PARAMS.find(p => p.name === name);
+function arpHostSet(name, v) {
+  const p = hostParam(name);
+  if (!p || hostGetFn(ctx, p.idx) === v) return;
+  hostSetFn(ctx, p.idx, v);
+  p.val = hostGetFn(ctx, p.idx);
+  if (p._range && !p.isFloat) { p._range.value = p.val; p._num.value = p.val; }
+}
 window.arpApply = () => {
   const mode=+$("#arpMode").value, oct=+$("#arpOct").value,
         bpm=+$("#arpRate").value, gate=+$("#arpGate").value;
+  // UI mode 0=up 1=down 2=up&down -> TYPE 0 / 2 / 1 (TYPE 2..5 all play down);
+  // octaves 1..3 -> STEP 0..2 (STEP 2..5 all span three octaves)
+  const t = hostParam("ARPEGGIO TYPE"), st = hostParam("ARPEGGIO STEP");
+  const curT = t ? hostGetFn(ctx, t.idx) : 0, curS = st ? hostGetFn(ctx, st.idx) : 0;
+  if ((curT === 0 ? 0 : curT === 1 ? 2 : 1) !== mode) arpHostSet("ARPEGGIO TYPE", [0, 2, 1][mode]);
+  if (Math.min(curS, 2) + 1 !== oct) arpHostSet("ARPEGGIO STEP", oct - 1);
+  arpHostSet("ARPEGGIO SW", arpOn ? 1 : 0);
   $("#arpRateV").textContent = bpm+" BPM";
   $("#arpGateV").textContent = Math.round(gate*100)+"%";
   if (arpFn) arpFn(ctx, arpOn?1:0, mode, oct, bpm, gate);
@@ -384,9 +428,10 @@ window.exportPreset = () => { const blob=new Blob([JSON.stringify(snapshot(),nul
 window.importPreset = (inp) => { const f=inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ apply(JSON.parse(rd.result)); status("imported "+f.name);}catch(e){status("import failed: "+e);} }; rd.readAsText(f); inp.value=""; };
 
 // --- render + play via Web Audio (no server), REAL-TIME + POLYPHONIC ---
-// A ScriptProcessor renders the full 8-voice master path continuously; key
-// presses drive per-voice note-on/off through the ported gate/ADSR driver and
-// the 8-voice allocator (juno_bridge.c), so held chords sound with real voices.
+// A ScriptProcessor renders the full master path continuously; key presses drive
+// per-voice note-on/off through the ported gate/ADSR driver and the plugin's
+// allocator at its shipped six voices (juno_bridge.c), so held chords sound with
+// real voices.
 let audioCtx, procNode, rbuf = 0, rcap = 0;
 const BLK = 1024;
 function ensureAudio() {
@@ -438,8 +483,9 @@ window.loadBank = (inp) => {
   rd.readAsArrayBuffer(f); inp.value = "";
 };
 
-// Apply the selected patch's full bit-exact recall into the live engine, then snap
-// every front-panel slider to that patch's own 0..255 bytes.
+// Load the selected patch as the plugin's own patch browser does (CLAIMS A22: its
+// 87 values in the patch tree's order through the host entry, a running engine,
+// held notes keep sounding), then snap every slider to the values loaded.
 window.applyBankPatch = () => {
   if (!BANK_RAW) return;
   applyPatchIndex(+$("#banksel").value);
@@ -451,7 +497,7 @@ window.applyBankPatch = () => {
 function applyPatchIndex(idx) {
   const ptr = malloc(BANK_RAW.length);
   M.HEAPU8.set(BANK_RAW, ptr);
-  const n = applyBankFn(ctx, ptr, BANK_RAW.length, idx);
+  const n = loadPatchFn(ctx, ptr, BANK_RAW.length, idx);
   free(ptr);
   reflectFromRecord(idx);   // sliders <- the patch's recalled bytes
   syncArpUI();              // arp toggle/mode/octave <- per-patch arp recall
@@ -465,7 +511,7 @@ function applyPatchIndex(idx) {
   // domain (no arp pattern/selector side effects) and is patch-gated inert for
   // presets whose sync flags are off.
   tempoFn(ctx, +$("#arpRate").value);
-  status(`applied patch ${idx} "${BANK.patches[idx].name}" — ${n} bit-exact coefficients loaded${arpOn?" · arp ON":""} (press a key to hear it)`);
+  status(`loaded patch ${idx} "${BANK.patches[idx].name}" — the plugin's own patch load, ${n} values${arpOn?" · arp ON":""} (press a key to hear it)`);
 }
 
 // Snap every slider to the loaded patch's own value, read back through the engine
@@ -493,8 +539,8 @@ function showBank() {
   sel.onchange = () => showPatch(+sel.value);
   $("#bankttl").textContent = `${BANK.model} bank`;
   $("#bankwarn").innerHTML =
-    `<div class="info"><b>Apply to engine</b> loads the patch's full front-panel + extended recall as <b>bit-exact coefficients</b> — the parameter set the plugin's OWN recall enumerator fires, each value proven against the plugin's own setter under emulation (recall_gate.py: 67/67 voice cells, all 64 patches): DCO range · PWM depth·level·source · saw·sub·noise level · LFO mod, VCF cutoff · resonance · HPF cutoff+type · env-mod · key-follow · LFO mod, both ADSR envelopes, VCA tone · level · mode, LFO delay · rate · key-trig · tempo-sync · env-trig, portamento · bend range, and per-patch delay · reverb · arpeggiator.</div>` +
-    `<div class="caveat">Voice recall is proven bit-exact against the plugin's own recall. The remaining JUNO panel controls are <b>not per-patch DSP coefficients</b>: bend / mod-wheel sensitivity (inert unless you move those controls), note-assign modes (mono / legato — this preview plays polyphonic), and the JU-06A-only controls the JUNO-60 disables (2nd oscillator, ring, sync). FX (chorus / delay / reverb / effect modes) render bit-exact for most patches, with <b>known open items</b> — delay feedback on zero-feedback patches and two effect-tail cases — tracked honestly in PROVENANCE.tsv.</div>`;
+    `<div class="info"><b>Apply to engine</b> loads the patch as the plugin's own patch browser does: its 87 values in the patch tree's order through the plugin's host parameter entry, on the running engine (held notes keep sounding). Proven bit-exact against the plugin's own patch load, executed (tools/verify/state_load_gate.py, CLAIMS A22).</div>` +
+    `<div class="caveat">Bit-exact means the same samples and engine state as the plugin where the gates look: 44.1 / 48 / 96 kHz, notes held across loads, the arp switched with keys held. Not graded: a host tempo other than the plugin's default (the webapp re-times the tempo-synced LFO and delay cells itself) and the arpeggiator while it runs (the oracle has no transport clock).</div>`;
   showPatch(0);
   $("#bankdlg").showModal();
 }
@@ -547,7 +593,7 @@ function note(midi, on) {
   // see juno_bridge.c).
   const vel = +$("#vel").value;   // 1..127; only honored when Kbd Vel SW is ON
   if (on) midiNoteOnFn(ctx, midi, vel); else midiNoteOffFn(ctx, midi);
-  if (on) status(`note ${midi} · vel ${$("#velSw").checked ? vel : "100 (fixed — Kbd Vel SW off, plugin default)"} — live 8-voice master path`);
+  if (on) status(`note ${midi} · vel ${$("#velSw").checked ? vel : "100 (fixed — Kbd Vel SW off, plugin default)"} — live master path, six voices`);
 }
 
 // SYSTEM "Keyboard Velocity SW" toggle: mirrors the plugin's wrapper flag.

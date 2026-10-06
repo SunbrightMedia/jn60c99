@@ -13,7 +13,9 @@ at the start of the next block. --ref therefore has two halves:
   2. an engine (e2e_emu, POPULATE) is fed those queues through the host entry,
      in queue order at block boundaries, with notes and renders between.
 --port: juno_gui_create + juno_gui_plugin_init, then juno_gui_state_load /
-juno_gui_load_patch / juno_gui_host_set on the same script.
+juno_gui_load_patch / juno_gui_host_set on the same script. The app family
+starts as the web app does: a warm-up (port: juno_gui_warmup; the plugin:
+rendering silence, as a DAW does before anyone plays) before the first load.
 Compares every sample, the rendered state (voice v from unit v, the master from
 unit 8) and the 798 ramp records at every check (host_edit_gate.py helpers).
 
@@ -37,7 +39,8 @@ render driver is READ, rva 0x320B20).
 TOOTH (--tooth): the patch load as the recall (the old port), the patch load
 in reverse order, the record decode masked to nibbles, the state masks dropped,
 the payload applied in reverse order, the voice count ignored, initialize's
-defaults skipped, the arp switch flushing the notes (the old port), its
+defaults skipped, the warm-up without the render's voice-count sync, the
+arp switch flushing the notes (the old port), its
 switch-off order ignoring the key-trig flag, re-playing at velocity 100, a wild
 LFO KEY TRIG not sticking; reach probe: the model record taking the loaded
 record's non-parameter leaves.
@@ -172,6 +175,14 @@ def scripts():
             sc += [('on', n), ('render', 40)]
         sc += [('render', 600), ('check',)] + [('off', n) for n in NOTES] + [('render', 1200), ('check',)]
         out.append(('boot', RATES[c], sc))
+    # app: the web app's start -- a warm-up that renders nothing anyone compares
+    # (longer and shorter than the 960-sample start-up mute), then the patch
+    # browser and the keys
+    for c in range(3):
+        for warm, k in ((1500, (5, 21, 40)[c]), (500, (12, 34, 58)[c])):   # none in ARP
+            sc = [('warm', warm), ('check',), ('patch', 'f%d' % k), ('on', 60), ('render', 600), ('check',),
+                  ('on', 64), ('render', 300), ('off', 60), ('off', 64), ('render', 900), ('check',)]
+            out.append(('app', RATES[c], sc))
     # patch: the patch browser, every factory record, notes held across loads
     for c in range(8):
         sc = [('render', 64)]
@@ -387,6 +398,8 @@ def build_ref():
             elif ev[0] == 'render':
                 L, Rr = e.render(ev[1])
                 outs.append(zlib.compress(array('I', L).tobytes() + array('I', Rr).tobytes(), 6))
+            elif ev[0] == 'warm':
+                e.render(ev[1])
             elif ev[0] == 'check':
                 parts = []
                 for v in range(8):
@@ -432,6 +445,7 @@ def check_port():
                    ('juno_gui_load_patch', [V, C, I, I]), ('juno_gui_host_set', [V, I, I]),
                    ('juno_gui_note_on', [V, I, I]), ('juno_gui_note_off', [V, I]),
                    ('juno_gui_render', [V, ctypes.POINTER(F), I]), ('juno_gui_destroy', [V]),
+                   ('juno_gui_warmup', [V, I]),
                    ('juno_set_fp_oracle_mode', [I]), ('juno_gui_state', [V])):
         getattr(lib, fn).argtypes = at
     lib.juno_gui_state.restype = V
@@ -466,6 +480,9 @@ def check_port():
                 lib.juno_gui_note_on(c, ev[1], ev[2] if len(ev) > 2 else 100)
             elif ev[0] == 'off':
                 lib.juno_gui_note_off(c, ev[1])
+            elif ev[0] == 'warm':
+                lib.juno_gui_warmup(c, ev[1])
+                last = '#%d warm %d' % (evi, ev[1])
             elif ev[0] == 'render':
                 n = ev[1]
                 buf = (F * (2 * n))()
@@ -565,6 +582,9 @@ def tooth():
          [('gui/juno_bridge.c', '    else if (host == JUNO_SE_VOICES) juno_gui_set_voice_count(c, v);\n', '')]),
         ('sl_no_init', 'initialize\'s defaults are not applied (the engine after BUILD)',
          [('gui/juno_bridge.c', '    for (k = 0; k < JUNO_STATE_N; ++k)\n        apply_event(c, JUNO_STATE_ENT[k].host, JUNO_STATE_ENT[k].dflt);\n', '')]),
+        ('sl_warm_no_preamble', 'the warm-up skips the render\'s voice-count sync (the old bridge)',
+         [('gui/juno_bridge.c', '         * next block\'s sync gates it off (state_load_gate.py, app family) */\n        asg_sync(c);\n',
+           '         * next block\'s sync gates it off (state_load_gate.py, app family) */\n')]),
     ]
     T += [
         ('sl_arp_flush', 'the arp switch flushes every note (the old port) instead of moving the keys',

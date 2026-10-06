@@ -1733,13 +1733,19 @@ void juno_gui_tick(juno_ctx *c)
  * audibly swells (measured: first 250 ms ~7x quieter on Rip Lead). In a DAW the
  * host has always rendered long before the user plays, so the swell is never
  * heard there — the browser app must warm up at boot to match. Renders idle
- * into a scratch buffer; no arp ticks (nothing is held). */
+ * into a scratch buffer in blocks of 512, each with the render's preamble;
+ * no arp ticks (nothing is held). */
 void juno_gui_warmup(juno_ctx *c, int nsamples)
 {
     float buf[2 * 512];
     if (!c) return;
     while (nsamples > 0) {
         int b = nsamples > 512 ? 512 : nsamples, i;
+        /* the engine render's preamble, as every block of juno_gui_render: the
+         * voice count juno_gui_plugin_init sent (six) syncs the assigners here,
+         * or the first note after the warm-up lands on a stopped unit and the
+         * next block's sync gates it off (state_load_gate.py, app family) */
+        asg_sync(c);
         for (i = 0; i < b; ++i) {
             juno_note_tick(c->st);
             juno_driver_render_sample(c->st, &buf[2 * i], &buf[2 * i + 1]);

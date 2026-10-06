@@ -2602,3 +2602,17 @@ check, sticky once wild) hid the same way: a special case of the host entry no c
 List what the oracle cannot run, then for each item grade the transitions into and out of it at
 the switch point (state compare, no render). READ every special case of an entry function and give
 each one a chain; a range check is not the first instruction just because it is the usual one.
+
+## 138. A HELPER THAT "DOES WHAT RENDER DOES" IS A SECOND, UNGRADED RENDER
+Paid 2026-10-06 (JUNO, CLAIMS A22/C4). The web app warmed the engine with juno_gui_warmup, a copy
+of the render loop without the render's preamble (the voice-count sync). Every gate rendered
+through juno_gui_render, so none saw it. Once the app called juno_gui_plugin_init (six voices),
+its first key landed on a stopped unit and the next block gated it off. The new WASM gate passed
+too: it compared two builds of the same source, which agree on a shared defect -- here, silence.
+The headless-browser check (an audio threshold) caught it; it had not been run since an earlier
+change, and it failed on that change as well (two float sliders out of their range).
+### The rule
+Every call the product makes must sit, in the product's order, on a chain graded against the
+plugin (here: the app family, warm-up then load then keys). A differential gate between two builds
+of one source needs a REACH guard on its inputs (audible renders, the first key) and a tooth that
+both builds share. Run the product's end-to-end check on every change to a product path.

@@ -63,13 +63,15 @@ console.log("status:", (await page.textContent("#status")).trim());
 const nRows = await page.$$eval("main#list .p", r => r.length);
 const nSecs = await page.$$eval("main#list .sec", r => r.map(e => e.textContent));
 console.log(`panel: ${nRows} controls in ${nSecs.length} sections:`, nSecs.join(" | "));
-// every control's number box must hold an integer in 0..255, and the panel must not
-// be all-zero (patch 5 loaded real bytes)
-const vals = await page.$$eval("main#list .p input[type=number]", ins => ins.map(i => +i.value));
+// every control's number box must hold a value inside its own min..max (integers,
+// except the two host-only floats shown 0..1), and the panel must not be all-zero
+// (patch 5 loaded real values)
+const nums = await page.$$eval("main#list .p input[type=number]", ins => ins.map(i => ({ v: +i.value, lo: +i.min, hi: +i.max, st: i.step })));
+const vals = nums.map(o => o.v);
 const swVals = await page.$$eval("main#list .p button.sw", bs => bs.map(b => b.textContent));
-const allByte = vals.every(v => Number.isInteger(v) && v >= -3 && v <= 255);   // OCTAVE SHIFT is signed -3..3
+const allByte = nums.every(o => Number.isFinite(o.v) && o.v >= o.lo && o.v <= o.hi && (o.st !== "1" || Number.isInteger(o.v)));
 const nonZero = vals.filter(v => v > 0).length;
-console.log(`  numeric controls: ${vals.length} (all in range: ${allByte}, non-zero: ${nonZero}); switches: ${swVals.join(",") || "none"}`);
+console.log(`  numeric controls: ${vals.length} (all in their range: ${allByte}, non-zero: ${nonZero}, floats: ${nums.filter(o => o.st !== "1").length}); switches: ${swVals.join(",") || "none"}`);
 // ranges are the SEMANTIC Script.xml ranges, not the byte width: enums must be
 // stepped (DCO RANGE 0..5), knobs full 0..255
 const ranges = await page.$$eval("main#list .p", rows => rows.slice(0, 20).map(d => {

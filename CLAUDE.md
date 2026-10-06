@@ -118,8 +118,10 @@ mine is a hypothesis (playbook 80).
   mute), juno_gui_state_load (DAW preset), juno_gui_load_patch (its patch
   browser) -- host edits, gated by state_load_gate.py against queues the booted
   plugin makes (docs/B6_WRAPPER_BOOT.md). juno_gui_apply_bank is the recall MODEL
-  the older gates use, not a product path. The apps (web, firmware) still call
-  apply_bank: switch them. `make test static` before every commit. Gates compare
+  the older gates use, not a product path. The web app runs the product
+  paths (CLAIMS C4: `make webapp` = WASM build, WASM == native on the app's
+  calls with a reach guard, headless-Chromium check); the device firmware
+  still calls apply_bank. `make test static` before every commit. Gates compare
   the port in the oracle's FP mode (DAZ, no FTZ: playbook 120). Do not touch
   src/ except through a gate.
 - **ONE-BOARD RULE**: every multi-chip arc is HISTORY — the S3 fork O4 arc

@@ -23,7 +23,7 @@ HDR     := $(wildcard src/*.h) $(wildcard gui/*.h)
 OBJ     := $(SRC:.c=.o)
 $(OBJ): $(HDR)
 
-.PHONY: all test clean gui provenance verify static completeness engineb engineb-quick verify-jx3p
+.PHONY: all test clean gui provenance verify static completeness engineb engineb-quick verify-jx3p webapp
 all: $(OBJ)
 
 # JX-3P port finish line: recall (C==oracle) + integration render (voice+master
@@ -193,6 +193,20 @@ provenance:
 #     && python3 tools/verify/port_writeset.py && python3 tools/verify/build_coverage.py
 completeness:
 	python3 tools/verify/completeness_gate.py
+
+# The web app (gui/web): build the WASM, then grade the DELIVERED artifact --
+# the recall corpus (wasm_golden.mjs), the app's own calls native vs WASM with
+# a reach guard (wasm_product_gate.py), and the bundled page in headless
+# Chromium (real audio, no console errors). Needs emcc on PATH (source
+# emsdk_env.sh) and playwright-core resolvable by node. `env node`: emsdk_env.sh
+# puts the emsdk folder, which holds a DIRECTORY named node, first on PATH, and
+# make's own PATH search stops there ("node: Permission denied").
+webapp: libjuno.so
+	bash gui/web/build.sh
+	env node tools/verify/wasm_golden.mjs
+	python3 tools/verify/wasm_product_gate.py
+	python3 tools/verify/bundle_webapp.py
+	env node tools/verify/verify_webapp.mjs
 
 # Shared library for the test GUI (gui/juno_gui.py via ctypes).
 gui: libjuno.so
