@@ -12,7 +12,7 @@ Tracks B and D below were written for two chips. Read them this way from now on:
 - The "three facts" at the end stay true as measurements; "one chip cannot do it" is exactly why B needs a cheaper engine.
 
 ## STATUS (2026-10-06, the rules below: one line per track, regressions first)
-- A: Port: PROVENANCE 26/26 PROVEN (full verify of 9009d62 green; of 0e8f853 running); CLAIMS B1-B10 closed: the plugin as shipped plays six voices after a 960-sample start-up mute (A21/A22), all 79 panel parameters as DAW automation incl. MASTER TUNE (A20, 45/45), and the plugin's own preset paths -- initialize, a DAW preset, its patch browser -- bit-exact against queues the plugin itself made (A22, 33/33). Open: B11 (two host-entry corners); the apps must switch to juno_gui_plugin_init + juno_gui_load_patch. The one-board engine will need its own sonic gate.
+- A: Port: PROVENANCE 26/26 PROVEN (full verify of 9009d62 green; of 0e8f853 running); CLAIMS B1-B10 closed: the plugin as shipped plays six voices after a 960-sample start-up mute (A21/A22), all 79 panel parameters as DAW automation incl. MASTER TUNE (A20, 45/45), and the plugin's own preset paths -- initialize, a DAW preset, its patch browser -- bit-exact against queues the plugin itself made (A22, 37/37, incl. the arp switch with keys held). Open: the apps must switch to juno_gui_plugin_init + juno_gui_load_patch. The one-board engine will need its own sonic gate.
 - D: RETIRED by the one-board rule (2026-09-23).
 - B: REOPENED for ONE board — no one-board JUNO engine chosen yet (budget facts in docs/ONE_BOARD_BUDGET.md).
 - C: esp32s3/ playable (console, patch step, MIDI UART); the Pi PLAY image is built, not yet on silicon.

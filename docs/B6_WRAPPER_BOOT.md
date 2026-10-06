@@ -108,3 +108,5 @@ gate: tools/verify/state_load_gate.py.
 | ARPEGGIO SW out of range | the host entry calls the arp switch with (v != 0) directly (rva 0x3C7AE0, dispatch 831), no range check |
 | MASTER TUNE record offset | 18, not 20 (juno_hostparams.c) |
 | oracle FP mode | a chain that never recalls must still set the plugin's FTZ|DAZ (e2e_emu set_ftz): playbook 120 |
+| arp switch with keys held | ON releases each pressed key's note and hands the key to the arp; OFF plays the arp's keys again as notes, order and velocity set by the key-trig flag (rva 0x3C49F0, 0x3C42D0); the port flushed everything |
+| LFO KEY TRIG wild value | sets the keyboard's key-trig byte before the range check and sticks once above 2 (rva 0x3C4ED0) |

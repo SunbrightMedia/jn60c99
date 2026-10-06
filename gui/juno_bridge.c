@@ -64,6 +64,17 @@ typedef struct {
     int   arp_on;          /* 0/1 (driver routes notes through the arp when set) */
     int   arp_cur;         /* MIDI note currently sounding via the arp (-1 none) */
     carp  arp;             /* bit-exact CArpeggio state machine                 */
+    /* The keyboard object's fields the arp switch reads (CLAIMS B11, rva 0x3C42D0
+     * / 0x3C49F0 / 0x3C4ED0): every key's last velocity (+1320), the keys in
+     * order of their last press, newest first (+1448, -1 = empty), the key-trig
+     * mode byte the LFO KEY TRIG entry sets (+12) with its pending flag (+11),
+     * and the flag the next note-on derives from them (+8), which picks the
+     * order a switch-off plays the arp's keys back in. */
+    unsigned char kb_vel[128];
+    int   kb_order[128];
+    unsigned char kb_trig_mode, kb_trig_pending, kb_flag8;
+    int   host_role;       /* 1 while a host edit runs its allocator half: the arp
+                            * switch then moves the keys as the plugin's does */
 
     /* LFO RATE front-panel byte of the loaded patch (blob 8), stashed so a host
      * tempo change can recompute the tempo-synced LFO rate (cell 1072). The
@@ -208,6 +219,7 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     carp_init(&c->arp);
     c->arp_on = 0;
     c->arp_cur = -1;
+    for (v = 0; v < 128; ++v) c->kb_order[v] = -1;
     c->host_bpm = 128.0f;   /* plugin recall-default TEMPO (880 -> 40+88.0) */
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
     return c;
@@ -249,6 +261,7 @@ void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
     carp_init(&c->arp);
     c->arp_on = 0;
     c->arp_cur = -1;
+    for (v = 0; v < 128; ++v) c->kb_order[v] = -1;
     c->host_bpm = 128.0f;
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
 }
@@ -1006,10 +1019,24 @@ int juno_gui_arp_trace_count(juno_ctx *c) { return c ? c->arp_trace_n : 0; }
  * juno_gui_midi_note_on below (the wrapper layer), like a DAW does. */
 void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
 {
+    int k;
     ++eb_coef_gen;
     if (!c) return;
-    if (!c->arp_on) { synth_note_on(c, midi_note, velocity); return; }
-    carp_add_key(&c->arp, midi_note, velocity);
+    /* the keyboard object's note-on (rva 0x3C42D0): a pending key-trig mode
+     * becomes the flag first ... */
+    if (c->kb_trig_pending) {
+        c->kb_flag8 = (unsigned char)(c->kb_trig_mode - 1) <= 1;
+        c->kb_trig_pending = 0;
+    }
+    if (!c->arp_on) synth_note_on(c, midi_note, velocity);
+    else carp_add_key(&c->arp, midi_note, velocity);
+    /* ... and the key's velocity and its place in the press order last */
+    if (midi_note < 0 || midi_note > 127) return;
+    c->kb_vel[midi_note] = (unsigned char)velocity;
+    for (k = 0; k < 128 && c->kb_order[k] != midi_note && c->kb_order[k] != -1; ++k) ;
+    if (k == 128) return;
+    for (; k > 0; --k) c->kb_order[k] = c->kb_order[k - 1];
+    c->kb_order[0] = midi_note;
 }
 
 /* Public note-off. midi_note < 0 releases everything. */
@@ -1125,7 +1152,35 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, floa
     }
     if (gate >= 0.0f) carp_set_gate_index(&c->arp, gate_frac_to_index(gate));
     c->arp_on = on ? 1 : 0;
-    if (was != c->arp_on) {                  /* on the toggle: flush everything */
+    if (was != c->arp_on && c->host_role) {
+        /* THE PLUGIN'S SWITCH (an ARPEGGIO SW host edit, rva 0x3C49F0): ON
+         * releases every pressed key's note and hands the key to the arp, in key
+         * order; OFF plays every key the arp still holds again as a note --
+         * highest first at velocity 100 when the key-trig flag is set, else in
+         * press order, oldest first, at the key's own velocity. (The switch's
+         * hold, which would keep released keys latched, is never set through
+         * the engine: no hold path, so the latched list stays empty.) */
+        int k;
+        if (c->arp_on) {
+            for (k = 0; k < 128; ++k)
+                if (c->held_notes[k >> 5] & (1u << (k & 31))) {
+                    synth_note_off(c, k);
+                    carp_add_key(&c->arp, k, c->kb_vel[k]);
+                }
+            carp_arm_beat_requant(&c->arp);
+        } else if (c->kb_flag8 == 1 || c->kb_flag8 == 2) {
+            for (k = 0; k < 128; ++k) {
+                int key = c->kb_flag8 == 1 ? 127 - k : k;
+                if (c->arp.note_active[key]) { carp_remove_key(&c->arp, key); synth_note_on(c, key, 100); }
+            }
+        } else {
+            for (k = 127; k >= 0; --k) {
+                int key = c->kb_order[k];
+                if (key >= 0 && c->arp.note_active[key]) { carp_remove_key(&c->arp, key); synth_note_on(c, key, c->kb_vel[key]); }
+            }
+        }
+        c->arp_cur = -1;
+    } else if (was != c->arp_on) {           /* the recall model's toggle: flush everything */
         synth_note_off(c, -1);
         carp_remove_key(&c->arp, -1);
         c->arp_cur = -1;
@@ -1475,7 +1530,9 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
                 }
                 c->last_condition = t.last_condition;
                 c->hpf_type = t.hpf_type;
+                c->host_role = 1;
                 ctx_alloc_recall(c, c->bank, c->patch_idx, 0, tmp);
+                c->host_role = 0;
                 free(tmp);
                 return 1;
             }
@@ -1501,6 +1558,14 @@ void juno_gui_host_set(juno_ctx *c, int i, int v)
     if (!c || !c->bank) return;
     rec = juno_bank_record(c->bank, c->patch_idx);
     if (!rec) return;
+    /* LFO KEY TRIG (dispatch 756): the entry first sets the keyboard object's
+     * key-trig mode byte, whatever the value, while that byte is 0..2 (rva
+     * 0x3C4ED0; a wild value therefore sticks), then range-checks as usual */
+    if (i >= 0 && i < juno_host_param_count() && !strcmp(juno_host_param_name(i), "LFO KEY TRIG") &&
+        c->kb_trig_mode <= 2 && (int)(signed char)c->kb_trig_mode != v) {
+        c->kb_trig_mode = (unsigned char)v;
+        c->kb_trig_pending = 1;
+    }
     /* mapped before the range check (rva 0x3C7AE0: dispatch 871 HPF TYPE, and
      * 831 ARPEGGIO SW, whose switch the entry calls with (v != 0) directly) */
     if (i >= 0 && i < juno_host_param_count() &&

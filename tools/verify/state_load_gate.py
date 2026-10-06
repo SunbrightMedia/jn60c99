@@ -37,8 +37,10 @@ render driver is READ, rva 0x320B20).
 TOOTH (--tooth): the patch load as the recall (the old port), the patch load
 in reverse order, the record decode masked to nibbles, the state masks dropped,
 the payload applied in reverse order, the voice count ignored, initialize's
-defaults skipped; reach probe: the model record taking the loaded record's
-non-parameter leaves.
+defaults skipped, the arp switch flushing the notes (the old port), its
+switch-off order ignoring the key-trig flag, re-playing at velocity 100, a wild
+LFO KEY TRIG not sticking; reach probe: the model record taking the loaded
+record's non-parameter leaves.
 
 TWO-PROCESS RULE: --ref (Unicorn only) -> scratchpad/state_load_ref.pkl;
 --port (libjuno only) reads it. FP MODE as the oracle (playbook 120).
@@ -209,6 +211,24 @@ def scripts():
               ('state', 'default'), ('render', 300), ('check',),
               ('on', 60), ('render', 500), ('check',), ('off', 60), ('render', 1000), ('check',)]
         out.append(('arp', RATES[c], sc))
+    # arpnote: the arp switched on and off while keys are held (CLAIMS B11),
+    # each switch checked before any render (the oracle cannot arpeggiate: no
+    # render with the arp on), in both key-trig modes (the switch-off order)
+    for c in range(3):
+        sc = [('render', 64), ('patch', 'f%d' % (12 + c)), ('host', 'LFO KEY TRIG', c % 2), ('on', 60), ('on', 64),
+              ('on', 55, 70), ('render', 300), ('off', 64), ('render', 40), ('host', 'ARPEGGIO SW', 1), ('check',),
+              ('on', 72, 90), ('host', 'ARPEGGIO SW', 0), ('check',), ('render', 300), ('check',),
+              ('host', 'LFO KEY TRIG', 1 - c % 2), ('on', 67), ('render', 200), ('host', 'ARPEGGIO SW', 1), ('check',),
+              ('host', 'ARPEGGIO SW', 0), ('check',), ('render', 400), ('check',)]
+        sc += [('off', n) for n in (55, 60, 67, 72)] + [('render', 1200), ('check',)]
+        out.append(('arpnote', RATES[c], sc))
+    # a wild LFO KEY TRIG (a mask payload) sticks in the key-trig byte: later
+    # values cannot move it, so the switch-off order stays the press order
+    sc = [('render', 64), ('patch', 'f15'), ('state', 'mask1'), ('render', 100), ('state', 'default'), ('render', 100),
+          ('host', 'LFO KEY TRIG', 1), ('on', 60), ('on', 64, 80), ('on', 52, 110), ('render', 300),
+          ('host', 'ARPEGGIO SW', 1), ('check',), ('host', 'ARPEGGIO SW', 0), ('check',), ('render', 300), ('check',)]
+    sc += [('off', n) for n in (52, 60, 64)] + [('render', 1000), ('check',)]
+    out.append(('arpnote', RATES[1], sc))
     # order: a DAW preset whose entries interact, in both orders, then the
     # edits that read what they left (a near cutoff step, a DELAY TYPE change)
     for c in range(3):
@@ -361,7 +381,7 @@ def build_ref():
             elif ev[0] == 'host':
                 e.call(E.IB + APPLY_RVA, rcx=e.HOST, rdx=hpid[ev[1]][1], r8=ev[2] & 0xFFFFFFFF, count=60_000_000)
             elif ev[0] == 'on':
-                e.note_on(ev[1], 100)
+                e.note_on(ev[1], ev[2] if len(ev) > 2 else 100)
             elif ev[0] == 'off':
                 e.note_off(ev[1])
             elif ev[0] == 'render':
@@ -443,7 +463,7 @@ def check_port():
                 lib.juno_gui_host_set(c, ref['_hpid'][ev[1]][0], ev[2])
                 last = '#%d host %s=%d' % (evi, ev[1], ev[2])
             elif ev[0] == 'on':
-                lib.juno_gui_note_on(c, ev[1], 100)
+                lib.juno_gui_note_on(c, ev[1], ev[2] if len(ev) > 2 else 100)
             elif ev[0] == 'off':
                 lib.juno_gui_note_off(c, ev[1])
             elif ev[0] == 'render':
@@ -545,6 +565,17 @@ def tooth():
          [('gui/juno_bridge.c', '    else if (host == JUNO_SE_VOICES) juno_gui_set_voice_count(c, v);\n', '')]),
         ('sl_no_init', 'initialize\'s defaults are not applied (the engine after BUILD)',
          [('gui/juno_bridge.c', '    for (k = 0; k < JUNO_STATE_N; ++k)\n        apply_event(c, JUNO_STATE_ENT[k].host, JUNO_STATE_ENT[k].dflt);\n', '')]),
+    ]
+    T += [
+        ('sl_arp_flush', 'the arp switch flushes every note (the old port) instead of moving the keys',
+         [('gui/juno_bridge.c', '    if (was != c->arp_on && c->host_role) {', '    if (was != c->arp_on && 0) {')]),
+        ('sl_arp_order', 'the switch-off ignores the key-trig flag (always the press order)',
+         [('gui/juno_bridge.c', '        } else if (c->kb_flag8 == 1 || c->kb_flag8 == 2) {', '        } else if (0) {')]),
+        ('sl_arp_vel100', 'the switch-off re-plays at velocity 100, not the key\'s own',
+         [('gui/juno_bridge.c', 'synth_note_on(c, key, c->kb_vel[key]); }', 'synth_note_on(c, key, 100); }')]),
+        ('sl_keytrig_unsticky', 'a wild LFO KEY TRIG does not stick in the key-trig byte',
+         [('gui/juno_bridge.c', '        c->kb_trig_mode <= 2 && (int)(signed char)c->kb_trig_mode != v) {',
+           '        (int)(signed char)c->kb_trig_mode != v) {')]),
     ]
     R = [
         ('sl_model_nonparam', 'the model record takes the loaded record\'s non-parameter leaves',

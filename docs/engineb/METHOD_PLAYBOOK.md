@@ -2590,3 +2590,15 @@ followed by a near cutoff split them.
 When a generated source is chosen because two quantities coincide over the census, READ the code
 for which one it is, then add a context where they differ (H != byte/255, a refresh after a
 change) before the key is believed.
+
+## 137. AN ORACLE THAT CANNOT RUN A MODE CAN STILL GRADE THE SWITCH INTO IT
+Paid 2026-10-06 (JUNO, CLAIMS B11 -> A22). The oracle has no transport clock, so it cannot
+arpeggiate, and every gate therefore switched the arp with no key held. The switch itself moves
+the keys (ON hands each pressed key to the arp, OFF plays them again as notes, order and velocity
+from the keyboard object), and all of that is in the state at the switch, before any render. The
+port flushed every note instead; no gate could see it. The LFO KEY TRIG byte (set before the range
+check, sticky once wild) hid the same way: a special case of the host entry no chain reached.
+### The rule
+List what the oracle cannot run, then for each item grade the transitions into and out of it at
+the switch point (state compare, no render). READ every special case of an entry function and give
+each one a chain; a range check is not the first instruction just because it is the usual one.
