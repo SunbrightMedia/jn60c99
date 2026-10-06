@@ -113,7 +113,8 @@ mine is a hypothesis (playbook 80).
 # LIVE STATE (update in place, no dated blocks here, EVER; detail lives in
 # FINAL_GUIDE.md / docs/ — this section is one line-group per arc)
 - **src/ + trunk**: `make verify` was red from cae0767 (four static gates,
-  playbook 119), fixed; a full re-run is owed. PROVENANCE 24/24 PROVEN.
+  playbook 119), fixed; the full re-run on a6e2ea6 is job verify_a6e2ea6
+  (read its EXIT before any claim). PROVENANCE 24/24 PROVEN.
   CLAIMS B1-B5, B7-B9 closed (DAW automation A20); B6 engine side closed,
   controller side (which params a preset load sends, in which order) behind
   the P112 wall.
