@@ -111,3 +111,5 @@ gate: tools/verify/state_load_gate.py.
 | arp switch with keys held | ON releases each pressed key's note and hands the key to the arp; OFF plays the arp's keys again as notes, order and velocity set by the key-trig flag (rva 0x3C49F0, 0x3C42D0); the port flushed everything |
 | LFO KEY TRIG wild value | sets the keyboard's key-trig byte before the range check and sticks once above 2 (rva 0x3C4ED0) |
 | the app's warm-up | juno_gui_warmup lacked the render's preamble (the voice-count sync): after initialize's six, the first key landed on a stopped unit (state_load_gate app family; playbook 138) |
+| the velocity switch | the wrapper's switch byte (core+572) is vm.vs.velSense, default 1, set at initialize (rva 0x320420) and moved by no host call; the port forced 100 (CLAIMS A23, probes/b6/kbd_vel_default.py) |
+| vm.vs.quality | in Script.xml, bound by no code: no name string for it in the binary (READ; the same search finds velSense and voiceCount, which are bound) -- a UI value with no effect on the sound |
