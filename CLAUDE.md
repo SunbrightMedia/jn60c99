@@ -112,15 +112,17 @@ mine is a hypothesis (playbook 80).
 
 # LIVE STATE (update in place, no dated blocks here, EVER; detail lives in
 # FINAL_GUIDE.md / docs/ — this section is one line-group per arc)
-- **src/ + trunk**: `make verify` was red from cae0767 (four static gates,
-  playbook 119), fixed; the full re-run on a6e2ea6 is job verify_a6e2ea6
-  (read its EXIT before any claim). PROVENANCE 24/24 PROVEN.
-  CLAIMS B1-B5, B7-B9 closed (DAW automation A20); B6 engine side closed,
-  controller side (which params a preset load sends, in which order) behind
-  the P112 wall.
-  `make test static` before every commit. Gates compare the port in the
-  oracle's FP mode (DAZ, no FTZ: playbook 120). Do not touch src/ except
-  through a gate.
+- **src/ + trunk**: PROVENANCE 26/26 PROVEN; full verify of 9009d62 green, of
+  0e8f853 is job verify_0e8f853 (read its EXIT before any claim). CLAIMS B1-B10
+  closed; B11 open (two host-entry corners, docs/CLAIMS.md). The PRODUCT paths
+  are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
+  mute), juno_gui_state_load (DAW preset), juno_gui_load_patch (its patch
+  browser) -- host edits, gated by state_load_gate.py against queues the booted
+  plugin makes (docs/B6_WRAPPER_BOOT.md). juno_gui_apply_bank is the recall MODEL
+  the older gates use, not a product path. The apps (web, firmware) still call
+  apply_bank: switch them. `make test static` before every commit. Gates compare
+  the port in the oracle's FP mode (DAZ, no FTZ: playbook 120). Do not touch
+  src/ except through a gate.
 - **ONE-BOARD RULE**: every multi-chip arc is HISTORY — the S3 fork O4 arc
   (two chips), the CLASSIC 4-slot plan, CHAIN4 (four boards played through
   the storm on 2026-09-14). Their full live-state text, facts and owed items

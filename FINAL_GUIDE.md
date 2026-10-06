@@ -11,8 +11,8 @@ Tracks B and D below were written for two chips. Read them this way from now on:
 - **D. LINK** = RETIRED. No chip-to-chip audio or voice links, ever. D1 (one DAC) survives as a board fact.
 - The "three facts" at the end stay true as measurements; "one chip cannot do it" is exactly why B needs a cheaper engine.
 
-## STATUS (2026-10-05, the rules below: one line per track, regressions first)
-- A: REGRESSED 2026-10-05, then repaired: four static gates were red since cae0767 (playbook 119); green again, run by `make static`. Port: PROVENANCE 24/24 PROVEN; CLAIMS B1-B5, B7, B8 closed (warm recall A17-A19; DAW automation of 78/79 panel parameters A20, host_edit_gate 39/39; out-of-range values dropped as the host entry does); B6 engine side closed (a DAW preset load reaches the engine only as host-role edits), its controller side (which parameters, which order) is behind the P112 wall; B9 closed (OCTAVE SHIFT moves no MIDI note). The one-board engine will need its own sonic gate.
+## STATUS (2026-10-06, the rules below: one line per track, regressions first)
+- A: Port: PROVENANCE 26/26 PROVEN (full verify of 9009d62 green; of 0e8f853 running); CLAIMS B1-B10 closed: the plugin as shipped plays six voices after a 960-sample start-up mute (A21/A22), all 79 panel parameters as DAW automation incl. MASTER TUNE (A20, 45/45), and the plugin's own preset paths -- initialize, a DAW preset, its patch browser -- bit-exact against queues the plugin itself made (A22, 33/33). Open: B11 (two host-entry corners); the apps must switch to juno_gui_plugin_init + juno_gui_load_patch. The one-board engine will need its own sonic gate.
 - D: RETIRED by the one-board rule (2026-09-23).
 - B: REOPENED for ONE board — no one-board JUNO engine chosen yet (budget facts in docs/ONE_BOARD_BUDGET.md).
 - C: esp32s3/ playable (console, patch step, MIDI UART); the Pi PLAY image is built, not yet on silicon.
