@@ -16,6 +16,9 @@
 #include "../src/delay_recall.h"
 #include "../src/juno_mod.h"
 #include "../src/carp.h"
+#include "../src/host_edit.h"
+#include "../src/recall_ramp.h"
+#include "../src/reverb_recall.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -1091,25 +1094,30 @@ void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, floa
  * Returns # coefficients set; on snapshot alloc failure the LOAD path falls
  * back to full apply+seed (cold-equivalent, never skips the recall) while the
  * EDIT path returns 0 unapplied. */
-static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush)
+/* The STATE half of a recall: the appliers, the voice propagation, the UNISON
+ * spread and the CONDITION scatter, into `st` (c->st, or a scratch copy for a
+ * host-role edit, juno_gui_host_set). Touches no allocator field of c; the
+ * bank-derived caches it sets (last_condition, hpf_type) are the same for any
+ * st. Returns # coefficients set, or -1 when the EDIT path could not allocate. */
+static int ctx_state_recall(juno_ctx *c, unsigned char *st, const unsigned char *bank, int idx, int flush)
 {
-    int n, mode = 0, oct = 1, on, porta = 0, old_mode;
+    int n;
     {
         unsigned char *pre = malloc(JUNO_VOICE_MAIN_STRIDE);
-        const unsigned char *v0 = c->st + 176;
+        const unsigned char *v0 = st + 176;
         int v;
         unsigned i;
         if (!pre) {
-            if (!flush) return 0;
-            n = c->live_recall ? juno_bank_apply_live(c->st, bank, idx)
-                               : juno_bank_apply(c->st, bank, idx);
-            juno_driver_seed_voices(c->st);  /* degraded fallback: full seed */
+            if (!flush) return -1;
+            n = c->live_recall ? juno_bank_apply_live(st, bank, idx)
+                               : juno_bank_apply(st, bank, idx);
+            juno_driver_seed_voices(st);  /* degraded fallback: full seed */
         } else {
-            memcpy(pre, c->st + 176, JUNO_VOICE_MAIN_STRIDE);
-            n = c->live_recall ? juno_bank_apply_live(c->st, bank, idx)
-                               : juno_bank_apply(c->st, bank, idx);
+            memcpy(pre, st + 176, JUNO_VOICE_MAIN_STRIDE);
+            n = c->live_recall ? juno_bank_apply_live(st, bank, idx)
+                               : juno_bank_apply(st, bank, idx);
             for (v = 1; v < JUNO_NUM_VOICES; ++v) {
-                unsigned char *dst = c->st + 176 + (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
+                unsigned char *dst = st + 176 + (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
                 for (i = 0; i < JUNO_VOICE_MAIN_STRIDE; ++i)
                     if (v0[i] != pre[i]) dst[i] = v0[i];
             }
@@ -1121,18 +1129,29 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
      * emulation). Default patch value 128 -> full scatter. */
     /* UNISON (ASSIGN==2) per-voice 3968 detune spread — after seed_voices, which
      * would replicate voice 0's 0.0 over it (fuzz seeds 93/83/61/27, patches 61+63). */
-    juno_apply_unison_spread(c->st, juno_bank_assign(bank, idx));
+    juno_apply_unison_spread(st, juno_bank_assign(bank, idx));
     c->last_condition = juno_bank_condition(bank, idx);
     c->hpf_type = juno_bank_hpf_type(bank, idx);   /* joint HPF recompute context */
-    juno_apply_condition(c->st, c->last_condition);
-    /* Per-patch VOICE-ASSIGN recall (CAssignJu60): ASSIGN MODE (poly/mono/unison/
-     * poly-variant), LEGATO, and PORTAMENTO-engaged drive the note allocator above. */
+    juno_apply_condition(st, c->last_condition);
+    return n;
+}
+
+/* The ALLOCATOR half of a recall: ASSIGN MODE / LEGATO / PORTAMENTO into the
+ * note allocator (with the plugin's flush on a mode change), the arpeggiator
+ * and the tempo-sync stashes, on c and c->st. `settled` is the state the
+ * recall left (c->st, or the host edit's scratch copy): the PORTAMENTO on/off
+ * the porta gate restores is read from there, never from the live cell, which
+ * a note's porta gate may have zeroed (host_edit_gate seed chain 22). */
+static void ctx_alloc_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush,
+                             const unsigned char *settled)
+{
+    int mode = 0, oct = 1, on, porta = 0, old_mode;
     old_mode = c->assign_mode;
     juno_bank_voice_modes(bank, idx, &c->legato, &c->assign_mode, &porta);
     c->portamento_on = (porta != 0);
     /* The value leaf 467+v restores into cell 592 is the PORTAMENTO on/off the
      * recall above just wrote there, so read it back rather than recomputing it. */
-    c->porta_base = JF(c->st, 592);
+    c->porta_base = JF(settled, 592);
     /* HISTORY — why ASSIGN MODE and LEGATO were forced to 0 here, and why that was
      * wrong (docs/ASSIGNER_MODE_FINDING.md). An earlier full-play-path A/B against
      * "the plugin's own render" concluded that all three KEY ASSIGN values are
@@ -1213,6 +1232,13 @@ static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush
      * LFO byte above; the cold-load cells were already written by juno_bank_apply at
      * the plugin's baked 128-BPM default). */
     juno_bank_delay_modes(bank, idx, &c->dly_time_byte, &c->dly_sync, &c->dly_type);
+}
+
+static int ctx_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush)
+{
+    int n = ctx_state_recall(c, c->st, bank, idx, flush);
+    if (n < 0) return 0;
+    ctx_alloc_recall(c, bank, idx, flush, c->st);
     return n;
 }
 
@@ -1274,12 +1300,92 @@ int juno_gui_host_get(juno_ctx *c, int i)
     return juno_host_param_decode(juno_bank_record(c->bank, c->patch_idx), i);
 }
 
+#ifndef EB_DEVCELLS
+/* host parameter index of a panel name (src/juno_hostparams.c), -1 if none */
+static int host_index(const char *name)
+{
+    int k, n = juno_host_param_count();
+    for (k = 0; k < n; ++k)
+        if (!strcmp(juno_host_param_name(k), name)) return k;
+    return -1;
+}
+
+static int host_val(const unsigned char *rec, const char *name)
+{
+    int k = host_index(name);
+    return k < 0 ? 0 : juno_host_param_decode(rec, k);
+}
+
+/* A HOST-ROLE edit as the plugin's host parameter entry makes it (CLAIMS B7):
+ * the settled recall of the edited record runs on a scratch copy of the state
+ * (so its values are the setters' values), then the plugin's own set list for
+ * this parameter (src/host_edit.c) ramps / writes those values into the live
+ * state; nothing else moves, as in the plugin. The allocator half of the
+ * recall (ASSIGN MODE flush, arpeggiator) then runs on the live context.
+ * Returns 0 (nothing done, record untouched) when the scratch copy cannot be
+ * allocated or the census did not cover the key. */
+static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
+{
+    juno_host_feat f;
+    unsigned char *tmp;
+    unsigned char keep[2];
+    int roff = juno_host_param_roff(i);
+    if (roff < 0) return 0;
+    f.from = juno_host_param_decode(rec, i);
+    f.et = host_val(rec, "EFFECT TYPE");
+    f.dt = host_val(rec, "DELAY TYPE");
+    f.pl = host_val(rec, "ASSIGN MODE") == 0 && host_val(rec, "LEGATO") == 1;
+    f.arpon = juno_rr_arp_on(c->st);
+    f.ron0 = juno_reverb_level_on(host_val(rec, "REVERB LEVEL"));
+    keep[0] = rec[roff]; keep[1] = rec[roff + 1];
+    juno_host_param_encode(rec, i, v);
+    f.to = juno_host_param_decode(rec, i);
+    f.ron1 = juno_reverb_level_on(host_val(rec, "REVERB LEVEL"));
+    tmp = (unsigned char *)malloc(JUNO_STATE_BYTES);
+    if (tmp) {
+        juno_ctx t = *c;
+        memcpy(tmp, c->st, JUNO_STATE_BYTES);
+        /* settle the live ramps on the copy first, so the recall meets the
+         * cells at their targets (a recall arm whose target is already stored
+         * early-outs and leaves the cell where it was: unsettled, a glide in
+         * flight would read as the recall's value; host_edit_gate fx chain 13) */
+        juno_rr_settle(tmp);
+        t.live_recall = 0;
+        if (ctx_state_recall(&t, tmp, c->bank, c->patch_idx, 0) >= 0) {
+            f.don1 = JI(tmp, JUNO_DLY_ON) != 0;
+            if (juno_host_edit_covered(i, &f)) {
+                juno_host_edit(c->st, tmp, i, &f);
+                /* the processor state the setters keep */
+                JI(c->st, JUNO_PREV_EFX)  = JI(tmp, JUNO_PREV_EFX);
+                JI(c->st, JUNO_PREV_DLY)  = JI(tmp, JUNO_PREV_DLY);
+                JI(c->st, JUNO_DLY_ON)    = JI(tmp, JUNO_DLY_ON);
+                JI(c->st, JUNO_PREV_FB)   = JI(tmp, JUNO_PREV_FB);
+                JI(c->st, JUNO_PREV_RESO) = JI(tmp, JUNO_PREV_RESO);
+                juno_rr_copy_proc(c->st, tmp);
+                if (i == host_index("ARPEGGIO SW")) juno_rr_set_arp_on(c->st, f.to != 0);
+                c->last_condition = t.last_condition;
+                c->hpf_type = t.hpf_type;
+                ctx_alloc_recall(c, c->bank, c->patch_idx, 0, tmp);
+                free(tmp);
+                return 1;
+            }
+        }
+        free(tmp);
+    }
+    rec[roff] = keep[0]; rec[roff + 1] = keep[1];
+    return 0;
+}
+#endif
+
 void juno_gui_host_set(juno_ctx *c, int i, int v)
 {
     unsigned char *rec;
     if (!c || !c->bank) return;
     rec = juno_bank_record(c->bank, c->patch_idx);
     if (!rec) return;
+#ifndef EB_DEVCELLS
+    if (juno_host_edit_known(i) && host_edit_live(c, rec, i, v)) return;
+#endif
     juno_host_param_encode(rec, i, v);
     ctx_recall(c, c->bank, c->patch_idx, 0);
 }

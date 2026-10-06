@@ -2440,3 +2440,45 @@ alternates them 100 samples apart made the tooth bite (2/2). The same day a "no-
 When a tooth does not bite, do not drop the rule and do not believe it either: work out the exact
 condition under which it changes the outcome, search the tables for inputs that meet it, and add
 that case to the gate.
+
+## 123. A DECOMPILED FLOAT LITERAL IS A DOUBLE IN C -- WHERE THE RESULT CANCELS, IT IS A DIFFERENT NUMBER
+Paid 2026-10-06 (JUNO, CLAIMS A20). The reverb fade steps by the float constant 0x39D1B717; the
+decompiler printed it as `0.00039999999`, a double literal, so C computed `v474 - 0.00039999999` in
+double. Near zero (a fade interrupted by a new tank clear) the double step rounds to another float:
+0x39d1b809 - step = 0x31f20000 in the plugin, 0x31f1ff14 in the port. Every recall gate was green:
+only a host edit re-triggers the clear mid-fade. Products with a near-power-of-two literal are safe
+(the exact float result absorbs the 1e-9 relative error); sums and differences that cancel are not.
+### The rule
+Give every single-precision constant in transcribed arithmetic an `f` suffix where the operation
+can cancel; audit the inexact literals (`float(lit) != lit`) of every transcribed file, and prove
+each remaining one safe by its use (assignment, clamp, scaling) -- not by a green gate.
+
+## 124. A CENSUS RUN ON ONE ENGINE INHERITS THE PROCESSOR STATE OF EARLIER JOBS
+Paid 2026-10-06 (JUNO, CLAIMS A20). 14000 census jobs each recalled a record before the host edit,
+and the ARPEGGIO TYPE / STEP edits always re-armed 75..300 cells. On a fresh engine they arm
+nothing: the refresh runs only while the PROCESSOR's arp is on, which an earlier census job's host
+ARPEGGIO SW 1 had set and which no recall ever clears (the recall leaves that state alone). The
+"context" of a job was the record; the state that decided the outcome was not in it.
+### The rule
+Before a census conclusion becomes a table, reproduce one case on a FRESH engine with nothing
+before it, and one after the opposite history. Key the table on processor state read from the
+plugin, not on the record bytes that usually mirror it.
+
+## 125. A SCRATCH COPY THAT COMPUTES "SETTLED" VALUES MUST SETTLE ITS RAMPS FIRST
+Paid 2026-10-06 (JUNO, CLAIMS A20). The port computes a host edit's values by a settled recall on a
+copy of the live state. With the live ramps dropped (not settled) on the copy, a recall arm whose
+target was already stored early-outed and left a glide's midpoint in the cell, and the edit armed
+that midpoint as its target (EFFECT TYPE 1 then DELAY TYPE 2 within 4 ms). Settling first leaves
+every cell at its target before the recall, as the harness's own settled recall does.
+### The rule
+A copy that stands for "the state after everything settled" gets the same settle the oracle's
+model applies, before it is used -- not a cheaper approximation of it.
+
+## 126. WHEN A GATE COMPARES STATE, ITS DEBUG MODE MUST ALSO COMPARE THE HIDDEN MACHINERY
+Paid 2026-10-06 (JUNO, CLAIMS A20). The host-edit gate saw audio part 600 samples after the cause;
+a trace mode that compares the plugin's ramp RECORDS (stored target, active, start, increment,
+accumulator, step) after every event named the defect in one run: one record, one field, at the
+edit that caused it. Four of the six defects found that day were read straight off that line.
+### The rule
+Give every state gate a trace mode that checks after every event and also compares the state the
+compare region does not hold (records, shadows, queues). Use it before reading any disassembly.

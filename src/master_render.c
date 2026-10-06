@@ -2080,11 +2080,17 @@ LABEL_105:
   if ( *(int *)(a1 + 10759872) <= 0 )
   {
     v475 = *(float *)(a1 + 11022032);
+    /* The fade steps are SINGLE-precision adds/subtracts of the float
+     * constant 0x39D1B717 (0.0004f). The decompiler printed it as a double
+     * literal, which made C evaluate the step in double: near zero, after a
+     * fade interrupted by a new tank clear, the double step rounds to another
+     * float (EXECUTED: 0x39d1b809 - step -> plugin 0x31f20000, double
+     * 0x31f1ff14; tools/verify/host_edit_gate.py fx chain 10, playbook 123). */
     if ( v474 < 1.0 && *(float *)(a1 + 10759376) > 0.0 )
     {
-      v475 = v474 + 0.00039999999;
-      *(float *)(a1 + 11022032) = v474 + 0.00039999999;
-      if ( (float)(v474 + 0.00039999999) > 1.0 )
+      v475 = v474 + 0.00039999999f;
+      *(float *)(a1 + 11022032) = v474 + 0.00039999999f;
+      if ( (float)(v474 + 0.00039999999f) > 1.0 )
       {
         *(_DWORD *)(a1 + 11022032) = 1065353216;
         v475 = 1.0;
@@ -2095,7 +2101,7 @@ LABEL_105:
   {
     if ( v474 != 0.0 )
     {
-      v474 = v474 - 0.00039999999;
+      v474 = v474 - 0.00039999999f;
       *(float *)(a1 + 11022032) = v474;
       if ( v474 < 0.0 )
       {

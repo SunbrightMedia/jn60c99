@@ -26,6 +26,7 @@
  */
 #include "juno_engine.h"
 #include "delay_recall.h"
+#include "recall_ramp.h"
 #include "finefx_recall.h"
 #include "reverb_recall.h"   /* juno_reverb_predelay */
 #include "rate_laws.h"
@@ -485,8 +486,12 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
      * value as a constant from the DLY1_B table; found by
      * tools/verify/seed_recall_gate.py (6 legal seeds), which randomizes 1178
      * now that the oracle fires the plugin's whole FX recall list. */
-    if (second)
+    if (second) {
         JF(state, 4297792) = juno_curve(22, 255 * (rec[3056] & 0x7F) / 100);
+#ifndef EB_DEVCELLS
+        juno_rr_note_tap2(state, JF(state, 4297792));   /* the instance keeps it (CLAIMS B7) */
+#endif
+    }
 
     /* --- The per-patch laws for TYPE 1 and TYPE 4. DERIVED FROM THE PLUGIN'S OWN
      * DISPATCH, never fitted. Sweeps under Unicorn, every other leaf at a factory
@@ -584,6 +589,17 @@ static void slot1_stale(unsigned char *state, int prev, int level, int dtime,
         JF(state, 4297824) = on ? 1.0f : 0.0f;
         JF(state, 4297808) = on ? dly_fb_law(pfb) : 0.0f;
         JF(state, 4297584) = dly_time_coeff(Hr, dtime, sync);
+#ifndef EB_DEVCELLS
+        /* DELAY TIME (797) and TEMPO SYNC (803) re-send the second instance's
+         * KEPT tap time (EXECUTED: recall DT1 tap 33, poke the cell, recall DT0
+         * tap 90 -> both write 84/255 by immediate set; scratchpad/
+         * probe_tap3.py). The cell holds that value unless a host edit's ramp
+         * moved it (host_edit_gate mix chain 31); the device has none. */
+        {
+            uint32_t tb = juno_rr_tap2_bits(state);
+            memcpy(&JF(state, 4297792), &tb, 4);
+        }
+#endif
         break;
     case 2: case 3:
         JF(state, 6396176) = (float)level / 255.0f;

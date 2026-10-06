@@ -113,8 +113,8 @@ mine is a hypothesis (playbook 80).
 # LIVE STATE (update in place, no dated blocks here, EVER; detail lives in
 # FINAL_GUIDE.md / docs/ — this section is one line-group per arc)
 - **src/ + trunk**: `make verify` was red from cae0767 (four static gates,
-  playbook 119), fixed; a full re-run is owed. PROVENANCE 23/23 PROVEN.
-  CLAIMS B1-B5 closed; open: B6, B7 (incl. DAW-automation ramps), B8.
+  playbook 119), fixed; a full re-run is owed. PROVENANCE 24/24 PROVEN.
+  CLAIMS B1-B5, B7 closed (B7 = DAW automation, A20); open: B6, B8.
   `make test static` before every commit. Gates compare the port in the
   oracle's FP mode (DAZ, no FTZ: playbook 120). Do not touch src/ except
   through a gate.

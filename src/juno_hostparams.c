@@ -14,8 +14,9 @@
  * 57/57 + arp 7/7) and for every 0..255 value of the single-input front-panel
  * cells (exhaustive recall gate). For extended enum leaves BEYOND the factory
  * bank's value set the port's law is INFERRED, not yet plugin-proven -- known
- * open case: HPF TYPE 2..8 currently maps to the TYPE-1 tables (the factory
- * bank only exercises types 0 and 1); VCA MODE >2 falls back to the switch
+ * open case: HPF TYPE 2..8 in a RECORD maps to the TYPE-1 tables (the factory
+ * bank only exercises types 0 and 1; the host range is the plugin's own
+ * parameter database, [0,1], tools/verify/host_edit_gate.py); VCA MODE >2 falls back to the switch
  * default, REVERB/EFFECT/DELAY TYPE >5 clamp/no-op. See the oracle-proof task
  * in the tracker before treating those edges as the plugin's own behavior.
  *
@@ -35,7 +36,7 @@ static const juno_hostparam HOSTPARAMS[] = {
     {"DCO NOISE LEVEL"    ,"DCO"     ,   74, 1,   0, 255,   0},
     {"DCO LFO MOD"        ,"DCO"     ,   34, 1,   0, 255, 128},
     {"HPF CUTOFF FREQ"    ,"HPF"     ,   92, 1,   0, 255,   0},
-    {"HPF TYPE"           ,"HPF"     ,  618, 2,   0,   8,   0},
+    {"HPF TYPE"           ,"HPF"     ,  618, 2,   0,   1,   0},   /* plugin DB [0,1] (rva 0x98c040, EXECUTED; Script.xml says 0..8) */
     {"VCF CUTOFF FREQ"    ,"VCF"     ,   86, 1,   0, 255, 255},
     {"VCF CUTOFF FREQ H"  ,"VCF"     , 1876, 2,   0, 255,   0},
     {"VCF RESONANCE"      ,"VCF"     ,   90, 1,   0, 255,   0},

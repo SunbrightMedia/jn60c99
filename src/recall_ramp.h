@@ -54,6 +54,18 @@ void juno_rr_end(unsigned char *state, const juno_rr_ctx *ctx);
 void juno_rr_settle(unsigned char *state);
 void juno_rr_pump(unsigned char *state);
 int  juno_rr_active(const unsigned char *state);
+/* One host-role ramped set (CLAIMS B7, src/host_edit.c): arm the record of a
+ * ramped cell toward v over time index t (4..96 ms, rva 0x9DEB50). Returns -1
+ * when the cell is not a ramped cell (src/ramp_cells.h). */
+int  juno_rr_arm(unsigned char *state, uint32_t cell, float v, int t);
+int  juno_rr_is_ramped(uint32_t cell);
+/* processor state the host-role edits read (src/host_edit.c) */
+void     juno_rr_note_tap2(unsigned char *state, float v);
+uint32_t juno_rr_tap2_bits(unsigned char *state);
+int      juno_rr_rev_on(unsigned char *state);
+int      juno_rr_arp_on(unsigned char *state);
+void     juno_rr_set_arp_on(unsigned char *state, int on);
+void     juno_rr_copy_proc(unsigned char *dst, const unsigned char *src);
 
 #ifdef __cplusplus
 }

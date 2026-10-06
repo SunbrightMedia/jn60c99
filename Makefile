@@ -133,6 +133,9 @@ verify: test libjuno.so
 	echo "=== WARM RENDER LIVE (CLAIMS A19): the same chains with the plugin's recall ramps NOT settled (4/24/36 ms), port juno_gui_apply_bank_live ==="; \
 	fresh $(SCRATCH)/warm_render_live.pkl $(ORACLE_DEPS) || python3 tools/verify/warm_render_gate.py --ref live || FAIL=1; \
 	python3 tools/verify/warm_render_gate.py --port live || FAIL=1; \
+	echo "=== HOST-ROLE EDITS: DAW automation through the plugin's host entry, no snap (CLAIMS A20) ==="; \
+	fresh $(SCRATCH)/host_edit_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/host_edit_gate.py --ref || FAIL=1; \
+	python3 tools/verify/host_edit_gate.py --port || FAIL=1; \
 	echo "=== SHADOW CELLS: bounds (cannot false-fail an A/B) + WRITER-SET invariant (prog == clamp(shadow)) ==="; \
 	python3 tools/verify/shadow_bounds_gate.py || FAIL=1; \
 	python3 tools/verify/shadow_sync_gate.py || FAIL=1; \

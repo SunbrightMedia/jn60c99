@@ -12,7 +12,7 @@ Tracks B and D below were written for two chips. Read them this way from now on:
 - The "three facts" at the end stay true as measurements; "one chip cannot do it" is exactly why B needs a cheaper engine.
 
 ## STATUS (2026-10-05, the rules below: one line per track, regressions first)
-- A: REGRESSED 2026-10-05, then repaired: four static gates were red since cae0767 (playbook 119); green again, run by `make static`. Port: PROVENANCE 23/23 PROVEN; CLAIMS B1-B5 closed (warm recall A17-A19: settled, running engine, live ramps); open: B6, B7 (incl. DAW automation ramps), B8. The one-board engine will need its own sonic gate.
+- A: REGRESSED 2026-10-05, then repaired: four static gates were red since cae0767 (playbook 119); green again, run by `make static`. Port: PROVENANCE 24/24 PROVEN; CLAIMS B1-B5 and B7 closed (warm recall A17-A19; DAW automation of every panel parameter A20, host_edit_gate 38/38); open: B6 (the preset-load path, H leaves), B8 (out-of-range bytes). The one-board engine will need its own sonic gate.
 - D: RETIRED by the one-board rule (2026-09-23).
 - B: REOPENED for ONE board — no one-board JUNO engine chosen yet (budget facts in docs/ONE_BOARD_BUDGET.md).
 - C: esp32s3/ playable (console, patch step, MIDI UART); the Pi PLAY image is built, not yet on silicon.

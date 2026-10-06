@@ -68,11 +68,11 @@ SHADOW = {'JUNO_PREV_EFX': 11022400, 'JUNO_PREV_DLY': 11022416,
           'JUNO_DLY_ON': 11022368, 'JUNO_PREV_FB': 11022376, 'JUNO_PREV_RESO': 11022384}
 WIN_LO = min(SHADOW.values())
 WIN_HI = max(SHADOW.values()) + 16                # one cell grid past the highest
-# The recall-ramp table (src/recall_ramp.c, CLAIMS B1): port-owned like the
+# The ramp-record table (src/recall_ramp.c, CLAIMS B1/B7): port-owned like the
 # shadows and checked like them (checks 0, 1, 3), but compiled out under
 # EB_DEVCELLS, so the device map need not carry it (checks 4/5 do not apply).
 RR_BASE = 11022464
-RR_END = RR_BASE + 16 + 73 * 32                   # header + 73 records of 32 bytes
+RR_END = 11049632                                 # 32-byte header + 798 records of 32 bytes + active list
 TOOTH = os.environ.get('JUNO_SHADOW_TOOTH', '')
 
 
@@ -86,7 +86,7 @@ def check_defines():
     hdr(0, 'the #defines still say what this gate assumes')
     txt = open(os.path.join(ROOT, 'src', 'juno_engine.h')).read()
     ok = True
-    for name, want in sorted(list(SHADOW.items()) + [('JUNO_RR_BASE', RR_BASE)]):
+    for name, want in sorted(list(SHADOW.items()) + [('JUNO_RR_BASE', RR_BASE), ('JUNO_RR_END', RR_END)]):
         m = re.search(r'#define\s+%s\s+(\d+)u?' % name, txt)
         got = int(m.group(1)) if m else None
         print('    %-14s src says %-12s gate assumes %d' % (name, got, want))

@@ -11,7 +11,13 @@ the next block is a few lines, not a new tool. A suite names:
              (int2x4, or the low byte of an int8x4), 'r' = int1x7 raw byte;
   spot     : bytes recalled fresh in part 2.
 
-PART 1 (live edit). The plugin's own complete recall of the context, then the
+PART 1 (single-leaf dispatch). NOT A PLUGIN PATH since 2026-10-06 (CLAIMS A20):
+a host's live parameter change goes through the host entry rva 0x3C7AE0 with
+flag 0, which tools/verify/host_edit_gate.py drives; this part dispatches ONE
+leaf in the recall role (flag 1) + snap, which no host does. Kept for its cell
+census; make verify runs --recall-only. Its DELAY LEVEL 0/1 reds under DELAY
+TYPE 4 are that difference (the port's host path is bit-exact there).
+The plugin's own complete recall of the context, then the
 leaf dispatched at every byte (+ snap), as a host's live parameter change does;
 every word ANY byte changes is graded (the plugin chooses the cells, never the
 port). Port: its live path for these leaves -- the context recalled, then the
