@@ -29,11 +29,12 @@ lib.juno_gui_state.restype = ctypes.c_void_p
 lib.juno_gui_state.argtypes = [ctypes.c_void_p]
 lib.juno_gui_destroy.argtypes = [ctypes.c_void_p]
 # Cells the recall READS keep their value in the flipped copy: the C++ header
-# and host rate [0,176), the slot routing cells JUNO_PROG_EFX/DLY (11022052/56)
-# and the port-owned shadows JUNO_PREV_EFX/DLY (11022400/16). Everything else in
-# the object, the reverb tap array (11022208..) included, is flipped.
+# and host rate [0,176) and the slot routing cells JUNO_PROG_EFX/DLY (11022052/56).
+# Everything else in the object, the reverb tap array (11022208..) included, is
+# flipped. The port-owned shadows (src/juno_engine.h) lie past KEEP_HI and are
+# never flipped; shadow_bounds_gate.py check 3 forbids naming them here.
 KEEP_LO, KEEP_HI = 176, 0xA83010
-KEEP = (11022052, 11022056, 11022400, 11022416)
+KEEP = (11022052, 11022056)
 
 
 def _after(bankbytes, idx, flip):

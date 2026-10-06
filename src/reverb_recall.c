@@ -199,6 +199,7 @@ void juno_write_reverb_taps_pd(unsigned char *state, int type, int Hr, int pd_by
         /* The plugin builds every tap as a sum of integer stage lengths plus the
          * pre-delay sample count (sub_7FF91E021AC0: tap1 = predelay + 1, ...), so
          * a non-44.1k rate moves every tap by predelay(20, H) - predelay(20, 96k).
+         * APPROX-OK: history, the REMOVED line, not this code.
          * This line used (int)(0.019995f * H) - 1919, a fitted stand-in for that
          * difference: right at the five rates it was checked at, one sample off
          * at 11025 (CLAIMS B4, tools/verify/rate_sweep_gate.py). */

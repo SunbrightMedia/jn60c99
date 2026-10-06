@@ -112,8 +112,10 @@ mine is a hypothesis (playbook 80).
 
 # LIVE STATE (update in place, no dated blocks here, EVER; detail lives in
 # FINAL_GUIDE.md / docs/ — this section is one line-group per arc)
-- **src/ + trunk**: SEALED. `make verify` green, PROVENANCE 20/20 PROVEN,
-  WASM republished. Do not touch src/ except through a gate.
+- **src/ + trunk**: `make verify` was red from cae0767 (four static gates,
+  playbook 119), fixed; a full re-run is owed. PROVENANCE 22/22 PROVEN.
+  CLAIMS B open: B1 (4 ms recall ramps), B6, B7, B8. `make test static`
+  before every commit. Do not touch src/ except through a gate.
 - **ONE-BOARD RULE**: every multi-chip arc is HISTORY — the S3 fork O4 arc
   (two chips), the CLASSIC 4-slot plan, CHAIN4 (four boards played through
   the storm on 2026-09-14). Their full live-state text, facts and owed items

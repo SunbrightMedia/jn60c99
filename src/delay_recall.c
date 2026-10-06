@@ -255,7 +255,10 @@ static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, i
     JF(state, 6396336) = LAW_CHLF(Hr);
     put_rate(state, Hr, 6396400, ARM_LFX1);
     put_rate(state, Hr, 6396528, 0x3d256000u, 0x3db40000u, 0x3db40000u, 0x3db40000u);
-    { uint32_t hb = 0x3f4ba5b0u; memcpy(&f, &hb, sizeof f); JF(state, 102656) = f; }
+    /* (102656 is the TYPE-0 block's cell: building the chorus does not touch
+     * it -- it keeps whatever the type-0 block last held, which from a fresh
+     * engine is the cold value. Writing it here overwrote a live value on a
+     * patch change; CLAIMS B1, tools/verify/warm_chain_gate.py.) */
     JF(state, 6395312) = ((float)b53 / 255.0f) * 11.0f - 8.0f;   /* chorus rate/level */
     JF(state, 6396176) = (float)b52 / 255.0f;                    /* chorus depth      */
     /* 6396432 -- WAS A LIE IN THE "CONSTANT" TABLE ABOVE. It sat there as
@@ -279,9 +282,9 @@ static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, i
         int lvl32 = b52 * 32; if (lvl32 > 255) lvl32 = 255;
         JF(state, 6396432) = (float)lvl32 / 255.0f;
     }
-    /* same shared gate as the reverb arm: under level 2 the plugin holds 0 at
-     * the first-instance FEEDBACK cell, not the FILT[] constant. */
-    if (b52 < 2) JF(state, 102560) = 0.0f;
+    /* (102560, the first-instance FEEDBACK under level 2, is written by the
+     * DELAY LEVEL leaf on the block IN FORCE before the type changes --
+     * slot1_stale() -- not by the chorus.) */
     /* Chorus I (dtype 2) vs II (dtype 3): these four routing/filter cells carry the
      * I/II distinction (constant per mode; exact bits from the master states). */
     {
@@ -343,17 +346,14 @@ static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, f
      * 10693312 is the THIRD site of the plugin's min(LEVEL*32,255)/255 idiom,
      * after the TYPE-4 block and the slot-1 chorus (6396432). */
     {
-        int on = (b52 >= 2);
+        int on = (int)JI(state, JUNO_DLY_ON);    /* the DELAY LEVEL on-flag, hysteresis */
         int lvl32 = b52 * 32; if (lvl32 > 255) lvl32 = 255;
         JF(state, 6497392)  = on ? 1.0f : 0.0f;
         JF(state, 10693312) = (float)lvl32 / 255.0f;
-        /* Shared with the delay block: the first-instance FEEDBACK cell is
-         * zeroed whenever the slot is under level 2, whatever hosts the slot.
-         * TYPE 1 already did this; TYPE 5 and the chorus did not, so 102560
-         * kept the FILT[] constant 0.423529 where the plugin holds 0.
-         * Measured at TYPES 1/2/3/5 alike: lvl 0,1 -> 0.0, lvl 2+ -> 0.423529
-         * (TYPE 0 is a different law, 0.843529, and is untouched here). */
-        if (!on) JF(state, 102560) = 0.0f;
+        /* (The first-instance FEEDBACK 0 under level 2 that used to be written
+         * here is the DELAY LEVEL leaf landing on the block in force before the
+         * type changes: slot1_stale(). From a fresh engine that block is type
+         * 0, which is why it "applied at every type".) */
     }
 
     /* 6497376 IS NOT A CONSTANT. IT WAS A CAPTURE, AND IT SAT IN S1REVERB[]
@@ -395,7 +395,6 @@ static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, f
     JF(state, 10693216) = LAW_CHLF(Hr);
     put_rate(state, Hr, 10693280, ARM_LFX1);
     JF(state, 10759360) = (float)juno_reverb_predelay(20, Hr);   /* 880/958/1762/1918 at the 4 old arms */
-    { uint32_t hb = 0x3f4ba5b0u; memcpy(&f, &hb, sizeof f); JF(state, 102656) = f; }
     JF(state, 6497344) = (float)b52 / 255.0f;   /* reverb depth              */
     JF(state, 6497168) = tc;                    /* delay time (sync-aware)   */
     /* Slot-1-reverb fine-FX: the DELAY fine-FX knobs move the reverb's delay-filter
@@ -432,14 +431,17 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
     /* DELAY DIRECT LEVEL (record 3060) is deliberately NOT read here: at TYPE 1 it
      * drives 4297744 through juno_apply_delay_finefx_2nd, and at TYPE 4 it is inert
      * (256-byte sweep at TYPE 4 moves ZERO cells in the full 2.75 M-cell state). */
-    int on = (level >= 2);
+    int on = (int)JI(state, JUNO_DLY_ON);     /* the DELAY LEVEL on-flag, hysteresis */
     int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
     unsigned k; uint32_t bits; float f;
 
-    /* constant cells — first instance always; second instance only for TYPE 1 */
-    for (k = 0; k < sizeof(DLY1_A) / sizeof(DLY1_A[0]); k += 2) {
-        bits = DLY1_A[k + 1]; memcpy(&f, &bits, sizeof f); JF(state, (int)DLY1_A[k]) = f;
-    }
+    /* NOT THE FIRST INSTANCE. Building TYPE 1 or 4 writes no 102xxx cell
+     * (PROVEN, every DELAY TYPE t -> 1/4 under Unicorn): the "TYPE-1 signature"
+     * the first instance shows after a COLD recall is the type-0 block's own
+     * cold state plus what the LEVEL/TIME leaves and the type switch-off wrote
+     * into it (slot1_stale / slot1_off). DLY1_A[] restated those cold values;
+     * on a patch change it overwrote live ones (CLAIMS B1). */
+    (void)DLY1_A;
     if (second)
         for (k = 0; k < sizeof(DLY1_B) / sizeof(DLY1_B[0]); k += 2) {
             bits = DLY1_B[k + 1]; memcpy(&f, &bits, sizeof f); JF(state, (int)DLY1_B[k]) = f;
@@ -449,7 +451,6 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
      * 102608/102656 are rate-CONSTANT for TYPE 1 (verified: plugin@44.1k holds the
      * same 0x3bab929a / 0x3f4ba5b0 the table writes). Second instance mirrors the
      * TYPE-0 block cell-for-cell. */
-    put_rate(state, Hr, 102544, 0x3fa754b5u, 0x3f9bd7cau, 0x3f2493b7u, 0x3f2493b7u);
     if (second) {
         put_rate(state, Hr, 4297680, ARM_HCSW);
         put_rate(state, Hr, 4297776, ARM_LFX1);
@@ -461,8 +462,8 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
         JF(state, 4297584) = tc;
     }
 
-    /* WET = DELAY LEVEL / 255 (both taps for TYPE 1). */
-    JF(state, 102528)  = (float)level / 255.0f;
+    /* WET = DELAY LEVEL / 255 (the second instance; the first instance's is
+     * slot1_stale()'s). */
     if (second) JF(state, 4297760) = (float)level / 255.0f;
     /* DELAY TAP TIME (1178, record 3056, int1x7): the plugin's setter (rva
      * 0x3B91E0, READ) acts only at DELAY TYPE 1, passing 255*v/100 (integer
@@ -520,11 +521,94 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
      * instance carries the feedback law; the base block does not. Because both
      * first-instance cells are stale-carrying, this fix was re-checked on the
      * patch-change path (5 sequential recalls on one engine), not only cold. */
-    if (!on) JF(state, 102560) = 0.0f;
-    JF(state, 102576)  = on ? 1.0f : 0.0f;
     if (second) {
         JF(state, 4297808) = ((float)fb / 255.0f) * 0.9f;
         JF(state, 4297824) = on ? 1.0f : 0.0f;
+    }
+}
+
+/* ===== THE PATCH-CHANGE SEQUENCE OF SLOT 1 (CLAIMS B1, 2026-10-05) =====
+ * The plugin recalls in ascending index order, so DELAY LEVEL (796), DELAY
+ * TIME (797) and TEMPO SYNC (803) are dispatched BEFORE DELAY TYPE (875): they
+ * land on the block of the type IN FORCE, with the NEW values. Then the DELAY
+ * TYPE setter (rva 0x3B93E0) switches that block off (its +24 with 0, via rva
+ * 0x3B86C0), routes slot 1, builds the new block (mode selector rva 0x3B8180,
+ * then the replays) and switches it on. PROVEN cell by cell under Unicorn for
+ * every type in force and every transition t -> n; graded by
+ * tools/verify/warm_chain_gate.py. From a fresh engine the type in force is 0. */
+
+/* The DELAY LEVEL setter's on-flag (processor +6776, rva 0x3B8E50, READ):
+ * new = (old == 0) ? (level >= 2) : (level >= 1). The replay inside the DELAY
+ * TYPE setter calls it again with the same level, which cannot change it. */
+static int dly_on_update(unsigned char *state, int level)
+{
+    int on = JI(state, JUNO_DLY_ON) ? (level >= 1) : (level >= 2);
+    JI(state, JUNO_DLY_ON) = (uint32_t)on;
+    return on;
+}
+
+static float dly_fb_law(int fb) { return ((float)fb / 255.0f) * 0.9f; }
+
+/* (1) LEVEL / TIME (/ SYNC's time) on the block in force. Per type, the cells
+ * the setters write (PROVEN under Unicorn, each type in force): the wet and
+ * on cells, the block's FEEDBACK re-applied from the processor's stored raw
+ * FEEDBACK (on ? it : 0 -- the previous recall's, since FEEDBACK is dispatched
+ * later), and the time cell. Types >= 6: the setters' switches have no case. */
+static void slot1_stale(unsigned char *state, int prev, int level, int dtime,
+                        int sync, int on, int Hr)
+{
+    int lvl32 = level * 32; if (lvl32 > 255) lvl32 = 255;
+    int pfb = (int)JI(state, JUNO_PREV_FB);
+    switch (prev) {
+    case 0:
+        JF(state, 102528) = (float)level / 255.0f;
+        JF(state, 102576) = on ? 1.0f : 0.0f;
+        JF(state, 102560) = on ? dly_fb_law(pfb) : 0.0f;
+        JF(state, 102352) = dly_time_coeff(Hr, dtime, sync);
+        break;
+    case 1:
+        JF(state, 4297760) = (float)level / 255.0f;
+        JF(state, 4297824) = on ? 1.0f : 0.0f;
+        JF(state, 4297808) = on ? dly_fb_law(pfb) : 0.0f;
+        JF(state, 4297584) = dly_time_coeff(Hr, dtime, sync);
+        break;
+    case 2: case 3:
+        JF(state, 6396176) = (float)level / 255.0f;
+        JF(state, 6396432) = (float)lvl32 / 255.0f;
+        JF(state, 6395312) = ((float)dtime / 255.0f) * 11.0f - 8.0f;
+        break;
+    case 4:
+        JF(state, 6430512) = juno_curve(22, level);
+        JF(state, 6430768) = juno_curve(22, lvl32);
+        JF(state, 6430752) = on ? juno_curve(22, (int)JI(state, JUNO_PREV_RESO)) * rl_f32(0x3f666666u) : 0.0f;
+        JF(state, 6429472) = (1.0f - juno_curve(22, dtime)) * -12.0f;
+        break;
+    case 5:
+        JF(state, 6497344) = (float)level / 255.0f;
+        JF(state, 6497392) = on ? 1.0f : 0.0f;
+        JF(state, 6497376) = on ? dly_fb_law(pfb) : 0.0f;
+        JF(state, 10693312) = (float)lvl32 / 255.0f;
+        JF(state, 6497168) = dly_time_coeff(Hr, dtime, sync);
+        break;
+    default:
+        break;
+    }
+}
+
+/* (2) The DELAY TYPE setter switches the block in force off: the off value
+ * (ARM_LFX1_OFF, the plugin's 3 rate classes) and enable 0 -- for type 5 on
+ * both of its blocks. PROVEN for every t -> n. */
+static void slot1_off(unsigned char *state, int prev, int Hr)
+{
+    switch (prev) {
+    case 0: put_rate(state, Hr, 102544, ARM_LFX1_OFF);   JF(state, 102592) = 0.0f;   break;
+    case 1: put_rate(state, Hr, 4297776, ARM_LFX1_OFF);  JF(state, 4297840) = 0.0f;  break;
+    case 2: case 3:
+            put_rate(state, Hr, 6396400, ARM_LFX1_OFF);  JF(state, 6396448) = 0.0f;  break;
+    case 4: put_rate(state, Hr, 6430736, ARM_LFX1_OFF);  JF(state, 6430784) = 0.0f;  break;
+    case 5: put_rate(state, Hr, 6497360, ARM_LFX1_OFF);  JF(state, 6497408) = 0.0f;
+            put_rate(state, Hr, 10693280, ARM_LFX1_OFF); JF(state, 10693328) = 0.0f; break;
+    default: break;
     }
 }
 
@@ -546,72 +630,15 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     float f, tc;
     if (Hr <= 0) Hr = 96000;
 
-    /* THE TYPE-0 BASE BLOCK IS WRITTEN FOR EVERY DELAY TYPE, NOT ONLY TYPE 0.
-     *
-     * The four cells 102528 / 102544 / 102576 / 102592 were the largest single
-     * defect class the random-state gate found: wrong on 19 of 30 legal seeds,
-     * every one of them a patch with DELAY TYPE 2, 3, 5 or 6. The port reached
-     * the type-2/3/5 arms and returned before it ever got here, so it wrote
-     * none of the four.
-     *
-     * MEASURED, warm, through ONE engine, plugin as the oracle (G2:
-     * tools/verify/warm_recall_gate.py with a synthetic bank from
-     * tools/verify/synth_warm_bank.py). Cold at TYPE 3 / LEVEL 150 the plugin
-     * writes 150/255, the OFF arm, 1 and 0; the port wrote 0, 0, 0 and a stale 1.
-     *
-     * THE WET CELL IS GATED ON THE PREVIOUS TYPE, NOT THE NEW ONE. With the
-     * previous DELAY TYPE 3 and a new patch at TYPE 2 / LEVEL 200, the plugin
-     * leaves 102528 at the PREVIOUS patch's 150/255 — it does not write 200/255.
-     * 102592 is the type-0 block's own ENABLE flag and is 1 exactly when the
-     * last recall was TYPE 0, so it IS the predicate; no shadow is needed.
-     *
-     * AND THE LEVEL GATE IS THREE-WAY, WHICH COST A REFUTED FIX TO LEARN. An
-     * earlier derivation read it as (level >= 2), from a chain whose only
-     * level-1 point followed a level-0 step — where "write 0" and "no write"
-     * are the same observation. Proven two-sided here instead: arm the carried
-     * flag to 1 and level 1 leaves 1; arm it to 0 and level 1 leaves 0. The
-     * result equals the incoming value both ways, so AT LEVEL 1 THE PLUGIN
-     * WRITES NOTHING. Writing 0 there would mute a path the plugin leaves open
-     * (src/master_render.c:1127 and :1151 multiply slot-1 by 102576) and the
-     * cell carries, so the split would persist across later patches. */
-    if (JF(state, 102592) != 0.0f) {          /* previous DELAY TYPE was 0 */
-        JF(state, 102528) = (float)level / 255.0f;
-        if (level == 0)       JF(state, 102576) = 0.0f;
-        else if (level >= 2)  JF(state, 102576) = 1.0f;
-        /* level == 1: NO WRITE. Proven two-sided above. Do not "complete" this. */
-    }
-    if (dtype != 0) {                          /* tear the type-0 block down */
-        put_rate(state, Hr, 102544, ARM_LFX1_OFF);
-        JF(state, 102592) = 0.0f;
-    }
-
-    /* THE SAME LAW, ONE INSTANCE OVER: leaving DELAY TYPE 1 tears the SECOND
-     * instance down, and the NEW patch's level lands in it first.
-     *
-     * FACTORY-REACHABLE, and it needs no exotic value: patches 39 -> 40 is an
-     * ordinary adjacent pair (TYPE 1 -> TYPE 0) and three cells diverged.
-     * Cold gates could never see it -- the second instance is only live after a
-     * type-1 patch, so a fresh engine per patch never has one to tear down.
-     *
-     * MEASURED through ONE engine (tools/verify/warm_recall_gate.py with a bank
-     * from tools/verify/synth_warm_bank.py):
-     *   TYPE 1 lvl 115 -> TYPE 0 lvl  68 : 4297760 = 68/255,  OFF arm, ENABLE 0
-     *   TYPE 1 lvl 115 -> TYPE 2 lvl 100 : 4297760 = 100/255, OFF arm, ENABLE 0
-     *   TYPE 2 lvl 100 -> TYPE 0 lvl  68 : the block is NOT TOUCHED
-     * so the write is gated on the PREVIOUS type being 1, exactly as the type-0
-     * base block above is gated on the previous type being 0. The level written
-     * is the NEW patch's, because the LEVEL leaf dispatches BEFORE the TYPE leaf
-     * and therefore lands on the block that is still live.
-     *
-     * prev comes from the port-owned shadow, not from a routing cell: the
-     * second instance's own ENABLE (4297840) is level-gated, so it reads 0 for a
-     * type-1 patch at level 0 or 1 and cannot answer "was the last type 1".
-     * JUNO_PREV_DLY is updated at the END of juno_bank_apply (src/juno_apply.c),
-     * so here it still holds the PREVIOUS patch's type. */
-    if (JI(state, JUNO_PREV_DLY) == 1 && dtype != 1) {
-        JF(state, 4297760) = (float)level / 255.0f;
-        put_rate(state, Hr, 4297776, ARM_LFX1_OFF);
-        JF(state, 4297840) = 0.0f;
+    /* (1) and (2) of the sequence above. The old code here modelled the
+     * previous type only for types 0 and 1, keyed the type-0 case on the
+     * block's own enable cell, and wrote 102352 for every type; all three
+     * were cold-shaped (from a fresh engine the type in force is 0). */
+    {
+        int prev = (int)JI(state, JUNO_PREV_DLY);
+        int on = dly_on_update(state, level);
+        slot1_stale(state, prev, level, dtime, sync, on, Hr);
+        slot1_off(state, prev, Hr);
     }
 
     /* The plugin CLAMPS out-of-range DELAY TYPE to 5 (routing int at 6/9/255 ==
@@ -679,19 +706,9 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
      * algebraically-equal ((H*ms-2)/16384) is wrong — H*ms exceeds 2^24 so the -2
      * must come after the scale. Hr from state[16], unset => 96 kHz. */
     tc = dly_time_coeff(Hr, dtime, sync);
-    JF(state, 102352) = tc;
 
-    if (dtype > 5) {                           /* seventh class: build NOTHING */
-        /* ...but the shared FEEDBACK gate is NOT part of building a block. It
-         * depends only on DELAY LEVEL and applies wherever the slot sits:
-         * measured lvl 0,1 -> 0.0 and lvl 2+ -> 0.423529 at TYPES 1,2,3,4,5
-         * AND 6 alike (TYPE 0 alone has its own law and is untouched).
-         * Found by the 10,687-seed gate: 10 seeds, all type 6 at level < 2.
-         * This is exactly why the seventh class is a BRANCH and not an early
-         * return -- a return here would skip a write the plugin still does. */
-        if (blob_val(rec, 52) < 2) JF(state, 102560) = 0.0f;
-        return;                                /* (common writes above already done) */
-    }
+    if (dtype > 5)                             /* seventh class: build NOTHING */
+        return;   /* the LEVEL/TIME leaves and the switch-off above still ran */
 
     if (dtype == 2 || dtype == 3) {            /* slot 1 hosts chorus I/II */
         apply_slot1_chorus(state, rec, dtype);
@@ -818,7 +835,8 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     JF(state, 102608) = LAW_LFX2(Hr);
     put_rate(state, Hr, 102656, ARM_HFDMP);
     JF(state, 102528) = (float)level  / 255.0f;             /* Wet (per-patch = LEVEL/255) */
-    JF(state, 102576) = level >= 2 ? 1.0f : 0.0f;           /* On/Off (curve: v0,v1->0, v2->1) */
+    JF(state, 102576) = JI(state, JUNO_DLY_ON) ? 1.0f : 0.0f;  /* On/Off: the on-flag (hysteresis) */
+    JF(state, 102352) = tc;                                  /* Time (the TIME replay) */
 
     /* Fine-FX filter params (DELAY HIGH CUT / LF+HF DAMP / LF+HF DAMP FREQ) — the
      * leaves the plugin's recall enumerator does NOT fire but a host's preset-load

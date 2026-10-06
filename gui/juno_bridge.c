@@ -329,10 +329,12 @@ void juno_gui_recall_factory(juno_ctx *c)
      * has the same provenance as the seed: PROVEN under Unicorn from the
      * plugin's own state cell 11022056 (src/juno_prepare.c:270-279).
      *
-     * NOTHING READS JUNO_PREV_DLY YET (it is owed to the DELAY TYPE >= 6 work),
-     * so no render or state A/B can catch a desync here — which is why this one
-     * is held statically, by tools/verify/shadow_sync_gate.py check S, which
-     * fails such a site on ORDER rather than on luck. */
+     * Since CLAIMS B1 (2026-10-05) the next recall READS JUNO_PREV_DLY: it is
+     * the block in force that DELAY LEVEL/TIME land on and DELAY TYPE switches
+     * off (src/delay_recall.c slot1_stale / slot1_off), so a desync here is a
+     * wrong patch change, graded by tools/verify/warm_chain_gate.py. The pair
+     * is also held statically, by tools/verify/shadow_sync_gate.py check S,
+     * which fails such a site on ORDER rather than on luck. */
     JI(c->st, JUNO_PROG_DLY) = 0;
     JI(c->st, JUNO_PREV_DLY) = 0;
     juno_driver_seed_voices(c->st);      /* propagate to all 8 voices */

@@ -89,8 +89,15 @@ int main(void)
     juno_bank_apply(st, bank, 0);
     if (*(int32_t *)(st + JUNO_PROG_DLY) != 2) {
         printf("  case2: v39 cell = %d, expected 2\n", *(int32_t *)(st + JUNO_PROG_DLY)); ++fails; }
-    if (JF(st, 102528) != 0.0f) {
-        printf("  case2: delay wet written for non-delay mode\n"); ++fails; }
+    /* The type-0 wet IS written: DELAY LEVEL is dispatched before DELAY TYPE,
+     * so it lands on the block in force -- type 0 from a fresh engine -- and
+     * only then does the type switch that block off (CLAIMS B1; PROVEN for
+     * every type in force under Unicorn, and on all ten factory DELAY TYPE 2
+     * patches at 18 rates by tools/verify/rate_sweep_gate.py). This case used
+     * to assert the opposite, which held only because the old code keyed the
+     * write on 102592, a cell this zeroed (unprepared) state holds at 0. */
+    if (u32(st, 102528) != 0x3f008081) {   /* 128/255 */
+        printf("  case2: wet %08x != 3f008081 (LEVEL lands on the type-0 block in force)\n", u32(st, 102528)); ++fails; }
     if (u32(st, 102352) != 0x3f96bc00) {   /* time carried for every type (manual b128 @96k) */
         printf("  case2: Time %08x != 3f96bc00 (universal write)\n", u32(st, 102352)); ++fails; }
 

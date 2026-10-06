@@ -19,6 +19,8 @@
 #
 # usage: sh tools/run_job.sh <name> <command...>
 #        sh tools/run_job.sh --list
+# The command is re-parsed by sh as `( $* )`: quotes are LOST. Put a compound
+# command in a script file and run that, never `sh -c '...'` (playbook 118).
 set -u
 cd "$(dirname "$0")/.." || exit 1
 JOBS=bench/jobs

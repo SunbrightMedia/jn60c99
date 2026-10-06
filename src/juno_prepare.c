@@ -179,8 +179,9 @@ void juno_engine_prepare(unsigned char *st)
      * target is delay_recall.c's ARM_LFX1 family (44100 / 48000 / the 96k word
      * at every other rate; coldstate_ab.py at 18 rates). The port models settled
      * smoothers, as every gate's drive does (e2e_emu.snap_all); this is that
-     * settled value. (A first guess, the delay-OFF family ARM_LFX1_OFF, was
-     * refused by the cold gate at all 9 rates it ran.) */
+     * settled value. (APPROX-OK: history, not this code. A first guess, the
+     * delay-OFF family ARM_LFX1_OFF, was refused by the cold gate at all 9 rates
+     * it ran.) */
     JI(st, 102544) = (Hr == 44100) ? 0x388b3cdf : (Hr == 48000) ? 0x387fd974 : 0x37ffd974;
     /* effect ENABLE / output-stage constants — the per-mode effect setActive step
      * (container setSampleRate sub_7FF91E01C980 @0x3BC980 + snap-all) writes these;
@@ -306,6 +307,9 @@ void juno_engine_prepare(unsigned char *st)
      * prepare (see src/juno_engine.h JUNO_PREV_EFX). */
     JI(st, JUNO_PREV_EFX) = 2;
     JI(st, JUNO_PREV_DLY) = 0;
+    JI(st, JUNO_DLY_ON) = 0;          /* processor +6776 at BUILD */
+    JI(st, JUNO_PREV_FB) = 120;       /* processor +1512 at BUILD (FEEDBACK default) */
+    JI(st, JUNO_PREV_RESO) = 230;     /* processor +1568 at BUILD (RESONANCE default) */
 
     /* --- Class E: reverb tap-index table (34 ints, 11022208..11022340) ------ */
     /* Generator sub_0x3C1AC0: tap[0]=1; a continuous predelay = floor(T1*H) (T1 in

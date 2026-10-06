@@ -855,6 +855,8 @@ int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx)
      * work); JUNO_PREV_EFX is read by src/chorus_recall.c. */
     JI(state, JUNO_PREV_EFX) = record_byte(blob, 634);   /* EFFECT TYPE */
     JI(state, JUNO_PREV_DLY) = record_byte(blob, 650);   /* DELAY  TYPE */
+    JI(state, JUNO_PREV_FB)   = record_byte(blob, 3057);  /* DELAY FEEDBACK (1179) */
+    JI(state, JUNO_PREV_RESO) = record_byte(blob, 3504);  /* FLANGER RESONANCE (1243) */
     return n;
 }
 

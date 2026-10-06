@@ -170,6 +170,20 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
          * any preset. NB: the flanger PARAMETER leaves (1242-1248 MANUAL/RESONANCE/…)
          * write NO engine cell via dispatch 0x3B9A30 (controller-path, engine dispatch
          * is a no-op) and remain GAP pending the #112 controller lifecycle. */
+        /* The mode method (rva 0x357B80, READ + traced) runs for EVERY EFFECT
+         * TYPE 2/3/4 recall and writes all four of 91120 (((H*T)-2)/16384),
+         * 91152 ((a+a)/H), 91168 (trunc(row value) * f32 0x3bb60b61: 180 for
+         * chorus I/II -> 1.0, 0 for the flanger row) and 91184 (the row's
+         * depth: 0.004 for chorus I/II). From a fresh engine chorus I/II's
+         * values ARE the prepare values, so the port wrote them only for type
+         * 4 and a patch change 4 -> 2/3 kept the flanger row's values
+         * (tools/verify/warm_chain_gate.py, CLAIMS B1). */
+        if (etype == 2 || etype == 3) {
+            int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+            JF(state, 91120) = rl_chorus_mode_time(etype - 2, Hr);
+            JF(state, 91168) = (float)180 * cr_bits(0x3bb60b61u);
+            JF(state, 91184) = cr_bits(0x3b83126fu);
+        }
         if (etype == 4) {
             /* 91120 / 91152: the mode method's flanger row (T = 3.3 ms, a = 9.2),
              * continuous in H (src/rate_laws.h); was 4 measured arms. */

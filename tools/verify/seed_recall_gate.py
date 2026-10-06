@@ -96,10 +96,11 @@ def leaf_slots():
     return sorted(set(slots))
 
 
-def seed_bank(bank, seed, slots, ranges):
+def seed_bank(bank, seed, slots, ranges, wild=None):
     """(one-record bank, mode, base patch) for a seed. Seeds 0..N_LEGAL-1 are
-    legal, the next N_WILD wild."""
-    wild = seed >= N_LEGAL
+    legal, the next N_WILD wild; `wild` overrides that (warm_chain_gate.py)."""
+    if wild is None:
+        wild = seed >= N_LEGAL
     rnd = random.Random(seed * 7919 + 13)
     base = seed % 64
     rec = bytearray(bank[HEADER + base * STRIDE: HEADER + (base + 1) * STRIDE])

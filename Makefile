@@ -23,7 +23,7 @@ HDR     := $(wildcard src/*.h) $(wildcard gui/*.h)
 OBJ     := $(SRC:.c=.o)
 $(OBJ): $(HDR)
 
-.PHONY: all test clean gui provenance verify completeness engineb engineb-quick verify-jx3p
+.PHONY: all test clean gui provenance verify static completeness engineb engineb-quick verify-jx3p
 all: $(OBJ)
 
 # JX-3P port finish line: recall (C==oracle) + integration render (voice+master
@@ -53,6 +53,17 @@ ORACLE_DEPS := $(wildcard tools/verify/*.py)
 # etmode_ab --port) never test a STALE binary: a src/*.c change that no factory
 # patch exercises (e.g. the EFFECT TYPE 4 flanger arm) would otherwise pass every
 # gate against an out-of-date library. Caught by etmode_ab.py, 2026-07-22.
+# The static and ledger gates of `make verify`, alone: seconds, no oracle. Run
+# `make test static` before EVERY commit (playbook 119): on 2026-10-05 four of
+# them went red across three commits, unseen, because only the gate being worked
+# on was run.
+STATIC_GATES := pathcheck shadow_bounds_gate shadow_sync_gate completeness_gate deferred_noop_gate approx_audit provenance_check completeness_scan
+static: libjuno.so
+	@mkdir -p $(SCRATCH); FAIL=0; for g in $(STATIC_GATES); do \
+	  if python3 tools/verify/$$g.py > $(SCRATCH)/static_$$g.log 2>&1; then echo "  ok   $$g"; \
+	  else echo "  RED  $$g  (log: $(SCRATCH)/static_$$g.log)"; FAIL=1; fi; \
+	done; exit $$FAIL
+
 verify: test libjuno.so
 	@FAIL=0; \
 	mkdir -p $(SCRATCH); \
@@ -104,21 +115,18 @@ verify: test libjuno.so
 	fresh $(SCRATCH)/seed_recall_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/seed_recall_gate.py --ref || FAIL=1; \
 	python3 tools/verify/seed_recall_gate.py --port || FAIL=1; \
 	echo "=== WARM RECALL: N recalls through ONE engine, plugin vs port (every gate above recalls COLD) ==="; \
-	echo "    p39,40 CARRY / p1,9 WRITE -- the two directions of the chorus WET law, judged on the"; \
-	echo "    NAMED cell (--cells-only). p0,0 is the IDENTITY case and is judged on the WHOLE state,"; \
-	echo "    so a gate stuck at green cannot hide here. THE WHOLE-STATE WARM VERDICT IS NOT YET"; \
-	echo "    GREEN and is OWED: p39,40 leaves 4297760/4297776/4297840 (warm DELAY TYPE 1->0"; \
-	echo "    tear-down) and p1,9 leaves 102608/102656 (unattributed, possibly a"; \
-	echo "    recall_render_ab._finefx_leaves artefact) differing. Both PRE-EXIST this gate --"; \
-	echo "    MEASURED identical on libjuno.so built from the pre-shadow gui/juno_bridge.c. Drop"; \
-	echo "    --cells-only the day those close; do NOT widen the claim before then."; \
-	for s in 39,40 1,9; do \
+	echo "    p39,40 CARRY / p1,9 WRITE (the two directions of the chorus WET law) and p0,0 (the"; \
+	echo "    IDENTITY case), each judged on the WHOLE state since CLAIMS A17 (2026-10-05). MEASURED"; \
+	echo "    on fresh references: p1,9's 102608/102656 were the slot-1 patch-change sequence (red at"; \
+	echo "    481bc99, green with src/delay_recall.c slot1_stale/slot1_off); p39,40 was already green."; \
+	for s in 39,40 1,9 0,0; do \
 	  wp=$(SCRATCH)/warm_recall_`echo $$s | tr , -`_44100.pkl; \
 	  fresh $$wp $(ORACLE_DEPS) || python3 tools/verify/warm_recall_gate.py --ref --seq $$s --cells 91232 || FAIL=1; \
-	  python3 tools/verify/warm_recall_gate.py --port --seq $$s --cells 91232 --cells-only || FAIL=1; \
+	  python3 tools/verify/warm_recall_gate.py --port --seq $$s --cells 91232 || FAIL=1; \
 	done; \
-	fresh $(SCRATCH)/warm_recall_0-0_44100.pkl $(ORACLE_DEPS) || python3 tools/verify/warm_recall_gate.py --ref --seq 0,0 --cells 91232 || FAIL=1; \
-	python3 tools/verify/warm_recall_gate.py --port --seq 0,0 --cells 91232 || FAIL=1; \
+	echo "=== WARM CHAINS (CLAIMS A17/B1): 22 chains of recalls through ONE engine (type variants, legal seeds, DELAY LEVEL edges), whole object after every step, 3 rates ==="; \
+	fresh $(SCRATCH)/warm_chain_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/warm_chain_gate.py --ref || FAIL=1; \
+	python3 tools/verify/warm_chain_gate.py --port || FAIL=1; \
 	echo "=== SHADOW CELLS: bounds (cannot false-fail an A/B) + WRITER-SET invariant (prog == clamp(shadow)) ==="; \
 	python3 tools/verify/shadow_bounds_gate.py || FAIL=1; \
 	python3 tools/verify/shadow_sync_gate.py || FAIL=1; \

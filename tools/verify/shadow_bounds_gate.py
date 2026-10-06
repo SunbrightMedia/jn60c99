@@ -7,6 +7,9 @@ PLUGIN DOES NOT HAVE:
 
     JUNO_PREV_EFX  11022400   previous EFFECT TYPE leaf (rec 634)
     JUNO_PREV_DLY  11022416   previous DELAY  TYPE leaf (rec 650)
+    JUNO_DLY_ON    11022368   DELAY LEVEL on-flag (processor +6776)   } CLAIMS B1,
+    JUNO_PREV_FB   11022376   previous DELAY FEEDBACK (proc. +1512)   } added
+    JUNO_PREV_RESO 11022384   previous FLANGER RESONANCE (+1568)      } 2026-10-05
 
 They exist because several recall arms are gated on the type IN FORCE BEFORE
 the recall (src/chorus_recall.c), and the plugin's own routing cells cannot
@@ -30,7 +33,7 @@ window starts 48 bytes past its end. This gate asserts:
      recall_fullstate_diff.STATE_SZ.
   3. No .py under tools/verify/ or tools/engineb/ mentions an integer literal
      inside the shadow window (i.e. nobody has started comparing one).
-  4. The device cell map covers both shadow cells, so an -DEB_DECELLS build
+  4. The device cell map covers every shadow cell, so an -DEB_DEVCELLS build
      cannot alias them onto the shared 8-byte miss SINK.
   5. The baked device boot image was generated FROM that same cell map. Adding
      the shadow cells grew EBDEV_SEGBYTES and the image had to grow with it;
@@ -61,9 +64,10 @@ import recall_fullstate_diff as FS               # noqa: E402  pure, no engine
 
 ROOT = FS.ROOT
 OBJ_SZ = 0xA83010                                # 11022352, operator new size
-SHADOW = {'JUNO_PREV_EFX': 11022400, 'JUNO_PREV_DLY': 11022416}
+SHADOW = {'JUNO_PREV_EFX': 11022400, 'JUNO_PREV_DLY': 11022416,
+          'JUNO_DLY_ON': 11022368, 'JUNO_PREV_FB': 11022376, 'JUNO_PREV_RESO': 11022384}
 WIN_LO = min(SHADOW.values())
-WIN_HI = max(SHADOW.values()) + 16                # 11022432, one cell grid past
+WIN_HI = max(SHADOW.values()) + 16                # one cell grid past the highest
 TOOTH = os.environ.get('JUNO_SHADOW_TOOTH', '')
 
 
@@ -74,7 +78,7 @@ def hdr(n, s):
 def check_defines():
     """The offsets this gate protects come from src/juno_engine.h, not from a
     number typed here. A moved #define must move the gate with it."""
-    hdr(0, 'the two #defines still say what this gate assumes')
+    hdr(0, 'the #defines still say what this gate assumes')
     txt = open(os.path.join(ROOT, 'src', 'juno_engine.h')).read()
     ok = True
     for name, want in sorted(SHADOW.items()):
@@ -157,7 +161,7 @@ def check_literals():
 
 
 def check_devmap():
-    hdr(4, 'the device cell map covers both shadow cells')
+    hdr(4, 'the device cell map covers every shadow cell')
     txt = open(os.path.join(ROOT, 'engine_b', 'dev', 'ebdev_seg.h')).read()
     segs = [(int(a), int(b)) for a, b in
             re.findall(r'\{\s*(\d+)u,\s*(\d+)u,\s*\d+u\s*\}', txt)]

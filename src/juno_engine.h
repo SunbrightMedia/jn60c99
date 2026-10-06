@@ -159,6 +159,24 @@ extern "C" {
  * shadow TRUE? Both run in `make verify`. */
 #define JUNO_PREV_EFX  11022400u  /* previous EFFECT TYPE leaf (rec 634) */
 #define JUNO_PREV_DLY  11022416u  /* previous DELAY  TYPE leaf (rec 650) */
+/* PROCESSOR-STATE SHADOWS (CLAIMS B1, 2026-10-05). The plugin's processor keeps
+ * state that outlives a recall and that the next recall READS; the port keeps it
+ * here, seeded to the plugin's BUILD values (read under Unicorn: on-flag 0,
+ * FEEDBACK 120, RESONANCE 230). Placed in [11022360, 11022400): past the
+ * object end and the highest compared REGION (11022360), and inside the device
+ * map's last segment, so -DEB_DEVCELLS maps them with no new segment
+ * (tools/verify/shadow_bounds_gate.py checks all three):
+ *   JUNO_DLY_ON     processor +6776: the DELAY LEVEL setter's on-flag, with
+ *                   hysteresis (rva 0x3B8E50) -- updated in juno_apply_delay;
+ *   JUNO_PREV_FB    processor +1512: the raw DELAY FEEDBACK of the previous
+ *                   recall, which the next recall's DELAY LEVEL re-applies to
+ *                   the old block before FEEDBACK itself is dispatched;
+ *   JUNO_PREV_RESO  processor +1568: the same for FLANGER RESONANCE.
+ * The last two are updated at the END of juno_bank_apply, like the routing
+ * shadows above. */
+#define JUNO_DLY_ON     11022368u
+#define JUNO_PREV_FB    11022376u
+#define JUNO_PREV_RESO  11022384u
 
 /* juno_engine_init — exact transcription of sub_1803990C0. Fills the engine
  * state `st` with the real coefficients. Set JF(st,16) to the sample rate first

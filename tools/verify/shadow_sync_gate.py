@@ -118,12 +118,23 @@ def parse_define(relpath, name):
 
 
 def parse_clamp(relpath, var):
-    """`if (etype > 5) etype = 5;` -- the routing cell is CLAMPED, the shadow is
-    the RAW leaf, so the relation between them is CLAMP, not equality."""
+    """The routing-cell bound N from the recall's CODE (comments stripped), as
+    (N, N). Two forms: the old clamp `if (etype > 5) etype = 5;` and, since
+    CLAIMS A13 (2026-10-05), the plugin's own law `if (etype > 5) return;` /
+    `if (dtype > 5) {` -- above N the recall stores NO routing value. Either way
+    the live setter (juno_gui_set_chorus_mode) routes clamp(mode) and shadows
+    the raw mode, and every recall check B drives stays at or below N (the
+    shipping bank), so the relation checked is still prog == CLAMP(shadow).
+    Every bound test on `var` must name the same N, or this returns None. (The
+    first parser matched a COMMENT in src/delay_recall.c quoting removed code.)"""
     txt = open(os.path.join(ROOT, relpath)).read()
-    m = re.search(r'if\s*\(\s*%s\s*>\s*(\d+)\s*\)\s*%s\s*=\s*(\d+)\s*;'
-                  % (var, var), txt)
-    return (int(m.group(1)), int(m.group(2))) if m else None
+    txt = re.sub(r'/\*.*?\*/', ' ', txt, flags=re.S)
+    txt = re.sub(r'//[^\n]*', ' ', txt)
+    ns = set(int(n) for n in re.findall(r'if\s*\(\s*%s\s*>\s*(\d+)\s*\)' % var, txt))
+    for n, to in re.findall(r'if\s*\(\s*%s\s*>\s*(\d+)\s*\)\s*%s\s*=\s*(\d+)\s*;' % (var, var), txt):
+        if n != to:
+            return None
+    return (ns.pop(), ) * 2 if len(ns) == 1 else None
 
 
 class Cells(object):

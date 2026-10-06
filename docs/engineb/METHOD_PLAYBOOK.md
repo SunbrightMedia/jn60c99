@@ -2360,3 +2360,47 @@ upward from 0; the port scanned down from 7. Fixed in one loop.
 ### The rule
 A finding gets a CLAIMS row the day it is made, OPEN if not fixed. A seeded gate must draw every
 leaf from its full declared range -- the values no factory patch uses are where the open defects are.
+
+## 116. A RECALL THAT ONLY EVER RAN ON A FRESH ENGINE ENCODES THE COLD STATE AS A CONSTANT -- CHAIN IT
+Paid 2026-10-05 (JUNO, CLAIMS A17). Every recall gate recalled into a fresh engine, where the
+DELAY TYPE in force is always 0, the DELAY LEVEL on-flag is off and the previous FEEDBACK is the
+build value. The port had baked those three facts in: it modelled the previous delay type for 0
+and 1 only, keyed it on a block's own enable cell, wrote type-0 cells for every type, and restated
+cold values in a table. Chains of recalls through ONE engine (tools/verify/warm_chain_gate.py)
+were red on 82 of 96 steps. In the plugin, DELAY LEVEL/TIME land on the block of the type IN
+FORCE (recall order), then DELAY TYPE switches that block off; the on-flag has hysteresis; the
+old block's feedback comes from the previous recall. Ported with three processor-state shadows:
+0 of 234 steps red.
+### The rule
+Every cold recall gate needs a warm twin: chains through one engine, the whole object after every
+step, seeded records (every leaf), and NAMED edge cases for any state with hysteresis -- a random
+byte reaches DELAY LEVEL 1 once in 256 draws, and the hysteresis tooth bit the edge family only.
+
+## 117. A SNAP IN THE HARNESS IS A MODEL OF TIME -- MEASURE WHAT IT HIDES
+Paid 2026-10-05 (JUNO, CLAIMS B1). The oracle settles every active ramp after a recall
+(e2e_emu.snap_all) so the plugin reaches the port's steady state. MEASURED on a running engine
+(probes/warm/warm_ramps_list.py): a recall arms 40-46 ramp records per unit, about 21 change value,
+and each glides for 4 ms. Every gate that snaps is blind to those 4 ms, and the port jumps.
+### The rule
+For every harness step that changes engine state outside the plugin's own code (snap, latch clear,
+FTZ), measure what it changes on the path the user will run, and state it as a limit of every gate
+that uses it.
+
+## 118. A JOB RUNNER THAT RE-PARSES ITS ARGUMENTS EATS QUOTED COMMANDS
+Paid 2026-10-05. tools/run_job.sh runs `( $* )`, so `sh -c 'a; b'` lost its quotes: one job died
+before it wrote a log, another ran plain `make` (the wrong target) and failed later. The EXIT/DIED
+rule caught both in minutes.
+### The rule
+A compound job command goes in a script file (scratchpad/job_*.sh), never in `sh -c '...'`.
+
+## 119. A GREEN GATE YOU DID NOT RUN IS NOT GREEN -- RUN THE CHEAP ONES ON EVERY COMMIT
+Paid 2026-10-05 (JUNO). Three commits in one day each ran the gates of their own change and turned
+four static gates red, unseen: an EFFECT TYPE bound rewritten from a clamp to an early return broke
+shadow_sync_gate's parser; shadow offsets written as literals in port_writeset.py broke
+shadow_bounds_gate check 3; two comments describing REMOVED fits tripped approx_audit; the new
+src/rate_laws.h had no PROVENANCE row (completeness_scan). Each takes seconds. Found only when
+adding new shadow cells. `make verify` was red from that commit on.
+### The rule
+`make test static` before every commit (the static target runs every seconds-long gate of
+`make verify`). A gate that parses source text must parse CODE, comments stripped: the old
+sync-gate parser was reading its bound from a comment that quoted removed code.
