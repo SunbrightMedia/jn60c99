@@ -1,5 +1,20 @@
 # HOSTPATH PARITY SCOPE — close every remaining gap between the port and a REAL host instance. Opus 5: execute to the letter, in order.
 
+**STATUS 2026-10-06 -- read first.** Closed since this order was parked, each gated
+against the plugin (docs/CLAIMS.md):
+- The plugin plays SIX voices, not eight (initialize's default vm.vs.voiceCount, A21),
+  after a 960-sample start-up mute (A22); the web app now starts that way (C4).
+  INFERRED, not measured against the bounces: this is the likely cause of S1/S2 --
+  a unison patch summed eight voices in the port and six in the plugin (8/6 = +2.5 dB
+  for voices in phase, as on a first note).
+- STEP 3 (setState): EXECUTED in the booted plugin and ported -- a DAW preset is 95
+  host edits in payload order, with storage masks (A22, state_load_gate.py).
+- STEP 2's live-edit audit: DAW automation through 0x3C7AE0, all 79 parameters, bit-exact
+  with the plugin's ramps (A20, host_edit_gate.py).
+Still open: STEP 1 (SYSTEM defaults by execution; Keyboard Velocity SW is READ, default
+0), STEP 2's wrapper note/CC event matrix (0x34A380 -> 0x31F4E0 -> 0x320B20), STEP 4
+(the two gates above are in make verify; the event matrix is not), STEP 5.
+
 **Why this scope exists.** The engine is proven bit-exact against the plugin's own
 machine code on every gated surface (recall, render, sequences, fuzz, voice-assign
 28/28 + Chillwave 16/16). Yet the user still reports audible differences vs their
