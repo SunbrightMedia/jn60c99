@@ -22,7 +22,10 @@
  *
  * NOTHING here is derived from a capture -- Script.xml is allowed plugin data.
  * type: 0=int1x7 (1 byte), 1=int2x4 (nibble pair), 2=int8x4 (8 bytes; the port
- * reads the low byte as a nibble pair at roff/roff+1).
+ * reads the low byte as a nibble pair at roff/roff+1), 3=host-only float (LFO
+ * RATE H / VCF CUTOFF FREQ H: the plugin's database range is the float bits
+ * [0, 1.0f], EXECUTED; the value lives in the context, not the record, whose
+ * encoding of these leaves is not the harness's -- CLAIMS B6).
  */
 typedef struct { const char *name; const char *section; int roff; int type; int min; int max; int def; } juno_hostparam;
 
@@ -38,7 +41,7 @@ static const juno_hostparam HOSTPARAMS[] = {
     {"HPF CUTOFF FREQ"    ,"HPF"     ,   92, 1,   0, 255,   0},
     {"HPF TYPE"           ,"HPF"     ,  618, 2,   0,   1,   0},   /* plugin DB [0,1] (rva 0x98c040, EXECUTED; Script.xml says 0..8) */
     {"VCF CUTOFF FREQ"    ,"VCF"     ,   86, 1,   0, 255, 255},
-    {"VCF CUTOFF FREQ H"  ,"VCF"     , 1876, 2,   0, 255,   0},
+    {"VCF CUTOFF FREQ H"  ,"VCF"     , 1876, 3,   0, 1065353216, 1065353216},   /* host-only float bits, plugin DB (CLAIMS B6) */
     {"VCF RESONANCE"      ,"VCF"     ,   90, 1,   0, 255,   0},
     {"VCF ENV MOD"        ,"VCF"     ,   94, 1,   0, 255, 128},
     {"VCF KEY FOLLOW"     ,"VCF"     ,  104, 1,   0, 255, 128},
@@ -57,7 +60,7 @@ static const juno_hostparam HOSTPARAMS[] = {
     {"ENV2 SUSTAIN"       ,"ENV2"    ,  110, 1,   0, 255, 255},
     {"ENV2 RELEASE"       ,"ENV2"    ,  112, 1,   0, 255,   0},
     {"LFO RATE"           ,"LFO"     ,   32, 1,   0, 255, 145},
-    {"LFO RATE H"         ,"LFO"     ,  674, 2,   0, 255, 146},
+    {"LFO RATE H"         ,"LFO"     ,  674, 3,   0, 1065353216, 1058115986},   /* host-only float bits, plugin DB (CLAIMS B6) */
     {"LFO DELAY TIME"     ,"LFO"     ,   30, 1,   0, 255,   0},
     {"LFO KEY TRIG"       ,"LFO"     ,   40, 1,   0,   1,   0},
     {"LFO TRIG ENV"       ,"LFO"     ,  554, 2,   0,   1,   0},
@@ -126,6 +129,7 @@ int juno_host_param_decode(const unsigned char *rec, int i)
 {
     int r = juno_host_param_roff(i), v;
     if (r < 0 || !rec) return -1;
+    if (juno_host_param_type(i) == 3) return juno_host_param_default(i);   /* context-held */
     if (juno_host_param_type(i) == 0) v = rec[r] & 0x7F;
     else v = ((rec[r] & 0xF) << 4) | (rec[r+1] & 0xF);
     if (juno_host_param_min(i) < 0 && v >= 128) v -= 256;   /* two's complement */
@@ -138,7 +142,7 @@ int juno_host_param_decode(const unsigned char *rec, int i)
 void juno_host_param_encode(unsigned char *rec, int i, int v)
 {
     int r = juno_host_param_roff(i);
-    if (r < 0 || !rec) return;
+    if (r < 0 || !rec || juno_host_param_type(i) == 3) return;
     if (v < juno_host_param_min(i)) v = juno_host_param_min(i);
     if (v > juno_host_param_max(i)) v = juno_host_param_max(i);
     if (v < 0) v += 256;                                    /* two's complement */

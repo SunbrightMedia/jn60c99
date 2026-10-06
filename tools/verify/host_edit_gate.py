@@ -15,7 +15,10 @@ Per chain (one engine per side, one host rate):
       ('lrecall', ...) a live patch change (as warm_render_gate.py live)
       ('on'/'off', n), ('render', n), ('check',)
 Compares every rendered sample (L and R bits) and, at every check, the state
-each plugin unit renders (voice v from unit v, the master from unit 8).
+each plugin unit renders (voice v from unit v, the master from unit 8) and
+the ramp records of the 798 ramped cells (stored target and active always;
+start, increment, accumulator and step while active): the hidden state that
+decides whether the NEXT edit glides.
 
 FAMILIES (--ref builds the scripts and stores them; --port replays them)
   each    every host parameter: three edits 40 / 250 / 900 samples apart
@@ -37,16 +40,18 @@ ARPEGGIO SW is edited only with no note held, and switched off before the next
 note: the oracle has no transport clock and cannot arpeggiate (as
 seed_recall_gate.py HOLD).
 
-LIMITS, stated: 76 of the 79 panel parameters (LFO RATE H and VCF CUTOFF FREQ H
-are CLAIMS B6; OCTAVE SHIFT is signed and its leaf decode is the harness's);
-legal values only (B8); host rates 44100 / 48000 / 96001.
+LIMITS, stated: 78 of the 79 panel parameters (MASTER TUNE is not in the
+engine's parameter map: the host cannot send it to the engine); out-of-range
+host values included (the law family); host rates 44100 / 48000 / 96001.
 
-TOOTH (--tooth): eight named defects must each turn --port red: the settled
-re-recall (the old port), the scratch recall meeting live ramps, the cutoff
-time law, the porta gate's restore value, the recall's re-send of the kept
-tap, the reverb fade in double, the arp gate, the POLY+LEGATO skip. Two reach
-probes are printed, not graded (the kept vs current tap on a switch to type 1;
-the 86 build-stale ramp targets): no path observes them.
+TOOTH (--tooth): thirteen named defects must each turn --port red: the
+settled re-recall (the old port), the scratch recall meeting live ramps, the
+cutoff time law, the porta gate's restore value, the recall's re-send of the
+kept tap, the reverb fade in double, the arp gate, the POLY+LEGATO skip, an
+out-of-range value clamped instead of dropped, the H leaves from the recall,
+the cutoff step from the record, OCTAVE SHIFT re-running the recall, the 86
+build-stale ramp targets. One reach probe is printed, not graded (the kept vs
+current tap on a switch to type 1): no path observes it.
 
 TWO-PROCESS RULE: --ref (Unicorn only) -> scratchpad/host_edit_ref.pkl;
 --port (libjuno only) reads it.
@@ -121,14 +126,15 @@ def oracle_params(e, E, S):
 
     walk(q(q(E.IB + MAP_RVA) + 8))
     roff_to = {off: d for d, off, kind in S.leaf_slots()}
+    # leaves the harness recall does not carry, by their dispatch index
+    # (coverage_leaves.tsv): the host-only fine leaves and the signed OCTAVE SHIFT
+    by_name = {'LFO RATE H': 878, 'VCF CUTOFF FREQ H': 1029, 'OCTAVE SHIFT': 836}
     out = {}
     for k, name, roff in host_table():
-        d = roff_to.get(roff)
+        d = by_name.get(name, roff_to.get(roff))
         if d is None or d not in pid_of:
             continue
         lo, hi = struct.unpack('<ii', uc.mem_read(E.IB + DB_RANGE_RVA + 16 * d, 8))
-        if lo < 0:
-            continue
         out[k] = (name, d, pid_of[d], lo, hi)
     return out
 
@@ -272,6 +278,19 @@ def scripts(bank, params):
           ('lrecall', 'lw_tap3', noarp(record_bank(bank, 42, {REC_DTYPE: 0}))), ('render', 300), ('check',),
           ('host', DTI, 77), ('render', 300), ('check',)]
     law.append(sc + [('off', 62), ('render', 800), ('check',)])
+    #   a value outside the parameter's database range reaches no setter (dropped;
+    #   HPF TYPE maps to v != 0); the host-only H floats; OCTAVE SHIFT's empty set
+    OOR = [(name_to['EFFECT TYPE'], 9), (name_to['VCF CUTOFF FREQ'], 300), (name_to['HPF TYPE'], 5),
+           (TAP, 101), (name_to['REVERB TYPE'], 6), (name_to['OCTAVE SHIFT'], 5), (name_to['OCTAVE SHIFT'], -4),
+           (name_to['LFO RATE H'], 0x3f800001), (name_to['DELAY TYPE'], 200), (name_to['ENV1 ATTACK'], -1)]
+    sc = [('recall', 'lw_oor', noarp(record_bank(bank, 44, {}))), ('render', 64), ('on', 64), ('render', 200)]
+    for k, v in OOR:
+        sc += [('host', k, v), ('render', 120), ('check',)]
+    for k, v in ((name_to['VCF CUTOFF FREQ H'], 0x3e800000), (name_to['LFO RATE H'], 0x3f000000),
+                 (name_to['OCTAVE SHIFT'], 2), (name_to['VCF CUTOFF FREQ H'], 0x3f400000), (name_to['OCTAVE SHIFT'], -3),
+                 (name_to['VCF CUTOFF FREQ'], 90), (name_to['LFO RATE H'], 0)):
+        sc += [('host', k, v), ('render', 150), ('check',)]
+    law.append(sc + [('off', 64), ('render', 800), ('check',)])
     for c, sc in enumerate(law):
         out.append(('law', RATES[c % 3], sc))
     # mix: host edits and live patch changes
@@ -391,7 +410,7 @@ def build_ref(trace=None):
     for ci, (fam, rate, sc) in enumerate(ch):
         e = RR.build_engine(E, rate)
         e.call(E.IB + POPULATE_RVA, count=200_000_000)
-        rmap = ramp_map(e, E) if trace is not None else None
+        rmap = ramp_map(e, E)
         recs = []
         outs = []
         for ev in sc:
@@ -419,9 +438,8 @@ def build_ref(trace=None):
                 outs.append(zlib.compress(b''.join(parts), 6))
                 if rmap is not None:
                     recs.append(oracle_records(e, rmap))
-        if rmap is not None:
-            ref['_recs'] = recs
-            ref['_rcells'] = sorted(rmap)
+        ref.setdefault('_recs', {})[ci] = zlib.compress(pickle.dumps(recs), 6)
+        ref['_rcells'] = sorted(rmap)
         ref['_chains'].append((fam, rate, [(ev[0], ev[1], zlib.compress(ev[2], 6)) if ev[0] in ('recall', 'lrecall')
                                            else ev for ev in sc]))
         ref[ci] = outs
@@ -485,6 +503,7 @@ def check_port(trace=None):
         last = None
         ci_check = [0]
         rec_seen = [False]
+        recs_want = pickle.loads(zlib.decompress(ref['_recs'][ci])) if '_recs' in ref else None
         for evi, ev in enumerate(sc):
             if trace is not None and ev[0] in ('render', 'on', 'off'):
                 last = '#%d %s %s' % (evi, ev[0], ev[1])
@@ -526,8 +545,8 @@ def check_port(trace=None):
                 want = np.frombuffer(zlib.decompress(outs[oi]), dtype='<u4')
                 oi += 1
                 dd = np.nonzero(got != want)[0]
-                if trace is not None and '_recs' in ref:
-                    want_r = ref['_recs'][ci_check[0]]
+                if recs_want is not None:
+                    want_r = recs_want[ci_check[0]]
                     ci_check[0] += 1
                     rdiff = []
                     for k, cell in enumerate(ref['_rcells']):
@@ -540,8 +559,11 @@ def check_port(trace=None):
                             rdiff.append((cell, ['%x' % x for x in pw], ['%x' % x for x in pg]))
                     if rdiff and not rec_seen[0]:
                         rec_seen[0] = True
-                        print('    [%s] RECORDS differ at %d cells (plug / port: target active start incr accum step): %s'
-                              % (last, len(rdiff), rdiff[:4]))
+                        if VERBOSE or trace is not None:
+                            print('    [%s] RECORDS differ at %d cells (plug / port: target active start incr accum step): %s'
+                                  % (last, len(rdiff), rdiff[:4]))
+                        if bad is None:
+                            bad = 'after %s: %d ramp records differ (first cell %d)' % (last, len(rdiff), rdiff[0][0])
                 if len(dd) and (bad is None or VERBOSE):
                     offs = []
                     for w in dd[:6]:
@@ -605,22 +627,31 @@ def tooth():
          [('src/host_edit.c', '    if (gated_off(hp, f)) return 0;\n', '')]),
         ('he_poly_legato_ignored', 'PORTAMENTO sets the porta on/off under POLY + LEGATO too',
          [('gui/juno_bridge.c', 'f.pl = host_val(rec, "ASSIGN MODE") == 0 && host_val(rec, "LEGATO") == 1;', 'f.pl = 0;')]),
+        ('he_out_of_range_clamped', 'an out-of-range host value is clamped and applied, not dropped',
+         [('gui/juno_bridge.c', '    if (v < juno_host_param_min(i) || v > juno_host_param_max(i)) return;\n',
+           '    if (v < juno_host_param_min(i)) v = juno_host_param_min(i);\n'
+           '    if (v > juno_host_param_max(i)) v = juno_host_param_max(i);\n')]),
+        ('he_h_from_recall', 'the H leaves set the recall\'s cell value, not the host value',
+         [('src/host_edit.c', 'case JH_HOSTV: bits = (uint32_t)f->to; break;', 'case JH_HOSTV: memcpy(&bits, settled + o->cell, 4); break;')]),
+        ('he_cutoff_last_from_record', 'the cutoff step is taken from the record, not the object\'s last value',
+         [('gui/juno_bridge.c', '    if (i == host_index("VCF CUTOFF FREQ")) f.from = juno_rr_cut_last(c->st);   /* the object\'s last value */\n', '')]),
+        ('he_octave_rerecall', 'OCTAVE SHIFT re-runs the settled recall instead of touching nothing',
+         [('gui/juno_bridge.c', '    if (!strcmp(juno_host_param_name(i), "OCTAVE SHIFT") || !strcmp(juno_host_param_name(i), "MASTER TUNE")) {',
+           '    if (!strcmp(juno_host_param_name(i), "MASTER TUNE")) {')]),
+        ('he_build_targets', 'every record seeded with its cell value (the build leaves 86 at 0)',
+         [('src/recall_ramp.c', 'r->target = JUNO_RAMP_BUILD0[i] ? 0.0f : JF(st, JUNO_RAMP_CELL[i]);',
+           'r->target = JF(st, JUNO_RAMP_CELL[i]);')]),
     ]
-    # REACH PROBES, not teeth: rules the port keeps as the plugin measures them,
-    # whose violation no path can observe (each printed, never graded).
-    #   kept tap vs current tap on a switch to DELAY TYPE 1: the switch's last
-    #   arm is the current tap, and the kept tap equals every target a tap arm
-    #   sets, so the two lists end in the same record state (worked through
-    #   2026-10-06, CLAIMS A20);
-    #   the 86 build-stale targets: no host edit (census, 15714) and no recall
-    #   ramp (234 recalls) arms any of those cells.
+    # REACH PROBE, not a tooth: a rule the port keeps as the plugin measures it,
+    # whose violation no path observes (printed, never graded): kept tap vs
+    # current tap on a switch to DELAY TYPE 1 -- the switch's last arm is the
+    # current tap, and the kept tap equals every target a tap arm sets, so the
+    # two lists end in the same record state (CLAIMS A20). (The 86 build-stale
+    # targets were a probe until the gate compared the records; now a tooth.)
     R = [
         ('he_tap_as_recall', 'a switch to DELAY TYPE 1 arms the current tap, not the kept one',
          [('src/host_edit.c', 'case JH_TAP2: bits = juno_rr_tap2_bits(st); break;',
            'case JH_TAP2: memcpy(&bits, settled + o->cell, 4); break;')]),
-        ('he_build_targets', 'every record seeded with its cell value (the build leaves 86 at 0)',
-         [('src/recall_ramp.c', 'r->target = JUNO_RAMP_BUILD0[i] ? 0.0f : JF(st, JUNO_RAMP_CELL[i]);',
-           'r->target = JF(st, JUNO_RAMP_CELL[i]);')]),
     ]
     res = {}
     for name, what, edits in T + R:

@@ -46,6 +46,7 @@ typedef struct {
     int new_etype, new_dtype;       /* EFFECT TYPE (rec 634), DELAY TYPE (rec 650)   */
     int new_revtype, new_revtime;   /* REVERB TYPE (rec 658), REVERB TIME (rec 666)  */
     int new_revlevel;               /* REVERB LEVEL byte (blob 51)                   */
+    int new_cutoff;                 /* VCF CUTOFF FREQ byte (blob 35)                */
 } juno_rr_ctx;
 
 void juno_rr_reset(unsigned char *state);   /* juno_engine_prepare: records re-seed at the next recall */
@@ -65,6 +66,8 @@ uint32_t juno_rr_tap2_bits(unsigned char *state);
 int      juno_rr_rev_on(unsigned char *state);
 int      juno_rr_arp_on(unsigned char *state);
 void     juno_rr_set_arp_on(unsigned char *state, int on);
+int      juno_rr_cut_last(unsigned char *state);
+void     juno_rr_set_cut_last(unsigned char *state, int v);
 void     juno_rr_copy_proc(unsigned char *dst, const unsigned char *src);
 
 #ifdef __cplusplus

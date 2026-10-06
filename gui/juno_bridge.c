@@ -120,6 +120,10 @@ typedef struct {
                               * (the wrapper's rule, see juno_gui_midi_note_on) */
     int   live_recall;       /* 1 while juno_gui_apply_bank_live runs: the recall
                               * leaves the plugin's recall ramps armed (CLAIMS B1) */
+    int   host_only[2];      /* LFO RATE H, VCF CUTOFF FREQ H: the host-only float
+                              * parameters' values (bits), not in the record (CLAIMS B6);
+                              * 0 = not set since create (the getter then reports the default) */
+    int   host_only_set[2];
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -1294,9 +1298,19 @@ const char *juno_gui_host_section(int i)     { return juno_host_param_section(i)
 int         juno_gui_host_min(int i)         { return juno_host_param_min(i); }
 int         juno_gui_host_max(int i)         { return juno_host_param_max(i); }
 
+static int host_only_slot(int i)
+{
+    const char *n = juno_host_param_name(i);
+    if (juno_host_param_type(i) != 3) return -1;
+    return strcmp(n, "LFO RATE H") ? 1 : 0;
+}
+
 int juno_gui_host_get(juno_ctx *c, int i)
 {
+    int k;
     if (!c || !c->bank) return -1;
+    k = host_only_slot(i);
+    if (k >= 0) return c->host_only_set[k] ? c->host_only[k] : juno_host_param_default(i);
     return juno_host_param_decode(juno_bank_record(c->bank, c->patch_idx), i);
 }
 
@@ -1331,7 +1345,8 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
     unsigned char keep[2];
     int roff = juno_host_param_roff(i);
     if (roff < 0) return 0;
-    f.from = juno_host_param_decode(rec, i);
+    f.from = juno_gui_host_get(c, i);
+    if (i == host_index("VCF CUTOFF FREQ")) f.from = juno_rr_cut_last(c->st);   /* the object's last value */
     f.et = host_val(rec, "EFFECT TYPE");
     f.dt = host_val(rec, "DELAY TYPE");
     f.pl = host_val(rec, "ASSIGN MODE") == 0 && host_val(rec, "LEGATO") == 1;
@@ -1339,7 +1354,7 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
     f.ron0 = juno_reverb_level_on(host_val(rec, "REVERB LEVEL"));
     keep[0] = rec[roff]; keep[1] = rec[roff + 1];
     juno_host_param_encode(rec, i, v);
-    f.to = juno_host_param_decode(rec, i);
+    f.to = host_only_slot(i) >= 0 ? v : juno_host_param_decode(rec, i);
     f.ron1 = juno_reverb_level_on(host_val(rec, "REVERB LEVEL"));
     tmp = (unsigned char *)malloc(JUNO_STATE_BYTES);
     if (tmp) {
@@ -1363,6 +1378,12 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
                 JI(c->st, JUNO_PREV_RESO) = JI(tmp, JUNO_PREV_RESO);
                 juno_rr_copy_proc(c->st, tmp);
                 if (i == host_index("ARPEGGIO SW")) juno_rr_set_arp_on(c->st, f.to != 0);
+                if (host_only_slot(i) >= 0) {
+                    c->host_only[host_only_slot(i)] = v;
+                    c->host_only_set[host_only_slot(i)] = 1;
+                }
+                if (i == host_index("VCF CUTOFF FREQ") || i == host_index("VCF CUTOFF FREQ H"))
+                    juno_rr_set_cut_last(c->st, v);
                 c->last_condition = t.last_condition;
                 c->hpf_type = t.hpf_type;
                 ctx_alloc_recall(c, c->bank, c->patch_idx, 0, tmp);
@@ -1377,14 +1398,27 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
 }
 #endif
 
+/* A host parameter change as the plugin's host entry (rva 0x3C7AE0) takes it.
+ * A value outside the parameter's database range reaches no setter and is
+ * dropped (EXECUTED: EFFECT/DELAY/REVERB TYPE 6..255, VCF CUTOFF 256, DELAY TAP
+ * TIME 101 -> no setter call); HPF TYPE is mapped to (v != 0) first. OCTAVE
+ * SHIFT reaches its setter but writes no engine cell (EXECUTED, fresh engines:
+ * identical state and audio), and MASTER TUNE is not in the engine's parameter
+ * map: both change the record only. CLAIMS A20 / B8. */
 void juno_gui_host_set(juno_ctx *c, int i, int v)
 {
     unsigned char *rec;
     if (!c || !c->bank) return;
     rec = juno_bank_record(c->bank, c->patch_idx);
     if (!rec) return;
+    if (i >= 0 && i < juno_host_param_count() && !strcmp(juno_host_param_name(i), "HPF TYPE")) v = (v != 0);
+    if (v < juno_host_param_min(i) || v > juno_host_param_max(i)) return;
 #ifndef EB_DEVCELLS
     if (juno_host_edit_known(i) && host_edit_live(c, rec, i, v)) return;
+    if (!strcmp(juno_host_param_name(i), "OCTAVE SHIFT") || !strcmp(juno_host_param_name(i), "MASTER TUNE")) {
+        juno_host_param_encode(rec, i, v);
+        return;
+    }
 #endif
     juno_host_param_encode(rec, i, v);
     ctx_recall(c, c->bank, c->patch_idx, 0);

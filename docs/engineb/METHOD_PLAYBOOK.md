@@ -2482,3 +2482,22 @@ edit that caused it. Four of the six defects found that day were read straight o
 ### The rule
 Give every state gate a trace mode that checks after every event and also compares the state the
 compare region does not hold (records, shadows, queues). Use it before reading any disassembly.
+
+## 127. A METHOD WHOSE VALUE GETTER IS A STUB IS NOT A PATH
+Paid 2026-10-06 (JUNO, CLAIMS B6). The "plugin's own recall enumerator" (rva 0x3B48A0, flag 1) was
+executed in 2026-08 and became the model every recall gate copies. It reads each value through a
+getter that is `xor eax,eax; ret` (rva 0x3B6C30) in the class the engine builds, and no code calls
+it directly: it proves a LIST, never a path. The engine's only writer turned out to be the host
+entry (flag 0), fed only by process(); a DAW preset load reaches the engine as host-role edits.
+### The rule
+Before a code path stands for "what the plugin does", find who calls it and where its values come
+from. A stub source or no caller makes it a model of the plugin, to be labelled as one.
+
+## 128. COMPARE RUNS ONLY FROM IDENTICAL STARTS -- AND AN ENGINE PROBE CANNOT SEE THE WRAPPER
+Paid 2026-10-06 (JUNO, CLAIMS B9). OCTAVE SHIFT "changed the audio" when several runs shared one
+engine: the voice rotation and the per-voice CONDITION scatter differed run to run. Fresh engines
+showed the setter writes no engine cell and a note sounds the same at every shift. If the plugin
+transposes, it does so in the wrapper's MIDI path, which the engine-level oracle bypasses.
+### The rule
+Give every A/B run its own fresh engine (or prove the starting states equal). When an engine-level
+probe shows no effect, write "no ENGINE effect" and name the layer it did not execute.

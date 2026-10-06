@@ -31,13 +31,14 @@ SCRATCH = os.path.join(REPO, 'scratchpad')
 REC_PKL = os.path.join(SCRATCH, 'ramp_records_units.pkl')
 CEN_PKL = os.path.join(SCRATCH, 'host_census_v2.pkl')
 CEN3_PKL = os.path.join(SCRATCH, 'host_census_v3.pkl')
+CENH_PKL = os.path.join(SCRATCH, 'host_census_h.pkl')
 FLG_PKL = os.path.join(SCRATCH, 'host_census_flags.pkl')
 CELLS_H = os.path.join(REPO, 'src', 'ramp_cells.h')
 TABLE_H = os.path.join(REPO, 'src', 'host_ramp_table.h')
 
 # value sources (src/host_edit.c)
-S_REC, S_ZERO, S_ONE, S_OFF, S_TAP2 = 0, 1, 2, 3, 4
-SRC_NAME = {S_REC: 'JH_REC', S_ZERO: 'JH_ZERO', S_ONE: 'JH_ONE', S_OFF: 'JH_OFF', S_TAP2: 'JH_TAP2'}
+S_REC, S_ZERO, S_ONE, S_OFF, S_TAP2, S_HOSTV = 0, 1, 2, 3, 4, 5
+SRC_NAME = {S_REC: 'JH_REC', S_ZERO: 'JH_ZERO', S_ONE: 'JH_ONE', S_OFF: 'JH_OFF', S_TAP2: 'JH_TAP2', S_HOSTV: 'JH_HOSTV'}
 CONST = {0x00000000: S_ZERO, 0x3f800000: S_ONE, 0x3fa754b5: S_OFF}   # OFF: juno_lfx1_value(44100, 0)
 OFF_CELLS = {91248, 96384, 102544, 4297776, 6396400, 6430736, 6497360, 10693280}
 TAP2_CELL = 4297792
@@ -122,7 +123,7 @@ def job_ops(r, name=None):
             t = 0
         if name == 'VCF CUTOFF FREQ' and a == 'R' and c in CUTOFF_CELLS and t == cutoff_time(r['frm'], r['to']):
             t = 0x80
-        out.append((KIND[a], c, t or 0, val & 0xFFFFFFFF, r['rec'].get(c) if r.get('rec') else None))
+        out.append((KIND[a], c, t or 0, val & 0xFFFFFFFF, r['rec'].get(c) if r.get('rec') else None, r['to']))
     return dedupe(out) if name in DEDUPE else out
 
 
@@ -144,7 +145,7 @@ def dedupe(ops):
     last = {}
     out = []
     for op in ops:
-        k, c, t, v, rc = op
+        k, c, t, v, rc = op[:5]
         prev = last.get(c)
         if prev is not None and prev[0] == k and prev[3] == v:
             continue
@@ -167,11 +168,13 @@ def card(f, lo, hi):
 
 
 def merge_src(rows):
-    """one op position over every job of a key: [(val, rec)] -> a source"""
-    vals = set(v for v, rc in rows)
-    rec_ok = all(rc is not None and v == rc for v, rc in rows)
+    """one op position over every job of a key: [(val, rec, host value)] -> a source"""
+    vals = set(v for v, rc, to in rows)
+    rec_ok = all(rc is not None and v == rc for v, rc, to in rows)
     if rec_ok:
         return S_REC
+    if all(v == (to & 0xFFFFFFFF) for v, rc, to in rows) and len(vals) > 1:
+        return S_HOSTV
     if len(vals) == 1:
         v = vals.pop()
         if v in CONST:
@@ -190,8 +193,12 @@ def programs():
     p0 = bank[HEADER:HEADER + STRIDE]
     jobs = {}
     srcs = [cen]
-    if os.path.exists(CEN3_PKL):
-        srcs.append(pickle.load(open(CEN3_PKL, 'rb')))
+    for extra in (CEN3_PKL, CENH_PKL):
+        if os.path.exists(extra):
+            srcs.append(pickle.load(open(extra, 'rb')))
+    for cs in srcs[1:]:
+        for p in cs['plist']:
+            P.setdefault(p[0], p)
     for cs in srcs:
         for j, r in cs['res'].items():
             if r['ok'] is not True:
@@ -222,7 +229,7 @@ def programs():
                     continue
                 key = tuple(f[x] for x in cand)
                 ops = job_ops(r, name)
-                shp = tuple((k, c, t) for k, c, t, v, rc in ops)
+                shp = tuple((k, c, t) for k, c, t, v, rc, to in ops)
                 g = groups.setdefault(key, [shp, []])
                 if g[0] != shp:
                     ok = False
@@ -235,7 +242,7 @@ def programs():
             for key, (shp, opsl) in groups.items():
                 srcs = []
                 for pos, (k, c, t) in enumerate(shp):
-                    rows = [(ops[pos][3], ops[pos][4]) for ops in opsl]
+                    rows = [(ops[pos][3], ops[pos][4], ops[pos][5]) for ops in opsl]
                     src = merge_src(rows) if rows else None
                     if src is None and c == TAP2_CELL and name == 'DELAY TYPE':
                         src = S_TAP2
@@ -244,7 +251,7 @@ def programs():
                     if src is None:
                         why = 'key %s op %d (cell %d): no one source for %s' % (
                             key, pos, c, sorted(set('%08x/%s' % (v, '%08x' % rc if rc is not None else '-')
-                                                    for v, rc in rows))[:4] if rows else 'no recall values')
+                                                    for v, rc, to in rows))[:4] if rows else 'no recall values')
                         break
                     srcs.append(src)
                 if why:
@@ -309,8 +316,8 @@ def table_h(host, params):
            ' * -- ramped sets (cell, time index), immediate sets, direct writes -- in',
            ' * the plugin\'s order, per key (the context the list depends on), and where',
            ' * each set\'s value comes from. EXECUTED: probes/host/host_census_v2.py',
-           ' * (11282 edits), host_census_v3.py (2632) and host_census_flags.py',
-           ' * (1800); %d ops, %d programs.' % (len(ops), len(prog_rows)),
+           ' * (11282 edits), host_census_v3.py (2632), host_census_flags.py (1800)',
+           ' * and host_census_h.py (72); %d ops, %d programs.' % (len(ops), len(prog_rows)),
            ' */',
            '#ifndef JUNO_HOST_RAMP_TABLE_H',
            '#define JUNO_HOST_RAMP_TABLE_H',
@@ -320,7 +327,7 @@ def table_h(host, params):
            'typedef struct { uint32_t feat, nprog, prog0; int32_t lo, hi; uint32_t gate; } jh_param;',
            'enum { JH_G_NONE = 0, JH_G_ARP_ON = 1, JH_G_ARP_TURN_ON = 2 };',
            'enum { JH_RAMP = 0, JH_IMM = 1, JH_WRITE = 2 };',
-           'enum { JH_REC = 0, JH_ZERO = 1, JH_ONE = 2, JH_OFF = 3, JH_TAP2 = 4 };',
+           'enum { JH_REC = 0, JH_ZERO = 1, JH_ONE = 2, JH_OFF = 3, JH_TAP2 = 4, JH_HOSTV = 5 };',
            'enum { %s };' % ', '.join('JH_F_%s = 0x%02X' % (f, FBIT[f]) for f in FEATS),
            '#define JH_NONE 0xFFFFFFFFu',
            'static const jh_op JH_OPS[%d] = {' % max(len(ops), 1)]

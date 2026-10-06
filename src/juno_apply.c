@@ -893,6 +893,7 @@ static int bank_apply(unsigned char *state, const unsigned char *bank, int idx, 
     rr.new_revtype = record_byte(blob, 658);
     rr.new_revtime = record_byte(blob, 666);
     rr.new_revlevel = ((blob[2 * 51] & 0xF) << 4) | (blob[2 * 51 + 1] & 0xF);
+    rr.new_cutoff = ((blob[2 * 35] & 0xF) << 4) | (blob[2 * 35 + 1] & 0xF);   /* VCF CUTOFF FREQ */
     juno_rr_end(state, &rr);
     if (!live) juno_rr_settle(state);
 #endif

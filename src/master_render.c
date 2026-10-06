@@ -971,7 +971,11 @@ float *juno_master_render(unsigned char *a1, float **a2, float **a3)
       v436 = -1.0;
     *(float *)(a1 + 4297520) = v436 * *(float *)(a1 + 4297840);
     v437 = v433 * *(float *)(a1 + 4297792);
-    if ( v437 <= 0.00012207031 )
+    /* rva 0x366417: `comiss xmm1, [2^-13 as float]` + `jbe`, taken when
+     * v437 <= 2^-13 OR unordered (NaN). The decompiled `v437 <= 0.00012207031`
+     * compared in double against a value just below 2^-13 and was false on
+     * NaN: wrong at v437 == 2^-13 and at NaN (READ; playbook 81/123). */
+    if ( !(v437 > 0.00012207031f) )
       v438 = 0.0001220703125;
     else
       v438 = v437;

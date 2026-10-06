@@ -56,7 +56,7 @@ typedef char rr_stride_is_10512[(JUNO_VOICE_MAIN_STRIDE == 10512) ? 1 : -1];
 typedef char rr_table_fits[(JUNO_RR_BASE + 32u + 34u * JUNO_RAMP_N <= JUNO_RR_END) ? 1 : -1];
 
 /* The record table, port-owned memory at JUNO_RR_BASE (src/juno_engine.h): a
- * 32-byte header {magic, n_active, revtime, rev_on, tap2, arp_on, 2 spare}, one record
+ * 32-byte header {magic, n_active, revtime, rev_on, tap2, arp_on, cut_last, 1 spare}, one record
  * per ramped cell (JUNO_RAMP_N, src/ramp_cells.h), then the active list (the
  * indices of the armed records, n_active of them). The records are
  * independent (each steps only its own cell), so the order the list holds
@@ -64,7 +64,7 @@ typedef char rr_table_fits[(JUNO_RR_BASE + 32u + 34u * JUNO_RAMP_N <= JUNO_RR_EN
 typedef struct { float incr, accum, start, target; int32_t active, step; float pre; int32_t pad; } rr_rec;
 #define RR_MAGIC 0x32525252
 #define HDR(st, k) (*(int32_t *)((st) + JUNO_RR_BASE + 4u * (unsigned)(k)))
-enum { H_MAGIC, H_NACT, H_REVTIME, H_REVON, H_TAP2, H_ARPON };
+enum { H_MAGIC, H_NACT, H_REVTIME, H_REVON, H_TAP2, H_ARPON, H_CUTLAST };
 
 static rr_rec *rec_at(unsigned char *st, int i)
 {
@@ -122,6 +122,7 @@ static void rr_seed(unsigned char *st)
     HDR(st, H_REVON) = 0;
     HDR(st, H_TAP2) = 0x3f008081;          /* 128/255: the build's (census job 236) */
     HDR(st, H_ARPON) = 0;
+    HDR(st, H_CUTLAST) = 255;              /* the cutoff object's build value; every recall sets it */
 }
 
 /* The DELAY TYPE 1 second instance's own copy of its tap time (CLAIMS B7):
@@ -151,6 +152,20 @@ void juno_rr_set_arp_on(unsigned char *st, int on)
 {
     if (HDR(st, H_MAGIC) != RR_MAGIC) rr_seed(st);
     HDR(st, H_ARPON) = on != 0;
+}
+
+/* The VCF CUTOFF object's last value (+0x14 of the setter's object, rva
+ * 0x3597F0): the step its host-role ramp time follows is |new - last|. Every
+ * value the object takes stores there -- the recall's byte, a host VCF CUTOFF
+ * byte, and a host VCF CUTOFF FREQ H value, whose float bits make the next
+ * step "large" (EXECUTED: H 0.25 then 87 -> 90 ramps at index 5, not 6;
+ * scratchpad/probe_cutH.py). CLAIMS A20. */
+int juno_rr_cut_last(unsigned char *st) { return HDR(st, H_MAGIC) == RR_MAGIC ? (int)HDR(st, H_CUTLAST) : 255; }
+
+void juno_rr_set_cut_last(unsigned char *st, int v)
+{
+    if (HDR(st, H_MAGIC) != RR_MAGIC) rr_seed(st);
+    HDR(st, H_CUTLAST) = v;
 }
 
 /* The processor state a host-role edit takes from the settled copy (src/
@@ -326,6 +341,7 @@ void juno_rr_end(unsigned char *st, const juno_rr_ctx *c)
 
     HDR(st, H_REVTIME) = c->new_revtime;
     HDR(st, H_REVON) = on_new;
+    HDR(st, H_CUTLAST) = c->new_cutoff;
 }
 
 /* the harness snap (tools/verify/e2e_emu.py snap_all): every ACTIVE record
