@@ -41,6 +41,10 @@ def main():
     import ccmap_state_gate as S
     import midi_ctl_gate as G
     from midi_teeth import build
+    base = G.check_port(ref_pkl=S.REF_PKL, title=S.TITLE + ' -- baseline')           # a mutant counts only on a green gate (playbook 155)
+    if base:
+        print('BASELINE RED: %d chains fail on the unmutated port -- teeth not graded' % base)
+        return 2
     tmp = tempfile.mkdtemp(prefix='ccmap_teeth_')
     res = {}
     try:

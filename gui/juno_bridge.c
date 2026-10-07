@@ -208,6 +208,20 @@ typedef struct {
     int   setup_rate;          /* the host rate setupProcessing stored (plugin_init: the create rate) */
     juno_ccmap ccmap;          /* the core's CC map (core+24+48 / record +12 / +64, CLAIMS A31):
                                 * the boot's default, emptied and refilled by every state load */
+
+    /* THE PARAMETER STORE (CLAIMS A32): the model's value of each state entry -- what the
+     * plugin's getState writes (rva 0x31FD90: each record's vt+128). Set by initialize's
+     * defaults, setState, a patch load, the model's own edits and the UI timer's drain; never
+     * by process() (EXECUTED: probes/host_api/state_save_census.py). */
+    int32_t store[JUNO_STATE_N];
+    /* THE CORE'S SECOND QUEUE (core+512) as its drain (rva 0x320120, the UI timer) applies it:
+     * the store records the push queues for a mapped CC (rva 0x3221F0: id, the CC's value),
+     * one per parameter, in the order of their LATEST push (a drain applies each as an
+     * overwrite, so an earlier record of the same parameter changes nothing it leaves), and
+     * the first CC message below 120 since the last drain (the only one a MIDI learn takes). */
+    struct ui_rec { uint32_t id; float f; } ui_q[JUNO_STATE_N];
+    int   ui_nq;
+    int   ui_cc;
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -330,6 +344,9 @@ static juno_ctx *ctx_create(float sample_rate, int chorus_mode)
     c->kb_sus_arp = c->kb_sus_note = c->ctl_sus = 0;
     c->host_bpm = 128.0f;   /* plugin recall-default TEMPO (880 -> 40+88.0) */
     juno_ccmap_boot(&c->ccmap);
+    for (v = 0; v < JUNO_STATE_N; ++v) c->store[v] = JUNO_STATE_ENT[v].dflt;
+    c->ui_nq = 0;
+    c->ui_cc = -1;
     drv_init(c, sample_rate);
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
     return c;
@@ -1400,6 +1417,124 @@ void juno_gui_set_kbd_velocity(juno_ctx *c, int on)
 
 void juno_gui_wrapper_midi(const juno_ctx *c, unsigned char m[3]);
 
+/* ---- THE PARAMETER STORE AND THE UI TIMER'S DRAIN (CLAIMS A32) ------------- */
+
+/* the state entry of `id`, -1 none */
+static int state_k(uint32_t id)
+{
+    int k;
+    for (k = 0; k < JUNO_STATE_N; ++k)
+        if (JUNO_STATE_ENT[k].id == id) return k;
+    return -1;
+}
+
+/* The model's set of state entry k. `masked`: the value & its storage mask --
+ * the model's set (rva 0x283DB0) that setState, the setting menu and the UI
+ * timer's drain use; a patch load's set from the record's bytes keeps the value
+ * as decoded (EXECUTED: state_save_gate.py, crafted records). Two entries set
+ * another (EXECUTED: the store-link census, every entry alone at four values):
+ * the LFO RATE and VCF CUTOFF bytes set their host-only float to byte x (1 /
+ * 255) in single precision; nothing else. */
+static void store_put(juno_ctx *c, int k, int32_t v, int masked)
+{
+    uint32_t id = JUNO_STATE_ENT[k].id;
+    if (masked && JUNO_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask);
+    c->store[k] = v;
+    if (id == 0x00600004u || id == 0x0060003Au) {
+        float h = (float)v * (1.0f / 255.0f);
+        int kh = state_k(id == 0x00600004u ? 0x00A00000u : 0x00A02802u);
+        if (kh >= 0) memcpy(&c->store[kh], &h, 4);
+    }
+}
+static void store_set(juno_ctx *c, int k, int32_t v) { store_put(c, k, v, 1); }
+
+/* the push's store record (rva 0x3221F0, through the core's slot 4): the
+ * parameter's earlier record leaves the queue, this one goes last */
+static void ui_push(juno_ctx *c, uint32_t id, float f)
+{
+    int i;
+    for (i = 0; i < c->ui_nq && c->ui_q[i].id != id; ++i) ;
+    if (i < c->ui_nq) {
+        memmove(&c->ui_q[i], &c->ui_q[i + 1], (size_t)(c->ui_nq - i - 1) * sizeof c->ui_q[0]);
+        --c->ui_nq;
+    }
+    if (c->ui_nq < JUNO_STATE_N) {
+        c->ui_q[c->ui_nq].id = id;
+        c->ui_q[c->ui_nq].f = f;
+        ++c->ui_nq;
+    }
+}
+
+/* The UI timer's handler (the core's slot 1, rva 0x320120; the plugin runs it
+ * every 50 ms on its UI thread, the port when the app calls this): the queued
+ * store records through the record value law (rva 0x31A940) into the store,
+ * the first CC message to a waiting MIDI learn (rva 0x319C90). No engine record
+ * (EXECUTED). Host parameter records never reach this queue. */
+void juno_gui_ui_tick(juno_ctx *c)
+{
+    int i;
+    if (!c) return;
+    for (i = 0; i < c->ui_nq; ++i) {
+        int e = juno_midi_entry(c->ui_q[i].id), k = state_k(c->ui_q[i].id);
+        if (e >= 0 && k >= 0) store_set(c, k, juno_midi_record_value(e, c->ui_q[i].f));
+    }
+    c->ui_nq = 0;
+    if (c->ui_cc >= 0) juno_ccmap_learn_done(&c->ccmap, c->ui_cc);
+    c->ui_cc = -1;
+}
+
+/* MIDI learn, as the plugin's GUI drives it (a control's menu): arm for the
+ * parameter `id` (rva 0x31AA40) -- the next drain gives it the first CC below
+ * 120 queued since the last drain; while it waits no CC drives a parameter --
+ * or forget its CC (rva 0x3192E0). 0 for an id the core has no record of. */
+int juno_gui_cc_learn(juno_ctx *c, uint32_t id)
+{
+    int e = c ? juno_midi_entry(id) : -1;
+    if (e < 0) return 0;
+    juno_ccmap_learn_arm(&c->ccmap, e);
+    return 1;
+}
+int juno_gui_cc_forget(juno_ctx *c, uint32_t id)
+{
+    int e = c ? juno_midi_entry(id) : -1;
+    if (e < 0) return 0;
+    juno_ccmap_forget(&c->ccmap, e);
+    return 1;
+}
+/* the CC a parameter's control shows (rva 0x319B70): -1 none or while a learn waits */
+int juno_gui_cc_of(const juno_ctx *c, uint32_t id)
+{
+    int e = c ? juno_midi_entry(id) : -1;
+    return e < 0 ? -1 : juno_ccmap_record_cc(&c->ccmap, e);
+}
+
+/* IComponent::getState (rva 0x349EA0 -> 0x31FD90): a big-endian byte count,
+ * then (id, value) as 4-byte big-endian fields: the 95 state entries in their
+ * order with the store's values, then the 128 CC map entries 0x10000000 + n
+ * (rva 0x319B90). Writes JUNO_STATE_SAVE_BYTES (1788) bytes; returns that, or
+ * -1 when `cap` is smaller. */
+static void put_be32(unsigned char *p, uint32_t v)
+{
+    p[0] = (unsigned char)(v >> 24); p[1] = (unsigned char)(v >> 16);
+    p[2] = (unsigned char)(v >> 8);  p[3] = (unsigned char)v;
+}
+int juno_gui_state_save(const juno_ctx *c, unsigned char *out, int cap)
+{
+    int k, n = 4 + 8 * (JUNO_STATE_N + 128);
+    unsigned char *p = out + 4;
+    if (!c || !out || cap < n) return -1;
+    put_be32(out, (uint32_t)(n - 4));
+    for (k = 0; k < JUNO_STATE_N; ++k, p += 8) {
+        put_be32(p, JUNO_STATE_ENT[k].id);
+        put_be32(p + 4, (uint32_t)c->store[k]);
+    }
+    for (k = 0; k < 128; ++k, p += 8) {
+        put_be32(p, 0x10000000u + (uint32_t)k);
+        put_be32(p + 4, (uint32_t)juno_ccmap_state_value(&c->ccmap, k));
+    }
+    return n;
+}
+
 /* The wrapper's push (rva 0x31F4E0) of one 3-byte message at a sample offset
  * of the next block: a CC the core's map assigns to a parameter (rva 0x319A60:
  * the boot's map, src/midi_tables.h, as the last state load left it, CLAIMS
@@ -1411,6 +1546,7 @@ static void drv_push(juno_ctx *c, unsigned char m[3], int offset)
 {
     if ((m[0] & 0xF0) == 0xB0) {
         int e = juno_ccmap_lookup(&c->ccmap, m[1]);
+        if (e >= 0) ui_push(c, juno_midi_entry_id(e), juno_midi_cc_value(e, m[2]));
         if (e >= 0 && c->drv_nq < DRV_QMAX) {
             struct drv_rec *r = &c->drv_q[c->drv_nq++];
             memset(r, 0, sizeof *r);
@@ -1419,6 +1555,7 @@ static void drv_push(juno_ctx *c, unsigned char m[3], int offset)
             r->id = juno_midi_entry_id(e);
             r->f = juno_midi_cc_value(e, m[2]);
         }
+        if (c->ui_cc < 0 && m[1] < 120) c->ui_cc = m[1];   /* the message's own record (core+512) */
     }
     juno_gui_wrapper_midi(c, m);
     if (c->drv_nq < DRV_QMAX) {
@@ -2033,10 +2170,12 @@ void juno_gui_set_engine_rate_setting(juno_ctx *c, int value)
     double r;
     int cur;
     if (!c) return;
+    value &= 0x7F;                    /* the model keeps the setting & 0x7F; its listener reads that */
     r = (double)JF(c->st, 16);                       /* rva 0x34B260: round, clamp */
     r = r >= 0.0 ? floor(r + 0.5) : ceil(r - 0.5);
     cur = !(r >= -2147483647.0) ? (int)0x80000001u : (r > 2147483647.0 ? 0x7FFFFFFF : (int)r);
     c->eng_req = juno_ro_setting_rate(value, cur, &c->eng_auto);
+    store_set(c, state_k(0x0FFFC015u), value);       /* the model's value (getState) */
     ro_switch(c);              /* a fresh start switches at once; else the next block */
 }
 
@@ -2217,39 +2356,55 @@ int juno_gui_plugin_init_model(juno_ctx *c)
     return JUNO_STATE_N;
 }
 
-static uint32_t be(const unsigned char *p, int n)
+/* `n` bytes at `off` of a stream of `len` bytes, big-endian, the low 32 bits
+ * kept (the deserializer's accumulator); 0 past the stream's end (an IBStream
+ * read of fewer bytes than asked leaves the rest of the plugin's zeroed vector) */
+static uint32_t be_at(const unsigned char *p, uint32_t len, uint32_t off, uint32_t n)
 {
-    uint32_t v = 0;
-    while (n--) v = (v << 8) | *p++;      /* the deserializer keeps the low 32 bits */
+    uint32_t v = 0, i;
+    for (i = 0; i < n; ++i)
+        v = (v << 8) | (off + i < len ? p[off + i] : 0u);    /* the low 32 bits are kept */
     return v;
 }
 
-/* IComponent::setState: `data` is the stream the plugin's getState writes -- a
- * big-endian byte count, then (id, value) entries, 4-byte big-endian fields (8
- * when the count exceeds (95 + 128) * 64 / 5: rva 0x321F20). Each entry whose
- * id is in the parameter list takes value & its storage mask (EXECUTED: 8, 7 or
- * 16 bits, or the value as given) and is applied in PAYLOAD order. The CC map
- * is emptied first (rva 0x31A4F0) and the MIDI-assign entries 0x10000000 + n
- * refill it (rva 0x31A6A0, CLAIMS A31): a payload without them leaves every CC
- * free. Unknown ids reach nothing. Returns the number of parameter entries
- * applied, -1 for an empty or short stream (the plugin returns kResultFalse and
- * sets nothing). */
+/* IComponent::setState (rva 0x34AAA0): `data` is the stream, `len` its length.
+ * The count's width is 8 bytes when the stream is longer than (95 + 128) x 64 /
+ * 5 = 2854 bytes, else 4 (rva 0x322330); its low 32 bits, as an int, are the
+ * payload's byte count: <= 0 -> kResultFalse, nothing set (-1). A payload the
+ * stream does not hold in full reads 0 past its end (the plugin's vector is
+ * zeroed; the SDK's stream reads what it has). The deserializer (rva 0x321F20)
+ * then reads (id, value) entries with fields of 8 bytes when the count exceeds
+ * 2854, else 4, keeping the low 32 bits. The CC map is emptied first (rva
+ * 0x31A4F0) and the MIDI-assign entries 0x10000000 + n refill it (rva 0x31A6A0,
+ * CLAIMS A31): a payload without them leaves every CC free. Each entry whose id
+ * is in the parameter list takes value & its storage mask (EXECUTED: 8, 7 or 16
+ * bits, or the value as given) and is applied in PAYLOAD order, to the model
+ * (the store getState writes) and to the engine. Unknown ids reach nothing; an
+ * entry of zeros (past the stream's end) is one. A last entry the count cuts
+ * short is read past the plugin's vector (undefined there) and skipped here.
+ * Returns the number of parameter entries applied, -1 for kResultFalse. */
 int juno_gui_state_load(juno_ctx *c, const unsigned char *data, int len)
 {
-    uint32_t n, off, w;
+    uint32_t hw, n, avail, off, w;
+    int32_t cnt;
     int k, applied = 0;
-    if (!c || !data || len < 4 || !ctx_model(c, 0)) return -1;
-    n = be(data, 4);
-    if (n == 0 || n > (uint32_t)len - 4) return -1;
+    if (!c || !data || len < 0 || !ctx_model(c, 0)) return -1;
+    hw = ((JUNO_STATE_N + 128) << 6) / 5 < len ? 8 : 4;
+    cnt = (int32_t)be_at(data, (uint32_t)len, 0, hw);
+    if (cnt <= 0) return -1;
+    n = (uint32_t)cnt;
+    avail = (uint32_t)len > hw ? (uint32_t)len - hw : 0;
+    data += (uint32_t)len > hw ? hw : (uint32_t)len;
     w = ((JUNO_STATE_N + 128) << 6) / 5 < (int)n ? 8 : 4;
     juno_ccmap_clear(&c->ccmap);              /* rva 0x31A4F0 (-1): the CC map emptied */
-    for (off = 0; off + 2 * w <= n; off += 2 * w) {
-        uint32_t id = be(data + 4 + off, (int)w);
-        int32_t v = (int32_t)be(data + 4 + off + w, (int)w);
+    for (off = 0; off + 2 * w <= n && off < avail; off += 2 * w) {   /* past the data: zeros, id 0 */
+        uint32_t id = be_at(data, avail, off, w);
+        int32_t v = (int32_t)be_at(data, avail, off + w, w);
         if (juno_ccmap_state_entry(&c->ccmap, id, v)) continue;   /* rva 0x31A6A0 */
         for (k = 0; k < JUNO_STATE_N && JUNO_STATE_ENT[k].id != id; ++k) ;
         if (k == JUNO_STATE_N) continue;
         if (JUNO_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask);
+        store_set(c, k, v);
         apply_event(c, JUNO_STATE_ENT[k].host, v);
         ++applied;
     }
@@ -2287,8 +2442,12 @@ int juno_gui_load_patch(juno_ctx *c, const unsigned char *bank, int len, int idx
     if (!ctx_model(c, bank)) return 0;
     r = bank + 23 + (size_t)idx * JUNO_REC_BYTES;
     memcpy(c->bank + 23, r, 16);          /* the patch's name: display only */
-    for (k = 0; k < JUNO_PATCH_EV_N; ++k)
-        apply_event(c, JUNO_PATCH_EV[k].host, rec_value(r, &JUNO_PATCH_EV[k]));
+    for (k = 0; k < JUNO_PATCH_EV_N; ++k) {
+        int32_t v = rec_value(r, &JUNO_PATCH_EV[k]);
+        int sk = state_k(JUNO_PATCH_EV[k].id);
+        if (sk >= 0) store_put(c, sk, v, 0);         /* the set from bytes: as decoded */
+        apply_event(c, JUNO_PATCH_EV[k].host, v);
+    }
     return JUNO_PATCH_EV_N;
 }
 
@@ -2313,9 +2472,30 @@ int juno_gui_queue_patch(juno_ctx *c, const unsigned char *bank, int len, int id
     c->drv_queue_mode = 0;
     return r;
 }
+/* A model edit of the parameter `id`, as the plugin's GUI makes one (its
+ * controls set the model: rva 0x283DB0): the store keeps value & its mask
+ * (getState), and the engine gets that value at the next block. (For a host-
+ * automatable parameter the plugin's listener tells the host instead, which
+ * sends the value back through process() -- the timing is the host's.) 0 for an
+ * id outside the state list. */
+int juno_gui_model_set(juno_ctx *c, uint32_t id, int32_t v)
+{
+    int k = c ? state_k(id) : -1;
+    if (k < 0) return 0;
+    store_set(c, k, v);
+    if (JUNO_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask);
+    c->drv_queue_mode = 1;
+    apply_event(c, JUNO_STATE_ENT[k].host, v);
+    c->drv_queue_mode = 0;
+    return 1;
+}
+
 void juno_gui_queue_host(juno_ctx *c, int host, int v)
 {
+    int k;
     if (!c) return;
+    for (k = 0; k < JUNO_STATE_N && JUNO_STATE_ENT[k].host != host; ++k) ;
+    if (k < JUNO_STATE_N && host != JUNO_SE_NONE) store_set(c, k, v);   /* the model's value (getState) */
     c->drv_queue_mode = 1;
     apply_event(c, host, v);
     c->drv_queue_mode = 0;

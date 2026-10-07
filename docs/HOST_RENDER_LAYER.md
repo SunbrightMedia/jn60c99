@@ -270,12 +270,43 @@ waits; getState writes map[n]'s record id or -1 (rva 0x319B90). The port: juno_c
 and the context's map (gui/juno_bridge.c). Gate: tools/verify/ccmap_state_gate.py; mutants:
 probes/host_api/ccmap_teeth.py.
 
-The core's second queue (core+512) and its drain (the conductor's slot 1, rva 0x320120) are NOT on
-the audio path: the drain runs on the plugin's UI timer (CUiThreadTimer, 50 ms; the core registers
-at initialize, rva 0x320420; the edit controller starts the timer) and, EXECUTED with the drain
-called directly (scratchpad drain probe, task #36): it adds no engine record; it applies the
-store records a mapped CC queues (kind 1: id, the CC's float value) to the parameter store getState
-reads, with the record value law (rva 0x31A940); it completes a waiting MIDI learn with the FIRST CC
-message it reads (rva 0x319C90: CC < 120; the record's old CC leaves the map, the CC's old record
-loses its CC). Host parameter records (process(), ids below the MIDI base) never reach that queue:
-the store does not follow host automation.
+The core's second queue (core+512) and its drain are not on the audio path: see the next section.
+
+## The state save, the UI timer's drain and MIDI learn (READ + EXECUTED, 2026-10-07; CLAIMS A32)
+
+IComponent::getState (rva 0x349EA0 -> 0x31FD90) writes a big-endian byte count, then (id, value)
+pairs as 4-byte big-endian fields: the 95 state entries in the record order, each with its model
+value (the record's vt+128), then the 128 CC map entries (rva 0x319B90). The model value -- the
+port's parameter STORE -- is set by initialize's defaults, setState (value & the entry's storage
+mask), the model's own edits (a GUI control or the engine-rate setting menu: the model's set,
+rva 0x283DB0, also value & mask), the patch browser's load (its set from the record's bytes keeps
+the value as decoded: EXECUTED with crafted records) and the UI timer's drain; never by process(): host automation does not reach it,
+and a host record changes no saved value (EXECUTED). Two entries set another (EXECUTED: every entry
+alone at four values, then every byte 0..255 in the gate): the LFO RATE and VCF CUTOFF bytes set
+their host-only float (0x00A00000, 0x00A02802) to byte x (1 / 255) in single precision; setting a
+float leaves its byte. The deserializer reads 8-byte fields when the payload is longer than
+(95 + 128) x 64 / 5 = 2854 bytes: a 4-byte payload of 357 entries is read with 8-byte fields.
+
+The drain is the core's slot 1 (rva 0x320120). The core registers with the plugin's UI timer
+(CUiThreadTimer, 50 ms) at initialize (rva 0x320420); the edit controller starts the timer. It reads
+the core's second queue (core+512), which only the MIDI push fills: for a mapped CC the store record
+(the core's slot 4, rva 0x347180 -> 0x3221F0: the id and the CC's float value; skipped while a GUI
+edit gesture is open, core+608) and every raw message. A store record goes through the record value
+law (rva 0x31A940) into the model; a CC message completes a waiting MIDI learn (rva 0x319C90: CC <
+120 only; the learning record's old CC leaves the map, the CC's old record loses its CC). It adds no
+engine record (EXECUTED). Notes, bend, aftertouch and unassigned CCs change no saved value. MIDI
+learn is armed from a control's menu (rva 0x31AA40: the record waits; the push's lookup gives none
+while it waits) or the menu's other choice forgets the control's CC (rva 0x3192E0). The port:
+juno_gui_state_save, juno_gui_ui_tick, juno_gui_cc_learn / _forget / _of and the store
+(gui/juno_bridge.c), juno_ccmap_learn_* (src/juno_midi.c). The port keeps the drain's queue bounded:
+one store record per parameter in the order of their latest push and the first CC message below 120
+-- a drain applies every record as an overwrite, so the result is the same (graded with repeated
+records). Gate: tools/verify/state_save_gate.py; mutants: probes/host_api/state_save_teeth.py.
+
+The stream's framing (rva 0x34AAA0 -> 0x322330), found by this gate: the COUNT field is 8 bytes
+when the whole stream is longer than 2854 bytes, else 4 (its low 32 bits, as an int; <= 0 ->
+kResultFalse, nothing set). The payload is a zeroed vector of that many bytes into which the
+stream's read puts what it holds (the SDK's memory stream reads short without error): a count past
+the data still empties the CC map and reads zeros (id 0: nothing). A stream of 2948 bytes whose
+count is 4 bytes is misread (its 8-byte count's low half is the payload's first word) and rejected
+when that word is 0. The port's state load (gui/juno_bridge.c juno_gui_state_load) is that law.

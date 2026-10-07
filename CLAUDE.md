@@ -126,10 +126,12 @@ mine is a hypothesis (playbook 80).
   flight (A29, boot_gate.py, from the first sample), and an engine-rate switch on a
   running engine, setSampleRate in place (A30, rate_switch_gate.py), and the MIDI
   CC map in the DAW state -- setState empties and refills it (A31,
-  ccmap_state_gate.py). Open (task #36, the host-call census): the state save
-  (getState: the parameter store), the UI-timer drain + MIDI learn. The web
-  app's WASM is not rebuilt with the converter yet (needs emcc). Engine:
-  PROVENANCE 32/32 PROVEN; full verify of
+  ccmap_state_gate.py), and the state save (getState byte for byte, setState's
+  stream framing), the UI-timer drain and MIDI learn (A32, state_save_gate.py).
+  Open (task #36, the host-call census): the edit controller's own state and
+  parameter list; a shared static buffer in the driver (multi-instance race,
+  task #41). The web app's WASM is not rebuilt with the converter yet (needs
+  emcc). Engine: PROVENANCE 33/33 PROVEN; full verify of
   cd63fc1 GREEN (job verify_fix3, EXIT 0, every section ran); ARM golden OK
   (job arm_golden_cd63, toolchain installed by apt in that container). The
   commits after cd63fc1 (A24..A31) carry their own gates; a full make verify

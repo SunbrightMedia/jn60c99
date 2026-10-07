@@ -136,3 +136,36 @@ int32_t juno_ccmap_state_value(const juno_ccmap *m, int cc)
     if (cc < 0 || cc > 127 || m->map[cc] < 0) return -1;
     return (int32_t)JUNO_MIDI_PARAM[m->map[cc]].id;
 }
+
+void juno_ccmap_learn_arm(juno_ccmap *m, int entry)
+{
+    m->learn = entry;
+}
+
+int juno_ccmap_learn_done(juno_ccmap *m, int cc)
+{
+    int r = m->learn, old;
+    if (r < 0 || r >= JUNO_CCMAP_RECS || cc >= 120 || cc < 0) return 0;
+    old = m->rec[r];                         /* the map's key of the record's old CC, erased */
+    if (old >= 0) m->map[old] = -1;
+    if (m->map[cc] >= 0) m->rec[m->map[cc]] = -1;
+    m->map[cc] = (int8_t)r;
+    m->rec[r] = (int8_t)cc;
+    m->learn = -1;
+    return 1;
+}
+
+void juno_ccmap_forget(juno_ccmap *m, int entry)
+{
+    int old;
+    if (entry < 0 || entry >= JUNO_CCMAP_RECS) return;
+    old = m->rec[entry];
+    if (old >= 0) m->map[old] = -1;
+    m->rec[entry] = -1;
+}
+
+int juno_ccmap_record_cc(const juno_ccmap *m, int entry)
+{
+    if (m->learn >= 0 || entry < 0 || entry >= JUNO_CCMAP_RECS) return -1;
+    return m->rec[entry];
+}

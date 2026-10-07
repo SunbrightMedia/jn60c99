@@ -71,6 +71,18 @@ int     juno_ccmap_state_entry(juno_ccmap *m, uint32_t id, int32_t v);
 int     juno_ccmap_lookup(const juno_ccmap *m, int cc);
 /* rva 0x319B90: getState's value for CC `cc`, the id of its record or -1. */
 int32_t juno_ccmap_state_value(const juno_ccmap *m, int cc);
+/* MIDI LEARN (READ + EXECUTED, CLAIMS A32). rva 0x31AA40: the record `entry`
+ * waits for a CC (the plugin's GUI arms it from a control's menu). */
+void    juno_ccmap_learn_arm(juno_ccmap *m, int entry);
+/* rva 0x319C90, for each CC message the UI timer's drain reads: none waits or
+ * cc >= 120 -> 0; else the waiting record's old CC leaves the map, the CC's old
+ * record loses its CC, CC `cc` drives the waiting record, none waits -> 1. */
+int     juno_ccmap_learn_done(juno_ccmap *m, int cc);
+/* rva 0x3192E0 (the menu's other choice): the record's CC leaves the map, the
+ * record has none. */
+void    juno_ccmap_forget(juno_ccmap *m, int entry);
+/* rva 0x319B70: the record's own CC, -1 when none or while a learn waits. */
+int     juno_ccmap_record_cc(const juno_ccmap *m, int entry);
 
 #ifdef __cplusplus
 }

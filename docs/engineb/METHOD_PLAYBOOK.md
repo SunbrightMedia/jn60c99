@@ -2813,3 +2813,25 @@ After a change to a path, re-run every mutant that names that path, not only the
 that stops biting means a gate lost reach: add the chain that restores it (here: a chain with no
 state load at all, the patch reloaded between CC pairs so no CC hides a later one) and move the
 tooth to the gate that now holds it.
+
+## 154. PORT THE CALLER'S FRAMING, NOT ONLY THE PARSER -- AND GRADE THE STREAMS NOBODY WRITES
+Paid 2026-10-07 (JUNO, the state save gate). The port's state load transcribed the deserializer
+(rva 0x321F20: 8-byte fields above 2854 payload bytes) and assumed a 4-byte count. The caller
+(setState, rva 0x34AAA0 -> 0x322330) picks the COUNT's width by the whole stream's length, and
+reads short streams into a zeroed vector. Every gate passed: the plugin's own getState writes 1788
+bytes, so no gate ever sent a long or short stream. The first test that built a long 8-byte
+payload failed -- the plugin rejected it, the port applied it.
+### The rule
+Transcribe a parser together with its caller's framing (counts, widths, short reads, error
+returns). Then grade the inputs the plugin itself never produces -- long, short, empty, cut,
+negative, past the data -- because a host or a hand-made preset will.
+
+## 155. A TOOTH RUN ON A RED GATE BITES FOR FREE -- A TEETH RUNNER CHECKS ITS BASELINE FIRST
+Paid 2026-10-07 (JUNO, the state save gate). The first teeth run of state_save_gate.py came while
+one chain already failed for the unmutated port (the stream framing, playbook 154): every mutant
+"bit" that chain, so 15 of 15 looked sharp. On the green gate four bit nothing (the store's mask,
+CC >= 120 offered to the learn, forget, the CC view in the save): no chain reached them.
+### The rule
+A mutant counts only where the unmutated port is green. Every teeth runner first runs its gate on
+the unmutated build and refuses to grade mutants while that baseline is red; a mutant that bites
+nothing on the green gate names a chain to add (or an equivalence to prove).
