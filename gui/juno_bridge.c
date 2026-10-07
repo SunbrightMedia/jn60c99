@@ -205,6 +205,7 @@ typedef struct {
     float *ro_tmp;             /* the converter's host samples of one segment (2 x ro_tmp_cap) */
     int   ro_tmp_cap;
     int   ro_unported;         /* a rate switch on a running engine was asked: B13b, not ported */
+    int   setup_rate;          /* the host rate setupProcessing stored (plugin_init: the create rate) */
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -261,6 +262,7 @@ static void drv_init(juno_ctx *c, float sample_rate)
     c->drv_tempo = 120.0;
     c->drv_tempo_valid = 0;
     c->drv_rate = (int)sample_rate;
+    c->setup_rate = (int)sample_rate;
     juno_ro_init(&c->ro, (int)sample_rate, (int)sample_rate);
     c->ro_model = 1;
     c->eng_req = (int)sample_rate;
@@ -2548,6 +2550,36 @@ int juno_gui_process(juno_ctx *c, const juno_host_note *ev, int nev, int tempo_v
                      float *outL, float *outR, int n)
 {
     return juno_gui_process_ex(c, ev, nev, 0, 0, tempo_valid, tempo, outL, outR, n);
+}
+
+/* IAudioProcessor::setupProcessing (rva 0x3CB150): the plugin stores the setup
+ * and nothing else; the next setActive applies its rate. */
+void juno_gui_setup_processing(juno_ctx *c, double host_rate)
+{
+    if (c) c->setup_rate = (int)host_rate;
+}
+
+/* IComponent::setActive, either way (rva 0x34AA50): the core's setup at the
+ * stored rate (rva 0x321AC0) -- the automatic engine-rate setting re-reads the
+ * engine's rate; the render object takes the rate (rva 0x3442D0, CLAIMS B13c)
+ * and is looked up for (engine rate, host rate) again: found, its buffers start
+ * from zeros and the tick phase and the note count go to 0 -- then the
+ * all-sound-off record (rva 0x3208E0: CC 120, offset 0, past the CC map; the
+ * engine's CC entry takes no 120, so it changes nothing). The engine itself is
+ * kept: a host-rate change on a running instance only swaps the converter. */
+void juno_gui_set_active(juno_ctx *c, int on)
+{
+    (void)on;
+    if (!c || c->ro_model) return;
+    if (c->eng_auto) c->eng_req = c->ro.engine;
+    c->drv_rate = c->setup_rate;
+    c->ro.host = c->setup_rate;
+    if (juno_ro_lookup(&c->ro) > 0) { c->drv_phase = 0; c->drv_notes = 0; }
+    if (c->drv_nq < DRV_QMAX) {
+        struct drv_rec *r = &c->drv_q[c->drv_nq++];
+        memset(r, 0, sizeof *r);
+        r->m[0] = 0xB0; r->m[1] = 120; r->m[2] = 0;
+    }
 }
 
 /* One host parameter queue's last point through the plugin's process() (rva

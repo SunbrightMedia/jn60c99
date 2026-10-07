@@ -203,14 +203,16 @@ def chains():
     return out
 
 
-def build_ref():
+def build_ref(chain_fn=None, ref_pkl=None):
+    """the plugin's side; chain_fn / ref_pkl: another gate's chains and reference (host_rate_gate)"""
     import host_process_emu as H
     import e2e_emu as E
+    REF = ref_pkl or REF_PKL
     bank = E.bank_bytes()
-    ref = {'_chains': chains()}
+    ref = {'_chains': (chain_fn or chains)()}
     only = [x[len('--only='):].split(',') for x in sys.argv if x.startswith('--only=')]
-    if only and os.path.exists(REF_PKL):              # the other chains from the existing reference
-        old = pickle.load(open(REF_PKL, 'rb'))
+    if only and os.path.exists(REF):                  # the other chains from the existing reference
+        old = pickle.load(open(REF, 'rb'))
         for ci, ch in enumerate(ref['_chains']):
             for oi, och in enumerate(old['_chains']):
                 if repr(och) == repr(ch) and oi in old:      # repr: a NaN value never equals itself
@@ -233,6 +235,10 @@ def build_ref():
                 pl = b''.join(struct.pack('>Ii', a, b) for a, b in stp[1])
                 if h.set_state(struct.pack('>I', len(pl)) + pl) != 0:
                     raise SystemExit('setState failed')
+            elif stp[0] == 'active':                  # IComponent::setActive
+                h.set_active(stp[1])
+            elif stp[0] == 'setup':                   # IAudioProcessor::setupProcessing (a new host rate)
+                h.setup_processing(stp[1])
             else:
                 _, n, evs, ctx, par = stp
                 c = dict(tempo=ctx[1], playing=True)
@@ -246,19 +252,20 @@ def build_ref():
             ci, name, rate, len(PL), max(abs(f(x)) for x in PL + PR)))
         sys.stderr.flush()
         del h
-    pickle.dump(ref, open(REF_PKL + '.partial', 'wb'))   # whole or nothing (playbook 142)
-    os.replace(REF_PKL + '.partial', REF_PKL)
-    print('wrote', REF_PKL)
+    pickle.dump(ref, open(REF + '.partial', 'wb'))       # whole or nothing (playbook 142)
+    os.replace(REF + '.partial', REF)
+    print('wrote', REF)
     return 0
 
 
-def check_port(tooth=None, only=None):
+def check_port(tooth=None, only=None, ref_pkl=None, title=None):
     import ctypes
     import freshlib
-    if not os.path.exists(REF_PKL):
-        print('MISSING %s -- run --ref first' % REF_PKL)
+    REF = ref_pkl or REF_PKL
+    if not os.path.exists(REF):
+        print('MISSING %s -- run --ref first' % REF)
         return 2
-    ref = pickle.load(open(REF_PKL, 'rb'))
+    ref = pickle.load(open(REF, 'rb'))
     lib = freshlib.load()
     V = ctypes.c_void_p
 
@@ -274,6 +281,8 @@ def check_port(tooth=None, only=None):
     lib.juno_gui_state.argtypes = [V]
     lib.juno_rr_settle.argtypes = [V]
     lib.juno_gui_unported.argtypes = [V]
+    lib.juno_gui_set_active.argtypes = [V, ctypes.c_int]
+    lib.juno_gui_setup_processing.argtypes = [V, ctypes.c_double]
     for fn, at in (('juno_gui_plugin_init', [V]), ('juno_gui_destroy', [V]),
                    ('juno_gui_set_engine_rate_setting', [V, ctypes.c_int]),
                    ('juno_gui_queue_state', [V, ctypes.c_char_p, ctypes.c_int]),
@@ -310,9 +319,18 @@ def check_port(tooth=None, only=None):
                 b = b''.join(struct.pack('>Ii', a, v) for a, v in stp[1])
                 b = struct.pack('>I', len(b)) + b
                 lib.juno_gui_queue_state(c, b, len(b))
+            elif stp[0] == 'active':
+                if tooth != 'no_active':                # tooth: the port's setActive dropped
+                    lib.juno_gui_set_active(c, stp[1])
+            elif stp[0] == 'setup':
+                lib.juno_gui_setup_processing(c, stp[1])
             else:
                 _, n, evs, ctx, par = stp
                 par = list(par)
+                if evs and not toothed[0] and tooth == 'late_note':   # the first note one sample late
+                    k_, off_, ch_, p_, v_ = evs[0]
+                    evs = [(k_, off_ + 1, ch_, p_, v_)] + list(evs[1:])
+                    toothed[0] = True
                 if par and not toothed[0] and tooth == 'late_record':
                     pid, off, v = par[0]
                     par[0] = (pid, off + 1, v)
@@ -344,7 +362,8 @@ def check_port(tooth=None, only=None):
         bad += bool(diff) or bool(unp)
     if tooth:
         return bad
-    print('\n=== MIDI CONTROLLERS (CLAIMS A26 / B16b): bend, mod, expression, the CC map, parameter records, sustain, all notes off -- plugin vs port ===')
+    print('\n=== %s ===' % (title or 'MIDI CONTROLLERS (CLAIMS A26 / A27): bend, mod, expression, the CC map, parameter '
+                              'records, sustain, all notes off -- plugin vs port'))
     print('GATE: %s' % ('FAIL' if bad else 'PASS'))
     return 1 if bad else 0
 

@@ -20,6 +20,7 @@ return address (rax = 0; the callers ignore the value).
 
 USE
     h = HostProcess(); h.start(48000.0, 512, setting=2)      # setting: vm.vs.sampleRate index or None
+    h.set_active(0); h.setup_processing(44100.0); h.set_active(1)   # a host-rate change while running
     L, R = h.process(512, events=[...], params=[...], ctx=dict(tempo=128.5, playing=True))
 events: ('on', offset, channel, pitch, velocity_float) / ('off', offset, channel, pitch, velocity_float)
 params: (param id, offset, value_double) -- the LAST point of a queue is what the plugin reads
@@ -219,6 +220,26 @@ class HostProcess(W.Wrapper):
         self._pc = self.new_obj('pchanges', queues=[])
         self._pq = []                               # reusable IParamValueQueue objects
         return self
+
+    def set_active(self, on):
+        """IComponent::setActive (rva 0x34AA50): the core's setup at the stored rate (rva 0x321AC0),
+        the all-sound-off record (rva 0x3208E0), the base"""
+        r = self.vcall(self.comp, 11, 1 if on else 0, count=4_000_000_000) & 0xFFFFFFFF
+        if r != 0:
+            raise RuntimeError('setActive -> 0x%x' % r)
+
+    def setup_processing(self, host_sr, max_block=None):
+        """IAudioProcessor::setupProcessing (rva 0x3CB150): the plugin stores the setup; the blocks
+        stay within the max block start() allocated"""
+        mb = self.max_block if max_block is None else max_block
+        if mb > self.max_block:
+            raise ValueError('max block %d above the %d start() allocated' % (mb, self.max_block))
+        setup = self.alloc_com(24)
+        self.uc.mem_write(setup, struct.pack('<iii4xd', 0, 0, mb, float(host_sr)))
+        r = self.vcall(self.audio, 7, setup, count=4_000_000_000) & 0xFFFFFFFF
+        if r != 0:
+            raise RuntimeError('setupProcessing -> 0x%x' % r)
+        self.host_sr = float(host_sr)
 
     def process(self, n, events=(), params=(), ctx=None):
         """one host block through the plugin's own process(); returns (Lbits, Rbits)"""
