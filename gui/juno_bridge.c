@@ -21,6 +21,7 @@
 #include "../src/reverb_recall.h"
 #include "../src/juno_state_tables.h"
 #include "../src/juno_conv.h"
+#include "../src/juno_midi.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -28,6 +29,10 @@
 /* a host note event as the plugin's process() reads it (VST3 Event: sample
  * offset, type 0 note-on / 1 note-off, channel, pitch, velocity 0..1) */
 typedef struct { int offset, type, channel, pitch; float velocity; } juno_host_note;
+/* the last point of one host parameter queue as the plugin's process() reads it
+ * (VST3 IParamValueQueue: the parameter id, the point's sample offset and its
+ * normalized value) */
+typedef struct { uint32_t id; int offset; double value; } juno_host_param;
 
 #define DRV_QMAX 1024             /* queued MIDI records per block (the plugin's vector grows; 1024 is
                                    * far above any host's events per block) */
@@ -161,7 +166,7 @@ typedef struct {
      * that restarts it (core+568), the tempo x 10 last given to the engine
      * (core+580, -1 at boot), the host tempo of the next blocks (process()
      * gives 120.0 when the host has none) and its valid flag, the host rate. */
-    struct drv_rec { int off, kind, host; int32_t v; unsigned char m[3]; } drv_q[DRV_QMAX], drv_carry[DRV_QMAX];
+    struct drv_rec { int off, kind, host; int32_t v; unsigned char m[3]; uint32_t id; float f; } drv_q[DRV_QMAX], drv_carry[DRV_QMAX];
     int   drv_nq, drv_ncarry;
     int   drv_queue_mode;       /* 1: apply_event queues a kind-2 record instead */
     long long drv_phase;
@@ -185,6 +190,7 @@ typedef struct {
     float *ro_tmp;             /* the converter's host samples of one segment (2 x ro_tmp_cap) */
     int   ro_tmp_cap;
     int   ro_unported;         /* a rate switch on a running engine was asked: B13b, not ported */
+    int   midi_unported;       /* a sustain (CC 64) or all-notes-off (CC 123) arrived: B16b, not ported */
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -966,6 +972,15 @@ void juno_gui_set_voice_count(juno_ctx *c, int n)
     if (c) juno_set_voice_count(c->st, n);
 }
 int juno_gui_voice_count(juno_ctx *c) { return c ? juno_voice_count(c->st) : 0; }
+
+/* The paths this context reached that the port does not model (each one an
+ * open claim): bit 0 an engine-rate switch on a running engine (CLAIMS B13b),
+ * bit 1 a sustain or all-notes-off message (CLAIMS B16b). A gate that sees a
+ * bit set must not report its chain as graded. */
+int juno_gui_unported(juno_ctx *c)
+{
+    return c ? (c->ro_unported ? 1 : 0) | (c->midi_unported ? 2 : 0) : 0;
+}
 /* voice v's own noise block (gates): see juno_driver_unit_noise */
 const void *juno_gui_unit_noise(juno_ctx *c, int v) { return c ? (const void *)juno_driver_unit_noise(c->st, v) : 0; }
 
@@ -1196,10 +1211,24 @@ void juno_gui_set_kbd_velocity(juno_ctx *c, int on)
 void juno_gui_wrapper_midi(const juno_ctx *c, unsigned char m[3]);
 
 /* The wrapper's push (rva 0x31F4E0) of one 3-byte message at a sample offset
- * of the next block: the velocity policy (juno_gui_wrapper_midi), then the
- * record into the queue the render driver applies. */
+ * of the next block: a CC the plugin's default map assigns to a parameter (rva
+ * 0x319A60, src/midi_tables.h) first queues that parameter's record (kind 1:
+ * its id and the CC byte over its range, rva 0x31A850); then, for every
+ * message, an assigned CC too, the velocity policy (juno_gui_wrapper_midi) and
+ * the message's own record (kind 0) into the queue the render driver applies. */
 static void drv_push(juno_ctx *c, unsigned char m[3], int offset)
 {
+    if ((m[0] & 0xF0) == 0xB0) {
+        int e = juno_midi_cc_entry(m[1]);
+        if (e >= 0 && c->drv_nq < DRV_QMAX) {
+            struct drv_rec *r = &c->drv_q[c->drv_nq++];
+            memset(r, 0, sizeof *r);
+            r->off = offset;
+            r->kind = 1;
+            r->id = juno_midi_entry_id(e);
+            r->f = juno_midi_cc_value(e, m[2]);
+        }
+    }
     juno_gui_wrapper_midi(c, m);
     if (c->drv_nq < DRV_QMAX) {
         struct drv_rec *r = &c->drv_q[c->drv_nq++];
@@ -1802,6 +1831,8 @@ void juno_gui_set_engine_rate_setting(juno_ctx *c, int value)
  * of host edits: a panel parameter through juno_gui_host_set (which drops a
  * value outside the database range), vm.vs.voiceCount stored for the render
  * (A21), everything else (patch name, view state) reaches no engine cell. */
+static void engine_host_entry(juno_ctx *c, int host, int32_t v);
+
 static void apply_event(juno_ctx *c, int host, int32_t v)
 {
     if (host == JUNO_SE_SRATE) {         /* the core's listener, at once (rva 0x3222F0) */
@@ -1818,6 +1849,14 @@ static void apply_event(juno_ctx *c, int host, int32_t v)
         }
         return;
     }
+    engine_host_entry(c, host, v);
+}
+
+/* The engine's host entry (CWaveGen vt+112, rva 0x3C7AE0): the voice count
+ * (vm.vs.voiceCount) to the engine's field; an id of its map to the units;
+ * any other id (the engine-rate setting among them) nothing. */
+static void engine_host_entry(juno_ctx *c, int host, int32_t v)
+{
     if (host >= 0) juno_gui_host_set(c, host, v);
     else if (host == JUNO_SE_VOICES) juno_gui_set_voice_count(c, v);
 }
@@ -2030,18 +2069,52 @@ int juno_gui_get_arp(juno_ctx *c)
 
 /* ---- THE RENDER DRIVER (rva 0x320B20, docs/HOST_RENDER_LAYER.md) --------- */
 
-/* One queued MIDI record through the engine (the consumer's switch): note-off
- * (vt+120) and note-on (vt+128) count down / up the note count core+568. The
- * other kinds (0xA0..0xE0, engine vt+136..+168) are the CC intake: not yet. */
+/* One queued record through the engine (the consumer's switch, rva 0x3211D6).
+ * Kind 2, a preset path's value: the engine's host entry (vt+112). Kind 1, a
+ * parameter record (a CC the map assigns; a host parameter through process()):
+ * the id map (rva 0x319AB0) gives its entry -- none, nothing -- and the host
+ * entry takes the entry's value (rva 0x31A940). Kind 0, a MIDI message by its
+ * status: note-off (vt+120) and note-on (vt+128) count down / up the note count
+ * core+568; CC (vt+136: rva 0x34AE90 -- 1 the mod wheel, 11 the expression,
+ * 64 the sustain, 123 all notes off, others nothing); pitch bend (vt+152: the
+ * 14 bits less 8192, as 16 bits); poly and channel aftertouch, program change
+ * (vt+160 / +168 / +144): empty functions. */
 static void apply_event(juno_ctx *c, int host, int32_t v);
+static void engine_host_entry(juno_ctx *c, int host, int32_t v);
+static void kb_sustain(juno_ctx *c, int on);
+static void kb_all_notes_off(juno_ctx *c);
+
+/* The keyboard object's sustain (CWaveGen vt+288, rva 0x3C7E20 -> 0x3C4E90)
+ * and all-notes-off (vt+296, rva 0x3C7DA0 -> 0x3C3A00): CLAIMS B16b, not
+ * ported -- the context records that one arrived. */
+static void kb_sustain(juno_ctx *c, int on) { (void)on; c->midi_unported = 1; }
+static void kb_all_notes_off(juno_ctx *c) { c->midi_unported = 1; }
+
+static void drv_cc(juno_ctx *c, int n, int v)
+{
+    switch (n) {
+    case 1:   juno_midi_mod(c->st, v); break;
+    case 11:  juno_midi_expression(c->st, v); break;
+    case 64:  kb_sustain(c, v != 0); break;
+    case 123: kb_all_notes_off(c); break;
+    default:  break;                       /* 10 (vt+272) and the rest: nothing */
+    }
+}
 
 static void drv_apply(juno_ctx *c, const struct drv_rec *r)
 {
     const unsigned char *m = r->m;
     if (r->kind == 2) { apply_event(c, r->host, r->v); return; }   /* the engine's host entry (vt+112) */
+    if (r->kind == 1) {
+        int e = juno_midi_entry(r->id);
+        if (e >= 0) engine_host_entry(c, juno_midi_entry_host(e), juno_midi_record_value(e, r->f));
+        return;
+    }
     switch (m[0] & 0xF0) {
     case 0x80: juno_gui_note_off(c, m[1]); c->drv_notes--; break;
     case 0x90: juno_gui_note_on(c, m[1], m[2]); c->drv_notes++; break;
+    case 0xB0: drv_cc(c, m[1], m[2]); break;
+    case 0xE0: juno_midi_bend(c->st, (uint16_t)(m[1] + ((m[2] - 64) << 7))); break;
     default: break;
     }
 }
@@ -2246,8 +2319,61 @@ int juno_gui_render(juno_ctx *c, float *out, int nframes)
  * (int)(float)(velocity x 127.0) & 0x7F -- pushed through the wrapper at their
  * sample offsets; the host tempo (tempo_valid = the ProcessContext's
  * kTempoValid) and the block through the render driver. outL / outR: n each. */
+int juno_gui_process_ex(juno_ctx *c, const juno_host_note *ev, int nev, const juno_host_param *par, int npar,
+                        int tempo_valid, double tempo, float *outL, float *outR, int n);
 int juno_gui_process(juno_ctx *c, const juno_host_note *ev, int nev, int tempo_valid, double tempo,
                      float *outL, float *outR, int n)
+{
+    return juno_gui_process_ex(c, ev, nev, 0, 0, tempo_valid, tempo, outL, outR, n);
+}
+
+/* One host parameter queue's last point through the plugin's process() (rva
+ * 0x34A380): an id below the MIDI-mapping base (core +48) becomes a parameter
+ * record (kind 1, rva 0x31F2C0: the value as a float); base + n becomes a MIDI
+ * message through the push -- n 0..127 the CC n with round(value x 127), 128
+ * channel aftertouch the same, 129 the pitch bend round(value x 16383) as two
+ * 7-bit bytes (rounded half away from zero, rva 0x3F2050; below 0 or NaN 0,
+ * above 255 / 65535 that), any other n three zero bytes. */
+static void proc_param(juno_ctx *c, const juno_host_param *p)
+{
+    int32_t id = (int32_t)p->id, base = (int32_t)juno_midi_base();
+    unsigned char m[3] = { 0, 0, 0 };
+    if (base > id) {
+        if (c->drv_nq < DRV_QMAX) {
+            struct drv_rec *r = &c->drv_q[c->drv_nq++];
+            memset(r, 0, sizeof *r);
+            r->off = p->offset;
+            r->kind = 1;
+            r->id = p->id;
+            r->f = (float)p->value;
+        }
+        return;
+    }
+    {
+        uint32_t d = (uint32_t)id - (uint32_t)base;
+        if (d <= 128u) {
+            double x = p->value * 127.0;
+            unsigned char b;
+            x = (x >= 0.0 || x != x) ? floor(x + 0.5) : ceil(x - 0.5);
+            b = !(x >= 0.0) ? 0 : (x > 255.0 ? 0xFF : (unsigned char)(int)x);
+            if (d < 128u) { m[0] = 0xB0; m[1] = (unsigned char)d; m[2] = b; }
+            else { m[0] = 0xD0; m[1] = b; }
+        } else if (d == 129u) {
+            double x = p->value * 16383.0;
+            unsigned w;
+            x = (x >= 0.0 || x != x) ? floor(x + 0.5) : ceil(x - 0.5);
+            w = !(x >= 0.0) ? 0u : (x > 65535.0 ? 0xFFFFu : (unsigned)(int)x & 0xFFFFu);
+            m[0] = 0xE0; m[1] = (unsigned char)(w & 0x7F); m[2] = (unsigned char)((w >> 7) & 0x7F);
+        }
+    }
+    drv_push(c, m, p->offset);
+}
+
+/* juno_gui_process with the host's parameter queues (one entry per queue: its
+ * last point, the one the plugin reads), after the note events, in queue
+ * order. */
+int juno_gui_process_ex(juno_ctx *c, const juno_host_note *ev, int nev, const juno_host_param *par, int npar,
+                        int tempo_valid, double tempo, float *outL, float *outR, int n)
 {
     drv_out o;
     int i;
@@ -2260,6 +2386,7 @@ int juno_gui_process(juno_ctx *c, const juno_host_note *ev, int nev, int tempo_v
         m[2] = (unsigned char)((int)(float)((double)v * 127.0) & 0x7F);
         drv_push(c, m, ev[i].offset);
     }
+    for (i = 0; i < npar; ++i) proc_param(c, &par[i]);
     c->drv_tempo_valid = tempo_valid != 0;
     c->drv_tempo = tempo_valid ? tempo : 120.0;
     memset(&o, 0, sizeof o);

@@ -2706,3 +2706,17 @@ neighbour fields), decide what that value is in the product's FP mode, show it c
 the machine, and port exactly that, with the out-of-range case named in a comment. Instrument the
 port to log every out-of-range index over the gate's chains, and prove the bound (here: the count
 is never below -1, so only index -1 is read).
+
+## 146. A HARNESS DEFAULT IS A PATH CHOICE -- CENSUS AN ENTRY THROUGH ITS REAL CALLER
+Paid 2026-10-07 (JUNO, the MIDI controllers). The first census of the bend / mod / expression
+leaves called the processor's dispatch through e2e_emu's `dispatch(unit, leaf, value, flag=1)`.
+The default flag 1 takes the setters' IMMEDIATE branch (rva 0x3C1090); the engine's own MIDI
+entries pass 0, the RAMPED branch (rva 0x3C10D0 -> 0x3C2920, time index 0 / 0 / 1). The census
+showed clean "immediate sets" with the right values; a port built from it would have set the
+cells at once where the plugin glides them. Found by reading the engine entry (`xor r8d, r8d`)
+and confirmed by a probe through the plugin's own process(): every set ramped.
+### The rule
+A census that enters below the plugin's real caller inherits the harness's defaults (flags,
+units, order) as silent choices. Census an entry through the caller the product runs (here
+process(); for engine entries at least the engine's vtable function), or name every argument the
+harness supplies and show the real caller passes the same.

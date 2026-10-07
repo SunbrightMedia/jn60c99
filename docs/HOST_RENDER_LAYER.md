@@ -67,6 +67,8 @@ engine render (CWaveGen vt+56)  rva 0x3C7400   voice workers + master (e2e_emu r
 | the render driver: events at offsets, the tick clock in 1e-8 host samples from round(tempo x 10), the grid restarted by the first key, ticks always, the tempo only when valid / changed / 40..300 | the same (gui/juno_bridge.c drv_block) -- **bit-exact, A24** |
 | the arp controller (SW / TYPE / STEP, the apply, the pattern reload at the next step) | the same (arp_sw / arp_type_set / arp_step_set, src/carp.c carp_ctl_config) -- **bit-exact, A24** |
 | the start-up: ~274 ramps per unit in flight after the boot | starts settled -- **open, B15** |
+| MIDI controllers through process(): bend, mod wheel, expression, the 51 default CC assignments, parameter records (every host id below the MIDI base), aftertouch / program change (empty) | the same (juno_gui_process_ex, src/juno_midi.c, src/midi_tables.h) -- **bit-exact, A26** |
+| sustain (CC 64, a HOLD in the keyboard object) and all-notes-off (CC 123, the assigner's) | flagged unported (juno_gui_unported bit 1) -- **open, B16b** |
 
 ## The arp controller (READ + EXECUTED, 2026-10-07)
 
@@ -140,5 +142,32 @@ taps forward then backward in float and is scaled by (float)L; the counters wrap
    (setSampleRate in place, rva 0x3C7A20).
 3. B15: the start-up as the plugin boots (its build at 96000, its ramps in flight); gate from
    the first sample.
-4. MIDI CC / channel aftertouch / pitch bend intake (process() re-encoding + the engine's
-   vt+136 / +152 / +160 / +168).
+4. DONE (A26): MIDI CC / channel aftertouch / pitch bend intake (process() re-encoding, the
+   push's CC map, the parameter records, the engine's vt+136 / +152 / +160 / +168). B16b: the
+   keyboard object's sustain (CC 64) and the assigner's all-notes-off (CC 123).
+
+## The MIDI controller intake (READ + EXECUTED, 2026-10-07; CLAIMS A26 / B16b)
+
+- process() (rva 0x34A380): host events first (notes), then one record per parameter queue (its
+  last point), in queue order. An id below the base (core +48 = 0x0FFFC100) -> a parameter record
+  (kind 1, rva 0x31F2C0, the value as a float). base + n: n 0..127 CC n with data round(v x 127)
+  (half away from zero, rva 0x3F2050; below 0 or NaN 0, above 255 255), 128 channel aftertouch
+  (data1 the same), 129 bend round(v x 16383) (below 0 or NaN 0, above 65535 65535) as two 7-bit
+  bytes, any other n a message of three zero bytes. All through the push (rva 0x31F4E0).
+- The push: a CC its map assigns (rva 0x319A60; the boot's map: 51 CCs, no learn slot open)
+  first queues a parameter record (the parameter's id, the CC byte over its range: rva 0x31A850,
+  rounded or -- entry byte +16 -- truncated); then the message's own record, for every message.
+- The driver (rva 0x3211D6): kind 1 -> the id map (rva 0x319AB0) -> the engine's host entry
+  (vt+112) with round(min + (max - min) x v) (rva 0x31A940); an id the map lacks, nothing. Kind
+  0: 0xB0 vt+136 (rva 0x34AE90: 1 mod, 10 empty, 11 expression, 64 sustain, 123 all notes off),
+  0xE0 vt+152 with (lsb + ((msb - 64) << 7)) as 16 bits, 0xA0 / 0xC0 / 0xD0 empty functions.
+- The engine's host entry with the engine-rate setting's id does nothing: only the model's
+  listener switches the rate, and process() does not touch the model.
+- Bend (rva 0x3C7390): clamped as an int16 to -8192..8191 (rva 0x3C4FD0), dispatch 493 flag 0
+  -> every voice's sub-objects +25 / +33 (rva 0x35BBD0 / 0x359440): curve 26 at bend + 8192,
+  ramped (time index 0) on cells 4112 / 7456. Mod (rva 0x3C7E70, 0..127 only): curve 22 on 4000 /
+  7376, time index 0. Expression (rva 0x3C7DD0, 0..127 only): curve 18 on the master's 101136,
+  time index 1. The processor keeps each value (+1160 / +1164 / +1168); nothing on the gated
+  paths re-sends them (a patch load and a voice-count change after a bend: bit-exact).
+- The product's units: the voice units' assigners follow the engine's voice count (6), the
+  master's stays at 8 (EXECUTED, sus_probe.py): its allocation differs and is never rendered.

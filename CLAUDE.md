@@ -118,9 +118,12 @@ mine is a hypothesis (playbook 80).
   (A24) and the render object -- the 96 kHz engine of the default setting, the
   converter, silence outside the rate table (A25) -- are ported and bit-exact
   through the plugin's own process() (host_process_gate.py, 21 chains;
-  docs/HOST_RENDER_LAYER.md). Open: a rate switch on a running engine (B13b),
-  the start-up transient (B15), CC / bend intake. The web app's WASM is not
-  rebuilt with the converter yet (needs emcc). Engine: PROVENANCE 27/27 PROVEN; full verify of
+  docs/HOST_RENDER_LAYER.md); so are the MIDI controllers -- bend, mod wheel,
+  expression, the 51 default CC assignments, parameter records (A26,
+  midi_ctl_gate.py). Open: a rate switch on a running engine (B13b), the
+  start-up transient (B15), sustain CC 64 + all-notes-off CC 123 (B16b). The web
+  app's WASM is not rebuilt with the converter yet (needs emcc). Engine:
+  PROVENANCE 29/29 PROVEN; full verify of
   cd63fc1 GREEN (job verify_fix3, EXIT 0, every section ran); ARM golden OK
   (job arm_golden_cd63, toolchain installed by apt in that container). Later commits are docs only. The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
