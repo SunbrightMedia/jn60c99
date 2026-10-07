@@ -2745,3 +2745,17 @@ bite either: no arp step fell inside the window after the change.
 A tooth (harness or mutant) must act where its effect is observable: after the start-up mute,
 inside a window longer than the effect's period, on a patch whose envelope can show it. Before
 reading "DID NOT BITE" as "equivalent", check where the tooth acted.
+
+## 149. A SILENT CHAIN GRADES NOTHING -- READ EVERY CHAIN'S PEAK BEFORE BELIEVING IT
+Paid 2026-10-07 (JUNO, boot_gate). The chain meant to grade units 6 and 7 resuming their boot
+ramps (the voice count raised to 8) passed bit-exact with a peak of 1.6e-13: its chord came in the
+block of the count change, and the render's preamble that applies a new count resets every
+assigner after the block's events -- plugin and port both drop the notes. A port-only probe of the
+same steps (count 6 kept: the chord sounds; count 8 or 4: silence) found the cause in minutes.
+The same day a mutant setting every boot start to 0 did not bite: the 22 starts other than 0 are
+all on ramps of 4 ms, which end inside the unit's 960-sample mute before any DSP reads them --
+equivalent on the output, said so with the reason, not hidden.
+### The rule
+Print each chain's peak (and where its sound starts) with the reference and look at it: a chain
+that is silent, or quieter than its purpose needs, is a reach gap even when it is bit-exact. Fix
+the chain, rebuild only that chain (--only), and say in the claim what the old chain did.

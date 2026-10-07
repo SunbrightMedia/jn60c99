@@ -224,10 +224,14 @@ def build_ref(chain_fn=None, ref_pkl=None):
         h = H.HostProcess()
         h.start(rate, 4096, setting=setting)
         payload = h.get_state()
-        h.process(PRELUDE)
-        h.snap_all()
+        raw = bool(steps) and steps[0] == ('raw',)   # from the first sample: no prelude, no settle
+        if not raw:
+            h.process(PRELUDE)
+            h.snap_all()
         PL, PR = [], []
         for stp in steps:
+            if stp[0] == 'raw':
+                continue
             if stp[0] == 'patch':
                 rec = bank[HEADER + stp[1] * STRIDE: HEADER + (stp[1] + 1) * STRIDE]
                 h.load_patch(rec[NAME:])
@@ -305,15 +309,21 @@ def check_port(tooth=None, only=None, ref_pkl=None, title=None):
         c = lib.juno_gui_create(ctypes.c_float(rate), 0)
         lib.juno_set_fp_oracle_mode(1)        # after create, which sets the production FTZ
         lib.juno_gui_plugin_init(c)
-        pl = ref['_payload'][ci]
-        lib.juno_gui_queue_state(c, pl, len(pl))
-        L0, R0 = (ctypes.c_float * PRELUDE)(), (ctypes.c_float * PRELUDE)()
-        lib.juno_gui_process_ex(c, (Note * 1)(), 0, (Param * 1)(), 0, 0, 120.0, L0, R0, PRELUDE)
-        lib.juno_rr_settle(lib.juno_gui_state(c))
+        raw = bool(steps) and steps[0] == ('raw',)
+        if raw and tooth == 'settled_start':  # tooth: the port before CLAIMS B15 (it started settled)
+            lib.juno_rr_settle(lib.juno_gui_state(c))
+        if not raw:                           # the plugin side's state (a raw chain sets none)
+            pl = ref['_payload'][ci]
+            lib.juno_gui_queue_state(c, pl, len(pl))
+            L0, R0 = (ctypes.c_float * PRELUDE)(), (ctypes.c_float * PRELUDE)()
+            lib.juno_gui_process_ex(c, (Note * 1)(), 0, (Param * 1)(), 0, 0, 120.0, L0, R0, PRELUDE)
+            lib.juno_rr_settle(lib.juno_gui_state(c))
         PL, PR = [], []
         toothed = [False]
         nblk = [0]
         for stp in steps:
+            if stp[0] == 'raw':
+                continue
             if stp[0] == 'patch':
                 lib.juno_gui_queue_patch(c, bankb, len(bankb), stp[1])
             elif stp[0] == 'state':

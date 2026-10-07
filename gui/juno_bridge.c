@@ -2142,6 +2142,7 @@ int juno_gui_plugin_init(juno_ctx *c)
     juno_ro_init(&c->ro, 96000, c->drv_rate);
     if (juno_ro_lookup(&c->ro) > 0) { c->drv_phase = 0; c->drv_notes = 0; }
     juno_engine_no_setsr(c->st);
+    juno_rr_boot(c->st);               /* the build's ramps still in flight (CLAIMS B15) */
     plugin_defaults(c, 1);
     /* initialize's core setup (rva 0x320420) sets the wrapper's velocity switch
      * from vm.vs.velSense, whose default is 1 (Script.xml; EXECUTED:

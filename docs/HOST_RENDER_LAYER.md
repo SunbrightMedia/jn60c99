@@ -67,7 +67,7 @@ engine render (CWaveGen vt+56)  rva 0x3C7400   voice workers + master (e2e_emu r
 | a host-rate change on a running instance (setActive / setupProcessing): the engine kept, the render object looked up again | the same (juno_gui_setup_processing, juno_gui_set_active) -- **bit-exact, A28** |
 | the render driver: events at offsets, the tick clock in 1e-8 host samples from round(tempo x 10), the grid restarted by the first key, ticks always, the tempo only when valid / changed / 40..300 | the same (gui/juno_bridge.c drv_block) -- **bit-exact, A24** |
 | the arp controller (SW / TYPE / STEP, the apply, the pattern reload at the next step) | the same (arp_sw / arp_type_set / arp_step_set, src/carp.c carp_ctl_config) -- **bit-exact, A24** |
-| the start-up: ~274 ramps per unit in flight after the boot | starts settled -- **open, B15** |
+| the start-up: 274 ramps per unit in flight after the boot (the build at 96000), the stopped units' kept | the same (src/boot_ramps.h, juno_rr_boot in juno_gui_plugin_init) -- **bit-exact from the first sample, A29** (the default setting) |
 | MIDI controllers through process(): bend, mod wheel, expression, the 51 default CC assignments, parameter records (every host id below the MIDI base), aftertouch / program change (empty) | the same (juno_gui_process_ex, src/juno_midi.c, src/midi_tables.h) -- **bit-exact, A26** |
 | sustain (CC 64, a HOLD in the keyboard object) and all-notes-off (CC 123, the assigner's) | the same (gui/juno_bridge.c, the keyboard block) -- **bit-exact, A27** |
 
@@ -141,8 +141,9 @@ taps forward then backward in float and is scaled by (float)L; the counters wrap
 2. DONE (A25): the engine-rate setting, the table, the converter, the silence object, the
    product start at 96000, the switch on a fresh start. B13b: the switch on a running engine
    (setSampleRate in place, rva 0x3C7A20).
-3. B15: the start-up as the plugin boots (its build at 96000, its ramps in flight); gate from
-   the first sample.
+3. DONE (A29): the start-up as the plugin boots (its build at 96000, its ramps in flight), gated
+   from the first sample (boot_gate.py). Not graded from the first sample: a setting that
+   switches the engine at the first block.
 4. DONE (A26): MIDI CC / channel aftertouch / pitch bend intake (process() re-encoding, the
    push's CC map, the parameter records, the engine's vt+136 / +152 / +160 / +168). DONE (A27): the
    keyboard object's sustain (CC 64) and the assigner's all-notes-off (CC 123).
@@ -212,3 +213,17 @@ held key's later note-off takes the count below 0) -- then the all-sound-off rec
 CC 120 at offset 0, written past the CC map; the engine's CC entry takes no 120). The engine is not
 touched: a DAW's rate change keeps every voice, ramp and FX state and swaps only the converter.
 The driver's tick period reads the host rate from the render object (core +108).
+
+## The start-up (READ + EXECUTED, 2026-10-07; CLAIMS A29)
+
+The constructor sets 96000 before the engine's build; the build arms its cells' ramps from their
+value before it (0 for most; CONDITION's scatter cells from their C = 0 values) toward the built
+value. No block renders before the host's first process(), so the product start runs 274 ramp
+records per unit from the first sample: unmoved, rate 96000, subdivision 10, time index 0 for 264
+cells, 5 for cell 6736 + 10512 v, 1 for the expression 101136, 8 for 10759376 -- the same on every
+unit and at host 44100 / 48000 / 96000 (probes/boot/boot_ramp_census.py). The units the voice
+count stops do not pump theirs; a later count resumes the ramps and the 960-sample mute together.
+A note in the block of a voice-count change is lost: the render's preamble that applies the count
+resets every assigner after the block's events. Port: src/boot_ramps.h (tools/verify/gen_boot_ramps.py),
+juno_rr_boot (src/recall_ramp.c) in juno_gui_plugin_init. Gate: tools/verify/boot_gate.py (7 chains
+from the first sample); mutants: probes/boot/boot_teeth.py.

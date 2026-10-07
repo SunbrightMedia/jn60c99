@@ -22,6 +22,7 @@
 #include "delay_recall.h"      /* juno_lfx1_value */
 #include "reverb_recall.h"     /* juno_reverb_hplp, juno_reverb_level_on */
 #include "ramp_cells.h"
+#include "boot_ramps.h"
 #include <string.h>
 
 /* The ramped setter's time table (rva 0x9DEB50, READ + EXECUTED: 16 floats);
@@ -417,6 +418,34 @@ int juno_rr_active(const unsigned char *state)
 {
     unsigned char *st = (unsigned char *)state;
     return HDR(st, H_MAGIC) == RR_MAGIC ? (int)HDR(st, H_NACT) : 0;
+}
+
+/* The product start (CLAIMS B15): the plugin's constructor builds its engine
+ * at 96000 and leaves 274 ramps per unit in flight (src/boot_ramps.h, read from
+ * the booted plugin: the same on every unit and at every host rate while the
+ * engine-rate setting is the default). Each cell goes back to the start its
+ * build arm read (0 for most) and is armed toward the value the port's build
+ * wrote, at the time index the census named, through the transcribed ramp
+ * start. A record's stored target before that arm only decides whether the arm
+ * acts (its fields come from start, target and time alone): the build's record
+ * held 0, or -- for the three ramps toward 0 -- the value an earlier build arm
+ * had left; anything but the target stands in for it. The units the voice count
+ * stops keep theirs in flight (juno_rr_pump). */
+void juno_rr_boot(unsigned char *st)
+{
+    int k;
+    if (HDR(st, H_MAGIC) != RR_MAGIC) rr_seed(st);
+    for (k = 0; k < JUNO_BOOT_RAMP_N; ++k) {
+        uint32_t cell = JUNO_BOOT_RAMP[k].cell;
+        int i = index_of(cell);
+        float target, start;
+        if (i < 0) continue;                       /* every boot cell is a ramped cell */
+        target = JF(st, cell);
+        memcpy(&start, &JUNO_BOOT_RAMP[k].start, 4);
+        JF(st, cell) = start;
+        rec_at(st, i)->target = (target == 0.0f) ? 1.0f : 0.0f;
+        arm_rec(st, i, target, JUNO_BOOT_RAMP[k].t);
+    }
 }
 
 #else   /* EB_DEVCELLS: the device recall stays settled */

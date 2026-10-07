@@ -50,6 +50,9 @@ typedef struct {
 } juno_rr_ctx;
 
 void juno_rr_reset(unsigned char *state);   /* juno_engine_prepare: records re-seed at the next recall */
+/* The product start (CLAIMS B15): the ramps the plugin's 96000 build leaves in
+ * flight, armed on the port's freshly built state (src/boot_ramps.h). */
+void juno_rr_boot(unsigned char *state);
 void juno_rr_begin(unsigned char *state, juno_rr_ctx *ctx);
 void juno_rr_end(unsigned char *state, const juno_rr_ctx *ctx);
 void juno_rr_settle(unsigned char *state);
