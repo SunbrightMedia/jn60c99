@@ -1,5 +1,6 @@
 """The MIDI controller intake's teeth (CLAIMS B16): midi_ctl_gate.py --port against mutated builds
-of the port, each a defect the gate must see. Builds each mutant in a temporary directory (the tree
+of the port, each a defect the gate must see (the controllers, CLAIMS A26; the sustain and
+all notes off, CLAIMS B16b). Builds each mutant in a temporary directory (the tree
 is not touched), loads it in this process only (libjuno only: two-process rule), runs the gate's
 port check, prints how many chains each mutant breaks.
 
@@ -37,6 +38,25 @@ MUTANTS = [
      'if (e >= 0) { if (juno_midi_entry_host(e) == JUNO_SE_SRATE) juno_gui_set_engine_rate_setting(c, '
      'juno_midi_record_value(e, r->f)); else engine_host_entry(c, juno_midi_entry_host(e), '
      'juno_midi_record_value(e, r->f)); }'),
+    ('damper', 'the sustain as a damper: a new key with no key down does not free the held notes',
+     'gui/juno_bridge.c', '    if (c->kb_sus_note && !kbm_any(c, KB_DOWN)) {\n        int i;\n        for (i = 127; i >= 0; --i) {\n            int o = c->kb_order[i];',
+     '    if (0) {\n        int i;\n        for (i = 127; i >= 0; --i) {\n            int o = c->kb_order[i];'),
+    ('no_alias_127', 'the press-order walk skipping an empty slot (no index -1, key 127 kept down)',
+     'gui/juno_bridge.c', '            if (kbm_has(c, KB_LATCH, k)) { synth_note_off(c, k & 0xFF); kbm_clear(c, KB_LATCH, k); }',
+     '            if (k >= 0 && kbm_has(c, KB_LATCH, k)) { synth_note_off(c, k & 0xFF); kbm_clear(c, KB_LATCH, k); }'),
+    ('arp_no_hold', 'the arp sustain ignored: a key released under the pedal leaves the arp',
+     'gui/juno_bridge.c', '    if (c->kb_sus_arp) kbl_add(&c->kb_arp_latch, k);\n    else arp_dispatch',
+     '    if (0) kbl_add(&c->kb_arp_latch, k);\n    else arp_dispatch'),
+    ('release_keeps', 'the pedal\'s release not freeing the held notes',
+     'gui/juno_bridge.c', '    if (!on) kb_free_note_latch(c, (signed char)c->kb_flag8);', '    (void)0;'),
+    ('cc123_no_flag', 'CC 123 without the held flag the last gate-off leaves (1856 stays)',
+     'gui/juno_bridge.c', '    if (any) juno_note_broadcast_held(c->st, 0);\n}', '    (void)any;\n}'),
+    ('cc123_keeps_mask', 'CC 123 keeping the assigner\'s held-note mask',
+     'gui/juno_bridge.c', '    c->held_notes[0] = c->held_notes[1] = c->held_notes[2] = c->held_notes[3] = 0;\n    c->legato_mask = 0;\n    if (any)',
+     '    c->legato_mask = 0;\n    if (any)'),
+    ('switch_no_hold_transfer', 'the arp switch-on leaving the held notes out of the arp',
+     'gui/juno_bridge.c', '            if (kbm_has(c, KB_LATCH, k)) kb_arp_key_on(c, k, c->kb_vel[k]);',
+     '            if (0) kb_arp_key_on(c, k, c->kb_vel[k]);'),
     ('params_first', 'the parameter queues pushed before the note events',
      'gui/juno_bridge.c', '    for (i = 0; i < npar; ++i) proc_param(c, &par[i]);\n', ''),
 ]

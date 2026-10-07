@@ -122,7 +122,8 @@ def chains():
     #    down at a release (the plugin clears its down state through index -1); the key-trig flag
     #    1 (descending release order); a voice steal released down to the stolen key
     ON, OFF = 1.0, 0.0
-    st = [('patch', 9), E(ev=[ev_on(0, 60, 0.8), ev_on(0, 64, 0.7), ev_on(0, 67, 0.6)])] + [E()] * 2
+    SUSTAIN = [(0x00600048, 255), (0x00600052, 255), (0x0060004A, 90), (0x00600054, 90)]   # ENV1/2 SUSTAIN, RELEASE
+    st = [('patch', 0), ('state', SUSTAIN), E(ev=[ev_on(0, 60, 0.8), ev_on(0, 64, 0.7), ev_on(0, 67, 0.6)])] + [E()] * 2
     st += [E(par=[cc(64, ON, 10)])] + [E()]
     st += [E(ev=[ev_off(20, 60), ev_off(21, 64), ev_off(22, 67)])] + [E()] * 3
     st += [E(ev=[ev_on(30, 72, 0.9)])] + [E()] * 2 + [E(ev=[ev_off(0, 72)])] + [E()] * 2
@@ -142,6 +143,12 @@ def chains():
     st += [E(ev=steal)] + [E()] * 2
     st += [E(ev=[ev_off(k, n) for k, n in enumerate((43, 47, 50, 53, 57, 60, 64))])] + [E()] * 3
     st += [E(ev=[ev_off(0, 40)])] + [E()] * 4
+    # a key left held with no voice: six keys, a seventh steals the newest voice and goes up,
+    # then the five voiced keys go up -- the held flag (1856) follows the gated voices
+    st += [E(ev=[ev_on(k, n, 0.8) for k, n in enumerate((40, 43, 47, 50, 53, 57))])] + [E()] * 2
+    st += [E(ev=[ev_on(0, 60, 0.8)])] + [E()] * 2 + [E(ev=[ev_off(0, 60)])] + [E()] * 2
+    st += [E(ev=[ev_off(k, n) for k, n in enumerate((40, 43, 47, 50, 53))])] + [E()] * 6
+    st += [E(ev=[ev_off(0, 57)])] + [E()] * 4
     out.append(('sus', 48000.0, None, st))
     # 9. the sustain in the arp route and across the arp switch: keys released under it keep
     #    the arp running; a new key with no key in the arp frees the held keys; the release frees
@@ -149,7 +156,7 @@ def chains():
     #    (held notes become held arp keys)
     T2 = (True, 128.0)
     A = lambda n=256, ev=(), par=(): ('blk', n, list(ev), T2, list(par))
-    st = [('patch', 9), ('state', [(0x00600108, 1)]), A(ev=[ev_on(0, 60, 0.8), ev_on(0, 64, 0.8)])] + [A()] * 6
+    st = [('patch', 0), ('state', SUSTAIN + [(0x00600108, 1)]), A(ev=[ev_on(0, 60, 0.8), ev_on(0, 64, 0.8)])] + [A()] * 6
     st += [A(par=[cc(64, ON, 0)]), A(ev=[ev_off(3, 60), ev_off(4, 64)])] + [A()] * 10
     st += [A(ev=[ev_on(0, 67, 0.7)])] + [A()] * 8 + [A(ev=[ev_off(0, 67)])] + [A()] * 6
     st += [A(par=[cc(64, OFF, 0)])] + [A()] * 6
@@ -157,13 +164,13 @@ def chains():
     st += [A(ev=[ev_off(0, 65)])] + [A()] * 3
     st += [('state', [(0x00600108, 0)])] + [A()] * 6
     st += [A(ev=[ev_on(0, 69, 0.6)])] + [A()] * 3 + [A(ev=[ev_off(0, 69)])] + [A()] * 2
-    st += [('state', [(0x00600108, 1)])] + [A()] * 8
+    st += [('state', [(0x00600108, 1)])] + [A()] * 60
     st += [A(par=[cc(64, OFF, 0)])] + [A()] * 4 + [A(ev=[ev_off(0, 62)])] + [A()] * 6
     st += [('state', [(0x00600108, 0)])] + [A()] * 3
     out.append(('sus_arp', 44100.0, None, st))
     # 10. all notes off (CC 123): held keys, held notes (sustain), a running arp; keys released and
     #     played after it; a MONO and a UNISON patch with the pedal and CC 123
-    st = [('patch', 9), E(ev=[ev_on(0, 60, 0.8), ev_on(0, 64, 0.8)])] + [E()] * 3
+    st = [('patch', 0), ('state', SUSTAIN), E(ev=[ev_on(0, 60, 0.8), ev_on(0, 64, 0.8)])] + [E()] * 3
     st += [E(par=[cc(123, 0.0, 40)])] + [E()] * 3 + [E(ev=[ev_off(0, 60), ev_on(9, 67, 0.7)])] + [E()] * 3
     st += [E(par=[cc(64, ON, 0)]), E(ev=[ev_off(0, 64), ev_off(0, 67)]), E(), E(par=[cc(123, 0.5, 0)])]
     st += [E()] * 2 + [E(ev=[ev_on(0, 72, 0.6)])] + [E()] * 2 + [E(par=[cc(64, OFF, 0)])] + [E()] * 2
@@ -171,8 +178,11 @@ def chains():
     st += [('state', [(0x00600108, 1)]), ('blk', 256, [ev_on(0, 57, 0.8)], T2, [])] + [A()] * 6
     st += [A(par=[cc(123, 1.0, 100)])] + [A()] * 8 + [A(ev=[ev_off(0, 57)])] + [A()] * 4
     st += [('state', [(0x00600108, 0)])] + [E()] * 2
+    st += [('patch', 15), ('state', SUSTAIN), E(ev=[ev_on(0, 40, 0.8)])] + [E()] * 2
+    st += [E(par=[cc(123, 0.0, 0)])] + [E()] * 2 + [E(ev=[ev_on(0, 52, 0.8)])] + [E()] * 3
+    st += [E(ev=[ev_off(0, 52)])] + [E()] * 6 + [E(ev=[ev_off(0, 40)])] + [E()] * 3
     for patch in (15, 61):
-        st += [('patch', patch), E(ev=[ev_on(0, 48, 0.8), ev_on(0, 55, 0.8)])] + [E()] * 2
+        st += [('patch', patch), ('state', SUSTAIN), E(ev=[ev_on(0, 48, 0.8), ev_on(0, 55, 0.8)])] + [E()] * 2
         st += [E(par=[cc(64, ON, 0)]), E(ev=[ev_off(0, 55)]), E(), E(ev=[ev_off(0, 48)]), E()]
         st += [E(ev=[ev_on(0, 52, 0.7)])] + [E()] * 2 + [E(par=[cc(123, 0.0, 0)])] + [E()] * 2
         st += [E(ev=[ev_on(0, 59, 0.7), ev_off(5, 52)])] + [E()] + [E(par=[cc(64, OFF, 0)])] + [E()] * 2
@@ -197,7 +207,7 @@ def build_ref():
         old = pickle.load(open(REF_PKL, 'rb'))
         for ci, ch in enumerate(ref['_chains']):
             for oi, och in enumerate(old['_chains']):
-                if och == ch and oi in old:
+                if repr(och) == repr(ch) and oi in old:      # repr: a NaN value never equals itself
                     ref[ci] = old[oi]
                     ref.setdefault('_payload', {})[ci] = old['_payload'][oi]
     for ci, (name, rate, setting, steps) in enumerate(ref['_chains']):
