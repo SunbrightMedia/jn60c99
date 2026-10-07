@@ -16,10 +16,15 @@
  * ticks emit. */
 static int scenario(int gate_index, int wait_for_gate_close, int *off_vel_out)
 {
-    carp e; carp_init(&e); carp_set_gate_index(&e, gate_index);
-    carp_add_key(&e, 60, 100);
+    carp e;
     carp_event ev[16];
     int got_on = 0, gate_closed = 0, offv = -1, n, i, t;
+    /* switched on as the controller does it; the beat re-latch spent first */
+    carp_init(&e);
+    e.ctl_on = 1; carp_ctl_config(&e); carp_ctl_config(&e); carp_enable(&e);
+    for (t = 0; t < 12; ++t) carp_engine_tick(&e, NULL, ev, 16);
+    carp_set_gate_index(&e, gate_index);
+    carp_add_key(&e, 60, 100);
     for (t = 0; t < 400; ++t) {
         n = carp_engine_tick(&e, NULL, ev, 16);
         for (i = 0; i < n; ++i) {

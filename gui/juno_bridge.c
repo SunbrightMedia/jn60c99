@@ -81,8 +81,9 @@ typedef struct {
     unsigned char kb_vel[128];
     int   kb_order[128];
     unsigned char kb_trig_mode, kb_trig_pending, kb_flag8;
-    int   host_role;       /* 1 while a host edit runs its allocator half: the arp
-                            * switch then moves the keys as the plugin's does */
+    int   host_role;       /* 1 while a host edit runs its allocator half: the
+                            * recall model's arp block stays out (the host entry
+                            * calls the controller's own setter instead) */
 
     /* LFO RATE front-panel byte of the loaded patch (blob 8), stashed so a host
      * tempo change can recompute the tempo-synced LFO rate (cell 1072). The
@@ -137,12 +138,11 @@ typedef struct {
     int   bank_len;
     int   patch_idx;
 
-    /* Last raw SCATTER TYPE/DEPTH handed to carp_set_scatter, so a live edit can
-     * skip the arp reconfig when the patch's arp settings are unchanged (the
-     * reconfig resets the pattern selector to step 0 — audible restart on every
-     * slider move otherwise). calloc zero-init == carp_init's (0,0) default. */
-    int   last_scatter_type;
-    int   last_scatter_depth;
+    /* The recall model's last ARPEGGIO TYPE / STEP (raw), so a live edit runs a
+     * setter only for a changed value (ctx_alloc_recall). calloc zero-init ==
+     * the controller as built. */
+    int   rm_arp_type;
+    int   rm_arp_step;
     int   kbd_velocity_sw;   /* the wrapper velocity switch (vm.vs.velSense): 0 = force vel 100
                               * (the wrapper's rule, see juno_gui_midi_note_on) */
     int   live_recall;       /* 1 while juno_gui_apply_bank_live runs: the recall
@@ -1045,6 +1045,26 @@ void juno_gui_arp_trace(juno_ctx *c, int *buf, int cap)
 }
 int juno_gui_arp_trace_count(juno_ctx *c) { return c ? c->arp_trace_n : 0; }
 
+/* Debug: the arp's fields in the plugin's CKbdArp / keyboard-object order, for
+ * the render-driver diagnostic (probes/host_render/diag_driver.py). out[32]. */
+int juno_gui_arp_debug(juno_ctx *c, int *out)
+{
+    const carp *e;
+    int s;
+    if (!c || !out) return 0;
+    e = &c->arp;
+    out[0] = (int)e->kb_ctr;          out[1] = e->beat_requant_armed;   out[2] = e->division;
+    out[3] = e->clk_on;               out[4] = (int)e->clk20;           out[5] = (int)e->tick_counter;
+    out[6] = e->state;                out[7] = (int)e->next_step_tick; out[8] = e->pat_step;
+    out[9] = e->count;                out[10] = e->sel_step;            out[11] = e->started;
+    out[12] = e->ud_dir;              out[13] = e->oct_adv_flag;        out[14] = e->oct_shift;
+    out[15] = e->range;               out[16] = e->selector;            out[17] = e->field56;
+    for (s = 0; s < 4; ++s) { out[18 + s] = e->sorted[s]; out[22 + s] = e->slot_pitch[s] < 0 ? 0x80 : e->slot_pitch[s];
+                              out[26 + s] = (int)e->slot_offtick[s]; }
+    out[30] = e->pat_nslots;          out[31] = e->pat_len;
+    return 32;
+}
+
 /* Public note-on: feeds the arp's held-key set when enabled, else the synth.
  * This is the ENGINE/router-level entry (the oracle's NOTEON equivalent) — the
  * verification gates drive it directly with raw velocities, exactly as they
@@ -1201,66 +1221,102 @@ void juno_gui_set_tempo(juno_ctx *c, float bpm)
     c->drv_tempo_valid = 1;
 }
 
-void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, float gate)
+/* The arp controller's switch, rva 0x3C49F0 (ARPEGGIO SW: dispatch 831 with
+ * v != 0; TYPE and STEP re-run it with force when their value changes). Only a
+ * change acts, or force. ON runs the config twice (for TYPE, for STEP) before
+ * anything moves; then the keyboard's route (+4) and the arp's own switch (rva
+ * 0x3C3450 -> 0x3BE3B0); then the keys. ON releases every key the keyboard
+ * sounds on the voices (its voice map +1048, key order) and hands it to the arp
+ * at the key's velocity: that map is empty while the arp is already on (a key
+ * pressed then goes to the arp), so a forced re-run moves no key. OFF: the arp
+ * goes idle (its sounding notes off) and drops its keys, then every key it held
+ * plays again as a note -- highest first at velocity 100 when the key-trig flag
+ * is set, else in press order, oldest first, at the key's own velocity. (The
+ * switch's hold, which would keep released keys latched, is never set through
+ * the engine: no hold path, so the latched list stays empty.) */
+static void arp_sw(juno_ctx *c, int on, int force)
 {
-    int was, type;
-    if (!c) return;
-    was = c->arp_on;
-    /* UI mode (0=up,1=down,2=up&down) -> CArpeggio TYPE (0=UP,1=UP&DOWN,2=DOWN). */
-    type = (mode == 1) ? CARP_TYPE_DOWN : (mode == 2) ? CARP_TYPE_UPDOWN : CARP_TYPE_UP;
-    carp_set_mode(&c->arp, type);
-    /* UI octaves 1..3 -> ARPEGGIO STEP 0..2 (carp_set_range maps step->range). */
-    carp_set_range(&c->arp, (oct < 1 ? 1 : (oct > 3 ? 3 : oct)) - 1);
-    if (bpm > 0.0f) juno_gui_set_tempo(c, bpm);   /* the host tempo (render driver) */
-    if (gate >= 0.0f) carp_set_gate_index(&c->arp, gate_frac_to_index(gate));
-    c->arp_on = on ? 1 : 0;
-    if (was != c->arp_on && c->host_role) {
-        /* THE PLUGIN'S SWITCH (an ARPEGGIO SW host edit, rva 0x3C49F0): ON
-         * releases every pressed key's note and hands the key to the arp, in key
-         * order; OFF plays every key the arp still holds again as a note --
-         * highest first at velocity 100 when the key-trig flag is set, else in
-         * press order, oldest first, at the key's own velocity. (The switch's
-         * hold, which would keep released keys latched, is never set through
-         * the engine: no hold path, so the latched list stays empty.) */
-        int k;
-        if (c->arp_on) {
+    carp *e = &c->arp;
+    int k, was = c->arp_on;
+    if (e->ctl_on == on && !force) return;
+    e->ctl_on = on;
+    if (on) {
+        if ((unsigned)e->ctl_type <= 5) carp_ctl_config(e);
+        if ((unsigned)e->ctl_step <= 5) carp_ctl_config(e);
+    }
+    c->arp_on = on;
+    if (on) {
+        carp_enable(e);
+        if (!was)
             for (k = 0; k < 128; ++k)
                 if (c->held_notes[k >> 5] & (1u << (k & 31))) {
                     synth_note_off(c, k);
-                    carp_add_key(&c->arp, k, c->kb_vel[k]);
+                    carp_add_key(e, k, c->kb_vel[k]);
                 }
-            carp_arm_beat_requant(&c->arp);
+    } else {
+        unsigned char held[128];
+        carp_event ev[64];
+        for (k = 0; k < 128; ++k) held[k] = e->note_active[k];
+        arp_dispatch(c, ev, carp_disable(e, ev, 64));
+        if (c->kb_flag8 == 1 || c->kb_flag8 == 2) {
+            for (k = 0; k < 128; ++k) {
+                int key = c->kb_flag8 == 1 ? 127 - k : k;
+                if (held[key]) synth_note_on(c, key, 100);
+            }
         } else {
-            /* the arp first (rva 0x3C3450 -> 0x3BE3B0): idle, its sounding
-             * notes off, its key lists cleared; then the keys it held play
-             * again as notes */
-            unsigned char held[128];
-            carp_event ev[64];
-            for (k = 0; k < 128; ++k) held[k] = c->arp.note_active[k];
-            arp_dispatch(c, ev, carp_disable(&c->arp, ev, 64));
-            if (c->kb_flag8 == 1 || c->kb_flag8 == 2) {
-                for (k = 0; k < 128; ++k) {
-                    int key = c->kb_flag8 == 1 ? 127 - k : k;
-                    if (held[key]) synth_note_on(c, key, 100);
-                }
-            } else {
-                for (k = 127; k >= 0; --k) {
-                    int key = c->kb_order[k];
-                    if (key >= 0 && held[key]) synth_note_on(c, key, c->kb_vel[key]);
-                }
+            for (k = 127; k >= 0; --k) {
+                int key = c->kb_order[k];
+                if (key >= 0 && held[key]) synth_note_on(c, key, c->kb_vel[key]);
             }
         }
-        c->arp_cur = -1;
-    } else if (was != c->arp_on) {           /* the recall model's toggle: flush everything */
+    }
+    if (was != on) c->arp_cur = -1;
+}
+
+/* ARPEGGIO TYPE (rva 0x3C4E50, dispatch 832) and ARPEGGIO STEP (rva 0x3C49B0,
+ * dispatch 833): 0..5 only; a new value re-runs the switch with force; while the
+ * arp is on, the config once more. While it is off the value only waits for the
+ * next switch-on. The config never touches the selector's index, its "started"
+ * flag or the UP&DOWN direction: a new TYPE swaps the selector and the pattern
+ * reloads at the next step (PROVEN, probes/host_render/arp_cfg_probe.py). */
+static void arp_type_set(juno_ctx *c, int v)
+{
+    carp *e = &c->arp;
+    if ((unsigned)v > 5) return;
+    if (e->ctl_type != v) { e->ctl_type = v; arp_sw(c, e->ctl_on, 1); }
+    if (e->ctl_on) carp_ctl_config(e);
+}
+
+static void arp_step_set(juno_ctx *c, int v)
+{
+    carp *e = &c->arp;
+    if ((unsigned)v > 5) return;
+    if (e->ctl_step != v) { e->ctl_step = v; arp_sw(c, e->ctl_on, 1); }
+    if (e->ctl_on) carp_ctl_config(e);
+}
+
+/* Configure the arpeggiator (UI convenience). on: 0/1. mode: 0=up,1=down,
+ * 2=up&down (the UI/patch convention). oct: 1..3. bpm: host tempo (<=0 keeps
+ * the current tempo). gate: note-on fraction 0..1, quantised to the machine's
+ * GATE table (<0 keeps current; the next config takes the pattern's gate
+ * again). Goes through the plugin's own controller: TYPE, STEP, then the
+ * switch. Outside a host edit a toggle first flushes every voice and the arp's
+ * keys (the recall model's toggle). */
+void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, float gate)
+{
+    if (!c) return;
+    if (bpm > 0.0f) juno_gui_set_tempo(c, bpm);   /* the host tempo (render driver) */
+    if ((on != 0) != c->arp_on && !c->host_role) {
         synth_note_off(c, -1);
         carp_remove_key(&c->arp, -1);
         c->arp_cur = -1;
-        /* Enabling the arp arms the one-shot beat-quantize re-latch (plugin sets
-         * router+6 at the controller SW method): the first 24-PPQN beat boundary
-         * re-quantizes the step grid to the beat. Matches the plugin's own arp
-         * schedule for the factory arp presets (tools/verify/arp_sched_ab.py). */
-        if (c->arp_on) carp_arm_beat_requant(&c->arp);
     }
+    /* UI mode (0=up,1=down,2=up&down) -> ARPEGGIO TYPE (0=UP,1=UP&DOWN,2=DOWN);
+     * UI octaves 1..3 -> ARPEGGIO STEP 0..2 */
+    arp_type_set(c, (mode == 1) ? CARP_TYPE_DOWN : (mode == 2) ? CARP_TYPE_UPDOWN : CARP_TYPE_UP);
+    arp_step_set(c, (oct < 1 ? 1 : (oct > 3 ? 3 : oct)) - 1);
+    arp_sw(c, on != 0, 0);
+    if (gate >= 0.0f) carp_set_gate_index(&c->arp, gate_frac_to_index(gate));
 }
 
 /* Core recall: apply patch `idx` from `bank` into the engine coefficient slots
@@ -1338,7 +1394,7 @@ static int ctx_state_recall(juno_ctx *c, unsigned char *st, const unsigned char 
 static void ctx_alloc_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush,
                              const unsigned char *settled)
 {
-    int mode = 0, oct = 1, on, porta = 0, old_mode;
+    int porta = 0, old_mode;
     old_mode = c->assign_mode;
     juno_bank_voice_modes(bank, idx, &c->legato, &c->assign_mode, &porta);
     c->portamento_on = (porta != 0);
@@ -1385,33 +1441,34 @@ static void ctx_alloc_recall(juno_ctx *c, const unsigned char *bank, int idx, in
         c->legato_mask = 0;                   /* assigner+68, zeroed by the mode-change
                                                  path sub_7FF91DFB49F0 */
     }
-    /* Per-patch ARPEGGIATOR recall: on/mode/range come from the patch (bit-exact,
-     * see juno_bank_arp); rate stays local (the plugin's arp is host-tempo-synced,
-     * no per-patch rate). This makes "arp presets" arpeggiate on load.
-     * On a LIVE EDIT (flush=0) the reconfig is SKIPPED when the recalled arp
-     * settings equal the running state: juno_gui_arp_config -> carp_set_mode
-     * unconditionally resets the pattern selector to step 0, so re-running it on
-     * every slider move audibly restarted the arpeggio mid-pattern. When the edit
-     * DID change an arp setting (SW/TYPE/STEP sliders), the reset is the correct
-     * mode-change semantics and runs as before. */
-    {
-        int stype = 0, sdepth = 0;
-        int cur_mode = (c->arp.type == 0) ? 0 : (c->arp.type == 1) ? 2 : 1;
-        int cur_oct  = c->arp.range + 1;
-        on = juno_bank_arp(bank, idx, &mode, &oct);
+    /* Per-patch ARPEGGIATOR recall (the recall MODEL; a host-role edit drives the
+     * controller itself, juno_gui_host_set): the record's ARPEGGIO SW / TYPE /
+     * STEP through the plugin's controller in the order the arp gates' oracle
+     * calls it (tools/verify/arp_sched_ab.py), every one on a patch LOAD, only a
+     * changed one on a live edit (a TYPE / STEP setter run while the arp is on
+     * clears the octave offset and reloads the pattern: an unrelated slider must
+     * not). A toggle first flushes every voice and the arp's keys. SCATTER TYPE /
+     * DEPTH (leaf 92/93, record byte 322/330) through their setters (dispatch
+     * 834/835) -- INFERRED for the recall model: the plugin's state and patch
+     * loads never send them (src/juno_state_tables.h), and all 64 factory
+     * patches hold (0,0), which the setters leave as built. */
+    if (!c->host_role) {
+        int on, sw = 0, typ = 0, step = 0, stype = 0, sdepth = 0;
+        juno_bank_arp_raw(bank, idx, &sw, &typ, &step);
         juno_bank_scatter(bank, idx, &stype, &sdepth);
-        if (flush || on != c->arp_on || mode != cur_mode || oct != cur_oct
-                  || stype != c->last_scatter_type || sdepth != c->last_scatter_depth) {
-            juno_gui_arp_config(c, on, mode, oct, -1.0f, -1.0f);  /* keep UI bpm/gate */
-            /* Per-patch SCATTER pattern grid: SCATTER TYPE/DEPTH (proven leaf 92/93
-             * -> record byte 322/330) select the arp's STEP x SLOT grid. All 64
-             * factory patches decode to (0,0) = the default slab0/sub7 grid. Applied
-             * AFTER arp_config (which resets the selector) so the pattern load lands
-             * last. See scratchpad/oracle/scatter_recall_spec.md. */
-            carp_set_scatter(&c->arp, stype, sdepth);
-            c->last_scatter_type = stype;
-            c->last_scatter_depth = sdepth;
+        on = sw != 0;
+        if (on != c->arp_on) {
+            synth_note_off(c, -1);
+            carp_remove_key(&c->arp, -1);
+            c->arp_cur = -1;
         }
+        if (flush || on != c->arp.ctl_on) arp_sw(c, on, 0);
+        if (flush || typ != c->rm_arp_type) arp_type_set(c, typ);
+        if (flush || step != c->rm_arp_step) arp_step_set(c, step);
+        carp_ctl_scatter_type(&c->arp, stype, 0);
+        carp_ctl_scatter_depth(&c->arp, sdepth, 0);
+        c->rm_arp_type = typ;
+        c->rm_arp_step = step;
     }
     /* Per-patch TEMPO-SYNCED LFO rate (cell 1072): stash the LFO RATE byte so a later
      * host tempo change (juno_gui_arp_config with bpm > 0) recomputes 1072 =
@@ -1643,6 +1700,23 @@ void juno_gui_host_set(juno_ctx *c, int i, int v)
         (!strcmp(juno_host_param_name(i), "HPF TYPE") || !strcmp(juno_host_param_name(i), "ARPEGGIO SW"))) v = (v != 0);
     if (v < juno_host_param_min(i) || v > juno_host_param_max(i)) return;
 #ifndef EB_DEVCELLS
+    if (i == host_index("ARPEGGIO SW") || i == host_index("ARPEGGIO TYPE") || i == host_index("ARPEGGIO STEP")) {
+        /* the arp row: the host entry calls the controller's own setter (rva
+         * 0x3C7AE0, dispatch 831..833); its engine cells are the apply's sends
+         * (dispatch 312..318, src/host_edit.c), the record keeps the value */
+        if (!(juno_host_edit_known(i) && host_edit_live(c, rec, i, v))) {
+            juno_host_param_encode(rec, i, v);
+            c->host_role = 1;
+            ctx_recall(c, c->bank, c->patch_idx, 0);
+            c->host_role = 0;
+        }
+        if (i == host_index("ARPEGGIO SW")) arp_sw(c, v != 0, 0);
+        else if (i == host_index("ARPEGGIO TYPE")) arp_type_set(c, v);
+        else arp_step_set(c, v);
+        c->rm_arp_type = host_val(rec, "ARPEGGIO TYPE");
+        c->rm_arp_step = host_val(rec, "ARPEGGIO STEP");
+        return;
+    }
     if (juno_host_edit_known(i) && host_edit_live(c, rec, i, v)) return;
     if (!strcmp(juno_host_param_name(i), "OCTAVE SHIFT")) {
         juno_host_param_encode(rec, i, v);

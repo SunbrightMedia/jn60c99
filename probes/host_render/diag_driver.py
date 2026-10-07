@@ -29,6 +29,37 @@ def chain(ci):
     return G.chains()[ci]
 
 
+ARP_NAMES = ['kb_ctr', 'requant', 'division', 'clk_on', 'clk20', 'clk24', 'state', 'next_step', 'pat_step',
+             'count', 'sel_step', 'started', 'ud_dir', 'oct_adv', 'oct_shift', 'range', 'selector', 'field56',
+             'sorted0', 'sorted1', 'sorted2', 'sorted3', 'pitch0', 'pitch1', 'pitch2', 'pitch3',
+             'off0', 'off1', 'off2', 'off3', 'nslots', 'pat_len']
+
+
+def arp_fields(h):
+    """unit 0's keyboard object (engine+120) and CKbdArp (engine+112), the port's carp order"""
+    uc = h.uc
+    q = lambda a: struct.unpack('<Q', uc.mem_read(a, 8))[0]
+    i32 = lambda a: struct.unpack('<i', uc.mem_read(a, 4))[0]
+    u8 = lambda a: uc.mem_read(a, 1)[0]
+    s8 = lambda a: struct.unpack('<b', uc.mem_read(a, 1))[0]
+    kb, arp = q(h.HOST + 120), q(h.HOST + 112)
+    sel_fn = q(arp + 3480) - E_IB()
+    sel = {0x3BEFC0: 0, 0x3BE6E0: 3, 0x3BE850: 19, 0x3BE5C0: 20}.get(sel_fn, sel_fn)
+    out = [i32(kb), u8(kb + 6), u8(kb + 5), u8(arp + 197), i32(arp + 20), i32(arp + 24), i32(arp + 44), i32(arp + 3048),
+           i32(arp + 3056), i32(arp + 3320), i32(arp + 3464), u8(arp + 3460), u8(arp + 3461), u8(arp + 3468),
+           i32(arp + 3472), i32(arp + 3476), sel, i32(arp + 56)]
+    out += [s8(arp + 3064 + k) for k in range(4)]
+    out += [u8(arp + 806 + 12 * k) for k in range(4)]
+    out += [i32(arp + 812 + 12 * k) for k in range(4)]
+    out += [s8(arp + 3054), s8(arp + 3055)]
+    return out
+
+
+def E_IB():
+    import e2e_emu as E
+    return E.IB
+
+
 def ref(ci, nstep):
     import host_process_emu as H
     import e2e_emu as E
@@ -37,6 +68,8 @@ def ref(ci, nstep):
     h = H.HostProcess()
     h.start(rate, 4096, setting=G.SETTING[rate])
     payload = h.get_state()
+    h.process(G.PRELUDE)
+    h.snap_all()
     out = []
     for si, stp in enumerate(steps[:nstep]):
         if stp[0] == 'patch':
@@ -55,7 +88,7 @@ def ref(ci, nstep):
                     parts.append(bytes(h.uc.mem_read(h.state[v] + a, b - a)))
             for a, b in WR.master_ranges():
                 parts.append(bytes(h.uc.mem_read(h.state[8] + a, b - a)))
-            out.append((si, l, r, zlib.compress(b''.join(parts), 6)))
+            out.append((si, l, r, zlib.compress(b''.join(parts), 6), arp_fields(h)))
     pickle.dump({'ci': ci, 'payload': payload, 'blocks': out}, open(PKL, 'wb'))
     print('wrote %s: %d blocks' % (PKL, len(out)))
 
@@ -91,6 +124,10 @@ def port(ci, nstep):
     c = lib.juno_gui_create(ctypes.c_float(rate), 0)
     lib.juno_gui_plugin_init(c)
     lib.juno_gui_queue_state(c, d['payload'], len(d['payload']))
+    L0, R0 = (ctypes.c_float * G.PRELUDE)(), (ctypes.c_float * G.PRELUDE)()
+    lib.juno_gui_process(c, (Note * 1)(), 0, 0, 120.0, L0, R0, G.PRELUDE)
+    lib.juno_rr_settle.argtypes = [V]
+    lib.juno_rr_settle(lib.juno_gui_state(c))
     # word index -> (unit, offset) for the report
     where = []
     for v in range(8):
@@ -117,7 +154,7 @@ def port(ci, nstep):
             lib.juno_gui_process(c, arr, len(evs), valid, tempo, L, R, n)
             gl = list(struct.unpack('<%dI' % n, bytes(L)))
             gr = list(struct.unpack('<%dI' % n, bytes(R)))
-            rsi, wl, wr, wst = d['blocks'][bi]
+            rsi, wl, wr, wst, warp = d['blocks'][bi]
             bi += 1
             stp_ = lib.juno_gui_state(c)
             parts = []
@@ -135,6 +172,12 @@ def port(ci, nstep):
                 si, bi - 1, n, len(evs), ctx, 'ok' if not da else '%d differ from %d' % (len(da), da[0]),
                 'ok' if not len(dd) else '%d words differ: %s' % (len(dd), ' '.join(
                     'u%d+%d plug %08x port %08x' % (where[x][0], where[x][1], int(want[x]), int(got[x])) for x in dd[:6]))))
+            ga = (ctypes.c_int * 32)()
+            lib.juno_gui_arp_debug(c, ga)
+            ga = list(ga)
+            adiff = [(ARP_NAMES[k], warp[k], ga[k]) for k in range(32) if warp[k] != ga[k]]
+            if adiff and os.environ.get('DIAG_ARP'):
+                print('      arp fields differ (name, plugin, port):', adiff)
             if (len(dd) or da) and si >= int(os.environ.get('DIAG_FROM', '0')):
                 break
 

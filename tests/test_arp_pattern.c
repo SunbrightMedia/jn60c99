@@ -80,6 +80,8 @@ static int run_cfg(const char *name, int selType, int stype, int depth, int rang
 {
     carp e;
     carp_init(&e);
+    carp_set_rate_index(&e, 4);              /* the config's rate and gate (rva 0x3C0EC0) */
+    carp_set_gate_index(&e, 7);
     carp_set_scatter(&e, stype, depth);
     carp_set_mode(&e, selType);
     carp_set_range(&e, range);

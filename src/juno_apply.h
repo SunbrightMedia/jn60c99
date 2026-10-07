@@ -42,6 +42,7 @@ float       juno_apply_param_leaf(unsigned char *state, int i, int byte, int Hr)
  * *mode (0=up,1=down,2=up&down) and *oct (1..3). Rate is host-tempo-synced in the
  * plugin (no per-patch value), so it is not returned. */
 int juno_bank_arp(const unsigned char *bank, int idx, int *mode, int *oct);
+int juno_bank_arp_raw(const unsigned char *bank, int idx, int *sw, int *type, int *step);
 
 /* Decode the per-patch SCATTER TYPE (0..9 -> arp pattern slab) and SCATTER DEPTH
  * (-7..7 -> pattern sub = depth+7), which select the arpeggiator's STEP x SLOT

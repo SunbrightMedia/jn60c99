@@ -106,15 +106,17 @@ def ev_off(off, pitch, vel=0.5, ch=0):
     return ('off', off, ch, pitch, vel)
 
 
-SETTLE = [('blk', 512, [], None)] * 12     # 6144 samples: the plugin's start-up ramps finish (CLAIMS B15)
+PRELUDE = 512     # one block inside the 960-sample start-up mute (no voice DSP runs), then every
+                  # ramp settled on both sides: the plugin's unsettled start-up is CLAIMS B15
 
 
 def chains():
     """(name, host rate, steps); a step: ('blk', n, events, ctx) with ctx None (no
     ProcessContext) or (valid, tempo); ('patch', factory index); ('state', [(id, v)]).
-    Every chain begins with SETTLE: the plugin starts with ~274 ramps per unit in flight
-    (its build and sample-rate setup, no settle), the port from the settled engine; that
-    start-up transient is CLAIMS B15, graded separately."""
+    Every chain starts after PRELUDE: the plugin starts with ~274 ramps per unit in flight
+    (its build at the ctor's 96000 and its sample-rate setup, never settled) and the port from
+    the settled engine; one muted block (the engine-rate change, the initial records) then a
+    settle on both sides isolates the render driver from that start-up (CLAIMS B15)."""
     out = []
     for rate in (48000.0, 44100.0, 96000.0):
         B = 512
@@ -134,7 +136,7 @@ def chains():
         st += [('state', [(ARP_SW, 1)])] + [('blk', B, [], T2)] * 10
         st += [('state', [(ARP_TYPE, 2), (ARP_STEP, 2)])] + [('blk', B, [], T2)] * 10
         st += [('blk', B, [ev_off(5, 55), ev_off(6, 62), ev_off(7, 67)], T2)] + [('blk', B, [], T2)] * 6
-        out.append(('main', rate, SETTLE + st))
+        out.append(('main', rate, st))
     # odd block sizes, tempos x.3 / absent / below 40 BPM / 300+, offsets past the block
     for rate in (48000.0, 44100.0):
         st = [('patch', 9)]
@@ -147,7 +149,7 @@ def chains():
         T4 = (True, 300.04)
         st += [('blk', 777, [ev_on(1, 60, 0.4)], T4)] + [('blk', 777, [], T4)] * 10
         st += [('blk', 512, [ev_off(0, 52), ev_off(0, 57), ev_off(0, 60)], (False, 150.0))] + [('blk', 512, [], (False, 150.0))] * 6
-        out.append(('odd', rate, SETTLE + st))
+        out.append(('odd', rate, st))
     return out
 
 
@@ -160,6 +162,8 @@ def build_ref():
         h = H.HostProcess()
         h.start(rate, 4096, setting=SETTING[rate])
         payload = h.get_state()
+        h.process(PRELUDE)                    # the engine-rate change + the initial records, muted
+        h.snap_all()                          # harness settle (as every engine oracle): B15 aside
         PL, PR = [], []
         for stp in steps:
             if stp[0] == 'patch':
@@ -182,7 +186,8 @@ def build_ref():
             ci, name, rate, len(PL), max(abs(f(x)) for x in PL + PR), len(h.renders)))
         sys.stderr.flush()
         del h
-    pickle.dump(ref, open(REF_PKL, 'wb'))
+    pickle.dump(ref, open(REF_PKL + '.partial', 'wb'))   # whole or nothing (playbook 142)
+    os.replace(REF_PKL + '.partial', REF_PKL)
     print('wrote', REF_PKL)
     return 0
 
@@ -202,6 +207,9 @@ def check_port(verbose=False):
                     ('pitch', ctypes.c_int), ('velocity', ctypes.c_float)]
     lib.juno_gui_create.restype = V
     lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
+    lib.juno_gui_state.restype = V
+    lib.juno_gui_state.argtypes = [V]
+    lib.juno_rr_settle.argtypes = [V]
     for fn, at in (('juno_gui_plugin_init', [V]), ('juno_gui_destroy', [V]),
                    ('juno_gui_queue_state', [V, ctypes.c_char_p, ctypes.c_int]),
                    ('juno_gui_queue_patch', [V, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]),
@@ -218,6 +226,9 @@ def check_port(verbose=False):
         lib.juno_gui_plugin_init(c)
         pl = ref['_payload'][ci]
         lib.juno_gui_queue_state(c, pl, len(pl))
+        L0, R0 = (ctypes.c_float * PRELUDE)(), (ctypes.c_float * PRELUDE)()
+        lib.juno_gui_process(c, (Note * 1)(), 0, 0, 120.0, L0, R0, PRELUDE)
+        lib.juno_rr_settle(lib.juno_gui_state(c))
         PL, PR = [], []
         for stp in steps:
             if stp[0] == 'patch':

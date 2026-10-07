@@ -926,6 +926,19 @@ int juno_bank_arp(const unsigned char *bank, int idx, int *mode, int *oct)
     return sw ? 1 : 0;
 }
 
+/* The same three values raw, as the plugin's controller takes them (dispatch
+ * 831..833: the switch with v != 0, TYPE and STEP 0..5). Returns 1 on success. */
+int juno_bank_arp_raw(const unsigned char *bank, int idx, int *sw, int *type, int *step)
+{
+    const unsigned char *blob;
+    if (idx < 0 || idx >= BANK_COUNT) return 0;
+    blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
+    if (sw)   *sw   = record_byte(blob, 298);
+    if (type) *type = record_byte(blob, 306);
+    if (step) *step = record_byte(blob, 314);
+    return 1;
+}
+
 /* Decode SCATTER TYPE (NAME1 leaf 92, record byte 322 -> arp pattern slab 0..9) and
  * SCATTER DEPTH (leaf 93, record byte 330, SIGNED int8 -5..5 -> pattern sub = depth+7).
  * These select the arpeggiator's STEP x SLOT pattern grid (carp_set_scatter /

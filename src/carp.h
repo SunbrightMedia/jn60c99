@@ -49,8 +49,8 @@ typedef struct {
     uint8_t per_note_vel[128];  /* a1+464  : velocity a note was pressed with */
 
     /* ---- selector / octave state ------------------------------------ */
-    int     field56;            /* a1+56   : octave-pass counter (clamped)    */
-    int     nslots;             /* a1+3054 : active slot count (chord size)   */
+    int     field56;            /* a1+56   : pattern passes, clamped by the selectors
+                                 *           to count - (char)+3054 (pat_nslots) */
     int     sel_step;           /* a1+3464 : selector running index           */
     int     started;           /* a1+3460 : selector "has started" flag       */
     int     ud_dir;             /* a1+3461 : UP&DOWN direction (1=up,0=down)  */
@@ -122,6 +122,30 @@ typedef struct {
     int      slot_noteidx[16];  /* raw selector note owning the slot (a1+804 +3)   */
     long long slot_offtick[16]; /* scheduled note-off tick per slot (-1 = none)   */
     int8_t   note_slot[128];    /* a1+3324 raw-note -> slot map, -1 = free         */
+
+    /* ---- the arp controller (engine+136) and its apply object (controller+40) --
+     * READ: rva 0x3C49F0 (SW, gui/juno_bridge.c), 0x3C4E50 (TYPE), 0x3C49B0 (STEP),
+     * 0x3C4F10 (SCATTER TYPE), 0x3C4EE0 (SCATTER DEPTH), 0x3C4F40 (config),
+     * 0x3C0E90 (the apply object's constructor), 0x3C0EC0 (the apply). PROVEN
+     * (probes/host_render/arp_cfg_probe.py, both oracles): after the build every
+     * controller field is 0 and the apply object holds (-1, -1, 0, 7). */
+    int      ctl_on;            /* controller +0                                  */
+    int      ctl_type;          /* controller +4 : ARPEGGIO TYPE (the config clamps it to 2) */
+    int      ctl_step;          /* controller +8 : ARPEGGIO STEP (the config clamps it to 2) */
+    int      ctl_depth;         /* controller +16: SCATTER DEPTH -7..7            */
+    int      ctl_stype;         /* controller +20: SCATTER TYPE 0..9              */
+    int      ap_type;           /* apply +24: TYPE 0..2, -1 until the first config */
+    int      ap_mode;           /* apply +28: the rate mode, -1, then 2 for good  */
+    int      ap_slab;           /* apply +32: SCATTER TYPE                        */
+    int      ap_sub;            /* apply +36: SCATTER DEPTH + 7                   */
+    int      enabled;           /* CArpeggio +10: on (rva 0x3BE3B0)               */
+    /* ---- the CArpeggio fields the apply sets (rva 0x3C3010, 0x3C34F0, 0x3C34C0) */
+    int      step4076;          /* +4076: the STEP the config stored              */
+    int      range4050;         /* +4050: STEP + the scatter's range delta (byte) */
+    int      rate4047;          /* +4047: the rate index before its clamp (byte)  */
+    int      gate4049;          /* +4049: the gate index from the pattern header  */
+    int      pat_reload;        /* +40  : a pattern reload waits for the next step (rva 0x3BF9C0) */
+    int      pend_slab, pend_sub; /* +32: the pattern block that reload expands   */
 } carp;
 
 /* Reset to power-on defaults (empty keyboard, UP, 1 octave). */
@@ -132,10 +156,11 @@ void carp_init(carp *e);
 void carp_add_key(carp *e, int note, int velocity);
 void carp_remove_key(carp *e, int note);      /* note < 0 => release all      */
 
-/* Configuration. */
-void carp_set_mode(carp *e, int type);        /* ARPEGGIO TYPE 0..5           */
-void carp_set_range(carp *e, int step);       /* ARPEGGIO STEP 0..5 -> octaves*/
-void carp_arm_beat_requant(carp *e);          /* arm one-shot beat re-latch on enable */
+/* Configuration. Low-level primitives (tests, carp_init); the plugin's own
+ * paths are the controller functions below. */
+void carp_set_mode(carp *e, int type);        /* the selector for TYPE 0..5 (rva 0x3BFCB0) */
+void carp_set_range(carp *e, int step);       /* ARPEGGIO STEP 0..5 -> octaves (rva 0x3BFE60) */
+void carp_arm_beat_requant(carp *e);          /* arm the one-shot beat re-latch (keyboard +6) */
 void carp_set_division(carp *e, int rate_sw); /* 0 => 12 PPQN, !=0 => 24 PPQN */
 void carp_set_rate_index(carp *e, int idx);   /* 0..9 fine rate (opt-in)      */
 void carp_set_gate_index(carp *e, int idx);   /* 0..9 gate %                  */
@@ -148,6 +173,18 @@ void carp_set_velocity(carp *e, int fixed, int sens); /* fixed 0..127, sens 0..1
  * which reproduces the single-note-per-step path bit-for-bit. Called by carp_init;
  * call again to change patterns. See scratchpad/oracle/arp_pattern_grid_spec.md. */
 void carp_set_scatter(carp *e, int type, int depth);
+
+/* The controller's config (rva 0x3C4F40): TYPE and STEP clamped to 2, then the
+ * apply (rva 0x3C0EC0) for a new TYPE, for the STEP, and -- the first time ever
+ * -- with the rate mode 2 and the beat re-latch armed. Each apply requests a
+ * pattern reload (done at the next step), swaps the selector, clears the octave
+ * offset and sets the range, rate and gate. */
+void carp_ctl_config(carp *e);
+
+/* SCATTER TYPE (rva 0x3C4F10, 0..9) and SCATTER DEPTH (rva 0x3C4EE0, -7..7):
+ * the host entry calls them with force 0 (dispatch 834 / 835). */
+void carp_ctl_scatter_type(carp *e, int v, int force);
+void carp_ctl_scatter_depth(carp *e, int v, int force);
 
 /* One engine tick (CWaveGen vt+184, rva 0x3C6750) for the arp: the keyboard
  * object's counter and beat re-latch (rva 0x3C3C50, kb_vel = the keyboard's
@@ -162,8 +199,10 @@ int  carp_engine_tick(carp *e, const uint8_t *kb_vel, carp_event *ev, int cap);
 int  carp_key_off(carp *e, int note, carp_event *ev, int cap);
 
 /* The arp switched off (rva 0x3BE3B0 -> 0x3BDAA0): while running, every
- * sounding arp note off; the key lists cleared. Returns the events written. */
+ * sounding arp note off; the key lists cleared. Returns the events written.
+ * carp_enable is the same function with 1: it only sets the flag. */
 int  carp_disable(carp *e, carp_event *ev, int cap);
+void carp_enable(carp *e);
 
 /* Exposed extracted tables (see docs/ARP_PROVENANCE.md). */
 extern const uint16_t CARP_RATE_TABLE[10][3];   /* {evenDur,oddDur,accentMod} */
