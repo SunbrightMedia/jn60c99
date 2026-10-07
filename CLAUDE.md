@@ -129,8 +129,9 @@ mine is a hypothesis (playbook 80).
   ccmap_state_gate.py), and the state save (getState byte for byte, setState's
   stream framing), the UI-timer drain and MIDI learn (A32, state_save_gate.py),
   and the calls that render nothing -- a flush, a mono bus (A33). Every host call:
-  docs/HOST_CALL_CENSUS.md (task #36 closed; the SYSTEM-8 hardware link is the one
-  feature not ported: OS MIDI to Roland hardware). The web app's WASM is rebuilt
+  docs/HOST_CALL_CENSUS.md (task #36 closed; not ported: the SYSTEM-8 hardware
+  link -- not needed, the user's decision; the GUI graphics come from the user,
+  for the plug-and-play test API of the bare-metal port). The web app's WASM is rebuilt
   with all of it (make webapp green: WASM == native, headless check; emcc from
   /home/user/emsdk/emsdk_env.sh). Engine: PROVENANCE 34/34 PROVEN;
   full verify of d59277db GREEN (job verify_final, EXIT 0, every section ran,
