@@ -11,8 +11,8 @@ Tracks B and D below were written for two chips. Read them this way from now on:
 - **D. LINK** = RETIRED. No chip-to-chip audio or voice links, ever. D1 (one DAC) survives as a board fact.
 - The "three facts" at the end stay true as measurements; "one chip cannot do it" is exactly why B needs a cheaper engine.
 
-## STATUS (2026-10-06, the rules below: one line per track, regressions first)
-- A: Port: PROVENANCE 27/27 PROVEN (full verify of cd63fc1 GREEN, job verify_fix3; the two days audited: docs/AUDIT_2026-10-06.md); CLAIMS B1-B12 closed: the plugin as shipped plays six voices after a 960-sample start-up mute (A21/A22) and the key's own velocity (A23, the port forced 100), all 79 panel parameters as DAW automation incl. MASTER TUNE (A20, 45/45), and the plugin's own preset paths -- initialize, a DAW preset, its patch browser -- bit-exact against queues the plugin itself made (A22, 43/43, incl. the arp switch with keys held and the web app's start). The web app runs these paths (C4, make webapp). Open: the device firmware still runs the recall model (a host edit there is a 12 MB state copy: Track B). The one-board engine will need its own sonic gate.
+## STATUS (2026-10-07, the rules below: one line per track, regressions first)
+- A: Port: REOPENED 2026-10-07 -- the plugin runs its engine at 96 kHz by default and converts to the host rate; its render driver owns the arp clock and tempo; the port has neither (CLAIMS B13/B14, PROVEN by the plugin's own process(): docs/HOST_RENDER_LAYER.md). Engine: PROVENANCE 27/27, full verify of cd63fc1 GREEN (job verify_fix3).
 - D: RETIRED by the one-board rule (2026-09-23).
 - B: REOPENED for ONE board — no one-board JUNO engine chosen yet (budget facts in docs/ONE_BOARD_BUDGET.md).
 - C: esp32s3/ playable (console, patch step, MIDI UART); the Pi PLAY image is built, not yet on silicon.

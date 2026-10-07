@@ -114,9 +114,12 @@ mine is a hypothesis (playbook 80).
 
 # LIVE STATE (update in place, no dated blocks here, EVER; detail lives in
 # FINAL_GUIDE.md / docs/ — this section is one line-group per arc)
-- **src/ + trunk**: PROVENANCE 27/27 PROVEN; full verify of cd63fc1 GREEN (job
-  verify_fix3, EXIT 0, every section ran; ARM step skipped: no cross
-  toolchain). Later commits are docs only. The two days 2026-10-05/06
+- **src/ + trunk**: OPEN AGAIN 2026-10-07 at the host layer: the plugin runs its
+  engine at 96 kHz (vm.vs.sampleRate default) and converts to the host rate, and
+  its render driver owns the arp clock + tempo (CLAIMS B13/B14,
+  docs/HOST_RENDER_LAYER.md). Engine: PROVENANCE 27/27 PROVEN; full verify of
+  cd63fc1 GREEN (job verify_fix3, EXIT 0, every section ran); ARM golden OK
+  (job arm_golden_cd63, toolchain installed by apt in that container). Later commits are docs only. The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
   mute), juno_gui_state_load (DAW preset), juno_gui_load_patch (its patch

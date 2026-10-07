@@ -2661,3 +2661,18 @@ not the port's.
 Save progress to <ref>.partial and rename to the final name only when the build is complete;
 --resume reads the .partial. A staleness test may trust a file only if a complete build wrote it.
 
+
+## 143. CENSUS THE HOST LAYER: EXECUTE THE PLUGIN'S OWN process() BEFORE ANY ENGINE GATE
+Paid 2026-10-07 (JUNO). Two months of gates graded the ENGINE at the host rate, driven from its
+vtable. The first execution of the plugin's own IAudioProcessor::process showed that the plugin,
+as shipped, runs the engine at 96 kHz (setting vm.vs.sampleRate, default 0) and converts every
+block to the host rate (rva 0x343E30); and that its render driver owns the arp clock and the host
+tempo with laws the port did not have. Every engine gate was green; none could see the layer
+above the engine. The JP8 notes had flagged a host resampler (D3) a month earlier; the JUNO census
+never asked the same question.
+### The rule
+Step 1 of every port: boot the plugin as a host does and execute process() once per host rate
+with a tempo, notes at offsets and a parameter queue. Log every engine entry it reaches
+(setSampleRate, render, tick, tempo, note, CC, bend) and the render object between the driver and
+the engine. Every reached entry is a census row with a gate, before any engine gate is trusted
+as "the plugin".
