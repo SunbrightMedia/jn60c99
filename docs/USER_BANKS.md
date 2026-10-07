@@ -43,9 +43,13 @@ through $JUNO_SCRATCH_TAG, truth.scratch()):
 | recall_render_ab.py at 44100 and 48000 | the recall MODEL (juno_gui_apply_bank: the device firmware's path), one cold engine per patch, one note | the non-arp ones |
 | bank_product_gate.py at 44100 and 48000 | THE PRODUCT PATH: the plugin's patch browser (rva 0x335850) of every record, warm, through its own process() at the default engine-rate setting (96000 + its converter), keys at offsets, a key held across each load, steals at six voices, the transport at 120 BPM -- the arp patches arpeggiate | 64 |
 
-Run: `sh tools/run_job.sh <name> sh <script>` where the script runs
-`python3 tools/verify/userbank_parity.py --only '<bank name>' --rates 44100,48000`
-(run_job loses quotes: put the command in a script, playbook 118).
+Run: `sh tools/run_job.sh <name> python3 tools/verify/userbank_parity.py
+--parallel 0 --rates 44100,48000` -- every bank at once (the user's call,
+2026-10-07), one worker process each (~560 MB; 11 banks fit in 16 GB). A bank
+that ends in an ERROR -- no verdict: a tool killed, e.g. out of memory, or one
+that raised -- runs again with half as many banks at a time, down to one; a
+FAIL is a verdict and never re-runs. One bank: `--only '<name>'` (run_job loses
+quotes: put that command in a script, playbook 118).
 
 ## Results
 

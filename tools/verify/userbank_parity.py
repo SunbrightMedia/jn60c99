@@ -45,6 +45,8 @@ import subprocess
 import sys
 import hashlib
 import glob
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -139,6 +141,34 @@ def one_bank(bank, rates, jobs):
     return name, results, log
 
 
+def ended_in_error(res, log):
+    """True when a bank's run gave NO verdict: a tool killed by a signal (out of
+    memory: -9 / 137) or one that raised. A gate that ran and found a
+    difference returns 1 with no traceback -- that is a FAIL, a finding, and is
+    never re-run to make it go away."""
+    if any(v < 0 or v >= 128 for v in res.values()):
+        return True
+    with open(log, errors='replace') as f:
+        txt = f.read()
+    return any(k in txt for k in ('Traceback', 'MemoryError', 'Killed'))
+
+
+def run_banks(banks, rates, jobs, par, say):
+    """every bank of `banks`, `par` at a time (each bank's tools in their own
+    processes; the threads only wait). {bank: (name, results, log)}"""
+    out = {}
+    with ThreadPoolExecutor(max_workers=par) as ex:
+        futs = {ex.submit(one_bank, b, rates, jobs): b for b in banks}
+        for f in as_completed(futs):
+            name, res, log = f.result()
+            out[futs[f]] = (name, res, log)
+            verdict = ('ERROR' if ended_in_error(res, log) else
+                       'PASS' if all(v == 0 for v in res.values()) else 'FAIL')
+            say('%-34s %s   %s\n    log: %s' % (name, verdict, ' '.join(
+                '%s=%d' % (k, v) for k, v in sorted(res.items())), log))
+    return out
+
+
 def main():
     banks = sorted(glob.glob(os.path.join(BANKDIR, '*.bin')))
     if not banks:
@@ -151,27 +181,48 @@ def main():
         only = argv[argv.index('--only') + 1]
     if '--rates' in argv:
         rates = [int(x) for x in argv[argv.index('--rates') + 1].split(',')]
-    jobs = int(argv[argv.index('--jobs') + 1]) if '--jobs' in argv else 3
     if only:
         banks = [b for b in banks if only in b]
+    # --parallel N: N banks at once (0: all at once). A bank that ends in an
+    # ERROR (no verdict: a tool killed, e.g. out of memory, or one that raised)
+    # runs again with half as many at a time, down to one; a FAIL never re-runs.
+    par = 1
+    if '--parallel' in argv:
+        par = int(argv[argv.index('--parallel') + 1]) or len(banks)
+    par = max(1, min(par, len(banks)))
+    # worker processes inside one bank's reference builds (~560 MB each)
+    jobs = (int(argv[argv.index('--jobs') + 1]) if '--jobs' in argv
+            else (1 if par > 1 else 3))
 
     print('=== USER BANK PARITY -- against src/, the FROZEN BIT-EXACT PORT ===')
     print('banks: %d   patches: %d   rates: %s'
           % (len(banks), 64 * len(banks), rates))
     print('The oracle is the PLUGIN executed under Unicorn. A bank is input.\n')
 
-    bad = 0
-    for b in banks:
-        name, res, log = one_bank(b, rates, jobs)
-        verdict = 'PASS' if all(v == 0 for v in res.values()) else 'FAIL'
-        if verdict == 'FAIL':
-            bad += 1
-        print('%-34s %s   %s' % (name, verdict,
-                                 ' '.join('%s=%d' % (k, v)
-                                          for k, v in sorted(res.items()))))
-        print('    log: %s' % log)
+    lock = threading.Lock()
 
-    print('\n%d of %d banks FAILED' % (bad, len(banks)))
+    def say(txt):
+        with lock:
+            print(txt)
+            sys.stdout.flush()
+
+    final, todo = {}, list(banks)
+    while todo:
+        say('--- %d bank(s), %d at a time, %d worker process(es) each'
+            % (len(todo), par, jobs))
+        got = run_banks(todo, rates, jobs, par, say)
+        err = [b for b in todo if ended_in_error(got[b][1], got[b][2])]
+        final.update(got)
+        if not err or par == 1:
+            break
+        par = max(1, par // 2)
+        say('%d bank(s) ended in an ERROR: run again, %d at a time' % (len(err), par))
+        todo = err
+    bad = sum(1 for b in banks if any(v != 0 for v in final[b][1].values()))
+    errs = sum(1 for b in banks if ended_in_error(final[b][1], final[b][2]))
+
+    print('\n%d of %d banks FAILED (%d of them with no verdict: ERROR)'
+          % (bad, len(banks), errs))
     print('A FAILING PATCH IS A FINDING, NOT NECESSARILY A DEFECT IN THE GATE:')
     print('the factory bank is a sample of the parameter space, and a')
     print('combination it never reaches has never been tested on either side.')
