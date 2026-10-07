@@ -224,9 +224,9 @@ static void battery_slot(gfx_fb *f, int x, const ui_live *lv, uint32_t now)
 
 static void overview(gfx_fb *f, const panel_t *pn, int bank, const ui_live *lv, uint32_t now)
 {
-    /* four columns: the bank's three parameters (knobs 3-5, left to right as
-     * on the panel), then the battery. Volume (knob 1) shows in the focus view. */
-    static const int COL_KNOB[4] = { 2, 3, 4, -1 };
+    /* four columns: the bank's three parameters (param knobs 1-3), then the
+     * battery. Volume shows in the focus view. */
+    static const int COL_KNOB[4] = { 1, 2, 3, -1 };
     for (int c = 0; c < 4; ++c) {
         int k = COL_KNOB[c], x = c * 32, p = k >= 0 ? panel_param_of(bank, k) : -1;
         static const char *SHORT[P_NPARAM] = { "WAVE", "ATK", "CHOR", "UNI", "REL", "VERB", "VOL" };

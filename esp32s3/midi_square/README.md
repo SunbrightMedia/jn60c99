@@ -13,7 +13,7 @@ Not a JUNO voice port.
 |---|---|---|
 | I2S BCK / LCK / DIN -> DAC | 42 / 40 / 21 | DAC: VIN 5V, SCK GND, FLT/DEMP/FMT GND, XSMT 3V3, A3V3 open |
 | MIDI RX (6N137 pin 6) | 17 | 1 k pull-up to 3V3 (never 5 V); 6N137 pins 8+7 on 5V, 0.1 uF 8-5; 220 R jack pos 4 -> pin 2; 1N4148 stripe pin 2 |
-| Knob 1 VOLUME / 2 free / 3 / 4 / 5 (wipers; ends 3V3, GND) | 1 / 4 / 6 / 8 / 9 | optional 0.1 uF wiper-GND at the ESP; pot bodies to GND |
+| VOLUME / param 1 / 2 / 3 / 4 (free) (wipers; ends 3V3, GND) | 1 / 9 / 4 / 6 / 8 | optional 0.1 uF wiper-GND at the ESP; pot bodies to GND |
 | OLED SDA / SCL | 15 / 13 | |
 | SHIFT button (PB86, NC to 3V3) | 48 | internal pull-down; pressed = LOW; armed after a first HIGH |
 | SHIFT LED | 38 | 1 k in series; lit while SHIFT is held |

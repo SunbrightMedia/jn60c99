@@ -53,8 +53,9 @@
 #define CHUNK     240          /* 5 ms */
 #define DMA_N     4
 #define MIDI_UART UART_NUM_1
-/* knob 1 VOLUME, knob 2 free, knobs 3-5 the bank's parameters (ADC1 wipers) */
-static const int PIN_KNOBS[PANEL_KNOBS] __attribute__((unused)) = { 1, 4, 6, 8, 9 };
+/* VOLUME, then param knobs 1-4 (user 2026-10-07): params 1-3 = the bank's
+ * three parameters, param 4 = free (ADC1 wipers) */
+static const int PIN_KNOBS[PANEL_KNOBS] __attribute__((unused)) = { 1, 9, 4, 6, 8 };
 #define PIN_SDA   15
 #define PIN_SCL   13
 #define PIN_BAT   11           /* ADC2: battery via 10k/10k from the boost VIN+ (after the switch) */
@@ -459,7 +460,7 @@ static void knob_poll(void)
             (knob_avg[k] > 0.998f && knob_sent[k] != 1.0f)) {
             float v = knob_avg[k] < 0.002f ? 0.0f : (knob_avg[k] > 0.998f ? 1.0f : knob_avg[k]);
             knob_sent[k] = v;
-            if (panel_param_of(0, k) >= 0) touch_ms = now;   /* the free knob 2 does not wake the screen */
+            if (panel_param_of(0, k) >= 0) touch_ms = now;   /* the free param knob 4 does not wake the screen */
             panel_knob(&PANEL, k, v, now);
         }
     }
