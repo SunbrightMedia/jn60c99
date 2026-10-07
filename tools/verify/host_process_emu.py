@@ -241,10 +241,12 @@ class HostProcess(W.Wrapper):
             raise RuntimeError('setupProcessing -> 0x%x' % r)
         self.host_sr = float(host_sr)
 
-    def process(self, n, events=(), params=(), ctx=None):
-        """one host block through the plugin's own process(); returns (Lbits, Rbits)"""
+    def process(self, n, events=(), params=(), ctx=None, nch=2):
+        """one host block through the plugin's own process(); returns (Lbits, Rbits). n = 0: the
+        host's flush call (no samples); nch: the output bus's channel count for this call (the
+        plugin returns at once below 2, rva 0x34A380)"""
         uc = self.uc
-        if not 1 <= n <= self.max_block:
+        if not 0 <= n <= self.max_block:
             raise ValueError('block %d' % n)
         evs = []
         for e in events:
@@ -290,11 +292,19 @@ class HostProcess(W.Wrapper):
         struct.pack_into('<iiiii', pd, 0, 0, 0, n, 0, 1)
         struct.pack_into('<QQQQQQQ', pd, 24, 0, self._bus, self._pc if params else 0, 0, self._ev if events else 0, 0, cptr)
         uc.mem_write(self._pd, bytes(pd))
-        uc.mem_write(self._bufL, b'\0' * (4 * n))
-        uc.mem_write(self._bufR, b'\0' * (4 * n))
+        if n:
+            uc.mem_write(self._bufL, b'\0' * (4 * n))
+            uc.mem_write(self._bufR, b'\0' * (4 * n))
+        if nch != 2:
+            bus = bytes(uc.mem_read(self._bus, 24))
+            uc.mem_write(self._bus, struct.pack('<i', nch) + bus[4:])
         r = self.vcall(self.audio, PROCESS_SLOT, self._pd, count=0) & 0xFFFFFFFF
+        if nch != 2:
+            uc.mem_write(self._bus, bus)
         if r != 0:
             raise RuntimeError('process -> 0x%x' % r)
+        if not n:
+            return [], []
         return (list(struct.unpack('<%dI' % n, uc.mem_read(self._bufL, 4 * n))),
                 list(struct.unpack('<%dI' % n, uc.mem_read(self._bufR, 4 * n))))
 

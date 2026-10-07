@@ -48,6 +48,7 @@ their old paths so no comment pointer dangles. Live project state:
 | HOSTPATH_PARITY_LOG.md | LIVING | What each host-path STEP found, with rvas (2026-10-06: the preset path's engine side is the host entry) |
 | HOSTPATH_PARITY_SCOPE.md | LIVING | HOSTPATH PARITY SCOPE — close every remaining gap between the port and a REAL host instance. Opus 5: execute t — *PARKED live work order (DAW-parity track)* |
 | HOST_RENDER_LAYER.md | LIVING | What happens between the host's process() and the engine: the engine-rate setting (default 96 kHz), the converter table (and the silence outside it), the render driver's arp clock and host tempo, the arp controller (SW / TYPE / STEP); where the port differs (CLAIMS B13, B15; A24) |
+| HOST_CALL_CENSUS.md | LIVING | Every call a host makes to the plugin (component, processor, controller, MIDI mapping, UI timer, editor) -- what the plugin does, what the port does, the evidence; the scope table of the host layer (task #36; CLAIMS A31-A33) |
 | PORT_PIPELINE.md | LIVING | THE NEXT-SYNTH ORDER: .vst3 -> playing instrument in 10 steps, each with its tool (pe_recon, abi_check, jx_emu.boot, audio_metrics, listen proofs) and the defect it prevents (playbook 85-88) |
 | JX3P_PLAN.md | LIVING | THE JX-3P PLAN — port-level C99, no hiccups, as fast as the method allows — *jx3p/docs/S3_STATUS.md holds live state* |
 | MASTER_RENDER_MAP.md | REFERENCE | master_render (sub_180363380) — transcription map & dropped-arg resolutions |

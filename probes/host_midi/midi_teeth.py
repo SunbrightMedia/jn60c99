@@ -58,6 +58,9 @@ MUTANTS = [
     ('switch_no_hold_transfer', 'the arp switch-on leaving the held notes out of the arp',
      'gui/juno_bridge.c', '            if (kbm_has(c, KB_LATCH, k)) kb_arp_key_on(c, k, c->kb_vel[k]);',
      '            if (0) kb_arp_key_on(c, k, c->kb_vel[k]);'),
+    ('flush_consumes', 'a 0-sample call (the host\'s flush) taking its events and parameters',
+     'gui/juno_bridge.c', '    if (!c || n <= 0) return 0;\n    for (i = 0; i < nev; ++i) {',
+     '    if (!c || n < 0) return 0;\n    for (i = 0; i < nev; ++i) {'),
     ('params_first', 'the parameter queues pushed before the note events',
      'gui/juno_bridge.c', '    for (i = 0; i < npar; ++i) proc_param(c, &par[i]);\n', ''),
 ]

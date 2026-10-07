@@ -200,6 +200,14 @@ def chains():
     st += [E(512, par=[bend(0.2, 400), cc(1, 0.0, 300), cc(11, 1.0, 200)])] + [E(512)] * 4
     st += [E(512, ev=[ev_off(0, 50), ev_off(0, 57)])] + [E(512)] * 6
     out.append(('ident96', 96000.0, 0, st))
+    # the host calls that render nothing (rva 0x34A380 returns at once): a flush (0 samples) and a
+    # call with a mono output bus, each carrying a note and CCs -- dropped by the plugin, so the
+    # port renders nothing for them (a wrapper with a mono bus calls nothing)
+    st = [('patch', 9), E(ev=[ev_on(0, 60, 0.8)])] + [E()] * 3
+    st += [('blk', 0, [ev_on(0, 64, 0.8)], T, [cc(3, 0.1), cc(74, 0.9), bend(0.1)])] + [E()] * 4
+    st += [('mono', 256, [ev_on(0, 67, 0.8), ev_off(5, 60)], T, [cc(3, 0.2), cc(64, 1.0)])] + [E()] * 4
+    st += [E(ev=[ev_off(0, 60), ev_off(0, 64), ev_off(0, 67)])] + [E()] * 6
+    out.append(('silent_calls', 48000.0, None, st))
     return out
 
 
@@ -243,6 +251,9 @@ def build_ref(chain_fn=None, ref_pkl=None):
                 h.set_active(stp[1])
             elif stp[0] == 'setup':                   # IAudioProcessor::setupProcessing (a new host rate)
                 h.setup_processing(stp[1])
+            elif stp[0] == 'mono':                    # process() with a 1-channel output bus
+                _, n, evs, ctx, par = stp
+                h.process(n, events=evs, params=par, ctx=dict(tempo=ctx[1], playing=True), nch=1)
             else:
                 _, n, evs, ctx, par = stp
                 c = dict(tempo=ctx[1], playing=True)
@@ -336,7 +347,13 @@ def check_port(tooth=None, only=None, ref_pkl=None, title=None):
                     lib.juno_gui_set_active(c, stp[1])
             elif stp[0] == 'setup':
                 lib.juno_gui_setup_processing(c, stp[1])
-            else:
+            elif stp[0] == 'mono':                    # the plugin does nothing: neither does the port
+                if tooth == 'mono_renders':           # tooth: the mono call rendered as a stereo one
+                    _, n, evs, ctx, par = stp
+                    stp = ('blk', n, evs, ctx, par)
+                else:
+                    continue
+            if stp[0] == 'blk':
                 _, n, evs, ctx, par = stp
                 par = list(par)
                 nblk[0] += 1
