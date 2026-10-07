@@ -2860,3 +2860,16 @@ group; the two references it finished outside the job registry were deleted.
 Compute a shared input of a long recipe once (the newest oracle file), never per check, and measure
 the expanded recipe after adding lines. Never dry-run a recipe that calls $(MAKE); read the Makefile
 instead. A job that ends in seconds has not run its gates: read its log before anything else.
+
+## 158. A STRUCT COPY ON THE STACK GROWS WITH THE STRUCT -- GUARD THE FRAME SIZE, NOT THE HABIT
+Paid 2026-10-07 (JUNO, the web app rebuild). Two functions took a scratch copy of the whole
+context (`juno_ctx t = *c;`). The context grew to 121 KB with a per-instance buffer (playbook 156);
+the WASM stack is 64 KB. Native builds (8 MB stacks) passed every gate; the optimized WASM died
+later with "null function or function signature mismatch" -- the overflow had overwritten memory
+-- and only a debug build (-g -sASSERTIONS=2) named the overflow and its function.
+### The rule
+Product code keeps every stack frame small, and the compiler enforces it:
+-Werror=frame-larger-than=16384 on libjuno.so and the WASM build (it fails on the old code with two
+121 KB frames). A scratch copy of a large struct goes on the heap. When a WASM run traps with a
+signature mismatch, rebuild with -g -sASSERTIONS=2 before reading any code: the trap is usually
+far from the cause.
