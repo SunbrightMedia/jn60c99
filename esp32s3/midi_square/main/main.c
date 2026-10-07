@@ -44,20 +44,23 @@
 #include "gen/msq_wave_check.h"
 #include "esp_memory_utils.h"
 
-#define PIN_BCK   GPIO_NUM_5
-#define PIN_WS    GPIO_NUM_6
-#define PIN_DOUT  GPIO_NUM_7
-#define PIN_MIDI  18
+/* PINS -- the user's final build, 2026-10-07 (docs: README "Pins"). */
+#define PIN_BCK   GPIO_NUM_42
+#define PIN_WS    GPIO_NUM_40
+#define PIN_DOUT  GPIO_NUM_21
+#define PIN_MIDI  17
 #define SR        48000
 #define CHUNK     240          /* 5 ms */
 #define DMA_N     4
 #define MIDI_UART UART_NUM_1
-static const int PIN_KNOBS[PANEL_KNOBS] __attribute__((unused)) = { 1, 2, 4, 8, 9 };   /* ADC1 wipers */
-#define PIN_SDA   11
-#define PIN_SCL   12
-#define PIN_BAT   10           /* ADC1: battery via 10k/10k divider from the charger OUT+ */
-#define PIN_CHRG  13           /* charger CHRG LED pin via 10k: LOW = charging   */
-#define PIN_STDBY 14           /* charger STDBY LED pin via 10k: LOW = full      */
+/* knob 1 VOLUME, knob 2 free, knobs 3-5 the bank's parameters (ADC1 wipers) */
+static const int PIN_KNOBS[PANEL_KNOBS] __attribute__((unused)) = { 1, 4, 6, 8, 9 };
+#define PIN_SDA   15
+#define PIN_SCL   13
+#define PIN_BAT   11           /* ADC2: battery via 10k/10k from the boost VIN+ (after the switch) */
+#define PIN_USB   10           /* ADC1: charger In+ via 10k/10k: USB 5 V present = charging      */
+#define PIN_BTN   48           /* PB86 SHIFT: NC to 3V3; pressed = open = LOW (internal pull-down) */
+#define PIN_BLED  38           /* PB86 LED via 1k: on while SHIFT is held                         */
 
 static msq_t M;
 static i2s_chan_handle_t TX;
@@ -456,10 +459,8 @@ static void knob_poll(void)
             (knob_avg[k] > 0.998f && knob_sent[k] != 1.0f)) {
             float v = knob_avg[k] < 0.002f ? 0.0f : (knob_avg[k] > 0.998f ? 1.0f : knob_avg[k]);
             knob_sent[k] = v;
-            touch_ms = now;
-            int bank0 = PANEL.bank;
+            if (panel_param_of(0, k) >= 0) touch_ms = now;   /* the free knob 2 does not wake the screen */
             panel_knob(&PANEL, k, v, now);
-            if (PANEL.bank != bank0) printf("BANK %c (%s)\n", PANEL.bank ? 'B' : 'A', PANEL.bank ? "SHIFT" : "MAIN");
         }
     }
     static uint32_t last_print;
@@ -479,27 +480,69 @@ static void knob_poll(void)
     }
 }
 
+/* ------------------------------------------------------------------ SHIFT
+ * The PB86 is normally closed to 3V3, so released = HIGH, pressed = LOW (the
+ * internal pull-down). SHIFT = bank B while held; its LED shows it. The button
+ * is ARMED only after it has read HIGH once: an unwired pin reads LOW, and
+ * that must not hold SHIFT on forever. 20 ms debounce. */
+static int btn_armed, btn_state, btn_raw_prev, btn_raw_ms;
+static void button_start(void)
+{
+    gpio_config_t in = { .pin_bit_mask = 1ULL << PIN_BTN, .mode = GPIO_MODE_INPUT,
+                         .pull_up_en = GPIO_PULLUP_DISABLE, .pull_down_en = GPIO_PULLDOWN_ENABLE };
+    gpio_config(&in);
+    gpio_config_t out = { .pin_bit_mask = 1ULL << PIN_BLED, .mode = GPIO_MODE_OUTPUT };
+    gpio_config(&out);
+    gpio_set_level((gpio_num_t)PIN_BLED, 0);
+    vTaskDelay(pdMS_TO_TICKS(2));
+    int lv = gpio_get_level((gpio_num_t)PIN_BTN);
+    btn_raw_prev = lv; btn_armed = lv;
+    printf("BUTTON: GPIO %d reads %s at boot -- %s; LED on GPIO %d\n", PIN_BTN, lv ? "HIGH" : "LOW",
+           lv ? "released, SHIFT armed" : "pressed or not wired: SHIFT waits for a first release", PIN_BLED);
+}
+
+static void button_poll(void)
+{
+    uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
+    int raw = gpio_get_level((gpio_num_t)PIN_BTN);
+    if (raw != btn_raw_prev) { btn_raw_prev = raw; btn_raw_ms = (int)now; return; }
+    if ((int)now - btn_raw_ms < 20) return;            /* not stable for 20 ms yet */
+    if (!btn_armed) {
+        if (raw) { btn_armed = 1; printf("BUTTON: first release seen -- SHIFT armed\n"); }
+        return;
+    }
+    int pressed = !raw;
+    if (pressed == btn_state) return;
+    btn_state = pressed;
+    touch_ms = now;
+    if (panel_ready) panel_shift(&PANEL, pressed, now);
+    gpio_set_level((gpio_num_t)PIN_BLED, pressed);
+    printf("BANK %c (%s)\n", pressed ? 'B' : 'A', pressed ? "SHIFT held" : "MAIN");
+}
+
 /* ---------------------------------------------------------------- BATTERY
- * GPIO 10 reads the battery through a 10k/10k divider (half the voltage),
- * calibrated in mV by the chip's own eFuse curve. WIRED OR NOT is measured,
- * not assumed: at boot the pin's pull-down is switched on -- a floating pin
- * falls to ~0 V, a divider holds it at ~1.6-2.1 V. CHRG and STDBY are the
- * charger's LED pins (open drain): LOW = charging / full. Both LOW is not a
- * real state (a clamped pin with the charger unplugged) and reads as "on
- * battery". */
-static adc_channel_t bat_ch;
-static adc_cali_handle_t bat_cali;
-static int bat_ok;
+ * GPIO 11 (ADC2 -- free of conflict, the synth runs no Wi-Fi) reads the
+ * battery through a 10k/10k divider at the boost VIN+, after the power switch.
+ * WIRED OR NOT is measured: at boot the pin's pull-down is switched on -- a
+ * floating pin falls to ~0 V, the divider holds it at half the battery.
+ * GPIO 10 (ADC1) reads the charger's In+ (USB 5 V) through a 10k/10k divider,
+ * with the internal pull-down left ON so an unwired pin reads 0 (no USB).
+ * USB present: below 4.18 V = CHG, 4.18 V or more for 60 s = FULL. Both
+ * readings are eFuse-calibrated mV. */
+static adc_oneshot_unit_handle_t adc2;
+static adc_channel_t bat_ch, usb_ch;
+static adc_cali_handle_t bat_cali, usb_cali;
+static int bat_ok, usb_ok;
 static volatile int bat_state;
-static volatile float bat_v;
+static volatile float bat_v, usb_v;
 static volatile int bat_pct;
 
-static float bat_read_v(void)
+static float adc_volts(adc_oneshot_unit_handle_t u, adc_channel_t ch, adc_cali_handle_t cal)
 {
     int raw, mv, acc = 0;
     for (int i = 0; i < 16; ++i) {
-        if (adc_oneshot_read(knob_adc, bat_ch, &raw) != ESP_OK) return -1;
-        if (adc_cali_raw_to_voltage(bat_cali, raw, &mv) != ESP_OK) return -1;
+        if (adc_oneshot_read(u, ch, &raw) != ESP_OK) return -1;
+        if (adc_cali_raw_to_voltage(cal, raw, &mv) != ESP_OK) return -1;
         acc += mv;
     }
     return acc / 16.0f * 2.0f / 1000.0f;               /* divider: x2 */
@@ -508,27 +551,34 @@ static float bat_read_v(void)
 static void bat_start(void)
 {
     adc_unit_t unit;
-    gpio_config_t st = { .pin_bit_mask = (1ULL << PIN_CHRG) | (1ULL << PIN_STDBY), .mode = GPIO_MODE_INPUT,
-                         .pull_up_en = GPIO_PULLUP_ENABLE };
-    gpio_config(&st);
     adc_oneshot_chan_cfg_t cc = { .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
-    adc_cali_curve_fitting_config_t cf = { .unit_id = ADC_UNIT_1, .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
-    if (!knob_ok || adc_oneshot_io_to_channel(PIN_BAT, &unit, &bat_ch) != ESP_OK || unit != ADC_UNIT_1 ||
-        adc_oneshot_config_channel(knob_adc, bat_ch, &cc) != ESP_OK ||
-        adc_cali_create_scheme_curve_fitting(&cf, &bat_cali) != ESP_OK) {
-        printf("BATT: ADC on GPIO %d unavailable -- no battery gauge\n", PIN_BAT); return;
+    adc_oneshot_unit_init_cfg_t u2 = { .unit_id = ADC_UNIT_2 };
+    adc_cali_curve_fitting_config_t c2 = { .unit_id = ADC_UNIT_2, .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
+    adc_cali_curve_fitting_config_t c1 = { .unit_id = ADC_UNIT_1, .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
+    if (adc_oneshot_new_unit(&u2, &adc2) != ESP_OK ||
+        adc_oneshot_io_to_channel(PIN_BAT, &unit, &bat_ch) != ESP_OK || unit != ADC_UNIT_2 ||
+        adc_oneshot_config_channel(adc2, bat_ch, &cc) != ESP_OK ||
+        adc_cali_create_scheme_curve_fitting(&c2, &bat_cali) != ESP_OK) {
+        printf("BATT: ADC2 on GPIO %d unavailable -- no battery gauge\n", PIN_BAT); return;
     }
     gpio_pulldown_en((gpio_num_t)PIN_BAT);             /* the wired-or-not probe */
     vTaskDelay(pdMS_TO_TICKS(5));
-    float probe = bat_read_v();
+    float probe = adc_volts(adc2, bat_ch, bat_cali);
     gpio_pulldown_dis((gpio_num_t)PIN_BAT);
     vTaskDelay(pdMS_TO_TICKS(5));
-    float v = bat_read_v();
+    float v = adc_volts(adc2, bat_ch, bat_cali);
     bat_ok = probe > 1.0f;
     if (bat_ok) { bat_v = v; bat_pct = ui_bat_pct(v); bat_state = UI_BAT_ON; }
-    printf("BATT: GPIO %d %s (probe %.2f V, now %.2f V), CHRG %d STDBY %d\n", PIN_BAT,
+    if (knob_ok && adc_oneshot_io_to_channel(PIN_USB, &unit, &usb_ch) == ESP_OK && unit == ADC_UNIT_1 &&
+        adc_oneshot_config_channel(knob_adc, usb_ch, &cc) == ESP_OK &&
+        adc_cali_create_scheme_curve_fitting(&c1, &usb_cali) == ESP_OK) {
+        gpio_pulldown_en((gpio_num_t)PIN_USB);         /* stays on: unwired = 0 V = no USB */
+        usb_ok = 1;
+        usb_v = adc_volts(knob_adc, usb_ch, usb_cali);
+    }
+    printf("BATT: GPIO %d %s (probe %.2f V, now %.2f V); USB sense GPIO %d %s %.2f V\n", PIN_BAT,
            bat_ok ? "divider found" : "nothing wired -- gauge shows USB", probe, v,
-           gpio_get_level((gpio_num_t)PIN_CHRG), gpio_get_level((gpio_num_t)PIN_STDBY));
+           PIN_USB, usb_ok ? "reads" : "UNAVAILABLE", usb_ok ? usb_v : 0.0f);
 }
 
 /* every 500 ms: smooth the voltage (tau ~5 s); the percent shown moves only on
@@ -536,14 +586,19 @@ static void bat_start(void)
 static void bat_poll(void)
 {
     if (!bat_ok) return;
-    float v = bat_read_v();
+    float v = adc_volts(adc2, bat_ch, bat_cali);
     if (v < 0) return;
     bat_v += (v - bat_v) * 0.1f;
-    int chg = !gpio_get_level((gpio_num_t)PIN_CHRG), full = !gpio_get_level((gpio_num_t)PIN_STDBY);
-    int st = (chg && !full) ? UI_BAT_CHG : (full && !chg) ? UI_BAT_FULL : UI_BAT_ON;
+    float u = usb_ok ? adc_volts(knob_adc, usb_ch, usb_cali) : 0.0f;
+    if (u >= 0) usb_v = u;
+    static int full_ticks;
+    int usb = usb_v > 4.0f;
+    full_ticks = (usb && bat_v >= 4.18f) ? full_ticks + 1 : 0;
+    int st = !usb ? UI_BAT_ON : (full_ticks >= 120 ? UI_BAT_FULL : UI_BAT_CHG);
     int p = ui_bat_pct(bat_v);
     if (st != bat_state || abs(p - bat_pct) >= 2) bat_pct = p;
-    if (st != bat_state) printf("BATT: %s\n", st == UI_BAT_CHG ? "CHARGING" : st == UI_BAT_FULL ? "FULL" : "ON BATTERY");
+    if (st != bat_state) printf("BATT: %s (USB %.2f V, battery %.2f V)\n",
+                                st == UI_BAT_CHG ? "CHARGING" : st == UI_BAT_FULL ? "FULL" : "ON BATTERY", usb_v, bat_v);
     bat_state = st;
 }
 #else
@@ -554,6 +609,8 @@ static volatile int bat_state, bat_pct;
 static volatile float bat_v;
 static void bat_start(void) { printf("BATT: not in the QEMU build\n"); }
 static void bat_poll(void) { }
+static void button_start(void) { printf("BUTTON: not in the QEMU build\n"); }
+static void button_poll(void) { }
 #endif
 
 /* ------------------------------------------------------------------ OLED
@@ -880,6 +937,7 @@ void app_main(void)
     stress();                                          /* ends with a_mute = 0 */
     knob_start();
     bat_start();
+    button_start();
     ui_begin();
     printf("READY -- play notes. Any MIDI channel. Expect one NOTE line per key.\n");
     sil_and_stat(1);
@@ -909,6 +967,7 @@ void app_main(void)
         }
         if (esp_timer_get_time() >= next_knob) {
             knob_poll();
+            button_poll();
             next_knob = esp_timer_get_time() + 10000;
         }
         if (esp_timer_get_time() >= next_bat) {

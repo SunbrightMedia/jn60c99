@@ -3,8 +3,10 @@
 #include <string.h>
 
 static const int8_t MAP[2][PANEL_KNOBS] = {
-    { -1, P_WAVE,   P_ATTACK,  P_CHORUS, P_VOLUME },
-    { -1, P_UNISON, P_RELEASE, P_REVERB, P_VOLUME },
+    /* knob 1 = VOLUME (both banks), knob 2 = free, knobs 3-5 = the bank's three
+     * parameters; SHIFT is the PB86 button (panel_shift), 2026-10-07 */
+    { P_VOLUME, -1, P_WAVE,   P_ATTACK,  P_CHORUS },
+    { P_VOLUME, -1, P_UNISON, P_RELEASE, P_REVERB },
 };
 static const char *NAME[P_NPARAM] = { "WAVE", "ATTACK", "CHORUS", "UNISON", "RELEASE", "REVERB", "VOLUME" };
 
@@ -35,7 +37,7 @@ void panel_init(panel_t *pn, const float knob[PANEL_KNOBS], uint32_t now_ms)
      * sine in the background of each note". The knob adds it. */
     pn->val[P_REVERB] = 0.0f;
     pn->val[P_WAVE] = 1.0f; pn->val[P_ATTACK] = 0.1f; pn->val[P_CHORUS] = 0.0f;
-    pn->bank = knob[0] > 0.5f;
+    pn->bank = 0;                                     /* the button sets the bank (panel_shift) */
     for (int k = 0; k < PANEL_KNOBS; ++k) {           /* the live bank follows the knobs now */
         int p = MAP[pn->bank][k];
         if (p >= 0) { pn->val[p] = knob[k]; pn->caught[p] = 1; }
@@ -45,6 +47,15 @@ void panel_init(panel_t *pn, const float knob[PANEL_KNOBS], uint32_t now_ms)
     pn->changed = (1u << P_NPARAM) - 1;
 }
 
+void panel_shift(panel_t *pn, int on, uint32_t now_ms)
+{
+    int b = on ? 1 : 0;
+    if (b == pn->bank) return;
+    pn->bank = b; pn->bank_ms = now_ms; rearm(pn);
+    pn->last_knob = -1;                               /* a new bank starts on its overview */
+    memcpy(pn->anchor, pn->knob, sizeof pn->anchor);
+}
+
 void panel_knob(panel_t *pn, int k, float pos, uint32_t now_ms)
 {
     if (k < 0 || k >= PANEL_KNOBS) return;
@@ -52,17 +63,6 @@ void panel_knob(panel_t *pn, int k, float pos, uint32_t now_ms)
     if (pos > 1.0f) pos = 1.0f;
     float prev = pn->knob[k];
     pn->knob[k] = pos;
-    if (k == 0) {                                     /* SHIFT: switch with hysteresis */
-        int b = pn->bank;
-        if (!b && pos > 0.55f) b = 1;
-        if (b && pos < 0.45f) b = 0;
-        if (b != pn->bank) {
-            pn->bank = b; pn->bank_ms = now_ms; rearm(pn);
-            pn->last_knob = -1;                       /* a new bank starts on its overview */
-            memcpy(pn->anchor, pn->knob, sizeof pn->anchor);
-        }
-        return;
-    }
     int p = MAP[pn->bank][k];
     if (p < 0) return;
 #ifdef MSQ_TOOTH_NO_FOCUS_DEADBAND

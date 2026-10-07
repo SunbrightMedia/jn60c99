@@ -8,15 +8,19 @@ FX stage only** (the proven engine_b master chain: JUNO CHORUS 2 + HALL 1, delay
 off) -> PCM5102 over I2S, 48 kHz. Five knobs, two banks, 128x32 SSD1306 OLED.
 Not a JUNO voice port.
 
-## Pins
-| signal | S3 GPIO |
-|---|---|
-| I2S BCK / LCK / DIN | 5 / 6 / 7 |
-| MIDI RX (6N137 pin 6, 1 k to 3.3 V) | 18 |
-| Knob 1 SHIFT / 2 / 3 / 4 / 5 VOLUME (wipers; ends to 3.3 V and GND) | 1 / 2 / 4 / 8 / 9 |
-| OLED SDA / SCL (3.3 V, GND) | 11 / 12 |
-| Battery sense: 10k from charger OUT+ to the pin, 10k from the pin to GND | 10 |
-| Charger CHRG / STDBY (LED pins, each via 10k; optional) | 13 / 14 |
+## Pins (the user's final build, 2026-10-07; headers flipped)
+| signal | S3 GPIO | parts |
+|---|---|---|
+| I2S BCK / LCK / DIN -> DAC | 42 / 40 / 21 | DAC: VIN 5V, SCK GND, FLT/DEMP/FMT GND, XSMT 3V3, A3V3 open |
+| MIDI RX (6N137 pin 6) | 17 | 1 k pull-up to 3V3 (never 5 V); 6N137 pins 8+7 on 5V, 0.1 uF 8-5; 220 R jack pos 4 -> pin 2; 1N4148 stripe pin 2 |
+| Knob 1 VOLUME / 2 free / 3 / 4 / 5 (wipers; ends 3V3, GND) | 1 / 4 / 6 / 8 / 9 | optional 0.1 uF wiper-GND at the ESP; pot bodies to GND |
+| OLED SDA / SCL | 15 / 13 | |
+| SHIFT button (PB86, NC to 3V3) | 48 | internal pull-down; pressed = LOW; armed after a first HIGH |
+| SHIFT LED | 38 | 1 k in series; lit while SHIFT is held |
+| Battery sense (ADC2) | 11 | 10 k from boost VIN+ (after the switch), 10 k to GND, both at the ESP |
+| USB sense (charger In+) | 10 | 10 k from In+, 10 k to GND, both at the ESP; pull-down on |
+Power: battery -> charger B+/B-; Out+ -> switch -> boost VIN+; Out- -> VIN-; boost OUT+/OUT- (5.0 V)
+= star point to ESP 5V/GND, DAC VIN/GND, PAM +/- (470 uF + 0.1 uF at the PAM), 6N137.
 Wiring pictures: docs/hardware/midi_in_6n137.png, docs/hardware/PCM5102_MODULE.md.
 
 ## Controls
