@@ -222,6 +222,10 @@ extern "C" {
  * (44100 selects one precomputed coefficient set; any other value the second).
  * Returns the sample rate it used. */
 uint32_t juno_engine_init(unsigned char *st);
+/* juno_engine_init_core -- sub_1803990C0 alone, without the BUILD wrapper's state (the
+ * DCO-retrigger latches, two reverb smoother seeds): the constructor's constants, which the
+ * plugin's setSampleRate also writes on a running engine (CLAIMS B13b). */
+uint32_t juno_engine_init_core(unsigned char *st);
 
 /* juno_engine_prepare — the coefficients the plugin's sample-rate prepare
  * (CWaveGen::setSampleRate 0x3C7A20 + smoother snap-all 0x3C29B0) writes but the

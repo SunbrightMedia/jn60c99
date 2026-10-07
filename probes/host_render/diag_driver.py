@@ -174,7 +174,7 @@ def port(ci, nstep):
             print('step %3d block %3d (n=%d, %d events, ctx %s): audio %s, state %s' % (
                 si, bi - 1, n, len(evs), ctx, 'ok' if not da else '%d differ from %d' % (len(da), da[0]),
                 'ok' if not len(dd) else '%d words differ: %s' % (len(dd), ' '.join(
-                    'u%d+%d plug %08x port %08x' % (where[x][0], where[x][1], int(want[x]), int(got[x])) for x in dd[:6]))))
+                    'u%d+%d plug %08x port %08x' % (where[x][0], where[x][1], int(want[x]), int(got[x])) for x in dd[:int(os.environ.get("DIAG_N", "6"))]))))
             ga = (ctypes.c_int * 32)()
             lib.juno_gui_arp_debug(c, ga)
             ga = list(ga)

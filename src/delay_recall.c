@@ -247,7 +247,7 @@ static const uint32_t S1CHORUS[] = {
 static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, int dtype)
 {
     int b53 = blob_val(rec, 53), b52 = blob_val(rec, 52);
-    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+    int Hr = (int)JF(state, 16);
     unsigned k; uint32_t bits; float f;
     for (k = 0; k < sizeof(S1CHORUS) / sizeof(S1CHORUS[0]); k += 2) {
         bits = S1CHORUS[k + 1]; memcpy(&f, &bits, sizeof f);
@@ -333,7 +333,7 @@ static const uint32_t S1REVERB[] = {
 static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, float tc)
 {
     int b52 = blob_val(rec, 52);
-    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+    int Hr = (int)JF(state, 16);
     unsigned k; uint32_t bits; float f;
     for (k = 0; k < sizeof(S1REVERB) / sizeof(S1REVERB[0]); k += 2) {
         bits = S1REVERB[k + 1]; memcpy(&f, &bits, sizeof f);
@@ -440,7 +440,7 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
      * drives 4297744 through juno_apply_delay_finefx_2nd, and at TYPE 4 it is inert
      * (256-byte sweep at TYPE 4 moves ZERO cells in the full 2.75 M-cell state). */
     int on = (int)JI(state, JUNO_DLY_ON);     /* the DELAY LEVEL on-flag, hysteresis */
-    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+    int Hr = (int)JF(state, 16);
     unsigned k; uint32_t bits; float f;
 
     /* NOT THE FIRST INSTANCE. Building TYPE 1 or 4 writes no 102xxx cell
@@ -651,7 +651,6 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     unsigned k;
     uint32_t bits;
     float f, tc;
-    if (Hr <= 0) Hr = 96000;
 
     /* (1) and (2) of the sequence above. The old code here modelled the
      * previous type only for types 0 and 1, keyed the type-0 case on the
@@ -882,7 +881,6 @@ void juno_apply_delay_tempo_t10(unsigned char *state, int time_byte, int sync, i
 {
     int Hr = (int)JF(state, 16);
     float tc;
-    if (Hr <= 0) Hr = 96000;
     tc = dly_time_coeff(state, Hr, time_byte, sync);
     if (dtype == 0) JF(state, 102352) = tc;
     else if (dtype == 1) JF(state, 4297584) = tc;
@@ -917,7 +915,6 @@ void juno_live_delay_sync(unsigned char *state, int time_byte, int sync, int dty
 {
     int Hr = (int)JF(state, 16);
     float tc;
-    if (Hr <= 0) Hr = 96000;
     tc = dly_time_coeff(state, Hr, time_byte, sync);   /* synced at the stored tempo */
     if (dtype == 0) JF(state, 102352)  = tc;
     if (dtype == 1) JF(state, 4297584) = tc;

@@ -55,6 +55,13 @@ void juno_rr_reset(unsigned char *state);   /* juno_engine_prepare: records re-s
 void juno_rr_boot(unsigned char *state);
 void juno_rr_begin(unsigned char *state, juno_rr_ctx *ctx);
 void juno_rr_end(unsigned char *state, const juno_rr_ctx *ctx);
+/* The plugin's setSampleRate on a running engine (CLAIMS B13b, src/recall_ramp.c): the
+ * processor's suspend (at the old rate), the effect container's re-applies (values from `ref`,
+ * a settled recall at the new rate; the reverb's arms at the old rate) and the resume (at the
+ * new rate). The caller sets the rate and runs the two constructors between the last two. */
+void juno_rr_setsr_suspend(unsigned char *state);
+void juno_rr_setsr_reapply(unsigned char *state, const unsigned char *ref);
+void juno_rr_setsr_resume(unsigned char *state);
 void juno_rr_settle(unsigned char *state);
 void juno_rr_pump(unsigned char *state);
 int  juno_rr_active(const unsigned char *state);

@@ -94,7 +94,6 @@ int juno_host_edit(unsigned char *st, const unsigned char *settled, int hp, cons
     int Hr = (int)JF(st, 16), resend_t = -1;
     if (!pg) return -1;
     if (gated_off(hp, f)) return 0;
-    if (Hr <= 0) Hr = 96000;
     for (k = 0; k < pg->count; ++k) {
         const jh_op *o = &JH_OPS[pg->first + k];
         uint32_t bits;

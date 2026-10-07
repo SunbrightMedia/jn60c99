@@ -312,9 +312,10 @@ def check_port(tooth=None, only=None, ref_pkl=None, title=None):
         raw = bool(steps) and steps[0] == ('raw',)
         if raw and tooth == 'settled_start':  # tooth: the port before CLAIMS B15 (it started settled)
             lib.juno_rr_settle(lib.juno_gui_state(c))
-        if not raw:                           # the plugin side's state (a raw chain sets none)
-            pl = ref['_payload'][ci]
-            lib.juno_gui_queue_state(c, pl, len(pl))
+        if not raw or setting is not None:    # the plugin side's state: a raw chain sets one only to start
+            pl = ref['_payload'][ci]          # at an engine-rate setting (the oracle's setState, before
+            lib.juno_gui_queue_state(c, pl, len(pl))   # setupProcessing: host_process_emu.start)
+        if not raw:
             L0, R0 = (ctypes.c_float * PRELUDE)(), (ctypes.c_float * PRELUDE)()
             lib.juno_gui_process_ex(c, (Note * 1)(), 0, (Param * 1)(), 0, 0, 120.0, L0, R0, PRELUDE)
             lib.juno_rr_settle(lib.juno_gui_state(c))

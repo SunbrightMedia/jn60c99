@@ -63,7 +63,7 @@ engine render (CWaveGen vt+56)  rva 0x3C7400   voice workers + master (e2e_emu r
 |---|---|
 | engine at vm.vs.sampleRate's rate (default 96000) + the converter to the host rate | the same on the product path (juno_gui_plugin_init, src/juno_conv.c) -- **bit-exact, A25**; juno_gui_create stays the engine model (the engine at the given rate, no table) the engine gates grade |
 | silence at a host rate outside its table (11025, 22050, 32000, 47999, ...) and at wild settings | the same -- **bit-exact, A25** |
-| a setting change after the engine has run: setSampleRate in place | refused, the port keeps its rate -- **open, B13b** |
+| a setting change after the engine has run: setSampleRate in place | the same (setsr_inplace, src/recall_ramp.c juno_rr_setsr_*) -- **bit-exact, A30** |
 | a host-rate change on a running instance (setActive / setupProcessing): the engine kept, the render object looked up again | the same (juno_gui_setup_processing, juno_gui_set_active) -- **bit-exact, A28** |
 | the render driver: events at offsets, the tick clock in 1e-8 host samples from round(tempo x 10), the grid restarted by the first key, ticks always, the tempo only when valid / changed / 40..300 | the same (gui/juno_bridge.c drv_block) -- **bit-exact, A24** |
 | the arp controller (SW / TYPE / STEP, the apply, the pattern reload at the next step) | the same (arp_sw / arp_type_set / arp_step_set, src/carp.c carp_ctl_config) -- **bit-exact, A24** |
@@ -139,8 +139,9 @@ taps forward then backward in float and is scaled by (float)L; the counters wrap
 1. DONE (A24): the oracle through process() with its isolation control; the driver and the arp
    controller ported and gated on the identity path at 44100 / 48000 / 96000.
 2. DONE (A25): the engine-rate setting, the table, the converter, the silence object, the
-   product start at 96000, the switch on a fresh start. B13b: the switch on a running engine
-   (setSampleRate in place, rva 0x3C7A20).
+   product start at 96000, the switch on a fresh start. DONE (A30): the switch on a running
+   engine (setSampleRate in place, rva 0x3C7A20); the fresh start now switches the boot state
+   in place too.
 3. DONE (A29): the start-up as the plugin boots (its build at 96000, its ramps in flight), gated
    from the first sample (boot_gate.py). Not graded from the first sample: a setting that
    switches the engine at the first block.
@@ -227,3 +228,28 @@ A note in the block of a voice-count change is lost: the render's preamble that 
 resets every assigner after the block's events. Port: src/boot_ramps.h (tools/verify/gen_boot_ramps.py),
 juno_rr_boot (src/recall_ramp.c) in juno_gui_plugin_init. Gate: tools/verify/boot_gate.py (7 chains
 from the first sample); mutants: probes/boot/boot_teeth.py.
+
+## setSampleRate on a running engine (READ + EXECUTED, 2026-10-07; CLAIMS A30)
+
+CWaveGen::setSampleRate (rva 0x3C7A20) does nothing when the rate equals the engine's (ucomiss /
+je: also on NaN); else, for each of the 9 units: the processor's suspend (vt3, rva 0x3B86C0) ramps
+the mute cells toward 0 at the OLD rate (every voice's 2848 / 3328 / 6448; 84560 and the effect
+type's own pair -- 91248 / 91280 for types 2..4, 96384 / 96416 for 5; 101744 and the delay block in
+force's switch / enable pairs; the reverb's 10759376 at 36 ms); the effect container's setSampleRate
+(rva 0x3BC980) re-applies by IMMEDIATE set (the cell, no record) every voice's 624, 1920, 1936,
+2784 .. 3312, 10240 .. 10288, the chorus' 91120 .. 91184, 96336, 96368 and the delay block in force's
+cells, with the values a recall at the new rate gives; the reverb arms its filter and cut cells
+(twice, mute / unmute around them) at the old rate and stores its 34 taps and its lazy-wipe
+countdown directly; the state's setSampleRate (rva 0x3C2770) sets every record's rate and runs the
+constructor's constants (sub_1803990C0, not the BUILD wrapper's latches and seeds) and the runtime
+reset (sub_1803A1300: voice and effect memories, the effect buffers, the delay ring positions, the
+noise block -- in every unit's own copy); the resume (vt5, rva 0x3B8560) ramps the mute cells back
+at the NEW rate (84560 and 85184 / 85168 at 24 ms for effect type 0, 86320 for 1). Records keep
+their increments unless re-armed: a ramp armed at an engine rate of 0 has a 0/0 increment and
+steps its cell to NaN, which the master render's tank test reads as "off" (rva 0x36680E, jbe on
+unordered). The port: setsr_inplace (gui/juno_bridge.c) composes juno_rr_setsr_suspend /
+_reapply / _resume (src/recall_ramp.c), juno_engine_init_core, juno_chorus_init and
+juno_driver_unit_noise_reinit; the re-applied values come from a recall of the current record on
+a reference engine built at the new rate (its own shim). Gate: tools/verify/rate_switch_gate.py;
+mutants: probes/b13b/switch_teeth.py; census probes: probes/b13b/.
+

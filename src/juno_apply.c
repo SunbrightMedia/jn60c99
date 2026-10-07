@@ -339,7 +339,6 @@ float juno_apply_param(unsigned char *state, int i, int byte, int Hr)
     int cid;
     float c;
     if (i < 0 || i >= N_BINDINGS) return 0.0f;
-    if (Hr <= 0) Hr = 96000;
     cid = BINDINGS[i].curve_id;
     if (BINDINGS[i].sr_variant == 1)                 /* 3-class curve-arm select */
         cid = rate_curve(cid, Hr);
@@ -378,7 +377,6 @@ float juno_apply_param_leaf(unsigned char *state, int param_index, int byte, int
     int blob = juno_param_blob(param_index), i, n;
     float w = 0.0f;
     if (blob < 0) return 0.0f;
-    if (Hr <= 0) Hr = 96000;
     n = N_BINDINGS;
     for (i = 0; i < n; ++i) {
         if (BINDINGS[i].blob_pos != blob) continue;
@@ -714,10 +712,10 @@ static int bank_apply(unsigned char *state, const unsigned char *bank, int idx, 
     (void)live;
 #endif
     /* Host rate, exactly as juno_prepare reads it — drives the SR-variant curve
-     * selection so recall matches the plugin at 44100/48000/else-96k. An unset
-     * rate field (0) defaults to 96 kHz (the engine's historical rate). */
+     * selection so recall matches the plugin at 44100/48000/else-96k. Any rate,
+     * 0 included, goes into the laws as the plugin's setters take it (no
+     * fallback: an engine-rate setting of 6 runs the engine at 0, CLAIMS B13b). */
     Hr = (int)JF(state, 16);
-    if (Hr <= 0) Hr = 96000;
     blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
     for (i = 0; i < N_BINDINGS; ++i) {
         int p   = BINDINGS[i].blob_pos;

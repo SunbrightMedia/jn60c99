@@ -123,10 +123,10 @@ mine is a hypothesis (playbook 80).
   midi_ctl_gate.py), and sustain CC 64 (a hold in the keyboard object) + all
   notes off CC 123 (A27), and a host-rate change on a running instance (A28,
   host_rate_gate.py), and the start-up as the plugin boots, its build's ramps in
-  flight (A29, boot_gate.py, from the first sample). Open: an engine-rate switch on
-  a running engine (B13b). The web
+  flight (A29, boot_gate.py, from the first sample), and an engine-rate switch on a
+  running engine, setSampleRate in place (A30, rate_switch_gate.py). The web
   app's WASM is not rebuilt with the converter yet (needs emcc). Engine:
-  PROVENANCE 30/30 PROVEN; full verify of
+  PROVENANCE 31/31 PROVEN; full verify of
   cd63fc1 GREEN (job verify_fix3, EXIT 0, every section ran); ARM golden OK
   (job arm_golden_cd63, toolchain installed by apt in that container). Later commits are docs only. The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12

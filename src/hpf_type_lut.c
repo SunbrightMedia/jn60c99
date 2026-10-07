@@ -227,7 +227,6 @@ void juno_apply_hpf_type(unsigned char *state, int cutoff, int type)
     if (type == 0) return;                 /* front-panel curves already correct */
     cutoff &= 0xFF;
     Hr = (int)JF(state, 16);
-    if (Hr <= 0) Hr = 96000;
     if (Hr == 48000)
         JF(state, 10240) = f_from_bits(HPF_T1_10240_48k[cutoff]);
     else if (Hr == 44100)

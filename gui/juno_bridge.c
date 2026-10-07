@@ -204,7 +204,7 @@ typedef struct {
     void *ro_out;              /* the block's drv_out, for the converter's engine render */
     float *ro_tmp;             /* the converter's host samples of one segment (2 x ro_tmp_cap) */
     int   ro_tmp_cap;
-    int   ro_unported;         /* a rate switch on a running engine was asked: B13b, not ported */
+    int   ro_unported;         /* a path the port does not model was reached (none since CLAIMS A30) */
     int   setup_rate;          /* the host rate setupProcessing stored (plugin_init: the create rate) */
 } juno_ctx;
 
@@ -530,7 +530,7 @@ float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
     int Hr, blob, i, n;
     float w = 0.0f;
     if (!c) return 0.0f;
-    Hr = (int)JF(c->st, 16); if (Hr <= 0) Hr = 96000;
+    Hr = (int)JF(c->st, 16);
     blob = juno_param_blob(param_index);
     if (blob < 0) return 0.0f;
     /* LEAF semantics: the plugin's value tree dispatches whole leaves — one panel
@@ -1005,8 +1005,9 @@ void juno_gui_set_voice_count(juno_ctx *c, int n)
 int juno_gui_voice_count(juno_ctx *c) { return c ? juno_voice_count(c->st) : 0; }
 
 /* The paths this context reached that the port does not model (each one an
- * open claim): bit 0 an engine-rate switch on a running engine (CLAIMS B13b).
- * A gate that sees a bit set must not report its chain as graded. */
+ * open claim). Bit 0 was an engine-rate switch on a running engine (CLAIMS
+ * B13b), ported since A30: no path sets a bit now. The gates keep the check:
+ * a gate that sees a bit set must not report its chain as graded. */
 int juno_gui_unported(juno_ctx *c)
 {
     return c ? (c->ro_unported ? 1 : 0) : 0;
@@ -2091,20 +2092,58 @@ static void plugin_defaults(juno_ctx *c, int setting)
     c->drv_nq = nq;
 }
 
+/* The plugin's setSampleRate on its running engine (CWaveGen vt+24, rva 0x3C7A20;
+ * CLAIMS B13b, src/recall_ramp.c): nothing when the rate is the engine's own
+ * (ucomiss / je: also when either is NaN); else, unit by unit, the processor's
+ * suspend, the effect container's re-applies (the values a settled recall of
+ * the current record gives at the new rate), the state's rate, the
+ * constructor's constants (sub_1803990C0, without the BUILD wrapper's state)
+ * and its runtime reset (sub_1803A1300: voice and effect memories, the effect
+ * buffers, the ring positions), then the resume. The voices keep their notes,
+ * the records their increments (only the re-armed ones change). `recall`: 0 on
+ * a fresh start, where the engine still holds the build's own values (the port's
+ * build at the new rate, coldstate_ab.py), 1 once a recall or edit has run. */
+static void setsr_inplace(juno_ctx *c, float rate, int recall)
+{
+    float old = JF(c->st, 16);
+    unsigned char *ref;
+    struct juno_host_shim rshim;     /* the reference's own: attaching c->shim would point the
+                                      * live master's selectors into `ref`, freed below */
+    juno_ctx t;
+    if (!(rate < old || rate > old)) return;
+    ref = (unsigned char *)malloc(JUNO_STATE_BYTES);
+    if (!ref) return;
+    memset(&rshim, 0, sizeof rshim);
+    st_build(ref, rate, &rshim, c->chorus_mode);     /* the build's rate laws at the new rate */
+    juno_rr_copy_proc(ref, c->st);                    /* the tempo, the tap copy, the reverb's state */
+    t = *c;
+    t.live_recall = 0;
+    if (recall && c->bank) ctx_state_recall(&t, ref, c->bank, c->patch_idx, 0);
+    juno_rr_settle(ref);
+    juno_rr_setsr_suspend(c->st);                     /* vt3, at the old rate */
+    juno_rr_setsr_reapply(c->st, ref);                /* rva 0x3BC980 */
+    JF(c->st, 16) = rate;                             /* rva 0x3C2770: the records' rate */
+    juno_engine_init_core(c->st);                     /* sub_1803990C0 */
+    juno_chorus_init(c->st);                          /* sub_1803A1300 */
+    juno_driver_unit_noise_reinit(c->st);             /* ... in every unit's noise copy */
+    juno_rr_setsr_resume(c->st);                      /* vt5, at the new rate */
+    free(ref);
+}
+
 /* The engine-rate switch (rva 0x320BA2: setSampleRate, then the render object's
- * lookup; found, the tick phase and note count start again). Exact here when
- * nothing has happened since the start -- the state byte-equal to a fresh
- * create + plugin_init at this host rate: the plugin switches its built engine
- * before its first block's queue (the defaults, the DAW's events), so the
- * result is the build at the new rate (the cold state coldstate_ab.py grades),
- * the mute and the defaults. A switch on an engine that has run is the
- * plugin's setSampleRate in place: CLAIMS B13b, not ported -- ro_unported is
- * set, the port keeps its rate and object. Returns 1 when it switched. */
+ * lookup; found, the tick phase and note count start again). The plugin
+ * switches at the start of a block, before that block's queue. On a fresh
+ * start -- the state byte-equal to a fresh create + plugin_init at this host
+ * rate -- that is before initialize's defaults, which the port applied at
+ * plugin_init: the port rebuilds the boot (the build at 96000, its ramps in
+ * flight: CLAIMS A29), switches it in place and applies the defaults again.
+ * On an engine that has run it switches in place (CLAIMS B13b). Returns 1
+ * when it switched. */
 int juno_gui_plugin_init(juno_ctx *c);
 
 static int ro_switch(juno_ctx *c)
 {
-    if (c->ro_model || c->ro.engine == c->eng_req || c->ro_unported) return 0;
+    if (c->ro_model || c->ro.engine == c->eng_req) return 0;
     if ((float)c->eng_req != JF(c->st, 16)) {
         juno_ctx *ref = ctx_create((float)c->drv_rate, c->chorus_mode);
         int same;
@@ -2112,9 +2151,16 @@ static int ro_switch(juno_ctx *c)
         juno_gui_plugin_init(ref);
         same = !memcmp(ref->st + 176, c->st + 176, JUNO_STATE_BYTES - 176);
         juno_gui_destroy(ref);
-        if (!same) { c->ro_unported = 1; return 0; }
-        st_build(c->st, (float)c->eng_req, &c->shim, c->chorus_mode);
-        plugin_defaults(c, 0);
+        if (same) {
+            float built = JF(c->st, 16);
+            st_build(c->st, built, &c->shim, c->chorus_mode);
+            juno_engine_no_setsr(c->st);
+            juno_rr_boot(c->st);
+            setsr_inplace(c, (float)c->eng_req, 0);   /* the build's own values: no recall yet */
+            plugin_defaults(c, 0);
+        } else {
+            setsr_inplace(c, (float)c->eng_req, 1);
+        }
     }
     c->ro.engine = c->eng_req;
     if (juno_ro_lookup(&c->ro) > 0) { c->drv_phase = 0; c->drv_notes = 0; }

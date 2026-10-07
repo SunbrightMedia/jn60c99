@@ -120,7 +120,7 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
              * (rva 0x357b80) computes (a + a) / H with chorus II's a = 0.82
              * (src/rate_laws.h). The 4 arms it replaced were this law at
              * 44100/48000/88200/96000; any other rate got the 96k word. */
-            int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+            int Hr = (int)JF(state, 16);
             JF(state, 91152) = rl_chorus_mode_rate(1, Hr);
         }
 #ifndef JUNO_TOOTH_NO_ET2_LFO
@@ -156,7 +156,7 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
         if (etype == 2) {
             /* (0.48 + 0.48) / H, the same mode method's chorus I row: the
              * f32 0.96f / Hf this replaced, bit for bit at every integer rate. */
-            int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+            int Hr = (int)JF(state, 16);
             JF(state, 91152) = rl_chorus_mode_rate(0, Hr);
         }
 #endif
@@ -179,7 +179,7 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
          * 4 and a patch change 4 -> 2/3 kept the flanger row's values
          * (tools/verify/warm_chain_gate.py, CLAIMS B1). */
         if (etype == 2 || etype == 3) {
-            int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+            int Hr = (int)JF(state, 16);
             JF(state, 91120) = rl_chorus_mode_time(etype - 2, Hr);
             JF(state, 91168) = (float)180 * cr_bits(0x3bb60b61u);
             JF(state, 91184) = cr_bits(0x3b83126fu);
@@ -187,7 +187,7 @@ void juno_apply_chorus(unsigned char *state, const unsigned char *rec)
         if (etype == 4) {
             /* 91120 / 91152: the mode method's flanger row (T = 3.3 ms, a = 9.2),
              * continuous in H (src/rate_laws.h); was 4 measured arms. */
-            int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+            int Hr = (int)JF(state, 16);
             JF(state, 91120) = rl_chorus_mode_time(2, Hr);
             JF(state, 91152) = rl_chorus_mode_rate(2, Hr);
             JF(state, 91168) = cr_bits(0x00000000u);

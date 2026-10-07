@@ -160,6 +160,26 @@ const unsigned char *juno_driver_unit_noise(const unsigned char *st, int v)
     return st + JUNO_NOISE_BLOCK_OFF;
 }
 
+/* The noise-block cells the plugin's setSampleRate re-initializes in every unit's
+ * own copy (sub_1803A1300: eight, sub_1803990C0: two; EXECUTED: probes/b13b/
+ * setsr_writers.py, the same ten on every unit; CLAIMS B13b). With per-voice
+ * copies live, each copy takes them from the shared block the two constructors
+ * have just written; its other cells stay its own. */
+void juno_driver_unit_noise_reinit(unsigned char *st)
+{
+#ifndef EB_DEVCELLS
+    static const unsigned W[10] = { 84272u, 84288u, 84320u, 84336u, 84352u, 84368u, 84384u,
+                                    84400u, 84416u, 84432u };
+    int v, k;
+    if (!unit_split(st)) return;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        for (k = 0; k < 10; ++k)
+            memcpy(unit_noise(st, v) + (W[k] - JUNO_NOISE_BLOCK_OFF), JCELL(st, W[k]), 4);
+#else
+    (void)st;
+#endif
+}
+
 void juno_driver_render_voices(unsigned char *st, float *vbuf)
 {
     unsigned char nblk[JUNO_NOISE_BLOCK_LEN];

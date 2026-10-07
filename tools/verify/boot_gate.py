@@ -8,7 +8,9 @@ sample from the first is compared. The runner is midi_ctl_gate.py's ('raw' chain
 Chains: host 48000 / 44100 (converter) and 96000 (identity), the default engine-rate setting:
 silence through the 960-sample start-up mute and the ramps; notes inside the mute and right
 after it; a patch load and a host edit while the boot ramps run; the voice count raised to 8
-after the start (the two units it had stopped resume their boot ramps); the arp from the start.
+after the start (the two units it had stopped resume their boot ramps); the arp from the start;
+and six starts at an engine-rate setting (2, 3, 1, 2 at host 96000, 5 automatic, 6: rate 0) --
+the first block's switch on the boot state, from the first sample (CLAIMS A30).
 
   --ref         (Unicorn) writes scratchpad/boot_ref.pkl (.partial, then renamed)
   --port        (libjuno) every sample of both channels must agree
@@ -59,6 +61,14 @@ def chains():
     st += [E(ev=[on(0, k, 0.7) for k in (48, 52, 55, 59, 62, 65, 69, 72)])] + [E()] * 10
     st += [E(ev=[off(0, k) for k in (48, 52, 55, 59, 62, 65, 69, 72)])] + [E()] * 6
     out.append(('vc8', 48000.0, None, st))
+    # an engine-rate setting from the start (a DAW state that carries one): the plugin's first block
+    # switches its built engine -- setSampleRate on the boot state, ramps in flight, before
+    # initialize's defaults (CLAIMS A30) -- then the defaults and the state apply
+    for name, rate, setting in (('s2', 48000.0, 2), ('s3', 44100.0, 3), ('s1', 44100.0, 1),
+                                ('s2u', 96000.0, 2), ('s5', 48000.0, 5), ('s6', 48000.0, 6)):
+        st = [('raw',)] + [E()] * 6 + [E(ev=[on(0, 60, 0.8)])] + [E()] * 3 + [E(ev=[on(5, 64, 0.7)])] + [E()] * 6
+        st += [E(ev=[off(0, 60), off(3, 64)])] + [E()] * 8
+        out.append((name, rate, setting, st))
     # the arp from the start
     A = lambda n=256, ev=(): ('blk', n, list(ev), (True, 128.0), [])
     st = [('raw',), ('patch', 1), A(ev=[on(0, 60, 0.8), on(0, 64, 0.8)])] + [A()] * 20

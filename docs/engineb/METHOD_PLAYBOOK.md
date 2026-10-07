@@ -2759,3 +2759,45 @@ equivalent on the output, said so with the reason, not hidden.
 Print each chain's peak (and where its sound starts) with the reference and look at it: a chain
 that is silent, or quieter than its purpose needs, is a reach gap even when it is bit-exact. Fix
 the chain, rebuild only that chain (--only), and say in the claim what the old chain did.
+
+## 150. A SCRATCH BUILD MUST NOT WRITE INTO ITS CALLER -- CHECK EVERY POINTER A BUILD HANDS BACK
+Paid 2026-10-07 (JUNO, the in-place rate switch). The switch builds a reference engine at the new
+rate to read the re-applied values from. Its build (st_build) attaches a host shim -- and attaching
+writes into the SHIM pointers to the state being built. Passing the live context's shim re-pointed
+the live master's effect selectors into the temporary state, freed a moment later. Nothing failed
+until a later malloc reused that block: the switch alone passed, the switch plus one queued state
+entry stopped the chorus (host_process_gate 4 chains red). A bisection over the payload found
+"any one entry" -- the tell of a lifetime defect, not of a value.
+### The rule
+Before reusing a build or init function on a scratch object, read what it writes through its
+ARGUMENTS, not only into its target. Give the scratch its own copy of every such argument (here a
+local shim). A failure that appears only with "one more harmless step" is a lifetime defect:
+look for freed or shared memory before looking at values.
+
+## 151. CENSUS BY MEMORY WRITE, NOT BY THE SETTERS YOU KNOW -- AND GRADE THE STATE, NOT ONLY THE SOUND
+Paid 2026-10-07 (JUNO, setSampleRate on a running engine). The census of the plugin's setter calls
+(ramped and immediate sets) missed two families its effect container writes by direct stores (the
+reverb's 34 tap positions, its lazy-wipe countdown); the memory-write log (every store with its call
+chain) had them. The same day the port's switch reset the shared noise block but not the units' own
+copies -- no chain played noise, so every chain was bit-exact; the per-block state diagnostic saw it
+at once.
+### The rule
+Census a function by the memory it writes (a write hook over the whole object, every store, its
+caller), then classify; a census of known entry points is a sample. Grade a new path's STATE as
+well as its audio (diag_driver per block), and for every state difference the audio cannot hear,
+extend a chain until it can (here: DCO NOISE up), so the gate keeps the reach.
+
+## 152. A ROBUSTNESS FALLBACK IS AN APPROXIMATION -- THE PLUGIN DOES NOT GUARD, SO NEITHER MAY THE PORT
+Paid 2026-10-07 (JUNO, an engine at rate 0). Twenty recall laws in src/ carried
+`if (Hr <= 0) Hr = 96000;` -- written for states with an unset rate field. The plugin has no such
+guard: at an engine rate of 0 (the engine-rate setting 6 reads 0 past its table) its laws give inf
+(C/H), -2.0 (the pre-delay), -2/16384 (the delay time). Two unit tests had codified the fallback
+("unset -> 96k"), and the reverb pre-delay law had its own clamp at 0 (the plugin's float law,
+rva 0x3C1720, is unclamped and differs from the port's integer law at huge rates). Then three NaN
+compares in the master render, written as C operators, took the other branch from the plugin's
+jumps once a rate-0 ramp produced a NaN level (playbook 81).
+### The rule
+Never guard a law the plugin does not guard. A state without a rate is a harness defect: fix the
+harness (the tests now set their rate), not the law. When a path can reach inf / NaN in the plugin
+(a zero rate, a 0/0 increment), grade it -- the NaN semantics of every compare on that path are
+then on trial.

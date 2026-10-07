@@ -40,6 +40,9 @@ int main(void)
 {
     unsigned char *bank = calloc(1, HDR + STRIDE);
     unsigned char *st = calloc(1, JUNO_STATE_BYTES);
+    /* the expected words are the 96 kHz ones (the test's rate): set it, as every engine has one
+     * (the recall laws take the rate as the plugin's setters do, 0 included: CLAIMS B13b) */
+    if (st) JF(st, 16) = 96000.0f;
     int fails = 0;
     bank[0] = 'K';
     unsigned char *rec = bank + HDR;
@@ -59,7 +62,7 @@ int main(void)
     put_blob(rec,  53, 128);    /* DELAY TIME   (blob 53, corrected from 49)  */
     put_pair(rec, 3057, 255);   /* DELAY FEEDBACK   */
     put_pair(rec, 3060, 255);   /* DELAY DIRECT LEV */
-    memset(st, 0, JUNO_STATE_BYTES);
+    memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
     juno_bank_apply(st, bank, 0);
 
     if (*(int32_t *)(st + JUNO_PROG_DLY) != 0) {
@@ -86,7 +89,7 @@ int main(void)
      * TIME cell 102352 is written for EVERY type (the plugin's recall dispatches the
      * time leaf before the type routing — every captured state carries it). --- */
     put_pair(rec, 650, 2);
-    memset(st, 0, JUNO_STATE_BYTES);
+    memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
     juno_bank_apply(st, bank, 0);
     if (*(int32_t *)(st + JUNO_PROG_DLY) != 2) {
         printf("  case2: v39 cell = %d, expected 2\n", *(int32_t *)(st + JUNO_PROG_DLY)); ++fails; }
@@ -105,7 +108,7 @@ int main(void)
     /* --- case 3: DELAY TYPE 0 but LEVEL 0 (delay off): block muted --- */
     put_pair(rec, 650, 0);
     put_blob(rec, 52, 0);       /* DELAY LEVEL 0 (blob 52, corrected from 40) */
-    memset(st, 0, JUNO_STATE_BYTES);
+    memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
     juno_bank_apply(st, bank, 0);
     /* LEVEL 0 -> ON/OFF gate (102576) drops to 0. 102592 is a constant enable (=1.0
      * for every factory patch), so it is NOT the level mute — only 102576 is checked. */
@@ -119,7 +122,7 @@ int main(void)
     put_pair(rec, 650, 0);
     put_blob(rec, 52, 128);
     put_blob(rec, 59, 1);       /* TEMPO SYNC on */
-    memset(st, 0, JUNO_STATE_BYTES);
+    memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
     juno_bank_apply(st, bank, 0);
     if (u32(st, 102352) != 0x4003d400) {
         printf("  case4: synced Time %08x != 4003d400 (d8 @96k)\n", u32(st, 102352)); ++fails; }
@@ -127,7 +130,7 @@ int main(void)
     /* --- case 5: DELAY TYPE 1 (dual delay): both instances written, same time;
      * second-instance constants + level gate present. --- */
     put_pair(rec, 650, 1);
-    memset(st, 0, JUNO_STATE_BYTES);
+    memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
     juno_bank_apply(st, bank, 0);
     if (*(int32_t *)(st + JUNO_PROG_DLY) != 1) {
         printf("  case5: v39 cell = %d, expected 1\n", *(int32_t *)(st + JUNO_PROG_DLY)); ++fails; }
@@ -154,12 +157,14 @@ int main(void)
         static const struct arm A[3] = {
             { 44100.0f, 0x3c3abeeau, 0x388b3cdfu, 0x3f800000u, 0x3f800000u },
             { 48000.0f, 0x3c2b929au, 0x387fd974u, 0x00000000u, 0x3f4ba5b0u },
-            {     0.0f, 0x3bab929au, 0x37ffd974u, 0x00000000u, 0x3f4ba5b0u },  /* unset -> 96k */
+            { 96000.0f, 0x3bab929au, 0x37ffd974u, 0x00000000u, 0x3f4ba5b0u },  /* 96k (was "rate 0 -> 96k": a
+                * port fallback; at rate 0 the plugin's own laws give inf here -- graded against the
+                * plugin by tools/verify/rate_switch_gate.py, CLAIMS B13b) */
         };
         int a;
         put_pair(rec, 650, 0);                 /* DELAY TYPE 0 -> FILT block */
         for (a = 0; a < 3; ++a) {
-            memset(st, 0, JUNO_STATE_BYTES);
+            memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
             JF(st, 16) = A[a].rate;
             juno_bank_apply(st, bank, 0);
             if ((unsigned)u32(st, 102608) != A[a].c102608 ||
@@ -172,7 +177,7 @@ int main(void)
             }
         }
         put_pair(rec, 650, 1);                 /* restore TYPE 1 for case 6 */
-        memset(st, 0, JUNO_STATE_BYTES);
+        memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
         juno_bank_apply(st, bank, 0);
     }
 
@@ -221,7 +226,7 @@ int main(void)
         rec[3059] = 3;                /* DELAY HIGH CUT = 3  (int1x7 raw) */
         put_pair(rec, 3084, 12);      /* DELAY HF DAMP   = 12 (int8x4)    */
         put_pair(rec, 3092, 3);       /* DELAY HF DAMP FREQ = 3 (int8x4)  */
-        memset(st, 0, JUNO_STATE_BYTES);
+        memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
         JF(st, 16) = 44100.0f;
         juno_bank_apply(st, bank, 0);
         if ((unsigned)u32(st, 102368) != 0x3ce64b15u) {   /* HIGH CUT=3 (rate-indep) */
@@ -240,7 +245,7 @@ int main(void)
      * at 44.1 kHz: HIGH CUT=0, LOW CUT=17, PRE DELAY=80 -- vs the plugin's own
      * smoother-target coeffs. int1x7 raw record bytes. --- */
     {
-        memset(st, 0, JUNO_STATE_BYTES);
+        memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
         JF(st, 16) = 44100.0f;
         put_pair(rec, 650, 2);          /* DELAY TYPE 2 -> slot-1 chorus I         */
         rec[3288] = 0;                  /* CHORUS HIGH CUT  = 0                     */
@@ -262,7 +267,7 @@ int main(void)
      * 4297968; DIRECT=128 -> 4297744 (=128/255); HF DAMP FREQ=3 -> 4297952 @44.1k
      * (== case-7's 102656 value, identical rate-armed law). --- */
     {
-        memset(st, 0, JUNO_STATE_BYTES);
+        memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
         JF(st, 16) = 44100.0f;
         put_pair(rec, 650, 1);          /* DELAY TYPE 1 -> dual delay              */
         rec[3059] = 3;                  /* DELAY HIGH CUT = 3 (int1x7 raw)         */
@@ -284,7 +289,7 @@ int main(void)
      * law-identical, dt5_derive.py). Rate-independent cells @44.1k: delay HIGH CUT=3 ->
      * 6497184; delay DIRECT=128 -> 6497328; chorus HIGH CUT=0 -> 10693072. --- */
     {
-        memset(st, 0, JUNO_STATE_BYTES);
+        memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
         JF(st, 16) = 44100.0f;
         put_pair(rec, 650, 5);          /* DELAY TYPE 5 -> slot-1 reverb           */
         rec[3059] = 3;                  /* DELAY HIGH CUT = 3                       */
@@ -311,7 +316,7 @@ int main(void)
         };
         int i;
         for (i = 0; i < (int)(sizeof FL / sizeof FL[0]); ++i) {
-            memset(st, 0, JUNO_STATE_BYTES);
+            memset(st, 0, JUNO_STATE_BYTES); JF(st, 16) = 96000.0f;
             JF(st, 16) = (float)FL[i].Hr;
             put_pair(rec, 634, 4);          /* EFFECT TYPE 4 -> FLANGER                */
             juno_bank_apply(st, bank, 0);
