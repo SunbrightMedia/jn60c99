@@ -15,12 +15,13 @@ Scenarios replayed:
 
 Run:  LIBJUNO=./libjuno_cov.so python3 tools/verify/cov_replay.py
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import os, sys, ctypes, struct
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import fuzz_diff as F
 from fuzz_diff import gen_script, BLOBS, ARPS, BANK
 
-LIB = os.environ.get('LIBJUNO', '/home/user/jn60c99/libjuno_cov.so')
+LIB = os.environ.get('LIBJUNO', _JREPO + '/libjuno_cov.so')
 lib = ctypes.CDLL(LIB)
 lib.juno_gui_create.restype = ctypes.c_void_p
 lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]

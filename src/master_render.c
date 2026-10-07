@@ -971,7 +971,11 @@ float *juno_master_render(unsigned char *a1, float **a2, float **a3)
       v436 = -1.0;
     *(float *)(a1 + 4297520) = v436 * *(float *)(a1 + 4297840);
     v437 = v433 * *(float *)(a1 + 4297792);
-    if ( v437 <= 0.00012207031 )
+    /* rva 0x366417: `comiss xmm1, [2^-13 as float]` + `jbe`, taken when
+     * v437 <= 2^-13 OR unordered (NaN). The decompiled `v437 <= 0.00012207031`
+     * compared in double against a value just below 2^-13 and was false on
+     * NaN: wrong at v437 == 2^-13 and at NaN (READ; playbook 81/123). */
+    if ( !(v437 > 0.00012207031f) )
       v438 = 0.0001220703125;
     else
       v438 = v437;
@@ -2080,11 +2084,17 @@ LABEL_105:
   if ( *(int *)(a1 + 10759872) <= 0 )
   {
     v475 = *(float *)(a1 + 11022032);
+    /* The fade steps are SINGLE-precision adds/subtracts of the float
+     * constant 0x39D1B717 (0.0004f). The decompiler printed it as a double
+     * literal, which made C evaluate the step in double: near zero, after a
+     * fade interrupted by a new tank clear, the double step rounds to another
+     * float (EXECUTED: 0x39d1b809 - step -> plugin 0x31f20000, double
+     * 0x31f1ff14; tools/verify/host_edit_gate.py fx chain 10, playbook 123). */
     if ( v474 < 1.0 && *(float *)(a1 + 10759376) > 0.0 )
     {
-      v475 = v474 + 0.00039999999;
-      *(float *)(a1 + 11022032) = v474 + 0.00039999999;
-      if ( (float)(v474 + 0.00039999999) > 1.0 )
+      v475 = v474 + 0.00039999999f;
+      *(float *)(a1 + 11022032) = v474 + 0.00039999999f;
+      if ( (float)(v474 + 0.00039999999f) > 1.0 )
       {
         *(_DWORD *)(a1 + 11022032) = 1065353216;
         v475 = 1.0;
@@ -2095,7 +2105,7 @@ LABEL_105:
   {
     if ( v474 != 0.0 )
     {
-      v474 = v474 - 0.00039999999;
+      v474 = v474 - 0.00039999999f;
       *(float *)(a1 + 11022032) = v474;
       if ( v474 < 0.0 )
       {

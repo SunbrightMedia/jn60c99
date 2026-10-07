@@ -6,9 +6,10 @@ all 8 voice regions against the plugin's cold post-recall state. 48 kHz cold
 audio is proven bit-exact, so its diff set is the benign baseline; report every
 cell whose diff-status exists at 44.1k or 96k but not at 48k, WITH the plugin's
 value at all three rates (to derive each cell's rate law)."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, ctypes
 import numpy as np
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import e2e_emu as E
 import os as _o, sys as _s; _s.path.insert(0, _o.path.join(_o.path.dirname(_o.path.abspath(__file__))))
 import truth
@@ -18,7 +19,7 @@ STRIDE, STATE = 10512, 12*1024*1024
 PATCHES = [(13, 0), (4, 1), (11, 2), (19, 3), (5, 5)]   # (patch, v39 type)
 RATES = [44100.0, 48000.0, 96000.0]
 
-lib = ctypes.CDLL("/home/user/jn60c99/libjuno.so")
+lib = ctypes.CDLL(_JREPO + "/libjuno.so")
 lib.juno_gui_create.restype = ctypes.c_void_p
 lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
 lib.juno_gui_apply_bank.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]

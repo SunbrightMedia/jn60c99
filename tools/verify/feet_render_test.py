@@ -20,9 +20,10 @@ libjuno-only (two-process rule). NOTE: use a high enough note (72) that one-octa
 down stays within the autocorrelation search window (lag < 900); note 60's feet=0.5
 period exceeds it and mis-locks onto a harmonic (a measurement artifact, not a bug).
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import ctypes, struct
 
-LIB  = '/home/user/jn60c99/libjuno.so'
+LIB  = _JREPO + '/libjuno.so'
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
 import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
 SR, N = 48000.0, 16000

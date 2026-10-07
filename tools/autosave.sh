@@ -14,9 +14,9 @@
 # It never rebases, never force-pushes, and skips a cycle if another git
 # process holds the lock, so it cannot fight an agent that is mid-commit.
 set -u
-cd /home/user/jn60c99 || exit 1
+cd "$(dirname "$0")/.." || exit 1      # the repo root, wherever it is checked out
 INTERVAL="${1:-300}"
-BRANCH=claude/session-recap-j7evnx
+BRANCH=$(git rev-parse --abbrev-ref HEAD)   # the branch this checkout is on, never a stale name
 
 while true; do
   sleep "$INTERVAL"

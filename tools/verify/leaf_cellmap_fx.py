@@ -6,21 +6,22 @@ real patch of each EFFECT TYPE via load_leaves activates that block (as
 ext_sweeps did with patch 5), so each fine-FX setter writes to a live block.
 
 Contexts (patch, EFFECT TYPE): chorusI=factory0(2), chorusII=factory11(3),
-mfx=factory7(5), pan=factory9(1), delay=factory13, flanger=chillwave32(4),
+mfx=factory7(5), pan=factory9(1), delay=factory13, flanger=factory0 at DELAY
+TYPE 4 (was a user-bank patch at EFFECT TYPE 4, the wrong selector: playbook 113),
 reverb=factory20(reverb-active). Merges cells into leaf_cellmap.pkl for the
 PAT2_*/EFX/CTRL leaves; the rest keep their first-pass result.
 Oracle-only (Unicorn). Output: updates scratchpad/leaf_cellmap.pkl in place.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 from unicorn import UC_HOOK_MEM_WRITE
 
-SP  = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
+SP  = _JREPO + '/scratchpad'
 PKL = SP + '/leaf_cellmap.pkl'
-CW  = SP + '/chillwave.bin'
 SZ  = 0xA83010
-EFFECT_TYPE, REVERB_TYPE = 873, 876
+EFFECT_TYPE, DELAY_TYPE, REVERB_TYPE = 873, 875, 876
 
 cellmap = pickle.load(open(PKL, 'rb'))
 # target: every PATCH2-family FX leaf + EFX/CTRL that is currently silent-or-gap
@@ -28,14 +29,14 @@ TARGET = [d for d, i in cellmap.items()
           if i['struct'] in ('PAT2_CHO','PAT2_FL','PAT2_MFX','PAT2_REV','PAT2_DLY',
                              'PAT2_FLT','PAT2_AMP','PAT2_LFO','PAT2_CTRL','EFX','CTRL')]
 
-# (label, bankfile, patch idx, force EFFECT TYPE, force REVERB TYPE)
+# (label, bankfile, patch idx, force EFFECT TYPE, force REVERB TYPE, force DELAY TYPE)
 FACT = None  # loaded via E.bank_bytes()
-CTXS = [('chorusI', 'fac', 0, 2, None), ('chorusII', 'fac', 11, 3, None),
-        ('mfx', 'fac', 7, 5, None), ('pan', 'fac', 9, 1, None),
-        ('delay', 'fac', 13, None, None), ('flanger', 'cw', 32, 4, None),
-        ('reverb', 'fac', 20, 2, 2)]
+CTXS = [('chorusI', 'fac', 0, 2, None, None), ('chorusII', 'fac', 11, 3, None, None),
+        ('mfx', 'fac', 7, 5, None, None), ('pan', 'fac', 9, 1, None, None),
+        ('delay', 'fac', 13, None, None, None), ('flanger', 'fac', 0, None, None, 4),
+        ('reverb', 'fac', 20, 2, 2, None)]
 
-facbank = E.bank_bytes(); cwbank = open(CW, 'rb').read()
+facbank = E.bank_bytes()
 leaves_std = E.load_leaves()
 
 def recall_full(e, bank, idx):
@@ -46,14 +47,17 @@ def recall_full(e, bank, idx):
             try: e.dispatch(u, disp, val)
             except RuntimeError: pass
 
-for (label, which, idx, et, rt) in CTXS:
-    bank = facbank if which == 'fac' else cwbank
+for (label, which, idx, et, rt, dt) in CTXS:
+    bank = facbank
     e = E.E2E(); e.build(48000.0); e.snap_all()
     recall_full(e, bank, idx); e.snap_all()
-    if et is not None or rt is not None:
+    if et is not None or rt is not None or dt is not None:
         for u in range(9):
             if et is not None:
                 try: e.dispatch(u, EFFECT_TYPE, et)
+                except RuntimeError: pass
+            if dt is not None:
+                try: e.dispatch(u, DELAY_TYPE, dt)
                 except RuntimeError: pass
             if rt is not None:
                 try: e.dispatch(u, REVERB_TYPE, rt)

@@ -28,6 +28,8 @@
 #include "effect_luts.h"
 #include <stdint.h>
 #include <string.h>
+#include "rate_laws.h"
+#include "juno_curve.h"
 
 static float efx_bits(uint32_t u) { float f; memcpy(&f, &u, sizeof f); return f; }
 
@@ -50,35 +52,65 @@ static void write_struct(unsigned char *state, const juno_efx_cell *tbl, int n)
         *(uint32_t *)JCELL(state, tbl[i].off) = tbl[i].bits;
 }
 
+/* EFFECT DEPTH under the EFFECT TYPE field t in force when DEPTH is dispatched.
+ * The plugin's DEPTH setter (rva 0x3AE560) switches on that field; for types
+ * 0/1 it sends column 0 of a 256-row table the processor constructor fills with
+ * min(4*depth, 255) (rva 0x3AC670) to the block method at rva 0x357D60, which
+ * stores curve 25 of it. PROVEN cell by cell under Unicorn (DEPTH dispatched
+ * with each type 0..6 in force; tools/verify/effect_param_gate.py sweeps all
+ * 256 bytes in types 0..5 at 3 rates):
+ *   t 0/1  : 84544 = curve 25 of min(4*depth, 255);
+ *            85136 (t 0) or 86288 (t 1) = MODE1_DS_DRIVE_LUT[depth]
+ *   t 2..4 : 84544 = EFFECT_SW_LUT[depth] (0 -> 0, else 1.0); block-A wet
+ *            91232 too, which src/chorus_recall.c writes with the same law
+ *   t 5    : 84544 = EFFECT_SW_LUT[depth]; 96400 = depth / 255
+ *   t >= 6 : nothing -- the switch has no such case.
+ * EFFECT_SW_LUT's 2026-08-25 correction was measured in types 2..5 only and
+ * had been applied to every type. */
+static void depth_under(unsigned char *state, int t, int depth)
+{
+    if (t <= 1) {
+        JF(state, 84544) = juno_curve(25, depth * 4 > 255 ? 255 : depth * 4);
+        JF(state, t == 0 ? 85136 : 86288) = efx_bits(MODE1_DS_DRIVE_LUT[depth & 0xFF]);
+    } else if (t <= 5) {
+        JF(state, 84544) = efx_bits(EFFECT_SW_LUT[depth & 0xFF]);
+        if (t == 5)
+            JF(state, 96400) = (float)depth / 255.0f;
+    }
+}
+
 void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
 {
     int depth = efx_blob_val(rec, 50);    /* EFFECT DEPTH 0..255 */
     int tone  = efx_rec_byte(rec, 642);   /* EFFECT TONE  0..255 */
     int etype = efx_rec_byte(rec, 634);   /* EFFECT TYPE  0..5   */
 
-    /* Route slot 2 to the patch's EFFECT TYPE (the driver points params+112 here).
-     *
-     * OUT OF RANGE MEANS NO STORE, NOT A CLAMPED STORE. The old comment here
-     * said the plugin clamps types above 5 to 5, from a COLD spot sweep — and
-     * cold that is unfalsifiable, because the power-on routing value and a
-     * clamped write can be the same number. Warm it is plainly false.
-     *
-     * PROVEN two-sided (tools/verify/warm_recall_gate.py, synthetic bank, one
-     * engine): with EFFECT TYPE 3 in force, a recall at type 6 leaves the cell
-     * at 3; with type 5 in force it leaves 5; type 7 and 255 behave as 6. The
-     * result always equals the incoming value, so the plugin performs NO STORE.
-     * The port clamped and stored 5, which is right only when the previous type
-     * happened to be 5 — 7 of 30 legal random seeds caught it.
-     *
-     * The CLAMP ITSELF STAYS for the mode arms below: only the routing store is
-     * skipped. The arms at a clamped 5 matched the plugin on every one of those
-     * seeds; changing them is the unlanded seventh-class work, not this fix. */
-    if (etype <= 5)
-        *(int32_t *)JCELL(state, JUNO_PROG_EFX) = (int32_t)etype;
-    if (etype > 5) etype = 5;
+    /* THE RECALL ORDER DECIDES WHICH TYPE EACH LEAF SEES. The plugin recalls in
+     * ascending index order (its enumerator, rva 0x3B48A0, executed:
+     * probes in tools/verify/plugin_recall_set.py): EFFECT DEPTH (794) runs
+     * BEFORE EFFECT TYPE (873), EFFECT TONE (874) after it. So DEPTH first acts
+     * under the type field in force BEFORE this recall -- the raw previous leaf,
+     * JUNO_PREV_EFX, which can be >= 6 (the plugin's field at processor +1472
+     * stores the raw value, PROVEN: 6 after a type-6 recall). */
+    depth_under(state, JI(state, JUNO_PREV_EFX), depth);
 
-    /* Shared slot-2 wet control (read by master_render for EVERY mode at 84544). */
-    JF(state, 84544) = efx_bits(EFFECT_SW_LUT[depth & 0xFF]);
+    /* OUT OF RANGE (type >= 6): the TYPE setter stores the raw value in its
+     * field but routes nothing, selects no mode and replays nothing; TONE then
+     * sees the raw value and its switch writes nothing. So no arm below runs.
+     * PROVEN two ways: the routing cell keeps the type in force (with 3 in
+     * force a type-6 recall leaves 3; tools/verify/warm_recall_gate.py), and a
+     * cold type-6/255 recall leaves block B (96352/96384/96400/96416) at 0
+     * where the old port ran the type-5 arm (a clamp to 5 that no gate had
+     * compared on the whole object; tools/verify/effect_param_gate.py). */
+    if (etype > 5)
+        return;
+    *(int32_t *)JCELL(state, JUNO_PROG_EFX) = (int32_t)etype;
+
+    /* A valid TYPE re-routes slot 2 and replays DEPTH under the NEW type:
+     * a cold type-0 recall ends at curve 25 of min(4*depth, 255) although
+     * DEPTH first ran under the power-on type 2 (effect_param_gate.py, fresh
+     * recalls). The arms below then write their own cells. */
+    depth_under(state, etype, depth);
 
     /* EFFECT TYPE 0 — the slot-2 "Pan" arm (the render's v551<=1 branch, block
      * 84960..85968): a clean level+pan stage sharing mode-1's laws (the DlyPan
@@ -134,22 +166,29 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
         JF(state, 96400) = (float)depth / 255.0f;                      /* On/Off           */
         {
             int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
-            /* LFO Rate (96352): the CHORUS5_LFORATE_LUT is the 96 kHz reference; the
-             * host-rate value is LUT * (96000/SR) computed in DOUBLE precision then
-             * rounded to float — a float32 multiply is +1 ULP off for some LUT
-             * entries (e.g. tone 128, LUT 0x37e6c674: plugin 0x387b2f14 @44.1k, the
-             * float op gives ..15). Proven against the plugin's own recall at
-             * 44100/88200 (2.0x @48k is exact either way). */
-            JF(state, 96352) = (float)((double)efx_bits(CHORUS5_LFORATE_LUT[tone & 0xFF])
-                               * (96000.0 / (double)Hr));
+            /* LFO Rate (96352), READ from the mode-5 method (rva 0x3573ab): curve 22 of
+             * the tone byte, r = c * 1.9667f (f32 0x3ffbbcd3, rva 0x988120) + 0.3333f
+             * (f32 0x3eaaa64c, rva 0x988110), then (r + r) / H -- all float.
+             * PROVEN 256/256 tone bytes at 44100, 32000 and 96001 by sweeping the
+             * plugin's own EFFECT TONE setter (dispatch 874) under Unicorn,
+             * 2026-10-05. It replaces "the 96 kHz LUT times 96000/H in double",
+             * an inferred form that matched the factory patches' tone values but
+             * was wrong for 65..72 of the 256 tone bytes at EVERY rate, 44.1k
+             * included (no gate swept EFFECT TONE at EFFECT TYPE 5). */
+            {
+                float r = juno_curve(22, tone & 0xFF) * efx_bits(0x3ffbbcd3u)
+                          + efx_bits(0x3eaaa64cu);
+                JF(state, 96352) = (r + r) / (float)Hr;
+            }
             /* Ip Fc gate (96384) — SR-dependent 3-class (mode5_gates_spec.md). */
             JF(state, 96384) = efx_bits(Hr == 44100 ? 0x388b3cdfu :
                                         Hr == 48000 ? 0x387fd974u : 0x37ffd974u);
-            /* Structural cell 96336 is rate-dependent with FOUR distinct arms (all
-             * measured from the plugin's own recall; MODE5_STRUCT holds the 96k arm). */
-            JF(state, 96336) = efx_bits(Hr == 44100 ? 0x3b8c0000u :
-                                        Hr == 48000 ? 0x3b98bc15u :
-                                        Hr == 88200 ? 0x3c0e0000u : 0x3c1abc15u);
+            /* Structural cell 96336: (H * C3) - C2, C3 = f32 0x33d5febf (rva
+             * 0x9880f0), C2 = f32 0x39000000 (rva 0x988104), read from the
+             * mode-5 method at rva 0x357310. CONTINUOUS in H (CLAIMS B4); it was
+             * four measured arms (this law at 44100/48000/88200/96000, the 96k
+             * word at every other rate -- wrong at 32000, rate_sweep_gate.py). */
+            JF(state, 96336) = rl_mode5_time(Hr);
             /* 17 further block-B cells are RATE-DEPENDENT, 2-class {44100 / else}
              * (48000 == 88200 == 96000 hold the MODE5_STRUCT values). The single-arm
              * struct capture broke every v551==5 patch cold at 44.1 kHz (divergence

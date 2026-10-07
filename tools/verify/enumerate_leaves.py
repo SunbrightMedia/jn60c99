@@ -8,11 +8,12 @@ param' is impossible — every leaf appears whether or not anyone thought of it.
 Dispatch index = flat <value> position + 740 (matches e2e_emu.load_leaves and
 the value-tree dispatch 0x3B9A30). Emits tools/verify/coverage_leaves.tsv.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, re, json
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import truth
 
-OUT = '/home/user/jn60c99/tools/verify/coverage_leaves.tsv'
+OUT = _JREPO + '/tools/verify/coverage_leaves.tsv'
 x = open(truth.SCRIPT_XML, encoding='utf-8', errors='replace').read()
 
 # Walk the document in order, tracking the enclosing <structType><type>NAME</type>

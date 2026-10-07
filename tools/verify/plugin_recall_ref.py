@@ -13,6 +13,7 @@ that is what the port's voice-0 block covers. Output: {patch: bytes(10512)}.
 Two-process rule: E2E/Unicorn only. Diff vs the port side (port_state.pkl) is a
 separate pickle-only step (plugin_recall_diff.py).
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, pickle
 sys.path.insert(0, 'tools/verify')
 import e2e_emu as E
@@ -20,7 +21,7 @@ import real_recall as RR
 import real_bank_parse as RB
 import plugin_recall_set as PRS
 
-PKL = '/home/user/jn60c99/scratchpad/plugin_recall_ref.pkl'
+PKL = _JREPO + '/scratchpad/plugin_recall_ref.pkl'
 BLOCK = 10512
 
 

@@ -17,19 +17,20 @@ GAP remains. Value-law correctness of APPLIED rows is Pillar 3's job, not this
 gate's. Regenerate the ledger with build_coverage.py (needs the Unicorn
 cell-map). This gate is static + fast (no Unicorn) so it runs in make verify.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, re
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import truth
 
-COV = '/home/user/jn60c99/COVERAGE.tsv'
+COV = _JREPO + '/COVERAGE.tsv'
 
 # 1) regenerate the enumeration from the binary's own Script.xml, then read the
 # canonical 'dispatchable' column (single source of truth — enumerate_leaves.py).
 import subprocess
-subprocess.run([sys.executable, '/home/user/jn60c99/tools/verify/enumerate_leaves.py'],
+subprocess.run([sys.executable, _JREPO + '/tools/verify/enumerate_leaves.py'],
                check=True, capture_output=True)
 want = set()
-for ln in open('/home/user/jn60c99/tools/verify/coverage_leaves.tsv').read().splitlines()[1:]:
+for ln in open(_JREPO + '/tools/verify/coverage_leaves.tsv').read().splitlines()[1:]:
     f = ln.split('\t')
     if f[8] == '1':
         want.add(int(f[1]))
@@ -71,7 +72,7 @@ deferred = {d: s for d, s in have.items() if s == 'DEFERRED-CONTROLLER'}
 # by relabelling it -> RED. (A row here that becomes APPLIED later, via #112, is fine
 # — this is a ceiling, not a floor.) Changing this set requires editing gate code in
 # the open, not a silent ledger relabel.
-DEFERRED_CONTROLLER_ALLOWED = frozenset({1118, 1242, 1243, 1244, 1245, 1246, 1247, 1248})
+DEFERRED_CONTROLLER_ALLOWED = frozenset({1118})   # 1242-1248 left 2026-10-05: engine-reachable at DELAY TYPE 4 (playbook 113)
 illegal_deferred = sorted(set(deferred) - DEFERRED_CONTROLLER_ALLOWED)
 if illegal_deferred:
     red.append("ILLEGAL DEFERRED-CONTROLLER (a GAP cannot be hidden by relabelling): "

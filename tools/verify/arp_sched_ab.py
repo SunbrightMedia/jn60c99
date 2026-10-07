@@ -40,15 +40,16 @@ TWO-PROCESS (mandatory): never build E2E + load libjuno in one process.
   python3 arp_sched_ab.py --ref  [patches...]
   python3 arp_sched_ab.py --port [patches...]
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 
 SR = 48000.0
 BPM = 120.0                      # carp power-on tempo == the plugin arp step clock
 NOTE, VEL = 60, 105
 NTICKS = 96
 ARPS = [1, 9, 17, 25, 33, 41, 49]
-PKL = os.environ.get('JUNO_ARP_SCHED_PKL', '/home/user/jn60c99/scratchpad/arp_sched_ref.pkl')
+PKL = os.environ.get('JUNO_ARP_SCHED_PKL', _JREPO + '/scratchpad/arp_sched_ref.pkl')
 
 TICK_PERIOD = round(SR * 60.0 / (BPM * 24.0))   # 1000 @ 48k/120
 

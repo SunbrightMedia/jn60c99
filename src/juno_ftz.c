@@ -40,6 +40,16 @@
  * faithful reproduction possible — so denormals never even form. WebAssembly and
  * targets without SSE have no such mode; there this is a no-op and the per-sample
  * juno_flush_denormals() below is the fallback. Call once after engine init. */
+/* THE ORACLE'S MODE (gates only). The Unicorn oracle honours DAZ but NOT FTZ:
+ * with MXCSR 0x9FC0, 1e-20f*1e-20f stores the denormal 0x000116c2 where an x86
+ * CPU stores 0 (MEASURED 2026-10-06, playbook 120). Under DAZ every later
+ * arithmetic op reads a denormal as 0, so the two modes differ ONLY in the
+ * denormal results that get stored. A gate that compares the port with the
+ * oracle bit for bit therefore runs the port in the oracle's mode -- DAZ on,
+ * FTZ off, no explicit flush -- via juno_set_fp_oracle_mode(1). Production
+ * code never calls it. */
+int juno_flush_enabled = 1;
+
 #if defined(__SSE__) && !defined(__EMSCRIPTEN__)
 #include <xmmintrin.h>
 #include <pmmintrin.h>   /* _MM_SET_DENORMALS_ZERO_MODE (DAZ) */
@@ -49,6 +59,12 @@ void juno_enable_hw_ftz(void)
     _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON); /* DAZ: denormal operand -> 0 */
 }
 int juno_hw_ftz_available(void) { return 1; }
+void juno_set_fp_oracle_mode(int on)
+{
+    _MM_SET_FLUSH_ZERO_MODE(on ? _MM_FLUSH_ZERO_OFF : _MM_FLUSH_ZERO_ON);
+    _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+    juno_flush_enabled = !on;
+}
 #elif defined(__ARM_FP) && !defined(__EMSCRIPTEN__)
 /* ARM VFP: set the FZ bit for flush-to-zero -- denormal inputs AND outputs -> 0,
  * which is the DAZ+FTZ equivalent of x86, so the whole engine computes in the
@@ -74,9 +90,11 @@ void juno_enable_hw_ftz(void)
 #endif
 }
 int juno_hw_ftz_available(void) { return 1; }
+void juno_set_fp_oracle_mode(int on) { juno_flush_enabled = !on; }   /* x86 gates only */
 #else
 void juno_enable_hw_ftz(void) { /* no hardware FTZ (WASM/other): explicit flush used */ }
 int juno_hw_ftz_available(void) { return 0; }
+void juno_set_fp_oracle_mode(int on) { juno_flush_enabled = !on; }   /* x86 gates only */
 #endif
 
 /* structural per-voice recursive-state offsets (relative to the voice block,
@@ -100,8 +118,9 @@ static inline void ftz(unsigned char *st, unsigned off)
  * FTZ/DAZ would. Cheap: 13*8 slot checks per sample. */
 void juno_flush_denormals(unsigned char *st)
 {
-    int v, i;
-    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+    int v, i, nv = juno_voice_count(st);
+    if (!juno_flush_enabled) return;          /* the oracle's mode: see above */
+    for (v = 0; v < JUNO_NUM_VOICES && v < nv; ++v) {   /* a voice not rendered keeps its state (B10) */
         unsigned base = (unsigned)v * JUNO_VOICE_MAIN_STRIDE;
         for (i = 0; i < N_VOICE; ++i) ftz(st, base + (unsigned)VOICE_OFF[i]);
     }

@@ -38,13 +38,14 @@ juno_note_broadcast_held() (src/juno_note.c) called from the assigner-level
 note paths (gui/juno_bridge.c synth_note_on/synth_note_off + bank-apply flush).
 After the fix: 7/7 here, 57/57 non-arp unchanged.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 
 SR = 48000.0; NOTE, VEL, N = 60, 105, 16000
 ARPS = [1, 9, 17, 25, 33, 41, 49]
-PKL = os.environ.get('JUNO_ARP_RENDER_PKL', '/home/user/jn60c99/scratchpad/arp_render_ab.pkl')
+PKL = os.environ.get('JUNO_ARP_RENDER_PKL', _JREPO + '/scratchpad/arp_render_ab.pkl')
 
 if sys.argv[1:2] == ['--port']:
     import ctypes

@@ -16,13 +16,14 @@ Two-process rule: E2E/Unicorn only.
 
 Usage: python3 tools/verify/index_cell_map.py [--dump] [--maxidx N]
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 from unicorn import UC_HOOK_MEM_WRITE
 
 STATE_SZ = E.STATE_SZ
-PKL      = '/home/user/jn60c99/scratchpad/index_cell_map.pkl'
+PKL      = _JREPO + '/scratchpad/index_cell_map.pkl'
 MAXIDX   = 4966   # BUILD drives 0..4965
 
 

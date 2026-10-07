@@ -8,8 +8,9 @@ fuzz_diff conventions VERBATIM), then:
      (full 12MB pre/post snapshot diff)
   3. post-flip full-state diff; introduced mismatches = post-set minus pre-set
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__)))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, ctypes
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import fuzz_diff as F
 import e2e_emu as E
 from unicorn import UC_HOOK_MEM_WRITE

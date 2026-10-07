@@ -159,6 +159,63 @@ extern "C" {
  * shadow TRUE? Both run in `make verify`. */
 #define JUNO_PREV_EFX  11022400u  /* previous EFFECT TYPE leaf (rec 634) */
 #define JUNO_PREV_DLY  11022416u  /* previous DELAY  TYPE leaf (rec 650) */
+/* PROCESSOR-STATE SHADOWS (CLAIMS B1, 2026-10-05). The plugin's processor keeps
+ * state that outlives a recall and that the next recall READS; the port keeps it
+ * here, seeded to the plugin's BUILD values (read under Unicorn: on-flag 0,
+ * FEEDBACK 120, RESONANCE 230). Placed in [11022360, 11022400): past the
+ * object end and the highest compared REGION (11022360), and inside the device
+ * map's last segment, so -DEB_DEVCELLS maps them with no new segment
+ * (tools/verify/shadow_bounds_gate.py checks all three):
+ *   JUNO_DLY_ON     processor +6776: the DELAY LEVEL setter's on-flag, with
+ *                   hysteresis (rva 0x3B8E50) -- updated in juno_apply_delay;
+ *   JUNO_PREV_FB    processor +1512: the raw DELAY FEEDBACK of the previous
+ *                   recall, which the next recall's DELAY LEVEL re-applies to
+ *                   the old block before FEEDBACK itself is dispatched;
+ *   JUNO_PREV_RESO  processor +1568: the same for FLANGER RESONANCE.
+ * The last two are updated at the END of juno_bank_apply, like the routing
+ * shadows above. */
+#define JUNO_DLY_ON     11022368u
+#define JUNO_PREV_FB    11022376u
+#define JUNO_PREV_RESO  11022384u
+/* THE RAMP-RECORD TABLE (CLAIMS B1/B7, src/recall_ramp.c): a 32-byte header,
+ * one 32-byte record per ramped cell (798, src/ramp_cells.h) and the active
+ * list (798 int16), [JUNO_RR_BASE, JUNO_RR_END), port-owned like the shadows,
+ * past every compared region; compiled out under EB_DEVCELLS, so the device
+ * map does not carry it. tools/verify/shadow_bounds_gate.py checks it. */
+#define JUNO_RR_BASE    11022464u
+#define JUNO_RR_END     11049632u
+/* THE VOICE COUNT (CLAIMS B10): the engine's own count (CWaveGen +0x38: the
+ * ctor writes 8, rva 0x3C5A50; the host entry's id 0x0FFFC00E, vm.vs.voiceCount,
+ * writes the raw value, rva 0x3C7AE0). The engine render (rva 0x3C7400) renders
+ * only voice units below it and syncs every voice unit's assigner to it. Kept in
+ * the last 4 bytes of the ramp-record region (the table ends at 11049628), stored
+ * XOR 8 so a zeroed state reads the ctor's 8; compiled out under EB_DEVCELLS
+ * (the device renders 8). Read/write only through juno_voice_count /
+ * juno_set_voice_count (src/juno_driver.c). */
+#define JUNO_VOICE_COUNT_CELL 11049628u
+/* THE UNITS THE COUNT STOPS (CLAIMS B10, src/juno_driver.c): the plugin's
+ * voice units each own a copy of the shared noise block [84272, 84436) and
+ * step it in lockstep; a unit the count stops keeps its copy frozen, and the
+ * master (unit 8) writes the voice output cells (10672 + v*10512) into its OWN
+ * copy. The port has one state, so once a count below 8 has been rendered it
+ * keeps one noise copy per voice here (magic at +0, copies at +16, 176 bytes
+ * each) and restores a stopped voice's output cell after the master. Port-owned,
+ * past every compared region; compiled out under EB_DEVCELLS. */
+#define JUNO_UNIT_BASE  11049632u
+/* THE START-UP MUTE (CLAIMS B6): the engine's construction (rva 0x398EA0, the
+ * unit state's vtable slot 4) sets every unit's skip counter (state+11022344)
+ * to 960; while it is above 0 the unit's render (rva 0x398F30 voice, 0x398EC0
+ * master) decrements it, outputs zero and runs no DSP -- only its ramp pump.
+ * A unit the voice count stops keeps its counter. The master's counter is the
+ * plugin's own cell (JUNO_LATCH_MASTER, unit 8's, compared by the gates); the
+ * eight voice units' are port-owned (JUNO_LATCH_BASE); 0 = none.
+ * juno_gui_create leaves them 0 (the start of the recall model every recall
+ * gate uses: the harness clears the counter, e2e_emu clear_latch);
+ * juno_gui_plugin_init sets them, as the plugin's own start does. */
+#define JUNO_LATCH_MASTER 11022344u
+#define JUNO_LATCH_BASE (JUNO_UNIT_BASE + 16u + 8u * 176u)
+#define JUNO_LATCH_N    960
+#define JUNO_UNIT_END   (JUNO_LATCH_BASE + 8u * 4u)
 
 /* juno_engine_init — exact transcription of sub_1803990C0. Fills the engine
  * state `st` with the real coefficients. Set JF(st,16) to the sample rate first
@@ -195,12 +252,44 @@ void *juno_chorus_init(unsigned char *st);
  * slower ops cause the intermittent audio crackle). See src/juno_ftz.c. */
 void juno_flush_denormals(unsigned char *st);
 
+/* The engine's voice count (CLAIMS B10, JUNO_VOICE_COUNT_CELL): 8 after
+ * construction; juno_set_voice_count stores the host's raw value, as the
+ * plugin's host entry does (no clamp). The render runs voices v < count
+ * (src/juno_driver.c), the ramp pump and the denormal flush skip the others;
+ * the allocator follows it at the next render (gui/juno_bridge.c). Always 8
+ * under EB_DEVCELLS. Header-inline so every driver variant links. */
+static inline int juno_voice_count(const unsigned char *st)
+{
+#ifdef EB_DEVCELLS
+    (void)st;
+    return JUNO_NUM_VOICES;
+#else
+    const unsigned char *p = st + JUNO_VOICE_COUNT_CELL;
+    int32_t x = (int32_t)((uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24));
+    return (int)(x ^ JUNO_NUM_VOICES);
+#endif
+}
+static inline void juno_set_voice_count(unsigned char *st, int n)
+{
+#ifdef EB_DEVCELLS
+    (void)st; (void)n;
+#else
+    uint32_t x = (uint32_t)(n ^ JUNO_NUM_VOICES);
+    unsigned char *p = st + JUNO_VOICE_COUNT_CELL;
+    p[0] = (unsigned char)x; p[1] = (unsigned char)(x >> 8); p[2] = (unsigned char)(x >> 16); p[3] = (unsigned char)(x >> 24);
+#endif
+}
+
 /* juno_enable_hw_ftz — put the CPU into the plugin's SSE flush-to-zero /
  * denormals-are-zero mode (x86 only). On WebAssembly / non-SSE targets this is a
  * no-op and juno_flush_denormals() is the per-sample fallback. Call once after
  * init. juno_hw_ftz_available() returns 1 when the hardware mode was applied. */
 void juno_enable_hw_ftz(void);
 int  juno_hw_ftz_available(void);
+/* juno_set_fp_oracle_mode — GATES ONLY: 1 = the Unicorn oracle's floating-point
+ * mode (DAZ on, FTZ off, no explicit flush), so denormal results match it bit
+ * for bit; 0 = back to the plugin's FTZ/DAZ. See src/juno_ftz.c. */
+void juno_set_fp_oracle_mode(int on);
 
 /* voice_render — exact transcription of sub_180369070, parameterised by voice.
  * Produces one mono sample for voice `voice` (0..7) from engine state `base`;

@@ -19,10 +19,16 @@ repository. It may not DEFAULT to an absolute path outside it. The distinction
 matters: `os.environ.get('JUNO_SCRATCH', <repo>/scratchpad)` is fine;
 defaulting to a /tmp/claude session directory is the defect.
 
-SCOPE: only the scripts `make verify` actually runs. The one-shot derivation
-tools in tools/verify carry the same dead paths and are deliberately not
-checked — they are not gates, they are not run by anything, and failing the
-build for them would be noise. If one is ever promoted to a gate, it lands here.
+SCOPE (WIDENED 2026-10-05): EVERY .py under tools/, and the class is ANY
+absolute /home/... or /tmp/claude-... literal, not only scratch directories.
+The old scope (scripts named in the verify target, scratch paths only) let
+~90 files hardcode the checkout's own absolute path: a git worktree then imported the
+MAIN tree's tools, loaded the MAIN tree's libjuno.so and wrote the MAIN tree's
+scratchpad. That silently broke the isolation tools/verify/mutation_gate.py
+depends on (a mutated worktree build was never the library some gates
+loaded) and any run on another machine or path. A gate's imported helpers are
+gates too, and a "one-shot" tool is one promotion away from being run, so the
+scan now covers all of them. Derive paths from __file__ (see truth.py).
 """
 import os
 import re
@@ -33,7 +39,7 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 
 # The absolute-path shapes that do not survive a container. Anything under the
 # repo is fine, and so is a bare /tmp/<something> a test creates itself.
-BAD = re.compile(r"['\"](/tmp/claude-[^'\"]*|/home/[^/'\"]+/[^'\"]*scratchpad[^'\"]*)['\"]")
+BAD = re.compile(r"['\"](/tmp/claude-[^'\"]*|/home/[^'\"]*|/root/[^'\"]*)['\"]")
 
 
 def gates_in_verify():
@@ -47,32 +53,42 @@ def gates_in_verify():
     return sorted(set(re.findall(r"tools/verify/[a-z_0-9]+\.py", m.group(0))))
 
 
+def tools_py():
+    """Every Python file under tools/ (gates, their helpers, and the one-shot
+    tools that can be promoted into gates)."""
+    out = []
+    for d, dirs, files in os.walk(os.path.join(REPO, "tools")):
+        dirs[:] = [x for x in dirs if x != "__pycache__"]
+        for f in files:
+            if f.endswith(".py"):
+                out.append(os.path.relpath(os.path.join(d, f), REPO))
+    return sorted(out)
+
+
 def main():
     bad = []
-    for rel in gates_in_verify():
+    gates_in_verify()                       # still refuses a Makefile without verify:
+    for rel in tools_py():
         p = os.path.join(REPO, rel)
-        if not os.path.exists(p):
-            continue
-        for n, line in enumerate(open(p), 1):
+        for n, line in enumerate(open(p, encoding="utf-8", errors="replace"), 1):
             if line.lstrip().startswith("#"):
                 continue
             for hit in BAD.finditer(line):
-                s = hit.group(1)
-                if s.startswith(REPO + os.sep) or s == REPO:
-                    continue        # inside the repo: fine
-                bad.append((rel, n, s))
+                # ANY absolute literal is the defect, including one that names
+                # this very checkout: it is wrong in every other checkout.
+                bad.append((rel, n, hit.group(1)))
 
     for rel, n, s in bad:
         print("  %s:%d defaults to a path outside the repo: %s" % (rel, n, s))
     if bad:
-        print("PATHCHECK: FAIL -- %d hardcoded external path(s) in gates that "
-              "`make verify` runs.\n"
+        print("PATHCHECK: FAIL -- %d hardcoded absolute path(s) in "
+              "tools/ (gates and their helpers).\n"
               "  These die in any container but the one that wrote them, and the "
               "failure looks like a port defect.\n"
               "  WHAT TO DO: default to <repo>/scratchpad and keep the "
               "environment override." % len(bad))
         return 1
-    print("PATHCHECK: OK -- every gate in `make verify` defaults inside the repo")
+    print("PATHCHECK: OK -- no absolute path literal in any tools/ Python file")
     return 0
 
 

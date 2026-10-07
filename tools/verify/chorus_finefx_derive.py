@@ -3,10 +3,11 @@ the slot-2 EFFECT-TYPE chorus which has no fine filters): CHORUS HIGH CUT (1212)
 LOW CUT (1211), PRE DELAY (1210), via dispatch 0x3B9A30 + snap_all, in a DELAY
 TYPE 2 context, all 4 rates. Cells: HIGH CUT 6396192.. (7), LOW CUT 6396336/352
 (2), PRE DELAY 6396128 (1). Reuse ONE engine. Output: chorus_finefx_laws.pkl."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
-sys.path.insert(0,'/home/user/jn60c99/tools/verify')
+sys.path.insert(0,_JREPO + '/tools/verify')
 import e2e_emu as E
-SP='/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
+SP=_JREPO + '/scratchpad'
 SZ=0xA83010; ET,DT=873,875
 PARAMS=[('CHORUS PRE DELAY',1210),('CHORUS LOW CUT',1211),('CHORUS HIGH CUT',1212)]
 RATES=[44100.0,48000.0,88200.0,96000.0]

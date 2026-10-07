@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 # env_measure.py -- measure ATTACK and RELEASE time of factory patches on the
 # HOST port (libjuno.so), to attribute the "latency" the user hears to the
 # patch envelope or rule it out. A number, no ears. Decimated peak envelope
 # (no numpy on this box); ms resolution is unaffected.
 import ctypes, sys, math
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import truth
-LIB  = '/home/user/jn60c99/libjuno.so'
+LIB  = _JREPO + '/libjuno.so'
 BANK = open(truth.BANK, 'rb').read()
 SR   = 44100.0
 HOLD = int(1.6 * SR)

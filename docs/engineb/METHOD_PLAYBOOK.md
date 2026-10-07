@@ -2212,3 +2212,452 @@ A tooth models a mistake the change under test could plausibly make (a lost writ
 specialisation, a dropped term), not a measure-zero boundary. If a tooth does not bite, first ask
 whether it could ever change the data -- and never ship the gate on it.
 
+
+## 104. A GATE THAT HARDCODES ITS CHECKOUT PATH IS NOT ISOLATED -- A WORKTREE RUN TESTS THE OTHER TREE
+Paid 2026-10-05 (JUNO, closing the B ledger). A "frozen" `make verify` baseline was started in a git
+worktree so the main tree could be edited meanwhile. ~90 tools under tools/ (82 Python files, 152
+literals) named `/home/user/jn60c99/...` or a dead `/tmp/claude-0/<old session>/scratchpad`: the
+worktree run imported the MAIN tree's tools, loaded the MAIN tree's libjuno.so (already rebuilt with
+an edit) and wrote the MAIN tree's scratchpad. Its verdict would have described neither tree. The same
+defect silently weakens tools/verify/mutation_gate.py, whose worktree mutant is never the library those
+gates load, and makes the suite unusable at any other path (mantra 4: another machine, another AI).
+tools/verify/pathcheck.py had checked only scratch paths, only in scripts the Makefile names; it now
+scans EVERY tools/ Python file for ANY absolute /home, /root or /tmp/claude literal (seen to fail: 152
+hits; after the rewrite to `__file__`-relative roots: 0).
+### The rule
+Every path a tool uses is derived from `__file__` (or an explicit environment override). Before
+trusting any isolated run, grep the tree for the checkout's own absolute path: if it appears, the run
+is not isolated.
+
+## 105. A LEDGERED "AUDIO-INERT" DIFFERENCE NEEDS A GATE THAT CAN SEE THE CELL -- THEN IT IS USUALLY ONE STORE
+Paid 2026-10-05 (JUNO CLAIMS B3). The ledger said "broadcast flags 1856/1488/1840: plugin writes all 8
+voices, port writes the gated voice; audio-inert". No gate compared the voices a note did NOT land on.
+A new all-voice state gate (tools/verify/note_bcast_gate.py: every voice's whole block, from the
+plugin unit that renders it, after every note event) showed the ledger was STALE -- 1856/1840/1488 had
+been fixed -- and found the difference nobody had listed: aux Array B (101488+32v), written to 1.0 by
+the gate setter on every gate-on, never written by the port (9/13 scenarios failed). An earlier probe
+had read Array B one voice off (101520+32v) and concluded MONO never writes it; tracing the setter's
+own stores (rva 0x3c2763) settled both in one run. The fix is one store.
+### The rule
+"Inert" is a statement about what the gates can see. Before ledgering a difference, build the gate
+that sees the cell; before trusting a probe's cell address, trace the writer's own store.
+
+## 106. A LEDGERED "LIMIT OF THE ORACLE" MUST BE RE-TESTED WHEN THE ORACLE GROWS
+Paid 2026-10-05 (JUNO CLAIMS B2). "A steal with >= 9 sounding voices differs by ~1-2 ULP: the plugin's
+steal path splices a worker-thread render the oracle cannot emulate" was written when the oracle drove
+notes through the leaf bus. The oracle later learned to drive the plugin's OWN allocator, but no gate
+ever forced a steal (fuzz_diff caps held notes at 6), so the ledger line was never re-tested. The first
+gate that forced steals (tools/verify/steal_gate.py) failed 12/16 seeds on ONE cell: the plugin gates
+a still-gated chosen voice OFF before the new gate-on, arming the DCO retrigger latch; the port did
+not. Not a thread-pool limit -- a one-line port defect, audible as a missing phase reset on every
+stolen voice.
+### The rule
+Every "the oracle cannot reach X" line names the oracle version it was true for. When the oracle
+gains a capability, re-run every such line as a gate the same day.
+
+## 107. A LAW THAT MATCHES EVERY MEASURED RATE IS STILL A FIT -- READ THE ARITHMETIC
+Paid 2026-10-05 (JUNO CLAIMS B4). The FX recall carried 4-arm tables (44100/48000/88200/96000) and
+used the 96000 arm at every other rate; the reverb tap shift was a fitted `0.019995*H - 1919`; the
+EFFECT TONE -> 96352 law was inferred as "96 kHz LUT x 96000/H in double". Each matched every point it
+was measured at. At 32000 and 192000 the arms were wrong (4/9 renders differed within 400 samples);
+the fitted shift diverged at 11025; the double law was wrong for 65..72 of 256 tone bytes at EVERY
+rate, 44100 included -- found by sweeping all 256 bytes, not by adding rates. The plugin's own
+arithmetic, read from the machine code (operation order, float precision, the `cmp eax,0x17700` skip
+at exactly 96000), matched everywhere (src/rate_laws.h).
+### The rule
+Measure to find a law; never ship the measurement as the law. Transcribe the arithmetic, keep the
+measured points as anchors in a self-test (tests/test_rate_laws.c), and grade the law at inputs no
+anchor names (47999, 96001, every byte).
+
+## 108. A CORRECTION MEASURED IN SOME CONTEXTS IS A LAW ONLY THERE -- READ THE SETTER'S SWITCH FIRST
+Paid 2026-10-05 (JUNO cell 84544). On 2026-08-25 a gate showed EFFECT DEPTH -> 84544 is an on/off
+switch, and the port's smooth ramp was replaced by it in EVERY EFFECT TYPE. The measurement used three
+context patches, all EFFECT TYPE 2..5. The plugin's DEPTH setter (rva 0x3AE560) switches on the type
+in force: types 0/1 store curve 25 of min(4*depth, 255), from a table the processor constructor fills
+(rva 0x3AC670). The "correction" broke types 0/1 for depth 1..63, where the old ramp had been right.
+No factory patch is type 0, so no factory gate saw it; tools/verify/effect_param_gate.py (every byte x
+every type) failed on it at once.
+### The rule
+Before generalizing a law, read its setter: every branch on another parameter is a context the law
+must be measured in. A sweep's context list comes from the setter's branches, not from the factory
+bank.
+
+## 109. AN INCOMPLETE COMPARE WINDOW IS A BLIND GATE -- COMPARE THE WHOLE OBJECT, NAME THE EXCLUSIONS
+Paid 2026-10-05 (JUNO B4). The first rate sweep compared recall_fullstate_diff.REGIONS, a hand-made
+list of engine ranges. It skipped part of the slot-1 chorus block (6396128..6396352), so a DELAY TYPE
+2/3 rate defect was invisible to it. Now the gate compares all 0xA83010 bytes (zlib, ~14 KB a patch)
+and names its exclusions as CONTROL with the reason (C++ header pointers [0,176); the heap neighbour
+at and after the object end).
+### The rule
+A gate compares everything and lists what it excludes, with the reason -- never a list of what it
+includes.
+
+## 110. A REFERENCE TOOL MUST SURVIVE A FRESH CLONE, ITS OWN SIZE, AND THE FREEZE
+Paid 2026-10-05 (JUNO B4: four job deaths in one day). (a) A fresh worktree has no scratchpad/, so
+`make verify` died (EXIT=2) on its first pickle write; the Makefile now creates it. (b) Unicorn's
+native memory is invisible to Python's GC: a sweep that kept 64 live engines, or 256 full 11 MB
+snapshots per leaf, was OOM-killed (exit 137). (c) A long job froze the tree for hours. (d) The rate
+sweep's first tooth mutated EFFECT TYPE 4, which no factory patch uses: it did not bite, and that
+exposed the sweep's reach gap (playbook 103); synthetic records now cover types 0 and 4.
+### The rule
+Run every new reference tool once in a fresh clone. Free each emulator (`del e; gc.collect()`) and
+keep only the words that change. Run long jobs from a snapshot worktree (tools/snap_tree.sh: the
+current working state, scratchpad and job registry shared), so the main tree stays editable. When a
+tooth does not bite, look for a reach gap before anything else.
+
+## 111. THE RECALL ORDER IS PART OF THE LAW -- A SETTER THAT SWITCHES ON ANOTHER PARAMETER SEES WHATEVER VALUE IT HOLDS AT THAT MOMENT
+Paid 2026-10-05 (JUNO A14). The plugin recalls in ascending index order: EFFECT DEPTH (794) before
+EFFECT TYPE (873), EFFECT TONE (874) after it. So DEPTH acts under the PREVIOUS type and TONE under
+the new raw type. At an out-of-range type the plugin stores the raw value (its field holds 6), routes
+nothing and replays nothing, and TONE's switch writes nothing; the port had clamped to 5 and run the
+type-5 arms. Only a whole-object compare of a fresh recall with an out-of-range type saw it
+(tools/verify/effect_param_gate.py part 2).
+### The rule
+For every setter that branches on another parameter, write down which value of that parameter it
+sees in the plugin's recall order, then test the transitions: cold (the power-on value) and warm
+(every previous class, out-of-range included).
+
+## 112. A PREMISE MARKED "GIVEN" IS A HYPOTHESIS -- READ THE INPUT FROM THE ARTIFACT
+Paid 2026-10-05 (JUNO B6). An earlier hunt concluded LFO RATE H (878) and VCF CUTOFF FREQ H (1029)
+were "redundant float twins" of the 8-bit leaves, "verified (given)". Its probe POPULATED the H leaves
+as byte/255 instead of reading them from the record, so it could not see a difference. The record
+carries them, and in 16 of the 64 factory patches they differ (patch 47's cutoff: 53/255 against
+0x3e11cbc0, about 36.3/255). The plugin's recall enumerator applies them after the 8-bit leaves.
+### The rule
+A probe that derives one input from another cannot test whether the two agree. Read every input
+from the artifact, and grep old findings for "given" before building on them.
+
+## 113. A NO-OP PROOF MUST FORCE THE PARAMETER THE SETTER ACTUALLY READS
+Paid 2026-10-05 (JUNO B5). tools/verify/deferred_noop_gate.py "proved" the seven flanger leaves
+(1242-1248) engine-unreachable, "even with EFFECT TYPE routing forced to 4". Their setters test the
+DELAY TYPE field (processor +1480, index 875), not EFFECT TYPE (873). With DELAY TYPE 4 in force,
+MANUAL, RESONANCE and LOW CUT each write engine cells. The gate was green for the wrong reason.
+### The rule
+Before a gate proves "X does nothing in context C", read X's setter and confirm that C is the value
+its branch reads. A no-op proof in the wrong context is the blind gate of entry 108.
+
+## 114. A LEDGER THAT CANNOT REGENERATE FROM THE TRUTH FILES IS NOT A LEDGER
+Paid 2026-10-05 (JUNO COVERAGE.tsv). Regenerating the completeness ledger by its documented chain
+failed three ways. (1) Two steps read a USER bank (scratchpad/chillwave.bin) to reach EFFECT TYPE
+0/4 and DELAY TYPE 4: absent in a fresh container, and user data must never be load-bearing. Now
+synthetic one-record banks (factory patches with every type pair forced) do it. (2) The port's write
+set was "cells whose value changed": a cell written with its cold value (91216 = the prepare seed
+1.3; the reverb tap array) looked unwritten and became a false GAP. Now the recall runs on the cold
+state and on a copy with every word XORed (outside the few cells the recall reads); a written cell
+ends equal in both. (3) The flanger context forced the wrong selector (playbook 113). The ledger
+had stayed green only because it was never regenerated.
+### The rule
+Regenerate every ledger from the truth files in a fresh clone before trusting it. A "written" test
+must catch writes of the value already there.
+
+## 115. A FINDING THAT NEVER REACHES THE LEDGER IS LOST -- THE SEEDS FOUND IT AGAIN SEVEN WEEKS LATER
+Paid 2026-10-05 (JUNO ASSIGN MODE 3). On 2026-08-13 the user's banks showed that every ASSIGN MODE 3
+patch (22 of 22) diverged at sample 2; docs/ASSIGN_MODE_3_FINDING.md diagnosed it as a voice-choice
+defect and listed what was owed. It never got a row in docs/CLAIMS.md, so no status page carried it
+and nothing was fixed. The first seeded run that drew ASSIGN MODE from its declared range 0..3
+(tools/verify/seed_recall_gate.py) failed 13 seeds on it. The plugin's mode-3 allocator scans voices
+upward from 0; the port scanned down from 7. Fixed in one loop.
+### The rule
+A finding gets a CLAIMS row the day it is made, OPEN if not fixed. A seeded gate must draw every
+leaf from its full declared range -- the values no factory patch uses are where the open defects are.
+
+## 116. A RECALL THAT ONLY EVER RAN ON A FRESH ENGINE ENCODES THE COLD STATE AS A CONSTANT -- CHAIN IT
+Paid 2026-10-05 (JUNO, CLAIMS A17). Every recall gate recalled into a fresh engine, where the
+DELAY TYPE in force is always 0, the DELAY LEVEL on-flag is off and the previous FEEDBACK is the
+build value. The port had baked those three facts in: it modelled the previous delay type for 0
+and 1 only, keyed it on a block's own enable cell, wrote type-0 cells for every type, and restated
+cold values in a table. Chains of recalls through ONE engine (tools/verify/warm_chain_gate.py)
+were red on 82 of 96 steps. In the plugin, DELAY LEVEL/TIME land on the block of the type IN
+FORCE (recall order), then DELAY TYPE switches that block off; the on-flag has hysteresis; the
+old block's feedback comes from the previous recall. Ported with three processor-state shadows:
+0 of 234 steps red.
+### The rule
+Every cold recall gate needs a warm twin: chains through one engine, the whole object after every
+step, seeded records (every leaf), and NAMED edge cases for any state with hysteresis -- a random
+byte reaches DELAY LEVEL 1 once in 256 draws, and the hysteresis tooth bit the edge family only.
+
+## 117. A SNAP IN THE HARNESS IS A MODEL OF TIME -- MEASURE WHAT IT HIDES
+Paid 2026-10-05 (JUNO, CLAIMS B1). The oracle settles every active ramp after a recall
+(e2e_emu.snap_all) so the plugin reaches the port's steady state. MEASURED on a running engine
+(probes/warm/warm_ramps_list.py): a recall arms 40-46 ramp records per unit, about 21 change value,
+and each glides for 4 ms. Every gate that snaps is blind to those 4 ms, and the port jumps.
+### The rule
+For every harness step that changes engine state outside the plugin's own code (snap, latch clear,
+FTZ), measure what it changes on the path the user will run, and state it as a limit of every gate
+that uses it.
+
+## 118. A JOB RUNNER THAT RE-PARSES ITS ARGUMENTS EATS QUOTED COMMANDS
+Paid 2026-10-05. tools/run_job.sh runs `( $* )`, so `sh -c 'a; b'` lost its quotes: one job died
+before it wrote a log, another ran plain `make` (the wrong target) and failed later. The EXIT/DIED
+rule caught both in minutes.
+### The rule
+A compound job command goes in a script file (scratchpad/job_*.sh), never in `sh -c '...'`.
+
+## 119. A GREEN GATE YOU DID NOT RUN IS NOT GREEN -- RUN THE CHEAP ONES ON EVERY COMMIT
+Paid 2026-10-05 (JUNO). Three commits in one day each ran the gates of their own change and turned
+four static gates red, unseen: an EFFECT TYPE bound rewritten from a clamp to an early return broke
+shadow_sync_gate's parser; shadow offsets written as literals in port_writeset.py broke
+shadow_bounds_gate check 3; two comments describing REMOVED fits tripped approx_audit; the new
+src/rate_laws.h had no PROVENANCE row (completeness_scan). Each takes seconds. Found only when
+adding new shadow cells. `make verify` was red from that commit on.
+### The rule
+`make test static` before every commit (the static target runs every seconds-long gate of
+`make verify`). A gate that parses source text must parse CODE, comments stripped: the old
+sync-gate parser was reading its bound from a comment that quoted removed code.
+
+## 120. THE EMULATOR'S FLOATING POINT IS PART OF THE ORACLE -- MEASURE IT
+Paid 2026-10-06 (JUNO). Unicorn honours DAZ (a denormal operand is read as 0) but NOT FTZ: with
+MXCSR 0x9FC0, 1e-20f * 1e-20f stores the denormal 0x000116c2 where an x86 CPU stores 0. The oracle
+therefore keeps denormal results the real plugin would flush; the port, in true FTZ/DAZ, stored
+signed zeros, and a long-tail render gate went red on cells like the voice filter state 10160.
+Mapping "denormal == 0" in the compare is wrong: integer cells (counters, ring indices) look
+denormal too, and the reverb clear counter 256 vs 0 would have passed. Under DAZ the two modes
+differ only in the denormal results that get stored, so the gate runs the PORT in the oracle's mode
+(src/juno_ftz.c juno_set_fp_oracle_mode: DAZ on, FTZ off, no explicit flush) and compares bit for bit.
+### The rule
+Test the emulator's FP mode with a two-instruction snippet before trusting any gate on long tails.
+Match the port to the oracle's mode in the gate; never canonicalize values in the compare.
+
+## 121. A GATE THAT NEVER RENDERS BETWEEN RECALLS CANNOT SEE THE ALLOCATOR
+Paid 2026-10-06 (JUNO, CLAIMS A18). warm_chain_gate.py (A17) compares the whole object after every
+recall but plays no note, so the voice allocator's state across patch changes was never compared.
+A chain with notes and renders between recalls (tools/verify/warm_render_gate.py) was red on 9 of
+12 chains: three allocator defects (unison ageing all voices, a voice flush on every load instead
+of on a mode change, note slots kept after that flush) plus the oracle FP mode (playbook 120).
+### The rule
+For every stateful subsystem, a warm gate must exercise the events that USE its state between
+recalls (notes for the allocator, renders for tanks and fades), not only the recall itself.
+
+## 122. A TOOTH THAT DOES NOT BITE NAMES A RULE OUTSIDE THE GATE'S REACH -- SEARCH THE DATA FOR THE CASE
+Paid 2026-10-06 (JUNO, CLAIMS A19). The REVERB TYPE setter recomputes the decay coefficients with
+the TIME the processor still holds; the port reproduced that, and a tooth that used the new TIME
+did NOT bite on 12 chains. The intermediate value changes the outcome only when the final value
+equals the stored target while a ramp is in flight. A search of the coefficient tables found
+exactly one pair that does that, (TYPE 0, TIME 116) <-> (TYPE 1, TIME 200); a chain that
+alternates them 100 samples apart made the tooth bite (2/2). The same day a "no-op" reach probe
+(dropping the mute pairs) bit too: the reverb on/off cell's final target then came from another arm.
+### The rule
+When a tooth does not bite, do not drop the rule and do not believe it either: work out the exact
+condition under which it changes the outcome, search the tables for inputs that meet it, and add
+that case to the gate.
+
+## 123. A DECOMPILED FLOAT LITERAL IS A DOUBLE IN C -- WHERE THE RESULT CANCELS, IT IS A DIFFERENT NUMBER
+Paid 2026-10-06 (JUNO, CLAIMS A20). The reverb fade steps by the float constant 0x39D1B717; the
+decompiler printed it as `0.00039999999`, a double literal, so C computed `v474 - 0.00039999999` in
+double. Near zero (a fade interrupted by a new tank clear) the double step rounds to another float:
+0x39d1b809 - step = 0x31f20000 in the plugin, 0x31f1ff14 in the port. Every recall gate was green:
+only a host edit re-triggers the clear mid-fade. Products with a near-power-of-two literal are safe
+(the exact float result absorbs the 1e-9 relative error); sums and differences that cancel are not.
+### The rule
+Give every single-precision constant in transcribed arithmetic an `f` suffix where the operation
+can cancel; audit the inexact literals (`float(lit) != lit`) of every transcribed file, and prove
+each remaining one safe by its use (assignment, clamp, scaling) -- not by a green gate.
+
+## 124. A CENSUS RUN ON ONE ENGINE INHERITS THE PROCESSOR STATE OF EARLIER JOBS
+Paid 2026-10-06 (JUNO, CLAIMS A20). 14000 census jobs each recalled a record before the host edit,
+and the ARPEGGIO TYPE / STEP edits always re-armed 75..300 cells. On a fresh engine they arm
+nothing: the refresh runs only while the PROCESSOR's arp is on, which an earlier census job's host
+ARPEGGIO SW 1 had set and which no recall ever clears (the recall leaves that state alone). The
+"context" of a job was the record; the state that decided the outcome was not in it.
+### The rule
+Before a census conclusion becomes a table, reproduce one case on a FRESH engine with nothing
+before it, and one after the opposite history. Key the table on processor state read from the
+plugin, not on the record bytes that usually mirror it.
+
+## 125. A SCRATCH COPY THAT COMPUTES "SETTLED" VALUES MUST SETTLE ITS RAMPS FIRST
+Paid 2026-10-06 (JUNO, CLAIMS A20). The port computes a host edit's values by a settled recall on a
+copy of the live state. With the live ramps dropped (not settled) on the copy, a recall arm whose
+target was already stored early-outed and left a glide's midpoint in the cell, and the edit armed
+that midpoint as its target (EFFECT TYPE 1 then DELAY TYPE 2 within 4 ms). Settling first leaves
+every cell at its target before the recall, as the harness's own settled recall does.
+### The rule
+A copy that stands for "the state after everything settled" gets the same settle the oracle's
+model applies, before it is used -- not a cheaper approximation of it.
+
+## 126. WHEN A GATE COMPARES STATE, ITS DEBUG MODE MUST ALSO COMPARE THE HIDDEN MACHINERY
+Paid 2026-10-06 (JUNO, CLAIMS A20). The host-edit gate saw audio part 600 samples after the cause;
+a trace mode that compares the plugin's ramp RECORDS (stored target, active, start, increment,
+accumulator, step) after every event named the defect in one run: one record, one field, at the
+edit that caused it. Four of the six defects found that day were read straight off that line.
+### The rule
+Give every state gate a trace mode that checks after every event and also compares the state the
+compare region does not hold (records, shadows, queues). Use it before reading any disassembly.
+
+## 127. A METHOD WHOSE VALUE GETTER IS A STUB IS NOT A PATH
+Paid 2026-10-06 (JUNO, CLAIMS B6). The "plugin's own recall enumerator" (rva 0x3B48A0, flag 1) was
+executed in 2026-08 and became the model every recall gate copies. It reads each value through a
+getter that is `xor eax,eax; ret` (rva 0x3B6C30) in the class the engine builds, and no code calls
+it directly: it proves a LIST, never a path. The engine's only writer turned out to be the host
+entry (flag 0), fed only by process(); a DAW preset load reaches the engine as host-role edits.
+### The rule
+Before a code path stands for "what the plugin does", find who calls it and where its values come
+from. A stub source or no caller makes it a model of the plugin, to be labelled as one.
+
+## 128. COMPARE RUNS ONLY FROM IDENTICAL STARTS -- AND AN ENGINE PROBE CANNOT SEE THE WRAPPER
+Paid 2026-10-06 (JUNO, CLAIMS B9). OCTAVE SHIFT "changed the audio" when several runs shared one
+engine: the voice rotation and the per-voice CONDITION scatter differed run to run. Fresh engines
+showed the setter writes no engine cell and a note sounds the same at every shift. If the plugin
+transposes, it does so in the wrapper's MIDI path, which the engine-level oracle bypasses.
+### The rule
+Give every A/B run its own fresh engine (or prove the starting states equal). When an engine-level
+probe shows no effect, write "no ENGINE effect" and name the layer it did not execute.
+
+## 129. A PID IS NOT A LIVE JOB AFTER A RESTART -- CHECK THE HEARTBEAT
+Paid 2026-10-06 (registry). A worker restart killed every job; the kernel then gave the dead
+job's pgid (860) to a process of the next job, and `tools/run_job.sh --list` printed the dead
+job as "RUNNING ... alive 110m". The runner's own law (a dead job never looks alive) was broken
+by `kill -0` alone. Now a job is alive only if its pgid answers AND its 20 s heartbeat is under
+90 s old. Seen to fail: the same entry now prints DIED; the running jobs still print RUNNING.
+### The rule
+Liveness needs two facts that a restart cannot both fake: the process answers, and the job's
+own heartbeat is fresh. A pid alone is a number the kernel reuses.
+
+## 130. A HARNESS WITHOUT A TEB TURNS EVERY MAGIC STATIC INTO A GHOST
+Paid 2026-10-06 (JUNO, CLAIMS B6). For ten weeks the plugin's IComponent::initialize "could not run
+under emulation" (P112 §7: a CRT abort in a magic-static string parse). Root cause: the emulator gave
+the plugin no TEB, so `gs:[0x58]` read zero, the thread's init epoch read 0, and every MSVC
+function-local static (`guard > epoch` -> initialise) looked already built: empty strings and
+vectors were used. A TEB with the PE's TLS template (epoch INT_MIN) fixed it; the rest was operating-
+system plumbing (OS version, InitOnceExecuteOnce, GetProcAddress, a read-only file system holding the
+plugin's own Script.xml, a few Shell and COM objects), each found by the next failure.
+### The rule
+Before calling a wall "not constructible", give the binary the process it was written for: TEB/TLS,
+the DLL entry point (not a hand-run initializer table), then the host's own call sequence
+(InitDll, factory, initialize). Run the CRT; do not imitate it.
+
+## 131. AN ORACLE THAT SKIPS PART OF THE PLUGIN'S BLOCK IS A MODEL OF THAT PART
+Paid 2026-10-06 (JUNO, CLAIMS A21/B10). The e2e harness replaced the engine render (rva 0x3C7400) by
+direct per-unit calls and kept only the assigner block counter. The render's preamble also syncs
+every assigner to the engine's voice count and skips the units above it; with the harness's zero
+HOST the count was never set, so every gate ran eight voices while the shipped plugin runs six.
+Port and oracle agreed -- with each other.
+### The rule
+When a harness replaces a plugin function by its "essential" calls, list EVERY call and branch of
+the replaced function and state which ones the harness keeps. A dropped branch is an open claim.
+
+## 132. THE PLUGIN AS SHIPPED IS NOT THE ENGINE AFTER BUILD -- RUN ITS OWN DEFAULTS
+Paid 2026-10-06 (JUNO, CLAIMS B6/A21). The plugin's initialize queues its whole default state (95
+values) for the first process() call; one of them (voiceCount 6) changes how every note is played.
+No gate saw it, because every gate starts from BUILD. The wrapper boot found it in one census.
+### The rule
+The reference starting point is what the product does before the first audio block, executed:
+construction, initialize, the first block's queued events. BUILD is a model of that start.
+
+## 133. AN ABSENCE CLAIM NEEDS A PROBE THAT COULD HAVE FOUND PRESENCE
+Paid 2026-10-06 (JUNO, CLAIMS A20). A20 said "MASTER TUNE is not in the engine's parameter map",
+and the port's MASTER TUNE changed nothing. The census that "found" this built its parameter list by
+joining host parameters to the RECORD slots the recall reads; MASTER TUNE is a SYSTEM parameter
+(Script.xml SYS_COM, no patch slot), fell out of the join, and was never sent to the engine. One
+host-entry call shows the truth: dispatch 20, all 8 voices' tune cells ramped over 4 ms, value =
+curve 55 of the host value, audible from sample 11 (probes/host/host_census_mt.py, 273 edits).
+### The rule
+"X does not reach the engine" is a measurement only when X itself was sent through the real entry
+and the probe could see every place it might land (ramp records and active lists included, not only
+the gated cells). A row that a join or a filter dropped is UNMEASURED, never "absent".
+
+## 134. A CENSUS KEY IS ONLY AS WIDE AS THE STATES THE CENSUS VARIED
+Paid 2026-10-06 (JUNO, CLAIMS A20). The DELAY TYPE host programs were keyed by EFFECT TYPE x FROM x
+TO and graded green for weeks. The setter also re-sends DELAY LEVEL, whose on-flag decides the
+feedback cell's first set (0 when the delay is off); the census ran DELAY TYPE only on records whose
+delay was on, so the generator saw one value and called it "the recall's". A regrouped gate chain
+(patch 38, DELAY LEVEL 0) showed it: one ramp record armed in the plugin and not in the port.
+### The rule
+Before a key is believed, list the processor state every setter in the list READS (here: the
+on-flag of a re-sent parameter) and vary each one in the census. A source that was constant over
+the census contexts is a hypothesis about the contexts the census never ran.
+
+## 135. THE PRODUCT'S OWN PATH IS THE REFERENCE -- NOT THE ENGINE'S QUICKEST WAY IN
+Paid 2026-10-06 (JUNO, CLAIMS A22/B6). Four gates (A17-A19, warm recall) proved the port's patch
+change against the engine's own recall enumerator. Executed in the booted plugin, its patch browser
+does not use that recall at all: it sets the model, and every value reaches the engine as a host
+edit (ramped, host-role programs) in the patch tree's order -- MASTER TUNE first, leaves outside
+the parameter list never. The same execution found what only that path shows: the engine's 960-
+sample start-up mute (the harness cleared it "to match our C engine"), the fine cutoff's last
+value, the arp refresh's glide law. Both models were exact; one of them was not the product.
+### The rule
+For every user-facing action, execute the product's own entry (GUI command, DAW call) once and
+record what reaches the engine. Gate the port against THAT queue. An engine entry the product
+never calls is a model, however exact; a harness step that "aligns the oracle to the port"
+(clear_latch) is a model too, and must be named as one.
+
+## 136. TWO VALUES THAT WERE EQUAL IN EVERY CENSUS CONTEXT ARE TWO SOURCES
+Paid 2026-10-06 (JUNO, CLAIMS A20/A22). The cutoff object's last value was the byte in every census
+context, because every factory H equals byte/255 and the recall leaves the last value at the
+stored byte -- so "H's bits" and "H * 255" and "the stored byte" were indistinguishable, and the
+arp refresh's glide (always step 0) looked like a constant 96 ms. A patch load (byte, then H)
+followed by a near cutoff split them.
+### The rule
+When a generated source is chosen because two quantities coincide over the census, READ the code
+for which one it is, then add a context where they differ (H != byte/255, a refresh after a
+change) before the key is believed.
+
+## 137. AN ORACLE THAT CANNOT RUN A MODE CAN STILL GRADE THE SWITCH INTO IT
+Paid 2026-10-06 (JUNO, CLAIMS B11 -> A22). The oracle has no transport clock, so it cannot
+arpeggiate, and every gate therefore switched the arp with no key held. The switch itself moves
+the keys (ON hands each pressed key to the arp, OFF plays them again as notes, order and velocity
+from the keyboard object), and all of that is in the state at the switch, before any render. The
+port flushed every note instead; no gate could see it. The LFO KEY TRIG byte (set before the range
+check, sticky once wild) hid the same way: a special case of the host entry no chain reached.
+### The rule
+List what the oracle cannot run, then for each item grade the transitions into and out of it at
+the switch point (state compare, no render). READ every special case of an entry function and give
+each one a chain; a range check is not the first instruction just because it is the usual one.
+
+## 138. A HELPER THAT "DOES WHAT RENDER DOES" IS A SECOND, UNGRADED RENDER
+Paid 2026-10-06 (JUNO, CLAIMS A22/C4). The web app warmed the engine with juno_gui_warmup, a copy
+of the render loop without the render's preamble (the voice-count sync). Every gate rendered
+through juno_gui_render, so none saw it. Once the app called juno_gui_plugin_init (six voices),
+its first key landed on a stopped unit and the next block gated it off. The new WASM gate passed
+too: it compared two builds of the same source, which agree on a shared defect -- here, silence.
+The headless-browser check (an audio threshold) caught it; it had not been run since an earlier
+change, and it failed on that change as well (two float sliders out of their range).
+### The rule
+Every call the product makes must sit, in the product's order, on a chain graded against the
+plugin (here: the app family, warm-up then load then keys). A differential gate between two builds
+of one source needs a REACH guard on its inputs (audible renders, the first key) and a tooth that
+both builds share. Run the product's end-to-end check on every change to a product path.
+
+## 139. A GETTER MATCHED TO A NAME BY READING IS A HYPOTHESIS -- EXECUTE IT AND READ ITS NAME
+Paid 2026-10-06 (JUNO, CLAIMS A23). For ten weeks the port forced every note to velocity 100: the
+wrapper's switch byte was READ as "refreshed from the settings object", and that object was matched
+to the SYSTEM table's 'Keyboard Velocity SW' (default 0) because its range looked right. Executed,
+the getter is vm.vs.velSense (default 1), a value of the plugin's own view state: a fresh plugin
+plays the key's own velocity. Every engine gate drove notes below the wrapper, so none could see it.
+### The rule
+When a value comes through an indirect call, EXECUTE the call, then print the name the object
+carries (its descriptor) before binding it to a table row. A plausible range is not an identity.
+Grade the layer between the host and the engine (here the MIDI push) byte for byte, not only the
+engine below it.
+
+## 140. A LONG JOB OUTLIVES THE SHELL, NOT THE CONTAINER -- KEEP A WATCHER RUNNING
+Paid 2026-10-06 (JUNO). Two full `make verify` runs died without a verdict: one after 186 minutes,
+one after 5. Each died a few minutes after a turn ended with no task of the session still running;
+the cloud container is reclaimed when the session is idle, and run_job's setsid does not survive
+that. run_job reported both as DIED (it worked as designed); the disk, refs and snapshot survived.
+### The rule
+While a long job runs, keep a session task alive that ends with the job: a Monitor on the job's
+EXIT file (re-armed at each 30-minute expiry), not a scheduled check-in, which wakes a fresh
+container after the job is gone. A restarted `make verify` keeps every ref that finished.
+
+## 141. AN EXCLUSION IS A CLAIM ABOUT THE PORT -- WHEN THE PORT GAINS THE CELL, THE EXCLUSION DIES; AND A HIDDEN STEP CANNOT BE SEEN DYING
+Paid 2026-10-06 (JUNO, audit). coldstate_ab excluded one cell as "audio-inert" and guarded it with a
+self-check that renders with the cell poked. The port then gained the start-up mute that READS the
+cell (A22). The self-check went red -- correctly -- but the Makefile sent that step's output to
+/dev/null, and the three full verifies that followed died with the idle container. Ten hours of
+commits were unverified while every gate's own run was green and LIVE STATE said "read its EXIT".
+### The rule
+Re-justify every exclusion when the port changes the cells it reads; prefer no exclusion (arm the
+same state on both sides). Never send a gate step's output to /dev/null: a red must be readable in
+the log. A commit is verified only by a COMPLETED make verify with EXIT 0; a green per-gate run on
+the day is not that. Keep the Monitor alive (playbook 140) so the verify completes.
+
+## 142. A REFERENCE SAVED MID-BUILD TO ITS FINAL NAME LOOKS FINISHED TO A STALENESS TEST
+Paid 2026-10-06 (JUNO, audit). effect_param_gate --ref saves its pickle after every rate so a long
+build can resume. A container restart stopped it halfway; on the re-run the Makefile's `fresh`
+test (file newer than the gate scripts) skipped the rebuild, and --port failed "REF INCOMPLETE".
+The port check made it loud, so no false green -- but a 4-hour verify was lost to a red that was
+not the port's.
+### The rule
+Save progress to <ref>.partial and rename to the final name only when the build is complete;
+--resume reads the .partial. A staleness test may trust a file only if a complete build wrote it.
+

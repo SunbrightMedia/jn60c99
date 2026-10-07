@@ -18,6 +18,7 @@ Output: scratchpad/delay_fb_sweep.pkl {rate: {idx: {cell: [bits]*256}}} + verdic
 Two-process rule: E2E/Unicorn only.
 NEVER reads any runtime-capture file (the forbidden JSON captures per CLAUDE.md).
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -73,7 +74,7 @@ def main():
     data = {}
     for r in RATES:
         data[int(r)] = sweep_rate(r)
-    pickle.dump(data, open('/home/user/jn60c99/scratchpad/delay_fb_sweep.pkl', 'wb'))
+    pickle.dump(data, open(_JREPO + '/scratchpad/delay_fb_sweep.pkl', 'wb'))
 
     print("=== plugin's own delay-leaf laws (executed, all 256 values x 3 rates) ===")
     for idx in IDXS:

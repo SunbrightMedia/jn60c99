@@ -6,10 +6,11 @@ render one block -> read the changed cells (proven static + byte-determined,
 scratchpad/rev_fast_probe.py). Reuse ONE engine per rate. Output:
 reverb_finefx_laws.pkl { param -> {rate -> {cell -> [256 uint32]}} }.
 Covenant-clean (plugin's own setter + tick under Unicorn). Two-process (oracle)."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
-sys.path.insert(0,'/home/user/jn60c99/tools/verify')
+sys.path.insert(0,_JREPO + '/tools/verify')
 import e2e_emu as E
-SP='/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
+SP=_JREPO + '/scratchpad'
 SZ=0xA83010
 PARAMS={'REVERB PRE DELAY':1323,'REVERB LOW CUT':1324,'REVERB HIGH CUT':1325,
         'REVERB DENSITY':1326,'REVERB DIRECT LEVEL':1327}

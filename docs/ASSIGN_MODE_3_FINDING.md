@@ -1,5 +1,14 @@
 # ASSIGN MODE 3 — found by the user's banks, never reachable from the factory bank
 
+> **CLOSED 2026-10-05 (CLAIMS A16).** Owed items 1-3 below are done: the
+> plugin's mode-3 allocator (sub_7FF91DFB35C0) scans voices UPWARD from 0 for
+> the first ungated (or hold-released) voice; the port scanned top-down. Fixed in
+> gui/juno_bridge.c poly_note_on; tools/verify/assigner_ab.py now drives mode-3
+> note sequences (synthetic p0A3 / p55A3), and tools/verify/seed_recall_gate.py
+> found it again on its first run (13 legal seeds) -- its tooth reverts the fix
+> and fails 15 seeds. This finding had never been entered in docs/CLAIMS.md
+> (playbook 115). Issue 2 below was closed earlier (DELAY on/off law).
+
 ## The evidence
 
 12 user banks, 768 patches, against `src/` (the frozen bit-exact port):

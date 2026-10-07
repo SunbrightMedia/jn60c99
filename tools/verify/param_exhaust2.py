@@ -4,11 +4,12 @@ Same domain as param_exhaust.py (25 binding rows x 256 bytes x 3 rates), but the
 dispatch fires into (a) a WARM engine (12000 samples idle-rendered) and (b) a
 MID-NOTE engine (note_on(60,105) + 3000 samples). State-level compare of the
 engine cell vs the port setter in the same configuration."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, ctypes, re
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import e2e_emu as E
 
-lib = ctypes.CDLL("/home/user/jn60c99/libjuno.so")
+lib = ctypes.CDLL(_JREPO + "/libjuno.so")
 for fn, rt, at in [
     ("juno_gui_create", ctypes.c_void_p, [ctypes.c_float, ctypes.c_int]),
     ("juno_gui_warmup", None, [ctypes.c_void_p, ctypes.c_int]),
@@ -19,7 +20,7 @@ for fn, rt, at in [
     ("juno_gui_param_count", ctypes.c_int, [])]:
     getattr(lib, fn).restype = rt; getattr(lib, fn).argtypes = at
 
-src = open('/home/user/jn60c99/src/juno_apply.c').read()
+src = open(_JREPO + '/src/juno_apply.c').read()
 m = re.search(r'BINDINGS\[\]\s*=\s*\{(.*?)\n\};', src, re.S)
 rows = re.findall(r'\{\s*(\d+)\s*,\s*\d+\s*,\s*[A-Z_]+\s*,\s*(\d+)\s*,\s*"([^"]*)"', m.group(1))
 BIND = [(int(bp), int(off), nm) for (bp, off, nm) in rows]

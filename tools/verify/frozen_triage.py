@@ -20,11 +20,12 @@ Produces the recall-correctness picture for voice-0 cells:
 Caveat: a param recalled via the setProgram worker path (0x3c7400, ~2 params)
 rather than the apply node would not show as map-reachable; minor, noted.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import struct, pickle
 
-ICM  = '/home/user/jn60c99/scratchpad/index_cell_map.pkl'    # {index: [cells]}
-PCM  = '/home/user/jn60c99/scratchpad/param_cell_map.pkl'    # {pid: (index, [cells])}
-PORT = '/home/user/jn60c99/scratchpad/port_state.pkl'        # {patch: bytes(VOICE)}
+ICM  = _JREPO + '/scratchpad/index_cell_map.pkl'    # {index: [cells]}
+PCM  = _JREPO + '/scratchpad/param_cell_map.pkl'    # {pid: (index, [cells])}
+PORT = _JREPO + '/scratchpad/port_state.pkl'        # {patch: bytes(VOICE)}
 VOICE = 10512
 STRIDE = 16
 

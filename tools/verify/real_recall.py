@@ -77,8 +77,9 @@ Usage:
   python3 tools/verify/real_recall.py 62 5 18 39 6 14 31 0
   python3 tools/verify/real_recall.py --fullloop 62
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, re
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 
 SR = 48000.0

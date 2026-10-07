@@ -13,8 +13,9 @@ the taps must EQUAL juno_write_reverb_taps' current output.
 Covenant-clean (plugin's own setter under Unicorn, dispatch+snap). Two-process.
 Output: scratchpad/reverb_predelay.json { "cls|rate": {cell: [128 values]} }.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, json
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import numpy as np, e2e_emu as E
 
 SZ = 0xA83010; NW = SZ // 4
@@ -78,7 +79,7 @@ def main():
                 if d[100] and sr:
                     print('      coef@b100 = predelay/(byte*H) = %.9f' % (s32(d[100]) / (100.0 * sr)))
             sys.stdout.flush()
-    json.dump(out, open('/home/user/jn60c99/scratchpad/reverb_predelay.json', 'w'))
+    json.dump(out, open(_JREPO + '/scratchpad/reverb_predelay.json', 'w'))
     print('wrote reverb_predelay.json')
 
 if __name__ == '__main__':

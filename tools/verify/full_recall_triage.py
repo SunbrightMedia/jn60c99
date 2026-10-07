@@ -15,11 +15,12 @@ Cell regions in a unit-0 block (STATE_SZ = 0xA83010):
 Verdict per plugin-writable cell: CORRECT / FROZEN-OK / CANDIDATE / SPURIOUS
 (same definitions as frozen_triage.py).
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle, ctypes
 
-ICM  = '/home/user/jn60c99/scratchpad/index_cell_map.pkl'
-PCM  = '/home/user/jn60c99/scratchpad/param_cell_map.pkl'
-LIB  = '/home/user/jn60c99/libjuno.so'
+ICM  = _JREPO + '/scratchpad/index_cell_map.pkl'
+PCM  = _JREPO + '/scratchpad/param_cell_map.pkl'
+LIB  = _JREPO + '/libjuno.so'
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
 import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
 SR   = 48000.0

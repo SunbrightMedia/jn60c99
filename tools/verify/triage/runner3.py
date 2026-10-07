@@ -4,8 +4,9 @@ VERBATIM. Constant render horizon 19451 (end of the render containing the
 residual divergence frame 16873 -- never below 16873). Event-prefix bisection
 keeps the FULL render schedule and only drops trailing non-render events.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__)))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, ctypes, os
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import fuzz_diff as F
 import e2e_emu as E
 

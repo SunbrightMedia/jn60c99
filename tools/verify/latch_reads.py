@@ -3,8 +3,9 @@
 render, and what EXACTLY do note_on/note_off write? Resolves Array A (101504+v*32,
 consumed by render) vs Array B (101520+v*32, written by note_on) and whether the
 DSP reads Array B at all. Ground truth = plugin machine code under Unicorn."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import e2e_emu as E
 from unicorn import UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE
 

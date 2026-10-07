@@ -90,7 +90,9 @@ mine is a hypothesis (playbook 80).
   logs). run_job = setsid + registry + EXIT verdict; a dead job prints DIED,
   never looks finished. NEVER `pkill -f` ANYTHING -- kill exact pids from the
   registry. NEVER report a job's result without its EXIT file. Status:
-  `sh tools/status.sh`.
+  `sh tools/status.sh`. While a long job runs, keep a Monitor on its EXIT
+  file (re-arm at each expiry): an idle session's container is reclaimed and
+  the job dies with it (playbook 140).
 
 # STRUCTURE (what lives where)
 - `src/` — the FROZEN bit-exact port. Transcribed DSP + derived recall.
@@ -112,8 +114,20 @@ mine is a hypothesis (playbook 80).
 
 # LIVE STATE (update in place, no dated blocks here, EVER; detail lives in
 # FINAL_GUIDE.md / docs/ — this section is one line-group per arc)
-- **src/ + trunk**: SEALED. `make verify` green, PROVENANCE 20/20 PROVEN,
-  WASM republished. Do not touch src/ except through a gate.
+- **src/ + trunk**: PROVENANCE 27/27 PROVEN; full verify of cd63fc1 GREEN (job
+  verify_fix3, EXIT 0, every section ran; ARM step skipped: no cross
+  toolchain). Later commits are docs only. The two days 2026-10-05/06
+  were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
+  closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
+  mute), juno_gui_state_load (DAW preset), juno_gui_load_patch (its patch
+  browser) -- host edits, gated by state_load_gate.py against queues the booted
+  plugin makes (docs/B6_WRAPPER_BOOT.md). juno_gui_apply_bank is the recall MODEL
+  the older gates use, not a product path. The web app runs the product
+  paths (CLAIMS C4: `make webapp` = WASM build, WASM == native on the app's
+  calls with a reach guard, headless-Chromium check); the device firmware
+  still calls apply_bank. `make test static` before every commit. Gates compare
+  the port in the oracle's FP mode (DAZ, no FTZ: playbook 120). Do not touch
+  src/ except through a gate.
 - **ONE-BOARD RULE**: every multi-chip arc is HISTORY — the S3 fork O4 arc
   (two chips), the CLASSIC 4-slot plan, CHAIN4 (four boards played through
   the storm on 2026-09-14). Their full live-state text, facts and owed items

@@ -5,11 +5,12 @@ Same method as dynmix.py but over EVERY function of EVERY src/*.c, so the M7
 per-sample instruction total is complete (libm expf/fmodf excepted; reported).
 Self-validates each file against callgrind's measured Ir.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import re, subprocess, os, collections
 from mix import cls_arm, cls_x86, ORDER
 
 S = os.path.dirname(os.path.abspath(__file__))
-REPO = "/home/user/jn60c99"
+REPO = _JREPO + ""
 G = S + "/gcov"
 SAMPLES = 4800
 

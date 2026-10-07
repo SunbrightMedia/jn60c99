@@ -13,12 +13,13 @@ Usage:
   python3 tools/verify/port_state_dump.py                 # dump + feet table
   python3 tools/verify/port_state_dump.py --feet-only      # just the feet table
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle, ctypes
 
-LIB   = '/home/user/jn60c99/libjuno.so'
+LIB   = _JREPO + '/libjuno.so'
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
 import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
-PKL   = '/home/user/jn60c99/scratchpad/port_state.pkl'
+PKL   = _JREPO + '/scratchpad/port_state.pkl'
 SR    = 48000.0
 BLOCK = 10512          # per-voice unit-0 block (matches recall_fullstate_diff)
 STRIDE = 16            # engine cells are 16-byte slots (float in low 4 bytes)

@@ -196,7 +196,14 @@ void juno_write_reverb_taps_pd(unsigned char *state, int type, int Hr, int pd_by
     if (Hr == 44100) {
         for (k = 1; k < 34; ++k) JI(state, 11022208 + 4 * k) = RTAP44[cls][k] + shift_pd;
     } else {
-        const int shift = (int)(0.019995f * (float)Hr) - 1919;  /* floor via trunc */
+        /* The plugin builds every tap as a sum of integer stage lengths plus the
+         * pre-delay sample count (sub_7FF91E021AC0: tap1 = predelay + 1, ...), so
+         * a non-44.1k rate moves every tap by predelay(20, H) - predelay(20, 96k).
+         * APPROX-OK: history, the REMOVED line, not this code.
+         * This line used (int)(0.019995f * H) - 1919, a fitted stand-in for that
+         * difference: right at the five rates it was checked at, one sample off
+         * at 11025 (CLAIMS B4, tools/verify/rate_sweep_gate.py). */
+        const int shift = juno_reverb_predelay(20, Hr) - juno_reverb_predelay(20, 96000);
         for (k = 1; k < 34; ++k) JI(state, 11022208 + 4 * k) = RTAP96[cls][k] + shift + shift_pd;
     }
 }
@@ -214,6 +221,28 @@ static int blob_val(const unsigned char *rec, int bp)
 {
     const unsigned char *b = rec + 16;
     return ((b[2 * bp] & 0xF) << 4) | (b[2 * bp + 1] & 0xF);
+}
+
+/* The joint (TYPE, TIME) decay coefficients as floats: out[0] HP01 (10759664 /
+ * 10759712), out[1] LP01 (10759680 / 10759728), out[2] HP23 (10759760 / 10759808),
+ * out[3] LP23 (10759776 / 10759824). The recall ramps (src/recall_ramp.c) need
+ * the value the REVERB TYPE setter computes with the PREVIOUS recall's TIME. */
+void juno_reverb_hplp(int type, int time, float out[4])
+{
+    if (type < 0) type = 0; else if (type > 5) type = 5;
+    time &= 0xFF;
+    memcpy(&out[0], &HP01[type][time], 4);
+    memcpy(&out[1], &LP01[type][time], 4);
+    memcpy(&out[2], &HP23[type][time], 4);
+    memcpy(&out[3], &LP23[type][time], 4);
+}
+
+/* REVERB LEVEL on/off as the plugin's level setter (rva 0x3C1460) tests it: its
+ * scaled level > 0, i.e. the level table entry is not 0 (bytes 0..2 -> off;
+ * EXECUTED: 2 -> off, 3 -> on, 1 -> off). */
+int juno_reverb_level_on(int byte)
+{
+    return REVLVL_LUT[byte & 0xFF] != 0u;
 }
 
 static void put_bits(unsigned char *state, int off, uint32_t bits)

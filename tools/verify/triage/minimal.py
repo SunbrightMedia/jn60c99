@@ -7,8 +7,9 @@ byte 139) at frame 400, render past the 128-BPM synced tap (16873).
   C: port + poke 4297584 = plugin bits after flip -> expect OK (cell causal)
 Also validates the coefficient law in pure python.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__)))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, ctypes
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import fuzz_diff as F
 import e2e_emu as E
 

@@ -13,11 +13,12 @@ are context-independent. This reference pins every (leaf, context) the port appl
 Covenant-clean: the plugin's OWN setter + smoother under Unicorn. Two-process.
 Output: scratchpad/finefx_cellsweep_ref.pkl { (leaf, ctx, rate) -> {cell: [256]} }.
 """
-import sys, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
+import os, sys, pickle
+sys.path.insert(0, _JREPO + '/tools/verify')
 import numpy as np, e2e_emu as E
 
-SP = '/home/user/jn60c99/scratchpad'
+SP = _JREPO + '/scratchpad'
 SZ = 0xA83010; NW = SZ // 4
 # ET/DT/RT = the FX TYPE selectors (EFFECT/DELAY/REVERB TYPE). RT = 876 = REVERB TYPE
 # (moves the reverb tap array -> the PRE DELAY baseline; verified idx 876 not 877,
@@ -79,16 +80,25 @@ def rd_words(e):
     return np.frombuffer(bytes(e.uc.mem_read(e.state[0], SZ)), dtype='<u4')
 
 def sweep_leaf(e, disp, nbytes=256):
+    """{cell: [value at byte 0..nbytes-1]} for every word any byte changes.
+    Keeps only the changing words (a word first seen changing at byte v held
+    a0's value for every earlier byte, so its history is back-filled from a0).
+    The old form kept all 256 full 11 MB snapshots per leaf -- 2.8 GB -- and two
+    parallel 7-rate runs were OOM-killed (exit 137) on 2026-10-05."""
     _force(e, disp, 0); e.snap_all(); a0 = rd_words(e)
-    changed = np.zeros(NW, dtype=bool); vals = {}
+    hist = {}
     for v in range(nbytes):
         _force(e, disp, v); e.snap_all(); av = rd_words(e)
-        changed |= (av != a0); vals[v] = av
-    words = np.nonzero(changed)[0]
-    return {int(w) * 4: [int(vals[v][w]) for v in range(nbytes)] for w in words}
+        for w in np.nonzero(av != a0)[0]:
+            w = int(w)
+            if w not in hist:
+                hist[w] = [int(a0[w])] * v
+        for w, h in hist.items():
+            h.append(int(av[w]))
+    return {w * 4: h for w, h in sorted(hist.items())}
 
 def main():
-    rates = [44100.0, 48000.0, 88200.0, 96000.0]
+    rates = [float(r) for r in "8000 11025 16000 22050 32000 37800 44100 47999 48000 50000 64000 88200 96000 96001 176400 192000 352800 384000".split()]   # CLAIMS B4: 18 host rates
     if len(sys.argv) > 1:
         rates = [float(x) for x in sys.argv[1:]]
     out = {}
@@ -103,10 +113,13 @@ def main():
                 sys.stdout.write('  leaf %d %-4s @%g: %d cells %s\n' % (
                     leaf, ctx, sr, len(tbl), sorted(tbl)[:8]))
                 sys.stdout.flush()
-    with open(SP + '/finefx_cellsweep_ref.pkl', 'wb') as f:
+    # $JUNO_FINEFX_REF_PKL lets several rate subsets run in parallel jobs; merge
+    # them into the canonical pickle with tools/verify/merge_pickles.py.
+    outp = os.environ.get('JUNO_FINEFX_REF_PKL') or (SP + '/finefx_cellsweep_ref.pkl')
+    with open(outp, 'wb') as f:
         pickle.dump(out, f)
-    sys.stdout.write('wrote finefx_cellsweep_ref.pkl (%d rates x %d contexts)\n'
-                     % (len(rates), len(CONTEXTS)))
+    sys.stdout.write('wrote %s (%d rates x %d contexts)\n'
+                     % (outp, len(rates), len(CONTEXTS)))
 
 if __name__ == '__main__':
     main()

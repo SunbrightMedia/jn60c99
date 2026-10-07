@@ -17,11 +17,12 @@ Any single-byte mismatch -> RED. Covenant-clean (plugin's own setter is the
 reference; no capture). Two-process (the reference pkl is generated in a
 separate oracle process; this gate only runs the port binary + compares).
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, subprocess, pickle
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-SP = '/home/user/jn60c99/scratchpad'
+SP = _JREPO + '/scratchpad'
 REF = os.path.join(SP, 'finefx_cellsweep_ref.pkl')
 DUMP = os.path.join(HERE, 'finefx_port_dump')
 

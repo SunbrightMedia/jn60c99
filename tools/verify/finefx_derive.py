@@ -8,11 +8,12 @@ This is the plugin's OWN setter executed on its OWN state (PROVEN provenance),
 covenant-clean. Oracle-only (Unicorn). Contexts recall a real FX-active patch
 via load_leaves + force the effect type, matching how delay/chorus/reverb_recall
 route in the port."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 
-SP  = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
+SP  = _JREPO + '/scratchpad'
 OUT = SP + '/finefx_laws.pkl'
 CW  = SP + '/chillwave.bin'
 SZ  = 0xA83010

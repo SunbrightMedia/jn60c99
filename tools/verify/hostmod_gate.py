@@ -22,13 +22,14 @@ is ctypes-libjuno only; they meet through a pickle.
   python3 tools/verify/hostmod_gate.py --ref [--full]
   python3 tools/verify/hostmod_gate.py --port
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, pickle
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import truth
 
-SP = '/home/user/jn60c99/scratchpad'
+SP = _JREPO + '/scratchpad'
 REF = SP + '/hostmod_ref.pkl'
 
 #            slot, mod idx, base idx, base setter's proc-vtable byte offset

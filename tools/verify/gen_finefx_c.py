@@ -1,5 +1,6 @@
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import pickle
-SP='/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
+SP=_JREPO + '/scratchpad'
 L=pickle.load(open(SP+'/finefx_delay_rates.pkl','rb'))
 RATES=[44100,48000,88200,96000]
 # verify clamp: entry[max]==entry[max+1..255]
@@ -57,5 +58,5 @@ for nm,cell,vn,mx in [('DELAY LF DAMP FREQ',102608,'DLY_LFDF',11),
         out.append("  {%s}, /* %d */"%(hexrow(arr),r))
     out.append("};")
     out.append("")
-open('/home/user/jn60c99/src/finefx_tables.h','w').write("\n".join(out)+"\n")
+open(_JREPO + '/src/finefx_tables.h','w').write("\n".join(out)+"\n")
 print("wrote src/finefx_tables.h (%d lines)"%len(out))

@@ -16,9 +16,10 @@ render(POST). Report first audio-diverging frame, or BIT-EXACT.
 
 Ground truth = the plugin's own machine code under Unicorn (e2e_emu.py).
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
-sys.path.insert(0, '/home/user/jn60c99/tools/verify/triage')
+sys.path.insert(0, _JREPO + '/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify/triage')
 from ft3 import PluginRun, PortRun, first_div
 
 RATE = 44100.0        # Teensy-native; the rate seed 51 diverged at

@@ -7,6 +7,9 @@ PLUGIN DOES NOT HAVE:
 
     JUNO_PREV_EFX  11022400   previous EFFECT TYPE leaf (rec 634)
     JUNO_PREV_DLY  11022416   previous DELAY  TYPE leaf (rec 650)
+    JUNO_DLY_ON    11022368   DELAY LEVEL on-flag (processor +6776)   } CLAIMS B1,
+    JUNO_PREV_FB   11022376   previous DELAY FEEDBACK (proc. +1512)   } added
+    JUNO_PREV_RESO 11022384   previous FLANGER RESONANCE (+1568)      } 2026-10-05
 
 They exist because several recall arms are gated on the type IN FORCE BEFORE
 the recall (src/chorus_recall.c), and the plugin's own routing cells cannot
@@ -30,7 +33,7 @@ window starts 48 bytes past its end. This gate asserts:
      recall_fullstate_diff.STATE_SZ.
   3. No .py under tools/verify/ or tools/engineb/ mentions an integer literal
      inside the shadow window (i.e. nobody has started comparing one).
-  4. The device cell map covers both shadow cells, so an -DEB_DECELLS build
+  4. The device cell map covers every shadow cell, so an -DEB_DEVCELLS build
      cannot alias them onto the shared 8-byte miss SINK.
   5. The baked device boot image was generated FROM that same cell map. Adding
      the shadow cells grew EBDEV_SEGBYTES and the image had to grow with it;
@@ -61,9 +64,24 @@ import recall_fullstate_diff as FS               # noqa: E402  pure, no engine
 
 ROOT = FS.ROOT
 OBJ_SZ = 0xA83010                                # 11022352, operator new size
-SHADOW = {'JUNO_PREV_EFX': 11022400, 'JUNO_PREV_DLY': 11022416}
+SHADOW = {'JUNO_PREV_EFX': 11022400, 'JUNO_PREV_DLY': 11022416,
+          'JUNO_DLY_ON': 11022368, 'JUNO_PREV_FB': 11022376, 'JUNO_PREV_RESO': 11022384}
 WIN_LO = min(SHADOW.values())
-WIN_HI = max(SHADOW.values()) + 16                # 11022432, one cell grid past
+WIN_HI = max(SHADOW.values()) + 16                # one cell grid past the highest
+# The ramp-record table (src/recall_ramp.c, CLAIMS B1/B7): port-owned like the
+# shadows and checked like them (checks 0, 1, 3), but compiled out under
+# EB_DEVCELLS, so the device map need not carry it (checks 4/5 do not apply).
+RR_BASE = 11022464
+RR_END = 11049632                                 # 32-byte header + 798 records of 32 bytes + active list
+                                                  # (+ the voice count, its last 4 bytes: CLAIMS B10)
+# The per-voice units the voice count stops (src/juno_driver.c, CLAIMS B10):
+# noise copies, port-owned, past the ramp table; compiled out under EB_DEVCELLS.
+UNIT_BASE = 11049632
+UNIT_END = UNIT_BASE + 16 + 8 * 176 + 8 * 4      # + the eight voice units' start-up mute counters
+
+
+def in_port_owned(o):
+    return WIN_LO <= o < WIN_HI or RR_BASE <= o < RR_END or UNIT_BASE <= o < UNIT_END
 TOOTH = os.environ.get('JUNO_SHADOW_TOOTH', '')
 
 
@@ -74,15 +92,20 @@ def hdr(n, s):
 def check_defines():
     """The offsets this gate protects come from src/juno_engine.h, not from a
     number typed here. A moved #define must move the gate with it."""
-    hdr(0, 'the two #defines still say what this gate assumes')
+    hdr(0, 'the #defines still say what this gate assumes')
     txt = open(os.path.join(ROOT, 'src', 'juno_engine.h')).read()
     ok = True
-    for name, want in sorted(SHADOW.items()):
+    for name, want in sorted(list(SHADOW.items()) + [('JUNO_RR_BASE', RR_BASE), ('JUNO_RR_END', RR_END),
+                                                      ('JUNO_VOICE_COUNT_CELL', RR_END - 4),
+                                                      ('JUNO_UNIT_BASE', UNIT_BASE)]):
         m = re.search(r'#define\s+%s\s+(\d+)u?' % name, txt)
         got = int(m.group(1)) if m else None
         print('    %-14s src says %-12s gate assumes %d' % (name, got, want))
         if got != want:
             ok = False
+    if not (WIN_HI <= RR_BASE):
+        print('    RED: the recall-ramp table overlaps the shadow window')
+        ok = False
     if not ok:
         print('    RED: src/juno_engine.h and this gate disagree.')
     return ok
@@ -97,10 +120,10 @@ def check_regions():
     offs = set()
     for a, b in regions:
         offs.update(range(a & ~3, b, 4))
-    bad = sorted(o for o in offs if WIN_LO <= o < WIN_HI)
+    bad = sorted(o for o in offs if in_port_owned(o))
     print('    %d compared cells, highest %d' % (len(offs), max(offs)))
-    print('    shadow window [%d, %d): %d compared cells inside'
-          % (WIN_LO, WIN_HI, len(bad)))
+    print('    shadow window [%d, %d) + ramp table [%d, %d): %d compared cells inside'
+          % (WIN_LO, WIN_HI, RR_BASE, RR_END, len(bad)))
     if bad:
         print('    RED: %s' % bad[:8])
     return not bad
@@ -148,7 +171,7 @@ def check_literals():
             p = os.path.join(d, name)
             for ln, line in enumerate(open(p, errors='replace'), 1):
                 for lit in re.findall(r'\b\d{8,9}\b', line):
-                    if WIN_LO <= int(lit) < WIN_HI:
+                    if in_port_owned(int(lit)):
                         hits.append((sub + '/' + name, ln, lit))
     print('    scanned tools/verify + tools/engineb; %d hit(s)' % len(hits))
     for h in hits:
@@ -157,7 +180,7 @@ def check_literals():
 
 
 def check_devmap():
-    hdr(4, 'the device cell map covers both shadow cells')
+    hdr(4, 'the device cell map covers every shadow cell')
     txt = open(os.path.join(ROOT, 'engine_b', 'dev', 'ebdev_seg.h')).read()
     segs = [(int(a), int(b)) for a, b in
             re.findall(r'\{\s*(\d+)u,\s*(\d+)u,\s*\d+u\s*\}', txt)]

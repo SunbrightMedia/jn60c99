@@ -9,8 +9,9 @@ Ground truth = the plugin's OWN note-on/note-off machine code under Unicorn.
 Method: hook EVERY memory write to any unit's state during the note_on / note_off
 call, and snapshot the latch cells before/after render, in COLD and WARM states.
 No captures. No guessing. We watch what the plugin's code actually writes."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct
-sys.path.insert(0, '/home/user/jn60c99/scratchpad/oracle')
+sys.path.insert(0, _JREPO + '/scratchpad/oracle')
 import e2e_emu as E
 from unicorn import UC_HOOK_MEM_WRITE
 

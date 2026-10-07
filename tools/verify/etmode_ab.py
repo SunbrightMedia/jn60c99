@@ -16,12 +16,13 @@ oracle), --port uses libjuno (ctypes); they meet only through a pickle.
   python3 tools/verify/etmode_ab.py --ref     # oracle reference  (Unicorn process)
   python3 tools/verify/etmode_ab.py --port     # port dump + DIFF  (libjuno process)
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import truth
-SP = '/home/user/jn60c99/scratchpad'
+SP = _JREPO + '/scratchpad'
 REF = SP + '/etmode_ref.pkl'
 HDR, STRIDE_REC = 23, 20223
 ET_OFF = 634                          # EFFECT TYPE record offset (nibble pair)

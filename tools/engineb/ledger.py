@@ -56,7 +56,7 @@ TSV = os.path.join(REPO, "docs", "trackb", "EQUIVALENCE.tsv")
 
 S3_BUDGET = 3500.0          # docs/engineb/SCOPE.md -- ESP32-S3, 240 MHz, 48 kHz
 S3_HARD = 5000.0
-XTENSA_BIN = ("/root/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/"
+XTENSA_BIN = (os.path.expanduser("~/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/") +
               "xtensa-esp-elf/bin")
 
 COLUMNS = [

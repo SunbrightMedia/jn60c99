@@ -34,4 +34,8 @@ void juno_apply_delay_tempo(unsigned char *state, int time_byte, int sync,
 void juno_live_delay_sync(unsigned char *state, int time_byte, int sync,
                           int dtype, float bpm); /* live blob-59 flip: instance cell only */
 
+/* The slot-1 block switch value at host rate Hr: on = the ARM_LFX1 class, off =
+ * ARM_LFX1_OFF (src/delay_recall.c). Used by the recall ramps (src/recall_ramp.c). */
+float juno_lfx1_value(int Hr, int on);
+
 #endif /* JUNO_DELAY_RECALL_H */

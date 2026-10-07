@@ -28,9 +28,10 @@ Inputs (all plugin-derived; two-process rule respected -- pure pickle here):
 
 NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle, gzip, os, re
 
-ROOT = '/home/user/jn60c99'
+ROOT = _JREPO + ''
 REF = ROOT + '/scratchpad/plugin_recall_ref.pkl'
 PORT = ROOT + '/scratchpad/port_state.pkl'
 ICM = ROOT + '/scratchpad/index_cell_map.pkl'

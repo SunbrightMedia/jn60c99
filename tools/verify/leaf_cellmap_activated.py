@@ -11,12 +11,13 @@ up live), snap, THEN sweep each leaf min<->max with memory-write instrumentation
 — the other 268 leaves stay fixed, so the diff still isolates the swept leaf's
 cells, but now against a fully-live engine. Union over contexts merges into
 leaf_cellmap.pkl. Oracle-only (Unicorn)."""
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 from unicorn import UC_HOOK_MEM_WRITE
 
-SP  = '/tmp/claude-0/-home-user-jn60c99/89f5fa0d-6fc0-55d6-a056-fe6fb14fdde6/scratchpad'
+SP  = _JREPO + '/scratchpad'
 PKL = SP + '/leaf_cellmap.pkl'
 CW  = SP + '/chillwave.bin'
 SZ  = 0xA83010

@@ -12,6 +12,9 @@ int juno_bank_num_patches(const unsigned char *bank, unsigned long len);
 int juno_bank_patch_name(const unsigned char *bank, int idx, char out[17]);
 /* Set engine coefficient slots for patch idx. Returns # params applied. */
 int juno_bank_apply(unsigned char *state, const unsigned char *bank, int idx);
+/* The same recall with the plugin's recall ramps armed and not settled (CLAIMS
+ * B1, src/recall_ramp.c): a patch change on a running engine. */
+int juno_bank_apply_live(unsigned char *state, const unsigned char *bank, int idx);
 
 /* --- Per-parameter "raw 0..255 byte -> parameter" setter ---
  * juno_param_count()  : number of exposed single-byte panel parameters.
@@ -98,7 +101,8 @@ int         juno_host_param_count(void);
 const char *juno_host_param_name(int i);
 const char *juno_host_param_section(int i);
 int         juno_host_param_roff(int i);
-int         juno_host_param_type(int i);    /* 0=int1x7 (1 byte), 1=int2x4, 2=int8x4 (nibble-pair low byte) */
+int         juno_host_param_type(int i);    /* 0=int1x7 (1 byte), 1=int2x4, 2=int8x4 (nibble-pair low byte),
+                                                 3=host-only float, 4=host-only int (context-held) */
 int         juno_host_param_min(int i);     /* semantic Script.xml range; min<0 = two's-complement byte */
 int         juno_host_param_max(int i);
 int         juno_host_param_default(int i);

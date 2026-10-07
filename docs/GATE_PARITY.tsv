@@ -38,6 +38,14 @@ leaf_completeness	tools/verify/completeness_gate.py	jx3p/tools/coverage_audit.py
 fx_param_sweep	tools/verify/fxsweep_gate.py	jx3p/tools/probe_pools.py	OK	JUNO sweeps 4 FX params x 256 values; JX FX pools are in the 57-pool census
 recall_gate	tools/verify/recall_gate.py	jx3p/tools/jx_recall_gate.sh	OK	patch bytes -> coefficient state, EXACTLY 0
 integration_render_ab	tools/verify/recall_render_ab.py	jx3p/tools/ab_render_c.py	OK	recall + note-on + full chain, plugin vs port
+effect_param_sweep	tools/verify/effect_param_gate.py	jx3p/tools/effect_param_gate.py	MISSING	every byte of each FX parameter under every FX type, whole object + render (JUNO 2026-10-05)
+fx_leaf_sweep	tools/verify/fx_leaf_gate.py	jx3p/tools/fx_leaf_gate.py	MISSING	every byte of each FX leaf family by fresh recall (JUNO flanger, 2026-10-05)
+all_voice_state	tools/verify/note_bcast_gate.py	jx3p/tools/note_bcast_gate.py	MISSING	every voice whole state after every note event, from the unit that renders it
+host_rate_sweep	tools/verify/rate_sweep_gate.py	jx3p/tools/rate_sweep_gate.py	MISSING	whole object + renders at 18 host rates; JX covers 3
+seeded_leaf_recall	tools/verify/seed_recall_gate.py	jx3p/tools/seed_recall_gate.py	MISSING	every recalled leaf random from its declared range; found 2 JUNO defects
+voice_steal	tools/verify/steal_gate.py	jx3p/tools/steal_gate.py	MISSING	more held notes than voices, audio + every voice state
+warm_chain	tools/verify/warm_chain_gate.py	jx3p/tools/warm_chain_gate.py	MISSING	chains of recalls through ONE engine, whole object after every step; found the JUNO slot-1 patch-change sequence
+warm_render	tools/verify/warm_render_gate.py	jx3p/tools/warm_render_gate.py	MISSING	patch changes on a RUNNING engine with notes and renders; found 3 JUNO assigner defects
 #
 # PARITY RUNS BOTH WAYS. ramp_smoothing was built for the JX first, so the
 # JUNO now owes an equivalent: does the JUNO port step ITS parameter ramps, or

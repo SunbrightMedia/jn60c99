@@ -18,7 +18,7 @@ import sys
 import glob
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-XT = glob.glob("/root/.espressif/tools/xtensa-esp-elf/*/xtensa-esp-elf/bin")
+XT = glob.glob(os.path.expanduser("~/.espressif/tools/xtensa-esp-elf/*/xtensa-esp-elf/bin"))
 if not XT:
     raise SystemExit("no Xtensa toolchain found -- this script measures the "
                      "TARGET's instruction counts and cannot guess them.")

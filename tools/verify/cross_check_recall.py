@@ -15,10 +15,11 @@ Reports, for voice-0 cells (offset < 10512):
 These are CANDIDATES. Whether the plugin actually emits a given param per patch is
 the host-mediated question (handled by the recall agent); this narrows where to look.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import struct, pickle
 
-PCM  = '/home/user/jn60c99/scratchpad/index_cell_map.pkl'   # complete: {index: [cells]}
-PORT = '/home/user/jn60c99/scratchpad/port_state.pkl'
+PCM  = _JREPO + '/scratchpad/index_cell_map.pkl'   # complete: {index: [cells]}
+PORT = _JREPO + '/scratchpad/port_state.pkl'
 VOICE = 10512
 STRIDE = 16
 

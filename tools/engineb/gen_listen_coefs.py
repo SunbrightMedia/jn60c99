@@ -18,10 +18,11 @@ note-on) and with the gate OFF (after the note-off). The firmware seeds state
 once per note, renders with the ON set, then swaps to the OFF set for the
 release -- which is exactly what the port's own cells do when a key is let go.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import ctypes, os, struct, sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-REPO = "/home/user/jn60c99"
+REPO = _JREPO + ""
 sys.path[:0] = [os.path.join(REPO, "tools", "verify"),
                 os.path.join(REPO, "tools", "trackb"),
                 os.path.join(REPO, "tools", "engineb")]

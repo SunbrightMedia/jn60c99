@@ -8,8 +8,9 @@ and a per-sample state-diff microscope around the introducing event.
 DOES NOT modify the repo. Plugin ground truth = its own machine code under
 Unicorn via tools/verify/e2e_emu.py.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__)))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, ctypes, os
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 import fuzz_diff as FD
 from fuzz_diff import gen_script, BLOBS, ARPS, BANK

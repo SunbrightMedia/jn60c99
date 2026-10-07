@@ -20,6 +20,7 @@ their old paths so no comment pointer dangles. Live project state:
 | ASSIGN_MODE_3_FINDING.md | REFERENCE | ASSIGN MODE 3 — found by the user's banks, never reachable from the factory bank |
 | ATTACK_TRANSIENT_FINDING.md | REFERENCE | BS Solid — the divergence is an ATTACK-TRANSIENT difference (2026-07-27) |
 | AUDIBLE_RECALL_PLAN.md | ARCHIVED | Audible patch recall — feasibility, plan, and progress — *superseded banner in-file; stays (cited by src comments)* |
+| AUDIT_2026-10-06.md | REFERENCE | Audit of the two days 2026-10-05/06 (27 commits): what was re-run or re-read, what was wrong (July reports presented as current; unverified later commits), and HEAD's full-verify verdict |
 | BANK_FORMAT.md | REFERENCE | JUNO-60 preset bank format (KoaBankFile00003 / PG-JU60) |
 | BEND_MOD_SENS.md | REFERENCE | BEND SENS / MOD SENS (DCO + VCF) — derived bit-exact, deferred to the wheel path |
 | BITEXACT_AUDIT.md | REFERENCE | Bit-exact audit: the timbre + arp bugs, and how they were fixed |
@@ -44,6 +45,7 @@ their old paths so no comment pointer dangles. Live project state:
 | FX_COLDLOAD_TODO.md | REFERENCE | FX cold-load recall — RESOLVED: 64/64 bit-exact |
 | H7_VS_S3_MEASURED.md | REFERENCE | H7 vs ESP32-S3 — measured, not estimated |
 | HISTORY.md | LIVING | PROJECT HISTORY — the full dated log that used to be CLAUDE.md |
+| HOSTPATH_PARITY_LOG.md | LIVING | What each host-path STEP found, with rvas (2026-10-06: the preset path's engine side is the host entry) |
 | HOSTPATH_PARITY_SCOPE.md | LIVING | HOSTPATH PARITY SCOPE — close every remaining gap between the port and a REAL host instance. Opus 5: execute t — *PARKED live work order (DAW-parity track)* |
 | PORT_PIPELINE.md | LIVING | THE NEXT-SYNTH ORDER: .vst3 -> playing instrument in 10 steps, each with its tool (pe_recon, abi_check, jx_emu.boot, audio_metrics, listen proofs) and the defect it prevents (playbook 85-88) |
 | JX3P_PLAN.md | LIVING | THE JX-3P PLAN — port-level C99, no hiccups, as fast as the method allows — *jx3p/docs/S3_STATUS.md holds live state* |

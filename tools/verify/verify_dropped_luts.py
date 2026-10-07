@@ -12,14 +12,15 @@ built at 48000, so we index the 48000 LUT.
 
 NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
-sys.path.insert(0, '/home/user/jn60c99/tools/verify')
+sys.path.insert(0, _JREPO + '/tools/verify')
 
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
 import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
 HEADER, STRIDE, BLOB_OFF = 23, 20223, 16
-REF = '/home/user/jn60c99/scratchpad/plugin_recall_ref.pkl'
-LUTS = '/home/user/jn60c99/scratchpad/dropped_luts.pkl'
+REF = _JREPO + '/scratchpad/plugin_recall_ref.pkl'
+LUTS = _JREPO + '/scratchpad/dropped_luts.pkl'
 
 # idx -> (blob_pos, [cells]); blob_pos = bb/2 (bb from real_recall.leaf_table SYNTH block)
 IDX = {

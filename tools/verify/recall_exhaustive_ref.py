@@ -26,6 +26,7 @@ Output: scratchpad/recall_exhaustive_<rate>.pkl =
 Two-process rule: E2E/Unicorn only. Usage: recall_exhaustive_ref.py <rate>
 NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e_emu as E
@@ -38,7 +39,7 @@ STRIDE = 16
 
 def main():
     rate = float(sys.argv[1]) if len(sys.argv) > 1 else 48000.0
-    out = '/home/user/jn60c99/scratchpad/recall_exhaustive_%d.pkl' % int(rate)
+    out = _JREPO + '/scratchpad/recall_exhaustive_%d.pkl' % int(rate)
 
     recall_idx = set(PRS.recall_indices())
     lt = dict(RR.leaf_table())

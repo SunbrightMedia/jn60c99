@@ -20,9 +20,10 @@ PROVENANCE label for everything emitted: MEASURED (the port's own recalled
 state, native build, 48000 Hz). The port is the sealed bit-exact engine; this
 is a cost harness input, not a gate reference.
 """
+import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__)))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import ctypes, os, struct, sys
 
-REPO = "/home/user/jn60c99"
+REPO = _JREPO + ""
 sys.path.insert(0, os.path.join(REPO, "tools", "verify"))
 import truth
 
