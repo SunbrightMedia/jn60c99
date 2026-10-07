@@ -56,7 +56,7 @@ def chains():
     st = [('patch', 9), ('state', [(ARP_SW, 1)]), A(ev=[on(0, 55, 0.8), on(3, 62, 0.8)])] + [A()] * 12
     st += [('active', 0), ('active', 1)] + [A()] * 12
     st += [A(ev=[off(40, 55)])] + [A()] * 4 + [A(ev=[on(100, 67, 0.8)])] + [A()] * 10
-    st += rate_change(44100.0) + [A()] * 12
+    st += rate_change(44100.0) + [A()] * 60          # several arp steps on the new tick period
     st += [A(ev=[off(0, 62), off(0, 67)])] + [A()] * 4 + [('state', [(ARP_SW, 0)])] + [A()] * 3
     out.append(('react', 48000.0, None, st))
     # 3. the engine-rate setting 2 (engine 48000): identity at 48000, an upsampling converter at

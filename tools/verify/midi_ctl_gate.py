@@ -312,6 +312,7 @@ def check_port(tooth=None, only=None, ref_pkl=None, title=None):
         lib.juno_rr_settle(lib.juno_gui_state(c))
         PL, PR = [], []
         toothed = [False]
+        nblk = [0]
         for stp in steps:
             if stp[0] == 'patch':
                 lib.juno_gui_queue_patch(c, bankb, len(bankb), stp[1])
@@ -327,7 +328,10 @@ def check_port(tooth=None, only=None, ref_pkl=None, title=None):
             else:
                 _, n, evs, ctx, par = stp
                 par = list(par)
-                if evs and not toothed[0] and tooth == 'late_note':   # the first note one sample late
+                nblk[0] += 1
+                if evs and not toothed[0] and tooth == 'late_note' and nblk[0] > 3:
+                    # the first note after the start-up mute (960 engine samples: a note inside it
+                    # sounds from the mute's end wherever it lands) one sample late
                     k_, off_, ch_, p_, v_ = evs[0]
                     evs = [(k_, off_ + 1, ch_, p_, v_)] + list(evs[1:])
                     toothed[0] = True
