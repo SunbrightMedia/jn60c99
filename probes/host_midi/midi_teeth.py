@@ -4,7 +4,7 @@ all notes off, CLAIMS B16b). Builds each mutant in a temporary directory (the tr
 is not touched), loads it in this process only (libjuno only: two-process rule), runs the gate's
 port check, prints how many chains each mutant breaks.
 
-    python3 probes/host_midi/midi_teeth.py      (needs cc and scratchpad/midi_ctl_ref.pkl)"""
+    python3 probes/host_midi/midi_teeth.py [mutant ...]     (needs cc and scratchpad/midi_ctl_ref.pkl)"""
 import ctypes
 import glob
 import os
@@ -91,7 +91,10 @@ def main():
     tmp = tempfile.mkdtemp(prefix='midi_teeth_')
     res = {}
     try:
+        names = [a for a in sys.argv[1:] if not a.startswith('-')]   # optional: these mutants only
         for name, what, path, old, new in MUTANTS:
+            if names and name not in names:
+                continue
             so = build(tmp, name, path, old, new)
             lib = ctypes.CDLL(so)
             freshlib.load = lambda lib=lib: lib

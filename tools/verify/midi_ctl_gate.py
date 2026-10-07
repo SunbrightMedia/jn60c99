@@ -167,6 +167,12 @@ def chains():
     st += [('state', [(0x00600108, 1)])] + [A()] * 60
     st += [A(par=[cc(64, OFF, 0)])] + [A()] * 4 + [A(ev=[ev_off(0, 62)])] + [A()] * 6
     st += [('state', [(0x00600108, 0)])] + [A()] * 3
+    # the switch on with held notes and NO key down: the held notes become the arp's (a key down
+    # would be moved in last and free the arp's held keys again)
+    st += [A(ev=[ev_on(0, 72, 0.8), ev_on(0, 76, 0.7)], par=[cc(64, ON, 10)])] + [A()] * 2
+    st += [A(ev=[ev_off(0, 72), ev_off(1, 76)])] + [A()] * 2
+    st += [('state', [(0x00600108, 1)])] + [A()] * 60
+    st += [A(par=[cc(64, OFF, 0)])] + [A()] * 8 + [('state', [(0x00600108, 0)])] + [A()] * 3
     out.append(('sus_arp', 44100.0, None, st))
     # 10. all notes off (CC 123): held keys, held notes (sustain), a running arp; keys released and
     #     played after it; a MONO and a UNISON patch with the pedal and CC 123

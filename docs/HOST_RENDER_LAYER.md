@@ -68,7 +68,7 @@ engine render (CWaveGen vt+56)  rva 0x3C7400   voice workers + master (e2e_emu r
 | the arp controller (SW / TYPE / STEP, the apply, the pattern reload at the next step) | the same (arp_sw / arp_type_set / arp_step_set, src/carp.c carp_ctl_config) -- **bit-exact, A24** |
 | the start-up: ~274 ramps per unit in flight after the boot | starts settled -- **open, B15** |
 | MIDI controllers through process(): bend, mod wheel, expression, the 51 default CC assignments, parameter records (every host id below the MIDI base), aftertouch / program change (empty) | the same (juno_gui_process_ex, src/juno_midi.c, src/midi_tables.h) -- **bit-exact, A26** |
-| sustain (CC 64, a HOLD in the keyboard object) and all-notes-off (CC 123, the assigner's) | flagged unported (juno_gui_unported bit 1) -- **open, B16b** |
+| sustain (CC 64, a HOLD in the keyboard object) and all-notes-off (CC 123, the assigner's) | the same (gui/juno_bridge.c, the keyboard block) -- **bit-exact, A27** |
 
 ## The arp controller (READ + EXECUTED, 2026-10-07)
 
@@ -143,7 +143,7 @@ taps forward then backward in float and is scaled by (float)L; the counters wrap
 3. B15: the start-up as the plugin boots (its build at 96000, its ramps in flight); gate from
    the first sample.
 4. DONE (A26): MIDI CC / channel aftertouch / pitch bend intake (process() re-encoding, the
-   push's CC map, the parameter records, the engine's vt+136 / +152 / +160 / +168). B16b: the
+   push's CC map, the parameter records, the engine's vt+136 / +152 / +160 / +168). DONE (A27): the
    keyboard object's sustain (CC 64) and the assigner's all-notes-off (CC 123).
 
 ## The MIDI controller intake (READ + EXECUTED, 2026-10-07; CLAIMS A26 / B16b)
@@ -171,3 +171,31 @@ taps forward then backward in float and is scaled by (float)L; the counters wrap
   paths re-sends them (a patch load and a voice-count change after a bend: bit-exact).
 - The product's units: the voice units' assigners follow the engine's voice count (6), the
   master's stays at 8 (EXECUTED, sus_probe.py): its allocation differs and is never rendered.
+
+## The keyboard object and the sustain (READ + EXECUTED, 2026-10-07; CLAIMS A27)
+
+One per unit (engine +120 + 64u), all alike; the engine's note entries (vt+120 / +128) call it.
+Fields: +4 the route (1: the arp), +7 a transpose no path writes (0), +8 the key-trig flag, +9 /
++10 the arp / note sustain, +11 / +12 the pending key-trig mode, +16 the keys in the arp and +532
+the arp keys the sustain holds (count + list), +1048 the keys down on the voices (key -> its
+note) and +1176 the notes the sustain holds (0xFF none) -- adjacent, and the press-order walk
+reads +1176 at index -1, which is +1048's key 127 --, +1320 the velocities, +1448 the press order
+(newest first, -1 empty), +1312 the note sink (the assigner), +1304 the arp.
+
+- Key-on (rva 0x3C42D0): the pending key-trig mode first. Arp route: with the arp sustain on and
+  no key in the arp, the held arp keys leave first; a key not yet in the arp goes in (unless the
+  sustain holds it: then it only leaves the hold). Voices: with the note sustain on and NO key
+  down, every held note leaves first (press order, oldest first); the key goes down; a held note
+  pressed again leaves the hold and plays again. Then the velocity and the press order.
+- Key-off (rva 0x3C4230): arp route out of the arp (held instead under the arp sustain); voices:
+  the key's note, held under the note sustain, else off.
+- CC 64 (rva 0x3C7E20 -> the arp controller's 0x3C4E90): only a change acts; the note sustain,
+  then the arp sustain, follow it; a release frees what each holds (notes: by the key-trig flag,
+  1 from key 127 down, else the press list -- its empty slots included, so with key 127 down the
+  walk sends note 255 and forgets that key: EXECUTED, probes/host_midi/sus_probe.py key127).
+- The arp switch (rva 0x3C49F0) moves held notes into the arp (and its hold) when it turns on,
+  held arp keys onto the voices (and their hold) when it turns off.
+- CC 123 (rva 0x3C7DA0 -> 0x3C3A00 -> the assigner's 0x354A90 -> 0x3530B0): gate-off for every
+  gated voice, every slot "no note", the held-note mask and +68 cleared; the keyboard's maps and
+  the arp stay. Each gate leaf rewrites the held flag 1856 as "a voice still gated" (rva
+  0x3B1C58), so the last gate-off leaves 0.

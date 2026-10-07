@@ -2720,3 +2720,18 @@ A census that enters below the plugin's real caller inherits the harness's defau
 units, order) as silent choices. Census an entry through the caller the product runs (here
 process(); for engine entries at least the engine's vtable function), or name every argument the
 harness supplies and show the real caller passes the same.
+
+## 147. A LAW MEASURED WHERE ITS RIVALS AGREE IS NOT MEASURED; A MUTANT THAT DOES NOT BITE IS A REACH GAP
+Paid 2026-10-07 (JUNO, the held flag 1856 and the sustain gate). B3 measured the flag on chords
+that never held more keys than voices and wrote "1 while any key is held". The plugin's gate leaf
+(rva 0x3B1C58) writes "1 while any voice is gated" -- equal on every scenario the gate had, apart
+after a steal (a key held with no voice). The rival law surfaced only while porting CC 123,
+whose two gate-offs wrote 1 then 0 with both keys still held. The same day three sustain mutants
+did not bite: a gate change on a patch whose envelope had decayed, an arp window shorter
+than one step, and an arp switch with a key down (the plugin then frees what the switch had
+just moved) are silent -- the chains could not see the paths they claimed.
+### The rule
+For every law taken from observation, name the rival laws that fit the same data and build the
+input that separates them before the law is believed. When a mutant does not bite, the chain
+does not reach the path: change the chain (a sustaining envelope, a window longer than the
+effect's period, a state-level gate for a state law), re-run, and only then claim the path.
