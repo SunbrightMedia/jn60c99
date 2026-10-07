@@ -2039,6 +2039,7 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
 {
     juno_host_feat f;
     unsigned char *tmp;
+    juno_ctx *t;
     unsigned char keep[2];
     int roff = juno_host_param_roff(i);
     if (roff < 0) return 0;
@@ -2055,16 +2056,18 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
     f.to = host_only_slot(i) >= 0 ? v : juno_host_param_decode(rec, i);
     f.ron1 = juno_reverb_level_on(host_val(rec, "REVERB LEVEL"));
     tmp = (unsigned char *)malloc(JUNO_STATE_BYTES);
-    if (tmp) {
-        juno_ctx t = *c;
+    t = tmp ? (juno_ctx *)malloc(sizeof *t) : NULL;   /* the context copy on the heap: it is
+                                                        * 121 KB, the WASM stack 64 KB */
+    if (tmp && t) {
+        *t = *c;
         memcpy(tmp, c->st, JUNO_STATE_BYTES);
         /* settle the live ramps on the copy first, so the recall meets the
          * cells at their targets (a recall arm whose target is already stored
          * early-outs and leaves the cell where it was: unsettled, a glide in
          * flight would read as the recall's value; host_edit_gate fx chain 13) */
         juno_rr_settle(tmp);
-        t.live_recall = 0;
-        if (ctx_state_recall(&t, tmp, c->bank, c->patch_idx, 0) >= 0) {
+        t->live_recall = 0;
+        if (ctx_state_recall(t, tmp, c->bank, c->patch_idx, 0) >= 0) {
             f.don1 = JI(tmp, JUNO_DLY_ON) != 0;
             if (juno_host_edit_covered(i, &f)) {
                 juno_host_edit(c->st, tmp, i, &f);
@@ -2089,17 +2092,19 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
                     memcpy(&h, &v, 4);
                     juno_rr_set_cut_last(c->st, (int)(h * 255.0f));
                 }
-                c->last_condition = t.last_condition;
-                c->hpf_type = t.hpf_type;
+                c->last_condition = t->last_condition;
+                c->hpf_type = t->hpf_type;
                 c->host_role = 1;
                 ctx_alloc_recall(c, c->bank, c->patch_idx, 0, tmp);
                 c->host_role = 0;
                 free(tmp);
+                free(t);
                 return 1;
             }
         }
-        free(tmp);
     }
+    free(tmp);
+    free(t);
     rec[roff] = keep[0]; rec[roff + 1] = keep[1];
     return 0;
 }
@@ -2255,16 +2260,17 @@ static void setsr_inplace(juno_ctx *c, float rate, int recall)
     unsigned char *ref;
     struct juno_host_shim rshim;     /* the reference's own: attaching c->shim would point the
                                       * live master's selectors into `ref`, freed below */
-    juno_ctx t;
+    juno_ctx *t;                     /* the context copy on the heap (121 KB; the WASM stack is 64 KB) */
     if (!(rate < old || rate > old)) return;
     ref = (unsigned char *)malloc(JUNO_STATE_BYTES);
-    if (!ref) return;
+    t = ref ? (juno_ctx *)malloc(sizeof *t) : NULL;
+    if (!ref || !t) { free(ref); free(t); return; }
     memset(&rshim, 0, sizeof rshim);
     st_build(ref, rate, &rshim, c->chorus_mode);     /* the build's rate laws at the new rate */
     juno_rr_copy_proc(ref, c->st);                    /* the tempo, the tap copy, the reverb's state */
-    t = *c;
-    t.live_recall = 0;
-    if (recall && c->bank) ctx_state_recall(&t, ref, c->bank, c->patch_idx, 0);
+    *t = *c;
+    t->live_recall = 0;
+    if (recall && c->bank) ctx_state_recall(t, ref, c->bank, c->patch_idx, 0);
     juno_rr_settle(ref);
     juno_rr_setsr_suspend(c->st);                     /* vt3, at the old rate */
     juno_rr_setsr_reapply(c->st, ref);                /* rva 0x3BC980 */
@@ -2274,6 +2280,7 @@ static void setsr_inplace(juno_ctx *c, float rate, int recall)
     juno_driver_unit_noise_reinit(c->st);             /* ... in every unit's noise copy */
     juno_rr_setsr_resume(c->st);                      /* vt5, at the new rate */
     free(ref);
+    free(t);
 }
 
 /* The engine-rate switch (rva 0x320BA2: setSampleRate, then the render object's

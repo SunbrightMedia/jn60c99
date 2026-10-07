@@ -230,8 +230,11 @@ webapp: libjuno.so
 
 # Shared library for the test GUI (gui/juno_gui.py via ctypes).
 gui: libjuno.so
+# The product code keeps every stack frame under 16 KB: the WASM stack is 64 KB and a
+# 121 KB context copied onto it overflowed silently (playbook 158).
+FRAME_GUARD := -Werror=frame-larger-than=16384
 libjuno.so: gui/juno_bridge.c $(SRC) $(HDR)
-	$(CC) $(CFLAGS) -shared -fPIC -o $@ $(filter %.c,$^) $(LDLIBS)
+	$(CC) $(CFLAGS) $(FRAME_GUARD) -shared -fPIC -o $@ $(filter %.c,$^) $(LDLIBS)
 
 # TRACK B candidate engine: the sealed engine with hand-written NATIVE kernels
 # substituted for their transcribed counterparts (native/*.c shadow src/*.c by
