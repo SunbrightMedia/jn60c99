@@ -57,24 +57,73 @@ engine render (CWaveGen vt+56)  rva 0x3C7400   voice workers + master (e2e_emu r
 - An engine-rate change (core+104 != core+588) at the start of a block: engine
   setSampleRate, new render object, and, when the pair changed, phase = 0, count = 0.
 
-## The port today (INFERRED until the new gates run)
+## The port today
 
 | plugin | port |
 |---|---|
-| engine at vm.vs.sampleRate's rate (default 96000) + the converter to the host rate | engine at the host rate, no converter: equal to the plugin only where the two rates are equal (a 96 kHz host with the default, or the setting matched to the host rate) |
-| tick period from round(tempo x 10), 1e-8 host samples | src/carp.c: from round(BPM) (whole BPM), 1e-9 samples |
-| grid restarts at the first key; ticks always run | free-running grid, ticks only while the arp is on |
-| tempo forwarded only when valid and changed, 40..300 BPM | juno_gui_set_tempo: every value > 0, as a float |
+| engine at vm.vs.sampleRate's rate (default 96000) + the converter to the host rate | engine at the host rate, no converter: equal to the plugin only where the two rates are equal (a 96 kHz host with the default, or the setting matched to the host rate) -- **open, B13** |
+| silence at a host rate outside its table (11025, 22050, 32000, 47999, ...) | plays at every host rate -- **open, B13** |
+| the render driver: events at offsets, the tick clock in 1e-8 host samples from round(tempo x 10), the grid restarted by the first key, ticks always, the tempo only when valid / changed / 40..300 | the same (gui/juno_bridge.c drv_block) -- **bit-exact, A24** |
+| the arp controller (SW / TYPE / STEP, the apply, the pattern reload at the next step) | the same (arp_sw / arp_type_set / arp_step_set, src/carp.c carp_ctl_config) -- **bit-exact, A24** |
+| the start-up: ~274 ramps per unit in flight after the boot | starts settled -- **open, B15** |
 
-## Work (CLAIMS B13, B14)
+## The arp controller (READ + EXECUTED, 2026-10-07)
 
-1. Oracle: execute the plugin's own process() in the booted plugin, the engine render's
-   thread transport replaced as in e2e_emu (the only replacement), with an isolation
-   control that equals the proven e2e path (identity path, notes at block starts).
-2. Port the driver (events at offsets, tick clock, tempo, note count) and gate it on the
-   identity path at 44100 / 48000 / 96000, arp running, tempos incl. non-integer and out
-   of range, keys at every offset, several block sizes.
-3. Port the engine-rate setting and the converter (rva 0x3442E0 tables, 0x343E30); gate
-   the default (96000 engine) at host 44100 / 48000 / 88200 and odd rates.
+The host entry (rva 0x3C7AE0) sends dispatch 831..835 straight to the controller of each of the 9
+units (engine +136 + 64u), nothing else: 831 the switch with (v != 0) (rva 0x3C49F0), 832 TYPE
+(0x3C4E50), 833 STEP (0x3C49B0), 834 SCATTER TYPE (0x3C4F10), 835 SCATTER DEPTH (0x3C4EE0), the
+last two with force 0. The plugin's state list and patch load never send 834 / 835: SCATTER stays
+at the build's (0, 7) on every product path.
+
+- TYPE / STEP (0..5): a new value re-runs the switch with force; while the arp is on, the config
+  runs once more. While the arp is off the value only waits: the switch-on's config applies it.
+- The switch, on: the config twice (TYPE, STEP) before anything moves, then the keyboard's route,
+  the arp's flag (+10), the keys from the voice map to the arp. Off: the arp idle (its sounding
+  notes off) and reset, then the keys back as notes (B11).
+- The config (rva 0x3C4F40): TYPE and STEP clamped to 2; the apply for a new TYPE, the apply for
+  STEP (+4076), and -- the first time ever -- the rate mode 2 with the beat re-latch armed.
+- The apply (rva 0x3C0EC0, apply object built with -1, -1, -1, -8): the pattern request (rva
+  0x3C3010: +40 = 1, the step index taken modulo the old length, the selector, the octave offset
+  0, the range from +4076, the block's gate and sensitivity), the rate ({0,2,4,1,3,5}[mode] + the
+  table's delta), the range delta, seven values to dispatch 312..318 (the engine's side, census
+  A20), the keyboard's beat (+5). Table rva 0x9D86D0, [150 x slab + 15 x k + sub].
+- The reload (rva 0x3C07E0) at the next step tick, before the step: while running, every slot's
+  note off (velocity 64), the expand (rva 0x3BF9F0) and the gate fill (rva 0x3BFED0).
+- PROVEN (probes/host_render/arp_cfg_probe.py): a TYPE edit while the arp runs with keys held
+  changes +40, the selector, the config bytes, the apply's type, nothing else -- not the selector
+  index, "started", the UP&DOWN direction; no unit's engine state moves.
+
+## The converter table (PROVEN, read from the booted plugin, 2026-10-07)
+
+rva 0xC43C30, 45 entries + a terminator, 32 bytes each {engine rate, host rate, L, M, coefficient
+vector, render function}; the lookup is rva 0x343A80 (on a new engine or host rate).
+
+| engine \ host | 11025, 22050 | 44100 | 48000 | 88200 | 96000 | 176400 | 192000 | 384000 |
+|---|---|---|---|---|---|---|---|---|
+| 96000 | silence | L588 M1280 | L4 M8 | L588 M640 | identity | L147 M80 | L4 M2 | L4 M1 |
+| 88200 | silence | L640 M1280 | L80 M147 | identity | L640 M588 | L640 M320 | L640 M294 | L640 M147 |
+| 48000 | silence | L1176 M1280 | identity | L147 M80 | L8 M4 | L147 M40 | L8 M2 | L8 M1 |
+| 44100 | silence | identity | L1280 M1176 | L1280 M640 | L1280 M588 | L1280 M320 | L1280 M294 | L1280 M147 |
+| 32000 | silence | L441 M320 | L441 M294 | L441 M160 | L12 M4 | L441 M80 | L12 M2 | L12 M1 |
+
+Coefficients per vector: 84 (L4/L8 at 2:1), 43 (L4 at 1:2, 1:4), 13257 (44.1k <-> 48k family),
+6631, 1524, 126, 4568. No entry for the pair -> the terminator's render function, silence:
+EXECUTED at host 32000 (default and setting 32000), 22050 and 47999 -- no engine render, zero
+output with a key held; 48000 (default) and 44100 (setting 3) play.
+
+The converter (rva 0x343E30): per block, ceil((acc43 + delay + n x M - acc42) / L) engine samples
+rendered after the kept history (2 x delay / L samples per channel); each output sample sums the
+taps forward then backward in float and is scaled by (float)L; the counters wrap at 0x40000000 -
+(0x40000000 mod (M x L)) + 2 x delay.
+
+## Work (CLAIMS B13, B15)
+
+1. DONE (A24): the oracle through process() with its isolation control; the driver and the arp
+   controller ported and gated on the identity path at 44100 / 48000 / 96000.
+2. B13: the engine-rate setting, the table (coefficients generated from the booted plugin), the
+   converter (rva 0x343E30), the silence object; gate the default (96000 engine) at every table
+   host rate and the silence at rates outside it.
+3. B15: the start-up as the plugin boots (its build at 96000, its ramps in flight); gate from
+   the first sample.
 4. MIDI CC / channel aftertouch / pitch bend intake (process() re-encoding + the engine's
    vt+136 / +152 / +160 / +168).

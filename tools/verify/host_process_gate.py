@@ -13,12 +13,18 @@ CLAIMS B13/B14). The plugin side is its own IAudioProcessor::process on the boot
            sample late; the e2e side built without the ramp settle (the boot's own settle is
            part of what the control asserts).
 
+--port-tooth  the port check must FAIL on two harness defects: the chain's first note one sample
+           late on the port side; one valid host tempo 0.1 BPM off. Both bite (7/7 and 4/7 chains, 2026-10-07).
+           The real-defect tooth: the port before the arp controller (commit a76cf2ea) fails
+           chains 0-2 at block 80, the TYPE edit (CLAIMS A24).
+
 --ref / --port  THE RENDER DRIVER (CLAIMS B14): chains of host blocks through the plugin's own
            process() and through the port's juno_gui_process -- the arp running, keys at every
            kind of offset (two in one block, note-off and note-on at one offset, offsets past the
            block), several block sizes, host tempos valid (integer, x.5, x.3, below 40 BPM) and
            absent, factory arp patches loaded through the plugin's patch load and the arp switch
-           / TYPE / STEP changed through setState, all with the identity render object (the
+           / TYPE / STEP changed through setState (the 'ctl' chains: while it runs, while it is off,
+           a same value, values above the controller's clamp), all with the identity render object (the
            engine-rate setting matched to the host rate, 44100 / 48000 / 96000). Every sample
            of both channels must agree. Two-process rule: --ref (Unicorn) writes
            scratchpad/host_process_ref.pkl, --port (libjuno) reads it.
@@ -150,6 +156,27 @@ def chains():
         st += [('blk', 777, [ev_on(1, 60, 0.4)], T4)] + [('blk', 777, [], T4)] * 10
         st += [('blk', 512, [ev_off(0, 52), ev_off(0, 57), ev_off(0, 60)], (False, 150.0))] + [('blk', 512, [], (False, 150.0))] * 6
         out.append(('odd', rate, st))
+    # the arp controller (rva 0x3C49F0 / 0x3C4E50 / 0x3C49B0): TYPE and STEP edits while the arp
+    # runs (UP&DOWN mid-pattern, a same value, 3 and 5 above the clamp), while it is off (the value
+    # waits for the switch), the switch back on (no second beat re-latch), a patch load with a key
+    # held
+    for rate in (48000.0, 44100.0):
+        B = 512
+        T = (True, 125.0)
+        st = [('patch', 1), ('blk', B, [ev_on(10, 60, 0.8), ev_on(10, 64, 0.7), ev_on(11, 67, 0.6)], T)]
+        st += [('blk', B, [], T)] * 8
+        for ed in ([(ARP_TYPE, 1)], [(ARP_TYPE, 1)], [(ARP_STEP, 2)], [(ARP_STEP, 0)], [(ARP_TYPE, 3)],
+                   [(ARP_TYPE, 5)], [(ARP_STEP, 1)]):
+            st += [('state', ed)] + [('blk', B, [], T)] * 7
+        st += [('state', [(ARP_SW, 0)])] + [('blk', B, [], T)] * 3
+        st += [('state', [(ARP_TYPE, 0)])] + [('blk', B, [], T)] * 2
+        st += [('state', [(ARP_STEP, 1)])] + [('blk', B, [], T)] * 2
+        st += [('state', [(ARP_SW, 1)])] + [('blk', B, [], T)] * 9
+        st += [('blk', B, [ev_off(200, 60), ev_off(200, 64), ev_off(201, 67)], T)] + [('blk', B, [], T)] * 3
+        st += [('blk', B, [ev_on(64, 72, 0.9)], T)] + [('blk', B, [], T)] * 9
+        st += [('patch', 33)] + [('blk', B, [], T)] * 10
+        st += [('blk', B, [ev_off(0, 72)], T)] + [('blk', B, [], T)] * 4
+        out.append(('ctl', rate, st))
     return out
 
 
@@ -192,7 +219,7 @@ def build_ref():
     return 0
 
 
-def check_port(verbose=False):
+def check_port(verbose=False, tooth=None):
     import ctypes
     import freshlib
     if not os.path.exists(REF_PKL):
@@ -230,6 +257,7 @@ def check_port(verbose=False):
         lib.juno_gui_process(c, (Note * 1)(), 0, 0, 120.0, L0, R0, PRELUDE)
         lib.juno_rr_settle(lib.juno_gui_state(c))
         PL, PR = [], []
+        toothed = [False]
         for stp in steps:
             if stp[0] == 'patch':
                 lib.juno_gui_queue_patch(c, bankb, len(bankb), stp[1])
@@ -239,6 +267,15 @@ def check_port(verbose=False):
                 lib.juno_gui_queue_state(c, b, len(b))
             else:
                 _, n, evs, ctx = stp
+                if tooth == 'late_note' and evs and not toothed[0]:
+                    # the harness delivers the chain's first note one sample late
+                    k_, off_, ch_, p_, v_ = evs[0]
+                    evs = [(k_, off_ + 1, ch_, p_, v_)] + list(evs[1:])
+                    toothed[0] = True
+                if tooth == 'tempo' and ctx is not None and ctx[0] and not toothed[0]:
+                    # one valid host tempo 0.1 BPM off (round(tempo x 10) moves by 1)
+                    ctx = (ctx[0], ctx[1] + 0.1)
+                    toothed[0] = True
                 arr = (Note * max(1, len(evs)))()
                 for i, (k, off, ch, pch, vel) in enumerate(evs):
                     arr[i] = Note(off, 0 if k == 'on' else 1, ch, pch, vel)
@@ -255,6 +292,8 @@ def check_port(verbose=False):
         print('chain %d %-5s %-7g %7d samples: %s' % (ci, name, rate, len(RL), 'BIT-EXACT' if not diff else
               '%d differ, first at %d (plugin %.6g, port %.6g)' % (len(diff), diff[0], f(RL[diff[0]]), f(PL[diff[0]]))))
         bad += bool(diff)
+    if tooth:
+        return bad
     print('\n=== HOST PROCESS (CLAIMS B14): the render driver -- arp clock, tempo, events at offsets -- plugin vs port ===')
     print('GATE: %s' % ('FAIL' if bad else 'PASS'))
     return 1 if bad else 0
@@ -280,6 +319,15 @@ def main():
         return build_ref()
     if a == ['--port']:
         return check_port('-v' in sys.argv)
+    if a == ['--port-tooth']:
+        res = {}
+        for t in ('late_note', 'tempo'):
+            print('--- tooth %s' % t)
+            res[t] = check_port(tooth=t)
+        print()
+        for t, b in res.items():
+            print('%-12s %s (%d chains differ)' % (t, 'BITES' if b else 'DID NOT BITE', b))
+        return 0 if all(res.values()) else 1
     print(__doc__)
     return 2
 

@@ -12,7 +12,7 @@ Tracks B and D below were written for two chips. Read them this way from now on:
 - The "three facts" at the end stay true as measurements; "one chip cannot do it" is exactly why B needs a cheaper engine.
 
 ## STATUS (2026-10-07, the rules below: one line per track, regressions first)
-- A: Port: REOPENED 2026-10-07 -- the plugin runs its engine at 96 kHz by default and converts to the host rate; its render driver owns the arp clock and tempo; the port has neither (CLAIMS B13/B14, PROVEN by the plugin's own process(): docs/HOST_RENDER_LAYER.md). Engine: PROVENANCE 27/27, full verify of cd63fc1 GREEN (job verify_fix3).
+- A: Port: REOPENED 2026-10-07 -- the plugin runs its engine at 96 kHz by default, converts to the host rate and is silent outside its rate table; the port has neither (CLAIMS B13); the port starts settled, the plugin does not (B15). Closed today: the render driver + the arp controller (A24, host_process_gate 7/7 bit-exact). Engine: PROVENANCE 27/27, full verify of cd63fc1 GREEN (job verify_fix3).
 - D: RETIRED by the one-board rule (2026-09-23).
 - B: REOPENED for ONE board — no one-board JUNO engine chosen yet (budget facts in docs/ONE_BOARD_BUDGET.md).
 - C: esp32s3/ playable (console, patch step, MIDI UART); the Pi PLAY image is built, not yet on silicon.

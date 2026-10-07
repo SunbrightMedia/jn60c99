@@ -89,6 +89,10 @@ verify: test libjuno.so
 	echo "=== LIVE GATE 5/7: arp RENDER (schedule replay into plugin, 7 arp patches) ==="; \
 	python3 tools/verify/arp_render_ab.py --port || FAIL=1; \
 	python3 tools/verify/arp_render_ab.py --ref || FAIL=1; \
+	echo "=== HOST PROCESS (CLAIMS B14): the plugin's own process() == the trusted engine path, then the render driver (arp clock, tempo, offsets, the arp controller), 5 chains ==="; \
+	python3 tools/verify/host_process_gate.py --control || FAIL=1; \
+	fresh $(SCRATCH)/host_process_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/host_process_gate.py --ref || FAIL=1; \
+	python3 tools/verify/host_process_gate.py --port || FAIL=1; \
 	echo "=== LIVE GATE 6/7: cold-state A/B (port init/prepare vs plugin build+setSR, 18 rates) ==="; \
 	for r in 8000 11025 16000 22050 32000 37800 44100 47999 48000 50000 64000 88200 96000 96001 176400 192000 352800 384000; do \
 	  python3 tools/verify/coldstate_ab.py --port $$r || FAIL=1; \

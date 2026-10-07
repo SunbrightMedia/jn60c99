@@ -115,9 +115,10 @@ mine is a hypothesis (playbook 80).
 # LIVE STATE (update in place, no dated blocks here, EVER; detail lives in
 # FINAL_GUIDE.md / docs/ — this section is one line-group per arc)
 - **src/ + trunk**: OPEN AGAIN 2026-10-07 at the host layer: the plugin runs its
-  engine at 96 kHz (vm.vs.sampleRate default) and converts to the host rate, and
-  its render driver owns the arp clock + tempo (CLAIMS B13/B14,
-  docs/HOST_RENDER_LAYER.md). Engine: PROVENANCE 27/27 PROVEN; full verify of
+  engine at 96 kHz (vm.vs.sampleRate default), converts to the host rate and is
+  silent at host rates outside its converter table (CLAIMS B13); it starts with
+  its build's ramps in flight (B15). Its render driver + arp controller are
+  ported and bit-exact (A24, host_process_gate.py; docs/HOST_RENDER_LAYER.md). Engine: PROVENANCE 27/27 PROVEN; full verify of
   cd63fc1 GREEN (job verify_fix3, EXIT 0, every section ran); ARM golden OK
   (job arm_golden_cd63, toolchain installed by apt in that container). Later commits are docs only. The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12

@@ -2676,3 +2676,18 @@ with a tempo, notes at offsets and a parameter queue. Log every engine entry it 
 (setSampleRate, render, tick, tempo, note, CC, bend) and the render object between the driver and
 the engine. Every reached entry is a census row with a gate, before any engine gate is trusted
 as "the plugin".
+
+## 144. A PORT WRITE NO PLUGIN FUNCTION MAKES IS A DEFECT, HOWEVER SENSIBLE IT SOUNDS
+Paid 2026-10-07 (JUNO). carp_set_mode reset the selector "so the new mode starts cleanly", and a
+patch load called carp_set_scatter, which reloaded the pattern at once and dropped the sounding
+slots without note-offs. No plugin function does either: the plugin's TYPE setter swaps the
+selector, keeps its index, and reloads the pattern at the next step, turning the sounding notes
+off first. The arp gates never saw it: their oracle configured the arp once on a fresh engine,
+before any key. The first chain that changed TYPE with keys held through the plugin's own
+process() was red at that block. A unit test (test_arp_onset) even asserted the port's belief
+that the arp clock stays off until the first key; the plugin's init sets it.
+### The rule
+Every write a port function makes to plugin state names the plugin function (rva) that makes the
+same write. A write justified by intent ("cleanly", "so play stays clean", "restart") with no rva
+behind it is a defect candidate: find the plugin function or delete the write. A unit test
+asserts plugin facts with their evidence, never the port's own design.

@@ -17,7 +17,10 @@ REFERENCE (process 1, --ref): the plugin under Unicorn.
   post velocity-scale, at the assigner — the same layer the port trace observes.
 
 PORT (process 2, --port): juno_gui_arp_trace on libjuno.so, sample offsets ->
-  ticks (tick = round((smp+1)/tick_period), tick_period = round(SR*60/(bpm*24))).
+  ticks. The port's render driver (the plugin's, rva 0x320B20; CLAIMS B14) ticks
+  at sample 0 and then every tick_period = SR*60/(bpm*24) samples (1000 at
+  48000 / 120, no host tempo), and an arp event carries the sample of its tick:
+  tick = smp // tick_period + 1, the reference's 1-based transport call.
 
 Comparison is OFFSET-CONVENTION-FREE where it matters: we compare the ordered
 (kind, note, vel) event sequence AND the inter-event tick gaps, plus the absolute
@@ -156,7 +159,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == '--port':
         sched = [(buf[4 * i], buf[4 * i + 1], buf[4 * i + 2], buf[4 * i + 3]) for i in range(ne)]
         lib.juno_gui_destroy(c)
         # sample -> tick
-        return [(round((smp + 1) / TICK_PERIOD), kind, note, vel) for (smp, kind, note, vel) in sched]
+        return [(smp // TICK_PERIOD + 1, kind, note, vel) for (smp, kind, note, vel) in sched]
 
     def gaps(ev):
         ts = [e[0] for e in ev]
