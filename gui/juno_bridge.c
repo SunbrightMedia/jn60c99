@@ -34,6 +34,10 @@ typedef struct { int offset, type, channel, pitch; float velocity; } juno_host_n
  * normalized value) */
 typedef struct { uint32_t id; int offset; double value; } juno_host_param;
 
+/* the keyboard object's key lists (count, then the keys: rva 0x3C4700 add,
+ * 0x3C4730 test, 0x3C4650 remove) */
+typedef struct { int n; int k[128]; } kb_list;
+
 #define DRV_QMAX 1024             /* queued MIDI records per block (the plugin's vector grows; 1024 is
                                    * far above any host's events per block) */
 
@@ -87,6 +91,17 @@ typedef struct {
     unsigned char kb_vel[128];
     int   kb_order[128];
     unsigned char kb_trig_mode, kb_trig_pending, kb_flag8;
+    /* ... and its sustain (CLAIMS B16b, rva 0x3C42D0 / 0x3C4230 / 0x3C4E90): the
+     * keys down on the voices, each with the note it plays (+1048), and the notes
+     * the sustain holds after their key went up (+1176), 0xFF = none -- ONE array,
+     * as in the plugin, whose press-order walks test and clear +1176 at index -1
+     * (an empty slot of the press list), which is +1048's key 127; the keys in the
+     * arp (+16) and the arp keys the sustain holds (+532); the arp sustain byte
+     * (+9) and the note sustain byte (+10); and the controller's sustain byte
+     * (+12 of the arp controller, engine +136 + 64u) that CC 64 sets. */
+    unsigned char kb_map[256];
+    kb_list kb_arp, kb_arp_latch;
+    unsigned char kb_sus_arp, kb_sus_note, ctl_sus;
     int   host_role;       /* 1 while a host edit runs its allocator half: the
                             * recall model's arp block stays out (the host entry
                             * calls the controller's own setter instead) */
@@ -190,7 +205,6 @@ typedef struct {
     float *ro_tmp;             /* the converter's host samples of one segment (2 x ro_tmp_cap) */
     int   ro_tmp_cap;
     int   ro_unported;         /* a rate switch on a running engine was asked: B13b, not ported */
-    int   midi_unported;       /* a sustain (CC 64) or all-notes-off (CC 123) arrived: B16b, not ported */
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -307,6 +321,9 @@ static juno_ctx *ctx_create(float sample_rate, int chorus_mode)
     c->arp_on = 0;
     c->arp_cur = -1;
     for (v = 0; v < 128; ++v) c->kb_order[v] = -1;
+    memset(c->kb_map, 0xFF, sizeof c->kb_map);
+    c->kb_arp.n = c->kb_arp_latch.n = 0;
+    c->kb_sus_arp = c->kb_sus_note = c->ctl_sus = 0;
     c->host_bpm = 128.0f;   /* plugin recall-default TEMPO (880 -> 40+88.0) */
     drv_init(c, sample_rate);
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
@@ -352,6 +369,9 @@ void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
     c->arp_on = 0;
     c->arp_cur = -1;
     for (v = 0; v < 128; ++v) c->kb_order[v] = -1;
+    memset(c->kb_map, 0xFF, sizeof c->kb_map);
+    c->kb_arp.n = c->kb_arp_latch.n = 0;
+    c->kb_sus_arp = c->kb_sus_note = c->ctl_sus = 0;
     c->host_bpm = 128.0f;
     drv_init(c, sample_rate);
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
@@ -734,7 +754,16 @@ static int pick_newest(juno_ctx *c, int want_assigned, int want_gated)
 
 /* 128-bit held-note bitmask (mirrors the assigner's a1[20..23]). */
 static void held_set(juno_ctx *c, int n)   { if (n>=0 && n<128) c->held_notes[n>>5] |=  (1u<<(n&31)); }
-static void held_clear(juno_ctx *c, int n) { if (n>=0 && n<128) c->held_notes[n>>5] &= ~(1u<<(n&31)); }
+/* The assigner's note-off clears bit n of its held mask a1[20..23] (rva
+ * 0x355780) with no range check. The only note above 127 that reaches it is 255
+ * (the keyboard's press-order walk at an empty slot, rva 0x3C3FA0): bit 31 of
+ * a1[27], the top bit of slot 5's note byte (+111) -- a slot without a note
+ * (0xFF) then holds note 127. */
+static void held_clear(juno_ctx *c, int n)
+{
+    if (n >= 0 && n < 128) c->held_notes[n >> 5] &= ~(1u << (n & 31));
+    else if (n == 255 && c->voice_note[5] < 0) c->voice_note[5] = 127;
+}
 static int  held_lowest(juno_ctx *c)       /* lowest still-held MIDI note, or -1 */
 {
     int w, b;
@@ -974,12 +1003,11 @@ void juno_gui_set_voice_count(juno_ctx *c, int n)
 int juno_gui_voice_count(juno_ctx *c) { return c ? juno_voice_count(c->st) : 0; }
 
 /* The paths this context reached that the port does not model (each one an
- * open claim): bit 0 an engine-rate switch on a running engine (CLAIMS B13b),
- * bit 1 a sustain or all-notes-off message (CLAIMS B16b). A gate that sees a
- * bit set must not report its chain as graded. */
+ * open claim): bit 0 an engine-rate switch on a running engine (CLAIMS B13b).
+ * A gate that sees a bit set must not report its chain as graded. */
 int juno_gui_unported(juno_ctx *c)
 {
-    return c ? (c->ro_unported ? 1 : 0) | (c->midi_unported ? 2 : 0) : 0;
+    return c ? (c->ro_unported ? 1 : 0) : 0;
 }
 /* voice v's own noise block (gates): see juno_driver_unit_noise */
 const void *juno_gui_unit_noise(juno_ctx *c, int v) { return c ? (const void *)juno_driver_unit_noise(c->st, v) : 0; }
@@ -1127,26 +1155,160 @@ int juno_gui_arp_debug(juno_ctx *c, int *out)
     return 32;
 }
 
-/* Public note-on: feeds the arp's held-key set when enabled, else the synth.
- * This is the ENGINE/router-level entry (the oracle's NOTEON equivalent) — the
- * verification gates drive it directly with raw velocities, exactly as they
- * drive the plugin's engine under emulation. Hosts/UIs must enter through
- * juno_gui_midi_note_on below (the wrapper layer), like a DAW does. */
+/* ---- THE KEYBOARD OBJECT (engine +120 + 64u: one per unit, all alike -- the
+ * port keeps one; CLAIMS B11, B16b). READ, transcribed in the plugin's order.
+ * Its transpose (+7) is 0: no plugin path writes it. ---- */
+enum { KB_DOWN = 0, KB_LATCH = 128 };
+
+static int  kbl_has(const kb_list *l, int k)      /* rva 0x3C4730 */
+{
+    int i;
+    for (i = 0; i < l->n; ++i) if (l->k[i] == k) return 1;
+    return 0;
+}
+static void kbl_add(kb_list *l, int k)            /* rva 0x3C4700: at the end, once */
+{
+    if (!kbl_has(l, k) && l->n < 128) l->k[l->n++] = k;
+}
+static void kbl_del(kb_list *l, int k)            /* rva 0x3C4650: the rest move down */
+{
+    int i;
+    for (i = 0; i < l->n && l->k[i] != k; ++i) ;
+    if (i == l->n) return;
+    for (--l->n; i < l->n; ++i) l->k[i] = l->k[i + 1];
+}
+/* the key maps (rva 0x3C48D0 test, 0x3C48B0 put if empty, 0x3C4810 take,
+ * 0x3C4800 clear, 0x3C48E0 any); k may be -1 in KB_LATCH (key 127 of KB_DOWN) */
+static int  kbm_has(const juno_ctx *c, int m, int k) { return c->kb_map[m + k] != 0xFF; }
+static void kbm_put(juno_ctx *c, int m, int k, int v) { if (c->kb_map[m + k] == 0xFF) c->kb_map[m + k] = (unsigned char)v; }
+static void kbm_take(juno_ctx *c, int m, int k, int *out)
+{
+    if (c->kb_map[m + k] == 0xFF) return;
+    *out = c->kb_map[m + k];
+    c->kb_map[m + k] = 0xFF;
+}
+static void kbm_clear(juno_ctx *c, int m, int k) { c->kb_map[m + k] = 0xFF; }
+static int  kbm_any(const juno_ctx *c, int m)
+{
+    int k;
+    for (k = 0; k < 128; ++k) if (c->kb_map[m + k] != 0xFF) return 1;
+    return 0;
+}
+
+/* rva 0x3C3AD0: the arp keys the sustain held (+532) leave the arp, key order */
+static void kb_free_arp_latch(juno_ctx *c)
+{
+    carp_event ev[64];
+    int k;
+    for (k = 0; k < 128; ++k)
+        if (kbl_has(&c->kb_arp_latch, k)) {
+            arp_dispatch(c, ev, carp_key_off(&c->arp, k, ev, 64));   /* rva 0x3BF290 -> 0x3BF110 */
+            kbl_del(&c->kb_arp_latch, k);
+        }
+}
+
+/* rva 0x3C3FA0: the notes the sustain held (+1176) leave the voices: mode 1
+ * from key 127 down, mode 2 from key 0 up, any other mode through the press
+ * list, oldest first, an empty slot (-1) included (index -1, note 255) */
+static void kb_free_note_latch(juno_ctx *c, int mode)
+{
+    int i;
+    if (mode == 1) {
+        for (i = 127; i >= 0; --i)
+            if (kbm_has(c, KB_LATCH, i)) { synth_note_off(c, i); kbm_clear(c, KB_LATCH, i); }
+    } else if (mode == 2) {
+        for (i = 0; i < 128; ++i)
+            if (kbm_has(c, KB_LATCH, i)) { synth_note_off(c, i); kbm_clear(c, KB_LATCH, i); }
+    } else {
+        for (i = 127; i >= 0; --i) {
+            int k = c->kb_order[i];
+            if (kbm_has(c, KB_LATCH, k)) { synth_note_off(c, k & 0xFF); kbm_clear(c, KB_LATCH, k); }
+        }
+    }
+}
+
+/* rva 0x3C4120 (and the voices half of 0x3C42D0): a key onto the voices. With
+ * the note sustain on and no key down, the held notes go first; a held note
+ * pressed again leaves the hold and plays again. */
+static void kb_note_key_on(juno_ctx *c, int k, int vel)
+{
+    int v = k;
+    if (c->kb_sus_note && !kbm_any(c, KB_DOWN)) {
+        int i;
+        for (i = 127; i >= 0; --i) {
+            int o = c->kb_order[i];
+            if (kbm_has(c, KB_LATCH, o)) { synth_note_off(c, o & 0xFF); kbm_clear(c, KB_LATCH, o); }
+        }
+    }
+    kbm_put(c, KB_DOWN, k, k);
+    if (c->kb_sus_note && kbm_has(c, KB_LATCH, v)) kbm_take(c, KB_LATCH, v, &v);
+    if (!kbm_has(c, KB_LATCH, v)) synth_note_on(c, v & 0xFF, vel);
+}
+
+/* rva 0x3C40A0 (and the voices half of 0x3C4230): a key off the voices; with
+ * the note sustain on its note is held instead */
+static void kb_note_key_off(juno_ctx *c, int k)
+{
+    int v = k;
+    kbm_take(c, KB_DOWN, k, &v);
+    if (c->kb_sus_note) kbm_put(c, KB_LATCH, v, v);
+    if (!kbm_has(c, KB_LATCH, v)) synth_note_off(c, v & 0xFF);
+}
+
+/* rva 0x3C3BB0 (and the arp half of 0x3C42D0): a key into the arp. With the arp
+ * sustain on and no key in the arp, the held arp keys go first; a key the arp
+ * already has is not given again; a held arp key pressed again only leaves the
+ * hold. */
+static void kb_arp_key_on(juno_ctx *c, int k, int vel)
+{
+    if (c->kb_sus_arp && c->kb_arp.n <= 0) kb_free_arp_latch(c);
+    if (kbl_has(&c->kb_arp, k)) return;
+    kbl_add(&c->kb_arp, k);
+    if (!kbl_has(&c->kb_arp_latch, k)) carp_add_key(&c->arp, k, vel);   /* rva 0x3C3440 */
+    kbl_del(&c->kb_arp_latch, k);
+}
+
+/* rva 0x3C3B40: a key out of the arp; with the arp sustain on it is held */
+static void kb_arp_key_off(juno_ctx *c, int k)
+{
+    carp_event ev[64];
+    if (!kbl_has(&c->kb_arp, k)) return;
+    kbl_del(&c->kb_arp, k);
+    if (c->kb_sus_arp) kbl_add(&c->kb_arp_latch, k);
+    else arp_dispatch(c, ev, carp_key_off(&c->arp, k, ev, 64));         /* rva 0x3BF290 */
+}
+
+/* rva 0x3C4550 / 0x3C4520: the note / arp sustain byte; a release frees what it held */
+static void kb_sus_note_set(juno_ctx *c, int on)
+{
+    if (on == c->kb_sus_note) return;
+    c->kb_sus_note = (unsigned char)on;
+    if (!on) kb_free_note_latch(c, (signed char)c->kb_flag8);
+}
+static void kb_sus_arp_set(juno_ctx *c, int on)
+{
+    if (on == c->kb_sus_arp) return;
+    c->kb_sus_arp = (unsigned char)on;
+    if (!on) kb_free_arp_latch(c);
+}
+
+/* The engine's note-on (CWaveGen vt+128, rva 0x3C7330 -> the keyboard's rva
+ * 0x3C42D0): a pending key-trig mode becomes the flag; the key into the arp or
+ * onto the voices; then the key's velocity and its place in the press order.
+ * This is the ENGINE-level entry the verification gates drive; hosts and UIs
+ * enter through juno_gui_midi_note_on below (the wrapper), as a DAW does. */
 void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     int k;
     ++eb_coef_gen;
     if (!c) return;
-    /* the keyboard object's note-on (rva 0x3C42D0): a pending key-trig mode
-     * becomes the flag first ... */
     if (c->kb_trig_pending) {
         c->kb_flag8 = (unsigned char)(c->kb_trig_mode - 1) <= 1;
         c->kb_trig_pending = 0;
     }
-    if (!c->arp_on) synth_note_on(c, midi_note, velocity);
-    else carp_add_key(&c->arp, midi_note, velocity);
-    /* ... and the key's velocity and its place in the press order last */
     if (midi_note < 0 || midi_note > 127) return;
+    if (c->arp_on) kb_arp_key_on(c, midi_note, velocity);
+    else kb_note_key_on(c, midi_note, velocity);
     c->kb_vel[midi_note] = (unsigned char)velocity;
     for (k = 0; k < 128 && c->kb_order[k] != midi_note && c->kb_order[k] != -1; ++k) ;
     if (k == 128) return;
@@ -1154,24 +1316,35 @@ void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
     c->kb_order[0] = midi_note;
 }
 
-/* Public note-off. midi_note < 0 releases everything. */
+/* The engine's note-off (CWaveGen vt+120, rva 0x3C72D0 -> the keyboard's rva
+ * 0x3C4230): the key out of the arp or off the voices. (Port convenience, no
+ * plugin path: midi_note < 0 takes every key the keyboard has down or in the
+ * arp off, key order.) */
 void juno_gui_note_off(juno_ctx *c, int midi_note)
 {
-    carp_event ev[64];
     ++eb_coef_gen;
     if (!c) return;
-    if (!c->arp_on) { synth_note_off(c, midi_note); return; }
-    /* the keyboard object hands the key-off to the arp (rva 0x3C4230 ->
-     * 0x3C3B40 -> 0x3BF110); the last key's release turns the sounding arp
-     * notes off at once */
-    if (midi_note >= 0) {
-        arp_dispatch(c, ev, carp_key_off(&c->arp, midi_note, ev, 64));
-    } else {                                 /* every key */
+    if (midi_note < 0) {
         int k;
         for (k = 0; k < 128; ++k)
-            while (c->arp.hold_count[k] & 0x7FFF)
-                arp_dispatch(c, ev, carp_key_off(&c->arp, k, ev, 64));
+            if (kbm_has(c, KB_DOWN, k) || kbl_has(&c->kb_arp, k)) juno_gui_note_off(c, k);
+        return;
     }
+    if (midi_note > 127) return;
+    if (c->arp_on) kb_arp_key_off(c, midi_note);
+    else kb_note_key_off(c, midi_note);
+}
+
+/* CC 64 (CWaveGen vt+288, rva 0x3C7E20 -> the arp controller's rva 0x3C4E90):
+ * only a change acts; the keyboard's note sustain, then its arp sustain, follow
+ * the controller's byte (a HOLD: keys released under it keep sounding until the
+ * pedal is released or a new key is pressed with no key down) */
+static void kb_sustain(juno_ctx *c, int on)
+{
+    if (c->ctl_sus == on) return;
+    c->ctl_sus = (unsigned char)on;
+    kb_sus_note_set(c, on);
+    kb_sus_arp_set(c, c->ctl_sus);
 }
 
 /* --- Wrapper-level MIDI note path (what a DAW's events actually go through) ---
@@ -1300,20 +1473,21 @@ void juno_gui_set_tempo(juno_ctx *c, float bpm)
 /* The arp controller's switch, rva 0x3C49F0 (ARPEGGIO SW: dispatch 831 with
  * v != 0; TYPE and STEP re-run it with force when their value changes). Only a
  * change acts, or force. ON runs the config twice (for TYPE, for STEP) before
- * anything moves; then the keyboard's route (+4) and the arp's own switch (rva
- * 0x3C3450 -> 0x3BE3B0); then the keys. ON releases every key the keyboard
- * sounds on the voices (its voice map +1048, key order) and hands it to the arp
- * at the key's velocity: that map is empty while the arp is already on (a key
- * pressed then goes to the arp), so a forced re-run moves no key. OFF: the arp
- * goes idle (its sounding notes off) and drops its keys, then every key it held
- * plays again as a note -- highest first at velocity 100 when the key-trig flag
- * is set, else in press order, oldest first, at the key's own velocity. (The
- * switch's hold, which would keep released keys latched, is never set through
- * the engine: no hold path, so the latched list stays empty.) */
+ * anything moves; then the keyboard's route (+4, rva 0x3C4540) and the arp's
+ * own switch (rva 0x3C3450 -> 0x3BE3B0); then the keys. ON: with the pedal
+ * down the arp sustain first; the notes the sustain holds go into the arp and
+ * out again (so the arp sustain holds them), the note sustain off (its notes
+ * leave the voices), then every key down leaves the voices and goes into the
+ * arp at its velocity. OFF (the arp idle and reset): with the pedal down the
+ * note sustain first; the arp keys the sustain holds go onto the voices and off
+ * again (held by the note sustain), the arp sustain off, then every key in the
+ * arp leaves it and goes onto the voices -- with the key-trig flag 1 from key
+ * 127 down and 2 from key 0 up at velocity 100, else in press order, oldest
+ * first, at the key's own velocity. */
 static void arp_sw(juno_ctx *c, int on, int force)
 {
     carp *e = &c->arp;
-    int k, was = c->arp_on;
+    int k, was = c->arp_on, mode;
     if (e->ctl_on == on && !force) return;
     e->ctl_on = on;
     if (on) {
@@ -1323,26 +1497,51 @@ static void arp_sw(juno_ctx *c, int on, int force)
     c->arp_on = on;
     if (on) {
         carp_enable(e);
-        if (!was)
-            for (k = 0; k < 128; ++k)
-                if (c->held_notes[k >> 5] & (1u << (k & 31))) {
-                    synth_note_off(c, k);
-                    carp_add_key(e, k, c->kb_vel[k]);
-                }
+        if (c->ctl_sus) kb_sus_arp_set(c, 1);
+        for (k = 0; k < 128; ++k)
+            if (kbm_has(c, KB_LATCH, k)) kb_arp_key_on(c, k, c->kb_vel[k]);
+        for (k = 0; k < 128; ++k)
+            if (kbm_has(c, KB_LATCH, k)) kb_arp_key_off(c, k);
+        if (c->ctl_sus) kb_sus_note_set(c, 0);
+        for (k = 0; k < 128; ++k)
+            if (kbm_has(c, KB_DOWN, k)) {
+                kb_note_key_off(c, k);
+                kb_arp_key_on(c, k, c->kb_vel[k]);
+            }
     } else {
-        unsigned char held[128];
         carp_event ev[64];
-        for (k = 0; k < 128; ++k) held[k] = e->note_active[k];
         arp_dispatch(c, ev, carp_disable(e, ev, 64));
-        if (c->kb_flag8 == 1 || c->kb_flag8 == 2) {
-            for (k = 0; k < 128; ++k) {
-                int key = c->kb_flag8 == 1 ? 127 - k : k;
-                if (held[key]) synth_note_on(c, key, 100);
+        mode = c->kb_flag8;
+        if (c->ctl_sus) kb_sus_note_set(c, 1);
+        if (mode == 1 || mode == 2) {
+            int i;
+            for (i = 0; i < 128; ++i) {
+                k = mode == 1 ? 127 - i : i;
+                if (kbl_has(&c->kb_arp_latch, k)) kb_note_key_on(c, k, 100);
+            }
+            for (i = 0; i < 128; ++i) {
+                k = mode == 1 ? 127 - i : i;
+                if (kbl_has(&c->kb_arp_latch, k)) kb_note_key_off(c, k);
+            }
+            if (c->ctl_sus) kb_sus_arp_set(c, 0);
+            for (i = 0; i < 128; ++i) {
+                k = mode == 1 ? 127 - i : i;
+                if (kbl_has(&c->kb_arp, k)) { kb_arp_key_off(c, k); kb_note_key_on(c, k, 100); }
             }
         } else {
-            for (k = 127; k >= 0; --k) {
-                int key = c->kb_order[k];
-                if (key >= 0 && held[key]) synth_note_on(c, key, c->kb_vel[key]);
+            int i;
+            for (i = 127; i >= 0; --i) {
+                k = c->kb_order[i];
+                if (k != -1 && kbl_has(&c->kb_arp_latch, k)) kb_note_key_on(c, k, c->kb_vel[k]);
+            }
+            for (i = 127; i >= 0; --i) {
+                k = c->kb_order[i];
+                if (k != -1 && kbl_has(&c->kb_arp_latch, k)) kb_note_key_off(c, k);
+            }
+            if (c->ctl_sus) kb_sus_arp_set(c, 0);
+            for (i = 127; i >= 0; --i) {
+                k = c->kb_order[i];
+                if (k != -1 && kbl_has(&c->kb_arp, k)) { kb_arp_key_off(c, k); kb_note_key_on(c, k, c->kb_vel[k]); }
             }
         }
     }
@@ -2081,14 +2280,27 @@ int juno_gui_get_arp(juno_ctx *c)
  * (vt+160 / +168 / +144): empty functions. */
 static void apply_event(juno_ctx *c, int host, int32_t v);
 static void engine_host_entry(juno_ctx *c, int host, int32_t v);
-static void kb_sustain(juno_ctx *c, int on);
-static void kb_all_notes_off(juno_ctx *c);
 
-/* The keyboard object's sustain (CWaveGen vt+288, rva 0x3C7E20 -> 0x3C4E90)
- * and all-notes-off (vt+296, rva 0x3C7DA0 -> 0x3C3A00): CLAIMS B16b, not
- * ported -- the context records that one arrived. */
-static void kb_sustain(juno_ctx *c, int on) { (void)on; c->midi_unported = 1; }
-static void kb_all_notes_off(juno_ctx *c) { c->midi_unported = 1; }
+/* CC 123 (CWaveGen vt+296, rva 0x3C7DA0 -> the keyboard's rva 0x3C3A00 -> the
+ * assigner's controller vt+32 with 123, rva 0x354A90 -> its all-notes-off, rva
+ * 0x3530B0; the assigner's hold +24 is never set through the engine): a
+ * gate-off for every voice of the count whose slot is gated (rva 0x355270) --
+ * each gate leaf ends with the held flag 1856 = "a voice still gated", so the
+ * last one leaves 0 -- then every slot "no note", the held-note mask and +68
+ * cleared. The keyboard's maps and the arp stay as they are. */
+static void kb_all_notes_off(juno_ctx *c)
+{
+    int v, n = c->asg_count < JUNO_NUM_VOICES ? c->asg_count : JUNO_NUM_VOICES, any = 0;
+    for (v = 0; v < n; ++v)
+        if (c->voice_gated[v]) { juno_note_off(c->st, v); any = 1; }
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+        c->voice_note[v] = -1;
+        c->voice_gated[v] = 0;
+    }
+    c->held_notes[0] = c->held_notes[1] = c->held_notes[2] = c->held_notes[3] = 0;
+    c->legato_mask = 0;
+    if (any) juno_note_broadcast_held(c->st, 0);
+}
 
 static void drv_cc(juno_ctx *c, int n, int v)
 {

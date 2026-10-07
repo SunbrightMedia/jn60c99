@@ -16,6 +16,10 @@ ids past 129; host parameters below the base (parameter records: the voice count
 engine-rate setting -- which must NOT switch the rate --, a float-bits parameter, ids the map
 lacks); records at offsets inside, at and past the block, with notes at the same offsets;
 patch loads and a voice-count state change after a bend (the stored values are not re-sent).
+CC 64, the sustain (a HOLD in the keyboard object): on the voices and in the arp, across arp
+switches, at the CC's rounding edges, with key 127 down at a release, with the key-trig flag, in
+MONO and UNISON patches; CC 123, all notes off: held keys, held notes, a running arp; a voice
+steal released down to the stolen key.
 
   --ref         (Unicorn) writes scratchpad/midi_ctl_ref.pkl (.partial, then renamed)
   --port        (libjuno) every sample of both channels must agree
@@ -112,6 +116,68 @@ def chains():
     st += [E(ev=[ev_off(0, 60), ev_on(0, 72, 0.5)], par=[bend(0.1, 0), cc(1, 0.9, 0), cc(74, 0.2, 0)])] + [E()] * 3
     st += [E(ev=[ev_off(0, 63), ev_off(0, 67), ev_off(0, 72)])] + [E()] * 6
     out.append(('records', 48000.0, None, st))
+    # 8. the sustain on the voices (CLAIMS B16b): a HOLD -- released keys keep sounding; a new
+    #    key with no key down frees the held notes first; a held key pressed again plays again;
+    #    the pedal's release frees them; CC 64 values on / off at their rounding edges; key 127
+    #    down at a release (the plugin clears its down state through index -1); the key-trig flag
+    #    1 (descending release order); a voice steal released down to the stolen key
+    ON, OFF = 1.0, 0.0
+    st = [('patch', 9), E(ev=[ev_on(0, 60, 0.8), ev_on(0, 64, 0.7), ev_on(0, 67, 0.6)])] + [E()] * 2
+    st += [E(par=[cc(64, ON, 10)])] + [E()]
+    st += [E(ev=[ev_off(20, 60), ev_off(21, 64), ev_off(22, 67)])] + [E()] * 3
+    st += [E(ev=[ev_on(30, 72, 0.9)])] + [E()] * 2 + [E(ev=[ev_off(0, 72)])] + [E()] * 2
+    st += [E(ev=[ev_on(5, 72, 0.5)])] + [E()] * 2 + [E(par=[cc(64, OFF, 0)])] + [E()] * 2
+    st += [E(ev=[ev_off(0, 72)])] + [E()] * 2
+    for v in (0.6, 0.0039, 0.004, 0.0, 1.5, 0.0):                    # on, off, on, off, on, off
+        st += [E(ev=[ev_on(0, 55, 0.7)], par=[cc(64, v, 100)]), E(ev=[ev_off(50, 55)]), E()]
+    st += [E(ev=[ev_on(0, 127, 0.8), ev_on(0, 50, 0.8)])] + [E()] + [E(par=[cc(64, ON, 0)])]
+    st += [E(ev=[ev_off(0, 50)])] + [E()] + [E(par=[cc(64, OFF, 7)])] + [E()] * 2
+    st += [E(par=[cc(64, ON, 0)]), E(ev=[ev_on(0, 60, 0.6)]), E(ev=[ev_off(0, 60)]), E()]
+    st += [E(ev=[ev_on(0, 64, 0.6)])] + [E()] * 2 + [E(ev=[ev_off(0, 64), ev_off(0, 127)], par=[cc(64, OFF, 9)])]
+    st += [E()] * 3
+    st += [('state', [(0x0060000C, 1)]), E(ev=[ev_on(0, 48, 0.5)]), E(par=[cc(64, ON, 0)])]
+    st += [E(ev=[ev_on(0, 52, 0.5), ev_on(0, 55, 0.5), ev_off(10, 48), ev_off(11, 52), ev_off(12, 55)])]
+    st += [E()] * 2 + [E(par=[cc(64, OFF, 0)])] + [E()] * 3 + [('state', [(0x0060000C, 0)])]
+    steal = [ev_on(k, n, 0.8) for k, n in enumerate((40, 43, 47, 50, 53, 57, 60, 64))]
+    st += [E(ev=steal)] + [E()] * 2
+    st += [E(ev=[ev_off(k, n) for k, n in enumerate((43, 47, 50, 53, 57, 60, 64))])] + [E()] * 3
+    st += [E(ev=[ev_off(0, 40)])] + [E()] * 4
+    out.append(('sus', 48000.0, None, st))
+    # 9. the sustain in the arp route and across the arp switch: keys released under it keep
+    #    the arp running; a new key with no key in the arp frees the held keys; the release frees
+    #    them; the switch off with the pedal down (held arp keys become held notes) and on again
+    #    (held notes become held arp keys)
+    T2 = (True, 128.0)
+    A = lambda n=256, ev=(), par=(): ('blk', n, list(ev), T2, list(par))
+    st = [('patch', 9), ('state', [(0x00600108, 1)]), A(ev=[ev_on(0, 60, 0.8), ev_on(0, 64, 0.8)])] + [A()] * 6
+    st += [A(par=[cc(64, ON, 0)]), A(ev=[ev_off(3, 60), ev_off(4, 64)])] + [A()] * 10
+    st += [A(ev=[ev_on(0, 67, 0.7)])] + [A()] * 8 + [A(ev=[ev_off(0, 67)])] + [A()] * 6
+    st += [A(par=[cc(64, OFF, 0)])] + [A()] * 6
+    st += [A(ev=[ev_on(0, 62, 0.9), ev_on(0, 65, 0.9)], par=[cc(64, ON, 5)])] + [A()] * 3
+    st += [A(ev=[ev_off(0, 65)])] + [A()] * 3
+    st += [('state', [(0x00600108, 0)])] + [A()] * 6
+    st += [A(ev=[ev_on(0, 69, 0.6)])] + [A()] * 3 + [A(ev=[ev_off(0, 69)])] + [A()] * 2
+    st += [('state', [(0x00600108, 1)])] + [A()] * 8
+    st += [A(par=[cc(64, OFF, 0)])] + [A()] * 4 + [A(ev=[ev_off(0, 62)])] + [A()] * 6
+    st += [('state', [(0x00600108, 0)])] + [A()] * 3
+    out.append(('sus_arp', 44100.0, None, st))
+    # 10. all notes off (CC 123): held keys, held notes (sustain), a running arp; keys released and
+    #     played after it; a MONO and a UNISON patch with the pedal and CC 123
+    st = [('patch', 9), E(ev=[ev_on(0, 60, 0.8), ev_on(0, 64, 0.8)])] + [E()] * 3
+    st += [E(par=[cc(123, 0.0, 40)])] + [E()] * 3 + [E(ev=[ev_off(0, 60), ev_on(9, 67, 0.7)])] + [E()] * 3
+    st += [E(par=[cc(64, ON, 0)]), E(ev=[ev_off(0, 64), ev_off(0, 67)]), E(), E(par=[cc(123, 0.5, 0)])]
+    st += [E()] * 2 + [E(ev=[ev_on(0, 72, 0.6)])] + [E()] * 2 + [E(par=[cc(64, OFF, 0)])] + [E()] * 2
+    st += [E(ev=[ev_off(0, 72)])] + [E()] * 2
+    st += [('state', [(0x00600108, 1)]), ('blk', 256, [ev_on(0, 57, 0.8)], T2, [])] + [A()] * 6
+    st += [A(par=[cc(123, 1.0, 100)])] + [A()] * 8 + [A(ev=[ev_off(0, 57)])] + [A()] * 4
+    st += [('state', [(0x00600108, 0)])] + [E()] * 2
+    for patch in (15, 61):
+        st += [('patch', patch), E(ev=[ev_on(0, 48, 0.8), ev_on(0, 55, 0.8)])] + [E()] * 2
+        st += [E(par=[cc(64, ON, 0)]), E(ev=[ev_off(0, 55)]), E(), E(ev=[ev_off(0, 48)]), E()]
+        st += [E(ev=[ev_on(0, 52, 0.7)])] + [E()] * 2 + [E(par=[cc(123, 0.0, 0)])] + [E()] * 2
+        st += [E(ev=[ev_on(0, 59, 0.7), ev_off(5, 52)])] + [E()] + [E(par=[cc(64, OFF, 0)])] + [E()] * 2
+        st += [E(ev=[ev_off(0, 59)])] + [E()] * 3
+    out.append(('cc123', 48000.0, None, st))
     # 7. identity render object (engine at the host rate) at 96000: everything once
     st = [('patch', 33), E(512, ev=[ev_on(0, 50, 0.9), ev_on(5, 57, 0.9)])] + [E(512)] * 2
     st += [E(512, par=[bend(0.8, 0), cc(1, 0.7, 0), cc(11, 0.4, 0), cc(74, 0.6, 0), cc(3, 0.1, 0)])] + [E(512)] * 4
@@ -127,6 +193,13 @@ def build_ref():
     bank = E.bank_bytes()
     ref = {'_chains': chains()}
     only = [x[len('--only='):].split(',') for x in sys.argv if x.startswith('--only=')]
+    if only and os.path.exists(REF_PKL):              # the other chains from the existing reference
+        old = pickle.load(open(REF_PKL, 'rb'))
+        for ci, ch in enumerate(ref['_chains']):
+            for oi, och in enumerate(old['_chains']):
+                if och == ch and oi in old:
+                    ref[ci] = old[oi]
+                    ref.setdefault('_payload', {})[ci] = old['_payload'][oi]
     for ci, (name, rate, setting, steps) in enumerate(ref['_chains']):
         if only and name not in only[0]:
             continue
@@ -255,7 +328,7 @@ def check_port(tooth=None, only=None):
         bad += bool(diff) or bool(unp)
     if tooth:
         return bad
-    print('\n=== MIDI CONTROLLERS (CLAIMS B16): bend, mod, expression, the CC map, parameter records -- plugin vs port ===')
+    print('\n=== MIDI CONTROLLERS (CLAIMS A26 / B16b): bend, mod, expression, the CC map, parameter records, sustain, all notes off -- plugin vs port ===')
     print('GATE: %s' % ('FAIL' if bad else 'PASS'))
     return 1 if bad else 0
 
