@@ -132,11 +132,9 @@ mine is a hypothesis (playbook 80).
   docs/HOST_CALL_CENSUS.md (task #36 closed; the SYSTEM-8 hardware link is the one
   feature not ported: OS MIDI to Roland hardware). The web app's WASM is not
   rebuilt with the converter yet (needs emcc). Engine: PROVENANCE 34/34 PROVEN;
-  full verify of
-  cd63fc1 GREEN (job verify_fix3, EXIT 0, every section ran); ARM golden OK
-  (job arm_golden_cd63, toolchain installed by apt in that container). The
-  commits after cd63fc1 (A24..A31) carry their own gates; a full make verify
-  of the last commit is owed (task #37). The two days 2026-10-05/06
+  full verify of d59277db GREEN (job verify_final, EXIT 0, every section ran,
+  every reference rebuilt from the plugin; ARM golden OK in the same run).
+  The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
   mute), juno_gui_state_load (DAW preset), juno_gui_load_patch (its patch

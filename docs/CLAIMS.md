@@ -17,7 +17,7 @@ Reproduce any row: run the script named in it. Rebuild first: `make libjuno.so`.
 | A4 | **Live param edits** — each of 25 front-panel params, all bytes | tools/verify/param_exhaust2.py; tests/test_param_setter.c | 25×256 live edits bit-exact at 3 rates |
 | A5 | **Live TEMPO SYNC** engage+disengage, note held across flip, all patches | tools/verify/temposync_engage_ab.py | **64/64 patches bit-exact** |
 | A6 | **Discrete DCO/LFO modes** (out-of-factory: OSC range/waveform, sub/noise type, LFO variation/routing, octave shift, VCA mode) | tools/verify/synth_dco_ab.py | all 13 discrete params × notes 24–96 bit-exact, 0 divergences |
-| A7 | **Arp audio (render + dispatch)** — port arp schedule rendered by port == by plugin | tools/verify/arp_audio_ab.py | **63/63 scenarios** (7 arp patches × 3 modes × 3 octaves) bit-exact; see §D1 for the schedule caveat |
+| A7 | **Arp audio (render + dispatch)** — port arp schedule rendered by port == by plugin | tools/verify/arp_audio_ab.py | **63/63 scenarios** (7 arp patches × 3 modes × 3 octaves) bit-exact; the schedule itself is the plugin's own arp, executed (D1, closed) |
 | A8 | **FX per-patch** (chorus I/II, delay, reverb) at 44.1/48/96 kHz | tools/verify/rate_audio_final.py; cold_regress.py | bit-exact; rate laws READ from the binary, whole object equal at 18 host rates (A13) |
 | A9 | **State-transplant step-equivalence** — plugin warm state → port, both step identically | Phase-2/3 transplant (docs/PHASE2_MATRIX_PROGRESS.md) | proven "equal state + equal steps ⇒ equal forever"; adversarially confirmed |
 | A10 | **Voice allocation** (POLY LRU: reuse/free/release/steal, persistent binding) | tools/verify/fuzz_diff.py; tests/test_voice_alloc.c | bit-exact within corpus; allocator matches CAssignJu60 |
@@ -81,7 +81,7 @@ Reproduce any row: run the script named in it. Rebuild first: `make libjuno.so`.
 
 | # | Item | Status |
 |---|------|--------|
-| D1 | **Arp note SELECTION** (which notes each step picks + step timing) | Verified by binary transcription with cited provenance: tasks #36 (carp vs CArpeggio), #50 (24-PPQN tick accumulator), #52 (STEP×SLOT grid) — docs/ARP_PROVENANCE.md. The arp RENDER+DISPATCH is directly proven (A7); the SELECTION rests on transcription. The plugin pattern-grid was execution-validated for enable/latch/start/clock/selector but its grid-population (nslots) was not fired under emulation for an independent schedule diff. docs/PHASE4_ARP_AUDIO_CERT.md. 2026-10-07: the selection now runs through the plugin's own clock and controller in host_process_gate.py (A24), the arp's fields compared after every block by diag_driver.py. |
+| D1 | ~~Arp note SELECTION by transcription only~~ **CLOSED by execution**: the schedule is the plugin's own arp, executed (tools/verify/arp_sched_ab.py, 7/7 schedules match; PROVENANCE row "arpeggiator pattern/onset/release"), and the arp runs through the plugin's own process() (A24). | closed |
 
 ## E. RECALL PATH — building the reconstruction-free reference (current work)
 
@@ -128,26 +128,25 @@ lone open item is the pre-existing patch-50-class FX/master residual (voice stat
 
 ## Verdict
 
-The machine-checked source of truth for status is **`PROVENANCE.tsv`** (repo root),
-run by `make verify`. As of this writing: the **voice path** — front-panel recall
-(incl. the 751-760 DCO RANGE / LFO / PWM cluster, gated 67/67 by recall_gate),
-notes, velocities, voice allocation, discrete oscillator modes, envelopes, and the
-voice+master render — is **proven bit-exact** against the running plugin across
-large exhaustions and a 203-seed differential corpus, with float-determinism guards
-for the Teensy target.
+The machine-checked source of truth is **`PROVENANCE.tsv`** (repo root), run by `make verify`:
+34 of 34 rows PROVEN (2026-10-07). Executed against the plugin itself, the port is bit-exact on: the
+voice and master render; every effect type and mode; the recall of all 64 factory patches at 18 host
+rates; the arp (its schedule executed in the plugin's own arp, its render); the host layer -- the
+plugin's own process(), the render driver, the 96 kHz engine and its converter, engine-rate
+switches, host-rate changes, the start-up; the MIDI intake -- notes, velocity, bend, mod,
+expression, sustain, all notes off, the CC map and its DAW state; the preset paths (initialize,
+setState with its stream framing, the patch browser); the state save; the UI timer's drain and
+MIDI learn; the calls that render nothing. Every host call and its evidence:
+docs/HOST_CALL_CENSUS.md. Not ported: the SYSTEM-8 hardware link (the plugin's own OS MIDI ports
+to Roland hardware) and the plugin's GUI graphics (the port's apps have their own). A green gate
+grades only what it reaches: completeness is governed by docs/PORT_COMPLETENESS_CHARTER.md.
 
-**Not yet proven (the open finish line, from PROVENANCE.tsv):**
-- **FX render** is gated at the render level (recall_render_ab): **12/15 representative
-  patches bit-exact**; patches 50 (delay feedback, early), 6 & 45 (effect tail, late)
-  diverge. The delay feedback constant (102560) is **CAPTURED** ("captured at 48 kHz")
-  and proven WRONG for zero-feedback patches — it must be replaced with the plugin's
-  own per-patch law. A cold apply_bank FX gate is unreliable (FX state is prepare/
-  render-populated), so the render A/B is the arbiter.
-- Arp per-step SCHEDULE (render is proven; note-selection dispatch is transcription-only).
-- init/prepare constants cross-checked against a live state_dump (a capture), not pure
-  emulation.
-- Host rates other than 44100/48000/96000 fall back to the 96k arm (not bit-exact).
+The text that stood here before (FX render 12/15, a CAPTURED delay constant, the arp schedule by
+transcription only, init/prepare constants checked against a capture, host rates falling back to
+the 96 kHz arm) described 2026-09; every item is closed (A8, A13 / A14, A24; the whole cold state
+at 18 rates, live gate 6; PROVENANCE rows "FX render" and "arpeggiator"). The last full verify:
+commit d59277db, job verify_final, EXIT 0 (2026-10-07, every section ran).
 
-Earlier phase docs that assert unqualified "recall complete" / FX completeness
-(e.g. docs/RECALL_COMPLETE.md, docs/COLDLOAD_AB.md) predate this ledger and are
-superseded by PROVENANCE.tsv where they conflict.
+Earlier phase docs that assert unqualified "recall complete" / FX completeness (e.g.
+docs/RECALL_COMPLETE.md, docs/COLDLOAD_AB.md) predate this ledger and are superseded by
+PROVENANCE.tsv where they conflict.

@@ -2848,3 +2848,15 @@ even one at a time -- the state holds pointers into its own instance; compare so
 No mutable static in the port's render or control path: every buffer belongs to its context. Keep a
 test that renders two instances on two threads at once and requires each to equal its run alone --
 and run that test one thread at a time too, so a failure is known to be the race.
+
+## 157. A RECIPE THAT GROWS CAN OUTGROW THE SHELL -- AND `make -n` RUNS A RECIPE THAT CALLS $(MAKE)
+Paid 2026-10-07 (JUNO, the final verify). `make verify` is one shell command; each of its 33
+freshness checks expanded the list of all 140 oracle files. Two new gate lines took it past the
+kernel's 128 KB limit for one argument, and the run died at once ("Argument list too long") -- the
+EXIT file said 2 after seconds, not hours. Then a `make -n verify` meant as a dry run started the
+real verify: a recipe that contains $(MAKE) runs even under -n. It was stopped by its exact process
+group; the two references it finished outside the job registry were deleted.
+### The rule
+Compute a shared input of a long recipe once (the newest oracle file), never per check, and measure
+the expanded recipe after adding lines. Never dry-run a recipe that calls $(MAKE); read the Makefile
+instead. A job that ends in seconds has not run its gates: read its log before anything else.
