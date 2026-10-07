@@ -68,42 +68,43 @@ verify: test libjuno.so
 	@FAIL=0; \
 	mkdir -p $(SCRATCH); \
 	python3 tools/verify/pathcheck.py || FAIL=1; \
-	fresh() { p="$$1"; shift; [ -f "$$p" ] || return 1; for d in "$$@"; do [ "$$p" -nt "$$d" ] || return 1; done; }; \
-	fresh $(SCRATCH)/index_cell_map.pkl $(ORACLE_DEPS)    || python3 tools/verify/index_cell_map.py    || FAIL=1; \
-	fresh $(SCRATCH)/plugin_recall_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/plugin_recall_ref.py || FAIL=1; \
-	fresh $(SCRATCH)/recall_render_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
-	for r in 8000 11025 16000 22050 32000 37800 44100 47999 48000 50000 64000 88200 96000 96001 176400 192000 352800 384000; do fresh $(SCRATCH)/recall_exhaustive_$$r.pkl $(ORACLE_DEPS) || python3 tools/verify/recall_exhaustive_ref.py $$r || FAIL=1; done; \
+	newest=$$(ls -t $(ORACLE_DEPS) | head -1); \
+	fresh() { [ -f "$$1" ] && [ "$$1" -nt "$$newest" ]; }; \
+	fresh $(SCRATCH)/index_cell_map.pkl || python3 tools/verify/index_cell_map.py || FAIL=1; \
+	fresh $(SCRATCH)/plugin_recall_ref.pkl || python3 tools/verify/plugin_recall_ref.py || FAIL=1; \
+	fresh $(SCRATCH)/recall_render_ref.pkl || python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
+	for r in 8000 11025 16000 22050 32000 37800 44100 47999 48000 50000 64000 88200 96000 96001 176400 192000 352800 384000; do fresh $(SCRATCH)/recall_exhaustive_$$r.pkl || python3 tools/verify/recall_exhaustive_ref.py $$r || FAIL=1; done; \
 	python3 tools/verify/port_state_dump.py >/dev/null 2>&1 || FAIL=1; \
 	echo "=== LIVE GATE 1/7: recall_gate (port vs plugin's own recall, 64 patches) ==="; \
 	python3 tools/verify/recall_gate.py || FAIL=1; \
 	echo "=== LIVE GATE 2/7: exhaustive recall (every byte 0..255 x 18 rates) ==="; \
 	python3 tools/verify/recall_exhaustive_gate.py || FAIL=1; \
 	echo "=== RATE SWEEP (CLAIMS A13/B4): whole object after recall + renders, 64 patches x 18 host rates ==="; \
-	fresh $(SCRATCH)/rate_sweep_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/rate_sweep_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/rate_sweep_ref.pkl || python3 tools/verify/rate_sweep_gate.py --ref || FAIL=1; \
 	python3 tools/verify/rate_sweep_gate.py --port || FAIL=1; \
 	echo "=== LIVE GATE 3/7: render A/B (port render vs plugin's own render, 57 non-arp) ==="; \
 	python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
 	echo "=== LIVE GATE 4/7: arp SCHEDULE (plugin's own arp vs carp.c, 7 arp patches) ==="; \
-	fresh $(SCRATCH)/arp_sched_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/arp_sched_ab.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/arp_sched_ref.pkl || python3 tools/verify/arp_sched_ab.py --ref || FAIL=1; \
 	python3 tools/verify/arp_sched_ab.py --port || FAIL=1; \
 	echo "=== LIVE GATE 5/7: arp RENDER (schedule replay into plugin, 7 arp patches) ==="; \
 	python3 tools/verify/arp_render_ab.py --port || FAIL=1; \
 	python3 tools/verify/arp_render_ab.py --ref || FAIL=1; \
 	echo "=== HOST PROCESS (CLAIMS B14): the plugin's own process() == the trusted engine path, then the render driver (arp clock, tempo, offsets, the arp controller), 5 chains ==="; \
 	python3 tools/verify/host_process_gate.py --control || FAIL=1; \
-	fresh $(SCRATCH)/host_process_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/host_process_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/host_process_ref.pkl || python3 tools/verify/host_process_gate.py --ref || FAIL=1; \
 	python3 tools/verify/host_process_gate.py --port || FAIL=1; \
-	fresh $(SCRATCH)/midi_ctl_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/midi_ctl_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/midi_ctl_ref.pkl || python3 tools/verify/midi_ctl_gate.py --ref || FAIL=1; \
 	python3 tools/verify/midi_ctl_gate.py --port || FAIL=1; \
-	fresh $(SCRATCH)/host_rate_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/host_rate_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/host_rate_ref.pkl || python3 tools/verify/host_rate_gate.py --ref || FAIL=1; \
 	python3 tools/verify/host_rate_gate.py --port || FAIL=1; \
-	fresh $(SCRATCH)/boot_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/boot_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/boot_ref.pkl || python3 tools/verify/boot_gate.py --ref || FAIL=1; \
 	python3 tools/verify/boot_gate.py --port || FAIL=1; \
-	fresh $(SCRATCH)/rate_switch_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/rate_switch_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/rate_switch_ref.pkl || python3 tools/verify/rate_switch_gate.py --ref || FAIL=1; \
 	python3 tools/verify/rate_switch_gate.py --port || FAIL=1; \
-	fresh $(SCRATCH)/ccmap_state_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/ccmap_state_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/ccmap_state_ref.pkl || python3 tools/verify/ccmap_state_gate.py --ref || FAIL=1; \
 	python3 tools/verify/ccmap_state_gate.py --port || FAIL=1; \
-	fresh $(SCRATCH)/state_save_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/state_save_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/state_save_ref.pkl || python3 tools/verify/state_save_gate.py --ref || FAIL=1; \
 	python3 tools/verify/state_save_gate.py --port || FAIL=1; \
 	echo "=== LIVE GATE 6/7: cold-state A/B (port init/prepare vs plugin build+setSR, 18 rates) ==="; \
 	for r in 8000 11025 16000 22050 32000 37800 44100 47999 48000 50000 64000 88200 96000 96001 176400 192000 352800 384000; do \
@@ -112,23 +113,23 @@ verify: test libjuno.so
 	done; \
 	echo "=== LIVE GATE 7/7: render A/B at 44100 + NON-standard 88200 (recall->render chain) ==="; \
 	for sr in 44100 88200; do \
-	  fresh $(SCRATCH)/recall_render_ref_$$sr.pkl $(ORACLE_DEPS) || JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
+	  fresh $(SCRATCH)/recall_render_ref_$$sr.pkl || JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl python3 tools/verify/recall_render_ab.py --ref || FAIL=1; \
 	  JUNO_RENDER_SR=$$sr JUNO_RENDER_REF_PKL=$(SCRATCH)/recall_render_ref_$$sr.pkl python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
 	done; \
 	echo "=== PILLAR-3: exhaustive fine-FX (port applier vs plugin's own setter, every byte x 18 rates x 9 contexts) ==="; \
-	fresh $(SCRATCH)/finefx_cellsweep_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/finefx_cellsweep.py || FAIL=1; \
+	fresh $(SCRATCH)/finefx_cellsweep_ref.pkl || python3 tools/verify/finefx_cellsweep.py || FAIL=1; \
 	$(MAKE) -s tools/verify/finefx_port_dump && python3 tools/verify/finefx_pillar3_gate.py || FAIL=1; \
 	echo "=== ET-MODE A/B: synthetic EFFECT TYPE 0..5 recall (port vs plugin; no factory patch reaches modes 2-5) ==="; \
-	fresh $(SCRATCH)/etmode_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/etmode_ab.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/etmode_ref.pkl || python3 tools/verify/etmode_ab.py --ref || FAIL=1; \
 	python3 tools/verify/etmode_ab.py --port || FAIL=1; \
 	echo "=== EFFECT PARAMS: DEPTH + TONE, every byte x EFFECT TYPE 0..5/6/255 x 3 rates, dispatched AND fresh recall (whole object + render) ==="; \
-	fresh $(SCRATCH)/effect_param_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/effect_param_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/effect_param_ref.pkl || python3 tools/verify/effect_param_gate.py --ref || FAIL=1; \
 	python3 tools/verify/effect_param_gate.py --port || FAIL=1; \
 	echo "=== FLANGER (DELAY TYPE 4) LEAVES: every byte of 18 leaves x 2 contexts x 3 rates, fresh recall (whole object + render) ==="; \
-	fresh $(SCRATCH)/fx_leaf_flanger_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/fx_leaf_gate.py --ref flanger || FAIL=1; \
+	fresh $(SCRATCH)/fx_leaf_flanger_ref.pkl || python3 tools/verify/fx_leaf_gate.py --ref flanger || FAIL=1; \
 	python3 tools/verify/fx_leaf_gate.py --port flanger --recall-only || FAIL=1; \
 	echo "=== SEEDED RECALL: 60 legal seeds (+30 wild, reported: CLAIMS B8), every recalled leaf random, whole object + render, 3 rates ==="; \
-	fresh $(SCRATCH)/seed_recall_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/seed_recall_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/seed_recall_ref.pkl || python3 tools/verify/seed_recall_gate.py --ref || FAIL=1; \
 	python3 tools/verify/seed_recall_gate.py --port || FAIL=1; \
 	echo "=== WARM RECALL: N recalls through ONE engine, plugin vs port (every gate above recalls COLD) ==="; \
 	echo "    p39,40 CARRY / p1,9 WRITE (the two directions of the chorus WET law) and p0,0 (the"; \
@@ -137,54 +138,54 @@ verify: test libjuno.so
 	echo "    481bc99, green with src/delay_recall.c slot1_stale/slot1_off); p39,40 was already green."; \
 	for s in 39,40 1,9 0,0; do \
 	  wp=$(SCRATCH)/warm_recall_`echo $$s | tr , -`_44100.pkl; \
-	  fresh $$wp $(ORACLE_DEPS) || python3 tools/verify/warm_recall_gate.py --ref --seq $$s --cells 91232 || FAIL=1; \
+	  fresh $$wp || python3 tools/verify/warm_recall_gate.py --ref --seq $$s --cells 91232 || FAIL=1; \
 	  python3 tools/verify/warm_recall_gate.py --port --seq $$s --cells 91232 || FAIL=1; \
 	done; \
 	echo "=== WARM CHAINS (CLAIMS A17/B1): 22 chains of recalls through ONE engine (type variants, legal seeds, DELAY LEVEL edges), whole object after every step, 3 rates ==="; \
-	fresh $(SCRATCH)/warm_chain_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/warm_chain_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/warm_chain_ref.pkl || python3 tools/verify/warm_chain_gate.py --ref || FAIL=1; \
 	python3 tools/verify/warm_chain_gate.py --port || FAIL=1; \
 	echo "=== WARM RENDER (CLAIMS A18/B1): patch changes on a RUNNING engine, notes + renders between recalls, audio + rendered state, settled recall model ==="; \
-	fresh $(SCRATCH)/warm_render_settled.pkl $(ORACLE_DEPS) || python3 tools/verify/warm_render_gate.py --ref settled || FAIL=1; \
+	fresh $(SCRATCH)/warm_render_settled.pkl || python3 tools/verify/warm_render_gate.py --ref settled || FAIL=1; \
 	python3 tools/verify/warm_render_gate.py --port settled || FAIL=1; \
 	echo "=== WARM RENDER LIVE (CLAIMS A19): the same chains with the plugin's recall ramps NOT settled (4/24/36 ms), port juno_gui_apply_bank_live ==="; \
-	fresh $(SCRATCH)/warm_render_live.pkl $(ORACLE_DEPS) || python3 tools/verify/warm_render_gate.py --ref live || FAIL=1; \
+	fresh $(SCRATCH)/warm_render_live.pkl || python3 tools/verify/warm_render_gate.py --ref live || FAIL=1; \
 	python3 tools/verify/warm_render_gate.py --port live || FAIL=1; \
 	echo "=== HOST-ROLE EDITS: DAW automation through the plugin's host entry, no snap (CLAIMS A20) ==="; \
-	fresh $(SCRATCH)/host_edit_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/host_edit_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/host_edit_ref.pkl || python3 tools/verify/host_edit_gate.py --ref || FAIL=1; \
 	python3 tools/verify/host_edit_gate.py --port || FAIL=1; \
 	echo "=== VOICE COUNT (CLAIMS B10): the shipped 6 voices, counts 1..9 changed while notes sound, audio + rendered state incl. stopped units ==="; \
-	fresh $(SCRATCH)/voice_count_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/voice_count_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/voice_count_ref.pkl || python3 tools/verify/voice_count_gate.py --ref || FAIL=1; \
 	python3 tools/verify/voice_count_gate.py --port || FAIL=1; \
 	echo "=== PLUGIN PRESET PATHS (CLAIMS A22): initialize / setState / patch-browser load, the plugin's own queues through the host entry ==="; \
-	fresh $(SCRATCH)/state_load_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/state_load_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/state_load_ref.pkl || python3 tools/verify/state_load_gate.py --ref || FAIL=1; \
 	python3 tools/verify/state_load_gate.py --port || FAIL=1; \
 	echo "=== WRAPPER VELOCITY (CLAIMS A23): the MIDI note intake and its velocity switch, the plugin's own push, byte for byte ==="; \
-	fresh $(SCRATCH)/wrapper_velocity_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/wrapper_velocity_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/wrapper_velocity_ref.pkl || python3 tools/verify/wrapper_velocity_gate.py --ref || FAIL=1; \
 	python3 tools/verify/wrapper_velocity_gate.py --port || FAIL=1; \
 	echo "=== SHADOW CELLS: bounds (cannot false-fail an A/B) + WRITER-SET invariant (prog == clamp(shadow)) ==="; \
 	python3 tools/verify/shadow_bounds_gate.py || FAIL=1; \
 	python3 tools/verify/shadow_sync_gate.py || FAIL=1; \
 	echo "=== DIFFERENTIAL FUZZ (SEAL 4 / Pillar-2b): random polyphonic sequences, port vs plugin, 24 seeds x 3 rates ==="; \
-	fresh $(SCRATCH)/fuzz_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/fuzz_diff.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/fuzz_ref.pkl || python3 tools/verify/fuzz_diff.py --ref || FAIL=1; \
 	python3 tools/verify/fuzz_diff.py --port || FAIL=1; \
 	echo "=== ALL-VOICE NOTE STATE (CLAIMS A11/B3): every voice's whole state after every note event, plugin vs port ==="; \
-	fresh $(SCRATCH)/note_bcast_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/note_bcast_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/note_bcast_ref.pkl || python3 tools/verify/note_bcast_gate.py --ref || FAIL=1; \
 	python3 tools/verify/note_bcast_gate.py --port || FAIL=1; \
 	echo "=== VOICE STEAL (CLAIMS A12/B2): more held notes than voices, audio + every voice's state, plugin vs port ==="; \
-	fresh $(SCRATCH)/steal_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/steal_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/steal_ref.pkl || python3 tools/verify/steal_gate.py --ref || FAIL=1; \
 	python3 tools/verify/steal_gate.py --port || FAIL=1; \
 	echo "=== COLD/WARM UNISON: the app must not present the phase-aligned cold engine (docs/COLDSTART_UNISON_FINDING.md) ==="; \
 	python3 tools/verify/coldwarm_unison.py || FAIL=1; \
 	echo "=== VOICE ASSIGN (KEY ASSIGN/LEGATO/PORTAMENTO): note SEQUENCES through the plugin's own allocator vs the port's ==="; \
-	fresh $(SCRATCH)/assigner_ab_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/assigner_ab.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/assigner_ab_ref.pkl || python3 tools/verify/assigner_ab.py --ref || FAIL=1; \
 	python3 tools/verify/assigner_ab.py --port || FAIL=1; \
 	echo "=== RENDER-LOOP STRUCTURE: block-size invariance (1/64/128/512/600) + warm apply-on-running-engine ==="; \
-	fresh $(SCRATCH)/renderstruct_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/renderstruct_ab.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/renderstruct_ref.pkl || python3 tools/verify/renderstruct_ab.py --ref || FAIL=1; \
 	python3 tools/verify/renderstruct_ab.py --port || FAIL=1; \
 	echo "=== #112 HOST-PATH ROLES: which dispatch indices behave differently for a HOST than for RECALL ==="; \
 	python3 tools/verify/hostpath_roles.py || FAIL=1; \
 	echo "=== #112 HOST MODULATION: port juno_mod_byte vs the plugin's own modulation setters ==="; \
-	fresh $(SCRATCH)/hostmod_ref.pkl $(ORACLE_DEPS) || python3 tools/verify/hostmod_gate.py --ref || FAIL=1; \
+	fresh $(SCRATCH)/hostmod_ref.pkl || python3 tools/verify/hostmod_gate.py --ref || FAIL=1; \
 	python3 tools/verify/hostmod_gate.py --port || FAIL=1; \
 	echo "=== PILLAR-1 completeness gate (fresh re-enumeration from binary vs COVERAGE.tsv) ==="; \
 	python3 tools/verify/completeness_gate.py || FAIL=1; \
