@@ -502,12 +502,23 @@ static void button_start(void)
            lv ? "released, SHIFT armed" : "pressed or not wired: SHIFT waits for a first release", PIN_BLED);
 }
 
+#ifdef MSQ_KNOBTEST
+static int kt_led;                                     /* KNOB TEST: the LED toggles on each press */
+#endif
 static void button_poll(void)
 {
     uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
     int raw = gpio_get_level((gpio_num_t)PIN_BTN);
     if (raw != btn_raw_prev) { btn_raw_prev = raw; btn_raw_ms = (int)now; return; }
     if ((int)now - btn_raw_ms < 20) return;            /* not stable for 20 ms yet */
+#ifdef MSQ_KNOBTEST
+    if ((raw == 0) != btn_state) {                     /* pressed = LOW; no arming, no SHIFT */
+        btn_state = !raw;
+        if (btn_state) { kt_led = !kt_led; gpio_set_level((gpio_num_t)PIN_BLED, kt_led); }
+        printf("KT BUTTON %s, LED %s\n", btn_state ? "PRESSED" : "released", kt_led ? "ON" : "OFF");
+    }
+    return;
+#endif
     if (!btn_armed) {
         if (raw) { btn_armed = 1; printf("BUTTON: first release seen -- SHIFT armed\n"); }
         return;
@@ -654,7 +665,25 @@ static void ui_task(void *arg)
                            bat_ok ? bat_state : UI_BAT_NONE, bat_v, bat_pct };
             for (int k = 0; k < MSQ_VOICES && k < 6; ++k)
                 lv.vstate[k] = M.v[k].gate ? 2 : (M.v[k].level > 0.0f ? 1 : 0);
+#if defined(MSQ_KNOBTEST) && !defined(MSQ_QEMU)
+            /* KNOB TEST screen: button + LED on top; per knob: percent, bar, GPIO */
+            (void)lv;
+            touch_ms = now;                            /* no dimming in the test */
+            gfx_clear(&fb);
+            char t[32];
+            snprintf(t, sizeof t, "BTN %s  LED %s", btn_state ? "DOWN" : "UP", kt_led ? "ON" : "OFF");
+            gfx_text(&fb, 0, 0, t, 1);
+            static const char *NM[PANEL_KNOBS] = { "VOL", "P1", "P2", "P3", "P4" };
+            for (int k = 0; k < PANEL_KNOBS; ++k) {
+                int x = k * 26, v = (int)(knob_avg[k] * 100.0f + 0.5f);
+                snprintf(t, sizeof t, "%d", v); gfx_text(&fb, x, 9, t, 1);
+                gfx_rect(&fb, x, 18, 24, 5, 1);
+                gfx_fill(&fb, x + 1, 19, (int)(knob_avg[k] * 22.0f + 0.5f), 3, 1);
+                gfx_text(&fb, x, 24, NM[k], 1);
+            }
+#else
             ui_render(&fb, &PANEL, &lv, &an, now);
+#endif
         }
         prev = now;
         if (intro_frames == 1) {                       /* frame 0: arm the sound, SND_DELAY_MS ahead */
@@ -971,6 +1000,16 @@ void app_main(void)
             button_poll();
             next_knob = esp_timer_get_time() + 10000;
         }
+#if defined(MSQ_KNOBTEST) && !defined(MSQ_QEMU)
+        static int64_t next_kt;
+        if (esp_timer_get_time() >= next_kt) {         /* KNOB TEST log, twice a second */
+            next_kt = esp_timer_get_time() + 500000;
+            printf("KT VOL(G%d)=%.2f P1(G%d)=%.2f P2(G%d)=%.2f P3(G%d)=%.2f P4(G%d)=%.2f | BTN G%d raw=%d %s | LED %s\n",
+                   PIN_KNOBS[0], knob_avg[0], PIN_KNOBS[1], knob_avg[1], PIN_KNOBS[2], knob_avg[2],
+                   PIN_KNOBS[3], knob_avg[3], PIN_KNOBS[4], knob_avg[4], PIN_BTN,
+                   gpio_get_level((gpio_num_t)PIN_BTN), btn_state ? "PRESSED" : "released", kt_led ? "ON" : "OFF");
+        }
+#endif
         if (esp_timer_get_time() >= next_bat) {
             bat_poll();
             next_bat = esp_timer_get_time() + 500000;
