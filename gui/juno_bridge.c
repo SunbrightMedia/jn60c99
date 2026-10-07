@@ -1012,6 +1012,18 @@ int juno_gui_unported(juno_ctx *c)
 /* voice v's own noise block (gates): see juno_driver_unit_noise */
 const void *juno_gui_unit_noise(juno_ctx *c, int v) { return c ? (const void *)juno_driver_unit_noise(c->st, v) : 0; }
 
+/* The held flag every gate leaf leaves on all voices (rva 0x3B1C58, the
+ * processor's gate leaf: any of its voices' gate values nonzero after the
+ * leaf's own) -- "a voice still gated". An event without a gate leaf writes
+ * nothing, but the flag then already equals this (only gate leaves move it). */
+static int any_gated(const juno_ctx *c)
+{
+    int v;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        if (c->voice_gated[v]) return 1;
+    return 0;
+}
+
 static void synth_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     held_set(c, midi_note);
@@ -1021,9 +1033,9 @@ static void synth_note_on(juno_ctx *c, int midi_note, int velocity)
         case 3:  poly_note_on(c, midi_note, velocity, 1);   break;
         default: poly_note_on(c, midi_note, velocity, 0);   break;
     }
-    /* Plugin note-on writes the global "any key held" flag (1856) to EVERY voice,
-     * not just the allocated one (see juno_note_broadcast_held). */
-    juno_note_broadcast_held(c->st, 1);
+    /* the held flag (1856) on EVERY voice, after the gate leaves (see
+     * juno_note_broadcast_held) */
+    juno_note_broadcast_held(c->st, any_gated(c));
 }
 
 /* Release all voices playing `key` (or every voice if key < 0). Used by POLY. */
@@ -1064,10 +1076,9 @@ static void synth_note_off(juno_ctx *c, int midi_note)
         case 2:  mono_note_off(c, midi_note, 1);            break;   /* unison: all voices */
         default: poly_release_key(c, midi_note);            break;   /* poly / variant    */
     }
-    /* Plugin note-off clears the global held flag (1856) on EVERY voice only when
-     * NO key remains held (chord release keeps it at 1.0 everywhere). */
-    juno_note_broadcast_held(c->st,
-        (c->held_notes[0] | c->held_notes[1] | c->held_notes[2] | c->held_notes[3]) != 0);
+    /* the held flag (1856) on EVERY voice: a voice still gated -- a key held
+     * with no voice (stolen) does not keep it up */
+    juno_note_broadcast_held(c->st, any_gated(c));
 }
 
 /* --- arpeggiator (bit-exact CArpeggio, src/carp.c) -------------------------- */
