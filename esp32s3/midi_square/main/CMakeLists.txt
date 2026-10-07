@@ -34,3 +34,8 @@ endif()
 if(MSQ_QEMU)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE MSQ_QEMU)
 endif()
+# KNOB TEST image (test/knobtest.sh): the screen shows the five knobs and the
+# button; each press toggles the LED. Everything else is the shipped firmware.
+if(MSQ_KNOBTEST)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE MSQ_KNOBTEST)
+endif()

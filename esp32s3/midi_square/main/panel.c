@@ -3,10 +3,10 @@
 #include <string.h>
 
 static const int8_t MAP[2][PANEL_KNOBS] = {
-    /* knob 1 = VOLUME (both banks), knob 2 = free, knobs 3-5 = the bank's three
-     * parameters; SHIFT is the PB86 button (panel_shift), 2026-10-07 */
-    { P_VOLUME, -1, P_WAVE,   P_ATTACK,  P_CHORUS },
-    { P_VOLUME, -1, P_UNISON, P_RELEASE, P_REVERB },
+    /* index 0 = VOLUME (both banks), 1-3 = param knobs 1-3 (the bank's three
+     * parameters), 4 = param knob 4 (free); SHIFT = the PB86 button (2026-10-07) */
+    { P_VOLUME, P_WAVE,   P_ATTACK,  P_CHORUS, -1 },
+    { P_VOLUME, P_UNISON, P_RELEASE, P_REVERB, -1 },
 };
 static const char *NAME[P_NPARAM] = { "WAVE", "ATTACK", "CHORUS", "UNISON", "RELEASE", "REVERB", "VOLUME" };
 
