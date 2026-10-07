@@ -29,65 +29,66 @@ int main(int argc, char **argv)
         if (t >= UI_INTRO_MS) CHECK(!running, "intro still running at %u ms", t);
     }
     msq_t m; msq_init(&m, 48000);     /* laws only */
-    float k[5] = { 0.1f, 0.40f, 0.30f, 0.55f, 0.5f };
+    float k[5] = { 0.5f, 0.1f, 0.40f, 0.30f, 0.55f };   /* VOL, free, WAVE, ATK, CHOR */
     panel_t pn; panel_init(&pn, k, 0);
     ui_anim a; ui_anim_init(&a, &pn);
     ui_live lv = { 60, 0.6f, {2, 2, 1, 0, 0, 0} };
     uint32_t now = 5000;
     ui_render(&f, &pn, &lv, &a, now); dump(&f, "overview bank A (WAVE 0.40, ATTACK, CHORUS)");
     CHECK(lit(&f, 0, 127, 10, 31) > 60, "overview empty");
-    panel_knob(&pn, 1, 0.45f, now); now += 60; ui_render(&f, &pn, &lv, &a, now); dump(&f, "turn WAVE: slide-in (60 ms)");
+    panel_knob(&pn, 2, 0.45f, now); now += 60; ui_render(&f, &pn, &lv, &a, now); dump(&f, "turn WAVE: slide-in (60 ms)");
     now += 300; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus WAVE");
     CHECK(lit(&f, 68, 127, 10, 31) > 40, "focus WAVE picture missing");
     uint32_t tt = now;
     for (float v = 0.0f; v <= 1.001f; v += 0.25f) {
-        panel_knob(&pn, 1, v, now); now += 200; ui_render(&f, &pn, &lv, &a, now);
+        panel_knob(&pn, 2, v, now); now += 200; ui_render(&f, &pn, &lv, &a, now);
         snprintf(lab, sizeof lab, "focus WAVE = %.2f", v); dump(&f, lab);
     }
     (void)tt;
-    panel_knob(&pn, 2, 0.6f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus ATTACK");
-    panel_knob(&pn, 3, 0.7f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus CHORUS");
-    panel_knob(&pn, 4, 0.2f, now); panel_knob(&pn, 4, 0.75f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus VOLUME 75%");
-    CHECK(pn.val[P_VOLUME] == 0.75f && a.focus_knob == 4, "knob 5 did not drive VOLUME (%.2f, focus %d)", pn.val[P_VOLUME], a.focus_knob);
+    panel_knob(&pn, 3, 0.6f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus ATTACK");
+    panel_knob(&pn, 4, 0.7f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus CHORUS");
+    panel_knob(&pn, 0, 0.2f, now); panel_knob(&pn, 0, 0.75f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus VOLUME 75%");
+    CHECK(pn.val[P_VOLUME] == 0.75f && a.focus_knob == 0, "knob 1 did not drive VOLUME (%.2f, focus %d)", pn.val[P_VOLUME], a.focus_knob);
     now += 1700; ui_render(&f, &pn, &lv, &a, now); now += 90; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus leaving (90 ms)");
     now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "back to overview");
     CHECK(a.focus_knob < 0, "focus did not leave after the hold");
     /* SHIFT to bank B */
-    panel_knob(&pn, 0, 0.9f, now); now += 70; ui_render(&f, &pn, &lv, &a, now); dump(&f, "SHIFT: bank slide (70 ms)");
+    panel_shift(&pn, 1, now); now += 70; ui_render(&f, &pn, &lv, &a, now); dump(&f, "SHIFT: bank slide (70 ms)");
     now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "overview bank B (not caught: dotted)");
     CHECK(pn.bank == 1, "shift did not switch to bank B");
     float before = pn.val[P_RELEASE];
-    /* knob 3 sits at 0.30 (ATTACK's value); RELEASE holds 0.642 */
-    panel_knob(&pn, 2, 0.45f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "RELEASE not caught: TURN hint");
+    /* knob 4 sits at 0.30 (ATTACK's value); RELEASE holds 0.642 */
+    panel_knob(&pn, 3, 0.45f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "RELEASE not caught: TURN hint");
     CHECK(pn.val[P_RELEASE] == before, "pick-up failed: RELEASE jumped from %.3f", before);
-    panel_knob(&pn, 2, 0.70f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "RELEASE caught (crossed 0.642)");
+    panel_knob(&pn, 3, 0.70f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "RELEASE caught (crossed 0.642)");
     CHECK(pn.caught[P_RELEASE] && pn.val[P_RELEASE] == 0.70f, "pick-up did not catch on crossing");
-    panel_knob(&pn, 1, 0.8f, now); now += 400;
-    panel_knob(&pn, 1, 0.8f, now);
+    panel_knob(&pn, 2, 0.8f, now); now += 400;
+    panel_knob(&pn, 2, 0.8f, now);
     /* unison: catch it (default 0) by passing 0 */
-    panel_knob(&pn, 1, 0.0f, now); panel_knob(&pn, 1, 0.7f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus UNISON 0.70");
-    panel_knob(&pn, 3, 0.25f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus REVERB");
-    /* KNOB NOISE: WAVE has the screen; every other knob jitters +-3 % (the v6 board log) for
-     * 300 polls (knob 5, VOLUME, too). The screen must not move. Then a
-     * real 10 % turn of knob 4 must take it. */
+    panel_knob(&pn, 2, 0.0f, now); panel_knob(&pn, 2, 0.7f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus UNISON 0.70");
+    panel_knob(&pn, 4, 0.25f, now); now += 400; ui_render(&f, &pn, &lv, &a, now); dump(&f, "focus REVERB");
+    /* KNOB NOISE: WAVE (knob 3) has the screen; every other knob jitters +-3 %
+     * (the v6 board log) for 300 polls (knob 1 VOLUME and the free knob 2 too).
+     * The screen must not move. Then a real 10 % turn of knob 5 must take it. */
     {
-        panel_t q; float kk[5] = { 0.1f, 0.40f, 0.30f, 0.55f, 0.5f };
+        panel_t q; float kk[5] = { 0.5f, 0.1f, 0.40f, 0.30f, 0.55f };
         panel_init(&q, kk, 0);
         uint32_t t = 100;
-        panel_knob(&q, 1, 0.45f, t);
+        panel_knob(&q, 2, 0.45f, t);
         unsigned r = 12345u; int moved = 0;
         for (int i = 0; i < 300; ++i) {
             t += 10;
-            for (int k = 2; k <= 4; ++k) {
+            for (int k = 0; k <= 4; ++k) {
+                if (k == 2) continue;                          /* WAVE: the focused knob, still */
                 r = r * 1103515245u + 12345u;
                 float j = ((int)((r >> 16) % 61) - 30) * 0.001f;
                 panel_knob(&q, k, kk[k] + j, t);
             }
-            if (q.last_knob != 1) moved++;
+            if (q.last_knob != 2) moved++;
         }
         CHECK(moved == 0, "knob noise stole the screen on %d of 300 polls", moved);
-        panel_knob(&q, 3, kk[3] + 0.10f, t + 10);
-        CHECK(q.last_knob == 3, "a real 10%% turn of knob 4 did not take the screen (last_knob %d)", q.last_knob);
+        panel_knob(&q, 4, kk[4] + 0.10f, t + 10);
+        CHECK(q.last_knob == 4, "a real 10%% turn of knob 5 did not take the screen (last_knob %d)", q.last_knob);
     }
     /* INTRO TIMING (user, 2026-10-01: "the title comes in too early, then its
      * animation restarts; the line under it plays twice"). Causes: unsigned
