@@ -2691,3 +2691,18 @@ Every write a port function makes to plugin state names the plugin function (rva
 same write. A write justified by intent ("cleanly", "so play stays clean", "restart") with no rva
 behind it is a defect candidate: find the plugin function or delete the write. A unit test
 asserts plugin facts with their evidence, never the port's own design.
+
+## 145. WHAT THE PLUGIN READS OUTSIDE ITS OWN OBJECT IS PART OF THE PLUGIN
+Paid 2026-10-07 (JUNO, the rate converter). In a 1-sample block at 96 kHz -> 384 kHz the
+plugin's converter renders -1 engine samples, and its next history copy starts one element in
+front of its buffer, copying upward, so the word there is smeared over the whole history. The
+port, written "correctly" with memmove and an in-bounds buffer, differed for 87 samples; the
+oracle showed exact zeros. The word is the high half of the raw pointer MSVC's aligned allocator
+stores in front of every block of 4 KB or more: below 0x8000 for any user-mode address, a
+denormal, +0 under the plugin's DAZ -- in Windows and in the emulator alike.
+### The rule
+When the plugin reads outside its object, do not "fix" it: find what is there (allocator layout,
+neighbour fields), decide what that value is in the product's FP mode, show it cannot depend on
+the machine, and port exactly that, with the out-of-range case named in a comment. Instrument the
+port to log every out-of-range index over the gate's chains, and prove the bound (here: the count
+is never below -1, so only index -1 is read).

@@ -61,8 +61,9 @@ engine render (CWaveGen vt+56)  rva 0x3C7400   voice workers + master (e2e_emu r
 
 | plugin | port |
 |---|---|
-| engine at vm.vs.sampleRate's rate (default 96000) + the converter to the host rate | engine at the host rate, no converter: equal to the plugin only where the two rates are equal (a 96 kHz host with the default, or the setting matched to the host rate) -- **open, B13** |
-| silence at a host rate outside its table (11025, 22050, 32000, 47999, ...) | plays at every host rate -- **open, B13** |
+| engine at vm.vs.sampleRate's rate (default 96000) + the converter to the host rate | the same on the product path (juno_gui_plugin_init, src/juno_conv.c) -- **bit-exact, A25**; juno_gui_create stays the engine model (the engine at the given rate, no table) the engine gates grade |
+| silence at a host rate outside its table (11025, 22050, 32000, 47999, ...) and at wild settings | the same -- **bit-exact, A25** |
+| a setting change after the engine has run: setSampleRate in place | refused, the port keeps its rate -- **open, B13b** |
 | the render driver: events at offsets, the tick clock in 1e-8 host samples from round(tempo x 10), the grid restarted by the first key, ticks always, the tempo only when valid / changed / 40..300 | the same (gui/juno_bridge.c drv_block) -- **bit-exact, A24** |
 | the arp controller (SW / TYPE / STEP, the apply, the pattern reload at the next step) | the same (arp_sw / arp_type_set / arp_step_set, src/carp.c carp_ctl_config) -- **bit-exact, A24** |
 | the start-up: ~274 ramps per unit in flight after the boot | starts settled -- **open, B15** |
@@ -93,6 +94,20 @@ at the build's (0, 7) on every product path.
   changes +40, the selector, the config bytes, the apply's type, nothing else -- not the selector
   index, "started", the UP&DOWN direction; no unit's engine state moves.
 
+## Ported details (A25)
+
+- The setting acts at once (the core's listener); the switch happens at the start of the next
+  block, before that block's records. initialize's defaults and the DAW's events follow it. The
+  port switches exactly on a fresh start (its state byte-equal to a fresh create + plugin_init: a
+  build at the new rate, the mute, the defaults again) and refuses a switch after the engine ran.
+- The plugin's default engine is built at 96000 and never given setSampleRate: the two mode-5
+  cells only setSampleRate writes (96336, 96368) stay 0 (juno_engine_no_setsr).
+- The converter's engine render runs its preamble (the voice-count sync) once per call; a call
+  that needs no engine sample runs none. The count can be -1; the next call then copies the
+  history upward from index -1, the word in front of the plugin's vector (+0 under DAZ), and the
+  history becomes zeros; the backward taps read index -1 the same way.
+- Harnesses set the oracle FP mode after juno_gui_create (which sets the production FTZ).
+
 ## The converter table (PROVEN, read from the booted plugin, 2026-10-07)
 
 rva 0xC43C30, 45 entries + a terminator, 32 bytes each {engine rate, host rate, L, M, coefficient
@@ -116,13 +131,13 @@ rendered after the kept history (2 x delay / L samples per channel); each output
 taps forward then backward in float and is scaled by (float)L; the counters wrap at 0x40000000 -
 (0x40000000 mod (M x L)) + 2 x delay.
 
-## Work (CLAIMS B13, B15)
+## Work (CLAIMS B13b, B15)
 
 1. DONE (A24): the oracle through process() with its isolation control; the driver and the arp
    controller ported and gated on the identity path at 44100 / 48000 / 96000.
-2. B13: the engine-rate setting, the table (coefficients generated from the booted plugin), the
-   converter (rva 0x343E30), the silence object; gate the default (96000 engine) at every table
-   host rate and the silence at rates outside it.
+2. DONE (A25): the engine-rate setting, the table, the converter, the silence object, the
+   product start at 96000, the switch on a fresh start. B13b: the switch on a running engine
+   (setSampleRate in place, rva 0x3C7A20).
 3. B15: the start-up as the plugin boots (its build at 96000, its ramps in flight); gate from
    the first sample.
 4. MIDI CC / channel aftertouch / pitch bend intake (process() re-encoding + the engine's

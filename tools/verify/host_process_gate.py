@@ -13,8 +13,11 @@ CLAIMS B13/B14). The plugin side is its own IAudioProcessor::process on the boot
            sample late; the e2e side built without the ramp settle (the boot's own settle is
            part of what the control asserts).
 
---port-tooth  the port check must FAIL on two harness defects: the chain's first note one sample
-           late on the port side; one valid host tempo 0.1 BPM off. Both bite (7/7 and 4/7 chains, 2026-10-07).
+--port-tooth  the port check must FAIL on three harness defects: the chain's first note one
+           sample late on the port side; one valid host tempo 0.1 BPM off; the port started as the
+           engine model (juno_gui_plugin_init_model: the engine at the host rate, no render object --
+           the port before CLAIMS B13). The converter's own teeth (mutated builds):
+           probes/host_render/conv_teeth.py. Both bite (7/7 and 4/7 chains, 2026-10-07).
            The real-defect tooth: the port before the arp controller (commit a76cf2ea) fails
            chains 0-2 at block 80, the TYPE edit (CLAIMS A24).
 
@@ -177,6 +180,35 @@ def chains():
         st += [('patch', 33)] + [('blk', B, [], T)] * 10
         st += [('blk', B, [ev_off(0, 72)], T)] + [('blk', B, [], T)] * 4
         out.append(('ctl', rate, st))
+    out = [(n_, r_, st_, SETTING[r_], PRELUDE) for n_, r_, st_ in out]
+    # THE RENDER OBJECT (CLAIMS B13): the plugin's default setting (its engine at 96000, the
+    # converter, rva 0x343E30) at every table host rate it converts to; other engine rates through
+    # the setting (88200 -> 48000, 32000 -> 44100, 48000 -> 96000 upsampling); silence at host rates
+    # outside the table and at wild settings (6: rate 0, 127: past the table). The prelude stays
+    # inside the 960-sample start-up mute (at most 558 engine samples), so the filter's history
+    # holds zeros on both sides when the ramps are settled (the start-up transient: CLAIMS B15).
+    def conv_steps():
+        T = (True, 123.4)
+        st = [('patch', 9), ('blk', 512, [ev_on(17, 60, 0.8)], T)] + [('blk', 512, [], T)] * 10
+        st += [('blk', 333, [ev_on(5, 64, 0.6), ev_off(200, 60)], T)] + [('blk', 333, [], T)] * 6
+        st += [('blk', 64, [], T)] * 10 + [('blk', 1, [], T)] * 9 + [('blk', 7, [], T)] * 5
+        st += [('patch', 2), ('blk', 777, [ev_on(0, 55, 0.9), ev_on(0, 62, 0.7), ev_on(3, 67, 0.5)], T)]
+        st += [('blk', 777, [], T)] * 8
+        st += [('blk', 512, [ev_off(0, 55), ev_off(1, 62), ev_off(2, 67), ev_off(3, 64)], T)] + [('blk', 512, [], T)] * 10
+        return st
+
+    def silent_steps():
+        T = (True, 120.0)
+        st = [('patch', 9), ('blk', 512, [ev_on(17, 60, 0.8)], T)] + [('blk', 512, [], T)] * 6
+        st += [('blk', 333, [ev_off(0, 60)], T)] + [('blk', 333, [], T)] * 3
+        return st
+    for name, rate, setting in (('cv48', 48000.0, None), ('cv44', 44100.0, None), ('cv88', 88200.0, None),
+                                ('cv176', 176400.0, None), ('cv192', 192000.0, None), ('cv384', 384000.0, None),
+                                ('cv48s1', 48000.0, 1), ('cv44s4', 44100.0, 4), ('cv96s2', 96000.0, 2)):
+        out.append((name, rate, conv_steps(), setting, 256))
+    for name, rate, setting in (('sil22', 22050.0, None), ('sil32', 32000.0, None), ('sil47999', 47999.0, None),
+                                ('sil48s6', 48000.0, 6), ('sil44s127', 44100.0, 127)):
+        out.append((name, rate, silent_steps(), setting, 256))
     return out
 
 
@@ -185,11 +217,11 @@ def build_ref():
     import e2e_emu as E
     bank = E.bank_bytes()
     ref = {'_chains': chains()}
-    for ci, (name, rate, steps) in enumerate(ref['_chains']):
+    for ci, (name, rate, steps, setting, prelude) in enumerate(ref['_chains']):
         h = H.HostProcess()
-        h.start(rate, 4096, setting=SETTING[rate])
+        h.start(rate, 4096, setting=setting)
         payload = h.get_state()
-        h.process(PRELUDE)                    # the engine-rate change + the initial records, muted
+        h.process(prelude)                    # the engine-rate change + the initial records, muted
         h.snap_all()                          # harness settle (as every engine oracle): B15 aside
         PL, PR = [], []
         for stp in steps:
@@ -219,7 +251,7 @@ def build_ref():
     return 0
 
 
-def check_port(verbose=False, tooth=None):
+def check_port(verbose=False, tooth=None, only=None):
     import ctypes
     import freshlib
     if not os.path.exists(REF_PKL):
@@ -239,6 +271,7 @@ def check_port(verbose=False, tooth=None):
     lib.juno_rr_settle.argtypes = [V]
     for fn, at in (('juno_gui_plugin_init', [V]), ('juno_gui_destroy', [V]),
                    ('juno_gui_queue_state', [V, ctypes.c_char_p, ctypes.c_int]),
+                   ('juno_gui_plugin_init_model', [V]),
                    ('juno_gui_queue_patch', [V, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]),
                    ('juno_gui_process', [V, ctypes.POINTER(Note), ctypes.c_int, ctypes.c_int, ctypes.c_double,
                                          ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int])):
@@ -248,13 +281,19 @@ def check_port(verbose=False, tooth=None):
     lib.juno_set_fp_oracle_mode.argtypes = [ctypes.c_int]
     lib.juno_set_fp_oracle_mode(1)            # the oracle's FP mode: DAZ, no FTZ (playbook 120)
     bad = 0
-    for ci, (name, rate, steps) in enumerate(ref['_chains']):
+    for ci, (name, rate, steps, setting, prelude) in enumerate(ref['_chains']):
+        if only is not None and name not in only:
+            continue
         c = lib.juno_gui_create(ctypes.c_float(rate), 0)
-        lib.juno_gui_plugin_init(c)
+        lib.juno_set_fp_oracle_mode(1)        # after create, which sets the production FTZ
+        if tooth == 'engine_model':           # the port before B13: the engine at the host rate
+            lib.juno_gui_plugin_init_model(c)
+        else:
+            lib.juno_gui_plugin_init(c)
         pl = ref['_payload'][ci]
         lib.juno_gui_queue_state(c, pl, len(pl))
-        L0, R0 = (ctypes.c_float * PRELUDE)(), (ctypes.c_float * PRELUDE)()
-        lib.juno_gui_process(c, (Note * 1)(), 0, 0, 120.0, L0, R0, PRELUDE)
+        L0, R0 = (ctypes.c_float * prelude)(), (ctypes.c_float * prelude)()
+        lib.juno_gui_process(c, (Note * 1)(), 0, 0, 120.0, L0, R0, prelude)
         lib.juno_rr_settle(lib.juno_gui_state(c))
         PL, PR = [], []
         toothed = [False]
@@ -289,7 +328,7 @@ def check_port(verbose=False, tooth=None):
         RL, RR = ref[ci]
         diff = [i for i in range(len(RL)) if RL[i] != PL[i] or RR[i] != PR[i]]
         f = lambda b: struct.unpack('<f', struct.pack('<I', b))[0]
-        print('chain %d %-5s %-7g %7d samples: %s' % (ci, name, rate, len(RL), 'BIT-EXACT' if not diff else
+        print('chain %2d %-9s %-7g %7d samples: %s' % (ci, name, rate, len(RL), 'BIT-EXACT' if not diff else
               '%d differ, first at %d (plugin %.6g, port %.6g)' % (len(diff), diff[0], f(RL[diff[0]]), f(PL[diff[0]]))))
         bad += bool(diff)
     if tooth:
@@ -318,10 +357,11 @@ def main():
     if a == ['--ref']:
         return build_ref()
     if a == ['--port']:
-        return check_port('-v' in sys.argv)
+        only = [x[len('--only='):].split(',') for x in sys.argv if x.startswith('--only=')]
+        return check_port('-v' in sys.argv, only=only[0] if only else None)
     if a == ['--port-tooth']:
         res = {}
-        for t in ('late_note', 'tempo'):
+        for t in ('late_note', 'tempo', 'engine_model'):
             print('--- tooth %s' % t)
             res[t] = check_port(tooth=t)
         print()

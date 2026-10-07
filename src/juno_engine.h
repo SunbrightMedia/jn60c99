@@ -232,6 +232,11 @@ uint32_t juno_engine_init(unsigned char *st);
  * on 1571/1573 DSP-read offsets (tools/oracle/full_ab.py). */
 void juno_engine_prepare(unsigned char *st);
 
+/* juno_engine_no_setsr -- the state of an engine that was only built, never
+ * given setSampleRate (the plugin as shipped, CLAIMS B13): the two mode-5
+ * cells only setSampleRate writes back to 0. Call after juno_engine_prepare. */
+void juno_engine_no_setsr(unsigned char *st);
+
 /* juno_chorus_init — exact transcription of sub_1803A1300, the chorus/master
  * state constructor: zeroes the BBD delay buffers and writes the integer control
  * fields (delay-line lengths, ring indices) the master indexes its circular

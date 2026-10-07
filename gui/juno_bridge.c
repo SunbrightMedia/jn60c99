@@ -20,6 +20,7 @@
 #include "../src/recall_ramp.h"
 #include "../src/reverb_recall.h"
 #include "../src/juno_state_tables.h"
+#include "../src/juno_conv.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -169,6 +170,21 @@ typedef struct {
     double drv_tempo;
     int   drv_tempo_valid;
     int   drv_rate;
+
+    /* The render object (core +96; CLAIMS B13, src/juno_conv.c) and the engine
+     * rate the setting vm.vs.sampleRate asks for (core +588, +592). ro_model: the
+     * engine model juno_gui_create makes -- the engine renders the host block
+     * itself at the rate it was made with, no table (every engine gate grades
+     * that); juno_gui_plugin_init makes the plugin's: its engine at the
+     * constructor's 96000 and the table's object for (96000, host rate). */
+    juno_ro ro;
+    int   ro_model;
+    int   eng_req;
+    int   eng_auto;
+    void *ro_out;              /* the block's drv_out, for the converter's engine render */
+    float *ro_tmp;             /* the converter's host samples of one segment (2 x ro_tmp_cap) */
+    int   ro_tmp_cap;
+    int   ro_unported;         /* a rate switch on a running engine was asked: B13b, not ported */
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -225,9 +241,37 @@ static void drv_init(juno_ctx *c, float sample_rate)
     c->drv_tempo = 120.0;
     c->drv_tempo_valid = 0;
     c->drv_rate = (int)sample_rate;
+    juno_ro_init(&c->ro, (int)sample_rate, (int)sample_rate);
+    c->ro_model = 1;
+    c->eng_req = (int)sample_rate;
 }
 
+/* The engine as its construction + setSampleRate leave it, at `rate`: what
+ * juno_gui_create makes (coldstate_ab.py grades it against the plugin's build
+ * + setSampleRate at 18 rates). */
+static void st_build(unsigned char *st, float rate, struct juno_host_shim *shim, int chorus_mode)
+{
+    memset(st, 0, JUNO_STATE_BYTES);
+    JF(st, 16) = rate;
+    juno_chorus_init(st);
+    juno_engine_init(st);
+    juno_engine_prepare(st);
+    default_patch(st);
+    juno_driver_seed_voices(st);
+    juno_apply_condition(st, 128);
+    juno_driver_attach_host(st, shim, chorus_mode);
+}
+
+static juno_ctx *ctx_create(float sample_rate, int chorus_mode);
+
 juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
+{
+    juno_enable_hw_ftz();                /* run in the plugin's SSE FTZ/DAZ mode (x86) */
+    return ctx_create(sample_rate, chorus_mode);
+}
+
+/* juno_gui_create without the FP mode (the rate switch's scratch reference) */
+static juno_ctx *ctx_create(float sample_rate, int chorus_mode)
 {
     ++eb_coef_gen;
     juno_ctx *c = calloc(1, sizeof *c);
@@ -236,7 +280,6 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     c->st = calloc(1, JUNO_STATE_BYTES);
     if (!c->st) { free(c); return NULL; }
 
-    juno_enable_hw_ftz();                /* run in the plugin's SSE FTZ/DAZ mode (x86) */
     JF(c->st, 16) = sample_rate;
     juno_chorus_init(c->st);
     juno_engine_init(c->st);             /* constructor state (sub_1803990C0)              */
@@ -281,6 +324,8 @@ void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
     ++eb_coef_gen;
     st = c->st;
     free(c->bank);                      /* the model record (a fresh create has none) */
+    juno_ro_free(&c->ro);
+    free(c->ro_tmp);
     memset(c, 0, sizeof *c);            /* match calloc's zero of the whole ctx */
     c->st = st;
     memset(st, 0, JUNO_STATE_BYTES);    /* match calloc's zero of the state     */
@@ -325,6 +370,8 @@ void juno_gui_destroy(juno_ctx *c)
 {
     if (!c) return;
     free(c->bank);
+    juno_ro_free(&c->ro);
+    free(c->ro_tmp);
     free(c->st);
     free(c);
 }
@@ -1727,6 +1774,26 @@ void juno_gui_host_set(juno_ctx *c, int i, int v)
     ctx_recall(c, c->bank, c->patch_idx, 0);
 }
 
+static int ro_switch(juno_ctx *c);
+
+/* vm.vs.sampleRate (id 0x0FFFC015, in the DAW state, value & 0x7F): the core's
+ * listener (rva 0x3222F0) sets the engine rate the next block switches to: the
+ * value indexes the table at rva 0x94AB80 (0..4: 96000, 88200, 48000, 44100,
+ * 32000; 6..127: the bytes that follow it -- EXECUTED, 6 -> 0, 127 ->
+ * 1634624882: no render object, silence); 5 is automatic, the engine's
+ * current rate (rva 0x34B260). Script.xml's range 0..3 is not applied. */
+void juno_gui_set_engine_rate_setting(juno_ctx *c, int value)
+{
+    double r;
+    int cur;
+    if (!c) return;
+    r = (double)JF(c->st, 16);                       /* rva 0x34B260: round, clamp */
+    r = r >= 0.0 ? floor(r + 0.5) : ceil(r - 0.5);
+    cur = !(r >= -2147483647.0) ? (int)0x80000001u : (r > 2147483647.0 ? 0x7FFFFFFF : (int)r);
+    c->eng_req = juno_ro_setting_rate(value, cur, &c->eng_auto);
+    ro_switch(c);              /* a fresh start switches at once; else the next block */
+}
+
 /* --- The plugin's own preset paths (CLAIMS B6, src/juno_state_tables.h) -------
  * EXECUTED in the booted plugin (probes/b6/): IComponent::initialize, setState
  * and the patch browser's load all set model values, and the core queues one
@@ -1737,7 +1804,13 @@ void juno_gui_host_set(juno_ctx *c, int i, int v)
  * (A21), everything else (patch name, view state) reaches no engine cell. */
 static void apply_event(juno_ctx *c, int host, int32_t v)
 {
-    if (c->drv_queue_mode) {               /* the model's record for the next block */
+    if (host == JUNO_SE_SRATE) {         /* the core's listener, at once (rva 0x3222F0) */
+        juno_gui_set_engine_rate_setting(c, v);
+        return;
+    }
+    /* while records wait for the next block, a preset path queues behind them:
+     * the plugin applies every one of its paths' events in that order */
+    if (c->drv_queue_mode || c->drv_nq > 0) {               /* the model's record for the next block */
         if (c->drv_nq < DRV_QMAX) {
             struct drv_rec *r = &c->drv_q[c->drv_nq++];
             memset(r, 0, sizeof *r);
@@ -1749,22 +1822,95 @@ static void apply_event(juno_ctx *c, int host, int32_t v)
     else if (host == JUNO_SE_VOICES) juno_gui_set_voice_count(c, v);
 }
 
-/* The plugin as shipped: the engine's construction mutes every unit for its
- * first 960 samples (juno_driver_arm_latch), and the first process() applies
- * the 95 defaults IComponent::initialize queues (e.g. six voices). Call once,
- * right after create. */
+/* The start-up mute and initialize's 95 defaults, applied at once, ahead of any
+ * record already queued (the plugin queues them for its first block; nothing
+ * renders before it). `setting`: the engine-rate setting's entry too -- the
+ * core's listener, at initialize; it is no engine event, so the replay after a
+ * rate switch leaves it out. */
+static void plugin_defaults(juno_ctx *c, int setting)
+{
+    int k, q = c->drv_queue_mode, nq = c->drv_nq;
+    juno_driver_arm_latch(c->st);
+    c->drv_queue_mode = 0;
+    c->drv_nq = 0;
+    for (k = 0; k < JUNO_STATE_N; ++k)
+        if (setting || JUNO_STATE_ENT[k].host != JUNO_SE_SRATE)
+            apply_event(c, JUNO_STATE_ENT[k].host, JUNO_STATE_ENT[k].dflt);
+    c->drv_queue_mode = q;
+    c->drv_nq = nq;
+}
+
+/* The engine-rate switch (rva 0x320BA2: setSampleRate, then the render object's
+ * lookup; found, the tick phase and note count start again). Exact here when
+ * nothing has happened since the start -- the state byte-equal to a fresh
+ * create + plugin_init at this host rate: the plugin switches its built engine
+ * before its first block's queue (the defaults, the DAW's events), so the
+ * result is the build at the new rate (the cold state coldstate_ab.py grades),
+ * the mute and the defaults. A switch on an engine that has run is the
+ * plugin's setSampleRate in place: CLAIMS B13b, not ported -- ro_unported is
+ * set, the port keeps its rate and object. Returns 1 when it switched. */
+int juno_gui_plugin_init(juno_ctx *c);
+
+static int ro_switch(juno_ctx *c)
+{
+    if (c->ro_model || c->ro.engine == c->eng_req || c->ro_unported) return 0;
+    if ((float)c->eng_req != JF(c->st, 16)) {
+        juno_ctx *ref = ctx_create((float)c->drv_rate, c->chorus_mode);
+        int same;
+        if (!ref) return 0;
+        juno_gui_plugin_init(ref);
+        same = !memcmp(ref->st + 176, c->st + 176, JUNO_STATE_BYTES - 176);
+        juno_gui_destroy(ref);
+        if (!same) { c->ro_unported = 1; return 0; }
+        st_build(c->st, (float)c->eng_req, &c->shim, c->chorus_mode);
+        plugin_defaults(c, 0);
+    }
+    c->ro.engine = c->eng_req;
+    if (juno_ro_lookup(&c->ro) > 0) { c->drv_phase = 0; c->drv_notes = 0; }
+    return 1;
+}
+
+/* The plugin as shipped: its engine built at the constructor's 96000 with the
+ * render object for (96000, host rate) -- the converter at a 44100 / 48000
+ * host, silence at a rate outside the table (CLAIMS B13); the construction
+ * mutes every unit for its first 960 engine samples (juno_driver_arm_latch);
+ * the 95 defaults IComponent::initialize queues (e.g. six voices) apply at the
+ * first block. Call once, right after create. */
 int juno_gui_plugin_init(juno_ctx *c)
 {
-    int k;
     if (!c || !ctx_model(c, 0)) return 0;
-    juno_driver_arm_latch(c->st);
-    for (k = 0; k < JUNO_STATE_N; ++k)
-        apply_event(c, JUNO_STATE_ENT[k].host, JUNO_STATE_ENT[k].dflt);
+    /* the plugin's engine: built at the constructor's 96000 (rva 0x3C5A50 ->
+     * the build; no setSampleRate follows while the setting is the default),
+     * and the core's render object for (96000, the host rate) -- setupProcessing
+     * (rva 0x321AC0) looks it up and, found, zeroes the tick phase and note count */
+    if (JF(c->st, 16) != 96000.0f) st_build(c->st, 96000.0f, &c->shim, c->chorus_mode);
+    c->ro_model = 0;
+    c->eng_req = 96000;
+    c->eng_auto = 0;
+    juno_ro_free(&c->ro);
+    juno_ro_init(&c->ro, 96000, c->drv_rate);
+    if (juno_ro_lookup(&c->ro) > 0) { c->drv_phase = 0; c->drv_notes = 0; }
+    juno_engine_no_setsr(c->st);
+    plugin_defaults(c, 1);
     /* initialize's core setup (rva 0x320420) sets the wrapper's velocity switch
      * from vm.vs.velSense, whose default is 1 (Script.xml; EXECUTED:
      * probes/b6/kbd_vel_default.py): a fresh instance plays the key's own
      * velocity. velSense is not in the state list, so no preset changes it;
      * only the plugin's own switch does (juno_gui_set_kbd_velocity). */
+    c->kbd_velocity_sw = 1;
+    return JUNO_STATE_N;
+}
+
+/* initialize on the ENGINE MODEL: the defaults and the start-up mute on the
+ * engine juno_gui_create made, which renders the host block itself at that
+ * rate, any rate (no table, no 96 kHz build). Not a plugin configuration where
+ * the rates differ from the table's (host 96001: the plugin plays silence);
+ * the configuration of the gates whose oracle is an engine fed the plugin's
+ * queues at the gate's rate (state_load_gate.py). */
+int juno_gui_plugin_init_model(juno_ctx *c)
+{
+    if (!c || !ctx_model(c, 0)) return 0;
+    plugin_defaults(c, 1);
     c->kbd_velocity_sw = 1;
     return JUNO_STATE_N;
 }
@@ -1914,25 +2060,86 @@ static void drv_engine_tempo(juno_ctx *c, int t10)
 
 typedef struct { float *il, *L, *R; int dry, full; } drv_out;
 
-static void drv_render_sample(juno_ctx *c, drv_out *o, int t)
+/* One engine sample (the engine render's per-sample body). */
+static void drv_engine_sample(juno_ctx *c, drv_out *o, float *l, float *r)
 {
-    float l, r;
     juno_note_tick(c->st);
     if (o->dry) {
         float vbuf[JUNO_NUM_VOICES];
         int v;
         juno_driver_render_voices(c->st, vbuf);   /* 8 voices; noise block stepped once */
-        l = 0.0f;
-        for (v = 0; v < JUNO_NUM_VOICES; ++v) l += vbuf[v];
-        r = l;
+        *l = 0.0f;
+        for (v = 0; v < JUNO_NUM_VOICES; ++v) *l += vbuf[v];
+        *r = *l;
         o->full = 1;
     } else {
-        o->full = juno_driver_render_sample(c->st, &l, &r);
+        o->full = juno_driver_render_sample(c->st, l, r);
     }
+}
+
+static void drv_out_sample(juno_ctx *c, drv_out *o, int t, float l, float r)
+{
     if (o->il) { o->il[2 * t] = l; o->il[2 * t + 1] = r; }
     if (o->L) o->L[t] = l;
     if (o->R) o->R[t] = r;
     if (c->arp_trace_cap) c->arp_trace_smp++;
+}
+
+static void drv_render_sample(juno_ctx *c, drv_out *o, int t)
+{
+    float l, r;
+    drv_engine_sample(c, o, &l, &r);
+    drv_out_sample(c, o, t, l, r);
+}
+
+/* The engine render (CWaveGen vt+56, rva 0x3C7400) the converter calls: its
+ * preamble (the voice count sync), then `count` samples into ptrs. */
+static void ro_engine_render(void *user, float *const *ptrs, int nch, int count)
+{
+    juno_ctx *c = (juno_ctx *)user;
+    int i;
+    asg_sync(c);
+    for (i = 0; i < count; ++i) {
+        float l, r;
+        drv_engine_sample(c, (drv_out *)c->ro_out, &l, &r);
+        ptrs[0][i] = l;
+        if (nch > 1) ptrs[1][i] = r;
+    }
+}
+
+/* One segment of the host block, samples [t0, t0 + n), through the render
+ * object (CWaveGen vt+48, rva 0x34B070: n >= 1): IDENTITY, the engine render
+ * of the n samples; CONVERTER (rva 0x343E30), the engine renders what the
+ * filter needs, the filter makes the n host samples; SILENCE (rva 0x344280),
+ * zeros and no engine render. The engine model (juno_gui_create) renders as
+ * IDENTITY. */
+static void ro_render(juno_ctx *c, drv_out *o, int t0, int n)
+{
+    int kind, t;
+    if (n <= 0) return;
+    kind = c->ro_model ? JUNO_RO_IDENTITY : juno_ro_kind(&c->ro);
+    if (kind == JUNO_RO_IDENTITY) {
+        asg_sync(c);
+        for (t = t0; t < t0 + n; ++t) drv_render_sample(c, o, t);
+        return;
+    }
+    if (kind == JUNO_RO_CONVERTER) {
+        float *out[2];
+        if (n > c->ro_tmp_cap) {
+            float *p = (float *)realloc(c->ro_tmp, (size_t)(2 * n) * sizeof(float));
+            if (p) { c->ro_tmp = p; c->ro_tmp_cap = n; }
+        }
+        if (n <= c->ro_tmp_cap) {
+            out[0] = c->ro_tmp;
+            out[1] = c->ro_tmp + c->ro_tmp_cap;
+            c->ro_out = o;
+            if (juno_ro_convert(&c->ro, out, 2, n, ro_engine_render, c) == 0) {
+                for (t = 0; t < n; ++t) drv_out_sample(c, o, t0 + t, out[0][t], out[1][t]);
+                return;
+            }
+        }
+    }
+    for (t = t0; t < t0 + n; ++t) drv_out_sample(c, o, t, 0.0f, 0.0f);   /* SILENCE (or out of memory) */
 }
 
 /* One host block of n samples: the driver's tempo, the queued records at
@@ -1941,8 +2148,12 @@ static void drv_render_sample(juno_ctx *c, drv_out *o, int t)
 static void drv_block(juno_ctx *c, int n, drv_out *o)
 {
     static struct drv_rec rec[2 * DRV_QMAX];
-    int nrec = 0, i, k, t, cut, T;
+    int nrec = 0, i, k, t, cut, T, s0;
     long long P, ph;
+    /* the engine rate (rva 0x320BA2): a setting that asks another rate switches
+     * the engine (setSampleRate) and the render object; the object found, the
+     * tick phase and the note count start again */
+    ro_switch(c);
     /* the tempo (rva 0x320C04): round(tempo x 10.0), half away from zero (rva
      * 0x3F2050), clamped to an int; given to the engine only when the host's
      * tempo is valid and it changed */
@@ -1990,23 +2201,29 @@ static void drv_block(juno_ctx *c, int n, drv_out *o)
     }
     /* sample by sample: the ticks due at or before the sample's start, the
      * records at the sample (the first key restarts the clock with a tick),
-     * the ticks inside the sample, then -- a new segment after any of them --
-     * the engine render's preamble, and the sample */
+     * the ticks inside the sample; each of them ends the segment before the
+     * sample, which renders first through the render object (ro_render) */
     ph = c->drv_phase;
     k = 0;
+    s0 = 0;
     for (t = 0; t < n; ++t) {
         int seg = (t == 0);
-        while (ph <= 100000000LL * t) { drv_tick(c); ph += P; seg = 1; }
+        if (ph <= 100000000LL * t) {
+            if (!seg) { ro_render(c, o, s0, t - s0); s0 = t; seg = 1; }
+            while (ph <= 100000000LL * t) { drv_tick(c); ph += P; }
+        }
         if (k < cut && rec[k].off == t) {
             int before = c->drv_notes;
+            if (!seg) { ro_render(c, o, s0, t - s0); s0 = t; seg = 1; }
             while (k < cut && rec[k].off == t) { drv_apply(c, &rec[k]); ++k; }
-            seg = 1;
             if (!before && c->drv_notes > 0) { ph = 100000000LL * t + P; drv_tick(c); }
         }
-        while (ph < 100000000LL * (t + 1)) { drv_tick(c); ph += P; seg = 1; }
-        if (seg) asg_sync(c);
-        drv_render_sample(c, o, t);
+        if (ph < 100000000LL * (t + 1)) {
+            if (!seg) { ro_render(c, o, s0, t - s0); s0 = t; seg = 1; }
+            while (ph < 100000000LL * (t + 1)) { drv_tick(c); ph += P; }
+        }
     }
+    ro_render(c, o, s0, n - s0);
     c->drv_phase = ph - 100000000LL * n;
 }
 

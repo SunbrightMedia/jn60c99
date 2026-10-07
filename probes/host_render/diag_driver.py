@@ -22,10 +22,12 @@ PKL = os.path.join(REPO, 'scratchpad', 'diag_driver.pkl')
 
 
 def chain(ci):
-    # DIAG_CHAIN: a Python literal (name, rate, steps) instead of the gate's chain ci
+    """(name, rate, steps, setting, prelude). DIAG_CHAIN: a Python literal (name, rate, steps[,
+    setting, prelude]) instead of the gate's chain ci"""
     if os.environ.get('DIAG_CHAIN'):
         import ast
-        return ast.literal_eval(os.environ['DIAG_CHAIN'])
+        c = ast.literal_eval(os.environ['DIAG_CHAIN'])
+        return c if len(c) == 5 else (c[0], c[1], c[2], G.SETTING[c[1]], G.PRELUDE)
     return G.chains()[ci]
 
 
@@ -64,11 +66,11 @@ def ref(ci, nstep):
     import host_process_emu as H
     import e2e_emu as E
     bank = E.bank_bytes()
-    name, rate, steps = chain(ci)
+    name, rate, steps, setting, prelude = chain(ci)
     h = H.HostProcess()
-    h.start(rate, 4096, setting=G.SETTING[rate])
+    h.start(rate, 4096, setting=setting)
     payload = h.get_state()
-    h.process(G.PRELUDE)
+    h.process(prelude)
     h.snap_all()
     out = []
     for si, stp in enumerate(steps[:nstep]):
@@ -100,7 +102,7 @@ def port(ci, nstep):
     import truth
     d = pickle.load(open(PKL, 'rb'))
     assert d['ci'] == ci
-    name, rate, steps = chain(ci)
+    name, rate, steps, setting, prelude = chain(ci)
     lib = freshlib.load()
     V = ctypes.c_void_p
 
@@ -122,10 +124,11 @@ def port(ci, nstep):
     lib.juno_set_fp_oracle_mode(1)
     bankb = open(truth.BANK, 'rb').read()
     c = lib.juno_gui_create(ctypes.c_float(rate), 0)
+    lib.juno_set_fp_oracle_mode(1)            # after create, which sets the production FTZ
     lib.juno_gui_plugin_init(c)
     lib.juno_gui_queue_state(c, d['payload'], len(d['payload']))
-    L0, R0 = (ctypes.c_float * G.PRELUDE)(), (ctypes.c_float * G.PRELUDE)()
-    lib.juno_gui_process(c, (Note * 1)(), 0, 0, 120.0, L0, R0, G.PRELUDE)
+    L0, R0 = (ctypes.c_float * prelude)(), (ctypes.c_float * prelude)()
+    lib.juno_gui_process(c, (Note * 1)(), 0, 0, 120.0, L0, R0, prelude)
     lib.juno_rr_settle.argtypes = [V]
     lib.juno_rr_settle(lib.juno_gui_state(c))
     # word index -> (unit, offset) for the report
