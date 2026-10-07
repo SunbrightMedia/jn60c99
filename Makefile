@@ -256,10 +256,11 @@ dll: juno.dll
 juno.dll: gui/juno_bridge.c $(SRC) $(HDR)
 	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $(filter %.c,$^) $(LDLIBS)
 
-test: tests/test_fma_canary tests/test_rate_laws tests/test_teensy_golden tests/test_voice_alloc tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter tests/test_arp_pattern tests/test_param_setter
+test: tests/test_fma_canary tests/test_rate_laws tests/test_teensy_golden tests/test_multi_instance tests/test_voice_alloc tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter tests/test_arp_pattern tests/test_param_setter
 	./tests/test_fma_canary
 	./tests/test_rate_laws
 	./tests/test_teensy_golden
+	./tests/test_multi_instance
 	./tests/test_helpers
 	./tests/test_voice_smoke
 	./tests/test_master_smoke
@@ -289,6 +290,9 @@ tools/verify/finefx_port_dump: tools/verify/finefx_port_dump.c src/finefx_recall
 
 tests/test_teensy_golden: tests/test_teensy_golden.c tests/teensy_golden.h gui/juno_bridge.c $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -Itests -o $@ tests/test_teensy_golden.c gui/juno_bridge.c $(SRC) $(LDLIBS)
+
+tests/test_multi_instance: tests/test_multi_instance.c gui/juno_bridge.c $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -D_POSIX_C_SOURCE=200809L -o $@ tests/test_multi_instance.c gui/juno_bridge.c $(SRC) $(LDLIBS) -lpthread
 
 tests/test_param_setter: tests/test_param_setter.c $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)

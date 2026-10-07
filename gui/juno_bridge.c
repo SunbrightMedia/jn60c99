@@ -182,6 +182,9 @@ typedef struct {
      * (core+580, -1 at boot), the host tempo of the next blocks (process()
      * gives 120.0 when the host has none) and its valid flag, the host rate. */
     struct drv_rec { int off, kind, host; int32_t v; unsigned char m[3]; uint32_t id; float f; } drv_q[DRV_QMAX], drv_carry[DRV_QMAX];
+    struct drv_rec drv_work[2 * DRV_QMAX];   /* a block's records (the core's vector at +464): one per
+                                              * instance -- a static one let two instances on two
+                                              * threads overwrite each other's (task #41) */
     int   drv_nq, drv_ncarry;
     int   drv_queue_mode;       /* 1: apply_event queues a kind-2 record instead */
     long long drv_phase;
@@ -2680,7 +2683,7 @@ static void ro_render(juno_ctx *c, drv_out *o, int t0, int n)
  * the start of every segment. */
 static void drv_block(juno_ctx *c, int n, drv_out *o)
 {
-    static struct drv_rec rec[2 * DRV_QMAX];
+    struct drv_rec *rec = c->drv_work;
     int nrec = 0, i, k, t, cut, T, s0;
     long long P, ph;
     /* the engine rate (rva 0x320BA2): a setting that asks another rate switches
@@ -2890,10 +2893,11 @@ int juno_gui_process_ex(juno_ctx *c, const juno_host_note *ev, int nev, const ju
  * A one-sample block: the queued records at offset 0, the ticks of the sample. */
 void juno_gui_tick(juno_ctx *c)
 {
-    static struct drv_rec rec[2 * DRV_QMAX];
+    struct drv_rec *rec;
     int i, nrec = 0, T;
     long long P, ph;
     if (!c) return;
+    rec = c->drv_work;
     {
         double r = c->drv_tempo * 10.0;
         r = r >= 0.0 ? floor(r + 0.5) : ceil(r - 0.5);

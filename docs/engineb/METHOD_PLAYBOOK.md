@@ -2835,3 +2835,16 @@ CC >= 120 offered to the learn, forget, the CC view in the save): no chain reach
 A mutant counts only where the unmutated port is green. Every teeth runner first runs its gate on
 the unmutated build and refuses to grade mutants while that baseline is red; a mutant that bites
 nothing on the green gate names a chain to add (or an equivalence to prove).
+
+## 156. A STATIC BUFFER IS STATE SHARED BY EVERY INSTANCE -- RUN TWO INSTANCES ON TWO THREADS
+Paid 2026-10-07 (JUNO, the host-call census). The render driver's block records lived in a
+function-level `static` array (drv_block and juno_gui_tick): every context shared it. One instance
+per process -- every gate -- never sees it; two instances on two threads (a DAW's tracks, the Pi
+kernel's worker cores calling juno_gui_tick at once) overwrote each other's pending MIDI records:
+tests/test_multi_instance.c failed 24 of 24 concurrent runs, and passed when the same threads ran
+one at a time. A first version of that test compared raw engine state between instances and failed
+even one at a time -- the state holds pointers into its own instance; compare sound.
+### The rule
+No mutable static in the port's render or control path: every buffer belongs to its context. Keep a
+test that renders two instances on two threads at once and requires each to equal its run alone --
+and run that test one thread at a time too, so a failure is known to be the race.
