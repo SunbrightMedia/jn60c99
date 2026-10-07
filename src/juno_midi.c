@@ -1,6 +1,7 @@
 /* juno_midi.c -- the plugin's MIDI controller intake below its render driver
  * (CLAIMS B16). See juno_midi.h. */
 #include <math.h>
+#include <string.h>
 #include "juno_midi.h"
 #include "midi_tables.h"
 #include "juno_engine.h"
@@ -89,3 +90,49 @@ int juno_midi_cc_entry(int cc)
 int juno_midi_entry_host(int entry) { return JUNO_MIDI_PARAM[entry].host; }
 uint32_t juno_midi_entry_id(int entry) { return JUNO_MIDI_PARAM[entry].id; }
 uint32_t juno_midi_base(void) { return JUNO_MIDI_BASE; }
+
+typedef char juno_ccmap_recs_check[(JUNO_MIDI_PARAM_N == JUNO_CCMAP_RECS) ? 1 : -1];
+
+void juno_ccmap_clear(juno_ccmap *m)
+{
+    memset(m->map, 0xFF, sizeof m->map);
+    memset(m->rec, 0xFF, sizeof m->rec);
+}
+
+void juno_ccmap_boot(juno_ccmap *m)
+{
+    int cc, e;
+    juno_ccmap_clear(m);
+    for (cc = 0; cc < 128; ++cc) {
+        e = juno_midi_cc_entry(cc);
+        if (e < 0) continue;
+        m->map[cc] = (int8_t)e;
+        m->rec[e] = (int8_t)cc;
+    }
+    m->learn = -1;
+}
+
+int juno_ccmap_state_entry(juno_ccmap *m, uint32_t id, int32_t v)
+{
+    uint32_t cc = id - 0x10000000u;
+    int e;
+    if (cc > 0x7Fu) return 0;
+    if (v < 0) return 1;
+    e = juno_midi_entry((uint32_t)v);
+    if (e < 0) return 1;
+    m->map[cc] = (int8_t)e;
+    m->rec[e] = (int8_t)cc;
+    return 1;
+}
+
+int juno_ccmap_lookup(const juno_ccmap *m, int cc)
+{
+    if (m->learn >= 0 || cc < 0 || cc > 127) return -1;
+    return m->map[cc];
+}
+
+int32_t juno_ccmap_state_value(const juno_ccmap *m, int cc)
+{
+    if (cc < 0 || cc > 127 || m->map[cc] < 0) return -1;
+    return (int32_t)JUNO_MIDI_PARAM[m->map[cc]].id;
+}

@@ -2801,3 +2801,15 @@ Never guard a law the plugin does not guard. A state without a rate is a harness
 harness (the tests now set their rate), not the law. When a path can reach inf / NaN in the plugin
 (a zero rate, a 0/0 increment), grade it -- the NaN semantics of every compare on that path are
 then on trial.
+
+## 153. A PORT THAT GROWS CAN BLIND AN OLD TOOTH -- RE-RUN EVERY TOOTH OF THE PATH YOU CHANGE
+Paid 2026-10-07 (JUNO, the CC map in the DAW state). The port had a constant CC map; its tooth (no
+default assignments) bit midi_ctl_gate. Porting the plugin's own law -- every setState empties the
+map and refills it from the payload's 128 entries -- made that tooth blind: every chain of that gate
+first loads the plugin's state, so the boot map is replaced before any CC arrives. The gate stayed
+green; only re-running the old tooth showed the lost reach.
+### The rule
+After a change to a path, re-run every mutant that names that path, not only the new ones. A tooth
+that stops biting means a gate lost reach: add the chain that restores it (here: a chain with no
+state load at all, the patch reloaded between CC pairs so no CC hides a later one) and move the
+tooth to the gate that now holds it.

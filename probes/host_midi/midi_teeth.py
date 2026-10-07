@@ -28,8 +28,9 @@ MUTANTS = [
     ('mod_no_limit', 'the mod wheel taking CC bytes over 127 (clamped to 127)',
      'src/juno_midi.c', 'if ((unsigned)v > 127u) return;\n    voices_arm(st, 4000u',
      'if ((unsigned)v > 127u) v = 127;\n    voices_arm(st, 4000u'),
-    ('no_ccmap', 'no default CC assignments',
-     'src/juno_midi.c', 'return (cc >= 0 && cc < 128) ? JUNO_CC_MAP[cc] : -1;', 'return -1;'),
+    # 'no_ccmap' (no default CC assignments) moved to probes/host_api/ccmap_teeth.py as
+    # 'no_boot_map': every chain here loads the plugin's state, which replaces the boot's map
+    # (CLAIMS A31), so only a chain with no state load can see it (playbook 153)
     ('trunc_ignored', 'the CC conversion always rounding (the entry\'s truncate flag ignored)',
      'src/juno_midi.c', 'if (p->trunc) {', 'if (0) {'),
     ('srate_listener', 'a parameter record of the engine-rate setting switching the rate (the listener)',

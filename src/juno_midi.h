@@ -49,6 +49,29 @@ uint32_t juno_midi_entry_id(int entry);
 /* The VST3 MIDI-mapping parameter base (core +48): ids base + 0..129. */
 uint32_t juno_midi_base(void);
 
+/* THE CC MAP of the core (core+24): +48 the map CC -> parameter record, each
+ * record's own CC at +12, +64 the record a MIDI learn waits for (-1: none).
+ * READ (rva 0x31A4F0 / 0x31A6A0 / 0x319A60 / 0x319B90) and EXECUTED through the
+ * plugin's own setState and process() (tools/verify/ccmap_state_gate.py,
+ * CLAIMS A31). Every state load empties the map and refills it from the
+ * payload's entries 0x10000000 + n. */
+#define JUNO_CCMAP_RECS 95
+typedef struct { int8_t map[128]; int8_t rec[JUNO_CCMAP_RECS]; int learn; } juno_ccmap;
+/* rva 0x31A4F0 at the boot: the map emptied, every record's CC -1, then the
+ * default assignment (juno_midi_cc_entry); no learn waits. */
+void    juno_ccmap_boot(juno_ccmap *m);
+/* rva 0x31A4F0 with -1, the state load's first step: the map emptied, every
+ * record's CC -1. A waiting learn is kept. */
+void    juno_ccmap_clear(juno_ccmap *m);
+/* rva 0x31A6A0, one state entry: 0 when `id` is not 0x10000000 + 0..127 (the
+ * entry is a parameter's); else 1, and a value >= 0 that the id map knows
+ * assigns CC n to that record (a negative or unknown value: CC n stays free). */
+int     juno_ccmap_state_entry(juno_ccmap *m, uint32_t id, int32_t v);
+/* rva 0x319A60: the record CC `cc` drives, -1 when none or while a learn waits. */
+int     juno_ccmap_lookup(const juno_ccmap *m, int cc);
+/* rva 0x319B90: getState's value for CC `cc`, the id of its record or -1. */
+int32_t juno_ccmap_state_value(const juno_ccmap *m, int cc);
+
 #ifdef __cplusplus
 }
 #endif

@@ -206,6 +206,8 @@ typedef struct {
     int   ro_tmp_cap;
     int   ro_unported;         /* a path the port does not model was reached (none since CLAIMS A30) */
     int   setup_rate;          /* the host rate setupProcessing stored (plugin_init: the create rate) */
+    juno_ccmap ccmap;          /* the core's CC map (core+24+48 / record +12 / +64, CLAIMS A31):
+                                * the boot's default, emptied and refilled by every state load */
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -327,6 +329,7 @@ static juno_ctx *ctx_create(float sample_rate, int chorus_mode)
     c->kb_arp.n = c->kb_arp_latch.n = 0;
     c->kb_sus_arp = c->kb_sus_note = c->ctl_sus = 0;
     c->host_bpm = 128.0f;   /* plugin recall-default TEMPO (880 -> 40+88.0) */
+    juno_ccmap_boot(&c->ccmap);
     drv_init(c, sample_rate);
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
     return c;
@@ -1398,15 +1401,16 @@ void juno_gui_set_kbd_velocity(juno_ctx *c, int on)
 void juno_gui_wrapper_midi(const juno_ctx *c, unsigned char m[3]);
 
 /* The wrapper's push (rva 0x31F4E0) of one 3-byte message at a sample offset
- * of the next block: a CC the plugin's default map assigns to a parameter (rva
- * 0x319A60, src/midi_tables.h) first queues that parameter's record (kind 1:
+ * of the next block: a CC the core's map assigns to a parameter (rva 0x319A60:
+ * the boot's map, src/midi_tables.h, as the last state load left it, CLAIMS
+ * A31) first queues that parameter's record (kind 1:
  * its id and the CC byte over its range, rva 0x31A850); then, for every
  * message, an assigned CC too, the velocity policy (juno_gui_wrapper_midi) and
  * the message's own record (kind 0) into the queue the render driver applies. */
 static void drv_push(juno_ctx *c, unsigned char m[3], int offset)
 {
     if ((m[0] & 0xF0) == 0xB0) {
-        int e = juno_midi_cc_entry(m[1]);
+        int e = juno_ccmap_lookup(&c->ccmap, m[1]);
         if (e >= 0 && c->drv_nq < DRV_QMAX) {
             struct drv_rec *r = &c->drv_q[c->drv_nq++];
             memset(r, 0, sizeof *r);
@@ -2224,10 +2228,12 @@ static uint32_t be(const unsigned char *p, int n)
  * big-endian byte count, then (id, value) entries, 4-byte big-endian fields (8
  * when the count exceeds (95 + 128) * 64 / 5: rva 0x321F20). Each entry whose
  * id is in the parameter list takes value & its storage mask (EXECUTED: 8, 7 or
- * 16 bits, or the value as given) and is applied in PAYLOAD order; other ids
- * (the 128 MIDI-assign entries, unknown ids) reach no engine cell. Returns the
- * number of parameter entries applied, -1 for an empty or short stream (the
- * plugin returns kResultFalse and sets nothing). */
+ * 16 bits, or the value as given) and is applied in PAYLOAD order. The CC map
+ * is emptied first (rva 0x31A4F0) and the MIDI-assign entries 0x10000000 + n
+ * refill it (rva 0x31A6A0, CLAIMS A31): a payload without them leaves every CC
+ * free. Unknown ids reach nothing. Returns the number of parameter entries
+ * applied, -1 for an empty or short stream (the plugin returns kResultFalse and
+ * sets nothing). */
 int juno_gui_state_load(juno_ctx *c, const unsigned char *data, int len)
 {
     uint32_t n, off, w;
@@ -2236,9 +2242,11 @@ int juno_gui_state_load(juno_ctx *c, const unsigned char *data, int len)
     n = be(data, 4);
     if (n == 0 || n > (uint32_t)len - 4) return -1;
     w = ((JUNO_STATE_N + 128) << 6) / 5 < (int)n ? 8 : 4;
+    juno_ccmap_clear(&c->ccmap);              /* rva 0x31A4F0 (-1): the CC map emptied */
     for (off = 0; off + 2 * w <= n; off += 2 * w) {
         uint32_t id = be(data + 4 + off, (int)w);
         int32_t v = (int32_t)be(data + 4 + off + w, (int)w);
+        if (juno_ccmap_state_entry(&c->ccmap, id, v)) continue;   /* rva 0x31A6A0 */
         for (k = 0; k < JUNO_STATE_N && JUNO_STATE_ENT[k].id != id; ++k) ;
         if (k == JUNO_STATE_N) continue;
         if (JUNO_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask);

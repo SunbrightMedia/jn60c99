@@ -124,11 +124,16 @@ mine is a hypothesis (playbook 80).
   notes off CC 123 (A27), and a host-rate change on a running instance (A28,
   host_rate_gate.py), and the start-up as the plugin boots, its build's ramps in
   flight (A29, boot_gate.py, from the first sample), and an engine-rate switch on a
-  running engine, setSampleRate in place (A30, rate_switch_gate.py). The web
+  running engine, setSampleRate in place (A30, rate_switch_gate.py), and the MIDI
+  CC map in the DAW state -- setState empties and refills it (A31,
+  ccmap_state_gate.py). Open (task #36, the host-call census): the state save
+  (getState: the parameter store), the UI-timer drain + MIDI learn. The web
   app's WASM is not rebuilt with the converter yet (needs emcc). Engine:
-  PROVENANCE 31/31 PROVEN; full verify of
+  PROVENANCE 32/32 PROVEN; full verify of
   cd63fc1 GREEN (job verify_fix3, EXIT 0, every section ran); ARM golden OK
-  (job arm_golden_cd63, toolchain installed by apt in that container). Later commits are docs only. The two days 2026-10-05/06
+  (job arm_golden_cd63, toolchain installed by apt in that container). The
+  commits after cd63fc1 (A24..A31) carry their own gates; a full make verify
+  of the last commit is owed (task #37). The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
   mute), juno_gui_state_load (DAW preset), juno_gui_load_patch (its patch

@@ -253,3 +253,29 @@ juno_driver_unit_noise_reinit; the re-applied values come from a recall of the c
 a reference engine built at the new rate (its own shim). Gate: tools/verify/rate_switch_gate.py;
 mutants: probes/b13b/switch_teeth.py; census probes: probes/b13b/.
 
+
+## The CC map in the DAW state (READ + EXECUTED, 2026-10-07; CLAIMS A31)
+
+The core keeps a map CC -> parameter record (core+24+48), each record's own CC (+12) and the record
+a MIDI learn waits for (+64, -1 none). The boot fills the 51 default assignments. IComponent::setState
+(rva 0x34AAA0) reads the byte count; a count <= 0 returns kResultFalse before the deserializer. The
+deserializer (rva 0x321F20) first EMPTIES the map (rva 0x31A4F0 with -1: every record's CC -1), then
+reads the entries in payload order: an id 0x10000000 + n (n 0..127) is a map entry (rva 0x31A6A0):
+a value >= 0 found in the id map (rva 0xCB04F8) sets map[n] = its record and the record's CC = n (a
+later entry for n wins; two CCs may drive one record; the old owner's CC field is not cleared); a
+negative or unknown value leaves n free. Every other id is a parameter entry. So a payload without
+the 128 map entries leaves every CC free. A patch load (rva 0x335850) leaves the map alone
+(probes/host_api/conductor_probe.py). The push's lookup (rva 0x319A60) answers -1 while a learn
+waits; getState writes map[n]'s record id or -1 (rva 0x319B90). The port: juno_ccmap_* (src/juno_midi.c)
+and the context's map (gui/juno_bridge.c). Gate: tools/verify/ccmap_state_gate.py; mutants:
+probes/host_api/ccmap_teeth.py.
+
+The core's second queue (core+512) and its drain (the conductor's slot 1, rva 0x320120) are NOT on
+the audio path: the drain runs on the plugin's UI timer (CUiThreadTimer, 50 ms; the core registers
+at initialize, rva 0x320420; the edit controller starts the timer) and, EXECUTED with the drain
+called directly (scratchpad drain probe, task #36): it adds no engine record; it applies the
+store records a mapped CC queues (kind 1: id, the CC's float value) to the parameter store getState
+reads, with the record value law (rva 0x31A940); it completes a waiting MIDI learn with the FIRST CC
+message it reads (rva 0x319C90: CC < 120; the record's old CC leaves the map, the CC's old record
+loses its CC). Host parameter records (process(), ids below the MIDI base) never reach that queue:
+the store does not follow host automation.
