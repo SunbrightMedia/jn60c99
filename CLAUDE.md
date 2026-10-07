@@ -121,8 +121,9 @@ mine is a hypothesis (playbook 80).
   docs/HOST_RENDER_LAYER.md); so are the MIDI controllers -- bend, mod wheel,
   expression, the 51 default CC assignments, parameter records (A26,
   midi_ctl_gate.py), and sustain CC 64 (a hold in the keyboard object) + all
-  notes off CC 123 (A27). Open: a rate switch on a running engine (B13b), a
-  host-rate change on a running instance (B13c), the start-up transient (B15). The web
+  notes off CC 123 (A27), and a host-rate change on a running instance (A28,
+  host_rate_gate.py). Open: an engine-rate switch on a running engine (B13b), the
+  start-up transient (B15). The web
   app's WASM is not rebuilt with the converter yet (needs emcc). Engine:
   PROVENANCE 29/29 PROVEN; full verify of
   cd63fc1 GREEN (job verify_fix3, EXIT 0, every section ran); ARM golden OK

@@ -64,6 +64,7 @@ engine render (CWaveGen vt+56)  rva 0x3C7400   voice workers + master (e2e_emu r
 | engine at vm.vs.sampleRate's rate (default 96000) + the converter to the host rate | the same on the product path (juno_gui_plugin_init, src/juno_conv.c) -- **bit-exact, A25**; juno_gui_create stays the engine model (the engine at the given rate, no table) the engine gates grade |
 | silence at a host rate outside its table (11025, 22050, 32000, 47999, ...) and at wild settings | the same -- **bit-exact, A25** |
 | a setting change after the engine has run: setSampleRate in place | refused, the port keeps its rate -- **open, B13b** |
+| a host-rate change on a running instance (setActive / setupProcessing): the engine kept, the render object looked up again | the same (juno_gui_setup_processing, juno_gui_set_active) -- **bit-exact, A28** |
 | the render driver: events at offsets, the tick clock in 1e-8 host samples from round(tempo x 10), the grid restarted by the first key, ticks always, the tempo only when valid / changed / 40..300 | the same (gui/juno_bridge.c drv_block) -- **bit-exact, A24** |
 | the arp controller (SW / TYPE / STEP, the apply, the pattern reload at the next step) | the same (arp_sw / arp_type_set / arp_step_set, src/carp.c carp_ctl_config) -- **bit-exact, A24** |
 | the start-up: ~274 ramps per unit in flight after the boot | starts settled -- **open, B15** |
@@ -199,3 +200,15 @@ reads +1176 at index -1, which is +1048's key 127 --, +1320 the velocities, +144
   gated voice, every slot "no note", the held-note mask and +68 cleared; the keyboard's maps and
   the arp stay. Each gate leaf rewrites the held flag 1856 as "a voice still gated" (rva
   0x3B1C58), so the last gate-off leaves 0.
+
+## A host-rate change on a running instance (READ + EXECUTED, 2026-10-07; CLAIMS A28)
+
+setupProcessing (rva 0x3CB150) stores the setup and nothing else. setActive, true or false (rva
+0x34AA50): the core's setup (rva 0x321AC0) at the stored rate -- with the automatic engine-rate
+setting the requested engine rate becomes the engine's current one; the render object takes the
+host rate (rva 0x3442D0, also a global its constructor reads) and is looked up again (rva
+0x343A80); found, its buffers start from zeros and the tick phase and the note count go to 0 (a
+held key's later note-off takes the count below 0) -- then the all-sound-off record (rva 0x3208E0:
+CC 120 at offset 0, written past the CC map; the engine's CC entry takes no 120). The engine is not
+touched: a DAW's rate change keeps every voice, ramp and FX state and swaps only the converter.
+The driver's tick period reads the host rate from the render object (core +108).

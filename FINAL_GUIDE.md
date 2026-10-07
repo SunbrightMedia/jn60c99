@@ -12,7 +12,7 @@ Tracks B and D below were written for two chips. Read them this way from now on:
 - The "three facts" at the end stay true as measurements; "one chip cannot do it" is exactly why B needs a cheaper engine.
 
 ## STATUS (2026-10-07, the rules below: one line per track, regressions first)
-- A: Port: REOPENED 2026-10-07, closing: the render driver + arp controller (A24) and the render object -- the 96 kHz engine, the converter, silence outside the rate table (A25) -- are bit-exact through the plugin's own process(); the MIDI controllers -- bend, mod, expression, the CC map, parameter records (A26), sustain + all notes off (A27) -- too; open: a rate switch on a running engine (B13b), a host-rate change on a running instance (B13c), the start-up transient (B15). Engine: PROVENANCE 29/29, full verify of cd63fc1 GREEN (job verify_fix3).
+- A: Port: REOPENED 2026-10-07, closing: the render driver + arp controller (A24) and the render object -- the 96 kHz engine, the converter, silence outside the rate table (A25) -- are bit-exact through the plugin's own process(); the MIDI controllers -- bend, mod, expression, the CC map, parameter records (A26), sustain + all notes off (A27) -- too, and a host-rate change on a running instance (A28); open: an engine-rate switch on a running engine (B13b), the start-up transient (B15). Engine: PROVENANCE 29/29, full verify of cd63fc1 GREEN (job verify_fix3).
 - D: RETIRED by the one-board rule (2026-09-23).
 - B: REOPENED for ONE board — no one-board JUNO engine chosen yet (budget facts in docs/ONE_BOARD_BUDGET.md).
 - C: esp32s3/ playable (console, patch step, MIDI UART); the Pi PLAY image is built, not yet on silicon.

@@ -2735,3 +2735,13 @@ For every law taken from observation, name the rival laws that fit the same data
 input that separates them before the law is believed. When a mutant does not bite, the chain
 does not reach the path: change the chain (a sustaining envelope, a window longer than the
 effect's period, a state-level gate for a state law), re-run, and only then claim the path.
+
+## 148. A TOOTH INSIDE A MUTE PROVES NOTHING -- PLACE TEETH WHERE THE PRODUCT IS AUDIBLE
+Paid 2026-10-07 (JUNO, host_rate_gate). The harness tooth "the first note one sample late" did
+not bite: every chain's first note lands inside the plugin's 960-sample start-up mute, where no
+voice runs, so the note sounds from the mute's end wherever it lands. A tick-rate mutant did not
+bite either: no arp step fell inside the window after the change.
+### The rule
+A tooth (harness or mutant) must act where its effect is observable: after the start-up mute,
+inside a window longer than the effect's period, on a patch whose envelope can show it. Before
+reading "DID NOT BITE" as "equivalent", check where the tooth acted.
