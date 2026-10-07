@@ -35,10 +35,10 @@ import sys, struct, pickle
 HERE = _JREPO + '/tools/verify'
 sys.path.insert(0, HERE)
 import os
-PKL  = os.environ.get('JUNO_RENDER_REF_PKL',
-                     _JREPO + '/scratchpad/recall_render_ref.pkl')
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
 import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
+PKL  = (os.environ.get('JUNO_RENDER_REF_PKL')
+        or truth.scratch('recall_render_ref.pkl'))   # per bank ($JUNO_SCRATCH_TAG)
 # Host rate (default 48 kHz). JUNO_RENDER_SR overrides it so the SAME render A/B can
 # prove the whole recall->render chain at NON-standard rates (88200/192000) — the
 # "other host sample rates" gate. Both processes read the same env, so the port and
@@ -90,21 +90,16 @@ def _arp_patches(bank_bytes):
     return out
 
 
-def default_patches(bank_bytes):
-    arp = _arp_patches(bank_bytes)
-    return [p for p in range(64) if p not in arp], arp
+def parse_patches(argv):
+    """The patches the REFERENCE renders: the ones named, else all 64.
 
-
-def parse_patches(argv, bank_bytes=None):
-    ps = [int(a) for a in argv if a.lstrip('-').isdigit()]
-    if ps:
-        return ps
-    if bank_bytes is None:
-        bank_bytes = open(BANK, 'rb').read()
-    keep, arp = default_patches(bank_bytes)
-    print("  arp patches in THIS bank (skipped, the reference cannot "
-          "arpeggiate): %s" % sorted(arp))
-    return keep
+    ⚠ NOT the arp skip set. Until 2026-10-07 the --ref process asked
+    _arp_patches() -- a ctypes call into libjuno.so -- inside the process that
+    builds the Unicorn oracle: the two-process rule broken, and the candidate
+    choosing which patches its own oracle renders. The reference now renders
+    every patch; the --port side drops the arp ones (it already did, and it is
+    the process that may load libjuno)."""
+    return [int(a) for a in argv if a.lstrip('-').isdigit()] or list(range(64))
 
 
 # Master/FX value-tree leaves whose dispatch index is beyond real_recall.leaf_table's
@@ -287,7 +282,7 @@ _MODE = sys.argv[1] if (__name__ == '__main__' and len(sys.argv) > 1) else None
 if _MODE == '--ref':
     import e2e_emu as E
     import real_recall as R
-    patches = parse_patches(sys.argv[2:], open(BANK, 'rb').read())
+    patches = parse_patches(sys.argv[2:])
     bank = E.bank_bytes(); leaves = R.leaf_table()
     out = {}
     for idx in patches:
