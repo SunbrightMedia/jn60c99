@@ -134,7 +134,9 @@ mine is a hypothesis (playbook 80).
   with all of it (make webapp green: WASM == native, headless check; emcc from
   /home/user/emsdk/emsdk_env.sh). Engine: PROVENANCE 34/34 PROVEN;
   full verify of d59277db GREEN (job verify_final, EXIT 0, every section ran,
-  every reference rebuilt from the plugin; ARM golden OK in the same run).
+  every reference rebuilt from the plugin; ARM golden OK in the same run), and
+  of 84921859 -- the stack fix and the rebuilt web app -- GREEN (job
+  verify_final2, EXIT 0, the same references). Later commits are docs only.
   The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
