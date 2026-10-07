@@ -14,6 +14,7 @@
 #include "../src/juno_engine.h"
 #include "../src/juno_apply.h"
 #include "../src/delay_recall.h"
+#include "../src/recall_ramp.h"
 
 #define HDR 23
 #define STRIDE 20223
@@ -175,17 +176,37 @@ int main(void)
         juno_bank_apply(st, bank, 0);
     }
 
-    /* --- case 6: host-tempo recompute (juno_apply_delay_tempo): 60 BPM, division 8
-     * -> ms = 750 exactly -> 0x40866300 @96k ((96000*750)/16384000 - 2/16384). The
-     * BPM law is bit-exact vs the plugin's own tempo dispatch at 60/88/176 BPM. --- */
-    juno_apply_delay_tempo(st, 128, 1, 1, 60.0f);
+    /* --- case 6: the tempo entry (juno_apply_delay_tempo): 60 BPM, division 8 ->
+     * ms = 750 exactly -> 0x40866300 @96k ((96000*750)/16384000 - 2/16384). TYPE 1
+     * sets only its second instance 4297584; 102352 keeps the recall's 128-BPM
+     * time (EXECUTED: probes/host_render/tempo_census.py --types). --- */
     {
+        uint32_t keep = (uint32_t)u32(st, 102352);
+        juno_apply_delay_tempo(st, 128, 1, 1, 60.0f);
         float ms = 750.0f;
         float dt = 96000.0f * ms; dt = dt * (1.0f/16384000.0f); dt = dt - (2.0f/16384.0f);
         unsigned int eb; memcpy(&eb, &dt, 4);
-        if ((unsigned)u32(st, 102352) != eb || (unsigned)u32(st, 4297584) != eb) {
-            printf("  case6: tempo recompute %08x/%08x != %08x\n",
-                   u32(st, 102352), u32(st, 4297584), eb); ++fails; }
+        if ((unsigned)u32(st, 4297584) != eb || (uint32_t)u32(st, 102352) != keep) {
+            printf("  case6: tempo entry 4297584 %08x (want %08x), 102352 %08x (want %08x kept)\n",
+                   u32(st, 4297584), eb, u32(st, 102352), keep); ++fails; }
+    }
+    /* --- case 6b: the synced time at the stored tempo, every byte, equals the old
+     * 128-BPM table at T = 1280 (the plugin's formula, rva 0x35FBF0). --- */
+    {
+        unsigned char *s2 = calloc(1, JUNO_STATE_BYTES);
+        int b, bad6 = 0;
+        static const float MS128[16] = { 58.59375f, 78.125f, 87.890625f, 117.1875f, 156.25f, 175.78125f, 234.375f,
+            312.5f, 351.5625f, 468.75f, 625.0f, 703.125f, 937.5f, 1250.0f, 1406.25f, 1875.0f };
+        JF(s2, 16) = 96000.0f;
+        for (b = 0; b < 256; ++b) {
+            float dt;
+            juno_rr_set_tempo(s2, 1280);
+            juno_apply_delay_tempo_t10(s2, b, 1, 0);
+            dt = 96000.0f * MS128[b == 0 ? 0 : (b + 16) / 17]; dt = dt * (1.0f/16384000.0f); dt = dt - (2.0f/16384.0f);
+            if (JF(s2, 102352) != dt) ++bad6;
+        }
+        if (bad6) { printf("  case6b: %d bytes differ from the 128-BPM table\n", bad6); ++fails; }
+        free(s2);
     }
 
     /* --- case 7: NON-DEFAULT fine-FX filter (src/finefx_recall.c). The 18 factory

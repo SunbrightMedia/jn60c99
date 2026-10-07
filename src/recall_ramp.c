@@ -56,7 +56,7 @@ typedef char rr_stride_is_10512[(JUNO_VOICE_MAIN_STRIDE == 10512) ? 1 : -1];
 typedef char rr_table_fits[(JUNO_RR_BASE + 32u + 34u * JUNO_RAMP_N <= JUNO_VOICE_COUNT_CELL) ? 1 : -1];
 
 /* The record table, port-owned memory at JUNO_RR_BASE (src/juno_engine.h): a
- * 32-byte header {magic, n_active, revtime, rev_on, tap2, arp_on, cut_last, 1 spare}, one record
+ * 32-byte header {magic, n_active, revtime, rev_on, tap2, arp_on, cut_last, tempo}, one record
  * per ramped cell (JUNO_RAMP_N, src/ramp_cells.h), then the active list (the
  * indices of the armed records, n_active of them). The records are
  * independent (each steps only its own cell), so the order the list holds
@@ -64,7 +64,7 @@ typedef char rr_table_fits[(JUNO_RR_BASE + 32u + 34u * JUNO_RAMP_N <= JUNO_VOICE
 typedef struct { float incr, accum, start, target; int32_t active, step; float pre; int32_t pad; } rr_rec;
 #define RR_MAGIC 0x32525252
 #define HDR(st, k) (*(int32_t *)((st) + JUNO_RR_BASE + 4u * (unsigned)(k)))
-enum { H_MAGIC, H_NACT, H_REVTIME, H_REVON, H_TAP2, H_ARPON, H_CUTLAST };
+enum { H_MAGIC, H_NACT, H_REVTIME, H_REVON, H_TAP2, H_ARPON, H_CUTLAST, H_TEMPO };
 
 static rr_rec *rec_at(unsigned char *st, int i)
 {
@@ -123,6 +123,8 @@ static void rr_seed(unsigned char *st)
     HDR(st, H_TAP2) = 0x3f008081;          /* 128/255: the build's (census job 236) */
     HDR(st, H_ARPON) = 0;
     HDR(st, H_CUTLAST) = 255;              /* the cutoff object's build value; every recall sets it */
+    HDR(st, H_TEMPO) = 1280;               /* processor +1056, the tempo x 10 the build stores
+                                            * (EXECUTED: probes/host_render/tempo_census.py) */
 }
 
 /* The DELAY TYPE 1 second instance's own copy of its tap time (CLAIMS B7):
@@ -161,6 +163,15 @@ void juno_rr_set_arp_on(unsigned char *st, int on)
  * step "large" (EXECUTED: H 0.25 then 87 -> 90 ramps at index 5, not 6;
  * scratchpad/probe_cutH.py). CLAIMS A20. */
 int juno_rr_cut_last(unsigned char *st) { return HDR(st, H_MAGIC) == RR_MAGIC ? (int)HDR(st, H_CUTLAST) : 255; }
+/* The engine's tempo x 10 (processor +1056): the tempo entry (rva 0x3C7F10 ->
+ * leaf 375, rva 0x3B9710) stores it; the LFO rate and the synced delay times of
+ * every later recall and edit read it. */
+int juno_rr_tempo(unsigned char *st) { return HDR(st, H_MAGIC) == RR_MAGIC ? (int)HDR(st, H_TEMPO) : 1280; }
+void juno_rr_set_tempo(unsigned char *st, int t10)
+{
+    if (HDR(st, H_MAGIC) != RR_MAGIC) rr_seed(st);
+    HDR(st, H_TEMPO) = t10;
+}
 
 void juno_rr_set_cut_last(unsigned char *st, int v)
 {
@@ -179,6 +190,7 @@ void juno_rr_copy_proc(unsigned char *dst, const unsigned char *src)
     HDR(dst, H_REVTIME) = HDR(s, H_REVTIME);
     HDR(dst, H_REVON) = HDR(s, H_REVON);
     HDR(dst, H_TAP2) = HDR(s, H_TAP2);
+    HDR(dst, H_TEMPO) = HDR(s, H_TEMPO);
 }
 
 

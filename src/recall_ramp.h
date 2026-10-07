@@ -67,6 +67,8 @@ int      juno_rr_rev_on(unsigned char *state);
 int      juno_rr_arp_on(unsigned char *state);
 void     juno_rr_set_arp_on(unsigned char *state, int on);
 int      juno_rr_cut_last(unsigned char *state);
+int      juno_rr_tempo(unsigned char *state);              /* processor +1056, x10 */
+void     juno_rr_set_tempo(unsigned char *state, int t10);
 void     juno_rr_set_cut_last(unsigned char *state, int v);
 void     juno_rr_copy_proc(unsigned char *dst, const unsigned char *src);
 

@@ -115,6 +115,7 @@
 #include "juno_engine.h"
 #include "juno_curve.h"
 #include "juno_apply.h"
+#include <math.h>
 #include <string.h>
 #include "hpf_type_lut.h"
 #include "delay_recall.h"
@@ -753,7 +754,7 @@ static int bank_apply(unsigned char *state, const unsigned char *bank, int idx, 
         int b760 = ((blob[2 * 16] & 0xF) << 4) | (blob[2 * 16 + 1] & 0xF);  /* DCO RANGE    */
         int rng  = b760 > 5 ? 5 : b760;
         JF(state, 1936) = (b751 == 0) ? 0.0f : 1.0f;                        /* LFO delay switch  */
-        JF(state, 1072) = juno_curve(48, b752) * juno_curve(53, 1280);      /* LFO tempo baseline */
+        JF(state, 1072) = juno_curve(48, b752) * juno_curve(53, juno_rr_tempo(state)); /* LFO rate at the engine's tempo */
         JF(state, 1872) = (b756 == 0) ? 1.0f : 0.0f;                        /* LFO key trig      */
         JF(state, 3840) = 0.125f * (float)(1u << rng);                      /* DCO feet 2^(rng-3) */
         apply_pwm_source(state, b759);                                      /* PWM source one-hot */
@@ -964,18 +965,27 @@ int juno_bank_scatter(const unsigned char *bank, int idx, int *type, int *depth)
  * curve53 = the tempo->multiplier LUT indexed by BPM*10 (0.1-BPM steps). Both LUTs are
  * already baked bit-exact in juno_curve.c. The result is SAMPLE-RATE INDEPENDENT.
  * Written to all 8 voices; harmless while sync is off (voice_render ignores it then). */
-void juno_apply_lfo_tempo(unsigned char *state, int lfo_rate_byte, float bpm)
+void juno_apply_lfo_tempo_t10(unsigned char *state, int lfo_rate_byte, int t10)
 {
-    int   idx = (int)(bpm * 10.0f + 0.5f);       /* curve53 index = BPM*10, round */
     float coeff;
     unsigned v;
-    if (idx < 400)  idx = 400;                   /* plugin TEMPO param clamps BPM to [40,300]; */
-    if (idx > 3000) idx = 3000;                  /* curve53 clamp is [100,3000] */
     if (lfo_rate_byte < 0) lfo_rate_byte = 0;
     if (lfo_rate_byte > 255) lfo_rate_byte = 255;
-    coeff = juno_curve(48, lfo_rate_byte) * juno_curve(53, idx);   /* f32 mul (mulss) */
+    coeff = juno_curve(48, lfo_rate_byte) * juno_curve(53, t10);   /* f32 mul (mulss) */
     for (v = 0; v < 8u; ++v)
-        JF(state, v * JUNO_VOICE_MAIN_STRIDE + 1072u) = coeff;
+        JF(state, v * JUNO_VOICE_MAIN_STRIDE + 1072u) = coeff;     /* immediate, every voice */
+}
+
+/* The same at a float BPM (tools and older callers): the tempo x 10 rounded as
+ * the render driver rounds the host's (rva 0x3F2050); outside 40..300 BPM the
+ * engine's tempo entry takes nothing. */
+void juno_apply_lfo_tempo(unsigned char *state, int lfo_rate_byte, float bpm)
+{
+    double r = (double)bpm * 10.0;
+    int t10 = (int)(r >= 0.0 ? floor(r + 0.5) : ceil(r - 0.5));
+    if (t10 < 400 || t10 > 3000) return;
+    juno_rr_set_tempo(state, t10);
+    juno_apply_lfo_tempo_t10(state, lfo_rate_byte, t10);
 }
 
 /* Read the LFO RATE front-panel byte (blob pool 8, the {8,22,T_ID,1088} binding's

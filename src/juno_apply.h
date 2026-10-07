@@ -56,6 +56,9 @@ int juno_bank_scatter(const unsigned char *bank, int idx, int *type, int *depth)
  * tempo. Bit-exact (juno_curve 48 x 53), SR-independent, inert while sync is off.
  * See scratchpad/oracle/lfo_tempo_rate_spec.md. */
 void juno_apply_lfo_tempo(unsigned char *state, int lfo_rate_byte, float bpm);
+/* The tempo entry's LFO half (leaf 375, EXECUTED census): every voice's 1072 =
+ * curve48[LFO RATE] x curve53[T], immediately. T = tempo x 10 (400..3000). */
+void juno_apply_lfo_tempo_t10(unsigned char *state, int lfo_rate_byte, int t10);
 int  juno_bank_lfo_rate_byte(const unsigned char *bank, int idx);
 
 /* Decode the per-patch DELAY tempo-sync inputs (DELAY TIME byte blob 53, TEMPO SYNC

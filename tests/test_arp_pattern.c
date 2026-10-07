@@ -1,5 +1,5 @@
 /* test_arp_pattern.c — guard for the arp SCATTER STEP×SLOT pattern-grid engine
- * (carp_set_scatter + the per-slot step loop in carp_tick). The golden event
+ * (carp_set_scatter + the per-slot step loop of carp_engine_tick). The golden event
  * vectors are emitted by scratchpad/oracle/gen_arp_golden.py from the reference
  * model that was verified 330/330 bit-exact against the plugin's OWN code under
  * Unicorn (scratchpad/oracle/{verify_grid,sweep_all}.py,
@@ -80,7 +80,6 @@ static int run_cfg(const char *name, int selType, int stype, int depth, int rang
 {
     carp e;
     carp_init(&e);
-    carp_set_bpm(&e, 120.0);
     carp_set_scatter(&e, stype, depth);
     carp_set_mode(&e, selType);
     carp_set_range(&e, range);
@@ -89,8 +88,8 @@ static int run_cfg(const char *name, int selType, int stype, int depth, int rang
     arp_ev got[512];
     int ng = 0, s, j;
     carp_event ev[64];
-    for (s = 0; s < 400000 && ng < ngold + 8; ++s) {
-        int n = carp_tick(&e, 96000.0, ev, 64);
+    for (s = 0; s < 4000 && ng < ngold + 8; ++s) {     /* one engine tick each (rva 0x3C6750) */
+        int n = carp_engine_tick(&e, NULL, ev, 64);
         for (j = 0; j < n; ++j) {
             if (ng < 512) { got[ng].kind = ev[j].kind; got[ng].note = ev[j].note; got[ng].vel = ev[j].velocity; }
             ++ng;
