@@ -15,13 +15,14 @@ separate pickle-only step (plugin_recall_diff.py).
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, pickle
-sys.path.insert(0, 'tools/verify')
+sys.path.insert(0, _os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__)))
+import truth
 import e2e_emu as E
 import real_recall as RR
 import real_bank_parse as RB
 import plugin_recall_set as PRS
 
-PKL = _JREPO + '/scratchpad/plugin_recall_ref.pkl'
+PKL = truth.scratch('plugin_recall_ref.pkl')   # per bank ($JUNO_SCRATCH_TAG)
 BLOCK = 10512
 
 

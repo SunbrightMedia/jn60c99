@@ -24,15 +24,14 @@
  * slot-1 delay coefficient block (102xxx). Leaves the block untouched otherwise. */
 void juno_apply_delay(unsigned char *state, const unsigned char *rec);
 
-/* Host-tempo recompute for the tempo-synced delay time (the delay sibling of
- * juno_apply_lfo_tempo). Rewrites 102352 (+ the type-1/type-5 instance cell) as
- * ms = beats(division(time_byte)) * 60000 / bpm through the exact 3-op coefficient
- * formula. Inert while sync (TEMPO SYNC, blob 59 != 0) is off. Bit-exact vs the
- * plugin's own tempo dispatch (see src/delay_recall.c). */
+/* The tempo entry's delay half (leaf 375, EXECUTED census): the active delay
+ * TYPE's time cell (0: 102352, 1: 4297584, 5: 6497168) at the engine's stored
+ * tempo (juno_rr_tempo); the float-BPM form rounds, stores and applies. */
+void juno_apply_delay_tempo_t10(unsigned char *state, int time_byte, int sync, int dtype);
 void juno_apply_delay_tempo(unsigned char *state, int time_byte, int sync,
                             int dtype, float bpm);
 void juno_live_delay_sync(unsigned char *state, int time_byte, int sync,
-                          int dtype, float bpm); /* live blob-59 flip: instance cell only */
+                          int dtype); /* live blob-59 flip: instance cell only, stored tempo */
 
 /* The slot-1 block switch value at host rate Hr: on = the ARM_LFX1 class, off =
  * ARM_LFX1_OFF (src/delay_recall.c). Used by the recall ramps (src/recall_ramp.c). */

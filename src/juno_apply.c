@@ -115,6 +115,7 @@
 #include "juno_engine.h"
 #include "juno_curve.h"
 #include "juno_apply.h"
+#include <math.h>
 #include <string.h>
 #include "hpf_type_lut.h"
 #include "delay_recall.h"
@@ -338,7 +339,6 @@ float juno_apply_param(unsigned char *state, int i, int byte, int Hr)
     int cid;
     float c;
     if (i < 0 || i >= N_BINDINGS) return 0.0f;
-    if (Hr <= 0) Hr = 96000;
     cid = BINDINGS[i].curve_id;
     if (BINDINGS[i].sr_variant == 1)                 /* 3-class curve-arm select */
         cid = rate_curve(cid, Hr);
@@ -377,7 +377,6 @@ float juno_apply_param_leaf(unsigned char *state, int param_index, int byte, int
     int blob = juno_param_blob(param_index), i, n;
     float w = 0.0f;
     if (blob < 0) return 0.0f;
-    if (Hr <= 0) Hr = 96000;
     n = N_BINDINGS;
     for (i = 0; i < n; ++i) {
         if (BINDINGS[i].blob_pos != blob) continue;
@@ -713,10 +712,10 @@ static int bank_apply(unsigned char *state, const unsigned char *bank, int idx, 
     (void)live;
 #endif
     /* Host rate, exactly as juno_prepare reads it — drives the SR-variant curve
-     * selection so recall matches the plugin at 44100/48000/else-96k. An unset
-     * rate field (0) defaults to 96 kHz (the engine's historical rate). */
+     * selection so recall matches the plugin at 44100/48000/else-96k. Any rate,
+     * 0 included, goes into the laws as the plugin's setters take it (no
+     * fallback: an engine-rate setting of 6 runs the engine at 0, CLAIMS B13b). */
     Hr = (int)JF(state, 16);
-    if (Hr <= 0) Hr = 96000;
     blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
     for (i = 0; i < N_BINDINGS; ++i) {
         int p   = BINDINGS[i].blob_pos;
@@ -753,7 +752,7 @@ static int bank_apply(unsigned char *state, const unsigned char *bank, int idx, 
         int b760 = ((blob[2 * 16] & 0xF) << 4) | (blob[2 * 16 + 1] & 0xF);  /* DCO RANGE    */
         int rng  = b760 > 5 ? 5 : b760;
         JF(state, 1936) = (b751 == 0) ? 0.0f : 1.0f;                        /* LFO delay switch  */
-        JF(state, 1072) = juno_curve(48, b752) * juno_curve(53, 1280);      /* LFO tempo baseline */
+        JF(state, 1072) = juno_curve(48, b752) * juno_curve(53, juno_rr_tempo(state)); /* LFO rate at the engine's tempo */
         JF(state, 1872) = (b756 == 0) ? 1.0f : 0.0f;                        /* LFO key trig      */
         JF(state, 3840) = 0.125f * (float)(1u << rng);                      /* DCO feet 2^(rng-3) */
         apply_pwm_source(state, b759);                                      /* PWM source one-hot */
@@ -925,6 +924,19 @@ int juno_bank_arp(const unsigned char *bank, int idx, int *mode, int *oct)
     return sw ? 1 : 0;
 }
 
+/* The same three values raw, as the plugin's controller takes them (dispatch
+ * 831..833: the switch with v != 0, TYPE and STEP 0..5). Returns 1 on success. */
+int juno_bank_arp_raw(const unsigned char *bank, int idx, int *sw, int *type, int *step)
+{
+    const unsigned char *blob;
+    if (idx < 0 || idx >= BANK_COUNT) return 0;
+    blob = bank + BANK_HEADER + idx * BANK_STRIDE + BANK_BLOB_OFF;
+    if (sw)   *sw   = record_byte(blob, 298);
+    if (type) *type = record_byte(blob, 306);
+    if (step) *step = record_byte(blob, 314);
+    return 1;
+}
+
 /* Decode SCATTER TYPE (NAME1 leaf 92, record byte 322 -> arp pattern slab 0..9) and
  * SCATTER DEPTH (leaf 93, record byte 330, SIGNED int8 -5..5 -> pattern sub = depth+7).
  * These select the arpeggiator's STEP x SLOT pattern grid (carp_set_scatter /
@@ -964,18 +976,27 @@ int juno_bank_scatter(const unsigned char *bank, int idx, int *type, int *depth)
  * curve53 = the tempo->multiplier LUT indexed by BPM*10 (0.1-BPM steps). Both LUTs are
  * already baked bit-exact in juno_curve.c. The result is SAMPLE-RATE INDEPENDENT.
  * Written to all 8 voices; harmless while sync is off (voice_render ignores it then). */
-void juno_apply_lfo_tempo(unsigned char *state, int lfo_rate_byte, float bpm)
+void juno_apply_lfo_tempo_t10(unsigned char *state, int lfo_rate_byte, int t10)
 {
-    int   idx = (int)(bpm * 10.0f + 0.5f);       /* curve53 index = BPM*10, round */
     float coeff;
     unsigned v;
-    if (idx < 400)  idx = 400;                   /* plugin TEMPO param clamps BPM to [40,300]; */
-    if (idx > 3000) idx = 3000;                  /* curve53 clamp is [100,3000] */
     if (lfo_rate_byte < 0) lfo_rate_byte = 0;
     if (lfo_rate_byte > 255) lfo_rate_byte = 255;
-    coeff = juno_curve(48, lfo_rate_byte) * juno_curve(53, idx);   /* f32 mul (mulss) */
+    coeff = juno_curve(48, lfo_rate_byte) * juno_curve(53, t10);   /* f32 mul (mulss) */
     for (v = 0; v < 8u; ++v)
-        JF(state, v * JUNO_VOICE_MAIN_STRIDE + 1072u) = coeff;
+        JF(state, v * JUNO_VOICE_MAIN_STRIDE + 1072u) = coeff;     /* immediate, every voice */
+}
+
+/* The same at a float BPM (tools and older callers): the tempo x 10 rounded as
+ * the render driver rounds the host's (rva 0x3F2050); outside 40..300 BPM the
+ * engine's tempo entry takes nothing. */
+void juno_apply_lfo_tempo(unsigned char *state, int lfo_rate_byte, float bpm)
+{
+    double r = (double)bpm * 10.0;
+    int t10 = (int)(r >= 0.0 ? floor(r + 0.5) : ceil(r - 0.5));
+    if (t10 < 400 || t10 > 3000) return;
+    juno_rr_set_tempo(state, t10);
+    juno_apply_lfo_tempo_t10(state, lfo_rate_byte, t10);
 }
 
 /* Read the LFO RATE front-panel byte (blob pool 8, the {8,22,T_ID,1088} binding's

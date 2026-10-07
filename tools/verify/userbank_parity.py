@@ -18,7 +18,12 @@ WHAT IT RUNS, per bank, against src/ -- the FROZEN BIT-EXACT PORT, not the fork:
   recall_gate        the port's cold post-recall state vs the PLUGIN'S OWN
                      recall enumerator, 67 voice cells, all 64 patches.
   recall_render_ab   full render A/B vs the plugin executed under Unicorn.
-                     Bit-exact or it fails.
+                     Bit-exact or it fails. The recall MODEL (apply_bank, the
+                     device firmware's path); the arp patches are skipped.
+  bank_product_gate  THE PRODUCT PATH: the plugin's own patch browser over all
+                     64 records, warm, through its own process() at the
+                     default engine-rate setting, the transport playing -- the
+                     arp patches arpeggiate. Bit-exact or it fails.
 
 HOW IT POINTS THE GATES AT A DIFFERENT BANK. tools/verify/truth.py already
 supports $JUNO_TRUTH. Each bank gets a scratch truth directory holding symlinks
@@ -87,7 +92,7 @@ def run(cmd, env, log):
         return subprocess.call(cmd, cwd=REPO, env=env, stdout=lf, stderr=lf)
 
 
-def one_bank(bank, rates):
+def one_bank(bank, rates, jobs):
     d, name = make_truthdir(bank)
     env = dict(os.environ)
     env['JUNO_TRUTH'] = d
@@ -118,11 +123,19 @@ def one_bank(bank, rates):
         e['JUNO_RENDER_SR'] = str(sr)
         e['JUNO_RENDER_REF_PKL'] = os.path.join(
             SCRATCH, 'render_ref_%s_%d.pkl' % (name, sr))
-        r = run(['python3', 'tools/verify/recall_render_ab.py', '--ref'], e, log)
+        r = run(['python3', 'tools/verify/recall_render_ab.py', '--ref',
+                 '--jobs', str(jobs)], e, log)
         if r == 0:
             r = run(['python3', 'tools/verify/recall_render_ab.py', '--port'],
                     e, log)
         results['render_%d' % sr] = r
+    rs = ','.join(str(sr) for sr in rates)
+    r = run(['python3', 'tools/verify/bank_product_gate.py', '--ref', '--rates', rs,
+             '--jobs', str(jobs)], env, log)
+    if r == 0:
+        r = run(['python3', 'tools/verify/bank_product_gate.py', '--port', '--rates', rs,
+                 '-v'], env, log)
+    results['product'] = r
     return name, results, log
 
 
@@ -138,6 +151,7 @@ def main():
         only = argv[argv.index('--only') + 1]
     if '--rates' in argv:
         rates = [int(x) for x in argv[argv.index('--rates') + 1].split(',')]
+    jobs = int(argv[argv.index('--jobs') + 1]) if '--jobs' in argv else 3
     if only:
         banks = [b for b in banks if only in b]
 
@@ -148,7 +162,7 @@ def main():
 
     bad = 0
     for b in banks:
-        name, res, log = one_bank(b, rates)
+        name, res, log = one_bank(b, rates, jobs)
         verdict = 'PASS' if all(v == 0 for v in res.values()) else 'FAIL'
         if verdict == 'FAIL':
             bad += 1

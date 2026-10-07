@@ -2,7 +2,8 @@
 """Generate carp_patterns.h : the JU-06A arp SCATTER pattern table as a C byte
 array, extracted programmatically from the PE .rdata (RVA 0x9C4480). NOT hand-typed.
 Emits the reachable slab0..9 x sub0..14 region (82500 bytes) verbatim + a sha256
-checksum the C code can assert against at build time.
+checksum the C code can assert against at build time, and the arp controller's
+apply table (RVA 0x9D86D0, 1500 int32).
 Usage: python3 gen_carp_patterns.py > carp_patterns.h
 """
 import pefile, hashlib, sys
@@ -35,6 +36,18 @@ for i,b in enumerate(data):
         out.append(line); line=""
     line += tok
 if line: out.append(line)
+out.append("};")
+# The arp controller's apply table (rva 0x9D86D0, int32, read by rva 0x3C0EC0 as
+# [150 * SCATTER TYPE + 15 * k + (SCATTER DEPTH + 7)]): k 0..6 the values the apply
+# sends to dispatch 312..318, k 7 the rate delta, k 8 an argument the pattern
+# request does not read, k 9 the range delta.
+APPLY_RVA = 0x9D86D0
+apply_tab = IMG[APPLY_RVA:APPLY_RVA + 1500 * 4]
+out.append("#define CARP_APPLY_SHA256 \"%s\"" % hashlib.sha256(apply_tab).hexdigest())
+out.append("static const int32_t carp_apply_table[1500] = {")
+vals = [int.from_bytes(apply_tab[4 * i:4 * i + 4], 'little', signed=True) for i in range(1500)]
+for r in range(0, 1500, 15):
+    out.append(" " + ",".join("%d" % v for v in vals[r:r + 15]) + ",")
 out.append("};")
 out.append("#endif")
 sys.stdout.write("\n".join(out)+"\n")

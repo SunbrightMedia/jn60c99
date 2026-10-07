@@ -10,30 +10,36 @@
 #include <stdio.h>
 #include "../src/carp.h"
 
-static const double SR = 96000.0;
-
-/* Run one release scenario: play a note, advance until (on then, if want_gate_closed,
- * its gate note-off) has fired, release the key, then count note-offs emitted after. */
+/* Run one release scenario: engine ticks until the note-on (and, if
+ * wait_for_gate_close, its gate note-off) has fired, release the key (the
+ * synchronous release, rva 0x3BF2A0), then count the note-offs it and the next
+ * ticks emit. */
 static int scenario(int gate_index, int wait_for_gate_close, int *off_vel_out)
 {
-    carp e; carp_init(&e); carp_set_bpm(&e, 120.0); carp_set_gate_index(&e, gate_index);
+    carp e;
+    carp_event ev[16];
+    int got_on = 0, gate_closed = 0, offv = -1, n, i, t;
+    /* switched on as the controller does it; the beat re-latch spent first */
+    carp_init(&e);
+    e.ctl_on = 1; carp_ctl_config(&e); carp_ctl_config(&e); carp_enable(&e);
+    for (t = 0; t < 12; ++t) carp_engine_tick(&e, NULL, ev, 16);
+    carp_set_gate_index(&e, gate_index);
     carp_add_key(&e, 60, 100);
-    carp_event ev[4];
-    int got_on = 0, gate_closed = 0, offv = -1;
-    for (int s = 0; s < 40000; ++s) {
-        int n = carp_tick(&e, SR, ev, 4);
-        for (int i = 0; i < n; ++i) {
+    for (t = 0; t < 400; ++t) {
+        n = carp_engine_tick(&e, NULL, ev, 16);
+        for (i = 0; i < n; ++i) {
             if (ev[i].kind == 1) got_on = 1;
             if (ev[i].kind == 0 && got_on) { gate_closed = 1; offv = ev[i].velocity; }
         }
         if (got_on && (!wait_for_gate_close || gate_closed)) break;
     }
     /* release the last key now */
-    carp_remove_key(&e, 60);
     int trailing_offs = 0;
-    for (int t = 0; t < 12; ++t) {
-        int n = carp_tick(&e, SR, ev, 4);
-        for (int i = 0; i < n; ++i) if (ev[i].kind == 0) { ++trailing_offs; offv = ev[i].velocity; }
+    n = carp_key_off(&e, 60, ev, 16);
+    for (i = 0; i < n; ++i) if (ev[i].kind == 0) { ++trailing_offs; offv = ev[i].velocity; }
+    for (t = 0; t < 12; ++t) {
+        n = carp_engine_tick(&e, NULL, ev, 16);
+        for (i = 0; i < n; ++i) if (ev[i].kind == 0) { ++trailing_offs; offv = ev[i].velocity; }
     }
     if (off_vel_out) *off_vel_out = offv;
     return trailing_offs;

@@ -22,7 +22,7 @@ INPUTS (Unicorn-only probes; regenerate them from the .vst3 first)
       plugin parameter id -> port host index (the plugin's id map)
 
 OUTPUT  src/juno_state_tables.h
-  JUNO_STATE_ENT[95]   id, port host index (or JUNO_SE_VOICES / JUNO_SE_NONE),
+  JUNO_STATE_ENT[95]   id, port host index (or JUNO_SE_VOICES / JUNO_SE_SRATE / JUNO_SE_NONE),
                        storage mask, default value -- list order
   JUNO_PATCH_EV[87]    id, port host index (or JUNO_SE_NONE), record offset,
                        decode -- tree order (the order a patch load sets them)
@@ -47,6 +47,7 @@ B6 = os.path.join(REPO, 'scratchpad', 'b6')
 OUT = os.path.join(REPO, 'src', 'juno_state_tables.h')
 HEADER, STRIDE, NAME = 23, 20223, 16
 VOICECOUNT_ID = 0x0FFFC00E
+SRATE_ID = 0x0FFFC015        # vm.vs.sampleRate: the core's listener sets the engine rate (CLAIMS B13)
 MASKS = (0xFF, 0x7F, 0xFFFF, 0)          # 0: the value as given
 DEC_NAMES = ('JUNO_DEC_INT1X7', 'JUNO_DEC_INT2X4', 'JUNO_DEC_INT8X4', 'JUNO_DEC_INT4X4')
 
@@ -116,6 +117,8 @@ def state_entries(slc, smc, hmap):
             raise SystemExit('entry %d (id 0x%x): no storage mask fits' % (k, pid))
         if pid == VOICECOUNT_ID:
             hi = 'JUNO_SE_VOICES'
+        elif pid == SRATE_ID:
+            hi = 'JUNO_SE_SRATE'
         elif pid in hmap:
             hi = hmap[pid][0]
         else:
@@ -195,7 +198,7 @@ def header(ents, evs, default):
              '#ifndef JUNO_STATE_TABLES_H',
              '#define JUNO_STATE_TABLES_H',
              '#include <stdint.h>',
-             'enum { JUNO_SE_NONE = -1, JUNO_SE_VOICES = -2 };',
+             'enum { JUNO_SE_NONE = -1, JUNO_SE_VOICES = -2, JUNO_SE_SRATE = -3 };',
              'enum { JUNO_DEC_INT1X7 = 0, JUNO_DEC_INT2X4 = 1, JUNO_DEC_INT8X4 = 2, JUNO_DEC_INT4X4 = 3 };',
              'typedef struct { uint32_t id; int16_t host; uint32_t mask; int32_t dflt; } juno_state_ent;',
              'typedef struct { uint32_t id; int16_t host; uint16_t roff; uint8_t dec; } juno_patch_ev;',

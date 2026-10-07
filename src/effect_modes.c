@@ -165,7 +165,7 @@ void juno_apply_effect_modes(unsigned char *state, const unsigned char *rec)
         write_struct(state, MODE5_STRUCT, MODE5_STRUCT_N);
         JF(state, 96400) = (float)depth / 255.0f;                      /* On/Off           */
         {
-            int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+            int Hr = (int)JF(state, 16);
             /* LFO Rate (96352), READ from the mode-5 method (rva 0x3573ab): curve 22 of
              * the tone byte, r = c * 1.9667f (f32 0x3ffbbcd3, rva 0x988120) + 0.3333f
              * (f32 0x3eaaa64c, rva 0x988110), then (r + r) / H -- all float.

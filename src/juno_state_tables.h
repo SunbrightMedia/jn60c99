@@ -18,7 +18,7 @@
 #ifndef JUNO_STATE_TABLES_H
 #define JUNO_STATE_TABLES_H
 #include <stdint.h>
-enum { JUNO_SE_NONE = -1, JUNO_SE_VOICES = -2 };
+enum { JUNO_SE_NONE = -1, JUNO_SE_VOICES = -2, JUNO_SE_SRATE = -3 };
 enum { JUNO_DEC_INT1X7 = 0, JUNO_DEC_INT2X4 = 1, JUNO_DEC_INT8X4 = 2, JUNO_DEC_INT4X4 = 3 };
 typedef struct { uint32_t id; int16_t host; uint32_t mask; int32_t dflt; } juno_state_ent;
 typedef struct { uint32_t id; int16_t host; uint16_t roff; uint8_t dec; } juno_patch_ev;
@@ -117,7 +117,7 @@ static const juno_state_ent JUNO_STATE_ENT[JUNO_STATE_N] = {
     { 0x0FFFC003u, JUNO_SE_NONE, 0x7Fu, 1 },
     { 0x0FFFC00Eu, JUNO_SE_VOICES, 0x7Fu, 6 },
     { 0x0FFFC008u, JUNO_SE_NONE, 0xFFFFu, 62 },
-    { 0x0FFFC015u, JUNO_SE_NONE, 0x7Fu, 0 },
+    { 0x0FFFC015u, JUNO_SE_SRATE, 0x7Fu, 0 },
     { 0x0FFFC010u, JUNO_SE_NONE, 0xFFFFu, 0 },
     { 0x0FFFC014u, JUNO_SE_NONE, 0x7Fu, 0 },
     { 0x0FFFC016u, JUNO_SE_NONE, 0xFFFFu, 62 },

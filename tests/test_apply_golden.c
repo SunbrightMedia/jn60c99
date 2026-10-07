@@ -148,6 +148,10 @@ static int check(const char *name, const unsigned char *blob, const golden_t *g)
             bank[23 + 1870 + 2*i + 1] = be[i] & 0xF;
         }
     }
+    /* the golden values are the 96 kHz ones: the engine's rate field says so (the recall laws
+     * take the rate as the plugin's setters do; a zero rate is a real, different engine,
+     * CLAIMS B13b) */
+    JF(state, 16) = 96000.0f;
     juno_bank_apply(state, bank, 0);
     for (i = 0; i < NG; ++i) {
         float v = JF(state, g[i].off);

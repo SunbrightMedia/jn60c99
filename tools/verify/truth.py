@@ -13,11 +13,28 @@ Resolution order:
 Filenames are canonical: JUNO60.vst3, Script.xml, presetbankog1.bin.
 truth/SHA256SUMS pins the exact bytes; call verify() to assert them.
 """
-import os, hashlib
+import os, re, hashlib
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(_HERE, '..', '..'))
 TRUTH_DIR = os.environ.get('JUNO_TRUTH') or os.path.join(REPO, 'truth')
+
+
+def scratch(fname):
+    """scratchpad/<fname> for the bank in force. userbank_parity.py sets
+    $JUNO_SCRATCH_TAG with $JUNO_TRUTH; '_<tag>' goes before the extension, so a
+    user bank's reference never overwrites the factory bank's or passes for it.
+    A truth directory other than truth/ with no tag is refused: that is how one
+    bank's reference gets read as another's (the tag was set and ignored until
+    2026-10-07)."""
+    tag = re.sub(r'[^A-Za-z0-9]+', '_',
+                 os.environ.get('JUNO_SCRATCH_TAG', '')).strip('_')
+    if not tag and (os.path.realpath(TRUTH_DIR)
+                    != os.path.realpath(os.path.join(REPO, 'truth'))):
+        raise SystemExit("JUNO_TRUTH=%s with no JUNO_SCRATCH_TAG: %s would be "
+                         "the factory bank's file" % (TRUTH_DIR, fname))
+    stem, ext = os.path.splitext(fname)
+    return os.path.join(REPO, 'scratchpad', stem + ('_' + tag if tag else '') + ext)
 
 VST3       = os.path.join(TRUTH_DIR, 'JUNO60.vst3')
 SCRIPT_XML = os.path.join(TRUTH_DIR, 'Script.xml')

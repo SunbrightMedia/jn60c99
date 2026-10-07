@@ -327,3 +327,18 @@ void juno_engine_prepare(unsigned char *st)
      * recall (juno_apply_reverb) rewrites it. Tables + writer: src/reverb_recall.c. */
     juno_write_reverb_taps(st, 2, Hr);
 }
+
+/* The two cells the plugin's setSampleRate writes and its build does not: the
+ * mode-5 chorus block's delay time (96336) and LFO depth (96368). A plugin whose
+ * engine was only built -- as shipped: built at the constructor's 96000, the
+ * default setting asks the same rate, setSampleRate early-outs -- holds 0 there
+ * until an EFFECT TYPE 5 recall writes both (MODE5_STRUCT). PROVEN: the
+ * plugin's own process() with the default setting at host 48000 against
+ * juno_engine_init + juno_engine_prepare at 96000, every compared word of every
+ * unit -- these two differ, nothing else (probes/host_render/diag_driver.py,
+ * gate chain cv48, block 0). */
+void juno_engine_no_setsr(unsigned char *st)
+{
+    JI(st, 96336) = 0;
+    JI(st, 96368) = 0;
+}

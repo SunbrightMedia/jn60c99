@@ -12,6 +12,7 @@
 #include "carp_patterns.h"      /* SCATTER pattern table (generated from the PE .rdata) */
 
 static int step_ticks(const carp *e);   /* fwd: step period in 24-PPQN ticks */
+static void set_rate_gate(carp *e, int rate, int gate);   /* fwd: rva 0x3BF3D0's indices */
 
 /* ===================================================================== *
  *  Extracted data tables (raw bytes from the binary, .rdata section)
@@ -40,65 +41,133 @@ const uint8_t CARP_TYPE_SELECTOR[6] = { 0, 20, 19, 19, 19, 19 };
  *  Held-note list  (insertion sort, ascending)
  * ===================================================================== */
 
-/* Transcribes the non-polyphonic (a1+3489 == 0) branch of
- * sub_7FF91E023440 @ 0x3C3440. On a genuinely new note it shifts every
- * already-sorted entry that is >= the new note up by one slot and inserts,
- * keeping sorted[] ascending. A re-press only bumps the per-note ref count. */
+/* Key-on into the arp: rva 0x3C3440 (sets the clock flag +197, then jumps to
+ * 0x3BF190), non-polyphonic (a1+3489 == 0) branch. The press count (+208, 15
+ * bits) saturates at 0x7FFF; +200 counts presses, +204 keys with a count; a new
+ * key goes into the ascending list by insertion (every entry >= the note moves
+ * up one) and becomes +3452, the last note. A re-press only bumps its count. */
 void carp_add_key(carp *e, int note, int velocity)
 {
+    uint16_t was;
+    int v7, v8;
     if (note < 0 || note > 127) return;
-
-    /* a1+208 press ref-count + a1+464 stored velocity (sub_7FF91E023440) */
-    if (e->hold_count[note] != 0x7FFF) e->hold_count[note]++;
-    e->per_note_vel[note] = (uint8_t)velocity;
-
-    if (e->note_active[note])            /* v6 = (a1+3192[note] == 0) */
-        return;                          /* already in list -> no insert */
-
-    /* insertion sort (lines 2071..2088 of the decompile) */
-    int v7 = e->count;                   /* v7 = *(a1+3320) */
-    int v8 = v7;
-    int v10 = 0;
+    e->clk_on = 1;                                   /* +197 = 1             */
+    was = e->hold_count[note];
+    if ((was & 0x7FFF) == 0x7FFF) return;
+    e->hold_count[note] = (uint16_t)((was & 0x7FFF) + 1);
+    e->presses++;                                    /* ++*(a1+200)          */
+    if (!was) e->keys204++;                          /* ++*(a1+204)          */
+    e->per_note_vel[note] = (uint8_t)velocity;       /* a1+464[note]         */
+    if (e->note_active[note]) return;                /* a1+3192[note]        */
+    v7 = e->count;
+    v8 = v7;
     if (v7 > 0) {
         do {
-            int v9 = e->sorted[v8 - 1];  /* *(char*)(a1+v8+3063) = sorted[v8-1] */
+            int v9 = e->sorted[v8 - 1];
             if (v9 < note) break;
-            e->sorted[v8] = (int8_t)v9;  /* *(char*)(a1+v8+3064) = sorted[v8] */
+            e->sorted[v8] = (int8_t)v9;
             v7--; v8--;
         } while (v8 > 0);
-        v10 = v7;
     }
-    e->sorted[v10] = (int8_t)note;       /* sorted[v10] = new note */
-    e->note_active[note] = 1;            /* a1+3192[note] = 1 */
-    e->count++;                          /* ++*(a1+3320) */
+    e->sorted[v7] = (int8_t)note;
+    e->note_active[note] = 1;
+    e->count++;                                      /* ++*(a1+3320)         */
+    e->last_note = note;                             /* a1+3452              */
 }
 
-/* Transcribes sub_7FF91E01F2A0 @ 0x3BF2A0 (non-poly branch): decrement the
- * ref count; when it reaches 0 remove the note from sorted[] (shift down). */
-void carp_remove_key(carp *e, int note)
+/* all-notes-off, rva 0x3BD3A0: every slot still sounding gets a note-off at
+ * velocity 64 and is freed (slots in order 0..15). */
+static int all_off(carp *e, carp_event *ev, int cap)
 {
-    if (note < 0) {                      /* release everything */
-        for (int i = 0; i < 128; i++) {
-            e->note_active[i] = 0;
-            e->hold_count[i] = 0;
+    int s, n = 0;
+    for (s = 0; s < 16; ++s) {
+        if (e->slot_pitch[s] >= 0) {
+            if (n < cap) { ev[n].kind = 0; ev[n].note = e->slot_pitch[s]; ev[n].velocity = 64; n++; }
+            e->note_slot[e->slot_noteidx[s] & 0x7F] = -1;
+            e->slot_pitch[s] = -1;
         }
-        e->count = 0;
-        return;
     }
-    if (note > 127 || !e->note_active[note]) return;
-    if (e->hold_count[note] > 0) e->hold_count[note]--;
-    if (e->hold_count[note] != 0) return;   /* still held elsewhere */
+    return n;
+}
 
-    /* find note in sorted[] and shift the tail down (sub_7FF91E01F2A0) */
-    int idx = -1;
-    for (int i = 0; i < e->count; i++)
-        if (e->sorted[i] == note) { idx = i; break; }
-    if (idx >= 0) {
-        for (int j = idx; j < e->count - 1; j++)
-            e->sorted[j] = e->sorted[j + 1];
-        e->count--;
+/* Key-off from the arp: rva 0x3BF110 (the press count, OR-ed with the sustain
+ * word +592) then, when the count reaches 0, rva 0x3BF2A0 (non-poly branch): the
+ * key leaves the ascending list (entries above it move down), +3452 becomes the
+ * top note, and when no key is left the selector resets (+3464, +3472, +3468)
+ * and -- with no sustain and the arp running (+44 in 1..3) -- the arp goes idle
+ * and every sounding arp note is turned off (rva 0x3BD3A0), synchronously. */
+int carp_key_off(carp *e, int note, carp_event *ev, int cap)
+{
+    int n = 0, cnt;
+    uint16_t r;
+    if (note < 0 || note > 127) return 0;
+    r = (uint16_t)(e->hold_count[note] & 0x7FFF);
+    if (!r) return 0;
+    e->hold_count[note] = (uint16_t)(e->sustain | (r - 1));
+    e->presses--;
+    if (e->hold_count[note]) return 0;
+    if (e->keys204) e->keys204--;
+    if (!e->note_active[note]) return 0;
+    cnt = e->count - 1;                              /* *(a1+3320) = v3 - 1   */
+    e->count = cnt;
+    if (cnt >= 0) {
+        int k = cnt, v4 = -1;
+        do {
+            int v6 = e->sorted[k];
+            e->sorted[k] = (int8_t)v4;
+            v4 = v6;
+            if (v6 == note) break;
+            --k;
+        } while (k >= 0);
     }
     e->note_active[note] = 0;
+    e->last_note = cnt <= 0 ? -1 : e->sorted[cnt - 1];
+    if (cnt <= 0) {
+        e->sel_step = 0; e->oct_shift = 0; e->oct_adv_flag = 0;
+        if (!cnt && !e->sustain && !e->keys204 && e->state >= 1 && e->state <= 3) {
+            e->state = 0;
+            n += all_off(e, ev + n, cap - n);
+        }
+    }
+    return n;
+}
+
+/* The arp's reset, rva 0x3BDAA0: while running, idle + all notes off; then the
+ * press counts, the list and the slot map cleared. */
+static int arp_reset(carp *e, carp_event *ev, int cap)
+{
+    int n = 0, i;
+    if (e->state >= 1 && e->state <= 3) { e->state = 0; n += all_off(e, ev, cap); }
+    for (i = 0; i < 128; ++i) { e->hold_count[i] = 0; e->note_active[i] = 0; e->note_slot[i] = -1; }
+    for (i = 0; i < 129; ++i) e->sorted[i] = -1;
+    e->presses = 0; e->keys204 = 0;                  /* *(qword*)(a1+200) = 0 */
+    e->sustain = 0;                                  /* *(dword*)(a1+592) = 0 */
+    e->count = 0;                                    /* a1+3320               */
+    e->last_note = -1;                               /* a1+3452               */
+    return n;
+}
+
+/* The arp's switch, rva 0x3BE3B0: only a change acts; off goes idle (all
+ * notes off while running) and resets (rva 0x3BDAA0); on only sets +10. */
+int carp_disable(carp *e, carp_event *ev, int cap)
+{
+    int n = 0;
+    if (!e->enabled) return 0;
+    if (e->state >= 1 && e->state <= 3) { e->state = 0; n += all_off(e, ev, cap); }
+    n += arp_reset(e, ev + n, cap - n);
+    e->enabled = 0;
+    return n;
+}
+
+void carp_enable(carp *e) { e->enabled = 1; }
+
+/* Bare list removal for the recall model's toggle (note < 0 releases every
+ * key): no events; the recall flushes the voices itself. */
+void carp_remove_key(carp *e, int note)
+{
+    carp_event dummy[16];
+    if (note < 0) { arp_reset(e, dummy, 0); e->state = 0; return; }
+    carp_key_off(e, note, dummy, 0);
 }
 
 /* ===================================================================== *
@@ -112,7 +181,7 @@ void carp_remove_key(carp *e, int note)
 static int sel_up(carp *e)
 {
     int count = e->count;                       /* v1 = *(a1+3320) */
-    if (e->field56 > count - e->nslots) e->field56 = 0; /* a1+56 clamp */
+    if (e->field56 > count - e->pat_nslots) e->field56 = 0; /* a1+56 clamp vs (char)+3054 */
     int v3 = e->sel_step;                        /* v3 = *(a1+3464) */
     if (v3 > count - 1) { e->sel_step = 0; v3 = 0; e->oct_adv_flag = 1; }
     if (v3 < 0)         { e->sel_step = 0; v3 = 0; }
@@ -130,7 +199,7 @@ static int sel_up(carp *e)
 static int sel_down(carp *e)
 {
     int count = e->count;                        /* v3 */
-    int nslots = e->nslots;                      /* v1 */
+    int nslots = e->pat_nslots;                  /* v1 = (char)+3054 */
     int v7 = (count - nslots < 0) ? 0 : count - nslots;
     if (e->field56 > v7) e->field56 = 0;
     int v8 = e->sel_step;
@@ -153,7 +222,7 @@ static int sel_down(carp *e)
 static int sel_updown(carp *e)
 {
     int count = e->count;                        /* v1 */
-    int nslots = e->nslots;                      /* v2 */
+    int nslots = e->pat_nslots;                  /* v2 = (char)+3054 */
     int v3 = count * (e->range + 1) - 1;         /* top index */
     int v6 = (count - nslots < 0) ? 0 : count - nslots;
     if (e->field56 > v6) e->field56 = 0;
@@ -185,7 +254,7 @@ static int sel_updown(carp *e)
 static int sel_downoct(carp *e)
 {
     int count = e->count;                        /* v1 */
-    int nslots = e->nslots;                      /* v3 */
+    int nslots = e->pat_nslots;                  /* v3 = (char)+3054 */
     int v4 = count * (e->range + 1) - 1;         /* top index */
     int v7 = (count - nslots < 0) ? 0 : count - nslots;
     if (e->field56 > v7) e->field56 = 0;
@@ -318,23 +387,28 @@ static void rebuild_gates(carp *e)
         fed0_gates(e->grid_vel[s], e->pat_len, dur, gateLen, e->grid_gate[s]);
 }
 
-void carp_set_scatter(carp *e, int type, int depth)
+static const uint8_t *pattern_block(int slab, int sub)
 {
-    int slab = type  < 0 ? 0 : (type  > 9 ? 9 : type);
-    int d    = depth < -7 ? -7 : (depth > 7 ? 7 : depth);
-    int sub  = d + 7;                              /* SCATTER DEPTH+7 -> sub */
-    const uint8_t *blk = carp_pattern_table
-                       + (unsigned)CARP_PAT_SLAB_STRIDE * (unsigned)slab
-                       + (unsigned)CARP_PAT_SUB_STRIDE  * (unsigned)sub;
-    int patLen = blk[5] >> 2;                      /* header[5]>>2, clamp 1..32 */
-    int sens   = blk[3] >> 1;                      /* header[3]>>1 (=100 for all) */
+    return carp_pattern_table + (unsigned)CARP_PAT_SLAB_STRIDE * (unsigned)slab
+                              + (unsigned)CARP_PAT_SUB_STRIDE  * (unsigned)sub;
+}
+
+/* The expand, rva 0x3BF9F0, of the block (slab, sub): the slot table reset first
+ * (rva 0x3BDD80: every slot's base note and sounding pitch to 0x80, the grid
+ * cleared; the note map, the slots' raw notes and off ticks stay), the length
+ * (header[5] >> 2, at most 32; every block of the table holds 1..31), the slots
+ * up to the first base note >= 0x80, then the prune and sort (rva 0x3BD540). */
+static void pattern_expand(carp *e, int slab, int sub)
+{
+    const uint8_t *blk = pattern_block(slab, sub);
+    int patLen = blk[5] >> 2;
     int term = 16, s, k, gi;
     static const int GAPS[4] = { 8, 4, 2, 1 };
-    if (patLen < 1) patLen = 1;
     if (patLen > 32) patLen = 32;
 
     e->scatter_type = slab; e->scatter_sub = sub;
-    e->pat_len = patLen;    e->pat_sens = sens;
+    e->pat_len = patLen;    e->pat_sens = blk[3] >> 1;
+    for (s = 0; s < 16; ++s) e->slot_pitch[s] = -1;
 
     /* --- expand sub_7FF91E01F9F0: per-slot base note + 32 step cells (transpose),
      *     stopping the slot list at the first base-note terminator (>=0x80). --- */
@@ -374,68 +448,192 @@ void carp_set_scatter(carp *e, int type, int depth)
     }
     e->pat_nslots = 0;
     for (s = 0; s < 16; ++s) { if (e->slot_note[s] >= 0x80) break; ++e->pat_nslots; }
+}
 
-    /* reset per-slot voice tracking + pattern step; velocity uses the header sens */
-    for (s = 0; s < 16; ++s) { e->slot_pitch[s] = -1; e->slot_noteidx[s] = 0; e->slot_offtick[s] = -1; }
+/* An immediate pattern load (carp_init, tests): the expand, the gate fill and a
+ * clean slot table. The plugin's own loads go through the apply's request and
+ * the reload at the next step (carp_ctl_config). */
+void carp_set_scatter(carp *e, int type, int depth)
+{
+    int slab = type  < 0 ? 0 : (type  > 9 ? 9 : type);
+    int d    = depth < -7 ? -7 : (depth > 7 ? 7 : depth);
+    int s, k;
+    pattern_expand(e, slab, d + 7);                /* SCATTER DEPTH+7 -> sub */
+    for (s = 0; s < 16; ++s) { e->slot_noteidx[s] = 0; e->slot_offtick[s] = -1; }
     for (k = 0; k < 128; ++k) e->note_slot[k] = -1;
     e->pat_step  = -1;
-    e->vel_sens  = (uint8_t)sens;
+    e->vel_sens  = (uint8_t)e->pat_sens;
     rebuild_gates(e);
 }
 
 /* ===================================================================== *
  *  Configuration
  * ===================================================================== */
+/* The arp as the build leaves it: the constructor (rva 0x3BD270: the selector
+ * index 0, "started" 0, UP&DOWN direction up, the octave state 0) and the init
+ * (rva 0x3BE2F0: the reset, the counters 0, the CLOCK FLAG +197 SET, +600 = 1,
+ * no pattern -- length 1, every slot empty (rva 0x3BF8B0 with no block) --, the
+ * step table for rate 5 / gate 2, the UP selector). PROVEN in the booted plugin
+ * (probes/host_render/diag_driver.py: +197 = 1 and +20 counting before any key).
+ * Nothing plays before the first switch-on: its config requests the pattern,
+ * sets rate 4 / gate 7 / sensitivity 100 and arms the beat re-latch. */
 void carp_init(carp *e)
 {
+    int s, k;
     for (int i = 0; i < 129; i++) e->sorted[i] = -1;
     e->count = 0;
     for (int i = 0; i < 128; i++) { e->note_active[i]=0; e->hold_count[i]=0; e->per_note_vel[i]=100; }
-    e->field56 = 0;  e->nslots = 0;
+    e->field52 = 0;  e->field56 = 0;
     e->sel_step = 0; e->started = 0; e->ud_dir = 1;
     e->oct_adv_flag = 0; e->oct_shift = 0; e->range = 0;
     e->type = 0; e->selector = CARP_TYPE_SELECTOR[0];
     e->vel_fixed = 0; e->vel_sens = 0;
-    /* Step clock: the real plugin ALWAYS steps by RATE_TABLE[rate_index] ticks
-     * (step trigger sub_7FF91E020260: +3048 += *(u16*)(a1+6*step+610)); enabling the
-     * arp forces rate_index = 4 (sub_7FF91E024F40 hard-codes cfg[7]=2 -> map{0,2,4,1,
-     * 3,5}[2] + 0 = 4 -> RATE_TABLE[4] = 6 ticks = 1/16 at 120 BPM). The owner-clock
-     * 12/24-tick divisor we previously used is the chord RE-LATCH quantizer, not the
-     * step clock (see docs/ARP_PROVENANCE.md / scratchpad/oracle/arp_rate_findings.md).
-     * gate_index 7 = 100% is the default sub-pattern header (0x1C>>2). */
-    e->bpm = 120.0; e->division = 0; e->rate_index = 4; e->gate_index = 7;
+    /* the step clock: RATE_TABLE[rate_index] ticks per step (the step trigger,
+     * rva 0x3C0260: +3048 += the step table's length); the init's table is rate 5,
+     * gate 2 (rva 0x3BF3D0 with 5, 2); the first config makes it rate 4 (mode 2:
+     * {0,2,4,1,3,5}[2]), gate 7 (every pattern header: 0x1C >> 2) */
+    e->division = 0;
+    set_rate_gate(e, 5, 2);
     e->use_rate_table = 1;
-    /* Free-running tick grid: phase/counter run on the transport, the first step
-     * is scheduled at tick_counter+1 on empty->held (never at pos 0). */
-    e->tick_acc = 0; e->tick_period = 1; e->tick_counter = 0; e->next_step_tick = 0;
-    e->running = 0; e->beat_requant_armed = 0;
-    /* Load the power-on SCATTER pattern (slab0/sub7): 1 slot, 1 step, velocity 127.
-     * This is the proven default and collapses the step loop to the original
-     * single-note-per-step behaviour. Sets the pattern/grid/slot state and vel_sens
-     * (=100). Must come AFTER rate_index/gate_index are set above. */
-    carp_set_scatter(e, 0, 0);
+    e->kb_ctr = 0; e->beat_requant_armed = 0; e->clk_on = 1;
+    e->clk20 = 0; e->tick_counter = 0; e->next_step_tick = 0; e->state = 0;
+    e->presses = 0; e->keys204 = 0; e->last_note = -1; e->sustain = 0;
+    e->countdown48 = 0; e->field52 = 0; e->field60 = -1; e->field64 = -1;
+    e->tail600 = 1; e->tail604 = 0; e->flag608 = 0;
+    /* no pattern: length 1, no slot, the step index 0 */
+    e->scatter_type = 0; e->scatter_sub = 0;
+    e->pat_len = 1; e->pat_nslots = 0; e->pat_step = 0; e->pat_sens = 0;
+    for (s = 0; s < 16; ++s) {
+        e->slot_note[s] = 0x80; e->slot_pitch[s] = -1; e->slot_noteidx[s] = 0; e->slot_offtick[s] = 0;
+        for (k = 0; k < 32; ++k) { e->grid_vel[s][k] = 0; e->grid_gate[s][k] = 0; }
+    }
+    for (k = 0; k < 128; ++k) e->note_slot[k] = -1;
+    /* the controller and its apply object as the build leaves them (PROVEN) */
+    e->ctl_on = 0; e->ctl_type = 0; e->ctl_step = 0; e->ctl_depth = 0; e->ctl_stype = 0;
+    e->ap_type = -1; e->ap_mode = -1; e->ap_slab = 0; e->ap_sub = 7;
+    e->enabled = 0;
+    e->step4076 = 0; e->range4050 = 0; e->rate4047 = 0; e->gate4049 = 0;
+    e->pat_reload = 0; e->pend_slab = 0; e->pend_sub = 7;
 }
 
+/* The selector for a TYPE (rva 0x3BFCB0 with the type record's byte 2): the
+ * selector function only. The selector's index, its "started" flag and the
+ * UP&DOWN direction stay (PROVEN, probes/host_render/arp_cfg_probe.py). */
 void carp_set_mode(carp *e, int type)
 {
     if (type < 0) type = 0;
     if (type > 5) type = 5;
     e->type = type;
     e->selector = CARP_TYPE_SELECTOR[type];      /* word_9C4458[type].byte2 */
-    /* re-arm the selector state so the new mode starts cleanly */
-    e->started = 0; e->sel_step = 0; e->ud_dir = 1; e->oct_shift = 0; e->oct_adv_flag = 0;
 }
 
-/* ARPEGGIO STEP param (0..5) -> octave range (octaves-1). Binary-proven:
- * dispatch id 833 -> sub_7FF91E024F40 clamps min(step,2) -> CArpeggio+4076 ->
- * sub_7FF91E01FE60 stores it to +3476 (range), consumed by the selectors as octave
- * span. So {0,1,2,2,2,2} == min(step,2) is exact (arp_rate_findings.md §3). */
+/* ARPEGGIO STEP param (0..5) -> octave range (octaves-1), as rva 0x3BFE60 sets it:
+ * the octave offset cleared, the range stored. The config (rva 0x3C4F40) clamps
+ * the STEP to 2 first, so {0,1,2,2,2,2} == min(step,2). */
 void carp_set_range(carp *e, int step)
 {
     static const int MAP[6] = { 0, 1, 2, 2, 2, 2 };
     if (step < 0) step = 0;
     if (step > 5) step = 5;
+    e->oct_shift = 0;
     e->range = MAP[step];
+}
+
+/* ===================================================================== *
+ *  The controller's apply (rva 0x3C0EC0) and its CArpeggio setters
+ * ===================================================================== */
+
+/* rva 0x3BF3D0's indices: the rate (+12) and the gate (+16), each clamped to
+ * 0..9. Its per-step table feeds the step length (read at every step) and the
+ * grid's gate lengths (the fill at the next reload, rebuild_gates). */
+static void set_rate_gate(carp *e, int rate, int gate)
+{
+    e->rate_index = rate < 0 ? 0 : (rate >= 10 ? 9 : rate);
+    e->gate_index = gate < 0 ? 0 : (gate >= 10 ? 9 : gate);
+}
+
+/* The pattern request, rva 0x3C3010 (with rva 0x3BF9C0): the block (slab, sub)
+ * becomes the one the next step expands (+32, +40 = 1), and a step index at or
+ * past the OLD length is taken modulo it; the rate (+4047) and the block's gate
+ * (header[1] >> 2) into the step table; the selector of the type record; the
+ * octave offset cleared and the range set from +4076 (rva 0x3BFE60); then the
+ * record's fixed velocity (byte 5: 0 in every record) and the block's velocity
+ * sensitivity (header[3] >> 1). */
+static void pattern_request(carp *e, int type, int slab, int sub)
+{
+    const uint8_t *blk = pattern_block(slab, sub);
+    int gate = blk[1] >> 2;
+    e->pend_slab = slab; e->pend_sub = sub;
+    e->pat_reload = 1;
+    if (e->pat_step >= e->pat_len) e->pat_step %= e->pat_len;
+    set_rate_gate(e, e->rate4047, gate);
+    carp_set_mode(e, type);
+    e->oct_shift = 0;
+    e->range = e->step4076;
+    e->gate4049 = gate;
+    e->range4050 = e->step4076 & 0xFF;
+    e->vel_fixed = 0;
+    e->vel_sens = (uint8_t)(blk[3] >> 1);
+}
+
+/* The apply, rva 0x3C0EC0: nothing until TYPE, rate mode, SCATTER TYPE and
+ * DEPTH are all set (-1, -1, -1, -8 from the constructor); then the pattern
+ * request, the rate mode (rva 0x3C34F0: {0,2,4,1,3,5}[mode] plus the table's
+ * rate delta, not below 0), the range delta (rva 0x3C34C0: +4050 += the delta
+ * clamped to -4..4, the octave offset cleared and the range = (signed) +4050),
+ * the seven values for dispatch 312..318 (the engine's side: src/host_edit.c),
+ * the keyboard's beat (+5, rva 0x3C4590: {0,0,0,1,1,1}[mode]), and, when
+ * `arm`, the beat re-latch (+6). Table: [150 * slab + 15 * k + sub]. */
+static void ctl_apply(carp *e, int arm)
+{
+    static const uint8_t RATE_OF_MODE[6] = { 0, 2, 4, 1, 3, 5 };
+    static const uint8_t BEAT_OF_MODE[6] = { 0, 0, 0, 1, 1, 1 };
+    const int32_t *t;
+    int m, r, d;
+    if (e->ap_type == -1 || e->ap_mode == -1 || e->ap_slab == -1 || e->ap_sub == -8) return;
+    t = carp_apply_table + 150 * e->ap_slab + e->ap_sub;
+    pattern_request(e, e->ap_type, e->ap_slab, e->ap_sub);
+    m = e->ap_mode < 0 ? 0 : (e->ap_mode >= 6 ? 5 : e->ap_mode);
+    r = RATE_OF_MODE[m] + t[105];
+    e->rate4047 = r < 0 ? 0 : (r & 0xFF);
+    set_rate_gate(e, e->rate4047, e->gate4049);
+    d = t[135];
+    if (d > 4) d = 4;
+    if (d < -4) d = -4;
+    e->range4050 = (e->range4050 + d) & 0xFF;
+    e->oct_shift = 0;
+    e->range = (int8_t)e->range4050;
+    e->division = BEAT_OF_MODE[m];
+    if (arm) e->beat_requant_armed = 1;
+}
+
+void carp_ctl_config(carp *e)
+{
+    int ty = e->ctl_type < 2 ? e->ctl_type : 2;
+    int st = e->ctl_step < 2 ? e->ctl_step : 2;
+    e->ctl_type = ty;
+    e->ctl_step = st;
+    if (e->ap_type != (ty & 0xFF)) { e->ap_type = ty & 0xFF; ctl_apply(e, 0); }
+    e->step4076 = st & 0xFF;
+    ctl_apply(e, 0);
+    if (e->ap_mode != 2) { e->ap_mode = 2; ctl_apply(e, 1); }
+    e->division = 0;                                 /* rva 0x3C4590 with mode 2 */
+}
+
+void carp_ctl_scatter_type(carp *e, int v, int force)
+{
+    if ((unsigned)v > 9 || (e->ctl_stype == v && !force)) return;
+    e->ctl_stype = v;
+    if (e->ap_slab != (v & 0xFF)) { e->ap_slab = v & 0xFF; ctl_apply(e, 0); }
+}
+
+void carp_ctl_scatter_depth(carp *e, int v, int force)
+{
+    int sub;
+    if ((unsigned)(v + 7) > 14u || (e->ctl_depth == v && !force)) return;
+    e->ctl_depth = v;
+    sub = (int8_t)v + 7;
+    if (e->ap_sub != sub) { e->ap_sub = sub; ctl_apply(e, 0); }
 }
 
 /* Arm the one-shot beat-quantize re-latch (called when the arp is ENABLED, i.e.
@@ -443,7 +641,6 @@ void carp_set_range(carp *e, int step)
  * it; see the re-latch block in carp_tick. */
 void carp_arm_beat_requant(carp *e)              { e->beat_requant_armed = 1; }
 
-void carp_set_bpm(carp *e, double bpm)           { if (bpm > 0.0) e->bpm = bpm; }
 void carp_set_division(carp *e, int rate_sw)     { e->division = rate_sw; rebuild_gates(e); }
 void carp_set_rate_index(carp *e, int idx)       { if(idx<0)idx=0; if(idx>9)idx=9; e->rate_index=idx; rebuild_gates(e); }
 void carp_set_gate_index(carp *e, int idx)       { if(idx<0)idx=0; if(idx>9)idx=9; e->gate_index=idx; rebuild_gates(e); }
@@ -471,129 +668,20 @@ static int step_ticks(const carp *e)
     return 24 / (2 - (e->division != 0));        /* 12 (division==0) or 24 */
 }
 
-int carp_tick(carp *e, double sample_rate, carp_event *ev, int cap)
+/* The step trigger, rva 0x3C0260: one pattern step -- the selector once per
+ * active grid cell, steals and self-offs first, then the note-on. */
+static int step_trigger(carp *e, carp_event *ev, int cap)
 {
     int n = 0;
-    if (sample_rate <= 0.0) sample_rate = 96000.0;
-
-    /* Integer 24-PPQN tick period in 1e-9-sample units, matching the plugin's own
-     * process clock (RVA 0x300000 loop, decompile line 27326):
-     *   period = 60000000000 * SR / round(BPM) / 24   (integer division)
-     * i.e. samples-per-tick x 1e9 truncated to an integer, with the tempo pre-rounded.
-     * We accumulate 1e9 units per sample and fire a tick when the accumulator reaches
-     * the period — sample-EXACT, unlike a float samples/tick (no sub-sample drift). */
     {
-        long long bpmr = (long long)(e->bpm + 0.5);   /* round(BPM), bpm > 0 */
-        if (bpmr < 1) bpmr = 1;
-        e->tick_period = 60000000000LL * (long long)sample_rate / bpmr / 24LL;
-        if (e->tick_period < 1) e->tick_period = 1;
-    }
-
-    /* --- arp start: empty -> held (mirror sub_7FF91E01D810 LABEL_27) --------
-     * schedule the first step at +3048 = +24 + 1 (the next whole tick). patStep
-     * is implicitly -1: the first run_selector() call below is step 0. */
-    if (e->count > 0 && !e->running) {
-        e->running = 1;
-        e->next_step_tick = e->tick_counter + 1;
-    }
-
-    /* --- all keys released (mirror sub_7FF91E01F2A0 -> sub_7FF91E01D3A0) -----
-     * The plugin handles the LAST key-release (no sustain) SYNCHRONOUSLY: F2A0
-     * sets state +44 2->0 immediately and tail-calls the all-notes-off D3A0, which
-     * offs only voice slots still SOUNDING (note < 0x80). There is NO tick-spanning
-     * release tail in the no-sustain case (the +44=3 / +604 tail is a sustain-pedal-
-     * only path; +48 is a dead counter). So emit a trailing off for every slot still
-     * open (gate not yet closed); slots whose gate already closed emit nothing (no
-     * spurious duplicate). Then go idle; the free clock keeps advancing so the next
-     * phrase re-quantizes to tick_counter+1. Zero sel_step/oct_shift/oct_adv_flag;
-     * keep started/ud_dir. See scratchpad/oracle/arp_release_fsm_spec.md (§5.1). */
-    if (e->count == 0) {
-        int s;
-        for (s = 0; s < e->pat_nslots; ++s) {
-            if (e->slot_pitch[s] >= 0) {
-                if (n < cap) { ev[n].kind = 0; ev[n].note = e->slot_pitch[s]; ev[n].velocity = 64; n++; }
-                e->note_slot[e->slot_noteidx[s] & 0x7F] = -1;
-                e->slot_pitch[s] = -1;
-            }
-            e->slot_offtick[s] = -1;
-        }
-        e->running = 0;
-        e->sel_step = 0; e->oct_shift = 0; e->oct_adv_flag = 0;
-    }
-
-    /* --- advance the free-running 24-PPQN tick clock by one sample ---------- */
-    e->tick_acc += 1000000000LL;                     /* +1e9 units (= one sample) */
-    if (e->tick_acc >= e->tick_period) {
-        e->tick_acc -= e->tick_period;
-        e->tick_counter++;
-
-        /* --- beat-quantize re-latch (plugin sub_7FF91E023C50) --------------
-         * The plugin arms a "changed" flag (router+6) when the arp is ENABLED,
-         * and its per-tick re-latch consumes it exactly ONCE at the first beat
-         * boundary (tick_counter % beat_div == 0, beat_div = 24/(2-(router+5!=0))
-         * = 12 or 24). Consuming it re-feeds the held notes, which re-quantizes
-         * the step grid to that beat: it forces a step to fire ON this tick
-         * (next_step_tick = tick_counter) and restarts the pattern step
-         * (pat_step = -1) WITHOUT resetting the selector index (the re-fed latch
-         * re-selects the current position, so the on-beat step re-fires the
-         * current note). One-time per enable; the flag is consumed even if no
-         * note is held (then it has no audible effect). Proven bit-exact vs the
-         * plugin's own arp under emulation (tools/verify/arp_sched_ab.py):
-         * factory arp presets step 1,7,12,18,24... not the free-run 1,7,13,19.
-         * NOT re-armed by later held-note changes (only by a fresh arp enable). */
-        if (e->beat_requant_armed) {
-            int beat_div = (e->division != 0) ? 24 : 12;
-            if (e->tick_counter % beat_div == 0) {
-                e->beat_requant_armed = 0;
-                if (e->running && e->count > 0) {
-                    /* Re-quantize the step clock to the beat: force a step to fire ON
-                     * this tick with the CURRENT selector state (a normal advancing
-                     * step, just one tick early). Proven vs the plugin: at the beat
-                     * the selector state == the post-previous-step state, so the
-                     * on-beat step advances it normally (UP&DOWN -> next octave note;
-                     * UP with one held note -> re-fires the current note because its
-                     * selector always wraps). Only the pattern step restarts. */
-                    e->next_step_tick = e->tick_counter;   /* fire a step ON the beat */
-                    e->pat_step = -1;                      /* restart the pattern step */
-                    /* The beat re-latch also restarts the OCTAVE cycle: oct_shift -> 0
-                     * (proven vs plugin: patch 1/49 UP arp, t12 entry oct==0 though the
-                     * post-t7 value was 1). Harmless for the UP&DOWN / DOWN-octave
-                     * selectors, which recompute oct_shift = sel/count each call; only
-                     * the UP selector (which carries oct_shift across steps) is affected.
-                     * sel_step is NOT reset — the selector index continues. */
-                    e->oct_shift = 0; e->oct_adv_flag = 0;
-                }
-            }
-        }
-
-        /* (1) scheduled note-offs first (plugin fires offs before step trigger),
-         * one per slot whose offTick == curTick. Plugin arp offs carry MIDI
-         * velocity 64 (0x40), not 0 — inert for the JUNO voice path but faithful
-         * to the emitted event stream. (per-tick handler body sub_7FF91E020960) */
-        {
-            int s;
-            for (s = 0; s < e->pat_nslots; ++s) {
-                if (e->slot_pitch[s] >= 0 && e->slot_offtick[s] >= 0 &&
-                    e->tick_counter == e->slot_offtick[s]) {
-                    if (n < cap) { ev[n].kind=0; ev[n].note=e->slot_pitch[s]; ev[n].velocity=64; n++; }
-                    e->note_slot[e->slot_noteidx[s] & 0x7F] = -1;
-                    e->slot_pitch[s] = -1;
-                }
-            }
-        }
-
-        /* (2) step trigger: +24 == +3048 -> sub_7FF91E020260. The step advances the
-         * pattern step once, then walks the pruned/sorted slots 0..pat_nslots-1,
-         * calling the selector once per ACTIVE cell (grid vel != 0). A note already
-         * owned by an EARLIER slot is skipped (no retrigger); one owned by this-or-a-
-         * LATER slot is stolen (off'd). The default slab0/sub7 (1 slot, 1 step, vel
-         * 127) degenerates to exactly one selector call + one emit per step. */
-        if (e->running && e->count > 0 && e->tick_counter == e->next_step_tick) {
             int dur = step_ticks(e);
             int s;
             e->pat_step += 1;
-            if (e->pat_step >= e->pat_len) e->pat_step = 0;
-            e->nslots = e->count;                        /* chord size (selector field56, inert) */
+            if (e->pat_step >= e->pat_len) {             /* a pattern pass: +52 and +56 count it */
+                e->pat_step = 0;
+                e->field52++;
+                e->field56++;
+            }
             e->next_step_tick += dur;                    /* +3048 += dur (constant step period)  */
             for (s = 0; s < e->pat_nslots; ++s) {
                 int gv = e->grid_vel[s][e->pat_step] & 0x7F;
@@ -624,6 +712,118 @@ int carp_tick(carp *e, double sample_rate, carp_event *ev, int cap)
                 per = e->per_note_vel[(unsigned)raw & 0x7F];
                 vel = velocity_calc(e, gv, per);         /* a3=gridVel, a4=per, sens=pat_sens */
                 if (n < cap) { ev[n].kind=1; ev[n].note=pitch; ev[n].velocity=vel; n++; }
+            }
+            }
+    return n;
+}
+
+/* The keyboard object's beat re-latch, rva 0x3C3C50, when it fires: every key
+ * the arp holds is released (rva 0x3C3A20: each key off through 0x3BF110, the
+ * last one's synchronous release turning the sounding notes off, then the reset
+ * 0x3BDAA0), handed back in again with the keyboard's velocity (rva 0x3C3440),
+ * and the selector index taken before is restored with "started" set (rva
+ * 0x3C34B0). No engine path latches keys (+532), so only the held keys return. */
+static int relatch(carp *e, const uint8_t *kb_vel, carp_event *ev, int cap)
+{
+    int n = 0, k, nk = 0;
+    int keys[128];
+    unsigned char sel = (unsigned char)e->sel_step;  /* rva 0x3C3000: a byte  */
+    for (k = 0; k < e->count; ++k) keys[nk++] = e->sorted[k];
+    for (k = 0; k < nk; ++k)                         /* rva 0x3C3A20: one key-off each, ascending */
+        n += carp_key_off(e, keys[k], ev + n, cap - n);
+    n += arp_reset(e, ev + n, cap - n);
+    for (k = 0; k < nk; ++k) carp_add_key(e, keys[k], kb_vel ? kb_vel[keys[k]] : e->per_note_vel[keys[k]]);
+    e->sel_step = sel;                               /* rva 0x3C34B0          */
+    e->started = 1;
+    return n;
+}
+
+/* One engine tick (CWaveGen vt+184, rva 0x3C6750) for one unit. */
+int carp_engine_tick(carp *e, const uint8_t *kb_vel, carp_event *ev, int cap)
+{
+    int n = 0;
+    /* the keyboard object: its counter, then its beat re-latch (rva 0x3C3C50):
+     * armed (+6) and the counter on a beat of 24 / (2 - (+5 != 0)) ticks */
+    e->kb_ctr++;
+    if (e->beat_requant_armed && e->kb_ctr % (unsigned)(24 / (2 - (e->division != 0))) == 0) {
+        e->beat_requant_armed = 0;
+        n += relatch(e, kb_vel, ev + n, cap - n);
+    }
+    /* the arp, rva 0x3BDEA0, transcribed whole: +48 counts down; idle with keys
+     * starts (LABEL_27: the first step at the next tick, +3048 = +24 + 1, the
+     * octave pass and the pattern step reset); states 1 and 3 and the no-key
+     * branch of 2 need the sustain word or the hold count, which no engine path
+     * sets (+592, and +204 above the key count) */
+    {
+        int keys = e->count || e->sustain || e->keys204;
+        int v1 = e->countdown48;
+        int start = 0;
+        if (v1) e->countdown48 = --v1;
+        switch (e->state) {
+        case 0:
+            start = keys;
+            break;
+        case 1:
+            if (!keys) { e->state = 0; n += all_off(e, ev + n, cap - n); }
+            else if (!v1) start = 1;
+            break;
+        case 2:
+            if (!keys) {
+                e->tail604 = e->tail600;
+                if (!e->flag608) n += all_off(e, ev + n, cap - n);
+                e->state = 3;
+            }
+            break;
+        case 3:
+            if (!keys) {
+                if (!e->tail604) e->tail604 = -1;
+                else { e->state = 0; n += all_off(e, ev + n, cap - n); }
+            } else {
+                e->state = 2;
+            }
+            break;
+        default:
+            break;
+        }
+        if (start) {
+            e->next_step_tick = e->tick_counter + 1;
+            e->field52 = 0; e->field56 = 0;          /* *(qword*)(a1+52) = 0  */
+            e->field60 = -1; e->field64 = -1;        /* *(qword*)(a1+60) = -1 */
+            e->pat_step = -1;                        /* a1+3056               */
+            e->state = 2;
+        }
+    }
+    /* +197: the counters run; while running, +24 walks up to +20 one tick at a
+     * time -- the slots whose note-off falls on it first, then the step */
+    if (e->clk_on) {
+        e->clk20++;
+        if (e->state < 2) {
+            e->tick_counter = e->clk20;
+        } else {
+            while (e->tick_counter != e->clk20) {
+                int s;
+                e->tick_counter++;
+                for (s = 0; s < e->pat_nslots; ++s) {
+                    if (e->slot_pitch[s] >= 0 && e->slot_offtick[s] == e->tick_counter) {
+                        if (n < cap) { ev[n].kind = 0; ev[n].note = e->slot_pitch[s]; ev[n].velocity = 64; n++; }
+                        e->note_slot[e->slot_noteidx[s] & 0x7F] = -1;
+                        e->slot_pitch[s] = -1;
+                    }
+                }
+                if (e->tick_counter == e->next_step_tick) {
+                    /* a pending pattern reload first (rva 0x3C07E0): while
+                     * running, every slot's note off (the state 0 meanwhile,
+                     * then back), the expand and the gate fill (rva 0x3BFED0) */
+                    if (e->pat_reload) {
+                        int st = e->state;
+                        if (st >= 1 && st <= 3) { e->state = 0; n += all_off(e, ev + n, cap - n); }
+                        e->state = st;
+                        pattern_expand(e, e->pend_slab, e->pend_sub);
+                        rebuild_gates(e);
+                        e->pat_reload = 0;
+                    }
+                    n += step_trigger(e, ev + n, cap - n);
+                }
             }
         }
     }

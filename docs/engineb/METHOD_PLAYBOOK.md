@@ -2661,3 +2661,239 @@ not the port's.
 Save progress to <ref>.partial and rename to the final name only when the build is complete;
 --resume reads the .partial. A staleness test may trust a file only if a complete build wrote it.
 
+
+## 143. CENSUS THE HOST LAYER: EXECUTE THE PLUGIN'S OWN process() BEFORE ANY ENGINE GATE
+Paid 2026-10-07 (JUNO). Two months of gates graded the ENGINE at the host rate, driven from its
+vtable. The first execution of the plugin's own IAudioProcessor::process showed that the plugin,
+as shipped, runs the engine at 96 kHz (setting vm.vs.sampleRate, default 0) and converts every
+block to the host rate (rva 0x343E30); and that its render driver owns the arp clock and the host
+tempo with laws the port did not have. Every engine gate was green; none could see the layer
+above the engine. The JP8 notes had flagged a host resampler (D3) a month earlier; the JUNO census
+never asked the same question.
+### The rule
+Step 1 of every port: boot the plugin as a host does and execute process() once per host rate
+with a tempo, notes at offsets and a parameter queue. Log every engine entry it reaches
+(setSampleRate, render, tick, tempo, note, CC, bend) and the render object between the driver and
+the engine. Every reached entry is a census row with a gate, before any engine gate is trusted
+as "the plugin".
+
+## 144. A PORT WRITE NO PLUGIN FUNCTION MAKES IS A DEFECT, HOWEVER SENSIBLE IT SOUNDS
+Paid 2026-10-07 (JUNO). carp_set_mode reset the selector "so the new mode starts cleanly", and a
+patch load called carp_set_scatter, which reloaded the pattern at once and dropped the sounding
+slots without note-offs. No plugin function does either: the plugin's TYPE setter swaps the
+selector, keeps its index, and reloads the pattern at the next step, turning the sounding notes
+off first. The arp gates never saw it: their oracle configured the arp once on a fresh engine,
+before any key. The first chain that changed TYPE with keys held through the plugin's own
+process() was red at that block. A unit test (test_arp_onset) even asserted the port's belief
+that the arp clock stays off until the first key; the plugin's init sets it.
+### The rule
+Every write a port function makes to plugin state names the plugin function (rva) that makes the
+same write. A write justified by intent ("cleanly", "so play stays clean", "restart") with no rva
+behind it is a defect candidate: find the plugin function or delete the write. A unit test
+asserts plugin facts with their evidence, never the port's own design.
+
+## 145. WHAT THE PLUGIN READS OUTSIDE ITS OWN OBJECT IS PART OF THE PLUGIN
+Paid 2026-10-07 (JUNO, the rate converter). In a 1-sample block at 96 kHz -> 384 kHz the
+plugin's converter renders -1 engine samples, and its next history copy starts one element in
+front of its buffer, copying upward, so the word there is smeared over the whole history. The
+port, written "correctly" with memmove and an in-bounds buffer, differed for 87 samples; the
+oracle showed exact zeros. The word is the high half of the raw pointer MSVC's aligned allocator
+stores in front of every block of 4 KB or more: below 0x8000 for any user-mode address, a
+denormal, +0 under the plugin's DAZ -- in Windows and in the emulator alike.
+### The rule
+When the plugin reads outside its object, do not "fix" it: find what is there (allocator layout,
+neighbour fields), decide what that value is in the product's FP mode, show it cannot depend on
+the machine, and port exactly that, with the out-of-range case named in a comment. Instrument the
+port to log every out-of-range index over the gate's chains, and prove the bound (here: the count
+is never below -1, so only index -1 is read).
+
+## 146. A HARNESS DEFAULT IS A PATH CHOICE -- CENSUS AN ENTRY THROUGH ITS REAL CALLER
+Paid 2026-10-07 (JUNO, the MIDI controllers). The first census of the bend / mod / expression
+leaves called the processor's dispatch through e2e_emu's `dispatch(unit, leaf, value, flag=1)`.
+The default flag 1 takes the setters' IMMEDIATE branch (rva 0x3C1090); the engine's own MIDI
+entries pass 0, the RAMPED branch (rva 0x3C10D0 -> 0x3C2920, time index 0 / 0 / 1). The census
+showed clean "immediate sets" with the right values; a port built from it would have set the
+cells at once where the plugin glides them. Found by reading the engine entry (`xor r8d, r8d`)
+and confirmed by a probe through the plugin's own process(): every set ramped.
+### The rule
+A census that enters below the plugin's real caller inherits the harness's defaults (flags,
+units, order) as silent choices. Census an entry through the caller the product runs (here
+process(); for engine entries at least the engine's vtable function), or name every argument the
+harness supplies and show the real caller passes the same.
+
+## 147. A LAW MEASURED WHERE ITS RIVALS AGREE IS NOT MEASURED; A MUTANT THAT DOES NOT BITE IS A REACH GAP
+Paid 2026-10-07 (JUNO, the held flag 1856 and the sustain gate). B3 measured the flag on chords
+that never held more keys than voices and wrote "1 while any key is held". The plugin's gate leaf
+(rva 0x3B1C58) writes "1 while any voice is gated" -- equal on every scenario the gate had, apart
+after a steal (a key held with no voice). The rival law surfaced only while porting CC 123,
+whose two gate-offs wrote 1 then 0 with both keys still held. The same day three sustain mutants
+did not bite: a gate change on a patch whose envelope had decayed, an arp window shorter
+than one step, and an arp switch with a key down (the plugin then frees what the switch had
+just moved) are silent -- the chains could not see the paths they claimed.
+### The rule
+For every law taken from observation, name the rival laws that fit the same data and build the
+input that separates them before the law is believed. When a mutant does not bite, the chain
+does not reach the path: change the chain (a sustaining envelope, a window longer than the
+effect's period, a state-level gate for a state law), re-run, and only then claim the path.
+
+## 148. A TOOTH INSIDE A MUTE PROVES NOTHING -- PLACE TEETH WHERE THE PRODUCT IS AUDIBLE
+Paid 2026-10-07 (JUNO, host_rate_gate). The harness tooth "the first note one sample late" did
+not bite: every chain's first note lands inside the plugin's 960-sample start-up mute, where no
+voice runs, so the note sounds from the mute's end wherever it lands. A tick-rate mutant did not
+bite either: no arp step fell inside the window after the change.
+### The rule
+A tooth (harness or mutant) must act where its effect is observable: after the start-up mute,
+inside a window longer than the effect's period, on a patch whose envelope can show it. Before
+reading "DID NOT BITE" as "equivalent", check where the tooth acted.
+
+## 149. A SILENT CHAIN GRADES NOTHING -- READ EVERY CHAIN'S PEAK BEFORE BELIEVING IT
+Paid 2026-10-07 (JUNO, boot_gate). The chain meant to grade units 6 and 7 resuming their boot
+ramps (the voice count raised to 8) passed bit-exact with a peak of 1.6e-13: its chord came in the
+block of the count change, and the render's preamble that applies a new count resets every
+assigner after the block's events -- plugin and port both drop the notes. A port-only probe of the
+same steps (count 6 kept: the chord sounds; count 8 or 4: silence) found the cause in minutes.
+The same day a mutant setting every boot start to 0 did not bite: the 22 starts other than 0 are
+all on ramps of 4 ms, which end inside the unit's 960-sample mute before any DSP reads them --
+equivalent on the output, said so with the reason, not hidden.
+### The rule
+Print each chain's peak (and where its sound starts) with the reference and look at it: a chain
+that is silent, or quieter than its purpose needs, is a reach gap even when it is bit-exact. Fix
+the chain, rebuild only that chain (--only), and say in the claim what the old chain did.
+
+## 150. A SCRATCH BUILD MUST NOT WRITE INTO ITS CALLER -- CHECK EVERY POINTER A BUILD HANDS BACK
+Paid 2026-10-07 (JUNO, the in-place rate switch). The switch builds a reference engine at the new
+rate to read the re-applied values from. Its build (st_build) attaches a host shim -- and attaching
+writes into the SHIM pointers to the state being built. Passing the live context's shim re-pointed
+the live master's effect selectors into the temporary state, freed a moment later. Nothing failed
+until a later malloc reused that block: the switch alone passed, the switch plus one queued state
+entry stopped the chorus (host_process_gate 4 chains red). A bisection over the payload found
+"any one entry" -- the tell of a lifetime defect, not of a value.
+### The rule
+Before reusing a build or init function on a scratch object, read what it writes through its
+ARGUMENTS, not only into its target. Give the scratch its own copy of every such argument (here a
+local shim). A failure that appears only with "one more harmless step" is a lifetime defect:
+look for freed or shared memory before looking at values.
+
+## 151. CENSUS BY MEMORY WRITE, NOT BY THE SETTERS YOU KNOW -- AND GRADE THE STATE, NOT ONLY THE SOUND
+Paid 2026-10-07 (JUNO, setSampleRate on a running engine). The census of the plugin's setter calls
+(ramped and immediate sets) missed two families its effect container writes by direct stores (the
+reverb's 34 tap positions, its lazy-wipe countdown); the memory-write log (every store with its call
+chain) had them. The same day the port's switch reset the shared noise block but not the units' own
+copies -- no chain played noise, so every chain was bit-exact; the per-block state diagnostic saw it
+at once.
+### The rule
+Census a function by the memory it writes (a write hook over the whole object, every store, its
+caller), then classify; a census of known entry points is a sample. Grade a new path's STATE as
+well as its audio (diag_driver per block), and for every state difference the audio cannot hear,
+extend a chain until it can (here: DCO NOISE up), so the gate keeps the reach.
+
+## 152. A ROBUSTNESS FALLBACK IS AN APPROXIMATION -- THE PLUGIN DOES NOT GUARD, SO NEITHER MAY THE PORT
+Paid 2026-10-07 (JUNO, an engine at rate 0). Twenty recall laws in src/ carried
+`if (Hr <= 0) Hr = 96000;` -- written for states with an unset rate field. The plugin has no such
+guard: at an engine rate of 0 (the engine-rate setting 6 reads 0 past its table) its laws give inf
+(C/H), -2.0 (the pre-delay), -2/16384 (the delay time). Two unit tests had codified the fallback
+("unset -> 96k"), and the reverb pre-delay law had its own clamp at 0 (the plugin's float law,
+rva 0x3C1720, is unclamped and differs from the port's integer law at huge rates). Then three NaN
+compares in the master render, written as C operators, took the other branch from the plugin's
+jumps once a rate-0 ramp produced a NaN level (playbook 81).
+### The rule
+Never guard a law the plugin does not guard. A state without a rate is a harness defect: fix the
+harness (the tests now set their rate), not the law. When a path can reach inf / NaN in the plugin
+(a zero rate, a 0/0 increment), grade it -- the NaN semantics of every compare on that path are
+then on trial.
+
+## 153. A PORT THAT GROWS CAN BLIND AN OLD TOOTH -- RE-RUN EVERY TOOTH OF THE PATH YOU CHANGE
+Paid 2026-10-07 (JUNO, the CC map in the DAW state). The port had a constant CC map; its tooth (no
+default assignments) bit midi_ctl_gate. Porting the plugin's own law -- every setState empties the
+map and refills it from the payload's 128 entries -- made that tooth blind: every chain of that gate
+first loads the plugin's state, so the boot map is replaced before any CC arrives. The gate stayed
+green; only re-running the old tooth showed the lost reach.
+### The rule
+After a change to a path, re-run every mutant that names that path, not only the new ones. A tooth
+that stops biting means a gate lost reach: add the chain that restores it (here: a chain with no
+state load at all, the patch reloaded between CC pairs so no CC hides a later one) and move the
+tooth to the gate that now holds it.
+
+## 154. PORT THE CALLER'S FRAMING, NOT ONLY THE PARSER -- AND GRADE THE STREAMS NOBODY WRITES
+Paid 2026-10-07 (JUNO, the state save gate). The port's state load transcribed the deserializer
+(rva 0x321F20: 8-byte fields above 2854 payload bytes) and assumed a 4-byte count. The caller
+(setState, rva 0x34AAA0 -> 0x322330) picks the COUNT's width by the whole stream's length, and
+reads short streams into a zeroed vector. Every gate passed: the plugin's own getState writes 1788
+bytes, so no gate ever sent a long or short stream. The first test that built a long 8-byte
+payload failed -- the plugin rejected it, the port applied it.
+### The rule
+Transcribe a parser together with its caller's framing (counts, widths, short reads, error
+returns). Then grade the inputs the plugin itself never produces -- long, short, empty, cut,
+negative, past the data -- because a host or a hand-made preset will.
+
+## 155. A TOOTH RUN ON A RED GATE BITES FOR FREE -- A TEETH RUNNER CHECKS ITS BASELINE FIRST
+Paid 2026-10-07 (JUNO, the state save gate). The first teeth run of state_save_gate.py came while
+one chain already failed for the unmutated port (the stream framing, playbook 154): every mutant
+"bit" that chain, so 15 of 15 looked sharp. On the green gate four bit nothing (the store's mask,
+CC >= 120 offered to the learn, forget, the CC view in the save): no chain reached them.
+### The rule
+A mutant counts only where the unmutated port is green. Every teeth runner first runs its gate on
+the unmutated build and refuses to grade mutants while that baseline is red; a mutant that bites
+nothing on the green gate names a chain to add (or an equivalence to prove).
+
+## 156. A STATIC BUFFER IS STATE SHARED BY EVERY INSTANCE -- RUN TWO INSTANCES ON TWO THREADS
+Paid 2026-10-07 (JUNO, the host-call census). The render driver's block records lived in a
+function-level `static` array (drv_block and juno_gui_tick): every context shared it. One instance
+per process -- every gate -- never sees it; two instances on two threads (a DAW's tracks, the Pi
+kernel's worker cores calling juno_gui_tick at once) overwrote each other's pending MIDI records:
+tests/test_multi_instance.c failed 24 of 24 concurrent runs, and passed when the same threads ran
+one at a time. A first version of that test compared raw engine state between instances and failed
+even one at a time -- the state holds pointers into its own instance; compare sound.
+### The rule
+No mutable static in the port's render or control path: every buffer belongs to its context. Keep a
+test that renders two instances on two threads at once and requires each to equal its run alone --
+and run that test one thread at a time too, so a failure is known to be the race.
+
+## 157. A RECIPE THAT GROWS CAN OUTGROW THE SHELL -- AND `make -n` RUNS A RECIPE THAT CALLS $(MAKE)
+Paid 2026-10-07 (JUNO, the final verify). `make verify` is one shell command; each of its 33
+freshness checks expanded the list of all 140 oracle files. Two new gate lines took it past the
+kernel's 128 KB limit for one argument, and the run died at once ("Argument list too long") -- the
+EXIT file said 2 after seconds, not hours. Then a `make -n verify` meant as a dry run started the
+real verify: a recipe that contains $(MAKE) runs even under -n. It was stopped by its exact process
+group; the two references it finished outside the job registry were deleted.
+### The rule
+Compute a shared input of a long recipe once (the newest oracle file), never per check, and measure
+the expanded recipe after adding lines. Never dry-run a recipe that calls $(MAKE); read the Makefile
+instead. A job that ends in seconds has not run its gates: read its log before anything else.
+
+## 158. A STRUCT COPY ON THE STACK GROWS WITH THE STRUCT -- GUARD THE FRAME SIZE, NOT THE HABIT
+Paid 2026-10-07 (JUNO, the web app rebuild). Two functions took a scratch copy of the whole
+context (`juno_ctx t = *c;`). The context grew to 121 KB with a per-instance buffer (playbook 156);
+the WASM stack is 64 KB. Native builds (8 MB stacks) passed every gate; the optimized WASM died
+later with "null function or function signature mismatch" -- the overflow had overwritten memory
+-- and only a debug build (-g -sASSERTIONS=2) named the overflow and its function.
+### The rule
+Product code keeps every stack frame small, and the compiler enforces it:
+-Werror=frame-larger-than=16384 on libjuno.so and the WASM build (it fails on the old code with two
+121 KB frames). A scratch copy of a large struct goes on the heap. When a WASM run traps with a
+signature mismatch, rebuild with -g -sASSERTIONS=2 before reading any code: the trap is usually
+far from the cause.
+
+## 159. A VARIABLE A DRIVER SETS IS A CLAIM ABOUT EVERY TOOL IT RUNS -- GREP THAT EACH ONE READS IT
+Paid 2026-10-07 (JUNO, the user banks). userbank_parity.py set JUNO_SCRATCH_TAG per bank "so one
+bank's reference can never be read as another's", and no tool read it: plugin_recall_ref.py,
+port_state_dump.py and recall_gate.py wrote and read fixed names, so a user-bank run replaced the
+factory bank's recall reference. In the same driver, the render A/B's ORACLE process chose its
+patches through a ctypes call into libjuno.so: the candidate inside the oracle's address space,
+deciding what the oracle renders (the two-process rule broken for a convenience).
+### The rule
+For every variable a driver sets, grep that every tool it runs reads it, and make the tools refuse
+the dangerous combination (truth.scratch(): a truth directory other than truth/ with no tag exits;
+seen to fire). An oracle process loads no candidate library, not even to choose its cases: the
+oracle renders every case, the candidate side drops what it cannot grade.
+
+## 160. A TOOTH INSIDE A MUTE IS BLIND -- PUT A TIMING TOOTH WHERE THE OUTPUT CAN SHOW IT
+Paid 2026-10-07 (JUNO, bank_product_gate.py). The first late-note tooth moved the chain's first key
+one sample and did not bite. That key falls inside the plugin's 960-sample start-up mute, where a
+sample's shift does not reach the output (INFERRED: the recall-model tooth's first difference is at
+host sample 187, the mute's end). The gate was right; the tooth stood where no defect can show.
+Moved to the second key, after the mute: it bites.
+### The rule
+A tooth that does not bite is first a question about the tooth: where in the output could its
+defect appear? Place timing teeth on events after every mute and settle, and keep beside them a
+tooth whose effect is known to reach the output (here: the wrong patch).

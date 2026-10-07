@@ -225,9 +225,15 @@ void juno_note_on(unsigned char *st, int voice, int midi_note, int velocity)
  * (scratchpad/b2_bcast2.py / b2_bcast3.py, zero render between snapshots):
  *   - note-on writes 1856 = 1.0 to ALL 8 voices (the allocated voice additionally
  *     gets pitch/gate/velocity);
- *   - note-off writes 1856 = 0.0 to ALL 8 voices ONLY when no key remains held
- *     (releasing one note of a chord leaves it at 1.0 everywhere);
- * i.e. 1856 = (held-note count > 0), broadcast on every transition. voice_render
+ *   - note-off writes 1856 = 0.0 to ALL 8 voices ONLY when no voice remains
+ *     gated (releasing one note of a chord leaves it at 1.0 everywhere);
+ * i.e. 1856 = (a voice still gated), broadcast on every transition. CORRECTED
+ * 2026-10-07: READ, the processor's gate leaf (rva 0x3B1C58) stores the voice's
+ * gate value, then writes 1856 on every voice of its range as "any gate value
+ * nonzero"; PROVEN (tools/verify/note_bcast_gate.py, scenario 'steal'): a key
+ * held with NO voice (stolen), the voiced keys released -> 0.0, where the former
+ * "held-note count > 0" law kept 1.0 (the seeds never held more keys than
+ * voices, so no gate could tell the two apart). voice_render
  * reads it every sample (voice_render.c:794, summed into a modulation CV, previous
  * value shadowed at 1840) and never clears it, so a missed broadcast permanently
  * diverges a free-running voice's state. The port originally set it only on the
@@ -235,7 +241,7 @@ void juno_note_on(unsigned char *st, int voice, int midi_note, int velocity)
  * to silence) but the arp gating a previously-idle voice inherited the divergent
  * seed — the proven root cause of the arp render A/B failures on patches 1/33/41
  * (tools/verify/arp_render_ab.py). Caller = the assigner-level note paths in
- * gui/juno_bridge.c, which own the held-note mask this flag reflects. */
+ * gui/juno_bridge.c, which own the voices' gate state this flag reflects. */
 void juno_note_broadcast_held(unsigned char *st, int any_held)
 {
     int v;

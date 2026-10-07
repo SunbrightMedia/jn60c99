@@ -19,7 +19,7 @@ import sys, struct, pickle, ctypes
 LIB   = _JREPO + '/libjuno.so'
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
 import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
-PKL   = _JREPO + '/scratchpad/port_state.pkl'
+PKL   = truth.scratch('port_state.pkl')   # per bank ($JUNO_SCRATCH_TAG)
 SR    = 48000.0
 BLOCK = 10512          # per-voice unit-0 block (matches recall_fullstate_diff)
 STRIDE = 16            # engine cells are 16-byte slots (float in low 4 bytes)

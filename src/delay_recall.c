@@ -26,6 +26,7 @@
  */
 #include "juno_engine.h"
 #include "delay_recall.h"
+#include <math.h>
 #include "recall_ramp.h"
 #include "finefx_recall.h"
 #include "reverb_recall.h"   /* juno_reverb_predelay */
@@ -60,29 +61,22 @@ static const uint16_t DELAYTIME_MS[256] = {
 };
 
 /* --- Tempo-synced DELAY TIME (TEMPO SYNC blob 59 != 0) ------------------------
- * When the patch's TEMPO SYNC switch is on, the plugin IGNORES the manual ms table
- * and quantizes the DELAY TIME byte into one of 16 note divisions, then computes
- * ms = beats(division) * 60000 / BPM. Derived by driving the plugin's own dispatch
- * under Unicorn (idx 797 time byte sweep 0..255 + idx 803 sync, all 3 rates):
- *   division d = (byte == 0) ? 0 : (byte + 16) / 17     (byte 0 alone; then 17-wide)
- *   d 0..15 = 1/32, 1/16T, 1/32D, 1/16, 1/8T, 1/16D, 1/8, 1/4T, 1/8D, 1/4,
- *             1/2T, 1/4D, 1/2, 1T, 1/2D, 1/1   (beats 0.125 .. 4.0)
- * The recall-time default tempo is the baked 128 BPM (TEMPO param default 880 ->
- * 40 + 88.0), at which every division's ms is exactly representable in float32 —
- * SYNC_MS_128 below. The resulting coefficient goes through the SAME 3-op affine
- * formula as the manual path and is bit-exact 48/48 (16 divisions x 3 rates) vs the
- * plugin's dispatch output; the live-tempo law ms=f32(beats*60000/BPM) is bit-exact
- * vs the plugin's tempo pushes at 60/88/176 BPM. See juno_apply_delay_tempo. */
-static const double SYNC_BEATS[16] = {
-    0.125, 1.0 / 6.0, 0.1875, 0.25, 1.0 / 3.0, 0.375, 0.5, 2.0 / 3.0,
-    0.75, 1.0, 4.0 / 3.0, 1.5, 2.0, 8.0 / 3.0, 3.0, 4.0
-};
-static const float SYNC_MS_128[16] = {   /* beats * 468.75 (128 BPM), all exact */
-    58.59375f, 78.125f, 87.890625f, 117.1875f, 156.25f, 175.78125f, 234.375f,
-    312.5f, 351.5625f, 468.75f, 625.0f, 703.125f, 937.5f, 1250.0f, 1406.25f, 1875.0f
-};
-
-static int sync_division(int byte) { return byte == 0 ? 0 : (byte + 16) / 17; }
+ * With TEMPO SYNC on the plugin ignores the manual ms table: the delay object
+ * computes the time from the engine's tempo and curve 63 (sync_ms below). At the
+ * build's 128 BPM this is beats(division) x 468.75 ms with the division of the
+ * byte (0 alone, then 17-wide: 1/32 .. 1/1), every value exact in float32; the
+ * coefficient goes through the same 3-op formula as the manual path. */
+/* The synced time in ms as the delay objects compute it (rva 0x35FBF0 / 0x362590
+ * / 0x361520, synced mode 2): (float)(2400000.0 / (float)T) x curve 63 at 255 -
+ * DELAY TIME, halved while above the object's maximum 4778 ms; T = the engine's
+ * tempo x 10 (processor +1056, juno_rr_tempo). At T = 1280 it is SYNC_MS_128 for
+ * every byte (checked by tests/test_delay_recall.c). */
+static float sync_ms(int t10, int byte)
+{
+    float i = (float)(2400000.0 / (double)(float)t10) * juno_curve(63, 255 - (byte & 0xFF));
+    while (i > 4778.0f) i = i * 0.5f;
+    return i;
+}
 
 /* ms -> engine coefficient: the plugin's exact 3-float-op sequence (order matters:
  * H*ms exceeds 2^24 so the -2 must come after the scale). */
@@ -94,10 +88,10 @@ static float dly_ms_to_coeff(int Hr, float ms)
 }
 
 /* The patch's delay-time coefficient: synced (TEMPO SYNC blob 59 != 0, at the
- * recall-default 128 BPM) or manual (per-byte ms table). */
-static float dly_time_coeff(int Hr, int time_byte, int sync)
+ * engine's stored tempo) or manual (per-byte ms table). */
+static float dly_time_coeff(const unsigned char *state, int Hr, int time_byte, int sync)
 {
-    float ms = sync ? SYNC_MS_128[sync_division(time_byte & 0xFF)]
+    float ms = sync ? sync_ms(juno_rr_tempo((unsigned char *)state), time_byte)
                     : (float)DELAYTIME_MS[time_byte & 0xFF];
     return dly_ms_to_coeff(Hr, ms);
 }
@@ -253,7 +247,7 @@ static const uint32_t S1CHORUS[] = {
 static void apply_slot1_chorus(unsigned char *state, const unsigned char *rec, int dtype)
 {
     int b53 = blob_val(rec, 53), b52 = blob_val(rec, 52);
-    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+    int Hr = (int)JF(state, 16);
     unsigned k; uint32_t bits; float f;
     for (k = 0; k < sizeof(S1CHORUS) / sizeof(S1CHORUS[0]); k += 2) {
         bits = S1CHORUS[k + 1]; memcpy(&f, &bits, sizeof f);
@@ -339,7 +333,7 @@ static const uint32_t S1REVERB[] = {
 static void apply_slot1_reverb(unsigned char *state, const unsigned char *rec, float tc)
 {
     int b52 = blob_val(rec, 52);
-    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+    int Hr = (int)JF(state, 16);
     unsigned k; uint32_t bits; float f;
     for (k = 0; k < sizeof(S1REVERB) / sizeof(S1REVERB[0]); k += 2) {
         bits = S1REVERB[k + 1]; memcpy(&f, &bits, sizeof f);
@@ -446,7 +440,7 @@ static void apply_slot1_delay1(unsigned char *state, const unsigned char *rec, f
      * drives 4297744 through juno_apply_delay_finefx_2nd, and at TYPE 4 it is inert
      * (256-byte sweep at TYPE 4 moves ZERO cells in the full 2.75 M-cell state). */
     int on = (int)JI(state, JUNO_DLY_ON);     /* the DELAY LEVEL on-flag, hysteresis */
-    int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+    int Hr = (int)JF(state, 16);
     unsigned k; uint32_t bits; float f;
 
     /* NOT THE FIRST INSTANCE. Building TYPE 1 or 4 writes no 102xxx cell
@@ -582,13 +576,13 @@ static void slot1_stale(unsigned char *state, int prev, int level, int dtime,
         JF(state, 102528) = (float)level / 255.0f;
         JF(state, 102576) = on ? 1.0f : 0.0f;
         JF(state, 102560) = on ? dly_fb_law(pfb) : 0.0f;
-        JF(state, 102352) = dly_time_coeff(Hr, dtime, sync);
+        JF(state, 102352) = dly_time_coeff(state, Hr, dtime, sync);
         break;
     case 1:
         JF(state, 4297760) = (float)level / 255.0f;
         JF(state, 4297824) = on ? 1.0f : 0.0f;
         JF(state, 4297808) = on ? dly_fb_law(pfb) : 0.0f;
-        JF(state, 4297584) = dly_time_coeff(Hr, dtime, sync);
+        JF(state, 4297584) = dly_time_coeff(state, Hr, dtime, sync);
 #ifndef EB_DEVCELLS
         /* DELAY TIME (797) and TEMPO SYNC (803) re-send the second instance's
          * KEPT tap time (EXECUTED: recall DT1 tap 33, poke the cell, recall DT0
@@ -617,7 +611,7 @@ static void slot1_stale(unsigned char *state, int prev, int level, int dtime,
         JF(state, 6497392) = on ? 1.0f : 0.0f;
         JF(state, 6497376) = on ? dly_fb_law(pfb) : 0.0f;
         JF(state, 10693312) = (float)lvl32 / 255.0f;
-        JF(state, 6497168) = dly_time_coeff(Hr, dtime, sync);
+        JF(state, 6497168) = dly_time_coeff(state, Hr, dtime, sync);
         break;
     default:
         break;
@@ -657,7 +651,6 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     unsigned k;
     uint32_t bits;
     float f, tc;
-    if (Hr <= 0) Hr = 96000;
 
     /* (1) and (2) of the sequence above. The old code here modelled the
      * previous type only for types 0 and 1, keyed the type-0 case on the
@@ -734,7 +727,7 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
      * mode. Rate-parameterized via the exact 3-op formula (dly_ms_to_coeff): the
      * algebraically-equal ((H*ms-2)/16384) is wrong — H*ms exceeds 2^24 so the -2
      * must come after the scale. Hr from state[16], unset => 96 kHz. */
-    tc = dly_time_coeff(Hr, dtime, sync);
+    tc = dly_time_coeff(state, Hr, dtime, sync);
 
     if (dtype > 5)                             /* seventh class: build NOTHING */
         return;   /* the LEVEL/TIME leaves and the switch-off above still ran */
@@ -876,25 +869,34 @@ void juno_apply_delay(unsigned char *state, const unsigned char *rec)
     juno_apply_delay_finefx(state, rec, Hr);
 }
 
-/* Host-tempo recompute for the tempo-synced delay time — the delay sibling of
- * juno_apply_lfo_tempo. The plugin's tempo push (dispatch idx 375) rewrites the
- * delay-time cells as ms = f32(beats(division) * 60000 / BPM) through the same
- * 3-op coefficient formula — verified bit-exact vs the plugin's own dispatch at
- * 60/88/176 BPM (the 128-BPM recall default equals the SYNC_MS_128 path). Inert
- * while the patch's TEMPO SYNC is off. time_byte/sync/dtype are the loaded patch's
- * DELAY TIME byte (blob 53), TEMPO SYNC (blob 59 != 0) and DELAY TYPE (rec 650). */
+/* The tempo entry's delay half (leaf 375 -> rva 0x3B9710: the active delay
+ * object takes the tempo, then DELAY TIME is re-sent, rva 0x3B9250), EXECUTED
+ * (probes/host_render/tempo_census.py, every DELAY TYPE, TEMPO SYNC off and on):
+ * TYPE 0 sets 102352, TYPE 1 its second instance 4297584, TYPE 5 6497168 --
+ * immediately, to the synced time at the new tempo or the manual time; TYPE 1
+ * also re-sends 4297792 and TYPES 2/3/4 6395312 / 6429472 through the ramped
+ * setter at their current values (no ramp starts: the target is unchanged). The
+ * caller stores the tempo first (juno_rr_set_tempo). */
+void juno_apply_delay_tempo_t10(unsigned char *state, int time_byte, int sync, int dtype)
+{
+    int Hr = (int)JF(state, 16);
+    float tc;
+    tc = dly_time_coeff(state, Hr, time_byte, sync);
+    if (dtype == 0) JF(state, 102352) = tc;
+    else if (dtype == 1) JF(state, 4297584) = tc;
+    else if (dtype == 5) JF(state, 6497168) = tc;
+}
+
+/* The same at a float BPM (tools and older callers): the tempo x 10 rounded as
+ * the render driver rounds the host's (rva 0x3F2050), stored, then applied. */
 void juno_apply_delay_tempo(unsigned char *state, int time_byte, int sync,
                             int dtype, float bpm)
 {
-    int Hr;
-    float ms, tc;
-    if (!sync || bpm <= 0.0f) return;
-    Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
-    ms = (float)(SYNC_BEATS[sync_division(time_byte & 0xFF)] * 60000.0 / (double)bpm);
-    tc = dly_ms_to_coeff(Hr, ms);
-    JF(state, 102352) = tc;                       /* always carries the time      */
-    if (dtype == 1) JF(state, 4297584) = tc;      /* dual-delay second instance   */
-    if (dtype == 5) JF(state, 6497168) = tc;      /* reverb-hosted delay instance */
+    double r = (double)bpm * 10.0;
+    int t10 = (int)(r >= 0.0 ? floor(r + 0.5) : ceil(r - 0.5));
+    if (t10 < 400 || t10 > 3000) return;
+    juno_rr_set_tempo(state, t10);
+    juno_apply_delay_tempo_t10(state, time_byte, sync, dtype);
 }
 
 /* LIVE TEMPO SYNC flip (value-tree leaf blob 59, dispatch idx 803) — measured from
@@ -909,17 +911,11 @@ void juno_apply_delay_tempo(unsigned char *state, int time_byte, int sync,
  * rewrites 102352 (synced ON / manual OFF). TYPES 2/3 (probed): the flip re-writes
  * the repurposed chorus rate cell 6395312 with its UNCHANGED value (inert; not
  * modeled). */
-void juno_live_delay_sync(unsigned char *state, int time_byte, int sync,
-                          int dtype, float bpm)
+void juno_live_delay_sync(unsigned char *state, int time_byte, int sync, int dtype)
 {
     int Hr = (int)JF(state, 16);
-    float ms, tc;
-    if (Hr <= 0) Hr = 96000;
-    if (sync && bpm > 0.0f)
-        ms = (float)(SYNC_BEATS[sync_division(time_byte & 0xFF)] * 60000.0 / (double)bpm);
-    else
-        ms = (float)DELAYTIME_MS[time_byte & 0xFF];
-    tc = dly_ms_to_coeff(Hr, ms);
+    float tc;
+    tc = dly_time_coeff(state, Hr, time_byte, sync);   /* synced at the stored tempo */
     if (dtype == 0) JF(state, 102352)  = tc;
     if (dtype == 1) JF(state, 4297584) = tc;
     if (dtype == 5) JF(state, 6497168) = tc;

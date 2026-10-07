@@ -441,7 +441,7 @@ def check_port():
     V, I, F, C = ctypes.c_void_p, ctypes.c_int, ctypes.c_float, ctypes.c_char_p
     lib.juno_gui_create.restype = V
     lib.juno_gui_create.argtypes = [F, I]
-    for fn, at in (('juno_gui_plugin_init', [V]), ('juno_gui_state_load', [V, C, I]),
+    for fn, at in (('juno_gui_plugin_init_model', [V]), ('juno_gui_state_load', [V, C, I]),
                    ('juno_gui_load_patch', [V, C, I, I]), ('juno_gui_host_set', [V, I, I]),
                    ('juno_gui_note_on', [V, I, I]), ('juno_gui_note_off', [V, I]),
                    ('juno_gui_render', [V, ctypes.POINTER(F), I]), ('juno_gui_destroy', [V]),
@@ -459,7 +459,10 @@ def check_port():
             continue
         c = lib.juno_gui_create(F(rate), 0)
         lib.juno_set_fp_oracle_mode(1)
-        lib.juno_gui_plugin_init(c)
+        # the engine model's initialize: this gate's oracle is an engine fed the plugin's
+        # queues at the gate's rate (96001 included, where the plugin product is silent:
+        # CLAIMS B13); the product's render object is host_process_gate.py's
+        lib.juno_gui_plugin_init_model(c)
         outs = ref[ci]
         recs_want = pickle.loads(zlib.decompress(ref['_rrec'][ci]))
         oi = ck = 0

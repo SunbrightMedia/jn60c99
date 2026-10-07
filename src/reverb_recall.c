@@ -179,8 +179,15 @@ static const int32_t RTAP44[3][34] = {
  * baseline (RTAP44/RTAP96 entry1 = predelay+1) exactly -- identity at the default. */
 int juno_reverb_predelay(int pd_byte, int Hr)
 {
-    long v = (long)pd_byte * (long)Hr / 1000L - 2L;
-    return v < 0 ? 0 : (int)v;
+    /* The reverb's PRE DELAY (rva 0x3C1720, READ): 0 for byte 0, else
+     * trunc((float)H x 0.001f x (float)byte) - 2, all in float, no clamp
+     * (EXECUTED: -2 at an engine rate of 0, probes/b13b/). Equal to the old
+     * integer law pd x H / 1000 - 2 at the 18 graded rates and bytes 0..100;
+     * not at rate 0 or at the huge rates of the wild engine-rate settings. */
+    float x;
+    if (pd_byte == 0) return 0;
+    x = ((float)Hr * 0.001f) * (float)pd_byte;          /* 0.001f: bits 0x3a83126f */
+    return (int)(long long)x - 2;                        /* cvttss2si rdi; sub edi, 2 */
 }
 
 /* Write the 34-int reverb tap array for (type, Hr) with REVERB PRE DELAY `pd_byte`.
@@ -264,7 +271,7 @@ void juno_apply_reverb(unsigned char *state, const unsigned char *rec)
 
     /* TYPE-only coeffs (idx 876): 4 DPF cutoffs (all equal, rate-armed) + type-5 stage */
     {
-        int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+        int Hr = (int)JF(state, 16);
         const uint32_t fc = (Hr == 44100) ? REV_FC44[type] : REV_FC[type];
         put_bits(state, 10759648, fc);
         put_bits(state, 10759696, fc);
@@ -286,7 +293,7 @@ void juno_apply_reverb(unsigned char *state, const unsigned char *rec)
      * shift 0, taps == pre-W1 baseline, 10759360 == 880/958/1762/1918 (== the value
      * delay_recall.c already writes for the DELAY-TYPE-5 slot-1 reverb). */
     {
-        int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+        int Hr = (int)JF(state, 16);
         juno_write_reverb_taps_pd(state, type, Hr, predl);
         JF(state, 10759360) = (float)juno_reverb_predelay(predl, Hr);
     }
@@ -296,7 +303,7 @@ void juno_apply_reverb(unsigned char *state, const unsigned char *rec)
      * 0x3B9A30 (see finefx_recall.c). Identity at the default byte, correct for any
      * user value. Unconditional (the master always runs the reverb tank). */
     {
-        int Hr = (int)JF(state, 16); if (Hr <= 0) Hr = 96000;
+        int Hr = (int)JF(state, 16);
         juno_apply_reverb_finefx(state, rec, Hr);
     }
 

@@ -24,8 +24,9 @@ WHAT IT COMPARES, after EVERY event (zero-render note events included):
   checkpoint; any differing cell fails the gate.
 
 SCENARIOS: a hand-written chord / partial-release / full-release / re-gate
-sequence (the exact shape of the 1856 law: 1.0 on every voice while ANY key is
-held, 0.0 on every voice when the last key goes) plus seeded random sequences
+sequence; a steal that leaves a key held with no voice (the 1856 law is "a voice
+still gated", not "a key held": rva 0x3B1C58, the gate leaf; the two differ only
+there -- the seeds below never hold more keys than voices); plus seeded random sequences
 (up to 6 held notes, render chunks 1..600 samples, three rates, non-arp
 patches). Seeds are reproducible; a failing seed is a regression script.
 
@@ -88,6 +89,19 @@ def hand_script():
     return 44100.0, 0, ev
 
 
+def steal_script():
+    """A key left held with NO voice (2026-10-07): eight keys fill the voices, a
+    ninth steals the newest one and goes up, then the voiced keys go up -- one
+    key is still held but no voice is gated. The plugin's gate leaf writes 1856 as
+    "a voice still gated" (rva 0x3B1C58), so it falls to 0.0 here; a "key held"
+    law keeps 1.0. Then a new key (the 0 -> 1 rise) and the last key up."""
+    ev = [('on', n, 100) for n in (40, 43, 47, 50, 53, 57, 60, 62)] + [('render', 64)]
+    ev += [('on', 64, 100), ('render', 64), ('off', 64), ('render', 64)]
+    ev += [('off', n) for n in (40, 43, 47, 50, 53, 57, 60)] + [('render', 600)]
+    ev += [('on', 67, 90), ('render', 333), ('off', 67), ('render', 64), ('off', 62), ('render', 600)]
+    return 48000.0, 0, ev
+
+
 def seed_script(seed):
     rng = random.Random(0xB3B3 + seed)
     rate = [44100.0, 48000.0, 96000.0][seed % 3]
@@ -117,7 +131,7 @@ def seed_script(seed):
 
 
 def scenarios():
-    out = [('hand', hand_script())]
+    out = [('hand', hand_script()), ('steal', steal_script())]
     for s in SEEDS:
         out.append(('seed%d' % s, seed_script(s)))
     return out

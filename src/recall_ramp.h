@@ -50,8 +50,18 @@ typedef struct {
 } juno_rr_ctx;
 
 void juno_rr_reset(unsigned char *state);   /* juno_engine_prepare: records re-seed at the next recall */
+/* The product start (CLAIMS B15): the ramps the plugin's 96000 build leaves in
+ * flight, armed on the port's freshly built state (src/boot_ramps.h). */
+void juno_rr_boot(unsigned char *state);
 void juno_rr_begin(unsigned char *state, juno_rr_ctx *ctx);
 void juno_rr_end(unsigned char *state, const juno_rr_ctx *ctx);
+/* The plugin's setSampleRate on a running engine (CLAIMS B13b, src/recall_ramp.c): the
+ * processor's suspend (at the old rate), the effect container's re-applies (values from `ref`,
+ * a settled recall at the new rate; the reverb's arms at the old rate) and the resume (at the
+ * new rate). The caller sets the rate and runs the two constructors between the last two. */
+void juno_rr_setsr_suspend(unsigned char *state);
+void juno_rr_setsr_reapply(unsigned char *state, const unsigned char *ref);
+void juno_rr_setsr_resume(unsigned char *state);
 void juno_rr_settle(unsigned char *state);
 void juno_rr_pump(unsigned char *state);
 int  juno_rr_active(const unsigned char *state);
@@ -67,6 +77,8 @@ int      juno_rr_rev_on(unsigned char *state);
 int      juno_rr_arp_on(unsigned char *state);
 void     juno_rr_set_arp_on(unsigned char *state, int on);
 int      juno_rr_cut_last(unsigned char *state);
+int      juno_rr_tempo(unsigned char *state);              /* processor +1056, x10 */
+void     juno_rr_set_tempo(unsigned char *state, int t10);
 void     juno_rr_set_cut_last(unsigned char *state, int v);
 void     juno_rr_copy_proc(unsigned char *dst, const unsigned char *src);
 

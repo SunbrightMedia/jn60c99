@@ -7,7 +7,7 @@
 #include "juno_engine.h"
 #include <stdint.h>
 
-uint32_t juno_engine_init(unsigned char *a1)
+uint32_t juno_engine_init_core(unsigned char *a1)
 {
   uint32_t result;
   int v2; // xmm6_4
@@ -3208,6 +3208,14 @@ uint32_t juno_engine_init(unsigned char *a1)
   JI(a1, 10693440) = 1056964608;
   JI(a1, 10693456) = 1006632960;
   JI(a1, 10693472) = -1140850688;
+  return result;
+}
+
+/* The engine BUILD's constructor state: sub_1803990C0 (juno_engine_init_core, which the plugin's
+ * setSampleRate also runs on a running engine -- CLAIMS B13b) and the BUILD-time state below. */
+uint32_t juno_engine_init(unsigned char *a1)
+{
+  uint32_t result = juno_engine_init_core(a1);
 
   /* BUILD-time state (not part of sub_1803990C0 itself; set by the engine BUILD
    * wrapper 0x3C68D0). Arm the per-voice DCO-retrigger latch — aux Array A,

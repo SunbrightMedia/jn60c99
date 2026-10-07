@@ -35,10 +35,10 @@ import sys, struct, pickle
 HERE = _JREPO + '/tools/verify'
 sys.path.insert(0, HERE)
 import os
-PKL  = os.environ.get('JUNO_RENDER_REF_PKL',
-                     _JREPO + '/scratchpad/recall_render_ref.pkl')
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
 import truth; BANK = truth.BANK  # single source of ground truth (truth/ folder)
+PKL  = (os.environ.get('JUNO_RENDER_REF_PKL')
+        or truth.scratch('recall_render_ref.pkl'))   # per bank ($JUNO_SCRATCH_TAG)
 # Host rate (default 48 kHz). JUNO_RENDER_SR overrides it so the SAME render A/B can
 # prove the whole recall->render chain at NON-standard rates (88200/192000) — the
 # "other host sample rates" gate. Both processes read the same env, so the port and
@@ -90,21 +90,16 @@ def _arp_patches(bank_bytes):
     return out
 
 
-def default_patches(bank_bytes):
-    arp = _arp_patches(bank_bytes)
-    return [p for p in range(64) if p not in arp], arp
+def parse_patches(argv):
+    """The patches the REFERENCE renders: the ones named, else all 64.
 
-
-def parse_patches(argv, bank_bytes=None):
-    ps = [int(a) for a in argv if a.lstrip('-').isdigit()]
-    if ps:
-        return ps
-    if bank_bytes is None:
-        bank_bytes = open(BANK, 'rb').read()
-    keep, arp = default_patches(bank_bytes)
-    print("  arp patches in THIS bank (skipped, the reference cannot "
-          "arpeggiate): %s" % sorted(arp))
-    return keep
+    ⚠ NOT the arp skip set. Until 2026-10-07 the --ref process asked
+    _arp_patches() -- a ctypes call into libjuno.so -- inside the process that
+    builds the Unicorn oracle: the two-process rule broken, and the candidate
+    choosing which patches its own oracle renders. The reference now renders
+    every patch; the --port side drops the arp ones (it already did, and it is
+    the process that may load libjuno)."""
+    return [int(a) for a in argv if a.lstrip('-').isdigit()] or list(range(64))
 
 
 # Master/FX value-tree leaves whose dispatch index is beyond real_recall.leaf_table's
@@ -281,21 +276,41 @@ def cmp_stream(la, ra, lb, rb):
     return n, nd, first
 
 
+def _ref_one(idx):
+    """one patch's reference: a fresh engine, as ref_render always made (a
+    --jobs worker runs it in its own process: Unicorn only)"""
+    import e2e_emu as E
+    import real_recall as R
+    return idx, ref_render(idx, E.bank_bytes(), R.leaf_table(), E, R)
+
+
 # CLI dispatch is gated on __main__ so this module is safely importable (fuzz_diff.py
 # reuses prepare_recall); otherwise importing it would run a render here.
 _MODE = sys.argv[1] if (__name__ == '__main__' and len(sys.argv) > 1) else None
 if _MODE == '--ref':
     import e2e_emu as E
-    import real_recall as R
-    patches = parse_patches(sys.argv[2:], open(BANK, 'rb').read())
-    bank = E.bank_bytes(); leaves = R.leaf_table()
+    argv = sys.argv[2:]
+    jobs = 1
+    if '--jobs' in argv:                      # patches in N worker processes
+        k = argv.index('--jobs')
+        jobs = int(argv[k + 1])
+        del argv[k:k + 2]
+    patches = parse_patches(argv)
+    bank = E.bank_bytes()
+    if jobs > 1:
+        import multiprocessing as mp
+        with mp.get_context('spawn').Pool(jobs) as pool:
+            res = pool.imap(_ref_one, patches, chunksize=1)
+            res = list(res)
+    else:
+        res = map(_ref_one, patches)
     out = {}
-    for idx in patches:
-        L, Rr = ref_render(idx, bank, leaves, E, R)
+    for idx, (L, Rr) in res:
         out[idx] = (L, Rr)
         sys.stderr.write("ref patch %2d (%s): %d frames\n" % (idx, E.patch_name(bank, idx), len(L)))
         sys.stderr.flush()
-    pickle.dump(out, open(PKL, 'wb'))
+    pickle.dump(out, open(PKL + '.partial', 'wb'))   # whole or nothing (playbook 142)
+    os.replace(PKL + '.partial', PKL)
     print("REF: saved %d patch render streams (N=%d, note %d vel %d, SR %g)" %
           (len(out), N, NOTE, VEL, SR))
 

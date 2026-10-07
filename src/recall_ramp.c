@@ -22,6 +22,7 @@
 #include "delay_recall.h"      /* juno_lfx1_value */
 #include "reverb_recall.h"     /* juno_reverb_hplp, juno_reverb_level_on */
 #include "ramp_cells.h"
+#include "boot_ramps.h"
 #include <string.h>
 
 /* The ramped setter's time table (rva 0x9DEB50, READ + EXECUTED: 16 floats);
@@ -56,7 +57,7 @@ typedef char rr_stride_is_10512[(JUNO_VOICE_MAIN_STRIDE == 10512) ? 1 : -1];
 typedef char rr_table_fits[(JUNO_RR_BASE + 32u + 34u * JUNO_RAMP_N <= JUNO_VOICE_COUNT_CELL) ? 1 : -1];
 
 /* The record table, port-owned memory at JUNO_RR_BASE (src/juno_engine.h): a
- * 32-byte header {magic, n_active, revtime, rev_on, tap2, arp_on, cut_last, 1 spare}, one record
+ * 32-byte header {magic, n_active, revtime, rev_on, tap2, arp_on, cut_last, tempo}, one record
  * per ramped cell (JUNO_RAMP_N, src/ramp_cells.h), then the active list (the
  * indices of the armed records, n_active of them). The records are
  * independent (each steps only its own cell), so the order the list holds
@@ -64,7 +65,7 @@ typedef char rr_table_fits[(JUNO_RR_BASE + 32u + 34u * JUNO_RAMP_N <= JUNO_VOICE
 typedef struct { float incr, accum, start, target; int32_t active, step; float pre; int32_t pad; } rr_rec;
 #define RR_MAGIC 0x32525252
 #define HDR(st, k) (*(int32_t *)((st) + JUNO_RR_BASE + 4u * (unsigned)(k)))
-enum { H_MAGIC, H_NACT, H_REVTIME, H_REVON, H_TAP2, H_ARPON, H_CUTLAST };
+enum { H_MAGIC, H_NACT, H_REVTIME, H_REVON, H_TAP2, H_ARPON, H_CUTLAST, H_TEMPO };
 
 static rr_rec *rec_at(unsigned char *st, int i)
 {
@@ -123,6 +124,8 @@ static void rr_seed(unsigned char *st)
     HDR(st, H_TAP2) = 0x3f008081;          /* 128/255: the build's (census job 236) */
     HDR(st, H_ARPON) = 0;
     HDR(st, H_CUTLAST) = 255;              /* the cutoff object's build value; every recall sets it */
+    HDR(st, H_TEMPO) = 1280;               /* processor +1056, the tempo x 10 the build stores
+                                            * (EXECUTED: probes/host_render/tempo_census.py) */
 }
 
 /* The DELAY TYPE 1 second instance's own copy of its tap time (CLAIMS B7):
@@ -161,6 +164,15 @@ void juno_rr_set_arp_on(unsigned char *st, int on)
  * step "large" (EXECUTED: H 0.25 then 87 -> 90 ramps at index 5, not 6;
  * scratchpad/probe_cutH.py). CLAIMS A20. */
 int juno_rr_cut_last(unsigned char *st) { return HDR(st, H_MAGIC) == RR_MAGIC ? (int)HDR(st, H_CUTLAST) : 255; }
+/* The engine's tempo x 10 (processor +1056): the tempo entry (rva 0x3C7F10 ->
+ * leaf 375, rva 0x3B9710) stores it; the LFO rate and the synced delay times of
+ * every later recall and edit read it. */
+int juno_rr_tempo(unsigned char *st) { return HDR(st, H_MAGIC) == RR_MAGIC ? (int)HDR(st, H_TEMPO) : 1280; }
+void juno_rr_set_tempo(unsigned char *st, int t10)
+{
+    if (HDR(st, H_MAGIC) != RR_MAGIC) rr_seed(st);
+    HDR(st, H_TEMPO) = t10;
+}
 
 void juno_rr_set_cut_last(unsigned char *st, int v)
 {
@@ -179,6 +191,7 @@ void juno_rr_copy_proc(unsigned char *dst, const unsigned char *src)
     HDR(dst, H_REVTIME) = HDR(s, H_REVTIME);
     HDR(dst, H_REVON) = HDR(s, H_REVON);
     HDR(dst, H_TAP2) = HDR(s, H_TAP2);
+    HDR(dst, H_TEMPO) = HDR(s, H_TEMPO);
 }
 
 
@@ -248,7 +261,6 @@ void juno_rr_end(unsigned char *st, const juno_rr_ctx *c)
     int pE = c->prev_etype, nE = c->new_etype, pD = c->prev_dtype, nD = c->new_dtype;
     int on_new = juno_reverb_level_on(c->new_revlevel);
     float ON, OFF;
-    if (Hr <= 0) Hr = 96000;
     ON = juno_lfx1_value(Hr, 1);
     OFF = juno_lfx1_value(Hr, 0);
     (void)pE;
@@ -405,6 +417,160 @@ int juno_rr_active(const unsigned char *state)
 {
     unsigned char *st = (unsigned char *)state;
     return HDR(st, H_MAGIC) == RR_MAGIC ? (int)HDR(st, H_NACT) : 0;
+}
+
+/* The product start (CLAIMS B15): the plugin's constructor builds its engine
+ * at 96000 and leaves 274 ramps per unit in flight (src/boot_ramps.h, read from
+ * the booted plugin: the same on every unit and at every host rate while the
+ * engine-rate setting is the default). Each cell goes back to the start its
+ * build arm read (0 for most) and is armed toward the value the port's build
+ * wrote, at the time index the census named, through the transcribed ramp
+ * start. A record's stored target before that arm only decides whether the arm
+ * acts (its fields come from start, target and time alone): the build's record
+ * held 0, or -- for the three ramps toward 0 -- the value an earlier build arm
+ * had left; anything but the target stands in for it. The units the voice count
+ * stops keep theirs in flight (juno_rr_pump). */
+void juno_rr_boot(unsigned char *st)
+{
+    int k;
+    if (HDR(st, H_MAGIC) != RR_MAGIC) rr_seed(st);
+    for (k = 0; k < JUNO_BOOT_RAMP_N; ++k) {
+        uint32_t cell = JUNO_BOOT_RAMP[k].cell;
+        int i = index_of(cell);
+        float target, start;
+        if (i < 0) continue;                       /* every boot cell is a ramped cell */
+        target = JF(st, cell);
+        memcpy(&start, &JUNO_BOOT_RAMP[k].start, 4);
+        JF(st, cell) = start;
+        rec_at(st, i)->target = (target == 0.0f) ? 1.0f : 0.0f;
+        arm_rec(st, i, target, JUNO_BOOT_RAMP[k].t);
+    }
+}
+
+/* ===== THE PLUGIN'S setSampleRate ON A RUNNING ENGINE (CLAIMS B13b) =====
+ * CWaveGen::setSampleRate (rva 0x3C7A20) runs, unit by unit: the processor's
+ * suspend (vt3, rva 0x3B86C0), the effect container's setSampleRate (rva
+ * 0x3BC980), the state's (rva 0x3C2770: every record's rate, then the
+ * constructor's constants sub_1803990C0 and the runtime reset sub_1803A1300)
+ * and the processor's resume (vt5, rva 0x3B8560). EXECUTED (probes/b13b/
+ * setsr_sets.py logs every ramped and immediate set in order; effect types
+ * 0..5, delay types 0..5, reverb on and off, 96000 -> 48000 / 44100): the
+ * suspend and the resume ramp the processor's mute cells down and up (time
+ * index 0, the reverb's at 36 ms), the effect container re-applies the
+ * rate-dependent cells of the voices, the chorus and the delay block in force
+ * by immediate set (the cell only, no record) and re-arms the reverb twice,
+ * all with the values a recall at the new rate gives (src/ caller: the
+ * settled recall `ref`). The suspend and the container's arms run at the old
+ * rate, the resume's at the new one. Cells are independent per unit, so the
+ * port's one state takes each unit's sequence for the cells it keeps. */
+static const uint32_t SR_VOICE_IMM[] = { 624u, 1936u, 1920u, 2784u, 2816u, 2832u, 3264u, 3296u,
+                                         3312u, 10240u, 10256u, 10272u, 10288u };
+static const uint32_t SR_CHORUS_IMM[] = { 91120u, 91184u, 91152u, 91168u, 91136u, 96336u, 96368u };
+static const uint32_t SR_DLY0[] = { 102352u, 102464u, 102480u, 102368u, 102384u, 102400u, 102416u,
+                                    102432u, 102448u, 102608u, 102656u, 0u };
+static const uint32_t SR_DLY1[] = { 4297584u, 4297792u, 4297696u, 4297712u, 4297600u, 4297616u,
+                                    4297632u, 4297648u, 4297664u, 4297680u, 4297904u, 4297952u, 0u };
+static const uint32_t SR_DLY23[] = { 6396128u, 6396288u, 6396304u, 6396192u, 6396208u, 6396224u,
+                                     6396240u, 6396256u, 6396272u, 6396336u, 0u };
+static const uint32_t SR_DLY4[] = { 6430464u, 6430624u, 6430640u, 6430528u, 6430544u, 6430560u,
+                                    6430576u, 6430592u, 6430608u, 6430672u, 0u };
+static const uint32_t SR_DLY5[] = { 6497168u, 6497280u, 6497296u, 6497184u, 6497200u, 6497216u,
+                                    6497232u, 6497248u, 6497264u, 6497424u, 6497472u, 10693168u,
+                                    10693184u, 10693072u, 10693088u, 10693104u, 10693120u, 10693136u,
+                                    10693152u, 10693216u, 0u };
+static const uint32_t SR_REV_FILT[] = { 10759648u, 10759696u, 10759744u, 10759792u, 10759488u,
+                                        10759680u, 10759728u, 10759664u, 10759712u, 10759776u,
+                                        10759824u, 10759760u, 10759808u };
+static const uint32_t SR_REV_CUT[] = { 10759520u, 10759536u, 10759552u, 10759568u, 10759584u,
+                                       10759600u, 10759616u, 10759632u };
+#define SR_N(a) ((int)(sizeof(a) / sizeof((a)[0])))
+
+/* the slot-1 block of delay type t: its {switch, enable} pairs (rva 0x3B86C0's
+ * case on the processor's type, +0x5c8) */
+static int sr_dly_pairs(int t, uint32_t pr[2][2])
+{
+    static const uint32_t P[6][2][2] = {
+        { { 102544u, 102592u },   { 0u, 0u } },
+        { { 4297776u, 4297840u }, { 0u, 0u } },
+        { { 6396400u, 6396448u }, { 0u, 0u } },
+        { { 6396400u, 6396448u }, { 0u, 0u } },
+        { { 6430736u, 6430784u }, { 0u, 0u } },
+        { { 6497360u, 6497408u }, { 10693280u, 10693328u } },
+    };
+    if (t < 0 || t > 5) return 0;
+    memcpy(pr, P[t], sizeof P[t]);
+    return pr[1][0] ? 2 : 1;
+}
+
+void juno_rr_setsr_suspend(unsigned char *st)
+{
+    int v, k, E = (int)JI(st, JUNO_PREV_EFX), D = (int)JI(st, JUNO_PREV_DLY), np;
+    float OFF = juno_lfx1_value((int)JF(st, 16), 0);
+    uint32_t pr[2][2];
+    if (HDR(st, H_MAGIC) != RR_MAGIC) rr_seed(st);
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) {               /* the voices' envelope / VCA objects */
+        uint32_t o = (uint32_t)v * JUNO_VOICE_MAIN_STRIDE;
+        arm(st, 2848u + o, 0.0f, T4);
+        arm(st, 3328u + o, 0.0f, T4);
+    }
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) arm(st, 6448u + (uint32_t)v * JUNO_VOICE_MAIN_STRIDE, 0.0f, T4);
+    if (E >= 2 && E <= 4) { arm(st, 91248u, OFF, T4); arm(st, 91280u, 0.0f, T4); }   /* slot 2 */
+    if (E == 5) { arm(st, 96384u, OFF, T4); arm(st, 96416u, 0.0f, T4); }
+    arm(st, 84560u, 0.0f, T4);
+    arm(st, 101744u, 0.0f, T4);                           /* slot 1 */
+    np = sr_dly_pairs(D, pr);
+    for (k = 0; k < np; ++k) { arm(st, pr[k][0], OFF, T4); arm(st, pr[k][1], 0.0f, T4); }
+    arm(st, 10759376u, 0.0f, T36);                        /* the reverb */
+}
+
+void juno_rr_setsr_reapply(unsigned char *st, const unsigned char *ref)
+{
+    int v, i, k, D = (int)JI(st, JUNO_PREV_DLY);
+    const uint32_t *dl = D == 0 ? SR_DLY0 : D == 1 ? SR_DLY1 : (D == 2 || D == 3) ? SR_DLY23 :
+                         D == 4 ? SR_DLY4 : D == 5 ? SR_DLY5 : 0;
+    unsigned char *r = (unsigned char *)ref;
+    if (HDR(st, H_MAGIC) != RR_MAGIC) rr_seed(st);
+    for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        for (i = 0; i < SR_N(SR_VOICE_IMM); ++i) {
+            uint32_t c = SR_VOICE_IMM[i] + (uint32_t)v * JUNO_VOICE_MAIN_STRIDE;
+            JF(st, c) = JF(r, c);
+        }
+    for (i = 0; i < SR_N(SR_CHORUS_IMM); ++i) JF(st, SR_CHORUS_IMM[i]) = JF(r, SR_CHORUS_IMM[i]);
+    for (k = 0; k < 2; ++k) {                             /* the reverb (+0x1ff0), twice */
+        arm(st, 10759376u, 0.0f, T36);
+        for (i = 0; i < SR_N(SR_REV_FILT); ++i) arm(st, SR_REV_FILT[i], JF(r, SR_REV_FILT[i]), T4);
+        arm(st, 10759376u, 1.0f, T36);
+        JF(st, 10759360u) = JF(r, 10759360u);
+    }
+    for (i = 0; i < SR_N(SR_REV_CUT); ++i) arm(st, SR_REV_CUT[i], JF(r, SR_REV_CUT[i]), T4);
+    /* the reverb's own direct stores: its 34 tap positions and the lazy-wipe countdown
+     * (EXECUTED: probes/b13b/setsr_writers.py, store sites rva 0x3AB563, 0x388164) */
+    for (i = 0; i < 34; ++i) JI(st, 11022208u + 4u * (uint32_t)i) = JI(r, 11022208u + 4u * (uint32_t)i);
+    JI(st, 10759872u) = JI(r, 10759872u);
+    for (i = 0; dl && dl[i]; ++i) JF(st, dl[i]) = JF(r, dl[i]);   /* the delay block in force */
+}
+
+void juno_rr_setsr_resume(unsigned char *st)
+{
+    int v, k, E = (int)JI(st, JUNO_PREV_EFX), D = (int)JI(st, JUNO_PREV_DLY), np;
+    float ON = juno_lfx1_value((int)JF(st, 16), 1);
+    uint32_t pr[2][2];
+    if (HDR(st, H_MAGIC) != RR_MAGIC) rr_seed(st);
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+        uint32_t o = (uint32_t)v * JUNO_VOICE_MAIN_STRIDE;
+        arm(st, 2848u + o, 1.0f, T4);
+        arm(st, 3328u + o, 1.0f, T4);
+    }
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) arm(st, 6448u + (uint32_t)v * JUNO_VOICE_MAIN_STRIDE, 1.0f, T4);
+    arm(st, 84560u, 1.0f, T4);
+    if (E == 0) { arm(st, 85184u, 1.0f, T24); arm(st, 85168u, 1.0f, T24); }
+    if (E == 1) arm(st, 86320u, 1.0f, T4);
+    if (E >= 2 && E <= 4) { arm(st, 91248u, ON, T4); arm(st, 91280u, 1.0f, T4); }
+    if (E == 5) { arm(st, 96384u, ON, T4); arm(st, 96416u, 1.0f, T4); }
+    np = sr_dly_pairs(D, pr);
+    for (k = 0; k < np; ++k) { arm(st, pr[k][0], ON, T4); arm(st, pr[k][1], 1.0f, T4); }
+    arm(st, 101744u, 1.0f, T4);
+    arm(st, 10759376u, 1.0f, T36);
 }
 
 #else   /* EB_DEVCELLS: the device recall stays settled */

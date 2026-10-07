@@ -42,6 +42,7 @@ float       juno_apply_param_leaf(unsigned char *state, int i, int byte, int Hr)
  * *mode (0=up,1=down,2=up&down) and *oct (1..3). Rate is host-tempo-synced in the
  * plugin (no per-patch value), so it is not returned. */
 int juno_bank_arp(const unsigned char *bank, int idx, int *mode, int *oct);
+int juno_bank_arp_raw(const unsigned char *bank, int idx, int *sw, int *type, int *step);
 
 /* Decode the per-patch SCATTER TYPE (0..9 -> arp pattern slab) and SCATTER DEPTH
  * (-7..7 -> pattern sub = depth+7), which select the arpeggiator's STEP x SLOT
@@ -56,6 +57,9 @@ int juno_bank_scatter(const unsigned char *bank, int idx, int *type, int *depth)
  * tempo. Bit-exact (juno_curve 48 x 53), SR-independent, inert while sync is off.
  * See scratchpad/oracle/lfo_tempo_rate_spec.md. */
 void juno_apply_lfo_tempo(unsigned char *state, int lfo_rate_byte, float bpm);
+/* The tempo entry's LFO half (leaf 375, EXECUTED census): every voice's 1072 =
+ * curve48[LFO RATE] x curve53[T], immediately. T = tempo x 10 (400..3000). */
+void juno_apply_lfo_tempo_t10(unsigned char *state, int lfo_rate_byte, int t10);
 int  juno_bank_lfo_rate_byte(const unsigned char *bank, int idx);
 
 /* Decode the per-patch DELAY tempo-sync inputs (DELAY TIME byte blob 53, TEMPO SYNC

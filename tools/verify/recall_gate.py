@@ -32,8 +32,10 @@ import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_
 import sys, struct, pickle, gzip, os, re
 
 ROOT = _JREPO + ''
-REF = ROOT + '/scratchpad/plugin_recall_ref.pkl'
-PORT = ROOT + '/scratchpad/port_state.pkl'
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import truth  # noqa: E402
+REF = truth.scratch('plugin_recall_ref.pkl')   # per bank ($JUNO_SCRATCH_TAG)
+PORT = truth.scratch('port_state.pkl')
 ICM = ROOT + '/scratchpad/index_cell_map.pkl'
 DUMP = ROOT + '/state_dump/state_t0.bin'
 BLOCK, STRIDE = 10512, 16

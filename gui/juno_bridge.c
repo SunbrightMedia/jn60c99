@@ -20,8 +20,26 @@
 #include "../src/recall_ramp.h"
 #include "../src/reverb_recall.h"
 #include "../src/juno_state_tables.h"
+#include "../src/juno_conv.h"
+#include "../src/juno_midi.h"
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
+
+/* a host note event as the plugin's process() reads it (VST3 Event: sample
+ * offset, type 0 note-on / 1 note-off, channel, pitch, velocity 0..1) */
+typedef struct { int offset, type, channel, pitch; float velocity; } juno_host_note;
+/* the last point of one host parameter queue as the plugin's process() reads it
+ * (VST3 IParamValueQueue: the parameter id, the point's sample offset and its
+ * normalized value) */
+typedef struct { uint32_t id; int offset; double value; } juno_host_param;
+
+/* the keyboard object's key lists (count, then the keys: rva 0x3C4700 add,
+ * 0x3C4730 test, 0x3C4650 remove) */
+typedef struct { int n; int k[128]; } kb_list;
+
+#define DRV_QMAX 1024             /* queued MIDI records per block (the plugin's vector grows; 1024 is
+                                   * far above any host's events per block) */
 
 typedef struct {
     unsigned char *st;
@@ -73,8 +91,20 @@ typedef struct {
     unsigned char kb_vel[128];
     int   kb_order[128];
     unsigned char kb_trig_mode, kb_trig_pending, kb_flag8;
-    int   host_role;       /* 1 while a host edit runs its allocator half: the arp
-                            * switch then moves the keys as the plugin's does */
+    /* ... and its sustain (CLAIMS B16b, rva 0x3C42D0 / 0x3C4230 / 0x3C4E90): the
+     * keys down on the voices, each with the note it plays (+1048), and the notes
+     * the sustain holds after their key went up (+1176), 0xFF = none -- ONE array,
+     * as in the plugin, whose press-order walks test and clear +1176 at index -1
+     * (an empty slot of the press list), which is +1048's key 127; the keys in the
+     * arp (+16) and the arp keys the sustain holds (+532); the arp sustain byte
+     * (+9) and the note sustain byte (+10); and the controller's sustain byte
+     * (+12 of the arp controller, engine +136 + 64u) that CC 64 sets. */
+    unsigned char kb_map[256];
+    kb_list kb_arp, kb_arp_latch;
+    unsigned char kb_sus_arp, kb_sus_note, ctl_sus;
+    int   host_role;       /* 1 while a host edit runs its allocator half: the
+                            * recall model's arp block stays out (the host entry
+                            * calls the controller's own setter instead) */
 
     /* LFO RATE front-panel byte of the loaded patch (blob 8), stashed so a host
      * tempo change can recompute the tempo-synced LFO rate (cell 1072). The
@@ -129,12 +159,11 @@ typedef struct {
     int   bank_len;
     int   patch_idx;
 
-    /* Last raw SCATTER TYPE/DEPTH handed to carp_set_scatter, so a live edit can
-     * skip the arp reconfig when the patch's arp settings are unchanged (the
-     * reconfig resets the pattern selector to step 0 — audible restart on every
-     * slider move otherwise). calloc zero-init == carp_init's (0,0) default. */
-    int   last_scatter_type;
-    int   last_scatter_depth;
+    /* The recall model's last ARPEGGIO TYPE / STEP (raw), so a live edit runs a
+     * setter only for a changed value (ctx_alloc_recall). calloc zero-init ==
+     * the controller as built. */
+    int   rm_arp_type;
+    int   rm_arp_step;
     int   kbd_velocity_sw;   /* the wrapper velocity switch (vm.vs.velSense): 0 = force vel 100
                               * (the wrapper's rule, see juno_gui_midi_note_on) */
     int   live_recall;       /* 1 while juno_gui_apply_bank_live runs: the recall
@@ -144,6 +173,58 @@ typedef struct {
                               * MASTER TUNE: a SYSTEM parameter the recall never sets (A20);
                               * 0 = not set since create (the getter then reports the default) */
     int   host_only_set[3];
+
+    /* THE RENDER DRIVER (rva 0x320B20, docs/HOST_RENDER_LAYER.md): the MIDI
+     * records the wrapper's push queued for the next block (core+440) and the
+     * ones a block defers to the next (core+488), the arp tick clock in 1e-8
+     * host samples (core+560), the count of note-on minus note-off records
+     * that restarts it (core+568), the tempo x 10 last given to the engine
+     * (core+580, -1 at boot), the host tempo of the next blocks (process()
+     * gives 120.0 when the host has none) and its valid flag, the host rate. */
+    struct drv_rec { int off, kind, host; int32_t v; unsigned char m[3]; uint32_t id; float f; } drv_q[DRV_QMAX], drv_carry[DRV_QMAX];
+    struct drv_rec drv_work[2 * DRV_QMAX];   /* a block's records (the core's vector at +464): one per
+                                              * instance -- a static one let two instances on two
+                                              * threads overwrite each other's (task #41) */
+    int   drv_nq, drv_ncarry;
+    int   drv_queue_mode;       /* 1: apply_event queues a kind-2 record instead */
+    long long drv_phase;
+    int   drv_notes;
+    int   drv_tempo_last;
+    double drv_tempo;
+    int   drv_tempo_valid;
+    int   drv_rate;
+
+    /* The render object (core +96; CLAIMS B13, src/juno_conv.c) and the engine
+     * rate the setting vm.vs.sampleRate asks for (core +588, +592). ro_model: the
+     * engine model juno_gui_create makes -- the engine renders the host block
+     * itself at the rate it was made with, no table (every engine gate grades
+     * that); juno_gui_plugin_init makes the plugin's: its engine at the
+     * constructor's 96000 and the table's object for (96000, host rate). */
+    juno_ro ro;
+    int   ro_model;
+    int   eng_req;
+    int   eng_auto;
+    void *ro_out;              /* the block's drv_out, for the converter's engine render */
+    float *ro_tmp;             /* the converter's host samples of one segment (2 x ro_tmp_cap) */
+    int   ro_tmp_cap;
+    int   ro_unported;         /* a path the port does not model was reached (none since CLAIMS A30) */
+    int   setup_rate;          /* the host rate setupProcessing stored (plugin_init: the create rate) */
+    juno_ccmap ccmap;          /* the core's CC map (core+24+48 / record +12 / +64, CLAIMS A31):
+                                * the boot's default, emptied and refilled by every state load */
+
+    /* THE PARAMETER STORE (CLAIMS A32): the model's value of each state entry -- what the
+     * plugin's getState writes (rva 0x31FD90: each record's vt+128). Set by initialize's
+     * defaults, setState, a patch load, the model's own edits and the UI timer's drain; never
+     * by process() (EXECUTED: probes/host_api/state_save_census.py). */
+    int32_t store[JUNO_STATE_N];
+    /* THE CORE'S SECOND QUEUE (core+512) as its drain (rva 0x320120, the UI timer) applies it:
+     * the store records the push queues for a mapped CC (rva 0x3221F0: id, the CC's value),
+     * one per parameter, in the order of their LATEST push (a drain applies each as an
+     * overwrite, so an earlier record of the same parameter changes nothing it leaves), and
+     * the first CC message below 120 since the last drain (the only one a MIDI learn takes). */
+    struct ui_rec { uint32_t id; float f; } ui_q[JUNO_STATE_N];
+    int   ui_nq;
+    int   ui_cc;
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -189,7 +270,49 @@ static void default_patch(unsigned char *st)
  */
 unsigned long eb_coef_gen = 1;
 
+/* the render driver's state as the core builds it: no records, the clock at 0,
+ * no notes, no tempo sent (core+580 = -1), process()'s default tempo 120.0 */
+static void drv_init(juno_ctx *c, float sample_rate)
+{
+    c->drv_nq = c->drv_ncarry = 0;
+    c->drv_phase = 0;
+    c->drv_notes = 0;
+    c->drv_tempo_last = -1;
+    c->drv_tempo = 120.0;
+    c->drv_tempo_valid = 0;
+    c->drv_rate = (int)sample_rate;
+    c->setup_rate = (int)sample_rate;
+    juno_ro_init(&c->ro, (int)sample_rate, (int)sample_rate);
+    c->ro_model = 1;
+    c->eng_req = (int)sample_rate;
+}
+
+/* The engine as its construction + setSampleRate leave it, at `rate`: what
+ * juno_gui_create makes (coldstate_ab.py grades it against the plugin's build
+ * + setSampleRate at 18 rates). */
+static void st_build(unsigned char *st, float rate, struct juno_host_shim *shim, int chorus_mode)
+{
+    memset(st, 0, JUNO_STATE_BYTES);
+    JF(st, 16) = rate;
+    juno_chorus_init(st);
+    juno_engine_init(st);
+    juno_engine_prepare(st);
+    default_patch(st);
+    juno_driver_seed_voices(st);
+    juno_apply_condition(st, 128);
+    juno_driver_attach_host(st, shim, chorus_mode);
+}
+
+static juno_ctx *ctx_create(float sample_rate, int chorus_mode);
+
 juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
+{
+    juno_enable_hw_ftz();                /* run in the plugin's SSE FTZ/DAZ mode (x86) */
+    return ctx_create(sample_rate, chorus_mode);
+}
+
+/* juno_gui_create without the FP mode (the rate switch's scratch reference) */
+static juno_ctx *ctx_create(float sample_rate, int chorus_mode)
 {
     ++eb_coef_gen;
     juno_ctx *c = calloc(1, sizeof *c);
@@ -198,7 +321,6 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     c->st = calloc(1, JUNO_STATE_BYTES);
     if (!c->st) { free(c); return NULL; }
 
-    juno_enable_hw_ftz();                /* run in the plugin's SSE FTZ/DAZ mode (x86) */
     JF(c->st, 16) = sample_rate;
     juno_chorus_init(c->st);
     juno_engine_init(c->st);             /* constructor state (sub_1803990C0)              */
@@ -220,7 +342,15 @@ juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
     c->arp_on = 0;
     c->arp_cur = -1;
     for (v = 0; v < 128; ++v) c->kb_order[v] = -1;
+    memset(c->kb_map, 0xFF, sizeof c->kb_map);
+    c->kb_arp.n = c->kb_arp_latch.n = 0;
+    c->kb_sus_arp = c->kb_sus_note = c->ctl_sus = 0;
     c->host_bpm = 128.0f;   /* plugin recall-default TEMPO (880 -> 40+88.0) */
+    juno_ccmap_boot(&c->ccmap);
+    for (v = 0; v < JUNO_STATE_N; ++v) c->store[v] = JUNO_STATE_ENT[v].dflt;
+    c->ui_nq = 0;
+    c->ui_cc = -1;
+    drv_init(c, sample_rate);
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
     return c;
 }
@@ -242,6 +372,8 @@ void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
     ++eb_coef_gen;
     st = c->st;
     free(c->bank);                      /* the model record (a fresh create has none) */
+    juno_ro_free(&c->ro);
+    free(c->ro_tmp);
     memset(c, 0, sizeof *c);            /* match calloc's zero of the whole ctx */
     c->st = st;
     memset(st, 0, JUNO_STATE_BYTES);    /* match calloc's zero of the state     */
@@ -262,7 +394,11 @@ void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
     c->arp_on = 0;
     c->arp_cur = -1;
     for (v = 0; v < 128; ++v) c->kb_order[v] = -1;
+    memset(c->kb_map, 0xFF, sizeof c->kb_map);
+    c->kb_arp.n = c->kb_arp_latch.n = 0;
+    c->kb_sus_arp = c->kb_sus_note = c->ctl_sus = 0;
     c->host_bpm = 128.0f;
+    drv_init(c, sample_rate);
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
 }
 
@@ -285,6 +421,8 @@ void juno_gui_destroy(juno_ctx *c)
 {
     if (!c) return;
     free(c->bank);
+    juno_ro_free(&c->ro);
+    free(c->ro_tmp);
     free(c->st);
     free(c);
 }
@@ -415,7 +553,7 @@ float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
     int Hr, blob, i, n;
     float w = 0.0f;
     if (!c) return 0.0f;
-    Hr = (int)JF(c->st, 16); if (Hr <= 0) Hr = 96000;
+    Hr = (int)JF(c->st, 16);
     blob = juno_param_blob(param_index);
     if (blob < 0) return 0.0f;
     /* LEAF semantics: the plugin's value tree dispatches whole leaves — one panel
@@ -466,8 +604,7 @@ float juno_gui_set_param(juno_ctx *c, int param_index, int byte)
      * patch's manual time; re-timing at 120 re-points the delay read head). */
     if (blob == 59) {
         c->dly_sync = (byte != 0);
-        juno_live_delay_sync(c->st, c->dly_time_byte, c->dly_sync, c->dly_type,
-                             c->host_bpm);
+        juno_live_delay_sync(c->st, c->dly_time_byte, c->dly_sync, c->dly_type);
     }
     return w;
 }
@@ -642,7 +779,16 @@ static int pick_newest(juno_ctx *c, int want_assigned, int want_gated)
 
 /* 128-bit held-note bitmask (mirrors the assigner's a1[20..23]). */
 static void held_set(juno_ctx *c, int n)   { if (n>=0 && n<128) c->held_notes[n>>5] |=  (1u<<(n&31)); }
-static void held_clear(juno_ctx *c, int n) { if (n>=0 && n<128) c->held_notes[n>>5] &= ~(1u<<(n&31)); }
+/* The assigner's note-off clears bit n of its held mask a1[20..23] (rva
+ * 0x355780) with no range check. The only note above 127 that reaches it is 255
+ * (the keyboard's press-order walk at an empty slot, rva 0x3C3FA0): bit 31 of
+ * a1[27], the top bit of slot 5's note byte (+111) -- a slot without a note
+ * (0xFF) then holds note 127. */
+static void held_clear(juno_ctx *c, int n)
+{
+    if (n >= 0 && n < 128) c->held_notes[n >> 5] &= ~(1u << (n & 31));
+    else if (n == 255 && c->voice_note[5] < 0) c->voice_note[5] = 127;
+}
 static int  held_lowest(juno_ctx *c)       /* lowest still-held MIDI note, or -1 */
 {
     int w, b;
@@ -880,8 +1026,29 @@ void juno_gui_set_voice_count(juno_ctx *c, int n)
     if (c) juno_set_voice_count(c->st, n);
 }
 int juno_gui_voice_count(juno_ctx *c) { return c ? juno_voice_count(c->st) : 0; }
+
+/* The paths this context reached that the port does not model (each one an
+ * open claim). Bit 0 was an engine-rate switch on a running engine (CLAIMS
+ * B13b), ported since A30: no path sets a bit now. The gates keep the check:
+ * a gate that sees a bit set must not report its chain as graded. */
+int juno_gui_unported(juno_ctx *c)
+{
+    return c ? (c->ro_unported ? 1 : 0) : 0;
+}
 /* voice v's own noise block (gates): see juno_driver_unit_noise */
 const void *juno_gui_unit_noise(juno_ctx *c, int v) { return c ? (const void *)juno_driver_unit_noise(c->st, v) : 0; }
+
+/* The held flag every gate leaf leaves on all voices (rva 0x3B1C58, the
+ * processor's gate leaf: any of its voices' gate values nonzero after the
+ * leaf's own) -- "a voice still gated". An event without a gate leaf writes
+ * nothing, but the flag then already equals this (only gate leaves move it). */
+static int any_gated(const juno_ctx *c)
+{
+    int v;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        if (c->voice_gated[v]) return 1;
+    return 0;
+}
 
 static void synth_note_on(juno_ctx *c, int midi_note, int velocity)
 {
@@ -892,9 +1059,9 @@ static void synth_note_on(juno_ctx *c, int midi_note, int velocity)
         case 3:  poly_note_on(c, midi_note, velocity, 1);   break;
         default: poly_note_on(c, midi_note, velocity, 0);   break;
     }
-    /* Plugin note-on writes the global "any key held" flag (1856) to EVERY voice,
-     * not just the allocated one (see juno_note_broadcast_held). */
-    juno_note_broadcast_held(c->st, 1);
+    /* the held flag (1856) on EVERY voice, after the gate leaves (see
+     * juno_note_broadcast_held) */
+    juno_note_broadcast_held(c->st, any_gated(c));
 }
 
 /* Release all voices playing `key` (or every voice if key < 0). Used by POLY. */
@@ -935,10 +1102,9 @@ static void synth_note_off(juno_ctx *c, int midi_note)
         case 2:  mono_note_off(c, midi_note, 1);            break;   /* unison: all voices */
         default: poly_release_key(c, midi_note);            break;   /* poly / variant    */
     }
-    /* Plugin note-off clears the global held flag (1856) on EVERY voice only when
-     * NO key remains held (chord release keeps it at 1.0 everywhere). */
-    juno_note_broadcast_held(c->st,
-        (c->held_notes[0] | c->held_notes[1] | c->held_notes[2] | c->held_notes[3]) != 0);
+    /* the held flag (1856) on EVERY voice: a voice still gated -- a key held
+     * with no voice (stolen) does not keep it up */
+    juno_note_broadcast_held(c->st, any_gated(c));
 }
 
 /* --- arpeggiator (bit-exact CArpeggio, src/carp.c) -------------------------- */
@@ -961,17 +1127,11 @@ static int gate_frac_to_index(float g)
     return best;
 }
 
-/* Drain one sample's worth of arp events into the voice allocator. Called once
- * per rendered sample when the arp is enabled: carp_tick emits note-offs before
- * note-ons at each gate/step boundary, exactly as the plugin's clock does. */
-static void arp_tick(juno_ctx *c)
+/* The arp's events into the voice allocator, in the order the arp made them
+ * (its note sink is the keyboard's: rva 0x3C35A0 / 0x3C3580). */
+static void arp_dispatch(juno_ctx *c, const carp_event *ev, int n)
 {
-    double sr = JF(c->st, 16); if (sr <= 0.0) sr = 96000.0;
-    /* A dense SCATTER pattern can fire many slots on one tick (each up to a
-     * steal-off + self-off + on), plus the pre-step scheduled offs — well over 4.
-     * Size for the worst case (16 slots) so no events are dropped. */
-    carp_event ev[64];
-    int i, n = carp_tick(&c->arp, sr, ev, 64);
+    int i;
     for (i = 0; i < n; ++i) {
         if (c->arp_trace_cap && c->arp_trace_n < c->arp_trace_cap) {
             int *r = c->arp_trace_buf + 4 * c->arp_trace_n++;
@@ -979,26 +1139,26 @@ static void arp_tick(juno_ctx *c)
             r[2] = ev[i].note; r[3] = ev[i].velocity;
         }
         /* THE ARPEGGIATOR'S EVENTS ARE NOTE EVENTS, so they bump the
-         * coefficient generation counter like every other note event does.
-         *
-         * They did not until now, and the consequence was total: engine B
-         * mirrors the port's event-written cells on a generation bump, so an
-         * arp-driven note was invisible to it and an arpeggiated patch played
-         * SILENCE. Seven of the sixty-four factory patches use the arpeggiator.
-         *
-         * It survived because no null scenario used an arp patch. It was found
-         * the moment one was added -- for EFFECT TYPE 1, whose only patch in
-         * the bank happens to have the arp on. Coverage added for one reason
-         * found a defect of another. */
+         * coefficient generation counter like every other note event does
+         * (engine B mirrors the port's event-written cells on a bump; an
+         * arp-driven note was once invisible to it). */
         ++eb_coef_gen;
-        if (ev[i].kind == 0) {                          /* note-off */
+        if (ev[i].kind == 0) {
             synth_note_off(c, ev[i].note);
             if (ev[i].note == c->arp_cur) c->arp_cur = -1;
-        } else {                                        /* note-on  */
+        } else {
             synth_note_on(c, ev[i].note, ev[i].velocity);
             c->arp_cur = ev[i].note;
         }
     }
+}
+
+/* One engine tick (CWaveGen vt+184, rva 0x3C6750): the arp's keyboard object
+ * and state machine, whether the arp is on or not. */
+static void drv_tick(juno_ctx *c)
+{
+    carp_event ev[64];
+    arp_dispatch(c, ev, carp_engine_tick(&c->arp, c->kb_vel, ev, 64));
 }
 
 /* Debug-only: enable arp-event tracing into caller-owned buf (4*cap ints:
@@ -1012,26 +1172,180 @@ void juno_gui_arp_trace(juno_ctx *c, int *buf, int cap)
 }
 int juno_gui_arp_trace_count(juno_ctx *c) { return c ? c->arp_trace_n : 0; }
 
-/* Public note-on: feeds the arp's held-key set when enabled, else the synth.
- * This is the ENGINE/router-level entry (the oracle's NOTEON equivalent) — the
- * verification gates drive it directly with raw velocities, exactly as they
- * drive the plugin's engine under emulation. Hosts/UIs must enter through
- * juno_gui_midi_note_on below (the wrapper layer), like a DAW does. */
+/* Debug: the arp's fields in the plugin's CKbdArp / keyboard-object order, for
+ * the render-driver diagnostic (probes/host_render/diag_driver.py). out[32]. */
+int juno_gui_arp_debug(juno_ctx *c, int *out)
+{
+    const carp *e;
+    int s;
+    if (!c || !out) return 0;
+    e = &c->arp;
+    out[0] = (int)e->kb_ctr;          out[1] = e->beat_requant_armed;   out[2] = e->division;
+    out[3] = e->clk_on;               out[4] = (int)e->clk20;           out[5] = (int)e->tick_counter;
+    out[6] = e->state;                out[7] = (int)e->next_step_tick; out[8] = e->pat_step;
+    out[9] = e->count;                out[10] = e->sel_step;            out[11] = e->started;
+    out[12] = e->ud_dir;              out[13] = e->oct_adv_flag;        out[14] = e->oct_shift;
+    out[15] = e->range;               out[16] = e->selector;            out[17] = e->field56;
+    for (s = 0; s < 4; ++s) { out[18 + s] = e->sorted[s]; out[22 + s] = e->slot_pitch[s] < 0 ? 0x80 : e->slot_pitch[s];
+                              out[26 + s] = (int)e->slot_offtick[s]; }
+    out[30] = e->pat_nslots;          out[31] = e->pat_len;
+    return 32;
+}
+
+/* ---- THE KEYBOARD OBJECT (engine +120 + 64u: one per unit, all alike -- the
+ * port keeps one; CLAIMS B11, B16b). READ, transcribed in the plugin's order.
+ * Its transpose (+7) is 0: no plugin path writes it. ---- */
+enum { KB_DOWN = 0, KB_LATCH = 128 };
+
+static int  kbl_has(const kb_list *l, int k)      /* rva 0x3C4730 */
+{
+    int i;
+    for (i = 0; i < l->n; ++i) if (l->k[i] == k) return 1;
+    return 0;
+}
+static void kbl_add(kb_list *l, int k)            /* rva 0x3C4700: at the end, once */
+{
+    if (!kbl_has(l, k) && l->n < 128) l->k[l->n++] = k;
+}
+static void kbl_del(kb_list *l, int k)            /* rva 0x3C4650: the rest move down */
+{
+    int i;
+    for (i = 0; i < l->n && l->k[i] != k; ++i) ;
+    if (i == l->n) return;
+    for (--l->n; i < l->n; ++i) l->k[i] = l->k[i + 1];
+}
+/* the key maps (rva 0x3C48D0 test, 0x3C48B0 put if empty, 0x3C4810 take,
+ * 0x3C4800 clear, 0x3C48E0 any); k may be -1 in KB_LATCH (key 127 of KB_DOWN) */
+static int  kbm_has(const juno_ctx *c, int m, int k) { return c->kb_map[m + k] != 0xFF; }
+static void kbm_put(juno_ctx *c, int m, int k, int v) { if (c->kb_map[m + k] == 0xFF) c->kb_map[m + k] = (unsigned char)v; }
+static void kbm_take(juno_ctx *c, int m, int k, int *out)
+{
+    if (c->kb_map[m + k] == 0xFF) return;
+    *out = c->kb_map[m + k];
+    c->kb_map[m + k] = 0xFF;
+}
+static void kbm_clear(juno_ctx *c, int m, int k) { c->kb_map[m + k] = 0xFF; }
+static int  kbm_any(const juno_ctx *c, int m)
+{
+    int k;
+    for (k = 0; k < 128; ++k) if (c->kb_map[m + k] != 0xFF) return 1;
+    return 0;
+}
+
+/* rva 0x3C3AD0: the arp keys the sustain held (+532) leave the arp, key order */
+static void kb_free_arp_latch(juno_ctx *c)
+{
+    carp_event ev[64];
+    int k;
+    for (k = 0; k < 128; ++k)
+        if (kbl_has(&c->kb_arp_latch, k)) {
+            arp_dispatch(c, ev, carp_key_off(&c->arp, k, ev, 64));   /* rva 0x3BF290 -> 0x3BF110 */
+            kbl_del(&c->kb_arp_latch, k);
+        }
+}
+
+/* rva 0x3C3FA0: the notes the sustain held (+1176) leave the voices: mode 1
+ * from key 127 down, mode 2 from key 0 up, any other mode through the press
+ * list, oldest first, an empty slot (-1) included (index -1, note 255) */
+static void kb_free_note_latch(juno_ctx *c, int mode)
+{
+    int i;
+    if (mode == 1) {
+        for (i = 127; i >= 0; --i)
+            if (kbm_has(c, KB_LATCH, i)) { synth_note_off(c, i); kbm_clear(c, KB_LATCH, i); }
+    } else if (mode == 2) {
+        for (i = 0; i < 128; ++i)
+            if (kbm_has(c, KB_LATCH, i)) { synth_note_off(c, i); kbm_clear(c, KB_LATCH, i); }
+    } else {
+        for (i = 127; i >= 0; --i) {
+            int k = c->kb_order[i];
+            if (kbm_has(c, KB_LATCH, k)) { synth_note_off(c, k & 0xFF); kbm_clear(c, KB_LATCH, k); }
+        }
+    }
+}
+
+/* rva 0x3C4120 (and the voices half of 0x3C42D0): a key onto the voices. With
+ * the note sustain on and no key down, the held notes go first; a held note
+ * pressed again leaves the hold and plays again. */
+static void kb_note_key_on(juno_ctx *c, int k, int vel)
+{
+    int v = k;
+    if (c->kb_sus_note && !kbm_any(c, KB_DOWN)) {
+        int i;
+        for (i = 127; i >= 0; --i) {
+            int o = c->kb_order[i];
+            if (kbm_has(c, KB_LATCH, o)) { synth_note_off(c, o & 0xFF); kbm_clear(c, KB_LATCH, o); }
+        }
+    }
+    kbm_put(c, KB_DOWN, k, k);
+    if (c->kb_sus_note && kbm_has(c, KB_LATCH, v)) kbm_take(c, KB_LATCH, v, &v);
+    if (!kbm_has(c, KB_LATCH, v)) synth_note_on(c, v & 0xFF, vel);
+}
+
+/* rva 0x3C40A0 (and the voices half of 0x3C4230): a key off the voices; with
+ * the note sustain on its note is held instead */
+static void kb_note_key_off(juno_ctx *c, int k)
+{
+    int v = k;
+    kbm_take(c, KB_DOWN, k, &v);
+    if (c->kb_sus_note) kbm_put(c, KB_LATCH, v, v);
+    if (!kbm_has(c, KB_LATCH, v)) synth_note_off(c, v & 0xFF);
+}
+
+/* rva 0x3C3BB0 (and the arp half of 0x3C42D0): a key into the arp. With the arp
+ * sustain on and no key in the arp, the held arp keys go first; a key the arp
+ * already has is not given again; a held arp key pressed again only leaves the
+ * hold. */
+static void kb_arp_key_on(juno_ctx *c, int k, int vel)
+{
+    if (c->kb_sus_arp && c->kb_arp.n <= 0) kb_free_arp_latch(c);
+    if (kbl_has(&c->kb_arp, k)) return;
+    kbl_add(&c->kb_arp, k);
+    if (!kbl_has(&c->kb_arp_latch, k)) carp_add_key(&c->arp, k, vel);   /* rva 0x3C3440 */
+    kbl_del(&c->kb_arp_latch, k);
+}
+
+/* rva 0x3C3B40: a key out of the arp; with the arp sustain on it is held */
+static void kb_arp_key_off(juno_ctx *c, int k)
+{
+    carp_event ev[64];
+    if (!kbl_has(&c->kb_arp, k)) return;
+    kbl_del(&c->kb_arp, k);
+    if (c->kb_sus_arp) kbl_add(&c->kb_arp_latch, k);
+    else arp_dispatch(c, ev, carp_key_off(&c->arp, k, ev, 64));         /* rva 0x3BF290 */
+}
+
+/* rva 0x3C4550 / 0x3C4520: the note / arp sustain byte; a release frees what it held */
+static void kb_sus_note_set(juno_ctx *c, int on)
+{
+    if (on == c->kb_sus_note) return;
+    c->kb_sus_note = (unsigned char)on;
+    if (!on) kb_free_note_latch(c, (signed char)c->kb_flag8);
+}
+static void kb_sus_arp_set(juno_ctx *c, int on)
+{
+    if (on == c->kb_sus_arp) return;
+    c->kb_sus_arp = (unsigned char)on;
+    if (!on) kb_free_arp_latch(c);
+}
+
+/* The engine's note-on (CWaveGen vt+128, rva 0x3C7330 -> the keyboard's rva
+ * 0x3C42D0): a pending key-trig mode becomes the flag; the key into the arp or
+ * onto the voices; then the key's velocity and its place in the press order.
+ * This is the ENGINE-level entry the verification gates drive; hosts and UIs
+ * enter through juno_gui_midi_note_on below (the wrapper), as a DAW does. */
 void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     int k;
     ++eb_coef_gen;
     if (!c) return;
-    /* the keyboard object's note-on (rva 0x3C42D0): a pending key-trig mode
-     * becomes the flag first ... */
     if (c->kb_trig_pending) {
         c->kb_flag8 = (unsigned char)(c->kb_trig_mode - 1) <= 1;
         c->kb_trig_pending = 0;
     }
-    if (!c->arp_on) synth_note_on(c, midi_note, velocity);
-    else carp_add_key(&c->arp, midi_note, velocity);
-    /* ... and the key's velocity and its place in the press order last */
     if (midi_note < 0 || midi_note > 127) return;
+    if (c->arp_on) kb_arp_key_on(c, midi_note, velocity);
+    else kb_note_key_on(c, midi_note, velocity);
     c->kb_vel[midi_note] = (unsigned char)velocity;
     for (k = 0; k < 128 && c->kb_order[k] != midi_note && c->kb_order[k] != -1; ++k) ;
     if (k == 128) return;
@@ -1039,13 +1353,35 @@ void juno_gui_note_on(juno_ctx *c, int midi_note, int velocity)
     c->kb_order[0] = midi_note;
 }
 
-/* Public note-off. midi_note < 0 releases everything. */
+/* The engine's note-off (CWaveGen vt+120, rva 0x3C72D0 -> the keyboard's rva
+ * 0x3C4230): the key out of the arp or off the voices. (Port convenience, no
+ * plugin path: midi_note < 0 takes every key the keyboard has down or in the
+ * arp off, key order.) */
 void juno_gui_note_off(juno_ctx *c, int midi_note)
 {
     ++eb_coef_gen;
     if (!c) return;
-    if (!c->arp_on) { synth_note_off(c, midi_note); return; }
-    carp_remove_key(&c->arp, midi_note);     /* midi_note < 0 => release all */
+    if (midi_note < 0) {
+        int k;
+        for (k = 0; k < 128; ++k)
+            if (kbm_has(c, KB_DOWN, k) || kbl_has(&c->kb_arp, k)) juno_gui_note_off(c, k);
+        return;
+    }
+    if (midi_note > 127) return;
+    if (c->arp_on) kb_arp_key_off(c, midi_note);
+    else kb_note_key_off(c, midi_note);
+}
+
+/* CC 64 (CWaveGen vt+288, rva 0x3C7E20 -> the arp controller's rva 0x3C4E90):
+ * only a change acts; the keyboard's note sustain, then its arp sustain, follow
+ * the controller's byte (a HOLD: keys released under it keep sounding until the
+ * pedal is released or a new key is pressed with no key down) */
+static void kb_sustain(juno_ctx *c, int on)
+{
+    if (c->ctl_sus == on) return;
+    c->ctl_sus = (unsigned char)on;
+    kb_sus_note_set(c, on);
+    kb_sus_arp_set(c, c->ctl_sus);
 }
 
 /* --- Wrapper-level MIDI note path (what a DAW's events actually go through) ---
@@ -1082,12 +1418,163 @@ void juno_gui_set_kbd_velocity(juno_ctx *c, int on)
     if (c) c->kbd_velocity_sw = (on != 0);
 }
 
+void juno_gui_wrapper_midi(const juno_ctx *c, unsigned char m[3]);
+
+/* ---- THE PARAMETER STORE AND THE UI TIMER'S DRAIN (CLAIMS A32) ------------- */
+
+/* the state entry of `id`, -1 none */
+static int state_k(uint32_t id)
+{
+    int k;
+    for (k = 0; k < JUNO_STATE_N; ++k)
+        if (JUNO_STATE_ENT[k].id == id) return k;
+    return -1;
+}
+
+/* The model's set of state entry k. `masked`: the value & its storage mask --
+ * the model's set (rva 0x283DB0) that setState, the setting menu and the UI
+ * timer's drain use; a patch load's set from the record's bytes keeps the value
+ * as decoded (EXECUTED: state_save_gate.py, crafted records). Two entries set
+ * another (EXECUTED: the store-link census, every entry alone at four values):
+ * the LFO RATE and VCF CUTOFF bytes set their host-only float to byte x (1 /
+ * 255) in single precision; nothing else. */
+static void store_put(juno_ctx *c, int k, int32_t v, int masked)
+{
+    uint32_t id = JUNO_STATE_ENT[k].id;
+    if (masked && JUNO_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask);
+    c->store[k] = v;
+    if (id == 0x00600004u || id == 0x0060003Au) {
+        float h = (float)v * (1.0f / 255.0f);
+        int kh = state_k(id == 0x00600004u ? 0x00A00000u : 0x00A02802u);
+        if (kh >= 0) memcpy(&c->store[kh], &h, 4);
+    }
+}
+static void store_set(juno_ctx *c, int k, int32_t v) { store_put(c, k, v, 1); }
+
+/* the push's store record (rva 0x3221F0, through the core's slot 4): the
+ * parameter's earlier record leaves the queue, this one goes last */
+static void ui_push(juno_ctx *c, uint32_t id, float f)
+{
+    int i;
+    for (i = 0; i < c->ui_nq && c->ui_q[i].id != id; ++i) ;
+    if (i < c->ui_nq) {
+        memmove(&c->ui_q[i], &c->ui_q[i + 1], (size_t)(c->ui_nq - i - 1) * sizeof c->ui_q[0]);
+        --c->ui_nq;
+    }
+    if (c->ui_nq < JUNO_STATE_N) {
+        c->ui_q[c->ui_nq].id = id;
+        c->ui_q[c->ui_nq].f = f;
+        ++c->ui_nq;
+    }
+}
+
+/* The UI timer's handler (the core's slot 1, rva 0x320120; the plugin runs it
+ * every 50 ms on its UI thread, the port when the app calls this): the queued
+ * store records through the record value law (rva 0x31A940) into the store,
+ * the first CC message to a waiting MIDI learn (rva 0x319C90). No engine record
+ * (EXECUTED). Host parameter records never reach this queue. */
+void juno_gui_ui_tick(juno_ctx *c)
+{
+    int i;
+    if (!c) return;
+    for (i = 0; i < c->ui_nq; ++i) {
+        int e = juno_midi_entry(c->ui_q[i].id), k = state_k(c->ui_q[i].id);
+        if (e >= 0 && k >= 0) store_set(c, k, juno_midi_record_value(e, c->ui_q[i].f));
+    }
+    c->ui_nq = 0;
+    if (c->ui_cc >= 0) juno_ccmap_learn_done(&c->ccmap, c->ui_cc);
+    c->ui_cc = -1;
+}
+
+/* MIDI learn, as the plugin's GUI drives it (a control's menu): arm for the
+ * parameter `id` (rva 0x31AA40) -- the next drain gives it the first CC below
+ * 120 queued since the last drain; while it waits no CC drives a parameter --
+ * or forget its CC (rva 0x3192E0). 0 for an id the core has no record of. */
+int juno_gui_cc_learn(juno_ctx *c, uint32_t id)
+{
+    int e = c ? juno_midi_entry(id) : -1;
+    if (e < 0) return 0;
+    juno_ccmap_learn_arm(&c->ccmap, e);
+    return 1;
+}
+int juno_gui_cc_forget(juno_ctx *c, uint32_t id)
+{
+    int e = c ? juno_midi_entry(id) : -1;
+    if (e < 0) return 0;
+    juno_ccmap_forget(&c->ccmap, e);
+    return 1;
+}
+/* the CC a parameter's control shows (rva 0x319B70): -1 none or while a learn waits */
+int juno_gui_cc_of(const juno_ctx *c, uint32_t id)
+{
+    int e = c ? juno_midi_entry(id) : -1;
+    return e < 0 ? -1 : juno_ccmap_record_cc(&c->ccmap, e);
+}
+
+/* IComponent::getState (rva 0x349EA0 -> 0x31FD90): a big-endian byte count,
+ * then (id, value) as 4-byte big-endian fields: the 95 state entries in their
+ * order with the store's values, then the 128 CC map entries 0x10000000 + n
+ * (rva 0x319B90). Writes JUNO_STATE_SAVE_BYTES (1788) bytes; returns that, or
+ * -1 when `cap` is smaller. */
+static void put_be32(unsigned char *p, uint32_t v)
+{
+    p[0] = (unsigned char)(v >> 24); p[1] = (unsigned char)(v >> 16);
+    p[2] = (unsigned char)(v >> 8);  p[3] = (unsigned char)v;
+}
+int juno_gui_state_save(const juno_ctx *c, unsigned char *out, int cap)
+{
+    int k, n = 4 + 8 * (JUNO_STATE_N + 128);
+    unsigned char *p = out + 4;
+    if (!c || !out || cap < n) return -1;
+    put_be32(out, (uint32_t)(n - 4));
+    for (k = 0; k < JUNO_STATE_N; ++k, p += 8) {
+        put_be32(p, JUNO_STATE_ENT[k].id);
+        put_be32(p + 4, (uint32_t)c->store[k]);
+    }
+    for (k = 0; k < 128; ++k, p += 8) {
+        put_be32(p, 0x10000000u + (uint32_t)k);
+        put_be32(p + 4, (uint32_t)juno_ccmap_state_value(&c->ccmap, k));
+    }
+    return n;
+}
+
+/* The wrapper's push (rva 0x31F4E0) of one 3-byte message at a sample offset
+ * of the next block: a CC the core's map assigns to a parameter (rva 0x319A60:
+ * the boot's map, src/midi_tables.h, as the last state load left it, CLAIMS
+ * A31) first queues that parameter's record (kind 1:
+ * its id and the CC byte over its range, rva 0x31A850); then, for every
+ * message, an assigned CC too, the velocity policy (juno_gui_wrapper_midi) and
+ * the message's own record (kind 0) into the queue the render driver applies. */
+static void drv_push(juno_ctx *c, unsigned char m[3], int offset)
+{
+    if ((m[0] & 0xF0) == 0xB0) {
+        int e = juno_ccmap_lookup(&c->ccmap, m[1]);
+        if (e >= 0) ui_push(c, juno_midi_entry_id(e), juno_midi_cc_value(e, m[2]));
+        if (e >= 0 && c->drv_nq < DRV_QMAX) {
+            struct drv_rec *r = &c->drv_q[c->drv_nq++];
+            memset(r, 0, sizeof *r);
+            r->off = offset;
+            r->kind = 1;
+            r->id = juno_midi_entry_id(e);
+            r->f = juno_midi_cc_value(e, m[2]);
+        }
+        if (c->ui_cc < 0 && m[1] < 120) c->ui_cc = m[1];   /* the message's own record (core+512) */
+    }
+    juno_gui_wrapper_midi(c, m);
+    if (c->drv_nq < DRV_QMAX) {
+        struct drv_rec *r = &c->drv_q[c->drv_nq++];
+        memset(r, 0, sizeof *r);
+        r->off = offset;
+        r->m[0] = m[0]; r->m[1] = m[1]; r->m[2] = m[2];
+    }
+}
+
 void juno_gui_midi_note_off(juno_ctx *c, int midi_note)
 {
-    /* off-velocity (64 forced / raw) is inert in the engine: the assigner's
-     * noteOff zeroes velocity (oracle NOTEOFF, e2e_emu.py) and the port's
-     * note-off path carries none — so no velocity parameter here. */
-    juno_gui_note_off(c, midi_note);
+    unsigned char m[3];
+    if (!c) return;
+    m[0] = 0x80; m[1] = (unsigned char)(midi_note & 0x7F); m[2] = 64;
+    drv_push(c, m, 0);
 }
 
 /* The wrapper's MIDI intake for one 3-byte message, in place (rva 0x31F4E0,
@@ -1107,14 +1594,13 @@ void juno_gui_wrapper_midi(const juno_ctx *c, unsigned char m[3])
     }
 }
 
+/* A host note at the start of the next block (offset 0), through the wrapper. */
 void juno_gui_midi_note_on(juno_ctx *c, int midi_note, int velocity)
 {
     unsigned char m[3];
     if (!c) return;
     m[0] = 0x90; m[1] = (unsigned char)(midi_note & 0x7F); m[2] = (unsigned char)(velocity & 0x7F);
-    juno_gui_wrapper_midi(c, m);
-    if ((m[0] & 0xF0) == 0x80) juno_gui_midi_note_off(c, midi_note);
-    else juno_gui_note_on(c, midi_note, m[2]);
+    drv_push(c, m, 0);
 }
 
 /* Configure the arpeggiator. on: 0/1. mode: 0=up,1=down,2=up&down (the UI/patch
@@ -1134,74 +1620,136 @@ void juno_gui_midi_note_on(juno_ctx *c, int midi_note, int velocity)
  * non-synced presets are byte-identical with or without the push. */
 void juno_gui_set_tempo(juno_ctx *c, float bpm)
 {
+    /* the host's tempo for the next blocks (the ProcessContext tempo with
+     * kTempoValid): the render driver gives the engine round(tempo x 10) when it
+     * changes (40..300 BPM) and times the arp ticks from it */
     if (!c || bpm <= 0.0f) return;
-    c->host_bpm = bpm;
-    carp_set_bpm(&c->arp, (double)bpm);
-    juno_apply_lfo_tempo(c->st, c->lfo_rate_byte, (float)c->arp.bpm);
-    juno_apply_delay_tempo(c->st, c->dly_time_byte, c->dly_sync, c->dly_type,
-                           (float)c->arp.bpm);
+    c->drv_tempo = (double)bpm;
+    c->drv_tempo_valid = 1;
 }
 
-void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, float gate)
+/* The arp controller's switch, rva 0x3C49F0 (ARPEGGIO SW: dispatch 831 with
+ * v != 0; TYPE and STEP re-run it with force when their value changes). Only a
+ * change acts, or force. ON runs the config twice (for TYPE, for STEP) before
+ * anything moves; then the keyboard's route (+4, rva 0x3C4540) and the arp's
+ * own switch (rva 0x3C3450 -> 0x3BE3B0); then the keys. ON: with the pedal
+ * down the arp sustain first; the notes the sustain holds go into the arp and
+ * out again (so the arp sustain holds them), the note sustain off (its notes
+ * leave the voices), then every key down leaves the voices and goes into the
+ * arp at its velocity. OFF (the arp idle and reset): with the pedal down the
+ * note sustain first; the arp keys the sustain holds go onto the voices and off
+ * again (held by the note sustain), the arp sustain off, then every key in the
+ * arp leaves it and goes onto the voices -- with the key-trig flag 1 from key
+ * 127 down and 2 from key 0 up at velocity 100, else in press order, oldest
+ * first, at the key's own velocity. */
+static void arp_sw(juno_ctx *c, int on, int force)
 {
-    int was, type;
-    if (!c) return;
-    was = c->arp_on;
-    /* UI mode (0=up,1=down,2=up&down) -> CArpeggio TYPE (0=UP,1=UP&DOWN,2=DOWN). */
-    type = (mode == 1) ? CARP_TYPE_DOWN : (mode == 2) ? CARP_TYPE_UPDOWN : CARP_TYPE_UP;
-    carp_set_mode(&c->arp, type);
-    /* UI octaves 1..3 -> ARPEGGIO STEP 0..2 (carp_set_range maps step->range). */
-    carp_set_range(&c->arp, (oct < 1 ? 1 : (oct > 3 ? 3 : oct)) - 1);
-    if (bpm > 0.0f) {
-        c->host_bpm = bpm;               /* host tempo, also used by live TEMPO SYNC flips */
-        carp_set_bpm(&c->arp, (double)bpm);
-        /* Host tempo drives the synced LFO rate (cell 1072) AND the synced delay
-         * time (102352 + instance cells) too, not just the arp. Both are inert
-         * while the patch's TEMPO SYNC is off. */
-        juno_apply_lfo_tempo(c->st, c->lfo_rate_byte, (float)c->arp.bpm);
-        juno_apply_delay_tempo(c->st, c->dly_time_byte, c->dly_sync, c->dly_type,
-                               (float)c->arp.bpm);
+    carp *e = &c->arp;
+    int k, was = c->arp_on, mode;
+    if (e->ctl_on == on && !force) return;
+    e->ctl_on = on;
+    if (on) {
+        if ((unsigned)e->ctl_type <= 5) carp_ctl_config(e);
+        if ((unsigned)e->ctl_step <= 5) carp_ctl_config(e);
     }
-    if (gate >= 0.0f) carp_set_gate_index(&c->arp, gate_frac_to_index(gate));
-    c->arp_on = on ? 1 : 0;
-    if (was != c->arp_on && c->host_role) {
-        /* THE PLUGIN'S SWITCH (an ARPEGGIO SW host edit, rva 0x3C49F0): ON
-         * releases every pressed key's note and hands the key to the arp, in key
-         * order; OFF plays every key the arp still holds again as a note --
-         * highest first at velocity 100 when the key-trig flag is set, else in
-         * press order, oldest first, at the key's own velocity. (The switch's
-         * hold, which would keep released keys latched, is never set through
-         * the engine: no hold path, so the latched list stays empty.) */
-        int k;
-        if (c->arp_on) {
-            for (k = 0; k < 128; ++k)
-                if (c->held_notes[k >> 5] & (1u << (k & 31))) {
-                    synth_note_off(c, k);
-                    carp_add_key(&c->arp, k, c->kb_vel[k]);
-                }
-            carp_arm_beat_requant(&c->arp);
-        } else if (c->kb_flag8 == 1 || c->kb_flag8 == 2) {
-            for (k = 0; k < 128; ++k) {
-                int key = c->kb_flag8 == 1 ? 127 - k : k;
-                if (c->arp.note_active[key]) { carp_remove_key(&c->arp, key); synth_note_on(c, key, 100); }
+    c->arp_on = on;
+    if (on) {
+        carp_enable(e);
+        if (c->ctl_sus) kb_sus_arp_set(c, 1);
+        for (k = 0; k < 128; ++k)
+            if (kbm_has(c, KB_LATCH, k)) kb_arp_key_on(c, k, c->kb_vel[k]);
+        for (k = 0; k < 128; ++k)
+            if (kbm_has(c, KB_LATCH, k)) kb_arp_key_off(c, k);
+        if (c->ctl_sus) kb_sus_note_set(c, 0);
+        for (k = 0; k < 128; ++k)
+            if (kbm_has(c, KB_DOWN, k)) {
+                kb_note_key_off(c, k);
+                kb_arp_key_on(c, k, c->kb_vel[k]);
+            }
+    } else {
+        carp_event ev[64];
+        arp_dispatch(c, ev, carp_disable(e, ev, 64));
+        mode = c->kb_flag8;
+        if (c->ctl_sus) kb_sus_note_set(c, 1);
+        if (mode == 1 || mode == 2) {
+            int i;
+            for (i = 0; i < 128; ++i) {
+                k = mode == 1 ? 127 - i : i;
+                if (kbl_has(&c->kb_arp_latch, k)) kb_note_key_on(c, k, 100);
+            }
+            for (i = 0; i < 128; ++i) {
+                k = mode == 1 ? 127 - i : i;
+                if (kbl_has(&c->kb_arp_latch, k)) kb_note_key_off(c, k);
+            }
+            if (c->ctl_sus) kb_sus_arp_set(c, 0);
+            for (i = 0; i < 128; ++i) {
+                k = mode == 1 ? 127 - i : i;
+                if (kbl_has(&c->kb_arp, k)) { kb_arp_key_off(c, k); kb_note_key_on(c, k, 100); }
             }
         } else {
-            for (k = 127; k >= 0; --k) {
-                int key = c->kb_order[k];
-                if (key >= 0 && c->arp.note_active[key]) { carp_remove_key(&c->arp, key); synth_note_on(c, key, c->kb_vel[key]); }
+            int i;
+            for (i = 127; i >= 0; --i) {
+                k = c->kb_order[i];
+                if (k != -1 && kbl_has(&c->kb_arp_latch, k)) kb_note_key_on(c, k, c->kb_vel[k]);
+            }
+            for (i = 127; i >= 0; --i) {
+                k = c->kb_order[i];
+                if (k != -1 && kbl_has(&c->kb_arp_latch, k)) kb_note_key_off(c, k);
+            }
+            if (c->ctl_sus) kb_sus_arp_set(c, 0);
+            for (i = 127; i >= 0; --i) {
+                k = c->kb_order[i];
+                if (k != -1 && kbl_has(&c->kb_arp, k)) { kb_arp_key_off(c, k); kb_note_key_on(c, k, c->kb_vel[k]); }
             }
         }
-        c->arp_cur = -1;
-    } else if (was != c->arp_on) {           /* the recall model's toggle: flush everything */
+    }
+    if (was != on) c->arp_cur = -1;
+}
+
+/* ARPEGGIO TYPE (rva 0x3C4E50, dispatch 832) and ARPEGGIO STEP (rva 0x3C49B0,
+ * dispatch 833): 0..5 only; a new value re-runs the switch with force; while the
+ * arp is on, the config once more. While it is off the value only waits for the
+ * next switch-on. The config never touches the selector's index, its "started"
+ * flag or the UP&DOWN direction: a new TYPE swaps the selector and the pattern
+ * reloads at the next step (PROVEN, probes/host_render/arp_cfg_probe.py). */
+static void arp_type_set(juno_ctx *c, int v)
+{
+    carp *e = &c->arp;
+    if ((unsigned)v > 5) return;
+    if (e->ctl_type != v) { e->ctl_type = v; arp_sw(c, e->ctl_on, 1); }
+    if (e->ctl_on) carp_ctl_config(e);
+}
+
+static void arp_step_set(juno_ctx *c, int v)
+{
+    carp *e = &c->arp;
+    if ((unsigned)v > 5) return;
+    if (e->ctl_step != v) { e->ctl_step = v; arp_sw(c, e->ctl_on, 1); }
+    if (e->ctl_on) carp_ctl_config(e);
+}
+
+/* Configure the arpeggiator (UI convenience). on: 0/1. mode: 0=up,1=down,
+ * 2=up&down (the UI/patch convention). oct: 1..3. bpm: host tempo (<=0 keeps
+ * the current tempo). gate: note-on fraction 0..1, quantised to the machine's
+ * GATE table (<0 keeps current; the next config takes the pattern's gate
+ * again). Goes through the plugin's own controller: TYPE, STEP, then the
+ * switch. Outside a host edit a toggle first flushes every voice and the arp's
+ * keys (the recall model's toggle). */
+void juno_gui_arp_config(juno_ctx *c, int on, int mode, int oct, float bpm, float gate)
+{
+    if (!c) return;
+    if (bpm > 0.0f) juno_gui_set_tempo(c, bpm);   /* the host tempo (render driver) */
+    if ((on != 0) != c->arp_on && !c->host_role) {
         synth_note_off(c, -1);
         carp_remove_key(&c->arp, -1);
         c->arp_cur = -1;
-        /* Enabling the arp arms the one-shot beat-quantize re-latch (plugin sets
-         * router+6 at the controller SW method): the first 24-PPQN beat boundary
-         * re-quantizes the step grid to the beat. Matches the plugin's own arp
-         * schedule for the factory arp presets (tools/verify/arp_sched_ab.py). */
-        if (c->arp_on) carp_arm_beat_requant(&c->arp);
     }
+    /* UI mode (0=up,1=down,2=up&down) -> ARPEGGIO TYPE (0=UP,1=UP&DOWN,2=DOWN);
+     * UI octaves 1..3 -> ARPEGGIO STEP 0..2 */
+    arp_type_set(c, (mode == 1) ? CARP_TYPE_DOWN : (mode == 2) ? CARP_TYPE_UPDOWN : CARP_TYPE_UP);
+    arp_step_set(c, (oct < 1 ? 1 : (oct > 3 ? 3 : oct)) - 1);
+    arp_sw(c, on != 0, 0);
+    if (gate >= 0.0f) carp_set_gate_index(&c->arp, gate_frac_to_index(gate));
 }
 
 /* Core recall: apply patch `idx` from `bank` into the engine coefficient slots
@@ -1279,7 +1827,7 @@ static int ctx_state_recall(juno_ctx *c, unsigned char *st, const unsigned char 
 static void ctx_alloc_recall(juno_ctx *c, const unsigned char *bank, int idx, int flush,
                              const unsigned char *settled)
 {
-    int mode = 0, oct = 1, on, porta = 0, old_mode;
+    int porta = 0, old_mode;
     old_mode = c->assign_mode;
     juno_bank_voice_modes(bank, idx, &c->legato, &c->assign_mode, &porta);
     c->portamento_on = (porta != 0);
@@ -1326,33 +1874,34 @@ static void ctx_alloc_recall(juno_ctx *c, const unsigned char *bank, int idx, in
         c->legato_mask = 0;                   /* assigner+68, zeroed by the mode-change
                                                  path sub_7FF91DFB49F0 */
     }
-    /* Per-patch ARPEGGIATOR recall: on/mode/range come from the patch (bit-exact,
-     * see juno_bank_arp); rate stays local (the plugin's arp is host-tempo-synced,
-     * no per-patch rate). This makes "arp presets" arpeggiate on load.
-     * On a LIVE EDIT (flush=0) the reconfig is SKIPPED when the recalled arp
-     * settings equal the running state: juno_gui_arp_config -> carp_set_mode
-     * unconditionally resets the pattern selector to step 0, so re-running it on
-     * every slider move audibly restarted the arpeggio mid-pattern. When the edit
-     * DID change an arp setting (SW/TYPE/STEP sliders), the reset is the correct
-     * mode-change semantics and runs as before. */
-    {
-        int stype = 0, sdepth = 0;
-        int cur_mode = (c->arp.type == 0) ? 0 : (c->arp.type == 1) ? 2 : 1;
-        int cur_oct  = c->arp.range + 1;
-        on = juno_bank_arp(bank, idx, &mode, &oct);
+    /* Per-patch ARPEGGIATOR recall (the recall MODEL; a host-role edit drives the
+     * controller itself, juno_gui_host_set): the record's ARPEGGIO SW / TYPE /
+     * STEP through the plugin's controller in the order the arp gates' oracle
+     * calls it (tools/verify/arp_sched_ab.py), every one on a patch LOAD, only a
+     * changed one on a live edit (a TYPE / STEP setter run while the arp is on
+     * clears the octave offset and reloads the pattern: an unrelated slider must
+     * not). A toggle first flushes every voice and the arp's keys. SCATTER TYPE /
+     * DEPTH (leaf 92/93, record byte 322/330) through their setters (dispatch
+     * 834/835) -- INFERRED for the recall model: the plugin's state and patch
+     * loads never send them (src/juno_state_tables.h), and all 64 factory
+     * patches hold (0,0), which the setters leave as built. */
+    if (!c->host_role) {
+        int on, sw = 0, typ = 0, step = 0, stype = 0, sdepth = 0;
+        juno_bank_arp_raw(bank, idx, &sw, &typ, &step);
         juno_bank_scatter(bank, idx, &stype, &sdepth);
-        if (flush || on != c->arp_on || mode != cur_mode || oct != cur_oct
-                  || stype != c->last_scatter_type || sdepth != c->last_scatter_depth) {
-            juno_gui_arp_config(c, on, mode, oct, -1.0f, -1.0f);  /* keep UI bpm/gate */
-            /* Per-patch SCATTER pattern grid: SCATTER TYPE/DEPTH (proven leaf 92/93
-             * -> record byte 322/330) select the arp's STEP x SLOT grid. All 64
-             * factory patches decode to (0,0) = the default slab0/sub7 grid. Applied
-             * AFTER arp_config (which resets the selector) so the pattern load lands
-             * last. See scratchpad/oracle/scatter_recall_spec.md. */
-            carp_set_scatter(&c->arp, stype, sdepth);
-            c->last_scatter_type = stype;
-            c->last_scatter_depth = sdepth;
+        on = sw != 0;
+        if (on != c->arp_on) {
+            synth_note_off(c, -1);
+            carp_remove_key(&c->arp, -1);
+            c->arp_cur = -1;
         }
+        if (flush || on != c->arp.ctl_on) arp_sw(c, on, 0);
+        if (flush || typ != c->rm_arp_type) arp_type_set(c, typ);
+        if (flush || step != c->rm_arp_step) arp_step_set(c, step);
+        carp_ctl_scatter_type(&c->arp, stype, 0);
+        carp_ctl_scatter_depth(&c->arp, sdepth, 0);
+        c->rm_arp_type = typ;
+        c->rm_arp_step = step;
     }
     /* Per-patch TEMPO-SYNCED LFO rate (cell 1072): stash the LFO RATE byte so a later
      * host tempo change (juno_gui_arp_config with bpm > 0) recomputes 1072 =
@@ -1490,6 +2039,7 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
 {
     juno_host_feat f;
     unsigned char *tmp;
+    juno_ctx *t;
     unsigned char keep[2];
     int roff = juno_host_param_roff(i);
     if (roff < 0) return 0;
@@ -1506,16 +2056,18 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
     f.to = host_only_slot(i) >= 0 ? v : juno_host_param_decode(rec, i);
     f.ron1 = juno_reverb_level_on(host_val(rec, "REVERB LEVEL"));
     tmp = (unsigned char *)malloc(JUNO_STATE_BYTES);
-    if (tmp) {
-        juno_ctx t = *c;
+    t = tmp ? (juno_ctx *)malloc(sizeof *t) : NULL;   /* the context copy on the heap: it is
+                                                        * 121 KB, the WASM stack 64 KB */
+    if (tmp && t) {
+        *t = *c;
         memcpy(tmp, c->st, JUNO_STATE_BYTES);
         /* settle the live ramps on the copy first, so the recall meets the
          * cells at their targets (a recall arm whose target is already stored
          * early-outs and leaves the cell where it was: unsettled, a glide in
          * flight would read as the recall's value; host_edit_gate fx chain 13) */
         juno_rr_settle(tmp);
-        t.live_recall = 0;
-        if (ctx_state_recall(&t, tmp, c->bank, c->patch_idx, 0) >= 0) {
+        t->live_recall = 0;
+        if (ctx_state_recall(t, tmp, c->bank, c->patch_idx, 0) >= 0) {
             f.don1 = JI(tmp, JUNO_DLY_ON) != 0;
             if (juno_host_edit_covered(i, &f)) {
                 juno_host_edit(c->st, tmp, i, &f);
@@ -1540,17 +2092,19 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
                     memcpy(&h, &v, 4);
                     juno_rr_set_cut_last(c->st, (int)(h * 255.0f));
                 }
-                c->last_condition = t.last_condition;
-                c->hpf_type = t.hpf_type;
+                c->last_condition = t->last_condition;
+                c->hpf_type = t->hpf_type;
                 c->host_role = 1;
                 ctx_alloc_recall(c, c->bank, c->patch_idx, 0, tmp);
                 c->host_role = 0;
                 free(tmp);
+                free(t);
                 return 1;
             }
         }
-        free(tmp);
     }
+    free(tmp);
+    free(t);
     rec[roff] = keep[0]; rec[roff + 1] = keep[1];
     return 0;
 }
@@ -1584,6 +2138,23 @@ void juno_gui_host_set(juno_ctx *c, int i, int v)
         (!strcmp(juno_host_param_name(i), "HPF TYPE") || !strcmp(juno_host_param_name(i), "ARPEGGIO SW"))) v = (v != 0);
     if (v < juno_host_param_min(i) || v > juno_host_param_max(i)) return;
 #ifndef EB_DEVCELLS
+    if (i == host_index("ARPEGGIO SW") || i == host_index("ARPEGGIO TYPE") || i == host_index("ARPEGGIO STEP")) {
+        /* the arp row: the host entry calls the controller's own setter (rva
+         * 0x3C7AE0, dispatch 831..833); its engine cells are the apply's sends
+         * (dispatch 312..318, src/host_edit.c), the record keeps the value */
+        if (!(juno_host_edit_known(i) && host_edit_live(c, rec, i, v))) {
+            juno_host_param_encode(rec, i, v);
+            c->host_role = 1;
+            ctx_recall(c, c->bank, c->patch_idx, 0);
+            c->host_role = 0;
+        }
+        if (i == host_index("ARPEGGIO SW")) arp_sw(c, v != 0, 0);
+        else if (i == host_index("ARPEGGIO TYPE")) arp_type_set(c, v);
+        else arp_step_set(c, v);
+        c->rm_arp_type = host_val(rec, "ARPEGGIO TYPE");
+        c->rm_arp_step = host_val(rec, "ARPEGGIO STEP");
+        return;
+    }
     if (juno_host_edit_known(i) && host_edit_live(c, rec, i, v)) return;
     if (!strcmp(juno_host_param_name(i), "OCTAVE SHIFT")) {
         juno_host_param_encode(rec, i, v);
@@ -1594,6 +2165,28 @@ void juno_gui_host_set(juno_ctx *c, int i, int v)
     ctx_recall(c, c->bank, c->patch_idx, 0);
 }
 
+static int ro_switch(juno_ctx *c);
+
+/* vm.vs.sampleRate (id 0x0FFFC015, in the DAW state, value & 0x7F): the core's
+ * listener (rva 0x3222F0) sets the engine rate the next block switches to: the
+ * value indexes the table at rva 0x94AB80 (0..4: 96000, 88200, 48000, 44100,
+ * 32000; 6..127: the bytes that follow it -- EXECUTED, 6 -> 0, 127 ->
+ * 1634624882: no render object, silence); 5 is automatic, the engine's
+ * current rate (rva 0x34B260). Script.xml's range 0..3 is not applied. */
+void juno_gui_set_engine_rate_setting(juno_ctx *c, int value)
+{
+    double r;
+    int cur;
+    if (!c) return;
+    value &= 0x7F;                    /* the model keeps the setting & 0x7F; its listener reads that */
+    r = (double)JF(c->st, 16);                       /* rva 0x34B260: round, clamp */
+    r = r >= 0.0 ? floor(r + 0.5) : ceil(r - 0.5);
+    cur = !(r >= -2147483647.0) ? (int)0x80000001u : (r > 2147483647.0 ? 0x7FFFFFFF : (int)r);
+    c->eng_req = juno_ro_setting_rate(value, cur, &c->eng_auto);
+    store_set(c, state_k(0x0FFFC015u), value);       /* the model's value (getState) */
+    ro_switch(c);              /* a fresh start switches at once; else the next block */
+}
+
 /* --- The plugin's own preset paths (CLAIMS B6, src/juno_state_tables.h) -------
  * EXECUTED in the booted plugin (probes/b6/): IComponent::initialize, setState
  * and the patch browser's load all set model values, and the core queues one
@@ -1602,23 +2195,154 @@ void juno_gui_host_set(juno_ctx *c, int i, int v)
  * of host edits: a panel parameter through juno_gui_host_set (which drops a
  * value outside the database range), vm.vs.voiceCount stored for the render
  * (A21), everything else (patch name, view state) reaches no engine cell. */
+static void engine_host_entry(juno_ctx *c, int host, int32_t v);
+
 static void apply_event(juno_ctx *c, int host, int32_t v)
+{
+    if (host == JUNO_SE_SRATE) {         /* the core's listener, at once (rva 0x3222F0) */
+        juno_gui_set_engine_rate_setting(c, v);
+        return;
+    }
+    /* while records wait for the next block, a preset path queues behind them:
+     * the plugin applies every one of its paths' events in that order */
+    if (c->drv_queue_mode || c->drv_nq > 0) {               /* the model's record for the next block */
+        if (c->drv_nq < DRV_QMAX) {
+            struct drv_rec *r = &c->drv_q[c->drv_nq++];
+            memset(r, 0, sizeof *r);
+            r->kind = 2; r->host = host; r->v = v;
+        }
+        return;
+    }
+    engine_host_entry(c, host, v);
+}
+
+/* The engine's host entry (CWaveGen vt+112, rva 0x3C7AE0): the voice count
+ * (vm.vs.voiceCount) to the engine's field; an id of its map to the units;
+ * any other id (the engine-rate setting among them) nothing. */
+static void engine_host_entry(juno_ctx *c, int host, int32_t v)
 {
     if (host >= 0) juno_gui_host_set(c, host, v);
     else if (host == JUNO_SE_VOICES) juno_gui_set_voice_count(c, v);
 }
 
-/* The plugin as shipped: the engine's construction mutes every unit for its
- * first 960 samples (juno_driver_arm_latch), and the first process() applies
- * the 95 defaults IComponent::initialize queues (e.g. six voices). Call once,
- * right after create. */
+/* The start-up mute and initialize's 95 defaults, applied at once, ahead of any
+ * record already queued (the plugin queues them for its first block; nothing
+ * renders before it). `setting`: the engine-rate setting's entry too -- the
+ * core's listener, at initialize; it is no engine event, so the replay after a
+ * rate switch leaves it out. */
+static void plugin_defaults(juno_ctx *c, int setting)
+{
+    int k, q = c->drv_queue_mode, nq = c->drv_nq;
+    juno_driver_arm_latch(c->st);
+    c->drv_queue_mode = 0;
+    c->drv_nq = 0;
+    for (k = 0; k < JUNO_STATE_N; ++k)
+        if (setting || JUNO_STATE_ENT[k].host != JUNO_SE_SRATE)
+            apply_event(c, JUNO_STATE_ENT[k].host, JUNO_STATE_ENT[k].dflt);
+    c->drv_queue_mode = q;
+    c->drv_nq = nq;
+}
+
+/* The plugin's setSampleRate on its running engine (CWaveGen vt+24, rva 0x3C7A20;
+ * CLAIMS B13b, src/recall_ramp.c): nothing when the rate is the engine's own
+ * (ucomiss / je: also when either is NaN); else, unit by unit, the processor's
+ * suspend, the effect container's re-applies (the values a settled recall of
+ * the current record gives at the new rate), the state's rate, the
+ * constructor's constants (sub_1803990C0, without the BUILD wrapper's state)
+ * and its runtime reset (sub_1803A1300: voice and effect memories, the effect
+ * buffers, the ring positions), then the resume. The voices keep their notes,
+ * the records their increments (only the re-armed ones change). `recall`: 0 on
+ * a fresh start, where the engine still holds the build's own values (the port's
+ * build at the new rate, coldstate_ab.py), 1 once a recall or edit has run. */
+static void setsr_inplace(juno_ctx *c, float rate, int recall)
+{
+    float old = JF(c->st, 16);
+    unsigned char *ref;
+    struct juno_host_shim rshim;     /* the reference's own: attaching c->shim would point the
+                                      * live master's selectors into `ref`, freed below */
+    juno_ctx *t;                     /* the context copy on the heap (121 KB; the WASM stack is 64 KB) */
+    if (!(rate < old || rate > old)) return;
+    ref = (unsigned char *)malloc(JUNO_STATE_BYTES);
+    t = ref ? (juno_ctx *)malloc(sizeof *t) : NULL;
+    if (!ref || !t) { free(ref); free(t); return; }
+    memset(&rshim, 0, sizeof rshim);
+    st_build(ref, rate, &rshim, c->chorus_mode);     /* the build's rate laws at the new rate */
+    juno_rr_copy_proc(ref, c->st);                    /* the tempo, the tap copy, the reverb's state */
+    *t = *c;
+    t->live_recall = 0;
+    if (recall && c->bank) ctx_state_recall(t, ref, c->bank, c->patch_idx, 0);
+    juno_rr_settle(ref);
+    juno_rr_setsr_suspend(c->st);                     /* vt3, at the old rate */
+    juno_rr_setsr_reapply(c->st, ref);                /* rva 0x3BC980 */
+    JF(c->st, 16) = rate;                             /* rva 0x3C2770: the records' rate */
+    juno_engine_init_core(c->st);                     /* sub_1803990C0 */
+    juno_chorus_init(c->st);                          /* sub_1803A1300 */
+    juno_driver_unit_noise_reinit(c->st);             /* ... in every unit's noise copy */
+    juno_rr_setsr_resume(c->st);                      /* vt5, at the new rate */
+    free(ref);
+    free(t);
+}
+
+/* The engine-rate switch (rva 0x320BA2: setSampleRate, then the render object's
+ * lookup; found, the tick phase and note count start again). The plugin
+ * switches at the start of a block, before that block's queue. On a fresh
+ * start -- the state byte-equal to a fresh create + plugin_init at this host
+ * rate -- that is before initialize's defaults, which the port applied at
+ * plugin_init: the port rebuilds the boot (the build at 96000, its ramps in
+ * flight: CLAIMS A29), switches it in place and applies the defaults again.
+ * On an engine that has run it switches in place (CLAIMS B13b). Returns 1
+ * when it switched. */
+int juno_gui_plugin_init(juno_ctx *c);
+
+static int ro_switch(juno_ctx *c)
+{
+    if (c->ro_model || c->ro.engine == c->eng_req) return 0;
+    if ((float)c->eng_req != JF(c->st, 16)) {
+        juno_ctx *ref = ctx_create((float)c->drv_rate, c->chorus_mode);
+        int same;
+        if (!ref) return 0;
+        juno_gui_plugin_init(ref);
+        same = !memcmp(ref->st + 176, c->st + 176, JUNO_STATE_BYTES - 176);
+        juno_gui_destroy(ref);
+        if (same) {
+            float built = JF(c->st, 16);
+            st_build(c->st, built, &c->shim, c->chorus_mode);
+            juno_engine_no_setsr(c->st);
+            juno_rr_boot(c->st);
+            setsr_inplace(c, (float)c->eng_req, 0);   /* the build's own values: no recall yet */
+            plugin_defaults(c, 0);
+        } else {
+            setsr_inplace(c, (float)c->eng_req, 1);
+        }
+    }
+    c->ro.engine = c->eng_req;
+    if (juno_ro_lookup(&c->ro) > 0) { c->drv_phase = 0; c->drv_notes = 0; }
+    return 1;
+}
+
+/* The plugin as shipped: its engine built at the constructor's 96000 with the
+ * render object for (96000, host rate) -- the converter at a 44100 / 48000
+ * host, silence at a rate outside the table (CLAIMS B13); the construction
+ * mutes every unit for its first 960 engine samples (juno_driver_arm_latch);
+ * the 95 defaults IComponent::initialize queues (e.g. six voices) apply at the
+ * first block. Call once, right after create. */
 int juno_gui_plugin_init(juno_ctx *c)
 {
-    int k;
     if (!c || !ctx_model(c, 0)) return 0;
-    juno_driver_arm_latch(c->st);
-    for (k = 0; k < JUNO_STATE_N; ++k)
-        apply_event(c, JUNO_STATE_ENT[k].host, JUNO_STATE_ENT[k].dflt);
+    /* the plugin's engine: built at the constructor's 96000 (rva 0x3C5A50 ->
+     * the build; no setSampleRate follows while the setting is the default),
+     * and the core's render object for (96000, the host rate) -- setupProcessing
+     * (rva 0x321AC0) looks it up and, found, zeroes the tick phase and note count */
+    if (JF(c->st, 16) != 96000.0f) st_build(c->st, 96000.0f, &c->shim, c->chorus_mode);
+    c->ro_model = 0;
+    c->eng_req = 96000;
+    c->eng_auto = 0;
+    juno_ro_free(&c->ro);
+    juno_ro_init(&c->ro, 96000, c->drv_rate);
+    if (juno_ro_lookup(&c->ro) > 0) { c->drv_phase = 0; c->drv_notes = 0; }
+    juno_engine_no_setsr(c->st);
+    juno_rr_boot(c->st);               /* the build's ramps still in flight (CLAIMS B15) */
+    plugin_defaults(c, 1);
     /* initialize's core setup (rva 0x320420) sets the wrapper's velocity switch
      * from vm.vs.velSense, whose default is 1 (Script.xml; EXECUTED:
      * probes/b6/kbd_vel_default.py): a fresh instance plays the key's own
@@ -1628,35 +2352,69 @@ int juno_gui_plugin_init(juno_ctx *c)
     return JUNO_STATE_N;
 }
 
-static uint32_t be(const unsigned char *p, int n)
+/* initialize on the ENGINE MODEL: the defaults and the start-up mute on the
+ * engine juno_gui_create made, which renders the host block itself at that
+ * rate, any rate (no table, no 96 kHz build). Not a plugin configuration where
+ * the rates differ from the table's (host 96001: the plugin plays silence);
+ * the configuration of the gates whose oracle is an engine fed the plugin's
+ * queues at the gate's rate (state_load_gate.py). */
+int juno_gui_plugin_init_model(juno_ctx *c)
 {
-    uint32_t v = 0;
-    while (n--) v = (v << 8) | *p++;      /* the deserializer keeps the low 32 bits */
+    if (!c || !ctx_model(c, 0)) return 0;
+    plugin_defaults(c, 1);
+    c->kbd_velocity_sw = 1;
+    return JUNO_STATE_N;
+}
+
+/* `n` bytes at `off` of a stream of `len` bytes, big-endian, the low 32 bits
+ * kept (the deserializer's accumulator); 0 past the stream's end (an IBStream
+ * read of fewer bytes than asked leaves the rest of the plugin's zeroed vector) */
+static uint32_t be_at(const unsigned char *p, uint32_t len, uint32_t off, uint32_t n)
+{
+    uint32_t v = 0, i;
+    for (i = 0; i < n; ++i)
+        v = (v << 8) | (off + i < len ? p[off + i] : 0u);    /* the low 32 bits are kept */
     return v;
 }
 
-/* IComponent::setState: `data` is the stream the plugin's getState writes -- a
- * big-endian byte count, then (id, value) entries, 4-byte big-endian fields (8
- * when the count exceeds (95 + 128) * 64 / 5: rva 0x321F20). Each entry whose
- * id is in the parameter list takes value & its storage mask (EXECUTED: 8, 7 or
- * 16 bits, or the value as given) and is applied in PAYLOAD order; other ids
- * (the 128 MIDI-assign entries, unknown ids) reach no engine cell. Returns the
- * number of parameter entries applied, -1 for an empty or short stream (the
- * plugin returns kResultFalse and sets nothing). */
+/* IComponent::setState (rva 0x34AAA0): `data` is the stream, `len` its length.
+ * The count's width is 8 bytes when the stream is longer than (95 + 128) x 64 /
+ * 5 = 2854 bytes, else 4 (rva 0x322330); its low 32 bits, as an int, are the
+ * payload's byte count: <= 0 -> kResultFalse, nothing set (-1). A payload the
+ * stream does not hold in full reads 0 past its end (the plugin's vector is
+ * zeroed; the SDK's stream reads what it has). The deserializer (rva 0x321F20)
+ * then reads (id, value) entries with fields of 8 bytes when the count exceeds
+ * 2854, else 4, keeping the low 32 bits. The CC map is emptied first (rva
+ * 0x31A4F0) and the MIDI-assign entries 0x10000000 + n refill it (rva 0x31A6A0,
+ * CLAIMS A31): a payload without them leaves every CC free. Each entry whose id
+ * is in the parameter list takes value & its storage mask (EXECUTED: 8, 7 or 16
+ * bits, or the value as given) and is applied in PAYLOAD order, to the model
+ * (the store getState writes) and to the engine. Unknown ids reach nothing; an
+ * entry of zeros (past the stream's end) is one. A last entry the count cuts
+ * short is read past the plugin's vector (undefined there) and skipped here.
+ * Returns the number of parameter entries applied, -1 for kResultFalse. */
 int juno_gui_state_load(juno_ctx *c, const unsigned char *data, int len)
 {
-    uint32_t n, off, w;
+    uint32_t hw, n, avail, off, w;
+    int32_t cnt;
     int k, applied = 0;
-    if (!c || !data || len < 4 || !ctx_model(c, 0)) return -1;
-    n = be(data, 4);
-    if (n == 0 || n > (uint32_t)len - 4) return -1;
+    if (!c || !data || len < 0 || !ctx_model(c, 0)) return -1;
+    hw = ((JUNO_STATE_N + 128) << 6) / 5 < len ? 8 : 4;
+    cnt = (int32_t)be_at(data, (uint32_t)len, 0, hw);
+    if (cnt <= 0) return -1;
+    n = (uint32_t)cnt;
+    avail = (uint32_t)len > hw ? (uint32_t)len - hw : 0;
+    data += (uint32_t)len > hw ? hw : (uint32_t)len;
     w = ((JUNO_STATE_N + 128) << 6) / 5 < (int)n ? 8 : 4;
-    for (off = 0; off + 2 * w <= n; off += 2 * w) {
-        uint32_t id = be(data + 4 + off, (int)w);
-        int32_t v = (int32_t)be(data + 4 + off + w, (int)w);
+    juno_ccmap_clear(&c->ccmap);              /* rva 0x31A4F0 (-1): the CC map emptied */
+    for (off = 0; off + 2 * w <= n && off < avail; off += 2 * w) {   /* past the data: zeros, id 0 */
+        uint32_t id = be_at(data, avail, off, w);
+        int32_t v = (int32_t)be_at(data, avail, off + w, w);
+        if (juno_ccmap_state_entry(&c->ccmap, id, v)) continue;   /* rva 0x31A6A0 */
         for (k = 0; k < JUNO_STATE_N && JUNO_STATE_ENT[k].id != id; ++k) ;
         if (k == JUNO_STATE_N) continue;
         if (JUNO_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask);
+        store_set(c, k, v);
         apply_event(c, JUNO_STATE_ENT[k].host, v);
         ++applied;
     }
@@ -1694,9 +2452,63 @@ int juno_gui_load_patch(juno_ctx *c, const unsigned char *bank, int len, int idx
     if (!ctx_model(c, bank)) return 0;
     r = bank + 23 + (size_t)idx * JUNO_REC_BYTES;
     memcpy(c->bank + 23, r, 16);          /* the patch's name: display only */
-    for (k = 0; k < JUNO_PATCH_EV_N; ++k)
-        apply_event(c, JUNO_PATCH_EV[k].host, rec_value(r, &JUNO_PATCH_EV[k]));
+    for (k = 0; k < JUNO_PATCH_EV_N; ++k) {
+        int32_t v = rec_value(r, &JUNO_PATCH_EV[k]);
+        int sk = state_k(JUNO_PATCH_EV[k].id);
+        if (sk >= 0) store_put(c, sk, v, 0);         /* the set from bytes: as decoded */
+        apply_event(c, JUNO_PATCH_EV[k].host, v);
+    }
     return JUNO_PATCH_EV_N;
+}
+
+/* The same three model paths as the PLUGIN orders them for the engine: the
+ * core queues one record per value (rva 0x347050) and the render driver applies
+ * them at offset 0 of the next block, after any arp tick due there. */
+int juno_gui_queue_state(juno_ctx *c, const unsigned char *data, int len)
+{
+    int r;
+    if (!c) return -1;
+    c->drv_queue_mode = 1;
+    r = juno_gui_state_load(c, data, len);
+    c->drv_queue_mode = 0;
+    return r;
+}
+int juno_gui_queue_patch(juno_ctx *c, const unsigned char *bank, int len, int idx)
+{
+    int r;
+    if (!c) return 0;
+    c->drv_queue_mode = 1;
+    r = juno_gui_load_patch(c, bank, len, idx);
+    c->drv_queue_mode = 0;
+    return r;
+}
+/* A model edit of the parameter `id`, as the plugin's GUI makes one (its
+ * controls set the model: rva 0x283DB0): the store keeps value & its mask
+ * (getState), and the engine gets that value at the next block. (For a host-
+ * automatable parameter the plugin's listener tells the host instead, which
+ * sends the value back through process() -- the timing is the host's.) 0 for an
+ * id outside the state list. */
+int juno_gui_model_set(juno_ctx *c, uint32_t id, int32_t v)
+{
+    int k = c ? state_k(id) : -1;
+    if (k < 0) return 0;
+    store_set(c, k, v);
+    if (JUNO_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask);
+    c->drv_queue_mode = 1;
+    apply_event(c, JUNO_STATE_ENT[k].host, v);
+    c->drv_queue_mode = 0;
+    return 1;
+}
+
+void juno_gui_queue_host(juno_ctx *c, int host, int v)
+{
+    int k;
+    if (!c) return;
+    for (k = 0; k < JUNO_STATE_N && JUNO_STATE_ENT[k].host != host; ++k) ;
+    if (k < JUNO_STATE_N && host != JUNO_SE_NONE) store_set(c, k, v);   /* the model's value (getState) */
+    c->drv_queue_mode = 1;
+    apply_event(c, host, v);
+    c->drv_queue_mode = 0;
 }
 
 /* Packed arp state for the UI to read back after apply: bit0 = on, bits1-2 = mode
@@ -1712,87 +2524,437 @@ int juno_gui_get_arp(juno_ctx *c)
     return (c->arp_on ? 1 : 0) | ((mode & 3) << 1) | (((oct - 1) & 3) << 3);
 }
 
-/* Render nframes stereo samples into out (interleaved L,R). Advances the note
- * driver's gate ramp once per sample (matches the control-tick rate the ramp
- * math assumes). Returns 1 if the full master/chorus path ran, 0 if the dry
- * fallback was used. */
-int juno_gui_render(juno_ctx *c, float *out, int nframes)
+/* ---- THE RENDER DRIVER (rva 0x320B20, docs/HOST_RENDER_LAYER.md) --------- */
+
+/* One queued record through the engine (the consumer's switch, rva 0x3211D6).
+ * Kind 2, a preset path's value: the engine's host entry (vt+112). Kind 1, a
+ * parameter record (a CC the map assigns; a host parameter through process()):
+ * the id map (rva 0x319AB0) gives its entry -- none, nothing -- and the host
+ * entry takes the entry's value (rva 0x31A940). Kind 0, a MIDI message by its
+ * status: note-off (vt+120) and note-on (vt+128) count down / up the note count
+ * core+568; CC (vt+136: rva 0x34AE90 -- 1 the mod wheel, 11 the expression,
+ * 64 the sustain, 123 all notes off, others nothing); pitch bend (vt+152: the
+ * 14 bits less 8192, as 16 bits); poly and channel aftertouch, program change
+ * (vt+160 / +168 / +144): empty functions. */
+static void apply_event(juno_ctx *c, int host, int32_t v);
+static void engine_host_entry(juno_ctx *c, int host, int32_t v);
+
+/* CC 123 (CWaveGen vt+296, rva 0x3C7DA0 -> the keyboard's rva 0x3C3A00 -> the
+ * assigner's controller vt+32 with 123, rva 0x354A90 -> its all-notes-off, rva
+ * 0x3530B0; the assigner's hold +24 is never set through the engine): a
+ * gate-off for every voice of the count whose slot is gated (rva 0x355270) --
+ * each gate leaf ends with the held flag 1856 = "a voice still gated", so the
+ * last one leaves 0 -- then every slot "no note", the held-note mask and +68
+ * cleared. The keyboard's maps and the arp stay as they are. */
+static void kb_all_notes_off(juno_ctx *c)
 {
-    int i, full = 0;
-    asg_sync(c);                           /* the engine render's preamble (B10) */
-    for (i = 0; i < nframes; ++i) {
-        if (c->arp_on) arp_tick(c);        /* step the arp pattern in real time */
-        juno_note_tick(c->st);
-        full = juno_driver_render_sample(c->st, &out[2 * i], &out[2 * i + 1]);
-        if (c->arp_trace_cap) c->arp_trace_smp++;
+    int v, n = c->asg_count < JUNO_NUM_VOICES ? c->asg_count : JUNO_NUM_VOICES, any = 0;
+    for (v = 0; v < n; ++v)
+        if (c->voice_gated[v]) { juno_note_off(c->st, v); any = 1; }
+    for (v = 0; v < JUNO_NUM_VOICES; ++v) {
+        c->voice_note[v] = -1;
+        c->voice_gated[v] = 0;
     }
-    return full;
+    c->held_notes[0] = c->held_notes[1] = c->held_notes[2] = c->held_notes[3] = 0;
+    c->legato_mask = 0;
+    if (any) juno_note_broadcast_held(c->st, 0);
 }
 
-/* One sample of the per-sample CONTROL step (arp + note tick) that juno_gui_render
- * runs before each driver render — WITHOUT rendering. The multi-core split calls
- * this on every core's private copy each sample, so every copy advances its arp
- * and note/gate state identically (they all hold the same replicated control), and
- * each core then renders only its own voices. Deterministic and side-effect-free
- * across copies. Not used by the single-core path. */
+static void drv_cc(juno_ctx *c, int n, int v)
+{
+    switch (n) {
+    case 1:   juno_midi_mod(c->st, v); break;
+    case 11:  juno_midi_expression(c->st, v); break;
+    case 64:  kb_sustain(c, v != 0); break;
+    case 123: kb_all_notes_off(c); break;
+    default:  break;                       /* 10 (vt+272) and the rest: nothing */
+    }
+}
+
+static void drv_apply(juno_ctx *c, const struct drv_rec *r)
+{
+    const unsigned char *m = r->m;
+    if (r->kind == 2) { apply_event(c, r->host, r->v); return; }   /* the engine's host entry (vt+112) */
+    if (r->kind == 1) {
+        int e = juno_midi_entry(r->id);
+        if (e >= 0) engine_host_entry(c, juno_midi_entry_host(e), juno_midi_record_value(e, r->f));
+        return;
+    }
+    switch (m[0] & 0xF0) {
+    case 0x80: juno_gui_note_off(c, m[1]); c->drv_notes--; break;
+    case 0x90: juno_gui_note_on(c, m[1], m[2]); c->drv_notes++; break;
+    case 0xB0: drv_cc(c, m[1], m[2]); break;
+    case 0xE0: juno_midi_bend(c->st, (uint16_t)(m[1] + ((m[2] - 64) << 7))); break;
+    default: break;
+    }
+}
+
+/* The tempo the engine is given (CWaveGen vt+176, rva 0x3C7F10): x10 in
+ * 400..3000 dispatches the tempo leaf (375) to every unit, any other value
+ * nothing. */
+static void drv_engine_tempo(juno_ctx *c, int t10)
+{
+    if ((unsigned)(t10 - 400) > 0xA28u) return;
+    juno_rr_set_tempo(c->st, t10);                   /* processor +1056 (rva 0x3B9710) */
+    c->host_bpm = (float)t10 / 10.0f;
+    juno_apply_lfo_tempo_t10(c->st, c->lfo_rate_byte, t10);
+    juno_apply_delay_tempo_t10(c->st, c->dly_time_byte, c->dly_sync, c->dly_type);
+}
+
+typedef struct { float *il, *L, *R; int dry, full; } drv_out;
+
+/* One engine sample (the engine render's per-sample body). */
+static void drv_engine_sample(juno_ctx *c, drv_out *o, float *l, float *r)
+{
+    juno_note_tick(c->st);
+    if (o->dry) {
+        float vbuf[JUNO_NUM_VOICES];
+        int v;
+        juno_driver_render_voices(c->st, vbuf);   /* 8 voices; noise block stepped once */
+        *l = 0.0f;
+        for (v = 0; v < JUNO_NUM_VOICES; ++v) *l += vbuf[v];
+        *r = *l;
+        o->full = 1;
+    } else {
+        o->full = juno_driver_render_sample(c->st, l, r);
+    }
+}
+
+static void drv_out_sample(juno_ctx *c, drv_out *o, int t, float l, float r)
+{
+    if (o->il) { o->il[2 * t] = l; o->il[2 * t + 1] = r; }
+    if (o->L) o->L[t] = l;
+    if (o->R) o->R[t] = r;
+    if (c->arp_trace_cap) c->arp_trace_smp++;
+}
+
+static void drv_render_sample(juno_ctx *c, drv_out *o, int t)
+{
+    float l, r;
+    drv_engine_sample(c, o, &l, &r);
+    drv_out_sample(c, o, t, l, r);
+}
+
+/* The engine render (CWaveGen vt+56, rva 0x3C7400) the converter calls: its
+ * preamble (the voice count sync), then `count` samples into ptrs. */
+static void ro_engine_render(void *user, float *const *ptrs, int nch, int count)
+{
+    juno_ctx *c = (juno_ctx *)user;
+    int i;
+    asg_sync(c);
+    for (i = 0; i < count; ++i) {
+        float l, r;
+        drv_engine_sample(c, (drv_out *)c->ro_out, &l, &r);
+        ptrs[0][i] = l;
+        if (nch > 1) ptrs[1][i] = r;
+    }
+}
+
+/* One segment of the host block, samples [t0, t0 + n), through the render
+ * object (CWaveGen vt+48, rva 0x34B070: n >= 1): IDENTITY, the engine render
+ * of the n samples; CONVERTER (rva 0x343E30), the engine renders what the
+ * filter needs, the filter makes the n host samples; SILENCE (rva 0x344280),
+ * zeros and no engine render. The engine model (juno_gui_create) renders as
+ * IDENTITY. */
+static void ro_render(juno_ctx *c, drv_out *o, int t0, int n)
+{
+    int kind, t;
+    if (n <= 0) return;
+    kind = c->ro_model ? JUNO_RO_IDENTITY : juno_ro_kind(&c->ro);
+    if (kind == JUNO_RO_IDENTITY) {
+        asg_sync(c);
+        for (t = t0; t < t0 + n; ++t) drv_render_sample(c, o, t);
+        return;
+    }
+    if (kind == JUNO_RO_CONVERTER) {
+        float *out[2];
+        if (n > c->ro_tmp_cap) {
+            float *p = (float *)realloc(c->ro_tmp, (size_t)(2 * n) * sizeof(float));
+            if (p) { c->ro_tmp = p; c->ro_tmp_cap = n; }
+        }
+        if (n <= c->ro_tmp_cap) {
+            out[0] = c->ro_tmp;
+            out[1] = c->ro_tmp + c->ro_tmp_cap;
+            c->ro_out = o;
+            if (juno_ro_convert(&c->ro, out, 2, n, ro_engine_render, c) == 0) {
+                for (t = 0; t < n; ++t) drv_out_sample(c, o, t0 + t, out[0][t], out[1][t]);
+                return;
+            }
+        }
+    }
+    for (t = t0; t < t0 + n; ++t) drv_out_sample(c, o, t, 0.0f, 0.0f);   /* SILENCE (or out of memory) */
+}
+
+/* One host block of n samples: the driver's tempo, the queued records at
+ * their offsets, the arp tick clock, the engine render with its preamble at
+ * the start of every segment. */
+static void drv_block(juno_ctx *c, int n, drv_out *o)
+{
+    struct drv_rec *rec = c->drv_work;
+    int nrec = 0, i, k, t, cut, T, s0;
+    long long P, ph;
+    /* the engine rate (rva 0x320BA2): a setting that asks another rate switches
+     * the engine (setSampleRate) and the render object; the object found, the
+     * tick phase and the note count start again */
+    ro_switch(c);
+    /* the tempo (rva 0x320C04): round(tempo x 10.0), half away from zero (rva
+     * 0x3F2050), clamped to an int; given to the engine only when the host's
+     * tempo is valid and it changed */
+    {
+        double r = c->drv_tempo * 10.0;
+        r = r >= 0.0 ? floor(r + 0.5) : ceil(r - 0.5);
+        if (!(r >= -2147483647.0)) T = -2147483647;
+        else if (r > 2147483647.0) T = 0x7FFFFFFF;
+        else T = (int)r;
+    }
+    if (T != c->drv_tempo_last && c->drv_tempo_valid) {
+        c->drv_tempo_last = T;
+        drv_engine_tempo(c, T);
+    }
+    /* the tick period (rva 0x320C93): (60e9 x host rate / T) / 24, in 1e-8
+     * host samples. T <= 0 divides by zero or never advances in the plugin (no
+     * host sends such a tempo): the port then ticks no more. */
+    P = T > 0 ? (60000000000LL * (long long)c->drv_rate / T) / 24 : (long long)1 << 62;
+    if (P <= 0) P = (long long)1 << 62;
+    /* the records: last block's deferred ones first (rva 0x31E7E0), then this
+     * block's. A note-on at or before the block's last note-off moves one
+     * sample after it; offsets never go down; from the first record at or after
+     * n on, every record waits for the next block, at offset 0 */
+    for (i = 0; i < c->drv_ncarry; ++i) rec[nrec++] = c->drv_carry[i];
+    for (i = 0; i < c->drv_nq; ++i) rec[nrec++] = c->drv_q[i];
+    c->drv_ncarry = c->drv_nq = 0;
+    {
+        int last = -1, lastoff = -1;
+        cut = nrec;
+        for (i = 0; i < nrec; ++i) {
+            int st = rec[i].kind ? 0 : rec[i].m[0] & 0xF0, off = rec[i].off;
+            if (st == 0x90) {
+                if (off <= lastoff) { off = lastoff + 1; rec[i].off = off; }
+            } else if (st == 0x80) {
+                lastoff = off;
+            }
+            if (off <= last) { rec[i].off = last; off = last; }
+            last = off;
+            if (n <= off) { cut = i; break; }
+        }
+        for (i = cut; i < nrec && c->drv_ncarry < DRV_QMAX; ++i) {
+            c->drv_carry[c->drv_ncarry] = rec[i];
+            c->drv_carry[c->drv_ncarry++].off = 0;
+        }
+    }
+    /* sample by sample: the ticks due at or before the sample's start, the
+     * records at the sample (the first key restarts the clock with a tick),
+     * the ticks inside the sample; each of them ends the segment before the
+     * sample, which renders first through the render object (ro_render) */
+    ph = c->drv_phase;
+    k = 0;
+    s0 = 0;
+    for (t = 0; t < n; ++t) {
+        int seg = (t == 0);
+        if (ph <= 100000000LL * t) {
+            if (!seg) { ro_render(c, o, s0, t - s0); s0 = t; seg = 1; }
+            while (ph <= 100000000LL * t) { drv_tick(c); ph += P; }
+        }
+        if (k < cut && rec[k].off == t) {
+            int before = c->drv_notes;
+            if (!seg) { ro_render(c, o, s0, t - s0); s0 = t; seg = 1; }
+            while (k < cut && rec[k].off == t) { drv_apply(c, &rec[k]); ++k; }
+            if (!before && c->drv_notes > 0) { ph = 100000000LL * t + P; drv_tick(c); }
+        }
+        if (ph < 100000000LL * (t + 1)) {
+            if (!seg) { ro_render(c, o, s0, t - s0); s0 = t; seg = 1; }
+            while (ph < 100000000LL * (t + 1)) { drv_tick(c); ph += P; }
+        }
+    }
+    ro_render(c, o, s0, n - s0);
+    c->drv_phase = ph - 100000000LL * n;
+}
+
+/* Render nframes stereo samples into out (interleaved L,R): one host block
+ * through the render driver, with the records queued since the last call.
+ * Returns 1 if the full master/chorus path ran, 0 if the dry fallback was used. */
+int juno_gui_render(juno_ctx *c, float *out, int nframes)
+{
+    drv_out o;
+    if (!c || nframes <= 0) return 0;
+    memset(&o, 0, sizeof o);
+    o.il = out;
+    drv_block(c, nframes, &o);
+    return o.full;
+}
+
+/* The plugin's IAudioProcessor::process for one block (rva 0x34A380): host
+ * note events (type 0 on, 1 off; velocity 0..1 as the host gives it) become
+ * MIDI -- status = channel | 0x90 / 0x80, data1 = pitch & 0x7F, data2 =
+ * (int)(float)(velocity x 127.0) & 0x7F -- pushed through the wrapper at their
+ * sample offsets; the host tempo (tempo_valid = the ProcessContext's
+ * kTempoValid) and the block through the render driver. outL / outR: n each. */
+int juno_gui_process_ex(juno_ctx *c, const juno_host_note *ev, int nev, const juno_host_param *par, int npar,
+                        int tempo_valid, double tempo, float *outL, float *outR, int n);
+int juno_gui_process(juno_ctx *c, const juno_host_note *ev, int nev, int tempo_valid, double tempo,
+                     float *outL, float *outR, int n)
+{
+    return juno_gui_process_ex(c, ev, nev, 0, 0, tempo_valid, tempo, outL, outR, n);
+}
+
+/* IAudioProcessor::setupProcessing (rva 0x3CB150): the plugin stores the setup
+ * and nothing else; the next setActive applies its rate. */
+void juno_gui_setup_processing(juno_ctx *c, double host_rate)
+{
+    if (c) c->setup_rate = (int)host_rate;
+}
+
+/* IComponent::setActive, either way (rva 0x34AA50): the core's setup at the
+ * stored rate (rva 0x321AC0) -- the automatic engine-rate setting re-reads the
+ * engine's rate; the render object takes the rate (rva 0x3442D0, CLAIMS B13c)
+ * and is looked up for (engine rate, host rate) again: found, its buffers start
+ * from zeros and the tick phase and the note count go to 0 -- then the
+ * all-sound-off record (rva 0x3208E0: CC 120, offset 0, past the CC map; the
+ * engine's CC entry takes no 120, so it changes nothing). The engine itself is
+ * kept: a host-rate change on a running instance only swaps the converter. */
+void juno_gui_set_active(juno_ctx *c, int on)
+{
+    (void)on;
+    if (!c || c->ro_model) return;
+    if (c->eng_auto) c->eng_req = c->ro.engine;
+    c->drv_rate = c->setup_rate;
+    c->ro.host = c->setup_rate;
+    if (juno_ro_lookup(&c->ro) > 0) { c->drv_phase = 0; c->drv_notes = 0; }
+    if (c->drv_nq < DRV_QMAX) {
+        struct drv_rec *r = &c->drv_q[c->drv_nq++];
+        memset(r, 0, sizeof *r);
+        r->m[0] = 0xB0; r->m[1] = 120; r->m[2] = 0;
+    }
+}
+
+/* One host parameter queue's last point through the plugin's process() (rva
+ * 0x34A380): an id below the MIDI-mapping base (core +48) becomes a parameter
+ * record (kind 1, rva 0x31F2C0: the value as a float); base + n becomes a MIDI
+ * message through the push -- n 0..127 the CC n with round(value x 127), 128
+ * channel aftertouch the same, 129 the pitch bend round(value x 16383) as two
+ * 7-bit bytes (rounded half away from zero, rva 0x3F2050; below 0 or NaN 0,
+ * above 255 / 65535 that), any other n three zero bytes. */
+static void proc_param(juno_ctx *c, const juno_host_param *p)
+{
+    int32_t id = (int32_t)p->id, base = (int32_t)juno_midi_base();
+    unsigned char m[3] = { 0, 0, 0 };
+    if (base > id) {
+        if (c->drv_nq < DRV_QMAX) {
+            struct drv_rec *r = &c->drv_q[c->drv_nq++];
+            memset(r, 0, sizeof *r);
+            r->off = p->offset;
+            r->kind = 1;
+            r->id = p->id;
+            r->f = (float)p->value;
+        }
+        return;
+    }
+    {
+        uint32_t d = (uint32_t)id - (uint32_t)base;
+        if (d <= 128u) {
+            double x = p->value * 127.0;
+            unsigned char b;
+            x = (x >= 0.0 || x != x) ? floor(x + 0.5) : ceil(x - 0.5);
+            b = !(x >= 0.0) ? 0 : (x > 255.0 ? 0xFF : (unsigned char)(int)x);
+            if (d < 128u) { m[0] = 0xB0; m[1] = (unsigned char)d; m[2] = b; }
+            else { m[0] = 0xD0; m[1] = b; }
+        } else if (d == 129u) {
+            double x = p->value * 16383.0;
+            unsigned w;
+            x = (x >= 0.0 || x != x) ? floor(x + 0.5) : ceil(x - 0.5);
+            w = !(x >= 0.0) ? 0u : (x > 65535.0 ? 0xFFFFu : (unsigned)(int)x & 0xFFFFu);
+            m[0] = 0xE0; m[1] = (unsigned char)(w & 0x7F); m[2] = (unsigned char)((w >> 7) & 0x7F);
+        }
+    }
+    drv_push(c, m, p->offset);
+}
+
+/* juno_gui_process with the host's parameter queues (one entry per queue: its
+ * last point, the one the plugin reads), after the note events, in queue
+ * order. */
+int juno_gui_process_ex(juno_ctx *c, const juno_host_note *ev, int nev, const juno_host_param *par, int npar,
+                        int tempo_valid, double tempo, float *outL, float *outR, int n)
+{
+    drv_out o;
+    int i;
+    if (!c || n <= 0) return 0;
+    for (i = 0; i < nev; ++i) {
+        unsigned char m[3];
+        float v = ev[i].velocity;
+        m[0] = (unsigned char)((ev[i].channel & 0x0F) | (ev[i].type == 0 ? 0x90 : 0x80));
+        m[1] = (unsigned char)(ev[i].pitch & 0x7F);
+        m[2] = (unsigned char)((int)(float)((double)v * 127.0) & 0x7F);
+        drv_push(c, m, ev[i].offset);
+    }
+    for (i = 0; i < npar; ++i) proc_param(c, &par[i]);
+    c->drv_tempo_valid = tempo_valid != 0;
+    c->drv_tempo = tempo_valid ? tempo : 120.0;
+    memset(&o, 0, sizeof o);
+    o.L = outL; o.R = outR;
+    drv_block(c, n, &o);
+    return o.full;
+}
+
+/* One sample of the driver's control half without the render: the multi-core
+ * split (pi/) runs it on every core's copy, then each core renders its voices.
+ * A one-sample block: the queued records at offset 0, the ticks of the sample. */
 void juno_gui_tick(juno_ctx *c)
 {
+    struct drv_rec *rec;
+    int i, nrec = 0, T;
+    long long P, ph;
     if (!c) return;
-    if (c->arp_on) arp_tick(c);
+    rec = c->drv_work;
+    {
+        double r = c->drv_tempo * 10.0;
+        r = r >= 0.0 ? floor(r + 0.5) : ceil(r - 0.5);
+        T = !(r >= -2147483647.0) ? -2147483647 : (r > 2147483647.0 ? 0x7FFFFFFF : (int)r);
+    }
+    if (T != c->drv_tempo_last && c->drv_tempo_valid) { c->drv_tempo_last = T; drv_engine_tempo(c, T); }
+    P = T > 0 ? (60000000000LL * (long long)c->drv_rate / T) / 24 : (long long)1 << 62;
+    if (P <= 0) P = (long long)1 << 62;
+    for (i = 0; i < c->drv_ncarry; ++i) rec[nrec++] = c->drv_carry[i];
+    for (i = 0; i < c->drv_nq; ++i) rec[nrec++] = c->drv_q[i];
+    c->drv_ncarry = c->drv_nq = 0;
+    ph = c->drv_phase;
+    while (ph <= 0) { drv_tick(c); ph += P; }
+    if (nrec) {
+        int before = c->drv_notes;
+        for (i = 0; i < nrec; ++i) drv_apply(c, &rec[i]);
+        if (!before && c->drv_notes > 0) { ph = P; drv_tick(c); }
+    }
+    while (ph < 100000000LL) { drv_tick(c); ph += P; }
+    c->drv_phase = ph - 100000000LL;
     juno_note_tick(c->st);
     if (c->arp_trace_cap) c->arp_trace_smp++;
 }
 
 /* Warm the engine to its steady idle state, exactly as a DAW does by rendering
- * silence continuously from the moment the plugin is activated. A freshly
- * prepared engine holds ~190 smoothed control cells at 0 that only converge
- * toward their targets WHILE rendering (the per-sample smoother pump inside the
- * voice/master renders); until they converge (~1.5-2 s) the first played note
- * audibly swells (measured: first 250 ms ~7x quieter on Rip Lead). In a DAW the
- * host has always rendered long before the user plays, so the swell is never
- * heard there — the browser app must warm up at boot to match. Renders idle
- * into a scratch buffer in blocks of 512, each with the render's preamble;
- * no arp ticks (nothing is held). */
+ * silence continuously from the moment the plugin is activated: blocks of 512
+ * through the render driver (its ticks run as they do in the plugin), output
+ * discarded. A freshly prepared engine holds ~190 smoothed control cells that
+ * converge only WHILE rendering; until they do the first note audibly swells.
+ * In a DAW the host has always rendered long before the user plays, so the
+ * browser app warms up at boot to match. */
 void juno_gui_warmup(juno_ctx *c, int nsamples)
 {
     float buf[2 * 512];
     if (!c) return;
     while (nsamples > 0) {
-        int b = nsamples > 512 ? 512 : nsamples, i;
-        /* the engine render's preamble, as every block of juno_gui_render: the
-         * voice count juno_gui_plugin_init sent (six) syncs the assigners here,
-         * or the first note after the warm-up lands on a stopped unit and the
-         * next block's sync gates it off (state_load_gate.py, app family) */
-        asg_sync(c);
-        for (i = 0; i < b; ++i) {
-            juno_note_tick(c->st);
-            juno_driver_render_sample(c->st, &buf[2 * i], &buf[2 * i + 1]);
-        }
+        int b = nsamples > 512 ? 512 : nsamples;
+        juno_gui_render(c, buf, b);
         nsamples -= b;
     }
 }
 
-/* Render the DRY voice signal (voice 0 = the one exact per-sample render),
- * bypassing the master/chorus/output stage. This is the genuine pre-FX signal
- * and carries the bit-exact timbre of whatever coefficients are loaded (osc +
- * VCF + VCA + both ADSRs). We use it for the note preview because the master's
- * output/chorus stage depends on ~250 coefficients Hex-Rays could not decompile
- * (see src/master_render.c) — with them zero the master's dry & chorus-I output
- * collapse to silence. So the dry voice is the most faithful AUDIBLE signal the
- * port can currently produce. Ticks the note driver once per sample. */
+/* Render the DRY voice signal (the sum of the 8 voices, the master/chorus/output
+ * stage bypassed) through the same driver: the note preview of the old app. */
 int juno_gui_render_dry(juno_ctx *c, float *out, int nframes)
 {
-    int i, v;
-    if (!c) return 0;
-    asg_sync(c);
-    for (i = 0; i < nframes; ++i) {
-        float mix = 0.0f, vbuf[JUNO_NUM_VOICES];
-        if (c->arp_on) arp_tick(c);        /* keep the arp advancing in the dry path too */
-        juno_note_tick(c->st);
-        juno_driver_render_voices(c->st, vbuf);   /* 8 voices; noise block stepped once */
-        for (v = 0; v < JUNO_NUM_VOICES; ++v) mix += vbuf[v];
-        out[2 * i]     = mix;                     /* mono mix -> both channels */
-        out[2 * i + 1] = mix;
-    }
+    drv_out o;
+    if (!c || nframes <= 0) return 0;
+    memset(&o, 0, sizeof o);
+    o.il = out; o.dry = 1;
+    drv_block(c, nframes, &o);
     return 1;
 }

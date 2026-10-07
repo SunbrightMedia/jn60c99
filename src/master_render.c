@@ -2090,7 +2090,10 @@ LABEL_105:
      * fade interrupted by a new tank clear, the double step rounds to another
      * float (EXECUTED: 0x39d1b809 - step -> plugin 0x31f20000, double
      * 0x31f1ff14; tools/verify/host_edit_gate.py fx chain 10, playbook 123). */
-    if ( v474 < 1.0 && *(float *)(a1 + 10759376) > 0.0 )
+    /* NaN (playbook 81): rva 0x3667C5 `comiss; jae` twice -- not taken on unordered, so a NaN
+     * fade or level FADES IN. The decompiler's `<` / `>` skipped it (CLAIMS B13b: a level ramp
+     * armed at an engine rate of 0 steps to NaN). */
+    if ( !(v474 >= 1.0) && !(0.0 >= *(float *)(a1 + 10759376)) )
     {
       v475 = v474 + 0.00039999999f;
       *(float *)(a1 + 11022032) = v474 + 0.00039999999f;
@@ -2115,11 +2118,14 @@ LABEL_105:
     }
     v475 = v474;
   }
-  if ( v475 <= 0.0 || (v476 = *(float *)(a1 + 10759376), v476 <= 0.0) )
+  /* rva 0x3667FC / 0x36680E `comiss; jbe` -- TAKEN on unordered: a NaN fade or level takes this
+   * branch, not the tank. C's `<=` is false on NaN (playbook 81, CLAIMS B13b). */
+  if ( !(v475 > 0.0) || (v476 = *(float *)(a1 + 10759376), !(v476 > 0.0)) )
   {
     v529 = v177;
     v530 = v176;
-    if ( *(int *)(a1 + 10759872) > 0 && v475 <= 0.0 )
+    /* rva 0x366F14 `comiss; ja` -- not taken on unordered: a NaN fade wipes (playbook 81) */
+    if ( *(int *)(a1 + 10759872) > 0 && !(v475 > 0.0) )
     {
       for ( i = 0; i < 256; i += 8 )
       {
