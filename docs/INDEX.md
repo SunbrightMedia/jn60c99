@@ -79,6 +79,7 @@ their old paths so no comment pointer dangles. Live project state:
 | RUN_GUIDE_GUI.md | REFERENCE | Test GUI — full parameter control + patch recall |
 | RUN_GUIDE_TABLES.md | REFERENCE | How to run `extract_tables.py` (final voice-engine data dump) — *regeneration guide for juno_tables.h; extraction folders purged* |
 | TRACKB_CHARTER.md | LIVING | --- — *PARKED track; gates live in tools/trackb/* |
+| USER_BANKS.md | LIVING | The port against the user's own banks (input, never ground truth): what they reach that the factory bank does not (tools/bank_census.py), the gates run per bank (userbank_parity.py: recall, render, the product path), the result per bank (CLAIMS A34) |
 | VELOCITY_COEFFS.md | REFERENCE | Velocity coefficients 6864 / 9680 — binary-derived resolution |
 | VOICE_MODES.md | REFERENCE | Voice-assign modes (ASSIGN MODE / LEGATO) — bit-exact port |
 | VOICE_RENDER_MAP.md | REFERENCE | voice_render (0x180369070) — full stage map |

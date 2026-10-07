@@ -276,21 +276,41 @@ def cmp_stream(la, ra, lb, rb):
     return n, nd, first
 
 
+def _ref_one(idx):
+    """one patch's reference: a fresh engine, as ref_render always made (a
+    --jobs worker runs it in its own process: Unicorn only)"""
+    import e2e_emu as E
+    import real_recall as R
+    return idx, ref_render(idx, E.bank_bytes(), R.leaf_table(), E, R)
+
+
 # CLI dispatch is gated on __main__ so this module is safely importable (fuzz_diff.py
 # reuses prepare_recall); otherwise importing it would run a render here.
 _MODE = sys.argv[1] if (__name__ == '__main__' and len(sys.argv) > 1) else None
 if _MODE == '--ref':
     import e2e_emu as E
-    import real_recall as R
-    patches = parse_patches(sys.argv[2:])
-    bank = E.bank_bytes(); leaves = R.leaf_table()
+    argv = sys.argv[2:]
+    jobs = 1
+    if '--jobs' in argv:                      # patches in N worker processes
+        k = argv.index('--jobs')
+        jobs = int(argv[k + 1])
+        del argv[k:k + 2]
+    patches = parse_patches(argv)
+    bank = E.bank_bytes()
+    if jobs > 1:
+        import multiprocessing as mp
+        with mp.get_context('spawn').Pool(jobs) as pool:
+            res = pool.imap(_ref_one, patches, chunksize=1)
+            res = list(res)
+    else:
+        res = map(_ref_one, patches)
     out = {}
-    for idx in patches:
-        L, Rr = ref_render(idx, bank, leaves, E, R)
+    for idx, (L, Rr) in res:
         out[idx] = (L, Rr)
         sys.stderr.write("ref patch %2d (%s): %d frames\n" % (idx, E.patch_name(bank, idx), len(L)))
         sys.stderr.flush()
-    pickle.dump(out, open(PKL, 'wb'))
+    pickle.dump(out, open(PKL + '.partial', 'wb'))   # whole or nothing (playbook 142)
+    os.replace(PKL + '.partial', PKL)
     print("REF: saved %d patch render streams (N=%d, note %d vel %d, SR %g)" %
           (len(out), N, NOTE, VEL, SR))
 

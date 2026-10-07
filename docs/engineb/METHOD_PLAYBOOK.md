@@ -2873,3 +2873,27 @@ Product code keeps every stack frame small, and the compiler enforces it:
 121 KB frames). A scratch copy of a large struct goes on the heap. When a WASM run traps with a
 signature mismatch, rebuild with -g -sASSERTIONS=2 before reading any code: the trap is usually
 far from the cause.
+
+## 159. A VARIABLE A DRIVER SETS IS A CLAIM ABOUT EVERY TOOL IT RUNS -- GREP THAT EACH ONE READS IT
+Paid 2026-10-07 (JUNO, the user banks). userbank_parity.py set JUNO_SCRATCH_TAG per bank "so one
+bank's reference can never be read as another's", and no tool read it: plugin_recall_ref.py,
+port_state_dump.py and recall_gate.py wrote and read fixed names, so a user-bank run replaced the
+factory bank's recall reference. In the same driver, the render A/B's ORACLE process chose its
+patches through a ctypes call into libjuno.so: the candidate inside the oracle's address space,
+deciding what the oracle renders (the two-process rule broken for a convenience).
+### The rule
+For every variable a driver sets, grep that every tool it runs reads it, and make the tools refuse
+the dangerous combination (truth.scratch(): a truth directory other than truth/ with no tag exits;
+seen to fire). An oracle process loads no candidate library, not even to choose its cases: the
+oracle renders every case, the candidate side drops what it cannot grade.
+
+## 160. A TOOTH INSIDE A MUTE IS BLIND -- PUT A TIMING TOOTH WHERE THE OUTPUT CAN SHOW IT
+Paid 2026-10-07 (JUNO, bank_product_gate.py). The first late-note tooth moved the chain's first key
+one sample and did not bite. That key falls inside the plugin's 960-sample start-up mute, where a
+sample's shift does not reach the output (INFERRED: the recall-model tooth's first difference is at
+host sample 187, the mute's end). The gate was right; the tooth stood where no defect can show.
+Moved to the second key, after the mute: it bites.
+### The rule
+A tooth that does not bite is first a question about the tooth: where in the output could its
+defect appear? Place timing teeth on events after every mute and settle, and keep beside them a
+tooth whose effect is known to reach the output (here: the wrong patch).
