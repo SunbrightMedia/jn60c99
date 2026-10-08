@@ -225,6 +225,12 @@ typedef struct {
     struct ui_rec { uint32_t id; float f; } ui_q[JUNO_STATE_N];
     int   ui_nq;
     int   ui_cc;
+
+    /* THE HOST EDIT'S SCRATCH (CLAIMS A35): the state copy and the context copy
+     * host_edit_live runs the recall on, kept for the context's life (NULL until
+     * the first edit). Only the recall's cells are refreshed per edit. */
+    unsigned char *edit_st;
+    void *edit_ctx;
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -367,15 +373,21 @@ static juno_ctx *ctx_create(float sample_rate, int chorus_mode)
 void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
 {
     int v;
-    unsigned char *st;
+    unsigned char *st, *edit_st;
+    void *edit_ctx;
     if (!c) return;
     ++eb_coef_gen;
     st = c->st;
+    edit_st = c->edit_st;               /* the host edit's scratch: kept (its bytes outside
+                                         * the recall's cells never reach a result, A35) */
+    edit_ctx = c->edit_ctx;
     free(c->bank);                      /* the model record (a fresh create has none) */
     juno_ro_free(&c->ro);
     free(c->ro_tmp);
     memset(c, 0, sizeof *c);            /* match calloc's zero of the whole ctx */
     c->st = st;
+    c->edit_st = edit_st;
+    c->edit_ctx = edit_ctx;
     memset(st, 0, JUNO_STATE_BYTES);    /* match calloc's zero of the state     */
 
     juno_enable_hw_ftz();
@@ -420,6 +432,8 @@ int juno_gui_debug_voices(juno_ctx *c, int *notes, unsigned char *gated)
 void juno_gui_destroy(juno_ctx *c)
 {
     if (!c) return;
+    free(c->edit_st);
+    free(c->edit_ctx);
     free(c->bank);
     juno_ro_free(&c->ro);
     free(c->ro_tmp);
@@ -2035,6 +2049,95 @@ static int host_val(const unsigned char *rec, const char *name)
  * recall (ASSIGN MODE flush, arpeggiator) then runs on the live context.
  * Returns 0 (nothing done, record untouched) when the scratch copy cannot be
  * allocated or the census did not cover the key. */
+/* THE RECALL'S CELLS (CLAIMS A35, 2026-10-08). host_edit_live runs the recall on
+ * a copy of the state and takes the setter's cells from it. That copy was the
+ * whole 12 MB array, allocated and filled for every edit: a patch load (about 80
+ * edits in one block) took ~90 ms of one process() call on Linux and ~380 ms
+ * under Windows, where every 12 MB allocation maps fresh pages -- an audible gap
+ * at every patch change, and 3-8 ms for every panel edit (MEASURED,
+ * gui/win/juno60_win.c --render, 2026-10-08).
+ *
+ * The recall reads and writes only the cells of the recall census -- the
+ * device's cell array, engine_b/dev/ebdev_seg.h: the voice blocks [176, 84272)
+ * and 31 segments -- and the port-owned tail [11022032, JUNO_UNIT_END): the
+ * processor shadows, the recall ramps, the voice-count cell, the unit latches.
+ * Those ranges, each widened to whole 64-byte lines, are copied per edit into a
+ * scratch kept for the context's life; the rest of the scratch never reaches a
+ * result. PROVEN, tools/verify/edit_cover_gate.py: a build that fills every byte
+ * outside these ranges with random bytes before EVERY edit equals the full copy
+ * bit for bit -- audio and the whole state -- over every host parameter and
+ * value class, the factory and the user banks, notes held, three rates; a cover
+ * without the voice block, without one effect segment or without the tail
+ * differs (the teeth). */
+static const unsigned JUNO_EDIT_COVER[][2] = {
+    {0u, 87168u}, {88192u, 88256u}, {90368u, 96960u}, {100992u, 102848u}, {131072u, 131136u},
+    {154304u, 154368u}, {192000u, 192064u}, {262144u, 262208u}, {524288u, 524352u}, {588864u, 588928u},
+    {600000u, 600064u}, {842496u, 842560u}, {1048576u, 1048640u}, {1499968u, 1500032u},
+    {2097152u, 2097216u}, {2199936u, 2200000u}, {2418432u, 2418496u}, {2509760u, 2509824u},
+    {4194304u, 4194368u}, {4195200u, 4195328u}, {4297088u, 4298112u}, {6395200u, 6396672u},
+    {6429376u, 6430976u}, {6463680u, 6463744u}, {6496448u, 6497664u}, {8388608u, 8388672u},
+    {8594752u, 8594816u}, {8999936u, 9000000u}, {10691904u, 10693504u}, {10726208u, 10726272u},
+    {10758848u, 10759936u}, {11022016u, 11051136u},
+};
+#define JUNO_EDIT_NCOVER ((int)(sizeof JUNO_EDIT_COVER / sizeof JUNO_EDIT_COVER[0]))
+typedef char edit_cover_reaches_the_units[(JUNO_UNIT_END <= 11051136u) ? 1 : -1];
+
+#if defined(JUNO_EDIT_POISON)
+/* edit_cover_gate.py's probe build only: every byte outside the cover random;
+ * the count of edits that reached the scratch (the gate's reach) */
+long juno_edit_probe_count;
+static void edit_poison(unsigned char *tmp)
+{
+    static unsigned char *rnd;               /* random bytes, read at a new offset per edit */
+    static unsigned rot;
+    unsigned at = 0, i;
+    int k;
+    if (!rnd) {
+        uint64_t x = 0x9E3779B97F4A7C15ull;
+        rnd = (unsigned char *)malloc(JUNO_STATE_BYTES + 4096u);
+        if (!rnd) abort();
+        for (i = 0; i < JUNO_STATE_BYTES + 4096u; i += 8) {
+            x ^= x >> 12; x ^= x << 25; x ^= x >> 27;
+            uint64_t w = x * 0x2545F4914F6CDD1Dull;
+            memcpy(rnd + i, &w, 8);
+        }
+    }
+    rot = (rot + 977u) & 4095u;
+    for (k = 0; k <= JUNO_EDIT_NCOVER; ++k) {
+        unsigned end = k < JUNO_EDIT_NCOVER ? JUNO_EDIT_COVER[k][0] : JUNO_STATE_BYTES;
+        if (end > at) memcpy(tmp + at, rnd + at + rot, end - at);
+        if (k < JUNO_EDIT_NCOVER) at = JUNO_EDIT_COVER[k][1];
+    }
+}
+#endif
+
+/* the scratch for this edit: the recall's cells as the state holds them now */
+static unsigned char *edit_scratch(juno_ctx *c)
+{
+    int k;
+    if (!c->edit_st) c->edit_st = (unsigned char *)malloc(JUNO_STATE_BYTES);
+    if (!c->edit_ctx) c->edit_ctx = malloc(sizeof *c);
+    if (!c->edit_st || !c->edit_ctx) return NULL;
+#if defined(JUNO_EDIT_FULLCOPY)          /* edit_cover_gate.py's reference: the whole array */
+    (void)k;
+    (void)JUNO_EDIT_COVER;
+    memcpy(c->edit_st, c->st, JUNO_STATE_BYTES);
+#else
+    for (k = 0; k < JUNO_EDIT_NCOVER; ++k) {
+#if defined(JUNO_EDIT_TOOTH)             /* the gate's teeth: the cover without one range */
+        if (k == JUNO_EDIT_TOOTH) continue;
+#endif
+        memcpy(c->edit_st + JUNO_EDIT_COVER[k][0], c->st + JUNO_EDIT_COVER[k][0],
+               JUNO_EDIT_COVER[k][1] - JUNO_EDIT_COVER[k][0]);
+    }
+#if defined(JUNO_EDIT_POISON)
+    edit_poison(c->edit_st);
+    ++juno_edit_probe_count;
+#endif
+#endif
+    return c->edit_st;
+}
+
 static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
 {
     juno_host_feat f;
@@ -2055,12 +2158,11 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
     juno_host_param_encode(rec, i, v);
     f.to = host_only_slot(i) >= 0 ? v : juno_host_param_decode(rec, i);
     f.ron1 = juno_reverb_level_on(host_val(rec, "REVERB LEVEL"));
-    tmp = (unsigned char *)malloc(JUNO_STATE_BYTES);
-    t = tmp ? (juno_ctx *)malloc(sizeof *t) : NULL;   /* the context copy on the heap: it is
-                                                        * 121 KB, the WASM stack 64 KB */
+    tmp = edit_scratch(c);                         /* the recall's cells, A35 */
+    t = tmp ? (juno_ctx *)c->edit_ctx : NULL;      /* the context copy on the heap: it is
+                                                    * 121 KB, the WASM stack 64 KB */
     if (tmp && t) {
         *t = *c;
-        memcpy(tmp, c->st, JUNO_STATE_BYTES);
         /* settle the live ramps on the copy first, so the recall meets the
          * cells at their targets (a recall arm whose target is already stored
          * early-outs and leaves the cell where it was: unsettled, a glide in
@@ -2097,14 +2199,10 @@ static int host_edit_live(juno_ctx *c, unsigned char *rec, int i, int v)
                 c->host_role = 1;
                 ctx_alloc_recall(c, c->bank, c->patch_idx, 0, tmp);
                 c->host_role = 0;
-                free(tmp);
-                free(t);
                 return 1;
             }
         }
     }
-    free(tmp);
-    free(t);
     rec[roff] = keep[0]; rec[roff + 1] = keep[1];
     return 0;
 }

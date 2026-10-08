@@ -2910,3 +2910,20 @@ Every tool that builds emulator instances in a loop deletes each one and calls g
 the next (measured after the fix: 347 MB flat over six patches; bank_product_gate.py 360 MB flat
 over three chains). Before running N copies of a tool at once, measure its RSS per case in-process
 (/proc/self/status) -- never with `pgrep -f`, which matches the shell that runs it (it did, here).
+
+## 162. A GREEN GATE SAYS NOTHING ABOUT TIME -- MEASURE THE PRODUCT'S WORST BLOCK, NOT ITS AVERAGE
+Paid 2026-10-08 (JUNO, the native Windows program). Every gate graded the port's samples; none timed
+a block. The program's own --render mode (gui/win/juno60_win.c) ran 1.4x real time under Wine against
+2.3x for the same calls on Linux; the AVERAGE hid the cause. Per-block timing of the same call log
+showed it: steady blocks 1.5-1.9 ms of 5.3, the patch-change block 89 ms (Linux) / 377 ms (Windows).
+Every host edit (about 80 per patch load) allocated and copied the whole 12 MB state to run the recall
+on the copy (host_edit_live, callgrind: 56 % of all instructions in that memcpy); under Windows each
+fresh 12 MB allocation also paid its page faults. An audible gap at every patch change, in a port
+that was bit-exact everywhere a gate looked. Fixed by copying only the recall's cells (CLAIMS A35).
+### The rule
+A real-time product's acceptance includes its WORST block under its own event script (boot, patch
+changes, edits), on the shipped build and platform, against the block period and the output buffer.
+When a fix narrows what a proven path copies, prove the narrowed copy with a probe that randomizes
+everything outside it before every use (edit_cover_gate.py), and pick its teeth from a census of
+which ranges the corpus actually needs: the first tooth (an effect segment the recall writes before
+it reads) was blind.

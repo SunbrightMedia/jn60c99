@@ -131,7 +131,11 @@ mine is a hypothesis (playbook 80).
   and the calls that render nothing -- a flush, a mono bus (A33), and a whole bank
   through the plugin's patch browser and its own process(), arp patches
   included (A34, bank_product_gate.py; the user's 11 banks, 704 patches: every
-  gate bit-exact, docs/USER_BANKS.md). Every host call:
+  gate bit-exact, docs/USER_BANKS.md), and the host edit's scratch -- only the
+  recall's cells per edit, so a patch change no longer stalls process() for
+  ~90-380 ms (A35, edit_cover_gate.py). JUNO-60.exe = the port + the plugin's
+  panel as ONE Windows program (gui/win, CLAIMS C6, `make native`; LOCAL ONLY:
+  it embeds the artwork and the user's banks). Every host call:
   docs/HOST_CALL_CENSUS.md (task #36 closed; not ported: the SYSTEM-8 hardware
   link -- not needed, the user's decision; the GUI graphics come from the user,
   for the plug-and-play test API of the bare-metal port -- received 2026-10-08:
@@ -144,7 +148,8 @@ mine is a hypothesis (playbook 80).
   of 84921859 -- the stack fix and the rebuilt web app -- GREEN (job
   verify_final2, EXIT 0, the same references), and of 5d0c2b8a -- A34 and the
   user banks -- GREEN (job verify_5d0c2b8a, EXIT 0, every reference rebuilt,
-  43 gates). Later commits are docs only.
+  43 gates). A35 (the scratch) changed gui/juno_bridge.c after that run: its
+  full verify is the open item (job name in FINAL_GUIDE.md's A line).
   The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up

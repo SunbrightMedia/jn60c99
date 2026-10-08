@@ -23,7 +23,7 @@ HDR     := $(wildcard src/*.h) $(wildcard gui/*.h)
 OBJ     := $(SRC:.c=.o)
 $(OBJ): $(HDR)
 
-.PHONY: all test clean gui provenance verify static completeness engineb engineb-quick verify-jx3p webapp
+.PHONY: all test clean gui provenance verify static completeness engineb engineb-quick verify-jx3p webapp native
 all: $(OBJ)
 
 # JX-3P port finish line: recall (C==oracle) + integration render (voice+master
@@ -155,6 +155,8 @@ verify: test libjuno.so
 	echo "=== HOST-ROLE EDITS: DAW automation through the plugin's host entry, no snap (CLAIMS A20) ==="; \
 	fresh $(SCRATCH)/host_edit_ref.pkl || python3 tools/verify/host_edit_gate.py --ref || FAIL=1; \
 	python3 tools/verify/host_edit_gate.py --port || FAIL=1; \
+	echo "=== HOST EDIT SCRATCH (CLAIMS A35): only the recall's cells per edit -- randomized outside them == the full copy, 172 patches ==="; \
+	python3 tools/verify/edit_cover_gate.py || FAIL=1; \
 	echo "=== VOICE COUNT (CLAIMS B10): the shipped 6 voices, counts 1..9 changed while notes sound, audio + rendered state incl. stopped units ==="; \
 	fresh $(SCRATCH)/voice_count_ref.pkl || python3 tools/verify/voice_count_gate.py --ref || FAIL=1; \
 	python3 tools/verify/voice_count_gate.py --port || FAIL=1; \
@@ -223,6 +225,13 @@ completeness:
 # emsdk_env.sh) and playwright-core resolvable by node. `env node`: emsdk_env.sh
 # puts the emsdk folder, which holds a DIRECTORY named node, first on PATH, and
 # make's own PATH search stops there ("node: Permission denied").
+# JUNO-60.exe (gui/win, CLAIMS C6): built into scratchpad/dist/ -- it embeds Roland's
+# artwork and the user's banks, LOCAL ONLY. Needs mingw-w64; the check needs Wine
+# (WINEPREFIX) or Windows.
+native: libjuno.so
+	python3 tools/dist/make_native.py
+	python3 tools/dist/native_check.py
+
 webapp: libjuno.so
 	bash gui/web/build.sh
 	env node tools/verify/wasm_golden.mjs

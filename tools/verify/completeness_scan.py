@@ -118,8 +118,12 @@ def main():
     for d in SCAN_GLOBS:
         base = os.path.join(ROOT, d)
         for dirpath, _, files in os.walk(base):
-            if 'web' in os.path.relpath(dirpath, ROOT).split(os.sep):
+            parts = os.path.relpath(dirpath, ROOT).split(os.sep)
+            if 'web' in parts:
                 continue                                  # gui/web JS app: not the engine
+            if parts[:2] == ['gui', 'win']:
+                continue                                  # gui/win: the Windows app AROUND the engine (its
+                                                          # audio path: tools/dist/native_check.py, CLAIMS C6)
             for fn in sorted(files):
                 if not fn.endswith(SCAN_EXT) or fn in SKIP_FILES:
                     continue
