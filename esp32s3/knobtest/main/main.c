@@ -16,8 +16,8 @@
 
 #define SR 48000
 #define CHUNK 240
-static const int KNOB[5] = { 1, 9, 4, 6, 8 };            /* VOL, P1, P2, P3, P4 */
-static const char *NM[5] = { "VOL", "P1", "P2", "P3", "P4" };
+static const int KNOB[5] = { 1, 4, 6, 8, 9 };            /* knob 1 (VOL), knobs 2-5 */
+static const char *NM[5] = { "VOL", "K2", "K3", "K4", "K5" };
 #define PIN_BTN 48                                        /* NC to 3V3: pressed = LOW */
 #define PIN_LED 38
 
@@ -103,7 +103,7 @@ void app_main(void)
         oled_flush(&fb);
         if (now - last_log >= 500) {
             last_log = now;
-            printf("KT VOL(G1)=%.2f P1(G9)=%.2f P2(G4)=%.2f P3(G6)=%.2f P4(G8)=%.2f | BTN G48 raw=%d %s | LED %s\n",
+            printf("KT VOL(G1)=%.2f K2(G4)=%.2f K3(G6)=%.2f K4(G8)=%.2f K5(G9)=%.2f | BTN G48 raw=%d %s | LED %s\n",
                    kv[0], kv[1], kv[2], kv[3], kv[4], raw, btn ? "PRESSED" : "released", led ? "ON" : "OFF");
         }
         xTaskDelayUntil(&wake, pdMS_TO_TICKS(33));
