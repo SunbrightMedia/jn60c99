@@ -279,9 +279,15 @@ def cmp_stream(la, ra, lb, rb):
 def _ref_one(idx):
     """one patch's reference: a fresh engine, as ref_render always made (a
     --jobs worker runs it in its own process: Unicorn only)"""
+    import gc
     import e2e_emu as E
     import real_recall as R
-    return idx, ref_render(idx, E.bank_bytes(), R.leaf_table(), E, R)
+    out = idx, ref_render(idx, E.bank_bytes(), R.leaf_table(), E, R)
+    # free the engine NOW: Unicorn's native memory is invisible to Python's GC
+    # thresholds, so a process rendering 64 patches grew ~25 MB a patch and
+    # eleven at once were OOM-killed (2026-10-08; rate_sweep_gate.py paid it first)
+    gc.collect()
+    return out
 
 
 # CLI dispatch is gated on __main__ so this module is safely importable (fuzz_diff.py

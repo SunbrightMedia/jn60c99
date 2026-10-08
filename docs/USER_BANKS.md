@@ -53,10 +53,30 @@ quotes: put that command in a script, playbook 118).
 
 ## Results
 
-| bank | recall | render 44100 | render 48000 | product 44100 / 48000 |
-|---|---|---|---|---|
-| factory (make verify) | 64/64 | -- | 57/57 (+ 7 arp: arp gates) | **16/16 chains** (job upg_factory) |
-| 2 Preset | 64/64 | 64/64 (no arp patch) | 64/64 | running |
+All 11 banks at once (job ub_all2, commit 6a6cc2c7, 2026-10-08, EXIT 0; every
+count below read from the per-bank logs, not only the exit codes):
+
+| bank | recall | render 44100 | render 48000 | arp patches | product 44100 + 48000 |
+|---|---|---|---|---|---|
+| 2 Preset | 64/64 | 64/64 | 64/64 | 0 | 16/16 chains |
+| Analog Stars | 64/64 | 53/53 | 53/53 | 11 | 16/16 chains |
+| Basses Pads And Arpeggios | 64/64 | 43/43 | 43/43 | 21 | 16/16 chains |
+| Brothertiger | 64/64 | 55/55 | 55/55 | 9 | 16/16 chains |
+| Chillwave | 64/64 | 56/56 | 56/56 | 8 | 16/16 chains |
+| CyberCity | 64/64 | 60/60 | 60/60 | 4 | 16/16 chains |
+| Deep House | 64/64 | 60/60 | 60/60 | 4 | 16/16 chains |
+| FutureBass | 64/64 | 64/64 | 64/64 | 0 | 16/16 chains |
+| Outrun | 64/64 | 57/57 | 57/57 | 7 | 16/16 chains |
+| SynthPop | 64/64 | 58/58 | 58/58 | 6 | 16/16 chains |
+| Synthwave | 64/64 | 64/64 | 64/64 | 0 | 16/16 chains |
+| **11 banks** | **704/704** | **634/634** | **634/634** | **70** | **176/176 chains: 704 patches x 2 rates** |
+| factory (make verify) | 64/64 | -- | 57/57 (+ 7 arp: arp gates) | 7 | 16/16 chains (job upg_factory) |
+
+Every sample of both channels bit-exact; the recall cells 0 mismatches. The 70
+arp patches arpeggiate in the product gate (the transport at 120 BPM).
+
+The first all-at-once run (job ub_all) lost five reference builds to the
+container's memory limit (playbook 161); fixed, the second run needed no halving.
 
 ## Found on the way (harness)
 
@@ -67,6 +87,9 @@ quotes: put that command in a script, playbook 118).
    pick its patches (two-process rule). Fixed: the reference renders all 64.
 3. bank_product_gate.py's first late-note tooth sat inside the start-up mute
    and could not bite (playbook 160). Moved after the mute: it bites.
+4. Two reference builders kept every Unicorn engine alive: eleven banks at
+   once were OOM-killed (playbook 161). Fixed: each instance freed and
+   collected (memory flat, measured in-process).
 
 ## Scope
 
