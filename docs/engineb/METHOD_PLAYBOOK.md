@@ -2949,3 +2949,19 @@ release's place inside a load) gets an observable that can: the engine's input q
 changed by analogy is a hypothesis until the oracle runs it: a release added to the host's own
 KEY HOLD path "because the model set releases" was wrong -- the plugin releases nothing there
 (executed before the commit; now gate chain `host` and its tooth).
+
+## 164. A RESET THAT COPIES AN INIT DRIFTS FROM IT -- CALL ONE INIT, GRADE THE RESET AGAINST A FRESH ONE
+Paid 2026-10-08 (JUNO, gui/juno_bridge.c). juno_gui_reinit promised "the exact COLD state of a
+fresh juno_gui_create" and repeated create's init line by line. Two later arcs added lines to
+create only -- the CC map's boot (A31), the store's defaults and the learn's waiting CC (A32) -- so
+a reset context saved a state of zeros, showed no CC assignments, and its first MIDI learn took
+CC 0. No check compared a reset with a fresh create: the Pi probes and the teeth scripts that call
+reinit compare the port with itself. Found by reading reinit while adding the keyboard note value
+(A36). Fixed by one init function both call (ctx_init); tools/verify/reinit_check.py (in `make
+static`) compares fresh and reset after use on every observable the API offers.
+### The rule
+A constructor and a reset call ONE init function: a second copy is a defect waiting for the next
+field. A reset's contract ("equal to fresh") is a check -- fresh vs reset after use, every
+observable (state save, maps, queues, render) -- and each line of the reset gets a tooth. A tooth
+needs its own pair of contexts when an earlier step of the check heals the defect it plants (here:
+any UI-timer drain clears both the learn's waiting CC and the pending note writes).

@@ -350,24 +350,12 @@ static void st_build(unsigned char *st, float rate, struct juno_host_shim *shim,
     juno_driver_attach_host(st, shim, chorus_mode);
 }
 
-static juno_ctx *ctx_create(float sample_rate, int chorus_mode);
-
-juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
+/* A zeroed context's init, at `sample_rate`: what a fresh create and a reinit both
+ * run, so the two cannot drift (reinit once skipped the CC map's boot, the store's
+ * defaults and the learn's waiting CC: tools/verify/reinit_check.py) */
+static void ctx_init(juno_ctx *c, float sample_rate, int chorus_mode)
 {
-    juno_enable_hw_ftz();                /* run in the plugin's SSE FTZ/DAZ mode (x86) */
-    return ctx_create(sample_rate, chorus_mode);
-}
-
-/* juno_gui_create without the FP mode (the rate switch's scratch reference) */
-static juno_ctx *ctx_create(float sample_rate, int chorus_mode)
-{
-    ++eb_coef_gen;
-    juno_ctx *c = calloc(1, sizeof *c);
     int v;
-    if (!c) return NULL;
-    c->st = calloc(1, JUNO_STATE_BYTES);
-    if (!c->st) { free(c); return NULL; }
-
     JF(c->st, 16) = sample_rate;
     juno_chorus_init(c->st);
     juno_engine_init(c->st);             /* constructor state (sub_1803990C0)              */
@@ -400,6 +388,25 @@ static juno_ctx *ctx_create(float sample_rate, int chorus_mode)
     ks_reset(c);
     drv_init(c, sample_rate);
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
+}
+
+static juno_ctx *ctx_create(float sample_rate, int chorus_mode);
+
+juno_ctx *juno_gui_create(float sample_rate, int chorus_mode)
+{
+    juno_enable_hw_ftz();                /* run in the plugin's SSE FTZ/DAZ mode (x86) */
+    return ctx_create(sample_rate, chorus_mode);
+}
+
+/* juno_gui_create without the FP mode (the rate switch's scratch reference) */
+static juno_ctx *ctx_create(float sample_rate, int chorus_mode)
+{
+    ++eb_coef_gen;
+    juno_ctx *c = calloc(1, sizeof *c);
+    if (!c) return NULL;
+    c->st = calloc(1, JUNO_STATE_BYTES);
+    if (!c->st) { free(c); return NULL; }
+    ctx_init(c, sample_rate, chorus_mode);
     return c;
 }
 
@@ -414,7 +421,6 @@ static juno_ctx *ctx_create(float sample_rate, int chorus_mode)
  * hashes to per-patch create/destroy — proven by the bit-exact gate. */
 void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
 {
-    int v;
     unsigned char *st, *edit_st;
     void *edit_ctx;
     if (!c) return;
@@ -433,28 +439,7 @@ void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
     memset(st, 0, JUNO_STATE_BYTES);    /* match calloc's zero of the state     */
 
     juno_enable_hw_ftz();
-    JF(c->st, 16) = sample_rate;
-    juno_chorus_init(c->st);
-    juno_engine_init(c->st);
-    juno_engine_prepare(c->st);
-    default_patch(c->st);
-    juno_driver_seed_voices(c->st);
-    juno_apply_condition(c->st, 128);
-    c->last_condition = 128;
-    c->chorus_mode = chorus_mode;
-    c->asg_count = JUNO_NUM_VOICES;
-    for (v = 0; v < JUNO_NUM_VOICES; ++v) c->voice_note[v] = -1;
-    carp_init(&c->arp);
-    c->arp_on = 0;
-    c->arp_cur = -1;
-    for (v = 0; v < 128; ++v) c->kb_order[v] = -1;
-    memset(c->kb_map, 0xFF, sizeof c->kb_map);
-    c->kb_arp.n = c->kb_arp_latch.n = 0;
-    c->kb_sus_arp = c->kb_sus_note = c->ctl_sus = 0;
-    c->host_bpm = 128.0f;
-    ks_reset(c);
-    drv_init(c, sample_rate);
-    juno_driver_attach_host(c->st, &c->shim, chorus_mode);
+    ctx_init(c, sample_rate, chorus_mode);
 }
 
 /* Diagnostic: copy the current per-voice allocation into caller arrays (each of

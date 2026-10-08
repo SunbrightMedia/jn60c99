@@ -57,7 +57,7 @@ ORACLE_DEPS := $(wildcard tools/verify/*.py)
 # `make test static` before EVERY commit (playbook 119): on 2026-10-05 four of
 # them went red across three commits, unseen, because only the gate being worked
 # on was run.
-STATIC_GATES := pathcheck shadow_bounds_gate shadow_sync_gate completeness_gate deferred_noop_gate approx_audit provenance_check completeness_scan
+STATIC_GATES := pathcheck shadow_bounds_gate shadow_sync_gate completeness_gate deferred_noop_gate approx_audit provenance_check completeness_scan reinit_check
 static: libjuno.so
 	@mkdir -p $(SCRATCH); FAIL=0; for g in $(STATIC_GATES); do \
 	  if python3 tools/verify/$$g.py > $(SCRATCH)/static_$$g.log 2>&1; then echo "  ok   $$g"; \
@@ -161,6 +161,8 @@ verify: test libjuno.so
 	fresh $(SCRATCH)/keyhold_ref.pkl || python3 tools/verify/keyhold_gate.py --ref || FAIL=1; \
 	python3 tools/verify/keyhold_gate.py --port || FAIL=1; \
 	python3 tools/verify/keyhold_gate.py --port-tooth || FAIL=1; \
+	echo "=== REINIT == CREATE: juno_gui_reinit leaves a fresh context (state save, CCs, a learn, the keyboard note value, a render) ==="; \
+	python3 tools/verify/reinit_check.py || FAIL=1; \
 	echo "=== VOICE COUNT (CLAIMS B10): the shipped 6 voices, counts 1..9 changed while notes sound, audio + rendered state incl. stopped units ==="; \
 	fresh $(SCRATCH)/voice_count_ref.pkl || python3 tools/verify/voice_count_gate.py --ref || FAIL=1; \
 	python3 tools/verify/voice_count_gate.py --port || FAIL=1; \
