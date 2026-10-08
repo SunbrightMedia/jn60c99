@@ -13,6 +13,10 @@
 //                           block; false = not a parameter-list id
 //   loadPatch(bank, idx)    the patch browser's load (rva 0x335850)
 //   noteOn(n, vel) / noteOff(n)   a key through the wrapper's MIDI intake
+//   keybedWrite(key, v)     the panel keyboard's write into its note value (rva
+//                           0x2D47E0: v > 0 a press, else a release; a change only)
+//   keybedState(key)        that value's state of a key (down above 0)
+//   commit()                the commit a panel control makes after its set
 //   setTempo(bpm)           the arp / tempo-sync clock when no host runs one
 //   uiTick()                the plugin's 50 ms UI-timer drain (rva 0x320120)
 //   start()                 open the audio output (a user gesture is needed)
@@ -51,6 +55,9 @@ export class WasmEngine {
       noteOff: f("juno_gui_midi_note_off", null, ["number", "number"]),
       setTempo: f("juno_gui_set_tempo", null, ["number", "number"]),
       uiTick: f("juno_gui_ui_tick", null, ["number"]),
+      keybedWrite: f("juno_gui_keybed_write", "number", ["number", "number", "number"]),
+      keybedState: f("juno_gui_keybed_state", "number", ["number", "number"]),
+      commit: f("juno_gui_commit", null, ["number"]),
       render: f("juno_gui_render", "number", ["number", "number", "number"]),
     };
     // the engine is built for the output device's own rate: nothing resamples
@@ -99,6 +106,9 @@ export class WasmEngine {
   noteOff(n) { this.fn.noteOff(this.ctx, n); }
   setTempo(bpm) { this.fn.setTempo(this.ctx, bpm); }
   uiTick() { this.fn.uiTick(this.ctx); }
+  keybedWrite(key, v) { return this.fn.keybedWrite(this.ctx, key, v); }
+  keybedState(key) { return this.fn.keybedState(this.ctx, key); }
+  commit() { this.fn.commit(this.ctx); }
 
   start() {
     if (!this.audio) this.audio = new (window.AudioContext || window.webkitAudioContext)();

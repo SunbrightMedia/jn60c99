@@ -184,7 +184,11 @@ class Model {
     if (this.local.has(L.id)) return this.local.get(L.id);
     return L.def;
   }
-  set(ref, v) {
+  // a panel control's edit: the model set (rva 0x283DB0), then the commit every
+  // control makes after it (rva 0x2DD100); setBare: the set alone (the patch
+  // browser's own set of the patch number, rva 0x338090)
+  set(ref, v) { this.setBare(ref, v); this.E.commit(); }
+  setBare(ref, v) {
     const L = this.leaf(ref);
     if (!L) return;
     if (L.max > L.min) v = Math.max(L.min, Math.min(L.max, v));
@@ -234,7 +238,8 @@ class Skin {
     this.status = status;
     this.M = new Model(S, E, (L, v) => this.changed(L, v));
     this.pressed = new Set();     // controls held down by the mouse
-    this.notes = new Map();       // sounding note -> source
+    this.kb = { drag: false, key: -1 };   // the keyboard control's drag flag (+48) and held key (+240)
+    this.kbStates = new Int32Array(128);  // its note value as last drawn
     this.drag = null;
     this.tip = null;
     this.banks = [];              // [{name, bytes}]
@@ -492,6 +497,10 @@ class Skin {
   }
 
   // ------------------------------------------------------------ keyboard
+  // the plugin's layout (rva 0x2D45E0): keyRange low..high (the parser keeps high + 1);
+  // the white keys -- the first and the last key always, else C D E F G A B -- one width /
+  // their count apart; the first key draws chromaticRect 12, the last 13; a black key sits
+  // at the right edge of the key before it, plus its chromaticOffset, less half its width
   keyboardInit(c) {
     const kr = ints(text(c.el, "keyRange"));
     const rects = {};
@@ -501,63 +510,91 @@ class Skin {
     }
     const offs = {};
     for (const s of texts(c.el, "chromaticOffset")) { const [k, o] = ints(s); offs[k] = o; }
-    const BLACK = new Set([1, 3, 6, 8, 10]);
-    const keys = [];
+    const lo = kr[0], hi = kr[1] + 1;
     let white = 0;
-    for (let n = kr[0]; n <= kr[1]; n++) {
-      const ch = n % 12, black = BLACK.has(ch);
-      const shape = !black && n === kr[1] ? 13 : ch;
+    for (let n = lo; n < hi; n++) {
+      const pc = n % 12;
+      white += (n === lo || n === hi - 1) ? 1 : (pc > 4 ? pc % 2 === 1 : (pc & 1) === 0) ? 1 : 0;
+    }
+    const step = Math.trunc(c.w / white);
+    const keys = [];
+    let acc = 0;
+    for (let n = lo; n < hi; n++) {
+      const shape = n === lo ? 12 : n === hi - 1 ? 13 : n % 12;
+      const isWhite = shape > 11 ? true : shape > 4 ? (shape & 1) === 1 : (shape & 1) === 0;
       const [, , w, h] = rects[shape][0];
       let x;
-      if (black) x = white * 40 - 1 - w / 2 + (offs[ch] || 0);
-      else { x = white * 40; white++; }
-      keys.push({ n, black, shape, x: c.x + x, y: c.y, w, h });
+      if (isWhite) { x = c.x + acc; acc += step; }
+      else { const p = keys[keys.length - 1]; x = p.x + p.w + (offs[shape] || 0) - Math.trunc(w / 2); }
+      keys.push({ n, black: !isWhite, shape, x, y: c.y, w, h });
     }
     c.keys = keys;
     c.rects = rects;
   }
+  // key i down when the note value's state of i + 12 x OCTAVE SHIFT is above 0 (rva 0x2D3E20)
   keyboardDraw(c) {
     const g = this.g, bm = c.bmp;
     if (!bm || !bm.img) return;
     const shift = this.M.get("fm.PATCH.NAME1.OCTAVE SHIFT");
-    for (const pass of [false, true]) {
-      for (const k of c.keys) {
-        if (k.black !== pass) continue;
-        const down = this.notes.has(k.n + 12 * shift);
-        const [sx, sy, w, h] = c.rects[k.shape][down ? 1 : 0];
-        g.drawImage(bm.img, sx, sy, w, h, k.x, k.y, w, h);
-      }
+    for (let i = 0; i < 128; i++) this.kbStates[i] = this.E.keybedState(i);
+    for (const k of c.keys) {
+      const n = k.n + 12 * shift;
+      const down = n >= 0 && n <= 127 && this.kbStates[n] > 0;
+      const [sx, sy, w, h] = c.rects[k.shape][down ? 1 : 0];
+      g.drawImage(bm.img, sx, sy, w, h, k.x, k.y, w, h);
     }
     if (shift && c.writers[0]) drawText(g, c.writers[0], "OCTAVE " + (shift > 0 ? "+" : "") + shift, c.x + 4, c.y + 4, 150, 26);
   }
-  keyAt(c, x, y) {
-    for (const k of c.keys) if (k.black && x >= k.x && x < k.x + k.w && y >= k.y && y < k.y + k.h) return k;
-    for (const k of c.keys) if (!k.black && x >= k.x && x < k.x + k.w && y >= k.y && y < k.y + k.h) return k;
-    return null;
+  // the key at a point and the velocity there (rva 0x2D4AA0): the point clamped into the
+  // control; from the lowest key: a next key overlapping this one's right edge (a black key)
+  // if the point is in it, else this key if the point is left of its right edge, else on
+  // (past a black key that missed); velocity 1016 x (y - top) / height / 7 in 1..127
+  keyHit(c, px, py) {
+    const x = Math.max(c.x, Math.min(c.x + c.w - 1, px)), y = Math.max(c.y, Math.min(c.y + c.h - 1, py));
+    let i = 0, k = c.keys[0];
+    while (i < c.keys.length - 1) {
+      const cur = c.keys[i], nx = c.keys[i + 1];
+      let missed = false;
+      k = cur;
+      if (nx.x < cur.x + cur.w) {
+        if (nx.x <= x && nx.y <= y && x < nx.x + nx.w && y < nx.y + nx.h) { k = nx; break; }
+        missed = true;
+      }
+      if (x < cur.x + cur.w) break;
+      i += missed ? 2 : 1;
+      k = c.keys[Math.min(i, c.keys.length - 1)];
+    }
+    return { n: k.n, vel: this.keyVelocity(k, y) };
   }
-  // the click velocity (rva 0x2D4AA0): 1016 * (y - key top) / key height / 7,
-  // C integer division, clamped to 1..127; the note moves by 12 per OCTAVE SHIFT
-  // step (rva 0x2D4C40) -- the engine's own OCTAVE SHIFT writes no engine cell
   keyVelocity(k, y) {
-    const yy = Math.max(k.y, Math.min(k.y + k.h - 1, y));
-    const v = Math.trunc(Math.trunc((1016 * (yy - k.y)) / k.h) / 7);
+    const v = Math.trunc(Math.trunc(1016 * (y - k.y) / k.h) / 7);
     return v < 1 ? 1 : v > 127 ? 127 : v;
   }
-  keyOn(c, k, y) {
-    const n = k.n + 12 * this.M.get("fm.PATCH.NAME1.OCTAVE SHIFT");
-    if (n < 0 || n > 127) return null;
+  kbNote(n) { return n + 12 * this.M.get("fm.PATCH.NAME1.OCTAVE SHIFT"); }
+  // the send (rva 0x2D47E0): a press at vm.ks.onVel when set (0), a release at
+  // -vm.ks.offVel (64): the Script.xml defaults, no control of this panel changes them
+  kbSend(key, v) {
+    const r = v <= 0 ? -64 : 0;
+    this.E.keybedWrite(key, r ? r : v);
+    this.dirty = true;
+  }
+  // a press (rva 0x2D4920): a note in the shifted key range other than the held key; with
+  // KEY HOLD off, or without Shift, every key above 0 is released first; then the note
+  kbPress(c, note, vel, shift) {
+    if (note < 0 || note > 127 || note < this.kbNote(c.keys[0].n) || note >= this.kbNote(c.keys[c.keys.length - 1].n + 1) ||
+        this.kb.key === note) return;
     this.E.start();
-    this.E.noteOn(n, this.keyVelocity(k, y));
-    this.notes.set(n, "mouse");
-    this.dirty = true;
-    return n;
+    if (!this.M.get("fm.PATCH.NAME1.KEY HOLD") || !shift)
+      for (let i = 0; i < 128; i++) if (this.E.keybedState(i) > 0) this.kbSend(i, -vel);
+    this.kbSend(note, vel);
+    this.kb.key = note;
   }
-  keyOff(n) {
-    if (n === null || n === undefined) return;
-    this.E.noteOff(n);
-    this.notes.delete(n);
-    this.dirty = true;
+  // the release (rva 0x2D48A0): the held key unless KEY HOLD is on
+  kbRelease(vel) {
+    if (this.kb.key >= 0 && !this.M.get("fm.PATCH.NAME1.KEY HOLD")) this.kbSend(this.kb.key, -vel);
+    this.kb.key = -1;
   }
+
 
   // ------------------------------------------------------------ hit tests
   bounds(c) {
@@ -583,9 +620,12 @@ class Skin {
   }
 
   // ------------------------------------------------------------ pointer
+  // the panel pixel under the pointer: whole pixels, as the plugin's controls get them (its
+  // hit tests and the click velocity are integer arithmetic, rva 0x2D4AA0)
   point(ev) {
     const r = this.cv.getBoundingClientRect();
-    return [(ev.clientX - r.left) * (this.cv.width / r.width), (ev.clientY - r.top) * (this.cv.height / r.height)];
+    return [Math.floor((ev.clientX - r.left) * (this.cv.width / r.width)),
+            Math.floor((ev.clientY - r.top) * (this.cv.height / r.height))];
   }
   down(ev) {
     const [x, y] = this.point(ev);
@@ -642,10 +682,10 @@ class Skin {
       case "patchName":
         this.pressed.add(c);
         break;
-      case "keyboardX": {
-        const k = this.keyAt(c, x, y);
-        this.drag.key = k;
-        this.drag.note = k ? this.keyOn(c, k, y) : null;
+      case "keyboardX": {                // the control's mouse handler (rva 0x2D41F0): down
+        const h = this.keyHit(c, x, y);
+        this.kb.drag = true;
+        this.kbPress(c, this.kbNote(h.n), h.vel, ev.shiftKey);
         break;
       }
     }
@@ -683,19 +723,19 @@ class Skin {
         d.both = true;
         this.chorusPress(c, true);
       }
-    } else if (c.type === "keyboardX") {
-      const k = this.keyAt(c, x, y);
-      if (k !== d.key) {
-        this.keyOff(d.note);
-        d.key = k;
-        d.note = k ? this.keyOn(c, k, y) : null;
-      }
+    } else if (c.type === "keyboardX" && this.kb.drag) {   // a move while it drags
+      const h = this.keyHit(c, x, y);
+      this.kbPress(c, this.kbNote(h.n), h.vel, ev.shiftKey);
     }
     this.dirty = true;
   }
   up(ev) {
     const d = this.drag;
-    if (d && d.c.type === "keyboardX") this.keyOff(d.note);
+    if (d && d.c.type === "keyboardX" && this.kb.drag) {   // up: the drag ends, the key released
+      const [x, y] = this.point(ev);
+      this.kb.drag = false;
+      this.kbRelease(this.keyHit(d.c, x, y).vel);
+    }
     this.drag = null;
     this.pressed.clear();
     this.tip = null;
@@ -704,6 +744,12 @@ class Skin {
   wheel(ev) {
     const [x, y] = this.point(ev);
     const c = this.hit(x, y);
+    if (c && c.type === "keyboardX" && c.writers[0]) {     // the keyboard's wheel (rva 0x2D4420)
+      ev.preventDefault();
+      this.M.set("fm.PATCH.NAME1.OCTAVE SHIFT", this.M.get("fm.PATCH.NAME1.OCTAVE SHIFT") + (ev.deltaY < 0 ? 1 : -1));
+      this.dirty = true;
+      return;
+    }
     if (!c || !(c.type === "slider" || c.type === "knob") || !this.leaf(c)) return;
     ev.preventDefault();
     if (c.type === "knob" && c.bmp.n <= 4) this.M.set(c.ref, this.valueAt(c, this.position(c) + (ev.deltaY < 0 ? 1 : -1)));
@@ -732,9 +778,9 @@ class Skin {
     if (fn === "ManagePatch" && (args === "inc" || args === "dec")) {
       const b = this.banks[this.bank];
       if (!b) return;
-      this.loadPatch((this.patch + (args === "inc" ? 1 : 63)) % 64);
+      this.loadPatch((this.patch + (args === "inc" ? 1 : 63)) % 64, true);
     } else if (fn === "ManagePatch" && args === "load") {
-      this.loadPatch(this.patchSel);
+      this.loadPatch(this.patchSel, true);
     } else if (fn === "ManagePatchBank" && (args === "inc" || args === "dec")) {
       if (!this.banks.length) return;
       this.bank = (this.bank + (args === "inc" ? 1 : this.banks.length - 1)) % this.banks.length;
@@ -757,12 +803,15 @@ class Skin {
     }
   }
 
-  loadPatch(idx) {
+  // the patch browser's load (rva 0x338090: the patch, its set of the patch number); the
+  // ManagePatch buttons' handler then commits (rva 0x322E60), the list does not (rva 0x3278C0)
+  loadPatch(idx, commit = false) {
     const b = this.banks[this.bank];
     if (!b) return;
     this.E.loadPatch(b.bytes, idx);
     this.patch = this.patchSel = idx;
-    this.M.set("vm.vs.patchId", idx);
+    this.M.setBare("vm.vs.patchId", idx);
+    if (commit) this.E.commit();
     this.M.refresh();
     this.status(`${b.name}: ${idx + 1} ${this.patchNameText()}`);
     this.dirty = true;
@@ -929,8 +978,8 @@ class Skin {
     this.port = port;
     port.onmidimessage = e => {
       const [st, d1, d2] = e.data, cmd = st & 0xf0;
-      if (cmd === 0x90 && d2 > 0) { this.E.start(); this.E.noteOn(d1, d2); this.notes.set(d1, "midi"); }
-      else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) { this.E.noteOff(d1); this.notes.delete(d1); }
+      if (cmd === 0x90 && d2 > 0) { this.E.start(); this.E.noteOn(d1, d2); }
+      else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) this.E.noteOff(d1);
       this.dirty = true;
     };
     this.status("MIDI in: " + port.name);
@@ -996,7 +1045,12 @@ export async function boot(canvas, status) {
   canvas.addEventListener("dblclick", e => skin.dblclick(e));
   // the plugin's UI timer: every 50 ms the drain (rva 0x320120), then a redraw
   // of what changed in the model
-  setInterval(() => { E.uiTick(); if (skin.M.refresh()) skin.dirty = true; }, 50);
+  setInterval(() => {               // the plugin's UI timer: the drain, then what changed
+    E.uiTick();
+    let kb = false;
+    for (let i = 0; i < 128 && !kb; i++) kb = (E.keybedState(i) > 0) !== (skin.kbStates[i] > 0);
+    if (skin.M.refresh() || kb) skin.dirty = true;
+  }, 50);
   const frame = () => {
     if (skin.dirty) { skin.dirty = false; skin.draw(); }
     requestAnimationFrame(frame);

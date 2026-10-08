@@ -230,7 +230,8 @@ completeness:
 # Chromium (real audio, no console errors). Needs emcc on PATH (source
 # emsdk_env.sh) and playwright-core resolvable by node. `env node`: emsdk_env.sh
 # puts the emsdk folder, which holds a DIRECTORY named node, first on PATH, and
-# make's own PATH search stops there ("node: Permission denied").
+# make's own PATH search stops there ("node: Permission denied"). skin_kb_check holds the
+# skin's keyboard equal to JUNO-60.exe's: it needs `make native` first, and Wine.
 # JUNO-60.exe (gui/win, CLAIMS C6): built into scratchpad/dist/ -- it embeds Roland's
 # artwork and the user's banks, LOCAL ONLY. Needs mingw-w64; the checks need Wine
 # (WINEPREFIX) or Windows. exe_oracle_check plays 8 seeded performances through the
@@ -249,6 +250,8 @@ webapp: libjuno.so
 	python3 tools/verify/bundle_webapp.py
 	env node tools/verify/verify_webapp.mjs
 	env node tools/verify/skin_check.mjs
+	env node tools/verify/skin_kb_check.mjs --exe scratchpad/dist/JUNO-60.exe
+	for t in velocity hold gap; do env node tools/verify/skin_kb_check.mjs --exe scratchpad/dist/JUNO-60.exe --seeds 1,2 --tooth $$t || exit 1; done
 
 # Shared library for the test GUI (gui/juno_gui.py via ctypes).
 gui: libjuno.so

@@ -32,8 +32,9 @@ URL options: `?zoom=75` (the plugin's zoom, 25..200; default 62),
 | Which panels show (tempo sync, delay type, patch window, setup) | `openCondition`, postfix |
 | The keyboard's key shapes, layout and black-key offsets | `keyboardX`: `keyRange`, `chromaticRect`, `chromaticOffset` |
 | CHORUS OFF / I / II and their LEDs | the plugin's code, READ: rva 0x351410 (OFF: DEPTH 0 when TYPE is 2..4; I / II: TYPE 2 / 3, 4 with the other held; DEPTH 255; TONE 128), rva 0x3515B0 (LED I: TYPE 2 or 4, LED II: 3 or 4, DEPTH > 0) |
-| A key's click velocity and the octave shift | the plugin's code, READ: rva 0x2D4AA0 (1016 x (y - key top) / key height / 7, integer, 1..127), rva 0x2D4C40 (note + 12 x OCTAVE SHIFT; the engine's own OCTAVE SHIFT writes no engine cell) |
-| A control's edit | the plugin GUI's model set (rva 0x283DB0) = `juno_gui_model_set`: the store keeps value & mask, the engine gets it at the next block |
+| The keyboard: layout, hit test, click velocity, press / release / KEY HOLD / Shift, the wheel, the keys drawn | the plugin's code, READ (docs/KEY_HOLD.md rule 10): rva 0x2D45E0 (white keys one width / their count apart, a black key at the key before's right edge + its offset - half its width), rva 0x2D4AA0 (the point clamped into the control, whole pixels; a gap belongs to the next key; velocity 1016 x (y - key top) / key height / 7, integer, 1..127), rva 0x2D4920 / 0x2D48A0 (a press releases every key above 0 first unless KEY HOLD is on and Shift is down; the button up releases the key unless KEY HOLD), rva 0x2D47E0 (each send is a write into the plugin's keyboard note value: a press at the click velocity, a release at -64), rva 0x2D4420 (the wheel: OCTAVE SHIFT one step), rva 0x2D3E20 (key i down when the note value's state of i + 12 x OCTAVE SHIFT is above 0: what the UI timer drained and the keyboard wrote) |
+| A control's edit | the plugin GUI's model set (rva 0x283DB0) = `juno_gui_model_set`: the store keeps value & mask, the engine gets it at the next block; then the commit every panel control makes (rva 0x2DD100) |
+| A patch load | the patch browser's load and its set of the patch number; the INC / DEC / LOAD buttons commit after it (rva 0x322E60), a load from the patch window's list does not (rva 0x3278C0) |
 
 The patch window's 4 x 16 list sits in the grid `panelPatch.png` draws (the list's
 rectangle is in `Script.xml`; the columns are read off the artwork).
@@ -48,7 +49,9 @@ rectangle is in `Script.xml`; the columns are read off the artwork).
 | `values()` | getState: the model, id -> value |
 | `set(id, v)` | a GUI control's model edit (rva 0x283DB0) |
 | `loadPatch(bank, idx)` | the patch browser's load (rva 0x335850) |
-| `noteOn(n, vel)` / `noteOff(n)` | a key through the wrapper's MIDI intake |
+| `noteOn(n, vel)` / `noteOff(n)` | MIDI in through the wrapper's intake (channel 1, note-off velocity 64) |
+| `keybedWrite(key, v)` / `keybedState(key)` | the panel keyboard's write into the plugin's keyboard note value (rva 0x2D47E0) / that value's state of a key |
+| `commit()` | the model's commit a panel control makes after its set |
 | `setTempo(bpm)` | the clock when no host runs one |
 | `uiTick()` | the 50 ms UI-timer drain (rva 0x320120) |
 | `start()`, `peaks()` | the audio output (display only) |
@@ -66,6 +69,16 @@ write through the model path (the engine's getState holds the value): DCO RANGE,
 slider drag, a lever, the CHORUS rule and LEDs; INC loads patch 2 through the patch
 load; a key sounds; no console error. Teeth (`--tooth chorus | address | swap`) all
 bite (2026-10-08).
+
+`node tools/verify/skin_kb_check.mjs` (in `make webapp`; needs `make native`'s
+JUNO-60.exe and Wine) plays seeded panel scripts -- mouse down / drag / up with and
+without Shift, inside, in the gaps and past the edges; the wheel; KEY HOLD and OCTAVE
+SHIFT edits; patch loads from the buttons and the list; MIDI notes; the UI timer --
+into the page with REAL pointer events and into JUNO-60.exe (`--kbscript`), and
+requires the same engine calls in the same order: the keyboard rules are READ and
+written twice (C and JavaScript); the exe's calls are graded against the plugin itself
+(CLAIMS C6). 8/8 seeds the same calls; teeth 3/3 bite (velocity one step off, the other keys never released, a
+gap given to the key before).
 
 ## Not ported (drawn idle or left out)
 

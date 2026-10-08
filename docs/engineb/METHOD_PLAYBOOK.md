@@ -2965,3 +2965,18 @@ field. A reset's contract ("equal to fresh") is a check -- fresh vs reset after 
 observable (state save, maps, queues, render) -- and each line of the reset gets a tooth. A tooth
 needs its own pair of contexts when an earlier step of the check heals the defect it plants (here:
 any UI-timer drain clears both the learn's waiting CC and the pending note writes).
+
+## 165. A FLAG ONE COMPILER DOES NOT KNOW IS A WARNING, NOT A GUARD -- SEE THE GUARD FAIL IN EVERY BUILD THAT CLAIMS IT
+Paid 2026-10-08 (JUNO, gui/web/build.sh). Playbook 158 put `-Werror=frame-larger-than=16384`
+into the Makefile (gcc) and into the WASM build (emcc). gcc knows that spelling; clang does not:
+emcc printed "unknown warning option" -- one line among the build's warnings -- and compiled a
+20 KB frame. The WASM build, the one the guard was written for (its stack is 64 KB), had no
+guard. Found while reading the web build's output for the keyboard change. Fixed with clang's
+spelling (`-Wframe-larger-than=16384 -Werror=frame-larger-than`) and
+`-Werror=unknown-warning-option`: a 20 KB frame now stops the build, the old spelling stops it
+too (both seen), the product's frames pass, the output is byte-identical.
+### The rule
+A guard is proven per toolchain: plant the defect it guards against and watch EACH build that
+claims the guard stop on it. A build script that relies on warning flags makes an unknown flag an
+error (`-Werror=unknown-warning-option` in clang) -- a silent "unknown option" is a guard that
+was never there.
