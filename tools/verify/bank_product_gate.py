@@ -44,6 +44,7 @@ USAGE
     python3 tools/verify/bank_product_gate.py --port [--rates ...]
     python3 tools/verify/bank_product_gate.py --tooth [--rates ...]
 """
+import gc
 import os
 import pickle
 import struct
@@ -109,7 +110,10 @@ def chain_ref(args):
             l, r = h.process(stp[1], events=stp[2], ctx=ctx)
             PL += l
             PR += r
-    return ci, payload, PL, PR, marks, len(h.renders)
+    nr = len(h.renders)
+    del h
+    gc.collect()          # Unicorn's native memory: free the instance now (playbook 161)
+    return ci, payload, PL, PR, marks, nr
 
 
 def build_ref(rates, jobs, only=None):

@@ -2897,3 +2897,16 @@ Moved to the second key, after the mute: it bites.
 A tooth that does not bite is first a question about the tooth: where in the output could its
 defect appear? Place timing teeth on events after every mute and settle, and keep beside them a
 tooth whose effect is known to reach the output (here: the wrong patch).
+
+## 161. AN EMULATOR'S MEMORY IS INVISIBLE TO PYTHON'S GC -- FREE EVERY INSTANCE, MEASURE RSS BEFORE RUNNING MANY
+Paid 2026-10-08 (JUNO, the user banks all at once). recall_render_ab.py --ref built a fresh Unicorn
+engine per patch and let it go out of scope; Unicorn's native memory does not count toward Python's
+GC thresholds, so one process grew ~118 MB a patch (measured: 465 -> 822 MB over five patches).
+Alone, one process survived 64 patches; eleven banks at once hit the container's memory limit and
+the OOM killer took five reference builds (dmesg: "Memory cgroup out of memory"). rate_sweep_gate.py
+had paid the same in July; the two newer tools had not copied its fix.
+### The rule
+Every tool that builds emulator instances in a loop deletes each one and calls gc.collect() before
+the next (measured after the fix: 347 MB flat over six patches; bank_product_gate.py 360 MB flat
+over three chains). Before running N copies of a tool at once, measure its RSS per case in-process
+(/proc/self/status) -- never with `pgrep -f`, which matches the shell that runs it (it did, here).
