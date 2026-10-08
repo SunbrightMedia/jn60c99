@@ -976,6 +976,17 @@ export async function boot(canvas, status) {
     skin.addBank("Factory", bytes);
     skin.loadPatch(0);
   } catch (e) { status("no factory bank: " + e); }
+  // ?banks=<manifest>: more banks for the patch window, [{name, file}] with
+  // each file relative to the manifest (the user's own banks: input, never truth)
+  if (Q.get("banks")) {
+    try {
+      const url = new URL(Q.get("banks"), location.href);
+      for (const b of await (await fetch(url)).json()) {
+        try { skin.addBank(b.name, new Uint8Array(await (await fetch(new URL(b.file, url))).arrayBuffer())); }
+        catch (e) { console.warn("bank " + b.name + ": " + e); }
+      }
+    } catch (e) { console.warn("banks: " + e); }
+  }
   E.setTempo(40 + skin.M.get("fm.SYNTH.COM.TEMPO") / 10);
   canvas.addEventListener("pointerdown", e => skin.down(e));
   canvas.addEventListener("pointermove", e => skin.move(e));
