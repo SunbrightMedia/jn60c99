@@ -225,6 +225,33 @@ typedef struct {
     struct ui_rec { uint32_t id; float f; } ui_q[JUNO_STATE_N];
     int   ui_nq;
     int   ui_cc;
+    /* THE KEYBOARD'S NOTE VALUE (ms.ch[vm.ks.ch].note, the model ring's slot 6; vm.ks.ch
+     * stays 0, its default: CLAIMS A36): per key the last value written -- a note-on's
+     * velocity, minus a note-off's, 0 when never written or released. Written by the UI
+     * timer's drain from the notes the push queued (rva 0x29FF40: any channel, straight
+     * into channel 0's states, no engine record) and by the panel keyboard (rva 0x2D47E0,
+     * juno_gui_keybed_write: a change only, the core's listener queues it). KEY HOLD = 0
+     * releases every key above 0 (ks_release). */
+    int   ks_note[128];
+    /* The second queue's notes and KEY HOLD records as the drain will apply them, in order
+     * (the push appends every record, rva 0x3221F0: none is merged, and the drain applies
+     * each with its own value -- EXECUTED). Only KEY HOLD's records read the notes (its
+     * release), so: the writes queued before the first KEY HOLD record (KS_NONE: none for
+     * that key), then each KEY HOLD record's value and the writes queued after it, the
+     * last per key in each part (nothing reads them in between). Other store records stay
+     * in ui_q: their last value is all the drain leaves. Past the bounds: ro_unported. */
+    int   ks_pend[128];
+    struct { int32_t v; int w0; } ks_kh[64];
+    unsigned char ks_wkey[1024];
+    int   ks_wval[1024];
+    int   ks_nkh, ks_nw;
+    /* the note value's change list (rva 0x2A05C0 appends a key's new value): the core's
+     * listener queues all of it each time it runs for the note value; the model's commit
+     * (rva 0x283120, and its dispatch) empties it. A release adds the keys above 0 (at most
+     * 128) and leaves every key at 0; past 1024 entries: ro_unported. */
+    unsigned char ks_lkey[1024];
+    int   ks_lval[1024];
+    int   ks_ln;
 
     /* THE HOST EDIT'S SCRATCH (CLAIMS A35): the state copy and the context copy
      * host_edit_live runs the recall on, kept for the context's life (NULL until
@@ -275,6 +302,20 @@ static void default_patch(unsigned char *st)
  * counter itself cannot cause a divergence.
  */
 unsigned long eb_coef_gen = 1;
+
+/* the keyboard's note value at boot: every key 0, no drain write pending */
+#ifndef KS_TOOTH
+#define KS_TOOTH 0
+#endif
+#define KS_NONE (-2147483647 - 1)
+static void ks_reset(juno_ctx *c)
+{
+    int k;
+    memset(c->ks_note, 0, sizeof c->ks_note);
+    for (k = 0; k < 128; ++k) c->ks_pend[k] = KS_NONE;
+    c->ks_nkh = c->ks_nw = 0;
+    c->ks_ln = 0;
+}
 
 /* the render driver's state as the core builds it: no records, the clock at 0,
  * no notes, no tempo sent (core+580 = -1), process()'s default tempo 120.0 */
@@ -356,6 +397,7 @@ static juno_ctx *ctx_create(float sample_rate, int chorus_mode)
     for (v = 0; v < JUNO_STATE_N; ++v) c->store[v] = JUNO_STATE_ENT[v].dflt;
     c->ui_nq = 0;
     c->ui_cc = -1;
+    ks_reset(c);
     drv_init(c, sample_rate);
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
     return c;
@@ -410,6 +452,7 @@ void juno_gui_reinit(juno_ctx *c, float sample_rate, int chorus_mode)
     c->kb_arp.n = c->kb_arp_latch.n = 0;
     c->kb_sus_arp = c->kb_sus_note = c->ctl_sus = 0;
     c->host_bpm = 128.0f;
+    ks_reset(c);
     drv_init(c, sample_rate);
     juno_driver_attach_host(c->st, &c->shim, chorus_mode);
 }
@@ -1465,11 +1508,23 @@ static void store_put(juno_ctx *c, int k, int32_t v, int masked)
 }
 static void store_set(juno_ctx *c, int k, int32_t v) { store_put(c, k, v, 1); }
 
-/* the push's store record (rva 0x3221F0, through the core's slot 4): the
- * parameter's earlier record leaves the queue, this one goes last */
+#define KEY_HOLD_ID 0x00600138u      /* fm.PATCH.NAME1.KEY HOLD */
+
+/* the push's store record (rva 0x3221F0, through the core's slot 4): appended. A
+ * KEY HOLD record goes to the ordered list with its value (the record value law,
+ * rva 0x31A940); for any other parameter only the last value reaches the store, so
+ * its earlier record leaves the queue and this one goes last */
 static void ui_push(juno_ctx *c, uint32_t id, float f)
 {
     int i;
+    if (id == KEY_HOLD_ID) {
+        int e = juno_midi_entry(id);
+        if (c->ks_nkh >= (int)(sizeof c->ks_kh / sizeof c->ks_kh[0])) { c->ro_unported = 1; return; }
+        c->ks_kh[c->ks_nkh].v = e >= 0 ? juno_midi_record_value(e, f) : 0;
+        c->ks_kh[c->ks_nkh].w0 = c->ks_nw;
+        ++c->ks_nkh;
+        return;
+    }
     for (i = 0; i < c->ui_nq && c->ui_q[i].id != id; ++i) ;
     if (i < c->ui_nq) {
         memmove(&c->ui_q[i], &c->ui_q[i + 1], (size_t)(c->ui_nq - i - 1) * sizeof c->ui_q[0]);
@@ -1482,22 +1537,177 @@ static void ui_push(juno_ctx *c, uint32_t id, float f)
     }
 }
 
-/* The UI timer's handler (the core's slot 1, rva 0x320120; the plugin runs it
- * every 50 ms on its UI thread, the port when the app calls this): the queued
- * store records through the record value law (rva 0x31A940) into the store,
- * the first CC message to a waiting MIDI learn (rva 0x319C90). No engine record
- * (EXECUTED). Host parameter records never reach this queue. */
-void juno_gui_ui_tick(juno_ctx *c)
+/* the push's own MIDI record into the second queue (rva 0x31F4E0: the message as
+ * the velocity switch left it, after the store record of a mapped CC); a note is
+ * a write the drain will make (rva 0x29FF40: on -> velocity, off -> -velocity,
+ * whatever the channel) */
+static void ui_push_midi(juno_ctx *c, const unsigned char m[3])
+{
+    int st = m[0] & 0xF0;
+#if KS_TOOTH == 2
+    return;                                   /* TOOTH 2: the drain's notes not kept */
+#endif
+    {
+    int key = m[1] & 0x7F, v = st == 0x90 ? (int)m[2] : -(int)m[2], i;
+    if (st != 0x90 && st != 0x80) return;
+    if (!c->ks_nkh) { c->ks_pend[key] = v; return; }
+    for (i = c->ks_kh[c->ks_nkh - 1].w0; i < c->ks_nw && c->ks_wkey[i] != key; ++i) ;
+    if (i == c->ks_nw) {
+        if (c->ks_nw >= (int)sizeof c->ks_wkey) { c->ro_unported = 1; return; }
+        c->ks_wkey[c->ks_nw++] = (unsigned char)key;
+    }
+    c->ks_wval[i] = v;
+    }
+}
+
+/* The core's listener for the note value (rva 0x321B30): one MIDI record per
+ * change, kind 0 at offset 0 -- a value above 0 a note-on at that velocity, else
+ * a note-off at minus the value (its low byte) -- through the velocity switch's
+ * rule, into the queue the render driver applies */
+static void ks_queue(juno_ctx *c, int key, int value)
+{
+    unsigned char m[3];
+    m[0] = value > 0 ? 0x90 : 0x80;
+    m[1] = (unsigned char)key;
+    m[2] = value > 0 ? (unsigned char)value : (unsigned char)(-(signed char)value);
+    juno_gui_wrapper_midi(c, m);
+    if (c->drv_nq < DRV_QMAX) {
+        struct drv_rec *r = &c->drv_q[c->drv_nq++];
+        memset(r, 0, sizeof *r);
+        r->m[0] = m[0]; r->m[1] = m[1]; r->m[2] = m[2];
+    }
+}
+
+/* the change list: an entry, the listener's run over all of it, the commit */
+static void ks_append(juno_ctx *c, int key, int value)
+{
+    if (c->ks_ln >= (int)sizeof c->ks_lkey) { c->ro_unported = 1; return; }
+    c->ks_lkey[c->ks_ln] = (unsigned char)key;
+    c->ks_lval[c->ks_ln] = value;
+    ++c->ks_ln;
+}
+static void ks_listen(juno_ctx *c)
 {
     int i;
+    for (i = 0; i < c->ks_ln; ++i) ks_queue(c, c->ks_lkey[i], c->ks_lval[i]);
+}
+static void ks_commit(juno_ctx *c)
+{
+#if KS_TOOTH == 6
+    return;                                   /* TOOTH 6: no commit empties the change list */
+#endif
+    c->ks_ln = 0;
+}
+
+/* KEY HOLD at 0 (EXECUTED, CLAIMS A36): the core's model handler (rva 0x31C820)
+ * for a set of model values holding KEY HOLD, first, before their own records:
+ * if KEY HOLD reads 0 the note value releases every key above 0 (rva 0x2A05C0
+ * with no pair: key order, each to 0, each an entry of the change list) and the
+ * handler runs the core's listener for the note value: the whole change list is
+ * queued -- a list no commit emptied since an earlier release goes again. Whether
+ * KEY HOLD changed does not matter. */
+static void ks_release(juno_ctx *c)
+{
+    int k;
+#if KS_TOOTH == 1
+    return;                                   /* TOOTH 1 (keyhold_gate.py): no release */
+#endif
+    for (k = 0; k < 128; ++k)
+        if (c->ks_note[k] > 0) { c->ks_note[k] = 0; ks_append(c, k, 0); }
+    ks_listen(c);
+#if KS_TOOTH == 5
+    c->ks_ln = 0;                             /* TOOTH 5: a release's entries never go again */
+#endif
+}
+
+/* The GUI's commit after an edit (rva 0x285320, 0x2853C0, 0x283120: every
+ * panel control calls them after its model set, rva 0x2DD100 / 0x2DEAD0): the
+ * note value's change list is emptied (no record). The patch browser's load
+ * (rva 0x338090) does not commit; the next UI timer drain or keyboard write
+ * does. */
+void juno_gui_commit(juno_ctx *c)
+{
+    if (c) ks_commit(c);
+}
+
+/* The UI timer's handler (the core's slot 1, rva 0x320120; the plugin runs it
+ * every 50 ms on its UI thread, the port when the app calls this): the second
+ * queue in order -- each note into the keyboard's note value (no record), the
+ * store records through the record value law (rva 0x31A940) into the store
+ * (KEY HOLD at 0 releases the keys there: the notes queued after it come
+ * later), the first CC message to a waiting MIDI learn (rva 0x319C90); at its
+ * end the model's commit empties the note value's change list. No other
+ * engine record (EXECUTED). Host parameter records never reach this queue. */
+void juno_gui_ui_tick(juno_ctx *c)
+{
+    int i, j, kh = state_k(KEY_HOLD_ID);
     if (!c) return;
+    for (i = 0; i < 128; ++i)
+        if (c->ks_pend[i] != KS_NONE) { c->ks_note[i] = c->ks_pend[i]; c->ks_pend[i] = KS_NONE; }
+    for (j = 0; j < c->ks_nkh; ++j) {
+        int end = j + 1 < c->ks_nkh ? c->ks_kh[j + 1].w0 : c->ks_nw;
+        if (kh >= 0) store_set(c, kh, c->ks_kh[j].v);
+#if KS_TOOTH != 3
+        if (kh >= 0 && c->store[kh] == 0) ks_release(c);
+#endif
+        for (i = c->ks_kh[j].w0; i < end; ++i) c->ks_note[c->ks_wkey[i]] = c->ks_wval[i];
+    }
+#if KS_TOOTH == 3
+    for (j = 0; j < c->ks_nkh; ++j)           /* TOOTH 3: the drain's releases at its end */
+        if (kh >= 0 && c->ks_kh[j].v == 0) ks_release(c);
+#endif
+    c->ks_nkh = c->ks_nw = 0;
     for (i = 0; i < c->ui_nq; ++i) {
         int e = juno_midi_entry(c->ui_q[i].id), k = state_k(c->ui_q[i].id);
         if (e >= 0 && k >= 0) store_set(c, k, juno_midi_record_value(e, c->ui_q[i].f));
     }
+    ks_commit(c);                             /* the drain's end: dispatch and commit (EXECUTED) */
     c->ui_nq = 0;
     if (c->ui_cc >= 0) juno_ccmap_learn_done(&c->ccmap, c->ui_cc);
     c->ui_cc = -1;
+}
+
+/* The panel keyboard's write of `value` for `key` into the note value (its send,
+ * rva 0x2D47E0: the set rva 0x2838C0 -> 0x2A05C0, then the model's notifies and
+ * commit; the control picks the value: a press its velocity, a release minus
+ * vm.ks.offVel): a change becomes an entry of the change list; the core's
+ * listener queues the whole list (entries a release left go again, with no change
+ * too), the commit empties it. Returns the records queued. */
+int juno_gui_keybed_write(juno_ctx *c, int key, int value)
+{
+    int n;
+    if (!c || key < 0 || key > 127) return 0;
+#if KS_TOOTH == 7
+    c->ks_note[key] = value;                  /* TOOTH 7: no change test */
+    ks_append(c, key, value);
+#else
+    if (c->ks_note[key] != value) { c->ks_note[key] = value; ks_append(c, key, value); }
+#endif
+    n = c->ks_ln;
+    ks_listen(c);
+    ks_commit(c);
+    return n;
+}
+
+/* The records waiting for the next block's render driver, in order (inspection, for
+ * the gates): kinds[i] 0 a MIDI message (its 3 bytes in midi[3i..3i+2]), 1 a
+ * parameter record, 2 a preset path's value. Returns how many wait (at most max
+ * are written). */
+int juno_gui_queue_peek(const juno_ctx *c, int *kinds, unsigned char *midi, int max)
+{
+    int i;
+    if (!c) return 0;
+    for (i = 0; i < c->drv_nq && i < max; ++i) {
+        kinds[i] = c->drv_q[i].kind;
+        midi[3 * i] = c->drv_q[i].m[0]; midi[3 * i + 1] = c->drv_q[i].m[1]; midi[3 * i + 2] = c->drv_q[i].m[2];
+    }
+    return c->drv_nq;
+}
+
+/* the note value's state of `key` (what the panel keyboard draws: down above 0) */
+int juno_gui_keybed_state(const juno_ctx *c, int key)
+{
+    return c && key >= 0 && key < 128 ? c->ks_note[key] : 0;
 }
 
 /* MIDI learn, as the plugin's GUI drives it (a control's menu): arm for the
@@ -1558,7 +1768,8 @@ int juno_gui_state_save(const juno_ctx *c, unsigned char *out, int cap)
  * A31) first queues that parameter's record (kind 1:
  * its id and the CC byte over its range, rva 0x31A850); then, for every
  * message, an assigned CC too, the velocity policy (juno_gui_wrapper_midi) and
- * the message's own record (kind 0) into the queue the render driver applies. */
+ * the message's own record (kind 0) into the second queue (the UI timer's) and
+ * into the queue the render driver applies. */
 static void drv_push(juno_ctx *c, unsigned char m[3], int offset)
 {
     if ((m[0] & 0xF0) == 0xB0) {
@@ -1575,6 +1786,7 @@ static void drv_push(juno_ctx *c, unsigned char m[3], int offset)
         if (c->ui_cc < 0 && m[1] < 120) c->ui_cc = m[1];   /* the message's own record (core+512) */
     }
     juno_gui_wrapper_midi(c, m);
+    ui_push_midi(c, m);
     if (c->drv_nq < DRV_QMAX) {
         struct drv_rec *r = &c->drv_q[c->drv_nq++];
         memset(r, 0, sizeof *r);
@@ -2513,9 +2725,11 @@ int juno_gui_state_load(juno_ctx *c, const unsigned char *data, int len)
         if (k == JUNO_STATE_N) continue;
         if (JUNO_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask);
         store_set(c, k, v);
+        if (id == KEY_HOLD_ID && v == 0) ks_release(c);   /* each entry its own set (EXECUTED) */
         apply_event(c, JUNO_STATE_ENT[k].host, v);
         ++applied;
     }
+    ks_commit(c);                             /* setState commits the model (EXECUTED) */
     return applied;
 }
 
@@ -2544,18 +2758,30 @@ static int32_t rec_value(const unsigned char *r, const juno_patch_ev *e)
 int juno_gui_load_patch(juno_ctx *c, const unsigned char *bank, int len, int idx)
 {
     const unsigned char *r;
-    int k;
+    int k, hold = 1;
     if (!c || !bank || len <= 0) return 0;
     if (idx < 0 || idx >= juno_bank_num_patches(bank, (unsigned long)len)) return 0;
     if (!ctx_model(c, bank)) return 0;
     r = bank + 23 + (size_t)idx * JUNO_REC_BYTES;
     memcpy(c->bank + 23, r, 16);          /* the patch's name: display only */
+    for (k = 0; k < JUNO_PATCH_EV_N; ++k)
+        if (JUNO_PATCH_EV[k].id == KEY_HOLD_ID) hold = rec_value(r, &JUNO_PATCH_EV[k]);
     for (k = 0; k < JUNO_PATCH_EV_N; ++k) {
         int32_t v = rec_value(r, &JUNO_PATCH_EV[k]);
         int sk = state_k(JUNO_PATCH_EV[k].id);
+        /* the tree's sets reach the model's handler node by node, each node's
+         * records after it; the node holding KEY HOLD begins with ARPEGGIO SW
+         * (id 0x00600108; EXECUTED: the release comes between the records of
+         * 0x0060009C and 0x00600108) */
+#if KS_TOOTH != 4
+        if (JUNO_PATCH_EV[k].id == 0x00600108u && hold == 0) ks_release(c);
+#endif
         if (sk >= 0) store_put(c, sk, v, 0);         /* the set from bytes: as decoded */
         apply_event(c, JUNO_PATCH_EV[k].host, v);
     }
+#if KS_TOOTH == 4
+    if (hold == 0) ks_release(c);             /* TOOTH 4: the release after the load's records */
+#endif
     return JUNO_PATCH_EV_N;
 }
 
@@ -2584,14 +2810,17 @@ int juno_gui_queue_patch(juno_ctx *c, const unsigned char *bank, int len, int id
  * controls set the model: rva 0x283DB0): the store keeps value & its mask
  * (getState), and the engine gets that value at the next block. (For a host-
  * automatable parameter the plugin's listener tells the host instead, which
- * sends the value back through process() -- the timing is the host's.) 0 for an
- * id outside the state list. */
+ * sends the value back through process() -- the timing is the host's.) KEY HOLD
+ * at 0 releases the keyboard's keys (ks_release). The set alone: a panel
+ * control then commits (juno_gui_commit), the patch browser's own set of the
+ * patch number does not. 0 for an id outside the state list. */
 int juno_gui_model_set(juno_ctx *c, uint32_t id, int32_t v)
 {
     int k = c ? state_k(id) : -1;
     if (k < 0) return 0;
     store_set(c, k, v);
     if (JUNO_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask);
+    if (id == KEY_HOLD_ID && v == 0) ks_release(c);   /* at once, set or not; no commit (EXECUTED) */
     c->drv_queue_mode = 1;
     apply_event(c, JUNO_STATE_ENT[k].host, v);
     c->drv_queue_mode = 0;
@@ -2937,6 +3166,9 @@ static void proc_param(juno_ctx *c, const juno_host_param *p)
     int32_t id = (int32_t)p->id, base = (int32_t)juno_midi_base();
     unsigned char m[3] = { 0, 0, 0 };
     if (base > id) {
+#if KS_TOOTH == 8
+        if ((uint32_t)id == KEY_HOLD_ID && p->value == 0.0) ks_release(c);   /* TOOTH 8: the host's KEY HOLD releases */
+#endif
         if (c->drv_nq < DRV_QMAX) {
             struct drv_rec *r = &c->drv_q[c->drv_nq++];
             memset(r, 0, sizeof *r);

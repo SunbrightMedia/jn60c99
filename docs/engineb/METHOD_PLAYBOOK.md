@@ -2927,3 +2927,25 @@ When a fix narrows what a proven path copies, prove the narrowed copy with a pro
 everything outside it before every use (edit_cover_gate.py), and pick its teeth from a census of
 which ranges the corpus actually needs: the first tooth (an effect segment the recall writes before
 it reads) was blind.
+
+## 163. A GATE THAT NEVER RUNS THE PRODUCT'S TIMER NEVER SEES THE STATE THE TIMER FILLS
+Paid 2026-10-08 (JUNO, the .exe checked against the plugin on seeded performances). Every gate
+since A22 played notes and loaded patches through the plugin's own paths and was bit-exact,
+including "notes held across loads" -- yet the first seeded run with the product's 50 ms UI
+timer in it differed: the plugin's timer copies every played note into its panel keyboard's
+model value, and a patch load (KEY HOLD = 0 in every factory patch) releases every key in it,
+sending real note-offs to the engine. No chain had ever called the timer, so that value was
+always empty and the release a no-op everywhere a gate looked. Under it a second rule hid (the
+release's entries are sent again at the next keyboard write unless a commit came first), and
+the oracle's first replay of a panel edit was itself wrong: it called the model set without
+the commit every panel control makes (a harness defect, found by reading the controls).
+### The rule
+An oracle chain includes every periodic call the product makes (UI timer, idle, commit) at the
+product's cadence, and every GUI action as the GUI makes it -- read the control's own call
+sequence before replaying it. When a state machine's input is a timer, census the machine's
+state at the moment of each event (here: the note value at every patch load) -- a machine that
+is always empty in the corpus is untested, not proven. A tooth that cannot bite on audio (the
+release's place inside a load) gets an observable that can: the engine's input queue. And a path
+changed by analogy is a hypothesis until the oracle runs it: a release added to the host's own
+KEY HOLD path "because the model set releases" was wrong -- the plugin releases nothing there
+(executed before the commit; now gate chain `host` and its tooth).

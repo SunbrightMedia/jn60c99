@@ -51,6 +51,7 @@ their old paths so no comment pointer dangles. Live project state:
 | HOST_CALL_CENSUS.md | LIVING | Every call a host makes to the plugin (component, processor, controller, MIDI mapping, UI timer, editor) -- what the plugin does, what the port does, the evidence; the scope table of the host layer (task #36; CLAIMS A31-A33) |
 | PORT_PIPELINE.md | LIVING | THE NEXT-SYNTH ORDER: .vst3 -> playing instrument in 10 steps, each with its tool (pe_recon, abi_check, jx_emu.boot, audio_metrics, listen proofs) and the defect it prevents (playbook 85-88) |
 | JX3P_PLAN.md | LIVING | THE JX-3P PLAN — port-level C99, no hiccups, as fast as the method allows — *jx3p/docs/S3_STATUS.md holds live state* |
+| KEY_HOLD.md | LIVING | The panel keyboard's note value and KEY HOLD: what the plugin's UI timer, patch loads, setState, the GUI's model sets and its keyboard control do to it (EXECUTED / READ, rule by rule), the port, the gate keyhold_gate.py, the limits (CLAIMS A36) |
 | MASTER_RENDER_MAP.md | REFERENCE | master_render (sub_180363380) — transcription map & dropped-arg resolutions |
 | NAN_SEMANTICS_SCOPE.md | LIVING | NaN semantics: what is a defect, and what is only an inaccuracy |
 | P112_FINDINGS.md | REFERENCE | #112 — VST3 host-lifecycle oracle: EXECUTED FINDINGS (2026-07-24) |

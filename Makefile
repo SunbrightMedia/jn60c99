@@ -157,6 +157,10 @@ verify: test libjuno.so
 	python3 tools/verify/host_edit_gate.py --port || FAIL=1; \
 	echo "=== HOST EDIT SCRATCH (CLAIMS A35): only the recall's cells per edit -- randomized outside them == the full copy, 172 patches ==="; \
 	python3 tools/verify/edit_cover_gate.py || FAIL=1; \
+	echo "=== KEY HOLD AND THE KEYBOARD NOTE VALUE (CLAIMS A36): the UI timer's notes, the release at every patch change, the keyboard's writes ==="; \
+	fresh $(SCRATCH)/keyhold_ref.pkl || python3 tools/verify/keyhold_gate.py --ref || FAIL=1; \
+	python3 tools/verify/keyhold_gate.py --port || FAIL=1; \
+	python3 tools/verify/keyhold_gate.py --port-tooth || FAIL=1; \
 	echo "=== VOICE COUNT (CLAIMS B10): the shipped 6 voices, counts 1..9 changed while notes sound, audio + rendered state incl. stopped units ==="; \
 	fresh $(SCRATCH)/voice_count_ref.pkl || python3 tools/verify/voice_count_gate.py --ref || FAIL=1; \
 	python3 tools/verify/voice_count_gate.py --port || FAIL=1; \
