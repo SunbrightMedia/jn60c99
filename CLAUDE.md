@@ -148,8 +148,13 @@ mine is a hypothesis (playbook 80).
   of 84921859 -- the stack fix and the rebuilt web app -- GREEN (job
   verify_final2, EXIT 0, the same references), and of 5d0c2b8a -- A34 and the
   user banks -- GREEN (job verify_5d0c2b8a, EXIT 0, every reference rebuilt,
-  43 gates). A35 (the scratch) changed gui/juno_bridge.c after that run: its
-  full verify is the open item (job name in FINAL_GUIDE.md's A line).
+  43 gates). After that run: A35 (the host edit's scratch), A36 (the panel
+  keyboard's note value and KEY HOLD: every patch change releases the keys the
+  UI timer has seen -- found by the .exe's seeded check against the plugin,
+  docs/KEY_HOLD.md, keyhold_gate.py) and one init for create and reinit
+  (reinit_check.py, playbook 164) changed gui/juno_bridge.c: their full verify
+  is the open item (job name in FINAL_GUIDE.md's A line; verify_a35 DIED in a
+  container restart, no EXIT).
   The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
