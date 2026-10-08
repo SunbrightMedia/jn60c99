@@ -51,6 +51,7 @@ import gc
 import os
 import sys
 import pickle
+import refio
 import random
 import struct
 
@@ -153,10 +154,10 @@ def build_ref(n_legal, n_wild):
         del e
         gc.collect()
         if seed % 10 == 9:
-            pickle.dump(ref, open(REF_PKL, 'wb'))
+            refio.dump(ref, REF_PKL)
         sys.stderr.write('ref seed %d (%s, base %d, %g Hz)\n' % (seed, mode, base, rate))
         sys.stderr.flush()
-    pickle.dump(ref, open(REF_PKL, 'wb'))
+    refio.dump(ref, REF_PKL)
     print('wrote %s (%d seeds, %d leaves randomized each)' % (REF_PKL, len(ref) - 2, len(slots)))
     return 0
 

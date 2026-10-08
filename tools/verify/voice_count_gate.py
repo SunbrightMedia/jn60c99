@@ -38,6 +38,7 @@ import gc
 import os
 import sys
 import pickle
+import refio
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -189,7 +190,7 @@ def build_ref():
         gc.collect()
         sys.stderr.write('ref chain %d %s (%g Hz): %d events\n' % (ci, fam, rate, len(sc)))
         sys.stderr.flush()
-    pickle.dump(ref, open(PKL, 'wb'))
+    refio.dump(ref, PKL)
     print('wrote %s (%d chains)' % (PKL, len(ch)))
     return 0
 

@@ -38,6 +38,7 @@ under Unicorn. PORT = libjuno via ctypes. TWO-PROCESS, as mandated.
 Env: JUNO_ASGAB_PKL. Covenant: no capture data anywhere.
 """
 import sys, os, struct, pickle
+import refio
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -181,7 +182,7 @@ def _ref():
             out['runs'][(sr, p, name)] = (mode, leg, L, Rr)
             print("  ref: sr %g patch %5s %-9s mode=%d legato=%d  %d samples"
                   % (sr, p, name, mode, leg, len(L)), flush=True)
-    pickle.dump(out, open(PKL, 'wb'))
+    refio.dump(out, PKL)
     print("assigner_ab ref -> %s" % PKL)
     return 0
 

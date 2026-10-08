@@ -18,6 +18,7 @@ Usage: python3 tools/verify/index_cell_map.py [--dump] [--maxidx N]
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
+import refio
 sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 from unicorn import UC_HOOK_MEM_WRITE
@@ -56,7 +57,7 @@ def main():
         if cells:
             idx_cells[idx] = sorted(cells)
 
-    pickle.dump(idx_cells, open(PKL, 'wb'))
+    refio.dump(idx_cells, PKL)
     print("indices driven: %d ; indices that write >=1 cell: %d" % (maxidx, len(idx_cells)))
 
     # spot-checks vs known port cells

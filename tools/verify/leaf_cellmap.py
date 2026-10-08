@@ -12,6 +12,7 @@ provenance. Covenant-clean. Oracle-only (Unicorn); no ctypes in this process.
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle
+import refio
 sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 from unicorn import UC_HOOK_MEM_WRITE
@@ -96,7 +97,7 @@ for ctx in CONTEXTS:
 
 for d in cellmap:
     cellmap[d]['cells'] = sorted(cellmap[d]['cells'])
-pickle.dump(cellmap, open(OUT, 'wb'))
+refio.dump(cellmap, OUT)
 nz = sum(1 for d in cellmap if cellmap[d]['cells'])
 print("leaves swept: %d   write-audio-cells: %d   silent: %d" %
       (len(cellmap), nz, len(cellmap) - nz))

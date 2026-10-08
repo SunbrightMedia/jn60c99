@@ -46,6 +46,7 @@ import gc
 import os
 import sys
 import pickle
+import refio
 import random
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -139,7 +140,7 @@ def build_ref():
         gc.collect()
         sys.stderr.write('ref chain %d %s (%g Hz): %s\n' % (ci, fam, rate, ' '.join(n for n, _ in steps)))
         sys.stderr.flush()
-    pickle.dump(ref, open(REF_PKL, 'wb'))
+    refio.dump(ref, REF_PKL)
     print('wrote %s (%d chains)' % (REF_PKL, len(ch)))
     return 0
 

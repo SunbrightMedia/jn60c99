@@ -56,6 +56,7 @@ import gc
 import os
 import sys
 import pickle
+import refio
 import random
 import struct
 
@@ -239,7 +240,7 @@ def build_ref(mode):
         gc.collect()
         sys.stderr.write('ref %s chain %d %s (%g Hz): %d events\n' % (mode, ci, fam, rate, len(sc)))
         sys.stderr.flush()
-    pickle.dump(ref, open(ref_pkl(mode), 'wb'))
+    refio.dump(ref, ref_pkl(mode))
     print('wrote %s (%d chains)' % (ref_pkl(mode), len(ch)))
     return 0
 

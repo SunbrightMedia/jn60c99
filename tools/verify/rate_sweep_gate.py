@@ -49,6 +49,7 @@ import gc
 import os
 import sys
 import pickle
+import refio
 import struct
 from array import array
 
@@ -130,7 +131,7 @@ def build_ref(rates, resume=False):
             del e
             gc.collect()
         ref[rate] = per
-        pickle.dump(ref, open(REF_PKL, 'wb'))
+        refio.dump(ref, REF_PKL)
         sys.stderr.write('ref rate %g: %d records\n' % (rate, len(per)))
         sys.stderr.flush()
     print('wrote %s (%d rates)' % (REF_PKL, len(ref)))

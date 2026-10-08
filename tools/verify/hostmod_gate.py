@@ -24,6 +24,7 @@ is ctypes-libjuno only; they meet through a pickle.
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, pickle
+import refio
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -95,8 +96,7 @@ def build_ref():
                     n += 1
         print('  slot %d (mod %d -> base %d): %d observations' % (slot, mod, base_idx, n))
     os.makedirs(SP, exist_ok=True)
-    pickle.dump({'obs': out, 'bases': bases, 'offs': offs, 'full': full},
-                open(REF, 'wb'))
+    refio.dump({'obs': out, 'bases': bases, 'offs': offs, 'full': full}, REF)
     print('wrote %s (%d observations)' % (REF, len(out)))
     return 0
 

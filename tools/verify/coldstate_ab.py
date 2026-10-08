@@ -29,6 +29,7 @@ NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle
+import refio
 
 BLOCK = 10512
 NVOICE = 8
@@ -79,7 +80,7 @@ if sys.argv[1:2] == ['--port']:
     buf = (ctypes.c_ubyte * MEANINGFUL)()
     n = lib.juno_gui_dump(c, 0, buf, MEANINGFUL)
     assert n == MEANINGFUL, n
-    pickle.dump({'rate': rate, 'state': bytes(buf)}, open(PKL, 'wb'))
+    refio.dump({'rate': rate, 'state': bytes(buf)}, PKL)
     print("PORT cold state @%g dumped (%d bytes)" % (rate, n))
 
     # SELF-CHECK: prove the FX_RECALL_DEFAULT cells this gate excludes are AUDIO-INERT

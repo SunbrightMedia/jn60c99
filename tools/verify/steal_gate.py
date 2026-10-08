@@ -32,6 +32,7 @@ USAGE
 import os
 import sys
 import pickle
+import refio
 import random
 import struct
 import shutil
@@ -104,7 +105,7 @@ def build_ref():
                          % (s, int(rate), patch, len(ev)))
         sys.stderr.flush()
     os.makedirs(SCRATCH, exist_ok=True)
-    pickle.dump(ref, open(REF_PKL, 'wb'))
+    refio.dump(ref, REF_PKL)
     print('wrote %s (%d seeds)' % (REF_PKL, len(ref)))
     return 0
 

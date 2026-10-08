@@ -45,6 +45,7 @@ TWO-PROCESS (mandatory): never build E2E + load libjuno in one process.
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle
+import refio
 sys.path.insert(0, _JREPO + '/tools/verify')
 
 SR = 48000.0
@@ -123,7 +124,7 @@ if len(sys.argv) > 1 and sys.argv[1] == '--ref':
         sys.stderr.write("ref patch %2d (%s): SW=%d TYPE=%d STEP=%d  %d events  faults=%d\n" %
                          (p, E.patch_name(bank, p), r['sw'], r['typ'], r['step'], len(r['ev']), r['faults']))
         sys.stderr.flush()
-    pickle.dump(out, open(PKL, 'wb'))
+    refio.dump(out, PKL)
     print("REF: saved %d arp schedules (N=%d ticks, note %d vel %d, SR %g, BPM %g)" %
           (len(out), NTICKS, NOTE, VEL, SR, BPM))
 

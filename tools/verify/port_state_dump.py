@@ -15,6 +15,7 @@ Usage:
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, struct, pickle, ctypes
+import refio
 
 LIB   = _JREPO + '/libjuno.so'
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
@@ -71,7 +72,7 @@ def main():
             print("  patch %2d  port feet=%-6s  stored DCO RANGE feet=%-4s%s" %
                   (idx, feet, stored, flag))
     if not feet_only:
-        pickle.dump(states, open(PKL, 'wb'))
+        refio.dump(states, PKL)
         print("\nsaved port voice-0 block for 64 patches -> %s (%d bytes/patch)" % (PKL, BLOCK))
     print("\nNOTE: this is the PORT side only. The reference side is the plugin's OWN")
     print("controller-driven recall (built under Unicorn); the diff is a separate step.")

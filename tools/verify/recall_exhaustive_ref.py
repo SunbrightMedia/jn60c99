@@ -28,6 +28,7 @@ NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle
+import refio
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e_emu as E
 import real_recall as RR
@@ -73,7 +74,7 @@ def main():
                              % (n, len(fp), idx, len(touched))); sys.stderr.flush()
 
     uc.mem_write(st0, baseline)
-    pickle.dump({'rate': int(rate), 'baseline': baseline, 'lut': lut}, open(out, 'wb'))
+    refio.dump({'rate': int(rate), 'baseline': baseline, 'lut': lut}, out)
     ncells = sum(len(d['cells']) for d in lut.values())
     print("rate %d: %d indices write %d voice-0 cells -> %s" % (int(rate), len(lut), ncells, out))
 

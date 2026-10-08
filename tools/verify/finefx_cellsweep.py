@@ -15,6 +15,7 @@ Output: scratchpad/finefx_cellsweep_ref.pkl { (leaf, ctx, rate) -> {cell: [256]}
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import os, sys, pickle
+import refio
 sys.path.insert(0, _JREPO + '/tools/verify')
 import numpy as np, e2e_emu as E
 
@@ -116,8 +117,7 @@ def main():
     # $JUNO_FINEFX_REF_PKL lets several rate subsets run in parallel jobs; merge
     # them into the canonical pickle with tools/verify/merge_pickles.py.
     outp = os.environ.get('JUNO_FINEFX_REF_PKL') or (SP + '/finefx_cellsweep_ref.pkl')
-    with open(outp, 'wb') as f:
-        pickle.dump(out, f)
+    refio.dump(out, outp)
     sys.stdout.write('wrote %s (%d rates x %d contexts)\n'
                      % (outp, len(rates), len(CONTEXTS)))
 

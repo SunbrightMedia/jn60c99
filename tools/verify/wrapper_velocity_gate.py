@@ -35,6 +35,7 @@ USAGE
 """
 import os
 import pickle
+import refio
 import struct
 import sys
 
@@ -94,7 +95,7 @@ def build_ref():
     ref['state'] = {'flag': uc.mem_read(w.core + 572, 1)[0], 'msgs': push_all()}
     for k in ('init', 'state'):
         print('ref %-5s: switch byte %d, %d messages' % (k, ref[k]['flag'], len(ref[k]['msgs'])))
-    pickle.dump(ref, open(REF_PKL, 'wb'))
+    refio.dump(ref, REF_PKL)
     print('wrote', REF_PKL)
     return 0
 

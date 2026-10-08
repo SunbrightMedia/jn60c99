@@ -11,6 +11,7 @@ setters write that the port never touches. Port-only process (ctypes libjuno);
 NO Unicorn here (two-process rule)."""
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, ctypes, struct, pickle
+import refio
 SP = _JREPO + '/scratchpad'
 OUT = SP + '/port_writeset.pkl'
 SZ = 0xA83010
@@ -89,6 +90,6 @@ for base in (0, 4, 20):
             allcells |= writeset_for(synth(base, et, dt), 0)
             n_synth += 1
 allcells = sorted(allcells)
-pickle.dump(set(allcells), open(OUT, 'wb'))
+refio.dump(set(allcells), OUT)
 print("port writes %d distinct unit-0 cells across 64 factory + %d synthetic records" % (len(allcells), n_synth))
 print("wrote", OUT)

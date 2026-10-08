@@ -47,6 +47,7 @@ import gc
 import os
 import sys
 import pickle
+import refio
 import struct
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -160,7 +161,7 @@ def build_ref(resume=False):
                 sys.stderr.write('ref %g ET%d %-12s direct %d bytes\n' % (rate, k, name, len(SPOT)))
                 sys.stderr.flush()
             os.makedirs(SCRATCH, exist_ok=True)
-            pickle.dump(ref, open(REF_PKL, 'wb'))
+            refio.dump(ref, REF_PKL)
     print('wrote %s (%d sweeps, %d direct recalls)'
           % (REF_PKL, len(ref['sweep']), len(ref['direct'])))
     return 0

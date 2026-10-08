@@ -36,6 +36,7 @@ Env: JUNO_RSTRUCT_PKL, JUNO_RSTRUCT_SR (default 44100).
 Covenant: no capture data anywhere; ground truth is the executed binary.
 """
 import sys, os, struct, pickle
+import refio
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -113,7 +114,7 @@ def _ref():
         out['warm'][p] = (L, Rr)
         print("  ref: patch %d warm lifecycle rendered" % p, flush=True)
 
-    pickle.dump(out, open(PKL, 'wb'))
+    refio.dump(out, PKL)
     print("renderstruct ref -> %s (sr=%g)" % (PKL, SR))
     return 0
 

@@ -43,6 +43,7 @@ bit-exact-able in the Phase-2 matrix, so any mismatch is a REAL finding):
 NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 """
 import sys, os, struct, random, re, pickle
+import refio
 from array import array
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -143,8 +144,7 @@ def build_ref(lo, hi):
                          % (seed, int(rate), patch, len(La)))
         sys.stderr.flush()
     os.makedirs(os.path.dirname(REF_PKL), exist_ok=True)
-    with open(REF_PKL, 'wb') as fh:
-        pickle.dump(ref, fh)
+    refio.dump(ref, REF_PKL)
     print("wrote %s (%d seeds)" % (REF_PKL, len(ref)))
     return 0
 

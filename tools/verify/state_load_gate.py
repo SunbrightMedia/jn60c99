@@ -58,6 +58,7 @@ import os
 import re
 import sys
 import pickle
+import refio
 import random
 import struct
 
@@ -419,7 +420,7 @@ def build_ref():
         sys.stderr.flush()
     ref['_hpid'] = hpid
     out = REF_PKL if TRACE is None else REF_PKL.replace('.pkl', '_trace%d.pkl' % TRACE)
-    pickle.dump(ref, open(out, 'wb'))
+    refio.dump(ref, out)
     print('wrote %s (%d chains, %d queues)' % (out, len(ch), len(queues)))
     return 0
 

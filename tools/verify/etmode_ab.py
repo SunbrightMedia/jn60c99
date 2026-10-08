@@ -18,6 +18,7 @@ oracle), --port uses libjuno (ctypes); they meet only through a pickle.
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle
+import refio
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -81,8 +82,7 @@ def build_ref():
                 out[(m, sr, base)] = {int(w) * 4: int(per[m][w]) for w in ws}
             sys.stdout.write('[ref base %d @%d] writeset=%d cells\n' % (base, sr, len(ws)))
             sys.stdout.flush()
-    with open(REF, 'wb') as f:
-        pickle.dump(out, f)
+    refio.dump(out, REF)
     sys.stdout.write('wrote %s (%d keys)\n' % (REF, len(out)))
 
 

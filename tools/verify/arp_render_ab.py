@@ -40,6 +40,7 @@ After the fix: 7/7 here, 57/57 non-arp unchanged.
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, os, struct, pickle
+import refio
 sys.path.insert(0, _JREPO + '/tools/verify')
 import e2e_emu as E
 
@@ -74,7 +75,7 @@ if sys.argv[1:2] == ['--port']:
         inter = struct.unpack("<%dI" % (2*N), bytes(buf))
         out[p] = {'L': list(inter[0::2]), 'R': list(inter[1::2]), 'sched': sched}
         lib.juno_gui_destroy(c)
-    pickle.dump(out, open(PKL, 'wb'))
+    refio.dump(out, PKL)
     print("PORT: saved render + schedule for %d arp patches" % len(out))
 
 elif sys.argv[1:2] == ['--ref']:

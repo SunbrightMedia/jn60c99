@@ -15,6 +15,7 @@ separate pickle-only step (plugin_recall_diff.py).
 """
 import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
 import sys, pickle
+import refio
 sys.path.insert(0, _os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__)))
 import truth
 import e2e_emu as E
@@ -53,7 +54,7 @@ def main():
         ref[patch] = bytes(e.uc.mem_read(e.state[0], BLOCK))
         if patch % 16 == 0:
             sys.stderr.write("  patch %d done\n" % patch); sys.stderr.flush()
-    pickle.dump(ref, open(PKL, 'wb'))
+    refio.dump(ref, PKL)
     print("saved plugin recall reference (voice-0, 64 patches) -> %s" % PKL)
 
 

@@ -75,6 +75,7 @@ import os
 import re
 import sys
 import pickle
+import refio
 import random
 import struct
 
@@ -493,7 +494,7 @@ def build_ref(trace=None):
         sys.stderr.write('ref chain %d %s (%g Hz): %d events\n' % (ci, fam, rate, len(sc)))
         sys.stderr.flush()
     out = REF_PKL if trace is None else TRACE_PKL % trace
-    pickle.dump(ref, open(out, 'wb'))
+    refio.dump(ref, out)
     print('wrote %s (%d chains, %d host params)' % (out, len(ch), len(params)))
     return 0
 

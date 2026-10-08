@@ -58,6 +58,7 @@ EXIT 0 = GREEN, 1 = RED, 2 = usage.
 import os
 import sys
 import pickle
+import refio
 import struct
 import hashlib
 
@@ -152,7 +153,7 @@ def ref(seq, cells):
     out = {'seq': seq, 'cells': cells, 'offs': offs, 'sr': SR,
            'bank': bp, 'bank_sha256': sha(bp), 'steps': steps}
     p = pkl_path(seq)
-    pickle.dump(out, open(p, 'wb'))
+    refio.dump(out, p)
     print('ref: %d steps x %d cells -> %s' % (len(steps), len(offs), p))
     return 0
 
