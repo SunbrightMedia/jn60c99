@@ -78,6 +78,8 @@ def load_lib():
                     ('juno_gui_queue_patch', [V, ctypes.c_char_p, ctypes.c_int, ctypes.c_int], ctypes.c_int),
                     ('juno_gui_model_set', [V, ctypes.c_uint32, ctypes.c_int32], ctypes.c_int),
                     ('juno_gui_ui_tick', [V], None),
+                    ('juno_gui_commit', [V], None),
+                    ('juno_gui_keybed_write', [V, ctypes.c_int, ctypes.c_int], ctypes.c_int),
                     ('juno_gui_process_ex', [V, ctypes.POINTER(Note), ctypes.c_int, ctypes.POINTER(Par), ctypes.c_int,
                                              ctypes.c_int, ctypes.c_double, ctypes.POINTER(ctypes.c_float),
                                              ctypes.POINTER(ctypes.c_float), ctypes.c_int], ctypes.c_int),
@@ -135,6 +137,10 @@ def replay(lib, log, tooth):
             lib.juno_gui_model_set(c, int(t[1]), int(t[2]))
         elif t[0] == 'ui_tick':
             lib.juno_gui_ui_tick(c)
+        elif t[0] == 'commit':
+            lib.juno_gui_commit(c)
+        elif t[0] == 'keybed':
+            lib.juno_gui_keybed_write(c, int(t[1]), int(t[2]))
         elif t[0] == 'midi':
             pending.append(int(t[1], 16))
         elif t[0] == 'process':

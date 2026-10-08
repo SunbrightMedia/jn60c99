@@ -10,8 +10,8 @@
  * the plugin's own code, READ (rva 0x351410 / 0x3515B0 / 0x2D4AA0 / 0x2D4C40).
  *
  * The engine runs as the plugin runs in a DAW: each audio block is the plugin's
- * own process() (juno_gui_process_ex) on the audio thread, in the plugin's SSE
- * FTZ / DAZ mode; keys arrive as host note events, CC / pitch bend / aftertouch
+ * own process() (juno_gui_process_ex) on the audio thread (WASAPI, the device's
+ * own rate when the plugin's table has it), in the plugin's SSE FTZ / DAZ mode; keys arrive as host note events, CC / pitch bend / aftertouch
  * as its MIDI-mapping parameters; a GUI edit is the model set (rva 0x283DB0), a
  * patch load the patch browser's queued load (rva 0x335850).
  *
@@ -20,7 +20,13 @@
  * --render FILE [--bank B] [--patch N] (the audio thread's own path on a fixed
  * key / controller / panel script: raw float L R to FILE, every engine call to
  * FILE.log -- tools/dist/native_check.py replays the log through the proven
- * libjuno.so and the two outputs must be equal bit for bit).
+ * libjuno.so and the two outputs must be equal bit for bit), --play FILE --seed N
+ * [--fp-oracle] (a seeded performance through the program's own inputs: MIDI
+ * through the winmm callback, the keybed through the mouse handlers; the log is
+ * played into the plugin itself by tools/dist/exe_oracle_check.py), --kbscript
+ * FILE (panel events through the program's own handlers, every engine call to
+ * FILE.log: tools/verify/skin_kb_check.mjs plays the same script into the web
+ * skin and requires the same calls).
  */
 #define WIN32_LEAN_AND_MEAN
 #ifndef _WIN32_WINNT
@@ -32,8 +38,15 @@
 #include <commdlg.h>
 #include <shlwapi.h>
 #include <shellapi.h>
+#include <shlobj.h>
 #include <objidl.h>
+#include <mmreg.h>
+#include <initguid.h>          /* the WASAPI interface ids are defined in this file */
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+#include <avrt.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -50,10 +63,16 @@ int juno_gui_model_set(void *c, uint32_t id, int32_t v);
 int juno_gui_state_save(const void *c, unsigned char *out, int cap);
 int juno_gui_queue_patch(void *c, const unsigned char *bank, int len, int idx);
 void juno_gui_ui_tick(void *c);
+void juno_gui_setup_processing(void *c, double host_rate);
+void juno_gui_set_active(void *c, int on);
 int juno_gui_process_ex(void *c, const juno_host_note *ev, int nev, const juno_host_param *par, int npar,
                         int tempo_valid, double tempo, float *outL, float *outR, int n);
 uint32_t juno_midi_base(void);
+int juno_gui_keybed_write(void *c, int key, int value);
+void juno_gui_commit(void *c);
+int juno_gui_keybed_state(const void *c, int key);
 void juno_enable_hw_ftz(void);
+void juno_set_fp_oracle_mode(int on);
 
 /* ------------------------------------------------------- GDI+ (flat API) */
 typedef struct { UINT32 GdiplusVersion; void *DebugEventCallback; BOOL SuppressBackgroundThread; BOOL SuppressExternalCodecs; } GpStartupIn;
@@ -549,9 +568,15 @@ static void frame_size(const Bmp *b, int *w, int *h)
     else { *w = b->w; *h = b->h / b->n; }
 }
 
+/* The panel keyboard's keys (the plugin's layout, rva 0x2D45E0): keyRange low..
+ * high (the parser keeps high + 1, rva 0x2D3190); the white keys -- the first and
+ * the last key always, else C D E F G A B -- one width / their count apart from the
+ * control's left; the first key draws chromaticRect 12, the last 13, the others their
+ * pitch class; a black key sits at the right edge of the key before it, plus its
+ * chromaticOffset, less half its own width (C division) */
 static void keyboard_init(Ctl *c)
 {
-    int kr[2] = {36, 96}, i, white = 0, offs[12] = {0};
+    int kr[2] = {36, 96}, i, lo, hi, white = 0, step, acc = 0, offs[14] = {0};
     for (i = 0; i < c->el->n; ++i) {
         XN *e = c->el->k[i];
         int v[6];
@@ -561,19 +586,28 @@ static void keyboard_init(Ctl *c)
             c->rects[v[0]][v[1]][1] = v[3];
             c->rects[v[0]][v[1]][2] = v[4] - v[2];
             c->rects[v[0]][v[1]][3] = v[5] - v[3];
-        } else if (!strcmp(e->tag, "chromaticOffset") && ints(e->text, v, 2) == 2 && v[0] >= 0 && v[0] < 12) offs[v[0]] = v[1];
+        } else if (!strcmp(e->tag, "chromaticOffset") && ints(e->text, v, 2) == 2 && v[0] >= 0 && v[0] < 14) offs[v[0]] = v[1];
     }
-    for (i = kr[0]; i <= kr[1] && c->nkeys < 64; ++i) {
-        int ch = i % 12, black = (ch == 1 || ch == 3 || ch == 6 || ch == 8 || ch == 10);
-        Key *k = &c->keys[c->nkeys++];
+    lo = kr[0];
+    hi = kr[1] + 1;
+    for (i = lo; i < hi; ++i) {
+        int pc = i % 12;
+        white += (i == lo || i == hi - 1) ? 1 : pc > 4 ? pc % 2 == 1 : (pc & 1) == 0;
+    }
+    step = white ? c->w / white : 0;
+    for (i = lo; i < hi && c->nkeys < 64; ++i) {
+        int shape = i == lo ? 12 : i == hi - 1 ? 13 : i % 12;
+        int is_white = shape > 11 ? 1 : shape > 4 ? (shape & 1) == 1 : (shape & 1) == 0;
+        Key *k = &c->keys[c->nkeys];
         k->n = i;
-        k->black = black;
-        k->shape = (!black && i == kr[1]) ? 13 : ch;
-        k->w = c->rects[k->shape][0][2];
-        k->h = c->rects[k->shape][0][3];
-        if (black) k->x = c->x + white * 40 - 1 - k->w / 2 + offs[ch];
-        else k->x = c->x + white++ * 40;
+        k->black = !is_white;
+        k->shape = shape;
+        k->w = c->rects[shape][0][2];
+        k->h = c->rects[shape][0][3];
+        if (is_white) { k->x = c->x + acc; acc += step; }
+        else k->x = c->keys[c->nkeys - 1].x + c->keys[c->nkeys - 1].w + offs[shape] - k->w / 2;
         k->y = c->y;
+        ++c->nkeys;
     }
 }
 
@@ -677,6 +711,16 @@ static int E_model_set(uint32_t id, int32_t v)
     if (g_log) fprintf(g_log, "model_set %u %d\n", (unsigned)id, (int)v);
     return juno_gui_model_set(g_eng, id, v);
 }
+static int E_keybed_write(int key, int value)
+{
+    if (g_log) fprintf(g_log, "keybed %d %d\n", key, value);
+    return juno_gui_keybed_write(g_eng, key, value);
+}
+static void E_commit(void)
+{
+    if (g_log) fprintf(g_log, "commit\n");
+    juno_gui_commit(g_eng);
+}
 static void E_ui_tick(void)
 {
     if (g_log) fprintf(g_log, "ui_tick\n");
@@ -737,20 +781,25 @@ static double g_tempo = 128.0;
 static DWORD g_note_flash;
 static void zoom_apply(void);
 
+/* a value the engine's state list does not hold (the view's own): kept here */
+static void local_put(uint32_t id, int v)
+{
+    int i;
+    for (i = 0; i < g_nloc && g_loc[i].id != id; ++i) ;
+    if (i == g_nloc && g_nloc < 256) ++g_nloc;
+    if (i < 256) { g_loc[i].id = id; g_loc[i].v = v; }
+}
 static void val_set(const Leaf *L, int v)
 {
-    int r, i;
+    int r;
     if (!L) return;
     if (L->max > L->min) { if (v < L->min) v = L->min; if (v > L->max) v = L->max; }
     EnterCriticalSection(&g_lock);
     r = E_model_set(L->id, v);
+    E_commit();                       /* a panel control commits after its set (rva 0x2DD100) */
     if (r) eng_refresh();
     LeaveCriticalSection(&g_lock);
-    if (!r) {
-        for (i = 0; i < g_nloc && g_loc[i].id != L->id; ++i) ;
-        if (i == g_nloc && g_nloc < 256) ++g_nloc;
-        if (i < 256) { g_loc[i].id = L->id; g_loc[i].v = v; }
-    }
+    if (!r) local_put(L->id, v);
     if (!strcmp(L->name, "fm.SYNTH.COM.TEMPO")) g_tempo = 40.0 + v / 10.0;     /* "40.0BPM" + 0.1 per step */
     if (!strcmp(L->name, "vm.vs.mainZoom")) zoom_apply();
     if (!strcmp(L->name, "fm.PATCH.CTRL.TEMPO SYNC")) g_note_flash = GetTickCount();
@@ -963,21 +1012,22 @@ static Ctl *g_pressed[8];
 static int g_npressed;
 static int is_pressed(const Ctl *c) { int i; for (i = 0; i < g_npressed; ++i) if (g_pressed[i] == c) return 1; return 0; }
 static void press(Ctl *c) { if (g_npressed < 8 && !is_pressed(c)) g_pressed[g_npressed++] = c; }
-static volatile LONG g_notes[128];
 
+/* the keys in key order (rva 0x2D3E20): key i down when the note value's state of
+ * i + 12 x OCTAVE SHIFT is above 0 (what the UI timer drained and the keyboard wrote) */
 static void draw_keyboard(const Ctl *c)
 {
-    int pass, i, shift = get("fm.PATCH.NAME1.OCTAVE SHIFT");
+    int i, shift = get("fm.PATCH.NAME1.OCTAVE SHIFT"), st[128];
     if (!c->bmp || !c->bmp->px) return;
-    for (pass = 0; pass < 2; ++pass)
-        for (i = 0; i < c->nkeys; ++i) {
-            const Key *k = &c->keys[i];
-            int n = k->n + 12 * shift, down = n >= 0 && n < 128 && g_notes[n];
-            const int *r;
-            if (k->black != pass) continue;
-            r = c->rects[k->shape][down];
-            blit(c->bmp, r[0], r[1], r[2], r[3], k->x, k->y);
-        }
+    EnterCriticalSection(&g_lock);
+    for (i = 0; i < 128; ++i) st[i] = juno_gui_keybed_state(g_eng, i);
+    LeaveCriticalSection(&g_lock);
+    for (i = 0; i < c->nkeys; ++i) {
+        const Key *k = &c->keys[i];
+        unsigned n = (unsigned)(k->n + 12 * shift);
+        const int *r = c->rects[k->shape][n <= 127u && st[n] > 0];
+        blit(c->bmp, r[0], r[1], r[2], r[3], k->x, k->y);
+    }
     if (shift && c->nwr) {
         char s[32];
         snprintf(s, sizeof s, "OCTAVE %s%d", shift > 0 ? "+" : "", shift);
@@ -1134,19 +1184,65 @@ static void status_set(const char *s)
     if (g_wnd) SetWindowTextA(g_wnd, t);
 }
 
-static void load_patch(int idx)
+/* A patch load while the audio plays is landed by the audio thread (land_patch):
+ * it first renders ahead -- the queue grows by the last load's measured block --
+ * so the load's slow block cannot empty it, then queues the load at a block
+ * boundary. The change lands some ms late; the audio never breaks (END_GOAL's
+ * INVARIANT). The calls are the same as below: the patch browser's load, then the
+ * view's patch id. */
+static volatile LONG g_preq = -1;      /* the load to land: bank * 64 + idx; -1 none */
+static volatile LONG g_landed;         /* 1: landed, the GUI shows it */
+static LONG g_landed_req, g_landed_ok;
+static double g_load_ms = 12.0;        /* the slowest recent load's block, measured on this computer */
+static const Leaf *g_patchid;          /* vm.vs.patchId */
+static volatile LONG g_audio_state;    /* 0 starting, 1 WASAPI, 2 waveOut, -1 no output device */
+static int audio_live(void) { return g_audio_state == 1 || g_audio_state == 2; }
+
+static void land_patch(void)            /* the audio thread, between two blocks */
+{
+    LONG r = InterlockedExchange(&g_preq, -1), commit;
+    int ok = 0;
+    if (r < 0) return;
+    commit = r & 0x40000000;
+    r &= 0x3FFFFFFF;
+    if (r / 64 >= g_nbanks) return;
+    EnterCriticalSection(&g_lock);
+    if (g_log) fprintf(g_log, "queue_patch %d %s\n", (int)(r % 64), g_banks[r / 64].name);
+    juno_gui_queue_patch(g_eng, g_banks[r / 64].bytes, g_banks[r / 64].len, (int)(r % 64));
+    if (g_patchid) ok = E_model_set(g_patchid->id, (int)(r % 64));
+    if (commit) E_commit();
+    LeaveCriticalSection(&g_lock);
+    g_landed_req = r;
+    g_landed_ok = ok;
+    InterlockedExchange(&g_landed, 1);
+}
+
+/* A patch load: the plugin's load (rva 0x338090: the patch, then its set of the
+ * patch number, no commit), then -- from the panel's ManagePatch buttons, whose
+ * command handler ends with one (rva 0x322E60) -- the model's commit; a load
+ * from the patch window's list does not commit (rva 0x3278C0, the window open) */
+static void load_patch(int idx, int commit)
 {
     Bank *b;
     char nm[32], s[128];
     if (g_bank < 0 || g_bank >= g_nbanks) return;
     b = &g_banks[g_bank];
+    if (audio_live() && !g_log) {
+        g_patch = g_patchsel = idx;
+        snprintf(s, sizeof s, "%s: %d ...", b->name, idx + 1);
+        status_set(s);
+        InterlockedExchange(&g_preq, (commit ? 0x40000000 : 0) | (g_bank * 64 + idx));
+        g_dirty = 1;
+        return;
+    }
     EnterCriticalSection(&g_lock);
     if (g_log) fprintf(g_log, "queue_patch %d %s\n", idx, b->name);
     juno_gui_queue_patch(g_eng, b->bytes, b->len, idx);     /* the patch browser's load, at the next block */
+    if (g_patchid && !E_model_set(g_patchid->id, idx)) local_put(g_patchid->id, idx);
+    if (commit) E_commit();
     eng_refresh();
     LeaveCriticalSection(&g_lock);
     g_patch = g_patchsel = idx;
-    set("vm.vs.patchId", idx);
     patch_name(nm);
     snprintf(s, sizeof s, "%s: %d %s", b->name, idx + 1, nm);
     status_set(s);
@@ -1163,12 +1259,7 @@ static void push_midi(uint32_t m)
     if (g_log) fprintf(g_log, "midi %06x\n", (unsigned)m);
     if (((g_qhead + 1) & 1023) != g_qtail) { g_queue[g_qhead] = m; g_qhead = (g_qhead + 1) & 1023; }
     LeaveCriticalSection(&g_qlock);
-    {
-        unsigned st = m & 0xF0, d1 = (m >> 8) & 0x7F, d2 = (m >> 16) & 0x7F;
-        if (st == 0x90 && d2) InterlockedExchange(&g_notes[d1], 1);
-        else if (st == 0x80 || st == 0x90) InterlockedExchange(&g_notes[d1], 0);
-        g_dirty = 1;
-    }
+    g_dirty = 1;
 }
 
 static HMIDIIN g_midi;
@@ -1194,17 +1285,71 @@ static void midi_open(int dev)
     }
 }
 
-/* ------------------------------------------------------------------- audio */
-#define SR 48000
-#define BLK 256                        /* one output buffer: 5.3 ms */
-#define NBUF 16
-static volatile LONG g_nbuf = 8;       /* buffers in flight: the output latency, 8 x 5.3 = 43 ms */
+/* --------------------------------------------------------------- settings
+ * The window's own choices -- audio latency, zoom, MIDI input -- kept in
+ * %APPDATA%\JUNO-60\settings.ini (not the plugin's state; no test mode reads it). */
+static char g_ini[MAX_PATH];
+static void ini_init(void)
+{
+    char d[MAX_PATH];
+    if (FAILED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, d))) return;
+    snprintf(g_ini, sizeof g_ini, "%s\\JUNO-60", d);
+    CreateDirectoryA(g_ini, NULL);
+    strncat(g_ini, "\\settings.ini", sizeof g_ini - strlen(g_ini) - 1);
+}
+static int ini_get(const char *sec, const char *key, int def) { return g_ini[0] ? (int)GetPrivateProfileIntA(sec, key, def, g_ini) : def; }
+static void ini_put(const char *sec, const char *key, int v)
+{
+    char s[32];
+    if (!g_ini[0]) return;
+    snprintf(s, sizeof s, "%d", v);
+    WritePrivateProfileStringA(sec, key, s, g_ini);
+}
+static void ini_gets(const char *sec, const char *key, char *out, int cap)
+{
+    out[0] = 0;
+    if (g_ini[0]) GetPrivateProfileStringA(sec, key, "", out, (DWORD)cap, g_ini);
+}
+static void ini_puts(const char *sec, const char *key, const char *v) { if (g_ini[0]) WritePrivateProfileStringA(sec, key, v, g_ini); }
+
+/* ------------------------------------------------------------------- audio
+ * WASAPI, shared mode, event-driven (Windows Vista and later). The engine renders
+ * for the device's own mix rate when the plugin's converter table has it --
+ * 44100, 48000, 88200, 96000, 176400, 192000, 384000: as in a DAW at that rate,
+ * nothing resamples -- else for 48000 and Windows converts. The queue holds the
+ * latency setting's worth of 128-sample blocks; "lowest" asks the device for its
+ * smallest period (IAudioClient3, Windows 10). waveOut is the fallback. */
+#define BLK 128                        /* one engine block: 2.67 ms at 48000 */
+static int g_rate = 48000;             /* the host rate the engine renders for */
+static volatile LONG g_lat_ms = 21;    /* the latency setting in ms; 0 = the device's lowest */
+static volatile LONG g_reopen;         /* a new setting: the output reopens */
+static char g_audio_desc[192] = "Output: starting";
+static CRITICAL_SECTION g_desc_lock;   /* g_audio_desc: the audio thread writes, the GUI reads */
+static void audio_desc(const char *fmt, ...)
+{
+    va_list a;
+    va_start(a, fmt);
+    EnterCriticalSection(&g_desc_lock);
+    vsnprintf(g_audio_desc, sizeof g_audio_desc, fmt, a);
+    LeaveCriticalSection(&g_desc_lock);
+    va_end(a);
+}
+static void audio_desc_get(char *out, size_t cap)
+{
+    EnterCriticalSection(&g_desc_lock);
+    snprintf(out, cap, "%s", g_audio_desc);
+    LeaveCriticalSection(&g_desc_lock);
+}
 static float g_gain = 0.5f;            /* the monitor fader after the engine (a DAW fader's role) */
 static volatile LONG g_run = 1;
 static HANDLE g_audio_thread;
-static volatile LONG g_dropouts;       /* the device ran dry: every buffer played before the next was ready */
+static volatile LONG g_dropouts;       /* the device found the queue empty: a gap */
 static volatile LONG g_blocks;         /* blocks rendered for the device */
-static volatile LONG g_audio_state;    /* 0 starting, 1 playing, -1 no output device */
+
+static int rate_in_table(int r)
+{
+    return r == 44100 || r == 48000 || r == 88200 || r == 96000 || r == 176400 || r == 192000 || r == 384000;
+}
 
 static void render_block(float *L, float *R)
 {
@@ -1238,44 +1383,284 @@ static void render_block(float *L, float *R)
     LeaveCriticalSection(&g_lock);
 }
 
-static DWORD WINAPI audio_main(LPVOID arg)
+/* the samples into the device's format: 0 float32, 1 int16, 2 int24, 3 int32 */
+static void put_samples(unsigned char *dst, int kind, int ch, const float *L, const float *R, int n)
+{
+    int k, c;
+    for (k = 0; k < n; ++k) {
+        float v[2];
+        v[0] = L[k] * g_gain;
+        v[1] = R[k] * g_gain;
+        for (c = 0; c < 2; ++c) v[c] = v[c] > 1.f ? 1.f : v[c] < -1.f ? -1.f : v[c];
+        for (c = 0; c < ch; ++c) {
+            float x = ch == 1 ? 0.5f * (v[0] + v[1]) : c < 2 ? v[c] : 0.f;
+            if (kind == 0) { memcpy(dst, &x, 4); dst += 4; }
+            else if (kind == 1) { short q = (short)lrintf(x * 32767.f); memcpy(dst, &q, 2); dst += 2; }
+            else if (kind == 2) { long q = lrintf(x * 8388607.f); dst[0] = (unsigned char)q; dst[1] = (unsigned char)(q >> 8); dst[2] = (unsigned char)(q >> 16); dst += 3; }
+            else { int32_t q = (int32_t)lrint((double)x * 2147483647.0); memcpy(dst, &q, 4); dst += 4; }
+        }
+    }
+}
+
+static const GUID SUB_FLOAT = {0x00000003, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
+static const GUID SUB_PCM = {0x00000001, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
+static int fmt_kind(const WAVEFORMATEX *f)
+{
+    int pcm = f->wFormatTag == WAVE_FORMAT_PCM, flt = f->wFormatTag == WAVE_FORMAT_IEEE_FLOAT;
+    if (f->wFormatTag == WAVE_FORMAT_EXTENSIBLE && f->cbSize >= 22) {
+        const WAVEFORMATEXTENSIBLE *x = (const WAVEFORMATEXTENSIBLE *)f;
+        pcm = IsEqualGUID(&x->SubFormat, &SUB_PCM);
+        flt = IsEqualGUID(&x->SubFormat, &SUB_FLOAT);
+    }
+    if (flt && f->wBitsPerSample == 32) return 0;
+    if (pcm) return f->wBitsPerSample == 16 ? 1 : f->wBitsPerSample == 24 ? 2 : f->wBitsPerSample == 32 ? 3 : -1;
+    return -1;
+}
+
+typedef struct {
+    IMMDevice *dev;
+    IAudioClient *ac;
+    IAudioRenderClient *rc;
+    WAVEFORMATEX *fmt;                 /* CoTaskMemAlloc'd, or &own */
+    WAVEFORMATEXTENSIBLE own;
+    int kind, ch;
+    UINT32 frames, period, target;     /* the buffer, the device period, the queue to keep */
+} Out;
+
+static void out_close(Out *o)
+{
+    if (o->ac) o->ac->lpVtbl->Stop(o->ac);
+    if (o->rc) o->rc->lpVtbl->Release(o->rc);
+    if (o->ac) o->ac->lpVtbl->Release(o->ac);
+    if (o->dev) o->dev->lpVtbl->Release(o->dev);
+    if (o->fmt && o->fmt != &o->own.Format) CoTaskMemFree(o->fmt);
+    memset(o, 0, sizeof *o);
+}
+
+/* the default device's mix rate (0: no device) */
+static int device_rate(void)
+{
+    IMMDeviceEnumerator *en = NULL;
+    IMMDevice *dev = NULL;
+    IAudioClient *ac = NULL;
+    WAVEFORMATEX *mix = NULL;
+    int r = 0;
+    if (SUCCEEDED(CoCreateInstance(&CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, &IID_IMMDeviceEnumerator, (void **)&en)) &&
+        SUCCEEDED(en->lpVtbl->GetDefaultAudioEndpoint(en, eRender, eConsole, &dev)) &&
+        SUCCEEDED(dev->lpVtbl->Activate(dev, &IID_IAudioClient, CLSCTX_ALL, NULL, (void **)&ac)) &&
+        SUCCEEDED(ac->lpVtbl->GetMixFormat(ac, &mix)))
+        r = (int)mix->nSamplesPerSec;
+    if (mix) CoTaskMemFree(mix);
+    if (ac) ac->lpVtbl->Release(ac);
+    if (dev) dev->lpVtbl->Release(dev);
+    if (en) en->lpVtbl->Release(en);
+    return r;
+}
+
+static int out_open(Out *o, HANDLE ev, int lat_ms)
+{
+    IMMDeviceEnumerator *en = NULL;
+    WAVEFORMATEX *mix = NULL;
+    REFERENCE_TIME defp = 0, minp = 0;
+    int lowest = 0, rate;
+    memset(o, 0, sizeof *o);
+    if (FAILED(CoCreateInstance(&CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, &IID_IMMDeviceEnumerator, (void **)&en)))
+        return 0;
+    if (FAILED(en->lpVtbl->GetDefaultAudioEndpoint(en, eRender, eConsole, &o->dev))) { en->lpVtbl->Release(en); return 0; }
+    en->lpVtbl->Release(en);
+    /* the lowest setting: the device's smallest shared-mode period */
+    if (lat_ms == 0) {
+        IAudioClient3 *a3 = NULL;
+        if (SUCCEEDED(o->dev->lpVtbl->Activate(o->dev, &IID_IAudioClient3, CLSCTX_ALL, NULL, (void **)&a3))) {
+            UINT32 def = 0, fund = 0, mn = 0, mx = 0;
+            if (SUCCEEDED(a3->lpVtbl->GetMixFormat(a3, &mix)) && (int)mix->nSamplesPerSec == g_rate && fmt_kind(mix) >= 0 &&
+                SUCCEEDED(a3->lpVtbl->GetSharedModeEnginePeriod(a3, mix, &def, &fund, &mn, &mx)) && mn > 0 &&
+                SUCCEEDED(a3->lpVtbl->InitializeSharedAudioStream(a3, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, mn, mix, NULL))) {
+                o->ac = (IAudioClient *)a3;          /* IAudioClient3 begins with IAudioClient's slots */
+                o->fmt = mix;
+                o->period = mn;
+                lowest = 1;
+            } else {
+                if (mix) CoTaskMemFree(mix);
+                mix = NULL;
+                a3->lpVtbl->Release(a3);
+            }
+        }
+        if (!lowest) lat_ms = 11;
+    }
+    if (!o->ac) {
+        DWORD flags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
+        if (FAILED(o->dev->lpVtbl->Activate(o->dev, &IID_IAudioClient, CLSCTX_ALL, NULL, (void **)&o->ac))) { o->ac = NULL; out_close(o); return 0; }
+        if (FAILED(o->ac->lpVtbl->GetMixFormat(o->ac, &mix))) { out_close(o); return 0; }
+        if ((int)mix->nSamplesPerSec == g_rate && fmt_kind(mix) >= 0) o->fmt = mix;
+        else {                                       /* our own format; Windows converts */
+            CoTaskMemFree(mix);
+            memset(&o->own, 0, sizeof o->own);
+            o->own.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
+            o->own.Format.nChannels = 2;
+            o->own.Format.nSamplesPerSec = (DWORD)g_rate;
+            o->own.Format.wBitsPerSample = 32;
+            o->own.Format.nBlockAlign = 8;
+            o->own.Format.nAvgBytesPerSec = (DWORD)g_rate * 8;
+            o->own.Format.cbSize = 22;
+            o->own.Samples.wValidBitsPerSample = 32;
+            o->own.dwChannelMask = 3;                /* front left, front right */
+            o->own.SubFormat = SUB_FLOAT;
+            o->fmt = &o->own.Format;
+            flags |= AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
+        }
+        /* a buffer room for the largest setting; the queue is kept at the setting */
+        if (FAILED(o->ac->lpVtbl->Initialize(o->ac, AUDCLNT_SHAREMODE_SHARED, flags, 1000000, 0, o->fmt, NULL))) { out_close(o); return 0; }
+        o->ac->lpVtbl->GetDevicePeriod(o->ac, &defp, &minp);
+        o->period = (UINT32)((defp * g_rate + 9999999) / 10000000);
+    }
+    o->kind = fmt_kind(o->fmt);
+    o->ch = o->fmt->nChannels;
+    if (FAILED(o->ac->lpVtbl->GetBufferSize(o->ac, &o->frames)) ||
+        FAILED(o->ac->lpVtbl->GetService(o->ac, &IID_IAudioRenderClient, (void **)&o->rc)) ||
+        FAILED(o->ac->lpVtbl->SetEventHandle(o->ac, ev))) { out_close(o); return 0; }
+    rate = g_rate;
+    if (lowest) o->target = o->frames;
+    else {
+        UINT32 want = (UINT32)((LONGLONG)lat_ms * rate / 1000);
+        if (want < o->period + BLK) want = o->period + BLK;
+        o->target = want < o->frames ? want : o->frames;
+    }
+    audio_desc("Output: WASAPI, %d Hz, %d ch, period %.1f ms, queue %.1f ms%s%s", rate, o->ch, o->period * 1000.0 / rate,
+               o->target * 1000.0 / rate, lowest ? " (the device's lowest)" : "",
+               o->fmt == &o->own.Format ? " (Windows converts the rate)" : "");
+    return 1;
+}
+
+/* fill the queue up to its target, one engine block at a time */
+static HRESULT out_fill(Out *o, int counting)
+{
+    UINT32 pad;
+    HRESULT hr = o->ac->lpVtbl->GetCurrentPadding(o->ac, &pad);
+    float L[BLK], R[BLK];
+    if (FAILED(hr)) return hr;
+    UINT32 target = o->target;
+    if (counting && pad == 0) InterlockedIncrement(&g_dropouts);
+    if (g_preq >= 0) {                     /* a patch load waits: render ahead first */
+        UINT32 more = (UINT32)((g_load_ms * 1.5 + 2.0) * g_rate / 1000.0);
+        target = o->target + more;
+        if (target > o->frames) target = o->frames;
+    }
+    for (;;) {
+        static int heavy;                  /* the next block is the landed load's */
+        BYTE *data;
+        LARGE_INTEGER t0, t1, f;
+        if (g_preq >= 0 && pad + BLK > target) { land_patch(); heavy = 1; }
+        if (pad + BLK > (heavy ? o->frames : target)) break;
+        hr = o->rc->lpVtbl->GetBuffer(o->rc, BLK, &data);
+        if (FAILED(hr)) return hr;
+        QueryPerformanceCounter(&t0);
+        render_block(L, R);
+        QueryPerformanceCounter(&t1);
+        put_samples(data, o->kind, o->ch, L, R, BLK);
+        o->rc->lpVtbl->ReleaseBuffer(o->rc, BLK, 0);
+        InterlockedIncrement(&g_blocks);
+        pad += BLK;
+        if (heavy) {                       /* the load's block: what the next render-ahead allows for */
+            double ms;
+            QueryPerformanceFrequency(&f);
+            ms = (double)(t1.QuadPart - t0.QuadPart) * 1000.0 / (double)f.QuadPart;
+            g_load_ms = ms > g_load_ms ? ms : 0.8 * g_load_ms + 0.2 * ms;
+            heavy = 0;
+            break;
+        }
+    }
+    return S_OK;
+}
+
+static int run_wasapi(void)
+{
+    HANDLE ev = CreateEventA(NULL, FALSE, FALSE, NULL);
+    Out o;
+    int opened = 0;
+    while (g_run) {
+        int lat = (int)g_lat_ms, dev;
+        InterlockedExchange(&g_reopen, 0);
+        /* a device with a new mix rate the table has: the host's rate change on a
+         * running instance (setActive / setupProcessing / setActive, CLAIMS A28) */
+        dev = device_rate();
+        if (opened && dev && dev != g_rate && rate_in_table(dev)) {
+            EnterCriticalSection(&g_lock);
+            juno_gui_set_active(g_eng, 0);
+            juno_gui_setup_processing(g_eng, (double)dev);
+            juno_gui_set_active(g_eng, 1);
+            LeaveCriticalSection(&g_lock);
+            g_rate = dev;
+        }
+        if (!out_open(&o, ev, lat)) {
+            if (!opened) { CloseHandle(ev); return 0; }    /* no WASAPI: waveOut */
+            InterlockedExchange(&g_audio_state, -1);
+            Sleep(500);                                    /* the device is gone: try again */
+            continue;
+        }
+        opened = 1;
+        InterlockedExchange(&g_audio_state, 1);
+        if (SUCCEEDED(out_fill(&o, 0)) && SUCCEEDED(o.ac->lpVtbl->Start(o.ac))) {
+            while (g_run && !g_reopen) {
+                WaitForSingleObject(ev, 200);
+                if (FAILED(out_fill(&o, 1))) break;       /* the device changed or is gone */
+            }
+        }
+        out_close(&o);
+    }
+    CloseHandle(ev);
+    return 1;
+}
+
+static void run_waveout(void)
 {
     WAVEFORMATEX wf;
     HWAVEOUT wo;
-    WAVEHDR hdr[NBUF];
-    short pcm[NBUF][BLK * 2];
+    enum { NB = 64 };
+    WAVEHDR hdr[NB];
+    static short pcm[NB][BLK * 2];
     float L[BLK], R[BLK];
     HANDLE ev = CreateEventA(NULL, FALSE, FALSE, NULL);
     int i, k;
-    (void)arg;
-    juno_enable_hw_ftz();                  /* this thread renders: the plugin's SSE FTZ / DAZ mode */
     memset(&wf, 0, sizeof wf);
     wf.wFormatTag = WAVE_FORMAT_PCM;
     wf.nChannels = 2;
-    wf.nSamplesPerSec = SR;
+    wf.nSamplesPerSec = (DWORD)g_rate;
     wf.wBitsPerSample = 16;
     wf.nBlockAlign = 4;
-    wf.nAvgBytesPerSec = SR * 4;
+    wf.nAvgBytesPerSec = (DWORD)g_rate * 4;
     if (waveOutOpen(&wo, WAVE_MAPPER, &wf, (DWORD_PTR)ev, 0, CALLBACK_EVENT) != MMSYSERR_NOERROR) {
         InterlockedExchange(&g_audio_state, -1);
-        return 0;
+        audio_desc("Output: none (no audio device)");
+        return;
     }
-    InterlockedExchange(&g_audio_state, 1);
+    InterlockedExchange(&g_audio_state, 2);
     memset(hdr, 0, sizeof hdr);
-    for (i = 0; i < NBUF; ++i) {
+    for (i = 0; i < NB; ++i) {
         hdr[i].lpData = (LPSTR)pcm[i];
         hdr[i].dwBufferLength = sizeof pcm[i];
         waveOutPrepareHeader(wo, &hdr[i], sizeof hdr[i]);
         hdr[i].dwFlags |= WHDR_DONE;
     }
     while (g_run) {
-        int done = 0, started = 0;
-        for (i = 0; i < g_nbuf; ++i) {
+        static int shown_nb;
+        int done = 0, started = 0, nb = (int)(((LONGLONG)(g_lat_ms ? g_lat_ms : 21) * g_rate / 1000 + BLK - 1) / BLK);
+        if (nb < 3) nb = 3;
+        if (nb > NB) nb = NB;
+        if (nb != shown_nb) { shown_nb = nb; audio_desc("Output: waveOut, %d Hz, queue %.1f ms", g_rate, nb * BLK * 1000.0 / g_rate); }
+        if (g_preq >= 0) {                 /* a patch load waits: render ahead first, then land it */
+            int ahead = nb + (int)((g_load_ms * 1.5 + 2.0) * g_rate / 1000.0 / BLK) + 1, queued = 0;
+            if (ahead > NB) ahead = NB;
+            for (i = 0; i < ahead; ++i) if (!(hdr[i].dwFlags & WHDR_DONE)) ++queued;
+            if (queued >= ahead - 1) land_patch();
+            else nb = ahead;
+        }
+        for (i = 0; i < nb; ++i) {
             if (hdr[i].dwFlags & WHDR_DONE) ++done;
             if (hdr[i].dwUser) ++started;
         }
-        if (started == g_nbuf && done == g_nbuf) InterlockedIncrement(&g_dropouts);
-        for (i = 0; i < g_nbuf; ++i) {
+        if (started == nb && done == nb) InterlockedIncrement(&g_dropouts);
+        for (i = 0; i < nb; ++i) {
             if (!(hdr[i].dwFlags & WHDR_DONE)) continue;
             hdr[i].dwUser = 1;
             InterlockedIncrement(&g_blocks);
@@ -1293,16 +1678,28 @@ static DWORD WINAPI audio_main(LPVOID arg)
         WaitForSingleObject(ev, 20);
     }
     waveOutReset(wo);
-    for (i = 0; i < NBUF; ++i) waveOutUnprepareHeader(wo, &hdr[i], sizeof hdr[i]);
+    for (i = 0; i < NB; ++i) waveOutUnprepareHeader(wo, &hdr[i], sizeof hdr[i]);
     waveOutClose(wo);
+}
+
+static DWORD WINAPI audio_main(LPVOID arg)
+{
+    DWORD task = 0;
+    HANDLE mm;
+    (void)arg;
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    mm = AvSetMmThreadCharacteristicsW(L"Pro Audio", &task);   /* the system's audio scheduling class */
+    juno_enable_hw_ftz();                  /* this thread renders: the plugin's SSE FTZ / DAZ mode */
+    if (!run_wasapi()) run_waveout();
+    if (mm) AvRevertMmThreadCharacteristics(mm);
+    CoUninitialize();
     return 0;
 }
 
 /* -------------------------------------------------------------- interaction */
 static Ctl *g_drag;
-static int g_dy, g_dv, g_dkey_note = -1, g_dboth;
+static int g_dy, g_dv, g_dboth;
 static double g_dacc;
-static const Key *g_dkey;
 static char g_tip[128];
 static int g_tipx, g_tipy, g_has_tip;
 
@@ -1346,31 +1743,78 @@ static void show_tip(const Ctl *c)
     g_tipy = c->y + c->tipy;
     g_has_tip = 1;
 }
-static const Key *key_at(const Ctl *c, int x, int y)
+/* The key at a point and the velocity there (rva 0x2D4AA0): the point clamped into
+ * the control; from the lowest key: a next key that overlaps this one's right edge (a
+ * black key) if the point is in it, else this key if the point is left of its right
+ * edge, else on to the next key (past a black key that missed it); the velocity
+ * 1016 x (y - the key's top) / its height, / 7, in 1..127 (C division) */
+static int key_hit(const Ctl *c, int px, int py, int *vel)
 {
-    int i, pass;
-    for (pass = 1; pass >= 0; --pass)
-        for (i = 0; i < c->nkeys; ++i) {
-            const Key *k = &c->keys[i];
-            if (k->black == pass && x >= k->x && x < k->x + k->w && y >= k->y && y < k->y + k->h) return k;
+    int x = px < c->x ? c->x : px > c->x + c->w - 1 ? c->x + c->w - 1 : px;
+    int y = py < c->y ? c->y : py > c->y + c->h - 1 ? c->y + c->h - 1 : py;
+    int i = 0, v;
+    const Key *k = &c->keys[0];
+    while (i < c->nkeys - 1) {
+        const Key *cur = &c->keys[i], *nx = &c->keys[i + 1];
+        int missed = 0;
+        k = cur;
+        if (nx->x < cur->x + cur->w) {
+            if (nx->x <= x && nx->y <= y && x < nx->x + nx->w && y < nx->y + nx->h) { k = nx; break; }
+            missed = 1;
         }
-    return NULL;
+        if (x < cur->x + cur->w) break;
+        i += missed ? 2 : 1;
+        k = &c->keys[i < c->nkeys ? i : c->nkeys - 1];
+    }
+    v = 1016 * (y - k->y) / k->h / 7;
+    *vel = v < 1 ? 1 : v > 127 ? 127 : v;
+    return k->n;
 }
-/* the click velocity (rva 0x2D4AA0) */
-static int key_velocity(const Key *k, int y)
+
+/* the keyboard's model values: OCTAVE SHIFT moves the notes by 12 (rva 0x2D4C40);
+ * vm.ks.onVel / offVel (Script.xml defaults 0 and 64: no control of this panel
+ * changes them) */
+static int kb_note(int n) { return n + 12 * get("fm.PATCH.NAME1.OCTAVE SHIFT"); }
+#define KS_ON_VEL 0
+#define KS_OFF_VEL 64
+static int g_kb_drag, g_kb_key = -1;     /* the control's drag flag (+48) and its key (+240) */
+
+/* the send (rva 0x2D47E0): a press at onVel when it is set, a release at -offVel,
+ * into the note value (the bridge queues it on a change) */
+static void kb_send(int key, int v)
 {
-    int yy = y < k->y ? k->y : y > k->y + k->h - 1 ? k->y + k->h - 1 : y;
-    int v = ((1016 * (yy - k->y)) / k->h) / 7;
-    return v < 1 ? 1 : v > 127 ? 127 : v;
+    int r = v <= 0 ? -KS_OFF_VEL : KS_ON_VEL;
+    if (r) v = r;
+    EnterCriticalSection(&g_lock);
+    E_keybed_write(key, v);
+    LeaveCriticalSection(&g_lock);
+    g_dirty = 1;
 }
-static int key_on(const Key *k, int y)
+/* a press (rva 0x2D4920): a note in the shifted key range other than the held key;
+ * with KEY HOLD off, or without Shift, every key above 0 is released first (key
+ * order); then the note at the velocity */
+static void kb_press(const Ctl *c, int note, int vel, int shift)
 {
-    int n = k->n + 12 * get("fm.PATCH.NAME1.OCTAVE SHIFT");       /* rva 0x2D4C40 */
-    if (n < 0 || n > 127) return -1;
-    push_midi(0x90u | ((uint32_t)n << 8) | ((uint32_t)key_velocity(k, y) << 16));
-    return n;
+    int i, st;
+    if ((unsigned)note > 127u || note < kb_note(c->keys[0].n) || note >= kb_note(c->keys[c->nkeys - 1].n + 1) || g_kb_key == note)
+        return;
+    if (!get("fm.PATCH.NAME1.KEY HOLD") || !shift)
+        for (i = 0; i < 128; ++i) {
+            EnterCriticalSection(&g_lock);
+            st = juno_gui_keybed_state(g_eng, i);
+            LeaveCriticalSection(&g_lock);
+            if (st > 0) kb_send(i, -vel);
+        }
+    kb_send(note, vel);
+    g_kb_key = note;
 }
-static void key_off(int n) { if (n >= 0) push_midi(0x80u | ((uint32_t)n << 8) | (64u << 16)); }
+/* the release (rva 0x2D48A0): the held key, unless KEY HOLD is on, at the velocity
+ * where the button went up */
+static void kb_release(int vel)
+{
+    if (g_kb_key >= 0 && !get("fm.PATCH.NAME1.KEY HOLD")) kb_send(g_kb_key, -vel);
+    g_kb_key = -1;
+}
 
 static void option_menu(void);
 static void midi_menu(void);
@@ -1446,10 +1890,12 @@ static void mouse_down(int x, int y, int shift, int dbl)
     case C_PATCHNAME:
         press(c);
         break;
-    case C_KEYBOARD:
-        g_dkey = key_at(c, x, y);
-        g_dkey_note = g_dkey ? key_on(g_dkey, y) : -1;
+    case C_KEYBOARD: {                  /* the control's mouse handler (rva 0x2D41F0): down */
+        int vel, n = key_hit(c, x, y, &vel);
+        g_kb_drag = 1;
+        kb_press(c, kb_note(n), vel, shift);
         break;
+    }
     default:
         break;
     }
@@ -1484,22 +1930,19 @@ static void mouse_move(int x, int y, int shift)
         int w, h;
         frame_size(c->bmp, &w, &h);
         if (x >= c->x2 && x < c->x2 + w && y >= c->y2 && y < c->y2 + h) { g_dboth = 1; chorus_press(c, 1); }
-    } else if (c->type == C_KEYBOARD) {
-        const Key *k = key_at(c, x, y);
-        if (k != g_dkey) {
-            key_off(g_dkey_note);
-            g_dkey = k;
-            g_dkey_note = k ? key_on(k, y) : -1;
-        }
+    } else if (c->type == C_KEYBOARD && g_kb_drag) {      /* a move while it drags */
+        int vel, n = key_hit(c, x, y, &vel);
+        kb_press(c, kb_note(n), vel, shift);
     }
     g_dirty = 1;
 }
 
+/* the button up: on the keyboard (rva 0x2D41F0) the drag ends and the held key is
+ * released (at -offVel: the velocity of the up position, which the hit test gives,
+ * is replaced, offVel being 1..127) */
 static void mouse_up(void)
 {
-    if (g_drag && g_drag->type == C_KEYBOARD) key_off(g_dkey_note);
-    g_dkey_note = -1;
-    g_dkey = NULL;
+    if (g_drag && g_drag->type == C_KEYBOARD && g_kb_drag) { g_kb_drag = 0; kb_release(1); }
     g_drag = NULL;
     g_npressed = 0;
     g_has_tip = 0;
@@ -1510,6 +1953,12 @@ static void mouse_wheel(int x, int y, int up)
 {
     Ctl *c = hit(x, y);
     Leaf *L;
+    if (c && c->type == C_KEYBOARD && c->nwr) {   /* the keyboard's wheel (rva 0x2D4420): OCTAVE SHIFT */
+        const Leaf *O = resolve("fm.PATCH.NAME1.OCTAVE SHIFT");       /* + the step, in its range, */
+        if (O) val_set(O, get("fm.PATCH.NAME1.OCTAVE SHIFT") + (up ? 1 : -1));   /* then the commit */
+        g_dirty = 1;
+        return;
+    }
     if (!c || !(c->type == C_SLIDER || c->type == C_KNOB) || !(L = cleaf(c))) return;
     if (c->type == C_KNOB && c->bmp && c->bmp->n <= 4) val_set(L, value_at(c, position(c) + (up ? 1 : -1)));
     else val_set(L, cval(c) + (up ? 1 : -1));
@@ -1567,7 +2016,7 @@ static int patch_down(int x, int y, int dbl)
             int k = (int)((x - c->x) / (c->w / 4.0)) * 16 + (int)((y - c->y) / (c->h / 16.0));
             if (k >= 0 && k < 64) {
                 g_patchsel = k;
-                if (dbl) load_patch(k);
+                if (dbl) load_patch(k, 0);
             }
             g_dirty = 1;
             return 1;
@@ -1645,9 +2094,9 @@ static void action(const char *fn, const char *args)
 {
     if (!fn) return;
     if (!strcmp(fn, "ManagePatch") && args && (!strcmp(args, "inc") || !strcmp(args, "dec")))
-        load_patch((g_patch + (!strcmp(args, "inc") ? 1 : 63)) % 64);
+        load_patch((g_patch + (!strcmp(args, "inc") ? 1 : 63)) % 64, 1);
     else if (!strcmp(fn, "ManagePatch") && args && !strcmp(args, "load"))
-        load_patch(g_patchsel);
+        load_patch(g_patchsel, 1);
     else if (!strcmp(fn, "ManagePatchBank") && args && (!strcmp(args, "inc") || !strcmp(args, "dec"))) {
         if (g_nbanks) g_bank = (g_bank + (!strcmp(args, "inc") ? 1 : g_nbanks - 1)) % g_nbanks;
         g_dirty = 1;
@@ -1676,7 +2125,7 @@ static void option_menu(void)
     int cmd, i, mode = get("vm.vs.mode"), vc = get("vm.vs.voiceCount"), sr = get("vm.vs.sampleRate"), z = get("vm.vs.mainZoom");
     static const int Z[] = {50, 62, 75, 100, 125, 150, 200};
     static const char *RATE[] = {"96 kHz", "88.2 kHz", "48 kHz", "44.1 kHz"};
-    static const int NB[] = {4, 6, 8, 12};
+    static const int LAT[] = {0, 5, 8, 11, 16, 21, 32, 43};
     char s[64];
     AppendMenuA(m, MF_STRING | (mode == 0 ? MF_CHECKED : 0), 100, "Panel: Original");
     AppendMenuA(m, MF_STRING | (mode == 1 ? MF_CHECKED : 0), 101, "Panel: SYSTEM-8 layout");
@@ -1688,11 +2137,17 @@ static void option_menu(void)
     AppendMenuA(m, MF_SEPARATOR, 0, NULL);
     for (i = 0; i < 7; ++i) { snprintf(s, sizeof s, "Zoom: %d%%", Z[i]); AppendMenuA(m, MF_STRING | (z == Z[i] ? MF_CHECKED : 0), 400 + Z[i], s); }
     AppendMenuA(m, MF_SEPARATOR, 0, NULL);
-    /* the audio output's buffering (this program's, not the plugin's): lower is
-     * faster to play, higher is safer against drop-outs on a busy computer */
-    for (i = 0; i < 4; ++i) {
-        snprintf(s, sizeof s, "Audio latency: %d ms", NB[i] * BLK * 1000 / SR);
-        AppendMenuA(m, MF_STRING | (g_nbuf == NB[i] ? MF_CHECKED : 0), 700 + NB[i], s);
+    /* the audio output's queue (this program's, not the plugin's): lower plays
+     * faster, higher is safer against drop-outs on a busy computer */
+    for (i = 0; i < 8; ++i) {
+        if (LAT[i]) snprintf(s, sizeof s, "Audio latency: %d ms", LAT[i]);
+        else snprintf(s, sizeof s, "Audio latency: the lowest the device allows");
+        AppendMenuA(m, MF_STRING | (g_lat_ms == LAT[i] ? MF_CHECKED : 0), 700 + LAT[i], s);
+    }
+    {
+        char d[192];
+        audio_desc_get(d, sizeof d);
+        AppendMenuA(m, MF_STRING | MF_GRAYED, 0, d);
     }
     GetCursorPos(&pt);
     cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, g_wnd, NULL);
@@ -1700,8 +2155,8 @@ static void option_menu(void)
     if (cmd == 100 || cmd == 101) set("vm.vs.mode", cmd - 100);
     else if (cmd >= 202 && cmd <= 208) set("vm.vs.voiceCount", cmd - 200);
     else if (cmd >= 300 && cmd <= 303) set("vm.vs.sampleRate", cmd - 300);
-    else if (cmd >= 700) InterlockedExchange(&g_nbuf, cmd - 700);
-    else if (cmd >= 400) set("vm.vs.mainZoom", cmd - 400);
+    else if (cmd >= 700) { InterlockedExchange(&g_lat_ms, cmd - 700); InterlockedExchange(&g_reopen, 1); ini_put("audio", "latency_ms", cmd - 700); }
+    else if (cmd >= 400) { set("vm.vs.mainZoom", cmd - 400); ini_put("window", "zoom", cmd - 400); }
     mouse_up();
 }
 
@@ -1721,8 +2176,11 @@ static void midi_menu(void)
     GetCursorPos(&pt);
     cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, g_wnd, NULL);
     DestroyMenu(m);
-    if (cmd >= 500) midi_open(cmd - 500);
-    else if (cmd == 499) { midi_open(-1); status_set("MIDI input off"); }
+    if (cmd >= 500) {
+        MIDIINCAPSA caps;
+        midi_open(cmd - 500);
+        if (midiInGetDevCapsA((UINT_PTR)(cmd - 500), &caps, sizeof caps) == MMSYSERR_NOERROR) ini_puts("midi", "input", caps.szPname);
+    } else if (cmd == 499) { midi_open(-1); status_set("MIDI input off"); ini_puts("midi", "input", "off"); }
     mouse_up();
 }
 
@@ -1822,6 +2280,17 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
         SetPropA(h, "juno.blocks", (HANDLE)(INT_PTR)g_blocks);
         SetPropA(h, "juno.dropouts", (HANDLE)(INT_PTR)g_dropouts);
         SetPropA(h, "juno.audio", (HANDLE)(INT_PTR)(g_audio_state + 1));
+        {
+            static char shown_desc[192];
+            char d[192];
+            audio_desc_get(d, sizeof d);
+            if (strcmp(d, shown_desc)) {
+                ATOM old = (ATOM)(UINT_PTR)GetPropA(h, "juno.desc");
+                snprintf(shown_desc, sizeof shown_desc, "%s", d);
+                if (old) GlobalDeleteAtom(old);
+                SetPropA(h, "juno.desc", (HANDLE)(UINT_PTR)GlobalAddAtomA(shown_desc));
+            }
+        }
         if (g_dropouts != shown || g_audio_state != shown_state) {
             char t[400];
             shown = g_dropouts;
@@ -1829,13 +2298,29 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
             if (shown_state < 0) snprintf(t, sizeof t, "JUNO-60  --  %s  --  NO AUDIO OUTPUT DEVICE", g_status);
             else snprintf(t, sizeof t, "JUNO-60  --  %s  --  audio drop-outs: %ld (OPTION: a higher audio latency)", g_status, (long)shown);
             if (shown || shown_state < 0) SetWindowTextA(h, t);
+            else status_set(g_status);            /* the device is back: the plain title */
         }
-        /* the plugin's UI timer: the drain (rva 0x320120), then what changed */
+        /* the plugin's UI timer: the drain (rva 0x320120), then what changed -- the
+         * model's values and the keyboard's note value (the drained notes) */
         EnterCriticalSection(&g_lock);
         E_ui_tick();
         changed = eng_refresh();
+        {
+            static int ks[128];
+            int k, v;
+            for (k = 0; k < 128; ++k) { v = juno_gui_keybed_state(g_eng, k) > 0; changed |= v != ks[k]; ks[k] = v; }
+        }
         LeaveCriticalSection(&g_lock);
         if (changed) g_dirty = 1;
+        if (InterlockedExchange(&g_landed, 0)) {   /* the audio thread landed a patch load */
+            char nm[32], s[128];
+            LONG r = g_landed_req;
+            if (!g_landed_ok && g_patchid) local_put(g_patchid->id, (int)(r % 64));
+            patch_name(nm);
+            snprintf(s, sizeof s, "%s: %d %s", r / 64 < g_nbanks ? g_banks[r / 64].name : "", (int)(r % 64) + 1, nm);
+            status_set(s);
+            g_dirty = 1;
+        }
         if (g_dirty) InvalidateRect(h, NULL, FALSE);
         return 0;
     }
@@ -1843,6 +2328,11 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
         RemovePropA(h, "juno.blocks");
         RemovePropA(h, "juno.dropouts");
         RemovePropA(h, "juno.audio");
+        {
+            ATOM old = (ATOM)(UINT_PTR)GetPropA(h, "juno.desc");
+            if (old) GlobalDeleteAtom(old);
+            RemovePropA(h, "juno.desc");
+        }
         PostQuitMessage(0);
         return 0;
     }
@@ -1901,23 +2391,24 @@ static int save_bmp(const char *path)
  * slider drag makes it ('s'), a key click as the mouse makes it ('k' key index,
  * 'K' its release), the next patch through the patch browser ('p') */
 typedef struct { int block; char kind; uint32_t midi; int v; const char *ref; } Step;
+#define S(step) ((step) * 256 / BLK)        /* the script's steps are 256 samples */
 static const Step SCRIPT[] = {
-    {2, 'm', 0x643C90, 0, NULL},                         /* note on 60, velocity 100 */
-    {4, 'm', 0x504090, 0, NULL}, {4, 'm', 0x7F4390, 0, NULL},
-    {30, 'm', 0x6401B0, 0, NULL},                        /* CC 1 (modulation) 100 */
-    {40, 's', 0, 200, "fm.PATCH.FLT.VCF CUTOFF FREQ"},
-    {50, 'm', 0x5D60E0, 0, NULL},                        /* pitch bend 12000 */
-    {60, 'm', 0x0040D0, 0, NULL},                        /* channel aftertouch 64 */
-    {80, 'm', 0x403C80, 0, NULL}, {80, 'm', 0x404080, 0, NULL}, {80, 'm', 0x404380, 0, NULL},
-    {84, 'm', 0x4000E0, 0, NULL}, {84, 'm', 0x0001B0, 0, NULL},
-    {90, 'k', 0, 24, NULL}, {120, 'K', 0, 0, NULL},
-    {130, 's', 0, 1, "fm.PATCH.NAME1.ARPEGGIO SW"},      /* the arp at the host tempo */
-    {132, 'm', 0x643090, 0, NULL}, {132, 'm', 0x643790, 0, NULL},
-    {240, 'm', 0x403080, 0, NULL}, {240, 'm', 0x403780, 0, NULL},
-    {250, 's', 0, 0, "fm.PATCH.NAME1.ARPEGGIO SW"},
-    {270, 'p', 0, 0, NULL}, {274, 'm', 0x5A3C90, 0, NULL}, {300, 'm', 0x403C80, 0, NULL},
+    {S(2), 'm', 0x643C90, 0, NULL},                         /* note on 60, velocity 100 */
+    {S(4), 'm', 0x504090, 0, NULL}, {S(4), 'm', 0x7F4390, 0, NULL},
+    {S(30), 'm', 0x6401B0, 0, NULL},                        /* CC 1 (modulation) 100 */
+    {S(40), 's', 0, 200, "fm.PATCH.FLT.VCF CUTOFF FREQ"},
+    {S(50), 'm', 0x5D60E0, 0, NULL},                        /* pitch bend 12000 */
+    {S(60), 'm', 0x0040D0, 0, NULL},                        /* channel aftertouch 64 */
+    {S(80), 'm', 0x403C80, 0, NULL}, {S(80), 'm', 0x404080, 0, NULL}, {S(80), 'm', 0x404380, 0, NULL},
+    {S(84), 'm', 0x4000E0, 0, NULL}, {S(84), 'm', 0x0001B0, 0, NULL},
+    {S(90), 'k', 0, 24, NULL}, {S(120), 'K', 0, 0, NULL},
+    {S(130), 's', 0, 1, "fm.PATCH.NAME1.ARPEGGIO SW"},      /* the arp at the host tempo */
+    {S(132), 'm', 0x643090, 0, NULL}, {S(132), 'm', 0x643790, 0, NULL},
+    {S(240), 'm', 0x403080, 0, NULL}, {S(240), 'm', 0x403780, 0, NULL},
+    {S(250), 's', 0, 0, "fm.PATCH.NAME1.ARPEGGIO SW"},
+    {S(270), 'p', 0, 0, NULL}, {S(274), 'm', 0x5A3C90, 0, NULL}, {S(300), 'm', 0x403C80, 0, NULL},
 };
-#define RENDER_BLOCKS 340
+#define RENDER_BLOCKS S(340)
 
 static Ctl *find_type(Panel *p, int type)
 {
@@ -1939,7 +2430,6 @@ static int render_test(const char *path)
     double worst = 0;
     int worst_b = -1;
     if (!f) return 2;
-    juno_enable_hw_ftz();                  /* as the audio thread */
     QueryPerformanceFrequency(&fq);
     QueryPerformanceCounter(&t0);
     for (b = 0; b < RENDER_BLOCKS; ++b) {
@@ -1948,10 +2438,13 @@ static int render_test(const char *path)
             if (st->block != b) continue;
             if (st->kind == 'm') push_midi(st->midi);
             else if (st->kind == 's') set(st->ref, st->v);
-            else if (st->kind == 'k' && kb && st->v < kb->nkeys)
-                held = key_on(&kb->keys[st->v], kb->keys[st->v].y + kb->keys[st->v].h / 2);
-            else if (st->kind == 'K') { key_off(held); held = -1; }
-            else if (st->kind == 'p') load_patch((g_patch + 1) % 64);
+            else if (st->kind == 'k' && kb && st->v < kb->nkeys) {      /* the keyboard control's press */
+                int vel, n = key_hit(kb, kb->keys[st->v].x + kb->keys[st->v].w / 2, kb->keys[st->v].y + kb->keys[st->v].h / 2, &vel);
+                g_kb_drag = 1;
+                kb_press(kb, kb_note(n), vel, 0);
+                held = n;
+            } else if (st->kind == 'K' && held >= 0) { g_kb_drag = 0; kb_release(1); held = -1; }
+            else if (st->kind == 'p') load_patch((g_patch + 1) % 64, 1);
         }
         if (b % 10 == 9) {                 /* the 50 ms UI timer (WM_TIMER) */
             EnterCriticalSection(&g_lock);
@@ -1968,9 +2461,126 @@ static int render_test(const char *path)
     }
     QueryPerformanceCounter(&t1);
     if (g_log) fprintf(g_log, "# rendered %d ms of audio in %.1f ms; worst block %.2f ms (block %d), block period %.2f ms\n",
-                       RENDER_BLOCKS * BLK * 1000 / SR, (double)(t1.QuadPart - t0.QuadPart) * 1000.0 / (double)fq.QuadPart,
-                       worst * 1000.0 / (double)fq.QuadPart, worst_b, BLK * 1000.0 / SR);
+                       RENDER_BLOCKS * BLK * 1000 / g_rate, (double)(t1.QuadPart - t0.QuadPart) * 1000.0 / (double)fq.QuadPart,
+                       worst * 1000.0 / (double)fq.QuadPart, worst_b, BLK * 1000.0 / g_rate);
     fclose(f);
+    return 0;
+}
+
+/* --play: a seeded performance through the program's own input paths -- MIDI
+ * through the winmm callback (midi_cb), the keybed through the mouse handlers
+ * (mouse_down / mouse_move / mouse_up at panel coordinates) -- rendered by the
+ * audio thread's own block (render_block), the 50 ms UI timer every 19 blocks.
+ * Raw float L R to FILE, every engine call to FILE.log. */
+static uint32_t g_rnd;
+static uint32_t rnd(void) { g_rnd ^= g_rnd << 13; g_rnd ^= g_rnd >> 17; g_rnd ^= g_rnd << 5; return g_rnd; }
+static void midi_in(uint32_t m, int t) { midi_cb(NULL, MIM_DATA, 0, (DWORD_PTR)m, (DWORD_PTR)t); }
+
+/* a point for the keybed: on the keys mostly, some in the gaps, some past the edges */
+static void kb_point(const Ctl *kb, int *x, int *y)
+{
+    *x = kb->x - 30 + (int)(rnd() % (unsigned)(kb->w + 60));
+    *y = kb->y - 10 + (int)(rnd() % (unsigned)(kb->h + 20));
+}
+
+static int play_test(const char *path, int change_patch)
+{
+    enum { PLAY = 900, TAIL = 200 };
+    FILE *f = fopen(path, "wb");
+    float L[BLK], R[BLK], o[2 * BLK];
+    Ctl *kb = find_type(g_tree, C_KEYBOARD);
+    int held[16], heldch[16], nheld = 0, b, i, down = 0, down_left = 0, sus = 0, change_at = change_patch ? PLAY / 2 : -1;
+    if (!f || !kb || kb->nkeys < 2) return 2;
+    for (b = 0; b < PLAY + TAIL; ++b) {
+        if (b < PLAY) {
+            unsigned r = rnd() % 1000;
+            if (r < 40 && nheld < 8) {                                    /* a MIDI key, any channel */
+                int n = 36 + (int)(rnd() % 61), v = 1 + (int)(rnd() % 127), ch = rnd() % 4 ? 0 : (int)(rnd() % 16);
+                for (i = 0; i < nheld && held[i] != n; ++i) ;
+                if (i == nheld) { held[nheld] = n; heldch[nheld++] = ch; midi_in(0x90u | (uint32_t)ch | ((uint32_t)n << 8) | ((uint32_t)v << 16), b); }
+            } else if (r < 75 && nheld > 0) {                             /* its release: note-off, or note-on at 0 */
+                i = (int)(rnd() % (unsigned)nheld);
+                if (rnd() % 5) midi_in(0x80u | (uint32_t)heldch[i] | ((uint32_t)held[i] << 8) | ((rnd() % 128) << 16), b);
+                else midi_in(0x90u | (uint32_t)heldch[i] | ((uint32_t)held[i] << 8), b);
+                --nheld;
+                held[i] = held[nheld];
+                heldch[i] = heldch[nheld];
+            } else if (r < 85) midi_in(0xB0u | (1u << 8) | ((rnd() % 128) << 16), b);          /* modulation */
+            else if (r < 92) { unsigned w = rnd() % 16384; midi_in(0xE0u | ((w & 127) << 8) | ((w >> 7) << 16), b); }
+            else if (r < 95) midi_in(0xD0u | ((rnd() % 128) << 8), b);                         /* aftertouch */
+            else if (r < 97) { sus = !sus; midi_in(0xB0u | (64u << 8) | ((sus ? 127u : 0u) << 16), b); }
+            if (!down && rnd() % 1000 < 30) {                             /* the keybed: a click (Shift at times) */
+                int x = kb->x + (int)(rnd() % (unsigned)kb->w), y = kb->y + (int)(rnd() % (unsigned)kb->h);
+                mouse_down(x, y, rnd() % 4 == 0, 0);
+                down = g_drag == kb;
+                down_left = 5 + (int)(rnd() % 100);
+            } else if (down && --down_left <= 0) {
+                mouse_up();
+                down = 0;
+            } else if (down && rnd() % 1000 < 40) {                      /* a drag, inside or past the edges */
+                int x, y;
+                kb_point(kb, &x, &y);
+                mouse_move(x, y, rnd() % 4 == 0);
+            }
+            if (rnd() % 1000 < 5) set("fm.PATCH.NAME1.KEY HOLD", !get("fm.PATCH.NAME1.KEY HOLD"));
+            if (rnd() % 1000 < 3) set("fm.PATCH.NAME1.OCTAVE SHIFT", (int)(rnd() % 7) - 3);
+            if (b == change_at || rnd() % 1000 < 3) load_patch((int)(rnd() % 64), (int)(rnd() & 1));   /* buttons / list */
+        } else if (b == PLAY) {                                          /* everything up */
+            for (i = 0; i < nheld; ++i) midi_in(0x80u | (uint32_t)heldch[i] | ((uint32_t)held[i] << 8) | (64u << 16), b);
+            nheld = 0;
+            if (sus) midi_in(0xB0u | (64u << 8), b);
+            midi_in(0xE0u | (64u << 16), b);
+            if (down) { mouse_up(); down = 0; }
+            if (get("fm.PATCH.NAME1.KEY HOLD")) set("fm.PATCH.NAME1.KEY HOLD", 0);
+        }
+        if (b % 19 == 18) {                                              /* the 50 ms UI timer */
+            EnterCriticalSection(&g_lock);
+            E_ui_tick();
+            eng_refresh();
+            LeaveCriticalSection(&g_lock);
+        }
+        render_block(L, R);
+        for (i = 0; i < BLK; ++i) { o[2 * i] = L[i]; o[2 * i + 1] = R[i]; }
+        fwrite(o, sizeof o, 1, f);
+    }
+    fclose(f);
+    return 0;
+}
+
+/* --kbscript: one panel event per line through the program's own handlers --
+ *   down X Y SHIFT | move X Y SHIFT | up | wheel X Y UP     the mouse, panel pixels
+ *   set V REF                                               a panel control's edit
+ *   patch IDX COMMIT                                        a patch load (buttons: 1)
+ *   note N V | off N                                        MIDI in, channel 1
+ *   block                                                   one audio block
+ *   tick                                                    the 50 ms UI timer
+ * every engine call to FILE.log (the calls a GUI makes, in order). */
+static int kb_script(const char *path)
+{
+    FILE *in = fopen(path, "r");
+    char line[256], ref[128];
+    float L[BLK], R[BLK];
+    int a, b, c;
+    if (!in) return 2;
+    fprintf(g_log, "# kbscript\n");                  /* the calls before it are the boot's */
+    while (fgets(line, sizeof line, in)) {
+        if (sscanf(line, "down %d %d %d", &a, &b, &c) == 3) mouse_down(a, b, c, 0);
+        else if (sscanf(line, "move %d %d %d", &a, &b, &c) == 3) mouse_move(a, b, c);
+        else if (!strncmp(line, "up", 2)) mouse_up();
+        else if (sscanf(line, "wheel %d %d %d", &a, &b, &c) == 3) mouse_wheel(a, b, c);
+        else if (sscanf(line, "set %d %127[^\r\n]", &a, ref) == 2) set(ref, a);
+        else if (sscanf(line, "patch %d %d", &a, &b) == 2) load_patch(a, b);
+        else if (sscanf(line, "note %d %d", &a, &b) == 2) midi_in(0x90u | ((uint32_t)a << 8) | ((uint32_t)b << 16), 0);
+        else if (sscanf(line, "off %d", &a) == 1) midi_in(0x80u | ((uint32_t)a << 8) | (64u << 16), 0);
+        else if (!strncmp(line, "block", 5)) render_block(L, R);
+        else if (!strncmp(line, "tick", 4)) {
+            EnterCriticalSection(&g_lock);
+            E_ui_tick();
+            eng_refresh();
+            LeaveCriticalSection(&g_lock);
+        }
+    }
+    fclose(in);
     return 0;
 }
 
@@ -1982,7 +2592,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     DWORD len;
     const unsigned char *x;
     char *xs, *dump = NULL, *shot = NULL, *rend = NULL;
-    int argc, i, shot_patch = 0, bank0 = 0;
+    int argc, i, shot_patch = 0, bank0 = 0, lat_arg = -1, seed = -1, fp_oracle = 0;
+    char *play = NULL, *kbs = NULL;
     LPWSTR *argvw = CommandLineToArgvW(GetCommandLineW(), &argc);
     BITMAPINFO bi;
     void *bits;
@@ -1994,7 +2605,17 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         else if (!strcmp(a, "--shot") && i + 1 < argc) { char b[MAX_PATH]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); shot = xstrdup(b); }
         else if (!strcmp(a, "--patch") && i + 1 < argc) { char b[32]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); shot_patch = atoi(b); }
         else if (!strcmp(a, "--bank") && i + 1 < argc) { char b[32]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); bank0 = atoi(b); }
+        else if (!strcmp(a, "--play") && i + 1 < argc) { char b[MAX_PATH]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); play = xstrdup(b); }
+        else if (!strcmp(a, "--seed") && i + 1 < argc) { char b[32]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); seed = atoi(b); }
+        else if (!strcmp(a, "--fp-oracle")) fp_oracle = 1;
+        else if (!strcmp(a, "--latency") && i + 1 < argc) { char b[32]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); lat_arg = atoi(b); }
         else if (!strcmp(a, "--render") && i + 1 < argc) { char b[MAX_PATH]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); rend = xstrdup(b); }
+        else if (!strcmp(a, "--kbscript") && i + 1 < argc) { char b[MAX_PATH]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); kbs = rend = xstrdup(b); }
+    }
+    if (play) {
+        rend = play;                                   /* the render test's plumbing: the log, no device */
+        g_rnd = 2463534242u ^ (uint32_t)(seed < 0 ? 1 : seed) * 2654435761u;
+        if (!g_rnd) g_rnd = 1;
     }
     if (rend) {
         char lp[MAX_PATH + 8];
@@ -2004,6 +2625,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     if (!dump && !shot && !rend) SetProcessDPIAware();
     InitializeCriticalSection(&g_lock);
     InitializeCriticalSection(&g_qlock);
+    InitializeCriticalSection(&g_desc_lock);
     GdiplusStartup(&gtok, &gin, NULL);
     x = resource(ASSET_SCRIPT_XML, &len);
     if (!x) { MessageBoxA(NULL, "Script.xml missing from the program", "JUNO-60", MB_OK); return 1; }
@@ -2028,6 +2650,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         if (mp && ints(xtext(mp, "size"), v, 2) == 2) { g_fbw = v[0]; g_fbh = v[1]; }
     }
     g_tree = build("main", 0, 0);
+    g_patchid = resolve("vm.vs.patchId");
     {
         XN *pp = paneltype("patch");
         int v[2] = {1690, 696};
@@ -2057,16 +2680,27 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     SelectObject(g_fbdc, g_fbbm);
     /* the engine, as a host boots the plugin: initialize (six voices, the 95
      * defaults, the start-up mute) at the output rate */
-    g_eng = juno_gui_create((float)SR, 0);
-    if (g_log) fprintf(g_log, "create %d 0\nplugin_init\n", SR);
+    /* the device's own rate when the plugin's converter table has it */
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    if (!dump && !shot && !rend) {
+        int r = device_rate();
+        if (rate_in_table(r)) g_rate = r;
+    }
+    g_eng = juno_gui_create((float)g_rate, 0);
+    if (fp_oracle) juno_set_fp_oracle_mode(1);         /* after create, which sets the production FTZ */
+    if (g_log) fprintf(g_log, "create %d 0\nplugin_init\n", g_rate);
     if (!g_eng || !juno_gui_plugin_init(g_eng)) { MessageBoxA(NULL, "engine start failed", "JUNO-60", MB_OK); return 1; }
     banks_load();
     if (bank0 >= 0 && bank0 < g_nbanks) g_bank = bank0;
+    if (play) {                                        /* the seed picks the bank and the patch */
+        g_bank = (int)(rnd() % (unsigned)g_nbanks);
+        shot_patch = (int)(rnd() % 64);
+    }
     EnterCriticalSection(&g_lock);
     eng_refresh();
     LeaveCriticalSection(&g_lock);
     g_tempo = 40.0 + get("fm.SYNTH.COM.TEMPO") / 10.0;
-    if (g_nbanks) load_patch((shot || rend) ? shot_patch : 0);
+    if (g_nbanks) load_patch((shot || rend) ? shot_patch : 0, 0);
     if (shot) {
         render();
         return save_bmp(shot) ? 0 : 2;
@@ -2076,10 +2710,26 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         int dpi = GetDeviceCaps(sdc, LOGPIXELSX), z;
         ReleaseDC(NULL, sdc);
         z = 75 * dpi / 96;
+        if (!rend) {                                  /* the window: the user's own settings */
+            static const int LAT[] = {0, 5, 8, 11, 16, 21, 32, 43};
+            int k, l, zs;
+            ini_init();
+            zs = ini_get("window", "zoom", 0);
+            if (zs >= 25 && zs <= 200) z = zs;
+            l = lat_arg >= 0 ? lat_arg : ini_get("audio", "latency_ms", 21);
+            for (k = 0; k < 8 && LAT[k] != l; ++k) ;
+            g_lat_ms = k < 8 ? l : 21;
+        }
         set("vm.vs.mainZoom", z < 25 ? 25 : z > 200 ? 200 : z);
     }
     if (rend) {
-        int r = render_test(rend);
+        int r;
+        if (play) r = play_test(play, (int)(rnd() & 1));
+        else if (kbs) r = kb_script(kbs);
+        else {
+            if (!fp_oracle) juno_enable_hw_ftz();      /* as the audio thread */
+            r = render_test(rend);
+        }
         fclose(g_log);
         return r;
     }
@@ -2110,7 +2760,17 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         }
         ShowWindow(g_wnd, show);
         SetTimer(g_wnd, 1, 50, NULL);
-        if (midiInGetNumDevs() > 0) midi_open(0);
+        {
+            char want[64];
+            int k, n = (int)midiInGetNumDevs(), pick = n > 0 ? 0 : -1;
+            ini_gets("midi", "input", want, sizeof want);
+            if (!strcmp(want, "off")) pick = -1;
+            else for (k = 0; want[0] && k < n; ++k) {
+                MIDIINCAPSA caps;
+                if (midiInGetDevCapsA((UINT_PTR)k, &caps, sizeof caps) == MMSYSERR_NOERROR && !strcmp(caps.szPname, want)) pick = k;
+            }
+            if (pick >= 0) midi_open(pick);
+        }
         g_audio_thread = CreateThread(NULL, 0, audio_main, NULL, 0, NULL);
         if (g_audio_thread) SetThreadPriority(g_audio_thread, THREAD_PRIORITY_TIME_CRITICAL);
         while (GetMessageA(&msg, NULL, 0, 0) > 0) { TranslateMessage(&msg); DispatchMessageA(&msg); }

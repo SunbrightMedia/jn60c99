@@ -232,11 +232,15 @@ completeness:
 # puts the emsdk folder, which holds a DIRECTORY named node, first on PATH, and
 # make's own PATH search stops there ("node: Permission denied").
 # JUNO-60.exe (gui/win, CLAIMS C6): built into scratchpad/dist/ -- it embeds Roland's
-# artwork and the user's banks, LOCAL ONLY. Needs mingw-w64; the check needs Wine
-# (WINEPREFIX) or Windows.
+# artwork and the user's banks, LOCAL ONLY. Needs mingw-w64; the checks need Wine
+# (WINEPREFIX) or Windows. exe_oracle_check plays 8 seeded performances through the
+# program's own inputs into THE PLUGIN ITSELF (Unicorn), then its tooth: every seed
+# must FAIL.
 native: libjuno.so
 	python3 tools/dist/make_native.py
 	python3 tools/dist/native_check.py
+	python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 1,2,3,4,5,6,7,8
+	python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 1,2,3,4,5 --tooth
 
 webapp: libjuno.so
 	bash gui/web/build.sh
