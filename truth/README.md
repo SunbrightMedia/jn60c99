@@ -9,6 +9,7 @@ machine code under Unicorn emulation. Nothing in `src/` is authoritative; these 
 | `JUNO60.vst3` | the plugin binary (PE/DLL). Its DSP is what the C99 port reproduces. Run under emulation — never patched, never "captured". |
 | `Script.xml` | the plugin's own "Koa Script" schema (user-supplied). Defines the bank-blob → parameter layout the recall reads. Reading it is allowed plugin data. |
 | `presetbankog1.bin` | the `KoaBankFile00003` / `PG-JU60` factory bank (64 patches) the recall is proven against. |
+| `Script/*.png` | the plugin's GUI sprite sheets, from the user's installation (its `Script` folder; its `Script.xml` is byte-identical to the one above). Used only by the local skin GUI, `gui/skin/`. **Roland's artwork: never publish it, never copy it into `gui/web/` or `docs/` (both may be served by GitHub Pages).** The folder's `Code8_*.Dat` / `TextCodeTable.dat` are not graphics (the plugin loads them by name for its SYSTEM-8 PLUG-OUT, which this port leaves out) and are not kept. |
 | `SHA256SUMS` | pins the exact bytes. `tools/verify/truth.py verify` asserts them before trusting any run. |
 
 ## How the gates find these

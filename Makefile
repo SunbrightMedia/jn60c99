@@ -229,6 +229,7 @@ webapp: libjuno.so
 	python3 tools/verify/wasm_product_gate.py
 	python3 tools/verify/bundle_webapp.py
 	env node tools/verify/verify_webapp.mjs
+	env node tools/verify/skin_check.mjs
 
 # Shared library for the test GUI (gui/juno_gui.py via ctypes).
 gui: libjuno.so

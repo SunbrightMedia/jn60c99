@@ -134,7 +134,9 @@ mine is a hypothesis (playbook 80).
   gate bit-exact, docs/USER_BANKS.md). Every host call:
   docs/HOST_CALL_CENSUS.md (task #36 closed; not ported: the SYSTEM-8 hardware
   link -- not needed, the user's decision; the GUI graphics come from the user,
-  for the plug-and-play test API of the bare-metal port). The web app's WASM is rebuilt
+  for the plug-and-play test API of the bare-metal port -- received 2026-10-08:
+  gui/skin/ draws the plugin's own GUI from truth/Script.xml + truth/Script/*.png,
+  local only, never published; CLAIMS C5, gui/skin/README.md). The web app's WASM is rebuilt
   with all of it (make webapp green: WASM == native, headless check; emcc from
   /home/user/emsdk/emsdk_env.sh). Engine: PROVENANCE 34/34 PROVEN;
   full verify of d59277db GREEN (job verify_final, EXIT 0, every section ran,
