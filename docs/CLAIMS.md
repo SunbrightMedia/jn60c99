@@ -146,7 +146,7 @@ The text that stood here before (FX render 12/15, a CAPTURED delay constant, the
 transcription only, init/prepare constants checked against a capture, host rates falling back to
 the 96 kHz arm) described 2026-09; every item is closed (A8, A13 / A14, A24; the whole cold state
 at 18 rates, live gate 6; PROVENANCE rows "FX render" and "arpeggiator"). The last full verify:
-commit d59277db, job verify_final, EXIT 0 (2026-10-07, every section ran).
+commit 5d0c2b8a, job verify_5d0c2b8a, EXIT 0 (2026-10-08, every reference rebuilt from the plugin, 43 gates, the whole-bank product gate A34 among them; the WARN lines identical to the run before). The user's 11 banks, 704 patches, through recall, the recall-model render and the product path: every gate bit-exact (docs/USER_BANKS.md).
 
 Earlier phase docs that assert unqualified "recall complete" / FX completeness (e.g.
 docs/RECALL_COMPLETE.md, docs/COLDLOAD_AB.md) predate this ledger and are superseded by
