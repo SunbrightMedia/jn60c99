@@ -3,7 +3,8 @@
 #
 # A gate that has never gone red is an untested detector (playbook defect 1).
 # This script is what makes "the O1 gate is green" mean anything: it first
-# proves the gate FAILS on six specific defects, then that it PASSES clean.
+# proves the gate FAILS on seven specific defects, then that it PASSES clean.
+# Run by `make engineb` (tools/engineb/foundation.sh step 2b).
 #
 # The teeth are applied with sed to a COPY. juno_event.c is never edited.
 set -e

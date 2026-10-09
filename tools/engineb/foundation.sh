@@ -13,6 +13,8 @@
 #                    subsystem; everything downstream inherits that.
 #   2  unit tests    the engine B contracts (sizes / free-run / patch decode).
 #                    They need no oracle, so they come before anything slow.
+#   2b event (O1)    the firmware's event queue (engine_b/event/teeth.sh):
+#                    seven planted defects caught, then the clean run.
 #   3  self-test     null_b --module none MUST be EXACTLY 0. This is the
 #                    comparator's own passthrough proof. If it is not exactly
 #                    zero, no module result below it can be believed.
@@ -98,6 +100,15 @@ make -C engine_b/tests || die "an engine B unit test failed" \
     "FIX: run 'make -C engine_b/tests clean && make -C engine_b/tests' to" \
     "     rule out a stale binary, then read the FAIL lines -- each names" \
     "     the field or sample index that disagreed."
+
+# ---------------------------------------------------------------- 2b event boundary
+STEP="2b event boundary (O1)"
+say "$STEP" "the firmware's event queue: seven planted defects caught, then the clean run"
+sh engine_b/event/teeth.sh || die "the event boundary gate is red, or blind to a planted defect" \
+    "engine_b/event/juno_event.c is compiled into the firmware exactly as this" \
+    "gate compiles it (esp32s3/main/CMakeLists.txt EVENT_SRCS). No oracle." \
+    "FIX: a 'NOT CAUGHT' / 'DID NOT APPLY' line names the tooth that failed;" \
+    "     otherwise the clean run's FAIL line names the contract that broke."
 
 # ---------------------------------------------------------------- 3 self-test
 STEP="3 null self-test"

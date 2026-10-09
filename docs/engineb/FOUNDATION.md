@@ -20,6 +20,7 @@ meaningless one.
     0  libjuno.so          the oracle side, built fresh from FROZEN src/
     1  labels              verify_labels.py
     2  unit tests          make -C engine_b/tests
+    2b event boundary (O1) engine_b/event/teeth.sh  seven planted defects caught, then the clean run
     3  null self-test      null_b --module none  MUST be EXACTLY 0
     4  teeth (module gate) null_b --teeth
     5  modules             null_b --module <every shim that exists>
