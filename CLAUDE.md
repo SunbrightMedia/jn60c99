@@ -179,7 +179,8 @@ mine is a hypothesis (playbook 80).
   skin_pm_check.py; docs/PATCH_MANAGER.md) and A40 (a window's zoom fit to
   the screen and the LED's show; zoom_fit_gate.py; the oracle now attaches
   the plugin's editor; docs/WINDOW_ZOOM.md) -- a full verify of A38-A40 is
-  owed. Jobs run from tools/snap_tree.sh snapshots (playbook 178).
+  owed (final_a40 died in a container restart; repro3's verify stage covers
+  it). Jobs run from tools/snap_tree.sh snapshots (playbook 178).
 - **Repeatability (task #62, the user's 2026-10-09 request)**: ONE command,
   tools/repro/reproduce.sh, re-runs everything from a fresh clone (docs/REPRODUCE.md):
   inputs, doctor, make test static verify native webapp engineb, regen_check
@@ -199,8 +200,10 @@ mine is a hypothesis (playbook 80).
   tools/repro/esp32_check.sh = the retired device JUNO gate at its own commit
   8cb8e141 + every image built with the pinned IDF 6.1 + the MINISYNTH
   self-test in QEMU + reproducible images equal from two paths (playbooks
-  184-188). The proof run of reproduce.sh: job repro2 (commit 46a2b6a3) -- owed
-  until its EXIT.
+  184-188). The proof run of reproduce.sh: job repro3 (commit 3a4291df) -- owed
+  until its EXIT (repro2 died in a container restart; after a restart:
+  reproduce.sh --resume, playbook 189). The cleanup moved 8 root entries
+  (README.md Layout); make engineb now runs the event gate (O1).
   The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
