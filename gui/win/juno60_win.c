@@ -74,6 +74,10 @@ int juno_gui_keybed_state(const void *c, int key);
 int juno_gui_lfo_led_frame(void *c, int nframes);
 int juno_gui_meter_tick(void *c, int ch, int decay, int state, const int *rect, int horiz, int *fill);
 int juno_gui_bar_draw(const int *rect, const int *fill, int horiz, int fade, int *out, int cap);
+int juno_gui_cc_entry(uint32_t id);
+int juno_gui_cc_of(const void *c, uint32_t id);
+int juno_gui_cc_learn(void *c, uint32_t id);
+int juno_gui_cc_forget(void *c, uint32_t id);
 void juno_enable_hw_ftz(void);
 void juno_set_fp_oracle_mode(int on);
 
@@ -734,6 +738,16 @@ static void E_commit(void)
 {
     if (g_log) fprintf(g_log, "commit\n");
     juno_gui_commit(g_eng);
+}
+static void E_cc_learn(uint32_t id)
+{
+    if (g_log) fprintf(g_log, "cc_learn %u\n", (unsigned)id);
+    juno_gui_cc_learn(g_eng, id);
+}
+static void E_cc_forget(uint32_t id)
+{
+    if (g_log) fprintf(g_log, "cc_forget %u\n", (unsigned)id);
+    juno_gui_cc_forget(g_eng, id);
 }
 static void E_ui_tick(void)
 {
@@ -1810,6 +1824,97 @@ static int bounds(const Ctl *c, int *b)
     if (c->has_size) { b[0] = c->x; b[1] = c->y; b[2] = c->w; b[3] = c->h; return 1; }
     return 0;
 }
+/* THE CC ASSIGN CONTROL (Script.xml ccAssign, the main panel's last control, rva 0x31D420): a
+ * panel offers a mouse message to its controls from the last, then to its open panels from the
+ * last (rva 0x2AAAF0), so a right-button press or double click with no Shift, Ctrl or Alt (the
+ * message's flags exactly 4, rva 0x411DB0) reaches it first. It looks for the control under the
+ * press the same way (rva 0x31D270): one that holds the point, is not a label or a display and
+ * has exactly one value (rva 0x31D7F0), whose parameter has a CC map record (rva 0x319B10). */
+#ifndef CC_TOOTH
+#define CC_TOOTH 0     /* tools/verify/cc_menu_gate.py --tooth N: a defect built in, which must FAIL */
+#endif
+static int cc_target(Panel *p, int x, int y, Ctl **out)
+{
+    int i, b[4], e = CC_TOOTH == 2;                     /* tooth 2: the right and bottom edges inside */
+    if (!panel_open(p) && CC_TOOTH != 3) return 0;      /* tooth 3: closed panels searched */
+    if (CC_TOOTH == 8)                                  /* tooth 8: the panels before the controls */
+        for (i = p->n - 1; i >= 0; --i)
+            if (p->items[i].p && cc_target(p->items[i].p, x, y, out)) return 1;
+    for (i = p->n - 1; i >= 0; --i) {
+        Ctl *c = p->items[CC_TOOTH == 1 ? p->n - 1 - i : i].c;   /* tooth 1: first to last */
+        Leaf *L;
+        if (!c || !bounds(c, b) || x < b[0] || x >= b[0] + b[2] + e || y < b[1] || y >= b[1] + b[3] + e) continue;
+        if (CC_TOOTH != 6 && (!strcmp(c->typestr, "label") || !strcmp(c->typestr, "display"))) continue;
+        if (c->nrefs != 1 && !(CC_TOOTH == 7 && c->nrefs > 1)) continue;   /* 6: displays; 7: many values */
+        if ((L = cleaf(c)) && juno_gui_cc_entry(L->id) >= 0) { *out = c; return 1; }
+    }
+    if (CC_TOOTH != 8)
+        for (i = p->n - 1; i >= 0; --i)
+            if (p->items[i].p && cc_target(p->items[i].p, x, y, out)) return 1;
+    return 0;
+}
+/* its menu: "Learn MIDI CC" (the learn waits for the first CC below 120 the UI timer drains, rva
+ * 0x31AA40); "Forget MIDI CC #n" while a CC drives the parameter (rva 0x3192E0), greyed and
+ * without a number when none does or a learn waits (rva 0x319B70). choice < 0: the popup asks;
+ * else the item a script picks (an item that is greyed does nothing). Returns 1 if a control was
+ * found: the press goes no further. */
+static int cc_menu(int x, int y, int choice)
+{
+    Ctl *c = NULL;
+    Leaf *L;
+    int cc, cmd = -1;
+    char s[64];
+    if (!cc_target(g_tree, x, y, &c) || !(L = cleaf(c))) return 0;
+    EnterCriticalSection(&g_lock);
+    cc = juno_gui_cc_of(g_eng, L->id);
+    LeaveCriticalSection(&g_lock);
+    if (cc >= 0) snprintf(s, sizeof s, "Forget MIDI CC #%d", cc);
+    else snprintf(s, sizeof s, "Forget MIDI CC");
+    if (g_log) fprintf(g_log, "# ccmenu %u %d Learn MIDI CC|1|%s|%d\n", (unsigned)L->id, cc, s, cc >= 0);
+    if (choice < 0) {
+        HMENU m = CreatePopupMenu();
+        POINT pt;
+        AppendMenuA(m, MF_STRING, 1, "Learn MIDI CC");
+        AppendMenuA(m, MF_STRING | (cc >= 0 ? 0 : MF_GRAYED), 2, s);
+        GetCursorPos(&pt);
+        cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, g_wnd, NULL) - 1;
+        DestroyMenu(m);
+    } else cmd = choice;
+    EnterCriticalSection(&g_lock);
+    if (cmd == 0) E_cc_learn(L->id);
+    else if (cmd == 1 && (cc >= 0 || CC_TOOTH == 5)) E_cc_forget(L->id);   /* tooth 5: a greyed item acts */
+    LeaveCriticalSection(&g_lock);
+    return 1;
+}
+/* the tree the search walks, for tools/verify/cc_menu_gate.py: a panel (open, its controls,
+ * its panels), then each control (type, bounds or none, value count, the first value's id or
+ * -1, its CC map record or -1), then each child panel -- the order of the plugin's two vectors */
+static void cc_tree(Panel *p, FILE *f)
+{
+    int i, nc = 0, np = 0, b[4];
+    for (i = 0; i < p->n; ++i) p->items[i].p ? ++np : ++nc;
+    fprintf(f, "# cctree P %d %d %d\n", panel_open(p), nc, np);
+    for (i = 0; i < p->n; ++i) {
+        Ctl *c = p->items[i].c;
+        Leaf *L;
+        if (!c) continue;
+        if (!bounds(c, b)) b[0] = b[1] = b[2] = b[3] = -1;
+        L = cleaf(c);
+        fprintf(f, "# cctree C %s %d %d %d %d %d %ld %d\n", c->typestr, b[0], b[1], b[2], b[3], c->nrefs,
+                L ? (long)L->id : -1L, L ? juno_gui_cc_entry(L->id) : -1);
+    }
+    for (i = 0; i < p->n; ++i)
+        if (p->items[i].p) cc_tree(p->items[i].p, f);
+}
+/* a right-button press or double click with the plugin's modifier bits (1 Shift, 2 Ctrl, 8 Alt:
+ * the message's flags are these | 4, rva 0x411DB0): the CC assign control takes it only when
+ * the flags are exactly 4 (rva 0x31D420) and finds a control; the patch window, a separate
+ * modal view, takes every press while it is open. 1: taken (no press reaches a control). */
+static int cc_press(int x, int y, int mods, int choice)
+{
+    if ((mods && CC_TOOTH != 4) || get("vm.vs.panelPatch") == 1) return 0;   /* tooth 4: modifiers ignored */
+    return cc_menu(x, y, choice);
+}
 static Ctl *hit(int x, int y)
 {
     Ctl *list[512];
@@ -2348,10 +2453,25 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
         if (g_drag) { mouse_move(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom, (wp & MK_SHIFT) != 0); InvalidateRect(h, NULL, FALSE); }
         return 0;
     case WM_LBUTTONUP:
+    case WM_RBUTTONUP:
         ReleaseCapture();
         mouse_up();
         InvalidateRect(h, NULL, FALSE);
         return 0;
+    case WM_RBUTTONDOWN:
+    case WM_RBUTTONDBLCLK: {
+        int x = GET_X_LPARAM(lp) * 100 / g_zoom, y = GET_Y_LPARAM(lp) * 100 / g_zoom;
+        if (cc_press(x, y, ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetKeyState(VK_MENU) < 0 ? 8 : 0), -1)) {
+            InvalidateRect(h, NULL, FALSE);
+            return 0;
+        }
+        /* any other right press goes on to the controls, which do not test the button */
+        SetCapture(h);
+        mouse_down(x, y, (wp & MK_SHIFT) != 0, m == WM_RBUTTONDBLCLK);
+        if (m == WM_RBUTTONDBLCLK) mouse_dbl(x, y);
+        InvalidateRect(h, NULL, FALSE);
+        return 0;
+    }
     case WM_MOUSEWHEEL: {
         POINT p;
         p.x = GET_X_LPARAM(lp);
@@ -2496,8 +2616,15 @@ static const Step SCRIPT[] = {
     {S(240), 'm', 0x403080, 0, NULL}, {S(240), 'm', 0x403780, 0, NULL},
     {S(250), 's', 0, 0, "fm.PATCH.NAME1.ARPEGGIO SW"},
     {S(270), 'p', 0, 0, NULL}, {S(274), 'm', 0x5A3C90, 0, NULL}, {S(300), 'm', 0x403C80, 0, NULL},
+    {S(310), 'c', 0, 0, "fm.PATCH.FLT.VCF RESONANCE"},      /* the CC assign menu: Learn */
+    {S(312), 'm', 0x5A3C90, 0, NULL},
+    {S(316), 'm', 0x4014B0, 0, NULL},                        /* CC 20: the learn takes it at the drain */
+    {S(326), 'm', 0x7F14B0, 0, NULL},                        /* CC 20 127: VCF RESONANCE */
+    {S(336), 'c', 0, 1, "fm.PATCH.FLT.VCF RESONANCE"},      /* Forget MIDI CC #20 */
+    {S(338), 'm', 0x0014B0, 0, NULL},                        /* CC 20 0: no parameter now */
+    {S(350), 'm', 0x403C80, 0, NULL},
 };
-#define RENDER_BLOCKS S(340)
+#define RENDER_BLOCKS S(360)
 
 static Ctl *find_type(Panel *p, int type)
 {
@@ -2505,6 +2632,29 @@ static Ctl *find_type(Panel *p, int type)
     for (i = 0; i < p->n; ++i) {
         Ctl *c = p->items[i].p ? find_type(p->items[i].p, type) : p->items[i].c;
         if (c && c->type == type) return c;
+    }
+    return NULL;
+}
+
+/* the test modes' last log line: the state as getState writes it (the CC map included) */
+static void log_state(void)
+{
+    unsigned char sb[4 + 8 * 256];
+    int n, k;
+    EnterCriticalSection(&g_lock);
+    n = juno_gui_state_save(g_eng, sb, (int)sizeof sb);
+    LeaveCriticalSection(&g_lock);
+    if (!g_log) return;
+    fprintf(g_log, "state ");
+    for (k = 0; k < n; ++k) fprintf(g_log, "%02x", sb[k]);
+    fprintf(g_log, "\n");
+}
+static Ctl *find_ref(Panel *p, const char *ref)
+{
+    int i;
+    for (i = 0; i < p->n; ++i) {
+        Ctl *c = p->items[i].p ? find_ref(p->items[i].p, ref) : p->items[i].c;
+        if (c && c->nrefs == 1 && !strcmp(c->refs[0], ref)) return c;
     }
     return NULL;
 }
@@ -2534,6 +2684,11 @@ static int render_test(const char *path)
                 held = n;
             } else if (st->kind == 'K' && held >= 0) { g_kb_drag = 0; kb_release(1); held = -1; }
             else if (st->kind == 'p') load_patch((g_patch + 1) % 64, 1);
+            else if (st->kind == 'c') {                                  /* a right press on the control's middle */
+                Ctl *c = find_ref(g_tree, st->ref);
+                int bb[4];
+                if (c && bounds(c, bb)) cc_menu(bb[0] + bb[2] / 2, bb[1] + bb[3] / 2, st->v);
+            }
         }
         if (b % 10 == 9) {                 /* the 50 ms UI timer (WM_TIMER) */
             EnterCriticalSection(&g_lock);
@@ -2553,6 +2708,7 @@ static int render_test(const char *path)
     if (g_log) fprintf(g_log, "# rendered %d ms of audio in %.1f ms; worst block %.2f ms (block %d), block period %.2f ms\n",
                        RENDER_BLOCKS * BLK * 1000 / g_rate, (double)(t1.QuadPart - t0.QuadPart) * 1000.0 / (double)fq.QuadPart,
                        worst * 1000.0 / (double)fq.QuadPart, worst_b, BLK * 1000.0 / g_rate);
+    log_state();
     fclose(f);
     return 0;
 }
@@ -2562,8 +2718,10 @@ static int render_test(const char *path)
  * (mouse_down / mouse_move / mouse_up at panel coordinates) -- rendered by the
  * audio thread's own block (render_block), the 50 ms UI timer every 19 blocks.
  * Raw float L R to FILE, every engine call to FILE.log. */
-static uint32_t g_rnd;
+static uint32_t g_rnd, g_rnd2;
 static uint32_t rnd(void) { g_rnd ^= g_rnd << 13; g_rnd ^= g_rnd >> 17; g_rnd ^= g_rnd << 5; return g_rnd; }
+/* the CC assign events' own stream: the performance's other events stay those of its seed */
+static uint32_t rnd2(void) { g_rnd2 ^= g_rnd2 << 13; g_rnd2 ^= g_rnd2 >> 17; g_rnd2 ^= g_rnd2 << 5; return g_rnd2; }
 static void midi_in(uint32_t m, int t) { midi_cb(NULL, MIM_DATA, 0, (DWORD_PTR)m, (DWORD_PTR)t); }
 
 /* a point for the keybed: on the keys mostly, some in the gaps, some past the edges */
@@ -2615,6 +2773,21 @@ static int play_test(const char *path, int change_patch)
             if (rnd() % 1000 < 5) set("fm.PATCH.NAME1.KEY HOLD", !get("fm.PATCH.NAME1.KEY HOLD"));
             if (rnd() % 1000 < 3) set("fm.PATCH.NAME1.OCTAVE SHIFT", (int)(rnd() % 7) - 3);
             if (b == change_at || rnd() % 1000 < 3) load_patch((int)(rnd() % 64), (int)(rnd() & 1));   /* buttons / list */
+            if (!down && rnd2() % 1000 < 25) {                            /* the CC assign menu: a right press, an item */
+                Ctl *vis[512];
+                int nv = visible_list(g_tree, vis, 0, 512), x, y, ch, bb[4];
+                if (nv > 0 && rnd2() % 10 < 8 && bounds(vis[rnd2() % (unsigned)nv], bb) && bb[2] > 0 && bb[3] > 0) {
+                    x = bb[0] + (int)(rnd2() % (unsigned)bb[2]);          /* on a control, mostly */
+                    y = bb[1] + (int)(rnd2() % (unsigned)bb[3]);
+                } else {
+                    x = (int)(rnd2() % (unsigned)g_fbw);
+                    y = (int)(rnd2() % (unsigned)g_fbh);
+                }
+                ch = (int)(rnd2() % 3);
+                cc_press(x, y, 0, ch);                                    /* no menu there: no press (a random */
+            }                                                             /* click could open a popup) */
+            if (rnd2() % 1000 < 12)                                       /* CCs a learn can take (below 120) */
+                midi_in(0xB0u | ((16u + rnd2() % 4u) << 8) | ((rnd2() % 128) << 16), b);
         } else if (b == PLAY) {                                          /* everything up */
             for (i = 0; i < nheld; ++i) midi_in(0x80u | (uint32_t)heldch[i] | ((uint32_t)held[i] << 8) | (64u << 16), b);
             nheld = 0;
@@ -2634,6 +2807,7 @@ static int play_test(const char *path, int change_patch)
         for (i = 0; i < BLK; ++i) { o[2 * i] = L[i]; o[2 * i + 1] = R[i]; }
         fwrite(o, sizeof o, 1, f);
     }
+    log_state();
     fclose(f);
     return 0;
 }
@@ -2645,17 +2819,45 @@ static int play_test(const char *path, int change_patch)
  *   note N V | off N                                        MIDI in, channel 1
  *   block                                                   one audio block
  *   tick                                                    the 50 ms UI timer
+ *   rdown X Y MODS ITEM                                     a right press (MODS: 1 Shift, 2 Ctrl, 8 Alt):
+ *                                                           the CC assign menu and its item (0 learn,
+ *                                                           1 forget, 2 none), else a press the
+ *                                                           controls take (up ends it)
+ *   ccmsg X Y MODS [ITEM]                                   the same press, its menu's item (2 none by
+ *                                                           default), never a press after it: taken or not
+ *   cc N V                                                  MIDI CC in, channel 1
+ *   ccpick X Y | cctree | state                             the CC assign search at a point (no press) |
+ *                                                           the panel tree it searches | the state as
+ *                                                           getState writes it (cc_menu_gate.py)
  * every engine call to FILE.log (the calls a GUI makes, in order). */
 static int kb_script(const char *path)
 {
     FILE *in = fopen(path, "r");
     char line[256], ref[128];
     float L[BLK], R[BLK];
-    int a, b, c;
+    int a, b, c, d, k;
     if (!in) return 2;
     fprintf(g_log, "# kbscript\n");                  /* the calls before it are the boot's */
     while (fgets(line, sizeof line, in)) {
-        if (sscanf(line, "down %d %d %d", &a, &b, &c) == 3) mouse_down(a, b, c, 0);
+        if (sscanf(line, "rdown %d %d %d %d", &a, &b, &c, &d) == 4) {
+            fprintf(g_log, "# rdown %d %d %d %d\n", a, b, c, d);
+            if (!cc_press(a, b, c, d)) mouse_down(a, b, c & 1, 0);
+        }
+        else if ((k = sscanf(line, "ccmsg %d %d %d %d", &a, &b, &c, &d)) >= 3) {   /* the press alone: */
+            if (k == 3) d = 2;                                   /* the menu's item (none by default), */
+            fprintf(g_log, "# ccmsg %d %d %d %d\n", a, b, c, d);   /* never a press on a control */
+            fprintf(g_log, "# ccmsg taken %d\n", cc_press(a, b, c, d));
+        }
+        else if (sscanf(line, "ccpick %d %d", &a, &b) == 2) {         /* the CC assign search alone */
+            Ctl *t = NULL;
+            Leaf *Lf;
+            fprintf(g_log, "# ccpick %d %d %ld\n", a, b,
+                    cc_target(g_tree, a, b, &t) && (Lf = cleaf(t)) ? (long)Lf->id : -1L);
+        }
+        else if (!strncmp(line, "cctree", 6)) cc_tree(g_tree, g_log);
+        else if (!strncmp(line, "state", 5)) log_state();
+        else if (sscanf(line, "cc %d %d", &a, &b) == 2) midi_in(0xB0u | ((uint32_t)a << 8) | ((uint32_t)b << 16), 0);
+        else if (sscanf(line, "down %d %d %d", &a, &b, &c) == 3) mouse_down(a, b, c, 0);
         else if (sscanf(line, "move %d %d %d", &a, &b, &c) == 3) mouse_move(a, b, c);
         else if (!strncmp(line, "up", 2)) mouse_up();
         else if (sscanf(line, "wheel %d %d %d", &a, &b, &c) == 3) mouse_wheel(a, b, c);
@@ -2708,6 +2910,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         rend = play;                                   /* the render test's plumbing: the log, no device */
         g_rnd = 2463534242u ^ (uint32_t)(seed < 0 ? 1 : seed) * 2654435761u;
         if (!g_rnd) g_rnd = 1;
+        g_rnd2 = 0x9E3779B9u ^ (uint32_t)(seed < 0 ? 1 : seed) * 2246822519u;   /* the CC menu's own stream */
+        if (!g_rnd2) g_rnd2 = 1;
     }
     if (rend) {
         char lp[MAX_PATH + 8];

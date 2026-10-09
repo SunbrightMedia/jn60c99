@@ -14,7 +14,8 @@ it, never commit it.
                                     b != 0: itself; 0, lo, hi: that many zeros)
   scratchpad/dist/JUNO-60.exe       the program
 
-USAGE  python3 tools/dist/make_native.py [--no-userbanks]
+USAGE  python3 tools/dist/make_native.py [--no-userbanks] [--define NAME=V ...] [--out EXE]
+       --define / --out: a test build (a gate's tooth, -DNAME=V) written to EXE instead
 """
 import os
 import shutil
@@ -127,10 +128,13 @@ def main():
     subprocess.check_call([rc, '-O', 'coff', '-o', res, os.path.join(BUILD, 'assets.rc')])
     srcs = [os.path.join(REPO, 'gui', 'win', 'juno60_win.c'), os.path.join(REPO, 'gui', 'juno_bridge.c')]
     srcs += sorted(os.path.join(REPO, 'src', f) for f in os.listdir(os.path.join(REPO, 'src')) if f.endswith('.c'))
-    subprocess.check_call([cc] + CFLAGS + ['-mwindows', '-I', BUILD, '-I', os.path.join(REPO, 'src'),
-                                           '-o', EXE] + srcs + [res] + LIBS + ['-s'])
+    defs = ['-D' + sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == '--define']
+    exe = sys.argv[sys.argv.index('--out') + 1] if '--out' in sys.argv else EXE
+    os.makedirs(os.path.dirname(os.path.abspath(exe)), exist_ok=True)
+    subprocess.check_call([cc] + CFLAGS + defs + ['-mwindows', '-I', BUILD, '-I', os.path.join(REPO, 'src'),
+                                                  '-o', exe] + srcs + [res] + LIBS + ['-s'])
     print('banks: %s' % ', '.join(n for n, _ in banks))
-    print('wrote %s (%d bytes)' % (EXE, os.path.getsize(EXE)))
+    print('wrote %s (%d bytes)%s' % (exe, os.path.getsize(exe), ' with ' + ' '.join(defs) if defs else ''))
     return 0
 
 

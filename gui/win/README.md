@@ -56,7 +56,7 @@ patch change may click there.
 | `--shot FILE.bmp [--bank B] [--patch N]` | the panel as drawn | equal to the web skin's canvas except text glyphs (GDI vs browser fonts) |
 | `--render FILE [--bank B] [--patch N]` | the audio thread's own path on a fixed script, raw float L R; every engine call to FILE.log; the worst block's time | `tools/dist/native_check.py`: the log replayed through `libjuno.so`, equal bit for bit; every block's host events = the queued MIDI in the DAW mapping |
 | `--play FILE --seed N [--fp-oracle]` | a seeded performance through the program's own inputs: MIDI through its winmm callback (any channel, note-on at 0 among the releases, mod wheel, bend, aftertouch, the pedal), the keybed through its mouse handlers (clicks, Shift-clicks, drags inside and past the keys), KEY HOLD and OCTAVE SHIFT from the panel, patch changes from the buttons and the list; the 50 ms UI timer every 19 blocks; raw float L R and the call log | `tools/dist/exe_oracle_check.py`: the log played into THE PLUGIN ITSELF (the official .vst3 under Unicorn: its own boot, patch browser, model set and commit, keyboard note value write, UI-timer drain and process()); every sample of both channels equal (`--fp-oracle`: the oracle's DAZ-only FP mode), the magnitude spectra equal; `--tooth`: the plugin side's first MIDI note and first keybed press a semitone up must FAIL (a velocity step was blind on patches without velocity sensitivity) |
-| `--kbscript FILE` | panel events, one per line -- the mouse (down / move / up with Shift, the wheel), a control's edit, a patch load (buttons or list), MIDI notes, an audio block, the UI timer -- through the program's own handlers; every engine call to FILE.log | `tools/verify/skin_kb_check.mjs`: the same seeded scripts into the web skin with real pointer events; the same engine calls in the same order (the keyboard rules are READ from the plugin and written twice, in C and in JavaScript) |
+| `--kbscript FILE` | panel events, one per line -- the mouse (down / move / up with Shift, the wheel), a control's edit, a patch load (buttons or list), MIDI notes and CCs, an audio block, the UI timer, the CC assign menu's presses and probes, the state -- through the program's own handlers; every engine call to FILE.log | `tools/verify/skin_kb_check.mjs`: the same seeded scripts into the web skin with real pointer events; the same engine calls in the same order (the keyboard rules are READ from the plugin and written twice, in C and in JavaScript); `tools/verify/cc_menu_gate.py`: the CC assign menu's probes and presses against the plugin's own handler on its own tree |
 
 ```
 WINEPREFIX=<a prefix> python3 tools/dist/native_check.py      # under Wine on Linux
@@ -73,10 +73,24 @@ NOT meaningful: Wine's ALSA layer takes the whole queue in 20 ms chunks, so the
 padding reads 0 at every second event (traced). Real-time behaviour must be
 read on a Windows PC: the title bar's count.
 
+The CC assign menu (CLAIMS A38, docs/CC_MENU.md): a right-button press or double click with no
+Shift, Ctrl or Alt on a parameter's control pops up "Learn MIDI CC" / "Forget MIDI CC #n"
+(`cc_press`, `cc_target`, `cc_menu`); any other right press acts as a left one. Graded by
+`tools/verify/cc_menu_gate.py` against THE PLUGIN'S OWN HANDLER (rva 0x31D420) on THE PLUGIN'S OWN
+PANEL TREE (built by its module init; the sprite sheets' real sizes): the tree the search reads,
+11280 search probes, 1632 right presses with modifier keys and items, CCs and drains, every state;
+teeth: builds with `-DCC_TOOTH=N` (make_native.py `--define`). `--play` makes right presses (Learn,
+Forget, nothing) and sends CCs 16-19; exe_oracle_check.py replays them in the plugin and compares
+the state at the end (getState's bytes); `--render` learns VCF RESONANCE, sends CC 20, forgets.
+
+kbscript lines for the CC assign menu: `rdown X Y MODS ITEM` (a right press, MODS 1 Shift, 2 Ctrl,
+8 Alt; ITEM 0 learn, 1 forget, 2 none; not taken: a press the controls take), `ccmsg X Y MODS
+[ITEM]` (the same, never a press after it), `ccpick X Y` (the search alone), `cctree` (the tree
+it searches), `cc N V` (MIDI CC in), `state` (the state as getState writes it).
+
 ## Not ported
 
-The same as gui/skin (README there): the CC-assign menu, writing patches into a
-bank, the SYSTEM-8 buttons. The LFO LED and the two level meters are ported (CLAIMS
+The same as gui/skin (README there): writing patches into a bank, the SYSTEM-8 buttons. The LFO LED and the two level meters are ported (CLAIMS
 A37, docs/LED_METER.md): the program's WM_TIMER runs the three bridge calls and blits
 their result; `--play` and `--kbscript` log every tick (led / meter / bar), which
 exe_oracle_check.py replays in the plugin itself.

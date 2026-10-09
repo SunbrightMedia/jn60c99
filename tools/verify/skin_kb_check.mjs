@@ -22,6 +22,17 @@
 //   --tooth velocity   the skin's click velocity one step higher (must FAIL)
 //   --tooth hold       the skin's press never releases the other keys (must FAIL)
 //   --tooth gap        the skin's hit test gives a gap to the key before it (must FAIL)
+//   --tooth ccedge     the skin's CC assign search counts the right and bottom edges inside (must FAIL;
+//                      the search's ORDER is not observable on this panel -- docs/CC_MENU.md rule 4)
+//   --tooth ccmods     the skin's CC assign menu opens with Shift held (must FAIL)
+//
+// Then the CC assign menu (CLAIMS A38; the exe's own is graded against the plugin's handler on
+// the plugin's tree by tools/verify/cc_menu_gate.py): per seed, the search at the edges of every
+// control it can stop at and at random points (the skin's ccTarget, the exe's ccpick), REAL
+// right-button presses (Playwright, with Shift / Ctrl / Alt at times) and the menu's item clicked
+// (Learn, Forget -- a greyed one stays open -- or Escape), MIDI CCs through the page's MIDI input,
+// audio blocks and drains, and the state (getState's bytes, the CC map included). Compared: the
+// menus (the parameter, the CC shown, the labels, enabled), learns, forgets, the calls, the states.
 import { chromium } from "playwright-core";
 import { createServer } from "node:http";
 import { readFile, writeFile, mkdtemp, copyFile, rm } from "node:fs/promises";
@@ -37,6 +48,7 @@ const EXE = arg("--exe", join(ROOT, "scratchpad", "dist", "JUNO-60.exe"));
 const SEEDS = arg("--seeds", "1,2,3,4,5,6,7,8").split(",").map(Number);
 const EVENTS = +arg("--events", "300");
 const TOOTH = arg("--tooth", null);
+const DUMP = arg("--dump", null);
 const WINE = process.env.WINE || "/usr/lib/wine/wine64";
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".wasm": "application/wasm",
                ".png": "image/png", ".xml": "application/xml", ".bin": "application/octet-stream", ".json": "application/json" };
@@ -78,7 +90,38 @@ function exeCalls(log) {
     if (t[0] === "keybed" || t[0] === "model_set") out.push(`${t[0]} ${t[1]} ${t[2]}`);
     else if (t[0] === "commit" || t[0] === "ui_tick") out.push(t[0]);
     else if (t[0] === "queue_patch") out.push(`patch ${t[1]}`);
+    else if (t[0] === "cc_learn" || t[0] === "cc_forget") out.push(`${t[0]} ${t[1]}`);
+    else if (t[0] === "state") out.push(ln);
+    else if (ln.startsWith("# ccpick ") || ln.startsWith("# ccmenu ")) out.push(ln.slice(2));
   }
+  return out;
+}
+
+// a seeded CC assign script over the skin's own controls: c = [{x, y, w, h, cc, drag}] (cc: the
+// search stops there; drag: a slider or knob, which a press with modifiers may take)
+function ccScript(seed, ctl, W, H) {
+  let r = (2246822519 ^ Math.imul(seed, 2654435761)) >>> 0 || 1;
+  const rnd = () => { r ^= r << 13; r >>>= 0; r ^= r >>> 17; r ^= r << 5; r >>>= 0; return r; };
+  const cc = ctl.filter(c => c.cc), drag = ctl.filter(c => c.drag);
+  const inside = c => [c.x + rnd() % c.w, c.y + rnd() % c.h];
+  const out = ["set 100 vm.vs.mainZoom", "block", "state"];   // the exe boots at its window's zoom, the page at its URL's
+  for (const c of cc)                                  // the edges of every control the search stops at
+    for (const [x, y] of [[c.x, c.y], [c.x + c.w - 1, c.y + c.h - 1], [c.x - 1, c.y], [c.x, c.y - 1],
+                          [c.x + c.w, c.y + c.h - 1], [c.x + c.w - 1, c.y + c.h]])
+      out.push(`ccpick ${x} ${y}`);
+  for (let i = 0; i < EVENTS; i++) {
+    const k = rnd() % 100;
+    if (k < 30) out.push(`ccpick ${rnd() % W} ${rnd() % H}`);
+    else if (k < 60) { const [x, y] = inside(cc[rnd() % cc.length]); out.push(`rdown ${x} ${y} 0 ${rnd() % 3}`, "up"); }
+    else if (k < 68) {                                 // modifiers: no menu, the press goes to the control
+      const [x, y] = inside(drag[rnd() % drag.length]);
+      out.push(`rdown ${x} ${y} ${[1, 2, 8, 3, 9][rnd() % 5]} 2`, "up");
+    }
+    else if (k < 85) out.push(`cc ${rnd() % 120} ${rnd() % 128}`, "block", "tick");
+    else if (k < 92) out.push("tick");
+    else out.push("state");
+  }
+  out.push("block", "tick", "state");
   return out;
 }
 
@@ -164,12 +207,157 @@ for (const seed of SEEDS) {
     (first >= 0 ? `; first difference at call ${first}: exe "${exe[first]}" web "${web[first]}"` : "") +
     (errors.length ? `; page errors: ${errors.join(" | ")}` : ""));
 }
+// ---------------------------------------------------------------- the CC assign menu
+let ccFails = 0;
+for (const seed of SEEDS) {
+  const page = await browser.newPage({ viewport: { width: 2400, height: 1100 } });   // room for a menu at the edge
+  const errors = [];
+  page.on("pageerror", e => errors.push(String(e)));
+  await page.goto(`http://127.0.0.1:${port}/gui/skin/?zoom=100`);
+  await page.waitForFunction(() => window.__skin && window.__skin.skin, null, { timeout: 60000 });
+  const geo = await page.evaluate(dump => {
+    const { E, skin } = window.__skin;
+    const log = window.__kblog = [];
+    const wrap = (name, fmt) => { const f = E[name].bind(E); E[name] = (...a) => { log.push(fmt(...a)); return f(...a); }; };
+    wrap("keybedWrite", (k, v) => `keybed ${k} ${v}`);
+    wrap("commit", () => "commit");
+    wrap("set", (id, v) => `model_set ${id >>> 0} ${v | 0}`);
+    wrap("loadPatch", (b, i) => `patch ${i}`);
+    wrap("ccLearn", id => `cc_learn ${id >>> 0}`);
+    wrap("ccForget", id => `cc_forget ${id >>> 0}`);
+    window.__dbg = [];
+    if (dump) {                                        // --dump: who closes a menu, what the presses hit
+      const cl = skin.closeMenu.bind(skin);
+      skin.closeMenu = () => { window.__dbg.push("close " + (new Error().stack || "").split("\n").slice(2, 5).join(" / ")); cl(); };
+      document.addEventListener("pointerdown", e => window.__dbg.push("pd " + e.target.className + " " + e.button), true);
+      document.addEventListener("click", e => window.__dbg.push("click " + e.target.className), true);
+    }
+    const cm = skin.ccMenu.bind(skin);
+    skin.ccMenu = (ev, t) => {
+      const cc = E.ccOf(t.id);
+      const m = cm(ev, t);
+      log.push(`ccmenu ${t.id >>> 0} ${cc} ` + [...m.children].map(b => `${b.textContent}|${b.classList.contains("off") ? 0 : 1}`).join("|"));
+      return m;
+    };
+    const tick = E.uiTick.bind(E);
+    window.__kbAllow = false;
+    E.uiTick = () => { if (window.__kbAllow) { log.push("ui_tick"); tick(); } };
+    window.__kbTick = () => { window.__kbAllow = true; E.uiTick(); window.__kbAllow = false; skin.M.refresh(); };
+    E.start = () => {};
+    const blk = E.M._malloc(8 * 128), sb = E.M._malloc(4 + 8 * 256);
+    window.__kbBlock = () => E.fn.render(E.ctx, blk, 128);              // the exe's audio block
+    window.__kbState = () => {
+      const n = E.fn.stateSave(E.ctx, sb, 4 + 8 * 256);
+      return "state " + Array.from(new Uint8Array(E.M.HEAPU8.buffer, sb, Math.max(n, 0)), b => b.toString(16).padStart(2, "0")).join("");
+    };
+    window.__kbPort = { name: "test", onmidimessage: null };
+    skin.listen(window.__kbPort);
+    const ctl = [];
+    for (const c of skin.visible(skin.tree)) {
+      const b = skin.bounds(c);
+      if (!b || b[2] <= 0 || b[3] <= 0) continue;
+      const t = skin.ccTarget(b[0] + (b[2] >> 1), b[1] + (b[3] >> 1));
+      ctl.push({ x: b[0], y: b[1], w: b[2], h: b[3], cc: !!t && t.c === c, drag: c.type === "slider" || c.type === "knob" });
+    }
+    const r = skin.cv.getBoundingClientRect();
+    return { ctl, W: skin.cv.width, H: skin.cv.height, left: r.left, top: r.top, sx: r.width / skin.cv.width, sy: r.height / skin.cv.height };
+  }, !!DUMP);
+  if (TOOTH === "ccedge") await page.evaluate(() => {
+    const { skin } = window.__skin;              // the right and bottom edges inside the rectangle
+    skin.ccTarget = function (x, y, node = this.tree) {
+      if (node.kind !== "panel" || !this.open(node)) return null;
+      for (let i = node.items.length - 1; i >= 0; i--) {
+        const c = node.items[i];
+        if (c.kind !== "control") continue;
+        const b = this.bounds(c);
+        if (!b || x < b[0] || x > b[0] + b[2] || y < b[1] || y > b[1] + b[3]) continue;
+        if (c.type === "label" || c.type === "display" || c.refs.length !== 1) continue;
+        const L = this.M.leaf(c.ref);
+        if (L && this.E.ccEntry(L.id) >= 0) return { c, id: L.id };
+      }
+      for (let i = node.items.length - 1; i >= 0; i--) if (node.items[i].kind === "panel") { const t = this.ccTarget(x, y, node.items[i]); if (t) return t; }
+      return null;
+    };
+  });
+  if (TOOTH === "ccmods") await page.evaluate(() => {
+    const { skin } = window.__skin;              // Shift does not stop the menu
+    const d = skin.down.bind(skin);
+    skin.down = ev => d(ev.button === 2 && ev.shiftKey ? new Proxy(ev, { get: (o, k) => k === "shiftKey" ? false : (typeof o[k] === "function" ? o[k].bind(o) : o[k]) }) : ev);
+  });
+  const lines = ccScript(seed, geo.ctl, geo.W, geo.H);
+  const cx = x => geo.left + (x + 0.5) * geo.sx, cy = y => geo.top + (y + 0.5) * geo.sy;
+  const MODKEYS = [[1, "Shift"], [2, "Control"], [8, "Alt"]];
+  let held = null;
+  const trace = [];                                    // --dump: the web log's length after each script line
+  for (const ln of lines) {
+    if (DUMP) trace.push(await page.evaluate(() => window.__kblog.length));
+    const t = ln.split(" ");
+    if (t[0] === "ccpick") await page.evaluate(([x, y]) => {
+      const tt = window.__skin.skin.ccTarget(x, y);
+      window.__kblog.push(`ccpick ${x} ${y} ${tt ? tt.id >>> 0 : -1}`);
+    }, [+t[1], +t[2]]);
+    else if (t[0] === "rdown") {
+      const mods = +t[3], item = +t[4];
+      await page.mouse.move(cx(+t[1]), cy(+t[2]));
+      for (const [bit, key] of MODKEYS) if (mods & bit) await page.keyboard.down(key);
+      await page.mouse.down({ button: "right" });
+      held = "right";
+      const open = await page.evaluate(() => !!window.__skin.skin.menuEl);
+      if (open) {
+        await page.mouse.up({ button: "right" });
+        held = null;
+        if (item < 2) {
+          const before = DUMP ? await page.evaluate(() => { window.__dbg = []; return window.__kblog.length; }) : 0;
+          const el = page.locator(".menu .mi").nth(item);
+          await el.click();
+          if (DUMP) {                                  // a click that did nothing on an enabled item: why
+            const d = await page.evaluate(b => ({ n: window.__kblog.length - b, dbg: window.__dbg, menus: document.querySelectorAll(".menu").length }), before);
+            const on = await page.evaluate(i => { const m = window.__skin.skin.menuEl; return m ? !m.children[i].classList.contains("off") : null; }, item);
+            if (d.n === 0 && on !== false) console.log("  click on item", item, "did nothing:", JSON.stringify(d).slice(0, 600));
+          }
+        }
+        if (await page.evaluate(() => !!window.__skin.skin.menuEl)) await page.keyboard.press("Escape");
+      }
+      for (const [bit, key] of MODKEYS) if (mods & bit) await page.keyboard.up(key);
+    }
+    else if (t[0] === "up") { if (held) { await page.mouse.up({ button: held }); held = null; } }
+    else if (t[0] === "cc") await page.evaluate(([n, v]) => window.__kbPort.onmidimessage({ data: [0xb0, n, v] }), [+t[1], +t[2]]);
+    else if (t[0] === "set") await page.evaluate(([v, ref]) => window.__skin.skin.M.set(ref, v), [+t[1], t.slice(2).join(" ")]);
+    else if (t[0] === "block") await page.evaluate(() => window.__kbBlock());
+    else if (t[0] === "tick") await page.evaluate(() => window.__kbTick());
+    else if (t[0] === "state") await page.evaluate(() => window.__kblog.push(window.__kbState()));
+  }
+  const web = await page.evaluate(() => window.__kblog);
+  await page.close();
+  const sp = join(work, `c${seed}.txt`);
+  await writeFile(sp, lines.join("\n") + "\n");
+  execFileSync(WINE, [join(work, "JUNO-60.exe"), "--kbscript", sp], { cwd: work, env: { ...process.env, WINEDEBUG: "-all" }, timeout: 300000 });
+  const exe = exeCalls(readFileSync(sp + ".log", "utf8"));
+  let first = -1;
+  for (let i = 0; i < Math.max(exe.length, web.length); i++) if (exe[i] !== web[i]) { first = i; break; }
+  if (DUMP && first >= 0) {                    // --dump DIR: both call lists of a failing seed, the script
+    await writeFile(join(DUMP, `cc${seed}_exe.txt`), exe.join("\n") + "\n");
+    await writeFile(join(DUMP, `cc${seed}_web.txt`), web.join("\n") + "\n");
+    await writeFile(join(DUMP, `cc${seed}_script.txt`), lines.map((l, i) => `${trace[i]}\t${l}`).join("\n") + "\n");
+  }
+  const menus = exe.filter(x => x.startsWith("ccmenu")).length, learns = exe.filter(x => x.startsWith("cc_learn")).length;
+  const forgets = exe.filter(x => x.startsWith("cc_forget")).length, picks = exe.filter(x => x.startsWith("ccpick")).length;
+  const states = exe.filter(x => x.startsWith("state")), moved = new Set(states).size > 1;
+  const ok = first < 0 && !errors.length && menus > 0 && learns > 0 && (TOOTH ? true : moved);
+  if (!ok) ccFails++;
+  console.log(`${ok ? "ok  " : "FAIL"} CC seed ${seed}: ${lines.length} events, ${picks} searches, ${menus} menus, ${learns} learns, ` +
+    `${forgets} forgets, ${states.length} states (${new Set(states).size} distinct)` +
+    (first >= 0 ? `; first difference at call ${first}: exe "${(exe[first] || "").slice(0, 120)}" web "${(web[first] || "").slice(0, 120)}"` : "") +
+    (errors.length ? `; page errors: ${errors.join(" | ")}` : ""));
+}
+
 await browser.close();
 srv.close();
 await rm(work, { recursive: true, force: true });
-if (TOOTH) {
-  console.log(`skin_kb_check --tooth ${TOOTH}: ${fails === SEEDS.length ? "BITES" : "DID NOT BITE"} (${fails} of ${SEEDS.length} seeds FAIL)`);
-  process.exit(fails === SEEDS.length ? 0 : 1);
+if (TOOTH) {                                   // a keyboard tooth fails every keyboard seed, a CC tooth every CC seed
+  const n = TOOTH.startsWith("cc") ? ccFails : fails;
+  console.log(`skin_kb_check --tooth ${TOOTH}: ${n === SEEDS.length ? "BITES" : "DID NOT BITE"} (${n} of ${SEEDS.length} seeds FAIL)`);
+  process.exit(n === SEEDS.length ? 0 : 1);
 }
-console.log(`skin_kb_check: ${fails ? "RED" : "GREEN"} (${SEEDS.length} seeds)`);
-process.exit(fails ? 1 : 0);
+console.log(`skin_kb_check: ${fails || ccFails ? "RED" : "GREEN"} (${SEEDS.length} keyboard seeds, ${SEEDS.length} CC seeds)`);
+process.exit(fails || ccFails ? 1 : 0);

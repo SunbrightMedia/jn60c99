@@ -27,6 +27,14 @@
 //                           read (rva 0x34AF70), the new state, the bar's fill rect
 //   barDraw(rect, fill, horiz, fade) -> [[dx, dy, w, h, sx, sy, alpha], ...]
 //                           what the bar draws (rva 0x31C210): alpha -1 a plain blit
+//   ccEntry(id)             the CC map's record of a parameter (rva 0x319B10), -1 none
+//   ccOf(id)                the CC a control shows (rva 0x319B70), -1 none or while a
+//                           learn waits
+//   ccLearn(id) / ccForget(id)  the CC assign menu's items (rva 0x31AA40 / 0x3192E0)
+//   midiIn(status, d1, d2)  a MIDI message as a DAW gives it to the plugin: a note through
+//                           the wrapper's MIDI intake; CC n, channel aftertouch and pitch bend
+//                           as MIDI-mapping parameter points (base + n, + 128, + 129) that
+//                           process() takes (rva 0x34A380) at the next block
 //   peaks() -> [l, r]       the page's output peak since the last call, after the
 //                           monitor fader (the checks' witness that the page sounds;
 //                           not the plugin's meters, which meterTick reads)
@@ -72,6 +80,12 @@ export class WasmEngine {
       meterTick: f("juno_gui_meter_tick", "number",
                    ["number", "number", "number", "number", "number", "number", "number"]),
       barDraw: f("juno_gui_bar_draw", "number", ["number", "number", "number", "number", "number", "number"]),
+      ccEntry: f("juno_gui_cc_entry", "number", ["number"]),
+      ccOf: f("juno_gui_cc_of", "number", ["number", "number"]),
+      ccLearn: f("juno_gui_cc_learn", "number", ["number", "number"]),
+      ccForget: f("juno_gui_cc_forget", "number", ["number", "number"]),
+      hostParam: f("juno_gui_host_param", null, ["number", "number", "number", "number"]),
+      midiBase: f("juno_gui_midi_base", "number", []),
     };
     // the engine is built for the output device's own rate: nothing resamples
     try {
@@ -119,6 +133,14 @@ export class WasmEngine {
 
   noteOn(n, vel) { this.fn.noteOn(this.ctx, n, vel); }
   noteOff(n) { this.fn.noteOff(this.ctx, n); }
+  midiIn(st, d1, d2) {
+    const cmd = st & 0xf0, base = this.fn.midiBase() >>> 0;
+    if (cmd === 0x90 && d2 > 0) this.noteOn(d1, d2);
+    else if (cmd === 0x80 || cmd === 0x90) this.noteOff(d1);
+    else if (cmd === 0xb0) this.fn.hostParam(this.ctx, base + d1, 0, d2 / 127);
+    else if (cmd === 0xd0) this.fn.hostParam(this.ctx, base + 128, 0, d1 / 127);
+    else if (cmd === 0xe0) this.fn.hostParam(this.ctx, base + 129, 0, (d1 | (d2 << 7)) / 16383);
+  }
   setTempo(bpm) { this.fn.setTempo(this.ctx, bpm); }
   uiTick() { this.fn.uiTick(this.ctx); }
   ledFrame(n) { return this.fn.ledFrame(this.ctx, n); }
@@ -137,6 +159,10 @@ export class WasmEngine {
     for (let i = 0; i < n; i++) out.push(Array.from(I.subarray(7 * i, 7 * i + 7)));
     return out;
   }
+  ccEntry(id) { return this.fn.ccEntry(id >>> 0); }
+  ccOf(id) { return this.fn.ccOf(this.ctx, id >>> 0); }
+  ccLearn(id) { return this.fn.ccLearn(this.ctx, id >>> 0); }
+  ccForget(id) { return this.fn.ccForget(this.ctx, id >>> 0); }
   keybedWrite(key, v) { return this.fn.keybedWrite(this.ctx, key, v); }
   keybedState(key) { return this.fn.keybedState(this.ctx, key); }
   commit() { this.fn.commit(this.ctx); }

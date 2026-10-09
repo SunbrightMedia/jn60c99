@@ -1725,6 +1725,13 @@ int juno_gui_cc_forget(juno_ctx *c, uint32_t id)
     juno_ccmap_forget(&c->ccmap, e);
     return 1;
 }
+/* the CC map's record of a parameter (rva 0x319B10, the map the booted plugin's tables give):
+ * its index, -1 when the parameter has none -- what the CC assign control (rva 0x31D420) asks
+ * of the control under a right-button press before it opens its menu */
+int juno_gui_cc_entry(uint32_t id)
+{
+    return juno_midi_entry(id);
+}
 /* the CC a parameter's control shows (rva 0x319B70): -1 none or while a learn waits */
 int juno_gui_cc_of(const juno_ctx *c, uint32_t id)
 {
@@ -3382,6 +3389,22 @@ int juno_gui_process_ex(juno_ctx *c, const juno_host_note *ev, int nev, const ju
     drv_block(c, n, &o);
     return o.full;
 }
+
+/* One host parameter point queued for the next block, as process() takes it (proc_param above):
+ * a MIDI-mapping parameter is what a DAW gives the plugin for its MIDI input -- CC n: id base +
+ * n, value d / 127; channel aftertouch base + 128, d / 127; pitch bend base + 129, (lsb | msb
+ * << 7) / 16383 (base: juno_gui_midi_base). The web app's MIDI input (gui/skin): a CC reaches a
+ * mapped parameter at the UI timer's drain, a MIDI learn, the mod wheel, the pedal, CC 123. */
+void juno_gui_host_param(juno_ctx *c, uint32_t id, int offset, double value)
+{
+    juno_host_param p;
+    if (!c) return;
+    p.id = id;
+    p.offset = offset;
+    p.value = value;
+    proc_param(c, &p);
+}
+uint32_t juno_gui_midi_base(void) { return juno_midi_base(); }
 
 /* One sample of the driver's control half without the render: the multi-core
  * split (pi/) runs it on every core's copy, then each core renders its voices.

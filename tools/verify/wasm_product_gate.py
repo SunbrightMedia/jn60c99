@@ -7,7 +7,9 @@ The app (gui/web/index.html) boots the engine as the plugin does
 plugin's patch browser does (juno_gui_load_patch, then the host tempo), plays
 notes, and moves panel parameters through the host entry (juno_gui_host_set;
 the arp row's switch / mode / range are ARPEGGIO SW / TYPE / STEP host edits,
-plus juno_gui_arp_config for the host-side tempo and gate). Those native paths
+plus juno_gui_arp_config for the host-side tempo and gate); the skin's MIDI input
+(juno_gui_host_param: CC, aftertouch and bend as the DAW maps them) and its CC
+assign menu (juno_gui_cc_learn / _forget, the UI-timer drain, the state). Those native paths
 are graded against the plugin by state_load_gate.py (A22) and
 host_edit_gate.py (A20); this gate grades the DELIVERED artifact against them:
 the same op list runs through libjuno.so (this process, ctypes) and through
@@ -31,7 +33,8 @@ voice-count sync).
 
 TOOTH (--tooth): a WASM built from a mutated bridge (the patch load reversed),
 the app flow without juno_gui_plugin_init, the load as the recall model
-(juno_gui_apply_bank), a WASM with another meter floor, and a native bridge whose
+(juno_gui_apply_bank), a WASM with another meter floor, a WASM whose MIDI CC
+value is one off, and a native bridge whose
 warm-up renders nothing (the reach guard) must each FAIL; the control must PASS."""
 import ctypes, glob, json, os, shutil, subprocess, sys
 
@@ -123,6 +126,20 @@ def chains(H):
     ops += release(57) + [['render', 24000],
             ['host', sw, 0], ['arp', 0, 2, 3, 120.0, 0.6], ['render', 24000]]
     out.append({'name': 'arp_48000', 'ops': ops})
+    # the skin's MIDI input (DAW mapping: CC n -> base + n, aftertouch + 128, bend + 129) and its CC
+    # assign menu (CLAIMS A38): learns that take a CC at the drain, the CC moving its parameter, the
+    # mod wheel, the pedal, bend, aftertouch, a forget, CC 123, a panel edit; the state after
+    ops = boot(48000) + [['load', 21], ['tempo', 120]] + chord(48, 2400) + [['render', 2400]]
+    for pid, cc in ((6291518, 20), (6291514, 21), (6291460, 22), (6291524, 1)):
+        ops += [['learn', pid], ['hcc', cc, 64], ['render', 960], ['uitick'], ['render', 960], ['state']]
+        for v in (0, 127, 33):
+            ops += [['hcc', cc, v], ['render', 960], ['uitick'], ['render', 960]]
+    ops += [['hcc', 64, 127], ['hat', 90], ['hbend', 12000], ['render', 4800], ['uitick']] + release(48)
+    ops += [['render', 4800], ['hcc', 64, 0], ['hbend', 8192], ['render', 4800], ['uitick'], ['state']]
+    ops += [['forget', 6291518], ['hcc', 20, 0], ['render', 960], ['uitick'], ['render', 960]]
+    ops += [['model', 6291514, 40], ['commit']] + chord(55, 2400) + [['render', 2400], ['hcc', 123, 0],
+                                                                     ['render', 4800], ['uitick'], ['state']]
+    out.append({'name': 'midi_cc_48000', 'ops': ops})
     # the app's 50 ms UI timer after every render: the LED's and both meters' ticks (CLAIMS A37)
     for ch in out:
         ops = []
@@ -191,6 +208,25 @@ def run_native(lib, bank, chain):
             lib.juno_gui_host_set(c, op[1], op[2])
         elif k == 'arp':
             lib.juno_gui_arp_config(c, op[1], op[2], op[3], ctypes.c_float(op[4]), ctypes.c_float(op[5]))
+        elif k in ('hcc', 'hat', 'hbend'):          # the skin's MIDI input (engine.js midiIn)
+            base = lib.juno_gui_midi_base()
+            lib.juno_gui_host_param(c, base + op[1] if k == 'hcc' else base + (128 if k == 'hat' else 129), 0,
+                                    op[2] / 127 if k == 'hcc' else op[1] / 127 if k == 'hat' else op[1] / 16383)
+        elif k == 'learn':
+            lib.juno_gui_cc_learn(c, op[1])
+        elif k == 'forget':
+            lib.juno_gui_cc_forget(c, op[1])
+        elif k == 'uitick':
+            lib.juno_gui_ui_tick(c)
+        elif k == 'model':
+            lib.juno_gui_model_set(c, op[1], op[2])
+        elif k == 'commit':
+            lib.juno_gui_commit(c)
+        elif k == 'state':
+            buf = ctypes.create_string_buffer(4 + 8 * 256)
+            n = lib.juno_gui_state_save(c, buf, len(buf))
+            hashes.append(fnv1a64(buf.raw[:max(n, 0)]))
+            continue
         elif k == 'render':
             buf = (ctypes.c_float * (2 * op[1]))()
             lib.juno_gui_render(c, buf, op[1])
@@ -222,8 +258,13 @@ def load_lib():
                  ('juno_gui_destroy', [V]), ('juno_gui_host_min', [ctypes.c_int]),
                  ('juno_gui_host_max', [ctypes.c_int]), ('juno_gui_lfo_led_frame', [V, ctypes.c_int]),
                  ('juno_gui_meter_tick', [V, ctypes.c_int, ctypes.c_int, ctypes.c_int, V, ctypes.c_int, V]),
-                 ('juno_gui_bar_draw', [V, V, ctypes.c_int, ctypes.c_int, V, ctypes.c_int])):
+                 ('juno_gui_bar_draw', [V, V, ctypes.c_int, ctypes.c_int, V, ctypes.c_int]),
+                 ('juno_gui_host_param', [V, ctypes.c_uint32, ctypes.c_int, ctypes.c_double]),
+                 ('juno_gui_cc_learn', [V, ctypes.c_uint32]), ('juno_gui_cc_forget', [V, ctypes.c_uint32]),
+                 ('juno_gui_ui_tick', [V]), ('juno_gui_model_set', [V, ctypes.c_uint32, ctypes.c_int32]),
+                 ('juno_gui_commit', [V]), ('juno_gui_state_save', [V, V, ctypes.c_int])):
         getattr(lib, f).argtypes = a
+    lib.juno_gui_midi_base.restype = ctypes.c_uint32
     lib.juno_gui_host_name.restype = ctypes.c_char_p
     lib.juno_gui_host_name.argtypes = [ctypes.c_int]
     return lib
@@ -320,6 +361,12 @@ def tooth():
                       '    if (!(peak >= 0.002f)) d = 0.002;\n#endif')
     print('--- tooth wasm_meter_floor')
     res.append(('wasm_meter_floor', 'a WASM whose meter floor is 0.002 (the LED and meter ticks are graded)',
+                run_wasm(script, web) == 1, 'BITES'))
+    web = mutant_wasm('cc_value', 'gui/juno_bridge.c',
+                      '            if (d < 128u) { m[0] = 0xB0; m[1] = (unsigned char)d; m[2] = b; }',
+                      '            if (d < 128u) { m[0] = 0xB0; m[1] = (unsigned char)d; m[2] = (unsigned char)(b ^ 1); }')
+    print('--- tooth wasm_cc_value')
+    res.append(('wasm_cc_value', 'a WASM whose MIDI CC value is one off (the skin\'s MIDI input and CC menu are graded)',
                 run_wasm(script, web) == 1, 'BITES'))
     for t, what in (('no_init', 'the app without juno_gui_plugin_init (the engine after BUILD)'),
                     ('apply_bank', 'the load as the recall model (juno_gui_apply_bank)')):

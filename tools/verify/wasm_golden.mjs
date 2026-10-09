@@ -118,7 +118,16 @@ function runScript(sc) {
     led: Module.cwrap('juno_gui_lfo_led_frame', N, [N, N]),
     meter: Module.cwrap('juno_gui_meter_tick', N, [N, N, N, N, N, N, N]),
     bar: Module.cwrap('juno_gui_bar_draw', N, [N, N, N, N, N, N]),
+    hparam: Module.cwrap('juno_gui_host_param', null, [N, N, N, N]),
+    base: Module.cwrap('juno_gui_midi_base', N, []),
+    learn: Module.cwrap('juno_gui_cc_learn', N, [N, N]),
+    forget: Module.cwrap('juno_gui_cc_forget', N, [N, N]),
+    uitick: Module.cwrap('juno_gui_ui_tick', null, [N]),
+    model: Module.cwrap('juno_gui_model_set', N, [N, N, N]),
+    commit: Module.cwrap('juno_gui_commit', null, [N]),
+    state: Module.cwrap('juno_gui_state_save', N, [N, N, N]),
   };
+  const sbuf = Module._malloc(4 + 8 * 256);
   // the app's LED and meters (wasm_product_gate.py meter_tick: the same rects, decay, fade)
   const RECT = [[1572, 52, 1800, 62], [1572, 69, 1800, 79]], BLITS = 64;
   const mbuf = Module._malloc(4 * (8 + 7 * BLITS));
@@ -162,6 +171,22 @@ function runScript(sc) {
         case 'moff': F.moff(c, op[1]); break;
         case 'host': F.host(c, op[1], op[2]); break;
         case 'arp': F.arp(c, op[1], op[2], op[3], op[4], op[5]); break;
+        case 'hcc': F.hparam(c, (F.base() >>> 0) + op[1], 0, op[2] / 127); break;
+        case 'hat': F.hparam(c, (F.base() >>> 0) + 128, 0, op[1] / 127); break;
+        case 'hbend': F.hparam(c, (F.base() >>> 0) + 129, 0, op[1] / 16383); break;
+        case 'learn': F.learn(c, op[1] >>> 0); break;
+        case 'forget': F.forget(c, op[1] >>> 0); break;
+        case 'uitick': F.uitick(c); break;
+        case 'model': F.model(c, op[1] >>> 0, op[2]); break;
+        case 'commit': F.commit(c); break;
+        case 'state': {
+          const n = F.state(c, sbuf, 4 + 8 * 256);
+          const h = fnvHex(new Uint8Array(Module.HEAPU8.buffer, sbuf, Math.max(n, 0)));
+          if (h !== ch.hashes[k] && first < 0) first = k;
+          k++;
+          nt++;
+          break;
+        }
         case 'render': {
           const out = Module._malloc(8 * op[1]);
           F.render(c, out, op[1]);
@@ -175,7 +200,7 @@ function runScript(sc) {
       }
     }
     if (first < 0 && k === ch.hashes.length)
-      console.log(`OK:   ${ch.name.padEnd(12)} ${k - nt} renders and ${nt} LED / meter ticks bit-exact vs native`);
+      console.log(`OK:   ${ch.name.padEnd(12)} ${k - nt} renders and ${nt} LED / meter ticks and states bit-exact vs native`);
     else {
       console.log(`FAIL: ${ch.name.padEnd(12)} render or tick ${first} of ${k} differs from native`);
       bad++;

@@ -668,6 +668,12 @@ class Skin {
   }
   down(ev) {
     const [x, y] = this.point(ev);
+    if (ev.button === 1) return;                 // the middle button: the plugin's window passes none
+    if (ev.button === 2 && !ev.shiftKey && !ev.ctrlKey && !ev.altKey && this.M.get("vm.vs.panelPatch") !== 1) {
+      const t = this.ccTarget(x, y);
+      if (t) { this.ccMenu(ev, t); return; }
+    }
+    // any other press -- a right one too: the panel's controls do not test the button (rva 0x2AAAF0)
     if (this.M.get("vm.vs.panelPatch") === 1 && this.patchDown(x, y, ev)) return;
     const c = this.hit(x, y);
     if (!c) return;
@@ -931,13 +937,65 @@ class Skin {
     m.style.top = ev.clientY + "px";
     document.body.appendChild(m);
     this.menuEl = m;
-    setTimeout(() => document.addEventListener("pointerdown", this.menuOff = e => { if (!m.contains(e.target)) this.closeMenu(); }), 0);
+    // a press outside closes the menu -- registered after the press that opened it, and only while
+    // this menu is the open one (a late timer once closed the next menu on its own item's press)
+    setTimeout(() => {
+      if (this.menuEl !== m) return;
+      document.addEventListener("pointerdown", this.menuOff = e => { if (this.menuEl === m && !m.contains(e.target)) this.closeMenu(); });
+    }, 0);
+    document.addEventListener("keydown", this.menuKey = e => { if (this.menuEl === m && e.key === "Escape") this.closeMenu(); });
     return m;
   }
   closeMenu() {
     if (this.menuEl) this.menuEl.remove();
     if (this.menuOff) document.removeEventListener("pointerdown", this.menuOff);
-    this.menuEl = null;
+    if (this.menuKey) document.removeEventListener("keydown", this.menuKey);
+    this.menuEl = this.menuOff = this.menuKey = null;
+  }
+
+  // ------------------------------------------------------- the CC assign control
+  // The main panel's last control (Script.xml ccAssign, rva 0x31D420): a panel offers a
+  // mouse message to its controls from the last, then to its open panels from the last
+  // (rva 0x2AAAF0), so a right-button press or double click with no Shift, Ctrl or Alt
+  // (the message's flags exactly 4, rva 0x411DB0) reaches it first. It looks for the
+  // control under the press the same way (rva 0x31D270): a control that holds the point,
+  // is not a label or a display and has exactly one value (rva 0x31D7F0), whose parameter
+  // has a CC map record (rva 0x319B10). Found: the menu, and the press goes no further.
+  ccTarget(x, y, node = this.tree) {
+    if (node.kind !== "panel" || !this.open(node)) return null;
+    const it = node.items;
+    for (let i = it.length - 1; i >= 0; i--) {
+      const c = it[i];
+      if (c.kind !== "control") continue;
+      const b = this.bounds(c);
+      if (!b || x < b[0] || x >= b[0] + b[2] || y < b[1] || y >= b[1] + b[3]) continue;
+      if (c.type === "label" || c.type === "display" || c.refs.length !== 1) continue;
+      const L = this.M.leaf(c.ref);
+      if (L && this.E.ccEntry(L.id) >= 0) return { c, id: L.id };
+    }
+    for (let i = it.length - 1; i >= 0; i--) {
+      if (it[i].kind !== "panel") continue;
+      const t = this.ccTarget(x, y, it[i]);
+      if (t) return t;
+    }
+    return null;
+  }
+  // its menu: "Learn MIDI CC" (the learn waits for the first CC below 120 the UI timer
+  // drains, rva 0x31AA40); "Forget MIDI CC #n" while a CC drives the parameter (rva
+  // 0x3192E0), greyed and without a number when none does or a learn waits (rva 0x319B70)
+  ccMenu(ev, t) {
+    const m = this.menu(ev);
+    const cc = this.E.ccOf(t.id);
+    const item = (label, on, fn) => {
+      const b = document.createElement("div");
+      b.className = "mi" + (on ? "" : " off");
+      b.textContent = label;
+      if (on) b.onclick = () => { fn(); this.closeMenu(); this.dirty = true; };
+      m.appendChild(b);
+    };
+    item("Learn MIDI CC", true, () => this.E.ccLearn(t.id));
+    item(cc >= 0 ? `Forget MIDI CC #${cc}` : "Forget MIDI CC", cc >= 0, () => this.E.ccForget(t.id));
+    return m;
   }
 
   // ------------------------------------------------- the patch manager window
@@ -1017,8 +1075,8 @@ class Skin {
     this.port = port;
     port.onmidimessage = e => {
       const [st, d1, d2] = e.data, cmd = st & 0xf0;
-      if (cmd === 0x90 && d2 > 0) { this.E.start(); this.E.noteOn(d1, d2); }
-      else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) this.E.noteOff(d1);
+      if (cmd === 0x90 && d2 > 0) this.E.start();
+      if (cmd >= 0x80 && cmd <= 0xe0 && cmd !== 0xa0 && cmd !== 0xc0) this.E.midiIn(st, d1, d2 | 0);
       this.dirty = true;
     };
     this.status("MIDI in: " + port.name);
@@ -1077,6 +1135,7 @@ export async function boot(canvas, status) {
   }
   E.setTempo(40 + skin.M.get("fm.SYNTH.COM.TEMPO") / 10);
   canvas.addEventListener("pointerdown", e => skin.down(e));
+  canvas.addEventListener("contextmenu", e => e.preventDefault());   // the right button is the panel's
   canvas.addEventListener("pointermove", e => skin.move(e));
   canvas.addEventListener("pointerup", e => skin.up(e));
   canvas.addEventListener("pointercancel", e => skin.up(e));

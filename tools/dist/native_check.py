@@ -19,12 +19,16 @@ engine call. This checker:
            129, value (lsb | msb << 7) / 16383)
   ticks    requires every LED / meter / bar tick of the program's UI timer (CLAIMS A37)
            equal to the build's for the same calls at the same points
+  state    requires the program's state at the end (getState's bytes: the 95 values and
+           the CC map, after the script's CC assign menu learn, CC 20 and forget) equal
+           to the build's
   speed    reports the render's real-time factor (the program's own clock)
 
 usage: python3 tools/dist/native_check.py [--exe PATH] [--tooth NAME]
   --tooth replay   the replay drops the first panel edit (VCF CUTOFF): must FAIL
   --tooth glue     the expected velocity is v / 128: must FAIL
   --tooth tick     the replay misses one LED read of the UI timer (CLAIMS A37): must FAIL
+  --tooth cc       the replay loses the CC assign menu's learn: must FAIL
 Wine: $WINE (default /usr/lib/wine/wine64) with $WINEPREFIX.
 """
 import ctypes
@@ -90,6 +94,9 @@ def load_lib():
                     ('juno_gui_lfo_led_frame', [V, ctypes.c_int], ctypes.c_int),
                     ('juno_gui_meter_tick', [V, ctypes.c_int, ctypes.c_int, ctypes.c_int, V, ctypes.c_int, V], ctypes.c_int),
                     ('juno_gui_bar_draw', [V, V, ctypes.c_int, ctypes.c_int, V, ctypes.c_int], ctypes.c_int),
+                    ('juno_gui_cc_learn', [V, ctypes.c_uint32], ctypes.c_int),
+                    ('juno_gui_cc_forget', [V, ctypes.c_uint32], ctypes.c_int),
+                    ('juno_gui_state_save', [V, V, ctypes.c_int], ctypes.c_int),
                     ('juno_gui_free', [V], None)]:
         fn = getattr(lib, n, None)
         if fn is None:
@@ -124,7 +131,8 @@ def replay(lib, log, tooth):
     out, errs, pending, blk, dropped = [], [], [], 0, False
     banks = {}
     rect, fill = (ctypes.c_int * 4)(), (ctypes.c_int * 4)()
-    skipped_led = False
+    skipped_led = dropped_cc = False
+    states = 0
     blits = (ctypes.c_int * (7 * 64))()
     lines = [ln.split() for ln in log.splitlines() if ln and not ln.startswith('#')]
     i = 0
@@ -167,6 +175,19 @@ def replay(lib, log, tooth):
             lib.juno_gui_commit(c)
         elif t[0] == 'keybed':
             lib.juno_gui_keybed_write(c, int(t[1]), int(t[2]))
+        elif t[0] == 'cc_learn':                          # the CC assign menu's items
+            if tooth == 'cc' and not dropped_cc:
+                dropped_cc = True                         # TOOTH: the learn is lost
+                continue
+            lib.juno_gui_cc_learn(c, int(t[1]))
+        elif t[0] == 'cc_forget':
+            lib.juno_gui_cc_forget(c, int(t[1]))
+        elif t[0] == 'state':                             # the program's state at the end
+            buf = ctypes.create_string_buffer(4 + 8 * 256)
+            n = lib.juno_gui_state_save(c, buf, len(buf))
+            states += 1
+            if n < 0 or buf.raw[:n].hex() != t[1]:
+                errs.append('state: the build %s, the program %s' % (buf.raw[:max(n, 0)].hex()[:64], t[1][:64]))
         elif t[0] == 'midi':
             pending.append(int(t[1], 16))
         elif t[0] == 'process':
@@ -198,6 +219,8 @@ def replay(lib, log, tooth):
             blk += 1
         else:
             raise SystemExit('log line %d: unknown call %r' % (i, t))
+    if states != 1:
+        errs.append('the program logged %d end states (1 expected)' % states)
     if c and hasattr(lib, 'juno_gui_free'):
         lib.juno_gui_free(c)
     return np.concatenate(out), errs

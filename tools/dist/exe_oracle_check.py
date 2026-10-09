@@ -76,10 +76,12 @@ def oracle(args):
     lines = [ln.split() for ln in log.splitlines() if ln and not ln.startswith('#')]
     h = None
     q = None
-    index, banks = {}, {}
+    index, kidx, banks = {}, {}, {}
     PL, PR = [], []
-    skipped, toothed, ktoothed = [], False, False
+    skipped, toothed, ktoothed, ctoothed = [], False, False, False
     meters = [0, 0, None]                                    # ticks, differing ticks, the first difference
+    cc = [0, 0, None, 0]                                     # learns, forgets, the end state equal (None: none
+    boot = None                                              # logged), CC map entries moved from the boot's
     rect = fill = None
     i = 0
     while i < len(lines):
@@ -93,10 +95,13 @@ def oracle(args):
             q = lambda a: struct.unpack('<Q', uc.mem_read(a, 8))[0]
             model = q(q(h.core + 8))
             note_value = h.vcall(q(model + 128), 6)          # ms.ch[vm.ks.ch].note (the ring's slot 6)
+            boot = ccmap(h.get_state())                      # the plugin's own CC map at its boot
             kbuf = h.alloc_com(16)
             vb, ve = q(h.core + 24), q(h.core + 32)
             for k in range((ve - vb) // 24):
-                index[h.call(H.IB + 0x319C50, rcx=h.core + 24, rdx=k) & 0xFFFFFFFF] = q(vb + 24 * k)
+                pid = h.call(H.IB + 0x319C50, rcx=h.core + 24, rdx=k) & 0xFFFFFFFF
+                index[pid] = q(vb + 24 * k)
+                kidx[pid] = k                                # the CC map's record index of the parameter
         elif t[0] == 'plugin_init':
             pass                                             # HostProcess.start is the plugin's boot
         elif t[0] == 'queue_patch':
@@ -118,13 +123,28 @@ def oracle(args):
                 h.call(H.IB + rva, rcx=model, count=500_000_000)
         elif t[0] == 'keybed':
             key, val = int(t[1]), int(t[2])
-            if tooth and not ktoothed and val > 0:
+            if tooth == 'note' and not ktoothed and val > 0:
                 key = min(127, key + 1)                      # TOOTH: the first press a semitone up
                 ktoothed = True
             uc.mem_write(kbuf, struct.pack('<ii', key, val))
             h.call(H.IB + 0x2838C0, rcx=model, rdx=note_value, r8=kbuf, count=500_000_000)
             for rva in (0x285320, 0x2853C0, 0x283120):
                 h.call(H.IB + rva, rcx=model, count=500_000_000)
+        elif t[0] == 'cc_learn':                             # the CC assign menu's items (rva 0x31D420 ->
+            if tooth == 'cc' and not ctoothed:               # 0x31AA40 / 0x3192E0 on core+24, the record)
+                ctoothed = True                              # TOOTH: the plugin side loses the first learn
+                continue
+            h.call(H.IB + 0x31AA40, rcx=h.core + 24, rdx=kidx.get(int(t[1]), 0xFFFFFFFF))
+            cc[0] += 1
+        elif t[0] == 'cc_forget':
+            if int(t[1]) in kidx:
+                h.call(H.IB + 0x3192E0, rcx=h.core + 24, rdx=kidx[int(t[1])])
+            cc[1] += 1
+        elif t[0] == 'state':                                # the program's state at the end: the plugin's
+            st = h.get_state()                               # own getState after the same calls
+            cc[2] = st.hex() == t[1]
+            end = ccmap(st)
+            cc[3] = sum(1 for k in end if end[k] != boot.get(k))
         elif t[0] == 'midi':
             pass                                             # the program's own input log
         elif t[0] in ('led', 'meter', 'bar'):                # the UI timer's LED and meter ticks (CLAIMS A37)
@@ -150,7 +170,7 @@ def oracle(args):
             for k in range(nev):
                 e = lines[i + k]
                 vel, pitch = f32(e[5]), int(e[4])
-                if tooth and not toothed and int(e[2]) == 0 and vel > 0:
+                if tooth == 'note' and not toothed and int(e[2]) == 0 and vel > 0:
                     pitch = min(127, pitch + 1)              # TOOTH: the first MIDI note a semitone up
                     toothed = True
                 evs.append(('on' if int(e[2]) == 0 else 'off', int(e[1]), int(e[3]), pitch, vel))
@@ -166,7 +186,13 @@ def oracle(args):
             raise SystemExit('log: unknown call %r' % (t,))
     del h
     gc.collect()                                             # Unicorn's native memory (playbook 161)
-    return PL, PR, sorted(set(skipped)), meters
+    return PL, PR, sorted(set(skipped)), meters, cc
+
+
+def ccmap(state):
+    """getState's 128 CC map entries 0x10000000 + n (big-endian (id, value) pairs after the count)"""
+    n = struct.unpack('>I', state[:4])[0] // 8
+    return {i: v for i, v in (struct.unpack('>Ii', state[4 + 8 * k: 12 + 8 * k]) for k in range(n)) if i >= 0x10000000}
 
 
 def run_exe(exe, work, seed, fp_oracle):
@@ -196,7 +222,10 @@ def main():
     exe = sys.argv[sys.argv.index('--exe') + 1]
     seeds = [int(x) for x in (sys.argv[sys.argv.index('--seeds') + 1] if '--seeds' in sys.argv else '1,2,3').split(',')]
     jobs = int(sys.argv[sys.argv.index('--jobs') + 1]) if '--jobs' in sys.argv else 3
-    tooth = '--tooth' in sys.argv
+    tooth = None
+    if '--tooth' in sys.argv:                                # --tooth [note|cc]: note when none is named
+        k = sys.argv.index('--tooth') + 1
+        tooth = sys.argv[k] if k < len(sys.argv) and not sys.argv[k].startswith('--') else 'note'
     import truth
     truth.verify()
     work = tempfile.mkdtemp(prefix='exe_oracle_')
@@ -208,7 +237,8 @@ def main():
     with mp.get_context('spawn').Pool(jobs) as pool:
         refs = pool.map(oracle, [(runs[s][0][1], tooth) for s in seeds], chunksize=1)
     fails = 0
-    for s, (PL, PR, skipped, meters) in zip(seeds, refs):
+    ccsum = [0, 0, 0]                                        # learns, forgets, CC map records moved at the end
+    for s, (PL, PR, skipped, meters, cc) in zip(seeds, refs):
         (ex, log), (prod, _) = runs[s]
         ref = np.empty(2 * len(PL), np.uint32)
         ref[0::2] = PL
@@ -230,17 +260,27 @@ def main():
         leds = [int(ln.split()[2]) for ln in log.splitlines() if ln.startswith('led ')]
         lit = sum(1 for ln in log.splitlines() if ln.startswith('meter ') and int(ln.split()[9]) > 0)
         mreach = len(set(leds)) >= 2 and lit > 0              # REACH: the LED moves, a bar lights
-        ok = same and spec_same and exb.size > 0 and float(np.max(np.abs(ex))) > 0.01 and not meters[1] and mreach
+        moved = cc[3]
+        ccsum[0] += cc[0]
+        ccsum[1] += cc[1]
+        ccsum[2] += moved
+        ok = (same and spec_same and exb.size > 0 and float(np.max(np.abs(ex))) > 0.01 and not meters[1] and mreach
+              and cc[2] is True)
         fails += not ok
         print('%s seed %d: %s patch %d, %d host notes, %d keybed writes (%d presses), %d KEY HOLD sets, %d patch '
               'changes, %d drains, %d samples: %s; spectra %s (max %.3g dB); production FP mode %s; LED and meter '
-              'ticks %s (%d, LED frames %d, bar lit %d)%s' % (
+              'ticks %s (%d, LED frames %d, bar lit %d); CC menu %d learns, %d forgets, %d CC map records moved, '
+              'end state %s%s' % (
             'ok  ' if ok else 'FAIL', s, name[2], int(name[1]) + 1, nkeys, len(kbw), npress, nhold, nload, ndrain, ex.size // 2,
             'BIT-EXACT' if same else 'DIFFER from sample %d' % (first // 2), 'IDENTICAL' if spec_same else 'DIFFER',
             dbmax, 'equal' if prod_same else 'differs (denormals: FTZ)',
             'EQUAL' if not meters[1] else '%d DIFFER, first %s' % (meters[1], meters[2]), meters[0], len(set(leds)), lit,
+            cc[0], cc[1], moved, {True: 'EQUAL', False: 'DIFFERS', None: 'NOT LOGGED'}[cc[2]],
             ('; model ids not in the plugin\'s record list: %s' % skipped) if skipped else ''))
     shutil.rmtree(work)
+    if not tooth and not (ccsum[0] and ccsum[1] and ccsum[2]):
+        fails += 1                            # REACH: a learn, a forget and a moved CC map in the run
+        print('FAIL reach: the CC menu made %d learns, %d forgets, %d moved records over the seeds' % tuple(ccsum))
     if tooth:                                 # the tooth must bite on every seed
         print('exe_oracle_check --tooth: %s (%d of %d seeds FAIL)' % (
             'BITES' if fails == len(seeds) else 'DID NOT BITE', fails, len(seeds)))

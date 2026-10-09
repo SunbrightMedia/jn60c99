@@ -3020,3 +3020,53 @@ red on "E.peaks is not a function". Restored, documented as the checks' witness 
 ### The rule
 Before removing or renaming a method of an interface, search the whole repository -- the gates
 and checks are its users too. An interface a check drives is part of the check's contract.
+
+## 169. THE PLUGIN'S OWN OBJECTS ARE A BETTER ORACLE THAN A COPY OF THEM -- SCAN THE BOOTED IMAGE BEFORE BUILDING FAKES
+Paid 2026-10-09 (JUNO, the CC assign menu, CLAIMS A38). The plan was to rebuild the GUI tree in
+the emulator from the program's own dump -- fake panels, fake controls with the real class
+vtables -- and run the plugin's search on it: that grades the search logic on the PROGRAM'S
+geometry, which nobody had graded. A scan of the booted plugin's heap for one class's vtable
+pointer found the plugin's whole GUI tree: its module init builds every panel and control from
+Script.xml. The emulator's GDI+ served blank images of guessed sizes; served the sheets' real sizes
+(the PNG headers), the plugin's own rectangles became the reference, and the gate graded the
+program's tree -- geometry, filters, CC map records -- instead of trusting it (two differences
+found and stated: a plug-in-only label, the patch name's click area).
+### The rule
+Before faking an object graph for an oracle, scan the booted image for the real one (a class's
+vtable pointer in the heap). Feed it the real inputs it reads (a file's size from its own header).
+Grade the port's copy against it.
+
+## 170. THE CALLS YOU REPLAY CAN REWRITE THE STATE YOU SET IN THE ORACLE -- RE-ASSERT IT BEFORE EVERY PROBE
+Paid 2026-10-09 (tools/verify/cc_menu_gate.py). The gate wrote the program's panel open flags into
+the plugin's template tree once per configuration. 245 probes then failed, all after the first
+audio block and drain: a CC mapped to a parameter reached the model at the drain, and the viewless
+template closed every panel. Measured in isolation (a CC through process(), then the drain: every
+open byte 0); a drain without a parameter change left them. Fixed: the open bytes are written right
+before each press.
+### The rule
+State a harness sets inside the oracle is not the oracle's own: its code may rewrite it at any
+call. Write it immediately before each probe, and read the first failing probe's context (the calls
+just before it) for the call that changed it.
+
+## 171. A FAILURE THAT MOVES BETWEEN RUNS OF ONE SEED IS A RACE -- A DEFERRED REGISTRATION MUST CHECK ITS OWNER IS STILL CURRENT
+Paid 2026-10-09 (gui/skin menus, found by skin_kb_check.mjs). A popup menu registered its "a press
+outside closes me" listener in setTimeout(0). Under load the timer fired after the NEXT menu
+opened: the dead menu's listener then closed the live menu on the press on its own item, and the
+item's action was lost. The same seed failed at a different call in each run -- the mark of a
+race, not of a rule difference. Fixed: the deferred registration returns if its menu is no longer
+the open one, and the listener re-checks at run time.
+### The rule
+A deferred callback that attaches behaviour to an object first checks that the object is still
+current; the behaviour checks it again when it fires. When a seeded check fails at a different
+place on each run, look for timing (timers, async callbacks), not for the rule.
+
+## 172. A RULE THE INPUT SPACE NEVER EXERCISES IS UNOBSERVABLE -- COMPUTE THAT IN THE GATE WHEN A TOOTH CANNOT BITE
+Paid 2026-10-09 (cc_menu_gate.py). Teeth 1 and 8 reversed the search's order (a panel's controls
+first to last; the child panels before the controls). Neither bit: on the JUNO's panel no two live
+controls the search can stop at overlap, in any of the 12 panel configurations -- computed from the
+tree. The order is READ only; the gate prints the computation each run, so a layout that makes the
+order observable is seen at once.
+### The rule
+When a tooth does not bite, prove why: compute that the property is unobservable on the input
+space, put that computation in the gate's output, and label the property READ in the claim. Never
+drop the tooth silently, never count it as biting.

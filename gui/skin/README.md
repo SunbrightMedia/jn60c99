@@ -86,11 +86,24 @@ the plugin's own functions by `tools/verify/led_meter_gate.py` (in `make verify`
 results against the native build's after every render of the app's flows by
 `tools/verify/wasm_product_gate.py` (in `make webapp`, with a tooth: a WASM with another meter floor).
 
+The CC assign menu (CLAIMS A38, docs/CC_MENU.md): a right-button press with no Shift, Ctrl or Alt
+on a parameter's control opens "Learn MIDI CC" / "Forget MIDI CC #n" -- the plugin's search
+(`ccTarget`: a panel's controls from the last, then its open panels; not a label or a display,
+one value, a CC map record) and its menu (`ccMenu`: Forget greyed without a CC or while a learn
+waits); any other right press acts as a left one. The page's MIDI input now gives the engine CCs,
+pitch bend and channel aftertouch as a DAW gives them to the plugin (`engine.js midiIn` ->
+`juno_gui_host_param`), so the mod wheel, the pedal, mapped and learned CCs work in the web app.
+`tools/verify/skin_kb_check.mjs` holds the skin's menu equal to JUNO-60.exe's (whose menu is graded
+against the plugin's own handler on the plugin's own panel tree by `tools/verify/cc_menu_gate.py`):
+the same searches, real right presses with modifier keys, the items clicked or Escape, CCs, drains
+and states; teeth `ccedge`, `ccmods`. Found by it: an old menu's outside-press listener, registered
+by a late timer, closed the next menu on its own item's press -- each listener now acts only for
+its own menu.
+
 ## Not ported (drawn idle or left out)
 
 | Item | Why |
 |---|---|
-| MIDI CC assign (`ccAssign`) | the engine has MIDI learn (`juno_gui_cc_learn`); the menu that arms it is not drawn yet |
 | The patch window's WRITE / RENAME / NEW / DELETE | writing a record into a bank is not in the port's API yet |
 | SEND / GET, SEND ALL / GET ALL, PLUG-OUT | the SYSTEM-8 link: not needed (the user's decision) |
 | Activation and login panels | licensing; not part of the synth |

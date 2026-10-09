@@ -240,13 +240,18 @@ completeness:
 # artwork and the user's banks, LOCAL ONLY. Needs mingw-w64; the checks need Wine
 # (WINEPREFIX) or Windows. exe_oracle_check plays 8 seeded performances through the
 # program's own inputs into THE PLUGIN ITSELF (Unicorn), then its tooth: every seed
-# must FAIL.
+# must FAIL. cc_menu_gate runs the plugin's own right-button handler on the plugin's own
+# panel tree against the program's CC assign menu (CLAIMS A38); its teeth are builds
+# with -DCC_TOOTH=N (1 and 8 cannot bite: the search order is not observable here).
 native: libjuno.so
 	python3 tools/dist/make_native.py
 	python3 tools/dist/native_check.py
-	for t in replay glue tick; do if python3 tools/dist/native_check.py --tooth $$t; then echo "native_check tooth $$t DID NOT BITE"; exit 1; fi; done
+	for t in replay glue tick cc; do if python3 tools/dist/native_check.py --tooth $$t; then echo "native_check tooth $$t DID NOT BITE"; exit 1; fi; done
 	python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 1,2,3,4,5,6,7,8
 	python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 1,2,3,4,5 --tooth
+	python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 1,2,4 --tooth cc
+	python3 tools/verify/cc_menu_gate.py
+	for t in 2 3 4 5 6 7; do python3 tools/verify/cc_menu_gate.py --quick --tooth $$t || exit 1; done
 
 webapp: libjuno.so
 	bash gui/web/build.sh
@@ -257,7 +262,7 @@ webapp: libjuno.so
 	env node tools/verify/verify_webapp.mjs
 	env node tools/verify/skin_check.mjs
 	env node tools/verify/skin_kb_check.mjs --exe scratchpad/dist/JUNO-60.exe
-	for t in velocity hold gap; do env node tools/verify/skin_kb_check.mjs --exe scratchpad/dist/JUNO-60.exe --seeds 1,2 --tooth $$t || exit 1; done
+	for t in velocity hold gap ccedge ccmods; do env node tools/verify/skin_kb_check.mjs --exe scratchpad/dist/JUNO-60.exe --seeds 1,2 --tooth $$t || exit 1; done
 
 # Shared library for the test GUI (gui/juno_gui.py via ctypes).
 gui: libjuno.so
