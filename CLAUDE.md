@@ -183,7 +183,17 @@ mine is a hypothesis (playbook 80).
   way: unrun and one-process early proofs, unrun teeth, a deleted cited script,
   juno_exp_ad3c[0] (never read), unreproducible dll/exe links, and the Pi image
   broken twice (log10 link, 2 MB kernel limit: 69/69 again, job pi_gate3).
-  The proof run of reproduce.sh is owed.
+  Part 2: the arp SCATTER grid 300/300 vs the plugin's own setters (its first
+  run graded nothing: reach check + tooth now), test_arp_pattern's goldens from
+  the plugin (the old ones were a lost model's; dead carp_set_scatter removed),
+  the fine-FX generator rebuilt on the pillar-3 reference (clamped range only),
+  engine B's and the firmware's headers in regen_check, and the device: the
+  recall firmware had not linked since 10-07 (fixed under EB_DEVCELLS);
+  tools/repro/esp32_check.sh = the retired device JUNO gate at its own commit
+  8cb8e141 + every image built with the pinned IDF 6.1 + the MINISYNTH
+  self-test in QEMU + reproducible images equal from two paths (playbooks
+  184-188). The proof run of reproduce.sh: job repro2 (commit 46a2b6a3) -- owed
+  until its EXIT.
   The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up

@@ -32,7 +32,10 @@ a required one is missing. Pinned: Python packages in `tools/repro/requirements.
 capstone 5.0.7, numpy 2.4.6, pefile 2024.8.26); Node packages in `package.json` + `package-lock.json`
 (playwright-core 1.56.1; `npm ci`; the Chromium at /opt/pw-browsers); emsdk 6.0.11; gcc 13.3;
 mingw-w64 13; wine 9.0; qemu-arm-static 8.2 + arm-linux-gnueabihf-gcc + arm-none-eabi-gcc (the ARM
-golden); aarch64-linux-gnu-gcc/g++ + qemu-system-aarch64 (the Pi track: optional in the doctor).
+golden); aarch64-linux-gnu-gcc/g++ + qemu-system-aarch64 (the Pi track), ESP-IDF v6.1 (the pin in
+esp32s3/dependencies.lock; CLAUDE.md BUILD & GIT) + Espressif's qemu-xtensa (`idf_tools.py install
+qemu-xtensa`) for the esp32 stage -- these optional in the doctor; a stage without its tools is
+reported SKIPPED, never passed.
 
 ## The stages and what each proves
 
@@ -42,7 +45,7 @@ golden); aarch64-linux-gnu-gcc/g++ + qemu-system-aarch64 (the Pi track: optional
 | doctor | `tools/repro/doctor.sh` | the tools are there |
 | test | `make test` | the unit battery (FMA canary, rate laws, goldens, voice / FX units) |
 | static | `make static` | the static gates; the ledger is well formed and 38/38 PROVEN; zero approximations; the CLAIMS CENSUS (below) with its two teeth; the tables from the plugin's read-only data and the host parameter rows against the plugin's data; the Pi's log10 against the C library's -- each with a tooth |
-| verify | `make verify` | every gate against the plugin (Unicorn), every reference rebuilt in the fresh clone; the teeth of every gate that has them, beside their gates; the early proofs (A1, A3-A6) |
+| verify | `make verify` | every gate against the plugin (Unicorn), every reference rebuilt in the fresh clone; the teeth of every gate that has them, beside their gates; the early proofs (A1, A3-A6); the arp scatter grid (300 schedules, reach check, two teeth) and the arp unit test's goldens against the plugin's own arp |
 | native | `make native` | JUNO-60.exe built and checked against the plugin itself (8 seeded performances, the patch window's 9 references, the CC menu), with teeth |
 | webapp | `make webapp` | the WASM == native, the bundled app, the skin's checks (keyboard, CC menu, patch window) against JUNO-60.exe and the plugin, with teeth |
 | engineb | `make engineb` | the engine B foundation (tools/engineb/foundation.sh) |
@@ -105,6 +108,9 @@ the targets) -- both must fail, and `make static` checks that they do.
   underruns, the bench nights -- are the device's own logs, not repeatable in a container. The
   committed images (esp32s3/flash/) are records of those runs, built with the IDF of their day and
   with time stamps, so they are not rebuilt byte for byte; a build with CONFIG_APP_REPRODUCIBLE_BUILD
-  is (two builds, the same bytes).
+  is (two builds from two paths, the same bytes; playbook 188).
+- The parked tracks (DAW parity steps 2-5, the Track B sonic-identity fork) hold no result beyond
+  their harnesses (CLAUDE.md LIVE STATE); the next synths (jx3p/, jp8/, tb303/) are not this port
+  and keep their own status pages.
 - `tools/verify/gate_parity.py` (the JUNO vs JX-3P gate-class ledger) is RED for the JX's owed gates;
   it is about the next synth, not this port, and no target runs it.
