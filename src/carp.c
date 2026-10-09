@@ -335,8 +335,10 @@ static int velocity_calc(carp *e, int in_vel, int per_note_vel)
 
 /* ===================================================================== *
  *  SCATTER pattern grid  (static .rdata block -> playable runtime grid)
- *  Ports the loader/expander/prune-sort/gate-fill chain; see
- *  scratchpad/oracle/arp_pattern_grid_spec.md (verified 330/330 vs plugin).
+ *  Ports the loader/expander/prune-sort/gate-fill chain. Graded against the
+ *  plugin's own arp through its controller setters: every SCATTER TYPE x DEPTH
+ *  (tools/verify/arp_sched_ab.py --port-grid, 300 schedules) and five cases
+ *  through the product path (tests/test_arp_pattern.c, plugin goldens).
  * ===================================================================== */
 
 /* Gate-length fill for ONE slot's step cells — transcribes sub_7FF91E01FED0.
@@ -448,22 +450,6 @@ static void pattern_expand(carp *e, int slab, int sub)
     }
     e->pat_nslots = 0;
     for (s = 0; s < 16; ++s) { if (e->slot_note[s] >= 0x80) break; ++e->pat_nslots; }
-}
-
-/* An immediate pattern load (carp_init, tests): the expand, the gate fill and a
- * clean slot table. The plugin's own loads go through the apply's request and
- * the reload at the next step (carp_ctl_config). */
-void carp_set_scatter(carp *e, int type, int depth)
-{
-    int slab = type  < 0 ? 0 : (type  > 9 ? 9 : type);
-    int d    = depth < -7 ? -7 : (depth > 7 ? 7 : depth);
-    int s, k;
-    pattern_expand(e, slab, d + 7);                /* SCATTER DEPTH+7 -> sub */
-    for (s = 0; s < 16; ++s) { e->slot_noteidx[s] = 0; e->slot_offtick[s] = -1; }
-    for (k = 0; k < 128; ++k) e->note_slot[k] = -1;
-    e->pat_step  = -1;
-    e->vel_sens  = (uint8_t)e->pat_sens;
-    rebuild_gates(e);
 }
 
 /* ===================================================================== *

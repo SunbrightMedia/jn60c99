@@ -52,6 +52,9 @@ if(S3_RECALL)
         ${CMAKE_CURRENT_LIST_DIR}/../../src/finefx_recall.c
         ${CMAKE_CURRENT_LIST_DIR}/../../src/effect_modes.c
         ${CMAKE_CURRENT_LIST_DIR}/../../src/hpf_type_lut.c
+        # the engine's stored tempo (EB_DEVCELLS: only that; the recall ramps compile out) --
+        # juno_apply.c and delay_recall.c read it since 2026-10-07 (task #62)
+        ${CMAKE_CURRENT_LIST_DIR}/../../src/recall_ramp.c
         ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/dev/ebdev.c
         ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/dev/eb_recall.c
         ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/dev/eb_devseq.c)
@@ -321,4 +324,15 @@ endif()
 
 if(S3_TONE)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE S3L_TONE=1)
+endif()
+
+# REPEATABLE IMAGES (task #62, tools/repro/esp32_check.sh). The engine sources live outside this
+# project (../../engine_b, ../../src, ../../tools), so their absolute paths reached the image -- in
+# the debug info, which the app's embedded ELF hash covers -- and one commit checked out at two
+# places built two images. A reproducible build maps the repository root too; a normal build is
+# unchanged.
+if(CONFIG_APP_REPRODUCIBLE_BUILD)
+    get_filename_component(JUNO_REPO "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+    target_compile_options(${COMPONENT_LIB} PRIVATE "-fdebug-prefix-map=${JUNO_REPO}=/JUNO"
+                                                   "-fmacro-prefix-map=${JUNO_REPO}=/JUNO")
 endif()

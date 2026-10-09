@@ -574,5 +574,16 @@ void juno_rr_setsr_resume(unsigned char *st)
 }
 
 #else   /* EB_DEVCELLS: the device recall stays settled */
-typedef int juno_rr_compiled_out;
+/* The engine's tempo x 10 still reaches the device's recall (the LFO rate cell
+ * 1072 and the synced delay times read it, src/juno_apply.c, delay_recall.c):
+ * one stored value -- one engine on a device -- the build's 1280 until a tempo
+ * entry (juno_apply_lfo_tempo) stores another. Without it the device recall
+ * did not link after 2026-10-07 (task #62: tools/repro/esp32_check.sh). */
+static int juno_rr_dev_tempo = 1280;
+int juno_rr_tempo(unsigned char *st) { (void)st; return juno_rr_dev_tempo; }
+void juno_rr_set_tempo(unsigned char *st, int t10) { (void)st; juno_rr_dev_tempo = t10; }
+/* Nothing is armed on the device: -1, the host's answer for a cell with no
+ * ramp. Its callers (host_edit.c, juno_midi.c) are host modules, not in the
+ * firmware's source list; the device answer key's build links them. */
+int juno_rr_arm(unsigned char *st, uint32_t cell, float v, int t) { (void)st; (void)cell; (void)v; (void)t; return -1; }
 #endif

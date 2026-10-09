@@ -8,6 +8,11 @@
 # identical to tools/engineb/chain_gate.sh (the host gate + answer key).
 #
 # Usage:  sh tools/engineb/build_chain4.sh [pos ...]      (default: 1 2 3 4)
+#
+# OUT OF TREE (task #62, tools/repro/esp32_check.sh): CHAIN4_BUILD=<dir> builds in <dir>/pos<N> with
+# the config generated from sdkconfig.defaults in <dir> (what `rm -rf build sdkconfig` gave the
+# staged images) and stages into CHAIN4_OUT (default <dir>/out), never VERSION.txt: no committed
+# file is touched. The default mode below is unchanged.
 set -e
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO/esp32s3"
@@ -61,20 +66,30 @@ for POS in "$@"; do
     *) echo "position must be 1..4"; exit 1 ;;
     esac
     echo "=== CHAIN4 position $POS ==="
-    rm -rf build sdkconfig
-    idf.py -DS3_LISTEN=1 -DS3_RECALL=1 -DS3_VOICES=6 -DS3_EXACT_ONLY=1 \
+    if [ -n "${CHAIN4_BUILD:-}" ]; then
+        BD="$CHAIN4_BUILD/pos$POS"
+        rm -rf "$BD" "$BD.sdkconfig"
+        set -- -B "$BD" -DSDKCONFIG="$BD.sdkconfig"
+        OUT="${CHAIN4_OUT:-$CHAIN4_BUILD/out}/pos$POS"
+    else
+        BD=build
+        rm -rf build sdkconfig
+        set --
+        OUT="$REPO/esp32s3/flash/chain4/pos$POS"
+    fi
+    idf.py "$@" -DS3_LISTEN=1 -DS3_RECALL=1 -DS3_VOICES=6 -DS3_EXACT_ONLY=1 \
            -DS3_EXTRA_DEFS="$COMMON;$LEVERS;$PER;-DS3_CHAIN_POS=$POS" \
            build
-    OUT="$REPO/esp32s3/flash/chain4/pos$POS"
     mkdir -p "$OUT"
-    cp build/bootloader/bootloader.bin      "$OUT/bootloader.bin"
-    cp build/partition_table/partition-table.bin "$OUT/partitiontable.bin"
-    cp build/juno_s3.bin                    "$OUT/juno_s3.bin"
+    cp "$BD"/bootloader/bootloader.bin      "$OUT/bootloader.bin"
+    cp "$BD"/partition_table/partition-table.bin "$OUT/partitiontable.bin"
+    cp "$BD"/juno_s3.bin                    "$OUT/juno_s3.bin"
     ( cd "$OUT" && sha256sum *.bin > SHA256SUMS )
     echo "staged -> $OUT"
 done
 # THE UNATTENDED BENCH watches this file (tools/bench/bench.py): a new
 # value = the PC flashes and tests by itself. Written ONLY after every
 # requested position staged, so a partial build never triggers a flash.
+[ -n "${CHAIN4_BUILD:-}" ] && exit 0
 date -u +%Y%m%d%H%M%S > "$REPO/esp32s3/flash/chain4/VERSION.txt"
 echo "VERSION -> $(cat "$REPO/esp32s3/flash/chain4/VERSION.txt")"

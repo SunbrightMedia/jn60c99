@@ -939,14 +939,17 @@ int juno_bank_arp_raw(const unsigned char *bank, int idx, int *sw, int *type, in
 
 /* Decode SCATTER TYPE (NAME1 leaf 92, record byte 322 -> arp pattern slab 0..9) and
  * SCATTER DEPTH (leaf 93, record byte 330, SIGNED int8 -5..5 -> pattern sub = depth+7).
- * These select the arpeggiator's STEP x SLOT pattern grid (carp_set_scatter /
+ * These select the arpeggiator's STEP x SLOT pattern grid (carp_ctl_scatter_type / _depth /
  * src/carp_patterns.h). The leaf -> param-DB id 834/835 -> record-byte binding is
  * nominally proven: the schema NAME1 value-leaf order (…ARP SW/TYPE/STEP, SCATTER
  * TYPE, SCATTER DEPTH…), the consecutive param-DB dispatch cases 831..835
  * (sub_7FF91E027AE0), and the rigid 8-byte NAME stride (record = 8*leaf-414) anchored
  * to 8 verified leaves all agree. All 64 factory patches decode to (0,0) = the default
- * slab0/sub7 grid. Writes *type (0..9) and *depth (-7..7, setter-clamped); either
- * pointer may be NULL. Returns 1 on success. See scratchpad/oracle/scatter_recall_spec.md. */
+ * slab0/sub7 grid. Writes *type (0..9) and *depth (-7..7); either pointer may be NULL.
+ * Returns 1 on success. The clamp is this decode's (INFERRED: no product path sends
+ * SCATTER, A24); the plugin's setters (rva 0x3C4F10 / 0x3C4EE0, READ; carp_ctl_scatter_*)
+ * IGNORE a value out of range. In range, graded against the plugin's own setters and arp:
+ * tools/verify/arp_sched_ab.py --port-grid (every type x depth, 300 schedules). */
 int juno_bank_scatter(const unsigned char *bank, int idx, int *type, int *depth)
 {
     const unsigned char *blob;

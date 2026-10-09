@@ -166,14 +166,6 @@ void carp_set_rate_index(carp *e, int idx);   /* 0..9 fine rate (opt-in)      */
 void carp_set_gate_index(carp *e, int idx);   /* 0..9 gate %                  */
 void carp_set_velocity(carp *e, int fixed, int sens); /* fixed 0..127, sens 0..100 */
 
-/* Select the SCATTER pattern grid. type = SCATTER TYPE (0..9 -> slab), depth =
- * SCATTER DEPTH (-5..5 -> sub = depth+7). Rebuilds the runtime slot/grid tables
- * (expand -> prune -> shell-sort -> gate-fill) and sets velocity sensitivity from
- * the pattern header. Defaults (0,0) -> slab0/sub7 = the proven power-on pattern,
- * which reproduces the single-note-per-step path bit-for-bit. Called by carp_init;
- * call again to change patterns. See scratchpad/oracle/arp_pattern_grid_spec.md. */
-void carp_set_scatter(carp *e, int type, int depth);
-
 /* The controller's config (rva 0x3C4F40): TYPE and STEP clamped to 2, then the
  * apply (rva 0x3C0EC0) for a new TYPE, for the STEP, and -- the first time ever
  * -- with the rate mode 2 and the beat re-latch armed. Each apply requests a

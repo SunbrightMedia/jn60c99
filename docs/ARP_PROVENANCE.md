@@ -205,6 +205,17 @@ the sorted list (shift the tail down) and clear `+3192[note]`.
 > value-tree leaf 92/93 = record byte 322/330 (param-DB dispatch cases 834/835).
 > See `scratchpad/oracle/arp_pattern_grid_spec.md` and `scatter_recall_spec.md`.
 > The historical notes below are kept for provenance.
+>
+> **2026-10-09 (task #62): those specs and the 330/330 scripts were lost with an old container; the
+> claim is RE-PROVEN by a gate that runs in `make verify`.** `tools/verify/arp_sched_ab.py
+> --ref-grid / --port-grid`: every SCATTER TYPE (0..9) x DEPTH (-7..7, all 15 patterns of a slab)
+> x one key and a C major chord, the plugin's own controller setters (rva 0x3C4F10 / 0x3C4EE0, the
+> host parameter entry's cases 834 / 835) and arp ticks against the port's recall path:
+> **300/300 schedules equal**, every event and tick, with a reach check and two teeth. The old
+> unit-test goldens were the lost model's, and the plugin does not play 4 of its 5 cases (its arp is
+> reached only through the controller): tests/test_arp_pattern.c now plays the product path against
+> the plugin's own events (tests/arp_pattern_golden.h, generated from the plugin), and the direct
+> entry `carp_set_scatter` is gone (METHOD_PLAYBOOK 184, 185).
 
 1. **Parameter binding → loader args `a2/a3/a4`.** `sub_7FF91E023010` takes
    `(type, a3, a4)` where `a3` picks the 8250-byte slab and `a4` the 550-byte

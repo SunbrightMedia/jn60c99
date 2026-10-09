@@ -1,5 +1,11 @@
 # The S3 LISTEN firmware — how to hear engine B on your board
 
+> **2026-10-09 (task #62): the first recipe below (no recall) no longer builds** -- its embedded
+> blob (main/s3_listen.bin) predates eb_render_state's growth, so the layout check refuses it, and
+> the report code uses names only the recall build defines. Every image shipped since September is
+> a recall build: the last one is tools/engineb/build_chain4.sh's, and tools/repro/esp32_check.sh
+> builds it (out of tree) with the pinned ESP-IDF. Kept for history.
+
     cd esp32s3
     idf.py -DS3_LISTEN=1 -DS3_VOICES=2 build flash monitor
 

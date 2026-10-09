@@ -28,7 +28,8 @@ row REQ "qemu-arm-static" "$(command -v qemu-arm-static >/dev/null && v qemu-arm
 row REQ "arm-linux-gnueabihf-gcc" "$(command -v arm-linux-gnueabihf-gcc >/dev/null && v arm-linux-gnueabihf-gcc --version)" "apt-get install gcc-arm-linux-gnueabihf" "make verify (the ARM golden)"
 row REQ "arm-none-eabi-gcc" "$(command -v arm-none-eabi-gcc >/dev/null && v arm-none-eabi-gcc --version)" "apt-get install gcc-arm-none-eabi" "make verify (the bare-metal M7 compile)"
 row OPT "python: scipy" "$(python3 -c 'import scipy; print(scipy.__version__)' 2>/dev/null)" "pip install scipy" "tools/engineb/gen_c6_halfband.py (a generator)"
-row OPT "ESP-IDF (idf.py)" "$( [ -f /home/user/esp-idf/export.sh ] && echo /home/user/esp-idf )" "CLAUDE.md BUILD & GIT: clone v6.1 + install.sh esp32s3" "esp32s3/ firmware"
+row OPT "ESP-IDF (idf.py)" "$( [ -f "${IDF_PATH:-/home/user/esp-idf}/export.sh" ] && (cd "${IDF_PATH:-/home/user/esp-idf}" && git describe --tags 2>/dev/null || echo present) )" "CLAUDE.md BUILD & GIT: clone v6.1 + install.sh esp32s3" "the esp32 stage (tools/repro/esp32_check.sh)"
+row OPT "qemu-system-xtensa" "$(ls /root/.espressif/tools/qemu-xtensa/*/qemu/bin/qemu-system-xtensa 2>/dev/null | head -1)" "python3 \$IDF_PATH/tools/idf_tools.py install qemu-xtensa" "the esp32 stage (the MINISYNTH self-test)"
 row OPT "qemu-system-aarch64" "$(command -v qemu-system-aarch64 >/dev/null && v qemu-system-aarch64 --version)" "apt-get install qemu-system-arm" "the Pi track (pi/)"
 row OPT "aarch64-linux-gnu-gcc" "$(command -v aarch64-linux-gnu-gcc >/dev/null && v aarch64-linux-gnu-gcc --version)" "apt-get install gcc-aarch64-linux-gnu" "the Pi track (pi/)"
 if [ $miss = 0 ]; then echo "doctor: every required tool present"; else echo "doctor: MISSING required tools (above)"; fi

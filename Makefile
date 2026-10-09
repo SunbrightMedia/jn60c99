@@ -69,6 +69,9 @@ static: libjuno.so
 	if python3 tools/repro/rdata_check.py > $(SCRATCH)/static_rdata_check.log 2>&1; then echo "  ok   rdata_check"; \
 	else echo "  RED  rdata_check: a table differs from the plugin's image (log: $(SCRATCH)/static_rdata_check.log)"; FAIL=1; fi; \
 	python3 tools/repro/rdata_check.py --tooth > /dev/null 2>&1 || { echo "  RED  rdata_check tooth DID NOT BITE"; FAIL=1; }; \
+	if python3 tools/repro/hostparams_check.py > $(SCRATCH)/static_hostparams_check.log 2>&1; then echo "  ok   hostparams_check"; \
+	else echo "  RED  hostparams_check: a host parameter row differs from the plugin's data (log: $(SCRATCH)/static_hostparams_check.log)"; FAIL=1; fi; \
+	python3 tools/repro/hostparams_check.py --tooth > /dev/null 2>&1 || { echo "  RED  hostparams_check tooth DID NOT BITE"; FAIL=1; }; \
 	if cc -O2 -std=c99 -ffp-contract=off -o $(SCRATCH)/pi_log10_check tools/repro/pi_log10_check.c -lm && $(SCRATCH)/pi_log10_check > $(SCRATCH)/static_pi_log10.log 2>&1; \
 	then echo "  ok   pi_log10_check"; else echo "  RED  pi_log10_check (log: $(SCRATCH)/static_pi_log10.log)"; FAIL=1; fi; \
 	{ cc -O2 -std=c99 -ffp-contract=off -DTOOTH -o $(SCRATCH)/pi_log10_tooth tools/repro/pi_log10_check.c -lm && $(SCRATCH)/pi_log10_tooth > /dev/null 2>&1; } || { echo "  RED  pi_log10_check tooth DID NOT BITE"; FAIL=1; }; \
@@ -97,6 +100,16 @@ verify: test libjuno.so
 	echo "=== LIVE GATE 4/7: arp SCHEDULE (plugin's own arp vs carp.c, 7 arp patches) ==="; \
 	fresh $(SCRATCH)/arp_sched_ref.pkl || python3 tools/verify/arp_sched_ab.py --ref || FAIL=1; \
 	python3 tools/verify/arp_sched_ab.py --port || FAIL=1; \
+	echo "=== ARP SCATTER GRID (task #62): the plugin's own arp vs carp.c, SCATTER TYPE 0..9 x DEPTH -7..7 x 2 held sets, 300 schedules ==="; \
+	fresh $(SCRATCH)/arp_grid_ref.pkl || python3 tools/verify/arp_sched_ab.py --ref-grid || FAIL=1; \
+	python3 tools/verify/arp_sched_ab.py --port-grid || FAIL=1; \
+	python3 tools/verify/arp_sched_ab.py --port-grid --tooth > /dev/null || { echo "arp grid tooth DID NOT BITE"; FAIL=1; }; \
+	python3 tools/verify/arp_sched_ab.py --port-grid --reach-tooth > /dev/null || { echo "arp grid reach tooth DID NOT BITE"; FAIL=1; }; \
+	echo "=== ARP GOLDENS (task #62): tests/test_arp_pattern.c's five cases, the plugin's own arp == tests/arp_pattern_golden.h == the port's product path ==="; \
+	fresh $(SCRATCH)/arp_golden_ref.pkl || python3 tools/verify/arp_sched_ab.py --ref-goldens || FAIL=1; \
+	python3 tools/verify/arp_sched_ab.py --check-goldens || FAIL=1; \
+	python3 tools/verify/arp_sched_ab.py --check-goldens --tooth > /dev/null || { echo "arp goldens tooth DID NOT BITE"; FAIL=1; }; \
+	python3 tools/verify/arp_sched_ab.py --port-goldens || FAIL=1; \
 	echo "=== LIVE GATE 5/7: arp RENDER (schedule replay into plugin, 7 arp patches) ==="; \
 	python3 tools/verify/arp_render_ab.py --port || FAIL=1; \
 	python3 tools/verify/arp_render_ab.py --ref || FAIL=1; \
@@ -486,5 +499,5 @@ tests/test_bend_mod_sens: tests/test_bend_mod_sens.c $(SRC) $(HDR)
 tests/test_condition_scatter: tests/test_condition_scatter.c $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)
 
-tests/test_arp_pattern: tests/test_arp_pattern.c $(SRC) $(HDR)
+tests/test_arp_pattern: tests/test_arp_pattern.c tests/arp_pattern_golden.h gui/juno_bridge.c $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)

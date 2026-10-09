@@ -32,10 +32,17 @@ ENTRIES = [
         'probes/host/ramp_records_units.py', 'probes/host/host_census_v2.py', 'probes/host/host_census_v3.py',
         'probes/host/host_census_flags.py', 'probes/host/host_census_h.py', 'probes/host/host_census_mt.py',
         'probes/host/host_census_dtype.py', 'tools/verify/gen_host_ramps.py']),
+    # the committed order: delay, reverb, chorus; the reverb tables from the pillar-3 gate's own reference
+    # (its four table rates, into a file of their own so the gate's 18-rate reference is never replaced)
     ('finefx_tables', ['src/finefx_tables.h'], [
-        'tools/verify/finefx_delay_rates.py', 'tools/verify/chorus_finefx_derive.py', 'tools/verify/reverb_finefx_derive.py',
-        'tools/verify/gen_finefx_c.py', 'tools/verify/gen_chorus_finefx_c.py', 'tools/verify/gen_reverb_finefx_c.py']),
+        'tools/verify/finefx_delay_rates.py', 'tools/verify/chorus_finefx_derive.py',
+        'JUNO_FINEFX_REF_PKL=scratchpad/finefx_reverb_ref.pkl tools/verify/finefx_cellsweep.py 44100 48000 88200 96000',
+        'tools/verify/gen_finefx_c.py',
+        'JUNO_FINEFX_REF_PKL=scratchpad/finefx_reverb_ref.pkl tools/verify/gen_reverb_finefx_c.py',
+        'tools/verify/gen_chorus_finefx_c.py']),
     ('teensy_golden', ['tests/teensy_golden.h', 'tools/verify/teensy_golden.json'], ['tools/verify/gen_teensy_golden.py']),
+    ('arp_golden', ['tests/arp_pattern_golden.h'], [
+        'tools/verify/arp_sched_ab.py --ref-goldens', 'tools/verify/arp_sched_ab.py --emit-goldens']),
     ('note_table', [], ['tools/verify/notevel_exhaust.py --ref', 'tools/verify/notevel_exhaust.py --check-table']),
     ('rdata_tables', [], ['tools/repro/rdata_check.py']),
 ]
@@ -45,16 +52,21 @@ def run(cmd, log):
     out = None
     if ' > ' in cmd:
         cmd, out = cmd.split(' > ')
-    argv = [PY] + cmd.split()
+    words = cmd.split()
+    env = dict(os.environ)
+    while words and '=' in words[0] and not words[0].endswith('.py'):   # VAR=value before the script
+        k, v = words.pop(0).split('=', 1)
+        env[k] = v
+    argv = [PY] + words
     t0 = time.time()
     with open(log, 'a') as lg:
         lg.write('$ %s%s\n' % (' '.join(argv), (' > ' + out) if out else ''))
         lg.flush()
         if out:
             with open(os.path.join(REPO, out), 'w') as f:
-                r = subprocess.run(argv, cwd=REPO, stdout=f, stderr=lg)
+                r = subprocess.run(argv, cwd=REPO, stdout=f, stderr=lg, env=env)
         else:
-            r = subprocess.run(argv, cwd=REPO, stdout=lg, stderr=subprocess.STDOUT)
+            r = subprocess.run(argv, cwd=REPO, stdout=lg, stderr=subprocess.STDOUT, env=env)
     return r.returncode, time.time() - t0
 
 
@@ -70,6 +82,9 @@ def main():
         raise SystemExit('regen_check: the generated files have uncommitted changes here -- run it in a fresh clone:\n' + dirty)
     os.makedirs(os.path.join(REPO, 'scratchpad', 'b6'), exist_ok=True)
     log = os.path.join(REPO, 'scratchpad', 'regen_check.log')
+    # the port library first: some generators load it (teensy_golden), and a fresh clone has none
+    if subprocess.run(['make', '-s', 'libjuno.so'], cwd=REPO).returncode:
+        raise SystemExit('regen_check: make libjuno.so failed')
     bad = 0
     for name, files, cmds in ENTRIES:
         if only and name not in only:

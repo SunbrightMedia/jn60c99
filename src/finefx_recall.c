@@ -139,7 +139,8 @@ void juno_apply_delay_finefx_slot1rev(unsigned char *state, const unsigned char 
  * applies them via 0x3B9A30; the coefficient CELL materializes when the reverb
  * smoother settles. The law is the plugin's own smoother TARGET (== the render-
  * materialized coeff), captured by dispatch 0x3B9A30 + snap_all at all 4 rates
- * (tools/verify/reverb_finefx_derive.py). The master always runs the reverb tank,
+ * (tools/verify/finefx_cellsweep.py, the pillar-3 gate's reference, through
+ * gen_reverb_finefx_c.py; the tables hold the clamped range only). The master always runs the reverb tank,
  * so these apply unconditionally; all cells are master_render-READ. Record decode
  * per juno_hostparams.c: LOW/HIGH CUT/DENSITY int1x7 (raw 7-bit, roff 3948/3949/
  * 3950); DIRECT LEVEL int2x4 (nibble pair, roff 3951). REVERB PRE DELAY (1323) is

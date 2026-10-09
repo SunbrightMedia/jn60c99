@@ -15,6 +15,9 @@
 #   determinism  libjuno.so, juno.dll, the WASM and JUNO-60.exe built twice: equal; the committed
 #                juno.dll and WASM equal to the build
 #   pi           the Pi track's gate (pi/run_qemu.sh) when its toolchain is present (doctor: opt)
+#   esp32        tools/repro/esp32_check.sh when ESP-IDF is present (doctor: opt): the retired device
+#                JUNO gate at its own commit; the firmware builds with the pinned IDF and the MINISYNTH
+#                self-test in QEMU; reproducible images equal from two paths
 #   tree         no committed file changed by any stage above
 # Exit 0 only when every stage passed (a skipped optional stage is reported, not failed).
 #
@@ -60,6 +63,11 @@ if command -v qemu-system-aarch64 > /dev/null && command -v aarch64-linux-gnu-g+
   stage pi sh pi/run_qemu.sh raspi3ap
 else
   skip pi "no aarch64 cross g++ / qemu-system-aarch64 / Circle"
+fi
+if [ -f "${IDF_PATH:-/home/user/esp-idf}/export.sh" ]; then
+  stage esp32 bash tools/repro/esp32_check.sh
+else
+  skip esp32 "no ESP-IDF (CLAUDE.md BUILD & GIT: clone v6.1 + ./install.sh esp32s3)"
 fi
 stage tree sh -c "git status --porcelain --untracked-files=no | tee /dev/stderr | wc -l | grep -qx 0"
 echo

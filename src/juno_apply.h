@@ -46,9 +46,9 @@ int juno_bank_arp_raw(const unsigned char *bank, int idx, int *sw, int *type, in
 
 /* Decode the per-patch SCATTER TYPE (0..9 -> arp pattern slab) and SCATTER DEPTH
  * (-7..7 -> pattern sub = depth+7), which select the arpeggiator's STEP x SLOT
- * pattern grid (feed to carp_set_scatter). Proven leaf 92/93 -> record byte 322/330;
+ * pattern grid (feed to carp_ctl_scatter_type / _depth). Proven leaf 92/93 -> record byte 322/330;
  * all 64 factory patches decode to (0,0) = the default grid. *type / *depth may be
- * NULL. Returns 1 on success. See scratchpad/oracle/scatter_recall_spec.md. */
+ * NULL. Returns 1 on success. Graded: tools/verify/arp_sched_ab.py --port-grid. */
 int juno_bank_scatter(const unsigned char *bank, int idx, int *type, int *depth);
 
 /* LFO Tempo Rate (cell 1072): write the host-tempo-synced LFO rate to all 8 voices.

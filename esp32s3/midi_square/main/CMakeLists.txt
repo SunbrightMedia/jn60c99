@@ -39,3 +39,11 @@ endif()
 if(MSQ_KNOBTEST)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE MSQ_KNOBTEST)
 endif()
+# REPEATABLE IMAGES (task #62, tools/repro/esp32_check.sh): the engine_b sources live outside this
+# project, so their absolute paths reached the image (the debug info, under the app's embedded ELF
+# hash). A reproducible build maps the repository root too; a normal build is unchanged.
+if(CONFIG_APP_REPRODUCIBLE_BUILD)
+    get_filename_component(JUNO_REPO "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+    target_compile_options(${COMPONENT_LIB} PRIVATE "-fdebug-prefix-map=${JUNO_REPO}=/JUNO"
+                                                   "-fmacro-prefix-map=${JUNO_REPO}=/JUNO")
+endif()
