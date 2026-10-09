@@ -86,8 +86,19 @@ def main():
         shutil.rmtree(tmp, ignore_errors=True)
     print()
     for name, b in res.items():
-        print('%-17s %s (%d chains differ)' % (name, 'BITES' if b else 'DID NOT BITE', b))
-    return 0 if all(res.values()) else 1
+        print('%-17s %s (%d chains differ)%s' % (name, 'BITES' if b else 'DID NOT BITE', b,
+                                                 ('  -- inert: ' + INERT[name]) if name in INERT else ''))
+    # the inert mutants must NOT bite (CLAIMS A30, INFERRED): one that starts to bite means the chains
+    # now reach what it changes -- the claim's statement must then be revisited
+    ok = all(b for n, b in res.items() if n not in INERT) and not any(res.get(n) for n in INERT)
+    return 0 if ok else 1
+
+
+# CLAIMS A30: equivalent on the output, so these two cannot bite (INFERRED, stated in the claim)
+INERT = {
+    'predelay_clamp': 'the clamp differs only at rates with no render object (silent), re-applied on the switch back',
+    'reverb_once': 'the second pass re-arms the same targets',
+}
 
 
 if __name__ == '__main__':

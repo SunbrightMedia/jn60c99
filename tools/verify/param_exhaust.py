@@ -1,62 +1,108 @@
 #!/usr/bin/env python3
-"""param_exhaust.py — Phase-2 finite-domain EXHAUSTION: every exposed panel param
-x all 256 byte values, plugin's own dispatch vs the port's setter, per rate.
+"""param_exhaust.py -- CLAIMS A1: every exposed panel parameter x all 256 byte values, the plugin's own
+dispatch vs the port's setter, at 44100 / 48000 / 96000 -- in two processes (CLAUDE.md two-process
+rule: the plugin's side writes a reference, the port's side reads it; the first version ran both in
+one process).
 
-For each BINDINGS row (25 rows over 21 distinct blob positions): dispatch
-idx = blob_pos + 744 with raw byte 0..255 into every unit of a live plugin
-instance (Unicorn), snap, read the engine cell at the binding's offset from
-unit 0; compare bitwise against the port's juno_apply_param(state, i, byte, Hr).
-Domain: 256 bytes x 3 rates (44100/48000/96000) x 25 rows = 19200 comparisons.
-For finite domains, exhaustive testing IS proof (MASTER_PLAN Phase 2)."""
-import os as _os_jrepo; _JREPO = _os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.dirname(_os_jrepo.path.abspath(__file__))))  # repo root from this file; never hardcode it (tools/verify/pathcheck.py)
-import sys, struct, ctypes, json
-sys.path.insert(0, _JREPO + '/scratchpad/oracle')
-import e2e_emu as E
+For each BINDINGS row of src/juno_apply.c (blob position, engine cell; read as text, so the plugin's
+side loads no port code): dispatch index = blob position + 744 with the raw byte into every unit of a
+live plugin instance (Unicorn), snap the ramps, read the cell from unit 0; the port's
+juno_gui_set_param(row, byte) then juno_gui_peek(cell) must give the same bits. Both sides walk the
+same sequence (rows in order, bytes 0..255, the state carried along), one instance per rate.
+25 rows x 256 bytes x 3 rates = 19200 comparisons; for a finite domain the exhaustion is the proof.
 
-lib = ctypes.CDLL(_JREPO + "/libjuno.so")
-lib.juno_gui_param_count.restype = ctypes.c_int
-lib.juno_gui_param_name.restype = ctypes.c_char_p
-lib.juno_gui_param_name.argtypes = [ctypes.c_int]
-lib.juno_gui_param_offset.restype = ctypes.c_int
-lib.juno_gui_param_offset.argtypes = [ctypes.c_int]
-lib.juno_gui_create.restype = ctypes.c_void_p
-lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
-lib.juno_gui_set_param.restype = ctypes.c_float
-lib.juno_gui_set_param.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
-lib.juno_gui_peek.restype = ctypes.c_uint
-lib.juno_gui_peek.argtypes = [ctypes.c_void_p, ctypes.c_int]
-
-# blob position per binding row, parsed from src/juno_apply.c BINDINGS
+usage: param_exhaust.py --ref     the plugin's side -> scratchpad/param_exhaust_ref.pkl (Unicorn only)
+       param_exhaust.py           the port's side (libjuno only): exit 1 on any difference
+"""
+import os
+import pickle
 import re
-src = open(_JREPO + '/src/juno_apply.c').read()
-m = re.search(r'BINDINGS\[\]\s*=\s*\{(.*?)\n\};', src, re.S)
-rows = re.findall(r'\{\s*(\d+)\s*,\s*\d+\s*,\s*[A-Z_]+\s*,\s*(\d+)\s*,\s*"([^"]*)"', m.group(1))
-BIND = [(int(bp), int(off), nm) for (bp, off, nm) in rows]
-assert len(BIND) == lib.juno_gui_param_count(), (len(BIND), lib.juno_gui_param_count())
+import struct
+import sys
 
-def f(u): return struct.unpack('<f', struct.pack('<I', u & 0xffffffff))[0]
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(os.path.dirname(HERE))
+REF = os.path.join(REPO, 'scratchpad', 'param_exhaust_ref.pkl')
+RATES = (44100.0, 48000.0, 96000.0)
 
-total_ok = total_bad = 0
-for sr in (44100.0, 48000.0, 96000.0):
-    # one plugin instance per rate; canonical cold prep
-    e = E.E2E(); e.build(sr); e.snap_all(); e.clear_latch(); e.set_ftz()
-    # one port instance per rate
-    c = lib.juno_gui_create(ctypes.c_float(sr), 0)
-    print(f"--- rate {int(sr)} ---", flush=True)
-    for i, (bp, off, nm) in enumerate(BIND):
-        disp = bp + 744
-        bad = []
-        for byte in range(256):
-            for u in range(9):
-                try: e.dispatch(u, disp, byte)
-                except RuntimeError: pass
-            e.snap_all()
-            gv = e.rd_u32(e.state[0] + off)
-            lib.juno_gui_set_param(c, i, byte)
-            pv = lib.juno_gui_peek(c, off)
-            if gv != pv:
-                bad.append((byte, gv, pv))
-        total_ok += 256 - len(bad); total_bad += len(bad)
-        tag = "OK 256/256" if not bad else f"BAD {len(bad)}/256 first: byte {bad[0][0]} plug {bad[0][1]:08x}({f(bad[0][1]):.6g}) port {bad[0][2]:08x}({f(bad[0][2]):.6g})"
-        print(f"  [{i:2d}] blob{bp:3d} off{off:6d} {nm:18s} {tag}", flush=True)
-print(f"\nEXHAUSTION TOTAL: {total_ok} identical / {total_bad} mismatched of {total_ok+total_bad}", flush=True)
+
+def bindings():
+    """(blob position, engine cell, name) per row of the port's BINDINGS table, as text"""
+    src = open(os.path.join(REPO, 'src', 'juno_apply.c')).read()
+    m = re.search(r'BINDINGS\[\]\s*=\s*\{(.*?)\n\};', src, re.S)
+    rows = re.findall(r'\{\s*(\d+)\s*,\s*\d+\s*,\s*[A-Z_]+\s*,\s*(\d+)\s*,\s*"([^"]*)"', m.group(1))
+    return [(int(bp), int(off), nm) for (bp, off, nm) in rows]
+
+
+def build_ref():
+    sys.path.insert(0, HERE)
+    import e2e_emu as E
+    bind = bindings()
+    out = {}
+    for sr in RATES:
+        e = E.E2E()
+        e.build(sr)
+        e.snap_all()
+        e.clear_latch()
+        e.set_ftz()
+        for i, (bp, off, nm) in enumerate(bind):
+            for byte in range(256):
+                for u in range(9):
+                    try:
+                        e.dispatch(u, bp + 744, byte)
+                    except RuntimeError:
+                        pass
+                e.snap_all()
+                out[(sr, i, byte)] = e.rd_u32(e.state[0] + off)
+        print('  plugin: rate %d, %d rows' % (int(sr), len(bind)), flush=True)
+        del e
+    pickle.dump({'fmt': 1, 'bind': bind, 'cells': out}, open(REF + '.partial', 'wb'))
+    os.replace(REF + '.partial', REF)
+    print('wrote %s: %d values' % (os.path.relpath(REF, REPO), len(out)))
+    return 0
+
+
+def port_side():
+    import ctypes
+    if not os.path.exists(REF):
+        raise SystemExit('no reference: run param_exhaust.py --ref first')
+    ref = pickle.load(open(REF, 'rb'))
+    bind = bindings()
+    if bind != ref['bind']:
+        raise SystemExit('src/juno_apply.c BINDINGS changed since the reference: run --ref again')
+    lib = ctypes.CDLL(os.path.join(REPO, 'libjuno.so'))
+    lib.juno_gui_param_count.restype = ctypes.c_int
+    lib.juno_gui_create.restype = ctypes.c_void_p
+    lib.juno_gui_create.argtypes = [ctypes.c_float, ctypes.c_int]
+    lib.juno_gui_destroy.argtypes = [ctypes.c_void_p]
+    lib.juno_gui_set_param.restype = ctypes.c_float
+    lib.juno_gui_set_param.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
+    lib.juno_gui_peek.restype = ctypes.c_uint
+    lib.juno_gui_peek.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    if len(bind) != lib.juno_gui_param_count():
+        raise SystemExit('BINDINGS has %d rows, juno_gui_param_count %d' % (len(bind), lib.juno_gui_param_count()))
+    f = lambda u: struct.unpack('<f', struct.pack('<I', u & 0xffffffff))[0]
+    ok = bad = 0
+    for sr in RATES:
+        c = lib.juno_gui_create(ctypes.c_float(sr), 0)
+        print('--- rate %d ---' % int(sr))
+        for i, (bp, off, nm) in enumerate(bind):
+            miss = []
+            for byte in range(256):
+                lib.juno_gui_set_param(c, i, byte)
+                pv = lib.juno_gui_peek(c, off)
+                gv = ref['cells'][(sr, i, byte)]
+                if gv != pv:
+                    miss.append((byte, gv, pv))
+            ok += 256 - len(miss)
+            bad += len(miss)
+            tag = 'OK 256/256' if not miss else 'BAD %d/256 first: byte %d plugin %08x (%.6g) port %08x (%.6g)' % (
+                len(miss), miss[0][0], miss[0][1], f(miss[0][1]), miss[0][2], f(miss[0][2]))
+            print('  [%2d] blob%3d off%6d %-18s %s' % (i, bp, off, nm, tag))
+        lib.juno_gui_destroy(c)
+    print('EXHAUSTION TOTAL: %d identical / %d mismatched of %d' % (ok, bad, ok + bad))
+    return 1 if bad else 0
+
+
+if __name__ == '__main__':
+    sys.exit(build_ref() if '--ref' in sys.argv else port_side())

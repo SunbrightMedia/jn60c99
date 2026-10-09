@@ -1,5 +1,7 @@
 # Phase 3 — Coverage Certificate (Gate G3, port + plugin sides)
 
+> **2026-10-09 (task #62):** the script this document cites was retired -- it ran the plugin and the port in one process (the two-process rule) and could not fail. The claim is re-proven in `make verify` by tools/verify/script_ab.py (temposync, dco); see docs/REPRODUCE.md and docs/CLAIMS.md A5 / A6.
+
 Ground truth = the plugin binary under Unicorn (tools/verify/e2e_emu.py). This
 document is the second half of Gate G3 (the first is the clean corpus). It
 records port-side branch coverage, the plugin-side block trace, and a

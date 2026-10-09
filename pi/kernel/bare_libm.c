@@ -11,9 +11,11 @@
  * verify_engine.sh disassembles this object to confirm no self-call remains.
  * fmodf has no single instruction, so it is the classic exact bit-twiddling
  * remainder (public-domain musl algorithm): exact for all finite inputs, hence
- * bit-identical to glibc. tools/... proof: verify_engine.sh re-runs the 12-patch
- * hash under qemu-user with THIS math linked and shows it still matches the
- * glibc-linked reference. */
+ * bit-identical to glibc. The proof is the metal gate itself (pi/run_qemu.sh: every
+ * scenario's hash with THIS math linked equals the glibc-linked x86 reference;
+ * the verify_engine.sh this comment once named is gone). log10, which the GUI
+ * meter in the bridge calls, is not exact: it lives in bare_log10.c with its own
+ * check (tools/repro/pi_log10_check.c). */
 #include <stdint.h>
 
 float  fabsf (float x)          { return __builtin_fabsf (x); }

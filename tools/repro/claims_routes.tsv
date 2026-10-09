@@ -1,0 +1,27 @@
+# claims_routes.tsv -- for a docs/CLAIMS.md row whose own proof script is not what re-proves it today,
+# the scripts that do (each must be run by a make target), or why the row needs none. Read by
+# tools/repro/claims_census.py (task #62). Columns: row, kind, scripts (space-separated) | reason.
+# kind: route = these scripts re-prove the row now; history = a finding whose result the routed rows
+# carry (no proof of its own to re-run); diagnostic = a script the row cites as a diagnostic, not a proof.
+A9	route	tools/verify/warm_recall_gate.py tools/verify/warm_chain_gate.py tools/verify/warm_render_gate.py tools/verify/renderstruct_ab.py	the transplant study (docs/PHASE2_MATRIX_PROGRESS.md) was a one-time workflow; equal state + equal steps is graded by the warm gates
+A24	diagnostic	probes/host_render/diag_driver.py	a per-block state diagnostic; the chains are graded by host_process_gate.py
+A25	diagnostic	probes/host_render/diag_driver.py	as A24
+A30	diagnostic	probes/host_render/diag_driver.py	as A24
+C1	history	-	the coverage certificate (docs/PHASE3_COVERAGE_CERTIFICATE.md) was a one-time analysis; completeness_gate.py, completeness_scan.py and mutation reach carry the property now
+C3	route	tools/verify/assigner_ab.py	VOICE ASSIGN: note sequences through the plugin's own allocator vs the port's
+D1	route	tools/verify/arp_sched_ab.py tools/verify/host_process_gate.py	closed by execution: the plugin's own arp schedule (LIVE GATE 4/7, A24)
+E1	history	-	recall-path research (2026-07); its result is the recall the gates of E11-E13 grade
+E2	history	-	as E1
+E3	history	-	as E1
+E4	history	-	as E1
+E5	history	-	as E1
+E6	history	-	as E1
+E7	history	-	as E1
+E8	history	-	as E1
+E9	history	-	as E1
+E10	history	-	as E1
+E11	route	tools/verify/plugin_recall_set.py tools/verify/recall_gate.py	the plugin's own recall set, used by the recall gates
+E12	route	tools/verify/recall_gate.py tools/verify/recall_exhaustive_gate.py	LIVE GATE 1/7 and 2/7
+E13	route	tools/verify/recall_render_ab.py	LIVE GATE 3/7
+B8	route	tools/verify/state_load_gate.py tools/verify/host_edit_gate.py	closed: the host entry's range drop and its two exceptions, gated in A22 / A20 (B11)
+B9	route	tools/verify/host_edit_gate.py tools/verify/keyhold_gate.py	closed: OCTAVE SHIFT writes no engine cell (A20) and moves the panel keyboard's notes (A36)

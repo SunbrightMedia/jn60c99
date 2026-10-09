@@ -1,6 +1,7 @@
 /* juno_tables.h — exact .rdata lookup tables used by voice_render.
- * Generated verbatim from tables_dump/tables.txt (extract_tables.py output);
- * do not hand-edit. See docs/RUN_GUIDE_TABLES.md.
+ * Generated verbatim from tables_dump/tables.txt (extract_tables.py output, an
+ * IDA script; the dump is not in the repository); re-derived from the plugin's
+ * image by tools/repro/rdata_check.py (task #62). Do not hand-edit.
  */
 #ifndef JUNO_TABLES_H
 #define JUNO_TABLES_H
@@ -42,13 +43,16 @@ static const double juno_pitch_table[29][26] = {
 };
 
 /* Exponent tables. dword_18098ACC0[m] = 2^-(m+1) (m=0..31);
- * dword_18098AD3C[k] = 2^k (k=1..32, [0] is an unused 2^-32 leftover).
+ * dword_18098AD3C[k] = 2^k (k=1..32, [0] is an unused 2^-32 leftover: the
+ * last entry of the table before it; voice_render never reads it -- a zero
+ * exponent skips the multiply). Every value re-derived from the plugin's image
+ * by tools/repro/rdata_check.py (task #62); [0] held 2^-24 until 2026-10-09.
  * Used to scale by 2^v63 with a +-32 clamp. */
 static const float juno_exp_acc0[32] = {
     0.5f, 0.25f, 0.125f, 0.0625f, 0.03125f, 0.015625f, 0.0078125f, 0.00390625f, 0.001953125f, 0.0009765625f, 0.00048828125f, 0.000244140625f, 0.0001220703125f, 6.103515625e-05f, 3.0517578125e-05f, 1.52587890625e-05f, 7.62939453125e-06f, 3.814697265625e-06f, 1.9073486328125e-06f, 9.5367431640625e-07f, 4.76837158203125e-07f, 2.384185791015625e-07f, 1.1920928955078125e-07f, 5.960464477539063e-08f, 2.9802322387695312e-08f, 1.4901161193847656e-08f, 7.450580596923828e-09f, 3.725290298461914e-09f, 1.862645149230957e-09f, 9.313225746154785e-10f, 4.656612873077393e-10f, 2.3283064365386963e-10f
 };
 static const float juno_exp_ad3c[33] = {
-    5.9604645e-08f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f, 64.0f, 128.0f, 256.0f, 512.0f, 1024.0f, 2048.0f, 4096.0f, 8192.0f, 16384.0f, 32768.0f, 65536.0f, 131072.0f, 262144.0f, 524288.0f, 1048576.0f, 2097152.0f, 4194304.0f, 8388608.0f, 16777216.0f, 33554432.0f, 67108864.0f, 134217728.0f, 268435456.0f, 536870912.0f, 1073741824.0f, 2147483648.0f, 4294967296.0f
+    2.3283064365386963e-10f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f, 64.0f, 128.0f, 256.0f, 512.0f, 1024.0f, 2048.0f, 4096.0f, 8192.0f, 16384.0f, 32768.0f, 65536.0f, 131072.0f, 262144.0f, 524288.0f, 1048576.0f, 2097152.0f, 4194304.0f, 8388608.0f, 16777216.0f, 33554432.0f, 67108864.0f, 134217728.0f, 268435456.0f, 536870912.0f, 1073741824.0f, 2147483648.0f, 4294967296.0f
 };
 
 #endif /* JUNO_TABLES_H */

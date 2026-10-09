@@ -1,0 +1,8 @@
+{
+  "name": "juno60-c99-checks",
+  "private": true,
+  "description": "The Node packages of the JUNO-60 C99 web checks (tools/verify/*.mjs). npm ci here; docs/REPRODUCE.md",
+  "dependencies": {
+    "playwright-core": "1.56.1"
+  }
+}

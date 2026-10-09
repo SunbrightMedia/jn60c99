@@ -31,11 +31,16 @@ echo ">> configure Circle: Pi 3, AArch64, --qemu --multicore"
 # single-core on core 0; the workers simply stay parked, so its hashes are
 # unchanged (bit-exactness is a property of the engine archive, not Circle's
 # config). One configure serves the probe and the split gate.
-( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" --qemu --multicore -f )
+( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" --kernel-max-size 4 --qemu --multicore -f )
 make -C "$CIRCLE/lib" -j"$(nproc)" >/dev/null
 make -C "$CIRCLE/lib/sound" -j"$(nproc)" >/dev/null
 make -C "$HERE/kernel" clean >/dev/null 2>&1 || true
 make -C "$HERE/kernel" >/dev/null          # GATE image (bit-exact probe)
+# the image (text + data + bss) must fit Circle's KERNEL_MAX_SIZE (--kernel-max-size 4 above):
+# past it the memory layout overlaps and the board does not boot, silently (task #62)
+SZ=$(${PREFIX}size "$HERE/kernel/kernel8.elf" | awk 'NR==2 {print $4}')
+[ "$SZ" -lt $((4 * 1048576)) ] || { echo "kernel8.elf is $SZ bytes: over Circle's KERNEL_MAX_SIZE (4 MB)"; exit 1; }
+echo ">> kernel8.elf: $SZ bytes (text + data + bss), under the 4 MB KERNEL_MAX_SIZE"
 echo ">> boot on -M $MACH (rendering all scenarios under TCG; up to 240 s)"
 timeout 240 qemu-system-aarch64 -M "$MACH" -kernel "$HERE/kernel/kernel8.img" \
     -serial "file:$OUT" -serial null -display none < /dev/null > /dev/null 2>&1 || true

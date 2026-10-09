@@ -1,5 +1,7 @@
 # Phase 4 — Arp audio certification
 
+> **2026-10-09 (task #62):** the script this document cites was retired -- it ran the plugin and the port in one process (the two-process rule) and could not fail. The claim is re-proven in `make verify` by tools/verify/arp_sched_ab.py, arp_render_ab.py and host_process_gate.py (the plugin's own arp); see docs/REPRODUCE.md and docs/CLAIMS.md A7.
+
 Ground truth = the plugin binary under Unicorn. Question: is the port's
 arpeggiator AUDIO bit-identical to the plugin's? The corpus (Phase 3) tests arp
 PATCHES with the arp DISABLED, so arp PLAYBACK audio was not previously A/B'd.

@@ -23,7 +23,7 @@ HDR     := $(wildcard src/*.h) $(wildcard gui/*.h)
 OBJ     := $(SRC:.c=.o)
 $(OBJ): $(HDR)
 
-.PHONY: all test clean gui provenance verify static completeness engineb engineb-quick verify-jx3p webapp native
+.PHONY: all test clean gui provenance verify static completeness engineb engineb-quick verify-jx3p webapp native reproduce
 all: $(OBJ)
 
 # JX-3P port finish line: recall (C==oracle) + integration render (voice+master
@@ -62,7 +62,17 @@ static: libjuno.so
 	@mkdir -p $(SCRATCH); FAIL=0; for g in $(STATIC_GATES); do \
 	  if python3 tools/verify/$$g.py > $(SCRATCH)/static_$$g.log 2>&1; then echo "  ok   $$g"; \
 	  else echo "  RED  $$g  (log: $(SCRATCH)/static_$$g.log)"; FAIL=1; fi; \
-	done; exit $$FAIL
+	done; \
+	if python3 tools/repro/claims_census.py > $(SCRATCH)/static_claims_census.log 2>&1; then echo "  ok   claims_census"; \
+	else echo "  RED  claims_census: a CLAIMS row whose proof no make target re-runs (log: $(SCRATCH)/static_claims_census.log)"; FAIL=1; fi; \
+	for t in missing unrun; do if python3 tools/repro/claims_census.py --tooth $$t > /dev/null 2>&1; then echo "  RED  claims_census tooth $$t DID NOT BITE"; FAIL=1; fi; done; \
+	if python3 tools/repro/rdata_check.py > $(SCRATCH)/static_rdata_check.log 2>&1; then echo "  ok   rdata_check"; \
+	else echo "  RED  rdata_check: a table differs from the plugin's image (log: $(SCRATCH)/static_rdata_check.log)"; FAIL=1; fi; \
+	python3 tools/repro/rdata_check.py --tooth > /dev/null 2>&1 || { echo "  RED  rdata_check tooth DID NOT BITE"; FAIL=1; }; \
+	if cc -O2 -std=c99 -ffp-contract=off -o $(SCRATCH)/pi_log10_check tools/repro/pi_log10_check.c -lm && $(SCRATCH)/pi_log10_check > $(SCRATCH)/static_pi_log10.log 2>&1; \
+	then echo "  ok   pi_log10_check"; else echo "  RED  pi_log10_check (log: $(SCRATCH)/static_pi_log10.log)"; FAIL=1; fi; \
+	{ cc -O2 -std=c99 -ffp-contract=off -DTOOTH -o $(SCRATCH)/pi_log10_tooth tools/repro/pi_log10_check.c -lm && $(SCRATCH)/pi_log10_tooth > /dev/null 2>&1; } || { echo "  RED  pi_log10_check tooth DID NOT BITE"; FAIL=1; }; \
+	exit $$FAIL
 
 verify: test libjuno.so
 	@FAIL=0; \
@@ -94,18 +104,32 @@ verify: test libjuno.so
 	python3 tools/verify/host_process_gate.py --control || FAIL=1; \
 	fresh $(SCRATCH)/host_process_ref.pkl || python3 tools/verify/host_process_gate.py --ref || FAIL=1; \
 	python3 tools/verify/host_process_gate.py --port || FAIL=1; \
+	python3 probes/host_render/conv_teeth.py > $(SCRATCH)/conv_teeth.log 2>&1 || { echo "conv_teeth: a mutant DID NOT BITE (log: $(SCRATCH)/conv_teeth.log)"; FAIL=1; }; \
+	grep -E "BITES|DID NOT" $(SCRATCH)/conv_teeth.log; \
 	fresh $(SCRATCH)/midi_ctl_ref.pkl || python3 tools/verify/midi_ctl_gate.py --ref || FAIL=1; \
 	python3 tools/verify/midi_ctl_gate.py --port || FAIL=1; \
+	python3 probes/host_midi/midi_teeth.py > $(SCRATCH)/midi_teeth.log 2>&1 || { echo "midi_teeth: a mutant DID NOT BITE (log: $(SCRATCH)/midi_teeth.log)"; FAIL=1; }; \
+	grep -E "BITES|DID NOT" $(SCRATCH)/midi_teeth.log; \
 	fresh $(SCRATCH)/host_rate_ref.pkl || python3 tools/verify/host_rate_gate.py --ref || FAIL=1; \
 	python3 tools/verify/host_rate_gate.py --port || FAIL=1; \
+	python3 probes/host_render/hostrate_teeth.py > $(SCRATCH)/hostrate_teeth.log 2>&1 || { echo "hostrate_teeth: a mutant DID NOT BITE (log: $(SCRATCH)/hostrate_teeth.log)"; FAIL=1; }; \
+	grep -E "BITES|DID NOT" $(SCRATCH)/hostrate_teeth.log; \
 	fresh $(SCRATCH)/boot_ref.pkl || python3 tools/verify/boot_gate.py --ref || FAIL=1; \
 	python3 tools/verify/boot_gate.py --port || FAIL=1; \
+	python3 probes/boot/boot_teeth.py > $(SCRATCH)/boot_teeth.log 2>&1 || { echo "boot_teeth: a mutant DID NOT BITE (log: $(SCRATCH)/boot_teeth.log)"; FAIL=1; }; \
+	grep -E "BITES|DID NOT" $(SCRATCH)/boot_teeth.log; \
 	fresh $(SCRATCH)/rate_switch_ref.pkl || python3 tools/verify/rate_switch_gate.py --ref || FAIL=1; \
 	python3 tools/verify/rate_switch_gate.py --port || FAIL=1; \
+	python3 probes/b13b/switch_teeth.py > $(SCRATCH)/switch_teeth.log 2>&1 || { echo "switch_teeth: a mutant DID NOT BITE (log: $(SCRATCH)/switch_teeth.log)"; FAIL=1; }; \
+	grep -E "BITES|DID NOT" $(SCRATCH)/switch_teeth.log; \
 	fresh $(SCRATCH)/ccmap_state_ref.pkl || python3 tools/verify/ccmap_state_gate.py --ref || FAIL=1; \
 	python3 tools/verify/ccmap_state_gate.py --port || FAIL=1; \
+	python3 probes/host_api/ccmap_teeth.py > $(SCRATCH)/ccmap_teeth.log 2>&1 || { echo "ccmap_teeth: a mutant DID NOT BITE (log: $(SCRATCH)/ccmap_teeth.log)"; FAIL=1; }; \
+	grep -E "BITES|DID NOT" $(SCRATCH)/ccmap_teeth.log; \
 	fresh $(SCRATCH)/state_save_ref.pkl || python3 tools/verify/state_save_gate.py --ref || FAIL=1; \
 	python3 tools/verify/state_save_gate.py --port || FAIL=1; \
+	python3 probes/host_api/state_save_teeth.py > $(SCRATCH)/state_save_teeth.log 2>&1 || { echo "state_save_teeth: a mutant DID NOT BITE (log: $(SCRATCH)/state_save_teeth.log)"; FAIL=1; }; \
+	grep -E "BITES|DID NOT" $(SCRATCH)/state_save_teeth.log; \
 	{ fresh $(SCRATCH)/product_bank_ref_44100.pkl && fresh $(SCRATCH)/product_bank_ref_48000.pkl; } || python3 tools/verify/bank_product_gate.py --ref --jobs 3 || FAIL=1; \
 	python3 tools/verify/bank_product_gate.py --port || FAIL=1; \
 	echo "=== LIVE GATE 6/7: cold-state A/B (port init/prepare vs plugin build+setSR, 18 rates) ==="; \
@@ -225,6 +249,18 @@ verify: test libjuno.so
 	bash tools/embed/arm_golden.sh; rc=$$?; \
 	if [ $$rc -eq 3 ]; then echo "SKIP: ARM cross toolchain absent (apt-get install gcc-arm-linux-gnueabihf qemu-user-static gcc-arm-none-eabi) -- NOT a pass"; \
 	elif [ $$rc -ne 0 ]; then FAIL=1; fi; \
+	echo "=== EARLY PROOFS (CLAIMS A1, A3-A6), two processes (task #62): every panel row x 256 bytes x 3 rates x {cold, warm, mid-note}; every note x velocity and the note table; a TEMPO SYNC flip under a held note on every patch; the discrete DCO / LFO modes ==="; \
+	fresh $(SCRATCH)/param_exhaust_ref.pkl || python3 tools/verify/param_exhaust.py --ref > /dev/null || FAIL=1; \
+	python3 tools/verify/param_exhaust.py > $(SCRATCH)/early_param_exhaust.log 2>&1 || FAIL=1; grep -E "TOTAL|EXHAUSTION|BAD" $(SCRATCH)/early_param_exhaust.log | tail -3; \
+	fresh $(SCRATCH)/param_exhaust2_ref.pkl || python3 tools/verify/param_exhaust2.py --ref > /dev/null || FAIL=1; \
+	python3 tools/verify/param_exhaust2.py > $(SCRATCH)/early_param_exhaust2.log 2>&1 || FAIL=1; grep -E "TOTAL|EXHAUSTION|BAD" $(SCRATCH)/early_param_exhaust2.log | tail -3; \
+	fresh $(SCRATCH)/notevel_exhaust_ref.pkl || python3 tools/verify/notevel_exhaust.py --ref > /dev/null || FAIL=1; \
+	python3 tools/verify/notevel_exhaust.py > $(SCRATCH)/early_notevel_exhaust.log 2>&1 || FAIL=1; grep -E "TOTAL|EXHAUSTION|BAD" $(SCRATCH)/early_notevel_exhaust.log | tail -3; \
+	python3 tools/verify/notevel_exhaust.py --check-table || FAIL=1; \
+	for set in temposync dco; do \
+	  fresh $(SCRATCH)/script_ab_$${set}_ref.pkl || python3 tools/verify/script_ab.py --ref $$set > /dev/null || FAIL=1; \
+	  python3 tools/verify/script_ab.py --port $$set || FAIL=1; \
+	done; \
 	echo "=== LEDGER ==="; \
 	echo "=== APPROXIMATION AUDIT (zero approximations in the port) ==="; \
 	python3 tools/verify/approx_audit.py || FAIL=1; \
@@ -323,8 +359,10 @@ juno_cand.so: gui/juno_bridge.c $(CAND_SRC) $(HDR) $(wildcard native/*.h)
 # A prebuilt juno.dll is committed so Windows users can run the GUI directly.
 CC_WIN ?= x86_64-w64-mingw32-gcc
 dll: juno.dll
+# no time stamp and a fixed image base: the same sources give the same bytes (task #62; the
+# linker's automatic base hashes the output path)
 juno.dll: gui/juno_bridge.c $(SRC) $(HDR)
-	$(CC_WIN) $(CFLAGS) -shared -static -o $@ $(filter %.c,$^) $(LDLIBS)
+	$(CC_WIN) $(CFLAGS) -shared -static -Wl,--no-insert-timestamp -Wl,--disable-auto-image-base -o $@ $(filter %.c,$^) $(LDLIBS)
 
 test: tests/test_fma_canary tests/test_rate_laws tests/test_teensy_golden tests/test_multi_instance tests/test_voice_alloc tests/test_helpers tests/test_voice_smoke tests/test_master_smoke tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter tests/test_arp_pattern tests/test_param_setter
 	./tests/test_fma_canary
@@ -397,6 +435,12 @@ tests/test_reverb_recall: tests/test_reverb_recall.c $(SRC) $(HDR)
 # and docs/engineb/FOUNDATION.md. Never add a gate here without adding it there.
 engineb:
 	@bash tools/engineb/foundation.sh
+
+# Everything again from a FRESH CLONE (task #62, docs/REPRODUCE.md): the inputs, the doctor, every
+# target above, every generated table from the plugin, two builds of every product, the Pi gate.
+# About 10 hours: run it as a job (sh tools/run_job.sh repro make reproduce).
+reproduce:
+	bash tools/repro/reproduce.sh
 engineb-quick:
 	@bash tools/engineb/foundation.sh --quick
 

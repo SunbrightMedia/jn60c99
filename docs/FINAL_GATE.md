@@ -1,5 +1,7 @@
 # Phase 7 — final gate
 
+> **2026-10-09 (task #62):** scripts/final_gate.sh and scratchpad/oracle/run_final_gate.sh are gone (the second with an old container; the first called scripts retired for the two-process rule). The delivery gate is `make test static verify native webapp engineb`, all of it re-run from a fresh clone by tools/repro/reproduce.sh (docs/REPRODUCE.md).
+
 The bit-exact ground truth for this port is the plugin's own machine code (run under
 Unicorn) and the states it produces. Every gate below compares OUR C99 engine against
 that ground truth. Reproduce with `scratchpad/oracle/run_final_gate.sh`.

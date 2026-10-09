@@ -14,7 +14,7 @@ OUT="${TMPDIR:-/tmp}/juno_split.txt"
 
 sh "$HERE/build_engine.sh"
 echo ">> configure Circle: Pi 3, AArch64, --qemu --multicore"
-( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" --qemu --multicore -f )
+( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" --kernel-max-size 4 --qemu --multicore -f )
 make -C "$CIRCLE/lib" clean >/dev/null 2>&1 || true      # multicore flag changes the lib
 make -C "$CIRCLE/lib" -j"$(nproc)" >/dev/null
 make -C "$CIRCLE/lib/sound" -j"$(nproc)" >/dev/null

@@ -3166,3 +3166,48 @@ double click, as a user does.
 Put a tooth only on a path the gate's REACH output shows executed. A tooth must bite on EVERY seed it
 is given; when it stops biting on one, find what the run no longer reaches before anything else --
 a change elsewhere (here a modal window) can silently remove coverage from a green check.
+
+## 180. A PROOF NO TARGET RUNS IS A STORY -- CENSUS THE LEDGER AGAINST THE TARGETS, AND GATE THE CENSUS
+Paid 2026-10-09 (task #62, the repeatability campaign). Every row of docs/CLAIMS.md names its proof,
+but nothing checked that the routine targets RUN it. A census (tools/repro/claims_census.py) found:
+the proofs of A1 and A3-A8 in no make target; five of them running the plugin and the port in one
+process (the two-process rule); two that could not fail (exit 0 on a divergence); A5's helper no
+longer importable; A8 citing a script deleted three months before; the teeth of seven gates (A24-A33)
+named only in docstrings -- and two of those teeth scripts always exited 1 on mutants their own
+claims call inert. All re-run or re-routed (claims_routes.tsv); the census and its two teeth are in
+`make static`.
+### The rule
+A claim is proven only while a target re-runs its proof. Keep a census of ledger rows against what
+the targets run (code, not comments), make it a gate, and see it fail. A row whose proof moved names
+the gates that carry it now.
+
+## 181. AN UNREAD TABLE ENTRY IS STILL A TRANSCRIPTION -- RE-DERIVE DATA FROM THE IMAGE, NOT ONLY ITS EFFECTS
+Paid 2026-10-09 (task #62). src/juno_tables.h juno_exp_ad3c[0] held 2^-24; the plugin's image holds
+2^-32 there (its comment even said so). No gate saw it: the render never reads index 0 (a zero
+exponent skips the multiply), so every executed gate was right to pass. tools/repro/rdata_check.py
+compares every table taken from the plugin's read-only data with the image itself (the pitch spline
+and the exponent tables at their addresses; the 66 curve tables found in the image) and found it.
+### The rule
+Gates prove what is executed. Data copied from the binary is also checked against the binary,
+entry by entry, so an unread entry cannot carry a wrong value into the next use.
+
+## 182. A BUILD IS A PRODUCT -- A TIME STAMP OR A PATH-HASHED BASE MAKES IT UNREPEATABLE
+Paid 2026-10-09 (task #62). juno.dll and JUNO-60.exe built twice gave different bytes: the MinGW
+linker writes a time stamp, and a DLL's automatic image base hashes the output path. With
+`--no-insert-timestamp` (and `--disable-auto-image-base` for the DLL) two builds are identical, and
+so are libjuno.so and the WASM; tools/repro/determinism.sh checks it and that the committed binaries
+are what the sources build.
+### The rule
+Build every shipped binary twice and compare. Remove every source of difference that is not the
+code (time, path, randomized base); then a committed binary can be checked against its sources.
+
+## 183. A TRACK NO TARGET RUNS ROTS IN SILENCE -- RUN EVERY TRACK'S GATE IN THE ONE COMMAND
+Paid 2026-10-09 (task #62). The Pi track (proven 2026-09-16) was broken twice and nothing said so:
+(a) the GUI meter's log10 (A37) pulled glibc's libm into the bare-metal link, which needs errno, and
+ld crashed; (b) the October tables grew the image past Circle's 2 MB KERNEL_MAX_SIZE, and QEMU then
+booted to an empty UART. Fixed: pi/kernel/bare_log10.c (checked against the C library's log10 for
+all 83,684,754 floats the meter can see, with a tooth), `--kernel-max-size 4` and a size guard that
+fails loudly; the gate runs in tools/repro/reproduce.sh. 69/69 scenarios bit-exact again.
+### The rule
+Every track with a gate is in the one command that reproduces the project, even when its tools are
+optional; a size or a link limit is checked with a message, never left to fail as a silent hang.

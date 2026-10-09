@@ -35,7 +35,7 @@ repo root (`make libjuno.so`). WASM checks need node + the built `gui/web/`.
 - `cold_regress.py` — cold single-note A/B vs cached plugin refs (usage:
   `plugin` to cache refs, `port <tag>` to compare a rebuilt libjuno.so).
 - `cold44_mode5.py` — all 8 v551==5 patches × {44.1k, 48k}, 12000 frames.
-- `rate_audio_final.py` — one patch per DELAY TYPE + patch 9, × {44.1k, 96k}.
+- (`rate_audio_final.py`, deleted 2026-07-16: its claim A8 is graded by recall_render_ab.py, etmode_ab.py, effect_param_gate.py, fx_leaf_gate.py, rate_sweep_gate.py and bank_product_gate.py -- docs/REPRODUCE.md.)
 
 **Rate-arm derivation (the 44.1/96 kHz fix, commits 5db92c9/23e2b1e/…)**
 - `rate_fullscan.py` — FULL-STATE cold differential scan port-vs-plugin per rate;

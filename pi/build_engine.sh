@@ -35,6 +35,9 @@ done
 # inline to AArch64 instructions (no glibc libm, no errno, no recursion).
 echo ">> compile bare_libm (exact math, no glibc)"
 ${PREFIX}gcc $PROVEN $BARE -fno-math-errno $INC -c "$HERE/kernel/bare_libm.c" -o "$OBJ/bare_libm.o"
+# log10 for the GUI meter in the bridge (not exact; the meter's steps are checked equal to the C
+# library's for every float it can see: tools/repro/pi_log10_check.c, task #62)
+${PREFIX}gcc $PROVEN $BARE -fno-math-errno $INC -c "$HERE/kernel/bare_log10.c" -o "$OBJ/bare_log10.o"
 
 echo ">> archive -> $OUT"
 rm -f "$OUT"; ${PREFIX}ar rcs "$OUT" "$OBJ"/*.o

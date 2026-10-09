@@ -173,6 +173,17 @@ mine is a hypothesis (playbook 80).
   the screen and the LED's show; zoom_fit_gate.py; the oracle now attaches
   the plugin's editor; docs/WINDOW_ZOOM.md) -- a full verify of A38-A40 is
   owed. Jobs run from tools/snap_tree.sh snapshots (playbook 178).
+- **Repeatability (task #62, the user's 2026-10-09 request)**: ONE command,
+  tools/repro/reproduce.sh, re-runs everything from a fresh clone (docs/REPRODUCE.md):
+  inputs, doctor, make test static verify native webapp engineb, regen_check
+  (every generated table from the plugin), determinism (two builds, committed ==
+  build), the Pi gate, a clean tree. `make static` runs the CLAIMS census (every
+  row's proof re-run by a target, with teeth); `make verify` runs the teeth of
+  A24-A33 and the early proofs A1, A3-A6 (two processes). Found and fixed on the
+  way: unrun and one-process early proofs, unrun teeth, a deleted cited script,
+  juno_exp_ad3c[0] (never read), unreproducible dll/exe links, and the Pi image
+  broken twice (log10 link, 2 MB kernel limit: 69/69 again, job pi_gate3).
+  The proof run of reproduce.sh is owed.
   The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up

@@ -1,0 +1,13 @@
+# The user's 11 banks (scratchpad/userbanks/: INPUT, never committed -- CLAUDE.md). Their SHA-256, so a
+# reproduction can prove it graded the same input: sha256sum -c tools/repro/userbanks.sha256 (from the repository root).
+cb07d785f5c660adc3ec4f62872470573420fc89e62a192174101f8ba186b90a  scratchpad/userbanks/2 Preset.bin
+39d0ddf1deb41b75b99b4f71fd9bea62eb8e29fdfc29af5db4294735c8d40d3f  scratchpad/userbanks/~Analog Stars.bin
+fb5651e41d6ef7d614520be46fd14d10ee89121ec147409554a1837d4d02bd64  scratchpad/userbanks/~Basses Pads And Arpeggios.bin
+c825f263e0f121b38e3ed484027350c6ca3504891f4280fc54833f8907ab979e  scratchpad/userbanks/~Brothertiger.bin
+5f28a70db2713a5601913eac616c0dbf75d0f9722d7d435fa9cf42a33d745c13  scratchpad/userbanks/~Chillwave.bin
+d02a8df8a1878b8111949568febf01b1d1635645d924956f6c092b12c90d5813  scratchpad/userbanks/~CyberCity.bin
+8ad96b9c6adf7ec1de6b6eb435f93084c67803f486f780c7c9ffb04acd77969d  scratchpad/userbanks/~Deep House.bin
+c80a99ce9c20d4532c1dfee262d563eb5487e4114c00279b1c2491ce58650930  scratchpad/userbanks/~FutureBass.bin
+7bf26cd48660fd4316ee209f07d752bd8c6ab6800f4e0c146f8efbd1d035d59a  scratchpad/userbanks/~Outrun.bin
+5c343bccc31863d4ad222f0b04b4fc031d7c3c17e84a3f4a6d111be450106e5f  scratchpad/userbanks/~SynthPop.bin
+241d5f902681229d5a03eb63ad5cd9cbf782d77f8687f351794ae82cefbf0009  scratchpad/userbanks/~Synthwave.bin

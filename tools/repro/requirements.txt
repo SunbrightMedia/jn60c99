@@ -1,0 +1,6 @@
+# The Python packages of the JUNO-60 C99 tools (task #62, docs/REPRODUCE.md): the versions every
+# recorded result was produced with. pip install -r tools/repro/requirements.txt
+unicorn==2.1.4
+capstone==5.0.7
+numpy==2.4.6
+pefile==2024.8.26

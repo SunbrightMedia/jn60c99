@@ -13,7 +13,7 @@ PREFIX=aarch64-linux-gnu-
 K="$HERE/kernel"
 
 sh "$HERE/build_engine.sh" >/dev/null
-( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" --qemu --multicore -f >/dev/null )
+( cd "$CIRCLE" && ./configure -r 3 -p "$PREFIX" --kernel-max-size 4 --qemu --multicore -f >/dev/null )
 make -C "$CIRCLE/lib" -j"$(nproc)" >/dev/null
 make -C "$CIRCLE/lib/sound" -j"$(nproc)" >/dev/null
 
