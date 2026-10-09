@@ -3070,3 +3070,17 @@ order observable is seen at once.
 When a tooth does not bite, prove why: compute that the property is unobservable on the input
 space, put that computation in the gate's output, and label the property READ in the claim. Never
 drop the tooth silently, never count it as biting.
+
+## 173. A JOB SCRIPT RUNS ITS TOOLCHAIN SETUP UNDER THE SHELL THAT SETUP NEEDS -- AND CHECKS IT TOOK
+Paid 2026-10-09 (job final_a38). The A38 evidence script was launched as `sh script.sh`; it sourced
+/home/user/emsdk/emsdk_env.sh, which sets PATH only under bash. Under dash the source "succeeded"
+silently, make native ran (it needs no emcc) and was GREEN, then make webapp died at its first line:
+"emcc: command not found" (Error 127) -- an hour into the job. Re-run as job final_a38_web under
+bash with a guard. The same hour, a second job script inverted a gate's exit convention (`--tooth`
+exits 0 when the tooth BITES); it was caught by reading the gate before any result, killed by its
+registry pid and restarted.
+### The rule
+A job script that sources a toolchain environment runs under bash (`bash script.sh`) and checks the
+tool right after (`command -v emcc || exit 1`), so a broken setup fails in the first second, not an
+hour in. Write every pass/fail test in a job script from the gate's own exit convention -- read it
+in the gate's source -- never from memory.

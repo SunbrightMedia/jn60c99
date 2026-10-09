@@ -29,7 +29,8 @@ waits no CC drives a parameter -- are CLAIMS A32 (state_save_gate.py).
   rectangles equal the apps' for every control the search can stop at.
 - The template's open bytes are all 0 and its CC assign control is not attached to a core (+0x80):
   the live editor sets both. A CC that reaches a parameter at the drain makes the viewless template
-  close every panel. The gate attaches the core and writes the open bytes before every press.
+  close every panel. The gate attaches the control with the plugin's own attach (vt+0xB0, rva
+  0x31D7B0, which sets +0x80 to the core) and writes the open bytes before every press.
 - The plugin's tree has two controls the apps do not build: a `<control-pi>` label ("disable",
   plug-in builds only) over the TEMPO knob, in both layouts -- the apps read only `<control>` and
   keep TEMPO live (they run no host clock); the search skips labels, so the menu is the same. And
@@ -82,6 +83,10 @@ graded against the plugin by midi_ctl_gate.py, CLAIMS A26), and the skin's MIDI 
   presses with modifier keys, the menu's items clicked (a greyed one stays open) or Escape, CCs
   through the page's MIDI input, blocks, drains, states -- the same calls and states as the exe
   (8 seeds); teeth `ccedge` and `ccmods` bite (a first tooth, `ccorder`, could not: rule 4).
+
+Final evidence (2026-10-09, commit 129a7bd3, clean tree): make native GREEN (job final_a38), make
+webapp GREEN with every tooth biting (job final_a38_web); the gate with the plugin's own attach
+GREEN, teeth 4 and 6 bite (job cc_attach2).
 
 ## Limits (stated)
 

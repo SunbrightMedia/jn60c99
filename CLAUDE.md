@@ -166,7 +166,8 @@ mine is a hypothesis (playbook 80).
   restart). After that run: A37 (the LED and the meters: gui/juno_bridge.c,
   both GUIs, a new gate; its full verify: job verify_3a5ee931) and A38 (the
   CC menu and the skin's MIDI input: gui/juno_bridge.c juno_gui_host_param,
-  both GUIs, a new gate) -- a full verify of A38 is owed.
+  both GUIs, a new gate; make native + make webapp GREEN on 129a7bd3: jobs
+  final_a38, final_a38_web) -- a full verify of A38 is owed.
   The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up

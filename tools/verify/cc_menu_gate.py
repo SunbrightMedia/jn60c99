@@ -22,8 +22,8 @@ of the images is used. The gate:
      with CCs, blocks and UI-timer drains after them, and the state;
   3. plays the log into the plugin (a worker process: Unicorn only): its boot and every engine
      call (as tools/dist/exe_oracle_check.py), and at each probe its handler rva 0x31D420 itself
-     on its own CC assign control, attached to its core (+0x80: what the live editor sets; the
-     template's is empty), with the message (type 0 down and type 2 double click; the point;
+     on its own CC assign control, attached to its core by its own attach (vt+0xB0, rva
+     0x31D7B0: +0x80; the template's is empty), with the message (type 0 down and type 2 double click; the point;
      flags 4 | the modifier bits), the panels' open bytes from the program's tree at that point
      (the open conditions are the program's, CLAIMS C5; written before each press: a model
      change the drain applies closes every panel of the viewless template), the menu service the
@@ -63,6 +63,7 @@ WINE = os.environ.get('WINE', '/usr/lib/wine/wine64')
 HEADER, STRIDE, NAME = 23, 20223, 16
 HANDLER, SEARCH_RET, LEARN, FORGET = 0x31D420, 0x31D499, 0x31AA40, 0x3192E0
 MAP_RECORD, MAP_ID, MENU_OVERRIDE, CCASSIGN_VT = 0x319B10, 0x319C50, 0xCB21F8, 0x94A4C0
+CCA_ATTACH = 0x31D7B0                # the CC assign control's attach (vt+0xB0)
 HEAP = (0x310000000, 0x312000000)      # where the module init's GUI objects live in the emulator
 RATE = 48000.0
 MODS = [0, 0, 0, 0, 1, 2, 8, 3, 9, 10, 11]   # the plugin's modifier bits: 1 Shift, 2 Ctrl, 8 Alt
@@ -123,7 +124,11 @@ class PluginGUI:
         self.cca = HEAP[0] + 8 * int(at[0])
         self.root = self.q(self.cca + 0x78)     # its parent (vt+0x18 = rva 0x28C020); the main panel's is 0
         self.map = h.core + 24
-        uc.mem_write(self.cca + 0x80, struct.pack('<Q', h.core))
+        # attached by the plugin's own attach (vt+0xB0, rva 0x31D7B0): it sets +0x80 to the core
+        h.call(IB + CCA_ATTACH, rcx=self.cca, count=500_000_000)
+        if self.q(self.cca + 0x80) != h.core:
+            raise SystemExit('the plugin\'s attach (rva 0x31D7B0) left +0x80 = %x, not the core %x'
+                             % (self.q(self.cca + 0x80), h.core))
         self.names, self.panels, self.tree = {}, [], []
         self._walk(self.root)
         # the record list: record k -> parameter id (rva 0x319C50), for model sets and the comparison
