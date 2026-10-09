@@ -5,8 +5,9 @@
 # (linked, checked against tools/repro/userbanks.sha256, never committed).
 #
 # Stages, each logged to DIR/logs/STAGE.log, each with its exit code and time in DIR/REPORT:
-#   clone        git clone of this repository at COMMIT (default HEAD) into DIR (default under $HOME,
-#                so Node finds a node_modules there; else `npm ci` runs in the clone)
+#   clone        git clone of this repository at COMMIT (default HEAD) into DIR (default: next to this
+#                tree, so Node finds the same node_modules; else `npm ci` runs in the clone); the Pi's
+#                Circle submodule from this tree's copy when it has one (the pinned commit, offline)
 #   inputs       truth/ checksums (tools/verify/truth.py) + the user's banks against their manifest
 #   doctor       tools/repro/doctor.sh: every required tool
 #   test static verify native webapp engineb     the make targets (verify: every reference rebuilt,
@@ -25,7 +26,7 @@
 set -u
 SRC=$(cd "$(dirname "$0")/../.." && pwd)
 COMMIT=${1:-$(git -C "$SRC" rev-parse HEAD)}
-DIR=${2:-$HOME/juno60_repro}
+DIR=${2:-$(dirname "$SRC")/juno60_repro}
 BANKS=${JUNO_USERBANKS:-$SRC/scratchpad/userbanks}
 rm -rf "$DIR"
 mkdir -p "$DIR.logs" || exit 2
@@ -47,8 +48,11 @@ stage() {   # stage NAME CMD... : run, log, record
 }
 skip() { printf '%-12s SKIPPED     (%s)\n' "$1" "$2" | tee -a "$REPORT"; }
 
-stage clone sh -c "git clone -q '$SRC' '$DIR' && cd '$DIR' && git checkout -q --detach '$COMMIT' && \
-  git submodule update --init -q pi/circle 2>/dev/null; echo commit \$(git rev-parse HEAD) tree \$(git rev-parse HEAD^{tree})" || { cat "$REPORT"; exit 1; }
+stage clone sh -c "git clone -q '$SRC' '$DIR' && cd '$DIR' && git checkout -q --detach '$COMMIT' || exit 1; \
+  if [ -e '$SRC/pi/circle/.git' ]; then git config submodule.pi/circle.url '$SRC/pi/circle'; fi; \
+  git -c protocol.file.allow=always submodule update --init -q pi/circle 2>/dev/null; \
+  echo commit \$(git rev-parse HEAD) tree \$(git rev-parse HEAD^{tree}) \
+       circle \$([ -f pi/circle/Rules.mk ] && git -C pi/circle rev-parse --short HEAD || echo absent)" || { cat "$REPORT"; exit 1; }
 cd "$DIR" || exit 1
 mkdir -p scratchpad && ln -s "$BANKS" scratchpad/userbanks
 [ -f /home/user/emsdk/emsdk_env.sh ] && source /home/user/emsdk/emsdk_env.sh > /dev/null 2>&1
