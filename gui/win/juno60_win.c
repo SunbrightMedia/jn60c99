@@ -71,6 +71,9 @@ uint32_t juno_midi_base(void);
 int juno_gui_keybed_write(void *c, int key, int value);
 void juno_gui_commit(void *c);
 int juno_gui_keybed_state(const void *c, int key);
+int juno_gui_lfo_led_frame(void *c, int nframes);
+int juno_gui_meter_tick(void *c, int ch, int decay, int state, const int *rect, int horiz, int *fill);
+int juno_gui_bar_draw(const int *rect, const int *fill, int horiz, int fade, int *out, int cap);
 void juno_enable_hw_ftz(void);
 void juno_set_fp_oracle_mode(int on);
 
@@ -514,7 +517,8 @@ static void load_script_tables(void)
 
 /* ---------------------------------------------------------- panels, controls */
 enum { C_SLIDER, C_KNOB, C_DISPLAY, C_LATCH, C_UNLATCH, C_MENU, C_SETUP, C_JU60BTN, C_JU60LED, C_LFOLED,
-       C_PATCHNAME, C_KEYBOARD, C_PATCHBANKNAME, C_PATCHLIST, C_OTHER };
+       C_PATCHNAME, C_KEYBOARD, C_PATCHBANKNAME, C_PATCHLIST, C_BARGRAPH, C_OTHER };
+#define BAR_BLITS 64                       /* a bar draws 1 + fade blits (Script.xml: fade 10) */
 typedef struct { int n, black, shape, x, y, w, h; } Key;
 typedef struct Ctl {
     int type, x, y, w, h, has_size;
@@ -531,6 +535,8 @@ typedef struct Ctl {
     Key keys[64];
     int nkeys, rects[14][2][4];
     int bx, by, tx, ty, tw, th;
+    int frame;                             /* lfoLed: the frame of its last tick (rva 0x325070) */
+    int horiz, decay, ch, fade, state, rect[4], blits[7 * BAR_BLITS], nblits;   /* barGraphX (rva 0x31C450) */
 } Ctl;
 typedef struct Panel Panel;
 typedef struct { Panel *p; Ctl *c; } Item;
@@ -624,7 +630,8 @@ static Ctl *control(XN *el, int ox, int oy)
               !strcmp(c->typestr, "setupButton") ? C_SETUP : !strcmp(c->typestr, "ju60UnlatchButton") ? C_JU60BTN :
               !strcmp(c->typestr, "ju60Led") ? C_JU60LED : !strcmp(c->typestr, "lfoLed") ? C_LFOLED :
               !strcmp(c->typestr, "patchName") ? C_PATCHNAME : !strcmp(c->typestr, "keyboardX") ? C_KEYBOARD :
-              !strcmp(c->typestr, "patchBankName") ? C_PATCHBANKNAME : !strcmp(c->typestr, "patch") ? C_PATCHLIST : C_OTHER;
+              !strcmp(c->typestr, "patchBankName") ? C_PATCHBANKNAME : !strcmp(c->typestr, "patch") ? C_PATCHLIST :
+              !strcmp(c->typestr, "barGraphX") ? C_BARGRAPH : C_OTHER;
     s = xtext(el, "position");
     c->x = ox; c->y = oy;
     if (s && ints(s, v, 2) == 2) { c->x = ox + v[0]; c->y = oy + v[1]; }
@@ -659,6 +666,13 @@ static Ctl *control(XN *el, int ox, int oy)
     if ((s = xtext(el, "tipBarPosition")) && ints(s, v, 2) == 2) { c->tipx = v[0]; c->tipy = v[1]; }
     if ((s = xtext(el, "timeout"))) c->timeout = atoi(s);
     if (c->type == C_KEYBOARD) keyboard_init(c);
+    if (c->type == C_BARGRAPH) {           /* CBarGraphControl: its object zeroed (rva 0x34FA60), then Script.xml */
+        c->horiz = (s = xtext(el, "direction")) && atoi(s) != 0;
+        c->decay = (s = xtext(el, "decay")) ? atoi(s) : 0;
+        c->ch = (s = xtext(el, "ch")) ? atoi(s) : 0;
+        c->fade = (s = xtext(el, "fade")) ? atoi(s) : 0;
+        c->rect[0] = c->x; c->rect[1] = c->y; c->rect[2] = c->x + c->w; c->rect[3] = c->y + c->h;
+    }
     if (c->type == C_PATCHNAME) {
         int b[2] = {0, 0}, tp[2] = {0, 0}, ts[2] = {0, 0};
         ints(xtext(el, "buttonPosition"), b, 2);
@@ -925,6 +939,36 @@ static void blit(const Bmp *b, int sx, int sy, int w, int h, int dx, int dy)
         }
     }
 }
+/* blit at a constant alpha too (the bar's fade columns): the premultiplied source scaled
+ * by alpha / 255, then over */
+static void blit_alpha(const Bmp *b, int sx, int sy, int w, int h, int dx, int dy, int alpha)
+{
+    int x, y;
+    if (!b || !b->px || alpha <= 0) return;
+    if (alpha >= 255) { blit(b, sx, sy, w, h, dx, dy); return; }
+    for (y = 0; y < h; ++y) {
+        int ty = dy + y, syy = sy + y;
+        const uint32_t *s;
+        uint32_t *d;
+        if (ty < 0 || ty >= g_fbh || syy < 0 || syy >= b->h) continue;
+        s = b->px + (size_t)syy * b->w;
+        d = g_fb + (size_t)ty * g_fbw;
+        for (x = 0; x < w; ++x) {
+            int tx = dx + x, sxx = sx + x;
+            uint32_t p, q, a, ia, k;
+            if (tx < 0 || tx >= g_fbw || sxx < 0 || sxx >= b->w) continue;
+            p = s[sxx];
+            q = d[tx];
+            a = ((p >> 24) * (uint32_t)alpha + 127) / 255;
+            if (!a) continue;
+            ia = 255 - a;
+            k = (uint32_t)alpha;
+            d[tx] = ((((p & 0xff) * k + 127) / 255 + ((q & 0xff) * ia + 127) / 255)) |
+                    (((((p >> 8) & 0xff) * k + 127) / 255 + (((q >> 8) & 0xff) * ia + 127) / 255) << 8) |
+                    (((((p >> 16) & 0xff) * k + 127) / 255 + (((q >> 16) & 0xff) * ia + 127) / 255) << 16) | 0xff000000u;
+        }
+    }
+}
 static void draw_frame(const Bmp *b, int f, int x, int y)
 {
     int w, h;
@@ -1090,8 +1134,16 @@ static void draw_control(Ctl *c)
         draw_frame(c->pic, chorus_led(c), c->x, c->y);
         return;
     case C_LFOLED:
-        draw_frame(c->pic, 0, c->x, c->y);                       /* not yet ported: drawn idle */
+        draw_frame(c->pic, c->frame, c->x, c->y);                /* the frame of its last tick */
         return;
+    case C_BARGRAPH: {                                           /* its blits (rva 0x31C210) */
+        int i;
+        for (i = 0; i < c->nblits && i < BAR_BLITS; ++i) {
+            const int *b = c->blits + 7 * i;
+            blit_alpha(c->bmp, b[4], b[5], b[2], b[3], b[0], b[1], b[6] < 0 ? 255 : b[6]);
+        }
+        return;
+    }
     case C_PATCHNAME:
         draw_frame(c->bmp, held ? 1 : 0, c->bx, c->by);
         patch_name(s);
@@ -1713,6 +1765,42 @@ static int visible_list(Panel *p, Ctl **out, int n, int max)
     }
     return n;
 }
+/* the LED's and the meters' ticks of the plugin's 50 ms window timer (WM_TIMER -> each open
+ * control's slot +96, CLAIMS A37): the LED of the open LFO panel, both meters; under g_lock.
+ * Logged (the calls a GUI makes): led NFRAMES -> FRAME; meter CH DECAY STATE X0 Y0 X1 Y1 HORIZ
+ * -> STATE F0 F1 F2 F3, then bar FADE -> N and its N blits. Returns 1 if a drawn value moved. */
+static int meters_tick(void)
+{
+    Ctl *list[512];
+    int n = visible_list(g_tree, list, 0, 512), i, j, moved = 0;
+    for (i = 0; i < n; ++i) {
+        Ctl *c = list[i];
+        if (c->type == C_LFOLED && c->pic) {
+            int f = juno_gui_lfo_led_frame(g_eng, c->pic->n);
+            if (g_log) fprintf(g_log, "led %d %d\n", c->pic->n, f);
+            moved |= f != c->frame;
+            c->frame = f;
+        } else if (c->type == C_BARGRAPH) {
+            int fill[4], b[7 * BAR_BLITS], nb, st = c->state;
+            c->state = juno_gui_meter_tick(g_eng, c->ch, c->decay, st, c->rect, c->horiz, fill);
+            nb = juno_gui_bar_draw(c->rect, fill, c->horiz, c->fade, b, BAR_BLITS);
+            if (nb > BAR_BLITS) nb = BAR_BLITS;
+            if (g_log) {
+                fprintf(g_log, "meter %d %d %d %d %d %d %d %d %d %d %d %d %d\n", c->ch, c->decay, st, c->rect[0],
+                        c->rect[1], c->rect[2], c->rect[3], c->horiz, c->state, fill[0], fill[1], fill[2], fill[3]);
+                fprintf(g_log, "bar %d %d", c->fade, nb);
+                for (j = 0; j < 7 * nb; ++j) fprintf(g_log, " %d", b[j]);
+                fprintf(g_log, "\n");
+            }
+            if (nb != c->nblits || memcmp(b, c->blits, sizeof(int) * 7 * (size_t)nb)) {
+                memcpy(c->blits, b, sizeof(int) * 7 * (size_t)nb);
+                c->nblits = nb;
+                moved = 1;
+            }
+        }
+    }
+    return moved;
+}
 static int bounds(const Ctl *c, int *b)
 {
     int w, h;
@@ -2310,6 +2398,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
             int k, v;
             for (k = 0; k < 128; ++k) { v = juno_gui_keybed_state(g_eng, k) > 0; changed |= v != ks[k]; ks[k] = v; }
         }
+        changed |= meters_tick();
         LeaveCriticalSection(&g_lock);
         if (changed) g_dirty = 1;
         if (InterlockedExchange(&g_landed, 0)) {   /* the audio thread landed a patch load */
@@ -2450,6 +2539,7 @@ static int render_test(const char *path)
             EnterCriticalSection(&g_lock);
             E_ui_tick();
             eng_refresh();
+            meters_tick();
             LeaveCriticalSection(&g_lock);
         }
         QueryPerformanceCounter(&b0);
@@ -2537,6 +2627,7 @@ static int play_test(const char *path, int change_patch)
             EnterCriticalSection(&g_lock);
             E_ui_tick();
             eng_refresh();
+            meters_tick();
             LeaveCriticalSection(&g_lock);
         }
         render_block(L, R);
@@ -2577,6 +2668,7 @@ static int kb_script(const char *path)
             EnterCriticalSection(&g_lock);
             E_ui_tick();
             eng_refresh();
+            meters_tick();
             LeaveCriticalSection(&g_lock);
         }
     }

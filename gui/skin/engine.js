@@ -20,7 +20,16 @@
 //   setTempo(bpm)           the arp / tempo-sync clock when no host runs one
 //   uiTick()                the plugin's 50 ms UI-timer drain (rva 0x320120)
 //   start()                 open the audio output (a user gesture is needed)
-//   peaks() -> [l, r]       output peak since the last call (display only)
+//   ledFrame(n)             the LFO LED's tick (rva 0x325070): the engine's LED store
+//                           read (rva 0x3C7180), the frame of a bitmap of n frames
+//   meterTick(ch, decay, state, rect, horiz) -> {state, fill}
+//                           a level meter's tick (rva 0x31C450): channel ch's peak
+//                           read (rva 0x34AF70), the new state, the bar's fill rect
+//   barDraw(rect, fill, horiz, fade) -> [[dx, dy, w, h, sx, sy, alpha], ...]
+//                           what the bar draws (rva 0x31C210): alpha -1 a plain blit
+//   peaks() -> [l, r]       the page's output peak since the last call, after the
+//                           monitor fader (the checks' witness that the page sounds;
+//                           not the plugin's meters, which meterTick reads)
 //
 // WasmEngine: the C99 port compiled to WebAssembly (gui/web/juno.js + juno.wasm,
 // the same build `make webapp` gates WASM == native).
@@ -59,6 +68,10 @@ export class WasmEngine {
       keybedState: f("juno_gui_keybed_state", "number", ["number", "number"]),
       commit: f("juno_gui_commit", null, ["number"]),
       render: f("juno_gui_render", "number", ["number", "number", "number"]),
+      ledFrame: f("juno_gui_lfo_led_frame", "number", ["number", "number"]),
+      meterTick: f("juno_gui_meter_tick", "number",
+                   ["number", "number", "number", "number", "number", "number", "number"]),
+      barDraw: f("juno_gui_bar_draw", "number", ["number", "number", "number", "number", "number", "number"]),
     };
     // the engine is built for the output device's own rate: nothing resamples
     try {
@@ -73,6 +86,8 @@ export class WasmEngine {
     this.sr = sr;
     this.stateCap = 4 + 8 * (95 + 128);
     this.statePtr = M._malloc(this.stateCap);
+    this.BLITS = 256;                            // a bar draws 1 + fade blits (Script.xml: fade 10)
+    this.rectPtr = M._malloc(4 * (8 + 7 * this.BLITS));   // rect[4], fill[4], blits[7 x BLITS]
     return this;
   }
 
@@ -106,6 +121,22 @@ export class WasmEngine {
   noteOff(n) { this.fn.noteOff(this.ctx, n); }
   setTempo(bpm) { this.fn.setTempo(this.ctx, bpm); }
   uiTick() { this.fn.uiTick(this.ctx); }
+  ledFrame(n) { return this.fn.ledFrame(this.ctx, n); }
+  meterTick(ch, decay, state, rect, horiz) {
+    new Int32Array(this.M.HEAPU8.buffer, this.rectPtr, 4).set(rect);
+    const st = this.fn.meterTick(this.ctx, ch, decay, state, this.rectPtr, horiz, this.rectPtr + 16);
+    return { state: st, fill: Array.from(new Int32Array(this.M.HEAPU8.buffer, this.rectPtr + 16, 4)) };
+  }
+  barDraw(rect, fill, horiz, fade) {
+    const W = new Int32Array(this.M.HEAPU8.buffer, this.rectPtr, 8);
+    W.set(rect, 0);
+    W.set(fill, 4);
+    const n = Math.min(this.fn.barDraw(this.rectPtr, this.rectPtr + 16, horiz, fade, this.rectPtr + 32, this.BLITS), this.BLITS);
+    const I = new Int32Array(this.M.HEAPU8.buffer, this.rectPtr + 32, 7 * this.BLITS);
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(Array.from(I.subarray(7 * i, 7 * i + 7)));
+    return out;
+  }
   keybedWrite(key, v) { return this.fn.keybedWrite(this.ctx, key, v); }
   keybedState(key) { return this.fn.keybedState(this.ctx, key); }
   commit() { this.fn.commit(this.ctx); }

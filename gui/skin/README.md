@@ -35,6 +35,7 @@ URL options: `?zoom=75` (the plugin's zoom, 25..200; default 62),
 | The keyboard: layout, hit test, click velocity, press / release / KEY HOLD / Shift, the wheel, the keys drawn | the plugin's code, READ (docs/KEY_HOLD.md rule 10): rva 0x2D45E0 (white keys one width / their count apart, a black key at the key before's right edge + its offset - half its width), rva 0x2D4AA0 (the point clamped into the control, whole pixels; a gap belongs to the next key; velocity 1016 x (y - key top) / key height / 7, integer, 1..127), rva 0x2D4920 / 0x2D48A0 (a press releases every key above 0 first unless KEY HOLD is on and Shift is down; the button up releases the key unless KEY HOLD), rva 0x2D47E0 (each send is a write into the plugin's keyboard note value: a press at the click velocity, a release at -64), rva 0x2D4420 (the wheel: OCTAVE SHIFT one step), rva 0x2D3E20 (key i down when the note value's state of i + 12 x OCTAVE SHIFT is above 0: what the UI timer drained and the keyboard wrote) |
 | A control's edit | the plugin GUI's model set (rva 0x283DB0) = `juno_gui_model_set`: the store keeps value & mask, the engine gets it at the next block; then the commit every panel control makes (rva 0x2DD100) |
 | A patch load | the patch browser's load and its set of the patch number; the INC / DEC / LOAD buttons commit after it (rva 0x322E60), a load from the patch window's list does not (rva 0x3278C0) |
+| The LFO LED and the two level meters | the plugin's code, EXECUTED (docs/LED_METER.md, CLAIMS A37): at each 50 ms tick the open LED's frame (`juno_gui_lfo_led_frame`: the engine's LED store read, rva 0x3C7180, then rva 0x325070) and each meter's state, fill and blits (`juno_gui_meter_tick`, rva 0x31C450; `juno_gui_bar_draw`, rva 0x31C210: a plain blit, then the fade columns at their alphas); the skin only blits what they return |
 
 The patch window's 4 x 16 list sits in the grid `panelPatch.png` draws (the list's
 rectangle is in `Script.xml`; the columns are read off the artwork).
@@ -80,11 +81,15 @@ written twice (C and JavaScript); the exe's calls are graded against the plugin 
 (CLAIMS C6). 8/8 seeds the same calls; teeth 3/3 bite (velocity one step off, the other keys never released, a
 gap given to the key before).
 
+The LED and the meters (CLAIMS A37): the three calls the skin makes at each tick are graded against
+the plugin's own functions by `tools/verify/led_meter_gate.py` (in `make verify`), and the WASM's
+results against the native build's after every render of the app's flows by
+`tools/verify/wasm_product_gate.py` (in `make webapp`, with a tooth: a WASM with another meter floor).
+
 ## Not ported (drawn idle or left out)
 
 | Item | Why |
 |---|---|
-| The LFO-rate LED, the output bar graphs | the plugin pushes them from its audio side (`vm.vs.dm`, `extraId`); that path is not yet read |
 | MIDI CC assign (`ccAssign`) | the engine has MIDI learn (`juno_gui_cc_learn`); the menu that arms it is not drawn yet |
 | The patch window's WRITE / RENAME / NEW / DELETE | writing a record into a bank is not in the port's API yet |
 | SEND / GET, SEND ALL / GET ALL, PLUG-OUT | the SYSTEM-8 link: not needed (the user's decision) |

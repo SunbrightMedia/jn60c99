@@ -60,7 +60,7 @@ patch change may click there.
 
 ```
 WINEPREFIX=<a prefix> python3 tools/dist/native_check.py      # under Wine on Linux
-python3 tools/dist/native_check.py --tooth replay | glue      # each must FAIL
+python3 tools/dist/native_check.py --tooth replay | glue | tick   # each must FAIL
 ```
 
 Window-level smoke test (2026-10-08, Wine + Xvfb + an ALSA null device): a
@@ -75,5 +75,8 @@ read on a Windows PC: the title bar's count.
 
 ## Not ported
 
-The same as gui/skin (README there): the LFO LED and output meters, the CC-assign
-menu, writing patches into a bank, the SYSTEM-8 buttons.
+The same as gui/skin (README there): the CC-assign menu, writing patches into a
+bank, the SYSTEM-8 buttons. The LFO LED and the two level meters are ported (CLAIMS
+A37, docs/LED_METER.md): the program's WM_TIMER runs the three bridge calls and blits
+their result; `--play` and `--kbscript` log every tick (led / meter / bar), which
+exe_oracle_check.py replays in the plugin itself.

@@ -258,6 +258,18 @@ typedef struct {
      * the first edit). Only the recall's cells are refreshed per edit. */
     unsigned char *edit_st;
     void *edit_ctx;
+
+    /* THE LFO LED'S STORE AND THE OUTPUT PEAKS (CLAIMS A37, docs/LED_METER.md). The engine's
+     * store at +1040 (the constructor rva 0x3C5A50 zeroes it): the add (rva 0x324A30) after
+     * every sample of voice unit 0 with its entry 29 -- voice 0's cell 2528, the LFO's
+     * square -- the read (rva 0x324980) for the LED. The engine's peaks at +32 / +36 (the
+     * base constructor rva 0x34ACE0 zeroes them): the engine render's tail (rva 0x3C787B)
+     * merges each call's own peak, a meter's read (rva 0x34AF70) takes one and zeroes it.
+     * pk: the engine render call in progress -- its length, the samples it has rendered,
+     * the end of its groups of four, its running maxima, a group's first three samples. */
+    struct { float last, sum; int32_t period, since, nread, nacc, toggle; } dm;
+    float pk_hold[2];
+    struct { int n, i, gend; float m[2], q[2][3]; } pk;
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -2915,9 +2927,160 @@ static void drv_engine_tempo(juno_ctx *c, int t10)
 
 typedef struct { float *il, *L, *R; int dry, full; } drv_out;
 
-/* One engine sample (the engine render's per-sample body). */
+/* ---- THE LFO LED'S STORE AND THE OUTPUT PEAKS (CLAIMS A37, docs/LED_METER.md) ----
+ * Each operation is the plugin's instructions in order; the integer steps wrap as its
+ * 32-bit ones do. Teeth (-DLM_TOOTH=n, tools/verify/led_meter_gate.py): each must fail. */
+#ifndef LM_TOOTH
+#define LM_TOOTH 0
+#endif
+
+/* maxss d, s: d if d > s, else s (s when either is NaN) */
+static float lm_max(float d, float s) { return d > s ? d : s; }
+/* andps with 0x7FFFFFFF */
+static float lm_abs(float x)
+{
+    uint32_t u;
+    memcpy(&u, &x, 4);
+    u &= 0x7FFFFFFFu;
+    memcpy(&x, &u, 4);
+    return x;
+}
+/* cvttss2si / cvttsd2si: NaN and out of range give 0x80000000 */
+static int32_t lm_cvtt(double x)
+{
+    if (!(x > -2147483649.0 && x < 2147483648.0)) return INT32_MIN;
+    return (int32_t)x;
+}
+
+/* the store's add (rva 0x324A30): ucomiss/je skips equal or unordered, comiss/jb skips
+ * below 0 or unordered; then sum, the three counts, the value */
+static void dm_add(juno_ctx *c, float v)
+{
+#if LM_TOOTH == 1
+    if (v < c->dm.last || v > c->dm.last) {
+#else
+    if ((v < c->dm.last || v > c->dm.last) && v >= 0.0f) {
+#endif
+        c->dm.period = c->dm.since;
+        c->dm.since = 0;
+    }
+    c->dm.sum = v + c->dm.sum;
+    c->dm.since = (int32_t)((uint32_t)c->dm.since + 1u);
+    c->dm.nread = (int32_t)((uint32_t)c->dm.nread + 1u);
+    c->dm.nacc = (int32_t)((uint32_t)c->dm.nacc + 1u);
+    c->dm.last = v;
+}
+
+/* the store's read (rva 0x324980): a period of at least four reads' samples gives the
+ * mean since the last such read; a shorter one alternates hi with the period's blend */
+static float dm_read(juno_ctx *c, float lo, float hi)
+{
+    int32_t c4 = (int32_t)((uint32_t)c->dm.nread << 2), p = c->dm.period;
+    float x = 0.0f;
+    c->dm.nread = 0;
+#if LM_TOOTH == 2
+    if (p > c4) {
+#else
+    if (p >= c4) {
+#endif
+        if (c->dm.nacc != 0) {
+            x = c->dm.sum;
+            c->dm.sum = 0.0f;
+            x = x / (float)c->dm.nacc;
+            c->dm.nacc = 0;
+        }
+    } else {
+        int32_t t = c->dm.toggle;
+        if (t == 0) {
+            x = hi;
+        } else {
+            float a = (float)p, b = (float)(int32_t)(9600u - (uint32_t)p);
+            a = a * lo;
+            b = b * hi;
+#if LM_TOOTH == 4
+            x = b * 0x1.b4e81cp-14f;
+#else
+            x = (b + a) * 0x1.b4e81cp-14f;              /* 0x38DA740E */
+#endif
+        }
+        t = (int32_t)((uint32_t)t + 1u);
+        c->dm.toggle = t;
+#if LM_TOOTH != 3
+        if (t >= 2) c->dm.toggle = 0;
+#endif
+    }
+    return (x - lo) / (hi - lo);
+}
+
+/* the engine render's peak (rva 0x3C787B): its call of n samples, per channel groups of
+ * four while four remain, then one sample at a time; at the end the merge into the held
+ * peaks under the engine's lock (left: the call's first, right: the held first) */
+static void pk_begin(juno_ctx *c, int n)
+{
+    c->pk.n = n;
+    c->pk.i = 0;
+    c->pk.gend = n >= 4 ? 4 * (int)((((unsigned)n - 4u) >> 2) + 1u) : 0;
+    c->pk.m[0] = c->pk.m[1] = 0.0f;
+}
+
+static float pk_group(float m, const float *q, float x)
+{
+    float r0 = m, r1 = lm_abs(q[0]), r2, r3;
+#if LM_TOOTH == 6
+    r1 = lm_max(r1, r0);
+    r1 = lm_max(lm_abs(q[1]), r1);
+    r1 = lm_max(lm_abs(q[2]), r1);
+    return lm_max(lm_abs(x), r1);
+#endif
+    r2 = lm_max(r1, r0);
+    r3 = lm_abs(q[1]);
+    r1 = lm_max(r1, r0);
+    if (!(r2 >= r3)) { r2 = r3; r1 = r3; }
+    r0 = lm_abs(q[2]);
+    if (!(r2 >= r0)) r1 = r0;
+    r3 = lm_abs(x);
+    r2 = lm_max(r2, r0);
+    if (!(r2 >= r3)) r1 = r3;
+    return r1;
+}
+
+static void pk_sample(juno_ctx *c, float l, float r)
+{
+    int i = c->pk.i++;
+    if (i < c->pk.gend) {
+        int k = i & 3;
+        if (k < 3) {
+            c->pk.q[0][k] = l;
+            c->pk.q[1][k] = r;
+        } else {
+            c->pk.m[0] = pk_group(c->pk.m[0], c->pk.q[0], l);
+            c->pk.m[1] = pk_group(c->pk.m[1], c->pk.q[1], r);
+        }
+    } else {
+        c->pk.m[0] = lm_max(lm_abs(l), c->pk.m[0]);
+        c->pk.m[1] = lm_max(lm_abs(r), c->pk.m[1]);
+    }
+}
+
+static void pk_end(juno_ctx *c)
+{
+    c->pk_hold[0] = lm_max(c->pk.m[0], c->pk_hold[0]);
+#if LM_TOOTH == 5
+    c->pk_hold[1] = lm_max(c->pk.m[1], c->pk_hold[1]);
+#else
+    c->pk_hold[1] = lm_max(c->pk_hold[1], c->pk.m[1]);
+#endif
+}
+
+/* One engine sample (the engine render's per-sample body), then what the plugin's
+ * engine records of it: unit 0's thread adds its entry 29 to the store after each of
+ * its samples (rva 0x3C6F00 -> the engine's vt+104, rva 0x3C7230 -> rva 0x3C10B0: the
+ * value's bits, voice 0's cell 2528), and the render's tail takes the samples' peak. */
 static void drv_engine_sample(juno_ctx *c, drv_out *o, float *l, float *r)
 {
+#if LM_TOOTH == 8
+    dm_add(c, JF(c->st, 2528));
+#endif
     juno_note_tick(c->st);
     if (o->dry) {
         float vbuf[JUNO_NUM_VOICES];
@@ -2930,6 +3093,12 @@ static void drv_engine_sample(juno_ctx *c, drv_out *o, float *l, float *r)
     } else {
         o->full = juno_driver_render_sample(c->st, l, r);
     }
+#if LM_TOOTH == 7
+    dm_add(c, JF(c->st, 2528u + JUNO_VOICE_MAIN_STRIDE));
+#elif LM_TOOTH != 8
+    dm_add(c, JF(c->st, 2528));
+#endif
+    pk_sample(c, *l, *r);
 }
 
 static void drv_out_sample(juno_ctx *c, drv_out *o, int t, float l, float r)
@@ -2954,12 +3123,14 @@ static void ro_engine_render(void *user, float *const *ptrs, int nch, int count)
     juno_ctx *c = (juno_ctx *)user;
     int i;
     asg_sync(c);
+    pk_begin(c, count);
     for (i = 0; i < count; ++i) {
         float l, r;
         drv_engine_sample(c, (drv_out *)c->ro_out, &l, &r);
         ptrs[0][i] = l;
         if (nch > 1) ptrs[1][i] = r;
     }
+    pk_end(c);
 }
 
 /* One segment of the host block, samples [t0, t0 + n), through the render
@@ -2975,7 +3146,9 @@ static void ro_render(juno_ctx *c, drv_out *o, int t0, int n)
     kind = c->ro_model ? JUNO_RO_IDENTITY : juno_ro_kind(&c->ro);
     if (kind == JUNO_RO_IDENTITY) {
         asg_sync(c);
+        pk_begin(c, n);
         for (t = t0; t < t0 + n; ++t) drv_render_sample(c, o, t);
+        pk_end(c);
         return;
     }
     if (kind == JUNO_RO_CONVERTER) {
@@ -3272,4 +3445,184 @@ int juno_gui_render_dry(juno_ctx *c, float *out, int nframes)
     o.il = out; o.dry = 1;
     drv_block(c, nframes, &o);
     return 1;
+}
+
+/* ==== THE LFO LED AND THE LEVEL METERS (CLAIMS A37, docs/LED_METER.md) ====
+ * What the plugin's GUI controls do at each tick of its 50 ms window timer (WM_TIMER ->
+ * the control tree's slot +96): the LED (Script.xml lfoLed, vm.vs.dm: rva 0x324FF0 ->
+ * 0x325070) and the two meters (barGraphX, ch 0 / 1: rva 0x31C450), and what a meter
+ * draws (rva 0x31C210). The app keeps each control's state and blits; every number it
+ * uses comes from these three calls. */
+
+/* The LED's read: the engine's vt+80 (rva 0x3C7180), the store's read with -1 and 1. */
+float juno_gui_lfo_led(juno_ctx *c)
+{
+    return c ? dm_read(c, -1.0f, 1.0f) : 0.0f;
+}
+
+/* A meter's read: the engine's vt+72 (rva 0x34AF70), channel ch's peak, then 0. */
+float juno_gui_peak(juno_ctx *c, int ch)
+{
+    float p;
+    if (!c || ch < 0 || ch > 1) return 0.0f;
+    p = c->pk_hold[ch];
+    c->pk_hold[ch] = 0.0f;
+    return p;
+}
+
+/* The LED's tick (rva 0x325070): the read, then the frame of a bitmap of nframes. */
+int juno_gui_lfo_led_frame(juno_ctx *c, int nframes)
+{
+    int32_t top = (int32_t)((uint32_t)nframes - 1u), f;
+    float x = (float)top, v = juno_gui_lfo_led(c);
+#if LM_TOOTH == 9
+    x = x * v + 0.5f;
+#else
+    x = x * v;
+#endif
+    f = lm_cvtt((double)x);
+    if (f < 0) return 0;
+    return f <= top ? f : top;
+}
+
+/* A bar's fill (rva 0x2C9A10): rect and fill are x0 y0 x1 y1; horizontal (Script.xml
+ * direction 1) fills from the left, vertical from the bottom; val of max. */
+static void bar_fill(const int *rect, int horiz, int max, int val, int *fill)
+{
+    int32_t v4 = val >= max ? max : val, span, prod;
+    fill[0] = rect[0];
+    fill[3] = rect[3];
+    if (horiz) {
+        fill[1] = rect[1];
+        fill[2] = rect[0];
+        if (max > 0) {
+            span = (int32_t)((uint32_t)rect[2] - (uint32_t)rect[0]);    /* sub */
+            prod = (int32_t)((uint32_t)span * (uint32_t)v4);            /* imul */
+            fill[2] = (int32_t)((uint32_t)(prod / max) + (uint32_t)rect[0]);   /* idiv, add */
+        }
+    } else {
+        fill[2] = rect[2];
+        fill[1] = rect[3];
+        if (max > 0) {
+            span = (int32_t)((uint32_t)rect[3] - (uint32_t)rect[1]);
+            prod = (int32_t)((uint32_t)span * (uint32_t)v4);
+            fill[1] = (int32_t)((uint32_t)rect[3] - (uint32_t)(prod / max));
+        }
+    }
+}
+
+/* A meter's tick (rva 0x31C450): channel ch's read, its new state from the state it
+ * had and its decay (Script.xml decay), its bar's fill of rect (state / 1000 of 999).
+ * The dB scale is the C library's log10 here and the plugin's own (MSVC CRT, rva
+ * 0x6D2660, an FMA3 path or an SSE2 one) there: every float peak gives the same step
+ * (tools/verify/led_meter_gate.py: no float lies within 1e-9 of a step). */
+int juno_gui_meter_tick(juno_ctx *c, int ch, int decay, int state, const int *rect, int horiz, int *fill)
+{
+    double d;
+    int32_t v7, v8;
+    float peak = juno_gui_peak(c, ch);
+#if LM_TOOTH == 10
+    if (!(peak >= 0.0001f)) d = 0.0001;
+#else
+    if (!(peak >= 0.001f)) d = 0.001;
+#endif
+    else if (peak > 1.0f) d = 1.0;
+    else d = (double)peak;
+    v7 = (int32_t)((uint32_t)lm_cvtt(log10(d) * 333.0 + 999.0) * 1000u);
+    if (decay <= 0) {
+        v8 = v7;
+    } else {
+        int32_t t = (int32_t)((uint32_t)state - (uint32_t)(500000 / decay));
+        if (t >= v7) v7 = t;
+        v8 = v7 >= 0 ? v7 : 0;
+    }
+    bar_fill(rect, horiz, 999, v8 / 1000, fill);
+    return v8;
+}
+
+/* A horizontal bar's draw (rva 0x31C210): its blits in order, 7 ints each -- dst x,
+ * dst y, width, height, src x, src y, alpha (-1: the first, a plain blit; then one
+ * column at a time at 255 - 255 (k + 1) / fade) -- returns their count; out holds
+ * cap. A vertical bar (no Script.xml barGraphX is one): 0. */
+int juno_gui_bar_draw(const int *rect, const int *fill, int horiz, int fade, int *out, int cap)
+{
+    int32_t w = (int32_t)((uint32_t)fill[2] - (uint32_t)fill[0]);
+    int32_t h = (int32_t)((uint32_t)fill[3] - (uint32_t)fill[1]);
+    int32_t n = (int32_t)((uint32_t)rect[2] - (uint32_t)w - (uint32_t)rect[0]);
+    int32_t m = fade >= w ? w : fade, solid, k, nb = 0;
+    if (!horiz) return 0;
+    if (n >= m) n = m;
+    solid = (int32_t)((uint32_t)w - (uint32_t)n);
+    if (nb < cap) {
+        int *o = out + 7 * nb;
+        o[0] = fill[0]; o[1] = fill[1]; o[2] = solid; o[3] = h; o[4] = 0; o[5] = 0; o[6] = -1;
+    }
+    ++nb;
+    for (k = 0; k < n; ++k, ++nb) {
+        if (nb < cap) {
+            int *o = out + 7 * nb;
+            o[0] = (int32_t)((uint32_t)fill[0] + (uint32_t)solid + (uint32_t)k);
+            o[1] = fill[1];
+            o[2] = 1;
+            o[3] = h;
+            o[4] = (int32_t)((uint32_t)solid + (uint32_t)k);
+            o[5] = 0;
+#if LM_TOOTH == 11
+            o[6] = 255 - (int32_t)(255u * (uint32_t)k) / fade;
+#else
+            o[6] = 255 - (int32_t)(255u * ((uint32_t)k + 1u)) / fade;
+#endif
+        }
+    }
+    return nb;
+}
+
+/* The store and the peaks as they are (the gate's inspection): last, sum, period,
+ * since, nread, nacc, toggle, held left, held right (floats as their bits). */
+void juno_gui_lm_peek(const juno_ctx *c, uint32_t *out)
+{
+    memcpy(&out[0], &c->dm.last, 4);
+    memcpy(&out[1], &c->dm.sum, 4);
+    out[2] = (uint32_t)c->dm.period;
+    out[3] = (uint32_t)c->dm.since;
+    out[4] = (uint32_t)c->dm.nread;
+    out[5] = (uint32_t)c->dm.nacc;
+    out[6] = (uint32_t)c->dm.toggle;
+    memcpy(&out[7], &c->pk_hold[0], 4);
+    memcpy(&out[8], &c->pk_hold[1], 4);
+}
+
+/* The store's and the render tail's own operations, for the gate's function-level part:
+ * op 0 add a, op 1 read with (a, b) -> *res, op 2 set the fields from in[0..8] (as
+ * juno_gui_lm_peek gives them), op 3 one engine render call of n samples (in: n left
+ * then n right, as bits) merged into the held peaks. */
+void juno_gui_lm_op(juno_ctx *c, int op, float a, float b, const uint32_t *in, int n, float *res)
+{
+    int i;
+    switch (op) {
+    case 0: dm_add(c, a); break;
+    case 1: *res = dm_read(c, a, b); break;
+    case 2:
+        memcpy(&c->dm.last, &in[0], 4);
+        memcpy(&c->dm.sum, &in[1], 4);
+        c->dm.period = (int32_t)in[2];
+        c->dm.since = (int32_t)in[3];
+        c->dm.nread = (int32_t)in[4];
+        c->dm.nacc = (int32_t)in[5];
+        c->dm.toggle = (int32_t)in[6];
+        memcpy(&c->pk_hold[0], &in[7], 4);
+        memcpy(&c->pk_hold[1], &in[8], 4);
+        break;
+    case 3:
+        pk_begin(c, n);
+        for (i = 0; i < n; ++i) {
+            float l, r;
+            memcpy(&l, &in[i], 4);
+            memcpy(&r, &in[n + i], 4);
+            pk_sample(c, l, r);
+        }
+        pk_end(c);
+        break;
+    default: break;
+    }
 }

@@ -11,12 +11,16 @@ browser, rendered by its audio thread's block function, and logs every engine
 call. This checker
 plays that call log into the plugin -- the same boot, the same patch loads, the
 same model sets, the same drains, the same process() blocks with the same host
-events and parameter points -- and requires:
+events and parameter points, the same LED and meter ticks of its UI timer (the
+plugin's own reads, frame, tick and draw: tools/verify/meter_emu.py, CLAIMS A37)
+-- and requires:
   bit-exact   every sample of both channels equal, the program in the oracle's FP
               mode (--fp-oracle: DAZ without FTZ -- Unicorn has no FTZ, playbook 120)
   spectra     the magnitude spectra (4096-point frames, Hann) equal
   production  the program in its shipped FP mode (FTZ + DAZ) against the same run:
               reported (equal unless a denormal result occurred)
+  meters      every LED frame, meter state, fill and blit the program logged equal
+              to the plugin's for the same reads (and the LED moves, a bar lights)
 Harness = plumbing: the plugin side runs the logged calls; nothing is computed
 here but the comparison. A keybed write is the plugin's own: the panel keyboard's
 (key, value) into its note value (rva 0x2838C0, then the model's notifies -- what
@@ -68,19 +72,23 @@ def oracle(args):
     log, tooth = args
     import gc
     import host_process_emu as H
+    import meter_emu as M
     lines = [ln.split() for ln in log.splitlines() if ln and not ln.startswith('#')]
     h = None
     q = None
     index, banks = {}, {}
     PL, PR = [], []
     skipped, toothed, ktoothed = [], False, False
+    meters = [0, 0, None]                                    # ticks, differing ticks, the first difference
+    rect = fill = None
     i = 0
     while i < len(lines):
         t = lines[i]
         i += 1
         if t[0] == 'create':
-            h = H.HostProcess()
+            h = M.FedHost()                                  # the plugin's LED store and render tail fed
             h.start(float(t[1]), 4096)                       # raw: no prelude, no settle (boot_gate.py)
+            h.bind()
             uc = h.uc
             q = lambda a: struct.unpack('<Q', uc.mem_read(a, 8))[0]
             model = q(q(h.core + 8))
@@ -119,6 +127,23 @@ def oracle(args):
                 h.call(H.IB + rva, rcx=model, count=500_000_000)
         elif t[0] == 'midi':
             pass                                             # the program's own input log
+        elif t[0] in ('led', 'meter', 'bar'):                # the UI timer's LED and meter ticks (CLAIMS A37)
+            if t[0] == 'led':
+                got = [h.rig.led_frame(h.rig.led_read(), int(t[1]))]
+                want = [int(t[2])]
+            elif t[0] == 'meter':
+                ch, dec, st = int(t[1]), int(t[2]), int(t[3])
+                rect, horiz = tuple(int(x) for x in t[4:8]), int(t[8])
+                nst, fill = h.rig.meter_tick(st, dec, ch, rect, horiz)
+                got, want = [nst] + list(fill), [int(x) for x in t[9:14]]
+            else:
+                got = [x for b in h.rig.bar_draw(rect, fill, int(t[1])) for x in b]
+                want = [int(x) for x in t[3:]]
+            meters[0] += 1
+            if got != want:
+                meters[1] += 1
+                if meters[2] is None:
+                    meters[2] = '%s: plugin %s, exe %s' % (' '.join(t[:3]), got[:8], want[:8])
         elif t[0] == 'process':
             n, tempo, nev, npar = int(t[1]), f64(t[2]), int(t[3]), int(t[4])
             evs, par = [], []
@@ -141,7 +166,7 @@ def oracle(args):
             raise SystemExit('log: unknown call %r' % (t,))
     del h
     gc.collect()                                             # Unicorn's native memory (playbook 161)
-    return PL, PR, sorted(set(skipped))
+    return PL, PR, sorted(set(skipped)), meters
 
 
 def run_exe(exe, work, seed, fp_oracle):
@@ -183,7 +208,7 @@ def main():
     with mp.get_context('spawn').Pool(jobs) as pool:
         refs = pool.map(oracle, [(runs[s][0][1], tooth) for s in seeds], chunksize=1)
     fails = 0
-    for s, (PL, PR, skipped) in zip(seeds, refs):
+    for s, (PL, PR, skipped, meters) in zip(seeds, refs):
         (ex, log), (prod, _) = runs[s]
         ref = np.empty(2 * len(PL), np.uint32)
         ref[0::2] = PL
@@ -202,13 +227,18 @@ def main():
         nhold = sum(1 for ln in log.splitlines() if ln.startswith('model_set %d ' % 0x00600138))
         nload = sum(1 for ln in log.splitlines() if ln.startswith('queue_patch')) - 1
         ndrain = sum(1 for ln in log.splitlines() if ln == 'ui_tick')
-        ok = same and spec_same and exb.size > 0 and float(np.max(np.abs(ex))) > 0.01
+        leds = [int(ln.split()[2]) for ln in log.splitlines() if ln.startswith('led ')]
+        lit = sum(1 for ln in log.splitlines() if ln.startswith('meter ') and int(ln.split()[9]) > 0)
+        mreach = len(set(leds)) >= 2 and lit > 0              # REACH: the LED moves, a bar lights
+        ok = same and spec_same and exb.size > 0 and float(np.max(np.abs(ex))) > 0.01 and not meters[1] and mreach
         fails += not ok
         print('%s seed %d: %s patch %d, %d host notes, %d keybed writes (%d presses), %d KEY HOLD sets, %d patch '
-              'changes, %d drains, %d samples: %s; spectra %s (max %.3g dB); production FP mode %s%s' % (
+              'changes, %d drains, %d samples: %s; spectra %s (max %.3g dB); production FP mode %s; LED and meter '
+              'ticks %s (%d, LED frames %d, bar lit %d)%s' % (
             'ok  ' if ok else 'FAIL', s, name[2], int(name[1]) + 1, nkeys, len(kbw), npress, nhold, nload, ndrain, ex.size // 2,
             'BIT-EXACT' if same else 'DIFFER from sample %d' % (first // 2), 'IDENTICAL' if spec_same else 'DIFFER',
             dbmax, 'equal' if prod_same else 'differs (denormals: FTZ)',
+            'EQUAL' if not meters[1] else '%d DIFFER, first %s' % (meters[1], meters[2]), meters[0], len(set(leds)), lit,
             ('; model ids not in the plugin\'s record list: %s' % skipped) if skipped else ''))
     shutil.rmtree(work)
     if tooth:                                 # the tooth must bite on every seed

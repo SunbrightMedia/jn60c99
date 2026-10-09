@@ -133,7 +133,10 @@ mine is a hypothesis (playbook 80).
   included (A34, bank_product_gate.py; the user's 11 banks, 704 patches: every
   gate bit-exact, docs/USER_BANKS.md), and the host edit's scratch -- only the
   recall's cells per edit, so a patch change no longer stalls process() for
-  ~90-380 ms (A35, edit_cover_gate.py). JUNO-60.exe = the port + the plugin's
+  ~90-380 ms (A35, edit_cover_gate.py), and the LFO LED and the two level
+  meters -- the engine's LED store and peaks, the GUI's reads, frame, dB tick,
+  decay and fade, all the plugin's own (A37, led_meter_gate.py,
+  docs/LED_METER.md). JUNO-60.exe = the port + the plugin's
   panel as ONE Windows program (gui/win, CLAIMS C6, `make native`; LOCAL ONLY:
   it embeds the artwork and the user's banks). Every host call:
   docs/HOST_CALL_CENSUS.md (task #36 closed; not ported: the SYSTEM-8 hardware
@@ -156,7 +159,8 @@ mine is a hypothesis (playbook 80).
   18ea9bd2 (all of them, the exe and web keyboard checks, refio) is GREEN (job
   verify_18ea9bd2, EXIT 0, 105 sections, 44 gates, 0 failures, ARM golden OK,
   every reference rebuilt from the plugin; verify_a35 had died in a container
-  restart). Later commits are docs only.
+  restart). After that run: A37 (the LED and the meters: gui/juno_bridge.c,
+  both GUIs, a new gate) -- a full verify is owed.
   The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up

@@ -2980,3 +2980,43 @@ A guard is proven per toolchain: plant the defect it guards against and watch EA
 claims the guard stop on it. A build script that relies on warning flags makes an unknown flag an
 error (`-Werror=unknown-warning-option` in clang) -- a silent "unknown option" is a guard that
 was never there.
+
+## 166. AN EMULATOR CAN AGREE WITH THE CPU ON EVERY COMPARE AND STILL RETURN OTHER BITS -- MEASURE EACH INSTRUCTION FAMILY THE GATE FEEDS EDGE INPUTS
+Paid 2026-10-09 (JUNO, CLAIMS A37). The function-level part of the LED / meter gate runs the
+plugin's render tail (maxss / comiss) on seeded samples with denormals. The first run differed on
+15 of 1200 calls: the reference ran at Unicorn's default MXCSR (no DAZ), the port under the gates'
+oracle mode (DAZ). Measured with a two-instruction snippet on both: under DAZ, comiss agrees, but
+Unicorn's maxss returns the denormal operand's OWN bits where the CPU returns the zero DAZ makes of
+it (maxss(0, 0x00000001): Unicorn 0x00000001, CPU 0x00000000). Playbook 120 measured DAZ on
+arithmetic only; selection instructions were never measured. Fixed by grading the logic in plain
+IEEE mode on both sides (no DAZ, no FTZ), where the emulator equals the CPU, and by proving the
+product never selects a denormal there (FTZ: the engine's samples are never denormal on x86; the
+running chains, in the oracle mode, compare every read).
+### The rule
+Before feeding a gate edge inputs (denormals, NaN payloads, infinities), measure the emulator
+against the CPU on each instruction FAMILY the gate's code uses -- arithmetic, compare, select,
+convert -- in each FP mode the gate runs. Run the function-level grading in the mode where they
+are measured equal, and state what the product's mode makes unreachable.
+
+## 167. A TOOTH THE ROUTINE TARGET NEVER RUNS ROTS UNSEEN -- RUN EVERY GATE'S TEETH WHERE THE GATE RUNS
+Paid 2026-10-09 (JUNO, tools/verify/wasm_product_gate.py). `make webapp` ran the WASM product gate
+but not its `--tooth`. Two of its five teeth had gone stale: their anchors -- the patch load's
+loop (changed by A32, 2026-10-07: the store's set) and the warm-up's own voice-count sync (gone
+with A25: the warm-up became the product's render) -- no longer existed, so `--tooth` stopped
+with "the tooth is stale" the first time anyone ran it again, two days later, while adding a
+meter tooth. For those two days the gate's claim "its teeth bite" was unproven. Fixed: both
+teeth rebuilt on today's code (the load reversed; the warm-up rendering nothing, which leaves the
+first key silent -- the defect the reach guard was added for), and `--tooth` now runs in `make
+webapp` after the gate.
+### The rule
+A gate's teeth run in the same target as the gate, every time: a tooth kept for occasional runs
+is a claim nobody re-checks. A stale anchor is a failure of the gate, never a skip.
+
+## 168. AN INTERFACE'S USERS INCLUDE ITS CHECKS -- SEARCH THE WHOLE TREE BEFORE REMOVING A METHOD
+Paid 2026-10-09 (JUNO, gui/skin/engine.js). Wiring the plugin's meters into the skin, the old
+`peaks()` (the page's output peak) looked dead: a search of gui/skin found no caller, so it was
+removed. tools/verify/skin_check.mjs used it as its witness that a key sounds; `make webapp` went
+red on "E.peaks is not a function". Restored, documented as the checks' witness (not the meters).
+### The rule
+Before removing or renaming a method of an interface, search the whole repository -- the gates
+and checks are its users too. An interface a check drives is part of the check's contract.

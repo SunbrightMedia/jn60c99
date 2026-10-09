@@ -12,7 +12,9 @@ are graded against the plugin by state_load_gate.py (A22) and
 host_edit_gate.py (A20); this gate grades the DELIVERED artifact against them:
 the same op list runs through libjuno.so (this process, ctypes) and through
 the WASM (node, tools/verify/wasm_golden.mjs --script), and the FNV-1a-64 of
-every render must agree. wasm_golden.mjs with no argument is the isolation
+every render must agree -- and of every UI-timer tick after it: the LED's frame,
+both meters' states, fills and blits (CLAIMS A37; the dB scale is each build's
+own log10, emscripten's and glibc's). wasm_golden.mjs with no argument is the isolation
 control: the 44.1 kHz recall corpus whose hashes the native build made.
 
 The harness is plumbing: an op list of API calls, no plugin logic.
@@ -29,8 +31,8 @@ voice-count sync).
 
 TOOTH (--tooth): a WASM built from a mutated bridge (the patch load reversed),
 the app flow without juno_gui_plugin_init, the load as the recall model
-(juno_gui_apply_bank), and a native bridge whose warm-up skips the voice-count
-sync (the reach guard) must each FAIL; the control must PASS."""
+(juno_gui_apply_bank), a WASM with another meter floor, and a native bridge whose
+warm-up renders nothing (the reach guard) must each FAIL; the control must PASS."""
 import ctypes, glob, json, os, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -121,15 +123,50 @@ def chains(H):
     ops += release(57) + [['render', 24000],
             ['host', sw, 0], ['arp', 0, 2, 3, 120.0, 0.6], ['render', 24000]]
     out.append({'name': 'arp_48000', 'ops': ops})
+    # the app's 50 ms UI timer after every render: the LED's and both meters' ticks (CLAIMS A37)
+    for ch in out:
+        ops = []
+        for op in ch['ops']:
+            ops.append(op)
+            if op[0] == 'render':
+                ops.append(['meter'])
+        ch['ops'] = ops
+    return out
+
+
+# the meters as Script.xml places them (functionUpperOrig at 56,0: barGraphL / barGraphR at
+# 1516,52 / 1516,69, 228 x 10, direction 1, decay 8, fade 10) and the LED's 24 frames
+METER_RECT = ((1572, 52, 1800, 62), (1572, 69, 1800, 79))
+LED_FRAMES, DECAY, FADE, BLITS = 24, 8, 10, 64
+
+
+def meter_tick(lib, c, st):
+    """one tick of the app's LED and meters: their ints, in order (st: the meters' states)"""
+    out = [lib.juno_gui_lfo_led_frame(c, LED_FRAMES)]
+    fill = (ctypes.c_int * 4)()
+    blits = (ctypes.c_int * (7 * BLITS))()
+    for ch in (0, 1):
+        rect = (ctypes.c_int * 4)(*METER_RECT[ch])
+        st[ch] = lib.juno_gui_meter_tick(c, ch, DECAY, st[ch], rect, 1, fill)
+        nb = min(lib.juno_gui_bar_draw(rect, fill, 1, FADE, blits, BLITS), BLITS)
+        out += [st[ch]] + list(fill) + [nb] + list(blits[:7 * nb])
     return out
 
 
 def run_native(lib, bank, chain):
     c, hashes, sound, first = None, [], [], None
+    st, frames, lit = [0, 0], set(), 0
     for op in chain['ops']:
         k = op[0]
+        if k == 'meter':
+            v = meter_tick(lib, c, st)
+            hashes.append(fnv1a64(b''.join(x.to_bytes(4, 'little', signed=True) for x in v)))
+            frames.add(v[0])
+            lit += st[0] > 0
+            continue
         if k == 'create':
             c = lib.juno_gui_create(ctypes.c_float(op[1]), 0)
+            st = [0, 0]
         elif k == 'vel_sw':
             lib.juno_gui_set_kbd_velocity(c, op[1])
         elif k == 'plugin_init':
@@ -164,6 +201,7 @@ def run_native(lib, bank, chain):
     lib.juno_gui_destroy(c)
     chain['peaks'] = sound
     chain['first'] = sound[first] if first is not None and first < len(sound) else 0.0
+    chain['meters'] = (len(frames), lit)
     return hashes
 
 
@@ -182,7 +220,9 @@ def load_lib():
                  ('juno_gui_arp_config', [V, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float, ctypes.c_float]),
                  ('juno_gui_render', [V, ctypes.POINTER(ctypes.c_float), ctypes.c_int]),
                  ('juno_gui_destroy', [V]), ('juno_gui_host_min', [ctypes.c_int]),
-                 ('juno_gui_host_max', [ctypes.c_int])):
+                 ('juno_gui_host_max', [ctypes.c_int]), ('juno_gui_lfo_led_frame', [V, ctypes.c_int]),
+                 ('juno_gui_meter_tick', [V, ctypes.c_int, ctypes.c_int, ctypes.c_int, V, ctypes.c_int, V]),
+                 ('juno_gui_bar_draw', [V, V, ctypes.c_int, ctypes.c_int, V, ctypes.c_int])):
         getattr(lib, f).argtypes = a
     lib.juno_gui_host_name.restype = ctypes.c_char_p
     lib.juno_gui_host_name.argtypes = [ctypes.c_int]
@@ -202,12 +242,15 @@ def make_script():
     for ch in sc['chains']:
         ch['hashes'] = run_native(lib, bank, ch)
         pk, f1 = ch.pop('peaks'), ch.pop('first')
+        nf, lit = ch.pop('meters')
         aud = sum(p > AUDIBLE for p in pk)
         ok = aud * 2 >= len(pk) and f1 > AUDIBLE
-        reach &= ok
-        print('native %-12s %3d ops, %3d renders, %3d audible (peak %.3g, first key %.3g)%s' % (
-            ch['name'], len(ch['ops']), len(pk), aud, max(pk), f1, '' if ok else
-            '  REACH: silent -- comparing silence proves nothing'), flush=True)
+        mok = nf >= 2 and lit * 4 >= len(pk)       # REACH of the meters: the LED moves, the bar lights
+        reach &= ok and mok
+        print('native %-12s %3d ops, %3d renders, %3d audible (peak %.3g, first key %.3g); LED %d frames, '
+              'meter lit at %d ticks%s' % (
+                  ch['name'], len(ch['ops']), len(pk), aud, max(pk), f1, nf, lit, '' if ok and mok else
+                  '  REACH: silent -- comparing silence proves nothing'), flush=True)
     os.makedirs(SCRATCH, exist_ok=True)
     path = os.path.join(SCRATCH, 'wasm_product_script.json')
     json.dump(sc, open(path, 'w'))
@@ -268,23 +311,34 @@ def tooth():
     print(r.stdout.rstrip().splitlines()[-1] if r.stdout.strip() else r.stderr[-500:])
     res.append(('control', 'the isolation control: the proven recall corpus', r.returncode == 0, 'PASS'))
     web = mutant_wasm('patch_reversed', 'gui/juno_bridge.c',
-                      '    for (k = 0; k < JUNO_PATCH_EV_N; ++k)\n        apply_event(c, JUNO_PATCH_EV[k].host, rec_value(r, &JUNO_PATCH_EV[k]));\n',
-                      '    for (k = JUNO_PATCH_EV_N - 1; k >= 0; --k)\n        apply_event(c, JUNO_PATCH_EV[k].host, rec_value(r, &JUNO_PATCH_EV[k]));\n')
+                      '    for (k = 0; k < JUNO_PATCH_EV_N; ++k) {\n        int32_t v = rec_value(r, &JUNO_PATCH_EV[k]);\n',
+                      '    for (k = JUNO_PATCH_EV_N - 1; k >= 0; --k) {\n        int32_t v = rec_value(r, &JUNO_PATCH_EV[k]);\n')
     print('--- tooth wasm_patch_reversed')
     res.append(('wasm_patch_reversed', 'a WASM built from other source (the patch load reversed)', run_wasm(script, web) == 1, 'BITES'))
+    web = mutant_wasm('meter_floor', 'gui/juno_bridge.c',
+                      '    if (!(peak >= 0.001f)) d = 0.001;\n#endif',
+                      '    if (!(peak >= 0.002f)) d = 0.002;\n#endif')
+    print('--- tooth wasm_meter_floor')
+    res.append(('wasm_meter_floor', 'a WASM whose meter floor is 0.002 (the LED and meter ticks are graded)',
+                run_wasm(script, web) == 1, 'BITES'))
     for t, what in (('no_init', 'the app without juno_gui_plugin_init (the engine after BUILD)'),
                     ('apply_bank', 'the load as the recall model (juno_gui_apply_bank)')):
         print('--- tooth flow_%s' % t)
         res.append(('flow_' + t, what, run_wasm(script, WEB, t) == 1, 'BITES'))
-    # the reach guard: a native bridge whose warm-up skips the render's voice-count
-    # sync leaves the app nearly silent (the defect this guard was added for)
+    # the reach guard: a native bridge whose warm-up renders nothing leaves the app's first key
+    # silent after start-up (the defect this guard was added for: the warm-up then skipped the
+    # voice-count sync; since A25 the warm-up is the product's own render, so the tooth is the
+    # warm-up gone)
     from tooth_tree import run_tooth
-    print('--- tooth reach_warm_no_preamble')
-    rc = run_tooth('wasm_reach_warm', [('gui/juno_bridge.c',
-                   '         * next block\'s sync gates it off (state_load_gate.py, app family) */\n        asg_sync(c);\n',
-                   '         * next block\'s sync gates it off (state_load_gate.py, app family) */\n')],
+    print('--- tooth reach_warm_none')
+    src = open(os.path.join(REPO, 'gui', 'juno_bridge.c')).read()
+    anchor = '    while (nsamples > 0) {\n        int b = nsamples > 512 ? 512 : nsamples;\n'
+    if src.count(anchor) != 1:
+        raise SystemExit('TOOTH reach_warm_none: anchor occurs %d times -- the tooth is stale' % src.count(anchor))
+    rc = run_tooth('wasm_reach_warm', [('gui/juno_bridge.c', anchor,
+                   '    while (0) {\n        int b = nsamples > 512 ? 512 : nsamples;\n')],
                    ['tools/verify/wasm_product_gate.py', '--native-only'], tail=1500)
-    res.append(('reach_warm_no_preamble', 'the warm-up without the voice-count sync: the app nearly silent', rc == 0, 'BITES'))
+    res.append(('reach_warm_none', 'the warm-up rendering nothing: the first key after start-up silent', rc == 0, 'BITES'))
     print()
     for n, what, ok, word in res:
         print('%-22s %-12s %s' % (n, word if ok else 'FAILED', what))

@@ -115,6 +115,24 @@ function runScript(sc) {
     host: Module.cwrap('juno_gui_host_set', null, [N, N, N]),
     arp: Module.cwrap('juno_gui_arp_config', null, [N, N, N, N, N, N]),
     render: Module.cwrap('juno_gui_render', N, [N, N, N]),
+    led: Module.cwrap('juno_gui_lfo_led_frame', N, [N, N]),
+    meter: Module.cwrap('juno_gui_meter_tick', N, [N, N, N, N, N, N, N]),
+    bar: Module.cwrap('juno_gui_bar_draw', N, [N, N, N, N, N, N]),
+  };
+  // the app's LED and meters (wasm_product_gate.py meter_tick: the same rects, decay, fade)
+  const RECT = [[1572, 52, 1800, 62], [1572, 69, 1800, 79]], BLITS = 64;
+  const mbuf = Module._malloc(4 * (8 + 7 * BLITS));
+  const meterTick = (c, st) => {
+    const out = [F.led(c, 24)];
+    for (let ch = 0; ch < 2; ch++) {
+      new Int32Array(Module.HEAPU8.buffer, mbuf, 4).set(RECT[ch]);
+      st[ch] = F.meter(c, ch, 8, st[ch], mbuf, 1, mbuf + 16);
+      const nb = Math.min(F.bar(mbuf, mbuf + 16, 1, 10, mbuf + 32, BLITS), BLITS);
+      const I = new Int32Array(Module.HEAPU8.buffer, mbuf, 8 + 7 * BLITS);
+      out.push(st[ch], I[4], I[5], I[6], I[7], nb);
+      for (let i = 0; i < 7 * nb; i++) out.push(I[8 + i]);
+    }
+    return new Uint8Array(Int32Array.from(out).buffer);
   };
   const tooth = process.env.WASM_SCRIPT_TOOTH || '';
   const bank = fs.readFileSync(sc.bank);
@@ -122,10 +140,17 @@ function runScript(sc) {
   Module.HEAPU8.set(bank, bankPtr);
   let bad = 0;
   for (const ch of sc.chains) {
-    let c = 0, k = 0, first = -1;
+    let c = 0, k = 0, first = -1, st = [0, 0], nt = 0;
     for (const op of ch.ops) {
       switch (op[0]) {
-        case 'create': c = F.create(op[1], 0); break;
+        case 'create': c = F.create(op[1], 0); st = [0, 0]; break;
+        case 'meter': {
+          const h = fnvHex(meterTick(c, st));
+          if (h !== ch.hashes[k] && first < 0) first = k;
+          k++;
+          nt++;
+          break;
+        }
         case 'vel_sw': F.vel_sw(c, op[1]); break;
         case 'plugin_init': if (tooth !== 'no_init') F.plugin_init(c); break;
         case 'warmup': F.warmup(c, op[1]); break;
@@ -150,9 +175,9 @@ function runScript(sc) {
       }
     }
     if (first < 0 && k === ch.hashes.length)
-      console.log(`OK:   ${ch.name.padEnd(12)} ${k} renders bit-exact vs native`);
+      console.log(`OK:   ${ch.name.padEnd(12)} ${k - nt} renders and ${nt} LED / meter ticks bit-exact vs native`);
     else {
-      console.log(`FAIL: ${ch.name.padEnd(12)} render ${first} of ${k} differs from native`);
+      console.log(`FAIL: ${ch.name.padEnd(12)} render or tick ${first} of ${k} differs from native`);
       bad++;
     }
   }

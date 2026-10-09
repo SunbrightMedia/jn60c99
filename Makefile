@@ -161,6 +161,10 @@ verify: test libjuno.so
 	fresh $(SCRATCH)/keyhold_ref.pkl || python3 tools/verify/keyhold_gate.py --ref || FAIL=1; \
 	python3 tools/verify/keyhold_gate.py --port || FAIL=1; \
 	python3 tools/verify/keyhold_gate.py --port-tooth || FAIL=1; \
+	echo "=== THE LFO LED AND THE LEVEL METERS (CLAIMS A37): the plugin's store, peaks, reads, frame, tick and draw, part 1 and the running plugin ==="; \
+	fresh $(SCRATCH)/led_meter_ref.pkl || python3 tools/verify/led_meter_gate.py --ref || FAIL=1; \
+	python3 tools/verify/led_meter_gate.py --port || FAIL=1; \
+	python3 tools/verify/led_meter_gate.py --port-tooth || FAIL=1; \
 	echo "=== REINIT == CREATE: juno_gui_reinit leaves a fresh context (state save, CCs, a learn, the keyboard note value, a render) ==="; \
 	python3 tools/verify/reinit_check.py || FAIL=1; \
 	echo "=== VOICE COUNT (CLAIMS B10): the shipped 6 voices, counts 1..9 changed while notes sound, audio + rendered state incl. stopped units ==="; \
@@ -240,6 +244,7 @@ completeness:
 native: libjuno.so
 	python3 tools/dist/make_native.py
 	python3 tools/dist/native_check.py
+	for t in replay glue tick; do if python3 tools/dist/native_check.py --tooth $$t; then echo "native_check tooth $$t DID NOT BITE"; exit 1; fi; done
 	python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 1,2,3,4,5,6,7,8
 	python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 1,2,3,4,5 --tooth
 
@@ -247,6 +252,7 @@ webapp: libjuno.so
 	bash gui/web/build.sh
 	env node tools/verify/wasm_golden.mjs
 	python3 tools/verify/wasm_product_gate.py
+	python3 tools/verify/wasm_product_gate.py --tooth
 	python3 tools/verify/bundle_webapp.py
 	env node tools/verify/verify_webapp.mjs
 	env node tools/verify/skin_check.mjs

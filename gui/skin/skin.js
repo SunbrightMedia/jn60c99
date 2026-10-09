@@ -303,6 +303,17 @@ class Skin {
     const tbp = text(el, "tipBarPosition");
     c.tipAt = tbp ? ints(tbp) : null;
     if (c.type === "keyboardX") this.keyboardInit(c);
+    if (c.type === "lfoLed") c.frame = 0;
+    if (c.type === "barGraphX") {        // CBarGraphControl: its object zeroed (rva 0x34FA60), then Script.xml
+      const num = k => parseInt(text(el, k) || "0", 10);
+      c.horiz = num("direction") !== 0 ? 1 : 0;
+      c.decay = num("decay");
+      c.ch = num("ch");
+      c.fade = num("fade");
+      c.state = 0;
+      c.rect = [c.x, c.y, c.x + c.w, c.y + c.h];
+      c.blits = [];
+    }
     if (c.type === "patchName") {
       const [bx, by] = ints(text(el, "buttonPosition"));
       const [tx, ty] = ints(text(el, "textPosition"));
@@ -362,6 +373,24 @@ class Skin {
     if (L.name === "vm.vs.mainZoom") this.applyZoom();
     if (L.name === "fm.PATCH.CTRL.TEMPO SYNC") this.noteFlash = performance.now();
     this.dirty = true;
+  }
+
+  // the LED's and the meters' ticks of the plugin's 50 ms window timer (WM_TIMER -> each
+  // open control's slot +96): the LED of the open LFO panel, both meters; true if one changed
+  meterTick() {
+    let moved = false;
+    for (const c of this.visible(this.tree)) {
+      if (c.type === "lfoLed" && c.pic) {
+        const f = this.E.ledFrame(c.pic.n);
+        if (f !== c.frame) { c.frame = f; moved = true; }
+      } else if (c.type === "barGraphX") {
+        const r = this.E.meterTick(c.ch, c.decay, c.state, c.rect, c.horiz);
+        c.state = r.state;
+        const b = this.E.barDraw(c.rect, r.fill, c.horiz, c.fade);
+        if (JSON.stringify(b) !== JSON.stringify(c.blits)) { c.blits = b; moved = true; }
+      }
+    }
+    return moved;
   }
 
   // ---------------------------------------------------------------- draw
@@ -437,8 +466,18 @@ class Skin {
         drawFrame(g, c.pic, this.chorusLed(c) ? 1 : 0, c.x, c.y);
         return;
       case "lfoLed":
-        drawFrame(g, c.pic, 0, c.x, c.y);          // not yet ported: drawn idle
+        drawFrame(g, c.pic, c.frame, c.x, c.y);    // the frame of its last tick (rva 0x325070)
         return;
+      case "barGraphX": {                          // its blits (rva 0x31C210), from its last tick
+        if (!c.bmp || !c.bmp.img) return;
+        for (const [dx, dy, w, h, sx, sy, a] of c.blits) {
+          if (w <= 0 || h <= 0) continue;
+          g.globalAlpha = a < 0 ? 1 : a / 255;
+          g.drawImage(c.bmp.img, sx, sy, w, h, dx, dy, w, h);
+        }
+        g.globalAlpha = 1;
+        return;
+      }
       case "patchName": {
         drawFrame(g, c.bmp, held ? 1 : 0, c.bx, c.by);
         drawText(g, c.writers[0], this.patchNameText(), c.tx, c.ty, c.tw, c.th);
@@ -448,7 +487,7 @@ class Skin {
         this.keyboardDraw(c);
         return;
       default:
-        return;                                    // barGraphX, ccAssign, auth*: not drawn
+        return;                                    // ccAssign, auth*: not drawn
     }
   }
 
@@ -1050,6 +1089,7 @@ export async function boot(canvas, status) {
     let kb = false;
     for (let i = 0; i < 128 && !kb; i++) kb = (E.keybedState(i) > 0) !== (skin.kbStates[i] > 0);
     if (skin.M.refresh() || kb) skin.dirty = true;
+    if (skin.meterTick()) skin.dirty = true;
   }, 50);
   const frame = () => {
     if (skin.dirty) { skin.dirty = false; skin.draw(); }

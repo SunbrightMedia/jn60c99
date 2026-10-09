@@ -17,11 +17,14 @@ engine call. This checker:
            note events, velocity v / 127; CC n -> MIDI-mapping parameter base +
            n, value d / 127; aftertouch -> base + 128; pitch bend -> base +
            129, value (lsb | msb << 7) / 16383)
+  ticks    requires every LED / meter / bar tick of the program's UI timer (CLAIMS A37)
+           equal to the build's for the same calls at the same points
   speed    reports the render's real-time factor (the program's own clock)
 
 usage: python3 tools/dist/native_check.py [--exe PATH] [--tooth NAME]
   --tooth replay   the replay drops the first panel edit (VCF CUTOFF): must FAIL
   --tooth glue     the expected velocity is v / 128: must FAIL
+  --tooth tick     the replay misses one LED read of the UI timer (CLAIMS A37): must FAIL
 Wine: $WINE (default /usr/lib/wine/wine64) with $WINEPREFIX.
 """
 import ctypes
@@ -84,6 +87,9 @@ def load_lib():
                                              ctypes.c_int, ctypes.c_double, ctypes.POINTER(ctypes.c_float),
                                              ctypes.POINTER(ctypes.c_float), ctypes.c_int], ctypes.c_int),
                     ('juno_midi_base', [], ctypes.c_uint32),
+                    ('juno_gui_lfo_led_frame', [V, ctypes.c_int], ctypes.c_int),
+                    ('juno_gui_meter_tick', [V, ctypes.c_int, ctypes.c_int, ctypes.c_int, V, ctypes.c_int, V], ctypes.c_int),
+                    ('juno_gui_bar_draw', [V, V, ctypes.c_int, ctypes.c_int, V, ctypes.c_int], ctypes.c_int),
                     ('juno_gui_free', [V], None)]:
         fn = getattr(lib, n, None)
         if fn is None:
@@ -117,11 +123,31 @@ def replay(lib, log, tooth):
     base = lib.juno_midi_base()
     out, errs, pending, blk, dropped = [], [], [], 0, False
     banks = {}
+    rect, fill = (ctypes.c_int * 4)(), (ctypes.c_int * 4)()
+    skipped_led = False
+    blits = (ctypes.c_int * (7 * 64))()
     lines = [ln.split() for ln in log.splitlines() if ln and not ln.startswith('#')]
     i = 0
     while i < len(lines):
         t = lines[i]
         i += 1
+        if t[0] in ('led', 'meter', 'bar'):             # the UI timer's LED and meter ticks (CLAIMS A37)
+            if t[0] == 'led' and tooth == 'tick' and not skipped_led:
+                skipped_led = True                        # TOOTH: the build misses one LED read
+                continue
+            if t[0] == 'led':
+                got, want = [lib.juno_gui_lfo_led_frame(c, int(t[1]))], [int(t[2])]
+            elif t[0] == 'meter':
+                for k in range(4):
+                    rect[k] = int(t[4 + k])
+                st = lib.juno_gui_meter_tick(c, int(t[1]), int(t[2]), int(t[3]), rect, int(t[8]), fill)
+                got, want = [st] + list(fill), [int(x) for x in t[9:14]]
+            else:
+                nb = min(lib.juno_gui_bar_draw(rect, fill, 1, int(t[1]), blits, 64), 64)
+                got, want = [nb] + list(blits[:7 * nb]), [int(x) for x in t[2:]]
+            if got != want:
+                errs.append('tick %s: the build %s, the program %s' % (' '.join(t[:3]), got[:8], want[:8]))
+            continue
         if t[0] == 'create':
             c = lib.juno_gui_create(float(t[1]), int(t[2]))
         elif t[0] == 'plugin_init':
