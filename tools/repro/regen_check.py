@@ -43,6 +43,14 @@ ENTRIES = [
     ('teensy_golden', ['tests/teensy_golden.h', 'tools/verify/teensy_golden.json'], ['tools/verify/gen_teensy_golden.py']),
     ('arp_golden', ['tests/arp_pattern_golden.h'], [
         'tools/verify/arp_sched_ab.py --ref-goldens', 'tools/verify/arp_sched_ab.py --emit-goldens']),
+    # engine B (the S3 fork) and the firmware's generated headers
+    ('eb_devcells', [], ['tools/engineb/gen_devcells.py --check']),
+    ('eb_fork_tab', ['engine_b/eb_pitch_fork_tab.h'], [
+        'tools/engineb/fork_tab_input.py > scratchpad/fork_tab_input.txt',
+        'tools/engineb/gen_fork_tab.py scratchpad/fork_tab_input.txt']),
+    ('eb_halfos_fir', ['engine_b/eb_halfos_fir.h'], ['tools/engineb/gen_halfos_fir.py']),
+    ('eb_reverb_halfband', ['engine_b/eb_reverb_halfband.h'], ['tools/engineb/gen_reverb_halfband.py']),
+    ('s3_vectors', ['esp32s3/main/s3_pitch_vectors.h', 'esp32s3/main/s3_exp_vectors.h'], ['tools/engineb/gen_s3_vectors.py']),
     ('note_table', [], ['tools/verify/notevel_exhaust.py --ref', 'tools/verify/notevel_exhaust.py --check-table']),
     ('rdata_tables', [], ['tools/repro/rdata_check.py']),
 ]
